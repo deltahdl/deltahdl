@@ -1,6 +1,3 @@
-// §12.7.3 "foreach-loop" in a subroutine body: the function executor's foreach,
-// split out of eval_function_body.cpp, which dispatches to ExecFuncForeach.
-
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -22,19 +19,11 @@
 
 namespace delta {
 
-// The index values a foreach in a subroutine body steps through: the keys of
-// an associative array, §12.7.3 giving the loop variable the index type and
-// the traversal the array's own order, or `size` indices from `lo` up for any
-// other array.
 static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
                                                  const FuncExecCtx& exec) {
   if (auto* aa = FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena)) {
     return AssocIndexValues(aa, exec.arena);
   }
-  // §12.7.3 with §7.10: a queue's one dimension holds as many elements as the
-  // queue does, whether the queue is a declared one or a property of an
-  // object (§8.5) named bare in the method or through a handle; a declared
-  // dynamic array is stored the same way and answers the same.
   uint32_t size = 0;
   int64_t lo = 0;
   ClassArrayRef ref;
@@ -43,18 +32,9 @@ static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
     size = static_cast<uint32_t>(q->elements.size());
   } else if (const StructFieldInfo* member =
                  ResolveStructArrayMember(stmt->expr, exec.ctx)) {
-    // §12.7.3 with §7.2 and §7.4.2: an unpacked array member of a structure,
-    // a property's `r.v` bare in the method among them, from the lower of its
-    // bounds.
     size = member->elem_count;
     lo = std::min(member->elem_left, member->elem_right);
   } else if (ResolveClassArray(stmt->expr, exec.ctx, exec.arena, ref)) {
-    // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property
-    // (§8.5) holds its elements on the object, the declared dimension's count
-    // from its lowest index for a fixed one and the object's count from 0 for
-    // a dynamic one, which is what the loop variable steps through. Before
-    // this the property was looked up as a variable of its name, which it is
-    // not, and the loop ran no times.
     size = ref.size;
     lo = ref.lo;
   } else {
@@ -72,8 +52,6 @@ static std::vector<Logic4Vec> ForeachIndexValues(const Stmt* stmt,
   return values;
 }
 
-// The body of the foreach `stmt` run once per index of `element`, the second
-// loop variable `var` taking each (§12.7.3): answers what the body gave last.
 static FuncFlow ExecFuncForeachElement(const Stmt* stmt, Variable* var,
                                        const QueueObject* element,
                                        const FuncExecCtx& exec) {
@@ -86,11 +64,6 @@ static FuncFlow ExecFuncForeachElement(const Stmt* stmt, Variable* var,
   return flow;
 }
 
-// Runs the iteration loop of a foreach over the index values `keys`, pushing
-// a scope that holds the (optional) loop index variable, and the second one
-// where the array's elements are queues or fixed-size arrays (§12.7.3,
-// ForeachElementDimOf). §12.8: a `continue` goes on to the next element, a
-// `break` leaves the loop and a `return` leaves the subroutine.
 static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
                                     const std::vector<Logic4Vec>& keys,
                                     const AssocArrayObject* aa,
@@ -105,10 +78,8 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   if (!iter_name.empty()) {
     iter_var = exec.ctx.CreateLocalVariable(iter_name, 32);
     iter_var->is_string = aa != nullptr && aa->is_string_key;
-    // §12.7.3: an int over a fixed-size, dynamic or queue array, signed.
     iter_var->is_signed =
         aa == nullptr || (!aa->is_string_key && aa->is_index_signed);
-    // §12.7.3: the loop variable has the index type of an associative array.
     TypeForeachIterVar(iter_name, aa, exec.ctx);
   }
   ForeachElementDim inner = ForeachElementDimOf(stmt, aa, exec.ctx, exec.arena);
@@ -128,11 +99,6 @@ static FuncFlow ExecFuncForeachLoop(const Stmt* stmt,
   return LoopExitFlow(flow);
 }
 
-// §12.7.3: the dimensions a foreach in a subroutine body walks one named loop
-// variable per dimension, as nested loops: a declared array's or vector's
-// (DeclaredForeachDims), a property's (ClassArrayForeachDims) or a structure
-// member's (StructMemberForeachDims). None where the loop steps through
-// ForeachIndexValues, whose arrays are tried first in the same order.
 static std::vector<ForeachDim> FuncForeachDims(const Stmt* stmt,
                                                const FuncExecCtx& exec) {
   if (FindAssocArrayOfBase(stmt->expr, exec.ctx, exec.arena) ||
@@ -148,8 +114,6 @@ static std::vector<ForeachDim> FuncForeachDims(const Stmt* stmt,
   return DeclaredForeachDims(stmt, exec.ctx);
 }
 
-// Runs a foreach over `dims` as nested loops, the last dimension varying
-// fastest and each walked from its declared left bound (SetForeachDimVars).
 static FuncFlow ExecFuncForeachDims(const Stmt* stmt,
                                     const std::vector<ForeachDim>& dims,
                                     const FuncExecCtx& exec) {
@@ -166,9 +130,6 @@ static FuncFlow ExecFuncForeachDims(const Stmt* stmt,
   return LoopExitFlow(flow);
 }
 
-// §12.7.3 makes a foreach an implicit block its label names, so §9.6.2's
-// disable of that label ends the loop and goes on after it (FuncNamedScope),
-// as it does for the other loops.
 FuncFlow ExecFuncForeach(const Stmt* stmt, const FuncExecCtx& exec) {
   bool labeled = !stmt->label.empty();
   if (labeled) exec.ctx.PushStaticScope(exec.ctx.StmtFrameName(stmt));

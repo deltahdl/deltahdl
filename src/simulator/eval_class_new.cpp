@@ -35,11 +35,6 @@
 
 namespace delta {
 
-// Stores `val` as the initial value of `prop` on `obj`: §7.4.2 has a
-// property declared as an array hold its elements one by one, each
-// initialized as the one value would be, and §7.5 one declared with a
-// dynamic dimension hold no element until `new[]` sizes it; any other
-// property is stored under its bare and its class-scoped name.
 static void StoreClassPropertyDefault(const ClassTypeInfo* info,
                                       const ClassTypeInfo::PropertyInfo& prop,
                                       const Logic4Vec& val, ClassObject* obj,
@@ -49,9 +44,6 @@ static void StoreClassPropertyDefault(const ClassTypeInfo* info,
         MakeLogic4VecVal(arena, 32, 0);
     return;
   }
-  // §7.4.2 with §7.4.4: a property of more than one unpacked dimension, `int
-  // g[2][3]`, holds each of its elements under the key the selects down to
-  // it spell, `g[1][2]` (ClassArrayRefElementKey).
   if (prop.dim_sizes.size() >= 2) {
     ArrayInfo shape;
     shape.dim_los = prop.dim_los;
@@ -72,9 +64,6 @@ static void StoreClassPropertyDefault(const ClassTypeInfo* info,
   obj->properties[scoped] = val;
 }
 
-// §8.12: the object `new src` copies, the one `src` names, shallow-copied as
-// TryExecClassShallowCopy in statement_assign_decl.cpp copies it for a
-// variable; null where the initializer names no source or no object.
 static ClassObject* ShallowCopyOfNewSource(const Expr* init, SimContext& ctx,
                                            Arena& arena) {
   if (!init->lhs || init->lhs->kind != ExprKind::kIdentifier) return nullptr;
@@ -82,28 +71,12 @@ static ClassObject* ShallowCopyOfNewSource(const Expr* init, SimContext& ctx,
   return src ? src->ShallowCopy(arena) : nullptr;
 }
 
-// §8.7: the `new` initializer of a class-typed property -- `baseA a = new;`,
-// `= new(7)` or §8.12's `= new src` -- constructs an object of the property's
-// declared class, or shallow-copies the one `src` names, and answers its
-// handle through `out`. A bare `new` names no class of its own, so evaluating
-// it as an ordinary expression constructs nothing and left the property a
-// null handle; the declared type supplies the class, as TryLowerClassNewVarInit
-// in lowerer_var.cpp and TryExecClassVarDecl in statement_assign_decl.cpp do
-// for a variable. The actuals are bound with the enclosing object as `this`
-// (BindCallerConstructorArgs), so `= new(i)` reads the enclosing object's `i`.
-// §8.25: the declared class may be named by a type parameter of the level
-// `info`, `T obj = new`, which PropertyClassName reads through the object
-// under construction's specialization. False for any other initializer, or
-// for a property of no class type.
 static bool TryInitClassPropertyNew(const ClassTypeInfo* info,
                                     const ClassTypeInfo::PropertyInfo& prop,
                                     SimContext& ctx, Arena& arena,
                                     Logic4Vec& out) {
   const Expr* init = prop.init_expr;
   if (init->kind != ExprKind::kCall || init->text != "new") return false;
-  // §19.3 with §8.7: a property of a covergroup type, `cg g = new;`, holds
-  // the instance its initializer builds; evaluated as a value, the `new`
-  // built none and the property held no handle.
   if (auto handle = CovergroupPropertyNew(info, prop.name, init, ctx, arena)) {
     out = *handle;
     return true;
@@ -119,28 +92,16 @@ static bool TryInitClassPropertyNew(const ClassTypeInfo* info,
   return true;
 }
 
-// §8.25: the type each type parameter of one level of the object's class
-// chain is bound to on the object under construction, by the parameter's
-// name: the object's own level as TypeParamActual reads it (OwnTypeBindings),
-// a base level as the extends clause of the level below binds it
-// (BaseTypeBindings).
 using TypeBindings = std::unordered_map<std::string_view, const DataType*>;
 
-// §8.7's object under construction, with the `new` call that asked for it and
-// the run it is built in, carried through the levels of its class chain.
 struct Construction {
   ClassObject* obj;
   const Expr* new_expr;
   SimContext& ctx;
   Arena& arena;
-  // The bindings of the level being constructed, ConstructBaseThenDefaults
-  // swapping a base level's in for the base's construction and back after.
   TypeBindings types;
 };
 
-// §8.25: the bindings of the object's own class -- the actual its
-// specialization bound each type parameter to, or the default the class
-// declares (§8.25.1).
 static TypeBindings OwnTypeBindings(const ClassObject* obj) {
   TypeBindings bindings;
   const ClassDecl* decl = obj->type->decl;
@@ -153,14 +114,6 @@ static TypeBindings OwnTypeBindings(const ClassObject* obj) {
   return bindings;
 }
 
-// §8.25: the type actuals the extends clause of `child` gives its base's type
-// parameters: the `#(...)` list written after the base's name, or, where the
-// base is named by one of the child's own type parameters -- `class D4 #(type
-// P = C#(byte)) extends P;` (printed page 205 of IEEE 1800-2023) -- the
-// list the type that parameter is bound to on this object carries, `byte` for
-// D4's default specialization and `int` under `extends D4 #(C#(int))`. Null
-// where such a parameter is bound to nothing, which leaves the base at its
-// defaults.
 static const std::vector<DataType>* BaseTypeActuals(
     const ClassDecl* child, const TypeBindings& child_types) {
   if (child->type_param_names.count(child->base_class) == 0)
@@ -169,13 +122,6 @@ static const std::vector<DataType>* BaseTypeActuals(
   return bound == child_types.end() ? nullptr : &bound->second->type_params;
 }
 
-// §8.25: the bindings of the base level `base` of a level declared by
-// `child`, whose extends clause binds the base's type parameters as a
-// specialization does -- `extends C` takes C's defaults, `extends C
-// #(integer)` binds integer, and `extends C #(P)` binds what the child's own
-// parameter P is bound to on this object (printed page 204 of IEEE
-// 1800-2023), so an actual naming one of the child's type parameters is
-// read through the child's bindings.
 static TypeBindings BaseTypeBindings(const ClassDecl* child,
                                      const TypeBindings& child_types,
                                      const ClassTypeInfo* base) {
@@ -199,11 +145,6 @@ static TypeBindings BaseTypeBindings(const ClassDecl* child,
   return bindings;
 }
 
-// §8.25: the width of the property `prop` of the level being constructed
-// where its declared type names a type parameter of that level, sized by the
-// type the parameter is bound to; the collector's width otherwise.
-// CollectClassMembers in lowerer_class.cpp sizes a property by the class's
-// declaration alone, so `T x` carries 32 bits whatever T is bound to.
 static uint32_t BoundPropertyWidth(const ClassTypeInfo::PropertyInfo& prop,
                                    const Construction& c) {
   if (prop.width_is_declared || prop.type_name.empty()) return prop.width;
@@ -213,11 +154,6 @@ static uint32_t BoundPropertyWidth(const ClassTypeInfo::PropertyInfo& prop,
   return width != 0 ? width : prop.width;
 }
 
-// §7.2.2 with §8.7: a property of a structure type with no initializer of its
-// own is the structure's width, each member holding the default its
-// declaration writes, `struct { int a = 7; int b = 11; }` 7 and 11. Filled
-// as any other property, it held 0 in the 32-bit carrier. False for a
-// property of any other type.
 static bool TryStructPropertyDefault(const ClassTypeInfo::PropertyInfo& prop,
                                      SimContext& ctx, Arena& arena,
                                      Logic4Vec& val) {
@@ -229,22 +165,6 @@ static bool TryStructPropertyDefault(const ClassTypeInfo::PropertyInfo& prop,
   return true;
 }
 
-// §8.7: the property `prop` of the level `info` of `obj` initialized to its
-// explicit default if one is given, otherwise to its type's uninitialized
-// value — X for a 4-state type, 0 for a 2-state one — rather than being
-// forced to zero.
-// §8.7 with §10.9.1: a fixed-size array property whose declaration
-// initializer is an array assignment pattern, `int f[4] = '{5, 1, 8, 3};`,
-// takes each item into the element at its position (StoreClassArrayPattern),
-// and a multidimensional one, `int g[2][3] = '{'{...}, '{...}}`, each nested
-// item into the subarray at its position.
-// Evaluated as one value, the pattern answered its last item, which every
-// element was given. The elements are first made at their type's default, as
-// for a property with no initializer, so an element the pattern leaves
-// uncovered still exists. §7.5: a dynamic array property, `byte i[] = '{9,
-// 8, 7};`, is made empty and then takes as many elements as the pattern has
-// items (StoreClassArrayPattern); declined here, the object's array stayed
-// empty. False for any other property or initializer.
 static bool TryInitClassArrayPattern(const ClassTypeInfo::PropertyInfo& prop,
                                      Construction& c) {
   if (prop.init_expr == nullptr ||
@@ -259,8 +179,6 @@ static bool TryInitClassArrayPattern(const ClassTypeInfo::PropertyInfo& prop,
   ClassArrayRef ref;
   ref.obj = c.obj;
   ref.prop = &prop;
-  // §7.4.4: a multidimensional property's reference starts at its first
-  // dimension, whose elements are subarrays the pattern's items fill.
   const bool kMulti = prop.dim_sizes.size() >= 2;
   ref.size = kMulti ? prop.dim_sizes[0] : prop.array_size;
   ref.lo = kMulti ? prop.dim_los[0] : prop.array_lo;
@@ -273,22 +191,10 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
   ClassObject* obj = c.obj;
   SimContext& ctx = c.ctx;
   Arena& arena = c.arena;
-  // §7.10/§8.7: a queue property with an initializer, `int q[$] = {1, 2}`,
-  // takes the initializer's elements as its own, and holds no value under
-  // its name. One without an initializer is left to ClassQueueProperty,
-  // which builds it empty on the first reference, once the specialization's
-  // parameters, which its bound may name (§8.25), are bound to the object.
   if (prop.init_expr != nullptr &&
       InitClassQueueProperty(obj, info, prop.name, prop.init_expr, ctx)) {
     return;
   }
-  // §15.3.1 (printed page 373 of IEEE 1800-2023) and §15.4.1 (printed
-  // 374) with §8.7: a semaphore or mailbox property's `new` builds the object's
-  // own bucket or queue (ClassObject::semaphore_properties and
-  // mailbox_properties) and stores the handle's carrier under the name,
-  // nonzero for a property holding an object, which §8.4 (printed 181-182)
-  // compares with null; evaluated as a value, the `new` built nothing, and a
-  // 0 stored here after the build read a property holding a mailbox as null.
   if (TryInitClassSyncProperty(obj, info, prop.name, prop.init_expr, ctx))
     return;
   Logic4Vec val;
@@ -298,19 +204,6 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
   }
   if (TryInitClassArrayPattern(prop, c)) return;
   if (prop.init_expr) {
-    // §6.8 executes a declaration's initializer as an assignment to the
-    // declared object, so it is coerced into the property exactly as a later
-    // write to it is. The two arms below already size from prop.width, which
-    // is what made this one's silence visible.
-    //
-    // §11.6.1 with §11.8.2: the initializer is the right-hand side of that
-    // assignment, so the property's declared width sizes its
-    // context-determined operands before the operators are applied, as
-    // Lowerer::LowerVarInit sizes a module variable's. Evaluated
-    // self-determined and widened after, `logic [15:0] v = -8'd6` negated at
-    // 8 bits and read 00fa where the clause gives fffa. A property whose
-    // width the declaration did not settle, or a real one, is evaluated
-    // self-determined and converted by CoerceToPropertyType as before.
     uint32_t context_width = prop.width_is_declared && !prop.is_real
                                  ? BoundPropertyWidth(prop, c)
                                  : 0;
@@ -325,13 +218,6 @@ static void InitClassPropertyDefault(const ClassTypeInfo* info,
   StoreClassPropertyDefault(info, prop, val, obj, arena);
 }
 
-// §8.25 with §8.13: a level of the object's class chain that is a
-// specialization -- the base an extends clause names, `class E extends Mem
-// #(2.25, 4)` (BindDeclarationBase) -- has its value parameters as the
-// specialization binds them, which InitSpecializationStaticProperties holds
-// on the level. Stored from the default expressions, the base level of an E
-// read Mem's 1.5 and 1 in its own methods. True where the i-th parameter was
-// so stored on `obj`, under its bare and its class-scoped name.
 static bool StoreSpecializationParam(const ClassTypeInfo* info, size_t i,
                                      ClassParamSizer& sizer, ClassObject* obj,
                                      Arena& arena) {
@@ -353,19 +239,11 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   SimContext& ctx = c.ctx;
   Arena& arena = c.arena;
   for (const auto& prop : info->properties) {
-    // §8.9: a static property is one shared copy that lives on the class type,
-    // created and initialized once. Constructing an object must not give it a
-    // private per-instance copy, or instance-qualified access would shadow the
-    // shared storage. Leave static properties out of the instance map so reads
-    // and writes fall through to the type's shared static_properties.
     if (prop.is_static) continue;
     InitClassPropertyDefault(info, prop, c);
   }
 
   if (info->decl) {
-    // §8.25 with §6.20.2: each default is sized by the parameter's declared
-    // type (ClassParamSizer), as the class's own copy is (InitClassParams in
-    // lowerer_class.cpp).
     ClassParamSizer sizer(info->decl);
     sizer.UseTypeActuals(info->param_actuals);
     const auto& params = info->decl->params;
@@ -373,16 +251,6 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
       const auto& [pname, pexpr] = params[i];
       if (StoreSpecializationParam(info, i, sizer, obj, arena)) continue;
       if (pexpr) {
-        // §6.8 makes the object's stored parameter and whatever the default
-        // expression read two data storage elements, each keeping its own value
-        // from one assignment to the next. EvalExpr on a bare identifier
-        // answers with the variable's own vector (evaluation.cpp), and a
-        // Logic4Vec copy carries the words pointer rather than the words
-        // (src/common/types.h), so storing it as it arrived left the two as
-        // one buffer. The property arm above reaches the same copy through
-        // CoerceToPropertyType; this arm coerces nothing, so it takes it here.
-        // The bare and the scoped key are two names for the one parameter and
-        // every writer sets both, so they share the one copy as they do above.
         auto val = OwnRhsWords(sizer.Value(i, pexpr, ctx, arena), arena);
         obj->properties[std::string(pname)] = val;
         std::string scoped =
@@ -394,12 +262,6 @@ static void InitClassPropertyDefaults(const ClassTypeInfo* info,
   }
 }
 
-// §8.7: the actuals of a `new(...)` call are the caller's expressions, so they
-// are bound with the caller's `this` and class in force, the object under
-// construction taken off the stack for the binding and put back after:
-// `next = new(depth - 1)` in a method of the class reads the method's own
-// object, where with the fresh object on top it read that object's `depth`,
-// still at its default, and constructed a chain that never ended.
 static void BindCallerConstructorArgs(const ModuleItem* ctor,
                                       const Expr* args_expr, SimContext& ctx,
                                       Arena& arena) {
@@ -409,11 +271,6 @@ static void BindCallerConstructorArgs(const ModuleItem* ctor,
   ctx.PushThis(constructed);
 }
 
-// The actuals one level's constructor is called with. `are_callers` says they
-// are the `new` call's own, the caller's expressions; otherwise they are
-// expressions of the derived class's constructor -- its leading `super.new`
-// call or its extends specifier -- and read the object under construction and
-// the derived constructor's formals.
 struct ConstructorActuals {
   const Expr* args = nullptr;
   bool are_callers = false;
@@ -424,12 +281,6 @@ static const ModuleItem* ClassConstructor(const ClassTypeInfo* info) {
   return it == info->methods.end() ? nullptr : it->second;
 }
 
-// The `super.new(...)` call standing as the first statement of `ctor`, the
-// form §8.15 requires of an explicit base constructor call, or null. The
-// declarations of the body's locals stand ahead of its statements (A.2.8's
-// block_item_declaration, `uvm_report_handler rh;` before uvm_root::new's
-// `super.new("__top__", null)`), and are no statement, so they are passed
-// over.
 static const Expr* LeadingSuperNewCall(const ModuleItem* ctor) {
   if (!ctor) return nullptr;
   const Stmt* first = nullptr;
@@ -448,7 +299,6 @@ static const Expr* LeadingSuperNewCall(const ModuleItem* ctor) {
   return call;
 }
 
-// §8.17: the `super.new(default)` form, whose one argument is the keyword.
 static bool IsSuperNewDefault(const Expr* call) {
   return call->args.size() == 1 && call->args[0] &&
          call->args[0]->kind == ExprKind::kIdentifier &&
@@ -498,9 +348,6 @@ static const Expr* SynthDefaultExtendsArgs(const ClassTypeInfo* base,
   return synth;
 }
 
-// §8.17: whether the child class's own 'new' constructor argument list uses the
-// 'default' keyword. When it does, the trailing actuals of the derived-most
-// new() call expand to the superclass constructor's argument list.
 static bool ChildNewUsesDefaultArg(const ClassDecl* child_decl) {
   for (const auto* m : child_decl->members) {
     if (m->kind == ClassMemberKind::kMethod && m->method &&
@@ -514,13 +361,6 @@ static bool ChildNewUsesDefaultArg(const ClassDecl* child_decl) {
   return false;
 }
 
-// §8.15/§8.17: the actuals `info`'s base class constructor is called with.
-// A `super.new(...)` standing as the first statement of `info`'s constructor
-// passes its own arguments, evaluated in that constructor's scope with its
-// formals bound; the `super.new(default)` form and a constructor that uses
-// `default` without the call forward the `new` call's trailing actuals, the
-// caller's expressions; an extends specifier with arguments passes those; and
-// with none of them the base constructor is called with no arguments.
 static ConstructorActuals BaseConstructorActuals(const ClassTypeInfo* info,
                                                  const ModuleItem* ctor,
                                                  const Expr* new_expr,
@@ -541,8 +381,6 @@ static ConstructorActuals BaseConstructorActuals(const ClassTypeInfo* info,
   return {};
 }
 
-// Binds the level's constructor formals in a scope of their own, from the
-// caller's actuals or from the ones the level below handed up.
 static void BindLevelFormals(const ModuleItem* ctor, ConstructorActuals actuals,
                              SimContext& ctx, Arena& arena) {
   ctx.PushScope();
@@ -554,15 +392,6 @@ static void BindLevelFormals(const ModuleItem* ctor, ConstructorActuals actuals,
   }
 }
 
-// §8.7 and §13.5: a constructor's arguments follow the ordinary subroutine
-// conventions, so when the level's constructor returns each `output` or
-// `inout` formal is copied into the actual it was bound from, the level's
-// scope still on top for WritebackOutputArgs to take off. The caller's
-// actuals -- the `new` call's own, or the trailing ones §8.17's `default`
-// forwards to the base -- are the caller's expressions, so they are assigned
-// with the caller's `this` in force, as BindCallerConstructorArgs bound them;
-// a `super.new(oid)` actual is the derived constructor's own and is assigned
-// into its scope, from where the derived level copies it out in turn.
 static void WritebackLevelFormals(const ModuleItem* ctor,
                                   ConstructorActuals actuals, SimContext& ctx,
                                   Arena& arena) {
@@ -580,9 +409,6 @@ static void WritebackLevelFormals(const ModuleItem* ctor,
 static void ConstructLevel(const ClassTypeInfo* info,
                            ConstructorActuals actuals, Construction& c);
 
-// The base of `info`, constructed with the actuals its constructor names for
-// it, then the level's own properties initialized; the whole of the implicit
-// constructor and the head of an explicit one.
 static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
                                       const ModuleItem* ctor, Construction& c) {
   if (info->parent) {
@@ -592,27 +418,11 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
                    BaseConstructorActuals(info, ctor, c.new_expr, c.arena), c);
     c.types = std::move(own);
   } else if (info->decl != nullptr) {
-    // §15.2 with §8.15: a base that is the built-in semaphore or mailbox.
     BuildBuiltinSyncBase(
         c.obj, info->decl->base_class,
         BaseConstructorActuals(info, ctor, c.new_expr, c.arena).args, c.ctx,
         c.arena);
   }
-  // §8.7 with §23.9 and §26.3: a property initializer is an expression of
-  // the class declaration's scope, nested in the package, module or unit
-  // declaring the class and never in the body constructing the object, so
-  // the defaults are read in a frame of their own marked a subroutine's, at
-  // which the package search ends (SimContext::PackageFrame): a package
-  // class's frame carries the package, whose enum literals, parameters and
-  // variables the initializer names bare (§26.2), and a module or unit
-  // class's carries none, so `int x = five()` is the module's five and not
-  // the one a constructing body's own import supplies. The frame is pushed
-  // after the base is constructed, so a base of another scope reads its own.
-  // A specialization's value parameters, bound as locals of the frame the
-  // `C#(7)::new` call pushed (BindClassParams), are bound again in this
-  // frame (CollectClassParamBindings): the mark ends the search for a local
-  // at this frame too (§23.9), so `int x = W` under `C#(7)::new` reads the
-  // 7 here or nowhere.
   auto params = CollectClassParamBindings(info, c.ctx);
   c.ctx.PushScope();
   RebindClassParamBindings(params, c.ctx);
@@ -621,24 +431,9 @@ static void ConstructBaseThenDefaults(const ClassTypeInfo* info,
   c.ctx.PopScope();
 }
 
-// Constructs the `info` level of the object in the order §8.7 gives: the
-// level's constructor formals are bound, its base class is constructed with
-// the actuals BaseConstructorActuals answers, then the level's own properties
-// are initialized -- after the base constructor, so a default such as
-// `d2 = c2` reads what it wrote -- and then the rest of the constructor body
-// runs, its leading `super.new` doing nothing more
-// (IsSuperNewRunByConstruction), and its output formals are copied out
-// (WritebackLevelFormals). A level with no constructor has the implicit
-// one: the base call and the property initialization alone. The level's class
-// is pushed while the base's actuals are bound and the body runs, as §8.15 has
-// `super` and the names of shadowed members resolve against the lexically
-// enclosing class.
 static void ConstructLevel(const ClassTypeInfo* info,
                            ConstructorActuals actuals, Construction& c) {
   const ModuleItem* ctor = ClassConstructor(info);
-  // §8.25: the constructor body reads the specialization's parameters the
-  // `C#(7)::new` call bound as the property defaults do, so they are bound
-  // again in the frame BindLevelFormals pushes (CollectClassParamBindings).
   auto params = CollectClassParamBindings(info, c.ctx);
   if (ctor) {
     BindLevelFormals(ctor, actuals, c.ctx, c.arena);
@@ -647,10 +442,6 @@ static void ConstructLevel(const ClassTypeInfo* info,
   c.ctx.PushMethodClass(info);
   ConstructBaseThenDefaults(info, ctor, c);
   if (ctor) {
-    // §26.2: the constructor body reads the package's names bare as any
-    // method does (ExecClassMethod); the frame is the one BindLevelFormals
-    // pushed, given the package once the base, whose own frames stood above
-    // it meanwhile, is constructed.
     c.ctx.EnterSubroutineScope(info->package);
     Variable dummy;
     ExecFunctionBody(ctor, nullptr, &dummy, c.ctx, c.arena);
@@ -680,26 +471,15 @@ Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
   }
   auto* obj = arena.Create<ClassObject>();
   obj->type = info;
-  // §37.31: a `new` in a method or constructor is written in the running
-  // object's class, and so stands in the instance that object was created
-  // in; any other stands in the instance its process or initializer runs in.
   const ClassObject* running = ctx.CurrentThis();
   obj->instance =
       running != nullptr ? running->instance : ctx.ActiveInstancePrefix();
-  // §8.25: the type parameters the specialization `info` is binds are bound
-  // here, ahead of the bindings the levels are built from, because a property
-  // whose declared type names one is sized as its level is built
-  // (BoundPropertyWidth). The list the declaration of the variable wrote is
-  // bound only once this has returned (ApplyClassParamOverrides), which is
-  // late enough for a method reading `$bits(T)` and too late for a width.
   BindSpecializationTypeParams(obj);
   auto handle = ctx.AllocateClassObject(obj);
   ctx.PushThis(obj);
   Construction construction{obj, new_expr, ctx, arena, OwnTypeBindings(obj)};
   ConstructLevel(info, {new_expr, true}, construction);
   ctx.PopThis();
-  // §38.36.1: a cbCreateObj callback is called once the constructor has
-  // completed.
   GetGlobalVpiContext().NoteObjectCreated(*obj);
   return MakeLogic4VecVal(arena, 64, handle);
 }

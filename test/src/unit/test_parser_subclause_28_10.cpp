@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -19,8 +17,6 @@ TEST(PullSources, EmptyTerminals) {
       "module m;\n"
       "  pullup ();\n"
       "endmodule\n");
-  // The terminal list is parsed as an expression list, so the empty one is
-  // rejected by Parser::ParsePrimaryExpr under §11.2 rather than by §28.10.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -62,8 +58,6 @@ TEST(PullSources, PullupRejectsDelay) {
       "module m;\n"
       "  pullup #5 pu1(net1);\n"
       "endmodule\n");
-  // §28.3.3 owns the rule that a pull gate takes no delay; §28.10 only defines
-  // the two pull sources.
   EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
                             "28.3.3"));
 }
@@ -77,11 +71,6 @@ TEST(PullSources, PulldownRejectsDelay) {
                             "28.3.3"));
 }
 
-// §28.3.2 lets a pull gate carry one strength keyword of the side it drives,
-// or a pair of one strength0 and one strength1 keyword in either order; a pair
-// of two keywords of one side is neither. Read as the first keyword and a
-// second of the wrong side, which the parser recorded as none, both
-// declarations below were accepted with the second keyword dropped.
 TEST(PullSources, AStrengthPairOfOneSideIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -98,8 +87,6 @@ TEST(PullSources, AStrengthPairOfOneSideIsReported) {
   }
 }
 
-// The forms §28.3.2 does give a pull gate stay legal: its own side's keyword
-// alone, and a pair of one keyword of each side in either order.
 TEST(PullSources, APullGatesOwnKeywordOrAMixedPairIsAccepted) {
   auto r = Parse(
       "module m;\n"

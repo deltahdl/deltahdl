@@ -1,20 +1,3 @@
-// IEEE 1800-2023 Annex G.5 (Std package -- Randomize).
-//
-// Section G.5 presents the prototype of the randomize function the std package
-// provides, function int randomize( ... ), described in 18.12, and gives the
-// form of a call of std::randomize as the randomize_call of A.8.2 applicable
-// to it:
-//
-//   randomize { attribute_instance } [ ( [ variable_identifier_list ] ) ]
-//       [ with constraint_block ]
-//
-// src/elaborator/std_package.h writes the prototype down; the parser holds a
-// call of std::randomize to that form, its arguments being variable
-// identifiers (test_parser_annex_g_05.cpp), and the elaborator holds the bare
-// scope form of A.8.2 to the same list where the parser lets a property name
-// through. These tests observe the prototype, the accepted forms -- an empty
-// list, a list of variables, a with block -- and the elaborator's rejection.
-
 #include <gtest/gtest.h>
 
 #include "elaborator/std_package.h"
@@ -25,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §G.5: function int randomize( ... ) -- a function returning int, taking
-// any number of actuals, of the package and of no class.
 TEST(RandomizeStdPackageElaborator, ThePrototypeIsWrittenDown) {
   const StdMethodPrototype& prototype = RandomizePrototype();
   EXPECT_EQ(prototype.name, "randomize");
@@ -40,9 +21,6 @@ TEST(RandomizeStdPackageElaborator, ThePrototypeIsWrittenDown) {
             StdPackageMemberKind::kFunction);
 }
 
-// §G.5: the forms the summary allows -- randomize with an empty list, with
-// a list of variables, and with a constraint block -- each elaborate through
-// std::randomize.
 TEST(RandomizeStdPackageElaborator, TheFormsOfTheSummaryAreAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -58,12 +36,6 @@ TEST(RandomizeStdPackageElaborator, TheFormsOfTheSummaryAreAccepted) {
              "endmodule\n"));
 }
 
-// §G.5 with §A.8.2: the list of a scope randomize call is a
-// variable_identifier_list. The parser refuses an expression to any
-// randomize call and, under §G.5, anything but a variable identifier to
-// std::randomize; what it lets through to the bare scope form as a property
-// name of §18.11, a member access and a select, the elaborator rejects under
-// §A.8.2 at the argument, while a variable beside them is accepted.
 TEST(RandomizeStdPackageElaborator, AScopeArgumentShallBeAVariableIdentifier) {
   ElabFixture f;
   ElabOk(

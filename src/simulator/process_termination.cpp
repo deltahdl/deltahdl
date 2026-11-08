@@ -9,8 +9,6 @@
 
 namespace delta {
 
-// §9.7 and §9.6.3: whether `proc` can still be terminated, neither FINISHED nor
-// KILLED.
 static bool IsProcessKillable(const Process& proc) {
   return proc.sv_state != ProcessState::kFinished &&
          proc.sv_state != ProcessState::kKilled;

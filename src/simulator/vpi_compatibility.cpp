@@ -1,24 +1,3 @@
-// §36.12.2: so that older applications can move to the current VPI standard
-// gradually, a tool is required to be able to emulate each older VPI behavior
-// that conflicts with the current one, which lets an application relying on
-// such a behavior run without changes.
-// §36.12.2.1's mechanism binds an application to one of those behaviors at
-// compile time: selecting a version symbol retargets every standard entry point
-// to that version's variant, and simulator/vpi_compatibility.h performs the
-// retargeting. This file is what the retargeted names resolve to.
-//
-// Nothing defined them. An application that selected a mode had each of its
-// calls renamed to a routine no translation unit declared or defined, so it did
-// not compile and could not link, and the capability the clause requires was
-// provided by the header's spelling alone.
-//
-// Each variant runs the current routine, and where §36.12.1's Table 36-10 marks
-// a behavior as differing in that version and this simulator can act on it, the
-// variant emulates the older one. The rows it can act on are 5, 6 and 7, all
-// about which objects an iteration reaches; they are N for the IEEE 1364
-// versions and Y for the IEEE 1800 ones, so the three 1364 variants of
-// vpi_iterate filter and every other variant of every routine forwards.
-
 #include <cstdarg>
 #include <vector>
 
@@ -32,22 +11,14 @@
 #include "simulator/vpi_routine_error_scope.h"
 #include "simulator/vpi_user.h"
 
-// The reader §38.4's entry point starts an argument list for; the vpi_control
-// variants below start their own and hand it to the same one.
 PLI_INT32 VpiControlWithArgs(PLI_INT32 operation, va_list args);
 
 namespace {
 
-// §36.12.1 Table 36-10 row 5: whether a vpiVariables iteration reaches vpiReg
-// and vpiRegArray objects is Y in the IEEE 1800 standards and N in the IEEE
-// 1364 ones, whose vpiVariables iterations left those objects out.
 bool Vpi1364VariablesKeeps(int obj_type) {
   return obj_type != vpiReg && obj_type != vpiRegArray;
 }
 
-// §36.12.1 Table 36-10 rows 6 and 7: a vpiReg iteration on an array retrieves
-// only the reg elements, and a vpiRegArray iteration reaches only arrays of
-// regs - the two behaviors the rows say an IEEE 1364 application expects.
 bool Vpi1364IterationKeeps(int type, delta::VpiHandle ref,
                            delta::VpiHandle object) {
   if (type == vpiVariables) return Vpi1364VariablesKeeps(object->type);
@@ -58,29 +29,15 @@ bool Vpi1364IterationKeeps(int type, delta::VpiHandle ref,
   return true;
 }
 
-// §36.12.1 Table 36-10: whether the version in force is one of the IEEE 1364
-// standards, whose iterations rows 5, 6 and 7 differ in.
 bool VpiModeIs1364(int mode) {
   return mode == vpiMode1364v1995 || mode == vpiMode1364v2001 ||
          mode == vpiMode1364v2005;
 }
 
-// §36.12.1 Table 36-10 rows 1 and 2 with Annex C.4.3 items 1 and 2: vpiMemory
-// and vpiMemoryWord are object types only some of the older compatibility
-// modes have, present in IEEE Std 1364-1995 and, deprecated, in IEEE Std
-// 1364-2001 (Y and D), and gone from IEEE Std 1364-2005 on, where a memory
-// is a vpiRegArray and its word a vpiReg as in this standard.
 bool VpiModeHasMemoryObjects(int mode) {
   return mode == vpiMode1364v1995 || mode == vpiMode1364v2001;
 }
 
-// Rows 3 and 4 with C.4.3 item 3: every IEEE 1364 standard lets a vpiIntegerVar
-// or vpiTimeVar object stand for an array as well as a simple variable, and
-// IEEE Std 1364-2001 and 1364-2005 let a vpiRealVar do the same, so an unpacked
-// array of one of
-// those kinds is an object of that kind under such a mode, told from the
-// simple variable by the vpiArray property. The kind such a mode reads
-// `array` as, or 0 for an array it reads as an array object.
 int Vpi1364ArrayAsVariableKind(delta::VpiHandle array, int mode) {
   for (const auto* word : array->children) {
     if (word->type == vpiIntegerVar || word->type == vpiTimeVar) {
@@ -93,10 +50,6 @@ int Vpi1364ArrayAsVariableKind(delta::VpiHandle array, int mode) {
   return 0;
 }
 
-// The vpiType an IEEE 1364 mode reports for `obj`, or 0 where it reports the
-// kind this standard does. Row 1 has an unpacked reg array of one dimension
-// reported as a vpiMemory object; an array of more dimensions is the
-// vpiRegArray IEEE Std 1364-2001 introduced for it.
 int Vpi1364Type(delta::VpiHandle obj, int mode) {
   if (delta::VpiIsArrayVarType(obj->type)) {
     if (obj->array_dim_indices.size() > 1) return 0;
@@ -112,10 +65,6 @@ int Vpi1364Type(delta::VpiHandle obj, int mode) {
   return 0;
 }
 
-// Row 3 and C.4.3 item 3: under an IEEE 1364 mode the vpiArray property is
-// TRUE for an integer, time or real variable that the mode reads an array as,
-// and for a vpiReg that is an element of a vpiRegArray; FALSE for every other
-// object.
 int Vpi1364ArrayProperty(delta::VpiHandle obj, int mode) {
   if (delta::VpiIsArrayVarType(obj->type)) {
     return Vpi1364ArrayAsVariableKind(obj, mode) != 0 ? 1 : 0;
@@ -129,14 +78,6 @@ namespace delta {
 
 const char* VpiCompatibilityUnsupportedConstruct(
     int mode, const std::vector<VpiObject*>& objects) {
-  // §36.12.3 leaves it to each VPI implementation how far it checks that the
-  // constructs of a design suit the mode, and this is the extent of it. Annex K
-  // reserves the object-type values 1 through 299 for vpi_user.h and Annex M
-  // reserves 600 through 999 for the SystemVerilog extensions, so a kind
-  // numbered in Annex M's range is a construct the IEEE 1364 standards have no
-  // notion of. An application running under one of their modes that reaches
-  // such an object is applied to a design §36.12.2 says the mechanism does not
-  // cover, and it is told so.
   if (!VpiModeIs1364(mode)) return nullptr;
   for (const auto* object : objects) {
     if (object->type >= 600 && object->type <= 999) {
@@ -148,10 +89,6 @@ const char* VpiCompatibilityUnsupportedConstruct(
 }
 
 int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode) {
-  // The property as the current routine answers it, with an error it recorded
-  // kept; under an IEEE 1364 mode the object type and vpiArray property are
-  // then the ones Table 36-10 rows 1 through 4 give that version, and every
-  // other property is the current one.
   int value = delta::GetGlobalVpiContext().Get(property, obj);
   if (value == vpiUndefined || obj == nullptr || !VpiModeIs1364(mode)) {
     return value;
@@ -165,12 +102,6 @@ int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode) {
 }
 
 VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
-  // The iterator the current routine builds, with the objects an application
-  // of `mode` does not expect dropped. An iteration left with nothing is the
-  // NULL §38.23 gives one that reaches no object, so the emptied iterator is
-  // released rather than handed back. §36.10.2 keeps vpi_iterate from an
-  // application until the cbEndOfCompile callbacks run, under whichever mode's
-  // name it is called.
   VpiContext& vpi = delta::GetGlobalVpiContext();
   if (vpi.RoutineIsUnavailableNow(VpiRoutine::kIterate)) return nullptr;
   VpiHandle iterator = vpi.Iterate(type, ref, mode);
@@ -187,12 +118,8 @@ VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode) {
 
 }  // namespace delta
 
-// The variants are the names Annex L.2's macros give the routines Annex K.2
-// declares inside extern "C", so an application that selected a mode calls
-// each with C linkage, and the definitions carry the same linkage.
 extern "C" {
 
-// IEEE Std 1364-1995.
 PLI_INT32 vpi_compare_objects_1364v1995(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
@@ -245,15 +172,12 @@ PLI_INT32 vpi_control_1364v1995(PLI_INT32 operation, ...) {
 }
 vpiHandle vpi_iterate_1364v1995(PLI_INT32 type, vpiHandle ref) {
   delta::VpiRoutineErrorScope error_scope;
-  // §36.12.2.2: an application using Mechanism 1 is governed by the mode
-  // compiled into it, whatever default the run was given.
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
           true, vpiMode1364v1995)));
 }
 
-// IEEE Std 1364-2001.
 PLI_INT32 vpi_compare_objects_1364v2001(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
@@ -306,15 +230,12 @@ PLI_INT32 vpi_control_1364v2001(PLI_INT32 operation, ...) {
 }
 vpiHandle vpi_iterate_1364v2001(PLI_INT32 type, vpiHandle ref) {
   delta::VpiRoutineErrorScope error_scope;
-  // §36.12.2.2: an application using Mechanism 1 is governed by the mode
-  // compiled into it, whatever default the run was given.
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
           true, vpiMode1364v2001)));
 }
 
-// IEEE Std 1364-2005.
 PLI_INT32 vpi_compare_objects_1364v2005(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
@@ -367,15 +288,12 @@ PLI_INT32 vpi_control_1364v2005(PLI_INT32 operation, ...) {
 }
 vpiHandle vpi_iterate_1364v2005(PLI_INT32 type, vpiHandle ref) {
   delta::VpiRoutineErrorScope error_scope;
-  // §36.12.2.2: an application using Mechanism 1 is governed by the mode
-  // compiled into it, whatever default the run was given.
   return delta::VpiHandleOf(delta::VpiIterateInCompatibilityMode(
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(
           true, vpiMode1364v2005)));
 }
 
-// IEEE Std 1800-2005.
 PLI_INT32 vpi_compare_objects_1800v2005(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
@@ -431,7 +349,6 @@ vpiHandle vpi_iterate_1800v2005(PLI_INT32 type, vpiHandle ref) {
           true, vpiMode1800v2005)));
 }
 
-// IEEE Std 1800-2009.
 PLI_INT32 vpi_compare_objects_1800v2009(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
@@ -487,7 +404,6 @@ vpiHandle vpi_iterate_1800v2009(PLI_INT32 type, vpiHandle ref) {
           true, vpiMode1800v2009)));
 }
 
-// IEEE Std 1800-2012.
 PLI_INT32 vpi_compare_objects_1800v2012(vpiHandle obj1, vpiHandle obj2) {
   return vpi_compare_objects(obj1, obj2);
 }
@@ -541,5 +457,4 @@ vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref) {
       type, delta::VpiObjectOf(ref),
       delta::GetGlobalVpiContext().EffectiveCompatibilityMode(true, 0)));
 }
-
-}  // extern "C"
+}

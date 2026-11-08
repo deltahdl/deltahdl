@@ -19,14 +19,6 @@
 
 namespace delta {
 
-// The keyword forms of A.1.8's property_formal_type, which A.2.10 spells
-// `sequence_formal_type | property` with `sequence_formal_type ::=
-// data_type_or_implicit | sequence | untyped`. A checker formal written with
-// a data type, or with none, is kData and carries the type in its data_type;
-// one written with one of the three keywords carries the keyword here. §17.2
-// gives the first formal of a checker the direction input and the type untyped
-// when its type is omitted, so a checker's first formal with no type is
-// kUntyped.
 enum class PropertyFormalType : uint8_t {
   kData,
   kSequence,
@@ -46,11 +38,9 @@ struct PortDecl {
   bool is_explicit_named = false;
   bool has_explicit_var = false;
   SourceLoc loc;
-  std::vector<Attribute> attrs;  // §5.12: those written before it.
+  std::vector<Attribute> attrs;
 };
 
-// §16.14.7: the inferred clocking or disable function a formal argument of a
-// property or sequence is defaulted to, where it is one.
 enum class InferredDefault : uint8_t { kNone, kClock, kDisable };
 
 enum class ModuleItemKind : uint8_t {
@@ -96,32 +86,9 @@ enum class ModuleItemKind : uint8_t {
   kElabSystemTask,
   kDefaultDisableIff,
   kNestedModuleDecl,
-  // §23.11 with §27.5: a bind directive written in a generate block, which
-  // binds only where the block is instantiated.
   kBindDirective,
 };
 
-// Whether `kind` is a module item whose body is a procedural statement. §9.2
-// lists the structured procedures: the `initial` procedure of §9.2.1, the
-// `always` procedure in its four spellings -- `always` (§9.2.2.1),
-// `always_comb` (§9.2.2.2), `always_latch` (§9.2.2.3) and `always_ff`
-// (§9.2.2.4) -- and the `final` procedure of §9.2.3. None of the six changes
-// what a statement inside it may contain, so a check over a procedural
-// statement reaches all six.
-//
-// The answer lives beside ModuleItemKind rather than inside the validator that
-// first needed it, because a caller that spells the set out for itself omits
-// part of it. Every such caller listed `always` and `initial` and left the four
-// remaining kinds unchecked, which meant a source rejected when its statement
-// sat in `always` was accepted when the same statement sat in `always_comb`.
-// Written here, a seventh procedural kind added to the enum is added to the
-// predicate in the same place.
-//
-// §9.2 also names a task and a function structured procedures. Neither is one
-// of these six: ModuleItemKind gives each its own kind, and a caller that walks
-// `ModuleItem::body` finds nothing there for either, because a task or function
-// declaration carries its statements under its own declaration rather than
-// inline.
 inline bool IsProceduralItemKind(ModuleItemKind kind) {
   switch (kind) {
     case ModuleItemKind::kInitialBlock:
@@ -196,40 +163,16 @@ struct GenerateCaseItem {
   bool is_default = false;
   std::vector<ModuleItem*> body;
 
-  // §27.6 gave this generate block its name, the genblk<n> name it gives every
-  // unnamed generate block, rather than the source writing one.
-  // §23.6 rules that a hierarchical name reaches an object declared in an
-  // unnamed generate block only from inside that block or from the hierarchy it
-  // instantiates, so a path written outside must not reach through the name
-  // even though elaboration has one to spell. The name is assigned into the
-  // field the source would have filled, so nothing downstream can tell the two
-  // apart without this.
   bool name_is_generated = false;
 
-  // True when the block held in body was written with the `begin` and `end`
-  // keywords, false when it was written as a single item without them. A.4.2
-  // gives `generate_block ::= generate_item | [ generate_block_identifier : ]
-  // begin [ : generate_block_identifier ] { generate_item } end
-  // [ : generate_block_identifier ]`, so the two forms are told apart only
-  // while the block is being parsed. §27.5 needs the distinction afterwards:
-  // a generate block of a conditional generate construct whose one item is
-  // itself a conditional generate construct, written without begin and end
-  // around it, forms no scope of its own.
   bool has_begin_end = false;
 
   std::string_view label;
 };
 
-// §16.12.17 / §F.7: per-instance metadata for one named-property instantiation
-// found in a property body. The recursive-property restrictions (Restriction 4
-// in particular) inspect the actual argument expressions of each instance.
 struct PropertyInstanceArgInfo {
   std::string_view callee;
-  // One entry per actual argument, in declaration order. Each holds the set of
-  // identifier tokens that appear textually within that argument expression.
   std::vector<std::vector<std::string_view>> arg_idents;
-  // Parallel to arg_idents: true when the argument is a single bare identifier
-  // (i.e. the actual argument expression is itself just one name).
   std::vector<bool> arg_is_single_ident;
 };
 
@@ -243,92 +186,43 @@ struct ClockingSignalDecl {
   Expr* hier_expr = nullptr;
 };
 
-// §16.7's cycle_delay_range as the linear sequence monitor reads it: the
-// number of clock ticks from the operand before to the one this stands
-// before, `##N` being [N:N], `##[a:b]` the closed range, `##[a:$]` a range
-// with no upper bound, `##[*]` [0:$] and `##[+]` [1:$].
-// A bound written as the name of a formal argument of the declaring sequence
-// is kept by name until §16.8's instantiation supplies the actual, an
-// elaboration-time constant or `$`, that the flattening reads it as.
-// §16.7: a cycle delay's bounds, `$` kept as kUnbounded, and a bound written
-// as a constant expression kept until an instance or the scope settles it.
 struct SeqCycleDelay {
   static constexpr uint32_t kUnbounded = UINT32_MAX;
   uint32_t min = 1;
   uint32_t max = 1;
   Expr* min_expr = nullptr;
   Expr* max_expr = nullptr;
-  // §16.7: whether a chain opens with this delay written, `##0 a`, which a
-  // delay of no ticks does not tell from the chain `a` written with none.
   bool written = false;
 };
 
-// §16.10: one assignment of a sequence_match_item, `lvar = rhs` or `lvar op=
-// rhs`, executed when the operand it stands with holds or, where `init` is
-// set, before that operand is evaluated: §16.8.2's initialization assignment
-// of a local variable formal argument at the start of an attempt.
 struct SeqMatchAssign {
   std::string_view lvar;
   TokenKind op = TokenKind::kEq;
   Expr* rhs = nullptr;
   bool init = false;
-  // §16.10 and §16.11: written in a group that admits an empty match.
   bool on_empty_match = false;
-  // §16.11: a subroutine call attached in place of an assignment, executed at
-  // each end point in the Reactive region with its by-value arguments as they
-  // read at the match; `lvar` and `rhs` are unset where this is.
   Expr* call = nullptr;
-  // §16.10 with A.10 footnote 51: the variable_lvalue written where it
-  // selects within the local `lvar` names or names a member of it, `v[1]` of
-  // `v[1] = b` or `s.f` of `s.f++`, read as an assignment's target is; null
-  // where the local is written whole.
   Expr* target = nullptr;
 };
 
-// §16.10: a local variable of a sequence body, one an
-// assertion_variable_declaration declares or, in the flattened form, a local
-// variable formal argument of an instance, with the keyword of its type, the
-// signing keyword written after it (§6.11), kKwSigned or kKwUnsigned, kEof
-// where none is, the packed dimensions written after that (§7.4.1), `[3:0]`
-// of `logic [3:0] v`, each a left and a right bound in the order written, and
-// its declaration assignment where it has one.
 struct SeqLocalDecl {
   std::string_view name;
   TokenKind type_kw = TokenKind::kKwInt;
   TokenKind signing = TokenKind::kEof;
-  // §6.18: the type name written in the keyword's place, `nib_t` of `nib_t
-  // v`, as a type of kind kNamed; kImplicit where a keyword is written.
   DataType named_type;
   std::vector<std::pair<Expr*, Expr*>> packed_dims;
   Expr* init = nullptr;
 };
 
-// §16.9.2: the repetition written after an operand of a linear body: none,
-// consecutive `[*min:max]` on a Boolean or a group, goto `[->min:max]` or
-// nonconsecutive `[=min:max]` on a Boolean, the count an exact `[*n]` being
-// [n:n], `[*]` [0:$] and `[+]` [1:$], its bounds held as a delay's are.
 struct SeqRepetition : SeqCycleDelay {
   enum class Kind : uint8_t { kNone, kConsecutive, kGoto, kNonconsecutive };
   Kind kind = Kind::kNone;
-  // Whether a group or an instance this repeats is iterated whole rather than
-  // unrolled into copies of its operands: a consecutive repetition by a
-  // range, `$`, a count of 0 or a count written as an expression not yet
-  // settled, which no number of copies stands for.
   bool IteratesWhole() const {
     return kind == Kind::kConsecutive &&
            (min != max || min == 0 || max_expr != nullptr);
   }
 };
 
-// §16.9.9: `exp throughout seq` inside a chain, `(exp)[*0:$] intersect seq`,
-// which matches where seq does and exp holds at every tick of the match: the
-// condition, the operands of the chain from `first` to `last` that seq
-// became, and seq's own leading delay, `lead` ticks by which the first
-// operand's delay exceeds the delay written before the throughout, so that
-// the interval exp holds over begins where seq begins rather than where its
-// first operand is read. Where the delay before the throughout is a range,
-// each tick of it begins an interval of its own, at the tick the first
-// operand is read, a 1 standing at the interval's start (`begins_at_read`).
 struct SeqThroughout {
   Expr* cond = nullptr;
   size_t first = 0;
@@ -337,83 +231,33 @@ struct SeqThroughout {
   bool begins_at_read = false;
 };
 
-// §16.13.6/§9.4.4: the linear form of a sequence body, `[##d0] b0 ##d1 b1
-// ... ##dn bn` (each bi a Boolean, each di one of §16.7's cycle_delay_range
-// forms, each operand carrying the §16.10 match items written with it), which
-// the parser captures for the simulator's sequence monitor. The delay before
-// each operand is parallel to the operands, the first one the leading delay,
-// 0 where none is written.
 struct SeqLinearBody {
   std::vector<Expr*> operands;
   std::vector<SeqCycleDelay> delays;
   std::vector<std::vector<SeqMatchAssign>> match_items;
-  // §16.9.2: the repetition each operand carries, parallel to the operands.
   std::vector<SeqRepetition> repetitions;
   std::vector<SeqLocalDecl> locals;
-  // §16.9.9: the conditions held throughout spans of this chain.
   std::vector<SeqThroughout> throughouts;
-  // §16.9.6: the other operands of an `intersect` this chain is the first
-  // operand of, each a chain of its own that must match from the same tick
-  // and end at the same tick as this one; §16.9.1 has `intersect` bind
-  // tighter than `and` and looser than `##`.
   std::vector<SeqLinearBody> intersects;
-  // §16.9.10: whether this chain is the first operand of a `within`, wrapped
-  // as `1[*0:$] ##1 seq1 ##1 1[*0:$]`, the first intersect its second.
   bool within = false;
-  // §16.9.5: the other operands of an `and` this chain is the first operand
-  // of, each a chain of its own, with its intersects, that must match from
-  // the same tick, the whole ending at the later of the end points; §16.9.1
-  // has `and` bind tighter than `or` and looser than `intersect`.
   std::vector<SeqLinearBody> conjuncts;
-  // §16.9.7: the operands of a top-level `or`, each a chain, with its
-  // conjuncts, of its own beside this one, the sequence matching where any of
-  // them does; §16.9.1 has `or` bind loosest, so each runs from one `or` to
-  // the next.
   std::vector<SeqLinearBody> alternatives;
-  // §16.9.8: whether the whole body is the operand of `first_match`, so
-  // that of an attempt's matches only those ending earliest count, and the
-  // match items written after the operand inside its parentheses, executed
-  // at the end of each of those matches.
   bool first_match = false;
   std::vector<SeqMatchAssign> first_match_items;
-  // §16.13.1: the clocking event each operand of the chain is evaluated on
-  // where the chain writes one before an operand, `##1 @(posedge clk1) b`,
-  // the event in force from that operand on; parallel to the operands once
-  // any is written, an operand before the first one written carrying none,
-  // which is the leading clock's, and empty where the chain writes none.
   std::vector<std::vector<EventExpr>> clocks;
-  // §16.13.3: the clock in force at the end of the chain, which flows out
-  // of the sequence to what follows it, an implication's consequent among
-  // others; a clock named inside parentheses or an instance flows no
-  // further than them. Empty where the clock flowing in flows out.
   std::vector<EventExpr> clock_out;
 };
 
 struct ModuleItem {
   ModuleItemKind kind;
   SourceLoc loc;
-  // §37.49: where an assertion item's text ends, the position of its last
-  // character, which the item's VPI object reports; unset for other items.
   SourceLoc end;
   std::vector<Attribute> attrs;
 
   bool from_anonymous_program = false;
 
-  // §13.3.1 (printed page 339) and §13.4.2: the lifetime keyword written after
-  // `function` or `task`, `function static f()`, which makes every variable
-  // of the subroutine one cell shared by all its activations; is_automatic is
-  // the `automatic` keyword in the same position. Both false where the
-  // declaration writes neither and the scope's default decides.
   bool is_automatic = false;
   bool is_static = false;
-  // §8.10 (printed pages 186 and 187): the `static` method qualifier written
-  // before `function` or `task` in a class, `static function f()`, which makes
-  // the method callable with no object and gives it no `this`. §8.10 sets it
-  // apart from the lifetime above: a static method's variables are automatic,
-  // as every class method's are (§13.3.1, printed page 339), and a class
-  // method carrying the static lifetime is illegal. The parser once folded
-  // the qualifier into is_static, so §13.5.2's ban on a ref formal in a
-  // static-lifetime subroutine refused a class static method's ref formal.
   bool is_static_method = false;
 
   bool is_extern = false;
@@ -421,43 +265,14 @@ struct ModuleItem {
 
   bool is_localparam = false;
 
-  // A.2.1.3: one data_declaration carries a list_of_variable_decl_assignments,
-  // and each declarator in that list becomes its own item. False on every
-  // declarator after the first, so that what the declaration as a whole
-  // introduces once -- an inline enumeration's named constants, say -- is not
-  // taken to be introduced again by each name in the list.
   bool first_in_decl_list = true;
-  // A.2.1.3: set on each declarator of a data_declaration written with the
-  // `var` keyword. A declaration naming a user-defined nettype declares a net
-  // only without it (§6.6.7); with it, the declaration is a variable's.
   bool has_explicit_var = false;
-  // §40.4.1 and §40.4.6: the enumeration name of the FSM pragma written in
-  // this item's declaration, before its first name; empty for none.
   std::string_view fsm_enum;
 
-  // §27.4: set on the declaration produced by `genvar i;`. A genvar is parsed
-  // as a variable declaration because that is its shape, but it is an integer
-  // that elaboration uses to run the generate loop and instantiate its generate
-  // block, and it is gone by simulation, so the elaborator must be able to
-  // tell the two apart.
   bool is_genvar = false;
 
-  // §6.18: set where the declaration was written as two bare identifiers and a
-  // semicolon and the first named nothing the parser had yet seen declared as a
-  // type. §6.18 requires a user-defined data type to be declared before any
-  // reference to its type_identifier, and that shape is the one a reference
-  // breaching it shares with a module instantiation written without its port
-  // connection list. The parser cannot tell the two apart: it holds no table of
-  // module names, and a module may be instantiated above its own declaration.
-  // Elaborator::ReportUndeclaredTypeName decides and reports, because the
-  // elaborator is what knows the module names.
   bool type_name_undeclared_at_parse = false;
 
-  // §29.3 lets a UDP be declared anywhere, and §29.8 gives its instance forms
-  // no module instance writes: set on a kUdpInst read in such a form, as
-  // Parser::AtUdpOnlyInstanceForm tells, before the parser had read a
-  // declaration of the name it gives. The elaborator reports one whose name
-  // proves to reach no primitive.
   bool udp_undeclared_at_parse = false;
 
   DataTypeKind forward_type_kind = DataTypeKind::kImplicit;
@@ -497,15 +312,7 @@ struct ModuleItem {
   std::vector<std::pair<std::string_view, Expr*>> inst_ports;
   std::vector<bool> inst_ports_implicit;
   bool inst_wildcard = false;
-  // Whether this instance is the second or a later hierarchical_instance of
-  // one instantiation, `chk c1(a), c2(b);`. A.4.1.1's module_instantiation,
-  // A.4.1.2's interface_instantiation and A.4.1.3's program_instantiation
-  // write `hierarchical_instance { , hierarchical_instance }`; A.4.1.4's
-  // checker_instantiation writes one name_of_instance, and the elaborator,
-  // which knows what the cell is, reads this to hold a checker to it.
   bool inst_continues_list = false;
-  // §17.3: the instantiation stands in procedural code, a checker
-  // instantiation read as a statement.
   bool inst_in_procedure = false;
   Expr* inst_range_left = nullptr;
   Expr* inst_range_right = nullptr;
@@ -514,45 +321,14 @@ struct ModuleItem {
   DataType typedef_type;
   std::string_view typedef_ifc_port;
   std::string_view nettype_resolve_func;
-  // §6.6.7's Syntax 6-1 writes the with clause as
-  // `with [ package_scope | class_scope ] tf_identifier`, so the resolution
-  // function may be named through a package or a class. This holds that scope
-  // as the type it names, null when the clause wrote none: its type_name is the
-  // package, `$unit` or class declaring the function, and the names written
-  // before that one stand in scope_name and outer_scope_names, as they do for a
-  // scoped type. A.2.2.1 makes a class_scope a class_type, so the chain may run
-  // through a package, `$unit` and nested classes, and type_params holds the
-  // parameter values the declaring class was written with. It is apart from
-  // nettype_resolve_func because a bare function name cannot say which scope
-  // was written, so `with C::res` and `with res` would bind alike.
   const DataType* nettype_resolve_scope = nullptr;
 
   Stmt* gen_init = nullptr;
   Expr* gen_cond = nullptr;
   Stmt* gen_step = nullptr;
   std::vector<ModuleItem*> gen_body;
-  // True when the block held in this item's own gen_body was written with the
-  // `begin` and `end` keywords, false when it was written as a single item
-  // without them. A.4.2 gives `generate_block ::= generate_item |
-  // [ generate_block_identifier : ] begin [ : generate_block_identifier ]
-  // { generate_item } end [ : generate_block_identifier ]`, so the two forms
-  // are told apart only while the block is being parsed. §27.5 needs the
-  // distinction afterwards: a generate block of a conditional generate
-  // construct whose one item is itself a conditional generate construct,
-  // written without begin and end around it, forms no scope of its own. The
-  // else branch of an if_generate_construct is its own ModuleItem, reached
-  // through gen_else, and records its block on that item's field rather than
-  // on this one.
   bool gen_body_has_begin_end = false;
 
-  // §27.6 gave this generate block its name, the genblk<n> name it gives every
-  // unnamed generate block, rather than the source writing one.
-  // §23.6 rules that a hierarchical name reaches an object declared in an
-  // unnamed generate block only from inside that block or from the hierarchy it
-  // instantiates, so a path written outside must not reach through the name
-  // even though elaboration has one to spell. The name is assigned into the
-  // field the source would have filled, so nothing downstream can tell the two
-  // apart without this.
   bool name_is_generated = false;
   ModuleItem* gen_else = nullptr;
   std::vector<GenerateCaseItem> gen_case_items;
@@ -570,17 +346,11 @@ struct ModuleItem {
   uint8_t drive_strength1 = 0;
 
   DataType return_type;
-  // §13.4.1 with §6.18 and §7.4.4: where `return_type` names a typedef of an
-  // unpacked array, `typedef int a_t[3]` for `function a_t f()`, the
-  // typedef's unpacked dimensions and element type, which the elaborator
-  // records (AdoptProceduralTypedefDims) so that the implicit variable of the
-  // function is an array of that shape; empty for any other return type.
   std::vector<Expr*> return_array_dims;
   DataType return_array_elem_type;
   bool is_ansi_ports = false;
   std::vector<FunctionArg> func_args;
   std::vector<Stmt*> func_body_stmts;
-  // §8.24: on an `extern` method prototype, its out-of-block definition.
   const ModuleItem* out_of_block_body = nullptr;
 
   std::vector<std::pair<Expr*, Expr*>> defparam_assigns;
@@ -590,120 +360,37 @@ struct ModuleItem {
   Expr* assert_expr = nullptr;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
-  // §16.12.1: for a concurrent assertion whose property_spec is an instance of
-  // a named property written without arguments, the property's name. The
-  // parser cannot tell such a name from a variable's, so it records the name
-  // and the elaborator substitutes the property's body in place of the
-  // instance, or reports why it cannot, emptying it where the name declares
-  // no property. Empty for every other property_spec.
   std::string_view prop_instance_name;
-  // §16.12.1: for a named property whose body is the clocked boolean form
-  // `@(event) boolean_expression`, the leading clocking event and the boolean,
-  // captured by the parser so an instance of the property can be evaluated as
-  // an assertion written in that form is. Both empty for any other body.
   std::vector<EventExpr> prop_clock;
   Expr* prop_body_expr = nullptr;
-  // §16.12: the disable condition of that body's property_spec, where it
-  // carries a `disable iff` between the clock and the boolean.
   Expr* prop_disable_iff = nullptr;
-  // §16.12.3: whether that body's boolean stands under `not`.
   bool prop_negated = false;
-  // §16.12: for a named property whose body is a property the tree
-  // evaluator reads, that body as a tree, its clock and disable condition
-  // in prop_clock and prop_disable_iff as the clocked boolean form's are;
-  // null for the clocked boolean form and for any other body. §16.12.17:
-  // an instance of the property in the tree, its own included, is expanded
-  // when it begins.
   PropertyExprNode* prop_body_tree = nullptr;
-  // §16.10 and §16.13.7: the local variables the body declares ahead of
-  // the property, each with the keyword of its type and its initialization
-  // assignment where it has one, a copy of each made for an evaluation
-  // attempt of an instance and initialized at the first tick of the clock
-  // the copy is for.
   std::vector<SeqLocalDecl> prop_locals;
 
-  // §16.12 / §F.4.1: metadata the rewriter needs to flatten property
-  // instances and enforce the disable-iff no-nesting rule.
   std::vector<std::string_view> prop_formals;
   int prop_disable_iff_count = 0;
   std::vector<std::string_view> prop_instance_refs;
 
-  // §16.12.17 / §F.7 recursive-property restriction metadata, harvested by the
-  // parser body scan and enforced by the elaborator.
-  //   prop_negated_instance_refs: names that are the operand of a prefix
-  //     property-negation/strong operator (not, s_nexttime, s_eventually,
-  //     s_always) or the right operand of s_until/s_until_with — Restriction 1.
-  //   prop_formal_is_local: parallel to prop_formals; true when the formal was
-  //     declared as a local variable formal argument — Restriction 4.
-  //   prop_instance_args: actual-argument shape of each property instance in
-  //     the body — Restriction 4.
-  //   prop_has_untimed_self_recursion: a self-name instantiation occurs in the
-  //     body with no preceding positive time advance — Restriction 3.
-  //   prop_untimed_instance_refs: every property instance reached in the body
-  //     with no preceding positive time advance — the zero-weight out-edges of
-  //     the dependency digraph. A cycle built solely from such edges has total
-  //     weight zero, which Restriction 3 forbids (the mutual-recursion case as
-  //     well as the direct self-loop).
   std::vector<std::string_view> prop_negated_instance_refs;
   std::vector<std::string_view> prop_untimed_instance_refs;
   std::vector<bool> prop_formal_is_local;
-  // §16.12.18: parallel to prop_formals; true when the formal was declared with
-  // type `property`. Such a formal may not be referenced as the antecedent of
-  // an implication (§16.12.7), which the body scan enforces.
   std::vector<bool> prop_formal_is_property;
   std::vector<PropertyInstanceArgInfo> prop_instance_args;
   bool prop_has_untimed_self_recursion = false;
 
-  // §16.8.2: per-formal direction when the formal is designated as a local
-  // variable argument. Length matches the number of local-marked formals in
-  // declaration order; non-local formals are not represented here.
   std::vector<Direction> prop_seq_local_lvar_directions;
 
-  // §16.8: parallel to prop_formals; true when the formal has a default actual
-  // argument declared (`formal = default_expression`). Used by the elaborator
-  // to decide which formals an instance must supply an actual for.
   std::vector<bool> prop_formal_has_default;
-  // §16.8: parallel to prop_formals for a sequence declaration; the default
-  // actual argument declared for the formal, which an instance that omits the
-  // formal takes, null where none is declared or it is one of §16.14.7's
-  // inferred functions, which prop_formal_inferred records.
   std::vector<Expr*> prop_formal_defaults;
-  // §16.14.7: parallel to prop_formals; which of the two inferred functions
-  // the formal's default value is, $inferred_clock or $inferred_disable, or
-  // neither, the elaborator putting the clocking event or the disable
-  // condition inferred at the instance in the formal's place.
   std::vector<InferredDefault> prop_formal_inferred;
 
-  // §16.8.1: parallel to prop_formals; the keyword of the type a formal was
-  // declared with, applying to every formal that follows the keyword and
-  // precedes the next, kEof where the formal is untyped or its type is one no
-  // keyword alone names, a packed vector or a user-defined type. The sequence
-  // flattening casts an actual to a keyword type and reads an `event` formal
-  // as the clock's event expression.
   std::vector<TokenKind> prop_formal_type_kw;
-  // §16.8 and §16.12: parallel to prop_formals for a sequence or property
-  // declaration; the data type a formal was declared with, packed dimensions
-  // and a user-defined type's name included, null where it is untyped or of
-  // the sequence, property or event type, which prop_formal_type_kw names.
   std::vector<DataType*> prop_formal_types;
-  // §7.4.4 with §8.23: parallel to prop_formals; the unpacked dimensions of
-  // the type a formal's class-scoped typedef names, C#(2)::arr_t under
-  // `typedef logic [W-1:0] arr_t [2]`, which a DataType does not hold. The
-  // parser leaves each empty; the elaborator fills it as it resolves the
-  // formal's type.
   std::vector<std::vector<Expr*>> prop_formal_unpacked_dims;
 
-  // §16.10: identifiers introduced by assertion_variable_declaration items in
-  // the body of a sequence or property declaration. Each entry is one local
-  // variable declared in the body (a single declaration with N comma-
-  // separated names produces N entries).
   std::vector<std::string_view> prop_seq_assert_vars;
 
-  // §23.9, §16.8 and §16.10, for a concurrent assertion statement and a
-  // sequence or property declaration: what the parser's scan of the text
-  // records, the names it reads, the names it declares as local variables of
-  // a user-defined type, the names it writes in a cycle delay or a repetition
-  // bound, and the identifiers it passes whole as actuals to instances.
   std::vector<AssertionRead> assertion_reads;
   std::vector<std::string_view> assertion_local_names;
   std::vector<std::string_view> assertion_const_names;
@@ -711,36 +398,15 @@ struct ModuleItem {
 
   std::vector<EventExpr> clocking_event;
 
-  // §16.13.6/§9.4.4: for a named sequence whose body the parser captured in
-  // its linear form, the clocking event and that form. Captured so the
-  // simulator can run a monitor that fires the sequence's endpoint event on a
-  // match and make `sequence.triggered` work. A dedicated field (not
-  // clocking_event, which marks a clocking block) so clocking-block validation
-  // is unaffected. Both empty for any other sequence shape.
   std::vector<EventExpr> seq_clock;
   SeqLinearBody seq_linear;
-  // §16.11 with §16.13.6: set on a named sequence whose `triggered` and
-  // `matched` nothing reads, whose monitor then runs no attached call.
   bool seq_triggered_unread = false;
 
-  // §16.16(b1): true when this property or sequence declaration's body begins
-  // with an explicit leading clocking event (a `@(...)`). Recorded so a
-  // declaration placed inside a clocking block, where such an explicit event is
-  // disallowed, can be rejected at parse time. Meaningful only for
-  // kPropertyDecl/kSequenceDecl items.
   bool decl_has_leading_clock = false;
 
-  // §16.16(b2): number of explicit clocking events (`@(...)`) appearing in this
-  // property or sequence declaration's body. Together with decl_has_leading_
-  // clock it distinguishes a singly clocked declaration (one leading event)
-  // from a multiclocked one (a non-leading event, or more than one), so a
-  // multiclocked declaration inside a clocking block can be rejected.
   int decl_clock_event_count = 0;
 
   std::vector<ClockingSignalDecl> clocking_signals;
-  // §16.16 (b): the property and sequence declarations of a clocking block,
-  // each clocked by the block's event and named through the block,
-  // `posedge_clk.q4`, where an assertion instantiates it.
   std::vector<ModuleItem*> clocking_decls;
   bool is_default_clocking = false;
   bool is_global_clocking = false;
@@ -750,8 +416,6 @@ struct ModuleItem {
   Expr* default_output_skew_delay = nullptr;
 
   std::string_view dpi_c_name;
-  // §35.5.4: the dpi_spec_string token, stripped of its surrounding quotes
-  // ("DPI-C" or the deprecated "DPI").
   std::string_view dpi_spec_string;
   bool dpi_is_pure = false;
   bool dpi_is_context = false;
@@ -763,26 +427,14 @@ struct ModuleItem {
 
   ModuleDecl* nested_module_decl = nullptr;
 
-  // The directive a kBindDirective item stands for.
   BindDirective* bind_directive = nullptr;
 
-  // §19.4.1: for the embedded-covergroup inheritance form
-  // `covergroup extends base ;`, the covergroup_identifier of the base
-  // covergroup being extended. Empty for a covergroup that is not derived.
   std::string_view covergroup_extends_base;
 
-  // kCovergroupDecl: the declaration as A.2.11 gives it -- formals, coverage
-  // event, coverpoints, crosses and options (ast_covergroup.h).
   CovergroupDecl* covergroup = nullptr;
 
-  // kModuleInst: whether the instantiation wrote A.4.1.1's
-  // parameter_value_assignment, `#( ... )`, which inst_params cannot say of
-  // an empty `#( )`.
   bool inst_param_assignment_written = false;
 
-  // kModuleInst: where an attribute instance stood ahead of a port connection,
-  // which A.4.1.1's ordered_port_connection takes and A.5.4's UDP terminal
-  // does not; invalid where none was written.
   SourceLoc inst_port_attr_loc;
 };
 
@@ -800,11 +452,6 @@ struct ModportPort {
   bool is_import = false;
   bool is_export = false;
   bool is_clocking = false;
-  // §25.5.4: set for the `.port_id(expr)` modport-expression form (including
-  // the empty `.port_id()` form). Distinguishes a named port — whose identifier
-  // is a fresh port name that need not be a declared interface item — from a
-  // bare simple port identifier, which must reference a declared interface
-  // item.
   bool is_named_port = false;
   ModuleItem* prototype = nullptr;
 };
@@ -821,30 +468,16 @@ struct ModuleDecl {
   bool is_automatic = false;
   bool has_wildcard_ports = false;
   bool is_non_ansi_ports = false;
-  // Whether the body has read an item other than a timeunits_declaration, set
-  // by Parser::NoteItemAndMatchNull. §3.14.2.2 has the time scope's timeunit
-  // and timeprecision declarations precede every other item in it, and several
-  // items leave `items` as it was: a non-ANSI port declaration, `input a;`,
-  // read into `ports`, a modport, a bind directive and the null item `;`.
   bool has_read_body_item = false;
   std::string_view name;
   SourceRange range;
   std::vector<Attribute> attrs;
   std::vector<PortDecl> ports;
-  // §23.2.2.1: the body port declarations of a non-ANSI module that name no
-  // port of its header but an object a port expression refers to, `input b, c;`
-  // under `.a({b, c})`, each held with the direction and type it declares.
   std::vector<PortDecl> port_expr_objects;
   std::vector<ModuleItem*> items;
   std::vector<std::pair<std::string_view, Expr*>> params;
   std::vector<DataType> param_types;
-  // §37.3.3: where each parameter port's identifier was written, one per
-  // entry of `params` in its order, which the port's vpiLineNo and vpiFile
-  // report.
   std::vector<SourceLoc> param_port_locs;
-  // A.2.1.1's param_assignment gives a parameter port { variable_dimension }:
-  // the unpacked dimensions each port parameter declared with any was written
-  // with, by name, as ModuleItem::unpacked_dims holds a body parameter's.
   std::unordered_map<std::string_view, std::vector<Expr*>>
       param_port_unpacked_dims;
   std::unordered_set<std::string_view> type_param_names;
@@ -852,22 +485,13 @@ struct ModuleDecl {
   bool has_param_port_list = false;
   std::vector<ModportDecl*> modports;
   std::vector<BindDirective*> bind_directives;
-  // §40.4: the FSMs the pragmas written in this definition identify.
   std::vector<FsmDecl> fsms;
 
   bool is_cell = false;
 
-  // Annex E: the default decay time, charge strength and delay mode in force
-  // where this module was declared, put here by ApplyModuleDirectives from
-  // what the preprocessor recorded; `has_module_directives` is false for a
-  // module parsed without the preprocessor, which then takes the compilation
-  // unit's values.
   bool has_module_directives = false;
   uint64_t default_decay_time = 0;
   bool default_decay_time_infinite = true;
-  // E.2 with §3.14.1: whether the decay time was written as a real constant,
-  // and its exact value, for the elaborator to round at this module's time
-  // precision.
   bool default_decay_time_is_real = false;
   double default_decay_time_real = 0.0;
   uint32_t default_trireg_strength = 0;
@@ -882,15 +506,8 @@ struct ModuleDecl {
   int time_prec_magnitude = 1;
   bool has_timeunit = false;
   bool has_timeprecision = false;
-  // §3.14.2.3 b): the `timescale in force at the header, put here by
-  // ApplyModuleDirectives, which the element takes for whichever of its unit
-  // and precision it does not declare.
   bool has_directive_timescale = false;
   TimeScale directive_timescale;
-  // §22.8 and §22.9: the default net type and the drive of unconnected input
-  // ports in force at the header, put here by ApplyModuleDirectives;
-  // `has_net_directives` is false for an element parsed without the
-  // preprocessor, which then takes the compilation unit's values.
   bool has_net_directives = false;
   NetType default_nettype = NetType::kWire;
   NetType unconnected_drive = NetType::kWire;
@@ -907,18 +524,9 @@ struct PackageDecl {
   int time_prec_magnitude = 1;
   bool has_timeunit = false;
   bool has_timeprecision = false;
-  // §13.3.1: a package declared `automatic` makes its subroutines default to
-  // automatic lifetime; otherwise their default lifetime is static. Kept last
-  // so adding it does not shift the offsets of the fields above.
   bool is_automatic = false;
-  // §3.14.2.3 b): the `timescale in force at the header, put here by
-  // ApplyModuleDirectives, which the package takes for whichever of its unit
-  // and precision it does not declare.
   bool has_directive_timescale = false;
   TimeScale directive_timescale;
-  // Whether the body has read an item other than a timeunits_declaration, as
-  // ModuleDecl::has_read_body_item records it. The null item and an anonymous
-  // program with an empty body leave `items` as it was.
   bool has_read_body_item = false;
 };
 

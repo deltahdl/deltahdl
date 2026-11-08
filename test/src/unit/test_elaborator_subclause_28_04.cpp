@@ -133,8 +133,6 @@ TEST(NInputGateElaboration, FirstTerminalIsOutputLhs) {
 }
 
 TEST(NInputGateElaboration, PropagationDelayIndependentOfInputCount) {
-  // For each input arity, the elaborator emits one continuous assign carrying
-  // the same #(7) delay; adding more inputs only widens the AND chain.
   const char* sources[] = {
       "module m;\n"
       "  wire y, a, b;\n"

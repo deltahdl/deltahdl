@@ -42,9 +42,6 @@ TEST(DynamicArraySimulation, DeclWithInitCorrectSize) {
   EXPECT_EQ(v, 4u);
 }
 
-// §7.5: a dynamic array admits any variable data type as its element. Build a
-// dynamic array of a packed-vector element type from real source and read an
-// element back at run time to observe the non-int element type in effect.
 TEST(DynamicArraySimulation, PackedVectorElementHoldsValue) {
   auto v = RunAndGet(
       "module t;\n"
@@ -56,13 +53,6 @@ TEST(DynamicArraySimulation, PackedVectorElementHoldsValue) {
   EXPECT_EQ(v, 0xC3u);
 }
 
-// §7.5 (printed pages 157-158 of the LRM): a declaration whose first unpacked
-// dimension is `[]` declares a dynamic array wherever it stands, sized by the
-// new[] constructor (§7.5.1) and read by size() (§7.5.2). Declared in an
-// initial block, `int d[]` built no storage -- CreateBlockArrayElements in
-// statement_assign_decl.cpp read no bounds off the dimension -- so `d =
-// new[3]` sized nothing, `d[1] = 5` wrote nothing and `d[1] + d.size()`
-// read 0 where the module-scope declaration reads 8.
 TEST(DynamicArraySimulation, BlockDeclaredDynamicArraySizedByNewHoldsElements) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int y;\n"
@@ -77,14 +67,6 @@ TEST(DynamicArraySimulation, BlockDeclaredDynamicArraySizedByNewHoldsElements) {
             8u);
 }
 
-// §10.7 (printed page 258) with §7.5: an assignment to an element of a
-// dynamic array takes the element's width, so `d[0] = 1` on `byte d[]`
-// leaves an 8-bit element, `$bits(d[0])` reading 8 as it does before the
-// write, and `d[1] = 300` holds 300's low byte, 44. The element store kept
-// the right-hand value's own width, the 32-bit literal, so
-// `{<< 8 {..., d}}` streamed four bytes for the element and the suite's
-// 11.4.14.4--dynamic_array_stream-sim.sv packed 32 bytes where 17 were
-// written (#4365). y reads 8 * 1000 + 44.
 TEST(DynamicArraySimulation, ElementWriteTakesTheElementWidth) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int y;\n"
@@ -100,8 +82,6 @@ TEST(DynamicArraySimulation, ElementWriteTakesTheElementWidth) {
             8044u);
 }
 
-// The same declaration as a function body's local, which CreateFuncLocalVar
-// (eval_function_body.cpp) creates and the same aggregate builder backs.
 TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByNewHoldsElements) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  function int f();\n"
@@ -117,12 +97,6 @@ TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByNewHoldsElements) {
             8u);
 }
 
-// §7.5.1 (printed page 158 of the LRM): the new[] constructor may stand as
-// the right-hand side of a variable declaration assignment, sizing the
-// array. A block's `int d[] = new[3]` was evaluated onto the carrier variable
-// and sized nothing (InitializeDeclVariable in statement_assign_decl.cpp),
-// where the module's declaration is sized by LowerDynArrayNewInit, so
-// `d.size()` read 0 for 3.
 TEST(DynamicArraySimulation,
      BlockDeclaredDynamicArraySizedByItsNewInitializer) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -136,10 +110,6 @@ TEST(DynamicArraySimulation,
             3u);
 }
 
-// The same initializer on a function body's local, and §7.5.1's optional
-// initialization array: `int e[] = new[4](d)` takes d's three elements and
-// a fourth at the element type's default, so e.size() * 100 + e[1] + e[3]
-// reads 405 from d's `d[1] = 5`. A local sized by nothing read 0.
 TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByItsNewInitializer) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  function int f();\n"
@@ -156,10 +126,6 @@ TEST(DynamicArraySimulation, FunctionBodyDynamicArraySizedByItsNewInitializer) {
             405u);
 }
 
-// §7.5 with §7.2: each element of a dynamic array of structures is a
-// structure, so `md[1].f1` reads the member of the element `md[1] = e`
-// stored -- for a module variable, a block local and a subroutine's `input T
-// a[]` formal alike. Built into a name, `md[1]` named no variable and read 0.
 TEST(DynamicArraySim, MemberOfAStructElement) {
   const char* src =
       "module t;\n"
@@ -188,9 +154,6 @@ TEST(DynamicArraySim, MemberOfAStructElement) {
   EXPECT_EQ(RunAndGet(src, "fn"), 9u);
 }
 
-// §7.5 with §8.4 and §8.5: a dynamic array property of a class type is sized
-// by new[] -- in a method and through a handle alike -- and each element is a
-// handle whose object's property an element select reaches.
 TEST(DynamicArraySim, PropertyOfClassHandlesSizedByNew) {
   SimFixture f;
   std::string out = RunCapture(
@@ -219,12 +182,6 @@ TEST(DynamicArraySim, PropertyOfClassHandlesSizedByNew) {
   EXPECT_EQ(out, "12 33 2 5\n");
 }
 
-// §7.5 with §6.11: an element of a dynamic array has the array's element type
-// however the value written into it was typed. On `bit [31:0] ud[]`,
-// `ud[0] = -5` stores the unsigned 32'hFFFFFFFB, and on `int d[]`,
-// `d[0] = u` of the unsigned 32'hDEADBEEF stores a signed int, so of the two
-// only `d[0]` is less than 0, as of a `bit [31:0]` and an `int` variable
-// assigned the same values.
 TEST(DynamicArraySimulation, AnElementReadsWithTheElementTypesSignedness) {
   SimFixture f;
   auto out = RunCapture(
@@ -243,9 +200,6 @@ TEST(DynamicArraySimulation, AnElementReadsWithTheElementTypesSignedness) {
   EXPECT_EQ(out, "0 1\n");
 }
 
-// §7.5 with §6.11 and §26.2: a dynamic array a package declares has elements
-// of its element type as a module's does, so on `int p::d[]` the unsigned
-// 32'hDEADBEEF written reads as a signed int, less than 0.
 TEST(DynamicArraySimulation, AnElementOfAPackageDynamicArrayReadsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -265,9 +219,6 @@ TEST(DynamicArraySimulation, AnElementOfAPackageDynamicArrayReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §7.5 with §6.11 and §13.5: a dynamic array formal, `int a[]`, has elements
-// of its own element type, so the unsigned 32'hDEADBEEF the actual was given
-// reads in the body as a signed int, less than 0.
 TEST(DynamicArraySimulation, AnElementOfADynamicArrayFormalReadsSigned) {
   SimFixture f;
   auto out = RunCapture(

@@ -21,7 +21,6 @@ namespace delta {
 
 namespace {
 
-// The keywords the built-in types are written with.
 const std::map<DataTypeKind, std::string_view>& BuiltinKeywords() {
   static const std::map<DataTypeKind, std::string_view> kKeywords = {
       {DataTypeKind::kLogic, "logic"},
@@ -42,22 +41,16 @@ const std::map<DataTypeKind, std::string_view>& BuiltinKeywords() {
   return kKeywords;
 }
 
-// The keyword a built-in type is written with, empty for a type that is not
-// one.
 std::string_view BuiltinKeyword(DataTypeKind kind) {
   auto it = BuiltinKeywords().find(kind);
   return it == BuiltinKeywords().end() ? std::string_view{} : it->second;
 }
 
-// Step c's struct, union and enum: the kinds $typename writes out with their
-// bodies, packed or not, rather than by a keyword.
 bool IsStructUnionOrEnumKind(DataTypeKind kind) {
   return kind == DataTypeKind::kEnum || kind == DataTypeKind::kStruct ||
          kind == DataTypeKind::kUnion;
 }
 
-// §6.11: the integer atom types other than `time` are signed by default, and
-// the integer vector types and `time` unsigned.
 bool SignedByDefault(DataTypeKind kind) {
   static constexpr std::array kSigned = {
       DataTypeKind::kByte, DataTypeKind::kShortint, DataTypeKind::kInt,
@@ -65,8 +58,6 @@ bool SignedByDefault(DataTypeKind kind) {
   return std::ranges::find(kSigned, kind) != kSigned.end();
 }
 
-// Step b: the default signing is removed, so an integral type's signing is
-// written only where it differs from its kind's.
 std::string_view SigningText(DataTypeKind kind, bool is_signed) {
   static constexpr std::array kIntegral = {
       DataTypeKind::kLogic,   DataTypeKind::kReg,      DataTypeKind::kBit,
@@ -79,8 +70,6 @@ std::string_view SigningText(DataTypeKind kind, bool is_signed) {
   return is_signed ? " signed" : " unsigned";
 }
 
-// The built-in type the name `name` spells, signed as its keyword is by
-// default; nothing where `name` is no keyword's name.
 std::optional<DataType> KeywordType(const Expr* name) {
   if (name->kind != ExprKind::kIdentifier) return std::nullopt;
   for (const auto& [kind, keyword] : BuiltinKeywords()) {
@@ -95,7 +84,6 @@ std::optional<DataType> KeywordType(const Expr* name) {
 
 }  // namespace
 
-// What is written of a type: the parts a DataType and a StructMember share.
 struct TypenameParts {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
@@ -145,7 +133,6 @@ std::string TypenameWriter::OfMember(const StructMember& member,
   return OfParts(parts, scope, member.name);
 }
 
-// Step g: each packed range as unsized decimal bounds.
 std::string TypenameWriter::PackedText(const TypenameParts& parts) {
   std::string text;
   if (parts.left != nullptr && parts.right != nullptr) {
@@ -176,9 +163,6 @@ std::string TypenameWriter::OfParts(const TypenameParts& parts,
   return text + PackedText(parts);
 }
 
-// Step a: a typedef name is resolved back to the type it names, the
-// declaration's own packed ranges written after it; step f: a struct, union
-// or enum it names, and a class, keep the name, behind the scope declaring it.
 std::string TypenameWriter::OfName(const TypenameParts& parts,
                                    std::string_view scope) {
   std::string prefix = parts.scope_name.empty()
@@ -194,9 +178,6 @@ std::string TypenameWriter::OfName(const TypenameParts& parts,
   return OfType(*named, prefix, parts.type_name) + PackedText(parts);
 }
 
-// A name no typedef resolves: a class, named behind the package or
-// compilation unit declaring it ("$unit::"), or the module; any other name
-// as written.
 std::string TypenameWriter::OfUnresolvedName(const TypenameParts& parts,
                                              const std::string& prefix) {
   std::string qualified =
@@ -205,17 +186,11 @@ std::string TypenameWriter::OfUnresolvedName(const TypenameParts& parts,
   return TypeOwnerPrefix(prefix) + std::string(parts.type_name);
 }
 
-// Step f: a module's declarations are prefixed with the module's name and a
-// dot, a package's with the package and `::`.
 std::string TypenameWriter::TypeOwnerPrefix(std::string_view prefix) {
   if (!prefix.empty()) return std::string(prefix);
   return std::string(env_.scope_name()) + ".";
 }
 
-// Step c: an anonymous struct, union or enum is named by the system. The clause
-// leaves the form to the implementation; this one writes "e$", "s$" or "u$"
-// followed by the name of what declares the type, which no other
-// declaration of the scope shares.
 std::string TypenameWriter::Anonymous(const DataType& type,
                                       std::string_view scope,
                                       std::string_view hint) {
@@ -237,8 +212,6 @@ std::string TypenameWriter::OfStructUnionOrEnum(const DataType& type,
   return text + "}" + name;
 }
 
-// Step e: each enumeration constant with its value, sized and signed as the
-// base type it is held in.
 std::string TypenameWriter::OfEnum(const DataType& type) {
   uint32_t width = 32;
   bool is_signed = true;
@@ -248,7 +221,6 @@ std::string TypenameWriter::OfEnum(const DataType& type) {
     base.packed_dim_left = type.packed_dim_left;
     base.packed_dim_right = type.packed_dim_right;
     width = env_.width_of(base);
-    // ParseEnumType gives the enumeration the base type's signing.
     is_signed = type.is_signed;
   }
   std::string text = "enum{";
@@ -301,10 +273,6 @@ namespace {
 
 SelfType SelfTypeOf(const Expr* e, const TypenameEnvironment& env);
 
-// §11.8.1: a bit-select or a part-select of a vector is unsigned whatever the
-// vector is, one element wide or as many elements as the range it selects
-// (§11.5.1), an element being a bit of a vector and an element of the
-// outermost dimension of a packed array (§7.4.1).
 SelfType SelfTypeOfSelect(const Expr* e, const TypenameEnvironment& env) {
   if (e->base == nullptr || e->base->kind != ExprKind::kIdentifier) return {};
   SelfType vector = env.name_self_type(e->base->text);
@@ -324,8 +292,6 @@ SelfType SelfTypeOfSelect(const Expr* e, const TypenameEnvironment& env) {
           true};
 }
 
-// §11.4.12 with §11.8.1: a concatenation is unsigned and as wide as its
-// operands together.
 SelfType SelfTypeOfConcat(const Expr* e, const TypenameEnvironment& env) {
   SelfType whole{0, false, false, true};
   for (const Expr* element : e->elements) {
@@ -337,8 +303,6 @@ SelfType SelfTypeOfConcat(const Expr* e, const TypenameEnvironment& env) {
   return whole;
 }
 
-// §11.6.1 Table 11-21 with §11.8.1: a logical negation or a reduction is one
-// unsigned bit; any other unary operator is its operand's type.
 SelfType SelfTypeOfUnary(const Expr* e, const TypenameEnvironment& env) {
   SelfType operand = SelfTypeOf(e->lhs, env);
   if (!operand.known) return {};
@@ -348,10 +312,6 @@ SelfType SelfTypeOfUnary(const Expr* e, const TypenameEnvironment& env) {
   return operand;
 }
 
-// §11.6.1 Table 11-21 with §11.8.1: an arithmetic or bitwise operator is as
-// wide as its wider operand and signed where both are, a shift or a power is
-// its left operand's type, and any other is one unsigned bit; each is 4-state
-// where an operand is.
 SelfType SelfTypeOfBinary(const Expr* e, const TypenameEnvironment& env) {
   SelfType left = SelfTypeOf(e->lhs, env);
   SelfType right = SelfTypeOf(e->rhs, env);

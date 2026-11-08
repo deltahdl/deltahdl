@@ -19,14 +19,6 @@
 using namespace delta;
 
 namespace {
-// The five included lists swept whole in an identifier slot, table by table.
-// Each entry is reserved under this version, and -- for every list but the
-// first, which has no earlier version to be measured against -- the same
-// declaration elaborates into a variable of the width it asked for under the
-// union of the lists that one is built on. The five sweeps share one test
-// because they share one shape; the table name travels with every failure
-// message. What they do not show is the keyword roles surviving, which the
-// tests further down carry, one per included list.
 TEST(SystemVerilog2012KeywordElaboration, IncludedWordsAreReservedAtThisStage) {
   for (const auto& table :
        {kVerilog1995KeywordSweep, kVerilog2001AddedKeywordSweep,
@@ -38,24 +30,11 @@ TEST(SystemVerilog2012KeywordElaboration, IncludedWordsAreReservedAtThisStage) {
   ExpectConfigurationWordsNameVariablesUnderNoconfig();
 }
 
-// Table 22-6 swept at this stage, with the leg that makes each entry an
-// addition. The word cannot name an elaborated variable here, and under
-// "1800-2009" -- the union of everything this version includes -- the same
-// declaration reaches the design as a variable of the width it asked for.
-// Reading it back keeps the accepting leg from being any elaboration that
-// happens to succeed.
 TEST(SystemVerilog2012KeywordElaboration, AddedWordsCannotNameVariables) {
   ExpectKeywordTableIsReserved("1800-2012",
                                kSystemVerilog2012AddedKeywordSweep);
 }
 
-// The added word whose construct becomes elaborated structure of its own kind.
-// An interconnect net carries a net type no other word produces -- scalar and
-// vector, in a port as well as in a declaration -- while the ordinary net
-// beside it does not. Two elaborator rules turn on that mark: the generic
-// connection carries no signedness, and it is not a net a declaration may drive
-// from its own initializer. Each is shown against the ordinary net allowed
-// exactly what it is refused.
 TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   const std::string kSrc =
       "module m (interconnect [3:0] p, inout interconnect [7:0] q,\n"
@@ -86,10 +65,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
 
   const auto* m = FindModule(design, "m");
   ASSERT_NE(m, nullptr);
-  // The mark survives every direction a port header may name, and the width
-  // still comes from the packed range written beside the word. A generic
-  // connection with no direction named is bidirectional, which is what the
-  // first row records.
   ASSERT_EQ(m->ports.size(), 6u);
   struct PortCase {
     size_t index;
@@ -107,8 +82,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   }
   EXPECT_FALSE(m->ports[4].is_interconnect);
 
-  // The first rule keyed off the mark: the generic connection has no
-  // signedness, while an ordinary port may be declared signed.
   ElabFixture signed_ic;
   ElaborateWithPreprocessor(
       In("1800-2012", "module m (interconnect signed [3:0] p);\nendmodule\n"),
@@ -123,8 +96,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
       signed_wire, "m");
   EXPECT_FALSE(signed_wire.has_errors);
 
-  // The second: an interconnect net takes no declaration assignment, while an
-  // ordinary net does.
   ElabFixture ic_assign;
   ElaborateWithPreprocessor(
       In("1800-2012", "module m;\n  interconnect [3:0] q = 4'd1;\nendmodule\n"),
@@ -140,9 +111,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
   EXPECT_FALSE(wire_assign.has_errors);
 
   ElabFixture included;
-  // `interconnect` is an ordinary identifier under 1800-2009, so the header
-  // is read as a non-ANSI port list and Parser::ParseNonAnsiPortList in
-  // src/parser/parser_port.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -150,11 +118,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedInterconnectNetsReachTheDesign) {
                             "23.2.2.1"));
 }
 
-// The added word that binds a name to a net's data type. What the elaborator
-// settles is the width every net declared with that name gets, so the nets are
-// read back rather than the declaration. Both forms of the declaration are here
-// and so is its own elaborator rule -- not every data type may stand in it --
-// which is a diagnostic only a keyword can raise.
 TEST(SystemVerilog2012KeywordElaboration,
      AddedNettypeDeclarationsResolveNetWidths) {
   const std::string kSrc =
@@ -182,9 +145,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   n = FindNet(design, "m", "through");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->width, 8u) << "the second name resolves through the first";
-  // The second form of the declaration, which also names the function resolving
-  // multiple drivers; the width still comes from the type the name was bound
-  // to.
   n = FindNet(design, "m", "resolved");
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->width, 64u);
@@ -192,7 +152,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   ASSERT_NE(n, nullptr);
   EXPECT_EQ(n->width, 1u);
 
-  // A nettype whose data type is not one a net may carry.
   ElabFixture bad_type;
   ElaborateWithPreprocessor(
       In("1800-2012", "module m;\n  nettype string text_net;\nendmodule\n"),
@@ -203,10 +162,6 @@ TEST(SystemVerilog2012KeywordElaboration,
                             LineInRegion(2), "6.6.7"));
 
   ElabFixture included;
-  // `nettype` is an ordinary identifier under 1800-2009, so the declaration
-  // is read as a variable named by it and Parser::ParsePlainVarDecl in
-  // src/parser/parser_items.cpp reports, naming the `logic` that follows where
-  // the declaration's ';' must be.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -214,11 +169,6 @@ TEST(SystemVerilog2012KeywordElaboration,
                             "6.8"));
 }
 
-// The added word whose clause the elaborator itself acts on. Naming an
-// interface class puts the implementing class under an obligation the
-// elaborator checks: a class supplying every prototype elaborates clean, and
-// the same class with one method removed is rejected. Both are shown, since the
-// accepting leg alone would be consistent with the clause being ignored.
 TEST(SystemVerilog2012KeywordElaboration,
      AddedImplementsClauseCarriesObligations) {
   const std::string kSrc =
@@ -243,7 +193,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  // The obligation from the first interface, unmet.
   ElabFixture missing_read;
   ElaborateWithPreprocessor(In("1800-2012",
                                "interface class reader;\n"
@@ -262,9 +211,6 @@ TEST(SystemVerilog2012KeywordElaboration,
                             "method 'read' from interface 'reader'",
                             LineInRegion(4), "8.26"));
 
-  // The same class without the clause is not under the obligation at all, so
-  // what the rejection above tracks is the clause rather than the missing
-  // method.
   ElabFixture no_clause;
   ElaborateWithPreprocessor(In("1800-2012",
                                "interface class reader;\n"
@@ -281,9 +227,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   EXPECT_FALSE(no_clause.has_errors);
 
   ElabFixture included;
-  // `implements` is an ordinary identifier under 1800-2009, so the class
-  // header is read as ending after its name and Parser::ParseClassDecl in
-  // src/parser/parser_class.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -291,13 +234,6 @@ TEST(SystemVerilog2012KeywordElaboration,
                             "8.3"));
 }
 
-// The added word with two keyword roles, both reaching this stage. As a union
-// qualifier it selects a type whose members share storage, shown in the width
-// the variable ends up with: one member's worth rather than the sum. As a
-// constraint qualifier it marks a relation the solver may drop, and the
-// elaborator applies the rule that such a relation may only be placed on a
-// variable randomized without a cycle -- with nothing to attach to when the
-// word is an ordinary identifier, as the "1800-2009" leg shows.
 TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
   const std::string kUnion =
       "module m;\n"
@@ -315,16 +251,12 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
   EXPECT_EQ(u->width, 8u) << "the members share their storage";
 
   ElabFixture union_included;
-  // `soft` is an ordinary identifier under 1800-2009, so it lands on the
-  // union tag check and Parser::ParseStructOrUnionType in
-  // src/parser/parser_declaration.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kUnion),
                                                union_included, "m");
   EXPECT_TRUE(ReportedError(union_included.diag.Diagnostics(),
                             "union declarations may not have a tag before '{'",
                             LineInRegion(2), "7.2"));
 
-  // The constraint role, and the rule the elaborator applies to it.
   const std::string kCyclic =
       "class c;\n"
       "  randc bit [3:0] v;\n"
@@ -341,8 +273,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
                             "variable 'v'",
                             LineInRegion(3), "18.5.13.1"));
 
-  // The same relation on an ordinary random variable is accepted, so the
-  // rejection above is the rule and not the qualifier being unusable.
   ElabFixture plain_rand;
   ElaborateWithPreprocessor(In("1800-2012",
                                "class c;\n"
@@ -356,11 +286,6 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
                             plain_rand, "m");
   EXPECT_FALSE(plain_rand.has_errors);
 
-  // Under everything this version includes the word is an ordinary
-  // identifier, so the rule never attaches. A name standing before the relation
-  // leaves an item A.1.10 does not write, so the very same source is reported
-  // there by ParserConstraintItemHelpers::Capture in
-  // src/parser/parser_constraint_items.cpp.
   ElabFixture constraint_included;
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2009", kCyclic),
                                                constraint_included, "m");
@@ -373,44 +298,26 @@ TEST(SystemVerilog2012KeywordElaboration, AddedSoftQualifierReachesTheDesign) {
                             LineInRegion(3), "A.1.10"));
 }
 
-// Table 22-1 doing its work, read back as elaborated structure. The net types
-// are the sharpest part: each resolved and driven type has to survive into the
-// design as itself rather than collapsing onto a plain wire.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedVerilog1995WordsStillBuildDesign) {
   ExpectVerilog1995DeclarationsElaborate("1800-2012");
 }
 
-// Table 22-3, whose lone entry is a net type of its own and so is read back the
-// same way.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedVerilog2005WordStillBuildsDesign) {
   ExpectVerilog2005DeclarationsElaborate("1800-2012");
 }
 
-// Table 22-2 doing its work, likewise as structure rather than as tokens. The
-// constructs are tied together on purpose: the localparam is the loop bound, so
-// the count of declarations depends on it resolving, and the nested condition
-// picks one iteration, so the genvar holds a different constant each pass.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedVerilog2001WordsStillBuildDesign) {
   ExpectVerilog2001DeclarationsElaborate("1800-2012");
 }
 
-// The fourth included list doing its work, the largest thing this version
-// inherits: data types with their widths and four-state flag, user-defined
-// types with their resolved members, inferred processes each as its own kind,
-// and the design element words.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedSystemVerilog2005WordsStillBuildDesign) {
   ExpectSystemVerilog2005DeclarationsElaborate("1800-2012");
 }
 
-// The declaration forms the identifier sweeps do not reach, all written with
-// types from that same fourth list since the added words bring no ordinary
-// data type of their own: a declaration carrying its own initializer, a port
-// typed in the module header, and a port typed in the body in the separate
-// style where the header lists only names.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedTypeWordsFillTheDeclarationFormsSweepsMiss) {
   const std::string kSrc =
@@ -454,10 +361,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   EXPECT_EQ(y->width, 8u);
 }
 
-// The fifth included list doing its work: the `let` declaration lands in lists
-// of its own at both scopes, the checker element resolves through an
-// instantiation, the marked clocking block is counted by a rule that rejects a
-// second one, and the permissive case qualifier survives into the process.
 TEST(SystemVerilog2012KeywordElaboration,
      IncludedSystemVerilog2009WordsStillBuildDesign) {
   const std::string kSrc =
@@ -510,8 +413,6 @@ TEST(SystemVerilog2012KeywordElaboration,
   }
   EXPECT_TRUE(qualified_case_seen);
 
-  // The rule that counts the mark on a clocking block: a second marked block in
-  // the same scope is rejected.
   ElabFixture two_global;
   ElaborateWithPreprocessor(
       In("1800-2012",
@@ -526,9 +427,6 @@ TEST(SystemVerilog2012KeywordElaboration,
                             LineInRegion(3), "14.14"));
 
   ElabFixture included;
-  // `checker` is an ordinary identifier under 1800-2005, so it heads the file
-  // where no top-level production can take it and
-  // Parser::ReportUnexpectedTopLevelToken in src/parser/parser.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(In("1800-2005", kSrc), included,
                                                "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
@@ -536,22 +434,11 @@ TEST(SystemVerilog2012KeywordElaboration,
                             "3.12.1"));
 }
 
-// The constant forms that reach a declaration's width, which is where a
-// constant expression is actually required. A literal and a `parameter` come
-// from the first included list, `localparam` and the `automatic` that lets a
-// constant function be written from the second, and `int` from the fourth. The
-// fifth form, a genvar, shows its value in the copies its loop produces and is
-// observed doing that in IncludedVerilog2001WordsStillBuildDesign above.
 TEST(SystemVerilog2012KeywordElaboration,
      EveryConstantFormResolvesUnderThisVersion) {
   ExpectEveryConstantFormResolves("1800-2012", "int ", "byte");
 }
 
-// The negative the six tables imply, carried to this stage. A word none of them
-// lists is an ordinary identifier here, so it names an object that reaches the
-// design -- and it is not a data type, the half that would go unchecked if only
-// the naming side were tested. Each word is a near miss of a real entry, since
-// this version is the last that reserves anything new.
 TEST(SystemVerilog2012KeywordElaboration,
      WordsOutsideTheTablesNameObjectsButAreNotTypes) {
   ExpectWordsNameObjectsButAreNotTypes(

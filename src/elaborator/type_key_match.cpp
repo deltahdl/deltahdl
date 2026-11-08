@@ -17,8 +17,6 @@ namespace delta {
 
 namespace {
 
-// §6.22.1: what decides whether two integral types match -- whether each
-// is 4-state, whether it is signed, and the range of its one dimension.
 struct IntegralShape {
   bool four_state;
   bool is_signed;
@@ -37,7 +35,6 @@ struct IntegerAtom {
   IntegralShape shape;
 };
 
-// §6.11: the integer atom types, each a vector of predefined width.
 constexpr std::array<IntegerAtom, 6> kIntegerAtoms = {{
     {"byte", DataTypeKind::kByte, {false, true, 7, 0}},
     {"shortint", DataTypeKind::kShortint, {false, true, 15, 0}},
@@ -53,8 +50,6 @@ std::optional<IntegralShape> AtomShapeOfKeyword(std::string_view key) {
   return std::nullopt;
 }
 
-// The shape of an integer atom type or of a bit, logic or reg vector of at most
-// one packed dimension whose bounds fold, nothing for any other type.
 std::optional<IntegralShape> IntegralShapeOf(const DataType& t) {
   for (const IntegerAtom& atom : kIntegerAtoms)
     if (atom.kind == t.kind) return atom.shape;
@@ -72,9 +67,6 @@ std::optional<IntegralShape> IntegralShapeOf(const DataType& t) {
   return shape;
 }
 
-// §6.22.1: a vector type of predefined width -- an integer atom -- matches
-// a bit, logic or reg vector of the same state and signedness over the range
-// [width-1:0], and two such vectors match when their ranges are the same.
 bool IntegralShapesMatch(const std::optional<IntegralShape>& a,
                          const DataType& b) {
   std::optional<IntegralShape> shape = IntegralShapeOf(b);
@@ -100,8 +92,6 @@ bool TypeKeyMatchesType(std::string_view key, const DataType& type,
   }
   const DataType* k = FollowTypedefs(it->second, typedefs, names);
   if (k == nullptr) return false;
-  // §6.22.1 (c) and (d): an enum, structure or union matches only a type of
-  // the same declaration.
   if (k->decl_loc.IsValid() || t->decl_loc.IsValid()) {
     return std::tie(k->decl_loc.file_id, k->decl_loc.line,
                     k->decl_loc.column) ==

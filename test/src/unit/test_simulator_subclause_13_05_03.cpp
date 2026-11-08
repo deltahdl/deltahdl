@@ -18,11 +18,6 @@ TEST(Functions, DefaultArgumentValue) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "add";
-  // §13.4: a function whose return type is left implicit returns a `logic`
-  // scalar, and §13.4.1's internal variable then truncates the returned
-  // expression to that one bit. This fixture is about how an argument reaches
-  // the body, not about an implicit return type, so it declares one wide
-  // enough to carry the value the call is checked for.
   func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kInput, false, false, false, {}, "a", nullptr, {}},
@@ -227,14 +222,6 @@ TEST(DefaultArgumentSim, EmptyPlaceholderUsesDefault) {
   EXPECT_EQ(EvalExpr(call, f.ctx, f.arena).ToUint64(), 6u);
 }
 
-// §13.5.3's own example, in its two-top shape: n enables m's tasks by
-// hierarchical name and reads m's variables the same way (§23.6 lets the
-// complete path start at a top-level module from a parallel hierarchy), and
-// each default actual binds in m, the scope of the declaration. The reads
-// before the enables give m's initial 1 and 2, and after them the 6 the
-// output default wrote into m's `a` and the 12 the inout default left in
-// `w`; a reference into m that reaches nothing reads 0 for all four and
-// leaves `a` and `w` at 1 and 2.
 TEST(DefaultArgumentSim, DefaultBoundInDeclaringTopFromParallelTop) {
   SimFixture f;
   auto* design = ElaborateSrcAllTops(
@@ -264,9 +251,6 @@ TEST(DefaultArgumentSim, DefaultBoundInDeclaringTopFromParallelTop) {
                     {"w", 12u}});
 }
 
-// §23.6: a write through the same path lands in m: n's `m.a = 7` is what m's
-// own process reads a time step later, 107 rather than the 101 its initial
-// value gives when the write reaches nothing.
 TEST(DefaultArgumentSim, WriteIntoParallelTopByHierarchicalName) {
   SimFixture f;
   auto* design = ElaborateSrcAllTops(
@@ -281,9 +265,6 @@ TEST(DefaultArgumentSim, WriteIntoParallelTopByHierarchicalName) {
   LowerRunAndCheck(f, design, {{"a", 7u}, {"b", 107u}});
 }
 
-// §13.5.3 (printed pages 350-351): an output argument's default names a
-// variable of the scope declaring the task, so u.t1() called from top copies
-// the result to u.a, the instance's a, and leaves top's own a at 0.
 TEST(DefaultArgumentSim, OutputDefaultBindsInTheDeclaringScope) {
   SimFixture f;
   auto* v = RunAndFindVar(

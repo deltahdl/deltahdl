@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.7 bars prev() from an associative array with a wildcard index type, so
-// the report names §7.9.7. §7.8.1 bars a wildcard array only from a foreach
-// loop and from a §7.12 array manipulation method that returns an index,
-// neither of which prev() is.
 TEST(AssocArrayPrevElaboration, PrevOnWildcardAssocArrayRejected) {
   ElabFixture f;
   ElaborateSrc(

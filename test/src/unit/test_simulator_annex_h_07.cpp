@@ -8,13 +8,6 @@
 
 using namespace delta;
 
-// Annex H.7 (Data types) defines the data types of the C layer of the DPI:
-// a value crosses the interface as one of them -- a basic type of Table H.1
-// (§H.7.4), the canonical representation of a packed array (§H.7.7), or the
-// handle of an open array (§H.12) -- and a type none of them covers does not
-// cross. The cases check which of the layer's types each formal crosses as
-// and which subclause defines it.
-
 namespace {
 
 DpiArg Formal(DataTypeKind type, uint32_t width = 0) {
@@ -26,9 +19,6 @@ DpiArg Formal(DataTypeKind type, uint32_t width = 0) {
   return formal;
 }
 
-// §H.7: an int, a real, a string, a chandle and a scalar bit cross as basic
-// types, a bit [63:0], an integer and a time in the canonical representation,
-// an open array of anything by handle, and a struct or event not at all.
 TEST(DpiCLayerDataTypes, EachFormalCrossesAsOneOfTheLayersTypes) {
   EXPECT_EQ(DpiCLayerTypeOfFormal(Formal(DataTypeKind::kInt), false),
             DpiCLayerType::kBasic);
@@ -56,9 +46,6 @@ TEST(DpiCLayerDataTypes, EachFormalCrossesAsOneOfTheLayersTypes) {
             DpiCLayerType::kNone);
 }
 
-// §H.7: the subclause that defines each of the layer's types -- H.7.4 the
-// basic types, H.7.7 the canonical representation, H.12 the open array
-// handle -- and none for what does not cross.
 TEST(DpiCLayerDataTypes, EachOfTheLayersTypesHasItsDefiningSubclause) {
   EXPECT_EQ(DpiSubclauseDefiningCLayerType(DpiCLayerType::kBasic), "H.7.4");
   EXPECT_EQ(DpiSubclauseDefiningCLayerType(DpiCLayerType::kCanonicalElement),

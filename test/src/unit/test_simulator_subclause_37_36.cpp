@@ -29,34 +29,11 @@
 namespace delta {
 namespace {
 
-// §37.36 "UDP": the VPI object model for a UDP definition (the "udp defn"
-// node), its io decl, table entry, and initial children, and the table entry's
-// own size and value. The udp instance and the udp -> udp defn edge belong to
-// the neighboring §37.35 (Primitive, prim term); this clause owns the udp
-// defn's properties and the two numbered Details.
-//
-//   defn vpiDefName  - the definition name a udp defn reports (string
-//   dispatch). defn vpiSize     - the number of inputs (the shared kVpiSize
-//   dispatch). defn vpiProtected- the protection flag every object carries
-//   (§37.3.6). defn vpiPrimType - the primitive type; Detail 2 fixes vpiSeqPrim
-//   for a
-//                      sequential UDP and vpiCombPrim for a combinational one.
-//   defn -> io decl / table entry / initial - one-to-many/one-to-one traversals
-//                      served by the generic child walk.
-//   table entry vpiSize - the number of symbol entries (shared size dispatch).
-//   table entry value   - Detail 1 allows only a string (decompilation) and a
-//                      vector (ASCII symbol values) through vpi_get_value().
-//
-// The fixture installs a context so the public vpi_* entry points run their
-// real dispatch, and provides the simulation plumbing a table-entry value read
-// needs.
 class UdpModel : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // A bare context-owned object of the requested kind, stamped with the name
-  // the test wants - the same approach the §37.37 model tests use.
   VpiHandle MakeObject(int type, std::string_view name) {
     VpiHandle obj = vpi_ctx_.CreateModule(name, std::string(name));
     obj->type = type;
@@ -71,24 +48,17 @@ class UdpModel : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// C1: a udp defn reports its definition name - the UDP declaration's identifier
-// - through vpi_get_str(vpiDefName).
 TEST_F(UdpModel, DefinitionNameReportsUdpName) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "latch_udp");
   EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(defn)), "latch_udp");
 }
 
-// C2: a udp defn reports its number of inputs through vpiSize, which the shared
-// size dispatch hands back from the stored size.
 TEST_F(UdpModel, SizeReportsNumberOfInputs) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "mux_udp");
-  defn->size = 3;  // a three-input UDP
+  defn->size = 3;
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(defn)), 3);
 }
 
-// C3: a udp defn carries the vpiProtected Boolean (§37.3.6), TRUE when it
-// stands for protected code and FALSE otherwise. §37.3.6 lets this property
-// through even for a protected object.
 TEST_F(UdpModel, ProtectedFlagReported) {
   VpiHandle open_defn = MakeObject(vpiUdpDefn, "open_udp");
   EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(open_defn)), 0);
@@ -98,22 +68,18 @@ TEST_F(UdpModel, ProtectedFlagReported) {
   EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(sealed_defn)), 1);
 }
 
-// C4 / Detail 2: a sequential UDP reports vpiSeqPrim through vpiPrimType.
 TEST_F(UdpModel, PrimTypeReportsSequentialUdp) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "ff_udp");
   defn->prim_type = vpiSeqPrim;
   EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(defn)), vpiSeqPrim);
 }
 
-// C4 / Detail 2: a combinational UDP reports vpiCombPrim through vpiPrimType.
 TEST_F(UdpModel, PrimTypeReportsCombinationalUdp) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "and_udp");
   defn->prim_type = vpiCombPrim;
   EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(defn)), vpiCombPrim);
 }
 
-// C5: iterating vpiIODecl from a udp defn walks its io decl children (the UDP's
-// output and input port declarations), in order.
 TEST_F(UdpModel, TraversesToIoDecls) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "io_udp");
   VpiHandle out = MakeObject(vpiIODecl, "q");
@@ -133,8 +99,6 @@ TEST_F(UdpModel, TraversesToIoDecls) {
   EXPECT_EQ(VpiObjectOf(seen[2]), in1);
 }
 
-// C6: iterating vpiTableEntry from a udp defn walks the rows of its state
-// table.
 TEST_F(UdpModel, TraversesToTableEntries) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "tab_udp");
   VpiHandle row0 = MakeObject(vpiTableEntry, "r0");
@@ -151,8 +115,6 @@ TEST_F(UdpModel, TraversesToTableEntries) {
   EXPECT_EQ(VpiObjectOf(seen[1]), row1);
 }
 
-// C7: vpi_handle(vpiInitial, defn) reaches a sequential UDP's initial statement
-// - the one that sets its starting state.
 TEST_F(UdpModel, TraversesToInitial) {
   VpiHandle defn = MakeObject(vpiUdpDefn, "seq_udp");
   VpiHandle init = MakeObject(vpiInitial, "init");
@@ -161,19 +123,15 @@ TEST_F(UdpModel, TraversesToInitial) {
   EXPECT_EQ(vpi_ctx_.Handle(vpiInitial, defn), init);
 }
 
-// C8: a table entry reports its number of symbol entries through vpiSize,
-// handed back by the shared size dispatch.
 TEST_F(UdpModel, TableEntrySizeReportsSymbolEntryCount) {
   VpiHandle row = MakeObject(vpiTableEntry, "row");
-  row->size = 4;  // four symbols in this table row
+  row->size = 4;
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(row)), 4);
 }
 
-// C9 / Detail 1: a table entry's value is obtainable as a string (its
-// decompiled symbol row). The read succeeds with no error.
 TEST_F(UdpModel, TableEntryValueAllowsStringFormat) {
   auto* var = sim_ctx_.CreateVariable("te_str", 16);
-  var->value = MakeLogic4VecVal(arena_, 16, 0x4142);  // 'A','B'
+  var->value = MakeLogic4VecVal(arena_, 16, 0x4142);
   VpiHandle row = MakeObject(vpiTableEntry, "row_str");
   row->var = var;
 
@@ -186,8 +144,6 @@ TEST_F(UdpModel, TableEntryValueAllowsStringFormat) {
   EXPECT_STREQ(v.value.str, "AB");
 }
 
-// C9 / Detail 1: a table entry's value is also obtainable as a vector (its
-// symbols, two bytes each). The read succeeds with no error.
 TEST_F(UdpModel, TableEntryValueAllowsVectorFormat) {
   auto* var = sim_ctx_.CreateVariable("te_vec", 16);
   var->value = MakeLogic4VecVal(arena_, 16, 0x4142);
@@ -201,14 +157,9 @@ TEST_F(UdpModel, TableEntryValueAllowsVectorFormat) {
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
   ASSERT_NE(v.value.vector, nullptr);
-  // §38.15: each symbol of the row "AB" takes two bytes, its character then
-  // NUL.
   EXPECT_EQ(v.value.vector[0].aval, 0x41004200u);
 }
 
-// C9 / Detail 1 (the shall): no other format may be obtained for a table entry.
-// A non-string, non-vector request is refused, records an error, and leaves the
-// caller's value buffer untouched.
 TEST_F(UdpModel, TableEntryValueRejectsOtherFormats) {
   auto* var = sim_ctx_.CreateVariable("te_int", 16);
   var->value = MakeLogic4VecVal(arena_, 16, 0x4142);
@@ -217,7 +168,7 @@ TEST_F(UdpModel, TableEntryValueRejectsOtherFormats) {
 
   s_vpi_value v = {};
   v.format = vpiIntVal;
-  v.value.integer = 0x7777;  // sentinel that must survive the refused read
+  v.value.integer = 0x7777;
   vpi_get_value(VpiHandleOf(row), &v);
 
   s_vpi_error_info info = {};
@@ -225,12 +176,6 @@ TEST_F(UdpModel, TableEntryValueRejectsOtherFormats) {
   EXPECT_EQ(v.value.integer, 0x7777);
 }
 
-// C9 / Detail 1 (the "only" boundary): the permitted set is exactly the
-// decompilation string and the ASCII vector. Formats that are themselves string
-// renderings - the binary/octal/hexadecimal radix strings - and the scalar/real
-// numeric forms are still not among the two allowed forms, so the table-entry
-// guard refuses each of them. This pins the boundary that a guard checking only
-// for a string format alone would wrongly let through.
 TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
   auto* var = sim_ctx_.CreateVariable("te_edge", 16);
   var->value = MakeLogic4VecVal(arena_, 16, 0x4142);
@@ -249,8 +194,6 @@ TEST_F(UdpModel, TableEntryValueRejectsStringLikeAndNumericFormats) {
   }
 }
 
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 int g_udp_defns = 0;
 std::string g_udp_def_name;
 int g_udp_inputs = 0;
@@ -258,8 +201,6 @@ int g_udp_prim_type = 0;
 int g_udp_table_entries = 0;
 
 PLI_INT32 ProbeUdpDefnsCalltf(PLI_BYTE8*) {
-  // §37.4.3: the udp defn is drawn from a circle, so the iteration that reaches
-  // the design's definitions is traversed with NULL for the ref_h.
   vpiHandle itr = vpi_iterate(vpiUdpDefn, nullptr);
   if (itr == nullptr) return 0;
   while (vpiHandle defn = vpi_scan(itr)) {
@@ -276,10 +217,6 @@ PLI_INT32 ProbeUdpDefnsCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §37.36 against a design. Every property and relation the figure draws is
-// drawn on a udp defn, and no pass built one, so the clause answered for no
-// design at all: the circle iteration that is how an application reaches a
-// design's UDP definitions returned none of them.
 TEST(UdpDesign, ADesignsUdpDeclarationIsAUdpDefnObject) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
@@ -317,18 +254,11 @@ TEST(UdpDesign, ADesignsUdpDeclarationIsAUdpDefnObject) {
 
   EXPECT_EQ(g_udp_defns, 1);
   EXPECT_EQ(g_udp_def_name, "my_and");
-  // The figure's "number of inputs" property.
   EXPECT_EQ(g_udp_inputs, 2);
-  // Detail 2: a UDP with no state is combinational.
   EXPECT_EQ(g_udp_prim_type, vpiCombPrim);
   EXPECT_EQ(g_udp_table_entries, 3);
 }
 
-// §37.36: the UDP definitions of a design include the ones its UDP instances
-// name, each once, however many instances name it and however deep they
-// stand, here with no compilation unit to read the declarations of. A child
-// instance with no module to stand for and a UDP instance naming no definition
-// add none.
 TEST(UdpDefinitionsOfADesign, EachDefinitionAnInstanceNamesOnce) {
   UdpDecl decl;
   decl.name = "u";
@@ -347,13 +277,8 @@ TEST(UdpDefinitionsOfADesign, EachDefinitionAnInstanceNamesOnce) {
   EXPECT_EQ(VpiDesignUdpDecls(&design), (std::vector<const UdpDecl*>{&decl}));
 }
 
-// §37.36 against designs read and run whole, a udp defn read back once the run
-// is over.
 class UdpDefnsOfARun : public VpiDesignRun {
  protected:
-  // §38.15: the symbols the vector value of the table entry `entry` holds,
-  // `count` of them, each in two bytes of aval or bval, four to an element,
-  // its second byte NUL for a one-character symbol.
   static std::vector<std::string> VectorSymbols(vpiHandle entry,
                                                 std::size_t count) {
     s_vpi_value value = {};
@@ -372,7 +297,6 @@ class UdpDefnsOfARun : public VpiDesignRun {
     return symbols;
   }
 
-  // The string value of the table entry `entry`, empty for none.
   static std::string StringText(vpiHandle entry) {
     s_vpi_value value = {};
     value.format = vpiStringVal;
@@ -381,9 +305,6 @@ class UdpDefnsOfARun : public VpiDesignRun {
   }
 };
 
-// §37.36: the circle iteration reaches every UDP the design declares, one no
-// instance uses among them, and a primitive written as an extern prototype and
-// then defined once only (#7143).
 TEST_F(UdpDefnsOfARun, EveryDeclaredUdpHasADefn) {
   Run("primitive used_and(o, a, b);\n"
       "  output o; input a, b;\n"
@@ -421,10 +342,6 @@ constexpr const char* kFlop =
     "  gate u2(o, d);\n"
     "endmodule\n";
 
-// §37.36 detail 1: a table entry's string value is its row as the table writes
-// it, an edge in parentheses among its inputs and the current state of a
-// sequential row in its own field, and its vector value holds its symbols, an
-// edge's two characters together (#7141, #7461).
 TEST_F(UdpDefnsOfARun, ATableEntryReadsAsItsRow) {
   Run(kFlop);
   const std::vector<vpiHandle> kRows =
@@ -441,9 +358,6 @@ TEST_F(UdpDefnsOfARun, ATableEntryReadsAsItsRow) {
   EXPECT_EQ(StringText(kGateRows[1]), "1 : 0");
 }
 
-// §37.36 (figure): a sequential UDP written with an initial statement reaches
-// it from its defn, and a combinational one, written with none, reaches none
-// (#7140).
 TEST_F(UdpDefnsOfARun, ASequentialUdpReachesItsInitial) {
   Run(kFlop);
   vpiHandle flop = Named(vpiUdpDefn, nullptr, "flop");
@@ -455,9 +369,6 @@ TEST_F(UdpDefnsOfARun, ASequentialUdpReachesItsInitial) {
             nullptr);
 }
 
-// §37.36 (figure) with §29.3.3 and §37.63: a UDP's initial runs a blocking
-// assignment of the bit its output starts at to its output reg, 1 where the
-// initial statement writes 1 and x where it writes x (#7368).
 TEST_F(UdpDefnsOfARun, AUdpsInitialAssignsItsOutput) {
   Run("primitive zero(q, d);\n"
       "  output reg q; input d;\n"
@@ -501,9 +412,6 @@ TEST_F(UdpDefnsOfARun, AUdpsInitialAssignsItsOutput) {
 
 constexpr std::string_view kUdpKey = "udp-exchange-key";
 
-// §37.36 with §37.3.6: a UDP declared in a decryption envelope is protected
-// code, and one written in the clear answers vpiProtected FALSE, without error
-// (#7142).
 TEST_F(UdpDefnsOfARun, ASealedUdpIsProtected) {
   RunUnderKey(EncryptEnvelopes("`pragma protect begin\n"
                                "primitive sealed_and(o, a, b);\n"
@@ -536,8 +444,6 @@ TEST_F(UdpDefnsOfARun, ASealedUdpIsProtected) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// §38.15: the vector value of a table entry is its symbols, two bytes each,
-// the first two in aval's halves and the third in bval's upper half (#7461).
 TEST_F(UdpDefnsOfARun, ATableEntrysVectorHoldsTwoBytesPerSymbol) {
   Run("primitive p(output o, input a, b);\n"
       "  table\n"

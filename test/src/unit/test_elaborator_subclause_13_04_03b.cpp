@@ -12,10 +12,6 @@ using namespace delta;
 
 namespace {
 
-// The resolved value of the named localparam of the single elaborated top
-// module, or -1 where it is absent or was left unresolved, so that a fold that
-// never happened is told from one that happened (§13.4.3), as in
-// test_elaborator_subclause_13_04_03a.cpp.
 int64_t ResolvedParam(RtlirDesign* design, std::string_view name) {
   if (!design || design->top_modules.empty()) return -1;
   for (const auto& p : design->top_modules[0]->params) {
@@ -24,12 +20,6 @@ int64_t ResolvedParam(RtlirDesign* design, std::string_view name) {
   return -1;
 }
 
-// §13.4.3 lets a constant function be declared in a package and called in a
-// parameter initializer, and §26.3 names a package's function through the
-// package scope resolution operator or an import (printed pages 345 and 808
-// of IEEE 1800-2023). The folder registered a module's own functions
-// alone and declined a call with no bare callee, so `pk::twice(6)` never folded
-// and P was left unresolved.
 TEST(ConstantFunctionElaboration, PackageFunctionThroughPackageScopeFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -44,9 +34,6 @@ TEST(ConstantFunctionElaboration, PackageFunctionThroughPackageScopeFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 12);
 }
 
-// The same function reached by a wildcard import, with its defaulted second
-// argument (§13.5.3) left to the default, and through the package scope with
-// both actuals written: 6 * 2 and 7 * 1.
 TEST(ConstantFunctionElaboration, ImportedPackageFunctionWithDefaultFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -65,9 +52,6 @@ TEST(ConstantFunctionElaboration, ImportedPackageFunctionWithDefaultFolds) {
   EXPECT_EQ(ResolvedParam(design, "Q"), 7);
 }
 
-// An explicit import names the one function it imports (§26.3): the other
-// package function stays unreachable by its bare name, and the localparam
-// naming it is left unresolved rather than folded.
 TEST(ConstantFunctionElaboration, ExplicitImportBringsInTheNamedFunctionAlone) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,9 +70,6 @@ TEST(ConstantFunctionElaboration, ExplicitImportBringsInTheNamedFunctionAlone) {
   EXPECT_EQ(ResolvedParam(design, "Q"), -1);
 }
 
-// §12.7.1 makes a variable a for loop's initialization declares a local of the
-// implicit block around the loop, so in a constant function the loop's reads
-// and writes of it name that local (#6411).
 TEST(ConstantFunctionElaboration, ForLoopDeclaredVariableIsLocal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -106,9 +87,6 @@ TEST(ConstantFunctionElaboration, ForLoopDeclaredVariableIsLocal) {
   EXPECT_EQ(ResolvedParam(design, "P"), 6);
 }
 
-// §11.2.1 makes a built-in method called on a constant identifier with
-// constant arguments a constant built-in method call, which a constant
-// function may make on a parameter as a localparam's initializer may (#6343).
 TEST(ConstantFunctionElaboration, BuiltinMethodOnParameterAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -123,8 +101,6 @@ TEST(ConstantFunctionElaboration, BuiltinMethodOnParameterAllowed) {
   EXPECT_EQ(ResolvedParam(design, "P"), 3);
 }
 
-// §13.4.3 excludes no case statement from a constant function's body, so one
-// folds with §12.5's matching: case compares values exactly (#6375).
 TEST(ConstantFunctionElaboration, CaseStatementFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -144,7 +120,6 @@ TEST(ConstantFunctionElaboration, CaseStatementFolds) {
   EXPECT_EQ(ResolvedParam(design, "Y"), 4);
 }
 
-// casez takes a z or ? bit of either side as matching anything (§12.5.1).
 TEST(ConstantFunctionElaboration, CasezStatementFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -165,7 +140,6 @@ TEST(ConstantFunctionElaboration, CasezStatementFolds) {
   EXPECT_EQ(ResolvedParam(design, "Y"), 4);
 }
 
-// case inside matches a value against a range or a value (§12.5.4).
 TEST(ConstantFunctionElaboration, CaseInsideStatementFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -187,9 +161,6 @@ TEST(ConstantFunctionElaboration, CaseInsideStatementFolds) {
   EXPECT_EQ(ResolvedParam(design, "Y"), 4);
 }
 
-// §13.4.3 evaluates a constant function as it would run, so a real local and a
-// real result keep their real values: x / 4 with x at 2.0 is 0.5, and 0.5
-// times 4 is 2 (#6344).
 TEST(ConstantFunctionElaboration, RealLocalsAndResultKeepTheirValues) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -217,10 +188,6 @@ TEST(ConstantFunctionElaboration, RealLocalsAndResultKeepTheirValues) {
   EXPECT_EQ(ResolvedParam(design, "Q"), 6);
 }
 
-// casex takes an x bit of an item as matching anything as well (§12.5.1);
-// case ignores none, and a constant selector holds no x or z, so an item with
-// one matches nothing; a leftmost z digit fills the bits above it (§5.7.1),
-// and a decimal literal's z digit every bit.
 TEST(ConstantFunctionElaboration, CaseItemXAndZBitsFold) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -255,8 +222,6 @@ TEST(ConstantFunctionElaboration, CaseItemXAndZBitsFold) {
   EXPECT_EQ(ResolvedParam(design, "G"), 8);
 }
 
-// An unsigned case inside range compares the values as unsigned (§12.5.4):
-// 4'd3 is inside [4'd2:4'd5], and 4'd9 is not.
 TEST(ConstantFunctionElaboration, UnsignedCaseInsideRangeFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -274,9 +239,6 @@ TEST(ConstantFunctionElaboration, UnsignedCaseInsideRangeFolds) {
   EXPECT_EQ(ResolvedParam(design, "X"), 4);
 }
 
-// A formal declared real takes the real its actual is, and a real result read
-// in an integral context is rounded (§6.12.1): h(1.25) is 2.5, which rounds
-// to 3, and times 4 is 10.0.
 TEST(ConstantFunctionElaboration, RealFormalKeepsItsValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -292,9 +254,6 @@ TEST(ConstantFunctionElaboration, RealFormalKeepsItsValue) {
   EXPECT_EQ(ResolvedParam(design, "S"), 3);
 }
 
-// §5.7.1's digits in every base: a hex item's letters and an underscore, an
-// octal item, upper-case X and Z, a leftmost x filling the bits above it, a
-// decimal x standing for every bit, and an item wider than 64 bits.
 TEST(ConstantFunctionElaboration, CaseItemDigitsOfEveryBaseFold) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -341,9 +300,6 @@ TEST(ConstantFunctionElaboration, CaseItemDigitsOfEveryBaseFold) {
   EXPECT_EQ(ResolvedParam(design, "W2"), 4);
 }
 
-// A case statement whose selector, item or range bound does not fold leaves
-// the call unfolded rather than choosing an arm: `bad` holds a forever loop,
-// which the interpreter does not model.
 TEST(ConstantFunctionElaboration, CaseWithAnUnfoldedOperandDoesNotFold) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -372,7 +328,6 @@ TEST(ConstantFunctionElaboration, CaseWithAnUnfoldedOperandDoesNotFold) {
   EXPECT_EQ(ResolvedParam(design, "R"), -1);
 }
 
-// shortreal and realtime are real types (§6.12) as real is.
 TEST(ConstantFunctionElaboration, ShortrealAndRealtimeKeepTheirValues) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -389,9 +344,6 @@ TEST(ConstantFunctionElaboration, ShortrealAndRealtimeKeepTheirValues) {
   EXPECT_EQ(ResolvedParam(design, "Q"), 6);
 }
 
-// §11.3.1 applies the relational, equality and logical operators to reals, so
-// a constant function's if, while and conditional predicates over a real fold
-// by its value (#6422): each true test adds its bit, 919 in all.
 TEST(ConstantFunctionElaboration, RealComparisonsFold) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -420,10 +372,6 @@ TEST(ConstantFunctionElaboration, RealComparisonsFold) {
   EXPECT_EQ(ResolvedParam(design, "P"), 919);
 }
 
-// §12.7.1 lets a for loop declare a real variable, which keeps its real value
-// for the loop's run (#6423), and hands the name back afterwards to what it
-// named outside: a real the loop hid, and an integer loop variable hiding a
-// real.
 TEST(ConstantFunctionElaboration, RealForLoopVariableKeepsItsValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -457,9 +405,6 @@ TEST(ConstantFunctionElaboration, RealForLoopVariableKeepsItsValue) {
   EXPECT_EQ(ResolvedParam(design, "P3"), 7);
 }
 
-// §13.4.3 ignores a constant function's system task calls, but not the
-// elaboration severity tasks (§20.10.1), which report while the call is
-// folded, formatted against the function's locals (#6434).
 TEST(ConstantFunctionElaboration, SeverityTaskInBodyReportsWhileFolding) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -476,7 +421,6 @@ TEST(ConstantFunctionElaboration, SeverityTaskInBodyReportsWhileFolding) {
       ReportedError(f.diag.Diagnostics(), "n is 5, above 3", 3, "20.10.1"));
 }
 
-// A call whose body never reaches the task reports nothing.
 TEST(ConstantFunctionElaboration, SeverityTaskNotReachedReportsNothing) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -494,9 +438,6 @@ TEST(ConstantFunctionElaboration, SeverityTaskNotReachedReportsNothing) {
   EXPECT_EQ(ResolvedParam(design, "P"), 2);
 }
 
-// §13.4.3 bars a constant function from calling a constant function in any
-// context requiring a constant expression, and a local parameter's
-// initializer in its body is one (#6441); a constant there is not.
 TEST(ConstantFunctionElaboration, ConstantCallInALocalParameterError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -522,10 +463,6 @@ TEST(ConstantFunctionElaboration, ConstantCallInALocalParameterError) {
   EXPECT_EQ(ResolvedParam(design, "Q"), 5);
 }
 
-// Each of §20.10.1's severity tasks reports while a constant function folds,
-// $fatal's first argument its finish number and $fatal and $error errors,
-// $warning and $info warnings; any other system task is ignored (§13.4.3),
-// and a call folded twice reports once.
 TEST(ConstantFunctionElaboration, EverySeverityTaskReportsWhileFolding) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -16,9 +16,6 @@ const DataType* ResolvedAggregateType(const DataType& dtype,
                                       const TypedefMap& typedefs,
                                       const ScopeMap& scope, Arena& arena) {
   const DataType* d = &dtype;
-  // §6.18 lets a typedef name stand for another typedef name; the chain is
-  // bounded so a name defined in terms of itself resolves to nothing rather
-  // than looping.
   for (int hops = 0; d->kind == DataTypeKind::kNamed && hops < 16; ++hops) {
     d = FindNamedType(*d, typedefs);
     if (d == nullptr) return nullptr;
@@ -51,12 +48,8 @@ const DataType* NamedPackedVectorType(const DataType& dtype,
 
 namespace {
 
-// The block a width's scratch fold starts its arena with: a few literals and
-// a nested type or two, where the arena's default block is 64 KiB.
 constexpr std::size_t kFoldScratchBlockSize = 4096;
 
-// `bound` folded against `scope`, as a literal of the integer it is; `bound`
-// itself where it is a literal already or does not fold.
 Expr* FoldedBound(Expr* bound, const ScopeMap& scope, Arena& arena) {
   if (bound == nullptr || bound->kind == ExprKind::kIntegerLiteral)
     return bound;
@@ -69,8 +62,6 @@ Expr* FoldedBound(Expr* bound, const ScopeMap& scope, Arena& arena) {
   return literal;
 }
 
-// An unpacked dimension folded: `[size]` whole, `[left:right]` and a queue's
-// `[$:bound]` by their bounds. A dynamic dimension, null, has none.
 Expr* FoldedUnpackedDim(Expr* dim, const ScopeMap& scope, Arena& arena) {
   if (dim == nullptr) return nullptr;
   bool is_range =

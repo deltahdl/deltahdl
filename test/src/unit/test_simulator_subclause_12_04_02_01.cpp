@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -23,7 +21,6 @@ TEST(UniqueIfViolationSim, MatureReportsImmediately) {
   proc.kind = ProcessKind::kInitial;
   f.ctx.SetCurrentProcess(&proc);
 
-  // A unique report (Table 20-6's bit 32) raised in no named scope.
   proc.pending_violations.push_back(
       {SourceLoc{1, 3, 5}, "mature test", "12.4.2.1", 32, ""});
   f.ctx.MaturePendingViolations();
@@ -299,14 +296,6 @@ TEST(UniqueIfViolationSim, UniqueIfThreeBranchesOneMatchNoWarning) {
 }
 
 TEST(UniqueIfViolationSim, AlwaysCombRetriggerFlushesPendingViolation) {
-  // §12.4.2.1: an always_comb procedure that accumulates a unique-if violation
-  // and is then resumed by a transition on a dependent signal reaches a flush
-  // point on that resume. Here the first evaluation sees a==1 and b==1, so both
-  // branch conditions match and a violation is queued. The nonblocking update
-  // of b re-triggers the procedure within the same time step; on resume the
-  // pending violation is flushed before the Observed region can mature it, so
-  // nothing is reported. Without the flush the stale violation would mature and
-  // produce a warning.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -332,15 +321,6 @@ TEST(UniqueIfViolationSim, AlwaysCombRetriggerFlushesPendingViolation) {
 }
 
 TEST(UniqueIfViolationSim, AlwaysLatchRetriggerFlushesPendingViolation) {
-  // §12.4.2.1: the flush-point-(b) rule names an always_comb *or* always_latch
-  // procedure resumed by a transition on a dependent signal. This is the
-  // always_latch counterpart of AlwaysCombRetriggerFlushesPendingViolation.
-  // The first evaluation sees a==1 and b==1, so both unique-if branch
-  // conditions are true and a violation is queued. The always_latch has no
-  // trailing else, so it models a latch (§9.2.2.3). The nonblocking update of b
-  // re-triggers the procedure within the same time step; on resume the pending
-  // violation is flushed before the Observed region can mature it, so nothing
-  // is reported. Without the flush the stale violation would mature and warn.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -365,14 +345,6 @@ TEST(UniqueIfViolationSim, AlwaysLatchRetriggerFlushesPendingViolation) {
 }
 
 TEST(UniqueIfViolationSim, LoopIterationsEachQueueViolationAllMature) {
-  // §12.4.2.1 (second example): when a unique-if sits inside a loop, each
-  // iteration independently checks for a uniqueness violation, and any
-  // iteration can queue one. Here the two branch conditions are both constant
-  // true, so every one of the three iterations queues an overlap violation
-  // into this process's report queue. The initial procedure never suspends, so
-  // no flush point is reached; in the Observed region all three pending reports
-  // mature and are reported. This is the real-source, loop-produced counterpart
-  // of MultipleViolationsMature.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -390,15 +362,6 @@ TEST(UniqueIfViolationSim, LoopIterationsEachQueueViolationAllMature) {
 }
 
 TEST(UniqueIfViolationSim, LoopViolationsAllFlushedOnReschedule) {
-  // §12.4.2.1 (second example): the loop form is likewise immune to zero-delay
-  // glitches -- if the always_comb procedure is rescheduled, *all* violations
-  // queued across the loop's iterations are flushed together and the whole loop
-  // is re-evaluated. The first pass sees a==1 and b==1, so both loop iterations
-  // queue an overlap violation (two pending reports). The nonblocking update of
-  // b re-triggers the procedure within the same time step; on resume the entire
-  // queue is flushed before the Observed region can mature it, and the loop is
-  // re-evaluated with b==0 (no overlap). Nothing is reported. The trailing else
-  // keeps the startup pass (a,b both x) from queuing a no-match violation.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -425,10 +388,6 @@ TEST(UniqueIfViolationSim, LoopViolationsAllFlushedOnReschedule) {
 }
 
 TEST(UniqueIfViolationSim, EventControlFlushesPendingViolation) {
-  // §12.4.2.1: a process that accumulates a unique-if violation and then
-  // suspends on an event control reaches a flush point when it resumes in the
-  // same time step (before the Observed region matures the report), so the
-  // pending violation is discarded and never reported.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -451,8 +410,6 @@ TEST(UniqueIfViolationSim, EventControlFlushesPendingViolation) {
 }
 
 TEST(UniqueIfViolationSim, WaitStatementFlushesPendingViolation) {
-  // §12.4.2.1: resuming after suspending on a wait statement is likewise a
-  // flush point; the pending unique-if violation is dropped.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -476,9 +433,6 @@ TEST(UniqueIfViolationSim, WaitStatementFlushesPendingViolation) {
 }
 
 TEST(UniqueIfViolationSim, PriorityIfNoMatchDeferredWarning) {
-  // §12.4.2.1: deferred violation reporting applies to priority-if as well as
-  // unique/unique0. A priority-if with no matching condition and no else queues
-  // a violation that is reported when the Observed region matures it.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -497,9 +451,6 @@ TEST(UniqueIfViolationSim, PriorityIfNoMatchDeferredWarning) {
 }
 
 TEST(UniqueIfViolationSim, WaitAlreadyTrueDoesNotFlushPendingViolation) {
-  // §12.4.2.1: a flush point is reached only when the procedure actually
-  // suspended on the wait. A wait whose condition is already true does not
-  // suspend, so a previously queued violation is not flushed and still matures.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -518,11 +469,6 @@ TEST(UniqueIfViolationSim, WaitAlreadyTrueDoesNotFlushPendingViolation) {
 }
 
 TEST(UniqueIfViolationSim, MaturedViolationSurvivesLaterEventControlResume) {
-  // §12.4.2.1: once a pending report matures in the Observed region it can no
-  // longer be flushed. The violation is detected and matured at time 0; the
-  // process only resumes from the event control at a later time step, so the
-  // flush on resume finds an empty queue and the already-reported violation
-  // stands.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -544,9 +490,6 @@ TEST(UniqueIfViolationSim, MaturedViolationSurvivesLaterEventControlResume) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2.1: a unique-if whose conditions overlap raises a violation report,
-// and that report names §12.4.2.1 rather than §12.5.3.1, which states the rule
-// for a case statement.
 TEST(UniqueIfViolationSim, OverlapReportNames12_4_2_1) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -568,9 +511,6 @@ TEST(UniqueIfViolationSim, OverlapReportNames12_4_2_1) {
                               "12.4.2.1"));
 }
 
-// §12.4.2.1 with §9.4.5: the `@(e)` of an intra-assignment timing control is
-// an event control, so resuming after suspending on it is a flush point and
-// the pending unique-if violation is dropped.
 TEST(UniqueIfViolationSim, IntraAssignmentEventFlushesPendingViolation) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -590,7 +530,6 @@ TEST(UniqueIfViolationSim, IntraAssignmentEventFlushesPendingViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// The same for an intra-assignment `repeat (n) @(e)`.
 TEST(UniqueIfViolationSim, IntraAssignmentRepeatEventFlushesPendingViolation) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -613,8 +552,6 @@ TEST(UniqueIfViolationSim, IntraAssignmentRepeatEventFlushesPendingViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A.6.5 makes `wait fork` a wait statement, so resuming after it suspended on
-// a running child is a flush point (§12.4.2.1).
 TEST(UniqueIfViolationSim, WaitForkFlushesPendingViolation) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -636,7 +573,6 @@ TEST(UniqueIfViolationSim, WaitForkFlushesPendingViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// And `wait_order` (A.6.5): the process suspends until a is triggered.
 TEST(UniqueIfViolationSim, WaitOrderFlushesPendingViolation) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -660,9 +596,6 @@ TEST(UniqueIfViolationSim, WaitOrderFlushesPendingViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2.1 leaves violation reporting to the assertion control tasks of
-// §20.11, whose Table 20-6 gives a unique report the assertion_type bit 32. An
-// Off for that bit adds no report until an On, so only the case's is made.
 TEST(UniqueIfViolationSim, AssertControlOffStopsUniqueViolationReports) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -680,8 +613,6 @@ TEST(UniqueIfViolationSim, AssertControlOffStopsUniqueViolationReports) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// A Kill also flushes a queued report of the type it selects that has not
-// matured, the unique if's being queued for the Observed region.
 TEST(UniqueIfViolationSim, AssertControlKillFlushesQueuedViolationReport) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -697,8 +628,6 @@ TEST(UniqueIfViolationSim, AssertControlKillFlushesQueuedViolationReport) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// $assertoff is $assertcontrol(4, 15, 7), and 15 selects no violation report
-// type, so the unique if's report is made.
 TEST(UniqueIfViolationSim, AssertOffLeavesViolationReports) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -714,7 +643,6 @@ TEST(UniqueIfViolationSim, AssertOffLeavesViolationReports) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// An Off for unique (32) leaves unique0's reports (64) on.
 TEST(UniqueIfViolationSim, AssertControlOffForUniqueLeavesUnique0Reports) {
   SimFixture f;
   auto* var = RunAndFindVar(

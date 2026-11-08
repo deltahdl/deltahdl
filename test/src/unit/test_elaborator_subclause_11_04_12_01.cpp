@@ -201,9 +201,6 @@ TEST(ReplicationElaboration, ZeroReplicationInsideConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.12.1: a zero-multiplier replication is only allowed inside a
-// concatenation that has at least one positive-size operand. A concatenation
-// built entirely from zero replications has no such operand and is rejected.
 TEST(ReplicationElaboration, ZeroReplicationConcatAllZeroRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -232,11 +229,6 @@ TEST(ReplicationElaboration, NegativeMultiplierRejected) {
                             "11.4.12.1"));
 }
 
-// §11.4.12.1: the multiplier is a constant expression, so the standalone-zero
-// rule applies to a parameter that evaluates to zero, not only a literal zero.
-// The zero here comes from a `parameter` (§11.2.1) resolved at elaboration, and
-// the replication stands alone (not inside a concatenation with a positive-size
-// operand), so it is rejected.
 TEST(ReplicationElaboration, ParameterZeroMultiplierStandaloneRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -253,9 +245,6 @@ TEST(ReplicationElaboration, ParameterZeroMultiplierStandaloneRejected) {
                             5, "11.4.12.1"));
 }
 
-// §11.4.12.1: a negative multiplier is illegal even when it comes from a
-// parameter (§11.2.1) rather than a literal; the constant-expression evaluation
-// resolves the parameter in the module scope and rejects the negative value.
 TEST(ReplicationElaboration, ParameterNegativeMultiplierRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -270,19 +259,6 @@ TEST(ReplicationElaboration, ParameterNegativeMultiplierRejected) {
                             "11.4.12.1"));
 }
 
-// §11.4.12.1 keeps a replication off the left-hand side of an assignment, a
-// rule about the lvalue and not about the statement the assignment stands in.
-//
-// ElaboratorOperationRules::WalkStmtsForReplicateLvalue in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `{4{a}} = 8'hFF` in one of the seven positions it did not read,
-// where the lvalue reached CheckReplicateLvalue not at all.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(ReplicationElaboration, ReplicationOnLvalueInAForkArmNames11_4_12_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -300,10 +276,6 @@ TEST(ReplicationElaboration, ReplicationOnLvalueInAForkArmNames11_4_12_1) {
                             5, "11.4.12.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(ReplicationElaboration,
      ReplicationOnLvalueInAnAssertionPassStatementNames11_4_12_1) {
   ElabFixture f;
@@ -334,10 +306,6 @@ TEST(ReplicationElaboration,
                             4, "11.4.12.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(ReplicationElaboration, ReplicationOnLvalueInARandcaseItemNames11_4_12_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -351,10 +319,6 @@ TEST(ReplicationElaboration, ReplicationOnLvalueInARandcaseItemNames11_4_12_1) {
                             3, "11.4.12.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(ReplicationElaboration,
      ReplicationOnLvalueInARandsequenceCodeBlockNames11_4_12_1) {
   ElabFixture f;
@@ -373,14 +337,6 @@ TEST(ReplicationElaboration,
                             5, "11.4.12.1"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(ReplicationElaboration,
      ReplicationOnLvalueInAForLoopInitializationNames11_4_12_1) {
   ElabFixture f;
@@ -410,20 +366,6 @@ TEST(ReplicationElaboration, ReplicationOnLvalueInAForLoopStepNames11_4_12_1) {
                             4, "11.4.12.1"));
 }
 
-// §11.4.12.1 lets a zero replication stand only beside an operand of positive
-// size in the same concatenation, and says nothing about the statement the
-// replication is written in.
-//
-// WalkStmtsForZeroReplicateStandalone in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `result = {0{a}}` in one of the seven positions it did not read,
-// every one of which elaborated clean beforehand.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(ReplicationElaboration,
      ZeroReplicationStandaloneInAForkArmNames11_4_12_1) {
   ElabFixture f;
@@ -444,10 +386,6 @@ TEST(ReplicationElaboration,
                             6, "11.4.12.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(ReplicationElaboration,
      ZeroReplicationStandaloneInAnAssertionPassStatementNames11_4_12_1) {
   ElabFixture f;
@@ -482,10 +420,6 @@ TEST(ReplicationElaboration,
                             5, "11.4.12.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(ReplicationElaboration,
      ZeroReplicationStandaloneInARandcaseItemNames11_4_12_1) {
   ElabFixture f;
@@ -502,10 +436,6 @@ TEST(ReplicationElaboration,
                             4, "11.4.12.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(ReplicationElaboration,
      ZeroReplicationStandaloneInARandsequenceCodeBlockNames11_4_12_1) {
   ElabFixture f;
@@ -526,14 +456,6 @@ TEST(ReplicationElaboration,
                             6, "11.4.12.1"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(ReplicationElaboration,
      ZeroReplicationStandaloneInAForLoopInitializationNames11_4_12_1) {
   ElabFixture f;
@@ -568,20 +490,6 @@ TEST(ReplicationElaboration,
                             5, "11.4.12.1"));
 }
 
-// §11.4.12.1 requires a replication multiplier to be a constant expression that
-// contains no x or z, a rule about the multiplier and not about the statement
-// around it.
-//
-// ElaboratorOperationRules::WalkStmtsForReplicateMultiplier in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `a = {1'bx{1'b0}}` in one of the seven positions it did not read,
-// where the multiplier reached CheckReplicateRepeatCount not at all.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(ReplicationElaboration, XMultiplierInAForkArmNames11_4_12_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -599,10 +507,6 @@ TEST(ReplicationElaboration, XMultiplierInAForkArmNames11_4_12_1) {
                             5, "11.4.12.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(ReplicationElaboration,
      XMultiplierInAnAssertionPassStatementNames11_4_12_1) {
   ElabFixture f;
@@ -633,10 +537,6 @@ TEST(ReplicationElaboration,
                             4, "11.4.12.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(ReplicationElaboration, XMultiplierInARandcaseItemNames11_4_12_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -650,10 +550,6 @@ TEST(ReplicationElaboration, XMultiplierInARandcaseItemNames11_4_12_1) {
                             3, "11.4.12.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(ReplicationElaboration,
      XMultiplierInARandsequenceCodeBlockNames11_4_12_1) {
   ElabFixture f;
@@ -672,14 +568,6 @@ TEST(ReplicationElaboration,
                             5, "11.4.12.1"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(ReplicationElaboration,
      XMultiplierInAForLoopInitializationNames11_4_12_1) {
   ElabFixture f;
@@ -709,8 +597,6 @@ TEST(ReplicationElaboration, XMultiplierInAForLoopStepNames11_4_12_1) {
                             4, "11.4.12.1"));
 }
 
-// A replication's body is a concatenation (A.8.1), so a zero replication there
-// stands beside its other operands, and one of positive size makes it legal.
 TEST(ReplicationElaboration, ZeroReplicationInsideAReplicationBody) {
   ElabFixture f;
   ElaborateSrc(
@@ -728,8 +614,6 @@ TEST(ReplicationElaboration, ZeroReplicationInsideAReplicationBody) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §11.4.12.1 makes the multiplier a constant expression, and §11.4.12.2 lets a
-// string replication take one that is not.
 TEST(ReplicationElaboration, NonConstantMultiplierOfNonStringReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -751,12 +635,6 @@ TEST(ReplicationElaboration, NonConstantMultiplierOfNonStringReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §11.4.12.1 keeps a replication off an assignment's left-hand side, and an
-// expression assigns in two places: an increment's or decrement's operand,
-// which §11.4.2 makes an assignment, and the target of an assignment written
-// within an expression (A.8.3). A compound assignment statement, whose
-// right-hand side holds its target again as the operator's left operand, is
-// reported once, and a replication read as a value stands.
 TEST(ReplicationElaboration, ReplicationAssignedWithinAnExpressionRejected) {
   ElabFixture f;
   ElaborateSrc(

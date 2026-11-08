@@ -38,9 +38,6 @@ TEST(BindDirective, BindDirectiveInInterface) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Second bind_directive alternative: a bind_target_instance directly precedes
-// the bind_instantiation, with no bind_target_instance_list. The directive is
-// recorded with a hierarchical target and an empty instance list.
 TEST(BindDirective, SecondFormBindsHierarchicalInstanceTarget) {
   auto r = Parse(
       "module probe; endmodule\n"
@@ -53,8 +50,6 @@ TEST(BindDirective, SecondFormBindsHierarchicalInstanceTarget) {
   EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
 }
 
-// bind_target_instance_list production: the colon-introduced list collects each
-// comma-separated bind_target_instance into the directive.
 TEST(BindDirective, FirstFormParsesTargetInstanceList) {
   auto r = Parse(
       "module probe; endmodule\n"
@@ -69,9 +64,6 @@ TEST(BindDirective, FirstFormParsesTargetInstanceList) {
   EXPECT_EQ(r.cu->bind_directives[0]->target_instances[1].path, "top.c3");
 }
 
-// A bind_target_instance carries a constant_bit_select, used to single out one
-// element of an instance array. The parser records the select expression
-// alongside the hierarchical name it qualifies.
 TEST(BindDirective, TargetInstanceCarriesConstantBitSelect) {
   auto r = Parse(
       "module probe; endmodule\n"
@@ -89,10 +81,6 @@ TEST(BindDirective, TargetInstanceCarriesConstantBitSelect) {
   EXPECT_NE(segments[1].selects[0], nullptr);
 }
 
-// The same bind_target_instance production also governs the second form's own
-// target: a hierarchical_identifier followed by a constant_bit_select. Here the
-// select rides on the directive target itself (not a list entry), so the parser
-// records it on the target's last segment while the instance list stays empty.
 TEST(BindDirective, SecondFormTargetCarriesConstantBitSelect) {
   auto r = Parse(
       "module probe; endmodule\n"
@@ -109,9 +97,6 @@ TEST(BindDirective, SecondFormTargetCarriesConstantBitSelect) {
   EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
 }
 
-// §23.11 states the bind_instantiation admits the full range of instantiation
-// syntax, so parameter associations may ride on it. Named form: the override is
-// recorded on the instantiation's inst_params keyed by parameter name.
 TEST(BindDirective, BindInstantiationCarriesNamedParameterOverride) {
   auto r = Parse(
       "module cpu; endmodule\n"
@@ -127,9 +112,6 @@ TEST(BindDirective, BindInstantiationCarriesNamedParameterOverride) {
   EXPECT_NE(inst->inst_params[0].second, nullptr);
 }
 
-// Companion positional form of a bind_instantiation parameter association: the
-// override has no parameter name and travels by position, a distinct parser
-// path from the named form above.
 TEST(BindDirective, BindInstantiationCarriesPositionalParameterOverride) {
   auto r = Parse(
       "module cpu; endmodule\n"

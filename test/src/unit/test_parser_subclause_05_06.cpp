@@ -117,8 +117,6 @@ TEST(LexicalConventionParsing, IdentifierInAssignExpression) {
 
 TEST(LexicalConventionParsing, KeywordCannotBeUsedAsIdentifier) {
   auto r = Parse("module m; logic module; endmodule");
-  // §6.8 states the variable declaration whose declarator the keyword stands
-  // in, and Parser::ParseVarDeclList files the report under it.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got 'module'", 1, "6.8"));
 }
@@ -131,10 +129,6 @@ TEST(LexicalConventionParsing, IdentifierExceedingMaxLengthReportsError) {
       "5.6"));
 }
 
-// §5.6 has the first character of a simple identifier be a letter or an
-// underscore, never a `$`. The lexer makes `$dollar` a system identifier, the
-// only thing those characters can be; where a name is expected, the report is
-// the lexical rule the spelling breaks, not the declaration grammar around it.
 TEST(LexicalConventionParsing, NameBeginningWithDollarIsReported) {
   auto r = Parse(
       "module identifiers();\n"
@@ -144,9 +138,6 @@ TEST(LexicalConventionParsing, NameBeginningWithDollarIsReported) {
       r.diags, "identifier '$dollar' shall not begin with '$'", 2, "5.6"));
 }
 
-// The same rule for a digit: `0number` is the integer 0 with the identifier
-// number directly against it, and that adjacency is what makes it one
-// misspelt name rather than two tokens the grammar has other uses for.
 TEST(LexicalConventionParsing, NameBeginningWithDigitIsReported) {
   auto r = Parse(
       "module identifiers();\n"
@@ -157,9 +148,6 @@ TEST(LexicalConventionParsing, NameBeginningWithDigitIsReported) {
       r.diags, "identifier '0number' shall not begin with a digit", 3, "5.6"));
 }
 
-// With white space between them, `0` and `number` are the two tokens they
-// look like and no name beginning with a digit was written: the declaration
-// is still wrong, but under its own grammar, not under §5.6.
 TEST(LexicalConventionParsing,
      DigitThenSpaceThenNameIsReportedByTheDeclarationGrammar) {
   auto r = Parse(
@@ -172,9 +160,6 @@ TEST(LexicalConventionParsing,
                             2, "6.8"));
 }
 
-// The misspelt name is taken as the declarator so that the rest of the
-// declaration is parsed in step: one report for the name, none for the
-// declaration or the module body around it.
 TEST(LexicalConventionParsing,
      MisspeltNameIsTakenAsTheDeclaratorWithoutCascade) {
   auto r = Parse(

@@ -39,7 +39,6 @@ TEST(StringIndexAssocArrayElaboration, VectorElementType) {
   EXPECT_EQ(v.width, 8u);
 }
 
-// §7.8.2: a string literal index of any length is a valid index.
 TEST(StringIndexAssocArrayElaboration, StringLiteralIndexNoError) {
   ElabFixture f;
   ElaborateSrc(
@@ -51,7 +50,6 @@ TEST(StringIndexAssocArrayElaboration, StringLiteralIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.2: a string-typed variable is a valid index.
 TEST(StringIndexAssocArrayElaboration, StringVariableIndexNoError) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,8 +62,6 @@ TEST(StringIndexAssocArrayElaboration, StringVariableIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.2: indexing with a non-string literal is a different type and shall be
-// reported as a type check error.
 TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -80,7 +76,6 @@ TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexIsError) {
                             3, "7.8.2"));
 }
 
-// §7.8.2: indexing with a variable of a non-string type is a type check error.
 TEST(StringIndexAssocArrayElaboration, IntegerVariableIndexIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,8 +91,6 @@ TEST(StringIndexAssocArrayElaboration, IntegerVariableIndexIsError) {
                             4, "7.8.2"));
 }
 
-// §7.8.2: string literals of any length are valid indices, so the
-// zero-length empty string literal is accepted without a type check error.
 TEST(StringIndexAssocArrayElaboration, EmptyStringLiteralIndexNoError) {
   ElabFixture f;
   ElaborateSrc(
@@ -109,9 +102,6 @@ TEST(StringIndexAssocArrayElaboration, EmptyStringLiteralIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.2: the illegal-index rule applies wherever the array is indexed, not
-// only when it is the assignment target. A non-string index in a read (an
-// index used as a source operand) is a type check error just the same.
 TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexInReadIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,18 +117,6 @@ TEST(StringIndexAssocArrayElaboration, IntegerLiteralIndexInReadIsError) {
                             4, "7.8.2"));
 }
 
-// The seven cases below stand in the seven statement positions
-// WalkStmtsForStringIndexSelect in
-// src/elaborator/elaborator_validate_class_array_index.cpp reached only once it
-// took its list of nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Each writes the integer index
-// IntegerLiteralIndexIsError above writes in a plain initial statement, and
-// §7.8.2 rules on it the same way wherever it stands. Each elaborated clean
-// beforehand.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(StringIndexAssocArrayElaboration, IntegerIndexInAForkArmIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -158,9 +136,6 @@ TEST(StringIndexAssocArrayElaboration, IntegerIndexInAForkArmIsError) {
                             6, "7.8.2"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// This case covers the pass arm and the one below it the else arm.
 TEST(StringIndexAssocArrayElaboration,
      IntegerIndexInAnAssertionPassStatementIsError) {
   ElabFixture f;
@@ -195,9 +170,6 @@ TEST(StringIndexAssocArrayElaboration,
                             5, "7.8.2"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`. The type
-// check is a static one, so it holds whether the weighted draw would select
-// the item or not.
 TEST(StringIndexAssocArrayElaboration, IntegerIndexInARandcaseItemIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -213,9 +185,6 @@ TEST(StringIndexAssocArrayElaboration, IntegerIndexInARandcaseItemIsError) {
                             4, "7.8.2"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements.
 TEST(StringIndexAssocArrayElaboration,
      IntegerIndexInARandsequenceCodeBlockIsError) {
   ElabFixture f;
@@ -236,11 +205,6 @@ TEST(StringIndexAssocArrayElaboration,
                             6, "7.8.2"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`, so an assignment stands at each of the two
-// positions: this case writes one at the initialization and the case below it
-// writes one at the step.
 TEST(StringIndexAssocArrayElaboration,
      IntegerIndexInAForLoopInitializationIsError) {
   ElabFixture f;
@@ -274,9 +238,6 @@ TEST(StringIndexAssocArrayElaboration, IntegerIndexInAForLoopStepIsError) {
                             5, "7.8.2"));
 }
 
-// §7.8.2: a string index shall be a string, whatever form the index takes: an
-// arithmetic operator gives an integral or real value and any other operator
-// an integral one, while a string method may give a string.
 TEST(StringIndexAssocArrayElaboration, NonStringIndexExpressionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -307,12 +268,6 @@ TEST(StringIndexAssocArrayElaboration, NonStringIndexExpressionRejected) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 13u) << d.message;
 }
 
-// §7.8.2: a string index shall be a string, and a select, a cast, a function
-// call or a concatenation gives the type its declaration states: an int
-// array's element, a string's character, a net's bit, a real array's element,
-// a cast to int, an int negated, an integral concatenation and a class array's
-// element are no string; a string array's element, a function returning a
-// string, a cast to string and a concatenation holding a string are.
 TEST(StringIndexAssocArrayElaboration, NonStringSelectCastAndCallRejected) {
   ElabFixture f;
   ElaborateSrc(

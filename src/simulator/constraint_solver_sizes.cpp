@@ -10,11 +10,6 @@
 
 namespace delta {
 
-// 18.5.7.1: an array's size method is solved with the size constraints,
-// ahead of the iterative (foreach) constraints over that array. The sizes
-// are drawn once per solve, ahead of the attempts that solve the other
-// variables, and held through them.
-
 void DrawArraySizeVariables(
     std::unordered_map<std::string, RandVariable>& variables,
     std::unordered_map<std::string, int64_t>& values,
@@ -28,8 +23,6 @@ void DrawArraySizeVariables(
   }
 }
 
-// 18.5.7.1: whether every hard constraint decided on an array size alone --
-// a size constraint -- holds under the values drawn.
 bool ConstraintSolver::SizeConstraintsHold(
     const std::vector<ConstraintExpr>& extra) {
   std::vector<const ConstraintExpr*> hard;
@@ -49,8 +42,6 @@ std::unordered_map<std::string, int64_t> ConstraintSolver::DrawArraySizesOnce(
     const std::function<int64_t(RandVariable&)>& gen) {
   static constexpr int kMaxSizeAttempts = 500;
   std::unordered_map<std::string, int64_t> sizes;
-  // With no array size to draw, nothing is drawn here, so that a solve over
-  // scalars alone draws the sequence it drew before.
   if (std::none_of(variables_.begin(), variables_.end(),
                    [](const auto& kv) { return kv.second.is_array_size; })) {
     return sizes;

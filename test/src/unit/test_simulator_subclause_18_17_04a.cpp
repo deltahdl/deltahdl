@@ -9,17 +9,6 @@ using namespace delta;
 
 namespace {
 
-// 18.17.4 governs the repeat production statement. Its grammar (rs_repeat) is
-// part of the parent randsequence syntax (Syntax 18-13), so parser acceptance
-// belongs to 18.17. What this subclause defines is purely a generation-time
-// rule: the repeat expression yields a non-negative integral count, and the
-// associated production is generated that many times. The repeat statement
-// cannot be aborted partway through -- a break unwinds the whole randsequence
-// (the break machinery itself is owned by 18.17.6). All of that is observed at
-// the simulator stage in the randsequence engine (stmt_exec.cpp).
-
-// The count specifies exactly how many times the production is generated: a
-// fixed count of 3 generates the inc production three times.
 TEST(RandsequenceSim, RepeatProduction) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -37,8 +26,6 @@ TEST(RandsequenceSim, RepeatProduction) {
   EXPECT_EQ(x, 3u);
 }
 
-// A count of zero is a valid non-negative count: the production is generated
-// zero times, so its side effects never occur.
 TEST(RandsequenceSim, RepeatZeroCountGeneratesNothing) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -56,12 +43,9 @@ TEST(RandsequenceSim, RepeatZeroCountGeneratesNothing) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // pre sets 1, the repeated production runs bump zero times, post adds 10.
   EXPECT_EQ(x, 11u);
 }
 
-// The repeat count is an arbitrary expression, evaluated when the production is
-// generated, not just a constant literal.
 TEST(RandsequenceSim, RepeatCountFromExpression) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -78,13 +62,9 @@ TEST(RandsequenceSim, RepeatCountFromExpression) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // n + 1 == 5 generations of inc.
   EXPECT_EQ(x, 5u);
 }
 
-// The repeat count also admits a parameter, a constant form of 11.2.1.
-// Resolving it takes the parameter-lookup path in expression evaluation rather
-// than reading a literal, and its value fixes the generation count.
 TEST(RandsequenceSim, RepeatCountFromParameter) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -100,12 +80,9 @@ TEST(RandsequenceSim, RepeatCountFromParameter) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // P == 3 generations of inc.
   EXPECT_EQ(x, 3u);
 }
 
-// The repeat count also admits a localparam, a distinct constant form of
-// 11.2.1. The generation count follows the localparam's value.
 TEST(RandsequenceSim, RepeatCountFromLocalparam) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -121,13 +98,9 @@ TEST(RandsequenceSim, RepeatCountFromLocalparam) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // L == 4 generations of inc.
   EXPECT_EQ(x, 4u);
 }
 
-// The repeat production statement cannot be terminated prematurely: a break in
-// the repeated production does not just stop the loop, it unwinds the entire
-// randsequence block. Productions following the repeat are never generated.
 TEST(RandsequenceSim, RepeatBreakTerminatesEntireRandsequence) {
   SimFixture f;
   auto [x, y] =
@@ -147,9 +120,6 @@ TEST(RandsequenceSim, RepeatBreakTerminatesEntireRandsequence) {
                        "  end\n"
                        "endmodule\n",
                        "x", "y");
-  // body runs twice (x->1, x->2) then breaks before the third iteration; the
-  // break terminates the whole randsequence, so after never generates (y stays
-  // 0).
   EXPECT_EQ(x, 2u);
   EXPECT_EQ(y, 0u);
 }

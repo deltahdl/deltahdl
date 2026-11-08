@@ -13,20 +13,6 @@
 namespace delta {
 namespace {
 
-// §39.3 "Static information" says what the subclause is for in one sentence: it
-// shows how to get an assertion's handle and the rest of what is static about
-// the assertion. The two halves are written out below it - §39.3.1 for the
-// handle and §39.3.2 for the information reached through it - so what §39.3
-// itself says is that the two go together, and that the second kind of thing is
-// static. Static is the word that separates this subclause from §39.4's dynamic
-// information: what is read here is a property of the assertion as it was
-// written, so a run that attempts the assertion, fails it, and disables it
-// leaves every one of these answers where it found them. These tests obtain a
-// handle and read the static information through it, and then run the assertion
-// through those dynamics and read it again.
-
-// The static information this tool answers for an assertion, gathered the way
-// an application would: from the handle alone.
 struct StaticAssertionInfo {
   std::string name;
   int type = 0;
@@ -71,10 +57,6 @@ class AssertionStaticInformation : public ::testing::Test {
   AssertionApi api_;
 };
 
-// §39.3, both halves in one: the handle comes from the assertion-class
-// iteration of §39.3.1, and the static information of §39.3.2 - the assertion's
-// name, its type, the instance it occurs in, and the file and line it was
-// written on - is read through that handle and through nothing else.
 TEST_F(AssertionStaticInformation,
        TheHandleIsWhatTheStaticInformationIsReadFrom) {
   vpiHandle it = vpi_iterate(vpiAssertion, VpiHandleOf(&dut_));
@@ -91,11 +73,6 @@ TEST_F(AssertionStaticInformation,
   EXPECT_EQ(info.line, 42);
 }
 
-// §39.3: what this subclause obtains is static, which is what puts it on the
-// other side of the line from §39.4's dynamic information. The assertion here
-// is attempted twice, fails, and is then disabled by a control action - the
-// dynamic side moves under it every time - and the name, type, instance, file
-// and line it reports afterwards are the ones it reported before any of it.
 TEST_F(AssertionStaticInformation, TheInformationDoesNotMoveWhileTheRunDoes) {
   StaticAssertionInfo before = ReadStaticInfo(VpiHandleOf(&assertion_));
 
@@ -107,7 +84,6 @@ TEST_F(AssertionStaticInformation, TheInformationDoesNotMoveWhileTheRunDoes) {
   api_.DeliverAssertionEvent("handshake_p", cbAssertionFailure, 14, attempt);
   ASSERT_TRUE(api_.Control(vpiAssertionDisable, "handshake_p"));
 
-  // The dynamic side did move: the assertion is no longer enabled.
   ASSERT_FALSE(api_.AssertionEnabled("handshake_p"));
 
   StaticAssertionInfo after = ReadStaticInfo(VpiHandleOf(&assertion_));

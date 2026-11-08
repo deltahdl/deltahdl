@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// The report stands at the constructor's `function` keyword rather than at the
-// super.new() call, because ValidateOneClassChainingCtor in
-// src/elaborator/elaborator_validate_class_members.cpp passes
-// ctor->method->loc.
 TEST(ChainedConstructorElaboration, ExtendsArgsAndSuperNewError) {
   ElabFixture f;
   ElabOk(
@@ -63,8 +59,6 @@ TEST(ChainedConstructorElaboration, SuperNewInConstructorOk) {
              "endmodule\n"));
 }
 
-// ReportSequentialSuperNew reports at the offending call's own line, which is
-// the second statement of the constructor body.
 TEST(ChainedConstructorElaboration, SuperNewNotFirstStatementError) {
   ElabFixture f;
   ElabOk(
@@ -121,8 +115,6 @@ TEST(ChainedConstructorElaboration, SuperNewWithArgsOk) {
              "endmodule\n"));
 }
 
-// ReportGuardedSuperNew reports at the top-level statement that encloses the
-// guarded call, so the line is the `if` rather than the super.new() it guards.
 TEST(ChainedConstructorElaboration, SuperNewInsideIfBlockError) {
   ElabFixture f;
   ElabOk(
@@ -184,8 +176,6 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultNoSuperNewOk) {
              "endmodule\n"));
 }
 
-// §8.17: the 'default' keyword in a constructor argument list requires the
-// class to be a subclass.
 TEST(ChainedConstructorElaboration, DefaultArgInNonSubclassError) {
   ElabFixture f;
   ElabOk(
@@ -202,10 +192,6 @@ TEST(ChainedConstructorElaboration, DefaultArgInNonSubclassError) {
                             "8.17"));
 }
 
-// §8.17: a 'default'-expanded constructor argument list shall not declare an
-// explicit argument whose name collides with a superclass constructor argument.
-// The message names the colliding argument, so the fragment asserted is the
-// part of the sentence the emission site writes down.
 TEST(ChainedConstructorElaboration, DefaultArgNameCollidesWithSuperError) {
   ElabFixture f;
   ElabOk(
@@ -227,7 +213,6 @@ TEST(ChainedConstructorElaboration, DefaultArgNameCollidesWithSuperError) {
       "8.17"));
 }
 
-// §8.17: a non-colliding explicit argument alongside 'default' is permitted.
 TEST(ChainedConstructorElaboration, DefaultArgNoNameCollisionOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -243,11 +228,6 @@ TEST(ChainedConstructorElaboration, DefaultArgNoNameCollisionOk) {
              "endmodule\n"));
 }
 
-// §8.17: 'default' is off limits once the default value of a superclass
-// constructor argument names a local member of that superclass. The report
-// stands at the subclass constructor, which is the declaration that used
-// 'default', rather than at the superclass argument whose default value it
-// names.
 TEST(ChainedConstructorElaboration, DefaultArgRefersToSuperLocalError) {
   ElabFixture f;
   ElabOk(
@@ -269,9 +249,6 @@ TEST(ChainedConstructorElaboration, DefaultArgRefersToSuperLocalError) {
                             7, "8.17"));
 }
 
-// §8.17: passing 'default' as the sole argument to super.new() is legal when
-// the constructor's own argument list uses the 'default' keyword and the
-// extends specifier carries no arguments of its own.
 TEST(ChainedConstructorElaboration, SuperNewDefaultWithDefaultArgOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -288,8 +265,6 @@ TEST(ChainedConstructorElaboration, SuperNewDefaultWithDefaultArgOk) {
              "endmodule\n"));
 }
 
-// §8.17: super.new(default) is only legal when the constructor argument list
-// itself used the 'default' keyword.
 TEST(ChainedConstructorElaboration, SuperNewDefaultWithoutDefaultArgError) {
   ElabFixture f;
   ElabOk(
@@ -313,8 +288,6 @@ TEST(ChainedConstructorElaboration, SuperNewDefaultWithoutDefaultArgError) {
                             7, "8.17"));
 }
 
-// §8.17: a subclass constructor whose extends specifier uses 'default' shall
-// repeat the 'default' keyword in its own argument list.
 TEST(ChainedConstructorElaboration, ExtendsDefaultUserCtorMissingDefaultError) {
   ElabFixture f;
   ElabOk(
@@ -337,10 +310,6 @@ TEST(ChainedConstructorElaboration, ExtendsDefaultUserCtorMissingDefaultError) {
                     6, "8.17"));
 }
 
-// §8.17: nothing executable may run in a constructor before super.new(). A
-// call reached only through a loop body is conditional on the loop running, so
-// it can never be the unconditional first statement -- rejected. (Distinct
-// control-flow position from the if-branch case.)
 TEST(ChainedConstructorElaboration, SuperNewInLoopBodyError) {
   ElabFixture f;
   ElabOk(
@@ -363,10 +332,6 @@ TEST(ChainedConstructorElaboration, SuperNewInLoopBodyError) {
                             7, "8.17"));
 }
 
-// §8.17: a super.new() reached only through a case-item body is likewise
-// conditional and thus never the first executable statement -- rejected. The
-// report stands at the `case` keyword, which is the top-level statement that
-// encloses the call.
 TEST(ChainedConstructorElaboration, SuperNewInCaseItemError) {
   ElabFixture f;
   ElabOk(
@@ -391,36 +356,6 @@ TEST(ChainedConstructorElaboration, SuperNewInCaseItemError) {
                             7, "8.17"));
 }
 
-// The cases below cover the seven links Stmt carries that
-// ConstructorHasGuardedSuperNew and StmtSubtreeHasSuperNew in
-// src/elaborator/elaborator_validate_class_members.cpp gained when their
-// hand-written recursion lists were replaced by ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Each of the six links a
-// conforming source can write the call in appears twice: once with the
-// construct as the constructor's own top-level statement, which is the list
-// ConstructorHasGuardedSuperNew walks, and once with the same construct under
-// an `if`, which is the list StmtSubtreeHasSuperNew walks after the `if` has
-// already settled that the position guards.
-//
-// Every one of them is a rejection, because §8.17 requires super.new(...) to be
-// the first executable statement of the function new for this approach and each
-// of these positions is reached only after something else has run: a fork arm
-// after the fork statement and in no order §9.3.2 defines against its siblings,
-// a for step after an iteration of the body, an action block after the
-// immediate assertion has passed or failed (§16.3), a randcase arm after the
-// weighted draw has selected it (§18.16), and a randsequence production after
-// the generator has reached it (§18.17).
-//
-// Stmt::for_inits is the seventh link and takes no case. A.6.8 gives
-// `for_initialization ::= list_of_variable_assignments | for_variable_
-// declaration { , for_variable_declaration }`, and a super.new() call is
-// neither a variable assignment nor a variable declaration, so no conforming
-// source puts one in a for header's initialization.
-
-// The report stands at the constructor's own top-level statement, which is the
-// `fork` on line 7, because ReportGuardedSuperNew passes that statement's
-// Stmt::range.start. §13.4.4 admits the fork-join_none form inside a function,
-// which a constructor is.
 TEST(ChainedConstructorElaboration, SuperNewInAForkArmError) {
   ElabFixture f;
   ElabOk(
@@ -445,9 +380,6 @@ TEST(ChainedConstructorElaboration, SuperNewInAForkArmError) {
                             7, "8.17"));
 }
 
-// A.6.8 admits a function_subroutine_call as a for_step_assignment, so the
-// step is a position a call can be written in; it runs after an iteration of
-// the loop body and so is never the first executable statement.
 TEST(ChainedConstructorElaboration, SuperNewInAForStepError) {
   ElabFixture f;
   ElabOk(
@@ -470,9 +402,6 @@ TEST(ChainedConstructorElaboration, SuperNewInAForStepError) {
                             7, "8.17"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// This case and the next cover one arm each.
 TEST(ChainedConstructorElaboration, SuperNewInAnAssertionPassStmtError) {
   ElabFixture f;
   ElabOk(
@@ -516,8 +445,6 @@ TEST(ChainedConstructorElaboration, SuperNewInAnAssertionFailStmtError) {
                             7, "8.17"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`. The report
-// stands at the `randcase` keyword, which is the top-level statement.
 TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemError) {
   ElabFixture f;
   ElabOk(
@@ -542,9 +469,6 @@ TEST(ChainedConstructorElaboration, SuperNewInARandcaseItemError) {
                             7, "8.17"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds a statement. The report
-// stands at the `randsequence` keyword.
 TEST(ChainedConstructorElaboration, SuperNewInARandsequenceCodeBlockError) {
   ElabFixture f;
   ElabOk(
@@ -569,10 +493,6 @@ TEST(ChainedConstructorElaboration, SuperNewInARandsequenceCodeBlockError) {
                             7, "8.17"));
 }
 
-// The six cases below write the same constructs under an `if`, so the guarding
-// answer is already settled by Stmt::then_branch and what is under test is
-// whether StmtSubtreeHasSuperNew finds the call beneath it. The report stands
-// at the `if` on line 7, which is the constructor's top-level statement.
 TEST(ChainedConstructorElaboration, SuperNewInAForkArmUnderAnIfError) {
   ElabFixture f;
   ElabOk(
@@ -715,12 +635,6 @@ TEST(ChainedConstructorElaboration,
                             7, "8.17"));
 }
 
-// Stmt::stmts is the one link ConstructorHasGuardedSuperNew does not treat as
-// guarding, and this case is what holds it there. §9.3.1 runs the statements
-// of a begin-end block in the order written, so a super.new() written first
-// inside a block that is itself the constructor's first statement is the first
-// executable statement §8.17 asks for, and reporting it would name a rule the
-// source did not break.
 TEST(ChainedConstructorElaboration, SuperNewFirstInABeginEndBlockOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -741,8 +655,6 @@ TEST(ChainedConstructorElaboration, SuperNewFirstInABeginEndBlockOk) {
              "endmodule\n"));
 }
 
-// §8.17's rule that super.new() opens the constructor holds over a class a
-// package declares as over one at compilation-unit scope.
 TEST(ChainedConstructorElaboration, PackageClassSuperNewNotFirstIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -764,10 +676,6 @@ TEST(ChainedConstructorElaboration, PackageClassSuperNewNotFirstIsAnError) {
                             7, "8.17"));
 }
 
-// §8.17 asks that super.new() be the first executable statement of the
-// constructor, and a local declaration ahead of it (A.2.8) is no statement
-// executed, so the call still opens the constructor; a statement ahead of it
-// does not let it.
 TEST(ChainedConstructorElaboration, ADeclarationAheadOfSuperNewIsNoStatement) {
   ElabFixture f;
   ElabOk(

@@ -11,15 +11,6 @@
 namespace delta {
 namespace {
 
-// §37.4.3 (Diagram key for traversing relationships) says how an arrow in a
-// data model diagram is walked. A single arrow is a one-to-one relationship
-// walked with vpi_handle() and a double arrow a one-to-many one walked with
-// vpi_scan(), each written out as the line of an application that walks it; a
-// tag on the arrow replaces the target's own type in the request; and an arrow
-// drawn out of a circle is followed with NULL as the ref_h. Everything else is
-// drawn from a reference object, and the closing sentence gives the untagged
-// request its name: the word in the target's enclosure with `vpi` put in front
-// and every word capitalized.
 class VpiRelationTraversal : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -35,8 +26,6 @@ class VpiRelationTraversal : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim (single arrow): a one-to-one relationship is accessed with vpi_handle()
-// naming the target's own type, which for the enclosure `module` is vpiModule.
 TEST_F(VpiRelationTraversal, AOneToOneRelationIsWalkedWithVpiHandle) {
   VpiHandle mod = ctx_.CreateModule("top", "top");
   VpiHandle port = ctx_.CreatePort("p", kVpiInput, mod);
@@ -44,9 +33,6 @@ TEST_F(VpiRelationTraversal, AOneToOneRelationIsWalkedWithVpiHandle) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(port))), mod);
 }
 
-// Claim (double arrow): a one-to-many relationship is walked with the iterator
-// vpi_iterate() hands back, one object per vpi_scan() - the loop the clause
-// writes out, run here over the module's ports.
 TEST_F(VpiRelationTraversal, AOneToManyRelationIsWalkedWithVpiScan) {
   VpiHandle mod = ctx_.CreateModule("top", "top");
   VpiHandle p0 = ctx_.CreatePort("p0", kVpiInput, mod);
@@ -58,9 +44,6 @@ TEST_F(VpiRelationTraversal, AOneToManyRelationIsWalkedWithVpiScan) {
   EXPECT_EQ(VpiObjectOf(seen[1]), p1);
 }
 
-// Claim (circle, one-to-many): a relationship drawn from a circle is traversed
-// with NULL for the ref_h. §37.5 detail 1 draws the top-level modules that way,
-// so vpi_iterate(vpiModule, NULL) is what reaches them.
 TEST_F(VpiRelationTraversal, ARelationFromACircleIsTraversedWithANullRef) {
   VpiHandle top = ctx_.CreateModule("top", "top");
   top->top_module = true;
@@ -70,27 +53,17 @@ TEST_F(VpiRelationTraversal, ARelationFromACircleIsTraversedWithANullRef) {
   EXPECT_EQ(VpiObjectOf(seen[0]), top);
 }
 
-// Claim: NULL is what a circle means, and a relationship no circle originates
-// has nothing to be traversed from. A scope's regs are drawn from the scope, so
-// a null reference names no traversal of them and yields no iterator - rather
-// than sweeping up every reg of every instance in the run, which is a
-// relationship no arrow in any diagram stands for.
 TEST_F(VpiRelationTraversal, ARelationFromNoCircleIsNotTraversedFromNull) {
   VpiHandle mod = ctx_.CreateModule("top", "top");
   VpiObject reg;
   reg.type = kVpiReg;
   mod->children.push_back(&reg);
 
-  // The relationship itself is there, walked from the scope it is drawn from.
   ASSERT_EQ(ScanAll(vpi_iterate(kVpiReg, VpiHandleOf(mod))).size(), 1u);
 
   EXPECT_EQ(vpi_iterate(kVpiReg, nullptr), nullptr);
 }
 
-// Claim: the same holds of the one-to-one routine, which already answered a
-// null reference only for the relationships the diagrams draw from a circle.
-// The two routines the key pairs with its two notations agree about what a null
-// reference means.
 TEST_F(VpiRelationTraversal, TheOneToOneRoutineAgreesAboutANullRef) {
   VpiHandle mod = ctx_.CreateModule("top", "top");
   mod->top_module = true;

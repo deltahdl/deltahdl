@@ -12,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §16.12 forbids nested disable iff clauses. A.2.10's property_spec takes
-// one, so the parser reports the second where it stands, and the elaborator
-// still counts both.
 TEST(PropertyDeclarationElaboration, ExplicitDisableIffNestingRejected) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(
@@ -33,9 +30,6 @@ TEST(PropertyDeclarationElaboration, ExplicitDisableIffNestingRejected) {
                             "16.12"));
 }
 
-// §16.12 forbids disable iff nesting that arises through property
-// instantiation: one disable iff in the outer body plus one inside an
-// instantiated callee makes two in the flattened form.
 TEST(PropertyDeclarationElaboration,
      DisableIffNestingViaInstantiationRejected) {
   ElabFixture f;
@@ -54,7 +48,6 @@ TEST(PropertyDeclarationElaboration,
                             "16.12"));
 }
 
-// §16.12 permits exactly one disable iff in a property_spec.
 TEST(PropertyDeclarationElaboration, SingleDisableIffNotFlaggedAsNested) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -68,10 +61,6 @@ TEST(PropertyDeclarationElaboration, SingleDisableIffNotFlaggedAsNested) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.12: the no-nesting rule sees disable iff clauses that accumulate across a
-// multi-level instantiation chain. root carries one and the transitively
-// instantiated leaf carries another, with an intermediate property between
-// them; the flattened form has two, so it is rejected.
 TEST(PropertyDeclarationElaboration,
      DisableIffNestingViaChainedInstantiationRejected) {
   ElabFixture f;
@@ -93,9 +82,6 @@ TEST(PropertyDeclarationElaboration,
                             "16.12"));
 }
 
-// §16.12: two sibling instantiations each contribute a disable iff to the same
-// flattened property even though the instantiating property has none of its
-// own. Their counts add to two, so the enclosing property is rejected.
 TEST(PropertyDeclarationElaboration,
      TwoSiblingDisableIffLeavesUnderOneRootRejected) {
   ElabFixture f;
@@ -117,9 +103,6 @@ TEST(PropertyDeclarationElaboration,
                             "16.12"));
 }
 
-// §16.12: the count is per flattened property, not per module. Two unrelated
-// properties that each carry exactly one disable iff and do not instantiate one
-// another are both legal.
 TEST(PropertyDeclarationElaboration,
      IndependentSingleDisableIffPropertiesAccepted) {
   ElabFixture f;
@@ -137,9 +120,6 @@ TEST(PropertyDeclarationElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.12: a single disable iff that reaches a property purely through one
-// instantiation (the instantiating property has none of its own) flattens to a
-// count of one and is accepted.
 TEST(PropertyDeclarationElaboration, SingleDisableIffViaInstantiationAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -156,31 +136,24 @@ TEST(PropertyDeclarationElaboration, SingleDisableIffViaInstantiationAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.12 head: a sampled value function other than $sampled used in a disable
-// condition requires an explicit clock argument; $sampled does not.
 TEST(PropertyDeclarationElaboration, DisableConditionSampledValueNeedsClock) {
-  // $sampled is well-formed with or without an explicit clock.
   EXPECT_TRUE(DisableConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kSampled, /*clock_explicitly_specified=*/false));
+      SampledValueFunction::kSampled, false));
   EXPECT_TRUE(DisableConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kSampled, /*clock_explicitly_specified=*/true));
+      SampledValueFunction::kSampled, true));
   EXPECT_FALSE(DisableConditionSampledValueRequiresExplicitClock(
       SampledValueFunction::kSampled));
 
-  // Every value-change / past function needs the clock named explicitly.
   for (SampledValueFunction fn :
        {SampledValueFunction::kRose, SampledValueFunction::kFell,
         SampledValueFunction::kStable, SampledValueFunction::kChanged,
         SampledValueFunction::kPast}) {
     EXPECT_TRUE(DisableConditionSampledValueRequiresExplicitClock(fn));
-    EXPECT_FALSE(DisableConditionSampledValueClockIsWellFormed(
-        fn, /*clock_explicitly_specified=*/false));
-    EXPECT_TRUE(DisableConditionSampledValueClockIsWellFormed(
-        fn, /*clock_explicitly_specified=*/true));
+    EXPECT_FALSE(DisableConditionSampledValueClockIsWellFormed(fn, false));
+    EXPECT_TRUE(DisableConditionSampledValueClockIsWellFormed(fn, true));
   }
 }
 
-// §16.12 + §F.4.1: arity mismatch makes the flattened form not legal.
 TEST(PropertyDeclarationElaboration, FlattenRejectsArgCountMismatch) {
   PropertyRegistry reg;
   ModuleItem decl;
@@ -193,7 +166,6 @@ TEST(PropertyDeclarationElaboration, FlattenRejectsArgCountMismatch) {
   EXPECT_FALSE(fp.legal);
 }
 
-// §16.12 + §F.4.1: a well-formed flatten is acceptable as a top-level spec.
 TEST(PropertyDeclarationElaboration, FlattenAcceptsWellFormedProperty) {
   PropertyRegistry reg;
   ModuleItem decl;
@@ -209,11 +181,6 @@ TEST(PropertyDeclarationElaboration, FlattenAcceptsWellFormedProperty) {
   EXPECT_TRUE(PropertyRegistry::IsAcceptableAsTopLevelConcurrent(fp));
 }
 
-// §16.12: the dependency digraph of named properties has an edge for an
-// instance in a formal's default actual, and one from a property to each
-// property an instance of it names in an actual argument: q1 reaches q2
-// through its default and q2 instantiates q1; r1 writes r2(r1), so r2
-// reaches r1 and r1 instantiates r2.
 TEST(PropertyDependencyGraph, DefaultsAndActualsAreEdges) {
   Expr q2_ref;
   q2_ref.kind = ExprKind::kIdentifier;
@@ -252,8 +219,6 @@ TEST(PropertyDependencyGraph, DefaultsAndActualsAreEdges) {
   EXPECT_TRUE(reg.IsRecursiveProperty(&r2));
 }
 
-// §16.12: a $ actual of a named property instance follows §16.8's rule: p1
-// reads its untyped formal m as an operand.
 TEST(PropertyDollarActual, AnOperandFormalIsReported) {
   ElabFixture f;
   ElaborateSrc(

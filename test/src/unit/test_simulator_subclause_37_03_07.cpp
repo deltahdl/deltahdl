@@ -12,14 +12,6 @@
 namespace delta {
 namespace {
 
-// §37.3.7 lifetimes of objects: vpiAutomatic is the Boolean lifetime selector
-// (false => static, true => non-static), and vpiAllocScheme is the three-valued
-// enumeration naming how an object's storage was obtained. These tests observe
-// the production VpiObject state through vpi_get and the VpiAllocSchemeFor
-// classification helper.
-
-// L8 (static default) + L14 (vpiOtherScheme is the mandated default): a freshly
-// constructed object is static and reports the Other allocation scheme.
 TEST(ObjectLifetimes, DefaultObjectIsStaticWithOtherScheme) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -29,8 +21,6 @@ TEST(ObjectLifetimes, DefaultObjectIsStaticWithOtherScheme) {
   EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&obj)), vpiOtherScheme);
 }
 
-// L8 (true => non-static) + L12 (frame/thread => Automatic scheme): an object
-// flagged automatic reports vpiAutomatic true and the Automatic scheme.
 TEST(ObjectLifetimes, AutomaticObjectReportsAutomaticScheme) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -43,8 +33,6 @@ TEST(ObjectLifetimes, AutomaticObjectReportsAutomaticScheme) {
   EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&obj)), vpiAutomaticScheme);
 }
 
-// L13 (dynamic memory / class object => Dynamic scheme): an object allocated
-// dynamically reports the Dynamic allocation scheme.
 TEST(ObjectLifetimes, DynamicObjectReportsDynamicScheme) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -56,9 +44,6 @@ TEST(ObjectLifetimes, DynamicObjectReportsDynamicScheme) {
   EXPECT_EQ(vpi_get(vpiAllocScheme, VpiHandleOf(&obj)), vpiDynamicScheme);
 }
 
-// L11 (exactly three schemes) + L12/L13/L14: the classification helper maps
-// each allocation category to its scheme, with Other as the fallthrough
-// default.
 TEST(ObjectLifetimes, AllocSchemeForCoversAllThreeKinds) {
   EXPECT_EQ(VpiAllocSchemeFor(VpiAllocKind::kFrameOrThread),
             vpiAutomaticScheme);
@@ -66,10 +51,6 @@ TEST(ObjectLifetimes, AllocSchemeForCoversAllThreeKinds) {
   EXPECT_EQ(VpiAllocSchemeFor(VpiAllocKind::kOther), vpiOtherScheme);
 }
 
-// L9: vpiAutomatic is also a property of container objects (module, program,
-// interface, package), where it expresses the default declared lifetime for
-// variables of their tasks and functions, so each container kind observes its
-// own declared lifetime.
 TEST(ObjectLifetimes, AutomaticIsAlsoAContainerProperty) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -90,9 +71,6 @@ TEST(ObjectLifetimes, AutomaticIsAlsoAContainerProperty) {
   }
 }
 
-// L10 with §8.6: a class defn's and a class typespec's vpiAutomatic is the
-// default lifetime of the class's methods, which §8.6 makes automatic in every
-// class, so both report TRUE.
 TEST(ObjectLifetimes, AClassDefnAndClassTypespecAreAutomatic) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -104,11 +82,8 @@ TEST(ObjectLifetimes, AClassDefnAndClassTypespecAreAutomatic) {
   }
 }
 
-// The lifetimes of a run's objects, built from a real design.
 class LifetimesOfARun : public VpiDesignRun {};
 
-// L9: an instance of a module, program or interface, and a package, reports
-// the lifetime its declaration was written with, static where none was.
 TEST_F(LifetimesOfARun, AnInstanceReportsItsDeclaredLifetime) {
   Run("module automatic am; endmodule\n"
       "module static sm; endmodule\n"
@@ -133,8 +108,6 @@ TEST_F(LifetimesOfARun, AnInstanceReportsItsDeclaredLifetime) {
   EXPECT_EQ(vpi_get(vpiAutomatic, By("ps")), 0);
 }
 
-// L10: a class defn and the class typespec an extends names report
-// vpiAutomatic TRUE, though Syntax 8-1 gives a class no lifetime to write.
 TEST_F(LifetimesOfARun, AClassOfARunIsAutomatic) {
   Run("module top; class C; endclass class D extends C; endclass endmodule\n");
   vpiHandle c = Named(vpiClassDefn, By("top"), "C");
@@ -147,8 +120,6 @@ TEST_F(LifetimesOfARun, AClassOfARunIsAutomatic) {
   EXPECT_EQ(vpi_get(vpiAutomatic, typespec), 1);
 }
 
-// L12 and L14: a subroutine's automatic variable, its return variable among
-// them, is allocated with the frame of its call; a static one is not.
 TEST_F(LifetimesOfARun, AnAutomaticVariableHasTheAutomaticScheme) {
   Run("module top; task automatic t(); int x; endtask\n"
       "  function int f(); int y; return 0; endfunction\n"
@@ -165,8 +136,6 @@ TEST_F(LifetimesOfARun, AnAutomaticVariableHasTheAutomaticScheme) {
   EXPECT_EQ(vpi_get(vpiAllocScheme, vpi_handle(vpiReturn, f)), vpiOtherScheme);
 }
 
-// L13 and L14: a class object and the properties that are part of it are in
-// dynamic memory; a static property, shared by every object, is not.
 TEST_F(LifetimesOfARun, AClassObjectHasTheDynamicScheme) {
   Run("module top; class C; int n; static int s; endclass\n"
       "  C c = new; endmodule\n");
@@ -179,21 +148,16 @@ TEST_F(LifetimesOfARun, AClassObjectHasTheDynamicScheme) {
             vpiOtherScheme);
 }
 
-// What the application found of the frame active during a call and of the
-// thread it is active in. A calltf is a plain C function with no return path
-// to the case that provoked it.
 int g_frame_scheme = 0;
 int g_thread_scheme = 0;
 
-PLI_INT32 ProbeSchemesCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 ProbeSchemesCalltf(PLI_BYTE8*) {
   vpiHandle frame = vpi_handle(vpiFrame, nullptr);
   g_frame_scheme = vpi_get(vpiAllocScheme, frame);
   g_thread_scheme = vpi_get(vpiAllocScheme, vpi_handle(vpiThread, frame));
   return 0;
 }
 
-// L12: a frame, and the thread it is active in, are allocated as the frame and
-// thread they are.
 TEST_F(LifetimesOfARun, AFrameAndItsThreadHaveTheAutomaticScheme) {
   g_frame_scheme = 0;
   g_thread_scheme = 0;
@@ -209,10 +173,6 @@ TEST_F(LifetimesOfARun, AFrameAndItsThreadHaveTheAutomaticScheme) {
   EXPECT_EQ(g_thread_scheme, vpiAutomaticScheme);
 }
 
-// With §6.21 and §23.4: a task of a module declared nested in another's body
-// takes the lifetime that declaration was written with, automatic for an
-// automatic module, as one of a module declared at the top level does
-// (#8266).
 TEST_F(LifetimesOfARun, ANestedAutomaticModulesTaskIsAutomatic) {
   Run("module top;\n"
       "  module automatic inner; task t(); int x; endtask endmodule\n"

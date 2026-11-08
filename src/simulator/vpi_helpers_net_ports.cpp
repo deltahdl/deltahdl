@@ -12,28 +12,16 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// §37.16 details 6 to 8: the ports a net reaches through vpiPorts and
-// vpiPortInst. They sit in a file of their own because vpi_helpers_nets.cpp,
-// which holds the rest of §37.16, had grown to the length
-// .github/workflows/deltahdl.yml admits a source file.
-
 namespace delta {
 
 namespace {
 
-// Where a net stands inside the higher connection of a port: whether the
-// connection holds it at all, whether the bit of the connection each of its
-// bits lands on can be told, and if so the bit of the connection the net's
-// least significant bit lands on, counted from the connection's least
-// significant bit. A select starting above the net's bit 0 puts that bit below
-// the connection, at a negative place.
 struct NetPlace {
   bool held = false;
   bool determinable = true;
   int offset = 0;
 };
 
-// The instance an object stands in: the nearest of its holders that is one.
 VpiHandle InstanceHolding(VpiHandle obj) {
   for (VpiHandle holder = obj->parent; holder != nullptr;
        holder = holder->parent) {
@@ -44,9 +32,6 @@ VpiHandle InstanceHolding(VpiHandle obj) {
 
 NetPlace PlaceIn(VpiHandle expr, VpiHandle net);
 
-// §11.4.12: a concatenation lays its operands out with the last written at the
-// least significant end, so an operand's place is the width of those written
-// after it.
 NetPlace PlaceInConcatenation(VpiHandle concat, VpiHandle net) {
   int below = 0;
   const std::vector<VpiHandle> kOperands = VpiOperationOperands(concat);
@@ -61,8 +46,6 @@ NetPlace PlaceInConcatenation(VpiHandle concat, VpiHandle net) {
   return {};
 }
 
-// Any other operation mixes its operands' bits, so a net it holds lands on no
-// bit that can be told.
 NetPlace PlaceInOperation(VpiHandle operation, VpiHandle net) {
   if (operation->op_type == vpiConcatOp) {
     return PlaceInConcatenation(operation, net);
@@ -77,15 +60,10 @@ NetPlace PlaceIn(VpiHandle expr, VpiHandle net) {
   if (expr == net) return {true, true, 0};
   if (expr->type == vpiOperation) return PlaceInOperation(expr, net);
   if (expr->parent != net) return {};
-  // A bit of the net puts the net's bit 0 that many places below it; any other
-  // select of the net is held without a place that can be told.
   if (expr->type == vpiNetBit) return {true, true, -expr->bit_offset};
   return {true, false, 0};
 }
 
-// The port bit of `port` at `offset` places above its least significant bit,
-// or the port itself where it is scalar and has none. A port's children are
-// its port bits.
 VpiHandle PortBitAt(VpiHandle port, int offset) {
   for (VpiHandle bit : port->children) {
     if (bit->bit_offset == offset) return bit;
@@ -93,10 +71,6 @@ VpiHandle PortBitAt(VpiHandle port, int offset) {
   return port;
 }
 
-// §37.16 details 7 and 8: what `port` gives a vpiPortInst iteration of `ref`,
-// whose net `net` its higher connection holds at `place`: the whole port for a
-// whole net or an untold place, else the port bit (or scalar port) its bit
-// lands on; nothing where none of the net's bits reaches a bit of the port.
 VpiHandle PortInstOf(VpiHandle port, VpiHandle ref, VpiHandle net,
                      const NetPlace& place) {
   const bool kBit = ref->type == vpiNetBit;
@@ -117,9 +91,6 @@ VpiHandle PortInstOf(VpiHandle port, VpiHandle ref, VpiHandle net,
 
 VpiHandle NetBitAt(VpiHandle conn, int place);
 
-// §11.4.12: the net bit `place` bits above the least significant end of the
-// concatenation `concat`, its last operand written lowest; null past its
-// most significant end.
 VpiHandle NetBitInConcatenation(VpiHandle concat, int place) {
   const std::vector<VpiHandle> kOperands = VpiOperationOperands(concat);
   for (VpiHandle operand : std::views::reverse(kOperands)) {
@@ -129,10 +100,6 @@ VpiHandle NetBitInConcatenation(VpiHandle concat, int place) {
   return nullptr;
 }
 
-// The net bit standing `place` bits above the least significant end of the
-// port connection `conn`, or the net standing there whole where it has no
-// bits, a scalar net; null where none does or where what does cannot be told:
-// a varying bit, a variable, or an operation other than a concatenation.
 VpiHandle NetBitAt(VpiHandle conn, int place) {
   if (conn == nullptr) return nullptr;
   if (conn->type == vpiOperation) {
@@ -141,7 +108,6 @@ VpiHandle NetBitAt(VpiHandle conn, int place) {
   }
   if (place >= conn->size || !VpiIsNetsType(conn->type)) return nullptr;
   if (conn->type == vpiNetBit) {
-    // A bit a constant index names is the net's own; a varying one is not.
     return VpiBitAtOffset(*conn->parent, conn->bit_offset) == conn ? conn
                                                                    : nullptr;
   }
@@ -149,10 +115,6 @@ VpiHandle NetBitAt(VpiHandle conn, int place) {
   return bit != nullptr ? bit : conn;
 }
 
-// Where `ref`, of the net `net`, stands in the higher connection of `port`. A
-// connection may hold the bits of one vector in any order, so a net bit found
-// at one of the port's places is placed there; any other reference, or a bit
-// found at none, takes its net's place.
 NetPlace PlaceOfReference(VpiHandle port, VpiHandle ref, VpiHandle net) {
   if (ref->type == vpiNetBit) {
     for (int place = 0; place < port->size; ++place) {
@@ -164,8 +126,6 @@ NetPlace PlaceOfReference(VpiHandle port, VpiHandle ref, VpiHandle net) {
   return PlaceIn(port->high_conn, net);
 }
 
-// What the ports of `instance` whose higher connection holds `net` give a
-// vpiPortInst iteration of `ref`.
 void CollectInstancePorts(VpiHandle instance, VpiHandle ref, VpiHandle net,
                           std::vector<VpiHandle>& out) {
   for (VpiHandle port : instance->children) {
@@ -177,8 +137,6 @@ void CollectInstancePorts(VpiHandle instance, VpiHandle ref, VpiHandle net,
   }
 }
 
-// The instances `scope` holds, reaching into the generate blocks it holds but
-// not into the instances, whose ports a net of `scope` stands outside of.
 void CollectHeldInstances(VpiHandle scope, std::vector<VpiHandle>& out) {
   for (VpiHandle child : scope->children) {
     if (child->type == vpiGenScope || child->type == vpiGenScopeArray) {
@@ -189,8 +147,6 @@ void CollectHeldInstances(VpiHandle scope, std::vector<VpiHandle>& out) {
   }
 }
 
-// The instances held by the instance holding the net, or the vector of the net
-// bit, `net`: those whose ports `net` can stand on the higher side of.
 std::vector<VpiHandle> InstancesBeside(VpiHandle net) {
   VpiHandle whole = net->type == vpiNetBit ? net->parent : net;
   std::vector<VpiHandle> held;
@@ -199,8 +155,6 @@ std::vector<VpiHandle> InstancesBeside(VpiHandle net) {
   return held;
 }
 
-// §37.16 detail 6: the port bits of `port`, its children, whose lower
-// connection is the net bit `bit`.
 void CollectPortBitsOf(VpiHandle port, VpiHandle bit,
                        std::vector<VpiHandle>& out) {
   for (VpiHandle port_bit : port->children) {
@@ -239,9 +193,6 @@ std::vector<VpiHandle> VpiNetPortInsts(VpiHandle net) {
 
 namespace {
 
-// Adds to `joined`, once each, what the port `port` joins `bit` to: at each of
-// its places where one end holds `bit`, the net bit or scalar net the other
-// end holds there.
 void AddBitsJoinedAcross(VpiHandle port, VpiHandle bit,
                          std::vector<VpiHandle>& joined) {
   for (int place = 0; place < port->size; ++place) {
@@ -257,11 +208,6 @@ void AddBitsJoinedAcross(VpiHandle port, VpiHandle bit,
 }  // namespace
 
 std::vector<VpiHandle> VpiNetBitsJoinedThroughPorts(VpiHandle bit) {
-  // §37.16 details 4 and 18: a port joins the bits standing at one place on
-  // its two ends, so a bit shares the drivers and loads of the bits joined to
-  // it, however many instances apart, and of no other bit of their vectors.
-  // Every port of the instances held beside the bit is read place by place,
-  // since a connection may hold the bits of one vector in any order.
   std::vector<VpiHandle> joined{bit};
   for (std::size_t k = 0; k < joined.size(); ++k) {
     VpiHandle current = joined[k];
@@ -285,8 +231,6 @@ bool VpiIsTermOrPortRelation(int type, VpiHandle ref) {
            type == vpiModDataPathIn;
   }
   if (ref->type == vpiRefObj) return VpiIsRefObjPortRelation(type);
-  // §37.17 (printed page 1025) draws the port relations from a variable as
-  // §37.16 draws them from a net.
   return (VpiIsNetsType(ref->type) || VpiIsVariablesType(ref->type)) &&
          (type == vpiPorts || type == vpiPortInst);
 }

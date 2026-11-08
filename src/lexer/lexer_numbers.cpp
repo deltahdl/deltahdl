@@ -1,12 +1,3 @@
-// The number-lexing members of Lexer. §5.7 and §5.8 give the literals read
-// here: based and unbased-unsized integers, real numbers with a fractional or
-// exponent part, and the time literals of §5.8. Lexer::Next dispatches into
-// Lexer::LexNumber, and in src/lexer/lexer_operators.cpp Lexer::LexApostrophe
-// calls Lexer::ApostropheStartsBaseSpecifier and Lexer::LexOpDot calls
-// Lexer::LexRealMissingDigit; every other call among these members comes from
-// one of the others. The declarations are in src/lexer/lexer.h, so a caller
-// needs no include beyond the ones it already has.
-
 #include <cctype>
 #include <cstdint>
 #include <string>
@@ -18,23 +9,6 @@
 
 namespace delta {
 
-// Decide whether the apostrophe at `apostrophe_pos` opens a based integer
-// literal. §5.7.1 makes the size constant optional, so both callers ask this:
-// Lexer::LexNumber of the apostrophe that follows a size, as in 8'h99, and
-// Lexer::LexApostrophe of an apostrophe written without one, as in 'h99. The
-// grammar requires an optional s/S signed marker and then one of the base
-// letters d/D/b/B/o/O/h/H. Anything else — most importantly a left
-// parenthesis or left brace — keeps the apostrophe a separate token so that
-// the '(expr) and '{...} cast and assignment-pattern forms tokenize
-// correctly.
-//
-// Spaces and tabs standing before the signed marker or before the base letter
-// are read past, so that `8' h99` and `' h99` reach Lexer::LexBasedNumber and
-// are reported there against the §5.7.1 sentence forbidding white space
-// between the apostrophe and the base format character. What follows the white
-// space still has to be a base letter, so the answer stays false for `'(x)`
-// and `4' (x)`, for `'{...}` and `4' {...}`, and for the unsized single-bit
-// forms '0, '1, 'x and 'z.
 bool Lexer::ApostropheStartsBaseSpecifier(uint32_t apostrophe_pos) const {
   auto skip_spaces_and_tabs = [this](uint32_t p) {
     while (CharAt(p) == ' ' || CharAt(p) == '\t') {
@@ -51,8 +25,6 @@ bool Lexer::ApostropheStartsBaseSpecifier(uint32_t apostrophe_pos) const {
          base == 'o' || base == 'O' || base == 'h' || base == 'H';
 }
 
-// LexApostrophe calls this, through LexNumber, only for an apostrophe followed
-// by 0, 1, x, X, z or Z, so there are two characters to step over.
 Token Lexer::LexUnbasedUnsized(SourceLoc loc, uint32_t start) {
   Advance();
   Advance();
@@ -83,15 +55,8 @@ void Lexer::ValidateDecimalXZ(SourceLoc loc, char base_letter,
   }
 }
 
-// Reports which sentence of §5.7.1 a based literal broke when its value run
-// collected nothing, given a lexer positioned at the character that stopped the
-// run. `loc` is the start of the literal, which is where both reports stand.
 void Lexer::ReportMissingValueToken(SourceLoc loc) {
   if ((Current() == '+' || Current() == '-')) {
-    // §5.7.1 makes a plus or minus sign between the base format and the number
-    // illegal syntax, which Example 3 writes as `8 'd -6`. The sign is no part
-    // of the value token, so a literal written with one arrives here with an
-    // empty run and the sign still unread.
     diag_.Error(loc,
                 "plus or minus operator between the base format and the number "
                 "is illegal syntax",
@@ -122,7 +87,7 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
       case 'D':
         valid = c <= '9';
         break;
-      default:  // 'h' or 'H', the one base left
+      default:
         valid = std::isxdigit(static_cast<unsigned char>(c));
         break;
     }
@@ -136,11 +101,6 @@ void Lexer::ValidateBaseDigits(SourceLoc loc, char base_letter,
 Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
   Advance();
 
-  // §5.7.1 forbids white space between the apostrophe and the base format
-  // character. The optional s/S signed marker stands between them, so white
-  // space is forbidden on either side of it. Read the literal as it was written
-  // whatever the answer, so that one token still spans it, and report the
-  // sentence once even when both places carry white space.
   bool space_before_sign = SkipSpacesAndTabs();
   if ((Current() == 's' || Current() == 'S')) {
     Advance();
@@ -152,24 +112,11 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
                 "based number must be written together without white space",
                 Subclause("5.7.1"));
   }
-  // Both callers asked ApostropheStartsBaseSpecifier first, so a base letter
-  // stands here.
   char base_letter = Current();
   Advance();
 
-  // §5.7.1 puts the unsigned number token straight after the base format, white
-  // space between them allowed, and §5.3 counts newlines and formfeeds as white
-  // space as much as blanks and tabs. This white space is legal, so stepping
-  // over it draws no report.
   while (IsWhiteSpace(Current())) Advance();
   uint32_t before_digits = pos_;
-  // §5.7.1 makes the third token, the unsigned number, out of digits legal for
-  // its base format. A letter or digit that is illegal for the base is still
-  // written where the value token belongs, so the run covers every alphanumeric
-  // character and Lexer::ValidateBaseDigits judges what it collected against
-  // the base. Ending the run at the first character no base accepts would hand
-  // that function a span it can never reject for a hexadecimal literal, and
-  // would leave `4'hG` reported as a literal carrying no value at all.
   while ((std::isalnum(static_cast<unsigned char>(Current())) ||
           Current() == '_' || Current() == '?')) {
     Advance();
@@ -191,8 +138,6 @@ Token Lexer::LexBasedNumber(SourceLoc loc, uint32_t start) {
 }
 
 void Lexer::LexFractionalPart() {
-  // LexNumber has already taken a point that no digit follows, as in `9.`, so
-  // a point here has a digit after it.
   if (Current() != '.') return;
   Advance();
   while ((std::isdigit(static_cast<unsigned char>(Current())) ||
@@ -221,18 +166,6 @@ void Lexer::LexExponentPart() {
   }
 }
 
-// Read the rest of a real literal written with a decimal point that has no
-// digit on one side of it, and report it. §5.7.2 has a real number expressed
-// with a decimal point carry at least one digit on each side of the point, and
-// lists `.12`, `9.`, `4.E3` and `.2e-7` as invalid for lacking one. Nothing
-// legal starts with a point against a digit, or with a digit run against a
-// point that no digit follows, so the spelling can only be the real literal it
-// was written to be: it is read whole, digits, underscores and exponent, and
-// returned as one token so that the statement holding it is parsed in step and
-// nothing cascades from the point or the digits taken separately. `start` is
-// where the literal begins in the source and `loc` its location; the caller has
-// read past the point, and `side` says which side of it, "before" or "after",
-// has no digit.
 Token Lexer::LexRealMissingDigit(SourceLoc loc, uint32_t start,
                                  const char* side) {
   while ((std::isdigit(static_cast<unsigned char>(Current())) ||
@@ -286,13 +219,6 @@ Token Lexer::LexNumber() {
     Advance();
   }
 
-  // §5.7.1 permits white space between the size and the apostrophe, as
-  // Example 2's `5 'D 3` writes it, so reading past white space is the only way
-  // to learn whether this number ends here or carries a base specifier. Both
-  // counters are put back when it does not: Advance() moved column_ over the
-  // white space, SkipWhitespaceAndComments() moves it over the same characters
-  // again before the next token, and a column counted twice locates that token
-  // and every later one on the line past where it is written.
   uint32_t before_ws = pos_;
   uint32_t column_before_ws = column_;
   SkipSpacesAndTabs();
@@ -303,10 +229,6 @@ Token Lexer::LexNumber() {
   pos_ = before_ws;
   column_ = column_before_ws;
 
-  // A point that no digit follows, as in `9.` and `4.E3`, is the decimal point
-  // of a real literal missing the digit §5.7.2 wants after it: no legal token
-  // puts a point against a digit run, since a member access or a hierarchical
-  // name is written against an identifier and never against a number.
   if (Current() == '.' &&
       !std::isdigit(static_cast<unsigned char>(PeekChar()))) {
     Advance();

@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -26,9 +24,6 @@ TEST(ProgramBlockParsing, ProgramEndprogramEnclosureProducesProgramDecl) {
 
 TEST(ProgramBlockParsing, ProgramBodyTerminatesOnlyAtEndprogram) {
   auto r = Parse("program p; initial begin end\n");
-  // §24.3 owns the report: Parser::ParseProgramDecl demands 'endprogram' and
-  // reaches EOF instead, which stands on line 2 because the source ends in a
-  // newline.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endprogram', got EOF", 2, "24.3"));
 }
@@ -149,15 +144,10 @@ TEST(ProgramBlockParsing, ProgramAcceptsPortListWithDirections) {
 
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysProcedure) {
   auto r = Parse("program p; always @(*) begin end endprogram\n");
-  // §24.3 owns every in-program prohibition the parser reports; §3.4 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "always procedures not allowed in programs", 1, "24.3"));
 }
 
-// The prohibition on "always procedures" covers every always variant, not just
-// the general-purpose always. Each keyword is a distinct token that the same
-// in-program guard must reject.
 TEST(ProgramBlockParsing, ProgramRejectsAlwaysCombProcedure) {
   auto r = Parse("program p; always_comb begin end endprogram\n");
   EXPECT_TRUE(ReportedError(

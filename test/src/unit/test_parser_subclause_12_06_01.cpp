@@ -89,9 +89,6 @@ TEST(CaseMatchesItemParsing, CaseMatchesPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Syntax 12-3 gives a case_pattern_item one pattern, where a plain case_item
-// takes a comma list, so the comma after the first pattern is reported and
-// the same list in a plain case is not.
 TEST(CaseMatchesItemParsing, CaseMatchesCommaSeparatedPatternsRejected) {
   auto r = Parse(
       "module m;\n"

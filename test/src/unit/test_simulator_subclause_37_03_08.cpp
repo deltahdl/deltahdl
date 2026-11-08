@@ -14,24 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.3.8 (Managing transient objects). A handle got during an object's life is
-// valid only while the object exists, so a static object's handle can be kept
-// for good, while a transient object's handle is either released after use or
-// left to be released, and to lapse, when the object goes away.
-//
-// The subclause's own rule is the second paragraph: callbacks, which differ
-// with the kind of object, let an application follow a transient object's
-// life, followed by the list of which callbacks those are -
-// cbCreateObj, cbReclaimObj, cbStartofFrame, cbEndOfFrame, cbStartOfThread,
-// cbEndOfThread, and cbEndOfObject. So an application that registers one of
-// them is called when the life event it names happens to a transient object.
-// (The list spells cbStartofFrame with a lowercase "o"; Annex M defines the
-// constant as cbStartOfFrame, which is the name used here.)
-//
-// The validity half of the subclause is §37.2.4's rule, tested there.
-
-// What the application was told. A callback routine is a plain C function with
-// no return path to the case that provoked it.
 std::vector<int> g_reasons;
 std::vector<vpiHandle> g_objects;
 
@@ -50,7 +32,6 @@ class TransientObjectCallbacks : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Registers for `reason`, placed on `on` where one is given.
   void RegisterFor(int reason, vpiHandle on = nullptr) {
     s_cb_data data = {};
     data.reason = reason;
@@ -62,9 +43,6 @@ class TransientObjectCallbacks : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// The frame half of the list. A frame is freed with its subelements by
-// §37.2.2's frame/thread rule, and that is the end of the frame's life, so
-// cbEndOfFrame is delivered for it.
 TEST_F(TransientObjectCallbacks, FreeingAFrameDeliversEndOfFrame) {
   RegisterFor(cbEndOfFrame);
 
@@ -77,8 +55,6 @@ TEST_F(TransientObjectCallbacks, FreeingAFrameDeliversEndOfFrame) {
   EXPECT_EQ(VpiObjectOf(g_objects[0]), &frame);
 }
 
-// The thread half of the same rule. The two reasons are told apart by the kind
-// of object being freed, so a thread's end is not reported as a frame's.
 TEST_F(TransientObjectCallbacks, FreeingAThreadDeliversEndOfThreadOnly) {
   RegisterFor(cbEndOfThread);
   RegisterFor(cbEndOfFrame);
@@ -92,9 +68,6 @@ TEST_F(TransientObjectCallbacks, FreeingAThreadDeliversEndOfThreadOnly) {
   EXPECT_EQ(VpiObjectOf(g_objects[0]), &thread);
 }
 
-// Reclaiming a class object is the end of that object's life, and the list
-// gives it two callbacks: cbReclaimObj for the reclaim and cbEndOfObject for
-// the object ceasing to exist. Both are delivered, and both name the object.
 TEST_F(TransientObjectCallbacks, ReclaimingAClassObjectDeliversBothReasons) {
   VpiObject class_object;
   class_object.type = vpiClassObj;
@@ -110,9 +83,6 @@ TEST_F(TransientObjectCallbacks, ReclaimingAClassObjectDeliversBothReasons) {
   EXPECT_EQ(VpiObjectOf(g_objects[1]), &class_object);
 }
 
-// An application that registered for none of these life events is not called by
-// them, so the delivery above is the registration being honoured rather than
-// every callback being run.
 TEST_F(TransientObjectCallbacks, AnUnrelatedReasonIsNotDelivered) {
   RegisterFor(cbEndOfSimulation);
 
@@ -123,11 +93,6 @@ TEST_F(TransientObjectCallbacks, AnUnrelatedReasonIsNotDelivered) {
   EXPECT_TRUE(g_reasons.empty());
 }
 
-// The beginning half of the list, against a run. A thread becomes an object of
-// the model when the design's processes are walked, and a frame is activated
-// for each call the design makes, so cbStartOfThread and cbStartOfFrame both
-// report a transient object beginning its life. Neither was delivered from any
-// site, so an application tracking a frame or a thread saw only its end.
 TEST_F(TransientObjectCallbacks, ARunDeliversTheStartOfAThreadAndAFrame) {
   RegisterFor(cbStartOfThread);
   RegisterFor(cbStartOfFrame);
@@ -144,9 +109,6 @@ TEST_F(TransientObjectCallbacks, ARunDeliversTheStartOfAThreadAndAFrame) {
       f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
-  // §37.44: the run's processes become thread objects when the set of them is
-  // brought up to date, which is what an application iterating vpiThread makes
-  // happen. Asking for it directly is the same pass without the iteration.
   ctx_.RefreshThreadObjects();
 
   int threads = 0;
@@ -159,13 +121,6 @@ TEST_F(TransientObjectCallbacks, ARunDeliversTheStartOfAThreadAndAFrame) {
   EXPECT_GT(frames, 0);
 }
 
-// The ending half of the list, against a run: the initial procedure's thread
-// and the fork branch it spawns end, and the frame its call activated ends
-// before them, so cbEndOfThread and cbEndOfFrame each report a transient
-// object's end. §37.2.2 item 2 has those ends release the handles to the frame
-// and the threads, which the routines were handed while they were still live.
-// The branch was made an object as it began (cbStartOfThread), the initial
-// procedure's thread only as it ends.
 TEST_F(TransientObjectCallbacks, ARunDeliversTheEndOfAThreadAndAFrame) {
   RegisterFor(cbStartOfThread);
   RegisterFor(cbEndOfThread);
@@ -196,11 +151,6 @@ TEST_F(TransientObjectCallbacks, ARunDeliversTheEndOfAThreadAndAFrame) {
   EXPECT_GT(frames, 0);
 }
 
-// The design below makes a class object and drops it, so the garbage
-// collector's next pass reclaims it. It calls $arm first, which places a
-// callback for each reason in g_armed on the typespec of c's class: §38.36.1
-// has a cbCreateObj or cbReclaimObj placed on a class typespec, which the run
-// makes an object of the model only once it starts.
 constexpr const char* kDroppedObject =
     "module t;\n"
     "  class C;\n"
@@ -216,7 +166,7 @@ constexpr const char* kDroppedObject =
 
 std::vector<int> g_armed;
 
-PLI_INT32 ArmCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 ArmCalltf(PLI_BYTE8*) {
   vpiHandle spec =
       vpi_handle(vpiTypespec, vpi_handle_by_name(VpiText("t.c"), nullptr));
   for (int reason : g_armed) {
@@ -229,8 +179,6 @@ PLI_INT32 ArmCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-// Runs kDroppedObject, $arm placing a callback for each of `armed`, and then
-// the garbage collector.
 void RunAndCollect(const std::vector<int>& armed = {}) {
   g_armed = armed;
   s_vpi_systf_data task = {};
@@ -245,8 +193,6 @@ void RunAndCollect(const std::vector<int>& armed = {}) {
   f.ctx.CollectGarbage();
 }
 
-// Reclaiming the object delivers cbReclaimObj and cbEndOfObject and, by
-// §37.2.2 item 3, releases the handle cbCreateObj was given for the object...
 TEST_F(TransientObjectCallbacks, ReclaimingARunsObjectDeliversBothReasons) {
   RegisterFor(cbEndOfObject);
   RunAndCollect({cbCreateObj, cbReclaimObj});
@@ -256,8 +202,6 @@ TEST_F(TransientObjectCallbacks, ReclaimingARunsObjectDeliversBothReasons) {
   EXPECT_TRUE(ctx_.HandleReleased(VpiObjectOf(g_objects[0])));
 }
 
-// ...each reason delivered to an application that registered for it alone,
-// though no handle to the object was handed out before...
 TEST_F(TransientObjectCallbacks, ReclaimingDeliversReclaimObjAlone) {
   RunAndCollect({cbReclaimObj});
   EXPECT_EQ(g_reasons, (std::vector<int>{cbReclaimObj}));
@@ -269,7 +213,6 @@ TEST_F(TransientObjectCallbacks, ReclaimingDeliversEndOfObjectAlone) {
   EXPECT_EQ(g_reasons, (std::vector<int>{cbEndOfObject}));
 }
 
-// ...and nothing told to an application that registered for neither.
 TEST_F(TransientObjectCallbacks, ReclaimingTellsNoOneWhoDidNotAsk) {
   RegisterFor(cbEndOfFrame);
   RunAndCollect();

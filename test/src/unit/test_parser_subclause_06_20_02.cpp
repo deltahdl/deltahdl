@@ -97,9 +97,6 @@ TEST(DataTypeParsing, RangedUntypedParameterParses) {
   EXPECT_EQ(item->name, "P");
 }
 
-// A value parameter's data type may stand behind a package scope, in the body
-// as in the header's parameter port list, and the parser reads the scope and
-// the type name rather than taking the package name for the parameter's.
 TEST(DeclarationListParsing, ValueParameterOfAPackageScopedType) {
   auto r = Parse(
       "package p;\n"

@@ -16,28 +16,6 @@
 
 using namespace delta;
 
-// Elaborates, lowers and runs `src`, then returns the value the run left in the
-// variable `var_name`.
-//
-// The elaboration is required to be clean, not merely to have produced
-// something. Elaboration reports what the source got wrong and still hands back
-// a design, and the evaluator will happily run that design and leave a value
-// behind, so a caller that read the value alone could not tell source the
-// elaborator accepted from source it rejected -- it would be asserting on
-// whatever the evaluator made of a program that will not elaborate. The fixture
-// already records the verdict; this reads it.
-//
-// The run is required to be clean as well. An evaluator that meets an error
-// while running -- a member read against another tag, a mailbox message of the
-// wrong type, an out-of-range select it refuses -- reports it and carries on,
-// leaving the variable holding whatever the statements before it produced, so
-// a caller that read the value alone would take a "0" the report explains for
-// a value the simulator computed and could not tell the two apart. Every
-// error the run raises is listed in the failure, since a caller whose subject
-// is such a report reads it through SimFixture and FindDiagFrom, not through
-// this. A warning is not a failure: §7.8.6's read of a nonexistent
-// associative-array entry, for one, answers the default value and may warn,
-// and the value is then the one the standard gives.
 inline void ExpectRunReportedNoError(const SimFixture& f, size_t before) {
   const auto& diags = f.diag.Diagnostics();
   for (size_t i = before; i < diags.size(); ++i) {
@@ -64,12 +42,6 @@ inline uint64_t RunAndGet(const std::string& src, const char* var_name) {
   return var->value.ToUint64();
 }
 
-// The real-valued form of RunAndGet, decoding the variable's bits through
-// RealVecToDouble so a §6.12 shortreal is read as the single-precision value
-// its 32 bits hold. Reading them as a double regardless would answer a
-// subnormal near zero for every shortreal, which would make a case over one
-// pass whatever the simulator stored. It requires a clean elaboration for the
-// same reason RunAndGet does.
 inline double RunAndGetReal(const std::string& src, const char* var_name) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
@@ -86,7 +58,6 @@ inline double RunAndGetReal(const std::string& src, const char* var_name) {
   return RealVecToDouble(var->value);
 }
 
-// Lower a design and check variable values.
 inline void LowerRunAndCheck(
     SimFixture& f, RtlirDesign* design,
     std::initializer_list<std::pair<const char*, uint64_t>> checks) {

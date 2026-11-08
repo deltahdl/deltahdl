@@ -21,11 +21,6 @@ namespace delta {
 
 namespace {
 
-// The C object a formal or a result is held in on this side of a call: one of
-// Table H.1's types (§H.7.4), a string's const char*, a scalar bit or logic's
-// svBit or svLogic, or the canonical array of a packed value (§H.7.7), words
-// of svBitVecVal for a 2-state one and pairs of svLogicVecVal for a 4-state
-// one.
 enum class DpiCObject : uint8_t {
   kChar,
   kShort,
@@ -38,20 +33,11 @@ enum class DpiCObject : uint8_t {
   kScalar,
   kBitVector,
   kLogicVector,
-  // §H.7.3: a sized unpacked array, its elements laid out one after another
-  // as C lays out an array of the element's own C object.
   kArray,
-  // §H.7.8: an unpacked struct or union, its members laid out as the C
-  // compiler lays them out.
   kAggregate,
-  // §H.8.6: an open array, passed by the handle of a descriptor (§H.12)
-  // over its elements laid out as svdpi.cpp reads them.
   kOpenArray,
 };
 
-// Table H.1: the object a small type is held in. An int, and the int an
-// imported task returns (§35.9) where the declaration gives no result, take
-// the int.
 DpiCObject ObjectOfSmallKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -80,14 +66,8 @@ DpiCObject ObjectOfSmallKind(DataTypeKind kind) {
 
 std::optional<DpiCObject> ObjectOfFormal(const DpiArg& formal);
 
-// The object one element of `formal` is held in -- the formal itself where it
-// has no unpacked dimension -- or none where it is of a type whose C layout is
-// not built here: one this side cannot see through to its C type, or an
-// unpacked struct or union whose members it does not know.
 std::optional<DpiCObject> ObjectOfElement(const DpiArg& formal) {
   if (!formal.members.empty()) {
-    // §H.7.8: an unpacked struct or union has the C compiler's layout of its
-    // members, so it is built where each member is.
     for (const DpiArg& member : formal.members) {
       if (!ObjectOfFormal(member).has_value()) return std::nullopt;
     }
@@ -104,8 +84,6 @@ std::optional<DpiCObject> ObjectOfElement(const DpiArg& formal) {
   }
 }
 
-// The object a formal is held in, or none where its C layout is not built
-// here (ObjectOfElement).
 DpiArg ElementOf(const DpiArg& formal);
 
 std::optional<DpiCObject> ObjectOfFormal(const DpiArg& formal) {
@@ -114,20 +92,12 @@ std::optional<DpiCObject> ObjectOfFormal(const DpiArg& formal) {
     if (!ObjectOfElement(ElementOf(formal)).has_value()) return std::nullopt;
     return DpiCObject::kOpenArray;
   }
-  // §H.7.3: a stand-alone array passed to a sized formal has the C layout of
-  // an array of its elements, so it is built where every dimension is sized
-  // and the element is an object built here -- an unpacked struct or union
-  // among them, each element then laid out as the C compiler lays the struct
-  // (§H.7.8).
   if (formal.unpacked_dims.empty() || !ObjectOfElement(formal).has_value()) {
     return std::nullopt;
   }
   return DpiCObject::kArray;
 }
 
-// One element of the unpacked formal `formal`. svdpi.cpp reads a scalar bit
-// or logic element of an open array as one canonical chunk (§H.12.5), so such
-// an element is held as the one-bit packed array.
 DpiArg ElementOf(const DpiArg& formal) {
   DpiArg element = formal;
   element.has_unpacked_dimensions = false;
@@ -143,8 +113,6 @@ DpiArg ElementOf(const DpiArg& formal) {
   return element;
 }
 
-// The count of elements the sized unpacked dimensions of `formal` hold, 1 for
-// a formal with none.
 std::size_t ElementCount(const DpiArg& formal) {
   std::size_t count = 1;
   for (const SvActualDimension& dim : formal.unpacked_dims) {
@@ -153,8 +121,6 @@ std::size_t ElementCount(const DpiArg& formal) {
   return count;
 }
 
-// §H.7.8: where the C compiler places each member of an unpacked struct or
-// union, how big the whole is, and the alignment it takes.
 struct DpiCAggregateLayout {
   std::vector<std::size_t> offsets;
   std::size_t size = 0;
@@ -163,16 +129,11 @@ struct DpiCAggregateLayout {
 
 DpiCAggregateLayout LayoutOf(const DpiArg& formal);
 
-// The bytes one element of `formal` takes in C: its own C type's size, the
-// canonical array of a packed one (DpiCElementBytes), or an aggregate's size.
 std::size_t ElementBytes(const DpiArg& formal) {
   if (!formal.members.empty()) return LayoutOf(formal).size;
   return DpiCElementBytes(formal);
 }
 
-// The alignment of one element of `formal`: a basic C type's own size, an
-// svBitVecVal or svLogicVecVal chunk's 4 for a packed one, and the largest
-// of its members' for an aggregate.
 std::size_t AlignmentOf(const DpiArg& formal) {
   if (!formal.members.empty()) return LayoutOf(formal).alignment;
   if (DpiCLayerTypeOfFormal(formal, false) ==
@@ -202,8 +163,6 @@ DpiCAggregateLayout LayoutOf(const DpiArg& formal) {
   return layout;
 }
 
-// §H.7.3: the width of a packed formal, which integer and time carry in
-// their type and a bit, logic or reg array in its declaration.
 uint32_t PackedWidthOf(const DpiArg& formal) {
   switch (formal.type) {
     case DataTypeKind::kInteger:
@@ -215,10 +174,6 @@ uint32_t PackedWidthOf(const DpiArg& formal) {
   }
 }
 
-// §H.12.2: dimension 0 of an open array's descriptor, the packed part of its
-// element normalized to [n-1:0] (§H.7.5) -- a scalar's [0:0], and none for
-// an element with no packed part, such as an unpacked struct or a real, for
-// which §20.7 counts no packed dimension.
 std::optional<SvOpenArrayDimRange> PackedRangeOf(const DpiArg& formal) {
   switch (formal.type) {
     case DataTypeKind::kBit:
@@ -241,14 +196,10 @@ std::optional<SvOpenArrayDimRange> PackedRangeOf(const DpiArg& formal) {
   }
 }
 
-// §H.7.7: the bits of the last chunk of a canonical array beyond the width are
-// undetermined, so a value read out of one keeps only the bits within it.
 uint32_t UsedBitsMask(uint32_t width) {
   return ~0U >> ((32U - (width % 32U)) % 32U);
 }
 
-// The C objects of one formal or result for the length of a call. The union's
-// first member is the widest, so zeroing the union zeroes all of it.
 struct DpiCStorage {
   DpiCObject object = DpiCObject::kInt;
   uint32_t width = 0;
@@ -266,24 +217,15 @@ struct DpiCStorage {
   std::vector<uint32_t> bits;
   std::vector<SvLogicVecVal> logic;
   std::string text;
-  // An array's or an aggregate's bytes as C lays them out, and the object of
-  // each of its parts -- an array's elements, an aggregate's members -- with
-  // the part's offset, size and type. The objects keep a string part's
-  // characters alive for the call.
   std::vector<unsigned char> bytes;
   std::vector<DpiCStorage> parts;
   std::vector<std::size_t> offsets;
   std::vector<std::size_t> sizes;
   std::vector<DataTypeKind> kinds;
-  // An open array's descriptor and the dimensions it points at, dimension 0
-  // the packed part (§H.12.2), with the stride svGetArrElemPtr steps by: 0
-  // where an element is not held as an individual value of its type is.
   std::vector<SvOpenArrayDimRange> ranges;
   SvOpenArrayDesc desc{};
   std::size_t element_stride = 0;
 
-  // The address a trampoline reads a formal passed by value out of, hands a
-  // formal passed by reference, or stores the result at.
   void* Address() {
     switch (object) {
       case DpiCObject::kBitVector:
@@ -294,15 +236,11 @@ struct DpiCStorage {
       case DpiCObject::kAggregate:
         return bytes.data();
       default:
-        // An open array's handle is held in the scalar, and crosses by value.
         return &scalar;
     }
   }
 };
 
-// Readies `storage` to hold `formal`: the object it is held in and, for an
-// array or an aggregate, the object of each part at the offset C gives it
-// (§H.7.6 c), §H.7.8).
 void Prepare(DpiCStorage& storage, const DpiArg& formal) {
   storage.object = ObjectOfFormal(formal).value_or(DpiCObject::kInt);
   storage.width = PackedWidthOf(formal);
@@ -328,8 +266,6 @@ void Prepare(DpiCStorage& storage, const DpiArg& formal) {
     const std::optional<SvOpenArrayDimRange> kPacked = PackedRangeOf(formal);
     storage.ranges.push_back(kPacked.value_or(SvOpenArrayDimRange{0, 0}));
     storage.desc.has_packed_part = kPacked.has_value() ? 1 : 0;
-    // §H.12.4: a scalar bit or logic element is held as a canonical chunk,
-    // not as the svBit or svLogic an individual value is.
     storage.element_stride =
         kElement.is_packed_array && !formal.is_packed_array && formal.width <= 1
             ? 0
@@ -347,10 +283,6 @@ void Prepare(DpiCStorage& storage, const DpiArg& formal) {
   }
 }
 
-// §H.10.1.2: `value`, of the packed type `kind`, as the canonical array of
-// `width` bits. A bit, logic or reg array arrives already in that form; an
-// integer arrives as its one aval/bval pair and a time as the 64 bits of a
-// longint.
 std::vector<SvLogicVecVal> CanonicalWordsOf(const DpiArgValue& value,
                                             DataTypeKind kind, uint32_t width) {
   std::vector<SvLogicVecVal> words(DpiCanonicalWordCount(width),
@@ -362,11 +294,9 @@ std::vector<SvLogicVecVal> CanonicalWordsOf(const DpiArgValue& value,
   } else if (kind == DataTypeKind::kInteger) {
     words[0] = value.AsLogicVec();
   } else if (value.type == DataTypeKind::kBit) {
-    // A one-bit packed array arrives as the scalar of its kind (§H.7.3).
     words[0].aval = value.AsBit() & 1U;
   } else if (value.type == DataTypeKind::kLogic ||
              value.type == DataTypeKind::kReg) {
-    // §H.10.1.2: sv_0, sv_1, sv_z and sv_x are aval/bval 00, 10, 01 and 11.
     const auto kCode = static_cast<uint32_t>(value.AsLogic());
     words[0] = {kCode & 1U, (kCode >> 1U) & 1U};
   } else {
@@ -377,8 +307,6 @@ std::vector<SvLogicVecVal> CanonicalWordsOf(const DpiArgValue& value,
   return words;
 }
 
-// §H.7.7: the svBitVecVal words of a 2-state canonical array, the avals of
-// the pairs `words` hold.
 std::vector<uint32_t> AvalsOf(const std::vector<SvLogicVecVal>& words) {
   std::vector<uint32_t> avals;
   avals.reserve(words.size());
@@ -386,7 +314,6 @@ std::vector<uint32_t> AvalsOf(const std::vector<SvLogicVecVal>& words) {
   return avals;
 }
 
-// The 2-state canonical array `bits` as pairs of aval and bval, every bval 0.
 std::vector<SvLogicVecVal> PairsOf(const std::vector<uint32_t>& bits) {
   std::vector<SvLogicVecVal> words;
   words.reserve(bits.size());
@@ -397,9 +324,6 @@ std::vector<SvLogicVecVal> PairsOf(const std::vector<uint32_t>& bits) {
 void StoreValue(DpiCStorage& storage, DataTypeKind kind,
                 const DpiArgValue& value);
 
-// Lays the parts of `value` -- an array's elements, an aggregate's members --
-// out in the parts `storage` holds, each at its offset; a part `value` does
-// not carry, an output's, is laid out as the zero of its type.
 void StoreParts(DpiCStorage& storage, const DpiArgValue& value) {
   for (std::size_t k = 0; k < storage.parts.size(); ++k) {
     DpiCStorage& part = storage.parts[k];
@@ -410,9 +334,6 @@ void StoreParts(DpiCStorage& storage, const DpiArgValue& value) {
   }
 }
 
-// §35.6.1.1 with §H.12: sizes the open array `storage` holds to the ranges
-// of the actual `value` carries, lays its elements out, each dimension from
-// its left bound, and points the descriptor the handle names at them.
 void StoreOpen(DpiCStorage& storage, const DpiArgValue& value) {
   const DpiCStorage kElement = storage.parts.front();
   const std::size_t kBytes = storage.sizes.front();
@@ -439,7 +360,6 @@ void StoreOpen(DpiCStorage& storage, const DpiArgValue& value) {
   storage.scalar.p = &storage.desc;
 }
 
-// Lays `value` out in the C objects `storage` holds for a formal of `kind`.
 void StoreValue(DpiCStorage& storage, DataTypeKind kind,
                 const DpiArgValue& value) {
   switch (storage.object) {
@@ -465,8 +385,6 @@ void StoreValue(DpiCStorage& storage, DataTypeKind kind,
       storage.scalar.p = value.AsChandle();
       break;
     case DpiCObject::kString:
-      // §H.8.10: the characters are laid out as a C string, and the pointer is
-      // what crosses.
       storage.text = value.AsString();
       storage.scalar.str = storage.text.c_str();
       break;
@@ -485,15 +403,11 @@ void StoreValue(DpiCStorage& storage, DataTypeKind kind,
       StoreOpen(storage, value);
       break;
     default:
-      // DpiCObject::kLogicVector, the one object left.
       storage.logic = CanonicalWordsOf(value, kind, storage.width);
       break;
   }
 }
 
-// The canonical array `words`, `width` bits of it, as a value of the packed
-// type `kind`: an integer is its one aval/bval pair, and a time and a bit,
-// logic or reg array the array itself, a time's unknown bits with it (§H.7.3).
 DpiArgValue PackedValueOf(std::vector<SvLogicVecVal> words, DataTypeKind kind,
                           uint32_t width) {
   words.back().aval &= UsedBitsMask(width);
@@ -505,7 +419,6 @@ DpiArgValue PackedValueOf(std::vector<SvLogicVecVal> words, DataTypeKind kind,
 
 DpiArgValue LoadValue(const DpiCStorage& storage, DataTypeKind kind);
 
-// What the array or aggregate `storage` holds, part by part.
 DpiArgValue LoadParts(const DpiCStorage& storage, DataTypeKind kind) {
   DpiArgValue whole;
   whole.type = kind;
@@ -518,7 +431,6 @@ DpiArgValue LoadParts(const DpiCStorage& storage, DataTypeKind kind) {
   return whole;
 }
 
-// What the C objects of `storage` hold, as a value of `kind`.
 DpiArgValue LoadValue(const DpiCStorage& storage, DataTypeKind kind) {
   DpiArgValue value;
   switch (storage.object) {
@@ -544,8 +456,6 @@ DpiArgValue LoadValue(const DpiCStorage& storage, DataTypeKind kind) {
       value = DpiArgValue::FromChandle(storage.scalar.p);
       break;
     case DpiCObject::kString:
-      // §H.8.10: SystemVerilog copies the characters the pointer the C side
-      // left names; a C side that left none has given no characters.
       value = DpiArgValue::FromString(
           storage.scalar.str == nullptr ? "" : storage.scalar.str);
       break;
@@ -561,7 +471,6 @@ DpiArgValue LoadValue(const DpiCStorage& storage, DataTypeKind kind) {
     case DpiCObject::kAggregate:
       return LoadParts(storage, kind);
     case DpiCObject::kOpenArray: {
-      // The actual's shape goes back with what C left in it.
       DpiArgValue open = LoadParts(storage, kind);
       for (std::size_t d = 1; d < storage.ranges.size(); ++d) {
         open.ranges.push_back(
@@ -570,17 +479,12 @@ DpiArgValue LoadValue(const DpiCStorage& storage, DataTypeKind kind) {
       return open;
     }
     default:
-      // DpiCObject::kLogicVector, the one object left.
       return PackedValueOf(storage.logic, kind, storage.width);
   }
   value.type = kind;
   return value;
 }
 
-// The C type a formal takes in the trampoline's call and the expression that
-// passes it: the formal's own C type read out of its object for one passed by
-// value, and the object's address, as a void*, for one passed by reference --
-// a pointer being passed alike whatever it points at.
 struct DpiCParameter {
   std::string type;
   std::string argument;
@@ -588,16 +492,12 @@ struct DpiCParameter {
 
 DpiCParameter ParameterOf(const DpiArg& formal, std::size_t index) {
   const std::string kObject = "args[" + std::to_string(index) + "]";
-  // §H.8.6: an open array crosses as its handle, by value in every direction.
   if (formal.is_open_array) return {"void*", "*(void**)" + kObject};
   if (!DpiFormalIsPassedByValue(formal, false)) return {"void*", kObject};
   const std::string kType = DpiCTypeOfFormal(formal, false);
   return {kType, "*(" + kType + "*)" + kObject};
 }
 
-// The trampoline of one import: casts the symbol to the prototype §H.8 gives
-// the import and calls it, storing a result where there is one. An imported
-// task returns the int §35.9 gives it.
 std::string TrampolineOf(const DpiRtFunction& import, std::size_t index) {
   std::string types;
   std::string arguments;
@@ -622,7 +522,6 @@ std::string TrampolineOf(const DpiRtFunction& import, std::size_t index) {
          kStatement + ";\n}\n";
 }
 
-// The bytes the C object `object` takes where it holds a value outright.
 std::size_t ScalarBytes(DpiCObject object) {
   switch (object) {
     case DpiCObject::kChar:
@@ -645,7 +544,6 @@ std::size_t ScalarBytes(DpiCObject object) {
   }
 }
 
-// The bytes the C objects of `storage` take, laid out as C reads them.
 std::size_t ObjectBytes(const DpiCStorage& storage) {
   switch (storage.object) {
     case DpiCObject::kBitVector:
@@ -660,10 +558,6 @@ std::size_t ObjectBytes(const DpiCStorage& storage) {
   }
 }
 
-// The forwarder of one export: under the export's linkage name, each formal
-// passed by value as its own C type and every other as a pointer, which is
-// one in the calling convention whatever it points at, handing the address of
-// each to the entry point.
 std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
   std::string parameters;
   std::string addresses;
@@ -689,8 +583,6 @@ std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
     parameters = "void";
     addresses = "0";
   }
-  // §35.8: an exported task returns the int that says whether a disable is
-  // active.
   const std::string kResult =
       exp.is_task ? "int" : DpiCTypeOfResult(exp.return_type);
   const std::string kIndex = std::to_string(index);
@@ -705,17 +597,11 @@ std::string ForwarderOf(const DpiRtExport& exp, std::size_t index) {
          ") {\n" + body + "}\n";
 }
 
-// §H.8.10: the copy of `text` an export hands its C caller, kept for the rest
-// of the run, one per distinct string, so the address C holds stays valid
-// however long its code runs.
 const char* KeptForC(const std::string& text) {
   static std::unordered_set<std::string> kept;
   return kept.insert(text).first->c_str();
 }
 
-// Points every string `storage` holds, its own or a member's or an element's,
-// at the copy KeptForC keeps, laying each part out again where its parent
-// holds it; the characters StoreValue copied go with `storage`.
 void KeepStringsForC(DpiCStorage& storage) {
   if (storage.object == DpiCObject::kString) {
     storage.scalar.str = KeptForC(storage.text);
@@ -740,8 +626,6 @@ std::string DpiImportNotCallableInC(const DpiRtFunction& import) {
              std::string(formal.name) + "'";
     }
   }
-  // §35.9: an imported task returns the int that says whether it was
-  // disabled, whatever its declaration names as a result.
   if (!import.is_task && !DpiTypeMayBeAResult(import.return_type)) {
     return "its result type is not one §H.8.9 lets a C function return";
   }
@@ -750,8 +634,6 @@ std::string DpiImportNotCallableInC(const DpiRtFunction& import) {
 
 std::string DpiCTrampolineSource(
     const std::vector<const DpiRtFunction*>& imports) {
-  // svdpi.h's names for the C types of a scalar bit and logic (§H.10.1.1);
-  // every other type a trampoline names is a C type of its own.
   std::string source =
       "typedef unsigned char svBit;\n"
       "typedef unsigned char svLogic;\n";
@@ -768,14 +650,10 @@ DpiArgValue CallDpiCFunction(const DpiCFunction& function,
   std::vector<void*> addresses(kCount);
   for (std::size_t i = 0; i < kCount; ++i) {
     const DpiArg& formal = function.formals[i];
-    // Only an import DpiImportNotCallableInC accepted is bound, so every formal
-    // here has an object; the int is never taken.
     Prepare(objects[i], formal);
     StoreValue(objects[i], formal.type, args[i]);
     addresses[i] = objects[i].Address();
   }
-  // §35.5.5: a function with no result, and a task, return no value the call
-  // site reads; the int an imported task returns is held and not read.
   const DataTypeKind kResultKind = function.result == DataTypeKind::kVoid
                                        ? DataTypeKind::kInt
                                        : function.result;
@@ -792,8 +670,6 @@ DpiArgValue CallDpiCFunction(const DpiCFunction& function,
 }
 
 std::string DpiExportNotCallableFromC(const DpiRtExport& exp) {
-  // §H.8.2: an export takes every formal type an import takes but an open
-  // array, an unpacked struct or union among them (§H.7.8).
   for (const DpiArg& formal : exp.args) {
     if (formal.is_open_array || !ObjectOfFormal(formal).has_value()) {
       return "deltahdl does not yet pass to an exported subroutine the type "
@@ -829,7 +705,6 @@ std::string DpiCForwarderSource(
 DpiArgValue DpiValueOfCObject(const DpiArg& formal, const void* object) {
   DpiCStorage storage;
   Prepare(storage, formal);
-  // Laying a value out first sizes the objects C's are read into.
   StoreValue(storage, formal.type, DpiArgValue{});
   std::memcpy(storage.Address(), object, ObjectBytes(storage));
   return LoadValue(storage, formal.type);

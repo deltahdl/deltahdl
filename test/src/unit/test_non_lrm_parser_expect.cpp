@@ -13,15 +13,6 @@
 
 namespace delta {
 
-// No subclause of IEEE 1800-2023 says how a parser reports a token it did not
-// find, so these cases cover Parser::Expect on its own terms. Every caller of
-// it is parsing a different production of the syntax and so enforcing a
-// different rule, which is why the subclause the report names is a parameter:
-// the one sentence Expect writes is shared by every caller, and the subclause
-// is not.
-//
-// Expect is private to Parser, and what it reports is what these cases are
-// about, so they reach it through the struct Parser names as a friend.
 struct ParserExpectAccess {
   static Token Expect(Parser& parser, TokenKind kind, Subclause subclause) {
     return parser.Expect(kind, subclause);
@@ -30,9 +21,6 @@ struct ParserExpectAccess {
 
 namespace {
 
-// One source that does not hold the token every case asks for, so each call
-// takes the reporting path rather than consuming a token and returning. The
-// first token is the module keyword and the token asked for is a semicolon.
 struct ExpectFixture {
   SourceManager mgr;
   Arena arena;
@@ -47,8 +35,6 @@ struct ExpectFixture {
 };
 
 TEST(ExpectWithASubclause, ReportsTheSubclauseTheCallerGave) {
-  // The subclause reaches the record from the call site, so a caller that has
-  // read its production against the standard can say which rule it enforces.
   ExpectFixture f;
   f.ExpectSemicolon(Subclause("23.2.2"));
 
@@ -57,10 +43,6 @@ TEST(ExpectWithASubclause, ReportsTheSubclauseTheCallerGave) {
 }
 
 TEST(ExpectWithASubclause, MessageIsUnchanged) {
-  // The subclause goes beside the sentence rather than into it, so two calls
-  // differing only in the subclause they name read out the same sentence.
-  // Without this, a caller naming a subclause would get a message no other
-  // caller writes.
   ExpectFixture named;
   named.ExpectSemicolon(Subclause("23.2.2"));
   ExpectFixture unnamed;
@@ -73,10 +55,6 @@ TEST(ExpectWithASubclause, MessageIsUnchanged) {
 }
 
 TEST(ExpectStatingNoRuleOfTheStandard, RecordsAnEmptySubclause) {
-  // A caller whose production the standard states no rule about gets a record
-  // naming no subclause, rather than one naming a subclause Expect chose for
-  // it: a subclause Expect substituted would be right for one caller and wrong
-  // for the rest.
   ExpectFixture f;
   f.ExpectSemicolon(Subclause::None());
 
@@ -85,11 +63,6 @@ TEST(ExpectStatingNoRuleOfTheStandard, RecordsAnEmptySubclause) {
 }
 
 TEST(ExpectNamingTheTokenItFound, ReportNamesTheKeywordItFound) {
-  // The sentence names the token that was there, not the category it belongs
-  // to. The first token of the fixture source is the module keyword, so the
-  // report reads "got 'module'": a reader who is told "got token" is told
-  // what a report of any of the other 339 kinds would also say, and has to go
-  // back to the location and read their own source to learn what was found.
   ExpectFixture f;
   f.ExpectSemicolon(Subclause("23.2.2"));
 

@@ -103,12 +103,6 @@ TEST(OperatorElaboration, UnaryReductionXnorAltElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Negative form: a reduction operator requires a bit-vector operand, so
-// applying one to a real variable is illegal and must be reported at
-// elaboration. §11.4.9 defines what the reduction operators compute and bars
-// no operand type; the rule broken here is §11.3.1's, which points to Table
-// 11-1 for the operators a real operand admits and leaves the reduction
-// operators out of that table. The report names §11.3.1.
 TEST(OperatorElaboration, UnaryReductionOnRealOperandRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -158,9 +152,6 @@ TEST(AlwaysCombExtendedSim, AlwaysCombReductionOr) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// §11.2.1 allows every Table 11-1 operator in a constant expression, so each
-// reduction of §11.4.9 folds, read across every bit of its operand: 4'b0100
-// has one bit set, and the 72-bit operand has its one set bit above bit 63.
 TEST(OperatorElaboration, ReductionOperatorsFoldInConstantExpressions) {
   EvalFixture f;
   const struct {
@@ -175,7 +166,6 @@ TEST(OperatorElaboration, ReductionOperatorsFoldInConstantExpressions) {
   }
 }
 
-// A reduction folded in a generate condition selects the block it names.
 TEST(OperatorElaboration, ReductionInGenerateConditionSelectsTheBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(

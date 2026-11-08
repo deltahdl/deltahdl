@@ -29,10 +29,6 @@ static const ModuleItem* FindExternPrototype(const ClassDecl* cls,
   return nullptr;
 }
 
-// §8.24: when an out-of-block declaration repeats a default argument value, it
-// shall be syntactically identical to the one in the prototype. The default
-// values are parsed into expression trees, so compare those trees node by node
-// as a faithful stand-in for syntactic identity.
 static bool DefaultArgExprsEqual(const Expr* a, const Expr* b) {
   if (a == nullptr || b == nullptr) return a == b;
   if (a->kind != b->kind || a->op != b->op || a->text != b->text ||
@@ -57,26 +53,13 @@ static bool DefaultArgExprsEqual(const Expr* a, const Expr* b) {
   return true;
 }
 
-// The declaration a subroutine body was prototyped by, for the two rules that
-// state one shall match the other. §8.24 governs a class out-of-block
-// declaration and writes the qualified name with the class-scope operator;
-// §25.7 governs a subroutine defined for an interface by a hierarchical name
-// and writes it with a dot. The comparison below is the same rule in both, so
-// the clause to cite and the separator to write are passed in rather than
-// decided inside it by asking what kind of declaration this is.
 struct OutOfBlockScope {
   std::string_view name;
   std::string_view separator;
   Subclause subclause;
-  // §8.24 holds a class's out-of-block declaration to its prototype exactly,
-  // argument names included; §25.7 asks an interface's only for the number and
-  // the types of the arguments.
   bool compare_names = false;
 };
 
-// Compares one prototype argument against the corresponding out-of-block
-// declaration argument: type, direction, and, per §8.24, a repeated default
-// value.
 static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
                                const FunctionArg& impl_arg,
                                const ModuleItem* impl,
@@ -106,9 +89,6 @@ static void CheckOutOfBlockArg(const FunctionArg& proto_arg,
                     scope.name, scope.separator, impl->name, impl_arg.name),
         scope.subclause);
   }
-  // §8.24: omitting the prototype's default value is allowed, but repeating a
-  // default value in the out-of-block declaration requires a syntactically
-  // identical default value in the prototype.
   const Expr* impl_default = impl_arg.default_value;
   if (impl_default != nullptr &&
       !DefaultArgExprsEqual(proto_arg.default_value, impl_default)) {
@@ -141,10 +121,6 @@ static void CheckOutOfBlockReturnType(const ModuleItem* proto,
   }
 }
 
-// §8.24 for a class out-of-block declaration and §25.7 for a subroutine defined
-// for an interface by a hierarchical name state one rule in the same words.
-// §25.7 (printed page 793): a prototype's arguments match the subroutine
-// declaration's in number and type.
 static void ValidateOutOfBlockSignature(const ModuleItem* proto,
                                         const ModuleItem* impl,
                                         const OutOfBlockScope& scope,
@@ -198,17 +174,12 @@ static const ModuleItem* FindInterfaceExternPrototype(const ModuleDecl* ifc,
   return nullptr;
 }
 
-// True when location a strictly precedes location b within the same source
-// file. Locations from different files carry no relative order, so they are
-// reported as not-preceding to avoid spurious diagnostics.
 static bool LocPrecedes(const SourceLoc& a, const SourceLoc& b) {
   if (a.file_id != b.file_id) return false;
   if (a.line != b.line) return a.line < b.line;
   return a.column < b.column;
 }
 
-// Handles an out-of-block body whose `method_class` names an interface rather
-// than a class. Mirrors the original interface branch exactly.
 static void ValidateInterfaceOutOfBlockBody(
     const ModuleDecl* ifc, ModuleItem* item,
     std::unordered_set<std::string>& linked, DiagEngine& diag) {
@@ -234,11 +205,6 @@ static void ValidateInterfaceOutOfBlockBody(
       proto, item, {item->method_class, ".", Subclause("25.7")}, diag);
 }
 
-// §8.24: whether the class `cls` declares a type named `name` (a typedef or a
-// nested class) after its member whose method is `proto`. The prototype,
-// resolved where it stands, does not see such a type, while the out-of-block
-// declaration's header sees every declaration of the class, so the name
-// resolves to two different declarations in the two.
 static bool ClassTypeDeclaredAfter(const ClassDecl* cls,
                                    const ModuleItem* proto,
                                    std::string_view name) {
@@ -251,9 +217,6 @@ static bool ClassTypeDeclaredAfter(const ClassDecl* cls,
   return false;
 }
 
-// §8.24: reports a named type of the out-of-block declaration `impl`, written
-// bare or behind its own class's scope, that resolves to a type `cls` declares
-// after the prototype `proto` of it.
 static void CheckOutOfBlockTypeResolution(const ClassDecl* cls,
                                           const ModuleItem* proto,
                                           const ModuleItem* impl,
@@ -276,10 +239,6 @@ static void CheckOutOfBlockTypeResolution(const ClassDecl* cls,
   for (const auto& arg : impl->func_args) check(arg.data_type);
 }
 
-// Handles an out-of-block body whose `method_class` names a regular class: it
-// is checked against the class's `extern` prototype of it and, once it is the
-// one definition of that prototype, linked to it as the method's body
-// (MethodBody in elaborator_validate_classes_internal.h).
 static void ValidateClassOutOfBlockBody(
     const ClassDecl* cls, ModuleItem* item,
     std::unordered_set<const ModuleItem*>& linked, DiagEngine& diag) {
@@ -292,9 +251,6 @@ static void ValidateClassOutOfBlockBody(
                Subclause("8.24"));
     return;
   }
-  // §8.24 places an out-of-block declaration after the declaration of its
-  // class, so a body that appears ahead of its class in source order is
-  // illegal.
   if (LocPrecedes(item->loc, cls->range.start)) {
     diag.Error(
         item->loc,
@@ -317,10 +273,6 @@ static void ValidateClassOutOfBlockBody(
   CheckOutOfBlockTypeResolution(cls, proto, item, diag);
 }
 
-// The class named `name` among `classes`, the classes one scope declares
-// directly; null where none is. §8.24 has an out-of-block declaration stand in
-// the scope of its class's declaration, so the class is looked for there and
-// nowhere else.
 static const ClassDecl* ClassNamedAmong(
     const std::vector<const ClassDecl*>& classes, std::string_view name) {
   for (const ClassDecl* cls : classes) {
@@ -329,7 +281,6 @@ static const ClassDecl* ClassNamedAmong(
   return nullptr;
 }
 
-// The classes `items` declares directly.
 static std::vector<const ClassDecl*> ClassesDeclaredAmong(
     const std::vector<ModuleItem*>& items) {
   std::vector<const ClassDecl*> classes;
@@ -343,18 +294,12 @@ static std::vector<const ClassDecl*> ClassesDeclaredAmong(
 
 namespace {
 
-// The out-of-block declarations of one scope and the classes it declares
-// directly, with what a declaration naming none of them is: an error, or, in
-// a module, interface, program or checker, a §25.7 subroutine defined for an
-// interface port, `task bus.pull()`, which is left to the interface rules.
 struct OutOfBlockSite {
   const std::vector<ModuleItem*>* items;
   std::vector<const ClassDecl*> classes;
   bool unknown_is_error;
 };
 
-// The prototypes and interface methods the scopes' declarations have linked
-// so far, which a second declaration of either is reported against.
 struct OutOfBlockLinks {
   std::unordered_set<std::string> interfaces;
   std::unordered_set<const ModuleItem*> prototypes;
@@ -362,8 +307,6 @@ struct OutOfBlockLinks {
 
 }  // namespace
 
-// The out-of-block declaration `item` of `site`, which names a class or
-// interface by its method_class.
 static void ValidateOutOfBlockItem(ModuleItem* item, const OutOfBlockSite& site,
                                    OutOfBlockLinks& links,
                                    const CompilationUnit* unit,
@@ -400,8 +343,6 @@ void ElaboratorClassRules::ValidateOutOfBlockDeclarations() {
   }
   OutOfBlockLinks links;
   for (const OutOfBlockSite& site : sites) {
-    // Only a function or task declaration carries a method_class (§8.24's
-    // class_scope before its name, §25.7's interface port).
     for (auto* item : *site.items) {
       if (!item->method_class.empty()) {
         ValidateOutOfBlockItem(item, site, links, unit_, diag_);

@@ -114,9 +114,6 @@ TEST(ChainedConstructorParsing, ArgAfterDefaultResetsToInputLogic) {
   auto& args = r.cu->classes[0]->members[0]->method->func_args;
   ASSERT_EQ(args.size(), 3u);
   EXPECT_TRUE(args[1].is_default);
-  // The argument directly following 'default' does not inherit the preceding
-  // 'output int'; it falls back to the default direction (input) and the
-  // default data type (logic).
   EXPECT_EQ(args[2].direction, Direction::kInput);
   EXPECT_EQ(args[2].data_type.kind, DataTypeKind::kLogic);
 }
@@ -131,8 +128,6 @@ TEST(ChainedConstructorParsing, ArgAfterDefaultKeepsExplicitDirection) {
   auto& args = r.cu->classes[0]->members[0]->method->func_args;
   ASSERT_EQ(args.size(), 2u);
   EXPECT_TRUE(args[0].is_default);
-  // The input/logic fallback for the argument following 'default' applies only
-  // when no direction is given; an explicit direction still takes effect.
   EXPECT_EQ(args[1].direction, Direction::kOutput);
 }
 

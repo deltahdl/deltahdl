@@ -23,20 +23,13 @@ namespace {
 
 using VarTypes = std::unordered_map<std::string_view, DataTypeKind>;
 
-// What a value's side is read from: each variable's declared kind, which for
-// an array is its element's, and the variables that are unpacked arrays.
 struct VarTables {
   const VarTypes& kinds;
   const std::unordered_set<std::string_view>& arrays;
 };
 
-// Which side of §6.16's rule a value or a target stands on. A string literal
-// stands on neither, since it may be assigned to either; so does a cast, which
-// is what bridges the two, and anything whose type this reading cannot see.
 enum class ValueSide : uint8_t { kUnknown, kString, kNumeric };
 
-// §6.16.8 to §6.16.10 (Table 6-9): the methods of a string whose result is a
-// string. The others give an integral or a real value, or nothing.
 constexpr std::array<std::string_view, 3> kStringResultMethods = {
     "substr", "toupper", "tolower"};
 
@@ -53,8 +46,6 @@ static ValueSide SideOfVar(std::string_view name, const VarTables& vars) {
   return it == vars.kinds.end() ? ValueSide::kUnknown : SideOfKind(it->second);
 }
 
-// A call of a string method giving a string. An array's `new[N]` is a call
-// with no callee, and stands on neither side.
 static bool IsStringResultMethodCall(const Expr* call, const VarTables& vars) {
   if (call->lhs == nullptr || call->lhs->kind != ExprKind::kMemberAccess ||
       SideOfVar(ExprIdent(call->lhs->lhs), vars) != ValueSide::kString) {
@@ -68,9 +59,6 @@ static bool IsStringResultMethodCall(const Expr* call, const VarTables& vars) {
 
 static ValueSide SideOf(const Expr* e, const VarTables& vars);
 
-// A select of an unpacked array names an element, whose side is the array's
-// declared kind; any other select takes bits, or a character, which is a
-// byte (§6.16), out of what it selects from, and is numeric.
 static ValueSide SideOfSelect(const Expr* select, const VarTables& vars) {
   std::string_view array = ExprIdent(select->base);
   if (vars.arrays.count(array) != 0) return SideOfVar(array, vars);
@@ -79,9 +67,6 @@ static ValueSide SideOfSelect(const Expr* select, const VarTables& vars) {
              : ValueSide::kNumeric;
 }
 
-// The side `e` stands on: an integral or a real literal or variable, and an
-// operation with an operand of that side, are numeric; a string variable and a
-// string method giving a string are string.
 static ValueSide SideOf(const Expr* e, const VarTables& vars) {
   switch (e->kind) {
     case ExprKind::kIntegerLiteral:
@@ -114,8 +99,6 @@ static void CheckWrite(ValueSide target, const Expr* value, SourceLoc loc,
              Subclause("6.16"));
 }
 
-// §6.16 makes the rule one about the two types, whatever statement the
-// assignment stands in, so every position ForEachChildStmt names is walked.
 static void CheckStmt(const Stmt* s, const VarTables& vars, DiagEngine& diag) {
   if (s == nullptr) return;
   if (s->kind == StmtKind::kBlockingAssign ||

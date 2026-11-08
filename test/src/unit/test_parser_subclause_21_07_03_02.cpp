@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §21.7.3.2 (Syntax 21-22): the $dumpportsoff task takes a single filename
-// argument and parses as a generic system task call.
 TEST(IoSystemTaskParsing, DumpportsoffCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -16,8 +14,6 @@ TEST(IoSystemTaskParsing, DumpportsoffCall) {
               "endmodule\n"));
 }
 
-// §21.7.3.2 (Syntax 21-22): the $dumpportson task takes a single filename
-// argument and parses as a generic system task call.
 TEST(IoSystemTaskParsing, DumpportsonCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -25,8 +21,6 @@ TEST(IoSystemTaskParsing, DumpportsonCall) {
               "endmodule\n"));
 }
 
-// §21.7.3.2: the filename argument is optional; both tasks accept the
-// no-argument form that targets every file opened by $dumpports.
 TEST(IoSystemTaskParsing, DumpportsOffOnNoFilename) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -37,8 +31,6 @@ TEST(IoSystemTaskParsing, DumpportsOffOnNoFilename) {
               "endmodule\n"));
 }
 
-// §21.7.3.2: leaving the filename unspecified also admits the empty
-// parenthesized call form for both tasks.
 TEST(IoSystemTaskParsing, DumpportsOffOnEmptyParenForms) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -49,8 +41,6 @@ TEST(IoSystemTaskParsing, DumpportsOffOnEmptyParenForms) {
               "endmodule\n"));
 }
 
-// §21.7.3.2: the filename is an expression, so both tasks accept an identifier
-// (a string-typed or integral variable holding the name) instead of a literal.
 TEST(IoSystemTaskParsing, DumpportsOffOnVariableFilename) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -61,28 +51,20 @@ TEST(IoSystemTaskParsing, DumpportsOffOnVariableFilename) {
               "endmodule\n"));
 }
 
-// §21.7.3.2 negative: the task call requires a parenthesized argument; a
-// filename butted against the task name without parentheses does not parse.
 TEST(IoSystemTaskParsing, DumpportsoffUnparenthesizedFilenameRejected) {
   auto result = Parse(
       "module t;\n"
       "  initial $dumpportsoff \"ports.vcd\";\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that terminates a subroutine call statement, and
-  // the unparenthesized filename is what stands where that semicolon must be.
   EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
                             "12.3"));
 }
 
-// §21.7.3.2 negative: the same unparenthesized-filename form is rejected for
-// the resume task too.
 TEST(IoSystemTaskParsing, DumpportsonUnparenthesizedFilenameRejected) {
   auto result = Parse(
       "module t;\n"
       "  initial $dumpportson \"ports.vcd\";\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that terminates a subroutine call statement, and
-  // the unparenthesized filename is what stands where that semicolon must be.
   EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
                             "12.3"));
 }

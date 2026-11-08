@@ -14,9 +14,6 @@ using namespace delta;
 
 namespace {
 
-// Writes `data` to a scratch file tagged by `tag` and returns its path. The
-// path holds no characters that need escaping inside a SystemVerilog string
-// literal, so it embeds directly in the source under test.
 std::string WritePersonalityFile(const std::string& tag,
                                  const std::string& data) {
   std::string path = "/tmp/deltahdl_t201604_" + tag + ".mem";
@@ -26,41 +23,23 @@ std::string WritePersonalityFile(const std::string& tag,
   return path;
 }
 
-// §20.16.4 defines the two PLA personality formats that the simulator's PLA
-// engine (eval_systask_pla.cpp) interprets when reducing a personality word.
-// The array format reads each bit as a plain take/don't-take selector, while
-// the plane format reads each bit as a Berkeley Espresso code that also chooses
-// the polarity of the participating input. These tests drive small synchronous
-// arrays so the per-bit interpretation is observable from the output term.
-
-// §20.16.4 array format: a 1 takes the input value and a 0 leaves it out. With
-// an AND-array selecting only the high input, the low input (whose personality
-// bit is 0) is excluded from the reduction, so a low value there cannot pull
-// the AND result down.
 TEST(PlaPersonalityFormat, ArrayFormatOneTakesInputZeroExcludesIt) {
   SimFixture f;
-  uint64_t out = RunModule(
-      f,
-      "module t;\n"
-      "  logic [1:2] in;\n"
-      "  logic [1:2] mem [1:1];\n"
-      "  logic [1:1] out;\n"
-      "  initial begin\n"
-      "    mem[1] = 2'b10;\n"  // take the high input, do not take the low one
-      "    in = 2'b10;\n"      // high = 1, low = 0
-      "    $sync$and$array(mem, in, out);\n"
-      "  end\n"
-      "endmodule\n",
-      "out");
+  uint64_t out = RunModule(f,
+                           "module t;\n"
+                           "  logic [1:2] in;\n"
+                           "  logic [1:2] mem [1:1];\n"
+                           "  logic [1:1] out;\n"
+                           "  initial begin\n"
+                           "    mem[1] = 2'b10;\n"
+                           "    in = 2'b10;\n"
+                           "    $sync$and$array(mem, in, out);\n"
+                           "  end\n"
+                           "endmodule\n",
+                           "out");
   EXPECT_EQ(out, 1u);
 }
 
-// §20.16.4: the two personality formats are differentiated by whether the array
-// or the plane system call is used, and they interpret the very same memory bit
-// differently. Driving identical personality memory and inputs through an
-// AND-array and an AND-plane, a 0 bit leaves the input out in the array format
-// (leaving the AND identity 1) but takes the complemented input in the plane
-// format (~1 = 0). The two calls therefore disagree on the same memory.
 TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -83,13 +62,10 @@ TEST(PlaPersonalityFormat, ArrayAndPlaneFormatsDifferOnSameMemory) {
   auto* outp = f.ctx.FindVariable("outp");
   ASSERT_NE(outa, nullptr);
   ASSERT_NE(outp, nullptr);
-  EXPECT_EQ(outa->value.ToUint64(), 1u);  // array: 0 excludes the input
-  EXPECT_EQ(outp->value.ToUint64(), 0u);  // plane: 0 complements the input
+  EXPECT_EQ(outa->value.ToUint64(), 1u);
+  EXPECT_EQ(outp->value.ToUint64(), 0u);
 }
 
-// §20.16.4 plane format: an x code takes the worst case of the input value. The
-// engine contributes an unknown for that term, so the reduced output bit is
-// itself unknown rather than a clean 0 or 1.
 TEST(PlaPersonalityFormat, PlaneFormatWorstCaseCodeYieldsUnknown) {
   SimFixture f;
   auto* out = RunAndFindVar(
@@ -108,11 +84,6 @@ TEST(PlaPersonalityFormat, PlaneFormatWorstCaseCodeYieldsUnknown) {
   EXPECT_FALSE(out->value.IsKnown());
 }
 
-// §20.16.4 array format, negative side: only a 1 takes the input value. A
-// personality bit of x or z is not a 1, so — like a 0 — it must not take the
-// input. The input under the unknown code is 0, which would force the AND
-// result low were it taken (and an unknown contribution would make the result
-// unknown), so a clean 1 on the output proves the code excluded the input.
 TEST(PlaPersonalityFormat, ArrayFormatUnknownCodeDoesNotTakeInput) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -122,10 +93,10 @@ TEST(PlaPersonalityFormat, ArrayFormatUnknownCodeDoesNotTakeInput) {
       "  logic [1:1] outx;\n"
       "  logic [1:1] outz;\n"
       "  initial begin\n"
-      "    in = 2'b01;\n"      // high = 0 (under the x/z code), low = 1
-      "    mem[1] = 2'bx1;\n"  // x code on the high input, 1 on the low
+      "    in = 2'b01;\n"
+      "    mem[1] = 2'bx1;\n"
       "    $sync$and$array(mem, in, outx);\n"
-      "    mem[1] = 2'bz1;\n"  // z code on the high input, 1 on the low
+      "    mem[1] = 2'bz1;\n"
       "    $sync$and$array(mem, in, outz);\n"
       "  end\n"
       "endmodule\n",
@@ -142,13 +113,6 @@ TEST(PlaPersonalityFormat, ArrayFormatUnknownCodeDoesNotTakeInput) {
   EXPECT_TRUE(outz->value.IsKnown());
 }
 
-// §20.16.4 plane format: a z code means the input value is of no significance,
-// and ? is the same as z. Two personality words identical except that one
-// writes the don't-care as z and the other as ? must produce the same output
-// bit. With the participating true input at 1 and the dropped input also at 1,
-// a complement reading of the code would give 1 & ~1 = 0 and a worst-case
-// reading would give x, so a known 1 in both positions pins the don't-care
-// meaning and the z/? equivalence together.
 TEST(PlaPersonalityFormat, PlaneFormatZIsDontCareAndQuestionMarkEqualsZ) {
   SimFixture f;
   uint64_t out = RunModule(f,
@@ -167,14 +131,6 @@ TEST(PlaPersonalityFormat, PlaneFormatZIsDontCareAndQuestionMarkEqualsZ) {
   EXPECT_EQ(out, 0b11u);
 }
 
-// §20.16.4, Example 1: the array-format personality is loaded from a text data
-// file with §21.4's $readmemb (the loading form §20.16.3 provides), the input
-// and output terms are concatenations of scalar signals, and each personality
-// word implements one logic equation:
-//   b1 = a1 & a2;  b2 = a3 & a4 & a5;  b3 = a5 & a6 & a7;
-// With a4 = 0 and every other input 1, only b2's word selects a4, so b2 falls
-// to 0 while b1 and b3 stay 1 — the 0 columns of each word exclude their
-// inputs and the 1 columns take them, per word, end to end from the file.
 TEST(PlaPersonalityFormat, ArrayFormatExampleOneLoadedFromReadmembFile) {
   SimFixture f;
   std::string path =
@@ -194,8 +150,6 @@ TEST(PlaPersonalityFormat, ArrayFormatExampleOneLoadedFromReadmembFile) {
       "endmodule\n";
   auto* design = ElaborateSrc(src.c_str(), f);
   ASSERT_NE(design, nullptr);
-  // $readmemb opens the file while the simulation runs, not while the source is
-  // elaborated, so the scratch file has to outlive LowerAndRun.
   LowerAndRun(design, f);
   std::remove(path.c_str());
   auto* b1 = f.ctx.FindVariable("b1");
@@ -209,13 +163,6 @@ TEST(PlaPersonalityFormat, ArrayFormatExampleOneLoadedFromReadmembFile) {
   EXPECT_EQ(b3->value.ToUint64(), 1u);
 }
 
-// §20.16.4 plane format, file-loaded input form: the Espresso codes can also
-// arrive in the personality memory through §21.4's $readmemb, whose binary
-// words admit the 4-state digits the plane decode assigns meanings to. A file
-// word "1z" keeps only the true high input (1) while "0z" keeps only its
-// complement (0), so with both inputs at 1 the two output terms disagree —
-// observable only if the file-loaded codes reach the same per-bit decode as
-// procedurally assigned ones.
 TEST(PlaPersonalityFormat, PlaneFormatCodesLoadedFromReadmembFile) {
   SimFixture f;
   std::string path = WritePersonalityFile("planecodes", "1z\n0z\n");
@@ -237,11 +184,6 @@ TEST(PlaPersonalityFormat, PlaneFormatCodesLoadedFromReadmembFile) {
   EXPECT_EQ(out, 0b10u);
 }
 
-// §20.16.4, Example 2: the $async$and$plane example. The personality encodes
-//   b[1] = a[1] & ~a[2];  b[2] = a[3];  b[3] = ~a[1] & ~a[3];  b[4] = 1;
-// via the plane codes in mem[1..4]. Applying the known input vectors from the
-// example's printed output must reproduce that output exactly, exercising the
-// 0/1/don't-care codes together. (b is logic [1:4], MSB = b[1].)
 TEST(PlaPersonalityFormat, PlaneFormatMatchesLrmExample) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -269,16 +211,11 @@ TEST(PlaPersonalityFormat, PlaneFormatMatchesLrmExample) {
   ASSERT_NE(c111, nullptr);
   ASSERT_NE(c000, nullptr);
   ASSERT_NE(c101, nullptr);
-  EXPECT_EQ(c111->value.ToUint64(), 0b0101u);  // 111 -> 0101
-  EXPECT_EQ(c000->value.ToUint64(), 0b0011u);  // 000 -> 0011
-  EXPECT_EQ(c101->value.ToUint64(), 0b1101u);  // 101 -> 1101
+  EXPECT_EQ(c111->value.ToUint64(), 0b0101u);
+  EXPECT_EQ(c000->value.ToUint64(), 0b0011u);
+  EXPECT_EQ(c101->value.ToUint64(), 0b1101u);
 }
 
-// §20.16.4 Example 2 (printed page 652) as the clause writes it: the
-// asynchronous AND plane, its inputs driven over time and each result shown by
-// `$displayb(a, " -> ", b)`, whose three arguments print in order, the
-// vectors in binary and the literal as its text (§21.2.1). The `b` after the
-// literal was dropped, so every line read `111 -> ` and the like.
 TEST(PlaPersonalityFormat, AsyncPlaneExampleDisplaysEachResult) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module pla;\n"

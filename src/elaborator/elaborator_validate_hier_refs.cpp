@@ -1,18 +1,3 @@
-// The rules that decide what a hierarchical name may reach, split out of
-// elaborator_validate_operations_streaming.cpp, which is named for the Clause
-// 11 operators and the §6.24.3 casting rules it holds and had grown a second
-// half about something else. §23.6 defines the hierarchical name, and every
-// rule below reads one: §24.3 bars a reference to a program signal from outside
-// the program, §13.3.1 and §13.4.2 bar a reference to an item of an automatic
-// task or function, §24.5 bars a call to a program subroutine from within a
-// design module, and §24.6 bars a reference to a name an anonymous program
-// declared from any scope that is not a program block.
-//
-// The §23.6 checker rule and the two §17.7.1 checker rules were here too, and
-// are now in elaborator_validate_checker_refs.cpp: this file had reached the
-// line cap and a checker is not a program. HierRefLeftmost, which both halves
-// read a name through, moved to elaborator_validate_internal.h.
-
 #include <cstddef>
 #include <string_view>
 #include <unordered_set>
@@ -44,18 +29,6 @@ static void CollectHierPathComponents(const Expr* e,
   }
 }
 
-// What a hierarchical name may not reach from the scope it is written in.
-// `names` holds the program instances and nested programs of that scope, which
-// a name's first component is matched against, and `locals` the names a nested
-// scope has declared over them (§23.9), which match nothing. Where `unit` is
-// set, a name whose first component is a design element's, or an instance of
-// `scope`, is also followed down the instances it names, and reaches a program
-// where one of them is a program instance: `top.qi.v` reaches the program
-// instance qi of module top, a name no first component gives away.
-// `every_reference` is set for an anonymous program, which §24.3 bars from any
-// hierarchical reference to another program scope, the name of a subroutine it
-// calls included. Outside every program the call's name is §24.5's subject, so
-// only the arguments the call is handed are §24.3's.
 struct ProgramScopes {
   std::unordered_set<std::string_view> names;
   std::unordered_set<std::string_view> locals;
@@ -69,8 +42,6 @@ struct ProgramScopes {
   }
 };
 
-// The module, program or interface `name` names, or nullptr. An extern header
-// is a prototype and holds no instances.
 static const ModuleDecl* FindDesignElement(const CompilationUnit* unit,
                                            std::string_view name) {
   for (const auto* decls :
@@ -81,8 +52,6 @@ static const ModuleDecl* FindDesignElement(const CompilationUnit* unit,
   return nullptr;
 }
 
-// The design element the instance `inst_name` among `decl`'s items
-// instantiates, or nullptr.
 static const ModuleDecl* FindInstanceElement(const ModuleDecl* decl,
                                              std::string_view inst_name,
                                              const CompilationUnit* unit) {
@@ -94,8 +63,6 @@ static const ModuleDecl* FindInstanceElement(const ModuleDecl* decl,
   return nullptr;
 }
 
-// §23.6 reads a hierarchical name one scope at a time, so the name reaches a
-// program scope where any scope its components step through is a program.
 static bool PathReachesProgram(const Expr* e, const ProgramScopes& scopes) {
   std::vector<std::string_view> path;
   CollectHierPathComponents(e, path);
@@ -112,9 +79,6 @@ static bool PathReachesProgram(const Expr* e, const ProgramScopes& scopes) {
   return false;
 }
 
-// True when the hierarchical name `e` reaches a program scope: its first
-// component is a program instance or nested program of the scope and no nested
-// scope declares it again, or the design path it spells steps through one.
 static bool PathNamesProgram(const Expr* e, const ProgramScopes& scopes) {
   auto leftmost = HierRefLeftmost(e);
   return !leftmost.empty() && scopes.locals.count(leftmost) == 0 &&
@@ -139,12 +103,6 @@ static void ReportProgramSignalRef(SourceLoc loc, DiagEngine& diag) {
              Subclause("24.3"));
 }
 
-// The subroutine a statement calls or enables as a whole, or nullptr: a call
-// SubroutineCallOfStmt (src/parser/ast_stmt.h) answers, `f(x);` or
-// `$display(x);`, or a task enable written without its parentheses, `pi.t;`,
-// which A.6.9 admits and which leaves the statement a bare hierarchical name.
-// Its name is a subroutine's, §24.5's subject rather than §24.3's, so only the
-// arguments it is handed are read as references.
 static const Expr* SubroutineEnableOfStmt(const Stmt* s) {
   if (const Expr* call = SubroutineCallOfStmt(s)) return call;
   if (s->kind == StmtKind::kExprStmt && s->expr != nullptr &&
@@ -153,23 +111,6 @@ static const Expr* SubroutineEnableOfStmt(const Stmt* s) {
   return nullptr;
 }
 
-// §24.3 bars a reference to a program signal, which the clause defines as a net
-// or variable declared within a program's scope. §23.9 decides which
-// declaration a reference reaches -- a locally declared item is the one used --
-// and it lists a begin-end block, a task and a function among the scopes a
-// declaration can be local to. So a name that merely spells a program
-// instance's identifier is not a program signal, and this rule, which resolves
-// nothing, reported one: a block-local `p` was refused for `p.a` wherever the
-// module held a program instance named `p`.
-//
-// The set is therefore taken by value and narrowed as the walk enters a scope,
-// never widened on the way out -- the shape WalkStmtForProgramWideSpaceAccess
-// below already uses for §24.6. What is erased is the declared name, because
-// that is the component ExprRefersToProgram matches: HierRefLeftmost reduces
-// `p.a` to `p`, so a declaration of `p` is what shadows it and a declaration of
-// `a` is not. A block's declarations are erased before its statements are read,
-// since a declaration and the use it shadows are siblings under the block
-// rather than one inside the other.
 static void WalkStmtsForProgramRef(const Stmt* s, ProgramScopes scopes,
                                    DiagEngine& diag) {
   if (!s) return;
@@ -177,13 +118,6 @@ static void WalkStmtsForProgramRef(const Stmt* s, ProgramScopes scopes,
     if (sub != nullptr && sub->kind == StmtKind::kVarDecl)
       scopes.Shadow(sub->var_name);
   });
-  // §24.3 makes a reference to a program signal from outside every program
-  // block an error, with no condition on where the reference is written, so
-  // every expression a statement holds, a return's value and a display task's
-  // arguments among them, and every position it holds a statement in, are ones
-  // this report reaches. ForEachChildExpr and ForEachChildStmt in
-  // elaborator_validate_internal.h state those positions once for the whole
-  // elaborator.
   const Expr* call =
       scopes.every_reference ? nullptr : SubroutineEnableOfStmt(s);
   ForEachChildExpr(s, [&](Expr* const& e) {
@@ -198,11 +132,6 @@ static void WalkStmtsForProgramRef(const Stmt* s, ProgramScopes scopes,
       s, [&](Stmt* const& sub) { WalkStmtsForProgramRef(sub, scopes, diag); });
 }
 
-// §23.9 makes a task and a function scopes of their own, so a formal argument
-// and a declaration at the head of a body shadow a program name the way a
-// block-local declaration does. Both reach the body by a route no statement
-// walk sees, so both are erased here, where the subroutine is read, rather than
-// where its statements are.
 static void WalkSubroutineBodyForProgramRef(const ModuleItem* item,
                                             ProgramScopes scopes,
                                             DiagEngine& diag) {
@@ -216,10 +145,6 @@ static void WalkSubroutineBodyForProgramRef(const ModuleItem* item,
   }
 }
 
-// §24.3 names no position a reference to a program signal may stand in, so
-// either side of a continuous assignment is one it reaches. This arm is a
-// function of its own because holding it inside the item walk put that walk
-// past the cognitive complexity threshold once the subroutine bodies joined it.
 static void CheckContAssignForProgramRef(const ModuleItem* item,
                                          const ProgramScopes& scopes,
                                          DiagEngine& diag) {
@@ -229,24 +154,6 @@ static void CheckContAssignForProgramRef(const ModuleItem* item,
     ReportProgramSignalRef(item->loc, diag);
 }
 
-// A class declared in a module, and a class an anonymous program declares, both
-// reach this: §24.3's first sentence bars a reference to a program signal from
-// outside every program block and its third bars one out of an anonymous
-// program, and neither says where in the enclosing scope the reference may
-// stand. A method is inside the module, and inside the anonymous program, as
-// plainly as a task beside it is -- and a class is where a verification
-// environment puts its code. A method is a subroutine, so it is read the way
-// one is, formals and body-head declarations erased.
-//
-// A class nested in a class is read here as well. ClassMember carries it in
-// nested_class, a member distinct from the class_decl of a method, so a walk
-// that follows methods alone stops at the outer class -- and §23.9 makes the
-// nested class a scope within the enclosing one, which puts a method of it
-// exactly where a method of the outer class stands.
-//
-// The §24.6 rule below keeps a class arm of its own rather than sharing this
-// one, because it reads the other direction -- a reference into an anonymous
-// program rather than out of one.
 static void CheckClassMethodsForProgramRef(const ClassDecl* cls,
                                            const ProgramScopes& scopes,
                                            DiagEngine& diag) {
@@ -260,7 +167,6 @@ static void CheckClassMethodsForProgramRef(const ClassDecl* cls,
   }
 }
 
-// True when the unit declares a program a path could reach.
 static bool UnitDeclaresNamedProgram(const CompilationUnit* unit) {
   for (const auto* p : unit->programs)
     if (!p->name.empty() && !p->is_extern) return true;
@@ -271,26 +177,12 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
   if (program_inst_names_.empty() && !UnitDeclaresNamedProgram(unit_)) return;
   const ProgramScopes kScopes{program_inst_names_, {}, unit_, decl};
-  // No name is erased at module level, where the walk below erases the names a
-  // block declares: program_inst_names_ holds instance and nested-program names
-  // of this very module, so an item of the module declaring one of them again
-  // is the collision §23.9 forbids -- one identifier declares one item in a
-  // scope -- rather than a different thing a reference could reach. Only a
-  // scope below the module can hold that other thing.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign)
       CheckContAssignForProgramRef(item, kScopes, diag_);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtsForProgramRef(item->body, kScopes, diag_);
-    // §24.3 makes a reference to a program signal from outside every program
-    // block an error and names no position the reference may stand in. §23.9
-    // makes a task and a function scopes within the module rather than outside
-    // it, so a subroutine this module declares is one of the places outside the
-    // program that the sentence reaches. IsProceduralItemKind in
-    // src/parser/ast_module.h accepts the six procedural blocks and nothing
-    // else, so neither item kind arrives above, and their statements are in
-    // func_body_stmts rather than in body.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl)
       WalkSubroutineBodyForProgramRef(item, kScopes, diag_);
@@ -298,28 +190,11 @@ void Elaborator::ValidateHierRefIntoProgram(const ModuleDecl* decl) {
   }
 }
 
-// The anonymous program items of one scope, read for the references §24.3
-// bars an anonymous program from holding: no hierarchical reference to another
-// program scope. §24.6 admits an anonymous program in a package (Clause 26) or
-// a compilation-unit scope (§3.12.1) and A.1.11 makes anonymous_program a
-// package_item, so a package's items and the compilation unit's items are two
-// lists this one body reads rather than two rules.
 static void CheckScopeItemsForAnonymousProgramHierRefs(
     const std::vector<ModuleItem*>& items, const ProgramScopes& scopes,
     DiagEngine& diag) {
   for (const auto* item : items) {
     if (!item->from_anonymous_program) continue;
-    // §24.3: a hierarchical reference to a program from an anonymous program is
-    // illegal wherever it appears, including inside a task or function the
-    // anonymous program declares, whose body is in func_body_stmts.
-    //
-    // ModuleItem::body is not read here because no item reaching this walk
-    // carries one. It holds a procedural block's statement, and A.1.11 admits
-    // only task, function, class, interface class, covergroup and class
-    // constructor declarations as an anonymous_program_item -- which
-    // FilterAnonymousProgramItems in src/parser/parser.cpp now enforces, so an
-    // initial block written there is reported and dropped rather than arriving
-    // with a body for this walk to miss.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl) {
       WalkSubroutineBodyForProgramRef(item, scopes, diag);
@@ -329,9 +204,6 @@ static void CheckScopeItemsForAnonymousProgramHierRefs(
 }
 
 void Elaborator::ValidateAnonymousProgramHierRefs() {
-  // §24.3 bars hierarchical references to other program scopes, and such a
-  // reference names a program declaration first, `q.v`, or reaches a program
-  // instance through the design, `top.qi.v`, which ProgramScopes follows.
   ProgramScopes scopes;
   scopes.unit = unit_;
   scopes.every_reference = true;
@@ -364,20 +236,12 @@ static bool ExprRefersToAutomatic(
   return false;
 }
 
-// §13.3.1 states the rule for a task and §13.4.2 states it for a function, in
-// the same words each time: the items of an automatic subroutine are allocated
-// per call and cannot be accessed by hierarchical references. The two are one
-// walk over two sets of names, so each set travels with the report its kind of
-// subroutine gets.
 struct AutoSubroutineRule {
   const std::unordered_set<std::string_view>& names;
   std::string_view message;
   Subclause subclause;
 };
 
-// The names of `decl`'s automatic tasks, or of its automatic functions,
-// selected by `kind`. Lifetimes have already been defaulted from the enclosing
-// declaration (§6.21) by the time this runs, so `is_automatic` is final here.
 static std::unordered_set<std::string_view> AutoSubroutineNames(
     const ModuleDecl* decl, ModuleItemKind kind) {
   std::unordered_set<std::string_view> names;
@@ -394,12 +258,6 @@ static void WalkStmtsForAutoRef(const Stmt* s, const AutoSubroutineRule& rule,
     diag.Error(s->range.start, std::string(rule.message), rule.subclause);
   if (s->rhs && ExprRefersToAutomatic(s->rhs, rule.names))
     diag.Error(s->range.start, std::string(rule.message), rule.subclause);
-  // §13.3.1 for a task and §13.4.2 for a function each say the automatic items
-  // cannot be accessed by hierarchical references, and neither names a position
-  // the reference may stand in, so every position a statement holds a statement
-  // in is one this report reaches. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtsForAutoRef(sub, rule, diag); });
 }
@@ -472,27 +330,6 @@ static void WalkExprForProgramCall(const Expr* e, const ProgramScopes& scopes,
     WalkExprForProgramCall(elem, scopes, diag, loc);
 }
 
-// §24.5 bars calling a program subroutine, and a program subroutine is one
-// declared in a program. §23.9 decides which declaration a call reaches -- a
-// locally declared item is the one used -- and it lists a begin-end block, a
-// task and a function among the scopes a declaration can be local to. So a name
-// that merely spells a program instance's identifier does not name a program,
-// and this rule, which resolves nothing, reported the method call anyway: a
-// block-local `p` was refused for `p.go()` wherever the module held a program
-// instance named `p`.
-//
-// The set is therefore taken by value and narrowed as the walk enters a scope,
-// never widened on the way out -- the shape WalkStmtsForProgramRef above
-// already uses for §24.3. What is erased is the declared name, because that is
-// the component IsProgramSubroutineCallExpr matches: HierRefLeftmost reduces
-// the callee `p.go` to `p`, so a declaration of `p` is what shadows the call
-// and a declaration of `go` is not. A block's declarations are erased before
-// its expressions and its statements are read, since a declaration and the call
-// it shadows are siblings under the block rather than one inside the other.
-//
-// WalkExprForProgramCall keeps the set by reference: an expression declares
-// nothing, so the narrowing this walk has already done is the whole of what it
-// needs, and it is passed the narrowed set from here.
 static void WalkStmtForProgramCall(const Stmt* s, ProgramScopes scopes,
                                    DiagEngine& diag) {
   if (!s) return;
@@ -501,8 +338,6 @@ static void WalkStmtForProgramCall(const Stmt* s, ProgramScopes scopes,
       scopes.Shadow(sub->var_name);
   });
   auto loc = s->range.start;
-  // A.6.9 lets a task enable stand without its parentheses, `pi.t;`, which
-  // leaves the statement a bare hierarchical name rather than a call.
   if (const Expr* call = SubroutineEnableOfStmt(s);
       call != nullptr && call->kind == ExprKind::kMemberAccess &&
       PathNamesProgram(call, scopes))
@@ -514,23 +349,10 @@ static void WalkStmtForProgramCall(const Stmt* s, ProgramScopes scopes,
   WalkExprForProgramCall(s->rhs, scopes, diag, loc);
   WalkExprForProgramCall(s->expr, scopes, diag, loc);
   WalkExprForProgramCall(s->condition, scopes, diag, loc);
-  // §24.5 makes a call of a program subroutine from a design module an error
-  // and names no position the call is allowed in, so every position a statement
-  // holds a statement in is one this report reaches. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtForProgramCall(sub, scopes, diag); });
 }
 
-// §23.9 makes a task and a function scopes of their own, so a formal argument
-// and a declaration at the head of a body shadow a program instance name the
-// way a block-local declaration does, and a call on the shadowed name reaches
-// the local's method rather than the program's subroutine. Both reach the body
-// by a route no statement walk sees, so both are erased here, where the
-// subroutine is read, rather than where its statements are. This is
-// WalkSubroutineBodyForProgramRef above with the §24.5 walk in place of the
-// §24.3 one.
 static void WalkSubroutineBodyForProgramCall(const ModuleItem* item,
                                              ProgramScopes scopes,
                                              DiagEngine& diag) {
@@ -544,10 +366,6 @@ static void WalkSubroutineBodyForProgramCall(const ModuleItem* item,
   }
 }
 
-// §24.6 NOTE: an identifier an anonymous program declares may not be referenced
-// outside every program block. Every position below reports through this one
-// call, so the rule reads the same wherever the reference stood and a test
-// naming this message names this rule.
 static void ReportProgramWideSpaceAccess(SourceLoc loc, DiagEngine& diag) {
   diag.Error(loc,
              "an identifier declared inside an anonymous program cannot be "
@@ -555,23 +373,6 @@ static void ReportProgramWideSpaceAccess(SourceLoc loc, DiagEngine& diag) {
              Subclause("24.6"));
 }
 
-// §24.6 names no position a reference may stand in, so every expression a
-// statement holds is one this report reaches, at every depth. ForEachChildExpr
-// and ForEachChildStmt in elaborator_validate_internal.h state those positions
-// once for the whole elaborator.
-// §24.6 shares an anonymous program's name space with the surrounding package
-// or compilation-unit scope and with nothing below it, so a name a nested scope
-// declares is a different thing of the same name and a reference to it is not
-// the reference the note bars. The rule matches identifier text, nothing
-// resolving the reference first, so a block-local `int t` was reported wherever
-// some anonymous program elsewhere in the compilation unit declared a `task t`.
-//
-// `names` is therefore taken by value and narrowed on the way down, never
-// widened on the way up -- the shape StmtRefsNonStaticMember in
-// elaborator_validate_static_methods.cpp already uses for its locals. A block's
-// declarations are erased before its statements are read, because a declaration
-// and the use that shadows it are siblings under the block rather than one
-// inside the other.
 static void WalkStmtForProgramWideSpaceAccess(
     const Stmt* s, std::unordered_set<std::string_view> names,
     DiagEngine& diag) {
@@ -590,33 +391,10 @@ static void WalkStmtForProgramWideSpaceAccess(
   });
 }
 
-// The positions one module item names a declaration in outside its statements.
-// A.1.11 admits a task, a function, a class, an interface class, a covergroup
-// and a class constructor into an anonymous program, so a reference to one is
-// either a call or the name of a type: the type of a declaration reaches a
-// class, and an initializer or either side of a continuous assignment reaches a
-// function. The four are read into one list so that one report answers for all
-// of them, rather than each position acquiring a rule of its own.
 static void CheckItemForProgramWideSpaceAccess(
     const ModuleItem* item, const std::unordered_set<std::string_view>& names,
     DiagEngine& diag);
 
-// A.1.11 admits a class_declaration into an anonymous program, and §24.6's note
-// bars a reference to one of its declarations from outside every program block,
-// naming no position such a reference may not stand in. A class method is
-// outside every program block, so a reference written in one is reached by the
-// note exactly as one written beside it is -- and a class is where a
-// verification environment puts its code.
-//
-// A method is itself a ModuleItem, so it goes back through the item walk, which
-// carries a class declared inside that method with it. That is the mutual
-// recursion the forward declaration above is for.
-//
-// A class nested in a class is a different member and is read here: ClassMember
-// carries it in nested_class rather than in the class_decl of a method, so the
-// item walk never arrives at one. §23.9 makes the nested class a scope within
-// the enclosing one, which puts a method of it exactly where a method of the
-// outer class stands.
 static void CheckClassMethodsForProgramWideSpaceAccess(
     const ClassDecl* cls, const std::unordered_set<std::string_view>& names,
     DiagEngine& diag) {
@@ -642,17 +420,6 @@ static void CheckItemForProgramWideSpaceAccess(
   }
   if (IsProceduralItemKind(item->kind))
     WalkStmtForProgramWideSpaceAccess(item->body, names, diag);
-  // A.1.11 admits a task and a function into an anonymous program, and §24.6
-  // names no position a reference to one may not stand in, so a subroutine
-  // body is read as well. A task or function keeps its statements in
-  // func_body_stmts rather than in body, and a package holds no procedural
-  // item at all -- §26.2 is what ValidatePackageItems reports "process is not
-  // allowed in a package" under -- so in a package a subroutine body is the
-  // only place a statement stands.
-  //
-  // A subroutine's formals and the declarations at the head of its body shadow
-  // the same way a block's do, and reach the body by a route no statement walk
-  // sees, so they are erased before it is read.
   std::unordered_set<std::string_view> body_names = names;
   for (const auto& arg : item->func_args) body_names.erase(arg.name);
   for (const auto* s : item->func_body_stmts) {
@@ -667,20 +434,7 @@ static void CheckItemForProgramWideSpaceAccess(
 
 void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
   if (anonymous_program_names_.empty()) return;
-  // §24.6 opens by making the program-wide space reachable from programs alone,
-  // and its note bars a reference from outside *any* program block rather than
-  // from outside the one that declared the name. §24.3 settles the same
-  // question for a program signal in the affirmative -- a hierarchical
-  // reference may reach from one program scope into another -- so what decides
-  // is whether the referring scope is a program block and not which program it
-  // is. A program's own items are inside one, and so are the items of every
-  // other anonymous program, which stand among the compilation-unit or package
-  // items and are not walked here.
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
-  // §24.6 shares the anonymous program's name space with the surrounding
-  // package or compilation-unit scope and with nothing below it, so a module
-  // declaring a name of its own declares a different thing of the same name and
-  // its references reach that one.
   std::unordered_set<std::string_view> names = anonymous_program_names_;
   for (const auto* item : decl->items) names.erase(item->name);
   for (const auto* item : decl->items) {
@@ -688,12 +442,6 @@ void Elaborator::ValidateProgramWideSpaceAccess(const ModuleDecl* decl) {
   }
 }
 
-// The items of one package, or of the compilation unit, read for the reference
-// §24.6's note bars. An anonymous program's own items are skipped: they are
-// declarations of the program-wide space §24.6 opens by defining, so naming one
-// from another is not a reference from outside every program block, and
-// ValidateProgramWideSpaceAccess keeps the same items legal by never reaching
-// them.
 static void CheckScopeItemsForProgramWideSpaceAccess(
     const std::vector<ModuleItem*>& items,
     const std::unordered_set<std::string_view>& names, DiagEngine& diag) {
@@ -703,48 +451,20 @@ static void CheckScopeItemsForProgramWideSpaceAccess(
   }
 }
 
-// §24.6's note bars a reference to an identifier an anonymous program declared
-// from outside every program block, and §24.6 names the package or
-// compilation-unit scope declaring the items in one phrase, drawing no
-// distinction between the two. Neither is a program block, so an item of either
-// that is not itself in an anonymous program is a place the note reaches, and
-// the two lists are read the same way. ValidateProgramWideSpaceAccess above
-// reads the same rule over a module, an interface and a checker, and reports it
-// through the same ReportProgramWideSpaceAccess.
 void Elaborator::ValidateProgramWideSpaceAccessInPackageAndCuScopes() {
   if (anonymous_program_names_.empty()) return;
-  // No name is erased here, where ValidateProgramWideSpaceAccess erases the
-  // names a module redeclares: §24.6 puts an anonymous program's items in the
-  // name space of the package or compilation-unit scope that declares them, so
-  // a declaration of that name in the surrounding scope is the collision
-  // ValidateAnonymousProgramNameSharing reports rather than a different thing a
-  // reference could reach.
   CheckScopeItemsForProgramWideSpaceAccess(unit_->cu_items,
                                            anonymous_program_names_, diag_);
   for (const auto* pkg : unit_->packages) {
     CheckScopeItemsForProgramWideSpaceAccess(pkg->items,
                                              anonymous_program_names_, diag_);
   }
-  // A class written at compilation-unit scope stands in
-  // CompilationUnit::classes rather than in cu_items, so it is reached by a
-  // route of its own and is missed by the two lists above.
-  //
-  // Every class here is outside any anonymous program, and so is every method
-  // of one: an anonymous program's body is parsed through ParseModuleItem into
-  // cu_items, where FilterAnonymousProgramItems marks it, and the class arm of
-  // CheckScopeItemsForProgramWideSpaceAccess skips it there. Nothing marked
-  // reaches this list, so nothing here needs the guard that walk carries.
   for (const auto* cls : unit_->classes) {
     CheckClassMethodsForProgramWideSpaceAccess(cls, anonymous_program_names_,
                                                diag_);
   }
 }
 
-// §24.5 makes a call of a program subroutine from a design module an error and
-// names no position the call may stand in, so a method of a class the module
-// declares is reached exactly as a task of the module is. This is
-// CheckClassMethodsForProgramRef with the §24.5 walk in place of the §24.3 one,
-// and it reads a class nested in a class the same way.
 static void CheckClassMethodsForProgramCall(const ClassDecl* cls,
                                             const ProgramScopes& scopes,
                                             DiagEngine& diag) {
@@ -761,17 +481,7 @@ static void CheckClassMethodsForProgramCall(const ClassDecl* cls,
 void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
   if (decl->decl_kind == ModuleDeclKind::kProgram) return;
   if (program_inst_names_.empty() && !UnitDeclaresNamedProgram(unit_)) return;
-  // §24.3 instantiates a top-level program implicitly under its declaration
-  // name, which no instance of this module holds, so a call is matched by the
-  // path its name spells as well as by its first component, as
-  // ValidateHierRefIntoProgram matches a reference.
   const ProgramScopes kScopes{program_inst_names_, {}, unit_, decl};
-  // No name is erased at module level, where the walk below erases the names a
-  // block declares, for the reason ValidateHierRefIntoProgram above states:
-  // program_inst_names_ holds instance and nested-program names of this very
-  // module, so an item of the module declaring one of them again is the
-  // collision §23.9 forbids rather than a different subroutine a call could
-  // reach. Only a scope below the module can hold that other subroutine.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kContAssign) {
       WalkExprForProgramCall(item->assign_lhs, kScopes, diag_, item->loc);
@@ -780,12 +490,6 @@ void Elaborator::ValidateProgramSubroutineCall(const ModuleDecl* decl) {
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body)
       WalkStmtForProgramCall(item->body, kScopes, diag_);
-    // §24.5 makes a call of a program subroutine from a design module an error
-    // and names no position the call may stand in. A task or a function this
-    // module declares is within the design module, so a call written there is
-    // one the sentence reaches; it arrives through neither branch above,
-    // IsProceduralItemKind accepting only the six procedural blocks and the
-    // statements living in func_body_stmts.
     if (item->kind == ModuleItemKind::kTaskDecl ||
         item->kind == ModuleItemKind::kFunctionDecl)
       WalkSubroutineBodyForProgramCall(item, kScopes, diag_);

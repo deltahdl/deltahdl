@@ -13,28 +13,12 @@
 
 using namespace delta;
 
-// §F.6 opens by fixing what the extended expressions of §F.6.1 through
-// §F.6.3 share: a meaning at a point of a word that may depend on the letter
-// there and on other letters, written e[w^j] so that the definitions of the
-// preceding subclauses, which read a Boolean at a letter alone, can be used
-// together with them. The cases check that a Boolean atom read as an extended
-// expression depends on its letter alone while $past_gclk and $future_gclk
-// depend on the letter before and after, that reading an extended expression
-// into a word sets its atom at exactly the points it holds and leaves the
-// undefined points and the letters T and _|_ alone, and that the word so read
-// is one the relations of §F.5 decide as they decide any word.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto Bs(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// §F.6: a Boolean atom is the extended expression that reads its letter
-// alone, T satisfying it and _|_ not, and undefined past the word; $past_gclk
-// of it reads the letter before, with the initial value at the first letter;
-// $future_gclk of it reads the letter after, and is undefined at the last
-// letter of a finite word.
 TEST(ExtendedExpressions, EachKindReadsItsOwnLetters) {
   const Word kWord{A({"x"}), A({"a"}), LetterTop(), LetterBottom()};
   auto atom = AtomAsExtendedExpression("a");
@@ -57,12 +41,6 @@ TEST(ExtendedExpressions, EachKindReadsItsOwnLetters) {
   EXPECT_EQ(future(kWord, 3), std::nullopt);
 }
 
-// §F.6: the meaning of an extended expression at a point may depend on other
-// letters, which a Boolean's does not. At the second letter of [x][x],
-// $past_gclk(a) differs from its value on [a][x], whose second letter is the
-// same, and $future_gclk(a) from its value on [x][x][a], while the atom a
-// itself agrees on every word carrying x there; a word that differs at the
-// point shows nothing.
 TEST(ExtendedExpressions, OnlyAnExtendedExpressionDependsOnOtherLetters) {
   const Word kWord{A({"x"}), A({"x"})};
   const std::vector<Word> kOthers{Word{A({"a"}), A({"x"})},
@@ -81,10 +59,6 @@ TEST(ExtendedExpressions, OnlyAnExtendedExpressionDependsOnOtherLetters) {
       DependsOnOtherLetters(PastGclkOfAtom("a", false), kWord, 2, kOthers));
 }
 
-// §F.6: reading an extended expression into a word sets its atom at exactly
-// the points at which it holds and clears it where it does not, leaves a
-// point at which it is undefined as it stands, and keeps the letters T and
-// _|_, which satisfy every Boolean and none.
 TEST(ExtendedExpressions, ReadingIntoTheWordSetsTheAtomWhereItHolds) {
   const Word kWord{A({"a"}), A({"x", "p"}),  A({"a", "p"}), LetterTop(),
                    A({"x"}), LetterBottom(), A({"p"})};
@@ -107,12 +81,6 @@ TEST(ExtendedExpressions, ReadingIntoTheWordSetsTheAtomWhereItHolds) {
   EXPECT_TRUE(WordWithExtendedAtom(Word{}, "p", FutureGclkOfAtom("a")).empty());
 }
 
-// §F.6: the word so read is decided by the preceding subclauses as any word
-// is. strong( a ##1 p ) with p read as $past_gclk(a) holds on [a][x], whose
-// second letter takes p from the first, and not on [x][x]; with p read as
-// $future_gclk(a) it holds on [a][x][a] and not on [a][x][x]; and the same
-// property on the word as written, where p is an atom of its own, holds on
-// neither.
 TEST(ExtendedExpressions, TheWordReadIsDecidedByThePrecedingSubclauses) {
   auto p = PropStrong(SeqConcat(Bs("a"), Bs("p")));
   auto past = PastGclkOfAtom("a", false);

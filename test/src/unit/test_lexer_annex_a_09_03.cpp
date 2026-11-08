@@ -87,11 +87,6 @@ TEST(IdentifierLexing, SystemIdentWithDollar) {
   EXPECT_EQ(tokens[0].text, "$foo$bar");
 }
 
-// A.9.3 bounds no length on system_tf_identifier, and footnote 55 adds only
-// that the $ is not followed by white space and that the name is not escaped.
-// §5.6's cap is on an identifier, which A.9.3 spells with its own productions;
-// what bounds a system task or system function name is §36.3, which bounds
-// nothing -- so this is a length the production admits rather than a limit.
 TEST(IdentifierLexing, SystemIdentMaxLength) {
   std::string id = "$" + std::string(1023, 'a');
   auto [tokens, errors] = LexWithDiag(id);
@@ -130,9 +125,6 @@ TEST(IdentifierLexing, EscapedIdentifierTerminatedByNewline) {
   EXPECT_EQ(tokens[0].text, "foo");
 }
 
-// Footnote 55 of Syntax 5-1 forbids escaping a system_tf_identifier, and the
-// lexer reports the escape under §5.6.3; the token it goes on to produce is the
-// escaped identifier the backslash asks for, never a system identifier.
 TEST(IdentifierLexing, EscapedSystemTfIdentifierIsEscapedNotSystemIdent) {
   auto tokens = Lex("\\$display ");
   ASSERT_GE(tokens.size(), 2u);
@@ -215,10 +207,6 @@ TEST(IdentifierLexing, SimpleIdentAllowsTrailingUnderscores) {
   EXPECT_EQ(tokens[0].text, "foo___");
 }
 
-// §5.6 bars a digit from starting a simple identifier, so `9abc` is two
-// tokens: an integer literal ending at the digit, then the identifier the
-// letters spell. This fails if the lexer takes the whole of `9abc` as one
-// token, and it fails if the letters are dropped with the literal.
 TEST(IdentifierLexing, SimpleIdentFirstCharCannotBeDigit) {
   auto tokens = Lex("9abc");
   ASSERT_GE(tokens.size(), 3u);

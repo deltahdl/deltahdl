@@ -183,8 +183,6 @@ TEST(SubroutineCallExprSim, FunctionCallInTernary) {
 }
 
 TEST(SubroutineCallArgWriteback, TaskOutputArgWriteback) {
-  // Returning from the subroutine copies the output argument's value back into
-  // the caller's variable, observed end to end through the simulator pipeline.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -202,8 +200,6 @@ TEST(SubroutineCallArgWriteback, TaskOutputArgWriteback) {
 }
 
 TEST(SubroutineCallArgWriteback, TaskInoutArgRoundTrip) {
-  // An inout argument carries the caller's value in and the subroutine's
-  // updated value back out on return.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -221,9 +217,6 @@ TEST(SubroutineCallArgWriteback, TaskInoutArgRoundTrip) {
 }
 
 TEST(SubroutineCallSim, InputArgExpressionEvaluated) {
-  // §13.5: an input actual may be any expression; its value is computed at the
-  // call site and passed into the formal. Built from real declarations and
-  // driven end to end so the value flows through the pipeline.
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [7:0] x, a, b;\n"
                       "  function logic [7:0] ident(input logic [7:0] v);\n"
@@ -240,8 +233,6 @@ TEST(SubroutineCallSim, InputArgExpressionEvaluated) {
 }
 
 TEST(SubroutineCallArgWriteback, PartSelectOutputArgWriteback) {
-  // §13.5: the returned output value is written back to the actual. When the
-  // actual is a part-select lvalue (§10.4), only the selected bits are updated.
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [7:0] x;\n"
                       "  task get(output logic [3:0] o);\n"
@@ -257,9 +248,6 @@ TEST(SubroutineCallArgWriteback, PartSelectOutputArgWriteback) {
 }
 
 TEST(SubroutineCallArgWriteback, StructMemberOutputArgWriteback) {
-  // §13.5: the output value is copied back into a member-select actual,
-  // updating the corresponding field of the packed struct built from real
-  // syntax.
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef struct packed "
                       "{ logic [3:0] hi; logic [3:0] lo; } pair_t;\n"
@@ -277,10 +265,6 @@ TEST(SubroutineCallArgWriteback, StructMemberOutputArgWriteback) {
 }
 
 TEST(SubroutineCallArgWriteback, ConcatenationOutputArgWriteback) {
-  // §13.5: returning from the subroutine copies the output value back into the
-  // actual. When the actual is a concatenation lvalue, the returned value is
-  // distributed across the concatenated targets (most-significant slice to the
-  // left element), observed end to end through the simulator pipeline.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -298,12 +282,6 @@ TEST(SubroutineCallArgWriteback, ConcatenationOutputArgWriteback) {
   LowerRunAndCheck(f, design, {{"a", 0xAu}, {"b", 0xBu}});
 }
 
-// §13.5: an actual is an expression of the caller, read before the formal it
-// is passed to exists. §13.3.2 gives a static function's formal storage that
-// retains the last call's value, so an actual named after the formal must not
-// read that retained value: the second call of twice(k) reads the module's k
-// at 7, not the formal's retained 3, and sums to 20. Read from the formal,
-// the second call would repeat the first and the sum would be 12.
 TEST(SubroutineCallSim, ActualNamedAfterAStaticFormalReadsTheCallersVariable) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -324,11 +302,6 @@ TEST(SubroutineCallSim, ActualNamedAfterAStaticFormalReadsTheCallersVariable) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// The same rule between the formals of one call: an actual named after a
-// formal bound before it reads the caller's variable of that name, not the
-// formal just bound. diff(b, a) with the module's a at 10 and b at 4 binds the
-// formal a to 4 and then the formal b to the caller's a, 10, and answers 4 -
-// 10 as -6; read from the formal a, b would be 4 and the answer 0.
 TEST(SubroutineCallSim,
      ActualNamedAfterAnEarlierFormalReadsTheCallersVariable) {
   SimFixture f;
@@ -349,17 +322,6 @@ TEST(SubroutineCallSim,
   EXPECT_EQ(static_cast<int32_t>(var->value.ToUint64()), -6);
 }
 
-// §13.5 (printed page 348) has the return from a subroutine pass the value of
-// an output formal to the variable the call named as the actual, and §8.11
-// (printed 187) makes `this.w` inside a method the property `w` of the object
-// the method was invoked on -- the same target the bare `w` names, spelled
-// with its handle. The copy-out resolves that actual with the caller's `this`
-// and the caller's class in force, so it lands where a read through the handle
-// looks: `h.w` reads the property under the key the object's construction
-// wrote for the declaring class, and a deposit under the bare key alone
-// answered the stale 0 beside it. w takes 9 through `setw(this.w)` and z 9
-// through `setw(z)` less one, so the read is 98; the copy-out dropped for the
-// `this.`-spelled actual alone gave 8.
 TEST(SubroutineCallArgWriteback,
      OutputActualThisPropertyInsideAMethodIsWrittenAtReturn) {
   SimFixture f;
@@ -388,11 +350,6 @@ TEST(SubroutineCallArgWriteback,
   EXPECT_EQ(var->value.ToUint64(), 98u);
 }
 
-// The inout form of the same actual: §13.5 passes the actual's value in at the
-// call and the formal's value out at the return, so `bump(this.w)` with w at 3
-// reads 3 into the formal, adds 4, and writes 7 back to the property. A
-// copy-out that missed the `this.`-spelled actual left 3; a copy-in that read
-// the property as 0 left 4.
 TEST(SubroutineCallArgWriteback,
      InoutActualThisPropertyInsideAMethodIsReadAndWrittenBack) {
   SimFixture f;
@@ -420,11 +377,6 @@ TEST(SubroutineCallArgWriteback,
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §8.15 has a method of the base class name the base's declaration of `w`
-// through `this.w` whatever the object's own class, so a `fill` declared in B
-// and invoked on a D object writes the `w` B declares, and a read through the
-// D-typed handle and through a B-typed one both see it: 9 * 100 + 9 = 909. The
-// copy-out dropped on the derived object gave 0.
 TEST(SubroutineCallArgWriteback,
      OutputActualThisPropertyFromABaseMethodOnADerivedObject) {
   SimFixture f;
@@ -456,14 +408,6 @@ TEST(SubroutineCallArgWriteback,
   EXPECT_EQ(var->value.ToUint64(), 909u);
 }
 
-// §13.5 (printed page 348) has the call pass an input formal the value of
-// the expression written in the call, and §8.11 (printed page 187) makes a
-// property named inside a method, bare or as `this.v`, the property of the
-// object the method was invoked on. `b.add8(v)` inside a method of A, with
-// A's `v` at 40, therefore passes 40 and reads 48; the actual read with B's
-// object already in force found no `v` on it and passed 0, so the method
-// answered 8. Bare, `this.`-qualified and the expression `v + 1` are read
-// into one number: 48 * 10000 + 48 * 100 + 49 = 484849 against 80809.
 TEST(SubroutineCallSim, ActualNamingAPropertyOfTheCallingObject) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -490,12 +434,6 @@ TEST(SubroutineCallSim, ActualNamingAPropertyOfTheCallingObject) {
   EXPECT_EQ(var->value.ToUint64(), 484849u);
 }
 
-// The same rule one call deeper: in `b.add8(c.add8(v))` the inner call is an
-// actual of the outer one and `v` an actual of the inner one, both written
-// in A's method, so both are read on A's object: 40 + 8 + 8 = 56. A read on
-// the wrong object gave 16. The inner call's own object is pushed while its
-// actual is read, so a bind that set only the outermost callee aside would
-// still fail here.
 TEST(SubroutineCallSim, ActualNamingAPropertyOfTheCallingObjectInANestedCall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -521,11 +459,6 @@ TEST(SubroutineCallSim, ActualNamingAPropertyOfTheCallingObjectInANestedCall) {
   EXPECT_EQ(var->value.ToUint64(), 56u);
 }
 
-// A class task enabled on another object takes the same rule: §13.5 reads
-// the actual in the enabling task, so `b.addt(v, t)` inside a task of A
-// passes A's 40 and B's task answers 48 through the output formal, which the
-// enabling task keeps in A's `w`; with B's object in force for the actual it
-// answered 8.
 TEST(SubroutineCallSim, TaskActualNamingAPropertyOfTheCallingObject) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -550,13 +483,6 @@ TEST(SubroutineCallSim, TaskActualNamingAPropertyOfTheCallingObject) {
   EXPECT_EQ(var->value.ToUint64(), 48u);
 }
 
-// §13.5 (printed page 348) copies an output or inout formal to its actual
-// when the task returns, and the actual is written in the enabling method,
-// so by §8.11 (printed 187) a property it names is the enabling object's:
-// `b.addt(v, w)` and `b.dbl(z)` in a task of A leave 48 in A's `w` and 14 in
-// A's `z`, and B's `w` and `z` -- the same names, so a copy-out on the wrong
-// object shows as their change -- keep 3 and 5. With B's object still in
-// force for the copy-out, A's kept 1 and 7 while B's took 48 and 14.
 TEST(SubroutineCallSim, TaskOutputActualNamingAPropertyOfTheCallingObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -589,11 +515,6 @@ TEST(SubroutineCallSim, TaskOutputActualNamingAPropertyOfTheCallingObject) {
                    {{"aw", 48u}, {"az", 14u}, {"bw", 3u}, {"bz", 5u}});
 }
 
-// The same rule one enable deeper: B's task `outer`, enabled from A's,
-// enables C's `addt` with B's own `w` as the output actual, so the copy-out
-// lands on B's object (48), `outer` answers 49 into A's `w`, and C's `w`
-// keeps 2. With the enabled task's object still in force for each copy-out,
-// C's `w` took 48, B's took 4 and A's kept 1.
 TEST(SubroutineCallSim, TaskOutputActualOfANestedTaskNamingTheEnablingObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -626,13 +547,6 @@ TEST(SubroutineCallSim, TaskOutputActualOfANestedTaskNamingTheEnablingObject) {
   LowerRunAndCheck(f, design, {{"aw", 49u}, {"bw", 48u}, {"cw", 2u}});
 }
 
-// §13.5 (printed page 348) has the call pass an input formal the value of
-// the expression written in the call, and §8.10 (printed page 186) runs a
-// static method in its class's scope, which each call pushes before binding
-// the actuals. `n` written in a static method of A is A's static n, 20, so
-// K::twice(n) answers 40, P#(3)::plus(n) 23 and k.twice(n) 40; read with
-// the callee's class in force each found the callee's own n, 5 or 7, and
-// answered 101010.
 TEST(SubroutineCallSim, ActualOfAStaticCallReadInTheCallersClass) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -660,11 +574,6 @@ TEST(SubroutineCallSim, ActualOfAStaticCallReadInTheCallersClass) {
   EXPECT_EQ(var->value.ToUint64(), 402340u);
 }
 
-// §13.5 with §8.23 (printed page 200): the scope an actual names is looked
-// up where the call is written, so `K::chk(T::get())` in `H #(type T)`
-// passes the handle R::get() returns under H#(R), whose v K::chk reads as 7.
-// Read under K, which has no T, the actual was the null handle and chk
-// answered -1.
 TEST(SubroutineCallSim, ActualNamingATypeParameterOfTheCallersClass) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -688,10 +597,6 @@ TEST(SubroutineCallSim, ActualNamingATypeParameterOfTheCallersClass) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §13.5 with §8.10: a static task pushes its class before binding the
-// actuals as a static function does, so `K::twice(n)` in a static task of A
-// passes A's n, 20, and stores 40; read under K it passed K's 5 and stored
-// 10.
 TEST(SubroutineCallSim, ActualOfAStaticTaskCallReadInTheCallersClass) {
   SimFixture f;
   auto* var = RunAndFindVar(

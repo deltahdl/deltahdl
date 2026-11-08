@@ -13,9 +13,6 @@
 
 using namespace delta;
 
-// Builds a fixed-size (non-dynamic) unpacked array as individual element
-// variables named arr[i] — the representation the locator's non-queue
-// collection path reads from, distinct from MakeDynArray's queue backing.
 inline void MakeFixedArray(SimFixture& f, std::string_view name,
                            const std::vector<uint64_t>& vals) {
   ArrayInfo info;
@@ -25,10 +22,6 @@ inline void MakeFixedArray(SimFixture& f, std::string_view name,
   info.is_dynamic = false;
   f.ctx.RegisterArray(name, info);
   for (size_t i = 0; i < vals.size(); ++i) {
-    // SimContext::variables_ keys by string_view, so the element name must
-    // outlive the call — intern it in the arena rather than passing a local
-    // std::string whose buffer dies at loop end (cf. MakeArray4 in
-    // helpers_array.h, and the note on CreateVariable in sim_context.h).
     auto elem = std::string(name) + "[" + std::to_string(i) + "]";
     auto* s = f.arena.AllocString(elem.c_str(), elem.size());
     auto* v = f.ctx.CreateVariable(std::string_view(s, elem.size()), 32);
@@ -36,17 +29,11 @@ inline void MakeFixedArray(SimFixture& f, std::string_view name,
   }
 }
 
-// Builds an integer-keyed associative array from (key, value) pairs. The keys
-// need not be supplied in order; the underlying map keeps them sorted.
 inline void MakeIntAssoc(SimFixture& f, std::string_view name,
                          const std::vector<std::pair<int64_t, uint64_t>>& kv,
                          uint32_t index_width = 32) {
   auto* aa = f.ctx.CreateAssocArray(
-      name, /*elem_width=*/32,
-      /*is_string_key=*/false,
-      AssocArraySpec{index_width,
-                     /*is_wildcard=*/false, /*is_4state=*/false,
-                     /*is_index_signed=*/true});
+      name, 32, false, AssocArraySpec{index_width, false, false, true});
   for (const auto& [k, v] : kv)
     aa->int_data[k] = MakeLogic4VecVal(f.arena, 32, v);
 }

@@ -9,19 +9,11 @@ using namespace delta;
 
 namespace {
 
-// A module whose only item is the generate construct written in `body`, so a
-// pair of cases differing only in whether a block carries `begin` and `end`
-// can be written that way. The two parameters stand in the header because a
-// case generate needs an expression to select on and a declaration in the body
-// would leave the module holding more than the construct under test.
 std::string ModuleAround(const std::string& body) {
   return "module m #(parameter SEL = 0, parameter q = 0) ();\n" + body +
          "endmodule\n";
 }
 
-// The construct ModuleAround wrapped, or nullptr when the parse left something
-// else there. Reaching it here leaves each case below with the source it parses
-// and the one field it reads.
 ModuleItem* SoleGenerateItem(ParseResult& r, ModuleItemKind kind) {
   if (r.cu == nullptr || r.cu->modules.empty()) return nullptr;
   const auto& items = r.cu->modules[0]->items;
@@ -77,8 +69,6 @@ TEST(ConditionalGenerateParsing, CaseItemWithMultiplePatterns) {
 }
 
 TEST(ConditionalGenerateParsing, DanglingElseBindsToNearestIf) {
-  // §27.5: when one if-generate is nested directly inside another, a trailing
-  // else attaches to the nearest (inner) if, not the outer one.
   auto r = Parse(
       "module m;\n"
       "  if (1)\n"
@@ -94,7 +84,6 @@ TEST(ConditionalGenerateParsing, DanglingElseBindsToNearestIf) {
   ASSERT_EQ(mod->items.size(), 1u);
   auto* outer = mod->items[0];
   EXPECT_EQ(outer->kind, ModuleItemKind::kGenerateIf);
-  // The else was consumed by the inner if, so the outer if has none.
   EXPECT_EQ(outer->gen_else, nullptr);
   ASSERT_EQ(outer->gen_body.size(), 1u);
   auto* inner = outer->gen_body[0];
@@ -103,8 +92,6 @@ TEST(ConditionalGenerateParsing, DanglingElseBindsToNearestIf) {
 }
 
 TEST(ConditionalGenerateParsing, CombineIfAndCaseGenerate) {
-  // §27.5: an if-generate and a case-generate may be combined in one scheme;
-  // here the else alternative of an if-generate is itself a case-generate.
   auto r = Parse(
       "module m #(parameter SEL = 0) ();\n"
       "  if (SEL == 0) begin\n"
@@ -141,11 +128,6 @@ TEST(ConditionalGenerateParsing, IfBodyWithoutBeginEnd) {
   EXPECT_EQ(cg->gen_else, nullptr);
 }
 
-// The six cases below come in three pairs, one pair per position A.4.2 writes
-// a generate_block in a conditional generate construct. Each pair holds the
-// source fixed and varies only the `begin` and `end` keywords, because a case
-// written for the begin-end source alone is satisfied by a field that is
-// always true.
 TEST(ConditionalGenerateParsing, IfThenBlockRecordsBeginEnd) {
   auto r = Parse(ModuleAround("  if (1) begin logic a; end\n"));
   ASSERT_FALSE(r.has_errors);
@@ -163,9 +145,6 @@ TEST(ConditionalGenerateParsing, IfThenSingleItemRecordsNoBeginEnd) {
 }
 
 TEST(ConditionalGenerateParsing, ElseBlockRecordsBeginEnd) {
-  // The else branch of an if generate construct is held in a second item,
-  // reached through gen_else, whose own gen_body_has_begin_end describes the
-  // block written after `else`.
   auto r =
       Parse(ModuleAround("  if (1) begin logic a; end\n"
                          "  else begin case (q) 0: logic b; endcase end\n"));
@@ -177,11 +156,6 @@ TEST(ConditionalGenerateParsing, ElseBlockRecordsBeginEnd) {
 }
 
 TEST(ConditionalGenerateParsing, ElseSingleItemRecordsNoBeginEnd) {
-  // §27.5, printed page 824: a generate block holding only a conditional
-  // generate construct without begin and end is not a separate scope, and the
-  // construct in it is directly nested. This source and the one above differ
-  // only in those two keywords, so this field is all that tells the directly
-  // nested case generate from the one written inside a scope of its own.
   auto r =
       Parse(ModuleAround("  if (1) begin logic a; end\n"
                          "  else case (q) 0: logic b; endcase\n"));

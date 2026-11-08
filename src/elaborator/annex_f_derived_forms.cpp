@@ -58,7 +58,6 @@ std::shared_ptr<const SequenceExpr> SeqRepeatOneOrMore(
   return SeqUnboundedRepeat(std::move(r));
 }
 
-// The constant 1 as a sequence, the operand every delay's repetition spans.
 static std::shared_ptr<const SequenceExpr> SeqTrue() {
   return SeqBoolean(BoolTrue());
 }
@@ -88,7 +87,6 @@ std::shared_ptr<const SequenceExpr> SeqDelayOneOrMore(
   return SeqDelayAtLeast(1, std::move(r));
 }
 
-// (R1 ##1 gap ##1 R2), grouped to the left as §F.3.4's convention allows.
 static std::shared_ptr<const SequenceExpr> SeqConcatAcrossGap(
     std::shared_ptr<const SequenceExpr> r1,
     std::shared_ptr<const SequenceExpr> gap,
@@ -132,15 +130,11 @@ std::shared_ptr<const SequenceExpr> SeqConcatDelayExactly(
   return SeqFusion(std::move(r1), std::move(r2));
 }
 
-// !b[*0:$], the run of letters without b that a goto repetition's unit opens
-// with and a nonconsecutive repetition ends with, in the §F.3.4.2.1 unfolding
-// of [*0:$].
 static std::shared_ptr<const SequenceExpr> SeqRunWithout(
     const std::shared_ptr<const BooleanExpr>& b) {
   return SeqRepeatAtLeast(SeqBoolean(BoolNot(b)), 0);
 }
 
-// (!b[*0:$] ##1 b), the unit a goto repetition repeats.
 static std::shared_ptr<const SequenceExpr> SeqGotoUnit(
     const std::shared_ptr<const BooleanExpr>& b) {
   return SeqConcat(SeqRunWithout(b), SeqBoolean(b));
@@ -181,8 +175,6 @@ std::shared_ptr<const SequenceExpr> SeqNonconsecutiveExactly(
   return SeqConcat(std::move(gotos), SeqRunWithout(b));
 }
 
-// 1[*0:$], the padding that lets one operand of and or within run on past the
-// other, in the §F.3.4.2.1 unfolding of [*0:$].
 static std::shared_ptr<const SequenceExpr> SeqAnyRun() {
   return SeqRepeatAtLeast(SeqTrue(), 0);
 }
@@ -307,11 +299,6 @@ std::shared_ptr<const ClockedProperty> ClkIfElse(
 
 namespace {
 
-// The recursion of §F.3.4.3.5 over the items from `first` on: the case over
-// no items is the default, and the case over an item followed by others is
-// the §F.3.4.3.4 conditional over that item's match, with the case over the
-// others as its else where there is one. The same b is nested rather than
-// specify(b), which the match already applies.
 std::shared_ptr<const PropertyExpr> PropCaseFrom(
     const std::shared_ptr<const BooleanExpr>& b,
     std::vector<PropCaseItem>::const_iterator first,
@@ -426,8 +413,6 @@ std::shared_ptr<const ClockedProperty> ClkSyncRejectOn(
 
 namespace {
 
-// The Boolean 0 of §F.3.4.3.8, which no letter satisfies, as the §F.3.2
-// Boolean !1.
 std::shared_ptr<const BooleanExpr> BoolFalse() { return BoolNot(BoolTrue()); }
 
 }  // namespace
@@ -621,9 +606,6 @@ std::shared_ptr<const LvTopLevelProperty> LvTopLocalVarDecls(
 
 namespace {
 
-// §F.3.4.6: the body both assumptions share, assume property (@1 b): the
-// clock form over the constant 1 whose operand is the Boolean read as a bare
-// sequence in an assume property statement.
 std::shared_ptr<const ClockedTopLevelProperty> AssumedAtGlobalClock(
     std::shared_ptr<const BooleanExpr> b) {
   return ClockedTopProperty(ClkClock(

@@ -65,12 +65,6 @@ TEST(IncludeFileSimulation, MultipleIncludesContributeToSimulation) {
   EXPECT_EQ(result, 10u);
 }
 
-// §22.4 end-to-end via the §22.5.1 dependency: the include argument is produced
-// by a text macro. The directive determines its filename from the expanded
-// macro text, so the file is inserted and the value it defines is observable at
-// simulation. Exercises the macro-expanded-filename path through the full
-// preprocess -> parse -> elaborate -> run pipeline, not just preprocessor
-// output.
 TEST(IncludeFileSimulation, IncludeFilenameFromMacroSimulates) {
   IncludeTestDir tmp;
   tmp.WriteFile("payload.svh", "`define VAL 8'd55\n");
@@ -86,10 +80,6 @@ TEST(IncludeFileSimulation, IncludeFilenameFromMacroSimulates) {
   EXPECT_EQ(result, 55u);
 }
 
-// §22.4 end-to-end via the §22.6 dependency: an include nested in a conditional
-// compilation block is processed only when its branch is active. The taken
-// branch's file is inserted (and the other branch's file is not), so the value
-// observed at simulation discriminates which include the conditional selected.
 TEST(IncludeFileSimulation, ConditionalIncludeSelectsActiveBranch) {
   IncludeTestDir tmp;
   tmp.WriteFile("high.svh", "`define SEL 8'd200\n");

@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -76,12 +75,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-// §23.3.3.5 (printed page 748): a packed port connection wider than one
-// instance's port gives each instance of the array a part-select, the
-// rightmost instance the rightmost bits, so four `xcell`s -- each an `xor`
-// on scalar ports, §28.3.6 (printed page 833) -- on `4'b1100` and `4'b1010`
-// drive `0110` onto the parent's four-bit net. The net output port of each
-// instance left y all x.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      InstanceArrayGivesEachInstanceItsBitsOfAVectorNet) {
   SimFixture f;
@@ -99,14 +92,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
   EXPECT_EQ(out, "y=0110\n");
 }
 
-// §23.3.3.5 (printed page 748): an unpacked array connection is split across
-// an array of instances, each element of the connection matched to the port
-// left index to left index and right index to right index: u[3], the leftmost
-// of u[3:0], takes ins[0], the leftmost of ins[0:3], and its output lands in
-// outs[0]. The element was chosen counting from the right end of the instance
-// array and the left end of the connection, so u[3] took ins[3]. `leaf k[3]` is
-// k[0] to k[2], three instances, each on its own element; it was one instance,
-// k[1] and k[2] never driven.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      UnpackedConnectionMatchesLeftIndexToLeftIndex) {
   SimFixture f;
@@ -130,13 +115,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
       "1100 0011 011 100\n");
 }
 
-// §23.3.3.5 (printed page 748): an unpacked array port connected to an
-// unpacked array has each element of the connection matched to the port left
-// index to left index, so `input var int i[3]` on `int one[3] = '{5, 6, 7}`
-// reads 5, 6 and 7, and `input logic [3:0] l[2]` on `'{9, 10}` reads 9 and 10
-// -- unsigned, as the element is declared. The port was one value of an
-// element's width, i[0] to i[2] reading the bits of 7 and l[0], l[1] those of
-// 10; s.i[1] names the port's element from above.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      UnpackedArrayPortReadsEachElementOfItsConnection) {
   SimFixture f;
@@ -155,12 +133,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "child i 5 6 7 l 9 10\ns.i 6\n");
 }
 
-// An output array port drives its connection element by element, left to
-// left across ranges that run opposite ways: o[0] of `int o[0:2]` lands in
-// res[3] of `int res[3:1]`. The input d[2:0] on dv[0:2] reads d[2] from
-// dv[0]. An array of instances over a two-dimensional array hands each
-// instance one row for its array port (`child c[3](oo, arr)`), and each
-// instance's output drives one element of the net array oo.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      UnpackedArrayPortsConnectLeftIndexToLeftIndex) {
   SimFixture f;
@@ -190,12 +162,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "10 20 4 o 101\n");
 }
 
-// §23.3.3.3 makes an inout port one net with its connection, and an array
-// port is so element by element: the parent drives bus[0] and the child b[1],
-// and each is seen from both sides. §7.4.2 (printed page 154) gives connecting
-// to the ports of module instances as what a net array is for, and the net
-// array was refused as a connection at all, the check asking for a variable
-// array.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      InoutArrayPortIsItsNetArrayElementByElement) {
   SimFixture f;
@@ -213,12 +179,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "3 7 3 7\n");
 }
 
-// §23.3.3.2 makes a ref port one variable with its connection, and an array
-// port is so element by element, whatever its bounds: §7.4.2 lets them be
-// negative. The child writes p[-1] and the parent a[0], and each is seen from
-// both sides. The elements were aliased by their signed addresses, p[-1] to
-// a[4294967295] and p[0] to a[4294967296], none of which is an element, so
-// neither write crossed the port.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      RefArrayPortWithANegativeBoundIsItsArrayElementByElement) {
   SimFixture f;
@@ -238,12 +198,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "5a 3c 5a 3c\n");
 }
 
-// §23.3.3.5 pairs an input or output array port's elements with the
-// connection's whatever their bounds, §7.4.2 letting them be negative: p[-1]
-// reads a[-1] and q[0] drives b[0]. Each pair was an assignment between
-// selects whose index literal took the width of its value, -1 sixty-four bits
-// of ones and a[0]'s address 4294967296 thirty-three bits, so no select named
-// an element and the child read x where the parent read x back.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      InputAndOutputArrayPortsWithANegativeBoundConnectElementByElement) {
   SimFixture f;
@@ -267,12 +221,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "10 20 11 22\n");
 }
 
-// §10.7 gives an element the value of its declared type, and §6.11.3 its
-// signedness by the declaration: `logic [3:0] d [2]` written 4'sd9, by a
-// statement or a continuous assignment, reads 9, as a scalar of that type
-// does, while `int c [2]` in a block keeps -9. The element reads took the
-// signedness of the last value stored, so the first read -7, and the block's
-// elements were created with none, so the second read 4294967287.
 TEST(UnpackedArraySimulation, ElementsReadWithTheirDeclaredSignedness) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -289,11 +237,6 @@ TEST(UnpackedArraySimulation, ElementsReadWithTheirDeclaredSignedness) {
             "9 9 -9\n");
 }
 
-// §23.3.3.5 with §23.3.3.4: an interface port declared as an array is
-// connected to an array of interface instances of its shape, each element
-// matched left index to left index: p[1] to ia[3], p[2] to ia[2], reading 3
-// and 1. The connection was refused as no unpacked array, and the port's
-// elements were joined to nothing.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      AnInterfaceArrayPortTakesAnInterfaceInstanceArray) {
   SimFixture f;
@@ -310,9 +253,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
             "3 1\n");
 }
 
-// The array may be declared by its size, `ifc ia[2]`, which counts from 0,
-// and an array of the same interface beside it is no part of the connection:
-// p[0] and p[1] read ia[0] and ia[1], 1 and 2, never other's 3.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      AnInterfaceArrayPortTakesTheArrayItNames) {
   SimFixture f;
@@ -334,12 +274,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
       "1 2\n");
 }
 
-// §23.3.3.5 (printed page 748): an array of instances of two dimensions is
-// an instance per element. Each takes the element of an unpacked connection
-// left index to left index in both dimensions, so c[1][2], leftmost in each,
-// takes ins[0][0]; and the part-select of a packed one that counts from the
-// rightmost indices, the rightmost dimension first, so c[1][2] drives out[5]
-// and c[0][2] drives out[2]. It was one instance.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSimulation,
      ATwoDimensionalArrayOfInstancesConnectsEveryElement) {
   SimFixture f;

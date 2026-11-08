@@ -14,18 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.55 immediate assertions: the VPI object model for an immediate assertion.
-// The immediate-assertion class is realized by the immediate assert, immediate
-// assume, and immediate cover directives. Each reaches its asserted expression
-// through vpiExpr and its pass action statement through vpiStmt, and reports
-// whether it is a deferred assertion (vpiIsDeferred) and whether it is a final
-// assertion (vpiIsFinal). An immediate assert and an immediate assume also
-// carry an else (fail) statement reached through vpiElseStmt; an immediate
-// cover does not. These tests observe the production helpers in vpi.cpp and the
-// VpiContext methods that apply those rules.
-
-// The three immediate directive kinds are immediate assertions; the concurrent
-// kinds (the broader §37.49 class) and unrelated kinds are not.
 TEST(ImmediateAssertionModel, ImmediateAssertionTypeCoversTheThreeDirectives) {
   EXPECT_TRUE(VpiIsImmediateAssertionType(vpiImmediateAssert));
   EXPECT_TRUE(VpiIsImmediateAssertionType(vpiImmediateAssume));
@@ -37,8 +25,6 @@ TEST(ImmediateAssertionModel, ImmediateAssertionTypeCoversTheThreeDirectives) {
   EXPECT_FALSE(VpiIsImmediateAssertionType(vpiModule));
 }
 
-// vpiIsDeferred and vpiIsFinal are Boolean properties of every immediate
-// assertion kind; each reports the assertion's stored flag.
 TEST(ImmediateAssertionModel, AssertReportsIsDeferredAndIsFinal) {
   VpiContext ctx;
 
@@ -55,7 +41,6 @@ TEST(ImmediateAssertionModel, AssertReportsIsDeferredAndIsFinal) {
   EXPECT_EQ(ctx.Get(vpiIsDeferred, &final_assert), 0);
 }
 
-// The same two properties apply to the assume and cover kinds as well.
 TEST(ImmediateAssertionModel, AssumeAndCoverReportIsDeferredAndIsFinal) {
   VpiContext ctx;
 
@@ -66,10 +51,6 @@ TEST(ImmediateAssertionModel, AssumeAndCoverReportIsDeferredAndIsFinal) {
   EXPECT_EQ(ctx.Get(vpiIsDeferred, &assume), 1);
   EXPECT_EQ(ctx.Get(vpiIsFinal, &assume), 1);
 
-  // A cover carries the same properties: here the stored deferred flag is set
-  // and the final flag is not, so each reports its own stored value (1 and 0)
-  // rather than a shared one. This shows a true value flows through a cover,
-  // not only the default.
   VpiObject cover;
   cover.type = vpiImmediateCover;
   cover.is_deferred = true;
@@ -77,9 +58,6 @@ TEST(ImmediateAssertionModel, AssumeAndCoverReportIsDeferredAndIsFinal) {
   EXPECT_EQ(ctx.Get(vpiIsFinal, &cover), 0);
 }
 
-// The deferred/final properties are drawn only on the immediate-assertion
-// kinds, so querying them on any other object kind is not valid and yields
-// vpiUndefined.
 TEST(ImmediateAssertionModel, IsDeferredAndIsFinalAreUndefinedElsewhere) {
   VpiContext ctx;
 
@@ -88,18 +66,12 @@ TEST(ImmediateAssertionModel, IsDeferredAndIsFinalAreUndefinedElsewhere) {
   EXPECT_EQ(ctx.Get(vpiIsDeferred, &mod), vpiUndefined);
   EXPECT_EQ(ctx.Get(vpiIsFinal, &mod), vpiUndefined);
 
-  // A concurrent assertion is not an immediate assertion, so it has no
-  // deferred/final property either.
   VpiObject concurrent;
   concurrent.type = vpiAssert;
   EXPECT_EQ(ctx.Get(vpiIsDeferred, &concurrent), vpiUndefined);
   EXPECT_EQ(ctx.Get(vpiIsFinal, &concurrent), vpiUndefined);
 }
 
-// Every immediate-assertion kind reaches its asserted expression through
-// vpiExpr, modeled as its first expression child, and its pass action statement
-// through vpiStmt. The diagram draws both edges from each of the assert,
-// assume, and cover boxes, so the traversals are observed on all three kinds.
 TEST(ImmediateAssertionModel, EachKindReachesExpressionAndPassStatement) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -107,15 +79,11 @@ TEST(ImmediateAssertionModel, EachKindReachesExpressionAndPassStatement) {
     VpiObject assertion;
     assertion.type = kind;
     VpiObject expr;
-    expr.type = vpiOperation;  // an expr-class kind
+    expr.type = vpiOperation;
     VpiObject pass;
-    // §37.55 draws the edge to a `stmt`, and a statement's own type is a
-    // statement kind rather than the vpiStmt relation tag.
     pass.type = vpiBegin;
     assertion.children = {&expr, &pass};
 
-    // The figure's edges through the public routine, which is where an
-    // application reads them.
     EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&assertion))), &expr)
         << "kind=" << kind;
     EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, VpiHandleOf(&assertion))), &pass)
@@ -127,23 +95,16 @@ TEST(ImmediateAssertionModel, EachKindReachesExpressionAndPassStatement) {
   SetGlobalVpiContext(nullptr);
 }
 
-// vpiElseStmt is routed from the assert and assume boxes but not from cover, so
-// only an immediate assert or assume carries an else (fail) statement.
 TEST(ImmediateAssertionModel, ElseStatementPresenceByKind) {
   EXPECT_TRUE(VpiImmediateAssertionHasElseStmt(vpiImmediateAssert));
   EXPECT_TRUE(VpiImmediateAssertionHasElseStmt(vpiImmediateAssume));
   EXPECT_FALSE(VpiImmediateAssertionHasElseStmt(vpiImmediateCover));
 }
 
-// An immediate assert traverses to its else statement through vpiElseStmt; an
-// immediate cover, built with only a pass statement, reaches none.
 TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
 
-  // The two action statements in the order they were written: the pass action
-  // first, the else action after it. Each carries its own statement kind, not
-  // the relation tag naming the edge that reaches it.
   VpiObject assertion;
   assertion.type = vpiImmediateAssert;
   VpiObject pass;
@@ -155,8 +116,6 @@ TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiElseStmt, VpiHandleOf(&assertion))),
             &els);
 
-  // The figure draws no vpiElseStmt edge from the cover box, so a cover reaches
-  // no else action however many statements it was written with.
   VpiObject cover;
   cover.type = vpiImmediateCover;
   VpiObject cover_pass;
@@ -171,8 +130,6 @@ TEST(ImmediateAssertionModel, AssertReachesElseStatementCoverDoesNot) {
   SetGlobalVpiContext(nullptr);
 }
 
-// The traversals each match by kind, so an immediate assertion whose only child
-// is an unrelated object reaches neither an expression nor a statement.
 TEST(ImmediateAssertionModel, TraversalsSkipUnrelatedChildren) {
   VpiObject assertion;
   assertion.type = vpiImmediateAssume;
@@ -184,11 +141,8 @@ TEST(ImmediateAssertionModel, TraversalsSkipUnrelatedChildren) {
   EXPECT_EQ(VpiImmediateAssertionElseStmt(&assertion), nullptr);
 }
 
-// The immediate assertions of a run, built from the elaborated design rather
-// than by hand.
 class ImmediateAssertionsOfARun : public VpiDesignRun {
  protected:
-  // The name of what `assertion` reaches through `relation`, empty for none.
   static std::string NameReached(int relation, vpiHandle assertion) {
     vpiHandle reached = vpi_handle(relation, assertion);
     if (reached == nullptr) return "";
@@ -197,9 +151,6 @@ class ImmediateAssertionsOfARun : public VpiDesignRun {
   }
 };
 
-// An assertion statement reaches the expression it asserts and its pass and
-// fail actions, and reports that it is not deferred; a cover has no fail
-// action (#5075).
 TEST_F(ImmediateAssertionsOfARun, AnAssertionStatementReachesItsParts) {
   Run("module top; logic a, b;\n"
       "  initial begin\n"
@@ -222,8 +173,6 @@ TEST_F(ImmediateAssertionsOfARun, AnAssertionStatementReachesItsParts) {
   EXPECT_EQ(vpi_handle(vpiElseStmt, c1), nullptr);
 }
 
-// A deferred assertion written as a module item reaches its expression and
-// actions, and reports whether it is deferred and whether final (#5078).
 TEST_F(ImmediateAssertionsOfARun, ADeferredAssertionItemReachesItsParts) {
   Run("module top; logic a, b;\n"
       "  d1: assert final (a) $display(\"p\"); else $write(\"f\");\n"
@@ -245,8 +194,6 @@ TEST_F(ImmediateAssertionsOfARun, ADeferredAssertionItemReachesItsParts) {
   EXPECT_EQ(vpi_get(vpiIsFinal, d2), 0);
 }
 
-// An assertion written with a fail action and no pass action reaches that
-// action through vpiElseStmt and no statement through vpiStmt (#5083).
 TEST_F(ImmediateAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
   Run("module top; logic a;\n"
       "  initial begin\n"

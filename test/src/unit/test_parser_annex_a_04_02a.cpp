@@ -194,8 +194,6 @@ TEST(GenerateInstantiationGrammar, GenerateBlockLabelAfterBegin) {
               "endmodule\n"));
 }
 
-// A generate_region holds generate_items, and no generate_item is a
-// generate_region, so a region opened inside another is reported.
 TEST(GenerateInstantiationGrammar, NestedGenerateRegionIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -337,9 +335,6 @@ TEST(GenerateInstantiationGrammar, IfGenerateInsideCaseGenerate) {
   EXPECT_EQ(gen->gen_case_items[0].body[0]->kind, ModuleItemKind::kGenerateIf);
 }
 
-// generate_block ::= ... | [ generate_block_identifier : ] begin ...
-// The label may precede `begin` (first optional position in the production),
-// distinct from the post-`begin` `: label` form exercised elsewhere.
 TEST(GenerateInstantiationGrammar, GenerateBlockLabelBeforeBegin) {
   auto r = Parse(
       "module m;\n"
@@ -393,12 +388,6 @@ TEST(GenerateInstantiationGrammar, DeeplyNestedGenerateFor) {
   ASSERT_EQ(l3->gen_body.size(), 1u);
 }
 
-// --- error conditions ---
-
-// case_generate_item ::= constant_expression { , constant_expression }
-//   : generate_block | default [ : ] generate_block
-// The colon is mandatory for the non-default form (only the `default` form may
-// omit it), so a pattern item with no colon before its body is rejected.
 TEST(GenerateInstantiationGrammar, CaseGenerateItemMissingColonRejected) {
   auto r = Parse(
       "module m;\n"
@@ -406,30 +395,19 @@ TEST(GenerateInstantiationGrammar, CaseGenerateItemMissingColonRejected) {
       "    8 assign out = in;\n"
       "  endcase\n"
       "endmodule\n");
-  // §27.5 owns the case generate construct; A.4.2 only states its production.
   EXPECT_TRUE(ReportedError(r.diags, "expected ':', got 'assign'", 3, "27.5"));
 }
 
-// if_generate_construct ::= if ( constant_expression ) generate_block
-//   [ else generate_block ]
-// The parentheses around the condition are required by the production.
 TEST(GenerateInstantiationGrammar, IfGenerateMissingParenRejected) {
   auto r = Parse(
       "module m;\n"
       "  if EN\n"
       "    assign out = in;\n"
       "endmodule\n");
-  // §27.5 owns the conditional generate construct; A.4.2 only states its
-  // production.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got identifier", 2, "27.5"));
 }
 
-// genvar_initialization ::= [ genvar ] genvar_identifier = constant_expression
-// The first header position holds that assignment and nothing else. The
-// parser read it as any assignment or expression statement, so an increment,
-// a compound assignment and a select on the genvar were each accepted
-// silently.
 TEST(GenerateInstantiationGrammar, LoopGenerateInitIncrementRejected) {
   auto r = Parse(
       "module m;\n"
@@ -460,9 +438,6 @@ TEST(GenerateInstantiationGrammar, LoopGenerateInitSelectRejected) {
       r.diags, "a loop generate's initialization is written", 3, "A.4.2"));
 }
 
-// The `genvar` keyword is the production's one option, and what follows it is
-// the same assignment; the genvar and its bound are recorded as the elaborator
-// reads them.
 TEST(GenerateInstantiationGrammar, LoopGenerateInitRecordsGenvarAndBound) {
   auto r = Parse(
       "module m;\n"
@@ -482,11 +457,6 @@ TEST(GenerateInstantiationGrammar, LoopGenerateInitRecordsGenvarAndBound) {
   EXPECT_EQ(item->gen_init->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// genvar_iteration ::= genvar_identifier assignment_operator genvar_expression
-//   | inc_or_dec_operator genvar_identifier
-//   | genvar_identifier inc_or_dec_operator
-// The third header position holds one of those three; a bare genvar, a call
-// and a nonblocking assignment were each accepted silently.
 TEST(GenerateInstantiationGrammar, LoopGenerateIterationBareGenvarRejected) {
   auto r = Parse(
       "module m;\n"
@@ -517,8 +487,6 @@ TEST(GenerateInstantiationGrammar, LoopGenerateIterationNonblockingRejected) {
                             3, "A.4.2"));
 }
 
-// The two forms the tests above do not already observe: a compound
-// assignment_operator other than `+=`, and a prefix decrement.
 TEST(GenerateInstantiationGrammar, LoopGenerateIterationOtherForms) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -528,9 +496,6 @@ TEST(GenerateInstantiationGrammar, LoopGenerateIterationOtherForms) {
               "endmodule\n"));
 }
 
-// case_generate_construct ::= case ( constant_expression ) case_generate_item
-//   { case_generate_item } endcase
-// One item at least; a construct with none was accepted silently.
 TEST(GenerateInstantiationGrammar, CaseGenerateWithoutItemsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -542,13 +507,6 @@ TEST(GenerateInstantiationGrammar, CaseGenerateWithoutItemsRejected) {
       3, "A.4.2"));
 }
 
-// generate_block ::= ... begin [ : generate_block_identifier ] { generate_item
-// }
-//   end [ : generate_block_identifier ]
-// The identifier after `end` is the one the block opened with: §9.3.4 makes it
-// an error for the name at the end to differ from the block's name at the
-// beginning, and a block with no name has none for it to match. The parser
-// skipped whatever identifier stood there.
 TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMismatchRejected) {
   auto r = Parse(
       "module m;\n"
@@ -571,8 +529,6 @@ TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelOnUnnamedRejected) {
       r.diags, "end label 'g' specified for unnamed block", 4, "9.3.4"));
 }
 
-// The label before `begin` names the block as the one after it does, so the
-// end label matches either.
 TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMatchesPrefixLabel) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -582,9 +538,6 @@ TEST(GenerateInstantiationGrammar, GenerateBlockEndLabelMatchesPrefixLabel) {
               "endmodule\n"));
 }
 
-// §27.3 lets a generate region stand only directly in a module, and A.4.2's
-// generate_item reaches no generate_region, so a region inside a generate
-// block is reported where no region encloses the block as well.
 TEST(GenerateInstantiationGrammar, GenerateRegionInsideAGenerateBlock) {
   auto r = Parse(
       "module m;\n"
@@ -606,9 +559,6 @@ TEST(GenerateInstantiationGrammar, GenerateRegionInsideAGenerateBlock) {
   EXPECT_FALSE(ReportedError(r.diags, kMsg, 11, "27.3"));
 }
 
-// A.4.2 fills a generate region with generate_items, as it fills a generate
-// block, and no generate_item is a port declaration, a specparam declaration
-// or a specify block.
 TEST(GenerateInstantiationGrammar, PortSpecparamAndSpecifyInARegion) {
   auto r = Parse(
       "module m(a, y);\n"

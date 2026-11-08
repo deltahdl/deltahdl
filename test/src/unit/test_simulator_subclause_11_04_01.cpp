@@ -66,11 +66,6 @@ TEST(LvalueSim, CompoundAssignWithIndexedLhs) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §11.4.1's once-only left-hand index rule is read the same way each time an
-// lhs form is claimed for it: an automatic function bumps a counter and returns
-// a fixed index, so the value the target ends at is the same however many times
-// the index ran, and the count is what discriminates. This runs one such design
-// and reads both.
 void RunAndCheckIndexOnce(const std::string& src, const char* target,
                           uint64_t expected) {
   SimFixture f;
@@ -105,11 +100,6 @@ TEST(LvalueSim, CompoundAssignEvaluatesLvalueIndexOnce) {
       "arr[2]", 15u);
 }
 
-// §11.4.1: the once-only left-hand index rule applies to a packed bit-select
-// lhs too, not just an unpacked array element. `data[idx_fn()] += ...` reads
-// and writes the same bit of a single packed variable, and each of those steps
-// re-derives the bit from the index expression; the side-effecting index must
-// still be evaluated exactly once.
 TEST(LvalueSim, CompoundAssignBitSelectIndexEvaluatedOnce) {
   RunAndCheckIndexOnce(
       "module t;\n"
@@ -128,11 +118,6 @@ TEST(LvalueSim, CompoundAssignBitSelectIndexEvaluatedOnce) {
       "data", 0x08u);
 }
 
-// §11.4.1: the once-only rule also governs an indexed part-select lhs
-// (`data[f() +: w] += ...`). That lhs resolves through a different production
-// path (packed part-select read + write) than a plain bit-select, and the base
-// index is re-derived by both the read and the write, so a side-effecting base
-// index must be evaluated exactly once here as well.
 TEST(LvalueSim, CompoundAssignPartSelectBaseIndexEvaluatedOnce) {
   RunAndCheckIndexOnce(
       "module t;\n"
@@ -151,13 +136,6 @@ TEST(LvalueSim, CompoundAssignPartSelectBaseIndexEvaluatedOnce) {
       "data", 0x0Cu);
 }
 
-// §11.4.1's once-only rule is a property of the operator, not of where it is
-// written, and the three cases above all write it as a bare statement -- which
-// is intercepted before the expression evaluator and reaches the path that
-// snapshots the indices. §11.3.6 admits the parenthesized form, and any
-// compound assignment used as an operand reaches EvalCompoundAssign instead,
-// where the allocation, the read and the write each re-derived the target from
-// the index and called it again.
 TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesLvalueIndexOnce) {
   RunAndCheckIndexOnce(
       "module t;\n"
@@ -177,8 +155,6 @@ TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesLvalueIndexOnce) {
       "arr[2]", 15u);
 }
 
-// The packed bit-select written as an expression, which reaches a different
-// writer from the array element above and so is a separate reading.
 TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
   RunAndCheckIndexOnce(
       "module t;\n"
@@ -198,18 +174,6 @@ TEST(LvalueSim, CompoundAssignAsAnExpressionEvaluatesBitSelectIndexOnce) {
       "data", 0x08u);
 }
 
-// §11.4.1 makes `a op= b` the same in meaning as a blocking assignment, and a
-// blocking assignment writes its target once. A subroutine body runs on the
-// statement executor in eval_function_body.cpp rather than the one in
-// statement_assign_core.cpp, and that executor evaluated the statement's
-// right-hand side -- which the parser builds as the compound operator over the
-// statement's own left-hand side, so evaluating it had already written the
-// target -- and then wrote the value it handed back to that same left-hand side
-// a second time. A fixed index hides the second write, because it lands the
-// same value on the same element; an index function that returns a fresh index
-// on every call does not. The first write puts 5 in arr[1] and there is no
-// second write, so arr[2] stays 0 and idx_fn has run once. Before the fix
-// arr[1] and arr[2] both held 5 and idx_fn had run twice.
 TEST(LvalueSim, CompoundAssignInAFunctionBodyWritesTheTargetOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -243,15 +207,6 @@ TEST(LvalueSim, CompoundAssignInAFunctionBodyWritesTheTargetOnce) {
   EXPECT_EQ(calls->value.ToUint64(), 1u);
 }
 
-// §11.4.1 makes `a += 10` one blocking assignment to a, and §8.6 lets a method
-// name the object's own properties unqualified, as `this.b` (§8.11) and, for a
-// static one, by its bare name too (§8.10). ApplyCompoundAssignOp resolved a
-// bare name among the declared variables alone and took a member access for a
-// struct field, so a property was read as nothing and written nowhere, while
-// `c = c + 10` beside it landed. Each property packs into one result: a is 10,
-// b starts at 4 and is tripled to 12, c is 10, and the static s is 7, so the
-// result is 10 * 1000000 + 12 * 10000 + 10 * 100 + 7; a dropped write leaves
-// its digits at 0 (b at 4).
 TEST(LvalueSim, CompoundAssignOnAPropertyInsideAMethod) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -283,11 +238,6 @@ TEST(LvalueSim, CompoundAssignOnAPropertyInsideAMethod) {
   EXPECT_EQ(result->value.ToUint64(), 10121007u);
 }
 
-// §11.4.1 x §23.7: the target of a compound assignment inside a method may be
-// a hierarchical name, `t.total += 1`, and §13.3 lets a class task write a
-// property after a delay. Both went through the same dropped path as the bare
-// property. The task adds 5 to the property after `#1` and 1 to the module's
-// total, so the result read at time 1 is 5 * 10 + 1.
 TEST(LvalueSim, CompoundAssignOnAHierarchicalNameAndAfterADelayInAMethod) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -316,11 +266,6 @@ TEST(LvalueSim, CompoundAssignOnAHierarchicalNameAndAfterADelayInAMethod) {
   EXPECT_EQ(result->value.ToUint64(), 51u);
 }
 
-// §11.4.1's once-only left-hand index rule read through the subroutine
-// executor. The index is fixed here, so the target ends at 15 however many
-// times the statement wrote it and the call count is the whole reading. Before
-// the fix the second write re-derived the element from the index expression and
-// idx_fn ran twice.
 TEST(LvalueSim, CompoundAssignInAFunctionBodyEvaluatesLvalueIndexOnce) {
   RunAndCheckIndexOnce(
       "module t;\n"
@@ -342,13 +287,6 @@ TEST(LvalueSim, CompoundAssignInAFunctionBodyEvaluatesLvalueIndexOnce) {
       "arr[2]", 15u);
 }
 
-// A task called with parentheses runs its body on the ordinary statement
-// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl and
-// ExecInlineTaskCall walks the body through ExecStmt, where a void function of
-// the same shape is declined there and reaches ExecFunctionBody. So a task body
-// never carried the second write and this reading passed before the fix. It is
-// §11.4.1's rule read through a task call rather than a second reading of the
-// subroutine executor, and the function case above is what claims that.
 TEST(LvalueSim, CompoundAssignInATaskBodyEvaluatesLvalueIndexOnce) {
   RunAndCheckIndexOnce(
       "module t;\n"
@@ -370,11 +308,6 @@ TEST(LvalueSim, CompoundAssignInATaskBodyEvaluatesLvalueIndexOnce) {
       "arr[2]", 15u);
 }
 
-// The plain variable form of the same statement, which nothing read inside a
-// subroutine body before. It does not discriminate on its own: both writes
-// carried the same sum to the same variable, so `x` read 15 before the fix as
-// well. This is coverage of the form in that position rather than a second
-// claim about the doubled write.
 TEST(LvalueSim, VarLvalueCompoundAddInAFunctionBody) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -390,11 +323,6 @@ TEST(LvalueSim, VarLvalueCompoundAddInAFunctionBody) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §11.4.1: the blocking-assignment equivalence also holds when the lhs is a
-// struct member (`s.field op= rhs`). That lhs kind takes its own production
-// branch (member-access read + struct-field write) distinct from a plain
-// variable or a select, so exercise `s.lo += 3` end-to-end from a real packed
-// struct declaration and confirm only the addressed field is updated.
 TEST(LvalueSim, CompoundAssignStructMemberLhs) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -412,7 +340,6 @@ TEST(LvalueSim, CompoundAssignStructMemberLhs) {
       "endmodule\n",
       f, "s");
   ASSERT_NE(s, nullptr);
-  // hi keeps 2 in the high nibble; lo becomes 5 + 3 = 8 in the low nibble.
   EXPECT_EQ(s->value.ToUint64(), 0x28u);
 }
 
@@ -466,15 +393,6 @@ TEST(LvalueSim, CompoundAssignArithBitwiseShiftThroughPipeline) {
   EXPECT_EQ(f.ctx.FindVariable("shr")->value.ToUint64(), 16u);
 }
 
-// §11.4.1 gives each element of a concatenation lvalue the bits its own width
-// claims, and §11.5.1 gives a select the bits its indices name. The element
-// walk read the width of the resolved variable instead, so a select element was
-// sized at the whole of its variable and written whole: `{a[3:0], b}` took all
-// of `a` and drew the boundary between the two elements in the wrong place, so
-// `b` took the wrong bits as well.
-//
-// `a` is set to 8'hFF first, so a write of the whole variable is told from a
-// write of the low nibble by what the high nibble holds afterwards.
 TEST(LvalueSim, ConcatSelectElementTakesOnlyTheBitsItNames) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -491,9 +409,6 @@ TEST(LvalueSim, ConcatSelectElementTakesOnlyTheBitsItNames) {
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0xF1u);
 }
 
-// The element to the right of the select, which a mis-sized first element moves
-// the boundary of. With the select claiming four bits, `b` takes the low eight
-// of 12'h123.
 TEST(LvalueSim, ConcatElementAfterASelectTakesTheBitsBelowIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -510,9 +425,6 @@ TEST(LvalueSim, ConcatElementAfterASelectTakesTheBitsBelowIt) {
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0x23u);
 }
 
-// Nothing in §11.4.1 drops the x and z bits of what is assigned. The slice was
-// taken through Logic4Vec::ToUint64, which returns `aval & ~bval`, so both
-// arrived as 0.
 TEST(LvalueSim, ConcatLvalueCarriesUnknownBitsToItsElements) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -526,8 +438,6 @@ TEST(LvalueSim, ConcatLvalueCarriesUnknownBitsToItsElements) {
   EXPECT_EQ(var->value.ToString(), "zzzzxxxx");
 }
 
-// And nothing bounds a concatenation at one word. ToUint64 reads words[0]
-// alone, so the element above bit 63 took nothing.
 TEST(LvalueSim, ConcatLvalueReachesElementsAboveTheFirstWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -541,16 +451,6 @@ TEST(LvalueSim, ConcatLvalueReachesElementsAboveTheFirstWord) {
   EXPECT_EQ(var->value.ToUint64(), 0x1234000000000000ull);
 }
 
-// §11.4.1 makes `a op= b` the same in meaning as a blocking assignment, writing
-// `a[i]+=2;` as the same statement as `a[i] = a[i] +2;`. So §10.7 truncates the
-// result into the target as it would any other assignment, and §6.11.2 converts
-// the unknowns a 2-state target has no room for. The result was written over
-// the target instead, so the target took the operation's width.
-
-// The eight bits the addition is evaluated at do not fit the four the target
-// declares. 17 is what the target read when it took the operation's width; 1 is
-// what four bits hold of it. The width is read as well as the value, because a
-// target that grew is the defect itself rather than a consequence of it.
 TEST(LvalueSim, CompoundAssignTruncatesToTheTargetWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -568,9 +468,6 @@ TEST(LvalueSim, CompoundAssignTruncatesToTheTargetWidth) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §6.11.2 gives a `bit` no unknown to hold, and the blocking assignment §11.4.1
-// makes this equivalent to converts them. The value is read through IsKnown as
-// well as by number, since an x reads as zero either way.
 TEST(LvalueSim, CompoundAssignZeroesXzIntoATwoStateTarget) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -589,14 +486,6 @@ TEST(LvalueSim, CompoundAssignZeroesXzIntoATwoStateTarget) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// §11.4.1 makes `i += 1.75` the blocking assignment `i = i + 1.75`, so
-// §11.8.1 evaluates the sum in real arithmetic and §6.12.1 then converts the
-// real to the integer target by rounding to the nearest integer with ties away
-// from zero. 2.75 is away from the tie, so the answer is 3 and the two wrong
-// answers it excludes are distinct from it and from each other: truncation
-// reads 2, and a raw resize of the 64-bit IEEE-754 double into a 32-bit target
-// reads 0, since the low word of 2.75's bit pattern (0x4006000000000000) is
-// zero.
 TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTarget) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -612,14 +501,6 @@ TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTarget) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// The same conversion in a subroutine body, which reaches it by a different
-// route. The subroutine executor used to write the target twice, and the second
-// write was the one that applied §6.12.1; routing the statement to the single
-// read-modify-write the ordinary executor uses would have dropped the
-// conversion, because the plain variable write does not apply it. So this is
-// the reading that holds §6.12.1 in place across the change rather than one
-// about the doubled write, and the wrong answer it excludes is 0 -- the low 32
-// bits of 2.75 as a double.
 TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTargetInAFunctionBody) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -638,12 +519,6 @@ TEST(LvalueSim, CompoundAssignOfARealToAnIntegerTargetInAFunctionBody) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §11.3.6: an assignment expression casts its right-hand side to the left-hand
-// data type, stacks it, updates the left-hand side and returns what it stacked,
-// and the returned value takes the left-hand side's data type. So what
-// `b = (a += 1)` reads is what `a` holds, not what the addition produced:
-// `b = (a+=1)` is the clause's own example. Sixteen is the untruncated sum, and
-// zero is the four bits `a` keeps of it.
 TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -661,24 +536,6 @@ TEST(LvalueSim, CompoundAssignExpressionYieldsTheTargetsDataType) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §11.4.1's `( operator_assignment )` primary is the one form of a compound
-// assignment that does not arrive as a statement: the parser wraps a bare
-// `x += 2;` as a blocking assign whose rhs carries the operator, and
-// TryDispatchSpecialBlockingAssign hands that to ApplyCompoundAssignOp, which
-// writes through WriteVar. Parenthesized, the same operator is an embedded
-// assignment expression whose target is its own lhs, so the dispatcher declines
-// it and EvalExpr routes it to EvalCompoundAssign -- which stores to the
-// variable directly. §9.4.2 makes that store a change like any other, and an
-// `always @(x)` parked on the target is entitled to see it.
-//
-// The delays keep one write to a time step so the tally is unambiguous, and the
-// third write adds nothing: the awaiter compares against the value it captured
-// when it armed, so a store of the value already held is not a change and does
-// not wake anyone. That fixes three separate wrong answers on `hits` -- 0 when
-// the embedded store notifies nobody, 1 when only the first change is seen, and
-// 4 when every store notifies whether or not it changed anything. §11.3.6 gives
-// the expression a value as well as an effect, so `y` pins what the last one
-// yielded beside `x`, which pins what it stored.
 TEST(LvalueSim, CompoundAssignExpressionWakesAnEventControlOnItsTarget) {
   SimFixture f;
   const std::string kSrc =
@@ -708,9 +565,6 @@ TEST(LvalueSim, CompoundAssignExpressionWakesAnEventControlOnItsTarget) {
   EXPECT_EQ(x->value.ToUint64(), 12u);
 }
 
-// §11.4.1 makes `a op= b` the assignment `a = a op (b)`, so b is sized by the
-// assignment's width (§11.6.1) and `s += x + y` keeps the carry of x + y, as a
-// statement and as an expression; a shift's count stays self-determined.
 TEST(CompoundAssignSim, RightOperandTakesTheAssignmentsWidth) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"

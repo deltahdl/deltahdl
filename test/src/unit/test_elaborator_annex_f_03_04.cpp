@@ -13,27 +13,12 @@
 
 using namespace delta;
 
-// §F.3.4 opens the derived forms with one convention of its own: a
-// composition of the operators ##1 and or is written without internal
-// parentheses, because both are associative. Every §F.3.2 form is binary and
-// parenthesized, so a derived form such as (R1 ##1 1[*m-1:n-1] ##1 R2) or
-// (R[*0] or R[*1:$]) stands for either of two trees, and the convention holds
-// only because §F.5's satisfaction relations give the two trees the same
-// words. These cases check that, for the sequence ##1 and or of §F.5.2, for
-// the same sequences under a clock through the §F.5.1.1 rewrite, and for the
-// property or of §F.5.3.1: over every word up to a bounded length, the
-// left-grouped and the right-grouped composition are satisfied by the same
-// words, and those words are the ones the ungrouped composition names.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto BoolSeq(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// Every word over `alphabet` of length at most `max_length`, the empty word
-// included, so that a grouping which differs on any word up to that length is
-// caught.
 std::vector<Word> WordsUpTo(const std::vector<Letter>& alphabet,
                             std::size_t max_length) {
   std::vector<Word> words{Word{}};
@@ -56,8 +41,6 @@ std::vector<Letter> UnclockedAlphabet() {
   return {A({}), A({"a"}), A({"b"}), A({"c"})};
 }
 
-// The number of words in `words` that tightly satisfy both groupings, after
-// checking that no word satisfies one and not the other.
 std::size_t CountAgreeingMatches(const std::vector<Word>& words,
                                  const SequenceExpr& left_grouped,
                                  const SequenceExpr& right_grouped) {
@@ -70,10 +53,6 @@ std::size_t CountAgreeingMatches(const std::vector<Word>& words,
   return matches;
 }
 
-// (a ##1 b[*1:$]) ##1 c and a ##1 (b[*1:$] ##1 c) are tightly satisfied by
-// the same words, which for length up to four are a b c and a b b c: the
-// middle operand has no fixed length, so a split made at the wrong operand
-// boundary would differ between the two trees.
 TEST(DerivedFormConventions, SequenceConcatenationGroupsEitherWay) {
   auto middle = SeqUnboundedRepeat(BoolSeq("b"));
   auto left = SeqConcat(SeqConcat(BoolSeq("a"), middle), BoolSeq("c"));
@@ -86,8 +65,6 @@ TEST(DerivedFormConventions, SequenceConcatenationGroupsEitherWay) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({"c"})}, *left));
 }
 
-// (a or b[*1:$]) or c and a or (b[*1:$] or c) are tightly satisfied by the
-// same words: a, c, and each run of b up to the bound, six words in all.
 TEST(DerivedFormConventions, SequenceOrGroupsEitherWay) {
   auto middle = SeqUnboundedRepeat(BoolSeq("b"));
   auto left = SeqOr(SeqOr(BoolSeq("a"), middle), BoolSeq("c"));
@@ -99,12 +76,6 @@ TEST(DerivedFormConventions, SequenceOrGroupsEitherWay) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({"c"})}, *left));
 }
 
-// The convention survives the §F.5.1.1 clock rewrite, which recurses into
-// each operand of ##1 and or and so keeps whichever tree it was given: under
-// the clock k, both trees of a ##1 b ##1 c are satisfied by a b c on three
-// clock letters and by the same word with one unclocked letter before any of
-// the three, four words up to length four. A clock letter carrying none of a,
-// b and c fits nowhere.
 TEST(DerivedFormConventions, ClockRewriteKeepsEitherGrouping) {
   auto left = SeqConcat(SeqConcat(BoolSeq("a"), BoolSeq("b")), BoolSeq("c"));
   auto right = SeqConcat(BoolSeq("a"), SeqConcat(BoolSeq("b"), BoolSeq("c")));
@@ -122,10 +93,6 @@ TEST(DerivedFormConventions, ClockRewriteKeepsEitherGrouping) {
       *right_clocked));
 }
 
-// The property or of §F.5.3.1 is associative as well: (p or q) or r and
-// p or (q or r), with p = strong(a), q = strong(b ##1 b) and r = strong(c), are
-// neutrally satisfied by the same words, which are those opening with a, with
-// b b, or with c.
 TEST(DerivedFormConventions, PropertyOrGroupsEitherWay) {
   auto p = PropStrong(BoolSeq("a"));
   auto q = PropStrong(SeqConcat(BoolSeq("b"), BoolSeq("b")));
@@ -138,7 +105,6 @@ TEST(DerivedFormConventions, PropertyOrGroupsEitherWay) {
     EXPECT_EQ(holds, NeutrallySatisfies(word, *right));
     if (holds) ++matches;
   }
-  // 21 words open with a, 21 with c, and 5 with b b.
   EXPECT_EQ(matches, 47u);
   EXPECT_TRUE(NeutrallySatisfies(Word{A({"b"}), A({"b"})}, *left));
   EXPECT_TRUE(NeutrallySatisfies(Word{A({"c"}), A({"b"})}, *right));

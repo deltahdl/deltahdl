@@ -183,10 +183,6 @@ TEST(TaskAndFunctionParsing, RefArgOnFunction) {
 }
 
 TEST(PassByRefParsing, RefStickiesToNextArg) {
-  // §13.4 (Syntax 13-2 prose): once a direction is given, subsequent formals
-  // default to the same direction, and the const/static qualifiers on the ref
-  // direction are included in this default. So the second bare argument here
-  // inherits ref, not input.
   auto r = Parse(
       "module m;\n"
       "  function automatic void f(ref int x, int y);\n"
@@ -233,9 +229,6 @@ TEST(PassByRefParsing, RefArgWithUnpackedArrayDims) {
   EXPECT_FALSE(fn->func_args[0].unpacked_dims.empty());
 }
 
-// Parser::ParseArgDirection files every rejection below under §13.3, which
-// carries tf_port_direction, rather than under this file's own §13.5.2. Each
-// stands at the second directional keyword, on line 2 of its own source.
 TEST(PassByRefParsing, RefInputCombinationRejected) {
   auto r = Parse(
       "module m;\n"

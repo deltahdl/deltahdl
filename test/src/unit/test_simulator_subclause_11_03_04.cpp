@@ -129,10 +129,6 @@ TEST(StateOps, BitwiseOrWithXzLiteralCoercedToInt) {
   EXPECT_EQ(result, 12u);
 }
 
-// Claim B, driven from real declarations: when both operands come from 2-state
-// (int) variables, the result stays in the 2-state value set. This is the
-// clause's "sum = n + n" line; a fully known 16 (never 0) shows the value is a
-// real result rather than a coerced-away unknown.
 TEST(StateOps, TwoStateOperandsGiveKnownResult) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -149,10 +145,6 @@ TEST(StateOps, TwoStateOperandsGiveKnownResult) {
   EXPECT_EQ(var->value.words[0].bval, 0u);
 }
 
-// Claim A for arithmetic, observed uncoerced: an int (2-state) operand added to
-// a logic (4-state) operand holding x evaluates as if all 4-state, so the
-// result is unknown. A 4-state destination (integer) keeps the x visible rather
-// than collapsing it to 0 the way an int destination would.
 TEST(StateOps, MixedArithInFourStateDestPreservesX) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -171,10 +163,6 @@ TEST(StateOps, MixedArithInFourStateDestPreservesX) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// Claim A for bitwise OR, the uncoerced counterpart of the clause's res line:
-// the same "4'b01xz | n" whose int destination coerced to 12 keeps its unknown
-// bits when the destination is a 4-state integer, confirming the operation is
-// carried out in the 4-state domain before any assignment coercion.
 TEST(StateOps, MixedBitwiseOrInFourStateDestPreservesUnknown) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -191,9 +179,6 @@ TEST(StateOps, MixedBitwiseOrInFourStateDestPreservesUnknown) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// Claim C, modulo-by-zero mirror of the div-by-zero example, into a 2-state
-// destination: modulo is another operator that yields x for 2-state operands,
-// and that x coerces to 0 when stored into an int.
 TEST(StateOps, ModuloByZeroCoercedToZeroInInt) {
   auto result = RunAndGet(
       "module t;\n"
@@ -208,9 +193,6 @@ TEST(StateOps, ModuloByZeroCoercedToZeroInInt) {
   EXPECT_EQ(result, 0u);
 }
 
-// Claim C, modulo-by-zero into a 4-state destination: the same exception keeps
-// its unknown value when stored into an integer, the modulo counterpart of the
-// div4 example.
 TEST(StateOps, ModuloByZeroPreservedInInteger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -227,10 +209,6 @@ TEST(StateOps, ModuloByZeroPreservedInInteger) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// Claim B for the unsigned 2-state operand type: two-state bit operands (unlike
-// the signed int cases above) take the unsigned arithmetic path, and when both
-// operands are known the result stays in the 2-state set. Driven from real bit
-// declarations so the unsigned typing is what selects the path.
 TEST(StateOps, TwoStateUnsignedOperandsGiveKnownResult) {
   auto result = RunAndGet(
       "module t;\n"
@@ -245,10 +223,6 @@ TEST(StateOps, TwoStateUnsignedOperandsGiveKnownResult) {
   EXPECT_EQ(result, 16u);
 }
 
-// Claim C via the unsigned path: division by zero with unsigned bit operands is
-// the same x-producing exception, exercising the unsigned evaluator's zero
-// guard rather than the signed one. A 4-state logic destination keeps the x
-// visible.
 TEST(StateOps, UnsignedDivideByZeroPreservedInLogic) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -266,9 +240,6 @@ TEST(StateOps, UnsignedDivideByZeroPreservedInLogic) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// Claim C via the unsigned path, modulo counterpart: unsigned bit modulo by
-// zero yields x through the unsigned evaluator's own zero guard, preserved in a
-// logic destination.
 TEST(StateOps, UnsignedModuloByZeroPreservedInLogic) {
   SimFixture f;
   auto* var = RunAndFindVar(

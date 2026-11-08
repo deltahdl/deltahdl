@@ -30,13 +30,6 @@
 
 namespace delta {
 
-// ClassMethodTarget and the ExecClassMethod prototype live in
-// eval_function_internal.h (so eval_static_method.cpp can run a method body
-// without a `this`); the definition is below.
-
-// Whether the class `defining` declares `name` with the virtual qualifier, as
-// a pure virtual method or as an `:extends` override, read off the
-// declaration for a class whose vtable was never built, a nested one.
 static bool DeclarationIsVirtual(const ClassTypeInfo* defining,
                                  std::string_view name) {
   if (defining == nullptr || defining->decl == nullptr) return false;
@@ -50,15 +43,6 @@ static bool DeclarationIsVirtual(const ClassTypeInfo* defining,
   return false;
 }
 
-// §8.20: a method is virtual from the class that first declares it so
-// downward -- a virtual method overrides in every base class, a non-virtual
-// one in its own class and its descendants alone. A handle's declared class
-// therefore sees `name` as virtual only where that class or a base of it has
-// put the name in its vtable, or declares it virtual itself; where none has,
-// the call is the declared class's own method, whatever a class below it
-// later redeclares virtual and so put in the object's vtable. An
-// interface-class handle has no such declaration and resolves by the object
-// (§8.26.9).
 static ModuleItem* ResolveNonVirtualFromDeclared(std::string_view method_name,
                                                  const ClassTypeInfo* declared,
                                                  InstanceMethodInfo& info) {
@@ -78,8 +62,6 @@ bool ResolveMethodByDeclaredClass(ClassObject* obj,
                                   std::string_view method_name, SimContext& ctx,
                                   InstanceMethodInfo& info) {
   info.obj = obj;
-  // §8.10: a static method is the declared class's and runs with no object, so
-  // a receiver holding null still names it.
   if (obj == nullptr)
     return ResolveStaticThroughNull(method_name, declared_class, ctx, info);
   auto* declared_type = ctx.FindClassType(declared_class);
@@ -87,9 +69,6 @@ bool ResolveMethodByDeclaredClass(ClassObject* obj,
   if (!info.method)
     info.method = info.obj->ResolveVirtualMethod(method_name, &info.owner);
   if (!info.method) {
-    // §8.26.9: a non-interface declared type resolves against that type; an
-    // interface-class declared type (or no declared type at all) resolves via
-    // the object's dynamic type (the implementing class).
     const ClassTypeInfo* from = (declared_type && !declared_type->is_interface)
                                     ? declared_type
                                     : info.obj->type;
@@ -99,16 +78,6 @@ bool ResolveMethodByDeclaredClass(ClassObject* obj,
   return info.method != nullptr;
 }
 
-// §8.11: `this` names the object the method was invoked on, so `this.m(...)`
-// is the bare `m(...)` written with its receiver, and §13.4.2 lets the method
-// -- automatic, as every class method is -- reach itself that way. It is
-// resolved as TryEvalEnclosingInstanceCall (eval_static_method.cpp) resolves
-// the bare name: the object's dynamic type through the vtable first (§8.20),
-// then a walk from the lexically enclosing class up its base chain. `this` is
-// a keyword and names no variable, so the handle path below, which reads the
-// declared class of a variable, found no class for it and the call fell
-// through to the module's functions, answering 0 -- every `this.fib(n - 2)`
-// of `fib(n - 1) + this.fib(n - 2)` read 0 and `h.fib(10)` summed to 1.
 static bool ResolveMethodOnThis(std::string_view method_name, SimContext& ctx,
                                 InstanceMethodInfo& info) {
   ClassObject* self = ctx.CurrentThis();
@@ -124,17 +93,6 @@ static bool ResolveMethodOnThis(std::string_view method_name, SimContext& ctx,
   return info.method != nullptr;
 }
 
-// The handle the property `name` holds on `self`, read as GetPropertyForType
-// reads it -- a static of the running method's class `enclosing` or of a
-// base of it from the class's one storage (§8.9, §8.13), the slot of that
-// class or of a base of it on the object (§8.15), the bare slot after -- but
-// without the value a property never written is made up as, which is no
-// handle. The static is asked of `enclosing` ahead of the object: §8.10 has a
-// static method run with no object of its own, and the object on the stack
-// while it runs is whatever its caller ran on -- Other's for
-// `C::via()` inside Other::go() -- whose class declares no such static, so
-// the read answered null and the call through `m_t` was reported before a
-// later resolver ran it.
 static uint64_t HeldPropertyHandle(const ClassObject* self,
                                    const ClassTypeInfo* enclosing,
                                    std::string_view name) {
@@ -154,15 +112,6 @@ static uint64_t HeldPropertyHandle(const ClassObject* self,
   return kNullClassHandle;
 }
 
-// §8.11 with §8.6: a call through a property of the running method's object,
-// `obj.get()` with `obj` a class-typed property named without `this.`, runs
-// the method on the object the property refers to, resolved by the property's
-// declared class as a call through a variable is by the variable's; and
-// §8.25 lets that class be named by a type parameter of the enclosing class,
-// `T obj`, which PropertyClassName reads through the object's specialization.
-// A local of the name shadows the property and takes the variable path. The
-// variable path alone answered a call, so one through a property fell to the
-// module's functions and read 0 whatever the object held.
 static bool ResolveMethodOnPropertyHandle(const MethodCallParts& parts,
                                           SimContext& ctx,
                                           InstanceMethodInfo& info) {
@@ -172,10 +121,6 @@ static bool ResolveMethodOnPropertyHandle(const MethodCallParts& parts,
   if (enclosing == nullptr) enclosing = self->type;
   std::string_view declared =
       PropertyClassName(self, enclosing, parts.var_name, ctx);
-  // §7.9 with §8.5: a property that is an array of handles, `E m_events[K]`,
-  // is no handle, and `m_events.delete(k)` is the array's method, which the
-  // array paths run; taken for a call through a handle, it read null and was
-  // reported under §8.4 before the delete ran.
   if (declared.empty() || PropertyIsArray(enclosing, parts.var_name, ctx))
     return false;
   uint64_t handle = HeldPropertyHandle(self, enclosing, parts.var_name);
@@ -186,13 +131,6 @@ static bool ResolveMethodOnPropertyHandle(const MethodCallParts& parts,
                                       parts.method_name, ctx, info);
 }
 
-// §8.3 (printed page 180) makes a variable of a class type a handle, and
-// §7.10 (printed 169) and §7.8 give a queue and an associative array declared
-// with the class's name, `C q[$]` or `C m[string]`, methods of their own: such
-// a variable is an array of handles and no handle. The class record is entered
-// under the array's key as under a scalar's (LowerVar in lowerer_var.cpp,
-// RegisterPackageClassVariables for a package's), so the record alone cannot
-// tell the two apart; the object the key holds can.
 static bool NameDenotesArrayOfHandles(std::string_view name, SimContext& ctx) {
   return ctx.FindQueue(name) != nullptr || ctx.FindAssocArray(name) != nullptr;
 }
@@ -205,11 +143,6 @@ bool ResolveInstanceMethod(const MethodCallParts& parts, SimContext& ctx,
   if (class_type.empty()) {
     return ResolveMethodOnPropertyHandle(parts, ctx, info);
   }
-  // A statement's `p1::q.push_back(c1)` is resolved here ahead of the queue
-  // path -- ExecInlineTaskCall (stmt_exec.cpp) asks SetupInstanceTaskCall
-  // before ExecCallStmtExpr reaches TryBuiltinMethodCall, where the same call
-  // in a function body reaches the queue first -- so the carrier's 0 was read
-  // as a null handle and §8.4's error reported for a queue that held handles.
   if (NameDenotesArrayOfHandles(parts.var_name, ctx)) return false;
   auto* var = ctx.FindVariable(parts.var_name);
   if (!var) return false;
@@ -230,11 +163,6 @@ Logic4Vec ExecInstanceMethodCall(ModuleItem* method, ClassObject* obj,
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
   ExecClassMethod({method}, expr, ctx, arena, out);
-  // §13.5.2: the actual an output argument is copied back to is an expression
-  // of the caller's, so the copy-out is made with the caller's `this` in
-  // scope: a method passing its own property, `other.get(vif)`, names a
-  // property of its own object, and with the callee's object still pushed the
-  // value landed on that object instead.
   ctx.PopThis();
   WritebackOutputArgs(method, expr, ctx, arena);
   WritebackQueueRefs(ctx);
@@ -248,23 +176,12 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   MethodCallParts parts;
   if (!ExtractMethodCallParts(expr, parts)) return false;
   if (parts.var_name != "super") return false;
-  // §8.7/§8.15: the `super.new(...)` that opens a constructor body is the
-  // base constructor call the construction of the object has already made,
-  // with these arguments, before this body began (EvalClassNew in
-  // eval_class_new.cpp), and §8.17's `super.new(default)` forwarded the
-  // expanded actuals the same way; reaching the statement runs nothing more,
-  // where running the base constructor a second time ran it once with no
-  // arguments first -- uvm_component::new saw the name "" instead of
-  // "__top__" and built a second root.
   if (parts.method_name == "new" && IsSuperNewRunByConstruction(expr, ctx)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
   auto* self = ctx.CurrentThis();
   if (!self || !self->type) return false;
-  // §8.15: `super` refers to the parent of the lexically enclosing class. Using
-  // the dynamic type of `this` here made super.new() in a mid-hierarchy
-  // constructor resolve back to the same level and recurse forever.
   const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
   const ClassTypeInfo* super_type =
       enclosing ? enclosing->parent : self->type->parent;
@@ -273,8 +190,6 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
   auto* method =
       self->ResolveMethodForType(parts.method_name, super_type, &defining);
   if (!method) return false;
-  // Run the resolved method with its own defining class as the enclosing scope
-  // so a nested super call walks one level further up, not back to here.
   ctx.PushMethodClass(defining);
   out = ExecInstanceMethodCall(method, self, expr, ctx, arena);
   ctx.PopMethodClass();
@@ -284,25 +199,18 @@ static bool TryEvalSuperMethodCall(const Expr* expr, SimContext& ctx,
 Logic4Vec RunInstanceMethod(const InstanceMethodInfo& info, const Expr* expr,
                             SimContext& ctx, Arena& arena) {
   Logic4Vec out;
-  // §8.10/§8.9: a static method invoked through an instance handle shares the
-  // class's single static storage; dispatch it in class scope (no `this`).
   if (info.method->is_static_method) {
     const ClassTypeInfo* scope =
         info.obj != nullptr ? info.obj->type : info.owner;
     RunStaticMethodInClassScope({info.method, scope}, expr, ctx, arena, out);
     return out;
   }
-  // Run the body with its defining class as the enclosing scope so an
-  // unqualified member resolves to that level even when a derived class
-  // shadows the name (§8.15).
   ctx.PushMethodClass(info.owner);
   out = ExecInstanceMethodCall(info.method, info.obj, expr, ctx, arena);
   ctx.PopMethodClass();
   return out;
 }
 
-// §26.3 admits a package-qualified handle as the receiver, `p1::h.m(...)`,
-// resolved by the key ExtractHandleMethodCallParts answers.
 static bool TryEvalClassMethodCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -318,12 +226,9 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
   if (!cls->decl) return;
   const auto& params = cls->decl->params;
   const auto& values = base_id->elements;
-  // §8.25 with §6.20.2: the actual or the default is sized by the
-  // parameter's declared type (ClassParamSizer).
   ClassParamSizer sizer(cls->decl);
   sizer.UseTypeActuals(cls->param_actuals);
   for (size_t i = 0; i < params.size(); ++i) {
-    // §6.20.1: a local would shadow a port array's element storage.
     if (cls->decl->param_port_unpacked_dims.count(params[i].first)) continue;
     Logic4Vec val;
     if (i < values.size()) {
@@ -335,12 +240,6 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
     }
     auto* v = ctx.CreateLocalVariable(params[i].first, val.width);
     v->value = val;
-    // §8.25.1: the same parameter is reachable inside the class -- and inside
-    // its out-of-block methods, which resolve as though written in the class --
-    // through the class scope resolution operator (`C::p`), which the evaluator
-    // sees as a "Class.param" member reference. Bind that compound name to the
-    // same value so `C::p` tracks the active specialization exactly as the bare
-    // name `p` does, and is never shadowed by a same-named local variable.
     auto* qname = arena.Create<std::string>(std::string(cls->decl->name) + "." +
                                             std::string(params[i].first));
     auto* qv = ctx.CreateLocalVariable(*qname, val.width);
@@ -350,19 +249,12 @@ void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
 
 struct ClassScopeInfo {
   const Expr* access;
-  // The class as the call named it: a bare `C` or, through the package scope
-  // resolution operator of §26.3, `p::C`, the key the lowerer binds a package's
-  // class under whether or not the package was imported.
   std::string_view class_name;
   ClassTypeInfo* cls;
   ModuleItem* method;
   bool is_void;
 };
 
-// §8.23 has the left operand of `::` name a class or a package, and §26.3
-// reaches a package's class through `p::C`, so the operand of `p::C::m` is
-// itself a scope resolution of two identifiers. Answers the key under which
-// SimContext holds the class for either shape, or an empty view for another.
 std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
   if (!scope) return {};
   if (scope->kind == ExprKind::kIdentifier) return scope->text;
@@ -375,12 +267,6 @@ std::string_view ScopedClassKey(const Expr* scope, Arena& arena) {
   return *key;
 }
 
-// §8.13 with §8.23: a class inherits its base's methods, so `Q::pk()` on
-// `class Q extends P` calls P's static pk, run under the level declaring it
-// -- the specialization `class E extends Mem #(4)` names, for `E::sk()`.
-// Looked up on the named class alone, the call found nothing and answered
-// 0. A constructor is the named class's own. Sets info.method, and info.cls
-// to the declaring level for an inherited static method.
 static bool FindInheritedMethod(std::string_view method_name, SimContext& ctx,
                                 ClassScopeInfo& info) {
   std::string name(method_name);
@@ -416,12 +302,6 @@ static bool ResolveClassScope(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §13.4.1 with §6.16: the value a call answers -- a placeholder for a void
-// subroutine, else the implicit variable's, carrying the string kind
-// ShapeStringReturnVariable gave the variable of a subroutine declared to
-// return a string, so that a method called on the call, `h.get().len()`,
-// reads it as text (TryEvalCallResultMethodCall); the words alone read as a
-// packed number and no string method reached them.
 static Logic4Vec CallResult(bool is_void, const Variable* ret_var,
                             Arena& arena) {
   if (is_void) return MakeLogic4VecVal(arena, 1, 0);
@@ -435,19 +315,10 @@ void ExecClassMethod(ClassMethodTarget target, const Expr* expr,
   ModuleItem* method = target.method;
   bool is_void = (method->return_type.kind == DataTypeKind::kVoid);
   BindFunctionArgs(method, expr, ctx, arena);
-  // §26.2 with §8.24: a method of a class a package declares, in-class or
-  // out-of-block, reads the package's parameters, enum literals, variables
-  // and functions by their bare names, so its frame -- the one the caller
-  // pushed for the call -- carries the package RecordClassPackage
-  // (lowerer_class.cpp) recorded, given once the actuals are bound so that
-  // a caller's actual of a package variable's name still reads the caller's.
-  // §23.9: the frame is the method body's own scope from here, so a body
-  // with no package of its own reads none of its caller's.
   ctx.EnterSubroutineScope(ctx.SubroutinePackage(method));
   Variable dummy_ret;
   Variable* ret_var = &dummy_ret;
   if (!is_void) ret_var = CreateMethodReturnVariable(target, ctx);
-  // §8.10: a static method has no `this`, its caller's included.
   if (method->is_static_method) ctx.PushThis(nullptr);
   ExecFunctionBody(method, expr, ret_var, ctx, arena);
   if (method->is_static_method) ctx.PopThis();
@@ -465,9 +336,6 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
     return true;
   }
   ctx.PushScope();
-  // §8.10: a static method can directly call static methods and access static
-  // properties of the same class, so the class scope must be in effect while
-  // the method body executes for unqualified same-class references to resolve.
   if (info.method->is_static_method) {
     ctx.PushMethodClass(info.cls);
   }
@@ -475,13 +343,6 @@ static bool TryEvalClassScopeCall(const Expr* expr, SimContext& ctx,
   if (info.method->is_static_method) {
     ctx.PopMethodClass();
   }
-  // §13.5.2: output and inout arguments are copied back to the caller on
-  // return. The instance-method path does this; the class-scope static path
-  // must too, or `Cls::task(out_arg)` silently drops its results. The actual
-  // is the caller's expression, so the copy-out runs with the caller's class
-  // in force rather than the callee's: a property of the caller's object named
-  // as the actual is written against the class declaring it (§8.15), where
-  // under the callee's class it landed on the unscoped key alone.
   WritebackOutputArgs(info.method, expr, ctx, arena);
   ctx.PopScope();
   return true;
@@ -492,19 +353,12 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
   ClassScopeInfo info;
   if (!ResolveClassScope(expr, ctx, arena, info)) return false;
   if (info.access->lhs->elements.empty()) return false;
-  // §8.25.1 with §8.25: the scope form names one specialization, and each
-  // specialization has its own set of static member variables, so the body runs
-  // under that specialization rather than under the class declaration, whose
-  // one map every specialization shares. ResolveClassScope found the class by
-  // the bare name the scope carries, which is the declaration.
   if (ClassTypeInfo* spec =
           ScopeNamedSpecialization(info.access->lhs, ctx, arena)) {
     info.cls = spec;
   }
   ctx.PushScope();
   BindClassParams(info.cls, info.access->lhs, ctx, arena);
-  // §8.25.1: the type actuals of the specialization the call names, bound
-  // in the same frame for $bits(T) and the like inside the static body.
   BindClassScopeTypeActuals(info.cls, info.access->lhs, ctx, arena);
 
   if (info.access->rhs->text == "new") {
@@ -512,17 +366,9 @@ static bool TryEvalParameterizedScopeCall(const Expr* expr, SimContext& ctx,
     ctx.PopScope();
     return true;
   }
-  // §8.10 with §8.25.1: the static method of a specialization runs in the
-  // class's scope as the unparameterized form above runs it, so a bare call
-  // or static property inside it resolves to the class's own, or to one a
-  // base declares (§8.13) -- the `get()` and `m_get_q(q, obj)` of
-  // uvm_callbacks#(T,CB)::get_first. Run under the caller's class, the two
-  // resolved nowhere and get_first's q stayed null.
   if (info.method->is_static_method) ctx.PushMethodClass(info.cls);
   ExecClassMethod({info.method, info.cls}, expr, ctx, arena, out);
   if (info.method->is_static_method) ctx.PopMethodClass();
-  // §13.5.2: copy output/inout arguments back to the caller on return (the
-  // parameterized class-scope path, e.g. `Cls#(N)::task(out_arg)`).
   WritebackOutputArgs(info.method, expr, ctx, arena);
   ctx.PopScope();
   return true;
@@ -537,9 +383,6 @@ bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->rhs->text != "new") return false;
   auto* cls = ctx.FindClassType(expr->lhs->text);
   if (!cls) return false;
-  // §8.25: a parameterized scope (E#(.N(77))::new) carries its specialization
-  // overrides in the base identifier's elements; bind them as locals in a fresh
-  // scope before constructing, mirroring the procedural assignment path.
   bool parameterized = !expr->lhs->elements.empty();
   if (parameterized) {
     ctx.PushScope();
@@ -550,10 +393,6 @@ bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §8.30.3 and §8.30.4: get() and clear() on a weak_reference variable. §26.3
-// admits a package's variable as the receiver, `p::w.get()`, by the "p.w" key
-// ExtractHandleMethodCallParts answers; taken as an identifier alone, the
-// scoped call resolved no reference and answered nothing.
 static bool TryEvalWeakRefMethodCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   MethodCallParts parts;
@@ -608,13 +447,6 @@ static bool TryBuiltinMethodCall(const Expr* expr, SimContext& ctx,
   return TryEvalAssocMethodCall(expr, ctx, arena, out);
 }
 
-// Clause 18: the randomization methods are built in on any class handle and are
-// never user-declared -- randomize() and srandom() (18.6.3, 18.13.3) and the
-// randstate accessors (18.13.4, 18.13.5) -- so each is dispatched ahead of the
-// user-method lookup. 18.12 adds the scope randomize, std::randomize(...) or
-// the bare randomize(...) spelling outside a class method, which randomizes
-// the current scope's variables rather than a class object's members; it has
-// no receiver, so the class randomize path passes it over.
 static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   if (TryEvalRandomizeMethodCall(expr, ctx, arena, out)) return true;
@@ -624,18 +456,12 @@ static bool TryDispatchRandomizeMethod(const Expr* expr, SimContext& ctx,
   return TryEvalObjectSetRandState(expr, ctx, arena, out);
 }
 
-// §18.8 and §18.9: rand_mode() and constraint_mode() are built in on any
-// class handle and cannot be overridden, so they are dispatched first, their
-// receiver evaluated once by their own arm (eval_randomize_mode.cpp).
 static bool TryDispatchModeMethod(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   if (TryEvalObjectConstraintMode(expr, ctx, arena, out)) return true;
   return TryEvalObjectRandMode(expr, ctx, arena, out);
 }
 
-// §11.12: the let a call names, by its callee, or, with §26.3, the
-// package's let `pex::twice(7)` names by the "pex::twice" key it is
-// registered under; null where it names none.
 static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (expr->callee.empty() && IsPackageScopedCall(expr))
@@ -643,10 +469,6 @@ static ModuleItem* FindCalledLet(const Expr* expr, SimContext& ctx,
   return FindVisibleLet(ctx, expr->callee);
 }
 
-// A method called on a receiver: a built-in method of its type, or a class
-// method of the object it yields. §8.6 with §11.3.1: a receiver starting at a
-// call, `pk().kid` or `pk().a[1]`, is evaluated once for all the arms below,
-// each of which evaluates it to learn whether the method is theirs.
 static bool TryDispatchReceiverMethod(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   if (TryDispatchModeMethod(expr, ctx, arena, out)) return true;
@@ -655,15 +477,9 @@ static bool TryDispatchReceiverMethod(const Expr* expr, SimContext& ctx,
   if (TryEvalSuperMethodCall(expr, ctx, arena, out)) return true;
   if (TryDispatchRandomizeMethod(expr, ctx, arena, out)) return true;
   if (TryEvalClassMethodCall(expr, ctx, arena, out)) return true;
-  // §8.6: a method called on a method call's result, `c.some_method(7).who()`,
-  // runs on the object the first call returned; ExtractMethodCallParts above
-  // takes a variable alone for the handle side.
   if (TryEvalCallResultMethodCall(expr, ctx, arena, out)) return true;
-  // §7.8/§8.4 with §8.6: and one called on an element of a container of
-  // handles, `arr[0].f()`, `q[0].f()` or `m["a"].f()`, runs on its object.
   if (TryEvalElementObjectMethodCall(expr, ctx, arena, out)) return true;
   if (TryEvalAssocElementMethodCall(expr, ctx, arena, out)) return true;
-  // and one on a chained property receiver, `c.kid.f()`, on its object.
   return TryEvalMethodOnEvaluatedBase(expr, ctx, arena, out);
 }
 
@@ -674,13 +490,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
   if (TryEvalProcessStaticCall(expr, ctx, arena, out)) return true;
   if (TryEvalClassScopeCall(expr, ctx, arena, out)) return true;
   if (TryEvalParameterizedScopeCall(expr, ctx, arena, out)) return true;
-  // §8.10 with §8.13: an unqualified call inside a static method resolves
-  // against the static methods of the enclosing class and of the classes it
-  // inherits from, before module-level functions.
   if (TryEvalEnclosingStaticCall(expr, ctx, arena, out)) return true;
-  // §8.13: and an unqualified call inside an instance method resolves against
-  // the enclosing class and the classes it inherits from, ahead of the same
-  // module-level names.
   if (TryEvalEnclosingInstanceCall(expr, ctx, arena, out)) return true;
   if (auto* let_decl = FindCalledLet(expr, ctx, arena)) {
     out = EvalLetExpansion(let_decl, expr, ctx, arena, CallContextWidth());
@@ -692,13 +502,7 @@ static bool TryDispatchMethodOrLet(const Expr* expr, SimContext& ctx,
 static void RunFunctionBody(const SubroutineTarget& target, const Expr* call,
                             Variable* ret_var, SimContext& ctx, Arena& arena) {
   const ModuleItem* func = target.func;
-  // §20.17.2: a function body is a calling context on the $stacktrace chain,
-  // so record its frame just as task calls do (see PushTaskCallScope).
   ctx.PushFuncName(func->name);
-  // §21.2.1.5: a function is a subroutine level of the hierarchical name, so
-  // %m inside its body names the function; task calls push the same scope in
-  // ExecInlineTaskCall. §19.3: the function beginning and ending are block
-  // events a covergroup may sample at.
   ctx.PushActiveNamedScope(func->name);
   SampleAtBlockEvent(func->name, true, ctx, arena);
   ctx.EnterFunction();
@@ -713,8 +517,6 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryDispatchMethodOrLet(expr, ctx, arena, result)) return result;
 
-  // §13.3 with §23.6: a function called by hierarchical name, `u1.f(2)`,
-  // is the instance's, and its body runs there (eval_function_hier.h).
   SubroutineTarget target = FindSubroutineTarget(expr, ctx, arena);
   const ModuleItem* func = target.func;
   if (!func) return EvalDpiCall(expr, ctx, arena);
@@ -722,22 +524,13 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   bool is_static = func->is_static && !func->is_automatic;
   bool is_void = (func->return_type.kind == DataTypeKind::kVoid);
 
-  // §13.3.2 with §23.6: the frame is pushed with the process standing in
-  // the callee's instance, so a static function's frame is that instance's.
   EnterCalleeInstance(ctx, target);
   if (is_static) {
     ctx.PushStaticScope(func->name);
   } else {
     ctx.PushScope();
   }
-  // §26.3 with §13.4: a package function's frame carries its package, so its
-  // body and its default actuals read the package's variables by their bare
-  // names; the caller's actuals are read with the frame set aside
-  // (ResolveArgValue) and see the caller's scope. §23.9: the frame is the
-  // body's own scope, so a function with no package reads none of its
-  // caller's body import.
   ctx.EnterSubroutinePackage(func);
-  // §27.4: a generate block instance's function reads its loop index.
   BindGenBlockConsts(target, ctx, arena);
 
   ctx.PushQueueRefFrame();
@@ -750,26 +543,11 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     auto* existing = is_static ? ctx.FindLocalVariable(func->name) : nullptr;
     uint32_t ret_width = DeclaredTypeWidth(func->return_type, ctx);
     if (ret_width == 0) ret_width = 32;
-    // §6.11.3: `byte`, `shortint`, `int`, `integer` and `longint` default to
-    // signed, and an explicit `signed`/`unsigned` settles the rest, so the
-    // implicit variable that holds the result takes the return type's declared
-    // signedness. Built from the width alone it would be unsigned whatever the
-    // function returns, and §21.2.1.2's automatic %d field would then lose the
-    // sign column an `integer` result is entitled to.
     bool ret_signed = DeclaredTypeIsSigned(func->return_type, ctx);
     ret_var = existing
                   ? existing
                   : ctx.CreateLocalVariable(func->name, ret_width, ret_signed);
-    // §13.4.1 with §6.11.2, as above. Set on the retained cell of a static
-    // function as well as on a fresh one, so the second call answers as the
-    // first did.
     ret_var->is_4state = DeclaredTypeIs4State(func->return_type, ctx);
-    // §13.4.1 with §6.12: the implicit variable of a function returning real,
-    // shortreal or realtime is a real variable, so the store a `return`
-    // makes into it and the `f = expr` form alike convert under §6.12.1, and
-    // the value the caller reads is a real. Left at the default, `return i`
-    // of an int local handed the caller the integer's bits, which %f read as
-    // 0.0.
     ret_var->is_real = DeclaredTypeIsReal(func->return_type, ctx);
   }
 
@@ -786,12 +564,6 @@ Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// §13.3 with §23.6: the process stands in the callee's instance from here
-// until TeardownTaskCall, across every timing control of the body, so the
-// static frame is the instance's own (§13.3.2) and a bare name the body reads
-// is the instance's variable; the actuals are read in the enabling instance
-// (BindActualsInCaller). A bare enable stands where it was, its target the
-// enabling instance's.
 static void PushTaskCallScope(const SubroutineTarget& target, SimContext& ctx,
                               Arena& arena) {
   const ModuleItem* func = target.func;
@@ -802,7 +574,6 @@ static void PushTaskCallScope(const SubroutineTarget& target, SimContext& ctx,
   } else {
     ctx.PushScope();
   }
-  // §27.4: a generate block instance's task reads its loop index.
   BindGenBlockConsts(target, ctx, arena);
   ctx.PushQueueRefFrame();
   ctx.PushAssocRefFrame();
@@ -830,11 +601,6 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (!expr) return nullptr;
 
-  // §13.5.5 (printed page 351) with §23.6 and §26.3: the empty parentheses
-  // after a task's name are optional, so a hierarchical name alone, `top.T;`,
-  // and a package-scoped one, `p::t;`, enable the task as `top.T()` and
-  // `p::t()` do; left to the expression evaluator the member access was read
-  // as a variable and the task never ran.
   if (expr->kind == ExprKind::kIdentifier ||
       expr->kind == ExprKind::kMemberAccess) {
     return SetupTaskCallFromIdentifier(expr, ctx, arena);
@@ -862,8 +628,6 @@ void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
   } else {
     ctx.PopScope();
   }
-  // §13.3 with §23.6: the enable is over, and the process is back in the
-  // instance that wrote it (PushTaskCallScope).
   LeaveCalleeInstance(ctx);
 }
 

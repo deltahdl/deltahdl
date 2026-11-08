@@ -22,8 +22,6 @@ struct DimReadScan {
   DiagEngine& diag;
 };
 
-// The names a block or a subroutine declares again, each hiding the module's
-// variable or net of that name from what is declared after it.
 using HiddenNames = std::unordered_set<std::string_view>;
 
 }  // namespace
@@ -33,8 +31,6 @@ static bool ReadsNoValue(ExprKind kind) {
          kind == ExprKind::kMemberAccess || kind == ExprKind::kTypeRef;
 }
 
-// Reports each of the module's variables and nets `e`, written in an unpacked
-// dimension of `declared`, reads.
 static void ReportValueReads(const Expr* e, std::string_view declared,
                              const HiddenNames& hidden,
                              const DimReadScan& scan) {
@@ -58,8 +54,6 @@ static void CheckDims(std::string_view declared, const std::vector<Expr*>& dims,
   for (const Expr* dim : dims) ReportValueReads(dim, declared, hidden, scan);
 }
 
-// §6.21: a name a block declares is visible in that block and the blocks
-// nested in it, so it hides the module's from the rest of the block alone.
 static void CheckStmt(const Stmt* s, HiddenNames& hidden,
                       const DimReadScan& scan) {
   if (s == nullptr) return;
@@ -86,8 +80,6 @@ void CheckVariableReadsInUnpackedDims(
         item->kind == ModuleItemKind::kNetDecl) {
       CheckDims(item->name, item->unpacked_dims, {}, kScan);
     }
-    // A subroutine's arguments are declared in its body's scope, and so is a
-    // function's own name, the variable its result is written to (§13.4.1).
     HiddenNames hidden{item->name};
     for (const FunctionArg& arg : item->func_args) hidden.insert(arg.name);
     CheckStmt(item->body, hidden, kScan);

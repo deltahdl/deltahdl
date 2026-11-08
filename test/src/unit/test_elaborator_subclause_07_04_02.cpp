@@ -59,9 +59,6 @@ TEST(UnpackedArrayValidation, RightBoundXzRejected) {
                             2, "7.4.2"));
 }
 
-// §7.4.2: the single-number `[size]` form is likewise a clean constant integer
-// expression, so an x/z bit in it is rejected too. This drives the non-range
-// branch of the check, distinct from the range-form bounds above.
 TEST(UnpackedArrayValidation, SizeFormXzRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -157,10 +154,6 @@ TEST(UnpackedArrayValidation, TwoDimUnpackedElaborates) {
   EXPECT_GT(mod->variables[0].unpacked_size, 0u);
 }
 
-// §7.4.2 admits any constant_expression as an unpacked bound, and §11.2.1
-// lists a parameter as a constant form. The `[size]` form built from a
-// parameter must resolve in the module's parameter scope, not silently
-// collapse to zero. The literal-only tests above never exercised that scope.
 TEST(UnpackedArrayValidation, ParameterSizedUnpackedDimResolves) {
   ElabFixture f;
   auto* design =
@@ -173,8 +166,6 @@ TEST(UnpackedArrayValidation, ParameterSizedUnpackedDimResolves) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 8u);
 }
 
-// §7.4.2 range form `[constant_expression : constant_expression]` with a
-// parameter in the bound, matching the packed-dimension parameter handling.
 TEST(UnpackedArrayValidation, ParameterRangeUnpackedDimResolves) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -188,7 +179,6 @@ TEST(UnpackedArrayValidation, ParameterRangeUnpackedDimResolves) {
   EXPECT_TRUE(mod->variables[0].is_descending);
 }
 
-// §11.2.1 also lists a localparam as a constant form usable in the bound.
 TEST(UnpackedArrayValidation, LocalparamSizedUnpackedDimResolves) {
   ElabFixture f;
   auto* design =
@@ -200,8 +190,6 @@ TEST(UnpackedArrayValidation, LocalparamSizedUnpackedDimResolves) {
   EXPECT_EQ(mod->variables[0].unpacked_size, 4u);
 }
 
-// §7.4.2 range form with a localparam in the bound — the same constant-form
-// admission as the parameter range case, exercised through a localparam.
 TEST(UnpackedArrayValidation, LocalparamRangeUnpackedDimResolves) {
   ElabFixture f;
   auto* design =
@@ -215,10 +203,6 @@ TEST(UnpackedArrayValidation, LocalparamRangeUnpackedDimResolves) {
   EXPECT_TRUE(mod->variables[0].is_descending);
 }
 
-// §7.4.2 forms an unpacked array from any data type, including a packed array
-// element (§7.4.1). The unpacked dimension sizes the outer array while the
-// element keeps its full packed width — here a 4x8 packed element is 32 bits
-// wide and the array holds two of them.
 TEST(UnpackedArrayValidation, PackedArrayElementArrayElaborates) {
   ElabFixture f;
   auto* design =
@@ -231,9 +215,6 @@ TEST(UnpackedArrayValidation, PackedArrayElementArrayElaborates) {
   EXPECT_EQ(mod->variables[0].width, 32u);
 }
 
-// Each dimension of a multidimensional fixed-size unpacked array carries its
-// own constant_expression, so per-dimension extents built from parameters must
-// resolve too (the simulator reads var.unpacked_dim_sizes).
 TEST(UnpackedArrayValidation, ParameterMultiDimUnpackedResolves) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -249,9 +230,6 @@ TEST(UnpackedArrayValidation, ParameterMultiDimUnpackedResolves) {
   EXPECT_EQ(mod->variables[0].unpacked_dim_sizes[1], 5u);
 }
 
-// §7.4.2 requires the `[size]` form to be a positive constant integer; a
-// parameter that evaluates to zero is the negative form of that rule and must
-// be diagnosed once the bound is resolved in scope.
 TEST(UnpackedArrayValidation, ZeroValuedParameterSizeFormRejected) {
   ElabFixture f;
   ElaborateSrc("module top; parameter int Z = 0; int x [Z]; endmodule\n", f);
@@ -260,12 +238,6 @@ TEST(UnpackedArrayValidation, ZeroValuedParameterSizeFormRejected) {
       "unpacked dimension size shall be a positive integer", 1, "7.4.2"));
 }
 
-// §7.4.2 writes a fixed-size unpacked dimension as a range of element
-// addresses, and §11.5.2 rules that the bounds the memory's declaration gives
-// decide what an address expression reaches, so both values written are part of
-// the declaration. The elaborator records only `std::min` of each pair, in
-// `unpacked_dim_los`, and only from two dimensions up; of `[3:1]` it keeps the
-// 1 and the declared 3 is gone.
 TEST(UnpackedArrayValidation, EachDimensionKeepsBothDeclaredBounds) {
   ElabFixture f;
   auto* design =
@@ -279,11 +251,6 @@ TEST(UnpackedArrayValidation, EachDimensionKeepsBothDeclaredBounds) {
             std::make_pair(int64_t{3}, int64_t{1}));
 }
 
-// §7.4.2 lets the first value of a dimension's range be greater than, equal to
-// or less than the second, so `[3:1]` and `[1:3]` are two different
-// declarations and the record has to tell them apart. Both collapse to
-// `std::min` of the pair, which is 1 for either, so the two declarations leave
-// the same `unpacked_dim_los`.
 TEST(UnpackedArrayValidation, OppositeSecondDimensionRecordsDifferently) {
   ElabFixture f1;
   auto* d1 = Elaborate("module m; logic [7:0] x [1:2][3:1]; endmodule\n", f1);
@@ -301,12 +268,6 @@ TEST(UnpackedArrayValidation, OppositeSecondDimensionRecordsDifferently) {
             std::make_pair(b.unpacked_dims[1].left, b.unpacked_dims[1].right));
 }
 
-// §7.4.2 gives a multidimensional fixed-size unpacked array one range per
-// dimension, so how many dimensions the declaration wrote is part of what was
-// declared. `RtlirVariable` carries no count of them at all: `unpacked_dims`
-// and `unpacked_dim_sizes` hold an entry only for a dimension whose bounds
-// folded to constants, so the number written can only be guessed from a vector
-// that a dimension can be missing from.
 TEST(UnpackedArrayValidation, DeclaredDimensionCountIsRecorded) {
   ElabFixture f;
   auto* design =
@@ -317,11 +278,6 @@ TEST(UnpackedArrayValidation, DeclaredDimensionCountIsRecorded) {
   EXPECT_EQ(mod->variables[0].num_unpacked_dims, 2u);
 }
 
-// The dimension §7.4.2 admits and the vector cannot hold. `[]` is a dynamic
-// dimension, and the parser pushes a null dimension for it, so no entry for it
-// can reach `unpacked_dims`. With no count recorded, `logic [7:0] x [1:4][]`
-// and `logic [7:0] x [1:4]` leave the same one-entry record, and §11.5.2
-// addressing cannot tell how many addresses a select has to supply.
 TEST(UnpackedArrayValidation,
      DynamicSecondDimensionIsNotRecordedAsOneDimension) {
   ElabFixture f;
@@ -332,11 +288,6 @@ TEST(UnpackedArrayValidation,
   EXPECT_EQ(mod->variables[0].num_unpacked_dims, 2u);
 }
 
-// §7.4.2 admits any constant expression as an element address bound, so a bound
-// may be negative -- `NegativeBoundYieldsCorrectSize` above elaborates the same
-// declaration and asks only for its size. §11.5.2 makes the declared bounds
-// decide which element an address names, and `unpacked_lo` is `uint32_t`, so
-// -3 is recorded as 4294967293 and every address computed from it is wrong.
 TEST(UnpackedArrayValidation, NegativeLowBoundIsRecordedAsDeclared) {
   ElabFixture f;
   auto* design = Elaborate("module m; int x [-3:5]; endmodule\n", f);
@@ -347,11 +298,6 @@ TEST(UnpackedArrayValidation, NegativeLowBoundIsRecordedAsDeclared) {
   EXPECT_EQ(mod->variables[0].unpacked_dims[0].left, -3);
 }
 
-// §7.4.2 draws no distinction between a one-dimensional unpacked array and a
-// multidimensional one: each dimension is a range of element addresses, and a
-// declaration with one dimension wrote one such range. The per-dimension record
-// is filled only from two dimensions up, so `[1:4]` leaves it empty and its
-// declared bounds survive only as `std::min` of the pair in `unpacked_lo`.
 TEST(UnpackedArrayValidation, SingleDimensionFillsThePerDimensionRecord) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [7:0] x [1:4]; endmodule\n", f);
@@ -364,11 +310,6 @@ TEST(UnpackedArrayValidation, SingleDimensionFillsThePerDimensionRecord) {
             std::make_pair(int64_t{1}, int64_t{4}));
 }
 
-// A.2.5 and §7.4.2: an unpacked dimension's bounds, and a queue's, are
-// constant expressions, and a variable, a net and a const variable, set at run
-// time (§6.20.6), are none. Each dimension below reads one, at module scope or
-// in a block, and is reported. Each was accepted, and its declaration built
-// with no dimension.
 TEST(UnpackedArrayValidation, VariableReadInUnpackedDimIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -403,10 +344,6 @@ TEST(UnpackedArrayValidation, VariableReadInUnpackedDimIsReported) {
   }
 }
 
-// Parameters, a package's parameter, `$size` of a fixed-size array, a type
-// reference, a constant function's call, and a block's own local parameter
-// hiding the module's variable of its name each leave a dimension constant,
-// in a block and a fork alike, and draw no report.
 TEST(UnpackedArrayValidation, ConstantsInUnpackedDimsAreNotReported) {
   ElabFixture f;
   ElaborateSrc(

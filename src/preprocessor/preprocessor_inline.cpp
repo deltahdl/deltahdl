@@ -61,10 +61,6 @@ bool Preprocessor::TryPredefinedMacro(std::string_view name,
   return false;
 }
 
-// The text_macro_identifier at the head of `macro_name` (Syntax 22-3): an
-// escaped identifier runs to the next white space (5.6.1), and a simple
-// identifier is its run of identifier characters (5.6), so whatever follows the
-// name -- a parenthesis, a space, a semicolon -- is not part of it.
 static std::string_view ExtractMacroName(std::string_view macro_name) {
   if (!macro_name.empty() && macro_name[0] == '\\') {
     auto ws = macro_name.find_first_of(" \t");
@@ -99,9 +95,6 @@ bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
   if (balanced.empty()) return false;
   auto args_text = balanced.substr(1, balanced.size() - 2);
   if (!ValidateMacroArgCount(def, args_text, loc, name)) return false;
-  // §22.5.1: ExpandMacro expands each argument (before the caller pushes this
-  // macro onto the expansion stack), so a same-macro call in an argument is not
-  // treated as recursion.
   expanded = ExpandMacro(def, args_text, loc);
   auto end_pos = static_cast<size_t>(balanced.data() + balanced.size() -
                                      after_name.data());
@@ -109,15 +102,6 @@ bool Preprocessor::ExpandFunctionLikeMacro(const MacroDef& def,
   return true;
 }
 
-// The text a macro substituted opens a compiler directive where the name after
-// its leading backtick is a directive keyword. A backtick equally opens a usage
-// of another text macro, and §22.5.1 (printed page 710) parts the two: usages
-// written in the macro text are substituted after the outer macro is
-// substituted, while a compiler directive written there takes effect when the
-// macro is used. Item a) of the same page is what makes the name enough to tell
-// them apart, a text macro name never spelling a directive keyword. `__FILE__
-// and `__LINE__ (22.13) stand for a value where they are written, so a text
-// opening with one is ordinary text for the inline expander to substitute into.
 static bool OpensCompilerDirective(std::string_view text) {
   if (text.empty() || text[0] != '`') return false;
   size_t end = 1;
@@ -156,12 +140,6 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
   }
 
   expansion_stack_.emplace_back(def->name);
-  // A body opening with a directive the inline expanders do not read, such as
-  // `include or `timescale, is a directive line and goes to ProcessDirective.
-  // A body holding a conditional compilation directive is not: §22.6 lets
-  // `ifdef stand anywhere in the source description (printed page 712), and
-  // §22.5.1 has a directive written in a macro's text take effect when the
-  // macro is used (printed page 710), so ExpandSubstitutedBody evaluates it.
   auto exp_trimmed = Trim(std::string_view(expanded));
   bool starts_directive =
       OpensCompilerDirective(exp_trimmed) && !HasInlineConditional(exp_trimmed);
@@ -170,10 +148,6 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
     return true;
   }
   expanded = ExpandSubstitutedBody(expanded, loc.file_id, loc.line);
-  // §22.5.1 (printed page 710): a macro is recursive where it expands to
-  // text holding a usage of itself, and the rest of the line its usage
-  // stands on is no part of that text, so the macro leaves the expansion
-  // stack before the rest is expanded.
   expansion_stack_.pop_back();
   if (!rest.empty()) {
     expanded += ExpandInlineMacros(rest, loc.file_id, loc.line);
@@ -182,20 +156,6 @@ bool Preprocessor::ExpandUserDefinedMacro(std::string_view name,
   return true;
 }
 
-// The text a macro substitutes opened a directive, `include FN after
-// `define DO_INCLUDE(FN) `include FN. The rest of the line the usage stands
-// on completes that directive, `INC "f.svh" after `define INC `include,
-// unless it opens with a backtick of its own: §22.4 lets only white space or
-// a comment follow an `include's file name, so a further directive there, or
-// a usage expanding to one, is a directive line of its own. §22.5.1 (printed
-// page 710) makes a macro recursive where it expands to text holding a usage
-// of itself, and the rest of the line is no part of that text: the macro
-// stays on the expansion stack while its own directive runs, so `define REC
-// `REC is still reported, and leaves it before the rest is read. The suite's
-// 22.4--include_via_define.sv writes `DO_INCLUDE("dummy_include.sv") twice
-// on one line: read under the first usage, the second was reported
-// recursive, and substituted inline it left its `include as text in the
-// output, since the inline expander copies a directive name through.
 void Preprocessor::RunDirectiveOpenedByMacro(std::string expanded,
                                              std::string_view rest,
                                              SourceLoc loc, int depth,
@@ -231,10 +191,6 @@ bool Preprocessor::TryExpandMacro(std::string_view trimmed, std::string& output,
   return ExpandUserDefinedMacro(name, macro_name, output, loc, depth);
 }
 
-// Steps a scan standing outside every string over the character at `i`, into
-// the escaped identifier a '\' opens there, or over the '"' or `"""` opening a
-// string there. §22.5.1's `" is a macro-quote rather than a string's quote,
-// macro usages between `" and `" being expanded, so it opens no string.
 static size_t StepOutsideString(std::string_view line, size_t i,
                                 StringLiteralState& state) {
   if (line[i] == '\\') {
@@ -250,13 +206,6 @@ static size_t StepOutsideString(std::string_view line, size_t i,
   return i + 3;
 }
 
-// A.8.8 closes a quoted_string at its next '"' and a triple_quoted_string only
-// at its next `"""`, a lone '"' being an item of it; inside either a '\' opens
-// a string_escape_seq, so the character after it closes nothing. A §5.6.1
-// escaped identifier ends only at white space, every character before that,
-// '"' included, being one of its own; a macro usage written inside it is still
-// found, the identifier being no string, and the scan stays inside the
-// identifier after the usage.
 size_t StepOverStringSyntax(std::string_view line, size_t i,
                             StringLiteralState& state) {
   if (state == StringLiteralState::kOutside) {
@@ -300,28 +249,6 @@ static size_t ParseInlineMacroName(std::string_view line, size_t name_start) {
   return i;
 }
 
-// §22.5.1 requires the actual arguments of a usage to be enclosed in
-// parentheses and separated by commas, allows white space between the name and
-// the left parenthesis, and places none of it on any particular line: a list
-// still open at the end of a physical line continues on the next one, and a
-// name ending a line has its list on a line after it, §5.3 making the newline
-// between them white space. The usage read here is the one the expanders read
-// -- the name as ExpandSingleInlineMacro parses it and the list as
-// ExtractBalancedArgs finds it -- so a text this answers kComplete for is one
-// they expand whole. The list has to open where the expander at the head of a
-// line requires it to, at the first character after the name, since a join
-// reads lines ahead and a parenthesis further along the line is not one this
-// macro's arguments open.
-//
-// The scan ends at a backtick introducing a compiler directive, because the
-// text after one is the directive's operand and not a usage: a `define body in
-// particular is arbitrary text, and a list it leaves open is closed by whatever
-// usage the body is written to pair with, not by a later line of this file.
-// `__FILE__ and `__LINE__ (22.13) stand for a value and are stepped over.
-//
-// OpensArgumentList is the test ExpandUserDefinedMacro applies to a usage at
-// the head of a line: the character after the name, blanks aside, is the list's
-// own parenthesis.
 static bool OpensArgumentList(std::string_view after_name) {
   size_t open = after_name.find_first_not_of(" \t");
   return open != std::string_view::npos && after_name[open] == '(';
@@ -390,9 +317,6 @@ size_t Preprocessor::ExpandInlineFunctionMacro(const MacroDef& def,
   size_t advance =
       name_end +
       static_cast<size_t>(balanced.data() + balanced.size() - rest.data());
-  // §22.5.1: ExpandMacro expands each argument before substitution (and before
-  // this macro is pushed below), so a same-macro call in an argument is not
-  // treated as recursion; the body re-expansion still guards true recursion.
   std::string body = ExpandMacro(def, args_text, loc);
   expansion_stack_.emplace_back(def.name);
   result += ExpandSubstitutedBody(body, loc.file_id, loc.line);
@@ -416,13 +340,6 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
 
   const auto* def = macros_.Lookup(name);
   if (def == nullptr) {
-    // §22.5.1: a text-macro usage naming an undefined macro is an error. A
-    // compiler directive (e.g. `timescale) that reaches the inline expander is
-    // handled elsewhere and is not a macro reference, so it is left verbatim
-    // without diagnosis; a conditional compilation directive does not reach
-    // here from a macro body, since ExpandSubstitutedBody evaluates it before
-    // this expander runs. This branch also catches line-leading undefined
-    // macros, which fall through to the inline expander as ordinary text.
     if (!IsCompilerDirective(name)) {
       diag_.Error({file_id, line_num, 1},
                   "undefined macro '" + std::string(name) + "'",
@@ -439,10 +356,6 @@ size_t Preprocessor::ExpandSingleInlineMacro(std::string_view line, size_t pos,
   }
 
   if (def->is_function_like) {
-    // §22.5.1: the parentheses are always required in the usage of a macro
-    // defined with arguments. A usage at the head of a line is reported by
-    // ExpandUserDefinedMacro; this is the same report for one after other
-    // text, which used to be left for the lexer to stumble on.
     if (!OpensArgumentList(line.substr(i))) {
       diag_.Error(loc,
                   "parentheses required for function-like macro '" +
@@ -480,9 +393,6 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
   while (bt != std::string_view::npos) {
     result.append(line.substr(copied, bt - copied));
     copied = ExpandSingleInlineMacro(line, bt, file_id, line_num, result);
-    // The usage's own text, the string literals among its arguments included,
-    // is stepped over, so that the search resumes knowing whether a string is
-    // open where the usage ends.
     size_t scan = bt;
     while (scan < copied) scan = StepOverStringSyntax(line, scan, state);
     bt = FindNextBacktick(line, scan, state);
@@ -491,18 +401,6 @@ std::string Preprocessor::ExpandInlineMacros(std::string_view line,
   return result;
 }
 
-// The text a macro's usage substitutes is read the way a source line is: the
-// conditional compilation directives first, then the macro usages. §22.6 lets
-// `ifdef, `ifndef, `else and `endif stand anywhere in the source description
-// (printed page 712), and §22.5.1 has a compiler directive written in a macro's
-// text wait until the macro is used, its other macro usages being substituted
-// after the outer macro is (printed page 710); so a body such as UVM's
-// `if ( `ifndef LEGACY ((FLAG)&1) && `endif (!(FLAG)) ) begin` holds a
-// conditional to evaluate at each usage, against the defines in force there.
-// The conditionals go first because they choose which of the body's macro
-// usages are expanded at all. The three expanders once ran ExpandInlineMacros
-// alone on the body, which copied each directive name through as though it
-// were a `timescale, and the lexer reported the backtick under §5.2.
 std::string Preprocessor::ExpandSubstitutedBody(std::string_view body,
                                                 uint32_t file_id,
                                                 uint32_t line_num) {
@@ -516,8 +414,6 @@ bool Preprocessor::IsActive() const {
                      [](const CondState& s) { return s.active; });
 }
 
-// Steps past the block comment opening at `i`, answering whether a `*/`
-// closed it before the text ran out.
 static bool SkipBlockComment(std::string_view body, size_t& i) {
   i += 2;
   while (i + 1 < body.size() && (body[i] != '*' || body[i + 1] != '/')) {
@@ -528,10 +424,6 @@ static bool SkipBlockComment(std::string_view body, size_t& i) {
   return true;
 }
 
-// §5.6.1: copies the escaped identifier whose '\' stands at `i`, whole to the
-// white space ending it, so no `//`, `/*` or '"' inside it is read as a
-// comment or a string; answers whether one stood there. The '\' of the `\`"
-// macro-text escape (§22.5.1) follows a grave accent and opens none.
 static bool CopyEscapedIdentifier(std::string_view body, size_t& i,
                                   std::string& result) {
   if (body[i] != '\\' || (i > 0 && body[i - 1] == '`')) return false;
@@ -565,8 +457,6 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
     return false;
   }
 
-  // §5.2: a block comment is a token of its own, so the text on either side
-  // of it stays apart: it leaves one space behind.
   if (i + 1 < body.size() && body[i] == '/' && body[i + 1] == '*') {
     if (!SkipBlockComment(body, i)) unclosed_comment = true;
     result += ' ';
@@ -577,10 +467,6 @@ static bool ProcessMacroBodyChar(std::string_view body, size_t& i,
   return true;
 }
 
-// The macro text `body` with its comments removed; `unclosed_comment` says
-// whether a block comment in it ran to the end of the text unclosed, which the
-// joiner reading the `define on (JoinDefineBody) leaves only at the end of the
-// source.
 static std::string StripMacroBodyComments(std::string_view body,
                                           bool& unclosed_comment) {
   std::string result;
@@ -623,9 +509,6 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
 
   MacroDef def;
   def.def_loc = loc;
-  // §22.5.1 (Syntax 22-2): the text_macro_name is required, and opens with an
-  // identifier, simple or escaped; a simple one opens with a letter or `_`
-  // (§5.6), so a digit or `$` opens none.
   if (name_end == 0 || (!escaped && rest[0] != '_' &&
                         !std::isalpha(static_cast<unsigned char>(rest[0])))) {
     diag_.Error(loc, "`define is missing its macro name", Subclause("22.5.1"));
@@ -640,15 +523,11 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
     return;
   }
 
-  // An escaped name runs to the white space that ends it (5.6.1), and that one
-  // character belongs to the name rather than to what follows it (22.5.1).
   auto after_name = rest.substr(name_end);
   if (escaped && !after_name.empty()) after_name.remove_prefix(1);
 
   bool unclosed_comment = false;
   if (!after_name.empty() && after_name[0] == '(') {
-    // §22.5.1 (Syntax 22-2): a `(` after the name opens a list of formal
-    // arguments the `)` closes; with none, the directive is neither form.
     auto close = FindMacroParamListClose(after_name);
     if (close == std::string_view::npos) {
       diag_.Error(
@@ -665,8 +544,6 @@ void Preprocessor::HandleDefine(std::string_view rest, SourceLoc loc) {
   } else {
     def.body = StripMacroBodyComments(Trim(after_name), unclosed_comment);
   }
-  // §5.4: a block comment is closed by */, so one the source never closes is
-  // reported here as it is outside a `define.
   if (unclosed_comment) {
     diag_.Error(loc, "unterminated block comment", Subclause("5.4"));
     return;
@@ -684,15 +561,6 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc loc) {
   if (!IsActive()) return;
   auto name = Trim(rest);
   if (!macros_.IsDefined(name)) {
-    // §22.5.2 permits reporting an attempt to remove a macro that was never
-    // defined, and stops short of making it an error — so a warning is the
-    // strongest report the rule allows. Catching a misspelled name here is
-    // the whole point, since removing nothing is otherwise silent.
-    //
-    // The rule is phrased against macros a `define created. This checks only
-    // whether the name is defined at all, which keeps a deliberate `undef of
-    // a command-line or predefined macro quiet rather than tracking where
-    // each definition came from.
     diag_.Warning(
         loc,
         "`undef of a macro that is not defined: '" + std::string(name) + "'",
@@ -702,8 +570,6 @@ void Preprocessor::HandleUndef(std::string_view rest, SourceLoc loc) {
   macros_.Undefine(name);
 }
 
-// §22.6 (Syntax 22-5): `elsif, `else and `endif are parts of a conditional an
-// `ifdef or `ifndef opened, none standing on its own.
 static bool ReportNoOpenConditional(bool none_open, std::string_view directive,
                                     SourceLoc loc, DiagEngine& diag) {
   if (!none_open) return false;
@@ -735,7 +601,6 @@ void Preprocessor::HandleElsif(std::string_view rest, SourceLoc loc) {
 void Preprocessor::HandleElse(SourceLoc loc) {
   if (ReportNoOpenConditional(cond_stack_.empty(), "else", loc, diag_)) return;
   auto& top = cond_stack_.back();
-  // §22.6 (Syntax 22-5): a conditional has at most one `else group.
   if (top.else_seen) {
     diag_.Error(loc, "a second `else in one `ifdef or `ifndef",
                 Subclause("22.6"));
@@ -750,8 +615,6 @@ void Preprocessor::HandleEndif(SourceLoc loc) {
   cond_stack_.pop_back();
 }
 
-// §22.6 (Syntax 22-5) closes every conditional with `endif, so one the source
-// leaves open is reported at the `ifdef or `ifndef that opened it.
 void Preprocessor::ReportUnclosedConditionals() {
   for (const CondState& open : cond_stack_) {
     diag_.Error(open.opened, "`ifdef or `ifndef with no closing `endif",
@@ -760,10 +623,6 @@ void Preprocessor::ReportUnclosedConditionals() {
   cond_stack_.clear();
 }
 
-// The one caller, HandleInclude, has already refused a name that opens with
-// neither a double quote nor an angle bracket.
-// §22.4 (printed page 705) writes the file name between double quotes or angle
-// brackets, so one never closed is neither form: answers false, leaving `fn`.
 static bool StripIncludeQuotes(std::string_view& fn,
                                std::string_view& after_close) {
   after_close = {};
@@ -802,7 +661,6 @@ void Preprocessor::ResolveAndReadInclude(std::string_view fn, SourceLoc loc,
                 Subclause::None());
     return;
   }
-  // ResolveInclude answers only a path it has just opened.
   std::ifstream ifs(resolved);
   std::ostringstream ss;
   ss << ifs.rdbuf();

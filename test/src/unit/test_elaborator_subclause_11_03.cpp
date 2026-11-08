@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.3's Table 11-1 gives each operator the operand types it takes, and an
-// unpacked structure or union is among them only for the equality, case
-// equality and conditional operators and for assignment. `s + 1` on an
-// unpacked structure is therefore illegal. It elaborated clean and ran,
-// adding 1 to the structure's bits.
 TEST(OperatorOperandTypeElaboration, UnpackedStructOperandOfPlusIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -28,7 +23,6 @@ TEST(OperatorOperandTypeElaboration, UnpackedStructOperandOfPlusIsIllegal) {
       "11.3"));
 }
 
-// The same of a structure declared in place and of a unary operator.
 TEST(OperatorOperandTypeElaboration, UnpackedStructOperandOfUnaryIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -44,8 +38,6 @@ TEST(OperatorOperandTypeElaboration, UnpackedStructOperandOfUnaryIsIllegal) {
       "11.3"));
 }
 
-// A packed structure is an integral operand (§7.2.1), and two unpacked
-// structures of one type are compared with ==, so neither is reported.
 TEST(OperatorOperandTypeElaboration, PackedStructOperandAndEqualityAreLegal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -61,8 +53,6 @@ TEST(OperatorOperandTypeElaboration, PackedStructOperandAndEqualityAreLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 has `matches` take a tagged union, which is an unpacked union unless
-// declared packed, so a `matches` operand is not an operand Table 11-1 bars.
 TEST(OperatorOperandTypeElaboration, TaggedUnionOperandOfMatchesIsLegal) {
   ElabFixture f;
   auto* design = ElaborateSrc(

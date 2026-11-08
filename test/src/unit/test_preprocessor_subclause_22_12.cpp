@@ -96,7 +96,6 @@ TEST(Preprocessor, Line_MissingLevel) {
                             "22.12"));
 }
 
-// The level is a number, so a word in its place is no level at all.
 TEST(Preprocessor, Line_LevelThatIsNoNumber) {
   PreprocFixture f;
   Preprocess("`line 1 \"somefile\" x\n", f);
@@ -121,9 +120,6 @@ TEST(Preprocessor, Line_ZeroLineNumber_Error) {
                             "22.12"));
 }
 
-// §22.12 is what requires the number to be a positive integer, so the record
-// the rejection leaves names that subclause. `line carries several rules and
-// one report per rule, and the clause is what tells them apart in the record.
 TEST(Preprocessor, Line_NonPositiveNumberNames22_12) {
   PreprocFixture f;
   Preprocess("`line 0 \"f\" 0\n", f);
@@ -342,13 +338,6 @@ TEST(Preprocessor, Line_IncludeSavesAndRestores) {
 }
 
 TEST(Preprocessor, Line_IncludeFileResetsLineCountToOne) {
-  // §22.12 requires the line counter to be reset to 1 at the beginning of each
-  // file, and an included file is a new file. The `include sits on line 2 of
-  // the parent, but `__LINE__ on the third line of the included file must
-  // report that file's own line 3 - a counter that continued from the parent
-  // would instead yield 4. Observing the reset from inside the include
-  // complements Line_IncludeSavesAndRestores, which only observes the parent
-  // resuming afterward.
   std::string tmp_dir = "/tmp/deltahdl_test_22_12_reset";
   std::string inc_path = tmp_dir + "/counted.svh";
   std::filesystem::create_directories(tmp_dir);
@@ -395,24 +384,6 @@ TEST(Preprocessor, Line_LibrarySearchUnaffectedByOverride) {
   std::filesystem::remove_all(tmp_dir);
 }
 
-// §22.12's first sentence is what the three cases below are about: the compiler
-// keeps track of the line number and file name of the file it is compiling. The
-// preprocessor's output is not that file. It splices in the lines of every
-// `include and joins a `define body that spanned continuation lines, so a
-// position in it names neither the file somebody wrote nor the line they wrote
-// it on, and a user handed one is sent to a buffer they have never seen.
-//
-// What answers for the rule is SourceManager::FormatLoc, because that is what
-// DiagEngine::Emit in src/common/diagnostic.cpp prints. The report's own
-// SourceLoc still stands in the preprocessed text and every other assertion in
-// this tree still reads it as such; only what a position is printed as
-// changes.
-
-// Preprocesses `src` registered under `path`, registers the output with the
-// origins the preprocessor recorded, and parses it -- the sequence
-// PreprocessSources and ParseSource in src/main.cpp run. The parse is what
-// provokes a report from a stage below the preprocessor, which is the half of
-// a run that had no file name of its own.
 static void PreprocessAndParseUnder(const std::string& path,
                                     const std::string& src, PreprocFixture& f,
                                     Arena& arena, PreprocConfig cfg = {}) {
@@ -427,8 +398,6 @@ static void PreprocessAndParseUnder(const std::string& path,
   parser.Parse();
 }
 
-// Where the first error of the run is printed, formatted as
-// DiagEngine::Emit in src/common/diagnostic.cpp formats it.
 static std::string FirstErrorLocation(PreprocFixture& f) {
   for (const auto& d : f.diag.Diagnostics()) {
     if (d.severity == DiagSeverity::kError) return f.mgr.FormatLoc(d.loc);
@@ -436,10 +405,6 @@ static std::string FirstErrorLocation(PreprocFixture& f) {
   return "<no error was reported>";
 }
 
-// The file name, on a source with no directive at all. Nothing here moves a
-// line, so the line was already right and the name is the whole of the claim:
-// every report made after preprocessing named <preprocessed>, which opens no
-// file.
 TEST(Preprocessor, ReportAfterPreprocessingNamesTheFileItWasWrittenIn) {
   PreprocFixture f;
   Arena arena;
@@ -449,18 +414,11 @@ TEST(Preprocessor, ReportAfterPreprocessingNamesTheFileItWasWrittenIn) {
                           "%\n",
                           f, arena);
 
-  // The third line opens no top-level declaration, so Parser::ParseTopLevel
-  // in src/parser/parser.cpp reports it, standing at its first column.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "expected top-level declaration", 3, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "design.sv:3:1");
 }
 
-// The line, below an `include. §22.12 requires the current line and file name
-// to be stored when an included file is entered and restored when it ends, and
-// the included file's lines are spliced into the output where the directive
-// stood. The offending line is the fourth of top.sv and the seventh of the
-// output, so a run that reports 7 reports a line the user's file does not have.
 TEST(Preprocessor, ReportBelowAnIncludeStandsAtTheIncludingFilesOwnLine) {
   std::string tmp_dir = "/tmp/deltahdl_test_22_12_origin";
   std::string inc_path = tmp_dir + "/pad.svh";
@@ -481,8 +439,6 @@ TEST(Preprocessor, ReportBelowAnIncludeStandsAtTheIncludingFilesOwnLine) {
                           "%\n",
                           f, arena, cfg);
 
-  // Three lines of pad.svh and the directive's own line stand above the module,
-  // so the report is at line 7 of the preprocessed text.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "expected top-level declaration", 7, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "top.sv:4:1");
@@ -491,12 +447,6 @@ TEST(Preprocessor, ReportBelowAnIncludeStandsAtTheIncludingFilesOwnLine) {
   std::filesystem::remove_all(tmp_dir);
 }
 
-// Both halves together, set by the directive §22.12 defines. `line gives the
-// following line a number and a file name, and until now it gave them to
-// `__FILE__ and `__LINE__ alone while every report ignored it. The file named
-// is one this run was never handed, which is why it is registered with no
-// content: the report can say where the line came from, and there is no text
-// of it to quote back.
 TEST(Preprocessor, ReportBelowALineDirectiveTakesTheNameAndNumberItSet) {
   PreprocFixture f;
   Arena arena;
@@ -505,19 +455,11 @@ TEST(Preprocessor, ReportBelowALineDirectiveTakesTheNameAndNumberItSet) {
                           "%\n",
                           f, arena);
 
-  // The directive leaves its own line in the output, so the report stands at
-  // line 2 of the preprocessed text whatever name that line is given.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "expected top-level declaration", 2, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "orig.v:3:1");
 }
 
-// The line, below the use of a macro whose text continues with a backslash.
-// §22.5.1 replaces the backslash-newline with a newline in the expansion, so
-// the use on line 3 writes two lines of output, and the offending line is the
-// fourth of the file and the fourth of the output only because the table
-// records both of them against line 3; a table with one entry per source line
-// ran out one short and reported a line of the preprocessed text instead.
 TEST(Preprocessor, ReportBelowAMultiLineExpansionStandsAtItsOwnLine) {
   PreprocFixture f;
   Arena arena;
@@ -533,9 +475,6 @@ TEST(Preprocessor, ReportBelowAMultiLineExpansionStandsAtItsOwnLine) {
   EXPECT_EQ(FirstErrorLocation(f), "design.sv:4:1");
 }
 
-// The line, inside such an expansion. Every line the use writes was written
-// by the use, so a report about the second of them names the line of the use,
-// which is the line the user can open the file at and find the construct on.
 TEST(Preprocessor, ReportInsideAMultiLineExpansionStandsAtTheLineOfTheUse) {
   PreprocFixture f;
   Arena arena;
@@ -546,17 +485,11 @@ TEST(Preprocessor, ReportInsideAMultiLineExpansionStandsAtTheLineOfTheUse) {
                           "`BAD\n",
                           f, arena);
 
-  // The joined definition leaves one output line, and the use writes three;
-  // the offending one is the last of those, line 4 of the preprocessed text,
-  // which a table of one entry per source line had no entry for at all.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "expected top-level declaration", 4, "3.12.1"));
   EXPECT_EQ(FirstErrorLocation(f), "design.sv:4:1");
 }
 
-// The empty name `line 5 "" 0 gives is a name like any other, so a report on
-// the line after names it, at the line the directive set. It named the file the
-// tool opened.
 TEST(Preprocessor, ReportBelowALineDirectiveNamingTheEmptyName) {
   PreprocFixture f;
   Arena arena;

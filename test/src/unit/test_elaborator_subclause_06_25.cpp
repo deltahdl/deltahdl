@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.25's parameterized data types: a typedef in a parameterized class is
-// reached through a specialization, and the specialization's parameters are
-// the ones its type is written in. `C#(t_t0,3)::t_array` is therefore three
-// elements of the 8-bit t_t0, and `C#(t_t0,3)::t_vector` is three bits wide.
 TEST(ParameterizedDataTypesElab, ClassTypedefTakesTheSpecializationsParams) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -37,9 +33,6 @@ TEST(ParameterizedDataTypesElab, ClassTypedefTakesTheSpecializationsParams) {
   EXPECT_EQ(a0->unpacked_size, 3u);
 }
 
-// A parameter the specialization leaves out takes its default, and a named
-// argument binds by name: `C#(.SIZE(5))::t_array` is five elements of the
-// default `logic`.
 TEST(ParameterizedDataTypesElab, ClassTypedefTakesDefaultsAndNamedArgs) {
   ElabFixture f;
   auto* design = ElaborateSrc(

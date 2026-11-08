@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a randcase of three branches that all carry `weight`, with `decls`
-// written among the module's declarations, and reports the counter the weights
-// advance and the branch that was selected. §18.16's rule that a weight is
-// evaluated no more than once is a claim about how many times a weight
-// expression ran, so every case making it needs the same run and differs only
-// in how the weight does its counting.
 void RunThreeWeightRandcase(SimFixtureSeeded& f, std::string_view decls,
                             std::string_view weight, uint64_t& cnt,
                             uint64_t& x) {
@@ -46,31 +40,16 @@ void RunThreeWeightRandcase(SimFixtureSeeded& f, std::string_view decls,
   x = f.ctx.FindVariable("x")->value.ToUint64();
 }
 
-// §18.16: each randcase_item weight expression is evaluated at most once. A
-// weight expression with a side effect (here a post-increment of a counter)
-// must therefore advance that counter exactly once per branch -- once for the
-// weight sum and the branch selection together, never twice. Three branches
-// whose weights each bump `cnt` leave it at 3, not 6.
 TEST(RandcaseWeightedCase, WeightExpressionsEvaluatedAtMostOnce) {
   SimFixtureSeeded f;
   uint64_t cnt = 0;
   uint64_t x = 0;
   RunThreeWeightRandcase(f, "", "(cnt++ + 1)", cnt, x);
-  // Each of the three weight expressions ran exactly once.
   EXPECT_EQ(cnt, 3u);
-  // A branch was selected and its body executed.
   EXPECT_GE(x, 1u);
   EXPECT_LE(x, 3u);
 }
 
-// §18.16: the weight that is evaluated at most once may be a call, and a call
-// is what rs_weight_specification's parenthesized expression admits in the
-// sibling randsequence statement. Three branches each weighing (bump()) -- a
-// function advancing `cnt` and returning 1 -- leave cnt at 3. §18.17.1 puts the
-// same rule on a randsequence production's rule weights, whose selection runs
-// through SelectRule in src/simulator/stmt_exec_randsequence.cpp; the claim is
-// written here as well as in test_simulator_subclause_18_17_01.cpp so it stands
-// in both clauses' files rather than in whichever was written first.
 TEST(RandcaseWeightedCase, FunctionCallWeightEvaluatedOncePerBranch) {
   SimFixtureSeeded f;
   uint64_t cnt = 0;
@@ -81,17 +60,11 @@ TEST(RandcaseWeightedCase, FunctionCallWeightEvaluatedOncePerBranch) {
                          "    return 1;\n"
                          "  endfunction\n",
                          "(bump())", cnt, x);
-  // Three branches, three calls.
   EXPECT_EQ(cnt, 3u);
-  // The count above was reached by selecting a branch rather than by never
-  // running the statement.
   EXPECT_GE(x, 1u);
   EXPECT_LE(x, 3u);
 }
 
-// §18.16: a zero-weight branch interleaved among nonzero ones is still skipped;
-// the random number maps onto the nonzero branches in declaration order. Here
-// only the third branch carries weight, so it is always selected.
 TEST(RandcaseWeightedCase, SingleNonzeroWeightAmongZerosAlwaysSelected) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -115,9 +88,6 @@ TEST(RandcaseWeightedCase, SingleNonzeroWeightAmongZerosAlwaysSelected) {
   EXPECT_EQ(f.ctx.FindVariable("x")->value.ToUint64(), 3u);
 }
 
-// §18.16: if all randcase_items specify zero weights, no branch is taken and a
-// warning can be issued. The target variable keeps its prior value and the
-// simulator reports a warning.
 TEST(RandcaseWeightedCase, AllZeroWeightsTakesNoBranchAndWarns) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -140,10 +110,6 @@ TEST(RandcaseWeightedCase, AllZeroWeightsTakesNoBranchAndWarns) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §18.16: the randcase weights can be arbitrary expressions, not just
-// constants. The example mixes arithmetic, bitwise, and sized-literal weight
-// expressions over module variables; the simulator evaluates them and selects
-// one of the branches.
 TEST(RandcaseWeightedCase, WeightsCanBeArbitraryExpressions) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -172,12 +138,6 @@ TEST(RandcaseWeightedCase, WeightsCanBeArbitraryExpressions) {
   EXPECT_LE(x, 4u);
 }
 
-// §18.16: each weight is summed and compared as an unsigned value. A signed
-// narrow weight holding the bit pattern of a negative number (byte -1 == 0xFF)
-// must therefore count as a large positive weight, not as a non-positive one.
-// Paired with a zero-weight sibling, the unsigned branch is the only reachable
-// one and is selected on every draw -- which holds only under unsigned
-// summation and comparison.
 TEST(RandcaseWeightedCase, NegativeSignedWeightCountsAsUnsigned) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -202,11 +162,6 @@ TEST(RandcaseWeightedCase, NegativeSignedWeightCountsAsUnsigned) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §18.16: a branch's weight divided by the sum of all weights is the
-// probability of taking that branch, and the random number maps onto the
-// branches in declaration order. Over many iterations with weights {3, 1, 4}
-// (sum 8) the observed branch frequencies track the 0.375 / 0.125 / 0.5
-// probabilities, and every iteration selects exactly one branch.
 TEST(RandcaseWeightedCase, BranchFrequenciesTrackWeightProbabilities) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -232,20 +187,12 @@ TEST(RandcaseWeightedCase, BranchFrequenciesTrackWeightProbabilities) {
   auto c1 = f.ctx.FindVariable("c1")->value.ToUint64();
   auto c2 = f.ctx.FindVariable("c2")->value.ToUint64();
   auto c3 = f.ctx.FindVariable("c3")->value.ToUint64();
-  // Every iteration selects exactly one branch.
   EXPECT_EQ(c1 + c2 + c3, 8000u);
-  // Frequencies are within a loose band of their expected probabilities.
   EXPECT_NEAR(static_cast<double>(c1) / 8000.0, 0.375, 0.05);
   EXPECT_NEAR(static_cast<double>(c2) / 8000.0, 0.125, 0.05);
   EXPECT_NEAR(static_cast<double>(c3) / 8000.0, 0.500, 0.05);
 }
 
-// §18.16: each randcase draw is a random number across the full [0, sum)
-// range, even when the sum of the weights exceeds 32 bits -- which a single
-// 32-bit draw cannot span. With two equal weights of 2**32 (sum 2**33), the
-// upper branch occupies the half of the range at or above 2**32. It must still
-// be reachable: a draw confined to the low 32 bits would never land there, so
-// observing both branches selected proves the wider range is covered.
 TEST(RandcaseWeightedCase, SumWiderThan32BitsCoversFullRange) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -269,23 +216,11 @@ TEST(RandcaseWeightedCase, SumWiderThan32BitsCoversFullRange) {
   f.scheduler.Run();
   auto lo_cnt = f.ctx.FindVariable("lo_cnt")->value.ToUint64();
   auto hi_cnt = f.ctx.FindVariable("hi_cnt")->value.ToUint64();
-  // Every iteration selects exactly one branch.
   EXPECT_EQ(lo_cnt + hi_cnt, 200u);
-  // The branch whose weight slot lies at/above 2**32 is reachable; a draw
-  // limited to 32 bits would leave hi_cnt at zero.
   EXPECT_GT(hi_cnt, 0u);
   EXPECT_GT(lo_cnt, 0u);
 }
 
-// §18.16: the precision of each weight expression is self-determined. Each
-// weight is evaluated at its own bit length before the weights are summed, not
-// at the sum's combined precision. `4'd8 + 4'd8` is a 4-bit self-determined
-// addition, so its true result 16 wraps to 0 within four bits and that branch
-// carries zero weight -- even though the wide sibling weight would give the sum
-// ample precision to hold 16. A weight coerced to the sum's precision before
-// evaluation would instead be 16 and reachable. Over many draws the narrow
-// branch is never selected, which holds only when the weight keeps its own
-// self-determined precision.
 TEST(RandcaseWeightedCase, WeightPrecisionIsSelfDetermined) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -307,21 +242,11 @@ TEST(RandcaseWeightedCase, WeightPrecisionIsSelfDetermined) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // The 4-bit self-determined addition wrapped to zero; that branch is
-  // unreachable regardless of the wider sibling weight's precision.
   EXPECT_EQ(f.ctx.FindVariable("narrow_hits")->value.ToUint64(), 0u);
-  // Every draw landed on the wide, nonzero branch.
   EXPECT_EQ(f.ctx.FindVariable("wide_hits")->value.ToUint64(), 500u);
-  // A nonzero total weight means no all-zero warning was issued.
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §18.16: a branch weight may be produced by a named elaboration-time constant
-// (a parameter), not only by an inline literal or a variable expression. A
-// parameter reference resolves through a different path than an inline literal
-// yet still supplies the branch weight. A nonzero parameter weight beside a
-// zero-weight sibling is the only reachable branch, so it is selected on every
-// draw -- observing that the parameter-produced value drives the selection.
 TEST(RandcaseWeightedCase, ParameterValuedWeightIsUsed) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -345,10 +270,6 @@ TEST(RandcaseWeightedCase, ParameterValuedWeightIsUsed) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §18.16: a weight may equally be a module-local named constant (a localparam),
-// declared locally but resolved at elaboration. A nonzero localparam weight
-// beside a zero sibling is always selected, confirming a localparam-produced
-// value is accepted as a branch weight.
 TEST(RandcaseWeightedCase, LocalparamValuedWeightIsUsed) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -372,16 +293,6 @@ TEST(RandcaseWeightedCase, LocalparamValuedWeightIsUsed) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §18.16: randcase obtains its random number from the thread-stable
-// $urandom_range() stream, so the selection sequence is governed by the current
-// process's seedable RNG. Seeding that RNG through real source syntax
-// (process::self().srandom, §18.14) and running a fixed run of randcase draws,
-// then rewinding to the same seed, reproduces the identical selection sequence;
-// a different seed produces a different one. This drives the process-srandom
-// dependency through the full pipeline and shows the draws are consumed from
-// the seedable stream, not from a seed-independent source. The per-iteration
-// selection is folded into a running signature so a whole sequence, not just
-// one draw, is compared.
 TEST(RandcaseWeightedCase, SelectionDrawsFromSeedableUrandomStream) {
   const char* src =
       "module t;\n"
@@ -433,15 +344,10 @@ TEST(RandcaseWeightedCase, SelectionDrawsFromSeedableUrandomStream) {
   auto a = f.ctx.FindVariable("sig_a")->value.ToUint64();
   auto b = f.ctx.FindVariable("sig_b")->value.ToUint64();
   auto c = f.ctx.FindVariable("sig_c")->value.ToUint64();
-  // Same seed rewinds the stream and reproduces the identical selection run.
   EXPECT_EQ(a, b);
-  // A different seed drives a different run, so randcase truly consumes the
-  // RNG.
   EXPECT_NE(a, c);
 }
 
-// §18.16: if all randcase_items specify zero weights, no branch is taken and a
-// warning can be issued. That warning names §18.16.
 TEST(RandcaseWeightedCase, AllZeroWeightsWarningNames18_16) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -464,17 +370,6 @@ TEST(RandcaseWeightedCase, AllZeroWeightsWarningNames18_16) {
                               "randcase: all weights are zero", 5, "18.16"));
 }
 
-// §18.16: a randcase may call $urandom_range() more than once to handle numbers
-// wider than 32 bits, so a sum wider than 32 bits is drawn against in full
-// rather than against its low half. Two branches of 2^32 each put the second
-// branch's interval entirely at or beyond 2^32, so a single 32-bit draw would
-// land in the first every time.
-//
-// randcase composed the wide draw already and the randsequence beside it did
-// not, which is what #3335 records; the two share one DrawBelow in
-// src/simulator/stmt_exec_randsequence.cpp now, and this case is what keeps the
-// randcase half of that shared rule stated in the file for its own subclause
-// rather than only in the file for §18.17.1.
 TEST(RandcaseWeightedCase, WeightsSummingPastThirtyTwoBitsReachEveryBranch) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(

@@ -152,15 +152,6 @@ TEST(AssignmentDelayElaboration, NetDeclTwoDelayOnImplicitAssign) {
   EXPECT_EQ(mod->assigns[0].delay_decay, nullptr);
 }
 
-// §10.3.3 treats a delay on a continuous assignment written in a net
-// declaration differently from a net delay followed by a separate continuous
-// assignment to the net, and the three cases above write the first of those two
-// forms. This is the second: the declaration assigns nothing, so its delay is
-// what the clause calls a net delay, which delays the changes the net's drivers
-// resolve to (§28.16) rather than any one driver's. The net carries it, and the
-// continuous assignment written separately carries none of its own: folded into
-// each driver, the delay was chosen from that driver's change rather than the
-// net's.
 TEST(AssignmentDelayElaboration, NetDeclDelayWithoutAssignStaysOnTheNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -184,10 +175,6 @@ TEST(AssignmentDelayElaboration, NetDeclDelayWithoutAssignStaysOnTheNet) {
   EXPECT_EQ(w->delay_rise->int_val, 5u);
 }
 
-// §10.3.3 admits a single delay not only on a scalar nettype net but also on an
-// array of such nets. The declared array name is registered as a nettype net,
-// so a whole-array continuous assignment carrying more than one delay must be
-// rejected by the same at-most-one-delay rule.
 TEST(AssignmentDelayElaboration, NettypeArrayRejectsMultiDelay) {
   ElabFixture f;
   Elaborate(
@@ -203,9 +190,6 @@ TEST(AssignmentDelayElaboration, NettypeArrayRejectsMultiDelay) {
                     4, "10.3.3"));
 }
 
-// The accepting counterpart: the same array-of-nettype declaration with a
-// single delay is legal, so the rejections above isolate the multiple-delay
-// rule rather than some incidental defect in the array declaration itself.
 TEST(AssignmentDelayElaboration, NettypeArrayAcceptsSingleDelay) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -219,9 +203,6 @@ TEST(AssignmentDelayElaboration, NettypeArrayAcceptsSingleDelay) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Syntax 10-1 gives the declaration of a net of a user-defined nettype a
-// delay_control rather than a delay3, and §10.3.3 a single delay, whether or
-// not the declaration assigns the net.
 TEST(AssignmentDelayElaboration, NettypeNetDeclRejectsMultiDelay) {
   ElabFixture f;
   Elaborate(

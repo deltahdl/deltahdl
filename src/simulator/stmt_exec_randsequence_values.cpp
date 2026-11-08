@@ -1,23 +1,3 @@
-// The values a randsequence production is called with and the values it
-// returns, which §18.17.7 states as one rule apiece: data is passed to a
-// production in a task call's syntax, and a rule implicitly declares a variable
-// for each value-returning production it names. EvalProductionActuals and
-// BindProductionFormals answer the first, evaluating a call's actual arguments
-// in the caller's scope and binding each formal, by position or by name, once
-// the production's own scope has been entered. BuildRuleValueCapture and
-// BuildStepValueCapture answer the second, counting how many times a rule names
-// each value-returning production so that one named more than once is
-// registered as the 1..N array §18.17.7 declares before any of its appearances
-// generates. SlotForAppearance then says which implicit variable one appearance
-// writes, and StoreRuleProductionValue creates that variable and stores the
-// returned value into it.
-//
-// src/simulator/stmt_exec_randsequence.cpp holds the rest of the statement --
-// §18.16's randcase, §18.17.1's weighted selection of a rule, the production
-// list forms of §18.17.2 through §18.17.4, §18.17.5's rand join and the reach
-// §18.17.6 gives break and return -- and is the only caller of the six
-// functions named above.
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -40,23 +20,10 @@
 
 namespace delta {
 
-// The two types below are also defined in
-// src/simulator/stmt_exec_randsequence.cpp, which generates the productions
-// these functions record and so names both types itself. A change to either
-// definition has to be made in both files.
-
-// §18.17.7: which productions a randsequence statement declares and whether one
-// of them returns a value. Defined in src/simulator/stmt_exec_randsequence.cpp,
-// which generates them.
 const RsProduction* FindProduction(const Stmt* stmt, std::string_view name);
 bool ProductionReturnsValue(const RsProduction* p);
 bool ProductionReturnsString(const RsProduction* p);
 
-// §18.17.7: passing data to a production uses the same syntax as a task call,
-// so `call` reaches the formal at `index` of `production` as §13.5.4 has a
-// call reach a task's: by position before its first named argument and by
-// name after it. Null where the call leaves the formal out, by an empty
-// position, by `.name()` or by not reaching it.
 static const Expr* ProductionActual(const RsProduction* production,
                                     const RsProductionItem& call,
                                     size_t index) {
@@ -70,17 +37,6 @@ static const Expr* ProductionActual(const RsProduction* production,
   return nullptr;
 }
 
-// Evaluate the actual arguments in the caller's scope, before the production's
-// own scope is entered, one per formal and each sized to its formal's declared
-// width; a formal the call leaves out has none, and takes its default.
-//
-// DeclaredTypeWidth rather than the one-argument EvalTypeWidth, because
-// §18.17.7 declares a production's arguments as a task prototype declares them
-// and a formal may therefore be written with a typedef name, which §6.18 makes
-// an object of the type that name stands for. EvalTypeWidth gives a
-// DataTypeKind::kNamed no width at all, so a typedef'd formal contributed
-// nothing to the context its actual is evaluated in. A width of 0 still means
-// self-determined, which is what a formal nothing here can size still gets.
 std::vector<std::optional<Logic4Vec>> EvalProductionActuals(
     const RsProduction* production, const RsProductionItem& call,
     SimContext& ctx, Arena& arena) {
@@ -94,26 +50,6 @@ std::vector<std::optional<Logic4Vec>> EvalProductionActuals(
   return actuals;
 }
 
-// §18.17.7: a production creates a scope that encompasses all its rules and
-// code blocks; formal arguments bound here are therefore available throughout
-// the production. Bind each formal to the actual EvalProductionActuals gave it,
-// falling back to its default value, then to zero, when the call left it out.
-// The caller must have entered the production's scope.
-//
-// The formal is an object of its declared type, so it is created at that type's
-// width and the value is assigned into it rather than put in its place. Both
-// halves are needed and neither implies the other. DeclaredTypeWidth is the
-// first: the one-argument EvalTypeWidth gives a typedef name no width, so the
-// `w ? w : 32` below made every typedef'd formal 32 bits. The resize is the
-// second: a sized literal is self-determined, so handing the width to EvalExpr
-// as a context width does not truncate it, and `8'hFF` passed to a four-bit
-// formal arrived eight bits wide and made the formal eight bits wide with it.
-// §10.7 truncates or extends a value assigned to a typed object, which is what
-// ResizeToWidth does here.
-//
-// A width of 0 is a formal nothing here can size -- a string (§6.16) among
-// them, which has no declared width to resize to -- and ResizeToWidth leaves
-// such a value alone, so the 32-bit carrier below still catches it.
 void BindProductionFormals(const RsProduction* production,
                            const std::vector<std::optional<Logic4Vec>>& actuals,
                            SimContext& ctx, Arena& arena) {
@@ -136,12 +72,6 @@ void BindProductionFormals(const RsProduction* production,
   }
 }
 
-// §18.17.7: record one appearance of a value-returning production, giving it
-// the next ordinal in the rule. Every appearance counts, including one written
-// inside an if, repeat or case production: the clause gives the code block of
-// `if (cond) D(5) else D(20)` the implicit declaration `int D[1:2]`, and the
-// code block of `B repeat(5) C B` the declarations `int B[1:2]` and `int C`.
-// A repeat counts its item once however many times it goes on to generate it.
 static void CountRuleProductionItem(const Stmt* stmt,
                                     const RsProductionItem& item,
                                     RuleValueCapture& cap) {
@@ -149,9 +79,6 @@ static void CountRuleProductionItem(const Stmt* stmt,
   cap.ordinal[&item] = ++cap.total[item.name];
 }
 
-// §18.17.7: count the appearances of every value-returning production one
-// production of a rule names, reaching the items an if, repeat or case
-// production generates as well as an item written directly in the rule.
 static void CountRuleProductions(const Stmt* stmt, const RsProd& prod,
                                  RuleValueCapture& cap) {
   switch (prod.kind) {
@@ -174,10 +101,6 @@ static void CountRuleProductions(const Stmt* stmt, const RsProd& prod,
   }
 }
 
-// §18.17.7: register the array shape of every production the counted
-// appearances name more than once, so a code block can read an element before
-// any generation has written one. A production named once needs no shape: its
-// implicit variable is the scalar StoreRuleProductionValue creates.
 static void RegisterRuleValueArrays(const Stmt* stmt,
                                     const RuleValueCapture& cap,
                                     SimContext& ctx) {
@@ -188,41 +111,15 @@ static void RegisterRuleValueArrays(const Stmt* stmt,
     info.lo = 1;
     info.size = static_cast<uint32_t>(n);
     uint32_t w = DeclaredTypeWidth(child->return_type, ctx);
-    // §18.17.7: the array's elements take the production's return type, so
-    // record the return type's kind for a read of an element to consult. §6.16
-    // then makes the element of a string array that no generation wrote "", the
-    // empty string, rather than 32 bits of x; every other return type
-    // EvalTypeWidth gives no width to keeps the 32-bit carrier.
     info.elem_type_kind = child->return_type.kind;
     info.elem_width = w ? w : (ProductionReturnsString(child) ? 0 : 32);
-    // §18.17: a randsequence statement opens an automatic scope, and §18.17.7
-    // declares this array inside a rule, so the name stands for the
-    // array only while that scope is on the stack. RegisterLocalArray puts the
-    // shape in the same scope as the implicit variables
-    // StoreRuleProductionValue creates, so PopScope takes both away together: a
-    // variable of the design that shares the name is read as itself again once
-    // the statement ends, and each activation of the rule sees its own shape.
-    // §18.17.7's Example 2 needs the last of those, giving one production three
-    // rules that name C once, twice and three times.
     ctx.RegisterLocalArray(name, info);
   }
 }
 
-// §18.17.7: within a rule, a variable is implicitly declared for each
-// value-returning production the rule names. A production named once yields a
-// scalar named after the production; a production named more than once yields
-// an array indexed 1..N, with element i holding the value returned by the i-th
-// appearance in syntactic order. Count the rule's appearances so a multiply
-// appearing production can be registered as an array before any code block
-// reads an element of it.
 RuleValueCapture BuildRuleValueCapture(const Stmt* stmt, const RsRule& selected,
                                        SimContext& ctx) {
   RuleValueCapture cap;
-  // Syntax 18-13 gives a rand join rule its productions as the
-  // rs_production_items written after the keywords, which stand in
-  // RsRule::rand_join_items and in no RsProd of RsRule::prods. A rule holds one
-  // list or the other, so both are walked and the empty one contributes
-  // nothing.
   for (const auto& item : selected.rand_join_items) {
     CountRuleProductionItem(stmt, item, cap);
   }
@@ -233,12 +130,6 @@ RuleValueCapture BuildRuleValueCapture(const Stmt* stmt, const RsRule& selected,
   return cap;
 }
 
-// §18.17.5 interleaves a rand join operand's productions to a depth of 1, so
-// what generates under the operand is the productions its own rule names rather
-// than the operand itself. Count the appearances over the steps that expansion
-// produced: for a nested rand join rule those are the wrappers
-// CollectRandJoinSteps built around its operands, and the wrapper is what
-// SlotForAppearance is given to look up.
 RuleValueCapture BuildStepValueCapture(const Stmt* stmt,
                                        const std::vector<const RsProd*>& steps,
                                        SimContext& ctx) {
@@ -250,10 +141,6 @@ RuleValueCapture BuildStepValueCapture(const Stmt* stmt,
   return cap;
 }
 
-// §18.17.7: the implicit variable this appearance of a production writes. An
-// appearance the rule recorded no ordinal for writes none: the top-level
-// production the randsequence statement names stands in no rule, and a
-// production that returns no value declares no variable to write.
 RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
                                      const RsProductionItem& call,
                                      std::string_view name) {
@@ -265,14 +152,6 @@ RuleProductionSlot SlotForAppearance(const RuleValueCapture* cap,
                             total == cap->total.end() ? 1 : total->second};
 }
 
-// §18.17.7: create the implicit variable that holds a generated production's
-// return value. A production named more than once in the rule writes the
-// idx-th element of its 1..N array, whose name is built at run time and so must
-// be interned in the arena (the scope map keys on a stable string_view); a
-// production named once writes the scalar named after the production. The name
-// the variable was created under is reported through `created_name`; it
-// outlives the call in both forms, so a caller that has to name the variable
-// again does not have to rebuild the name.
 static Variable* CreateRuleProductionVariable(const RuleProductionSlot& slot,
                                               uint32_t width, SimContext& ctx,
                                               Arena& arena,
@@ -287,29 +166,17 @@ static Variable* CreateRuleProductionVariable(const RuleProductionSlot& slot,
   return ctx.CreateLocalVariable(slot.name, width);
 }
 
-// §18.17.7: store one generated production's return value into its implicit
-// variable, at the moment it is generated so that a code block written to its
-// right observes the value and one written to its left does not.
 void StoreRuleProductionValue(const RuleProductionSlot& slot,
                               const RsProduction* child,
                               const Logic4Vec& ret_value, SimContext& ctx,
                               Arena& arena) {
   uint32_t w = DeclaredTypeWidth(child->return_type, ctx);
   if (w == 0) w = ret_value.width;
-  // §6.16: a string is as wide as the characters it holds, so a string
-  // production that returned nothing leaves the empty string and not 32 bits
-  // of zero. Every other return type EvalTypeWidth gives no width to keeps the
-  // 32-bit carrier.
   if (w == 0 && !ProductionReturnsString(child)) w = 32;
   std::string_view created_name;
   Variable* var =
       CreateRuleProductionVariable(slot, w, ctx, arena, &created_name);
   var->value = ret_value;
-  // §18.17.7 gives the implicit variable the production's return type, and
-  // what reads a string reads SimContext::IsStringVariable rather than the
-  // width, so register the name the variable was created under. The registry
-  // keys on a string_view it never erases, and both names
-  // CreateRuleProductionVariable reports outlive this call.
   if (ProductionReturnsString(child)) ctx.RegisterStringVariable(created_name);
 }
 

@@ -5,17 +5,8 @@
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_design_attach_build.h"
 
-// The built-in tasks and functions the procedure walk names a call of: the
-// methods of §9.7's process class, of §15's semaphore and mailbox and of every
-// class (§18). They are lists the standard fixes, kept apart from the walk that
-// consults them.
-
 namespace delta {
 
-// §9.7, §15.3 and §15.4: the kind of tf call a call of the method `method` of
-// the built-in class `cls` is, zero for none. Every method the three classes
-// declare is listed but new, which no statement calls through a variable; the
-// built-in methods every class has (§18) are each class's too.
 int VpiBuiltInClassCallKind(std::string_view cls, std::string_view method) {
   using Method = std::pair<std::string_view, std::string_view>;
   static constexpr Method kTasks[] = {

@@ -1,16 +1,3 @@
-// Tests for IEEE 1800-2023 clause 7.9.4 -- the first() associative array
-// method. first() assigns to its ref index argument the smallest index present
-// in the array and returns 1; on an empty array it returns 0 and leaves the
-// index unchanged. Which index is "smallest" is determined by the entries
-// produced by prior indexed writes (clause 7.8, this pass's dependency), and
-// the index is delivered back to the caller through the ref argument
-// (clause 13.5.1), so every test builds the array from real declaration +
-// indexed-assignment source and drives it through parse -> elaborate -> lower
-// -> run, observing either the value first() returns or the index it assigns,
-// rather than hand-building the array object. The index type is supplied
-// through each dependency's real key syntax: integral keys (7.8.4) and string
-// keys (7.8.2).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -21,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Non-empty integral-keyed array: first() returns 1.
 TEST(AssocArrayFirstMethod, IntKeyReturnsOneWhenNonEmpty) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -39,8 +25,6 @@ TEST(AssocArrayFirstMethod, IntKeyReturnsOneWhenNonEmpty) {
   EXPECT_EQ(v, 1u);
 }
 
-// first() assigns the smallest (least) index, regardless of insertion order.
-// Keys are written 10, 30, 20; the assigned index must be 10.
 TEST(AssocArrayFirstMethod, IntKeyAssignsSmallestIndex) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -60,7 +44,6 @@ TEST(AssocArrayFirstMethod, IntKeyAssignsSmallestIndex) {
   EXPECT_EQ(v, 10u);
 }
 
-// Empty integral-keyed array: first() returns 0.
 TEST(AssocArrayFirstMethod, IntKeyReturnsZeroWhenEmpty) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -73,8 +56,6 @@ TEST(AssocArrayFirstMethod, IntKeyReturnsZeroWhenEmpty) {
   EXPECT_EQ(v, 0u);
 }
 
-// A narrow integral index type (dependency 7.8.4) still selects the smallest
-// stored key. Keys 50 and 200 are written; first() picks 50.
 TEST(AssocArrayFirstMethod, NarrowIndexAssignsSmallestIndex) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -93,7 +74,6 @@ TEST(AssocArrayFirstMethod, NarrowIndexAssignsSmallestIndex) {
   EXPECT_EQ(v, 50u);
 }
 
-// String-keyed array (dependency 7.8.2): first() returns 1 when non-empty.
 TEST(AssocArrayFirstMethod, StringKeyReturnsOneWhenNonEmpty) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -110,9 +90,6 @@ TEST(AssocArrayFirstMethod, StringKeyReturnsOneWhenNonEmpty) {
   EXPECT_EQ(v, 1u);
 }
 
-// String-keyed first() selects the lexicographically smallest key. Values are
-// stored so that indexing with the returned key recovers a distinct value:
-// keys apple/banana/cherry hold 1/2/3, so first() -> "apple" and map[s] == 1.
 TEST(AssocArrayFirstMethod, StringKeyAssignsSmallestKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -132,7 +109,6 @@ TEST(AssocArrayFirstMethod, StringKeyAssignsSmallestKey) {
   EXPECT_EQ(v, 1u);
 }
 
-// Empty string-keyed array: first() returns 0.
 TEST(AssocArrayFirstMethod, StringKeyReturnsZeroWhenEmpty) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -145,9 +121,6 @@ TEST(AssocArrayFirstMethod, StringKeyReturnsZeroWhenEmpty) {
   EXPECT_EQ(v, 0u);
 }
 
-// The clause 7.9.4 worked example: because the array is non-empty, first() is
-// true and the guarded statement runs. Here the then-branch records the value
-// stored under the smallest key that first() reached.
 TEST(AssocArrayFirstMethod, IfConditionTakesBranchWhenNonEmpty) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -165,10 +138,6 @@ TEST(AssocArrayFirstMethod, IfConditionTakesBranchWhenNonEmpty) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.9.4 on a class property (§8.5 restricts no property's type), from a
-// method of the class: first() assigns the smallest index the property holds
-// to the local and returns 1. It found no array under the name before and
-// answered 0, leaving the local untouched.
 TEST(AssocArrayFirstMethod, IntKeyAssignsSmallestIndexOfAClassProperty) {
   uint64_t v = RunAndGet(
       "class C;\n"

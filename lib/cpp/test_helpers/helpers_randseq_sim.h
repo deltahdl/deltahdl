@@ -10,10 +10,6 @@
 
 using namespace delta;
 
-// Elaborates `src`, lowers and runs it on `f`, then returns the simulation
-// variable named `var_name` (or nullptr). The elaborated design is checked
-// non-null with a non-fatal expectation so callers can keep their own fatal
-// ASSERT on the returned variable and on its value.
 inline Variable* RunRandseqAndFindVar(SimFixture& f, const std::string& src,
                                       const char* var_name) {
   auto* design = ElaborateSrc(src, f);

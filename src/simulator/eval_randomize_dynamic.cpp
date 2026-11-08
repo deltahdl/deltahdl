@@ -24,23 +24,10 @@
 
 namespace delta {
 
-// 18.4: a rand member declared as a dynamic array whose size an active
-// constraint block constrains is resized to the size the size constraints
-// choose and randomized over that many elements; one whose size no block
-// constrains keeps its size and is randomized over the elements it holds.
-// 18.5.7.1: the solver settles size constraints before the iterative ones, so
-// the size is the solver's variable drawn ahead of the others, which a foreach
-// reads as a state variable.
-
 namespace {
 
-// The most elements a dynamic array is randomized over: the elements are
-// drawn for the largest size the size constraints admit, and a size bounded
-// below alone admits any.
 constexpr int64_t kMaxDynamicElements = 256;
 
-// §18.4: the rand member named `name` the class chain from `type` declares
-// as a queue, and the class declaring it in `level`; null for any other name.
 const ClassMember* QueueMember(const ClassTypeInfo* type, std::string_view name,
                                SimContext& ctx, const ClassTypeInfo*& level) {
   for (const auto* t = type; t != nullptr; t = t->parent) {
@@ -56,9 +43,6 @@ const ClassMember* QueueMember(const ClassTypeInfo* type, std::string_view name,
   return nullptr;
 }
 
-// Whether `e` is the size method of a dynamic array or queue property of the
-// class `type`, `A.size` or `A.size()`, filling `array` with the property's
-// name.
 bool IsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx,
                 std::string_view& array) {
   const Expr* access = e;
@@ -83,8 +67,6 @@ bool IsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx,
   return true;
 }
 
-// Whether `e` holds a size call of a dynamic array or queue property of
-// `type` anywhere within it.
 bool HoldsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx) {
   if (e == nullptr) return false;
   std::string_view array;
@@ -101,9 +83,6 @@ bool HoldsSizeCall(const Expr* e, const ClassTypeInfo* type, SimContext& ctx) {
          std::ranges::any_of(kChildren, holds);
 }
 
-// The solver variable for the size of the dynamic array `array` declared at
-// `level`: an int, as the size method returns (7.5.2), over the sizes the
-// elements are drawn for, and drawn ahead of the other variables.
 RandInfo SizeVariable(std::string_view array, const ClassTypeInfo* level) {
   RandInfo size;
   size.name = ClassArraySizeKey(array);
@@ -119,18 +98,12 @@ RandInfo SizeVariable(std::string_view array, const ClassTypeInfo* level) {
   return size;
 }
 
-// 18.4: `rel` with each size method resolved to its variable, where it then
-// names the size `size`; null where it does not.
 const Expr* SizeRelation(const Expr* rel, const RandInfo& size,
                          RandomizeCtx& rc) {
   const Expr* resolved = ResolveArraySizes(rel, rc);
   return RefsNamedRandVar(resolved, size.name) ? resolved : nullptr;
 }
 
-// 18.4: folds the hard relations `rels` that name the size `size` over it,
-// each translated against it, a comparison folding its domain and a set
-// membership bounding `largest` by its largest member. Answers whether any
-// names it.
 bool FoldHardSizeRelations(const std::vector<Expr*>& rels, RandInfo& size,
                            std::vector<RandInfo>& rands, RandomizeCtx& rc,
                            int64_t& largest) {
@@ -139,7 +112,7 @@ bool FoldHardSizeRelations(const std::vector<Expr*>& rels, RandInfo& size,
     const Expr* resolved = SizeRelation(rel, size, rc);
     if (resolved == nullptr) continue;
     named = true;
-    ConstraintExpr ce = TranslateRelation(resolved, rands, rc, /*fold=*/true);
+    ConstraintExpr ce = TranslateRelation(resolved, rands, rc, true);
     if (ce.kind == ConstraintKind::kSetMembership && ce.var_name == size.name &&
         !ce.set_values.empty()) {
       largest = std::min(largest, *std::max_element(ce.set_values.begin(),
@@ -149,7 +122,6 @@ bool FoldHardSizeRelations(const std::vector<Expr*>& rels, RandInfo& size,
   return named;
 }
 
-// 18.4 with 18.5.13: whether a soft relation of `rels` names the size `size`.
 bool SoftRelationNamesSize(const std::vector<Expr*>& rels, const RandInfo& size,
                            RandomizeCtx& rc) {
   return std::ranges::any_of(rels, [&](const Expr* rel) {
@@ -157,21 +129,12 @@ bool SoftRelationNamesSize(const std::vector<Expr*>& rels, const RandInfo& size,
   });
 }
 
-// What the constraint blocks read so far say of one array's size: whether a
-// hard relation names it, whether a soft relation names it that no disable
-// soft of higher priority discards, and the largest size a set membership
-// admits.
 struct SizeReading {
   bool hard = false;
   bool soft = false;
   int64_t largest = kMaxDynamicElements;
 };
 
-// 18.4: reads the block `m` for the size `size`, hard relations folded over
-// it as FoldHardSizeRelations does. 18.5.13.2: a block's disable soft on the
-// size discards the soft relations of the blocks before it, never its own;
-// a kept soft relation constrains the size as a hard one does, though it is
-// never folded into the domain, the solve being free to discard it.
 void ReadBlockSize(const ClassMember* m, RandInfo& size,
                    std::vector<RandInfo>& rands, RandomizeCtx& rc,
                    SizeReading& reading) {
@@ -190,10 +153,6 @@ void ReadBlockSize(const ClassMember* m, RandInfo& size,
   }
 }
 
-// 18.4: folds the size constraints of each active constraint block, and of
-// the call's inline block (18.7), the last in priority, over the size
-// variable `size`; false where none constrains the size, or only soft ones
-// all discarded, which leaves the array its size.
 bool FoldSizeConstraints(RandInfo& size, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc) {
   SizeReading reading;
@@ -211,9 +170,6 @@ bool FoldSizeConstraints(RandInfo& size, std::vector<RandInfo>& rands,
   return kConstrained;
 }
 
-// A rand member declared as a dynamic array or a queue: its declaration, the
-// class declaring it, the elements the object holds, and whether it is a
-// queue.
 struct DynamicMember {
   const ClassMember* decl = nullptr;
   const ClassTypeInfo* level = nullptr;
@@ -221,10 +177,6 @@ struct DynamicMember {
   bool in_queue = false;
 };
 
-// The random variables of the rand dynamic array or queue `member`: the size
-// variable where the size is constrained, and one variable per element up to
-// the largest size admitted, or up to the size the object holds where it is
-// not.
 void AddDynamicArray(const DynamicMember& member, std::vector<RandInfo>& rands,
                      RandomizeCtx& rc) {
   const ClassMember* m = member.decl;
@@ -249,9 +201,6 @@ void AddDynamicArray(const DynamicMember& member, std::vector<RandInfo>& rands,
   }
 }
 
-// §18.4: the random variables of the rand member `m` declared at `level`
-// as the associative array `aa`: one per element it holds, named by its key,
-// `m[5]` or `m["a"]`.
 void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
                       const AssocArrayObject& aa, std::vector<RandInfo>& rands,
                       RandomizeCtx& rc) {
@@ -264,9 +213,6 @@ void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
     elem.var.name = elem.name;
     rands.push_back(std::move(elem));
   };
-  // §7.8.4: an integral index is kept whole, so the element is named by
-  // the decimal numeral of every word of it, two indices differing above
-  // bit 63 being two elements.
   for (const auto& [key, value] : aa.int_data) {
     add(std::string(m->name) + "[" +
         FormatDecimalDigits(key.ToSignedVec(rc.arena)) + "]");
@@ -278,20 +224,14 @@ void AddAssocElements(const ClassMember* m, const ClassTypeInfo* level,
   }
 }
 
-// The random variables of the rand member `m` of `lvl` whose count is the
-// object's rather than the class's, where it is one.
 void AddObjectSizedMember(const ClassMember* m, const ClassTypeInfo* lvl,
                           std::vector<RandInfo>& rands, RandomizeCtx& rc) {
-  // §18.4: an associative array has its elements randomized, its keys and so
-  // its size left as they are.
   if (IsAssocPropertyDecl(m, lvl, rc.ctx)) {
     AssocArrayObject* aa = ClassAssocProperty(rc.obj, lvl, m->name, rc.ctx);
     if (aa != nullptr && !m->is_static)
       AddAssocElements(m, lvl, *aa, rands, rc);
     return;
   }
-  // §18.4: a queue is randomized as a dynamic array is, resized at its back to
-  // the size the constraints draw.
   if (IsQueuePropertyDecl(m, lvl, rc.ctx)) {
     QueueObject* queue = ClassQueueProperty(rc.obj, lvl, m->name, rc.ctx);
     if (queue != nullptr && !m->is_static) {
@@ -303,9 +243,6 @@ void AddObjectSizedMember(const ClassMember* m, const ClassTypeInfo* lvl,
   }
   const auto* array = FindClassArrayProperty(lvl, m->name);
   if (array == nullptr || !array->is_dynamic) return;
-  // §18.4: randomize() allocates no class object, so an array of handles is
-  // resized alone: the handles up to the new size are kept and the elements
-  // added are null.
   if (IsClassHandleMember(m, rc.ctx)) {
     rands.push_back(SizeVariable(m->name, lvl));
     if (!FoldSizeConstraints(rands.back(), rands, rc)) rands.pop_back();
@@ -351,10 +288,6 @@ void AddDynamicArrayVariables(std::vector<RandInfo>& rands, RandomizeCtx& rc) {
   }
 }
 
-// 18.4: whether `ri` is an element of a dynamic array beyond the size the
-// solve drew for it, recorded in `sizes` under the array's name by the size
-// variable, which precedes the elements; the array is resized to that size,
-// so the element is dropped rather than written.
 static bool BeyondDrawnSize(
     const RandInfo& ri, const std::unordered_map<std::string, int64_t>& sizes) {
   if (ri.array_base.empty() || ri.var.is_array_size) return false;
@@ -364,11 +297,8 @@ static bool BeyondDrawnSize(
 
 namespace {
 
-// §18.4: an element of a rand associative array lands under the key it was
-// drawn for.
 void WriteAssocElement(ClassObject* obj, const RandInfo& ri,
                        const Logic4Vec& lv) {
-  // The array the element was collected from holds it under its key.
   AssocArrayObject* aa = obj->assoc_properties.at(ri.array_base);
   if (aa->is_string_key) {
     aa->str_data[ri.str_key] = lv;
@@ -377,17 +307,13 @@ void WriteAssocElement(ClassObject* obj, const RandInfo& ri,
   }
 }
 
-// §18.4: a member of a rand unpacked structure lands in its bits of the value
-// the property holds, the other members left as they were.
 void WriteStructMember(ClassObject* obj, const RandInfo& ri,
                        const Logic4Vec& lv) {
-  // The property the structure's layout came from holds the whole value.
   Logic4Vec& whole = obj->properties.at(ri.struct_base);
   DepositBitField(whole, ri.struct_offset, lv, ri.var.width);
   obj->properties[std::string(ri.level->name) + "::" + ri.struct_base] = whole;
 }
 
-// The value `lv` drawn for `ri`, written where the variable is held.
 void WriteSolvedValue(ClassObject* obj, const RandInfo& ri,
                       const Logic4Vec& lv) {
   if (ri.in_assoc) {
@@ -395,11 +321,6 @@ void WriteSolvedValue(ClassObject* obj, const RandInfo& ri,
   } else if (!ri.struct_base.empty()) {
     WriteStructMember(obj, ri, lv);
   } else if (ri.is_static && ri.level != nullptr) {
-    // 18.6.3: a static random variable is a single storage shared by every
-    // instance of the class, so a successful randomize() must publish the
-    // drawn value to that class-wide cell, not to a private per-object copy,
-    // which would shadow the shared storage for this object and leave the
-    // other instances observing the old value.
     ri.level->static_properties[ri.name] = lv;
   } else {
     obj->properties[ri.name] = lv;
@@ -407,8 +328,6 @@ void WriteSolvedValue(ClassObject* obj, const RandInfo& ri,
   }
 }
 
-// §18.4: each rand queue holds the elements drawn for it, as many as its
-// size, resized at its back.
 void WriteQueues(
     ClassObject* obj,
     std::unordered_map<std::string, std::vector<Logic4Vec>>& queues) {
@@ -421,9 +340,6 @@ void WriteQueues(
   }
 }
 
-// §18.4: the elements drawn for the rand dynamic members of rand unpacked
-// structures, each written into the copy of its member's elements the
-// structure is given to hold, one copy per member.
 void WriteStructDynamicElements(
     ClassObject* obj,
     const std::vector<std::pair<const RandInfo*, Logic4Vec>>& elements,
@@ -443,11 +359,6 @@ void WriteStructDynamicElements(
 
 }  // namespace
 
-// 18.6.1: write each solved value back to the object, keeping the bare and
-// scoped ("Class::name") property aliases in sync so member reads see it. A
-// dynamic array's size is written under its key, which sizes the array
-// (18.4), ahead of its elements. 18.5.8: the solver names the variables
-// under `prefix`.
 void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
                      const ConstraintSolver& solver, const std::string& prefix,
                      Arena& arena) {

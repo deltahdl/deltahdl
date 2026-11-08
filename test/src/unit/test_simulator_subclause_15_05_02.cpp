@@ -237,11 +237,6 @@ TEST(IpcSync, EventControlOperatorDispatchesEdgeAndNamedEvent) {
   EXPECT_EQ(b, 22u);
 }
 
-// §15.5.2 with §6.21: an event declared as a local of an automatic task, or as
-// an automatic local of a begin-end block, is a named event of its frame, so
-// the wait on it in one fork branch is woken by the trigger in the other: 1
-// and 2, read as 12. Taken for a value, each wait waited for a change the
-// trigger never made, and neither time was written.
 TEST(NamedEventSim, AutomaticLocalEventsWakeTheirWaiters) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -271,10 +266,6 @@ TEST(NamedEventSim, AutomaticLocalEventsWakeTheirWaiters) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §15.5.2 with §9.3.2 and §24.3: an event declared in a program instance is
-// woken by the trigger a sibling fork branch of the program makes, both
-// branches naming the program's own e: 3. The branch triggered the top's e,
-// which no one waited on, and the wait was never woken.
 TEST(NamedEventSim, ProgramEventIsWokenByASiblingBranch) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p;\n"
@@ -291,9 +282,6 @@ TEST(NamedEventSim, ProgramEventIsWokenByASiblingBranch) {
             "woke at 3\n");
 }
 
-// §15.5.2 with §7.10: an event pushed into a queue of events is the event
-// itself, so the wait on q[0] is woken by the trigger of e at 2. Pushed as a
-// value, the element named no event and the wait was never woken.
 TEST(NamedEventSim, EventPushedIntoAQueueIsTheSameEvent) {
   SimFixture f;
   auto* var = RunAndFindVar(

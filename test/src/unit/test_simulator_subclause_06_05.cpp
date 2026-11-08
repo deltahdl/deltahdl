@@ -1,12 +1,3 @@
-// §6.5 (printed page 91) lets a continuous assignment drive a variable, and a
-// primitive output or an output port connected to a variable is one. Whatever
-// strength the driver carries, the variable takes the driven value converted
-// to its own type, as an assignment converts it, and the strength is lost. A
-// tool may warn of a strength other than St0, St1, StX or HiZ reaching a
-// variable; none is an error. §10.3.4 keeps a drive strength written on an
-// `assign` to scalar nets, so a strength reaches a variable through a gate, a
-// UDP or a port.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -18,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// A gate written with a weak or a pull strength drives the variable's value,
-// a 0 and a 1 each read back as the plain value.
 TEST(StrengthLostOnAVariable, GateWithAStrengthDrivesTheValue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -39,9 +28,6 @@ TEST(StrengthLostOnAVariable, GateWithAStrengthDrivesTheValue) {
   EXPECT_EQ(out, "0 0\n1 1\n");
 }
 
-// A highz strength drives no value on its side: the variable reads z there,
-// the HiZ the rule names among what a variable may be driven with, and the
-// driven value on the other side.
 TEST(StrengthLostOnAVariable, HighzSideReachesTheVariableAsZ) {
   SimFixture f;
   std::string out = RunCapture(
@@ -61,8 +47,6 @@ TEST(StrengthLostOnAVariable, HighzSideReachesTheVariableAsZ) {
   EXPECT_EQ(out, "0 z\nz 1\n");
 }
 
-// A UDP instance carries its strength to the variable its output names the
-// same way.
 TEST(StrengthLostOnAVariable, UdpWithAStrengthDrivesTheValue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -88,9 +72,6 @@ TEST(StrengthLostOnAVariable, UdpWithAStrengthDrivesTheValue) {
   EXPECT_EQ(out, "1 1\n0 z\n");
 }
 
-// An output port connected to a variable implies a continuous assignment to
-// it (§23.3.3), and the weak strength the port's net is driven with inside the
-// instance does not reach the variable.
 TEST(StrengthLostOnAVariable, OutputPortNetWithAStrengthDrivesTheValue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -112,8 +93,6 @@ TEST(StrengthLostOnAVariable, OutputPortNetWithAStrengthDrivesTheValue) {
   EXPECT_EQ(out, "1\n0\n");
 }
 
-// The nearest form the standard forbids: a drive strength written on an
-// `assign` whose target is a variable, which §10.3.4 keeps to scalar nets.
 TEST(StrengthLostOnAVariable, AssignmentStrengthOnAVariableIsReported) {
   SimFixture f;
   ElaborateSrc(
@@ -128,9 +107,6 @@ TEST(StrengthLostOnAVariable, AssignmentStrengthOnAVariableIsReported) {
       "10.3.4"));
 }
 
-// A 2-state variable converts an x or a z driven to it into 0, whether an
-// assignment drives the x or a highz strength leaves the z, bit by bit in a
-// vector.
 TEST(StrengthLostOnAVariable, TwoStateVariableTakesZeroForXAndZ) {
   SimFixture f;
   std::string out = RunCapture(
@@ -149,10 +125,6 @@ TEST(StrengthLostOnAVariable, TwoStateVariableTakesZeroForXAndZ) {
   EXPECT_EQ(out, "0 0 1000\n");
 }
 
-// The value converts to the variable's type as an assignment's does: an
-// integer to a real numerically, a real to an integer rounded with ties away
-// from zero (§6.12.1), a wider value truncated, and a narrower one extended
-// by its own signedness.
 TEST(StrengthLostOnAVariable, ValueConvertsToTheVariablesType) {
   SimFixture f;
   std::string out = RunCapture(
@@ -174,10 +146,6 @@ TEST(StrengthLostOnAVariable, ValueConvertsToTheVariablesType) {
   EXPECT_EQ(out, "7.0 3 -3 bc 255 -1\n");
 }
 
-// An input port connected to an expression is continuously assigned it
-// (§23.3.3), so a variable port converts the value to its own type: an
-// integer expression into a real port, a real one into an int port rounded
-// with ties away from zero.
 TEST(StrengthLostOnAVariable, InputPortVariableConvertsTheConnectedValue) {
   SimFixture f;
   std::string out = RunCapture(

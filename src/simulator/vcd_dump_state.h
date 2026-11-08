@@ -11,170 +11,65 @@
 
 namespace delta {
 
-// §21.7 defines two dump files and no more: a 4-state file, recording changes
-// among 0, 1, x and z without strength, and an extended file, recording
-// changes in every state along with strength. The 4-state file is written by
-// $dumpfile, $dumpvars and the control tasks §21.7.1.3 through §21.7.1.6 give
-// them; the extended file by $dumpports and the control tasks §21.7.3.2
-// through §21.7.3.5 give it. §21.7.3.1 lets one source ask for both, a source
-// calling $dumpports being free to call $dumpvars too, so a run holds one dump
-// of each, each with its own writer, file name and default name, and a task
-// reaches the dump its own clause names.
-//
-// Everything a run holds of both files lives here rather than on SimContext.
-// The two files are one feature with one clause behind them, and SimContext is
-// the class every part of the simulator reaches through, so its header grew
-// until an ordinary addition failed the file-size gate (#3463). What stays on
-// SimContext is the handful of operations that need the rest of the run --
-// opening a dump walks the variable table and arms a per-timestep callback,
-// closing one stamps the current simulation time.
 struct VcdDumpState {
-  // §21.7.1.1 defaults the 4-state file to dump.vcd and §21.7.3.1 defaults the
-  // extended file to dumpports.vcd, so each dump starts under its own name.
   VcdDump four_state{"dump.vcd"};
   VcdDump extended{"dumpports.vcd"};
 
-  // The dump a VcdFileType names, so the open path can take the one the task
-  // that called it writes.
   VcdDump& Dump(VcdFileType type);
 
-  // A writer installed here stands in for both dumps. Whatever installed it --
-  // the --vcd option, a test driver -- built one writer over one file and
-  // settled its form, so there is no second file for the other form to go to.
-  // Nothing here owns it.
   void SetVcdWriter(VcdWriter* vcd);
-  // §21.7.1: the 4-state dump, or null when nothing has opened one.
   VcdWriter* GetVcdWriter() { return four_state.writer; }
-  // §21.7.3.1: the extended dump, or null when no $dumpports has opened one.
-  // Separate from GetVcdWriter because the two files are separate: a control
-  // task reaching the wrong one writes its checkpoint into a file of the other
-  // type, or into no file at all.
   VcdWriter* GetDumpportsWriter() { return extended.writer; }
 
-  // §21.7.1.1: the name $dumpfile gives the 4-state file. The name may be left
-  // out, and is "dump.vcd" then.
   void SetDumpFileName(std::string name);
   const std::string& GetDumpFileName() const;
 
-  // §21.7.3.1: the name $dumpports gives the extended file, which without one
-  // is dumpports.vcd in the current working directory. Held apart from the
-  // 4-state name because the two files are two files: the defaults differ, and
-  // a source calling both tasks names both.
   void SetDumpportsFileName(std::string name);
   const std::string& GetDumpportsFileName() const;
 
-  // §21.7.2.3: the filename argument of $dumpfile exactly as written in the
-  // source -- a string literal keeps its quotes, and a variable or expression
-  // keeps its unevaluated source spelling. The $version section of the VCD
-  // header reproduces this literal inside its $dumpfile(...) entry. Empty when
-  // no $dumpfile call supplied a filename.
   void SetDumpFileLiteral(std::string text);
   const std::string& GetDumpFileLiteral() const;
 
-  // §21.7.3.1 cross-call $dumpports bookkeeping: scope names and explicitly
-  // specified file names must each be unique across all $dumpports calls.
   std::unordered_set<std::string> dumpports_scopes;
   std::unordered_set<std::string> dumpports_files;
-  // §21.7.4.1: the $dumpports commands that executed before the extended dump
-  // was opened, in call order, waiting to be written into its version_text.
   std::vector<std::string> dumpports_commands;
 
-  // §21.7.3.1: scope names supplied to $dumpports must be unique across every
-  // call. Records the scope and returns false when it repeats one already used
-  // by an earlier $dumpports call.
   bool RegisterDumpportsScope(const std::string& scope);
-  // §21.7.3.1: an explicitly named $dumpports output file may not be named by
-  // more than one call. Records the name and returns false on a repeat.
   bool RegisterDumpportsFile(const std::string& file);
-  // §21.7.3.7: an extended VCD control task may name the $dumpports output it
-  // targets; the name matches only when some $dumpports call explicitly
-  // specified that file. Returns true when the name was so registered.
   bool IsDumpportsFile(const std::string& file) const;
-  // §21.7.3.7: true once at least one $dumpports call has explicitly named an
-  // output file, so a control task's filename can be matched against the set.
   bool HasDumpportsFiles() const { return !dumpports_files.empty(); }
-  // §21.7.4.1 (Syntax 21-27): an extended file's version_text lists the
-  // $dumpports commands that produced it, so each call's source spelling is
-  // recorded as it executes. A call made before the extended dump was opened
-  // is held until the open replays it into the header; one made after goes
-  // straight to the writer, which is holding its declaration commands for
-  // exactly this.
   void AddDumpportsCommand(std::string text);
 
-  // §21.7.3.1: $dumpports may be invoked many times, but the execution of all
-  // $dumpports tasks shall be at the same simulation time. The first call
-  // records its time; a later call passes only when it matches.
   bool RegisterDumpportsTime(uint64_t time);
-  // §21.7.1.2: $dumpvars may be invoked as often as desired, but the execution
-  // of all the $dumpvars tasks shall be at the same simulation time. The first
-  // call records its time; a later call passes only when it matches. Separate
-  // from RegisterDumpportsTime because §21.7.1.2 and §21.7.3.1 are two rules
-  // over two sets of calls, and a source may call only one of the two tasks.
   bool RegisterDumpvarsTime(uint64_t time);
 
-  // §21.7.5 (Table 21-11): record the declared SystemVerilog data type of a
-  // dumped variable so its $var declaration can masquerade as the matching
-  // IEEE Std 1364-2005 var_type. `kind` is the effective type keyword the
-  // lowerer resolved for VCD -- a typed enum is already reduced to its base
-  // type and a packed structure to a reg-vector masquerade. A variable with no
-  // recorded kind reports kImplicit, which keeps the §21.7.2.3 net default.
   void SetVcdVarKind(std::string_view name, DataTypeKind kind);
   DataTypeKind GetVcdVarKind(std::string_view name) const;
-  // §21.7.4.3.1: the declared direction of each dumped port, which is what
-  // picks the list its extended VCD state characters come from. A name no port
-  // declaration covers answers kNone, the unknown-direction list.
   void SetVcdPortDirection(std::string_view name, Direction direction);
   Direction GetVcdPortDirection(std::string_view name) const;
-  // §21.7.2.1 (Syntax 21-20): the dumped names that are parameters, whose
-  // $var declarations carry the parameter var_type rather than the one their
-  // stored value's type would give them.
   void MarkVcdParameter(std::string_view name);
   bool IsVcdParameter(std::string_view name) const;
-  // §21.7.1.2 with §6.19: the names whose storage holds an enumeration's
-  // named constant, a constant rather than a variable, which no dump declares.
   void MarkVcdEnumConstant(std::string_view name);
   bool IsVcdEnumConstant(std::string_view name) const;
-  // §21.7.2.3: the design's packages, each a top-level scope of the dump.
   void MarkVcdPackage(std::string_view name);
   bool IsVcdPackage(std::string_view name) const;
-  // §21.7.2.3: the kind of each scope below a module that a dumped object's
-  // hierarchical name passes through -- a task, a function, or a named
-  // sequential or parallel block -- keyed by its full path, `b1` or `u.tk.b2`.
-  // A path with no kind recorded is a module instance's.
   void SetVcdScopeKind(const std::string& path, VcdScopeKind kind);
   VcdScopeKind GetVcdScopeKind(std::string_view path) const;
-  // §21.7.4.3.1: the signal the parent connected to each input port, keyed by
-  // the port's hierarchical name, whose drivers are the port's test-fixture
-  // side. Empty for a port connected to no plain signal name.
   void SetVcdPortSource(const std::string& port, std::string source);
   std::string_view GetVcdPortSource(std::string_view port) const;
 
  private:
-  // §21.7.3.1: the one simulation time at which every $dumpports call must
-  // execute, recorded by the first call.
   bool have_dumpports_time_ = false;
   uint64_t dumpports_time_ = 0;
-  // §21.7.1.2: the one simulation time at which every $dumpvars call must
-  // execute, recorded by the first call.
   bool have_dumpvars_time_ = false;
   uint64_t dumpvars_time_ = 0;
 
-  // §21.7.5 (Table 21-11): declared type keyword (enum base / packed struct
-  // already resolved) of each dumped variable, consulted when its $var
-  // declaration is written to pick the masquerading 1364-2005 var_type.
   std::unordered_map<std::string_view, DataTypeKind> var_kinds_;
-  // §21.7.4.3.1: declared direction of each dumped port. See
-  // GetVcdPortDirection.
   std::unordered_map<std::string_view, Direction> port_dirs_;
-  // §21.7.2.1: the dumped parameters. See IsVcdParameter.
   std::unordered_set<std::string_view> parameters_;
-  // §6.19: the enumeration constants. See IsVcdEnumConstant.
   std::unordered_set<std::string_view> enum_constants_;
-  // §21.7.2.3: the packages. See IsVcdPackage.
   std::unordered_set<std::string_view> packages_;
-  // §21.7.2.3: the scope kinds. See GetVcdScopeKind.
   std::unordered_map<std::string, VcdScopeKind> scope_kinds_;
-  // §21.7.4.3.1: the input ports' sources. See GetVcdPortSource.
   std::unordered_map<std::string, std::string> port_sources_;
 };
 

@@ -6,14 +6,6 @@
 
 using namespace delta;
 
-// §21.2.1.6 Assignment pattern format. The %p (and the shorter %0p) format
-// specifier prints aggregate operands -- unpacked structures, arrays, and
-// unions -- as an assignment pattern, and prints a singular operand as a single
-// element of one. These tests drive the whole simulator: $display passes the
-// run-time context into the formatter, which reads the struct/union/array/enum
-// type information the lowerer recorded, and the displayed text is captured end
-// to end.
-
 namespace {
 
 std::string RunSim(const std::string& src) {
@@ -25,10 +17,6 @@ std::string RunSim(const std::string& src) {
   return testing::internal::GetCapturedStdout();
 }
 
-// §21.2.1.6 (C1/C2/C7a/C6): a struct prints as an assignment pattern with one
-// "name:value" entry per member, in declaration order. The leading '{ and the
-// member/comma punctuation form a legal interpretation of the assignment
-// pattern syntax.
 TEST(AssignmentPatternFormat, StructPrintsNamedMembers) {
   auto out = RunSim(
       "module t;\n"
@@ -43,9 +31,6 @@ TEST(AssignmentPatternFormat, StructPrintsNamedMembers) {
   EXPECT_EQ(out, "'{a:1, b:2}\n");
 }
 
-// §21.2.1.6 (C7e edge): a signed integer member prints with its sign, since an
-// element prints as it would unformatted. A byte member holding -5 shows "-5",
-// not the unsigned bit pattern.
 TEST(AssignmentPatternFormat, StructMemberWithNegativeValuePrintsSigned) {
   auto out = RunSim(
       "module t;\n"
@@ -60,10 +45,6 @@ TEST(AssignmentPatternFormat, StructMemberWithNegativeValuePrintsSigned) {
   EXPECT_EQ(out, "'{a:-5, b:2}\n");
 }
 
-// §21.2.1.6 (C7e edge): a member that holds unknown bits prints as it would
-// unformatted -- the decimal status character x. An unassigned 4-state struct
-// keeps every member at x, exercising the field extraction's preservation of
-// unknown bits.
 TEST(AssignmentPatternFormat, StructMemberWithUnknownValuePrintsX) {
   auto out = RunSim(
       "module t;\n"
@@ -74,8 +55,6 @@ TEST(AssignmentPatternFormat, StructMemberWithUnknownValuePrintsX) {
   EXPECT_EQ(out, "'{a:x, b:x}\n");
 }
 
-// §21.2.1.6 (C5/C7e edge): array elements also print as they would unformatted,
-// so a signed element with a negative value shows its sign within the pattern.
 TEST(AssignmentPatternFormat, ArrayOfSignedElementsPrintsNegative) {
   auto out = RunSim(
       "module t;\n"
@@ -90,7 +69,6 @@ TEST(AssignmentPatternFormat, ArrayOfSignedElementsPrintsNegative) {
   EXPECT_EQ(out, "'{-5, 20, 30}\n");
 }
 
-// §21.2.1.6 (C3): a (non-tagged) union prints only its first declared member.
 TEST(AssignmentPatternFormat, UnionPrintsOnlyFirstMember) {
   auto out = RunSim(
       "module t;\n"
@@ -104,8 +82,6 @@ TEST(AssignmentPatternFormat, UnionPrintsOnlyFirstMember) {
   EXPECT_EQ(out, "'{a:5}\n");
 }
 
-// §21.2.1.6 (C4): a tagged union prints "tag:value" for the currently valid
-// member.
 TEST(AssignmentPatternFormat, TaggedUnionPrintsTagAndValue) {
   auto out = RunSim(
       "module t;\n"
@@ -119,8 +95,6 @@ TEST(AssignmentPatternFormat, TaggedUnionPrintsTagAndValue) {
   EXPECT_EQ(out, "'{Valid:42}\n");
 }
 
-// §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
-// the value is one named by the type.
 TEST(AssignmentPatternFormat, EnumPrintsMemberName) {
   auto out = RunSim(
       "module t;\n"
@@ -134,10 +108,6 @@ TEST(AssignmentPatternFormat, EnumPrintsMemberName) {
   EXPECT_EQ(out, "BLUE\n");
 }
 
-// §21.2.1.6 (C7b): when the value is not one named by the enumeration, it
-// prints according to the base type instead of an enumeration name. An
-// uninitialized 4-state enum holds x, which names no member, so the base-type
-// (decimal) form is used.
 TEST(AssignmentPatternFormat, EnumWithUnnamedValueFallsBackToBaseType) {
   auto out = RunSim(
       "module t;\n"
@@ -148,13 +118,6 @@ TEST(AssignmentPatternFormat, EnumWithUnnamedValueFallsBackToBaseType) {
   EXPECT_EQ(out, "x\n");
 }
 
-// §21.2.1.6 (C7b): the base-type fallback also applies to a *known* value that
-// simply names no member of the enumeration -- the distinct path where the
-// member-match search runs to completion without a hit (as opposed to an
-// unknown value, which skips the search). Casting day_e's SUN (6) into the
-// three-member color_e leaves a known 6 that matches no color name, so the
-// value prints in the base type's decimal form rather than as an enumeration
-// name.
 TEST(AssignmentPatternFormat, EnumKnownValueNotNamedFallsBackToBaseType) {
   auto out = RunSim(
       "module t;\n"
@@ -169,8 +132,6 @@ TEST(AssignmentPatternFormat, EnumKnownValueNotNamedFallsBackToBaseType) {
   EXPECT_EQ(out, "6\n");
 }
 
-// §21.2.1.6 (C7d): a null class handle prints the word "null". An uninitialized
-// handle is null.
 TEST(AssignmentPatternFormat, NullClassHandlePrintsNull) {
   auto out = RunSim(
       "class C; endclass\n"
@@ -181,8 +142,6 @@ TEST(AssignmentPatternFormat, NullClassHandlePrintsNull) {
   EXPECT_EQ(out, "null\n");
 }
 
-// §21.2.1.6 (C7c/C10): %p on a singular string operand prints the string value
-// enclosed in quotes, formatted as it would be as an element of an aggregate.
 TEST(AssignmentPatternFormat, StringOperandIsQuoted) {
   auto out = RunSim(
       "module t;\n"
@@ -195,8 +154,6 @@ TEST(AssignmentPatternFormat, StringOperandIsQuoted) {
   EXPECT_EQ(out, "\"hi\"\n");
 }
 
-// §21.2.1.6 (C10/C7e): %p on a singular non-string operand formats it as a
-// single aggregate element -- i.e. as it would print unformatted (decimal).
 TEST(AssignmentPatternFormat, SingularValuePrintsUnformatted) {
   auto out = RunSim(
       "module t;\n"
@@ -209,9 +166,6 @@ TEST(AssignmentPatternFormat, SingularValuePrintsUnformatted) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §21.2.1.6 (C2): the rule's primary form is the *unpacked* structure data
-// type, which shall print as an assignment pattern with named elements just as
-// the packed form does.
 TEST(AssignmentPatternFormat, UnpackedStructPrintsNamedMembers) {
   auto out = RunSim(
       "module t;\n"
@@ -226,9 +180,6 @@ TEST(AssignmentPatternFormat, UnpackedStructPrintsNamedMembers) {
   EXPECT_EQ(out, "'{a:1, b:2}\n");
 }
 
-// §21.2.1.6 (C7a): a member that is itself a packed structure shall print as a
-// nested assignment pattern with named elements -- every element printed by one
-// of the listed rules -- not as a flat number.
 TEST(AssignmentPatternFormat, NestedStructMemberPrintsNestedPattern) {
   auto out = RunSim(
       "module t;\n"
@@ -245,9 +196,6 @@ TEST(AssignmentPatternFormat, NestedStructMemberPrintsNestedPattern) {
   EXPECT_EQ(out, "'{i:'{x:3, y:4}, c:5}\n");
 }
 
-// §21.2.1.6 (C5 x C7a): an unpacked array of structs is traversed until the
-// singular members are reached, so each element prints as its own nested
-// named pattern inside the array's pattern.
 TEST(AssignmentPatternFormat, ArrayOfStructsPrintsNestedElementPatterns) {
   auto out = RunSim(
       "module t;\n"
@@ -262,8 +210,6 @@ TEST(AssignmentPatternFormat, ArrayOfStructsPrintsNestedElementPatterns) {
   EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
 }
 
-// §21.2.1.6 (C5 x C7b): an enum element of an unpacked array prints as its
-// enumeration member name when the value is one named by the type.
 TEST(AssignmentPatternFormat, ArrayOfEnumsPrintsMemberNames) {
   auto out = RunSim(
       "module t;\n"
@@ -278,8 +224,6 @@ TEST(AssignmentPatternFormat, ArrayOfEnumsPrintsMemberNames) {
   EXPECT_EQ(out, "'{GREEN, RED}\n");
 }
 
-// §21.2.1.6 (C5 x C7c): string elements of an unpacked array print as quoted
-// strings within the array's pattern.
 TEST(AssignmentPatternFormat, ArrayOfStringsQuotesEachElement) {
   auto out = RunSim(
       "module t;\n"
@@ -293,10 +237,6 @@ TEST(AssignmentPatternFormat, ArrayOfStringsQuotesEachElement) {
   EXPECT_EQ(out, "'{\"ab\", \"cd\"}\n");
 }
 
-// §21.2.1.6 (C5 x C7c): the string elements of a queue, of a queue a locator
-// filled, of a dynamic array and of an associative array print quoted, as those
-// of a fixed-size array do. The elements themselves carry no string mark, so
-// read as numbers they printed the codes of their characters.
 TEST(AssignmentPatternFormat, VariableSizeArraysOfStringsQuoteEachElement) {
   auto out = RunSim(
       "module t;\n"
@@ -315,8 +255,6 @@ TEST(AssignmentPatternFormat, VariableSizeArraysOfStringsQuoteEachElement) {
             "'{\"b\", \"c\"} '{\"b\", \"c\"} '{\"x\", \"yz\"} '{1:\"p\"}\n");
 }
 
-// §21.2.1.6 (C5): a queue is an unpacked array data type, so its current
-// elements print as an assignment pattern in index order.
 TEST(AssignmentPatternFormat, QueuePrintsElementsAsPattern) {
   auto out = RunSim(
       "module t;\n"
@@ -330,8 +268,6 @@ TEST(AssignmentPatternFormat, QueuePrintsElementsAsPattern) {
   EXPECT_EQ(out, "'{5, 6}\n");
 }
 
-// §21.2.1.6 (C5/C6 edge): a queue holding no elements still yields a legal
-// assignment-pattern interpretation -- the empty pattern.
 TEST(AssignmentPatternFormat, EmptyQueuePrintsEmptyPattern) {
   auto out = RunSim(
       "module t;\n"
@@ -341,8 +277,6 @@ TEST(AssignmentPatternFormat, EmptyQueuePrintsEmptyPattern) {
   EXPECT_EQ(out, "'{}\n");
 }
 
-// §21.2.1.6 (C5): a dynamic array likewise prints its current elements as an
-// assignment pattern.
 TEST(AssignmentPatternFormat, DynamicArrayPrintsElementsAsPattern) {
   auto out = RunSim(
       "module t;\n"
@@ -357,9 +291,6 @@ TEST(AssignmentPatternFormat, DynamicArrayPrintsElementsAsPattern) {
   EXPECT_EQ(out, "'{8, 9}\n");
 }
 
-// §21.2.1.6 (C5): an associative array prints as an assignment pattern that
-// includes index labels, one "key:value" item per populated element -- the
-// form the clause's own example shows for an int-indexed array.
 TEST(AssignmentPatternFormat, AssociativeArrayPrintsIndexLabels) {
   auto out = RunSim(
       "module t;\n"
@@ -373,8 +304,6 @@ TEST(AssignmentPatternFormat, AssociativeArrayPrintsIndexLabels) {
   EXPECT_EQ(out, "'{10:100, 20:200}\n");
 }
 
-// §21.2.1.6 (C5): a string-indexed associative array's index labels are the
-// quoted string keys.
 TEST(AssignmentPatternFormat, StringKeyedAssocArrayQuotesIndexLabels) {
   auto out = RunSim(
       "module t;\n"
@@ -388,8 +317,6 @@ TEST(AssignmentPatternFormat, StringKeyedAssocArrayQuotesIndexLabels) {
   EXPECT_EQ(out, "'{\"k1\":1, \"k2\":2}\n");
 }
 
-// §21.2.1.6 (C7d): a null chandle value shall print the word "null"; an
-// uninitialized chandle is null.
 TEST(AssignmentPatternFormat, NullChandlePrintsNull) {
   auto out = RunSim(
       "module t;\n"
@@ -399,10 +326,6 @@ TEST(AssignmentPatternFormat, NullChandlePrintsNull) {
   EXPECT_EQ(out, "null\n");
 }
 
-// §21.2.1.6 (C7d): a null virtual interface shall print the word "null"; once
-// bound to an interface instance it prints an implementation-dependent form
-// instead (here the instance name), showing the "null" spelling comes from the
-// handle being null rather than from the operand's type.
 TEST(AssignmentPatternFormat, NullVirtualInterfacePrintsNull) {
   auto out = RunSim(
       "interface ifc; logic a; endinterface\n"
@@ -418,9 +341,6 @@ TEST(AssignmentPatternFormat, NullVirtualInterfacePrintsNull) {
   EXPECT_EQ(out, "null\ni0\n");
 }
 
-// §21.2.1.6 (C10 x C7e): %p on a singular real operand prints the value as it
-// would unformatted -- the shortest real form, keeping the fraction rather
-// than truncating to an integer.
 TEST(AssignmentPatternFormat, RealOperandPrintsRealForm) {
   auto out = RunSim(
       "module t;\n"
@@ -433,8 +353,6 @@ TEST(AssignmentPatternFormat, RealOperandPrintsRealForm) {
   EXPECT_EQ(out, "1.5\n");
 }
 
-// §21.2.1.6 (C9): %0p is the shorter form of the assignment-pattern specifier;
-// it likewise yields a legal assignment-pattern rendering of the aggregate.
 TEST(AssignmentPatternFormat, ShortFormSpecifierRendersPattern) {
   auto out = RunSim(
       "module t;\n"
@@ -449,11 +367,6 @@ TEST(AssignmentPatternFormat, ShortFormSpecifierRendersPattern) {
   EXPECT_EQ(out, "'{a:1, b:2}\n");
 }
 
-// §21.2.1.6 (C2/C6) x §10.9 dependency: a struct whose value comes from an
-// assignment-pattern *initializer* -- the very syntax the printed output must
-// remain a legal interpretation of -- round-trips through %p as a named
-// pattern. The input is built from the declaration initializer, not from
-// procedural member assignments.
 TEST(AssignmentPatternFormat, StructFromPatternInitializerRoundTrips) {
   auto out = RunSim(
       "module t;\n"
@@ -464,9 +377,6 @@ TEST(AssignmentPatternFormat, StructFromPatternInitializerRoundTrips) {
   EXPECT_EQ(out, "'{a:1, b:2}\n");
 }
 
-// §21.2.1.6 (C5/C6) x §10.9 dependency: an unpacked array populated by an
-// assignment-pattern initializer prints back as an assignment pattern of the
-// same element values.
 TEST(AssignmentPatternFormat, ArrayFromPatternInitializerRoundTrips) {
   auto out = RunSim(
       "module t;\n"
@@ -476,9 +386,6 @@ TEST(AssignmentPatternFormat, ArrayFromPatternInitializerRoundTrips) {
   EXPECT_EQ(out, "'{5, 6, 7}\n");
 }
 
-// §21.2.1.6 (C7e edge): a member holding all high-impedance bits prints as it
-// would unformatted -- the decimal status character z -- alongside a known
-// member, exercising the z half of the unknown/high-impedance element forms.
 TEST(AssignmentPatternFormat, StructMemberWithHighImpedanceValuePrintsZ) {
   auto out = RunSim(
       "module t;\n"
@@ -493,9 +400,6 @@ TEST(AssignmentPatternFormat, StructMemberWithHighImpedanceValuePrintsZ) {
   EXPECT_EQ(out, "'{a:z, b:0}\n");
 }
 
-// §21.2.1.6 (C1/C2) in the $write position: the rule applies to the whole
-// display-and-write task family, and $write renders the same pattern without
-// appending a newline.
 TEST(AssignmentPatternFormat, WriteTaskRendersPatternWithoutNewline) {
   auto out = RunSim(
       "module t;\n"
@@ -506,8 +410,6 @@ TEST(AssignmentPatternFormat, WriteTaskRendersPatternWithoutNewline) {
   EXPECT_EQ(out, "'{a:1, b:2}|");
 }
 
-// §21.2.1.6 (C1): Table 21-1 spells the specifier as %p or %P; the uppercase
-// spelling selects the same assignment-pattern rendering.
 TEST(AssignmentPatternFormat, UppercaseSpecifierRendersPattern) {
   auto out = RunSim(
       "module t;\n"
@@ -518,8 +420,6 @@ TEST(AssignmentPatternFormat, UppercaseSpecifierRendersPattern) {
   EXPECT_EQ(out, "'{a:1, b:2}\n");
 }
 
-// §21.2.1.6 (C10): a singular *expression* operand -- not just a variable
-// reference -- is formatted as one element of an aggregate would be.
 TEST(AssignmentPatternFormat, ExpressionOperandPrintsElementForm) {
   auto out = RunSim(
       "module t;\n"
@@ -532,9 +432,6 @@ TEST(AssignmentPatternFormat, ExpressionOperandPrintsElementForm) {
   EXPECT_EQ(out, "8\n");
 }
 
-// §21.2.1.6 (C10 x C9): the shorter %0p form may likewise be applied to a
-// singular expression, which is then formatted as a single element of an
-// aggregate would be.
 TEST(AssignmentPatternFormat, ShortFormOnSingularPrintsElementForm) {
   auto out = RunSim(
       "module t;\n"
@@ -549,11 +446,6 @@ TEST(AssignmentPatternFormat, ShortFormOnSingularPrintsElementForm) {
   EXPECT_EQ(out, "7 \"hi\"\n");
 }
 
-// §21.2.1.6 (C1/C2) in an instantiated module: the struct is declared in M,
-// which top instantiates as `m`, so its layout stands under "m.s" (§23.9) and
-// the operand's bare name is resolved through the instance. Looked up bare,
-// no layout was found and the operand fell to the singular form, printing
-// the whole 16-bit value as 258; the named pattern prints each member.
 TEST(AssignmentPatternFormat, ChildInstanceStructPrintsNamedMembers) {
   auto out = RunSim(
       "module M;\n"
@@ -571,11 +463,6 @@ TEST(AssignmentPatternFormat, ChildInstanceStructPrintsNamedMembers) {
   EXPECT_EQ(out, "'{a:1, b:2}\n");
 }
 
-// §21.2.1.6 (C4) in an instantiated module: the valid member of a tagged
-// union prints as its own type, an int here, so -7 keeps its sign. With the
-// layout looked up by the bare name inside instance `m`, the member's type
-// and width were not found and the value was sliced at the union's width as
-// an unsigned quantity, printing '{Valid:4294967289}.
 TEST(AssignmentPatternFormat,
      ChildInstanceTaggedUnionPrintsValidMemberAsItsType) {
   auto out = RunSim(
@@ -593,11 +480,6 @@ TEST(AssignmentPatternFormat,
   EXPECT_EQ(out, "'{Valid:-7}\n");
 }
 
-// §21.2.1.6 (C5 x C7a) in an instantiated module: a queue of structs is
-// traversed to its singular members, so each element prints as a nested
-// named pattern. The queue is found through the instance, but its element
-// layout was looked up by the bare name and missed, so each element printed
-// as a number: '{258, 772}.
 TEST(AssignmentPatternFormat, ChildInstanceQueueOfStructsPrintsNestedPatterns) {
   auto out = RunSim(
       "module M;\n"
@@ -615,12 +497,6 @@ TEST(AssignmentPatternFormat, ChildInstanceQueueOfStructsPrintsNestedPatterns) {
   EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
 }
 
-// §21.2.1.6 (C5 x C7a) in an instantiated module: a fixed-size unpacked
-// array of structs prints each element as a nested named pattern. The array
-// is declared in M and stored under "m.a" (§23.9), and the formatter asked
-// for its shape by the bare name and found none, so the operand fell to the
-// struct form and printed the never-written carrier as one pattern,
-// '{x:0, y:0}; the two elements print in index order.
 TEST(AssignmentPatternFormat, ChildInstanceArrayOfStructsPrintsNestedPatterns) {
   auto out = RunSim(
       "module M;\n"
@@ -638,12 +514,6 @@ TEST(AssignmentPatternFormat, ChildInstanceArrayOfStructsPrintsNestedPatterns) {
   EXPECT_EQ(out, "'{'{x:1, y:2}, '{x:3, y:4}}\n");
 }
 
-// §21.2.1.6 (C7a) with §7.4 and §7.8: an element selected from an array of
-// structs is a struct and prints as a named pattern, as the whole array prints
-// it -- an associative array's `va[10]` written from a struct variable, a
-// fixed-size array's `arr[1]`, a queue's `q[0]`, in the top module and in an
-// instance -- and an element of an array of enums prints as its member name.
-// Each printed the element's bits as one number, 21474836486 for '{a:5, b:6}.
 TEST(AssignmentPatternFormat, ElementOfAnArrayOfStructsPrintsAsAPattern) {
   auto out = RunSim(
       "module M;\n"
@@ -673,10 +543,6 @@ TEST(AssignmentPatternFormat, ElementOfAnArrayOfStructsPrintsAsAPattern) {
   EXPECT_EQ(out, "'{a:7, b:8}\n'{a:5, b:6} '{a:3, b:4} '{a:9, b:10} OFF\n");
 }
 
-// §21.2.1.6 (C2 with C7b): a struct member of an enum type prints as the name
-// of its value, as the enum prints on its own -- in a struct variable, in each
-// element of an array of such structs, and for an enum declared in a package.
-// Each printed the value's number, '{sw:1, n:7} for OFF.
 TEST(AssignmentPatternFormat, EnumMemberOfAStructPrintsItsName) {
   auto out = RunSim(
       "package pk; typedef enum { RED, GREEN } col_e; endpackage\n"
@@ -696,9 +562,6 @@ TEST(AssignmentPatternFormat, EnumMemberOfAStructPrintsItsName) {
             "'{'{sw:ON, c:RED, n:0}, '{sw:OFF, c:GREEN, n:7}}\n");
 }
 
-// §21.2.1.6 (C5 with §10.9.1): a multidimensional unpacked array prints as a
-// pattern of the patterns of its subarrays, one level of braces per dimension,
-// down to its elements -- integers, structs and enum names alike.
 TEST(AssignmentPatternFormat,
      MultidimensionalArrayNestsOnePatternPerDimension) {
   auto out = RunSim(
@@ -725,11 +588,6 @@ TEST(AssignmentPatternFormat,
             "'{'{ON, OFF}, '{OFF, ON}}\n");
 }
 
-// §21.2.1.6 with §7.6 (printed page 160): elements correspond in each array's
-// left-to-right element order, so the pattern %p prints lists each dimension
-// from its left bound -- a[3] first for int a[3:0], and in dr[1:0][2:3] the
-// subarray dr[1] first, itself from dr[1][2]. Printing from the lowest address
-// gave a pattern that, assigned back, reverses the array.
 TEST(AssignmentPatternFormat, DescendingDimensionPrintsFromItsLeftBound) {
   auto out = RunSim(
       "module top;\n"
@@ -740,10 +598,6 @@ TEST(AssignmentPatternFormat, DescendingDimensionPrintsFromItsLeftBound) {
   EXPECT_EQ(out, "'{1, 2, 3, 4} 1 '{'{1, 2}, '{3, 4}} 1\n");
 }
 
-// §21.2.1.6 with §6.19: an enumerated value prints as its member's name when
-// every bit matches a member, x and z included, so `XX='x` prints XX and
-// `Z='z` prints Z; a value holding x in an enumeration with no x member
-// prints as its base type does.
 TEST(AssignmentPatternFormat, EnumXAndZMembersPrintByName) {
   auto out = RunSim(
       "module top;\n"
@@ -758,12 +612,6 @@ TEST(AssignmentPatternFormat, EnumXAndZMembersPrintByName) {
   EXPECT_EQ(out, "XX Z x\n");
 }
 
-// §21.2.1.6 with §7.12 and §7.10.1: the result of a locator or map method is a
-// queue, and a slice of a queue or of a fixed-size array is an unpacked array,
-// so each passed straight to %p prints as a pattern of its elements, of the
-// type the method or slice gives them: a found string quoted, an index a
-// number, a string key quoted. Read as the value the expression evaluates to,
-// each printed as one packed number.
 TEST(AssignmentPatternFormat, ArrayMethodResultsAndSlicesPrintAsPatterns) {
   auto out = RunSim(
       "module t;\n"
@@ -789,12 +637,6 @@ TEST(AssignmentPatternFormat, ArrayMethodResultsAndSlicesPrintAsPatterns) {
             "'{90} '{\"k\"}\n");
 }
 
-// §21.2.1.6 with §7.4 and §7.10: an array whose elements are queues or
-// fixed-size arrays prints each element as a nested pattern of its values --
-// a queue of queues, a queue and a dynamic array of fixed-size arrays, an
-// associative array of queues -- and an element never written as its type's
-// default, 0 for int and x for logic. Read from the element's placeholder,
-// each element printed as 0.
 TEST(AssignmentPatternFormat, ArraysOfArraysPrintNestedPatterns) {
   auto out = RunSim(
       "module t;\n"
@@ -817,10 +659,6 @@ TEST(AssignmentPatternFormat, ArraysOfArraysPrintNestedPatterns) {
             "'{\"k\":'{9}}\n");
 }
 
-// §21.2.1.6 with §7.12.1 and §7.4.4: a locator over an array whose elements
-// are arrays returns a queue of those elements, the subarrays of a
-// multidimensional array or the element queues of a queue, so %p prints a
-// pattern of their patterns. Declined as no locator result, each printed 0.
 TEST(AssignmentPatternFormat, LocatorRowsPrintNestedPatterns) {
   auto out = RunSim(
       "module t;\n"
@@ -835,11 +673,6 @@ TEST(AssignmentPatternFormat, LocatorRowsPrintNestedPatterns) {
   EXPECT_EQ(out, "'{'{3, 4}, '{5, 0}} '{'{6, 7}}\n");
 }
 
-// §21.2.1.6 with §26.3 and §3.12.1: an array named through a scope prefix is
-// the array the prefix's scope declares -- a package's through `pk::`, printed
-// as through an import, and the compilation unit's through `$unit::`, past a
-// module's own of the same name. Looked up by no name or by the text alone,
-// the package's printed 0 and the unit's printed the module's.
 TEST(AssignmentPatternFormat, ArraysNamedThroughAScopePrefixPrintTheirOwn) {
   auto out = RunSim(
       "int uq[$] = '{8, 9};\n"
@@ -854,10 +687,6 @@ TEST(AssignmentPatternFormat, ArraysNamedThroughAScopePrefixPrintTheirOwn) {
   EXPECT_EQ(out, "'{1, 2} '{3, 4} '{8, 9} '{0}\n");
 }
 
-// §21.2.1.6 with §8.5: an unpacked array property of a class object, reached
-// through a handle, is an aggregate as an array variable is, so a queue
-// property and a fixed-size one each print their elements as an assignment
-// pattern. Neither is a variable, and each printed 0.
 TEST(FormatPSim, ArrayPropertyThroughAHandlePrintsItsElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class H;\n"
@@ -876,8 +705,6 @@ TEST(FormatPSim, ArrayPropertyThroughAHandlePrintsItsElements) {
             "'{5, 2, 9} '{1, 2, 3} 3\n");
 }
 
-// The handle may itself be a property of another object: o.inner.q is the
-// queue the object o.inner refers to holds. A chain of handles printed 0.
 TEST(FormatPSim, ArrayPropertyTwoHandlesDownPrintsItsElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class In;\n"

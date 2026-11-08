@@ -9,16 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §15.4 (printed page 374) and §15.4.1 (printed 374) with §26.2 (printed
-// 808): a package's `mailbox mb = new` is an unbounded queue before any
-// procedure starts, so `p1::mb.put(7)` and `p1::mb.put(9)` place two
-// messages, `p1::mb.get(a)` retrieves the first in the order they were
-// placed (§15.4.5) and num() counts the one left (§15.4.2): 7 * 10 + 1. The
-// package's storage was a plain Variable, the initializer evaluated into it
-// and no MailboxObject made under "p1.mb", so the two put() statements and
-// the get() were served by no mailbox, a stayed 0 and num() answered
-// nothing: 0. A queue that placed both messages and retrieved none would
-// read 2.
 TEST(PackageImportSim, PackageMailboxInitializedByNewThroughTheQualifier) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  mailbox mb = new;\n"
@@ -36,13 +26,6 @@ TEST(PackageImportSim, PackageMailboxInitializedByNewThroughTheQualifier) {
             71u);
 }
 
-// §15.4.1 (printed page 374) with §26.2 (printed 808) and §11.2.1: a nonzero
-// bound is the size of the queue, and a package's new(D) reads D, the
-// package's own parameter, by its bare name in the package's frame, so the
-// first try_put() places its message and the second finds the queue full
-// (§15.4.4): 1 * 10 + 0. A bound that never reached the queue, or a D read
-// as 0, would leave it unbounded and both try_put() calls placing: 11; no
-// mailbox under "p1.mb" at all served neither call: 0.
 TEST(PackageImportSim, PackageMailboxBoundReadsThePackagesOwnParameter) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  localparam int D = 1;\n"
@@ -58,16 +41,6 @@ TEST(PackageImportSim, PackageMailboxBoundReadsThePackagesOwnParameter) {
             10u);
 }
 
-// §26.2 (printed page 808) lets a package's items reference what the package
-// itself declares, and §13.3 and §13.4 run a subroutine's body in the scope
-// declaring it, so the bare `mb` inside p1::send and p1::offer is p1's
-// mailbox, the one `p1::mb` reaches through §26.3's scope resolution
-// operator: send(4) places a message through put() (§15.4.3), offer(5)
-// places another through try_put() and answers 1 (§15.4.4), and num() then
-// counts two (§15.4.2): 1 * 10 + 2. Under the defect no mailbox stood under
-// "p1.mb", the key FindMailbox tries through the package frame, so the put()
-// ran on nothing, try_put() answered 0 and num() nothing: 0. A mailbox the
-// task reached and the function missed would read 1, the other way round 11.
 TEST(PackageImportSim, PackageSubroutinesReachTheirOwnMailboxBare) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  mailbox mb = new;\n"
@@ -89,14 +62,6 @@ TEST(PackageImportSim, PackageSubroutinesReachTheirOwnMailboxBare) {
             12u);
 }
 
-// §15.4.1 (printed page 374) with §26.2 (printed 808): a package's `mailbox
-// mb` with no initializer is an unbounded queue, as a module's is
-// (CreateSyncObjectForVar in sync_variable.cpp), and a procedural `p1::mb =
-// new(1)` then builds it with a bound of one (TryMailboxNewAssign), so the
-// first try_put() places its message and the second finds the queue full:
-// 1 * 10 + 0. Under the same defect no queue stood under "p1.mb", so the
-// new() found no mailbox to build and both try_put() calls were served by
-// none: 0. A queue created but not rebuilt by the new() would read 11.
 TEST(PackageImportSim,
      PackageMailboxDeclaredWithoutInitializerBuiltThroughTheQualifier) {
   EXPECT_EQ(RunAndGet("package p1;\n"
@@ -113,14 +78,6 @@ TEST(PackageImportSim,
             10u);
 }
 
-// §15.3.1 (printed page 373) with §26.2 (printed 808) and §11.2.1: a
-// package's `semaphore s = new(K)` reads K, the package's own parameter, by
-// its bare name in the package's frame once K holds its value, so the bucket
-// starts with two keys and two try_get(1) calls procure one each: 1 * 10 +
-// 1. The key count was read when the bucket was created, ahead of the
-// parameters' own initializers (InitPackageDataItem), when "p1.K" held the
-// 0 its storage was created with, so the bucket started empty and both calls
-// procured none: 0. A count read as 1 would read 10.
 TEST(PackageImportSim, PackageSemaphoreKeyCountReadsThePackagesOwnParameter) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  localparam int K = 2;\n"
@@ -136,10 +93,6 @@ TEST(PackageImportSim, PackageSemaphoreKeyCountReadsThePackagesOwnParameter) {
             11u);
 }
 
-// A design whose package p1 declares the class B, with `int n = 7` and
-// get_n() reading it, and constructs `B b = new;` as its own declaration
-// assignment, followed by `module_items` as the body of a module top, the
-// last of which declares y at its declaration; answers y at time 0.
 static uint64_t ModuleInitializerRead(const std::string& module_items) {
   return RunAndGet(
       "package p1;\n"
@@ -156,32 +109,17 @@ static uint64_t ModuleInitializerRead(const std::string& module_items) {
       "y");
 }
 
-// §26.2 (printed page 808) with §6.21 (printed 132-133): a package's `B b =
-// new;` is made before any procedure starts, and a module's `int y =
-// p1::b.get_n();` is initialized at its declaration, ahead of the module's
-// own procedures, so y reads 7 through the package's object. The package's
-// constructions ran after the modules were lowered
-// (ConstructDataClassInitializers after LowerModule), so the module's
-// initializer called get_n() on a null handle and y read 0.
 TEST(PackageImportSim,
      ModuleInitializerReadsAPackageHandleThroughTheQualifier) {
   EXPECT_EQ(ModuleInitializerRead("  int y = p1::b.get_n();\n"), 7u);
 }
 
-// The same through the module's own wildcard import (§26.3, printed page
-// 810), the property read bare: `int y = b.n;` reads 7 from the object the
-// package constructed; a null b read 0.
 TEST(PackageImportSim, ModuleInitializerReadsAnImportedPackageHandle) {
   EXPECT_EQ(ModuleInitializerRead("  import p1::*;\n"
                                   "  int y = b.n;\n"),
             7u);
 }
 
-// §3.12.1 (printed page 56) with §26.2 and §6.21: the compilation unit's
-// `B ub = new;` outside every module is made before any procedure starts,
-// as a package's is, so a module's `int y = ub.get_n();` reads 7 through the
-// unit's object at its declaration. The unit's constructions ran after the
-// modules as the packages' did, so y read 0.
 TEST(PackageImportSim, ModuleInitializerReadsAUnitHandle) {
   EXPECT_EQ(RunAndGet("class B;\n"
                       "  int n = 7;\n"
@@ -197,8 +135,6 @@ TEST(PackageImportSim, ModuleInitializerReadsAUnitHandle) {
             7u);
 }
 
-// A module importing package p, whose class C's v starts at 7 and whose
-// `C objs[2]` is an array of handles, running `body` in its initial block.
 std::string PackageHandleArrayDesign(const std::string& body) {
   return "package p;\n"
          "  class C;\n"
@@ -216,10 +152,6 @@ std::string PackageHandleArrayDesign(const std::string& body) {
          "endmodule\n";
 }
 
-// §26.3 with §8.4: `p::objs[1]` is an element of the package's array of
-// handles, so `p::objs[1].v = 5` writes v of the object the element refers
-// to, read back through c, the handle stored in it. The write was stored
-// under the bare name alone, so c, declared of C, read its stale 7.
 TEST(PackageScopeReferenceSim, AWriteThroughAPackageArrayElementReachesIt) {
   EXPECT_EQ(RunAndGet(PackageHandleArrayDesign("    c = new;\n"
                                                "    p::objs[1] = c;\n"
@@ -229,7 +161,6 @@ TEST(PackageScopeReferenceSim, AWriteThroughAPackageArrayElementReachesIt) {
             5u);
 }
 
-// The same write, the element selected by a variable index.
 TEST(PackageScopeReferenceSim,
      AWriteThroughAPackageArrayElementAtAVariableIndexReachesIt) {
   EXPECT_EQ(RunAndGet(PackageHandleArrayDesign("    c = new;\n"
@@ -241,10 +172,6 @@ TEST(PackageScopeReferenceSim,
             5u);
 }
 
-// §8.4 with §7.4 and §26.3: `p::objs[0] = new` constructs a C into the
-// element, the class its array is declared of, and `p::objs[0].v = 3`
-// writes that object, which c then refers to: 3 read through c and 3
-// through the element, 33.
 TEST(PackageScopeReferenceSim, AnObjectConstructedThroughAPackageArrayElement) {
   EXPECT_EQ(
       RunAndGet(PackageHandleArrayDesign("    p::objs[0] = new;\n"

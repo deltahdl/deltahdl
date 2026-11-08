@@ -45,9 +45,6 @@ static bool IsCastTypeToken(TokenKind kind) {
   }
 }
 
-// §10.9, Syntax 10-5: of the keywords IsCastTypeToken admits, only an
-// integer_atom_type may prefix an assignment pattern; the other prefixes the
-// grammar gives are names and type references, which are not keywords.
 static bool IsIntegerAtomType(TokenKind kind) {
   static constexpr std::array kIntegerAtomTypes = {
       TokenKind::kKwByte,    TokenKind::kKwShortint, TokenKind::kKwInt,
@@ -55,9 +52,6 @@ static bool IsIntegerAtomType(TokenKind kind) {
   return std::ranges::find(kIntegerAtomTypes, kind) != kIntegerAtomTypes.end();
 }
 
-// The value of one digit character of an integer literal, or -1 for a
-// character that is no digit at all: an x, z or ? digit, which §5.7.1 sets to
-// the unknown or high-impedance value rather than to a number.
 static int LiteralDigitValue(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -65,12 +59,6 @@ static int LiteralDigitValue(char c) {
   return -1;
 }
 
-// Folds `digits` in `base` into 64 bits, wrapping modulo 2^64, so a literal
-// wider than 64 bits yields its low 64 bits: the residue of each partial value
-// is what the next digit multiplies, and unsigned overflow discards nothing
-// below bit 64. The fold ends at the first character that is not a digit of
-// the base -- an x, z or ? digit, or a digit above the base -- leaving what the
-// digits before it made.
 static uint64_t FoldDigitsModulo64(std::string_view digits, uint64_t base) {
   uint64_t val = 0;
   for (char c : digits) {
@@ -81,18 +69,6 @@ static uint64_t FoldDigitsModulo64(std::string_view digits, uint64_t base) {
   return val;
 }
 
-// §5.7.1: a based literal's digits give its value in the base its base format
-// names, and a simple decimal number gives its value in base 10; the size
-// constant states the literal's exact width, so the digits can reach beyond
-// the 64 bits Expr::int_val holds. int_val then holds the low 64 bits of the
-// value, `96'h0123_4567_89AB_CDEF_0011_2233` giving 0x89ABCDEF00112233, which
-// is what the elaborator's ConstEvalLiteral folds and what any 64-bit
-// arithmetic on the value sees. The whole value is produced from the digits
-// again where every bit is needed: EvalIntLiteral and SetDigitBits in
-// src/simulator/evaluation_literal.cpp build the run-time vector, and
-// SynthLower::LowerLiteralBit reads the digits for a bit at or above 64. An x,
-// z or ? digit ends the fold, the digits before it standing; the same run-time
-// reparse sets the bits such a digit covers.
 uint64_t ParseIntText(std::string_view text) {
   std::string buf = LiteralTextWithoutSeparators(text);
 
@@ -124,16 +100,6 @@ uint64_t ParseIntText(std::string_view text) {
   return FoldDigitsModulo64(std::string_view(buf).substr(i), base);
 }
 
-// A.6.6 and A.8.3 give a cond_predicate, the clauses `&&&` joins with their
-// `matches` patterns, two places: an if statement's condition, which
-// Parser::ParseIfStmt reads through ParseExprBp, and a conditional operator's
-// condition, which never stands as an expression of its own. A.8.6 makes
-// neither operator a binary_operator, so one at the top of any other
-// expression is reported. That covers one in parentheses, whose
-// mintypmax_expression is an expression too. A.8.1 writes `with [
-// array_range_expression ]` after the operand of a stream_expression alone,
-// which Parser::ParseStreamingConcat reads short of this, so a range after
-// any other expression is reported and read past.
 Expr* Parser::ParseExpr() {
   Expr* e = ParseExprBp(0);
   ReportPredicateOperator(e, diag_);
@@ -146,9 +112,6 @@ Expr* Parser::ParseExprBp(int min_bp) {
   return ParseInfixBp(lhs, min_bp);
 }
 
-// A cond_predicate's `&&&` or `matches` node over `lhs`, its right operand
-// still to read. §12.4 and §12.6 write each as a left operand followed by the
-// operator, which is where Parser::ParseInfixBp starts every other one.
 static Expr* MakePredicateNode(Arena& arena, TokenKind op, Expr* lhs) {
   auto* bin = arena.Create<Expr>();
   bin->kind = ExprKind::kBinary;
@@ -159,9 +122,6 @@ static Expr* MakePredicateNode(Arena& arena, TokenKind op, Expr* lhs) {
 }
 
 Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
-  // §5.5: a unary-only operator here follows its operand. It is read past,
-  // with the operand after it, and the left operand kept, so that the one
-  // report stands alone.
   if (ReportUnaryOperatorAfterOperand(tok, diag_)) {
     Consume();
     if (!EndsExpression(CurrentToken())) ParseExprBp(min_bp);
@@ -173,19 +133,10 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     auto* tern = arena_.Create<Expr>();
     tern->kind = ExprKind::kTernary;
     tern->attrs = std::move(attrs);
-    // §11.4.11 writes the conditional expression as its condition followed by
-    // the operator, so it begins where the condition begins.
     tern->range.start = lhs->range.start;
     tern->condition = lhs;
     tern->true_expr = ParseExpr();
     Expect(TokenKind::kColon, Subclause("11.4.11"));
-    // §11.3.2's Table 11-2 (printed page 272) ranks the conditional operator
-    // above -> and <-> and makes it right associative. The false expression is
-    // therefore read at the binding power of ||, the operator just above the
-    // conditional, so an implication or an equivalence after it takes the
-    // whole conditional as its left operand, and a conditional written next is
-    // one more nested to the right. Reading it at the lowest power had
-    // `a ? b : c -> d` take the implication into the false expression.
     tern->false_expr =
         ParseExprBp(InfixBindingPower(TokenKind::kPipePipe).first);
     if (Check(TokenKind::kQuestion))
@@ -197,11 +148,6 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
   if (tok.kind == TokenKind::kAmpAmpAmp && min_bp <= 0) {
     Consume();
     auto* bin = MakePredicateNode(arena_, TokenKind::kAmpAmpAmp, lhs);
-    // The clause after the operator is an expression, or a cond_pattern of
-    // one, and the `?` of A.8.3 after the last clause takes the whole
-    // predicate as its condition, so the clause is read short of a `?` and
-    // then given its `matches` pattern. It is no pattern itself, not even after
-    // a pattern-matching case item's pattern (A.6.7).
     int depth = std::exchange(pattern_depth_, 0);
     bin->rhs = ParseExprBp(2);
     if (Check(TokenKind::kKwMatches)) {
@@ -215,9 +161,6 @@ Expr* Parser::TryParseSpecialInfix(Expr*& lhs, const Token& tok, int min_bp) {
     return ParseInsideExpr(lhs);
   }
 
-  // A cond_pattern's expression is any expression, an implication included
-  // (A.8.3), so `matches` is read only at the lowest binding power and never
-  // inside an implication's right operand.
   if (tok.kind == TokenKind::kKwMatches && min_bp <= 0) {
     Consume();
     auto* bin = MakePredicateNode(arena_, TokenKind::kKwMatches, lhs);
@@ -242,8 +185,6 @@ Expr* Parser::ParseInfixBp(Expr* lhs, int min_bp) {
 
     auto [lbp, rbp] = InfixBindingPower(tok.kind);
     if (lbp < 0 || lbp < min_bp) break;
-    // §16.12.7: inside a sequence body an implication operator ends the
-    // operand, the antecedent, rather than joining it to the consequent.
     if (in_sequence_body_ && (tok.kind == TokenKind::kPipeDashGt ||
                               tok.kind == TokenKind::kPipeEqGt)) {
       break;
@@ -269,8 +210,6 @@ Expr* Parser::ParsePrefixExpr() {
 
   if (tok.kind == TokenKind::kPlusPlus || tok.kind == TokenKind::kMinusMinus) {
     auto op = Consume();
-    // §A.8.3 inc_or_dec_expression allows an attribute_instance between the
-    // prefix ++/-- operator and its variable_lvalue.
     std::vector<Attribute> attrs = ParseAttributes();
     auto* operand = ParsePrimaryExpr();
     CheckIncDecOperand(operand, diag_);
@@ -286,8 +225,6 @@ Expr* Parser::ParsePrefixExpr() {
   int bp = PrefixBindingPower(tok.kind);
   if (bp >= 0) {
     auto op = Consume();
-    // §A.8.3 expression/constant_expression allow an attribute_instance between
-    // a unary_operator and its (constant_)primary.
     std::vector<Attribute> attrs = ParseAttributes();
     auto* operand = ParseExprBp(bp);
     auto* unary = arena_.Create<Expr>();
@@ -310,10 +247,6 @@ Expr* Parser::ParseNewExpr() {
     Consume();
     expr->args.push_back(ParseExpr());
     Expect(TokenKind::kRBracket, Subclause("7.5.1"));
-    // A.2.4's dynamic_array_new writes `( expression )` after the size: one
-    // expression, the array whose elements the new one starts with (§7.5.1).
-    // Any other count is reported, and the list read whole so the parse goes
-    // on.
     if (Check(TokenKind::kLParen)) {
       auto open = CurrentLoc();
       ParseParenList(expr->args);
@@ -325,10 +258,6 @@ Expr* Parser::ParseNewExpr() {
       }
     }
   } else if (Check(TokenKind::kLParen)) {
-    // A.2.4 gives class_new a list_of_arguments, the same production a
-    // subroutine call takes, so the named forms A.8.2 spells are read here as
-    // ParseCallExpr reads them; the dynamic_array_new branch above keeps its
-    // single parenthesized expression.
     ParseListOfArguments(expr);
   }
 
@@ -336,10 +265,6 @@ Expr* Parser::ParseNewExpr() {
   return expr;
 }
 
-// Whether `kind` ends a tagged expression or pattern whose member is written
-// without a value: what follows a whole expression or pattern, the `&&&` and
-// `?` of §12.6 after a pattern among them, so a `?` straight after a void
-// member's name ends it.
 static bool EndsTaggedMember(TokenKind kind) {
   static constexpr std::array kEnds = {
       TokenKind::kSemicolon, TokenKind::kComma,   TokenKind::kRParen,
@@ -367,16 +292,8 @@ Expr* Parser::ParseTaggedExpr() {
     expr->lhs = ParsePrimaryExpr();
   } else if (!EndsTaggedMember(CurrentToken().kind)) {
     if (pattern_depth_ > 0) {
-      // Syntax 12-4: the member pattern of `tagged M p` ends where the pattern
-      // does, so it is read at the binding power a `matches` pattern is read
-      // at (TryParseSpecialInfix), short of the `&&&` filter of §12.6.1 and
-      // §12.6.2 and the `?` of §12.6.3 that follow the whole pattern.
       expr->lhs = ParseExprBp(2);
     } else if (InfixBindingPower(CurrentToken().kind).first < 0) {
-      // A.8.3: in an expression the member's value is a primary, so an
-      // operator after the value takes the whole tagged expression as its
-      // operand, and one straight after the member name, a `-` included,
-      // leaves the member without a value.
       expr->lhs = ParsePrimaryExpr();
     }
   }
@@ -398,19 +315,9 @@ Expr* Parser::ParseThisOrSuperExpr() {
       }
     }
   }
-  // §8.11 makes `this` a handle to the object the method runs in (printed
-  // page 187 of IEEE 1800-2023), and a name reached through it takes the
-  // postfix chain any name takes -- A.8.4's method_call and A.8.6's select run
-  // on -- so `this.m[k].kill()` is read here as `m[k].kill()` is, through the
-  // loop ParseIdentifierExpr uses. Reading one call and one select then
-  // stopping left the `.` before kill unread, and the statement was reported as
-  // missing its ';'.
   return ParseNameTail(result);
 }
 
-// Declared in parser/expr_parser_internal.h, because the literal parsing in
-// expr_parser_literals.cpp builds one of these for a sized integer literal
-// followed by '(expr).
 Expr* MakeNodeCast(Arena& arena, Expr* type_node, Expr* value) {
   auto* cast = arena.Create<Expr>();
   cast->kind = ExprKind::kCast;
@@ -420,10 +327,6 @@ Expr* MakeNodeCast(Arena& arena, Expr* type_node, Expr* value) {
   return cast;
 }
 
-// Builds a bare identifier node carrying the given name text and location.
-// Pure node construction; declared in expr_parser_internal.h for the loop
-// generate header in parser_generate.cpp, so it stands outside the unnamed
-// namespace the other node builders share.
 Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc) {
   auto* id = arena.Create<Expr>();
   id->kind = ExprKind::kIdentifier;
@@ -432,11 +335,6 @@ Expr* MakeIdentifierNode(Arena& arena, std::string_view text, SourceLoc loc) {
   return id;
 }
 
-// Builds a cast whose target type is carried by a name string (cast->text) and
-// whose value is carried by cast->lhs, starting at the given location. Pure
-// node construction; declared in expr_parser_internal.h for the void cast
-// statement in parser_stmt.cpp, so it stands outside the unnamed namespace
-// the other node builders share.
 Expr* MakeTextCast(Arena& arena, std::string_view type_text, SourceLoc start,
                    Expr* value) {
   auto* cast = arena.Create<Expr>();
@@ -458,9 +356,6 @@ Expr* MakePostfixUnary(Arena& arena, TokenKind op, Expr* operand) {
 
 namespace {
 
-// Builds the placeholder integer-literal node returned after an "expected
-// expression" diagnostic, so parsing can continue past the offending token.
-// Pure node construction.
 Expr* MakeErrorExpr(Arena& arena, SourceLoc loc) {
   auto* err = arena.Create<Expr>();
   err->kind = ExprKind::kIntegerLiteral;
@@ -470,10 +365,6 @@ Expr* MakeErrorExpr(Arena& arena, SourceLoc loc) {
 
 }  // namespace
 
-// type_reference primary ('type(...)' or the 'type' keyword), optionally used
-// as the casting_type of an assignment-pattern cast or, §6.23 listing casts
-// among the uses of a type reference, of a `'(expression)` cast. A.8.2 makes
-// either cast, a primary, the root a method call may follow.
 Expr* Parser::ParseTypeRefPrimary() {
   auto* ref = ParseTypeRefExpr();
   if (Check(TokenKind::kApostropheLBrace)) {
@@ -489,9 +380,6 @@ Expr* Parser::ParseTypeRefPrimary() {
   return ref;
 }
 
-// A.8.2 makes any primary a method call's root (method_call_root), so a
-// literal, a size cast, an assignment pattern, null and $ each take the method
-// tail the other primaries take: `"abc".len()`, `T'{1, 2}.sum()`.
 Expr* Parser::ParsePrimaryExpr() {
   auto tok = CurrentToken();
 
@@ -573,12 +461,6 @@ Expr* Parser::ParseCastOrTypedPattern() {
   id->text = type_tok.text;
   id->range.start = type_tok.loc;
 
-  // §7.4.1 (printed page 153) allows more than one packed dimension on a
-  // vector type, declaring `bit [0:3] [7:0] packedArray;` as its example, so a
-  // keyword base takes every bracketed range written on it rather than the
-  // first alone. Parser::ParseIdentifierPostfixChain already loops this way for
-  // a name base, which is why `word_t [3:0][7:0]` parses and, until this loop,
-  // `logic [3:0][7:0]` left its second range for the caller to trip over.
   while (AtSelectBracket()) id = ParseSelectExpr(id);
   return id;
 }
@@ -600,29 +482,11 @@ static bool IsMethodKeyword(TokenKind kind) {
 Expr* Parser::MakeMemberAccess(Expr* base) {
   bool is_scope = CurrentToken().kind == TokenKind::kColonColon;
   Consume();
-  // §23.7 states the member select written with '.' and §23.7.1 the name
-  // written after a package or class scope resolution operator, so which rule a
-  // missing member name breaches depends on the operator that introduced it.
-  // §18.7.1: local::this names the this of the scope containing a
-  // randomize() call, so `this` is a member a scope resolution may name, as
-  // `super` is among the method keywords.
   auto member_tok =
       IsMethodKeyword(CurrentToken().kind) ||
               (is_scope && Check(TokenKind::kKwThis))
           ? Consume()
           : ExpectIdentifier(Subclause(is_scope ? "23.7.1" : "23.7"));
-  // §8.12: a typed constructor call (§8.8) may not make a shallow copy. A.2.4
-  // gives class_new the two alternatives
-  // `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, and
-  // only the second takes the copy source, so no legal parse puts a copy source
-  // after a class-scoped `new`. Consuming that source leaves the caller a
-  // well-formed scope resolution instead of an operand standing where a
-  // terminator belongs, which is what drew the §12.3 report this replaces.
-  // `is_scope` is required because `super.new` is §8.17 and a `.new` member
-  // select is not a typed constructor call. What counts as a copy source is
-  // Parser::StartsShallowCopySource in src/parser/expr_parser_aux.cpp, which
-  // Parser::ParseNewExpr asks as well, so `C::new this` is reported here rather
-  // than accepted there.
   if (is_scope && member_tok.kind == TokenKind::kKwNew &&
       StartsShallowCopySource()) {
     diag_.Error(CurrentLoc(),
@@ -680,10 +544,6 @@ Expr* Parser::TryParseUserTypeCast(const Token& tok) {
   return ParseMethodTail(cast);
 }
 
-// An identifier or scoped name may be the casting_type of a cast: "id'{...}"
-// (assignment-pattern cast) or "id'(expr)" (value cast). Returns the cast node
-// when one is recognized, leaving *handled true; otherwise returns base with
-// *handled false and the lexer position restored.
 Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
   *handled = true;
   if (Check(TokenKind::kApostropheLBrace)) {
@@ -706,10 +566,6 @@ Expr* Parser::TryParseIdentifierCast(Expr* base, bool* handled) {
   return base;
 }
 
-// A.8.4 (printed page 1211) writes a select's part_select_range last and gives
-// a subroutine call's result one bracket, `function_subroutine_call
-// [ [ range_expression ] ]`: reports the bracket at `loc` when `base`, what it
-// would select, is a part-select or the select of a call's result.
 static void ReportBracketAfterLastSelect(const Expr* base, SourceLoc loc,
                                          DiagEngine& diag) {
   if (base->kind != ExprKind::kSelect) return;
@@ -724,8 +580,6 @@ static void ReportBracketAfterLastSelect(const Expr* base, SourceLoc loc,
   }
 }
 
-// Parse the run of postfix call/select operators (with optional intervening
-// attribute lists and trailing member accesses) that follow a name primary.
 Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
   while (Check(TokenKind::kLParen) || AtSelectBracket() ||
          Check(TokenKind::kAttrStart)) {
@@ -739,12 +593,6 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
       ReportBracketAfterLastSelect(result, CurrentLoc(), diag_);
       result = ParseSelectExpr(result);
     }
-    // §23.6 Syntax 23-7 gives a hierarchical name as
-    // `{ identifier constant_bit_select . } identifier`, so any number of
-    // members may follow a select and not just one. Taking a single member
-    // left the rest of the name unread: `a[0].b` parsed and `a[0].b.c` stopped
-    // at the second period, which is why `defparam b[0].u.P = 99;` was
-    // reported as a defparam missing its `=`.
     while (Check(TokenKind::kDot) || Check(TokenKind::kColonColon)) {
       result = MakeMemberAccess(result);
     }
@@ -752,9 +600,6 @@ Expr* Parser::ParseIdentifierPostfixChain(Expr* result) {
   return result;
 }
 
-// Parse the member/select tail that may follow a 'with' clause expression or
-// a system call: its selects, and the methods Parser::ParseMethodTail reads
-// after each '.'.
 Expr* Parser::ParseWithClauseTail(Expr* result) {
   while (Check(TokenKind::kDot) || AtSelectBracket()) {
     if (Check(TokenKind::kDot)) {
@@ -767,13 +612,6 @@ Expr* Parser::ParseWithClauseTail(Expr* result) {
   return result;
 }
 
-// §A.9.3 ps_type_identifier admits a "local ::" scope prefix (footnote 48),
-// used inside an inline randomize()...with constraint to bind a name in the
-// calling scope rather than the randomized object (see 18.7.1); the same
-// prefix also opens §A.8.4 class_qualifier. Parse it as a scope-resolution
-// chain so a trailing type identifier can still form a cast
-// ("local::T'(expr)"). A bare "local" without "::" is not an expression, so
-// this keeps that error path intact rather than treating "local" as a name.
 void ReportLocalQualifier(SourceLoc loc, DiagEngine& diag) {
   diag.Error(loc,
              "the 'local::' qualifier stands only in an inline constraint "
@@ -782,15 +620,12 @@ void ReportLocalQualifier(SourceLoc loc, DiagEngine& diag) {
 }
 
 Expr* Parser::ParseLocalScopeExpr() {
-  auto tok = Consume();  // 'local'
+  auto tok = Consume();
   if (!Check(TokenKind::kColonColon)) {
     diag_.Error(tok.loc, "'local' may only appear here as a 'local::' prefix",
                 Subclause("18.7.1"));
     return MakeErrorExpr(arena_, tok.loc);
   }
-  // A.10 footnote 48: within a constraint block the qualifier is left to the
-  // block's own check, ParserConstraintItemHelpers::ReportLocalQualifiers for
-  // a class's own; an inline block is the one place it stands.
   if (constraint_block_depth_ == 0) ReportLocalQualifier(tok.loc, diag_);
   Expr* result = ParseMemberAccessChain(tok);
   bool cast_handled = false;
@@ -806,11 +641,6 @@ Expr* Parser::ParseIdentifierExpr() {
 
   Expr* result = ParseMemberAccessChain(tok);
 
-  // §8.25.1: a parameterized class scope ("C#(5)::f()") is class_type with a
-  // parameter_value_assignment, i.e. a name followed by "#(...)". The name need
-  // not be a previously declared type for this to be grammatical, so recognize
-  // it by the "#(" lookahead rather than by type knowledge (which fails for
-  // forward-referenced parameterized classes).
   if (Check(TokenKind::kHash)) {
     auto saved = lexer_.SavePos();
     Consume();
@@ -828,8 +658,6 @@ Expr* Parser::ParseIdentifierExpr() {
 
 namespace {
 
-// Whether `callee` is `super.new`, the one call A.1.9 lets write `default` in
-// place of its arguments (§8.17).
 bool IsSuperNewCallee(const Expr* callee) {
   return callee != nullptr && callee->kind == ExprKind::kMemberAccess &&
          callee->lhs->text == "super" && callee->rhs->text == "new";
@@ -840,8 +668,6 @@ bool IsSuperNewCallee(const Expr* callee) {
 void Parser::ParseCallArgs(Expr* call) {
   if (Check(TokenKind::kKwDefault)) {
     auto tok = Consume();
-    // A.8.2's list_of_arguments holds no `default`, which stands for a
-    // constructor's arguments in its super.new call alone.
     if (!IsSuperNewCallee(call->lhs)) {
       diag_.Error(tok.loc,
                   "'default' stands in place of an argument list only in a "
@@ -874,8 +700,6 @@ void Parser::ParseCallArgs(Expr* call) {
 }
 
 Expr* Parser::ParseCallExpr(Expr* callee) {
-  // A.8.2 writes an argument list after the name of a subroutine or a method
-  // alone, so none follows a call, `f(1)(2)`, or a select, `a[0](1)`.
   if (callee->kind == ExprKind::kCall || callee->kind == ExprKind::kSelect) {
     diag_.Error(CurrentLoc(),
                 "an argument list follows the name of a subroutine or a "
@@ -892,12 +716,6 @@ Expr* Parser::ParseCallExpr(Expr* callee) {
   return call;
 }
 
-// 18.7: capture a randomize() with { constraint_block } body, positioned just
-// past the opening '{'. The block's inline constraints follow the same rules
-// and take the same forms as an in-class constraint block, so the body is
-// scanned by the shared constraint-body scanner into a throwaway constraint
-// member; the simulator later applies its captured relations alongside the
-// object's own constraints. The scan consumes through the matching '}'.
 ClassMember* Parser::CaptureInlineConstraintBlock() {
   auto* block = arena_.Create<ClassMember>();
   block->kind = ClassMemberKind::kConstraint;
@@ -905,10 +723,6 @@ ClassMember* Parser::CaptureInlineConstraintBlock() {
   return block;
 }
 
-// §16.9.2: in a sequence body a `[` after an operand may open a repetition,
-// `[*`, `[->`, `[=` or `[+]`, rather than a select; while the linear capture
-// reads such a body, an expression stops before one, leaving it to the
-// capture, and everywhere else a `[` is the select it has always been.
 bool Parser::AtSelectBracket() {
   if (!Check(TokenKind::kLBracket)) return false;
   if (!in_sequence_body_) return true;
@@ -925,10 +739,6 @@ Expr* Parser::ParseSelectExpr(Expr* base) {
   auto* sel = arena_.Create<Expr>();
   sel->kind = ExprKind::kSelect;
   sel->base = base;
-  // §11.5.1 writes a select as its base followed by the bracketed address, so
-  // the select starts where its base does. Without this the node carries no
-  // position at all, and a report standing at a select renders as
-  // "<unknown location>".
   sel->range.start = base->range.start;
   sel->index = ParseExpr();
   if (Match(TokenKind::kPlusColon)) {

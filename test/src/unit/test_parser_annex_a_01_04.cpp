@@ -231,11 +231,6 @@ TEST(BindDirective, ErrorBindMissingTarget) {
       ReportedError(r.diags, "expected identifier, got ';'", 1, "23.11"));
 }
 
-// bind_target_instance ::= hierarchical_identifier constant_bit_select, and
-// A.9.3's hierarchical_identifier, `[ $root . ] { identifier
-// constant_bit_select . } identifier`, lets a select stand on any identifier of
-// the path, not only its last: the instance inside a generate loop's block is
-// spelled `top.g[0].u`.
 TEST(BindDirective, TargetInstanceSelectInsideHierarchicalIdentifier) {
   auto r = Parse("bind top.g[0].u chk c();\n");
   ASSERT_NE(r.cu, nullptr);
@@ -253,8 +248,6 @@ TEST(BindDirective, TargetInstanceSelectInsideHierarchicalIdentifier) {
   EXPECT_TRUE(r.cu->bind_directives[0]->target_instances.empty());
 }
 
-// constant_bit_select ::= { [ constant_expression ] } -- zero or more, so an
-// element of a two-dimensional instance array carries two.
 TEST(BindDirective, TargetInstanceCarriesEverySelect) {
   auto r = Parse("bind top.u[0][1] chk c();\n");
   ASSERT_NE(r.cu, nullptr);
@@ -266,9 +259,6 @@ TEST(BindDirective, TargetInstanceCarriesEverySelect) {
   EXPECT_EQ(target.segments[1].selects.size(), 2u);
 }
 
-// A.9.3 opens hierarchical_identifier with an optional `$root .`, which names
-// the same instance as the path without it and is left out of the recorded
-// path.
 TEST(BindDirective, RootedTargetInstance) {
   auto r = Parse("bind $root.top.c1 chk c();\n");
   ASSERT_NE(r.cu, nullptr);
@@ -280,8 +270,6 @@ TEST(BindDirective, RootedTargetInstance) {
   ASSERT_EQ(target.segments.size(), 2u);
 }
 
-// Each bind_target_instance of the first form's list is read by the same
-// production, so the selects inside its path are held as the second form's.
 TEST(BindDirective, TargetInstanceListEntrySelectInsideHierarchicalIdentifier) {
   auto r = Parse("bind cpu : top.g[0].u, top.v[1][2] chk c();\n");
   ASSERT_NE(r.cu, nullptr);
@@ -298,11 +286,6 @@ TEST(BindDirective, TargetInstanceListEntrySelectInsideHierarchicalIdentifier) {
   EXPECT_EQ(instances[1].segments[1].selects.size(), 2u);
 }
 
-// bind_target_scope ::= module_identifier | interface_identifier, one name;
-// §23.11 has it name the module or interface whose instances the list after
-// the ':' narrows. An instance path in its place names one instance, and the
-// list then narrows nothing, so it is reported at the target; the list and the
-// instantiation are still read, so the directive ends at its own ';'.
 TEST(BindDirective, ErrorHierarchicalTargetScopeIsRejected) {
   auto r = Parse("bind top.dut : u1 chk c();\n");
   EXPECT_TRUE(ReportedError(
@@ -314,8 +297,6 @@ TEST(BindDirective, ErrorHierarchicalTargetScopeIsRejected) {
   EXPECT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
 }
 
-// A select on the scope's name makes it an element of an instance array, a
-// bind_target_instance rather than a bind_target_scope.
 TEST(BindDirective, ErrorSelectedTargetScopeIsRejected) {
   auto r = Parse("bind dut[0] : u1 chk c();\n");
   EXPECT_TRUE(ReportedError(
@@ -325,8 +306,6 @@ TEST(BindDirective, ErrorSelectedTargetScopeIsRejected) {
   EXPECT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
 }
 
-// `$root .` opens a hierarchical_identifier and so an instance path; a
-// module_identifier carries no such prefix.
 TEST(BindDirective, ErrorRootedTargetScopeIsRejected) {
   auto r = Parse("bind $root.cpu : top.c1 chk c();\n");
   EXPECT_TRUE(ReportedError(
@@ -336,9 +315,6 @@ TEST(BindDirective, ErrorRootedTargetScopeIsRejected) {
   EXPECT_NE(r.cu->bind_directives[0]->instantiation, nullptr);
 }
 
-// The first form with a single module name and the second form with a single
-// instance name are spelled alike up to the ':', so a plain name before it is
-// held to nothing; §23.11 settles which the name is at elaboration.
 TEST(BindDirective, PlainTargetScopeBeforeInstanceListIsAccepted) {
   auto r = Parse("bind cpu : top.c1 chk c();\n");
   ASSERT_NE(r.cu, nullptr);
@@ -347,12 +323,6 @@ TEST(BindDirective, PlainTargetScopeBeforeInstanceListIsAccepted) {
   EXPECT_EQ(r.cu->bind_directives[0]->target.path, "cpu");
   EXPECT_FALSE(r.cu->bind_directives[0]->target.from_root);
 }
-
-// --- module_common_item ---
-// module_common_item enumerates the constructs shared by modules, interfaces,
-// programs, and checkers. These tests observe that the shared module-item parse
-// path accepts each alternative inside a module body and records the matching
-// item kind. The same path is reused for interface bodies in A.1.6.
 
 TEST(ModuleCommonItem, ContinuousAssignAndProceduralConstructs) {
   auto r = Parse(
@@ -408,8 +378,6 @@ TEST(ModuleCommonItem, AssertionItem) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty));
 }
 
-// --- module_or_generate_item_declaration ---
-
 TEST(ModuleOrGenerateItemDecl, ClockingAndDefaultClocking) {
   auto r = Parse(
       "module m;\n"
@@ -443,8 +411,6 @@ TEST(ModuleOrGenerateItemDecl, DefaultDisableIff) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// --- module_or_generate_item: parameter_override and gate_instantiation ---
-
 TEST(ModuleOrGenerateItem, ParameterOverrideDefparam) {
   auto r = Parse(
       "module m;\n"
@@ -466,8 +432,6 @@ TEST(ModuleOrGenerateItem, GateInstantiation) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
 }
-
-// --- non_port_module_item ---
 
 TEST(NonPortModuleItem, SpecparamDeclaration) {
   auto r = Parse(
@@ -494,8 +458,6 @@ TEST(NonPortModuleItem, NestedModuleDeclaration) {
   EXPECT_EQ(item->nested_module_decl->name, "inner");
 }
 
-// --- module_item: port_declaration ; alongside a non_port_module_item ---
-
 TEST(ModuleItem, NonAnsiPortDeclarationAndNonPortItem) {
   auto r = Parse(
       "module m(a, b);\n"
@@ -512,12 +474,6 @@ TEST(ModuleItem, NonAnsiPortDeclarationAndNonPortItem) {
   EXPECT_TRUE(HasItemOfKind(mod->items, ModuleItemKind::kContAssign));
 }
 
-// module_common_item lists interface_instantiation and program_instantiation,
-// and module_or_generate_item lists module_instantiation. All three share one
-// instantiation syntax (the module/interface/program distinction is resolved at
-// elaboration), so the parser records them uniformly as a module instance.
-// udp_instantiation is the same syntax and is distinguished only when a UDP of
-// that name is in scope (observed under A.5.4).
 TEST(ModuleOrGenerateItem, InstantiationItem) {
   auto r = Parse(
       "module m;\n"
@@ -528,8 +484,6 @@ TEST(ModuleOrGenerateItem, InstantiationItem) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
-
-// --- module_or_generate_item_declaration: remaining named alternatives ---
 
 TEST(ModuleOrGenerateItemDecl, GenvarDeclaration) {
   auto r = Parse(
@@ -543,9 +497,6 @@ TEST(ModuleOrGenerateItemDecl, GenvarDeclaration) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
-// package_or_generate_item_declaration is one of the alternatives; observe that
-// a representative package_or_generate_item (a parameter declaration) is
-// accepted as a module item.
 TEST(ModuleOrGenerateItemDecl, PackageOrGenerateItemDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -556,8 +507,6 @@ TEST(ModuleOrGenerateItemDecl, PackageOrGenerateItemDeclaration) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kParamDecl));
 }
-
-// --- non_port_module_item: remaining named alternatives ---
 
 TEST(NonPortModuleItem, GenerateRegion) {
   auto r = Parse(
@@ -596,8 +545,6 @@ TEST(NonPortModuleItem, TimeunitsDeclaration) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeprecision);
 }
 
-// non_port_module_item writes no { attribute_instance } before a
-// generate_region, a specify_block or a timeunits_declaration.
 TEST(NonPortModuleItem, AttributeBeforeAnItemThatTakesNoneRejected) {
   auto r = Parse(
       "module m;\n"
@@ -615,9 +562,6 @@ TEST(NonPortModuleItem, AttributeBeforeAnItemThatTakesNoneRejected) {
                             4, "A.1.4"));
 }
 
-// module_or_generate_item gives { attribute_instance } to every
-// module_common_item, a conditional generate construct and an elaboration
-// system task among them.
 TEST(ModuleOrGenerateItem, AttributeBeforeACommonItemAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -649,8 +593,6 @@ TEST(NonPortModuleItem, NestedProgramAndInterfaceDeclaration) {
   EXPECT_TRUE(saw_interface);
 }
 
-// A.1.2 makes the extern forms alternatives of interface_declaration and
-// program_declaration, both of which non_port_module_item admits.
 TEST(NonPortModuleItem, NestedExternInterfaceAndProgramDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -672,22 +614,15 @@ TEST(NonPortModuleItem, NestedExternInterfaceAndProgramDeclaration) {
   EXPECT_EQ(items[1]->nested_module_decl->ports.size(), 1u);
 }
 
-// --- error conditions / edge cases ---
-
-// elaboration_severity_system_task ends in a required `;`. Omitting it is a
-// parse error.
 TEST(ElaborationSeverityTask, SeverityTaskMissingSemicolonRejected) {
   auto r = Parse(
       "module m;\n"
       "  $info(\"x\")\n"
       "endmodule\n");
-  // `endmodule` is the token standing where the ';' was wanted on line 3.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "20.10.1"));
 }
 
-// parameter_override ::= defparam list_of_defparam_assignments ; — the trailing
-// `;` is required.
 TEST(ModuleOrGenerateItem, ParameterOverrideMissingSemicolonRejected) {
   auto r = Parse(
       "module m;\n"
@@ -697,15 +632,11 @@ TEST(ModuleOrGenerateItem, ParameterOverrideMissingSemicolonRejected) {
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.10.1"));
 }
 
-// module_or_generate_item_declaration's `default disable iff
-// expression_or_dist` form requires the `iff` keyword after `default disable`.
 TEST(ModuleOrGenerateItemDecl, DefaultDisableMissingIffRejected) {
   auto r = Parse(
       "module m;\n"
       "  default disable rst;\n"
       "endmodule\n");
-  // §16.15 owns `default disable iff`, so the missing `iff` is reported there
-  // rather than under A.1.4's module_or_generate_item_declaration.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'iff', got identifier", 2, "16.15"));
 }

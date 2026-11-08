@@ -1,14 +1,3 @@
-// Canonical tests for §6.3.2 "Strengths".
-//
-// §6.3.2 names two restrictions on the strengths that a net declaration may
-// carry:
-//   - Charge strength may be used only when the declared net is a trireg.
-//   - Drive strength may be used only when the same statement that declares
-//     the net also places a continuous assignment on it.
-// Both restrictions are enforced by the elaborator, so they are observed here.
-// The keyword set, default charge strength, and the drive-strength semantics
-// themselves belong to the descendant subclauses §6.3.2.1 and §6.3.2.2.
-
 #include <gtest/gtest.h>
 
 #include "common/types.h"
@@ -19,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.3.2: charge strength is permitted on a trireg net, and the elaborator
-// records it on the net rather than rejecting the declaration.
 TEST(NetStrengths, ChargeStrengthAcceptedOnTrireg) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -41,16 +28,8 @@ TEST(NetStrengths, ChargeStrengthAcceptedOnTrireg) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2 allows charge strength only on a trireg net declaration, so a
-// charge-strength keyword on any other net type is rejected. The report names
-// §6.3.2.1, the subclause devoted to the charge strength specification, which
-// restates the rule by keeping the charge strength specification to trireg
-// nets. It is raised in Parser::ParseNetStrength, where the specification is
-// read, and ElaborateSrc leaves it in the fixture's engine.
 TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
   ElabFixture f;
-  // The charge-strength rule is reported while parsing, so this case reaches
-  // its subject through a source that does not parse.
   ElaborateSrcAllowingParseErrors(
       "module t;\n"
       "  wire (large) w;\n"
@@ -61,12 +40,6 @@ TEST(NetStrengths, ChargeStrengthRejectedOnNonTrireg) {
                             2, "6.3.2.1"));
 }
 
-// §6.3.2 states drive strength is used only where a net's declaring statement
-// also places a continuous assignment on it, so a declaration carrying a
-// strength and no assignment is rejected. §6.3.2 is the subclause the report
-// names: §6.3.2.2 says only that the specification "allows" the assignment, and
-// §10.3.4 says only where a strength may be written and that it applies to
-// scalar nets.
 TEST(NetStrengths, DriveStrengthRejectedWithoutAssignment) {
   ElabFixture f;
   Elaborate(
@@ -79,8 +52,6 @@ TEST(NetStrengths, DriveStrengthRejectedWithoutAssignment) {
       "drive strength on net declaration requires an assignment", 2, "6.3.2"));
 }
 
-// §6.3.2: drive strength is permitted when the same statement that declares
-// the net also continuously assigns to it.
 TEST(NetStrengths, DriveStrengthAcceptedWithAssignment) {
   ElabFixture f;
   Elaborate(

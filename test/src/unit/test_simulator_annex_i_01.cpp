@@ -5,17 +5,12 @@
 #include <type_traits>
 
 #include "simulator/dpi_include_file.h"
-// svdpi.h is included alone, as every case exercising it does: it redefines
-// VPI names vpi.h spells otherwise.
 #include "simulator/svdpi.h"
 
 using namespace delta;
 
 namespace {
 
-// §I.1: Annex I lists the contents of the svdpi.h include file -- constant
-// definitions, structure definitions and routine declarations, each of
-// which the file contains.
 TEST(SvdpiHContents, TheAnnexListsThreeKindsOfContent) {
   EXPECT_EQ(DpiAnnexListingSvdpiH(), "Annex I");
   const std::array<DpiSvdpiContent, 3> kContents = DpiSvdpiContents();
@@ -27,9 +22,6 @@ TEST(SvdpiHContents, TheAnnexListsThreeKindsOfContent) {
   }
 }
 
-// §I.1: the file provides one of each kind -- the scalar and time-type
-// constants, the canonical vector and time value structures, and the
-// routines of the interface -- reached through the file alone.
 TEST(SvdpiHContents, TheFileProvidesConstantsStructuresAndRoutines) {
   EXPECT_EQ(sv_x, 3);
   EXPECT_EQ(sv_scaled_real_time, 1);

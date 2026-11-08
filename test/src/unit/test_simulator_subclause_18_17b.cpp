@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.17: the generator picks at random among production lists set apart by |,
-// and emits a chosen list's items in order, so 200 runs of the clause's example
-// reach each of add pop done, add push done, dec pop done and dec push done and
-// nothing else, as the design test/src/e2e/randsequence_statement.sv runs it.
 TEST(RandsequenceRun, TheClausesExampleReachesItsFourOutcomes) {
   SimFixture f;
   std::string out = RunCapture(
@@ -45,13 +41,6 @@ TEST(RandsequenceRun, TheClausesExampleReachesItsFourOutcomes) {
   EXPECT_EQ(out, "1 1 1 1 1\n");
 }
 
-// 18.17: the statement creates no loop of itself but a recursive production
-// will loop, so a production naming itself as one alternative runs one or
-// more times and stops; and the statement is an automatic scope whose code
-// blocks are anonymous automatic scopes, a static variable needing the
-// static prefix, so a static counter in a code block sees all three
-// activations while an automatic one starts afresh each time, as the design
-// test/src/e2e/randsequence_statement.sv runs it.
 TEST(RandsequenceRun, ARecursiveProductionLoopsAndCodeBlockScopesAreAutomatic) {
   SimFixture f;
   std::string out = RunCapture(
@@ -74,10 +63,6 @@ TEST(RandsequenceRun, ARecursiveProductionLoopsAndCodeBlockScopesAreAutomatic) {
   EXPECT_EQ(out, "1 3 1\n");
 }
 
-// 18.17: the production named in the parentheses is the top-level one and
-// the first production is when none is named, so randsequence(second) runs
-// only the second production and randsequence() starts at main, as the
-// design test/src/e2e/randsequence_statement.sv runs it.
 TEST(RandsequenceRun, TheNamedProductionOrElseTheFirstIsTheTopLevel) {
   SimFixture f;
   std::string out = RunCapture(
@@ -107,12 +92,6 @@ TEST(RandsequenceRun, TheNamedProductionOrElseTheFirstIsTheTopLevel) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// 18.17 with 13.4: a randsequence is a statement a function body may hold,
-// and it generates its sequence there as it does in a process. The function's
-// own variable is what the code blocks write, so the value the function
-// returns is the sum the three productions left in it -- 6 -- and not the 0 a
-// body that stepped over the statement returns. This is the shape of sv-tests'
-// 18.17--random-sequence-generation-randsequence_0.sv.
 TEST(RandsequenceRun, ARandsequenceInAFunctionBodyGeneratesItsSequence) {
   SimFixture f;
   std::string out = RunCapture(
@@ -133,14 +112,6 @@ TEST(RandsequenceRun, ARandsequenceInAFunctionBodyGeneratesItsSequence) {
   EXPECT_EQ(out, "6\n");
 }
 
-// 18.17.6: a return in a production code block ends that production and the
-// sequence goes on, whatever encloses the randsequence. In a function body the
-// return has a second candidate to end, the function itself, and it does not:
-// `second` returns before its own addition, `third` still runs, and the
-// function's own return hands out 25. A return that left the function would
-// hand out 20 -- or, read as the function's, would want a value the bare
-// return does not carry. This is the shape of sv-tests'
-// 18.17.6--aborting-productions-break-and-return_2.sv.
 TEST(RandsequenceRun, AReturnInAProductionInAFunctionEndsTheProductionOnly) {
   SimFixture f;
   std::string out = RunCapture(

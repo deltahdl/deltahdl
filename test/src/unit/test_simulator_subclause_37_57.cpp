@@ -15,85 +15,56 @@
 namespace delta {
 namespace {
 
-// §37.57 Let: the VPI object model for a let construct. The diagram pairs a let
-// expression (its vpiArgument iteration of actual arguments) with the let
-// declaration it instantiates (reached by the tagless down arrow), where the
-// declaration carries its vpiName, its body expression, and its seq formal
-// decls. The one normative rule, detail 1, governs the vpiArgument iteration:
-// the arguments come back in the order the formals are declared, and a formal's
-// default value stands in for an argument the instantiation omits. These tests
-// observe the production helper VpiLetExprArguments that applies that rule. The
-// remaining diagram edges (let expr -> let decl, the vpiName property, the body
-// expr, and the seq formal decls) are tagless traversals/properties carried by
-// the generic VPI machinery (vpi_handle / vpi_get_str of §38.11), not by any
-// rule §37.57 itself states.
-
-// §37.57 detail 1: the vpiArgument iteration returns the arguments in
-// formal-declaration order, substituting a formal's default value for an
-// argument the instantiation omits. Here the middle formal is omitted but
-// carries a default, so its default appears in that position while the supplied
-// actuals keep their places - each argument lines up with its formal.
 TEST(LetExprModel, ArgumentsFollowFormalOrderAndFillDefaults) {
   VpiObject a0;
   VpiObject a2;
   VpiObject def1;
 
   std::vector<VpiLetFormal> formals = {
-      {nullptr},  // formal 0: no default
-      {&def1},    // formal 1: has a default value
-      {nullptr},  // formal 2: no default
+      {nullptr},
+      {&def1},
+      {nullptr},
   };
-  std::vector<VpiHandle> provided = {&a0, nullptr, &a2};  // formal 1 omitted
+  std::vector<VpiHandle> provided = {&a0, nullptr, &a2};
 
   auto args = VpiLetExprArguments(formals, provided);
   ASSERT_EQ(args.size(), 3u);
   EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1],
-            &def1);  // default substituted, declaration order kept
+  EXPECT_EQ(args[1], &def1);
   EXPECT_EQ(args[2], &a2);
 }
 
-// §37.57 detail 1 (an argument the instantiation leaves out, when the formal
-// has no default): an omitted argument whose formal has no default value yields
-// a null argument in that position, so later arguments still align with their
-// own formals rather than shifting left.
 TEST(LetExprModel, OmittedArgumentWithoutDefaultIsNull) {
   VpiObject a2;
 
   std::vector<VpiLetFormal> formals = {
-      {nullptr},  // formal 0: no default
-      {nullptr},  // formal 1: no default
+      {nullptr},
+      {nullptr},
   };
-  std::vector<VpiHandle> provided = {nullptr, &a2};  // formal 0 omitted
+  std::vector<VpiHandle> provided = {nullptr, &a2};
 
   auto args = VpiLetExprArguments(formals, provided);
   ASSERT_EQ(args.size(), 2u);
-  EXPECT_EQ(args[0], nullptr);  // no actual and no default
-  EXPECT_EQ(args[1], &a2);      // position preserved
+  EXPECT_EQ(args[0], nullptr);
+  EXPECT_EQ(args[1], &a2);
 }
 
-// §37.57 detail 1: the result always has one argument per formal even when the
-// instantiation supplies fewer actuals than there are formals; the trailing
-// formals fall back to their default values.
 TEST(LetExprModel, FewerProvidedThanFormalsUsesDefaults) {
   VpiObject a0;
   VpiObject def1;
 
   std::vector<VpiLetFormal> formals = {
-      {nullptr},  // formal 0: no default
-      {&def1},    // formal 1: has a default value
+      {nullptr},
+      {&def1},
   };
-  std::vector<VpiHandle> provided = {&a0};  // only the first actual given
+  std::vector<VpiHandle> provided = {&a0};
 
   auto args = VpiLetExprArguments(formals, provided);
   ASSERT_EQ(args.size(), 2u);
   EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1],
-            &def1);  // trailing formal filled from its default
+  EXPECT_EQ(args[1], &def1);
 }
 
-// §37.57 detail 1 (edge): a let with no formals has no arguments, whatever the
-// instantiation happens to pass.
 TEST(LetExprModel, NoFormalsYieldsNoArguments) {
   VpiObject stray;
   std::vector<VpiLetFormal> formals;
@@ -102,18 +73,6 @@ TEST(LetExprModel, NoFormalsYieldsNoArguments) {
   EXPECT_TRUE(VpiLetExprArguments(formals, provided).empty());
 }
 
-// -----------------------------------------------------------------------------
-// §37.57's vpiArgument edge, walked through the routine the diagram names for
-// it. The cases above hand the rule its formals and actuals directly, which
-// says what the rule does with them; nothing said whether the iteration a PLI
-// application performs applies the rule at all. It did not: vpiArgument is a
-// relation tag no object carries as its type, so the generic child walk the
-// request fell through to reached none of the arguments, and the rule was
-// stated by a helper the simulator never called.
-// -----------------------------------------------------------------------------
-
-// The fixture installs a context so the public vpi_iterate/vpi_scan entry
-// points run their real dispatch over the test objects.
 class LetExprIteration : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -129,8 +88,6 @@ class LetExprIteration : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// §37.57 (figure) + detail 1: the vpiArgument iteration of a let expression
-// hands back its arguments, in the order the let's formals are declared.
 TEST_F(LetExprIteration, TheArgumentIterationReachesTheActualsInFormalOrder) {
   VpiObject formal0;
   formal0.type = vpiSeqFormalDecl;
@@ -157,11 +114,6 @@ TEST_F(LetExprIteration, TheArgumentIterationReachesTheActualsInFormalOrder) {
   EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
-// §37.57 detail 1: when the instantiation gives a formal with a default no
-// value, the default appears as its argument. The instantiation leaves the
-// first port empty - written the way §37.42 detail 8 writes an omitted argument
-// - so the formal's default stands in its place and the actual it did write
-// keeps the second position.
 TEST_F(LetExprIteration, AnOmittedArgumentComesBackAsItsFormalsDefault) {
   VpiObject default0;
   default0.type = vpiConstant;
@@ -191,9 +143,6 @@ TEST_F(LetExprIteration, AnOmittedArgumentComesBackAsItsFormalsDefault) {
   EXPECT_EQ(VpiObjectOf(args[1]), &a1);
 }
 
-// §37.57 detail 1: the correspondence is with the formals, so an instantiation
-// that writes fewer actuals than there are formals still reaches one argument
-// per formal, the trailing ones coming from their defaults.
 TEST_F(LetExprIteration, ATrailingFormalIsFilledFromItsDefault) {
   VpiObject default1;
   default1.type = vpiConstant;
@@ -221,9 +170,6 @@ TEST_F(LetExprIteration, ATrailingFormalIsFilledFromItsDefault) {
   EXPECT_EQ(VpiObjectOf(args[1]), &default1);
 }
 
-// §37.57 (figure): the let declaration a let expression instantiates is reached
-// by the diagram's tagless edge, and carries the name the declaration was
-// written with. The declaration is not one of the arguments.
 TEST_F(LetExprIteration, TheLetExpressionReachesTheDeclarationItInstantiates) {
   VpiObject decl;
   decl.type = vpiLetDecl;
@@ -238,10 +184,6 @@ TEST_F(LetExprIteration, TheLetExpressionReachesTheDeclarationItInstantiates) {
   EXPECT_EQ(vpi_iterate(vpiArgument, VpiHandleOf(&let_expr)), nullptr);
 }
 
-// §37.57 detail 1: an operation the instantiation wrote is an argument like
-// any other expression; a child of the let expression that is neither its
-// declaration nor an expression is none; and a formal left empty with no
-// default has no argument object, so the iteration hands back the rest.
 TEST_F(LetExprIteration, OnlyWrittenAndDefaultedArgumentsComeBack) {
   VpiObject formal0;
   formal0.type = vpiSeqFormalDecl;
@@ -269,8 +211,6 @@ TEST_F(LetExprIteration, OnlyWrittenAndDefaultedArgumentsComeBack) {
   EXPECT_EQ(VpiObjectOf(args[0]), &sum);
 }
 
-// §37.57 detail 1: a null formal has no default, and a formal's default is its
-// first expression child, its typespec not being one.
 TEST(LetFormalDefault, NullHasNoneAndTheTypespecIsPassedOver) {
   EXPECT_EQ(VpiLetFormalDefault(nullptr), nullptr);
   VpiObject typespec;
@@ -283,10 +223,8 @@ TEST(LetFormalDefault, NullHasNoneAndTheTypespecIsPassedOver) {
   EXPECT_EQ(VpiLetFormalDefault(&formal), &value);
 }
 
-// The lets of a run, built from the elaborated design.
 class LetsOfARun : public VpiDesignRun {
  protected:
-  // The right sides of the continuous assignments of `scope`, in order.
   static std::vector<vpiHandle> AssignedRhs(vpiHandle scope) {
     std::vector<vpiHandle> sides;
     vpiHandle it = vpi_iterate(vpiContAssign, scope);
@@ -296,15 +234,11 @@ class LetsOfARun : public VpiDesignRun {
     return sides;
   }
 
-  // The let decl the let expr `used` instantiates, null where `used` is no
-  // let expr.
   static VpiObject* DeclOf(vpiHandle used) {
     if (used == nullptr || vpi_get(vpiType, used) != vpiLetExpr) return nullptr;
     return VpiObjectOf(vpi_handle(vpiLetDecl, used));
   }
 
-  // The kinds of what the vpiArgument iteration of `let_expr` reaches, in
-  // the order reached.
   static std::vector<int> ArgumentKinds(vpiHandle let_expr) {
     std::vector<int> kinds;
     vpiHandle it = vpi_iterate(vpiArgument, let_expr);
@@ -324,12 +258,6 @@ constexpr const char* kLets =
     "  initial r = pick(, b) + one;\n"
     "endmodule\n";
 
-// §37.12 with the let decl of the figure: each let a module declares is a let
-// decl of its instance, named after it, reaching a seq formal decl per formal
-// in the order declared, each reaching the default it declares, if any, and
-// its body, in which a formal's name is a ref obj named after it and bound to
-// no actual, as in a sequence's body (§37.53); a covergroup beside the lets
-// is none (#7036).
 TEST_F(LetsOfARun, AModulesLetsAreLetDeclsOfItsInstance) {
   Run(kLets);
   vpiHandle top = By("top");
@@ -356,11 +284,6 @@ TEST_F(LetsOfARun, AModulesLetsAreLetDeclsOfItsInstance) {
   EXPECT_STREQ(vpi_get_str(vpiName, kOperands[1]), "y");
 }
 
-// The let expr of the figure: a use of a let, called with arguments in a
-// continuous assignment or by its name alone in a procedure, is a let expr
-// reaching the let decl it instantiates and, through vpiArgument, an argument
-// per formal in the order declared, an omitted one its formal's default
-// (detail 1) (#7185).
 TEST_F(LetsOfARun, AUseOfALetIsALetExpr) {
   Run(kLets);
   vpiHandle top = By("top");
@@ -391,10 +314,6 @@ TEST_F(LetsOfARun, AUseOfALetIsALetExpr) {
   EXPECT_TRUE(ArgumentKinds(kUses[1]).empty());
 }
 
-// §37.12 with §37.85 and §27.4: a let a generate block declares is a let decl
-// of the gen scope of the block instance declaring it, one per instance of a
-// loop generate block, and of no scope around it; a use of it in the block is
-// a let expr reaching it (#7322).
 TEST_F(LetsOfARun, AGenerateBlocksLetIsALetDeclOfItsGenScope) {
   Run("module top; logic a, w, v;\n"
       "  let h(x) = x;\n"
@@ -425,10 +344,6 @@ TEST_F(LetsOfARun, AGenerateBlocksLetIsALetDeclOfItsGenScope) {
             VpiObjectOf(Named(vpiLetDecl, g, "f")));
 }
 
-// §37.12 with §37.10 and §26.3: a let a package declares is a let decl of the
-// package, and a use of it is a let expr reaching it whether the module names
-// it through an explicit import, a wildcard import or the package's path; a
-// call of the module's own function beside them is still a func call (#7321).
 TEST_F(LetsOfARun, APackagesLetIsALetDeclOfThePackage) {
   Run("package pk; let f(x) = x + 1; let h(x) = x - 1; endpackage\n"
       "package qk; let q(x) = x; endpackage\n"
@@ -457,9 +372,6 @@ TEST_F(LetsOfARun, APackagesLetIsALetDeclOfThePackage) {
   EXPECT_EQ(vpi_get(vpiType, kSides[3]), vpiFuncCall);
 }
 
-// §37.12 with §3.12.1: a let the compilation unit declares is a let decl of
-// the unit's scope, $unit, which a unit declaring nothing else has too, and a
-// use of it in a module is a let expr reaching it (#7323).
 TEST_F(LetsOfARun, ACompilationUnitsLetIsALetDeclOfItsScope) {
   Run("let g(y) = y * 2;\n"
       "module top; logic [3:0] a, w; assign w = g(a); endmodule\n");

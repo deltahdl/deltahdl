@@ -12,17 +12,6 @@
 namespace delta {
 namespace {
 
-// §37.20 Memory: the VPI object model for a memory. Detail 1 is the clause's
-// only own normative statement - the legacy vpiMemory and vpiMemoryWord objects
-// have been generalized to arrays of variables and, for backwards
-// compatibility, behave as methods returning vpiRegArray and vpiReg objects
-// respectively. The vpiMemory iteration's item type (vpiRegArray) is owned by
-// §37.10, and the reg/reg-array object definitions, ranges, parent edge, and
-// access-by-index are owned by §37.17 and §38.19 (the cited dependencies). The
-// piece §37.20 owns and is exercised here is the vpiMemoryWord relation: a reg
-// array's words are reached as reg (vpiReg) objects.
-
-// Walk an iterator to completion, collecting every object it yields in order.
 std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   std::vector<VpiHandle> objects;
   if (!iterator) return objects;
@@ -30,15 +19,12 @@ std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   return objects;
 }
 
-// Detail 1: iterating vpiMemoryWord over a reg array reaches its reg word
-// objects (vpiReg), in order, and skips any child that is not a reg word (for
-// instance a range expression carried by the same reg array).
 TEST(MemoryModel, MemoryWordIterationReachesRegWords) {
   VpiContext ctx;
 
   VpiObject word0;
   word0.type = vpiReg;
-  VpiObject left_range;  // not a word: a vpiLeftRange expr, must be skipped
+  VpiObject left_range;
   left_range.type = vpiConstant;
   VpiObject word1;
   word1.type = vpiReg;
@@ -56,8 +42,6 @@ TEST(MemoryModel, MemoryWordIterationReachesRegWords) {
   EXPECT_EQ(words[1]->type, vpiReg);
 }
 
-// Detail 1: a reg array with no reg word children yields nothing, so the
-// vpiMemoryWord iterator is NULL.
 TEST(MemoryModel, MemoryWordIterationNullWhenNoWords) {
   VpiContext ctx;
 
@@ -66,10 +50,6 @@ TEST(MemoryModel, MemoryWordIterationNullWhenNoWords) {
   EXPECT_EQ(ctx.Iterate(vpiMemoryWord, &reg_array), nullptr);
 }
 
-// Detail 1 (boundary): the vpiMemoryWord relation is special only for a reg
-// array (an array-variable kind). An object that is not a reg array - even one
-// that happens to carry reg children - exposes no vpiMemoryWord iteration, so
-// the iterator is NULL.
 TEST(MemoryModel, MemoryWordIterationGatedToRegArray) {
   VpiContext ctx;
 
@@ -82,19 +62,6 @@ TEST(MemoryModel, MemoryWordIterationGatedToRegArray) {
   EXPECT_EQ(ctx.Iterate(vpiMemoryWord, &not_an_array), nullptr);
 }
 
-// -----------------------------------------------------------------------------
-// The other half of detail 1, and the property beside it. vpiMemory and
-// vpiMemoryWord are now methods, the first returning vpiRegArray objects and
-// the second vpiReg ones. The word half was answered; the memory half was not,
-// so vpi_iterate(vpiMemory, scope) looked for a child whose own type is the
-// legacy vpiMemory kind - which no design builds - and reached none of a
-// scope's memories. vpiIsMemory, drawn on the reg array beside it, was
-// dispatched by nothing and answered FALSE for every one.
-// -----------------------------------------------------------------------------
-
-// Detail 1: the vpiMemory iteration returns objects of type vpiRegArray, so a
-// scope's memories are the array variables it declares. A variable that is not
-// an array is not one of them.
 TEST(MemoryPublic, MemoryIterationReturnsRegArrayObjects) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -119,8 +86,6 @@ TEST(MemoryPublic, MemoryIterationReturnsRegArrayObjects) {
   SetGlobalVpiContext(nullptr);
 }
 
-// Detail 1: a scope declaring no array variable has no memory to reach, which
-// §38.23 reports as no iterator.
 TEST(MemoryPublic, MemoryIterationIsNullWhenTheScopeHasNoArray) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -137,9 +102,6 @@ TEST(MemoryPublic, MemoryIterationIsNullWhenTheScopeHasNoArray) {
   SetGlobalVpiContext(nullptr);
 }
 
-// Figure (reg array -> is a memory): the array reports whether it is one.
-// Detail 1 makes a memory's words regs, so an array of regs is a memory and an
-// array of some other variable kind is an array variable that is not.
 TEST(MemoryPublic, IsMemoryDistinguishesARegArrayFromAnyOtherArray) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -165,12 +127,8 @@ TEST(MemoryPublic, IsMemoryDistinguishesARegArrayFromAnyOtherArray) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.20 against a design read and run whole.
 class MemoriesOfARun : public VpiDesignRun {};
 
-// Detail 1 with §37.17 detail 18: a word a reg array's vpiMemoryWord iteration
-// reaches answers vpiIndex with the index that selects it, the declared one
-// rather than its position (#7020).
 TEST_F(MemoriesOfARun, AMemoryWordReachesItsIndex) {
   Run("module top;\n"
       "  reg [7:0] mem [4:7];\n"

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// The §18.13.2 prototype lists maxval as the only required argument and minval
-// as a defaulted optional argument, so a single-argument call is well-formed.
 TEST_F(AnnexHParseTest, UrandomRangeSingleArgumentForm) {
   auto* unit = Parse(
       "module m;\n"
@@ -20,7 +18,6 @@ TEST_F(AnnexHParseTest, UrandomRangeSingleArgumentForm) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// The §18.13.2 prototype accepts maxval followed by an explicit minval.
 TEST_F(AnnexHParseTest, UrandomRangeTwoArgumentForm) {
   auto* unit = Parse(
       "module m;\n"

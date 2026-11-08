@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A 64-bit two-state message holding `v`, as the C++ cases below place one,
-// and the low word of a message read back out of the queue.
 Logic4Snapshot Msg(uint64_t v) {
   Logic4Word word{v, 0};
   Logic4Vec vec{64, 1, &word};
@@ -29,10 +27,6 @@ TEST(IpcSync, MailboxTryPutBoundedWithRoom) {
   EXPECT_EQ(mb.Num(), 2);
 }
 
-// §15.4.4: a full mailbox returns 0 from try_put(). Fullness is reached when
-// the queue holds the bounded number of messages, so exercise a bound greater
-// than one: the first two placements succeed, the third is rejected, and the
-// rejected message leaves the queue (and its FIFO contents) undisturbed.
 TEST(IpcSync, MailboxTryPutRejectsAtBoundGreaterThanOne) {
   MailboxObject mb(2);
   EXPECT_EQ(mb.TryPut(Msg(10).Get()), 1);
@@ -78,12 +72,6 @@ TEST(IpcSync, MailboxTryPutSucceedsAfterGetFreesSpace) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.4 (printed page 375): try_put() places its message and returns a
-// positive integer when the mailbox is not full, and returns 0 without
-// placing it when the mailbox is full. On a queue of one the first call
-// answers 1 and the second 0, and num() confirms only one message was
-// placed: 1, 0 and 1 read as 101. Left unlowered, the calls evaluated to
-// nothing and r read x.
 TEST(MailboxSim, TryPutAnswersZeroOnAFullQueue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -101,11 +89,6 @@ TEST(MailboxSim, TryPutAnswersZeroOnAFullQueue) {
   EXPECT_EQ(var->value.ToUint64(), 101u);
 }
 
-// §15.2 with §15.4.4 and §8.15: a class may extend the built-in mailbox, and
-// the inherited try_put(), called unqualified in a method, places into the
-// base's queue `super.new(b)` built, from which `m.get(v)` through the handle
-// retrieves the first message: 2 sent and 6, read as 26. Built by nothing,
-// try_put() placed nothing and get() waited for ever.
 TEST(MailboxSim, ClassExtendingTheMailboxHoldsTheBaseQueue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -129,12 +112,6 @@ TEST(MailboxSim, ClassExtendingTheMailboxHoldsTheBaseQueue) {
   EXPECT_EQ(var->value.ToUint64(), 26u);
 }
 
-// §15.3 and §15.4 with §8.6 and §8.5: a mailbox or semaphore property is
-// reached through any expression that yields its object's handle, a call's
-// result among them, and §11.3.1 has the call run once for each method:
-// try_put() stores 5, num() counts it, try_get() takes it into x, put() adds a
-// key and try_get(3) takes all three. Each was reported as a call through a
-// null handle and did nothing.
 TEST(IpcSync, MethodsOfASyncPropertyReachedThroughACallsResult) {
   SimFixture f;
   auto out = RunCapture(

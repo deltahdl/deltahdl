@@ -220,9 +220,6 @@ TEST(LoopSyntaxParsing, ForAllPartsNonNull) {
   EXPECT_NE(stmt->for_body, nullptr);
 }
 
-// The optional for_initialization of the for production is absent, so the
-// parsed statement carries no init entries. The 12.7.1 file carries the
-// prose case, where the loop variable is declared prior to the loop.
 TEST(LoopSyntaxParsing, ForOmittedForInitialization) {
   auto r = Parse(
       "module m;\n"
@@ -255,9 +252,6 @@ TEST(LoopSyntaxParsing, ForEmptyCond) {
   EXPECT_EQ(stmt->for_cond, nullptr);
 }
 
-// The optional for_step of the for production is absent, so the parsed
-// statement carries no step entries. The 12.7.1 file carries the prose
-// case, where the body modifies the loop-control variable instead.
 TEST(LoopSyntaxParsing, ForOmittedForStep) {
   auto r = Parse(
       "module m;\n"
@@ -482,9 +476,6 @@ TEST(LoopSyntaxParsing, ForStepFunctionCall) {
   EXPECT_FALSE(stmt->for_steps.empty());
 }
 
-// for_step_assignment ::= ... | function_subroutine_call — a bare call as the
-// step, distinct from an operator_assignment whose right side happens to call a
-// function. It parses to a plain expression statement.
 TEST(LoopSyntaxParsing, ForStepStandaloneSubroutineCall) {
   auto r = Parse(
       "module m;\n"
@@ -524,7 +515,6 @@ TEST(LoopSyntaxParsing, ErrorForMissingSemicolonAfterInit) {
       "    for (int i = 0 i < 10; i++) x = i;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.1 owns the for statement; A.6.8 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got identifier", 3, "12.7.1"));
 }
@@ -536,13 +526,10 @@ TEST(LoopSyntaxParsing, ErrorForMissingCloseParen) {
       "    for (int i = 0; i < 10; i++ x = i;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.1 owns the for statement; A.6.8 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got identifier", 3, "12.7.1"));
 }
 
-// loop_statement ::= for ... — for_initialization may declare more than one
-// control variable (for_variable_declaration { , for_variable_declaration }).
 TEST(LoopSyntaxParsing, ForInitMultipleDeclarations) {
   auto r = Parse(
       "module m;\n"
@@ -558,8 +545,6 @@ TEST(LoopSyntaxParsing, ForInitMultipleDeclarations) {
   EXPECT_EQ(stmt->for_inits.size(), 2u);
 }
 
-// for_initialization ::= list_of_variable_assignments — the comma-separated
-// form without local declarations.
 TEST(LoopSyntaxParsing, ForInitListOfVariableAssignments) {
   auto r = Parse(
       "module m;\n"
@@ -575,8 +560,6 @@ TEST(LoopSyntaxParsing, ForInitListOfVariableAssignments) {
   EXPECT_EQ(stmt->for_inits.size(), 2u);
 }
 
-// for_step ::= for_step_assignment { , for_step_assignment } — more than one
-// step assignment separated by commas.
 TEST(LoopSyntaxParsing, ForStepMultipleAssignments) {
   auto r = Parse(
       "module m;\n"
@@ -592,9 +575,6 @@ TEST(LoopSyntaxParsing, ForStepMultipleAssignments) {
   EXPECT_EQ(stmt->for_steps.size(), 2u);
 }
 
-// loop_statement ::= forever statement_or_null
-// Here statement_or_null is a plain assignment. The 12.7.6 file carries the
-// timing-controlled body that clause recommends.
 TEST(LoopSyntaxParsing, ForeverLoopWithAssignmentBody) {
   auto r = Parse(
       "module m;\n"
@@ -610,9 +590,6 @@ TEST(LoopSyntaxParsing, ForeverLoopWithAssignmentBody) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// loop_statement ::= repeat ( expression ) statement_or_null
-// Here statement_or_null is a plain assignment. The 12.7.2 file carries the
-// event-controlled body.
 TEST(LoopSyntaxParsing, RepeatLoopWithAssignmentBody) {
   auto r = Parse(
       "module m;\n"
@@ -629,9 +606,6 @@ TEST(LoopSyntaxParsing, RepeatLoopWithAssignmentBody) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// loop_statement ::= while ( expression ) statement_or_null
-// Here statement_or_null is a plain assignment. The 12.7.4 file carries the
-// countdown control expression.
 TEST(LoopSyntaxParsing, WhileLoopWithAssignmentBody) {
   auto r = Parse(
       "module m;\n"
@@ -648,7 +622,6 @@ TEST(LoopSyntaxParsing, WhileLoopWithAssignmentBody) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// loop_statement ::= do statement_or_null while ( expression ) ;
 TEST(LoopSyntaxParsing, DoWhileLoop) {
   auto r = Parse(
       "module m;\n"
@@ -665,7 +638,6 @@ TEST(LoopSyntaxParsing, DoWhileLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// The do-while body must be followed by 'while ( expr ) ;'.
 TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhile) {
   auto r = Parse(
       "module m;\n"
@@ -673,15 +645,10 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhile) {
       "    do x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.5 owns the do-while statement; A.6.8 only states its BNF. The
-  // `while` Parser::ParseDoWhileStmt demands is missing, and the `end` closing
-  // the initial block stands where it belongs, on line 4.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'while', got 'end'", 4, "12.7.5"));
 }
 
-// loop_statement ::= foreach ( ps_or_hierarchical_array_identifier
-//                               [ loop_variables ] ) statement
 TEST(LoopSyntaxParsing, ForeachLoop) {
   auto r = Parse(
       "module m;\n"
@@ -701,7 +668,6 @@ TEST(LoopSyntaxParsing, ForeachLoop) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// foreach with more than one loop variable for a multidimensional array.
 TEST(LoopSyntaxParsing, ForeachMultipleLoopVars) {
   auto r = Parse(
       "module m;\n"
@@ -718,8 +684,6 @@ TEST(LoopSyntaxParsing, ForeachMultipleLoopVars) {
   EXPECT_EQ(stmt->foreach_vars.size(), 2u);
 }
 
-// The foreach array reference may be a hierarchical (member) name, exercising
-// the ps_or_hierarchical_array_identifier slot of the foreach alternative.
 TEST(LoopSyntaxParsing, ForeachHierarchicalArrayId) {
   auto r = Parse(
       "module m;\n"
@@ -738,7 +702,6 @@ TEST(LoopSyntaxParsing, ForeachHierarchicalArrayId) {
   EXPECT_EQ(stmt->foreach_vars[0], "i");
 }
 
-// repeat ( expression ) — the parentheses around the count are required.
 TEST(LoopSyntaxParsing, ErrorRepeatMissingParen) {
   auto r = Parse(
       "module m;\n"
@@ -746,12 +709,10 @@ TEST(LoopSyntaxParsing, ErrorRepeatMissingParen) {
       "    repeat 8 x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.2 owns the repeat statement; A.6.8 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got integer literal", 3, "12.7.2"));
 }
 
-// while ( expression ) — the parentheses around the condition are required.
 TEST(LoopSyntaxParsing, ErrorWhileMissingParen) {
   auto r = Parse(
       "module m;\n"
@@ -759,13 +720,10 @@ TEST(LoopSyntaxParsing, ErrorWhileMissingParen) {
       "    while x < 10 x = x + 1;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.4 owns the while statement; A.6.8 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got identifier", 3, "12.7.4"));
 }
 
-// foreach ( array [ loop_variables ] ) — the bracketed loop-variable list is
-// part of the syntax; omitting the brackets is an error.
 TEST(LoopSyntaxParsing, ErrorForeachMissingBrackets) {
   auto r = Parse(
       "module m;\n"
@@ -774,18 +732,9 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingBrackets) {
       "    foreach (arr) arr[0] = 0;\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.3 owns the foreach statement; A.6.8 only states its BNF.
   EXPECT_TRUE(ReportedError(r.diags, "expected '[', got ')'", 4, "12.7.3"));
 }
 
-// for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration
-//   { , for_variable_declaration }, each item assigning with '=':
-// list_of_variable_assignments is `variable_lvalue = expression { , ... }` and
-// for_variable_declaration `[ var ] data_type variable_identifier = expression
-// { , variable_identifier = expression }`. The parser read each item as any
-// assignment or expression statement, so a bare `i`, a nonblocking `i <= 0`
-// and a declaration with no initial value were accepted silently.
 TEST(LoopSyntaxParsing, ErrorForInitializationWithoutAssignmentRejected) {
   auto r = Parse(
       "module m;\n"
@@ -807,12 +756,6 @@ TEST(LoopSyntaxParsing, ErrorForInitializationWithoutAssignmentRejected) {
       "A.6.8"));
 }
 
-// for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-//   function_subroutine_call
-// A bare expression and a nonblocking assignment are neither; each was
-// accepted silently. A name or a member select alone is a call whose
-// parentheses are left off, as one of a task, a void function or a method may
-// be (A.8.2), so whether it names a subroutine is the elaborator's question.
 TEST(LoopSyntaxParsing, ErrorForStepOutsideItsThreeFormsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -834,9 +777,6 @@ TEST(LoopSyntaxParsing, ErrorForStepOutsideItsThreeFormsRejected) {
       r.diags, "a for loop's step is an operator assignment", 7, "A.6.8"));
 }
 
-// foreach ( ps_or_hierarchical_array_identifier [ loop_variables ] ) statement
-// -- a statement, where the five other loops take a statement_or_null. A ';'
-// body was accepted silently.
 TEST(LoopSyntaxParsing, ErrorForeachNullBodyRejected) {
   auto r = Parse(
       "module m;\n"
@@ -848,11 +788,6 @@ TEST(LoopSyntaxParsing, ErrorForeachNullBodyRejected) {
       "A.6.8"));
 }
 
-// ps_or_hierarchical_array_identifier is A.9.3's `[ implicit_class_handle . |
-// class_scope | package_scope ] hierarchical_array_identifier`, so the array
-// may be reached through `this.`, a class or package scope, or a hierarchical
-// path; the parser read '.' alone, so the first three were reported as a
-// missing identifier or '['.
 TEST(LoopSyntaxParsing, ForeachScopedAndClassHandleArrayId) {
   auto r = Parse(
       "class C;\n"
@@ -885,10 +820,6 @@ TEST(LoopSyntaxParsing, ForeachScopedAndClassHandleArrayId) {
   EXPECT_EQ(loops[2]->expr->lhs->text, "pkg");
 }
 
-// A.6.8's for_variable_declaration takes a data_type, which A.2.2.1 lets be a
-// type_reference (§6.23), held for the elaborator to resolve. The loop
-// variable is a variable, so its type reference follows `var`, and one written
-// without it is reported.
 TEST(LoopSyntaxParsing, ForVariableOfATypeReference) {
   auto r = Parse(
       "module m;\n"
@@ -917,10 +848,6 @@ TEST(LoopSyntaxParsing, ForVariableOfATypeReferenceWithoutVarIsReported) {
                             3, "6.23"));
 }
 
-// A.6.8's foreach array is an A.9.3 hierarchical_identifier, whose segments
-// before a period carry bit-selects alone, A.8.4's constant_bit_select. A
-// part-select and an indexed part-select there are reported; one bit-select
-// or several are not.
 TEST(LoopSyntaxParsing, AForeachArraySelectsBitsBeforeAPeriod) {
   auto r = Parse(
       "module m;\n"

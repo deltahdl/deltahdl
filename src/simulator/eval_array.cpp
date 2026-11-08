@@ -29,13 +29,6 @@ static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
                              const std::vector<Logic4Vec>& vals,
                              SimContext& ctx);
 
-// The 'with'-clause iteration binding for array reduction/ordering methods
-// (§7.12). Each element is evaluated with the iterator variable (named by
-// iter_name) and its index variable (idx_var_name) bound in a fresh scope.
-// ctx/arena are the evaluation environment those bindings live in, and
-// index_base is the index of the first element, a fixed-size array's low
-// bound (§7.12.4 with §7.4.2). An associative array's elements are indexed
-// by `keys` instead, one per element, strings where `string_keys` says so.
 struct WithIterEnv {
   std::string_view iter_name;
   const std::string& idx_var_name;
@@ -88,19 +81,12 @@ static void WriteElements(std::string_view var_name, const ArrayInfo& info,
   }
 }
 
-// The identity permutation over `count` positions. Each ordering method of
-// §7.12.2 sorts, reverses or shuffles this vector instead of the values, so
-// that where every element moved is still known once the new value list has
-// been built from it.
 static std::vector<size_t> IdentityOrder(size_t count) {
   std::vector<size_t> order(count);
   for (size_t i = 0; i < count; ++i) order[i] = i;
   return order;
 }
 
-// Applies a permutation to a value list: `order[i]` is the position the value
-// now at i came from, the same meaning the permutation carries into
-// ApplyDynArrayIdPermutation.
 template <typename T>
 static std::vector<T> GatherByOrder(const std::vector<T>& vals,
                                     const std::vector<size_t>& order) {
@@ -109,17 +95,6 @@ static std::vector<T> GatherByOrder(const std::vector<T>& vals,
   return out;
 }
 
-// §7.10.3: an argument passed by reference names the element it was taken on,
-// so it must keep naming that element after the array is reordered. A dynamic
-// array is backed by a QueueObject whose element_ids run parallel to its
-// elements, and a ref argument is recorded against the id at the index it was
-// taken at; moving an element without moving its id sends the write-back to
-// whichever element landed at that index. So every §7.12.2 ordering method
-// applies its permutation here as well as to the values. `order[i]` is the
-// index the element now at position i came from. element_ids can be shorter
-// than elements, so an entry whose source or destination index is past its end
-// is skipped rather than read or written out of range. Nothing is done for a
-// fixed-size array, whose elements are ordinary variables and carry no ids.
 static void ApplyDynArrayIdPermutation(std::string_view var_name,
                                        const ArrayInfo& info,
                                        const std::vector<size_t>& order,
@@ -136,18 +111,12 @@ static void ApplyDynArrayIdPermutation(std::string_view var_name,
   ids = std::move(reordered);
 }
 
-// A variable's value with the variable's own signedness, as
-// ReadReferencedVariable (eval_expr.cpp) reads it.
 static Logic4Vec ValueAsRead(const Variable& v) {
   Logic4Vec val = v.value;
   val.is_signed = v.is_signed;
   return val;
 }
 
-// §6.11 with §7.12: each element as it reads, with the element type's
-// signedness rather than that of the value written into it -- a queue's or a
-// dynamic array's by TakeElementSignedness, and a fixed-size array's element
-// variable's own, as ReadReferencedVariable (eval_expr.cpp) reads a variable.
 std::vector<Logic4Vec> CollectVecElements(std::string_view var_name,
                                           const ArrayInfo& info,
                                           SimContext& ctx, Arena& arena) {
@@ -204,13 +173,9 @@ static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
                                         const WithIterEnv& env,
                                         const Logic4Vec& elem, size_t index) {
   env.ctx.PushScope();
-  // §7.12 with §6.11: the iterator is a variable of the element type, whose
-  // signedness `elem` carries (CollectVecElements).
   auto* item_var =
       env.ctx.CreateLocalVariable(env.iter_name, elem.width, elem.is_signed);
   item_var->value = elem;
-  // §7.12.4: the index iterator is an associative element's key, of the
-  // index type, and any other element's index, an int.
   Logic4Vec index_val =
       env.keys != nullptr
           ? (*env.keys)[index]
@@ -223,10 +188,6 @@ static Logic4Vec EvalWithExprForElement(const Expr* with_expr,
   return ev;
 }
 
-// §7.12.3: the type a reduction with a with clause takes, the with
-// expression's, as its first value states it: the width, 0 where there is no
-// value, and the signedness, so `q.sum() with (item)` over an int queue is a
-// signed int; built unsigned, -1 + -2 read 4294967293.
 struct WithResultType {
   uint32_t width = 0;
   bool is_signed = false;
@@ -253,10 +214,6 @@ struct ArrayCtx {
   Arena& arena;
 };
 
-// §7.12.3 with §7.4.4: the with clause's value for element `row` of the
-// first dimension of the multidimensional array of `ac`, the iterator bound
-// to the subarray it is, so that `item.sum with (item)` reduces it, and the
-// index iterator to its index in that dimension.
 static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
                                 const IterNames& names, uint32_t row) {
   SimContext& ctx = ac.ctx;
@@ -270,9 +227,6 @@ static Logic4Vec EvalWithForRow(const ArrayCtx& ac, const Expr* expr,
   return value;
 }
 
-// §7.12.3: a multidimensional fixed-size array reduced through a with clause
-// is reduced over the elements of its first dimension, each a subarray, which
-// §7.12.3's own `m.sum with (item.sum with (item))` example relies on.
 static Logic4Vec ReduceRowsWithExpr(const ArrayCtx& ac, const Expr* expr,
                                     std::string_view method) {
   IterNames names = ExtractIterNames(expr);
@@ -290,11 +244,6 @@ static Logic4Vec ReduceRowsWithExpr(const ArrayCtx& ac, const Expr* expr,
   return out;
 }
 
-// Reduces the values produced by the with-clause expression of `expr` for each
-// element of the named array (§7.12.3). `method` selects the fold and is passed
-// explicitly so this serves both the parenthesized call form (method name on
-// expr->lhs->rhs) and the bare member-access form `arr.sum with (e)` (method
-// name on expr->rhs). The result takes the width of the with expression.
 static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
                                 std::string_view method) {
   if (HasSubarrayElements(ac.info) && expr->with_expr != nullptr) {
@@ -316,19 +265,12 @@ static Logic4Vec ReduceWithExpr(const ArrayCtx& ac, const Expr* expr,
   return out;
 }
 
-// §7.5.2: size() is a dynamic array's method, answering the elements its
-// queue holds. A fixed-size array has no such method, which the elaborator
-// reports (§7.12), so no fixed size is answered here.
 static Logic4Vec ArraySize(std::string_view var_name, SimContext& ctx,
                            Arena& arena) {
   auto* q = ctx.FindQueue(var_name);
   return MakeLogic4VecVal(arena, 32, q ? q->elements.size() : 0);
 }
 
-// §7.12.1 with §6.11: the element max() selects where `want_max` is set and
-// the one min() selects where it is not, the first of several equal ones, the
-// elements ordered by their type's signedness, which CollectVecElements gives
-// each of them.
 static Logic4Vec ArrayExtreme(std::string_view var_name, const ArrayInfo& info,
                               bool want_max, SimContext& ctx, Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
@@ -347,13 +289,6 @@ static bool IsReductionMethod(std::string_view method) {
          method == "or" || method == "xor";
 }
 
-// Resolves the ArrayInfo a reduction should read. Registered fixed and dynamic
-// arrays return their own info. A queue ([$]) is not registered as ArrayInfo,
-// but §7.12.3 reduction methods apply to any unpacked integral array; when a
-// reduction is requested on a queue, present a dynamic-array view backed by the
-// queue's elements so the shared reduction path reads them. `scratch` provides
-// storage for that synthesized view. Non-reduction methods on a queue return
-// nullptr so they fall through to the dedicated queue dispatch.
 static const ArrayInfo* ArrayInfoForReduction(std::string_view var_name,
                                               std::string_view method,
                                               SimContext& ctx,
@@ -369,18 +304,11 @@ static const ArrayInfo* ArrayInfoForReduction(std::string_view var_name,
   return nullptr;
 }
 
-// Folds an associative array's elements with the named reduction, optionally
-// transforming each through the with clause carried by `expr` (null for the
-// bare property form). Returns nullopt for non-reduction methods so the caller
-// keeps handling its own methods (size, exists, traversal, …).
 std::optional<Logic4Vec> TryAssocReduction(AssocArrayObject* aa,
                                            std::string_view method,
                                            const Expr* expr, SimContext& ctx,
                                            Arena& arena) {
   if (!IsReductionMethod(method)) return std::nullopt;
-  // §7.12.3: an associative array is an unpacked array of integral values, so
-  // the reduction methods apply to its stored elements, in key order; the
-  // folds are commutative, so the order does not affect the result.
   std::vector<Logic4Vec> keys;
   std::vector<Logic4Vec> elems;
   CollectAssocKeyVals(*aa, arena, keys, elems);
@@ -400,16 +328,12 @@ std::optional<Logic4Vec> TryAssocReduction(AssocArrayObject* aa,
   std::vector<uint64_t> vals;
   vals.reserve(elems.size());
   for (const auto& e : elems) vals.push_back(e.ToUint64());
-  // §7.12.3 with §6.11: of the element type, signed where it is (#4609).
   Logic4Vec out =
       MakeLogic4VecVal(arena, aa->elem_width, ApplyReduction(method, vals));
   out.is_signed = aa->is_signed;
   return out;
 }
 
-// §7.12.3 with §6.11: whether the elements of the array `ac` names are of a
-// signed type, as a queue or dynamic array records for its elements and a
-// fixed-size array's element variables each record for themselves.
 static bool ElementsAreSigned(const ArrayCtx& ac) {
   if (ac.info.is_dynamic) {
     const QueueObject* q = ac.ctx.FindQueue(ac.var_name);
@@ -420,10 +344,6 @@ static bool ElementsAreSigned(const ArrayCtx& ac) {
   return first != nullptr && first->is_signed;
 }
 
-// §7.12.3: the reduction `method` of the elements of the array `ac` names,
-// with no with clause, of the element type -- signed where the elements are,
-// so `b.sum()` over `byte b[2] = '{-1, -2}` is -3; built unsigned, it read
-// 253.
 static Logic4Vec ReduceElements(std::string_view method, const ArrayCtx& ac) {
   Logic4Vec out = MakeLogic4VecVal(
       ac.arena, ac.info.elem_width,
@@ -460,14 +380,6 @@ static bool DispatchQuery(std::string_view method, const ArrayCtx& ac,
   return false;
 }
 
-// §26.3 admits a package-qualified array as the receiver, `p::a.sum()`,
-// resolved by the key ExtractHandleMethodCallParts answers.
-// §7.12 with §7.2 and §7.4.2: an unpacked array member of a structure is an
-// unpacked array, so a reduction method, `r.v.sum()`, folds its elements, the
-// result of the element's type (§7.12.3). The member names no array of its own
-// name, so the array paths below found none and answered 0. A with clause is
-// left to those paths. size() is no method of a fixed-size member (§7.12),
-// which the elaborator reports.
 static bool TryStructArrayMemberMethod(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
@@ -492,9 +404,6 @@ static bool TryStructArrayMemberMethod(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §7.12.3 with §8.5: `expr` as a reduction on a queue property, which
-// QueuePropertyReceiver names for the reduction to read; false for a call of
-// another method or on another receiver.
 static bool TryQueuePropertyReduction(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
@@ -507,10 +416,6 @@ static bool TryQueuePropertyReduction(const Expr* expr, SimContext& ctx,
          TryEvalArrayMethodCall(receiver.Call(), ctx, arena, out);
 }
 
-// §7.12.3 with §7.4.4: a reduction on a subarray, `m2[1].sum()`, folds the
-// elements of that subarray (ResolveSubarraySelect), with or without a with
-// clause, as it folds a one-dimensional array's. The select names no array
-// by its own name, so the paths below found none and answered 0.
 static bool TrySubarrayReduction(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
@@ -525,21 +430,13 @@ static bool TrySubarrayReduction(const Expr* expr, SimContext& ctx,
   return DispatchReductionExpr(access->rhs->text, ac, expr, out);
 }
 
-// §7.12.3 with §7.4 and §7.10: an element of an array whose elements are
-// queues or fixed-size arrays, `r[0]` of `int r[$][2]` or `aq[1]` of `int
-// aq[int][$]`, is an unpacked array itself, kept as its own queue
-// (ElementQueueOfSelect), and a reduction on it folds that queue's values:
-// without a with clause of the element type, signed where it is, and with
-// one of the with expression's type. The select names no array of its own
-// name, so the paths below found none and answered 0.
 static bool TryElementQueueReduction(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
       access->rhs == nullptr || !IsReductionMethod(access->rhs->text))
     return false;
-  const QueueObject* q =
-      ElementQueueOfSelect(access->lhs, ctx, arena, /*allocate=*/false);
+  const QueueObject* q = ElementQueueOfSelect(access->lhs, ctx, arena, false);
   if (q == nullptr || q->elements_are_queues) return false;
   std::vector<Logic4Vec> elems = q->elements;
   for (Logic4Vec& e : elems) TakeElementSignedness(*q, e);
@@ -585,12 +482,6 @@ bool TryEvalArrayMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
   return false;
 }
 
-// §7.12.3: a reduction method written without parentheses carries its with
-// clause on the member-access node itself (arr.sum with (e), the form used
-// throughout the LRM). EvalMemberAccess routes such a node here so the with
-// clause is applied instead of silently dropped. Only reduction methods on an
-// unpacked integral array (or queue) are handled; everything else, including
-// the no-clause property read, falls through to the ordinary member path.
 bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   if (expr->kind != ExprKind::kMemberAccess || !expr->with_expr) return false;
@@ -615,8 +506,6 @@ bool TryEvalArrayReductionWithClause(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §7.12.2: each element's with-clause value, the key sort() and rsort() order
-// by, paired with the index of the element it was computed for.
 using SortKeys = std::vector<std::pair<Logic4Vec, size_t>>;
 
 static SortKeys BuildSortKeys(const std::vector<Logic4Vec>& vals,
@@ -628,9 +517,6 @@ static SortKeys BuildSortKeys(const std::vector<Logic4Vec>& vals,
   return keys;
 }
 
-// §7.12.2 with §6.11: the keys in ascending order for sort() and descending
-// for rsort(), ordered by the with expression's signedness, which every key
-// carries alike; equal keys keep the order of their elements.
 static void SortKeysByValue(SortKeys& keys, bool ascending) {
   std::stable_sort(keys.begin(), keys.end(), [&](const auto& a, const auto& b) {
     return ascending ? OrdersBefore(a.first, b.first, a.first.is_signed)
@@ -656,27 +542,15 @@ static void ArraySortWithExpr(const ArrayCtx& ac, const Expr* expr,
   SortKeysByValue(keys, ascending);
   std::vector<Logic4Vec> sorted = ReorderByKeys(vals, keys);
   WriteVecElements(ac.var_name, ac.info, sorted, ac.ctx);
-  // The second of each key pair is the index the element now at that position
-  // came from, which is the permutation §7.10.3 requires the element ids of a
-  // dynamic array to follow.
   std::vector<size_t> order(keys.size());
   for (size_t i = 0; i < keys.size(); ++i) order[i] = keys[i].second;
   ApplyDynArrayIdPermutation(ac.var_name, ac.info, order, ac.ctx);
 }
 
-// §7.12.2: reorder a queue by the with-clause key. A queue is not registered as
-// an ArrayInfo, so it cannot share the array path above; reorder its elements
-// (and their tracking ids, kept parallel) directly by the computed key. The
-// permuted ids are always stored, because §7.10.3 makes a reference follow the
-// element it was taken on and a lost permutation sends its write-back to the
-// element that took that position. Each id is bounds-guarded on its own, so an
-// element_ids list that has drifted shorter than elements costs the entries it
-// no longer covers rather than the whole permutation.
 void SortQueueByWithExpr(QueueObject* q, const Expr* expr, bool ascending,
                          SimContext& ctx, Arena& arena) {
   auto names = ExtractIterNames(expr);
   WithIterEnv env{names.iter_name, names.idx_var_name, ctx, arena};
-  // §6.11 with §7.12: each element as it reads, the iterator taking its type.
   std::vector<Logic4Vec> vals = q->elements;
   for (auto& v : vals) TakeElementSignedness(*q, v);
   SortKeys keys = BuildSortKeys(vals, expr, env);
@@ -693,11 +567,6 @@ void SortQueueByWithExpr(QueueObject* q, const Expr* expr, bool ascending,
   ++q->generation;
 }
 
-// §7.12.2: sort()/rsort() optionally order by the with-clause expression. The
-// call form (arr.sort(x) with (e)) is handled by TryExecArrayMethodStmt, but
-// the parenthesis-free member form and any queue receiver arrive here as a bare
-// member-access node carrying the with clause. Without this, that clause would
-// be dropped and the elements sorted by their raw value instead of the key.
 bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
                                         Arena& arena) {
   if (expr == nullptr || expr->kind != ExprKind::kMemberAccess ||
@@ -724,16 +593,8 @@ bool TryExecArrayOrderingWithClauseStmt(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §7.12.2 sort()/rsort() order the elements by their own value. The order the
-// values take is computed over indices rather than over the values themselves,
-// so that ApplyDynArrayIdPermutation can move the element ids of a dynamic
-// array the same way and keep the §7.10.3 references pointing at their own
-// elements.
 static void ArraySortByValue(std::string_view var_name, const ArrayInfo& info,
                              bool ascending, SimContext& ctx, Arena& arena) {
-  // §7.12.2 with §6.16: strings are ordered lexicographically, and each keeps
-  // its own text; read as integers they were ordered by their packed value
-  // and written back empty.
   if (IsStringArray(var_name, info, ctx)) {
     auto elems = CollectVecElements(var_name, info, ctx, arena);
     std::vector<std::string> text;
@@ -747,8 +608,6 @@ static void ArraySortByValue(std::string_view var_name, const ArrayInfo& info,
     ApplyDynArrayIdPermutation(var_name, info, order, ctx);
     return;
   }
-  // §7.12.2 with §6.11: other elements are ordered by their type's
-  // signedness, which CollectVecElements gives each of them.
   auto vals = CollectVecElements(var_name, info, ctx, arena);
   auto order = IdentityOrder(vals.size());
   std::sort(order.begin(), order.end(), [&](size_t a, size_t b) {
@@ -788,9 +647,6 @@ static void WriteVecElements(std::string_view var_name, const ArrayInfo& info,
   }
 }
 
-// §7.12.2 reverse() reverses the element order. Reversing the index vector and
-// gathering through it leaves the permutation available for the element ids of
-// a dynamic array, which §7.10.3 requires to move with their elements.
 static void ArrayReverse(std::string_view var_name, const ArrayInfo& info,
                          SimContext& ctx, Arena& arena) {
   auto vals = CollectVecElements(var_name, info, ctx, arena);
@@ -800,10 +656,6 @@ static void ArrayReverse(std::string_view var_name, const ArrayInfo& info,
   ApplyDynArrayIdPermutation(var_name, info, order, ctx);
 }
 
-// §7.12.2 shuffle() randomizes the element order. The Fisher-Yates swaps are
-// applied to the index vector rather than to the values, so the draw that
-// produced the new order is also the permutation the element ids of a dynamic
-// array follow under §7.10.3.
 static void ArrayShuffle(std::string_view var_name, const ArrayInfo& info,
                          SimContext& ctx, Arena& arena) {
   auto vals = CollectElements(var_name, info, ctx);
@@ -821,9 +673,6 @@ static bool IsOrderingMethod(std::string_view name) {
          name == "shuffle";
 }
 
-// Validates the 'with'-clause usage for ordering methods. Returns true if
-// execution should continue; sets *handled when the call has already been
-// fully resolved (diagnostic emitted) and the caller should return *result.
 static bool CheckOrderingWithClause(const MethodCallParts& parts,
                                     const Expr* expr, SimContext& ctx,
                                     bool& handled, bool& result) {
@@ -875,8 +724,6 @@ static void ExecOrderingMethod(const MethodCallParts& parts,
   ArrayShuffle(parts.var_name, info, ctx, arena);
 }
 
-// §26.3 admits a package-qualified array as the receiver, `p::a.sort()`,
-// resolved by the key ExtractHandleMethodCallParts answers.
 bool TryExecArrayMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   MethodCallParts parts;
   if (!ExtractHandleMethodCallParts(expr, arena, parts)) return false;

@@ -20,9 +20,6 @@ TEST(QueueDeclarationElaboration, UnboundedQueueDimension) {
   EXPECT_EQ(mod->variables[0].queue_max_size, -1);
 }
 
-// Records the optional right bound from `queue_dimension ::= [ $ [ :
-// constant_expression ] ]`. The stored max_size is the size of the queue
-// (last index N plus one).
 TEST(QueueDeclarationElaboration, BoundedQueueDimensionRecordsCapacity) {
   ElabFixture f;
   auto* design = Elaborate("module m; bit b [$:7]; endmodule\n", f);
@@ -34,9 +31,6 @@ TEST(QueueDeclarationElaboration, BoundedQueueDimensionRecordsCapacity) {
   EXPECT_EQ(mod->variables[0].queue_max_size, 8);
 }
 
-// Observes the rule that constant_expression evaluate to a positive integer.
-// Anything non-positive (zero or negative) trips the same check in the
-// elaborator; a single negative-bound case suffices to pin the rule.
 TEST(QueueDeclarationElaboration, NonPositiveBoundEmitsError) {
   ElabFixture f;
   auto* design = Elaborate("module m; int q [$:-1]; endmodule\n", f);
@@ -46,9 +40,6 @@ TEST(QueueDeclarationElaboration, NonPositiveBoundEmitsError) {
                             "7.10"));
 }
 
-// §7.10's bound is a constant_expression, which per §11.2.1 may name a
-// localparam. A localparam bound shall resolve to the queue's capacity exactly
-// as a literal bound does; here N == 7 yields size N+1 == 8.
 TEST(QueueDeclarationElaboration, LocalparamBoundRecordsCapacity) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -68,10 +59,6 @@ TEST(QueueDeclarationElaboration, LocalparamBoundRecordsCapacity) {
   EXPECT_EQ(q->queue_max_size, 8);
 }
 
-// The same constant-expression path must still enforce the positive-integer
-// rule: a parameter that evaluates non-positive trips the error, proving the
-// bound is genuinely evaluated in the parameter scope rather than silently
-// dropped (which would leave the queue unbounded with no diagnostic).
 TEST(QueueDeclarationElaboration, ParameterNonPositiveBoundEmitsError) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -86,9 +73,6 @@ TEST(QueueDeclarationElaboration, ParameterNonPositiveBoundEmitsError) {
                             "7.10"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a queue a
-// procedure inside one declares takes a positive bound, folded in the block
-// instance when the block's genvar gives it.
 TEST(QueueDeclarationElaboration, BoundInsideGenerateBlocksIsChecked) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "logic y;", "initial begin int q[$:-1]; end"},

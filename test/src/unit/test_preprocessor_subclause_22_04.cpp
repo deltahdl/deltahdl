@@ -67,8 +67,6 @@ TEST(Preprocessor, Include_AngleBracket_SearchesIncludeDirs) {
   EXPECT_NE(result.find("parameter P = 1;"), std::string::npos);
 }
 
-// The user-specified locations are searched in turn, so a file the first does
-// not hold is still found in the one after it.
 TEST(Preprocessor, Include_AngleBracket_SearchesPastAnIncludeDirWithoutIt) {
   IncludeTestDir tmp;
   auto first = tmp.dir / "first";
@@ -101,8 +99,6 @@ TEST(Preprocessor, Include_AngleBracket_DoesNotSearchSourceDir) {
   Preprocessor pp(f.mgr, f.diag, {});
   pp.Preprocess(fid);
 
-  // The search this directive states found no file, which is a fact about the
-  // run rather than a rule of the standard, so the report names no subclause.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot find include file 'local.svh'", 1, ""));
 }
@@ -148,8 +144,6 @@ TEST(Preprocessor, Include_RelativeToSourceDir) {
   EXPECT_NE(result.find("wire h;"), std::string::npos);
 }
 
-// Runs the enclosing scope with the working directory at `dir`, and puts the
-// one it replaced back when the scope ends.
 struct WorkingDirectoryAt {
   fs::path previous;
 
@@ -161,11 +155,6 @@ struct WorkingDirectoryAt {
   ~WorkingDirectoryAt() { fs::current_path(previous); }
 };
 
-// §22.4 (printed page 705): a relative filename in double quotes is looked for
-// in the compiler's current working directory and, optionally, in locations the
-// user names. A source file named without a directory, as `deltahdl 46.sv`
-// names it from the directory holding it, has no directory of its own to
-// search, and its quoted include is found in the working directory.
 TEST(Preprocessor, Include_DoubleQuote_SearchesWorkingDirectory) {
   IncludeTestDir tmp;
   tmp.WriteFile("46-inc.svh", "`define FROM_INC 10\n");
@@ -180,9 +169,6 @@ TEST(Preprocessor, Include_DoubleQuote_SearchesWorkingDirectory) {
   EXPECT_NE(result.find("10"), std::string::npos);
 }
 
-// §22.4: a filename in angle brackets is looked for only in a location, chosen
-// by the implementation, that holds the files the language standard defines, so
-// the working directory is not searched for it.
 TEST(Preprocessor, Include_AngleBracket_DoesNotSearchWorkingDirectory) {
   IncludeTestDir tmp;
   tmp.WriteFile("local.svh", "wire local_wire;\n");
@@ -246,8 +232,6 @@ TEST(Preprocessor, Include_MaxDepthExceeded) {
   Preprocessor pp(f.mgr, f.diag, {});
   pp.Preprocess(fid);
 
-  // §22.4 requires a limit of at least 15 and leaves the limit itself to the
-  // implementation, so what the report states is this tool's own bound.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "include depth exceeds maximum of 15", 1, ""));
 }
@@ -302,9 +286,6 @@ TEST(Preprocessor, Include_NonCommentTextAfterFilename_Error) {
                             1, "22.4"));
 }
 
-// Two more shapes of text that is not a comment: a single character, too
-// short to open one, and a slash followed by neither the slash nor the
-// asterisk that would make it the start of a comment (5.4).
 TEST(Preprocessor, Include_ShortOrSlashTextAfterFilename_Error) {
   for (const char* trailing : {";", "/x"}) {
     PreprocFixture f;
@@ -431,16 +412,6 @@ TEST(Preprocessor, Include_FromMacroBodyExpansion) {
   EXPECT_NE(result.find("wire via_macro;"), std::string::npos);
 }
 
-// §22.5.1 (printed page 710) has a macro's compiler directive take effect
-// when the macro is used and makes a macro recursive only where it expands
-// to text holding a usage of itself; the rest of the line a usage stands on
-// is no part of its text. Two usages of DO_INCLUDE on one line, each
-// expanding to a whole `include, are two directives, and both files'
-// contents are in the result with nothing reported. This is the suite's
-// 22.4--include_via_define.sv (#2921): the second usage was expanded while
-// the first still stood on the expansion stack and was reported as a
-// recursive expansion, and its text was then appended to the first's
-// `include line, which reported the trailing text (§22.4).
 TEST(Preprocessor, Include_TwoMacroUsagesOnOneLineAreTwoIncludes) {
   IncludeTestDir tmp;
   tmp.WriteFile("first.svh", "wire first_included;\n");
@@ -628,10 +599,6 @@ TEST(Preprocessor, Include_AbsolutePath_Missing_DoesNotFallBack) {
                             "cannot find include file '/decoy.svh'", 1, ""));
 }
 
-// §22.4: for the angle-bracket form, a relative filename is resolved relative
-// to the searched (implementation-dependent) location. Exercise a subdirectory
-// relative path so the resolver joins the include dir with a multi-segment path
-// rather than a bare filename.
 TEST(Preprocessor,
      Include_AngleBracket_RelativeSubdirResolvedUnderSearchLocation) {
   IncludeTestDir tmp;
@@ -651,11 +618,6 @@ TEST(Preprocessor,
   EXPECT_NE(result.find("wire angle_count;"), std::string::npos);
 }
 
-// §22.4: whether the double-quote or angle-bracket search rule applies is
-// decided from the macro-expanded filename text. A macro expanding to the
-// angle-bracket form must therefore take the angle-bracket search path, which
-// does not consult the source file's directory. The included name exists only
-// beside the top file, so a correct angle-bracket resolution fails to find it.
 TEST(Preprocessor,
      Include_MacroExpandsToAngleBracketForm_DoesNotSearchSourceDir) {
   IncludeTestDir tmp;
@@ -694,9 +656,6 @@ TEST(Preprocessor, Include_BothFormsInSameFile) {
   EXPECT_NE(result.find("wire system_w;"), std::string::npos);
 }
 
-// §22.4 (printed page 705) writes the file name between double quotes or
-// angle brackets, so one never closed is neither form, reported with no file
-// searched for. Its first and last characters were dropped and abc.sv sought.
 TEST(Preprocessor, UnclosedIncludeFileNameIsReported) {
   struct Case {
     const char* directive;
@@ -715,9 +674,6 @@ TEST(Preprocessor, UnclosedIncludeFileNameIsReported) {
   }
 }
 
-// §22.4 (printed page 705): only white space or a comment may appear on the
-// same line as the `include directive, before it as much as after its file
-// name, so a declaration ahead of it on the line is reported.
 TEST(Preprocessor, Include_TextBeforeDirective_Error) {
   PreprocFixture f;
   Preprocess("wire a; `include \"/dev/null\"\n", f);
@@ -725,8 +681,6 @@ TEST(Preprocessor, Include_TextBeforeDirective_Error) {
                             "may precede `include on its line", 1, "22.4"));
 }
 
-// §22.4: a block comment is one of the two things that may stand before the
-// directive on its line.
 TEST(Preprocessor, Include_BlockCommentBeforeDirective_OK) {
   PreprocFixture f;
   Preprocess("/* lead */ `include \"/dev/null\"\n", f);

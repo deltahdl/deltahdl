@@ -15,25 +15,12 @@
 namespace delta {
 namespace {
 
-// §37.51 property declaration: the VPI object model for a property declaration,
-// its formals, and a property instance. A property declaration's formals are
-// returned in declaration order; each formal exposes a direction, an optional
-// typespec and an optional initialization expression; a property instance maps
-// its arguments to the formals in declaration order (filling defaults) and
-// resolves to its declaration. The argument and initialization-expression kinds
-// reuse §37.52's property-expr classification, weaving the two subclauses
-// together. These tests observe the production helpers in vpi.cpp and the
-// VpiContext methods that apply those rules.
-
-// Detail 1: the vpiPropFormalDecl iteration returns a property declaration's
-// formals in declaration order; both the dedicated helper and the generic
-// iteration observe the same ordered formals and skip non-formal members.
 TEST(PropertyDeclModel, PropFormalDeclIterationFollowsDeclarationOrder) {
   VpiContext ctx;
   VpiObject decl;
   decl.type = vpiPropertyDecl;
   VpiObject spec;
-  spec.type = vpiPropertySpec;  // not a formal
+  spec.type = vpiPropertySpec;
   VpiObject f0;
   f0.type = vpiPropFormalDecl;
   VpiObject f1;
@@ -54,35 +41,29 @@ TEST(PropertyDeclModel, PropFormalDeclIterationFollowsDeclarationOrder) {
   EXPECT_EQ(seen[1], &f1);
 }
 
-// Detail 1 edge: a null handle declares no formals.
 TEST(PropertyDeclModel, NullDeclarationHasNoFormals) {
   EXPECT_TRUE(VpiPropFormals(nullptr).empty());
 }
 
-// Detail 2: vpiArgument returns the property instance's actuals in
-// formal-declaration order, and a formal that carries a default contributes
-// that default when the instance does not provide an actual for it.
 TEST(PropertyDeclModel, ArgumentsFollowFormalOrderAndFillDefaults) {
   VpiObject a0;
   VpiObject a2;
   VpiObject def1;
 
   std::vector<VpiPropertyFormal> formals = {
-      {nullptr},  // formal 0: no default
-      {&def1},    // formal 1: has a default value
-      {nullptr},  // formal 2: no default
+      {nullptr},
+      {&def1},
+      {nullptr},
   };
-  std::vector<VpiHandle> provided = {&a0, nullptr, &a2};  // formal 1 omitted
+  std::vector<VpiHandle> provided = {&a0, nullptr, &a2};
 
   auto args = VpiPropertyInstArguments(formals, provided);
   ASSERT_EQ(args.size(), 3u);
   EXPECT_EQ(args[0], &a0);
-  EXPECT_EQ(args[1], &def1);  // default substituted, keeping declaration order
+  EXPECT_EQ(args[1], &def1);
   EXPECT_EQ(args[2], &a2);
 }
 
-// Detail 2 edge: a supplied actual wins over the formal's default, and trailing
-// formals beyond the provided actuals still fall back to their defaults.
 TEST(PropertyDeclModel, ArgumentsPreferActualsAndDefaultTrailingFormals) {
   VpiObject a0;
   VpiObject def1;
@@ -93,16 +74,12 @@ TEST(PropertyDeclModel, ArgumentsPreferActualsAndDefaultTrailingFormals) {
   ASSERT_EQ(supplied.size(), 2u);
   EXPECT_EQ(supplied[1], &def1);
 
-  // Provided list shorter than the formals: the trailing formal uses its
-  // default.
   auto trailing = VpiPropertyInstArguments(formals, {&a0});
   ASSERT_EQ(trailing.size(), 2u);
   EXPECT_EQ(trailing[0], &a0);
   EXPECT_EQ(trailing[1], &def1);
 }
 
-// Detail 3: the vpiTypespec relation returns the formal's typespec when typed
-// and null when the formal is untyped.
 TEST(PropertyDeclModel, FormalTypespecReportsNullWhenUntyped) {
   VpiObject typed;
   typed.type = vpiPropFormalDecl;
@@ -117,9 +94,6 @@ TEST(PropertyDeclModel, FormalTypespecReportsNullWhenUntyped) {
   EXPECT_EQ(VpiPropFormalTypespec(nullptr), nullptr);
 }
 
-// Detail 4: a formal's initialization expression is reached through vpiExpr;
-// the diagram draws its target as a named event or a property expression, and a
-// formal with no initialization expression reports none.
 TEST(PropertyDeclModel, FormalInitExprReachesNamedEventOrPropertyExpr) {
   VpiObject with_event;
   with_event.type = vpiPropFormalDecl;
@@ -131,28 +105,23 @@ TEST(PropertyDeclModel, FormalInitExprReachesNamedEventOrPropertyExpr) {
   VpiObject with_prop_expr;
   with_prop_expr.type = vpiPropFormalDecl;
   VpiObject pe;
-  pe.type = vpiClockedProp;  // a property-expr kind (see §37.52)
+  pe.type = vpiClockedProp;
   with_prop_expr.children = {&pe};
   EXPECT_EQ(VpiPropFormalInitExpr(&with_prop_expr), &pe);
 
   VpiObject untyped_only;
   untyped_only.type = vpiPropFormalDecl;
   VpiObject ts;
-  ts.type = vpiTypespec;  // a typespec is not an initialization expression
+  ts.type = vpiTypespec;
   untyped_only.children = {&ts};
   EXPECT_EQ(VpiPropFormalInitExpr(&untyped_only), nullptr);
 }
 
-// Detail 5: vpiDirection is vpiInput for a local variable argument and
-// vpiNoDirection for every other formal.
 TEST(PropertyDeclModel, FormalDirectionDistinguishesLocalVariableArguments) {
   EXPECT_EQ(VpiPropFormalDirection(true), vpiInput);
   EXPECT_EQ(VpiPropFormalDirection(false), vpiNoDirection);
 }
 
-// Diagram (property inst -> property decl): a property instance resolves to the
-// property declaration it instantiates, and reports none when no declaration is
-// attached or the handle is null.
 TEST(PropertyDeclModel, PropertyInstResolvesItsDeclaration) {
   VpiObject inst;
   inst.type = vpiPropertyInst;
@@ -167,10 +136,6 @@ TEST(PropertyDeclModel, PropertyInstResolvesItsDeclaration) {
   EXPECT_EQ(VpiPropertyInstDecl(nullptr), nullptr);
 }
 
-// Diagram (property inst -- vpiArgument --> property expr | named event): an
-// argument of a property instance is a named event or a property expression
-// (reusing §37.52's property-expr classification); other kinds are not
-// arguments.
 TEST(PropertyDeclModel, PropertyArgumentKindsAreNamedEventOrPropertyExpr) {
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiNamedEvent));
   EXPECT_TRUE(VpiIsPropertyArgumentType(vpiClockedProp));
@@ -181,18 +146,12 @@ TEST(PropertyDeclModel, PropertyArgumentKindsAreNamedEventOrPropertyExpr) {
   EXPECT_FALSE(VpiIsPropertyArgumentType(vpiModule));
 }
 
-// Diagram (property inst -- vpiDisableCondition --> expr): a property
-// instance's disable condition reaches an expression. The disable-condition
-// relation is shared with §37.52's property specification, so its expression
-// kinds are accepted by the shared classifier.
 TEST(PropertyDeclModel, PropertyInstDisableConditionReachesAnExpression) {
   EXPECT_TRUE(VpiIsDisableConditionType(vpiExpr));
   EXPECT_TRUE(VpiIsDisableConditionType(vpiOperation));
   EXPECT_FALSE(VpiIsDisableConditionType(vpiModule));
 }
 
-// Diagram (property decl -> property spec): a property declaration traverses to
-// its property specification through the generic relation lookup.
 TEST(PropertyDeclModel, PropertyDeclReachesItsSpecification) {
   VpiContext ctx;
   VpiObject decl;
@@ -204,11 +163,6 @@ TEST(PropertyDeclModel, PropertyDeclReachesItsSpecification) {
   EXPECT_EQ(ctx.Handle(vpiPropertySpec, &decl), &spec);
 }
 
-// Diagram (property decl -> name: str vpiName, str vpiFullName; prop formal
-// decl
-// -> name: str vpiName): a property declaration reports both a simple name and
-// a full name through vpi_get_str(), and a property formal reports its simple
-// name. The full-name query falls back to the simple name when none is stored.
 TEST(PropertyDeclModel, PropertyDeclAndFormalReportTheirNames) {
   VpiContext ctx;
   VpiObject decl;
@@ -222,21 +176,16 @@ TEST(PropertyDeclModel, PropertyDeclAndFormalReportTheirNames) {
   formal.type = vpiPropFormalDecl;
   formal.name = "a";
   EXPECT_STREQ(ctx.GetStr(vpiName, &formal), "a");
-  // No full name stored on the formal -> the full-name query falls back to the
-  // simple name.
   EXPECT_STREQ(ctx.GetStr(vpiFullName, &formal), "a");
 }
 
 class PropertyDeclsOfARun : public VpiDesignRun {
  protected:
-  // The name of what `relation` reaches from `ref`, empty for nothing.
   static std::string NameReached(int relation, vpiHandle ref) {
     vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
     return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 
-  // The class typespec the formal h of `top`'s property p reaches, null where
-  // it reaches none of that kind or C is not the class it names.
   static vpiHandle ClassTypespecOfH() {
     vpiHandle decl = Named(vpiPropertyDecl, By("top"), "p");
     vpiHandle h =
@@ -250,8 +199,6 @@ class PropertyDeclsOfARun : public VpiDesignRun {
     return h;
   }
 
-  // The arguments the property inst of `top`'s assertion `assertion`
-  // reaches, in the order reached; none where it reaches no property inst.
   static std::vector<vpiHandle> ArgumentsOf(const char* assertion) {
     std::vector<vpiHandle> arguments;
     vpiHandle a = Named(vpiAssertion, By("top"), assertion);
@@ -264,9 +211,6 @@ class PropertyDeclsOfARun : public VpiDesignRun {
     return arguments;
   }
 
-  // A module `top` declaring a property p of an event formal e and an untyped
-  // formal x, clocked on e, instantiated by the assertions a1, a2 and so on,
-  // whose property specs are `specs` in that order.
   static std::string EventActualsSource(const std::vector<std::string>& specs) {
     std::string src =
         "module top; logic clk, a;\n"
@@ -278,15 +222,11 @@ class PropertyDeclsOfARun : public VpiDesignRun {
     return src + "endmodule\n";
   }
 
-  // The operator of the first argument the property inst of `top`'s
-  // assertion `assertion` reaches, 0 where it reaches other than two.
   static int FirstArgumentOp(const char* assertion) {
     const std::vector<vpiHandle> kArguments = ArgumentsOf(assertion);
     return kArguments.size() == 2 ? vpi_get(vpiOpType, kArguments[0]) : 0;
   }
 
-  // The names of the objects of `relation` `ref` reaches, in the order
-  // reached.
   static std::vector<std::string> NamesOf(int relation, vpiHandle ref) {
     std::vector<std::string> names;
     vpiHandle it = vpi_iterate(relation, ref);
@@ -298,10 +238,6 @@ class PropertyDeclsOfARun : public VpiDesignRun {
   }
 };
 
-// A property a module declares is a property decl of its instance, named in
-// it, reaching its formals in the order declared (detail 1), each of no
-// direction (detail 5) and a default value through vpiExpr (detail 4), and its
-// property spec (#5086).
 TEST_F(PropertyDeclsOfARun, AnInstanceReachesThePropertyItDeclares) {
   Run("module top; logic clk, rst, a, b;\n"
       "  property p(x, y = b);\n"
@@ -325,8 +261,6 @@ TEST_F(PropertyDeclsOfARun, AnInstanceReachesThePropertyItDeclares) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
-// A property a generate block declares is one of that block's instance
-// (§37.12, §27.4) (#5086).
 TEST_F(PropertyDeclsOfARun, AGenerateBlockReachesThePropertyItDeclares) {
   Run("module top; logic clk, a;\n"
       "  for (genvar i = 0; i < 1; i++) begin : g\n"
@@ -339,10 +273,6 @@ TEST_F(PropertyDeclsOfARun, AGenerateBlockReachesThePropertyItDeclares) {
   EXPECT_EQ(Named(vpiPropertyDecl, By("top"), "q"), nullptr);
 }
 
-// An assertion instantiating a declared property reaches a property inst
-// through vpiProperty, which reaches the declaration and its arguments in the
-// order of the formals, a default standing for one not given (detail 2)
-// (#5086).
 TEST_F(PropertyDeclsOfARun, AnAssertionReachesThePropertyInstItWrites) {
   Run("module top; logic clk, a, b;\n"
       "  property p(x, y = b); @(posedge clk) x; endproperty\n"
@@ -360,7 +290,6 @@ TEST_F(PropertyDeclsOfARun, AnAssertionReachesThePropertyInstItWrites) {
   EXPECT_EQ(NamesOf(vpiArgument, inst), (std::vector<std::string>{"a", "b"}));
 }
 
-// One embedded in a procedure reaches its property inst the same way (#5086).
 TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
   Run("module top; logic clk, a;\n"
       "  property p(x); x; endproperty\n"
@@ -375,10 +304,6 @@ TEST_F(PropertyDeclsOfARun, AProceduralAssertionReachesItsPropertyInst) {
   EXPECT_EQ(NamesOf(vpiArgument, inst), (std::vector<std::string>{"a"}));
 }
 
-// A property inst reaches the disable condition it is evaluated under: the one
-// its property declares, the actuals in the formals' places, and otherwise
-// the default disable iff in scope (§16.15), in a procedure as at an item
-// (#7178).
 TEST_F(PropertyDeclsOfARun, APropertyInstReachesItsDisableCondition) {
   Run("module top; logic clk, rst, a, b;\n"
       "  default disable iff rst;\n"
@@ -399,10 +324,6 @@ TEST_F(PropertyDeclsOfARun, APropertyInstReachesItsDisableCondition) {
   EXPECT_EQ(kConditionOf("p1"), "rst");
 }
 
-// A formal declared with a type reaches a typespec of that type, and an
-// untyped one none (detail 3) (#5091). §16.12 adds property to the types a
-// property's formal may have, and §6.12 makes realtime a synonym for real
-// (#5746).
 TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   Run("module top; logic clk;\n"
       "  property p(bit x, untyped y, event e, sequence s, property q,\n"
@@ -425,8 +346,6 @@ TEST_F(PropertyDeclsOfARun, ATypedFormalReachesItsTypespec) {
   EXPECT_EQ(kTypespecOf("t"), vpiRealTypespec);
 }
 
-// Detail 5: a local variable formal argument (§16.8.2) is an input, beside a
-// formal of no direction written ahead of it.
 TEST_F(PropertyDeclsOfARun, ALocalVariableFormalIsAnInput) {
   Run("module top; logic clk, a;\n"
       "  property p(x, local input int n);\n"
@@ -443,8 +362,6 @@ TEST_F(PropertyDeclsOfARun, ALocalVariableFormalIsAnInput) {
   EXPECT_EQ(vpi_get(vpiDirection, x), vpiNoDirection);
 }
 
-// An instance reaches the property of its own name, not another the module
-// declares ahead of it (#5632).
 TEST_F(PropertyDeclsOfARun, AnInstReachesItsPropertyPastAnother) {
   Run("module top; logic clk, a, b;\n"
       "  property p1; @(posedge clk) a; endproperty\n"
@@ -458,8 +375,6 @@ TEST_F(PropertyDeclsOfARun, AnInstReachesItsPropertyPastAnother) {
   EXPECT_EQ(NameReached(vpiPropertyDecl, inst), "p2");
 }
 
-// A property reaches the local variables it declares (§16.10), each of the
-// kind its type is (#5092).
 TEST_F(PropertyDeclsOfARun, APropertyReachesItsLocalVariables) {
   Run("module top; logic clk, a;\n"
       "  property p;\n"
@@ -477,9 +392,6 @@ TEST_F(PropertyDeclsOfARun, APropertyReachesItsLocalVariables) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, n), "top.p.n");
 }
 
-// A property whose body declares a local of a packed type, `logic [3:0] v`
-// (§16.10's var_data_type with §7.4.1), reaches the variable, a logic var,
-// and its property spec, with the clock and the property expression (#5745).
 TEST_F(PropertyDeclsOfARun, APropertyReachesAPackedLocalVariableAndItsSpec) {
   Run("module top; logic clk, a;\n"
       "  property p; logic [3:0] v; @(posedge clk) a; endproperty\n"
@@ -494,9 +406,6 @@ TEST_F(PropertyDeclsOfARun, APropertyReachesAPackedLocalVariableAndItsSpec) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
-// A property's local declared with a type name, `nib_t v` (§16.10 with
-// §6.18), is a variable of the kind the name stands for, a logic var for a
-// `logic [3:0]`, and the property reaches its spec (#5767).
 TEST_F(PropertyDeclsOfARun, APropertyReachesALocalOfATypeName) {
   Run("module top; logic clk, a;\n"
       "  typedef logic [3:0] nib_t;\n"
@@ -508,9 +417,6 @@ TEST_F(PropertyDeclsOfARun, APropertyReachesALocalOfATypeName) {
   EXPECT_NE(vpi_handle(vpiPropertySpec, decl), nullptr);
 }
 
-// A property a clocking block declares is a property decl of that block
-// (§37.12, §14.3), and an assertion naming it through the block, `cb.p`
-// (§16.16 (b)), reaches it from its property inst (#5090).
 TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
   Run("module top; logic clk, a;\n"
       "  clocking cb @(posedge clk);\n"
@@ -531,10 +437,6 @@ TEST_F(PropertyDeclsOfARun, AClockingBlockReachesThePropertyItDeclares) {
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
-// A property an interface declares is instantiated through an instance of the
-// interface, `i0.p` (§16.12 with §23.6), and the property inst reaches the
-// property decl of that instance, which is built though the module writing
-// the assertion is walked first (#5741).
 TEST_F(PropertyDeclsOfARun, AnInstThroughAnInterfaceReachesItsProperty) {
   Run("interface ifc(input logic clk); logic a;\n"
       "  property p; @(posedge clk) a; endproperty\n"
@@ -551,10 +453,6 @@ TEST_F(PropertyDeclsOfARun, AnInstThroughAnInterfaceReachesItsProperty) {
   EXPECT_TRUE(vpi_compare_objects(vpi_handle(vpiPropertyDecl, inst), decl));
 }
 
-// A formal of a packed type reaches a typespec of its keyword with the range
-// it was written with, and one of a user-defined type the typespec of the
-// typedef naming it, the module's or the compilation unit's (detail 3,
-// §37.25) (#5093).
 TEST_F(PropertyDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
   Run("typedef logic [7:0] byte_t;\n"
       "module top; logic clk;\n"
@@ -582,9 +480,6 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAWrittenTypeReachesItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, w), "byte_t");
 }
 
-// The terminal `$`, an actual §16.8 admits, is the argument the unbounded
-// constant (§37.59 detail 4) in its formal's place, and an actual the
-// instance leaves out is the formal's default (detail 2) (#5744).
 TEST_F(PropertyDeclsOfARun, ADollarActualIsTheUnboundedConstant) {
   Run("module top; logic clk, a, b;\n"
       "  property p(x = b, y); @(posedge clk) x; endproperty\n"
@@ -597,9 +492,6 @@ TEST_F(PropertyDeclsOfARun, ADollarActualIsTheUnboundedConstant) {
   EXPECT_EQ(vpi_get(vpiConstType, kArguments[1]), vpiUnboundedConst);
 }
 
-// A sequence an actual writes (§16.12) is the argument the property expr of
-// that sequence stands as, in its formal's place, ahead of the argument of
-// the formal after it (detail 2) (#5749).
 TEST_F(PropertyDeclsOfARun, ASequenceActualIsItsPropertyExpr) {
   Run("module top; logic clk, a, b, c;\n"
       "  property p(s, x); @(posedge clk) s |-> x; endproperty\n"
@@ -611,9 +503,6 @@ TEST_F(PropertyDeclsOfARun, ASequenceActualIsItsPropertyExpr) {
   EXPECT_STREQ(vpi_get_str(vpiName, kArguments[1]), "c");
 }
 
-// An import the compilation unit writes makes a package's property visible in
-// the unit's modules too (§3.12.1, §26.3), and an instance of it reaches the
-// package's property decl (#5763).
 TEST_F(PropertyDeclsOfARun, AnInstThroughAUnitImportReachesItsProperty) {
   Run("package pk; property p(c, x); @(posedge c) x; endproperty\n"
       "endpackage\n"
@@ -629,10 +518,6 @@ TEST_F(PropertyDeclsOfARun, AnInstThroughAUnitImportReachesItsProperty) {
       "pk::p");
 }
 
-// A formal of a typedef a package declares, made visible by an import
-// (§26.3), reaches the package's typespec for it (detail 3), past a wildcard
-// import of a package declaring no such typedef and an import of another of
-// the package's typedefs (#5743).
 TEST_F(PropertyDeclsOfARun, AFormalOfAnImportedTypedefReachesItsTypespec) {
   Run("package pk; typedef logic [3:0] nib_t; typedef int word_t;\n"
       "endpackage\n"
@@ -648,8 +533,6 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAnImportedTypedefReachesItsTypespec) {
   EXPECT_TRUE(vpi_compare_objects(v, Named(vpiTypedef, By("pk"), "nib_t")));
 }
 
-// A formal of a package's type, pk::t, reaches the package's typespec for it
-// (detail 3, §26.3), not the compilation unit's of the same name (#7306).
 TEST_F(PropertyDeclsOfARun, AFormalOfAPackagesTypeReachesItsTypespec) {
   Run("typedef bit [5:0] t;\n"
       "package pk; typedef logic [1:0] t; endpackage\n"
@@ -662,8 +545,6 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAPackagesTypeReachesItsTypespec) {
   EXPECT_TRUE(vpi_compare_objects(v, Named(vpiTypedef, By("pk"), "t")));
 }
 
-// A formal of a typedef of another typedef reaches the typespec of the one it
-// names, which aliases the other (detail 3, §37.25 detail 1) (#5748).
 TEST_F(PropertyDeclsOfARun, AFormalOfAnAliasTypedefReachesItsTypespec) {
   Run("module top; logic clk;\n"
       "  typedef logic [3:0] nib_t; typedef nib_t half_t;\n"
@@ -676,9 +557,6 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAnAliasTypedefReachesItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, v), "half_t");
 }
 
-// A formal of a class type reaches a class typespec of that class (detail 3,
-// §16.8), and the typespec the class defn the module declares, past another
-// class of it (#5761).
 TEST_F(PropertyDeclsOfARun, AFormalOfAModulesClassReachesItsClassTypespec) {
   Run("module top; logic clk;\n"
       "  class D; endclass\n"
@@ -691,8 +569,6 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAModulesClassReachesItsClassTypespec) {
                                   Named(vpiClassDefn, By("top"), "C")));
 }
 
-// ...and one of the compilation unit's class a class typespec naming it
-// (#5761).
 TEST_F(PropertyDeclsOfARun, AFormalOfAUnitsClassReachesItsClassTypespec) {
   Run("class C; endclass\n"
       "module top; logic clk;\n"
@@ -701,9 +577,6 @@ TEST_F(PropertyDeclsOfARun, AFormalOfAUnitsClassReachesItsClassTypespec) {
   EXPECT_NE(ClassTypespecOfH(), nullptr);
 }
 
-// An actual bound to a formal of a struct type is built against the formal's
-// typespec, a positional pattern being the assignment pattern operation over
-// its expressions in the order written (§37.59 detail 6) (#5760).
 TEST_F(PropertyDeclsOfARun, AnActualOfATypedFormalIsBuiltAgainstItsTypespec) {
   Run("module top; logic clk, x;\n"
       "  typedef struct packed { logic a, b; } pair_t;\n"
@@ -720,9 +593,6 @@ TEST_F(PropertyDeclsOfARun, AnActualOfATypedFormalIsBuiltAgainstItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, first), "x");
 }
 
-// A keyed pattern passed for a formal of a struct type is the assignment
-// pattern operation the formal's typespec orders, its typespec members giving
-// the places (§37.59 detail 6, §37.26) (#5760).
 TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
   Run("module top; logic clk, x;\n"
       "  typedef struct packed { logic a, b; } pair_t;\n"
@@ -742,8 +612,6 @@ TEST_F(PropertyDeclsOfARun, AKeyedPatternActualTakesItsFormalsOrder) {
   EXPECT_STREQ(vpi_get_str(vpiName, second), "x");
 }
 
-// An event expression passed for a formal of type event (§16.12.18) is the
-// argument the operation of its edge stands as (§37.59) (#5764)...
 TEST_F(PropertyDeclsOfARun, AnEdgeEventActualIsAnEdgeOperation) {
   Run("module top; logic clk, a;\n"
       "  property p(event e, x); @(e) x; endproperty\n"
@@ -754,7 +622,6 @@ TEST_F(PropertyDeclsOfARun, AnEdgeEventActualIsAnEdgeOperation) {
   EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiPosedgeOp);
 }
 
-// ...one joined by or the event or operation...
 TEST_F(PropertyDeclsOfARun, AnOrEventActualIsAnEventOrOperation) {
   Run("module top; logic clk, a;\n"
       "  property p(event e, x); @(e) x; endproperty\n"
@@ -765,7 +632,6 @@ TEST_F(PropertyDeclsOfARun, AnOrEventActualIsAnEventOrOperation) {
   EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiEventOrOp);
 }
 
-// ...and one guarded by iff the iff operation (#5764).
 TEST_F(PropertyDeclsOfARun, AnIffEventActualIsAnIffOperation) {
   Run("module top; logic clk, a;\n"
       "  property p(event e, x); @(e) x; endproperty\n"
@@ -776,9 +642,6 @@ TEST_F(PropertyDeclsOfARun, AnIffEventActualIsAnIffOperation) {
   EXPECT_EQ(vpi_get(vpiOpType, kArguments[0]), vpiIffOp);
 }
 
-// Instances of one property with an event formal, by assertions of one
-// module, each reach the operation of their own event actual: an edge and an
-// or (#5765)...
 TEST_F(PropertyDeclsOfARun, AnEdgeAndAnOrEventActualOfOneProperty) {
   Run(EventActualsSource(
       {"p(posedge clk, a)", "p(negedge clk or posedge clk, a)"}));
@@ -786,7 +649,6 @@ TEST_F(PropertyDeclsOfARun, AnEdgeAndAnOrEventActualOfOneProperty) {
   EXPECT_EQ(FirstArgumentOp("a2"), vpiEventOrOp);
 }
 
-// ...an or and an iff...
 TEST_F(PropertyDeclsOfARun, AnOrAndAnIffEventActualOfOneProperty) {
   Run(EventActualsSource(
       {"p(negedge clk or posedge clk, a)", "p(posedge clk iff a, a)"}));
@@ -794,14 +656,12 @@ TEST_F(PropertyDeclsOfARun, AnOrAndAnIffEventActualOfOneProperty) {
   EXPECT_EQ(FirstArgumentOp("a2"), vpiIffOp);
 }
 
-// ...an edge and an iff...
 TEST_F(PropertyDeclsOfARun, AnEdgeAndAnIffEventActualOfOneProperty) {
   Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk iff a, a)"}));
   EXPECT_EQ(FirstArgumentOp("a1"), vpiPosedgeOp);
   EXPECT_EQ(FirstArgumentOp("a2"), vpiIffOp);
 }
 
-// ...and all three (#5765).
 TEST_F(PropertyDeclsOfARun, AnEdgeAnOrAndAnIffEventActualOfOneProperty) {
   Run(EventActualsSource({"p(posedge clk, a)",
                           "p(negedge clk or posedge clk, a)",
@@ -811,9 +671,6 @@ TEST_F(PropertyDeclsOfARun, AnEdgeAnOrAndAnIffEventActualOfOneProperty) {
   EXPECT_EQ(FirstArgumentOp("a3"), vpiIffOp);
 }
 
-// The assertions of an instance include the property inst each one's spec
-// holds (§37.49, §39.3.1), which has no name: the named ones are the two
-// assertions (#5765).
 TEST_F(PropertyDeclsOfARun,
        TheNamedAssertionsOfAnInstancePassItsPropertyInsts) {
   Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk, a)"}));
@@ -821,16 +678,12 @@ TEST_F(PropertyDeclsOfARun,
             (std::vector<std::string>{"a1", "a2"}));
 }
 
-// Two instances of one property with an event formal, each passing the same
-// edge, each reach it (#5765).
 TEST_F(PropertyDeclsOfARun, TwoInstancesPassingOneEdgeEachReachIt) {
   Run(EventActualsSource({"p(posedge clk, a)", "p(posedge clk, a)"}));
   EXPECT_EQ(FirstArgumentOp("a1"), vpiPosedgeOp);
   EXPECT_EQ(FirstArgumentOp("a2"), vpiPosedgeOp);
 }
 
-// Two instances of one property of a written clock and an untyped formal
-// each reach their own argument (#5765).
 TEST_F(PropertyDeclsOfARun, TwoInstancesOfAnUntypedFormalEachReachTheirOwn) {
   Run("module top; logic clk, a, b;\n"
       "  property p(x); @(posedge clk) x; endproperty\n"
@@ -845,9 +698,6 @@ TEST_F(PropertyDeclsOfARun, TwoInstancesOfAnUntypedFormalEachReachTheirOwn) {
   EXPECT_STREQ(vpi_get_str(vpiName, kSecond[0]), "b");
 }
 
-// The edge keyword's event, which Annex K and Annex M give no operation, as
-// §37.65 notes of an event control, is no argument: the instance reaches the
-// argument of the formal after it alone.
 TEST_F(PropertyDeclsOfARun, AnEdgeKeywordEventActualIsNoArgument) {
   Run("module top; logic clk, a;\n"
       "  property p(event e, x); @(e) x; endproperty\n"
@@ -858,9 +708,6 @@ TEST_F(PropertyDeclsOfARun, AnEdgeKeywordEventActualIsNoArgument) {
   EXPECT_STREQ(vpi_get_str(vpiName, kArguments[0]), "a");
 }
 
-// A property with no clock of its own, instantiated by an assertion the
-// module's default clocking clocks (§14.12), reaches the module's property
-// decl.
 TEST_F(PropertyDeclsOfARun, AnUnclockedPropertyUnderDefaultClocking) {
   Run("module top; logic clk, a;\n"
       "  default clocking cb @(posedge clk); endclocking\n"
@@ -872,9 +719,6 @@ TEST_F(PropertyDeclsOfARun, AnUnclockedPropertyUnderDefaultClocking) {
   EXPECT_EQ(NameReached(vpiPropertyDecl, vpi_handle(vpiProperty, a1)), "p");
 }
 
-// A property a package declares is a property decl of the package, and an
-// instance of it by the bare name a wildcard import makes visible reaches it
-// (§16.12, §26.3) (#5750).
 TEST_F(PropertyDeclsOfARun, AnInstOfAWildcardImportedPropertyReachesIt) {
   Run("package pk; property p(c, x); @(posedge c) x; endproperty\n"
       "endpackage\n"
@@ -890,9 +734,6 @@ TEST_F(PropertyDeclsOfARun, AnInstOfAWildcardImportedPropertyReachesIt) {
       vpi_handle(vpiPropertyDecl, vpi_handle(vpiProperty, a1)), decl));
 }
 
-// ...past a wildcard import of a package declaring no such property and an
-// import of another of the package's properties, and whatever import follows
-// (#5750).
 TEST_F(PropertyDeclsOfARun, AnInstOfAnImportedPropertyPassesOtherImports) {
   Run("package pk; property p(c, x); @(posedge c) x; endproperty\n"
       "  property r(c); @(posedge c) 1; endproperty endpackage\n"
@@ -908,9 +749,6 @@ TEST_F(PropertyDeclsOfARun, AnInstOfAnImportedPropertyPassesOtherImports) {
       Named(vpiPropertyDecl, By("pk"), "p")));
 }
 
-// §37.51 details 3 and 4: a formal's typespec is its typespec child, found
-// past a child of another kind, and a null formal has no initialization
-// expression.
 TEST(PropertyFormal, TypespecFoundPastOtherChildrenAndNullHasNoInit) {
   VpiObject attribute;
   attribute.type = vpiAttribute;
@@ -923,8 +761,6 @@ TEST(PropertyFormal, TypespecFoundPastOtherChildrenAndNullHasNoInit) {
   EXPECT_EQ(VpiPropFormalInitExpr(nullptr), nullptr);
 }
 
-// §37.51 (figure): a property inst reaches its disable condition, and asked for
-// a relation it does not draw it resolves nothing here.
 TEST(PropertyDeclModel, AnInstReachesItsDisableConditionAndNoOtherTag) {
   VpiObject condition;
   condition.type = vpiOperation;

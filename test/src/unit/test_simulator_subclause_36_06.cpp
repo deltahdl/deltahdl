@@ -9,33 +9,8 @@
 namespace delta {
 namespace {
 
-// §36.6 -- User-supplied PLI applications. Such an application is a C function
-// that uses the library of PLI C functions to reach and work with a
-// SystemVerilog implementation while the source is running.
-//
-// What the applications here do is what the clause says one is: each is a plain
-// C function that reaches the running design through the library and through
-// nothing else. It is handed no design, no context and no arguments -- §36.8.4
-// gives a calltf its registered user_data and that is all -- so vpi_*() is the
-// only way it has of finding out what the design holds, which is what makes
-// these cases about the clause rather than about the routines they are carried
-// by.
-//
-// The design a case runs is the discriminating half. Every value the
-// application reads is one the design assigned while it ran, and never the
-// declared value, so a tool answering from the source text rather than from the
-// live storage gives a different answer.
-
-// What the application made of the design, recorded where a test can read it
-// once the run is over. A calltf is a C function with no return path to the
-// case, so file scope is the only place it has to leave this.
 int g_seen = 0;
 
-// The application: it reaches the design's `r` by name and reads what the
-// design has just put there. Neither call is guarded, because both routines
-// answer a null handle by leaving the value alone -- so a run that put the
-// design nowhere leaves `g_seen` at what it was rather than crashing, and the
-// case reports the difference as a value.
 PLI_INT32 ReadRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
@@ -44,8 +19,6 @@ PLI_INT32 ReadRCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// The other direction of that live interaction: the application writes into the
-// design's `r`, and the design reads the write back afterwards.
 PLI_INT32 WriteRCalltf(PLI_BYTE8*) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
@@ -55,10 +28,6 @@ PLI_INT32 WriteRCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// Registers `calltf` as $probe. The registration is a system task rather than a
-// system function because §36.5 makes a task the type that may read and change
-// its arguments but returns no value, and a value the call site would take is
-// not what any case here is about.
 void RegisterProbe(PLI_INT32 (*calltf)(PLI_BYTE8*)) {
   g_seen = 0;
   s_vpi_systf_data data = {};
@@ -76,10 +45,6 @@ class PliApplicationDesignAccess : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.6: the application reaches the implementation while the source is
-// running, so what it reads is the value the design holds at the moment it
-// runs. `r` is declared without an initializer and assigned 7 by the statement
-// before the call, so 7 is a value only the live storage carries.
 TEST_F(PliApplicationDesignAccess, TheApplicationReadsTheDesignAsItRuns) {
   RegisterProbe(&ReadRCalltf);
 
@@ -99,11 +64,6 @@ TEST_F(PliApplicationDesignAccess, TheApplicationReadsTheDesignAsItRuns) {
   EXPECT_EQ(g_seen, 7);
 }
 
-// §36.6: the applications' live interaction with the design runs both ways, so
-// a value the application writes through the library is a value the design goes
-// on to read. The design copies `r` into `after` once the call has returned,
-// and 42 arriving there is the write having landed in the storage the design
-// reads rather than in a copy of it.
 TEST_F(PliApplicationDesignAccess, TheApplicationWritesWhereTheDesignReads) {
   RegisterProbe(&WriteRCalltf);
 
@@ -127,11 +87,6 @@ TEST_F(PliApplicationDesignAccess, TheApplicationWritesWhereTheDesignReads) {
   EXPECT_EQ(after->value.ToUint64(), 42u);
 }
 
-// §36.6: the applications the clause describes are linked into a tool and so
-// become part of it, and a run holding none of them has nothing to reach the
-// design through this library. §36.9 gives an application two ways of becoming
-// part of the tool and this run has taken neither, so the design is left where
-// it was and the name resolves to nothing.
 TEST_F(PliApplicationDesignAccess, ARunWithNoApplicationAttachesNothing) {
   SimFixture f;
   auto* design = ElaborateSrc(

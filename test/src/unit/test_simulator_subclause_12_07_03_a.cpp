@@ -206,8 +206,6 @@ TEST(LoopStatementSim, ForeachWriteArrayElements) {
   EXPECT_EQ(a2->value.ToUint64(), 12u);
 }
 
-// §12.7.3 — the loop variable takes the array's declared index values, so a
-// non-zero base is honored: the writes land in data[1], data[2], data[3].
 TEST(LoopStatementSim, ForeachUsesDeclaredIndexBase) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -233,12 +231,6 @@ TEST(LoopStatementSim, ForeachUsesDeclaredIndexBase) {
   EXPECT_EQ(d3->value.ToUint64(), 3u);
 }
 
-// §12.7.3 — each loop variable corresponds to one array dimension, and the
-// loop variables map to nested loops whose innermost (highest-cardinality)
-// index changes most rapidly. Stamping an increasing order counter into each
-// element records the visit sequence: for a 2x3 array the row index advances
-// only after the column index has swept its full range, so element [1][0]
-// (order 4) is visited immediately after [0][2] (order 3).
 TEST(LoopStatementSim, ForeachMultiDimIteratesInnermostFastest) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -266,18 +258,12 @@ TEST(LoopStatementSim, ForeachMultiDimIteratesInnermostFastest) {
   ASSERT_NE(m02, nullptr);
   ASSERT_NE(m10, nullptr);
   ASSERT_NE(m12, nullptr);
-  EXPECT_EQ(m00->value.ToUint64(), 1u);  // first visited
-  EXPECT_EQ(m02->value.ToUint64(), 3u);  // end of first row
-  EXPECT_EQ(m10->value.ToUint64(), 4u);  // row advances only after column sweep
-  EXPECT_EQ(m12->value.ToUint64(), 6u);  // last visited
+  EXPECT_EQ(m00->value.ToUint64(), 1u);
+  EXPECT_EQ(m02->value.ToUint64(), 3u);
+  EXPECT_EQ(m10->value.ToUint64(), 4u);
+  EXPECT_EQ(m12->value.ToUint64(), 6u);
 }
 
-// §12.7.3 — for a descending dimension the loop variable counts down from the
-// high declared index to the low one (the LRM's B[5:1] iterates 5 down to 1).
-// Stamping an increasing order counter into each visited element records the
-// visit order: the first-visited element (index 5) gets 1 and the last-visited
-// (index 1) gets 5, which is only possible if the loop walked the range
-// downward.
 TEST(LoopStatementSim, ForeachDescendingRangeIteratesHighToLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -301,13 +287,10 @@ TEST(LoopStatementSim, ForeachDescendingRangeIteratesHighToLow) {
   auto* d1 = f.ctx.FindVariable("data[1]");
   ASSERT_NE(d5, nullptr);
   ASSERT_NE(d1, nullptr);
-  EXPECT_EQ(d5->value.ToUint64(), 1u);  // index 5 visited first
-  EXPECT_EQ(d1->value.ToUint64(), 5u);  // index 1 visited last
+  EXPECT_EQ(d5->value.ToUint64(), 1u);
+  EXPECT_EQ(d1->value.ToUint64(), 5u);
 }
 
-// §12.7.3 — a string is iterated as a dynamic array of bytes: the loop runs
-// once per character, so the counter reaches the character count (3), not the
-// bit width (24).
 TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -325,11 +308,6 @@ TEST(LoopStatementSim, ForeachOverStringIteratesPerCharacter) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.3 — when a loop variable appears in an expression other than as an
-// index into the designated array it takes an integer value (for a fixed-size
-// array, int). Accumulating the loop variable itself sums the visited indices
-// 0..3, giving 6, which is only meaningful if the variable is a usable integer
-// operand outside the index position.
 TEST(LoopStatementSim, ForeachLoopVarUsableAsIntInExpression) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -346,13 +324,6 @@ TEST(LoopStatementSim, ForeachLoopVarUsableAsIntInExpression) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// §12.7.3 — the foreach-loop creates an implicit begin-end block whose loop
-// variable has automatic lifetime local to that scope. Driven from real source:
-// a module variable `i` is set to 99, then a foreach whose loop variable is
-// also named `i` runs. Inside the loop the local loop variable shadows the
-// outer one (last_seen records the final index 3), and after the loop the outer
-// `i` still holds 99 because the loop variable was a distinct, scope-local
-// declaration.
 TEST(LoopStatementSim, ForeachImplicitScopeShadowsOuterVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -375,13 +346,10 @@ TEST(LoopStatementSim, ForeachImplicitScopeShadowsOuterVar) {
   auto* outer = f.ctx.FindVariable("i");
   ASSERT_NE(seen, nullptr);
   ASSERT_NE(outer, nullptr);
-  EXPECT_EQ(seen->value.ToUint64(), 3u);    // local loop var swept the indices
-  EXPECT_EQ(outer->value.ToUint64(), 99u);  // outer `i` untouched by the loop
+  EXPECT_EQ(seen->value.ToUint64(), 3u);
+  EXPECT_EQ(outer->value.ToUint64(), 99u);
 }
 
-// §12.7.3 — a foreach may iterate any packed OR unpacked array. A packed vector
-// is a packed array, so foreach runs once per bit position: for a [7:0] packed
-// value the loop body executes exactly eight times.
 TEST(LoopStatementSim, ForeachOverPackedArrayIteratesPerBit) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -398,11 +366,6 @@ TEST(LoopStatementSim, ForeachOverPackedArrayIteratesPerBit) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// §12.7.3 — a loop variable may be omitted to indicate no iteration over that
-// dimension. For a 2x3 array, naming only the first slot iterates just the
-// leading dimension (2 steps), and naming only the second slot iterates just
-// the trailing dimension (3 steps); the omitted dimension is not walked, so
-// neither loop runs the full 2*3 element count.
 TEST(LoopStatementSim, ForeachOmittedDimensionIsNotIterated) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -426,16 +389,10 @@ TEST(LoopStatementSim, ForeachOmittedDimensionIsNotIterated) {
   auto* vi = f.ctx.FindVariable("inner_cnt");
   ASSERT_NE(vo, nullptr);
   ASSERT_NE(vi, nullptr);
-  EXPECT_EQ(vo->value.ToUint64(), 2u);  // only the leading dimension iterated
-  EXPECT_EQ(vi->value.ToUint64(), 3u);  // only the trailing dimension iterated
+  EXPECT_EQ(vo->value.ToUint64(), 2u);
+  EXPECT_EQ(vi->value.ToUint64(), 3u);
 }
 
-// §12.7.3 — the implicit block a foreach creates is unnamed by default but can
-// be named by prefixing the statement with a label; naming it makes the loop a
-// disable target. Driven end-to-end from real label (§9.3.5) and disable
-// (§9.6.2) source syntax: once the counter reaches 2 the body disables the
-// loop's own label, which ends the loop like a break, so the counter stops at 2
-// even though the array has five elements.
 TEST(LoopStatementSim, ForeachNamedByLabelIsDisableTarget) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -455,11 +412,6 @@ TEST(LoopStatementSim, ForeachNamedByLabelIsDisableTarget) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.7.3: a foreach over an associative array steps its loop variable
-// through the indices the array holds, in the array's order (§7.8.4:
-// numerical for an integral index). The loop ran over the variable under the
-// array's name before -- elem_width iterations from 0 -- so the keys 3 and 10
-// summed as 0 through 31 do.
 TEST(LoopStatementSim, ForeachOverAnAssociativeArrayVisitsItsIndices) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -476,9 +428,6 @@ TEST(LoopStatementSim, ForeachOverAnAssociativeArrayVisitsItsIndices) {
   EXPECT_EQ(v, 143u);
 }
 
-// §12.7.3 with §7.8.2: a string index orders its keys lexicographically and
-// the loop variable is the key itself, so the entries are visited a, b, c
-// whatever order they were written in.
 TEST(LoopStatementSim, ForeachOverAStringKeyedAssociativeArrayVisitsItsKeys) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -496,9 +445,6 @@ TEST(LoopStatementSim, ForeachOverAStringKeyedAssociativeArrayVisitsItsKeys) {
   EXPECT_EQ(v, 123u);
 }
 
-// §12.7.3 over a class property (§8.5 restricts no property's type) reached
-// through a handle: the loop visits the entries a method of the object wrote
-// and reads each through the same handle.
 TEST(LoopStatementSim, ForeachOverAnAssociativePropertySumsWhatAMethodWrote) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -522,10 +468,6 @@ TEST(LoopStatementSim, ForeachOverAnAssociativePropertySumsWhatAMethodWrote) {
   EXPECT_EQ(v, 60u);
 }
 
-// §12.7.3 inside a method: a foreach over the object's own associative
-// property, named bare, steps through the keys a method wrote, each loop
-// variable value a key rather than a count; the function interpreter stepped
-// a counter from 0 to a size no variable answered, so the sum stayed 0.
 TEST(LoopStatementSim, ForeachOverAnAssociativePropertyInsideAMethod) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -550,8 +492,6 @@ TEST(LoopStatementSim, ForeachOverAnAssociativePropertyInsideAMethod) {
   EXPECT_EQ(v, 2960u);
 }
 
-// §12.7.3 with §7.8.2: a string-keyed property's foreach inside a method hands
-// the loop variable each key as a string, in lexicographical order.
 TEST(LoopStatementSim, ForeachOverAStringKeyedPropertyInsideAMethod) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -580,10 +520,6 @@ TEST(LoopStatementSim, ForeachOverAStringKeyedPropertyInsideAMethod) {
   EXPECT_EQ(v, 321u);
 }
 
-// §12.7.3 with §7.10 and §8.5: a foreach over a queue property steps once per
-// element the queue holds, in a method by the property's bare name (§8.11)
-// and at module level through the handle: 4 + 5 + 6 twice, and the last loop
-// variable's value 2.
 TEST(LoopStatementSim, ForeachOverAQueuePropertyInAMethodAndThroughAHandle) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int q[$];\n"
@@ -613,10 +549,6 @@ TEST(LoopStatementSim, ForeachOverAQueuePropertyInAMethodAndThroughAHandle) {
             302u);
 }
 
-// §12.7.3 with §7.4 and §8.5: a foreach over a fixed-size unpacked array
-// property named bare in a method (§8.11) steps once per declared index, so
-// the sum of 12, 14, 16 and 18 a for loop wrote is 60. Before this the loop
-// found no array of the name and ran its body no times, answering 0.
 TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int a[4];\n"
@@ -641,9 +573,6 @@ TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAMethod) {
             60u);
 }
 
-// §12.7.3 with §7.4.2: the loop variable takes the dimension's own indices,
-// so a property declared `[2:5]` iterated through the handle at module level
-// hands the body 2, 3, 4 and 5 in turn, and nothing else: 2345.
 TEST(LoopStatementSim,
      ForeachOverAFixedSizeArrayPropertyStepsItsDeclaredIndices) {
   EXPECT_EQ(RunAndGet("class C;\n"
@@ -661,9 +590,6 @@ TEST(LoopStatementSim,
             2345u);
 }
 
-// §12.7.3 with §7.5 and §8.5: a foreach over a dynamic array property sized 5
-// by `new[n]` in the same method steps 0 to 4, so `d[i] = i * 3` leaves d[3]
-// holding 9. Before this the loop ran no times and d[3] stayed 0.
 TEST(LoopStatementSim, ForeachOverADynamicArrayPropertyWritesEachElement) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int d[];\n"
@@ -684,8 +610,6 @@ TEST(LoopStatementSim, ForeachOverADynamicArrayPropertyWritesEachElement) {
             9u);
 }
 
-// §12.7.3 with §7.5.1: the elements a foreach wrote survive a `new[8](d)`
-// that grows the property, so d[3] is still 9 beside the new size 8: 98.
 TEST(LoopStatementSim, ForeachWrittenDynamicArrayPropertySurvivesAResize) {
   EXPECT_EQ(
       RunAndGet("class C;\n"
@@ -709,10 +633,6 @@ TEST(LoopStatementSim, ForeachWrittenDynamicArrayPropertySurvivesAResize) {
       98u);
 }
 
-// §12.7.3 with §8.5 and §13.3: the same loop inside a class task called
-// through a handle, which the scheduler runs statement by statement, with a
-// delay in the body so each element is visited in its own time step: 5 + 8 +
-// 11 + 14 is 38, read after the task's four steps have passed.
 TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAClassTask) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int a[4];\n"
@@ -738,13 +658,6 @@ TEST(LoopStatementSim, ForeachOverAFixedSizeArrayPropertyInsideAClassTask) {
             38u);
 }
 
-// §12.7.3 with §7.8.3: the loop variable has the index type, so over an
-// array keyed by a class it is a handle of that class, and a method called
-// through it runs on the object the key designates -- uvm_phase's
-// `foreach (m_successors[succ]) succ.m_find_successor(...)`. The keys are
-// objects holding 3 and 40, summed through their get() inside a method: 43.
-// Typed as the 32-bit counter it was, the variable named no class and each
-// call answered 0.
 TEST(LoopStatementSim, ForeachKeyOfAClassKeyedPropertyIsAHandle) {
   EXPECT_EQ(RunAndGet("class N;\n"
                       "  int v;\n"
@@ -775,8 +688,6 @@ TEST(LoopStatementSim, ForeachKeyOfAClassKeyedPropertyIsAHandle) {
             43u);
 }
 
-// §12.7.3 with §7.8.3: the same for a module's array iterated by a procedural
-// foreach, which creates its loop variable apart from a subroutine body's.
 TEST(LoopStatementSim, ForeachKeyOfAClassKeyedModuleArrayIsAHandle) {
   EXPECT_EQ(RunAndGet("class N;\n"
                       "  int v;\n"
@@ -800,12 +711,6 @@ TEST(LoopStatementSim, ForeachKeyOfAClassKeyedModuleArrayIsAHandle) {
             43u);
 }
 
-// §12.7.3 gives a foreach loop variable over an associative array the array's
-// index type, so over `int m[color_t]` the variable is a color_t and
-// §6.19.5.6's name() names the key's member, in the array's own order (§7.8.1,
-// RED before BLUE). This fails on a loop variable holding the key's bits with
-// no enumeration, where name() answered garbage and the accumulated string
-// lost the first key.
 TEST(ForeachEnumKeySim, LoopVariableOverAnEnumKeyedArrayIsOfTheEnum) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -824,10 +729,6 @@ TEST(ForeachEnumKeySim, LoopVariableOverAnEnumKeyedArrayIsOfTheEnum) {
             "RED=5 BLUE=7 \n");
 }
 
-// A foreach inside a subroutine runs through its own executor, and the rule
-// holds there as well: over a class property in a method and over a local
-// array in a function. This fails on the subroutine path typing the loop
-// variable with a class index alone.
 TEST(ForeachEnumKeySim, LoopVariableInASubroutineIsOfTheEnum) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -857,9 +758,6 @@ TEST(ForeachEnumKeySim, LoopVariableInASubroutineIsOfTheEnum) {
             "[GREEN BLUE ] [RED GREEN ]\n");
 }
 
-// §12.7.3 with §7.4.2, §7.5 and §8.5: inside a method, a foreach over the
-// object's fixed array property and over its dynamic array property, sized in
-// the constructor, writes each element and reads each back.
 TEST(LoopStatementSim, ForeachOverArrayPropertiesInMethods) {
   SimFixture f;
   std::string out = RunCapture(
@@ -885,10 +783,6 @@ TEST(LoopStatementSim, ForeachOverArrayPropertiesInMethods) {
   EXPECT_EQ(out, "10 40 20 3100\n");
 }
 
-// §12.7.3 with §7.8.4: the loop variable of a foreach over an associative
-// array has the index type, so a signed one, `byte` or `bit signed [4:1]`,
-// reads the key -3 as -3, in a module and in a function; an unsigned 4-bit
-// one reads -1's key as 15.
 TEST(LoopStatementSim, ForeachOverASignedAssociativeIndex) {
   SimFixture f;
   std::string out = RunCapture(
@@ -914,10 +808,6 @@ TEST(LoopStatementSim, ForeachOverASignedAssociativeIndex) {
   EXPECT_EQ(out, " -3 5 f-3 f5 -3 0 u15\n");
 }
 
-// §12.7.3 with §7.8 and §7.10: over a queue or associative array whose
-// elements are arrays, the second loop variable steps through each element,
-// from a fixed-size element's left bound. Only the first stepped, so
-// `foreach (r[k, j])` visited j = 0 alone and summed 12 of 26.
 TEST(LoopStatementSim, ForeachSecondVariableStepsThroughElementArrays) {
   SimFixture f;
   auto out = RunCapture(

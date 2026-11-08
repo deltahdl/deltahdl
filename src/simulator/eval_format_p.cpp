@@ -1,6 +1,3 @@
-// §21.2.1.6: the %p format specifier's assignment-pattern rendering of
-// aggregates, enums, class handles and singular values.
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -33,8 +30,6 @@
 
 namespace delta {
 
-// The integer kinds whose unformatted decimal rendering is signed, so a member
-// or element holding a negative value shows its sign.
 static bool IsSignedIntegerKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -48,12 +43,6 @@ static bool IsSignedIntegerKind(DataTypeKind kind) {
   }
 }
 
-// §21.2.1.6: render a singular value the way it appears as one element of an
-// assignment pattern. A string-typed element is enclosed in quotes (C7c); every
-// other singular type prints as it would unformatted (C7e) -- a real value in
-// the shortest real form, anything else in the default decimal form with x/z
-// status characters carried through by FormatArg and the sign shown for the
-// signed integer kinds.
 static std::string FormatSingularForP(const Logic4Vec& val, DataTypeKind kind) {
   if (kind == DataTypeKind::kString || val.is_string) {
     return "\"" + FormatValueAsString(val) + "\"";
@@ -64,9 +53,6 @@ static std::string FormatSingularForP(const Logic4Vec& val, DataTypeKind kind) {
   return FormatArg(v, 'd');
 }
 
-// §21.2.1.6: copy the [offset, offset+width) bit field out of a packed
-// aggregate into its own vector, preserving unknown/high-impedance bits so a
-// member that holds x or z renders as such.
 static Logic4Vec SliceField(const Logic4Vec& val, uint32_t offset,
                             uint32_t width, DataTypeKind kind, Arena& arena) {
   Logic4Vec out = MakeLogic4Vec(arena, width == 0 ? 1 : width);
@@ -82,18 +68,10 @@ static Logic4Vec SliceField(const Logic4Vec& val, uint32_t offset,
   return out;
 }
 
-// §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
-// the value is one named by the type; otherwise it prints in the base type's
-// (decimal) form.
 static std::string FormatEnumValueForP(const EnumTypeInfo& et,
                                        const Logic4Vec& val) {
-  // §21.2.1.6 with §6.19: a value is a member where every bit matches, x and
-  // z included, as the enum methods match it, so `XX='x` prints XX; read as
-  // a number, a value holding x or z matched no member.
   if (val.nwords > 0) {
     const Logic4Word& w = val.words[0];
-    // A member's value is kept as folded, and a value of the enumeration
-    // holds the base type's bits alone.
     uint64_t mask = et.width == 0 || et.width >= 64
                         ? ~uint64_t{0}
                         : (uint64_t{1} << et.width) - 1;
@@ -108,11 +86,6 @@ static std::string FormatEnumValueForP(const EnumTypeInfo& et,
 static std::string FormatStructValueForP(const StructTypeInfo& st,
                                          const Logic4Vec& val, SimContext& ctx);
 
-// §21.2.1.6 (C2/C7a): render one struct or union member as "name:value". A
-// member that is itself a struct or union prints as a nested assignment
-// pattern under the same rules, and one of an enum type as the name of its
-// value (C7b) as the enum prints on its own; any other singular member is
-// formatted by the singular rules.
 static std::string FormatMember(const StructFieldInfo& f, const Logic4Vec& val,
                                 SimContext& ctx) {
   Logic4Vec slice =
@@ -124,16 +97,11 @@ static std::string FormatMember(const StructFieldInfo& f, const Logic4Vec& val,
     if (const EnumTypeInfo* et = ctx.FindEnumType(f.type_name))
       return label + FormatEnumValueForP(*et, slice);
   }
-  // §7.2 with §6.16: a string member's bits are a handle to its text.
   if (f.type_kind == DataTypeKind::kString)
     slice = StringMemberText(slice, ctx.GetArena());
   return label + FormatSingularForP(slice, f.type_kind);
 }
 
-// §21.2.1.6 (C2/C3/C7a): the assignment-pattern text of one struct or union
-// value: every member as "name:value" in declaration order for a struct, only
-// the first declared member for an (untagged) union. Nested aggregate members
-// recurse through FormatMember.
 static std::string FormatStructValueForP(const StructTypeInfo& st,
                                          const Logic4Vec& val,
                                          SimContext& ctx) {
@@ -148,11 +116,6 @@ static std::string FormatStructValueForP(const StructTypeInfo& st,
   return out;
 }
 
-// §21.2.1.6: render one element of an unpacked aggregate. The traversal
-// descends until a singular value is reached: a struct-typed element becomes a
-// nested assignment pattern, an enum-typed element its member name, and any
-// other element the singular form.
-// The element layout and enum type an array's elements are rendered by.
 struct AggElemTypes {
   const StructTypeInfo* st;
   const EnumTypeInfo* et;
@@ -166,12 +129,6 @@ static std::string FormatAggElemForP(const Logic4Vec& val, DataTypeKind kind,
   return FormatSingularForP(val, kind);
 }
 
-// §21.2.1.6 (C4, printed page 662): a tagged union prints its currently valid
-// member as "tag:value". The active member's width and type come from the
-// union's layout `st`, or the value's own width where none is registered.
-// §7.3.2 has a member that is itself a tagged union carry a tag of its own,
-// kept under the union's tag key `key` followed by the member's name, so such
-// a member prints in the same tagged form, '{Jmp:'{JmpV:10}}.
 static std::string FormatTaggedUnionForP(std::string_view tag,
                                          const StructTypeInfo* st,
                                          const Logic4Vec& val,
@@ -196,9 +153,6 @@ static std::string FormatTaggedUnionForP(std::string_view tag,
   return "'{" + std::string(tag) + ":" + member + "}";
 }
 
-// §21.2.1.6 (C4): the tagged form of the variable `name`. Returns no value
-// when the variable is not a tagged union holding a tag (the caller falls
-// through to the next aggregate form).
 static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
                                                           const Logic4Vec& val,
                                                           SimContext& ctx) {
@@ -209,9 +163,6 @@ static std::optional<std::string> BuildFormatPTaggedUnion(std::string_view name,
                                ctx);
 }
 
-// §21.2.1.6 (C2/C3/C7a): a struct prints every member as "name:value"; a
-// plain (untagged) union prints only its first declared member. Returns no
-// value when the variable is not a struct/union type.
 static std::optional<std::string> BuildFormatPStruct(std::string_view name,
                                                      const Logic4Vec& val,
                                                      SimContext& ctx) {
@@ -220,21 +171,11 @@ static std::optional<std::string> BuildFormatPStruct(std::string_view name,
   return FormatStructValueForP(*st, val, ctx);
 }
 
-// §7.6 (printed page 160): array elements correspond by their left-to-right
-// order in each array, so int A[7:0] = B of int B[1:8] puts B[1] in A[7], and
-// §10.9.1's array pattern matches its items one to one with the elements in
-// that order. %p's pattern, which §21.2.1.6 requires to read as valid
-// assignment pattern syntax, thus lists a dimension
-// spanning addresses [lo, lo+size-1] from its left bound: its i-th item is the
-// i-th address from the top when the dimension was declared descending.
 static uint32_t LeftToRightAddress(uint32_t lo, uint32_t size, bool descending,
                                    uint32_t i) {
   return descending ? lo + size - 1 - i : lo + i;
 }
 
-// §21.2.1.6 (C5): dimension `d` of a multidimensional unpacked array, outermost
-// first, as a pattern of the patterns of the dimensions below it; the elements
-// of the last live as variables named "arr[i][j]" by the lowerer.
 static std::string FormatArrayDimForP(const std::string& prefix,
                                       const ArrayInfo& ai, size_t d,
                                       const AggElemTypes& types,
@@ -258,11 +199,6 @@ static std::string FormatArrayDimForP(const std::string& prefix,
   return out + "}";
 }
 
-// §21.2.1.6 (C5): a fixed-size unpacked array prints as an assignment pattern
-// of its elements from its left bound, each element rendered by the traversal
-// rules (a struct element as a nested pattern, an enum element as its member
-// name). Elements live as their own variables, named "arr[idx]" by the lowerer.
-// Returns no value when the variable is not a non-empty unpacked array.
 static std::optional<std::string> BuildFormatPArray(std::string_view name,
                                                     SimContext& ctx,
                                                     Arena& arena) {
@@ -286,20 +222,11 @@ static std::optional<std::string> BuildFormatPArray(std::string_view name,
   return out;
 }
 
-// §21.2.1.6 (C5 with C7c): what %p prints each element of an unpacked array
-// by -- its type, as far as %p tells elements apart, and its structure layout
-// and enumeration.
 struct ElementTypeForP {
   DataTypeKind kind = DataTypeKind::kImplicit;
   AggElemTypes types{nullptr, nullptr};
 };
 
-// The element type the array `name` declares. A fixed-size array records it;
-// the elements of a queue, dynamic array or associative array carry no mark
-// of their own, so a string array's elements read as numbers, the codes of
-// their characters, unless the declaration's type reaches them from here: the
-// lowerer marks such an array's own name a string variable when its elements
-// are strings.
 static ElementTypeForP ElementTypeOfName(std::string_view name,
                                          SimContext& ctx) {
   ElementTypeForP type;
@@ -316,11 +243,6 @@ static std::string FormatQueueForP(const QueueObject* q,
                                    const ElementTypeForP& type,
                                    SimContext& ctx);
 
-// §21.2.1.6 with §7.4 and §7.10: element `pos` of `q`. Where the elements are
-// queues or fixed-size arrays (QueueObject::elements_are_queues) the value in
-// `elements` only holds the element's place, and the element is its own
-// queue, printed as a nested pattern; one never written holds its type's
-// default (ElementQueueOrDefault).
 static std::string FormatQueueElementForP(const QueueObject& q, size_t pos,
                                           const ElementTypeForP& type,
                                           SimContext& ctx) {
@@ -331,10 +253,6 @@ static std::string FormatQueueElementForP(const QueueObject& q, size_t pos,
                          ctx);
 }
 
-// §21.2.1.6 (C5): a queue or dynamic array (both stored as a QueueObject)
-// prints its current elements as an assignment pattern in index order; an
-// empty one prints the empty pattern, and so does a null one, the queue of an
-// associative array's element never made.
 static std::string FormatQueueForP(const QueueObject* q,
                                    const ElementTypeForP& type,
                                    SimContext& ctx) {
@@ -346,8 +264,6 @@ static std::string FormatQueueForP(const QueueObject* q,
   return out + "}";
 }
 
-// §21.2.1.6 (C5): the queue or dynamic array `name` names, or no value when
-// it names neither.
 static std::optional<std::string> BuildFormatPQueue(std::string_view name,
                                                     SimContext& ctx) {
   QueueObject* q = ctx.FindQueue(name);
@@ -355,10 +271,6 @@ static std::optional<std::string> BuildFormatPQueue(std::string_view name,
   return FormatQueueForP(q, ElementTypeOfName(name, ctx), ctx);
 }
 
-// §21.2.1.6 (C5): an associative array prints as an assignment pattern with
-// index labels, one "key:value" item per populated element in key order (a
-// string key is quoted), an element that is a queue as a nested pattern.
-// Returns no value when the name is not an associative array.
 static std::optional<std::string> BuildFormatPAssoc(std::string_view name,
                                                     SimContext& ctx) {
   AssocArrayObject* aa = ctx.FindAssocArray(name);
@@ -390,9 +302,6 @@ static std::optional<std::string> BuildFormatPAssoc(std::string_view name,
   return out;
 }
 
-// §21.2.1.6 (C7d): a class handle prints in an implementation-dependent form,
-// except that a null handle prints the word "null". A null handle is the known
-// zero value. Returns no value when the variable is not a class handle.
 static std::optional<std::string> BuildFormatPClassHandle(std::string_view name,
                                                           const Logic4Vec& val,
                                                           SimContext& ctx) {
@@ -401,10 +310,6 @@ static std::optional<std::string> BuildFormatPClassHandle(std::string_view name,
   return FormatArg(val, 'd');
 }
 
-// §21.2.1.6 (C7d): a virtual interface prints in an implementation-dependent
-// form -- here, the hierarchical name of the interface instance it is bound
-// to -- except that a null (unbound) one prints the word "null". Returns no
-// value when the variable is not a virtual interface.
 static std::optional<std::string> BuildFormatPVirtualInterface(
     std::string_view name, SimContext& ctx) {
   Variable* v = ctx.FindVariable(name);
@@ -413,9 +318,6 @@ static std::optional<std::string> BuildFormatPVirtualInterface(
   return std::string(ctx.VirtualInterfaceBinding(v));
 }
 
-// §21.2.1.6 (C7d): a chandle likewise prints in an implementation-dependent
-// form, except that a null (zero) handle prints the word "null". Returns no
-// value when the variable is not a chandle.
 static std::optional<std::string> BuildFormatPChandle(std::string_view name,
                                                       const Logic4Vec& val,
                                                       SimContext& ctx) {
@@ -424,9 +326,6 @@ static std::optional<std::string> BuildFormatPChandle(std::string_view name,
   return FormatArg(val, 'd');
 }
 
-// §21.2.1.6 (C7b): an enumerated value prints as the matching member name when
-// the value is one named by the type; otherwise it prints in the base type's
-// (decimal) form. Returns no value when the variable is not an enum type.
 static std::optional<std::string> BuildFormatPEnum(std::string_view name,
                                                    const Logic4Vec& val,
                                                    SimContext& ctx) {
@@ -435,23 +334,6 @@ static std::optional<std::string> BuildFormatPEnum(std::string_view name,
   return FormatEnumValueForP(*et, val);
 }
 
-// §21.2.1.6: build the text the %p (and %0p) format specifier substitutes for
-// an argument. An aggregate operand prints as an assignment pattern; a singular
-// operand prints as a single element of one. The use of white space is left to
-// the implementation, but the result is a legal assignment-pattern form (C6).
-// §21.2.1.6: the %p rendering of a named object, or nullopt when the name
-// denotes nothing with an aggregate or handle rendering of its own. The
-// aggregate forms are tried outermost-first: a queue/dynamic array, an
-// associative array, then a fixed-size unpacked array. An array whose element
-// type is a struct or enum also carries that type's info under the same name,
-// so the array checks come before the struct/enum ones.
-//
-// §23.9: the argument is a name resolved within the running instance, so each
-// form above asks for its struct or union layout by the key that instance's
-// storage was created under (StructLayoutOfName). Asked by the bare name, a
-// struct of an instantiated module printed as one number, a tagged union's
-// valid member printed at the union's width and as unsigned, and a queue of
-// structs printed each element as a number.
 static std::optional<std::string> BuildFormatPNamed(std::string_view name,
                                                     const Logic4Vec& val,
                                                     SimContext& ctx,
@@ -468,14 +350,6 @@ static std::optional<std::string> BuildFormatPNamed(std::string_view name,
   return BuildFormatPEnum(name, val, ctx);
 }
 
-// §21.2.1.6 (printed page 662) prints an aggregate wherever the argument names
-// one, and §7.3.2 (printed 151) has a tagged union carry its tag as a member
-// of a structure as it does as a variable: `s.u` after `s.u = tagged Valid 9`
-// prints '{Valid:9}, and a structure member prints its named members. The
-// member's layout and, for a tagged union, its current tag are walked to by
-// ResolveMemberLayout, under the member's own key; asked by the variable's
-// name alone, a member argument had no name and printed as one number.
-// Returns no value for an argument that is no member of a variable's layout.
 static std::optional<std::string> BuildFormatPMember(const Expr* arg,
                                                      const Logic4Vec& val,
                                                      SimContext& ctx) {
@@ -492,7 +366,6 @@ static std::optional<std::string> BuildFormatPMember(const Expr* arg,
       base, info, std::string_view(name).substr(dot + 1), ctx);
   if (member.layout == nullptr) return std::nullopt;
   if (!member.tag.empty()) {
-    // The member's tag key, as ResolveMemberLayout walked to it.
     std::string key = TagKeyOfName(base, ctx) + "." +
                       std::string(std::string_view(name).substr(dot + 1));
     return FormatTaggedUnionForP(member.tag, member.layout, val, key, ctx);
@@ -500,11 +373,6 @@ static std::optional<std::string> BuildFormatPMember(const Expr* arg,
   return FormatStructValueForP(*member.layout, val, ctx);
 }
 
-// §21.2.1.6 with §7.4 and §7.8: an element selected from an array whose
-// elements are structs or enums -- `va[10]` of `pair_t va[int]`, `arr[1]` of a
-// fixed-size array, `q[0]` of a queue -- is a struct or an enum, and prints as
-// the whole array prints that element. Returns no value for any other
-// argument, a select of a multidimensional array's higher dimension included.
 static std::optional<std::string> BuildFormatPElement(const Expr* arg,
                                                       const Logic4Vec& val,
                                                       SimContext& ctx) {
@@ -526,8 +394,6 @@ static std::optional<std::string> BuildFormatPElement(const Expr* arg,
   return FormatAggElemForP(val, kind, st, et, ctx);
 }
 
-// §21.2.1.6 (C5): the pattern of `elems`, the elements of an unpacked array
-// value that names no variable of its own, each printed by `type`.
 static std::string FormatValuesForP(const std::vector<Logic4Vec>& elems,
                                     const ElementTypeForP& type,
                                     SimContext& ctx) {
@@ -540,20 +406,12 @@ static std::string FormatValuesForP(const std::vector<Logic4Vec>& elems,
   return out + "}";
 }
 
-// Whether the array `name` names holds arrays in its elements -- a
-// multidimensional fixed-size array, or a queue or dynamic array whose
-// elements are queues or fixed-size arrays -- whose values its element
-// storage does not hold.
 static bool ElementsAreArrays(std::string_view name, SimContext& ctx) {
   if (const QueueObject* q = ctx.FindQueue(name)) return q->elements_are_queues;
   const ArrayInfo* ai = ctx.FindArrayInfo(name);
   return ai != nullptr && ai->dim_sizes.size() >= 2;
 }
 
-// §21.2.1.6 with §7.10.1 and §7.4.5: a slice of a queue, `q[0:1]`, is a queue
-// and a slice of a fixed-size array an unpacked array, so %p prints its run of
-// elements, each as the whole array prints it. No value for any other
-// argument.
 static std::optional<std::string> BuildFormatPSlice(const Expr* arg,
                                                     SimContext& ctx,
                                                     Arena& arena) {
@@ -569,17 +427,11 @@ static std::optional<std::string> BuildFormatPSlice(const Expr* arg,
   return FormatValuesForP(elems, ElementTypeOfName(name, ctx), ctx);
 }
 
-// §7.12.1: the locators returning indices rather than elements.
 static bool ReturnsIndices(std::string_view method) {
   return method == "find_index" || method == "find_first_index" ||
          method == "find_last_index" || method == "unique_index";
 }
 
-// §21.2.1.6 with §7.12.1 and §7.4.4: the elements a locator selects of an
-// array whose elements are arrays -- the subarrays of a multidimensional
-// fixed-size array, or the element queues of a queue -- print as the whole
-// array prints them, each a nested pattern. No value for a call selecting no
-// such elements.
 static std::optional<std::string> BuildFormatPLocatorRows(const Expr* arg,
                                                           SimContext& ctx,
                                                           Arena& arena) {
@@ -601,12 +453,6 @@ static std::optional<std::string> BuildFormatPLocatorRows(const Expr* arg,
   return out + "}";
 }
 
-// §21.2.1.6 with §7.12: a locator method returns a queue and so does map(), so
-// %p prints the queue a call of one returns. The elements a locator finds are
-// the array's, printed as the array prints them; the indices it finds are the
-// array's index type, so a string key prints quoted; map()'s are the values
-// its with clause gives, each printed as it is. No value for an argument that
-// is no such call.
 static std::optional<std::string> BuildFormatPLocator(const Expr* arg,
                                                       SimContext& ctx,
                                                       Arena& arena) {
@@ -633,11 +479,6 @@ static std::optional<std::string> BuildFormatPLocator(const Expr* arg,
   return FormatValuesForP(elems, type, ctx);
 }
 
-// §21.2.1.6 with §26.3: `pk::pq`, a package's item named through its
-// package, is the item the lowerer keeps under "pk.pq" (BuildLhsName), and
-// prints as it does by the name an import gives it. Asked by no name, a
-// package's queue or array printed as one number. No value for an argument
-// that names no package item with a rendering of its own.
 static std::optional<std::string> BuildFormatPPackageItem(const Expr* arg,
                                                           const Logic4Vec& val,
                                                           SimContext& ctx,
@@ -649,11 +490,6 @@ static std::optional<std::string> BuildFormatPPackageItem(const Expr* arg,
   return BuildFormatPNamed(key, val, ctx, arena);
 }
 
-// §21.2.1.6 with §8.5: a class property of a structure or union type, named
-// bare in a method or through a handle, prints as the pattern its layout gives
-// -- a tagged union's as its tag and the member the tag names, read under the
-// property's own key (PropertyAggregateLayout). A property is no variable, so
-// none of the named forms found a layout for it and it printed as one number.
 static std::optional<std::string> BuildFormatPProperty(const Expr* arg,
                                                        const Logic4Vec& val,
                                                        SimContext& ctx) {
@@ -676,21 +512,11 @@ static std::optional<std::string> BuildFormatPProperty(const Expr* arg,
   return FormatStructValueForP(*layout, val, ctx);
 }
 
-// Whether `e` names a handle by identifiers and member selects alone, `h` or
-// `o.inner`, so that resolving it runs nothing.
 static bool IsCallFreeHandlePath(const Expr* e) {
   while (e->kind == ExprKind::kMemberAccess) e = e->lhs;
   return e->kind == ExprKind::kIdentifier;
 }
 
-// §21.2.1.6 with §8.5: an unpacked array property of a class object, through a
-// handle, is an aggregate as an array variable is: a queue property is the
-// queue the object holds, and a fixed-size one the elements the object holds
-// one by one (ResolveClassArray), printed from the left bound. No variable
-// stands under the argument's name, so none of the named forms found it and it
-// printed as one number, 0. Only a chain of handles is asked about, `h.q` or
-// `o.inner.q` (IsCallFreeHandlePath): every argument of the call passes here,
-// and a base holding a call, `q.pop_front().id`, would run again to be asked.
 static std::optional<std::string> BuildFormatPClassArray(const Expr* arg,
                                                          SimContext& ctx,
                                                          Arena& arena) {
@@ -715,9 +541,6 @@ static std::optional<std::string> BuildFormatPClassArray(const Expr* arg,
 std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
                          SimContext& ctx) {
   Arena& arena = ctx.GetArena();
-  // §3.12.1: `$unit::uq` names the compilation unit's uq, kept under
-  // "$unit.uq" past a module's own uq (DeclaredKindsKey); read by its text, it
-  // printed the module's.
   std::string name = arg->kind == ExprKind::kIdentifier ? DeclaredKindsKey(arg)
                                                         : std::string();
 
@@ -731,8 +554,6 @@ std::string BuildFormatP(const Expr* arg, const Logic4Vec& val,
   if (auto found = BuildFormatPLocator(arg, ctx, arena)) return *found;
   if (auto array = BuildFormatPClassArray(arg, ctx, arena)) return *array;
 
-  // §21.2.1.6 (C10): %p on a singular expression formats it as one element of
-  // an aggregate would be formatted.
   return FormatSingularForP(val, DataTypeKind::kImplicit);
 }
 

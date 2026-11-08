@@ -19,17 +19,10 @@
 #include "simulator/vpi_design_attach_procedures_internal.h"
 #include "simulator/vpi_named_type_kinds.h"
 
-// The declarations a call the procedure walk resolves is made against: the
-// class a name stands for where the call stands, the methods it declares, the
-// class it extends under a specialization, the variable a named block declares
-// where a hierarchical name reaches it, the item an interface declares where a
-// virtual interface reaches it, and the structure a chain of members descends.
-
 namespace delta {
 
 namespace {
 
-// The class among `decls` named `name`, null for none.
 const ClassDecl* ClassNamed(const std::vector<ClassDecl*>& decls,
                             std::string_view name) {
   for (const ClassDecl* decl : decls) {
@@ -38,8 +31,6 @@ const ClassDecl* ClassNamed(const std::vector<ClassDecl*>& decls,
   return nullptr;
 }
 
-// The classes the package named `package` declares; none for a name no
-// package of the design has.
 std::vector<ClassDecl*> PackageClasses(const RtlirDesign& design,
                                        std::string_view package) {
   std::vector<ClassDecl*> classes;
@@ -49,10 +40,6 @@ std::vector<ClassDecl*> PackageClasses(const RtlirDesign& design,
   return classes;
 }
 
-// §8.25: the argument of the specialization `args` binding the class parameter
-// `name`, the `index`th the class declares: by name where the specialization
-// names its arguments, .T(B2), and by position otherwise, (2, B2); null where
-// it binds none, which leaves the parameter its default (§8.25.1).
 const DataType* TypeArgument(std::span<const DataType> args, std::size_t index,
                              std::string_view name) {
   const auto kNamed = std::ranges::find(args, name, &DataType::param_arg_name);
@@ -62,9 +49,6 @@ const DataType* TypeArgument(std::span<const DataType> args, std::size_t index,
   return kPositional && index < args.size() ? &args[index] : nullptr;
 }
 
-// §8.25: the type the specialization `args` of the class `decl` binds its
-// type parameter `name` to, the parameter's default where it binds none
-// (§8.25.1); null where `name` is none of the class's type parameters.
 const DataType* TypeParamBound(const ClassDecl& decl,
                                std::span<const DataType> args,
                                std::string_view name) {
@@ -77,7 +61,6 @@ const DataType* TypeParamBound(const ClassDecl& decl,
   return arg != nullptr ? arg : &decl.param_types.at(kIndex);
 }
 
-// §8.23: the classes the class `outer` declares within it.
 std::vector<ClassDecl*> NestedClasses(const ClassDecl& outer) {
   std::vector<ClassDecl*> nested;
   for (const ClassMember* member : outer.members) {
@@ -88,8 +71,6 @@ std::vector<ClassDecl*> NestedClasses(const ClassDecl& outer) {
   return nested;
 }
 
-// §9.3.4: the declaration of the variable `name` that a block named `block`,
-// written anywhere in the statement `s`, declares; null where none does.
 const Stmt* NamedBlockVarDecl(const Stmt* s, std::string_view block,
                               std::string_view name) {
   if (s == nullptr) return nullptr;
@@ -107,8 +88,6 @@ const Stmt* NamedBlockVarDecl(const Stmt* s, std::string_view block,
   return found;
 }
 
-// §6.18: the type the typedef `name` the walked module declares stands for;
-// null where the module declares no typedef of that name.
 const DataType* ModuleTypedef(const BodyWalk& walk, std::string_view name) {
   const DataType* found = nullptr;
   for (const ModuleDecl* decl : walk.design.compilation_unit->modules) {
@@ -133,8 +112,6 @@ VpiScopedClass VpiFindClassDecl(const BodyWalk& walk, std::string_view name,
                                 std::string_view package) {
   name = VpiClassNameOf(walk, name);
   if (!package.empty()) {
-    // §8.23: a scope naming a class is the class a nested class is declared
-    // in, whose defn the nested one's hangs under.
     const VpiScopedClass kOuter = VpiFindClassDecl(walk, package);
     if (kOuter.decl != nullptr) {
       return {ClassNamed(NestedClasses(*kOuter.decl), name), kOuter.scope};

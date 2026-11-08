@@ -17,17 +17,10 @@ using namespace delta;
 
 namespace {
 
-// §H.9.5: no specific relationship is defined between DPI and VPI, and a
-// vpiHandle is not equivalent to an svOpenArrayHandle: the two may not be
-// interchanged and passed between functions of the two interfaces.
 TEST(DpiAndVpi, AnOpenArrayHandleIsNoVpiHandle) {
   EXPECT_FALSE(DpiOpenArrayHandleIsInterchangeableWithVpiHandle());
 }
 
-// §H.9.5: the VPI routines an import may call without the context qualifier
-// are Table 36-9's exceptions -- the three vpi_printf-family I/O routines,
-// the six vpi_mcd I/O routines and vpi_get_vlog_info -- since they do not
-// access the Verilog model.
 TEST(DpiAndVpi, TenVpiRoutinesNeedNoContextQualifier) {
   const std::array<std::string_view, 10> kExceptions =
       DpiVpiRoutinesCallableWithoutContext();
@@ -46,8 +39,6 @@ TEST(DpiAndVpi, TenVpiRoutinesNeedNoContextQualifier) {
   }
 }
 
-// §H.9.5: every other VPI function accesses the Verilog model and requires
-// the import calling it to be flagged context.
 TEST(DpiAndVpi, EveryOtherVpiRoutineRequiresTheContextQualifier) {
   EXPECT_TRUE(DpiVpiRoutineRequiresContext("vpi_handle"));
   EXPECT_TRUE(DpiVpiRoutineRequiresContext("vpi_iterate"));
@@ -56,10 +47,6 @@ TEST(DpiAndVpi, EveryOtherVpiRoutineRequiresTheContextQualifier) {
   EXPECT_TRUE(DpiVpiRoutineRequiresContext("vpi_register_cb"));
 }
 
-// §H.9.5: an imported subroutine is not a system task, so the handle to the
-// system task call site and the callbacks and other activities associated
-// with system tasks are not available from within a context import, while
-// iterating the top-level modules is.
 TEST(DpiAndVpi, SystemTaskActivitiesAreUnavailableAndIteratingModulesIsNot) {
   EXPECT_FALSE(DpiVpiActivityIsAvailableFromContextImport(
       DpiVpiActivity::kSystemTaskCallSiteHandle));
@@ -69,10 +56,6 @@ TEST(DpiAndVpi, SystemTaskActivitiesAreUnavailableAndIteratingModulesIsNot) {
       DpiVpiActivity::kIterateTopLevelModules));
 }
 
-// The clause's two calls made from within a context import under this tool:
-// a VPI data model holding one top-level module, and a DpiRuntime whose
-// context import scans the top-level modules and asks for the system task
-// call site.
 class VpiFromAContextImport : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -85,11 +68,9 @@ class VpiFromAContextImport : public ::testing::Test {
     scan.is_context = true;
     scan.return_type = DataTypeKind::kInt;
     scan.impl = [](const std::vector<DpiArgValue>&) -> DpiArgValue {
-      // Prepare to scan all top-level modules, and count what the scan yields.
       int tops = 0;
       vpiHandle it = vpi_iterate(vpiModule, nullptr);
       while (it != nullptr && vpi_scan(it) != nullptr) ++tops;
-      // Get the handle to the system task call site, which no import has.
       vpiHandle call_site = vpi_handle(vpiSysTfCall, nullptr);
       return DpiArgValue::FromInt(call_site == nullptr ? tops : -1);
     };
@@ -110,10 +91,6 @@ class VpiFromAContextImport : public ::testing::Test {
   DpiRuntime rt_;
 };
 
-// §H.9.5: vpi_iterate(vpiModule, NULL) works reliably from within a context
-// import, reaching the design's one top-level module, and
-// vpi_handle(vpiSysTfCall, NULL) reaches no call site there, the import not
-// being a system task.
 TEST_F(VpiFromAContextImport, TheImportScansTheTopModulesAndHasNoCallSite) {
   EXPECT_EQ(ScanFromTheImport(), 1);
 }

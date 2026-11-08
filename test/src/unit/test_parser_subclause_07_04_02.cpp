@@ -138,14 +138,6 @@ TEST(UnpackedArrayParsing, StringUnpackedDim) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// Covers the `msb : lsb` branch of Parser::ParseUnpackedDims in
-// src/parser/parser_types.cpp, which builds an ExprKind::kBinary carrying the
-// colon. It assigned no range.start before this commit, and
-// src/parser/parser_types.cpp assigned none at any site, so a report standing
-// at a declared dimension printed "<unknown location>" instead of a file, line
-// and column. §7.4.2 writes the dimension as `[ constant_expression :
-// constant_expression ]`, and the node holds the pair rather than the brackets,
-// so it begins at its first bound: `3`, at column 10 of line 2.
 TEST(UnpackedArrayParsing, UnpackedDimRangeStartsAtItsFirstBound) {
   auto r = Parse(
       "module m;\n"

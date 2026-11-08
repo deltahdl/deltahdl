@@ -11,52 +11,25 @@
 
 namespace delta {
 
-// §F.5.3.1 defines neutral satisfaction, the relation w |= P, for the
-// properties, top-level properties, and assertion statements of the §F.3.2
-// grammar, under the assumption that no local variables are involved. The
-// relation is layered on §F.5.2's tight satisfaction of sequences (used by the
-// strong/weak/implication forms) and on the §F.5 alphabet word operations
-// (suffix w^{i.}, letterwise complement w-bar, finite prefixes, and the
-// T^omega / _|_^omega tails).
-//
-// This file models §F.5.3.1 in two layers. The unclocked layer covers the
-// property forms whose neutral satisfaction §F.5.3.1 spells out directly, the
-// unclocked top-level property T (a property, a disable iff guard, or a
-// parenthesized T), and the disabling relation w |=^d T together with the
-// pass/disabled/fail trichotomy. The clocked layer covers the rule
-// w |= Q iff w |= T^p(Q, 1), the clocked top-level property U, and the
-// assertion-statement forms (always/initial x assert/assume/cover, threading
-// their operands through @(c) and U). The clocked layer borrows the §F.5.1.2
-// ClockedProperty model and its property rewrite T^p (a satisfied dependency):
-// it routes every clocked property through T^p(., 1) -- or, for an explicit
-// @(c), through T^p(., c) -- and then evaluates the resulting unclocked
-// property with the layer above. A Boolean emitted by T^p in property position
-// is read as the property strong(b).
-
-// §F.3.2 production P, restricted to the unclocked forms §F.5.3.1 evaluates
-// directly. strong(R) and weak(R) carry a sequence operand R; the implication
-// (R |-> P) carries both a sequence antecedent and a property consequent;
-// accept_on(b) P carries a Boolean abort condition.
 struct PropertyExpr {
   enum class Kind : std::uint8_t {
-    kStrong,       // strong ( R )
-    kWeak,         // weak ( R )
-    kParen,        // ( P )
-    kNot,          // not P
-    kImplication,  // ( R |-> P )
-    kOr,           // ( P1 or P2 )
-    kAnd,          // ( P1 and P2 )
-    kNexttime,     // ( nexttime P )
-    kUntil,        // ( P1 until P2 )
-    kAcceptOn,     // ( accept_on ( b ) P )
+    kStrong,
+    kWeak,
+    kParen,
+    kNot,
+    kImplication,
+    kOr,
+    kAnd,
+    kNexttime,
+    kUntil,
+    kAcceptOn,
   };
 
   Kind kind = Kind::kStrong;
-  std::shared_ptr<const SequenceExpr>
-      sequence;                                // R for strong/weak/implication
-  std::shared_ptr<const BooleanExpr> boolean;  // b for accept_on
-  std::shared_ptr<const PropertyExpr> lhs;     // sub-property / first operand
-  std::shared_ptr<const PropertyExpr> rhs;     // second operand
+  std::shared_ptr<const SequenceExpr> sequence;
+  std::shared_ptr<const BooleanExpr> boolean;
+  std::shared_ptr<const PropertyExpr> lhs;
+  std::shared_ptr<const PropertyExpr> rhs;
 };
 
 std::shared_ptr<const PropertyExpr> PropStrong(
@@ -85,20 +58,17 @@ std::shared_ptr<const PropertyExpr> PropAcceptOn(
     std::shared_ptr<const BooleanExpr> b,
     std::shared_ptr<const PropertyExpr> inner);
 
-// §F.3.2 production T (unclocked top-level property), in the unclocked forms
-// §F.5.3.1 evaluates: a bare property P, a disable iff (b) P guard, and a
-// parenthesized top-level property ( T ).
 struct TopLevelProperty {
   enum class Kind : std::uint8_t {
-    kProperty,    // P
-    kDisableIff,  // disable iff ( b ) P
-    kParen,       // ( T )
+    kProperty,
+    kDisableIff,
+    kParen,
   };
 
   Kind kind = Kind::kProperty;
-  std::shared_ptr<const BooleanExpr> disable_condition;  // b for disable iff
-  std::shared_ptr<const PropertyExpr> property;          // P
-  std::shared_ptr<const TopLevelProperty> inner;         // T for ( T )
+  std::shared_ptr<const BooleanExpr> disable_condition;
+  std::shared_ptr<const PropertyExpr> property;
+  std::shared_ptr<const TopLevelProperty> inner;
 };
 
 std::shared_ptr<const TopLevelProperty> TopProperty(
@@ -109,46 +79,30 @@ std::shared_ptr<const TopLevelProperty> TopDisableIff(
 std::shared_ptr<const TopLevelProperty> TopParen(
     std::shared_ptr<const TopLevelProperty> inner);
 
-// §F.5.3.1: neutral satisfaction w |= P of a property by a nonempty word w.
 bool NeutrallySatisfies(const Word& word, const PropertyExpr& property);
 
-// §F.5.3.1: neutral satisfaction w |= T of an (unclocked) top-level property.
 bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top);
 
-// §F.5.3.1: the disabling relation w |=^d T for an (unclocked) top-level
-// property. A bare property is never disabled; a disable iff guard is disabled
-// when its condition first becomes true on a word for which the guarded
-// property is true under a T^omega completion but not under a _|_^omega one.
 bool DisablesTopLevel(const Word& word, const TopLevelProperty& top);
 
-// §F.5.3.1: T passes on w when w |= T, is disabled on w when w |=^d T, and
-// fails on w when it does neither. The standard notes pass and disabled are
-// mutually exclusive.
 bool PassesTopLevel(const Word& word, const TopLevelProperty& top);
 bool IsDisabledTopLevel(const Word& word, const TopLevelProperty& top);
 bool FailsTopLevel(const Word& word, const TopLevelProperty& top);
 
-// §F.5.3.1: neutral satisfaction of a clocked property Q, defined by the single
-// rule w |= Q iff w |= T^p(Q, 1). Q is the §F.5.1.2 ClockedProperty; the clock
-// is pushed down by that subclause's property rewrite under the constant clock
-// 1 and the unclocked result is evaluated as a §F.5.3.1 property.
 bool NeutrallySatisfiesClockedProperty(const Word& word,
                                        const ClockedProperty& q);
 
-// §F.3.2 production U (clocked top-level property), in the forms §F.5.3.1
-// evaluates: a clocked property Q, a disable iff (b) Q guard, and a
-// parenthesized clocked top-level property ( U ).
 struct ClockedTopLevelProperty {
   enum class Kind : std::uint8_t {
-    kProperty,    // Q
-    kDisableIff,  // disable iff ( b ) Q
-    kParen,       // ( U )
+    kProperty,
+    kDisableIff,
+    kParen,
   };
 
   Kind kind = Kind::kProperty;
-  std::shared_ptr<const BooleanExpr> disable_condition;  // b for disable iff
-  std::shared_ptr<const ClockedProperty> property;       // Q
-  std::shared_ptr<const ClockedTopLevelProperty> inner;  // U for ( U )
+  std::shared_ptr<const BooleanExpr> disable_condition;
+  std::shared_ptr<const ClockedProperty> property;
+  std::shared_ptr<const ClockedTopLevelProperty> inner;
 };
 
 std::shared_ptr<const ClockedTopLevelProperty> ClockedTopProperty(
@@ -159,73 +113,44 @@ std::shared_ptr<const ClockedTopLevelProperty> ClockedTopDisableIff(
 std::shared_ptr<const ClockedTopLevelProperty> ClockedTopParen(
     std::shared_ptr<const ClockedTopLevelProperty> inner);
 
-// §F.5.3.1: the unclocked property that decides w |= Q, T^p(Q, c) read into
-// the property model for the clock c -- 1 for a clocked property standing
-// alone, the clock of @( c ) T for a property under an explicit clock -- with
-// a Boolean T^p emits in property position read as strong(b), a Boolean being
-// a length-one sequence on which strong and weak coincide. §F.5.1.2's
-// RewritePropertyUnderClock is the satisfied dependency that supplies T^p.
 std::shared_ptr<const PropertyExpr> UnclockedPropertyOf(
     const ClockedProperty& q, const std::shared_ptr<const BooleanExpr>& clock);
 
-// §F.5.3.1: neutral satisfaction w |= U and disabling w |=^d U of a clocked
-// top-level property. The U forms mirror the unclocked T forms with Q replacing
-// P, so each reduces to its T counterpart over the unclocked property T^p(Q,
-// 1).
 bool NeutrallySatisfiesTopLevelClocked(const Word& word,
                                        const ClockedTopLevelProperty& top);
 bool DisablesTopLevelClocked(const Word& word,
                              const ClockedTopLevelProperty& top);
 
-// §F.5.3.1: the pass/disabled/fail trichotomy applies to clocked top-level
-// properties as well, since the disabling-of-top-level definitions it follows
-// cover both T and U.
 bool PassesTopLevelClocked(const Word& word,
                            const ClockedTopLevelProperty& top);
 bool IsDisabledTopLevelClocked(const Word& word,
                                const ClockedTopLevelProperty& top);
 bool FailsTopLevelClocked(const Word& word, const ClockedTopLevelProperty& top);
 
-// §F.3.2 production A (assertion statement) in the forms §F.5.3.1 defines
-// neutral satisfaction for. Each statement combines an activation (always or
-// initial), a role (assert, assume, or cover), and a clocked top-level body.
-// The body comes in two shapes: an explicit leading clock over an unclocked
-// top-level property, @( c ) T, or an intrinsically clocked top-level property
-// U.
 struct AssertionStatement {
   enum class Activation : std::uint8_t { kAlways, kInitial };
   enum class Role : std::uint8_t { kAssert, kAssume, kCover };
   enum class Form : std::uint8_t {
-    kExplicitClock,  // @( c ) T
-    kClockedTop,     // U
+    kExplicitClock,
+    kClockedTop,
   };
 
   Activation activation = Activation::kAlways;
   Role role = Role::kAssert;
   Form form = Form::kExplicitClock;
-  std::shared_ptr<const BooleanExpr> clock;     // c, for kExplicitClock
-  std::shared_ptr<const TopLevelProperty> top;  // T, for kExplicitClock
-  std::shared_ptr<const ClockedTopLevelProperty> clocked_top;  // U, kClockedTop
+  std::shared_ptr<const BooleanExpr> clock;
+  std::shared_ptr<const TopLevelProperty> top;
+  std::shared_ptr<const ClockedTopLevelProperty> clocked_top;
 };
 
-// §F.5.3.1: what fixes the activation points of an assertion statement, apart
-// from its body and role -- its activation, its form and, for the explicit
-// clock form, its clock -- so that a statement whose body carries local
-// variables (§F.5.6.1) activates by the same rule.
 struct AssertionActivation {
   AssertionStatement::Activation activation =
       AssertionStatement::Activation::kAlways;
   AssertionStatement::Form form = AssertionStatement::Form::kExplicitClock;
-  std::shared_ptr<const BooleanExpr> clock;  // c, for kExplicitClock
+  std::shared_ptr<const BooleanExpr> clock;
 };
 AssertionActivation ActivationOf(const AssertionStatement& assertion);
 
-// §F.5.3.1: every rule guards an activation point i by the enabling condition
-// (w-bar^i |= b) and, depending on activation and form, by the clock. The
-// always forms scan every index; the initial forms fire only at the first
-// clock tick, the index whose prefix of w-bar tightly satisfies
-// !c [*0:$] ##1 c (explicit clock), or at index 0 (the U column).
-// `complement` is w-bar.
 bool ActivationPointEnabled(std::size_t i, const Word& complement,
                             const BooleanExpr& enabling,
                             const AssertionActivation& activation);
@@ -238,52 +163,29 @@ std::shared_ptr<const AssertionStatement> AssertionWithClockedTop(
     AssertionStatement::Activation activation, AssertionStatement::Role role,
     std::shared_ptr<const ClockedTopLevelProperty> clocked_top);
 
-// §F.5.3.1: neutral satisfaction w, b |= A of an assertion statement, where b
-// is the Boolean enabling condition (1 for a declarative assertion statement).
-// The always forms quantify over every index; the initial forms over the first
-// clocked activation. An assert or assume statement requires that the body pass
-// or be disabled at every enabled activation; a cover statement requires that
-// it pass at some enabled activation.
 bool NeutrallySatisfiesAssertion(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion);
 
-// §F.5.3.1 on the infinite word w tail^omega, tail being T or _|_, which is
-// the word §F.5.3.2 reads the finite word w through. The activation points in
-// the tail all see the suffix tail^omega and the same letter of the
-// complement, so the |w| points of the prefix and one point standing for the
-// whole tail decide the relation, the body at each evaluated on its suffix
-// completed with the tail far enough past the prefix for its verdict to have
-// settled, as the disable iff rule of §F.5.3.1 completes its prefix.
 bool NeutrallySatisfiesAssertionWithTail(const Word& word, const Letter& tail,
                                          const BooleanExpr& enabling,
                                          const AssertionStatement& assertion);
 
-// §F.5.3.1: an assertion statement together with the enabling condition under
-// which it is evaluated, so a set of assumptions can be carried as a list.
 struct EnabledAssertion {
   AssertionStatement statement;
   std::shared_ptr<const BooleanExpr> enabling;
 };
 
-// §F.5.3.1: a word of the set is feasible when it satisfies every assumption of
-// the set.
 bool WordIsFeasible(const Word& word,
                     const std::vector<EnabledAssertion>& assumptions);
 
-// §F.5.3.1: an assert property statement is satisfied on a set of words, given
-// the assumptions, when every feasible word satisfies it.
 bool AssertSatisfiedOnWordSet(const EnabledAssertion& assertion,
                               const std::vector<Word>& words,
                               const std::vector<EnabledAssertion>& assumptions);
 
-// §F.5.3.1: a cover property statement is satisfied on a set of words, given
-// the assumptions, when some feasible word satisfies it.
 bool CoverSatisfiedOnWordSet(const EnabledAssertion& assertion,
                              const std::vector<Word>& words,
                              const std::vector<EnabledAssertion>& assumptions);
 
-// §F.5.3.1: an assertion statement holds globally on the set of words, given
-// the assumptions, when every feasible word satisfies it.
 bool HoldsGloballyOnWordSet(const EnabledAssertion& assertion,
                             const std::vector<Word>& words,
                             const std::vector<EnabledAssertion>& assumptions);

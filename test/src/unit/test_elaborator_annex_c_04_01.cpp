@@ -1,15 +1,3 @@
-// Annex C.4.1: defparam statements. The statement is identified for
-// deprecation, yet tools must still support it under this edition, in the
-// placements the subclause names as what makes it costly: before or after the
-// instance it modifies, at the end of the file, in a separate file, and
-// hierarchically. A defparam written in a separate file is one written in a
-// module of its own, which names the instance it modifies from the root of the
-// hierarchy: §23.8 resolves a name whose leading step names no scope of the
-// writing module upward, and the root it reaches is a top-level module, which
-// is how §23.10.4.2's own example, `defparam m.n.p = 1;` written in the m1 that
-// m instantiates, reaches m's instance n. These cases observe the elaborator
-// supporting each placement.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -36,7 +24,6 @@ int64_t ParamValue(const RtlirModule* mod, std::string_view name) {
   return -1;
 }
 
-// C.4.1: a defparam may be written before the instance it modifies.
 TEST(DefparamSupport, DefparamBeforeTheInstanceApplies) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,11 +38,6 @@ TEST(DefparamSupport, DefparamBeforeTheInstanceApplies) {
   EXPECT_EQ(ParamValue(FirstChild(design->top_modules[0]), "P"), 5);
 }
 
-// C.4.1: a defparam may be written in a file other than the one holding the
-// instance it modifies. A separate file holds a module of its own, a top-level
-// one, whose defparam names the instance from the top-level module that holds
-// it. Both modules are roots, so the design is elaborated with every
-// uninstantiated module a top (§23.3.1) rather than with the last module alone.
 TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheInstance) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -66,15 +48,13 @@ TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheInstance) {
       "module annotate;\n"
       "  defparam top.u1.P = 7;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
   EXPECT_EQ(ParamValue(FirstChild(design->top_modules[0]), "P"), 7);
 }
 
-// The same from a separate top, naming the top-level module's own parameter:
-// the root of the path is the module the parameter is declared in.
 TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheTopsParameter) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -82,17 +62,13 @@ TEST(DefparamSupport, DefparamInASeparateTopModuleReachesTheTopsParameter) {
       "module annotate;\n"
       "  defparam top.P = 9;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
   EXPECT_EQ(ParamValue(design->top_modules[0], "P"), 9);
 }
 
-// §23.10.4.2's example, with the generate block renamed as its last paragraph
-// says: the defparam in m1 names m1's own instance through the top-level
-// module m, sets its p to 1, and the generate condition reading p selects the
-// block, so m1 holds the m2 instance it wrote there.
 TEST(DefparamSupport, DefparamThroughTheTopLevelModuleReachesTheWriter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -117,10 +93,6 @@ TEST(DefparamSupport, DefparamThroughTheTopLevelModuleReachesTheWriter) {
   EXPECT_NE(FirstChild(m1), nullptr);
 }
 
-// C.4.1: a defparam may modify, through the hierarchy, a parameter that another
-// defparam then passes on to modify a further one, so a defparam whose target
-// another defparam reads on its right-hand side is applied first, §23.10.4.1
-// deferring a statement whose target is not yet resolved.
 TEST(DefparamSupport, DefparamValueFlowsIntoAnotherDefparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -141,8 +113,6 @@ TEST(DefparamSupport, DefparamValueFlowsIntoAnotherDefparam) {
   EXPECT_EQ(ParamValue(FirstChild(mid), "P"), 8);
 }
 
-// A path through the top that names no parameter of it reaches nothing, and
-// is the warning §23.10.1 gives an unresolved target.
 TEST(DefparamSupport, DefparamNamingNoParameterOfTheTopWarns) {
   ElabFixture f;
   ElaborateSrc(
@@ -155,10 +125,6 @@ TEST(DefparamSupport, DefparamNamingNoParameterOfTheTopWarns) {
                               3, "23.10.1"));
 }
 
-// §23.10.1 holds for a path through the top as for one through the writer's
-// own instances: a defparam in a generate block may not change a parameter
-// outside that hierarchy, so one that names the top-level module is reported
-// rather than applied.
 TEST(DefparamSupport, DefparamInGenerateBlockCannotReachOutThroughTheTop) {
   ElabFixture f;
   ElaborateSrc(

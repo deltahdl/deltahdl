@@ -22,8 +22,6 @@ namespace delta {
 
 namespace {
 
-// §19.10: the members of a covergroup's `option` structure. A coverpoint's and
-// a cross's hold some of them.
 constexpr std::array<std::string_view, 11> kOptionMembers = {
     "name",
     "weight",
@@ -37,13 +35,10 @@ constexpr std::array<std::string_view, 11> kOptionMembers = {
     "per_instance",
     "get_inst_coverage"};
 
-// §19.10: the members of a covergroup's `type_option` structure. A
-// coverpoint's and a cross's hold some of them.
 constexpr std::array<std::string_view, 7> kTypeOptionMembers = {
     "weight",           "goal",         "comment", "strobe", "merge_instances",
     "distribute_first", "real_interval"};
 
-// §19.10: a coverage option names a member of its structure.
 void CheckMember(const CoverageOption& option, DiagEngine& diag) {
   if (IsCovergroupOptionMember(option.member, option.is_type_option)) return;
   diag.Error(option.loc,
@@ -53,8 +48,6 @@ void CheckMember(const CoverageOption& option, DiagEngine& diag) {
              Subclause("19.10"));
 }
 
-// §19.7, Table 19-1, and §19.7.1, Table 19-3: a weight is a non-negative
-// integral value.
 void CheckWeight(const CoverageOption& option, DiagEngine& diag) {
   if (option.member != "weight") return;
   std::optional<int64_t> weight = ConstEvalInt(option.value);
@@ -66,9 +59,6 @@ void CheckWeight(const CoverageOption& option, DiagEngine& diag) {
              Subclause("19.7"));
 }
 
-// §19.7.1: a call in a type option's value is a constant one: a constant
-// system function, or a function reading no variable outside it that is no
-// constant.
 void CheckTypeOptionCalls(const Expr* e, const CoverageOption& option,
                           const CovergroupContext& ctx, DiagEngine& diag) {
   if (e == nullptr) return;
@@ -91,8 +81,6 @@ void CheckTypeOptionCalls(const Expr* e, const CoverageOption& option,
   });
 }
 
-// §19.7.1: a type option is set with a constant expression. The parser
-// reports a formal of the covergroup there.
 void CheckTypeOptionValue(const CoverageOption& option,
                           const CovergroupDecl& cg,
                           const CovergroupContext& ctx, DiagEngine& diag) {
@@ -120,7 +108,6 @@ void CheckOption(const CoverageOption& option, const CovergroupDecl& cg,
   CheckTypeOptionValue(option, cg, ctx, diag);
 }
 
-// The options of a coverpoint's or a cross's body, added to `options`.
 void CollectItemOptions(const CoverageSpecOrOption& item,
                         std::vector<const CoverageOption*>& options) {
   if (item.kind == CoverageSpecKind::kCoverPoint) {

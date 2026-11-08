@@ -174,9 +174,6 @@ TEST(ClassIndexAssocArrayElaboration, AssocArrayClassIndex_NullIndexNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.3: an index that is a declared variable of a non-class type (here an
-// int) is "any other type" and shall be a type check error, even though it is
-// neither a literal nor a wrong-class handle.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_IntVariableIndexIsError) {
   ElabFixture f;
@@ -196,8 +193,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             7, "7.8.3"));
 }
 
-// §7.8.3: a string variable is likewise a non-class type and an illegal class
-// index.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_StringVariableIndexIsError) {
   ElabFixture f;
@@ -217,7 +212,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             7, "7.8.3"));
 }
 
-// A handle of a class derived from the index class is an accepted index.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_DerivedHandleNoError) {
   ElabFixture f;
@@ -238,9 +232,6 @@ TEST(ClassIndexAssocArrayElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.3: derivation is directional. A base-class handle is neither the
-// derived index class nor derived from it, so indexing a derived-index array
-// with a base handle is a type check error.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_BaseHandleForDerivedIndexIsError) {
   ElabFixture f;
@@ -263,18 +254,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             10, "7.8.3"));
 }
 
-// The seven cases below stand in the seven statement positions
-// WalkStmtsForClassIndexSelect in
-// src/elaborator/elaborator_validate_class_array_index.cpp reached only once it
-// took its list of nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Each writes the literal index
-// AssocArrayClassIndex_LiteralIndexIsError above writes in a plain initial
-// statement, and §7.8.3 rules on it the same way wherever it stands. Each
-// elaborated clean beforehand.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_LiteralIndexInAForkArmIsError) {
   ElabFixture f;
@@ -298,9 +277,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             9, "7.8.3"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// This case covers the pass arm and the one below it the else arm.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_LiteralIndexInAnAssertionPassStatementIsError) {
   ElabFixture f;
@@ -341,9 +317,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             8, "7.8.3"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`. The type
-// check is a static one, so it holds whether the weighted draw would select
-// the item or not.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_LiteralIndexInARandcaseItemIsError) {
   ElabFixture f;
@@ -363,9 +336,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             7, "7.8.3"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_LiteralIndexInARandsequenceCodeBlockIsError) {
   ElabFixture f;
@@ -389,11 +359,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             9, "7.8.3"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`, so an assignment stands at each of the two
-// positions: this case writes one at the initialization and the case below it
-// writes one at the step.
 TEST(ClassIndexAssocArrayElaboration,
      AssocArrayClassIndex_LiteralIndexInAForLoopInitializationIsError) {
   ElabFixture f;
@@ -434,8 +399,6 @@ TEST(ClassIndexAssocArrayElaboration,
                             8, "7.8.3"));
 }
 
-// §7.8.3: a class index shall be an object of the index class, whatever form
-// the index takes; a string method giving an integral value gives no object.
 TEST(ClassIndexAssocArrayElaboration, NonObjectIndexExpressionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -458,12 +421,6 @@ TEST(ClassIndexAssocArrayElaboration, NonObjectIndexExpressionRejected) {
                             8, "7.8.3"));
 }
 
-// §7.8.3: a class index shall be an object of the index class, and a select, a
-// cast, a function call or a concatenation gives the type its declaration
-// states: an int array's element, a real array's element, a cast to int, an
-// integral concatenation and a function returning a string are no object; a
-// class array's element, a cast to the class and a function returning a
-// handle are left to the class rule.
 TEST(ClassIndexAssocArrayElaboration, NonObjectSelectCastAndCallRejected) {
   ElabFixture f;
   ElaborateSrc(

@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -23,31 +22,6 @@ TEST(ScopeResolutionPrefixSynthesis, PackagePrefixParamSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-// The assertion names §23.7.1 because `pkg::level` is a name written with the
-// scope resolution operator rather than a member of a packed structure.
-// §23.7.1 defines what this source writes: a name with a package or class scope
-// resolution prefix (::) always resolves downwards and never by §23.8's upward
-// rules, and the :: is the class scope resolution operator when the normal
-// scope rules resolve the prefix, the package one otherwise.
-// Parser::MakeMemberAccess in src/parser/expr_parser.cpp builds this name as
-// ExprKind::kMemberAccess and records the operator in
-// Expr::is_scope_resolution, and it builds the member select `p.hi` and the
-// hierarchical name `c1.sig` as that same kind, so SynthLower is what has to
-// tell the three apart before it reports one. This case fails while SynthLower
-// reports the §7.2.1 packed-structure message for a name written with `::`,
-// which is what it reports today.
-//
-// The source reads a package variable on the right-hand side of a continuous
-// assignment, because that is a position the elaborator hands to
-// SynthLower::LowerExprBit unevaluated. BuildContAssignFor in
-// src/elaborator/elaborator_cont_assign.cpp writes the parser's Expr* into
-// RtlirContAssign::rhs (src/elaborator/rtlir.h) and evaluates nothing, and
-// SynthLower::LowerExprBit switches on Expr::kind with no constant folding
-// ahead of it. ScopeResolutionPrefixSynthesis.PackagePrefixParamSynthesizes
-// above writes `pkg::WIDTH` in a packed range instead, which the elaborator
-// evaluates into a width, so that name reaches no synthesizer report. `level`
-// is a package variable rather than a parameter, so it is not a constant
-// expression in any position and no folding can reach it.
 TEST(ScopeResolutionPrefixSynthesis,
      PackageVariableReadInAssignmentIsReported) {
   SynthFixture f;

@@ -1,19 +1,3 @@
-// §5.7 and §5.8: turning a literal's source text into the value it denotes, and
-// the checks that reading raises.
-//
-// §5.7.1 gives an integer literal an optional size and base, so the width and
-// the digits have to be pulled back out of the token's text; §5.8 gives a time
-// literal a unit suffix, whose scale depends on the `timeunit in force where
-// the literal was written. Both are text-to-value conversions rather than
-// parsing decisions, which is what separates them from the rest of the
-// expression parser: nothing here reads a token beyond the one it was handed.
-//
-// They stood in src/parser/expr_parser.cpp, which reached 982 lines against the
-// 1000 assert-no-oversized-source-files in .github/workflows/deltahdl.yml fails
-// at. Parser::MakeLiteral, Parser::WarnSizedOverflow and
-// Parser::ParseIntLiteralPrimary are still called from there, being members
-// src/parser/parser.h declares.
-
 #include <cctype>
 #include <cstdint>
 #include <cstdlib>
@@ -65,8 +49,6 @@ static double ParseRealText(std::string_view text) {
   return std::strtod(buf.c_str(), nullptr);
 }
 
-// The time unit the innermost element around a literal declares in its body:
-// `mod`'s where there is one, else `pkg`'s, else the 1 ns default.
 static TimeScale DeclaredTimeUnit(const ModuleDecl* mod,
                                   const PackageDecl* pkg) {
   TimeScale scale;
@@ -95,9 +77,6 @@ Expr* Parser::MakeLiteral(ExprKind kind, const Token& tok) {
     }
   } else if (kind == ExprKind::kRealLiteral || kind == ExprKind::kTimeLiteral) {
     lit->real_val = ParseRealText(tok.text);
-    // §5.8: a time literal is scaled by the unit its element declares, the
-    // most the parse knows of its time scope, and recorded with that scope
-    // for ScaleTimeLiterals to scale again once the scope's unit is known.
     if (kind == ExprKind::kTimeLiteral) {
       lit->real_val = TimeLiteralValue(
           lit->text, DeclaredTimeUnit(current_module_, current_package_));
@@ -126,9 +105,6 @@ void Parser::WarnSizedOverflow(const Token& tok) {
   }
 }
 
-// Whether `text` is a simple decimal number, the digits and underscores §5.7.1
-// composes it of and nothing else -- so no apostrophe, and none of the '.', 'e'
-// and unit letters that make a real or a time literal.
 static bool IsSimpleDecimalText(std::string_view text) {
   if (text.empty()) return false;
   for (char c : text) {
@@ -137,30 +113,6 @@ static bool IsSimpleDecimalText(std::string_view text) {
   return true;
 }
 
-// casting_type allows constant_primary; an integer literal followed by '(expr)
-// is a width-cast (the literal is the target width). Otherwise it is just the
-// integer literal.
-//
-// §5.7.1 (printed page 77): a based literal is up to three tokens, its size,
-// its base and its digits, and §5.4 makes a comment a separator between tokens
-// as §5.3's white space is, so `8 /* c */ 'h11` is the one literal 8'h11.
-// Lexer::LexNumber reads the size and the based number after it as one token
-// across spaces and tabs alone; across a comment or a newline the size arrives
-// as a simple decimal token and the rest as an unsized based one, which is the
-// pair joined here into the token the lexer would have made of `8 'h11`. The
-// joined text is owned by the arena, as the source holds it nowhere. No other
-// production puts two integer literals side by side, so the pair is never
-// anything else.
-//
-// §5.7.1's Example 1 lists `4af` as illegal, a simple decimal number being a
-// sequence of the digits 0 through 9 and hexadecimal digits going behind a
-// base such as 'h. The lexer hands `4af` on as the literal 4 with the
-// identifier af against it, the only thing the grammar makes of those
-// characters, so a simple decimal literal whose next token is an identifier
-// starting where the literal's text ends is the malformed literal it was
-// written to be: it is reported under §5.7.1 and the identifier is taken with
-// it, so that nothing is left over for the statement to report. Where a name
-// is expected instead, the same pair is Parser::ExpectIdentifier's §5.6 report.
 Expr* Parser::ParseIntLiteralPrimary(const Token& tok) {
   auto* lit = MakeLiteral(ExprKind::kIntegerLiteral, tok);
   if (IsSimpleDecimalText(tok.text) && Check(TokenKind::kIdentifier) &&

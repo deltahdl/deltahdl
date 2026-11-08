@@ -21,18 +21,10 @@
 #include "simulator/statement_assign.h"
 #include "simulator/variable.h"
 
-// §19.3: a covergroup is a user-defined type whose instances `new` builds,
-// and a variable of it holds a handle to one. This is where a `new` finds the
-// variable, element, property or embedded covergroup it builds for, and where
-// the handle is stored.
-
 namespace delta {
 
 namespace {
 
-// §19.3: the covergroup type of the property `name` of the class `type`
-// declares or inherits; null where it declares none of the name, or one of no
-// covergroup type.
 const CovergroupDecl* PropertyCovergroup(const ClassTypeInfo* type,
                                          std::string_view name,
                                          SimContext& ctx) {
@@ -46,10 +38,6 @@ const CovergroupDecl* PropertyCovergroup(const ClassTypeInfo* type,
   return nullptr;
 }
 
-// The class whose properties `lhs`, an identifier or a member access, names
-// one of: the running object's for a bare name, the object's `h` holds for
-// `h.p`, and K for `K::s`; null for none. `owner` is set to the object where
-// there is one.
 const ClassTypeInfo* ClassOfTarget(const Expr* lhs, SimContext& ctx,
                                    Arena& arena, ClassObject*& owner) {
   if (lhs->kind == ExprKind::kIdentifier) {
@@ -62,11 +50,6 @@ const ClassTypeInfo* ClassOfTarget(const Expr* lhs, SimContext& ctx,
   return owner != nullptr ? owner->type : nullptr;
 }
 
-// §19.3 and §19.4: where an assignment of `new` to `lhs` builds its
-// instance: a covergroup the class of the running object, or of `h` in
-// `h.cg`, embeds; a property or static property of a covergroup type; or a
-// variable of one, an element of an array of them among them. A site of no
-// covergroup where `lhs` is of no covergroup type.
 CovergroupSite NewSiteOf(const Expr* lhs, SimContext& ctx, Arena& arena) {
   if (lhs->kind != ExprKind::kIdentifier &&
       lhs->kind != ExprKind::kMemberAccess) {
@@ -97,19 +80,15 @@ CovergroupSite NewSiteOf(const Expr* lhs, SimContext& ctx, Arena& arena) {
   return {HierarchicalReferenceName(lhs), decl, nullptr};
 }
 
-// §19.3: the handle of `inst`, the value a variable holding it stores.
 Logic4Vec HandleOf(const CovergroupInstance* inst, SimContext& ctx,
                    Arena& arena) {
   return MakeLogic4VecVal(arena, 64, ctx.Covergroups().IdentityOf(inst));
 }
 
-// Whether `e` is a call of `new`, which builds an instance.
 bool IsNewCall(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kCall && e->text == "new";
 }
 
-// §19.3: builds at `site` the instance an initializer `new(...)`, `init`,
-// makes, and stores its handle in `v`; nothing for any other initializer.
 void HoldNewInstance(Variable* v, const CovergroupSite& site, const Expr* init,
                      SimContext& ctx, Arena& arena) {
   if (!IsNewCall(init)) return;

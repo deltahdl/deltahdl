@@ -74,34 +74,18 @@ struct StructMember {
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;
   std::string_view name;
   std::string_view type_name;
-  // §26.3 / §8.23: the package or class a named member type was written
-  // behind, `q` of `q::pair_t Add`, so the type is looked up in that scope's
-  // declarations and never by its bare name. Empty for an unqualified name.
   std::string_view scope_name;
   Expr* init_expr = nullptr;
   std::vector<Expr*> unpacked_dims;
   std::vector<Attribute> attrs;
-  // §7.2.1: for an inline aggregate (struct/union) or enum member type, the
-  // full parsed type, retained so member widths can be computed by recursing
-  // into nested members / enum base. Null for scalar and named-type members.
   const DataType* nested_type = nullptr;
-  // §7.2.1 with §6.18: the bit width of a member declared through a typedef
-  // that names no aggregate -- an enum with its base, `typedef logic [5:0]
-  // w_t` -- as the elaborator resolved it; 0 where it resolved none.
   uint32_t resolved_width = 0;
-  // §7.2 with §8.25: the parameter_value_assignment a named member type was
-  // written with, `C #(.T(B2)) c`, held as DataType::type_params holds a
-  // declaration's, so the specialization the member holds a handle of is
-  // known. Empty where the type was written with none.
   std::vector<DataType> type_params;
 };
 
 struct DataType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   bool is_signed = false;
-  // A.2.2.1: the type was written with a `signed` or `unsigned` keyword. An
-  // implicit type written `unsigned` alone is otherwise indistinguishable from
-  // one written with nothing at all.
   bool signing_written = false;
   bool is_packed = false;
   bool is_const = false;
@@ -117,29 +101,15 @@ struct DataType {
   Expr* packed_dim_left = nullptr;
   Expr* packed_dim_right = nullptr;
   std::vector<std::pair<Expr*, Expr*>> extra_packed_dims;
-  // True when the packed part was written with its range left unspecified --
-  // the empty-bracket "[]" form, as in "bit []". Such a dimension has no bounds
-  // to record, so neither the leading pair nor extra_packed_dims can express
-  // it; this flag is what marks its presence.
   bool has_unsized_packed_dim = false;
   std::string_view type_name;
   std::string_view scope_name;
-  // §8.23 with A.2.2.1: the names written before scope_name in a chain of more
-  // than one prefix, outermost first, so `A::B::C` holds {A} here, B as
-  // scope_name and C as type_name. Empty for a single prefix or none.
   std::vector<std::string_view> outer_scope_names;
-  // §8.25.1: the class scope_name names was written with a
-  // parameter_value_assignment, even an empty one, `C#()::T`, which leaves
-  // type_params as empty as the unadorned `C::T` does.
   bool scope_param_assignment_written = false;
   std::string_view modport_name;
   std::string_view enum_base_name;
 
   DataTypeKind enum_base_kind = DataTypeKind::kImplicit;
-  // §7.4.1 with A.2.2.1: the packed dimensions written after an enumeration's
-  // body, outermost first, which make a packed array of the enumeration. The
-  // base type's own dimension (§6.19) stays in packed_dim_left and
-  // packed_dim_right.
   std::vector<std::pair<Expr*, Expr*>> enum_array_dims;
 
   Expr* type_ref_expr = nullptr;
@@ -147,29 +117,12 @@ struct DataType {
   std::vector<StructMember> struct_members;
   std::vector<DataType> type_params;
 
-  // §6.20 / Syntax 8-2: when this DataType is an element of an enclosing type's
-  // parameter_value_assignment given in the named form ".name(value)", this
-  // holds the formal parameter name it binds to. Empty for the ordered form.
   std::string_view param_arg_name;
 
-  // §6.22.1(c) and (d): where an enum, struct or union type was declared, its
-  // keyword's position. Such a type matches only a type of the same
-  // declaration, which a typedef naming it carries along, so two types alike
-  // member for member but declared apart do not match. Unset for any other
-  // type, and for one no declaration wrote.
   SourceLoc decl_loc;
 
-  // The net type keyword the declaration wrote, `tri0` of `tri0 logic n`, kept
-  // where `kind` gives way to the data type written after it (§6.7.1);
-  // kImplicit where none was written, as for a port §23.2.2.3 makes a net of
-  // the default net type.
   DataTypeKind net_keyword = DataTypeKind::kImplicit;
 
-  // §7.4.4: set by the elaborator on the type of a declaration that writes
-  // unpacked dimensions of its own on a typedef name writing unpacked
-  // dimensions too, `mem_type ba [0:7]` under `typedef bsix mem_type [0:3]`,
-  // whose element is therefore an array, so that an index past the element is
-  // the typedef's dimension rather than a select within a packed element.
   bool names_unpacked_array = false;
 };
 
@@ -182,9 +135,6 @@ struct FunctionArg {
   std::string_view name;
   Expr* default_value = nullptr;
   std::vector<Expr*> unpacked_dims;
-  // A let formal written with the `untyped` keyword (A.2.12), which takes no
-  // type written before it in the port list (§11.12). It stands last because
-  // tests and helpers brace-initialize the members before it in order.
   bool is_untyped = false;
 };
 

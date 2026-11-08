@@ -7,11 +7,6 @@
 #include "simulator/property_attempts.h"
 #include "simulator/sim_context.h"
 
-// §16.12.17 and §16.12.18: what the tree evaluator asks of an instance of
-// a named property among its booleans, the declaration it names and the
-// sequences and properties it takes as actuals, split out of
-// property_attempts.cpp.
-
 namespace delta {
 
 void ForEachPropertyActual(

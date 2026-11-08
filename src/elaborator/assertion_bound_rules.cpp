@@ -24,23 +24,12 @@ namespace {
 
 using NameSet = std::unordered_set<std::string_view>;
 
-// The module's named sequences and properties by name, the diagnostics sink,
-// and the declarations whose instance is being followed, so a cyclic
-// instantiation, which §16.8 makes illegal on its own account, ends the walk.
 struct BoundEnv {
   const NamedDecls& decls;
   DiagEngine& diag;
   std::unordered_set<const ModuleItem*> active;
 };
 
-// The bounds one pass folds and checks. A declaration's own pass, with
-// `formals_only` false, checks the bounds that name none of its `formals`,
-// with the module's parameters in `values`; the pass an instance makes over
-// the declaration it instantiates, with `formals_only` true, checks the
-// bounds that name a formal, with the formals bound to the instance's
-// folded actuals in `values` beside the parameters. Every bound is so
-// checked once, in the place its value is settled. A bound written as an
-// integer literal, negated or not, is the parser's to check.
 struct BoundScope {
   const ScopeMap& values;
   const NameSet& formals;
@@ -58,8 +47,6 @@ bool Checks(const Expr* e, const BoundScope& scope) {
          ExprMentionsAny(e, scope.formals) == scope.formals_only;
 }
 
-// A bound's value: the expression's folded, else the literal's, `$` having
-// none.
 std::optional<int64_t> Fold(const Expr* e, uint32_t value,
                             const BoundScope& scope) {
   if (e != nullptr || value == SeqCycleDelay::kUnbounded) {
@@ -68,8 +55,6 @@ std::optional<int64_t> Fold(const Expr* e, uint32_t value,
   return value;
 }
 
-// §16.7: a cycle delay, and each bound of a cycle delay range, is 0 or
-// greater, and a range's maximum is no less than its minimum.
 void CheckDelay(const SeqCycleDelay& delay, const BoundScope& scope,
                 DiagEngine& diag) {
   if (!Checks(delay.min_expr, scope) && !Checks(delay.max_expr, scope)) {
@@ -96,8 +81,6 @@ void CheckBodyDelays(const SeqLinearBody& body, const BoundScope& scope,
   });
 }
 
-// §16.12.10: the index of nexttime and s_nexttime is a non-negative integer
-// constant expression.
 void CheckNexttime(const PropertyExprNode& node, const BoundScope& scope,
                    DiagEngine& diag) {
   if (!Checks(node.boolean, scope)) return;
@@ -122,10 +105,6 @@ AlwaysRangeBound FoldedBound(const Expr* e, const BoundScope& scope) {
   return bound;
 }
 
-// §16.12.11 and §16.12.13: the bounds of a ranged always or eventually are
-// non-negative integer constant expressions, the minimum no greater than
-// the maximum. A `$` maximum is the parser's to judge, so it is read here as
-// one a weak operator allows.
 void CheckRange(const PropertyExprNode& node, const BoundScope& scope,
                 DiagEngine& diag) {
   if (!Checks(node.range_min, scope) && !Checks(node.range_max, scope)) {
@@ -144,8 +123,6 @@ void CheckRange(const PropertyExprNode& node, const BoundScope& scope,
              Subclause(always ? "16.12.11" : "16.12.13"));
 }
 
-// Whether the formal `i` of `decl` may be bound to `$`: untyped, and read
-// only as a range's upper bound or as an instance's actual.
 bool AdmitsDollar(const ModuleItem* decl, size_t i) {
   std::string_view name = decl->prop_formals[i];
   FormalReferences refs;
@@ -156,17 +133,11 @@ bool AdmitsDollar(const ModuleItem* decl, size_t i) {
          refs.all == refs.permitted;
 }
 
-// The actual bound to the formal `i` of `decl` by the instance `call`, or by
-// the formal's default.
 const Expr* ActualOf(const Expr* call, const ModuleItem* decl, size_t i) {
   const Expr* actual = i < call->args.size() ? call->args[i] : nullptr;
   return actual != nullptr ? actual : decl->prop_formal_defaults[i];
 }
 
-// §16.8, and §16.12 for a property: a formal of `decl` bound to `$`, by the
-// instance `call` or by its default, is untyped, and each reference to it is
-// the upper bound of a cycle delay range or an actual argument of an
-// instance.
 void CheckDollarActuals(const Expr* call, const ModuleItem* decl,
                         DiagEngine& diag) {
   const char* clause =
@@ -186,9 +157,6 @@ void CheckDollarActuals(const Expr* call, const ModuleItem* decl,
 
 void CheckOperand(const Expr* e, const BoundScope& scope, BoundEnv& env);
 
-// §16.7 and §16.8: an instance of a named sequence settles the bounds its
-// declaration writes with a formal; they are checked with each formal bound
-// to the instance's actual, folded in the scope the instance stands in.
 void CheckInstance(const Expr* call, const ModuleItem* seq,
                    const BoundScope& outer, BoundEnv& env) {
   CheckDollarActuals(call, seq, env.diag);

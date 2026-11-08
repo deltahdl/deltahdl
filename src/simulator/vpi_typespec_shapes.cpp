@@ -17,8 +17,6 @@
 namespace delta {
 namespace {
 
-// §7.8: the keyword types an associative array's index type may be written
-// as, which name no typedef.
 struct IndexKeyword {
   std::string_view text;
   DataTypeKind kind;

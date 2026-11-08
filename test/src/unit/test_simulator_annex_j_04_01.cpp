@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §J.4.1: the bootstrap file of Figure J.2 -- the header line and four
-// entries, each the path name without extension of an object code file,
-// preceded by a blank -- lists the four libraries in order.
 TEST(ForeignCodeBootstrapFile, TheFigureFileListsItsFourLibrariesInOrder) {
   EXPECT_EQ(ForeignCodeBootstrapHeader(), "#!SV_LIBRARIES");
   const ForeignCodeBootstrap kFile = ParseForeignCodeBootstrap(
@@ -27,9 +24,6 @@ TEST(ForeignCodeBootstrapFile, TheFigureFileListsItsFourLibrariesInOrder) {
   EXPECT_EQ(kFile.libraries[3], "proj3/clibs/lib2");
 }
 
-// §J.4.1 b) and c): an entry may be surrounded by any number of blanks, and
-// comment lines -- # after any number of blanks -- may stand between the
-// entries without becoming entries themselves.
 TEST(ForeignCodeBootstrapFile, BlanksSurroundEntriesAndCommentsAreSkipped) {
   const ForeignCodeBootstrap kFile = ParseForeignCodeBootstrap(
       "#!SV_LIBRARIES\n"
@@ -43,8 +37,6 @@ TEST(ForeignCodeBootstrapFile, BlanksSurroundEntriesAndCommentsAreSkipped) {
   EXPECT_EQ(kFile.libraries[1], "proj/lib");
 }
 
-// §J.4.1 a): the first line contains the header string, and a file whose
-// first line does not is no bootstrap file -- an empty file among them.
 TEST(ForeignCodeBootstrapFile, TheFirstLineMustCarryTheHeader) {
   const std::string kMissing =
       "line 1: the first line of a bootstrap file contains #!SV_LIBRARIES";
@@ -54,8 +46,6 @@ TEST(ForeignCodeBootstrapFile, TheFirstLineMustCarryTheHeader) {
   EXPECT_TRUE(ParseForeignCodeBootstrap("#!SV_LIBRARIES").Ok());
 }
 
-// §J.4.1 b): at least one blank precedes an entry, a line holds exactly one
-// entry, and a line of blanks alone is neither an entry nor a comment.
 TEST(ForeignCodeBootstrapFile, AnEntryIsOnePathPrecededByABlank) {
   const ForeignCodeBootstrap kUnpreceded =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\nmyclibs/lib1\n");
@@ -73,9 +63,6 @@ TEST(ForeignCodeBootstrapFile, AnEntryIsOnePathPrecededByABlank) {
             "holds neither");
 }
 
-// §J.4.1 b): an entry is the path name without extension, equivalent to the
-// value of -sv_lib, kept as written for the application to extend and to
-// resolve against the root of §J.3.
 TEST(ForeignCodeBootstrapFile, AnEntryIsKeptAsThePathNameWithoutExtension) {
   const ForeignCodeBootstrap kFile =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n /abs/dir/lib\n rel/lib\n");

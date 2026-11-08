@@ -28,25 +28,15 @@
 namespace delta {
 namespace {
 
-// The key an enumeration a block's typedef `td` declares is registered under:
-// the typedef's name, the member path of one written as a structure or union
-// member's type, and the declaration's address, which no other typedef
-// shares. The `$block::` scope is spelled by no source name, and puts the key
-// among the scoped ones SimContext::FindEnumTypeDeclaringMember falls back to
-// only where no enumeration of the module declares the member.
 std::string BlockEnumKey(const ModuleItem* td, std::string_view path) {
   return std::format("$block::{}{}{}@{:x}", td->name, path.empty() ? "" : ".",
                      path, reinterpret_cast<std::uintptr_t>(td));
 }
 
-// The key the inline enumeration of a block variable's declaration `s`,
-// `enum {r, s} y;`, is registered under: the declaration's address, which no
-// other declaration shares, in the `$block::` scope BlockEnumKey's are.
 std::string BlockVarEnumKey(const Stmt* s) {
   return std::format("$block::@{:x}", reinterpret_cast<std::uintptr_t>(s));
 }
 
-// The typedef a block item declaration `s` declares, or null.
 const ModuleItem* BlockTypedefOf(const Stmt* s) {
   if (s == nullptr || s->kind != StmtKind::kBlockItemDecl) return nullptr;
   const ModuleItem* td = s->decl_item;
@@ -54,11 +44,6 @@ const ModuleItem* BlockTypedefOf(const Stmt* s) {
   return td;
 }
 
-// The type parameter a block item declaration `s` declares, or null. The
-// parser carries a block's parameter as a kVarDecl over the item it read
-// (Parser::ParseBlockVarDecls), and a type parameter's item holds its type in
-// typedef_type with a void data_type, as Elaborator::ElaborateParamDecl tells
-// one at module scope.
 const ModuleItem* BlockTypeParamOf(const Stmt* s) {
   if (s == nullptr || s->kind != StmtKind::kVarDecl || !s->var_is_param)
     return nullptr;
@@ -67,20 +52,13 @@ const ModuleItem* BlockTypeParamOf(const Stmt* s) {
   return param;
 }
 
-// What a type name a block has declared stands for: the key its enumeration,
-// structure or union is registered under, or, for any other type, the type.
 struct BlockTypeName {
   std::string_view key;
   const DataType* type = nullptr;
 };
 
-// The type names a block has declared by the statement being walked.
 using BlockTypeNames = std::unordered_map<std::string_view, BlockTypeName>;
 
-// §7.4.4: the type `named` stands for, as a declaration that names it with
-// the type `use` has it. Packed dimensions written where the name is used
-// stack outside the type's own, so `T [1:0] w` on a `logic [7:0]` T is a
-// `logic [1:0][7:0]`.
 DataType StackedOnNamedType(const DataType& use, const DataType& named) {
   DataType out = named;
   out.is_const = use.is_const;
@@ -96,10 +74,6 @@ DataType StackedOnNamedType(const DataType& use, const DataType& named) {
   return out;
 }
 
-// §6.18: the type a declaration written with the type `use` has, where `use`
-// names a block type name that stands for `name`: the key its enumeration,
-// structure or union is registered under, packed dimensions and all, or the
-// plain type with `use`'s packed dimensions stacked on it.
 DataType TypeThroughName(const DataType& use, const BlockTypeName& name) {
   if (name.type != nullptr) return StackedOnNamedType(use, *name.type);
   DataType out = use;
@@ -112,12 +86,6 @@ struct BlockEnumWalk {
   SimContext& ctx;
   Arena& arena;
 
-  // Registers the enumerations the typedef `td` declares, and makes its name
-  // stand for the one it declares at the top, if any, in `aliases`. §7.4.1
-  // with §7.4.4: that one is recorded as the declaration behind its key
-  // (SimContext::RegisterTypeDeclaration), where RecordPackedRange reads the
-  // dimensions after its body that make a variable of it an array of the
-  // enumeration, so `x[1]` selects one element.
   void RegisterTypedef(const ModuleItem* td, BlockTypeNames& aliases) {
     ForEachEnumTypeOfItem(td, [&](std::string_view path, const DataType& t) {
       auto* key = arena.Create<std::string>(BlockEnumKey(td, path));
@@ -128,13 +96,6 @@ struct BlockEnumWalk {
     });
   }
 
-  // §6.18 with §7.2 and §7.3: a structure or union the typedef `td`
-  // declares at its top is registered as a layout under the typedef's key,
-  // with the width, kind and signedness a declaration by that key reads, and
-  // its name is made to stand for that key in `aliases`, so a variable the
-  // block declares by the name is an object of the layout and a member write
-  // lands in its window. With no layout, `p.a = 3` wrote nothing and `p.a`
-  // read 0.
   void RegisterAggregateTypedef(const ModuleItem* td, BlockTypeNames& aliases) {
     const DataType& type = td->typedef_type;
     if ((type.kind != DataTypeKind::kStruct &&
@@ -154,12 +115,6 @@ struct BlockEnumWalk {
     aliases[td->name] = {*key};
   }
 
-  // §6.18 and §6.20.3: a typedef or type parameter `item` of the block whose
-  // type registers no enumeration, structure or union key -- a vector, an
-  // integer or real type, a string, a class -- makes its name stand for that
-  // type, so a declaration the block writes by the name is one of the type
-  // written out (ReshapeDecl). A type that is itself one of the block's type
-  // names, written with no scope, is the type that name stands for.
   void RegisterPlainType(const ModuleItem* item, BlockTypeNames& aliases) {
     const DataType& type = item->typedef_type;
     auto named = type.kind == DataTypeKind::kNamed && type.scope_name.empty()
@@ -172,9 +127,6 @@ struct BlockEnumWalk {
     aliases[item->name] = {{}, stands_for};
   }
 
-  // §6.19 with §7.4.1: the members are as wide as the enumeration alone,
-  // and a declaration by the key is as wide as the packed array of it the
-  // dimensions after its body make.
   void Register(std::string_view key, const DataType& type) {
     EnumTypeInfo info;
     info.type_name = key;
@@ -191,16 +143,6 @@ struct BlockEnumWalk {
     ctx.RegisterTypeSigned(key, IsSignedType(type, TypedefMap{}));
   }
 
-  // §6.19 with A.2.8: a block variable declared with an inline enumerated
-  // type is of that enumeration, which is registered under the declaration's
-  // own key and named by a reshaped copy of the declaration, as a typedef's
-  // is. The key's width already holds the base type's range and the packed
-  // dimensions after the body (§7.4.1), so the copy names the key with none
-  // of its own: one left on it is a use-site dimension stacking on the key's
-  // width (§7.4.4), and `enum logic [2:0] {P, Q} [1:0] w` was 18 bits. The
-  // dimensions are read instead off a typedef of the enumeration recorded as
-  // the declaration behind the key, as RegisterTypedef records a block
-  // typedef's, so `w[1]` selects one element.
   void RegisterInlineEnum(const Stmt* s) {
     auto* key = arena.Create<std::string>(BlockVarEnumKey(s));
     if (ctx.FindEnumType(*key) == nullptr) {
@@ -222,9 +164,6 @@ struct BlockEnumWalk {
     ctx.ClassTypedefShapedDecls()[s] = shaped;
   }
 
-  // §6.18: a declaration naming a typedef or type parameter of the block is
-  // of the type the name stands for, so it is reshaped to name the key that
-  // type is registered under, or to be of the type itself.
   void ReshapeDecl(const Stmt* s, const BlockTypeNames& aliases) {
     const DataType& type = s->var_decl_type;
     if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) return;
@@ -235,12 +174,6 @@ struct BlockEnumWalk {
     ctx.ClassTypedefShapedDecls()[s] = shaped;
   }
 
-  // A statement list whose typedefs and type parameters are visible to the
-  // statements after them and to everything those hold (§23.9), a begin-end
-  // or fork-join block's or a subroutine body's. A typedef hides whatever its
-  // name stood for in an enclosing block. One with an unpacked dimension
-  // stands for no plain type, its dimensions being the declaration's to
-  // adopt (§7.4.4).
   template <typename List>
   void WalkList(const List& stmts, BlockTypeNames aliases) {
     for (const Stmt* s : stmts) {
@@ -274,8 +207,6 @@ struct BlockEnumWalk {
   }
 };
 
-// The constants a block's enumeration member value may name: the compilation
-// unit's, the module's parameters and the members of its enumerations.
 ScopeMap BlockEnumScope(const RtlirModule* mod, const RtlirDesign* design) {
   ScopeMap scope;
   if (design != nullptr) scope = design->unit_constants;
@@ -298,8 +229,6 @@ void RegisterBlockEnumTypes(const RtlirModule* mod, const RtlirDesign* design,
   for (const ModuleItem* func : mod->function_decls) {
     walk.WalkList(func->func_body_stmts, {});
   }
-  // §8.3: a class's methods are subroutines whose bodies are blocks too, of
-  // a class the module declares or of the compilation unit's.
   auto walk_methods = [&](const ClassDecl* cls) {
     for (const ClassMember* m : cls->members) {
       if (m->kind == ClassMemberKind::kMethod && m->method != nullptr)

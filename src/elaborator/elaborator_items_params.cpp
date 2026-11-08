@@ -1,7 +1,3 @@
-// A value or type parameter declaration written among a module's items
-// (§6.20.2, §6.20.3), moved out of src/elaborator/elaborator_items.cpp, which
-// holds the item walk, at its size limit.
-
 #include "elaborator/elaborator_items_params.h"
 
 #include <algorithm>
@@ -36,25 +32,6 @@
 
 namespace delta {
 
-// §6.20.2 (printed page 127) applies §6.12.1's real-to-integer conversion to
-// a parameter whose value is real, so the value expression of an integer
-// parameter is folded as a real only where it has a real operand: a real
-// literal, a time literal, which §5.8 makes a real scaled to the time unit,
-// or a call of one of §20.5's real-returning conversions, anywhere in it. An
-// integral expression the integer fold answered x for -- `0 ** -1`, x by
-// §11.4.3's Table 11-4 (printed 276) -- was refolded as a real before,
-// std::pow(0, -1) being inf and std::llround(inf) undefined, so `localparam
-// int Z = 0 ** -1` read as resolved to whatever that made.
-//
-// §6.20.2 (printed page 126) makes a parameter whose value is real a real
-// parameter, so a name standing for one -- declared real, or untyped with a
-// real value -- is a real operand as its value would be: `(r + f) / 2` over
-// `parameter r = 5.7` is real arithmetic. Only a parameter of the registered
-// module is known here, as ConstEvalReal reads it.
-//
-// §13.4.3 folds a constant function as it would run (ConstFuncRealFrame), so
-// inside one a local declared real is a real operand, and anywhere a call of a
-// constant function declared to return a real is.
 static bool IsRealOperand(const Expr* e) {
   if (e->kind == ExprKind::kRealLiteral || e->kind == ExprKind::kTimeLiteral)
     return true;
@@ -91,19 +68,12 @@ std::optional<int64_t> FoldRealValueAsInteger(const Expr* expr,
                                               const ScopeMap& scope) {
   if (!HasRealOperand(expr)) return std::nullopt;
   auto rval = ConstEvalReal(expr, scope);
-  // §11.4.3 (printed page 276) leaves a real power with a zero base and a
-  // negative exponent unspecified, which std::pow answers with inf, and
-  // §6.12.1 rounds a number, so a value that is none folds to nothing.
   if (!rval || !std::isfinite(*rval)) return std::nullopt;
   return std::llround(*rval);
 }
 
 namespace {
 
-// §6.20.3: a data type parameter (parameter type) can only be set to a data
-// type. The parser marks a type parameter with a void data type; if such a
-// parameter received an ordinary value expression instead of a type, it has
-// been set to a non-type and must be rejected.
 void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
   if (item->data_type.kind == DataTypeKind::kVoid &&
       item->typedef_type.kind == DataTypeKind::kImplicit &&
@@ -117,19 +87,6 @@ void CheckTypeParamNotSetToValue(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §6.20.3: a type parameter declared with a leading basic-data-type keyword
-// (enum, struct, union, class, or interface class) restricts its valid types;
-// assigning a type that does not conform to that keyword is an error. The
-// assigned type is resolved through any typedef chain first, and only a
-// definite mismatch is flagged -- a still-named type is left alone, since it
-// may resolve to a conforming type declared elsewhere.
-//
-// On a type-parameter item the restriction keyword is carried in
-// forward_type_kind as: kEnum/kStruct/kUnion for those three keywords,
-// kNamed for a `class` restriction, and kVoid for `interface class` (see
-// Parser::ParseTypeParamDecl).
-// Follow a chain of typedef names to the concrete type behind it, stopping at
-// a name with no definition. The hop limit keeps a cyclic typedef from looping.
 const DataType* ResolveNamedTypeChain(const DataType* dtype,
                                       const TypedefMap& typedefs) {
   for (int hops = 0; hops < 8 && dtype->kind == DataTypeKind::kNamed; ++hops) {
@@ -140,35 +97,8 @@ const DataType* ResolveNamedTypeChain(const DataType* dtype,
   return dtype;
 }
 
-// §6.20.3: assigning a type parameter a type definition that does not conform
-// to its stated basic data type is an error (printed page 128 of IEEE
-// 1800-2023). `class` and `interface class` are two of the five basic data
-// types that clause lists, and §8.26 makes them different kinds of declaration,
-// so a type conforming to one does not conform to the other.
-//
-// Four answers, and the declaration decides them. A class (or interface class)
-// type is always referenced by name, so a resolved concrete type -- a built-in
-// scalar or vector, an enum, a struct or a union -- is not a class at all. A
-// name that reaches a ClassDecl conforms when that declaration's kind is the
-// restricted one. A name known to be a class that reaches no ClassDecl is taken
-// as an ordinary class. A name that is neither conforms to neither restriction,
-// because nothing makes it a class.
-//
-// Deciding from DataTypeKind alone is what let the second and fourth of those
-// through: every name survives typedef resolution as kNamed, so an ordinary
-// class assigned to an `interface class` restriction and a name nothing
-// declares were both accepted in silence, and `fwd` reached the function only
-// to pick a word for the message.
 struct ClassTypeLookup {
-  // Carries each ClassDecl, and so is what says whether a class is an interface
-  // class.
   const CompilationUnit* unit;
-  // The names known to be classes. It holds two kinds FindClassDecl cannot
-  // return a declaration for: the built-in classes, which have no declaration
-  // to find, and a name declared as a class in more than one scope, which
-  // FindClassDecl reports as ambiguous by returning null. Neither is an
-  // interface class as far as anything here can tell, and both are classes, so
-  // the set decides only whether the name is one -- never which kind.
   const std::unordered_set<std::string_view>* names;
 };
 
@@ -176,8 +106,6 @@ void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
                            const DataType& resolved,
                            const ClassTypeLookup& lookup, DiagEngine& diag) {
   const bool kWantsInterface = fwd == DataTypeKind::kVoid;
-  // The article travels with the noun. Written as a literal `a` before a
-  // substituted noun it read "restricted to a interface class type".
   const std::string_view kRestriction =
       kWantsInterface ? "an interface class" : "a class";
   if (resolved.kind != DataTypeKind::kNamed) {
@@ -210,8 +138,6 @@ void CheckTypeParamIsClass(const ModuleItem* item, DataTypeKind fwd,
       Subclause("6.20.3"));
 }
 
-// §6.20.3: a type parameter restricted to enum, struct, or union conforms
-// only if the type it is assigned resolves to that same kind.
 void CheckTypeParamIsEnumStructOrUnion(const ModuleItem* item, DataTypeKind fwd,
                                        const DataType& resolved,
                                        DiagEngine& diag) {
@@ -235,9 +161,6 @@ void CheckTypeParamIsEnumStructOrUnion(const ModuleItem* item, DataTypeKind fwd,
              Subclause("6.20.3"));
 }
 
-// `assigned` is the type the parameter takes: the declaration's default, or
-// the type an instance's parameter value assignment names for it, which the
-// restriction judges as it judges the default.
 void CheckTypeParamConformsToForwardKind(const ModuleItem* item,
                                          const DataType& assigned,
                                          const TypedefMap& typedefs,
@@ -259,28 +182,6 @@ void CheckTypeParamConformsToForwardKind(const ModuleItem* item,
   CheckTypeParamIsEnumStructOrUnion(item, fwd, *resolved, diag);
 }
 
-// Fills the value-parameter type information on `pd` and records a real-typed
-// parameter in `real_param_names`, which is the set CheckRealSelectNode in
-// src/elaborator/elaborator_validate.cpp reads to reject a later bit-select or
-// part-select of it. §11.5.1 states one rule -- a bit-select or part-select of
-// a scalar, a real variable or a real parameter is illegal -- whose second
-// alternative names a real parameter, so the name goes in the set standing for
-// that alternative rather than in scalar_var_names_, which stands for the
-// first.
-//
-// A parameter carrying an unpacked dimension stays out, because §11.5.2 makes
-// an address written after such a name an array element select: `parameter real
-// P[4] = '{default: 0.0}; v = P[0];` reads one real element and is legal.
-//
-// §6.20.2 (printed page 126) gives a parameter with a range specification the
-// range of its declaration, and §7.4.1 (printed 153) makes a second packed
-// dimension multiply the first, so the declared type is sized against
-// `scope`, the parameters already elaborated, and `typedefs`, the scope's
-// type names, as ElaborateParamPortList sizes a parameter port. Sized with
-// neither, `logic [HI:1][3:0] V` under `localparam int HI = 8` had a
-// decl_width of 1, the vector atom's, with HI unfolded, and `logic [HI:1] V`
-// was read at the span of its recorded bounds alone, 8 where `[HI:1][3:0]` is
-// 32.
 void PopulateValueParamInfo(
     RtlirParamDecl& pd, const ModuleItem* item,
     std::unordered_set<std::string_view>& real_param_names,
@@ -292,34 +193,11 @@ void PopulateValueParamInfo(
   }
 }
 
-// Const-evaluates a parameter's initializer against `scope` and records the
-// resolved value on `pd`. §6.20.2: a parameter declared real takes a real
-// value, and an integer-typed parameter initialized from a real constant rounds
-// to the nearest integer (ties away from zero). A parameter declared `string`
-// also keeps its characters, which `arena` owns (§6.16).
-//
-// §11.6.1 (printed page 299) with §11.8.2 (printed 302): the initializer is
-// the right-hand side of an assignment to the parameter, so its
-// context-determined operands are sized by the declared width as well as by
-// each other, and the value is cut to that width (FoldParamValue). Folded
-// self-determined, `localparam [15:0] Y = 8'hAB << 8` shifted at 8 bits and
-// read 0, and `localparam logic [63:0] Z = 32'hFFFF_FFFF + 1` read 0. A
-// parameter declared with neither type nor range takes the range of its
-// value (§6.20.2, printed 126), which is folded self-determined as before.
 void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
                             bool is_type, const ScopeMap& scope, Arena& arena) {
-  // The real fold comes first, because an integer fold of a real-typed
-  // parameter's initializer succeeds whenever the value happens to have no
-  // fraction and would then store it as the integer it is not.
   if (!is_type &&
       TryFoldRealParamValue(pd, item->init_expr, item->data_type, scope))
     return;
-  // §6.20.2 (printed page 127) with §6.12.1: an integer parameter set from a
-  // real expression rounds it to the nearest integer, and the rounding comes
-  // before the integer fold because that fold answers a name standing for a
-  // real parameter with the 0 its integer slot holds, so `parameter int ri =
-  // r` over `parameter r = 5.7` read 0 for 6. An integral expression the
-  // integer fold declines stays unresolved.
   std::optional<int64_t> val;
   if (!is_type && ParamExpectsIntegerValue(pd, item->data_type))
     val = FoldRealValueAsInteger(item->init_expr, scope);
@@ -327,30 +205,12 @@ void ResolveParamConstValue(RtlirParamDecl& pd, const ModuleItem* item,
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
-    // §6.20.2 (printed page 126): the words above bit 63 of a value declared
-    // wider than 64 bits, and the width of one declared with neither type nor
-    // range, are recorded as the value is, for a read of the name where this
-    // scope is not the one in force.
     RecordResolvedHighWords(pd, item->init_expr, scope);
   }
   if (!is_type)
     RecordStringParamValue(pd, item->init_expr, &item->data_type, arena);
 }
 
-// §6.23/§6.20.3: a type-parameter default written with the type operator,
-// e.g. `localparam type T = type(bit [12:0])`, arrives as a kTypeRef init
-// expression rather than a typedef_type. Resolves it to a concrete type so
-// dependent declarations elaborate against the chosen type: the data type the
-// parser read, packed dimensions and the built-in's implicit signedness
-// included (so `T x` is signed for int). §8.23 also permits a class scope
-// resolution to prefix that type name, as in `type(Frame::payload_t)`, which
-// the kTypeRef expression carries in scope_prefix. That form is resolved
-// through the class instead, and typedef_type left unchanged when the class or
-// its typedef is not visible. A reference to an expression, §6.23's
-// `parameter type bus_t = type(A_bus);`, is the expression's self-determined
-// type, which `resolve_expr_type` gives from the names declared above the
-// parameter. Answers whether the item is a type parameter after that, false for
-// one written any other way.
 bool ResolveTypeOperatorDefault(
     ModuleItem* item, const CompilationUnit* unit,
     const std::function<void(DataType&)>& resolve_expr_type) {
@@ -376,21 +236,6 @@ bool ResolveTypeOperatorDefault(
   return item->typedef_type.kind != DataTypeKind::kImplicit;
 }
 
-// §23.10.2 (printed page 766) with §6.20.1 (printed 125) and §6.20.3
-// (printed 127-128): the type the type parameter `item` takes for the
-// instantiation being elaborated -- the type the instance's parameter value
-// assignment names for it, where the module declares it among its items
-// with no parameter port list and an assignment is installed naming it, and
-// the declaration's own default otherwise. A localparam, which §6.20.4
-// (printed 128) puts beyond any assignment and which a body `parameter` is
-// under a parameter port list, and a generate block's parameter keep their
-// default. Nothing, having reported, for an assignment that names no type,
-// as ResolveChildTypeParam (elaborator_module_inst.cpp) answers for a
-// parameter port: the default would elaborate the module against a type the
-// instantiation did not write. The default was published whatever the
-// assignment named, so `c #(.T(logic [7:0])) u()` over `module c; parameter
-// type T = int; T x;` left x 32 bits wide; ApplyChildTypeParams reads the
-// parameter port list alone.
 std::optional<DataType> AssignedTypeParamType(const ModuleItem* item,
                                               RtlirParamDecl& pd,
                                               const RtlirModule* mod,
@@ -418,19 +263,6 @@ std::optional<DataType> AssignedTypeParamType(const ModuleItem* item,
   return resolved;
 }
 
-// §23.10 (printed page 763) with §6.20.1 (printed 125): a module declared
-// with no parameter port list declares its value parameters among its items,
-// and an instance's parameter value assignment (§23.10.2, printed 766) or a
-// configuration's (§33.4.3) overrides such a parameter as it does a parameter
-// port -- by name, or in declaration order (§23.10.2.1). A localparam, which
-// §6.20.4 (printed 128) puts beyond any assignment and which a body
-// `parameter` is under a parameter port list, and a parameter a generate
-// block declares (§6.20.1) are left to their own value, as is every
-// parameter while no instantiation's assignments are installed. The
-// assignments reached the parameter port list alone before, so `c #(.P(5))
-// u()` and `c #(5) u()` over `module c; parameter P = 1; localparam int Q =
-// P;` kept P at 1 and Q with it, and a config's `use #(.W(48))` on a body
-// `parameter W = 32` printed 32.
 void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
                               Arena& arena) {
   if (pd.is_localparam || !pd.gen_block_prefix.empty()) return;
@@ -441,13 +273,6 @@ void ApplyBodyParamAssignment(RtlirParamDecl& pd, const ModuleItem* item,
 
 }  // namespace
 
-// §6.20.2 (printed page 126): a parameter declared with neither type nor
-// range whose value is real is a real parameter, so it joins the set
-// §11.5.1's rejection of a select on one reads, as a declared real one does
-// through PopulateValueParamInfo and on the same terms: a parameter carrying
-// an unpacked dimension stays out, §11.5.2 making an address after its name
-// an element select. Its own function because ElaborateParamDecl is at the
-// cognitive complexity limit.
 static void RecordUntypedRealParam(
     const RtlirParamDecl& pd, const ModuleItem* item,
     std::unordered_set<std::string_view>& real_param_names) {
@@ -485,7 +310,6 @@ void RecordTypeParamActual(RtlirParamDecl& pd,
 }
 
 void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
-  // §6.23: `localparam type(x) P = -5;` is a value parameter of x's type.
   ResolveTypeRef(item->data_type, item->loc, mod);
   bool is_type = item->data_type.kind == DataTypeKind::kVoid &&
                  item->typedef_type.kind != DataTypeKind::kImplicit;
@@ -499,9 +323,6 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   RtlirParamDecl pd;
   pd.name = item->name;
   pd.loc = item->loc;
-  // §27.4: a generate block forms a scope of its own and a further level of
-  // hierarchy once instantiated, and this site elaborates a parameter written
-  // in one as readily as one written among a module's own items.
   pd.gen_block_prefix = InternedGenPrefix();
   pd.is_type_param = is_type;
 
@@ -509,16 +330,9 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   pd.default_value = item->init_expr;
   if (!item->unpacked_dims.empty()) pd.unpacked_dims = &item->unpacked_dims;
   if (is_type) {
-    // The prefix is judged by the parameters elaborated before this one, so
-    // the check runs before the parameter's own type joins them.
     ReportTypeParamPrefixNotAClass(item->typedef_type.scope_name, item->loc,
                                    {mod->params, typedefs_, class_names_},
                                    diag_);
-    // The type the instantiation gives the parameter, or the default, is
-    // what the declaration's restriction judges and what the declarations
-    // written in terms of the parameter elaborate against. It is also the
-    // type §37.28 detail 2 has the parameter's vpiTypespec stand for, a
-    // typedef it names left unresolved.
     if (auto type = AssignedTypeParamType(item, pd, mod, unit_, diag_)) {
       CheckTypeParamConformsToForwardKind(
           item, *type, typedefs_, ClassTypeLookup{unit_, &class_names_}, diag_);
@@ -526,30 +340,16 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
       pd.resolved_type = arena_.Create<DataType>(*type);
     }
   }
-  // The parameters already elaborated, which a range bound, a type and the
-  // value written in terms of one are each folded against.
   const ScopeMap kScope = BuildParamScope(mod);
   FoldParamUnpackedBounds(pd, kScope);
   if (!is_type) {
     PopulateValueParamInfo(pd, item, real_param_names_, typedefs_, kScope);
     RecordTypeParamActual(pd, mod->params, typedefs_, arena_);
-    // §11.5.1: a select on this parameter names bits by their index in the
-    // range it is declared with, so keep the two bounds. They are folded
-    // against the parameters already elaborated, which is what a bound written
-    // in terms of an earlier parameter needs.
     RecordParamDeclRange(pd, item->data_type, kScope);
-    // After the sizing, so that the value is converted to a range written in
-    // terms of an earlier parameter, itself overridden or not (§6.20.2).
     ApplyBodyParamAssignment(pd, item, arena_);
   }
 
-  // §23.10.2: an assignment replaced the declaration's own value, which
-  // ApplyParamOverride recorded, so the initializer is left unfolded as
-  // ElaborateParamPortList leaves an overridden parameter port's.
   const bool kFoldsDefault = item->init_expr != nullptr && !pd.from_override;
-  // §6.20.7: a parameter is unbounded if it is assigned a literal '$', or if it
-  // is assigned another (unbounded) parameter; the assigned-to parameter is
-  // itself unbounded in that case.
   if (kFoldsDefault && item->init_expr->kind == ExprKind::kIdentifier &&
       (item->init_expr->text == "$" ||
        RefersToUnboundedParam(mod, item->init_expr->text))) {
@@ -559,8 +359,6 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
         {typedefs_, td_array_dims_, class_names_}, diag_);
   } else if (kFoldsDefault) {
     if (ContainsDollarSubexpr(item->init_expr)) {
-      // §6.20.7: $ must be the entire, self-contained parameter value; it may
-      // not be combined with operators or selects in this context.
       diag_.Error(item->loc,
                   std::format("'$' may only be assigned to parameter '{}' as a "
                               "complete, self-contained expression",
@@ -576,9 +374,6 @@ void Elaborator::ElaborateParamDecl(ModuleItem* item, RtlirModule* mod) {
   const_names_.insert(item->name);
 }
 
-// §8.25.1: the parameterized-class declarations of a compilation unit, indexed
-// by class name. Only a class with parameter ports can be specialized, so only
-// those are exposed to the constant folder.
 std::unordered_map<std::string_view, const ClassDecl*> BuildParamClassRegistry(
     const CompilationUnit* unit) {
   std::unordered_map<std::string_view, const ClassDecl*> registry;

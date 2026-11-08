@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 21-19: dumpflush_task ::= $dumpflush ; -- a task enable with no
-// argument list, terminated by a semicolon. The tests cover the syntactic
-// positions the task enable can occupy and the missing-semicolon reject.
-
-// The canonical shape of the LRM example: the bare invocation follows
-// $dumpvars inside an initial begin-end block.
 TEST(IoSystemTaskParsing, DumpflushNoArgs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -23,8 +17,6 @@ TEST(IoSystemTaskParsing, DumpflushNoArgs) {
               "endmodule\n"));
 }
 
-// A bare statement needs no begin-end: the task parses as the sole statement
-// of an initial construct behind a delay control.
 TEST(IoSystemTaskParsing, DumpflushAsSoleStatement) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -32,7 +24,6 @@ TEST(IoSystemTaskParsing, DumpflushAsSoleStatement) {
               "endmodule\n"));
 }
 
-// The task is an ordinary statement inside an always procedure.
 TEST(IoSystemTaskParsing, DumpflushInAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -43,7 +34,6 @@ TEST(IoSystemTaskParsing, DumpflushInAlwaysBlock) {
               "endmodule\n"));
 }
 
-// The task is an ordinary statement inside a task body.
 TEST(IoSystemTaskParsing, DumpflushInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -53,8 +43,6 @@ TEST(IoSystemTaskParsing, DumpflushInTaskBody) {
               "endmodule\n"));
 }
 
-// Negative: the production requires the terminating semicolon, so a
-// $dumpflush task enable running straight into the block end is rejected.
 TEST(IoSystemTaskParsing, DumpflushMissingSemicolonRejected) {
   auto result = Parse(
       "module t;\n"
@@ -62,8 +50,6 @@ TEST(IoSystemTaskParsing, DumpflushMissingSemicolonRejected) {
       "    $dumpflush\n"
       "  end\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that terminates a subroutine call statement;
-  // §21.7.1.6 states the dumpflush_task production but reports nothing itself.
   EXPECT_TRUE(
       ReportedError(result.diags, "expected ';', got 'end'", 4, "12.3"));
 }

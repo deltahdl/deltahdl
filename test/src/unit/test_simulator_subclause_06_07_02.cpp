@@ -45,9 +45,6 @@ TEST(NettypeSimulation, NettypeCreatesNet) {
   ASSERT_NE(net, nullptr);
 }
 
-// §6.7.2: a net declared with a nettype uses any associated resolution
-// function. Verify the resolution function is carried onto the lowered net
-// in the simulator (not just recorded in the RTLIR).
 TEST(NettypeSimulation, ResolvedNettypeNetCarriesResolveFunc) {
   SimFixture f;
   auto* design = ElaborateSrc(

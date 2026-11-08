@@ -17,8 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Package p, written after the reference in each forbidden form and before it
-// in each allowed one.
 constexpr const char* kPackageP =
     "package p;\n"
     "  parameter int K = 3;\n"
@@ -31,14 +29,11 @@ constexpr const char* kPackageP =
 constexpr const char* kLaterPackage =
     "reference to package 'p', which is declared after the reference";
 
-// The module the design is elaborated under, written last.
 constexpr const char* kTop = "module top; endmodule\n";
 
-// A function whose body names p's parameter.
 constexpr const char* kFunctionReadingK =
     "  function int g(); return p::K; endfunction";
 
-// Whether elaborating `src` draws `message` at `line` under `subclause`.
 ::testing::AssertionResult ElabReports(const std::string& src,
                                        const char* message, uint32_t line,
                                        const char* subclause) {
@@ -47,10 +42,6 @@ constexpr const char* kFunctionReadingK =
   return ReportedError(f.diag.Diagnostics(), message, line, subclause);
 }
 
-// §3.12 (printed page 55) requires a package's compilation to precede the
-// references to it. Each of `items`, written on one line after `header` and
-// closed by `footer`, names p by the scope resolution operator: it is reported
-// where p follows it, and accepted where p precedes it.
 void ExpectReportedBeforeThePackage(std::string_view header,
                                     std::initializer_list<const char*> items,
                                     std::string_view footer) {
@@ -66,9 +57,6 @@ void ExpectReportedBeforeThePackage(std::string_view header,
   }
 }
 
-// In a module: a variable's initializer, a continuous assignment, a procedural
-// assignment, a variable's type, a parameter's value, a call of p's function,
-// a function's body and a generate block's item.
 TEST(PackageBeforeReference, EachFormInAModule) {
   ExpectReportedBeforeThePackage("module m;\n",
                                  {
@@ -118,7 +106,6 @@ TEST(PackageBeforeReference, EachFormInAChecker) {
                                  "endchecker\n");
 }
 
-// Another package, compiled ahead of p where written ahead of it.
 TEST(PackageBeforeReference, EachFormInAnotherPackage) {
   ExpectReportedBeforeThePackage("package q;\n",
                                  {
@@ -152,8 +139,6 @@ TEST(PackageBeforeReference, EachFormInTheCompilationUnit) {
                                  "");
 }
 
-// §26.3 reports an import of the later package by the module elaborated, as an
-// import, and the scope resolution operator in it draws no second report.
 TEST(PackageBeforeReference, AnImportIsReportedOnceAsAnImport) {
   for (const char* import : {"  import p::K;", "  import p::*;"}) {
     std::string element =
@@ -172,8 +157,6 @@ TEST(PackageBeforeReference, AnImportIsReportedOnceAsAnImport) {
   }
 }
 
-// A class the reference can see names a class scope, not the package, whatever
-// package of the name is written after it.
 TEST(PackageBeforeReference, AClassOfTheNameIsNoPackageReference) {
   ElabFixture f;
   ElabOk(std::string("module m;\n"
@@ -187,7 +170,6 @@ TEST(PackageBeforeReference, AClassOfTheNameIsNoPackageReference) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kLaterPackage, 5, "3.12"));
 }
 
-// A reference inside p itself follows p's own declaration.
 TEST(PackageBeforeReference, ThePackagesOwnReferenceToItself) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -197,7 +179,6 @@ TEST(PackageBeforeReference, ThePackagesOwnReferenceToItself) {
              "module top; endmodule\n"));
 }
 
-// Elaborates `srcs` together, each a compilation unit of its own.
 void ElaborateUnits(const std::vector<std::string>& srcs, ElabFixture& f) {
   Elaborator elab(f.arena, f.diag,
                   ParseUnitsApart(srcs, f.mgr, f.arena, f.diag));
@@ -205,9 +186,6 @@ void ElaborateUnits(const std::vector<std::string>& srcs, ElabFixture& f) {
   f.has_errors = f.diag.HasErrors();
 }
 
-// §3.12.1's units are compiled in the order they are given, so a package of a
-// later unit is compiled after a reference an earlier unit makes to it, and
-// one of an earlier unit before it.
 TEST(PackageBeforeReference, APackageOfALaterUnit) {
   ElabFixture later;
   ElaborateUnits({"module top;\n"

@@ -209,9 +209,6 @@ TEST(ParameterizedClassElaboration, TypedefChainedSpecializationOk) {
              "endmodule\n"));
 }
 
-// A parameterized class whose value parameter has no default has no default
-// specialization, so using its unadorned name as a type is illegal (the LRM's
-// "D obj;" example).
 TEST(ParameterizedClassElaboration, NoDefaultSpecializationUnadornedIsError) {
   ElabFixture f;
   ElabOk(
@@ -227,9 +224,6 @@ TEST(ParameterizedClassElaboration, NoDefaultSpecializationUnadornedIsError) {
                             "8.25"));
 }
 
-// The same class supplied with an explicit parameter has a concrete
-// specialization and elaborates, confirming the rejection above is specific to
-// the missing default specialization rather than to the class itself.
 TEST(ParameterizedClassElaboration, ExplicitOverrideForNoDefaultClassOk) {
   EXPECT_TRUE(
       ElabOk("class D #(int p);\n"
@@ -240,10 +234,6 @@ TEST(ParameterizedClassElaboration, ExplicitOverrideForNoDefaultClassOk) {
              "endmodule\n"));
 }
 
-// §8.25: when only some parameters have defaults, a specialization must supply
-// values for the ones without defaults. Overriding the defaultless parameter
-// while letting the rest default is legal (contrast
-// NoDefaultSpecializationUnadornedIsError, which omits the required override).
 TEST(ParameterizedClassElaboration, MixedDefaultPartialOverrideOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int a, int b = 2);\n"
@@ -254,14 +244,6 @@ TEST(ParameterizedClassElaboration, MixedDefaultPartialOverrideOk) {
              "endmodule\n"));
 }
 
-// §23.10.2.2 binds a named parameter argument to the formal it names, so `byte`
-// reaches T2 although T2 is declared second and the argument is written first.
-// The width says which formal it reached: T1's default is int at 32 bits and
-// T2's is bit at 1 bit, so only `byte` landing on T2 gives elem_t 8 bits.
-//
-// This case alone passes wrongly for an elaborator that ignores the name and
-// gives elem_t whatever type the specialization mentions, which is what
-// OmittedNamedTypeArgumentKeepsItsDeclaredDefault below rules out.
 TEST(ParameterizedClassElaboration, NamedTypeArgumentReachesTheFormalItNames) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -277,14 +259,6 @@ TEST(ParameterizedClassElaboration, NamedTypeArgumentReachesTheFormalItNames) {
   ExpectVariableWidth(FindModule(design, "m"), "v", 8u);
 }
 
-// §23.10.2.2 requires only the parameters being given new values to be
-// specified, so naming T1 alone leaves T2 at its declared default of bit and
-// elem_t 1 bit wide. The 8 bits of `byte` and the 32 of T1's own default are
-// both distinct from 1, so neither reaching elem_t can be mistaken for this.
-//
-// This case alone passes wrongly for an elaborator that discards every named
-// argument and defaults the whole specialization, which is what
-// NamedTypeArgumentReachesTheFormalItNames above rules out.
 TEST(ParameterizedClassElaboration,
      OmittedNamedTypeArgumentKeepsItsDeclaredDefault) {
   ElabFixture f;
@@ -301,11 +275,6 @@ TEST(ParameterizedClassElaboration,
   ExpectVariableWidth(FindModule(design, "m"), "v", 1u);
 }
 
-// Both formals are named, in the reverse of the order the class declares them,
-// so §23.10.2.2's binding by name is the only rule that puts `byte` on T2 and
-// `shortint` on T1. An elaborator binding these two arguments by the position
-// they are written in gives T2 shortint and elem_t 16 bits, and one taking the
-// last argument mentioned gives the same 16, so 8 is reachable only by name.
 TEST(ParameterizedClassElaboration,
      NamedTypeArgumentsResolveOutOfDeclarationOrder) {
   ElabFixture f;
@@ -322,12 +291,6 @@ TEST(ParameterizedClassElaboration,
   ExpectVariableWidth(FindModule(design, "m"), "v", 8u);
 }
 
-// §23.10.2.2 states that the parameter named must be one the instantiated
-// module declares, and §8.25 applies the same parameter override rules to a
-// class specialization, so `.Nope` names no parameter of Buf and the
-// specialization is illegal. An elaborator that drops an argument whose name it
-// cannot find accepts the source and leaves T2 at its declared default of bit,
-// giving v 1 bit rather than saying the name is wrong.
 TEST(ParameterizedClassElaboration,
      NamedArgumentNamingNoClassParameterIsError) {
   ElabFixture f;
@@ -344,11 +307,6 @@ TEST(ParameterizedClassElaboration,
                             "23.10.2.2"));
 }
 
-// §23.10.2.2 states that a parameter given a value may not be assigned again
-// under that name, so naming T2 twice in one specialization is illegal. An
-// elaborator that lets each named argument overwrite the last accepts the
-// source and gives T2 shortint, making v 16 bits from whichever argument was
-// written last rather than reporting the repeat.
 TEST(ParameterizedClassElaboration, NamedClassParameterAssignedTwiceIsError) {
   ElabFixture f;
   ElabOk(
@@ -365,13 +323,6 @@ TEST(ParameterizedClassElaboration, NamedClassParameterAssignedTwiceIsError) {
                             5, "23.10.2.2"));
 }
 
-// §8.25 instantiates a parameterized class object by the parameter override
-// rules of §23.10, and §23.10.2 gives a parameter override a constant
-// expression as its value, so the module variable `v` is not a legal argument
-// of the specialization `C#(v)`. An elaborator that folds the argument only
-// where a later constant expression happens to read it accepts this declaration
-// and carries C's own default of 1 in place of the value the source wrote, so
-// the report is the only thing that says the source is wrong.
 TEST(ParameterizedClassElaboration,
      NonConstantValueArgumentInDeclarationIsError) {
   ElabFixture f;
@@ -389,12 +340,6 @@ TEST(ParameterizedClassElaboration,
                             "23.10.2"));
 }
 
-// A localparam is a constant expression per §6.20.2, so `C#(K)` is a legal
-// specialization and the rejection above is specific to an argument that is not
-// one. Without this case the cheapest way to pass
-// NonConstantValueArgumentInDeclarationIsError is to reject every value
-// argument. K is 4 rather than C's own default of 1, so the argument the source
-// wrote is the value that has to fold here.
 TEST(ParameterizedClassElaboration,
      ConstantLocalparamValueArgumentInDeclarationOk) {
   EXPECT_TRUE(
@@ -407,15 +352,6 @@ TEST(ParameterizedClassElaboration,
              "endmodule\n"));
 }
 
-// The same rule over an extends clause rather than a declaration. §8.25 rules
-// that instances of a parameterized class are instantiated by the parameter
-// override rules of §23.10 (printed page 203), and §23.10.2 gives an override a
-// constant expression, so the module variable `v` is not a legal argument of
-// `C#(v)` wherever the specialization is written.
-// Elaborator::ValidateSpecializationArgsConstant reports the declaration form
-// at elaborator_decls_var.cpp and reaches no inheritance clause, so nothing
-// said this source was wrong: the class silently took C's own default of 1 in
-// place of the value the source wrote.
 TEST(ParameterizedClassElaboration, NonConstantValueArgumentInExtendsIsError) {
   ElabFixture f;
   ElabOk(
@@ -433,11 +369,6 @@ TEST(ParameterizedClassElaboration, NonConstantValueArgumentInExtendsIsError) {
                             "23.10.2"));
 }
 
-// §6.20.1 gives a class's own formal value parameter no value until the class
-// is specialized, so `N` here is not an argument that failed to be constant and
-// the report above must not fire on it. Without this case the obvious
-// implementation of that report -- reject every argument that does not fold --
-// passes every other test in this file and rejects a legal source.
 TEST(ParameterizedClassElaboration, ForwardedFormalValueArgumentInExtendsOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int P = 1);\n"
@@ -447,12 +378,6 @@ TEST(ParameterizedClassElaboration, ForwardedFormalValueArgumentInExtendsOk) {
              "endclass\n"));
 }
 
-// The false positive the report must not produce, and the reason the fold and
-// the report are one change. `K` is declared in the module the class is
-// declared in, which is a scope Elaborator::cu_param_scope_ does not hold, so a
-// report added without ScopeParamValues rejects this legal source. K is 4
-// rather than C's own default of 1, so the argument has a value distinct from
-// what accepting it silently would leave behind.
 TEST(ParameterizedClassElaboration, ModuleLocalparamValueArgumentInExtendsOk) {
   EXPECT_TRUE(
       ElabOk("class C #(int P = 1);\n"
@@ -465,14 +390,6 @@ TEST(ParameterizedClassElaboration, ModuleLocalparamValueArgumentInExtendsOk) {
              "endmodule\n"));
 }
 
-// §8.25 gives each specialization its own parameter values, and §6.20.1 lets a
-// parameter depend on earlier ones, so the class body localparam `N` and the
-// header's `M` are both `W * 2` with the specialization's `W`: 8 in `C#(4)`,
-// 16 in the default and 6 under the named override `.W(3)`, and `M` written
-// out as 5 in `C#(4, 5)` is 5. Each is folded at elaboration as the
-// right-hand side of a module localparam. This fails on a fold that reads a
-// parameter the list does not override with the class's default `W = 8` in
-// scope, which answered 16 wherever it read `W * 2`.
 TEST(ParameterizedClassElaboration,
      ParameterThroughASpecializationFoldsWithItsParameters) {
   ElabFixture f;
@@ -497,10 +414,6 @@ TEST(ParameterizedClassElaboration,
   EXPECT_EQ(ParamValue(design, "B"), 5);
 }
 
-// §6.20.1 with §8.25: a class parameter declared with unpacked dimensions is
-// an array of constants, assigned by a pattern whose items, nested for a second
-// dimension or real for a real element, are each constant, or by another
-// parameter array; the pattern is no one integer, and is not judged as one.
 TEST(ParameterizedClassElaboration, ParameterArrayOfConstantsOk) {
   ElabFixture f;
   ElabOk(
@@ -518,8 +431,6 @@ TEST(ParameterizedClassElaboration, ParameterArrayOfConstantsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An item of the pattern that is no constant expression is reported, as a
-// scalar parameter's value would be.
 TEST(ParameterizedClassElaboration, ParameterArrayItemNotConstantIsError) {
   ElabFixture f;
   ElabOk(
@@ -537,9 +448,6 @@ TEST(ParameterizedClassElaboration, ParameterArrayItemNotConstantIsError) {
                             3, "6.20.2"));
 }
 
-// §8.25: a type parameter may lack a default as a value parameter may, and a
-// class with one has no default specialization either, so its unadorned name
-// as a type is illegal; with the parameter given, it is a specialization.
 TEST(ParameterizedClassElaboration, TypeParameterWithoutDefaultHasNoDefault) {
   ElabFixture f;
   ElabOk(
@@ -560,11 +468,6 @@ TEST(ParameterizedClassElaboration, TypeParameterWithoutDefaultHasNoDefault) {
       ReportedError(f.diag.Diagnostics(), "has no default", 6, "8.25"));
 }
 
-// §8.25: the unadorned name of a class with no default specialization is
-// illegal in every declaration that writes a type: a class property, a
-// method's return type and argument, the class an extends clause names, a
-// typedef, a block's variable, a package's and the compilation unit's
-// variables. A specialization written with its arguments stays legal.
 TEST(ParameterizedClassElaboration, NoDefaultSpecializationInEveryDeclaration) {
   ElabFixture f;
   ElabOk(
@@ -597,12 +500,6 @@ TEST(ParameterizedClassElaboration, NoDefaultSpecializationInEveryDeclaration) {
       ReportedError(f.diag.Diagnostics(), "has no default", 6, "8.25"));
 }
 
-// §8.13 has a class extend a class, and §8.25 adds that a typedef or a type
-// parameter written as the base shall resolve to a class type after
-// elaboration. A name nothing declares, a typedef of int, and a type
-// parameter a specialization gives int are each reported; a typedef of a
-// class, a built-in class and a specialization giving a class are not, nor is
-// a parameter given no type at all, which is reported as having no default.
 TEST(ParameterizedClassElaboration, ABaseResolvingToNoClassIsAnError) {
   ElabFixture f;
   ElabOk(

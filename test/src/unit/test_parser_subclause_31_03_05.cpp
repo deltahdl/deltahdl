@@ -9,18 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.5 owns Syntax 31-7, the $recovery_timing_check production:
-//   $recovery ( reference_event , data_event , timing_check_limit
-//              [ , [ notifier ] ] ) ;
-// The shared timing-check parser (ParseTimingCheckKind / ParseTimingCheck /
-// ParseTimingCheckTrailingArgs) carries it. The terminals are positional, so
-// the first argument (the reference_event) lands in ref_terminal and the
-// second (the data_event) in data_terminal -- the natural order shared with
-// $hold (§31.3.2) and $removal (§31.3.4). Table 31-5's timecheck/timestamp
-// role assignment is applied later by the simulator. The optional trailing
-// notifier (notifier ::= variable_identifier) is the same notifier whose
-// violation-response semantics §31.6 defines.
-
 TEST(TimingCheckCommandParsing, RecoveryWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -52,15 +40,10 @@ TEST(TimingCheckCommandParsing, RecoveryAsSpecifyItem) {
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
-  // The optional notifier is omitted here, so nothing is recorded for it.
   EXPECT_TRUE(si->timing_check.notifier.empty());
 }
 
 TEST(TimingCheckCommandParsing, RecoveryAcceptsTrailingCommaWithoutNotifier) {
-  // Syntax 31-7's optional [ , [ notifier ] ] also permits the separating
-  // comma to appear with the notifier itself omitted; the parser accepts this
-  // and records no notifier (the trailing-comma break branch of the
-  // trailing-arg loop, distinct from the no-comma and comma+notifier forms).
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -90,13 +73,6 @@ TEST(TimingCheckCommandParsing, RecoveryLimitIsExpression) {
 }
 
 TEST(TimingCheckCommandParsing, RecoveryPlainReferenceEvent) {
-  // Syntax 31-7 gives reference_event ::= timing_check_event and
-  // data_event ::= timing_check_event. A timing_check_event may be a bare
-  // signal with no edge control, so $recovery imposes no edge requirement on
-  // its events (unlike $width/$period/$nochange, which do). The parser accepts
-  // an unedged reference, records its edge as kNone, and still classifies the
-  // call as $recovery -- the plain-event input form of the reference/data
-  // operands, distinct from the edged forms the other tests exercise.
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
       "  specify\n"
@@ -121,8 +97,6 @@ TEST(TimingCheckCommandParsing, ErrorRecoveryMissingLimit) {
       "  $recovery(posedge rst, posedge clk);\n"
       "endspecify\n"
       "endmodule\n");
-  // The shared timing-check parser files the missing separator under §31.2, the
-  // system_timing_check production, rather than under §31.3.5.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 

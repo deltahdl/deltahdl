@@ -11,12 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Wraps `body` in a real `begin_keywords "1364-2001" region and runs the whole
-// pipeline over it -- preprocess, parse, elaborate, lower, simulate --
-// returning the final value of `var_name`. The diagnostic check is what keeps
-// the result meaningful: source this version's list admits has to run clean,
-// not merely produce a number after the front end recovered from something it
-// rejected.
 uint64_t Run2001(const std::string& body, const char* var_name) {
   SimFixture f;
   auto fid = f.mgr.AddFile(
@@ -28,11 +22,6 @@ uint64_t Run2001(const std::string& body, const char* var_name) {
   return value;
 }
 
-// `localparam` is an addition of this version, and a constant it declares has
-// to be worth something at runtime, not merely parse. The three constant forms
-// this list makes available in an expression -- a literal, a `parameter`
-// carried over from the earlier list, and a `localparam` this version adds --
-// all reach the same value.
 TEST(Verilog2001KeywordSimulation, LiteralParameterAndLocalparamAgree) {
   auto from_literal = Run2001(
       "module m;\n"
@@ -61,10 +50,6 @@ TEST(Verilog2001KeywordSimulation, LiteralParameterAndLocalparamAgree) {
   EXPECT_EQ(from_localparam, 43u);
 }
 
-// `automatic` is an addition of this version whose whole point is a runtime
-// one: each call needs its own copy of the subroutine's storage, which only a
-// recursive call can show. The factorial and the task's accumulation both have
-// to survive re-entry for this number to come out.
 TEST(Verilog2001KeywordSimulation, AutomaticFunctionAndTaskRun) {
   auto result = Run2001(
       "module m;\n"
@@ -86,14 +71,9 @@ TEST(Verilog2001KeywordSimulation, AutomaticFunctionAndTaskRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // 20 + 3! + 17 = 43.
   EXPECT_EQ(result, 43u);
 }
 
-// `signed` is an addition of this version, and what it selects is only visible
-// once arithmetic runs: the same bit patterns multiplied as signed values give
-// a different answer than they would unsigned, and the negation below can only
-// land on this value if both operands were treated as signed.
 TEST(Verilog2001KeywordSimulation, SignedDeclarationsChangeTheArithmetic) {
   auto result = Run2001(
       "module m;\n"
@@ -109,11 +89,6 @@ TEST(Verilog2001KeywordSimulation, SignedDeclarationsChangeTheArithmetic) {
   EXPECT_EQ(result, 43u);
 }
 
-// `unsigned` is the other half of that addition, and the only way to tell it
-// apart from `signed` is to run both. The two declarations hold the same eight
-// bits; the comparison against zero is what separates them, so a run in which
-// `unsigned` had been ignored -- or in which neither word was a keyword --
-// cannot reach this value.
 TEST(Verilog2001KeywordSimulation, SignedAndUnsignedDeclarationsDiverge) {
   auto result = Run2001(
       "module m;\n"
@@ -127,15 +102,9 @@ TEST(Verilog2001KeywordSimulation, SignedAndUnsignedDeclarationsDiverge) {
       "  end\n"
       "endmodule\n",
       "result");
-  // The signed copy reads as negative and the unsigned copy does not.
   EXPECT_EQ(result, 43u);
 }
 
-// The same addition in the other declaration position it qualifies: a net
-// rather than a variable. Nets and variables take different paths from the
-// declaration into the running design, so the keyword has to survive both, and
-// only a run can show that the value arriving over the net is still read as
-// signed.
 TEST(Verilog2001KeywordSimulation, SignedNetKeepsItsSignednessAtRuntime) {
   auto result = Run2001(
       "module m;\n"
@@ -152,12 +121,6 @@ TEST(Verilog2001KeywordSimulation, SignedNetKeepsItsSignednessAtRuntime) {
   EXPECT_EQ(result, 43u);
 }
 
-// The constant forms again, but sizing a declaration rather than standing in an
-// expression -- a different path into the running design than the operand test
-// above takes. Each variable is four bits wide and is handed a value too large
-// for it, so the truncation is what proves the width really came from the
-// constant. All three forms this list admits have to truncate identically: the
-// literal and the `parameter` are inherited, the `localparam` is an addition.
 TEST(Verilog2001KeywordSimulation, ConstantFormsAllSizeADeclaration) {
   const char* const kSrc =
       "module m;\n"
@@ -175,16 +138,12 @@ TEST(Verilog2001KeywordSimulation, ConstantFormsAllSizeADeclaration) {
       "  end\n"
       "endmodule\n";
 
-  // 0x1B truncated to four bits is 11, and three of them plus ten is 43.
   EXPECT_EQ(Run2001(kSrc, "result"), 43u);
   EXPECT_EQ(Run2001(kSrc, "from_literal"), 11u);
   EXPECT_EQ(Run2001(kSrc, "from_parameter"), 11u);
   EXPECT_EQ(Run2001(kSrc, "from_localparam"), 11u);
 }
 
-// The inclusion half at runtime: the gate primitives, net types, and
-// procedural statements the earlier list names still build working structure
-// and drive real control flow under this one.
 TEST(Verilog2001KeywordSimulation, InheritedKeywordsStillRun) {
   auto gates = Run2001(
       "module m;\n"
@@ -203,7 +162,6 @@ TEST(Verilog2001KeywordSimulation, InheritedKeywordsStillRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // and(1,1) = 1, nor(1,1) = 0, wand of two 1s = 1.
   EXPECT_EQ(gates, 5u);
 
   auto control = Run2001(
@@ -231,11 +189,6 @@ TEST(Verilog2001KeywordSimulation, InheritedKeywordsStillRun) {
   EXPECT_EQ(control, 33u);
 }
 
-// The inherited event-control words doing their job under this list: an
-// `always` procedure sensitive to a `posedge`/`negedge` list joined by `or`,
-// with an `if`/`else` pair choosing between them. The count the run leaves
-// behind is reachable only if the sensitivity list and both branches were
-// understood as keywords.
 TEST(Verilog2001KeywordSimulation, InheritedEventControlAndBranchRun) {
   auto result = Run2001(
       "module m;\n"
@@ -257,16 +210,9 @@ TEST(Verilog2001KeywordSimulation, InheritedEventControlAndBranchRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // The negedge on rst loads 40, then three posedges each add one.
   EXPECT_EQ(result, 43u);
 }
 
-// Words neither table lists are ordinary identifiers under this version, and
-// they carry values at runtime like any other name: this spreads them across a
-// hierarchy -- the child module's name, its two port names, a parameter, a
-// task, a variable, and the instance name are all words later standards
-// reserve. The value the child computes has to reach the parent for the run to
-// produce this result, so every one of those names had to resolve.
 TEST(Verilog2001KeywordSimulation, FreedWordsRunAcrossAHierarchy) {
   auto result = Run2001(
       "module bit (input wire [7:0] logic, output wire [7:0] byte);\n"
@@ -288,11 +234,6 @@ TEST(Verilog2001KeywordSimulation, FreedWordsRunAcrossAHierarchy) {
   EXPECT_EQ(result, 43u);
 }
 
-// An `event` declared under this list, triggered with `->`, and waited on by
-// an `always` procedure. The name carrying the event is a word a later
-// standard reserved, so the run observes both sides of the rule at once: the
-// inherited keyword still opens a declaration, and the freed word still names
-// one.
 TEST(Verilog2001KeywordSimulation, FreedWordNamesAnEventDrivingAProcess) {
   auto result = Run2001(
       "module m;\n"

@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// edge_identifier ::= posedge | negedge | edge -- one observer per alternative.
-// The edge keyword is parsed by ParseSpecifyEdge independently of the path
-// operator and polarity, so combinations of edge keyword x path_kind x
-// polarity are not retested here.
 TEST(SpecifyPathParsing, EdgeIdentifierEdge) {
   auto r = Parse(
       "module m;\n"
@@ -27,8 +23,6 @@ TEST(SpecifyPathParsing, EdgeIdentifierEdge) {
   EXPECT_EQ(si->path.edge, SpecifyEdge::kEdge);
 }
 
-// posedge alternative; also the parallel '=>' bare form (second alternative of
-// parallel_edge_sensitive_path_description, with no data-source parenthesis).
 TEST(SpecifyPathParsing, PosedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"
@@ -50,7 +44,6 @@ TEST(SpecifyPathParsing, PosedgeSensitivePath) {
   EXPECT_EQ(si->path.data_source, nullptr);
 }
 
-// negedge alternative.
 TEST(SpecifyPathParsing, NegedgeSensitivePath) {
   auto sp = ParseSpecifySingle(
       "module m(input clk, output q);\n"
@@ -68,9 +61,6 @@ TEST(SpecifyPathParsing, NegedgeSensitivePath) {
   EXPECT_EQ(si->path.src_ports[0].name, "clk");
 }
 
-// parallel_edge_sensitive_path_description first alternative: '=>' with a
-// data-source parenthesis. Also confirms the output descriptor's optional
-// polarity_operator is absent (kNone) when not written.
 TEST(SpecifyPathParsing, EdgeSensitiveParallelWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -90,8 +80,6 @@ TEST(SpecifyPathParsing, EdgeSensitiveParallelWithDataSource) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNone);
 }
 
-// full_edge_sensitive_path_description first alternative: '*>' with a
-// data-source parenthesis.
 TEST(SpecifyPathParsing, EdgeSensitiveFullWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -108,8 +96,6 @@ TEST(SpecifyPathParsing, EdgeSensitiveFullWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// full_edge_sensitive_path_description second alternative: '*>' with a bare
-// list_of_path_outputs and no data source.
 TEST(SpecifyPathParsing, EdgeSensitiveFullWithoutDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -127,7 +113,6 @@ TEST(SpecifyPathParsing, EdgeSensitiveFullWithoutDataSource) {
   ASSERT_EQ(si->path.dst_ports.size(), 2u);
 }
 
-// Optional polarity_operator after the edge-sensitive input descriptor.
 TEST(SpecifyPathParsing, EdgeSensitiveParallelPolarityAndDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -144,8 +129,6 @@ TEST(SpecifyPathParsing, EdgeSensitiveParallelPolarityAndDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// Optional polarity_operator on the output descriptor, before the colon -- a
-// position unique to the edge-sensitive (data-source) path forms.
 TEST(SpecifyPathParsing, DataSourceWithOutputPolarity) {
   auto r = Parse(
       "module m;\n"
@@ -161,11 +144,6 @@ TEST(SpecifyPathParsing, DataSourceWithOutputPolarity) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kPositive);
 }
 
-// polarity_operator '-' alternative on the output descriptor, written with a
-// space before the ':' so it lexes as a plain '-' token. This is the negative
-// counterpart of DataSourceWithOutputPolarity and drives the else branch of
-// parse_destination (ParseSpecifyPolarity + a separate ':'), a distinct path
-// from the abutting '-:' single-token form below.
 TEST(SpecifyPathParsing, OutputPolarityMinusSpaced) {
   auto r = Parse(
       "module m;\n"
@@ -181,10 +159,6 @@ TEST(SpecifyPathParsing, OutputPolarityMinusSpaced) {
   EXPECT_EQ(si->path.dst_polarity, SpecifyPolarity::kNegative);
 }
 
-// polarity_operator '+' on the output descriptor written with no space before
-// the ':' separator -- '+:' lexes as one token yet must be read as a positive
-// polarity operator plus the data-source colon. This is the exact spelling of
-// LRM 30.4.3 Example 1: (posedge clock => (out +: in)).
 TEST(SpecifyPathParsing, OutputPolarityPlusAbutsColon) {
   auto r = Parse(
       "module m;\n"
@@ -203,10 +177,6 @@ TEST(SpecifyPathParsing, OutputPolarityPlusAbutsColon) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// polarity_operator '-' alternative on the output descriptor, again abutting
-// the ':' as the single token '-:'. This is LRM 30.4.3 Example 2:
-// (negedge clock[0] => (out -: in)); it also exercises the negedge identifier
-// with a bit-select source in one declaration.
 TEST(SpecifyPathParsing, OutputPolarityMinusAbutsColon) {
   auto r = Parse(
       "module m;\n"
@@ -225,9 +195,6 @@ TEST(SpecifyPathParsing, OutputPolarityMinusAbutsColon) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// polarity_operator '-' alternative on the input descriptor (the negative
-// counterpart of the '+' input-polarity case above), confirming both
-// alternatives of polarity_operator ::= + | - are accepted at the source.
 TEST(SpecifyPathParsing, InputPolarityMinus) {
   auto r = Parse(
       "module m;\n"
@@ -243,8 +210,6 @@ TEST(SpecifyPathParsing, InputPolarityMinus) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// No edge identifier: edge field stays kNone (the parser side of the
-// any-transition rule).
 TEST(SpecifyPathParsing, NoEdgeIdentifierWithDataSource) {
   auto r = Parse(
       "module m;\n"
@@ -260,8 +225,6 @@ TEST(SpecifyPathParsing, NoEdgeIdentifierWithDataSource) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// A bit-select source records the selected bit (parser-structural facet of the
-// vector-source rule; the runtime LSB detection itself is not yet simulated).
 TEST(SpecifyPathParsing, VectorInputBitSelectOnLsb) {
   auto r = Parse(
       "module m;\n"
@@ -278,7 +241,6 @@ TEST(SpecifyPathParsing, VectorInputBitSelectOnLsb) {
   EXPECT_EQ(si->path.src_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-// data_source_expression ::= expression -- an arbitrary expression is accepted.
 TEST(SpecifyPathParsing, DataSourceCompoundExpression) {
   auto r = Parse(
       "module m;\n"
@@ -293,7 +255,6 @@ TEST(SpecifyPathParsing, DataSourceCompoundExpression) {
   EXPECT_NE(si->path.data_source, nullptr);
 }
 
-// The data source requires a ':' separator.
 TEST(SpecifyPathParsing, ErrorDataSourceMissingColon) {
   auto r = Parse(
       "module m;\n"
@@ -305,7 +266,6 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingColon) {
       ReportedError(r.diags, "expected ':', got identifier", 3, "30.4.3"));
 }
 
-// The data source requires an expression after the ':'.
 TEST(SpecifyPathParsing, ErrorDataSourceMissingExpression) {
   auto r = Parse(
       "module m;\n"
@@ -313,8 +273,6 @@ TEST(SpecifyPathParsing, ErrorDataSourceMissingExpression) {
       "    (posedge clk => (q :)) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §11.2 owns the expression the data source is, and the missing operand is
-  // reported there; §30.4.3 has no report of its own for an empty data source.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

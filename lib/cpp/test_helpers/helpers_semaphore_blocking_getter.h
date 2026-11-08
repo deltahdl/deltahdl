@@ -8,12 +8,6 @@
 
 using namespace delta;
 
-// Minimal coroutine used to model a process that blocks in semaphore get().
-// It starts suspended; the first resume() runs it up to the co_await, which
-// either acquires keys immediately or parks the handle on the semaphore's
-// waiter queue. When put() returns enough keys, WakeWaiters() resumes it and
-// the body records its id, so a sequence of resumes reveals the order in which
-// blocked processes were served.
 struct BlockingGetter {
   struct promise_type {
     BlockingGetter get_return_object() {

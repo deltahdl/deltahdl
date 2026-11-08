@@ -53,8 +53,6 @@ bool IsValueChangeFunction(SampledValueFunction fn) {
 }
 
 bool SampledValueFunctionUsesClockingEvent(SampledValueFunction fn) {
-  // §16.9.3: every sampled value function other than $sampled is given meaning
-  // by a clocking event; $sampled alone does not use one.
   return fn != SampledValueFunction::kSampled;
 }
 
@@ -92,10 +90,8 @@ SampledValueClockInference InferSampledValueClockingEvent(
     SampledValueClockContext context) {
   switch (context) {
     case SampledValueClockContext::kAssertionSequenceOrProperty:
-      // The clock flow rules of §16.13.3 determine the clocking event.
       return SampledValueClockInference::kFromClockFlow;
     case SampledValueClockContext::kDisableConditionOrClockExpression:
-      // No inference here: the call shall be explicitly clocked.
       return SampledValueClockInference::kRequiresExplicitClock;
     case SampledValueClockContext::kActionBlock:
       return SampledValueClockInference::kFromLeadingClock;

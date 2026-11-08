@@ -27,117 +27,37 @@ class SimContext;
 class Arena;
 enum class DataTypeKind : uint8_t;
 
-// Internal helpers shared across the statement_assign_*.cpp family and the
-// handful of other translation units that reach into it. Each symbol is
-// defined in exactly one translation unit, which that symbol's own comment
-// names.
-
-// Defined in statement_assign_core.cpp.
 void CoerceTo2State(Logic4Vec& v);
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
-// statement executor in eval_function_body_assign.cpp. §8.5 with §7.3.2: where
-// the blocking assignment `stmt` writes a `tagged` value into a class property
-// of a tagged union type, named bare in a method or through a handle, records
-// the value's tags under the property's own key (PropertyAggregateLayout).
 void RecordPropertyTags(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp, which evaluates its own
-// right-hand side and so reaches none of the copies this file's own path takes.
-// Answers a value that owns its words, for a store to keep; the definition's
-// comment gives the reason and the fields it carries across. Call it once where
-// the value is produced, not at each store.
 Logic4Vec OwnRhsWords(const Logic4Vec& val, Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the §11.4.2 nonblocking
-// path in statement_assign_nonblocking.cpp and by the subroutine-body statement
-// executor in eval_function_body.cpp, which applies §10.7 to its own writes.
-// Convert the rhs value when the lhs and rhs differ in real-ness or real width
-// before a write into `var`, the variable `lhs` names, at its width. §6.12:
-// whether the target is real is read off the variable's own mark first, which
-// a subroutine's formal and local carry and no name table does, and off the
-// name the declaration registered for the readers that hold none.
 Logic4Vec ConvertRealOnAssign(Logic4Vec rhs_val, const Expr* lhs,
                               const Variable& var, SimContext& ctx,
                               Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by lowerer_var.cpp for the
-// declaration-initializer form of the §6.12.1 conversion. Same rule as
-// ConvertRealOnAssign but with the lhs real-ness supplied directly, for callers
-// that have no lhs Expr (e.g. a variable declared with an initializer).
 Logic4Vec ConvertRealForKnownLhs(Logic4Vec rhs_val, bool lhs_is_real,
                                  uint32_t target_width, Arena& arena);
 
-// Defined in statement_assign_compound.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp. §11.4.1 states a compound
-// assignment as one blocking assignment, but for an index on its left-hand
-// side, which is evaluated once only, and this performs that
-// one read-modify-write for whichever of the identifier, select, member-access
-// and scalar-fallback forms the target takes. A caller that reaches it has had
-// its statement written for it and must not go on to write the target again
-// from the value of stmt->rhs, which is the compound operator over the same lhs
-// node and would assign it a second time.
-
 void ApplyCompoundAssignOp(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp; the plain blocking assignment of a
-// scalar value to the target `stmt->lhs` names, resolved to its variable, a
-// string given its whole value, a real converted on the way (§6.12.1), a
-// structure member written through its window. ApplyCompoundAssignOp in
-// statement_assign_compound.cpp takes it for a target no other arm claims.
 void AssignToScalarLhs(const Stmt* stmt, Logic4Vec rhs_val, SimContext& ctx,
                        Arena& arena);
 
-// Defined in statement_assign_object.cpp; also used by the package and
-// compilation-unit declaration initializers in lowerer_package_data.cpp.
-// §8.30.1: the weak reference `call`, a weak_reference's `new(referent)`,
-// allocates, to the object its one argument evaluates to, or a null one with
-// no argument, answered as the 64-bit handle value the target holds.
 Logic4Vec EvalWeakReferenceNew(const Expr* call, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_core.cpp: the store §11.4.1's compound operators
-// make into a variable, sized to it, 2-state coerced (§6.11.2), declined while
-// the variable is forced (§10.6.2), its watchers told. Shared with
-// ApplyCompoundAssignOp in statement_assign_compound.cpp.
 void WriteVar(Variable* var, const Logic4Vec& val, Arena& arena);
 
-// Defined in statement_assign_compound.cpp; also used by EvalCompoundAssign in
-// eval_expr.cpp. §11.4.1 makes one exception to a compound assignment being an
-// ordinary blocking assignment -- an index on the left-hand side is evaluated
-// once only -- and the helpers that resolve, read and write a select
-// target each re-derive it from lhs->index, which would call a side-effecting
-// index several times. Snapshot evaluates each index node once and stashes the
-// result for those later reads to find; Clear undoes it, and has to run on
-// every exit or the snapshot leaks into a later statement reusing the same
-// node.
 void SnapshotSelectIndices(const Expr* lhs, SimContext& ctx, Arena& arena);
 void ClearSelectIndices(const Expr* lhs, SimContext& ctx);
 
-// Defined in statement_assign_lhs_snapshots.cpp; also used by the nonblocking
-// scheduler in statement_assign_nonblocking.cpp. Each index node under a
-// left-hand side -- a select's own and its base's, and those under every
-// element of a concatenation, an assignment pattern or a streaming
-// concatenation -- paired with the value it has when collected. The value is
-// held in a Logic4Snapshot rather than a Logic4Vec because a Logic4Vec copy
-// keeps pointing at the words it was copied from, and a write does not always
-// replace the words it writes -- the trap variable.h records for #3358, where
-// both sides of a comparison became one value. A snapshot owns its words, so
-// an in-place write to the object an index expression read cannot reach back
-// into what was sampled. Install makes each pair a deferred-argument snapshot
-// EvalExpr answers from; Clear removes them.
 using LhsIndexSnapshots = std::vector<std::pair<const Expr*, Logic4Snapshot>>;
 LhsIndexSnapshots CollectLhsIndexSnapshots(const Expr* lhs, SimContext& ctx,
                                            Arena& arena);
 void InstallLhsIndexSnapshots(const LhsIndexSnapshots& snaps, SimContext& ctx);
 void ClearLhsIndexSnapshots(const LhsIndexSnapshots& snaps, SimContext& ctx);
 
-// Defined in statement_assign_lhs_snapshots.cpp; also used by the blocking
-// stores in statement_assign_core.cpp and the nonblocking scheduler in
-// statement_assign_nonblocking.cpp. §10.4.1 and §10.4.2: evaluates, once, each
-// index under `lhs` whose evaluation could change something and that no caller
-// has pinned already, and holds the values as deferred-argument snapshots until
-// it is destroyed, so every writer a store asks reads the same index.
 class LhsIndexPin {
  public:
   LhsIndexPin(const Expr* lhs, SimContext& ctx, Arena& arena);
@@ -152,162 +72,51 @@ class LhsIndexPin {
   LhsIndexSnapshots snaps_;
 };
 
-// Defined in statement_assign_core.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp. §10.4 lists bit-selects,
-// part-selects and slices of packed arrays among the left-hand sides a
-// procedural assignment may take, alongside the elements of the arrays of
-// Clause 7, and this decides which of those a select names and writes it
-// accordingly. Always returns true: a select target is this function's to
-// answer for, whether or not it found something to write.
-// The queue or the unpacked-array elements a procedural declaration's own
-// dimensions ask for, beside the variable that carries one element's width.
-// Both procedural declaration paths ask for them: §7.10's queue and §7.4.2's
-// array are the same declaration whether it is written inside a subroutine or
-// outside one.
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena);
-// §10.5 (printed page 256): a procedural declaration's initializer, where the
-// declaration has unpacked dimensions, assigned to the array
-// CreateDeclAggregate made as the statement `name = init` would assign it.
 void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// Defined in eval_function_body_decl.cpp. §6.20.2: a value parameter a
-// procedural block, a task or a function declares with no type and no range
-// takes the type and range of its value, `parameter Q = 3` holding 32 signed
-// bits rather than the one bit an implicit type gives a variable; a `signed`
-// or `unsigned` written alone sets the signing (§23.10). Answers `stmt` itself
-// for every other declaration and for a parameter with no value.
 const Stmt* DeclParameterTypedByValue(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena);
-// Defined in statement_assign_decl_array.cpp. §7.4.2 and §7.4.4: registers
-// the fixed-size unpacked array a procedural declaration's own dimensions
-// describe, every one of them, and creates a variable for each of its elements,
-// `elem_width` wide.
 void CreateBlockArrayElements(const Stmt* stmt, uint32_t elem_width,
                               SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_decl.cpp; also used by the module-scope
-// declaration lowering in lowerer_var.cpp. §8.25: records the parameter value
-// assignment of the specialization the class variable `var_name` was declared
-// with, `G #(5) b` -- the value expressions, and the actuals themselves as the
-// parser recorded them, since an actual may be a type, `#(string, int)`, which
-// is no expression and binds a type parameter -- for ApplyClassParamOverrides
-// to bind on the object the variable's `new` constructs. Nothing is recorded
-// for a declaration that wrote no `#(...)`.
-//
-// §8.25 makes each specialization a type of its own with its own static
-// members, so the declaration is also pointed at the specialization's own
-// ClassTypeInfo (SpecializationOf in class_specialization.cpp), registered
-// under a key spelling the actuals, and the variable's recorded class type
-// becomes that key. `class_name` is the class the declaration wrote; a name
-// no class is registered under leaves the variable as it was.
 void RecordClassParamActuals(std::string_view var_name,
                              std::string_view class_name,
                              const std::vector<DataType>& type_params,
                              SimContext& ctx);
 
-// Defined in statement_assign_assoc_index.cpp; used by every builder of an
-// array from its declaration. §7.8: whether the unpacked dimension `dim` is an
-// index type -- a keyword type, the `*` wildcard, a class, a name the
-// elaborated typedef table sizes, bare or through a package or class scope,
-// or a type reference (A.2.5), which also holds an index written as a
-// data_type no expression can spell -- and so declares an associative array
-// rather than a fixed-size one.
 bool IsAssocIndexDim(const Expr* dim, SimContext& ctx);
 
-// Defined in statement_assign_assoc_index.cpp. §7.8: the index type the
-// dimension `dim`, which IsAssocIndexDim has answered for, writes: a type
-// reference's own, which the elaborator resolved where it was written
-// `type(expression)`; for a name written through a package or class scope,
-// the type the run's tables hold under its "p::idx_t" key, kept in the run's
-// arena (§26.3, §8.23); or else the type the name spells.
 DataType AssocIndexType(const Expr* dim, SimContext& ctx);
 
-// Defined in statement_assign_assoc_index.cpp. §7.8.2: whether the dimension
-// `dim`, which IsAssocIndexDim has answered for, keys its array by string.
 bool IsStringIndexDim(const Expr* dim, SimContext& ctx);
 
-// Defined in statement_assign_assoc_index.cpp; also used by
-// eval_array_class_assoc.cpp. §7.8: the index-type attributes of an associative
-// array declared with the dimension `dim`, which IsAssocIndexDim has answered
-// for, and whose element type is 4-state when `elem_4state` says so.
 AssocArraySpec AssocIndexSpec(const Expr* dim, bool elem_4state,
                               SimContext& ctx);
 
-// Defined in statement_assign_assoc_index.cpp; also used by
-// eval_array_class_assoc.cpp
-// for an index dimension naming a type parameter, whose type is what the
-// specialization bound it to (§8.25) rather than what the dimension spells.
-// §7.8: the index-type attributes of an associative array whose index type is
-// `index_type`, an integral type sized and signed as it declares and a named
-// type as the elaborated table sizes it; the wildcard is no type and is not
-// answered here.
 AssocArraySpec AssocIndexSpecOfType(const DataType& index_type,
                                     bool elem_4state, SimContext& ctx);
 
 bool TrySelectBlockingAssign(const Expr* lhs, Logic4Vec& rhs_val,
                              SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_concat.cpp; also used by the nonblocking
-// scheduler in statement_assign_nonblocking.cpp, which needs the answer before
-// it takes an event from the pool rather than after. §11.4.12 gives a
-// concatenation the left-hand side of an assignment and §10.9 gives an
-// assignment pattern, bare or typed, the same use, so the three are one kind of
-// target. Answers whether the left-hand side is one of them, a typed pattern's
-// cast looked through.
 bool IsConcatLhs(const Expr* lhs);
 
-// Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
-// procedural continuous assignments in statement_assign_decl.cpp, whose
-// concatenation targets walk the same elements. §10.9 lets an assignment
-// pattern carry a type prefix -- `type_reference '{...}` -- and that prefix is
-// a cast around the pattern rather than a target of its own, so a caller that
-// means to walk the pattern's elements has to look through it first. Answers
-// the pattern a typed pattern wraps, and the expression itself otherwise.
 const Expr* UnwrapTypedPattern(const Expr* expr);
 
-// §10.10 with §10.9: the positional pattern `expr` wraps where `expr` is an
-// assignment pattern expression whose type is an unpacked array, `T_SQ'{"p",
-// "q"}` under `typedef string T_SQ[$]`, whose items are that many elements of
-// an unpacked array concatenation; null for any other expression. Defined in
-// statement_assign_concat.cpp.
 const Expr* UnpackedArrayTypedPattern(const Expr* expr, SimContext& ctx);
 
-// §10.9: the pattern `expr` wraps where `expr` is an assignment pattern
-// expression whose type is an unpacked array, keyed or positional; null for
-// any other expression. Defined in statement_assign_concat.cpp.
 const Expr* TypedUnpackedArrayPattern(const Expr* expr, SimContext& ctx);
 
-// §10.10: the values of the elements of the fixed-size unpacked array `name`
-// that `ai` describes, appended to `out` in the left-to-right order its
-// declaration writes them. Defined in statement_assign_pattern.cpp.
 void CollectFixedArrayElements(std::string_view name, const ArrayInfo& ai,
                                SimContext& ctx, std::vector<Logic4Vec>& out);
 
-// §10.10: the values an unpacked array concatenation `rhs` gives a fixed-size
-// target, in order through every dimension: an array item's elements, a
-// slice's, an unpacked-array-typed pattern's items, and every other item's own
-// value. Defined in statement_assign_pattern.cpp, for the blocking and the
-// nonblocking assignment alike.
 std::vector<Logic4Vec> CollectConcatElements(const Expr* rhs, SimContext& ctx,
                                              Arena& arena);
 
-// §10.10: stores the values CollectConcatElements gives into the fixed-size
-// array `arr_name` that `info` describes, or reports at `rhs` that their count
-// is not the array's. Defined in statement_assign_pattern.cpp; also used for a
-// declaration's initializer (lowerer_var_aggregate.cpp).
 void DistributeConcatToArray(std::string_view arr_name, const ArrayInfo& info,
                              const Expr* rhs, SimContext& ctx, Arena& arena);
 
-// §10.10.3 (printed page 266): each non-default item of an assignment pattern
-// is an assignment-like context, so braces standing as the item for a
-// subarray of a multidimensional array are an unpacked array concatenation
-// giving that subarray its elements: an array item contributes each of its
-// elements, and a count unlike the subarray's is an error. Read as a nested
-// positional pattern, `'{{A}, {3, 4}}` took A as one value and left the rest
-// of the row at 0. Defined in statement_assign_concat.cpp.
-//
-// A subarray of a multidimensional array: `prefix` names it within `info`'s
-// array, and its dimensions run from `dim`.
 struct SubarrayRef {
   const ArrayInfo& info;
   const std::string& prefix;
@@ -316,76 +125,21 @@ struct SubarrayRef {
 void DistributeConcatToSubarray(const SubarrayRef& sub, const Expr* concat,
                                 SimContext& ctx, Arena& arena);
 
-// §7.6 with §10.9.1: stores `elems` into the leaves of `sub`, paired by their
-// left-to-right position, when there are as many of them as the subarray has
-// leaves, and stores nothing otherwise. Answers the subarray's leaf count, so
-// that the caller reports a mismatch under its own clause. Defined in
-// statement_assign_concat.cpp.
 size_t StoreSubarrayElements(const SubarrayRef& sub,
                              const std::vector<Logic4Vec>& elems,
                              SimContext& ctx, Arena& arena);
 
-// §7.4.4 with §7.4.5: the elements of `item` where it is an unpacked array --
-// a fixed-size array or a queue named whole, a slice, or a select of a
-// multidimensional array's leading dimensions -- appended to `out` in the
-// order its declaration writes them; false for any other item. Defined in
-// statement_assign_pattern.cpp.
 bool CollectArrayItemElements(const Expr* item, SimContext& ctx, Arena& arena,
                               std::vector<Logic4Vec>& out);
 
-// §10.9.1 with §7.6: an item of an array pattern standing for the subarray
-// `sub` that is itself an unpacked array (CollectArrayItemElements) is
-// assigned to it as one unpacked array to another, its elements paired with
-// the subarray's by left-to-right position, and one of another size is
-// reported. False for an item that is no unpacked array, which §10.9.1
-// applies to every element of the subarray instead. Defined in
-// statement_assign_concat.cpp.
 bool CopyArrayItemToSubarray(const SubarrayRef& sub, const Expr* item,
                              SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_concat.cpp; also used by the §11.4.14 streaming
-// unpack in statement_assign_stream.cpp, which sizes a target element that is a
-// select with it. §11.5.1: how wide the select `sel` on `var` is as an
-// expression -- one bit for an ordinary bit-select, the element width for the
-// index of a packed multidimensional array (§7.4.1), and the span of the
-// indices for a part-select, indexed or not. An address outside the declared
-// bounds changes none of those: §11.5.1 gives the invalid reference a value
-// rather than an absence, x for a 4-state type and 0 for a 2-state one, and
-// says separately that such a write leaves the stored data untouched. Zero
-// only where the select names no bits, which is a part-select whose bounds or
-// width expression carry x or z and an indexed one whose width is zero,
-// §11.5.1 requiring that width to be a positive constant.
-//
-// This is the width the select names and not the window of its object it may
-// write; the second question is SelectStorageBits'. The two differ wherever a
-// select runs off the end of its object, and a caller that asked one of them
-// for both drew its element boundaries in the wrong place.
 uint32_t SelectExprWidth(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena);
 
-// Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
-// procedural continuous assignments in statement_assign_decl.cpp, which cut a
-// forced or assigned value into the same element windows a blocking assignment
-// cuts it into. §11.4.12/§11.5.1: the width of one concatenation lvalue element
-// -- a nested concatenation or assignment pattern sums its own elements, a
-// select is as wide as the bits §11.5.1 gives its indices whether or not they
-// are in bounds, and any other form is as wide as the variable it resolves to.
-// Zero for an element this cannot size at all, which a caller passes over
-// without advancing its offset.
-//
-// This is the element's width as an expression and not the window of its object
-// it may write; the second question is ConcatLhsElemHasWritableBits' and
-// SelectStorageBits'. Answering the window to both dropped an element
-// addressing no bit out of the concatenation entirely, and every element to its
-// left then took its bits one element too low.
 uint32_t ConcatLhsElemWidth(const Expr* e, SimContext& ctx, Arena& arena);
 
-// §7.2 with §7.4, §7.5, §7.8 and §7.10: the member a member access of a
-// selected element names, `arr[i].f` or `d[1].a`, found in the layout of the
-// structures the container holds, with its offset in that layout. The field is
-// null where the target is no such member. Defined in
-// statement_assign_core.cpp, whose writer deposits it; ConcatLhsElemWidth sizes
-// it by the same answer.
 struct SelectedElementMember {
   const StructTypeInfo* layout = nullptr;
   const StructFieldInfo* field = nullptr;
@@ -394,97 +148,29 @@ struct SelectedElementMember {
 SelectedElementMember ResolveSelectedElementMember(const Expr* lhs,
                                                    SimContext& ctx);
 
-// Defined in statement_assign_concat.cpp; also used by the §10.6.1 and §10.6.2
-// procedural continuous assignments in statement_assign_decl.cpp, which have
-// the same element to decline. §11.5.1: whether the concatenation lvalue
-// element `e`, having resolved to `var`, addresses any bit of it -- false for
-// the select whose address lies wholly outside the declared bounds or carries x
-// or z, whose write leaves the stored data untouched, and true for
-// every other element shape, each of which names its whole variable. An element
-// this answers false for still occupies ConcatLhsElemWidth's bits of the value.
 bool ConcatLhsElemHasWritableBits(const Expr* e, const Variable& var,
                                   SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_select.cpp, whose bit-select writer raises it
-// before it resolves a window; also used by the §11.4.12 concatenation unpack
-// in statement_assign_concat.cpp and by the §10.6.1 and §10.6.2 procedural
-// continuous assignments in statement_assign_decl.cpp, each of which sizes a
-// concatenation element itself and so never reaches that writer with one this
-// concerns. §11.5.1 requires an indexed part-select's width to be a positive
-// constant, which makes a zero-width one illegal rather than merely empty,
-// and this raises that error for the select `sel`. It asks the question of the
-// select as written: it returns silently unless `sel` has an index_end, is a
-// plus or minus indexed part-select, and reads a declared width of zero, so a
-// caller may offer it every element it passed over and the ones whose width is
-// zero for another reason -- an element nothing here can size, bounds carrying
-// x or z -- stay as silent as they were. Reporting is all it does; the caller
-// still passes the element over without advancing its offset.
 void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_concat.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp. §10.4 puts procedural
-// assignments inside always and initial blocks, tasks and functions alike, so a
-// concatenation or assignment-pattern target is written the same way in a
-// subroutine body as outside one. Returns false when the lhs is neither, so the
-// caller goes on to its other forms.
 bool TryUnpackConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                         SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_concat.cpp; also used by the subroutine-body
-// statement executor in eval_function_body.cpp, the §11.4.1 compound
-// assignment in eval_expr_assign_ops.cpp and the §10.6 procedural continuous
-// assignments in statement_assign_decl.cpp. §10.7: the left-hand side's size is
-// the context the right-hand expression is sized in, and
-// §11.6.1 makes that context part of what sizes the expression. The width of
-// the object the lhs names, the bits §11.5.1 gives a select's indices, or the
-// sum of a concatenation's or assignment pattern's element widths -- the same
-// question ConcatLhsElemWidth answers of one element, asked of the whole lhs,
-// and answered by it. 0 where the lhs names no bits at all, either because
-// nothing here can resolve it or because it is a zero-width part-select, which
-// EvalExpr reads as self-determined.
 uint32_t LhsContextWidth(const Expr* lhs, SimContext& ctx, Arena& arena);
 
-// §7.3.2: a member that is itself a tagged union holds its own tag as part of
-// its value, so a union copied whole hands over the tag at each level its
-// active members reach: the tag under `src` to `dst`, then that member's own
-// under `src.<tag>` to `dst.<tag>`, for as long as `layout` gives the member a
-// union layout. Defined in statement_assign_core.cpp; a pattern identifier
-// bound to a tagged union (§12.6) takes its tags the same way.
 void CopyTagChain(std::string src, std::string dst,
                   const StructTypeInfo* layout, SimContext& ctx, Arena& arena);
 
-// §11.4.11: a blocking assignment of a conditional over two queues, dynamic
-// arrays or associative arrays to one of their kind; false for any other.
-// Defined in statement_assign_conditional.cpp.
 bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena);
-// §11.4.11: the same for a conditional over two fixed-size unpacked arrays of
-// one dimension assigned to one. Defined in statement_assign_conditional.cpp.
 bool TryConditionalArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §11.4.1 with §11.6.1: `a op= b` is `a = a op (b)`, so where `op` sizes its
-// operands by context -- the arithmetic and bitwise operators of Table 11-21
-// -- `b` is evaluated at the width of the assignment, the left-hand side's,
-// and `s += x + y` keeps the carry of x + y; a shift's or a power's right
-// operand is self-determined, 0. Defined in statement_assign_compound.cpp.
 uint32_t CompoundOperandWidth(TokenKind base_op, const Expr* lhs,
                               SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_concat.cpp; also used by the §11.4.2 nonblocking
-// path in statement_assign_nonblocking.cpp. Evaluate the rhs with the lhs as
-// the assignment context (width and, for named patterns, struct type).
-// §11.9: the value of the tagged union expression `expr` whose union type has
-// the layout `layout`, each member expression packed against and converted to
-// the member it names; none where `expr` is no tagged expression or names no
-// member the layout converts for. Defined in statement_assign_concat.cpp; a
-// declaration's initializer is evaluated by it as an assignment's right-hand
-// side is.
 std::optional<Logic4Vec> EvalTaggedForLayout(const Expr* expr,
                                              const StructTypeInfo& layout,
                                              SimContext& ctx, Arena& arena);
-// The value of `init`, the initializer of a variable whose structure or union
-// layout is `layout` (null for none): a tagged expression evaluated by that
-// layout (EvalTaggedForLayout), and anything else at `context_width`.
 Logic4Vec EvalTaggedOrPlain(const Expr* init, const StructTypeInfo* layout,
                             SimContext& ctx, Arena& arena,
                             uint32_t context_width = 0);
@@ -492,213 +178,71 @@ Logic4Vec EvalTaggedOrPlain(const Expr* init, const StructTypeInfo* layout,
 Logic4Vec EvalRhsWithStructContext(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);
 
-// Defined in statement_assign_core.cpp; also used by the §11.4.12 element
-// widths in statement_assign_concat.cpp. The key the kinds of the variable
-// `lhs` names or selects into stand under (DeclaredKindsKey): "$unit.s" for
-// §3.12.1's `$unit::s`, which asked by the text alone read a module's own
-// `int s` for the string. Empty for a left-hand side that is no identifier
-// under its selects.
 std::string LhsIdentName(const Expr* lhs);
 
-// Defined in statement_assign_slice.cpp; the §7.4.6 assignment of an unpacked
-// array slice `a[1:2] = b[3:4]` or `a[1:2] = packed_value`, the destination
-// window's elements each written from the source's in declared order. False
-// when the left-hand side is no such slice, so the blocking dispatch in
-// statement_assign_core.cpp goes on to its other forms.
 bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_slice.cpp; the §7.4.6 copy of one subarray into
-// another, `a[1] = b[2]` over two-dimensional unpacked arrays, element by
-// element. False when either side is no such compound select.
 bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_pattern.cpp; §10.9.1: the assignment pattern
-// `rhs` stored into the fixed-size array whose elements are the variables
-// `arr_name[i]...`, of the shape `info`, item by item.
 void DistributePatternToArray(std::string_view arr_name, const ArrayInfo& info,
                               const Expr* rhs, SimContext& ctx, Arena& arena);
 
-// The whole-object assignment forms, defined in statement_assign_object.cpp
-// and each used by the blocking-assignment dispatch in
-// statement_assign_core.cpp, which offers a statement to them in turn before
-// evaluating any right-hand value. None of them sizes its right-hand side
-// against the width of its target, because neither an associative array nor a
-// class handle takes a value the way §10.7 sizes one for a vector; each
-// answers the statement whole or declines it, returning false having written
-// nothing, and the caller then goes on to its other forms.
-//
-// §7.9.11 lets a whole associative array be written at once. Copy takes the
-// entries of another associative array named on the right; Map takes those
-// §7.12.5's map() produced, whose set of index values matches its source with
-// each stored value replaced by the value of the with expression; Literal
-// takes them from an '{index:value} assignment pattern, reading each key as an
-// index of the array's declared index type and `default` as the array's
-// default. All three replace the destination's previous contents rather than
-// merging into them.
 bool TryAssocCopyAssign(const Stmt* stmt, SimContext& ctx);
 bool TryAssocMapAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryAssocLiteralAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §8.3's class `new` in the two forms whose type comes from somewhere other
-// than the target's own declared class. Typed is the class-scope call
-// `obj = C::new`, which names the type on the right and binds §8.25's
-// specialization overrides as locals around the construction when the scope is
-// parameterized; Member is `obj.field = new`, whose bare `new` carries no type
-// at all, so the field's declared class is resolved from the class type of the
-// base and the resulting handle stored through the member chain. The form
-// whose type is the target's, `obj = new`, is TryClassNewAssign, which
-// simulator/statement_assign.h declares.
 bool TryTypedClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
 bool TryMemberClassNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §7.2 with §8.7: `s.h = new` on a member of a structure variable declared
-// with a class type, the class read from the member's type in the variable's
-// layout and the handle written into the member's bits.
 bool TryStructMemberClassNewAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena);
 
-// Defined in statement_assign_stream_widen.cpp; also used by the §11.4.2
-// nonblocking path in statement_assign_nonblocking.cpp. §11.4.14: left-align
-// a streaming concatenation source in a wider fixed-size target.
 Logic4Vec ApplyStreamPackToTargetWidening(const Stmt* stmt, Logic4Vec rhs_val,
                                           SimContext& ctx, Arena& arena);
-// The same rule for a stream and the width of the fixed-size target it is
-// assigned to, a declaration's initializer among the callers: the stream
-// widened with zero bits on the right, or reported at `loc` where the
-// target is the narrower.
 Logic4Vec WidenStreamPackToFixedTarget(Logic4Vec stream, uint32_t target_width,
                                        SourceLoc loc, SimContext& ctx,
                                        Arena& arena);
-// Left-shift `stream` (stream_w bits) into a `total_w`-bit vector, padding the
-// LSB side with zero bits; the stream itself when total_w is no wider.
 Logic4Vec RightPadStreamToWidth(const Logic4Vec& stream, uint32_t stream_w,
                                 uint32_t total_w, Arena& arena);
 
-// Defined in statement_assign_stream.cpp.
-// §11.4.14.3 with §8.5: the unpack of `rhs_val` into the streaming target
-// `lhs` where some of its targets are class properties reached through a
-// handle -- a queue or dynamic array property resized to take the bits left
-// to it, any other property taking its declared width -- each stood in for by
-// a local while UnpackStreamingConcatLhs runs over the rest and handed its
-// bits afterwards. False, with nothing written, where `lhs` names no such
-// property. Defined in statement_assign_stream_property.cpp.
 bool TryUnpackStreamIntoProperties(const Expr* lhs, const Logic4Vec& rhs_val,
                                    SimContext& ctx, Arena& arena);
 void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
                               SimContext& ctx, Arena& arena);
 
-// Defined in statement_assign_stream.cpp; also used by the blocking-assignment
-// dispatch in statement_assign_core.cpp, which offers a statement to it before
-// falling through to the generic write. §11.4.14: a streaming concatenation
-// assigned to a dynamically sized target left-aligns in that target, so the
-// queue is resized to the smallest number of elements at least as wide as the
-// stream and the stream is padded with zero bits on the right before being
-// carved into them. Returns false, having written nothing, when the right-hand
-// side is not a streaming concatenation, the left-hand side does not name a
-// queue, or the queue's element width is unknown; the caller then goes on to
-// its other forms.
 bool TryStreamingConcatToQueueTarget(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena);
 
-// Geometry of an array/queue target addressed by a `with` clause (§11.4.14.3):
-// `size` is the element count and `lo` is the declared low index.
 struct ArrayGeom {
   uint32_t size;
   uint32_t lo;
 };
 
-// Half-open slice window [start, start + count) selected by a `with` clause.
 struct StreamSliceRange {
   uint32_t start;
   uint32_t count;
 };
 
-// Resolves an optional `with` range expression on an array target into a
-// 0-based [out_range.start, out_range.start + out_range.count) window. Returns
-// false when an explicit single-index selection lands out of bounds. Defined in
-// statement_assign_stream.cpp; also used by eval_streaming.cpp.
 bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
                       ArrayGeom geom, StreamSliceRange& out_range);
 
-// Defined in statement_assign_pattern.cpp.
-// §10.9: the index an array pattern key names. Syntax 10-5 writes such a key as
-// a constant expression -- `array_pattern_key ::= constant_expression` -- so
-// the index is what the whole expression evaluates to, not what the text of its
-// first token reads as: `8'd3` names element 3, and `N-1` names one element as
-// definitely as a bare number does. `default` and a simple-type key name no
-// index and are not asked about here.
 uint32_t PatternKeyIndex(const Expr* key, SimContext& ctx, Arena& arena);
 
-// §10.9.1 with §7.4: the one-dimensional unpacked array an array assignment
-// pattern is assigned to -- its bounds, element width and state -- and, for an
-// array of structures, the element's layout, by which each item is packed
-// (§10.9.2); null for any other element type.
 struct ArrayPatternTarget {
   const ArrayInfo& info;
   const StructTypeInfo* layout;
 };
 
-// Defined in statement_assign_pattern.cpp.
-// §10.9.1: the value the array assignment pattern `rhs` gives the element at
-// position `i` of `target`, counted from the left: the item keyed by its
-// index, by its type or by `default`, the replicated item that falls there, or
-// the positional item. An element no item reaches reads the default of its
-// type.
 Logic4Vec PatternItemAt(const Expr* rhs, const ArrayPatternTarget& target,
                         uint32_t i, SimContext& ctx, Arena& arena);
 
-// §7.10.4: the elements a right-hand side contributes to a queue it is
-// assigned to. An item naming a queue or an unpacked array contributes that
-// object's elements, a queue slice contributes the run of elements it names,
-// and anything else contributes the one value it evaluates to. A right-hand
-// side that is not a concatenation is itself the single item, which is what
-// makes `q = q[1:$]` a queue of the elements the slice names rather than a
-// queue holding one value.
-//
-// Every element is copied into `out` before any caller writes it back, so a
-// right-hand side reading the queue it is assigned to is safe.
-//
-// Defined in statement_assign_pattern.cpp; also used by the nonblocking form of
-// the same assignment in statement_assign_nonblocking.cpp.
 void CollectQueueElements(const Expr* expr, SimContext& ctx, Arena& arena,
                           std::vector<Logic4Vec>& out);
 
-// Defined in statement_assign_select.cpp; also used by the §11.4.2 nonblocking
-// path in statement_assign_nonblocking.cpp, whose deferred update deposits the
-// window its own left-hand side named. §11.5.1 has a write through a
-// part-select that is only partly in range change the in-range bits alone, and
-// this writes `rhs_val` into exactly the window `bits` names: `bits.lo` and
-// `bits.width` are the bits of `var` that are affected, and `bits.src_lo` is
-// where in the value the bits they receive begin. `bits` is what
-// SelectStorageBits (statement_assign.h) answers, and the two are meant to be
-// asked in that order, so that one statement of the clause resolves a select
-// and one deposits it.
-//
-// The deposit is made bit by bit and not in a machine word: a target wider
-// than 64 bits keeps the bits above the first word, the x and z §6.3.1 lets a
-// 4-state bit hold survive the round trip, and a window beginning at bit 64 or
-// above lands where it was named. The definition's own comment gives the three
-// wrong answers that says.
-//
-// A forced target is the caller's to decline, because the two callers ask at
-// different moments. §10.6.2 has a force override procedural assignments until
-// a release is executed on the variable; the blocking caller WriteBitSelect
-// asks before it evaluates the indices, while the nonblocking one has to ask
-// inside its update callback, the flag that governs the write being the one
-// standing when the update region runs rather than when the event was queued.
 void WritePartSelect(Variable* var, const PartSelectBits& bits,
                      const Logic4Vec& rhs_val, Arena& arena);
 
-// §7.4.2: the address of every leaf of the multidimensional fixed-size array
-// `info` describes, "[i][j]..." from each dimension's low bound, the lowest
-// address first and the last dimension varying fastest, so that two arrays of
-// one shape pair their elements by position (§7.6). Empty for an array of one
-// dimension. Defined in statement_assign_select.cpp.
 std::vector<std::string> MultiDimLeafSuffixes(const ArrayInfo& info);
 
-// Defined in statement_assign_select.cpp; also used by the array-copy form of a
-// pattern assignment in statement_assign_pattern.cpp. Copies element by
-// element over the overlap of the two arrays, leaving any excess destination
-// element untouched.
 void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
                        std::string_view src_name, const ArrayInfo& src,
                        SimContext& ctx);

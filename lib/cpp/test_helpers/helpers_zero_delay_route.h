@@ -12,11 +12,6 @@
 
 using namespace delta;
 
-// Elaborates, lowers and runs a "zero-delay routes to (re)inactive" scenario
-// whose source declares logic [7:0] b, snap, done and ends with:
-//   b <= <expected_b>;  done = #0 8'd1;  snap = b;
-// After the run, `done` must have updated to 1, `snap` must still observe the
-// pre-NBA value of b (0), and b must have taken its nonblocking update.
 inline void RunZeroDelayRouteScenario(SimFixture& f, const char* src,
                                       uint64_t expected_b) {
   auto* design = ElaborateSrc(src, f);

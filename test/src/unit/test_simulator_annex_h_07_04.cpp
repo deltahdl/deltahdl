@@ -9,16 +9,6 @@
 
 using namespace delta;
 
-// Annex H.7.4 (Basic types): Table H.1 maps the basic SystemVerilog data
-// types to C types, the DPI supports the unsigned integer types with the
-// unsigned C types corresponding to the table's signed ones, and an input of
-// byte unsigned or shortint unsigned is not equivalent to a bit [7:0] or
-// bit [15:0], the former being passed by value as unsigned char and
-// unsigned short and the latter by reference as svBitVecVal, nor is the
-// pair equivalent under output or inout, where the one is an unsigned char*
-// and the other an svBitVecVal*. The cases check each row of the table, the
-// four unsigned types, and the pair of passings under each direction.
-
 namespace {
 
 DpiArg Formal(DataTypeKind type, Direction direction, bool is_unsigned,
@@ -32,10 +22,6 @@ DpiArg Formal(DataTypeKind type, Direction direction, bool is_unsigned,
   return formal;
 }
 
-// Table H.1: byte is char, shortint short int, int int, longint long long,
-// real double, shortreal float, chandle void*, string const char*, and bit
-// and logic -- reg using logic's encoding -- unsigned char, the encodings
-// being svdpi.h's; a type the table has no row for maps to nothing.
 TEST(DpiBasicTypes, EachBasicTypeMapsToItsCType) {
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kByte, false), "char");
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kShortint, false), "short int");
@@ -52,9 +38,6 @@ TEST(DpiBasicTypes, EachBasicTypeMapsToItsCType) {
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kEvent, false), "");
 }
 
-// §H.7.4: the unsigned integer types map to the unsigned C types
-// corresponding to the table's rows for their signed equivalents; a type
-// with no signed row is unaffected by the qualifier.
 TEST(DpiBasicTypes, TheUnsignedIntegerTypesMapToTheUnsignedCTypes) {
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kByte, true), "unsigned char");
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kShortint, true),
@@ -67,9 +50,6 @@ TEST(DpiBasicTypes, TheUnsignedIntegerTypesMapToTheUnsignedCTypes) {
   EXPECT_EQ(DpiCTypeOfBasicType(DataTypeKind::kString, true), "const char*");
 }
 
-// §H.7.4: an input of byte unsigned is passed by value as unsigned char and
-// one of shortint unsigned as unsigned short, where bit [7:0] and bit [15:0]
-// are passed by reference as svBitVecVal, so neither pair is equivalent.
 TEST(DpiBasicTypes, AnUnsignedByteInputIsNotABitVectorOfEight) {
   EXPECT_EQ(DpiCTypeOfFormal(
                 Formal(DataTypeKind::kByte, Direction::kInput, true), false),
@@ -85,14 +65,11 @@ TEST(DpiBasicTypes, AnUnsignedByteInputIsNotABitVectorOfEight) {
       DpiCTypeOfFormal(Formal(DataTypeKind::kBit, Direction::kInput, false, 16),
                        false),
       "const svBitVecVal*");
-  // The signed types keep the table's rows.
   EXPECT_EQ(DpiCTypeOfFormal(
                 Formal(DataTypeKind::kByte, Direction::kInput, false), false),
             "const char");
 }
 
-// §H.7.4: the same lack of equivalence holds under output and inout, where
-// byte unsigned is an unsigned char* and bit [7:0] an svBitVecVal*.
 TEST(DpiBasicTypes, AnUnsignedByteOutputIsNotABitVectorOfEight) {
   EXPECT_EQ(DpiCTypeOfFormal(
                 Formal(DataTypeKind::kByte, Direction::kOutput, true), false),

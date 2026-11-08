@@ -15,8 +15,6 @@ TEST(SeveritySystemTaskElab, FatalFinishNumberInRangeAccepted) {
     auto src = "module m; $fatal(" + std::to_string(fn) + "); endmodule\n";
     auto* design = Elaborate(src, ef);
     ASSERT_NE(design, nullptr);
-    // The finish_number is accepted: the $fatal reports itself (§20.10.1)
-    // and nothing stands on the argument (§20.10).
     EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(),
                               "elaboration FATAL in scope 'm'", 1, "20.10.1"))
         << "finish_number " << fn;

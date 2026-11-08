@@ -12,10 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §27.4: a loop generate block may consist of a single item that is not
-// wrapped in begin-end. It is still a generate block and is instantiated once
-// per loop index value, so a begin-less body yields one declaration copy per
-// iteration just as a begin-end body would.
 TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -32,11 +28,6 @@ TEST(GenerateElaboration, GenerateForSingleItemBodyWithoutBeginEnd) {
   EXPECT_EQ(mod->variables.size(), 3u);
 }
 
-// §27.4: the implicit localparam inside a loop generate block has the same name
-// as the genvar and shadows it, so two nested loop generate constructs cannot
-// use the same genvar -- inside the inner loop the name already refers to the
-// outer block's localparam. This is LRM Example 1, module mod_a, which the
-// standard flags as an error.
 TEST(GenerateElaboration, NestedLoopGenerateSameGenvarErrors) {
   ElabFixture f;
   ElabOk(
@@ -55,9 +46,6 @@ TEST(GenerateElaboration, NestedLoopGenerateSameGenvarErrors) {
                             4, "27.4"));
 }
 
-// §27.4: nesting loop generate constructs is legal as long as they use distinct
-// genvars, so an outer i and an inner j elaborate cleanly to the full cross
-// product of instances.
 TEST(GenerateElaboration, NestedLoopGenerateDistinctGenvarsElaborate) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -78,10 +66,6 @@ TEST(GenerateElaboration, NestedLoopGenerateDistinctGenvarsElaborate) {
   EXPECT_EQ(mod->variables.size(), 4u);
 }
 
-// §27.4: the restriction is only on nesting -- two sibling loop generate
-// constructs (one finishing before the other begins) may reuse the same genvar.
-// The active-genvar set is cleared when a loop finishes, so the second loop is
-// not rejected and both bodies are instantiated.
 TEST(GenerateElaboration, SiblingLoopGenerateReuseSameGenvarElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -103,10 +87,6 @@ TEST(GenerateElaboration, SiblingLoopGenerateReuseSameGenvarElaborates) {
   EXPECT_EQ(mod->variables.size(), 4u);
 }
 
-// §27.4: a named loop generate block declares an array of generate block
-// instances whose index values are the values the genvar assumes; these need
-// not form a contiguous range, so the array may be sparse. A geometric step
-// yields the non-contiguous values 1, 2, 4, 8, producing one instance each.
 TEST(GenerateElaboration, GenerateForSparseGenvarRange) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -125,9 +105,6 @@ TEST(GenerateElaboration, GenerateForSparseGenvarRange) {
   EXPECT_EQ(mod->variables.size(), 4u);
 }
 
-// §27.4: the iteration assignment advances the genvar each pass of the loop
-// generate scheme. An increment (i++) iteration form assigns to the same
-// genvar, so the loop steps 0,1,2,3 and instantiates the block four times.
 TEST(GenerateElaboration, GenerateForIncrementIterationForm) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -146,9 +123,6 @@ TEST(GenerateElaboration, GenerateForIncrementIterationForm) {
   EXPECT_EQ(mod->variables.size(), 4u);
 }
 
-// §27.4: the iteration form may also decrement the genvar. A (i--) iteration
-// assigns to the same genvar and drives the loop 3,2,1,0, again producing four
-// instances -- exercising the decrement branch of the genvar advance.
 TEST(GenerateElaboration, GenerateForDecrementIterationForm) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -167,10 +141,6 @@ TEST(GenerateElaboration, GenerateForDecrementIterationForm) {
   EXPECT_EQ(mod->variables.size(), 4u);
 }
 
-// §27.4 (dep §6.20.4): the loop bound is a constant expression, which may be a
-// localparam as well as a literal or a module parameter. Built from real
-// localparam source syntax and driven through elaboration, the bound resolves
-// so the loop instantiates the block once per index value, 0..3.
 TEST(GenerateElaboration, GenerateForBoundFromLocalparam) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -190,13 +160,6 @@ TEST(GenerateElaboration, GenerateForBoundFromLocalparam) {
   EXPECT_EQ(mod->variables.size(), 4u);
 }
 
-// §27.4: within a generate block the genvar names an implicit localparam that
-// can be used anywhere a normal integer parameter can be used -- including as
-// the bound of a nested loop generate scheme. Here the inner loop bound reads
-// the outer genvar, so the inner loop runs i times per outer index: i=0 makes
-// no instance, i=1 one, i=2 two, for three block instances in all. This
-// observes the outer index value being consumed as a constant in the inner
-// generate scheme.
 TEST(GenerateElaboration, NestedLoopGenerateInnerBoundUsesOuterGenvar) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -217,10 +180,6 @@ TEST(GenerateElaboration, NestedLoopGenerateInnerBoundUsesOuterGenvar) {
   EXPECT_EQ(mod->variables.size(), 3u);
 }
 
-// §27.4: the same-genvar requirement on the iteration assignment applies to the
-// increment/decrement iteration form too, not just the assignment form. A (j++)
-// step whose target differs from the init genvar i is rejected, exercising the
-// unary-step branch of the same-genvar check.
 TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
   ElabFixture f;
   ElabOk(
@@ -238,12 +197,6 @@ TEST(GenerateElaboration, GenerateForInitStepMismatchIncrementFormErrors) {
       "generate-for init and step assign different genvars", 4, "27.4"));
 }
 
-// §27.4: the genvar serves as an integer during elaboration, to run the
-// generate loop and create the block's instances, and does not exist once
-// simulation starts. The sibling tests here observe that through a variable
-// count, which a change in how many variables the loop body contributes would
-// also move. This one names the claim directly: whatever else the module holds,
-// nothing in it is called by the genvar's name.
 TEST(GenerateElaboration, GenvarIsNotAmongTheModuleVariables) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -264,10 +217,6 @@ TEST(GenerateElaboration, GenvarIsNotAmongTheModuleVariables) {
   }
 }
 
-// §27.4: a loop generate block forms a scope of its own and a further level of
-// hierarchy once instantiated, so the one instantiation written in the body
-// declares its name in a different scope on each iteration. Two iterations of
-// `child c1()` are two declarations in two scopes, not two in one.
 TEST(GenerateElaboration, LoopIterationsDoNotRedeclareTheSameInstanceName) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -283,10 +232,6 @@ TEST(GenerateElaboration, LoopIterationsDoNotRedeclareTheSameInstanceName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §27.4, the other side of the same scope: separate scopes per iteration do not
-// make one iteration's scope permissive. Two instantiations sharing a name
-// inside a single loop body land in the same scope on every iteration, so that
-// is still a redeclaration.
 TEST(GenerateElaboration, TwoInstancesOfOneNameInALoopBodyIsRedeclaration) {
   ElabFixture f;
   Elaborate(
@@ -303,9 +248,6 @@ TEST(GenerateElaboration, TwoInstancesOfOneNameInALoopBodyIsRedeclaration) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'c1'", 6, "23.9"));
 }
 
-// §27.4 scopes the name to its generate block, which leaves an instantiation
-// outside any generate block scoped to the module as before. Two instances of
-// one name in a module body remain a redeclaration.
 TEST(GenerateElaboration, TwoInstancesOfOneNameInAModuleBodyIsRedeclaration) {
   ElabFixture f;
   Elaborate(
@@ -319,9 +261,6 @@ TEST(GenerateElaboration, TwoInstancesOfOneNameInAModuleBodyIsRedeclaration) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'c1'", 4, "23.9"));
 }
 
-// §27.4: the report that rejects a generate-for whose initializer reads its own
-// loop index names the subclause stating the rule, so a caller learns which
-// rule was enforced without matching the wording of the message.
 TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
   ElabFixture f;
   ElabOk(
@@ -338,29 +277,6 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarNames27_4) {
                             "27.4"));
 }
 
-// §27.4 requires the genvar initialization assignment to be a constant
-// expression, and §26.3 makes a wildcard-imported name locally visible only
-// after an earlier import in the current scope. The scope holding the import is
-// module a, so W names nothing in module b and Elaborator::OpenGenerateForLoop
-// in src/elaborator/elaborator_generate.cpp reports an error instead of opening
-// the loop.
-//
-// What this fails on is W folding in module b anyway, which it does when the
-// scope the loop header is evaluated against is assembled after every module
-// has been elaborated rather than inside module b.
-//
-// The imported parameter is the loop's initial value rather than its
-// termination bound because a termination condition that does not fold is
-// reported nowhere: GenerateForConditionHolds in
-// src/elaborator/elaborator_generate.cpp answers false for a condition it
-// cannot fold, which stops the loop exactly as a false condition does, so a
-// case written on the termination bound would assert on an absence and pass on
-// any cause of it. Both expressions are evaluated against the one scope this
-// case is about.
-//
-// The case that the import still reaches the module that wrote it is
-// GenerateElaboration.ImportedParameterReachesItsOwnModulesGenerateIf in
-// test/src/unit/test_elaborator_subclause_27_05a.cpp.
 TEST(GenerateElaboration,
      ImportedParameterDoesNotReachAnotherModulesGenerateFor) {
   ElabFixture f;
@@ -381,18 +297,6 @@ TEST(GenerateElaboration,
                             "generate-for init is not constant", 8, "27.4"));
 }
 
-// Annex A.8.3 gives `genvar_expression ::= constant_expression`, so the
-// termination expression of a loop generate has to fold during elaboration.
-// Here it reads the variable n, which does not, and the case fails when nothing
-// is reported: GenerateForConditionHolds in
-// src/elaborator/elaborator_generate.cpp answers the same false for a condition
-// it could not fold as for one that folded to zero, and
-// Elaborator::ElaborateGenerateFor breaks the loop on that false, so the run
-// produces the design of a zero-trip loop.
-//
-// The absence of m.g is not what this asserts, because the block is equally
-// absent when the source failed to parse and when the loop was legally
-// zero-trip.
 TEST(GenerateElaboration, GenerateForBoundOnAVariableIsNotConstant) {
   ElabFixture f;
   Elaborate(
@@ -408,15 +312,6 @@ TEST(GenerateElaboration, GenerateForBoundOnAVariableIsNotConstant) {
       "generate-for termination expression is not constant", 3, "27.4"));
 }
 
-// Annex A.8.3 requires a constant expression of the iteration assignment too,
-// through `genvar_iteration ::= genvar_identifier assignment_operator
-// genvar_expression`. The bound here folds and the step reads the variable n,
-// so this case fails while ComputeGenerateForNextValue in
-// src/elaborator/elaborator_generate.cpp returns std::nullopt for an expression
-// it cannot fold and Elaborator::ElaborateGenerateFor breaks on it in silence,
-// leaving one instance behind. It is separate from the termination expression
-// because the two are folded at different sites and a report added to one
-// leaves the other quiet.
 TEST(GenerateElaboration, GenerateForStepOnAVariableIsNotConstant) {
   ElabFixture f;
   Elaborate(
@@ -432,12 +327,6 @@ TEST(GenerateElaboration, GenerateForStepOnAVariableIsNotConstant) {
                             3, "27.4"));
 }
 
-// The form the same defect takes when the bound was meant to name a parameter a
-// package exports: W is declared nowhere in module m, so ConstEvalInt cannot
-// fold `i < W` and GenerateForConditionHolds in
-// src/elaborator/elaborator_generate.cpp answers false. The case fails when the
-// run says nothing, which is what makes a misspelled or unimported name
-// indistinguishable from a bound of zero.
 TEST(GenerateElaboration,
      GenerateForBoundOnAnUndeclaredIdentifierIsNotConstant) {
   ElabFixture f;
@@ -453,18 +342,6 @@ TEST(GenerateElaboration,
       "generate-for termination expression is not constant", 2, "27.4"));
 }
 
-// A loop generate whose termination expression folds to false is legal and
-// creates no instances, which GenerateElaboration.GenerateForZeroIterations
-// above already reads off the variable count. This case is the other half of
-// that claim: the run has to stay quiet about it. It fails when the report
-// GenerateForConditionHolds in src/elaborator/elaborator_generate.cpp gains for
-// an expression it could not fold is also raised for one that folded to zero,
-// which is the shape a fix takes when it reports at the site of the break
-// rather than at the fold.
-//
-// The absence of a report is read here rather than through ReportedError in
-// lib/cpp/test_helpers/helpers_reported_error.h, which answers that a named
-// report was made and has no form for the claim that none was.
 TEST(GenerateElaboration, GenerateForBoundThatFoldsToFalseIsNotReported) {
   ElabFixture f;
   Elaborate(
@@ -489,13 +366,6 @@ TEST(GenerateElaboration, GenerateForBoundThatFoldsToFalseIsNotReported) {
       << reported;
 }
 
-// A header the parser reported on still reaches the elaborator through this
-// fixture, with the tree as the parser left it.
-// Parser::ParseGenvarInitialization and Parser::ParseGenvarIteration record an
-// assignment to an unnamed genvar with no value and a `++` on it in place of
-// the positions they reported, so the loop is read as one whose initial value
-// folds to nothing, and builds no instance, rather than one the elaborator has
-// to guard against.
 TEST(GenerateElaboration, ReportedHeaderElaboratesAsALoopThatBuildsNothing) {
   ElabFixture f;
   auto* design = ElaborateSrcAllowingParseErrors(
@@ -517,10 +387,6 @@ TEST(GenerateElaboration, ReportedHeaderElaboratesAsALoopThatBuildsNothing) {
   EXPECT_TRUE(design->top_modules[0]->variables.empty());
 }
 
-// §27.4 lets a genvar be referenced only within a loop generate scheme, so a
-// module-level genvar read by an initial procedure is an error. The test fails
-// on an elaborator that admits every genvar as a declared name wherever it is
-// read, which accepts the read with nothing said.
 TEST(GenerateElaboration, GenvarReadOutsideALoopSchemeErrors) {
   ElabFixture f;
   ElabOk(
@@ -536,8 +402,6 @@ TEST(GenerateElaboration, GenvarReadOutsideALoopSchemeErrors) {
                             4, "27.4"));
 }
 
-// The same genvar read in its loop's scheme and in the block the loop
-// generates is the use §27.4 allows, and nothing is reported.
 TEST(GenerateElaboration, GenvarReadInItsLoopIsAccepted) {
   ElabFixture f;
   ElabOk(
@@ -553,11 +417,6 @@ TEST(GenerateElaboration, GenvarReadInItsLoopIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Footnote 44 to §11.11's Syntax 11-7 makes a genvar legal in a constant
-// primary only within a loop generate construct, so the constant expressions
-// a module writes outside every loop -- a parameter's value, a generate-if
-// condition and a generate-case selector, a declaration's dimension and a
-// continuous assignment's delay -- may not read one.
 TEST(GenerateElaboration, GenvarInConstantPositionsOutsideALoopErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -583,7 +442,6 @@ TEST(GenerateElaboration, GenvarInConstantPositionsOutsideALoopErrors) {
   }
 }
 
-// Within the loop the genvar is a constant in each of those positions.
 TEST(GenerateElaboration, GenvarInConstantPositionsInsideALoopAccepted) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -604,13 +462,6 @@ TEST(GenerateElaboration, GenvarInConstantPositionsInsideALoopAccepted) {
              "endmodule\n"));
 }
 
-// §27.4 requires the index of a loop generate construct to be declared by a
-// genvar declaration before the loop uses it, and A.4.2 gives two places for
-// one: a genvar_declaration earlier in an enclosing scope, or the keyword in
-// the loop's own initialization. k is declared nowhere, n is a variable and no
-// genvar, and j is declared only after the loop that uses it, so each of the
-// three loops is reported; m and p are declared in the two ways the standard
-// gives, and their loops draw nothing.
 TEST(GenerateElaboration, LoopIndexNoEarlierGenvarDeclaresIsReported) {
   ElabFixture f;
   Elaborate(
@@ -638,11 +489,6 @@ TEST(GenerateElaboration, LoopIndexNoEarlierGenvarDeclaresIsReported) {
   }
 }
 
-// A genvar declared in a generate block encloses the loops written after it in
-// that block, and one declared in the module encloses those in every block,
-// so neither loop below is reported. The loop over q in block g2 is: q is
-// declared in g1, which is no scope enclosing g2. Nor is an index the outer
-// loop's initialization declares one the loop after it may use.
 TEST(GenerateElaboration, GenvarOfAnEnclosingScopeDeclaresALoopIndex) {
   ElabFixture f;
   Elaborate(

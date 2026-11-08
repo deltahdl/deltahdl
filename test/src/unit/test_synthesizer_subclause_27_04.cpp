@@ -6,11 +6,6 @@
 
 namespace {
 
-// §27.4 gives each instance of a loop generate block an implicit localparam
-// named after the genvar, an integer holding that iteration's value, so a
-// genvar read as an operand stands for its instance's value. Each case fails on
-// a lowering that reads the genvar as constant zero.
-
 TEST(GenvarOperandSynthesis, GenvarBitIsItsInstancesValue) {
   ExpectInputSweep(
       "module m (input [3:0] a, output logic [3:0] y);\n"
@@ -21,10 +16,6 @@ TEST(GenvarOperandSynthesis, GenvarBitIsItsInstancesValue) {
       16, [](uint64_t a) -> uint64_t { return a & 0xAu; });
 }
 
-// The implicit localparam is a signed integer, so beside the signed int M = -1
-// the comparison `M < i` is signed (§11.4.4) and holds in every instance. It
-// fails on a lowering that reads the genvar unsigned, which makes the
-// comparison unsigned, where -1 is the largest value and `M < i` never holds.
 TEST(GenvarOperandSynthesis, GenvarOperandIsASignedInteger) {
   ExpectInputSweep(
       "module m (input [3:0] a, output logic [3:0] y);\n"
@@ -35,12 +26,6 @@ TEST(GenvarOperandSynthesis, GenvarOperandIsASignedInteger) {
       "endmodule\n",
       16, [](uint64_t a) -> uint64_t { return a; });
 }
-
-// §27.4 allows a localparam inside a generate block, and §23.9 makes each
-// generate block a scope of its own, so a parameter read as an operand inside a
-// block stands for that block's value. Each case fails on a lowering that
-// reports the block's parameter as having no lowering, or reads another
-// scope's parameter of the same name.
 
 TEST(GenerateBlockParameterSynthesis, BlockLocalparamIsItsValue) {
   ExpectInputSweep(

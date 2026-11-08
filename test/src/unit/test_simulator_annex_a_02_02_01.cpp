@@ -128,10 +128,6 @@ TEST(NetAndVariableTypeSimulation, IntegerVectorTypeBitIsTwoState) {
   EXPECT_EQ(var->value.ToUint64() & 0xFu, 0xAu);
 }
 
-// A variable declared through `$unit ::` holds what the compilation unit's
-// type holds, though the module declares a wider type of the same name: the
-// unit's T is 4 bits, so 8'hAB keeps its low nibble, where m's byte T would
-// keep all of it (#7595).
 TEST(NetAndVariableTypeSimulation, VariableOfAUnitScopedTypeHasTheUnitsWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -147,10 +143,6 @@ TEST(NetAndVariableTypeSimulation, VariableOfAUnitScopedTypeHasTheUnitsWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-// A nettype may rename one named through `$unit ::` as a data_type of A.2.2.1:
-// the module's own nt, resolved by mres, hides the unit's, and unt renames the
-// unit's nt all the same, so a net of unt resolves through ures, which ANDs the
-// two drivers, 3 & 5 = 1, where mres would OR them to 7 (#7595).
 TEST(NetAndVariableTypeSimulation,
      NettypeRenamedThroughTheUnitScopeIsTheUnits) {
   SimFixture f;
@@ -181,9 +173,6 @@ TEST(NetAndVariableTypeSimulation,
       "1\n");
 }
 
-// A class property written with `var` and an implicit_data_type of packed
-// dimensions alone is as wide as they make it: 300 stored in an 8-bit
-// property reads back as 44.
 TEST(NetAndVariableTypeSimulation, VarClassPropertyOfImplicitTypeHasItsWidth) {
   auto val = RunAndGet(
       "class C;\n"
@@ -201,10 +190,6 @@ TEST(NetAndVariableTypeSimulation, VarClassPropertyOfImplicitTypeHasItsWidth) {
   EXPECT_EQ(val, 44u);
 }
 
-// A.2.2.1 counts a type_reference among the data types (§6.23). A typedef of
-// one names x's int, so v holds -5 whole where an implicit type's one bit would
-// hold 1; a nettype of one has y's four bits, all of which n carries; and a
-// structure member of one is an int, which holds -5 for r to read back.
 TEST(NetAndVariableTypeSimulation, TypeReferencesNameTheReferencedType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -229,9 +214,6 @@ TEST(NetAndVariableTypeSimulation, TypeReferencesNameTheReferencedType) {
                    {{"v", 0xFFFFFFFBu}, {"n", 0xAu}, {"r", 0xFFFFFFFBu}});
 }
 
-// A class property and a subroutine's formals take a type_reference after
-// `var` (§6.23): w, y and z are each x's int, so -5 stands whole in each,
-// where a one-bit one would hold 1.
 TEST(NetAndVariableTypeSimulation, PropertyAndFormalsOfATypeReference) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -264,14 +246,6 @@ TEST(NetAndVariableTypeSimulation, PropertyAndFormalsOfATypeReference) {
       {{"rw", 0xFFFFFFFBu}, {"ry", 0xFFFFFFFBu}, {"rz", 0xFFFFFFFBu}});
 }
 
-// A class property's type reference names another property of its class,
-// found past the class's other members, a method and a property of another name
-// among them, a built-in type, or a value of the scope around the class
-// (§6.23). w is z's byte, and k and u, of the compilation unit's g, are each an
-// int, so each holds -5 for rw, rk and ru to read back, where a one-bit
-// property would hold 1. e's argument is an expression rather than a name,
-// which the compilation unit has no values to type, and the class stands with
-// it all the same.
 TEST(NetAndVariableTypeSimulation,
      PropertyTypeReferencesFindAPropertyOrABuiltInType) {
   SimFixture f;

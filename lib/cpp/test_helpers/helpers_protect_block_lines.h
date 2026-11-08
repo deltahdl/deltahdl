@@ -4,21 +4,6 @@
 #include <string>
 #include <string_view>
 
-// Presenting a §34.5 protected block on more lines than the tool wrote it on.
-//
-// §34.5.15.2 starts a data block on the following line of the file and says
-// nothing about where it ends, and §34.5.22.2 and §34.5.27.2 word the digest
-// block and the key block the same way. So one block written on one line and
-// the same block written on three are the same block: §34.5.9's count is of the
-// bytes the characters stand for rather than of the characters, and the coding
-// schemes §34.5.9.2 lists either break their own output into lines or tolerate
-// a reader that does. A test showing a reading takes a block whichever way it
-// arrives writes the envelope with the tool and then breaks the block by hand,
-// so the two texts differ in the breaks and in nothing else.
-
-// The same text with the line standing after `opening` broken into `pieces`
-// lines of as near the same length as divides. A text that does not write
-// `opening`, or that writes nothing under it, comes back unchanged.
 inline std::string WithBlockBrokenIntoLines(const std::string& text,
                                             std::string_view opening,
                                             size_t pieces) {

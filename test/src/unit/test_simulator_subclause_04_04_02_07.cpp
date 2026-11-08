@@ -133,18 +133,6 @@ TEST(ReInactiveRegionSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// §4.4.2.7 D2, discriminating end-to-end form: an explicit #0 evaluated in the
-// reactive region set (here, inside a program block) must suspend the running
-// process and reschedule it into the Re-Inactive region so that the remaining
-// Reactive events of the same time slot run before it resumes in the next
-// Re-Inactive->Reactive iteration. Two program initials share one program
-// block, so they drain the Reactive region in declaration order (FIFO): the
-// reader activates first, and its #0 must let the later writer's blocking
-// assignment to `shared` run before the read is taken. If #0 were a no-op the
-// reader would run straight through and observe the pre-write value (0);
-// observing 42 proves the process actually yielded via Re-Inactive and resumed
-// in the same slot. This is the reactive-set counterpart of the Inactive yield
-// in §4.4.2.3.
 TEST(ReInactiveRegionSim,
      ZeroDelayFromReactiveContextYieldsToOtherReactiveProcessBeforeResuming) {
   SimFixture f;
@@ -171,15 +159,6 @@ TEST(ReInactiveRegionSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// §4.4.2.7 D2 negative/discriminating form: the Re-Inactive reschedule is
-// specific to an *explicit #0* in the reactive region set. The closest input
-// the rule must treat differently is a nonzero delay, which suspends the
-// process to a *later* time slot rather than the current slot's Re-Inactive
-// region. Driven from a program block so the delay is evaluated in the reactive
-// context, a #1 must advance simulation time, landing the post-delay write at
-// time 1. An implementation that funneled every reactive-context delay into the
-// current slot's Re-Inactive region (mistreating #1 as #0) would leave the
-// clock at 0; observing ticks==1 proves the rule keys on zero specifically.
 TEST(ReInactiveRegionSim,
      NonzeroDelayFromReactiveContextAdvancesTimeInsteadOfReInactiveResume) {
   SimFixture f;
@@ -203,21 +182,6 @@ TEST(ReInactiveRegionSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 1u);
 }
 
-// §4.4.2.7 D2, intra-assignment #0 input form (discriminating): the explicit #0
-// can appear as an intra-assignment delay (`lhs = #0 rhs`) rather than a
-// standalone delay-control statement. That form reaches the delay via a
-// distinct dispatch path (the timed blocking-assignment executor) yet must obey
-// the same rule -- in the reactive region set it suspends the process into
-// Re-Inactive so the rest of the Reactive region drains before it resumes in
-// the same slot. The intra-assignment right-hand side (8'd1) is captured before
-// the delay, so the yield is instead observed by the *following* statement's
-// read of `shared`: the reader initial is declared first and thus activates
-// first in the Reactive region, and its intra-assignment #0 must let the later
-// writer's `shared = 42` run before the read. A no-op #0 would run the reader
-// straight through and read the pre-write value (0); observing 42 proves the
-// intra-assignment form yields via Re-Inactive and resumes in the same slot.
-// Complements the standalone-`#0;` yield test above by covering the other
-// syntactic position of the rule's input.
 TEST(ReInactiveRegionSim,
      IntraAssignmentZeroDelayFromReactiveContextYieldsBeforeResuming) {
   SimFixture f;
@@ -245,9 +209,6 @@ TEST(ReInactiveRegionSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// §4.4.2.7 with §4.5: the reactive dual of the Inactive rule. An event
-// scheduled into Re-Inactive while a Re-Inactive event runs waits for the
-// Reactive event that one created meanwhile.
 TEST(ReInactiveRegionSim,
      ReInactiveEventWaitsForReactiveEventsCreatedMeanwhile) {
   Arena arena;

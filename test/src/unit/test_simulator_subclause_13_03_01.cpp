@@ -68,10 +68,6 @@ TEST(TaskDeclSim, DefaultTaskIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-// §13.3.1: a task with no explicit lifetime that is declared inside a module
-// marked `automatic` is implicitly automatic, so its locals are reallocated on
-// every call. Contrast with DefaultTaskIsStatic, where the same default task in
-// an ordinary module keeps its locals between calls.
 TEST(TaskDeclSim, DefaultTaskInAutomaticModuleIsAutomatic) {
   auto val = RunAndGet(
       "module automatic t;\n"
@@ -91,10 +87,6 @@ TEST(TaskDeclSim, DefaultTaskInAutomaticModuleIsAutomatic) {
   EXPECT_EQ(val, 1u);
 }
 
-// §13.3.1: a task defined in an ordinary package has no explicit lifetime and
-// so defaults to static. Its local therefore persists across the two calls made
-// from the importing module's initial block, yielding 2. This is the package
-// input form of the default-static rule (contrast DefaultTaskIsStatic, module).
 TEST(TaskDeclSim, DefaultTaskInPackageIsStatic) {
   auto val = RunAndGet(
       "package pk;\n"
@@ -116,9 +108,6 @@ TEST(TaskDeclSim, DefaultTaskInPackageIsStatic) {
   EXPECT_EQ(val, 2u);
 }
 
-// §13.3.1: a task with no explicit lifetime defined in a package marked
-// `automatic` is implicitly automatic, so its local is reallocated on each call
-// and the counter resets to 1. Contrast DefaultTaskInPackageIsStatic above.
 TEST(TaskDeclSim, DefaultTaskInAutomaticPackageIsAutomatic) {
   auto val = RunAndGet(
       "package automatic pk;\n"
@@ -178,11 +167,6 @@ TEST(TaskDeclSim, AutoVarInStaticTaskFresh) {
   EXPECT_EQ(val, 1u);
 }
 
-// §13.3.1: a task defined inside a class is always automatic, even with no
-// explicit lifetime keyword. Its locals are therefore reallocated on every
-// invocation, so the counter resets to 1 each call. Contrast
-// DefaultTaskIsStatic above, where the same no-lifetime task at module level
-// keeps its locals.
 TEST(TaskDeclSim, ClassTaskIsAlwaysAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(

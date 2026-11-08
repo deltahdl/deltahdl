@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The design of test/src/e2e/sequence_methods.sv around one destination
-// sequence: the clause's e1 on sysclk, rising at 8, 24, 40, ..., ends at
-// 56, and a destination sequence on the clock its body names; the process
-// counts the end points the destination reaches and keeps the time of the
-// last. clk rises at 5, 15, ..., never together with sysclk.
 std::string SequenceMethodSource(const std::string& destination) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -59,8 +54,6 @@ std::string SequenceMethodSource(const std::string& destination) {
          "endmodule\n";
 }
 
-// The end points the destination sequence reached, and the time of the
-// last.
 struct EndPoints {
   uint64_t ends;
   uint64_t last_end;
@@ -74,9 +67,6 @@ EndPoints EndPointsOf(const std::string& destination) {
   return {ends->value.ToUint64(), last_end->value.ToUint64()};
 }
 
-// §16.13.6: triggered on a named sequence is true at the time step its end
-// point is reached, 56 for e1, so the clause's e2, on e1's clock, reads it
-// there and ends at branch_back, 72.
 TEST(SequenceMethods, TriggeredOnANamedSequenceReadsItsEndPoint) {
   EndPoints e2 = EndPointsOf(
       "    @(posedge sysclk) reset ##1 inst ##1 e1.triggered ##1 "
@@ -85,9 +75,6 @@ TEST(SequenceMethods, TriggeredOnANamedSequenceReadsItsEndPoint) {
   EXPECT_EQ(e2.last_end, 72u);
 }
 
-// §16.13.6: matched on a named sequence stores its end point until the
-// first tick of the reading clock after it, 65 on clk for e1's 56, so the
-// clause's e3 reads it there and ends at branch_back1, 75.
 TEST(SequenceMethods, MatchedOnANamedSequenceStoresItsEndPointForAnotherClock) {
   EndPoints e3 = EndPointsOf(
       "    @(posedge clk) reset1 ##1 e1.matched ##1 branch_back1;\n");
@@ -95,9 +82,6 @@ TEST(SequenceMethods, MatchedOnANamedSequenceStoresItsEndPointForAnotherClock) {
   EXPECT_EQ(e3.last_end, 75u);
 }
 
-// §16.13.6: triggered on a formal of type sequence reads the end point of
-// the actual, e1's body passed to e2_with_arg, so the clause's e4 ends
-// where e2 does, 72.
 TEST(SequenceMethods, TriggeredOnASequenceFormalReadsTheActualsEndPoint) {
   EndPoints e4 =
       EndPointsOf("    e2_with_arg(@(posedge sysclk) $rose(a) ##1 b ##1 c);\n");
@@ -105,21 +89,12 @@ TEST(SequenceMethods, TriggeredOnASequenceFormalReadsTheActualsEndPoint) {
   EXPECT_EQ(e4.last_end, 72u);
 }
 
-// §16.13.6: the formal's triggered is the actual's end point and not the
-// instance's own progress: an actual that never ends, $rose(reset1) at 56
-// followed by b at 72 where b is low, leaves it false and the instance
-// never ends.
 TEST(SequenceMethods, AnActualThatNeverMatchesLeavesTheFormalsTriggeredFalse) {
   EndPoints e4 = EndPointsOf(
       "    e2_with_arg(@(posedge sysclk) $rose(reset1) ##1 b ##1 c);\n");
   EXPECT_EQ(e4.ends, 0u);
 }
 
-// §16.13.6 with §23.9: a sequence declared in an instantiated module has an
-// end point of its own in each instance, which `triggered` waited on in the
-// instance sees: each of u and w counts the ends of a ##1 a at 15 and 25 of
-// its own a, u's high from 2 to 32 and w's never. The instance's sequence had
-// no monitor, and its end point was never reached.
 TEST(SequenceMethods, TriggeredInAnInstanceReadsItsOwnEndPoint) {
   SimFixture f;
   auto* u_hits = RunAndFindVar(
@@ -145,11 +120,6 @@ TEST(SequenceMethods, TriggeredInAnInstanceReadsItsOwnEndPoint) {
   EXPECT_EQ(f.ctx.FindVariable("w.hits")->value.ToUint64(), 0u);
 }
 
-// §16.13.6 with §23.6: `triggered` read through a hierarchical name, u.s,
-// reads the end point of the sequence s of the instance the name selects, a
-// wait on it resuming there: u's s ends at 15 and 25, its v1 high from 2 to
-// 22, and w's s, its v1 never high, ends nowhere, so the waits on u.s resume
-// twice, the last at 25, and those on w.s never.
 TEST(SequenceMethods, TriggeredThroughAHierarchicalNameReadsThatInstances) {
   SimFixture f;
   auto* u_hits = RunAndFindVar(
@@ -183,11 +153,6 @@ TEST(SequenceMethods, TriggeredThroughAHierarchicalNameReadsThatInstances) {
   EXPECT_EQ(f.ctx.FindVariable("w_hits")->value.ToUint64(), 0u);
 }
 
-// §16.13.6: the triggered status of a sequence is set in the Observed region
-// of the time step its end point is reached at and persists to the end of the
-// time step: s ends at 15 and 25, so a process waking at those posedges reads
-// `s.triggered` in the Active region, before the status is set, and counts
-// none, while a wait on it resumes after the Observed region and counts both.
 TEST(SequenceMethods, TriggeredIsSetInTheObservedRegion) {
   SimFixture f;
   auto* active_hits = RunAndFindVar(
@@ -210,10 +175,6 @@ TEST(SequenceMethods, TriggeredIsSetInTheObservedRegion) {
   EXPECT_EQ(f.ctx.FindVariable("waited_hits")->value.ToUint64(), 2u);
 }
 
-// §16.13.6 with §16.9.3: a sequence a method is applied to infers its clock
-// where it is used, and outside an assertion that is the default clocking:
-// e4, written with no clock, ends on posedge clk at 15, and the wait on
-// e4.triggered resumes there, the block that is not the default aside.
 TEST(SequenceMethods, AClocklessSequenceReadOutsideAnAssertionTakesTheDefault) {
   SimFixture f;
   std::string out = RunCapture(
@@ -235,10 +196,6 @@ TEST(SequenceMethods, AClocklessSequenceReadOutsideAnAssertionTakesTheDefault) {
   EXPECT_NE(out.find("e4 at 15\n"), std::string::npos);
 }
 
-// §16.13.6 with §16.9.3 and §16.14.6: a clockless sequence whose method is
-// read in a procedure infers the clock that procedure gives, ahead of any
-// default clocking: the always procedure infers posedge clk for e4, which
-// ends at 15, where the wait, in a procedure that infers no clock, resumes.
 TEST(SequenceMethods, AClocklessSequenceReadInAProcedureTakesItsClock) {
   SimFixture f;
   std::string out = RunCapture(

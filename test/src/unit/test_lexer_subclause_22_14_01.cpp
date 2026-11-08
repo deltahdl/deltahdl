@@ -16,11 +16,6 @@ using namespace delta;
 
 namespace {
 
-// Drives the real directive through the preprocessor, lexes what comes out,
-// and reports the kind each of `words` lexed with — so the token kinds
-// observed below are the ones the version marker produced rather than ones a
-// hand-built marker was asked for. A word the lexer never produced comes back
-// as kError, which no expectation below accepts.
 std::vector<TokenKind> PreprocessAndLexKinds(
     const std::string& src, const std::vector<std::string_view>& words) {
   PreprocFixture f;
@@ -59,13 +54,6 @@ std::string Guarded(const std::string& specifier, const std::string& body) {
   return "`begin_keywords \"" + specifier + "\"\n" + body + "`end_keywords\n";
 }
 
-// §22.14.1's second example, driven through the directive that produces it.
-// The LRM names "1364-2001" and says "1364-1995" or "1364-2005" would serve
-// the example just as well, none of them reserving `logic`; under each, the
-// declaration's `logic` really does come out of the lexer as an ordinary
-// identifier, while every word those lists do reserve — `module`, `reg`,
-// `wire`, `endmodule` — still lexes as its keyword. The region picks the
-// reserved word list and touches nothing else.
 TEST(KeywordVersionExampleLexing, VerilogRegionLexesLogicAsAnIdentifier) {
   for (const char* specifier : {"1364-2001", "1364-1995", "1364-2005"}) {
     auto kinds =
@@ -79,11 +67,6 @@ TEST(KeywordVersionExampleLexing, VerilogRegionLexesLogicAsAnIdentifier) {
   }
 }
 
-// §22.14.1's third example, and the reason the second one needs its directive
-// at all: `logic` is a reserved word in SystemVerilog, so under "1800-2005" —
-// and under every later list of this standard's line — the identical source
-// hands the parser the type keyword where the variable's name belongs. That is
-// the token-level cause of the error the LRM predicts.
 TEST(KeywordVersionExampleLexing, SystemVerilogRegionLexesLogicAsAKeyword) {
   for (const char* specifier :
        {"1800-2005", "1800-2009", "1800-2012", "1800-2017", "1800-2023"}) {
@@ -93,9 +76,6 @@ TEST(KeywordVersionExampleLexing, SystemVerilogRegionLexesLogicAsAKeyword) {
   }
 }
 
-// The fourth example end to end: under the reserved word list of this standard
-// the words that open and close the interface are keywords, so the declaration
-// reaches the parser as a design element rather than as loose identifiers.
 TEST(KeywordVersionExampleLexing, SystemVerilog2005RegionLexesTheInterface) {
   auto kinds = PreprocessAndLexKinds(Guarded("1800-2005", kInterface),
                                      {"interface", "endinterface"});
@@ -103,9 +83,6 @@ TEST(KeywordVersionExampleLexing, SystemVerilog2005RegionLexesTheInterface) {
   EXPECT_EQ(kinds[1], TokenKind::kKwEndinterface);
 }
 
-// The fifth example end to end, and the reason it produces errors: "1364-2005"
-// reserves neither word, and neither do the older Verilog lists §22.14.1
-// names, so both arrive as ordinary identifiers.
 TEST(KeywordVersionExampleLexing, VerilogRegionLexesInterfaceAsIdentifiers) {
   for (const char* specifier : {"1364-2005", "1364-2001", "1364-1995"}) {
     auto kinds = PreprocessAndLexKinds(Guarded(specifier, kInterface),
@@ -115,10 +92,6 @@ TEST(KeywordVersionExampleLexing, VerilogRegionLexesInterfaceAsIdentifiers) {
   }
 }
 
-// §22.14.1's first example: with no directive governing the module, the
-// reserved word list is the implementation's default set. This implementation
-// defaults to 1800-2023, so the very declaration the 1364-2001 region above
-// accepts as a name arrives here as the type keyword instead.
 TEST(KeywordVersionExampleLexing, ModuleWithNoDirectiveUsesTheDefaultList) {
   auto kinds = PreprocessAndLexKinds(
       "module m1;\n"
@@ -129,11 +102,6 @@ TEST(KeywordVersionExampleLexing, ModuleWithNoDirectiveUsesTheDefaultList) {
   EXPECT_EQ(kinds[1], TokenKind::kKwModule);
 }
 
-// The other half of that first example's condition — the directive is absent
-// *before* the module, not absent from the file. A region opened further down
-// governs only what follows it, so the earlier occurrence of the word is still
-// classified under the default list while the later one, inside the region, is
-// not. One source, one word, two kinds, decided by position.
 TEST(KeywordVersionExampleLexing, RegionDoesNotReachBackOverEarlierSource) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -163,18 +131,6 @@ TEST(KeywordVersionExampleLexing, RegionDoesNotReachBackOverEarlierSource) {
   EXPECT_EQ(logic_kinds[1], TokenKind::kIdentifier);
 }
 
-// A declaration written after the version_specifier is lexed at the line it
-// was written on, and so is the declaration on the line below it.
-//
-// This is the half of the directive's output that a newline count does not
-// reach. Preprocessor::ProcessKeywordsDirective in
-// src/preprocessor/preprocessor_lines.cpp hands what follows the specifier to
-// OutputText, which appends it straight after the version byte, so that text
-// now shares the marker's line instead of starting the line below.
-// Lexer::Advance in src/lexer/lexer.cpp counts a newline it moves over, and
-// Lexer::ConsumeKeywordMarker in src/lexer/lexer.cpp consumes one only when a
-// newline actually follows the version byte, so the two agree: the marker line
-// costs the counter one line, whatever is written on it.
 TEST(KeywordVersionExampleLexing, DeclarationsKeepTheLineTheyWereWrittenOn) {
   PreprocFixture f;
   auto out = Preprocess(

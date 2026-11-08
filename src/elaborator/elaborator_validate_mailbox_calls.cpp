@@ -1,7 +1,3 @@
-// §15.4.9's compile-time check of a parameterized mailbox: the argument a
-// send or receive method passes is type-equivalent to the mailbox's element
-// type.
-
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -19,14 +15,6 @@ namespace delta {
 
 namespace {
 
-// §15.4.9: coarse category of a data type for the compile-time equivalence
-// check a parameterized mailbox applies to its method arguments. A
-// parameterized mailbox transfers exactly one element type, so an argument in a
-// different category (integral vs. real vs. string) is a type mismatch the
-// compiler must reject up front. Returns -1 for a type this check does not
-// classify (e.g. a class handle, struct, or the special dynamic_type), which
-// suppresses the diagnostic so a case whose equivalence cannot be decided this
-// coarsely is left to run time rather than wrongly rejected.
 int MailboxTypeCategory(DataTypeKind k) {
   switch (k) {
     case DataTypeKind::kLogic:
@@ -38,37 +26,26 @@ int MailboxTypeCategory(DataTypeKind k) {
     case DataTypeKind::kLongint:
     case DataTypeKind::kInteger:
     case DataTypeKind::kTime:
-      return 0;  // integral
+      return 0;
     case DataTypeKind::kReal:
     case DataTypeKind::kShortreal:
     case DataTypeKind::kRealtime:
-      return 1;  // real
+      return 1;
     case DataTypeKind::kString:
-      return 2;  // string
+      return 2;
     default:
-      return -1;  // not classified by this check
+      return -1;
   }
 }
 
-// §15.4.9: the mailbox methods whose argument the compiler type-checks against
-// the mailbox element type — the send methods carry a message value, the
-// receive methods a reference destination; both must match the parameterized
-// type.
 bool IsMailboxTransferMethod(std::string_view m) {
   return m == "put" || m == "try_put" || m == "get" || m == "peek" ||
          m == "try_get" || m == "try_peek";
 }
 
-// §15.4.9: resolves the element-type kind of a parameterized mailbox
-// declaration
-// (`mailbox #(T)`, or a typedef of that form). Returns kImplicit when the
-// declaration is not a parameterized mailbox with a concrete element type — an
-// unparameterized (typeless) mailbox, or `mailbox #(dynamic_type)`, imposes no
-// compile-time constraint and is left to the run-time check.
 DataTypeKind MailboxElementKind(const DataType& dt,
                                 const TypedefMap& typedefs) {
   const DataType* mbx = &dt;
-  // Follow one level of typedef: `typedef mailbox #(T) name; name v;`.
   if (dt.kind == DataTypeKind::kNamed && dt.type_params.empty()) {
     auto it = typedefs.find(dt.type_name);
     if (it != typedefs.end()) mbx = &it->second;
@@ -79,10 +56,6 @@ DataTypeKind MailboxElementKind(const DataType& dt,
   return mbx->type_params[0].kind;
 }
 
-// §15.4.9: the data-type kind of a mailbox method argument. Literals carry
-// their own type; an identifier is resolved through the module-scope variable
-// kinds. Anything else (a computed expression) yields kImplicit and is not
-// checked.
 DataTypeKind MailboxArgKind(
     const Expr* a,
     const std::unordered_map<std::string_view, DataTypeKind>& var_kinds) {
@@ -104,10 +77,6 @@ DataTypeKind MailboxArgKind(
   }
 }
 
-// §15.4.9: recursively inspects `e` for a parameterized-mailbox method call
-// `mbx.method(arg)` and rejects an argument whose type is not equivalent to the
-// mailbox element type — the mismatch the compiler catches up front instead of
-// at run time.
 void CheckMailboxCallExpr(
     const Expr* e,
     const std::unordered_map<std::string_view, DataTypeKind>& mbx_elem,
@@ -148,12 +117,6 @@ void CheckMailboxCallExpr(
     CheckMailboxCallExpr(el, mbx_elem, var_kinds, diag);
 }
 
-// §15.4.9 puts no condition on where the parameterized-mailbox method call it
-// type-checks stands, and A.6.4 makes a subroutine_call_statement a
-// statement_item, so every position a statement holds a statement in is one the
-// report is owed at. ForEachChildStmt in elaborator_validate_internal.h states
-// those positions once for the whole elaborator, which is why the list is not
-// written out again here.
 void CheckMailboxCallStmt(
     const Stmt* s,
     const std::unordered_map<std::string_view, DataTypeKind>& mbx_elem,
@@ -173,9 +136,6 @@ void CheckMailboxCallStmt(
 }  // namespace
 
 void Elaborator::ValidateParameterizedMailboxCalls(const ModuleDecl* decl) {
-  // Collect the parameterized-mailbox variables (name -> element kind) and the
-  // kind of every module-scope variable, so an identifier argument can be
-  // typed.
   std::unordered_map<std::string_view, DataTypeKind> mbx_elem;
   std::unordered_map<std::string_view, DataTypeKind> var_kinds;
   for (const auto* item : decl->items) {

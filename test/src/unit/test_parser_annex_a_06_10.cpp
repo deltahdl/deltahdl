@@ -592,8 +592,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorAssertMissingExpression) {
       "module m;\n"
       "  initial assert();\n"
       "endmodule\n");
-  // §11.2 owns the report for a missing expression; §16.3 requires one between
-  // the parentheses but has no report of its own for the empty case.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -619,7 +617,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorAssumeMissingExpression) {
       "module m;\n"
       "  initial assume();\n"
       "endmodule\n");
-  // §11.2 owns the report for a missing expression, as for the assert form.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -628,7 +625,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverMissingExpression) {
       "module m;\n"
       "  initial cover();\n"
       "endmodule\n");
-  // §11.2 owns the report for a missing expression, as for the assert form.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -638,10 +634,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorCoverWithElseClause) {
       "  initial cover(1) $display(\"hit\");\n"
       "  else $display(\"miss\");\n"
       "endmodule\n");
-  // A.6.10 gives simple_immediate_cover_statement `statement_or_null` where the
-  // assert and assume forms take `action_block`, and `action_block` is the only
-  // production carrying `else`. §16.3 is the prose behind it and is what the
-  // report names.
   EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
@@ -664,7 +656,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssertHashNonZero) {
       "module m;\n"
       "  initial assert #1 (a);\n"
       "endmodule\n");
-  // §16.4 owns the rule that a deferred immediate assertion is written #0.
   EXPECT_TRUE(ReportedError(
       r.diags, "deferred immediate assertion requires #0, got #1", 2, "16.4"));
 }
@@ -674,7 +665,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredAssumeHashNonZero) {
       "module m;\n"
       "  initial assume #2 (a);\n"
       "endmodule\n");
-  // §16.4 owns the rule that a deferred immediate assertion is written #0.
   EXPECT_TRUE(ReportedError(
       r.diags, "deferred immediate assertion requires #0, got #2", 2, "16.4"));
 }
@@ -684,7 +674,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHashNonZero) {
       "module m;\n"
       "  initial cover #3 (a);\n"
       "endmodule\n");
-  // §16.4 owns the rule that a deferred immediate assertion is written #0.
   EXPECT_TRUE(ReportedError(
       r.diags, "deferred immediate assertion requires #0, got #3", 2, "16.4"));
 }
@@ -695,8 +684,6 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverHash0WithElseClause) {
       "  initial cover #0 (1) $display(\"hit\");\n"
       "  else $display(\"miss\");\n"
       "endmodule\n");
-  // deferred_immediate_cover_statement ends in `statement_or_null` as the
-  // undeferred form does, so the same §16.3 report answers for it.
   EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
@@ -706,16 +693,9 @@ TEST(AssertionStatementSyntaxParsing, ErrorDeferredCoverFinalWithElseClause) {
       "  initial cover final (1) $display(\"hit\");\n"
       "  else $display(\"miss\");\n"
       "endmodule\n");
-  // The `cover final` alternative of deferred_immediate_cover_statement ends in
-  // `statement_or_null` too, so the same §16.3 report answers for it.
   EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
-// procedural_assertion_statement has three alternatives; the immediate one is
-// exercised above. This covers the concurrent_assertion_statement alternative:
-// `assert property (...)` sitting in procedural (initial/always) code, which
-// the grammar admits alongside immediate_assertion_statement. The parser must
-// route it to the procedural-concurrent form rather than an immediate assert.
 TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentAssertProperty) {
   auto r = Parse(
       "module m;\n"
@@ -731,10 +711,6 @@ TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentAssertProperty) {
   EXPECT_FALSE(stmt->is_deferred);
 }
 
-// The assume keyword reaches the concurrent alternative through the same shared
-// path as assert but must tag the statement with its own kind; confirm
-// `assume property (...)` in procedural code is admitted and typed as an
-// assume.
 TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentAssumeProperty) {
   auto r = Parse(
       "module m;\n"
@@ -749,8 +725,6 @@ TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentAssumeProperty) {
   EXPECT_TRUE(stmt->is_procedural_concurrent);
 }
 
-// The cover keyword reaches the concurrent alternative through a separate parse
-// path; confirm `cover property (...)` in procedural code is admitted too.
 TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentCoverProperty) {
   auto r = Parse(
       "module m;\n"
@@ -765,11 +739,6 @@ TEST(AssertionStatementSyntaxParsing, ProceduralConcurrentCoverProperty) {
   EXPECT_TRUE(stmt->is_procedural_concurrent);
 }
 
-// assertion_item resolves to either a concurrent_assertion_item or a
-// deferred_immediate_assertion_item. The deferred alternative is covered by the
-// ModuleLevel tests above; this covers the concurrent_assertion_item
-// alternative at module-item scope (a bare `assert property` with no procedural
-// block).
 TEST(AssertionStatementSyntaxParsing, ConcurrentAssertionItemModuleLevel) {
   auto r = Parse(
       "module m;\n"
@@ -782,10 +751,6 @@ TEST(AssertionStatementSyntaxParsing, ConcurrentAssertionItemModuleLevel) {
   ASSERT_NE(item, nullptr);
 }
 
-// procedural_assertion_statement takes every concurrent_assertion_statement,
-// a restrict_property_statement among them, and §16.14.6 lets one stand in an
-// always or an initial procedure. §16.14.4 has a simulator not check it, so
-// the statement does nothing when reached.
 TEST(AssertionStatementSyntaxParsing, ProceduralRestrictPropertyIsAccepted) {
   auto r = Parse(
       "module m(input logic clk, a);\n"
@@ -801,9 +766,6 @@ TEST(AssertionStatementSyntaxParsing, ProceduralRestrictPropertyIsAccepted) {
   EXPECT_EQ(stmt->kind, StmtKind::kNull);
 }
 
-// A procedural restrict is held to the places §16.14 lets a concurrent
-// assertion statement stand in procedural code, and its spec to A.2.10's
-// grammar; without `property` it is the immediate restrict §16.2 rules out.
 TEST(AssertionStatementSyntaxParsing, ProceduralRestrictPropertyIsChecked) {
   auto r = Parse(
       "module m(input logic clk, a);\n"

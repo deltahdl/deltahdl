@@ -107,7 +107,6 @@ TEST(UserDefinedTypeElaboration, TypedefUnionWidth) {
   bool found = false;
   for (const auto& v : mod->variables) {
     if (v.name == "u") {
-      // A packed union sizes to its widest member; both members are 8 bits.
       EXPECT_EQ(v.width, 8u);
       found = true;
     }
@@ -219,9 +218,6 @@ TEST(UserDefinedTypeElaboration, ForwardUnionWithEnumDefinition_Error) {
       "6.18"));
 }
 
-// §6.18: a forward typedef that specified the class basic type does not conform
-// to a later definition of the same name that resolves to a non-class type, so
-// redefining the name as a data typedef is an error.
 TEST(UserDefinedTypeElaboration, ForwardClassTypedefWithDataDefinition_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -236,8 +232,6 @@ TEST(UserDefinedTypeElaboration, ForwardClassTypedefWithDataDefinition_Error) {
       "6.18"));
 }
 
-// §6.18: the same conformance rule applies to a forward interface-class
-// typedef; a later data typedef of the same name does not conform.
 TEST(UserDefinedTypeElaboration,
      ForwardInterfaceClassTypedefWithDataDefinition_Error) {
   ElabFixture f;
@@ -247,8 +241,6 @@ TEST(UserDefinedTypeElaboration,
       "  typedef int IC;\n"
       "endmodule\n",
       f);
-  // Parser::TryForwardClassTypedef records kNamed for the interface-class form
-  // too, so the report names the same "class" noun the plain class form gets.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "typedef 'IC' does not conform to its forward declaration as class", 3,
@@ -291,13 +283,6 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefAfterFinalDefinition) {
   EXPECT_TRUE(found);
 }
 
-// §6.18: the actual data type definition of a forward typedef shall be
-// resolved within the same local scope OR generate block. Here a forward enum
-// typedef, its final definition, and a variable using it all live inside a
-// generate block; the definition resolves the forward declaration, so the
-// variable's type is known and elaboration reports no error (an unresolved
-// forward typedef would be an error, as UnresolvedForwardTypedefInModule_Error
-// shows).
 TEST(UserDefinedTypeElaboration, ForwardTypedefResolvedInGenerateBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -323,11 +308,6 @@ TEST(UserDefinedTypeElaboration, UnresolvedForwardTypedefInModule_Error) {
       "  color_e c;\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateForwardTypedefsInScope and
-  // Elaborator::ValidateForwardClassTypedefs emit this sentence word for word,
-  // both under §6.18. They walk disjoint item lists: the first a ModuleDecl's
-  // items, the second the compilation unit's. This forward typedef is inside a
-  // module, so only the first reaches it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "forward typedef 'color_e' is never resolved by a "
                             "definition in the same scope",
@@ -348,12 +328,6 @@ TEST(UserDefinedTypeElaboration, UnresolvedBareForwardTypedefInModule_Error) {
                             2, "6.18"));
 }
 
-// §6.18 (printed page 118) has a forward typedef's definition resolved within
-// the same local scope or generate block, and §27.5 (printed 824) makes a
-// generate block a scope of its own, so a block's `typedef struct pair_t;`
-// is resolved by a definition of the block alone. The check walked the
-// module's items only, so the block's forward typedef was never reported,
-// with or without a module definition of the name.
 TEST(UserDefinedTypeElaboration,
      GenerateBlockForwardTypedefWithNoDefinitionInTheBlockIsReported) {
   ElabFixture f;
@@ -390,9 +364,6 @@ TEST(UserDefinedTypeElaboration,
                              3, "6.18"));
 }
 
-// The nested block h is a scope of its own too, so g's definition does not
-// resolve h's forward typedef, and the else branch of an if generate is
-// walked as the block it is.
 TEST(UserDefinedTypeElaboration,
      NestedAndElseGenerateBlockForwardTypedefsAreJudgedInTheirOwnBlock) {
   ElabFixture f;
@@ -449,11 +420,6 @@ TEST(UserDefinedTypeElaboration, ForwardTypedefScopePrefixClass_Legal) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.18: a typedef names an existing data type, and the clause counts unpacked
-// array types among those -- it notes that a user-defined name is needed for a
-// type parameter value where unpacked array types are involved. A variable
-// declared with such a name is therefore of that array type, dimensions
-// included, and a queue dimension makes it a queue.
 TEST(UserDefinedTypeElaboration, QueueTypedefDeclaresAQueue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -469,9 +435,6 @@ TEST(UserDefinedTypeElaboration, QueueTypedefDeclaresAQueue) {
   EXPECT_TRUE(vars[0].is_queue);
 }
 
-// The same rule for the other unsized dimension. §7.4 makes `[]` a dynamic
-// array, and neither it nor a queue has a fixed width -- which is what had kept
-// both from being carried across the typedef while the fixed form was.
 TEST(UserDefinedTypeElaboration, DynamicArrayTypedefDeclaresADynamicArray) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -487,10 +450,6 @@ TEST(UserDefinedTypeElaboration, DynamicArrayTypedefDeclaresADynamicArray) {
   EXPECT_TRUE(vars[0].is_dynamic);
 }
 
-// The fixed form, which already worked, as the guard that widening the
-// recording to the unsized dimensions did not disturb it: a sized typedef
-// dimension still gives the variable that many elements and leaves it neither a
-// queue nor a dynamic array.
 TEST(UserDefinedTypeElaboration, FixedArrayTypedefStillSizesTheVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -508,21 +467,6 @@ TEST(UserDefinedTypeElaboration, FixedArrayTypedefStillSizesTheVariable) {
   EXPECT_FALSE(vars[0].is_dynamic);
 }
 
-// ---------------------------------------------------------------------------
-// Claim: a user-defined data type is declared before any reference to its
-// type_identifier.
-//
-// The three cases below are the ones the parser cannot answer, because
-// `my_type x;` is the two identifiers and semicolon a module instantiation
-// missing its port connection list also spells, and the parser holds no table
-// of module names. Each asserts the §6.18 report rather than the §23.3.2 one
-// the missing port connection list would draw.
-// ---------------------------------------------------------------------------
-
-// The typedef stands below the declaration that references it, so the type is
-// resolvable by the time the module is elaborated and the variable takes the
-// right width. §6.18 is breached all the same: what the sentence forbids is the
-// order, not the failure to resolve.
 TEST(UserDefinedTypeElaboration, TypeReferenceBeforeItsDeclarationIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -537,15 +481,6 @@ TEST(UserDefinedTypeElaboration, TypeReferenceBeforeItsDeclarationIsReported) {
                             2, "6.18"));
 }
 
-// A list of declarators references the type_identifier once. A.2.1.3 writes
-// `data_declaration ::= [ const ] [ var ] [ lifetime ] data_type_or_implicit
-// list_of_variable_decl_assignments ;`, putting the type ahead of the whole
-// list, so §6.18's reference to the type_identifier is one reference here and
-// earns one report however many names follow. Parser::ParseVarDeclList builds
-// one ModuleItem per declarator and marks every one of them as undeclared at
-// parse, so the count is what holds the report to the declaration rather than
-// to the names; the ReportedError beside it is what says which rule the one
-// report enforces, which a count states nothing about on its own.
 TEST(UserDefinedTypeElaboration,
      TypeReferenceBeforeItsDeclarationInAListIsReportedOnce) {
   ElabFixture f;
@@ -566,10 +501,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_EQ(reports, 1);
 }
 
-// A name declared nowhere at all. §6.18 draws no distinction between a
-// declaration written below the reference and one never written: neither
-// precedes the reference. Reporting it as an unknown module instead would name
-// a construct the source does not contain, since nothing here is instantiated.
 TEST(UserDefinedTypeElaboration,
      NameThatIsNeitherTypeNorModuleIsReportedAsAnUndeclaredType) {
   ElabFixture f;
@@ -584,10 +515,6 @@ TEST(UserDefinedTypeElaboration,
                             2, "6.18"));
 }
 
-// The type is declared, in a package the module never imports, so no
-// declaration of it precedes the reference in the scope the reference stands
-// in. This is the case a repair keyed on the declaration coming later in the
-// same file would miss.
 TEST(UserDefinedTypeElaboration,
      TypeDeclaredInAPackageNeverImportedIsStillAnUndeclaredTypeReference) {
   ElabFixture f;
@@ -605,15 +532,6 @@ TEST(UserDefinedTypeElaboration,
                             5, "6.18"));
 }
 
-// §6.18: an object declared with the name has the type the name stands for, and
-// the dimensions written on a typedef belong to that type -- what arr_t stands
-// for is four ints, not one. The parser leaves those dimensions beside the data
-// type rather than in it, so the elaborated table used to record the element's
-// width and a reader could not tell it from a singular type's: arr_t answered
-// the same 32 that i_t does. The singular typedef is asserted alongside the
-// four aggregate forms for that reason, and an absent entry is distinguished
-// from a recorded 0 so that "no width" is read as an answer rather than as the
-// name never having reached the table.
 TEST(UserDefinedTypeElaboration, AggregateTypedefIsRecordedWithNoWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -640,11 +558,6 @@ TEST(UserDefinedTypeElaboration, AggregateTypedefIsRecordedWithNoWidth) {
   EXPECT_EQ(width_of("aa_t"), 0);
 }
 
-// §3.12.1 puts a typedef written outside any design element in the
-// compilation-unit scope, and such a declaration never runs the module item
-// walk, so its dimensions are recorded where the compilation-unit scope is
-// built rather than where a module's typedef is elaborated. Both spellings of
-// the same §6.18 name stand for the same type and the table has to say so.
 TEST(UserDefinedTypeElaboration, CompilationUnitAggregateTypedefHasNoWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -660,11 +573,6 @@ TEST(UserDefinedTypeElaboration, CompilationUnitAggregateTypedefHasNoWidth) {
   EXPECT_EQ(design->type_widths["cu_arr_t"], 0u);
 }
 
-// §26.4: an import is what makes a package's typedef available by its bare
-// name, and that name stands for the type the package declared -- dimensions
-// included. The import registers the element type alone, so the aggregate has
-// to be recorded as the import enters the name, not only where the package
-// wrote it.
 TEST(UserDefinedTypeElaboration, ImportedAggregateTypedefHasNoWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -683,15 +591,6 @@ TEST(UserDefinedTypeElaboration, ImportedAggregateTypedefHasNoWidth) {
   EXPECT_EQ(design->type_widths["p_arr_t"], 0u);
 }
 
-// §6.18 (printed page 118) has a user-defined type's declaration precede any
-// reference to its type_identifier, a forward typedef standing for a
-// definition the scope gives before or after the reference. A class method's
-// formal naming `pair_t` above the typedef, with no forward typedef, breaches
-// it, and the elaborator's second resolution of the module's classes, run for
-// the forward-typedef shape, resolved this one the same way with no report;
-// the parser had in fact read `pair_t` as a member named pair_t and reported
-// a missing semicolon at `A`. The reference is reported where it stands, in
-// the words the module-level declaration `my_type x;` earns above.
 TEST(UserDefinedTypeElaboration,
      ClassMethodFormalMemberNamingATypedefDefinedBelowIsReported) {
   ElabFixture f;
@@ -711,9 +610,6 @@ TEST(UserDefinedTypeElaboration,
                             3, "6.18"));
 }
 
-// The same class with `typedef struct pair_t;` above it: §6.18's forward
-// typedef lets the name be referenced before its definition, which may stand
-// below the class in the same scope, so nothing is reported.
 TEST(UserDefinedTypeElaboration,
      ClassMethodFormalMemberNamingAForwardDeclaredTypedefIsClean) {
   ElabFixture f;
@@ -732,11 +628,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A member naming a type declared nowhere. §6.18 draws no line between a
-// declaration below the reference and none at all, so a formal's inline
-// structure with `nosuch_t m` is reported once at the member, as the
-// module-level `nosuch x;` is above; it was sized as a scalar with no report
-// of its own, behind the parser's missing-semicolon report at `m`.
 TEST(UserDefinedTypeElaboration,
      FormalStructMemberNamingAnUndeclaredTypeIsReportedOnce) {
   ElabFixture f;
@@ -758,8 +649,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_EQ(reports, 1);
 }
 
-// The member's type declared above the formal resolves, and nothing is
-// reported.
 TEST(UserDefinedTypeElaboration,
      FormalStructMemberNamingADeclaredTypedefIsClean) {
   ElabFixture f;
@@ -775,10 +664,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.18 (printed page 118) ties a forward typedef's basic type to the
-// definition of the same scope, and §27.5 (printed 824) makes a generate block
-// a scope of its own, so the block's union pair_t is a declaration of another
-// scope than the module's forward struct pair_t and nothing is reported.
 TEST(UserDefinedTypeElaboration,
      GenerateBlockTypedefIsNotJudgedByTheModuleForwardTypedef) {
   ElabFixture f;
@@ -795,8 +680,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The block's own forward typedef still judges the block's own definition:
-// reported at the definition's line.
 TEST(UserDefinedTypeElaboration,
      GenerateBlockDefinitionNotConformingToTheBlockForwardTypedefIsReported) {
   ElabFixture f;
@@ -814,9 +697,6 @@ TEST(UserDefinedTypeElaboration,
       4, "6.18"));
 }
 
-// A module definition below the block is judged by the module's own forward
-// typedef alone: the module's union pair_t is reported at its own line, and
-// the block's union pair_t, a scope of its own, is reported nowhere.
 TEST(UserDefinedTypeElaboration,
      ModuleDefinitionBelowAGenerateBlockIsJudgedByTheModuleForwardTypedef) {
   ElabFixture f;
@@ -840,9 +720,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_EQ(reports, 1);
 }
 
-// A block's forward typedef stayed in the table after the block, so a sibling
-// block's union pair_t, written in a scope of its own, was reported as not
-// conforming to g's forward struct; nothing is reported.
 TEST(UserDefinedTypeElaboration,
      SiblingGenerateBlockForwardTypedefDoesNotJudgeALaterBlockDefinition) {
   ElabFixture f;
@@ -861,9 +738,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The nested block h's forward enum stayed in the table after h, so g's own
-// struct pair_t below h was reported as not conforming to it; nothing is
-// reported, h's forward typedef being a declaration of h's scope.
 TEST(UserDefinedTypeElaboration,
      NestedGenerateBlockForwardTypedefDoesNotJudgeTheEnclosingDefinition) {
   ElabFixture f;
@@ -882,9 +756,6 @@ TEST(UserDefinedTypeElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The enclosing block's forward typedef is back in place below the nested
-// block: g's forward struct judges g's union pair_t written below h, and h's
-// own struct pair_t, a scope of its own, is not what it is judged against.
 TEST(UserDefinedTypeElaboration,
      EnclosingBlockForwardTypedefJudgesItsDefinitionBelowANestedBlock) {
   ElabFixture f;
@@ -905,9 +776,6 @@ TEST(UserDefinedTypeElaboration,
       7, "6.18"));
 }
 
-// §6.18: a name declared by a typedef stands for the type it was declared with,
-// so a chain of names is followed to the type at its end. A chain that comes
-// round to a name again has no end, and the walk stops on a name.
 TEST(UserDefinedTypeElaboration, ResolvedTypeKindFollowsAChainOfNames) {
   DataType integer;
   integer.kind = DataTypeKind::kInteger;

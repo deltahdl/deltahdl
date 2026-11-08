@@ -11,16 +11,6 @@
 
 using namespace delta;
 
-// Elaborates and runs a module whose only declaration is one undriven 96-bit
-// net of type `net_type`, then checks every bit of the value the resolver left
-// on it: `bit_value` is the level each bit carries, and no bit is unknown.
-// Returns the settled net, so a caller goes on to read the strength that
-// accompanied the value.
-//
-// A net type whose undriven value is not z fills its whole width from that
-// value, and a vector wider than one machine word is what shows the fill
-// reaches every word rather than only the first. Returns nullptr when the
-// module did not elaborate or declared no such net.
 inline Net* ExpectWideUndrivenNetBits(SimFixture& f, const char* net_type,
                                       bool bit_value) {
   auto* design = ElaborateSrc(

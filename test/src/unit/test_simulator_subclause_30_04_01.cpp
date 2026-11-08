@@ -1,7 +1,3 @@
-// §30.4.1's module path destination, as a running simulation delays it: the
-// path delay reaches the output port whatever drives the port inside the
-// module.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -12,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A top module driving `a` 0, then 1 at 10 and 0 at 20, into `mybuf`'s `a` and
-// printing each change of what it connects to `mybuf`'s `y` from 8 on, after
-// the module `mybuf_decl` declares.
 std::string BufferDesign(const std::string& mybuf_decl) {
   return mybuf_decl +
          "module top;\n"
@@ -30,10 +23,6 @@ std::string BufferDesign(const std::string& mybuf_decl) {
          "endmodule\n";
 }
 
-// §30.4.1 (printed page 872): a module path's destination must be a net or
-// variable connected to a module output or inout port, so an `output reg`
-// written by `always @*` takes its path delay of 5. The delay reached only an
-// output a continuous assignment drove, and y followed a at once.
 TEST(ModulePathDestinationRun, ProcedureDrivenOutputTakesThePathDelay) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferDesign("module mybuf(input a, output reg y);\n"
@@ -46,7 +35,6 @@ TEST(ModulePathDestinationRun, ProcedureDrivenOutputTakesThePathDelay) {
             "t=15 y=1\nt=25 y=0\n");
 }
 
-// The same for an output driven by a nested instance's output port.
 TEST(ModulePathDestinationRun, NestedInstanceDrivenOutputTakesThePathDelay) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferDesign("module leaf(input i, output o);\n"
@@ -62,9 +50,6 @@ TEST(ModulePathDestinationRun, NestedInstanceDrivenOutputTakesThePathDelay) {
             "t=15 y=1\nt=25 y=0\n");
 }
 
-// §30.4.3 (printed page 874) on a flip-flop: `(posedge clk => (q +: d)) = (4,
-// 6)` delays the q a clocked `q <= d` writes by 4 when it rises and 6 when it
-// falls, both timed from the clock edge.
 TEST(ModulePathDestinationRun, FlipFlopOutputTakesTheEdgePathDelay) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module myff(input clk, input d, output reg q);\n"

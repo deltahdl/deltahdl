@@ -1,14 +1,3 @@
-// §25.9 "Virtual interfaces": a call through a virtual interface names a task
-// or a function of the interface the virtual interface refers to an instance
-// of, and an array of virtual interfaces is indexed as any array is. The calls
-// test_elaborator_subclause_25_09b.cpp writes reach the virtual interface
-// through a variable or a class property; the cases here reach the class that
-// holds the property through a nested class, a typedef its own scope resolves
-// and a forward typedef, index an array of virtual interfaces, and stand in
-// the methods of a class and in generate blocks. The last cases name an
-// interface a module declares nested, and hold every place a virtual interface
-// type is written, not only a module's variables, to naming an interface.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -27,7 +16,6 @@ namespace {
 constexpr std::string_view kNoSuch =
     "'nosuch' names no task or function of interface 'ifc'";
 
-// Whether `f` holds no error on line `line`.
 ::testing::AssertionResult NoErrorOnLine(const ElabFixture& f, uint32_t line) {
   for (const Diagnostic& diag : f.diag.Diagnostics()) {
     if (diag.severity == DiagSeverity::kError && diag.loc.line == line) {
@@ -37,12 +25,6 @@ constexpr std::string_view kNoSuch =
   return ::testing::AssertionSuccess();
 }
 
-// §25.9 with §7.4: `virtual ifc va[2]` declares an array of virtual
-// interfaces, and va[0] selects one of them, through which the interface's task
-// is called; it is no select of a virtual interface (#5813). A select into the
-// element, va[0][1], or into an element of the two-dimensional vb, vb[0][1][0],
-// selects into a virtual interface, as v[0] does, and each is reported (#5817);
-// selects of a logic array and of an array net are not.
 TEST(VirtualInterfaceArrayElaboration, AnElementOfAnArrayIsSelected) {
   ElabFixture f;
   ElaborateSrc(
@@ -67,14 +49,6 @@ TEST(VirtualInterfaceArrayElaboration, AnElementOfAnArrayIsSelected) {
   }
 }
 
-// §25.9 with §7.4: a call through an element of an array of virtual
-// interfaces, one select per unpacked dimension, names a task or a function of
-// the interface, and one naming nothing it declares is reported, whether the
-// array is a variable (#5819) or a class property (#5820). A call through an
-// interface instance is no virtual interface call, and the valid calls are not
-// reported; v[0], a select of a single virtual interface, names none, and is
-// reported as the select it is. h.vif[0] selects into a single property, no
-// element of an array, and its call is not followed.
 TEST(VirtualInterfaceCallElaboration, ACallThroughAnElementOfAnArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -103,12 +77,6 @@ TEST(VirtualInterfaceCallElaboration, ACallThroughAnElementOfAnArray) {
                             "25.9"));
 }
 
-// §25.9 with §8.24: a class nested in another, H::Inner, is found behind the
-// enclosing class's scope, past a sibling nested class, so a call through its
-// virtual interface property naming nothing the interface declares is
-// reported (#5812). H::T, a typedef of H rather than a class nested in it, and
-// HA::Inner, behind a typedef rather than a class, name no class this search
-// finds, and the valid calls through them are not reported.
 TEST(VirtualInterfaceCallElaboration, ACallThroughANestedClasssProperty) {
   ElabFixture f;
   ElaborateSrc(
@@ -131,9 +99,6 @@ TEST(VirtualInterfaceCallElaboration, ACallThroughANestedClasssProperty) {
   EXPECT_TRUE(NoErrorOnLine(f, 12));
 }
 
-// §25.9 with §6.18 and §26.2: the module's C names the package's B, and B
-// names C as the package sees it, the package's C, the class K, never the
-// module's C (#5814).
 TEST(VirtualInterfaceCallElaboration, APackageTypedefNamesItsPackagesType) {
   ElabFixture f;
   ElaborateSrc(
@@ -150,9 +115,6 @@ TEST(VirtualInterfaceCallElaboration, APackageTypedefNamesItsPackagesType) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 7, "25.9"));
 }
 
-// §25.9 with §6.18: a forward typedef, `typedef class F;`, names no type, so
-// the typedef after it naming F reaches the class F declared later in the
-// module.
 TEST(VirtualInterfaceCallElaboration, AForwardTypedefLeadsToTheClassAfterIt) {
   ElabFixture f;
   ElaborateSrc(
@@ -167,11 +129,6 @@ TEST(VirtualInterfaceCallElaboration, AForwardTypedefLeadsToTheClassAfterIt) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoSuch, 5, "25.9"));
 }
 
-// §25.9 with §26.3: a package's typedef naming a class the package imports
-// from another reaches that class, and a call through its property naming
-// nothing the interface declares is reported; a package typedef of int names
-// no class, and the call through the variable of it is no virtual interface
-// call.
 TEST(VirtualInterfaceCallElaboration, APackageTypedefOfAnImportedClass) {
   ElabFixture f;
   ElaborateSrc(
@@ -193,13 +150,6 @@ TEST(VirtualInterfaceCallElaboration, APackageTypedefOfAnImportedClass) {
   }
 }
 
-// §25.9 with §13.3: a call in a task the module declares, through the
-// module's virtual interface, a formal argument, an element of an array
-// argument or a variable the task declares, naming nothing the interface
-// declares, is reported as one in a procedural block is (#5822). The valid
-// calls and a call of a function declared after the task are not, and neither
-// is a call of a class's own method in the class's method defined out of its
-// body, which is the class's subroutine rather than the module's.
 TEST(VirtualInterfaceCallElaboration, ACallInAModulesTask) {
   ElabFixture f;
   ElaborateSrc(
@@ -227,11 +177,6 @@ TEST(VirtualInterfaceCallElaboration, ACallInAModulesTask) {
   EXPECT_TRUE(NoErrorOnLine(f, 11));
 }
 
-// §25.9 with §7.4: a select into a class property that is a single virtual
-// interface, h.vif[0], or past the last dimension of a property's array of
-// them, h.vifs[0][1], selects into a virtual interface and is reported
-// (#5821); a select of a logic array property, and a call through an element
-// of the array, are not.
 TEST(VirtualInterfaceArrayElaboration, ASelectIntoAPropertysVirtualInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -256,10 +201,6 @@ TEST(VirtualInterfaceArrayElaboration, ASelectIntoAPropertysVirtualInterface) {
   EXPECT_TRUE(NoErrorOnLine(f, 8));
 }
 
-// §11.4.13: the value range [0:1] of an inside set is a select with no
-// expression it selects from, and the walk that looks for selects into a
-// virtual interface leaves it and reports nothing, whether the set follows
-// an inside operator or labels an item of a case inside statement.
 TEST(VirtualInterfaceArrayElaboration, AValueRangeSelectsFromNothing) {
   ElabFixture f;
   ElaborateSrc(
@@ -274,15 +215,6 @@ TEST(VirtualInterfaceArrayElaboration, AValueRangeSelectsFromNothing) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §25.9 with §8.3: a call in a method of a class, through a virtual interface
-// property the class declares (line 3), one a class nested in it declares
-// (line 5), one it inherits (§8.13, line 9), or one of a class a package or a
-// module declares (lines 13 and 16), naming nothing the interface declares, is
-// reported (#5823), as is one in a method defined out of its class's body
-// (§8.24, line 11). A property of a derived class shadows the base's of its
-// name, and the call through it, no virtual interface, is not checked against
-// the interface (line 10); the valid calls are not reported (line 4). A call
-// of a method's local variable names data (A.8.2, line 7).
 TEST(VirtualInterfaceCallElaboration, ACallInAClassMethod) {
   ElabFixture f;
   ElaborateSrc(
@@ -316,10 +248,6 @@ TEST(VirtualInterfaceCallElaboration, ACallInAClassMethod) {
       "A.8.2"));
 }
 
-// §8.24: a method defined out of the body of a class the scope does not
-// declare, Nope::t2, has no class scope to be walked in, and the call it
-// writes through a name no property bears is not checked against an
-// interface.
 TEST(VirtualInterfaceCallElaboration, AMethodOutOfTheBodyOfNoClass) {
   ElabFixture f;
   ElaborateSrc(
@@ -330,11 +258,6 @@ TEST(VirtualInterfaceCallElaboration, AMethodOutOfTheBodyOfNoClass) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 2, "25.9"));
 }
 
-// §25.9 with §8.11: a method reaches a property of its own class, or one it
-// inherits, through `this`, and a call through this.vif, or through an element
-// of this.vifs, naming nothing the interface declares is reported (#5824).
-// this.n names a property that is no virtual interface and this.none names no
-// property, and neither call is checked against the interface.
 TEST(VirtualInterfaceCallElaboration, ACallThroughThis) {
   ElabFixture f;
   ElaborateSrc(
@@ -356,11 +279,6 @@ TEST(VirtualInterfaceCallElaboration, ACallThroughThis) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 6, "25.9"));
 }
 
-// §25.9 with §23.9: a method of a class a module declares sees the module's
-// variables, and a call through the module's virtual interface v naming
-// nothing the interface declares is reported (#5825). The class's property w
-// hides the module's virtual interface of its name, and the call through it is
-// not checked against the interface.
 TEST(VirtualInterfaceCallElaboration, ACallThroughTheModulesVariableInAClass) {
   ElabFixture f;
   ElaborateSrc(
@@ -375,13 +293,6 @@ TEST(VirtualInterfaceCallElaboration, ACallThroughTheModulesVariableInAClass) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kNoSuch, 5, "25.9"));
 }
 
-// §25.9 with §27: a procedure of a generate block, whether the block is a
-// conditional construct's (line 7), its else branch's (line 9), a case
-// construct's (line 11) or a loop's (line 12), or nested in another (line 8),
-// is checked as the module's own are (#5826), through the module's virtual
-// interface and through one the block declares. A task the block declares is
-// called there (line 7) and nowhere after the block (line 13, §23.9); the
-// block's net and its parameter declare nothing a call names.
 TEST(VirtualInterfaceCallElaboration, ACallInAGenerateBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -410,12 +321,6 @@ TEST(VirtualInterfaceCallElaboration, ACallInAGenerateBlock) {
                             13, "23.9"));
 }
 
-// §25.9 with §7.4 and §8.11: a method of a class selecting into the class's
-// own virtual interface property, vif[0] or this.vif[0], past the last
-// dimension of its array of them, vifs[0][1], or into one it inherits (line
-// 9), selects into a virtual interface and is reported (#5827). A select of a
-// logic array property, a call through an element of the array, and a select
-// of the method's local variable hiding the property's name are not.
 TEST(VirtualInterfaceArrayElaboration, ASelectIntoTheMethodsOwnProperty) {
   ElabFixture f;
   ElaborateSrc(
@@ -440,10 +345,6 @@ TEST(VirtualInterfaceArrayElaboration, ASelectIntoTheMethodsOwnProperty) {
   EXPECT_TRUE(NoErrorOnLine(f, 7));
 }
 
-// §25.9: an interface containing a hierarchical reference to an object outside
-// its body shall not be the type of a virtual interface, wherever in the body
-// the reference stands. Here it is written in a process, `a = top.x`, between
-// statements reaching nothing outside, and in a function's body.
 TEST(VirtualInterfaceOutsideReference, ReferenceInAProceduralBodyIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -466,10 +367,6 @@ TEST(VirtualInterfaceOutsideReference, ReferenceInAProceduralBodyIsRefused) {
   }
 }
 
-// A dotted name whose first name a body declares itself reaches nothing outside
-// the interface: a function's argument, a block's variable, a foreach index
-// variable used under a select, and a block's label. Nor does a name written
-// with `::`, which reaches a package rather than the hierarchy.
 TEST(VirtualInterfaceOutsideReference, NamesTheBodyDeclaresAreInside) {
   EXPECT_TRUE(ElabOk(
       "package pk; typedef struct { int f; } s_t; s_t v; endpackage\n"
@@ -486,12 +383,6 @@ TEST(VirtualInterfaceOutsideReference, NamesTheBodyDeclaresAreInside) {
       "module top; ifc i(); virtual ifc v; endmodule\n"));
 }
 
-// §25.9: a modport an interface instance's connection names, `p32.phy`, is
-// selected as a virtual interface's modport is, so it goes only to a virtual
-// interface selecting the same modport: `v32 = p32.phy` is refused as
-// `v16 = v16_phy` is, and `v8 = p8.mon` for naming another modport, while
-// `v8 = p8.phy` and a member that is no modport, `w = p8.addr`, are not
-// judged by the modport rule.
 TEST(VirtualInterfaceModportAssignment, InstanceModportSelectsTheType) {
   ElabFixture f;
   ElaborateSrc(
@@ -522,11 +413,6 @@ TEST(VirtualInterfaceModportAssignment, InstanceModportSelectsTheType) {
                              10, "25.9"));
 }
 
-// §25.9 with §23.4: an interface a module declares nested in its body is a
-// name the module may write a virtual interface type with, its parameter
-// values and modport held to that declaration, so a modport it does not
-// declare is reported as missing from it rather than the interface as unknown
-// (#8265).
 TEST(VirtualInterfaceElaboration, ANestedInterfaceTypesAVirtualInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -549,9 +435,6 @@ TEST(VirtualInterfaceElaboration, ANestedInterfaceTypesAVirtualInterface) {
                              7, "25.9"));
 }
 
-// ...and a modport of an instance of it, `b.mq`, goes only to a virtual
-// interface selecting the same modport, the instance's interface found nested
-// as the virtual interface's is.
 TEST(VirtualInterfaceModportAssignment, ANestedInstancesModportSelectsTheType) {
   ElabFixture f;
   ElaborateSrc(
@@ -568,18 +451,11 @@ TEST(VirtualInterfaceModportAssignment, ANestedInstancesModportSelectsTheType) {
                             "25.9"));
 }
 
-// The message §25.9's rule gives a virtual interface type naming no interface,
-// for the name `name`.
 std::string UnknownInterface(std::string_view name) {
   return "unknown interface '" + std::string(name) +
          "' in virtual interface declaration";
 }
 
-// §25.9: a virtual interface type names an interface wherever it is written,
-// not only among a module's variables: a module's typedef, a task's argument
-// and a variable its body declares, a variable a procedural block declares and
-// a class property naming none are each reported, and a modport the named
-// interface does not declare is reported missing from it (#8269).
 TEST(VirtualInterfaceElaboration, EveryVirtualInterfaceTypeOfAModuleIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -607,8 +483,6 @@ TEST(VirtualInterfaceElaboration, EveryVirtualInterfaceTypeOfAModuleIsChecked) {
                             "25.9"));
 }
 
-// ...and an interface the module declares nested in its body (§23.4), or the
-// compilation unit declares, is one in each of those places (#8269).
 TEST(VirtualInterfaceElaboration,
      ADeclaredInterfaceTypesEveryVirtualInterface) {
   ElabFixture f;
@@ -626,10 +500,6 @@ TEST(VirtualInterfaceElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ...as it does in the compilation unit and a package: a typedef, a variable,
-// a class property and a task's argument naming no interface are reported
-// there as well, and one naming an interface the compilation unit declares is
-// not (#8269).
 TEST(VirtualInterfaceElaboration, AUnitOrPackageVirtualInterfaceTypeIsChecked) {
   ElabFixture f;
   ElaborateSrc(

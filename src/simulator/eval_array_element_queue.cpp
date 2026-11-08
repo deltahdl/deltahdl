@@ -29,15 +29,6 @@ namespace delta {
 
 namespace {
 
-// What each element's queue of an array whose elements are queues is made
-// of: elements of `width` bits, four-state where `is_4state` says so, signed
-// where `is_signed` does, class handles where `handles` does, `levels`
-// further levels of queues below it (QueueObject::nested_queue_levels), and,
-// where the element is a fixed-size array, `fixed_size` elements addressed by
-// the bounds `fixed_lo` and `fixed_descending` give
-// (QueueObject::element_array_size, index_lo), and, where that array is
-// multidimensional, `inner` its dimensions after the first, which the queues
-// one level down are made with (QueueObject::element_inner_dims).
 struct ElementQueueShape {
   uint32_t width;
   bool is_4state;
@@ -66,10 +57,6 @@ ElementQueueShape ShapeOf(const AssocArrayObject& aa) {
           aa.element_inner_dims};
 }
 
-// §7.4 with Table 7-1: brings `q`, the queue of an element that is a
-// fixed-size array of `size` elements, to that many, dropping any past the
-// last and filling any missing with the element type's default, x for a
-// 4-state element and 0 for a 2-state one.
 void FitToFixedSize(QueueObject* q, uint32_t size, Arena& arena) {
   if (size == 0) return;
   if (q->elements.size() > size) q->elements.resize(size);
@@ -80,9 +67,6 @@ void FitToFixedSize(QueueObject* q, uint32_t size, Arena& arena) {
   }
 }
 
-// The queue of the shape `shape` gives an element's queue, empty or, for a
-// fixed-size array, holding its defaults; where it has levels below it, its
-// own elements are queues of one level fewer.
 QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   auto* q = arena.Create<QueueObject>();
   q->elem_width = shape.width;
@@ -93,8 +77,6 @@ QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   q->nested_queue_levels = shape.levels > 0 ? shape.levels - 1 : 0;
   q->index_lo = shape.fixed_lo;
   q->index_descending = shape.fixed_descending;
-  // §7.4.4: the elements of a multidimensional element's queue are the next
-  // dimension's arrays, each kept as a queue of that dimension's size.
   if (!shape.inner.empty()) {
     q->element_array_size = shape.inner[0].size;
     q->element_array_lo = shape.inner[0].lo;
@@ -106,19 +88,12 @@ QueueObject* NewElementQueue(const ElementQueueShape& shape, Arena& arena) {
   return q;
 }
 
-// The entries of an associative array under one kind of key, `data`, and the
-// queue each element that is a queue holds under the same key, `queues`.
 template <typename Key>
 struct KeyedEntries {
   std::map<Key, Logic4Vec>& data;
   std::map<Key, QueueObject*>& queues;
 };
 
-// The queue under `key` of the associative array `aa`, whose entries under
-// that kind of key are `entries`. A key the entries lack is allocated where
-// `allocate` says so, the queue a deleted entry left under it dropped so the
-// new element starts empty (§7.8.7); read alone, it answers a fresh empty
-// queue and allocates nothing.
 template <typename Key>
 QueueObject* AssocElementQueue(AssocArrayObject* aa, KeyedEntries<Key> entries,
                                const Key& key, bool allocate, Arena& arena) {
@@ -132,11 +107,6 @@ QueueObject* AssocElementQueue(AssocArrayObject* aa, KeyedEntries<Key> entries,
   return q;
 }
 
-// §7.8.6: a read of an entry the array lacks answers the element's default
-// and is warned of, as a read of any other associative element is
-// (WarnAssocMiss in eval_select_assoc.cpp), unless the array has a
-// user-specified default. Read here, `af[9][1]` on `int af[int][2]` and
-// `aq["x"].size()` on `int aq[string][$]` answered the default unwarned.
 static void WarnAssocElementMiss(const AssocArrayObject* aa, bool present,
                                  const Expr* sel, SimContext& ctx) {
   if (present || aa->has_default) return;
@@ -148,8 +118,6 @@ static void WarnAssocElementMiss(const AssocArrayObject* aa, bool present,
       Subclause("7.8.6"));
 }
 
-// §7.8: the element `sel` selects of the associative array `aa`, keyed as the
-// array keys its entries (AssocStringKey, AssocIntKey).
 QueueObject* OfAssocElement(AssocArrayObject* aa, const Expr* sel,
                             SimContext& ctx, Arena& arena, bool allocate) {
   Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
@@ -171,11 +139,6 @@ QueueObject* OfAssocElement(AssocArrayObject* aa, const Expr* sel,
       allocate, arena);
 }
 
-// §7.10.1: the element `sel` selects of the queue or dynamic array `outer`,
-// `$` in the index standing for the last position. The element's queue is
-// kept under the element's identity where `outer` keeps identities, so a
-// push_front or a pop on `outer` leaves each element with its own queue, and
-// under the position otherwise.
 QueueObject* OfQueueElement(QueueObject* outer, const Expr* sel,
                             SimContext& ctx, Arena& arena) {
   ctx.PushScope();
@@ -192,10 +155,6 @@ QueueObject* OfQueueElement(QueueObject* outer, const Expr* sel,
   return q;
 }
 
-// Appends to `q` what `item` contributes as an item of an unpacked array
-// concatenation (§10.10): a queue's elements where it designates one, a copy
-// of each element of a fixed-size array variable where it names one (§7.6),
-// else its one value, sized to the element type.
 void AppendItem(QueueObject* q, const Expr* item, SimContext& ctx,
                 Arena& arena) {
   if (const QueueObject* src = FindQueueOfBase(item, ctx, arena)) {
@@ -216,10 +175,6 @@ void AppendItem(QueueObject* q, const Expr* item, SimContext& ctx,
       SizedForQueueElement(*q, EvalExpr(item, ctx, arena), arena));
 }
 
-// §7.4: the element `sel` selects of a fixed-size array whose elements are
-// queues, which is the queue created under the element's own name
-// (CreateFixedElementQueues in lowerer_var_aggregate.cpp); null for an index
-// holding an x or z bit or one outside the array.
 QueueObject* OfFixedElement(const Expr* sel, SimContext& ctx, Arena& arena) {
   Logic4Vec idx = EvalExpr(sel->index, ctx, arena);
   if (HasUnknownBits(idx)) return nullptr;
@@ -234,12 +189,7 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   ElementQueueShape empty = ShapeOf(*outer);
   empty.fixed_size = 0;
   QueueObject* q = NewElementQueue(empty, arena);
-  // §10.9: a pattern typed with the element's queue type, `T_QI'{2, 3}`,
-  // lists the element's items as the bare pattern does.
   item = UnwrapTypedPattern(item);
-  // §7.10 with §10.9.1: where the element's own elements are queues, `a[0]`
-  // of `int a[$][$][$]` or of `int q[$][2][2]`, each of its items makes one
-  // of those queues in turn.
   if (!FillQueueOfQueues(q, item, ctx, arena)) {
     bool listed = item->kind == ExprKind::kConcatenation ||
                   (item->kind == ExprKind::kAssignmentPattern &&
@@ -256,9 +206,6 @@ QueueObject* ElementQueueFromItem(const QueueObject* outer, const Expr* item,
   return q;
 }
 
-// Empties `q`, a queue whose elements are queues, the element queues with it,
-// and gives it `count` placeholder elements with fresh identities, under which
-// the caller keeps each element's queue.
 static void ResetToPlaceholders(QueueObject* q, size_t count, Arena& arena) {
   q->elements.clear();
   q->element_queues.clear();
@@ -267,8 +214,6 @@ static void ResetToPlaceholders(QueueObject* q, size_t count, Arena& arena) {
   q->AssignFreshIds();
 }
 
-// The queue of the element at position `pos` of `outer`, an array whose
-// elements are queues; null where that element's queue was never made.
 static const QueueObject* ElementQueueAt(const QueueObject& outer, size_t pos) {
   auto it = outer.element_queues.find(outer.ElementQueueKeyAt(pos));
   return it == outer.element_queues.end() ? nullptr : it->second;
@@ -280,12 +225,6 @@ const QueueObject* ElementQueueOrDefault(const QueueObject& outer, size_t pos,
   return NewElementQueue(ShapeOf(outer), arena);
 }
 
-// A copy of `src`, the queue of one element of an array whose elements are
-// queues, made in the shape `shape` gives the target's elements: each value
-// owning its words, the element type's fixed size kept, and where the values
-// stand for queues of their own, each of those copied one level down. A null
-// `src`, an element whose queue was never made, copies as the shape's
-// default.
 static QueueObject* CopyElementQueue(const QueueObject* src,
                                      const ElementQueueShape& shape,
                                      Arena& arena) {
@@ -305,18 +244,12 @@ static QueueObject* CopyElementQueue(const QueueObject* src,
   return copy;
 }
 
-// The multidimensional fixed-size array a subarray is copied from, `info`,
-// and the context and arena the copy is made in.
 struct SubarraySource {
   const ArrayInfo& info;
   SimContext& ctx;
   Arena& arena;
 };
 
-// §7.12.1 with §7.4.4: a copy of the subarray under `prefix` of the array
-// `src` describes, whose first dimension is `dim`, as an element queue of the
-// shape `shape` gives the target's elements: the leaves of its last
-// dimension as values, and each level above as queues of the level below.
 static QueueObject* CopySubarray(const SubarraySource& src,
                                  const std::string& prefix, size_t dim,
                                  const ElementQueueShape& shape) {
@@ -346,12 +279,6 @@ static QueueObject* CopySubarray(const SubarraySource& src,
   return element;
 }
 
-// §7.12.1 with §7.4.4: `q`, a queue whose elements are fixed-size arrays or
-// queues, assigned the elements the locator `rhs` selects of a
-// multidimensional array (its subarrays) or of an array whose elements are
-// queues (TryCollectLocatorRows), holds one element per selection, each a
-// copy of the selected element's values. False, with `q` left alone, where
-// `rhs` selects no such elements.
 static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
                                      SimContext& ctx, Arena& arena) {
   LocatorRows rows;
@@ -376,10 +303,6 @@ static bool FillQueueFromLocatorRows(QueueObject* q, const Expr* rhs,
   return true;
 }
 
-// §7.6 with §7.10: `q`, a queue whose elements are queues, assigned `rhs`
-// naming another such queue, holds a copy of each of its elements' queues
-// (CopyElementQueue), made before `q` is emptied so that `q = q` keeps what it
-// held. False, with `q` left alone, where `rhs` names no such queue.
 static bool FillQueueFromQueueOfQueues(QueueObject* q, const Expr* rhs,
                                        SimContext& ctx, Arena& arena) {
   if (rhs->kind != ExprKind::kIdentifier &&
@@ -398,16 +321,6 @@ static bool FillQueueFromQueueOfQueues(QueueObject* q, const Expr* rhs,
   return true;
 }
 
-// §10.10 with §7.4 and §7.10: `q`, a queue whose elements are queues, assigned
-// the unpacked array concatenation `rhs`, holds what each item contributes in
-// turn. An item naming an array of `q`'s own type, a queue of the same levels
-// and element size, contributes a copy of each of its elements' queues; a
-// select of one element of such an array, `r[0]`, a copy of that element's
-// queue; and any other item, being of `q`'s element type, one element made as
-// a pushed argument makes it (ElementQueueFromItem), so `a` of `int a[3]` is
-// one row of `int r[$][3]`. The copies are made before `q` is emptied, so that
-// `r = {r, a}` keeps r's rows. False, with `q` left alone, where `rhs` is no
-// concatenation.
 static bool FillQueueFromConcatenation(QueueObject* q, const Expr* rhs,
                                        SimContext& ctx, Arena& arena) {
   if (rhs->kind != ExprKind::kConcatenation) return false;
@@ -415,7 +328,7 @@ static bool FillQueueFromConcatenation(QueueObject* q, const Expr* rhs,
   std::vector<QueueObject*> copies;
   for (const Expr* item : rhs->elements) {
     if (const QueueObject* element =
-            ElementQueueOfSelect(item, ctx, arena, /*allocate=*/false)) {
+            ElementQueueOfSelect(item, ctx, arena, false)) {
       copies.push_back(CopyElementQueue(element, shape, arena));
       continue;
     }
@@ -486,10 +399,6 @@ QueueObject* ElementQueueOfSelect(const Expr* sel, SimContext& ctx,
     if (info != nullptr && info->elements_are_queues)
       return OfFixedElement(sel, ctx, arena);
   }
-  // §7.8.7: an element written through a select of its own element,
-  // `am[0][1]` of `int am[int][2][3]`, allocates the associative entry the
-  // inner select names, as a write through `am[0]` alone does; read, the
-  // missing entry's queue was a fresh one that nothing kept.
   QueueObject* outer =
       allocate ? FindWrittenQueueOfBase(sel->base, ctx, arena, nullptr)
                : FindQueueOfBase(sel->base, ctx, arena);
@@ -529,8 +438,7 @@ bool SelectsElementQueue(const Expr* sel, SimContext& ctx, Arena& arena) {
 
 bool TryCopyElementQueueToArray(const Stmt* stmt, const ArrayInfo& dst,
                                 SimContext& ctx, Arena& arena) {
-  const QueueObject* src =
-      ElementQueueOfSelect(stmt->rhs, ctx, arena, /*allocate=*/false);
+  const QueueObject* src = ElementQueueOfSelect(stmt->rhs, ctx, arena, false);
   if (src == nullptr || dst.is_dynamic || dst.is_queue) return false;
   if (src->elements.size() != dst.size) {
     ctx.GetDiag().Error(stmt->range.start,

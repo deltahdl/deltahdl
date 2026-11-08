@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8.5: an index of a user-defined type is keyed by its whole value, so two
-// structures that differ only in a member lying above bit 63 of the
-// structure's 80 bits are two entries.
 TEST(UserDefinedIndexAssocArraySimulation,
      StructureIndexIsKeyedByItsWholeValue) {
   SimFixture f;
@@ -31,10 +28,6 @@ TEST(UserDefinedIndexAssocArraySimulation,
   EXPECT_EQ(out, "2 1 2\n");
 }
 
-// §7.8.5 with §6.14: a chandle is a legal index type, and a chandle variable
-// starts as null, so the entry written under `h` is read back under it and is
-// the array's one entry. The array was built with no dimension, so `m[h]`
-// selected nothing.
 TEST(UserDefinedIndexAssocArraySimulation, ChandleIndexKeysAnEntry) {
   SimFixture f;
   std::string out = RunCapture(
@@ -50,10 +43,6 @@ TEST(UserDefinedIndexAssocArraySimulation, ChandleIndexKeysAnEntry) {
   EXPECT_EQ(out, "1 7 1\n");
 }
 
-// §7.8.5 with §15.5.5.3: an event index keys an entry by the object the event
-// refers to, so two events are two entries and `null` a third. Once `e2 = e1`
-// merges them (§15.5.5.1), e2 refers to e1's object and reads e1's entry.
-// Every event read as one bit, so e1 and e2 shared an entry.
 TEST(UserDefinedIndexAssocArraySimulation, EventIndexKeysByTheObject) {
   SimFixture f;
   std::string out = RunCapture(

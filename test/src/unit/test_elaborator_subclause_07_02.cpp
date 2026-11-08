@@ -23,10 +23,6 @@ TEST(StructDeclarationValidation, VoidMemberInUnpackedStruct_Rejected) {
                             "7.2"));
 }
 
-// A void member in a packed structure breaches two rules at once: §7.2 bars a
-// void member outside a tagged union, and §7.2.1 bars a member whose type is
-// not packed. Naming the §7.2 report is what says the void rule fired rather
-// than the packed-member-type rule.
 TEST(StructDeclarationValidation, VoidMemberInPackedStruct_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -102,12 +98,6 @@ TEST(StructDeclarationValidation, UnpackedStructAcceptsAnyDataType) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2: an unpacked structure member may be declared with any data type, which
-// includes a user-defined enumeration. UnpackedStructAcceptsAnyDataType above
-// exercises real/string/vector/array/int members; an enum member is a distinct
-// admitted member type not otherwise observed at the elaborator stage. The
-// unpacked struct carries no packed-member-type restriction, so the enum-typed
-// member is accepted.
 TEST(StructDeclarationValidation, UnpackedStructEnumMemberAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -120,10 +110,6 @@ TEST(StructDeclarationValidation, UnpackedStructEnumMemberAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2: an unpacked structure member may itself be a structure. A nested inline
-// (unpacked) struct member is a distinct admitted member type; the parser
-// already observes this form, but the elaborator's acceptance of an unpacked
-// struct holding a struct-typed member is not otherwise observed here.
 TEST(StructDeclarationValidation, UnpackedStructNestedStructMemberAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -171,10 +157,6 @@ TEST(StructDeclarationValidation, BareStructWithRealMemberClassifiedUnpacked) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2, footnote 17: when a packed dimension follows the struct keyword, the
-// packed keyword shall also be used. An unpacked struct carrying a trailing
-// packed dimension is illegal. The trailing [3:0] is parsed onto the struct
-// type's packed dimension, so the elaborator's packed-dim gate must fire.
 TEST(StructDeclarationValidation, PackedDimOnStructWithoutPackedRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -188,9 +170,6 @@ TEST(StructDeclarationValidation, PackedDimOnStructWithoutPackedRejected) {
                             2, "7.2"));
 }
 
-// §7.2, footnote 17: a packed struct may carry a trailing packed dimension.
-// This is the positive discriminator showing the gate opens once packed is
-// present; it shares the same validator as the union form below.
 TEST(StructDeclarationValidation, PackedDimOnPackedStructAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -202,10 +181,6 @@ TEST(StructDeclarationValidation, PackedDimOnPackedStructAllowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2, footnote 17: when a packed dimension follows the union keyword, the
-// soft and/or packed keyword shall also be used. A plain (unpacked) union with
-// a trailing packed dimension carries neither, so it is illegal. This weaves
-// the same packed-dimension rule across structures and unions.
 TEST(StructDeclarationValidation, PackedDimOnPlainUnionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -219,9 +194,6 @@ TEST(StructDeclarationValidation, PackedDimOnPlainUnionRejected) {
                             2, "7.2"));
 }
 
-// §7.2, footnote 20: a void member is legal only within a tagged union. A
-// plain (non-tagged) union with a void member must be rejected; this
-// discriminates the tagged gate from the tagged-union positive case above.
 TEST(StructDeclarationValidation, VoidMemberInPlainUnionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -234,11 +206,6 @@ TEST(StructDeclarationValidation, VoidMemberInPlainUnionRejected) {
                             "7.2"));
 }
 
-// §7.2 with §6.12 (printed page 110): a real member is a C double and a
-// shortreal a C float, and realtime is real, so an unpacked structure holding
-// them is as wide as those members together: 32 + 64 for `int a; real b;`,
-// and 32 + 64 for `shortreal s; realtime t;`. A real member was laid out one
-// bit wide, as a `bit` with no dimension is.
 TEST(StructDeclarationValidation, RealMemberIsSixtyFourBitsWide) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -268,9 +235,6 @@ TEST(StructDeclarationValidation,
   EXPECT_EQ(v->width, 96u);
 }
 
-// §7.2 with §6.18: the layout a member select uses comes from the structure a
-// type names. A chain of typedef names that never ends names no structure, nor
-// does a structure with no members, so neither gives a layout.
 TEST(StructDeclarationValidation,
      NoLayoutForAnEndlessChainOrAMemberlessStruct) {
   Arena arena;
@@ -288,9 +252,6 @@ TEST(StructDeclarationValidation,
   EXPECT_EQ(ResolvedAggregateType(memberless, kCycle, {}, arena), nullptr);
 }
 
-// §7.2 footnote 20 and §7.3.2: a structure or union written in place as the
-// type of another one's member is a type of its own, under the same rules as
-// one declared anywhere else, at whatever depth it is written.
 TEST(StructDeclarationValidation, AggregatesNestedInPlaceAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -312,9 +273,6 @@ TEST(StructDeclarationValidation, AggregatesNestedInPlaceAreJudged) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 5u) << d.message;
 }
 
-// §7.2 to §7.3.2: the rules on a structure or union type hold wherever the type
-// is written: as a port's type, a class property's, a function's return type
-// and a procedural block's variable's.
 TEST(StructDeclarationValidation, AggregatesWrittenInsideTheModuleAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -338,8 +296,6 @@ TEST(StructDeclarationValidation, AggregatesWrittenInsideTheModuleAreJudged) {
       diags, "void member is only allowed in tagged unions", 5, "7.2"));
 }
 
-// The same rules for what no module's elaboration reaches: a package's
-// typedefs and variables and a variable of the compilation unit.
 TEST(StructDeclarationValidation, AggregatesInPackagesAndTheUnitAreJudged) {
   ElabFixture f;
   ElaborateSrc(

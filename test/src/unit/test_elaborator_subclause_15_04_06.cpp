@@ -37,8 +37,6 @@ TEST(MailboxTryGetElaborator, TryGetResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.6: try_get() stores the message into its argument, which shall be a
-// valid left-hand expression.
 TEST(MailboxTryGetElaborator, TryGetIntoALiteralIsReported) {
   ElabFixture f;
   ElaborateSrc(

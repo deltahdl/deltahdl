@@ -25,8 +25,6 @@ namespace delta {
 
 namespace {
 
-// Appends the file at `path`, preprocessed, to `result`, noting the line its
-// text begins on. False where the file could not be read.
 bool PreprocessFile(const std::string& path, Preprocessor& preproc,
                     SourceManager& src_mgr, PreprocResult& result) {
   std::optional<std::string> content = ReadSource(path);
@@ -42,7 +40,6 @@ bool PreprocessFile(const std::string& path, Preprocessor& preproc,
   return true;
 }
 
-// The directive state `preproc` ends a compilation unit in.
 void ReadPreprocessorState(const Preprocessor& preproc, PreprocResult& result) {
   result.default_nettype = preproc.DefaultNetType();
   result.unconnected_drive = preproc.UnconnectedDrive();
@@ -61,19 +58,12 @@ void ReadPreprocessorState(const Preprocessor& preproc, PreprocResult& result) {
   result.runtime_licenses = preproc.RuntimeLicenses();
 }
 
-// A parse of one compilation unit's text: the unit, the type names its scope
-// ended with, and whether the text ended inside a declaration.
 struct UnitParse {
   CompilationUnit* cu = nullptr;
   CompilationUnitScopeNames scope;
   bool ended_inside_declaration = false;
 };
 
-// Parses `pp`'s text knowing the type names `known` holds. The text is
-// registered with its origins, so a report about a token of it names the file
-// and line somebody can open rather than a position in a buffer they have never
-// seen; the path stays <preprocessed> because it is what a position with no
-// origin recorded falls back to.
 UnitParse ParseUnitText(const PreprocResult& pp,
                         const CompilationUnitScopeNames& known,
                         SourceManager& src_mgr, DiagEngine& diag,
@@ -87,9 +77,6 @@ UnitParse ParseUnitText(const PreprocResult& pp,
   return {cu, parser.CompilationUnitScope(), parser.EndedInsideDeclaration()};
 }
 
-// §3.12.1: whether `pp`'s text ends inside a declaration, asked of a trial
-// parse whose reports are kept from the user, the text being parsed again once
-// the unit is complete.
 bool EndsInsideDeclaration(const PreprocResult& pp,
                            const CompilationUnitScopeNames& known,
                            SourceManager& src_mgr) {
@@ -111,8 +98,6 @@ PreprocResult PreprocessSources(const CliOptions& opts, SourceManager& src_mgr,
   for (const auto& path : opts.source_files) {
     if (!PreprocessFile(path, preproc, src_mgr, result)) return result;
   }
-  // A `begin_keywords region may span source file boundaries (22.14), so the
-  // pairing check only makes sense once every file has been preprocessed.
   preproc.ReportUnterminatedKeywordRegions();
   result.line_origins = preproc.LineOrigins();
   ReadPreprocessorState(preproc, result);
@@ -148,9 +133,6 @@ SeparateUnits ParseSeparateUnits(const CliOptions& opts, SourceManager& src_mgr,
   SeparateUnits result;
   auto& units = result.units;
   Preprocessor preproc(src_mgr, diag, PreprocConfigFor(opts, licenses.Asker()));
-  // §3.12.1: packages and primitives are visible in every unit, so a later
-  // unit's parse knows the type names the earlier units' packages and the
-  // names their primitives declared, and nothing of their own scopes.
   CompilationUnitScopeNames design_wide;
   const auto& files = opts.source_files;
   size_t next = 0;

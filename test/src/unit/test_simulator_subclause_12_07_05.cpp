@@ -40,10 +40,6 @@ TEST(LoopStatementSim, DoWhileIterates) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// A do...while-loop tests its control expression at the end of the loop
-// (12.7.5); a break in the body leaves before that test is reached, even
-// though the expression would still be true. The 12.8 file covers break
-// itself, with a control expression that never ends the loop.
 TEST(LoopStatementSim, DoWhileBreakExitsBeforeConditionTest) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -62,9 +58,6 @@ TEST(LoopStatementSim, DoWhileBreakExitsBeforeConditionTest) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// A continue reaches the end of the do...while body, which is where the
-// control expression is evaluated (12.7.5), so the loop still terminates on
-// that expression. The 12.8 file covers continue as a jump statement.
 TEST(LoopStatementSim, DoWhileConditionTestedAfterContinue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -103,13 +96,7 @@ TEST(LoopStatementSim, DoWhileXConditionOneIteration) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.7.5: the control expression is tested at the end of the loop, so the
-// body runs at least once even when the condition is already false. Exercised
-// here on the function-body execution path, where the loop is interpreted by
-// ExecFuncDoWhile rather than the statement scheduler.
 TEST(LoopStatementSim, DoWhileInFunctionRunsBodyBeforeTest) {
-  // count_up(0): the body increments once before the while test reads the
-  // updated value (1 < 0 is false), so the function returns 1, not 0.
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [31:0] result;\n"
                       "  function automatic int count_up(input int n);\n"
@@ -124,10 +111,6 @@ TEST(LoopStatementSim, DoWhileInFunctionRunsBodyBeforeTest) {
             1u);
 }
 
-// §12.7.5: the control expression may be any expression treatable as a Boolean,
-// not just a one-bit relational result. Here the raw multi-bit counter value is
-// the condition: any nonzero value is true, and the loop stops once it reaches
-// zero. Counting down from 5 runs the body five times.
 TEST(LoopStatementSim, DoWhileMultiBitConditionIsTruthy) {
   SimFixture f;
   auto* design = ElaborateSrc(

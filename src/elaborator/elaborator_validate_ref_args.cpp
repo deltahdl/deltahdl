@@ -1,10 +1,3 @@
-// §13.5.2: what may be passed to a ref argument, judged from the declaration
-// of the name the actual is written with. The call walk in
-// elaborator_validate_subroutine_args.cpp knows a name only as a net or not;
-// this walk keeps, per procedure and per subroutine, what each name the actual
-// can be is declared as: a module variable, a formal of the subroutine, or a
-// local of its body, automatic or static.
-
 #include <cstddef>
 #include <format>
 #include <string_view>
@@ -23,7 +16,6 @@ namespace delta {
 
 namespace {
 
-// What a name is declared as, where the walk can see the declaration.
 struct RefDecl {
   const DataType* type = nullptr;
   bool unpacked = false;
@@ -34,7 +26,6 @@ struct RefDecl {
 using RefScope = std::unordered_map<std::string_view, RefDecl>;
 using FuncDecls = std::unordered_map<std::string_view, const ModuleItem*>;
 
-// One ref formal and the actual a call binds it to.
 struct RefBinding {
   const ModuleItem* func;
   const FunctionArg& formal;
@@ -48,14 +39,10 @@ const Expr* RootIdentifier(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kIdentifier ? e : nullptr;
 }
 
-// A type §6.22.2's equivalence is judged on here: one written with a type
-// keyword and a width the folder can size; a typedef name or a range a
-// parameter sets is left alone rather than judged wrongly.
 bool IsJudgedType(const DataType& t) {
   return t.kind != DataTypeKind::kNamed && EvalTypeWidth(t) > 0;
 }
 
-// §13.5.2 with §6.22.2: a ref argument is matched with an equivalent type.
 void CheckRefEquivalence(const RefBinding& b, DiagEngine& diag) {
   if (b.actual->kind != ExprKind::kIdentifier || b.decl.unpacked ||
       !b.formal.unpacked_dims.empty())
@@ -69,9 +56,6 @@ void CheckRefEquivalence(const RefBinding& b, DiagEngine& diag) {
              Subclause("13.5.2"));
 }
 
-// §13.5.2: a variable, a class property, a member of an unpacked structure or
-// an element of an unpacked array is passed by reference, so a select of a
-// value with no unpacked dimension is not.
 void CheckRefPackedSelect(const RefBinding& b, DiagEngine& diag) {
   if (b.actual->kind != ExprKind::kSelect || b.actual->base != b.root ||
       b.decl.unpacked)
@@ -83,8 +67,6 @@ void CheckRefPackedSelect(const RefBinding& b, DiagEngine& diag) {
              Subclause("13.5.2"));
 }
 
-// §13.5.2: a ref static argument is passed only what has a static lifetime,
-// never an automatic variable or a ref argument without the static qualifier.
 void CheckRefStatic(const RefBinding& b, DiagEngine& diag) {
   if (!b.formal.is_ref_static ||
       (!b.decl.automatic && !b.decl.ref_without_static))
@@ -126,8 +108,6 @@ void WalkRefExpr(const Expr* e, const RefScope& scope, const RefWalk& w) {
   ForEachExprChild(e, [&](const Expr* child) { WalkRefExpr(child, scope, w); });
 }
 
-// §6.21: a local is automatic in an automatic subroutine unless declared
-// static, and in a static one where declared automatic.
 void WalkRefStmt(const Stmt* s, RefScope& scope, bool automatic,
                  const RefWalk& w) {
   if (s == nullptr) return;

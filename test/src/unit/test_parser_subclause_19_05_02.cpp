@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.2: a transition bin of length 0 is illegal -- a trans_set of one
-// covergroup_value_range, a single value or a single range, or of one with a
-// repeat_range of 1. A transition of two values, and one value repeated twice,
-// have length 1 and are accepted.
 TEST_F(VerifyParseTest, TransitionOfLengthZeroIsError) {
   Parse(R"(
     module m;
@@ -38,10 +34,6 @@ TEST_F(VerifyParseTest, TransitionOfLengthZeroIsError) {
   }
 }
 
-// §19.5.2: the multiple-bins form `name [ ]` makes one bin per transition, so
-// a transition of unbounded or undetermined length -- a nonconsecutive or a
-// goto repetition -- cannot stand in it; the same transitions in a single bin,
-// and a bounded consecutive repetition in the array form, are accepted.
 TEST_F(VerifyParseTest, UnboundedTransitionInBinArrayIsError) {
   Parse(R"(
     module m;

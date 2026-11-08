@@ -12,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §20.6.3: $isunbounded returns true (1'b1) when its argument is an unbounded
-// parameter (one declared with $). This is the LRM example: parameter int i =
-// $; then $isunbounded(i) returns true.
 TEST(RangeSystemFunctionSim, UnboundedParameterReturnsTrue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -28,8 +25,6 @@ TEST(RangeSystemFunctionSim, UnboundedParameterReturnsTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §20.6.3: for any argument that is not $, $isunbounded returns false (1'b0).
-// A parameter given an ordinary bounded value is therefore not unbounded.
 TEST(RangeSystemFunctionSim, BoundedParameterReturnsFalse) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -43,9 +38,6 @@ TEST(RangeSystemFunctionSim, BoundedParameterReturnsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §20.6.3: the result is resolved per argument name, so when one parameter is
-// unbounded and another is bounded the two queries disagree within the same
-// design.
 TEST(RangeSystemFunctionSim, ResolvesPerParameterName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -72,9 +64,6 @@ TEST(RangeSystemFunctionSim, ResolvesPerParameterName) {
   EXPECT_EQ(r_lo->value.ToUint64(), 0u);
 }
 
-// §20.6.3: the true result is a single-bit value (1'b1), not a wider integer.
-// Evaluating the call directly against a registered unbounded parameter shows
-// the 1-bit width the LRM specifies.
 TEST(RangeSystemFunctionSim, TrueResultIsOneBitWide) {
   SimFixture f;
   f.ctx.RegisterUnboundedParam("u");
@@ -84,9 +73,6 @@ TEST(RangeSystemFunctionSim, TrueResultIsOneBitWide) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §20.6.3: an argument that is not a parameter name at all (here a plain
-// integer literal) is still not $, so the "otherwise" branch applies and the
-// call returns the 1-bit false value (1'b0).
 TEST(RangeSystemFunctionSim, NonParameterArgumentReturnsFalse) {
   SimFixture f;
   auto* expr = MakeSysCall(f.arena, "$isunbounded", {MakeInt(f.arena, 8)});
@@ -95,12 +81,6 @@ TEST(RangeSystemFunctionSim, NonParameterArgumentReturnsFalse) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// §20.6.3 BNF (Syntax 20-8): the operand may be a hierarchical_parameter_
-// identifier, not only a simple ps_parameter_identifier. A dotted reference to
-// an unbounded parameter inside an instantiated submodule shall evaluate to the
-// same true (1'b1) result. Built from real source and driven through the full
-// pipeline so the instance-qualified name is produced by elaboration/lowering,
-// not hand-registered.
 TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -116,9 +96,6 @@ TEST(RangeSystemFunctionSim, HierarchicalUnboundedParameterReturnsTrue) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §20.6.3: the branch that returns false otherwise holds for the hierarchical
-// operand form too — a submodule parameter given an ordinary bounded value is
-// not $, so a dotted query of it yields 1'b0.
 TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -134,12 +111,6 @@ TEST(RangeSystemFunctionSim, HierarchicalBoundedParameterReturnsFalse) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §20.6.3 answers 1'b1 where the parameter's value is `$`, and §6.20.7 lets
-// `$` be a class value parameter's value as it is a module's. The default
-// specialization holds `$` and `C #(4)` holds 4, so the two method calls
-// disagree; beside them a module parameter of each kind gives the same pair.
-// This fails on a class that rejects `$` as its default, and on one that
-// answers every class parameter as bounded.
 TEST(RangeSystemFunctionSim, ClassParameterHoldingDollarIsUnbounded) {
   SimFixture f;
   EXPECT_EQ(
@@ -160,13 +131,6 @@ TEST(RangeSystemFunctionSim, ClassParameterHoldingDollarIsUnbounded) {
       "1 0 1 0\n");
 }
 
-// §6.20.7 makes it legal to assign a `$` parameter to another parameter, and
-// the one assigned holds `$` in its turn: `M = N` does in the default
-// specialization, and so does the body localparam `L = $`. Under `C #(4)` N
-// holds 4, so M, whose default names N, holds 4 and is bounded; under
-// `C #(.M(3))` M is overridden and bounded while N keeps `$`. Each digit of
-// ub() is one parameter, N M L. This fails on a mark taken from a default
-// alone, which left M unbounded under `C #(4)`.
 TEST(RangeSystemFunctionSim, ClassParameterAssignedADollarParameterFollowsIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -185,10 +149,6 @@ TEST(RangeSystemFunctionSim, ClassParameterAssignedADollarParameterFollowsIt) {
             "111 1 101\n");
 }
 
-// §6.20.7: an override naming a parameter that holds `$` hands the class's
-// parameter `$`, so $isunbounded on it answers 1; one naming a bounded
-// parameter answers 0. This fails on an override that reads the name's value
-// alone, which `$` does not have.
 TEST(RangeSystemFunctionSim, OverrideNamingADollarParameterIsUnbounded) {
   SimFixture f;
   EXPECT_EQ(

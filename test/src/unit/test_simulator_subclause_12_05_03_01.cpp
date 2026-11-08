@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -142,15 +140,6 @@ TEST(CaseViolationDeferralSim, DeferredUniqueCasezOverlapReported) {
 }
 
 TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesCaseViolation) {
-  // §12.5.3.1: a unique-case violation check is immune to false reports caused
-  // by zero-delay glitches in the active region set, using the same mechanics
-  // as the unique-if construct (§12.4.2.1). Here the always_comb first
-  // evaluates with a==1 and b==1, so both case items match 1'b1 and an overlap
-  // violation is queued. The nonblocking update of b re-triggers the procedure
-  // within the same time step; on resume the procedure reaches a flush point
-  // that discards the pending violation before the Observed region can mature
-  // it. The settled state (a==1, b==0) has a single match, so nothing is
-  // reported.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -178,23 +167,6 @@ TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesCaseViolation) {
 }
 
 TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesNoMatchViolation) {
-  // §12.5.3.1 covers *all* the violation checks of §12.5.3, not just the
-  // overlap check: the no-matching-item check of a unique case is equally
-  // immune to zero-delay glitches, through the same flush mechanics
-  // (§12.4.2.1). This exercises the distinct no-match production path rather
-  // than the overlap one. The always_comb first evaluates with a==0 and b==0,
-  // so neither item matches 1'b1 and (there being no default) a no-match
-  // violation is queued. The nonblocking update of a re-triggers the procedure
-  // in the same time step; on resume the flush point discards the pending
-  // violation before the Observed region can mature it. The settled state
-  // (a==1) matches a single item, so nothing is reported.
-  //
-  // The count is taken as a difference across the run rather than against zero.
-  // A no-match is only reportable where the case has no default, and an
-  // always_comb whose case has no default draws a latch-inference warning
-  // during elaboration -- so an absolute count of zero is unreachable here for
-  // a reason that has nothing to do with §12.5.3.1. What the clause claims is
-  // that running the simulation adds no report, which is what this measures.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -222,16 +194,6 @@ TEST(CaseViolationDeferralSim, AlwaysCombRetriggerFlushesNoMatchViolation) {
 }
 
 TEST(CaseViolationDeferralSim, AlwaysLatchRetriggerFlushesCaseViolation) {
-  // §12.5.3.1: the zero-delay-glitch mechanics are identical to those of the
-  // unique-if construct (§12.4.2.1), which apply to always_latch just as they
-  // do to always_comb (both lower through the same coroutine). Here a unique
-  // case with no default sits in an always_latch, so a latch is inferred. The
-  // block first evaluates with a==1 and b==1, so both case items match 1'b1 and
-  // an overlap violation is queued. The nonblocking update of b re-triggers the
-  // procedure within the same time step; on resume it reaches a flush point
-  // that discards the pending violation before the Observed region can mature
-  // it. The settled state (a==1, b==0) matches a single item, so nothing is
-  // reported.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -280,13 +242,6 @@ TEST(CaseViolationDeferralSim, DeferredPriorityCasexNoMatchReported) {
 }
 
 TEST(CaseViolationDeferralSim, EventControlFlushesCaseViolation) {
-  // §12.5.3.1: case violation reports use the same zero-delay-glitch mechanics
-  // as the unique-if construct (§12.4.2.1), so a pending case violation is also
-  // a flush point candidate when the procedure suspends mid-body. Here a unique
-  // case queues an overlap violation, then the procedure suspends on an event
-  // control and is resumed in the same time step by the other process; on
-  // resume the pending violation is flushed before the Observed region matures
-  // it, so nothing is reported.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -311,10 +266,6 @@ TEST(CaseViolationDeferralSim, EventControlFlushesCaseViolation) {
 }
 
 TEST(CaseViolationDeferralSim, WaitStatementFlushesCaseViolation) {
-  // §12.5.3.1: resuming after suspending on a wait statement is likewise a
-  // flush point for a pending case violation, matching the §12.4.2.1 mechanics.
-  // The queued overlap violation is dropped when the procedure resumes once the
-  // wait condition becomes true within the same time step.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -340,11 +291,6 @@ TEST(CaseViolationDeferralSim, WaitStatementFlushesCaseViolation) {
 }
 
 TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
-  // §12.5.3.1 / §12.4.2.1 edge case: once a deferred case violation matures in
-  // the Observed region it can no longer be flushed. The overlap is detected
-  // and matured at time 0; the procedure only resumes from the event control at
-  // a later time step, so the flush on resume finds an empty queue and the
-  // already-reported violation stands.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -368,9 +314,6 @@ TEST(CaseViolationDeferralSim, MaturedCaseViolationSurvivesLaterResume) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3.1: a unique-case whose items overlap raises a violation report, and
-// that report names §12.5.3.1 rather than §12.4.2.1, which states the rule for
-// an if statement.
 TEST(CaseViolationDeferralSim, UniqueCaseOverlapNames12_5_3_1) {
   SimFixture f;
   auto* design = ElaborateSrc(

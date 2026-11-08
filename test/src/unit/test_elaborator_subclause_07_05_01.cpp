@@ -49,13 +49,6 @@ TEST(DynamicArrayNewValidation, SelfReferenceResizeElaborates) {
              "endmodule\n"));
 }
 
-// §7.5.1 with A.6.2: `new [n]` is no expression. It stands only as the whole
-// right-hand side of a blocking assignment or a declaration assignment, never
-// in a nonblocking or continuous one or as an operand, and only where the
-// left-hand side is a dynamic array: a fixed dimension or a keyword type is
-// nothing it constructs. An element of an array whose next dimension is
-// dynamic, a subroutine's dynamic array argument and a structure member it
-// cannot see the type of are left alone.
 TEST(DynamicArrayNewValidation, NewStandsOnlyWhereItConstructsADynamicArray) {
   ElabFixture f;
   ElaborateSrc(

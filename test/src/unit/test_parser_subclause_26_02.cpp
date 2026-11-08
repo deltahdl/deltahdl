@@ -87,18 +87,12 @@ TEST(PackageDeclaration, MissingEndpackageIsError) {
       ReportedError(r.diags, "expected 'endpackage', got EOF", 1, "26.2"));
 }
 
-// §3.14.2.2: a package is one time scope, and a repeated timeunit or
-// timeprecision within a time scope shall match the declaration before it. A
-// repeat is grammatical, so the pair below differs from its neighbours only in
-// whether the two declarations agree.
 TEST(PackageDeclaration, RepeatedTimeunitMustMatchThePreviousOne) {
   auto r = Parse(
       "package pkg;\n"
       "  timeunit 1ns;\n"
       "  timeunit 1ps;\n"
       "endpackage\n");
-  // §3.14.2.2 owns the matching rule and is what the report names; §26.2 states
-  // only that a package is a time scope.
   EXPECT_TRUE(ReportedError(
       r.diags, "timeunit does not match prior declaration", 3, "3.14.2.2"));
 }
@@ -109,7 +103,6 @@ TEST(PackageDeclaration, RepeatedTimeprecisionMustMatchThePreviousOne) {
       "  timeprecision 1ps;\n"
       "  timeprecision 1fs;\n"
       "endpackage\n");
-  // §3.14.2.2 owns the matching rule and is what the report names.
   EXPECT_TRUE(ReportedError(r.diags,
                             "timeprecision does not match prior declaration", 3,
                             "3.14.2.2"));
@@ -123,9 +116,6 @@ TEST(PackageDeclaration, ARepeatedTimeunitThatMatchesIsAccepted) {
               "endpackage\n"));
 }
 
-// §26.2 lists package_declaration under description alone, so `package` inside
-// a module, interface or program body reaches no dispatch and is rejected by
-// the module-item fallback, whose report names §23.2.4.
 TEST(PackageDeclaration, PackageNotAllowedInsideModule) {
   auto r = Parse(
       "module m;\n"
@@ -282,8 +272,6 @@ TEST(PackageDeclaration, PackageExportDeclarationAsPackageItem) {
   EXPECT_TRUE(found_export);
 }
 
-// The package_declaration production opens with { attribute_instance }: an
-// attribute prefix on the package header is legal and must not disturb parsing.
 TEST(PackageDeclaration, AttributeInstanceBeforePackageAccepted) {
   auto r = Parse(
       "(* keep *) package pkg;\n"
@@ -296,8 +284,6 @@ TEST(PackageDeclaration, AttributeInstanceBeforePackageAccepted) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 1u);
 }
 
-// Each package_item may itself carry a leading { attribute_instance }; the
-// attribute is consumed and the item still lands in the package body.
 TEST(PackageDeclaration, AttributeInstanceBeforePackageItemAccepted) {
   auto r = Parse(
       "package pkg;\n"
@@ -310,9 +296,6 @@ TEST(PackageDeclaration, AttributeInstanceBeforePackageItemAccepted) {
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kVarDecl);
 }
 
-// package_or_generate_item_declaration lists extern_constraint_declaration; a
-// package body accepts an out-of-block constraint via its dedicated dispatch
-// and records it on the compilation unit for later prototype pairing.
 TEST(PackageDeclaration, ExternConstraintDeclarationAsPackageItem) {
   auto r = Parse(
       "package pkg;\n"
@@ -339,10 +322,6 @@ TEST(PackageDeclaration, TimeunitsDeclarationAsPackageItem) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// §26.2 names every package: Syntax 26-1 writes the declaration as `package [
-// lifetime ] package_identifier ;`. A package header written without a name is
-// rejected at the token standing where the name belongs, and the report names
-// §26.2 rather than the token it wanted.
 TEST(PackageDeclaration, MalformedPackageHeaderNames26_2) {
   auto r = Parse(
       "package ;\n"
@@ -350,9 +329,6 @@ TEST(PackageDeclaration, MalformedPackageHeaderNames26_2) {
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier", 1, "26.2"));
 }
 
-// §26.2 lets a package declare a checker, and §17.2 lets a checker declare a
-// clocking block: the checker is a scope of its own, so its default clocking
-// is no clocking block of the package (§14.7). It was reported as one.
 TEST(PackageDeclaration, CheckerInAPackageMayDeclareAClockingBlock) {
   auto r = Parse(
       "package p;\n"
@@ -364,7 +340,6 @@ TEST(PackageDeclaration, CheckerInAPackageMayDeclareAClockingBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// The package's own clocking block is still reported, at the block.
 TEST(PackageDeclaration, ClockingBlockOfThePackageItselfStaysReported) {
   auto r = Parse(
       "package p;\n"

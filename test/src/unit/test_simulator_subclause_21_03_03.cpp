@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.3: $swrite writes the formatted output into the variable named by its
-// first argument. A string destination holds the full result.
 TEST(StringFormatTaskSim, SwriteWritesToStringVariable) {
   SimFixture f;
   std::string out = RunCapture(
@@ -25,9 +23,6 @@ TEST(StringFormatTaskSim, SwriteWritesToStringVariable) {
   EXPECT_EQ(out, "x=7 y=11\n");
 }
 
-// §21.3.3 (cross-ref §21.3.2): the b/h/o suffix selects the default radix for a
-// bare expression argument, exactly as $fwriteb/$fwriteh/$fwriteo do. Each
-// operand is sized so the rendered width is predictable.
 TEST(StringFormatTaskSim, SwriteSuffixSelectsRadix) {
   SimFixture f;
   std::string out = RunCapture(
@@ -47,8 +42,6 @@ TEST(StringFormatTaskSim, SwriteSuffixSelectsRadix) {
   EXPECT_EQ(out, "ab\n017\n1010\n");
 }
 
-// §21.3.3: $sformat always treats its second argument as the format string and
-// writes the formatted result into the first-argument variable.
 TEST(StringFormatTaskSim, SformatUsesSecondArgAsFormat) {
   SimFixture f;
   std::string out = RunCapture(
@@ -63,9 +56,6 @@ TEST(StringFormatTaskSim, SformatUsesSecondArgAsFormat) {
   EXPECT_EQ(out, "data is 123\n");
 }
 
-// §21.3.3: only the second argument of $sformat is a format string; a later
-// string argument is emitted verbatim through %s and never re-interpreted as
-// another format template.
 TEST(StringFormatTaskSim, SformatLaterStringArgIsNotFormat) {
   SimFixture f;
   std::string out = RunCapture(
@@ -80,8 +70,6 @@ TEST(StringFormatTaskSim, SformatLaterStringArgIsNotFormat) {
   EXPECT_EQ(out, "tag=raw %d nope\n");
 }
 
-// §21.3.3: the format argument may itself be a string-typed expression whose
-// content is interpreted as the formatting string, not only a string literal.
 TEST(StringFormatTaskSim, SformatFormatArgFromStringVariable) {
   SimFixture f;
   std::string out = RunCapture(
@@ -98,9 +86,6 @@ TEST(StringFormatTaskSim, SformatFormatArgFromStringVariable) {
   EXPECT_EQ(out, "n=9\n");
 }
 
-// §21.3.3: $sformat supports every format specifier $display supports
-// (§21.2.1.1). %c, exercised here, confirms the engine linkage beyond the
-// %d/%s arms.
 TEST(StringFormatTaskSim, SformatSupportsCharacterSpecifier) {
   SimFixture f;
   std::string out = RunCapture(
@@ -115,9 +100,6 @@ TEST(StringFormatTaskSim, SformatSupportsCharacterSpecifier) {
   EXPECT_EQ(out, "ch=A\n");
 }
 
-// §21.3.3: the remaining arguments fill the specifiers in call order. A
-// three-specifier format with mixed integer and string positions binds
-// 1, "two", 3 left to right.
 TEST(StringFormatTaskSim, SformatConsumesArgsInOrder) {
   SimFixture f;
   std::string out = RunCapture(
@@ -132,9 +114,6 @@ TEST(StringFormatTaskSim, SformatConsumesArgsInOrder) {
   EXPECT_EQ(out, "a=1, b=two, c=3\n");
 }
 
-// §21.3.3: $sformatf returns the formatted string as the function value rather
-// than placing it into a first argument, so it can be used where a string value
-// is valid -- here the right-hand side of an assignment.
 TEST(StringFormatTaskSim, SformatfReturnsFormattedResult) {
   SimFixture f;
   std::string out = RunCapture(
@@ -149,10 +128,6 @@ TEST(StringFormatTaskSim, SformatfReturnsFormattedResult) {
   EXPECT_EQ(out, "val=42\n");
 }
 
-// §21.3.3: the output variable is assigned using the string-literal
-// assignment-to-variable rules (§5.9). Into a fixed-width integral variable of
-// exactly the string width, the leftmost character occupies the highest byte
-// (left bound to right bound): "ABCD" -> 0x41424344.
 TEST(StringFormatTaskSim, SwriteByteOrderingIntoExactWidthVector) {
   SimFixture f;
   std::string out = RunCapture(
@@ -167,9 +142,6 @@ TEST(StringFormatTaskSim, SwriteByteOrderingIntoExactWidthVector) {
   EXPECT_EQ(out, "41424344\n");
 }
 
-// §21.3.3 / §5.9: a fixed-width integral destination narrower than the result
-// is truncated from the left (dropping the earliest characters), keeping the
-// low bits. "ABCD" (32 bits) into a 16-bit variable retains "CD" = 0x4344.
 TEST(StringFormatTaskSim, SwriteTruncatesNarrowerDestination) {
   SimFixture f;
   std::string out = RunCapture(
@@ -184,9 +156,6 @@ TEST(StringFormatTaskSim, SwriteTruncatesNarrowerDestination) {
   EXPECT_EQ(out, "4344\n");
 }
 
-// §21.3.3 / §5.9: a fixed-width integral destination wider than the result is
-// right-justified and zero-padded on the left. "AB" (16 bits) into a 32-bit
-// variable yields 0x00004142.
 TEST(StringFormatTaskSim, SformatRightJustifiesWiderDestination) {
   SimFixture f;
   std::string out = RunCapture(
@@ -201,9 +170,6 @@ TEST(StringFormatTaskSim, SformatRightJustifiesWiderDestination) {
   EXPECT_EQ(out, "00004142\n");
 }
 
-// §21.3.3: if too few or too many arguments are supplied for the format
-// specifiers, the application shall issue a warning and continue execution.
-// The run still completes and writes the partially-formatted result.
 TEST(StringFormatTaskSim, SformatArgCountMismatchWarnsAndContinues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -216,15 +182,9 @@ TEST(StringFormatTaskSim, SformatArgCountMismatchWarnsAndContinues) {
       "endmodule\n",
       f);
   EXPECT_GT(f.diag.WarningCount(), 0u);
-  // Execution continues: the $display after the warned call still runs.
   EXPECT_NE(out.find("done "), std::string::npos);
 }
 
-// §21.3.3: the output variable may be an unpacked array of byte. The resulting
-// string's characters are stored from the array's left bound to its right bound
-// -- for an ascending [0:3] range, character 0 ("A") lands in b[0] and the last
-// character ("D") in b[3]. Read back with bare $display, which renders an
-// unpacked byte array as its character string.
 TEST(StringFormatTaskSim, SwriteIntoUnpackedByteArrayLeftToRight) {
   SimFixture f;
   std::string out = RunCapture(
@@ -239,9 +199,6 @@ TEST(StringFormatTaskSim, SwriteIntoUnpackedByteArrayLeftToRight) {
   EXPECT_EQ(out, "ABCD\n");
 }
 
-// §21.3.3: $sformat likewise writes its formatted result into an unpacked
-// byte-array destination. A result shorter than the array leaves the trailing
-// elements cleared, so the rendered string is just the written characters.
 TEST(StringFormatTaskSim, SformatIntoUnpackedByteArrayPadsRemainder) {
   SimFixture f;
   std::string out = RunCapture(
@@ -256,10 +213,6 @@ TEST(StringFormatTaskSim, SformatIntoUnpackedByteArrayPadsRemainder) {
   EXPECT_EQ(out, "v7\n");
 }
 
-// §21.3.3 N1: the unsuffixed $swrite inherits the $fwrite rendering of a bare
-// expression argument (no embedded format string) -- an unformatted integer
-// renders in decimal. This is the default-radix arm, distinct from the b/h/o
-// suffix arms exercised above.
 TEST(StringFormatTaskSim, SwriteBareExpressionRendersDecimal) {
   SimFixture f;
   std::string out = RunCapture(
@@ -276,11 +229,6 @@ TEST(StringFormatTaskSim, SwriteBareExpressionRendersDecimal) {
   EXPECT_EQ(out, "255\n");
 }
 
-// §21.3.3 N4: for a descending [3:0] byte-array declaration, left-bound to
-// right-bound ordering still places the leftmost character in the left-bound
-// (highest-index) element. So b[3]='A' and b[0]='D'; reading the elements in
-// ascending index order therefore yields "DCBA", distinguishing declared-order
-// distribution from naive index-order distribution.
 TEST(StringFormatTaskSim, SwriteIntoDescendingUnpackedByteArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -295,10 +243,6 @@ TEST(StringFormatTaskSim, SwriteIntoDescendingUnpackedByteArray) {
   EXPECT_EQ(out, "DCBA\n");
 }
 
-// §21.3.3 N7: the format argument may be an expression of integral type whose
-// packed bytes encode the formatting string -- not only a string literal or a
-// string-typed variable. A logic vector holding the characters is decoded back
-// into the template and drives the specifiers.
 TEST(StringFormatTaskSim, SformatFormatArgFromIntegralExpression) {
   SimFixture f;
   std::string out = RunCapture(
@@ -315,11 +259,6 @@ TEST(StringFormatTaskSim, SformatFormatArgFromIntegralExpression) {
   EXPECT_EQ(out, "n=5\n");
 }
 
-// §21.3.3 N7: the format argument may be an unpacked array of byte, whose
-// characters (left bound to right bound) are interpreted as the formatting
-// string. The array is built from real element assignments and consumed as the
-// second argument of $sformat; its reconstructed template "%0d!" then formats
-// the trailing value.
 TEST(StringFormatTaskSim, SformatFormatArgFromByteArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -336,10 +275,6 @@ TEST(StringFormatTaskSim, SformatFormatArgFromByteArray) {
   EXPECT_EQ(out, "5!\n");
 }
 
-// §21.3.3 N9 (too-many branch): supplying more arguments than the format
-// specifiers consume is also a mismatch -- the application shall warn and
-// continue, writing the partially-formatted result. This is the opposite arm of
-// the too-few case above.
 TEST(StringFormatTaskSim, SformatTooManyArgsWarnsAndContinues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -355,10 +290,6 @@ TEST(StringFormatTaskSim, SformatTooManyArgsWarnsAndContinues) {
   EXPECT_NE(out.find("done only=1"), std::string::npos);
 }
 
-// §21.3.3 N12: $sformatf yields the formatted string as its function value, so
-// it is valid anywhere a string value is -- including directly as an argument
-// expression, not only as an assignment right-hand side. Used inline as a %s
-// argument to $display, its result renders without an intermediate variable.
 TEST(StringFormatTaskSim, SformatfUsableAsExpressionArgument) {
   SimFixture f;
   std::string out = RunCapture(
@@ -369,9 +300,6 @@ TEST(StringFormatTaskSim, SformatfUsableAsExpressionArgument) {
   EXPECT_EQ(out, "val=42\n");
 }
 
-// §21.3.3: when too few or too many arguments are supplied for the format
-// specifiers, the application shall issue a warning and continue execution.
-// That warning names §21.3.3.
 TEST(StringFormatTaskSim, ArgCountMismatchWarningNames21_3_3) {
   SimFixture f;
   RunCapture(
@@ -385,11 +313,6 @@ TEST(StringFormatTaskSim, ArgCountMismatchWarningNames21_3_3) {
                               "21.3.3"));
 }
 
-// §9.4.2: a non-edge implicit event is detected whenever the expression's value
-// changes, and the clause names no writer whose change is exempt. A system task
-// that writes one of its arguments has written a user variable, so a process
-// parked on it resumes -- which every case above could pass without, the store
-// having happened all along and the value being what they read back.
 TEST(StringFormatTaskSim, SformatDestinationWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -408,11 +331,6 @@ TEST(StringFormatTaskSim, SformatDestinationWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §21.3.3 (printed page 668): $sformatf returns a string, so the value it
-// answers is one to a task handed it, `$display($sformatf("e %0d", v))`
-// printing the text as `$display(s)` prints a string variable holding it.
-// Without the kind on the value the bytes were rendered as the number they
-// make, 6627381 for "e 5".
 TEST(StringFormatTaskSim, SformatfResultDisplaysAsText) {
   SimFixture f;
   std::string out = RunCapture(
@@ -424,10 +342,6 @@ TEST(StringFormatTaskSim, SformatfResultDisplaysAsText) {
   EXPECT_EQ(out, "e 5\n");
 }
 
-// §21.3.3 (printed pages 668-669): $sformatf and $sformat accept the format
-// specifiers the display tasks accept, %p among them (§21.2.1.6), so a packed
-// structure formats as its assignment pattern; the other specifiers go on
-// formatting as before.
 TEST(StringFormatTaskSim, SformatfAndSformatFormatAggregatesWithP) {
   SimFixture f;
   std::string out = RunCapture(
@@ -450,10 +364,6 @@ TEST(StringFormatTaskSim, SformatfAndSformatFormatAggregatesWithP) {
   EXPECT_EQ(out, "'{hi:5, lo:6}\n<'{a:1, b:2}>\n0101|1.500000e+00|Z|100%\n");
 }
 
-// §21.3.3 with §6.16 and A.8.4: $sformatf's result is a string, and a string
-// method is called on it where it is written, alone or in a chain --
-// `$sformatf("%s", s).len()` is 4, and the rest of the string methods read
-// the same text.
 TEST(StringFormatTaskSim, StringMethodsOnSformatfResult) {
   SimFixture f;
   std::string out = RunCapture(
@@ -469,10 +379,6 @@ TEST(StringFormatTaskSim, StringMethodsOnSformatfResult) {
   EXPECT_EQ(out, "4\nAB\n12346\n");
 }
 
-// §21.3.3 with §21.2.1.1: $sformatf answers a string whatever its format is
-// written as -- a string variable, a string property, or a literal whose
-// argument is another $sformatf -- so the result, a bare display argument,
-// prints as its characters rather than as the integer its bytes make.
 TEST(StringFormatTaskSim, SformatfResultPrintsAsTextWhateverItsFormat) {
   SimFixture f;
   std::string out = RunCapture(
@@ -490,11 +396,6 @@ TEST(StringFormatTaskSim, SformatfResultPrintsAsTextWhateverItsFormat) {
   EXPECT_EQ(out, "m=4\nk=5\nouter(inner 9)\n");
 }
 
-// §21.3.3 with §8.5 and §8.6: the output variable of $swrite and $sformat may
-// be a class property -- a string one named bare inside a method, a string one
-// through a handle, and a packed one, which holds the text as a 32-bit
-// variable holds a string literal -- and takes the text as an assignment to
-// it would.
 TEST(StringFormatTaskSim, SwriteAndSformatWriteClassProperties) {
   SimFixture f;
   std::string out = RunCapture(

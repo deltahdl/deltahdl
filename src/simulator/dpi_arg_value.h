@@ -19,12 +19,6 @@ using SvLogic = uint8_t;
 
 using SvBitVecVal = uint32_t;
 
-// §H.10.1.2 / svdpi.h's s_vpi_vecval: the canonical representation of a
-// four-state value, carried as this pair rather than as one word because a
-// 4-state bit needs two bits to say it is x or z. The members carry no default
-// member initializer, as the standard's own declaration of the type does not:
-// a variant member of DpiArgValue's union is written here, and a member type
-// with a non-trivial default constructor deletes the union's.
 struct SvLogicVecVal {
   uint32_t aval;
   uint32_t bval;
@@ -32,17 +26,8 @@ struct SvLogicVecVal {
 
 using SvChandle = void*;
 
-// The widest value DpiArgValue's union carries when nothing narrower applies:
-// its int, longint, real and chandle members each hold a machine word.
 inline constexpr uint32_t kDpiInlineValueBits = 64;
 
-// The widest value the union carries for `kind`, which is the width of the
-// member that kind lands in rather than of the widest member there is. §35.2.2
-// gives a bit and a logic one scalar each -- SvBit and SvLogic are a uint8_t
-// holding one bit -- and §35.2.2.1's aval/bval pair carries an `integer`'s 32.
-// A packed formal §35.5.6 admits above this has nowhere in the union to be and
-// travels in the canonical array instead, so measuring against the widest
-// member would send a `bit [7:0]` down the SvBit branch and cross it as bit 0.
 inline uint32_t DpiInlineValueBits(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -56,26 +41,15 @@ inline uint32_t DpiInlineValueBits(DataTypeKind kind) {
   }
 }
 
-// Annex H.10.1.2: how many aval/bval pairs a value of `width` bits occupies in
-// the canonical representation, which packs 32 bits into each.
 inline uint32_t DpiCanonicalWordCount(uint32_t width) {
   return (width + 31U) / 32U;
 }
 
-// §35.6.1.1: one dimension of an actual argument, as the actual's own
-// declaration wrote it. §35.5.6.1's `MyType a_10x5 [11:20][6:2]` has two of
-// these, the first running 11 to 20 and the second 2 to 6, and the bounds are
-// signed because the same clause's `a_64x8 [64:1][-1:-8]` declares a dimension
-// over -8 to -1. An unsized formal dimension is what these bounds reach: which
-// of them it takes on is what MakeOpenArrayFromUnpackedActual and
-// MakeOpenArrayFromPackedActual differ over.
 struct SvActualDimension {
   int32_t low = 0;
   int32_t high = 0;
 };
 
-// §35.6.1.1: one unpacked dimension of an actual as its declaration wrote it,
-// left bound first, which an open formal's dimension takes on.
 struct DpiArrayRange {
   int32_t left = 0;
   int32_t right = 0;
@@ -85,70 +59,23 @@ struct SvOpenArrayHandle {
   void* data = nullptr;
   uint32_t size = 0;
   uint32_t elem_width = 0;
-  // §35.6.1.1: an open array's unsized ranges are settled at the call site, so
-  // this is the range the formal's unsized dimension took on there
-  // rather than anything the import declaration could have said. SvLow and
-  // SvHigh report it.
   int32_t low = 0;
   int32_t high = 0;
 };
 
-// §35.5.6: one formal argument of an imported or exported subroutine, as the
-// declaration writes it -- the name a call site can bind the actual to by
-// §35.6, the SystemVerilog data type the value crosses as, and the direction
-// §35.5.1.2 reads to decide which way it crosses.
 struct DpiArg {
   std::string_view name;
   DataTypeKind type = DataTypeKind::kInt;
   Direction direction = Direction::kInput;
-  // §35.6: the default value expression the declaration gave this formal,
-  // supplied where the call site omits the argument.
   const Expr* default_value = nullptr;
-  // §35.5.6 admits as a formal type any packed array, struct or union built
-  // from bit and logic, and names no width limit, so `bit [127:0]` is a
-  // formal a declaration may write and the kind alone cannot say how wide it
-  // is. This is the width the declaration gave it; 0 leaves the width to the
-  // kind, which is what every formal whose type carries its own width has.
   uint32_t width = 0;
-  // §H.7.3 and §H.8.4: whether the declaration wrote a packed dimension on a
-  // bit, logic or reg formal. A one-bit packed array, `bit [0:0]`, has the
-  // scalar's width and is still a packed array, crossing by reference to its
-  // canonical chunk where the scalar crosses by value.
   bool is_packed_array = false;
-  // §H.7.4: whether the type is unsigned -- a byte, shortint, int or
-  // longint the declaration qualified unsigned crosses as the unsigned C
-  // type corresponding to Table H.1's row for the signed type. For any other
-  // type the flag changes nothing on the C side, the table having no signed
-  // row for it to differ from.
   bool is_unsigned = false;
-  // §H.7.5 with §H.10.2: the name of the type a struct or union formal was
-  // declared with, which is the C typedef the aggregate crosses under -- the
-  // example's `pair i2` is `const pair* i2` in C. Empty for a formal whose
-  // kind names its C type itself.
   std::string_view type_name = {};
-  // §35.5.6.1 and §H.7.3: whether the declaration gave the formal unpacked
-  // dimensions, sized or open, after its name. Such a formal is an array whose
-  // elements are what the kind and width describe, and crosses as a C array
-  // or an open-array handle rather than as one value of that type.
   bool has_unpacked_dimensions = false;
-  // §H.7.3 with §H.7.6: the unpacked dimensions, outermost first, of a formal
-  // whose declaration sized every one of them with constant bounds, each as
-  // its lower and upper bound whichever way round it was written. Empty for a
-  // formal with none, with an open one (§35.5.6.1) or with a bound that does
-  // not fold.
   std::vector<SvActualDimension> unpacked_dims = {};
-  // §H.7.8: the members of an unpacked struct or union formal, in
-  // declaration order, each as a formal of its own type. Empty for every other
-  // formal, and for one whose declaration was not found.
   std::vector<DpiArg> members = {};
-  // §35.5.6.1 and §H.8.6: whether a dimension the declaration wrote after the
-  // formal's name is unsized, `[]`, which makes the formal an open array
-  // passed by handle, its dimensions those of the actual.
   bool is_open_array = false;
-  // The formal as the declaration wrote it, which ResolveDpiFormalTypes
-  // (src/simulator/dpi_formal_type.h) resolves to the type the formal crosses
-  // as once the design's typedef names are known (§H.7.3, §H.7.4). Null for a
-  // formal registered without a declaration.
   const FunctionArg* declaration = nullptr;
 };
 
@@ -161,31 +88,12 @@ struct DpiArgValue {
     SvChandle chandle_val;
     SvBit bit_val;
     SvLogic logic_val;
-    // §35.2.2.1: the aval/bval pair a four-state integral value crosses as.
-    // How a four-state value is laid out matters only to the foreign side and
-    // leaves SystemVerilog's semantics untouched, so an x or a z has to survive
-    // the crossing; a single word says a bit is 0 or 1 and cannot say it is x
-    // or z.
     SvLogicVecVal logic_vec_val;
   } data = {};
   std::string string_val;
-  // Annex H.10.1.2: a packed value wider than the union's single pair, carried
-  // as the canonical representation -- an array of aval/bval pairs, one per 32
-  // bits, which is the layout svGetBitselLogic and svPutBitselLogic already
-  // index into. §35.5.6 puts no width limit on a packed formal while one pair
-  // says nothing above bit 31, so a formal too wide for the union crosses in
-  // here and `data` says nothing about it. Empty for every value that fits.
   std::vector<SvLogicVecVal> vec_words;
-  // The declared width the words carry, which the word count rounds up to a
-  // multiple of 32 and so cannot state.
   uint32_t vec_width = 0;
-  // §H.7.3: the elements of an unpacked array, each a value of the formal's
-  // element type, in the order C lays them out -- row-major, each dimension
-  // from its lower index. Empty for every value that is not an array.
   std::vector<DpiArgValue> elements;
-  // §35.6.1.1: the actual's unpacked dimensions, outermost first, as an open
-  // formal takes them on; an open array's elements are in the order those
-  // ranges run, each from its left bound (§H.12.4).
   std::vector<DpiArrayRange> ranges;
 
   static DpiArgValue FromInt(int32_t v);
@@ -195,12 +103,7 @@ struct DpiArgValue {
   static DpiArgValue FromChandle(SvChandle v);
   static DpiArgValue FromBit(SvBit v);
   static DpiArgValue FromLogic(SvLogic v);
-  // §35.2.2.1: a four-state integral value of type `integer`, carried as the
-  // canonical aval/bval pair rather than as a plain word.
   static DpiArgValue FromLogicVec(SvLogicVecVal v);
-  // Annex H.10.1.2: a packed value of `width` bits typed as `type`, carried as
-  // the canonical array of aval/bval pairs. `words` holds ceil(width/32) of
-  // them, least significant first.
   static DpiArgValue FromLogicVecWords(std::vector<SvLogicVecVal> words,
                                        uint32_t width, DataTypeKind type);
 
@@ -212,21 +115,14 @@ struct DpiArgValue {
   SvBit AsBit() const;
   SvLogic AsLogic() const;
   SvLogicVecVal AsLogicVec() const;
-  // Whether this value crossed in the canonical array rather than in `data`.
   bool IsWideVec() const { return !vec_words.empty(); }
   const std::vector<SvLogicVecVal>& AsLogicVecWords() const {
     return vec_words;
   }
   uint32_t VecWidth() const { return vec_width; }
-  // Whether this value is an unpacked array's elements.
   bool IsArray() const { return !elements.empty(); }
 };
 
-// §35.6.2: a value-change event the SystemVerilog simulator raises for an
-// output or inout actual after an imported function returns. `index` is the
-// argument's position in the call; `old_value` and `new_value` bracket the
-// change. The simulator is responsible for detecting and handling these
-// changes once control has returned from the import, never while it runs.
 struct DpiArgValueChange {
   size_t index = 0;
   DpiArgValue old_value;
@@ -236,14 +132,8 @@ struct DpiArgValueChange {
 using DpiRtCallback =
     std::function<DpiArgValue(const std::vector<DpiArgValue>&)>;
 
-// §35.5.1.2: an import implementation that participates in output and inout
-// argument passing. The argument vector is mutable so the foreign function can
-// deposit values into its output and inout formals; the return value is the
-// function result. Unlike DpiRtCallback (input-only), values written here to
-// output/inout positions become visible outside the call.
 using DpiRtArgCallback = std::function<DpiArgValue(std::vector<DpiArgValue>&)>;
 
-// §35.6.1: `v` converted to `target`, unchanged when already of that type.
 DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target);
 
 }  // namespace delta

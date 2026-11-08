@@ -7,16 +7,8 @@
 
 using namespace delta;
 
-// §4.4.1 defines three named groupings over the stratified event scheduler's
-// regions: the active region set, the reactive region set, and the iterative
-// regions. It also states that every region of a time slot is categorized as
-// either a simulation region or a PLI region. These are pure classifications of
-// the region model, so they are exercised directly against the production
-// predicates in src/common/types.cpp rather than through HDL source.
-
 namespace {
 
-// Every real region, excluding the kCOUNT sentinel.
 std::array<Region, kRegionCount> AllRegions() {
   std::array<Region, kRegionCount> regions{};
   for (std::size_t i = 0; i < kRegionCount; ++i) {
@@ -25,8 +17,6 @@ std::array<Region, kRegionCount> AllRegions() {
   return regions;
 }
 
-// Independent restatement of the §4.4.1 active region set: Active, Inactive,
-// Pre-NBA, NBA, Post-NBA.
 bool ExpectedActive(Region r) {
   switch (r) {
     case Region::kActive:
@@ -40,8 +30,6 @@ bool ExpectedActive(Region r) {
   }
 }
 
-// Independent restatement of the §4.4.1 reactive region set: Reactive,
-// Re-Inactive, Pre-Re-NBA, Re-NBA, Post-Re-NBA.
 bool ExpectedReactive(Region r) {
   switch (r) {
     case Region::kReactive:
@@ -55,9 +43,6 @@ bool ExpectedReactive(Region r) {
   }
 }
 
-// Independent restatement of the fourteen §4.4.1 iterative regions: the active
-// and reactive sets, the three Observed regions, and Pre-Postponed. Preponed,
-// Pre-Active, and Postponed are deliberately excluded.
 bool ExpectedIterative(Region r) {
   switch (r) {
     case Region::kActive:
@@ -82,7 +67,6 @@ bool ExpectedIterative(Region r) {
 
 }  // namespace
 
-// The active region set predicate holds for exactly the §4.4.1 members.
 TEST(ActiveAndReactiveRegionSetsSim, ActiveRegionSetMembership) {
   for (Region r : AllRegions()) {
     EXPECT_EQ(IsActiveRegionSet(r), ExpectedActive(r))
@@ -90,7 +74,6 @@ TEST(ActiveAndReactiveRegionSetsSim, ActiveRegionSetMembership) {
   }
 }
 
-// The reactive region set predicate holds for exactly the §4.4.1 members.
 TEST(ActiveAndReactiveRegionSetsSim, ReactiveRegionSetMembership) {
   for (Region r : AllRegions()) {
     EXPECT_EQ(IsReactiveRegionSet(r), ExpectedReactive(r))
@@ -98,7 +81,6 @@ TEST(ActiveAndReactiveRegionSetsSim, ReactiveRegionSetMembership) {
   }
 }
 
-// The iterative predicate holds for exactly the fourteen §4.4.1 members.
 TEST(ActiveAndReactiveRegionSetsSim, IterativeRegionsMembership) {
   for (Region r : AllRegions()) {
     EXPECT_EQ(IsIterativeRegion(r), ExpectedIterative(r))
@@ -106,8 +88,6 @@ TEST(ActiveAndReactiveRegionSetsSim, IterativeRegionsMembership) {
   }
 }
 
-// §4.4.1 lists both the active and reactive region sets among the iterative
-// regions, so membership in either set implies an iterative region.
 TEST(ActiveAndReactiveRegionSetsSim, ActiveAndReactiveSetsAreIterative) {
   for (Region r : AllRegions()) {
     if (IsActiveRegionSet(r) || IsReactiveRegionSet(r)) {
@@ -117,7 +97,6 @@ TEST(ActiveAndReactiveRegionSetsSim, ActiveAndReactiveSetsAreIterative) {
   }
 }
 
-// The active and reactive region sets are distinct groupings.
 TEST(ActiveAndReactiveRegionSetsSim, ActiveAndReactiveSetsAreDisjoint) {
   for (Region r : AllRegions()) {
     EXPECT_FALSE(IsActiveRegionSet(r) && IsReactiveRegionSet(r))
@@ -125,9 +104,6 @@ TEST(ActiveAndReactiveRegionSetsSim, ActiveAndReactiveSetsAreDisjoint) {
   }
 }
 
-// §4.4.1: every event region of a time slot is categorized as a simulation
-// region or a PLI region. This checks the categorization is exhaustive; the
-// specific membership of each category belongs to §4.4.2/§4.4.3.
 TEST(ActiveAndReactiveRegionSetsSim, EveryRegionIsSimulationOrPli) {
   for (Region r : AllRegions()) {
     EXPECT_TRUE(IsSimulationRegion(r) || IsPliRegion(r))

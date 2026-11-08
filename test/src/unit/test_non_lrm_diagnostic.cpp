@@ -16,18 +16,6 @@ using namespace delta;
 
 namespace {
 
-// No clause of IEEE 1800-2023 says what a tool keeps about the diagnostics it
-// has reported, so these cases cover DiagEngine on its own terms. What they
-// establish is that a caller can tell one reported failure from another: the
-// counts beside the records say how many errors there were and never which
-// error, so an assertion that a run failed for the reason under test has to
-// read the record itself.
-
-// One real file for the diagnostics to be reported against, so a record
-// carries a location it could have got wrong. Every case reports at a line and
-// a column that differ from each other and from zero, so a record that dropped
-// either of the two, or that kept the location a default-constructed record
-// carries, reads differently from one that kept what it was given.
 struct EngineFixture {
   SourceManager mgr;
   uint32_t file_id = mgr.AddFile("cell.sv",
@@ -53,10 +41,6 @@ TEST(Diagnostics, ErrorIsRecordedWithItsMessage) {
 }
 
 TEST(Diagnostics, ErrorIsRecordedWithItsSeverity) {
-  // A Diagnostic carries kError as its default severity, so a record that was
-  // never given a severity at all still reads as an error. The warning
-  // reported first is what makes the claim able to fail: code that stamped one
-  // severity on every record it kept would have to stamp it on that one too.
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
                  Subclause::None());
@@ -78,14 +62,6 @@ TEST(Diagnostics, WarningIsRecordedWithItsSeverity) {
   EXPECT_EQ(f.diag.Diagnostics().front().severity, DiagSeverity::kWarning);
 }
 
-// Whether sev is a value DiagSeverity declares. The switch gives every
-// enumerator a case and declares no default label, so an enumerator added to
-// DiagSeverity in src/common/diagnostic.h and not listed here fails the build
-// under the -Wall -Wextra -Werror that CMakeLists.txt sets. That compile
-// error is what catches a new enumerator, and
-// Diagnostics.EverySeverityHasAProducer below is what then catches its having
-// no entry point on DiagEngine that produces it. The trailing return is what
-// a value cast in from outside the enumeration reaches.
 bool IsDeclaredSeverity(DiagSeverity sev) {
   switch (sev) {
     case DiagSeverity::kWarning:
@@ -95,11 +71,6 @@ bool IsDeclaredSeverity(DiagSeverity sev) {
   return false;
 }
 
-// Fails when DiagSeverity declares a severity that no entry point on
-// DiagEngine can produce, which is the defect issue #3003 records. Asserting
-// that kWarning and kError are producible would not catch that: an
-// enumeration holding those two values plus an unproducible one satisfies
-// such an assertion as much as an enumeration holding only the two does.
 TEST(Diagnostics, EverySeverityHasAProducer) {
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
@@ -125,9 +96,6 @@ TEST(Diagnostics, EverySeverityHasAProducer) {
 }
 
 TEST(Diagnostics, RecordsAreReturnedInTheOrderTheyWereReported) {
-  // Two descriptions of one run fail for different reasons. A caller reading
-  // the records back attributes each reason to the step that reported it, so
-  // the order the records come in is the order they were reported in.
   EngineFixture f;
   f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
                Subclause::None());
@@ -142,12 +110,6 @@ TEST(Diagnostics, RecordsAreReturnedInTheOrderTheyWereReported) {
 }
 
 TEST(Diagnostics, SuppressedDiagnosticIsNotRecorded) {
-  // A speculative parse whose result is discarded reports errors that never
-  // happened, and the engine suppresses them. The record it keeps has to
-  // respect the suppression the counts already respect, or a caller reading
-  // the records back learns of a failure the run did not have. The error
-  // reported before the suppression is what shows the records were being kept
-  // at all.
   EngineFixture f;
   f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
                Subclause::None());
@@ -162,10 +124,6 @@ TEST(Diagnostics, SuppressedDiagnosticIsNotRecorded) {
 }
 
 TEST(Diagnostics, SuppressedWarningIsNotCountedAsASuppressedError) {
-  // A trial parse learns whether the text it read was well formed by comparing
-  // the suppressed errors before and after, so a warning it provoked has to
-  // leave that count alone or well-formed text would read as malformed. The
-  // suppressed error reported after it is what shows the count was being kept.
   EngineFixture f;
   f.diag.PushSuppress();
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
@@ -181,9 +139,6 @@ TEST(Diagnostics, SuppressedWarningIsNotCountedAsASuppressedError) {
 }
 
 TEST(Diagnostics, ReportWithoutAColumnQuotesItsLineWithoutACaret) {
-  // A column counts from 1, so a location whose column is 0 names a line and
-  // no position on it. The report still quotes the line, and draws no caret
-  // under a character the location does not name.
   EngineFixture f;
   std::ostringstream captured;
   std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
@@ -195,14 +150,6 @@ TEST(Diagnostics, ReportWithoutAColumnQuotesItsLineWithoutACaret) {
   EXPECT_EQ(captured.str().find('^'), std::string::npos);
 }
 
-// A subclause of IEEE 1800-2023 is what the engine reports a rule from, and the
-// cases below cover the record keeping it. The subclause a report names is
-// separate from the sentence it reads out, so a caller can ask which rule was
-// enforced without matching the wording of the sentence, and a reworded
-// message leaves the answer alone. Every case names a subclause of three
-// components, since the numbering is not arithmetic and code that stored it
-// as a number would lose the third.
-
 TEST(Diagnostics, SubclauseNamedInTheReportIsRecorded) {
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
@@ -213,8 +160,6 @@ TEST(Diagnostics, SubclauseNamedInTheReportIsRecorded) {
 }
 
 TEST(Diagnostics, SubclauseReportedWithAWarningIsRecorded) {
-  // A warning enforces a rule as much as an error does, so the subclause
-  // survives the path through the engine that an error does not take.
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
                  Subclause("16.12.17"));
@@ -224,11 +169,6 @@ TEST(Diagnostics, SubclauseReportedWithAWarningIsRecorded) {
 }
 
 TEST(Diagnostics, ReportStatingNoRuleOfTheStandardCarriesAnEmptySubclause) {
-  // A report that enforces no rule of the standard says so with
-  // Subclause::None(), and it has to read back as naming none rather than as
-  // naming whatever the last report named. The subclause-bearing error reported
-  // first is what makes that able to fail: an engine holding the subclause
-  // across reports would hand it to the second one.
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
                Subclause("11.4.14"));
@@ -240,11 +180,6 @@ TEST(Diagnostics, ReportStatingNoRuleOfTheStandardCarriesAnEmptySubclause) {
 }
 
 TEST(Diagnostics, SubclauseIsPrintedWithTheMessage) {
-  // A field nothing prints helps a test and no user, so the subclause reaches
-  // the reader of the diagnostic as well as the reader of the record.
-  // Diagnostics
-  // are written to standard error, which the case redirects for the one report
-  // it makes.
   EngineFixture f;
   std::ostringstream captured;
   std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
@@ -257,9 +192,6 @@ TEST(Diagnostics, SubclauseIsPrintedWithTheMessage) {
   EXPECT_NE(captured.str().find("(§11.4.14)"), std::string::npos);
 }
 
-// How many times *needle* occurs in *haystack*, so a case about a subclause
-// being named twice asserts on a count rather than on the presence a single
-// naming and a double naming both satisfy.
 size_t CountOccurrences(const std::string& haystack,
                         const std::string& needle) {
   size_t count = 0;
@@ -271,10 +203,6 @@ size_t CountOccurrences(const std::string& haystack,
 }
 
 TEST(Diagnostics, SubclauseIsPrintedExactlyOnce) {
-  // DiagEngine appends the subclause the caller passes in the field, so a
-  // caller that also spells the subclause in its sentence prints it twice. The
-  // rendered line is where the two meet, and nothing stores it, so the case
-  // redirects standard error to read what a user reads.
   EngineFixture f;
   std::ostringstream captured;
   std::streambuf* old_buf = std::cerr.rdbuf(captured.rdbuf());
@@ -286,11 +214,6 @@ TEST(Diagnostics, SubclauseIsPrintedExactlyOnce) {
 }
 
 TEST(Diagnostics, SuppressedDiagnosticWithASubclauseIsNotRecorded) {
-  // A speculative parse reports rules broken by source the run goes on to
-  // discard, and naming the subclause does not make one of those reports real.
-  // The engine returns before it appends, so this holds today; the case is
-  // what keeps a later edit from treating a subclause-bearing diagnostic as a
-  // case worth recording through the suppression.
   EngineFixture f;
   f.diag.PushSuppress();
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
@@ -301,10 +224,6 @@ TEST(Diagnostics, SuppressedDiagnosticWithASubclauseIsNotRecorded) {
 }
 
 TEST(Diagnostics, WarningPromotedToAnErrorIsRecordedAsAnError) {
-  // An invocation that asked for warnings to be errors gets a record saying
-  // error, matching the count the same warning is added to. Without the
-  // promotion this warning is recorded as a warning, which is what the case
-  // above establishes.
   EngineFixture f;
   f.diag.SetWarningsAsErrors(true);
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
@@ -315,12 +234,6 @@ TEST(Diagnostics, WarningPromotedToAnErrorIsRecordedAsAnError) {
 }
 
 TEST(Diagnostics, EveryReportedLocationIsValid) {
-  // A record whose location never got filled in reads as <unknown location>
-  // when it is written out, which tells a reader what went wrong and not where.
-  // The engine takes whatever location it is given, so this is the case that
-  // states the rule the reporting sites are held to: a report names a position
-  // in the source. Both severities are reported here because either can reach
-  // a reader with nothing but a sentence.
   EngineFixture f;
   f.diag.Error(f.Loc(1, 8), "reference through a null virtual interface",
                Subclause("25.9"));
@@ -333,17 +246,7 @@ TEST(Diagnostics, EveryReportedLocationIsValid) {
   }
 }
 
-// The cases below cover how the engine answers whether anyone has looked at
-// what it recorded. A caller that hands the engine to another, as a test
-// fixture hands it to a case, compares ReadCount at the handover with
-// ReadCount later to learn whether the other looked, and HasUnreadError says
-// whether an error has been reported that no query has followed.
-
 TEST(Diagnostics, EveryQueryOfTheRecordCountsAsARead) {
-  // Six accessors answer from the record, and each is called once. One left
-  // uncounted leaves the total at five, and one counted twice raises it to
-  // seven, so the count says the record was looked at whichever accessor did
-  // the looking.
   EngineFixture f;
   static_cast<void>(f.diag.HasErrors());
   static_cast<void>(f.diag.ErrorCount());
@@ -367,10 +270,6 @@ TEST(Diagnostics, AnErrorIsUnreadUntilTheRecordIsQueried) {
 }
 
 TEST(Diagnostics, AQueryBeforeAnErrorDoesNotReadIt) {
-  // A parse reads the record as it starts, before anything has gone wrong, and
-  // the error it reports afterwards is one nobody has seen. An engine that
-  // remembered only that it had been read at some point would call this error
-  // read.
   EngineFixture f;
   static_cast<void>(f.diag.Diagnostics());
   f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
@@ -380,8 +279,6 @@ TEST(Diagnostics, AQueryBeforeAnErrorDoesNotReadIt) {
 }
 
 TEST(Diagnostics, AnErrorAfterTheLastQueryIsUnreadAgain) {
-  // The query between the two errors reads the first. The second comes after
-  // it, so the record holds an error again that nobody has seen.
   EngineFixture f;
   f.diag.Error(f.Loc(1, 8), "cannot read source description: absent.v",
                Subclause::None());
@@ -393,8 +290,6 @@ TEST(Diagnostics, AnErrorAfterTheLastQueryIsUnreadAgain) {
 }
 
 TEST(Diagnostics, AWarningLeavesNoErrorUnread) {
-  // An engine that marked every report unread, whatever its severity, would
-  // answer true here.
   EngineFixture f;
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
                  Subclause::None());
@@ -403,8 +298,6 @@ TEST(Diagnostics, AWarningLeavesNoErrorUnread) {
 }
 
 TEST(Diagnostics, AWarningPromotedToAnErrorIsUnread) {
-  // The promotion records the warning as an error, so it is unread as an error
-  // is, where the case above leaves an unpromoted warning read.
   EngineFixture f;
   f.diag.SetWarningsAsErrors(true);
   f.diag.Warning(f.Loc(1, 8), "cell name collides with one already written",
@@ -414,8 +307,6 @@ TEST(Diagnostics, AWarningPromotedToAnErrorIsUnread) {
 }
 
 TEST(Diagnostics, ASuppressedErrorLeavesNoErrorUnread) {
-  // A suppressed error was never recorded, so there is nothing in the record
-  // for anyone to read.
   EngineFixture f;
   f.diag.PushSuppress();
   f.diag.Error(f.Loc(2, 4), "unexpected token in module body",
@@ -426,8 +317,6 @@ TEST(Diagnostics, ASuppressedErrorLeavesNoErrorUnread) {
 }
 
 TEST(Diagnostics, AskingWhetherTheRecordWasReadIsNotItselfARead) {
-  // Were either of the two a read, the second call to HasUnreadError would
-  // answer false and the count would have moved.
   EngineFixture f;
   f.diag.Error(f.Loc(2, 4), "two libraries claim this description",
                Subclause::None());

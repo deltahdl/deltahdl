@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -430,7 +428,6 @@ TEST(IntegerLiteralSim, UnsizedHexXExtendsToWideContext) {
       "endmodule\n",
       f, "x");
   ASSERT_NE(var, nullptr);
-  // Both words of the 64-bit vector must report all-x.
   EXPECT_EQ(var->value.words[0].aval, ~uint64_t{0});
   EXPECT_EQ(var->value.words[0].bval, ~uint64_t{0});
 }
@@ -444,14 +441,10 @@ TEST(IntegerLiteralSim, UnsizedHexZExtendsToWideContext) {
       "endmodule\n",
       f, "x");
   ASSERT_NE(var, nullptr);
-  // All 64 bits must report high-impedance: aval=0, bval=1 per bit.
   EXPECT_EQ(var->value.words[0].aval, uint64_t{0});
   EXPECT_EQ(var->value.words[0].bval, ~uint64_t{0});
 }
 
-// §5.7.1: the '?' digit is the z alternative and, in a hexadecimal literal,
-// sets four bits to high-impedance. Here the low hex digit '?' drives bits 0-3
-// to z (aval=0, bval=1) while the known high digit 5 stays a plain value.
 TEST(IntegerLiteralSim, QuestionMarkFillsFourBitsInHex) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -466,9 +459,6 @@ TEST(IntegerLiteralSim, QuestionMarkFillsFourBitsInHex) {
   EXPECT_EQ(var->value.words[0].bval & 0xF0u, 0x00u);
 }
 
-// §5.7.1: in an octal literal the '?' digit sets three bits to high-impedance.
-// The low octal digit '?' drives bits 0-2 to z while the high digit 7 stays a
-// known value.
 TEST(IntegerLiteralSim, QuestionMarkFillsThreeBitsInOctal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -483,11 +473,6 @@ TEST(IntegerLiteralSim, QuestionMarkFillsThreeBitsInOctal) {
   EXPECT_EQ(var->value.words[0].bval & 0x38u, 0x00u);
 }
 
-// §5.7.1 (final paragraph): an integer literal constant is a logic vector with
-// range [n-1:0]. Built end-to-end on the §7.4 packed-vector dependency: the
-// literal is stored in a real logic [7:0] packed vector and part-selected, so
-// the high nibble reads 0xA and the low nibble 0x5 — observing the literal laid
-// out MSB-first across the vector's bit range rather than as an opaque scalar.
 TEST(IntegerLiteralSim, LiteralOccupiesLogicVectorMsbFirst) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -514,10 +499,6 @@ TEST(IntegerLiteralSim, LiteralOccupiesLogicVectorMsbFirst) {
   EXPECT_EQ(lo->value.ToUint64(), 0x5u);
 }
 
-// §5.7.1: the digits of a decimal literal form its value at the width its size
-// constant states, so `81'd1208925819614629174706177` (2^80 + 1) sets bit 80
-// as well as bit 0. Expr::int_val carries the value's low 64 bits alone, and a
-// run-time value built from it read the high seventeen bits as 0.
 TEST(IntegerLiteralSim, WideDecimalLiteralSetsBitEighty) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
@@ -539,11 +520,6 @@ TEST(IntegerLiteralSim, WideDecimalLiteralSetsBitEighty) {
   EXPECT_EQ(lo->value.ToUint64(), 1u);
 }
 
-// §5.7.1: an unsized number that needs more than 32 bits has at least the
-// width that represents its value, a sign bit included for a signed one, so
-// the simple decimal 1180591620717411303424 (2^70) is at least 72 bits and
-// keeps bit 70 into a 96-bit target. Sized from Expr::int_val, whose 64 bits
-// hold 2^70 as 0, the literal was 32 bits of zero.
 TEST(IntegerLiteralSim, UnsizedDecimalPastSixtyFourBitsKeepsItsValue) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
@@ -565,10 +541,6 @@ TEST(IntegerLiteralSim, UnsizedDecimalPastSixtyFourBitsKeepsItsValue) {
   EXPECT_EQ(lo->value.ToUint64(), 0u);
 }
 
-// §5.7.1: a decimal literal wider than 64 bits whose value is 0 or fits in one
-// word is padded to the left with zeros, `_` separators dropped -- the same
-// digit fold as the wide value above, on values the 64-bit path already got
-// right.
 TEST(IntegerLiteralSim, WideDecimalLiteralPadsSmallValueWithZeros) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
@@ -599,9 +571,6 @@ TEST(IntegerLiteralSim, WideDecimalLiteralPadsSmallValueWithZeros) {
   EXPECT_EQ(zlo->value.ToUint64(), 0u);
 }
 
-// §5.7.1: an unsigned number larger than the size constant is truncated from
-// the left, so 2^80 + 1 written under a size of 72 keeps bits 0 to 71 alone
-// and reads 1.
 TEST(IntegerLiteralSim, WideDecimalLiteralTruncatesFromTheLeft) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
@@ -623,11 +592,6 @@ TEST(IntegerLiteralSim, WideDecimalLiteralTruncatesFromTheLeft) {
   EXPECT_EQ(lo->value.ToUint64(), 1u);
 }
 
-// §5.7.1: an unsized based number has at least the width its value needs, so
-// the 17-digit `'hF_FFFF_FFFF_FFFF_FFFF` is 68 bits, `'b1` over 70 zeros 71
-// and the 24-digit octal all-sevens 72, each carrying its top digit into a
-// 96-bit target. Sized from Expr::int_val, whose 64 bits are the value's low
-// word, each was 64 bits and read 0 above bit 63.
 TEST(IntegerLiteralSim, UnsizedBasedLiteralPastSixtyFourBitsKeepsItsDigits) {
   SimFixture f;
   ASSERT_TRUE(RunSim(f,
@@ -660,8 +624,6 @@ TEST(IntegerLiteralSim, UnsizedBasedLiteralPastSixtyFourBitsKeepsItsDigits) {
   EXPECT_EQ(olo->value.ToUint64(), ~uint64_t{0});
 }
 
-// §5.7.1 and §5.3: a newline between the base format and the digits is white
-// space the value ignores, as a blank there is.
 TEST(IntegerLiteralSim, NewlineBetweenBaseAndDigitsKeepsTheValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -675,8 +637,6 @@ TEST(IntegerLiteralSim, NewlineBetweenBaseAndDigitsKeepsTheValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// The width of an unsized literal is read from its digits alone, white space
-// before them aside: 'h7_0000_0000 is 35 bits however the gap is written.
 TEST(IntegerLiteralSim, NewlineBeforeTheDigitsLeavesTheUnsizedWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -690,9 +650,6 @@ TEST(IntegerLiteralSim, NewlineBeforeTheDigitsLeavesTheUnsizedWidth) {
   EXPECT_EQ(var->value.ToUint64(), 35u);
 }
 
-// A literal wider than 64 bits folded during elaboration reads its digits
-// past the white space before them too: a blank or a newline there left the
-// digits unread.
 TEST(IntegerLiteralSim, WhiteSpaceBeforeTheDigitsOfAWideConstant) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -706,10 +663,6 @@ TEST(IntegerLiteralSim, WhiteSpaceBeforeTheDigitsOfAWideConstant) {
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
-// §5.7.1: an unsized number needing more than 32 bits takes the minimum width
-// representing it, a sign bit included when it is signed: 2^32 is 34 bits as
-// a simple decimal and 33 with an unsigned 'd base. Any value past 32 bits was
-// given 64.
 TEST(IntegerLiteralSim, UnsizedDecimalPastThirtyTwoBitsTakesItsMinimumWidth) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -726,9 +679,6 @@ TEST(IntegerLiteralSim, UnsizedDecimalPastThirtyTwoBitsTakesItsMinimumWidth) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 33u);
 }
 
-// 2^63 as a simple decimal is signed and needs 65 bits to stay positive. At 64
-// bits its top bit read as a sign bit, so it sign-extended into a wider
-// target with the upper half all ones.
 TEST(IntegerLiteralSim, SignedDecimalAtTwoToTheSixtyThreeStaysPositive) {
   SimFixture f;
   auto* hi = RunAndFindVar(
@@ -748,10 +698,6 @@ TEST(IntegerLiteralSim, SignedDecimalAtTwoToTheSixtyThreeStaysPositive) {
   EXPECT_EQ(f.ctx.FindVariable("w")->value.ToUint64(), 65u);
 }
 
-// §5.7.1: an unsized unsigned literal whose high-order bit is x extends with x
-// to the width of the expression holding it, as an operand of an operator as
-// much as in an assignment. Against an unsigned 64-bit operand 'hx was
-// zero-extended, so === found bits 63:32 differing and | gave them 0.
 TEST(IntegerLiteralSim, HighOrderXExtendsToTheWidthOfAnOperatorsOperands) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -771,7 +717,6 @@ TEST(IntegerLiteralSim, HighOrderXExtendsToTheWidthOfAnOperatorsOperands) {
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
   EXPECT_EQ(f.ctx.FindVariable("u")->value.ToUint64(), 1u);
-  // An x below the top digit leaves the literal zero-extended.
   EXPECT_EQ(f.ctx.FindVariable("k")->value.ToUint64(), 1u);
 }
 

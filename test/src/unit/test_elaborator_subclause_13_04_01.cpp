@@ -34,9 +34,6 @@ TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueError) {
                             "void function returns a value", 3, "13.4.1"));
 }
 
-// §13.4.1: the report that rejects a return statement carrying a value in a
-// void function names the subclause stating the rule, so a caller learns which
-// rule was enforced without matching the wording of the message.
 TEST(FunctionReturnElaboration,
      ReturnStatementWithAValueInAVoidFunctionNames13_4_1) {
   ElabFixture f;
@@ -129,10 +126,6 @@ TEST(FunctionReturnElaboration, VoidFunctionBareReturnOk) {
 }
 
 TEST(FunctionReturnElaboration, NonVoidFunctionBareReturnError) {
-  // §13.4: when the return statement is used, nonvoid functions shall specify
-  // an expression with the return; a bare `return;` here is an error. The
-  // report comes from CheckValueReturningFuncReturn, which cites §12.8 rather
-  // than §13.4.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -287,8 +280,6 @@ TEST(FunctionReturnElaboration,
       "  logic [7:0] dup;\n"
       "endmodule\n",
       f);
-  // The rule that fires is the §23.9 same-scope redeclaration one, reported
-  // against the variable because the function registered the name first.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'dup'", 3, "23.9"));
 }
@@ -303,7 +294,6 @@ TEST(FunctionReturnElaboration, NonvoidCallMissingParensIsIllegal) {
       "  end\n"
       "endmodule\n",
       f);
-  // §13.5.5 owns the omitted-parentheses rule; §13.4.1 has no report for it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot omit parentheses in call to nonvoid "
                             "function 'f'",
@@ -322,28 +312,6 @@ TEST(FunctionReturnElaboration, SystemFunctionAllowedAsImplicitVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The four cases below cover the positions CheckFuncBodyStmt in
-// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
-// now that it takes its child-statement links from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. It had written out nine of the
-// thirteen links Stmt declares, so §13.4.1's two reports -- and §13.4's and
-// §10.6.1's beside them -- went unmade for a statement written in
-// Stmt::fork_stmts, Stmt::for_inits, Stmt::for_steps or Stmt::rs_productions.
-//
-// Stmt::for_inits gets no case: A.6.8 admits only a
-// list_of_variable_assignments or a for_variable_declaration there, and neither
-// is a return or a declaration the elaborator sees as a StmtKind::kVarDecl.
-// Stmt::for_steps does hold a function_subroutine_call, and
-// FunctionElaboration.TaskEnabledFromAForStepError in
-// test/src/unit/test_elaborator_subclause_13_04a.cpp covers it, the rule that
-// reaches a for step being §13.4's rather than §13.4.1's.
-
-// §9.3.2 already rejected this return, through CheckNoReturnInFork, but
-// §13.4.1's own report about the value it carries was never made: nothing in
-// CheckFuncBodyStmt descended into a fork. §13.4.4 exempts the statements under
-// a fork-join_none -- inside a function, one may hold whatever statements a
-// task may -- and the walk still stops at one, so the fork here is the
-// fork-join §13.4 rule a) forbids outright.
 TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueInsideAForkJoin) {
   ElabFixture f;
   ElaborateSrc(
@@ -359,11 +327,6 @@ TEST(FunctionReturnElaboration, VoidFunctionReturnWithValueInsideAForkJoin) {
                             "void function returns a value", 4, "13.4.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds the data declaration
-// §13.4.1's ban on declaring, inside a function's scope, another object named
-// after the function is about. The parser keeps it in RsProd::code_stmts,
-// reached through Stmt::rs_productions and through no other member of Stmt.
 TEST(FunctionReturnElaboration, VarNamedAsFunctionInARandsequenceCodeBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -380,10 +343,6 @@ TEST(FunctionReturnElaboration, VarNamedAsFunctionInARandsequenceCodeBlock) {
                             4, "13.4.1"));
 }
 
-// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
-// rs_code_block ] ]` puts a second code block after the weight, kept in
-// RsRule::weight_code rather than in RsProd::code_stmts, so it is a second
-// statement position under Stmt::rs_productions and gets its own case.
 TEST(FunctionReturnElaboration,
      VarNamedAsFunctionInARandsequenceWeightCodeBlock) {
   ElabFixture f;
@@ -402,16 +361,6 @@ TEST(FunctionReturnElaboration,
                             4, "13.4.1"));
 }
 
-// The §18.17.6 case: what a return written in a randsequence production code
-// block is, and what §13.4.1 therefore owes it. The return statement stops
-// generating the current production, and §18.17.7 adds that a production
-// returns a value through a return carrying an expression, so a production
-// declared `int` returns its value exactly the way §13.4.1's "void function
-// returns a value" report fires -- a return carrying an expression. Neither
-// return below is the function's, so neither is that report's. Take
-// FunctionBodyScope::in_production_code_block in
-// src/elaborator/elaborator_validate_funcbody.cpp away and §18.17.7's own
-// construct is rejected inside a void function.
 TEST(FunctionReturnElaboration, ValueReturningProductionInAVoidFunctionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -428,11 +377,6 @@ TEST(FunctionReturnElaboration, ValueReturningProductionInAVoidFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.1 with §16.11: a subroutine call attached to a sequence runs at each
-// match, and the assertion receives nothing back from it, so a nonvoid
-// function called there is called as if it had no return value and draws the
-// warning a call written as a statement draws. A void function and a task
-// draw none.
 TEST(FunctionReturnElaboration, NonvoidFunctionAttachedToASequenceWarns) {
   ElabFixture f;
   ElaborateSrc(
@@ -454,9 +398,6 @@ TEST(FunctionReturnElaboration, NonvoidFunctionAttachedToASequenceWarns) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// §13.4.1 with §16.11: a system function is a nonvoid function, so one
-// attached to a sequence draws the same warning, whether written with its
-// arguments or with none; a system task draws none.
 TEST(FunctionReturnElaboration, SystemFunctionAttachedToASequenceWarns) {
   ElabFixture f;
   ElaborateSrc(
@@ -479,10 +420,6 @@ TEST(FunctionReturnElaboration, SystemFunctionAttachedToASequenceWarns) {
   EXPECT_EQ(f.diag.WarningCount(), 2u);
 }
 
-// §13.4.1: a system function written as a statement is called as if it had
-// no return value and draws the warning, with its arguments or without;
-// a cast to void, a system task and $cast, which §8.16 lets a statement call
-// as a task, draw none.
 TEST(FunctionReturnElaboration, SystemFunctionCallAsStatementWarns) {
   ElabFixture f;
   ElaborateSrc(

@@ -76,8 +76,6 @@ TEST(TaskElaboration, TaskEnablesTaskElaborates) {
 
 TEST(TaskElaboration, TaskWithRefArgElaborates) {
   ElabFixture f;
-  // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine, so a
-  // ref argument requires an automatic (or ref static) subroutine.
   auto* design = Elaborate(
       "module m;\n"
       "  task automatic inc(ref int v);\n"
@@ -109,10 +107,6 @@ TEST(TaskElaboration, RefStaticQualifierStickyInheritedAtElaboration) {
   EXPECT_TRUE(tk->func_args[1].is_ref_static);
 }
 
-// §13.3: a task exits at endtask or at a return statement, and that return
-// carries no value. The report that rejects one that does names the subclause
-// stating the rule, so a caller learns which rule was enforced without matching
-// the wording of the message.
 TEST(TaskElaboration, ReturnValueDeclaredNames13_3) {
   ElabFixture f;
   ElaborateSrc(
@@ -126,24 +120,6 @@ TEST(TaskElaboration, ReturnValueDeclaredNames13_3) {
       ReportedError(f.diag.Diagnostics(), "task returns a value", 3, "13.3"));
 }
 
-// The four cases below cover the positions CheckTaskBodyStmt in
-// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
-// now that it takes its child-statement links from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. It had written out seven of
-// the thirteen links Stmt declares, so §13.3's report on a return carrying a
-// value went unmade for one written in Stmt::assert_pass_stmt,
-// Stmt::assert_fail_stmt, Stmt::randcase_items or Stmt::rs_productions.
-//
-// Stmt::for_inits and Stmt::for_steps are newly reached too and get no case
-// here: A.6.8 admits no jump_statement in either. The §13.3.2 rules the same
-// walk carries do reach a for step, and
-// TaskBodyElaboration.AutoTaskLocalInMonitorInAForStepError in
-// test/src/unit/test_elaborator_subclause_13_03_02.cpp covers that.
-
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(TaskElaboration, ReturnValueInAnAssertionPassStmtIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -170,9 +146,6 @@ TEST(TaskElaboration, ReturnValueInAnAssertionFailStmtIsError) {
       ReportedError(f.diag.Diagnostics(), "task returns a value", 3, "13.3"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry.
 TEST(TaskElaboration, ReturnValueInARandcaseItemIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -186,16 +159,6 @@ TEST(TaskElaboration, ReturnValueInARandcaseItemIsError) {
       ReportedError(f.diag.Diagnostics(), "task returns a value", 3, "13.3"));
 }
 
-// The §18.17.6 case: what a return written in a randsequence production code
-// block is, and what §13.3 therefore owes it. The return statement stops
-// generating the current production, and §18.17.7 adds that a production
-// returns a value through a return carrying an expression, so a production
-// declared `int` returns its value exactly the way §13.3's "task returns a
-// value" report fires -- a return carrying an expression. Neither return below
-// is the task's, so neither is that report's. Take
-// TaskBodyScope::in_production_code_block in
-// src/elaborator/elaborator_validate_funcbody.cpp away and §18.17.7's own
-// construct is rejected inside a task.
 TEST(TaskElaboration, ValueReturningProductionInATaskOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -212,12 +175,6 @@ TEST(TaskElaboration, ValueReturningProductionInATaskOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3 (printed page 335 of IEEE 1800-2023) enables a task from a
-// statement, and §13.2 lets a nonvoid function alone stand as an operand of an
-// expression: a task returns no value, so `x = t(1);` has no value to assign.
-// No pass asked whether a call's callee is a task, so the misuse of an imported
-// task (§35.2.1, printed 970) reached the run masked by the §35.5.4 binding
-// report and that of a native task ran unreported.
 TEST(TaskElaboration, ImportedTaskAsAnExpressionOperandIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -249,8 +206,6 @@ TEST(TaskElaboration, NativeTaskAsAnExpressionOperandIsError) {
                             5, "13.3"));
 }
 
-// §13.3: the enabling statement itself, `t(1);`, and a function call in the
-// same expression position are what the rule admits.
 TEST(TaskElaboration, TaskEnabledAsAStatementBesideAFunctionOperandOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -271,9 +226,6 @@ TEST(TaskElaboration, TaskEnabledAsAStatementBesideAFunctionOperandOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3 enables a task only as a statement, so a task call used as an operand
-// is reported wherever the expression stands: a continuous assignment's right
-// side and a declaration's initializer as well as a procedure (#5916).
 TEST(TaskElaboration, TaskOperandInContinuousAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -303,7 +255,6 @@ TEST(TaskElaboration, TaskOperandInDeclarationInitializerError) {
                             3, "13.3"));
 }
 
-// A generate block's procedures are procedures of the design (#5917).
 TEST(TaskElaboration, TaskOperandInGenerateBlockError) {
   ElabFixture f;
   ElaborateSrc(
@@ -321,8 +272,6 @@ TEST(TaskElaboration, TaskOperandInGenerateBlockError) {
                             5, "13.3"));
 }
 
-// A task is no operand wherever it is declared: in a package and called
-// through `pk::`, or at compilation-unit scope (#5918).
 TEST(TaskElaboration, PackageAndUnitTaskOperandsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -346,8 +295,6 @@ TEST(TaskElaboration, PackageAndUnitTaskOperandsError) {
                             7, "13.3"));
 }
 
-// A module's own function hides a unit task of the same name (§23.9), so the
-// call names the function and is a legal operand.
 TEST(TaskElaboration, ModuleFunctionHidesUnitTask) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -362,8 +309,6 @@ TEST(TaskElaboration, ModuleFunctionHidesUnitTask) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same in an else arm of a conditional generate and in an arm of a case
-// generate (§27.5).
 TEST(TaskElaboration, TaskOperandInGenerateElseAndCaseArmsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -391,8 +336,6 @@ TEST(TaskElaboration, TaskOperandInGenerateElseAndCaseArmsError) {
                             10, "13.3"));
 }
 
-// §13.3's mytask2: a data declaration in the body gives its type to the formal
-// the body declared by direction alone, and is no second declaration of it.
 TEST(TaskElaboration, BodyDeclarationTypingADirectionOnlyFormalElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -410,9 +353,6 @@ TEST(TaskElaboration, BodyDeclarationTypingADirectionOnlyFormalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A formal whose port declaration wrote a data type has one already, and a
-// variable declared with an initial value or a parameter is a declaration of
-// its own, so each of these declares its name a second time.
 TEST(TaskElaboration, BodyDeclarationThatTypesNoFormalIsARedeclaration) {
   ElabFixture f;
   Elaborate(

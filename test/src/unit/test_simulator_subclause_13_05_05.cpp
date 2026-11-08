@@ -79,13 +79,6 @@ TEST(ArgumentBindingSim, VoidFunctionAllDefaultsNoParens) {
   LowerRunAndCheck(f, design, {{"x", 99u}});
 }
 
-// §13.5.5 (printed page 351): the empty parentheses after the name of a class
-// function method with no arguments are optional, so the statement `p.bump;`
-// is the call `p.bump();`, and §8.6 (printed 183) has a method reached
-// through the handle of the object it belongs to. The statement was evaluated
-// as a read of a property called bump and the method never ran, so a read
-// after it gave 3, the property's initial value, rather than the 23 the
-// method leaves.
 TEST(ArgumentBindingSim, VoidMethodThroughAHandleNoParens) {
   auto val = RunAndGet(
       "module t;\n"
@@ -106,11 +99,6 @@ TEST(ArgumentBindingSim, VoidMethodThroughAHandleNoParens) {
   EXPECT_EQ(val, 23u);
 }
 
-// §13.5.5 with §8.20 (printed page 196): the parenthesis-free call goes to
-// the same method the parenthesised one does, so a virtual method named
-// through a base-class handle runs the override of the object's class -- the
-// example of §8.20 writes every one of its calls this way. The base method
-// writes 11, the override 44, and a call that never ran leaves 0.
 TEST(ArgumentBindingSim,
      VirtualMethodThroughABaseHandleNoParensRunsTheOverride) {
   auto val = RunAndGet(
@@ -140,12 +128,6 @@ TEST(ArgumentBindingSim,
   EXPECT_EQ(val, 44u);
 }
 
-// §13.5.5 makes the parentheses optional for a task too, and §13.3 (printed
-// page 335) has control return to the enabling process only when the task
-// has completed, so a class task with a delay called as `w.run;` suspends
-// the caller for the delay as `w.run();` does: the write the task makes is
-// seen after it, and $time read after the call is the task's 7, not the 0 of
-// a call run through the function interpreter with its delay skipped.
 TEST(ArgumentBindingSim, ClassTaskThroughAHandleNoParensConsumesItsDelay) {
   auto val = RunAndGet(
       "module t;\n"
@@ -167,11 +149,6 @@ TEST(ArgumentBindingSim, ClassTaskThroughAHandleNoParensConsumesItsDelay) {
   EXPECT_EQ(val, 907u);
 }
 
-// §13.5.5 with §8.13 (printed page 190): a method of the running object named
-// by its bare name inside another of its methods is a call as `step();` is,
-// so a class task calling `step;` runs it on the same object. The step writes
-// 6 into the counter it finds at 0; a bare name read as a variable instead
-// leaves it at 0.
 TEST(ArgumentBindingSim, BareMethodNameInAClassTaskNoParensCallsIt) {
   auto val = RunAndGet(
       "module t;\n"
@@ -196,10 +173,6 @@ TEST(ArgumentBindingSim, BareMethodNameInAClassTaskNoParensCallsIt) {
   EXPECT_EQ(val, 6u);
 }
 
-// §13.5.5 (printed page 351): the parentheses are optional after a class
-// function method with no arguments wherever it is called, so `C::k` read as
-// an operand is the call `C::k()`. The call answers 41 and the sum 42; the
-// name read as a static property of the class instead answers nothing.
 TEST(ArgumentBindingSim, ScopeNamedStaticMethodNoParensReadsItsResult) {
   auto val = RunAndGet(
       "module t;\n"
@@ -215,8 +188,6 @@ TEST(ArgumentBindingSim, ScopeNamedStaticMethodNoParensReadsItsResult) {
   EXPECT_EQ(val, 42u);
 }
 
-// §13.5.5 with §8.6: `h.get` read as an operand is `h.get()`, run on the
-// object the handle holds, whose n is 7.
 TEST(ArgumentBindingSim, HandleNamedMethodNoParensReadsItsResult) {
   auto val = RunAndGet(
       "module t;\n"
@@ -234,9 +205,6 @@ TEST(ArgumentBindingSim, HandleNamedMethodNoParensReadsItsResult) {
   EXPECT_EQ(val, 14u);
 }
 
-// §13.5.5 with §8.13: inside a method of the class, the bare name of another
-// read as an operand is its call, the formal with a default included, and in
-// a static method a static method's bare name is (§8.10).
 TEST(ArgumentBindingSim, BareMethodNameReadInAClassMethodCallsIt) {
   auto val = RunAndGet(
       "module t;\n"
@@ -263,8 +231,6 @@ TEST(ArgumentBindingSim, BareMethodNameReadInAClassMethodCallsIt) {
   EXPECT_EQ(val, 122u);
 }
 
-// §13.5.5 with §8.25 (printed page 204): `T::k` through a type parameter is
-// the call of k on the class the parameter's actual names.
 TEST(ArgumentBindingSim, TypeParameterScopeMethodNoParensReadsItsResult) {
   auto val = RunAndGet(
       "module t;\n"
@@ -285,9 +251,6 @@ TEST(ArgumentBindingSim, TypeParameterScopeMethodNoParensReadsItsResult) {
   EXPECT_EQ(val, 43u);
 }
 
-// §13.5.5 with §13.4.1 (printed page 342): inside a nonvoid function its own
-// name is the variable holding its result, never a call of the function, so
-// `get` reads the 3 written to it and the function answers 3 + 5.
 TEST(ArgumentBindingSim, FunctionNameInsideItsBodyIsItsResultVariable) {
   auto val = RunAndGet(
       "module t;\n"
@@ -306,10 +269,6 @@ TEST(ArgumentBindingSim, FunctionNameInsideItsBodyIsItsResultVariable) {
   EXPECT_EQ(val, 8u);
 }
 
-// §13.5.5 with §18.5.12: only a method's name stands for its call, so a
-// property named through a null handle in a constraint guard is no call of a
-// method and raises no report of one; the guard's other disjunct, a.x == 5,
-// is TRUE, which sifts the null b.x away and generates y == 10.
 TEST(ArgumentBindingSim, PropertyThroughANullHandleInAGuardIsNoMethodCall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -340,10 +299,6 @@ TEST(ArgumentBindingSim, PropertyThroughANullHandleInAGuardIsNoMethodCall) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.5.5 (printed page 351): the empty parentheses after a task's or a void
-// function's name are optional, and so are those after one named by a
-// hierarchical name, `d.T2;` taking its default argument and `d.vf;`, by a
-// package scope, `p::t;`, and by a class scope, `C::st;`. Each ran nothing.
 TEST(ArgumentBindingSim, ScopedAndHierarchicalEnablesNeedNoParentheses) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -372,10 +327,6 @@ TEST(ArgumentBindingSim, ScopedAndHierarchicalEnablesNeedNoParentheses) {
             "n=4\ns=3\na=6\na=9\n");
 }
 
-// §13.5.5 (printed page 351) bars omitting the parentheses in a directly
-// recursive call of a nonvoid class function method, so inside the method its
-// bare name is the implicit result variable (§13.4.1), not a call: f = 7 and
-// f + n read it, and c.f(1) returns 8.
 TEST(ArgumentBindingSim, BareMethodNameInsideItIsTheResultVariable) {
   SimFixture f;
   auto* v = RunAndFindVar(

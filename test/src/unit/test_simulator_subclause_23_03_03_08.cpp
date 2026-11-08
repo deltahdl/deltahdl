@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "helpers_scheduler.h"
@@ -84,9 +83,6 @@ TEST(SignedValuesViaPortsSimulation,
       0xFFu);
 }
 
-// An arbitrary expression on a port connection is evaluated and then sized to
-// the port width using assignment rules. Here p + 1 produces an 8-bit 0xFF,
-// which is truncated to the 4-bit input port, so only the low nibble survives.
 TEST(SignedValuesViaPortsSimulation,
      ExpressionOnPortTruncatedToPortWidthLikeAssignment) {
   EXPECT_EQ(
@@ -103,9 +99,6 @@ TEST(SignedValuesViaPortsSimulation,
       0x0Fu);
 }
 
-// Sign must not cross hierarchy on the output path either. The child drives a
-// signed output, but the receiving net is unsigned; widening that receiver
-// must zero-extend (per the receiver's own declaration), not sign-extend.
 TEST(SignedValuesViaPortsSimulation,
      SignedOutputToUnsignedReceiverDoesNotSignExtend) {
   EXPECT_EQ(RunAndGet("module child(output logic signed [7:0] o);\n"
@@ -121,9 +114,6 @@ TEST(SignedValuesViaPortsSimulation,
             0x00FFu);
 }
 
-// With the signed keyword at both levels, the signed type does cross hierarchy
-// on the output path: a signed output feeding a signed receiver sign-extends
-// when that receiver is widened.
 TEST(SignedValuesViaPortsSimulation, SignedOutputToSignedReceiverSignExtends) {
   EXPECT_EQ(RunAndGet("module child(output logic signed [7:0] o);\n"
                       "  assign o = -1;\n"
@@ -138,8 +128,6 @@ TEST(SignedValuesViaPortsSimulation, SignedOutputToSignedReceiverSignExtends) {
             0xFFFFu);
 }
 
-// A narrow unsigned expression on a port connection is sized to the wider port
-// using assignment rules, which for an unsigned source means zero-extension.
 TEST(SignedValuesViaPortsSimulation,
      UnsignedNarrowExpressionZeroExtendedOnPortAssignment) {
   EXPECT_EQ(
@@ -156,9 +144,6 @@ TEST(SignedValuesViaPortsSimulation,
       0x0Fu);
 }
 
-// Signedness carried by a 2-state element type (bit signed) crosses hierarchy
-// the same way an explicitly-signed logic vector does: with the signed keyword
-// on both the port and the receiver, widening the receiver sign-extends.
 TEST(SignedValuesViaPortsSimulation, BitSignedTypeSignExtendsAcrossPort) {
   EXPECT_EQ(RunAndGet("module child(output bit signed [7:0] o);\n"
                       "  assign o = -1;\n"
@@ -173,9 +158,6 @@ TEST(SignedValuesViaPortsSimulation, BitSignedTypeSignExtendsAcrossPort) {
             0xFFFFu);
 }
 
-// Signedness supplied by an inherently-signed type (byte) — rather than the
-// explicit signed keyword — also crosses hierarchy when both the port and the
-// receiver are declared with that signed type.
 TEST(SignedValuesViaPortsSimulation,
      InherentlySignedByteTypeSignExtendsAcrossPort) {
   EXPECT_EQ(RunAndGet("module child(output byte o);\n"
@@ -191,8 +173,6 @@ TEST(SignedValuesViaPortsSimulation,
             0xFFFFu);
 }
 
-// The inherent signedness of a byte output still does not cross to an unsigned
-// receiver: widening that unsigned receiver zero-extends per its own type.
 TEST(SignedValuesViaPortsSimulation,
      InherentlySignedByteToUnsignedReceiverDoesNotSignExtend) {
   EXPECT_EQ(RunAndGet("module child(output byte o);\n"
@@ -208,9 +188,6 @@ TEST(SignedValuesViaPortsSimulation,
             0x00FFu);
 }
 
-// The receiving object may be a net rather than a variable; a signed net
-// (wire signed) carries the signed type across hierarchy, so widening it
-// sign-extends just as a signed variable receiver would.
 TEST(SignedValuesViaPortsSimulation, SignedNetReceiverSignExtendsAcrossPort) {
   EXPECT_EQ(RunAndGet("module child(output logic signed [7:0] o);\n"
                       "  assign o = -1;\n"

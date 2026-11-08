@@ -8,17 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §12.7.1: the for loop is a statement whose body runs a number of times the
-// loop control decides. SynthLower has no lowering for it and no rule naming
-// it, so it is the case that reaches the last arm of LowerStmt, and the last
-// arm is what this test is for. Before that arm existed, the loop and the
-// assignment inside it left no trace in the graph while `Lower` answered with
-// a netlist and the run reported success.
-//
-// The report carries no subclause because the design breaks no rule of IEEE
-// 1800-2023 by writing a for loop: what it meets is a limit of this
-// synthesizer, and the location is what tells the reader which statement is
-// missing from the netlist.
 TEST(SequentialLoopSynthesis, UnlowerableStatementIsReportedRatherThanDropped) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

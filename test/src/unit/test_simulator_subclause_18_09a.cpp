@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// These tests drive 18.9's runtime rule end to end. Each program elaborates
-// a real class with named constraint blocks, calls constraint_mode() from
-// source, and copies the outcome to module variables the harness reads -- so
-// the behavior observed is that of parse/elaborate/run applying the rule, not a
-// hand-built solver state. Two mutually conflicting equality constraints on one
-// variable make randomize() unsatisfiable while both are active; turning one
-// OFF removes it from the solve so the survivor pins the variable and the call
-// succeeds. That flip is the visible proof that constraint_mode() controls
-// whether a block is considered.
-
-// 18.9 / Table 18-4: a void-form constraint_mode(0) call sets the named block
-// inactive, so randomize() no longer enforces it. With both pins active the
-// solve is unsatisfiable (returns 0); disabling one leaves the other binding
-// and the solve succeeds with the surviving pin's value.
 TEST(ConstraintModeRuntime, VoidOffRemovesBlockFromSolve) {
   const char* src =
       "class P;\n"
@@ -45,9 +31,6 @@ TEST(ConstraintModeRuntime, VoidOffRemovesBlockFromSolve) {
   EXPECT_EQ(RunAndGet(src, "rx"), 10u);
 }
 
-// 18.9: constraint_mode(1) sets a previously disabled block active again, so
-// randomize() enforces it once more. Toggling c_hi off then on restores the
-// original conflict, and the solve is unsatisfiable again.
 TEST(ConstraintModeRuntime, VoidOnReenablesBlock) {
   const char* src =
       "class P;\n"
@@ -71,10 +54,6 @@ TEST(ConstraintModeRuntime, VoidOnReenablesBlock) {
   EXPECT_EQ(RunAndGet(src, "ok_on"), 0u);
 }
 
-// 18.9: the nonvoid form returns the current active state -- 1 for an active
-// block and 0 after it was turned off. A block is active when the object is
-// created, so the query reads 1 before any change and 0 after
-// constraint_mode(0).
 TEST(ConstraintModeRuntime, NonvoidReturnsActiveState) {
   const char* src =
       "class P;\n"
@@ -96,9 +75,6 @@ TEST(ConstraintModeRuntime, NonvoidReturnsActiveState) {
   EXPECT_EQ(RunAndGet(src, "st_after"), 0u);
 }
 
-// 18.9: the void form with no constraint named acts on every constraint of the
-// object. Disabling every block removes the conflict, so randomize() succeeds,
-// and querying each block confirms both are inactive.
 TEST(ConstraintModeRuntime, UnnamedFormDisablesAllBlocks) {
   const char* src =
       "class P;\n"
@@ -124,10 +100,6 @@ TEST(ConstraintModeRuntime, UnnamedFormDisablesAllBlocks) {
   EXPECT_EQ(RunAndGet(src, "q_hi"), 0u);
 }
 
-// 18.9: the constraint named may be any block of the class hierarchy, including
-// one inherited from a base class. Disabling the base block through a derived
-// handle removes the base pin, so the derived pin binds the solve; the query on
-// the base block confirms it is inactive.
 TEST(ConstraintModeRuntime, NamedFormReachesInheritedBlock) {
   const char* src =
       "class Base;\n"
@@ -158,11 +130,6 @@ TEST(ConstraintModeRuntime, NamedFormReachesInheritedBlock) {
   EXPECT_EQ(RunAndGet(src, "q_base"), 0u);
 }
 
-// 18.9: the nonvoid form returns the block's active state as a value usable in
-// any expression, not just an assignment right-hand side. Here it appears in
-// two other operand positions -- a conditional-operator condition and an if
-// condition -- and its 1/0 result steers the control flow. This mirrors the
-// clause's own example, which tests the state directly inside an if.
 TEST(ConstraintModeRuntime, NonvoidFormAsExpressionOperand) {
   const char* src =
       "class P;\n"
@@ -180,19 +147,10 @@ TEST(ConstraintModeRuntime, NonvoidFormAsExpressionOperand) {
       "    if (p.c.constraint_mode()) r_after = 10; else r_after = 20;\n"
       "  end\n"
       "endmodule\n";
-  // Active initially -> the query yields 1, so the conditional operator selects
-  // its true arm; after disabling, it yields 0 and the if takes the else arm.
   EXPECT_EQ(RunAndGet(src, "r_before"), 1u);
   EXPECT_EQ(RunAndGet(src, "r_after"), 20u);
 }
 
-// 18.9: the void form with no constraint named acts on EVERY constraint of the
-// object -- including those inherited from a base class. Two conflicting pins
-// (one inherited, one derived) make randomize() unsatisfiable; the no-name form
-// disables every block across the hierarchy, so the solve succeeds and querying
-// each block reports inactive.
-// This exercises the base-class walk in the no-name branch, distinct from the
-// same-class-only case.
 TEST(ConstraintModeRuntime, UnnamedFormDisablesInheritedBlocks) {
   const char* src =
       "class Base;\n"
@@ -223,13 +181,6 @@ TEST(ConstraintModeRuntime, UnnamedFormDisablesInheritedBlocks) {
   EXPECT_EQ(RunAndGet(src, "q_der"), 0u);
 }
 
-// 18.9: any expression giving the handle of the object that defines the
-// constraint can stand as the object -- including a subroutine's formal
-// argument, the form the clause's own example uses (a function takes the object
-// and calls constraint_mode on it). Disabling one of two conflicting pins
-// through the formal handle inside a function turns an unsatisfiable solve into
-// one the surviving pin binds, proving the call applied through the passed
-// handle.
 TEST(ConstraintModeRuntime, ConstraintModeThroughSubroutineArgument) {
   const char* src =
       "class Packet;\n"
@@ -258,10 +209,6 @@ TEST(ConstraintModeRuntime, ConstraintModeThroughSubroutineArgument) {
   EXPECT_EQ(RunAndGet(src, "rv"), 3u);
 }
 
-// 18.9: a block turned off is not considered by randomize(), so a bound its
-// relation places on a variable does not confine the draw either: with the
-// block holding x to at least 200 off, 64 draws of an 8-bit x reach below
-// 200, and with it back on every one of the next 64 stays at or above it.
 TEST(ConstraintModeRuntime, ABoundOfAnInactiveBlockDoesNotConfineTheDraw) {
   const char* src =
       "class P;\n"

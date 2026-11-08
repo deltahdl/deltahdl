@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Plain-data copy of a recognized §40.4.3 concatenation FSM pragma so that
-// assertions do not depend on string_views into a transient SourceManager.
 struct ConcatPragmaInfo {
   std::vector<std::string> signals;
   std::string fsm_name;
@@ -40,9 +38,6 @@ std::vector<ConcatPragmaInfo> CollectConcatPragmas(const std::string& src) {
   return out;
 }
 
-// §40.4.3: the concatenation is composed of all the signals specified. Every
-// listed member is recorded, regardless of the irregular whitespace around the
-// commas and braces that may split the comment body into separate words.
 TEST(FsmConcatPragmaLexing, ComposedOfAllSignalsWithIrregularSpacing) {
   auto pragmas =
       CollectConcatPragmas("/* tool state_vector { a , b,c } my_fsm enum e */");
@@ -50,9 +45,6 @@ TEST(FsmConcatPragmaLexing, ComposedOfAllSignalsWithIrregularSpacing) {
   EXPECT_EQ(pragmas[0].signals, (std::vector<std::string>{"a", "b", "c"}));
 }
 
-// §40.4.3: the concatenation is composed of all the signals specified — the
-// minimal case being a single whole signal between the braces, written as one
-// contiguous word. That single member is recorded.
 TEST(FsmConcatPragmaLexing, SingleSignalConcatenationRecordsThatSignal) {
   auto pragmas = CollectConcatPragmas(
       "/* tool state_vector {only} my_fsm enum state_e "
@@ -63,9 +55,6 @@ TEST(FsmConcatPragmaLexing, SingleSignalConcatenationRecordsThatSignal) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-// §40.4.3: bit-selects or part-selects of signals cannot be used in the
-// concatenation. A member that is a bit-select or a part-select makes the
-// whole pragma unrecognized as a concatenation current-state pragma.
 TEST(FsmConcatPragmaLexing, BitSelectOrPartSelectMemberRejected) {
   EXPECT_TRUE(
       CollectConcatPragmas("/* tool state_vector {hi[0], lo} my_fsm enum e */")
@@ -76,32 +65,22 @@ TEST(FsmConcatPragmaLexing, BitSelectOrPartSelectMemberRejected) {
           .empty());
 }
 
-// §40.4.3's form includes an FSM name and an enumeration name bound with the
-// literal `enum` keyword. A concatenation pragma missing the FSM name, or with
-// some other token in the binding position, is not recognized.
 TEST(FsmConcatPragmaLexing, RequiresFsmNameAndEnumBinding) {
-  // Missing the FSM name between the braces and the `enum` keyword.
   EXPECT_TRUE(
       CollectConcatPragmas("/* tool state_vector {hi, lo} enum state_e */")
           .empty());
-  // The binding keyword must literally be `enum`.
   EXPECT_TRUE(
       CollectConcatPragmas("/* tool state_vector {hi, lo} my_fsm uses state_e "
                            "*/")
           .empty());
 }
 
-// §40.4.3's form lists the signals between braces; an empty brace pair names no
-// signals for the concatenation to be composed of, so it is not recognized.
 TEST(FsmConcatPragmaLexing, EmptyConcatenationIsNotRecognized) {
   EXPECT_TRUE(
       CollectConcatPragmas("/* tool state_vector {} my_fsm enum state_e */")
           .empty());
 }
 
-// §40.4.3's concatenation form is brace-delimited; without a closing brace the
-// signal list is unterminated and the pragma is not recognized as a
-// concatenation current-state pragma.
 TEST(FsmConcatPragmaLexing, UnclosedBraceIsNotRecognized) {
   EXPECT_TRUE(
       CollectConcatPragmas("/* tool state_vector {hi, lo my_fsm enum state_e "
@@ -109,9 +88,6 @@ TEST(FsmConcatPragmaLexing, UnclosedBraceIsNotRecognized) {
           .empty());
 }
 
-// The concatenation form is recorded as its own kind of FSM pragma: it does not
-// appear among the §40.4.1 whole-signal pragmas nor the §40.4.2 part-select
-// pragmas.
 TEST(FsmConcatPragmaLexing, ConcatIsSeparateFromOtherFsmPragmas) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -124,9 +100,6 @@ TEST(FsmConcatPragmaLexing, ConcatIsSeparateFromOtherFsmPragmas) {
   EXPECT_TRUE(lexer.FsmPartSelectPragmas().empty());
 }
 
-// The pragma is written inside the module definition where the signals are
-// declared, and is recognized there while the surrounding source still lexes
-// into its ordinary token stream.
 TEST(FsmConcatPragmaLexing, RecognizedWithinModuleBody) {
   const std::string kSrc =
       "module fsm;\n"
@@ -141,12 +114,6 @@ TEST(FsmConcatPragmaLexing, RecognizedWithinModuleBody) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-// §40.4.3: the concatenation may not name a bit or part select of a signal. A
-// comment carrying the whole of the form around the braces is an FSM its author
-// meant to specify, so the prohibition that stopped it being one is reported
-// rather than leaving the FSM unrecognized with nothing to say why. It is a
-// warning because the prohibition is on what the tool can use: the comment
-// annotates a design that is legal with or without it.
 TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
   const std::string kSrc =
       "module fsm;\n"
@@ -169,11 +136,6 @@ TEST(FsmConcatPragmaLexing, SelectMemberIsReportedAgainstTheProhibition) {
       LineHolding(kSrc, "/* tool state_vector"), "40.4.3"));
 }
 
-// The report is of the prohibition and not of every comment the recognizer
-// passes over: a comment that never had the §40.4.3 form - one whose braces
-// hold no select, and one that is not a pragma at all - leaves the source
-// silent, because nothing there is an FSM that the prohibition kept from being
-// recognized.
 TEST(FsmConcatPragmaLexing, NothingIsReportedWhereNoSelectWasWritten) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -187,10 +149,6 @@ TEST(FsmConcatPragmaLexing, NothingIsReportedWhereNoSelectWasWritten) {
   EXPECT_TRUE(diag.Diagnostics().empty());
 }
 
-// The braces are followed by exactly the FSM name, `enum` and the enumeration
-// name, and both names are identifiers. A comment missing the enumeration
-// name, writing another word for `enum`, or naming either with a word that is
-// not an identifier is not recorded.
 TEST(FsmConcatPragmaLexing, MissingOrMalformedNamesAreNotRecognized) {
   for (const char* tail : {"my_fsm enum", "my_fsm with state_e",
                            "9fsm enum state_e", "my_fsm enum 9e"}) {

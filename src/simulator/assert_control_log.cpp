@@ -13,7 +13,6 @@ namespace delta {
 
 namespace {
 
-// The parts of an assertion's status a control_type sets.
 constexpr uint32_t kChecking = 1;
 constexpr uint32_t kFail = 2;
 constexpr uint32_t kVacuousPass = 4;
@@ -41,9 +40,6 @@ uint32_t PartsSetBy(uint32_t control_type) {
   }
 }
 
-// Table 20-6's last three bits are violation report types, which the
-// directive_type argument does not select, and so is an expect statement's:
-// §20.11 checks that argument only for assertions.
 bool DirectiveSelected(const AssertControlCall& call,
                        const AssertionIdentity& assertion) {
   if (assertion.type_bit >= static_cast<uint32_t>(AssertionTypeBit::kExpect)) {
@@ -52,10 +48,6 @@ bool DirectiveSelected(const AssertControlCall& call,
   return (call.directive_type & assertion.directive_bit) != 0;
 }
 
-// Whether the scope list item `item`, by one of the names it may stand for,
-// names the assertion itself or a scope that holds it within `levels` levels,
-// which count as §21.7.1.2's levels of $dumpvars do: 0 is every level below
-// the scope, 1 the scope alone.
 bool ItemSelects(const std::vector<std::string>& item, uint32_t levels,
                  const AssertionIdentity& assertion) {
   for (const std::string& name : item) {
@@ -74,9 +66,6 @@ bool ItemSelects(const std::vector<std::string>& item, uint32_t levels,
   return false;
 }
 
-// Whether the whole-design call `later` selects every assertion `earlier`
-// selects and sets every part of its status `earlier` sets, which leaves
-// `earlier` nothing to decide once no call locks an assertion.
 bool Supersedes(const AssertControlCall& later,
                 const AssertControlCall& earlier) {
   uint32_t parts = PartsSetBy(earlier.control_type);

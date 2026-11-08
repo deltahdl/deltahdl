@@ -1,9 +1,3 @@
-// Tests for §6.9.2 "Vector net accessibility": vectored and scalared are
-// optional advisory keywords for vector net declarations, and where they are
-// implemented they may restrict operations on a vector net -- vectored possibly
-// forbidding bit-selects, part-selects and strength specifications, while
-// scalared permits bit-selects and part-selects of the net.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -56,9 +50,6 @@ TEST(VectorNetAccessibility, ScalaredWithPackedDimOk) {
   EXPECT_TRUE(ValidateNetDecl(info));
 }
 
-// §6.9.2: vectored and scalared are optional advisory keywords for vector net
-// declarations. A net with no packed dimension is not a vector net, so vectored
-// on it is rejected under §6.9.2 and not under some other rule.
 TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -72,8 +63,6 @@ TEST(VectorNetAccessibility, VectoredWithoutPackedDimIsError) {
       "6.9.2"));
 }
 
-// §6.9.2: scalared is the other of the two advisory keywords the same sentence
-// confines to vector net declarations.
 TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -87,9 +76,6 @@ TEST(VectorNetAccessibility, ScalaredWithoutPackedDimIsError) {
       "6.9.2"));
 }
 
-// §6.9.2: when scalared is used, bit-selects and part-selects of the net shall
-// be permitted. A scalared vector net referenced by both a bit-select and a
-// part-select elaborates without error.
 TEST(VectorNetAccessibility, ScalaredPermitsBitAndPartSelects) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -105,8 +91,6 @@ TEST(VectorNetAccessibility, ScalaredPermitsBitAndPartSelects) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.9.2: an indexed part-select (the +: form) is a distinct part-select shape
-// that a scalared net shall likewise permit.
 TEST(VectorNetAccessibility, ScalaredPermitsIndexedPartSelect) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -120,8 +104,6 @@ TEST(VectorNetAccessibility, ScalaredPermitsIndexedPartSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.9.2: the permission covers a bit-select used as a continuous-assignment
-// target, a different syntactic position from a select read as an operand.
 TEST(VectorNetAccessibility, ScalaredPermitsBitSelectAsAssignTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -135,8 +117,6 @@ TEST(VectorNetAccessibility, ScalaredPermitsBitSelectAsAssignTarget) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.9.2: a part-select of a scalared net is also permitted in the
-// assignment-target position.
 TEST(VectorNetAccessibility, ScalaredPermitsPartSelectAsAssignTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -150,9 +130,6 @@ TEST(VectorNetAccessibility, ScalaredPermitsPartSelectAsAssignTarget) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.9.2: the permit rule applies to any vector net type declared scalared;
-// exercise it on the tri net family used in the standard's scalared example,
-// built end-to-end from real net-declaration source (§6.7).
 TEST(VectorNetAccessibility, ScalaredTriNetPermitsSelects) {
   ElabFixture f;
   auto* design = ElaborateSrc(

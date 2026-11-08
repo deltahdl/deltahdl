@@ -58,14 +58,6 @@ TEST(TaggedUnionSimulation, VoidMemberTaggedAssignment) {
   EXPECT_EQ(v, 99u);
 }
 
-// §7.3.2: a tagged union member may be read only through the name matching the
-// current tag. Driven end-to-end from real source: the tag is set by a real
-// `tagged` assignment (not a hand-set tag), then a read through the sibling
-// member that does not match the tag is not type-consistent and yields unknown
-// bits. This observes the read-consistency rule rather than the synthetic
-// hand-built-type path above. §11.9 (printed page 304) makes the read a
-// run-time error as well, so the fixture is read directly: RunAndGet fails a
-// case on any error the run raises.
 TEST(TaggedUnionSimulation, MismatchedMemberReadIsUnknownFromRealSource) {
   SimFixture f;
   auto* result = RunAndFindVar(
@@ -87,10 +79,6 @@ TEST(TaggedUnionSimulation, MismatchedMemberReadIsUnknownFromRealSource) {
                             7, "11.9"));
 }
 
-// The contrast to the mismatch case: reading through the member that does match
-// the active tag is type-consistent and returns known bits. Sharing the same
-// initialized value with the mismatch test shows the unknown result there comes
-// from the tag mismatch, not from uninitialized storage.
 TEST(TaggedUnionSimulation, MatchingMemberReadIsKnownFromRealSource) {
   auto known = RunAndGet(
       "module t;\n"
@@ -106,9 +94,6 @@ TEST(TaggedUnionSimulation, MatchingMemberReadIsKnownFromRealSource) {
   EXPECT_EQ(known, 0u);
 }
 
-// §7.3.2 packed representation, observed at run time end-to-end: the packed
-// size of a tagged union is the tag width plus the widest member. A two-arm
-// union whose widest arm is 32 bits needs one tag bit, so its bit count is 33.
 TEST(TaggedUnionSimulation, PackedTaggedUnionBitsIsTagPlusMaxMember) {
   auto v = RunAndGet(
       "module t;\n"
@@ -124,10 +109,6 @@ TEST(TaggedUnionSimulation, PackedTaggedUnionBitsIsTagPlusMaxMember) {
   EXPECT_EQ(v, 33u);
 }
 
-// §7.3.2 puts a packed tagged union's tag in the value's most significant bits,
-// so a write naming another member rewrites the tag as well as the member:
-// after `tagged v2` sets the tag bit to 1, `tagged v1 (85)` reads 0 followed by
-// 1010101. Kept at 1, the stale tag read 11010101.
 TEST(TaggedUnionSimulation, PackedTaggedUnionRetagRewritesTagBits) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -143,8 +124,6 @@ TEST(TaggedUnionSimulation, PackedTaggedUnionRetagRewritesTagBits) {
             "01010101\n");
 }
 
-// Without the packed qualifier the tag is not part of the in-vector layout, so
-// the same tagged union reports only its widest member's width at run time.
 TEST(TaggedUnionSimulation, UnpackedTaggedUnionBitsHasNoTagBits) {
   auto v = RunAndGet(
       "module t;\n"
@@ -159,12 +138,6 @@ TEST(TaggedUnionSimulation, UnpackedTaggedUnionBitsHasNoTagBits) {
   EXPECT_EQ(v, 32u);
 }
 
-// §7.3.2 has a tagged union hold the member its tag names, with that member's
-// type, and §6.11.2 drops x and z only on the way into a 2-state type. A
-// 4-state member keeps its z whatever the member declared before it: an
-// unpacked union led by a `bit` member read the `logic` member back as 1001,
-// and one led by a `logic` member read 1z01, so the two unions together tell
-// the first member's type from the written member's.
 TEST(TaggedUnionSimulation, FourStateMemberAfterTwoStateMemberKeepsZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -183,8 +156,6 @@ TEST(TaggedUnionSimulation, FourStateMemberAfterTwoStateMemberKeepsZ) {
             "1z01 1z01\n");
 }
 
-// The contrast: a write of the same value into the 2-state member of that union
-// drops the z to 0 by the member's type, after the 4-state member has held one.
 TEST(TaggedUnionSimulation, TwoStateMemberBesideFourStateMemberDropsZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -201,8 +172,6 @@ TEST(TaggedUnionSimulation, TwoStateMemberBesideFourStateMemberDropsZ) {
             "1001\n");
 }
 
-// The same union declared in a procedural block is the same object (§6.21), so
-// its 4-state member keeps the z and its 2-state member drops it there too.
 TEST(TaggedUnionSimulation, BlockLocalUnionKeepsFourStateMemberZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -220,9 +189,6 @@ TEST(TaggedUnionSimulation, BlockLocalUnionKeepsFourStateMemberZ) {
             "1z01\n1001\n");
 }
 
-// §7.3 gives an unpacked union the default initial value of its first member,
-// so a union led by a `bit` member starts at 0 even though a later member is
-// 4-state and could hold x.
 TEST(TaggedUnionSimulation, UnionLedByTwoStateMemberStartsAtZero) {
   SimFixture f;
   auto* u = RunAndFindVar(
@@ -236,11 +202,6 @@ TEST(TaggedUnionSimulation, UnionLedByTwoStateMemberStartsAtZero) {
   EXPECT_EQ(u->value.ToUint64(), 0u);
 }
 
-// §7.3.2 has every tagged union value carry its tag, a member that is itself a
-// tagged union included, and §11.9 builds `tagged Jmp (tagged JmpV 10)` from
-// the inner tagged value, tag and all. §21.2.1.6 prints a tagged union as its
-// tag and its member's value, so the member prints in the same tagged form;
-// with the inner tag lost it printed as the bare 10.
 TEST(TaggedUnionSimulation, NestedTaggedValuePrintsInnerTag) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -259,10 +220,6 @@ TEST(TaggedUnionSimulation, NestedTaggedValuePrintsInnerTag) {
             "'{Jmp:'{JmpV:10}}\n");
 }
 
-// §12.6 matches `tagged Jmp (tagged JmpV .v)` against the member's own tag as
-// well as the outer one, so the inner tag the assignment gave the member
-// selects the item; a pattern naming the other inner member, JmpU, is passed
-// over.
 TEST(TaggedUnionSimulation, NestedTaggedValueMatchesInnerTagPattern) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -287,11 +244,6 @@ TEST(TaggedUnionSimulation, NestedTaggedValueMatchesInnerTagPattern) {
             "v=10\n");
 }
 
-// §7.3.2 makes a tagged union's tag part of its value, and a member that is
-// itself a tagged union holds its own tag as part of the member's value, so
-// assigning one variable to another copies the inner tag too. b first holds
-// the other inner member, JmpU, so the inner tag it keeps after `b = a` tells
-// a copied tag from a stale one.
 TEST(TaggedUnionSimulation, CopyingAUnionCopiesItsNestedTags) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -319,9 +271,6 @@ TEST(TaggedUnionSimulation, CopyingAUnionCopiesItsNestedTags) {
             "'{Jmp:'{JmpV:10}}\nv=10\n");
 }
 
-// §7.3.2: a copy stops handing over tags where the active member is not a
-// union; a structure member carries no tag of its own, so d takes c's Add tag
-// and matches Add's structure pattern with c's member values.
 TEST(TaggedUnionSimulation, CopyingAUnionWithAStructMemberCopiesItsTag) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -346,9 +295,6 @@ TEST(TaggedUnionSimulation, CopyingAUnionWithAStructMemberCopiesItsTag) {
             "6\n");
 }
 
-// §7.3.2 lets an unpacked tagged union hold a real member, and §11.9 builds
-// `tagged R v` with v in that member, so the member holds the real itself:
-// u.R * 4 is 10.0 for 2.5, and the integer 3 written to it is the real 3.0.
 TEST(TaggedUnionSimulation, RealMemberHoldsItsReal) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef union tagged { real R; int I; } U;\n"
@@ -365,7 +311,6 @@ TEST(TaggedUnionSimulation, RealMemberHoldsItsReal) {
             1012u);
 }
 
-// The same for a module variable's declaration initializer.
 TEST(TaggedUnionSimulation, RealMemberInitializerHoldsItsReal) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef union tagged { real R; int I; } U;\n"
@@ -377,8 +322,6 @@ TEST(TaggedUnionSimulation, RealMemberInitializerHoldsItsReal) {
             10u);
 }
 
-// The same through a nonblocking assignment, and through the initializer of a
-// variable declared in a block and in a function body (§6.8).
 TEST(TaggedUnionSimulation, RealMemberHoldsItsRealOnEveryWritePath) {
   EXPECT_EQ(
       RunAndGet("module t;\n"

@@ -31,8 +31,6 @@ namespace delta {
 
 namespace {
 
-// §37.46: the names an assignment's left side drives -- a net written whole,
-// through a select, or as an element of a concatenation.
 void CollectTargets(const Expr* expr, std::vector<std::string_view>& out) {
   if (expr == nullptr) return;
   if (expr->kind == ExprKind::kIdentifier) {
@@ -67,8 +65,6 @@ void CollectReads(const Expr* expr, std::vector<std::string_view>& out) {
 
 namespace {
 
-// Hangs `assign` among the children of each object `names` resolve to once,
-// which is where §37.46's driver and load iterations look for it.
 void HangOn(VpiObject* assign, const std::vector<std::string_view>& found,
             const AssignNames& names) {
   for (std::string_view name : found) {
@@ -80,10 +76,6 @@ void HangOn(VpiObject* assign, const std::vector<std::string_view>& found,
   }
 }
 
-// §37.47 details 1 and 3: the cont assign bits of the vector continuous
-// assignment `assign`, one per bit of what it drives, each a scalar reporting
-// its offset from the least significant bit, whose value is that bit of the
-// assignment's.
 void MakeContAssignBits(VpiObject* assign, const AssignBuild& build) {
   const int kWidth = assign->lhs != nullptr ? assign->lhs->size : 0;
   for (int offset = 0; kWidth > 1 && offset < kWidth; ++offset) {
@@ -99,23 +91,15 @@ void MakeContAssignBits(VpiObject* assign, const AssignBuild& build) {
   }
 }
 
-// §37.47: the continuous assignment `ca` stands for, in `scope`, with its two
-// sides, whose value is that of its right-hand side evaluated where it stands,
-// and its bits; and §37.46: a driver of what it writes and a load of what it
-// reads.
 void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
                               const AssignBuild& build) {
   const ModuleItem* item = ca.source_item;
   const bool kDecl = item->kind == ModuleItemKind::kNetDecl;
-  // A net declaration's assignment has no left side written in the source; the
-  // elaborator names the net in one of its own.
   const Expr* lhs = kDecl ? ca.lhs : item->assign_lhs;
   const Expr* rhs = kDecl ? item->init_expr : item->assign_rhs;
 
   VpiObject* obj = build.alloc();
   obj->type = vpiContAssign;
-  // It hangs among a net's children as a driver or a load, where an index
-  // selects a bit (§38.19); it is no bit, so it answers no index.
   obj->index = -1;
   obj->net_decl_assign = kDecl;
   obj->parent = scope;
@@ -131,32 +115,22 @@ void MakeContinuousAssignment(const RtlirContAssign& ca, VpiObject* scope,
   if (build.sim != nullptr) {
     VpiFillContAssignDelays(obj, ca, VpiFlatName(build.names.prefix, ""),
                             *build.sim, build.alloc);
-    // §37.3.3: where the assignment, or the net declaration, was written.
     VpiRecordWrittenLocation(obj, item->loc, *build.sim);
   }
 
   std::vector<std::string_view> names;
   CollectTargets(lhs, names);
-  // §38.32: what the run keys the assignment's delays under, the instance and
-  // the net it drives, which a vpi_put_delays gives it new ones under.
   if (!names.empty()) {
     const std::string& prefix = build.names.prefix;
     obj->run_key = (prefix.empty() ? "" : prefix + ".") + std::string(names[0]);
   }
   HangOn(obj, names, build.names);
-  // §37.21 detail 1: a member it writes, `s.a`, is written by no name of the
-  // scope, and makes it a driver of the variable holding the member.
   VpiHangOnVariablesNamed(obj, obj->lhs);
   names.clear();
   CollectReads(rhs, names);
   HangOn(obj, names, build.names);
 }
 
-// §37.42 with §23.9: the scope a func call an assignment makes, written in
-// the generate block instances `prefixes` names, resolves its callee from
-// first: the innermost of them declaring a task or function, whose gen scope
-// is found through the path one of those declarations records, and the
-// instance `instance` where none does.
 const VpiObject* CalleeScope(const RtlirModule& mod,
                              const GenBlockPrefixes& prefixes,
                              VpiHandle instance) {
@@ -179,9 +153,6 @@ const VpiObject* CalleeScope(const RtlirModule& mod,
 
 void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
                                              const VpiCallBuild& calls) {
-  // §37.47: a module reaches the continuous assignments it holds. Nothing made
-  // one, so the relation reached none and no net had a driver or a load
-  // (§37.46).
   if (design == nullptr || design->top_modules.empty() ||
       design->top_modules.front() == nullptr) {
     return;
@@ -194,19 +165,12 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
         VpiHandle scope = FindObjectForFlatName(
             object_map_, prefix.empty() ? kFirstTop : prefix);
         if (scope == nullptr) return;
-        // The elaborator splits one statement into an assignment per element of
-        // a concatenation it writes, and each instance of a loop generate
-        // block holds its own instance of the statement (§27.4): the statement
-        // is one object per generate block instance it stands in.
         std::set<std::pair<const ModuleItem*, GenBlockPrefixes>> made;
         for (const RtlirContAssign& ca : mod->assigns) {
           if (ca.source_item == nullptr ||
               !made.emplace(ca.source_item, ca.gen_block_prefixes).second) {
             continue;
           }
-          // §37.85: an assignment a generate block writes is one of its
-          // block instance's gen scope, whose declarations, a let's among
-          // them (§37.12), its names find ahead of the instance's (§23.9).
           VpiObject* within = VpiGenScopeOf(scope, ca.gen_block_path);
           AssignBuild build{
               kAttach.alloc,
@@ -230,9 +194,6 @@ void VpiContext::AttachContinuousAssignments(const RtlirDesign* design,
 void AttachAliasStatements(const RtlirDesign* design,
                            const VpiObjectMap& objects, SimContext& ctx,
                            const VpiAttachBuild& build) {
-  // §37.76 with §37.5: an instance reaches the alias statements it writes, one
-  // per net an alias joins to its last, which is the right-hand side of every
-  // one of them: alias a = b = c makes a = c and b = c.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,

@@ -12,23 +12,16 @@ using namespace delta;
 
 namespace {
 
-// A scalar variable the run left behind, read as an unsigned value.
 uint64_t ReadAfterRun(SimFixture& f, const char* var_name) {
   auto* var = f.ctx.FindVariable(var_name);
   EXPECT_NE(var, nullptr);
   return var ? var->value.ToUint64() : 0;
 }
 
-// The report a rand join weight outside 0.0 to 1.0 draws before it is clamped.
 constexpr const char* kOutsideTheRange =
     "rand join expression lies outside 0.0 to 1.0; it needs a real number in "
     "that range";
 
-// Elaborate, lower, and run a module, then read back a scalar variable as an
-// unsigned value. The rand join tests gather statistics across many runs of a
-// randsequence wrapped in a repeat loop, so they read counters left behind in
-// module level variables. The run is made on `f`, which the case keeps, so a
-// case whose source draws a report reads it after the run.
 uint64_t RunAndRead(const char* src, const char* var_name, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
@@ -43,9 +36,6 @@ uint64_t RunAndRead(const char* src, const char* var_name) {
   return RunAndRead(src, var_name, f);
 }
 
-// 18.17.5: rand join generates every operand sequence. With two single
-// production operands their side effects both run regardless of interleaving
-// order.
 TEST(RandsequenceSim, RandJoinBothExecute) {
   uint64_t x = RunAndRead(
       "module t;\n"
@@ -63,9 +53,6 @@ TEST(RandsequenceSim, RandJoinBothExecute) {
   EXPECT_EQ(x, 30u);
 }
 
-// 18.17.5: the relative order of the productions inside each interleaved
-// sequence is always preserved. Across many runs `a` precedes `b` and `c`
-// precedes `d` without exception.
 TEST(RandsequenceSim, RandJoinPreservesRelativeOrder) {
   uint64_t viol = RunAndRead(
       "module t;\n"
@@ -91,10 +78,6 @@ TEST(RandsequenceSim, RandJoinPreservesRelativeOrder) {
   EXPECT_EQ(viol, 0u);
 }
 
-// 18.17.5: rand join actually interleaves the sequences rather than running one
-// after the other. Over many runs at the neutral default, orders where the two
-// sequences overlap (neither fully precedes the other) occur, and so do the two
-// fully blocked orders, proving the generator mixes them.
 TEST(RandsequenceSim, RandJoinInterleavesSequences) {
   const char* src =
       "module t;\n"
@@ -117,17 +100,10 @@ TEST(RandsequenceSim, RandJoinInterleavesSequences) {
       "  end\n"
       "endmodule\n";
   uint64_t mixed = RunAndRead(src, "mixed");
-  // Interleaved orders dominate but blocked orders still appear, so the count
-  // sits strictly between none and all of the runs.
   EXPECT_GT(mixed, 0u);
   EXPECT_LT(mixed, 300u);
 }
 
-// 18.17.5: the weight expression controls how the remaining length of each
-// sequence biases selection. With a short (length 1) and a long (length 3)
-// operand, a weight of 0.0 favors the short sequence so its single production
-// leads most often, 1.0 favors the long sequence so it leads least often, and
-// 0.5 sits in between.
 TEST(RandsequenceSim, RandJoinLengthBiasDirection) {
   const char* tmpl =
       "module t;\n"
@@ -178,15 +154,12 @@ TEST(RandsequenceSim, RandJoinLengthBiasDirection) {
   uint64_t af0 = RunAndRead(tmpl, "af0");
   uint64_t af05 = RunAndRead(tmpl, "af05");
   uint64_t af1 = RunAndRead(tmpl, "af1");
-  // Short favored most at 0.0, least at 1.0, with 0.5 strictly in between.
   EXPECT_GT(af0, af05 + 30u);
   EXPECT_GT(af05, af1 + 20u);
   EXPECT_GT(af0, 150u);
   EXPECT_LT(af1, 60u);
 }
 
-// 18.17.5: when the weight expression is omitted the generator uses 0.5, so an
-// absent weight produces the same length bias as an explicit 0.5.
 TEST(RandsequenceSim, RandJoinDefaultWeightIsHalf) {
   const char* tmpl =
       "module t;\n"
@@ -228,10 +201,6 @@ TEST(RandsequenceSim, RandJoinDefaultWeightIsHalf) {
   EXPECT_LT(diff, 40);
 }
 
-// 18.17.5: the weight lies between 0.0 and 1.0 inclusive. A value below the
-// range is reported, each time the join is reached, and clamped to 0.0, so it
-// produces the same bias as an explicit 0.0 rather than an ever stronger
-// preference for the short sequence.
 TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
   const char* tmpl =
       "module t;\n"
@@ -271,8 +240,6 @@ TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
   uint64_t afneg = ReadAfterRun(f, "afneg");
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), kOutsideTheRange, 21, "18.17.5"));
-  // Clamped to 0.0: still favors the short sequence, but not saturated the way
-  // an unclamped negative exponent would make it.
   EXPECT_GT(afneg, 150u);
   EXPECT_LT(afneg, 280u);
   int64_t diff = static_cast<int64_t>(afzero) - static_cast<int64_t>(afneg);
@@ -280,12 +247,6 @@ TEST(RandsequenceSim, RandJoinWeightClampedToRange) {
   EXPECT_LT(diff, 50);
 }
 
-// 18.17.5: the weight lies between 0.0 and 1.0 inclusive. A value above the
-// range is reported, each time the join is reached, and clamped to 1.0, so it
-// produces the same long-sequence preference as an explicit 1.0 instead of a
-// runaway exaggeration of it. Lengths 2 and 3 keep the clamped bias well clear
-// of zero so the clamp is observable: without it a weight of 5.0 would drive
-// the short sequence to lead almost never.
 TEST(RandsequenceSim, RandJoinWeightClampedToHighBound) {
   const char* tmpl =
       "module t;\n"
@@ -327,17 +288,12 @@ TEST(RandsequenceSim, RandJoinWeightClampedToHighBound) {
   uint64_t afhigh = ReadAfterRun(f, "afhigh");
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), kOutsideTheRange, 22, "18.17.5"));
-  // Clamped to 1.0: the short sequence still leads a noticeable fraction of the
-  // time, matching an explicit 1.0 rather than collapsing toward zero.
   EXPECT_GT(afhigh, 30u);
   int64_t diff = static_cast<int64_t>(afone) - static_cast<int64_t>(afhigh);
   if (diff < 0) diff = -diff;
   EXPECT_LT(diff, 40);
 }
 
-// 18.17.5: rand join interleaves two or more sequences. With three operands the
-// generator still preserves the relative order inside each one (a before b, c
-// before d, e before f) and always emits every production.
 TEST(RandsequenceSim, RandJoinInterleavesThreeSequences) {
   const char* src =
       "module t;\n"
@@ -370,12 +326,6 @@ TEST(RandsequenceSim, RandJoinInterleavesThreeSequences) {
   EXPECT_EQ(allran, 300u);
 }
 
-// 18.17.5: the generator interleaves nonterminals one level deep and no deeper.
-// An operand item that is itself a nonterminal (here `a`, which expands to `p
-// q`) is treated as a single atomic unit: its own sub-productions stay
-// contiguous and are never split apart by the other sequence's productions.
-// `pq` therefore always immediately follows `pp`, while the unit as a whole is
-// still interleaved with `c d` so it does not always lead.
 TEST(RandsequenceSim, RandJoinInterleavesToDepthOne) {
   const char* src =
       "module t;\n"
@@ -401,20 +351,10 @@ TEST(RandsequenceSim, RandJoinInterleavesToDepthOne) {
       "endmodule\n";
   uint64_t viol = RunAndRead(src, "viol");
   uint64_t mid = RunAndRead(src, "mid");
-  // Depth 1: p and q stay adjacent in every run because `a` runs as one unit.
   EXPECT_EQ(viol, 0u);
-  // The atomic `a` unit is still genuinely interleaved, not pinned to the
-  // front.
   EXPECT_GT(mid, 0u);
 }
 
-// 18.17.5: the weight lies between 0.0 and 1.0 inclusive. The expression is not
-// restricted to a literal; it may be any real-valued constant form of 11.2.1.
-// Here it is a real `parameter`, resolved through the parameter-lookup path in
-// expression evaluation rather than a literal, and applied as the length bias
-// all the same. With the parameter valued 0.0 the short operand is favored, so
-// its single production leads on most runs, pinning the parameter value as the
-// applied weight.
 TEST(RandsequenceSim, RandJoinWeightFromParameter) {
   uint64_t af0 = RunAndRead(
       "module t;\n"
@@ -438,15 +378,9 @@ TEST(RandsequenceSim, RandJoinWeightFromParameter) {
       "  end\n"
       "endmodule\n",
       "af0");
-  // A parameter of 0.0 favors the short sequence just as an explicit 0.0 does.
   EXPECT_GT(af0, 150u);
 }
 
-// 18.17.5: the real weight also admits a `localparam`, a distinct constant form
-// of 11.2.1. Valued 1.0, it favors the long operand, so the short sequence's
-// single production leads only rarely. Reversing the favored sequence relative
-// to the parameter test confirms selection follows the localparam value rather
-// than the syntactic order of the operands.
 TEST(RandsequenceSim, RandJoinWeightFromLocalparam) {
   uint64_t af1 = RunAndRead(
       "module t;\n"
@@ -470,35 +404,9 @@ TEST(RandsequenceSim, RandJoinWeightFromLocalparam) {
       "  end\n"
       "endmodule\n",
       "af1");
-  // A localparam of 1.0 favors the long sequence just as an explicit 1.0 does.
   EXPECT_LT(af1, 60u);
 }
 
-// §18.17.7: the array's elements take the values the production's instances
-// return in the order those instances appear in the source, while §18.17.5 has
-// the generator interleave two or more production sequences at random, so which
-// operand of a rand join generates first is settled at run time. The two rules
-// meet in the rule written here, and the reading that keeps them consistent is
-// that the element an appearance writes follows where the appearance is written
-// and not when it generated. §18.17.7 already reads that way for the ordinary
-// productions, giving the code block of `if (cond) D(5) else D(20)` the
-// declaration `int D[1:2]` whose second element the else branch writes when it
-// is the only branch that generated at all.
-//
-// A rand join rule is a rule, so §18.17.7 declares `int p[1:2]` for the two
-// appearances of the value-returning production p. p returns a counter it
-// increments, so the operand that generates first returns 1 and the other
-// returns 2 whichever of the two they are. The elements therefore read (1, 2)
-// on the runs the first-written operand led and (2, 1) on the runs it did not,
-// and both orders happen: `swapped` counts the second kind and has to be
-// neither none of the 300 runs nor all of them.
-//
-// That is what makes the case able to fail. An engine numbering the elements as
-// it generates reports (1, 2) on every run and leaves `swapped` at zero, and a
-// single run passes such an engine on half the draws. An engine that captures
-// nothing reads bit selects of the module variable p, which is 0, so both
-// elements read 0 and `bad` counts every run. Both counts come off one run, so
-// the runs that swapped the order are the same runs the elements were read on.
 TEST(RandsequenceSim, RandJoinElementsFollowSyntacticOrderNotGenerationOrder) {
   SimFixture f;
   auto [bad, swapped] = RunModuleTwoVars(
@@ -522,10 +430,7 @@ TEST(RandsequenceSim, RandJoinElementsFollowSyntacticOrderNotGenerationOrder) {
       "  end\n"
       "endmodule\n",
       "bad", "swapped");
-  // Each element holds what its own operand returned, on every run.
   EXPECT_EQ(bad, 0u);
-  // Both interleaving orders happen, so the runs where the second-written
-  // operand generated first are among those the elements were read on.
   EXPECT_GT(swapped, 0u);
   EXPECT_LT(swapped, 300u);
 }

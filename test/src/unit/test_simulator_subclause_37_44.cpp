@@ -15,17 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.44 thread: the VPI object model for a thread - a SystemVerilog process
-// such as an always procedure or a branch of a fork construct (detail 1). The
-// diagram gives a thread one Boolean property (vpiActive) and four relations:
-// vpiParent reaches the spawning thread, vpiOrigin reaches the originating
-// statement, the tagless frame line reaches the thread's active frame, and the
-// one-to-many thread relation iterates the threads this thread spawned. These
-// tests observe the production helpers in vpi.cpp and VpiContext::Get that
-// apply those rules. Thread specific callbacks are §38.36.1's (detail 2).
-
-// vpiActive property: a thread reports whether it is the active one through
-// vpi_get(vpiActive).
 TEST(ThreadModel, ActiveBooleanPropertyIsReported) {
   VpiContext ctx;
 
@@ -39,8 +28,6 @@ TEST(ThreadModel, ActiveBooleanPropertyIsReported) {
   EXPECT_EQ(ctx.Get(vpiActive, &suspended), 0);
 }
 
-// vpiParent -> thread: a thread reaches the thread that spawned it through its
-// parent link.
 TEST(ThreadModel, ParentRelationReachesTheSpawningThread) {
   VpiObject parent;
   parent.type = vpiThread;
@@ -52,8 +39,6 @@ TEST(ThreadModel, ParentRelationReachesTheSpawningThread) {
   EXPECT_EQ(VpiThreadParent(&child), &parent);
 }
 
-// vpiParent edge: a root thread (no parent) and a null handle report no parent;
-// a parent that is not a thread is not reported as a thread parent.
 TEST(ThreadModel, ParentRelationIsNullForRootAndNonThreadParents) {
   VpiObject root;
   root.type = vpiThread;
@@ -69,9 +54,6 @@ TEST(ThreadModel, ParentRelationIsNullForRootAndNonThreadParents) {
   EXPECT_EQ(VpiThreadParent(&thread_in_module), nullptr);
 }
 
-// vpiOrigin -> stmt: a thread reaches the statement it was started from, held
-// apart from its children, and reports none when it was started from none or
-// the handle is null.
 TEST(ThreadModel, OriginRelationReachesTheOriginatingStatement) {
   VpiObject origin;
   origin.type = vpiBegin;
@@ -87,9 +69,6 @@ TEST(ThreadModel, OriginRelationReachesTheOriginatingStatement) {
   EXPECT_EQ(VpiThreadOrigin(nullptr), nullptr);
 }
 
-// frame -- thread with §37.43 detail 4: a thread reaches the frame active in
-// it now, the innermost active frame of its call chain, passing over a frame
-// that has ended and a thread it spawned, and none when no frame is active.
 TEST(ThreadModel, FrameRelationReachesTheActiveFrame) {
   VpiObject inner;
   inner.type = vpiFrame;
@@ -117,8 +96,6 @@ TEST(ThreadModel, FrameRelationReachesTheActiveFrame) {
   EXPECT_EQ(VpiThreadFrame(nullptr), nullptr);
 }
 
-// The thread's own relations are vpiParent, vpiOrigin and vpiFrame: asked for
-// another, its resolver declines and leaves the answer as it was.
 TEST(ThreadModel, AnotherRelationIsNotTheThreadsToResolve) {
   VpiObject thread;
   thread.type = vpiThread;
@@ -128,9 +105,6 @@ TEST(ThreadModel, AnotherRelationIsNotTheThreadsToResolve) {
   EXPECT_EQ(out, &before);
 }
 
-// thread one-to-many thread: the iteration yields the threads this thread
-// spawned, in order, skipping non-thread children (the origin statement and the
-// active frame).
 TEST(ThreadModel, ThreadIterationYieldsSpawnedThreads) {
   VpiObject origin;
   origin.type = vpiStmt;
@@ -151,8 +125,6 @@ TEST(ThreadModel, ThreadIterationYieldsSpawnedThreads) {
   EXPECT_EQ(spawned[1], &child1);
 }
 
-// thread one-to-many thread edge: a thread that spawned nothing, and a null
-// handle, iterate to no threads.
 TEST(ThreadModel, ThreadIterationIsEmptyWhenNoneSpawned) {
   VpiObject thread;
   thread.type = vpiThread;
@@ -160,21 +132,6 @@ TEST(ThreadModel, ThreadIterationIsEmptyWhenNoneSpawned) {
   EXPECT_TRUE(VpiThreadThreads(nullptr).empty());
 }
 
-// -----------------------------------------------------------------------------
-// §37.44 detail 1: a thread is a SystemVerilog process, an always procedure or
-// one branch of a fork for example. Every case above builds its threads by
-// hand, which says what the model reports about an object and nothing about
-// where such an object comes from -- and no run produced one at all, so the
-// whole of this model answered for a design only in a test that wrote the
-// design's threads itself.
-//
-// The cases below run a design and let an application reach the threads it has,
-// through the iteration the diagram's circle relation draws: vpi_iterate with a
-// null reference.
-// -----------------------------------------------------------------------------
-
-// What the application made of the run's threads. A calltf is a plain C
-// function with no return path to the case that provoked it.
 int g_threads_seen = 0;
 int g_non_threads_seen = 0;
 int g_threads_with_a_parent = 0;
@@ -206,9 +163,6 @@ void RegisterThreadProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// The clause's two examples in one design: a process, and two branches of a
-// fork inside it. The call is written after the join so all three have run by
-// the time the application looks.
 void RunAForkOfTwoBranches(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -241,12 +195,7 @@ TEST_F(ThreadModelInARun, TheRunsThreadsAreReachedByANullReferencedIteration) {
   SimFixture f;
   RunAForkOfTwoBranches(f);
 
-  // The procedure and the two branches of the fork it ran, which is §37.44
-  // detail 1's own list of what a thread is. Before this the iteration answered
-  // with nothing whatever the design did, no run having made a thread object.
   EXPECT_GE(g_threads_seen, 3);
-  // And every one of them is a thread, rather than the iteration having handed
-  // back whatever else the context holds.
   EXPECT_EQ(g_non_threads_seen, 0);
 }
 
@@ -256,18 +205,10 @@ TEST_F(ThreadModelInARun, AForkBranchReachesTheThreadThatSpawnedIt) {
   SimFixture f;
   RunAForkOfTwoBranches(f);
 
-  // §37.44 (vpiParent -> thread, and the one-to-many thread relation): the two
-  // branches are the threads with a parent, and the procedure that forked them
-  // is the thread that has two. The two counts are the same pair of edges read
-  // from each end, so a model linking a branch to a parent that does not own it
-  // answers differently.
   EXPECT_EQ(g_threads_with_a_parent, 2);
   EXPECT_EQ(g_spawned_total, 2);
 }
 
-// §37.44 (vpiOrigin -> stmt): a thread's origin is the statement it was
-// started from, which it holds apart from its children, so a statement among
-// them is no origin.
 TEST(ThreadModel, AThreadsOriginIsNoneOfItsChildren) {
   VpiObject frame;
   frame.type = vpiFrame;
@@ -279,8 +220,6 @@ TEST(ThreadModel, AThreadsOriginIsNoneOfItsChildren) {
   EXPECT_EQ(VpiThreadOrigin(&thread), nullptr);
 }
 
-// What an application read of the thread a task, called in a fork branch,
-// runs in: from inside the task and again once the task has returned.
 vpiHandle g_task_frame = nullptr;
 vpiHandle g_task_thread = nullptr;
 vpiHandle g_thread_frame = nullptr;
@@ -307,11 +246,6 @@ PLI_INT32 AfterTaskCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §37.44: a fork branch's thread reaches the thread that forked it through
-// vpiParent (#7165), the statement it was started from through vpiOrigin, the
-// branch's block, as the forking thread reaches the fork (#7166), and through
-// vpiFrame the frame active in it now: the task's while the task runs, and
-// none once it has returned (§37.43 detail 4) (#7167).
 TEST_F(ThreadModelInARun, AForkBranchsThreadReachesItsParentOriginAndFrame) {
   for (const auto& [name, calltf] : {std::pair{"$inside", &InsideTaskCalltf},
                                      std::pair{"$after", &AfterTaskCalltf}}) {

@@ -13,20 +13,6 @@ namespace delta {
 
 void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
                                  SourceLoc loc) {
-  // §34.5.32.2 has a viewport describe objects within the current protected
-  // envelope, so the ones an envelope was described by belong to that envelope
-  // and to no other. §34.2 permits the nesting -- the data block a decryption
-  // envelope encloses may itself hold further envelopes -- so which
-  // envelope is current changes as one opens and closes inside another, and
-  // the outer envelope is current again when the inner one has closed, still
-  // described by what it wrote.
-  //
-  // The viewports were held in one flat list cleared at every boundary, so an
-  // inner envelope's opening wiped the outer's and nothing put them back. They
-  // are a stack now, mirroring the envelope nesting that
-  // ProtectEnvelopeState::Close already keeps: an open puts the current
-  // envelope's aside and starts an empty list for the one opening, and a close
-  // takes the enclosing one back.
   if (OpensEncryptionEnvelope(expr.keyword, expr.has_value) ||
       OpensDecryptionEnvelope(expr.keyword, expr.has_value)) {
     protect_viewport_stack_.push_back(
@@ -46,9 +32,6 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
   }
   if (ClosesEncryptionEnvelope(expr.keyword, expr.has_value) ||
       ClosesDecryptionEnvelope(expr.keyword, expr.has_value)) {
-    // A close standing where nothing was opened has no enclosing envelope to
-    // give back, and the list it ends is the one written outside every
-    // envelope, which describes nothing.
     if (protect_viewport_stack_.empty()) {
       protect_viewports_.clear();
       protect_envelope_source_ = 0;
@@ -65,9 +48,6 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
   if (expr.keyword != kViewportKeyword) return;
   ProtectViewport viewport =
       ParseProtectViewport(expr.value.empty() ? expr.value_list : expr.value);
-  // §34.5.32.1 writes the value as an object and an access, each against a
-  // string. A value written any other way describes no object, so there is
-  // nothing for the access it asks to be permitted for.
   if (!viewport.stated) {
     diag_.Error(loc,
                 "protect pragma viewport expression is written as an object "
@@ -75,9 +55,6 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
                 Subclause("34.5.32.1"));
     return;
   }
-  // §34.5.32.2: the specified object name shall be contained within the
-  // current envelope. Where no envelope is open there is no current envelope
-  // for it to be contained within, whichever object the expression named.
   if (!protect_envelopes_.InProtectedRegion() &&
       protect_envelopes_.EncryptionEnvelopeDepth() == 0) {
     diag_.Error(loc,
@@ -86,10 +63,6 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
                 Subclause("34.5.32.2"));
     return;
   }
-  // §34.5.32.2: the access value is an implementation-specific relaxation of
-  // protection, and this tool defines two (see ViewportAccessOf in
-  // src/common/envelope_viewport.h). A text asking for any other is told that
-  // it is granted nothing rather than left to assume it was.
   if (ViewportAccessOf(viewport.access) == ViewportAccess::kNone) {
     diag_.Warning(loc,
                   "protect pragma viewport access \"" + viewport.access +
@@ -103,9 +76,6 @@ void Preprocessor::ApplyViewport(const PragmaKeywordExpression& expr,
 
 namespace {
 
-// What a later stage keeps of a viewport: the object it names, the access it
-// asks for and where it was written. The text of its envelope is the caller's
-// to fill in.
 EnvelopeViewport KeptViewport(const ProtectViewport& viewport) {
   EnvelopeViewport kept;
   kept.object = viewport.object;
@@ -117,13 +87,6 @@ EnvelopeViewport KeptViewport(const ProtectViewport& viewport) {
 }  // namespace
 
 void Preprocessor::RecordEnvelopeViewports() {
-  // §34.5.32.2 requires a viewport's object to be contained within its
-  // envelope, and §34.4 makes the envelope a lexical region: the text its data
-  // block recovered to and the text of every envelope and file read inside
-  // that. They were registered from the data block on, so they are the sources
-  // from it to the last one registered. An envelope whose block was never read
-  // -- refused a licence, or never written -- recovered to no text, so its
-  // viewports describe nothing a later stage could find.
   if (protect_envelope_source_ == 0) return;
   for (const ProtectViewport& viewport : protect_viewports_) {
     EnvelopeViewport kept = KeptViewport(viewport);
@@ -134,10 +97,6 @@ void Preprocessor::RecordEnvelopeViewports() {
 }
 
 void Preprocessor::RecordRegionViewports(SourceLoc closed_at) {
-  // An encryption envelope this tool compiles where it is written is the lines
-  // from its begin to its end, and the sources registered between them. A
-  // begin and an end in different sources bound no lines of one source, so
-  // their viewports describe no region a later stage could find.
   if (closed_at.file_id != protect_envelope_opened_at_.file_id) return;
   for (const ProtectViewport& viewport : protect_viewports_) {
     EnvelopeViewport kept = KeptViewport(viewport);

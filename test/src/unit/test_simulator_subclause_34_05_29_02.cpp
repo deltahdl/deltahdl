@@ -1,18 +1,3 @@
-// §34.5.29.2 runtime_license, Description: the asking before execution.
-//
-// On meeting the expression in an encrypted model, and before executing it,
-// the tool asks the library the value names as §34.5.28.2 has it asked; where
-// the answer is not the match value, execution does not begin and the error
-// includes the value the entry function returned. The reading records each
-// such expression (test_preprocessor_subclause_34_05_29_02.cpp), and the run
-// asks them with RuntimeLicensesGranted
-// (src/driver/protect_license_libraries.h) before synthesis or simulation.
-//
-// A model precompiled into a library (§33.5.3) is executed by the later
-// invocation that binds it (§33.5.4). RunPrecompile keeps the licences it met
-// in the compiled form, and the bind asks them with
-// PrecompiledRuntimeLicensesGranted before it simulates.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -40,8 +25,6 @@ using namespace delta;
 
 namespace {
 
-// The run's asking of the runtime licences one model states, each met at a
-// line of its own in a recovered text.
 struct RuntimeAsking {
   LicenseLibrary library;
   SourceManager mgr;
@@ -58,8 +41,6 @@ struct RuntimeAsking {
   bool Granted() { return RuntimeLicensesGranted(licenses, libraries, diag); }
 };
 
-// Every licence answered with its match value licenses execution, and nothing
-// is reported.
 TEST(ProtectRuntimeLicenseAsking, MatchingAnswersLetExecutionBegin) {
   RuntimeAsking asking;
   asking.Met("open", 42, 2);
@@ -67,7 +48,6 @@ TEST(ProtectRuntimeLicenseAsking, MatchingAnswersLetExecutionBegin) {
   EXPECT_TRUE(asking.diag.Diagnostics().empty());
 }
 
-// One answered otherwise does not, so execution does not begin.
 TEST(ProtectRuntimeLicenseAsking, AnotherAnswerKeepsExecutionFromBeginning) {
   RuntimeAsking asking;
   asking.Met("open", 42, 2);
@@ -75,7 +55,6 @@ TEST(ProtectRuntimeLicenseAsking, AnotherAnswerKeepsExecutionFromBeginning) {
   EXPECT_FALSE(asking.Granted());
 }
 
-// And it is reported at the licence's line, with the value returned.
 TEST(ProtectRuntimeLicenseAsking, AnotherAnswerIsReportedWithItsValue) {
   RuntimeAsking asking;
   asking.Met("run", 42, 3);
@@ -90,8 +69,6 @@ TEST(ProtectRuntimeLicenseAsking, AnotherAnswerIsReportedWithItsValue) {
       3, "34.5.29.2"));
 }
 
-// The exit function each licence names is called once the run is over,
-// whatever the answers were.
 TEST(ProtectRuntimeLicenseAsking, EachLicenceIsReleased) {
   RuntimeAsking asking;
   asking.Met("open", 42, 2);
@@ -101,8 +78,6 @@ TEST(ProtectRuntimeLicenseAsking, EachLicenceIsReleased) {
   EXPECT_EQ(asking.library.Released(), 2);
 }
 
-// The bind's asking of the runtime licences a library's precompiled models
-// state, the library at `dpl` in the licensing library's scratch directory.
 struct BindAsking {
   LicenseLibrary library;
   SourceManager mgr;
@@ -122,8 +97,6 @@ struct BindAsking {
   }
 };
 
-// A precompiled licence answered with its match value lets the bind simulate,
-// and nothing is reported.
 TEST(ProtectRuntimeLicenseAsking, APrecompiledMatchingAnswerLetsTheBindRun) {
   BindAsking asking;
   asking.Precompiled("open");
@@ -131,7 +104,6 @@ TEST(ProtectRuntimeLicenseAsking, APrecompiledMatchingAnswerLetsTheBindRun) {
   EXPECT_TRUE(asking.diag.Diagnostics().empty());
 }
 
-// One answered otherwise keeps the bind from simulating.
 TEST(ProtectRuntimeLicenseAsking,
      APrecompiledOtherAnswerKeepsTheBindFromRunning) {
   BindAsking asking;
@@ -140,8 +112,6 @@ TEST(ProtectRuntimeLicenseAsking,
   EXPECT_FALSE(asking.Granted());
 }
 
-// And it is reported with the value returned. The bind reads no source text,
-// so the report stands at no line.
 TEST(ProtectRuntimeLicenseAsking,
      APrecompiledOtherAnswerIsReportedWithItsValue) {
   BindAsking asking;
@@ -157,7 +127,6 @@ TEST(ProtectRuntimeLicenseAsking,
       0, "34.5.29.2"));
 }
 
-// Each licence the bind asked is released once the run is over.
 TEST(ProtectRuntimeLicenseAsking, EachPrecompiledLicenceIsReleased) {
   BindAsking asking;
   asking.Precompiled("open");
@@ -167,8 +136,6 @@ TEST(ProtectRuntimeLicenseAsking, EachPrecompiledLicenceIsReleased) {
   EXPECT_EQ(asking.library.Released(), 2);
 }
 
-// The precompile keeps the runtime licence it met in an encrypted model in the
-// compiled form it writes, for the bind to ask.
 TEST(ProtectRuntimeLicenseAsking, ThePrecompileKeepsTheLicenceItMet) {
   constexpr std::string_view kKey = "precompile-exchange-key";
   ScratchDir tmp;

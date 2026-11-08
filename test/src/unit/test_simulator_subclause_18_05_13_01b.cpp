@@ -8,15 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.13.1: the clause's example, a D2 holding two D1 and a B1 randomized
-// with an inline block of two soft constraints. Reinstated from the highest
-// priority down while the set stays satisfiable, the inline y inside {10,
-// 20, 30} and y < p1.x hold, e1 and d1 contradict them and are discarded,
-// c1 leaves y at 20 or 30, p3 keeps its [5:9] and loses a1, p2 keeps both
-// bounds, and p1 loses its [5:9], no value of it lying above y, and keeps
-// its bounds: over 8 draws y is 20 or 30 below p1.x, p1.x below p2.x below
-// 100, and p3.x in 5 to 9, as the design
-// test/src/e2e/soft_constraint_priorities.sv runs it.
 TEST(SoftConstraintPrioritiesRun, TheClausesExampleResolvesByPriority) {
   SimFixture f;
   std::string out = RunCapture(
@@ -62,10 +53,6 @@ TEST(SoftConstraintPrioritiesRun, TheClausesExampleResolvesByPriority) {
   EXPECT_EQ(out, "8 8 8 8\n");
 }
 
-// 18.5.13.1: a constraint in an external block has the priority of its
-// prototype's place in the class, not the out-of-body block's: the
-// prototype declared after the block preferring 1 outranks it, so the
-// external block's 2 prevails.
 TEST(SoftConstraintPrioritiesRun, AnExternalBlockTakesItsPrototypesPlace) {
   SimFixture f;
   std::string out = RunCapture(
@@ -87,10 +74,6 @@ TEST(SoftConstraintPrioritiesRun, AnExternalBlockTakesItsPrototypesPlace) {
   EXPECT_EQ(out, "1 2\n");
 }
 
-// 18.5.13.1: a contained object's constraints rank below every constraint of
-// its container, and among contained objects the later-declared handle ranks
-// higher: the container ties the two values, the later object prefers 2 and the
-// earlier 1, so both take 2.
 TEST(SoftConstraintPrioritiesRun, TheContainerAndTheLaterHandleOutrank) {
   SimFixture f;
   std::string out = RunCapture(

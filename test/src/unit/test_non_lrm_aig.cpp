@@ -90,9 +90,6 @@ TEST(Aig, OrViaDeMorgan) {
   EXPECT_GT(AigVar(c), 0);
 }
 
-// An AND node no output reaches is still allocated, so NodeCount() counts it,
-// but the graph no longer describes it: the constant node, the three inputs and
-// a & b are what remain.
 TEST(Aig, ReachableNodeCountLeavesOutAnUnreachedAnd) {
   AigGraph graph;
   auto a = graph.AddInput();
@@ -104,9 +101,6 @@ TEST(Aig, ReachableNodeCountLeavesOutAnUnreachedAnd) {
   EXPECT_EQ(graph.ReachableNodeCount(), 5);
 }
 
-// A latch's next state reaches the AND that feeds it though no output does,
-// and its state input is counted with the other inputs; the AND of a and the
-// state, which nothing reads, is not.
 TEST(Aig, ReachableNodeCountFollowsALatchNextState) {
   AigGraph graph;
   auto a = graph.AddInput();
@@ -117,8 +111,6 @@ TEST(Aig, ReachableNodeCountFollowsALatchNextState) {
   EXPECT_EQ(graph.ReachableNodeCount(), 5);
 }
 
-// A complemented output reaches the node beneath it as a plain one does, and
-// an input no output reads is counted all the same.
 TEST(Aig, ReachableNodeCountKeepsEveryInputAndComplementedOutputs) {
   AigGraph graph;
   auto a = graph.AddInput();
@@ -212,9 +204,6 @@ TEST(SynthLower, AssignXorGate) {
   EXPECT_NE(aig->outputs[0], AigGraph::kConstFalse);
 }
 
-// No graph comes back for a module whose combinational procedure reads a
-// system function, and the report names the callee, so a design calling
-// several says which one left it without a netlist.
 TEST(SynthLower, RejectSystemCall) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

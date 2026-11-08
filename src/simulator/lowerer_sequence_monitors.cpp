@@ -32,9 +32,6 @@
 namespace delta {
 namespace {
 
-// §16.9.11 and §16.13.5: whether the expression applies `triggered` or
-// `matched` to a named sequence, as `e1.triggered` or `e2(ready, proc1,
-// proc2).matched`, and if so the sequence's name.
 std::string_view TriggeredSequenceName(const Expr* e, SimContext& ctx) {
   if (e->kind != ExprKind::kMemberAccess || e->lhs == nullptr ||
       e->rhs == nullptr ||
@@ -47,8 +44,6 @@ std::string_view TriggeredSequenceName(const Expr* e, SimContext& ctx) {
   return ctx.FindSequenceDecl(name) != nullptr ? name : std::string_view{};
 }
 
-// Every expression a sequence body holds: its operands and match items, and
-// those of its intersects, conjuncts and alternatives.
 template <typename Fn>
 void ForEachBodyExpr(const SeqLinearBody& body, const Fn& fn) {
   for (const Expr* operand : body.operands) ForEachSubExpr(operand, fn);
@@ -62,9 +57,6 @@ void ForEachBodyExpr(const SeqLinearBody& body, const Fn& fn) {
   }
 }
 
-// The names of the sequences a body applies `triggered` to, whose end points
-// its monitor reads at the tick they are reached, so whose monitors run
-// first at each tick.
 std::unordered_set<std::string_view> TriggeredDependencies(
     const SeqLinearBody& body, SimContext& ctx) {
   std::unordered_set<std::string_view> deps;
@@ -75,8 +67,6 @@ std::unordered_set<std::string_view> TriggeredDependencies(
   return deps;
 }
 
-// Whether the body of `decl` applies `triggered` or `matched` to its formal
-// `formal`, as `a.triggered`.
 bool AppliesMethodToFormal(const ModuleItem* decl, std::string_view formal) {
   bool applies = false;
   ForEachBodyExpr(decl->seq_linear, [&](const Expr* e) {
@@ -90,10 +80,6 @@ bool AppliesMethodToFormal(const ModuleItem* decl, std::string_view formal) {
   return applies;
 }
 
-// §16.9.11 with §16.8.1 (a): the instances with arguments bound as actuals of
-// `instance` to formals of type sequence that the instantiated body applies
-// `triggered` or `matched` to, which the method, once the formal is
-// replaced, reads the end point of.
 void SequenceFormalInstances(const Expr* instance, SimContext& ctx,
                              std::vector<const Expr*>& out) {
   if (instance->kind != ExprKind::kCall) return;
@@ -116,16 +102,11 @@ void SequenceFormalInstances(const Expr* instance, SimContext& ctx,
   }
 }
 
-// An instance with arguments `triggered` is applied to, and the sequence
-// whose body applies it, null for a procedure.
 struct TriggeredInstance {
   const Expr* instance;
   const ModuleItem* owner;
 };
 
-// The instances with arguments the module applies `triggered` to, in its
-// sequence bodies and its procedures, directly or through a formal of type
-// sequence, each once.
 std::vector<TriggeredInstance> TriggeredInstances(const RtlirModule* mod,
                                                   SimContext& ctx) {
   std::vector<TriggeredInstance> instances;
@@ -154,12 +135,6 @@ std::vector<TriggeredInstance> TriggeredInstances(const RtlirModule* mod,
   return instances;
 }
 
-// §16.13.6: the sequence actuals the module's bodies pass to instances,
-// `e2_with_arg(@(posedge sysclk) $rose(a) ##1 b ##1 c)`, each carried by
-// the identifier standing in the argument's place, in its sequence bodies,
-// its procedures and its instances' connections, each once. A method the
-// instantiated body applies to the formal, `subseq.triggered`, reads the end
-// point of the actual's own monitor.
 std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
   std::vector<const Expr*> actuals;
   std::unordered_set<const Expr*> seen;
@@ -171,8 +146,6 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
     }
     actuals.push_back(e);
   };
-  // §16.7: a clocked boolean, `@(posedge clk) b`, is a sequence of one
-  // operand, though the property reading keeps it as a boolean.
   auto collect_connection = [&](const Expr* e) {
     if (e->property_actual != nullptr &&
         e->property_actual->kind == PropertyExprNode::Kind::kBoolean &&
@@ -189,8 +162,6 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
     ForEachStmtReadExpr(proc.body,
                         [&](const Expr* e) { ForEachSubExpr(e, collect); });
   }
-  // §17.3: a checker instance's sequence actual, whose end point the checker
-  // reads through `triggered` on the formal bound to it.
   for (const RtlirModuleInst& child : mod->children) {
     for (const RtlirPortBinding& binding : child.port_bindings) {
       ForEachSubExpr(binding.connection, collect_connection);
@@ -199,9 +170,6 @@ std::vector<const Expr*> SequenceActuals(const RtlirModule* mod) {
   return actuals;
 }
 
-// §16.13.6: the sequence_expr an actual carries as a declaration of its
-// own, on the clock the actual opens with, `@(posedge sysclk)`, where it
-// opens with one; a clocked boolean's is the one operand it reads.
 ModuleItem* ActualAsSequence(const Expr* holder, std::string_view name,
                              Arena& arena) {
   const PropertyExprNode* tree = holder->property_actual;
@@ -225,8 +193,6 @@ ModuleItem* ActualAsSequence(const Expr* holder, std::string_view name,
   return seq;
 }
 
-// Whether every sequence the body applies `triggered` to, itself aside, has
-// its monitor made.
 bool DependenciesMade(const ModuleItem* seq,
                       const std::unordered_set<std::string_view>& made,
                       SimContext& ctx) {
@@ -236,13 +202,6 @@ bool DependenciesMade(const ModuleItem* seq,
   return true;
 }
 
-// §16.9.11: `e2(ready, proc1, proc2).triggered` is `e2_instantiated.triggered`
-// for a sequence e2_instantiated whose body is the instance, so the instance
-// is given a declaration of that shape, clockless, the flattening taking the
-// clock from e2's own. §16.10: a local of `owner` passed as an entire actual
-// is declared in it too, so the instance's match assigns it and the end point
-// hands the value on; its initialization is left out, the formal being
-// assigned before it is read.
 ModuleItem* InstanceAsSequence(const TriggeredInstance& triggered,
                                std::string_view name, Arena& arena) {
   const Expr* instance = triggered.instance;
@@ -266,16 +225,6 @@ ModuleItem* InstanceAsSequence(const TriggeredInstance& triggered,
   return seq;
 }
 
-// §16.9.11 with §16.13.5 and §16.16: the clock a sequence declared without
-// one takes where `triggered` is applied to it, the clock of the context the
-// method is read in, kept for each read of `e.triggered`, `e` as written in
-// it, under the sequence's name, and for the instance of `e2(a).triggered`.
-// The walk starts at each concurrent assertion on its leading clock and
-// enters the sequences it instantiates, a clockless one on the clock flowing
-// to it and a clocked one on its own; the first clock an instance is read on
-// is kept.
-// Whether two clocks are the same events, edge by edge over signals of the
-// same spelling.
 bool SameClock(const std::vector<EventExpr>& a,
                const std::vector<EventExpr>& b) {
   for (size_t i = 0; i < a.size() && i < b.size(); ++i) {
@@ -302,8 +251,6 @@ class TriggeredContextClocks {
       VisitSequence(stmt->assert_sequence, clock, 0);
       VisitTree(stmt->assert_property, clock, 0);
     }
-    // §16.13.6 with §16.9.3: a method read in a procedure takes the clock
-    // the procedure infers (§16.14.6), after any assertion's.
     for (const auto& proc : mod->processes) {
       if (proc.is_concurrent_clocked) continue;
       std::vector<EventExpr> clock = ProcessInferredClock(proc, mod);
@@ -313,15 +260,11 @@ class TriggeredContextClocks {
     }
   }
 
-  // The clock of the first context reading `triggered` of the sequence
-  // `name`, null where none reads it.
   const std::vector<EventExpr>* FirstClockOf(std::string_view name) const {
     auto it = by_name_.find(name);
     return it == by_name_.end() ? nullptr : &it->second.front().clock;
   }
 
-  // The reads of the sequence `name` on clocks other than the first, grouped
-  // by clock, each read by `name` as it stands in it.
   std::vector<ClockReads> FurtherClocksOf(std::string_view name) const {
     std::vector<ClockReads> further;
     auto it = by_name_.find(name);
@@ -375,9 +318,6 @@ class TriggeredContextClocks {
     ForEachSubExpr(e, [&](const Expr* sub) { VisitOne(sub, clock, depth); });
   }
 
-  // One subexpression: an application of `triggered` records the clock for
-  // the read or the instance it reads, and an instance, that one's operand
-  // among them, enters the sequence.
   void VisitOne(const Expr* e, const std::vector<EventExpr>& clock, int depth) {
     std::string_view read = TriggeredSequenceName(e, ctx_);
     if (!read.empty() && e->lhs->kind == ExprKind::kCall) {
@@ -399,17 +339,6 @@ class TriggeredContextClocks {
 
 }  // namespace
 
-// §16.13.6/§9.4.4: spawn a monitor process for one named sequence whose
-// clocked linear body the flattening reads, so its endpoint event fires on a
-// match and `sequence.triggered` and `wait` observe it. §16.8: a sequence
-// declared without a clock is matched through the sequences that
-// instantiate it, which inherit it into their own bodies, unless an instance
-// in it names the clock through an event formal (§16.8.1), which the
-// flattening then answers as the sequence's own. §16.9.11: where `triggered`
-// is applied to it, it takes the clock of the context the method is read in,
-// `context_clock`.
-// §16.11: `body` without the subroutine calls its match items attach, in its
-// nested operands and its intersect, and and or operands too.
 static void DropMatchCalls(LinearSequence& body) {
   for (std::vector<SeqMatchAssign>& items : body.match_items) {
     std::erase_if(
@@ -430,20 +359,12 @@ void Lowerer::LowerSequenceMonitor(
     const std::vector<EventExpr>* context_clock) {
   LinearSequence body;
   if (!FlattenLinearSequence(seq, ctx_, arena_, body)) return;
-  // §16.11 with §16.13.6: a monitor no `triggered` or `matched` read asks for
-  // is no evaluation the source instantiates, so the calls attached to the
-  // sequence are left to the evaluations that do, run at their end points.
   if (seq->seq_triggered_unread) DropMatchCalls(body);
   if (body.clock.empty() && context_clock != nullptr) {
     body.clock = *context_clock;
   }
   if (body.clock.empty()) return;
-  // §16.13.1: a sequence whose operands name a clock other than its own is
-  // matched where a property holds it, which tells the clocks apart; the
-  // monitor, on the one clock, does not.
   if (NamesAnotherClock(body)) return;
-  // §16.5.1: the monitor reads its operands' sampled values, so the names the
-  // sequence reads are enrolled as an assertion's are.
   std::unordered_set<std::string> names;
   ForEachLinearSequenceExpr(
       body, [&names](const Expr* e) { CollectSampledOperandNames(e, names); });
@@ -466,8 +387,6 @@ void Lowerer::LowerSequenceMonitor(
   ScheduleProcess(p, ctx_);
 }
 
-// §16.13.6 with §23.9: the event of an end point `ep_name` the monitor fires
-// and `triggered` reads, declared in the instance being lowered.
 void Lowerer::CreateEndPoint(std::string_view ep_name) {
   const auto* key =
       arena_.Create<std::string>(inst_prefix_ + std::string(ep_name));
@@ -490,13 +409,6 @@ void Lowerer::LowerNamedSequenceMonitor(
   }
 }
 
-// §16.9.11 and §16.13.6: the monitors of a module's sequences, the
-// sequence actuals its bodies pass and the instances with arguments its
-// bodies apply `triggered` to first, each under an endpoint of its own that
-// the evaluator finds by the actual or the instance, and then the named
-// sequences, a sequence reading another's `triggered` after the one it
-// reads, so that at each tick the end point is fired before it is read; a
-// cycle among them is broken in declaration order.
 void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
   TriggeredContextClocks context(mod, ctx_);
   for (const Expr* actual : SequenceActuals(mod)) {
@@ -518,10 +430,6 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
     LowerSequenceMonitor(InstanceAsSequence(triggered, *name, arena_), *ep_name,
                          context.OfInstance(instance));
   }
-  // §16.13.6 with §16.9.3: a clockless sequence no assertion reads takes the
-  // clock its methods are read under outside one, the default clocking's.
-  // §14.12: the default clocking of the scope, DefaultClockingEvent
-  // (property_instance.cpp), empty where it has none.
   const std::vector<EventExpr> kDefaultClock = DefaultClockingEvent(mod);
   auto lower_named = [&](const ModuleItem* seq) {
     const std::vector<EventExpr>* clock = context.FirstClockOf(seq->name);
@@ -542,7 +450,6 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
       made.insert(seq->name);
     }
     if (deferred.size() == waiting.size()) {
-      // A cycle: the rest are made in declaration order.
       for (const ModuleItem* seq : deferred) lower_named(seq);
       break;
     }
@@ -550,8 +457,6 @@ void Lowerer::LowerSequenceMonitors(const RtlirModule* mod) {
   }
 }
 
-// §16.8 and §16.12: each named property and sequence of the module under its
-// name, and each sequence's end-point event, which `.triggered` reads.
 void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
   for (auto* prop_decl : mod->property_decls) {
     ctx.RegisterPropertyDecl(prop_decl->name, prop_decl);
@@ -561,11 +466,6 @@ void RegisterModuleSequenceDecls(const RtlirModule* mod, SimContext& ctx) {
 
     std::string ep_name = std::string("__seq_") + std::string(seq_decl->name);
     if (!ctx.FindVariable(ep_name)) {
-      // variables_ keys by string_view, so the key's backing string must
-      // outlive the map; intern it in the arena. A local std::string would
-      // dangle and make every later FindVariable("__seq_<name>") miss.
-      // §23.9: the end point is declared in the instance being built, so
-      // each instance of a module has one of its own.
       auto* stored = ctx.GetArena().Create<std::string>(
           ctx.ActiveInstancePrefix() + ep_name);
       auto* ep_var = ctx.CreateVariable(*stored, 1);

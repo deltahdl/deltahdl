@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -10,11 +9,6 @@
 
 namespace {
 
-// Elaborates a child with two defaulted 8-bit inputs instantiated via the given
-// instantiation line, then verifies the second (omitted/blank) input's binding
-// resolves to the port's declared default expression rather than being left
-// unconnected. Both the trailing-omitted and explicit-blank forms must observe
-// the default-substitution rule identically.
 void ExpectSecondInputUsesDeclaredDefault(const char* instantiation) {
   ElabFixture f;
   std::string src =
@@ -34,9 +28,6 @@ void ExpectSecondInputUsesDeclaredDefault(const char* instantiation) {
   EXPECT_EQ(bindings[0].port_name, "a");
   EXPECT_NE(bindings[0].connection, nullptr);
   EXPECT_EQ(bindings[1].port_name, "b");
-  // Observe the default actually being substituted: the binding points at the
-  // port's declared default expression, not at the high-Z sentinel that an
-  // unconnected input net would otherwise receive.
   ASSERT_NE(mod->children[0].resolved, nullptr);
   ASSERT_GE(mod->children[0].resolved->ports.size(), 2u);
   EXPECT_EQ(bindings[1].connection,
@@ -72,8 +63,6 @@ TEST(OrderedPortElaboration, OrderedPortDirectionMatchesChildPort) {
       "  assign b = a;\n"
       "endmodule\n"
       "module top;\n"
-      // §23.3.3 requires a net for the inout connection; a variable connected
-      // to an inout port is illegal, so z is a wire (x/y may stay variables).
       "  logic x, y;\n"
       "  wire z;\n"
       "  child u(x, y, z);\n"
@@ -135,15 +124,10 @@ TEST(OrderedPortElaboration, BlankOrderedPortLeavesPortUnconnected) {
 }
 
 TEST(OrderedPortElaboration, TrailingOmittedInputUsesDefault) {
-  // Trailing-omitted form: the second input is simply absent from the list.
   ExpectSecondInputUsesDeclaredDefault("  child u(x);\n");
 }
 
 TEST(OrderedPortElaboration, BlankInputWithDefaultUsesDefault) {
-  // Explicit-blank form: the second input is named by an empty positional slot.
-  // Absent the default rule this blank input would be left unconnected (a null
-  // connection), so pointer-equality with the declared default distinguishes
-  // substitution from non-connection.
   ExpectSecondInputUsesDeclaredDefault("  child u(x, );\n");
 }
 
@@ -164,8 +148,6 @@ TEST(OrderedPortElaboration, BlankInputWithoutDefaultLeftUnconnected) {
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_GE(bindings.size(), 2u);
   EXPECT_EQ(bindings[1].port_name, "b");
-  // The blank input port carries no default, so it is left unconnected, and
-  // as a net port takes 'z (§23.3.3.3) rather than any default.
   ASSERT_NE(mod->children[0].resolved, nullptr);
   ASSERT_GE(mod->children[0].resolved->ports.size(), 2u);
   EXPECT_EQ(mod->children[0].resolved->ports[1].default_value, nullptr);
@@ -190,9 +172,6 @@ TEST(OrderedPortElaboration,
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1u);
   const auto& bindings = mod->children[0].port_bindings;
-  // Port 'a' is bound positionally; the trailing omitted port 'b' has no
-  // default, so it is left unconnected, and as a net port takes 'z
-  // (§23.3.3.3).
   bool a_connected = false;
   bool b_high_z = false;
   for (const auto& binding : bindings) {
@@ -257,12 +236,6 @@ TEST(OrderedPortElaboration, AllPortsOrderedOnPortlessModuleElaborates) {
 }
 
 TEST(OrderedPortElaboration, NonAnsiChildPortsBindByPosition) {
-  // §23.2.2.1 dependency: the instantiated child declares its ports in the
-  // non-ANSI style (bare names in the header, directions and ranges in the
-  // body). The ordered-list rule must still pair the i-th instance expression
-  // with the i-th declared port, independent of how the child declared its
-  // ports. The input is built from real non-ANSI syntax and driven through
-  // elaboration rather than hand-constructed.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(a, b);\n"
@@ -282,8 +255,6 @@ TEST(OrderedPortElaboration, NonAnsiChildPortsBindByPosition) {
   ASSERT_EQ(mod->children.size(), 1u);
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_EQ(bindings.size(), 2u);
-  // Positional pairing onto the non-ANSI-declared ports: slot 0 -> first
-  // declared port 'a' (input), slot 1 -> second declared port 'b' (output).
   EXPECT_EQ(bindings[0].port_name, "a");
   EXPECT_EQ(bindings[0].direction, delta::Direction::kInput);
   EXPECT_EQ(bindings[0].width, 8u);
@@ -292,11 +263,6 @@ TEST(OrderedPortElaboration, NonAnsiChildPortsBindByPosition) {
   EXPECT_EQ(bindings[1].width, 8u);
 }
 
-// §23.3.2.1: an instance lists its port expressions in the order the module
-// declaration lists its ports, so an instantiation listing more expressions
-// than the module has ports has no port for the last of them. The report that
-// says so names the subclause stating the rule, which lets a caller learn which
-// rule was enforced without matching the wording of the message.
 TEST(OrderedPortElaboration, TooManyOrderedConnectionsNames23_3_2_1) {
   ElabFixture f;
   ElaborateSrc(

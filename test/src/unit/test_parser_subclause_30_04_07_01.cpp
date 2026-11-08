@@ -37,14 +37,6 @@ TEST(UnknownPolarityParsing, FullPathWithoutOperator) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNone);
 }
 
-// §30.4.7.1's discriminator is operator ABSENCE: the unknown classification is
-// only correct because the parser reads the '+'/'-' operator and reports its
-// absence. The accepting tests above assert kNone, but kNone is also the
-// field's default, so they would pass even if the rule were removed. These
-// contrast cases pin the boundary: the same parse path, given a polarity
-// operator, must report a non-unknown polarity — proving the no-operator result
-// is computed, not merely defaulted. The specific positive/negative value is
-// §30.4.7.2/.3's claim, so we assert only that it is not unknown.
 TEST(UnknownPolarityParsing, ParallelPathWithOperatorIsNotUnknown) {
   auto r = Parse(
       "module m;\n"

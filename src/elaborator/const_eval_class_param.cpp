@@ -13,10 +13,6 @@
 
 namespace delta {
 
-// §8.25.1: registry of parameterized-class declarations visible to the constant
-// folder, installed by the elaborator via ParamClassRegistryGuard. Null unless
-// a guard is live. Used to map an accessed value-parameter name to its port
-// position when resolving a specialization override.
 static const std::unordered_map<std::string_view, const ClassDecl*>*
     g_param_class_registry = nullptr;
 
@@ -30,8 +26,6 @@ ParamClassRegistryGuard::~ParamClassRegistryGuard() {
   g_param_class_registry = prev_;
 }
 
-// The class declaration behind a `C#(args)::name` member access, or null when
-// the access is not of that shape or names no registered parameterized class.
 static const ClassDecl* SpecializedParamClass(const Expr* expr) {
   if (!g_param_class_registry) return nullptr;
   const Expr* base = expr->lhs;
@@ -44,8 +38,6 @@ static const ClassDecl* SpecializedParamClass(const Expr* expr) {
   return cit->second;
 }
 
-// A named override, `.name(value)`, anywhere in the specialization's argument
-// list.
 static SpecializationArg NamedParamOverride(const Expr& base,
                                             std::string_view name,
                                             const ScopeMap& scope) {
@@ -58,8 +50,6 @@ static SpecializationArg NamedParamOverride(const Expr& base,
   return {};
 }
 
-// The expression the specialization's argument list writes for the i-th
-// header parameter, `pname`, named or ordered, or null where it writes none.
 static const Expr* WrittenParamActual(const Expr& base, std::string_view pname,
                                       size_t pos) {
   const auto& elems = base.elements;
@@ -71,8 +61,6 @@ static const Expr* WrittenParamActual(const Expr& base, std::string_view pname,
   return ordered && pos < elems.size() ? elems[pos] : nullptr;
 }
 
-// An ordered override, the argument occupying the parameter's own port
-// position. Only an argument list that is ordered at that position qualifies.
 static SpecializationArg OrderedParamOverride(const Expr& base, size_t pos,
                                               const ScopeMap& scope) {
   const auto& elems = base.elements;
@@ -83,10 +71,6 @@ static SpecializationArg OrderedParamOverride(const Expr& base, size_t pos,
   return {};
 }
 
-// §6.20.2 with §11.6.1: a parameter's default folded as the right-hand side of
-// an assignment to the declared `type` over `values`, as RecordClassParam
-// (elaborator_class_params.cpp) folds the default it records under
-// "Class.name".
 static std::optional<ConstVal> FoldClassParamDefault(const Expr* pexpr,
                                                      const DataType* type,
                                                      const ScopeMap& values) {
@@ -97,12 +81,6 @@ static std::optional<ConstVal> FoldClassParamDefault(const Expr* pexpr,
   return ConstVal{*v, 32, true};
 }
 
-// The value `values` gives a parameter from what one fold answered: the
-// value where it folded, and nothing where it did not, so that a name the
-// caller's scope happens to hold is not read in its place. Beside it, what a
-// parameter of a 2-state type reads of it (TwoStateReading), the fold of
-// `source`, the expression that gave the value, over `source_scope`, where
-// the parameter is declared with a 4-state `type` and holds x or z.
 struct BoundSource {
   const Expr* source;
   const DataType* type;
@@ -123,20 +101,11 @@ static void Bind(ScopeMap& values, std::string_view name,
   SetTwoStateReading(values, name, reading);
 }
 
-// What the walk below answers for the parameter it was looking for. `arg`
-// holds an override where `supplied` is set, and otherwise the default folded
-// under the specialization. An override decides the answer whether or not it
-// folded (§8.25.1). A default that did not fold is left unanswered, so that
-// the class's own "Class.name" entry, folded where the class was registered,
-// answers instead.
 static SpecializationArg Answer(const SpecializationArg& arg) {
   if (arg.supplied || arg.value) return {true, arg.value};
   return {};
 }
 
-// What the specialization gives the class's i-th header parameter: its
-// override, named or ordered, where the list writes one, and otherwise its
-// default folded over `values`, the parameters before it.
 static SpecializationArg HeaderParamArg(const Expr* expr, const ClassDecl* decl,
                                         size_t i, const ScopeMap& scope,
                                         const ScopeMap& values) {
@@ -149,15 +118,6 @@ static SpecializationArg HeaderParamArg(const Expr* expr, const ClassDecl* decl,
   return {false, FoldClassParamDefault(pexpr, type, values)};
 }
 
-// §8.25 gives each specialization its own parameter values, and §6.20.1 lets a
-// parameter depend on earlier ones, a class body localparam on the header's.
-// So the parameter `C#(args)::name` names is found by walking the class's
-// value parameters in the order they are written: each takes its override
-// where the list writes one, named or ordered, and otherwise its default
-// folded over the values before it, and the body parameters follow. A
-// default read straight from the class's own "Class.name" entry was folded
-// over the class's defaults, so `C#(4)::N` of `localparam int N = W * 2` read
-// the default `W = 8` and answered 16.
 static SpecializationArg FoldUnderSpecialization(const Expr* expr,
                                                  const ClassDecl* decl,
                                                  const ScopeMap& scope) {

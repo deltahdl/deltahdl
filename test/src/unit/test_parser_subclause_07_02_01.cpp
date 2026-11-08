@@ -537,14 +537,9 @@ TEST(PackedStructParsing, UnpackedSignedStruct_Rejected) {
       "module t;\n"
       "  typedef struct signed { int f1; logic f2; } bad_t;\n"
       "endmodule\n");
-  // Parser::ParseStructPackedSigning files this report under §7.2, the clause
-  // that states the structure declaration, not under §7.2.1.
   EXPECT_TRUE(ReportedError(
       r.diags, "signing is not allowed on an unpacked structure or union", 2,
       "7.2"));
-  // The targeted signing diagnostic drops the stray 'signed' and still parses
-  // the member list, so the (illegal) body is recovered with both members
-  // rather than desyncing on a generic brace error.
   auto* item = FirstItem(r);
   ASSERT_NE(item, nullptr);
   EXPECT_FALSE(item->typedef_type.is_signed);

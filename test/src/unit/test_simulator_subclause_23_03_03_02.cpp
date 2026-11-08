@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -55,10 +54,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // The input is a variable left unconnected, so it holds the default initial
-  // value of its data type. For 4-state logic that default is x, which the
-  // child forwards to result -- distinct from the high-Z an unconnected net
-  // input would carry.
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
@@ -77,9 +72,6 @@ TEST(PortConnectionRulesForVariablesSimulation, RefPortWriteReflectsInParent) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// R1a admits any compatible expression on a variable input port, including a
-// constant literal. The implied continuous assignment carries the literal into
-// the port, and the child forwards it out, so the parent observes the constant.
 TEST(PortConnectionRulesForVariablesSimulation,
      VariableInputPortReceivesLiteral) {
   SimFixture f;
@@ -96,10 +88,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// R1a on a variable input port also admits a net operand, connected here by
-// ordered (positional) list rather than by name. The net's value flows through
-// the implied continuous assignment into the variable input port -- a net-to-
-// variable connection whose compatibility is the §6.22.3 dependency in action.
 TEST(PortConnectionRulesForVariablesSimulation,
      VariableInputPortReceivesNetPositional) {
   SimFixture f;
@@ -118,10 +106,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x33u);
 }
 
-// R1d, 4-state half: the default is the data type's, so an unconnected 4-state
-// variable input carries x rather than a value. This is the guard on the
-// 2-state case below -- the rule is per type, not a blanket zero, and the two
-// tests differ only in the port's type keyword.
 TEST(PortConnectionRulesForVariablesSimulation,
      UnconnectedFourStateInputVarDefaultsToX) {
   SimFixture f;
@@ -138,10 +122,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
-// R1d: an unconnected variable input port takes the default initial value of
-// its data type. For a 2-state type that default is 0, distinct from the x an
-// unconnected 4-state variable input carries. This observes the data-type-
-// dependent branch of the default rather than repeating the 4-state case.
 TEST(PortConnectionRulesForVariablesSimulation,
      UnconnectedTwoStateInputVarDefaultsToZero) {
   SimFixture f;
@@ -158,12 +138,6 @@ TEST(PortConnectionRulesForVariablesSimulation,
   EXPECT_EQ(var->value.ToString(), "00000000");
 }
 
-// §23.3.3.2 (printed page 747): a reference to the port variable acts as a
-// hierarchical reference to the variable the instantiation connects it to, so a
-// ref port drives nothing: the parent's v keeps its initializer 10, the parent
-// writes 20 after the child read 10, the child reads that 20, and its r + 11
-// lands in v as 31. The connection was recorded as an output port's, and v's
-// initializer and the parent's write were refused as a second driver.
 TEST(RefPortSimulation, WritesOnEitherSideAreSeenOnTheOther) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child(ref int r);\n"
@@ -186,8 +160,6 @@ TEST(RefPortSimulation, WritesOnEitherSideAreSeenOnTheOther) {
             "child 10\nparent 20\nchild2 20\nfinal 31\n");
 }
 
-// A ref port beside input, output and inout ports, connected to a parent
-// variable with an initializer: the child's write of 42 is the parent's r.
 TEST(RefPortSimulation, RefPortBesideTheOtherDirections) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child(input logic [7:0] a, b, output logic "
@@ -208,10 +180,6 @@ TEST(RefPortSimulation, RefPortBesideTheOtherDirections) {
             "sum 12 r 42 io 1\n");
 }
 
-// §23.3.3.2 with §27.5 and §23.9: a ref port connected inside a generate block
-// to a variable the block declares is that variable, found under the block's
-// name: c writes 5A through its port, and g.v reads it. Joined under the
-// module's name alone, the port was a variable of its own and g.v kept 00.
 TEST(GenerateBlockRefConnectionSim, ARefReachesTheVariableItsBlockDeclares) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child(ref logic [7:0] r);\n"
@@ -228,8 +196,6 @@ TEST(GenerateBlockRefConnectionSim, ARefReachesTheVariableItsBlockDeclares) {
             "g.v 5a\n");
 }
 
-// The block's v stands over the module's v of the same name (§23.9), so the
-// write through the port lands in the block's and the module's keeps C3.
 TEST(GenerateBlockRefConnectionSim, TheBlocksVariableStandsOverTheModules) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child(ref logic [7:0] r);\n"

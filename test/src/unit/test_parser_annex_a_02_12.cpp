@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// A.2.12 let_declaration ::= let let_identifier = expression ;
-// The simplest form: no port list, a single right-hand-side expression.
 TEST(LetDeclParsing, LetDecl_NoPorts) {
   auto r = Parse(
       "module m;\n"
@@ -25,14 +23,11 @@ TEST(LetDeclParsing, LetDecl_NoPorts) {
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kLetDecl);
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kLetDecl);
-  // A.2.12 let_identifier ::= identifier
   EXPECT_EQ(item->name, "answer");
   ASSERT_NE(item->init_expr, nullptr);
   EXPECT_TRUE(item->func_args.empty());
 }
 
-// A.2.12 let_declaration ::= let let_identifier ( ) = expression ;
-// An empty parenthesized port list is permitted.
 TEST(LetDeclParsing, LetDecl_EmptyPortList) {
   auto r = Parse(
       "module m;\n"
@@ -46,8 +41,6 @@ TEST(LetDeclParsing, LetDecl_EmptyPortList) {
   EXPECT_TRUE(item->func_args.empty());
 }
 
-// A.2.12 let_port_item ::= ... let_formal_type formal_port_identifier ...
-// A single typed formal: let_formal_type takes the data_type_or_implicit form.
 TEST(LetDeclParsing, LetPortItem_TypedFormal) {
   auto r = Parse(
       "module m;\n"
@@ -61,10 +54,6 @@ TEST(LetDeclParsing, LetPortItem_TypedFormal) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// A.2.12 let_formal_type ::= data_type_or_implicit | untyped
-// The `untyped` alternative of the let_formal_type production, taken on its
-// own. test_parser_subclause_11_12.cpp carries the 11.12 prose cases for
-// `untyped`, including its combination with an explicitly typed formal.
 TEST(LetDeclParsing, LetFormalType_UntypedAlternative) {
   auto r = Parse(
       "module m;\n"
@@ -78,8 +67,6 @@ TEST(LetDeclParsing, LetFormalType_UntypedAlternative) {
   EXPECT_EQ(item->func_args[0].name, "a");
 }
 
-// A.2.12 let_formal_type ::= data_type_or_implicit (implicit form: the type
-// is omitted entirely and only the formal identifier appears).
 TEST(LetDeclParsing, LetFormalType_Implicit) {
   auto r = Parse(
       "module m;\n"
@@ -93,9 +80,6 @@ TEST(LetDeclParsing, LetFormalType_Implicit) {
   EXPECT_EQ(item->func_args[0].name, "a");
 }
 
-// A.2.12 let_formal_type ::= data_type_or_implicit, and A.2.2.1 lets a
-// data_type be a type_identifier behind a package_scope, so `pc::P x` is a
-// typed formal whose type is P of package pc and whose name is x.
 TEST(LetDeclParsing, LetFormalType_PackageScoped) {
   auto r = Parse(
       "package pc;\n"
@@ -115,10 +99,6 @@ TEST(LetDeclParsing, LetFormalType_PackageScoped) {
   EXPECT_EQ(item->func_args[0].data_type.type_name, "P");
 }
 
-// A.2.12 let_port_list ::= let_port_item { , let_port_item }
-// The repeated `{ , let_port_item }` group of the production, and the order in
-// which the repeats reach func_args. test_parser_subclause_11_12.cpp carries
-// the 11.12 prose case for a longer port list.
 TEST(LetDeclParsing, LetPortList_RepeatedPortItems) {
   auto r = Parse(
       "module m;\n"
@@ -134,8 +114,6 @@ TEST(LetDeclParsing, LetPortList_RepeatedPortItems) {
   EXPECT_EQ(item->func_args[2].name, "d1");
 }
 
-// A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension }
-// ... A formal carrying an unpacked dimension.
 TEST(LetDeclParsing, LetPortItem_VariableDimension) {
   auto r = Parse(
       "module m;\n"
@@ -149,8 +127,6 @@ TEST(LetDeclParsing, LetPortItem_VariableDimension) {
   EXPECT_FALSE(item->func_args[0].unpacked_dims.empty());
 }
 
-// A.2.12 let_port_item ::= ... [ = expression ]
-// A formal with a default value expression.
 TEST(LetDeclParsing, LetPortItem_DefaultValue) {
   auto r = Parse(
       "module m;\n"
@@ -164,8 +140,6 @@ TEST(LetDeclParsing, LetPortItem_DefaultValue) {
   EXPECT_NE(item->func_args[0].default_value, nullptr);
 }
 
-// A.2.12 let_port_item ::= { attribute_instance } let_formal_type ...
-// An attribute instance preceding a formal.
 TEST(LetDeclParsing, LetPortItem_WithAttribute) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -173,9 +147,6 @@ TEST(LetDeclParsing, LetPortItem_WithAttribute) {
               "endmodule\n"));
 }
 
-// A.2.12 let_expression ::= let_identifier ( let_list_of_arguments )
-// where let_list_of_arguments uses positional let_actual_arg entries; each
-// let_actual_arg ::= expression.
 TEST(LetDeclParsing, LetExpression_PositionalArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -185,7 +156,6 @@ TEST(LetDeclParsing, LetExpression_PositionalArgs) {
               "endmodule\n"));
 }
 
-// A.2.12 let_expression ::= let_identifier (with no argument list at all).
 TEST(LetDeclParsing, LetExpression_NoArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -195,8 +165,6 @@ TEST(LetDeclParsing, LetExpression_NoArgs) {
               "endmodule\n"));
 }
 
-// A.2.12 let_list_of_arguments: the fully-named form
-// . identifier ( [ let_actual_arg ] ) { , . identifier ( [ let_actual_arg ] ) }
 TEST(LetDeclParsing, LetListOfArguments_AllNamed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -206,8 +174,6 @@ TEST(LetDeclParsing, LetListOfArguments_AllNamed) {
               "endmodule\n"));
 }
 
-// A.2.12 let_list_of_arguments: positional entries followed by trailing
-// named entries: let_actual_arg { , let_actual_arg } { , . identifier ( ... ) }
 TEST(LetDeclParsing, LetListOfArguments_PositionalThenNamed) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -217,8 +183,6 @@ TEST(LetDeclParsing, LetListOfArguments_PositionalThenNamed) {
               "endmodule\n"));
 }
 
-// A.2.12 let_list_of_arguments: a named entry may omit its actual argument,
-// since let_actual_arg is optional: . identifier ( ).
 TEST(LetDeclParsing, LetListOfArguments_NamedEmptyArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -228,8 +192,6 @@ TEST(LetDeclParsing, LetListOfArguments_NamedEmptyArg) {
               "endmodule\n"));
 }
 
-// A.2.12 let_expression ::= [ package_scope ] let_identifier ( ... )
-// A let invocation qualified by a package scope.
 TEST(LetDeclParsing, LetExpression_PackageScope) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -238,8 +200,6 @@ TEST(LetDeclParsing, LetExpression_PackageScope) {
               "endmodule\n"));
 }
 
-// A let_declaration may appear inside a procedural block
-// (block_item_declaration).
 TEST(LetDeclParsing, LetDecl_InProceduralBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -249,9 +209,6 @@ TEST(LetDeclParsing, LetDecl_InProceduralBlock) {
               "endmodule\n"));
 }
 
-// A.2.12 let_port_item ::= ... formal_port_identifier { variable_dimension }
-// ... The variable_dimension group repeats: a formal with two unpacked
-// dimensions.
 TEST(LetDeclParsing, LetPortItem_MultipleVariableDimensions) {
   auto r = Parse(
       "module m;\n"
@@ -265,10 +222,6 @@ TEST(LetDeclParsing, LetPortItem_MultipleVariableDimensions) {
   EXPECT_EQ(item->func_args[0].unpacked_dims.size(), 2u);
 }
 
-// A.2.12 let_list_of_arguments, alternative 1: each positional entry is
-// [ let_actual_arg ] and so may be omitted. This omits the leading positional
-// actual (distinct from the named-tail omission tested above), exercising the
-// optional-positional form of the first alternative.
 TEST(LetDeclParsing, LetListOfArguments_PositionalEmptyArg) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -278,8 +231,6 @@ TEST(LetDeclParsing, LetListOfArguments_PositionalEmptyArg) {
               "endmodule\n"));
 }
 
-// A.2.12 let_expression ::= [ package_scope ] let_identifier
-// The package_scope prefix with no trailing argument list.
 TEST(LetDeclParsing, LetExpression_PackageScopeNoArgs) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -288,35 +239,23 @@ TEST(LetDeclParsing, LetExpression_PackageScopeNoArgs) {
               "endmodule\n"));
 }
 
-// Error recovery: a let_declaration without the required `= expression`.
 TEST(LetDeclParsing, ErrorMissingAssignment) {
   auto r = Parse(
       "module m;\n"
       "  let bad(x);\n"
       "endmodule\n");
-  // §11.12 owns the let_declaration's '='; the report stands on the ';' that
-  // arrived in its place.
   EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "11.12"));
 }
 
-// Error recovery: a let_declaration must end with a semicolon. This is the
-// form without the optional `( [ let_port_list ] )`, so recovery resumes from
-// the expression alone; test_parser_subclause_11_12.cpp covers the form that
-// carries a port list.
 TEST(LetDeclParsing, ErrorMissingSemicolonNoPortList) {
   auto r = Parse(
       "module m;\n"
       "  let bad = 1\n"
       "endmodule\n");
-  // 'endmodule' stands where the ';' was demanded.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "11.12"));
 }
 
-// A.2.12's let_formal_type is a data_type_or_implicit, which A.2.2.1 lets be
-// a type_reference (§6.23), held on the formal for the elaborator to resolve.
-// A let formal is neither a net nor a variable declaration, so no keyword
-// comes before it.
 TEST(LetDeclParsing, LetFormalOfATypeReference) {
   auto r = Parse(
       "module m;\n"
@@ -332,9 +271,6 @@ TEST(LetDeclParsing, LetFormalOfATypeReference) {
   EXPECT_NE(item->func_args[0].data_type.type_ref_expr, nullptr);
 }
 
-// A.2.12's let_formal_type is a data_type_or_implicit or `untyped`, and
-// A.2.2.1's data_type opens with no `const`, so a `const` before a formal is
-// reported and the type after it still read.
 TEST(LetDeclParsing, ALetFormalTakesNoConst) {
   auto r = Parse(
       "module m;\n"
@@ -353,8 +289,6 @@ TEST(LetDeclParsing, ALetFormalTakesNoConst) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// A.2.2.1's implicit_data_type may be a packed dimension with no signing, so
-// `[3:0] x` is a formal of an implicit type that carries the dimension.
 TEST(LetDeclParsing, ALetFormalOfAnImplicitPackedType) {
   auto r = Parse(
       "module m;\n"
@@ -375,8 +309,6 @@ TEST(LetDeclParsing, ALetFormalOfAnImplicitPackedType) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// A.2.2.1's data_type includes an inline struct, union or enum, which a let
-// formal may take as its type.
 TEST(LetDeclParsing, ALetFormalOfAnInlineAggregateType) {
   auto r = Parse(
       "module m;\n"

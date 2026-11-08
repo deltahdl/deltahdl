@@ -128,10 +128,6 @@ TEST(FunctionDeclParsing, IntegerTypesAsFunctionParams) {
   EXPECT_EQ(item->func_args[1].name, "b");
 }
 
-// §13.4 (printed page 341) lets a return type be given implicitly by the ranges
-// of its packed dimensions alone, optionally with a signedness, and the
-// dimensions are plural. A function return type may carry multiple packed
-// dimensions, as in the LRM example `function [3:0][7:0] myfunc4(...)`.
 TEST(FunctionDeclParsing, FuncReturnTypeImplicitMultiPackedDims) {
   auto r = Parse(
       "module m;\n"
@@ -300,8 +296,6 @@ TEST(FunctionDeclParsing, NoDimsOnFuncArg) {
   EXPECT_TRUE(fn->func_args[0].unpacked_dims.empty());
 }
 
-// A.2.7's tf_port_declaration takes a data_type_or_implicit, so a port
-// declared in the body may carry a packed range with no type keyword before it.
 TEST(FunctionDeclParsing, OldStyleFunction) {
   auto r = Parse(
       "module m;\n"
@@ -474,22 +468,6 @@ TEST(FunctionDeclParsing, FuncArgDataTypeInheritedFromPrevious) {
   EXPECT_EQ(item->func_args[1].data_type.kind, DataTypeKind::kInt);
 }
 
-// §13.4 Syntax 13-2 gives `function_declaration ::= function [
-// dynamic_override_specifiers ] [ lifetime ] function_body_declaration`, so
-// nothing may precede `function`. A.1.9 reaches a function_declaration from a
-// `virtual` only through `class_method`, exactly as it does a task_declaration,
-// which is why §13.4 owns this report and §13.3 owns the task one asserted by
-// TaskAndFunctionParsing.VirtualTaskAtModuleScopeRejected in
-// test/src/unit/test_parser_subclause_13_03.cpp.
-//
-// Only the two-keyword sequence is rejected, so the legal reading of a
-// module-scope `virtual` stands: §25.9 Syntax 25-3 gives `data_type ::= virtual
-// [ interface ] interface_identifier ...`.
-// InterfaceParsing.VirtualInterfaceDecl and
-// InterfaceParsing.VirtualInterfaceNoKeyword in
-// test/src/unit/test_parser_subclause_25_09.cpp assert both spellings of that
-// declaration, and the same file parses a module-scope function whose formal
-// carries the type, which is the nearest legal source to this one.
 TEST(FunctionDeclParsing, VirtualFunctionAtModuleScopeRejected) {
   auto r = Parse(
       "module m;\n"
@@ -500,8 +478,6 @@ TEST(FunctionDeclParsing, VirtualFunctionAtModuleScopeRejected) {
                             "13.4"));
 }
 
-// A.2.6 opens a function body without a port list as A.2.7 does a task's, so
-// a port may follow a body variable there too: f takes a and b and declares s.
 TEST(FunctionDeclParsing, OldStylePortAfterABodyDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -524,8 +500,6 @@ TEST(FunctionDeclParsing, OldStylePortAfterABodyDeclaration) {
   EXPECT_EQ(fn->func_body_stmts[0]->var_name, "s");
 }
 
-// After a port list in parentheses A.2.6 gives a function body block item
-// declarations alone, so a port declared there is reported.
 TEST(FunctionDeclParsing, PortInTheBodyOfAFunctionWithAPortListIsReported) {
   auto r = Parse(
       "module m;\n"

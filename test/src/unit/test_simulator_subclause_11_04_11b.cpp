@@ -244,8 +244,6 @@ TEST(ConditionalAmbiguousCondition, DifferentWidthBranchesCombinedToMaxWidth) {
   EXPECT_EQ(result.width, 8u);
 }
 
-// §11.4.11 with §11.4.7: a predicate with an unknown bit and no known 1 is
-// ambiguous, so both results are combined bit by bit.
 TEST(ConditionalAmbiguousCondition, MultiBitPartialXTriggersAmbiguous) {
   SimFixture f;
   auto* cv = f.ctx.CreateVariable("cond", 4);
@@ -259,7 +257,7 @@ TEST(ConditionalAmbiguousCondition, MultiBitPartialXTriggersAmbiguous) {
                            MakeId(f.arena, "t"), MakeId(f.arena, "e")),
                f.ctx, f.arena);
 
-  EXPECT_EQ(result.words[0].aval, 0b1110u);  // differing bits -> x = (1, 1)
+  EXPECT_EQ(result.words[0].aval, 0b1110u);
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
@@ -311,12 +309,7 @@ TEST(TernaryOperatorSim, CondPredicateTripleAndSecondFalse) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §11.4.11: when one branch is real and the other integral, the integral branch
-// is cast to real and the result type is real. The selected integral operand
-// must contribute its numeric value, not its raw bit pattern.
 TEST(ConditionalRealResult, IntegralSelectedBranchCastToReal) {
-  // Condition true selects the integral branch; the real second branch still
-  // forces a real result, so 5 must be delivered as 5.0.
   double v = RunAndGetReal(
       "module t;\n"
       "  real r;\n"
@@ -327,8 +320,6 @@ TEST(ConditionalRealResult, IntegralSelectedBranchCastToReal) {
 }
 
 TEST(ConditionalRealResult, IntegralUnselectedBranchStillForcesReal) {
-  // Condition false selects the integral second branch; the real first branch
-  // forces a real result, so the integer 7 must be delivered as 7.0.
   double v = RunAndGetReal(
       "module t;\n"
       "  real r;\n"
@@ -339,8 +330,6 @@ TEST(ConditionalRealResult, IntegralUnselectedBranchStillForcesReal) {
 }
 
 TEST(ConditionalRealResult, SignedIntegralBranchCastPreservesSign) {
-  // A signed integral branch cast to real keeps its negative value rather than
-  // reinterpreting the two's-complement pattern as a large positive number.
   double v = RunAndGetReal(
       "module t;\n"
       "  int i;\n"
@@ -355,8 +344,6 @@ TEST(ConditionalRealResult, SignedIntegralBranchCastPreservesSign) {
 }
 
 TEST(ConditionalRealResult, BothBranchesRealUnchanged) {
-  // Regression guard for the real early-return path: a plain both-real
-  // conditional still selects the taken real branch verbatim.
   double v = RunAndGetReal(
       "module t;\n"
       "  real r;\n"
@@ -366,11 +353,6 @@ TEST(ConditionalRealResult, BothBranchesRealUnchanged) {
   EXPECT_DOUBLE_EQ(v, 2.5);
 }
 
-// §11.4.11: when the condition is ambiguous (x/z) and both branches are
-// logically equivalent, the operator returns that shared value. Driven from
-// real source syntax (a 1'bx-valued logic condition) through the full pipeline
-// so the ambiguous-condition path is reached the way a design would reach it,
-// not by hand-constructing a 4-state operand.
 TEST(ConditionalAmbiguousCondition,
      XConditionEqualBranchesReturnsValueEndToEnd) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -387,10 +369,6 @@ TEST(ConditionalAmbiguousCondition,
             0xAu);
 }
 
-// §11.4.11: an ambiguous condition with integral, non-equivalent branches
-// combines the two results bit by bit (Table 11-20) — each bit that agrees is
-// kept, each bit that differs becomes x. Full pipeline from a 1'bx condition:
-// a and b agree on bits 3/1/0 and differ on bit 2.
 TEST(ConditionalAmbiguousCondition, XConditionDiffersCombinesBitwiseEndToEnd) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -410,14 +388,9 @@ TEST(ConditionalAmbiguousCondition, XConditionDiffersCombinesBitwiseEndToEnd) {
       "  end\n"
       "endmodule\n",
       f);
-  // Differing bit 2 forces the result unknown; the agreeing bits survive.
   LowerRunAndCheck(f, design, {{"unk", 1u}, {"bit3", 1u}, {"bit1", 0u}});
 }
 
-// §11.4.11: a z-valued condition is ambiguous exactly as an x-valued one is
-// (both are unknown). With logically-equivalent branches the shared value is
-// returned. This is the z counterpart to the x end-to-end test above, driven
-// from a 1'bz literal through the full pipeline.
 TEST(ConditionalAmbiguousCondition,
      ZConditionEqualBranchesReturnsValueEndToEnd) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -434,10 +407,6 @@ TEST(ConditionalAmbiguousCondition,
             0xAu);
 }
 
-// §11.4.11: besides integral operands, the conditional operator also applies to
-// aggregate operands. With a determinate condition a packed-struct branch is
-// selected whole; reading the selected struct back confirms its bits flowed
-// through. Built from a real packed-struct declaration and struct literals.
 TEST(TernaryOperatorSim, PackedStructAggregateBranchSelected) {
   EXPECT_EQ(
       RunAndGet("module t;\n"
@@ -454,10 +423,6 @@ TEST(TernaryOperatorSim, PackedStructAggregateBranchSelected) {
       0xA5u);
 }
 
-// §11.4.11: with an ambiguous condition and a real (nonintegral) result, the
-// branches are compared for numeric equivalence. When they differ, the result
-// is the default value for the type (Table 7-1: 0.0 for real) rather than a
-// bit-by-bit combination of the two operands' bit patterns.
 TEST(ConditionalRealResult, AmbiguousRealBranchesNotEquivalentReturnDefault) {
   double v = RunAndGetReal(
       "module t;\n"
@@ -472,8 +437,6 @@ TEST(ConditionalRealResult, AmbiguousRealBranchesNotEquivalentReturnDefault) {
   EXPECT_DOUBLE_EQ(v, 0.0);
 }
 
-// §11.4.11: an ambiguous condition with numerically-equivalent real branches
-// returns that shared value.
 TEST(ConditionalRealResult, AmbiguousRealBranchesEquivalentReturnValue) {
   double v = RunAndGetReal(
       "module t;\n"
@@ -488,11 +451,6 @@ TEST(ConditionalRealResult, AmbiguousRealBranchesEquivalentReturnValue) {
   EXPECT_DOUBLE_EQ(v, 4.5);
 }
 
-// §11.4.11 lets the conditional operator take unpacked arrays: a known
-// predicate yields the whole array it selects, and an unknown one yields an
-// array whose elements are the two arms' elements where they match and the
-// element type's default (Table 7-1: 0 for int, x for logic) where they do
-// not. Every one of these assignments copied nothing.
 TEST(ConditionalOperatorSim, UnpackedArrayOperandsYieldTheChosenArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -511,10 +469,6 @@ TEST(ConditionalOperatorSim, UnpackedArrayOperandsYieldTheChosenArray) {
   EXPECT_EQ(out, "1 2 9 8 1 0 0001 xxxx\n");
 }
 
-// §11.4.11 with §11.4.7: the predicate is read by its truth value, every word
-// of an integral one and the value of a real one, so a 128-bit predicate set
-// at bit 100 is true, a real -0.0 false, and 4'b1x00, which has a known 1
-// bit, true.
 TEST(ConditionalOperatorSim, PredicateIsReadByItsTruthValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -528,10 +482,6 @@ TEST(ConditionalOperatorSim, PredicateIsReadByItsTruthValue) {
             "1 2 1\n");
 }
 
-// §11.4.11 with §11.3.5: the expression a known predicate does not choose is
-// not evaluated, so a read of a nonexistent associative entry there reports
-// nothing. It still types the result: an unchosen real makes it real, and an
-// unchosen wider operand widens the chosen one.
 TEST(ConditionalOperatorSim, UnchosenBranchIsNotEvaluated) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -552,10 +502,6 @@ TEST(ConditionalOperatorSim, UnchosenBranchIsNotEvaluated) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §11.4.11: under an ambiguous predicate either operand is returned only where
-// the two are logically equal; z bits they share are not, and come out x by
-// Table 11-20. Strings, class handles and unpacked structures that differ take
-// their type's Table 7-1 default: "", null, and each member's own.
 TEST(ConditionalOperatorSim, AmbiguousPredicateOverOperandsNotLogicallyEqual) {
   SimFixture f;
   EXPECT_EQ(

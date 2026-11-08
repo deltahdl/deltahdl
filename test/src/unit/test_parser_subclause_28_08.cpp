@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -17,7 +15,6 @@ TEST(PassSwitches, TranRejectsSingleTerminal) {
       "module m;\n"
       "  tran t1(a);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -27,7 +24,6 @@ TEST(PassEnableSwitches, Tranif0RejectsTwoTerminals) {
       "module m;\n"
       "  tranif0 t1(a, b);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -37,7 +33,6 @@ TEST(PassEnableSwitches, Tranif1RejectsFourTerminals) {
       "module m;\n"
       "  tranif1 t1(a, b, en, extra);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -83,8 +78,6 @@ TEST(PassSwitches, TranRejectsDelay) {
       "module m;\n"
       "  tran #5 t1(a, b);\n"
       "endmodule\n");
-  // §28.3.3 owns the report that a gate type admits no delay; §28.8 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
                             "28.3.3"));
 }
@@ -94,8 +87,6 @@ TEST(PassSwitches, RtranRejectsDelay) {
       "module m;\n"
       "  rtran #5 (a, b);\n"
       "endmodule\n");
-  // §28.3.3 owns the report that a gate type admits no delay; §28.8 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
                             "28.3.3"));
 }
@@ -118,8 +109,6 @@ TEST(PassEnableSwitches, Tranif1RejectsThreeValueDelay) {
       "module m;\n"
       "  tranif1 #(2, 4, 6) t1(a, b, c);\n"
       "endmodule\n");
-  // §28.3.3 owns the count of delay values a gate type admits; §28.8 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
@@ -154,8 +143,6 @@ TEST(PassEnableSwitches, Rtranif1RejectsThreeValueDelay) {
       "module m;\n"
       "  rtranif1 #(1, 2, 3) r1(a, b, en);\n"
       "endmodule\n");
-  // §28.3.3 owns the count of delay values a gate type admits; §28.8 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
@@ -165,7 +152,6 @@ TEST(PassSwitches, TranRejectsThreeTerminals) {
       "module m;\n"
       "  tran t1(a, b, c);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -187,7 +173,6 @@ TEST(PassSwitches, RtranRejectsSingleTerminal) {
       "module m;\n"
       "  rtran r1(a);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -197,7 +182,6 @@ TEST(PassSwitches, RtranRejectsThreeTerminals) {
       "module m;\n"
       "  rtran r1(a, b, c);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -233,7 +217,6 @@ TEST(PassEnableSwitches, Rtranif0RejectsTwoTerminals) {
       "module m;\n"
       "  rtranif0 r1(a, b);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -243,7 +226,6 @@ TEST(PassEnableSwitches, Rtranif1RejectsFourTerminals) {
       "module m;\n"
       "  rtranif1 r1(a, b, en, extra);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.8 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }

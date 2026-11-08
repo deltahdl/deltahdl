@@ -32,8 +32,6 @@ TEST(NonAnsiStylePortDeclarations, ExplicitPortsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2.3 (printed page 735): an inout declared in the body with no port kind
-// is a net of the default net type, not a variable §23.3.3.2 would refuse.
 TEST(NonAnsiStylePortDeclarations, BodyInoutWithNoKindIsANet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -117,8 +115,6 @@ TEST(NonAnsiStylePortDeclarations, PortWithoutDirectionInBodyIsError) {
 
 TEST(NonAnsiStylePortDeclarations, DuplicatePortDeclarationIsError) {
   ElabFixture f;
-  // The duplicate is caught while the port declarations are parsed, so this
-  // case reaches its subject through a source that does not parse.
   ElaborateSrcAllowingParseErrors(
       "module m(a);\n"
       "  input a;\n"
@@ -170,8 +166,6 @@ TEST(NonAnsiStylePortDeclarations, PartialPortDeclMismatchedRangesIsError) {
                             3, "23.2.2.1"));
 }
 
-// §23.2.2.1: an interconnect port may be connected without complaint as long as
-// no signedness is forced on it.
 TEST(NonAnsiStylePortDeclarations, UnsignedInterconnectPortIsAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -186,11 +180,6 @@ TEST(NonAnsiStylePortDeclarations, UnsignedInterconnectPortIsAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2.1: it shall be illegal to specify `signed` for a port declared as an
-// interconnect port. The report is the one
-// src/elaborator/elaborator_module_ports.cpp emits over the ANSI port list of
-// `child`, and it names §23.2.2.3, where the interconnect port kind is defined;
-// the port is written ANSI-style, so no rule of §23.2.2.1 is reached.
 TEST(NonAnsiStylePortDeclarations, SignedInterconnectPortIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -207,25 +196,16 @@ TEST(NonAnsiStylePortDeclarations, SignedInterconnectPortIsError) {
                             1, "23.2.2.3"));
 }
 
-// §23.2.2.1: a net implicitly assumed for a port expression is considered
-// unsigned unless the port itself is declared signed; every other implicit net
-// is unsigned. The signedness half of the implicit-net rule that §23.2.2.1
-// shares with §6.10.
 TEST(NonAnsiStylePortDeclarations, ImplicitPortNetSignednessFollowsPort) {
-  auto unsigned_net = delta::MakeImplicitPortNet(
-      "a", /*port_width=*/8, /*port_is_signed=*/false, delta::NetType::kWire);
+  auto unsigned_net =
+      delta::MakeImplicitPortNet("a", 8, false, delta::NetType::kWire);
   EXPECT_FALSE(unsigned_net.is_signed);
 
-  auto signed_net = delta::MakeImplicitPortNet(
-      "c", /*port_width=*/8, /*port_is_signed=*/true, delta::NetType::kWire);
+  auto signed_net =
+      delta::MakeImplicitPortNet("c", 8, true, delta::NetType::kWire);
   EXPECT_TRUE(signed_net.is_signed);
 }
 
-// §23.2.2.1: real-source form of the implicit-net-signedness rule. A non-ANSI
-// port that has no explicit net declaration is not materialized as a separate
-// net; it stands for the implicit net directly, so the rule that a port is
-// unsigned unless declared signed manifests on the port itself. Driven through
-// parse+elaborate with no net declarations for either port.
 TEST(NonAnsiStylePortDeclarations, SignedPortWithoutNetDeclFollowsDeclaration) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -247,8 +227,6 @@ TEST(NonAnsiStylePortDeclarations, SignedPortWithoutNetDeclFollowsDeclaration) {
   EXPECT_FALSE(b_signed) << "unsigned port with no net declaration is unsigned";
 }
 
-// §23.2.2.1: if the net declaration of a non-ANSI port is signed, the port is
-// also considered signed.
 TEST(NonAnsiStylePortDeclarations, NetSignedMakesPortSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -270,8 +248,6 @@ TEST(NonAnsiStylePortDeclarations, NetSignedMakesPortSigned) {
   EXPECT_TRUE(net_signed);
 }
 
-// §23.2.2.1: if the port direction declaration is signed, the net declaration
-// of that port is also considered signed.
 TEST(NonAnsiStylePortDeclarations, PortSignedMakesNetSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -289,8 +265,6 @@ TEST(NonAnsiStylePortDeclarations, PortSignedMakesNetSigned) {
   EXPECT_TRUE(net_signed) << "net should inherit signed from its port";
 }
 
-// §23.2.2.1: the signedness reconciliation also applies when the port is later
-// redeclared as a variable rather than a net.
 TEST(NonAnsiStylePortDeclarations, PortSignedMakesVariableSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -308,9 +282,6 @@ TEST(NonAnsiStylePortDeclarations, PortSignedMakesVariableSigned) {
   EXPECT_TRUE(var_signed) << "variable should inherit signed from its port";
 }
 
-// §23.2.2.1: a port declared only with a direction may be completed by a
-// separate variable declaration; when the variable is a vector its range must
-// match the port declaration. Matching ranges elaborate cleanly.
 TEST(NonAnsiStylePortDeclarations, PartialPortDeclAsVariableMatchingRanges) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -323,8 +294,6 @@ TEST(NonAnsiStylePortDeclarations, PartialPortDeclAsVariableMatchingRanges) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2.1: the range of the completing variable declaration must be identical
-// to the port declaration's range.
 TEST(NonAnsiStylePortDeclarations,
      PartialPortDeclAsVariableMismatchedRangesIsError) {
   ElabFixture f;
@@ -340,8 +309,6 @@ TEST(NonAnsiStylePortDeclarations,
                             3, "23.2.2.1"));
 }
 
-// §23.2.2.1: once a port is completely declared (here with a variable data
-// type), redeclaring it again in a data type declaration is an error.
 TEST(NonAnsiStylePortDeclarations,
      CompletePortDeclRedeclaredAsVariableIsError) {
   ElabFixture f;
@@ -357,8 +324,6 @@ TEST(NonAnsiStylePortDeclarations,
                             3, "23.2.2.1"));
 }
 
-// §23.2.2.1: each port_identifier must be declared in the body with a
-// direction; a bare net declaration does not satisfy that requirement.
 TEST(NonAnsiStylePortDeclarations, PortWithNetDeclButNoDirectionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -371,10 +336,6 @@ TEST(NonAnsiStylePortDeclarations, PortWithNetDeclButNoDirectionIsError) {
                             "23.2.2.1"));
 }
 
-// §23.2.2.1: named port connections may be used for an implicit port only when
-// its port_expression is a simple (or escaped) identifier, which then serves as
-// the port name. Here the implicit port `a` is a plain identifier, so the name
-// is available for a named connection (see 23.3.2.2) and binds cleanly.
 TEST(NonAnsiStylePortDeclarations,
      ImplicitSimpleIdentifierPortConnectableByName) {
   ElabFixture f;
@@ -393,11 +354,6 @@ TEST(NonAnsiStylePortDeclarations,
       << "a simple-identifier implicit port carries its name and is nameable";
 }
 
-// §23.2.2.1 (negative): an implicit port whose port_expression is a
-// concatenation has no port name, so it shall not be reachable by a named
-// connection. The concatenation elements (`a`, `b`) are internal names, not
-// port names, so `.a(...)` finds no such port and the named connection (see
-// 23.3.2.2) is rejected.
 TEST(NonAnsiStylePortDeclarations,
      ImplicitConcatenationPortNotConnectableByName) {
   ElabFixture f;
@@ -411,16 +367,10 @@ TEST(NonAnsiStylePortDeclarations,
       "endmodule\n",
       f, "top");
   ASSERT_NE(design, nullptr);
-  // §23.3.2.2 makes the named connection to no port an error.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
 }
 
-// §23.2.2.1 (negative): a part-select implicit port carries no port name, so a
-// named connection using the base identifier must not resolve to it — the LRM's
-// split-vector example that named port connections cannot reach. The port is
-// built from real non-ANSI source and reached through the named-connection path
-// of 23.3.2.2.
 TEST(NonAnsiStylePortDeclarations, ImplicitPartSelectPortNotConnectableByName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -437,8 +387,6 @@ TEST(NonAnsiStylePortDeclarations, ImplicitPartSelectPortNotConnectableByName) {
       ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
 }
 
-// §23.2.2.1 (negative): the same holds for a bit-select implicit port; it too
-// has no port name and cannot be reached by a named connection.
 TEST(NonAnsiStylePortDeclarations, ImplicitBitSelectPortNotConnectableByName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -455,9 +403,6 @@ TEST(NonAnsiStylePortDeclarations, ImplicitBitSelectPortNotConnectableByName) {
       ReportedError(f.diag.Diagnostics(), "port 'a' not found", 6, "23.3.2.2"));
 }
 
-// §23.2.2.1 (positive contrast): the fix must not strip the name from a simple
-// implicit port or an explicitly-named port. A plain identifier port stays
-// name-connectable, so this named connection resolves without warning.
 TEST(NonAnsiStylePortDeclarations, SelectPortFixKeepsSimplePortNameable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -475,11 +420,6 @@ TEST(NonAnsiStylePortDeclarations, SelectPortFixKeepsSimplePortNameable) {
       << "a simple-identifier implicit port keeps its name after the fix";
 }
 
-// §23.2.2.1: each port_identifier in the list of ports must also be declared in
-// the module body as an input, output, inout or ref port, or as an interface
-// port. A header port the body never gives a direction breaches that, and the
-// report naming it carries the subclause, so a caller learns which rule was
-// enforced without matching the wording of the message.
 TEST(NonAnsiStylePortDeclarations, PortWithoutADirectionNames23_2_2_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -491,10 +431,6 @@ TEST(NonAnsiStylePortDeclarations, PortWithoutADirectionNames23_2_2_1) {
                             "has no direction declaration", 1, "23.2.2.1"));
 }
 
-// §23.2.2.1 (printed pages 731 and 732): a port declaration with no net or
-// variable type makes its port a net of the default net type, and a net or
-// variable declaration of the same name in the body makes the port that object
-// instead: a wand net for b, a variable for f.
 TEST(NonAnsiStylePortDeclarations, ABodyDeclarationGivesAPortItsKind) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -516,9 +452,6 @@ TEST(NonAnsiStylePortDeclarations, ABodyDeclarationGivesAPortItsKind) {
   EXPECT_EQ(ports[2].net_type, delta::NetType::kNone);
 }
 
-// §23.2.2.1 (printed page 731): a port declaration written with `var` holds a
-// variable type, so its port is a variable, and it declares the port
-// completely, leaving no room for a second declaration in the body.
 TEST(NonAnsiStylePortDeclarations, AVarDeclaredPortIsACompleteVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(

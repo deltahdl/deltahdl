@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A class C holding the members `decls` under the constraint block `c`,
-// randomized `draws` times by an initial that counts the draws for which
-// `holds` is true, as the design test/src/e2e/if_else_constraints.sv does,
-// and displays the count.
 std::string Counting(const std::string& decls, const std::string& constraint,
                      int draws, const std::string& holds) {
   return "class C;\n" + decls + "  constraint c { " + constraint +
@@ -34,9 +30,6 @@ std::string Counting(const std::string& decls, const std::string& constraint,
          "endmodule\n";
 }
 
-// 18.5.6: the expression of an if-else constraint may be a real
-// expression. A real r drawn from 0.5 and 1.5 selects k of 2 above 1.0 and
-// of 3 below it on every draw.
 TEST(IfElseConstraintsRun, ARealExpressionSelectsTheBranch) {
   SimFixture f;
   std::string out = RunCapture(
@@ -49,10 +42,6 @@ TEST(IfElseConstraintsRun, ARealExpressionSelectsTheBranch) {
   EXPECT_EQ(out, "64\n");
 }
 
-// 18.5.6: the condition and the constraint sets are interdependent, so a
-// constraint on len constrains mode: with len held to 50, neither little's
-// len below 10 nor big's above 100 can hold, so mode is other, the literal
-// of value 2, on every draw.
 TEST(IfElseConstraintsRun, TheConstraintSetConstrainsTheCondition) {
   SimFixture f;
   std::string out =
@@ -66,11 +55,6 @@ TEST(IfElseConstraintsRun, TheConstraintSetConstrainsTheCondition) {
   EXPECT_EQ(out, "64\n");
 }
 
-// 18.5.6: in nested ifs, an else belongs to the nearest earlier if still
-// without an else. In the clause's example the else belongs to the inner if, so
-// a mode held to big, the literal of value 1, passes the outer if and reaches
-// neither set, and len is free to be 50. Were the else the outer if's, big
-// would demand len above 100 and randomize() would refuse the 50.
 TEST(IfElseConstraintsRun, TheElseGoesWithTheClosestIfLackingOne) {
   SimFixture f;
   std::string out =

@@ -14,9 +14,6 @@
 namespace delta {
 namespace {
 
-// The `count` bits of `v` from bit `lo` up, of its bval words where `bval`
-// says so and its aval words otherwise, each read from the 64-bit word that
-// holds it, so a value wider than one word gives every bit it has.
 uint8_t GroupBits(const Logic4Vec& v, bool bval, int lo, int count) {
   uint8_t bits = 0;
   for (int k = 0; k < count; ++k) {
@@ -32,22 +29,13 @@ char HexDigitFromBits(uint8_t nibble) {
   return static_cast<char>('a' + nibble - 10);
 }
 
-// §38.15, Table 38-3 (octal/hex rows): choose the character for a digit group
-// that contains at least one unknown bit. `mask` selects the group's valid bits
-// (the top group may be narrower than a full digit). A group with any x bit
-// prints lowercase 'x' only when every valid bit is x, otherwise uppercase 'X';
-// otherwise the unknown bits are all z, printing lowercase 'z' when every valid
-// bit is z, otherwise uppercase 'Z'. Canonical bit encoding: x=(a1,b1),
-// z=(a0,b1).
 char UnknownGroupChar(uint8_t a_bits, uint8_t b_bits, uint8_t mask) {
   uint8_t unknown = b_bits & mask;
-  uint8_t x_bits = a_bits & b_bits & mask;  // unknown bits that are x
+  uint8_t x_bits = a_bits & b_bits & mask;
   if (x_bits != 0) {
     bool all_x = unknown == mask && (a_bits & mask) == mask;
     return all_x ? 'x' : 'X';
   }
-  // No unknown bit is x here, so every valid bit is z exactly when every one
-  // is unknown.
   bool all_z = unknown == mask;
   return all_z ? 'z' : 'Z';
 }
@@ -65,7 +53,7 @@ void GetValueBinStr(const Logic4Vec& v, s_vpi_value* value,
     if (!b_bit) {
       result += (a_bit ? '1' : '0');
     } else {
-      result += (a_bit ? 'x' : 'z');  // x=(1,1), z=(0,1)
+      result += (a_bit ? 'x' : 'z');
     }
   }
   pool.push_back(std::move(result));
@@ -114,10 +102,6 @@ void GetValueOctStr(const Logic4Vec& v, s_vpi_value* value,
   value->value.str = VpiText(pool.back().c_str());
 }
 
-// §38.15, Table 38-3 (vpiStringVal row): each eight bits of the value, from
-// its top down, as one character, a null byte left out; an unknown bit reads
-// as 0. Every word is read, so a value wider than 64 bits gives every
-// character it holds rather than the last eight.
 void GetValueStringVal(const Logic4Vec& v, s_vpi_value* value,
                        std::vector<std::string>& pool) {
   const int kWidth = static_cast<int>(v.width);
@@ -132,10 +116,6 @@ void GetValueStringVal(const Logic4Vec& v, s_vpi_value* value,
   value->value.str = VpiText(pool.back().c_str());
 }
 
-// §38.15, Table 38-3 (vpiDecStrVal row): the value as a string of decimal
-// digits, a signed one's negative value written with its sign. The row allows
-// no character for an unknown bit, so an x or z bit reads as 0, as the
-// vpiIntVal row has it.
 void GetValueDecStr(const Logic4Vec& v, s_vpi_value* value,
                     std::vector<std::string>& pool) {
   std::vector<Logic4Word> known(v.words, v.words + v.nwords);

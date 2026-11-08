@@ -209,9 +209,6 @@ TEST(TwoStateAndFourState, MultiWordFourToTwoStateZeroesXz) {
   EXPECT_EQ(dst->value.words[1].aval, 0ull);
 }
 
-// The x/z-to-zero conversion also applies when a 4-state value initializes a
-// 2-state variable at declaration, not only in a procedural assignment. Widths
-// match here so the numeric-projection path does not mask the coercion.
 TEST(TwoStateAndFourState, TwoStateInitializerZeroesXz) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -232,8 +229,6 @@ TEST(TwoStateAndFourState, TwoStateInitializerZeroesXz) {
   EXPECT_EQ(vb->value.ToUint64(), 0u);
 }
 
-// A 4-state variable keeps the same x/z initializer, discriminating the guard
-// against the 2-state coercion above.
 TEST(TwoStateAndFourState, FourStateInitializerKeepsXz) {
   SimFixture f;
   auto* va = RunAndFindVar(
@@ -246,7 +241,6 @@ TEST(TwoStateAndFourState, FourStateInitializerKeepsXz) {
   EXPECT_EQ(va->value.ToString(), "1010x10z");
 }
 
-// reg is one of the four 4-state types, so it retains x and z like logic.
 TEST(TwoStateAndFourState, RegHoldsXAndZ) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -260,7 +254,6 @@ TEST(TwoStateAndFourState, RegHoldsXAndZ) {
   EXPECT_EQ(var->value.ToString(), "1x0z");
 }
 
-// time is the fourth 4-state type; unknown bits survive rather than coercing.
 TEST(TwoStateAndFourState, TimeHoldsXAndZ) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -274,7 +267,6 @@ TEST(TwoStateAndFourState, TimeHoldsXAndZ) {
   EXPECT_FALSE(var->value.IsKnown());
 }
 
-// A 2-state byte destination forces the incoming unknown/high-Z bits to zero.
 TEST(TwoStateAndFourState, ByteConversionZeroesXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -292,7 +284,6 @@ TEST(TwoStateAndFourState, ByteConversionZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// Same conversion into a 16-bit 2-state shortint destination.
 TEST(TwoStateAndFourState, ShortintConversionZeroesXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -310,7 +301,6 @@ TEST(TwoStateAndFourState, ShortintConversionZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0x00A4u);
 }
 
-// Same conversion into a 64-bit 2-state longint destination.
 TEST(TwoStateAndFourState, LongintConversionZeroesXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -328,9 +318,6 @@ TEST(TwoStateAndFourState, LongintConversionZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// The widening direction depends on signedness (§6.11.3): an explicit unsigned
-// override on a normally-signed byte zero-extends instead of sign-extending.
-// The same 0xFF bits sign-extend to 0xFFFFFFFF when the byte stays signed.
 TEST(TwoStateAndFourState, UnsignedByteWideningZeroExtends) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -348,16 +335,6 @@ TEST(TwoStateAndFourState, UnsignedByteWideningZeroExtends) {
   EXPECT_EQ(var->value.ToUint64(), 0x000000FFu);
 }
 
-// §6.11.2's conversion applies to an assignment wherever it is written, and a
-// subroutine body runs on the statement executor in eval_function_body.cpp
-// rather than the one FourToTwoStateZeroesOnlyXzBits above exercises. That
-// executor converted nowhere, and it also left every body local at Variable's
-// 4-state default, so both halves are read below: the target's flag, which the
-// lowerer sets for a variable of the design, and the flag a local gets when the
-// subroutine declares it.
-
-// The target is a `bit` of the design, written from a function body. Its flag
-// was already right; what was missing was the conversion at the write.
 TEST(TwoStateAndFourState, FunctionBodyZeroesXzIntoATwoStateTarget) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -378,9 +355,6 @@ TEST(TwoStateAndFourState, FunctionBodyZeroesXzIntoATwoStateTarget) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// The other half: a `bit` local the subroutine declares. Its flag is what the
-// declaration sets, and the value is carried out through a 4-state variable so
-// that what is read is the local's own conversion and not a second one.
 TEST(TwoStateAndFourState, FunctionBodyTwoStateLocalZeroesXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -403,9 +377,6 @@ TEST(TwoStateAndFourState, FunctionBodyTwoStateLocalZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// §6.11.2 names `logic` among the types that do have unknown values, so a
-// 4-state local keeps what a 2-state one loses. Without this the two cases
-// above would also pass a body that converted every local it declared.
 TEST(TwoStateAndFourState, FunctionBodyFourStateLocalKeepsXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -428,12 +399,6 @@ TEST(TwoStateAndFourState, FunctionBodyFourStateLocalKeepsXz) {
   EXPECT_EQ(var->value.ToString(), "1010x10z");
 }
 
-// The limit the declaration accepts. Is4stateType is asked of the type's kind
-// alone, and a name answers false whatever it stands for, so a local declared
-// with a typedef of `logic` is left 4-state rather than converted on that
-// answer. This case is that choice: the unknowns survive, which is the smaller
-// error than clearing the unknowns of a type that has them. #3486 is what would
-// carry the name's resolved kind this far.
 TEST(TwoStateAndFourState, FunctionBodyLocalOfATypedefNameKeepsXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -457,17 +422,6 @@ TEST(TwoStateAndFourState, FunctionBodyLocalOfATypedefNameKeepsXz) {
   EXPECT_EQ(var->value.ToString(), "1010x10z");
 }
 
-// A subroutine creates two more objects the clause governs and neither carried
-// its state-ness: the formal a value is copied into, and the implicit variable
-// §13.4.1 gives the function's return type. Both were left at Variable's
-// 4-state default, so an unknown passed to a `bit` formal or returned from a
-// `bit` function was kept where the same value assigned to a `bit` of the
-// design was cleared.
-
-// §10.8 makes passing a value to a subroutine's input, output or inout argument
-// an assignment-like context, so the conversion belongs at the copy in. The
-// formal is read back out through a 4-state variable, so what is read is the
-// formal's own conversion and not a second one at the target.
 TEST(TwoStateAndFourState, TwoStateFormalZeroesXzAtTheCall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -488,8 +442,6 @@ TEST(TwoStateAndFourState, TwoStateFormalZeroesXzAtTheCall) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// The same call with a 4-state formal, which keeps what the 2-state one loses.
-// Without this a copy that converted every formal would pass the case above.
 TEST(TwoStateAndFourState, FourStateFormalKeepsXzAtTheCall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -510,10 +462,6 @@ TEST(TwoStateAndFourState, FourStateFormalKeepsXzAtTheCall) {
   EXPECT_EQ(var->value.ToString(), "1010x10z");
 }
 
-// §13.4.1's implicit variable, written by a return statement. ExecFuncReturn
-// resizes to the declared return width and wrote the result straight into the
-// variable, so this is the one write in a subroutine body that the identifier
-// assignment's conversion does not stand for.
 TEST(TwoStateAndFourState, TwoStateFunctionReturnZeroesXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -534,10 +482,6 @@ TEST(TwoStateAndFourState, TwoStateFunctionReturnZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// The same variable written by name rather than by a return statement, which
-// §13.4.1 gives as the other way to set it. That write reaches
-// ExecFuncIdentifierAssign, so it converts on the flag rather than on a
-// conversion of its own, and it is the flag that both forms needed.
 TEST(TwoStateAndFourState, TwoStateFunctionNameAssignZeroesXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -558,20 +502,6 @@ TEST(TwoStateAndFourState, TwoStateFunctionNameAssignZeroesXz) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// §6.11.2, printed p.110: any x or z bits become zeros. The rule is stated of
-// the 2-state type of the object written, and an element of an unpacked array
-// is an object of the array's element type, so how many dimensions the
-// declaration wrote cannot change the answer. It did. The two-dimensional leaf
-// carried the declaration's 2-state flag and coerced; the one-dimensional leaf
-// was created without it and defaulted to 4-state, so the coercion never fired
-// and the same 8'hxx stayed unknown in c[0] while it read zero in d[0][0]. Both
-// spellings are written in the one run, and both asserted, so the case states
-// the disagreement rather than one half of it.
-//
-// ToUint64 is no use here: it projects aval & ~bval, so an x reads as zero
-// whether or not it was converted, and every one of these cases would have
-// passed unconverted. ToString reads the bval plane, which is the plane the
-// conversion clears.
 TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesXzAtEitherRank) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -594,11 +524,6 @@ TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesXzAtEitherRank) {
   EXPECT_EQ(vd->value.ToString(), vc->value.ToString());
 }
 
-// The clause names x and z bits together and converts both, and only the bval
-// plane tells the two apart: x is (aval=1, bval=1) and z is (aval=0, bval=1). A
-// value that is all z therefore sets a bit pattern the x case above never
-// reaches -- every aval bit clear -- and pins that the rule's second word is
-// covered too, rather than leaving z to the coercion's arithmetic by inference.
 TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesHighImpedance) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -613,11 +538,6 @@ TEST(TwoStateAndFourState, TwoStateUnpackedElementZeroesHighImpedance) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0u);
 }
 
-// The guard on the two above: §6.11.2 converts what a 2-state type stores, and
-// says nothing about a 4-state one, whose whole point is to hold these bits. An
-// element of a logic array is a 4-state object, so it keeps a mixed x/z pattern
-// unchanged. A fix that gave every array leaf the conversion rather than giving
-// each leaf its declaration's own state count would read 10100100 here.
 TEST(TwoStateAndFourState, FourStateUnpackedElementKeepsXz) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -631,12 +551,6 @@ TEST(TwoStateAndFourState, FourStateUnpackedElementKeepsXz) {
   EXPECT_EQ(var->value.ToString(), "1010x10z");
 }
 
-// §6.8 makes a variable declaration assignment an assignment to the declared
-// variable, so §6.11.2's conversion is owed by a declaration exactly as it is
-// owed by the statement below it. A subroutine-body local recorded the flag the
-// conversion is made through and stored its initializer without applying it,
-// which is what makes the two spellings of one declaration disagree: the second
-// case here is the same two facts as two statements and answered 0 all along.
 TEST(TwoStateAndFourState, TwoStateBodyLocalDropsItsInitializersUnknownBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -657,8 +571,6 @@ TEST(TwoStateAndFourState, TwoStateBodyLocalDropsItsInitializersUnknownBits) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// The spelling that already converted, which is what the case above has to
-// agree with rather than merely answer correctly on its own.
 TEST(TwoStateAndFourState, TwoStateBodyLocalAssignedAfterDeclarationDropsThem) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -680,9 +592,6 @@ TEST(TwoStateAndFourState, TwoStateBodyLocalAssignedAfterDeclarationDropsThem) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// The bits the conversion keeps: §6.11.2 zeroes the unknown ones and leaves the
-// known ones alone, so a case asserting only that nothing is unknown would pass
-// on a local that came out all zeros.
 TEST(TwoStateAndFourState, TwoStateBodyLocalKeepsTheKnownBitsOfItsInitializer) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -703,13 +612,6 @@ TEST(TwoStateAndFourState, TwoStateBodyLocalKeepsTheKnownBitsOfItsInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 0xA4u);
 }
 
-// §10.5 makes a variable declaration assignment a special case of procedural
-// assignment, so §6.11.2's conversion reaches an array's initializer element by
-// element -- §10.9.1 evaluating each pattern item in the assignment context of
-// its element. The three helpers that fill a one-dimensional array's leaves
-// stored the item resized and not converted, so the one spelling that is both a
-// declaration initializer and an array element kept the x that the same value
-// loses in a scalar declaration and in a runtime write to the same element.
 TEST(TwoStateAndFourState, TwoStateArrayPositionalInitDropsUnknownBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -721,7 +623,6 @@ TEST(TwoStateAndFourState, TwoStateArrayPositionalInitDropsUnknownBits) {
   EXPECT_EQ(var->value.ToString(), "00000000");
 }
 
-// §10.9.1's replication form, whose item is stored by a second helper.
 TEST(TwoStateAndFourState, TwoStateArrayReplicatedInitDropsUnknownBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -733,7 +634,6 @@ TEST(TwoStateAndFourState, TwoStateArrayReplicatedInitDropsUnknownBits) {
   EXPECT_EQ(var->value.ToString(), "00000000");
 }
 
-// §10.9.1's default key, whose item is stored by a third helper again.
 TEST(TwoStateAndFourState, TwoStateArrayDefaultKeyedInitDropsUnknownBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -745,9 +645,6 @@ TEST(TwoStateAndFourState, TwoStateArrayDefaultKeyedInitDropsUnknownBits) {
   EXPECT_EQ(var->value.ToString(), "00000000");
 }
 
-// The guard: §6.11.2 converts on the way into a 2-state type and only there, so
-// a 4-state element keeps every bit its initializer gave it. Without this the
-// three above would pass on a helper that zeroed unconditionally.
 TEST(TwoStateAndFourState, FourStateArrayPositionalInitKeepsUnknownBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -759,10 +656,6 @@ TEST(TwoStateAndFourState, FourStateArrayPositionalInitKeepsUnknownBits) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
-// The initializer item is a bare name here, which EvalExpr answers with that
-// variable's own Logic4Vec, and the conversion writes in place: through a
-// shared buffer it would clear the source's own unknown bits, which §6.8 keeps
-// as the source's to hold.
 TEST(TwoStateAndFourState, TwoStateArrayInitLeavesItsSourceVariableAlone) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -775,12 +668,6 @@ TEST(TwoStateAndFourState, TwoStateArrayInitLeavesItsSourceVariableAlone) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
-// §6.11.2 with §11.8.2: a declaration initializer is an assignment, so the
-// unsized `-1` is negated at the variable's 64 bits and fills a longint and
-// a time with ones, -1 and 18446744073709551615 (Table 6-8 has time 64 bits
-// and unsigned); the negation was done at the literal's 32 bits and the
-// result zero-extended, reading 4294967295 for both where the write from an
-// int variable and a 64-bit shift were sign-extended.
 TEST(TwoStateAndFourState, NegativeInitializerFillsALongintAndATime) {
   SimFixture f;
   EXPECT_EQ(
@@ -798,11 +685,6 @@ TEST(TwoStateAndFourState, NegativeInitializerFillsALongintAndATime) {
       "lo=-1 lo2=-5 t=18446744073709551615 neg=-4294967296\n");
 }
 
-// §6.11.3 with §6.11.2: byte, shortint, int, integer and longint are signed
-// and read their initializers back as negatives, `byte by = 200` being -56
-// once the 32-bit 200 is cut to 8 bits; bit, logic, time and an explicit
-// `unsigned` are unsigned and read -1 as all ones at their own width; an
-// explicit `signed` on int and on a bit vector reads -1.
 TEST(TwoStateAndFourState, SignednessDefaultsDecideTheReadOfAnInitializer) {
   SimFixture f;
   EXPECT_EQ(

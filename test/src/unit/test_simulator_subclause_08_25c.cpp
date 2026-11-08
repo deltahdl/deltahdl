@@ -6,22 +6,8 @@
 #include "fixture_simulator.h"
 #include "helpers_scheduler.h"
 
-// §8.25 (printed pages 203-204 of IEEE 1800-2023): a specialization's methods
-// run under that specialization, and an initializer that constructs one builds
-// it rather than the generic class. Split out of
-// test_simulator_subclause_08_25b.cpp, whose opening comment gives the reason
-// these cases run the whole pipeline on source text.
-
 namespace {
 
-// §8.25 with §8.20: a virtual method called on an object of Own #(byte) is
-// Own #(byte)'s method, so `rsrc_t`, Own's `typedef R #(T) rsrc_t;`, names
-// R #(byte) in it as in the non-virtual one, and both read R #(byte)'s 9. The
-// specialization's vtable, copied from the declaration, named the generic Own
-// as the virtual method's class, which the call ran under: rsrc_t resolved
-// there, to another R, and read 0 -- UVM's resource pool compared the type
-// handle `rsrc_t::get_type()` its default implementation's virtual
-// get_by_name passed against each resource's own and matched none.
 TEST(ClassSim, VirtualMethodOfASpecializationRunsUnderTheSpecialization) {
   SimFixture f;
   auto out = RunCapture(
@@ -45,11 +31,6 @@ TEST(ClassSim, VirtualMethodOfASpecializationRunsUnderTheSpecialization) {
   EXPECT_EQ(out, "9 9\n");
 }
 
-// The same where the virtual method overrides a base's pure virtual one and
-// the typedef is the base's, as uvm_resource_db_default_implementation_t
-// #(T) implements uvm_resource_db_implementation_t #(T)'s get_by_name with
-// the base's rsrc_t: the override runs as Imp #(byte)'s, whose base is
-// ImpBase #(byte), so the inherited rsrc_t is R #(byte) and reads 9.
 TEST(ClassSim, OverrideOfASpecializationReadsItsBasesTypedef) {
   SimFixture f;
   auto out = RunCapture(
@@ -77,11 +58,6 @@ TEST(ClassSim, OverrideOfASpecializationReadsItsBasesTypedef) {
   EXPECT_EQ(out, "9 9\n");
 }
 
-// §8.25 (printed pages 203-204): a declaration's initializer `new`
-// constructs the specialization the declared type names, so the constructor
-// that runs is S #(byte)'s and increments its static n rather than the
-// default specialization's; built as the generic S, the count went to
-// S #(int)::n.
 TEST(ClassSim, DeclarationInitializerNewBuildsTheSpecialization) {
   SimFixture f;
   auto out = RunCapture(
@@ -99,8 +75,6 @@ TEST(ClassSim, DeclarationInitializerNewBuildsTheSpecialization) {
   EXPECT_EQ(out, "1 0\n");
 }
 
-// The same rule for a local declared in a function body, which is declared
-// by a path of its own and had recorded no specialization at all.
 TEST(ClassSim, FunctionLocalInitializerNewBuildsTheSpecialization) {
   SimFixture f;
   auto out = RunCapture(
@@ -119,10 +93,6 @@ TEST(ClassSim, FunctionLocalInitializerNewBuildsTheSpecialization) {
   EXPECT_EQ(out, "1 0\n");
 }
 
-// §6.20.4 with §8.25: a localparam in a parameterized class body is a
-// constant of each specialization, so `N = W * 2` is 16 for C#(8) and for
-// the default specialization C#() and C, 8 for C#(4), and the same inside a
-// method run on an object of each; K, which names no parameter, is 3 in all.
 TEST(ClassParamsSim, BodyLocalparamFoldsInEachSpecialization) {
   SimFixture f;
   auto out = RunCapture(
@@ -145,11 +115,6 @@ TEST(ClassParamsSim, BodyLocalparamFoldsInEachSpecialization) {
   EXPECT_EQ(out, "16 8 16 8 16 3\n");
 }
 
-// §6.18 with §8.25: a class typedef naming a type parameter names the type the
-// specialization binds it to, so in C #(byte) `typedef T U;` is byte: $bits(U)
-// in a method is 8, as $bits(T) is, and a property declared U holding 8'hFF
-// reads -1, as one declared T does. Sized under the declaration's default,
-// $bits(U) was int's 32 and the property 255.
 TEST(ClassParamsSim, TypedefOfATypeParameterFollowsTheSpecialization) {
   SimFixture f;
   auto out = RunCapture(
@@ -170,9 +135,6 @@ TEST(ClassParamsSim, TypedefOfATypeParameterFollowsTheSpecialization) {
   EXPECT_EQ(out, "8 -1\n");
 }
 
-// §6.20.3 with §8.25: a local type parameter of the class body names its
-// default's type in each specialization, so in C #(byte) `localparam type U
-// = T;` is byte and $bits(U) in a method is 8, as $bits(T) is.
 TEST(ClassParamsSim, BodyLocalTypeParamFollowsTheSpecialization) {
   SimFixture f;
   auto out = RunCapture(
@@ -192,11 +154,6 @@ TEST(ClassParamsSim, BodyLocalTypeParamFollowsTheSpecialization) {
   EXPECT_EQ(out, "8 8\n");
 }
 
-// §8.25 with §7.8: a class variable declared among a module's items with a
-// specialization, `Box #(string, 6) bs;`, binds the type parameter to string,
-// so its `int m[T]` property is keyed by strings: two keys written through
-// the handle stay two entries, each with its own value, while the default
-// specialization's `int m[T]` keys by int.
 TEST(ClassParamsSim, ModuleLevelSpecializationKeysATypeIndexedProperty) {
   SimFixture f;
   auto out = RunCapture(
@@ -217,11 +174,6 @@ TEST(ClassParamsSim, ModuleLevelSpecializationKeysATypeIndexedProperty) {
   EXPECT_EQ(out, "2 77 5 9\n");
 }
 
-// §8.25 with §8.23 and §13.4: a structure typedef a parameterized class
-// declares is of the widths each specialization binds, inside its methods as
-// well as outside. A function's return variable and a local of the typedef
-// have a 32-bit `data` under `B#(32)` and an 8-bit one under the default,
-// `p = 8`, so 200 survives under the default, and 300 is cut to 44 there.
 TEST(ClassParamsSim, SubroutineVariableOfAParameterizedStructTypedef) {
   SimFixture f;
   std::string out = RunCapture(
@@ -246,9 +198,6 @@ TEST(ClassParamsSim, SubroutineVariableOfAParameterizedStructTypedef) {
   EXPECT_EQ(out, "200 44 | 7 1.500000 | 300\n");
 }
 
-// §8.25 with §20.6.2: a type parameter named through a specialization is the
-// type its list binds, shortint for `C#(shortint)::T`, and the default for
-// `C#()::T`.
 TEST(ClassSim, BitsOfATypeParameterNamedThroughASpecialization) {
   auto v = RunAndGet(
       "class C #(type T = int);\n"
@@ -261,9 +210,6 @@ TEST(ClassSim, BitsOfATypeParameterNamedThroughASpecialization) {
   EXPECT_EQ(v, 1632u);
 }
 
-// §8.25: a method local declared with the class's type parameter is of the
-// type the running specialization binds, a signed byte under `C #(byte)`, so
-// 8'hFF held in it reads -1.
 TEST(ClassSim, MethodLocalOfATypeParameterHasTheBoundType) {
   auto v = RunAndGet(
       "class C #(type T = int);\n"
@@ -278,7 +224,6 @@ TEST(ClassSim, MethodLocalOfATypeParameterHasTheBoundType) {
   EXPECT_EQ(v, 1u);
 }
 
-// §8.25: bound to a structure type, the local has the structure's members.
 TEST(ClassSim, MethodLocalOfATypeParameterBoundToAStruct) {
   auto v = RunAndGet(
       "typedef struct { byte a; shortint b; } pair_t;\n"
@@ -295,10 +240,6 @@ TEST(ClassSim, MethodLocalOfATypeParameterBoundToAStruct) {
   EXPECT_EQ(v, 297u);
 }
 
-// §8.13 with §8.25: a base named by an extends clause is the specialization
-// its list names, positional or named, and an actual naming the derived
-// class's own parameter stands for that parameter's value in each
-// specialization of the derived class.
 TEST(ClassSim, ExtendsClauseValueParametersBindTheBaseLevel) {
   auto v = RunAndGet(
       "class Mem #(real D = 1.5, int K = 1);\n"
@@ -322,11 +263,6 @@ TEST(ClassSim, ExtendsClauseValueParametersBindTheBaseLevel) {
   EXPECT_EQ(v, 1438u);
 }
 
-// §8.25 with §8.23: a structure typedef a parameterized class declares has the
-// widths its specialization binds, and a property declared by it holds that
-// structure, so a method of `Box #(16)` selects its two 16-bit members and
-// $bits counts 32, and one of `Box #()` counts 16 under the default W = 8.
-// The property had no layout in either and read 0, with $bits 32 in both.
 TEST(ClassSim, PropertyOfParameterizedClassTypedefHasSpecializationLayout) {
   SimFixture f;
   auto out = RunCapture(
@@ -349,12 +285,6 @@ TEST(ClassSim, PropertyOfParameterizedClassTypedefHasSpecializationLayout) {
   EXPECT_EQ(out, "3 5 32\n3 5 16\n");
 }
 
-// §8.13 with §8.23 and §8.25: a class extending a specialization of a
-// parameterized base reaches the base's structure typedef bare, with the widths
-// that base specialization binds, so Der's `S s` under `Base #(16)` has two
-// 16-bit members, and D #(4)'s under the `Base #(N)` it extends has two 4-bit
-// ones. The typedef of a base with value parameters was left unresolved, and
-// the members read 0 in a 32-bit carrier.
 TEST(ClassSim, PropertyOfParameterizedBaseTypedefHasBaseSpecializationLayout) {
   SimFixture f;
   auto out = RunCapture(
@@ -383,11 +313,6 @@ TEST(ClassSim, PropertyOfParameterizedBaseTypedefHasBaseSpecializationLayout) {
   EXPECT_EQ(out, "3 5 32\n3 5 8\n");
 }
 
-// §8.25 with §7.4.4: a member of a parameterized class's structure typedef
-// written as a typedef name with packed dimensions, `nib_t [W-1:0] x`, is
-// the typedef's 4 bits times the W = 2 the specialization binds, so the
-// structure is 9 bits and 9'h1A5 leaves x 210 and y 1. Laid out by the
-// written dimensions alone, x was 2 bits.
 TEST(ClassSim, TypedefNamedMemberOfClassTypedefStacksItsDimensions) {
   SimFixture f;
   auto out = RunCapture(
@@ -411,12 +336,6 @@ TEST(ClassSim, TypedefNamedMemberOfClassTypedefStacksItsDimensions) {
   EXPECT_EQ(out, "9 210 1\n");
 }
 
-// §8.25 with §8.9: each specialization has its own copy of a static array
-// property, initialized with its own value parameter, and the scope form
-// `P#(5)::a` names that copy -- written through it, it reads back through it
-// and from the specialization's static method, and not through `P#(9)::`.
-// The scope form named the generic class's elements, one storage for every
-// specialization, and the static method read a third copy that held 0.
 TEST(ParameterizedClassSim, SpecializationStaticArrayIsItsOwn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -439,9 +358,6 @@ TEST(ParameterizedClassSim, SpecializationStaticArrayIsItsOwn) {
   EXPECT_EQ(out, "6 9\n11 22 11 3 0\n");
 }
 
-// §8.25 with §20.6.2: a property's packed dimension sized by `$bits` of a type
-// parameter is as wide as the type the specialization binds it to, eight bits
-// for `C #(byte)` and the default's sixteen for `C #()`.
 TEST(ParameterizedClassSim, APackedDimensionSizedByATypeParameterFollowsIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C #(type T = logic [15:0]);\n"
@@ -457,9 +373,6 @@ TEST(ParameterizedClassSim, APackedDimensionSizedByATypeParameterFollowsIt) {
             "8 16\n");
 }
 
-// §6.20.1 with §8.25: a parameter among a class's items declared with an
-// unpacked dimension is an array the class holds once, so its elements read
-// from its pattern through the class scope and from a static method alike.
 TEST(ParameterizedClassSim, BodyParameterArrayHoldsItsElements) {
   SimFixture f;
   EXPECT_EQ(
@@ -475,7 +388,6 @@ TEST(ParameterizedClassSim, BodyParameterArrayHoldsItsElements) {
       "1 2\n");
 }
 
-// Two unpacked dimensions take a nested pattern, read from an object's method.
 TEST(ParameterizedClassSim, BodyParameterArrayOfTwoDimensions) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"
@@ -490,8 +402,6 @@ TEST(ParameterizedClassSim, BodyParameterArrayOfTwoDimensions) {
             "3\n");
 }
 
-// Each specialization holds its own elements, filled with its own value
-// parameters bound, so P#(5) reads 6 where P#() reads 2.
 TEST(ParameterizedClassSim, BodyParameterArrayFollowsTheSpecialization) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class P #(int N = 1);\n"
@@ -505,9 +415,6 @@ TEST(ParameterizedClassSim, BodyParameterArrayFollowsTheSpecialization) {
             "6 2\n");
 }
 
-// §8.25 with §6.20.1: a parameter port declared with unpacked dimensions is an
-// array too, its elements filled from its default and read through the class
-// scope and from a static method of the default specialization.
 TEST(ParameterizedClassSim, PortParameterArrayHoldsItsElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C #(parameter int A[2] = '{1, 2});\n"
@@ -522,8 +429,6 @@ TEST(ParameterizedClassSim, PortParameterArrayHoldsItsElements) {
             "1 2\n");
 }
 
-// A specialization's actual for the array is its value, item by item, and one
-// overriding only another parameter keeps the array's default.
 TEST(ParameterizedClassSim, PortParameterArrayTakesTheActual) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C #(parameter int A[2] = '{1, 2}, int W = 3);\n"
@@ -536,12 +441,6 @@ TEST(ParameterizedClassSim, PortParameterArrayTakesTheActual) {
             "6 2\n");
 }
 
-// §8.25 (printed page 204): a generic class a module declares is the
-// instance's own, each instance of the module making one with its own
-// specializations, so u1's and u2's C #(4) count their own constructions,
-// and so do their default specializations; a generic class a package declares
-// is one for the whole design, P #(4) counting both instances' objects,
-// whether written through the import or behind the package's scope (§26.3).
 TEST(ClassSim, AModulesGenericClassIsEachInstancesOwn) {
   const std::string kSrc =
       "package p;\n"
@@ -576,10 +475,6 @@ TEST(ClassSim, AModulesGenericClassIsEachInstancesOwn) {
   }
 }
 
-// §8.25 with §8.23: a class nested in a module instance's own generic class is
-// that instance's own too, so K, named bare in O's method, is the instance's
-// own K and counts its objects alone, and the specialization I #(2) of the
-// nested I is the instance's own as well.
 TEST(ClassSim, AClassNestedInAnInstancesGenericClassIsItsOwn) {
   const std::string kSrc =
       "module sub;\n"
@@ -611,10 +506,6 @@ TEST(ClassSim, AClassNestedInAnInstancesGenericClassIsItsOwn) {
   }
 }
 
-// §8.25 with §8.9 and §10.5: a specialization is a type the design names, made
-// with the design, so its static properties and its methods' static locals
-// are set before the procedures start, even where only a procedure's class
-// scope prefix names it.
 TEST(ClassSpecializationSim, ProcessNamedSpecializationStaticsAreSetEarly) {
   const char* src =
       "int g = 1;\n"
@@ -632,9 +523,6 @@ TEST(ClassSpecializationSim, ProcessNamedSpecializationStaticsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "u"), 14u);
 }
 
-// §8.25 with §8.9: so are those of one a subroutine's body names -- the
-// compilation unit's, a module's, a class's method, and a method of a
-// specialization, whose own parameter is the actual.
 TEST(ClassSpecializationSim, SubroutineNamedSpecializationStaticsAreSetEarly) {
   const char* src =
       "int g = 1;\n"
@@ -659,8 +547,6 @@ TEST(ClassSpecializationSim, SubroutineNamedSpecializationStaticsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "w"), 31u);
 }
 
-// §8.25 with §8.9: so are those of one a procedure's local declaration names,
-// and of one whose actual is a parameter of the instance naming it.
 TEST(ClassSpecializationSim, DeclaredAndInstanceSpecializationsAreSetEarly) {
   const char* src =
       "int g = 1;\n"
@@ -682,9 +568,6 @@ TEST(ClassSpecializationSim, DeclaredAndInstanceSpecializationsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "v"), 21u);
 }
 
-// §8.25 with §8.9 and §23.9: so are those of one a method of a module's class
-// names with an actual reading the module's parameter, which each instance
-// gives a value of its own.
 TEST(ClassSpecializationSim, ModuleClassMethodSpecializationsAreSetEarly) {
   const char* src =
       "int g = 1;\n"

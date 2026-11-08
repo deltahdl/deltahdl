@@ -418,16 +418,6 @@ TEST(AlwaysLatchBasicSim, BeginEndBlockWithArithmetic) {
   EXPECT_EQ(q->value.ToUint64(), 0x30u);
 }
 
-// §9.2.2.3: always_latch is always_comb with extra checks a tool should make,
-// warning when the behavior is not latched logic, and everything §9.2.2.2
-// states applies to always_latch too. So the implicit sensitivity list of an
-// always_latch is the one §9.2.2.2.1 defines, including the sentence on printed
-// page 223 that expressions used in assertion action blocks do not contribute
-// to it.
-//
-// `en` is the assertion expression and is in the list; `d` is read only in the
-// pass statement and is not. `d` moves from 10 to 20 at time 1 with `en` held,
-// and `q` keeps the 13 the time-zero evaluation left it.
 TEST(AlwaysLatchBasicSim, AssertPassStatementReadStaysOutOfSensitivity) {
   SimFixture f;
   auto* q = RunAndFindVar(

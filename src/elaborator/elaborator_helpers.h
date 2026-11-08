@@ -36,65 +36,29 @@ struct RtlirParamDecl;
 struct ResolvedAttribute;
 enum class RtlirProcessKind : uint8_t;
 
-// What one instantiation asks for: the name of the cell it instantiates, and
-// where that name is written. A report about a cell no declaration answers to
-// stands at that position, so somebody whose design named a cell that is not
-// there is told which instantiation asked for it.
 struct InstantiatedCell {
   std::string_view name;
   SourceLoc loc;
 };
 
-// §23.3.1: appends to `cells` every instantiation in `items`, descending
-// through generate constructs -- whose alternatives are reached only by
-// looking inside them -- and through nested module declarations. A name two
-// instantiations write is appended twice, each with its own position, so a
-// caller that wants each name once says which of them it keeps.
 void CollectInstantiations(const std::vector<ModuleItem*>& items,
                            std::vector<InstantiatedCell>& cells);
 
-// The same walk as CollectInstantiations, reduced to the set of names it
-// reaches. Names already present stay, so a walk over the item lists of
-// several declarations accumulates into one set. Which declaration each name
-// belongs to, and whether any declaration answers to it at all, is the
-// caller's question: deciding which modules no instance names (the tops of a
-// compilation unit) and deciding whether every name reached has a declaration
-// behind it are both asked of the same set.
 void CollectInstantiatedNames(const std::vector<ModuleItem*>& items,
                               std::unordered_set<std::string_view>& names);
 
-// §5.12: the attributes `attrs`, each value folded against `scope`, the
-// constants visible where the attributes are written, and reported when it is
-// not a constant expression there.
 std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
     const ScopeMap& scope);
-// The same, where the constants visible where the attributes are written are
-// `constants`: those of `scope` and the ones whose values fold to no integer,
-// which `scope` leaves out because the values are folded against it.
 std::vector<ResolvedAttribute> ResolveAttributes(
     const std::vector<Attribute>& attrs, DiagEngine& diag,
     const ScopeMap& scope, const ScopeMap& constants);
-// §10.3.2: the name a left-hand side drives as a whole, empty where it drives
-// no single declared signal under a name. The clause admits a concatenation, a
-// select and a member access there as well as a plain name, none of which names
-// one signal, and a malformed left-hand side is absent altogether.
 std::string_view LhsSignalName(const Expr* lhs);
 
 uint32_t LookupLhsWidth(const Expr* lhs, const RtlirModule* mod);
 
-// The declared width of the variable, net or port of `mod` recorded under
-// `name`, a generate block's declaration under its prefixed name
-// (DeclaredScopedName); 0 where `mod` records none.
 uint32_t LookupNameWidth(std::string_view name, const RtlirModule* mod);
 
-// The declared type and width of the signal named `name`, whether its
-// declaration wrote an unpacked dimension, which makes a select of it name an
-// element (§7.4.6), and whether it is signed (§11.8.1). A port contributes
-// them all, like a variable or a net:
-// RtlirPort::dtype carries the type the port header declared, so a port's
-// own packed dimension is reachable from here. Empty where `name` names no
-// variable, net or port of `mod`.
 struct FoundSignalDecl {
   const DataType* dtype = nullptr;
   uint32_t width = 0;
@@ -103,115 +67,34 @@ struct FoundSignalDecl {
 };
 FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod);
 
-// The range a select on the signal named `name` in `mod` resolves its indices
-// against: the outermost packed dimension of that signal's declaration, folded
-// in `scope`. Falls back to [width-1:0] -- where an index and a bit offset
-// coincide -- in every case the simulator addresses the storage that way too:
-//
-//   - `name` names no variable, net or port of `mod`. A port answers from
-//     RtlirPort::dtype, which carries the packed dimension its header declared;
-//     the lowering records no packed range for port storage.
-//   - the declaration carries no packed dimension (an `int`, a scalar, a
-//     string), or a bound that does not fold in this scope.
-//   - a further packed dimension makes the outermost range index elements
-//     rather than bits (§7.4.1), which is the fallback
-//     Variable::BitSelectRange makes for a select addressed by bit.
-//   - the folded bounds do not span the signal's width, so a range read off
-//     them would misaddress every bit -- as RecordPackedRange requires.
-//   - a bound is negative. A synthesized index is an unsigned integer literal,
-//     so a negative index is not expressible here.
 PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
                                 const ScopeMap& scope);
 RtlirProcessKind MapAlwaysKind(AlwaysKind ak);
 
-// §9.2: the elaboration environment in which a procedural process is built and
-// added to a module -- the arena it is allocated from, the diagnostics sink for
-// its legality checks, and an optional map of subroutine declarations consulted
-// when expanding the process's sensitivity list.
 struct ProcessBuildEnv {
   Arena& arena;
   DiagEngine& diag;
   const InferenceFuncs* func_map = nullptr;
-  // §9.2.2.2.1: names that are elaboration-time constants (parameters,
-  // localparams, specparams) so the inferred sensitivity list can drop them --
-  // only nets and variables belong in the list.
   const std::unordered_set<std::string_view>* const_names = nullptr;
-  // §14.14 rule a): the event expression of the global clocking declaration in
-  // the enclosing module, interface, checker, or program instance scope, which
-  // an event control naming $global_clock in the process body is rewritten
-  // into. Null where that scope declares no global clocking, in which case the
-  // body is used as it stands and §14.14's own report of a $global_clock
-  // reference with no declaration in scope is the only account of it.
   const std::vector<EventExpr>* global_clocking_event = nullptr;
-  // §9.2.2.1 with Annex P: the tasks a call in the process can name, as
-  // Elaborator::ReachableTaskNames spells them; enabling one is a way for a
-  // general purpose always to let time advance. Null where none is consulted.
   const std::unordered_set<std::string>* task_names = nullptr;
 };
-// §5.12: `params` is the parameter scope the attributes the process is written
-// with fold their values against.
 void AddProcess(RtlirProcessKind kind, ModuleItem* item, RtlirModule* mod,
                 const ProcessBuildEnv& env, const ScopeMap& params);
-// The process a static assertion, the assertion item `item`, is modeled as
-// (§16.4.3, §16.14.5). The attributes the assertion is written with are the
-// item's, which RecordNodeAttributes resolves into RtlirModule::node_attrs and
-// §37.83's view reads there; resolving them onto the process as well would
-// make each §5.12 report about them twice.
 void AddStaticAssertionProcess(RtlirProcessKind kind, ModuleItem* item,
                                RtlirModule* mod, const ProcessBuildEnv& env);
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
                        const ScopeMap& scope);
 
-// §28.3.6: expands an instance array written with a range into one instance per
-// array element, calling `elaborate_element` once for each with `item` holding
-// that element's own terminal list -- a terminal as wide as the array replaced
-// by its [p] bit-select, so the LSB reaches the element at the right-hand index
-// of the range, and a single-bit terminal left as it stands so every element
-// sees it. The whole terminal list is restored before returning, so `item` is
-// left as the caller passed it.
-//
-// The array length is InstanceArrayLength below: §28.3.5's count, read off the
-// range the declaration wrote. It was read off the widest terminal instead, on
-// the grounds that a source satisfying §28.3.6 makes the two the same number,
-// which the clause does not - a terminal may be scalar as well as
-// array-length, and an array whose terminals were all scalar was built as one
-// instance. CheckGateInstanceArrayTerminalWidths
-// (src/elaborator/elaborator_items.cpp) measures a terminal against the same
-// count, so what a terminal was checked against is what is built.
-//
-// Returns false, having called `elaborate_element` no times, when the range
-// declares a single instance or carries a bound this pass cannot fold: the
-// caller then elaborates `item` as the one instance it already is.
-//
-// Shared because §29.8 makes this one rule for two kinds of instance -- an
-// array of user-defined primitive instances connects its terminals by the
-// terminal connection rules of §28.3.6, the rules an array of gates connects
-// by.
 bool ExpandInstanceArray(
     ModuleItem* item, const RtlirModule* mod, Arena& arena,
     const ScopeMap& scope,
     const std::function<void(ModuleItem*)>& elaborate_element);
 
-// §28.3.5: how many instances the range written on an instance name declares -
-// the range sets the instance array's size - which is the count of values its
-// two bounds span, in either order. A.3.1 admits the range on every primitive
-// through `[ name_of_instance ]`, and §29.8 admits it on a user-defined
-// primitive on the same terms, so this is what says how many instances any of
-// those declarations makes.
-//
-// Absent where `item` carries no range, and where a bound is not a constant
-// this pass can fold against `scope`: such a range is not one §28.3.5 admits,
-// and CheckGateInstanceArrayTerminalWidths reports it.
-// Defined in elaborator_gates.cpp.
 std::optional<uint32_t> InstanceArrayLength(const ModuleItem* item,
                                             const ScopeMap& scope);
 
-// §6.22.6: a nettype matches itself and the nettype of nets declared using it,
-// and a renaming alias of a user-defined nettype matches the nettype it
-// renames. Two nettype names match when they resolve to the same canonical
-// (source) nettype; `nettype_canonical` maps each nettype name to its canonical
-// name.
 bool NettypesMatch(std::string_view a, std::string_view b,
                    const std::unordered_map<std::string_view, std::string_view>&
                        nettype_canonical);
@@ -221,36 +104,19 @@ void ValidateBidirectionalSwitchConnections(
     const std::unordered_map<std::string_view, std::string_view>&
         nettype_canonical);
 
-// §28.16: true when this item carries any delay expression, so the parameter
-// scope a delay is folded against is built for the items that have one and not
-// for every item in the module.
 bool ItemCarriesDelay(const ModuleItem* item);
 
-// §28.16: report each of this item's delays that folds to a negative value. A
-// delay is the time between two events and has no negative form, and a value
-// cast into the unsigned tick counts the model runs on becomes an enormous
-// positive one instead.
 void ValidateItemDelaysNonNegative(const ModuleItem* item,
                                    const ScopeMap& scope, DiagEngine& diag);
 
-// §4.9.6: reports a primitive instance's output or inout terminal wider than
-// one bit. `names` places the instance among the module's generate blocks, so
-// a terminal naming a block's own net is measured as that net.
 void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const RtlirModule* mod,
                                            const ScopeMap& scope,
                                            const ScopedDeclarations& names,
                                            DiagEngine& diag);
 
-// The indices of the terminals a gate or user-defined primitive instance
-// drives: A.3.1's output and inout terminals of a gate, and a UDP instance's
-// one output terminal (A.5.4).
 std::vector<size_t> PrimitiveDrivenTerminalIndices(const ModuleItem* item);
 
-// A.3.3 and A.5.4 with A.8.5: reports each terminal a gate or user-defined
-// primitive instance drives that names a parameter or selects with an
-// expression that is not constant. `scope` holds the constants a select may
-// name, and `gen_scopes` the generate blocks the instance stands in.
 void ValidatePrimitiveDrivenTerminals(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::vector<std::string_view>& gen_scopes, DiagEngine& diag);
@@ -260,25 +126,10 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype);
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
                            const TypedefMap& typedefs, const ScopeMap& scope);
 
-// §11.5.1: records on `pd` the two bounds of the packed range its declaration
-// was written with, folded in `scope`. The declared width does not answer which
-// bit an index reaches -- the clause sets `logic [15:0] acc` beside
-// `logic [2:17] acc` and observes that one value of an index addresses a
-// different bit in each -- so a select on the parameter needs the bounds
-// themselves. Leaves `pd` untouched, and its has_decl_range_bounds flag clear,
-// when the declaration carries no packed range or a bound that does not fold
-// here; the parameter is then addressed as [width-1:0], where an index and a
-// bit offset are the same number.
 void RecordParamDeclRange(RtlirParamDecl& pd, const DataType& dtype,
                           const ScopeMap& scope);
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd);
-// §23.10 with §6.20.2: the real an override's expression folds to where the
-// expression is real (HasRealOperand), else empty; the same real rounded as
-// §6.12.1 converts a real to an integer; and the realness the override leaves
-// the parameter with -- real for a parameter declared real or untyped under
-// a real override, real for one declared real under an integral one, and
-// integral otherwise. Defined in elaborator_module_params.cpp.
 std::optional<double> RealOverrideValue(const Expr* expr,
                                         const ScopeMap& scope);
 int64_t RoundRealToInteger(double value);
@@ -286,175 +137,56 @@ void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real);
 
 bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype);
 
-// §6.20.2: a parameter declared with a real type takes a real value. Folding it
-// as an integer either loses the fraction or fails outright, and a failure
-// leaves the parameter unresolved -- which is not a value at all, so nothing is
-// lowered for it and a reference finds no such name at run time. Keeps the
-// double on `pd` and marks it, so the lowering can reproduce it as the real it
-// is. Returns false, leaving `pd` untouched, when `dtype` is not a real type or
-// `init` does not fold to a real constant; a parameter declared in either of
-// the two syntactic positions -- a parameter port or a module item -- is
-// resolved through this before the integer folds are tried.
 bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
                            const DataType& dtype, const ScopeMap& scope);
 
-// §6.16: records on `pd` the characters of a string parameter's value, so that
-// a later fold can read the length §6.16.1's `len()` returns. Leaves
-// resolved_value alone, which the §11.10 packed fold has already written and
-// which the rest of the elaborator reads. The characters are copied into
-// `arena` because resolved_string is a std::string_view. Leaves `pd`
-// untouched, and its is_string_value flag clear, when `dtype` is not `string`
-// -- §5.13 associates `len()` with `string` alone -- or `init` does not fold to
-// a constant string.
 void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
                             const DataType* dtype, Arena& arena);
 
-// The same recording without the check on the declared type, for a caller that
-// already knows the parameter holds a string value and is replacing the
-// characters rather than establishing them. Returns false, leaving `pd`
-// untouched, when `init` does not fold to a constant string -- which tells such
-// a caller that the characters it meant to replace are still the old ones.
 bool RecordStringParamChars(RtlirParamDecl& pd, const Expr* init, Arena& arena);
 
 std::string_view ExprIdent(const Expr* e);
-// Defined in elaborator_validate_queries_dims.cpp.
 bool SelectPathIsConstant(const Expr* e, const ScopeMap& scope);
-// §11.5.1: the bits a constant select spans, 0 where a bound does not fold.
-// Defined in elaborator_cont_assign.cpp.
 uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope);
 const ClassDecl* FindClassDecl(std::string_view name,
                                const CompilationUnit* unit);
 
-// Whether `decl`'s parameter port list declares a value parameter with no
-// default, which only an instance overriding it gives a value. Defined in
-// elaborator_module_params.cpp.
 bool HasParamPortWithoutDefault(const ModuleDecl* decl);
 
-// §8.13: the class `cls` extends, its `extends` name resolved from the scope
-// declaring `cls` (§3.13, §23.9, §26.3): the class of the name the package its
-// name is written through declares, else that scope's own class of the name,
-// one it imports, or the compilation unit's. A class standing in a generate
-// block or in another class, whose scope is none of those, and a name that
-// scope does not resolve, are answered by FindClassDecl. Null for a class
-// extending nothing. Defined in elaborator_validate_struct_types.cpp.
 const ClassDecl* FindBaseClass(const ClassDecl* cls,
                                const CompilationUnit* unit);
 
-// Every class the unit declares, wherever it is declared: the compilation
-// unit's own list, which the parser fills from the classes at the top of a
-// file alone, then the class items of each module, interface, program,
-// checker and package, in that order, with those of the generate blocks in
-// their bodies, each followed by the classes nested in its body (§8.23). §8.1
-// lets a class be declared wherever a data declaration may appear, so a rule
-// that walks the unit's own list passes over a class written inside a module; a
-// rule that walks this sees every one. Defined in
-// elaborator_validate_struct_types.cpp.
 std::vector<const ClassDecl*> AllClassDecls(const CompilationUnit* unit);
 
-// §6.23: takes onto `dt` the type its type reference stands for, `type`, in
-// place of the reference: the type's kind, signing, name, the package or
-// class scopes the name is written behind, the parameter values a class's
-// name is specialized with (§8.25), and packed dimensions. What the
-// declaration itself says, a net type keyword or `const`, stays as `dt` holds
-// it. Defined in type_ref_walks.cpp.
 void AdoptReferencedType(DataType& dt, const DataType& type);
 
-// §6.23 with §26.2 and §3.12.1: resolves in place the type reference `dt`
-// holds, whose argument is a name, against `items`, the declarations of the
-// package or the compilation unit it is written in: the built-in type the
-// name spells, a typedef of the scope, by its name, which the typedef tables
-// resolve, or a value of the scope, by the type its declaration writes. A
-// reference to none of these, or whose argument is an expression, is left as
-// it stands. Defined in elaborator_validate_struct_types.cpp.
 void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
                          Arena& arena);
 
-// §6.23: takes onto `dt`, in place of its type reference, the self-determined
-// type `type` of the expression the reference names: a structure, union or
-// enumeration whole, keeping the declaration's own `const`, and any other type
-// as AdoptReferencedType takes it. A logic bit where the expression is of no
-// type a data type alone carries. Defined in
-// elaborator_validate_struct_types.cpp.
 void AdoptExpressionType(DataType& dt, const std::optional<DataType>& type,
                          Arena& arena);
 
-// Whether any identifier or callee anywhere in `e` is one of `names`. A caller
-// that has failed to fold an expression asks this to tell a value it cannot
-// compute yet from one it can never compute.
 bool ExprMentionsAny(const Expr* e,
                      const std::unordered_set<std::string_view>& names);
 
-// Every parameter name `cls` declares: its type parameters, its #() parameter
-// ports and its body parameter declarations. §6.20.1 gives such a name no value
-// until the class is specialized, so an expression mentioning one is not a
-// constant expression that failed to fold.
 std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls);
 
-// §23.10.2 with §8.25: whether `e`, the value a specialization of a class
-// assigns one of its value parameters, is a constant expression over `scope`.
-// §6.20.2 lets that value be integral or real, and §6.20.7 lets it be `$`, so
-// it folds as either kind of constant or is `$` itself. Defined in
-// elaborator_class_params.cpp.
 bool IsConstantClassParamValue(const Expr* e, const ScopeMap& scope);
 
-// §6.20.7 and §6.20.2: the parameters among `items`, a module's or the
-// compilation unit's declarations, whose value is a constant a ScopeMap
-// cannot carry -- `$`, a real, or the name of one of those -- so that an
-// override naming one is known constant where the integer fold of the scope,
-// `values`, cannot say so. Defined in elaborator_class_params.cpp.
 std::unordered_set<std::string_view> NonIntegralParamNames(
     const std::vector<ModuleItem*>* items, const ScopeMap& values);
 
-// §8.23: the type that the class-scoped name `cls_name::type_name` denotes,
-// where `cls_name` names a class and `type_name` names a typedef declared in
-// its body. Returns null when no such class is visible or the class declares no
-// such typedef. §8.23 names the type operator as one of the contexts a class
-// scope resolution may appear in, so both forms of that operator -- the data
-// type `type(C::T)` and the expression form of a type parameter default --
-// resolve their prefix through this. Defined in
-// elaborator_validate_struct_types.cpp.
 const DataType* FindClassScopedTypedefType(std::string_view cls_name,
                                            std::string_view type_name,
                                            const CompilationUnit* unit);
 
-// §8.23: the typedef declaration whose type FindClassScopedTypedefType
-// answers, which also holds the unpacked dimensions the typedef writes; null
-// where that answers null. Defined in elaborator_validate_struct_types.cpp.
 const ModuleItem* FindClassScopedTypedefItem(std::string_view cls_name,
                                              std::string_view type_name,
                                              const CompilationUnit* unit);
 
-// §8.23: rewrites `dtype` in place when it is a type name carrying a class
-// scope prefix -- the `Cfg::my_type` of `Cfg::my_type x;` -- and that prefix
-// names a visible class declaring that typedef. Returns false, leaving `dtype`
-// untouched, wherever that does not hold. Defined in
-// elaborator_validate_struct_types.cpp.
-//
-// `typedefs` is asked first and left in charge wherever it answers, because
-// "scope_name::type_name" is also the key a package typedef and a
-// compilation-unit class typedef are recorded under, and the class walk cannot
-// tell a package from a class of the same name. What this adds is the case that
-// key never covers: RegisterClassTypedefs fills the map from
-// CompilationUnit::classes, which the parser fills from a top-of-file class
-// alone, so a class written inside a module contributes no key at all.
-// FindClassDecl reaches one, which is why `type(Cfg::my_type)` resolves against
-// a module-local class while the bare declaration beside it sized itself at
-// zero bits and unsigned.
-//
-// Registering module-local classes into the map instead would be the other way
-// round, and TypedefMap is one flat map for the whole compilation unit: two
-// modules each declaring a `class Cfg` would write one "Cfg::my_type" key and
-// silently take each other's type. FindClassDecl answers null on that ambiguity
-// through TakeUniqueMatch.
-//
-// DataType::scope_name is left as written rather than cleared, so a prefix that
-// a later pass judges under §8.23's restriction on which contexts may carry one
-// still has the prefix to judge.
 bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
                                 const CompilationUnit* unit);
 
-// What RegisterClassTypedefKeys records a class's typedefs into, and the unit
-// it looks the class's base classes up in.
 struct ClassTypedefTables {
   const CompilationUnit* unit;
   TypedefMap& typedefs;
@@ -462,121 +194,39 @@ struct ClassTypedefTables {
   Arena& arena;
 };
 
-// §8.23: records every typedef `cls` declares under its "scope::name" key, and
-// each typedef of a class nested in it, at any depth, under the nested class's
-// path, "C::N::T", so a type written through its class reaches the type the
-// typedef stands for. `scope` is the key's leading part, the class's own name
-// for a class at compilation-unit scope or in a module. §7.4.4 keeps an array
-// typedef's unpacked dimensions with the type, and they are recorded in
-// `td_array_dims` under the same key. A typedef written as the name of a
-// typedef the class declares before it, or of one a base class declares
-// (§8.13), is recorded behind the declaring class's key, and so is such a name
-// written as a member of a structure or union (InTypedefScopes, §23.9).
-// Defined in elaborator_resolve.cpp.
 void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
                               const ClassTypedefTables& tables);
 
-// §8.23: a type name in use has to resolve to a type once elaboration is done.
-// Reports a declared type whose class scope prefix names a visible class that
-// declares nothing under that name, which otherwise sizes the declared object
-// at zero bits and says nothing at all. `loc` is where the declaration stands.
-// Defined in elaborator_validate_struct_types.cpp.
-//
-// Only that one shape is reported, and the guards are what keep the report off
-// the other prefixes the same clause admits: the left operand may be a class
-// type name, package name (§26.2), covergroup type name, coverpoint name, cross
-// name (§19.5, §19.6), typedef name or type parameter name, and FindClassDecl
-// answering a class is what separates the first from the rest. A prefix this
-// tool resolves by no route stays as silent as it was rather than becoming a
-// report about a legal declaration. A class that extends another is left alone
-// for the same reason, since the members walked are the class's own and not the
-// ones it inherits, and a prefix carrying specialization arguments is
-// ResolveParameterizedType's to resolve.
 void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
                                      const TypedefMap& typedefs,
                                      const CompilationUnit* unit,
                                      DiagEngine& diag);
 
-// §8.23: the key the simulator holds a nested class under, `Outer::Inner`,
-// when `dtype` is written `Outer::Inner` and the class `Outer` reaches
-// declares a class named `Inner`; empty for any other type. The declared
-// variable is then a class handle of that key rather than a value of a type
-// nothing resolved. Defined in elaborator_validate_struct_types.cpp.
 std::string_view NestedClassKey(const DataType& dtype,
                                 const CompilationUnit* unit, Arena& arena);
 
-// §14.11 (printed page 361): reports a ## written in a package's task or
-// function, or in a method of a class the package declares, none of which has
-// a default clocking. Defined in elaborator_validate_clocking.cpp.
 void ValidatePackageCycleDelays(const CompilationUnit* unit, DiagEngine& diag);
 
-// §14.11 (printed page 361): reports each cycle delay of `decl`'s procedural
-// code whose count folds, against `scope`, to a negative constant. Defined in
-// elaborator_validate_clocking_signals.cpp.
 void ValidateCycleDelayCounts(const ModuleDecl* decl, const ScopeMap& scope,
                               DiagEngine& diag);
 
-// §26.3 (printed page 808): the key the simulator holds a package's class
-// under, `p::C`, when `dtype` is written `p::C` and the package `p` declares a
-// class named `C`, or is written through a typedef of `p`'s, `p::bt`, whose
-// chain of `typedefs` ends at a class, `C` of `p` or `q::C` of `q` (§6.18);
-// empty for any other type. The package scope resolution operator reaches the
-// class without an import of the package. Defined in
-// elaborator_validate_struct_types.cpp.
 std::string_view PackageClassKey(const DataType& dtype,
                                  const TypedefMap& typedefs,
                                  const CompilationUnit* unit, Arena& arena);
 
-// §8.25: rewrites `dtype` in place when it names a member of a specialization
-// of a parameterized class, substituting the arguments DataType::type_params
-// carries for the class's own parameters. Returns false, leaving `dtype`
-// untouched, when it carries no arguments, when its scope_name reaches no
-// visible class, or when the member it names does not alias one of the
-// substituted parameters. Both the declared form `C#(int)::T v;` and the
-// override form `child #(.P(C#(int)::T)) u();` resolve through this, so a
-// caller outside Elaborator passes the compilation unit rather than reading it
-// off a member. `loc` is where the specialization was written, and is the
-// position of the §23.10.2.2 reports the arguments earn: a named argument
-// carrying a name the class does not declare, and one assigning a name a second
-// argument already assigned. Defined in elaborator_validate_struct_types.cpp.
 bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
                               DiagEngine& diag, SourceLoc loc);
 bool IsRealType(DataTypeKind k);
 
-// §11.5.2 fixes how many addresses a select may carry before §11.5.1 judges it:
-// a bit-select or part-select of an array element first selects the word, one
-// address per dimension, and is then addressed as a net's or a variable's
-// select is (§11.5.1). So a select chain written on a declaration is measured
-// against the dimensions that declaration has, and the address after the last
-// of them is the one §11.5.1 rules on.
-//
-// `addressable_dims` counts the unpacked dimensions and the vector dimensions
-// together, because an address spends one of either. A packed dimension
-// contributes one, and an integer atom type or a packed aggregate contributes
-// one for the implicit vector it presents. The two flags say which alternative
-// of §11.5.1's rule barring a bit-select or part-select of a scalar, a real
-// variable or a real parameter the operand at that depth falls under, and a
-// declaration whose operand falls under neither gets no entry.
 struct VarSelectShape {
   size_t addressable_dims = 0;
   bool element_is_real = false;
   bool element_is_scalar = false;
 };
 
-// Constructs the implicit net that an identifier acquires when it is used as a
-// port expression. This is the single point shared by two subclauses: §6.10
-// fixes the net's kind and size -- the default net type, sized to the vector
-// width of the port expression declaration -- while §23.2.2.1 fixes its
-// signedness -- such a net is unsigned unless the port itself is declared
-// signed. Both subclauses depend on the same materialization, so they share it.
 RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
                              bool port_is_signed, NetType default_nettype);
 
-// §6.6.7: the structural constraints a user-defined resolution function for a
-// nettype whose data type is T must satisfy. The function shall return T, take
-// a single input argument that is a dynamic array of T, and be automatic (hold
-// no state). A class method used as a resolution function shall be a static
-// method, since it is called in a context where no class object is involved.
 struct NettypeResolutionSig {
   bool return_type_matches_nettype = false;
   bool single_input_argument = false;
@@ -588,9 +238,6 @@ struct NettypeResolutionSig {
   bool is_static_method = false;
 };
 
-// The §6.6.7 requirement a resolution-function signature breaks, one value per
-// requirement the clause states, so a report can name the one that failed.
-// kConforming is the signature that breaks none of them.
 enum class NettypeResolutionRule : uint8_t {
   kConforming,
   kReturnType,
@@ -602,50 +249,19 @@ enum class NettypeResolutionRule : uint8_t {
   kClassStaticMethod,
 };
 
-// Returns the first §6.6.7 requirement `sig` breaks, or kConforming.
 NettypeResolutionRule ValidateNettypeResolutionFunction(
     const NettypeResolutionSig& sig);
 
-// §33.6.1: how far into a library search order `library` sits. Absent a
-// configuration the order is the one the library map declared its libraries in,
-// and a name reaches the cell held by the first library searched that holds
-// one, so a smaller position is reached first. A library the order does not
-// name is searched after every library it does.
 size_t LibrarySearchPosition(std::string_view library,
                              const std::vector<std::string>& order);
 
-// §33.4.1.5, §33.6.2: whether a library list a configuration selected is in
-// force over `order`. A default clause names the libraries to search and so
-// replaces the order the library map established with the one it names, which
-// `strict` records. A list naming no library selects nothing, and selecting
-// nothing is what having selected no list already means, so an empty order is
-// not a list in force.
 bool SelectedLibraryListInForce(const std::vector<std::string>& order,
                                 bool strict);
 
-// §33.6.2: whether a library list in force over `order` leaves `library` out.
-// A library the selected list does not name is not searched, so a description
-// held only by such a library is not used at all -- it is not merely ranked
-// behind the listed ones. Answers false wherever no list is in force, since
-// then no library is left out.
 bool LibraryExcludedBySelectedList(std::string_view library,
                                    const std::vector<std::string>& order,
                                    bool strict);
 
-// §33.6.4: the library list an instance selection clause put in force over the
-// instance at `inst_path`, or nullptr when no clause in `overrides` covers it.
-// Each entry pairs the path a clause named with the list it named there. Such a
-// list governs the instance the clause names and is inherited by every
-// descendant of that instance, so a path is covered both by a clause naming it
-// outright and by a clause naming any of its ancestors. Inheritance runs down
-// the hierarchy rather than across the spelling of a name, so a clause path
-// counts as an ancestor only when the whole of it is matched and the next
-// character of the covered path opens a further level: `top.a` names no
-// ancestor of `top.a1`. Where two clauses cover one path, the longer -- the one
-// naming the nearer ancestor -- is the one that governs. The returned list is
-// owned by `overrides`.
-// §33.3 and §33.5.4: the library and the cell a lib.cell name gives, the
-// library empty where the name is a cell's alone.
 inline std::pair<std::string_view, std::string_view> SplitLibCell(
     std::string_view name) {
   const std::size_t kDot = name.find('.');
@@ -653,54 +269,20 @@ inline std::pair<std::string_view, std::string_view> SplitLibCell(
   return {name.substr(0, kDot), name.substr(kDot + 1)};
 }
 
-// §33.4.3: whether an expression of kind `k` is a literal, the only value a
-// configuration's localparam may be set to.
 bool IsLiteralKind(ExprKind k);
 
-// §23.6: `parent`, a hierarchical instance path, extended by an instance named
-// `inst_name` that sits inside the generate block instances `gen_steps`, each
-// of those a level of its own and a loop generate block's written with its
-// index. An unnamed generate block adds an empty level, which no written path
-// matches (§27.6).
 std::string HierInstancePath(std::string_view parent, const HierPath& gen_steps,
                              std::string_view inst_name);
 
-// §33.2.1: the primitive named `cell` that `library` holds, or nullptr when it
-// holds no such primitive. A primitive is one of the kinds of design element a
-// library holds a cell of, and it is the one kind a search over modules,
-// interfaces, programs and checkers does not reach, so a name bound outright to
-// a library's cell is looked for here as well as there.
 UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
                           CompilationUnit* unit);
 
-// §33.4.1.4: whether a cell selection clause qualified by `src_lib` reaches
-// the cell named `name`. Qualifying the selection with a library confines it
-// to the cell that library itself defines, so the clause selects nothing when
-// the named library defines no cell of the name -- of any kind a library holds
-// a cell of, a primitive included. An unqualified clause, which leaves
-// `src_lib` empty, selects the name wherever it appears.
 bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
                             CompilationUnit* unit);
 
-// §33.2.1: the names under which the compilation unit's libraries hold cells
-// that are not configurations. A library is a collection of cells, a cell is a
-// design element, and a cell carries the name of the design element it was
-// made from -- so a module, a primitive, an interface, a program and a checker
-// each contribute their own declared name. A configuration is a design element
-// too, and is left out here on purpose: this set answers whether a name reaches
-// a cell other than a configuration, which is what decides whether naming the
-// configuration takes the ':config' extension.
 std::unordered_set<std::string_view> NonConfigCellNames(
     const CompilationUnit* unit);
 
-// §33.2.1: whether the use clause of `rule` names a configuration rather than
-// an ordinary cell. The ':config' extension names one explicitly, and it shall
-// be written wherever a configuration shares its name with a module or a
-// primitive, because the plain name reaches the module or primitive there. A
-// name carried by no other design element is unambiguous on its own, so the
-// extension is optional and the plain name still reaches the configuration.
-// `cfg` is the configuration the rule was written in; a configuration does not
-// name itself.
 bool UseClauseNamesConfig(const ConfigRule* rule, const ConfigDecl* cfg,
                           const CompilationUnit* unit);
 

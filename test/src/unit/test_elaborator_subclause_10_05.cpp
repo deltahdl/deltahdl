@@ -72,11 +72,6 @@ TEST(VarDeclAssignmentElaboration, StaticClassMemberWithInitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.5 draws the net-vs-variable distinction directly: an identically
-// written `= expr` makes a net a continuously assigned net but makes a
-// variable an initialization. Even when a continuous assignment is present
-// in the module, the variable's initializer must not be swept into the
-// continuous-assignment list; it stays an initializer on the variable.
 TEST(VarDeclAssignmentElaboration, NetVsVariableDeclAssignmentDistinction) {
   ElabFixture f;
   auto* design = Elaborate(

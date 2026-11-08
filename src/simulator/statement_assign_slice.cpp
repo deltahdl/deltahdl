@@ -20,40 +20,19 @@
 
 namespace delta {
 
-// §7.4.6's assignments between unpacked arrays taken element by element: a
-// slice of one written from a slice of another or from a packed value
-// (TryUnpackedSliceAssign), and a subarray copied element by element
-// (TrySubarrayAssign).
-
-// §7.4.6: destination window of an unpacked-array slice assignment, i.e. the
-// elements `base[dst_lo .. dst_lo+dst_count)` each `elem_width` bits wide.
 struct UnpackedSliceTarget {
   std::string_view base;
   uint32_t dst_lo;
   uint32_t dst_count;
   uint32_t elem_width;
-  // The declared direction of the array the window is cut from. `dst_lo` is the
-  // numerically lowest index either way, so this is what says which end of the
-  // window receives the first source element.
   bool is_descending;
 };
 
-// The index that position `i` of the destination window occupies, counting
-// positions in the declared order of the array rather than by ascending index.
 static uint32_t SliceTargetIndex(const UnpackedSliceTarget& dst, uint32_t i) {
   return dst.is_descending ? (dst.dst_lo + dst.dst_count - 1 - i)
                            : (dst.dst_lo + i);
 }
 
-// When no element-wise source was collected, evaluate the rhs as a single
-// packed value and split it into `dst.dst_count` element-width slices.
-//
-// The concatenation a slice reads as puts the lowest-indexed element in the low
-// bits, so the low field belongs to index `dst_lo` whichever way the array
-// runs. The writer places source position i by declared order, so on a
-// descending destination the low field is the last position rather than the
-// first, and the fields are emitted from the top down to land where they came
-// from.
 static void FillSliceSourceFromPacked(const Stmt* stmt,
                                       const UnpackedSliceTarget& dst,
                                       SimContext& ctx, Arena& arena,
@@ -69,14 +48,6 @@ static void FillSliceSourceFromPacked(const Stmt* stmt,
   }
 }
 
-// Write the collected source elements into the destination slice elements
-// `dst.base[dst.dst_lo .. dst.dst_lo+dst.dst_count)`, resizing/coercing as for
-// a scalar write. Source position i fills the window's i'th element in the
-// destination array's declared order: §7.4.5 makes both sides unpacked arrays,
-// and §7.6 pairs one with another by position rather than by index, matching
-// elements by their left-to-right order in each array. §7.6 also settles the
-// window itself, since it treats an assignment to a slice as one assignment to
-// the whole slice.
 static void WriteUnpackedSliceElements(const UnpackedSliceTarget& dst,
                                        const std::vector<Logic4Vec>& src,
                                        SimContext& ctx, Arena& arena) {
@@ -101,9 +72,6 @@ bool TryUnpackedSliceAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   UnpackedSliceTarget dst{lhs->base->text, dst_lo, dst_count,
                           dst_info->elem_width, dst_info->is_descending};
   std::vector<Logic4Vec> src;
-  // The collector answers each element with a copy of its own, so its entries
-  // are the destination's to keep; the packed fallback builds its fields fresh
-  // and owns them likewise.
   if (!CollectUnpackedSliceElements(stmt->rhs, ctx, arena, src) || src.empty())
     FillSliceSourceFromPacked(stmt, dst, ctx, arena, src);
   WriteUnpackedSliceElements(dst, src, ctx, arena);
@@ -122,26 +90,17 @@ static bool IsCompoundSelect(const Expr* expr) {
          expr->base->kind == ExprKind::kSelect && !expr->index_end;
 }
 
-// §7.4.4: a fixed-size array, or the subarray a select of one names by
-// omitting its fastest-varying indices -- `A[1]` of `int A[2][3]`,
-// `A[0][2]` of `int A[2][3][4]` -- as the names of its elements in the
-// positional order §7.6 pairs two arrays by, and the sizes of its remaining
-// dimensions.
 struct SubarrayElems {
   std::vector<std::string> names;
   std::vector<uint32_t> shape;
 };
 
-// One dimension of a fixed-size array as §7.6 walks it: its low bound, its
-// element count, and whether it is declared from the higher bound down.
 struct DeclaredDim {
   uint32_t lo;
   uint32_t size;
   bool descending;
 };
 
-// The dimensions `info` records, outermost first: a multidimensional array's
-// each, a one-dimensional array's one.
 static std::vector<DeclaredDim> DeclaredDims(const ArrayInfo& info) {
   std::vector<DeclaredDim> dims;
   if (info.dim_sizes.size() < 2 ||
@@ -157,9 +116,6 @@ static std::vector<DeclaredDim> DeclaredDims(const ArrayInfo& info) {
   return dims;
 }
 
-// Appends the name of every element under `prefix` across `dims` from `d`
-// on, each dimension walked from its left bound (§7.6 matches elements by
-// their left-to-right order in each array).
 static void AppendLeftToRight(const std::vector<DeclaredDim>& dims, size_t d,
                               const std::string& prefix,
                               std::vector<std::string>& out) {
@@ -175,8 +131,6 @@ static void AppendLeftToRight(const std::vector<DeclaredDim>& dims, size_t d,
   }
 }
 
-// `expr` as a whole fixed-size array or one of its subarrays, into `out`;
-// false for an expression naming an element, a slice or anything else.
 static bool ResolveSubarray(const Expr* expr, SimContext& ctx, Arena& arena,
                             SubarrayElems& out) {
   std::vector<const Expr*> indices;
@@ -203,10 +157,6 @@ static bool ResolveSubarray(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The element values of the source of an assignment to the subarray `dst`:
-// another fixed-size array or subarray of its shape, or a dynamic array or
-// queue of its element count; false where the source is none of these, and
-// a §7.6 error, the assignment writing nothing, where the sizes differ.
 static bool SubarraySourceValues(const Stmt* stmt, const SubarrayElems& dst,
                                  SimContext& ctx, Arena& arena,
                                  std::vector<Logic4Vec>& vals) {
@@ -237,11 +187,6 @@ static bool SubarraySourceValues(const Stmt* stmt, const SubarrayElems& dst,
   return true;
 }
 
-// §7.4.4 with §7.6: an assignment one of whose sides is a subarray of a
-// multidimensional fixed-size array, `A[1] = B[0]`, `A[0][2] = C[0]`,
-// `R = B[1]`, or a dynamic array assigned to such a subarray, copies element
-// by element by position. False where neither side is a select naming a
-// subarray or the other side is no array.
 static bool TryFixedSubarrayAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   if (stmt->rhs == nullptr || (stmt->lhs->kind != ExprKind::kSelect &&
@@ -262,11 +207,6 @@ static bool TryFixedSubarrayAssign(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// §10.9.1 with §7.4.4: an assignment pattern assigned to a subarray of a
-// multidimensional fixed-size array, `A[1] = '{6, 4, 9}` or `M[1] =
-// '{'{1, 2}, '{3, 4}}`, fills it element by element as it fills an array of
-// the subarray's shape. Taken as one value written into a select, the pattern
-// wrote no element.
 static bool TrySubarrayPatternAssign(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (stmt->lhs->kind != ExprKind::kSelect || stmt->rhs == nullptr ||
@@ -290,13 +230,6 @@ bool TrySubarrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!BuildCompoundLhsName(stmt->rhs, ctx, arena, src_prefix)) return false;
   std::string match = src_prefix + "[";
   std::vector<std::pair<std::string, Logic4Vec>> elems;
-  // Each element of the source subarray is a storage element of its own under
-  // §6.8, so the run is copied where it is gathered rather than shared with
-  // the destination's elements. This handler runs ahead of the right-hand
-  // value the statement executor makes and gathers its own, so none of that
-  // value's copy reaches here; and the store below neither resizes nor
-  // coerces, so `b = a` was quiet where it paired the elements up and the
-  // shared words only showed on the next write to either array.
   for (const auto& [vname, vptr] : ctx.GetVariables()) {
     if (vname.starts_with(match))
       elems.emplace_back(std::string(vname.substr(src_prefix.size())),

@@ -365,15 +365,6 @@ TEST(IdentifierSyntaxParsing, InterfacePortIdentifierAsModulePort) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The right-hand operand of the one relation held by the inline constraint
-// block of the randomize call that the parsed module's initial block tests,
-// `initial if (obj.randomize() with { x == local::y; }) ;`.
-//
-// A constraint block states its relations as expressions, so a test about the
-// syntax admitted on one side of a relation parses a single relation and reads
-// that side back. A.10 footnote 48 confines `local::` to an inline constraint
-// block, so the relation stands in one. Returns nullptr when no initial block
-// testing such a call, no single relation, or no binary relation was produced.
 const Expr* SoleInlineRelationRhs(const CompilationUnit* cu) {
   if (cu == nullptr || cu->modules.empty()) return nullptr;
   for (const ModuleItem* item : cu->modules[0]->items) {
@@ -388,12 +379,6 @@ const Expr* SoleInlineRelationRhs(const CompilationUnit* cu) {
   return nullptr;
 }
 
-// §A.9.3: ps_type_identifier admits a "local ::" scope prefix (footnote 48),
-// which names a value in the enclosing scope of an inline randomize()...with
-// constraint rather than the randomized object (see 18.7.1). The parser accepts
-// "local::name" as a scope-resolution chain, so the constraint relation that
-// references it is captured; without that acceptance the speculative relation
-// parse bails on the 'local' keyword and drops the relation entirely.
 TEST(IdentifierSyntaxParsing, LocalScopePrefixInConstraintRelation) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -418,9 +403,6 @@ TEST(IdentifierSyntaxParsing, LocalScopePrefixInConstraintRelation) {
   EXPECT_EQ(rhs->rhs->text, "y");
 }
 
-// §A.9.3: a ps_type_identifier is a simple_type, so the "local ::"-prefixed
-// form may serve as the casting_type of a cast ("local::T'(expr)"). Verify the
-// scoped type name is parsed as the cast's target type.
 TEST(IdentifierSyntaxParsing, LocalScopePrefixCastType) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -448,10 +430,6 @@ TEST(IdentifierSyntaxParsing, LocalScopePrefixCastType) {
   EXPECT_EQ(casting_type->rhs->text, "word_t");
 }
 
-// §A.9.3: ps_type_identifier's class_scope alternative — a type nested in a
-// class is named by qualifying it with the class ("C::T"). This exercises the
-// third prefix form of the production (the package_scope and local:: forms are
-// covered by PsTypeIdentifierFromPackage and LocalScopePrefix* above).
 TEST(IdentifierSyntaxParsing, PsTypeIdentifierFromClassScope) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -466,8 +444,6 @@ TEST(IdentifierSyntaxParsing, PsTypeIdentifierFromClassScope) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3: class_variable_identifier ::= variable_identifier — a variable whose
-// data type is a class handle is named by an ordinary identifier.
 TEST(IdentifierSyntaxParsing, ClassVariableIdentifierDecl) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -482,10 +458,6 @@ TEST(IdentifierSyntaxParsing, ClassVariableIdentifierDecl) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3: ps_parameter_identifier's class_scope alternative — a parameter
-// declared inside a class is referenced by qualifying it with the class
-// ("C::P"). The package_scope form is covered by PsParameterFromPackageResolves
-// and the generate_block form by PsParameterIdentifierFromGenerateBlock.
 TEST(IdentifierSyntaxParsing, PsParameterIdentifierFromClassScope) {
   ParseFixture f;
   auto* cu = ParseSrc(
@@ -501,10 +473,6 @@ TEST(IdentifierSyntaxParsing, PsParameterIdentifierFromClassScope) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.9.3: c_identifier ::= [ a-zA-Z_ ] { [ a-zA-Z0-9_ ] } — the first character
-// may be an underscore as well as a letter. A DPI import linkage name that
-// begins with '_' is accepted (the letter-first form is covered by
-// DpiImportWithCIdentifier).
 TEST(IdentifierSyntaxParsing, DpiImportCIdentifierLeadingUnderscore) {
   ParseFixture f;
   auto* cu = ParseSrc(

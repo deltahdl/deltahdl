@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.6.1, 18.6.2, 18.8, 18.9 and 18.13.3 to 18.13.5: every class has the
-// built-in randomization methods without declaring them, the classes of the
-// std package among them, so a handle of mailbox, semaphore or process calls
-// each one although the prototype Annex G writes down for the class lists few
-// or none of them.
 TEST(StdClassBuiltInMethods, AHandleOfAStdClassCallsEveryClasssMethods) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -35,10 +30,6 @@ TEST(StdClassBuiltInMethods, AHandleOfAStdClassCallsEveryClasssMethods) {
              "endmodule\n"));
 }
 
-// The actuals of such a call are those the method takes: one on/off value for
-// the form of rand_mode and constraint_mode a call on the object itself uses,
-// one seed for srandom and none for pre_randomize, each reported under the
-// subclause giving the method.
 TEST(StdClassBuiltInMethods, TheActualsAreThoseTheMethodTakes) {
   ElabFixture f;
   ElabOk(

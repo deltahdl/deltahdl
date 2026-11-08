@@ -7,21 +7,15 @@ using namespace delta;
 
 namespace {
 
-// §19.5.1.2: the set_covergroup_expression is evaluated when the covergroup
-// instance is constructed, so it is evaluated exactly once.
 TEST(CoverageSetExpression, EvaluatedOnceAtConstruction) {
   EXPECT_EQ(CoverageDB::SetExpressionEvaluationCount(0), 1u);
 }
 
-// §19.5.1.2: evaluation happens at construction, not at each sampling point, so
-// the count stays one no matter how many times the instance is sampled.
 TEST(CoverageSetExpression, NotReevaluatedPerSample) {
   EXPECT_EQ(CoverageDB::SetExpressionEvaluationCount(1), 1u);
   EXPECT_EQ(CoverageDB::SetExpressionEvaluationCount(100), 1u);
 }
 
-// §19.5.1.2: a bin's values may come from an array, read at instantiation;
-// one bin per element of the dynamic array vals.
 TEST(CovergroupInstanceSim, SetExpressionBinsTakeArrayElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -42,9 +36,6 @@ TEST(CovergroupInstanceSim, SetExpressionBinsTakeArrayElements) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.5.1.2: a queue is an unpacked array (§7.10), so it defines one bin per
-// element as any other array does, read as it stands when the instance is
-// constructed: the element pushed before `new` is a bin of its own.
 TEST(CovergroupInstanceSim, SetExpressionBinsTakeQueueElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

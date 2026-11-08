@@ -7,17 +7,8 @@
 
 using namespace delta;
 
-// §E.7 `delay_mode_zero. The directive selects the zero delay mode for every
-// module that follows it in the source description. It takes no argument, and
-// it shall appear before the declaration of the module whose delay mode it
-// controls. All three rules are carried by the preprocessor, which recognizes
-// the directive, records the selected mode queried below, and rejects the
-// directive when it appears inside a design element.
-
 namespace {
 
-// E7-C1/C2 (declarative + syntax): the bare directive is recognized before a
-// module declaration and records the zero delay mode for what follows.
 TEST(Preprocessor, DelayModeZero_RecognizedBeforeModule) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -30,7 +21,6 @@ TEST(Preprocessor, DelayModeZero_RecognizedBeforeModule) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kZero);
 }
 
-// E7-C1 (baseline): with no directive present, no delay mode is in effect.
 TEST(Preprocessor, DelayModeZero_DefaultStateNoDirective) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -40,8 +30,6 @@ TEST(Preprocessor, DelayModeZero_DefaultStateNoDirective) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kNone);
 }
 
-// E7-C3 (shall): the directive shall precede the module declaration; placing it
-// inside a design element is illegal and is rejected.
 TEST(Preprocessor, DelayModeZero_IllegalInsideModule) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -50,16 +38,11 @@ TEST(Preprocessor, DelayModeZero_IllegalInsideModule) {
                            "`delay_mode_zero\n"
                            "endmodule\n");
   pp.Preprocess(fid);
-  // E.7 is where the standard says the directive comes before the module
-  // it controls, so the report names it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "`delay_mode_zero illegal inside a design element",
                             2, "E.7"));
 }
 
-// E7-C3 (shall, boundary): once a module declaration has closed, the design
-// element nesting is back at the top level, so the directive is legal again
-// before the next module and records the mode for the module that follows.
 TEST(Preprocessor, DelayModeZero_LegalBetweenModules) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -74,9 +57,6 @@ TEST(Preprocessor, DelayModeZero_LegalBetweenModules) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kZero);
 }
 
-// E7-C1 (sequencing edge): the directive selects the zero delay mode for what
-// follows it, so issuing it after a different mode directive supersedes that
-// earlier mode. The recording stage ends with the zero mode in effect.
 TEST(Preprocessor, DelayModeZero_SupersedesEarlierMode) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -90,11 +70,6 @@ TEST(Preprocessor, DelayModeZero_SupersedesEarlierMode) {
   EXPECT_EQ(pp.DelayModeDirective(), DelayModeDirective::kZero);
 }
 
-// E.7 has the directive select the mode for the modules that follow it, so
-// the record the preprocessor keeps of the directives in force at each module
-// header carries, for a module between a `delay_mode_unit and this directive,
-// the unit mode, and the zero mode for the module after this directive, while
-// the unit-wide query above answers only with the last.
 TEST(Preprocessor, DelayModeZero_RecordedAtEachModuleHeader) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

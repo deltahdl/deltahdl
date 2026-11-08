@@ -43,10 +43,6 @@ TEST(IpcSync, TriggerNullEventHasNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// The rule that triggering a null event does nothing applies to both trigger
-// operators. This exercises the nonblocking trigger (->>) path on a null event;
-// the process must run straight through without blocking or disturbing
-// simulation.
 TEST(IpcSync, NonblockingTriggerNullEventHasNoEffect) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -99,11 +95,6 @@ TEST(IpcSync, TriggerAfterImperativeNullHasNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// Nonblocking-trigger counterpart of the case above: here the event is nulled
-// by a run-time procedural assignment rather than a declaration initializer, so
-// the
-// ->> path sees an is_null_event flag that was set during simulation, in the
-// same process, and must still treat the trigger as a no-op.
 TEST(IpcSync, NonblockingTriggerAfterImperativeNullHasNoEffect) {
   LowerFixture f;
   auto* var = RunAndFindVar(

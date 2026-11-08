@@ -17,9 +17,6 @@ TEST(ProceduralBlockSim, InitialConstructRuns) {
 }
 
 TEST(ProceduralBlockSim, FinalConstructLowersWithoutDisturbingInitial) {
-  // §9.2.3: final procedures are enabled at the end of simulation and execute
-  // only once. The initial block sets a = 1, then the final block runs at end
-  // of simulation and overwrites it with 99, so the observed end value is 99.
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [7:0] a;\n"
                       "  initial a = 8'd1;\n"
@@ -159,10 +156,6 @@ TEST(ProceduralBlockSim, ProceduralReleaseOnNetRestoresDriver) {
             7u);
 }
 
-// blocking_assignment whose variable_lvalue is a concatenation (§A.8.5 real
-// syntax): a single right-hand side is split across the concatenated targets.
-// Built from source and run through the full pipeline so the observed values
-// come from the assignment executing, not a hand-built state.
 TEST(ProceduralBlockSim, BlockingAssignmentConcatLvalue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -174,9 +167,6 @@ TEST(ProceduralBlockSim, BlockingAssignmentConcatLvalue) {
   LowerRunAndCheck(f, design, {{"hi", 0xCu}, {"lo", 0x3u}});
 }
 
-// blocking_assignment alt 1: variable_lvalue = delay_or_event_control
-// expression. The intra-assignment delay is mandatory in this alternative;
-// running to quiescence observes the delayed assignment taking effect.
 TEST(ProceduralBlockSim, BlockingAssignmentIntraDelayRuns) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [7:0] a;\n"

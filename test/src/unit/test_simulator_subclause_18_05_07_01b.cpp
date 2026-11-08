@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A class C holding the members `decls`, randomized `draws` times by an
-// initial that counts the draws for which `holds` is true, as the design
-// test/src/e2e/foreach_iterative_constraints.sv does, and displays the count
-// and `after`, an expression read once the draws are done.
 std::string Counting(const std::string& decls, int draws,
                      const std::string& holds, const std::string& after) {
   return "class C;\n" + decls +
@@ -35,12 +31,6 @@ std::string Counting(const std::string& decls, int draws,
          "endmodule\n";
 }
 
-// 18.5.7.1: a constraint on a dynamic array's size method sets how large the
-// array is, and the solver settles such size constraints first. The clause's c1
-// holds A.size inside {[1:10]}, so every one of 64 draws leaves A holding 1 to
-// 10 elements, read through size() and through the element past the last, which
-// reads as no element does, and more than one size is drawn, which an array
-// kept at the size it had would never show.
 TEST(ForeachIterativeConstraintsRun, ASizeConstraintSizesTheArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -65,12 +55,6 @@ TEST(ForeachIterativeConstraintsRun, ASizeConstraintSizesTheArray) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.1: a predicate that tests a loop variable against the iterated array's
-// size decides whether a constraint is created at all, so the clause's c2 holds
-// each element above the one before it for the indexes below the last alone,
-// and every one of 64 draws is sorted ascending whatever its size, which a
-// foreach imposing its set on every index, the last element held below an
-// element the array lacks, would fail on.
 TEST(ForeachIterativeConstraintsRun, APredicateGuardsTheConstraint) {
   SimFixture f;
   std::string out = RunCapture(
@@ -99,11 +83,6 @@ TEST(ForeachIterativeConstraintsRun, APredicateGuardsTheConstraint) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.1: a predicate over the loop variable alone guards a relation
-// between an element and the one before it out of the first element, whose
-// predecessor the array lacks, so over a fixed array of eight ints every one
-// of 32 draws is ascending, which the draws tried against the eight
-// relations as a whole would meet once in forty thousand.
 TEST(ForeachIterativeConstraintsRun, AGuardedRelationBetweenElementsHolds) {
   SimFixture f;
   std::string out = RunCapture(
@@ -119,9 +98,6 @@ TEST(ForeachIterativeConstraintsRun, AGuardedRelationBetweenElementsHolds) {
   EXPECT_EQ(out, "32 1\n");
 }
 
-// 18.5.7.1: the same guard over an equality between an element and the one
-// before it, each held to one more than its predecessor, so that every draw
-// of a six-element array ends five above where it starts.
 TEST(ForeachIterativeConstraintsRun, AGuardedEqualityBetweenElementsHolds) {
   SimFixture f;
   std::string out = RunCapture(
@@ -134,10 +110,6 @@ TEST(ForeachIterativeConstraintsRun, AGuardedEqualityBetweenElementsHolds) {
   EXPECT_EQ(out, "32 1\n");
 }
 
-// 18.5.7.1: the clause's guard over a dynamic array held to eight elements
-// by an equality on its size method, so that the guard reads the size as a
-// state variable of 8 and holds the first seven relations, every one of 16
-// draws ascending.
 TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAtAFixedSize) {
   SimFixture f;
   std::string out = RunCapture(
@@ -154,9 +126,6 @@ TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAtAFixedSize) {
   EXPECT_EQ(out, "16 8\n");
 }
 
-// 18.5.7.1: the same array under a guard over the loop variable alone, the
-// size held to eight by a set membership on the size method rather than an
-// equality, so that the size is drawn from the one member the set holds.
 TEST(ForeachIterativeConstraintsRun, AGuardOverTheIndexHoldsAtADrawnSize) {
   SimFixture f;
   std::string out = RunCapture(
@@ -173,9 +142,6 @@ TEST(ForeachIterativeConstraintsRun, AGuardOverTheIndexHoldsAtADrawnSize) {
   EXPECT_EQ(out, "16 8\n");
 }
 
-// 18.5.7.1: the clause's guard over the size method with an equality as the
-// consequent, each element one above the one before it, so that every draw
-// of an eight-element array ends seven above where it starts.
 TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAnEquality) {
   SimFixture f;
   std::string out = RunCapture(
@@ -189,11 +155,6 @@ TEST(ForeachIterativeConstraintsRun, AGuardOverTheSizeHoldsAnEquality) {
   EXPECT_EQ(out, "16 8\n");
 }
 
-// 18.5.7.1: inside the array's foreach block its size reads as a state
-// variable, already settled before the iterative constraints, so a foreach
-// holding each element to the size plus its index over an array held to 3
-// elements reads the size as 3 and draws 3, 4 and 5, which the size read as
-// anything but the value drawn for it would not give.
 TEST(ForeachIterativeConstraintsRun, TheSizeIsAStateVariableInTheForeach) {
   SimFixture f;
   std::string out = RunCapture(
@@ -213,11 +174,6 @@ TEST(ForeachIterativeConstraintsRun, TheSizeIsAStateVariableInTheForeach) {
   EXPECT_EQ(out, "3 3 4 5\n");
 }
 
-// 18.5.7.1/18.4: a dynamic array whose size no constraint holds keeps the
-// size new[] gave it, its elements alone randomized, so a foreach over it
-// iterates the 5 elements the array holds and holds each to three times its
-// index; a second new[] of 2 leaves 2 elements to iterate, and delete()
-// none, which the size reports.
 TEST(ForeachIterativeConstraintsRun, AnUnconstrainedSizeIsKept) {
   SimFixture f;
   std::string out = RunCapture(
@@ -246,11 +202,6 @@ TEST(ForeachIterativeConstraintsRun, AnUnconstrainedSizeIsKept) {
   EXPECT_EQ(out, "5 0 3 6 9 12\n2 0 3\n0\n");
 }
 
-// 18.5.7.1: loop variables, constants and state variables may all appear in an
-// index expression, and a predicate over a loop variable and a state variable
-// is a guard: with off a state variable holding 2, each element from index 2 on
-// is held to one more than the element off places before it, and over 32 draws
-// every draw holds B[2] one above B[0] and B[3] one above B[1].
 TEST(ForeachIterativeConstraintsRun, AnIndexExpressionMayHoldAStateVariable) {
   SimFixture f;
   std::string out = RunCapture(
@@ -265,11 +216,6 @@ TEST(ForeachIterativeConstraintsRun, AnIndexExpressionMayHoldAStateVariable) {
   EXPECT_EQ(out, "32 1\n");
 }
 
-// 18.5.7.1: each loop variable is visible only within its foreach constraint,
-// so a loop variable named as a property of the class is the index within the
-// foreach and the property outside it: each element is held to one more than
-// its index, which a k read as the property's 100 would put beyond a 4-bit
-// element, and the property keeps its 100.
 TEST(ForeachIterativeConstraintsRun, TheLoopVariableShadowsAProperty) {
   SimFixture f;
   std::string out = RunCapture(
@@ -289,9 +235,6 @@ TEST(ForeachIterativeConstraintsRun, TheLoopVariableShadowsAProperty) {
   EXPECT_EQ(out, "1 2 3 100\n");
 }
 
-// §18.5.7.1: a foreach naming two loop variables binds each to one dimension
-// of a two-dimensional array and iterates every element, so each of the six
-// is constrained to its own value 10 * i + j + 1.
 TEST(ForeachConstraintRun, TwoLoopVariablesIterateBothDimensions) {
   SimFixture f;
   std::string out = RunCapture(
@@ -314,10 +257,6 @@ TEST(ForeachConstraintRun, TwoLoopVariablesIterateBothDimensions) {
   EXPECT_EQ(out, "1 0 13\n");
 }
 
-// §18.5.7.1: a foreach iterates a string as a dynamic array of bytes indexed
-// from 0, so b avoids each character of the object's "AB", leaving it 67, a
-// select past the end reading 0, and, in an inline block, each character of
-// the calling scope's "A", leaving 66.
 TEST(ForeachConstraintRun, AForeachIteratesTheCharactersOfAString) {
   SimFixture f;
   std::string out = RunCapture(

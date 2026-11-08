@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.1: a default bin of a real coverpoint catches every value no other bin
-// holds as one bin; neither the `[]` nor the `[N]` array form is allowed for
-// it. An integral coverpoint's default bin may be an array.
 TEST(RealCoverpointDefaultBin, DefaultBinArrayOfRealCoverpointIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -35,8 +32,6 @@ TEST(RealCoverpointDefaultBin, DefaultBinArrayOfRealCoverpointIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5.1: a fixed number of bins is given by a positive integral expression,
-// so a constant count of zero or less is an error and a count of one is not.
 TEST(FixedBinCount, ConstantCountOfZeroOrLessIsError) {
   ElabFixture f;
   ElaborateSrc(

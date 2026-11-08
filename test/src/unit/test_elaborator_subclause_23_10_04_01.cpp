@@ -21,13 +21,6 @@ RtlirParamDecl* FindParamInModule(RtlirModule* mod,
   return nullptr;
 }
 
-// The parameter `param_name` of the first child of `parent` that instantiates
-// `module_name`. Selecting the instance by the module it instantiates rather
-// than by its instance name is what keeps a case about what a defparam reaches
-// independent of how a generate block spells the names of the instances inside
-// it: §27.4 gives a generate block a scope of its own, and the name an instance
-// inside one carries in the flattened design is not the simple name the source
-// wrote.
 RtlirParamDecl* FindParamUnderChildOfModule(RtlirModule* parent,
                                             std::string_view module_name,
                                             std::string_view param_name) {
@@ -126,28 +119,6 @@ TEST(ElaborationOrder, GenerateDrivesFurtherGenerateEvaluationOnNextIteration) {
   EXPECT_EQ(i1->children[0].module_name, "leaf");
 }
 
-// §27.5: a selected generate block without a name still creates a scope, but
-// its declarations can be reached by hierarchical name only from inside the
-// hierarchy that block instantiates.
-//
-// `i1` sits inside an unnamed conditional generate block in `outer`, and the
-// defparam is written in `top`, outside the hierarchy that block instantiates.
-// So `u.i1.P` is not a legal hierarchical reference to that parameter and shall
-// not reach it: `P` keeps the 5 its declaration gives it, not the 99 the
-// defparam writes.
-//
-// The elaborator does not reject the source. Elaborator::ResolveDefparamPath
-// (src/elaborator/elaborator_defparam.cpp:84) answers nullptr for a path no
-// child instance matches, Elaborator::ApplyDefparams (:240) skips such a
-// defparam without recording it as applied, and
-// Elaborator::WarnUnresolvedDefparams (:370) then reports every unapplied
-// assignment as a warning under §23.10.1. A warning is not an error, so
-// f.has_errors stays false and ReportedWarning is what names the report.
-//
-// This case asserted the opposite until the instance name inside a generate
-// block carried the block's scope: with `i1` recorded under the simple name the
-// source wrote, the path descended into the block from outside and the override
-// landed.
 TEST(ElaborationOrder, DefparamCannotReachIntoAnUnnamedGenerateBlock) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -193,12 +164,6 @@ TEST(ElaborationOrder, DesignWithoutGeneratesTerminatesInSinglePass) {
   EXPECT_EQ(leaf->params[0].resolved_value, 7);
 }
 
-// The ordering rule governs every kind of generate construct, not just the
-// conditional (if) form. Here a loop generate's iteration bound reads a
-// parameter that a defparam overrides. Because step (b) finalizes the
-// parameter before step (c) evaluates the generate scheme, the loop must run
-// the overridden number of times (3), not the default zero. The three marker
-// instances the loop body creates surface as children of the fanout instance.
 TEST(ElaborationOrder, GenerateForBoundObservesDefparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -223,11 +188,6 @@ TEST(ElaborationOrder, GenerateForBoundObservesDefparam) {
   EXPECT_EQ(CountChildrenByModule(u, "marker"), 3u);
 }
 
-// Same ordering rule for the case form of a generate construct. The case
-// selector reads a parameter overridden by a defparam; the finalized value
-// (1) must pick the matching branch rather than the default branch that the
-// declared default (0) would select. The instance in the chosen branch is
-// hoisted into the picker instance's children.
 TEST(ElaborationOrder, GenerateCaseSelectorObservesDefparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(

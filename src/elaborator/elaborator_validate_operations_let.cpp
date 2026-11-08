@@ -17,10 +17,6 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
-// §11.12's rules on where a let may be referred to: before its declaration in
-// no scope, and through a hierarchical name nowhere; and on the actuals a let's
-// formals take, which let_actual_check.cpp judges.
-
 namespace delta {
 
 namespace {
@@ -32,8 +28,6 @@ void ForEachExprInStmt(const Stmt* s, Fn& fn) {
   ForEachChildStmt(s, [&fn](Stmt* const& sub) { ForEachExprInStmt(sub, fn); });
 }
 
-// Every expression one module item writes: its procedure's or subroutine's
-// statements, a continuous assignment's sides and a declaration's initializer.
 template <typename Fn>
 void ForEachExprOfItem(const ModuleItem* item, Fn& fn) {
   ForEachExprInStmt(item->body, fn);
@@ -43,7 +37,6 @@ void ForEachExprOfItem(const ModuleItem* item, Fn& fn) {
   ForEachExprUnder(item->init_expr, fn);
 }
 
-// `items` and the items of every generate block among them, in turn.
 template <typename Fn>
 void ForEachItemNested(const std::vector<ModuleItem*>& items, Fn& fn) {
   for (const ModuleItem* item : items) {
@@ -57,17 +50,11 @@ void ForEachItemNested(const std::vector<ModuleItem*>& items, Fn& fn) {
   }
 }
 
-// §11.12: the lets one scope declares, by the position of each among the
-// scope's items or statements, and the names its other items declare.
 struct LetPositions {
   std::unordered_map<std::string_view, size_t> let_at;
   std::unordered_set<std::string_view> other_names;
 };
 
-// Reports `e` where it names a let of `scope` declared after position `at`, the
-// position of the item or statement `e` is written in. A name another item of
-// the scope also declares is left alone, the use then being of that
-// declaration.
 void ReportLetUsedBefore(const Expr* e, size_t at, const LetPositions& scope,
                          DiagEngine& diag) {
   if (e->kind != ExprKind::kIdentifier) return;
@@ -80,15 +67,11 @@ void ReportLetUsedBefore(const Expr* e, size_t at, const LetPositions& scope,
              Subclause("11.12"));
 }
 
-// §11.12: whether `s` declares a let among a block's or a subroutine body's
-// statements, as the parser keeps one (Parser::ParseBlockVarDecls).
 bool IsBlockLet(const Stmt* s) {
   return s->kind == StmtKind::kBlockItemDecl &&
          s->decl_item->kind == ModuleItemKind::kLetDecl;
 }
 
-// The same rule within each begin-end or fork block under `s`, whose lets are
-// declared among its statements as block item declarations.
 void CheckBlockLetsUsedBeforeDeclared(const Stmt* s, DiagEngine& diag) {
   if (s == nullptr) return;
   LetPositions scope;
@@ -105,10 +88,6 @@ void CheckBlockLetsUsedBeforeDeclared(const Stmt* s, DiagEngine& diag) {
   });
 }
 
-// §11.12 asks a let be declared before it is used in the scope of its
-// declaration, and a generate block and a procedural block are scopes of their
-// own (§27.5, §9.3.4): the rule is applied among `items`, then within each
-// generate block among them and each block their statements open.
 void CheckLetsUsedBeforeDeclaredIn(const std::vector<ModuleItem*>& items,
                                    DiagEngine& diag) {
   LetPositions scope;
@@ -143,15 +122,8 @@ void ElaboratorOperationRules::CheckLetUsedBeforeDeclared(
   CheckLetsUsedBeforeDeclaredIn(decl->items, diag_);
 }
 
-// §11.12, example d: a let is referred to only within the scope declaring it
-// and the scopes nested in it, never through a hierarchical name, so a call
-// through a path whose last component names a let the module declares is
-// illegal.
 void ElaboratorOperationRules::CheckLetReferencedHierarchically(
     const ModuleDecl* decl) {
-  // §11.12 bars a hierarchical reference to any let, so the lets a path may
-  // end in are this module's, at any depth of its generate blocks, and those
-  // of each module, interface or program it instantiates, `u.my_let(1'b0)`.
   std::unordered_set<std::string_view> lets;
   std::unordered_set<std::string_view> instantiated;
   auto collect = [&lets](const ModuleItem* item) {
@@ -171,8 +143,6 @@ void ElaboratorOperationRules::CheckLetReferencedHierarchically(
     }
   }
   if (lets.empty()) return;
-  // `p::f` and `C::f` name a package's let and a class's method by scope
-  // resolution (§26.3, §8.23), which is no hierarchical reference.
   auto check = [&](const Expr* e) {
     if (e->kind != ExprKind::kCall || e->lhs == nullptr ||
         e->lhs->kind != ExprKind::kMemberAccess ||
@@ -188,8 +158,6 @@ void ElaboratorOperationRules::CheckLetReferencedHierarchically(
   ForEachItemNested(decl->items, walk);
 }
 
-// §11.12, rule 2, for the calls a design element writes; let_actual_check.h
-// gives the rule.
 void ElaboratorOperationRules::CheckLetActualTypes(const ModuleDecl* decl) {
   const TypeShapeTables kShapes{typedefs_, td_array_dims_, class_names_};
   const NetType kDefaultNettype =
@@ -200,8 +168,6 @@ void ElaboratorOperationRules::CheckLetActualTypes(const ModuleDecl* decl) {
                                   arena_, kDefaultNettype != NetType::kNone});
 }
 
-// The same rule for the compilation unit's own items and each package's,
-// judged once rather than in every design element.
 void ElaboratorOperationRules::CheckUnitLetActualTypes() {
   const TypeShapeTables kShapes{typedefs_, td_array_dims_, class_names_};
   CheckLetActualsOfUnitAndPackages(

@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.6.3: randomize() is predefined and no class may override it. A class that
-// declares its own method named randomize is therefore an error, whatever the
-// form of the declaration.
 TEST(BehaviorOfRandomizationMethods, RandomizeOverrideIsError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -26,9 +23,6 @@ TEST(BehaviorOfRandomizationMethods, RandomizeOverrideIsError) {
                     3, "18.6.3"));
 }
 
-// 18.6.3: the prohibition is on declaring randomize itself; a class with no
-// such declaration uses the built-in method and elaborates without complaint,
-// even when it declares random variables and constraints.
 TEST(BehaviorOfRandomizationMethods, NoRandomizeOverrideOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -39,10 +33,6 @@ TEST(BehaviorOfRandomizationMethods, NoRandomizeOverrideOk) {
              "endmodule\n"));
 }
 
-// 18.6.3: pre_randomize() and post_randomize() are functions, so neither may
-// block.
-// A time-controlling statement in pre_randomize() makes it block, which is not
-// permitted in a function and is reported as an error.
 TEST(BehaviorOfRandomizationMethods, PreRandomizeCannotBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -53,19 +43,12 @@ TEST(BehaviorOfRandomizationMethods, PreRandomizeCannotBlock) {
              "module m;\n"
              "endmodule\n",
              f));
-  // The rule 18.6.3 states for pre_randomize() is enforced by the general
-  // prohibition on a time-controlling statement in a function, which
-  // CheckFuncBodyTimeControl in
-  // src/elaborator/elaborator_validate_funcbody.cpp reports under
-  // §13.4; that is the report this source provokes.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "time-controlling statement is not allowed inside a function", 3,
       "13.4"));
 }
 
-// 18.6.3: the same holds for post_randomize(): a delay inside it is a blocking
-// statement that a function may not contain.
 TEST(BehaviorOfRandomizationMethods, PostRandomizeCannotBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -76,17 +59,12 @@ TEST(BehaviorOfRandomizationMethods, PostRandomizeCannotBlock) {
              "module m;\n"
              "endmodule\n",
              f));
-  // As in PreRandomizeCannotBlock, the report is the §13.4 one from
-  // CheckFuncBodyTimeControl in
-  // src/elaborator/elaborator_validate_funcbody.cpp.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "time-controlling statement is not allowed inside a function", 3,
       "13.4"));
 }
 
-// 18.6.3: a non-blocking pre_randomize()/post_randomize() — one whose body has
-// no time-controlling statement — is the legal case the rule allows.
 TEST(BehaviorOfRandomizationMethods, NonBlockingPrePostRandomizeOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -99,10 +77,6 @@ TEST(BehaviorOfRandomizationMethods, NonBlockingPrePostRandomizeOk) {
              "endmodule\n"));
 }
 
-// 18.6.3 (edge of B4): the prohibition is on the name randomize, independent of
-// the declared signature. A void-returning, argument-less override — the form
-// that most resembles a legal method — is still rejected because randomize() is
-// built-in and cannot be overridden.
 TEST(BehaviorOfRandomizationMethods, RandomizeVoidOverrideIsError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -119,11 +93,6 @@ TEST(BehaviorOfRandomizationMethods, RandomizeVoidOverrideIsError) {
                     3, "18.6.3"));
 }
 
-// 18.6.3 (edge of B4, task syntactic position): the prohibition is on declaring
-// the name randomize as a class method at all, whichever subroutine form is
-// used. A member declared as a task named randomize takes a different parse
-// than a function, but it is still an attempt to override the built-in method
-// and is rejected the same way.
 TEST(BehaviorOfRandomizationMethods, RandomizeTaskOverrideIsError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -140,9 +109,6 @@ TEST(BehaviorOfRandomizationMethods, RandomizeTaskOverrideIsError) {
                     3, "18.6.3"));
 }
 
-// 18.6.3 (edge of B6): the ban on blocking covers every time-controlling
-// statement, not just a delay. An event-control wait inside pre_randomize() is
-// likewise a blocking statement a function may not contain, and is rejected.
 TEST(BehaviorOfRandomizationMethods, PreRandomizeWithEventControlCannotBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -154,9 +120,6 @@ TEST(BehaviorOfRandomizationMethods, PreRandomizeWithEventControlCannotBlock) {
              "module m;\n"
              "endmodule\n",
              f));
-  // Again the §13.4 report from CheckFuncBodyTimeControl in
-  // src/elaborator/elaborator_validate_funcbody.cpp, which covers the
-  // event control as well as the delay.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "time-controlling statement is not allowed inside a function", 4,

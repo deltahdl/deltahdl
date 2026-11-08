@@ -51,9 +51,6 @@ TEST(StreamReorderingParsing, StreamingWithExprSliceSize) {
   ASSERT_NE(stmt->rhs->lhs, nullptr);
 }
 
-// §11.4.14.2: a number written as the slice size is a constant expression,
-// kept as the literal it is so that its base is read with its digits; a type
-// keyword written there is kept as a name.
 TEST(StreamReorderingParsing, NumberSliceSizesKeptAsLiterals) {
   auto r = Parse(
       "module m;\n"

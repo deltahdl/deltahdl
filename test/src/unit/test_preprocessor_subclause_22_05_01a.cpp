@@ -90,9 +90,6 @@ TEST(Preprocessor, MultiLineBackslashContinuation) {
   EXPECT_NE(result.find('c'), std::string::npos);
 }
 
-// §22.5.1: a newline preceded by a backslash in the macro text is replaced in
-// the expansion by a newline character, and the backslash itself is dropped. A
-// multi-statement macro therefore expands with its lines still separated.
 TEST(Preprocessor, BackslashNewlineBecomesNewlineInExpansion) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -102,10 +99,7 @@ TEST(Preprocessor, BackslashNewlineBecomesNewlineInExpansion) {
       f);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(result.find("first"), std::string::npos);
-  // The continuation newline survives, so "second" begins a fresh line rather
-  // than being concatenated onto "first".
   EXPECT_NE(result.find("\nsecond"), std::string::npos);
-  // The backslash that introduced the continuation is not part of the body.
   EXPECT_EQ(result.find('\\'), std::string::npos);
 }
 
@@ -517,8 +511,6 @@ TEST(Preprocessor, EscapedIdentifierAllDefaults) {
   EXPECT_NE(result.find("5 + 0"), std::string::npos);
 }
 
-// An escaped name runs to the next white space, and one that ends its line
-// has none after it: the end of the line closes the name instead.
 TEST(Preprocessor, EscapedIdentifierMacroNameEndingTheLine) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -529,9 +521,6 @@ TEST(Preprocessor, EscapedIdentifierMacroNameEndingTheLine) {
   EXPECT_EQ(result, "\n7\n");
 }
 
-// §22.5.1 lets the macro text be blank, and an escaped name that ends the
-// directive's line has no white space after it to end it: the end of the line
-// does, and the macro is defined to be empty.
 TEST(Preprocessor, EscapedIdentifierMacroNameWithBlankText) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -544,8 +533,6 @@ TEST(Preprocessor, EscapedIdentifierMacroNameWithBlankText) {
   EXPECT_NE(result.find(" b"), std::string::npos);
 }
 
-// The same usage after other text on its line, where the inline expander
-// rather than the directive path reads the name.
 TEST(Preprocessor, EscapedIdentifierMacroNameEndingTheLineAfterText) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -556,9 +543,6 @@ TEST(Preprocessor, EscapedIdentifierMacroNameEndingTheLineAfterText) {
   EXPECT_EQ(result, "\nx = 7\n");
 }
 
-// A grave accent with no name after it is neither a directive nor a macro
-// usage, so the preprocessor leaves it in place for the lexer to report as the
-// character §5.2 gives no token.
 TEST(Preprocessor, GraveAccentWithNoNameIsLeftInPlace) {
   PreprocFixture f;
   auto result = Preprocess("a\n`\nb\n", f);
@@ -566,8 +550,6 @@ TEST(Preprocessor, GraveAccentWithNoNameIsLeftInPlace) {
   EXPECT_EQ(result, "a\n`\nb\n");
 }
 
-// The same grave accent ending a line after other text, where the inline
-// expander finds no name at all after it.
 TEST(Preprocessor, GraveAccentEndingALineAfterTextIsLeftInPlace) {
   PreprocFixture f;
   auto result = Preprocess("a `\n", f);
@@ -738,9 +720,6 @@ TEST(Preprocessor, MacroDefaultWithNestedMacroAndArg) {
   EXPECT_NE(result.find("(5+10)"), std::string::npos);
 }
 
-// `""" overrides the usual meaning of the triple-quote delimiter: the
-// expansion includes the triple quotation marks and substitutes the actual
-// argument, building a triple-quoted string literal from macro arguments.
 TEST(Preprocessor, BacktickTripleQuoteStringConstruction) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -751,11 +730,6 @@ TEST(Preprocessor, BacktickTripleQuoteStringConstruction) {
   EXPECT_NE(result.find("\"\"\"hi\"\"\""), std::string::npos);
 }
 
-// Contrast with a plain triple-quoted string (which spans newlines without
-// terminating the body): a `""" span is different -- a plain, un-continued
-// newline inside it ends the macro text. Here the body is only the first line,
-// so the following source line is NOT folded into the macro and survives as
-// ordinary text.
 TEST(Preprocessor, BacktickTripleQuotePlainNewlineTerminatesBody) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -764,16 +738,10 @@ TEST(Preprocessor, BacktickTripleQuotePlainNewlineTerminatesBody) {
       "string s = `M;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // The `""" span captured only "start"; the expansion emits the triple quote
-  // followed by that text.
   EXPECT_NE(result.find("\"\"\"start"), std::string::npos);
-  // The line after the terminating newline was not absorbed into the body.
   EXPECT_NE(result.find("tail_marker"), std::string::npos);
 }
 
-// Within a `""" expansion a plain newline would terminate the definition, but
-// a backslash-newline is an exception: the backslash is dropped while the
-// newline is preserved in the expanded text.
 TEST(Preprocessor, BacktickTripleQuoteKeepsNewlineAfterBackslash) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -786,9 +754,6 @@ TEST(Preprocessor, BacktickTripleQuoteKeepsNewlineAfterBackslash) {
   EXPECT_NE(result.find("a\nb"), std::string::npos);
 }
 
-// Exception to the line-continuation rule: when the backslash-newline falls in
-// the middle of a string literal, both the backslash and the newline are
-// omitted from the expanded macro rather than being replaced by a newline.
 TEST(Preprocessor, BackslashNewlineInsideStringOmitsBoth) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -800,9 +765,6 @@ TEST(Preprocessor, BackslashNewlineInsideStringOmitsBoth) {
   EXPECT_NE(result.find("\"abcdef\""), std::string::npos);
 }
 
-// A newline that is not continued by a backslash (and is outside any triple
-// quote or block comment) terminates the macro text. The following source line
-// is ordinary text and must not be folded into the macro body.
 TEST(Preprocessor, NewlineTerminatesMacroBody) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -811,14 +773,10 @@ TEST(Preprocessor, NewlineTerminatesMacroBody) {
       "int x = `A;\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // The body is exactly "1"; if the next line had been absorbed the macro
-  // would expand to something other than the contiguous "int x = 1;".
   EXPECT_NE(result.find("int x = 1;"), std::string::npos);
   EXPECT_NE(result.find("2 + 3"), std::string::npos);
 }
 
-// An actual argument may carry a comma inside a triple-quoted string without it
-// being read as an argument separator, just like the other matched delimiters.
 TEST(Preprocessor, TripleQuotedActualArgumentProtectsComma) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -829,11 +787,6 @@ TEST(Preprocessor, TripleQuotedActualArgumentProtectsComma) {
   EXPECT_NE(result.find("\"\"\"a,b\"\"\""), std::string::npos);
 }
 
-// An escaped identifier is one of the matched-delimiter forms that protects a
-// comma inside an actual argument: the comma belongs to the identifier (which
-// runs to the next white space), so it is not read as an argument separator and
-// the single-formal macro receives one argument rather than raising a
-// too-many-arguments error.
 TEST(Preprocessor, EscapedIdentifierActualArgumentProtectsComma) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -844,10 +797,6 @@ TEST(Preprocessor, EscapedIdentifierActualArgumentProtectsComma) {
   EXPECT_NE(result.find("\\a,b"), std::string::npos);
 }
 
-// A formal argument's default text is also protected by matched pairs: a comma
-// and a right parenthesis inside a double-quoted default do not split the
-// parameter list or terminate it early, so the omitted argument is replaced by
-// the whole default string.
 TEST(Preprocessor, DefaultTextMatchedPairProtectsCommaAndParen) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -858,10 +807,6 @@ TEST(Preprocessor, DefaultTextMatchedPairProtectsCommaAndParen) {
   EXPECT_NE(result.find("[1][\"x,)y\"]"), std::string::npos);
 }
 
-// A macro body may mix a `" macro-quote (whose contents are substituted) with a
-// plain " string literal (whose contents are copied verbatim). The same formal
-// argument is replaced inside the `"..`" span but left untouched inside the
-// ordinary string literal.
 TEST(Preprocessor, MixedBacktickQuoteAndPlainQuote) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -869,8 +814,6 @@ TEST(Preprocessor, MixedBacktickQuoteAndPlainQuote) {
       "string s = `MIX(hi);\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // Substituted inside the `" span...
   EXPECT_NE(result.find("\"hi\""), std::string::npos);
-  // ...but the plain string literal keeps the literal formal name.
   EXPECT_NE(result.find("\"x\""), std::string::npos);
 }

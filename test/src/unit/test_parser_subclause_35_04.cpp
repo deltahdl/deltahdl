@@ -13,11 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §35.4: an explicit global name, besides the declared name, is given before
-// the '=' in an import or export declaration. The parser records the global
-// name on dpi_c_name and the local SystemVerilog name on name, which keeps the
-// two name spaces distinct as the clause requires.
-
 TEST(DpiGlobalNameParsing, ImportExplicitGlobalNameDistinctFromSvName) {
   auto r = Parse(R"(
     module m;
@@ -46,10 +41,6 @@ TEST(DpiGlobalNameParsing, ExportExplicitGlobalNameDistinctFromSvName) {
   EXPECT_EQ(item->name, "sv_local");
 }
 
-// §35.4: when no global name is given, the linkage identifier defaults to the
-// SystemVerilog subroutine name. The parser models this by leaving dpi_c_name
-// empty; the downstream consumer treats an empty dpi_c_name as the request to
-// fall back on item->name.
 TEST(DpiGlobalNameParsing, ImportWithoutGlobalNameLeavesDpiCNameEmpty) {
   auto r = Parse(R"(
     module m;
@@ -76,10 +67,6 @@ TEST(DpiGlobalNameParsing, ExportWithoutGlobalNameLeavesDpiCNameEmpty) {
   EXPECT_EQ(item->name, "plain");
 }
 
-// §35.4: a global name that collides with a SystemVerilog keyword or reserved
-// name has to be written as an escaped identifier. The lexer strips the leading
-// '\' and the trailing whitespace; the linkage identifier the parser records is
-// the bare keyword text.
 TEST(DpiGlobalNameParsing, ImportEscapedGlobalNameOfKeywordIsRecorded) {
   auto r = Parse(R"(
     module m;
@@ -106,11 +93,6 @@ TEST(DpiGlobalNameParsing, ExportEscapedGlobalNameOfKeywordIsRecorded) {
   EXPECT_EQ(item->name, "sv_local");
 }
 
-// §35.4: a global name may start with either a letter or an underscore.
-// The letter-start case is observed by the explicit-global-name tests
-// above; here the underscore-start case takes the other half of that rule
-// and walks the linkage-name path with characters that exercise both kinds
-// of continuation (alphanumerics and underscores).
 TEST(DpiGlobalNameParsing, ImportGlobalNameStartingWithUnderscoreAccepted) {
   auto r = Parse(R"(
     module m;
@@ -123,25 +105,17 @@ TEST(DpiGlobalNameParsing, ImportGlobalNameStartingWithUnderscoreAccepted) {
   EXPECT_EQ(item->dpi_c_name, "_legal_42");
 }
 
-// §35.4: after the first character a global name may contain only
-// alphanumerics and underscores. A '$' is legal in a SystemVerilog
-// identifier but not in a C identifier, so it must be rejected when
-// supplied as the linkage name.
 TEST(DpiGlobalNameParsing, ImportGlobalNameWithDollarRejected) {
   auto r = Parse(R"(
     module m;
       import "DPI-C" foo$bar = function void sv_local();
     endmodule
   )");
-  // §35.5.4 owns the c_identifier report; §35.4 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*", 3,
       "35.5.4"));
 }
 
-// §35.4: once stripped, the linkage identifier must be a well-formed C
-// identifier. A name whose first character is a digit fails the C rule even
-// though escaping made it lexable as a SystemVerilog identifier.
 TEST(DpiGlobalNameParsing, EscapedNameStartingWithDigitIsRejected) {
   SourceManager mgr;
   Arena arena;
@@ -153,7 +127,6 @@ TEST(DpiGlobalNameParsing, EscapedNameStartingWithDigitIsRejected) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   Parser parser(lexer, arena, diag);
   parser.Parse();
-  // §35.5.4 owns the c_identifier report; §35.4 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       diag.Diagnostics(), "DPI c_identifier must match [a-zA-Z_][a-zA-Z0-9_]*",
       2, "35.5.4"));

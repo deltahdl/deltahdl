@@ -3,9 +3,6 @@
 #include <fstream>
 #include <string>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
@@ -16,25 +13,13 @@
 namespace delta {
 namespace {
 
-// Exercises the $dumpports system task (§21.7.3.1) end to end: every test
-// drives real source through parse, elaboration, lowering, and the scheduler
-// with the driver's per-timestep recording loop installed, so the file-naming
-// and port-selection rules are observed as the production task path applies
-// them to arguments the parser actually produced.
 class DumpportsSysTask : public VcdDumpRunTestBase {
  protected:
-  // Runs the source through the full pipeline with the driver's dump loop
-  // (timestamp + changed values at the end of each time unit) and returns the
-  // dump file contents. The fixture is caller-owned so its diagnostics and
-  // context stay inspectable after the run.
   std::string RunVcd(SimFixture& f, const std::string& src) {
     return RunVcdDump(f, src, {.scope = "t"});
   }
 };
 
-// §21.7.3.1: with no arguments both $dumpports; and $dumpports(); are
-// allowed, and the default values apply: the output file is dumpports.vcd and
-// the scope is the calling module, so the module's objects are dumped.
 TEST_F(DumpportsSysTask, NoArgumentFormsUseDefaults) {
   SimFixture f1;
   RunVcd(f1,
@@ -59,12 +44,9 @@ TEST_F(DumpportsSysTask, NoArgumentFormsUseDefaults) {
                         "endmodule\n");
   EXPECT_FALSE(f2.diag.HasErrors());
   EXPECT_EQ(f2.ctx.Vcd().GetDumpportsFileName(), "dumpports.vcd");
-  EXPECT_NE(content.find("1!"), std::string::npos);  // a dumped by default
+  EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-// §21.7.3.1: a null first argument stands for the absent scope_list, so a
-// comma precedes the filename. The scope defaults to the calling module and
-// the trailing string literal names the VCD file.
 TEST_F(DumpportsSysTask, NullScopeCommaThenStringLiteralFilename) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -79,12 +61,10 @@ TEST_F(DumpportsSysTask, NullScopeCommaThenStringLiteralFilename) {
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "dump2.dump");
-  EXPECT_NE(content.find("1!"), std::string::npos);   // a dumped
-  EXPECT_NE(content.find("0\""), std::string::npos);  // b dumped
+  EXPECT_NE(content.find("1!"), std::string::npos);
+  EXPECT_NE(content.find("0\""), std::string::npos);
 }
 
-// §21.7.3.1: the filename may be an expression of string data type; the
-// characters the variable holds at the call name the file.
 TEST_F(DumpportsSysTask, FilenameFromStringTypedVariable) {
   SimFixture f;
   RunVcd(f,
@@ -99,8 +79,6 @@ TEST_F(DumpportsSysTask, FilenameFromStringTypedVariable) {
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "sv.vcd");
 }
 
-// §21.7.3.1: the filename may also be an integral variable containing a
-// character string, decoded byte by byte into the name.
 TEST_F(DumpportsSysTask, FilenameFromIntegralVariable) {
   SimFixture f;
   RunVcd(f,
@@ -115,9 +93,6 @@ TEST_F(DumpportsSysTask, FilenameFromIntegralVariable) {
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "int.vcd");
 }
 
-// §21.7.3.1: the filename variable may get its characters from a declaration
-// initializer rather than a procedural assignment; the name it holds when the
-// task executes is the one used.
 TEST_F(DumpportsSysTask, FilenameFromDeclarationInitializedVariable) {
   SimFixture f;
   RunVcd(f,
@@ -129,10 +104,6 @@ TEST_F(DumpportsSysTask, FilenameFromDeclarationInitializedVariable) {
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "ini.vcd");
 }
 
-// §21.7.3.1: the filename argument is an expression, so a parameter constant
-// holding the character string is also accepted as the trailing argument.
-// The name stays within four characters: string parameters longer than that
-// hit an upstream §6.20 32-bit truncation defect outside this subclause.
 TEST_F(DumpportsSysTask, FilenameFromParameterConstant) {
   SimFixture f;
   RunVcd(f,
@@ -144,9 +115,6 @@ TEST_F(DumpportsSysTask, FilenameFromParameterConstant) {
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "p.vc");
 }
 
-// §21.7.3.1: a localparam constant holding the character string is likewise
-// accepted as the filename expression (kept within four characters for the
-// same upstream §6.20 truncation limit as the parameter form).
 TEST_F(DumpportsSysTask, FilenameFromLocalparamConstant) {
   SimFixture f;
   RunVcd(f,
@@ -158,9 +126,6 @@ TEST_F(DumpportsSysTask, FilenameFromLocalparamConstant) {
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "l.vc");
 }
 
-// §21.7.3.1: $dumpports names the extended VCD file itself. In source that
-// also carries a $dumpfile call ($21.7.1.1 syntax), the name in effect after
-// the $dumpports call is the one that call supplied, not the 4-state task's.
 TEST_F(DumpportsSysTask, NamesFileIndependentlyOfDumpfileCall) {
   SimFixture f;
   RunVcd(f,
@@ -176,10 +141,6 @@ TEST_F(DumpportsSysTask, NamesFileIndependentlyOfDumpfileCall) {
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "dump2.dump");
 }
 
-// §21.7.3.1: the simulator carries out the file-writing checks for the named
-// dump file. A filename pointing into a directory that does not exist cannot
-// be written and is reported as an error; a writable name raises none (the
-// accept path is held by the other filename tests).
 TEST_F(DumpportsSysTask, UnwritablePathReportedAsError) {
   SimFixture f;
   RunVcd(f,
@@ -194,9 +155,6 @@ TEST_F(DumpportsSysTask, UnwritablePathReportedAsError) {
                             "cannot write dump file at path", 5, "21.7.3.1"));
 }
 
-// §21.7.3.1: an already-existing file is silently overwritten. With stale
-// bytes pre-placed in the output file, the run raises no error and leaves a
-// freshly written dump with no trace of the old contents.
 TEST_F(DumpportsSysTask, ExistingFileSilentlyOverwritten) {
   {
     std::ofstream stale(tmp_path_);
@@ -217,9 +175,6 @@ TEST_F(DumpportsSysTask, ExistingFileSilentlyOverwritten) {
   EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-// §21.7.3.1: ports that exist in instantiations below the scope_list are not
-// dumped -- neither in the opening checkpoint nor as later value changes --
-// while the listed module's own port keeps recording.
 TEST_F(DumpportsSysTask, PortsBelowListedScopeNotDumped) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -243,16 +198,12 @@ TEST_F(DumpportsSysTask, PortsBelowListedScopeNotDumped) {
                         "  initial #1 $dumpports(c1, \"dump2.dump\");\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  // Sorted registration: c1.g1.deep -> '!', c1.own -> '"'.
-  EXPECT_NE(content.find("b10100101 "), std::string::npos);  // own checkpoint
-  EXPECT_NE(content.find("b1111 \""), std::string::npos);    // own change at #5
-  EXPECT_EQ(content.find("b111100 "), std::string::npos);    // deep checkpoint
-  EXPECT_EQ(content.find("b11111111"), std::string::npos);   // deep change
+  EXPECT_NE(content.find("b10100101 "), std::string::npos);
+  EXPECT_NE(content.find("b1111 \""), std::string::npos);
+  EXPECT_EQ(content.find("b111100 "), std::string::npos);
+  EXPECT_EQ(content.find("b11111111"), std::string::npos);
 }
 
-// §21.7.3.1: a path name using the period hierarchy separator may name a
-// module deeper in the hierarchy; that module's own ports are dumped and the
-// intermediate module's ports are not selected by it.
 TEST_F(DumpportsSysTask, HierarchicalPathNamesModuleScope) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -270,13 +221,10 @@ TEST_F(DumpportsSysTask, HierarchicalPathNamesModuleScope) {
                         "  initial $dumpports(c1.g1, \"dump2.dump\");\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(content.find("b111100 "), std::string::npos);    // c1.g1.deep
-  EXPECT_EQ(content.find("b10100101 "), std::string::npos);  // c1.own not
+  EXPECT_NE(content.find("b111100 "), std::string::npos);
+  EXPECT_EQ(content.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.1: more than one module_identifier may appear in the scope_list,
-// separated by commas; each listed module is dumped and an unlisted one is
-// not.
 TEST_F(DumpportsSysTask, MultipleScopeListModulesDumped) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -299,13 +247,11 @@ TEST_F(DumpportsSysTask, MultipleScopeListModulesDumped) {
                         "  initial $dumpports(c1, c2, \"dump2.dump\");\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(content.find("b10001 "), std::string::npos);   // c1.xa dumped
-  EXPECT_NE(content.find("b100010 "), std::string::npos);  // c2.xb dumped
-  EXPECT_EQ(content.find("b110011"), std::string::npos);   // c3.xc excluded
+  EXPECT_NE(content.find("b10001 "), std::string::npos);
+  EXPECT_NE(content.find("b100010 "), std::string::npos);
+  EXPECT_EQ(content.find("b110011"), std::string::npos);
 }
 
-// §21.7.3.1: when arguments are present but none is a trailing filename, the
-// name still defaults to dumpports.vcd while the listed scope is dumped.
 TEST_F(DumpportsSysTask, ScopeWithoutFilenameKeepsDefaultName) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -319,11 +265,9 @@ TEST_F(DumpportsSysTask, ScopeWithoutFilenameKeepsDefaultName) {
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(f.ctx.Vcd().GetDumpportsFileName(), "dumpports.vcd");
-  EXPECT_NE(content.find("b10100101 "), std::string::npos);  // c1.own dumped
+  EXPECT_NE(content.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.1: string literals are not allowed for a module_identifier, so a
-// quoted name in a scope position is reported as an error.
 TEST_F(DumpportsSysTask, StringLiteralScopeRejected) {
   SimFixture f;
   RunVcd(f,
@@ -339,8 +283,6 @@ TEST_F(DumpportsSysTask, StringLiteralScopeRejected) {
                             "must be a module, not a string", 7, "21.7.3.1"));
 }
 
-// §21.7.3.1: only modules are allowed in the scope_list, not variables; an
-// entry naming a variable of the design is reported as an error.
 TEST_F(DumpportsSysTask, VariableScopeRejected) {
   SimFixture f;
   RunVcd(f,
@@ -356,8 +298,6 @@ TEST_F(DumpportsSysTask, VariableScopeRejected) {
                             5, "21.7.3.1"));
 }
 
-// §21.7.3.1: each scope in one call's scope_list shall be unique; the same
-// module named twice in one call is reported as an error.
 TEST_F(DumpportsSysTask, DuplicateScopeWithinCallRejected) {
   SimFixture f;
   RunVcd(f,
@@ -374,8 +314,6 @@ TEST_F(DumpportsSysTask, DuplicateScopeWithinCallRejected) {
                             "21.7.3.1"));
 }
 
-// §21.7.3.1: scope uniqueness spans separate $dumpports calls; a scope named
-// by an earlier call may not be named again by a later one.
 TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsRejected) {
   SimFixture f;
   RunVcd(f,
@@ -395,8 +333,6 @@ TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsRejected) {
                             "21.7.3.1"));
 }
 
-// §21.7.3.1: specifying the same filename in more than one $dumpports call is
-// not allowed, even when the scopes differ.
 TEST_F(DumpportsSysTask, RepeatedFileNameAcrossCallsRejected) {
   SimFixture f;
   RunVcd(f,
@@ -421,9 +357,6 @@ TEST_F(DumpportsSysTask, RepeatedFileNameAcrossCallsRejected) {
                             14, "21.7.3.1"));
 }
 
-// §21.7.3.1: $dumpports can be invoked multiple times throughout the model
-// when every execution is at the same simulation time; each call adds its
-// scope to the dump.
 TEST_F(DumpportsSysTask, MultipleCallsAtSameTimeAllowed) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -449,13 +382,11 @@ TEST_F(DumpportsSysTask, MultipleCallsAtSameTimeAllowed) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(content.find("b10001 "), std::string::npos);   // c1.xa dumped
-  EXPECT_NE(content.find("b100010 "), std::string::npos);  // c2.xb dumped
-  EXPECT_EQ(content.find("b110011"), std::string::npos);   // c3.xc excluded
+  EXPECT_NE(content.find("b10001 "), std::string::npos);
+  EXPECT_NE(content.find("b100010 "), std::string::npos);
+  EXPECT_EQ(content.find("b110011"), std::string::npos);
 }
 
-// §21.7.3.1: the execution of all $dumpports tasks shall be at the same
-// simulation time; a call at a later time is reported as an error.
 TEST_F(DumpportsSysTask, CallsAtDifferentTimesRejected) {
   SimFixture f;
   RunVcd(f,
@@ -481,11 +412,6 @@ TEST_F(DumpportsSysTask, CallsAtDifferentTimesRejected) {
       "21.7.3.1"));
 }
 
-// §21.7.3.1: when $dumpports executes, the associated value change dumping
-// starts at the end of the current simulation time unit: a value assigned
-// after the call but within the same time unit is what the opening checkpoint
-// records, and the value the variable held at the execution point never
-// reaches the file.
 TEST_F(DumpportsSysTask, DumpingStartsAtEndOfCurrentTimeUnit) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -498,13 +424,10 @@ TEST_F(DumpportsSysTask, DumpingStartsAtEndOfCurrentTimeUnit) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(content.find("1!"), std::string::npos);  // end-of-unit value
-  EXPECT_EQ(content.find("0!"), std::string::npos);  // call-point value absent
+  EXPECT_NE(content.find("1!"), std::string::npos);
+  EXPECT_EQ(content.find("0!"), std::string::npos);
 }
 
-// §21.7.3.1: the end-of-time-unit start holds mid-simulation too: executed at
-// a nonzero time, the opening checkpoint is stamped with that time and
-// records the value assigned after the call within the same time unit.
 TEST_F(DumpportsSysTask, EndOfUnitStartAtNonzeroExecutionTime) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -517,15 +440,11 @@ TEST_F(DumpportsSysTask, EndOfUnitStartAtNonzeroExecutionTime) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(content.find("#7"), std::string::npos);  // checkpoint's time unit
-  EXPECT_NE(content.find("1!"), std::string::npos);  // end-of-unit value
-  EXPECT_EQ(content.find("0!"), std::string::npos);  // call-point value absent
+  EXPECT_NE(content.find("#7"), std::string::npos);
+  EXPECT_NE(content.find("1!"), std::string::npos);
+  EXPECT_EQ(content.find("0!"), std::string::npos);
 }
 
-// §21.7.3.1: the end-of-time-unit start also picks up a value produced by a
-// nonblocking assignment in the same time unit -- NBA updates land before the
-// unit ends, so the opening checkpoint records the updated value, not the one
-// held when the task executed.
 TEST_F(DumpportsSysTask, EndOfUnitCheckpointSeesNonblockingUpdate) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -538,13 +457,10 @@ TEST_F(DumpportsSysTask, EndOfUnitCheckpointSeesNonblockingUpdate) {
                         "  end\n"
                         "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
-  EXPECT_NE(content.find("1!"), std::string::npos);  // NBA-updated value
-  EXPECT_EQ(content.find("0!"), std::string::npos);  // pre-update value absent
+  EXPECT_NE(content.find("1!"), std::string::npos);
+  EXPECT_EQ(content.find("0!"), std::string::npos);
 }
 
-// §21.7.3.1: $dumpports can be used in source code that also contains the
-// $dumpvars task; both start their dumps (each with its own checkpoint
-// section) and later changes keep recording, with no error raised.
 TEST_F(DumpportsSysTask, CoexistsWithDumpvarsInSameSource) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -560,14 +476,11 @@ TEST_F(DumpportsSysTask, CoexistsWithDumpvarsInSameSource) {
   EXPECT_FALSE(f.diag.HasErrors());
   auto first = content.find("$dumpvars");
   ASSERT_NE(first, std::string::npos);
-  EXPECT_NE(content.rfind("$dumpvars"), first);  // one section per task
+  EXPECT_NE(content.rfind("$dumpvars"), first);
   EXPECT_NE(content.find("#10"), std::string::npos);
-  EXPECT_NE(content.find("1!"), std::string::npos);  // recording continues
+  EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-// §21.7.3.1: all file-writing checks shall be made by the simulator and
-// appropriate errors or warnings issued, so a path that cannot be written is
-// reported under §21.7.3.1 rather than as a bare fact about the run.
 TEST_F(DumpportsSysTask, UnwritablePathNames21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -582,8 +495,6 @@ TEST_F(DumpportsSysTask, UnwritablePathNames21_7_3_1) {
                             "cannot write dump file at path", 5, "21.7.3.1"));
 }
 
-// §21.7.3.1: string literals are not allowed for the module_identifier of a
-// scope_list entry, and the report names §21.7.3.1.
 TEST_F(DumpportsSysTask, StringLiteralScopeNames21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -599,7 +510,6 @@ TEST_F(DumpportsSysTask, StringLiteralScopeNames21_7_3_1) {
                             "21.7.3.1"));
 }
 
-// §21.7.3.1: only modules are allowed in the scope_list, not variables.
 TEST_F(DumpportsSysTask, VariableScopeNames21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -614,7 +524,6 @@ TEST_F(DumpportsSysTask, VariableScopeNames21_7_3_1) {
       ReportedError(f.diag.Diagnostics(), "not a variable", 5, "21.7.3.1"));
 }
 
-// §21.7.3.1: each scope specified in the scope_list shall be unique.
 TEST_F(DumpportsSysTask, DuplicateScopeWithinCallNames21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -631,8 +540,6 @@ TEST_F(DumpportsSysTask, DuplicateScopeWithinCallNames21_7_3_1) {
                             "21.7.3.1"));
 }
 
-// §21.7.3.1: if multiple calls to $dumpports are specified, the scope_list
-// values in those calls shall also be unique.
 TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsNames21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -652,7 +559,6 @@ TEST_F(DumpportsSysTask, DuplicateScopeAcrossCallsNames21_7_3_1) {
                             "21.7.3.1"));
 }
 
-// §21.7.3.1: specifying the same filename multiple times is not allowed.
 TEST_F(DumpportsSysTask, RepeatedFileNameNames21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -677,8 +583,6 @@ TEST_F(DumpportsSysTask, RepeatedFileNameNames21_7_3_1) {
                             "21.7.3.1"));
 }
 
-// §21.7.3.1: the execution of all $dumpports tasks shall be at the same
-// simulation time, and the report that rejects a later call names §21.7.3.1.
 TEST_F(DumpportsSysTask, CallsAtDifferentTimesName21_7_3_1) {
   SimFixture f;
   RunVcd(f,
@@ -702,20 +606,8 @@ TEST_F(DumpportsSysTask, CallsAtDifferentTimesName21_7_3_1) {
                             14, "21.7.3.1"));
 }
 
-// §21.7.3.1: one source may call both $dumpports and $dumpvars. The two tasks
-// write two files -- §21.7.1.1 defaults $dumpfile's to dump.vcd and §21.7.3.1
-// defaults $dumpports' to dumpports.vcd -- and the two are of the two different
-// types §21.7 defines, so neither can stand in for the other: §21.7.4.2
-// declares an extended file's objects as $var port, which a 4-state reader has
-// no rule for.
-//
-// Every case runs the source's own dump tasks and reads back what the run left
-// in the directory it stood in, because a fixture that installs one writer of
-// its own gives the run one file whatever its tasks ask for.
 class DumpvarsAndDumpportsFromSource : public VcdDumpFromSourceTestBase {
  protected:
-  // A module that sets one variable, runs `tasks` and then changes it, so each
-  // dump the tasks opened has both definitions and a value change in it.
   static std::string SourceCalling(const std::string& tasks) {
     return "module t;\n"
            "  logic a;\n"
@@ -728,10 +620,6 @@ class DumpvarsAndDumpportsFromSource : public VcdDumpFromSourceTestBase {
   }
 };
 
-// §21.7.3.1: a source calling $dumpvars and then $dumpports gets both files.
-// The 4-state file is the one $dumpfile named and declares its objects under
-// the §21.7.5 var_type keywords; the extended file stands under the §21.7.3.1
-// default name and declares them as $var port (§21.7.4.2).
 TEST_F(DumpvarsAndDumpportsFromSource, DumpvarsThenDumpportsWritesBothFiles) {
   RunSource(
       SourceCalling("    $dumpfile(\"a.vcd\");\n"
@@ -745,10 +633,6 @@ TEST_F(DumpvarsAndDumpportsFromSource, DumpvarsThenDumpportsWritesBothFiles) {
       << DumpFile("dumpports.vcd");
 }
 
-// §21.7.3.1: the order the two tasks are called in decides nothing. Each opens
-// the file its own clause gives it, so a $dumpports ahead of the $dumpvars
-// leaves the same two files as the reverse -- where one dump per context makes
-// whichever task ran first settle the file and the type for both.
 TEST_F(DumpvarsAndDumpportsFromSource, DumpportsThenDumpvarsWritesBothFiles) {
   RunSource(
       SourceCalling("    $dumpports;\n"
@@ -762,10 +646,6 @@ TEST_F(DumpvarsAndDumpportsFromSource, DumpportsThenDumpvarsWritesBothFiles) {
       << DumpFile("dumpports.vcd");
 }
 
-// §21.7.3.1: with no filename given, the file goes to the current working
-// directory as dumpports.vcd. That default is $dumpports' own; §21.7.1.1's
-// dump.vcd belongs to $dumpfile, and a source calling no 4-state task writes no
-// 4-state file for it to name.
 TEST_F(DumpvarsAndDumpportsFromSource, DumpportsAloneWritesOnlyItsOwnDefault) {
   RunSource(SourceCalling("    $dumpports;\n"));
   EXPECT_EQ(NamesWritten(), "dumpports.vcd");

@@ -13,21 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §28.15.3 defines one runtime rule with two duals. A supply0 net models a
-// ground connection: it carries value 0 at supply driving strength. A supply1
-// net models a power-supply connection: it carries value 1 at supply driving
-// strength. The net type is produced by a `supply0`/`supply1` declaration, so
-// every test builds the net from real source and drives it through
-// parse -> elaborate -> lower -> simulate, observing the value and strength the
-// production resolver (net.cpp ResolveSupplyNet) installs. Because a supply net
-// is a constant connection, its canonical form has no explicit source; the
-// production Net::Resolve gate resolves a driverless supply net just as it does
-// tri0/tri1. The final pair drives an opposing strong continuous assignment to
-// confirm supply strength dominates strong, the adversarial form of the rule.
-
-// ---- Scalar declared net, no source (canonical constant connection) ----
-
-// A driverless scalar supply0 net settles to 0 at supply strength.
 TEST(SupplyNetStrengths, DeclaredSupply0UndrivenResolvesZeroWithSupply) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -44,7 +29,6 @@ TEST(SupplyNetStrengths, DeclaredSupply0UndrivenResolvesZeroWithSupply) {
   EXPECT_EQ(w->resolved_strength.s0_lo, Strength::kSupply);
 }
 
-// The dual: a driverless scalar supply1 net settles to 1 at supply strength.
 TEST(SupplyNetStrengths, DeclaredSupply1UndrivenResolvesOneWithSupply) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -61,10 +45,6 @@ TEST(SupplyNetStrengths, DeclaredSupply1UndrivenResolvesOneWithSupply) {
   EXPECT_EQ(w->resolved_strength.s1_lo, Strength::kSupply);
 }
 
-// ---- Vector declared net, no source (multi-bit input form) ----
-
-// A packed-vector supply0 declaration carries 0 at supply strength on every
-// bit.
 TEST(SupplyNetStrengths, DeclaredSupply0VectorUndrivenAllBitsZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -81,8 +61,6 @@ TEST(SupplyNetStrengths, DeclaredSupply0VectorUndrivenAllBitsZero) {
   EXPECT_EQ(w->resolved_strength.s0_lo, Strength::kSupply);
 }
 
-// The dual: a packed-vector supply1 declaration carries 1 at supply strength on
-// every bit.
 TEST(SupplyNetStrengths, DeclaredSupply1VectorUndrivenAllBitsOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -99,10 +77,6 @@ TEST(SupplyNetStrengths, DeclaredSupply1VectorUndrivenAllBitsOne) {
   EXPECT_EQ(w->resolved_strength.s1_lo, Strength::kSupply);
 }
 
-// ---- Wide (multi-word) declared net, no source ----
-
-// The rule holds bit-for-bit across a vector wider than one machine word,
-// exercising the per-word fill in the resolver.
 TEST(SupplyNetStrengths, DeclaredSupply1WideVectorUndrivenAllBitsOne) {
   SimFixture f;
   auto* w = ExpectWideUndrivenNetBits(f, "supply1", true);
@@ -119,13 +93,6 @@ TEST(SupplyNetStrengths, DeclaredSupply0WideVectorUndrivenAllBitsZero) {
   EXPECT_EQ(w->resolved_strength.s0_lo, Strength::kSupply);
 }
 
-// ---- Contended by an opposing strong source (adversarial / negative form)
-// ----
-
-// Supply is the strongest drive: a continuous assignment pushing the opposite
-// value at strong strength does not override a supply0 net, which stays 0 at
-// supply strength. This is the negative form -- an ordinary net would take the
-// driver's value, but supply strength dominates strong.
 TEST(SupplyNetStrengths, Supply0NotOverriddenByStrongOppositeSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,8 +110,6 @@ TEST(SupplyNetStrengths, Supply0NotOverriddenByStrongOppositeSource) {
   EXPECT_EQ(w->resolved_strength.s0_lo, Strength::kSupply);
 }
 
-// The dual: a strong 0 source does not override a supply1 net, which stays 1 at
-// supply strength.
 TEST(SupplyNetStrengths, Supply1NotOverriddenByStrongOppositeSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -162,13 +127,6 @@ TEST(SupplyNetStrengths, Supply1NotOverriddenByStrongOppositeSource) {
   EXPECT_EQ(w->resolved_strength.s1_lo, Strength::kSupply);
 }
 
-// A supply net drives at supply strength, and §28.12.1 combines two signals of
-// equal strength and opposite value into x at that strength: a supply-strength
-// value driven onto a supply net of the opposite constant, which is no
-// stronger than the net's own, leaves an x at supply strength on both sides,
-// where pinning the net to its constant read the constant. `body` declares w
-// and drives it, through a gate, since §10.3.4 excepts a supply net from the
-// nets a continuous assignment's strength applies to.
 void ExpectSupplyX(const std::string& body) {
   SimFixture f;
   auto* design = ElaborateSrc("module m;\n" + body + "endmodule\n", f);
@@ -188,7 +146,6 @@ TEST(SupplyNetStrengths, Supply0ContendedAtSupplyStrengthResolvesToX) {
       "  buf (supply0, supply1) g (w, 1'b1);\n");
 }
 
-// The dual: a supply-strength 0 driven onto a supply1 net leaves a supply x.
 TEST(SupplyNetStrengths, Supply1ContendedAtSupplyStrengthResolvesToX) {
   ExpectSupplyX(
       "  supply1 w;\n"

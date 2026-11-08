@@ -17,10 +17,6 @@ namespace delta {
 
 namespace {
 
-// The C type a small SystemVerilog type maps to, the one an input of it is
-// passed by value as and a pointer to which an output or inout of it is
-// passed by reference as: Table H.1's row, a scalar bit or logic under the
-// svBit and svLogic names svdpi.h gives its unsigned char.
 std::string SmallCType(DataTypeKind kind, bool is_unsigned) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -33,8 +29,6 @@ std::string SmallCType(DataTypeKind kind, bool is_unsigned) {
   }
 }
 
-// A formal of bit, logic or reg whose declaration gave it a packed dimension,
-// or a width only one can give, is a packed array; one without is the scalar.
 bool IsPackedArray(const DpiArg& formal) {
   switch (formal.type) {
     case DataTypeKind::kBit:
@@ -49,8 +43,6 @@ bool IsPackedArray(const DpiArg& formal) {
   }
 }
 
-// §H.7.3: the width of a packed formal, which integer and time carry in
-// their type and a bit, logic or reg array in its declaration.
 uint32_t PackedWidth(const DpiArg& formal) {
   switch (formal.type) {
     case DataTypeKind::kInteger:
@@ -62,7 +54,6 @@ uint32_t PackedWidth(const DpiArg& formal) {
   }
 }
 
-// Table H.1: sizeof the C type a small type maps to.
 std::size_t SmallCTypeBytes(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -89,14 +80,10 @@ std::size_t SmallCTypeBytes(DataTypeKind kind) {
   }
 }
 
-// The count of a dimension's range, however it runs.
 uint32_t SizeOfDimension(const SvActualDimension& dim) {
   return static_cast<uint32_t>(std::abs(dim.high - dim.low)) + 1U;
 }
 
-// §H.7.1: the range of the one-dimensional packed array equivalent to the
-// actual's packed dimensions, one element per combination of their indices,
-// normalized to [size-1:0].
 SvActualDimension LinearizedNormalizedRange(
     const std::vector<SvActualDimension>& actual_packed) {
   int32_t size = actual_packed.empty() ? 0 : 1;
@@ -109,8 +96,6 @@ SvActualDimension LinearizedNormalizedRange(
 }  // namespace
 
 bool DpiTypeIsSmall(DataTypeKind kind) {
-  // §H.8.7: byte, shortint, int, longint, real, shortreal; scalar bit and
-  // logic; chandle and string.
   return !SmallCType(kind, false).empty();
 }
 
@@ -121,13 +106,9 @@ std::string_view DpiCTypeOfHandleArgument() {
 bool DpiUserMayModifyHandleContents() { return false; }
 
 std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
-  // §H.8.6: an open array is passed by handle whatever the direction, and the
-  // handle always carries the const qualifier.
   if (open_array) return std::string(DpiCTypeOfHandleArgument());
   const bool kInput = formal.direction == Direction::kInput;
   if (IsPackedArray(formal)) {
-    // §H.8.4 and §H.8.8: a packed array is passed by reference to its
-    // canonical representation, const for an input.
     const std::string kChunk = DpiCanonicalElementType(formal.type);
     if (kChunk.empty()) return "";
     return (kInput ? "const " : "") + kChunk + "*";
@@ -135,24 +116,16 @@ std::string DpiCTypeOfFormal(const DpiArg& formal, bool open_array) {
   if ((formal.type == DataTypeKind::kStruct ||
        formal.type == DataTypeKind::kUnion) &&
       !formal.type_name.empty()) {
-    // §H.7.5 and §H.8.4: a struct or union is passed by reference to the
-    // C-compatible object of the type it was declared with, const for an
-    // input -- §H.10.2's `pair i2` being `const pair* i2`.
     return (kInput ? "const " : "") + std::string(formal.type_name) + "*";
   }
   const std::string kSmall = SmallCType(formal.type, formal.is_unsigned);
   if (kSmall.empty()) return "";
-  // §H.8.7: an input of a small type is passed by value with the const
-  // qualifier, which a string's table type const char* already carries
-  // (§H.8.10); §H.8.8: an inout or output is passed by reference.
   if (!kInput) return kSmall + "*";
   return kSmall.starts_with("const ") ? kSmall : "const " + kSmall;
 }
 
 std::size_t DpiCElementBytes(const DpiArg& formal) {
   if (IsPackedArray(formal)) {
-    // §H.7.7: the canonical representation, one chunk per 32 bits, a
-    // 2-state chunk being one word and a 4-state one an aval/bval pair.
     const std::size_t kChunk = formal.type == DataTypeKind::kBit
                                    ? sizeof(SvBitVecVal)
                                    : sizeof(SvLogicVecVal);
@@ -168,8 +141,6 @@ std::string DpiCDeclarationOfUnpackedFormal(
       kPacked ? DpiCanonicalElementType(formal.type)
               : SmallCType(formal.type, formal.is_unsigned);
   if (kElement.empty()) return "";
-  // §H.8.10.1: a string element's const char* already carries the const an
-  // input has, and an array of strings is const char** in every direction.
   const bool kQualify =
       formal.direction == Direction::kInput && !kElement.starts_with("const ");
   std::string decl = kQualify ? "const " : "";
@@ -201,8 +172,6 @@ std::size_t DpiCOffsetOfUnpackedElement(
     const std::vector<int32_t>& sv_indices) {
   const std::vector<uint32_t> kIndices =
       DpiCIndicesOfUnpackedElement(unpacked_dims, sv_indices);
-  // Row-major: each dimension's index is scaled by the count of elements
-  // under one step of it, the product of the sizes of the dimensions after.
   std::size_t linear = 0;
   for (std::size_t k = 0; k < kIndices.size(); ++k) {
     linear = linear * SizeOfDimension(unpacked_dims[k]) + kIndices[k];
@@ -211,27 +180,19 @@ std::size_t DpiCOffsetOfUnpackedElement(
 }
 
 bool DpiPartSelectAppliesTo(const DpiArg& formal) {
-  // §H.11.5: a slice of a packed array of bit or logic, which is what has a
-  // canonical representation to slice.
   return IsPackedArray(formal);
 }
 
 bool DpiPartSelectIsDetermined(uint32_t width, int i, int w) {
   if (w < 1 || w > kDpiPartSelectMaxWidth || i < 0) return false;
-  // [(i+w-1):i] within [width-1:0]: the bit past the top of the select is
-  // no further than the bit past the top of the array.
   return static_cast<uint64_t>(i) + static_cast<uint64_t>(w) <= width;
 }
 
 int DpiNormalizedBitIndex(SvActualDimension packed, int32_t sv_index) {
-  // §H.7.6 b): [L:R] is normalized to [abs(L-R):0], the LSB at R index 0.
   return std::abs(sv_index - packed.high);
 }
 
 uint64_t DpiOpenArrayElementCount(const SvOpenArrayDesc& desc) {
-  // §H.12: the actual's size, over the unpacked dimensions the handle
-  // records after the packed part at dimension 0; a dimension is counted
-  // however its range runs.
   if (desc.ranges == nullptr) return 0;
   uint64_t count = 1;
   for (int d = 1; d < desc.n_dims; ++d) {
@@ -251,8 +212,6 @@ bool DpiOpenArrayWriteIsDefined(const SvOpenArrayDesc& desc, uint64_t bytes) {
 }
 
 std::string DpiCanonicalElementType(DataTypeKind kind) {
-  // §H.7.3 and §H.7.7: 2-state for bit, 4-state for logic and reg and for
-  // integer and time.
   switch (kind) {
     case DataTypeKind::kBit:
       return "svBitVecVal";
@@ -267,15 +226,11 @@ std::string DpiCanonicalElementType(DataTypeKind kind) {
 }
 
 DpiCanonicalBitPosition DpiCanonicalPositionOfBit(uint32_t bit) {
-  // §H.7.7: element 0 holds bits 0 to 31, element 1 the 32 more significant
-  // bits, and so on.
   return DpiCanonicalBitPosition{bit / kDpiCanonicalElementBits,
                                  bit % kDpiCanonicalElementBits};
 }
 
 uint32_t DpiCanonicalUnusedBits(uint32_t width) {
-  // §H.7.7: the last element holds width mod 32 bits when the width is not
-  // a multiple of 32, and the rest of it is unused.
   const uint32_t kUsed = width % kDpiCanonicalElementBits;
   return kUsed == 0 ? 0 : kDpiCanonicalElementBits - kUsed;
 }
@@ -286,8 +241,6 @@ uint32_t DpiCanonicalLastElementWithUnusedBits(uint32_t last, uint32_t width,
   if (kUnused == 0) return last;
   const uint32_t kUsed = kDpiCanonicalElementBits - kUnused;
   const uint32_t kUsedMask = (1U << kUsed) - 1U;
-  // §H.7.7: masking for an unsigned array, sign extension for a signed one
-  // from the array's most significant bit, bit kUsed-1 of the element.
   const bool kNegative = is_signed && ((last >> (kUsed - 1)) & 1U) != 0;
   return kNegative ? (last | ~kUsedMask) : (last & kUsedMask);
 }
@@ -329,8 +282,6 @@ DpiActualCoercion DpiCoercionOfPackedActual(uint32_t actual_width,
 
 bool DpiCTypeMatchesFormal(const DpiArg& formal, bool open_array,
                            std::string_view c_type) {
-  // The spelling DpiCTypeOfFormal gives puts the * against the type, so the
-  // prototype's spaces around a * are dropped before the comparison.
   std::string spelled;
   for (std::size_t i = 0; i < c_type.size(); ++i) {
     if (c_type[i] == ' ' && (i + 1 == c_type.size() || c_type[i + 1] == '*' ||
@@ -466,8 +417,6 @@ bool DpiAggregateLayoutIsCCompatible(const DpiAggregateElement& aggregate) {
 
 DpiPassingMode DpiPassingModeOfFormal(const DpiArg& formal, bool open_array) {
   if (open_array) return DpiPassingMode::kByHandle;
-  // §H.8.4 and §H.8.8: an unpacked array is passed by reference whatever its
-  // element type, an input of small elements included.
   if (formal.direction == Direction::kInput && !IsPackedArray(formal) &&
       !formal.has_unpacked_dimensions && DpiTypeIsSmall(formal.type)) {
     return DpiPassingMode::kByValue;
@@ -606,9 +555,7 @@ std::string_view DpiCTypeOfStringMember() { return "const char*"; }
 
 bool DpiStringMemberStipulationsAreStandalone() { return true; }
 
-std::string_view DpiCTypeOfStringArray(Direction /*direction*/) {
-  return "const char**";
-}
+std::string_view DpiCTypeOfStringArray(Direction) { return "const char**"; }
 
 bool DpiProgrammerChoosesFormalSizing() { return true; }
 
@@ -635,11 +582,8 @@ std::vector<SvActualDimension> DpiCRangesAtCall(
   std::vector<SvActualDimension> ranges =
       DpiFormalRangesAtCall(packed, unpacked, actual_packed, actual_unpacked);
   if (ranges.empty()) return ranges;
-  // §H.12.1: the packed part is normalized on the C side either way, [n:0].
   ranges[0] = DpiNormalizedRange(ranges[0]);
   for (std::size_t k = 1; k < ranges.size() && k - 1 < unpacked.size(); ++k) {
-    // §H.12.1: a sized unpacked dimension is normalized to C style, [0:k];
-    // an unsized one keeps the actual's original range.
     if (unpacked[k - 1].sized) {
       const auto kSize = static_cast<int32_t>(SizeOfDimension(ranges[k]));
       ranges[k] = SvActualDimension{0, kSize - 1};
@@ -797,11 +741,8 @@ std::string DpiCDeclarationOfAggregateMember(
   DpiArg member;
   member.name = name;
   member.type = kind;
-  // §H.7.1: the packed dimensions linearize to one normalized range, whose
-  // count is the member's width.
   member.width = SizeOfDimension(LinearizedNormalizedRange(packed_dims));
   if (packed_dims.empty()) member.width = 0;
-  // A member is qualified by no direction; an inout formal carries none.
   member.direction = Direction::kInout;
   return DpiCDeclarationOfUnpackedFormal(member, unpacked_dims);
 }
@@ -812,11 +753,7 @@ uint32_t DpiCLayerIncludeFileCount() { return 1; }
 
 bool DpiCLayerIncludeFileIsImplementationIndependent() { return true; }
 
-bool DpiIncludeFileDefines(DpiIncludeFileContent /*content*/) {
-  // §H.10: the canonical representation, all basic types and all interface
-  // functions alike.
-  return true;
-}
+bool DpiIncludeFileDefines(DpiIncludeFileContent) { return true; }
 
 std::string_view DpiAnnexShowingIncludeFile() { return "Annex I"; }
 

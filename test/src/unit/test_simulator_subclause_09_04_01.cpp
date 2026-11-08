@@ -123,10 +123,6 @@ TEST(DelayControlSim, NegativeDelayReinterpretedAsUnsignedTimeVariable) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
 }
 
-// §9.4.1: a negative delay is an unsigned value of a time variable's size, so
-// taken at time 5 its wake lies past the last time the simulation can reach:
-// the statement after it never runs, and the run ends at time 5. The sum of
-// time and delay wrapped to a time before the present.
 TEST(DelayControlSim, NegativeDelayAfterTimeZeroNeverWakes) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -145,10 +141,6 @@ TEST(DelayControlSim, NegativeDelayAfterTimeZeroNeverWakes) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 5u);
 }
 
-// §9.4.1's unsigned reading of a negative delay leaves it near the largest
-// time before it is scaled to ticks, by the time unit's magnitude and by the
-// unit's distance from the precision, and either scaling stops at the largest
-// time rather than wrapping.
 TEST(DelayControlSim, ScalingALargeDelayStopsAtTheLargestTime) {
   constexpr uint64_t kLargest = ~uint64_t{0};
   const TimeScale kHundredNs{TimeUnit::kNs, 100, TimeUnit::kNs, 1};
@@ -190,12 +182,6 @@ TEST(DelayControlSim, MultibitUnknownDelayTreatedAsZero) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 0u);
 }
 
-// §9.4.1 treats a high-impedance delay value the same as an unknown one: it is
-// a zero delay. A single-bit z is non-discriminating because it carries no
-// known nonzero bits, so this uses 4'b10zz whose known high bits are worth 8.
-// Correct behavior forces a zero delay (time stays at 0); a raw-bits reading of
-// the value would instead advance time by 8. This is the high-Z counterpart of
-// MultibitUnknownDelayTreatedAsZero.
 TEST(DelayControlSim, MultibitHighZDelayTreatedAsZero) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -229,11 +215,6 @@ TEST(DelayControlSim, NarrowSignedNegativeDelayReinterpretedAsTimeVariable) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, ~uint64_t{0});
 }
 
-// §9.4.1 lists a parameter among the operands permitted in a delay value. A
-// parameter is not folded into a literal at the delay site: it is lowered to an
-// instance-scoped runtime variable (Lowerer::LowerParams) that the delay
-// expression resolves by name. This exercises that param-constant lookup path,
-// which is distinct from the literal path covered by DelayControlAdvancesTime.
 TEST(DelayControlSim, ParameterAsDelayValueAdvancesTime) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -248,10 +229,6 @@ TEST(DelayControlSim, ParameterAsDelayValueAdvancesTime) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 6u);
 }
 
-// §9.4.1 equally permits a localparam as the delay value. A localparam takes
-// the same params list as a parameter but carries the is_localparam flag; it is
-// still lowered to a runtime constant variable, so the delay must advance by
-// its value. This is the localparam counterpart of the parameter delay form.
 TEST(DelayControlSim, LocalparamAsDelayValueAdvancesTime) {
   SimFixture f;
   auto* var = RunAndFindVar(

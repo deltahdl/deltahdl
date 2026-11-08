@@ -12,14 +12,6 @@
 
 using namespace delta;
 
-// Annex H.8.8 (Inout and output arguments): an inout or output argument,
-// open arrays excepted, is always passed by reference, a packed array as
-// svBitVecVal* or svLogicVecVal*, and the same rules about unused bits
-// apply as in §H.7.7. The cases check the mode and C type an output or
-// inout takes and that the unused bits of a packed output's last chunk are
-// what the foreign code left there, the value being the bits within the
-// width once masked as §H.7.7 has the user do.
-
 namespace {
 
 DpiArg Formal(DataTypeKind type, Direction direction, uint32_t width = 0) {
@@ -31,10 +23,6 @@ DpiArg Formal(DataTypeKind type, Direction direction, uint32_t width = 0) {
   return formal;
 }
 
-// §H.8.8: an output or inout of any type but an open array is passed by
-// reference -- an int as int*, a packed bit array as svBitVecVal*, a packed
-// logic array, an integer and a time as svLogicVecVal* -- and an open array
-// stays the handle.
 TEST(DpiInoutAndOutputArguments, AlwaysPassedByReferenceUnlessAnOpenArray) {
   for (const Direction kDirection : {Direction::kOutput, Direction::kInout}) {
     EXPECT_EQ(
@@ -65,10 +53,6 @@ TEST(DpiInoutAndOutputArguments, AlwaysPassedByReferenceUnlessAnOpenArray) {
       Formal(DataTypeKind::kInt, Direction::kInput), false));
 }
 
-// §H.8.8 with §H.7.7: the unused bits of the last chunk a foreign function
-// writes to a `bit [7:0]` output are undetermined, so the chunk comes back
-// holding whatever it left there and the value is the eight bits within
-// the width once masked -- 0xAB out of 0xFFFFFFAB.
 TEST(DpiInoutAndOutputArguments, AnOutputsUnusedBitsFollowTheCanonicalRules) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -94,8 +78,6 @@ TEST(DpiInoutAndOutputArguments, AnOutputsUnusedBitsFollowTheCanonicalRules) {
   EXPECT_EQ(DpiCanonicalLastElementWithUnusedBits(kChunk, 8, false), 0xABU);
 }
 
-// The C functions the imports below are bound to, each writing its output and
-// inout formals through the pointers they arrive as.
 void WriteIntegers(char* b, short* s, int* i, long long* l) {
   *b = -100;
   *s = -30000;
@@ -128,9 +110,6 @@ void WriteVectors(uint32_t* bits40, SvLogicVecVal* logic64,
   time[1] = {2, 0};
 }
 
-// §H.8.8: an output or inout of a small type is passed by reference, a pointer
-// to its C type, and what the C function leaves there becomes the formal's
-// value on return (§35.5.1.2); an inout arrives holding the actual's value.
 TEST(DpiInoutAndOutputArguments, SmallFormalsAreWrittenThroughTheirPointers) {
   DpiCBinding b;
   b.dpi.RegisterImport(
@@ -182,10 +161,6 @@ TEST(DpiInoutAndOutputArguments, SmallFormalsAreWrittenThroughTheirPointers) {
   EXPECT_EQ(scalars[2].AsInt(), 123);
 }
 
-// §H.8.8: a packed output is passed as svBitVecVal* or svLogicVecVal*, and the
-// §H.7.7 rule about unused bits applies: what lies beyond the width in the
-// last chunk is undetermined, and the value is what lies within it. An
-// integer is one aval/bval pair and a time two.
 TEST(DpiInoutAndOutputArguments, PackedFormalsAreWrittenAsCanonicalArrays) {
   DpiCBinding b;
   b.dpi.RegisterImport(

@@ -8,31 +8,6 @@ using namespace delta;
 
 namespace {
 
-// What the synthesizer answers for each matching rule §10.9.1 states, over an
-// array. §10.9.1 rules that in an array assignment pattern the expressions
-// correspond element by element and the braces follow the array's dimensions,
-// gives a replication that stands for one whole dimension, gives the `default`
-// keyword for setting array elements to a value without counting how many there
-// are, and states the index:value rule as giving an explicit value to a keyed
-// element index. One case per rule below.
-//
-// Until this change this file wrote no assignment pattern at all. It held an
-// unpacked array declaration and two continuous assignments to its elements,
-// `assign arr[0] = 8'hAA;` and `assign arr[1] = 8'hBB;`, which is the §11.5.2
-// array addressing test/src/unit/test_synthesizer_subclause_11_05_02.cpp
-// covers, and its one case asserted the assignment-target report. No brace
-// reached the synthesizer from here.
-//
-// Every form below reaches SynthLower::LowerExprBit in
-// src/synthesizer/synth_lower.cpp as ExprKind::kAssignmentPattern, which
-// NonSynthExprRule in the same file reports under §10.9, so every case asserts
-// a refusal rather than the element values the rule produces. This is the
-// array half of what test/src/unit/test_synthesizer_subclause_10_09.cpp covers
-// over a bit vector, and the type-prefixed form that file writes is
-// ExprKind::kCast rather than ExprKind::kAssignmentPattern.
-
-// The positional rule: the expressions match element for element and the braces
-// match the array dimensions.
 TEST(ArrayPatternSynth, PositionalPatternOverAnArrayIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -49,11 +24,6 @@ TEST(ArrayPatternSynth, PositionalPatternOverAnArrayIsReportedUnlowered) {
                             3, "10.9"));
 }
 
-// The index:value rule, which names the element rather than counting to it.
-// Parser::ParseAssignmentPattern records the keys on the same
-// ExprKind::kAssignmentPattern node the positional form above builds, so a
-// lowering written for the positional form alone would reach this one and
-// answer with whatever it made of an unkeyed item list.
 TEST(ArrayPatternSynth, IndexKeyedPatternOverAnArrayIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -70,11 +40,6 @@ TEST(ArrayPatternSynth, IndexKeyedPatternOverAnArrayIsReportedUnlowered) {
                             3, "10.9"));
 }
 
-// The default:value rule, which covers the elements or subarrays neither an
-// index key nor a type key matched. Here it matches every element, so the
-// pattern carries one item for an array of four and the item count says nothing
-// about the element count -- the case above and this one differ in that as well
-// as in the key.
 TEST(ArrayPatternSynth, DefaultKeyedPatternOverAnArrayIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -91,12 +56,6 @@ TEST(ArrayPatternSynth, DefaultKeyedPatternOverAnArrayIsReportedUnlowered) {
                             3, "10.9"));
 }
 
-// The replication §10.9.1 borrows from §11.4.12.1, where each replication
-// stands for one whole dimension. §11.4.12.1 replication over a bit vector is a
-// lowering this synthesizer does have, in SynthLower::LowerReplicateBit, so
-// this case is what tells the replication inside braces from the one outside
-// them: the braces make the node ExprKind::kAssignmentPattern rather than
-// ExprKind::kReplicate, and it is reported.
 TEST(ArrayPatternSynth, ReplicatedPatternOverAnArrayIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

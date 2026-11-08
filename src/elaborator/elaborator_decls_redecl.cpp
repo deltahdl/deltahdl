@@ -13,8 +13,6 @@
 
 namespace delta {
 
-// §23.2.2.1: diagnose redeclaration of a declared name against the ANSI and
-// complete non-ANSI port name tables.
 static void CheckPortNameRedeclaration(const ModuleItem* item,
                                        const DeclNameTables& tables,
                                        DiagEngine& diag) {
@@ -33,12 +31,6 @@ static void CheckPortNameRedeclaration(const ModuleItem* item,
   }
 }
 
-// §23.2.2.1: reconcile a declaration against an earlier partial
-// (direction-only) port declaration — width mismatch is an error — and record
-// the name, diagnosing any plain redeclaration. §3.13 (g) has the first net or
-// variable of a port's name reintroduce it in the module name space, so a
-// second one is a redeclaration there like any other. `kind_word` selects
-// "net" or "variable" in the vector-range message.
 static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
                                                 const DeclTypeRef& decl_type,
                                                 DeclNameTables tables,
@@ -56,25 +48,11 @@ static void CheckPartialPortOrNameRedeclaration(const ModuleItem* item,
     }
   }
   if (!tables.declared_names.insert(tables.scoped_name).second) {
-    // §27.4: each generate-loop iteration is a distinct block instance, so the
-    // name is tracked under its generate-prefixed (scoped) form; an unprefixed
-    // top-level declaration scopes to its bare name, leaving that case
-    // unchanged. Only a true same-scope clash collides.
-    //
-    // §6.5 closes with the rule that within a name space a name a net or
-    // variable declared is not redeclared, and §23.9 states the general rule
-    // that an identifier declares one item in a scope. A net or variable
-    // reusing a net's or variable's name is the case §6.5 names and is filed
-    // there, which is where sv-tests tags 6.5--variable_redeclare.sv; a clash
-    // with a declaration of another kind keeps §23.9.
     diag.Error(item->loc, std::format("redeclaration of '{}'", item->name),
                Subclause(tables.redeclares_net_or_variable ? "6.5" : "23.9"));
   }
 }
 
-// §23.2.2.1: diagnose redeclaration of a declared name and width mismatches
-// against an earlier partial (direction-only) port declaration. `kind_word`
-// selects "net" or "variable" in the vector-range message.
 void CheckDeclRedeclaration(const ModuleItem* item,
                             const DeclTypeRef& decl_type, DeclNameTables tables,
                             std::string_view kind_word, DiagEngine& diag) {
@@ -82,14 +60,6 @@ void CheckDeclRedeclaration(const ModuleItem* item,
   CheckPartialPortOrNameRedeclaration(item, decl_type, tables, kind_word, diag);
 }
 
-// §3.13 (g) (printed page 58): a port's name may be reintroduced in the module
-// name space only by a net or variable of that name, which
-// CheckDeclRedeclaration reconciles with the port, so a declaration of any
-// other kind taking it in the module itself is a redeclaration under §3.13's
-// closing rule. A generate block is a scope of its own (§27.4), whose names do
-// not reach the ports. Every other name enters §3.13 (e)'s one module name
-// space under its generate-prefixed form, where a second declaration of it is
-// the redeclaration §23.9 states.
 void Elaborator::DeclareInModuleNameSpace(std::string_view name,
                                           SourceLoc loc) {
   if (name.empty()) return;

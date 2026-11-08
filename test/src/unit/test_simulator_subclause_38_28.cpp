@@ -29,9 +29,6 @@ class VpiMcdPrintfSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.28: the descriptor names files through its discrete channel bits, so the
-// OR of two mcd-opened descriptors writes the same text to both files in one
-// call, and the routine returns the number of characters printed.
 TEST_F(VpiMcdPrintfSim, WritesToSeveralChannelsSimultaneouslyAndReturnsCount) {
   char a[] = "a.log";
   char b[] = "b.log";
@@ -48,8 +45,6 @@ TEST_F(VpiMcdPrintfSim, WritesToSeveralChannelsSimultaneouslyAndReturnsCount) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd_b), "hello");
 }
 
-// §38.28: the text is controlled by a format string using the same format as
-// the C fprintf() routine, and the return value counts the expanded characters.
 TEST_F(VpiMcdPrintfSim, FormatStringControlsTheTextLikeCFprintf) {
   char name[] = "fmt.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -63,8 +58,6 @@ TEST_F(VpiMcdPrintfSim, FormatStringControlsTheTextLikeCFprintf) {
   EXPECT_EQ(written, 5);
 }
 
-// §38.28: an error returns EOF. With no format string there is nothing to
-// print, so the routine reports the error and writes nothing.
 TEST_F(VpiMcdPrintfSim, ReturnsEofWhenFormatStringIsMissing) {
   char name[] = "err.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -74,10 +67,6 @@ TEST_F(VpiMcdPrintfSim, ReturnsEofWhenFormatStringIsMissing) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
-// §38.28: the routine must not write to a file that an fd from $fopen stands
-// for, which the set MSB marks. A descriptor carrying that bit is withheld from
-// this routine entirely, so nothing is written and the count of characters
-// written is zero.
 TEST_F(VpiMcdPrintfSim, WritesNothingToAFileNamedByAnFdDescriptor) {
   PLI_UINT32 fd = PLI_UINT32{1} << 31;
 
@@ -88,13 +77,6 @@ TEST_F(VpiMcdPrintfSim, WritesNothingToAFileNamedByAnFdDescriptor) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(fd), "");
 }
 
-// §38.28: the MSB says the descriptor is an fd rather than an mcd, and an fd is
-// one whole value rather than a set of discrete channel bits, so the bits below
-// the MSB are part of that value rather than channels to write. $fopen hands
-// back fds whose low bits are an index, so an fd such as this one overlaps the
-// bit naming channel 1 and the bit naming an open mcd channel; reading those as
-// channels would put the text on the tool's output channel and in another
-// file's buffer, which is what the clause withholds.
 TEST_F(VpiMcdPrintfSim, AnFdWritesNoneOfTheChannelsItsLowerBitsWouldName) {
   char name[] = "overlap.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -112,15 +94,12 @@ TEST_F(VpiMcdPrintfSim, AnFdWritesNoneOfTheChannelsItsLowerBitsWouldName) {
 
 class PrintOnARunChannel : public RunFilesRun {
  protected:
-  // Prints on the channel beside the design's mcd, on which no file is open.
-  static PLI_INT32 PrintBeside(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 PrintBeside(PLI_BYTE8*) {
     vpi_mcd_printf(DescriptorIn("top.mcd") << 1, VpiText("stray"));
     return 0;
   }
 };
 
-// §38.28: in a run, text printed on a channel with no file open is written to
-// no file, the design's file on the channel beside it among them.
 TEST_F(PrintOnARunChannel, AChannelWithNoFileWritesNowhere) {
   RegisterTask("$print_beside", &PrintBeside);
   Run("module top; integer mcd;\n"

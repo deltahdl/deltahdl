@@ -10,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The variable of module `mod` named `name`, or nullptr when there is none.
 const RtlirVariable* FindVar(RtlirDesign* design, std::string_view mod,
                              std::string_view name) {
   auto it = design->all_modules.find(mod);
@@ -21,11 +20,6 @@ const RtlirVariable* FindVar(RtlirDesign* design, std::string_view mod,
   return nullptr;
 }
 
-// §22.14.1's second example carried all the way to an elaborated design. Under
-// a 1364-2001 region `logic` is an ordinary identifier, so it names the
-// module's 64-bit variable — and the elaborated module really does hold a
-// variable under that name and width, which is what shows the word survived as
-// a declaration rather than merely getting past the parser.
 TEST(KeywordVersionExampleElab, VerilogRegionElaboratesLogicAsAVariable) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -43,11 +37,6 @@ TEST(KeywordVersionExampleElab, VerilogRegionElaboratesLogicAsAVariable) {
   EXPECT_EQ(var->width, 64u);
 }
 
-// The example's variable is a packed 64-bit `reg`, but the region frees the
-// identifier rather than one declaration form. Carried through elaboration,
-// the freed word names a variable of each type a module of that era could
-// declare, and each arrives with the storage its own type implies — a
-// different path through the elaborator than the packed vector above.
 TEST(KeywordVersionExampleElab,
      VerilogRegionElaboratesLogicAsEveryVariableType) {
   struct Case {
@@ -77,11 +66,6 @@ TEST(KeywordVersionExampleElab,
   }
 }
 
-// §22.14.1's fourth example: the region names this standard, whose reserved
-// word list makes `interface`/`endinterface` keywords, so the declaration
-// elaborates as an interface — a §3.2 design element of a kind other than a
-// module, and a distinct input form for the region. The instantiating module
-// sits outside the pair, under the default list, and still binds to it.
 TEST(KeywordVersionExampleElab, SystemVerilogRegionElaboratesTheInterface) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -105,12 +89,6 @@ TEST(KeywordVersionExampleElab, SystemVerilogRegionElaboratesTheInterface) {
   EXPECT_EQ(it->second->nets[0].name, "data");
 }
 
-// §22.14.1's first example: with no directive governing it, the module is
-// elaborated under the implementation's default reserved word list. This
-// implementation's default is 1800-2023, and the positive witness for that is
-// that `logic` works here as the type keyword the newer lists reserve — the
-// opposite role it plays inside the 1364-2001 region above, from the same
-// spelling of the word.
 TEST(KeywordVersionExampleElab, ModuleWithNoDirectiveUsesTheDefaultList) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

@@ -151,8 +151,6 @@ TEST(ProceduralAssignDeassignElaboration, AssignIndexedPartSelectLhsIsError) {
 
 TEST(ProceduralAssignDeassignElaboration,
      AssignConcatWithBitSelectElemIsError) {
-  // A concatenation LHS must be a concatenation *of variables*; a bit-select
-  // element makes it a bit-select of a variable, which §10.6.1 forbids.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -186,9 +184,6 @@ TEST(ProceduralAssignDeassignElaboration,
 }
 
 TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatOfVariablesLhs) {
-  // A concatenation of variables may itself contain a nested concatenation of
-  // variables; with no bit/part-select anywhere in the tree the assign LHS is
-  // still a concatenation of variables and elaborates cleanly.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -203,9 +198,6 @@ TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatOfVariablesLhs) {
 }
 
 TEST(ProceduralAssignDeassignElaboration, AssignNestedConcatWithSelectIsError) {
-  // The concatenation-of-variables rule reaches through nesting: a part-select
-  // buried inside an inner concatenation still makes the LHS a part-select of a
-  // variable and must be rejected.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -238,20 +230,6 @@ TEST(ProceduralAssignDeassignElaboration, ReAssignSameVariableElaborates) {
 
 TEST(ProceduralAssignDeassignElaboration,
      ProceduralContinuousAssignInAlwaysCombIsIllegal) {
-  // §9.2.2.2 defines always_comb, and it does not change what a statement
-  // inside it may contain. §10.6.1's rule against a bit-select or part-select
-  // in a procedural assign LHS therefore reaches an assignment written in
-  // always_comb exactly as it reaches the one AssignBitSelectLhsIsError writes
-  // in initial. This case writes that same source with only the enclosing
-  // procedure changed.
-  //
-  // It fails today because is_proc in
-  // src/elaborator/elaborator_validate_matches.cpp names two of the six
-  // procedural kinds ModuleItemKind declares, so
-  // Elaborator::ValidateItemConstraints never calls CheckProceduralAssignLhs
-  // on an always_comb body and no report is made at all. Nine calls sit behind
-  // that one flag, so this case exists to pin the fix as a property of is_proc
-  // rather than of any single check.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -266,11 +244,6 @@ TEST(ProceduralAssignDeassignElaboration,
       "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so the fail arm of an immediate assertion is a statement
-// position, and §10.6.1's rule reaches the procedural assign written there.
-// This is the source AssignBitSelectLhsIsError writes in an initial block, with
-// only the offending statement moved into that arm.
 TEST(ProceduralAssignDeassignElaboration,
      ProceduralAssignWithASelectLhsInAnAssertFailArmIsRejected) {
   ElabFixture f;
@@ -286,9 +259,6 @@ TEST(ProceduralAssignDeassignElaboration,
       "bit-select or part-select in procedural assign LHS", 4, "10.6.1"));
 }
 
-// The same §16.3 action-block arm holding an assign LHS §10.6.1 allows, which
-// mirrors AssignSingularVariableLhs. It pins that reaching the arm reports on
-// what the rule forbids rather than on every statement newly walked.
 TEST(ProceduralAssignDeassignElaboration,
      ProceduralAssignWithAWholeVariableLhsInAnAssertFailArmIsAccepted) {
   ElabFixture f;
@@ -303,11 +273,6 @@ TEST(ProceduralAssignDeassignElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.6.1 bounds an `assign` statement's target to a variable, and §6.20 and
-// §6.19 make a parameter, a localparam, a specparam and a name an enumeration
-// declares constants, none of them a variable. Each is reported, in a process
-// and in a task alike, and an element of a concatenation is asked about as a
-// target of its own; the variable `q` is not reported.
 TEST(ProceduralAssignDeassignElaboration, AssignOfAConstantIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -340,12 +305,6 @@ TEST(ProceduralAssignDeassignElaboration, AssignOfAConstantIsReported) {
                              "procedural assign of constant", 11, "10.6.1"));
 }
 
-// §10.6.1 (printed page 257) bounds an `assign` statement's target to a
-// variable or a concatenation of variables, and A.6.2 (printed page 1198)
-// writes a `deassign`'s target as a variable_lvalue; only `force` and `release`
-// (§10.6.2) take a net as well. A net named alone or within a concatenation is
-// reported, in a process and in a task alike, while a block's own variable of
-// the net's name is the block's and not the net.
 TEST(ProceduralAssignDeassignElaboration, NetTargetOfAssignOrDeassignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -381,9 +340,6 @@ TEST(ProceduralAssignDeassignElaboration, NetTargetOfAssignOrDeassignIsError) {
   }
 }
 
-// §27.2 makes a generate block a collection of module items, so a net and a
-// select are no target of a procedural assign or deassign inside one, and a
-// whole variable is.
 TEST(ProceduralAssignDeassignElaboration, TargetInsideGenerateBlocksIsChecked) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "wire w;", "initial assign w = 1;"},

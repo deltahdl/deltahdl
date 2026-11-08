@@ -133,12 +133,6 @@ TEST(DisableForkExecution, DisableForkWithNoChildrenIsNoop) {
   LowerRunAndCheck(f, design, {{"x", 1u}});
 }
 
-// Terminating every descendant must also retire the calling process's
-// outstanding-children bookkeeping: once disable fork has killed the spawned
-// subprocesses there is nothing left for a subsequent wait fork to block on, so
-// it returns immediately and the following statement runs. Were the tally left
-// standing, wait fork would suspend forever (the killed child can never resume
-// to decrement it) and y would never be written.
 TEST(DisableForkExecution, WaitForkAfterDisableForkDoesNotBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -157,14 +151,6 @@ TEST(DisableForkExecution, WaitForkAfterDisableForkDoesNotBlock) {
   LowerRunAndCheck(f, design, {{"x", 0u}, {"y", 1u}});
 }
 
-// Mirrors the clause's own example: the disable fork sits inside a subroutine,
-// after a join_any that unblocks on the first branch to finish. Once the #10
-// branch completes (hits==1, result==1), disable fork -- from the task's own
-// process -- terminates the two still-pending branches, so neither the #20 nor
-// the #30 branch ever runs and hits stays at 1. This exercises the construct in
-// a distinct syntactic position (within a called task rather than directly in
-// an initial block) and confirms the calling process it operates on is the
-// task's.
 TEST(DisableForkExecution, DisableForkInsideTaskKillsRemainingWaiters) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -187,14 +173,6 @@ TEST(DisableForkExecution, DisableForkInsideTaskKillsRemainingWaiters) {
   LowerRunAndCheck(f, design, {{"hits", 1u}, {"result", 1u}});
 }
 
-// Isolates the dynamic-parent-child 'shall': disable fork ends only what the
-// calling thread spawned, NOT every process executing a given block. Both
-// initial blocks fork a call to the SAME task work -- one static block executed
-// by two distinct dynamic threads. The first thread's disable fork kills only
-// its own work(1) instance (a stays 0), while the second thread's work(2)
-// instance -- the same static block, spawned by a different thread -- is
-// untouched and runs to completion (b becomes 2). A static-block disable would
-// have ended both; disable fork spares the sibling thread's copy.
 TEST(DisableForkExecution, DisableForkSparesSameBlockInOtherThread) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -217,9 +195,6 @@ TEST(DisableForkExecution, DisableForkSparesSameBlockInOtherThread) {
   LowerRunAndCheck(f, design, {{"a", 0u}, {"b", 2u}});
 }
 
-// §9.6.3: a child disable fork ends before it has started leaves the caller's
-// wait-fork tally as one that ran and ended would, so a wait fork on a later
-// fork waits for that fork's children alone.
 TEST(DisableForkExecution, ALaterWaitForkWaitsForItsOwnChildren) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; int y;\n"

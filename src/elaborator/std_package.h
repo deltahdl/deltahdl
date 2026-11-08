@@ -10,20 +10,6 @@ namespace delta {
 
 struct DataType;
 
-// §G.1: the built-in standard package, std, has the contents Annex G
-// describes -- the semaphore class, the mailbox class, the randomize
-// function, the process class and the weak reference class -- each with a
-// prototype of its own in §G.3 through §G.7. §G.2 adds that the package
-// contains system types, the types of §26.7's std package, and that the
-// semantics of each of its members are defined not in the annex but in the
-// subclause its prototype indicates: §15.3 for semaphore, §15.4 for mailbox,
-// §18.12 for randomize, §9.7 for process and §8.30 for weak_reference. This
-// file is the one place the contents are written down: the compilation-unit
-// scope registers the std package's class names from it, and any other
-// reader of the std package asks it what the package holds and where each
-// member's semantics live.
-
-// §G.1: the five members, in the order the subclause lists them.
 enum class StdPackageMember : std::uint8_t {
   kSemaphore,
   kMailbox,
@@ -32,139 +18,79 @@ enum class StdPackageMember : std::uint8_t {
   kWeakReference,
 };
 
-// §G.1: four of the members are classes and one, randomize, is a function.
 enum class StdPackageMemberKind : std::uint8_t { kClass, kFunction };
 
 struct StdPackageEntry {
   StdPackageMember member = StdPackageMember::kSemaphore;
   std::string_view name;
   StdPackageMemberKind kind = StdPackageMemberKind::kClass;
-  std::string_view defining_subclause;   // §G.2: where the semantics are
-  std::string_view prototype_subclause;  // §G.3 to §G.7: where the prototype is
+  std::string_view defining_subclause;
+  std::string_view prototype_subclause;
 };
 
-// §G.1: the contents of the std package, in the subclause's order.
 const std::vector<StdPackageEntry>& StdPackageContents();
 
-// §G.1: the name a member is declared under in the std package, its kind,
-// and the member a name denotes, or none where the std package holds no
-// member of that name.
 std::string_view StdPackageMemberName(StdPackageMember member);
 StdPackageMemberKind KindOfStdPackageMember(StdPackageMember member);
 std::optional<StdPackageMember> StdPackageMemberNamed(std::string_view name);
 
-// §G.2: the subclause the semantics of a member are defined in, which the
-// member's prototype in §G.3 through §G.7 indicates; and whether a subclause
-// lies there, being that subclause or one beneath it, so that a diagnostic a
-// std member's semantics raise can be seen to cite the place §G.2 points to.
 std::string_view DefiningSubclauseOfStdPackageMember(StdPackageMember member);
 
-// §G.3 through §G.7: the subclause of the annex that gives a member's
-// prototype, which a diagnostic checking a call against the prototype cites.
 std::string_view PrototypeSubclauseOfStdPackageMember(StdPackageMember member);
 bool StdPackageDefinesSemanticsIn(StdPackageMember member,
                                   std::string_view subclause);
 
-// §G.2: the std package contains system types; a name denotes one iff it
-// denotes a member of the package that is a class, randomize being a function
-// and no type.
 bool IsStdPackageSystemType(std::string_view name);
 
-// §G.3 through §G.7 give each class of the std package a prototype: its
-// methods, each a function or a task, with a return type and formals of which
-// some carry a default, and with the constructor new among them where the
-// class has one. A prototype is written down once here and read by the
-// elaborator where a call on a handle of the class is checked against it.
 enum class StdMethodKind : std::uint8_t { kFunction, kTask };
 
 struct StdFormal {
   std::string_view type;
   std::string_view name;
   bool has_default = false;
-  bool by_reference = false;  // a ref formal
+  bool by_reference = false;
 };
 
 struct StdMethodPrototype {
   std::string_view name;
   StdMethodKind kind = StdMethodKind::kFunction;
-  std::string_view return_type;  // void for a task and a void function
+  std::string_view return_type;
   std::vector<StdFormal> formals;
   bool is_static = false;
-  bool variadic = false;  // written ( ... ): any number of actuals
+  bool variadic = false;
 };
 
-// §G.3: the prototype of the semaphore class -- new(int keyCount = 0),
-// void put(int keyCount = 1), task get(int keyCount = 1) and
-// int try_get(int keyCount = 1).
 const std::vector<StdMethodPrototype>& SemaphorePrototype();
 
-// §G.5: the prototype of the randomize function, function int
-// randomize( ... ), a function of the package and no class, whose call
-// takes the form randomize { attribute_instance } [ ( [
-// variable_identifier_list ] ) ] [ with constraint_block ] of randomize_call
-// in §A.8.2: the actuals, any number of them, are variable identifiers.
 const StdMethodPrototype& RandomizePrototype();
 
-// §G.4: the prototype of the mailbox class -- new(int bound = 0), int num(),
-// the tasks put(T message), get(ref T message) and peek(ref T message) and
-// the int functions try_put(T message), try_get(ref T message) and
-// try_peek(ref T message) -- over its type parameter T, whose default,
-// dynamic_singular_type, is the special type that enables run-time type
-// checking.
 const std::vector<StdMethodPrototype>& MailboxPrototype();
 
-// §G.6: the prototype of the process class -- class :final process, with the
-// nested typedef enum state of FINISHED, RUNNING, WAITING, SUSPENDED and
-// KILLED, the static function process self(), state status(), void kill(),
-// the task await(), void suspend(), void resume(), void srandom(int seed),
-// string get_randstate() and void set_randstate(string state), and no
-// constructor new.
 const std::vector<StdMethodPrototype>& ProcessPrototype();
 
-// §G.6: the members of the process class's nested enum state, in order.
 const std::vector<std::string_view>& ProcessStateEnumMembers();
 
-// §G.6: the enumeration a std class declares, where the named type `named`
-// denotes one -- process::state, the process class's enumeration of the
-// members ProcessStateEnumMembers lists over the default base type int -- or
-// null where it denotes none.
 const DataType* StdClassEnumType(const DataType& named);
 
-// §G.6: whether a std class is declared :final, which process alone is, so
-// that it cannot be extended; and whether it declares a constructor, which
-// process alone does not, so that a handle of it cannot be built with new.
 bool StdClassIsFinal(StdPackageMember member);
 bool StdClassHasConstructor(StdPackageMember member);
 
-// §G.7: the prototype of the weak reference class -- class weak_reference
-// #(type class T), with new(T referent), T get(), void clear() and the static
-// function longint get_id(T obj) -- over a type parameter restricted to a
-// class type and given no default.
 const std::vector<StdMethodPrototype>& WeakReferencePrototype();
 
-// The type parameter a std class prototype is written over, where it has
-// one: its name, its default, and whether it is restricted to a class type.
 struct StdTypeParameter {
   std::string_view name;
-  std::string_view default_type;  // empty where the parameter has no default
-  bool class_only = false;        // type class T
+  std::string_view default_type;
+  bool class_only = false;
 };
 std::optional<StdTypeParameter> StdClassTypeParameterOf(
     StdPackageMember member);
 
-// The prototype of a member of the std package: empty for the randomize
-// function, which is no class, and for a class whose prototype is not
-// written down.
 const std::vector<StdMethodPrototype>& StdClassPrototype(
     StdPackageMember member);
 
-// The method of a std class of the given name, or null where the prototype
-// declares none.
 const StdMethodPrototype* StdMethodNamed(StdPackageMember member,
                                          std::string_view name);
 
-// A call of a method may pass no fewer actuals than the formals without a
-// default and no more than the formals there are.
 std::size_t LeastActualsOf(const StdMethodPrototype& method);
 std::size_t MostActualsOf(const StdMethodPrototype& method);
 

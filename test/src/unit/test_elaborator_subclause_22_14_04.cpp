@@ -15,14 +15,11 @@ using namespace delta;
 
 namespace {
 
-// The ten identifiers this version_specifier drops from the list "1364-2001"
-// reserves.
 constexpr const char* kExcluded[] = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",
 };
 
-// The rest of Table 22-2, which this version keeps reserved.
 constexpr const char* kKept[] = {
     "automatic",
     "endgenerate",
@@ -37,11 +34,6 @@ constexpr const char* kKept[] = {
     "unsigned",
 };
 
-// The exception carried to this stage. Being dropped from the reserved list
-// has to mean more than lexing as an identifier: each of the ten must name a
-// variable that really exists in the elaborated design, carrying the storage
-// its declaration asked for. The "1364-2001" leg is what makes each one an
-// exception rather than a word that was never reserved.
 TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
   EXPECT_EQ(std::size(kExcluded), 10u);
   for (const char* word : kExcluded) {
@@ -57,12 +49,7 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
     EXPECT_EQ(v->width, 8u) << word;
 
     ElabFixture reserved;
-    // A reserved word in a declaration's name slot is a keyword token where an
-    // identifier is required, so Parser::ExpectIdentifier in
-    // src/parser/parser_inst.cpp reports and the source does not parse.
     ElaborateWithPreprocessorAllowingParseErrors(In2001(decl), reserved, "t");
-    // The report names the keyword it found, so each of the ten is asserted on
-    // its own word rather than on a sentence all ten share.
     EXPECT_TRUE(
         ReportedError(reserved.diag.Diagnostics(),
                       std::string("expected identifier, got '") + word + "'",
@@ -71,10 +58,6 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedVariables) {
   }
 }
 
-// The complement: the eleven entries of Table 22-2 this subclause does not
-// name stay reserved, so none of them reaches the design as a variable. The
-// 1364-1995 leg shows the same declaration building one under the list
-// "1364-2001" extends, so the rejection is the reserved word list's doing.
 TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
   EXPECT_EQ(std::size(kKept), 11u);
   for (const char* word : kKept) {
@@ -82,9 +65,6 @@ TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
         std::string("module t;\n  reg [7:0] ") + word + ";\nendmodule\n";
 
     ElabFixture reserved;
-    // As above: the word is still a keyword token here, so the report this
-    // leg rests on is the parser's, from Parser::ExpectIdentifier in
-    // src/parser/parser_inst.cpp.
     ElaborateWithPreprocessorAllowingParseErrors(InNoconfig(decl), reserved,
                                                  "t");
     EXPECT_TRUE(
@@ -103,12 +83,6 @@ TEST(NoconfigKeywordElaboration, KeptAdditionsCannotNameElaboratedVariables) {
   }
 }
 
-// The elaborated design keeps nets and constants in containers of their own,
-// separate from the variables above, so a dropped word has to survive each of
-// those paths in its own right. This also puts both sides of the rule in one
-// declaration list: the constants are introduced by `parameter`, inherited
-// from Table 22-1, and by `localparam`, an addition this version keeps, while
-// every name they carry is one of the ten it drops.
 TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedNetsAndConstants) {
   ElabFixture f;
   auto* design =
@@ -142,8 +116,6 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameElaboratedNetsAndConstants) {
   EXPECT_EQ(p->resolved_value, 9);
 }
 
-// The declaration kinds the sweep does not reach -- an integer, a real, a time,
-// and an event -- each a different path from the declaration into the design.
 TEST(NoconfigKeywordElaboration, ExcludedWordsNameEveryVariableKind) {
   ElabFixture f;
   auto* design =
@@ -179,30 +151,15 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsNameEveryVariableKind) {
   EXPECT_TRUE(v->is_event);
 }
 
-// A dropped word naming the design element itself, its ports, and the instance
-// that binds to it: the region governs a whole elaborated hierarchy, not one
-// declaration inside one module.
 TEST(NoconfigKeywordElaboration, ExcludedWordNamesModulePortsAndInstance) {
   ExpectFreedWordsNameModulePortsAndInstance(
       "1364-2001-noconfig", {"cell", "design", "library", "config"});
 }
 
-// Behaving as "1364-2001" does, observed as elaborated structure rather than
-// as tokens: the additions this version keeps still do their job. `localparam`
-// resolves to a constant, `genvar`/`generate`/`endgenerate` produce one copy of
-// the loop body per iteration, and `signed`/`unsigned` select what they select.
-// They are tied together deliberately -- the localparam is the loop bound, so
-// the number of declarations reaching the design depends on it resolving, and
-// the nested condition picks out a single iteration, so the genvar has to hold
-// a different constant on each pass.
 TEST(NoconfigKeywordElaboration, KeptAdditionsStillBuildTheDesign) {
   ExpectVerilog2001DeclarationsElaborate("1364-2001-noconfig");
 }
 
-// A dropped word sizing a declaration rather than naming one: each constant
-// form this version admits reaches the elaborator by a different path, and all
-// three arrive at the same width. Every constant here is carried by one of the
-// ten, so the exception is what makes the widths resolvable at all.
 TEST(NoconfigKeywordElaboration, ExcludedWordsCarryConstantsThatSizeADecl) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -230,15 +187,6 @@ TEST(NoconfigKeywordElaboration, ExcludedWordsCarryConstantsThatSizeADecl) {
   }
 }
 
-// The constant form the width test above cannot reach: a genvar. This puts
-// both halves of the rule inside one declaration -- `genvar` is one of the
-// eleven additions this version keeps, so it still opens the declaration, while
-// the name it introduces is one of the ten this version drops. Only a loop
-// generate construct shows a genvar doing its job, so the count of the
-// per-iteration copies proves it resolved, and the nested condition picking
-// one pass proves it held a different constant each time rather than merely
-// making the loop run. The loop bound is carried by a second dropped word, so
-// the whole construct is driven by names this version freed.
 TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
   ElabFixture f;
   auto* built = ElaborateWithPreprocessor(
@@ -267,13 +215,6 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
   EXPECT_EQ(CountVarsEndingIn(built, "t", "slot"), 4u);
   EXPECT_EQ(CountVarsEndingIn(built, "t", "picked"), 1u);
 
-  // The identical construct under the version this one is defined from, where
-  // both names are still reserved and so cannot be declared. Being reserved is
-  // what the parser enforces, so this leg reaches its subject through a source
-  // that does not parse. `incdir` is the first of the two the parser reaches:
-  // it is a keyword token in the name slot of a parameter declaration, so
-  // Parser::ParseParamDecl in src/parser/parser_types.cpp reports through
-  // Parser::Expect under §6.20.1.
   ElabFixture reserved;
   ElaborateWithPreprocessorAllowingParseErrors(
       In2001("module t;\n"
@@ -286,11 +227,6 @@ TEST(NoconfigKeywordElaboration, ExcludedWordNamesAGenvarDrivingAGenerateLoop) {
                             LineInRegion(2), "6.20.1"));
 }
 
-// The bound from above: this version reserves no more than "1364-2001" does,
-// so a word a later list introduces is not a data type here. `uwire` is the
-// sharpest case, being the sole addition of the very next version. The same
-// source outside the region does elaborate, which is what shows the region --
-// and not some unrelated limitation -- is doing the rejecting.
 TEST(NoconfigKeywordElaboration, WordOutsideTheListIsNotADataType) {
   ExpectDeclsFailInRegionButElaborateOutside(
       "1364-2001-noconfig", {"logic [7:0] v;", "uwire v;", "bit [7:0] v;"});

@@ -47,9 +47,6 @@ TEST(DeclarationAssignmentElaboration, ParamAssignmentResolvesConstant) {
 
 TEST(DeclarationAssignmentElaboration,
      ParamAssignmentConstantExprReferencesParam) {
-  // param_assignment's right side is a constant_param_expression. A literal
-  // (covered above) and a reference to another parameter take different
-  // constant-evaluation code paths; here B's value is derived from A.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -167,10 +164,6 @@ TEST(DeclarationAssignmentElaboration, DefparamAssignmentOverridesChildParam) {
 
 TEST(DeclarationAssignmentElaboration,
      DefparamAssignmentOverrideReferencesParam) {
-  // defparam_assignment's right side is a constant_mintypmax_expression. Beyond
-  // a literal override (covered above), the override value may reference a
-  // parameter visible in the enclosing scope; that reference resolves during
-  // elaboration to drive the child's parameter.
   ElabFixture f;
   auto* design = Elaborate(
       "module child;\n"
@@ -222,13 +215,6 @@ TEST(DeclarationAssignmentElaboration, DefparamAssignmentDeepHierarchy) {
   EXPECT_TRUE(found);
 }
 
-// A.2.4's class_new writes a shallow copy as `new expression`, and footnote 23
-// has the expression evaluate to an object handle. An int, a 4-bit logic and a
-// net, an int parameter port and a byte parameter are none, and each is
-// reported, in a module item's initializer, a block's declaration and an
-// assignment alike. A variable and a parameter of a named type, which may be a
-// class, and an untyped parameter, whose type is its final value's (§6.20.2),
-// are let through. Each was accepted, and the copy built nothing at run time.
 TEST(DeclarationAssignmentElaboration, ShallowCopyOfNoHandleIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -275,9 +261,6 @@ TEST(DeclarationAssignmentElaboration, ShallowCopyOfNoHandleIsReported) {
   }
 }
 
-// A handle is a shallow copy's source in each of its forms: a handle variable
-// in a module item's initializer and in an assignment, an element of an array
-// of handles, and `this` in a method.
 TEST(DeclarationAssignmentElaboration, ShallowCopyOfHandleIsAccepted) {
   ElabFixture f;
   ElaborateSrc(

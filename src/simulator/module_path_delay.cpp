@@ -1,8 +1,3 @@
-// The selection half of simulator/module_path_delay.h: which of Table 30-2's
-// twelve transitions a change of value is, and which registered module path
-// governs that change. RunModulePathTransition, declared in the same header, is
-// in simulator/module_path_drive.cpp.
-
 #include "simulator/module_path_delay.h"
 
 #include <algorithm>
@@ -31,8 +26,6 @@
 namespace delta {
 namespace {
 
-// The four levels Table 30-2's rows and columns run over. The enumerator values
-// are the indices into kTransitionSlots.
 enum class PathLevel : uint8_t {
   kZero = 0,
   kOne = 1,
@@ -40,10 +33,6 @@ enum class PathLevel : uint8_t {
   kZ = 3,
 };
 
-// Table 30-2's slots, indexed [from level][to level]. The table lists the
-// twelve transitions in the order 0 -> 1, 1 -> 0, 0 -> z, z -> 1, 1 -> z, z ->
-// 0, 0 -> x, x -> 1, 1 -> x, x -> 0, x -> z, z -> x, which is what puts 6 at 0
-// -> x and 11 at z -> x. The diagonal is not a transition and answers slot 0.
 constexpr uint8_t kTransitionSlots[4][4] = {
     {0, 0, 6, 2},
     {1, 0, 8, 4},
@@ -51,10 +40,6 @@ constexpr uint8_t kTransitionSlots[4][4] = {
     {5, 3, 11, 0},
 };
 
-// Every bit high-z. simulator/evaluation.h declares HasUnknownBits and no
-// counterpart for z, so the test stands here; SelectScalarContAssignDelay in
-// simulator/lowerer_contassign.cpp asks the same question of a continuous
-// assignment's value.
 bool IsHighZValue(const Logic4Vec& v) {
   if (v.nwords == 0) return false;
   for (uint32_t i = 0; i < v.nwords; ++i) {
@@ -64,8 +49,6 @@ bool IsHighZValue(const Logic4Vec& v) {
   return true;
 }
 
-// The level Table 30-2 reduces a vector to. The z test comes before the x test
-// because HasUnknownBits reports any bval bit, and z sets bval as x does.
 PathLevel LevelOf(const Logic4Vec& v) {
   if (IsHighZValue(v)) return PathLevel::kZ;
   if (HasUnknownBits(v)) return PathLevel::kX;
@@ -73,10 +56,6 @@ PathLevel LevelOf(const Logic4Vec& v) {
   return PathLevel::kZero;
 }
 
-// Whether `pd` ends at the module path destination `qualified` names, which is
-// that destination's own port name under the instance prefix of the module
-// whose specify block declared the path. The two halves are compared where they
-// stand rather than joined into one string, so a lookup allocates nothing.
 bool PathEndsAt(const PathDelay& pd, std::string_view qualified) {
   if (qualified.size() != pd.inst_prefix.size() + pd.dst_port.size()) {
     return false;
@@ -85,11 +64,6 @@ bool PathEndsAt(const PathDelay& pd, std::string_view qualified) {
          qualified.substr(pd.inst_prefix.size()) == pd.dst_port;
 }
 
-// Whether `pd` starts at one of the driver's operands, which is what makes it a
-// path the transition may be reached through. The operands are the bare names
-// the driver was written with, and pd.src_port is the bare name the specify
-// block was written with; both stand in the instance PathEndsAt has already
-// selected, so no prefix enters here.
 bool PathStartsAtOneOf(const PathDelay& pd,
                        const std::vector<std::string_view>& sources) {
   for (std::string_view src : sources) {
@@ -98,9 +72,6 @@ bool PathStartsAtOneOf(const PathDelay& pd,
   return false;
 }
 
-// The bounds a path terminal's select spells (PathDelay::src_select), "[1]"
-// read as [1:1] and "[3:2]" as written; false for an empty select and for text
-// of any other shape.
 bool SelectBounds(std::string_view select, int64_t& left, int64_t& right) {
   if (select.size() < 3 || select.front() != '[' || select.back() != ']')
     return false;
@@ -117,33 +88,22 @@ bool SelectBounds(std::string_view select, int64_t& left, int64_t& right) {
   return parse(lhs, left) && parse(rhs, right);
 }
 
-// The level of bit `bit` of `word`: 0, 1, or 2 for x and z alike, which is
-// all §9.4.2's Table 9-2 tells apart.
 uint8_t BitLevel(const Logic4Word& word, unsigned bit) {
   if (((word.bval >> bit) & 1U) != 0U) return 2;
   return static_cast<uint8_t>((word.aval >> bit) & 1U);
 }
 
-// §9.4.2 Table 9-2: the edge a bit moving from level `from` to level `to` is,
-// posedge (Variable::kEdgeRise) for every change that leaves 0 or arrives at 1
-// and negedge (kEdgeFall) for every other change, which leaves 1 or arrives at
-// 0; none for no change.
 uint8_t EdgeBetween(uint8_t from, uint8_t to) {
   if (from == to) return 0;
   if (from == 0 || to == 1) return Variable::kEdgeRise;
   return Variable::kEdgeFall;
 }
 
-// The edge the change from `seen` to `var`'s value is at the least significant
-// bit, storage offset 0.
 uint8_t LsbEdge(const std::vector<Logic4Word>& seen, const Variable& var) {
   if (var.value.nwords == 0 || seen.empty()) return 0;
   return EdgeBetween(BitLevel(seen[0], 0), BitLevel(var.value.words[0], 0));
 }
 
-// Records `now` as the change time of each bit of `var` that differs from
-// `seen`, the value the watcher last recorded, a bit being one that differs
-// in either its value or its unknown plane, and the edge the change was.
 void RecordChangedBits(Variable& var, const std::vector<Logic4Word>& seen,
                        uint64_t now) {
   const size_t kWords = std::min<size_t>(var.value.nwords, seen.size());
@@ -191,21 +151,6 @@ bool IsModulePathOutput(const SpecifyManager& mgr, std::string_view output) {
   return false;
 }
 
-// The time the source terminal of `pd` last changed, or 0 where the design
-// declares no such variable. The name handed to FindVariable is already
-// qualified, and that resolves from inside the instance that declared the path
-// because SimContext::FindVariable reads a dotted name out of its own table
-// rather than joining it to the running process's prefix -- the rule §23.8's
-// hierarchical names need and this relies on. Zero is also what a source that
-// has never changed reads, and the two need not be told apart: §30.5.3 compares
-// these times against each other, and a source that never moved is never the
-// most recent unless every candidate is in the same position.
-//
-// A path whose input is a select of the variable, `(a[1] => y)`, transitions
-// when those bits do, so it reads the latest change among them
-// (Variable::bit_change_ticks). Timed by the whole vector, the paths from a[0]
-// and a[1] both moved at every change of either bit, and the smaller delay
-// governed a transition only the other bit had made.
 static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
   const Variable* var = ctx.FindVariable(pd.inst_prefix + pd.src_port);
   if (var == nullptr) return 0;
@@ -227,20 +172,9 @@ static uint64_t SourceChangeTicks(const PathDelay& pd, SimContext& ctx) {
   return latest;
 }
 
-// §30.5.3's condition half for a candidate that is not an ifnone path: it is
-// either unconditioned or its condition holds. A path the specify
-// block wrote without a condition carries no PathDelay::condition_expr and is
-// always active. A state-dependent one (§30.4.4) is active when its condition
-// evaluates true, which §30.4.4.1 extends to an x or z result;
-// StateDependentPathConditionEnables in simulator/specify_path_delay.h is that
-// rule, and it reads the least-significant 4-state word because a multi-bit
-// condition is represented by its LSB. A result with no words states no bit and
-// so states no true condition.
 static bool ConditionalPathIsActive(const PathDelay& pd,
                                     const ModulePathDrive& drive) {
   if (pd.condition_expr == nullptr) return true;
-  // The condition names the declaring instance's signals by their bare names,
-  // and a drive at the port runs in the instance above.
   InstancePrefixOverride scope(drive.ctx.InstancePrefixOverride(),
                                pd.inst_prefix);
   Logic4Vec value = EvalExpr(pd.condition_expr, drive.ctx, drive.arena);
@@ -248,13 +182,6 @@ static bool ConditionalPathIsActive(const PathDelay& pd,
   return StateDependentPathConditionEnables(value.words[0]);
 }
 
-// Whether a conditional module path between the same two terminals as
-// `ifnone_path` came out true. §30.4.4.4 makes that the whole of the ifnone
-// question: the keyword gives the state-dependent delay a path takes by default
-// when every other condition on it is false, so the ifnone path
-// is active exactly when this answers false. The candidates are already
-// restricted to one path output and one set of sources, so src_port and
-// dst_port are what say two of them are paths between the same terminals.
 static bool CorrespondingConditionIsTrue(
     const std::vector<PathCandidate>& candidates,
     const PathDelay& ifnone_path) {
@@ -268,12 +195,6 @@ static bool CorrespondingConditionIsTrue(
   return false;
 }
 
-// Settles every ifnone candidate against the conditional ones, which is why the
-// conditions are evaluated in a pass of their own first: §30.4.4.4 answers for
-// an ifnone path only once every corresponding condition has an answer. A path
-// output no state-dependent path reaches leaves each ifnone candidate active,
-// which is the clause's rule that an ifnone path with no matching
-// state-dependent module path behaves as an unconditional simple module path.
 static void SettleIfnoneCandidates(std::vector<PathCandidate>& candidates) {
   for (PathCandidate& candidate : candidates) {
     if (!candidate.path->is_ifnone) continue;
@@ -282,13 +203,6 @@ static void SettleIfnoneCandidates(std::vector<PathCandidate>& candidates) {
   }
 }
 
-// §30.4.3 (printed page 874): an edge-sensitive path models a delay that
-// applies only when the source signal makes the named edge, detected on
-// the LSB of a vector source, so it is active only where the source's latest
-// change was its edge -- the posedge of a `posedge` path, the negedge of a
-// `negedge` one, either of an `edge` one. A path from a select of the source
-// reads the edge of the select's least significant bit. A path written with no
-// edge is active whatever transition its input terminal makes.
 static bool EdgeSensitivePathIsActive(const PathDelay& pd, SimContext& ctx) {
   if (pd.edge == SpecifyEdge::kNone) return true;
   const Variable* var = ctx.FindVariable(pd.inst_prefix + pd.src_port);
@@ -319,8 +233,6 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
   for (const PathDelay& pd : drive.mgr.GetPathDelays()) {
     if (!PathEndsAt(pd, drive.output)) continue;
     if (!drive.at_port && !PathStartsAtOneOf(pd, drive.sources)) continue;
-    // An ifnone candidate is settled below, after every condition has an
-    // answer to be settled against.
     bool active = (pd.is_ifnone || ConditionalPathIsActive(pd, drive)) &&
                   EdgeSensitivePathIsActive(pd, drive.ctx);
     candidates.push_back(
@@ -334,30 +246,12 @@ ModulePathDelay SelectModulePathDelay(const ModulePathDrive& drive,
     if (candidate.path == selected)
       source_ticks = candidate.last_transition_time;
   }
-  // §30.7 measures a pulse against the limits of the delay that formed its
-  // edge, so all three are read off the one path the selection settled on.
   const uint64_t kDelay = selected->delays[slot];
   return ModulePathDelay{
       true, kDelay, EffectivePulseLimit(selected->reject_limit[slot], kDelay),
       EffectivePulseLimit(selected->error_limit[slot], kDelay), source_ticks};
 }
 
-// Records on `var` the time its value last changed, for as long as the run
-// lasts. Variable::last_change_ticks has no other writer.
-//
-// The watcher keeps its own copy of the value it last recorded rather than
-// trusting that a notification means a change. Variable::NotifyWatchers fires
-// whenever a driver commits, and a driver may commit the value already there --
-// Net::Resolve in src/simulator/net.cpp notifies after every resolution. A time
-// recorded for a commit that changed nothing would make that path the more
-// recent of two and hand the transition the wrong delay, which is the very
-// mistake §30.5.3 is being applied to avoid.
-//
-// It returns false so that NotifyWatchers re-arms it: a module path source may
-// transition any number of times before the run ends.
-//
-// `per_bit` asks for each bit's change time as well, which a path whose input
-// is a select of the variable reads (Variable::bit_change_ticks).
 static void WatchSourceVariable(Variable* var, SimContext& ctx, bool per_bit) {
   if (per_bit) {
     var->bit_change_ticks.assign(var->value.width, 0);
@@ -383,9 +277,6 @@ static void WatchSourceVariable(Variable* var, SimContext& ctx, bool per_bit) {
 }
 
 void WatchModulePathSources(const SpecifyManager& mgr, SimContext& ctx) {
-  // One watcher per source terminal however many paths start there, since the
-  // time recorded is the variable's and not the path's; it times each bit too
-  // where any of those paths starts at a select of the terminal.
   std::unordered_map<std::string, bool> sources;
   for (const PathDelay& pd : mgr.GetPathDelays()) {
     bool& per_bit = sources[pd.inst_prefix + pd.src_port];

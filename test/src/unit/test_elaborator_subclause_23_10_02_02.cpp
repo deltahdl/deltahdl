@@ -32,11 +32,6 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_EQ(u0->params[0].resolved_value, 8);
 }
 
-// §23.10.2 with §6.20.1: an override gives a parameter any value its
-// declaration could hold, and A's unpacked dimension makes its value an
-// array, given by an assignment pattern. B, folded from A[1], reads the
-// override's second item, 6; the pattern was dropped, leaving A '{1, 2} and B
-// 2.
 TEST(ModuleInstanceParameterAssignment,
      AssignmentPatternOverridesAnArrayParameter) {
   ElabFixture f;
@@ -117,9 +112,6 @@ TEST(ModuleInstanceParameterAssignment, EmptyExpressionRetainsDefault) {
   EXPECT_EQ(u0->params[0].resolved_value, 7);
 }
 
-// The value linked to a named parameter is an expression evaluated in the
-// instantiating module's scope, not merely a literal. A parameter of the
-// enclosing module is a valid constant form for that value (§6.20.2).
 TEST(ModuleInstanceParameterAssignment,
      NamedOverrideValueMayBeParentParameter) {
   ElabFixture f;
@@ -140,9 +132,6 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_EQ(u0->params[0].resolved_value, 12);
 }
 
-// A localparam of the enclosing module is another constant form (§6.20.2) that
-// may supply a named override value; it flows through the same scope-evaluation
-// path as a literal or parameter but is declared differently.
 TEST(ModuleInstanceParameterAssignment,
      NamedOverrideValueMayBeParentLocalparam) {
   ElabFixture f;
@@ -164,10 +153,6 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_EQ(u0->params[0].resolved_value, 9);
 }
 
-// Named assignment also binds a TYPE parameter (§6.20.3): the operand of the
-// override is a type rather than a value expression, taking a distinct code
-// path. The chosen type propagates to declarations inside the child, so a
-// variable typed by the parameter takes the overridden type's width.
 TEST(ModuleInstanceParameterAssignment, TypeParameterNamedOverrideSelectsType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -186,7 +171,6 @@ TEST(ModuleInstanceParameterAssignment, TypeParameterNamedOverrideSelectsType) {
   for (const auto& v : u0->variables)
     if (v.name == "sig") sig = &v;
   ASSERT_NE(sig, nullptr);
-  // int is 32 bits; the default byte would have been 8.
   EXPECT_EQ(sig->width, 32u);
 }
 
@@ -215,11 +199,6 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_EQ(u_named->params[0].resolved_value, 8);
 }
 
-// §6.20.4 rules that a local parameter cannot be modified by an instance
-// parameter value assignment, so a named assignment naming one names nothing
-// §23.10.2.2 lets an instantiation override. The report that says so names the
-// subclause, which lets a caller learn which rule was enforced without matching
-// the wording of the message.
 TEST(ModuleInstanceParameterAssignment,
      LocalparamIsNotOverridableNames23_10_2_2) {
   ElabFixture f;
@@ -234,9 +213,6 @@ TEST(ModuleInstanceParameterAssignment,
       ReportedError(f.diag.Diagnostics(), "has no parameter", 4, "23.10.2.2"));
 }
 
-// The resolved value of parameter `name` of top's one child instance, or -1
-// where the design holds no such instance or parameter or the fold left it
-// unresolved.
 int64_t ChildParamValue(RtlirDesign* design, std::string_view name) {
   if (design->top_modules.empty() || design->top_modules[0]->children.empty())
     return -1;
@@ -248,9 +224,6 @@ int64_t ChildParamValue(RtlirDesign* design, std::string_view name) {
   return -1;
 }
 
-// Q of c, whose `logic [TOP:0] P` follows its `parameter int TOP = 15` in the
-// parameter port list and whose Q is set from P, instantiated once in top
-// with `assignment` as the instance's parameter value assignment.
 int64_t ChildQUnder(std::string_view assignment, ElabFixture& f) {
   std::string src =
       "module c #(parameter int TOP = 15, parameter logic [TOP:0] P = 0);\n"
@@ -265,15 +238,6 @@ int64_t ChildQUnder(std::string_view assignment, ElabFixture& f) {
   return ChildParamValue(design, "Q");
 }
 
-// §23.10.2 (printed page 766) with §6.20.2 (printed 126): a named parameter
-// value assignment gives the parameter the value of an expression written in
-// the instantiating module, converted to the range of its declaration, and
-// that range may be written in terms of an earlier parameter of the same
-// list: `logic [TOP:0] P` under `parameter int TOP = 15` is 16 bits, so
-// `.P(16'hABCD)` gives P every bit of the literal and Q, set from P in the
-// child, reads 0xABCD. The range is sized with TOP in scope, as the port
-// list folds each parameter after the ones before it; cut to a width folded
-// without TOP, the vector atom's one bit, P would be 1.
 TEST(ModuleInstanceParameterAssignment,
      NamedOverrideIsConvertedToARangeWrittenAsAnEarlierParameter) {
   ElabFixture f;
@@ -281,9 +245,6 @@ TEST(ModuleInstanceParameterAssignment,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same list with TOP overridden in the same assignment: §23.10.2 has the
-// later parameter's range follow the earlier one's new value, so `.TOP(7)`
-// makes P eight bits and `.P(16'hABCD)` is cut to 0xCD, which Q reads.
 TEST(ModuleInstanceParameterAssignment,
      NamedOverrideIsConvertedToARangeTheSameAssignmentOverrides) {
   ElabFixture f;

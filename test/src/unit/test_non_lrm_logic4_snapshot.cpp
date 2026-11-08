@@ -9,13 +9,6 @@ using namespace delta;
 
 namespace {
 
-// A Logic4Vec holds a pointer to its words, so a plain copy of one shares them
-// with the original. Logic4Snapshot exists so that a baseline held across a
-// change does not: these cases mutate the words the capture was taken from,
-// which is what DepositBitField does for a packed struct member assignment and
-// what the sites writing value.words[i] directly do, and require the captured
-// value to be what it was.
-
 TEST(Logic4Snapshot, CaptureSurvivesAnInPlaceWriteToTheSourceWords) {
   Arena arena;
   auto value = MakeLogic4VecVal(arena, 8, 0x10);
@@ -46,9 +39,6 @@ TEST(Logic4Snapshot, RecapturingReadsTheValueAsItStandsAtTheSecondCapture) {
   EXPECT_EQ(snap.Get().words[0].aval, 0x22u);
 }
 
-// A watcher lambda holding a snapshot is copied into the std::function the
-// watcher list stores, so a copy that kept pointing at the words the source
-// owns would put the aliasing straight back.
 TEST(Logic4Snapshot, ACopyOwnsItsWordsRatherThanTheSourceSnapshotWords) {
   Arena arena;
   auto value = MakeLogic4VecVal(arena, 8, 0x10);
@@ -72,8 +62,6 @@ TEST(Logic4Snapshot,
   EXPECT_EQ(copy.Get().words[0].aval, 0x10u);
 }
 
-// A vector wider than one word, so that a snapshot copying only the first word
-// would differ from one copying all of them.
 TEST(Logic4Snapshot, CaptureCopiesEveryWordOfAMultiWordValue) {
   Arena arena;
   auto value = MakeLogic4Vec(arena, 128);
@@ -90,10 +78,6 @@ TEST(Logic4Snapshot, ADefaultSnapshotReadsAsAnEmptyValue) {
   EXPECT_EQ(snap.Get().nwords, 0u);
 }
 
-// Assigning a snapshot to itself keeps what it holds. The assignment reaches
-// the snapshot through a second name, as it would through two references to
-// one object; a move that emptied its own words before reading them would
-// leave the snapshot empty.
 TEST(Logic4Snapshot, CopyAssignedToItselfKeepsItsValue) {
   Arena arena;
   auto value = MakeLogic4VecVal(arena, 8, 0x10);

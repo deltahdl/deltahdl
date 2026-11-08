@@ -159,9 +159,6 @@ TEST(PackedStructSimulation, BitMemberInFourStateStruct_ReadsAsTwoState) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.2.1: a packed structure used as a whole behaves per its signedness. A
-// 'packed signed' struct read as a single vector sign-extends when widened, so
-// an all-ones 8-bit value fills the upper byte with ones.
 TEST(PackedStructSimulation, SignedPackedStructWholeReadSignExtends) {
   auto v = RunAndGet(
       "module t;\n"
@@ -174,9 +171,6 @@ TEST(PackedStructSimulation, SignedPackedStructWholeReadSignExtends) {
   EXPECT_EQ(v, 0xFFFFu);
 }
 
-// §7.2.1: unsigned is the default signedness of a packed structure, so the
-// same whole-vector read zero-extends when widened. This discriminates the
-// default from the explicit 'signed' case above.
 TEST(PackedStructSimulation, UnsignedDefaultPackedStructWholeReadZeroExtends) {
   auto v = RunAndGet(
       "module t;\n"
@@ -189,10 +183,6 @@ TEST(PackedStructSimulation, UnsignedDefaultPackedStructWholeReadZeroExtends) {
   EXPECT_EQ(v, 0x00FFu);
 }
 
-// §7.2.1 built from §6.11 integer data types: a packed structure whose members
-// are declared with real Table 6-8 types (int, byte) packs them without gaps in
-// most-significant-first order. Driven end-to-end (parse/elaborate/run), the
-// first member occupies the high bits of the whole vector.
 TEST(PackedStructSimulation, IntegerTypeMembersPackMsbFirst) {
   auto v = RunAndGet(
       "module t;\n"
@@ -205,9 +195,6 @@ TEST(PackedStructSimulation, IntegerTypeMembersPackMsbFirst) {
   EXPECT_EQ(v, 0x11223344u);
 }
 
-// §7.2.1: bits of a packed structure may be selected as if it were a packed
-// array [n-1:0]. This exercises the indexed part-select form ([base+:width]),
-// distinct from the fixed [msb:lsb] and single-bit select forms.
 TEST(PackedStructSimulation, IndexedPartSelectOnPackedStruct) {
   auto v = RunAndGet(
       "module t;\n"
@@ -236,29 +223,6 @@ TEST(PackedStructSimulation, MemberWriteUpdatesWholeVector) {
   EXPECT_EQ(v, 0xAB00u);
 }
 
-// §7.2.1 makes a member of a packed structure a named window on the bits of one
-// variable -- the members sit side by side in memory with no gaps -- and
-// §10.4.2 asks of a nonblocking target only that variable_lvalue is any data
-// type a procedural assignment statement accepts, which A.8.5 opens with the
-// dotted member path. So `s.b <= 8'hA5` has to reach the same eight bits that
-// WriteTwoStateValueToBitMember_OverwritesPriorX above reaches with `=`, the
-// two forms differing only in when the write lands.
-//
-// They differed in whether it landed at all. ScheduleNonblockingAssign resolved
-// a member-access target through ResolveLhsVariable, which rebuilds the dotted
-// name and asks ctx.FindVariable; a packed member is a bit field inside `s` and
-// no variable is registered under "s.b", so the lookup answered null and the
-// function returned having acquired no update event, performed no write and
-// reported no diagnostic. `r` read 8'h00.
-//
-// The whole structure is asserted beside `r` because `r` alone cannot say which
-// bits the write reached: a write that landed on the low half would leave `s`
-// at 16'h00A5 while `r`, reading the member back through the same wrong window,
-// could still answer 8'hA5. `s` at 16'hA500 is the member in its declared
-// place, the high byte, with the four-state half below it untouched. The #1 is
-// required rather than decorative -- a nonblocking assignment takes effect in
-// the update region, so a read at time 0 answers the old value however the
-// scheduling behaves.
 TEST(PackedStructSimulation, NonblockingWriteToBitMemberReachesThatMember) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -277,16 +241,6 @@ TEST(PackedStructSimulation, NonblockingWriteToBitMemberReachesThatMember) {
   LowerRunAndCheck(f, design, {{"r", 0xA5u}, {"s", 0xA500u}});
 }
 
-// §7.2.1 writes a member select as `struct_variable.member` and makes no part
-// of the selection depend on what the structure is stored in. A class property
-// declared with a packed struct type holds the whole structure in one value
-// (§6.8/§8.3), so `c.p.b` selects a run of that value's bits exactly as `s.b`
-// selects a run of a module variable's.
-//
-// The member write went to a property keyed by the whole dotted path -- a name
-// the class never declared -- so `c.p` kept the 16'hAABB it was assigned and
-// only a read written the same way could see the 8'h05. Reading the property
-// itself is what tells them apart.
 TEST(PackedStructSimulation, MemberWriteThroughAClassPropertyLandsInTheValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -311,11 +265,6 @@ TEST(PackedStructSimulation, MemberWriteThroughAClassPropertyLandsInTheValue) {
   LowerRunAndCheck(f, design, {{"r1", 0x05BBu}, {"r2", 0x05u}});
 }
 
-// The other half: a member read after a whole-property write. The value is in
-// the property, so both members are read out of it -- the high member is 8'hAA
-// and the low one 8'hBB. The read answered from the flattened key instead,
-// which no write had created, and ClassObject::GetProperty answers a known zero
-// for a key it does not hold.
 TEST(PackedStructSimulation, MemberReadThroughAClassPropertyTakesItsBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -338,9 +287,6 @@ TEST(PackedStructSimulation, MemberReadThroughAClassPropertyTakesItsBits) {
   LowerRunAndCheck(f, design, {{"rb", 0xAAu}, {"rl", 0xBBu}});
 }
 
-// A member write reaches its own member and no other, which is what says the
-// window is the one the layout gives rather than the whole property: the low
-// member takes 8'h07 and the high member keeps the 8'hAA it was assigned.
 TEST(PackedStructSimulation, MemberWriteThroughAPropertyLeavesTheOtherMember) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -363,15 +309,6 @@ TEST(PackedStructSimulation, MemberWriteThroughAPropertyLeavesTheOtherMember) {
   LowerRunAndCheck(f, design, {{"r1", 0xAA07u}});
 }
 
-// §7.2.1 with §23.9: a member of a packed structure declared in an
-// instantiated module is a window of that instance's own vector. The child
-// writes 8'hA5 into opcode and 24'h123456 into imm, and the top reads the
-// whole of `m.s` as 32'hA5123456. Both writes went nowhere -- the target was
-// resolved by asking the layout table for bare `s`, while the instance's
-// layout is keyed "m.s" -- so the whole read 0 and both members read 0. The
-// values tell a landed write from a misplaced one: opcode's high bit is set,
-// so a write at bit 0 instead of bit 24 reads 0x000000A5 for the whole, and
-// imm differs in every byte from opcode.
 TEST(PackedStructSimulation, ChildInstanceMemberWriteLandsInItsWindow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -406,14 +343,6 @@ TEST(PackedStructSimulation, ChildInstanceMemberWriteLandsInItsWindow) {
   EXPECT_EQ(im->value.ToUint64(), 0x123456u);
 }
 
-// §10.9.2: a structure assignment pattern keyed by member name places each
-// value in the member it names, whatever order the keys are written in. The
-// child assigns `'{imm: 24'h0F1E2D, opcode: 8'h5A}` and the top reads the
-// whole of `m.s` as 32'h5A0F1E2D. With the layout looked up by bare `s`
-// inside instance `m`, no layout was found and the pattern fell back to a
-// concatenation of the values in written order, 32'h0F1E2D5A, with opcode
-// reading 0x0F; the keys are written in the reverse of the declaration order
-// so that fallback and the keyed placement cannot agree.
 TEST(PackedStructSimulation, ChildInstanceKeyedPatternPlacesEachMember) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -443,16 +372,6 @@ TEST(PackedStructSimulation, ChildInstanceKeyedPatternPlacesEachMember) {
   EXPECT_EQ(op->value.ToUint64(), 0x5Au);
 }
 
-// §7.2.1 makes a member a window on the structure's bits, and §10.7 has an
-// assignment write the whole right-hand value into the target, so a 96-bit
-// member takes all 96 bits of its value. `big` sits at bits [103:8] of `s` and
-// `low8` at [7:0]: word 0 of `s` is big's low 56 bits over 0xA5, and word 1 the
-// 40 bits above, 0x0123456789; read back as a member, `w` holds the literal
-// whole. A write that carried one word of the value would leave word 1 of `s`
-// at 0x89 and `w`'s high word at 0. These pins were written when the stream of
-// `s` read that word as 0x89 (test_simulator_subclause_11_04_14_01.cpp) and
-// the write was suspected; it was the stream's 64-bit carrier, and the deposit
-// this pins was whole all along.
 TEST(PackedStructSimulation, WideMemberWriteLandsEveryWordOfItsValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -478,10 +397,6 @@ TEST(PackedStructSimulation, WideMemberWriteLandsEveryWordOfItsValue) {
   EXPECT_EQ(w->value.words[1].aval, 0x01234567u);
 }
 
-// §7.3.1: the members of a packed union share the union's storage, each a
-// window on all of it, so 96 bits written through `w` are the 96 bits read
-// through `v`, high word included: 0xFEDCBA98 above 0x765432100F0FA5A5. A write
-// that carried one word would leave the high word x, the union's initial value.
 TEST(PackedStructSimulation, WideUnionMemberWriteReadsBackThroughTheOther) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -501,11 +416,6 @@ TEST(PackedStructSimulation, WideUnionMemberWriteReadsBackThroughTheOther) {
   EXPECT_EQ(var->value.words[1].aval, 0xFEDCBA98u);
 }
 
-// §7.2.1 has a structure with a 4-state member be a 4-state vector, and §6.3.1
-// lets any bit of a logic member be x, so x digits above bit 64 of the value
-// land as x above bit 72 of `s` (big's offset is 8): word 1 of `s` carries
-// aval and bval 1 in bits [39:8] and the known 0x89 in [7:0]. A deposit that
-// moved the aval plane alone would read those bits as a known 1.
 TEST(PackedStructSimulation, WideMemberWriteKeepsXAboveTheFirstWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -525,9 +435,6 @@ TEST(PackedStructSimulation, WideMemberWriteKeepsXAboveTheFirstWord) {
   EXPECT_EQ(var->value.words[1].bval, 0xFFFFFFFF00u);
 }
 
-// §10.4.2: a nonblocking assignment to the member lands the whole 96 bits in
-// the update region, so after #1 `s` holds them at the member's offset, its
-// own values so the blocking test above is not mistaken for this one.
 TEST(PackedStructSimulation, WideMemberNonblockingWriteLandsEveryWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -550,15 +457,6 @@ TEST(PackedStructSimulation, WideMemberNonblockingWriteLandsEveryWord) {
   EXPECT_EQ(w->value.words[1].aval, 0xFEDCBA98u);
 }
 
-// §7.2.1 (printed page 147) lays a packed structure's members out in the order
-// written, each at its own type's width, and §26.3 (printed 808) reaches a
-// package's typedef through its qualifier: with r's 8-bit `pair_t` imported
-// and the member written `q::pair_t p`, p is q's 16-bit pair, so a is the top
-// byte of the 24-bit v and 200 written to it reads back whole, v holding
-// 24'hC80709. The nested layout the member registers is named `q::pair_t`,
-// the key q's typedef stands under, where it carried the bare `pair_t` that r's
-// import and q's typedef both answer to. Found by the session that carried
-// the qualifier to the type resolver (4af839bf7).
 TEST(PackedStructSimulation,
      QualifiedMemberLaidOutByItsPackageOverAnImportedSameNamedTypedef) {
   SimFixture f;
@@ -590,10 +488,6 @@ TEST(PackedStructSimulation,
   EXPECT_EQ(y->value.words[0].aval, 200u);
 }
 
-// §7.2.1: a packed structure is 4-state when any member is, judged by the type
-// each member is written with. Here the only 4-state members are written
-// through a typedef name and as an enumeration, so a structure taken as 2-state
-// would drop the x written into them and print 0.
 TEST(PackedStructSimulation, NamedAndEnumMembersKeepTheStructFourState) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -611,11 +505,6 @@ TEST(PackedStructSimulation, NamedAndEnumMembersKeepTheStructFourState) {
             "xxxx xx\n");
 }
 
-// §7.2.1 with §7.4.1 and §6.20: a member `logic [W-1:0]` of a structure the
-// module declares is W bits under the W each instance binds, so the structure
-// is 2*W bits, 8 in the instance binding 4 and 16 in the one binding 8, and
-// '1 with lo cleared reads 240 and 65280. Folded with no parameters, each
-// member was one bit, the structure two, and both instances read 2.
 TEST(PackedStructSimulation, AMemberSizedByAParameterTakesEachInstancesValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter int W = 2);\n"
@@ -639,12 +528,6 @@ TEST(PackedStructSimulation, AMemberSizedByAParameterTakesEachInstancesValue) {
             "4 8 240\n8 16 65280\n");
 }
 
-// §7.2.1 with §7.4.1 and §6.20: a member written as a packed structure type
-// with packed dimensions after its body, `struct packed {...} [1:0][W-1:0]`,
-// has those dimensions and its own members sized by the module's W, so under
-// W = 3 it is 2*3 elements of 3 bits and the structure holding it 18 bits.
-// Folded with no parameters, the inner member was one bit and the dimension
-// [W-1:0] no dimension.
 TEST(PackedStructSimulation, ANestedMembersParameterDimensionsAreFolded) {
   SimFixture f;
   EXPECT_EQ(
@@ -660,10 +543,6 @@ TEST(PackedStructSimulation, ANestedMembersParameterDimensionsAreFolded) {
       "18\n");
 }
 
-// §7.2.1 with §7.4.4: packed dimensions written on a typedef name stack on the
-// typedef's own, so a member `nib_t [1:0] x` is two 4-bit elements, 8 bits,
-// and the structure with a bit beside it 9. 9'h1A5 then leaves x 8'hD2 and y
-// 1. Sized by the written dimensions alone, x was 2 bits and the structure 3.
 TEST(PackedStructSimulation, ATypedefMembersOwnPackedDimensionsStackOnIt) {
   SimFixture f;
   EXPECT_EQ(
@@ -681,10 +560,6 @@ TEST(PackedStructSimulation, ATypedefMembersOwnPackedDimensionsStackOnIt) {
       "9 8 210 1\n");
 }
 
-// §7.2.1: a packed structure written in place is 4-state when any member is,
-// so a function's argument and return value of a structure of logic keep
-// 1x0z, while those of a structure of bit read 1000. Judged by its kind
-// alone, the logic structure was taken as 2-state and read 1000 too.
 TEST(PackedStructSimulation, AnInPlaceStructsStateIsItsMembers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -703,11 +578,6 @@ TEST(PackedStructSimulation, AnInPlaceStructsStateIsItsMembers) {
             "1x0z 1000\n");
 }
 
-// §7.2.1 with §6.18: a member written with a typedef name is as 4-state as
-// the type the name stands for, at compilation-unit or module scope and in
-// a nested structure written in place. A structure whose member's typedef
-// names logic keeps 1x0z; one whose member's typedef names bit reads 1000.
-// Every name was taken as 2-state, so the logic forms read 1000 too.
 TEST(PackedStructSimulation, AnInPlaceStructOfATypedefMemberTakesItsState) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef logic [3:0] n4_t;\n"
@@ -741,15 +611,6 @@ TEST(PackedStructSimulation, AnInPlaceStructOfATypedefMemberTakesItsState) {
             "1x0z\nz1x0\n1000\n1x0z\n");
 }
 
-// §7.2.1 and §7.3.1 with §6.18: a member written with a type name takes the
-// width the name stands for, so $bits of a structure or union typedef counts
-// it in full wherever the typedef stands: the compilation unit's, a package's
-// read through p::, and a module's. A structure of an 8-bit
-// vector name, a byte enumeration name and a bit is 17; three of the vector
-// name, b_t [2:0], 24; a packed union of the two names 8, and tagged 9 with
-// its tag; a structure holding the first structure and a bit 18; and two of
-// it, s_t [1:0], 34. Sized with no table, each named member counted 1 bit,
-// or the product of the dimensions written on it.
 TEST(PackedStructSimulation, AMemberWrittenWithATypeNameTakesItsWidth) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef logic [5:0] w_t;\n"

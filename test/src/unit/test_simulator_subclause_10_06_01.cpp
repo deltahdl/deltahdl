@@ -160,10 +160,6 @@ TEST(ProceduralContinuousAssignSim,
 
 TEST(ProceduralContinuousAssignSim,
      DeassignRetainsValueThenContinuousOverwrites) {
-  // After a deassign the held value persists until the variable is reassigned.
-  // Besides an ordinary procedural assignment, a fresh procedural continuous
-  // assignment is one of the ways that new value can be installed; here the
-  // second assign must take effect and re-establish the forced state.
   SimFixture f;
   auto* q = RunAndFindVar(
       "module t;\n"
@@ -182,10 +178,6 @@ TEST(ProceduralContinuousAssignSim,
 
 TEST(ProceduralContinuousAssignSim,
      DeassignRetainsValueThenNonblockingOverwrites) {
-  // The held value also gives way to a nonblocking procedural assignment, which
-  // reaches the variable through a different scheduling path than a blocking
-  // one; once the deassign has cleared the forced state the nonblocking update
-  // must land.
   SimFixture f;
   auto* q = RunAndFindVar(
       "module t;\n"
@@ -245,24 +237,6 @@ TEST(ProceduralContinuousAssignSim, ReAssignClearsOldRhsWatcher) {
   EXPECT_EQ(q->value.ToUint64(), 2u);
 }
 
-// §10.6.1: an assign statement's left-hand side is a singular variable
-// reference or a concatenation of variables. The concatenation is the second of
-// the two forms the clause admits, and
-// ProceduralAssignDeassignElaboration.AssignConcatenationLhs accepts
-// `assign {a, b} = 2'b10;`, so the statement reaches the simulator and owes
-// each element the bits its own width claims of the one right-hand value, the
-// leftmost element taking the most significant ones: 8'h12 for a and 8'h34 for
-// b out of 16'h1234. The later `a = 8'd7;` is what reads the clause's own
-// sentence back -- the assign overrides every procedural assignment to the
-// variable -- so a reading 8'h12 says the override reached the element as well
-// as the value did.
-//
-// The wrong answer was that nothing happened at all, and silently: the executor
-// that force and assign share resolved its one target through
-// ResolveLhsVariable, which answers null for a concatenation, so no element was
-// written, none was marked, and the assignment after it landed. Both elements
-// start at sentinels no expected value can be, so an assign that writes nothing
-// cannot pass for one that wrote the right answer.
 TEST(ProceduralContinuousAssignSim,
      AssignOfAConcatenationDistributesToItsElements) {
   SimFixture f;
@@ -286,17 +260,6 @@ TEST(ProceduralContinuousAssignSim,
   EXPECT_TRUE(b->is_forced);
 }
 
-// §10.6.1: deassign ends an assign procedural continuous assignment to a
-// variable, which then holds its value until a procedural assignment or
-// procedural continuous assignment gives it a new one.
-// ProceduralAssignDeassignElaboration.DeassignConcatenationLhs accepts
-// `deassign {a, b};` after the same assign, so the deassign has to end the
-// assignment on every element the assign made, and each element keeps the slice
-// it was given. That is DeassignRetainsValue reached through a concatenation.
-//
-// The wrong answer was that both statements were no-ops: the deassign resolved
-// its target the same way the assign did and cleared nothing, which is also why
-// a fix to the assign alone would leave an assign no deassign could end.
 TEST(ProceduralContinuousAssignSim,
      DeassignOfAConcatenationEndsItOnEachElement) {
   SimFixture f;
@@ -320,18 +283,6 @@ TEST(ProceduralContinuousAssignSim,
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §10.6.1 names a concatenation of variables without bounding its nesting, and
-// ProceduralAssignDeassignElaboration.AssignNestedConcatOfVariablesLhs accepts
-// `assign {a, {b, c}} = 3'b101;` on that reading, so an inner concatenation is
-// one more element of the outer one and distributes its own slice among its own
-// elements the way §11.4.12 treats every concatenation lvalue. Out of
-// 24'h123456 the outer's first element a takes 8'h12, the inner takes the
-// remaining 16 bits and hands 8'h34 to b and 8'h56 to c.
-//
-// The wrong answer was that nothing happened at all. An arm that walked one
-// level of elements and wrote each resolved variable is the other wrong answer
-// this case names: the inner concatenation resolves to no variable, so b and c
-// would stand at their sentinels while a alone took its slice.
 TEST(ProceduralContinuousAssignSim,
      AssignOfANestedConcatenationReachesTheInnerElements) {
   SimFixture f;

@@ -1,9 +1,3 @@
-// §6.3.2 keeps the strength information a net's bits carry out of the net's
-// data type. A net declared with a drive strength, and a trireg declared with a
-// charge strength, have the data type of the same net declared without one,
-// and a value read from such a net is a value of that type, with no strength.
-// The strength stays on the net's own bits, where %v still finds it.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -15,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// $typename names the data type alone, so each net carrying a strength names
-// the type the same net declared without one names. The vector pair is named
-// in full, a name no fallback to plain `logic` would give, and the signed pair
-// is compared with each other: #9006 has a signed net's name leave out signed.
 TEST(NetStrengthSim, TypenameLeavesOutTheStrength) {
   SimFixture f;
   std::string out = RunCapture(
@@ -43,9 +33,6 @@ TEST(NetStrengthSim, TypenameLeavesOutTheStrength) {
   EXPECT_EQ(out, "logic logic\nlogic logic\nlogic[3:0] logic[3:0]\n1\n");
 }
 
-// $bits counts the bits of the data type, and a strength adds none: each net
-// carrying one is as wide as the same net declared without it. #9007 holds
-// the type operator's comparisons of a net's type.
 TEST(NetStrengthSim, BitsLeaveOutTheStrength) {
   const std::string kSrc =
       "module t;\n"
@@ -61,10 +48,6 @@ TEST(NetStrengthSim, BitsLeaveOutTheStrength) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1111u);
 }
 
-// The weak 1 stays on the net's bit, where %v renders it, but a value read from
-// the net is a plain 1. Driven on by a continuous assignment with no strength
-// of its own, directly, through a function's argument or through a variable,
-// it reaches each other net at the default strong strength.
 TEST(NetStrengthSim, ValueReadFromTheNetCarriesNoStrength) {
   SimFixture f;
   std::string out = RunCapture(

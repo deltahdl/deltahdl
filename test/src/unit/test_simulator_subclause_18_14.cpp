@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The five kinds of draw 18.14 lists as randomly stable, taken from the
-// running thread's RNG by one task: $urandom, $urandom_range, shuffle(),
-// randcase and randsequence.
 const char* const kDrawFive =
     "  int arr[8];\n"
     "  int unsigned u, r;\n"
@@ -35,11 +32,6 @@ const char* const kDrawFive =
     "    endsequence\n"
     "  endtask\n";
 
-// 18.14: each thread and each object has an RNG of its own, so a thread seeded
-// with 11 and drawn from through every kind the clause lists returns the same
-// nine values whether or not two objects randomize between, and seeded with 12
-// it returns another first value, as the design
-// test/src/e2e/random_stability.sv runs it.
 TEST(RandomStabilityRun,
      AThreadsSequenceIsUntouchedByObjectsAndSelectedBySeed) {
   SimFixture f;
@@ -83,10 +75,6 @@ TEST(RandomStabilityRun,
   EXPECT_EQ(out, "9 1\n");
 }
 
-// 18.14: a thread's draws do not depend on what other threads' RNGs do, so a
-// forked thread seeded with 3 returns the same nine values beside a thread that
-// draws nothing and beside one that draws a hundred and runs every kind the
-// clause lists, as the design test/src/e2e/random_stability.sv runs it.
 TEST(RandomStabilityRun, AThreadsSequenceIsUntouchedByAnotherThread) {
   SimFixture f;
   std::string out = RunCapture(
@@ -136,10 +124,6 @@ TEST(RandomStabilityRun, AThreadsSequenceIsUntouchedByAnotherThread) {
   EXPECT_EQ(out, "9\n");
 }
 
-// 18.14: the RNG of an object is its own, so an object seeded with 7 returns
-// the same four randomize() values whether or not its thread and another
-// object draw between, and seeded with 8 it returns others, as the design
-// test/src/e2e/random_stability.sv runs it.
 TEST(RandomStabilityRun,
      AnObjectsSequenceIsUntouchedByItsThreadAndAnotherObject) {
   SimFixture f;

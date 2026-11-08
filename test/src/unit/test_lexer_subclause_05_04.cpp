@@ -294,9 +294,6 @@ TEST(LexicalConventionLexing, BlockCloseWithoutOpenIsOperators) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kEof);
 }
 
-// §5.4 is what makes the closing */ obligatory: a block comment opens with /*
-// and closes with */. The rejection records that clause, so a reader of the run
-// recovers the rule without matching the wording of the message.
 TEST(LexicalConventionLexing, UnterminatedBlockCommentNames5_4) {
   auto diags = LexDiagnostics("a /* never closed");
   EXPECT_TRUE(ReportedError(diags, "unterminated block comment", 1, "5.4"));
@@ -310,8 +307,6 @@ TEST(LexicalConventionLexing, LineCommentEndedByCrlf) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-// A one-line comment ends at the end of the text as well as at a newline, and
-// the text ending inside one is no error.
 TEST(LexicalConventionLexing, OneLineCommentMayEndTheText) {
   auto result = LexWithDiag("a // no newline follows");
   ASSERT_EQ(result.tokens.size(), 2u);
@@ -320,9 +315,6 @@ TEST(LexicalConventionLexing, OneLineCommentMayEndTheText) {
   EXPECT_FALSE(result.has_errors);
 }
 
-// §5.4 with §5.9: inside a string literal, quoted or triple-quoted, `//`, `/*`
-// and `*/` are characters of the string and open or close no comment, so the
-// string ends at its own closing quote and the tokens after it are read.
 TEST(LexicalConventionLexing, CommentMarkersInsideAStringAreItsCharacters) {
   for (const char* literal : {"\"/*\"", "\"*/\"", "\"a // b\"",
                               "\"\"\"/* c\"\"\"", "\"\"\"x // y\"\"\""}) {

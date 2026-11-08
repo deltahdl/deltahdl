@@ -1,12 +1,3 @@
-// Named-type and member-type resolution: FindNamedType, MemberNamedType,
-// NestedAggregateSource and ResolveNestedAggregateTypes, moved out of
-// type_eval.cpp verbatim, for room, once that file reached the source-size
-// gate; SizeClassHandleMembers, which sizes a member of a class type as the
-// handle it holds; LastTypeInChain and ResolvedTypeKind, which follow a chain
-// of names to its type; RecordTypedef, which enters a typedef into the table;
-// and OuterScopePrefixes and TypeChainKey, which key a name written behind a
-// chain of scopes.
-
 #include <algorithm>
 #include <cstddef>
 #include <optional>
@@ -42,11 +33,6 @@ std::string TypeChainKey(const DataType& type) {
          "::" + std::string(type.type_name);
 }
 
-// §6.20.3: `dtype`, a name behind a single scope prefix, with the prefix
-// replaced by the class name the scope binds it to, where `typedefs` holds the
-// prefix as a type parameter or typedef naming another type by a bare name.
-// Nothing for a prefix bound to anything else, a chain of prefixes, or a prefix
-// that names itself.
 std::optional<DataType> ThroughBoundPrefix(const DataType& dtype,
                                            const TypedefMap& typedefs) {
   if (dtype.scope_name.empty() || !dtype.outer_scope_names.empty())
@@ -62,22 +48,6 @@ std::optional<DataType> ThroughBoundPrefix(const DataType& dtype,
   return through;
 }
 
-// The type a named type denotes, or null when no declaration matches it. A
-// name behind a scope prefix selects that scope's declaration and never the
-// unqualified one: §8.23 (printed page 200) has the class scope resolution
-// operator pick out one class's member, its example telling `Base::bin` from
-// a `bin` of the enclosing scope, and §26.3 (printed 808) reaches a package's
-// declaration the same way, `ComplexPkg::Complex cout`. So a prefixed name
-// looks up the key RegisterPackageTypedefs and RegisterClassTypedefs in
-// elaborator_resolve.cpp record, every prefix of a chain included
-// (TypeChainKey), and misses rather than falling back to a bare name, which
-// would size the object wrongly. Keyed by its last prefix alone,
-// `Outer::Inner::s` took the typedef of the compilation unit's own class Inner.
-//
-// §6.20.3 with §8.23: a type parameter bound to a class may prefix the class
-// scope resolution operator, and `T::inner` then names the typedef of the class
-// the instance binds T to. The binding is the scope's entry for T, a class
-// name standing alone, so the name is looked up as that class's.
 const DataType* FindNamedType(const DataType& dtype,
                               const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return nullptr;
@@ -86,15 +56,12 @@ const DataType* FindNamedType(const DataType& dtype,
     if (qit != typedefs.end()) return &qit->second;
     if (std::optional<DataType> through = ThroughBoundPrefix(dtype, typedefs))
       return FindNamedType(*through, typedefs);
-    // §9.7 with §G.6: process::state is declared by the built-in process
-    // class, which no declaration of the design holds.
     return StdClassEnumType(dtype);
   }
   auto it = typedefs.find(dtype.type_name);
   return (it != typedefs.end()) ? &it->second : nullptr;
 }
 
-// Whether `type` is a typedef name written with no scope prefix.
 static bool IsBareTypeName(const DataType& type) {
   return type.kind == DataTypeKind::kNamed && type.scope_name.empty();
 }
@@ -127,8 +94,6 @@ DataType InClassScope(const DataType& type, const ClassDecl& cls) {
   return InClassScope(type, cls, cls.name);
 }
 
-// Writes `scope_name`, empty for a name written bare, as the key `scopes`
-// gives `type_name`, where it gives one.
 static void ScopeTypedefName(std::string_view type_name,
                              std::string_view& scope_name,
                              const TypedefScopes& scopes) {
@@ -137,9 +102,6 @@ static void ScopeTypedefName(std::string_view type_name,
     scope_name = declarer->second;
 }
 
-// Puts behind its declaring scope's key each member of `type` that
-// InTypedefScopes scopes, copying an inline aggregate into `arena` before
-// scoping its own members.
 static void ScopeTypedefMembers(DataType& type, const TypedefScopes& scopes,
                                 Arena& arena) {
   for (StructMember& m : type.struct_members) {
@@ -180,8 +142,6 @@ DataType PackageTypedefType(const ModuleItem& item, const PackageDecl& pkg,
 
 const DataType& LastTypeInChain(const DataType& dtype,
                                 const TypedefMap& typedefs) {
-  // Each step follows one name, and a chain longer than the table has names
-  // runs through one of them twice, so the walk is bounded by the table.
   const DataType* type = &dtype;
   for (std::size_t steps = 0; steps <= typedefs.size(); ++steps) {
     const DataType* named = FindNamedType(*type, typedefs);
@@ -196,8 +156,6 @@ DataTypeKind ResolvedTypeKind(const DataType& dtype,
   return LastTypeInChain(dtype, typedefs).kind;
 }
 
-// ResolvedTypeKind answers the named kind for every chain that does not end
-// in a type, so a chain it resolves is followed to its end unbounded.
 const DataType* TypeAtChainEnd(const DataType& dtype,
                                const TypedefMap& typedefs) {
   if (ResolvedTypeKind(dtype, typedefs) == DataTypeKind::kNamed) return nullptr;
@@ -207,10 +165,6 @@ const DataType* TypeAtChainEnd(const DataType& dtype,
   return type;
 }
 
-// The same for a structure or union member's named type (§7.2.1): a member
-// written behind a qualifier, `q::pair_t Add`, was looked up by `pair_t`
-// alone, resolving to whatever a wildcard import made the bare name stand
-// for, or to nothing.
 const DataType* MemberNamedType(const StructMember& m,
                                 const TypedefMap& typedefs) {
   DataType named;
@@ -220,10 +174,6 @@ const DataType* MemberNamedType(const StructMember& m,
   return FindNamedType(named, typedefs);
 }
 
-// The struct/union DataType a member's declared type denotes: an inline
-// aggregate keeps its parsed type directly; a named member resolves through the
-// typedef table, by its qualified name where it was written with one. Returns
-// null for scalar members and unresolved names.
 static const DataType* NestedAggregateSource(const StructMember& m,
                                              const TypedefMap& typedefs) {
   if (m.nested_type) return m.nested_type;
@@ -241,8 +191,6 @@ void SizeClassHandleMembers(
     written.kind = m.type_kind;
     written.type_name = m.type_name;
     written.scope_name = m.scope_name;
-    // §6.18: a typedef of a class names the class, so the member is one of
-    // the class the chain of names ends at, and is recorded under it.
     const DataType& end = LastTypeInChain(written, typedefs);
     if (!class_names.contains(end.type_name)) continue;
     m.type_name = end.type_name;
@@ -256,9 +204,6 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
   for (auto& m : dt.struct_members) {
     const DataType* src = NestedAggregateSource(m, typedefs);
     if (!src) {
-      // A named member that is no aggregate keeps no nested type, and the
-      // run-time layout sizes it by this width rather than by its kind alone,
-      // the typedef's with any packed dimensions the member writes on it.
       if (MemberNamedType(m, typedefs) != nullptr)
         m.resolved_width = EvalStructMemberWidth(m, typedefs);
       continue;
@@ -269,15 +214,6 @@ void ResolveNestedAggregateTypes(DataType& dt, const TypedefMap& typedefs,
   }
 }
 
-// §6.18 has a typedef name a type declared before it, and §23.9 looks a name a
-// module does not yet declare up in the compilation unit's scope. So in a
-// module, `typedef HU HU;` names the compilation unit's HU and declares the
-// module's HU as the type that HU stood for. Recorded as written, the entry
-// would name itself, and following it would never end; the table already
-// holds what the name stood for, a typedef's type or, for a class, no entry at
-// all. Packed dimensions the typedef writes after the name are packed outside
-// that type's own (§7.4.1), so `typedef w_t [1:0] w_t;` under a compilation
-// unit `typedef logic [3:0] w_t;` is `logic [1:0][3:0]`.
 void RecordTypedef(TypedefMap& typedefs, std::string_view name,
                    const DataType& type) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty() ||

@@ -24,8 +24,6 @@ TEST(PliPostObservedSim, PostObservedExecutesAfterObservedBeforeReactive) {
 }
 
 TEST(PliPostObservedSim, PostObservedIsClassifiedAsPliRegion) {
-  // §4.4.3.6 establishes Post-Observed as a PLI callback control point; the
-  // scheduler encodes that membership in IsPliRegion.
   EXPECT_TRUE(IsPliRegion(Region::kPostObserved));
 }
 
@@ -90,17 +88,6 @@ TEST(PliPostObservedSim, PostObservedProvidesReadOnlySnapshotAfterObserved) {
   EXPECT_EQ(sum_in_post_observed, 40);
 }
 
-// End-to-end coverage of §4.4.3.6's read guarantee, building the consumed value
-// from real source syntax rather than a hand-scheduled event. §4.4.3.6 lets a
-// Post-Observed PLI callback read values settled by the Observed region or an
-// earlier one; an NBA update is exactly such an earlier active-set region.
-// Parsing/elaborating/lowering `q <= 8'd42` schedules q's update into the real
-// NBA region at time 0. A Post-Observed callback in that same slot (the only
-// way PLI code reaches this region - there is no HDL syntax for it) must sample
-// the value the earlier NBA update wrote, which holds only if the scheduler
-// drains the active region set through Post-Observed before the callback runs.
-// Driving the whole pipeline - not a hand-built NBA event - ties the read rule
-// to a genuine nonblocking assignment.
 TEST(PliPostObservedSim, PostObservedReadsValueFromRealNonblockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -77,11 +77,6 @@ TEST(CovergroupDeclParsing, CovergroupDecl_InClass) {
               "endclass\n"));
 }
 
-// A.2.11 gives covergroup_declaration two alternatives and no others: the
-// first names the covergroup and carries an optional port list and coverage
-// event, the second writes `covergroup extends covergroup_identifier ;` and
-// ends at the semicolon. Neither does both, so a name followed by `extends` is
-// a production the grammar does not have.
 TEST(CovergroupDeclParsing, NamedCovergroupWithExtendsIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -95,9 +90,6 @@ TEST(CovergroupDeclParsing, NamedCovergroupWithExtendsIsRejected) {
 }
 
 TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoPortList) {
-  // §19.4.1 (printed page 581): a derived covergroup takes over its base's
-  // argument list, when the base has one. So the derived one declares none of
-  // its own.
   auto r = Parse(
       "module m;\n"
       "  covergroup extends base_cg (int x);\n"
@@ -109,10 +101,6 @@ TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoPortList) {
 }
 
 TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoCoverageEvent) {
-  // §19.4.1 (printed page 581): a derived covergroup must use the coverage
-  // event its base names, if the base names one. The second alternative admits
-  // no coverage_event, and this is the half of that rule the port-list case
-  // above cannot reach.
   auto r = Parse(
       "module m;\n"
       "  covergroup extends base_cg @(posedge clk);\n"
@@ -124,9 +112,6 @@ TEST(CovergroupDeclParsing, DerivedCovergroupTakesNoCoverageEvent) {
 }
 
 TEST(CovergroupDeclParsing, CovergroupDeclWithPortListAndNoExtends) {
-  // The first alternative does carry `[ ( [ tf_port_list ] ) ]`, so a fix that
-  // took the port list away from both alternatives instead of one goes red
-  // here rather than passing the two rejections above.
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  covergroup cg (int x);\n"
@@ -134,11 +119,6 @@ TEST(CovergroupDeclParsing, CovergroupDeclWithPortListAndNoExtends) {
               "endmodule\n"));
 }
 
-// covergroup_declaration's second alternative: `covergroup extends base ;`
-// names no new covergroup of its own. The parser takes the identifier that
-// follows `extends` as both the declared name and the inherited base, so a
-// derived covergroup written this way resolves under the base's name, which is
-// what §19.4.1 describes.
 TEST(CovergroupDeclParsing, CovergroupExtendsWithoutOwnName) {
   auto r = Parse(
       "module m;\n"
@@ -331,10 +311,6 @@ TEST(CovergroupDeclParsing, CoverPoint_ComplexExpression) {
               "endmodule\n"));
 }
 
-// cover_point's label may be preceded by a data_type_or_implicit: §19.5
-// (printed page 583) lets data_type_or_implicit give the coverpoint a data
-// type, explicitly or implicitly, and requires a cover_point_identifier
-// whenever a data type is given.
 TEST(CovergroupDeclParsing, CoverPoint_WithDataType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

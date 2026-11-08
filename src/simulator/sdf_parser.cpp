@@ -1,5 +1,3 @@
-
-
 #include "simulator/sdf_parser.h"
 
 #include <algorithm>
@@ -41,23 +39,12 @@ static SdfToken LexString(std::string_view& s) {
   return tok;
 }
 
-// A number, together with the leading minus sign a value that lowers what it
-// annotates is written with. The token's text keeps the sign, so a caller
-// rendering the token back as source writes what the file wrote, while the
-// value and the sign are reported apart.
-// The length of the run of digits starting at `pos` in `s`.
 static size_t DigitRun(std::string_view s, size_t pos) {
   size_t len = 0;
   while (pos + len < s.size() && (std::isdigit(s[pos + len]) != 0)) ++len;
   return len;
 }
 
-// §32.2 (printed page 924) with IEEE 1497: an SDF number is a real number, a
-// fraction and an exponent allowed, `2.5` and `1e3` among them. Read as digits
-// alone, `2.5` stopped at the decimal point and the rest of its entry was
-// reported as constructs that could not be annotated.
-// The length of the number whose digits start at `first_digit` of `s`, its
-// fraction and exponent included; `whole` is cleared where it has either.
 static size_t NumberLength(std::string_view s, size_t first_digit,
                            bool& whole) {
   size_t len = first_digit + DigitRun(s, first_digit);
@@ -116,8 +103,6 @@ SdfToken NextSdfToken(std::string_view& s) {
   if (ch == ')') return MakeSingleChar(s, SdfTokKind::kRParen);
   if (ch == ':') return MakeSingleChar(s, SdfTokKind::kColon);
   if (ch == '"') return LexString(s);
-  // A minus sign belongs to the number it introduces; standing on its own it is
-  // ordinary text, an operator in a condition expression among other things.
   const bool kSignedNumber =
       ch == '-' && s.size() > 1 && (std::isdigit(s[1]) != 0);
   if ((std::isdigit(ch) != 0) || kSignedNumber) return LexNumber(s);
@@ -129,7 +114,6 @@ bool Expect(std::string_view& s, SdfTokKind kind) {
   return tok.kind == kind;
 }
 
-// One member of a min:typ:max triple, taken from the number `tok`.
 static void SetSdfTripleMember(SdfDelayValue& dv, int member,
                                const SdfToken& tok) {
   if (member == 0) {
@@ -147,10 +131,6 @@ static void SetSdfTripleMember(SdfDelayValue& dv, int member,
   }
 }
 
-// Reads a value's body up to the ')' that closes it, which is left for the
-// caller: one number, which every member of the triple takes, or a
-// min:typ:max triple, any member of which may be left out (§32.3). Answers
-// whether any member was written.
 static bool ParseSdfValueBody(std::string_view& s, SdfDelayValue& dv) {
   bool written[3] = {false, false, false};
   bool triple = false;
@@ -189,9 +169,6 @@ static std::string ParseSdfPort(std::string_view& s) {
   }
   auto tok = NextSdfToken(s);
   std::string port(tok.text);
-  // §32.4.1: a port may be written with a part-select, `b[3:2]`, whose colon
-  // the lexer takes as a token of its own; the rest of the select, up to its
-  // closing bracket, is joined back onto the name.
   if (port.find('[') != std::string::npos &&
       port.find(']') == std::string::npos && !s.empty() && s[0] == ':') {
     size_t close = s.find(']');
@@ -213,10 +190,6 @@ void SkipSdfParen(std::string_view& s) {
   }
 }
 
-// Collects the tokens making up a COND condition expression. It ends at the '('
-// that opens a parenthesized construct or at the ')' closing the COND, neither
-// of which is consumed -- what follows the expression is the caller's to read,
-// because only the caller knows whether a port name comes next.
 std::vector<std::string> ParseSdfCondTokens(std::string_view& s) {
   std::vector<std::string> out;
   while (true) {
@@ -229,15 +202,6 @@ std::vector<std::string> ParseSdfCondTokens(std::string_view& s) {
   return out;
 }
 
-// Renders the first `count` collected tokens back as condition text, one space
-// between each.
-//
-// That is not how SpecifyConditionText spaces the SystemVerilog side, and no
-// join rule could be: NextSdfToken above lexes `:` as a token of its own, so
-// `mode[3:2]` arrives here as three tokens and `c ? a : b` as five, and one
-// spacing cannot serve both. SpecifyConditionsMatch in
-// simulator/specify_condition_text.cpp is what reconciles the two, comparing
-// them with whitespace ignored.
 std::string JoinSdfCondTokens(const std::vector<std::string>& tokens,
                               std::size_t count) {
   std::string out;
@@ -267,7 +231,6 @@ static SdfDelayValue ParseDelayValOrEmpty(std::string_view& s, bool* present) {
   return dv;
 }
 
-// A value, `(...)`, read with whether it was written as empty parentheses.
 SdfDelayValue ParseDelayVal(std::string_view& s) {
   bool written = false;
   SdfDelayValue dv = ParseDelayValOrEmpty(s, &written);
@@ -304,16 +267,6 @@ static bool LooksLikeExtendedIopathDirection(std::string_view s) {
   return i < s.size() && s[i] == '(';
 }
 
-// Optionally consumes a leading (RETAIN ...) sub-expression. If the
-// parenthesized form is not a RETAIN, the input is restored to its original
-// position.
-//
-// §32.4.1 Table 32-1 maps `(IOPATH (RETAIN`, `(COND (IOPATH (RETAIN` and
-// `(CONDELSE (IOPATH (RETAIN` to the specify path delays and pulse limits the
-// forms without RETAIN reach, and adds that RETAIN may be ignored. Ignoring it
-// is therefore the mapping the standard defines for the construct, which
-// leaves nothing of it unannotated for §32.3 to warn about: the IOPATH's own
-// delays are annotated as usual and the RETAIN is dropped in silence.
 static void SkipOptionalIopathRetain(std::string_view& s) {
   SkipWhitespace(s);
   if (s.size() >= 7 && s[0] == '(') {
@@ -328,11 +281,6 @@ static void SkipOptionalIopathRetain(std::string_view& s) {
   }
 }
 
-// Parses the form of an IOPATH delay list that writes each direction as
-// `(delay reject error)`. §32.8: a module path carries twelve transition
-// delays filled from a listed one, two, three, six or twelve values, so every
-// direction written is read, and each counts towards how many values the entry
-// supplied whether or not it wrote a delay.
 static void ParseExtendedIopathDelays(std::string_view& s, SdfIopath& io) {
   while (io.directions.size() < 12) {
     SkipWhitespace(s);
@@ -345,10 +293,6 @@ static void ParseExtendedIopathDelays(std::string_view& s, SdfIopath& io) {
   if (io.values.size() > 2) io.turnoff = io.values[2];
 }
 
-// §32.8: parses the simple form of an IOPATH delay list. A module path carries
-// twelve state transition delays and an entry fills them in from a listed one,
-// two, three, six or twelve values, so the whole list is read rather than only
-// a rise/fall/turnoff triple.
 static void ParseSimpleIopathDelays(std::string_view& s, SdfIopath& io) {
   while (io.values.size() < 12) {
     SkipWhitespace(s);
@@ -360,12 +304,6 @@ static void ParseSimpleIopathDelays(std::string_view& s, SdfIopath& io) {
   if (io.values.size() > 2) io.turnoff = io.values[2];
 }
 
-// §32.4.1: an IOPATH's source port, which may be written with an edge,
-// `(posedge clk)`; the port's name, with the edge recorded on `io`. posedge
-// and negedge are the edges a module path declares (§30.4.2); any other edge
-// the SDF file writes leaves the source's edge unknown. Read as a bare port, a
-// parenthesized source read as no name, and the rest of the entry was
-// reported token by token as constructs that could not be annotated.
 static std::string ParseIopathSource(std::string_view& s, SdfIopath& io) {
   SkipWhitespace(s);
   if (s.empty() || s[0] != '(') return ParseSdfPort(s);
@@ -401,18 +339,11 @@ static SdfIopath ParseIopath(std::string_view& s) {
   return io;
 }
 
-// §32.4.4: reads the delay list of an interconnect entry. An interconnect delay
-// has twelve transition delays and is filled in from a listed one, two, three,
-// six or twelve values the same way a module path delay is, so the whole list
-// is read rather than only the first two values.
 static void ParseInterconnectDelayList(std::string_view& s,
                                        SdfInterconnect& ic) {
   while (ic.values.size() < 12) {
     SkipWhitespace(s);
     if (s.empty() || s[0] != '(') break;
-    // §32.4.4: interconnect delays follow the specify path delays' rules for
-    // pulse limits, so a value may state its limits as an IOPATH direction
-    // does, `((d) (r) (e))`.
     if (LooksLikeExtendedIopathDirection(s)) {
       ic.directions.push_back(ParseExtendedDirection(s));
       ic.values.push_back(ic.directions.back().delay);
@@ -449,13 +380,6 @@ static SdfInterconnect ParseLoadOnlyInterconnect(std::string_view& s,
   return ic;
 }
 
-// §32.4.1 Table 32-1: a DEVICE entry. The operand naming the instance or output
-// it applies to is optional -- an entry that opens straight into a delay value
-// carries none. §32.8: the delay values that follow are read as a whole list
-// rather than as a fixed rise/fall/turnoff triple, because a DEVICE delay may
-// land on a specify path, which carries twelve state transition delays, as
-// readily as on a gate primitive, which carries three -- and how many values
-// were written is what decides both mappings.
 static SdfDevice ParseDeviceEntry(std::string_view& s) {
   SdfDevice dev;
   dev.port_instance = ParseSdfPort(s);
@@ -485,8 +409,6 @@ static SdfPulseLimit ParsePulseLimit(std::string_view& s) {
   return pl;
 }
 
-// §32.5: notes where in the cell's run of constructs this one occurred, so
-// annotation can later replay them in exactly that order.
 static void RecordCellEntry(SdfCell& cell, SdfCellEntryKind kind,
                             size_t index) {
   SdfCellEntryRef ref;
@@ -495,9 +417,6 @@ static void RecordCellEntry(SdfCell& cell, SdfCellEntryKind kind,
   cell.entry_order.push_back(ref);
 }
 
-// Appends an already-parsed iopath to the cell and records its delay-entry
-// order slot; one whose source edge names no edge a module path declares is
-// reported instead.
 static void AddIopathToCell(SdfCell& cell, SdfFile& file, const SdfIopath& io) {
   if (!io.src_edge_known) {
     file.unannotatable.emplace_back("IOPATH");
@@ -507,16 +426,12 @@ static void AddIopathToCell(SdfCell& cell, SdfFile& file, const SdfIopath& io) {
   RecordCellEntry(cell, SdfCellEntryKind::kIopath, cell.iopaths.size() - 1);
 }
 
-// Appends an already-parsed interconnect to the cell and records its
-// delay-entry order slot.
 static void AddInterconnectToCell(SdfCell& cell, SdfInterconnect&& ic) {
   cell.interconnects.push_back(std::move(ic));
   RecordCellEntry(cell, SdfCellEntryKind::kInterconnect,
                   cell.interconnects.size() - 1);
 }
 
-// Parses a load-only interconnect (PORT/NETDELAY) of the given kind and adds it
-// to the cell.
 static void ParseAndAddLoadOnlyInterconnect(std::string_view& s, SdfCell& cell,
                                             SdfInterconnectKind kind,
                                             bool increment) {
@@ -525,8 +440,6 @@ static void ParseAndAddLoadOnlyInterconnect(std::string_view& s, SdfCell& cell,
   AddInterconnectToCell(cell, std::move(ic));
 }
 
-// Handles a (COND ...) delay-section entry: a conditioned IOPATH is recorded,
-// any other inner construct is skipped and reported unannotatable.
 static void ParseCondDelayEntry(std::string_view& s, SdfCell& cell,
                                 SdfFile& file, bool increment) {
   std::string cond = ParseSdfConditionText(s);
@@ -551,8 +464,6 @@ static void ParseCondDelayEntry(std::string_view& s, SdfCell& cell,
   if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
 }
 
-// Handles a (CONDELSE ...) delay-section entry: an ifnone IOPATH is recorded,
-// any other inner construct is skipped and reported unannotatable.
 static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
                                     SdfFile& file, bool increment) {
   SkipWhitespace(s);
@@ -574,8 +485,6 @@ static void ParseCondElseDelayEntry(std::string_view& s, SdfCell& cell,
   if (!s.empty() && s[0] == ')') Expect(s, SdfTokKind::kRParen);
 }
 
-// Handles a (PATHPULSE ...) / (PATHPULSEPERCENT ...) delay-section entry:
-// parses the pulse limit, records the percent flag, and appends it to the cell.
 static void ParsePulseLimitDelayEntry(std::string_view& s, SdfCell& cell,
                                       bool is_percent, bool increment) {
   auto pl = ParsePulseLimit(s);
@@ -586,7 +495,6 @@ static void ParsePulseLimitDelayEntry(std::string_view& s, SdfCell& cell,
                   cell.pulse_limits.size() - 1);
 }
 
-// Handles a (INTERCONNECT ...) delay-section entry.
 static void ParseInterconnectDelayEntry(std::string_view& s, SdfCell& cell,
                                         bool increment) {
   auto ic = ParseInterconnectEntry(s);
@@ -594,7 +502,6 @@ static void ParseInterconnectDelayEntry(std::string_view& s, SdfCell& cell,
   AddInterconnectToCell(cell, std::move(ic));
 }
 
-// Handles a (DEVICE ...) delay-section entry.
 static void ParseDeviceDelayEntry(std::string_view& s, SdfCell& cell,
                                   bool increment) {
   auto dev = ParseDeviceEntry(s);
@@ -603,7 +510,6 @@ static void ParseDeviceDelayEntry(std::string_view& s, SdfCell& cell,
   RecordCellEntry(cell, SdfCellEntryKind::kDevice, cell.devices.size() - 1);
 }
 
-// Handles a (IOPATH ...) delay-section entry.
 static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
                                   SdfFile& file, bool increment) {
   auto io = ParseIopath(s);
@@ -611,8 +517,6 @@ static void ParseIopathDelayEntry(std::string_view& s, SdfCell& cell,
   AddIopathToCell(cell, file, io);
 }
 
-// Dispatches a single already-opened delay-section entry (the leading '(' and
-// keyword have been consumed) to the handler for its keyword.
 static void HandleDelayEntry(std::string_view& s, SdfCell& cell, SdfFile& file,
                              const SdfToken& kw, bool increment) {
   if (kw.text == "PATHPULSE" || kw.text == "PATHPULSEPERCENT") {
@@ -652,17 +556,6 @@ static void ParseDelaySection(std::string_view& s, SdfCell& cell, SdfFile& file,
   Expect(s, SdfTokKind::kRParen);
 }
 
-// Parses the body of a DELAY section: one or more deltypes, each of whose
-// leading keyword selects whether the delays it lists replace or add to the
-// ones already in place. §32.5 (printed pages 929-930) has them annotate in
-// the order written, so an INCREMENT after an ABSOLUTE in one section adds to
-// it; read as a section of one deltype, the second was taken for the section's
-// end and dropped.
-//
-// §32.3: a leading keyword this annotator does not recognize makes that deltype
-// data it is unable to annotate, so it is reported and skipped. Reading its
-// contents as an absolute delay list anyway would push delays onto module
-// paths under a mode the SDF file never asked for.
 static void ParseDelaySpec(std::string_view& s, SdfCell& cell, SdfFile& file) {
   while (true) {
     SkipWhitespace(s);
@@ -687,11 +580,6 @@ static void ParseTimingCheckSection(std::string_view& s, SdfCell& cell,
     Expect(s, SdfTokKind::kLParen);
     auto kw = NextSdfToken(s);
     SdfCheckType ct = SdfCheckType::kSetup;
-    // §32.3: an entry of a TIMINGCHECK section is timing data by construction,
-    // so one this annotator does not recognize is data it is unable to
-    // annotate and has to be reported. Guessing a check type for it instead
-    // would overwrite a timing check constraint the SDF file never provided a
-    // value for, which the same subclause forbids.
     if (!MapCheckType(kw.text, ct)) {
       file.unannotatable.emplace_back(kw.text);
       SkipSdfParen(s);
@@ -719,9 +607,6 @@ static SdfDelayValue ParseLabelValue(std::string_view& s) {
   return dv;
 }
 
-// One lbl_type of a LABEL section, its leading `(` already read: the mode, and
-// the specparam values it lists in that mode, through its closing `)`. A mode
-// this annotator does not know is reported and skipped.
 static void ParseLabelType(std::string_view& s, SdfCell& cell, SdfFile& file) {
   auto mode = NextSdfToken(s);
   if (mode.text != "ABSOLUTE" && mode.text != "INCREMENT") {
@@ -748,9 +633,6 @@ static void ParseLabelType(std::string_view& s, SdfCell& cell, SdfFile& file) {
   Expect(s, SdfTokKind::kRParen);
 }
 
-// A LABEL section holds one or more lbl_types, as a DELAY section holds one or
-// more deltypes, and §32.5 annotates them in the order written; read as a
-// section of one, a second was taken for the section's end.
 static void ParseLabelSection(std::string_view& s, SdfCell& cell,
                               SdfFile& file) {
   while (true) {
@@ -774,10 +656,6 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
       cell.cell_type = std::string(val.text);
       Expect(s, SdfTokKind::kRParen);
     } else if (kw.text == "INSTANCE") {
-      // SDF writes a cell at the level the annotation runs at with its path
-      // left out, `(INSTANCE)`, which SdfCellPrefixInRegion reads as the region
-      // itself; read as a name, the closing parenthesis became the path and
-      // the cell's next construct was taken for the close.
       SkipWhitespace(s);
       if (!s.empty() && s[0] != ')')
         cell.instance = std::string(NextSdfToken(s).text);
@@ -796,10 +674,6 @@ static SdfCell ParseCell(std::string_view& s, SdfFile& file) {
   return cell;
 }
 
-// IEEE 1497's TIMESCALE header, its leading `(` and keyword already read: the
-// unit the file's values are in, in seconds, through its closing `)`. The
-// number and the unit may be written together, `100ps`, or apart, `100 ps`.
-// Zero for a unit it does not name, which leaves the file at the 1 ns default.
 static double ParseSdfTimescale(std::string_view& s) {
   const SdfToken kNumber = NextSdfToken(s);
   SkipWhitespace(s);

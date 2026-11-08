@@ -9,12 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §25.9: using a virtual interface that represents no instance is a fatal
-// run-time error. The write through the class's null property is reported at
-// line 4, and the run ends there: the statement after the call does not run,
-// and the second process, which would read through another null virtual
-// interface at time 5, is never reached. Before the run was ended, both lines
-// printed and the read drew a second report.
 TEST(VirtualInterfaceSim, NullReferenceEndsTheRun) {
   SimFixture f;
   std::string out = RunCapture(
@@ -41,10 +35,6 @@ TEST(VirtualInterfaceSim, NullReferenceEndsTheRun) {
                             "25.9"));
 }
 
-// §25.9: one assignment through a null virtual interface is one use, and
-// draws one fatal error. The blocking assignment measures its target to size
-// the right-hand side before it writes, and the measurement reported the null
-// base too, so the one error was printed twice at the same place.
 TEST(VirtualInterfaceSim, NullAssignmentTargetReportsOnce) {
   SimFixture f;
   std::string out = RunCapture(
@@ -62,12 +52,6 @@ TEST(VirtualInterfaceSim, NullAssignmentTargetReportsOnce) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §25.9: two virtual interfaces are equal when they represent the same
-// instance, wherever they are compared. In a method, the property `vif` set
-// to s1 equals the formal bound to s1, not the one bound to s2, and `!=`
-// answers the opposite. Before the operands were compared by handle, the
-// property was read as an instance's name, found none, and compared as an
-// unbound virtual interface: `same=0 other=0 ne=1`.
 TEST(VirtualInterfaceSim, PropertyComparedWithFormalInMethod) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -92,12 +76,6 @@ TEST(VirtualInterfaceSim, PropertyComparedWithFormalInMethod) {
             "same=1 other=0 ne=0\n");
 }
 
-// §25.9: a virtual interface a class function returns represents the
-// instance it was set to, so it equals that instance whether it was first
-// held in a variable, `got == s1`, or is compared as the call's own value,
-// `p.pick(0) == s0`, and not another, `p.pick(0) == s1`. The write through
-// it reaching s1.a shows the handle arrived. Each comparison is printed on
-// its own: their sum is a 1-bit expression (§11.6.1), in which 1 + 1 is 0.
 TEST(VirtualInterfaceSim, FunctionResultComparesEqualToItsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -122,10 +100,6 @@ TEST(VirtualInterfaceSim, FunctionResultComparesEqualToItsInstance) {
             "got=1 call=1 other=0 a=50\n");
 }
 
-// §25.9 with §27.4: an interface instance in a loop generate block is named
-// `g[1].s`, and a virtual interface assigned that path represents it, so each
-// write lands in its own instance. Before the path evaluated to a handle,
-// every write reached nothing and all three read 0.
 TEST(VirtualInterfaceSim, GenerateBlockInstancePathIsASource) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -146,9 +120,6 @@ TEST(VirtualInterfaceSim, GenerateBlockInstancePathIsASource) {
             "30 10 20\n");
 }
 
-// §25.9 with §23.6: `top.s1` names the instance s1 from the top, so the
-// virtual interface set to s1 equals it and not s2. Before the path evaluated
-// to a handle, `v == top.s1` answered 0.
 TEST(VirtualInterfaceSim, TopHeadedInstancePathCompares) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -165,11 +136,6 @@ TEST(VirtualInterfaceSim, TopHeadedInstancePathCompares) {
             "hier=1 other=0\n");
 }
 
-// §25.9 with §25.3.2: an interface port denotes the instance connected to
-// it, so a program's virtual interface assigned its port b represents top.s,
-// and the write through it at time 3 reaches top.s.a. Before the port's name
-// evaluated to that instance's handle, the write reached nothing and the
-// program read 0.
 TEST(VirtualInterfaceSim, ProgramInterfacePortIsASource) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -190,9 +156,6 @@ TEST(VirtualInterfaceSim, ProgramInterfacePortIsASource) {
             "prog sees 5 t=3\n");
 }
 
-// §25.9 with §25.3.2: the same through a module's interface port, compared
-// as well as written: `v == b` holds and the write through v is the
-// connected instance's.
 TEST(VirtualInterfaceSim, ModuleInterfacePortIsASource) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -212,10 +175,6 @@ TEST(VirtualInterfaceSim, ModuleInterfacePortIsASource) {
             "a=7 eq=1\n");
 }
 
-// §25.9 with §23.3.3.5: each element of an array of interface instances is
-// an instance, so `v = s[1]` represents s[1]: the write through v reaches
-// s[1].a and v equals s[1]. Before the select evaluated to that instance's
-// handle, v represented nothing.
 TEST(VirtualInterfaceSim, InstanceArrayElementIsASource) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -234,11 +193,6 @@ TEST(VirtualInterfaceSim, InstanceArrayElementIsASource) {
             "s1.a=6 v.a=6 eq=1\n");
 }
 
-// §25.9 with §6.8: a virtual interface declared with an initializer naming an
-// instance, `virtual SBus v = s;`, represents it before any procedure runs,
-// so a task's local initialized from v represents s too. Before the
-// instance was registered ahead of the module's variables, v stayed null and
-// every reference through it was reported.
 TEST(VirtualInterfaceSim, ModuleItemInitializerNamesAnInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -257,10 +211,6 @@ TEST(VirtualInterfaceSim, ModuleItemInitializerNamesAnInstance) {
             "a=8 eq=1 v.a=8\n");
 }
 
-// §25.9 with §7.4: an element of a fixed array of virtual interfaces is used
-// as the virtual interface it holds, so `v[0].a` is s0's a, written and read,
-// and `v[1].a` is s1's. Before the element was resolved as a virtual
-// interface, the write was lost and every read gave 0.
 TEST(VirtualInterfaceSim, FixedArrayElementReachesItsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -278,8 +228,6 @@ TEST(VirtualInterfaceSim, FixedArrayElementReachesItsInstance) {
             "v0.a=7 s0.a=7 v1.a=8\n");
 }
 
-// §25.9 with §7.10 and §7.8: the same for an element of a queue, `q[1].a`
-// written, and of an associative array, `m["two"].a` read.
 TEST(VirtualInterfaceSim, QueueAndAssocElementsReachTheirInstances) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -297,8 +245,6 @@ TEST(VirtualInterfaceSim, QueueAndAssocElementsReachTheirInstances) {
             "s1.a=22 m=22\n");
 }
 
-// §25.9 with §7.4.2: an element of an array property of virtual interfaces,
-// `vifs[i]` in a method, reaches the instance it holds.
 TEST(VirtualInterfaceSim, ArrayPropertyElementReachesItsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface SBus; int a; endinterface\n"
@@ -320,10 +266,6 @@ TEST(VirtualInterfaceSim, ArrayPropertyElementReachesItsInstance) {
             "100 101\n");
 }
 
-// §25.9 with §25.7: a function of an interface called through a virtual
-// interface held in a module variable is the function of the instance it
-// represents, reading that instance's `base`. Before the callee's head was
-// resolved as a virtual interface, the call ran nothing and answered 0.
 TEST(VirtualInterfaceSim, FunctionCalledThroughVariable) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface calc_if;\n"
@@ -343,11 +285,6 @@ TEST(VirtualInterfaceSim, FunctionCalledThroughVariable) {
             "vif add=60\n");
 }
 
-// §25.9 with §25.7: the same through a class's property, from a method: the
-// task's delay of 7 runs and its write reaches the instance's base, which
-// the function then reads, and through a static property named by the class
-// scope, `Agent::svif.add(2)`. Before this the task took no time and both
-// calls answered 0.
 TEST(VirtualInterfaceSim, SubroutinesCalledThroughClassProperties) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface calc_if;\n"

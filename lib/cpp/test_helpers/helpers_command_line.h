@@ -8,14 +8,6 @@
 
 #include "driver/cli_options.h"
 
-// One reading of a command line for a test whose subject is what the driver
-// makes of a switch. ParseArgs starts at index 1 because argv[0] is the
-// program name, so the program name is prepended here and no case writes it.
-// The words are copied into buffers this function owns because ParseArgs takes
-// a non-const `char* argv[]`.
-
-// Runs ParseArgs over `args`, the arguments as written on the command line,
-// filling `opts` and answering whether the parse was accepted.
 inline bool ParseCommandLine(const std::vector<std::string>& args,
                              delta::CliOptions& opts) {
   std::vector<std::string> words;
@@ -28,8 +20,6 @@ inline bool ParseCommandLine(const std::vector<std::string>& args,
   return delta::ParseArgs(static_cast<int>(argv.size()), argv.data(), opts);
 }
 
-// The same, with what ParseArgs prints to std::cerr captured into `err` instead
-// of shown, for a case whose subject is the report a switch draws.
 inline bool ParseCommandLineCapturingStderr(
     const std::vector<std::string>& args, delta::CliOptions& opts,
     std::string& err) {

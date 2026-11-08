@@ -10,18 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.4.2 governs $fgets. It reads characters from a file descriptor into a
-// destination variable until the variable is filled, a newline is read (and
-// itself transferred), or end-of-file is reached; a packed destination's
-// capacity counts only whole bytes; the call returns the count of characters
-// read, or zero when an error produced none, with $ferror describing a
-// failure. Every rule operates on a descriptor produced by a §21.3.1 $fopen
-// and on a destination produced by a declaration, so each test builds both
-// from real source syntax and drives the full pipeline.
-
-// C1: a newline ends the read and is itself transferred into the variable;
-// the characters after it stay in the file, so the next call picks up the
-// following line. The returned count includes the newline.
 TEST(ReadingALineAtATime, NewlineEndsReadAndIsTransferred) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_newline.txt";
@@ -47,9 +35,6 @@ TEST(ReadingALineAtATime, NewlineEndsReadAndIsTransferred) {
   std::remove(tmp.c_str());
 }
 
-// C1: filling the destination ends the read mid-line. A 24-bit variable holds
-// three characters, so a six-character line arrives across two calls of three
-// each, and the trailing newline is left for a third call.
 TEST(ReadingALineAtATime, FilledVariableEndsReadAndNextCallResumes) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_fill.txt";
@@ -72,17 +57,12 @@ TEST(ReadingALineAtATime, FilledVariableEndsReadAndNextCallResumes) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_NE(out.find("c1=3 h1=414243"), std::string::npos) << out;  // "ABC"
-  EXPECT_NE(out.find("c2=3 h2=444546"), std::string::npos) << out;  // "DEF"
-  EXPECT_NE(out.find("c3=1"), std::string::npos) << out;            // "\n"
+  EXPECT_NE(out.find("c1=3 h1=414243"), std::string::npos) << out;
+  EXPECT_NE(out.find("c2=3 h2=444546"), std::string::npos) << out;
+  EXPECT_NE(out.find("c3=1"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// C2: a declared width that is not a multiple of eight contributes only its
-// whole bytes. A 20-bit variable spans two whole bytes plus a partial byte
-// that is ignored, so each call reads two characters -- and the second call
-// starting exactly at the third character proves the partial byte consumed
-// nothing from the stream.
 TEST(ReadingALineAtATime, PartialByteDoesNotCountTowardCapacity) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_partial.txt";
@@ -103,14 +83,11 @@ TEST(ReadingALineAtATime, PartialByteDoesNotCountTowardCapacity) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_NE(out.find("c1=2 h1=4142"), std::string::npos) << out;  // "AB"
-  EXPECT_NE(out.find("c2=2 h2=4344"), std::string::npos) << out;  // "CD"
+  EXPECT_NE(out.find("c1=2 h1=4142"), std::string::npos) << out;
+  EXPECT_NE(out.find("c2=2 h2=4344"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// C2 (edge): a destination narrower than one byte has no whole bytes, so its
-// capacity is zero -- the call reads nothing and returns zero, and the file's
-// first character is still there for a byte-wide destination afterward.
 TEST(ReadingALineAtATime, SubByteDestinationReadsNothing) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_subbyte.txt";
@@ -135,9 +112,6 @@ TEST(ReadingALineAtATime, SubByteDestinationReadsNothing) {
   std::remove(tmp.c_str());
 }
 
-// C1: a string-typed destination resizes to the line rather than filling, so
-// a line longer than the string's prior contents arrives whole; a following
-// shorter line replaces it completely. The newline is kept in both.
 TEST(ReadingALineAtATime, StringDestinationTakesWholeLine) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_string.txt";
@@ -163,9 +137,6 @@ TEST(ReadingALineAtATime, StringDestinationTakesWholeLine) {
   std::remove(tmp.c_str());
 }
 
-// C1/C3/C4: a final line without a trailing newline is ended by end-of-file
-// and transferred with its true count; a further call at end-of-file returns
-// zero -- and $ferror reports no error, because exhaustion is not a failure.
 TEST(ReadingALineAtATime, EofEndsReadAndReturnsZeroWithoutError) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_eof.txt";
@@ -191,9 +162,6 @@ TEST(ReadingALineAtATime, EofEndsReadAndReturnsZeroWithoutError) {
   std::remove(tmp.c_str());
 }
 
-// C3/C4: an error reading -- here a descriptor opened for writing only, which
-// §21.3.4 forbids reading -- makes the returned count zero, and $ferror then
-// describes the cause of the failed $fgets.
 TEST(ReadingALineAtATime, ErrorReturnsZeroAndFerrorReportsCause) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_werr.txt";
@@ -217,10 +185,6 @@ TEST(ReadingALineAtATime, ErrorReturnsZeroAndFerrorReportsCause) {
   std::remove(tmp.c_str());
 }
 
-// C3/C4: reading through a descriptor already closed also yields a zero count
-// with a $ferror-visible cause, while a fresh working descriptor reads
-// cleanly and reports no error -- separating zero-for-error from
-// zero-at-end-of-file.
 TEST(ReadingALineAtATime, ClosedDescriptorReturnsZeroAndFreshOneClears) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_closed.txt";
@@ -253,8 +217,6 @@ TEST(ReadingALineAtATime, ClosedDescriptorReturnsZeroAndFreshOneClears) {
   std::remove(tmp.c_str());
 }
 
-// C3: $fgets is a function, so besides the assignment form of the standard's
-// example its count can sit directly in expression-operand position.
 TEST(ReadingALineAtATime, CountUsableAsExpressionOperand) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_operand.txt";
@@ -277,8 +239,6 @@ TEST(ReadingALineAtATime, CountUsableAsExpressionOperand) {
   std::remove(tmp.c_str());
 }
 
-// C1: a read-update descriptor ("r+") admits line reads just as "r" does --
-// the other §21.3.1 open type §21.3.4 permits for reading.
 TEST(ReadingALineAtATime, ReadsThroughReadUpdateDescriptor) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_rplus.txt";
@@ -301,11 +261,6 @@ TEST(ReadingALineAtATime, ReadsThroughReadUpdateDescriptor) {
   std::remove(tmp.c_str());
 }
 
-// §9.4.2: a non-edge implicit event is detected whenever the expression's value
-// changes, and the clause names no writer whose change is exempt. A system task
-// that writes one of its arguments has written a user variable, so a process
-// parked on it resumes -- which every case above could pass without, the store
-// having happened all along and the value being what they read back.
 TEST(ReadingALineAtATime, FgetsDestinationWakesAnEventControlOnIt) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213402_event.txt";
@@ -331,10 +286,6 @@ TEST(ReadingALineAtATime, FgetsDestinationWakesAnEventControlOnIt) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.2 with §13.3 and §8.5: the destination is any string or integral
-// variable -- a task's string output formal, a string property through a
-// handle or bare inside one of its methods, and a packed property, which fills
-// at its whole bytes as a module variable does.
 TEST(ReadingALineAtATime, FgetsIntoFormalsAndClassProperties) {
   SimFixture f;
   std::string tmp = "/tmp/deltahdl_213402_props.txt";

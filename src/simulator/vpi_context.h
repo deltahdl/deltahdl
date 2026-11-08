@@ -38,12 +38,8 @@ class VpiContext {
   VpiContext() = default;
   ~VpiContext();
   void Attach(SimContext& sim_ctx, const RtlirDesign* design = nullptr);
-  SimContext* Run() const { return sim_ctx_; }  // Null before Attach.
+  SimContext* Run() const { return sim_ctx_; }
 
-  // §37.14: the ports each module instance declares, off the design, where a
-  // port's direction and declared order live. §37.37: the intermodule paths
-  // running between the ports two instances connect to one signal. §37.45: the
-  // delay device an annotated SDF INTERCONNECT or (`source` empty) PORT places.
   void AttachDesignPorts(const RtlirDesign* design);
   void AttachDesignInterModPaths(const RtlirDesign* design);
   void PlaceSdfDelayDevice(std::string_view source, std::string_view load);
@@ -53,174 +49,49 @@ class VpiContext {
 
   VpiHandle RegisterSystf(s_vpi_systf_data* data);
 
-  // §38.37.1: run the calltf of the application a registration associated with
-  // `name`, as each invocation of the system task or function during simulation
-  // calls for, and answer whether one did. §36.3.2 has a PLI application
-  // override a built-in of the same name, so the registry is asked ahead of
-  // what the tool implements. `result` is what a system function's application
-  // wrote back through vpi_put_value on the call (§37.42), a 32-bit zero where
-  // it wrote nothing. compiletf and sizetf run when the design is built
-  // (VpiSystfCallbackFiresAtBuild, vpi_control.cpp), not here. `call_site` is
-  // what the arguments are read off (§36.4, MakeSystfCallObject).
   bool CallRegisteredSystf(const char* name, const Expr* call_site,
                            SimContext& ctx, Logic4Vec& result, Arena& arena);
 
-  // §36.8.2: run the compiletf of one system task or system function call the
-  // source description wrote, with that call standing where the application
-  // looks for it. The clause has the routine verify the arguments the source
-  // code passes to the user-defined system task or system function, and §36.4
-  // leaves an application no other way of reaching those arguments -- a
-  // compiletf is handed its own user_data and nothing else -- so a compiletf
-  // called with no current call is one that can check nothing. `call_site` is
-  // the expression the source wrote, and its arguments are hung on the call
-  // unevaluated, this period standing before the first event.
   void CallCompiletfForSourceCall(const s_vpi_systf_data& data,
                                   const Expr* call_site, SimContext& ctx,
                                   Arena& arena);
 
-  // §36.3.2: resolve the effective registration for a system task/function
-  // name, honouring the override rule. A user-provided PLI application
-  // associated with the same name as a built-in overrides that built-in,
-  // replacing its functionality, so the registry is consulted first: a matching
-  // registration is the override to invoke, and only when none is present (a
-  // null result) does the built-in stand. When several registrations share the
-  // name the most recent one wins, so a later user application overrides an
-  // earlier one.
   const s_vpi_systf_data* ResolveSystf(const char* name) const;
 
-  // §38.12: report the registration of the system task or system function
-  // callback denoted by `obj` into the application-allocated structure
-  // `systf_data_p`. The structure's memory belongs to the caller; this routine
-  // only writes the stored s_vpi_systf_data fields into it. A null handle, a
-  // null destination, or a handle that does not name a registered system
-  // task/function callback leaves the destination untouched.
   void GetSystfInfo(VpiHandle obj, s_vpi_systf_data* systf_data_p);
 
-  // §38.8: report the registration of the simulation-related callback denoted
-  // by `obj` into the application-allocated structure `cb_data_p`, which
-  // belongs to the caller. What leaves it untouched is written where this is
-  // defined; a system task/function callback goes to GetSystfInfo instead.
   void GetCbInfo(VpiHandle obj, s_cb_data* cb_data_p);
 
-  // §38.13: write the relevant simulation time into the application-allocated
-  // structure `time_p`. The caller selects the form through `time_p->type`:
-  // vpiSimTime delivers the raw 64-bit count in high/low; vpiScaledRealTime
-  // delivers a real scaled to the object's timescale. A null obj uses the
-  // simulation time unit; a time queue object reports the scheduled time of the
-  // next future event, also in the simulation time unit. The structure's memory
-  // belongs to the caller, so the routine only fills it and never allocates. A
-  // null `time_p` leaves nothing to do.
   void GetTime(VpiHandle obj, s_vpi_time* time_p);
 
-  // §38.10: retrieve the delays or pulse limits of `obj` into the
-  // application-allocated structure `delay_p`. delay_p->no_of_delays selects
-  // how many of the object's delays to retrieve and must be legal for the
-  // object's category; delay_p->time_type controls the form of every value
-  // written, and the type field of each da entry is ignored; delay_p->mtm_flag
-  // and delay_p->pulsere_flag select the per-delay layout (Table 38-2). The
-  // structure and its da array belong to the caller, so the routine only fills
-  // them. A null delay_p, a null obj, or a null da leaves nothing to do; an
-  // illegal no_of_delays records an error and writes nothing.
   void GetDelays(VpiHandle obj, s_vpi_delay* delay_p);
 
-  // §38.32: set the delays or timing limits of `obj` from the
-  // application-allocated `delay_p`, the write counterpart of GetDelays().
-  // delay_p->no_of_delays selects how many delays to set and must be legal for
-  // the object's category; delay_p->time_type gives the form of every source
-  // value (the type field of each da entry is ignored); delay_p->mtm_flag and
-  // delay_p->pulsere_flag select the per-delay layout (Table 38-4), with the
-  // delays taken in source order. Only the fields the flags select are written,
-  // so when pulsere_flag is clear the pulse limits keep their prior values. A
-  // null delay_p, a null obj, or a null da changes nothing; an illegal
-  // no_of_delays records an error (§38.2) and changes nothing.
   void PutDelays(VpiHandle obj, s_vpi_delay* delay_p);
 
-  // §38.9: retrieve up to `num_of_bytes` of data saved under the save/restart
-  // `id` into the caller-allocated buffer `data_loc`, returning the number of
-  // bytes actually retrieved. The first call for an id reads from the start of
-  // what was saved; each later call resumes where the previous one stopped. It
-  // is acceptable to ask for fewer bytes than were saved. Asking for more than
-  // remain is a warning: the bytes that are left are delivered, the rest of the
-  // buffer is zero-filled, and the return value is the number actually read.
-  // The routine is only legal from an application routine running for reason
-  // cbStartOfRestart or cbEndOfRestart; any other failure (wrong reason, an
-  // unknown id, or a null buffer) records an error and returns 0.
   int GetData(int id, char* data_loc, int num_of_bytes);
 
-  // §38.9 / §38.32: populate the save/restart store for `id` with `len` bytes
-  // from `data`, appending to whatever is already stored for that id. The
-  // production writer is vpi_put_data() (§38.32); this entry point stands in
-  // for it so the data vpi_get_data() reads back can be established.
   void SeedSaveData(int id, const char* data, int len);
 
-  // §38.31: append `num_of_bytes` bytes from `data_loc` to the save/restart
-  // store for `id`, returning the number of bytes written. The byte count must
-  // be greater than zero and the source pointer must be supplied by the
-  // application. The routine is only legal from an application routine running
-  // for reason cbStartOfSave or cbEndOfSave; any failure (wrong reason, a
-  // non-positive count, or a null source) detects an error and returns zero.
-  // There is no limit on how many times an id may be written, and ids may be
-  // written in any order; bytes for one id accumulate contiguously so that
-  // vpi_get_data() (§38.9) can later read them back in chunks of any size.
   int PutData(int id, const char* data_loc, int num_of_bytes);
 
-  // §38.33: associate `userdata` with `obj`, the storage location of a
-  // user-defined system task or system function call instance, so a later
-  // vpi_get_userdata() can read it back. Returns 1 on success. A null handle or
-  // a handle that is not a system task/function call is an error (§38.2) and
-  // returns 0, leaving no association made.
   int PutUserData(VpiHandle obj, void* userdata);
 
-  // §38.14: read back the user-data value a prior vpi_put_userdata() (§38.33)
-  // associated with `obj`, a system task or system function call instance. When
-  // nothing was ever associated, or the handle is null or not such a call, the
-  // routine yields null. A restart or a reset clears the field (§38.33), so a
-  // read afterwards returns null until the application re-establishes it.
   void* GetUserData(VpiHandle obj);
 
-  // §38.33: drop every system task/function call instance's user-data
-  // association. Run when the simulation restarts or resets, so that after
-  // either event a vpi_get_userdata() returns null until the application sets
-  // the field again (from a cbEndOfRestart or cbEndOfReset routine).
   void ClearUserDataForRestartOrReset();
 
-  // §38.13: set the simulation time unit, as a base-ten exponent of one second
-  // (the unit the scheduler counts ticks in). vpi_get_time() uses it both as
-  // the scaling reference for a scaled-real result and as the unit reported for
-  // a null obj or a time queue object.
   void SetSimTimeUnit(int exponent) { sim_time_unit_ = exponent; }
   int SimTimeUnit() const { return sim_time_unit_; }
 
-  // §38.13: create a time queue object so vpi_get_time() can report the
-  // scheduled time of the next future event.
   VpiHandle CreateTimeQueue();
 
-  // §37.81: record the simulation time queue the vpi_iterate(vpiTimeQueue,
-  // NULL) walk reports. The scheduler keeps this in step with the pending-event
-  // calendar; each slot names a simulation time that still holds events. The
-  // iteration sorts them into increasing time order, drops the current-time
-  // slot unless events remain before its read-only synch region, and yields a
-  // time queue object for each surviving slot (an empty result returns NULL).
   void SetTimeQueueSlots(std::vector<VpiTimeQueueSlot> slots) {
     time_queue_slots_ = std::move(slots);
   }
 
-  // §38.21: return a handle to the object named `name`, which may be a simple
-  // or a hierarchical name. With a null scope the name is searched for from the
-  // top level of the design hierarchy; with a scope the search is confined to
-  // that scope's contents. A protected scope object, or a hierarchical name
-  // that passes through a protected scope, makes the call an error (no handle).
   VpiHandle HandleByName(const char* name, VpiHandle scope);
   VpiHandle HandleByIndex(int index, VpiHandle parent);
 
-  // §38.20: return a handle to the index-selected subobject of `parent` named
-  // by the `num_index` indices in `index_array`. Like vpi_handle_by_index(),
-  // the reference object must carry the access-by-index property and must not
-  // be protected, or the call is an error. The indices are applied leftmost
-  // first, following the array dimension declaration from the leftmost to the
-  // rightmost range, optionally ending in a bit-select index. When the indices
-  // do not form a legal SystemVerilog index select expression the result is a
-  // null handle.
   VpiHandle HandleByMultiIndex(int num_index, const int* index_array,
                                VpiHandle parent);
   VpiHandle Handle(int type, VpiHandle ref);
@@ -234,37 +105,15 @@ class VpiContext {
   int ExecuteCallback(VpiHandle cb_handle);
   void RegisterCbValueChange(const s_cb_data& data);
 
-  // §38.36.3: deliver every active callback registered for the given action or
-  // feature reason. Each routine receives a copy of its s_cb_data whose reason
-  // field holds the reason for the callback; when a non-null obj or user_data
-  // is supplied the simulator fills that field before the routine runs (for
-  // example, the timing-check handle for cbTchkViolation, the new scope handle
-  // for cbInteractiveScopeChange, or the unresolved name for
-  // cbUnresolvedSystf). Returns how many callbacks were delivered.
   int DispatchCallbacks(int reason, VpiHandle obj = nullptr,
                         void* user_data = nullptr);
-  // §38.36: deliver the one registration `cb_handle` names, once for a
-  // simulation-time reason; answers 1 where it was delivered.
   int DeliverCallback(VpiHandle cb_handle);
-  // §38.36.3: call the cbSignal callbacks of the signals trapped since.
   int DeliverRaisedSignals();
-  // §38.36.1: deliver the cbValueChange callbacks placed on `obj` in
-  // vpiStrengthVal, for a change of its strength alone.
   int DispatchStrengthChange(VpiObject* obj);
-  // §37.43 detail 4 and §38.36.1.1: `stmt`, run in the instance `prefix` names,
-  // is the active frame's statement now, and its cbStmt callbacks are called.
   void NoteStmtExecuting(const Stmt* stmt, std::string prefix);
-  // §38.36.1: what the run tells the simulation-event callbacks of, each
-  // costing nothing where none of its reason is registered: a process created
-  // or ended, an object constructed or reclaimed, a variable `stmt` in the
-  // instance `prefix` forced, released, assigned or deassigned (cbForce,
-  // cbRelease, cbAssign, cbDeassign), and the disable statement `disable`
-  // there run (cbDisable).
   void NoteThreadCreated(Process* proc);
   void NoteThreadEnded(Process* proc);
-  // §38.36.1: the thread `proc` resumes execution (cbEnterThread).
   void NoteThreadEntered(Process* proc);
-  // §38.36.3: the timing check `check` is violated (cbTchkViolation).
   void NoteTimingViolation(const TimingCheckEntry& check);
   void NoteObjectCreated(ClassObject& obj);
   void NoteObjectReclaimed(ClassObject& obj);
@@ -272,96 +121,38 @@ class VpiContext {
                  std::string prefix);
   void NoteDisabled(const Stmt* disable, std::string prefix);
 
-  // §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
-  // cbEndOfReset once it has completed. No run reaches it: this implementation
-  // is without $reset, as Annex D.1 allows, and vpi_control(vpiReset) fails.
   int DispatchReset();
 
-  // §38.36.3: a restart first removes every registered callback except the
-  // restart callbacks, then delivers cbStartOfRestart followed by
-  // cbEndOfRestart, so the only callbacks that exist across a restart are those
-  // two.
   int DispatchRestart();
 
   int Get(int property, VpiHandle obj);
 
-  // §38.7: read a 64-bit integer object property (one whose type is PLI_INT64),
-  // returning the value at full width instead of the PLI_INT32 vpi_get()
-  // yields. Querying a protected object is an error, and on any error the value
-  // returned is vpiUndefined.
   PLI_INT64 Get64(int property, VpiHandle obj);
 
-  // §37.10 detail 7: the smallest time precision over every module object the
-  // context knows about, used to answer vpi_get(vpiTimePrecision/vpiTimeUnit)
-  // for a null handle.
   int SmallestModuleTimePrecision() const;
 
   PLI_BYTE8* GetStr(int property, VpiHandle obj);
-  // §38.11: computes the raw string value for a property, pointing into the
-  // object's own storage (or null). GetStr() copies the result into the shared
-  // temporary buffer the clause mandates; this helper does not.
   const char* GetStrRaw(int property, VpiHandle obj);
-  // Annex C.2.4: the deprecated vpi_free_object() routine. It was renamed
-  // vpi_release_handle(), so this name no longer performs a release: a call is
-  // flagged as deprecated and reports failure. Use ReleaseHandleStatus() (the
-  // vpi_release_handle() backend) for the live operation.
   int FreeObject(VpiHandle obj);
-  // §38.4: vpi_control() passes an operation-specific request from the PLI
-  // application to the simulator. arg0 carries the diagnostic level vpiStop and
-  // vpiFinish take; scope carries the vpiHandle argument of
-  // vpiSetInteractiveScope. Returns 1 on success, 0 on failure, which is what
-  // vpiReset gets: this implementation is without $reset, as Annex D.1 allows.
   int Control(int operation, int arg0 = 0, VpiHandle scope = nullptr);
 
-  // §40.5.3: control of coverage collection is requested through vpi_control()
-  // using the coverage control constants of §40.5.1. `operation` selects the
-  // action: vpiCoverageStart/Stop/Reset/Check apply the §40.3.2.1 control rules
-  // to the scope named by `scope_handle` (an instance or assertion handle);
-  // vpiCoverageSave applies the §40.3.2.5 rules and vpiCoverageMerge the
-  // §40.3.2.4 rules to the coverage database located by `name`. `coverage_type`
-  // is one of the §40.5.1 coverage type properties. What the actions act on and
-  // what the return means are written where it is defined.
   int ControlCoverage(int operation, int coverage_type, VpiHandle scope_handle,
                       const std::string& name);
 
-  // §40.5.3: the coverage-control state vpi_control() drives - the run's own
-  // wherever a run is attached, because §40.5 extends §40.2's one coverage API
-  // rather than keeping a second one. Written in vpi_control.cpp.
   CoverageControlState& GetCoverageControlState();
 
   bool ChkError(s_vpi_error_info* info);
 
-  // §38.17: capture the simulator's invocation command line. Following the
-  // standard argv convention, entry zero is the tool's own name and the
-  // remaining entries are the invocation options; GetVlogInfo() reports these
-  // back through the s_vpi_vlog_info structure. Placing the tool name at entry
-  // zero here is what makes that requirement hold for every later query.
   void SetInvocationArguments(const std::string& tool_name,
                               const std::vector<std::string>& options);
 
-  // §38.17: fill the result structure with the invocation option count (argc),
-  // the option values (argv), and the product and version strings. Returns true
-  // on success and false when the information cannot be supplied.
   bool GetVlogInfo(s_vpi_vlog_info* info);
 
-  // §38.5: flush the output buffers for the simulator's output channel and the
-  // current log file. Each channel accumulates written text in an in-memory
-  // buffer until it is flushed; flushing commits any pending text into the
-  // channel's committed stream and empties the buffer. Returns 0 on success and
-  // nonzero on failure, in which case the buffers are left untouched.
   int Flush();
 
-  // Support hooks for the flush model. Writes feed buffered text into either
-  // channel, or into the run's standard output once ConnectOutputChannel has
-  // connected it; the buffer accessors report what is still pending and the
-  // flushed accessors report what a flush has committed.
   void WriteOutputChannel(std::string_view text);
   void WriteLogFile(std::string_view text);
 
-  // §38.30 and §38.27: makes `out`, the run's standard output, which the run
-  // copies to its log file, the tool's output channel and log file, writing to
-  // it first whatever text they hold, flushed or not; null, once the run is
-  // over, returns them to their buffers.
   void ConnectOutputChannel(std::ostream* out);
   const std::string& OutputChannelBuffer() const {
     return channels_.output_channel_buffer;
@@ -373,35 +164,12 @@ class VpiContext {
   const std::string& LogFileFlushed() const {
     return channels_.log_file_flushed;
   }
-  // Forces the next Flush() down the failure path so the nonzero return can be
-  // exercised.
   void SetFlushShouldFail(bool fail) { channels_.flush_should_fail = fail; }
 
-  // §38.27: open a file for writing and return a multichannel descriptor (mcd)
-  // naming it. A fresh descriptor selects a single channel drawn from the bits
-  // that vpi_mcd_open() is allowed to use: channel 1 (the LSB) is reserved for
-  // the tool's own output channel and log file, and channel 32 (the MSB) is
-  // reserved for an fd from $fopen, so neither is ever handed out here. These
-  // mcds share one namespace with the mcds $fopen returns, so a file that is
-  // already open - whether opened by an earlier vpi_mcd_open() or by $fopen -
-  // yields its existing descriptor instead of a new one. Returns 0 on error,
-  // including when no channel is free.
   PLI_UINT32 McdOpen(const std::string& filename);
 
-  // §38.24: close the file(s) named by a multichannel descriptor. Because the
-  // channels are discrete bits of the integer mcd, several are closed at once -
-  // every set bit that names an open channel is freed and the file it named is
-  // dropped from the shared namespace (the same namespace $fopen uses, so an fd
-  // opened there can be closed here too). Descriptor 1 (the LSB) is predefined
-  // for the tool's own output channel and log file and cannot be closed; any
-  // bit that names no closeable channel is left untouched. Returns 0 when every
-  // requested channel was closed, otherwise the mcd of the channels left open.
   PLI_UINT32 McdClose(PLI_UINT32 mcd);
 
-  // Support hooks for the mcd-open model. The fopen registrar records that a
-  // file is already open on a given descriptor in the shared namespace; the
-  // accessors let a test observe which descriptor names a file; the failure
-  // hook forces the next open down its error return.
   void RegisterFopenMcdFile(const std::string& filename, PLI_UINT32 mcd) {
     channels_.mcd_open_files[filename] = mcd;
     channels_.mcd_allocated_channels |= mcd;
@@ -418,43 +186,14 @@ class VpiContext {
     channels_.mcd_open_should_fail = fail;
   }
 
-  // §38.25: flush the output buffers for the file(s) named by a multichannel
-  // descriptor. Because the channels are discrete bits of the integer mcd, one
-  // call names several files; the buffered output of every named channel is
-  // committed into its committed stream and the buffer emptied. Returns 0 on
-  // success and nonzero on failure, in which case the buffers are left
-  // untouched so nothing pending is lost.
   PLI_INT32 McdFlush(PLI_UINT32 mcd);
 
-  // §38.26: return the name of the file a single-channel descriptor names. The
-  // descriptor is looked up in the shared mcd/fd namespace - the one
-  // vpi_mcd_open() and $fopen populate (§38.27, §21.3.1) - so cd may be an mcd
-  // channel or an fd from $fopen with its MSB set. The name is handed back
-  // through a buffer reused on every call, so a pointer from an earlier call is
-  // overwritten here; a caller that needs to keep the string must copy it.
-  // Returns NULL on error, including a descriptor that names no open file.
   PLI_BYTE8* McdName(PLI_UINT32 cd);
 
-  // §38.28: write already-formatted text to every file the descriptor names.
-  // Each channel is a discrete bit of the integer mcd, so one call writes to
-  // several files at once; bit 0 names channel 1 (the tool's output channel and
-  // log file) and bit 30 names channel 31, the last of them, the MSB above them
-  // marking an fd from $fopen instead, whose file this clause withholds from
-  // the routine - so an fd names no channel here and nothing is written for it.
-  // The text is appended to each named channel's output buffer (the same buffer
-  // §38.25 flushes). Returns the number of characters written, which is zero
-  // where the descriptor named no channel.
   PLI_INT32 McdPrintf(PLI_UINT32 mcd, std::string_view text);
 
-  // §38.30: write already-formatted text to the output channel of the tool that
-  // invoked the PLI application and to its current log file, the §38.5 buffers,
-  // appending the same text to each; unlike McdPrintf() it takes no descriptor.
-  // Returns the number of characters written.
   PLI_INT32 Printf(std::string_view text);
 
-  // Hooks for the mcd-flush model: the writer feeds buffered text onto the one
-  // channel a set bit names, the accessors report what is pending on a channel
-  // and what a flush has committed, and the failure hook fails the next flush.
   void WriteMcdChannel(PLI_UINT32 channel, std::string_view text);
   const std::string& McdChannelBuffer(PLI_UINT32 channel) const;
   const std::string& McdChannelFlushed(PLI_UINT32 channel) const;
@@ -464,118 +203,32 @@ class VpiContext {
 
   VpiHandle HandleMulti(int type, VpiHandle ref1, VpiHandle ref2);
 
-  // §38.3: report whether two handles reference the same underlying simulation
-  // object at the moment of the call. Returns 1 (TRUE) when they do and that
-  // object exists, 0 (FALSE) otherwise. The comparison resolves each handle to
-  // the representative of the object it denotes, so handles that alias the same
-  // object compare equal even though their handle pointers differ; this is why
-  // object equivalence cannot be settled with a C "==" comparison.
   int CompareObjects(VpiHandle obj1, VpiHandle obj2);
 
-  // §37.2.1: hand back a handle that refers to an existing object. The standard
-  // lets a tool answer a request for a handle to an object it can already name
-  // either with the same handle or with a fresh, distinct one; this routine
-  // takes the latter option, allocating a new handle (a different pointer) that
-  // nonetheless denotes the same underlying object. Because the two handles
-  // refer to one object they are equivalent: vpi_compare_objects() reports them
-  // equal even though a C "==" of the handle pointers would not. A null object
-  // names nothing, so the result is null, and §37.2.4 permits a handle to an
-  // object only during that object's lifetime, so an object that has ceased to
-  // exist yields null as well.
   VpiHandle CreateHandleFor(VpiHandle object);
 
-  // §39.4.2: the callback object a placed assertion callback is removed
-  // through, carrying the placement `placed_handle` names. It is made here
-  // because this owns the objects a run hands out; the placement that needs one
-  // is made in src/simulator/vpi_assertion_cb.cpp, which says the rest.
   VpiHandle CreateAssertionCallbackObject(std::uint64_t placed_handle);
 
-  // §37.2.2: release a handle, the operation vpi_release_handle() performs. The
-  // handle is marked released so it is no longer a live handle to its object;
-  // the object itself is left in place. Because the flag is per-handle, a
-  // distinct handle to the same object - one another VPI program may still hold
-  // - is unaffected and continues to refer to that object. A null handle names
-  // nothing to release. Idempotent.
   void ReleaseHandle(VpiHandle handle);
 
-  // §38.38: the public vpi_release_handle() routine. It frees the memory a VPI
-  // routine allocated for a handle and reports whether it did so - 1 on success
-  // and 0 on failure. The routine shall not be called on an invalid handle, so
-  // a null, already-released, or otherwise invalid handle has no live memory to
-  // free and the call fails with 0. An iterator object (from vpi_iterate(),
-  // §38.21) owns storage that vpi_scan() reclaims only once a traversal runs to
-  // its end; releasing one before then frees that storage directly, which is
-  // how a program that breaks out of an iteration loop early reclaims it. For
-  // any other handle, freeing it is the §37.2.2 release operation above.
   PLI_INT32 ReleaseHandleStatus(VpiHandle handle);
 
-  // §37.2.2: observe whether a handle has been released. False for a null
-  // handle (there is nothing to have released).
   bool HandleReleased(VpiHandle handle) const;
 
-  // §37.2.4: whether a handle is valid. A handle is valid from the time of its
-  // creation until it is released (§37.2.2), until the object it refers to
-  // ceases to exist (§38.3 object existence), or until the tool terminates; at
-  // any other time it is invalid. Termination tears down the context itself, so
-  // the live cases this predicate distinguishes are release and the object
-  // ceasing to exist. A null handle refers to nothing and is never valid. A VPI
-  // program is required not to use an invalid handle to refer to an object, nor
-  // to release one; this predicate reports the validity those rules turn on.
   bool HandleValid(VpiHandle handle) const;
 
-  // §37.2.2 (restart): whether a handle survives a simulation restart. Only the
-  // handles to cbStartOfRestart and cbEndOfRestart callbacks survive; every
-  // other handle is released by the restart so those two callbacks can run.
   bool HandleSurvivesRestart(VpiHandle handle) const;
 
-  // §37.2.2 (restart): release every handle a simulation restart releases - all
-  // of them except the two restart-callback handles (see
-  // HandleSurvivesRestart). DispatchRestart() invokes this so a restart applies
-  // the rule.
   void ReleaseHandlesForRestart();
 
-  // §37.2.2 (frame/thread free): when the simulator frees objects belonging to
-  // a frame or thread, it releases all handles to those objects and to any
-  // subelement of them; handles to callbacks placed on any of these objects are
-  // released as well. `root` is the freed object; its subelements are its
-  // children, walked recursively.
   void ReleaseFrameOrThreadObject(VpiHandle root);
 
-  // §37.2.2 (class reclaim): when the simulator reclaims the memory of a class
-  // object, it releases the handle to the class object, to any of its automatic
-  // data members, and to any subelement of those automatic data members;
-  // handles to callbacks placed on any of these are released too. Static data
-  // members persist and are not released (NOTE 3 of §37.2.2 - a static local in
-  // a task/function does not belong to a frame or thread either).
   void ReleaseClassObject(VpiHandle class_object);
 
-  // §36.12.2.2: Mechanism 2 - selection of the default VPI compatibility mode
-  // run by the host simulator. This is the means the simulation provider makes
-  // available to set, for an entire simulation run, the compatibility mode that
-  // governs every VPI application not bound to a mode through the compile-based
-  // scheme of Mechanism 1 (§36.12.2.1). Only one default mode is selectable for
-  // a given run: the first selection fixes it and a later request for a
-  // different mode is refused (returns false) so the run keeps one consistent
-  // default; re-selecting the mode already in force is accepted. `mode` is a
-  // vpiCompatibilityMode value, with 0 meaning no compatibility mode (the
-  // native, current-standard data model). Returns true when the requested mode
-  // is the one in force after the call.
   bool SetDefaultCompatibilityMode(int mode);
 
-  // §36.12.2.2: the default VPI compatibility mode currently in force for the
-  // simulation run, as established by SetDefaultCompatibilityMode. Zero when no
-  // mode has been selected, in which case applications observe the native
-  // current-standard behavior.
   int DefaultCompatibilityMode() const { return default_compat_mode_; }
 
-  // §36.12.2.2: the compatibility mode that actually governs a particular VPI
-  // application. An application bound to a mode through Mechanism 1 carries
-  // that mode in its recompiled entry points, so the run-wide default does not
-  // apply to it - when `uses_mechanism1` is true the application's own
-  // `mechanism1_mode` governs. Every application not using the compile-based
-  // scheme is governed by the run-wide default instead. This is how an
-  // application needing a mode different from the default obtains one: by using
-  // the compile-based mechanism.
   int EffectiveCompatibilityMode(bool uses_mechanism1,
                                  int mechanism1_mode) const;
 
@@ -585,37 +238,17 @@ class VpiContext {
 
   VpiHandle CreateParameter(std::string_view name, int int_value);
 
-  // §37.49: register an assertion object under one of the assertion-class kinds
-  // so that it is reachable as a top-level assertion (the circle relation) by a
-  // null-referenced vpi_iterate(vpiAssertion, NULL).
   VpiHandle CreateAssertion(std::string_view name, int type);
 
   VpiHandle CreateNetObj(std::string_view name, Net* net_ptr, int width);
 
-  // §38.35: build a static unpacked array object with one element child per
-  // supplied variable. `array_type` is the vpiArrayType the array reports;
-  // `dim_indices` gives the declared index values of each unpacked dimension in
-  // left-to-right order. Each element child is created as a vpiReg over the
-  // matching variable, keyed by its flat ordinal (rightmost dimension varying
-  // fastest), so vpi_put_value_array() can locate and fill elements.
   VpiHandle CreateRegArray(std::string_view name, int array_type,
                            const std::vector<std::vector<int>>& dim_indices,
                            const std::vector<Variable*>& elements);
 
-  // §38.35: write values into contiguous elements of a static unpacked array.
-  // arrayvalue_p selects the element encoding and flags; index_p gives the
-  // starting element's coordinate (one entry per unpacked dimension); num is
-  // how many consecutive elements to set. Applies vpiNoDelay semantics only.
   void PutValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                      int* index_p, unsigned int num);
 
-  // §38.16: read values from contiguous elements of a static unpacked array.
-  // arrayvalue_p->format selects the element encoding written back; index_p
-  // gives the starting element's coordinate (one entry per unpacked dimension);
-  // num is how many consecutive elements to retrieve, taken with the rightmost
-  // dimension varying fastest. By default the values land in VPI-owned storage
-  // pointed to by the value arm; with vpiUserAllocFlag the caller's own buffer
-  // is filled instead. On any error the value arm is set to NULL.
   void GetValueArray(VpiHandle obj, s_vpi_arrayvalue* arrayvalue_p,
                      int* index_p, unsigned int num);
 
@@ -623,50 +256,18 @@ class VpiContext {
     return systfs_;
   }
 
-  // §36.8.1: the width in bits of the value the calltf routine returns for the
-  // system function. VpiSystfResultSizeBits computes it, and this is where the
-  // clause's other rule about the routine lands: no sizetf routine may be
-  // called more than once. The first ask of a
-  // registration runs it; every later ask answers with what that run returned,
-  // so a system function a design calls a thousand times is sized once.
-  //
-  // A record that is not one of this context's registrations -- a caller's own
-  // s_vpi_systf_data, which the free function is happy to measure -- has no
-  // registration to remember the answer against, so it is measured each time.
   int SystfResultSizeBits(const s_vpi_systf_data& data);
 
   const std::vector<s_cb_data>& RegisteredCallbacks() const;
 
-  // §36.9.1: the registration of system tasks shall occur prior to elaboration
-  // or the resolution of references. Marking elaboration as started closes the
-  // window in which RegisterSystf will accept new registrations.
   void MarkElaborationStarted() { elaboration_started_ = true; }
   bool ElaborationStarted() const { return elaboration_started_; }
 
-  // §36.10.2: the tool-lifecycle phase the VPI interface is currently in. It
-  // gates which routines and callback reasons a PLI application may use. The
-  // default is the full phase, so ordinary (post-compile) VPI use is
-  // unrestricted; InvokeVlogStartupRoutines narrows it to the startup phase
-  // while the vlog_startup_routines[] array executes.
   void SetToolPhase(VpiToolPhase phase) { tool_phase_ = phase; }
   VpiToolPhase ToolPhase() const { return tool_phase_; }
 
-  // §36.10.2: whether `routine` is refused because the tool has not reached the
-  // phase that makes it available. While the vlog_startup_routines[] array
-  // runs, almost nothing is available and only two routines may be called --
-  // vpi_register_systf() and vpi_register_cb() -- and the sizetf phase that
-  // follows permits nothing further. All functionality arrives with the
-  // cbEndOfCompile callbacks and lasts until the tool's execution is over.
-  //
-  // A refused call records §36.10.1's error, which is what vpi_chk_error
-  // reports, and the entry point yields nothing rather than answering out of a
-  // data structure the tool has not built yet.
   bool RoutineIsUnavailableNow(VpiRoutine routine);
 
-  // §38.36.2: the scheduler records when simulation has advanced past time zero
-  // into a time slice, and when it has reached the read-only synch region of a
-  // time slice. vpi_register_cb() consults these to reject the zero-delay
-  // simulation-time callbacks the standard forbids in those situations.
   void SetSimulationProgressedIntoTimeSlice(bool progressed);
   bool SimulationProgressedIntoTimeSlice() const;
   void SetAtReadOnlySynchTime(bool at_read_only) {
@@ -674,45 +275,24 @@ class VpiContext {
   }
   bool AtReadOnlySynchTime() const { return at_read_only_synch_time_; }
 
-  // §38.4: what vpi_control() has been asked for (VpiControlRequests).
   bool StopRequested() const { return control_.stop_requested; }
   bool FinishRequested() const { return control_.finish_requested; }
   int StopDiagLevel() const { return control_.stop_diag_level; }
   int FinishDiagLevel() const { return control_.finish_diag_level; }
   VpiHandle InteractiveScope() const { return control_.interactive_scope; }
-  // §38.4: an application routine starts, and returns; the built-in tasks
-  // vpi_control() requested while one ran execute once the outermost returns.
   void EnterApplicationRoutine() { ++control_.routines_running; }
   void LeaveApplicationRoutine();
-  // §38.4 and D.11: make `scope` the interactive scope, as
-  // vpiSetInteractiveScope and $scope do, and call back the
-  // cbInteractiveScopeChange registrations.
   void NoteInteractiveScope(VpiHandle scope);
 
-  // §37.43 detail 4: record which frame is the one currently active. There is
-  // at most one active frame at a time in a given thread, the running one's
-  // here, and an application reaches it through vpi_handle(vpiFrame, NULL).
   void SetActiveFrame(VpiHandle frame);
   VpiHandle ActiveFrame() const;
 
-  // §37.42 detail 3: record which system task or function call is currently
-  // invoking a PLI application. An application reaches it through
-  // vpi_handle(vpiSysTfCall, NULL) (see Handle); null when no system tf call is
-  // active.
   void SetCurrentSystfCall(VpiHandle call) { current_systf_call_ = call; }
   VpiHandle CurrentSystfCall() const { return current_systf_call_; }
 
-  // §37.82: record the $timeformat() call `call_site` that established the
-  // active time format, which an application reaches through
-  // vpi_handle(vpiActiveTimeFormat, NULL) (see Handle). $timeformat() calls
-  // this as it runs; before it has, nothing stands there, which is what makes
-  // that traversal return NULL (detail 1). Written in vpi_systf_call.cpp.
   void NoteTimeFormatCall(const Expr* call_site, SimContext& ctx);
   VpiHandle ActiveTimeFormatCall() const { return active_time_format_call_; }
 
-  // §38.31 / §38.9: the path to this implementation's save/restart location,
-  // read with vpi_get_str(vpiSaveRestartLocation, NULL) from a save or restart
-  // callback. Empty is no location rather than an empty path.
   void SetSaveRestartLocation(std::string path) {
     save_restart_location_ = std::move(path);
   }
@@ -722,62 +302,33 @@ class VpiContext {
 
   const s_vpi_error_info& LastError() const { return last_error_; }
 
-  // §38.2: the error status is reset by any VPI routine call except
-  // vpi_chk_error(). The C entry points clear the pending error here on entry
-  // before doing their work, so vpi_chk_error() reports only the outcome of the
-  // most recent routine; a failing routine then records a fresh error.
   void ResetErrorStatus() { last_error_ = {}; }
 
-  // §37.44: the VPI object standing for one of the run's threads, and the pass
-  // that brings the set of them up to date with the run, written in
-  // src/simulator/vpi_design_attach.cpp; that pass with §37.81's time queue
-  // slots made from the run's pending ones; §37.33 details 2 and 5: the class
-  // obj a class var references now, written in vpi_class_objects.cpp.
   VpiHandle ThreadObjectFor(Process* proc);
   void RefreshThreadObjects();
   void RefreshRunObjects();
   VpiHandle ClassObjectOf(VpiObject& class_var);
 
-  // §37.43 detail 4: activate the frame of a subroutine the run has just
-  // entered through `call`, answering with the frame that was active, and put
-  // that one back when the subroutine returns. Written beside the rest of it.
   VpiHandle ActivateFrame(const void*& thread, const Expr* call);
   void RestoreActiveFrame(VpiHandle previous, const void* thread);
 
-  // §36.10.1: a callback may also be registered for the occurrence of an error.
-  // This is that occurrence, delivered on the way out of the VPI routine that
-  // recorded the error. Which reason it goes to is written where it is defined.
   void NoteErrorRecorded();
 
  private:
   VpiHandle AllocObject();
 
-  // §37.42: the object standing for one system task or system function call.
-  // Written in vpi_systf.cpp, where what `evaluate_args` separates is set out.
   VpiHandle MakeSystfCallObject(const s_vpi_systf_data& data,
                                 const Expr* call_site, SimContext& ctx,
                                 Arena& arena, bool evaluate_args);
 
-  // §36.10: the object one component of a flat design name stands for, and the
-  // object a whole such name stands for with the instance scopes above it made
-  // as the walk passes through them. Both are written in
-  // src/simulator/vpi_design_attach.cpp, where the reading is.
   VpiHandle DesignScopeChild(VpiHandle parent, std::string_view part,
                              std::string_view full_path);
   VpiHandle DesignObjectForFlatName(std::string_view flat_name);
 
-  // §38.10: the design's module paths; §37.40: its timing checks; §38.11: each
-  // module's definition name; §37.36: its UDP definitions.
   void AttachModulePathDelays(SimContext& sim_ctx);
   void AttachTimingChecks(SimContext& sim_ctx);
   void AttachModuleDefNames(SimContext& sim_ctx);
   void AttachUdpDefns(const RtlirDesign* design);
-  // §37.10: every instance's object, each package's, and once the tops are
-  // made what each instance holds (vpi_design_attach_instances.cpp): what it
-  // takes from its definition, its variables' declared facts (§37.17,
-  // vpi_design_attach_vars.cpp), the objects the steps of
-  // vpi_design_attach_build.h add and its continuous assignments (§37.47,
-  // vpi_design_attach_assigns.cpp).
   void AttachInstanceObjects(const RtlirDesign* design);
   void AttachPackages(const RtlirDesign* design);
   void AttachInstanceContents(const RtlirDesign* design);
@@ -786,160 +337,82 @@ class VpiContext {
                                    const VpiCallBuild& calls);
   void AttachVariableFacts(const RtlirDesign* design);
 
-  // §37.23: the declaration object a design's user-defined nettype stands as,
-  // and the pass that makes one per nettype. In vpi_design_attach.cpp.
   void AttachNettypeDeclarations(const RtlirDesign* design);
   void MakeNettypeDecls(VpiHandle scope, const std::vector<ModuleItem*>& items,
                         const std::vector<RtlirImport>& imports);
 
-  // §37.3.4: the source-written delay expression each net of the design
-  // reaches through vpiDelay. In vpi_design_attach.cpp.
   void AttachSourceDelayExpressions(SimContext& sim_ctx,
                                     const RtlirDesign* design);
 
-  // §37.2.2: release one handle plus the handles to every callback placed on
-  // the object it names. Building block for the simulation-event release rules.
   void ReleaseHandleWithCallbacks(VpiObject* object);
 
-  // §37.2.2: release a handle, all subelement handles reachable through its
-  // children, and the callbacks on any of them. Used by the frame/thread-free
-  // and class-reclaim release rules.
   void ReleaseHandleSubtree(VpiObject* root);
 
   std::vector<s_vpi_systf_data> systfs_;
-  // §38.37: the systf object each registration returned, at its position.
   std::vector<VpiObject*> systf_objects_;
-  // §36.8.1: what each registration's sizetf returned, keyed by its position in
-  // systfs_, which is stable because registrations are appended and never
-  // removed. Absent until the first ask, which is the run the clause allows.
   std::unordered_map<size_t, int> systf_result_bits_;
   std::vector<s_cb_data> callbacks_;
   std::vector<VpiHandle> cb_handles_;
   std::unordered_map<std::string_view, VpiObject*> object_map_;
   std::vector<VpiObject*> all_objects_;
   Scheduler* scheduler_ = nullptr;
-  // §38.13: the simulation time unit (base-ten exponent of one second) the
-  // scheduler's tick count is expressed in; the reference vpi_get_time() scales
-  // a scaled-real result against.
   int sim_time_unit_ = 0;
-  // §37.81: the pending entries of the simulation time queue, the source the
-  // vpi_iterate(vpiTimeQueue, NULL) walk filters and sorts. Empty until the
-  // scheduler records pending events, which is why an idle queue iterates to
-  // NULL.
   std::vector<VpiTimeQueueSlot> time_queue_slots_;
   bool elaboration_started_ = false;
-  // §36.10.2: see SetToolPhase. Defaults to the full phase so VPI use outside
-  // the startup window is unrestricted.
   VpiToolPhase tool_phase_ = VpiToolPhase::kFull;
   VpiControlRequests control_;
-  // §37.43 detail 4: the frame active in each thread, keyed by its process
-  // (null outside one); the running thread's is vpi_handle(vpiFrame, NULL).
   std::unordered_map<const void*, VpiHandle> active_frames_;
-  // §37.42 detail 3: the system task or function call currently invoking a PLI
-  // application, returned by vpi_handle(vpiSysTfCall, NULL).
   VpiHandle current_systf_call_ = nullptr;
-  // §37.42 detail 3 and §37.43 detail 6: the model's calls, which a registered
-  // system task's invocation stands as and a subroutine's frame was entered by.
   VpiCallSiteObjects call_site_objects_;
-  // §38.14 with §38.33: the call instances the model made no object for, each
-  // made on its first invocation and kept, under its call site and instance,
-  // so that its user data lasts from one invocation to the next.
   VpiCallSiteObjects invoked_call_objects_;
-  // §38.32: where in the run's specify manager each module path's and timing
-  // check's object stands, for vpi_put_delays to give it new delays there.
   std::unordered_map<const VpiObject*, std::size_t> run_entry_index_;
-  // §38.36.1.1: the model's statements, keyed as the call statements are, and
-  // whether a cbStmt has been registered, before which none is looked up.
   VpiStmtObjects stmt_objects_;
   bool stmt_callbacks_registered_ = false;
-  // §37.42: the class defns, tasks and functions and unit typespecs a call is
-  // shaped against (CallBuild), kept for the port connections made after them.
   VpiCallObjects call_objects_;
   VpiCallBuild CallBuild();
 
-  // §37.82: the $timeformat() call that set the active time format, returned by
-  // vpi_handle(vpiActiveTimeFormat, NULL). Null until $timeformat() is called.
   VpiHandle active_time_format_call_ = nullptr;
 
-  // §36.12.2.2: the run-wide default VPI compatibility mode selected through
-  // Mechanism 2 (a vpiCompatibilityMode value; 0 = native current standard),
-  // and whether one has been selected yet. The selection is fixed for the
-  // simulation run once made, so only one default mode is selectable per run.
   int default_compat_mode_ = 0;
   bool default_compat_mode_selected_ = false;
 
-  // §38.5, §38.25 to §38.28: the output channel, log file and multichannel
-  // descriptor state, declared in simulator/vpi_channel_state.h.
   VpiChannelState channels_;
 
   s_vpi_error_info last_error_ = {};
 
-  // §38.9: the reason of the callback whose application routine is currently
-  // executing, or -1 when no callback is running. vpi_get_data() consults this
-  // to enforce that it is only called from a cbStartOfRestart/cbEndOfRestart
-  // routine; DispatchCallbacks sets and restores it around each cb_rtn call.
   int current_callback_reason_ = -1;
   void Deliver(s_cb_data data);
   VpiHandle MadeClassObject(ClassObject& obj);
 
-  // §38.36.2: where the scheduler has the run, set as simulation advances: past
-  // time zero into a time slice, and in a time slice's read-only synch region.
-  // Both gate RegisterCb's zero-delay placement errors; neither holds at first.
   bool sim_progressed_into_time_slice_ = false;
   bool at_read_only_synch_time_ = false;
 
-  // §38.9 and §38.32: the save/restart bytes by id, which SeedSaveData appends
-  // to as vpi_put_data would, and each id's read cursor, which GetData advances
-  // so successive vpi_get_data() calls resume where the last one stopped.
   std::unordered_map<int, std::vector<char>> save_data_;
   std::unordered_map<int, std::size_t> save_data_cursor_;
 
-  // §40.5.3: the coverage-collection state driven by vpi_control(). It carries
-  // the §40.3.2.1/.4/.5 control rules so a coverage control request applies the
-  // same semantics as the equivalent $coverage_* system function.
   CoverageControlState coverage_control_;
 
   std::string product_ = "DeltaHDL";
   std::string version_ = "0.1.0";
 
-  // §38.17: what vpi_get_vlog_info() reports - the command line's own strings,
-  // the words read out of any options file it names, and the pointer array
-  // handed back as argv, which GetVlogInfo rebuilds from both on each query.
   std::vector<std::string> invocation_args_;
   std::vector<std::string> invocation_file_args_;
   std::vector<PLI_BYTE8*> invocation_argv_;
 
   VpiValuePools value_pools_;
 
-  // §36.10: the names of the objects Attach makes, copied here because the
-  // components of a flat name are not strings of their own; a deque, so the
-  // views object_map_ and each VpiObject::name hold stay put as it grows.
   std::deque<std::string> name_pool_;
-  // §5.6.1: the escaped identifiers of the design attached that hold a
-  // period, each kept as one component when a flat name is split.
   std::unordered_set<std::string_view> dotted_escaped_names_;
 
-  // §36.10.1: whether an error-callback pass is running. A callback's own VPI
-  // calls may record an error, and delivering it from inside the pass would
-  // re-enter callbacks that have not yet returned from the error before it.
   bool dispatching_error_callbacks_ = false;
 
-  // §37.44 and §37.33: the run attached to, the object standing for each of
-  // its processes and class objects, made against the run as it stands since
-  // they come and go, and the class defn of each class declaration (§37.31).
   SimContext* sim_ctx_ = nullptr;
   std::unordered_map<const void*, VpiObject*> run_objects_;
 
-  // §38.11: vpi_get_str() places its result in one temporary buffer that every
-  // call reuses, so an earlier returned pointer is clobbered by a later call.
-  // It is deliberately separate storage from value_pools_ (the buffers that
-  // back s_vpi_value strings), which the clause requires to be different.
   std::string get_str_buffer_;
 
   std::string save_restart_location_;
 
-  // §38.16: vpi_get_value_array() returns its section in VPI-allocated,
-  // read-only storage, one buffer that each later call overwrites.
   std::vector<unsigned char> value_array_storage_;
 };
 

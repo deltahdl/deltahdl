@@ -26,16 +26,6 @@
 
 namespace delta {
 
-// Reads `expr` into the steps of §23.6's Syntax 23-7, folding each instance
-// select against `scope`. Returns false when the expression is not a path at
-// all, or when a select does not fold: §23.6 requires the select to evaluate to
-// a legal index of the array, so one that does not names no instance and the
-// caller reports the path as reaching nothing.
-//
-// The select is folded here rather than at the point of comparison because a
-// defparam standing in a loop generate block may write its own genvar --
-// §23.10.1's example is `defparam somename[i+1].my_flop.xyz = i` -- and `scope`
-// carries that binding only while the block instance is being applied.
 static bool CollectPathSteps(const Expr* expr, const ScopeMap& scope,
                              HierPath& out) {
   if (expr->kind == ExprKind::kMemberAccess) {
@@ -61,8 +51,6 @@ static bool CollectPathSteps(const Expr* expr, const ScopeMap& scope,
 
 static bool RhsContainsHierarchicalRef(const Expr* e);
 
-// True if any scalar (single-Expr) child slot of `e` contains a hierarchical
-// reference. Kept separate so the top-level node check stays simple.
 static bool AnyScalarChildContainsHierarchicalRef(const Expr* e) {
   return RhsContainsHierarchicalRef(e->lhs) ||
          RhsContainsHierarchicalRef(e->rhs) ||
@@ -75,8 +63,6 @@ static bool AnyScalarChildContainsHierarchicalRef(const Expr* e) {
          RhsContainsHierarchicalRef(e->repeat_count);
 }
 
-// True if any element of one of `e`'s child-Expr lists contains a hierarchical
-// reference.
 static bool AnyListChildContainsHierarchicalRef(const Expr* e) {
   for (const auto* a : e->args) {
     if (RhsContainsHierarchicalRef(a)) return true;
@@ -119,27 +105,6 @@ RtlirParamDecl* Elaborator::ResolveDefparamSteps(RtlirModule* root,
   return nullptr;
 }
 
-// §23.8: a hierarchical name whose leading step names no scope of the module
-// writing it is resolved upward until the name is found or the root of the
-// hierarchy is reached, and the root is a top-level module: a leading step
-// naming one roots the remaining steps there, which is how §23.10.4.2's own
-// example, `defparam m.n.p = 1;` written in the m1 that m instantiates, reaches
-// m's instance n, and how a defparam Annex C.4.1 places in a file apart from
-// the instance it modifies names that instance from a top-level module of its
-// own. The writer's generate block path is the writer's and does not carry into
-// the top the name starts over from. Answers the parameter the name reaches
-// through a top-level module, or null where its leading step names none or the
-// steps behind that step reach none.
-//
-// `rooted.root` is read first as the writing module, which both callers put
-// there, and null where the caller asks with no writer: §23.10.1 (printed
-// 764) forbids a statement in a hierarchy under a generate block instance
-// from changing a parameter outside it, and a name starting over from a
-// top-level module leaves the block a writer's own instance stands in as
-// readily as the block a statement is written in, so a parameter outside
-// that block (EscapesWriterBlock) is answered as none. `module w; defparam
-// top.u2.P = 5;` instantiated in top's block g beside u2 gave u2's P 5,
-// judged by the statement's position in w alone.
 RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
                                                    DefparamTopRooted& rooted) {
   const RtlirModule* writer = rooted.root;
@@ -152,8 +117,6 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   rooted.steps.assign(path.begin() + 1, path.end());
   if (EscapesWriterBlock(defparam_writer_blocks_, writer, top, rooted.steps))
     return nullptr;
-  // One remaining step names a parameter of the top-level module itself,
-  // which no descent reaches.
   if (rooted.steps.size() != 1) {
     return ResolveDefparamSteps(top, rooted.steps, {}, &rooted.target_mod);
   }
@@ -166,20 +129,6 @@ RtlirParamDecl* Elaborator::ResolveDefparamFromTop(const HierPath& path,
   return nullptr;
 }
 
-// §6.18 (printed page 118): a typedef name stands for the type its
-// declaration gave it, in the scope of that declaration. Once every module is
-// elaborated, typedefs_ holds the union of what the modules registered
-// (Elaborator::ElaborateTopModules), one flat map in which two modules'
-// typedefs of one name leave the last one elaborated, so the table a
-// parameter of `decl` is sized against here lays the module's own typedef
-// items over that union, as the module's own were in force where the
-// declaration was sized. A forward typedef, kImplicit, defines nothing. A
-// typedef a generate block declares is not among the items and is not
-// needed: Elaborator::ResolveDefparamsAndGenerates applies every defparam a
-// module's blocks could read before it elaborates the blocks, and a block's
-// declaration is sized at its elaboration with the block's own typedefs in
-// force, so no parameter a block declares is on RtlirModule::params when
-// RecomputeDependentParams runs for a defparam into the module.
 static TypedefMap ModuleTypedefTable(const TypedefMap& all,
                                      const ModuleDecl* decl) {
   TypedefMap typedefs = all;
@@ -193,11 +142,6 @@ static TypedefMap ModuleTypedefTable(const TypedefMap& all,
   return typedefs;
 }
 
-// Whether `p`'s declared type carries a range the parameters in scope can
-// change: a packed range written on it, or a typedef name `typedefs` holds,
-// whose own range §6.18 (printed page 118) makes the parameter's. A name the
-// table does not hold, a type parameter's among them, sizes as the declaration
-// sized it.
 static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
                                       const TypedefMap& typedefs) {
   const DataType* dtype = p.decl_type;
@@ -207,10 +151,6 @@ static bool DeclTypeRangeFollowsScope(const RtlirParamDecl& p,
          FindNamedType(*dtype, typedefs) != nullptr;
 }
 
-// Gives `p` the value `expr`, folded against `scope` under the registration
-// the caller installed, converted to the range `p` now has, with the words
-// above bit 63 of one wider than 64 bits recorded from it. A fold that fails
-// leaves the value `p` held to the conversion.
 static void RefoldOverride(RtlirParamDecl& p, const Expr* expr,
                            const ScopeMap& scope) {
   auto val = FoldParamValue(p, expr, scope);
@@ -218,16 +158,6 @@ static void RefoldOverride(RtlirParamDecl& p, const Expr* expr,
   RecordResolvedHighWords(p, expr, scope);
 }
 
-// §23.10.2 (printed page 766) with §6.20.2 (printed 126): whether the
-// expression an instance's assignment gave `p`, folded where the
-// instantiation was written as Elaborator::ApplyParamOverride recorded it,
-// reproduces the value `p` holds at the range it has now, so that a refold
-// of it at another range can be trusted. False for a value no instance
-// assigned, for one whose scope was not recorded, and where the fold gives
-// another value: the recorded scope holds the instantiating module's own
-// parameters, and a name the site read otherwise -- a generate block's
-// parameter of the same name -- would fold to something the source did not
-// write.
 static bool OverrideExprReproducesValue(const RtlirParamDecl& p) {
   if (p.override_expr == nullptr || p.override_module == nullptr) return false;
   ParamRangeRegistryGuard instantiating_module_guard(p.override_module);
@@ -235,25 +165,6 @@ static bool OverrideExprReproducesValue(const RtlirParamDecl& p) {
   return val && ConvertOverrideValue(*val, p) == p.resolved_value;
 }
 
-// §23.10.1 (printed pages 764-765) with §6.20.2 (printed 126): the value a
-// defparam gave `p` is the right-hand side converted to the range `p` now
-// has, so the right-hand side is folded again in the scope of the statement
-// as Elaborator::ApplyDefparamSite folded it, with the module holding the
-// statement and the generate blocks the statement stands in registered, and
-// the words above bit 63 of one wider than 64 bits recorded from it.
-// Converting the value already cut to the earlier range kept that range's
-// bits alone: `defparam u.P = 96'h1_0000_0003_0000_0005` applied while
-// `logic [W-1:0] P` was 32 bits wide, and `defparam u.W = 96` after it, left
-// P[95:64] reading 0 and P[47:32] 0. The blocks are registered because a
-// name on the right-hand side written in a block may be the block's own
-// parameter (§23.9, printed 761; §27.4, printed 820), which the module's
-// registration alone keeps out of sight: `defparam u.P = V` in a block
-// declaring `localparam logic [95:0] V` read V's low 64 bits alone when a
-// later defparam widened P. A value an instance's assignment gave (§23.10.2,
-// printed 766) is folded again the same way where `refold_override` says the
-// expression and scope recorded for it reproduce it, and otherwise converted
-// as it stands, which kept the 5 the 32-bit range had left of
-// `c #(.P(96'h1_0000_0003_0000_0005)) u()` under `defparam u.W = 96`.
 static void ReconvertOverrideValue(RtlirParamDecl& p, bool refold_override) {
   if (p.defparam_value_expr != nullptr) {
     ParamRangeRegistryGuard defparam_module_guard(p.defparam_module);
@@ -269,26 +180,10 @@ static void ReconvertOverrideValue(RtlirParamDecl& p, bool refold_override) {
   p.resolved_value = ConvertOverrideValue(p.resolved_value, p);
 }
 
-// §6.20.2 (printed page 126): a parameter with a range specification has the
-// range of its declaration, and that range is folded with the parameters in
-// scope, so one written as `logic [TOP:0]` follows TOP's final value, which
-// §23.10.1 (printed 764-765) lets a defparam set. RecomputeDependentParams
-// refolded the values alone, so `defparam u.TOP = 7` over `parameter logic
-// [TOP:0] P` left P sixteen bits wide and `$bits(P)` reading 16, and
-// `defparam u.P = 16'hABCD` after it gave P 0xABCD where the eight-bit range
-// holds 0xCD. Sizes `p` again against `scope` and `typedefs` where its
-// declared type carries a packed range, as PopulateValueParamInfo and
-// BuildParamDeclShell sized it at the declaration, and converts a value an
-// override gave it to the range it now has (§23.10, printed 763-764). A type
-// written as a typedef name, `typedef logic [TOP:0] vec_t; parameter vec_t
-// P`, is sized through the typedef's own range folded in the same scope
-// (§6.18, printed 118); it was left as first sized, with $bits(P) at 16 under
-// `defparam u.TOP = 7`, while the typedef table was not in force here.
 static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
                                          const TypedefMap& typedefs,
                                          const ScopeMap& scope) {
   if (!DeclTypeRangeFollowsScope(p, typedefs)) return;
-  // Judged at the range `p` still has, which the recorded value was cut to.
   const bool kRefoldOverride = OverrideExprReproducesValue(p);
   const DataType& dtype = *p.decl_type;
   PopulateParamTypeInfo(p, dtype, typedefs, scope);
@@ -296,46 +191,17 @@ static void ResizeParamToRecomputedRange(RtlirParamDecl& p,
   if (p.from_override) ReconvertOverrideValue(p, kRefoldOverride);
 }
 
-// The values in scope where an instantiation stands, `outer`, with the
-// instantiating module's own parameters, `own`, as they now are over them.
 static ScopeMap ScopeOverlaidWith(ScopeMap outer, const ScopeMap& own) {
   for (const auto& [name, value] : own) outer[name] = value;
   return outer;
 }
 
-// Whether `p` is a value parameter the instantiation in `parent` assigned and
-// no defparam has set since, so a change in `parent` folds it again.
 static bool RefoldsFromInstantiation(const RtlirParamDecl& p,
                                      const RtlirModule* parent) {
   return !p.is_type_param && p.override_expr != nullptr &&
          p.override_module == parent && p.defparam_value_expr == nullptr;
 }
 
-// §23.10.2 (printed page 766): a parameter whose value depends on the one a
-// defparam redefined takes its new value too. Each such value expression is
-// written in `mod`, so `mod` is registered while it folds: the module
-// holding the defparam, which ApplyDefparams registers, is where the
-// right-hand side's names mean something and not where these do, and under
-// it a select on the redefined parameter read that parameter at 32 bits,
-// `localparam int H = P[95:64]` folding to 0 over a 96-bit P a defparam had
-// just given its words above 64. Those words are recorded on each parameter
-// made over as the value is, for a later read of it. A parameter whose range
-// depends on the redefined one is sized again first, against the typedefs of
-// `mod` where its type is a typedef name, its own value included where an
-// override gave it, so that the parameters after it read it at the range it
-// now has. The module's own parameters are what is here (ModuleTypedefTable
-// says why no block's is), so the scope is the module's with no block
-// registered; a child instantiated inside a generate block of its parent had
-// its parameters keyed under that block's prefix until
-// ElaboratorData::GenerateScopeSaver, and stood out of this scope's sight.
-// §23.10.1 (printed pages 762-763): a defparam sets a parameter of the
-// instance it names, and an instantiation inside that instance whose
-// parameter value assignment reads the parameter hands the new value down --
-// `adder #(.W(WIDTH)) a2();` under `defparam t.WIDTH = 64;` makes a2's W 64.
-// Each child parameter `mod` assigned, and no defparam has set since, is folded
-// again from its assignment against the values in scope where the
-// instantiation stands with `mod`'s own parameters as they now are, and a child
-// whose parameter so changes has its own dependents recomputed in turn.
 void Elaborator::RefoldChildOverrides(RtlirModule* mod,
                                       const ScopeMap& mod_scope) {
   for (auto& child : mod->children) {
@@ -345,9 +211,6 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
     for (auto& p : cm->params) {
       if (!RefoldsFromInstantiation(p, mod)) continue;
       int64_t before = p.resolved_value;
-      // §33.4.3: a configuration's override names the configuration's own
-      // localparams as well as the instantiating scope's parameters, and its
-      // localparams are what a name both declare means.
       ScopeMap scope = ScopeOverlaidWith(p.override_scope, mod_scope);
       if (p.config_locked) {
         scope = ScopeOverlaidWith(std::move(scope), config_localparam_scope_);
@@ -359,16 +222,6 @@ void Elaborator::RefoldChildOverrides(RtlirModule* mod,
   }
 }
 
-// §23.10.1: a defparam gives the parameter its value for the whole instance, so
-// a declaration the parameter sizes, `logic [W-1:0] data`, is as wide as the
-// value now in force makes it, as it is when an instantiation's override is in
-// force while the instance is elaborated. A variable a loop generate block
-// declares reads that block's index as well (§27.4). A net carries no such
-// index, so one a generate block declares, named under the block's scope,
-// keeps the width it was elaborated with.
-// §23.10.1 with §7.4.2: the same holds for the unpacked dimensions of a fixed
-// array, `logic x[N]`, whose bounds are folded again in `scope`; a dynamic,
-// queue or associative dimension has no bounds a parameter could give.
 static void RefoldFixedUnpackedDims(RtlirVariable& var, const ScopeMap& scope) {
   if (var.declared_unpacked_dims == nullptr ||
       var.unpacked_dim_sizes.size() != var.declared_unpacked_dims->size()) {
@@ -428,11 +281,6 @@ void Elaborator::RecomputeDependentParams(RtlirModule* mod) {
   RefoldChildOverrides(mod, BuildParamScope(mod, {}));
 }
 
-// Checks whether a defparam may legally override the resolved target `param`
-// whose right-hand side is `val_expr`. On a violation it emits the matching
-// diagnostic against `loc` and returns false (the caller then records the
-// defparam as handled and skips it). Returns true when the override may
-// proceed.
 static bool DefparamOverrideAllowed(DiagEngine& diag,
                                     const RtlirParamDecl* param,
                                     const Expr* val_expr, SourceLoc loc) {
@@ -447,9 +295,6 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
     return false;
   }
   if (param->config_locked) {
-    // A configuration's parameter override takes precedence over a defparam
-    // targeting the same parameter (§33.4.3); leave the config value in
-    // place and treat this defparam as resolved against it.
     return false;
   }
   if (RhsContainsHierarchicalRef(val_expr)) {
@@ -462,9 +307,6 @@ static bool DefparamOverrideAllowed(DiagEngine& diag,
   return true;
 }
 
-// One defparam override as an LRM entity (§23.10.4): the resolved target
-// parameter, the right-hand side value expression, the scope its value is
-// evaluated in, and the source location of the defparam statement.
 struct DefparamOverride {
   const RtlirParamDecl* param;
   const Expr* val_expr;
@@ -472,9 +314,6 @@ struct DefparamOverride {
   SourceLoc loc;
 };
 
-// The bookkeeping for which defparam assignments have been handled: the
-// applied-set keyed by (module, item, assignment index) plus the key naming
-// this particular assignment.
 using DefparamAppliedKey =
     std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>;
 struct DefparamAppliedRecord {
@@ -482,11 +321,6 @@ struct DefparamAppliedRecord {
   const DefparamAppliedKey& key;
 };
 
-// Validates one already-resolved defparam target and, if the override may
-// proceed, evaluates its right-hand side. On any rejection (illegal override or
-// non-constant value) the assignment key is recorded in the applied set and an
-// empty optional is returned; the caller then skips it. On success the
-// converted override value is returned.
 static std::optional<int64_t> EvalDefparamOverride(
     DiagEngine& diag, const DefparamOverride& ovr,
     const DefparamAppliedRecord& rec) {
@@ -494,22 +328,11 @@ static std::optional<int64_t> EvalDefparamOverride(
     rec.applied.insert(rec.key);
     return std::nullopt;
   }
-  // §23.10 (printed page 764): a real right-hand side, the clause's own
-  // `defparam f1.A = 3.1415`, is converted to the parameter's type
-  // (ApplyOverrideRealness), rounded for an integral one as §6.12.1 converts a
-  // real; folded as an integer it had no value and was reported as not
-  // constant.
   if (auto real = RealOverrideValue(ovr.val_expr, ovr.scope)) {
     return ConvertOverrideValue(RoundRealToInteger(*real), *ovr.param);
   }
   auto val = FoldParamValue(*ovr.param, ovr.val_expr, ovr.scope);
   if (!val) {
-    // §23.10.1 requires a defparam assignment's right-hand side to be a
-    // constant expression built from nothing but numbers and parameters. A
-    // right-hand side that is no constant expression breaks that rule, so the
-    // source is illegal and the report is an error. Folding can also fail on a
-    // right-hand side that is a constant expression, which breaks no rule and
-    // stays the warning it was.
     if (!IsConstantExpr(ovr.val_expr, ovr.scope)) {
       diag.Error(ovr.loc,
                  "defparam right-hand side must be a constant expression "
@@ -525,25 +348,12 @@ static std::optional<int64_t> EvalDefparamOverride(
   return ConvertOverrideValue(*val, *ovr.param);
 }
 
-// §6.16: a defparam replaces the whole of the parameter's value, and for one
-// declared string that value is characters rather than the §11.10 packed number
-// resolved_value holds. Elaborator::ElaborateParamDecl has already recorded the
-// declaration's own characters by the time a defparam lands, so they are
-// replaced here or the value the defparam overrode is what Lowerer::LowerParams
-// reads. Clearing is_string_value where the right-hand side is not a string
-// literal is what sends the lowering to resolved_value, which
-// EvalDefparamOverride did write, in preference to characters that are no
-// longer the parameter's. Does nothing for a parameter that never held a string
-// value.
 static void ReplaceStringParamValue(RtlirParamDecl& pd, const Expr* val_expr,
                                     Arena& arena) {
   if (!pd.is_string_value) return;
   if (!RecordStringParamChars(pd, val_expr, arena)) pd.is_string_value = false;
 }
 
-// Trailing return type: DefparamSite is a protected member of ElaboratorData,
-// which the class scope opened by the Elaborator:: qualifier reaches and
-// namespace scope does not.
 auto Elaborator::CollectDefparamSites(RtlirModule* mod,
                                       const ModuleDecl* decl) const
     -> std::vector<DefparamSite> {
@@ -558,13 +368,6 @@ auto Elaborator::CollectDefparamSites(RtlirModule* mod,
   return sites;
 }
 
-// §23.10.1: the right-hand side is written in the scope of the defparam
-// statement, which the simulator stands in nowhere when it gives the parameter
-// storage, so an expression naming anything is left to the folded value; a
-// literal names nothing and reads the same in every scope, and a parameter
-// declared wider than 64 bits (§6.20.2) is widened from it. An instance
-// override's expression recorded earlier is dropped either way, the defparam
-// having replaced its value.
 static const Expr* DefparamOverrideExpr(const Expr* val_expr) {
   return val_expr->kind == ExprKind::kIntegerLiteral ? val_expr : nullptr;
 }
@@ -580,12 +383,6 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     DefparamTopRooted rooted{mod, path, mod};
     auto* param =
         ResolveDefparamSteps(mod, path, site.path, &rooted.target_mod);
-    // §23.10.1: a defparam in a generate block may not change a parameter
-    // outside that hierarchy, and a name starting over from a top-level module
-    // leaves the block, so the upward reading is the module-level statement's
-    // alone, and it is confined to the block the module's own instance stands
-    // under (`rooted.root` names the writer); ReportUnresolvedDefparamSite
-    // reports both.
     if (param == nullptr && site.path.empty()) {
       param = ResolveDefparamFromTop(path, rooted);
     }
@@ -607,12 +404,6 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
     param->from_override = true;
     ApplyOverrideRealness(*param, RealOverrideValue(val_expr, scope));
     param->override_expr = DefparamOverrideExpr(val_expr);
-    // §23.10.1 (printed pages 764-765): the right-hand side stands in the
-    // scope of the defparam statement, which is registered here and not
-    // where the parameter is later read, so its words above bit 63 are
-    // recorded now as the value is, and the expression, the scope and the
-    // module are kept for RecomputeDependentParams to record them again
-    // should a later defparam widen the parameter's range.
     RecordResolvedHighWords(*param, val_expr, scope);
     param->defparam_value_expr = val_expr;
     param->defparam_value_scope = scope;
@@ -629,36 +420,15 @@ void Elaborator::ApplyDefparamSite(RtlirModule* mod, const DefparamSite& site,
 }
 
 void Elaborator::ApplyDefparams(RtlirModule* mod, const ModuleDecl* decl) {
-  // §6.16: a defparam's right-hand side is written in the module holding the
-  // defparam statement, so that module's parameters are what a name in it
-  // means, and registering it is what lets ConstEvalString read the characters
-  // of one. ApplyDefparamsRecursively runs outside every module, so without
-  // this no module is registered and a defparam naming a string parameter
-  // recovers nothing.
   ParamRangeRegistryGuard param_range_guard(mod);
   for (const auto& site : CollectDefparamSites(mod, decl)) {
-    // §23.9: a statement written in a generate block reads that block's
-    // declarations as well as the module's, and one written among the module's
-    // own items reads only the module's. This runs outside every module, so the
-    // prefixes come from the site rather than from what elaboration left in
-    // force, and the parameter scope is built per site rather than once.
     RegisteredGenScopeGuard gen_scope_guard(site.scopes);
     ScopeMap scope = BuildParamScope(mod, site.scopes);
-    // §27.4 opens a localparam sharing the loop index's name in each instance
-    // of a loop generate block, and §23.10.1's own example reads it on a
-    // right-hand side. The module's parameters are rebuilt on every pass
-    // because an earlier defparam may have changed one, so the block's bindings
-    // are laid over that rather than kept in place of it.
     for (const auto& [name, value] : site.consts) scope[name] = value;
     ApplyDefparamSite(mod, site, scope);
   }
 }
 
-// Names of the generate blocks a conditional/loop generate construct can
-// introduce directly into the enclosing scope. A conditional construct
-// contributes its then-block name plus, recursively, the names of every
-// else/else-if alternative; a case construct contributes each item label; a
-// loop construct contributes its array name.
 static void CollectLocalGenerateBlockNames(
     const ModuleItem* item, std::unordered_set<std::string_view>& out) {
   switch (item->kind) {
@@ -678,19 +448,6 @@ static void CollectLocalGenerateBlockNames(
   }
 }
 
-// §23.10.4.2: a defparam's hierarchical name may have to be resolved before the
-// hierarchy is fully elaborated (so a generate condition that reads the target
-// can be evaluated). If that early resolution would differ from the resolution
-// the completed hierarchy dictates, it is an error. The situation arises when a
-// named generate block in the module holding the defparam shares its name with
-// a scope named by the leading component of the defparam's path: before the
-// block is elaborated the leading name resolves outward (here, to a top-level
-// module of the same name), but once the block exists the same name would bind
-// to the local block instead, changing the target. We flag that collision; per
-// the LRM it is fixed by renaming the generate block.
-// Flags each defparam assignment in `item` whose leading path component names
-// both a local generate block and a top-level scope: that name resolves
-// outward now but would bind to the local block once it is elaborated.
 static void CheckDefparamItemEarlyAmbiguity(
     DiagEngine& diag, const ModuleItem* item,
     const std::unordered_set<std::string_view>& block_names,
@@ -726,10 +483,6 @@ void Elaborator::CheckEarlyResolutionAmbiguity(
   }
 }
 
-// §25.3: whether a port actual of `child`, an instance of `parent`, refers
-// to an arrayed interface: names an array of instances `parent` holds, `ia`,
-// or selects an element of one, `ia[0]`. Only an array of interface instances
-// is a legal actual of that form, so the array's kind need not be asked.
 static bool RefersToArrayedInterface(const RtlirModule* parent,
                                      const RtlirModuleInst& child) {
   for (const RtlirPortBinding& binding : child.port_bindings) {
@@ -743,11 +496,6 @@ static bool RefersToArrayedInterface(const RtlirModule* parent,
   return false;
 }
 
-// §23.10.1 (printed page 764): records on `blocks` the generate block
-// instance or the element of an array of instances `child`, an instance of
-// `parent`, stands in or under -- the element `child` itself is, the blocks of
-// `parent` its gen_block_path names, or what `parent` itself stands under
-// where it is neither. Nothing for a child under no block and in no array.
 static void NoteInstanceBlock(DefparamWriterBlocks& blocks, RtlirModule* parent,
                               const RtlirModuleInst& child) {
   if (child.resolved == nullptr) return;
@@ -771,10 +519,6 @@ static void NoteInstanceBlock(DefparamWriterBlocks& blocks, RtlirModule* parent,
 
 void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   if (!mod) return;
-  // §23.10.1 with §23.6: the elements of an array `mod` holds are given
-  // modules of their own before any defparam is applied here or below, so
-  // the module whose statements are being applied is never copied away from
-  // the element holding it while they are.
   IsolateArrayElements(*mod, arena_, *unit_);
   if (auto* decl = FindModule(mod->name)) {
     ApplyDefparams(mod, decl);
@@ -785,12 +529,6 @@ void Elaborator::ApplyDefparamsRecursively(RtlirModule* mod) {
   }
 }
 
-// Reports every assignment of one defparam statement that was never applied.
-// §23.10.1 gives two reasons for that and they are different diagnoses. A
-// statement inside a generate block whose target exists but lies outside the
-// block breaks the clause's rule that such a statement may not change a
-// parameter outside that hierarchy, and is an error. Anything else named
-// nothing at all, and stays the warning it was.
 void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
                                               const DefparamSite& site,
                                               const ScopeMap& mod_scope) {
@@ -802,13 +540,6 @@ void Elaborator::ReportUnresolvedDefparamSite(RtlirModule* mod,
     const Expr* path_expr = site.item->defparam_assigns[idx].first;
     HierPath path;
     bool read = CollectPathSteps(path_expr, scope, path);
-    // A site not applied whose name reaches a parameter with no regard to
-    // where the statement stands -- the writer's block path left out of the
-    // steps, and a null writer asking ResolveDefparamFromTop for no
-    // confinement -- was refused for reaching outside the hierarchy §23.10.1
-    // confines it to: the block a statement is written in, or the block the
-    // writing module's own instance stands under. A module-level statement
-    // of a module under no block that reaches anything was applied.
     DefparamTopRooted any{nullptr, path, mod};
     bool reaches = read && (ResolveDefparamSteps(mod, path, {}) != nullptr ||
                             ResolveDefparamFromTop(path, any) != nullptr);
@@ -838,10 +569,6 @@ void Elaborator::ReportUnresolvedDefparams(RtlirModule* mod,
                                            const ModuleDecl* decl) {
   ParamRangeRegistryGuard param_range_guard(mod);
   for (const auto& site : CollectDefparamSites(mod, decl)) {
-    // The same per-site scope Elaborator::ApplyDefparams builds, for the same
-    // §23.9 reason: a site is judged unresolved against the declarations it
-    // could have named, and a statement in a generate block could name that
-    // block's.
     RegisteredGenScopeGuard gen_scope_guard(site.scopes);
     ReportUnresolvedDefparamSite(mod, site, BuildParamScope(mod, site.scopes));
   }

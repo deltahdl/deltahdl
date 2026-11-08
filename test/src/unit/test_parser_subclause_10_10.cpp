@@ -47,9 +47,6 @@ TEST(UnpackedArrayConcatParsing, EmptyConcat) {
   EXPECT_TRUE(stmt->rhs->elements.empty());
 }
 
-// §10.10 allows mixing scalar and array items in a single concatenation, as
-// in the LRM example `A9 = {A3, 4, 5, A3, 6};`. The parser shall emit one
-// concatenation node holding all five item expressions in source order.
 TEST(UnpackedArrayConcatParsing, MixedScalarAndArrayItems) {
   auto r = Parse(
       "module t;\n"

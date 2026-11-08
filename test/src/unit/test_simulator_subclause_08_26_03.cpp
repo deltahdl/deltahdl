@@ -68,9 +68,6 @@ TEST(InterfaceClassTypeAccess, ExtendedInterfaceInheritsStaticProperties) {
   EXPECT_TRUE(ext->IsA(base));
 }
 
-// §8.26.3: a parameter declared in an interface class is inherited by an
-// extending interface class, so it can be read through the extending class
-// name with the scope resolution operator.
 TEST(InterfaceClassTypeAccess, ParamInheritedByExtendingInterfaceEndToEnd) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
                       "  parameter int SIZE = 64;\n"
@@ -87,8 +84,6 @@ TEST(InterfaceClassTypeAccess, ParamInheritedByExtendingInterfaceEndToEnd) {
             64u);
 }
 
-// §8.26.3: typedefs (here, the enumeration constants of a member typedef) are
-// likewise inherited through extends and reachable via the extending class.
 TEST(InterfaceClassTypeAccess, EnumValueInheritedByExtendingInterfaceEndToEnd) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
                       "  typedef enum {ONE, TWO, THREE} t1_t;\n"
@@ -105,8 +100,6 @@ TEST(InterfaceClassTypeAccess, EnumValueInheritedByExtendingInterfaceEndToEnd) {
             2u);
 }
 
-// §8.26.3: the inheritance is transitive across a chain of extending interface
-// classes, so a parameter from the root is reachable through the leaf.
 TEST(InterfaceClassTypeAccess, ParamInheritedThroughChainedExtends) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
                       "  parameter int WIDTH = 8;\n"
@@ -126,10 +119,6 @@ TEST(InterfaceClassTypeAccess, ParamInheritedThroughChainedExtends) {
             8u);
 }
 
-// §8.26.3: the lowerer itself performs the extends-inheritance — after
-// lowering, the extending interface's type carries the base parameter as a
-// static property. Observing the lowered ClassTypeInfo exercises that
-// production path directly (not a hand-built type).
 TEST(InterfaceClassTypeAccess,
      LowererCopiesInheritedParamIntoExtendingInterface) {
   SimFixture f;
@@ -153,8 +142,6 @@ TEST(InterfaceClassTypeAccess,
   EXPECT_EQ(it->second.ToUint64(), 64u);
 }
 
-// §8.26.3: typedef enumeration constants are inherited through extends too; the
-// lowered extending interface carries the base enum members.
 TEST(InterfaceClassTypeAccess,
      LowererCopiesInheritedEnumMembersIntoExtendingInterface) {
   SimFixture f;
@@ -178,10 +165,6 @@ TEST(InterfaceClassTypeAccess,
   EXPECT_EQ(it->second, 2u);
 }
 
-// §8.26.3: parameters and typedefs are NOT inherited through implements. After
-// lowering, the implementing class does not carry the interface's parameter as
-// a static property, while the interface class itself still does. This observes
-// the lowerer's interface-only inheritance guard rather than a hand-built type.
 TEST(InterfaceClassTypeAccess, LowererDoesNotCopyParamIntoImplementingClass) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -206,12 +189,6 @@ TEST(InterfaceClassTypeAccess, LowererDoesNotCopyParamIntoImplementingClass) {
   EXPECT_EQ(c->static_properties.find("SIZE"), c->static_properties.end());
 }
 
-// §8.26.3 (Claim B): a typedef of an interface class is reachable through the
-// class scope resolution operator as a real TYPE. Declaring a variable of the
-// interface's typedef, assigning it an enum constant of that typedef (also via
-// `::`), and reading the value back observes the type and the constant
-// resolving through the full pipeline. Input form: typedef used in a
-// declaration position.
 TEST(InterfaceClassTypeAccess, TypedefTypeViaScopeResolutionUsedAtRuntime) {
   EXPECT_EQ(RunAndGet("interface class IntfC;\n"
                       "  typedef enum {ONE, TWO, THREE} t1_t;\n"
@@ -229,12 +206,6 @@ TEST(InterfaceClassTypeAccess, TypedefTypeViaScopeResolutionUsedAtRuntime) {
             2u);
 }
 
-// §8.26.3 (Claim A, extends): a typedef declared in an interface class is
-// inherited by an extending interface class, so the extending class's scope
-// exposes it as a TYPE. Declaring a variable of `IB::t1_t` (where t1_t is
-// declared in the extended IA) and reading an inherited enum constant back
-// observes the inherited typedef resolving as a type, end-to-end. Input form:
-// inherited typedef reached through the extending interface's scope.
 TEST(InterfaceClassTypeAccess,
      InheritedTypedefTypeViaExtendingInterfaceAtRuntime) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
@@ -256,12 +227,6 @@ TEST(InterfaceClassTypeAccess,
             1u);
 }
 
-// §8.26.3 (Claim B): an interface class parameter is static and reachable via
-// `::`, so it is usable in a constant expression. Here `IC::WIDTH` sizes a
-// vector directly; driving the vector to all ones observes the width the
-// constant resolved to (8 -> 255). Input form: parameter via `::` in a
-// constant-expression (packed dimension) position, distinct from an rvalue
-// read.
 TEST(InterfaceClassTypeAccess, InterfaceParamInConstantExpressionWidth) {
   EXPECT_EQ(RunAndGet("interface class IC;\n"
                       "  parameter int WIDTH = 8;\n"
@@ -279,11 +244,6 @@ TEST(InterfaceClassTypeAccess, InterfaceParamInConstantExpressionWidth) {
             255u);
 }
 
-// §8.26.3 (Claim B): the constant form also flows through a localparam — an
-// interface parameter read via `::` initializes a module localparam, which then
-// sizes a vector. Driving it to all ones observes the resolved value (8 ->
-// 255). Input form: parameter via `::` feeding a localparam constant
-// expression.
 TEST(InterfaceClassTypeAccess, InterfaceParamViaLocalparamConstantExpression) {
   EXPECT_EQ(RunAndGet("interface class IC;\n"
                       "  parameter int WIDTH = 8;\n"
@@ -302,14 +262,6 @@ TEST(InterfaceClassTypeAccess, InterfaceParamViaLocalparamConstantExpression) {
             255u);
 }
 
-// §8.26.3's own IntfA/IntfB example: `typedef T1[1:0] T2` declared in the
-// parameterized interface class `IntfA #(type T1 = logic)` is inherited by
-// `IntfB #(type T = bit) extends IntfA #(T)`, and a class implementing
-// `IntfB#(bit[1:0])` names it through the specialization as its method's
-// return type, `IntfA#(bit[1:0])::T2`. §8.25 binds T1 to `bit [1:0]` there,
-// so the call's result is 2 * 2 = 4 bits: `$bits(im.funcB())` reads 4. A
-// return type sized from the elaborated table alone, where T1 is unbound,
-// fell to the 32-bit carrier and read 32; sized from the default `logic`, 2.
 TEST(InterfaceClassTypeAccess, SpecializedTypedefReturnTypeWidthEndToEnd) {
   EXPECT_EQ(
       RunAndGet("interface class IntfA #(type T1 = logic);\n"
@@ -336,11 +288,6 @@ TEST(InterfaceClassTypeAccess, SpecializedTypedefReturnTypeWidthEndToEnd) {
       4u);
 }
 
-// §8.25: the width follows the actual the specialization names, not a fixed
-// count. `IntfA#(bit[3:0])::T2` binds T1 to four bits, so `T1[1:0]` is 8
-// bits; a second method of the same class specialized on `bit[1:0]` stays at
-// 4, and the two are read through one expression, 8 * 100 + 4 = 804. A width
-// fixed at the first case's 4 would read 404; the 32-bit carrier 3232.
 TEST(InterfaceClassTypeAccess, SpecializedTypedefReturnTypeFollowsActual) {
   EXPECT_EQ(
       RunAndGet("interface class IntfA #(type T1 = logic);\n"

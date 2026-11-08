@@ -97,26 +97,20 @@ TEST(LexicalConventionLexing, MixedWhitespaceAsTokenSeparators) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// Negative form of the free-format separator rule: whitespace between two
-// word tokens is significant precisely because removing it fuses them into a
-// single token. "foo bar" is two identifiers; "foobar" is one.
 TEST(LexicalConventionLexing, AdjacentWordTokensRequireSeparator) {
   auto separated = Lex("foo bar");
-  ASSERT_EQ(separated.size(), 3u);  // ident, ident, EOF
+  ASSERT_EQ(separated.size(), 3u);
   EXPECT_EQ(separated[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(separated[0].text, "foo");
   EXPECT_EQ(separated[1].kind, TokenKind::kIdentifier);
   EXPECT_EQ(separated[1].text, "bar");
 
   auto merged = Lex("foobar");
-  ASSERT_EQ(merged.size(), 2u);  // one ident, EOF
+  ASSERT_EQ(merged.size(), 2u);
   EXPECT_EQ(merged[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(merged[0].text, "foobar");
 }
 
-// Sharper negative: dropping the separator changes meaning, not just count --
-// a keyword run together with a following letter is no longer the keyword but
-// a single ordinary identifier.
 TEST(LexicalConventionLexing, MissingSeparatorMergesKeywordIntoIdentifier) {
   auto spaced = Lex("module m");
   ASSERT_EQ(spaced.size(), 3u);
@@ -125,7 +119,7 @@ TEST(LexicalConventionLexing, MissingSeparatorMergesKeywordIntoIdentifier) {
 
   auto merged = Lex("modulem");
   ASSERT_EQ(merged.size(), 2u);
-  EXPECT_EQ(merged[0].kind, TokenKind::kIdentifier);  // NOT the keyword
+  EXPECT_EQ(merged[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(merged[0].text, "modulem");
 }
 
@@ -243,21 +237,13 @@ TEST(LexicalConventionLexing, FreeFormatIdentifierSplitByBlockComment) {
   EXPECT_EQ(with_comment[1].text, "bc");
 }
 
-// The free-format rule of 5.2 says whitespace is not syntactically
-// significant beyond separating tokens -- except for escaped identifiers
-// (see 5.6.1). These two tests exercise that carve-out using 5.6.1's real
-// escaped-identifier syntax (leading backslash). Inside an escaped
-// identifier, operator characters are NOT split into their own tokens; the
-// run continues until whitespace, which is what actually terminates it.
 TEST(LexicalConventionLexing, EscapedIdentifierSuspendsFreeFormatSeparation) {
-  // Without the escape, '+' separates three tokens.
   auto plain = Lex("cpu+alu");
   ASSERT_EQ(plain.size(), 4u);
   EXPECT_EQ(plain[0].kind, TokenKind::kIdentifier);
   EXPECT_EQ(plain[1].kind, TokenKind::kPlus);
   EXPECT_EQ(plain[2].kind, TokenKind::kIdentifier);
 
-  // With the escape, the whole run is one identifier -- the '+' is absorbed.
   auto escaped = Lex("\\cpu+alu ");
   ASSERT_EQ(escaped.size(), 2u);
   EXPECT_EQ(escaped[0].kind, TokenKind::kEscapedIdentifier);
@@ -266,8 +252,6 @@ TEST(LexicalConventionLexing, EscapedIdentifierSuspendsFreeFormatSeparation) {
 }
 
 TEST(LexicalConventionLexing, WhitespaceIsSignificantAsEscapedIdentifierEnd) {
-  // The space is significant here: it delimits the escaped identifier's
-  // extent rather than being an ignorable separator between two idents.
   auto tokens = Lex("\\a+b c");
   ASSERT_EQ(tokens.size(), 3u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kEscapedIdentifier);
@@ -301,25 +285,10 @@ TEST(LexicalConventionLexing, BlockCommentOnlyInputProducesEofOnly) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-// §5.2 lists the seven types of lexical token a source text file is a stream
-// of, and a grave accent left over once the compiler directives are gone
-// begins none of them. The rejection names that clause rather than §5.6.4,
-// which describes what a grave accent introduces and not what a file may hold.
 TEST(LexicalConventionLexing, UnexpectedCharacterNames5_2) {
   auto diags = LexDiagnostics("a ` b");
   EXPECT_TRUE(ReportedError(diags, "unexpected character '`'", 1, "5.2"));
 }
-
-// The three cases below hand the Lexer a grave accent the preprocessor never
-// saw, and they are here rather than in a file named for §5.6.4 because §5.2
-// is the clause the rejection enforces. §5.6.4 says the grave accent
-// introduces a compiler directive and that the behavior it dictates takes
-// effect as the compiler reads it; it states no rule a source text file
-// breaches by holding one. §5.2 states the rule that is breached, since a
-// grave accent begins none of the seven types of lexical token it lists.
-// Lexer::LexOperator files one report for every character that begins no
-// token, so the subclause it names has to hold for all of them and not for
-// the grave accent alone.
 
 TEST(CompilerDirectiveLexing, BacktickIsUnexpectedInLexer) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("`define FOO 1"),
@@ -331,18 +300,11 @@ TEST(CompilerDirectiveLexing, BacktickMidLineIsError) {
                             "unexpected character '`'", 1, "5.2"));
 }
 
-// The grave accent as the last character of the file, where the Lexer has to
-// report it without reading past the end of the buffer.
 TEST(CompilerDirectiveLexing, BacktickAtEofIsError) {
   EXPECT_TRUE(
       ReportedError(LexDiagnostics("`"), "unexpected character '`'", 1, "5.2"));
 }
 
-// The two cases below hand the Lexer the byte the Preprocessor writes to
-// introduce a keyword-version change. §5.2 gives it no lexical token to begin,
-// exactly as it gives the grave accent none, so the same report answers for it:
-// a byte carries no mark of who wrote it, and a Lexer reading a file the user
-// wrote has no version marker to find in it.
 TEST(LexicalConventionLexing, KeywordMarkerByteInUserSourceIsUnexpected) {
   std::string src = "a ";
   src += kKeywordMarker;
@@ -351,18 +313,6 @@ TEST(LexicalConventionLexing, KeywordMarkerByteInUserSourceIsUnexpected) {
                             "5.2"));
 }
 
-// What the report is worth, which the report alone does not say. The byte is
-// followed here by a well-formed version, so a Lexer that took it for a marker
-// would leave §22.14's reserved word list set to the oldest one there is for
-// the whole of the rest of the file, and would say nothing about having done
-// so.
-//
-// The version and the word are chosen together so that the assertion can fail.
-// `logic` is reserved from IEEE Std 1800-2005 (§22.14.6) and is not among the
-// IEEE Std 1364-1995 keywords (§22.14.2), so it is a keyword under the default
-// list and an identifier under the one the byte pair selects. A word reserved
-// by both, or a version whose list matches the default, would leave this
-// passing whether the version changed or not.
 TEST(LexicalConventionLexing,
      KeywordMarkerByteInUserSourceLeavesKeywordsAlone) {
   std::string src;
@@ -387,14 +337,11 @@ TEST(LexicalConventionLexing, BlockCommentSpanningMultipleLinesAsSeparator) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-// One byte no lexical token begins with, and the value the report names it by.
 struct ByteBeginningNoToken {
   std::string bytes;
   const char* reported;
 };
 
-// A NUL, a DEL, an ESC and the two bytes of a UTF-8 é: none is white space
-// (§5.3) and none begins any of §5.2's seven token types.
 std::vector<ByteBeginningNoToken> BytesBeginningNoToken() {
   return {{std::string(1, '\0'), "0x00"},
           {"\x7F", "0x7F"},
@@ -402,10 +349,6 @@ std::vector<ByteBeginningNoToken> BytesBeginningNoToken() {
           {"\xC3\xA9", "0xC3"}};
 }
 
-// §5.2: a byte that begins none of the seven token types, standing between
-// two tokens, makes the text no stream of tokens and is reported on its line,
-// named by its value since it does not print. The text after it is still read,
-// so the identifier on the next line is lexed.
 TEST(LexicalConventionLexing, ByteBeginningNoTokenIsReportedByItsValue) {
   for (const ByteBeginningNoToken& c : BytesBeginningNoToken()) {
     const std::string kSrc = "a " + c.bytes + " b\nlast";
@@ -419,9 +362,6 @@ TEST(LexicalConventionLexing, ByteBeginningNoTokenIsReportedByItsValue) {
   }
 }
 
-// §5.4 and §5.9: inside a block comment, a one-line comment or a string
-// literal, the same byte is a character of that comment or string, so nothing
-// is reported.
 TEST(LexicalConventionLexing, ByteInsideACommentOrStringDrawsNoReport) {
   for (const ByteBeginningNoToken& c : BytesBeginningNoToken()) {
     for (const std::string& src :

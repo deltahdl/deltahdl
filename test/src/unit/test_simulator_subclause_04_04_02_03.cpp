@@ -187,13 +187,6 @@ TEST(InactiveRegionSim, InactiveRegionHoldsMultipleEvents) {
   EXPECT_EQ(count, 5);
 }
 
-// §4.4.2.3: an explicit #0 suspends the running process into the Inactive
-// region so that every other Active event of the current time slot drains
-// before it resumes in the next Inactive->Active iteration. The reader initial
-// is declared first, so it activates first (declaration-order FIFO in the
-// Active region); its #0 must let the later writer initial run before the read
-// is observed. A no-op #0 would read the pre-write value instead, so `seen`
-// distinguishes the two.
 TEST(InactiveRegionSim, ZeroDelayYieldsToOtherActiveProcessesBeforeResuming) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -217,14 +210,6 @@ TEST(InactiveRegionSim, ZeroDelayYieldsToOtherActiveProcessesBeforeResuming) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// §4.4.2.3 negative/discriminating form: the Inactive-region resume is specific
-// to an *explicit #0*. The closest input that must be handled differently is a
-// nonzero delay, which suspends the process to a *later* time slot rather than
-// the current slot's Inactive region. Here #1 must advance simulation time, so
-// the post-delay write lands at time 1 -- an implementation that funneled every
-// delay into the current-slot Inactive region (mistreating #1 as #0) would
-// leave the clock at 0. Observing ticks==1 proves the rule keys on zero
-// specifically.
 TEST(InactiveRegionSim, NonzeroDelayAdvancesTimeInsteadOfInactiveResume) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -245,10 +230,6 @@ TEST(InactiveRegionSim, NonzeroDelayAdvancesTimeInsteadOfInactiveResume) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 1u);
 }
 
-// §4.4.2.3 with §4.5: the Inactive region's events run only after all the
-// Active events, so an event scheduled into Inactive while an Inactive event
-// runs waits for the Active event that one created meanwhile. Drained in
-// place, the second Inactive event ran ahead of it.
 TEST(InactiveRegionSim, InactiveEventWaitsForActiveEventsCreatedMeanwhile) {
   Arena arena;
   Scheduler sched(arena);
@@ -269,9 +250,6 @@ TEST(InactiveRegionSim, InactiveEventWaitsForActiveEventsCreatedMeanwhile) {
             (std::vector<std::string>{"inactive1", "active", "inactive2"}));
 }
 
-// The same in a design: the process resumed from its first `#0` writes a,
-// which wakes the always block in the Active region, and its second `#0`
-// resumes only once that block has copied a into b.
 TEST(InactiveRegionSim, SecondZeroDelayResumesAfterTheProcessesItWoke) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -288,8 +266,6 @@ TEST(InactiveRegionSim, SecondZeroDelayResumesAfterTheProcessesItWoke) {
   EXPECT_EQ(f.ctx.FindVariable("seen")->value.ToUint64(), 1u);
 }
 
-// A `$finish` from one of the events the Inactive region held on entry ends
-// the run there: the process resumed after it in the same region never writes.
 TEST(InactiveRegionSim, FinishFromAnInactiveEventStopsTheRestOfTheRegion) {
   SimFixture f;
   auto* design = ElaborateSrc(

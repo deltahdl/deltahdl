@@ -152,11 +152,6 @@ TEST(SuperSimulation, SuperInitializationOrder) {
             6u);
 }
 
-// §8.15 states the compiler inserts super.new automatically when the user
-// constructor does not provide one, so the superclass is still initialized
-// before the current class. Here the derived constructor omits super.new yet
-// the base constructor's assignment to x is observed, proving the implicit
-// call ran first.
 TEST(SuperSimulation, ImplicitSuperNewInitializesBase) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int x;\n"
@@ -180,12 +175,6 @@ TEST(SuperSimulation, ImplicitSuperNewInitializesBase) {
             7u);
 }
 
-// §8.15: a base class's method writes the property the base declares, and a
-// read of that name through a handle to the derived object, from a method of
-// another class, answers the same storage: no class between the object's type
-// and the base declares the name again. The base constructor's write reached
-// the base-scoped copy alone and the bare copy a handle read kept its default,
-// so `child.v` read 0 where the constructor had stored 3.
 TEST(SuperSim, BaseConstructorWriteReadThroughHandleFromAnotherClass) {
   EXPECT_EQ(RunAndGet("class InnerBase;\n"
                       "  int v;\n"
@@ -220,9 +209,6 @@ TEST(SuperSim, BaseConstructorWriteReadThroughHandleFromAnotherClass) {
             3903u);
 }
 
-// §8.15: where the derived class declares the name again, the base's write
-// stays the base's own -- the bare copy a handle read answers is the derived
-// declaration's, which the base constructor's write leaves alone.
 TEST(SuperSim, BaseWriteLeavesAShadowingDerivedPropertyAlone) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int v;\n"
@@ -248,10 +234,6 @@ TEST(SuperSim, BaseWriteLeavesAShadowingDerivedPropertyAlone) {
             7u);
 }
 
-// §8.15 with §7.8: `super.m` in a method of the subclass names the
-// associative-array property the base declares, on the running object: an
-// entry written through it joins the one written by the bare name, and its
-// num() and a read through it answer for both.
 TEST(SuperSimulation, SuperNamesAnInheritedAssociativeProperty) {
   auto v = RunAndGet(
       "module t;\n"
@@ -276,9 +258,6 @@ TEST(SuperSimulation, SuperNamesAnInheritedAssociativeProperty) {
   EXPECT_EQ(v, 294u);
 }
 
-// §8.15 with §8.13 and §7.8: a subclass's associative-array property of the
-// same name as its base's hides it without sharing it -- `m` in the subclass
-// and `super.m` are two arrays, and a method of the base counts its own.
 TEST(SuperSimulation, SuperReachesAHiddenBaseAssociativeProperty) {
   auto v = RunAndGet(
       "module t;\n"
@@ -304,9 +283,6 @@ TEST(SuperSimulation, SuperReachesAHiddenBaseAssociativeProperty) {
   EXPECT_EQ(v, 2122u);
 }
 
-// §8.15 with §25.9: `super.vif` is the base's virtual interface property of
-// the running object, so a member of the instance it refers to is read
-// through it as through `this.vif`.
 TEST(SuperSim, VirtualInterfaceMemberReadThroughSuper) {
   auto v = RunAndGet(
       "interface SBus; int a; endinterface\n"

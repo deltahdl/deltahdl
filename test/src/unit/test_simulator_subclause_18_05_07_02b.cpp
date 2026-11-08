@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A class C holding the members `decls`, randomized `draws` times by an
-// initial that counts the draws for which `holds` is true after `prepare`
-// has run, as the designs test/src/e2e/array_reduction_constraints_*.sv do,
-// and displays the count and `after`, an expression read once the draws are
-// done.
 std::string Counting(const std::string& decls, int draws,
                      const std::string& prepare, const std::string& holds,
                      const std::string& after) {
@@ -36,12 +31,6 @@ std::string Counting(const std::string& decls, int draws,
          "endmodule\n";
 }
 
-// 18.5.7.2: the clause's example, a dynamic byte array held to five elements
-// whose sum through int'(item) is held below a bound: the result is of the
-// type of the with clause's expression, an int, so the sum of the five bytes
-// stays below 300 on every one of 64 draws, which a sum held to the element
-// type, wrapped to a byte and so below 300 whatever the elements, would not
-// give, and the elements are drawn, some draw summing above 100.
 TEST(ArrayReductionConstraintsRun, AWithClauseTypesTheResult) {
   SimFixture f;
   std::string out = RunCapture(
@@ -57,10 +46,6 @@ TEST(ArrayReductionConstraintsRun, AWithClauseTypesTheResult) {
   EXPECT_EQ(std::stoi(out) % 1000, 64);
 }
 
-// 18.5.7.2: without a with clause the result is of the element type, so a
-// sum of three bytes held to 44 wraps to the byte: with each element from 100
-// to 200 the elements sum to 300 or 556, which is 44 as a byte, on every one
-// of 64 draws.
 TEST(ArrayReductionConstraintsRun, TheResultIsOfTheElementType) {
   SimFixture f;
   std::string out = RunCapture(
@@ -76,10 +61,6 @@ TEST(ArrayReductionConstraintsRun, TheResultIsOfTheElementType) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.2: the solver settles the size before the reduction, so a dynamic
-// array drawn at two to six elements has the elements drawn, and those alone,
-// summing to 100 through int'(item) on every one of 64 draws, over more than
-// one size.
 TEST(ArrayReductionConstraintsRun, TheSizeIsSolvedBeforeTheReduction) {
   SimFixture f;
   std::string out = RunCapture(
@@ -107,9 +88,6 @@ TEST(ArrayReductionConstraintsRun, TheSizeIsSolvedBeforeTheReduction) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.2: each element is joined by the operand of the method, so product()
-// multiplies: three 4-bit elements from 2 to 5 held to a product of 8
-// multiply to 8 or 40, which is 8 as a nibble, on every one of 64 draws.
 TEST(ArrayReductionConstraintsRun, AProductJoinsByMultiplication) {
   SimFixture f;
   std::string out = RunCapture(
@@ -127,12 +105,6 @@ TEST(ArrayReductionConstraintsRun, AProductJoinsByMultiplication) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7.2: the reduction reads the elements the object holds as well as
-// the solver's draws: a sum through a with clause over an array sized and
-// filled by a method, read outside any randomize(), is the sum the clause
-// interprets, int'(A[0]) + ... + int'(A[4]), here 15 as an int, where the
-// bytes' own sum wrapped would read 15 as well and a product through the
-// clause reads 120.
 TEST(ArrayReductionConstraintsRun, AWithClauseIsReadOnTheObject) {
   SimFixture f;
   std::string out = RunCapture(

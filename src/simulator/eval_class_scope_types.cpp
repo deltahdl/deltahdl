@@ -20,10 +20,6 @@
 
 namespace delta {
 
-// §8.25 through §23.10.2.2: the element of the `#(...)` list that binds the
-// parameter at position `pos` named `pname` -- the one written `.pname(...)`
-// wherever it stands, else the one standing at the position where no name
-// was written -- or null where the list leaves the parameter at its default.
 static const Expr* SpecializationElement(const Expr& base, size_t pos,
                                          std::string_view pname) {
   for (size_t j = 0; j < base.elements.size(); ++j) {
@@ -35,9 +31,6 @@ static const Expr* SpecializationElement(const Expr& base, size_t pos,
   return named ? nullptr : base.elements[pos];
 }
 
-// §7.4.1: a packed dimension written on the type, `[msb:lsb]`, which
-// Parser::ParseSelectExpr records as a range select with neither `+:` nor
-// `-:` flag; a bit select or an indexed part select names no type.
 static bool IsPackedDimension(const Expr* expr) {
   return expr != nullptr && expr->kind == ExprKind::kSelect &&
          expr->index != nullptr && expr->index_end != nullptr &&
@@ -64,13 +57,6 @@ DataType TypeSpelledBy(const Expr* elem) {
   return dt;
 }
 
-// §8.25.1: the binding made from the specialization `spec` itself, whose
-// actuals were resolved where the scope was read -- in the caller, ahead of
-// the callee's frame -- so a list naming the caller's own type parameter,
-// `Box#(T)::w()` inside `Reg #(type T)`, binds the callee's T to the type the
-// caller's T stands for (ScopeNamedSpecialization in class_specialization.h).
-// Read again from the list in the callee's frame, such a name bound a type
-// called T. An actual that spells no type binds nothing.
 static void BindSpecializationTypeActuals(const ClassTypeInfo* spec,
                                           SimContext& ctx) {
   const ClassDecl* decl = spec->decl;

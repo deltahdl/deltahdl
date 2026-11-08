@@ -14,50 +14,20 @@ class PropertyRegistry;
 struct RtlirModule;
 struct RtlirProcess;
 
-// §16.14.6: the concurrent assertion statements embedded in the procedure
-// `procedure`, an initial or an always of `mod`, made ready for the run:
-// one whose property_spec instantiates a named property or sequence takes
-// its body as a static statement's does (§16.12.1), and one whose spec
-// opens with no clocking event takes the leading clocking event of its
-// evaluation from the procedure, where the procedure holds no blocking
-// timing control, exactly one event control and, among that control's
-// event expressions, exactly one that is solely an event variable or a
-// clocking block identifier, or an edge over an expression with an
-// optional iff, whose terms the procedure references nowhere else but as a
-// clocking event or within an assertion statement; and, where the
-// procedure gives none, from the default clocking of `mod` as if the
-// assertion stood before the procedure. A statement left with no clock is
-// reported, the clause making that an error.
 void ElaborateProceduralConcurrentAssertions(ModuleItem* procedure,
                                              const RtlirModule* mod,
                                              const PropertyRegistry& registry,
                                              Arena& arena, DiagEngine& diag);
 
-// §16.14.6: the clock the process `proc` of `mod` infers for what it reads
-// with none of its own, empty where the clause's requirements fail; §16.13.6
-// has a clockless sequence whose method the process reads take it.
 std::vector<EventExpr> ProcessInferredClock(const RtlirProcess& proc,
                                             const RtlirModule* mod);
 
-// §16.14.7: what an instance written in the procedure `procedure` of `mod`
-// takes for $inferred_clock and $inferred_disable: the clock the procedure
-// gives (§16.14.6), or the default clocking behind it, and the module's
-// default disable iff.
 InferredAtInstance InferredInProcedure(const ModuleItem* procedure,
                                        const RtlirModule* mod);
 
-// §11.12 with §16.9.3: a sampled value call in a let body with no clocking
-// event of its own is clocked as if written where the let is instantiated. In
-// the procedure `procedure` of `mod`, outside its concurrent assertions, that
-// is the clock the procedure gives or the default clocking behind it; an
-// instance where there is neither is reported.
 void ReportUnclockedLetSampledValues(const ModuleItem* procedure,
                                      const RtlirModule* mod, DiagEngine& diag);
 
-// §16.17: the same for the expect statements of the task or function
-// `subroutine`, which §16.17 has appear wherever a wait statement can; a
-// subroutine gives no contextually inferred clock, so a spec that opens
-// with none takes the default clocking of `mod`.
 void ElaborateSubroutineConcurrentAssertions(ModuleItem* subroutine,
                                              const RtlirModule* mod,
                                              const PropertyRegistry& registry,

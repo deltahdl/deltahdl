@@ -10,107 +10,30 @@
 
 namespace delta {
 
-// ===========================================================================
-// §37.43 Frames. The VPI object model for a frame - a dynamically activated
-// procedural scope together with its locally declared automatic variables,
-// events, and event arrays, if any (detail 1). A frame carries one Boolean
-// property (vpiActive, applied by VpiContext::Get - the same property a thread
-// reports, §37.44) and the relations modeled by the helpers below. A frame is
-// woven to its thread by the frame--thread edge shared with §37.44: §37.44's
-// VpiThreadFrame walks that edge from the thread to its active frame, and
-// VpiFrameThread (below) walks it back. Frame specific callbacks are §38.36.1's
-// (detail 8). The frame object model is not backwards compatible with
-// IEEE Std 1800-2017 or earlier (detail 7).
-// ===========================================================================
-
-// §37.43 (vpiParent -> frame / detail 5): the frame from which this child frame
-// was activated, reached up the parent chain when that parent is itself a
-// frame. Null for a null handle, a root frame with no parent, or a non-frame
-// parent.
 VpiHandle VpiFrameParent(VpiHandle frame);
 
-// §37.43 (vpiOrigin / detail 6): the elaboration-hierarchy point a frame was
-// activated from, as its activation recorded it in its frame facts. Null for a
-// null handle or a frame with no origin.
 VpiHandle VpiFrameOrigin(VpiHandle frame);
 
-// §37.43 (frame to stmt transition / details 4 and 5): the statement reached
-// from a frame. For the active frame this is the currently active statement
-// within it; for a parent frame it is the atomic statement or scope whose
-// execution activated the child frame. Read from its frame facts. Null for a
-// null handle or a frame no statement has run in.
 VpiHandle VpiFrameStmt(VpiHandle frame);
 
-// §37.43 (frame--thread edge): the thread a frame belongs to. This is the
-// reverse of §37.44's VpiThreadFrame, which reaches the active frame from the
-// thread; here the frame reaches its thread, at the top of its chain of parent
-// frames. Null for a null handle or a frame whose chain ends below no thread.
 VpiHandle VpiFrameThread(VpiHandle frame);
 
-// §37.43 (vpiAutomatics / detail 1): the automatic objects a frame locally
-// declares - the automatic variables, named events, and named event arrays of
-// the task or function its origin calls, in order. A null handle yields none.
 std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame);
 
-// ===========================================================================
-// §37.44 Threads. The VPI object model for a thread - a SystemVerilog process
-// such as an always procedure or a branch of a fork construct (detail 1). The
-// diagram gives a thread one Boolean property (vpiActive, applied by
-// VpiContext::Get) and four relations modeled by the helpers below. Thread
-// specific callbacks are §38.36.1's (detail 2).
-// ===========================================================================
-
-// §37.44 (vpiParent -> thread): the thread that spawned this one, reached up
-// the parent chain. Returns the thread's parent when that parent is itself a
-// thread; null for a null handle, a root thread with no parent, or a parent
-// that is not a thread.
 VpiHandle VpiThreadParent(VpiHandle thread);
 
-// §37.44 (vpiOrigin -> stmt): the statement a thread originated from, held
-// apart from its children. Null for a null handle or a thread started from no
-// statement the model holds.
 VpiHandle VpiThreadOrigin(VpiHandle thread);
 
-// §37.44 (frame -- thread / detail 1): the active frame of a thread. As a
-// thread descends a call chain of tasks and functions a new frame is activated
-// for each one entered, and at most one is active at a time (§37.43); this
-// returns that frame, the innermost active frame of the chain hung from the
-// thread. Null for a null handle or a thread with no frame active.
 VpiHandle VpiThreadFrame(VpiHandle thread);
 
-// §37.44: a thread's vpiParent, vpiOrigin and vpiFrame relations, each a
-// designated link rather than a child of the relation's type; false for any
-// other relation or object, `out` then left as it was.
 bool VpiTryResolveThreadRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// §37.43: a frame's vpiParent, vpiOrigin and vpiThread relations and its frame
-// to stmt transition, each a designated link rather than a child of the
-// relation's type; false for any other relation or object, `out` then left as
-// it was.
 bool VpiTryResolveFrameRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// §37.43 detail 1: puts in `iter` what vpi_iterate(vpiAutomatics, ref) yields
-// where `ref` is a frame, and answers whether it was one; false, `iter` left
-// as it was, for any other relation or object.
 bool VpiCollectFrameAutomatics(int type, VpiHandle ref, VpiHandle iter);
 
-// §37.44 (thread one-to-many thread): the threads spawned by this thread, as
-// the iteration over its thread children yields them, in order. A null handle
-// yields none.
 std::vector<VpiHandle> VpiThreadThreads(VpiHandle thread);
 
-// ===========================================================================
-// §37.22 Object range. A range object carries the bounds of one array
-// dimension. §37.17's range relations (details 4 and 6) are woven onto these
-// helpers, so a range that one subclause calls "empty" behaves identically in
-// the other.
-// ===========================================================================
-
-// §37.22 detail 1: a range object's contents. An empty range has no elements;
-// it stands in for an associative-array dimension, an empty dynamic array or
-// queue, and any range obtained from a typespec for a dynamic-array, queue, or
-// associative dimension. A non-empty range carries the bound expressions
-// reached through vpiLeftRange/vpiRightRange and an element count.
 struct VpiRangeDesc {
   bool empty = false;
   VpiHandle left_expr = nullptr;
@@ -118,10 +41,6 @@ struct VpiRangeDesc {
   int size = 0;
 };
 
-// §37.22 detail 1 (and §37.17 detail 4): the array-dimension kinds a range can
-// describe, and which of them are represented by an empty range. Fixed packed
-// and unpacked dimensions have real bounds; dynamic-array, queue, and
-// associative dimensions are empty ranges.
 enum class VpiDimensionKind : std::uint8_t {
   kPacked,
   kFixedUnpacked,
@@ -130,138 +49,56 @@ enum class VpiDimensionKind : std::uint8_t {
   kAssoc,
 };
 
-// §37.22 detail 1: whether a dimension of the given kind is an empty range.
 bool VpiDimensionRangeIsEmpty(VpiDimensionKind kind);
 
-// §37.22 detail 2: vpiSize of a range - 0 for an empty range, otherwise the
-// range's element count.
 int VpiRangeSize(const VpiRangeDesc& range);
 
-// §37.22 detail 2: vpiLeftRange of a range - NULL for an empty range, otherwise
-// the left bound expression. §37.17 detail 6 reuses this for a variable's
-// leftmost dimension.
 VpiHandle VpiRangeLeftRange(const VpiRangeDesc& range);
 
-// §37.22 detail 2: vpiRightRange of a range, the mirror of VpiRangeLeftRange.
 VpiHandle VpiRangeRightRange(const VpiRangeDesc& range);
 
-// ===========================================================================
-// §37.17 Variables.
-// ===========================================================================
-
-// §37.4.1: `variables` is drawn as a class definition -- bold italic letters in
-// a dotted enclosure -- which groups further objects and classes rather than
-// being an object of its own, so vpiVariables is the name of that group and no
-// object's vpiType is ever it. This answers what the group holds: the object
-// definitions §37.17 draws inside the enclosure, which is what a relation drawn
-// to the class reaches.
 bool VpiIsVariablesType(int type);
 
-// §37.58: whether an object of `type` can stand where §37.59 draws an expr --
-// an expr kind, or a net or variable, which simple expr holds beside them.
-// VpiIsExprType leaves the two out for the protection rule it serves.
 bool VpiIsExprOperandType(int type);
 
-// The same of an object: one of those kinds that is not a function call
-// written as a statement (§37.42), which a statement holding both a condition
-// and a body tells its condition by.
 bool VpiIsOperandObject(VpiHandle obj);
 
-// §11.2.1: the value of `expr` where it is an elaboration-time constant
-// holding one -- a constant, a parameter or a spec param, a genvar standing
-// as the local parameter of its value; empty for any other expression.
 std::optional<int64_t> VpiElaborationValue(const VpiObject* expr);
 
-// §11.2.1: whether `expr` is an elaboration-time constant expression -- a
-// constant, a parameter or a spec param, or an operation whose operands all
-// are. §37.58 detail 3, §37.59 detail 9 and §37.16 detail 23 make a select
-// written with such indices or bounds a constant select.
 bool VpiIsElaborationConstant(const VpiObject* expr);
 
-// §37.59: the relations of a part select (vpiLeftRange, vpiRightRange,
-// vpiParent) and an indexed part select (vpiBaseExpr, vpiWidthExpr,
-// vpiParent); §37.58, §37.16 and §37.17: of a bit select, net bit and var bit
-// (vpiIndex, vpiParent); and §37.35: a prim term's vpiExpr. Answers whether
-// `ref` is one and `type` one of its relations, with the target in `out`.
 bool TryResolveSelectRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// §37.21 detail 1: a structure, union, or class variable owns the additional
-// driver/load collection behaviour, so the relation must also reach the
-// drivers/loads of its bit/part-selects and nested members.
 bool VpiIsStructUnionOrClassVar(int type);
 
-// §37.21 detail 1: the select kinds whose drivers/loads count toward an
-// aggregate variable - a bit-select or either form of part-select.
 bool VpiIsVariableSelectType(int type);
 
-// §37.21 detail 2: the variable kinds that are an array or a vector - the ones
-// whose drivers and loads cover the whole array or vector and every part of it
-// a handle can be had to.
 bool VpiIsVariableArrayType(int type);
 
-// §37.21 details 1 and 2: the children worth descending into when gathering the
-// drivers or loads of an aggregate variable - a select of the variable, or a
-// member nested inside it, itself of any kind the `variables` class groups.
 bool VpiIsVariableSelectOrMemberType(int type);
 
-// §37.12 detail 7: the virtual interface vars a scope declares, an array of
-// them expanded into its elements. Empty for a null handle and for a lexical
-// context such as a class defn, where the iteration is not supported.
 std::vector<VpiHandle> VpiScopeVirtualInterfaceVars(VpiHandle scope);
 
-// §37.12 (figure): the variables a scope declares, as the vpiVariables relation
-// reaches them - the kinds the `variables` class groups, with an array of
-// virtual interfaces reported as the single array var that declares it.
 std::vector<VpiHandle> VpiScopeVariables(VpiHandle scope);
 
-// §37.20 (figure): whether an array variable is a memory - an array whose words
-// are regs, which is what §37.20 detail 1 makes vpiMemoryWord return. False for
-// an array of any other variable kind and for anything that is not an array
-// variable.
 bool VpiArrayVarIsMemory(VpiHandle var);
 
-// §37.26 (figure): the members a structure or union holds, which its vpiMember
-// relation reaches - the variables of a struct or union var and the nets of a
-// struct or union net. Empty for a null handle or an aggregate with none.
 std::vector<VpiHandle> VpiStructUnionMembers(VpiHandle aggregate);
 
-// §37.17 detail 19: a logic var is the same object kind as a reg; treat either
-// as a logic variable so an existing reg-typed object is classified correctly.
 bool VpiIsLogicVarType(int type);
 
-// §37.17 detail 19: an array var is the same object kind as a reg array; accept
-// either kind wherever an array variable is meant.
 bool VpiIsArrayVarType(int type);
 
-// §37.17 detail 1: a variable declared as an array with one or more unpacked
-// ranges is an array var.
 bool VpiIsArrayVar(int unpacked_range_count);
 
-// §37.17 detail 2: vpiArrayMember is TRUE exactly when a variable is an element
-// of an array variable, read from the variable's vpiParent prefix.
 bool VpiVariableIsArrayMember(VpiHandle var);
 
-// §37.17 detail 17: vpiStructUnionMember is TRUE when a variable's vpiParent
-// prefix is a struct or union variable.
 bool VpiVariableIsStructUnionMember(VpiHandle var);
 
-// §37.17 detail 8: a variable's initialization expression, reached through
-// vpiExpr. Null when the variable has no initialization expression.
 VpiHandle VpiVariableInitExpr(VpiHandle var);
 
-// §37.17 detail 14: whether the cbSizeChange callback is applicable to a
-// variable. It applies only to dynamic arrays, associative arrays, queues, and
-// string variables; array_type is the variable's vpiArrayType (0 when not an
-// array). The detail's firing-order and new-size-value semantics need a
-// size-change callback engine the simulator does not have, so only
-// applicability is realized here.
 bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var);
 
-// §37.17 detail 4: one dimension of a variable as the vpiRange iteration sees
-// it. The kind decides whether the dimension yields an empty range (§37.22); a
-// fixed dimension also carries its bounds and size. An implicit element range
-// (the implicit range of packed struct/union elements, or an enum var's base
-// type) is excluded from a packed array's range iteration.
 struct VpiArrayDimension {
   VpiDimensionKind kind = VpiDimensionKind::kFixedUnpacked;
   VpiHandle left_expr = nullptr;
@@ -270,202 +107,98 @@ struct VpiArrayDimension {
   bool implicit_element_range = false;
 };
 
-// §37.17 detail 4: the ranges vpi_iterate(vpiRange, array_var) returns, one per
-// dimension from leftmost to rightmost. A dynamic-array, queue, or associative
-// dimension contributes an empty range (§37.22); a fixed dimension contributes
-// its bounds. Implicit element ranges are dropped.
 std::vector<VpiRangeDesc> VpiArrayVarRanges(
     const std::vector<VpiArrayDimension>& dims);
 
-// §37.17 detail 6: vpiLeftRange of a variable - the left bound of its leftmost
-// dimension (leftmost packed dimension for a packed array, leftmost unpacked
-// dimension for an unpacked array). NULL when the variable has no members or
-// that leftmost range is empty (§37.22).
 VpiHandle VpiVariableLeftRange(const std::vector<VpiArrayDimension>& dims,
                                bool has_members);
 
-// §37.17 detail 6: vpiRightRange of a variable, the mirror of
-// VpiVariableLeftRange.
 VpiHandle VpiVariableRightRange(const std::vector<VpiArrayDimension>& dims,
                                 bool has_members);
 
-// §37.17 detail 5: vpi_handle(vpiIndex, var_select) returns the index of a var
-// select within a one-dimensional array - its single (innermost) index.
 VpiHandle VpiSelectSingleIndex(
     const std::vector<VpiHandle>& indices_inner_to_outer);
 
-// §37.17 details 5, 13, and 18: vpi_iterate(vpiIndex, ...) over a var select, a
-// var bit, or an array-member variable returns the selecting index expressions
-// starting with the innermost index and working outward; the inputs are already
-// in that order.
 std::vector<VpiHandle> VpiSelectIndicesOutward(
     const std::vector<VpiHandle>& indices_inner_to_outer);
 
-// §37.17 details 9 and 10: the inputs vpiSize reads for a variable or var
-// select.
 struct VpiVariableSizeQuery {
   int var_type = 0;
-  bool packed = false;  // struct/union var: packed vs unpacked
-  int bit_width = 0;    // integer-typed/packed/enum var, packed var select
-  int array_element_count = 0;  // variable array: number of element variables
-  int string_length = 0;        // string var: current character count
-  int field_count = 0;          // unpacked struct/union var: number of fields
+  bool packed = false;
+  int bit_width = 0;
+  int array_element_count = 0;
+  int string_length = 0;
+  int field_count = 0;
 };
 
-// §37.17 details 9 and 10: vpiSize for a variable object. A variable array
-// reports its element count; an integer-typed, packed struct/union, packed
-// array, enum var, or packed var select reports its bit width; a string var
-// reports its current character count; an unpacked struct/union reports its
-// field count; a var bit reports 1. Every other variable's vpiSize is undefined
-// and reported as 0.
 int VpiVariableSize(const VpiVariableSizeQuery& query);
 
-// §37.41 detail 12: vpiSize of a function. When the function's vpiReturn
-// variable has a defined size that can be determined without evaluating the
-// function, vpiSize for the function is the same as vpiSize for that variable.
-// A void function reports 0. For every other case the behavior is undefined;
-// this helper reports 0 there, the same not-defined sentinel VpiVariableSize
-// uses.
 int VpiFunctionSize(bool is_void_function, bool return_size_defined,
                     int return_var_size);
 
-// §37.17 detail 11: whether a variable kind has a value property. Array, class,
-// and virtual-interface variables do not; an unpacked struct or union variable
-// (vpiVector FALSE) does not; every other variable kind does.
 bool VpiVariableHasValueProperty(int var_type, bool vpi_vector);
 
-// §37.17 detail 12: the vpiBit iterator applies only to logic, bit, packed
-// struct, packed union, and packed array variables.
 bool VpiBitIteratorApplies(int var_type, bool packed);
 
-// §37.17 details 15 and 22: vpiRandType is one of vpiRand, vpiRandC,
-// vpiNotRand.
 bool VpiIsRandTypeValue(int value);
 
-// §37.17 detail 16: vpiIsRandomized reports whether a random variable is
-// currently active for randomization.
 bool VpiIsRandomized(bool active_for_randomization);
 
-// §37.17 details 15 and 22: the randomization type `obj` reports through
-// vpiRandType: a typespec member's or a class property's as declared,
-// vpiNotRand for any other variable, and 0 for an object of any other kind.
 int VpiRandTypeOf(VpiHandle obj);
 
-// §37.17 detail 16 with §18.8: whether the variable `var` is a random variable
-// rand_mode() has not turned off, on the object it is a property of or, for a
-// static one, on its class.
 bool VpiVariableIsRandomized(VpiHandle var);
 
-// §37.17 detail 21: vpiArrayType is one of vpiStaticArray, vpiDynamicArray,
-// vpiAssocArray, vpiQueueArray.
 bool VpiIsArrayTypeValue(int value);
 
-// §37.17 detail 20: the inputs the scalar/vector rules read for a variable.
 struct VpiScalarVectorQuery {
   int var_type = 0;
-  bool has_packed_dimension = false;  // bit/logic var: any packed dimensions
-  bool packed = false;                // struct/union var: packed vs unpacked
-  bool base_is_scalar = false;        // enum var: base typespec's vpiScalar
-  bool base_is_vector = false;        // enum var: base typespec's vpiVector
-  bool element_is_scalar = false;     // array var: an element's vpiScalar
-  bool element_is_vector = false;     // array var: an element's vpiVector
+  bool has_packed_dimension = false;
+  bool packed = false;
+  bool base_is_scalar = false;
+  bool base_is_vector = false;
+  bool element_is_scalar = false;
+  bool element_is_vector = false;
 };
 
-// §37.17 detail 20: vpiScalar for a variable. A scalar bit/logic var (no packed
-// dimension) and a var bit are scalars; an enum var defers to its base
-// typespec; an array var defers to an element; every other variable is not a
-// scalar.
 bool VpiVariableScalar(const VpiScalarVectorQuery& query);
 
-// §37.17 detail 20: vpiVector for a variable. A packed bit/logic var, a packed
-// struct/union/array var, and the integer-typed vars are vectors; an enum var
-// defers to its base typespec; an array var defers to an element; every other
-// variable is not a vector.
 bool VpiVariableVector(const VpiScalarVectorQuery& query);
 
-// §37.17 detail 24: vpiVisibility of a variable. A class member reports its
-// declared visibility (vpiLocalVis, vpiProtectedVis, or vpiPublicVis); a member
-// that is neither local nor protected - and any non-class-member variable -
-// reports vpiPublicVis.
 int VpiVariableVisibility(bool is_class_member, int declared_visibility);
 
-// §37.41 detail 4: vpiVisibility of a task or function. A class member (a
-// method) reports its declared visibility (vpiLocalVis, vpiProtectedVis, or
-// vpiPublicVis); a member that is neither local nor protected - and any task or
-// function that is not a class member - reports vpiPublicVis.
 int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility);
 
-// §37.17 detail 24 and §37.41 detail 4: the vpiVisibility `obj` reports, by
-// the two rules above for a task or function and for a variable, a class
-// defn's member being one whose parent is the class defn; vpiUndefined for an
-// object of any other kind, which has no such property.
 int VpiObjectVisibility(VpiHandle obj);
 
-// §37.41 (figure): vpiMethod, the Boolean the task func enclosure carries. TRUE
-// for a task or function declared as a class item - what detail 4 calls a class
-// member - and FALSE for every other object.
 bool VpiTaskFuncIsMethod(VpiHandle tf);
 
-// §37.41 (figure): vpiSigned, the Boolean the function carries. Detail 1 makes
-// the function's return object share its type and detail 2 reaches it through
-// vpiReturn, so the answer is whether that object's kind is one §6.11 makes
-// signed. FALSE for a task and for every object that is not a function.
 bool VpiFunctionIsSigned(VpiHandle function);
 
-// §37.17 detail 25: vpiFullName for a class data member. A non-static member
-// has none (the empty string marks its absence); a static member's full name is
-// the hierarchical path written through its "class defn", e.g.
-// "top.Packet::Id".
 std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
                                    std::string_view class_defn,
                                    std::string_view member);
 
-// §37.17 detail 25: whether `obj` is a non-static data member of a class,
-// reached through a class object or through its class defn, which has no
-// vpiFullName.
 bool VpiIsNonStaticClassDataMember(VpiHandle obj);
 
-// §37.17 detail 26: a candidate vpiParent prefix object, in prefix order
-// (rightmost/innermost first). A prefix qualifies when it is a
-// struct/union/class variable, a struct/union member or class data member, or
-// the largest containing packed or unpacked array object; otherwise its handle
-// is null.
 struct VpiParentPrefix {
   bool qualifies = false;
   VpiHandle handle = nullptr;
 };
 
-// §37.17 detail 26: vpiParent of a variable. Scanning the prefixes rightmost to
-// leftmost, the first qualifying prefix is returned; NULL when none qualifies.
 VpiHandle VpiVariableParent(const std::vector<VpiParentPrefix>& prefixes);
 
-// §37.17 detail 26: among a run of nested array prefixes for one array object
-// (given innermost first), vpiParent reports the largest (outermost) containing
-// array - the last one - or null when there are none.
 VpiHandle VpiLargestContainingArray(
     const std::vector<VpiHandle>& nested_innermost_first);
 
-// §37.17 detail 27: the inputs vpiConstantSelect reads for a var bit or other
-// variable.
 struct VpiConstantSelectQuery {
   bool has_static_lifetime = false;
-  bool has_parent = false;            // vpiParent != NULL
-  bool all_indices_constant = false;  // every index is elaboration-constant
-  bool all_elements_static_members = false;  // struct/union members or packed/
-                                             // unpacked array elements with
-                                             // static bounds
+  bool has_parent = false;
+  bool all_indices_constant = false;
+  bool all_elements_static_members = false;
 };
 
-// §37.17 detail 27: vpiConstantSelect. TRUE when the variable has static
-// lifetime and no parent, or when every index expression is an elaboration-time
-// constant and every selected element is a struct/union member or a
-// packed/unpacked array element with static bounds; FALSE otherwise.
 bool VpiConstantSelect(const VpiConstantSelectQuery& query);
 
-// §37.17 detail 28: the components of a member variable's name. The
-// struct/union/ class-var prefixes run outermost first; the object's own
-// index/slice (if any) is carried separately so it can be appended to all three
-// name forms.
 struct VpiVariableNameParts {
   std::string top_scope;
   std::vector<std::string> member_prefixes;
@@ -473,321 +206,102 @@ struct VpiVariableNameParts {
   std::string index_suffix;
 };
 
-// §37.17 detail 28: vpiName - the leaf member with its own index/slice but none
-// of its struct/union/class-var prefixes.
 std::string VpiVariableName(const VpiVariableNameParts& parts);
 
-// §37.17 detail 28 and §37.16 detail 34: the vpiDecompile of the variable,
-// net, var bit or net bit `var`: its name joined to the names of the struct
-// and union vars or nets it is a member of.
 std::string VpiStructMemberDecompileOf(VpiHandle var);
 
-// §37.17 detail 28: vpiDecompile - the prefixes joined to the member (and its
-// index/slice) without the top-level scope, so it resolves for any
-// non-top-level scope context.
 std::string VpiVariableDecompile(const VpiVariableNameParts& parts);
 
-// §37.17 detail 28: vpiFullName - the top-level scope prefixed to the decompile
-// form.
 std::string VpiVariableFullName(const VpiVariableNameParts& parts);
 
-// ===========================================================================
-// §37.18 Packed array variables. A vpiPackedArrayVar models a packed array of
-// packed struct var, union var, or enum var objects. The size/vector/struct-
-// union-member rules it cites are carried by the §37.17 variable helpers above;
-// the relations and property below are §37.18's own normative details. The
-// vpiElement and vpiIndex relations are recognized in VpiContext::Iterate
-// rather than through a standalone iterator helper.
-// ===========================================================================
-
-// §37.18 detail 3: the member kinds a packed array variable's vpiElement
-// transition reaches - a struct var, union var, enum var, or (for a
-// multidimensioned packed array) another packed array var. Used to collect a
-// packed array var's subelements one dimension level at a time.
 bool VpiIsPackedArrayVarElementType(int type);
 
-// §37.18 detail 4: vpiPackedArrayMember is TRUE for a struct var, union var,
-// enum var, or packed array var whose vpiParent prefix is a packed array var,
-// and FALSE for every other variable.
 bool VpiVariableIsPackedArrayMember(VpiHandle var);
 
-// ===========================================================================
-// §37.19 Variable select. A var select is a variable reference qualified by one
-// or more index expressions (vpiIndex) that reach into an unpacked array var
-// (its vpiParent). Its name/full name (§37.17 detail 28), size (§37.17 detail
-// 10), value (§38.34) and typespec relations are the generic variable
-// machinery; the one normative detail owned here is when the var select's
-// vpiConstantSelect property is TRUE.
-// ===========================================================================
-
-// §37.19 detail 1: the inputs vpiConstantSelect reads for a var select.
 struct VpiVarSelectConstantSelectQuery {
-  bool all_indices_constant = false;      // every index expression of the
-                                          // select is an elaboration-time
-                                          // constant expression
-  bool parent_is_unpacked_static_array =  // the select's parent is an
-      false;                              // unpacked array with static bounds
-  bool parent_constant_select = false;    // vpiConstantSelect is TRUE for
-                                          // the select's parent
+  bool all_indices_constant = false;
+  bool parent_is_unpacked_static_array = false;
+  bool parent_constant_select = false;
 };
 
-// §37.19 detail 1: vpiConstantSelect of a var select. TRUE only when every
-// index expression of the select is an elaboration-time constant, the parent is
-// an unpacked array with static bounds, and vpiConstantSelect is itself TRUE
-// for that parent; otherwise FALSE.
 bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query);
 
-// §37.19 detail 1: the same property, answered from a var select object. The
-// three conditions are read off the select - its index expressions, its
-// vpiParent prefix, and that prefix's own constant-select answer - so that
-// vpi_get(vpiConstantSelect, sel) reports the "bool: vpiConstantSelect" the
-// figure draws on the var select. FALSE for anything that is not a var select.
 bool VpiVarSelectConstantSelectOf(VpiHandle select);
 
-// ===========================================================================
-// §37.25 Typespec. The VPI object model for a type specification. Each helper
-// applies one of the clause's numbered "Details"; the figure's range relations
-// route through §37.22 and a member's expr role reuses §37.59's expr class. The
-// figure attributes that carry no numbered Detail (vpiTagged/vpiSoft/vpiPacked/
-// vpiVector/vpiArrayType/vpiRandType) are defined by §37.26 and §37.17, not
-// here.
-// ===========================================================================
-
-// §37.25: the object-type codes the data model groups under the typespec class
-// - every "... typespec" node of Figure 37.25, plus an unresolved type
-// parameter, which acts as a typespec (detail 11). Used to tell a member's
-// typespec child from its default-value expr child.
 bool VpiIsTypespecType(int type);
 
-// §37.25 detail 1: vpiName of a typespec. A typespec that denotes a
-// user-defined typedef reports that typedef's name (which may be the empty
-// string for a field defined inline, detail 5); a class typespec always reports
-// the class name; every SystemVerilog built-in type reports NULL.
 const char* VpiTypespecName(int ts_type, bool denotes_user_typedef,
                             const char* typedef_name, const char* class_name);
 
-// §37.25 detail 1: vpiTypedefAlias of a typespec. A typespec whose typedef
-// creates an alias of another typedef hands back a handle to the aliased
-// typedef; a typespec that is not such an alias reports NULL.
 VpiHandle VpiTypespecTypedefAlias(bool is_alias, VpiHandle aliased_typedef);
 
-// §37.25 detail 2: vpiIndexTypespec of a typespec. The relation exists only on
-// an associative-array typespec, where it yields the type used as the array
-// key; a wildcard index type (see 7.8.1) yields NULL, and so does any typespec
-// that is not an associative array.
 VpiHandle VpiTypespecIndexTypespec(bool is_assoc_array_typespec,
                                    bool wildcard_index, VpiHandle key_typespec);
 
-// §37.25 detail 3: the members vpi_iterate(vpiTypespecMember, typespec) walks.
-// Only a struct or union typespec has members; every other typespec kind yields
-// none.
 std::vector<VpiHandle> VpiTypespecMembers(
     int ts_type, const std::vector<VpiHandle>& members);
 
-// §37.25 detail 3: the typespec relation of a struct/union member indicates the
-// member's type - the member's typespec child. Any object's typespec is reached
-// the same way; null for none or for no object.
 VpiHandle VpiTypespecChild(VpiHandle obj);
 
-// §37.25 detail 4: vpiName of a typespec member is the member's own name, not
-// the name of the member's typespec.
 const char* VpiTypespecMemberName(VpiHandle member);
 
-// §37.25 detail 7: the expr of a typespec member is the explicit default value
-// of the corresponding member of an unpacked structure (see 7.2), reached as
-// the member's expr child; a member with no default reports NULL.
 VpiHandle VpiTypespecMemberDefaultExpr(VpiHandle member);
 
-// §37.25 detail 8: vpi_handle(vpiElemTypespec, typespec) unwinds one array
-// dimension at a time. A typespec that still has at least one range hands back
-// the element typespec with its leftmost range removed; a typespec with no
-// ranges present yields NULL.
 VpiHandle VpiTypespecElemTypespec(bool has_ranges, VpiHandle element_typespec);
 
-// §37.25 detail 10 (woven with §37.22): the ranges vpi_iterate(vpiRange,
-// typespec) returns, one per dimension from leftmost to rightmost. For an array
-// typespec these are the unpacked ranges; for a bit or logic typespec they are
-// the packed ranges. A dynamic-array, queue, or associative dimension
-// contributes an empty range.
 std::vector<VpiRangeDesc> VpiTypespecRanges(
     const std::vector<VpiArrayDimension>& dims);
 
-// §37.25 detail 9: vpiLeftRange of a typespec - the left bound of its leftmost
-// dimension (the leftmost packed dimension of a logic/bit/packed-array
-// typespec, the leftmost unpacked dimension of an array typespec). NULL when
-// there is no dimension or that leftmost range is empty (§37.22).
 VpiHandle VpiTypespecLeftRange(const std::vector<VpiArrayDimension>& dims);
 
-// §37.25 detail 9: vpiRightRange of a typespec, the mirror of
-// VpiTypespecLeftRange.
 VpiHandle VpiTypespecRightRange(const std::vector<VpiArrayDimension>& dims);
 
-// §37.25 detail 11: in a context where a type parameter has not been resolved,
-// the type parameter itself acts as the typespec. Returns the resolved typespec
-// when one exists, otherwise the type parameter handle itself.
 VpiHandle VpiTypespecForTypeParameter(VpiHandle type_parameter,
                                       VpiHandle resolved_typespec);
 
-// §37.25: the relations a typespec reaches through vpiElemTypespec (detail 8),
-// vpiBaseTypespec, vpiIndexTypespec (detail 2), vpiLeftRange and vpiRightRange
-// (detail 9), and a typespec member through vpiExpr (detail 7). Answers
-// whether `ref` is one and `type` one of its relations, with the target in
-// `out`.
 bool TryResolveTypespecRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// ===========================================================================
-// §37.26 Structures and unions. The VPI object model for a structure or union
-// declared as a variable (struct/union var) or as a net (struct/union net).
-// Each is reached from its parent and iterates to its member variables or nets
-// (vpiParent/vpiMember), and carries the Boolean figure properties vpiPacked,
-// vpiTagged, and vpiSoft. Those relations and properties are served by the
-// generic object-model machinery once an object's fields and children are set;
-// the clause's one numbered rule (detail 1) is the value-access restriction the
-// helpers below recognise.
-// ===========================================================================
-
-// ===========================================================================
-// §37.21 Variable drivers and loads. The vpiDriver and vpiLoad edges relate a
-// variable to the objects that drive it and the objects that read it. A driver
-// or load is not a child whose own type is literally vpiDriver/vpiLoad; it is
-// one of the driving/reading object kinds the figure lists, so the iteration is
-// recognised through these classifiers.
-// ===========================================================================
-
-// §37.21 (figure, variable drivers): the object kinds that drive a variable - a
-// port, a force, a continuous assignment (a whole continuous assignment or a
-// single bit of one), or a procedural assignment statement.
 bool VpiIsVariableDriverType(int type);
 
-// §37.21 (figure, variable loads): the object kinds that read a variable. They
-// are the driver kinds without a port: an assignment statement, a force, and a
-// continuous assignment (whole or single bit). A port appears only as a driver.
 bool VpiIsVariableLoadType(int type);
 
-// §37.21 and §37.46: whether the target `lhs` of an assignment writes
-// `target`, a variable or a net: names it or a part of it, or names either
-// among the operands of a concatenation.
 bool VpiAssignTargetWrites(const VpiObject* lhs, const VpiObject& target);
 
-// §37.21 and §37.46: whether the expression `rhs` reads `target`, a variable
-// or a net: names it or a part of it, or reads it as an operand, an index of a
-// select or an argument of a call at any depth.
 bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target);
 
-// The expressions the expression `expr` is written over: a call's arguments,
-// which it holds apart from its children (§37.42), and any other expression's
-// children, an operation's operands or a var select's indices among them.
 const std::vector<VpiObject*>& VpiSubexpressions(const VpiObject& expr);
 
-// §37.21: whether `child`, an object hung among the variable `var`'s children,
-// is among the variable's drivers (`want_driver`) or its loads: a port always
-// a driver, and an assignment, a procedural assign or a force by whether its
-// target writes `var` or a part of it, or its expression reads it.
 bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
                                bool want_driver);
 
-// §37.21 (figure) + detail 1: gather the drivers (`want_driver`) or loads of
-// the variable `node` into the iterator `iter`: its own driver and load
-// children, and where `descend` is set - a structure, union, class or array
-// variable - those of its selects and members at any depth.
 void VpiCollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
                                       bool descend, VpiObject* iter);
 
-// §37.21: hang `holder`, a continuous assignment, a procedural assign, a force
-// or a port, among the children of each variable the expression object `expr`
-// names, itself or a part of it, or as an operand of it at any depth, which is
-// where a variable's driver and load iterations look for it; once per
-// variable.
 void VpiHangOnVariablesNamed(VpiHandle holder, VpiHandle expr);
 
-// ===========================================================================
-// §37.46 Net drivers and loads. The vpiDriver and vpiLoad edges relate a net to
-// the objects that drive it and the objects that load (read) it. As in §37.21 a
-// driver/load is not a child whose own type is literally vpiDriver/vpiLoad; it
-// is one of the object kinds the figure lists, recognised through the
-// classifiers below. The net case differs from the variable case: an assignment
-// statement loads but does not drive a net, and a port loads a net only through
-// the complex-expression rule of detail 1, recognised separately below.
-// ===========================================================================
-
-// §37.46 (figure): the kinds the dotted `ports` enclosure of the net drivers
-// and net loads classes groups - a port and a port bit (§37.14).
 bool VpiIsPortsType(int type);
 
-// §37.46 (figure, net drivers): the object kinds that drive a net - a port, a
-// force, a delay terminal, a continuous assignment (whole or single bit), or a
-// primitive terminal.
 bool VpiIsNetDriverType(int type);
 
-// §37.46 (figure, net loads): the object kinds that load a net - a delay
-// terminal, an assignment statement, a force, a continuous assignment (whole or
-// single bit), a primitive terminal, or a port, which loads one only through
-// the complex-expression rule of detail 1.
 bool VpiIsNetLoadType(int type);
 
-// §37.46 detail 1: whether `port`, which is a port, carries a complex
-// expression that loads the nets it reads, making the port itself a load. The
-// connection on the port (its vpiHighConn) must be a complex expression - an
-// operation rather than a simple reference - and must not be a concatenation,
-// whose operands connect their nets individually. Only an input port loads this
-// way; the complex expression itself is reached through vpi_handle(vpiHighConn,
-// port) (§37.14).
 bool VpiPortIsComplexExpressionLoad(VpiHandle port);
 
-// §37.46: whether `child`, an object hung among the net `net`'s children, is
-// among the net's drivers (`want_driver`) or its loads: one of the kinds the
-// figure draws on that side, and then a prim term by the direction of its
-// terminal (§37.35), a force (§37.79) or a continuous assignment (§37.47) by
-// whether its target writes the net or its expression reads it, a delay term
-// by which term of its device it is (§37.45), and a port by detail 1.
 bool VpiIsNetDriverOrLoad(VpiHandle child, VpiHandle net, bool want_driver);
 
-// §37.16 detail 16: the ports driving the net `net` from something other than
-// a net or a net bit: an output or inout port of an instance its own instance
-// holds whose lower connection is such, and an input or inout port of its own
-// instance whose higher connection is. Of a net bit (detail 18), they are port
-// bits, and a port bit is judged by what its port's higher connection holds at
-// its place.
 std::vector<VpiHandle> VpiNetPortDrivers(VpiHandle net);
 
-// §37.16 details 4 and 16: the net `net` and every net joined to it through a
-// port nets drive at both ends, in either direction and at any depth, each
-// once, `net` first. vpiDriver and vpiLoad reach the drivers and loads of them
-// all.
 std::vector<VpiHandle> VpiNetsJoinedThroughPorts(VpiHandle net);
 
-// §37.46 with §37.16 details 4, 11, 16, 17 and 18: the drivers (`want_driver`)
-// or loads of `node`, a net or a delay term placed on one, each once. The
-// local relations (`local`) take those the net's own instance holds with its
-// ports; the whole ones those of every net joined to it through ports nets
-// drive, with the ports something other than a net drives it through. A net
-// bit takes the assignments of its vector writing or reading it, and of each
-// bit a port joins it to. A delay term reaches those of its net less its own
-// device's terms (§37.45).
 std::vector<VpiHandle> VpiNetDriversOrLoads(VpiHandle node, bool want_driver,
                                             bool local);
 
-// §37.16 detail 17: the ports of the instance holding the net `net` that are
-// among its local drivers (`want_driver`) or its local loads: of the ports it
-// connects to, an input or inout port a driver, an output or inout port a load.
 std::vector<VpiHandle> VpiNetLocalPorts(VpiHandle net, bool want_driver);
 
-// §37.46: hang `holder`, a prim term, a force or a port, among the children
-// of each net the expression object `expr` names, itself, a bit of it or an
-// operand of it at any depth, which is where a net's driver and load
-// iterations look for it; once per net.
 void VpiHangOnNetsNamed(VpiHandle holder, VpiHandle expr);
 
-// §37.26 (figure): the four object kinds the Structures-and-unions figure
-// models - a structure or union declared as a variable, and a structure or
-// union declared as a net. Used to recognise an entire structure/union object.
 bool VpiIsStructOrUnionType(int type);
 
-// §37.26 detail 1: whether an object is an entire unpacked structure or
-// unpacked union - one whose value vpi_get_value()/vpi_put_value() cannot
-// access. A packed struct/union (vpiPacked true) has a single vector value and
-// stays accessible; only the unpacked aggregate is off-limits, so the rule is
-// the struct/union object kinds restricted to the unpacked case.
 bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed);
 
 }  // namespace delta

@@ -14,61 +14,21 @@
 
 namespace delta {
 
-// Answers whether tk closes a construct a generate region can stand inside.
-// A.4.2 gives `generate_region ::= generate { generate_item } endgenerate`, and
-// the four productions that reach generate_region are A.1.4's
-// non_port_module_item, A.1.6's non_port_interface_item, A.1.7's
-// program_generate_item and A.1.8's checker_generate_item, so a region stands
-// directly in a module, an interface, a program or a checker and in nothing
-// else. §27.3 is narrower than the grammar here -- it lets a generate region
-// stand only directly in a module, never inside another region -- and the
-// three keywords beyond endmodule are what the grammar admits.
 static bool ClosesGenerateRegionEnclosure(TokenKind tk) {
   return tk == TokenKind::kKwEndmodule || tk == TokenKind::kKwEndinterface ||
          tk == TokenKind::kKwEndprogram || tk == TokenKind::kKwEndchecker;
 }
 
-// Answers whether tk closes a construct a generate block can stand inside.
-// A.4.2 writes generate_block in three productions only:
-// loop_generate_construct, if_generate_construct and case_generate_item. The
-// first two end with it, so what follows a block there comes from whatever
-// holds the construct: a generate_region, closed by endgenerate; an enclosing
-// generate_block, closed by the `end` Parser::ParseGenerateBody tests first;
-// or one of the four declarations above. The third is case_generate_item,
-// whose case_generate_construct is closed by endcase.
-//
-// `else` is left out although A.4.2 writes it between the two generate_blocks
-// of if_generate_construct, because it continues that production rather than
-// closing one. EndsGenerateBlockItems below asks for it separately.
 static bool ClosesGenerateBlockEnclosure(TokenKind tk) {
   return ClosesGenerateRegionEnclosure(tk) || tk == TokenKind::kKwEndgenerate ||
          tk == TokenKind::kKwEndcase;
 }
 
-// Answers whether tk ends the items of a generate_block by something other than
-// the `end` Parser::ParseGenerateBody tests first. else_may_follow says whether
-// A.4.2 lets an `else` stand after the block being read, which is true of the
-// first generate_block of an if_generate_construct and of no other position the
-// production admits: there the `else` is what comes after a well-formed block,
-// and no generate_item begins with that keyword. It is asked only where the
-// caller says an `else` can stand, because elsewhere a stray `else` is a token
-// the loop has to consume to make progress, and Parser::ParseGenerateCase's own
-// loop would spin on one left in front of it.
 static bool EndsGenerateBlockItems(TokenKind tk, bool else_may_follow) {
   return ClosesGenerateBlockEnclosure(tk) ||
          (else_may_follow && tk == TokenKind::kKwElse);
 }
 
-// Syntax 27-1 (§27.3) writes what a generate block holds, and A.4.2 what a
-// generate region holds, as generate_items: a module_or_generate_item, an
-// interface_or_generate_item or a checker_or_generate_item. None of the three
-// reaches a module_declaration, an interface_declaration or a
-// program_declaration, which only A.1.4's non_port_module_item and A.1.6's
-// non_port_interface_item reach, while a checker_declaration and an
-// interface_class_declaration are reached through
-// package_or_generate_item_declaration. So a declaration of one of those three
-// design elements is reported at its keyword, and every item is then read by
-// Parser::ParseModuleItem, so that the block or region resumes after it.
 void Parser::ParseGenerateItem(std::vector<ModuleItem*>& items) {
   bool design_element = Check(TokenKind::kKwModule) ||
                         Check(TokenKind::kKwMacromodule) ||
@@ -93,25 +53,12 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
     ~DepthGuard() { --d; }
   } guard(generate_block_depth_);
 
-  // §23.9 makes a generate block a scope, so a typedef inside one is not a type
-  // name in the module after it. The guard stands here rather than after the
-  // `begin` below, because §27.5 makes a conditional generate body that is a
-  // single item an implicit generate block, which is the bare-item branch that
-  // returns before that `begin` is ever looked for. Parser::ParseGenerateRegion
-  // has no guard of its own: §27.3's generate region is not on §23.9's list,
-  // and an item written straight into one belongs to the enclosing module.
   TypeNameScope type_scope(*this);
 
-  // Start at the single generate_item form of A.4.2's generate_block, so that
-  // the null generate block `;` below and the bare-item branch further down
-  // both leave it false without saying so again.
   out_has_begin_end = false;
 
   if (Match(TokenKind::kSemicolon)) return;
 
-  // Detect an optional `label :` prefix that introduces a named generate
-  // block. Only commit to it when it is immediately followed by `begin`;
-  // otherwise restore the lexer so the tokens are reparsed as an item.
   auto detect_gen_label = [&]() -> bool {
     if (!CheckIdentifier()) return false;
     auto saved = lexer_.SavePos();
@@ -126,19 +73,12 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
   };
   bool has_gen_label = detect_gen_label();
 
-  // A bare (non-`begin`) generate body is a single module item.
   if (!Match(TokenKind::kKwBegin)) {
     ParseGenerateItem(body);
     return;
   }
-  // The `begin` has been consumed, so this is the begin-end form of A.4.2's
-  // generate_block whatever the rest of the block turns out to hold.
   out_has_begin_end = true;
 
-  // Consume the optional `: name` block name at the head of the `begin` block,
-  // diagnosing a conflict with a generate-block label. A generate-block label
-  // suppresses (and conflicts with) an explicit block name, so the `Match`
-  // that would consume the name is guarded behind `!has_gen_label`.
   if (has_gen_label && Check(TokenKind::kColon)) {
     diag_.Error(CurrentLoc(),
                 "cannot have both a generate block label and a block name",
@@ -147,38 +87,19 @@ void Parser::ParseGenerateBody(std::vector<ModuleItem*>& body,
     out_label = Consume().text;
   }
 
-  // Parse the items, then the matching `end` and its optional trailing
-  // `: name`. Stop at a token that closes an enclosing construct as well as at
-  // `end`: without that stop Parser::ParseModuleItem reports the token as a
-  // stray item and Parser::SynchronizeWithProgress consumes it, so a block left
-  // open before an `endgenerate` swallowed it and then the `endmodule` behind
-  // it, and the report below could only ever fire at end of input.
   while (!Check(TokenKind::kKwEnd) && !AtEnd() &&
          !EndsGenerateBlockItems(CurrentToken().kind, else_may_follow)) {
     ParseGenerateItem(body);
   }
-  // Leave the token for the enclosing production when the loop stopped on one,
-  // which is what lets the generate region find its endgenerate, the case
-  // construct its endcase and the if_generate_construct its else branch. Expect
-  // reports without consuming, so it survives.
   Expect(TokenKind::kKwEnd, Subclause("27.3"));
-  // A.4.2 closes the block with `end [ : generate_block_identifier ]`, the
-  // same identifier the block opened with, and §9.3.4 has the mismatch an
-  // error; an unnamed block has no name for an end label to match.
   MatchEndBlockLabel(out_label, {});
 }
 
 void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   auto loc = CurrentLoc();
-  // A.1.11's package_item reaches no generate_region, and the region's items
-  // are read into the holder's list where FilterPackageItems reports each by
-  // its kind, so the region itself is reported here.
   RejectInPackageBody("a generate region is not an item of a package");
   Expect(TokenKind::kKwGenerate, Subclause("27.3"));
 
-  // §27.3 lets a region stand only directly in a module, so a generate block,
-  // whose generate_items A.4.2 writes with no generate_region among them,
-  // holds none either, whether or not a region encloses the block.
   if (in_generate_region_) {
     diag_.Error(
         loc,
@@ -192,39 +113,14 @@ void Parser::ParseGenerateRegion(std::vector<ModuleItem*>& items) {
   }
   bool saved = in_generate_region_;
   in_generate_region_ = true;
-  // Stop at the keyword closing the declaration the region stands in as well as
-  // at `endgenerate`, for the reason Parser::ParseGenerateBody above stops at
-  // one: without it a region left open before an `endmodule` had
-  // Parser::ParseModuleItem report that keyword as a stray item and
-  // Parser::SynchronizeWithProgress consume it, so the report below stood at
-  // end of input and Parser::ParseModuleDecl reported the `endmodule` it never
-  // saw. Two reports for one missing `endgenerate`, neither naming where it
-  // should have been.
   while (!Check(TokenKind::kKwEndgenerate) && !AtEnd() &&
          !ClosesGenerateRegionEnclosure(CurrentToken().kind)) {
     ParseGenerateItem(items);
   }
   in_generate_region_ = saved;
-  // Leave the token for the enclosing production when it is one of the closers,
-  // which is what lets the module find its endmodule. Expect reports without
-  // consuming, so it survives.
   Expect(TokenKind::kKwEndgenerate, Subclause("27.3"));
 }
 
-// A.4.2's genvar_initialization, `[ genvar ] genvar_identifier =
-// constant_expression`, read as the blocking assignment the elaborator's
-// loop evaluation takes it for. The header position admits no other form --
-// no select on the genvar, no compound assignment_operator, no
-// inc_or_dec_operator -- so a position holding one is reported at the token
-// that breaks the form and read as the statement it is, which is what lets
-// the rest of the header be read.
-//
-// What is recorded for a reported position is still an assignment to an
-// identifier, one with no name and no value: the elaborator reads gen_init as
-// the form A.4.2 gives it, with no guard of its own, and the test fixtures
-// that elaborate a source the parser reported on hand it the tree as it
-// stands. A genvar with no name is looked up by nothing, and a value that is
-// no expression folds to nothing, so the loop builds no instance.
 Stmt* Parser::ParseGenvarInitialization() {
   bool declares_genvar = Match(TokenKind::kKwGenvar);
   auto saved = lexer_.SavePos();
@@ -248,8 +144,6 @@ Stmt* Parser::ParseGenvarInitialization() {
   }
   Token id = Consume();
   init->lhs = MakeIdentifierNode(arena_, id.text, id.loc);
-  // §27.4: the keyword declares the index as a genvar, which the elaborator
-  // reads as var_name, the name a statement declares.
   if (declares_genvar) init->var_name = id.text;
   Consume();
   init->rhs = ParseExpr();
@@ -257,15 +151,6 @@ Stmt* Parser::ParseGenvarInitialization() {
   return init;
 }
 
-// Whether a statement read from a loop generate's third header position has
-// one of the three forms A.4.2 gives genvar_iteration: `genvar_identifier
-// assignment_operator genvar_expression`, `inc_or_dec_operator
-// genvar_identifier` or `genvar_identifier inc_or_dec_operator`.
-// Parser::ParseAssignmentOrExprNoSemi records every assignment_operator as a
-// StmtKind::kBlockingAssign, the compound ones with the operation folded into
-// the right-hand side, and `<=` as a StmtKind::kNonblockingAssign, which is no
-// assignment_operator of A.6.2; the two inc_or_dec forms are expression
-// statements over a unary or postfix-unary node.
 static bool IsGenvarIteration(const Stmt* step) {
   if (step->kind == StmtKind::kBlockingAssign) {
     return step->lhs != nullptr && step->lhs->kind == ExprKind::kIdentifier;
@@ -279,13 +164,6 @@ static bool IsGenvarIteration(const Stmt* step) {
          e->lhs->kind == ExprKind::kIdentifier;
 }
 
-// A.4.2's genvar_iteration. A position holding none of its three forms -- a
-// bare `i`, a call, a nonblocking `i <= i + 1` -- is reported where it
-// stands; the elaborator's §27.4 rule that the iteration assign to the
-// genvar the initialization assigned to reads the statement after it. What
-// is recorded for a reported position is `genvar ++` on the genvar the
-// initialization named, for the reason ParseGenvarInitialization gives: the
-// elaborator reads gen_step as one of the three forms and nothing else.
 Stmt* Parser::ParseGenvarIteration(std::string_view genvar) {
   SourceLoc loc = CurrentLoc();
   Stmt* step = ParseAssignmentOrExprNoSemi();
@@ -318,8 +196,6 @@ ModuleItem* Parser::ParseGenerateFor() {
   Expect(TokenKind::kSemicolon, Subclause("27.4"));
   item->gen_step = ParseGenvarIteration(item->gen_init->lhs->text);
   Expect(TokenKind::kRParen, Subclause("27.4"));
-  // A.4.2 ends loop_generate_construct with its generate_block, so no `else`
-  // follows this one.
   ParseGenerateBody(item->gen_body, item->name, item->gen_body_has_begin_end,
                     false);
   return item;
@@ -333,8 +209,6 @@ ModuleItem* Parser::ParseGenerateIf() {
   Expect(TokenKind::kLParen, Subclause("27.5"));
   item->gen_cond = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("27.5"));
-  // This is the one position A.4.2 lets an `else` follow a generate_block, so
-  // a block left open before one is reported here rather than swallowing it.
   ParseGenerateBody(item->gen_body, item->name, item->gen_body_has_begin_end,
                     true);
   if (!Match(TokenKind::kKwElse)) return item;
@@ -344,8 +218,6 @@ ModuleItem* Parser::ParseGenerateIf() {
     auto* else_item = arena_.Create<ModuleItem>();
     else_item->kind = ModuleItemKind::kGenerateIf;
     else_item->loc = CurrentLoc();
-    // A.4.2 ends if_generate_construct with the else branch, so no second
-    // `else` follows this block.
     ParseGenerateBody(else_item->gen_body, else_item->name,
                       else_item->gen_body_has_begin_end, false);
     item->gen_else = else_item;
@@ -377,14 +249,9 @@ ModuleItem* Parser::ParseGenerateCase() {
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     GenerateCaseItem ci;
     ParseGenerateCaseLabel(ci);
-    // A.4.2 ends case_generate_item with its generate_block, so no `else`
-    // follows this one.
     ParseGenerateBody(ci.body, ci.label, ci.has_begin_end, false);
     item->gen_case_items.push_back(std::move(ci));
   }
-  // A.4.2 writes the construct `case ( constant_expression )
-  // case_generate_item { case_generate_item } endcase`: one item at least,
-  // and one written with none is reported where its first item was due.
   if (item->gen_case_items.empty()) {
     diag_.Error(CurrentLoc(),
                 "a case generate construct has at least one "

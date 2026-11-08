@@ -50,9 +50,6 @@ TEST(CompilerDirectiveParsing, DirectiveDoesNotAffectOtherCU) {
       "  localparam Y = `FOO;\n"
       "endmodule\n");
 
-  // §22.5.1 owns the text-macro usage rule and Preprocessor files the report
-  // under it; §5.6.4 only states that a directive's effect ends with the
-  // compilation unit.
   EXPECT_TRUE(ReportedError(r2.diags, "undefined macro 'FOO'", 2, "22.5.1"));
 }
 

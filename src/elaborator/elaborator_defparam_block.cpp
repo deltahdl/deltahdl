@@ -1,6 +1,3 @@
-// §23.10.1 with §23.10.2: finding a parameter a named block declares, which a
-// defparam names through the block, and the initializer the defparam gives it.
-
 #include "elaborator/elaborator_defparam_block.h"
 
 #include <cstddef>
@@ -30,13 +27,11 @@ bool IsNamedBlock(const Stmt* s) {
          (s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork);
 }
 
-// Whether the statement `s` declares the parameter `name`.
 bool DeclaresParamNamed(const Stmt* s, std::string_view name) {
   return s->kind == StmtKind::kVarDecl && s->var_is_param &&
          s->var_name == name;
 }
 
-// The parameter `name` the named block `block` declares among its items.
 const Stmt* DeclaredParam(const Stmt* block, std::string_view name) {
   const Stmt* found = nullptr;
   ForEachChildStmt(block, [&](const Stmt* sub) {
@@ -45,9 +40,6 @@ const Stmt* DeclaredParam(const Stmt* block, std::string_view name) {
   return found;
 }
 
-// The declaration under `s` that blocks[i] and the steps after it reach. An
-// unnamed statement is no level of the hierarchy (§23.6) and is looked
-// through; a named block is one, so only blocks[i] itself is entered.
 const Stmt* FindUnder(const Stmt* s, const HierPath& blocks, std::size_t i,
                       std::string_view name) {
   if (s == nullptr) return nullptr;
@@ -63,10 +55,6 @@ const Stmt* FindUnder(const Stmt* s, const HierPath& blocks, std::size_t i,
   return found;
 }
 
-// The declaration a subroutine `sub`'s body holds that `blocks` reaches, the
-// first step naming the subroutine: §23.10.2 lets a defparam redefine a
-// parameter a task or a function declares as well as one a named block in
-// it declares.
 const Stmt* FindInSubroutine(const ModuleItem& sub, const HierPath& blocks,
                              std::string_view name) {
   if (blocks.front().has_index || sub.name != blocks.front().name) {
@@ -112,8 +100,6 @@ Expr* BlockParamInit(Expr* value, const ScopeMap& scope, Arena& arena) {
   return literal;
 }
 
-// Records `init` as the initializer of the block parameter `decl` in the
-// instance `mod` is, replacing one an earlier defparam recorded.
 static void RecordBlockParamOverride(RtlirModule& mod, const Stmt* decl,
                                      Expr* init) {
   for (auto& recorded : mod.block_param_overrides) {
@@ -125,11 +111,6 @@ static void RecordBlockParamOverride(RtlirModule& mod, const Stmt* decl,
   mod.block_param_overrides.push_back({decl, init});
 }
 
-// §23.10.1 with §23.10.2: a parameter a named block declares is reached by the
-// path's steps after its last instance naming the block, read down from the
-// writing module or, for a statement among a module's own items, from a
-// top-level module (§23.8), which ResolveDefparamFromTop confines as it does a
-// module parameter. A localparam takes no defparam.
 bool ElaboratorData::ApplyBlockParamDefparam(RtlirModule* mod,
                                              const HierPath& writer,
                                              const HierPath& path,

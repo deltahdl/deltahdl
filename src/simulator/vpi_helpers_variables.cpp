@@ -4,58 +4,41 @@
 #include <vector>
 
 #include "simulator/class_object.h"
-#include "simulator/vpi_internal.h"
-#include "simulator/vpi_user.h"
-// §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_constants.h"
+#include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
 bool VpiDimensionRangeIsEmpty(VpiDimensionKind kind) {
-  // §37.22 detail 1: dynamic-array, queue, and associative dimensions have no
-  // fixed bounds and are represented by an empty range. Fixed packed and
-  // unpacked dimensions are not empty.
   switch (kind) {
     case VpiDimensionKind::kDynamic:
     case VpiDimensionKind::kQueue:
     case VpiDimensionKind::kAssoc:
       return true;
-    default:  // kPacked and kFixedUnpacked, whose bounds are fixed.
+    default:
       return false;
   }
 }
 
 int VpiRangeSize(const VpiRangeDesc& range) {
-  // §37.22 detail 2: an empty range reports a size of 0.
   return range.empty ? 0 : range.size;
 }
 
 VpiHandle VpiRangeLeftRange(const VpiRangeDesc& range) {
-  // §37.22 detail 2: an empty range returns NULL for vpiLeftRange.
   return range.empty ? nullptr : range.left_expr;
 }
 
 VpiHandle VpiRangeRightRange(const VpiRangeDesc& range) {
-  // §37.22 detail 2: an empty range returns NULL for vpiRightRange.
   return range.empty ? nullptr : range.right_expr;
 }
 
-// ===========================================================================
-// §37.17 Variables.
-// ===========================================================================
-
 bool VpiIsVariablesType(int type) {
-  // §37.4.1: the objects the `variables` class groups are the ones §37.17 draws
-  // inside its dotted enclosure. A class groups further objects and classes and
-  // is not an object itself, so vpiVariables is not among them: a child
-  // carrying it as its own type is an object of a kind the standard draws
-  // nowhere, and the variables an application is after carry the kinds below.
   if (VpiIsLogicVarType(type) || VpiIsArrayVarType(type)) return true;
   switch (type) {
     case vpiShortRealVar:
@@ -82,45 +65,26 @@ bool VpiIsVariablesType(int type) {
   }
 }
 
-bool VpiIsLogicVarType(int type) {
-  // §37.17 detail 19: a logic var and a reg are the same object kind, and
-  // sv_vpi_user.h defines vpiLogicVar as vpiReg.
-  return type == vpiLogicVar;
-}
+bool VpiIsLogicVarType(int type) { return type == vpiLogicVar; }
 
-bool VpiIsArrayVarType(int type) {
-  // §37.17 detail 19: an array var and a reg array are the same object kind,
-  // and sv_vpi_user.h defines vpiArrayVar as vpiRegArray.
-  return type == vpiArrayVar;
-}
+bool VpiIsArrayVarType(int type) { return type == vpiArrayVar; }
 
 bool VpiIsArrayVar(int unpacked_range_count) {
-  // §37.17 detail 1: one or more unpacked ranges makes a variable an array var.
   return unpacked_range_count >= 1;
 }
 
 bool VpiVariableIsArrayMember(VpiHandle var) {
-  // §37.17 detail 2: a variable is an array member when its vpiParent prefix is
-  // an array variable, and §37.27 a named event when it is a named event array.
   return var != nullptr && var->parent != nullptr &&
          (VpiIsArrayVarType(var->parent->type) ||
           var->parent->type == vpiNamedEventArray);
 }
 
 bool VpiVariableIsStructUnionMember(VpiHandle var) {
-  // §37.17 detail 17: a variable is a struct/union member when its vpiParent
-  // prefix is a struct or union variable. A var bit of a packed one is a bit
-  // of the vector (detail 12), no member, as §37.16 detail 33 says of a net
-  // bit; counted, vpiMember of a packed struct var reached its bits too.
   if (!var || var->type == vpiRegBit || !var->parent) return false;
   return var->parent->type == vpiStructVar || var->parent->type == vpiUnionVar;
 }
 
 bool VpiIsPackedArrayVarElementType(int type) {
-  // §37.18 detail 3: a packed array variable's subelements are packed struct
-  // var, union var, or enum var objects; for a multidimensioned packed array a
-  // subelement is itself another packed array var (the leftmost packed range
-  // removed). vpiElement walks exactly these kinds.
   switch (type) {
     case vpiStructVar:
     case vpiUnionVar:
@@ -132,46 +96,24 @@ bool VpiIsPackedArrayVarElementType(int type) {
   }
 }
 
-// §37.21 detail 1: a structure, union, or class variable owns the additional
-// driver/load collection behaviour - the relation must also reach drivers/loads
-// of bit/part-selects and nested members of the variable.
 bool VpiIsStructUnionOrClassVar(int type) {
   return type == vpiStructVar || type == vpiUnionVar || type == vpiClassVar;
 }
 
-// §37.21 detail 1: the select kinds whose drivers/loads count toward an
-// aggregate variable - a bit-select or either form of part-select.
 bool VpiIsVariableSelectType(int type) {
   return type == vpiBitSelect || type == vpiPartSelect ||
          type == vpiIndexedPartSelect;
 }
 
-// §37.21 detail 2: the variable kinds that are an array or a vector, whose
-// drivers and loads the detail has cover the whole array or vector and every
-// part of it a handle can be had to. An unpacked array var (a reg array under
-// §37.17 detail 19 being the same kind) and a packed array var are those.
 bool VpiIsVariableArrayType(int type) {
   return VpiIsArrayVarType(type) || type == vpiPackedArrayVar;
 }
 
-// §37.21 details 1 and 2: the children worth descending into when gathering the
-// drivers or loads of an aggregate or array variable - a bit-select or
-// part-select of the variable, a var select of an array element (§37.19's
-// portion of an array a handle can be obtained for), or a member nested inside
-// it (itself any variable kind, including a further aggregate that is walked
-// recursively).
 bool VpiIsVariableSelectOrMemberType(int type) {
-  // §37.4.1: a member nested inside an aggregate is a variable, and which kinds
-  // those are is what the `variables` class groups. The set was written out
-  // here with vpiVariables among its cases -- the class rather than a kind any
-  // object has -- and without kinds the class does group, so an int var or a
-  // string var member was descended into by neither.
   return VpiIsVariableSelectType(type) || type == vpiVarSelect ||
          VpiIsVariablesType(type);
 }
 
-// §37.12 detail 7: expand a declared array of virtual interfaces into its
-// individual virtual interface var elements.
 static void VpiAppendVirtualInterfaceArrayElems(VpiHandle array_var,
                                                 std::vector<VpiHandle>& out) {
   for (auto* elem : array_var->children) {
@@ -180,10 +122,6 @@ static void VpiAppendVirtualInterfaceArrayElems(VpiHandle array_var,
 }
 
 std::vector<VpiHandle> VpiScopeVirtualInterfaceVars(VpiHandle scope) {
-  // §37.12 detail 7: the scope's virtual interface vars, a declared array of
-  // virtual interfaces expanded into its individual elements. The iteration is
-  // supported only in an elaborated context; within a lexical context such as a
-  // class defn (§37.31) it is not supported and yields nothing.
   std::vector<VpiHandle> vifs;
   if (!scope || scope->type == vpiClassDefn) return vifs;
   for (auto* child : scope->children) {
@@ -197,11 +135,6 @@ std::vector<VpiHandle> VpiScopeVirtualInterfaceVars(VpiHandle scope) {
 }
 
 std::vector<VpiHandle> VpiScopeVariables(VpiHandle scope) {
-  // §37.12 (figure): the scope's vpiVariables relation is drawn to the
-  // `variables` class, so it reaches the objects that class groups (§37.4.1).
-  // Detail 7: an array of virtual interfaces is reported as the single array
-  // var that declares it rather than expanded, which is what matching the array
-  // var itself does.
   std::vector<VpiHandle> variables;
   if (!scope) return variables;
   for (auto* child : scope->children) {
@@ -211,12 +144,6 @@ std::vector<VpiHandle> VpiScopeVariables(VpiHandle scope) {
 }
 
 bool VpiArrayVarIsMemory(VpiHandle var) {
-  // §37.20 (figure): a reg array reports whether it is a memory through
-  // vpiIsMemory. Detail 1 says what a memory is now made of - vpiMemoryWord
-  // answers vpiReg objects - so an array variable is a memory
-  // exactly when the words it holds are regs. An array of some other variable
-  // kind is an array variable and not a memory, and neither is an object that
-  // is not an array variable at all.
   if (!var || !VpiIsArrayVarType(var->type)) return false;
   for (auto* child : var->children) {
     if (child->type == kVpiReg) return true;
@@ -225,11 +152,6 @@ bool VpiArrayVarIsMemory(VpiHandle var) {
 }
 
 bool VpiVariableIsPackedArrayMember(VpiHandle var) {
-  // §37.18 detail 4: vpiPackedArrayMember is TRUE for a struct var, union var,
-  // enum var, or packed array var whose vpiParent prefix is a packed array var.
-  // The vpiParent prefix is resolved by §37.17 detail 26; here the property is
-  // simply that prefix being a packed array var with the element being one of
-  // those four kinds.
   if (!var || !var->parent || var->parent->type != vpiPackedArrayVar) {
     return false;
   }
@@ -237,38 +159,21 @@ bool VpiVariableIsPackedArrayMember(VpiHandle var) {
 }
 
 bool VpiVarSelectConstantSelectOf(VpiHandle select) {
-  // §37.19 detail 1, read off the object rather than from a query a caller
-  // filled in: the three conditions are answered from the select itself, its
-  // index expressions and its vpiParent prefix.
   if (!select || select->type != vpiVarSelect) return false;
 
   VpiVarSelectConstantSelectQuery query;
 
-  // The first condition: each index expression of the select is a constant
-  // expression at elaboration time. The index expressions are the ones
-  // vpi_iterate(vpiIndex, sel) reaches - the select's expression children - and
-  // an index that is an elaboration-time constant stands as a constant
-  // expression object; a variable or net index (§37.58) is no constant.
   query.all_indices_constant = true;
   for (const VpiObject* child : select->children) {
     if (!VpiIsExprOperandType(child->type)) continue;
     if (child->type != vpiConstant) query.all_indices_constant = false;
   }
 
-  // The var select's parent is an unpacked array whose bounds are static.
-  // §37.17 detail 21 is where those bounds are reported: an unpacked array var
-  // whose vpiArrayType is vpiStaticArray has them, and a dynamic, associative
-  // or queue array does not.
   VpiHandle parent = select->parent;
   query.parent_is_unpacked_static_array = parent != nullptr &&
                                           parent->type == vpiArrayVar &&
                                           parent->array_type == vpiStaticArray;
 
-  // vpiConstantSelect is TRUE for the var select's parent. A parent
-  // that is itself a var select is answered by this same rule; an array var is
-  // the base of the chain and is a constant select when its lifetime is static,
-  // which is §37.17 detail 27's first arm - static lifetime and no prefix above
-  // it.
   if (parent != nullptr) {
     query.parent_constant_select = parent->type == vpiVarSelect
                                        ? VpiVarSelectConstantSelectOf(parent)
@@ -279,26 +184,15 @@ bool VpiVarSelectConstantSelectOf(VpiHandle select) {
 }
 
 bool VpiVarSelectConstantSelect(const VpiVarSelectConstantSelectQuery& query) {
-  // §37.19 detail 1: a var select is a constant select only when all three
-  // conditions hold together - every index is an elaboration-time constant, the
-  // parent is an unpacked array with static bounds, and the parent is itself a
-  // constant select. If any condition fails the property is FALSE.
   return query.all_indices_constant && query.parent_is_unpacked_static_array &&
          query.parent_constant_select;
 }
 
 VpiHandle VpiVariableInitExpr(VpiHandle var) {
-  // §37.17 detail 8: when a variable has an initialization expression, it is
-  // reached through vpiExpr; its declaration's facts hold it
-  // (AttachVariableInitializers). A variable with no initialization
-  // expression has none.
   return var != nullptr ? var->decl_facts.init_expr : nullptr;
 }
 
 bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var) {
-  // §37.17 detail 14: cbSizeChange applies only to dynamic arrays, associative
-  // arrays, queues, and string variables; not to fixed-size (static) arrays or
-  // any other variable.
   if (is_string_var) return true;
   return array_type == vpiDynamicArray || array_type == vpiAssocArray ||
          array_type == vpiQueueArray;
@@ -306,10 +200,6 @@ bool VpiSizeChangeCallbackApplies(int array_type, bool is_string_var) {
 
 std::vector<VpiRangeDesc> VpiArrayVarRanges(
     const std::vector<VpiArrayDimension>& dims) {
-  // §37.17 detail 4: one range per dimension, leftmost to rightmost. Each
-  // dimension routes through §37.22: a dynamic/queue/associative dimension is
-  // an empty range, a fixed dimension keeps its bounds. The implicit range of a
-  // packed struct/union element or an enum var's base type is excluded.
   std::vector<VpiRangeDesc> ranges;
   for (const auto& dim : dims) {
     if (dim.implicit_element_range) continue;
@@ -323,9 +213,6 @@ std::vector<VpiRangeDesc> VpiArrayVarRanges(
   return ranges;
 }
 
-// §37.17 detail 6: build the §37.22 range for a variable's leftmost dimension,
-// the one vpiLeftRange/vpiRightRange report. Returns an empty range (so both
-// relations yield NULL) when the variable has no members or no dimensions.
 static VpiRangeDesc LeftmostVariableRange(
     const std::vector<VpiArrayDimension>& dims, bool has_members) {
   if (!has_members || dims.empty()) {
@@ -344,39 +231,31 @@ static VpiRangeDesc LeftmostVariableRange(
 
 VpiHandle VpiVariableLeftRange(const std::vector<VpiArrayDimension>& dims,
                                bool has_members) {
-  // §37.17 detail 6: defer to §37.22's vpiLeftRange, which returns NULL for an
-  // empty leftmost range.
   return VpiRangeLeftRange(LeftmostVariableRange(dims, has_members));
 }
 
 VpiHandle VpiVariableRightRange(const std::vector<VpiArrayDimension>& dims,
                                 bool has_members) {
-  // §37.17 detail 6: the mirror of VpiVariableLeftRange.
   return VpiRangeRightRange(LeftmostVariableRange(dims, has_members));
 }
 
 VpiHandle VpiSelectSingleIndex(
     const std::vector<VpiHandle>& indices_inner_to_outer) {
-  // §37.17 detail 5: the index of a var select in a one-dimensional array is
-  // its single innermost index.
   if (indices_inner_to_outer.empty()) return nullptr;
   return indices_inner_to_outer.front();
 }
 
 std::vector<VpiHandle> VpiSelectIndicesOutward(
     const std::vector<VpiHandle>& indices_inner_to_outer) {
-  // §37.17 details 5, 13, and 18: the iteration runs from the innermost index
-  // outward, which is the order the inputs are already in.
   return indices_inner_to_outer;
 }
 
 int VpiVariableSize(const VpiVariableSizeQuery& query) {
-  // §37.17 details 9 and 10: vpiSize depends on the kind of variable.
   if (VpiIsArrayVarType(query.var_type)) {
-    return query.array_element_count;  // variable array -> element count
+    return query.array_element_count;
   }
   if (VpiIsLogicVarType(query.var_type)) {
-    return query.bit_width;  // logic var (reg) -> size in bits
+    return query.bit_width;
   }
   switch (query.var_type) {
     case vpiByteVar:
@@ -388,39 +267,29 @@ int VpiVariableSize(const VpiVariableSizeQuery& query) {
     case vpiBitVar:
     case vpiEnumVar:
     case vpiPackedArrayVar:
-      return query.bit_width;  // integer-typed/packed/enum -> size in bits
+      return query.bit_width;
     case vpiStructVar:
     case vpiUnionVar:
-      // packed -> size in bits; unpacked -> number of fields
       return query.packed ? query.bit_width : query.field_count;
     case vpiStringVar:
-      return query.string_length;  // current character count
+      return query.string_length;
     case vpiVarBit:
-      return 1;  // a var bit is one bit
+      return 1;
     case vpiVarSelect:
-      return query.bit_width;  // bits in the (packed) var select
+      return query.bit_width;
     default:
-      return 0;  // behavior of vpiSize not defined for other variables
+      return 0;
   }
 }
 
 int VpiFunctionSize(bool is_void_function, bool return_size_defined,
                     int return_var_size) {
-  // §37.41 detail 12: a void function has no return value, so its size is 0.
-  // Otherwise, when the vpiReturn variable's size is defined and determinable
-  // without evaluating the function, the function's size is that variable's
-  // size (§37.17 detail 9 is what defines the variable's size). Every remaining
-  // case is undefined; report 0, the same not-defined value VpiVariableSize
-  // uses.
   if (is_void_function) return 0;
   if (return_size_defined) return return_var_size;
   return 0;
 }
 
 bool VpiVariableHasValueProperty(int var_type, bool vpi_vector) {
-  // §37.17 detail 11: array, class, and virtual-interface variables have no
-  // value property, and neither does an unpacked struct/union (vpiVector
-  // FALSE).
   if (VpiIsArrayVarType(var_type) || var_type == vpiClassVar ||
       var_type == vpiVirtualInterfaceVar) {
     return false;
@@ -432,8 +301,6 @@ bool VpiVariableHasValueProperty(int var_type, bool vpi_vector) {
 }
 
 bool VpiBitIteratorApplies(int var_type, bool packed) {
-  // §37.17 detail 12: vpiBit applies to logic, bit, packed struct, packed
-  // union, and packed array variables only.
   if (VpiIsLogicVarType(var_type) || var_type == vpiBitVar ||
       var_type == vpiPackedArrayVar) {
     return true;
@@ -445,21 +312,14 @@ bool VpiBitIteratorApplies(int var_type, bool packed) {
 }
 
 bool VpiIsRandTypeValue(int value) {
-  // §37.17 details 15 and 22: the three randomization types.
   return value == vpiRand || value == vpiRandC || value == vpiNotRand;
 }
 
 bool VpiIsRandomized(bool active_for_randomization) {
-  // §37.17 detail 16: vpiIsRandomized is exactly that activeness.
   return active_for_randomization;
 }
 
 int VpiRandTypeOf(VpiHandle obj) {
-  // §37.17 details 15 and 22 and §37.25: a variable and a typespec member hold
-  // the randomization type they were declared with, a variable declared with
-  // neither rand nor randc being vpiNotRand. No other object carries the
-  // property, and 0 is none of its values, so §38.6 has any other answer
-  // vpiUndefined.
   if (obj->rand_type != 0) return obj->rand_type;
   return VpiIsVariablesType(obj->type) ? vpiNotRand : vpiUndefined;
 }
@@ -468,8 +328,6 @@ bool VpiVariableIsRandomized(VpiHandle var) {
   if (var->rand_type != vpiRand && var->rand_type != vpiRandC) return false;
   const ClassObject* holder = var->property_of;
   if (holder == nullptr) return VpiIsRandomized(true);
-  // §18.8: every random variable is active until rand_mode() turns it off,
-  // and a static one's state is its class's, shared by every object.
   const auto& states = var->automatic || holder->type == nullptr
                            ? holder->rand_active
                            : holder->type->static_rand_active;
@@ -478,15 +336,11 @@ bool VpiVariableIsRandomized(VpiHandle var) {
 }
 
 bool VpiIsArrayTypeValue(int value) {
-  // §37.17 detail 21: the four array-type values.
   return value == vpiStaticArray || value == vpiDynamicArray ||
          value == vpiAssocArray || value == vpiQueueArray;
 }
 
 bool VpiVariableScalar(const VpiScalarVectorQuery& query) {
-  // §37.17 detail 20: a bit/logic var with no packed dimension and a var bit
-  // are scalars; an enum var defers to its base typespec; an array var defers
-  // to an element; every other variable kind is not a scalar.
   if (VpiIsLogicVarType(query.var_type) || query.var_type == vpiBitVar) {
     return !query.has_packed_dimension;
   }
@@ -497,10 +351,6 @@ bool VpiVariableScalar(const VpiScalarVectorQuery& query) {
 }
 
 bool VpiVariableVector(const VpiScalarVectorQuery& query) {
-  // §37.17 detail 20: a packed bit/logic var, a packed struct/union/array var,
-  // and the integer-typed vars are vectors; an enum var defers to its base
-  // typespec; an array var defers to an element; everything else is not a
-  // vector.
   if (VpiIsLogicVarType(query.var_type) || query.var_type == vpiBitVar) {
     return query.has_packed_dimension;
   }
@@ -526,8 +376,6 @@ bool VpiVariableVector(const VpiScalarVectorQuery& query) {
 }
 
 int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
-  // §37.17 detail 24: a non-class-member variable, and a class member that is
-  // neither local nor protected, reports vpiPublicVis.
   if (!is_class_member) return vpiPublicVis;
   if (declared_visibility == vpiLocalVis ||
       declared_visibility == vpiProtectedVis) {
@@ -537,8 +385,6 @@ int VpiVariableVisibility(bool is_class_member, int declared_visibility) {
 }
 
 int VpiObjectVisibility(VpiHandle obj) {
-  // §37.33 detail 6: a property reached through a class object is a member of
-  // the object's class as much as one reached through the class defn is.
   const bool kClassMember =
       (obj->parent != nullptr && obj->parent->type == vpiClassDefn) ||
       obj->property_of != nullptr;
@@ -552,22 +398,11 @@ int VpiObjectVisibility(VpiHandle obj) {
 }
 
 bool VpiTaskFuncIsMethod(VpiHandle tf) {
-  // §37.41 (figure): "-> method / bool: vpiMethod" is drawn on the task func
-  // enclosure, and detail 4 says what a method is - a task or function that is
-  // a member of a class. §37.31 detail 1 draws a class defn's vpiMethods
-  // relation to that same enclosure, so a task or function declared as a class
-  // item is one and a task or function declared anywhere else is not.
   if (!tf || !VpiIsClassMethodType(tf->type)) return false;
   return tf->parent != nullptr && tf->parent->type == vpiClassDefn;
 }
 
 bool VpiFunctionIsSigned(VpiHandle function) {
-  // §37.41 (figure): "-> sign / bool: vpiSigned" is drawn on the function.
-  // Detail 1 has the function hold an object of its own name, size and type,
-  // and detail 2 reaches that object through
-  // vpiReturn, so the function's signedness is its return object's: §6.11 makes
-  // byte, shortint, int, longint and integer signed by default, and leaves the
-  // 4-state vector kinds unsigned. A task returns nothing and is not signed.
   if (!function || function->type != vpiFunction) return false;
   const VpiObject* ret = function->return_var;
   if (ret == nullptr) return false;
@@ -584,9 +419,6 @@ bool VpiFunctionIsSigned(VpiHandle function) {
 }
 
 int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility) {
-  // §37.41 detail 4: a task or function that is not a class member, and a class
-  // member (method) that is neither local nor protected, reports vpiPublicVis;
-  // a local or protected method reports its declared visibility.
   if (!is_class_member) return vpiPublicVis;
   if (declared_visibility == vpiLocalVis ||
       declared_visibility == vpiProtectedVis) {
@@ -598,9 +430,6 @@ int VpiTaskFuncVisibility(bool is_class_member, int declared_visibility) {
 std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
                                    std::string_view class_defn,
                                    std::string_view member) {
-  // §37.17 detail 25: a non-static class data member has no full name; a static
-  // member's full name routes through the "class defn" with "::", e.g.
-  // "top.Packet::Id".
   if (!is_static) return std::string();
   std::string result;
   if (!scope_path.empty()) {
@@ -612,16 +441,12 @@ std::string VpiClassMemberFullName(bool is_static, std::string_view scope_path,
 
 bool VpiIsNonStaticClassDataMember(VpiHandle obj) {
   if (!VpiIsVariablesType(obj->type)) return false;
-  // A class object's property is automatic unless declared static; a class
-  // defn's static property alone carries the full name its defn gives it.
   if (obj->property_of != nullptr) return obj->automatic;
   return obj->parent != nullptr && obj->parent->type == vpiClassDefn &&
          obj->full_name.empty();
 }
 
 VpiHandle VpiVariableParent(const std::vector<VpiParentPrefix>& prefixes) {
-  // §37.17 detail 26: scan the prefixes rightmost to leftmost and return the
-  // first one that qualifies; NULL when none does.
   for (const auto& prefix : prefixes) {
     if (prefix.qualifies) return prefix.handle;
   }
@@ -630,28 +455,20 @@ VpiHandle VpiVariableParent(const std::vector<VpiParentPrefix>& prefixes) {
 
 VpiHandle VpiLargestContainingArray(
     const std::vector<VpiHandle>& nested_innermost_first) {
-  // §37.17 detail 26: the largest containing array is the outermost of the
-  // nested array prefixes (the last entry when given innermost first).
   if (nested_innermost_first.empty()) return nullptr;
   return nested_innermost_first.back();
 }
 
 bool VpiConstantSelect(const VpiConstantSelectQuery& query) {
-  // §37.17 detail 27: a static-lifetime variable with no parent is a constant
-  // select, as is a select whose indices are all elaboration-time constants and
-  // whose elements are all struct/union members or static-bound array elements.
   if (query.has_static_lifetime && !query.has_parent) return true;
   return query.all_indices_constant && query.all_elements_static_members;
 }
 
 std::string VpiVariableName(const VpiVariableNameParts& parts) {
-  // §37.17 detail 28: the leaf member and its own index/slice, no prefixes.
   return parts.member + parts.index_suffix;
 }
 
 std::string VpiVariableDecompile(const VpiVariableNameParts& parts) {
-  // §37.17 detail 28: the struct/union/class-var prefixes joined to the member,
-  // without the top-level scope.
   std::string result;
   for (const auto& prefix : parts.member_prefixes) {
     result += prefix + ".";
@@ -661,8 +478,6 @@ std::string VpiVariableDecompile(const VpiVariableNameParts& parts) {
 }
 
 std::string VpiStructMemberDecompileOf(VpiHandle var) {
-  // A var bit or net bit carries its own index in its name, and is a bit of a
-  // variable or net whose holders prefix it.
   const VpiObject* named =
       var->type == vpiRegBit || var->type == vpiNetBit ? var->parent : var;
   VpiVariableNameParts parts;
@@ -677,42 +492,19 @@ std::string VpiStructMemberDecompileOf(VpiHandle var) {
 }
 
 std::string VpiVariableFullName(const VpiVariableNameParts& parts) {
-  // §37.17 detail 28: the top-level scope prefixed to the decompile form.
   std::string decompile = VpiVariableDecompile(parts);
   if (parts.top_scope.empty()) return decompile;
   return parts.top_scope + "." + decompile;
 }
 
-// ===========================================================================
-// §37.26 Structures and unions.
-// ===========================================================================
-
 bool VpiIsStructOrUnionType(int type) {
-  // §37.26 (figure): the structure/union object kinds - a struct or union
-  // declared as a variable, and a struct or union declared as a net.
   return type == vpiStructVar || type == vpiUnionVar || type == vpiStructNet ||
          type == vpiUnionNet;
 }
 
 std::vector<VpiHandle> VpiStructUnionMembers(VpiHandle aggregate) {
-  // §37.26 (figure): the var forms draw vpiMember to the `variables` class and
-  // the net forms to `nets`, and the model already answers from a member's own
-  // side which aggregate holds it - §37.17 detail 17 for a variable and §37.16
-  // detail 33 for a net, both reading the member's vpiParent prefix. So the
-  // members are the children those two call members of this aggregate.
-  //
-  // vpiMember was served for §37.24's interconnect net alone. Every structure
-  // and union fell through to the generic child walk, which looks for a child
-  // whose own type is the type asked for; vpiMember is a relation tag and no
-  // object's type is one, so the members of a struct or union were reached by
-  // nothing.
   std::vector<VpiHandle> members;
   if (!aggregate) return members;
-  // The var forms hold variables and the net forms nets, so which side the
-  // aggregate is on says which class its members come from. The two predicates
-  // above read only the member's vpiParent prefix, which every child of the
-  // aggregate satisfies - a typespec drawn by an edge of its own among them -
-  // so the member's own kind is what tells a member from the rest.
   const bool kHoldsVariables =
       aggregate->type == vpiStructVar || aggregate->type == vpiUnionVar;
   for (auto* child : aggregate->children) {
@@ -728,23 +520,10 @@ std::vector<VpiHandle> VpiStructUnionMembers(VpiHandle aggregate) {
 }
 
 bool VpiIsEntireUnpackedStructOrUnion(int type, bool packed) {
-  // §37.26 detail 1: the value-access restriction applies to an entire unpacked
-  // structure or union. A packed aggregate has a single vector value and is
-  // accessible, so the restriction is the struct/union kinds with vpiPacked
-  // false.
   return VpiIsStructOrUnionType(type) && !packed;
 }
 
-// ===========================================================================
-// §37.28 Parameter, spec param, def param, param assign.
-// ===========================================================================
-
 VpiHandle VpiTypeParameterTypespec(VpiHandle type_parameter) {
-  // §37.28 detail 2: hand back the stored typespec verbatim. The detail asks
-  // for the typespec the type parameter has at the end of elaboration with its
-  // typedef aliases left unresolved, so we deliberately do not run
-  // §37.25/§37.30's alias resolution here - the recorded typespec is returned
-  // as-is, even when it is itself a typedef alias.
   if (!type_parameter || type_parameter->type != vpiTypeParameter) {
     return nullptr;
   }
@@ -752,9 +531,6 @@ VpiHandle VpiTypeParameterTypespec(VpiHandle type_parameter) {
 }
 
 VpiHandle VpiParameterDefaultExpr(VpiHandle parameter) {
-  // §37.28 detail 3: vpiExpr reaches the parameter's default - a value
-  // parameter's default value expression, or a type parameter's default
-  // typespec. Both are kept in the same designated slot.
   if (!parameter || (parameter->type != vpiParameter &&
                      parameter->type != vpiTypeParameter)) {
     return nullptr;
@@ -763,11 +539,6 @@ VpiHandle VpiParameterDefaultExpr(VpiHandle parameter) {
 }
 
 VpiHandle VpiParamAssignLhs(VpiHandle param_assign) {
-  // §37.28 detail 4: vpiLhs reaches the overridden parameter - the value
-  // parameter (vpiParameter) or type parameter (vpiTypeParameter) among the
-  // param assign's children. The override target is a parameter-kind object,
-  // not a child whose own type is literally vpiLhs, so the generic walk cannot
-  // find it.
   if (!param_assign || param_assign->type != vpiParamAssign) return nullptr;
   for (auto* child : param_assign->children) {
     if (child->type == vpiParameter || child->type == vpiTypeParameter) {
@@ -778,9 +549,6 @@ VpiHandle VpiParamAssignLhs(VpiHandle param_assign) {
 }
 
 VpiHandle VpiParameterLeftRange(VpiHandle parameter) {
-  // §37.28 detail 5: a value parameter declared without an explicit range
-  // reports a null handle for vpiLeftRange; only an explicitly ranged parameter
-  // reaches its left range-bound expression.
   if (!parameter || parameter->type != vpiParameter ||
       !parameter->explicit_param_range) {
     return nullptr;
@@ -789,7 +557,6 @@ VpiHandle VpiParameterLeftRange(VpiHandle parameter) {
 }
 
 VpiHandle VpiParameterRightRange(VpiHandle parameter) {
-  // §37.28 detail 5: the mirror of VpiParameterLeftRange for vpiRightRange.
   if (!parameter || parameter->type != vpiParameter ||
       !parameter->explicit_param_range) {
     return nullptr;
@@ -797,19 +564,7 @@ VpiHandle VpiParameterRightRange(VpiHandle parameter) {
   return parameter->param_right_range;
 }
 
-// ===========================================================================
-// §37.29 Virtual interface.
-// ===========================================================================
-
-// ===========================================================================
-// §37.21 Variable drivers and loads: the two kind sets the figure's classes
-// group.
-// ===========================================================================
-
 bool VpiIsVariableDriverType(int type) {
-  // §37.21 (figure, variable drivers): the kinds that drive a variable - a
-  // port, a force, a continuous assignment, a single bit of a continuous
-  // assignment, or a procedural assignment statement.
   switch (type) {
     case vpiPort:
     case vpiForce:
@@ -823,10 +578,6 @@ bool VpiIsVariableDriverType(int type) {
 }
 
 bool VpiIsVariableLoadType(int type) {
-  // §37.21 (figure, variable loads): the kinds that read a variable. The figure
-  // lists the driver kinds without a port - an assignment statement, a force,
-  // and a continuous assignment or single bit of one - because a port only ever
-  // drives a variable, it never loads it.
   switch (type) {
     case vpiForce:
     case vpiContAssign:

@@ -17,20 +17,10 @@ struct ModuleDecl;
 struct ModuleItem;
 struct Stmt;
 
-// §23.9: every name a declaration of a compilation unit gives, in whichever
-// scope it stands: the items of the unit, of its packages and of its modules,
-// interfaces, programs and checkers with their ports and parameters; the
-// members, parameters and type parameters of every class, nested ones among
-// them; and every enumeration constant those declare. A name read in a class
-// resolves, if at all, to one of these, so one none of them gives is
-// unresolved wherever it is read. The set is wider than any one scope reaches,
-// so it answers whether a name is declared at all, not whether it is visible.
 class UnitDeclaredNames {
  public:
   explicit UnitDeclaredNames(const CompilationUnit* unit);
 
-  // Whether some declaration of the unit gives `name`. A §6.19.2 member
-  // written `name[N]` gives the constants its name with a number appended.
   bool Declares(std::string_view name) const;
 
  private:
@@ -43,12 +33,6 @@ class UnitDeclaredNames {
   std::unordered_set<std::string_view> numbered_enum_names_;
 };
 
-// The names the items of a scope declare, with those of every scope nested in
-// it: each named item, instance and gate, generate block and case label,
-// procedural block label, loop and foreach variable, formal and procedural
-// local, enumeration constant (§6.19) and implicit net (§6.10), and what a
-// nested declaration declares. It holds more than any one scope declares, so a
-// check consults it only to leave a name unreported.
 class ScopeNameSet {
  public:
   void AddScope(const ModuleDecl* scope);
@@ -56,8 +40,6 @@ class ScopeNameSet {
   void AddStmt(const Stmt* s);
   void Insert(std::string_view name);
 
-  // Whether the set gives `name`. A §6.19.2 member written `name[N]` gives
-  // the constants its name with a number appended.
   bool Contains(std::string_view name) const;
 
  private:
@@ -69,15 +51,6 @@ class ScopeNameSet {
   std::unordered_set<std::string_view> numbered_enum_names_;
 };
 
-// §23.8: the names the first name of a hierarchical name may resolve to. The
-// search goes downward and then upward, through the scopes enclosing the
-// reference and the modules instantiating them, and can end at an instance, a
-// named block, a generate block, a task, a function or a module, so rather
-// than follow it from each reference this answers whether any declaration of
-// the unit gives the name: those of UnitDeclaredNames, with the scope names
-// it leaves out -- every instance, gate and bound instance, block label,
-// generate name, formal and procedural local, modport and nested declaration.
-// A name it does not give is declared nowhere.
 class UnitHierHeadNames {
  public:
   explicit UnitHierHeadNames(const CompilationUnit* unit);
@@ -89,44 +62,23 @@ class UnitHierHeadNames {
   ScopeNameSet scope_names_;
 };
 
-// §23.8: reports the first name of each hierarchical name the procedural
-// blocks and the subroutines of `decl` write that `admits` does not accept.
-// Defined in elaborator_scope_rules_hier.cpp.
 void ReportUnresolvedHierHeads(
     const ModuleDecl* decl, const std::function<bool(std::string_view)>& admits,
     DiagEngine& diag);
 
-// §3.12.1: the first name of each hierarchical name the tasks and functions
-// of `unit`'s compilation-unit scope write, but for their formals and locals.
-// Defined in elaborator_scope_rules_hier.cpp.
 std::vector<const Expr*> UnitSubroutineHierHeads(const CompilationUnit& unit);
 
-// §23.6 with §27.4 and §27.5: reports each `g.m` or `g[k].m` the continuous
-// assignments and procedural blocks of `decl` write where `g` names a generate
-// block of `decl` and nothing else of it, and no block of that name declares
-// `m`. Defined in elaborator_scope_rules_hier.cpp.
 void ReportUndeclaredGenerateBlockMembers(const ModuleDecl* decl,
                                           DiagEngine& diag);
 
-// The genblk<n> names §27.6 gave the generate blocks that stand in the scope
-// of `decl` itself, those of a construct directly nested in one included
-// (§27.5). Defined in elaborator_scope_rules_hier.cpp.
 std::unordered_set<std::string_view> UnnamedGenerateBlockNames(
     const ModuleDecl* decl);
 
-// §27.4, §27.5 and §27.6: reports each hierarchical name the continuous
-// assignments and procedural blocks of `decl` write that reaches into a
-// generate block of `decl` the source left unnamed, through the genblk<n> name
-// §27.6 gave it, written first or after the name of `decl` itself. Defined in
-// elaborator_scope_rules_hier.cpp.
 void ReportUnnamedGenerateBlockReaches(const ModuleDecl* decl,
                                        DiagEngine& diag);
 
-// §23.9: reports each name a method of a class of `unit` reads that neither
-// the method declares, as a formal or in its body, nor any declaration of the
-// unit gives (UnitDeclaredNames).
 void ReportClassMethodUnresolved(const CompilationUnit* unit, DiagEngine& diag);
 
 }  // namespace delta
 
-#endif  // DELTA_ELABORATOR_CLASS_METHOD_READS_H
+#endif

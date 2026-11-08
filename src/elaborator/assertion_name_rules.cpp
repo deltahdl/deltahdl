@@ -35,8 +35,6 @@ bool Holds(const std::vector<std::string_view>& names, std::string_view name) {
   return std::find(names.begin(), names.end(), name) != names.end();
 }
 
-// The names a declaration's own body may read beside the enclosing scope's:
-// its formals and its local variables.
 bool DeclaresLocally(const ModuleItem* item, std::string_view name) {
   if (Holds(item->prop_formals, name) ||
       Holds(item->prop_seq_assert_vars, name) ||
@@ -49,8 +47,6 @@ bool DeclaresLocally(const ModuleItem* item, std::string_view name) {
   return false;
 }
 
-// Whether the text of `item` names `callee`, by an instance written with or
-// without an argument list.
 bool Instantiates(const ModuleItem* item, std::string_view callee) {
   if (Holds(item->prop_instance_refs, callee)) return true;
   for (const AssertionRead& read : item->assertion_reads) {
@@ -75,8 +71,6 @@ DeclsByName SequenceAndPropertyDecls(const ModuleDecl* decl) {
   return decls;
 }
 
-// §16.10: the sequence or property `item` instantiates that declares `name`
-// as a local variable, or nullptr.
 const ModuleItem* OwnerOfInvisibleLocal(const ModuleItem* item,
                                         std::string_view name,
                                         const DeclsByName& decls) {
@@ -109,9 +103,6 @@ void ReportRead(const ModuleItem* item, const AssertionRead& read,
              Subclause("23.9"));
 }
 
-// The sequence or property `arg` is passed to by `item`, when the formal it
-// binds is written in a cycle delay or a repetition bound and the actual is a
-// variable rather than one of `item`'s own formals; null otherwise.
 const ModuleItem* CalleeTakingAVariableAsAConstant(
     const ModuleItem* item, const AssertionInstanceArg& arg,
     const DeclsByName& decls,

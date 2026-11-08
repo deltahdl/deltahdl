@@ -19,19 +19,8 @@ namespace delta {
 
 namespace {
 
-// The most typedefs one type is followed through. §6.18 gives no typedef its
-// own name as its type, so a chain this long is never written; the bound keeps
-// a malformed one from holding the walk.
 constexpr int kMaxTypedefHops = 16;
 
-// One scope of the walk, linked to the scope enclosing it. A class body names
-// its class in `cls`, and its members are found through the class and its
-// bases. Any other scope -- the compilation unit, a module, package, generate
-// block, subroutine or statement -- maps each name it declares to the type
-// written for it, a function's being its return type; each typedef it
-// declares to the type it names; each instance it holds to the module that
-// instance instantiates; each named generate block it holds to the block's
-// items; and keeps the package imports it holds.
 struct Scope {
   explicit Scope(const Scope* enclosing, const ClassDecl* body = nullptr)
       : outer(enclosing), cls(body) {}
@@ -45,8 +34,6 @@ struct Scope {
   std::vector<const ImportItem*> imports;
 };
 
-// The classes enclosing `s`, outermost first, which a type name written in `s`
-// reaches before the classes of the unit (§8.23).
 std::vector<const ClassDecl*> EnclosingClasses(const Scope* s) {
   std::vector<const ClassDecl*> chain;
   for (; s != nullptr; s = s->outer) {
@@ -61,10 +48,6 @@ bool IsGenerateConstruct(ModuleItemKind kind) {
          kind == ModuleItemKind::kGenerateCase;
 }
 
-// Records in `scope` the named generate blocks of the construct `item`: a
-// loop's or a branch's own block, each else branch chained after it, and each
-// case item's block. A block named by §27.6's genblk<n> rule is left out,
-// since §23.6 lets no name from outside the block reach into it.
 void DeclareGenerateBlocks(const ModuleItem& item, Scope& scope) {
   for (const ModuleItem* g = &item; g != nullptr; g = g->gen_else) {
     if (!g->name.empty() && !g->name_is_generated) {
@@ -78,9 +61,6 @@ void DeclareGenerateBlocks(const ModuleItem& item, Scope& scope) {
   }
 }
 
-// Records in `scope` what `item` declares. A forward typedef, `typedef class
-// C;`, names a type declared elsewhere rather than giving one, so it is left
-// out of the typedefs a scope declares.
 void DeclareItem(const ModuleItem& item, Scope& scope) {
   switch (item.kind) {
     case ModuleItemKind::kVarDecl:
@@ -112,18 +92,6 @@ void DeclareItems(const std::vector<ModuleItem*>& items, Scope& scope) {
   }
 }
 
-// §18.7 reads the names of an inline constraint block first in the class of
-// the object randomize() is called on, so a uniqueness group there is checked
-// against that class: the static type of the receiver, read in the scope the
-// call stands in. A name takes the type of its innermost declaration, or of a
-// package variable a scope imports (§26.3), with each typedef followed to the
-// type it names (§6.18). A `.` or `::` access takes the declared type of the
-// property or method it names in the class on its left (§8.4, §8.9), the
-// declaration a package names after `p::` (§26.3), or the declaration an
-// instance's module holds after the instance's name (§23.6). A call takes the
-// type of what it calls, and a select the element class of the array of
-// handles it selects from (§7.4). An array and its elements are not told
-// apart, since randomize() is called on an element alone.
 class InlineUniqueWalk {
  public:
   InlineUniqueWalk(const CompilationUnit* unit, DiagEngine& diag)
@@ -153,7 +121,6 @@ class InlineUniqueWalk {
     }
   }
 
-  // The module, interface or program named `name`.
   const ModuleDecl* FindModule(std::string_view name) const {
     const ModuleDecl* found = nullptr;
     for (const auto* group :
@@ -165,8 +132,6 @@ class InlineUniqueWalk {
     return found;
   }
 
-  // The declarations of `decl`, which a hierarchical name through one of its
-  // instances reads (§23.6), built once per module.
   const Scope& ModuleScope(const ModuleDecl* decl) const {
     auto& slot = module_scopes_[decl];
     if (slot == nullptr) {
@@ -177,9 +142,6 @@ class InlineUniqueWalk {
     return *slot;
   }
 
-  // The declarations of the package named `name`, which `name::` and an
-  // import of it read (§26.3), built once per package. Read from outside, a
-  // package holds its own declarations alone, so the scope has no outer one.
   const Scope& PackageScope(std::string_view name) const {
     auto& slot = package_scopes_[name];
     if (slot == nullptr) {
@@ -191,9 +153,6 @@ class InlineUniqueWalk {
     return *slot;
   }
 
-  // The type the typedef named `name` gives, read from `s` outward: a typedef
-  // of a class body among the class's members, and any other among those its
-  // scope declares.
   const DataType* TypedefIn(std::string_view name, const Scope* s) const {
     for (; s != nullptr; s = s->outer) {
       if (s->cls != nullptr) {
@@ -210,8 +169,6 @@ class InlineUniqueWalk {
     return nullptr;
   }
 
-  // The class a type written in `s` holds a handle to, where `chain` is the
-  // classes enclosing it, with each typedef its name passes through followed.
   const ClassDecl* TypeClass(const DataType* type, const Scope* s,
                              const std::vector<const ClassDecl*>& chain) const {
     for (int hops = 0;
@@ -225,8 +182,6 @@ class InlineUniqueWalk {
     return ClassOfDeclaredType(*type, chain, unit_);
   }
 
-  // The class a member holds a handle to: a property's declared type, or the
-  // return type of a method.
   const ClassDecl* MemberClass(
       const ClassMember* m, const Scope* s,
       const std::vector<const ClassDecl*>& chain) const {
@@ -236,8 +191,6 @@ class InlineUniqueWalk {
         chain);
   }
 
-  // The class `this` or `super` names in `s`: that of the innermost class
-  // body, or the class it extends.
   const ClassDecl* SelfClass(std::string_view name, const Scope* s) const {
     for (; s != nullptr; s = s->outer) {
       if (s->cls != nullptr) {
@@ -247,9 +200,6 @@ class InlineUniqueWalk {
     return nullptr;
   }
 
-  // The class of the package variable `name` an import of `s` makes visible:
-  // an explicit import of that name, or a wildcard import of a package
-  // declaring it.
   const ClassDecl* ImportedClass(std::string_view name, const Scope* s) const {
     for (const ImportItem* imp : s->imports) {
       if (imp->is_wildcard || imp->item_name == name) {
@@ -278,14 +228,11 @@ class InlineUniqueWalk {
     return nullptr;
   }
 
-  // The scope of the module named `name`, or null where none has that name.
   const Scope* ModuleScopeNamed(std::string_view name) const {
     const ModuleDecl* decl = FindModule(name);
     return decl == nullptr ? nullptr : &ModuleScope(decl);
   }
 
-  // The scope a name of `scope` itself opens: an instance's module, or a named
-  // generate block, read with `scope` around it. Null for any other name.
   const Scope* ChildScope(std::string_view name, const Scope& scope) const {
     auto inst = scope.instances.find(name);
     if (inst != scope.instances.end()) return ModuleScopeNamed(inst->second);
@@ -296,11 +243,6 @@ class InlineUniqueWalk {
     return block.get();
   }
 
-  // The scope `e` names as the leading part of a hierarchical name (§23.6): an
-  // instance or a named generate block a scope from `s` outward holds, an
-  // element of an array of either, one nested inside another, or, where no
-  // scope declares the name at all, a module above named upward by its own
-  // name (§23.8). A name a scope declares as anything else is no scope.
   const Scope* NamedScope(const Expr* e, const Scope* s) const {
     if (e->kind == ExprKind::kSelect) return NamedScope(e->base, s);
     if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
@@ -338,10 +280,6 @@ class InlineUniqueWalk {
         chain);
   }
 
-  // An expression of a kind not read here -- a conditional, a cast, a system
-  // name -- is looked up by its text, which names no declaration in any scope
-  // the walk keeps, so it resolves to no class as an identifier naming nothing
-  // does.
   const ClassDecl* Resolve(const Expr* e, const Scope* s) const {
     if (e->kind == ExprKind::kSelect) return Resolve(e->base, s);
     if (e->kind == ExprKind::kCall) return Resolve(e->lhs, s);
@@ -349,11 +287,6 @@ class InlineUniqueWalk {
     return NameClass(e->text, s);
   }
 
-  // The class randomize() with is called on: the receiver's for
-  // `h.randomize()`, and for a bare `randomize()` that of the method it stands
-  // in, which §18.6.1 calls on the object the method runs on. Outside every
-  // class, and as `std::randomize()`, the call is the scope randomize of
-  // §18.12, whose names are no class's.
   const ClassDecl* ReceiverClass(const Expr* call, const Scope& s) const {
     const Expr* callee = call->lhs;
     if (callee->kind == ExprKind::kMemberAccess &&
@@ -379,9 +312,6 @@ class InlineUniqueWalk {
     ForEachExprChild(e, [&](const Expr* child) { VisitExpr(child, s); });
   }
 
-  // A statement opens a scope holding the variables its own statements
-  // declare, a block's items or a for loop's initializations among them, which
-  // its expressions and statements read before the enclosing scope.
   void VisitStmt(const Stmt* st, const Scope& outer) {
     if (st == nullptr) return;
     Scope scope(&outer);
@@ -394,9 +324,6 @@ class InlineUniqueWalk {
     ForEachChildStmt(st, [&](const Stmt* sub) { VisitStmt(sub, scope); });
   }
 
-  // A function or task reads its arguments and the variables its body
-  // declares first. A body written out of its class's block (§8.24) is read
-  // in that class's scope, as a body written inside it is.
   void VisitSubroutine(const ModuleItem* item, const Scope& outer) {
     Scope owner(&outer);
     if (!item->method_class.empty()) {
@@ -427,8 +354,6 @@ class InlineUniqueWalk {
     }
   }
 
-  // The items of the unit, a module, a package or a generate block, read in a
-  // scope holding their own declarations.
   void VisitItems(const std::vector<ModuleItem*>& items, Scope& scope) {
     DeclareItems(items, scope);
     for (const auto* item : items) {
@@ -470,9 +395,6 @@ class InlineUniqueWalk {
       module_scopes_;
   mutable std::unordered_map<std::string_view, std::unique_ptr<Scope>>
       package_scopes_;
-  // The scopes of generate blocks a hierarchical name has been read through.
-  // Each is read with the scope declaring the block around it, which lives no
-  // longer than the walk of that scope, so none is reused across lookups.
   mutable std::vector<std::unique_ptr<Scope>> block_scopes_;
 };
 

@@ -439,9 +439,6 @@ TEST(LvalueParsing, VarLvalueWithImplicitClassHandle) {
 }
 
 TEST(LvalueParsing, VarLvalueWithSuperHandle) {
-  // variable_lvalue's optional prefix is `implicit_class_handle .`, and
-  // implicit_class_handle admits `super` as well as `this`. Assigning through
-  // `super.` exercises the distinct super branch of the lvalue parse.
   auto r = Parse(
       "class B;\n"
       "  int x;\n"
@@ -456,10 +453,6 @@ TEST(LvalueParsing, VarLvalueWithSuperHandle) {
 }
 
 TEST(LvalueParsing, VarLvalueWithThisSuperHandle) {
-  // implicit_class_handle also admits the `this.super` form; variable_lvalue
-  // may carry it as its optional prefix. Assigning through `this.super.`
-  // exercises that third handle alternative (distinct from bare `this` and bare
-  // `super`).
   auto r = Parse(
       "class B;\n"
       "  int x;\n"
@@ -489,12 +482,6 @@ TEST(LvalueParsing, VarLvalueWithPackageScope) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kMemberAccess);
 }
 
-// A.6.2 (printed page 1198) writes the target of a blocking, a nonblocking and
-// an operator assignment as a variable_lvalue, which A.8.5 (printed page 1212)
-// gives four forms: a name under selects, a concatenation or an assignment
-// pattern of variable_lvalues (typed or not), and a streaming concatenation.
-// None is written in parentheses, whole or as an element, and a literal or a
-// cast of a name is none of them.
 TEST(LvalueParsing, ProceduralTargetOfNoVariableLvalueFormIsError) {
   auto r = Parse(
       "module m;\n"
@@ -523,10 +510,6 @@ TEST(LvalueParsing, ProceduralTargetOfNoVariableLvalueFormIsError) {
   EXPECT_EQ(r.diags.size(), 7u);
 }
 
-// A.6.2 (printed page 1198) writes the target of a procedural assign and a
-// deassign as a variable_lvalue, and that of a force and a release as a
-// variable_lvalue or a net_lvalue; A.8.5 (printed page 1212) writes neither in
-// parentheses or as an operation.
 TEST(LvalueParsing, ProceduralContinuousTargetOfNoLvalueFormIsError) {
   auto r = Parse(
       "module m;\n"
@@ -552,14 +535,6 @@ TEST(LvalueParsing, ProceduralContinuousTargetOfNoLvalueFormIsError) {
   EXPECT_EQ(r.diags.size(), 5u);
 }
 
-// A.8.5 (printed page 1212) roots variable_lvalue's name form at a
-// hierarchical_variable_identifier, so a select of a call's result or a member
-// of a name written in parentheses is no target of a blocking or nonblocking
-// assignment. A select of a concatenation is no name form either, but §11.4.12
-// bars it by name and the elaborator reports it under that subclause, as it
-// reports a replication under §11.4.12.1, so the parser leaves it be. A
-// parenthesized target assigned a `new` is reported once, as no
-// variable_lvalue, and not again as the aggregate A.6.2 refuses a `new` to.
 TEST(LvalueParsing, ProceduralTargetRootedAtNoNameIsError) {
   auto r = Parse(
       "module m;\n"
@@ -586,10 +561,6 @@ TEST(LvalueParsing, ProceduralTargetRootedAtNoNameIsError) {
   EXPECT_EQ(r.diags.size(), 3u);
 }
 
-// A.8.3 writes an increment's operand, and A.6.2 the target of an assignment
-// within an expression, as a variable_lvalue, whose name form A.8.5 (printed
-// page 1212) roots at a hierarchical_variable_identifier: a select of a call's
-// result or a member of a name written in parentheses is neither.
 TEST(LvalueParsing, ExpressionTargetRootedAtNoNameIsError) {
   auto r = Parse(
       "module m;\n"

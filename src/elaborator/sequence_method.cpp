@@ -20,11 +20,7 @@ bool IsSequenceMethodOperandLegal(SequenceMethodOperandKind kind) {
 
 bool SequenceMethodResultIsSingleBit() { return true; }
 
-bool SequenceMethodResultDependsOnStartPoint() {
-  // §16.13.6: the result reflects only whether the end point has been reached,
-  // never where the match began.
-  return false;
-}
+bool SequenceMethodResultDependsOnStartPoint() { return false; }
 
 bool SequenceTreatsFormalAsLocalVar(bool formal_is_match_item_lvalue) {
   return formal_is_match_item_lvalue;
@@ -38,18 +34,13 @@ bool IsSequenceMethodContextLegal(SequenceMethod method,
       switch (context) {
         case SequenceMethodContext::kSequenceExpression:
         case SequenceMethodContext::kAssertionStatement:
-          // Used within a sequence/property expression (a sequence context),
-          // triggered is always available.
           return true;
         case SequenceMethodContext::kWaitStatement:
         case SequenceMethodContext::kBooleanExpressionOutsideSequence:
-          // Outside a sequence context it is an error to apply triggered to a
-          // sequence that treats its formal arguments as local variables.
           return !sequence_treats_formal_as_local_var;
       }
       return false;
     case SequenceMethod::kMatched:
-      // matched can only be used in sequence expressions.
       return context == SequenceMethodContext::kSequenceExpression;
   }
   return false;
@@ -70,17 +61,12 @@ SequenceMethodPersistence SequenceMethodStatusPersistence(
 
 bool SequenceMethodSampledValueIsCurrentValue() { return true; }
 
-bool EmptyMatchActivatesSequenceMethod() {
-  // §16.13.6 / §16.9.11: empty matches never activate triggered or matched.
-  return false;
-}
+bool EmptyMatchActivatesSequenceMethod() { return false; }
 
 namespace {
 
-// Depth-first cycle search over the triggered-dependency digraph.
 bool HasCycleFrom(size_t node, const std::vector<std::vector<int>>& adjacency,
                   std::vector<int>& state) {
-  // state: 0 = unvisited, 1 = on the current path, 2 = fully explored.
   state[node] = 1;
   for (int next : adjacency[node]) {
     const auto kNextIndex = static_cast<size_t>(next);

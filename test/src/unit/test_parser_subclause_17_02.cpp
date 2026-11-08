@@ -70,17 +70,13 @@ TEST(CheckerDeclaration, MissingEndcheckerIsError) {
 }
 
 TEST(CheckerDeclaration, EndLabelMismatchIsError) {
-  // §17.2: the optional name following endchecker must match the checker name.
   auto r = Parse("checker ck; endchecker : other\n");
   ASSERT_NE(r.cu, nullptr);
-  // §9.3.4 owns the end-label matching rule the parser reports here; §17.2
-  // states it for endchecker but has no report of its own.
   EXPECT_TRUE(ReportedError(r.diags, "end label 'other' does not match 'ck'", 1,
                             "9.3.4"));
 }
 
 TEST(CheckerDeclaration, OutputDirectionFormalParses) {
-  // §17.2: checker_port_direction admits output as well as input.
   auto r = Parse("checker chk(output bit a, input bit b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -121,8 +117,6 @@ TEST(CheckerDeclaration, FirstFormalOmittedDirectionDefaultsToInput) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
-  // §17.2: the first formal defaults to input when its direction is omitted,
-  // and the following formal inherits that direction.
   EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kInput);
   EXPECT_EQ(r.cu->checkers[0]->ports[1].direction, Direction::kInput);
 }
@@ -133,7 +127,6 @@ TEST(CheckerDeclaration, OmittedDirectionInheritsExplicitOutput) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_EQ(r.cu->checkers.size(), 1u);
   ASSERT_GE(r.cu->checkers[0]->ports.size(), 2u);
-  // §17.2: a formal with no explicit direction inherits the previous formal's.
   EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kOutput);
   EXPECT_EQ(r.cu->checkers[0]->ports[1].direction, Direction::kOutput);
 }
@@ -148,7 +141,6 @@ TEST(CheckerDeclaration, WithMixedContents) {
               "endchecker\n"));
 }
 
-// Returns true if a nested checker declaration appears among `items`.
 static bool HasNestedChecker(const std::vector<ModuleItem*>& items) {
   for (const auto* item : items) {
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
@@ -160,8 +152,6 @@ static bool HasNestedChecker(const std::vector<ModuleItem*>& items) {
   return false;
 }
 
-// §17.2: a checker may be declared in a module. The construct parses in that
-// syntactic position and is recorded as a nested checker declaration.
 TEST(CheckerDeclaration, DeclaredInsideModule) {
   auto r = Parse(
       "module m;\n"
@@ -173,7 +163,6 @@ TEST(CheckerDeclaration, DeclaredInsideModule) {
   EXPECT_TRUE(HasNestedChecker(r.cu->modules[0]->items));
 }
 
-// §17.2: a checker may be declared in an interface.
 TEST(CheckerDeclaration, DeclaredInsideInterface) {
   auto r = Parse(
       "interface ifc;\n"
@@ -185,7 +174,6 @@ TEST(CheckerDeclaration, DeclaredInsideInterface) {
   EXPECT_TRUE(HasNestedChecker(r.cu->interfaces[0]->items));
 }
 
-// §17.2: a checker may be declared in a program.
 TEST(CheckerDeclaration, DeclaredInsideProgram) {
   auto r = Parse(
       "program prog;\n"
@@ -197,7 +185,6 @@ TEST(CheckerDeclaration, DeclaredInsideProgram) {
   EXPECT_TRUE(HasNestedChecker(r.cu->programs[0]->items));
 }
 
-// §17.2: a checker may be declared in a package.
 TEST(CheckerDeclaration, DeclaredInsidePackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -209,7 +196,6 @@ TEST(CheckerDeclaration, DeclaredInsidePackage) {
   EXPECT_TRUE(HasNestedChecker(r.cu->packages[0]->items));
 }
 
-// §17.2: a checker may be declared in a generate block.
 TEST(CheckerDeclaration, DeclaredInsideGenerateBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -219,9 +205,6 @@ TEST(CheckerDeclaration, DeclaredInsideGenerateBlock) {
               "endmodule\n"));
 }
 
-// §17.2: a checker body may contain a default clocking specification and a
-// default disable iff declaration, from which the checker's clock and disable
-// contexts are taken.
 TEST(CheckerDeclaration, BodyAllowsClockingAndDisableContexts) {
   EXPECT_TRUE(
       ParseOk("checker c(input logic clk, input logic rst);\n"
@@ -232,8 +215,6 @@ TEST(CheckerDeclaration, BodyAllowsClockingAndDisableContexts) {
               "endchecker\n"));
 }
 
-// §17.2: a checker body may contain initial, always_comb, always_latch,
-// always_ff, and final procedures.
 TEST(CheckerDeclaration, BodyAllowsProcedureForms) {
   EXPECT_TRUE(
       ParseOk("checker c(input logic clk, input logic en);\n"
@@ -244,8 +225,6 @@ TEST(CheckerDeclaration, BodyAllowsProcedureForms) {
               "endchecker\n"));
 }
 
-// §17.2: a checker body may contain deferred assertions (assert #0) as well as
-// concurrent assertion statements such as assume property.
 TEST(CheckerDeclaration, BodyAllowsDeferredAndAssumeAssertions) {
   EXPECT_TRUE(
       ParseOk("checker c(input logic clk, input logic a, input logic b);\n"
@@ -254,8 +233,6 @@ TEST(CheckerDeclaration, BodyAllowsDeferredAndAssumeAssertions) {
               "endchecker\n"));
 }
 
-// §17.2: a checker body may contain declarations of let constructs, sequences,
-// properties, and functions, plus covergroup and genvar declarations.
 TEST(CheckerDeclaration, BodyAllowsVerificationDeclarations) {
   EXPECT_TRUE(
       ParseOk("checker c(input logic clk, input logic a);\n"
@@ -269,9 +246,6 @@ TEST(CheckerDeclaration, BodyAllowsVerificationDeclarations) {
               "endchecker\n"));
 }
 
-// §17.2: a checker body may contain generate blocks (a checker_generate_item
-// such as a conditional generate construct) that in turn hold checker body
-// elements.
 TEST(CheckerDeclaration, BodyAllowsGenerateBlock) {
   EXPECT_TRUE(
       ParseOk("checker c(input logic a);\n"
@@ -282,7 +256,6 @@ TEST(CheckerDeclaration, BodyAllowsGenerateBlock) {
               "endchecker\n"));
 }
 
-// §17.2: a checker body may contain other checker instantiations.
 TEST(CheckerDeclaration, BodyAllowsNestedCheckerInstantiation) {
   EXPECT_TRUE(
       ParseOk("checker inner(input logic x); endchecker\n"
@@ -291,9 +264,6 @@ TEST(CheckerDeclaration, BodyAllowsNestedCheckerInstantiation) {
               "endchecker\n"));
 }
 
-// §17.2: a checker declaration may specify a default value for a singular input
-// port using the same syntax as sequences and properties. The parser records
-// the default expression on the port.
 TEST(CheckerDeclaration, InputPortDefaultValueParses) {
   auto r = Parse("checker c(input logic a = 1'b1); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -304,10 +274,6 @@ TEST(CheckerDeclaration, InputPortDefaultValueParses) {
   EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
 }
 
-// §17.2: a formal argument written with an explicit direction qualifier is in
-// error when its type is left out. An output formal that omits its type breaks
-// that rule before the one on untyped outputs, and is reported under it (the
-// counterpart accept path is covered by the typed-output tests above).
 TEST(CheckerDeclaration, UntypedOutputFormalIsError) {
   auto r = Parse("checker c(output a); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -317,8 +283,6 @@ TEST(CheckerDeclaration, UntypedOutputFormalIsError) {
                             1, "17.2"));
 }
 
-// The same rule reaches an input formal: `input clk` omits the type that the
-// direction written on it requires.
 TEST(CheckerDeclaration, DirectedInputFormalWithoutTypeIsError) {
   auto r = Parse("checker c(input logic clk, input a); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -328,18 +292,12 @@ TEST(CheckerDeclaration, DirectedInputFormalWithoutTypeIsError) {
                             1, "17.2"));
 }
 
-// A signing or a packed dimension written alone is a type written: A.1.8's
-// property_formal_type reaches data_type_or_implicit, whose implicit form
-// §6.8 spells `[ signing ] { packed_dimension }`.
 TEST(CheckerDeclaration, DirectedFormalWithImplicitTypeIsAccepted) {
   auto r = Parse("checker c(input [3:0] a, output signed b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §17.2: the checker's first formal argument, when its type is omitted, is
-// taken to be an untyped input, and a later formal with neither direction nor
-// type takes both from the one before it.
 TEST(CheckerDeclaration, FirstFormalWithoutTypeIsInputUntyped) {
   auto r = Parse("checker c(a, b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -356,8 +314,6 @@ TEST(CheckerDeclaration, FirstFormalWithoutTypeIsInputUntyped) {
             PropertyFormalType::kUntyped);
 }
 
-// §17.2: untyped, sequence and property are types an input argument can have
-// and an output argument cannot.
 TEST(CheckerDeclaration, OutputFormalOfKeywordTypeIsError) {
   auto r = Parse(
       "checker c(output sequence s, input bit x, untyped u, property p, "
@@ -378,8 +334,6 @@ TEST(CheckerDeclaration, OutputFormalOfKeywordTypeIsError) {
                             1, "17.2"));
 }
 
-// The direction the rule reads is the one the formal has, inherited from the
-// formal before it when none is written on it.
 TEST(CheckerDeclaration, OutputFormalInheritingDirectionOfKeywordTypeIsError) {
   auto r = Parse("checker c(output bit x, untyped u); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -389,8 +343,6 @@ TEST(CheckerDeclaration, OutputFormalInheritingDirectionOfKeywordTypeIsError) {
                             1, "17.2"));
 }
 
-// §17.2: an output formal that carries a type is accepted, confirming the
-// prohibition targets only the untyped form and not outputs in general.
 TEST(CheckerDeclaration, TypedOutputFormalIsAccepted) {
   auto r = Parse("checker c(output bit a); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -400,8 +352,6 @@ TEST(CheckerDeclaration, TypedOutputFormalIsAccepted) {
   EXPECT_EQ(r.cu->checkers[0]->ports[0].direction, Direction::kOutput);
 }
 
-// §17.2: a checker declaration may specify an initial value for a singular
-// output port using the same syntax as an input default value.
 TEST(CheckerDeclaration, OutputPortInitialValueParses) {
   auto r = Parse("checker c(output int ctr = 0); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -412,9 +362,6 @@ TEST(CheckerDeclaration, OutputPortInitialValueParses) {
   EXPECT_NE(r.cu->checkers[0]->ports[0].default_value, nullptr);
 }
 
-// §17.2: the direction a checker formal is written with is input or output,
-// the two alternatives of A.1.8's checker_port_direction. The input and output
-// formals beside them are not reported.
 TEST(CheckerDeclaration, InoutOrRefFormalIsError) {
   auto r = Parse(
       "checker c(input logic a, inout logic b,\n"
@@ -435,9 +382,6 @@ TEST(CheckerDeclaration, InoutOrRefFormalIsError) {
       ReportedError(r.diags, "checker formal 'o' is declared", 2, "17.2"));
 }
 
-// The rule is the one the formal is written with: a formal after an inout one
-// that writes no direction of its own inherits it, and the report made at the
-// first formal is not made again at the second.
 TEST(CheckerDeclaration, FormalInheritingInoutIsNotReportedAgain) {
   auto r = Parse("checker c(inout logic a, logic b); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -447,11 +391,6 @@ TEST(CheckerDeclaration, FormalInheritingInoutIsNotReportedAgain) {
                              1, "17.2"));
 }
 
-// §17.2 makes the legal types of a checker formal those §16.12 makes legal for
-// a property formal, and A.1.8 writes them as a property_formal_type: a net
-// type, `var` and an interface port header are port kinds of A.1.3 that none
-// of its forms reaches. An input formal of a data type is not reported, though
-// a module's input port of that type is an implicit net.
 TEST(CheckerDeclaration, NetOrVarFormalIsError) {
   auto r = Parse(
       "checker c(input wire a, input tri logic b,\n"
@@ -472,9 +411,6 @@ TEST(CheckerDeclaration, NetOrVarFormalIsError) {
       ReportedError(r.diags, "checker formal 'd' is declared", 2, "17.2"));
 }
 
-// The interface port header in the three spellings that say it is one: the
-// keyword alone, the keyword with a modport, and an interface's name with a
-// modport. A.1.3 writes no direction before any of them.
 TEST(CheckerDeclaration, InterfacePortFormalIsError) {
   auto r = Parse(
       "interface ifc; logic s; modport mp(input s); endinterface\n"
@@ -498,9 +434,6 @@ TEST(CheckerDeclaration, InterfacePortFormalIsError) {
   }
 }
 
-// A name and an identifier with nothing between them read the same whether
-// the name is an interface's or a type's the parser has not yet seen, so the
-// formal is not reported as an interface port on that reading alone.
 TEST(CheckerDeclaration, FormalOfAnUnseenTypeNameIsNotAnInterfacePort) {
   auto r = Parse("checker c(T x); endchecker\n");
   ASSERT_NE(r.cu, nullptr);
@@ -508,7 +441,6 @@ TEST(CheckerDeclaration, FormalOfAnUnseenTypeNameIsNotAnInterfacePort) {
       ReportedError(r.diags, "is declared as an interface port", 1, "17.2"));
 }
 
-// The rules are a checker's: a module's ports may be all of these.
 TEST(CheckerDeclaration, ModulePortsOfTheseKindsAreNotReported) {
   auto r = Parse(
       "interface ifc; endinterface\n"

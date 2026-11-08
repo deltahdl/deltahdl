@@ -16,21 +16,10 @@
 namespace delta {
 namespace {
 
-// The expressions a delimiter is followed by on its own line: `rest` up to any
-// comment written there, and without the whitespace that ran up to it.
-//
-// Neither a comment nor the space ahead of it is a pragma expression, and
-// neither states anything about the envelope, so neither is among the things an
-// encrypting tool carries. Leaving the comment behind is also what keeps the
-// envelope readable: a block comment the author never closed would otherwise be
-// carried onto the produced directive and take the expressions written after it
-// -- the description of the encryption, and the block itself -- into the
-// comment with it.
 std::string_view ExpressionsAfterDelimiter(std::string_view rest) {
   size_t end = rest.size();
   size_t i = 0;
   while (i < rest.size()) {
-    // A comment opener inside a string value is content of that value.
     if (rest[i] == '"') {
       i = SkipStringValue(rest, i);
     } else if (StartsLineComment(rest, i) || rest.compare(i, 2, "/*") == 0) {
@@ -106,9 +95,6 @@ std::string OpeningDirectiveOf(std::string_view line,
   auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
   std::string transformed(line.substr(0, at));
   transformed.append(replacement);
-  // The trimming takes the line's terminator with it, and the last line of a
-  // source text need not have had one. What follows this line either way is a
-  // directive of its own.
   transformed.push_back('\n');
   return transformed;
 }
@@ -118,8 +104,6 @@ std::string ClosingDirectiveOf(std::string_view line,
                                std::string_view replacement) {
   std::string_view body;
   ProtectPragmaLine(line, &body);
-  // The list begins past the space separating it from the pragma's name, which
-  // is kept with the name.
   auto opens = static_cast<size_t>(TrimLeading(body).data() - line.data());
   auto at = static_cast<size_t>(delimiter.keyword.data() - line.data());
   std::string transformed(line.substr(0, opens));
@@ -130,13 +114,11 @@ std::string ClosingDirectiveOf(std::string_view line,
   return transformed;
 }
 
-// The expressions of `line`'s list standing on one side of its delimiter.
 static std::string ExpressionsBesideDelimiter(std::string_view line,
                                               const DelimiterMatch& delimiter,
                                               bool ahead) {
   std::string_view body;
   ProtectPragmaLine(line, &body);
-  // The list ends where a comment written on the line begins.
   auto after = static_cast<size_t>(delimiter.keyword.data() - body.data()) +
                delimiter.keyword.size();
   std::string_view listed_part = body.substr(
@@ -188,22 +170,12 @@ InputLine ReadInputLine(std::string_view line, PreviouslyProtectedBlock* block,
   if (block->Contains(line)) {
     return {true, {EnvelopeDelimiter::kNone, {}}};
   }
-  // §34.5.15 makes a data block found in an input file an error unless a
-  // previously generated protected block contains it. This line is outside
-  // every one of them, so a block written here is the block of no envelope --
-  // there is nothing for it to have come out of, and nothing that could read
-  // it back. The line is still carried across like any other; what the
-  // condition costs is a report rather than the transformation.
   if (diag != nullptr && NamesKeyword(line, kDataBlockKeyword)) {
     diag->Error(loc,
                 "protect pragma data_block is written where no previously "
                 "generated begin_protected-end_protected block contains it",
                 Subclause("34.5.15"));
   }
-  // §34.5.27 states the same of a key block, and it costs the same: outside
-  // every previously generated protected block there is no envelope whose keys
-  // a key block here could be carrying, and no key it could have been encrypted
-  // under either.
   if (diag != nullptr && NamesKeyword(line, kKeyBlockKeyword)) {
     diag->Error(loc,
                 "protect pragma key_block is written where no previously "

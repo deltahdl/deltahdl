@@ -26,9 +26,6 @@ Tri FromStep(SequenceStep step) {
 
 Tri FromBool(bool b) { return b ? Tri::kTrue : Tri::kFalse; }
 
-// §16.12.4 and §16.12.5 over the operands' verdicts: or is true where any
-// operand is and false where every one is; and is false where any operand
-// is and true where every one is; else the junction is not yet decided.
 Tri Junction(bool is_or, const std::vector<Tri>& verdicts) {
   Tri decisive = is_or ? Tri::kTrue : Tri::kFalse;
   Tri result = is_or ? Tri::kFalse : Tri::kTrue;
@@ -39,10 +36,6 @@ Tri Junction(bool is_or, const std::vector<Tri>& verdicts) {
   return result;
 }
 
-// §16.12.8 over two operands' verdicts: implies is true where the first is
-// false or the second true, false where the first is true and the second
-// false; iff is true where both are decided alike and false where decided
-// apart; else not yet decided.
 Tri Implies(Tri first, Tri second) {
   if (first == Tri::kFalse || second == Tri::kTrue) return Tri::kTrue;
   if (first == Tri::kTrue && second == Tri::kFalse) return Tri::kFalse;
@@ -56,12 +49,6 @@ Tri Iff(Tri first, Tri second) {
 
 namespace {
 
-// §16.12.12: what an until's tick says from its operands' verdicts there:
-// the until decided true or false, the tick passed on to the next, or not
-// yet known. The non-overlapping forms are true at a tick the second operand
-// holds at, whatever the first, and the overlapping forms need the first
-// there too; a tick the first operand fails at before that fails the until;
-// a tick the first holds at with the second false passes on.
 enum class UntilTick : uint8_t { kTrue, kFalse, kNext, kPending };
 
 UntilTick TickOfUntil(const PropertyExprNode* node, Tri first, Tri second) {
@@ -76,8 +63,6 @@ UntilTick TickOfUntil(const PropertyExprNode* node, Tri first, Tri second) {
 
 }  // namespace
 
-// The ticks in order from the first not yet decided, which `wait` indexes;
-// an until whose every tick has passed on is not yet decided.
 Tri DecideUntil(const PropertyExprNode* node, NodeState& state,
                 const std::vector<Tri>& firsts,
                 const std::vector<Tri>& seconds) {
@@ -116,8 +101,6 @@ Tri FinishIfElse(const PropertyExprNode* node, NodeState& state) {
   return state.condition ? then_branch : else_branch;
 }
 
-// §16.12.16: the item selected is finished as itself; none selected, the
-// case holds.
 Tri FinishCase(const PropertyExprNode* node, NodeState& state) {
   if (state.selected == node->operands.size()) return Tri::kTrue;
   return Finish(node->operands[state.selected],
@@ -140,10 +123,6 @@ Tri FinishPair(const PropertyExprNode* node, NodeState& state) {
                                                         : Iff(first, second);
 }
 
-// §16.12.11 and §16.12.13: the operand attempts begun are finished as
-// themselves; ticks of the range the run never reached are no failure of
-// the weak forms and fail the strong, an eventually with a true operand
-// holding either way.
 Tri FinishAlways(const PropertyExprNode* node, NodeState& state) {
   bool eventually = node->kind == PropertyExprNode::Kind::kEventually;
   std::vector<Tri> verdicts;
@@ -158,9 +137,6 @@ Tri FinishAlways(const PropertyExprNode* node, NodeState& state) {
   return joined;
 }
 
-// §16.12.12: the ticks' operands are finished as themselves and the ticks
-// decided in order; an until whose every tick passed on is the weak form
-// holding and the strong failing, no tick having the second operand true.
 Tri FinishUntil(const PropertyExprNode* node, NodeState& state) {
   std::vector<Tri> firsts;
   std::vector<Tri> seconds;
@@ -175,8 +151,6 @@ Tri FinishUntil(const PropertyExprNode* node, NodeState& state) {
   return node->strong ? Tri::kFalse : Tri::kTrue;
 }
 
-// §16.12.10: with no further tick the weak form holds and the strong fails;
-// an operand begun is finished as itself.
 Tri FinishNexttime(const PropertyExprNode* node, NodeState& state) {
   if (state.begun) return Finish(node->operands[0], *state.operands[0]);
   return node->strong ? Tri::kFalse : Tri::kTrue;
@@ -188,8 +162,6 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
   if (state.verdict != Tri::kPending) return state.verdict;
   switch (node->kind) {
     case PropertyExprNode::Kind::kBoolean:
-      // §16.12.17: an instance expanded is finished as its body; a boolean
-      // never stepped was never required.
       if (state.expansion == nullptr) return Tri::kTrue;
       state.verdict = Finish(state.expansion, *state.operands[0]);
       break;
@@ -220,8 +192,6 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
       state.verdict = FinishUntil(node, state);
       break;
     case PropertyExprNode::Kind::kAbort:
-      // §16.12.14: an abort marked between the last tick and the end takes
-      // precedence; otherwise the property is its operand.
       state.verdict = state.aborted
                           ? (node->accept ? Tri::kTrue : Tri::kFalse)
                           : Finish(node->operands[0], *state.operands[0]);
@@ -237,7 +207,6 @@ Tri Finish(const PropertyExprNode* node, NodeState& state) {
   return state.verdict;
 }
 
-// The verdict of an attempt decided, read off its root's state.
 PropertyVerdict VerdictOf(const PropertyExprNode* root,
                           const NodeState& state) {
   PropertyVerdict verdict;

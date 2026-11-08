@@ -94,10 +94,6 @@ TEST(SubroutineCallSyntaxParsing, MethodCallChained) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-// tf_call permits the parenthesized list_of_arguments to be omitted entirely,
-// the counterpart of SystemCallWithoutParens for a user-defined task. The
-// prose rule that licenses the omission is covered by TaskCallWithoutParens in
-// test_parser_subclause_13_05_05.cpp.
 TEST(SubroutineCallSyntaxParsing, TfCallWithoutParens) {
   auto r = Parse(
       "module m;\n"
@@ -143,9 +139,6 @@ TEST(SubroutineCallSyntaxParsing, VoidCastSystemCall) {
   EXPECT_EQ(expr->lhs->kind, ExprKind::kSystemCall);
 }
 
-// A tf_call naming a user-defined void function stands alone as a statement.
-// The 13.5 prose form of the same claim is VoidFunctionCallAsStatement in
-// test_parser_subclause_13_05.cpp.
 TEST(SubroutineCallSyntaxParsing, VoidFunctionTfCallAsStatement) {
   auto r = Parse(
       "module m;\n"
@@ -266,8 +259,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorCallMissingSemicolon) {
       "    foo()\n"
       "  end\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that ends a statement; the report stands at the
-  // 'end' that arrived instead.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "12.3"));
 }
 
@@ -279,8 +270,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingSemicolon) {
       "    void'(foo())\n"
       "  end\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that ends a statement; the report stands at the
-  // 'end' that arrived instead.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 5, "12.3"));
 }
 
@@ -290,10 +279,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingOpenParen) {
       "  function int foo(); return 1; endfunction\n"
       "  initial void'foo());\n"
       "endmodule\n");
-  // The parser never reaches the cast: an apostrophe not followed by '(' or a
-  // base is no token of §5.6, so Lexer::LexOperator in
-  // src/lexer/lexer_operators.cpp rejects the character itself. §6.24.1 owns
-  // the cast operator's parentheses and has no report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "unexpected character '''", 3, "5.2"));
 }
 
@@ -303,10 +288,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastMissingCloseParen) {
       "  function int foo(); return 1; endfunction\n"
       "  initial void'(foo();\n"
       "endmodule\n");
-  // A.6.9 writes the void cast statement's parentheses, `void ' (
-  // function_subroutine_call ) ;`, and Parser::ParseVoidCastCallStmt reads
-  // them: A.8.4's casting_type names no `void`, so §6.24.1's cast operator is
-  // not what stands here.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "A.6.9"));
 }
 
@@ -366,10 +347,6 @@ TEST(SubroutineCallExprParsing, RandomizeCallWithConstraintBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.8.2 makes a method_call's root a primary, and A.8.4 counts a parenthesized
-// mintypmax_expression among the primaries, so a method is called on the
-// handle a parenthesized expression yields (§8.4): the call's receiver is the
-// conditional expression inside the parentheses.
 TEST(SubroutineCallExprParsing, MethodCallOnAParenthesizedExpression) {
   auto r = Parse(
       "class D;\n"
@@ -395,8 +372,6 @@ TEST(SubroutineCallExprParsing, MethodCallOnAParenthesizedExpression) {
   EXPECT_EQ(stmt->rhs->lhs->rhs->text, "f");
 }
 
-// A randomize_call (A.8.2) is a built_in_method_call, so it too takes a
-// parenthesized receiver, with its inline constraint block after it.
 TEST(SubroutineCallExprParsing, RandomizeWithOnAParenthesizedExpression) {
   auto r = Parse(
       "class D;\n"
@@ -441,7 +416,6 @@ TEST(SubroutineCallExprParsing, ErrorSystemCallMissingCloseParen) {
       "module m;\n"
       "  initial $display(\"hi\";\n"
       "endmodule\n");
-  // §13.5 owns the argument-list parentheses of a subroutine call.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "13.5"));
 }
 
@@ -608,8 +582,6 @@ TEST(SubroutineCallExprParsing, SystemTfCallDataTypeAndExpression) {
               "endmodule\n"));
 }
 
-// A.8.2 with A.8.3: an assignment in its own parentheses is no primary, so a
-// method call or member select applied to it is reported (#7725).
 TEST(SubroutineCallExprParsing, AMethodOfAnAssignmentInItsOwnParensIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -626,8 +598,6 @@ TEST(SubroutineCallExprParsing, AMethodOfAnAssignmentInItsOwnParensIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.8.2"));
 }
 
-// A.8.4: an assignment in a second pair of parentheses is a primary a method
-// is called on, and one in its own parentheses is an operand (§11.3.6).
 TEST(SubroutineCallExprParsing, AnAssignmentInASecondPairOfParensTakesAMethod) {
   auto r = Parse(
       "module m;\n"
@@ -640,9 +610,6 @@ TEST(SubroutineCallExprParsing, AnAssignmentInASecondPairOfParensTakesAMethod) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.8.2's list_of_arguments holds no `default`: A.1.9 writes the keyword in
-// place of an argument list only in a constructor's super.new call (§8.17),
-// so it is reported in any other call and in a class new (#8055).
 TEST(SubroutineCallExprParsing, ADefaultArgumentListIsReportedOutsideSuperNew) {
   auto r = Parse(
       "module m;\n"
@@ -673,8 +640,6 @@ TEST(SubroutineCallExprParsing, SuperNewTakesADefaultArgumentList) {
               "endclass\n"));
 }
 
-// A.8.2 writes an argument list after the name of a subroutine or a method,
-// so none follows a call or a select (#8056).
 TEST(SubroutineCallExprParsing, AnArgumentListAfterACallOrASelectIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -690,7 +655,6 @@ TEST(SubroutineCallExprParsing, AnArgumentListAfterACallOrASelectIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "A.8.2"));
 }
 
-// A.8.4 lets a select follow a call, and a member or a method follow either.
 TEST(SubroutineCallExprParsing, ASelectOrAMethodFollowsACall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -702,9 +666,6 @@ TEST(SubroutineCallExprParsing, ASelectOrAMethodFollowsACall) {
               "endmodule\n"));
 }
 
-// A.8.2 writes a with clause in an array_manipulation_call, after a method
-// named through `.`, and in a randomize_call, written bare, under std:: or as
-// a method; after anything else it is reported (#8057).
 TEST(SubroutineCallExprParsing, AWithClauseAfterNoArrayMethodOrRandomize) {
   auto r = Parse(
       "module m;\n"
@@ -736,11 +697,6 @@ TEST(SubroutineCallExprParsing, AnArrayMethodOrARandomizeCallTakesAWithClause) {
               "endmodule\n"));
 }
 
-// A.8.2 (printed page 1209): a randomize_call's argument list is optional,
-// so a randomize name followed by a with clause, under std::, after a `.` or
-// bare, and std::randomize alone, are each the call randomize() is, the
-// constraint block on that call. A member named randomize with neither,
-// which may be a struct's, stays the member it reads as (#8151).
 TEST(SubroutineCallExprParsing, ARandomizeCallWithoutItsListIsACall) {
   auto r = Parse(
       "module m;\n"
@@ -767,8 +723,6 @@ TEST(SubroutineCallExprParsing, ARandomizeCallWithoutItsListIsACall) {
   EXPECT_EQ(kStmts[4]->rhs->kind, ExprKind::kMemberAccess);
 }
 
-// A.8.2's randomize_call writes after `with` an optional parenthesized list
-// of identifiers and then a constraint block, which is required (#8058).
 TEST(SubroutineCallExprParsing, ARandomizeWithClauseNamesAndEndsInABlock) {
   auto r = Parse(
       "module m;\n"
@@ -786,8 +740,6 @@ TEST(SubroutineCallExprParsing, ARandomizeWithClauseNamesAndEndsInABlock) {
                             4, "A.8.2"));
 }
 
-// A.8.2's array_manipulation_call writes after `with` one expression in
-// parentheses and no constraint block (#8059).
 TEST(SubroutineCallExprParsing, AnArrayMethodsWithClauseHoldsOneExpression) {
   auto r = Parse(
       "module m;\n"
@@ -809,8 +761,6 @@ TEST(SubroutineCallExprParsing, AnArrayMethodsWithClauseHoldsOneExpression) {
   EXPECT_TRUE(ReportedError(r.diags, kOne, 7, "A.8.2"));
 }
 
-// A.8.2's randomize_call takes variable identifiers or `null` alone, so no
-// `null` beside a name, no empty position and no named argument (#8060).
 TEST(SubroutineCallExprParsing, ARandomizeArgumentListIsNamesOrNullAlone) {
   auto r = Parse(
       "module m;\n"
@@ -830,10 +780,6 @@ TEST(SubroutineCallExprParsing, ARandomizeArgumentListIsNamesOrNullAlone) {
       r.diags, "a randomize call passes no argument by name", 5, "A.8.2"));
 }
 
-// A.8.2's system_tf_call takes a data_type as its first argument, and A.2.2.1
-// gives a data_type a signing, the struct, union and enum types, a virtual
-// interface, chandle and event, none of which an expression spells: each is
-// read whole into a kTypeRef node carrying the type (#8061).
 TEST(SubroutineCallExprParsing, ASystemCallTakesATypeNoExpressionSpells) {
   const std::pair<const char*, DataTypeKind> kTypes[] = {
       {"int unsigned", DataTypeKind::kInt},
@@ -858,8 +804,6 @@ TEST(SubroutineCallExprParsing, ASystemCallTakesATypeNoExpressionSpells) {
   }
 }
 
-// A.8.2 writes a system call's clocking event after a first expression, so
-// none follows an empty first position (#8062).
 TEST(SubroutineCallExprParsing, AClockingEventAfterAnEmptyFirstArgument) {
   auto r = Parse(
       "module m;\n"
@@ -883,10 +827,6 @@ TEST(SubroutineCallExprParsing, AClockingEventAfterAFirstExpression) {
               "endmodule\n"));
 }
 
-// A.8.2 makes any primary a method call's root, and A.8.4 counts among the
-// primaries a literal, an assignment pattern expression with or without its
-// type, the empty unpacked array concatenation, a streaming concatenation,
-// null, $, and a cast whose type is a size or a type reference (#8063).
 TEST(SubroutineCallExprParsing, EveryPrimaryTakesAMethodCall) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -908,8 +848,6 @@ TEST(SubroutineCallExprParsing, EveryPrimaryTakesAMethodCall) {
               "endmodule\n"));
 }
 
-// A.8.2's method_call_body writes attribute instances between a method's name
-// and its arguments, whatever primary the method is called on (#8064).
 TEST(SubroutineCallExprParsing, AMethodOnAnyPrimaryTakesAttributeInstances) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -923,9 +861,6 @@ TEST(SubroutineCallExprParsing, AMethodOnAnyPrimaryTakesAttributeInstances) {
               "endmodule\n"));
 }
 
-// A.8.2 lets an array method end in a with clause whatever primary it is
-// called on: the queue another with clause's call returns, a cast, or a
-// $unit:: name (#8065).
 TEST(SubroutineCallExprParsing, AnArrayMethodOnAnyPrimaryTakesAWithClause) {
   EXPECT_TRUE(
       ParseOk("typedef int q_t [$];\n"

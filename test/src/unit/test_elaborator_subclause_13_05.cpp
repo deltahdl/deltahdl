@@ -88,8 +88,6 @@ TEST(SubroutineCallElaboration, TooFewArgsError) {
       "  initial x = foo(1);\n"
       "endmodule\n",
       f);
-  // The omitted argument has no default, so the rule that fires is §13.5.3
-  // rather than §13.5.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "missing argument 'b' in call to 'foo'", 4,
                             "13.5.3"));
@@ -181,8 +179,6 @@ TEST(SubroutineCallElaboration, OutputArgSelectOk) {
 }
 
 TEST(SubroutineCallElaboration, VoidFunctionAsOperandError) {
-  // Only a nonvoid function call may appear as an operand within an
-  // expression; using a void function call as an operand is illegal.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -193,16 +189,12 @@ TEST(SubroutineCallElaboration, VoidFunctionAsOperandError) {
       "  initial x = set_x() + 8'd1;\n"
       "endmodule\n",
       f);
-  // The report that rejects the operand names §13.4.1 rather than §13.5.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "void function 'set_x' used as expression operand",
                             6, "13.4.1"));
 }
 
 TEST(SubroutineCallElaboration, OutputArgConcatenationOk) {
-  // §13.5: an output actual may be any expression valid as a procedural-
-  // assignment lvalue (§10.4). A concatenation of variables is such an lvalue,
-  // so binding it to an output formal must elaborate without error.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -218,9 +210,6 @@ TEST(SubroutineCallElaboration, OutputArgConcatenationOk) {
 }
 
 TEST(SubroutineCallElaboration, OutputArgConcatenationWithLiteralError) {
-  // A concatenation is a valid lvalue only when every element is assignable;
-  // a literal element cannot appear on the left of a procedural assignment, so
-  // the concatenation is not a valid output actual.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -253,9 +242,6 @@ TEST(SubroutineCallElaboration, OutputArgBinaryExprError) {
 }
 
 TEST(SubroutineCallElaboration, OutputArgPartSelectOk) {
-  // §13.5/§10.4: a part-select is a valid procedural-assignment lvalue, so it
-  // is an admissible output actual (a distinct syntactic form from a scalar
-  // bit-select).
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -271,8 +257,6 @@ TEST(SubroutineCallElaboration, OutputArgPartSelectOk) {
 }
 
 TEST(SubroutineCallElaboration, OutputArgMemberSelectOk) {
-  // A member select of a packed struct is a valid procedural-assignment lvalue
-  // (§10.4) and is therefore an admissible output actual.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -289,8 +273,6 @@ TEST(SubroutineCallElaboration, OutputArgMemberSelectOk) {
 }
 
 TEST(SubroutineCallElaboration, InoutArgSelectOk) {
-  // The lvalue restriction applies equally to the inout direction: an element
-  // select of an unpacked array is a valid inout actual.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -305,20 +287,6 @@ TEST(SubroutineCallElaboration, InoutArgSelectOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5 restricts an output actual to an expression legal on the left-hand
-// side of a procedural assignment and says nothing about where the call
-// carrying it stands; A.6.4 makes a subroutine_call_statement a statement_item,
-// so every position a statement holds a statement in is a position the report
-// is owed at. WalkChildStmtsForCallArgs in
-// src/elaborator/elaborator_validate_subroutine_args.cpp had written out eight
-// of the thirteen child-statement links Stmt declares, and now takes the list
-// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
-// cases below cover one newly reached position each.
-
-// A.6.3's par_block holds a list of statement_or_null between fork and its
-// join_keyword, which the parser keeps in Stmt::fork_stmts. §13.4.4 lets a
-// fork-join_none written inside a function hold whatever statements a task may,
-// so a call in a fork arm is a call §13.5 governs.
 TEST(SubroutineCallElaboration, OutputArgLiteralInForkArmError) {
   ElabFixture f;
   ElaborateSrc(
@@ -336,9 +304,6 @@ TEST(SubroutineCallElaboration, OutputArgLiteralInForkArmError) {
                             "13.5"));
 }
 
-// A.6.3's action_block gives an immediate assertion a statement in each arm,
-// held in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(SubroutineCallElaboration, OutputArgLiteralInAssertionPassStatementError) {
   ElabFixture f;
   ElaborateSrc(
@@ -369,8 +334,6 @@ TEST(SubroutineCallElaboration, OutputArgLiteralInAssertionFailStatementError) {
                             "13.5"));
 }
 
-// §18.16's `randcase_item ::= expression : statement_or_null` puts a statement
-// after each weight, held in Stmt::randcase_items.
 TEST(SubroutineCallElaboration, OutputArgLiteralInRandcaseItemError) {
   ElabFixture f;
   ElaborateSrc(
@@ -388,8 +351,6 @@ TEST(SubroutineCallElaboration, OutputArgLiteralInRandcaseItemError) {
                             "13.5"));
 }
 
-// A.6.12's rs_code_block holds procedural statements, which the parser keeps in
-// RsProd::code_stmts under Stmt::rs_productions.
 TEST(SubroutineCallElaboration, OutputArgLiteralInRandsequenceCodeBlockError) {
   ElabFixture f;
   ElaborateSrc(
@@ -409,9 +370,6 @@ TEST(SubroutineCallElaboration, OutputArgLiteralInRandsequenceCodeBlockError) {
                             "13.5"));
 }
 
-// §18.17.1 admits a code block after a rule's weight specification, kept in
-// RsRule::weight_code. That is a second statement list under
-// Stmt::rs_productions, reached by a different member from the case above.
 TEST(SubroutineCallElaboration,
      OutputArgLiteralInRandsequenceWeightCodeBlockError) {
   ElabFixture f;
@@ -434,9 +392,6 @@ TEST(SubroutineCallElaboration,
                             "13.5"));
 }
 
-// §13.5 restricts an output or inout actual to what a procedural assignment
-// may assign, and §10.4 makes that a variable, so a net, whole, selected or in
-// a concatenation, is no such actual (#6436).
 TEST(SubroutineCallElaboration, NetAsOutputOrInoutActualError) {
   ElabFixture f;
   ElaborateSrc(

@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -36,8 +34,6 @@ TEST(ClassSyntaxParsing, ErrorBothRandAndRandc) {
       "class C;\n"
       "  rand randc int x;\n"
       "endclass\n");
-  // §8.3 owns the class-property qualifier report; §18.4 states the rand and
-  // randc modes but has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "cannot combine 'rand' and 'randc' qualifiers", 2, "8.3"));
 }

@@ -355,8 +355,6 @@ TEST(ConditionalSyntaxParsing, IfEmptyCondition) {
       "    if () x = 1;\n"
       "  end\n"
       "endmodule\n");
-  // §11.2 owns the primary the condition is missing; §12.4 reports only the
-  // parentheses around it.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
@@ -483,9 +481,6 @@ TEST(ConditionalSyntaxParsing, ElseWithoutIfIsError) {
       "    else x = 1;\n"
       "  end\n"
       "endmodule\n");
-  // No statement production begins with 'else', so it reaches the expression
-  // statement path and §11.2 refuses it as a primary; §12.4 has no report for
-  // an else with no if.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

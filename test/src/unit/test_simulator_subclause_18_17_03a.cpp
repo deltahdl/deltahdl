@@ -28,9 +28,6 @@ TEST(RandsequenceSim, CaseProduction) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// 18.17.3: both the case expression and the case item expressions are arbitrary
-// expressions evaluated at run time; selection follows their computed values.
-// Here (sel & 3) == 2 matches the item expression (1 + 1), generating b.
 TEST(RandsequenceSim, CaseProductionEvaluatesExpressions) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -53,7 +50,6 @@ TEST(RandsequenceSim, CaseProductionEvaluatesExpressions) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// 18.17.3: case item expressions separated by commas share one production.
 TEST(RandsequenceSim, CaseProductionCommaSharedExpressions) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -73,7 +69,6 @@ TEST(RandsequenceSim, CaseProductionCommaSharedExpressions) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// 18.17.3: when no case item expression matches, the default production runs.
 TEST(RandsequenceSim, CaseProductionDefaultWhenNoMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -94,8 +89,6 @@ TEST(RandsequenceSim, CaseProductionDefaultWhenNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// 18.17.3: the default item is only a fallback. Even when it appears before a
-// matching case item, the matching item's production is the one generated.
 TEST(RandsequenceSim, CaseProductionDefaultIsFallbackRegardlessOfPosition) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -115,9 +108,6 @@ TEST(RandsequenceSim, CaseProductionDefaultIsFallbackRegardlessOfPosition) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// 18.17.3: when several case item expressions match the case expression, the
-// first one written wins. Both items below match the value 5, but the earlier
-// production (a) is the one generated, not b.
 TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -137,12 +127,6 @@ TEST(RandsequenceSim, CaseProductionFirstMatchingItemWinsWhenSeveralMatch) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// 18.17.3: the case expression is an arbitrary expression, so it admits a
-// parameter operand (a constant form of 11.2.1). Resolving it takes the
-// parameter-lookup path in expression evaluation rather than reading a literal
-// or a procedural variable. With P equal to 2 the case expression matches the
-// second item, generating b and pinning the parameter value as the compared
-// value.
 TEST(RandsequenceSim, CaseProductionParameterCaseExpressionSelectsProduction) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -164,11 +148,6 @@ TEST(RandsequenceSim, CaseProductionParameterCaseExpressionSelectsProduction) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// 18.17.3: a case item expression is likewise an arbitrary expression and
-// admits a localparam operand, a distinct constant form of 11.2.1, in the
-// case-item position. Here the case expression is 3 and the localparam item
-// expression L also equals 3, so that item matches and its production a is
-// generated, confirming selection follows the localparam's value.
 TEST(RandsequenceSim, CaseProductionLocalparamCaseItemSelectsProduction) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -189,7 +168,6 @@ TEST(RandsequenceSim, CaseProductionLocalparamCaseItemSelectsProduction) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// 18.17.3: with no match and no default item, nothing is generated.
 TEST(RandsequenceSim, CaseProductionNoMatchNoDefaultGeneratesNothing) {
   SimFixture f;
   auto* var = RunAndFindVar(

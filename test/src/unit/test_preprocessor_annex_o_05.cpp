@@ -17,9 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Two recipients of one envelope -- a tool vendor and a user -- each with a
-// key of its own that the sender holds and that the recipient's decrypting
-// run holds, standing for the public and the private key of the pair.
 struct Recipient {
   std::string_view owner;
   std::string_view key_name;
@@ -29,8 +26,6 @@ constexpr Recipient kVendor = {"orion-eda", "orion-2026",
                                "orion-recipient-key"};
 constexpr Recipient kUser = {"vega-systems", "vega-2026", "vega-recipient-key"};
 
-// The design the sender protects, under a symmetric key of its own name that
-// no recipient holds.
 constexpr std::string_view kDesign = "  initial result = 42;\n";
 constexpr std::string_view kSymmetricKeyName = "design-session-2026";
 
@@ -59,9 +54,6 @@ ProtectKeyList Keys(std::initializer_list<Recipient> recipients) {
   return keys;
 }
 
-// The sender's input: one region naming the symmetric key its data are
-// under and, for each recipient, the key of the recipient's that the
-// symmetric key is to be encrypted under.
 std::string TheSendersInput() {
   std::string src = "`pragma protect begin\n";
   for (const Recipient& r : {kVendor, kUser}) {
@@ -77,12 +69,10 @@ std::string TheSendersInput() {
   return src;
 }
 
-// The envelope the sender's run, holding both recipients' keys, writes.
 std::string TheEnvelope() {
   return EncryptEnvelopes(TheSendersInput(), "", Keys({kVendor, kUser}));
 }
 
-// The text a decrypting run of `envelope` produced holding `keys`.
 std::string Produced(const std::string& envelope, const ProtectKeyList& keys) {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -92,8 +82,6 @@ std::string Produced(const std::string& envelope, const ProtectKeyList& keys) {
   return pp.Preprocess(mgr.AddFile("<envelope>", envelope));
 }
 
-// The buffer the first key block of `envelope` records under `key`: the
-// block's characters read out of the coding scheme and out of the key.
 std::string FirstKeyBlockBuffer(const std::string& envelope,
                                 std::string_view key) {
   size_t at = envelope.find(kKeyBlockAnnouncement);
@@ -109,10 +97,6 @@ std::string FirstKeyBlockBuffer(const std::string& envelope,
   return buffer;
 }
 
-// §O.5: the design is encrypted under a symmetric key, the symmetric key
-// under the recipient's public key and recorded in a key_block, the envelope
-// can be created under either secret key scheme, and several key blocks open
-// one envelope to several recipients.
 TEST(DigitalEnvelopes, TheMechanismIsAsTheAnnexDescribesIt) {
   EXPECT_TRUE(DigitalEnvelopeEncryptsTheDesignUnderASymmetricKey());
   EXPECT_TRUE(
@@ -124,11 +108,6 @@ TEST(DigitalEnvelopes, TheMechanismIsAsTheAnnexDescribesIt) {
   EXPECT_TRUE(AnEnvelopeWithSeveralKeyBlocksOpensToSeveralRecipients());
 }
 
-// §O.5 against the flow: the sender's run writes one envelope with a key
-// block for each recipient, the design in neither the clear nor either
-// block; each recipient's run, holding only its own key, recovers the
-// symmetric key from its block and the design with it, and a run holding
-// neither recipient's key gets no design.
 TEST(DigitalEnvelopes, EachRecipientOpensTheOneEnvelopeWithItsOwnKey) {
   std::string envelope = TheEnvelope();
   EXPECT_EQ(Count(envelope, kKeyBlockAnnouncement), 2u);
@@ -139,14 +118,6 @@ TEST(DigitalEnvelopes, EachRecipientOpensTheOneEnvelopeWithItsOwnKey) {
   EXPECT_FALSE(Holds(Produced(envelope, ProtectKeyList()), "result = 42"));
 }
 
-// §O.5's example: the key encrypting the data block may be specified by the
-// data_keyowner/data_keyname pair, which leaves the decrypting tool needing
-// the key the pair names, or by data_decrypt_key, the key itself in the
-// block, which the annex prefers for the dependency it removes and the
-// hit-and-trial it defeats. That is what this tool writes: the buffer a
-// recipient's key opens carries the data_method and the data_decrypt_key
-// that open the data block, and neither the key nor the keyword carrying it
-// stands in the clear.
 TEST(DigitalEnvelopes,
      TheKeyBlockCarriesTheSymmetricKeyItselfAsTheAnnexPrefers) {
   EXPECT_EQ(DataKeySpecificationNeedingTheKeyAtTheDecryptingTool(),

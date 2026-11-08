@@ -13,11 +13,6 @@
 namespace delta {
 namespace {
 
-// §36.8.3: a calltf application is the routine that performs the work of a
-// user-defined system task or function each time it executes - for example,
-// reading a test vector from the first task/function argument and assigning a
-// value back to a second argument. These stubs record that the routine ran and
-// the single argument it received, so a test can observe each execution.
 const char* g_calltf_arg = nullptr;
 int g_calltf_calls = 0;
 
@@ -32,9 +27,6 @@ void ResetCalltfProbe() {
   g_calltf_calls = 0;
 }
 
-// A VpiContext fixture so the round-trip tests can register a system task or
-// function and read its record back, exercising the calltf rule against the
-// production registry rather than a bare struct.
 class CalltfApplicationRoutine : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -43,25 +35,9 @@ class CalltfApplicationRoutine : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// -----------------------------------------------------------------------------
-// §36.8.3: a calltf routine runs every time the source executes its
-// user-defined system task or system function. Unlike compiletf and sizetf,
-// which run while the simulation data structure is compiled or built, calltf is
-// an execution-time routine - it fires during simulation, not at build. That
-// classification is the timing this subclause fixes for calltf.
-// -----------------------------------------------------------------------------
-
 TEST_F(CalltfApplicationRoutine, RunsAtExecutionTimeNotAtBuild) {
   EXPECT_FALSE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCalltf));
 }
-
-// -----------------------------------------------------------------------------
-// §36.8.3: the routine runs on every execution of the system task or function.
-// The subclause's worked example loops over $get_vector 1024 times and states
-// the calltf routine is called that many times - i.e. once per execution,
-// repeatedly. Driving the routine once for each execution of the loop
-// reproduces that one-call-per-execution behavior.
-// -----------------------------------------------------------------------------
 
 TEST_F(CalltfApplicationRoutine, IsCalledOncePerExecution) {
   int payload = 0;
@@ -73,22 +49,13 @@ TEST_F(CalltfApplicationRoutine, IsCalledOncePerExecution) {
   get_vector.user_data = reinterpret_cast<PLI_BYTE8*>(&payload);
 
   ResetCalltfProbe();
-  // Model the @(posedge clk) $get_vector(...) loop: each of the 1024 executions
-  // drives the associated calltf application exactly once.
   const int kExecutions = 1024;
   for (int i = 0; i < kExecutions; ++i) {
     VpiSystfInvoke(get_vector.calltf, get_vector.user_data);
   }
   EXPECT_EQ(g_calltf_calls, kExecutions);
-  // Every execution passes the registration's user_data as the lone argument.
   EXPECT_EQ(g_calltf_arg, reinterpret_cast<const char*>(&payload));
 }
-
-// -----------------------------------------------------------------------------
-// §36.8.3: the rule covers the user-defined system task and the user-defined
-// system function alike. The same calltf application runs whether the
-// registration is a system task or a system function.
-// -----------------------------------------------------------------------------
 
 TEST_F(CalltfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   int payload = 0;
@@ -115,14 +82,6 @@ TEST_F(CalltfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   EXPECT_EQ(g_calltf_arg, reinterpret_cast<const char*>(&payload));
 }
 
-// -----------------------------------------------------------------------------
-// §36.8.3: so that the routine can be called each time the system task or
-// function executes, the registration preserves the supplied calltf
-// application. The stored routine round-trips through the registry and, when
-// driven for an execution, receives the registration's user_data as its lone
-// argument.
-// -----------------------------------------------------------------------------
-
 TEST_F(CalltfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
   int payload = 0;
 
@@ -146,28 +105,10 @@ TEST_F(CalltfApplicationRoutine, SuppliedRoutineRoundTripsAndReceivesUserData) {
   EXPECT_EQ(g_calltf_arg, reinterpret_cast<const char*>(&payload));
 }
 
-// -----------------------------------------------------------------------------
-// §36.8.3: a calltf routine runs every time the source executes its
-// user-defined system task or system function, and the clause's example is one
-// call site inside a loop that runs $get_vector's calltf 1024 times. So what
-// the rule counts is executions, and not the one call the source description
-// wrote -- which is the count §36.8.2's compiletf answers with.
-//
-// Every case above drives the routine by hand, which says nothing about what a
-// running design does with it. These run one.
-// -----------------------------------------------------------------------------
-
-// What the applications below recorded across a whole run. A calltf is a plain
-// C function with no return path to the case that provoked it, so file scope is
-// the only place it has to leave a count.
 int g_calltf_runs = 0;
 int g_compiletf_runs = 0;
 uint64_t g_arg_total = 0;
 
-// Counts its own executions and adds up the first argument as it stood at each
-// one. The total is what separates one execution from many even where the count
-// does not: a run that built the call once and reused it adds the same value
-// every time.
 PLI_INT32 CountingCalltf(PLI_BYTE8*) {
   ++g_calltf_runs;
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
@@ -188,10 +129,6 @@ PLI_INT32 CountingCompiletf(PLI_BYTE8*) {
   return 0;
 }
 
-// Registers $probe with both routines, so one run answers §36.8.3's count and
-// §36.8.2's side by side. A system task rather than a system function because
-// §36.5 makes a task the type whose call is a statement, which is the position
-// the clause's own example writes its call in.
 void RegisterCountingProbe() {
   g_calltf_runs = 0;
   g_compiletf_runs = 0;
@@ -217,10 +154,6 @@ TEST_F(CalltfApplicationRoutine, RunsOncePerExecutionOfTheOneCallSite) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // Four executions of the one call the source wrote. The compiletf's count is
-  // the discriminating half: a run that called both routines per call site
-  // answers 1 here too, and a run that called both per execution answers 4
-  // there.
   EXPECT_EQ(g_calltf_runs, 4);
   EXPECT_EQ(g_compiletf_runs, 1);
 }
@@ -238,11 +171,6 @@ TEST_F(CalltfApplicationRoutine, ReadsTheArgumentsAsTheyStandAtEachExecution) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // §36.8.3's example has the calltf read a test vector and put it where the
-  // design will use it, once per iteration, so each execution is a fresh look
-  // at the arguments rather than a repeat of the first. The loop counter is 1,
-  // 2, 3 and 4 at the four executions, and 10 is a total only four separate
-  // reads produce -- a call object built once and reused adds 1 four times.
   EXPECT_EQ(g_arg_total, 10u);
 }
 
@@ -259,10 +187,6 @@ TEST_F(CalltfApplicationRoutine, RunsAgainAtEveryLaterTimeTheCallIsReached) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // The clause's example reaches its call once per posedge, so the executions
-  // it counts are spread through simulation time rather than run off end to end
-  // in one step. A delay ahead of the call puts these three at 5, 10 and 15,
-  // and the count is the same three.
   EXPECT_EQ(g_calltf_runs, 3);
   EXPECT_EQ(g_arg_total, 6u);
   EXPECT_EQ(g_compiletf_runs, 1);

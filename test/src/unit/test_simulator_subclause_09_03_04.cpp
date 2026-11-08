@@ -53,9 +53,6 @@ TEST(BlockNameSimulation, NestedNamedBlocksSimulate) {
   EXPECT_EQ(val, 8u);
 }
 
-// A named parallel block (par_block from §9.3.2) closed with a matching join
-// label runs end-to-end: the block name is accepted and all forked children
-// complete before control passes the join, so their combined effect is visible.
 TEST(BlockNameSimulation, NamedForkBlockSimulates) {
   auto val = RunAndGet(
       "module t;\n"
@@ -89,9 +86,6 @@ TEST(BlockNameSimulation, NamedBlockVarsAreStatic) {
   EXPECT_EQ(val, 3u);
 }
 
-// §9.3.4: a named block is a scope of the hierarchy, and a variable it
-// declares is read from another process by the block's name, through the
-// module's, and through a task for a block nested in the task.
 TEST(BlockNameSimulation, NamedBlockVariableReadByHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(
@@ -115,9 +109,6 @@ TEST(BlockNameSimulation, NamedBlockVariableReadByHierarchicalName) {
       "8\n");
 }
 
-// §9.3.4 with §6.21: a block declaring an item is a scope of its own, so a
-// nested block's `x` is a variable apart from the enclosing block's, which it
-// hides, and its initializer is applied to it; the outer `x` keeps its 5.
 TEST(BlockNameSimulation, ANestedBlockDeclarationHidesTheOuterVariable) {
   SimFixture f;
   EXPECT_EQ(

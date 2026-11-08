@@ -22,25 +22,17 @@ static bool IsValidCIdentifier(std::string_view text) {
   return true;
 }
 
-// §35.5.4: dpi_spec_string ::= "DPI-C" | "DPI". The lexer keeps the raw
-// quoted text in the token; this returns the inner characters so the rest
-// of the parser can compare against the two literal values from Syntax 35-1.
 static std::string_view StripStringLiteralQuotes(std::string_view text) {
   if (text.size() < 2) return text;
   if (text.front() != '"' || text.back() != '"') return text;
   return text.substr(1, text.size() - 2);
 }
 
-// CPD-dedup: the dpi_spec_string parse and validation, the optional
-// "= c_identifier" tail and the conformance of the linkage name are identical
-// between a DPI import declaration and a DPI export declaration.
 struct ParserDpiHelpers {
   static void ParseDpiSpecString(Parser& p, ModuleItem* item) {
     auto spec_tok = p.Consume();
     item->dpi_spec_string = StripStringLiteralQuotes(spec_tok.text);
     if (item->dpi_spec_string == "DPI") {
-      // §35.5.4: "DPI" is deprecated; the warning text must point at the
-      // canonical replacement and warn about possible C-code changes.
       p.diag_.Warning(
           spec_tok.loc,
           "\"DPI\" is deprecated and should be replaced with \"DPI-C\"; "
@@ -71,15 +63,8 @@ struct ParserDpiHelpers {
     }
   }
 
-  // §35.5.4: with no explicit c_identifier the linkage name defaults to the
-  // SystemVerilog subroutine name, and the clause holds a linkage name to the
-  // same conformance whether it was written or defaulted. §5.6 admits `$` in a
-  // simple identifier, so a legal subroutine name is not always a legal C one.
   static void CheckDefaultedLinkageName(Parser& p, const ModuleItem* item,
                                         const Token& name_tok) {
-    // Parser::Expect returns the token it did not get when the name is
-    // missing, having already reported that. Reading a `;` back as a linkage
-    // name would report a second time for the one mistake.
     if (name_tok.kind != TokenKind::kIdentifier &&
         name_tok.kind != TokenKind::kEscapedIdentifier) {
       return;
@@ -94,16 +79,6 @@ struct ParserDpiHelpers {
         Subclause("35.5.4"));
   }
 
-  // Footnote 25 of Syntax 35-1: the dynamic_override_specifiers that
-  // function_prototype and task_prototype admit are legal on a method
-  // declaration only within the scope of a class that is not an interface
-  // class, and an import
-  // declaration is never one. Consuming them here is what lets the report name
-  // that rule rather than the identifier the parser went on to expect. The
-  // message names the import declaration because §8.20 states the same rule
-  // for an ordinary subroutine declaration and Elaborator reports it there:
-  // one message reported under two clauses tells neither site apart, which is
-  // what assert-subclause-citations fails a build for.
   static void RejectDynamicOverrideSpecifiers(Parser& p, ModuleItem* item) {
     auto loc = p.CurrentLoc();
     p.ParseDynamicOverrideSpecifiers(item);
@@ -125,21 +100,11 @@ ModuleItem* Parser::ParseDpiImport() {
   item->loc = CurrentLoc();
   ParserDpiHelpers::ParseDpiSpecString(*this, item);
 
-  // §35.5.4, Syntax 35-1: `dpi_function_import_property ::= context | pure`,
-  // one alternative of two, and §35.5.1.3 says the same in prose, giving an
-  // imported subroutine either pure or context as its special property. So the
-  // property is read once, whichever of the two comes first.
   if (Match(TokenKind::kKwPure)) {
     item->dpi_is_pure = true;
   } else if (Match(TokenKind::kKwContext)) {
     item->dpi_is_context = true;
   }
-  // A second property where the c_identifier or the `function` keyword is due.
-  // Reading the two independently accepted `pure context` outright and turned
-  // `context pure` away by accident, the leftover keyword standing where a name
-  // was expected and drawing a report about a missing `function`. The keyword
-  // is consumed so the rest of the declaration parses from the token it should,
-  // and this is the only report the source raises.
   if (Check(TokenKind::kKwPure) || Check(TokenKind::kKwContext)) {
     diag_.Error(CurrentLoc(),
                 "an import declaration can specify one property, pure or "
@@ -157,8 +122,6 @@ ModuleItem* Parser::ParseDpiImport() {
   }
   ParserDpiHelpers::RejectDynamicOverrideSpecifiers(*this, item);
 
-  // §35.5.1.3: the pure property is reserved for imported functions; an
-  // imported task can never be declared pure.
   if (item->dpi_is_task && item->dpi_is_pure) {
     diag_.Error(item->loc, "an imported task cannot be declared pure",
                 Subclause("35.5.4"));

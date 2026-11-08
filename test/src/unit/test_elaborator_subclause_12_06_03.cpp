@@ -22,9 +22,6 @@ TEST(TernaryMatchesElaboration, TernaryMatchesElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6.3 gives a pattern identifier of a conditional expression's predicate
-// the later clauses and e2 as its scope, so e3 reading the name reads no
-// declaration and is §23.9's unresolved reference.
 TEST(TernaryMatchesElaboration,
      PatternIdentifierReadInTheThirdOperandIsUnresolved) {
   SimFixture f;

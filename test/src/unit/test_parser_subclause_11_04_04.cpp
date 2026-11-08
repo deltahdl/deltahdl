@@ -49,9 +49,6 @@ TEST(OperatorParsing, BinaryGreaterOrEqual) {
   EXPECT_EQ(rhs->op, TokenKind::kGtEq);
 }
 
-// Two different relational operators still fold left to right, so `<` binds
-// first and `>` takes that result as its left operand. §11.3.2's file carries
-// the case where one relational operator repeats.
 TEST(Precedence, RelationalLeftAssocAcrossOperators) {
   auto r = Parse("module m; initial x = a < b > c; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -74,8 +71,6 @@ TEST(Precedence, RelationalLowerThanArithmetic) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kMinus);
 }
 
-// §11.4.4 precedence example: "b - 1 < a" binds as "(b - 1) < a" because the
-// subtraction has higher precedence than the relational operator.
 TEST(Precedence, ArithmeticOnLeftBindsTighter) {
   auto r = Parse("module m; initial x = b - 1 < a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

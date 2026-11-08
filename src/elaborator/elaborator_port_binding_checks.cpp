@@ -60,14 +60,6 @@ void Elaborator::CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc) {
   }
 }
 
-// §23.3.3.1 (printed page 747): a port declared input (output) but used as an
-// output (input) or inout may be coerced to inout, and a warning is due where
-// it is not. An input port the module drives,
-// `module m(input wire a); assign a = 1'b1;`, is coerced where both sides are
-// nets -- §23.3.3.3 lets an inout connect to a net and never to a variable --
-// so the connection becomes the one net an inout's is and the module's driver
-// reaches the parent's w. CheckPortCoercion has warned by then; the warning is
-// kept, being what reports the port's use.
 void CoerceDrivenInputPorts(RtlirModuleInst& inst, const RtlirModule* parent) {
   if (inst.resolved == nullptr || parent == nullptr) return;
   std::unordered_set<std::string_view> driven;
@@ -94,7 +86,6 @@ void CoerceDrivenInputPorts(RtlirModuleInst& inst, const RtlirModule* parent) {
   }
 }
 
-// Looks up a child port by name; returns nullptr when no port matches.
 static const RtlirPort* FindChildPortByName(
     const std::vector<RtlirPort>& child_ports, std::string_view name) {
   auto port_it =
@@ -104,8 +95,6 @@ static const RtlirPort* FindChildPortByName(
   return &*port_it;
 }
 
-// Resolves the child port a binding connects to; nullptr when the binding has
-// no connection or names no matching child port.
 static const RtlirPort* FindBoundChildPort(
     const std::vector<RtlirPort>& child_ports,
     const RtlirPortBinding& binding) {
@@ -113,11 +102,6 @@ static const RtlirPort* FindBoundChildPort(
   return FindChildPortByName(child_ports, binding.port_name);
 }
 
-// True when this child port carries no user-supplied connection in the
-// instantiation, i.e. its binding was synthesized for an unconnected input
-// port. §23.3.3.6: an unconnected uwire port has no second source to merge, so
-// the single-source warning shall not fire for it. Explicit connections (named
-// or positional, including non-identifier expressions) remain user-supplied.
 static bool PortLeftUnconnected(const std::vector<RtlirPort>& child_ports,
                                 const ModuleItem* item,
                                 std::string_view port_name) {
@@ -161,9 +145,6 @@ void Elaborator::CheckUwirePortMerge(RtlirModuleInst& inst,
 
     if (!internal_is_uwire && !external_is_uwire) continue;
 
-    // A port joining two nets is counted as merged here, and the binding is
-    // marked, since a design that calls $sdf_annotate keeps an inout's two
-    // nets apart (WarnUwireNetsKeptApart).
     binding.uwire_net_join =
         (internal_net != NetType::kNone) && external_is_net;
     if (!binding.uwire_net_join) {
@@ -172,13 +153,6 @@ void Elaborator::CheckUwirePortMerge(RtlirModuleInst& inst,
   }
 }
 
-// §23.3.3.7.1: each port connection of `inst` involving an interconnect net is
-// kept in the design's merges, one joining two interconnect nets joining them
-// and one joining an interconnect net to anything else typing it, so that
-// whether a merged net is still an interconnect net is judged once the whole
-// design is elaborated (InterconnectMerges::Report). Each port with
-// interconnect on both sides was reported here, though the merged net may
-// reach a typed net through a connection further on (#7388).
 void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
                                             const ModuleItem* item,
                                             RtlirModule* mod) {
@@ -199,8 +173,6 @@ void Elaborator::CheckInterconnectPortMerge(const RtlirModuleInst& inst,
       interconnect_merges_.Join(kOuter, kInner, item->loc, binding.port_name,
                                 inst.inst_name);
     } else if (port_it->is_interconnect) {
-      // The type of the net the port is connected to, none for a variable or
-      // for an expression, which names no net.
       interconnect_merges_.MarkTyped(kInner,
                                      FindSignalNetType(conn->text, mod));
     } else if (kOuterIsInterconnect) {
@@ -214,9 +186,6 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
   for (const auto* term : terminals) {
     if (!term || term->kind != ExprKind::kIdentifier) continue;
     if (interconnect_names_.count(term->text) == 0) continue;
-    // §23.3.3.7.1: the terminal's net type is that of the net any port
-    // connection merges it with, an interconnect port's own net included,
-    // which stands among no module's nets.
     interconnect_merges_.MarkTyped({mod, term->text}, NetType::kNone);
     auto scoped = ScopedName(term->text);
     for (auto& net : mod->nets) {
@@ -229,16 +198,11 @@ void Elaborator::ResolveInterconnectPrimitiveTerminals(
   }
 }
 
-// The unpacked shape a port connection names: how many unpacked dimensions it
-// has and the size of each, outermost first, 0 where a size does not fold.
 struct ConnectedShape {
   uint32_t num_dims = 0;
   std::vector<uint32_t> sizes;
 };
 
-// Validates one unpacked-array port binding: the connection must name an
-// unpacked array with matching dimension count and sizes. `conn` is the shape
-// the connection names, no value where it names no unpacked array.
 static void CheckUnpackedArrayPortBinding(
     DiagEngine& diag, const ModuleItem* item, const RtlirPortBinding& binding,
     const RtlirPort* port_it, const std::optional<ConnectedShape>& conn) {
@@ -278,10 +242,6 @@ static void CheckUnpackedArrayPortBinding(
   }
 }
 
-// §7.4.2 (printed page 154) gives connecting to the ports of module instances
-// as what a net array is for, so the array an unpacked array port's connection
-// names is a net array as readily as a variable one, and each is recorded
-// apart.
 using ArrayInfoMap =
     std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
 static const Elaborator::VarArrayInfo* ConnectedArrayInfo(
@@ -297,8 +257,6 @@ static const Elaborator::VarArrayInfo* ConnectedArrayInfo(
   return it != nets.end() ? &it->second : nullptr;
 }
 
-// The number of elements the slice `sel` takes -- `[a:b]`, `[i+:w]` or
-// `[i-:w]` -- when its bounds fold in `scope`, 0 otherwise.
 static uint32_t SliceWidth(const Expr* sel, const ScopeMap& scope) {
   if (sel->is_part_select_plus || sel->is_part_select_minus) {
     auto width = ConstEvalInt(sel->index_end, scope);
@@ -310,11 +268,6 @@ static uint32_t SliceWidth(const Expr* sel, const ScopeMap& scope) {
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// §7.4 (printed page 153): an element of a multidimensional unpacked array and
-// a slice of an unpacked array are unpacked arrays in their own right. An index
-// removes the dimension it selects, and a slice keeps it at the slice's width.
-// No value where the connection names no unpacked array, a select reaching
-// past the unpacked dimensions into the element's bits among them.
 static std::optional<ConnectedShape> ConnectedArrayShape(
     const Expr* connection, const ArrayInfoMap& vars, const ArrayInfoMap& nets,
     const ScopeMap& scope) {
@@ -341,9 +294,6 @@ static std::optional<ConnectedShape> ConnectedArrayShape(
   return shape;
 }
 
-// The size of one dimension of an instance array: its two bounds, or a size,
-// `ia[2]`, written as the left alone (§23.3.2); 0 where a bound does not fold,
-// which matches any size.
 static uint32_t InstanceArrayDimSize(const Expr* left, const Expr* right,
                                      const ScopeMap& scope) {
   auto l = ConstEvalInt(left, scope);
@@ -357,8 +307,6 @@ static uint32_t InstanceArrayDimSize(const Expr* left, const Expr* right,
   return size > 0 ? static_cast<uint32_t>(size) : 0;
 }
 
-// The instantiation in `parent` that declares the array of instances `name`,
-// or null.
 static const ModuleItem* InstanceArrayItem(std::string_view name,
                                            const ModuleDecl* parent) {
   if (parent == nullptr) return nullptr;
@@ -371,10 +319,6 @@ static const ModuleItem* InstanceArrayItem(std::string_view name,
   return nullptr;
 }
 
-// §23.3.3.4 with §23.3.3.5: an interface port declared as an array, `ifc p[2]`,
-// is connected to an array of interface instances, `ifc ia[2]()`, whose shape
-// is the instantiation's own range list. No value where the connection names
-// no instance array the module declares.
 static std::optional<ConnectedShape> InterfaceInstanceArrayShape(
     const Expr* connection, const ModuleDecl* parent, const ScopeMap& scope) {
   if (connection == nullptr || connection->kind != ExprKind::kIdentifier) {
@@ -390,9 +334,6 @@ static std::optional<ConnectedShape> InterfaceInstanceArrayShape(
   return shape;
 }
 
-// The signing and the number of states of the instantiating module's signal
-// `name`, a net being 4-state (§6.7.1); no value where it declares neither a
-// variable nor a net so named.
 struct SignalSigning {
   bool is_signed;
   bool is_4state;
@@ -409,8 +350,6 @@ static std::optional<SignalSigning> FindSignalSigning(std::string_view name,
   return std::nullopt;
 }
 
-// Whether the instantiating module's signal `name` differs from `port` in
-// signing or in its number of states; false where it declares no such signal.
 static bool SigningOrStatesDiffer(const RtlirPort& port, std::string_view name,
                                   const RtlirModule* parent) {
   auto signal = FindSignalSigning(name, parent);
@@ -434,7 +373,6 @@ void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
                                            bool is_wildcard,
                                            const RtlirPort& port,
                                            const RtlirModule* parent) {
-  // §23.3.2.4 makes `.*` the implicit `.name` connection of every port.
   std::string_view form = is_wildcard ? ".*" : "named";
   std::string_view rule = is_wildcard ? "23.3.2.4" : "23.3.2.3";
   uint32_t sig_width = FindSignalWidth(port.name, parent);
@@ -456,7 +394,6 @@ void ReportNonEquivalentImplicitConnection(DiagEngine& diag, SourceLoc loc,
              Subclause(rule));
 }
 
-// §26.3: whether package `pkg_name` declares a variable or a net `name`.
 static bool PackageDeclaresSignal(const CompilationUnit* unit,
                                   std::string_view pkg_name,
                                   std::string_view name) {
@@ -491,9 +428,6 @@ void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
         FindChildPortByName(child_ports, binding.port_name);
     if (!port_it) continue;
     if (port_it->num_unpacked_dims == 0) continue;
-    // §10.8 and §10.9: an assignment pattern written without a type takes the
-    // port's own type where IllegalPatternPortConnection lets it stand, so
-    // its dimensions match the port's by construction.
     if (binding.connection != nullptr &&
         binding.connection->kind == ExprKind::kAssignmentPattern)
       continue;
@@ -507,14 +441,11 @@ void Elaborator::ValidateUnpackedArrayPorts(const RtlirModuleInst& inst,
   }
 }
 
-// The connecting signal's unpacked-array shape: total dimension count and, when
-// known, the per-dimension sizes consulted by the instance-array check.
 struct ConnArrayShape {
   uint32_t num_dims;
   const std::vector<uint32_t>* dim_sizes;
 };
 
-// Validates an unpacked-array connection against an instance-array port.
 static void CheckInstanceArrayUnpackedConn(
     const PortBindCtx& ctx, const RtlirPortBinding& binding,
     const RtlirPort* port_it, const ConnArrayShape& conn,
@@ -561,9 +492,6 @@ static void CheckInstanceArrayUnpackedConn(
 
 namespace {
 
-// The instance-array connection environment for one binding: the instantiating
-// module, the per-dimension instance-array sizes, the total instance count, and
-// the parent-scope unpacked-array shapes consulted by the connection check.
 struct InstArrayConnEnv {
   const RtlirModule* parent_mod;
   const std::vector<uint32_t>& inst_dim_sizes;
@@ -572,8 +500,6 @@ struct InstArrayConnEnv {
       var_array_info;
 };
 
-// §23.3.3.x classifies one instance-array port connection and dispatches to the
-// unpacked-array shape check or the packed-array width check.
 void CheckOneInstanceArrayBinding(const PortBindCtx& ctx,
                                   const RtlirPortBinding& binding,
                                   const RtlirPort* port_it,
@@ -637,9 +563,6 @@ void Elaborator::ValidateInstanceArrayPorts(
 void ReportVariableOnInout(const PortBindCtx& ctx, std::string_view name,
                            std::string_view port_name, bool port_is_var) {
   if (ctx.var_types.count(name) == 0 || ctx.net_names.count(name) != 0) return;
-  // §23.3.3.2 governs a port declared with a variable data type and §23.3.3.3
-  // a port declared with a net type, and both forbid a variable here, so the
-  // rule reported is the one whose opening sentence the port answers to.
   ctx.diag.Error(ctx.item->loc,
                  std::format("variable '{}' cannot be connected to inout port "
                              "'{}'",

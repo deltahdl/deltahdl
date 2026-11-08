@@ -15,8 +15,6 @@ namespace delta {
 
 namespace {
 
-// §37.85: the gen scope array `scope` holds for the loop generate block
-// `name`, made under it the first time it is asked for.
 VpiObject* GenScopeArrayOf(VpiObject* scope, std::string_view name,
                            const VpiAttachBuild& build) {
   for (VpiObject* child : scope->children) {
@@ -33,9 +31,6 @@ VpiObject* GenScopeArrayOf(VpiObject* scope, std::string_view name,
   return array;
 }
 
-// §37.85: the gen var of the loop generate whose gen scope array is `array`,
-// the genvar `genvar` the loop iterates over (§27.4), named in the scope the
-// array is, made under the array the first time it is asked for.
 void MakeGenVar(VpiObject* array, std::string_view genvar,
                 const VpiAttachBuild& build) {
   for (VpiObject* child : array->children) {
@@ -51,10 +46,6 @@ void MakeGenVar(VpiObject* array, std::string_view genvar,
   array->children.push_back(var);
 }
 
-// §27.4 with §37.28: the implicit localparam the iteration of a loop generate
-// whose gen scope is `block` declares under the name of its genvar `genvar`,
-// a local parameter. The run keys it as a variable of the block, and the
-// object that key made for it was a reg. A block with no name has none.
 void MakeGenvarParameter(VpiObject* block, std::string_view genvar) {
   VpiObject* param = ChildNamed(block, genvar);
   if (param == nullptr) return;
@@ -62,10 +53,6 @@ void MakeGenvarParameter(VpiObject* block, std::string_view genvar) {
   param->local_param = true;
 }
 
-// §37.85: `block`, a gen scope of an iteration of a loop generate, as an
-// element of the gen scope array `array`, reached by its index - the value
-// of the loop's genvar in the iteration, which vpiIndex reaches as a constant
-// (§38.19) - and moved from the scope it hung in to the array.
 void MakeArrayElement(VpiObject* block, VpiObject* array, int64_t index,
                       const VpiAttachBuild& build) {
   block->array_member = true;
@@ -79,8 +66,6 @@ void MakeArrayElement(VpiObject* block, VpiObject* array, int64_t index,
   array->children.push_back(block);
 }
 
-// §37.85: the block instance `scope` holds under `name`, made where the run
-// keyed nothing the block declares, whatever it declares.
 VpiObject* BlockNamed(VpiObject* scope, const std::string& name,
                       const VpiAttachBuild& build) {
   if (VpiObject* block = ChildNamed(scope, name)) return block;
@@ -92,12 +77,6 @@ VpiObject* BlockNamed(VpiObject* scope, const std::string& name,
   return block;
 }
 
-// §37.85: the generate block instances the path `path` names below
-// `instance`, outermost first, each made the gen scope it is, named by its
-// external name (§27.6), and each iteration of a loop generate an element of
-// its gen scope array, which reaches the loop's gen var, holding the genvar's
-// value as a local parameter. Detail 2: an unnamed block's is an implicit
-// scope.
 void MakeGenScopes(VpiObject* instance, const HierPath& path,
                    const VpiAttachBuild& build) {
   VpiObject* scope = instance;
@@ -117,11 +96,6 @@ void MakeGenScopes(VpiObject* instance, const HierPath& path,
   }
 }
 
-// §27.4 with §37.17: `flat`, the object of a declaration of a generate block
-// instance the run keys under a flattened name, `g_1_v`, put in the place of
-// `alias`, the object the block's own name for it, `g[1].v`, made: named as
-// declared, under the gen scope, and full-named through it. The passes before
-// resolved the block's expressions to `flat`, and it holds what they built.
 void FoldInto(VpiObject* flat, VpiObject* alias) {
   VpiObject* scope = alias->parent;
   if (flat->parent != nullptr) std::erase(flat->parent->children, flat);
@@ -132,8 +106,6 @@ void FoldInto(VpiObject* flat, VpiObject* alias) {
   flat->index = alias->index;
 }
 
-// §23.6: give `obj`, and each object it holds beneath it, the full name its
-// own one, `from` and what it continues with, becomes under `to`.
 void Refullname(VpiObject* obj, const std::string& from,
                 const std::string& to) {
   const std::string_view kName(obj->full_name);
@@ -148,9 +120,6 @@ void Refullname(VpiObject* obj, const std::string& from,
   }
 }
 
-// §27.4: the flattened key the run stores the generate block member `member`
-// of `mod` under: a variable's or net's storage key, and a parameter's
-// declaration's block prefix and name.
 std::string StoredKey(const RtlirModule& mod,
                       const RtlirGenBlockMember& member) {
   if (member.kind == RtlirGenBlockMember::Kind::kStorage) {
@@ -160,16 +129,6 @@ std::string StoredKey(const RtlirModule& mod,
   return std::string(param.gen_block_prefix) + std::string(param.name);
 }
 
-// §23.6 with §27.4 and §37.85: the instance `flat` a generate block instance
-// holds, which the run keys under a flattened name, `g_d2`, moved under the
-// block's gen scope `scope` and named as the source wrote it, `d2`, with what
-// it holds full-named through it. The run keys what the instance declares
-// under the block's own path as well, `g.d2.v` beside `g_d2.v`
-// (AliasChildObjectsUnderPath in lowerer_child.cpp), and the attach made a
-// scope for each component of such a key, so the block's scope may already
-// hold a stand-in `d2`. Everything the stand-in holds the instance holds under
-// its own key, so the stand-in leaves the scope, and the name reaches the one
-// instance, ports and all.
 void MoveIntoGenScope(VpiObject* flat, VpiObject* scope, std::string_view name,
                       const VpiNameKeeper& keep) {
   const std::string kFrom = flat->full_name;
@@ -186,11 +145,6 @@ void MoveIntoGenScope(VpiObject* flat, VpiObject* scope, std::string_view name,
 void AttachGenBlockInstances(const RtlirDesign* design,
                              const VpiObjectMap& objects,
                              const VpiNameKeeper& keep) {
-  // §23.6: an instance a generate block instance holds is a scope inside that
-  // block's, and its hierarchical name runs through the block's name. The run
-  // keys it under a name it flattens with the block's generate prefix, and
-  // the scope DesignObjectForFlatName made for it hung from its module under
-  // that name.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,
@@ -208,10 +162,6 @@ void AttachGenBlockInstances(const RtlirDesign* design,
 
 void AttachGenBlockStorage(const RtlirDesign* design,
                            const VpiObjectMap& objects) {
-  // §27.4: a variable, net or parameter a generate block instance declares is
-  // named under that instance's gen scope. The run keys it under a flattened
-  // name and its alias under the block's, and an object was made for each;
-  // AttachParameters made the flattened one of a parameter its vpiParameter.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,
@@ -231,10 +181,6 @@ void AttachGenBlockStorage(const RtlirDesign* design,
 
 void AttachGenScopes(const RtlirDesign* design, const VpiObjectMap& objects,
                      const VpiAttachBuild& build) {
-  // §37.85: a generate block instance is a gen scope, and the instances of a
-  // loop generate's block are the elements of a gen scope array. The scopes
-  // the run's keys made for them were all modules, no array was made, and a
-  // block declaring nothing the run keys had no object at all.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {

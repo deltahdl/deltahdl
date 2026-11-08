@@ -142,9 +142,6 @@ TEST(LexicalConventionElaboration, DuplicateAttrAcrossInstances) {
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// The "last value wins" / duplicate rule is scoped to a single language
-// element. The same attribute name on two distinct declarations is independent:
-// each keeps its own value and no duplicate warning is produced.
 TEST(LexicalConventionElaboration, SameNameDifferentElementsIndependent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -294,12 +291,6 @@ TEST(LexicalConventionElaboration, NoErrorsWithAttributePresent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §5.12: when an attr_spec supplies a value, the attribute takes the value of
-// that expression rather than the default of 1. The value is a constant
-// expression, so it may be any of the constant forms of 11.2.1 -- here a
-// localparam reference -- not just a literal. This drives the parameter-scope
-// name-resolution path of attribute-value evaluation, which the literal and
-// arithmetic cases never touch.
 TEST(LexicalConventionElaboration, AttrValueFromLocalparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -318,13 +309,6 @@ TEST(LexicalConventionElaboration, AttrValueFromLocalparam) {
   EXPECT_EQ(mod->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 12);
 }
 
-// §5.12: an attribute value is a constant expression, so it may name a module
-// parameter (a distinct 11.2.1 constant form from a literal or localparam,
-// since a parameter can be overridden at instantiation). The attribute takes
-// the *resolved* value of the expression -- attribute evaluation consumes the
-// elaborated parameter, so overriding the parameter changes the attribute's
-// value. This drives the parameter-override path end-to-end, not just the
-// declared default.
 TEST(LexicalConventionElaboration, AttrValueFromParameterOverride) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -352,10 +336,6 @@ TEST(LexicalConventionElaboration, AttrValueFromParameterOverride) {
   EXPECT_EQ(leaf->variables[0].attrs[0].resolved_value.value_or(INT64_MIN), 16);
 }
 
-// An attribute's value is a constant expression, which may name a parameter
-// of the module the attribute is written in, on whatever it is written on: a
-// net, an instance, a procedure and a continuous assignment each fold it to
-// the parameter's value.
 TEST(LexicalConventionElaboration, AttrValueNamingAParameterFoldsOnEachItem) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -390,10 +370,6 @@ TEST(LexicalConventionElaboration, AttrValueNamingAParameterFoldsOnEachItem) {
   EXPECT_EQ(kValueOf(mod->assigns[0].attrs), std::optional<int64_t>{9});
 }
 
-// §5.12 writes an attribute's value as a constant expression, and a name of a
-// variable is none (§11.2.1), alone or as an operand. A parameter expression,
-// a string and a real literal are constants, so only the first two values are
-// reported.
 TEST(LexicalConventionElaboration, AttrValueThatIsNotConstantIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -414,8 +390,6 @@ TEST(LexicalConventionElaboration, AttrValueThatIsNotConstantIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// The same holds for the attributes a subroutine and a statement carry, which
-// are kept beside the module's items rather than on a record of their own.
 TEST(LexicalConventionElaboration, NodeAttrValueThatIsNotConstantIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -433,9 +407,6 @@ TEST(LexicalConventionElaboration, NodeAttrValueThatIsNotConstantIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "5.12"));
 }
 
-// An attribute written before a module declaration stands in the compilation
-// unit, so a parameter declared there is a constant it may name, and its value
-// folds against that parameter.
 TEST(LexicalConventionElaboration, ModuleAttrValueNamesUnitParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -451,10 +422,6 @@ TEST(LexicalConventionElaboration, ModuleAttrValueNamesUnitParameter) {
   EXPECT_EQ(attrs[0].resolved_value, std::optional<int64_t>{6});
 }
 
-// A class member's attribute stands in the class, where the class's value
-// parameters and local parameters are constants it may name. A property of
-// the class is no constant, and neither a type parameter, a real parameter nor
-// a method adds a name an attribute folds against.
 TEST(LexicalConventionElaboration, ClassMemberAttrValueNamesClassParameter) {
   ElabFixture f;
   ElaborateSrc(
@@ -477,8 +444,6 @@ TEST(LexicalConventionElaboration, ClassMemberAttrValueNamesClassParameter) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// The values of the attributes named `name` that `mod` keeps beside its items,
-// in ascending order with the ones that fold to nothing first.
 std::vector<std::optional<int64_t>> NodeAttrValues(const RtlirModule& mod,
                                                    std::string_view name) {
   std::vector<std::optional<int64_t>> values;
@@ -491,11 +456,6 @@ std::vector<std::optional<int64_t>> NodeAttrValues(const RtlirModule& mod,
   return values;
 }
 
-// A local parameter of a function, a sequential block or a parallel block is a
-// constant of it, so a statement's attribute there may name it and folds to its
-// value, the block's shadowing the module's parameter of the same name until
-// the block ends. A function's local parameter named outside the function is
-// no constant there.
 TEST(LexicalConventionElaboration, AttrValueNamesSubroutineAndBlockLocalParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -532,10 +492,6 @@ TEST(LexicalConventionElaboration, AttrValueNamesSubroutineAndBlockLocalParam) {
   EXPECT_EQ(NodeAttrValues(*design->top_modules[0], "weight"), kExpected);
 }
 
-// A class's value parameter is a constant within it though its value is a
-// real or is given by no default, and so is a real local parameter. Such a
-// name shadows the module's parameter of the same name, so an attribute naming
-// it folds to nothing rather than to the module parameter's value.
 TEST(LexicalConventionElaboration, AttrValueNamesUnfoldedClassParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -556,11 +512,6 @@ TEST(LexicalConventionElaboration, AttrValueNamesUnfoldedClassParam) {
   EXPECT_EQ(NodeAttrValues(*design->top_modules[0], "width"), kNothing);
 }
 
-// A concurrent assertion in the clocked boolean form and a deferred immediate
-// assertion item are each modeled as a process, and the attributes such an
-// assertion is written with are its own, so each §5.12 report about them is
-// made once: the value that is not constant on lines 3 and 5, and the
-// attribute given twice on line 4.
 TEST(LexicalConventionElaboration, AssertionAttrReportsAreMadeOnce) {
   ElabFixture f;
   ElaborateSrc(

@@ -9,7 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Locate a constraint member of the given name within a parsed class.
 const ClassMember* FindConstraint(const ClassDecl* cls, std::string_view name) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kConstraint && m->name == name) return m;
@@ -24,8 +23,6 @@ bool RefersTo(const ClassMember* m, std::string_view callee) {
   return false;
 }
 
-// 18.5.11: a constraint expression may call a function. The parser records the
-// unqualified call so the elaborator can resolve the callee and check it.
 TEST(FunctionsInConstraintsParsing, RecordsUnqualifiedCall) {
   auto r = Parse(
       "class C;\n"
@@ -41,7 +38,6 @@ TEST(FunctionsInConstraintsParsing, RecordsUnqualifiedCall) {
   EXPECT_TRUE(RefersTo(m, "count_ones"));
 }
 
-// 18.5.11: a constraint with no function call records none.
 TEST(FunctionsInConstraintsParsing, NoCallRecordsNothing) {
   auto r = Parse(
       "class C;\n"
@@ -54,13 +50,7 @@ TEST(FunctionsInConstraintsParsing, NoCallRecordsNothing) {
   EXPECT_TRUE(m->constraint_function_call_refs.empty());
 }
 
-// 18.5.11: a member-qualified call (obj.f(...)) is not an unqualified call on
-// the enclosing class, so its leaf name is not recorded as a constraint
-// function call — only the receiver-free form is the function-in-constraint the
-// clause governs.
 TEST(FunctionsInConstraintsParsing, MemberQualifiedCallNotRecorded) {
-  // Class D must be declared so `D d;` is a property of a known type; C is then
-  // the last class, and its constraint references d.f() through the handle d.
   auto r = Parse(
       "class D; endclass\n"
       "class C;\n"
@@ -74,8 +64,6 @@ TEST(FunctionsInConstraintsParsing, MemberQualifiedCallNotRecorded) {
   EXPECT_FALSE(RefersTo(m, "f"));
 }
 
-// 18.5.11: a scope-qualified call (pkg::f(...)) is likewise not recorded as an
-// unqualified constraint function call.
 TEST(FunctionsInConstraintsParsing, ScopeQualifiedCallNotRecorded) {
   auto r = Parse(
       "class C;\n"
@@ -88,8 +76,6 @@ TEST(FunctionsInConstraintsParsing, ScopeQualifiedCallNotRecorded) {
   EXPECT_FALSE(RefersTo(m, "f"));
 }
 
-// 18.5.11: every unqualified call in the body is recorded, so a constraint that
-// calls more than one function lists each callee.
 TEST(FunctionsInConstraintsParsing, RecordsMultipleCalls) {
   auto r = Parse(
       "class C;\n"
@@ -105,9 +91,6 @@ TEST(FunctionsInConstraintsParsing, RecordsMultipleCalls) {
   EXPECT_TRUE(RefersTo(m, "g"));
 }
 
-// 18.5.11: a call nested as the argument of another call is itself an
-// unqualified call and is recorded too, so the restrictions can later be
-// applied to both the outer and the inner function.
 TEST(FunctionsInConstraintsParsing, RecordsNestedCall) {
   auto r = Parse(
       "class C;\n"

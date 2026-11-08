@@ -59,12 +59,6 @@ TEST(GateInstStrengthParsing, StrengthPrecedesDelay) {
   EXPECT_EQ(item->gate_delay->int_val, 5u);
 }
 
-// §28.3.2 (printed page 831): the strength specification comes after the gate
-// type keyword and before any delay specification, so a strength after `#5` is
-// reported under that rule, once, at its opening parenthesis, and the instance
-// after it still parses. Read as the terminal list, its keywords were reported
-// as missing expressions under §11.2 and the instance name as a missing
-// semicolon.
 TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
   auto r = Parse(
       "module m;\n"
@@ -84,8 +78,6 @@ TEST(GateInstStrengthParsing, DelayBeforeStrengthRejected) {
   EXPECT_EQ(r.cu->modules[0]->items.size(), 4u);
 }
 
-// A parenthesis after a gate's delay that opens no strength is the terminal
-// list of an unnamed instance, and parses as one.
 TEST(GateInstStrengthParsing, TerminalListAfterDelayStillParses) {
   auto r = Parse(
       "module m;\n"
@@ -250,17 +242,10 @@ TEST(GateInstStrengthParsing, MissingCommaBetweenStrengthsRejected) {
       "  wire y, a, b;\n"
       "  and (strong0 strong1) g(y, a, b);\n"
       "endmodule\n");
-  // With no comma the strength spec ends after strong0, so the report is the
-  // one for the closing parenthesis the parser wanted, and `strong1` is what
-  // stands there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got 'strong1'", 3, "28.3.2"));
 }
 
-// §28.3.2 admits every Table 28-2 primitive as a strength carrier. Each gate
-// keyword is a distinct case in the allow-list, so drive one instantiation of
-// every remaining n-input/n-output/enable gate through a real parse and confirm
-// the strengths are accepted and recorded on the instance.
 TEST(GateInstStrengthParsing, NorWithStrengthAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -352,23 +337,16 @@ TEST(GateInstStrengthParsing, Notif1WithStrengthAccepted) {
   EXPECT_EQ(item->drive_strength1, 5u);
 }
 
-// §28.3.2 negative form: a strength specification must be enclosed in a pair of
-// parentheses; bare strength keywords after the gate type are not accepted.
 TEST(GateInstStrengthParsing, StrengthWithoutParenthesesRejected) {
   auto r = Parse(
       "module m;\n"
       "  wire y, a, b;\n"
       "  and strong0, strong1 g(y, a, b);\n"
       "endmodule\n");
-  // Without the parentheses the gate has no strength spec at all, so the
-  // instance tail demands the terminal list's '(' and reports under §28.3.6.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got 'strong0'", 3, "28.3.6"));
 }
 
-// §28.3.2 negative form: only Table 28-2 primitives may carry a drive strength.
-// nmos is exercised above; cover the other switch families (MOS pmos, CMOS,
-// bidirectional tran) each with a full parse that must reject the strength.
 TEST(SwitchStrengthRejection, PmosStrengthRejected) {
   auto r = Parse(
       "module m;\n"

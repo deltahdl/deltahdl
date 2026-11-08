@@ -108,9 +108,6 @@ TEST(CastOperatorSim, CastUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFFFFFu);
 }
 
-// §6.24.1: the cast truncates to shortint's 16 bits and is signed, as a
-// shortint variable is, so 16'hABCD is a negative value, and its assignment
-// to the 32-bit `result` extends it by its sign (§10.7).
 TEST(CastOperatorSim, CastShortint) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -160,9 +157,6 @@ TEST(CastOperatorSim, CastConcatToShortint) {
   EXPECT_EQ(var->value.ToUint64(), 0xFACEu);
 }
 
-// 6.24.1: when the casting type is a constant expression giving the target
-// width, that width shall be positive. A literal zero-width size cast is an
-// error.
 TEST(CastOperatorElaboration, SizeCastZeroWidthLiteralError) {
   ElabFixture f;
   ElaborateSrc(
@@ -177,9 +171,6 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthLiteralError) {
       "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
-// 6.24.1: the zero-or-negative size rule applies to any constant-expression
-// casting type, not just a bare literal. A constant expression that folds to
-// zero ((2-2)) is likewise rejected.
 TEST(CastOperatorElaboration, SizeCastZeroWidthConstExprError) {
   ElabFixture f;
   ElaborateSrc(
@@ -194,8 +185,6 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthConstExprError) {
       "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
-// 6.24.1: a positive constant-expression width is the legal, accepting form of
-// the size cast; it must not be flagged by the zero-or-negative-size rule.
 TEST(CastOperatorElaboration, SizeCastPositiveWidthOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -209,8 +198,6 @@ TEST(CastOperatorElaboration, SizeCastPositiveWidthOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// 6.24.1: a signing cast accepts only an integral expression. A real variable
-// driven through signed'() has no bit representation and is rejected.
 TEST(CastOperatorElaboration, RealVarInSignedCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -225,8 +212,6 @@ TEST(CastOperatorElaboration, RealVarInSignedCastError) {
                             "6.24.1"));
 }
 
-// 6.24.1: the integral-operand rule applies to unsigned'() as well as
-// signed'(); a real variable inside unsigned'() is rejected.
 TEST(CastOperatorElaboration, RealVarInUnsignedCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -241,8 +226,6 @@ TEST(CastOperatorElaboration, RealVarInUnsignedCastError) {
                             "6.24.1"));
 }
 
-// 6.24.1: a real literal operand is likewise non-integral, so signed'(2.5) is
-// rejected -- the operand need not be a declared variable to violate the rule.
 TEST(CastOperatorElaboration, RealLiteralInSignedCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -256,9 +239,6 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastError) {
                             "6.24.1"));
 }
 
-// 6.24.1: the integral-operand rule also governs the size cast (changing the
-// size), not only the signing casts. A real variable inside a numeric-width
-// cast is rejected.
 TEST(CastOperatorElaboration, RealVarInSizeCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -273,9 +253,6 @@ TEST(CastOperatorElaboration, RealVarInSizeCastError) {
                             "6.24.1"));
 }
 
-// 6.24.1: the integral-operand rule for a size cast rejects a real *literal*
-// operand as well as a real variable -- a non-integral value is illegal
-// regardless of how it is written.
 TEST(CastOperatorElaboration, RealLiteralInSizeCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -289,9 +266,6 @@ TEST(CastOperatorElaboration, RealLiteralInSizeCastError) {
                             "6.24.1"));
 }
 
-// 6.24.1: shortreal is a distinct non-integral operand type; a shortreal
-// variable inside a signing cast is likewise rejected by the integral-operand
-// rule.
 TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -306,12 +280,6 @@ TEST(CastOperatorElaboration, ShortrealVarInSignedCastError) {
                             "6.24.1"));
 }
 
-// §5.8: a time literal reads as a realtime value scaled to the current time
-// unit, so 2.1ns is a real value and not a value of the type named time, which
-// §6.11 defines as a 64-bit integral type. §6.24.1 requires the expression
-// inside a signing cast to be an integral value, so signed'(2.1ns) breaks that
-// rule exactly as signed'(2.5) does at
-// CastOperatorElaboration.RealLiteralInSignedCastError above.
 TEST(CastOperatorElaboration, TimeLiteralInSignedCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -326,13 +294,6 @@ TEST(CastOperatorElaboration, TimeLiteralInSignedCastError) {
                             "6.24.1"));
 }
 
-// §6.24.1 puts the same integral-operand rule on the size cast, and §5.8 makes
-// 2.1ns a realtime value scaled to the current time unit, so 8'(2.1ns) is
-// rejected too. This case reaches the operand test through the size-cast arm of
-// ElaboratorOperationRules::CheckCastExpr in
-// src/elaborator/elaborator_validate_operations.cpp, which reports a different
-// message under the same subclause than the signing-cast arm
-// CastOperatorElaboration.TimeLiteralInSignedCastError reaches.
 TEST(CastOperatorElaboration, TimeLiteralInSizeCastError) {
   ElabFixture f;
   ElaborateSrc(
@@ -359,9 +320,6 @@ TEST(CastOperatorSim, CastByteTruncate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-// §6.24.1: a size of zero or below is an error. The subclause on the report is
-// what tells this rejection from §6.24.3's bit-stream cast rules, which a cast
-// naming a type rather than a width breaches instead.
 TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
   ElabFixture f;
   ElabOk(
@@ -376,23 +334,6 @@ TEST(CastOperatorElaboration, SizeCastZeroWidthNames6_24_1) {
       "size cast target width must be a positive constant", 4, "6.24.1"));
 }
 
-// §6.24.1: a casting type that is a constant expression of positive integral
-// value pads or truncates the parenthesized expression to that size. So 4'(20)
-// is 20 truncated to four bits: 20 is 5'b10100, its low four bits are 4'b0100,
-// and the value is 4. §6.20.4 makes a localparam identical to a parameter but
-// for the ways it can be overridden, so one holding that value is a constant
-// expression and legal as a packed range bound, and `logic [W-1:0] r` with W
-// folded to 4 is [3:0] -- four bits wide.
-//
-// This reads the recorded width rather than the absence of a diagnostic because
-// an initializer accepted as constant and then folded to nothing reports
-// nothing: the localparam is left with no value, and a case asserting the
-// module elaborates cleanly passes whether the cast folded or not. A packed
-// range bound has to resolve to a number before the elaborator can record a
-// width, so the width it records is the value the fold produced. The three
-// outcomes are distinct: 4 is the folded cast, 22 is a fold that passed the
-// operand through without truncating it to four bits, and anything else is a
-// range that never resolved.
 TEST(CastOperatorElaboration, SizeCastInLocalparamSizesAPackedRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -408,20 +349,6 @@ TEST(CastOperatorElaboration, SizeCastInLocalparamSizesAPackedRange) {
   EXPECT_EQ(var->width, 4u);
 }
 
-// §6.24.1 requires the expression inside a signing cast to be an integral
-// value, and names no statement the cast is allowed to stand in unjudged.
-// ElaboratorOperationRules::WalkStmtsForCast in
-// src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The seven
-// cases below are CastOperatorElaboration.RealLiteralInSignedCastError above
-// rewritten in the seven positions the walk was missing, each of which
-// elaborated clean beforehand with the non-integral operand unreported.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
-// holds statements the way a begin-end block does. The parser keeps them in
-// Stmt::fork_stmts rather than in Stmt::stmts.
 TEST(CastOperatorElaboration, RealLiteralInSignedCastInForkArmError) {
   ElabFixture f;
   ElaborateSrc(
@@ -437,10 +364,6 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInForkArmError) {
                             "6.24.1"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so a cast
-// stands on the right of an assignment in a for-loop header. The parser keeps
-// those assignments in Stmt::for_inits.
 TEST(CastOperatorElaboration, RealLiteralInSignedCastInForInitializerError) {
   ElabFixture f;
   ElaborateSrc(
@@ -457,10 +380,6 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInForInitializerError) {
                             "6.24.1"));
 }
 
-// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
-// at the other end of the loop header, kept in Stmt::for_steps. The
-// initializer here assigns an integer, so the report can only be about the
-// step.
 TEST(CastOperatorElaboration, RealLiteralInSignedCastInForStepError) {
   ElabFixture f;
   ElaborateSrc(
@@ -477,10 +396,6 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInForStepError) {
                             "6.24.1"));
 }
 
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
 TEST(CastOperatorElaboration,
      RealLiteralInSignedCastInAssertionPassStatementError) {
   ElabFixture f;
@@ -496,8 +411,6 @@ TEST(CastOperatorElaboration,
                             "6.24.1"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(CastOperatorElaboration,
      RealLiteralInSignedCastInAssertionFailStatementError) {
   ElabFixture f;
@@ -513,10 +426,6 @@ TEST(CastOperatorElaboration,
                             "6.24.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §6.24.1
-// judges the operand written inside the cast rather than what runs, so the
-// report stands whether the weighted draw would select the item or not.
 TEST(CastOperatorElaboration, RealLiteralInSignedCastInRandcaseItemError) {
   ElabFixture f;
   ElaborateSrc(
@@ -530,10 +439,6 @@ TEST(CastOperatorElaboration, RealLiteralInSignedCastInRandcaseItemError) {
                             "6.24.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(CastOperatorElaboration,
      RealLiteralInSignedCastInRandsequenceCodeBlockError) {
   ElabFixture f;
@@ -552,13 +457,6 @@ TEST(CastOperatorElaboration,
                             "6.24.1"));
 }
 
-// §6.24.1 holds a size or a signing cast's operand to an integral type, which
-// is a matter of the operand's type rather than its form: a real-valued
-// expression of any shape is refused as a bare real variable is, and so is a
-// string, a class handle, a chandle, an event, an unpacked array and an
-// unpacked structure. An integral expression built from real operands, a
-// relation, is accepted, as are integral operands of every shape, a
-// conditional choosing between two integral values among them.
 TEST(CastOperatorElaboration, NonIntegralOperandOfAnyFormRejected) {
   ElabFixture f;
   ElaborateSrc(

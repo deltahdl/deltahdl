@@ -33,9 +33,6 @@
 
 namespace delta {
 
-// The value parameter of `mod` written `name`, or null where none is. A type
-// parameter is a type rather than a value, and is left to the name's reading
-// as a type.
 static const RtlirParamDecl* ValueParamNamed(const RtlirModule* mod,
                                              std::string_view name) {
   for (const auto& p : mod->params) {
@@ -44,10 +41,6 @@ static const RtlirParamDecl* ValueParamNamed(const RtlirModule* mod,
   return nullptr;
 }
 
-// The shape of the value `name` stands for in `mod`: a variable's, a net's,
-// or a value parameter's, which §6.20.2 makes as wide as its declaration, or
-// as its final value where it was declared with neither range nor type.
-// Empty where `name` is none of them.
 static std::optional<ValueShape> NamedValueShape(std::string_view name,
                                                  const RtlirModule* mod) {
   for (const auto& v : mod->variables) {
@@ -63,8 +56,6 @@ static std::optional<ValueShape> NamedValueShape(std::string_view name,
   return std::nullopt;
 }
 
-// The values in scope of a module: its variables, nets and value parameters
-// (NamedValueShape).
 static ValueShapeOf ShapesIn(const RtlirModule* mod) {
   return [mod](std::string_view name) { return NamedValueShape(name, mod); };
 }
@@ -85,11 +76,6 @@ void AdoptExpressionType(DataType& dt, const std::optional<DataType>& type,
   dt.type_ref_expr = nullptr;
 }
 
-// The type of the value `name` that the module's declaration writes: a port's,
-// or that of a variable, net or parameter of its body. A type reference reads
-// it there where the module has yet to elaborate the value, as a port's does,
-// the ports being elaborated ahead of the items (Elaborator::ElaboratePorts).
-// Nothing where the declaration writes nothing of the name.
 static std::optional<DataType> ModuleValueType(std::string_view name,
                                                const TypeRefScope& scope) {
   const auto& ports = scope.decl->ports;
@@ -100,9 +86,6 @@ static std::optional<DataType> ModuleValueType(std::string_view name,
   return DeclaredValueType(*item, ShapesIn(scope.mod), scope.arena);
 }
 
-// §6.19: the named constant `name` of an enumeration the module sees, or null
-// where no enumeration declares it, with the key RtlirModule::enum_types
-// holds that enumeration under.
 static const RtlirEnumMember* EnumConstantNamed(const RtlirModule* mod,
                                                 std::string_view name,
                                                 std::string_view& key) {
@@ -115,14 +98,6 @@ static const RtlirEnumMember* EnumConstantNamed(const RtlirModule* mod,
   return nullptr;
 }
 
-// §6.19.3 with §6.23: the enumerated type declaring `constant`, keyed `key`,
-// which a type reference to the constant stands for. A typedef's enumeration
-// is named by the typedef, and the declaration resolves the name as it would
-// a typedef it wrote. One written as a variable's or a structure member's type
-// has no name another declaration could write, so the declaration takes a
-// copy of it, keeping its own `const`, and the key is answered: the
-// declaration declares none of the enumeration's constants again, and names
-// its enumeration by the key. Empty for a typedef's.
 static std::string_view AdoptEnumerationType(DataType& dt,
                                              const RtlirEnumMember& constant,
                                              std::string_view key,
@@ -137,12 +112,6 @@ static std::string_view AdoptEnumerationType(DataType& dt,
   return key;
 }
 
-// §6.23 with §7.2: takes onto each member of the structure or union `dt`
-// whose type is a type reference, `struct { type(x) f; }`, the type the
-// reference stands for, which `resolve` resolves in place, as the parser takes
-// a written member type onto its member (ApplyMemberType). The whole type is
-// kept as the member's nested type, which its width, its state and its layout
-// are read from.
 static void ResolveMemberTypeRefs(
     DataType& dt, Arena& arena, const std::function<void(DataType&)>& resolve) {
   for (StructMember& m : dt.struct_members) {
@@ -162,16 +131,6 @@ static void ResolveMemberTypeRefs(
   }
 }
 
-// §8.23 names the type operator as a context in which a class scope resolution
-// may prefix a type name, so `type(Frame::payload_t)` denotes the typedef
-// `payload_t` declared in class `Frame`, and §26.3 lets a package's scope
-// prefix the name of a value it declares, so `type(p::W)` stands for the type
-// of package `p`'s W. Either parses to a kMemberAccess node, which
-// ResolveTypeRef would otherwise treat as an expression whose width and
-// signedness are unknown, making the declared object a 1-bit unsigned logic.
-// Returns false, leaving `dt` untouched, when `ref` is not a scope resolution
-// over two identifiers or when neither a class's typedef nor a package's
-// declaration is found by it.
 static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
                                  const TypeRefScope& scope) {
   if (ref->kind != ExprKind::kMemberAccess || !ref->is_scope_resolution) {
@@ -189,7 +148,6 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
     AdoptReferencedType(dt, *resolved);
     return true;
   }
-  // §6.20.3: or a type parameter bound to a class names that class's typedef.
   if (const DataType* bound =
           TypeRefThroughBoundPrefix(prefix, ref->rhs->text, scope.typedefs)) {
     AdoptReferencedType(dt, *bound);
@@ -204,15 +162,6 @@ static bool ResolveScopedTypeRef(DataType& dt, const Expr* ref,
   return true;
 }
 
-// §6.23 with §6.20.2: a type reference whose argument is a name no variable or
-// net of the module carries. A parameter stands for its type: the one it was
-// declared with, or, declared with no type, the logic vector of its declared
-// range or of its final value. A built-in type keyword and a typedef name,
-// which the parser reads as identifiers, stand for the type they spell, a
-// typedef's left named for the declaration's own resolution of it. A value of a
-// package or of the compilation unit stands for its type (OuterValueType). A
-// name that is none of these leaves the reference as it stands, for the scope
-// rules to report.
 static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
                                 const TypeRefScope& scope) {
   if (const RtlirParamDecl* pd = ValueParamNamed(scope.mod, name)) {
@@ -238,11 +187,6 @@ static void ResolveNamedTypeRef(DataType& dt, std::string_view name,
   }
 }
 
-// §6.23: the type a net or variable `name` of `mod` stands for where no
-// declaration records the data type it is declared with: a variable's recorded
-// kind, as wide as the variable where that kind is a vector's, or the logic
-// vector of a net's width. False, leaving `dt` untouched, where `mod` holds no
-// value of that name.
 static bool AdoptRecordedValueType(
     DataType& dt, std::string_view name, const RtlirModule& mod,
     std::unordered_map<std::string_view, DataTypeKind>& var_types,
@@ -258,9 +202,6 @@ static bool AdoptRecordedValueType(
     dt.type_ref_expr = nullptr;
     return true;
   }
-  // §6.23: type(net) yields the net's underlying data type (a logic vector of
-  // the net's width); the net-ness of the declared object comes separately from
-  // its own net keyword, not from the type_reference.
   for (const auto& n : mod.nets) {
     if (n.name != name) continue;
     AdoptLogicVector(dt, {n.width, n.is_signed}, arena);
@@ -273,11 +214,6 @@ static bool AdoptRecordedValueType(
   return true;
 }
 
-// §6.23: resolves the type reference `dt` holds, if any, written at `loc` in
-// `mod`, to the type it stands for, in place. Answers the key
-// RtlirModule::enum_types holds an enumeration under where the reference
-// named a constant of one no typedef names, whose type `dt` then copies
-// (AdoptEnumerationType), and empty otherwise.
 std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
                                             const RtlirModule* mod) {
   ResolveMemberTypeRefs(
@@ -290,7 +226,6 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
   ReportTypeRefPrefixNotAClass(ref, loc, {mod->params, typedefs_, class_names_},
                                diag_);
   if (ResolveScopedTypeRef(dt, ref, kScope)) return {};
-  // §7.4.4: an unpacked array's element; TypeRefUnpackedDims has its dims.
   if (std::optional<UnpackedArrayType> array = TypeRefValueArray(ref, mod)) {
     AdoptReferencedType(dt, array->element);
     return {};
@@ -299,8 +234,6 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     AdoptReferencedType(dt, *returned);
     return {};
   }
-  // §3.12.1: a value behind `$unit::` is the compilation unit's, not one the
-  // module declares by the same name.
   if (!ref->scope_prefix.empty()) {
     if (std::optional<DataType> scoped = TypeRefExprType(ref, mod)) {
       AdoptExpressionType(dt, scoped, arena_);
@@ -311,18 +244,11 @@ std::string_view Elaborator::ResolveTypeRef(DataType& dt, SourceLoc loc,
     AdoptExpressionType(dt, TypeRefExprType(ref, mod), arena_);
     return {};
   }
-  // A named constant of an enumeration stands for the enumeration's type. It
-  // is looked up before the module's variables, which BuildEnumMembers gives
-  // each constant one of to hold its value: matched there, the constant read
-  // var_types_, which records no such name, and took the implicit one bit.
   std::string_view enumeration;
   if (const RtlirEnumMember* constant =
           EnumConstantNamed(mod, ref->text, enumeration)) {
     return AdoptEnumerationType(dt, *constant, enumeration, kScope);
   }
-  // §6.23 with §6.22.1 (f): a net or variable stands for the type it is
-  // declared with, range and all, which one rebuilt from its width as
-  // [width-1:0] is not where the declaration writes [0:3].
   if (std::optional<DataType> declared = NetOrVariableType(
           *mod,
           DeclaredScopedName(ref->text, gen_prefix_scopes_, declared_names_))) {
@@ -351,17 +277,6 @@ void ResolveScopeTypeRef(DataType& dt, const std::vector<ModuleItem*>& items,
   AdoptReferencedType(dt, ScopeValueType(*item, items, arena));
 }
 
-// The class a name reaches, or nothing when the answer is not clear.
-//
-// §8.1 lets a class be declared wherever a data declaration may appear, so the
-// compilation unit's own list holds only the ones written at the top of a file
-// and a lookup confined to it cannot see a class declared inside a module. What
-// it must not do instead is guess: two modules may each declare a class of one
-// name, and answering with whichever came first would resolve a rule against a
-// class the source never named -- a wrong answer where there had only been
-// silence. So a name declared once among the scopes is resolved, a name
-// declared in more than one is left unresolved, and the caller is no worse off
-// than it was.
 static const ClassDecl* FindClassAmong(std::string_view name,
                                        const std::vector<ModuleItem*>& items) {
   for (const auto* item : items) {
@@ -399,8 +314,6 @@ const ClassDecl* FindClassDecl(std::string_view name,
   return ambiguous ? nullptr : only;
 }
 
-// The site of the scope among `items`, of kind `kind`, that declares `cls`
-// directly; `found` is left alone where `items` does not.
 static void TakeDeclaringSite(const ClassDecl* cls,
                               const std::vector<ModuleItem*>& items,
                               SiteKind kind, TypeSite& found) {
@@ -433,8 +346,6 @@ const ClassDecl* FindBaseClass(const ClassDecl* cls,
   return seen != nullptr ? seen : FindClassDecl(cls->base_class, unit);
 }
 
-// Appends `cls` and, after it, each class nested in its body (§8.23), which
-// the parser keeps as a kClassDecl member rather than in any scope's list.
 static void AppendClassAndNested(const ClassDecl* cls,
                                  std::vector<const ClassDecl*>& out) {
   out.push_back(cls);
@@ -447,9 +358,6 @@ static void AppendClassAndNested(const ClassDecl* cls,
 static void AppendClassDecls(const std::vector<ModuleItem*>& items,
                              std::vector<const ClassDecl*>& out);
 
-// Appends the classes of the generate blocks a generate construct holds: a
-// loop's or a branch's own block, the else branch chained after it, and each
-// case item's block.
 static void AppendGenerateClassDecls(const ModuleItem* item,
                                      std::vector<const ClassDecl*>& out) {
   for (; item != nullptr; item = item->gen_else) {
@@ -460,9 +368,6 @@ static void AppendGenerateClassDecls(const ModuleItem* item,
   }
 }
 
-// Appends the classes declared among `items`, with those of every generate
-// block the items hold, since A.1.11 makes class_declaration a
-// package_or_generate_item_declaration.
 static void AppendClassDecls(const std::vector<ModuleItem*>& items,
                              std::vector<const ClassDecl*>& out) {
   for (const auto* item : items) {
@@ -504,9 +409,6 @@ std::string_view PackageClassKey(const DataType& dtype,
                                  const TypedefMap& typedefs,
                                  const CompilationUnit* unit, Arena& arena) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) return {};
-  // §6.18: a typedef stands for the name its chain ends at, which the
-  // package's own typedefs leave bare (InPackageScope) and which a typedef of
-  // another package's class writes behind that package.
   DataType end = LastTypeInChain(dtype, typedefs);
   if (end.scope_name.empty()) end.scope_name = dtype.scope_name;
   for (const auto* pkg : unit->packages) {
@@ -548,12 +450,6 @@ const DataType* FindClassScopedTypedefType(std::string_view cls_name,
   return &td->typedef_type;
 }
 
-// Both functions below ask whether a scope-qualified name's key
-// (TypeChainKey, which FindNamedType looks it up by) is present before
-// reaching for a class, and reach for it through every prefix written before
-// the scope (ClassOfChainedScope), §8.23 naming a nested class by the whole
-// chain. Keyed and found by the last prefix alone, `Outer::Inner::u` was
-// judged against the compilation unit's own class Inner, which declares no u.
 bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
                                 const CompilationUnit* unit) {
   if (dtype.kind != DataTypeKind::kNamed || dtype.scope_name.empty()) {
@@ -574,13 +470,6 @@ bool ResolveClassScopedDeclType(DataType& dtype, const TypedefMap& typedefs,
   return true;
 }
 
-// Whether `cls` declares anything at all under `name`. §8.23 puts a nested
-// class declaration and a typedef in one list -- the class scope resolution
-// operator reaches every static element of a class, its static properties,
-// static methods, typedefs, enumerations, parameters, local parameters,
-// constraints, structures, unions and nested class declarations -- so a name
-// this tool does not resolve to a type is still a name the class declared, and
-// `StringList::Node n;` is the case that is.
 static bool ClassDeclaresMember(const ClassDecl* cls, std::string_view name) {
   for (const auto* m : cls->members) {
     if (m->name == name) return true;
@@ -606,22 +495,6 @@ void ReportUnresolvedClassScopedType(const DataType& dtype, SourceLoc loc,
              Subclause("8.23"));
 }
 
-// What each parameter of `cls` stands for in the specialization `args` writes,
-// keyed by the parameter's own name.
-//
-// §23.10.2.2 (printed page 767) makes a parameter assignment by name an
-// explicit pairing of the parameter's name with its new value, so a written
-// name selects the formal whatever position the argument holds, and an argument
-// written without one takes the position it holds. The same subclause requires
-// only the parameters given new values to be named, not all of them, so a
-// formal the list does not mention keeps the default its declaration gave,
-// which ClassDecl::param_types records. §8.25 (printed page 204) instantiates a
-// specialization by the parameter override rules of §23.10, which is what
-// brings all three to bear on a specialization.
-//
-// A formal declared with no default has a kImplicit entry in param_types and is
-// left out, so a member reaching it fails to resolve rather than resolving to a
-// type nothing named.
 static std::unordered_map<std::string_view, const DataType*>
 BuildSpecializationSubst(const ClassDecl* cls,
                          const std::vector<DataType>& args) {
@@ -641,21 +514,6 @@ BuildSpecializationSubst(const ClassDecl* cls,
   return subst;
 }
 
-// Reports a named argument of a specialization carrying a name the class does
-// not declare, and one assigning a name a second argument already assigned.
-//
-// §23.10.2.2 (printed page 767) requires the parameter name to be the one the
-// instantiated module specifies, and forbids a second assignment to a parameter
-// name once it has a value. §8.25 (printed page 204) instantiates a
-// specialization by the parameter override rules of §23.10. Neither report
-// changes what BuildSpecializationSubst goes on to substitute: an unrecognized
-// name binds no parameter, so the one it was written for keeps its declared
-// default, and a repeated name leaves the last argument standing. Both of those
-// are types nobody wrote, which is what the reports stand in place of.
-//
-// ResolveNamedInstParams in src/elaborator/elaborator_module_inst.cpp makes
-// the first of these reports for a module instance, and the wording here
-// follows it so that the two forms of one rule read alike.
 static void ValidateSpecializationArgNames(const ClassDecl* cls,
                                            const std::vector<DataType>& args,
                                            DiagEngine& diag, SourceLoc loc) {
@@ -687,10 +545,6 @@ bool ResolveParameterizedType(DataType& dtype, const CompilationUnit* unit,
   ValidateSpecializationArgNames(cls, dtype.type_params, diag, loc);
   auto subst = BuildSpecializationSubst(cls, dtype.type_params);
 
-  // The scope resolution operator applied to a specialization may name a type
-  // parameter of the class directly, or a member typedef whose aliased type is
-  // one of those parameters. Resolve a direct type-parameter reference first;
-  // otherwise look through a member typedef to the parameter it aliases.
   std::string_view param_name = dtype.type_name;
   if (!subst.count(param_name)) {
     const auto* td = FindClassTypedef(cls, dtype.type_name);

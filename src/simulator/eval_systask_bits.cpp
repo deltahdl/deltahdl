@@ -25,17 +25,6 @@
 
 namespace delta {
 
-// §8.25: the width of the type a type parameter of the running method's class
-// is bound to on the object -- the actual of the object's specialization, or
-// the default the class declares (§8.25.1) -- and 0 for a name that is no
-// type parameter of that class, for a call outside a method, or for a type
-// nothing sizes. The type table holds the class's default under the name, so
-// the object is asked before it. A static method runs on no object: called
-// through an explicit specialization, `Box#(byte)::bits()`, it reads the
-// type the call's scope bound (§8.25.1, eval_class_scope_types.h), and
-// through the default specialization the class's default; left to the
-// expression, the name read the class's 32-bit parameter slot or the 1-bit
-// local the value-parameter bind made of the type, whatever the type was.
 static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
   const ClassObject* self = ctx.CurrentThis();
   if (self == nullptr) return ScopedTypeParamWidth(name, ctx);
@@ -46,14 +35,6 @@ static uint32_t BoundTypeParamWidth(std::string_view name, SimContext& ctx) {
   const DataType* actual = TypeParamActual(self, decl, pname);
   return actual != nullptr ? DeclaredTypeWidth(*actual, ctx) : 0;
 }
-
-// The bits of every element of the fixed-size unpacked array `arg` names --
-// the array itself, or a sub-array of it that one index per dimension selects
-// from the left, `m[1]` of `logic [7:0] m [2][3]` being three elements -- or 0
-// where it names no such array.
-// §20.6.2 with §23.6: the name of the array `arg` names -- an identifier's
-// own, or the dotted path of a hierarchical reference such as u.mem naming an
-// instance's array -- and empty where `arg` is neither.
 
 static uint64_t FixedArrayBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   size_t depth = 0;
@@ -77,9 +58,6 @@ static uint64_t FixedArrayBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   return count * info->elem_width;
 }
 
-// §8.23 and §26.3: the name a data type is written with through its class or
-// package, `C::T`, `p::T` or `C::N::T`, as the type tables key it; empty where
-// `arg` is not such a scope resolution of identifiers.
 static std::string ScopedTypeName(const Expr* arg) {
   if (arg->kind == ExprKind::kIdentifier) return std::string(arg->text);
   if (arg->kind != ExprKind::kMemberAccess || !arg->is_scope_resolution ||
@@ -90,13 +68,6 @@ static std::string ScopedTypeName(const Expr* arg) {
   if (scope.empty()) return {};
   return scope + "::" + std::string(arg->rhs->text);
 }
-
-// §20.6.2: the width of the data type `arg` names -- a type parameter bound
-// on the running specialization, or a typedef by its bare name -- and, with
-// §8.23 and §26.3, one named through its class or package, which read as an
-// expression, `C::T`, was 1 bit. §8.25: through a specialization,
-// `C#(shortint)::T`, the type is the one its list binds, where the table's
-// "C::T" holds the declaration's default. 0 where `arg` names no type.
 
 static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kIdentifier) {
@@ -111,10 +82,6 @@ static uint64_t NamedTypeBits(const Expr* arg, SimContext& ctx, Arena& arena) {
   return name.empty() ? 0 : ctx.FindTypeWidth(name);
 }
 
-// §20.6.2 with §36.8.3: the width of the value a call of a system function
-// an application registered returns, as its registration gives it, found
-// without the call being made, since a calltf runs only when the function is
-// executed; 0 where `arg` calls no registered system function.
 static uint64_t UserSystemFunctionBits(const Expr* arg) {
   if (arg->kind != ExprKind::kSystemCall) return 0;
   VpiContext& vpi = GetGlobalVpiContext();
@@ -129,27 +96,16 @@ Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
   auto* arg = expr->args[0];
-  // §20.6.2 with A.8.2: a data_type argument is as wide as the type, which the
-  // parser carries in Expr::type_value -- `$bits(int unsigned)` is 32, and a
-  // packed struct's width is its members'.
   if (arg->type_value != nullptr) {
     return MakeLogic4VecVal(arena, 32,
                             DeclaredTypeWidth(*arg->type_value, ctx));
   }
-  // §20.6.2 (printed page 629): the bit count of the expression packed into a
-  // bit stream, which for a fixed-size unpacked array is every element's bits
-  // -- 16 for `logic [7:0] m [0:1]`, of a net array as of a variable one. Read
-  // as an expression the name is one element's worth, so it is sized from the
-  // array's shape instead.
   if (uint64_t bits = FixedArrayBits(arg, ctx, arena); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);
   }
   if (uint64_t tw = NamedTypeBits(arg, ctx, arena); tw > 0) {
     return MakeLogic4VecVal(arena, 32, tw);
   }
-  // §20.6.2: the value is found without evaluating the enclosed expression, so
-  // a call of a function is sized by the type it is declared to return and is
-  // not made.
   if (arg->kind == ExprKind::kCall) {
     SubroutineTarget target = FindSubroutineTarget(arg, ctx, arena);
     if (target.func != nullptr) {
@@ -160,20 +116,12 @@ Logic4Vec EvalBits(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (uint64_t bits = UserSystemFunctionBits(arg); bits > 0) {
     return MakeLogic4VecVal(arena, 32, bits);
   }
-  // §20.6.2: a queue or dynamic array is a dynamically sized bit-stream
-  // expression. Its current bit-stream size is the live element count times
-  // the per-element width, so an empty one reports 0. Both kinds keep their
-  // elements in a QueueObject, so this one lookup covers each, named bare or
-  // hierarchically.
   if (std::string name = ArrayArgPath(arg, ctx, arena); !name.empty()) {
     if (auto* q = ctx.FindQueue(name)) {
       uint64_t bits = static_cast<uint64_t>(q->elements.size()) * q->elem_width;
       return MakeLogic4VecVal(arena, 32, bits);
     }
   }
-  // §20.6.2 with §8.5: an unpacked array property of a class object holds its
-  // elements one by one, and its bit stream is every element's, fixed-size or
-  // dynamic, named bare in a method or through a handle.
   ClassArrayRef ref;
   if (ResolveClassArray(arg, ctx, arena, ref)) {
     return MakeLogic4VecVal(arena, 32,

@@ -14,7 +14,6 @@ std::string_view SubclauseDefiningTheDistributionFunctionSyntax() {
 
 std::optional<std::string_view> CFunctionComputing(
     std::string_view sv_function) {
-  // §N.1, Table N.1, row by row.
   if (sv_function == "$dist_uniform") return "rtl_dist_uniform";
   if (sv_function == "$dist_normal") return "rtl_dist_normal";
   if (sv_function == "$dist_exponential") return "rtl_dist_exponential";

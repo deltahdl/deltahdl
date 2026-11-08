@@ -122,11 +122,6 @@ TEST(StructMemberAccess, MemberAccessBasic) {
   EXPECT_EQ(result.ToUint64(), 99u);
 }
 
-// §7.2 with §6.18: a member declared through a typedef holds the typedef's
-// type -- `ab_e e` of `typedef enum logic [1:0] {A=1, B=2} ab_e` two bits,
-// `six_t w` of `typedef logic [5:0] six_t` six -- in an unpacked struct and a
-// packed one alike, as $bits of the struct already counted them. The run-time
-// layout gave each one bit, so B and 6'h2a read back as 0.
 TEST(StructType, MembersDeclaredThroughTypedefsHoldTheirWidth) {
   SimFixture f;
   std::string out = RunCapture(
@@ -145,10 +140,6 @@ TEST(StructType, MembersDeclaredThroughTypedefsHoldTheirWidth) {
   EXPECT_EQ(out, "2 2a 3 2 2a aa '{e:B, w:42, n:3}\n");
 }
 
-// §7.2.1 with §6.11: a member reads as the type it is declared with, so a
-// shortint and a byte member of an unpacked struct hold -2 and -3, a
-// `logic signed [3:0]` member -1, and a `bit [3:0]` member 15; each compares
-// below zero exactly when its type is signed.
 TEST(StructType, SignedMembersOfAnUnpackedStructReadSigned) {
   SimFixture f;
   std::string out = RunCapture(
@@ -170,11 +161,6 @@ TEST(StructType, SignedMembersOfAnUnpackedStructReadSigned) {
   EXPECT_EQ(out, "-2 -3 -1 15 1 0\n");
 }
 
-// §7.2 and §7.3 with §6.21: a structure or union declared in an initial block
-// or a static task has storage like any variable, so a whole assignment, a
-// member write and a member read all reach it -- st holds 9 and 1, the union
-// reads 16'h1234 through either member, the inline packed struct's x holds 5,
-// and the task's local 7. Bound to no layout, each member read 0 or x.
 TEST(StructType, AggregateLocalsOfAStaticBlockAndTaskHoldTheirValues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -202,10 +188,6 @@ TEST(StructType, AggregateLocalsOfAStaticBlockAndTaskHoldTheirValues) {
   EXPECT_EQ(out, "9 1 00001234 00001234 5 7\n");
 }
 
-// §7.2 with §7.4.2: an unpacked array member of an unpacked struct holds each
-// of its elements, so m.v[1] and m.v[3] keep 20 and 40 beside n's 5, the
-// struct is 32 + 4*32 = 160 bits, and a member after an array member keeps
-// its own value. Laid out as one element, the writes landed in n or nowhere.
 TEST(StructType, UnpackedArrayMemberHoldsEachElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -225,10 +207,6 @@ TEST(StructType, UnpackedArrayMemberHoldsEachElement) {
   EXPECT_EQ(out, "20 40 5 160 7 9 3\n");
 }
 
-// §7.2 with §6.16: an element of an unpacked array member of strings holds a
-// string of any length, so m.v[1] keeps all ten characters of "abcdefghij"
-// beside m.v[0]'s "xy", and §7.4.6 has a read past its end give the empty
-// string. Held as its own bits cut to the element's 64, it kept "cdefghij".
 TEST(StructType, AnArrayMemberOfStringsHoldsEachElementWhole) {
   SimFixture f;
   std::string out = RunCapture(
@@ -246,10 +224,6 @@ TEST(StructType, AnArrayMemberOfStringsHoldsEachElementWhole) {
   EXPECT_EQ(out, "[abcdefghij] 10 [xy] []\n");
 }
 
-// §7.2 with §7.4.4: a member declared with an unpacked-array typedef has the
-// typedef's dimensions, `a_t m1;` under `typedef bit a_t [3:0];` being four
-// bits as `bit m1 [3:0]` is, so the struct is 12 bits, m1[3] keeps the 1
-// written to it and the byte after m1 keeps its own value.
 TEST(StructType, MemberDeclaredWithAnArrayTypedefHoldsEachElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -267,11 +241,6 @@ TEST(StructType, MemberDeclaredWithAnArrayTypedefHoldsEachElement) {
   EXPECT_EQ(out, "12 4 1 5a\n");
 }
 
-// §10.9.2 with §7.2 and §7.4.2: a nested pattern for an unpacked array member
-// gives each element its value, left to right, each as wide as the element:
-// `'{2, 3, 4, 5}` fills `byte data[4]` in a declaration initializer and in an
-// assignment, and `'{1, 2, 3, 4}` fills `int v[4]`. Concatenated at their own
-// widths, the byte member kept only the last value.
 TEST(StructType, NestedPatternFillsAnArrayMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -292,10 +261,6 @@ TEST(StructType, NestedPatternFillsAnArrayMember) {
   EXPECT_EQ(out, "2 5 1 4 9 12 8\n");
 }
 
-// §7.2.2 with §10.9.1: a member default gives a variable with no initializer
-// its value, and a replicated default pattern for an unpacked array member,
-// `byte data[4] = '{4{1}}`, gives every element 1, beside addr's default 6.
-// Evaluated as one value, it reached the last element alone.
 TEST(StructType, ArrayMemberDefaultFillsEachElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -311,11 +276,6 @@ TEST(StructType, ArrayMemberDefaultFillsEachElement) {
   EXPECT_EQ(out, "6 1 1 1 1\n");
 }
 
-// §12.7.3 with §7.2 and §7.4.2: foreach over an unpacked array member iterates
-// its elements -- a module variable's `m.v`, a property's `r.v` bare in a
-// method, and `h.r.v` through a handle -- so the four elements written with
-// (i+1)*10 and (i+1)*100 sum to 100 and 1000. Found no array, each loop ran
-// no iteration.
 TEST(StructType, ForeachOverAnArrayMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -346,11 +306,6 @@ TEST(StructType, ForeachOverAnArrayMember) {
   EXPECT_EQ(out, "100 1000 1000\n");
 }
 
-// §7.12 with §7.2 and §7.4.2: an unpacked array member of a structure is an
-// unpacked array, so after `r.v = '{4, 5, 6}` its size is 3 and its sum() 15,
-// while the member beside it keeps its own value. size() is a dynamic array's
-// method (§7.5.2), so the fixed-size member's size is read through $size
-// (§20.7). Named no array of its own, the member answered 0 to both.
 TEST(StructType, ArrayMethodsOnAnArrayMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -368,10 +323,6 @@ TEST(StructType, ArrayMethodsOnAnArrayMember) {
   EXPECT_EQ(out, "15 3 120 1\n");
 }
 
-// §7.2 with §6.16: a string member of an unpacked structure is a string
-// variable, holding whatever string is written to it at whatever length: "d"
-// reads back as "d", and a 28-character string reads back whole, its len()
-// 28, beside an enum member that keeps its own value.
 TEST(StructType, AStringMemberHoldsTheStringWrittenToIt) {
   SimFixture f;
   auto out = RunCapture(
@@ -391,10 +342,6 @@ TEST(StructType, AStringMemberHoldsTheStringWrittenToIt) {
   EXPECT_EQ(out, "[d] 1\n[hello world, a longer string] 28\n");
 }
 
-// §7.2 with §10.9.2: an assignment pattern gives a string member its string,
-// positionally or by the member's name, and a copy of the whole structure,
-// through an associative array's element among others, carries the string
-// with it; a member never written holds the empty string.
 TEST(StructType, AStringMemberTravelsWithItsStructure) {
   SimFixture f;
   auto out = RunCapture(
@@ -414,8 +361,6 @@ TEST(StructType, AStringMemberTravelsWithItsStructure) {
   EXPECT_EQ(out, "[hello] 7 [x] 3 []\n");
 }
 
-// §21.2.1.6 with §7.2: %p prints a structure's string member as its quoted
-// string.
 TEST(StructType, PercentPPrintsAStringMemberQuoted) {
   SimFixture f;
   auto out = RunCapture(
@@ -433,8 +378,6 @@ TEST(StructType, PercentPPrintsAStringMemberQuoted) {
   EXPECT_EQ(out, "'{sw:OFF, s:\"d\"}\n");
 }
 
-// §11.4.5 with §7.2: structures whose string members hold equal strings,
-// written separately, compare equal, and ones whose strings differ do not.
 TEST(StructType, StructuresWithEqualStringMembersCompareEqual) {
   SimFixture f;
   auto out = RunCapture(
@@ -454,12 +397,6 @@ TEST(StructType, StructuresWithEqualStringMembersCompareEqual) {
   EXPECT_EQ(out, "1\n0\n");
 }
 
-// §7.2 with §6.16: a structure's string member holds its string wherever the
-// structure is kept -- a class property, an element of an associative array,
-// a queue or a fixed-size array -- whether the member is written in place and
-// the structure then copied out, or the structure copied in whole and the
-// member then read in place; and a function returning the structure returns
-// its string with it.
 TEST(StructType, AStringMemberHoldsItsStringWhereverTheStructureIsKept) {
   SimFixture f;
   auto out = RunCapture(
@@ -504,10 +441,6 @@ TEST(StructType, AStringMemberHoldsItsStringWhereverTheStructureIsKept) {
             "[copied in whole]\n[from a function]\n");
 }
 
-// §7.2 with §6.8: each member of an unpacked structure is a variable of its
-// type, so one declared without an initializer starts with its 4-state
-// members at x, its 2-state members at 0 and its string member empty, and an
-// assignment to the whole structure keeps a 4-state member's x and z bits.
 TEST(StructType, UnpackedMembersStartAtTheirTypesDefaults) {
   SimFixture f;
   auto out = RunCapture(
@@ -526,8 +459,6 @@ TEST(StructType, UnpackedMembersStartAtTheirTypesDefaults) {
   EXPECT_EQ(out, "xxxx 0 [] xxxx x\nz01x 5 [s]\n");
 }
 
-// §7.2: a member of an unpacked structure may be a dynamic array, sized by
-// new[] and written and read element by element through the member.
 TEST(UnpackedStructDynamicMember, ADynamicMemberIsSizedWrittenAndRead) {
   SimFixture f;
   std::string out = RunCapture(
@@ -546,8 +477,6 @@ TEST(UnpackedStructDynamicMember, ADynamicMemberIsSizedWrittenAndRead) {
   EXPECT_EQ(out, "3 9 0 5\n");
 }
 
-// §7.2.2: a dynamic member's declared initial value is every variable's of
-// the structure, a module's and a class property's alike.
 TEST(UnpackedStructDynamicMember, ADynamicMembersInitializerIsTaken) {
   SimFixture f;
   std::string out = RunCapture(
@@ -565,8 +494,6 @@ TEST(UnpackedStructDynamicMember, ADynamicMembersInitializerIsTaken) {
   EXPECT_EQ(out, "7 4 4 | 7 4 3\n");
 }
 
-// §7.2: assigning a structure assigns each of its members, so the copy
-// holds its own dynamic member, which a later write to the source leaves.
 TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -585,9 +512,6 @@ TEST(UnpackedStructDynamicMember, AStructAssignmentCopiesTheDynamicMember) {
   EXPECT_EQ(out, "2 4 6\n");
 }
 
-// §7.2 with §7.5: a dynamic array member never written holds no element, and
-// new[] grows it, a copy taken before the growth keeping the elements it was
-// taken with. A queue member, which push_back grows, is the case after this.
 TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
   SimFixture f;
   std::string out = RunCapture(
@@ -608,9 +532,6 @@ TEST(UnpackedStructDynamicMember, AnUnwrittenMemberIsEmptyAndGrowsByMethod) {
   EXPECT_EQ(out, "0\n2 4 1\n");
 }
 
-// §7.2 with §7.10: a member may be a queue, which holds the elements written
-// to it and grows by push_back, a copy of the structure taken before the
-// growth keeping its own.
 TEST(UnpackedStructDynamicMember, AQueueMemberGrowsAndACopyKeepsItsOwn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -629,7 +550,6 @@ TEST(UnpackedStructDynamicMember, AQueueMemberGrowsAndACopyKeepsItsOwn) {
   EXPECT_EQ(out, "2 4 1\n");
 }
 
-// §7.10.2's insert and delete reach a queue member as push_back does.
 TEST(UnpackedStructDynamicMember, AQueueMemberTakesInsertAndDelete) {
   SimFixture f;
   std::string out = RunCapture(
@@ -651,8 +571,6 @@ TEST(UnpackedStructDynamicMember, AQueueMemberTakesInsertAndDelete) {
   EXPECT_EQ(out, "3 1 2 3\n2 2\n0\n");
 }
 
-// §7.10: a bounded queue member [$:1] holds no element past index 1, so a
-// third push_back leaves the first two and overflows the bound (§7.10.5).
 TEST(UnpackedStructDynamicMember, ABoundedQueueMemberKeepsToItsBound) {
   SimFixture f;
   std::string out = RunCapture(
@@ -670,11 +588,6 @@ TEST(UnpackedStructDynamicMember, ABoundedQueueMemberKeepsToItsBound) {
   EXPECT_EQ(out, "2 5 6\n");
 }
 
-// §7.2 with §7.4.2 and §6.20: a member `int a[N]` of a structure the module
-// declares holds N elements, one `int b[N-1:0]` the same and one `int c[N-1]`
-// one fewer, so with N = 3 the first two take an index 2 and the third an
-// index 1. Folded with no parameters, each held one element and the writes
-// past index 0 were dropped.
 TEST(UnpackedStructArrayMember, AMemberSizedByAParameterHoldsThatMany) {
   SimFixture f;
   std::string out = RunCapture(
@@ -694,10 +607,6 @@ TEST(UnpackedStructArrayMember, AMemberSizedByAParameterHoldsThatMany) {
   EXPECT_EQ(out, "1 5 6 7\n");
 }
 
-// §7.10 with §6.20: a queue member's bound `[$:N-2]` names the module's
-// parameter, so with N = 3 it holds no element past index 1 and a third
-// push_back leaves the first two. Folded with no parameters, the bound was
-// none and the queue took all three.
 TEST(UnpackedStructDynamicMember, AQueueMembersParameterBoundIsKept) {
   SimFixture f;
   std::string out = RunCapture(
@@ -716,13 +625,6 @@ TEST(UnpackedStructDynamicMember, AQueueMembersParameterBoundIsKept) {
   EXPECT_EQ(out, "2 5 6\n");
 }
 
-// §7.2 with §7.4 and §6.20: a structure type written in a variable's
-// declaration rather than a typedef has its members sized by the parameters
-// each instance binds, as a typedef's are. Under W = 4 and N = 3 the packed
-// structure is 8 bits, `a[N]` takes index 2 and the `[$:N-2]` queue keeps two
-// of three elements; under W = 8 and N = 4 they are 16 bits, index 3 and
-// three. Folded with no parameters, every member was one bit or one element
-// and each queue unbounded.
 TEST(StructWrittenInDeclaration, MembersSizedByParametersTakeEachInstances) {
   SimFixture f;
   std::string out = RunCapture(
@@ -749,11 +651,6 @@ TEST(StructWrittenInDeclaration, MembersSizedByParametersTakeEachInstances) {
   EXPECT_EQ(out, "4 8 240 5 2\n8 16 65280 5 3\n");
 }
 
-// §7.2 with §8.4: a member of a class type holds the whole handle of the
-// object stored in it, whether the structure is a typedef's or written in the
-// declaration, so a handle copied in and out again names the same object.
-// With one bit of each handle kept, handle 2 came back as the null handle and
-// handle 3 as handle 1, the object holding 1 (#7229).
 TEST(UnpackedStructClassMember, AHandleCopiedThroughAClassMemberIsKept) {
   SimFixture f;
   std::string out = RunCapture(
@@ -781,11 +678,6 @@ TEST(UnpackedStructClassMember, AHandleCopiedThroughAClassMemberIsKept) {
   EXPECT_EQ(out, "5 7 5 8\n");
 }
 
-// §7.2 with §6.18: a member declared through a typedef of a class, and
-// through a typedef of that typedef, is a member of the class: it holds the
-// whole handle, and `new` assigned to it constructs the class with its
-// argument (#7231). Under the typedef's name the member took no bits and its
-// `new` found no class to construct.
 TEST(UnpackedStructClassMember, AMemberDeclaredThroughAClassTypedefIsAHandle) {
   SimFixture f;
   std::string out = RunCapture(

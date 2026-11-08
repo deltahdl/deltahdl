@@ -90,10 +90,6 @@ std::string ExtractStrArg(const Expr* arg) {
   return std::string(text);
 }
 
-// §21.6: a plusarg search string is supplied either as a string literal or as
-// an integral variable whose packed bytes are read back as text. For the
-// variable form, FormatValueAsString drops the all-zero (high) padding bytes,
-// which discharges the rule that leading nulls are ignored when matching.
 static std::string ResolvePlusargPattern(const Expr* arg, SimContext& ctx,
                                          Arena& arena) {
   if (arg->kind == ExprKind::kStringLiteral) {
@@ -105,11 +101,7 @@ static std::string ResolvePlusargPattern(const Expr* arg, SimContext& ctx,
 static Logic4Vec EvalTestPlusargs(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  // §21.6: the search string never carries the command-line '+' sign; plusargs
-  // are stored without it, so a plain prefix comparison applies.
   std::string prefix = ResolvePlusargPattern(expr->args[0], ctx, arena);
-  // §21.6: plusargs are examined in the order supplied; a plusarg whose prefix
-  // matches every character of the search string yields a nonzero integer.
   for (const auto& arg : ctx.GetPlusArgs()) {
     if (arg.substr(0, prefix.size()) == prefix) {
       return MakeLogic4VecVal(arena, 32, 1);
@@ -118,12 +110,6 @@ static Logic4Vec EvalTestPlusargs(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
-// §21.6: the user_string of $value$plusargs has the form
-// "plusarg_string format_string", where the trailing format string is a
-// $display-style specifier. Splits off the matching prefix and returns the
-// conversion letter folded to lowercase ('\0' when no specifier is present).
-// Leading-zero and width digits after '%' are accepted but not otherwise acted
-// on, as the clause allows a specifier written with a leading 0.
 static char SplitUserString(const std::string& user, std::string& prefix_out) {
   auto pct = user.find('%');
   if (pct == std::string::npos) {
@@ -139,8 +125,6 @@ static char SplitUserString(const std::string& user, std::string& prefix_out) {
   return c;
 }
 
-// §21.6: map an integer conversion code (%d/%o/%h/%x/%b) to its radix; returns
-// 0 for any other conversion letter so the caller can reject it.
 static int PlusargIntegerBase(char conv) {
   switch (conv) {
     case 'd':
@@ -157,9 +141,6 @@ static int PlusargIntegerBase(char conv) {
   }
 }
 
-// §21.6: decode a single text digit into its numeric value. Returns false when
-// the character is not a valid hexadecimal digit, so callers can reject any
-// character illegal for their radix.
 static bool DecodePlusargDigit(char c, int& digit) {
   if (c >= '0' && c <= '9') {
     digit = c - '0';
@@ -176,25 +157,16 @@ static bool DecodePlusargDigit(char c, int& digit) {
   return false;
 }
 
-// One digit of a plusarg binary/octal/hex remainder: its value, or its
-// unknown/high-impedance kind when the character is an x/z/? digit.
 struct PlusargDigit {
   int val = 0;
   bool is_x = false;
   bool is_z = false;
 };
 
-// True for the characters that read back as whole-digit unknown (x) or
-// high-impedance (z) groups; '?' is an alternative spelling of z.
 static bool IsPlusargXZDigit(char c) {
   return c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?';
 }
 
-// §21.6: gather the digits of a %b/%o/%h remainder. The legal characters for
-// these conversions follow the reading rules of §21.3.4.3: base digits, x/z/?
-// standing for unknown or high-impedance digit groups, and underscores after
-// the first digit. Returns false when any character falls outside that set so
-// the caller can store the 'bx fill the clause mandates.
 static bool CollectPlusargDigits(const std::string& s, int base,
                                  std::vector<PlusargDigit>& digits) {
   for (char c : s) {
@@ -211,10 +183,6 @@ static bool CollectPlusargDigits(const std::string& s, int base,
   return !digits.empty();
 }
 
-// Packs base-2/8/16 digits (most significant first) into a 4-state value of
-// the destination width. Digit groups beyond the width fall off the top, which
-// is the truncation the clause requires when the variable cannot contain the
-// value; a short digit run leaves the high bits zero (the zero-padded case).
 static Logic4Vec PackPlusargDigits(Arena& arena,
                                    const std::vector<PlusargDigit>& digits,
                                    uint32_t bits_per_digit, uint32_t width) {
@@ -233,8 +201,6 @@ static Logic4Vec PackPlusargDigits(Arena& arena,
   return vec;
 }
 
-// Fills a destination entirely with x or entirely with z, the stored image of
-// a decimal remainder that is a single character from the x/z/? set.
 static Logic4Vec MakePlusargAllXZ(Arena& arena, uint32_t width, bool is_x) {
   auto vec = MakeLogic4VecVal(arena, width, 0);
   for (uint32_t bit = 0; bit < width; ++bit) {
@@ -244,11 +210,6 @@ static Logic4Vec MakePlusargAllXZ(Arena& arena, uint32_t width, bool is_x) {
   return vec;
 }
 
-// §21.6: the destination of a $value$plusargs conversion is the named
-// variable receiving the converted remainder, together with its width and
-// whether it is a string-typed variable (which resizes to the stored text
-// rather than filling a fixed width). Bundled so the conversion helpers share
-// one entity rather than loose parameters.
 struct PlusargDest {
   Variable* var;
   std::string name;
@@ -256,12 +217,6 @@ struct PlusargDest {
   bool is_string = false;
 };
 
-// §21.6: %d converts an optionally signed decimal remainder. The legal forms
-// follow the reading rules of §21.3.4.3: a digit run with underscores after
-// the first digit, or a single x/z/? standing for a wholly unknown or
-// high-impedance value. Anything else is illegal and stores 'bx; a negative
-// value is treated as wider than the destination, so its two's-complement
-// image is truncated to the variable width.
 static void StorePlusargDecimal(const PlusargDest& dest, const std::string& s,
                                 Arena& arena) {
   size_t i = 0;
@@ -296,9 +251,6 @@ static void StorePlusargDecimal(const PlusargDest& dest, const std::string& s,
   dest.var->value = MakeLogic4VecVal(arena, dest.width, stored);
 }
 
-// §21.6: %e/%f/%g convert the remainder to a real value, stored as its 64-bit
-// IEEE pattern. An empty remainder stores zero; an unparseable remainder is
-// written with 'bx.
 static void StorePlusargReal(const PlusargDest& dest,
                              const std::string& remainder, SimContext& ctx,
                              Arena& arena) {
@@ -320,9 +272,6 @@ static void StorePlusargReal(const PlusargDest& dest,
   dest.var->value = vec;
 }
 
-// §21.6: integer conversions (%d/%o/%h/%x/%b) store the converted remainder.
-// An empty remainder stores zero; a remainder holding any character illegal
-// for the conversion is written with 'bx.
 static void StorePlusargInteger(const PlusargDest& dest, char conv,
                                 const std::string& remainder, Arena& arena) {
   if (remainder.empty()) {
@@ -348,16 +297,9 @@ static void StorePlusargInteger(const PlusargDest& dest, char conv,
       PackPlusargDigits(arena, digits, bits_per_digit, dest.width);
 }
 
-// §21.6: convert the remainder of a matching plusarg into `var` according to
-// the format string's conversion code. The stored value is automatically zero-
-// padded or truncated to the variable width by MakeLogic4VecVal.
 static void StorePlusargConverted(const PlusargDest& dest, char conv,
                                   const std::string& remainder, SimContext& ctx,
                                   Arena& arena) {
-  // §21.6: %s performs no numeric conversion; the characters are stored as
-  // is. A string-typed destination resizes to exactly the stored text (an
-  // empty remainder leaves it the empty string); a packed destination is
-  // right-justified, zero-padded or truncated to the variable width.
   if (conv == 's') {
     uint32_t w = dest.is_string ? static_cast<uint32_t>(remainder.size()) * 8
                                 : dest.width;
@@ -373,15 +315,6 @@ static void StorePlusargConverted(const PlusargDest& dest, char conv,
   StorePlusargInteger(dest, conv, remainder, arena);
 }
 
-// The conversion above reaches eleven stores into the destination across four
-// functions, and every one of them is a write to a user variable. §9.4.2: an
-// implicit event with no edge is detected on any change in the expression's
-// value, and the clause names no writer whose change is exempt, so the
-// notification is made once here where the destination is known rather than
-// eleven times inside the conversion. Whether a given change counts is the
-// awaiter's own test -- AnyChangeAwaiter::ChangeGatePasses and
-// EventAwaiter::CheckEdge each decline a wake on a value that did not move --
-// so what is owed here is unconditional.
 static void StorePlusargValue(const PlusargDest& dest, char conv,
                               const std::string& remainder, SimContext& ctx,
                               Arena& arena) {
@@ -408,16 +341,12 @@ static Logic4Vec EvalValuePlusargs(const Expr* expr, SimContext& ctx,
   uint32_t dest_width = (var && var->value.width) ? var->value.width : 32;
   PlusargDest dest{var, var_name, dest_width, is_string};
 
-  // §21.6: the first plusarg (in command-line order) whose prefix matches the
-  // plusarg_string supplies the remainder available for conversion.
   for (const auto& arg : ctx.GetPlusArgs()) {
     if (arg.substr(0, prefix.size()) != prefix) continue;
     std::string remainder = arg.substr(prefix.size());
     StorePlusargValue(dest, conv, remainder, ctx, arena);
     return MakeLogic4VecVal(arena, 32, 1);
   }
-  // §21.6: with no match the function returns the integer zero, leaves the
-  // variable unmodified, and issues no warning.
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
@@ -445,14 +374,6 @@ Logic4Vec EvalTypenameOfExpression(const Expr* expr, SimContext& ctx,
   return StringToLogic4Vec(arena, "logic");
 }
 
-// §21.3.4.3 / §21.3.1 / §21.4: read a system-task argument as text. The
-// expression's packed-byte value is decoded back into a std::string, dropping
-// all-zero (high) padding bytes. A string literal is evaluated the same way,
-// which is what gives it the value §5.9.1 gives it, its escape sequences each
-// standing for the character they spell; it used to yield its quoted contents
-// as written, so a "\n" in a string handed to $sreadmemh (Annex D.14) was a
-// backslash and an n rather than the line break a load file's comment ends at.
-// Shared with eval_systask_io.cpp / eval_systask_readmem.cpp.
 std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   auto val = EvalExpr(arg, ctx, arena);
   uint32_t nbytes = val.width / 8;
@@ -468,12 +389,6 @@ std::string EvalStringArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// §21.3.3: a format argument may be an unpacked array of byte, whose characters
-// -- read from the array's left bound to its right bound -- form the formatting
-// string. Such an array is lowered to one element variable per index rather
-// than a single packed value, so EvalStringArg cannot decode it; reconstruct
-// the string from the element variables here. Returns false when the argument
-// is not a fixed unpacked byte array, leaving the packed-value path in charge.
 static bool TryFormatArgFromByteArray(const Expr* arg, SimContext& ctx,
                                       std::string& out) {
   if (arg == nullptr || arg->kind != ExprKind::kIdentifier) return false;
@@ -497,10 +412,6 @@ static bool TryFormatArgFromByteArray(const Expr* arg, SimContext& ctx,
   return true;
 }
 
-// §21.3.3 N10: a format argument may be supplied as a string literal or as any
-// expression whose content encodes the formatting string -- an integral or
-// string value via its packed bytes, or an unpacked array of byte via its
-// elements. Shared with eval_systask_io.cpp.
 std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg && arg->kind == ExprKind::kStringLiteral) {
     return ExtractFormatString(arg);
@@ -510,18 +421,12 @@ std::string ResolveFormatArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return EvalStringArg(arg, ctx, arena);
 }
 
-// Outcome of scanning one '%'-introduced specifier.
 enum class SpecifierScan : std::uint8_t {
   kLiteralPercent,
   kTruncated,
   kComplete
 };
 
-// §21.3.3: scan the specifier that begins at fmt[i] (which is '%'). Advances
-// `i` past the consumed characters and reports whether the specifier consumes
-// an argument value (%m/%l and %% do not). Mirrors the control flow of the
-// caller: a `%%` literal advances one and consumes nothing; a specifier whose
-// body runs off the end of the string is reported truncated.
 static SpecifierScan ScanFormatSpecifier(const std::string& fmt, size_t& i,
                                          bool& consumes) {
   consumes = false;
@@ -540,8 +445,6 @@ static SpecifierScan ScanFormatSpecifier(const std::string& fmt, size_t& i,
   return SpecifierScan::kComplete;
 }
 
-// §21.3.3: counts %-introduced specifiers that consume an argument value,
-// excluding %% literals and %m/%l self-supplied specifiers.
 size_t CountConsumingSpecifiers(const std::string& fmt) {
   size_t n = 0;
   for (size_t i = 0; i + 1 < fmt.size(); ++i) {
@@ -555,9 +458,6 @@ size_t CountConsumingSpecifiers(const std::string& fmt) {
   return n;
 }
 
-// §21.3.3 N14: when the supplied argument count does not match the number of
-// consuming format specifiers, the application shall issue a warning and
-// continue execution.
 void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
                             const std::string& fmt, size_t supplied,
                             SourceLoc loc) {
@@ -572,29 +472,15 @@ void WarnIfArgCountMismatch(SimContext& ctx, std::string_view task_name,
 
 static Logic4Vec EvalSformatf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return StringToLogic4Vec(arena, "");
-  // §21.3.3 N10: accept a string literal or any integral / byte-array /
-  // string-typed expression as the format argument.
   std::string fmt = ResolveFormatArg(expr->args[0], ctx, arena);
   WarnIfArgCountMismatch(ctx, "$sformatf", fmt, expr->args.size() - 1,
                          expr->range.start);
-  // §21.3.3: the arguments fill the format as a display task's fill its
-  // template, the aggregate renderings of %p and the strengths of %v included.
   std::string result = FormatDisplayArgs(expr, 0, fmt, ctx, arena);
-  // §21.3.3: the result is a string, and the value carries the kind so that
-  // a display or severity task handed it, `$error($sformatf(...))`, renders
-  // its text rather than the number its bytes make (AppendDisplayArg in
-  // eval_system_task.cpp reads the kind), as a string variable holding the
-  // same text is rendered; without the kind `$display($sformatf("e %0d",
-  // 5))` printed 6627381.
   Logic4Vec out = StringToLogic4Vec(arena, result);
   out.is_string = true;
   return out;
 }
 
-// §20.5: $itor converts an integer value to real, so a signed operand gives
-// the value its sign gives, and a real operand reaches it rounded to the
-// nearest integer, ties away from zero (§6.12.1). The result is a real, which
-// a reader tells from an integer by the mark rather than by the bits.
 static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
@@ -606,10 +492,7 @@ static Logic4Vec EvalItor(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalRtoi(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  // §20.5: the operand is a real, so an integral one reaches it as its value
-  // converted to real (§6.12.1), never as its bits.
   auto truncated = static_cast<int64_t>(RealValueOf(val));
-  // §20.5: the result is an integer, which is signed.
   Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(truncated));
   out.is_signed = true;
   return out;
@@ -619,15 +502,11 @@ static Logic4Vec EvalBitstoreal(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   auto val = EvalExpr(expr->args[0], ctx, arena);
-  // §20.5: $bitstoreal returns the real the bits spell.
   Logic4Vec out = MakeLogic4VecVal(arena, 64, val.ToUint64());
   out.is_real = true;
   return out;
 }
 
-// §20.5: $realtobits takes a real operand, so an operand of another type
-// reaches it as its value converted to real (§6.12.1), never as its bits: an
-// int 3 gives the pattern of 3.0, and a shortreal the double its float holds.
 static Logic4Vec EvalRealtobits(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
@@ -676,10 +555,6 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$shortrealtobits") {
     if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
     auto val = EvalExpr(expr->args[0], ctx, arena);
-    // §20.5 gives this task a shortreal operand, so an operand of another type
-    // reaches it as its value converted to shortreal (§6.12.1): a real is
-    // narrowed to single precision, an int 3 gives the pattern of 3.0, and a
-    // shortreal variable's own pattern makes the round trip unchanged.
     auto f = static_cast<float>(RealValueOf(val));
     uint32_t fbits = 0;
     std::memcpy(&fbits, &f, sizeof(float));
@@ -702,11 +577,6 @@ static Logic4Vec EvalConversionSysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Flatten a parameter reference into the instance-qualified name the lowerer
-// registers a parameter under. A simple ps_parameter_identifier is just its
-// text; a hierarchical_parameter_identifier parses as a member-access chain
-// (e.g. sub.P -> lhs "sub", rhs "P") whose segments join with dots, matching
-// the "inst_prefix.name" key LowerParams builds.
 static bool FlattenParamRefName(const Expr* e, std::string& out) {
   if (e->kind == ExprKind::kIdentifier) {
     if (!e->scope_prefix.empty()) {
@@ -725,8 +595,6 @@ static bool FlattenParamRefName(const Expr* e, std::string& out) {
   return false;
 }
 
-// §6.20.7 with §8.25: whether `name`, read in a method, is a value parameter
-// of the object's class that holds `$` in the object's specialization.
 static bool IsUnboundedClassParam(const std::string& name, SimContext& ctx) {
   const ClassObject* obj = ctx.CurrentThis();
   return obj != nullptr && obj->unbounded_params.count(name) != 0;
@@ -734,10 +602,6 @@ static bool IsUnboundedClassParam(const std::string& name, SimContext& ctx) {
 
 static Logic4Vec EvalIsunbounded(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
-  // §20.6.3: $isunbounded reports whether its parameter argument holds the
-  // unbounded value $. Syntax 20-8 admits both a simple and a hierarchical
-  // parameter identifier, so accept a member-access operand (sub.P) alongside a
-  // bare identifier by resolving either to its registered name.
   if (!expr->args.empty()) {
     std::string name;
     if (FlattenParamRefName(expr->args[0], name)) {

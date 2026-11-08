@@ -13,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §H.11.2: multiple packed dimensions are linearized into one normalized
-// packed dimension -- `bit [6:1][1:8]` is [47:0], three dimensions [1:0]
-// [3:0][7:0] are [63:0], and one dimension [29:0] is its own normalization.
 TEST(DpiMultidimensionalArrays, PackedDimensionsLinearizeToOneNormalizedRange) {
   const SvActualDimension kTwo = DpiLinearizedPackedRange({{6, 1}, {1, 8}});
   EXPECT_EQ(kTwo.low, 47);
@@ -30,10 +27,6 @@ TEST(DpiMultidimensionalArrays, PackedDimensionsLinearizeToOneNormalizedRange) {
   EXPECT_EQ(DpiPackedDimensionCountInC(), 1u);
 }
 
-// §H.11.2 with §H.7.7: the linearized dimension is what the canonical
-// representation holds, one chunk per 32 bits of it -- two for the 48 bits
-// of `bit [6:1][1:8]`, and the C declaration of `bit [6:1][1:8] b [65:2]`
-// carries that one chunk dimension after the unpacked one.
 TEST(DpiMultidimensionalArrays, TheLinearizedRangeIsWhatTheChunksHold) {
   EXPECT_EQ(DpiCanonicalWordCount(48), 2u);
   DpiArg b;
@@ -45,9 +38,6 @@ TEST(DpiMultidimensionalArrays, TheLinearizedRangeIsWhatTheChunksHold) {
             "svBitVecVal b[64][2]");
 }
 
-// §H.11.2: unpacked arrays can have an arbitrary number of dimensions --
-// four here, each a dimension of the C array, and an element reached by its
-// four indices counted from the low bounds.
 TEST(DpiMultidimensionalArrays, UnpackedArraysHaveAnyNumberOfDimensions) {
   EXPECT_FALSE(DpiUnpackedDimensionCountIsLimited());
   DpiArg a;
@@ -65,9 +55,6 @@ TEST(DpiMultidimensionalArrays, UnpackedArraysHaveAnyNumberOfDimensions) {
   EXPECT_EQ(kIndices[3], 3u);
 }
 
-// §H.11.2 with §H.12.2: an open array's handle reports as many unpacked
-// dimensions as the actual has -- four, at dimensions 1 to 4 -- beside its
-// one packed dimension at 0, five in all as $dimensions of §20.7 counts.
 TEST(DpiMultidimensionalArrays, AnOpenArrayReportsEveryUnpackedDimension) {
   const SvOpenArrayDimRange kRanges[] = {
       {47, 0}, {1, 0}, {2, 0}, {3, 0}, {1, 4}};

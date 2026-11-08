@@ -17,21 +17,6 @@
 namespace delta {
 namespace {
 
-// §37.16 Nets: the VPI net object model, the net counterpart of §37.17's
-// variable model. These tests observe the production helpers in vpi.cpp that
-// apply the numbered "Details" of the clause. The range relations (details 1
-// and 26) are woven onto §37.22's range helpers, so an empty dimension behaves
-// the same here as it does there.
-//
-// The driver/load/port iteration details (4, 6-8, 14-20, 22) describe the
-// behavior of a connectivity and force/assign engine that the VPI layer does
-// not model with a live driver graph, so they carry no production rule of their
-// own here; the ownable classification rules they rest on (e.g. detail 5,
-// detail 11's driver-iteration gate) are exercised below.
-
-// D1: a net declared as an array with one or more unpacked ranges is an array
-// net; a packed struct/union or enum net with one or more explicit packed
-// ranges is a packed array net.
 TEST(NetModel, ArrayNetAndPackedArrayNetClassification) {
   EXPECT_TRUE(VpiIsArrayNet(1));
   EXPECT_TRUE(VpiIsArrayNet(2));
@@ -40,13 +25,10 @@ TEST(NetModel, ArrayNetAndPackedArrayNetClassification) {
   EXPECT_TRUE(VpiIsPackedArrayNet(vpiStructNet, 1));
   EXPECT_TRUE(VpiIsPackedArrayNet(vpiUnionNet, 2));
   EXPECT_TRUE(VpiIsPackedArrayNet(vpiEnumNet, 1));
-  // No explicit packed range -> not a packed array net.
   EXPECT_FALSE(VpiIsPackedArrayNet(vpiStructNet, 0));
-  // A logic net is not one of the packed-array-net base kinds.
   EXPECT_FALSE(VpiIsPackedArrayNet(vpiNet, 1));
 }
 
-// D2: vpiArrayMember is TRUE when the net's vpiParent prefix is an array net.
 TEST(NetModel, ArrayMemberReadsArrayNetParent) {
   VpiObject array_net;
   array_net.type = vpiNetArray;
@@ -65,8 +47,6 @@ TEST(NetModel, ArrayMemberReadsArrayNetParent) {
   EXPECT_FALSE(VpiNetIsArrayMember(nullptr));
 }
 
-// D2: vpiPackedArrayMember is TRUE for a packed struct/union net, an enum net,
-// or a packed array net whose parent is a packed array net; FALSE otherwise.
 TEST(NetModel, PackedArrayMemberReadsPackedArrayNetParent) {
   VpiObject packed_array_net;
   packed_array_net.type = vpiPackedArrayNet;
@@ -81,8 +61,6 @@ TEST(NetModel, PackedArrayMemberReadsPackedArrayNetParent) {
   enum_elem.parent = &packed_array_net;
   EXPECT_TRUE(VpiNetIsPackedArrayMember(&enum_elem));
 
-  // A packed union net element and a nested packed array net element are the
-  // other two admitted member kinds under a packed array net.
   VpiObject union_elem;
   union_elem.type = vpiUnionNet;
   union_elem.parent = &packed_array_net;
@@ -93,13 +71,11 @@ TEST(NetModel, PackedArrayMemberReadsPackedArrayNetParent) {
   packed_array_elem.parent = &packed_array_net;
   EXPECT_TRUE(VpiNetIsPackedArrayMember(&packed_array_elem));
 
-  // A plain logic net element does not qualify, even under a packed array net.
   VpiObject logic_elem;
   logic_elem.type = vpiNet;
   logic_elem.parent = &packed_array_net;
   EXPECT_FALSE(VpiNetIsPackedArrayMember(&logic_elem));
 
-  // The right kind, but the parent is not a packed array net.
   VpiObject array_net;
   array_net.type = vpiNetArray;
   struct_elem.parent = &array_net;
@@ -107,8 +83,6 @@ TEST(NetModel, PackedArrayMemberReadsPackedArrayNetParent) {
   EXPECT_FALSE(VpiNetIsPackedArrayMember(nullptr));
 }
 
-// D3: the net bits of a logic net or a bit net are reachable regardless of
-// vector expansion; no other net kind exposes net bits this way.
 TEST(NetModel, NetBitsAvailableForLogicAndBitNets) {
   EXPECT_TRUE(VpiNetBitIteratorApplies(vpiNet));
   EXPECT_TRUE(VpiNetBitIteratorApplies(vpiBitNet));
@@ -116,15 +90,11 @@ TEST(NetModel, NetBitsAvailableForLogicAndBitNets) {
   EXPECT_FALSE(VpiNetBitIteratorApplies(vpiNetArray));
 }
 
-// D5: continuous assignments and primitive terminals are reachable only from a
-// scalar net or a bit-select.
 TEST(NetModel, TerminalAccessRequiresScalarNetOrBitSelect) {
   EXPECT_TRUE(VpiNetTerminalAccessAllowed(true));
   EXPECT_FALSE(VpiNetTerminalAccessAllowed(false));
 }
 
-// D6: vpiPorts hands back the matching port bits for a net bit reference, and a
-// handle to the entire port for an entire net or array net reference.
 TEST(NetModel, PortsGranularityByReferenceKind) {
   EXPECT_EQ(VpiPortsReferenceGranularity(vpiNetBit),
             VpiPortGranularity::kPortBits);
@@ -134,37 +104,22 @@ TEST(NetModel, PortsGranularityByReferenceKind) {
             VpiPortGranularity::kEntirePort);
 }
 
-// D7: vpiPortInst hands back port bits / scalar ports for a bit or scalar
-// reference, unless the highconn is a complex expression whose bit index cannot
-// be determined (then the whole port); an entire net or array net reference
-// always yields the whole port.
 TEST(NetModel, PortInstGranularityByReferenceAndHighconn) {
-  // Bit/scalar reference, determinable highconn -> port bits / scalar ports.
-  EXPECT_EQ(VpiPortInstReferenceGranularity(
-                /*ref_is_bit_or_scalar=*/true,
-                /*ref_is_entire_net_or_array=*/false,
-                /*highconn_bit_index_undeterminable=*/false),
+  EXPECT_EQ(VpiPortInstReferenceGranularity(true, false, false),
             VpiPortGranularity::kPortBits);
-  // Bit/scalar reference, complex highconn -> the whole port.
   EXPECT_EQ(VpiPortInstReferenceGranularity(true, false, true),
             VpiPortGranularity::kEntirePort);
-  // Entire net or array net reference -> the whole port regardless of highconn.
   EXPECT_EQ(VpiPortInstReferenceGranularity(false, true, false),
             VpiPortGranularity::kEntirePort);
   EXPECT_EQ(VpiPortInstReferenceGranularity(false, true, true),
             VpiPortGranularity::kEntirePort);
 }
 
-// D8: a vpiPortInst reference inside the highconn but connected to none of the
-// port's bits (e.g. a size mismatch) does not qualify as a member.
 TEST(NetModel, PortInstMemberQualification) {
   EXPECT_TRUE(VpiPortInstReferenceQualifies(true));
   EXPECT_FALSE(VpiPortInstReferenceQualifies(false));
 }
 
-// D9: an implicit net reports vpiLineNo 0 and the vpiImplicitDecl property
-// TRUE; an explicitly declared net reports its declared line and FALSE. The
-// property is observed through the public vpi_get entry point.
 class NetContext : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -179,9 +134,6 @@ TEST_F(NetContext, ImplicitNetDeclarationAndLineNumber) {
   EXPECT_EQ(vpi_get(vpiImplicitDecl, VpiHandleOf(&implicit_net)), 1);
   EXPECT_EQ(VpiNetLineNo(true, 42), 0);
 
-  // An implicit net has no declaration line, but it still maps to source text:
-  // vpiFile reports the file where it is first referenced (the file recorded on
-  // the net), observed through the public vpi_get_str entry point.
   implicit_net.file = "first_ref.sv";
   EXPECT_EQ(std::string(vpi_get_str(vpiFile, VpiHandleOf(&implicit_net))),
             "first_ref.sv");
@@ -192,9 +144,6 @@ TEST_F(NetContext, ImplicitNetDeclarationAndLineNumber) {
   EXPECT_EQ(VpiNetLineNo(false, 42), 42);
 }
 
-// D10: vpi_handle(vpiIndex, net_bit) returns the net bit's single index;
-// vpi_iterate(vpiIndex, net_bit) over a multidimensional net array bit-select
-// returns the indices from the net bit's index outward.
 TEST(NetModel, NetBitIndexAndMultidimIndices) {
   VpiObject i0, i1, i2;
   EXPECT_EQ(VpiNetBitIndex({&i0, &i1, &i2}), &i0);
@@ -206,9 +155,6 @@ TEST(NetModel, NetBitIndexAndMultidimIndices) {
   EXPECT_EQ(outward[2], &i2);
 }
 
-// D11: vpiNetType is vpiNettypeNet for a net not declared with a nettype and
-// vpiNettypeNetSelect for a select of a nettype net; driver iteration is not
-// supported for a vpiNettypeNetSelect.
 TEST(NetModel, NettypeValueAndDriverIterationGate) {
   EXPECT_EQ(VpiNetNettypeValue(false), vpiNettypeNet);
   EXPECT_EQ(VpiNetNettypeValue(true), vpiNettypeNetSelect);
@@ -217,10 +163,6 @@ TEST(NetModel, NettypeValueAndDriverIterationGate) {
   EXPECT_FALSE(VpiNetDriverIterationSupported(vpiNettypeNetSelect));
 }
 
-// §37.16 detail 11: a net declared with a nettype is a nettype net, and any
-// part of it -- a net bit, whose parent stands for the same net -- a nettype
-// net select, in both forms. Neither vpiDriver nor vpiLocalDriver is iterated
-// on such a part, while the whole net keeps its drivers.
 TEST_F(NetContext, APartOfANettypeNetIsANettypeNetSelect) {
   Net user;
   user.is_user_nettype = true;
@@ -247,17 +189,12 @@ TEST_F(NetContext, APartOfANettypeNetIsANettypeNetSelect) {
   EXPECT_NE(vpi_iterate(vpiDriver, VpiHandleOf(&net)), nullptr);
 }
 
-// D12: vpiNetType for an interconnect net is vpiInterconnect;
-// vpiResolvedNetType for a simulated interconnect net is the resolved type of
-// the simulated net.
 TEST(NetModel, InterconnectNetTypeAndResolvedType) {
   EXPECT_EQ(VpiInterconnectNetType(), vpiInterconnect);
   EXPECT_EQ(VpiInterconnectResolvedNetType(vpiWand), vpiWand);
   EXPECT_EQ(VpiInterconnectResolvedNetType(vpiTri), vpiTri);
 }
 
-// D13: vpiTypespec returns NULL for an interconnect array; for any other net it
-// is the net's typespec child.
 TEST(NetModel, TypespecNullForInterconnectArray) {
   VpiObject typespec;
   typespec.type = vpiTypespec;
@@ -273,40 +210,30 @@ TEST(NetModel, TypespecNullForInterconnectArray) {
   EXPECT_EQ(VpiNetTypespec(&interconnect_array), nullptr);
 }
 
-// D21: vpiExpanded on a net bit reports the value of the property for its
-// parent net (a scalared/default net is expanded; a vectored net is not),
-// observed through the public vpi_get entry point.
 TEST_F(NetContext, ExpandedOnNetBitReadsParentNet) {
   VpiObject vectored_net;
   vectored_net.type = vpiNet;
-  vectored_net.is_vectored = true;  // a vectored net is reported unexpanded
+  vectored_net.is_vectored = true;
   VpiObject bit_of_vectored;
   bit_of_vectored.type = vpiNetBit;
   bit_of_vectored.parent = &vectored_net;
   EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&bit_of_vectored)), 0);
 
   VpiObject plain_net;
-  plain_net.type = vpiNet;  // neither vectored nor scalared -> expanded
+  plain_net.type = vpiNet;
   VpiObject bit_of_plain;
   bit_of_plain.type = vpiNetBit;
   bit_of_plain.parent = &plain_net;
   EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&bit_of_plain)), 1);
 }
 
-// D23: vpiConstantSelect is TRUE for a net with no parent, or for a select with
-// all-constant indices over static-bound elements; FALSE otherwise (see A.8.4).
 TEST(NetModel, ConstantSelectRule) {
-  // No parent -> constant select regardless of the select inputs.
-  EXPECT_TRUE(VpiNetConstantSelect(/*has_parent=*/false, false, false));
-  // Has parent: TRUE only when both select conditions hold.
+  EXPECT_TRUE(VpiNetConstantSelect(false, false, false));
   EXPECT_TRUE(VpiNetConstantSelect(true, true, true));
   EXPECT_FALSE(VpiNetConstantSelect(true, true, false));
   EXPECT_FALSE(VpiNetConstantSelect(true, false, true));
 }
 
-// D24: vpiSize is the element count for an interconnect array or array net, the
-// connected net's size for an interconnect net, the bit width for an integral
-// net, the member count for an unpacked struct/union net, and 1 for a net bit.
 TEST(NetModel, SizeByNetKind) {
   VpiNetSizeQuery q;
 
@@ -330,15 +257,11 @@ TEST(NetModel, SizeByNetKind) {
   q.bit_width = 32;
   EXPECT_EQ(VpiNetSize(q), 32);
 
-  // A plain packed logic vector net (e.g. `wire [7:0] w`) is of an integral
-  // data type, so vpiSize is its width in bits - the most common integral form,
-  // reached through the net-family head rather than the integer-net kind.
   q = {};
   q.net_type = vpiNet;
   q.bit_width = 8;
   EXPECT_EQ(VpiNetSize(q), 8);
 
-  // A bit net and an enum net are likewise sized in bits.
   q = {};
   q.net_type = vpiBitNet;
   q.bit_width = 3;
@@ -353,8 +276,6 @@ TEST(NetModel, SizeByNetKind) {
   q.net_type = vpiNetBit;
   EXPECT_EQ(VpiNetSize(q), 1);
 
-  // A packed struct net is integral (size in bits); an unpacked one reports its
-  // member count.
   q = {};
   q.net_type = vpiStructNet;
   q.packed = true;
@@ -364,7 +285,6 @@ TEST(NetModel, SizeByNetKind) {
   q.packed = false;
   EXPECT_EQ(VpiNetSize(q), 3);
 
-  // The same packed/unpacked split applies to a union net.
   q = {};
   q.net_type = vpiUnionNet;
   q.packed = true;
@@ -374,16 +294,12 @@ TEST(NetModel, SizeByNetKind) {
   q.packed = false;
   EXPECT_EQ(VpiNetSize(q), 2);
 
-  // Edge: vpiSize is undefined for a net that is not one of the above kinds and
-  // is not of an integral data type (a real net), reported as 0.
   q = {};
   q.net_type = vpiRealNet;
   q.bit_width = 64;
   EXPECT_EQ(VpiNetSize(q), 0);
 }
 
-// D25: vpi_iterate(vpiIndex, net) returns the indices from the net's index
-// outward only when the net is an element of an array net; otherwise none.
 TEST(NetModel, IndexIterationOnlyForArrayNetElement) {
   VpiObject i0, i1;
   std::vector<VpiHandle> indices = {&i0, &i1};
@@ -395,9 +311,6 @@ TEST(NetModel, IndexIterationOnlyForArrayNetElement) {
   EXPECT_TRUE(VpiNetIndicesOutward(false, indices).empty());
 }
 
-// D26 (woven with §37.22): vpiRange returns one range per declared dimension,
-// dropping implicit element ranges; vpiLeftRange/vpiRightRange report the
-// bounds of the leftmost dimension, or NULL when there is none.
 TEST(NetModel, RangeIterationAndLeftRightRange) {
   VpiObject lo, hi;
 
@@ -413,24 +326,19 @@ TEST(NetModel, RangeIterationAndLeftRightRange) {
 
   std::vector<VpiArrayDimension> dims = {packed, implicit_elem};
   std::vector<VpiRangeDesc> ranges = VpiNetRanges(dims);
-  ASSERT_EQ(ranges.size(), 1u);  // the implicit element range is dropped
+  ASSERT_EQ(ranges.size(), 1u);
   EXPECT_EQ(ranges[0].size, 4);
 
   EXPECT_EQ(VpiNetLeftRange(dims), &hi);
   EXPECT_EQ(VpiNetRightRange(dims), &lo);
 
-  // No dimensions -> the leftmost range is empty, so both relations are NULL.
   EXPECT_EQ(VpiNetLeftRange({}), nullptr);
   EXPECT_EQ(VpiNetRightRange({}), nullptr);
 }
 
-// D27 and D29: vpi_get_str(vpiType) reports a permitted spelling of the type
-// constant. Because vpiArrayNet aliases vpiNetArray and vpiLogicNet aliases
-// vpiNet, either spelling is acceptable; the simulator returns the IEEE 1364
-// names. Driven through the public vpi_get_str entry point.
 TEST_F(NetContext, TypeStringForAliasedNetKinds) {
-  EXPECT_EQ(vpiLogicNet, vpiNet);       // #defined the same (D29)
-  EXPECT_EQ(vpiArrayNet, vpiNetArray);  // #defined the same (D27)
+  EXPECT_EQ(vpiLogicNet, vpiNet);
+  EXPECT_EQ(vpiArrayNet, vpiNetArray);
 
   VpiObject logic_net;
   logic_net.type = vpiNet;
@@ -448,24 +356,17 @@ TEST_F(NetContext, TypeStringForAliasedNetKinds) {
             "vpiStructNet");
 }
 
-// D28: a bit/logic net with no packed dimension and a net bit are scalars; an
-// integral net is a vector; an enum net and an array net defer to their base
-// type and element respectively.
 TEST(NetModel, ScalarAndVectorRules) {
   VpiNetScalarVectorQuery q;
 
-  // Logic net, no packed dimension -> scalar, not vector.
   q = {};
   q.net_type = vpiNet;
   EXPECT_TRUE(VpiNetScalar(q));
   EXPECT_FALSE(VpiNetVector(q));
-  // With a packed dimension it becomes a vector.
   q.has_packed_dimension = true;
   EXPECT_FALSE(VpiNetScalar(q));
   EXPECT_TRUE(VpiNetVector(q));
 
-  // A bit net follows the same packed-dimension rule as a logic net: scalar
-  // when it has no packed dimension, a vector once it does.
   q = {};
   q.net_type = vpiBitNet;
   EXPECT_TRUE(VpiNetScalar(q));
@@ -474,54 +375,44 @@ TEST(NetModel, ScalarAndVectorRules) {
   EXPECT_FALSE(VpiNetScalar(q));
   EXPECT_TRUE(VpiNetVector(q));
 
-  // A net bit is a scalar.
   q = {};
   q.net_type = vpiNetBit;
   EXPECT_TRUE(VpiNetScalar(q));
   EXPECT_FALSE(VpiNetVector(q));
 
-  // An integer net is a vector, not a scalar.
   q = {};
   q.net_type = vpiIntegerNet;
   EXPECT_FALSE(VpiNetScalar(q));
   EXPECT_TRUE(VpiNetVector(q));
 
-  // An enum net defers to its base typespec: a vector base makes it a vector...
   q = {};
   q.net_type = vpiEnumNet;
   q.base_is_vector = true;
   EXPECT_TRUE(VpiNetVector(q));
   EXPECT_FALSE(VpiNetScalar(q));
-  // ...and a scalar base makes it a scalar.
   q = {};
   q.net_type = vpiEnumNet;
   q.base_is_scalar = true;
   EXPECT_TRUE(VpiNetScalar(q));
   EXPECT_FALSE(VpiNetVector(q));
 
-  // An array net defers to an element: a scalar element makes it a scalar...
   q = {};
   q.net_type = vpiNetArray;
   q.element_is_scalar = true;
   EXPECT_TRUE(VpiNetScalar(q));
   EXPECT_FALSE(VpiNetVector(q));
-  // ...and a vector element makes it a vector.
   q = {};
   q.net_type = vpiNetArray;
   q.element_is_vector = true;
   EXPECT_TRUE(VpiNetVector(q));
   EXPECT_FALSE(VpiNetScalar(q));
 
-  // A packed struct net is a vector by the same integral rule as a packed union
-  // net (both flow through the struct/union arm).
   q = {};
   q.net_type = vpiStructNet;
   q.packed = true;
   EXPECT_TRUE(VpiNetVector(q));
   EXPECT_FALSE(VpiNetScalar(q));
 
-  // A packed struct/union net is integral, so it is a vector (not a scalar); an
-  // unpacked one is neither.
   q = {};
   q.net_type = vpiUnionNet;
   q.packed = true;
@@ -531,39 +422,29 @@ TEST(NetModel, ScalarAndVectorRules) {
   EXPECT_FALSE(VpiNetVector(q));
   EXPECT_FALSE(VpiNetScalar(q));
 
-  // Edge: for every other net object both properties are FALSE (a real net).
   q = {};
   q.net_type = vpiRealNet;
   EXPECT_FALSE(VpiNetScalar(q));
   EXPECT_FALSE(VpiNetVector(q));
 }
 
-// D30: array nets, unpacked struct/union nets, and interconnect arrays have no
-// value property; other nets do.
 TEST(NetModel, ValuePropertyAvailability) {
   EXPECT_FALSE(VpiNetHasValueProperty(vpiNetArray, false));
   EXPECT_FALSE(VpiNetHasValueProperty(vpiInterconnectArray, false));
-  EXPECT_FALSE(
-      VpiNetHasValueProperty(vpiStructNet, /*packed_struct_union=*/false));
-  EXPECT_TRUE(
-      VpiNetHasValueProperty(vpiStructNet, /*packed_struct_union=*/true));
-  // An unpacked union net likewise has no value property; a packed one does.
-  EXPECT_FALSE(
-      VpiNetHasValueProperty(vpiUnionNet, /*packed_struct_union=*/false));
-  EXPECT_TRUE(
-      VpiNetHasValueProperty(vpiUnionNet, /*packed_struct_union=*/true));
+  EXPECT_FALSE(VpiNetHasValueProperty(vpiStructNet, false));
+  EXPECT_TRUE(VpiNetHasValueProperty(vpiStructNet, true));
+  EXPECT_FALSE(VpiNetHasValueProperty(vpiUnionNet, false));
+  EXPECT_TRUE(VpiNetHasValueProperty(vpiUnionNet, true));
   EXPECT_TRUE(VpiNetHasValueProperty(vpiNet, false));
   EXPECT_TRUE(VpiNetHasValueProperty(vpiBitNet, false));
 }
 
-// D31: vpiParent returns the first qualifying prefix object, scanning rightmost
-// to leftmost; NULL when none qualifies.
 TEST(NetModel, ParentReturnsFirstQualifyingPrefix) {
   VpiObject struct_net, array_net;
   std::vector<VpiParentPrefix> prefixes = {
-      {/*qualifies=*/false, nullptr},
-      {/*qualifies=*/true, &struct_net},
-      {/*qualifies=*/true, &array_net},
+      {false, nullptr},
+      {true, &struct_net},
+      {true, &array_net},
   };
   EXPECT_EQ(VpiNetParent(prefixes), &struct_net);
 
@@ -571,8 +452,6 @@ TEST(NetModel, ParentReturnsFirstQualifyingPrefix) {
   EXPECT_EQ(VpiNetParent(none), nullptr);
 }
 
-// D32: vpiElement iterates the subelements of a packed array net (one dimension
-// at a time); no other net kind has a vpiElement iteration.
 TEST(NetModel, ElementIterationForPackedArrayNet) {
   EXPECT_TRUE(VpiNetElementIteratorApplies(vpiPackedArrayNet));
   EXPECT_FALSE(VpiNetElementIteratorApplies(vpiNetArray));
@@ -591,8 +470,6 @@ TEST(NetModel, ElementIterationForPackedArrayNet) {
   EXPECT_TRUE(VpiPackedArrayNetElements(&plain_net).empty());
 }
 
-// D33: vpiStructUnionMember is TRUE for a net or array net whose parent is a
-// struct/union net, FALSE otherwise, and is reported FALSE for a net bit.
 TEST(NetModel, StructUnionMemberRule) {
   VpiObject struct_net;
   struct_net.type = vpiStructNet;
@@ -607,7 +484,6 @@ TEST(NetModel, StructUnionMemberRule) {
   member_array.parent = &struct_net;
   EXPECT_TRUE(VpiNetStructUnionMember(&member_array));
 
-  // A union net parent also makes the member a struct/union member.
   VpiObject union_net;
   union_net.type = vpiUnionNet;
   VpiObject union_member;
@@ -615,21 +491,17 @@ TEST(NetModel, StructUnionMemberRule) {
   union_member.parent = &union_net;
   EXPECT_TRUE(VpiNetStructUnionMember(&union_member));
 
-  // A net bit's parent is a net, so the property is reported FALSE for it.
   VpiObject net_bit;
   net_bit.type = vpiNetBit;
   net_bit.parent = &struct_net;
   EXPECT_FALSE(VpiNetStructUnionMember(&net_bit));
 
-  // A net whose parent is not a struct/union net.
   VpiObject array_net;
   array_net.type = vpiNetArray;
   member_net.parent = &array_net;
   EXPECT_FALSE(VpiNetStructUnionMember(&member_net));
 }
 
-// D34: for a net that is a member of a struct/union, vpiFullName and
-// vpiDecompile include the struct-name prefix while vpiName does not.
 TEST(NetModel, MemberNetNameForms) {
   VpiVariableNameParts parts;
   parts.top_scope = "top";
@@ -641,9 +513,6 @@ TEST(NetModel, MemberNetNameForms) {
   EXPECT_EQ(VpiNetDecompile(parts), "str1.vec[5]");
   EXPECT_EQ(VpiNetFullName(parts), "top.str1.vec[5]");
 
-  // A top-level indexed net has no member prefixes, so vpiName and vpiDecompile
-  // are the same indexed leaf; only vpiFullName carries the scope. (LRM's
-  // top.warr1[1][9] form.)
   VpiVariableNameParts top_level;
   top_level.top_scope = "top";
   top_level.member = "warr1";
@@ -652,8 +521,6 @@ TEST(NetModel, MemberNetNameForms) {
   EXPECT_EQ(VpiNetDecompile(top_level), "warr1[1][9]");
   EXPECT_EQ(VpiNetFullName(top_level), "top.warr1[1][9]");
 
-  // A net nested more than one struct deep carries every intermediate prefix in
-  // vpiDecompile/vpiFullName but never in vpiName. (LRM's top.str1.inner1.j1.)
   VpiVariableNameParts nested;
   nested.top_scope = "top";
   nested.member_prefixes = {"str1", "inner1"};
@@ -662,18 +529,14 @@ TEST(NetModel, MemberNetNameForms) {
   EXPECT_EQ(VpiNetDecompile(nested), "str1.inner1.j1");
   EXPECT_EQ(VpiNetFullName(nested), "top.str1.inner1.j1");
 
-  // With no top-level scope, vpiFullName collapses to the vpiDecompile form.
   VpiVariableNameParts no_scope;
   no_scope.member = "w";
   EXPECT_EQ(VpiNetFullName(no_scope), VpiNetDecompile(no_scope));
   EXPECT_EQ(VpiNetFullName(no_scope), "w");
 }
 
-// A design run with a PLI application registered, its nets' bits read back
-// once the run is over.
 class NetBitsOfARun : public VpiDesignRun {
  protected:
-  // The integer value of an object.
   static int IntOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -681,7 +544,6 @@ class NetBitsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // How many objects of `type` `ref` reaches.
   static int CountOf(int type, vpiHandle ref) {
     int count = 0;
     vpiHandle it = vpi_iterate(type, ref);
@@ -698,40 +560,31 @@ class NetBitsOfARun : public VpiDesignRun {
 constexpr const char* kVectorNet =
     "module top; wire [3:0] n = 4'b0100; endmodule\n";
 
-// §37.16: a vector net has one net bit per bit...
 TEST_F(NetBitsOfARun, AVectorNetHasOneBitPerBit) {
   Run(kVectorNet);
   EXPECT_EQ(CountOf(vpiBit, Net()), 4);
 }
 
-// ...of type vpiNetBit...
 TEST_F(NetBitsOfARun, ANetsBitIsANetBit) {
   Run(kVectorNet);
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(Net(), 2)), vpiNetBit);
 }
 
-// ...holding its bit of the net's value.
 TEST_F(NetBitsOfARun, ANetBitHoldsItsBit) {
   Run(kVectorNet);
   EXPECT_EQ(IntOf(vpi_handle_by_index(Net(), 2)), 1);
 }
 
-// Detail 23: a net bit is an element of a packed array, whose bounds are
-// static, so one whose index is a constant is a constant select.
 TEST_F(NetBitsOfARun, ANetBitAtAConstantIndexIsAConstantSelect) {
   Run(kVectorNet);
   EXPECT_EQ(vpi_get(vpiConstantSelect, vpi_handle_by_index(Net(), 2)), 1);
 }
 
-// Detail 23: a net no other net holds has no parent, so it is a constant
-// select.
 TEST_F(NetBitsOfARun, ANetWithNoParentIsAConstantSelect) {
   Run(kVectorNet);
   EXPECT_EQ(vpi_get(vpiConstantSelect, Net()), 1);
 }
 
-// A design run with a PLI application registered, its nets read back once the
-// run is over.
 class NetTypesOfARun : public VpiDesignRun {
  protected:
   static int NetTypeOf(const char* name) {
@@ -745,7 +598,6 @@ constexpr const char* kNetKinds =
     "  wire w; tri t; wand wa; supply0 s0; trireg tr; uwire u; mynet n;\n"
     "endmodule\n";
 
-// §37.16: a net's vpiNetType is the kind of net it was declared.
 TEST_F(NetTypesOfARun, AWireIsAWire) {
   Run(kNetKinds);
   EXPECT_EQ(NetTypeOf("top.w"), vpiWire);
@@ -776,14 +628,11 @@ TEST_F(NetTypesOfARun, AUwireIsAUwire) {
   EXPECT_EQ(NetTypeOf("top.u"), vpiUwire);
 }
 
-// A net of a user-defined nettype is a nettype net.
 TEST_F(NetTypesOfARun, AUserNettypeNetIsANettypeNet) {
   Run(kNetKinds);
   EXPECT_EQ(NetTypeOf("top.n"), vpiNettypeNet);
 }
 
-// §37.16: every kind a net can be declared is reported as its own constant,
-// in the integer form and, by §37.3.2, in the string form naming it.
 TEST_F(NetTypesOfARun, EveryNetKindReportsItsConstantAndItsName) {
   Run("module top;\n"
       "  nettype logic mynet;\n"
@@ -820,7 +669,6 @@ TEST_F(NetTypesOfARun, EveryNetKindReportsItsConstantAndItsName) {
   }
 }
 
-// §37.3.2: the string form names the constant the integer form reports.
 TEST_F(NetTypesOfARun, TheNetTypesNameIsItsConstant) {
   Run(kNetKinds);
   EXPECT_STREQ(
@@ -828,9 +676,6 @@ TEST_F(NetTypesOfARun, TheNetTypesNameIsItsConstant) {
       "vpiWand");
 }
 
-// Detail 31: a select of an outer packed dimension of a net is a logic net
-// vector the size of the element it selects, whose parent is the net it
-// selects from, holding the element its index now names (#4986).
 TEST_F(NetBitsOfARun, AnOuterPackedSelectOfANetIsANetVector) {
   Run("module top; wire [3:0][7:0] n = 32'h44332211; integer i = 1;\n"
       "  wire [7:0] y; assign y = n[i];\n"
@@ -851,23 +696,17 @@ TEST_F(NetBitsOfARun, AnOuterPackedSelectOfANetIsANetVector) {
   EXPECT_EQ(IntOf(rhs), 0x22);
 }
 
-// D2: a packed member is one whose vpiParent is a packed array net, so a struct
-// net with no parent at all is none.
 TEST(NetModel, AStructNetWithNoParentIsNoPackedArrayMember) {
   VpiObject orphan;
   orphan.type = vpiStructNet;
   EXPECT_FALSE(VpiNetIsPackedArrayMember(&orphan));
 }
 
-// D7: a reference that is neither a bit or scalar nor an entire net or array
-// net selects the whole port.
 TEST(NetModel, AnyOtherReferenceSelectsTheWholePort) {
   EXPECT_EQ(VpiPortInstReferenceGranularity(false, false, false),
             VpiPortGranularity::kEntirePort);
 }
 
-// D13: the typespec reached is the net's typespec child, found past any child
-// of another kind; a net holding none, or no net at all, reaches NULL.
 TEST(NetModel, TheNetTypespecIsFoundAmongOtherChildren) {
   VpiObject bit;
   bit.type = vpiNetBit;
@@ -883,16 +722,12 @@ TEST(NetModel, TheNetTypespecIsFoundAmongOtherChildren) {
   EXPECT_EQ(VpiNetTypespec(nullptr), nullptr);
 }
 
-// D21: a net bit reports its parent net's vpiExpanded, and one with no parent
-// has the default, expanded.
 TEST_F(NetContext, ANetBitWithNoParentIsExpanded) {
   VpiObject bit;
   bit.type = vpiNetBit;
   EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&bit)), 1);
 }
 
-// D24 and D28: every integral-typed net kind reports its size in bits and is a
-// vector.
 TEST(NetModel, EveryIntegralTypedNetIsAVectorSizedInBits) {
   for (int kind : {vpiIntegerNet, vpiTimeNet, vpiByteNet, vpiShortIntNet,
                    vpiIntNet, vpiLongIntNet, vpiPackedArrayNet}) {
@@ -906,13 +741,10 @@ TEST(NetModel, EveryIntegralTypedNetIsAVectorSizedInBits) {
   }
 }
 
-// D32: no handle has subelements.
 TEST(NetModel, NoHandleHasPackedArrayElements) {
   EXPECT_TRUE(VpiPackedArrayNetElements(nullptr).empty());
 }
 
-// §37.16 (figure): the `nets` class groups the net bit, the interconnect array,
-// the array net and every concrete net kind, a user-defined net's among them.
 TEST(NetModel, EveryKindTheNetsClassGroupsIsANet) {
   for (int kind :
        {vpiNet, vpiNetBit, vpiNetArray, vpiStructNet, vpiUnionNet, vpiEnumNet,
@@ -924,9 +756,6 @@ TEST(NetModel, EveryKindTheNetsClassGroupsIsANet) {
   EXPECT_FALSE(VpiIsNetsType(vpiReg));
 }
 
-// §37.16 detail 31: a constant select of an outer packed dimension of a net
-// reaches the net it selects from through vpiParent; a select standing over
-// no net reaches nothing.
 TEST_F(NetContext, AConstantPackedSelectReachesItsNet) {
   VpiObject net;
   net.type = vpiNet;

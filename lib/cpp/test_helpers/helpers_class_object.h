@@ -28,7 +28,6 @@ inline std::pair<uint64_t, ClassObject*> MakeObj(SimFixture& f,
                                                  ClassTypeInfo* type) {
   auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
-  // Initialize properties to 0.
   for (const auto& p : type->properties) {
     obj->properties[std::string(p.name)] =
         MakeLogic4VecVal(f.arena, p.width, 0);

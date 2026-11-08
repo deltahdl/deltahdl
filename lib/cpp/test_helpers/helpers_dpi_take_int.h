@@ -9,12 +9,6 @@
 
 using namespace delta;
 
-// Registers a "take_int" DPI import on `rt` whose int formal reports back the
-// value it observed (or -1 if the callee did not see a kInt formal), then calls
-// it with the single `actual` and returns the callee's reported result. This is
-// the shared §35.6.1 / §35.6.1.1 setup for the input-coercion and WYSIWYG
-// declared-type tests, which differ only in the actual presented and the value
-// expected back.
 inline DpiArgValue CallTakeIntReportingFormal(DpiRuntime& rt,
                                               const DpiArgValue& actual) {
   DpiRtFunction func;

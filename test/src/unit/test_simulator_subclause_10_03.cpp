@@ -77,17 +77,6 @@ TEST(ContinuousAssignSim, AssignmentReevaluatesOnRhsChange) {
   EXPECT_EQ(y->value.ToUint64(), 42u);
 }
 
-// §10.3 makes a continuous assignment drive its left-hand side whenever an
-// operand of the right-hand side changes, and puts no condition on the shape of
-// that operand. The case above reads two whole variables; this one reads a
-// single bit of one, which is the operand form whose collected name --
-// BuildSelectPrefix's `a[1]` -- resolves to no simulation object, since
-// `logic [3:0] a` is one Variable named `a`.
-//
-// The second write clears the bit the assignment reads while leaving the
-// variable's other bits alone, so an assignment that never re-evaluated leaves
-// y at 1. This states the defect without an instance array, so it stays red if
-// a fix reaches only the array expansion.
 TEST(ContinuousAssignSim, RhsBitSelectOfAPackedVectorTracksLaterChanges) {
   SimFixture f;
   auto* y = RunAndFindVar(

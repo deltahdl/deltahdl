@@ -89,8 +89,6 @@ void CollectUnitScopedInStmt(const Stmt* s, std::vector<const Expr*>& out) {
       s, [&](Stmt* const& sub) { CollectUnitScopedInStmt(sub, out); });
 }
 
-// Whether `item` names `name` among the enumeration members it declares
-// (§6.19), which are declarations of the scope the item stands in.
 bool DeclaresEnumMember(const ModuleItem* item, std::string_view name) {
   bool found = false;
   ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
@@ -101,15 +99,10 @@ bool DeclaresEnumMember(const ModuleItem* item, std::string_view name) {
   return found;
 }
 
-// A search of the unit for the declaration `ref`, a `$unit::` name, names.
 struct UnitNameSearch {
   const Expr* ref;
-  // Set when a declaration of the name stands only after `ref`.
   bool declared_after = false;
 
-  // Whether the declaration of `name` at `loc` is one `ref` names: a
-  // declaration written before it, or one that `any_order` lets be written
-  // anywhere.
   bool Names(std::string_view name, SourceLoc loc, bool any_order) {
     if (name != ref->text) return false;
     if (any_order || PrecedesInText(loc, ref->range.start)) return true;
@@ -118,10 +111,6 @@ struct UnitNameSearch {
   }
 };
 
-// Whether a declaration of the unit written before the search's reference, or
-// a task or function of the unit written anywhere, is what it names. A class
-// is reached as the head of `$unit::C::K`; a checker is no expression primary,
-// so no `$unit::` identifier names one.
 bool FindsUnitDeclaration(UnitNameSearch& search, const CompilationUnit* unit) {
   for (const auto* item : unit->cu_items) {
     bool is_subroutine = item->kind == ModuleItemKind::kTaskDecl ||
@@ -138,8 +127,6 @@ bool FindsUnitDeclaration(UnitNameSearch& search, const CompilationUnit* unit) {
   return false;
 }
 
-// Reports `ref`, a `$unit::` name, unless FindsUnitDeclaration finds what it
-// names.
 void CheckUnitScopedName(const Expr* ref, const CompilationUnit* unit,
                          DiagEngine& diag) {
   UnitNameSearch search{ref};

@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §25.7.3: memMod defines the interface's Read for its port a and exports it
-// through the target modport, so cpuMod's `b.Read(17)` through the initiator
-// modport runs memMod's body: in mem, reading and writing mem's avail, and
-// taking its delay of 4 before the caller goes on. Before the body was
-// registered under the connected instance's key, the call ran nothing and
-// the caller went on at time 0.
 TEST(InterfaceExportSim, ExportedTaskRunsInTheDefiningModule) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface simple_bus;\n"

@@ -145,13 +145,6 @@ TEST(OperatorAndExpressionParsing, InsideExpressionWithLhsAndElements) {
   EXPECT_EQ(cond->elements.size(), 3u);
 }
 
-// Covers Parser::ParseInsideValueRange in src/parser/expr_parser_patterns.cpp,
-// which builds the ExprKind::kSelect that one bracketed element of an
-// open_range_list becomes. It assigned no range.start before this commit, so a
-// report standing at such an element printed "<unknown location>" instead of a
-// file, line and column. §11.4.13 writes the element as `[ expression :
-// expression ]`, the bracketed pair itself, so it begins at the `[` rather than
-// at either bound: column 25 of line 2.
 TEST(OperatorAndExpressionParsing, InsideValueRangeStartsAtItsBracket) {
   auto r = Parse(
       "module t;\n"

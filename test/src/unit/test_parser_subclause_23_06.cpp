@@ -102,12 +102,6 @@ TEST(HierarchicalNameParsing, HierarchicalReferenceWithInstanceSelect) {
               "endmodule\n"));
 }
 
-// §23.6 Syntax 23-7: `hierarchical_identifier ::= [ $root . ]
-// { identifier constant_bit_select . } identifier`, so an instance select may
-// be followed by as many members as the name has. One member after a select
-// parsed already, which is what HierarchicalReferenceWithInstanceSelect above
-// covers and why it could not fail for this: the parser read exactly one and
-// stopped, leaving the rest of the name behind.
 TEST(HierarchicalNameParsing, InstanceSelectFollowedByMoreThanOneMember) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -117,9 +111,6 @@ TEST(HierarchicalNameParsing, InstanceSelectFollowedByMoreThanOneMember) {
               "endmodule\n"));
 }
 
-// §23.6 lets $root head a hierarchical name, and A.8.4 gives the name any
-// number of selects: `$root.top.arr[1][0]` was read with one select, and the
-// second `[` was reported where the argument list's `)` was expected.
 TEST(HierarchicalNameParsing, RootedNameTakesSeveralSelects) {
   EXPECT_TRUE(
       ParseOk("module sub;\n"
@@ -131,9 +122,6 @@ TEST(HierarchicalNameParsing, RootedNameTakesSeveralSelects) {
               "endmodule\n"));
 }
 
-// §23.6 with A.8.2: a call through a $root-headed name, as an expression, as
-// a statement, and as a randomize() with a `with` clause. The tail stopped at
-// the name, and each `(` was reported where a ';' was expected.
 TEST(HierarchicalNameParsing, RootedNameTakesACall) {
   EXPECT_TRUE(
       ParseOk("class D;\n"

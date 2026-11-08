@@ -42,24 +42,6 @@
 
 namespace delta {
 
-// §11.5.1 with §6.18: a variable declared with a typedef name is the type the
-// name stands for, packed range included, and which bit an index addresses is
-// decided in part by the declaration: a `value_t v` on `typedef bit [15:10]
-// value_t` addresses its bits as [15:10]. The declaration itself writes no
-// dimension, so the lowerer's RecordPackedRange, which reads one off `dtype`,
-// had nothing to read and left `v` addressed as [5:0], and `v[13:10]` read
-// four bits outside it (#3808). The resolved type is set as `dtype`, the way
-// SetEnumTypeInfo in elaborator_decls.cpp sets an enum's, for a name standing
-// for a vector of one packed dimension or more (§7.4.4 letting a typedef write
-// them all, and §7.4.1 having each index of a multidimensional one address an
-// element); a name written with a dimension of its own stacks it on the type
-// and keeps the declaration's own DataType.
-//
-// §21.7.5 (Table 21-11) with §6.18: a name standing for an integral keyword
-// type with no dimension, `typedef int myint`, is set the same way, since the
-// kind is the one fact of such a type the width does not carry, and the
-// lowerer declares a dumped variable by it (VcdEffectiveDeclKind); left with
-// the name alone, `myint v` was dumped with var_type wire, a net's.
 static bool IsIntegralKeywordKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -107,18 +89,6 @@ static void ValidateParameterizedClassDefaults(const ModuleItem* item,
              Subclause("8.25"));
 }
 
-// §8.25: the objects of a parameterized class are instantiated as modules and
-// interfaces are, by the parameter override rules of §23.10 (printed page 203
-// of IEEE 1800-2023), and §23.10.2 gives a parameter override a constant
-// expression as its value. Reports a value argument of `C#(...) c;` that is not
-// one.
-//
-// A value argument parses as an implicit-typed slot carrying the expression, so
-// `type_name` is empty and `type_ref_expr` holds it; a type argument names a
-// type and is decided elsewhere. Without this, the argument was folded only
-// where a later constant expression happened to reach it, and the failure was
-// read as "no override was written" rather than as a value the source got
-// wrong.
 static void ValidateSpecializationArgsConstant(const ModuleItem* item,
                                                const ScopeMap& scope,
                                                DiagEngine& diag) {
@@ -148,45 +118,6 @@ static void ValidateWeakReferenceTypeParam(
   }
 }
 
-// Rewrites the type a declaration wrote to the type it denotes, so that every
-// check downstream reads the second rather than the first. Two rewrites are
-// needed and both are done here, because either one alone leaves a declaration
-// whose written name says nothing about what it declares.
-//
-// §8.25 makes a member of a parameterized class depend on the specialization it
-// is reached through, so `C#(int)::T v;` denotes int and
-// ResolveParameterizedType substitutes it.
-//
-// §6.20.3 lets a type parameter resolve to a class type, and §6.18 lets a
-// typedef name one, so `P obj;` declares a handle when `P` is bound to `D`.
-// Both bindings live in the typedef map under the written name, and the
-// declaration keeps that name, so every check that recognizes a handle by
-// looking the declared name up in class_names_ misses the declaration
-// entirely -- the name there is `P` and the class is `D`. Rewriting the name is
-// what puts the declaration in front of those checks, and it carries the
-// specialization arguments §8.25 makes the type depend on along with it.
-// Only the three fields that say which type it is are taken, so a dimension
-// written on the declaration itself survives.
-//
-// The declaration is passed whole rather than as its DataType because the
-// specialization earns §23.10.2.2 reports about the names its arguments carry,
-// and ModuleItem::loc is where those stand.
-//
-// The typedef is looked up by the name the declaration wrote, qualifier
-// included: §26.3 (printed page 808) reaches a package's typedef through the
-// package scope resolution operator, and §15.4.9 (printed 377) declares a
-// parameterized mailbox through a typedef of `mailbox #(string)`, so
-// `p::s_mbox sm = new` on a package's `typedef mailbox #(string) s_mbox`
-// declares a mailbox, as `p::sem_t s = new(2)` on its `typedef semaphore
-// sem_t` declares a semaphore (§15.3.1, printed 373). The table holds the
-// two under "p::s_mbox" and "p::sem_t", the keys FindNamedType builds from
-// the qualifier, and the lookup by dtype.type_name alone missed them, so the
-// declaration kept an empty class_type_name and the lowerer's
-// CreateSyncObjectForVar (sync_variable.cpp) made no object: put() and get()
-// ran on nothing. §6.18 (printed 118) lets one typedef name stand for
-// another, `typedef p::s_mbox my_mbox`, so the chain is followed until it
-// reaches a class name or a type that is not a name; a chain that comes back
-// to itself is left where it stands.
 static void ResolveDeclaredTypeName(
     ModuleItem* item, const CompilationUnit* unit, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
@@ -212,10 +143,6 @@ void Elaborator::ValidateVarDeclTypes(ModuleItem* item, const ScopeMap& scope,
                                       bool writes_its_type) {
   if (item->data_type.kind == DataTypeKind::kNamed &&
       class_names_.count(item->data_type.type_name)) {
-    // §7.4 and §7.8: a declaration with an unpacked dimension, `C m[string]`
-    // or `C a[3]`, is an array whose elements are handles, and a select of
-    // it is an element (§7.4.6), not §8.4's bit-select of a handle; the
-    // checks that take a class variable for one handle leave it alone.
     if (item->unpacked_dims.empty()) class_var_names_.insert(item->name);
     class_var_types_[item->name] = item->data_type.type_name;
     ValidateParameterizedClassDefaults(item, unit_, diag_);
@@ -243,17 +170,12 @@ static void CollectUnpackedDimSizes(
   for (auto* dim : dims) {
     if (!dim) continue;
     if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
-      // §7.4.2 / §11.2.1: bounds may name parameters, so evaluate every
-      // dimension in the module's parameter scope (mirrors
-      // ComputeUnpackedDims).
       auto lv = ConstEvalInt(dim->lhs, scope);
       auto rv = ConstEvalInt(dim->rhs, scope);
       if (!lv || !rv) continue;
       declared_dims.push_back({*lv, *rv});
       dim_sizes.push_back(static_cast<uint32_t>(std::abs(*lv - *rv) + 1));
     } else if (auto sv = ConstEvalInt(dim, scope); sv && *sv > 0) {
-      // §7.4.2: a dimension given as a size N is the range [0:N-1], so it
-      // counts upward from zero.
       declared_dims.push_back({0, *sv - 1});
       dim_sizes.push_back(static_cast<uint32_t>(*sv));
     }
@@ -291,22 +213,12 @@ void Elaborator::TrackVarArrayInfo(
   info.unpacked_shape = UnpackedShapeOf(item->data_type, item->unpacked_dims,
                                         aggregate_typedef_names_, scope);
   out[item->name] = info;
-  // §11.5.2 resolves an address against the bounds the declaration gives, so
-  // both bounds of every dimension that folded are carried through as declared,
-  // in declaration order. A dimension written the other way round is a
-  // different declaration, which the smaller bound alone cannot say, and one
-  // dimension needs the record as much as two: an address is resolved the same
-  // way whatever the dimension count.
   var.num_unpacked_dims = static_cast<uint32_t>(item->unpacked_dims.size());
   var.declared_unpacked_dims = &item->unpacked_dims;
   var.unpacked_dims.reserve(info.declared_dims.size());
   for (const auto& dim : info.declared_dims) {
     var.unpacked_dims.push_back({dim.left, dim.right});
   }
-  // §7.4.2: carry full per-dimension extents only when every dimension is a
-  // fixed const size — a queue, dynamic or associative dimension folds to
-  // nothing, so the count falls short of the declared one and the sizes do not
-  // line up with the dimensions they would be read as.
   if (info.dim_sizes.size() == item->unpacked_dims.size()) {
     var.unpacked_dim_sizes = info.dim_sizes;
   }
@@ -314,9 +226,6 @@ void Elaborator::TrackVarArrayInfo(
 
 namespace {
 
-// §25.9: record explicit parameter overrides of a virtual interface variable
-// when they all evaluate to constants, so a later assignment can confirm the
-// actual parameter values match the interface it is assigned from.
 void RecordViParamOverrides(
     const ModuleItem* item,
     std::unordered_map<std::string_view, std::vector<int64_t>>& param_values,
@@ -329,9 +238,6 @@ void RecordViParamOverrides(
       all_const = false;
       break;
     }
-    // §25.9 / §11.2.1: an override may be any constant expression, including a
-    // parameter or localparam of the enclosing scope, so evaluate it in the
-    // module's parameter scope rather than an empty one.
     auto v = ConstEvalInt(tp.type_ref_expr, scope);
     if (!v) {
       all_const = false;
@@ -344,30 +250,18 @@ void RecordViParamOverrides(
   }
 }
 
-// §6.8 / §6.11: classify a scalar variable's element kind flags from its data
-// type. Width/signedness/struct/enum info is filled in separately.
 void SetVariableKindFlags(const ModuleItem* item, RtlirVariable& var,
                           const TypedefMap& typedefs) {
-  // §36.12.1 Table 36-10 rows 3 and 4: the type the declaration named, which is
-  // what tells an integer var from a time var from a plain logic one once the
-  // variable is an object.
   var.decl_kind = item->data_type.kind;
   var.is_4state = Is4stateType(item->data_type, typedefs);
   var.is_event = (item->data_type.kind == DataTypeKind::kEvent);
   var.is_chandle = (item->data_type.kind == DataTypeKind::kChandle);
-  // §6.18: an object declared with the name has the type the name stands for,
-  // so a `typedef string s_t` declares a string. The kind alone answers kNamed
-  // for such a name, and the declaration then took the 32-bit carrier and was
-  // never marked a string, so §6.16's methods and formats did not reach it.
   var.is_string = IsStringType(item->data_type, typedefs);
   var.is_real = (item->data_type.kind == DataTypeKind::kReal ||
                  item->data_type.kind == DataTypeKind::kShortreal ||
                  item->data_type.kind == DataTypeKind::kRealtime);
 }
 
-// §6.6.7: tag a net produced from a user-defined nettype with its nettype, by
-// the key `nettype` the nettype is recorded under, and its resolution function
-// (if any).
 void TagUserNettypeNet(
     std::string_view nettype, RtlirNet& net,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -382,9 +276,6 @@ void TagUserNettypeNet(
 
 }  // namespace
 
-// §6.11 / §6.20 / §23.2.2.1: bundle of name-table state updated while
-// registering a variable declaration's name (const-ness, kind, shape, named
-// type).
 struct VarDeclNameTables {
   std::unordered_set<std::string_view>& const_names;
   std::unordered_set<std::string_view>& const_var_names;
@@ -396,11 +287,6 @@ struct VarDeclNameTables {
   std::unordered_map<std::string_view, VarSelectShape>& var_select_shapes;
 };
 
-// §6.11.1 / Table 6-8: the integer atom types (byte, shortint, int, longint,
-// integer, time) are multi-bit vector types with a fixed implicit width, not
-// scalars. Per §11.5.1 a bit-select or part-select of a scalar is illegal, but
-// these vector types are freely bit/part-selectable, so they must not be
-// classified as scalars even though they carry no explicit packed dimension.
 static bool IsIntegerAtomKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kByte:
@@ -415,11 +301,6 @@ static bool IsIntegerAtomKind(DataTypeKind kind) {
   }
 }
 
-// §6.18 with §11.5.1: whether `dtype` is a name standing for a type a select
-// may address -- one written with a packed dimension, `typedef logic [7:0] B`,
-// an enumeration with one after its body, `typedef enum {P, Q} [1:0] E`, or an
-// integer atom, `typedef int W` -- rather than for a scalar. A name standing
-// for nothing the table resolves answers false.
 static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
   if (dtype.kind != DataTypeKind::kNamed) return false;
   const DataType* d = TypeAtChainEnd(dtype, typedefs);
@@ -429,12 +310,6 @@ static bool NamesVectorType(const DataType& dtype, const TypedefMap& typedefs) {
          IsIntegerAtomKind(d->kind);
 }
 
-// §11.5.1 / §7.4.1: a packed structure or packed union presents as a single
-// contiguous vector, and §11.5.1 lists a packed structure among the operands a
-// bit-select or part-select may address. A variable of packed aggregate type is
-// therefore freely bit/part-selectable and must not be treated as a scalar,
-// even though it carries no explicit packed dimension of its own. Named types
-// are followed through the typedef map to the underlying aggregate.
 static bool IsPackedAggregateVar(const DataType& dtype,
                                  const TypedefMap& typedefs) {
   const DataType* d = TypeAtChainEnd(dtype, typedefs);
@@ -444,19 +319,11 @@ static bool IsPackedAggregateVar(const DataType& dtype,
          (d->is_packed || d->is_soft);
 }
 
-// §6.16: a string is an ordered collection of characters, and the clause makes
-// indexing one the way a single character is reached -- indexing a string
-// variable selects one character of it to read or write. A select on a string
-// variable is therefore that character selection, not the bit-select of a
-// scalar §11.5.1 makes illegal, even though a string carries no packed
-// dimension.
 static bool IsStringVar(const DataType& dtype, const TypedefMap& typedefs) {
   const DataType* d = TypeAtChainEnd(dtype, typedefs);
   return d != nullptr && d->kind == DataTypeKind::kString;
 }
 
-// §7.4.1 with A.2.2.1: dimensions after an enumeration's body, `enum {P, Q}
-// [1:0] w`, make a packed array of it, whose index selects an element.
 bool DeclaresScalar(const DataType& dtype, const TypedefMap& typedefs) {
   return !IsIntegerAtomKind(dtype.kind) && !IsRealType(dtype.kind) &&
          dtype.enum_array_dims.empty() &&
@@ -464,30 +331,12 @@ bool DeclaresScalar(const DataType& dtype, const TypedefMap& typedefs) {
          !NamesVectorType(dtype, typedefs) && !IsStringVar(dtype, typedefs);
 }
 
-// §11.5.2 states how many addresses a select written on this declaration may
-// carry: a bit-select or part-select of an array element first selects the
-// word, one address per dimension, and is then addressed as a net's or a
-// variable's select is (§11.5.1). This records that count, and which
-// alternative of §11.5.1's sentence the operand one address past it falls
-// under. CheckElementSelectNode in src/elaborator/elaborator_validate.cpp reads
-// it.
-//
-// Only a declared type whose select behaviour §11.5.1 settles gets an entry:
-// the real types, the scalar types logic, reg and bit, the integer atom types,
-// and a packed structure or union. Every other declaration is left out, so it
-// keeps drawing no report rather than one naming a rule that does not cover it.
-// A named type is among them because its dimensions live in the typedef and not
-// at the declaration, so a count taken here would put the boundary too early
-// and report a legal element select. A string is another: §6.16 lets indexing a
-// string variable select one character of it to read or write, so the address
-// after a string's own reaches a character, whose own bits are selectable.
 void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes) {
   const DataType& dtype = item->data_type;
   const bool kIsAtom = IsIntegerAtomKind(dtype.kind);
   const bool kIsPackedAggregate = IsPackedAggregateVar(dtype, typedefs);
-  // §6.7.1: a net type keyword alone, `wire w [0:3]`, declares logic elements.
   const bool kIsScalarKind =
       dtype.kind == DataTypeKind::kLogic || dtype.kind == DataTypeKind::kReg ||
       dtype.kind == DataTypeKind::kBit || IsNetTypeKind(dtype.kind);
@@ -495,34 +344,21 @@ void RecordVarSelectShape(
       !kIsScalarKind) {
     return;
   }
-  // A packed dimension takes one address, and so does the implicit vector that
-  // an integer atom type or a packed aggregate presents, because §11.5.1 lists
-  // both among the operands a bit-select may address.
   size_t vector_dims = (dtype.packed_dim_left ? 1 : 0) +
                        dtype.extra_packed_dims.size() +
                        (dtype.has_unsized_packed_dim ? 1 : 0);
   if (kIsAtom || kIsPackedAggregate) ++vector_dims;
   VarSelectShape shape;
   shape.addressable_dims = item->unpacked_dims.size() + vector_dims;
-  // Every address up to that count reaches either an array element or a bit, so
-  // what the next address is written on is a real variable when the declared
-  // type is real and a scalar otherwise -- the two alternatives §11.5.1 names.
   shape.element_is_real = IsRealType(dtype.kind);
   shape.element_is_scalar = !shape.element_is_real;
   shapes[item->name] = shape;
 }
 
-// §6.11 / §6.20: record the bookkeeping name tables for a variable declaration
-// (const-ness, type kind, scalar/packed-array shape, named type) before the
-// RtlirVariable is built.
 static void RegisterVarDeclNames(const ModuleItem* item,
                                  VarDeclNameTables tables,
                                  const TypedefMap& typedefs, DiagEngine& diag) {
   if (item->data_type.is_const) {
-    // §17.7: a constant free checker variable (rand const) need not be
-    // initialized; an uninitialized one simply takes a nondeterministic
-    // constant value that never changes. The general requirement that a const
-    // variable be initialized therefore does not apply to a free variable.
     if (!item->init_expr && !item->is_rand) {
       diag.Error(
           item->loc,
@@ -533,20 +369,7 @@ static void RegisterVarDeclNames(const ModuleItem* item,
     tables.const_var_names.insert(item->name);
   }
   tables.var_types[item->name] = item->data_type.kind;
-  // §7.4/§7.8: a variable carrying an unpacked dimension (fixed, dynamic,
-  // queue, or associative array) is neither a scalar, nor a real variable, nor
-  // a packed-array variable for select-legality purposes; §11.5.2 makes
-  // indexing it an array element select, not a bit-select. Only dimensionless
-  // variables are classified here, so `real arr[4];` is left out of
-  // real_var_names and `arr[i]` reads an element whose type is real.
   if (item->unpacked_dims.empty()) {
-    // §11.5.1: a bit-select or part-select of a scalar, a real variable or a
-    // real parameter is illegal. The sentence's two alternatives get one name
-    // set each, and the two sets are disjoint: a real variable is the second
-    // alternative and not the first, so it is recorded here and excluded from
-    // scalar_var_names below. Recording it as a scalar as well made one breach
-    // draw two reports. CheckRealSelect and CheckRealSelectStmt read
-    // real_var_names and name the alternative that fits the select written.
     if (IsRealType(item->data_type.kind))
       tables.real_var_names.insert(item->name);
     if (item->data_type.packed_dim_left)
@@ -559,8 +382,6 @@ static void RegisterVarDeclNames(const ModuleItem* item,
   RecordVarSelectShape(item, typedefs, tables.var_select_shapes);
 }
 
-// §25.9: bundle of virtual-interface name-table state updated while registering
-// a virtual interface variable declaration.
 struct VirtualInterfaceVarTables {
   std::unordered_map<std::string_view, std::string_view>&
       vi_var_interface_types;
@@ -569,9 +390,6 @@ struct VirtualInterfaceVarTables {
       vi_var_param_values;
 };
 
-// §25.9: register a virtual interface variable's interface/modport bindings and
-// validate the named interface target (`iface_decl` is the resolved interface,
-// or null when unknown).
 static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
                                             const ModuleDecl* iface_decl,
                                             VirtualInterfaceVarTables tables,
@@ -586,20 +404,12 @@ static void RegisterVirtualInterfaceVarDecl(const ModuleItem* item,
   ValidateVirtualInterfaceTarget(item->data_type, item->loc, iface_decl, diag);
 }
 
-// §6.18 / §7.4 / §10.10.1: when a variable's named type is a fixed unpacked-
-// array typedef and it declares no unpacked dimensions of its own, rewrite it
-// to the typedef's element base type (keeping its own const-ness) plus the
-// typedef's unpacked dimensions, so it elaborates and lowers identically to an
-// inline unpacked-array declaration. Returns the adopted typedef name (empty
-// when no rewrite happened) so the caller can keep the variable's named-type
-// association, which the rewrite to a non-named base type would otherwise drop.
 static std::string_view AdoptTypedefArrayDims(
     ModuleItem* item, const TypedefMap& typedefs,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
         td_array_dims) {
   if (!item->unpacked_dims.empty()) return {};
   if (item->data_type.kind != DataTypeKind::kNamed) return {};
-  // §8.23: `Cfg::my_type` names Cfg's type, never this scope's my_type.
   if (!item->data_type.scope_name.empty()) return {};
   auto base_it = typedefs.find(item->data_type.type_name);
   if (base_it == typedefs.end()) return {};
@@ -613,13 +423,6 @@ static std::string_view AdoptTypedefArrayDims(
   return typedef_name;
 }
 
-// §6.6.7: a declaration naming a nettype declares a net, and only a net may
-// be declared with one. A.2.1.3 opens a data declaration, and never a net
-// declaration, with `const`, `var` or a lifetime, so the same declaration
-// written with any of them declares a variable of the nettype, which is
-// reported and elaborated as a variable of the data type the nettype names.
-// A nettype written through a package or `$unit` (A.2.1.3) is that scope's,
-// found under the key NamedTypeKey gives, whatever a bare name would reach.
 bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   if (item->data_type.kind != DataTypeKind::kNamed) return false;
   auto it = nettype_names_.find(NamedTypeKey(item->data_type));
@@ -630,7 +433,6 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
                         item->loc, diag_);
     return false;
   }
-  // Syntax 10-1 and §10.3.3 give such a declaration one delay at most.
   if (item->net_delay_fall != nullptr) {
     diag_.Error(item->loc,
                 "a net of a user-defined nettype is declared with at most a "
@@ -645,11 +447,6 @@ bool Elaborator::ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod) {
   return true;
 }
 
-// What the variable `item` declares takes from the declaration as it was
-// written: where it stands, which the variable object reports through
-// vpiLineNo and vpiFile (§37.3.3); the kind it was declared with, and whether
-// that names a typedef of an unpacked array; its initializer; and the implicit
-// localparams of the loop generate blocks around it (§27.4).
 static void TakeWrittenFields(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
@@ -664,8 +461,6 @@ static void TakeWrittenFields(
   var.gen_block_consts = gen_loop_consts;
 }
 
-// §8.23: resolves a declared type named through a class scope, and reports
-// one that resolves by no route.
 static void ResolveOrReportClassScopedDeclType(DataType& type, SourceLoc loc,
                                                const TypedefMap& typedefs,
                                                const CompilationUnit* unit,
@@ -674,12 +469,6 @@ static void ResolveOrReportClassScopedDeclType(DataType& type, SourceLoc loc,
   ReportUnresolvedClassScopedType(type, loc, typedefs, unit, diag);
 }
 
-// §6.23: a type reference to a constant of an enumeration no typedef names
-// gives the declaration that enumeration (Elaborator::ResolveTypeRef), which
-// this returns, and one to an unpacked array its dimensions, inside those the
-// declaration writes, as an array typedef's are (§7.4.4). A.2.5: an
-// associative index the declaration writes as a type reference takes its type
-// the same way.
 std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
                                                     RtlirModule* mod) {
   std::vector<Expr*> taken_dims =
@@ -695,13 +484,6 @@ std::string_view Elaborator::ResolveVarDeclTypeRefs(ModuleItem* item,
 }
 
 void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
-  // §27.4: the genvar serves as an integer during elaboration, to run the
-  // generate loop and create its block instances, and does not exist at
-  // simulation time. A genvar is therefore not one of the module's variables,
-  // and elaborating it as one would put a name into the design that the clause
-  // says is not there. The loop generate construct does not read it from here
-  // -- it binds the index value per iteration into its own scope -- so nothing
-  // downstream needs the declaration to survive.
   if (item->is_genvar) return;
 
   ReportUndeclaredTypeName(item);
@@ -712,19 +494,11 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   SpecializeClassScopedTypedef(item, unit_, BuildParamScope(mod), typedefs_,
                                arena_);
 
-  // §6.18: `ca_t c;` under `typedef C ca_t [2];` is an array of handles, so
-  // the dimensions are taken before the name is resolved to the class it
-  // names, under which they are recorded nowhere.
   std::string_view adopted_array_typedef =
       AdoptTypedefArrayDims(item, typedefs_, td_array_dims_);
 
   ResolveDeclaredTypeName(item, unit_, typedefs_, class_names_, diag_);
 
-  // §8.23: `Cfg::my_type x;` names a type declared in a class, and the map
-  // ResolveNamed reads carries a "Cfg::my_type" key only where that class
-  // stands at compilation-unit scope. A class written inside this module
-  // reaches the declaration through here instead, and a declaration that
-  // resolved by neither route earns the report below.
   ResolveOrReportClassScopedDeclType(item->data_type, item->loc, typedefs_,
                                      unit_, diag_);
 
@@ -747,7 +521,6 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
                         scalar_var_names_, real_var_names_, packed_array_vars_,
                         var_named_types_, var_select_shapes_},
                        typedefs_, diag_);
-  // §25.9 with §23.4: the interface named may be one nested in the module.
   RegisterVirtualInterfaceVarDecl(
       item,
       item->data_type.kind == DataTypeKind::kVirtualInterface
@@ -760,11 +533,7 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   var.name = ScopedName(item->name);
   TakeWrittenFields(item, td_array_dims_, gen_loop_consts_, var);
   var.gen_block_prefix = InternedGenPrefix();
-  // §7.2 with §8.4: a structure written in the declaration itself sizes its
-  // members of a class type as the handles they hold, as a typedef's does.
   SizeClassHandleMembers(item->data_type, typedefs_, class_names_);
-  // A packed dimension may reference a parameter (e.g. `logic [W-1:0]`), so the
-  // width must be evaluated in the module's parameter scope (10.3.3 / A.2.2.1).
   var.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   ValidatePackedDimRange(item->data_type, item->loc);
   SetVariableKindFlags(item, var, typedefs_);
@@ -787,14 +556,6 @@ void Elaborator::ElaborateVarDecl(ModuleItem* item, RtlirModule* mod) {
   TrackVarArrayInfo(item, var, BuildParamScope(mod), var_array_info_);
 
   var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
-  // §6.8 with §6.19: `enum {a, b, c} s = c;` declares a, b and c with the
-  // type, ahead of s, whose initializer reads c. The simulator lowers
-  // mod->variables in order, so the constants go first; pushed after s, the
-  // initializer read a c not yet declared, and s started at a.
-  // §6.19: the typedef declared the constants of an enumeration it writes,
-  // and the declaration a type reference took its enumeration from declared
-  // that enumeration's, so a variable adopting either type above declares
-  // none of them again.
   bool writes_its_type =
       adopted_array_typedef.empty() && adopted_enumeration.empty();
   ValidateVarDeclTypes(item, BuildParamScope(mod), writes_its_type);

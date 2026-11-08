@@ -1,22 +1,5 @@
 #pragma once
 
-// The state one simulation run holds and the operations that read and write
-// it: the variables and nets a name resolves to, the scope stack a subroutine
-// call pushes, the processes the scheduler runs, the coverage database, the
-// VCD dump, the timescales, the file descriptors, the class objects and the
-// state each system task records.
-//
-// Five groups of it stand in headers of their own, included below. Three are
-// declared as base classes, so every call through a SimContext reads as it
-// did: simulator/sim_context_name_tables.h holds the tables keyed by a
-// declared name, simulator/sim_context_random_stability.h holds the §18.13
-// and §18.14 operations on a generator that lives on a ClassObject or a
-// Process, and simulator/sim_context_scope_stack.h holds the §23.9 scope
-// stack a subroutine call pushes. simulator/instance_prefix_override.h holds
-// the §32.4.3 override and its guard, and simulator/sim_context_file_tables.h
-// the tables of the §21.3 file I/O tasks, both of which SimContext keeps as
-// members.
-
 #include <cstdint>
 #include <cstdio>
 #include <functional>
@@ -37,11 +20,14 @@
 #include "parser/ast_stmt.h"
 #include "simulator/assert_control_log.h"
 #include "simulator/class_object.h"
+#include "simulator/clocking.h"
 #include "simulator/cover_results.h"
 #include "simulator/coverage.h"
 #include "simulator/coverage_control.h"
 #include "simulator/covergroup_instance.h"
+#include "simulator/dpi_runtime.h"
 #include "simulator/file_monitor.h"
+#include "simulator/instance_prefix_override.h"
 #include "simulator/net.h"
 #include "simulator/output_log.h"
 #include "simulator/scheduler.h"
@@ -51,13 +37,6 @@
 #include "simulator/sim_context_scope_stack.h"
 #include "simulator/sim_context_type_ref_compares.h"
 #include "simulator/sim_context_types.h"
-// ClockingManager, SpecifyManager and DpiRuntime, each held by value behind an
-// owning unique_ptr below. The constructor of this class is defined inline,
-// which instantiates those pointers' destructors, so a forward declaration is
-// not enough for any of them.
-#include "simulator/clocking.h"
-#include "simulator/dpi_runtime.h"
-#include "simulator/instance_prefix_override.h"
 #include "simulator/specify.h"
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/sync_objects.h"
@@ -83,26 +62,16 @@ class SimContext : public DeclaredNameTables,
   SimContext(Scheduler& sched, Arena& arena, DiagEngine& diag,
              uint32_t seed = 0)
       : scheduler_(sched), arena_(arena), diag_(diag), default_seed_(seed) {
-    // The scheduler clears the executing process through it (Scheduler::Run).
     scheduler_.SetContext(this);
     running_unit_scope_ = [this] { return ActiveUnitScope(); };
   }
 
-  // Declared (not defaulted inline) so the owning unique_ptr to the
-  // forward-declared CoverageDB is destroyed where that type is complete.
   ~SimContext();
 
   Variable* FindVariable(std::string_view name);
-  // Resolves a name against the generate block instance the running process
-  // belongs to (§27.4); null when it belongs to none or the block lacks it.
   Variable* FindInGenerateBlock(const std::string& inst_prefix,
                                 std::string_view name);
 
-  // The variable maps below key on std::string_view, so `name` is stored as an
-  // address rather than copied: the memory behind it must outlive the context.
-  // Callers that build a name at run time (e.g. an element name `a[3]`) intern
-  // it in the arena first; a name held only in a local std::string leaves a
-  // dangling key once that local dies, and every later lookup silently misses.
   Variable* CreateVariable(std::string_view name, uint32_t width);
 
   void AliasVariable(std::string_view alias_name, std::string_view target_name);
@@ -113,9 +82,6 @@ class SimContext : public DeclaredNameTables,
   Net* CreateNet(std::string_view name, NetType type, uint32_t width,
                  const NetSpec& spec = {});
 
-  // Binds alias_name to the same Net as target_name (no-op if target is
-  // unknown). Used to share an interface port's nets with the connected
-  // interface instance (§25.3.2). alias_name must outlive the context.
   void AliasNet(std::string_view alias_name, std::string_view target_name);
 
   Scheduler& GetScheduler() { return scheduler_; }
@@ -126,79 +92,38 @@ class SimContext : public DeclaredNameTables,
   void RequestStop() { stop_requested_ = true; }
   bool StopRequested() const { return stop_requested_; }
 
-  // §20.2: an explicit $finish/$stop/$fatal ends the run and drops every event
-  // still scheduled, in its own time slot as in a later one (§9.2.3); it
-  // raises the stop too, so process loops guarding on StopRequested() unwind.
   void RequestFinish();
   bool FinishRequested() const { return finish_requested_; }
-  // §20.10: $fatal terminates the simulation with an error code and $error
-  // generates a run-time error, so a run in which either was called ends with
-  // the status an elaboration error ends with; RunSimulation in src/main.cpp
-  // reads this beside DiagEngine::HasErrors. A run that called neither, a
-  // $warning or an $info among its calls, exits as it did.
   void NoteRuntimeError() { ++runtime_error_count_; }
   bool HasRuntimeErrors() const { return runtime_error_count_ > 0; }
 
-  // Optional $scope system task (Annex D.11). The interactive scope names the
-  // level of hierarchy used when identifying objects interactively, as the one
-  // vpi_control reaches through vpiSetInteractiveScope (§38.4) does. It starts
-  // as the first top-level module; $scope retargets it to the complete name of
-  // a module, task, function, or named block, one of the names the lowerer
-  // registered from CompleteHierarchicalScopeNames, and is refused any other.
   void SetInteractiveScope(std::string_view name);
   const std::string& InteractiveScope() const { return interactive_scope_; }
   void RegisterHierarchicalScope(std::string_view name);
   bool IsHierarchicalScope(std::string_view name) const;
 
-  // Optional $list system task (Annex D.6). $list lists a module, task,
-  // function, or named block: the current scope setting (the interactive scope
-  // above) with no argument, the named scope with one, a registered name as
-  // $scope takes. RecordListing remembers the scope last listed.
   void RecordListing(std::string_view name);
   const std::string& LastListedScope() const { return last_listed_scope_; }
 
-  // Optional $showscopes system task (Annex D.12). $showscopes lists the
-  // modules, tasks, functions, and named blocks defined at the current scope
-  // level (the interactive scope above), and with a nonzero integer argument
-  // every one in or below it. HierarchicalScopesUnder answers that list from
-  // the registered names, sorted; RecordShowScopes remembers the scope shown
-  // and whether the listing recursed, so the selection can be observed.
   std::vector<std::string> HierarchicalScopesUnder(std::string_view scope,
                                                    bool recursive) const;
   void RecordShowScopes(std::string_view scope, bool recursive);
   const std::string& LastShownScope() const { return last_shown_scope_; }
   bool ShowScopesRecursive() const { return show_scopes_recursive_; }
 
-  // Optional $showvars system task (Annex D.13). $showvars reports the status
-  // of the reg and net variables in the current scope (the interactive scope
-  // above), every one with no argument and the named ones with a list, a
-  // selection of a vector standing for the whole vector. RegisterScopeVariables
-  // holds the names a module instance declares under its complete scope name;
-  // ScopeVariables answers them, null for a scope that is no module instance,
-  // and RecordShowVars remembers the scope and the names given for observation.
   void RegisterScopeVariables(std::string_view scope, ScopeVariableSet set);
   const ScopeVariableSet* ScopeVariables(std::string_view scope) const;
   void RecordShowVars(std::string_view scope, std::vector<std::string> vars);
   const std::string& LastShowVarsScope() const { return last_showvars_scope_; }
   const std::vector<std::string>& ShowVarsVariables() const;
 
-  // The stream standard output is printed through, and the log file of Annex
-  // D.7 that holds a copy of all the text printed to the standard output:
-  // $nolog disables the copy, $log reenables it, and a filename argument to
-  // $log closes the log file and directs the copy to the named one. The copy
-  // starts enabled and, the clause naming no default file, goes nowhere until
-  // a $log names one. simulator/output_log.h has the whole of it.
   std::ostream& Out() { return log_.Out(); }
   OutputLog& Log() { return log_; }
   bool LoggingEnabled() const { return log_.Enabled(); }
   const std::string& LogFile() const { return log_.Name(); }
 
-  // §40.3.2.1 coverage-collection state driven by $coverage_control.
   CoverageControlState& GetCoverageControlState() { return coverage_control_; }
 
-  // §24.3 with §24.7: the program initials, each counted out as it ends or as
-  // $exit ends its program; with none left the run ends by an implicit $finish
-  // once that time step is done (Scheduler::Run), so no later step runs.
   void RegisterProgramInitial(uint32_t program_block_id, Process* proc);
   void OnProgramInitialComplete(Process* proc);
   void ExitProgramBlock(uint32_t program_block_id);
@@ -211,71 +136,38 @@ class SimContext : public DeclaredNameTables,
   TimeUnit GlobalPrecision() const { return global_precision_; }
   TimeUnit StepTimeUnit() const { return global_precision_; }
 
-  // $timeformat state per 20.4.3. The defaults follow Table 20-3; the unit
-  // number tracks the global precision until $timeformat is invoked.
   const TimeFormatSpec& GetTimeFormat() const { return time_format_; }
   void SetTimeFormat(const TimeFormatSpec& spec);
 
-  // Timescale of the design element that is the current scope, reported by
-  // $timeunit/$timeprecision when no argument is supplied (see 20.4.1).
   void SetCurrentTimeScale(const TimeScale& ts) { current_timescale_ = ts; }
   const TimeScale& CurrentTimeScale() const { return current_timescale_; }
 
-  // Name of the design element that is the current scope. $printtimescale with
-  // no argument prints this name in its report line (see 20.4.2).
   void SetCurrentScopeName(std::string_view name);
   const std::string& CurrentScopeName() const { return current_scope_name_; }
 
-  // The compilation unit's timescale, what $timeunit($unit) reports.
   void SetCompUnitTimeScale(const TimeScale& ts) { compunit_timescale_ = ts; }
   const TimeScale& CompUnitTimeScale() const { return compunit_timescale_; }
 
-  // Timescale of a named design element, reported when that element is passed
-  // as the argument to $timeunit/$timeprecision.
   void SetScopeTimeScale(std::string_view name, const TimeScale& ts);
   const TimeScale* FindScopeTimeScale(std::string_view name) const;
 
   void RegisterFinalProcess(Process* proc);
   void RunFinalBlocks();
 
-  // §26.3, §13.3: EnterSubroutineScope for `func`'s package; answers `func`.
   const ModuleItem* EnterSubroutinePackage(const ModuleItem* func);
-  // §13.4.2: a static function's frame is the one PopStaticScope retained
-  // under StaticFrameKey the last time the function returned.
   void PushStaticScope(std::string_view func_name);
   void PopStaticScope(std::string_view func_name);
-  // §13.3.2: static storage is per declaration: a module's subroutine's and
-  // named block's under the running instance's path, the bare name at the
-  // top, and a package's or unit's subroutine's under its owner's name, the
-  // innermost Process::frame_owners entry (DeclaredNameTables).
   std::string_view StaticFrameKey(std::string_view name);
 
-  // §18.17.7: while a randsequence production with a non-void return type is
-  // being generated, the engine points the return slot at the production's
-  // return-value storage, and a 'return <expr>' anywhere in the production's
-  // code blocks evaluates into it; null outside randsequence value generation.
-  // The setter answers the previous slot so nested generation restores it.
   Logic4Vec* SetRsReturnSlot(Logic4Vec* slot);
   Logic4Vec* RsReturnSlot() const { return rs_return_slot_; }
 
-  // §26.3 with §23.9 and §13.4: the two key lists, in sim_context_fileio.cpp,
-  // and the lookups through them.
   std::vector<std::string> PackageFrameKeys(std::string_view name) const;
   std::vector<std::string> ScopedObjectKeys(std::string_view name) const;
   Variable* FindInPackageScope(std::string_view name);
   ModuleItem* FindFunctionInPackageScope(std::string_view name);
-  // §3.12.1: whether `name`, read in a compilation-unit subroutine's frame, is
-  // a path from $root, and the variable it reaches there, or null, which
-  // FindVariable answers it by.
   bool IsUnitPathFromRoot(std::string_view name);
   Variable* FindUnitPathVariable(std::string_view name);
-  // Creates a scope-local variable of `width` bits, signed when `is_signed`
-  // says the declaration it stands for was (§6.11.3: `byte`, `shortint`,
-  // `int`, `integer` and `longint` default to signed, and a `signed`/`unsigned`
-  // qualifier settles the rest, so a caller that knows the declared type passes
-  // IsSignedType of it). The parameter is defaulted because every caller with
-  // no declared type to consult -- a foreach iterator, a `$` bound, a
-  // per-element array copy -- wants the unsigned default.
   Variable* CreateLocalVariable(std::string_view name, uint32_t width,
                                 bool is_signed = false);
 
@@ -297,115 +189,43 @@ class SimContext : public DeclaredNameTables,
   void RecordAssocRef(const AssocRefBinding& binding);
   std::vector<AssocRefBinding> PopAssocRefFrame();
 
-  // §21.7's two dump files and everything a run holds of them, which
-  // VcdDumpState carries rather than this class. A task reaches the dump its
-  // own clause names through it -- ctx.Vcd().GetDumpportsWriter() and the rest
-  // -- and what stays below is the handful of operations that need the rest of
-  // the run to answer.
   VcdDumpState& Vcd() { return vcd_; }
   const VcdDumpState& Vcd() const { return vcd_; }
 
-  // §21.7.1: open the dump file named by GetDumpFileName, write everything
-  // that precedes the value changes and install the per-timestep recording;
-  // the context owns the writer from then on. `top_scope` is the module whose
-  // $scope encloses the object definitions, `wait_for_dumpvars` holds the
-  // recording back until a $dumpvars starts it (§21.7.1.3), and `type` picks
-  // which of §21.7's two file types is written, settled here because it
-  // decides the form of the object definitions. Returns the writer to dump
-  // through, or null when the file could not be opened; a writer already
-  // installed through SetVcdWriter wins and comes back unchanged.
   VcdWriter* OpenVcdDump(std::string_view top_scope, bool wait_for_dumpvars,
                          VcdFileType type);
-  // §21.7.1: the dump the source creates for itself, opened by the first
-  // $dumpfile, $dumpvars or $dumpports the run executes. §21.7.1 gives the
-  // first two the 4-state file and §21.7.3.1 gives $dumpports the extended
-  // one, so the task passes the type it creates.
   VcdWriter* OpenVcdDumpFromTask(VcdFileType type);
-  // §21.7.3.6.1: record the final simulation time and close both dumps, which
-  // is what puts the buffered value changes on disk. A run ends with whatever
-  // dumps its source opened still open, either or both. WriteVcdClose writes
-  // nothing on a 4-state dump, which §21.7.3.6 gives no such keyword command.
   void CloseVcdDump();
-  // §21.7.3.6.1: closes the extended dump alone, which is what $vcdclose
-  // terminates; §21.7.3.6 adds the keyword to that format alone, so a 4-state
-  // dump open beside it is neither stamped nor closed and goes on recording.
   void CloseDumpportsDump();
 
-  // §32.9: the timing data a $sdf_annotate call reads out of an SDF file lands
-  // in the design's specify data, so the running model needs a way back to the
-  // manager holding it. Left null when nothing has bound one, in which case a
-  // $sdf_annotate call has nowhere to put what it reads.
   void SetSpecifyManager(SpecifyManager* mgr) { specify_manager_ = mgr; }
   SpecifyManager* GetSpecifyManager() { return specify_manager_; }
-  // §30.3's specify data for the design, created on the first call and
-  // installed as the manager GetSpecifyManager answers with; owned here since
-  // it outlives the Lowerer that fills it, $sdf_annotate reading it in the run.
   SpecifyManager& AcquireSpecifyManager();
 
-  // §21.7.2.1: register the model's dumpable objects with a VCD writer, in
-  // name order so identifier codes are deterministic. Memories are not dumped
-  // -- an unpacked array's whole-array Variable and its per-element shadows
-  // are both excluded -- and a real variable is declared under the real
-  // var_type so readers expect its r-form value changes.
   void RegisterVcdSignals(VcdWriter& vcd);
-  // §21.7.2.3: the same for the variables of the design's packages alone, which
-  // RegisterVcdSignals leaves out: a package is no instance of the top module,
-  // so its scope is opened at the top level of the dump, beside the module's.
   void RegisterVcdPackageSignals(VcdWriter& vcd);
-  // Registers the objects of the packages, or else everything but them.
   void RegisterVcdSignalsOf(VcdWriter& vcd, bool packages);
-  // Whether `name` is a variable of one of the design's packages, keyed "p.v".
   bool IsVcdPackageVariable(std::string_view name) const;
-  // §21.7.2.1: true for a variable-table entry that names a memory rather than
-  // a dumpable object.
   bool IsUndumpableVcdName(std::string_view name) const;
 
-  // §35: the one registry the run's DPI calls go through. EvalDpiCall reaches
-  // an import through it, so the clause 35 rules DpiRuntime holds -- §35.5.2's
-  // pure-result reuse, §35.5.3's call chain, §35.6.2's value changes, §35.9's
-  // disable protocol -- are the rules a design's calls meet.
-  // §35.5.3: installing a registry also makes it the one the C layer's
-  // svGetScope and svSetScope read and write, so that only one answer exists
-  // to which instance of an exported subroutine a call reaches.
   void SetDpiRuntime(DpiRuntime* dpi);
   DpiRuntime* GetDpiRuntime() { return dpi_runtime_; }
 
-  // §35.5.4: the registry a design's own import declarations are put in, made
-  // on first use and owned by the context so it outlives the lowering that
-  // fills it. A run that declares no import never makes one, and a caller that
-  // installed a registry of its own through SetDpiRuntime keeps it: the two
-  // ways of supplying the registry agree on which one the run's calls go
-  // through, which is what §35 holds of.
   DpiRuntime& AcquireDpiRuntime();
 
   void SetCurrentProcess(Process* proc);
   Process* CurrentProcess() const { return current_process_; }
   bool IsReactiveContext() const;
 
-  // §23.9: a name written without a hierarchical path resolves within the
-  // module instance holding its declaration. A running process names its own
-  // instance, but a declaration initializer is evaluated before any process
-  // exists, so whatever builds an instance's declarations states it here.
   void SetLoweringInstancePrefix(std::string_view prefix);
 
-  // The instance a name written without a hierarchical path resolves within:
-  // the running process's, or the one being built when none is running. Public
-  // because a name that is not a variable resolves the same way and is looked
-  // up somewhere else -- §14.3's clocking block is registered under this prefix
-  // and reached by the bare name its module declared
-  // (ClockingManager::FindInScope).
   std::string ActiveInstancePrefix() const;
-  std::string_view ActiveGenBlockPrefix() const;  // §27.4, sim_context_scope
-  UnitScopes& Units() { return units_; }          // §3.12.1, unit_scopes.h
-  std::string ActiveUnitScope() const;  // "$unit#k" running, "" for one unit
-  // §27.4: the generate block prefix of the process `proc`, running or not.
+  std::string_view ActiveGenBlockPrefix() const;
+  UnitScopes& Units() { return units_; }
+  std::string ActiveUnitScope() const;
   static std::string_view GenBlockPrefixOf(const Process& proc);
-  // §6.23: TypeRefCompares' answer for `expr` where the running code stands.
   std::optional<bool> TypeRefCompareHere(const Expr* expr) const;
 
-  // §32.4.3: the instance an evaluation stands in, where that is not the
-  // running process's. simulator/instance_prefix_override.h holds the reason
-  // and the guard that sets it; nothing else should write it.
   InstancePrefixOverrideState& InstancePrefixOverride() {
     return prefix_override_;
   }
@@ -419,10 +239,6 @@ class SimContext : public DeclaredNameTables,
   const std::vector<Process*>& FindNamedScopeProcesses(
       std::string_view name) const;
 
-  // The label of the block a process begins with, recorded once and answered
-  // for the whole life of the process. This is deliberately not the named-scope
-  // registry above, which tracks the blocks a process is currently inside and
-  // so stops answering for a block the moment it is left.
   void RegisterOutermostScope(std::string_view name, Process* proc);
   const std::vector<Process*>& FindOutermostScopeProcesses(
       std::string_view name) const;
@@ -431,96 +247,41 @@ class SimContext : public DeclaredNameTables,
   void PopActiveNamedScope() { active_scope_stack_.pop_back(); }
   const std::vector<std::string_view>& ActiveNamedScopes() const;
 
-  // §12.4.2.1, §12.5.3.1: queues the report a unique, unique0 or priority
-  // statement (`qual`) raised, unless §20.11's controls of its type stop it.
   void AddPendingViolation(SourceLoc loc, std::string msg, Subclause subclause,
                            CaseQualifier qual = CaseQualifier::kUnique);
   void FlushPendingViolations();
   void MaturePendingViolations();
 
-  // §16.4.2: reaching a deferred assertion flush point clears the current
-  // process's pending (not-yet-executed) deferred immediate assertion reports.
-  // Called at the three flush points defined by §16.4.2: a process resuming
-  // after suspending on an event control or wait, an always_comb/always_latch
-  // procedure resuming on a dependent-signal transition, and (via §16.4.4) the
-  // disabling of the process's outermost scope; §16.14.6.2 names the same
-  // points, so the procedural assertion queue is flushed here too.
   void FlushPendingDeferredReports();
 
-  // §16.4.2: the current process's deferred-report generation. A deferred
-  // report captures this when enqueued; if it differs when the report's region
-  // runs, a flush point cleared the report in between and it must not execute.
   uint64_t CurrentDeferredReportGeneration() const;
 
   const std::unordered_map<std::string_view, Variable*>& GetVariables() const {
     return variables_;
   }
 
-  // §36.10: the run's nets, keyed the way GetVariables keys its variables --
-  // one flat string per object, the instance prefix folded into it. VpiContext
-  // ::Attach reads both: the clause gives VPI routines access to the objects
-  // of the instantiated design, its own example of one being a wire.
   const std::unordered_map<std::string_view, Net*>& GetNets() const {
     return nets_;
   }
 
-  // §20.15.6: the live registry of stochastic-analysis queues, keyed by the
-  // q_id supplied to $q_initialize. Its membership drives the status for a
-  // q_id no queue has, and each entry's capacity and occupancy drive the
-  // statuses for a full queue and an empty one.
   std::unordered_map<uint64_t, StochasticQueue>& StochasticQueues() {
     return stochastic_queues_;
   }
 
   uint32_t Urandom32();
-  // Reseed the generator so a given seed always replays the same sequence.
   void SeedUrandom(uint32_t seed);
   uint32_t UrandomRange(uint32_t min_val, uint32_t max_val);
 
-  // Returns the mt19937 stream that the running thread must draw from, or the
-  // §18.14.1 initialization RNG of the instance being built when none runs.
   std::mt19937& ActiveRng();
 
-  // Pulls the next value from the active stream, the seed material a freshly
-  // created child thread inherits per §18.14.2 hierarchical seeding.
   uint32_t DrawSeedForChild();
 
-  // Like CreateVariable, keys on the string_view: `name` must outlive the
-  // context, so intern a run-time-built name in the arena before calling. The
-  // registration lasts for the rest of the run, which is what a declared array
-  // needs; an array a scope declares is registered with RegisterLocalArray
-  // below instead.
   void RegisterArray(std::string_view name, const ArrayInfo& info);
 
-  // Registers `name` as an array of the innermost scope, the way
-  // CreateLocalVariable creates a variable of it: PopScope takes the shape away
-  // again, and a lookup of the name reads whatever the enclosing scopes or
-  // RegisterArray registered for it once the scope is gone. §18.17 needs this
-  // for the array §18.17.7 implicitly declares within a randsequence rule,
-  // that statement opening an automatic scope. The caller must have pushed
-  // a scope, as ExecRandsequence and ExecRsProduction in
-  // stmt_exec_randsequence.cpp do. `name` must outlive the context.
   void RegisterLocalArray(std::string_view name, const ArrayInfo& info);
 
-  // The shape of an array, given the lifetime the scope it was declared in
-  // gives it: the enclosing block or call where there is one, and the whole run
-  // otherwise. §23.9 makes a begin-end block a scope and a declaration in it
-  // local to that block, and §13.4 gives a call's formal the lifetime of the
-  // call, so neither shape may answer for a like-named variable afterwards --
-  // which is what a shape registered for the run does, array_infos_ being flat
-  // and cleared by nothing. A module-level declaration has no local scope to
-  // belong to and keeps the run-long registration it always had.
   void RegisterArrayInScope(std::string_view name, const ArrayInfo& info);
 
-  // §6.16: marks the variable `name` finds a string, and answers whether the
-  // one it finds is. The mark is Variable::is_string, so it belongs to the
-  // variable rather than to the text of a name: a set keyed on the unqualified
-  // text and erased by nothing made one block-local `string s;` mark every
-  // variable called `s` for the rest of the run, everywhere in the design.
-  //
-  // Marking a name no variable answers to marks nothing, which is what a
-  // registration made before the variable exists would do; every caller
-  // creates the variable first.
   void RegisterStringVariable(std::string_view name);
   bool IsStringVariable(std::string_view name);
   ArrayInfo* FindArrayInfo(std::string_view name);
@@ -529,53 +290,30 @@ class SimContext : public DeclaredNameTables,
   QueueObject* CreateQueue(std::string_view name, uint32_t elem_width,
                            int32_t max_size = -1, bool is_4state = true);
   QueueObject* FindQueue(std::string_view name);
-  // §26.3: the queue `target_name` names, answered under `alias_name` too, as
-  // AliasVariable answers the variable, for an imported or re-exported package
-  // queue reached by its bare or its exporter's name. Nothing where no queue
-  // stands under the target. Defined in sim_context_fileio.cpp.
   void AliasQueue(std::string_view alias_name, std::string_view target_name);
 
   AssocArrayObject* CreateAssocArray(std::string_view name, uint32_t elem_width,
                                      bool is_string_key,
                                      const AssocArraySpec& spec = {});
   AssocArrayObject* FindAssocArray(std::string_view name);
-  // The same for an associative array. Defined in sim_context_fileio.cpp.
   void AliasAssocArray(std::string_view alias_name,
                        std::string_view target_name);
 
   void SetVariableTag(std::string_view var_name, std::string_view tag);
   std::string_view GetVariableTag(std::string_view var_name) const;
 
-  // §33.7: the resolved "library.cell" binding of a module instance, keyed by
-  // the same instance-path prefix used for instance types and reported by the
-  // %l/%L specifier. An unrecorded prefix reads back empty.
   void RegisterInstanceBinding(std::string_view prefix,
                                std::string_view library, std::string_view cell);
   std::string_view FindInstanceBinding(std::string_view prefix) const;
 
-  // §33.7: the instance-path prefix an output command records for itself when
-  // its text is produced later than the issuing statement, preferred over the
-  // running process when the binding is resolved. See the definitions.
   void SetDeferredBindingScope(std::optional<std::string> prefix);
   const std::optional<std::string>& DeferredBindingScope() const;
 
-  // Full hierarchical scope of an interface instance named `ident` relative to
-  // the current process, or empty if `ident` is not a known interface instance.
-  // `ident` is a name or a path as §23.6 spells it: an instance's own name, an
-  // element of an instance array, `s[1]`, a path through generate block
-  // instances, `g[1].s`, one headed by a top-level module's name, `top.s1`,
-  // or an interface port, which denotes the instance connected to it
-  // (§25.3.2). The scope is the key the instance's storage is held under,
-  // which is the one VirtualInterfaceHandle interns for it.
   std::string ResolveInstanceScope(std::string_view ident) const;
 
   void AddPlusArg(std::string arg);
   const std::vector<std::string>& GetPlusArgs() const { return plus_args_; }
 
-  // Per §21.3.1: when type is supplied, $fopen yields a 32-bit fd whose MSB is
-  // set; when type is omitted, $fopen yields a 32-bit mcd whose MSB is clear
-  // and a single channel bit (1..30) is set. STDIN/STDOUT/STDERR have reserved
-  // fd values 32'h8000_0000/0001/0002.
   static constexpr uint32_t kFdMsb = 0x80000000u;
   static constexpr uint32_t kStdinFd = 0x80000000u;
   static constexpr uint32_t kStdoutFd = 0x80000001u;
@@ -585,40 +323,20 @@ class SimContext : public DeclaredNameTables,
   uint32_t OpenMcd(std::string_view filename);
   void CloseFile(uint32_t descriptor);
   FILE* GetFileHandle(uint32_t fd);
-  // §21.3.4: a file descriptor may be read from only when it was opened with a
-  // read or read-update type ("r" or "r+"); the pre-opened STDIN channel is
-  // also readable. Write/append descriptors report false.
   bool IsFdReadable(uint32_t fd) const;
   std::vector<FILE*> GetMcdFiles(uint32_t mcd);
 
-  // §21.3.7: $ferror reports the outcome of the most recent file I/O operation
-  // on a descriptor. Failures the simulator detects itself -- a refused read
-  // (§21.3.4) or a bad reposition (§21.3.5) -- never reach the host stream, so
-  // each operation records its own outcome here: a failing operation stores an
-  // error code with a textual description, and one that completes normally
-  // erases the record so $ferror then returns zero and clears its str output.
   void SetFileIoError(uint32_t fd, int32_t code, std::string msg);
   void ClearFileIoError(uint32_t fd);
   const FileIoError* GetFileIoError(uint32_t fd) const;
 
-  // §21.3.8: whether a read has detected end-of-file on a descriptor, for
-  // $feof. $fscanf scans a buffered copy and then repositions the stream,
-  // which clears the host's indicator, so a scan that reached the end records
-  // it here; repositioning (§21.3.5), a push back (§21.3.4.1) and closing the
-  // file erase it.
   void SetFdEofDetected(uint32_t fd, bool detected);
   bool FdEofDetected(uint32_t fd) const;
-  // §21.3.4.1: what $ungetc pushed onto a descriptor not open for reading, for
-  // $fgetc to return last-pushed first; a readable one's host stream holds it.
   std::string& FdPushback(uint32_t fd) { return files_.pushback[fd]; }
-  // §21.3.2: the $fmonitor tasks set up so far; CloseFile cancels a closed
-  // descriptor's.
   std::vector<std::unique_ptr<FileMonitor>>& FileMonitors() {
     return files_.monitors;
   }
   SimFileTables& FileTables() { return files_; }
-  // §37.35 detail 2 with §38.34: what sets the state of each running
-  // sequential UDP instance under its flat name, which a VPI put calls.
   std::unordered_map<std::string, std::function<void(char)>>&
   UdpStateSetters() {
     return udp_state_setters_;
@@ -626,10 +344,8 @@ class SimContext : public DeclaredNameTables,
 
   SemaphoreObject* CreateSemaphore(std::string_view name, int32_t keys);
   SemaphoreObject* FindSemaphore(std::string_view name);
-  // §8.12: the entry FindSemaphore/FindMailbox reads for `name`, or null.
   SemaphoreObject** SemaphoreSlot(std::string_view name);
   MailboxObject** MailboxSlot(std::string_view name);
-  // The same as AliasQueue, for a semaphore and a mailbox a package declares.
   void AliasSemaphore(std::string_view alias_name,
                       std::string_view target_name);
 
@@ -642,15 +358,9 @@ class SimContext : public DeclaredNameTables,
 
   void RegisterClassType(std::string_view name, ClassTypeInfo* info);
   ClassTypeInfo* FindClassType(std::string_view name) const;
-  // §8.25: while `scope`, an instance's prefix, is set, RegisterClassType
-  // holds classes as that instance's own, under it, and FindClassType tries
-  // the running code's instance's first; returns the scope set before.
   std::string SetClassInstanceScope(std::string scope);
   const std::string& ClassInstanceScope() const { return class_scope_; }
-  // The class held under `name` in the scope set, which is not empty.
   ClassTypeInfo* ExactClassType(std::string_view name);
-  // Every class held under its own name, an alias's entry left out, for
-  // RegisterClassTypeAliases; with `all`, every class any key holds, once.
   std::vector<ClassTypeInfo*> RegisteredClassTypes(bool all = false) const;
   void SetVariableClassType(std::string_view var, std::string_view type);
   std::string_view GetVariableClassType(std::string_view var) const;
@@ -681,45 +391,14 @@ class SimContext : public DeclaredNameTables,
 
   void PushThis(ClassObject* obj);
   void PopThis();
-  // 18.7.1: the `this` of the scope containing a randomize() call while an
-  // inline constraint of it is evaluated with the randomized object as
-  // `this`, which local::this bypasses; null outside such an evaluation. The
-  // constraint evaluation scope sets it as it binds the object and restores
-  // it as it unbinds.
   ClassObject* ConstraintCallerThis() const { return constraint_caller_this_; }
   ClassObject* SetConstraintCallerThis(ClassObject* obj);
   ClassObject* CurrentThis() const;
-  // §9.3.2: parks the running object, class and scope stacks on a fork branch.
   void CopyCarriedStacksTo(Process& child) const;
-  // The handle of the object CurrentThis returns, or kNullClassHandle when no
-  // object is in scope. This is what a bare `this` evaluates to, §8.11 making
-  // the keyword a predefined object handle.
   uint64_t CurrentThisHandle() const;
 
-  // §9.4.2: notifies the watchers armed on every variable that designates the
-  // object `handle` names. A write to a class property is a change to an
-  // object's data members, which the clause has re-evaluate an event
-  // expression, and the watchers that can see it sit on the variables rather
-  // than on the object: a class handle's own bits never move, so the
-  // notification is the whole of what a process waiting on `obj.f` has to go on
-  // (StateLivesInValue in src/simulator/awaiters.h answers false for a
-  // class-typed name for exactly that reason).
-  //
-  // The object is reached by handle rather than by name because the three
-  // writers inside a method -- an unqualified property name, `this.f` and
-  // `super.f` -- hold a ClassObject and no name at all, and because the answer
-  // is a set rather than one variable: `C q = p;` leaves both designating one
-  // object, and a write through either is a change both are watching.
-  //
-  // Only a variable declared with a class type is considered, which is what
-  // keeps an integer that happens to equal the handle out of it, and the walk
-  // is over those alone rather than over every variable in the design.
   void NotifyClassHandleWatchers(uint64_t handle);
 
-  // §8.15/§8.17: the class whose method body is currently executing (the
-  // lexically enclosing class), so `super` resolves relative to that class
-  // rather than the dynamic type of `this`. Without this, super.new() in a
-  // mid-hierarchy constructor would re-resolve to the same level and recurse.
   void PushMethodClass(const ClassTypeInfo* cls);
   void PopMethodClass();
   const ClassTypeInfo* CurrentMethodClass() const;
@@ -727,19 +406,11 @@ class SimContext : public DeclaredNameTables,
   void IncrementAssertionFailCount() { ++assertion_fail_count_; }
   int AssertionFailCount() const { return assertion_fail_count_; }
 
-  // §16.3 and §16.14.3: the coverage results of the immediate and of the
-  // concurrent cover statements the run has evaluated, reported at its end.
   ImmediateCoverResults& ImmediateCovers() { return immediate_covers_; }
   ConcurrentCoverResults& ConcurrentCovers() { return concurrent_covers_; }
 
-  // §20.11: the assertion control system tasks the run has called, which an
-  // assertion reads its status from.
   AssertControlLog& AssertControls() { return assert_controls_; }
 
-  // §20.10: record the last severity system task's tool-specific message parts
-  // so a harness can confirm the required call-site information was reported --
-  // the severity label, the user message, the simulation time, the hierarchical
-  // scope of the call, and its source line (the `__LINE__ equivalent).
   void SetLastSeverity(std::string_view sev, std::string_view msg, SimTime t,
                        std::string_view scope = {}, uint32_t line = 0);
   std::string_view LastSeverity() const { return last_severity_; }
@@ -750,70 +421,43 @@ class SimContext : public DeclaredNameTables,
 
   void SetClockingManager(class ClockingManager* mgr) { clocking_mgr_ = mgr; }
   class ClockingManager* GetClockingManager() { return clocking_mgr_; }
-  // §14's clocking blocks for the design, created on the first call and
-  // installed as the manager GetClockingManager answers with. The context owns
-  // it for the reason it owns the specify data: the Lowerer that registers the
-  // blocks is gone before the run starts, and the manager is what the run's
-  // clocking events, synchronous drives and clocking block events go through.
   ClockingManager& AcquireClockingManager();
 
   void SetCoverageDB(class CoverageDB* db) { coverage_db_ = db; }
   class CoverageDB* GetCoverageDB() { return coverage_db_; }
-  // The run's coverage database for §19.9's tasks: the one SetCoverageDB
-  // injected, or else one this context makes on first use and owns.
   class CoverageDB& CoverageData();
-  // §19.3: the covergroup instances the run's variables hold.
   CovergroupTable& Covergroups();
 
   void SetDeferredArgSnapshot(const Expr* arg, const Logic4Vec& val);
   const Logic4Vec* FindDeferredArgSnapshot(const Expr* arg) const;
   void ClearDeferredArgSnapshot(const Expr* arg);
 
-  // §16.5.1: the sampled values the clocked concurrent assertions in this
-  // design read. The store is owned here because the read that consults it is
-  // EvalIdentifier, which holds the context and nothing else.
   AssertionSampleStore& AssertionSamples() { return assertion_samples_; }
 
-  // §13.5.5: the call each class method named without its parentheses stands
-  // for, keyed by the name (ParenFreeCall in eval_instance_task.cpp).
   std::unordered_map<const Expr*, Expr*>& ParenFreeCalls() {
     return paren_free_calls_;
   }
-  // §6.18: each declaration reshaped by the class-scope (§8.3) or block
-  // typedef it names (DeclShapedByTypedef, RegisterBlockEnumTypes).
   std::unordered_map<const Stmt*, const Stmt*>& ClassTypedefShapedDecls() {
     return class_typedef_shaped_decls_;
   }
 
-  // §21.2.3 continuous monitoring. Only one $monitor display list can be
-  // active at a time; recording a new one bumps the generation so that
-  // watchers left behind by a superseded list deactivate themselves.
   void SetActiveMonitor(const Expr* call);
   const Expr* ActiveMonitor() const { return active_monitor_; }
 
-  // §33.7: a stand-in for the active display list's caller (deferred_caller.h),
-  // recorded with the list so each redisplay reads it where it was written.
   void SetMonitorCaller(std::shared_ptr<Process> caller);
   Process* MonitorCaller() const { return monitor_caller_.get(); }
   uint64_t MonitorGeneration() const { return monitor_generation_; }
 
-  // The monitor flag is toggled by $monitoron/$monitoroff and is on by
-  // default at the start of simulation.
   void SetMonitorEnabled(bool on) { monitor_enabled_ = on; }
   bool MonitorEnabled() const { return monitor_enabled_; }
 
-  // At most one monitor display is produced per time step even when several
-  // watched signals change together; this flag coalesces them.
   bool MonitorDisplayPending() const { return monitor_display_pending_; }
   void SetMonitorDisplayPending(bool pending);
 
-  // The value a watched signal held when its change was last observed, so a
-  // write that does not alter the value is not treated as a change.
   const Logic4Vec* MonitorLastValue(Variable* var) const;
   void SetMonitorLastValue(Variable* var, const Logic4Vec& value);
 
  private:
-  // See ResolveInstanceScope.
   std::string InstanceKeyOf(const std::string& cand) const;
   Scheduler& scheduler_;
   Arena& arena_;
@@ -824,21 +468,14 @@ class SimContext : public DeclaredNameTables,
   Logic4Vec* rs_return_slot_ = nullptr;
 
   std::vector<Process*> final_processes_;
-  // §21.7.2.1: record one time unit's simulation_time command and the value
-  // changes under it, which is what the end of a time slot does and what a
-  // close does for the unit it closes in.
   void RecordVcdTimestep(VcdWriter* writer);
-  // §21.7.3.6.1: record the closing time unit, stamp one dump with the final
-  // simulation time and release its writer.
   void CloseOneVcdDump(VcdDump& dump);
-  // §21.7: the two dump files and their bookkeeping. See VcdDumpState.
   VcdDumpState vcd_;
   SpecifyManager* specify_manager_ = nullptr;
   std::unique_ptr<SpecifyManager> owned_specify_manager_;
   std::unique_ptr<DpiRuntime> owned_dpi_runtime_;
   DpiRuntime* dpi_runtime_ = nullptr;
   Process* current_process_ = nullptr;
-  // The instance being built. See SetLoweringInstancePrefix.
   std::string lowering_inst_prefix_;
   UnitScopes units_;
   InstancePrefixOverrideState prefix_override_;
@@ -863,7 +500,6 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<const Stmt*, const Stmt*> class_typedef_shaped_decls_;
 
   const Expr* active_monitor_ = nullptr;
-  // §33.7: the caller of the active display list (see above).
   std::shared_ptr<Process> monitor_caller_;
   uint64_t monitor_generation_ = 0;
   bool monitor_enabled_ = true;
@@ -897,8 +533,8 @@ class SimContext : public DeclaredNameTables,
   std::unordered_map<std::string_view, MailboxObject*> mailboxes_;
   std::unordered_map<std::string_view, uint64_t> event_triggered_;
   std::unordered_map<std::string_view, ClassTypeInfo*> class_types_;
-  std::string class_scope_;        // See SetClassInstanceScope.
-  bool instance_classes_ = false;  // Whether one was ever set.
+  std::string class_scope_;
+  bool instance_classes_ = false;
   std::unordered_map<std::string_view, std::string_view> var_class_types_;
   std::unordered_map<std::string_view, std::vector<Expr*>>
       var_class_param_exprs_;
@@ -915,9 +551,6 @@ class SimContext : public DeclaredNameTables,
   std::vector<std::vector<QueueRefBinding>> queue_ref_stack_;
   std::vector<std::vector<AssocRefBinding>> assoc_ref_stack_;
 
-  // §33.7: per-instance resolved "library.cell" binding strings, keyed like
-  // instance_types_ by instance-path prefix, and the call site a deferred
-  // output command recorded for itself to be keyed in by ahead of the process.
   std::unordered_map<std::string, std::string> instance_bindings_;
   std::optional<std::string> deferred_binding_scope_;
 
@@ -925,7 +558,6 @@ class SimContext : public DeclaredNameTables,
   ImmediateCoverResults immediate_covers_;
   ConcurrentCoverResults concurrent_covers_;
 
-  // §20.11: whole-design assertion control state (see the accessor comment).
   AssertControlLog assert_controls_;
 
   std::string last_severity_;

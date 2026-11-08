@@ -100,8 +100,6 @@ TEST(CasexSyntaxParsing, AlwaysCombCasexStatement) {
   ASSERT_EQ(stmt->case_items.size(), 3u);
 }
 
-// Syntax 12-3 writes every case form with at least one item, so a case
-// statement that reaches endcase with none is reported there.
 TEST(CasexSyntaxParsing, CasexWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -214,8 +212,6 @@ TEST(CasezSyntaxParsing, AlwaysCombCasezStatement) {
   ASSERT_EQ(stmt->case_items.size(), 5u);
 }
 
-// Syntax 12-3 writes every case form with at least one item, so a case
-// statement that reaches endcase with none is reported there.
 TEST(CasezSyntaxParsing, CasezWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"

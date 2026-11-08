@@ -16,8 +16,6 @@ void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag) {
   bool is_static = func->is_static && !func->is_automatic;
   if (!is_static) return;
   for (const auto& arg : func->func_args) {
-    // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine,
-    // except for a `ref static` argument, which is explicitly permitted.
     if (arg.direction == Direction::kRef && !arg.is_ref_static) {
       diag.Error(func->loc,
                  "ref argument '" + std::string(arg.name) +

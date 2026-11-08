@@ -159,17 +159,10 @@ TEST(ProgramInstantiationGrammar, Error_MissingSemicolon) {
       "program my_prog;\n"
       "endprogram\n"
       "module m; my_prog u0() endmodule\n");
-  // Parser::ParseModuleInstList files the shared instantiation reports under
-  // §23.3.2, whatever kind of design element the leading identifier names.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.3.2"));
 }
 
-// program_instantiation ::= program_identifier [ parameter_value_assignment ]
-//   hierarchical_instance { , hierarchical_instance } ;
-// Its sub-symbols are A.4.1.1's: name_of_instance takes A.9.3's
-// escaped_identifier, and param_expression is one of A.8.3's
-// `mintypmax_expression | data_type | $`.
 TEST(ProgramInstantiationGrammar, EscapedNameAndParamExpressionForms) {
   auto r = Parse(
       "program p #(parameter int W = 8, parameter type T = logic) ();\n"
@@ -190,10 +183,6 @@ TEST(ProgramInstantiationGrammar, EscapedNameAndParamExpressionForms) {
   EXPECT_EQ(items[1]->inst_params[1].first, "T");
 }
 
-// A.1.4's module_common_item admits program_instantiation and A.1.6's
-// interface_or_generate_item reaches module_common_item, as §24.3 has it, a
-// program block may be nested in a module or an interface; a program is
-// instantiated inside an interface and inside a generate block of it.
 TEST(ProgramInstantiationGrammar, ProgramInstantiatedInsideInterface) {
   auto r = Parse(
       "program p(input logic clk); endprogram\n"

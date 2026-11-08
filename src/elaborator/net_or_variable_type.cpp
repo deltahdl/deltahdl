@@ -17,15 +17,12 @@
 
 namespace delta {
 
-// §6.7.1: a net declared with no data type, its kind the net type's keyword,
-// and a declaration writing only a signing or a range are of logic.
 static DataType OfLogicWhereImplicit(DataType type) {
   if (type.kind == DataTypeKind::kImplicit || IsNetTypeKind(type.kind))
     type.kind = DataTypeKind::kLogic;
   return type;
 }
 
-// §23.2.2.3: the net the port `name` of `decl` declares.
 static std::optional<DeclaredValue> PortNetValue(std::string_view name,
                                                  const ModuleDecl* decl) {
   if (decl == nullptr) return std::nullopt;
@@ -37,8 +34,6 @@ static std::optional<DeclaredValue> PortNetValue(std::string_view name,
   return value;
 }
 
-// The unpacked dimensions `written` holds, where they are the `count` a value
-// is recorded with, and none where they are not recorded or not all of them.
 static std::vector<Expr*> RecordedDims(const std::vector<Expr*>* written,
                                        uint32_t count) {
   if (written == nullptr || written->size() != count) return {};
@@ -66,9 +61,6 @@ static DataType NamedType(std::string_view name) {
   return named;
 }
 
-// §7.8: the index type the associative array `var` declares, as its
-// declaration writes it (IndexDimType). Nothing for a wildcard index, which
-// has no type.
 static std::optional<DataType> AssociativeIndexType(const RtlirVariable& var) {
   if (!var.assoc_index_type_name.empty())
     return NamedType(var.assoc_index_type_name);
@@ -103,9 +95,6 @@ std::optional<DeclaredValue> NetOrVariableValue(const RtlirModule& mod,
     value.dims = RecordedDims(var->declared_unpacked_dims, value.unpacked_dims);
     return value;
   }
-  // A port the module records no net or variable for is kept as a port alone,
-  // and is of the type its declaration writes. An interface port is of no data
-  // type.
   auto port = std::ranges::find(mod.ports, declared, &RtlirPort::name);
   if (port == mod.ports.end() || port->is_interface_port) return std::nullopt;
   return PortNetValue(declared, mod.decl);

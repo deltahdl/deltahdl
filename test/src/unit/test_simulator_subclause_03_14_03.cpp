@@ -20,10 +20,6 @@ TEST(DesignBuildingBlockParsing, ThreeMagnitudes) {
   EXPECT_EQ(DelayToTicks(1, ts100, TimeUnit::kPs), 100000u);
 }
 
-// §3.14.2.3 leaves a compilation-unit scope without a timeunit at the default
-// 1 ns / 1 ns, and §3.14.3 forms the global precision without that default, so
-// under `timescale 1us / 1us such a scope's unit is finer than the global
-// precision. 3000 ns is three ticks of 1 us, as an integer and as a real.
 TEST(DesignBuildingBlockSimulation, UnitFinerThanGlobalPrecisionDividesDown) {
   TimeScale ts{TimeUnit::kNs, 1, TimeUnit::kNs, 1};
   EXPECT_EQ(DelayToTicks(3000, ts, TimeUnit::kUs), 3u);
@@ -40,10 +36,6 @@ TEST(DesignBuildingBlockSimulation, StepTimeUnitTracksLatestGlobalPrecision) {
   EXPECT_EQ(f.ctx.StepTimeUnit(), f.ctx.GlobalPrecision());
 }
 
-// §3.14.3 takes the smallest precision of every `timescale in the design, not
-// only the last one: the 1 fs before p makes the global precision 1 fs, so the
-// #1.5 of p's task stays 1.5 ns and t reads 1.500. Counted in ticks of the last
-// directive's 1 ns, the delay landed on 2 ns.
 TEST(DesignBuildingBlockSimulation,
      EarlierFinerTimescaleSetsTheGlobalPrecision) {
   SimFixture f;
@@ -62,11 +54,6 @@ TEST(DesignBuildingBlockSimulation,
             "1.500\n");
 }
 
-// The step time unit is the global time precision, here the 1 ps of the
-// module's own `timescale, so a 1step delay on a continuous assignment, on a
-// net and on a gate waits 1 ps where the module counts in 1 ns: the target
-// rises at 1.001. Evaluated as the literal's stored value, the delay was none
-// and the target rose with its source at 1.000.
 TEST(DesignBuildingBlockSimulation, AOneStepDelayWaitsOneGlobalPrecisionUnit) {
   for (const char* driver : {"  wire w;\n  assign #1step w = a;\n",
                              "  wire #1step w;\n  assign w = a;\n",

@@ -47,8 +47,6 @@ enum class ExprKind : uint8_t {
   kTagged,
 };
 
-// §5.12: one attribute instance, `name` or `name = value`, where it was
-// written.
 struct Attribute {
   std::string_view name;
   Expr* value = nullptr;
@@ -75,9 +73,6 @@ struct Expr {
   std::string_view callee;
   std::vector<Expr*> args;
   std::vector<std::string_view> arg_names;
-  // kSystemCall only: true when the call wrote a parenthesized argument list,
-  // empty or not, telling `$timeformat();` from the bare `$timeformat;` whose
-  // args are just as empty (§20.4.3).
   bool has_arg_list = false;
 
   Expr* base = nullptr;
@@ -86,109 +81,36 @@ struct Expr {
   bool is_part_select_plus = false;
   bool is_part_select_minus = false;
   bool has_param_spec = false;
-  // kMemberAccess only: true when the operator was `::` (scope resolution),
-  // false when it was `.` (member access). Lets the elaborator distinguish
-  // `pkg::x` from `obj.x` (§26.3 / §23.7.1).
   bool is_scope_resolution = false;
 
   Expr* with_expr = nullptr;
   bool with_has_parens = false;
 
-  // 18.7: for a randomize() with { constraint_block } call, the captured inline
-  // constraint block. Its top-level relations (and dist/soft/if-else forms) are
-  // scanned into a throwaway constraint ClassMember exactly as an in-class
-  // constraint block is, so the simulator can apply them alongside the object's
-  // own constraints. Null for any other call, including a plain randomize().
   ClassMember* inline_constraint = nullptr;
 
-  // 18.7: the identifier_list of a restricted inline constraint block -- the
-  // names inside the parentheses of `randomize() with ( a, b ) { ... }`. In a
-  // restricted block only these names resolve as the object's random variables;
-  // all others resolve in the calling scope. with_has_parens records that the
-  // parenthesized form was used (so an empty list still marks a restricted
-  // block); this vector holds the listed names. Empty for an unrestricted
-  // block.
   std::vector<std::string_view> with_restrict_ids;
 
   std::vector<Expr*> elements;
   Expr* repeat_count = nullptr;
-  // §10.9: set on the kReplicate an assignment pattern's replication form,
-  // `'{n{...}}`, makes its only element, telling it from the replication
-  // operator of §11.4.12.1 written as a pattern's one positional item,
-  // `'{ {n{...}} }`, whose node is the same kind.
   bool is_pattern_replication = false;
 
-  // §10.9: the key of each keyed element of an assignment pattern, in the order
-  // the elements were written, and empty for a positional one. Syntax 10-5
-  // writes a key as an expression -- `array_pattern_key ::= constant_expression
-  // | assignment_pattern_key` -- so a key is held as one, and `N-1` is as much
-  // a key as `3` is. The two spellings that are not expressions,
-  // `assignment_pattern_key ::= simple_type | default`, are held as an
-  // identifier node carrying the keyword, which is a spelling no member name
-  // and no index can be confused with. A key written as a single name or
-  // literal therefore has that name or literal as its node's text, which is
-  // what a reader matching a key against a member name or an associative
-  // array's string index wants.
   std::vector<Expr*> pattern_keys;
 
   bool is_parenthesized = false;
 
-  // §12.6: set on a kIdentifier produced from the `. variable_identifier`
-  // pattern form, distinguishing a pattern identifier that binds a new variable
-  // from a bare identifier used as a constant expression pattern. Parsing drops
-  // the leading dot, so this flag is the only record that the identifier came
-  // from a binding position.
   bool is_pattern_binding = false;
-  // §19.3: the sample() call deltahdl synthesizes for a covergroup's clocking
-  // event, which the strobe option (§19.7.1) defers to the Postponed region;
-  // a sample() written in the source is never one.
   bool is_coverage_event_sample = false;
 
-  // §16.12.18: for an actual argument of a property instance that is a
-  // sequence_expr or a property_expr rather than an expression, passed to a
-  // formal of type sequence or property, the tree the parser read it into;
-  // the node is an identifier standing in the argument's place, and the
-  // substitution of the actuals for the formals reads the tree.
   PropertyExprNode* property_actual = nullptr;
-  // §16.8.1 with §9.4 and §16.11: for an event actual written as a
-  // parenthesized list of names, `(a, f)`, the sequence it reads as too, `a`
-  // with `f` called at its match, which a formal used as a sequence takes in
-  // place of the events; nullptr for any other actual.
   PropertyExprNode* sequence_reading = nullptr;
-  // §16.9.3: for a call of a sampled value function written with a clocking
-  // event, `$rose(req, @(posedge clk))`, that event, at whose ticks the
-  // argument is sampled; nullptr where none is written.
   const std::vector<EventExpr>* sampled_clock = nullptr;
-  // §16.14.2 with §37.34: for the kInside an assertion's `expression dist {
-  // dist_list }` is read as, the dist_list as written, each item's weight and
-  // its := or :/ kept, which the inside's elements drop; nullptr for an inside
-  // written as one.
   const std::vector<ConstraintDistItem>* dist_items = nullptr;
 
-  // kTypeRef only: the data_type the node stands for, read by ParseDataType.
-  // It is set on `type(data_type)`, whose text keeps only the type's name, so
-  // the packed dimensions of `type(bit [12:0])` are here alone (§6.23), and on
-  // an element of a parameter_value_assignment holding a data_type A.8.3's
-  // param_expression admits and an expression cannot spell -- A.2.2.1's
-  // signing after an integer type, or a virtual interface type. A keyword type
-  // written alone there stays the identifier node ParseCastOrTypedPattern
-  // makes, with its packed dimensions as selects, which is the shape the
-  // elaborator's override readers take.
   DataType* type_value = nullptr;
-  // §5.12: the attributes written after the operator an operation is.
   std::vector<Attribute> attrs;
-  // A.8.1: on the operand of a stream_expression written with `with [
-  // array_range_expression ]`, the range, a kSelect with no base holding its
-  // bounds (§11.4.14.4); nullptr on any other node. It is kept apart from
-  // with_expr, an array manipulation call's own with clause (A.8.2), because
-  // §11.4.14.4 lets the queue such a call returns be the operand.
   Expr* stream_range = nullptr;
 };
 
-// §11.5: an operand is "simple" iff it is not parenthesized AND is a primary
-// (as defined in A.8.4). The example given is `1'b1 - 2'b00 + (1'b1 + 1'b1)`,
-// where `1'b1 - 2'b00` (binary, not a primary) and `(1'b1 + 1'b1)`
-// (parenthesized) are operands but not simple operands.
 inline bool IsSimpleOperand(const Expr* e) {
   if (e == nullptr) return false;
   if (e->is_parenthesized) return false;
@@ -222,11 +144,6 @@ inline bool IsSimpleOperand(const Expr* e) {
   return false;
 }
 
-// §11.8.1: decimal numbers are signed, and based numbers are unsigned except
-// where the s notation is used in the base specifier, as in 4'sd12. The text an
-// Expr carries for a literal is its source spelling, which is where the base
-// specifier is: the apostrophe separates the decimal form from the based form,
-// and the character after the apostrophe decides the based one.
 inline bool IsSignedLiteral(std::string_view text) {
   auto tick = text.find('\'');
   if (tick == std::string_view::npos) return true;

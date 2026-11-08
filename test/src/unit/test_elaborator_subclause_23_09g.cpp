@@ -1,10 +1,3 @@
-// Tests for the §23.9 scope rules as they reach the type a variable of a scope
-// within a module is declared with. A generate block (§27.5), a task, a
-// function and a begin-end block are each a scope, and a typedef one of them
-// declares (§6.18) stands over the module's of the same name for the
-// variables it declares, deciding the built-in methods (§6.16, §23.7) and the
-// class (§8.5) a select through such a variable reaches.
-
 #include <gtest/gtest.h>
 
 #include "elaborator/rtlir.h"
@@ -65,9 +58,6 @@ TEST(LocalTypedefScope, FunctionTypedefTypesItsOwnVariables) {
                             "class 'C' has no member named 'nope'", 12, "8.5"));
 }
 
-// A scope that declares no typedef of the name sees the module's: a block's
-// variable of the module's `int t` is an integral value, which has no
-// built-in method.
 TEST(LocalTypedefScope, BlockWithoutItsOwnTypedefReadsTheModules) {
   ElabFixture f;
   ElaborateSrc(
@@ -86,10 +76,6 @@ TEST(LocalTypedefScope, BlockWithoutItsOwnTypedefReadsTheModules) {
       "23.7"));
 }
 
-// An interface's typedef is a name of the interface's scope, never of a module
-// connected to it, so a module's function formal written with the module's own
-// class `t` is a handle of that class whatever array typedef `t` the interface
-// declares, and takes none of the typedef's dimensions.
 TEST(LocalTypedefScope, InterfacesArrayTypedefLeavesAModulesClassFormal) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(

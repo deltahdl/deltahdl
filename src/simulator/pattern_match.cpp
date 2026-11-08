@@ -36,8 +36,6 @@ static const StructFieldInfo* FindMember(const StructTypeInfo& layout,
   return nullptr;
 }
 
-// The member a member access `s.m` or `s.p.m` names of a variable, through
-// the layout each prefix has; null where a prefix has none.
 static const StructFieldInfo* MemberOfPath(const Expr* e, SimContext& ctx) {
   if (e->rhs == nullptr) return nullptr;
   const StructTypeInfo* base = nullptr;
@@ -50,8 +48,6 @@ static const StructFieldInfo* MemberOfPath(const Expr* e, SimContext& ctx) {
   return base != nullptr ? FindMember(*base, e->rhs->text) : nullptr;
 }
 
-// §12.6.1 with §13.4.1: a call's value as a subject, the tag its body returned
-// and the layout of its return type.
 static PatternSubject CallSubject(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   PatternSubject subject;
@@ -62,22 +58,16 @@ static PatternSubject CallSubject(const Expr* expr, SimContext& ctx,
   return subject;
 }
 
-// The layout and tag key of what `expr` names in the design's storage: a
-// variable, an element of an array, or a member of a structure or union.
 static void AddVariableStorage(const Expr* expr, SimContext& ctx, Arena& arena,
                                PatternSubject& subject) {
   if (expr->kind == ExprKind::kIdentifier) {
     subject.layout = StructLayoutOfName(expr->text, ctx);
     subject.tag_key = TagKeyOfName(expr->text, ctx);
   } else if (expr->kind == ExprKind::kSelect) {
-    // §7.4 with §12.6: an element of an array of structures or unions has
-    // the array's element layout, and its tag stands under ElementTagKey's.
     if (ElementTagKey(expr, ctx, arena, subject.tag_key)) {
       subject.layout = StructLayoutOfName(subject.tag_key, ctx);
     }
   } else if (expr->kind == ExprKind::kMemberAccess) {
-    // §7.2 with §12.6: a member of a structure or union has the layout of its
-    // own type, and a tagged union member's tag stands under its path.
     subject.field = MemberOfPath(expr, ctx);
     if (subject.field != nullptr) subject.layout = subject.field->nested;
     if (std::string key; TaggedUnionMemberKey(expr, ctx, key)) {
@@ -89,14 +79,9 @@ static void AddVariableStorage(const Expr* expr, SimContext& ctx, Arena& arena,
 PatternSubject PatternSubjectOf(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->kind == ExprKind::kCall) return CallSubject(expr, ctx, arena);
-  // §12.6 evaluates the subject once: the indices it selects by are pinned
-  // (LhsIndexPin) for its value and for the key of its tag (ElementTagKey)
-  // alike, so `arr[i++]` advances i once and both name one element.
   LhsIndexPin pin(expr, ctx, arena);
   PatternSubject subject;
   subject.value = EvalExpr(expr, ctx, arena);
-  // §8.5 with §12.6: a class property of a tagged union type is matched against
-  // the tag its own object holds, under the property's key.
   std::string name;
   if (expr->kind == ExprKind::kIdentifier) {
     name = std::string(expr->text);
@@ -115,9 +100,6 @@ PatternSubject PatternSubjectOf(const Expr* expr, SimContext& ctx,
   return subject;
 }
 
-// The member `field` of `subject`: its bits, with its signedness, the layout of
-// its own type, and the key a tag of its own stands under, the subject's key
-// followed by the member's name as TaggedUnionMemberKey forms it.
 static PatternSubject MemberSubject(const PatternSubject& subject,
                                     const StructFieldInfo& field,
                                     Arena& arena) {
@@ -132,9 +114,6 @@ static PatternSubject MemberSubject(const PatternSubject& subject,
   return member;
 }
 
-// §12.6: `tagged M p` matches a value whose tag is M and whose member M
-// matches p; a void member, which `tagged M` names with no pattern, has
-// nothing more to match.
 static bool MatchTagged(const Expr* pat, const PatternSubject& subject,
                         const PatternMatchEnv& env) {
   std::string_view tag = pat->rhs->text;
@@ -149,9 +128,6 @@ static bool MatchTagged(const Expr* pat, const PatternSubject& subject,
   return MatchPattern(pat->lhs, MemberSubject(subject, *field, env.arena), env);
 }
 
-// §12.6: a structure pattern matches each member its elements name, by
-// declaration position, or by the member name a key gives, in any order and
-// leaving out any member.
 static bool MatchStructure(const Expr* pat, const PatternSubject& subject,
                            const PatternMatchEnv& env) {
   const auto& fields = subject.layout->fields;
@@ -191,9 +167,6 @@ bool MatchPattern(const Expr* pat, const PatternSubject& subject,
                      env.case_kind, env.arena);
 }
 
-// §12.6: a pattern identifier is a variable of the type of the member it
-// binds: a real, a string, a 2-state value, an enumeration or a handle of a
-// class as that member is (§6.12, §6.16, §6.11.2, §6.19, §8.4).
 static void TypeBoundVariable(std::string_view name,
                               const StructFieldInfo& field, Variable& var,
                               SimContext& ctx) {
@@ -225,9 +198,6 @@ void InstallPatternBindings(const std::vector<PatternBinding>& bindings,
     if (binding.field != nullptr) {
       TypeBoundVariable(binding.name, *binding.field, *var, ctx);
     }
-    // §7.3.2: what a tagged union identifier is bound to carries its tag, and
-    // that of each member union its active member reaches, which the bound
-    // name holds as a variable assigned the value would.
     if (!binding.tag_key.empty()) {
       CopyTagChain(binding.tag_key, std::string(binding.name), binding.layout,
                    ctx, ctx.GetArena());
@@ -246,14 +216,8 @@ bool PatternBindsIdentifiers(const Expr* expr) {
                      PatternBindsIdentifiers);
 }
 
-// §12.6: a constant expression pattern succeeds when the value equals the
-// constant's value, and §12.6.2 matches `e matches p` the same way; the
-// narrower operand is extended to the wider's width, as §12.5's case
-// comparison is, and every word of the two is compared, not the first alone.
-// Both value planes take part: §12.6.1 lets matching ignore bits only in
-// casez and casex, so an x or a z bit matches an x or a z bit alone.
 bool MatchesClauseValueMatch(const Logic4Vec& value, const Logic4Vec& constant,
-                             TokenKind /*case_kind*/, Arena& arena) {
+                             TokenKind, Arena& arena) {
   uint32_t width = std::max(value.width, constant.width);
   bool sign_ext = value.is_signed && constant.is_signed;
   Logic4Vec lhs =

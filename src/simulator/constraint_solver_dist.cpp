@@ -11,23 +11,10 @@ namespace delta {
 
 namespace {
 
-// 18.5.3: the draws tried within one distribution item before the item is
-// taken to hold no value the constraints on its variable admit. A single value
-// is decided by its first draw; a range of three values two of which another
-// constraint excludes is passed over wrongly once in (2/3)**32 draws.
 constexpr int kDrawsPerItem = 32;
 
 constexpr size_t kNoItem = SIZE_MAX;
 
-// 18.5.3: the stage-1 weight of a distribution item. The ':=' operator on a
-// range assigns the weight to each element, so the range's total weight is the
-// per-element weight times the element count, counting the elements other
-// constraints exclude. A single value, or a range or default weighted with
-// ':/', contributes its weight as a whole, as does every range of a real
-// variable, whose elements are not counted.
-// The sum and the product of two weights, held to the largest uint64_t where
-// they overflow it: the weights keep their order of size there, and no
-// nonzero weight wraps to zero.
 uint64_t SaturatingAdd(uint64_t a, uint64_t b) {
   return a > UINT64_MAX - b ? UINT64_MAX : a + b;
 }
@@ -46,8 +33,6 @@ int64_t DistItemRepresentative(const DistWeight& w) {
   return w.is_range ? w.lo : w.value;
 }
 
-// 18.5.3: stage 1 of a draw -- choose an item with probability proportional to
-// its weight. kNoItem when every weight is zero, so there is nothing to draw.
 size_t SelectDistItem(const std::vector<DistWeight>& weights, bool is_real,
                       std::mt19937& rng) {
   uint64_t total = 0;
@@ -64,13 +49,6 @@ size_t SelectDistItem(const std::vector<DistWeight>& weights, bool is_real,
   return weights.size() - 1;
 }
 
-// 18.5.3: a value is covered by the distribution's non-default items when it
-// equals a named single value or falls inside a named range. Default items name
-// no specific value, so they never cover anything here.
-// 6.11.3: a weighted range covers the values between its ends in the order the
-// constrained variable's declared type reads them, the same order the range is
-// drawn from, so a range in the top half of an unsigned domain covers what it
-// names rather than nothing.
 bool DistValueCovered(const std::vector<DistWeight>& weights, int64_t v,
                       bool is_signed) {
   for (const auto& w : weights) {
@@ -118,9 +96,6 @@ bool ConfinedTo(const ConstraintExpr& c, const std::string& name) {
 
 namespace {}  // namespace
 
-// 18.5.3: a value covered only by 'default :/ weight' is any domain value not
-// named by another item. Draw uniformly from [domain_lo, domain_hi], rejecting
-// values already covered by a non-default item.
 int64_t ConstraintSolver::SampleDefaultValue(
     const std::vector<DistWeight>& weights, int64_t domain_lo,
     int64_t domain_hi, bool is_signed) {
@@ -132,8 +107,6 @@ int64_t ConstraintSolver::SampleDefaultValue(
   return domain_lo;
 }
 
-// 18.5.3: stage 2 of a draw -- resolve the chosen item to a concrete value, a
-// range uniformly and the default item from the rest of the domain.
 int64_t ConstraintSolver::DrawDistItem(const DistWeight& item,
                                        const std::vector<DistWeight>& weights,
                                        int64_t domain_lo, int64_t domain_hi,
@@ -162,17 +135,6 @@ bool ConstraintSolver::DistValueAdmissible(
   return true;
 }
 
-// 18.5.3: select a value from a distribution. Stage 1 chooses an item with
-// probability proportional to its (unsigned) weight; stage 2 resolves the
-// chosen item to a concrete value. Because the per-item probabilities add, a
-// value named by several items accumulates their weights, and a value carrying
-// a zero weight in one item is still reachable through another nonzero item.
-// Only values named by the set (or, with a default item, the rest of the
-// domain) are ever produced. The weight of an item applies to it as a whole,
-// so a value of it another constraint excludes is redrawn within the item
-// rather than costing the item its share; an item holding no admissible value
-// is passed over. The last draw is handed back when no item holds one, for the
-// attempt to refuse.
 int64_t ConstraintSolver::SampleDist(const ConstraintExpr& c,
                                      const std::vector<ConstraintExpr>& extra) {
   auto it = variables_.find(c.var_name);
@@ -196,9 +158,6 @@ int64_t ConstraintSolver::SampleDist(const ConstraintExpr& c,
   return v;
 }
 
-// 18.5.3: stage 2 over a real variable -- a range is drawn uniformly over the
-// reals it spans, and the default item from the domain outside every other
-// item.
 double ConstraintSolver::DrawRealDistItem(
     const DistWeight& item, const std::vector<DistWeight>& weights,
     double domain_lo, double domain_hi) {
@@ -217,10 +176,6 @@ double ConstraintSolver::DrawRealDistItem(
   return draw(rng_);
 }
 
-// 18.5.3: a distribution over a real variable, the clause's mix of real and
-// integral values. The draw within an item is admitted by the domain the
-// variable's relational constraints leave it (18.4.1), which is where those
-// constraints are kept for a real variable.
 double ConstraintSolver::SampleRealDist(const ConstraintExpr& c) {
   auto it = variables_.find(c.var_name);
   double lo = it != variables_.end() ? it->second.real_min : 0.0;

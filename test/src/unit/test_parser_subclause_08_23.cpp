@@ -176,18 +176,6 @@ TEST(ClassScopeResolutionParsing, NestedClassDeclaration) {
   EXPECT_EQ(r.cu->classes[0]->members[0]->nested_class->name, "Inner");
 }
 
-// A.2.2.1's class_type (printed page 1183 of the LRM) lets a
-// parameter_value_assignment follow the class identifier before each `::`, and
-// §8.25.1 (printed page 205) has a use of the scope resolution operator outside
-// a parameterized class name its specialization, `C#(bit)::set(1)`. The block
-// item predicate walked the `::` path of a known type name without reading the
-// `#(...)`, so it stopped at `#`, took the line for a declaration, and
-// ParseNamedType then met the call's `(` where a variable name should stand
-// and reported it under §6.8.
-
-// The one statement of module m's function f, read from a parse that reported
-// nothing, is an expression statement holding a call: the shape a scoped call
-// written as a statement takes, where a declaration would be a kVarDecl.
 void ExpectSoleStatementOfFIsACall(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -279,10 +267,6 @@ TEST(ClassScopeResolutionParsing,
   EXPECT_EQ(f->func_body_stmts[1]->kind, StmtKind::kExprStmt);
 }
 
-// A.2.2.1 writes a class_type as a class name followed by any number of
-// `:: class_identifier` steps, and §8.23 names a class nested two levels deep
-// that way: `A::B::C` keeps A among its outer prefixes, B as the scope the
-// type is declared in and C as the type, so no step of the chain is lost.
 TEST(ClassScopeResolutionParsing, TypeNamedThroughAChainKeepsEveryPrefix) {
   auto r = Parse(
       "class A;\n"
@@ -301,11 +285,6 @@ TEST(ClassScopeResolutionParsing, TypeNamedThroughAChainKeepsEveryPrefix) {
   EXPECT_EQ(h->data_type.type_name, "C");
 }
 
-// The same chain opened by a package, whose name the parser does not know as
-// a type, with the class written as a specialization: `pkg::Inner#(4)::t`
-// keeps pkg among its outer prefixes and the class's parameter value with the
-// type. The module item was read one scope at a time, the package dropped and
-// the value cleared at the second `::`.
 TEST(ClassScopeResolutionParsing, PackageLedChainKeepsItsPrefixAndValues) {
   auto r = Parse(
       "package pkg;\n"

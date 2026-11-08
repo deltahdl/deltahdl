@@ -77,8 +77,6 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  // Every ansi header shares one report, which for a program header cites
-  // §24.3, where Syntax 24-1 footnote 1 states the requirement.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
@@ -86,11 +84,6 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportRequiresPortList) {
                             2, "24.3"));
 }
 
-// Syntax 26-3 lists program_nonansi_header among the headers that may carry a
-// package import. The ansi program header is exercised elsewhere; here the port
-// list is a bare name list (non-ansi) whose directions arrive as separate body
-// declarations, so parsing this proves the non-ansi program production accepts
-// a leading header import.
 TEST(ProgramDeclaration, NonAnsiHeaderWithPackageImport) {
   auto r = Parse(
       "package pkg; typedef int word_t; endpackage\n"
@@ -133,7 +126,6 @@ TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "module m import pkg::*;\n"
       "endmodule\n");
-  // §23.2.1 is the subclause the shared ansi-header report names.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
@@ -146,8 +138,6 @@ TEST(InterfaceParsing, AnsiHeaderPackageImportRequiresPortList) {
       "package pkg; endpackage\n"
       "interface ifc import pkg::*;\n"
       "endinterface\n");
-  // The shared ansi-header report cites §25.3 for an interface header, where
-  // Syntax 25-1 footnote 1 states the requirement.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
@@ -162,11 +152,6 @@ TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportFollowedByEmptyPortList) {
               "endmodule\n"));
 }
 
-// The Syntax 26-3 footnote lists three accept forms for an ansi-header package
-// import: it may be followed by a parameter_port_list, by a
-// list_of_port_declarations, or by both. The port-list-only and both forms are
-// exercised elsewhere; this isolates the parameter_port_list-only form, where a
-// param list follows the import and no port list appears at all.
 TEST(ModuleHeaderDefinition, AnsiHeaderPackageImportFollowedByParamListOnly) {
   EXPECT_TRUE(
       ParseOk("package pkg; endpackage\n"

@@ -59,13 +59,6 @@ TEST(ProgramConstructSim, NoImplicitFinishWithoutProgramInitial) {
   EXPECT_FALSE(f.ctx.StopRequested());
 }
 
-// §24.3: the implicit $finish fires as soon as every thread of every program
-// has ended -- not when the first one ends. Two program blocks whose initials
-// complete at different times (t=20 and t=60) must both run to completion
-// before the run stops. If the stop fired when the earlier initial (p1) ended
-// at t=20, p2's #60 delay would be cut off and b would keep its reset value;
-// observing b==2 shows the run waited for the latest-ending program initial
-// across both blocks.
 TEST(ProgramConstructSim,
      ImplicitFinishWaitsForLatestProgramInitialAcrossBlocks) {
   SimFixture f;
@@ -115,11 +108,6 @@ TEST(ProgramConstructSim, ProgramInitialTerminatesDescendantThreads) {
   EXPECT_EQ(v->value.ToUint64(), 7u);
 }
 
-// §24.3: a top-level program not explicitly instantiated is implicitly
-// instantiated once (printed page 776 of IEEE 1800-2023), so its initial
-// runs and a task it declares, enabled from that initial, consumes its delay
-// (§13.3): the write lands at time 5. The program was rooted by no run before,
-// so nothing ran and `at` kept its reset value.
 TEST(ProgramConstructSim, ATopLevelProgramsInitialRunsItsTask) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -136,8 +124,6 @@ TEST(ProgramConstructSim, ATopLevelProgramsInitialRunsItsTask) {
   EXPECT_EQ(at->value.ToUint64(), 505u);
 }
 
-// The same beside a module: both tops run, the module's initial and the
-// program's, so the unit is elaborated with no top named.
 TEST(ProgramConstructSim, ATopLevelProgramBesideAModuleRunsWithIt) {
   SimFixture f;
   auto* design = ElaborateSrcAllTops(
@@ -160,8 +146,6 @@ TEST(ProgramConstructSim, ATopLevelProgramBesideAModuleRunsWithIt) {
   EXPECT_EQ(b->value.ToUint64(), 7u);
 }
 
-// A recursive task that records its local after the inner calls return, so
-// each activation's `k` shows whether it was its own or a shared one.
 std::string RecursiveTaskUnder(const std::string& header,
                                const std::string& task_kw,
                                const std::string& footer) {
@@ -179,11 +163,6 @@ std::string RecursiveTaskUnder(const std::string& header,
          footer;
 }
 
-// §24.3 Syntax 24-1 (printed page 775) with §6.21 (printed page 132) and
-// §13.3.1: a program's lifetime qualifier is the default lifetime of the
-// subroutines declared in it, so under `program automatic` each activation of
-// a recursive task has its own local, and under `program static` all share
-// one. A `task automatic` in a program with no qualifier is automatic too.
 TEST(ProgramConstructSim, ProgramLifetimeIsTheDefaultOfItsTasks) {
   const std::string kTop = "endprogram\nmodule top; p pi(); endmodule\n";
   SimFixture fa;
@@ -200,7 +179,6 @@ TEST(ProgramConstructSim, ProgramLifetimeIsTheDefaultOfItsTasks) {
             "k=0 k=1 k=2\n");
 }
 
-// §23.2.1 (printed page 728): the same default taken from `module automatic`.
 TEST(ProgramConstructSim, ModuleAutomaticGivesATaskAnActivationPerCall) {
   SimFixture f;
   EXPECT_EQ(RunCapture(RecursiveTaskUnder("module automatic top;\n", "task",
@@ -209,10 +187,6 @@ TEST(ProgramConstructSim, ModuleAutomaticGivesATaskAnActivationPerCall) {
             "k=0 k=1 k=2\n");
 }
 
-// §24.3 (printed page 776) with §7.2 (printed page 146) and §7.8 (printed
-// page 163): a struct and an associative array declared as program items are
-// variables of the program instance, so their member and key writes are kept
-// and read back beside a queue's pushes.
 TEST(ProgramConstructSim, StructQueueAndAssociativeProgramVariablesHoldWrites) {
   SimFixture f;
   EXPECT_EQ(
@@ -235,12 +209,6 @@ TEST(ProgramConstructSim, StructQueueAndAssociativeProgramVariablesHoldWrites) {
       "st=13 q=3 sum=60 aa=2 v=44\n");
 }
 
-// §24.3 (printed page 776) with §6.19.5.3 (printed page 123) and §6.19.5.6
-// (printed page 124): an enum typedef declared as a program item names its
-// literals in the program's scope, so a program variable and a local of the
-// initial's block of the type store the literal's value and answer `name()`
-// and `next()` on it. The program variable's methods answered nothing, and
-// the block local stored nothing at all.
 TEST(ProgramConstructSim, EnumTypedefProgramItemAnswersItsMethods) {
   const std::string kEnum =
       "program p;\n"
@@ -261,9 +229,6 @@ TEST(ProgramConstructSim, EnumTypedefProgramItemAnswersItsMethods) {
       "prog s=GREEN n=1 next=BLUE\n");
 }
 
-// §24.3: once every initial procedure of every program has ended, the run
-// ends at once through an implicit $finish, so a module initial waiting past
-// that time never runs its statement and the run stops at the program's end.
 TEST(ProgramConstructSim, ProgramEndEndsTheRunBeforeLaterDesignEvents) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p;\n"
@@ -278,8 +243,6 @@ TEST(ProgramConstructSim, ProgramEndEndsTheRunBeforeLaterDesignEvents) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 2u);
 }
 
-// §24.3 as above beside a free-running design clock, whose next toggle is
-// no reason to go on: the run still ends at 2.
 TEST(ProgramConstructSim, ProgramEndEndsTheRunBesideAFreeRunningClock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p;\n"
@@ -296,8 +259,6 @@ TEST(ProgramConstructSim, ProgramEndEndsTheRunBesideAFreeRunningClock) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 2u);
 }
 
-// §24.3 with §9.3.2: after join_any the initial runs to its end at 1, which
-// ends the sibling still pending and the run with it.
 TEST(ProgramConstructSim, ProgramEndAfterJoinAnyEndsTheRun) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p;\n"
@@ -317,8 +278,6 @@ TEST(ProgramConstructSim, ProgramEndAfterJoinAnyEndsTheRun) {
             "fast at 1\nparent at 1\n");
 }
 
-// §24.3: with an input port connected and driven by the module after the
-// program's end, the program's end at 4 still ends the run there.
 TEST(ProgramConstructSim, ProgramWithDrivenInputPortEndsTheRunAtItsEnd) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p(input logic d);\n"
@@ -334,9 +293,6 @@ TEST(ProgramConstructSim, ProgramWithDrivenInputPortEndsTheRunAtItsEnd) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
 }
 
-// §24.3 with §4.4.2: a program's initial procedure runs in the Reactive
-// region, so at one time it runs after a module's, which runs in the Active
-// region, whatever time unit either reads its delay in.
 TEST(ProgramSim, AProgramInitialRunsAfterAModuleInitialAtOneTime) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -353,11 +309,6 @@ TEST(ProgramSim, AProgramInitialRunsAfterAModuleInitialAtOneTime) {
             "mod 2000\nprog 2 2.000000\n");
 }
 
-// §24.3 with §23.10.2: a program nested in a module is instantiated in each
-// instance of the module and reads the module's parameter at the value that
-// instance gives it. m1's K is 7 and m2's 2, and the delays order the lines.
-// The program's lookup fell back to the top's storage, which holds no K, and
-// both lines read 0.
 TEST(ProgramConstructSim, NestedProgramReadsItsModuleInstanceParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter int K = 0);\n"
@@ -373,11 +324,6 @@ TEST(ProgramConstructSim, NestedProgramReadsItsModuleInstanceParameter) {
             "k=2\nk=7\n");
 }
 
-// Syntax 24-1's extern program header is a prototype as §23.5 describes: the
-// definition after it takes its ports through `.*`, and the instance runs
-// that definition with the port values the module connects. An input with a
-// data type and no kind is a net (§23.2.2.3), and int is no type a net may
-// have (§6.7.1), so the input is declared var.
 TEST(ProgramConstructSim, ExternProgramDefinitionRunsWithPrototypePorts) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -395,10 +341,6 @@ TEST(ProgramConstructSim, ExternProgramDefinitionRunsWithPrototypePorts) {
   EXPECT_EQ(w->value.ToUint64(), 58u);
 }
 
-// §24.3 with §25.3: a program nested in an interface is implicitly
-// instantiated once in each instance of the interface and, like one nested in
-// a module, reads the enclosing interface's variable by its simple name: the
-// 71 the module writes through `s.a`.
 TEST(ProgramConstructSim, ProgramNestedInAnInterfaceReadsItsVariable) {
   SimFixture f;
   EXPECT_EQ(
@@ -416,7 +358,6 @@ TEST(ProgramConstructSim, ProgramNestedInAnInterfaceReadsItsVariable) {
       "top.s.p a=71 at 1\n");
 }
 
-// And the interface's own port and a variable the interface itself sets.
 TEST(ProgramConstructSim, ProgramNestedInAnInterfaceReadsItsPortAndVariable) {
   SimFixture f;
   EXPECT_EQ(

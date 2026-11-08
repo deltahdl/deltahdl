@@ -409,11 +409,6 @@ TEST(ImmediateAssertSim, FailureTimeRecordableInActionBlock) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §16.3: the execution of immediate assertions can be controlled by using the
-// assertion control system tasks (§20.11). With $assertoff in effect the
-// assertion is not checked, so neither its pass nor its fail (else) action
-// runs; $asserton restores checking and the fail action runs. Built from real
-// source and driven through the full pipeline.
 TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
   SimFixture off;
   auto* xo = RunAndFindVar(
@@ -427,7 +422,7 @@ TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
       "endmodule\n",
       off, "x");
   ASSERT_NE(xo, nullptr);
-  EXPECT_EQ(xo->value.ToUint64(), 0u);  // fail action suppressed while off
+  EXPECT_EQ(xo->value.ToUint64(), 0u);
 
   SimFixture on;
   auto* xn = RunAndFindVar(
@@ -442,7 +437,7 @@ TEST(ImmediateAssertSim, ControlledByAssertionControlSystemTask) {
       "endmodule\n",
       on, "x");
   ASSERT_NE(xn, nullptr);
-  EXPECT_EQ(xn->value.ToUint64(), 99u);  // fail action runs once re-enabled
+  EXPECT_EQ(xn->value.ToUint64(), 99u);
 }
 
 TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
@@ -466,10 +461,6 @@ TEST(ImmediateAssertSim, MultipleSeverityTasksInActionBlockBothRun) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "second");
 }
 
-// §16.3: the fail statement, being any legal procedural statement, can signal a
-// failure to another part of the testbench. Here a failing assert triggers an
-// event that a separate process is waiting on, and that process then runs.
-// Built from real source and driven end to end.
 TEST(ImmediateAssertSim, FailActionTriggersEventUnblockingProcess) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -487,10 +478,6 @@ TEST(ImmediateAssertSim, FailActionTriggersEventUnblockingProcess) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §16.3: the asserted expression is interpreted like an if condition, and it
-// may be any nontemporal expression -- including a function call. Here the
-// condition is a user function returning false, so the assertion fails and the
-// else arm runs. Built from real source and driven end to end.
 TEST(ImmediateAssertSim, AssertConditionFromFunctionCall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -508,19 +495,9 @@ TEST(ImmediateAssertSim, AssertConditionFromFunctionCall) {
       "endmodule\n",
       f, "flag");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 2u);  // is_hi(3) is false -> else arm
+  EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §16.3: when the severity task runs at a time other than the failure's, the
-// failure time recorded in the action block is what the message prints. The
-// clause's own example records $time into t, delays the $error by 5, and says
-// the message printed at 15 reads "assert failed at time 10". The example
-// writes the time through %0t, so the string is the clause's only where a 0
-// field width prints the time with no leading spaces; padded to Table 20-3's
-// 20-column default the string would not be the one the clause gives. $info
-// stands in for the example's $error so std::cout carries the message, and the
-// tool-specific header the same $info emits goes ahead of it on the line, so
-// the check is for the clause's string at the end of the header's line.
 TEST(ImmediateAssertSim, DelayedSeverityTaskPrintsTheRecordedFailureTime) {
   SimFixture f;
   std::string out = RunCapture(
@@ -539,14 +516,6 @@ TEST(ImmediateAssertSim, DelayedSeverityTaskPrintsTheRecordedFailureTime) {
   EXPECT_EQ(out.rfind("[15]", 0), 0u);
 }
 
-// §16.3: the results of coverage for an immediate cover statement contain the
-// number of times it was evaluated and the number of times it succeeded, and a
-// tool reports them at the end of simulation. Two statements in a loop of
-// three, one holding on every pass and one on none, so the two records differ
-// from each other and from a count kept over all cover statements together;
-// the report names each by its scope and line, and the label the second one
-// carries is in its scope, as §16.3 has the label create a named block around
-// the statement.
 TEST(ImmediateAssertSim, CoverResultsAreReportedPerStatementAtEndOfSimulation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -571,11 +540,6 @@ TEST(ImmediateAssertSim, CoverResultsAreReportedPerStatementAtEndOfSimulation) {
             "cover t.never (line 6): evaluated 3, succeeded 0\n");
 }
 
-// §16.3's results are the immediate cover statement's. A cover property in the
-// clocked boolean form is lowered to the same statement kind inside a clocked
-// process, but it is a concurrent cover, whose results §16.14.3 defines as
-// attempts, successes and vacuous successes, so it leaves the immediate
-// results empty however many ticks it is evaluated at.
 TEST(ImmediateAssertSim, CoverPropertyIsNotAnImmediateCoverResult) {
   SimFixture f;
   auto* design = ElaborateSrc(

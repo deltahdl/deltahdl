@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §25.7 with §25.3.2: a module calls the tasks and functions of the interface
-// connected to its port by the port's name. `b.hit(10)` runs hit in the
-// instance i, so %m names t.i.hit and the count it adds is i's, read through
-// the port and from the parent at time 2; `b.tick(o)` takes its delay of 2
-// and writes its output back. Before the port's name was resolved to the
-// connected instance, neither call ran.
 TEST(InterfaceSubroutineSim, CalledThroughNamedInterfacePort) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface bus;\n"
@@ -41,11 +35,6 @@ TEST(InterfaceSubroutineSim, CalledThroughNamedInterfacePort) {
             "hit 10 in t.i.hit\ncalls via port 10\n10\ntick o=9 t=3\n");
 }
 
-// §25.7: where a prototype and the declaration both give an argument a
-// default, the value a call through the prototype takes is the prototype's.
-// b defaults to 9 in f's declaration and to 4 in mp's prototype, and each call
-// leaving b without an actual, left out, left empty in order, or by name,
-// takes 4.
 TEST(InterfaceSubroutineSim, ModportPrototypeDefaultIsTheOneUsed) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface sb;\n"

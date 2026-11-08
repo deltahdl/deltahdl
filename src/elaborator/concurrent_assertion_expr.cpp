@@ -14,7 +14,6 @@ namespace delta {
 
 namespace {
 
-// True when `name` is declared as a chandle variable of the module.
 bool NamesChandleVariable(std::string_view name, const RtlirModule* mod) {
   if (name.empty() || mod == nullptr) return false;
   for (const auto& v : mod->variables) {
@@ -23,8 +22,6 @@ bool NamesChandleVariable(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-// Recursively searches an assertion expression for a reference to a chandle
-// variable. Returns the first such variable's name, or an empty view.
 std::string_view FindChandleRef(const Expr* e, const RtlirModule* mod) {
   if (e == nullptr) return {};
   if (e->kind == ExprKind::kIdentifier && NamesChandleVariable(e->text, mod)) {
@@ -49,8 +46,6 @@ std::string_view FindChandleRef(const Expr* e, const RtlirModule* mod) {
   return {};
 }
 
-// The class a variable of the module holds a handle to, or nullptr where the
-// variable is none or its class is not one the unit declares.
 const ClassDecl* HandleClass(std::string_view name, const RtlirModule* mod,
                              const CompilationUnit* unit) {
   if (name.empty() || mod == nullptr || unit == nullptr) return nullptr;
@@ -62,9 +57,6 @@ const ClassDecl* HandleClass(std::string_view name, const RtlirModule* mod,
   return nullptr;
 }
 
-// Whether `cls`, or a class it extends (§8.13), declares `member` without
-// `static`. False where no class on the chain declares it, so a name this
-// cannot place is never reported.
 bool DeclaresNonStaticMember(const ClassDecl* cls, std::string_view member,
                              const CompilationUnit* unit) {
   std::unordered_set<const ClassDecl*> seen;
@@ -78,9 +70,6 @@ bool DeclaresNonStaticMember(const ClassDecl* cls, std::string_view member,
   return false;
 }
 
-// Recursively searches an assertion expression for `h.m`, a property read or
-// a method called through a handle `h` to an object, where `m` is a non-static
-// member of the handle's class. Writes `h.m` to `out` for the first one.
 bool FindNonStaticMemberRef(const Expr* e, const RtlirModule* mod,
                             const CompilationUnit* unit, std::string& out) {
   if (e == nullptr) return false;
@@ -126,11 +115,7 @@ bool ConcurrentAssertionExprTypeIsAcceptable(bool overall_result_castable) {
   return overall_result_castable;
 }
 
-bool ConcurrentAssertionSubexprTypeIsExempt() {
-  // §16.6 carves out subexpressions explicitly: only the overall expression
-  // must be cast compatible with an integral type.
-  return true;
-}
+bool ConcurrentAssertionSubexprTypeIsExempt() { return true; }
 
 bool AutomaticVariableReferenceAllowed(
     bool inside_procedural_concurrent_assertion) {
@@ -161,9 +146,6 @@ bool FunctionArgKindAllowedInAssertionExpr(FunctionArgKind kind) {
 
 bool FunctionEligibleInAssertionExpr(bool is_automatic, bool preserves_no_state,
                                      bool has_no_side_effects) {
-  // §16.6 phrases the lifetime constraint as automatic OR stateless: a static
-  // function with no preserved state is acceptable in lieu of an automatic
-  // one. The no-side-effects requirement is independent and always required.
   return (is_automatic || preserves_no_state) && has_no_side_effects;
 }
 

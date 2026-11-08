@@ -38,17 +38,6 @@
 
 namespace delta {
 
-// The specialization arguments written on a parameterized class name, in the
-// form DataType::type_params holds them in.
-//
-// Parser::ParseParameterizedScope in src/parser/expr_parser.cpp records
-// `Buf#(byte)` onto the identifier node as has_param_spec, arg_names and
-// elements, because an override value is parsed as an expression. That is a
-// different shape from the DataType vector Parser::ParseTypeParamList in
-// src/parser/parser_types.cpp builds for the declaration `Buf#(byte) v;`,
-// which is the shape ResolveParameterizedType substitutes from. Each argument
-// is a type written where an expression was parsed, so it converts through the
-// same route the override value itself takes.
 static std::vector<DataType> OverrideSpecializationArgs(
     const Expr* name, const CompilationUnit* unit, DiagEngine& diag,
     SourceLoc loc) {
@@ -63,49 +52,12 @@ static std::vector<DataType> OverrideSpecializationArgs(
   return args;
 }
 
-// Gives an override list written as `Buf#()` the class's own default
-// arguments, so that the specialization it names survives the substitution.
-//
-// §8.25.1 (printed page 205) makes a parameterized class's default
-// specialization the one written with an empty parameter override list, so
-// `Buf#()::elem_t` names elem_t with every parameter of Buf at the default its
-// declaration gives. DataType carries no flag recording that `#(...)` was
-// written, only the arguments themselves, so an empty list reaching
-// ResolveParameterizedType is indistinguishable there from the unspecialized
-// `Buf::elem_t` that function rejects. Filling the defaults here is what tells
-// the two apart. A list that is not empty needs nothing, because
-// ResolveParameterizedType supplies the default of every formal the list leaves
-// unmentioned, whether the list binds by name or by position.
 static void FillDefaultSpecializationArgs(std::vector<DataType>& args,
                                           const ClassDecl* cls) {
   if (!args.empty()) return;
   args = cls->param_types;
 }
 
-// §8.23 names a type parameter assignment as one of the contexts in which a
-// class scope resolution may prefix a type name, so `.T(Frame::payload_t)`
-// denotes the typedef `payload_t` declared in class `Frame`. The parse is a
-// kMemberAccess with is_scope_resolution set, from Parser::MakeMemberAccess in
-// src/parser/expr_parser.cpp. When the class and its typedef are visible
-// the override binds to the type the typedef aliases; type_ref_expr is dropped
-// for the reason ResolveScopedTypeRef drops it in
-// src/elaborator/elaborator_validate_struct_types.cpp, namely that the
-// alias has already been resolved and a leftover `type(...)` argument would be
-// resolved a second time against the child's scope. When they are not visible
-// the two halves of the name are kept in the shape Parser::ParseNamedType
-// writes the declaration form `Frame::payload_t` in
-// (src/parser/parser_types.cpp), so whatever resolves a named type
-// later still has both. Returns a DataType left at kImplicit when the node is
-// not a scope resolution over two identifiers.
-//
-// A prefix written with `#(...)` is a specialization instead of a plain class
-// name. §8.25 (printed page 204) states that a generic class is not itself a
-// type, only a concrete specialization is, and that two specializations are the
-// same type only when all their parameters are the same, so
-// `Buf#(byte)::elem_t` and `Buf#(shortint)::elem_t` are different types and
-// neither is what the unspecialized `Buf` would give. Such a prefix therefore
-// builds the named type ResolveParameterizedType substitutes into rather than
-// reading the member's declared type as it stands.
 static DataType ClassScopedOverrideToDataType(const Expr* expr,
                                               const CompilationUnit* unit,
                                               DiagEngine& diag, SourceLoc loc) {
@@ -124,11 +76,6 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
     dt.type_name = expr->rhs->text;
     dt.type_params = OverrideSpecializationArgs(expr->lhs, unit, diag, loc);
     FillDefaultSpecializationArgs(dt.type_params, cls);
-    // A specialization whose arguments do not reach the member leaves the
-    // override naming no type, which ResolveChildTypeParam reports against
-    // §23.10.2. Answering with the member's declared type instead would bind
-    // the parameter to the unspecialized class, which is the silence that
-    // report stands in place of.
     if (!ResolveParameterizedType(dt, unit, diag, loc)) return DataType{};
     return dt;
   }
@@ -145,23 +92,12 @@ static DataType ClassScopedOverrideToDataType(const Expr* expr,
   return dt;
 }
 
-// True when `expr` is a packed dimension written on a type rather than a select
-// of a value. §7.4.1 writes a packed dimension as the range [msb:lsb], which
-// Parser::ParseSelectExpr records as index and index_end with neither
-// part-select flag set (src/parser/expr_parser.cpp); a bit select
-// leaves index_end null and a +:/-: part select sets one of the flags, and
-// neither of those names a type.
 static bool IsPackedDimSelect(const Expr* expr) {
   return expr != nullptr && expr->kind == ExprKind::kSelect &&
          expr->index != nullptr && expr->index_end != nullptr &&
          !expr->is_part_select_plus && !expr->is_part_select_minus;
 }
 
-// Peels the packed dimensions off `expr`, appending each to `sels` and
-// returning the node they were written on. Parser::ParseSelectExpr hangs each
-// select off the expression it follows (src/parser/expr_parser.cpp), so the
-// first dimension written is the innermost node and `sels` comes out in the
-// reverse of written order.
 static const Expr* PeelPackedDimSelects(const Expr* expr,
                                         std::vector<const Expr*>& sels) {
   while (IsPackedDimSelect(expr)) {
@@ -171,10 +107,6 @@ static const Expr* PeelPackedDimSelects(const Expr* expr,
   return expr;
 }
 
-// §7.4.1 orders packed dimensions left to right with the leftmost the most
-// significant, so a dimension written on the override precedes any the named
-// type already carries: `T [3:0]`, where `typedef byte T`, is [3:0][7:0].
-// `sels` is in the reverse of written order, as PeelPackedDimSelects leaves it.
 static void PrependWrittenPackedDims(DataType& dt,
                                      const std::vector<const Expr*>& sels) {
   if (sels.empty()) return;
@@ -193,28 +125,15 @@ static void PrependWrittenPackedDims(DataType& dt,
   dt.extra_packed_dims.assign(dims.begin() + 1, dims.end());
 }
 
-// The type named by the head of a type-parameter override, once its packed
-// dimensions have been peeled off: a name (a keyword type, which
-// Parser::ParseCastOrTypedPattern hands over as an identifier in
-// src/parser/expr_parser.cpp, a typedef, or a class), or a class scope
-// resolution. Anything else leaves the DataType at kImplicit.
 static DataType OverrideHeadToDataType(const Expr* head,
                                        const CompilationUnit* unit,
                                        DiagEngine& diag, SourceLoc loc) {
   if (head == nullptr) return DataType{};
-  // A data_type an expression could not spell, `int unsigned` or `virtual
-  // ifc`, arrives as the type Parser::ParseParamValueAssignment read
-  // (src/parser/expr_parser.cpp).
   if (head->kind == ExprKind::kTypeRef && head->type_value != nullptr) {
     return *head->type_value;
   }
   if (head->kind == ExprKind::kIdentifier) {
     DataType dt = TypeNameToDataType(head->text);
-    // §8.25 (printed page 204): a specialization is the generic class combined
-    // with its arguments, and a generic class is not itself a type, only a
-    // concrete specialization is. So `D#(4)` names a type where the bare `D`
-    // names none when D leaves a parameter without a default, and the arguments
-    // are what the declaration the override reaches is judged on.
     if (head->has_param_spec) {
       dt.type_params = OverrideSpecializationArgs(head, unit, diag, loc);
     }
@@ -226,17 +145,6 @@ static DataType OverrideHeadToDataType(const Expr* head,
   return DataType{};
 }
 
-// §6.20.3: convert the value of an instance parameter value assignment that
-// binds a type parameter into the DataType it names.
-// Parser::ParseParamValueEntry parses that value with ParseExpr
-// in src/parser/parser_inst.cpp because the parse cannot know which
-// of the child's parameters are type parameters, so the type has to be read
-// back off the expression node the parse left. A returned DataType still at
-// DataTypeKind::kImplicit means the value names no type, which is what lets the
-// caller tell an assignment it cannot use from an absent one. Declared in
-// elaborator_items_params.h, since Elaborator::ElaborateParamDecl reads the
-// type an assignment names for a type parameter declared among a module's
-// items through it as well.
 DataType TypeParamOverrideToDataType(const Expr* expr,
                                      const CompilationUnit* unit,
                                      DiagEngine& diag, SourceLoc loc) {
@@ -248,10 +156,6 @@ DataType TypeParamOverrideToDataType(const Expr* expr,
   return dt;
 }
 
-// §11.2.1 counts parameters among the operands a constant expression is made
-// of, so an instance-array bound may name one. `scope` carries the values
-// declared where the instantiation is written; without it a bound like [N:0]
-// would not fold and the array would collapse to a single instance.
 static uint32_t EvalInstDimSize(const Expr* left, const Expr* right,
                                 const ScopeMap& scope) {
   if (left && right) {
@@ -267,14 +171,6 @@ static uint32_t EvalInstDimSize(const Expr* left, const Expr* right,
 
 namespace {
 
-// Resolves positional parameter overrides (#(v0, v1, ...)) against the child
-// module's overridable parameters, appending evaluated values to child_params.
-// §23.10 (printed page 763) with §6.20.1 (printed 125): those are the
-// parameter port list's, or, for a module declared with no parameter port
-// list, the `parameter` declarations among its items in declaration order,
-// which OverridableParamNames answers; read from the port list alone, `vdff
-// #(10,15)` over §23.10.2's own vdff (printed 766) was one value too many for
-// a list of none.
 void ResolvePositionalInstParams(const ModuleItem* item,
                                  const ModuleDecl* child_decl,
                                  const ScopeMap& parent_scope,
@@ -299,12 +195,6 @@ void ResolvePositionalInstParams(const ModuleItem* item,
   }
 }
 
-// Resolves named parameter overrides (#(.p(v), ...)) against the child module's
-// overridable parameters, appending evaluated values to child_params. The
-// parameters are the ones ResolvePositionalInstParams above binds by position,
-// a module without a parameter port list having them among its items; read
-// from the port list alone, `c #(.P(5))` over `module c; parameter P = 1;`
-// was refused as naming no parameter of c.
 void ResolveNamedInstParams(const ModuleItem* item,
                             const ModuleDecl* child_decl,
                             const ScopeMap& parent_scope,
@@ -328,8 +218,6 @@ void ResolveNamedInstParams(const ModuleItem* item,
   }
 }
 
-// Marks each parameter the configuration fixed so a later defparam cannot
-// change it: a config override takes precedence over defparam (§33.4.3).
 void MarkConfigLockedParams(
     RtlirModuleInst& inst, const std::vector<std::string_view>& config_locked) {
   if (!inst.resolved) return;
@@ -343,8 +231,6 @@ void MarkConfigLockedParams(
   }
 }
 
-// Evaluates the instance array dimensions, appending each nonzero size to
-// inst_dim_sizes and returning the product (total instance count, default 1).
 uint32_t ComputeInstDimSizes(const ModuleItem* item, const ScopeMap& scope,
                              std::vector<uint32_t>& inst_dim_sizes) {
   uint32_t total_instances = 1;
@@ -358,8 +244,6 @@ uint32_t ComputeInstDimSizes(const ModuleItem* item, const ScopeMap& scope,
   return total_instances;
 }
 
-// Returns true when the instantiation supplied at least one positional
-// (unnamed) parameter override (#(v0, v1, ...)).
 bool InstUsesPositionalParams(const ModuleItem* item) {
   for (const auto& [pname, pexpr] : item->inst_params) {
     if (pname.empty() && pexpr) return true;
@@ -367,8 +251,6 @@ bool InstUsesPositionalParams(const ModuleItem* item) {
   return false;
 }
 
-// Reports a diagnostic for an instantiation of an unknown module, qualifying
-// the name with its scope when one was specified.
 void ReportUnknownModule(const ModuleItem* item, DiagEngine& diag) {
   if (item->inst_scope.empty())
     diag.Error(item->loc, std::format("unknown module '{}'", item->inst_module),
@@ -383,11 +265,6 @@ void ReportUnknownModule(const ModuleItem* item, DiagEngine& diag) {
 using VarArrayInfoMap =
     std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
 
-// Shared context for §23.3.3.5 instance-array expansion: the arena for
-// synthesizing per-instance connection expressions, the parent module (for
-// signal widths), the parent's unpacked-array shapes, and the parent's
-// parameter scope, which folds the packed dimension of a connected signal so a
-// synthesized part-select can be written in its declared range.
 struct InstArrayDistribCtx {
   Arena& arena;
   const RtlirModule* parent_mod;
@@ -402,7 +279,6 @@ Expr* MakeIntLitExpr(Arena& arena, uint64_t v) {
   return e;
 }
 
-// `base[idx]` (single element/bit select).
 Expr* MakeElementSelectExpr(Arena& arena, Expr* base, uint32_t idx) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kSelect;
@@ -411,9 +287,6 @@ Expr* MakeElementSelectExpr(Arena& arena, Expr* base, uint32_t idx) {
   return e;
 }
 
-// `base[base_index +: width]` (ascending indexed part-select). `base_index` is
-// an index of `base` in the range its declaration was written with, which is
-// what §11.5.1 resolves the select against.
 Expr* MakePartSelectPlusExpr(Arena& arena, Expr* base, int64_t base_index,
                              uint32_t width) {
   auto* e = arena.Create<Expr>();
@@ -425,13 +298,6 @@ Expr* MakePartSelectPlusExpr(Arena& arena, Expr* base, int64_t base_index,
   return e;
 }
 
-// §11.5.1: the base index the part-select for instance `position` of a `total`
-// instance array is written with. The rightmost instance takes the least
-// significant bits of the connection (§23.3.3.5), so `position` fixes how far
-// above that end this instance's run starts, and the range the connection was
-// declared with turns that into the index naming it. A connection that is not a
-// named signal -- a concatenation the uniform-element case declined -- carries
-// no declaration of its own and is addressed as [width-1:0].
 int64_t ConnPartSelectBase(const InstArrayDistribCtx& ctx,
                            const RtlirPortBinding& binding, uint32_t position,
                            uint32_t total) {
@@ -445,8 +311,6 @@ int64_t ConnPartSelectBase(const InstArrayDistribCtx& ctx,
                               port_width);
 }
 
-// Total width of a concatenation whose elements are all named signals, or 0 if
-// any element is not a simple identifier.
 uint32_t ConcatConnWidth(const Expr* conn, const RtlirModule* mod) {
   uint32_t w = 0;
   for (const Expr* el : conn->elements) {
@@ -456,8 +320,6 @@ uint32_t ConcatConnWidth(const Expr* conn, const RtlirModule* mod) {
   return w;
 }
 
-// True when a concatenation has exactly `total` elements and each is a named
-// signal of width `port_width`, so position `p` maps cleanly to one element.
 bool ConcatElementsUniform(const Expr* conn, uint32_t total,
                            uint32_t port_width, const RtlirModule* mod) {
   if (conn->elements.size() != total) return false;
@@ -468,11 +330,6 @@ bool ConcatElementsUniform(const Expr* conn, uint32_t total,
   return true;
 }
 
-// §23.3.3.5 (printed page 748): where the instance at flat position
-// `position` of an array of `dims` stands in each dimension, counted from that
-// dimension's left bound. Position 0 is the instance at every dimension's right
-// index, and the rightmost dimension varies fastest, the order the part-selects
-// of a packed connection are taken in.
 std::vector<int64_t> FromLeftOffsets(const std::vector<InstArrayDim>& dims,
                                      uint32_t position) {
   std::vector<int64_t> from_left(dims.size());
@@ -485,15 +342,6 @@ std::vector<int64_t> FromLeftOffsets(const std::vector<InstArrayDim>& dims,
   return from_left;
 }
 
-// §23.3.3.5 (printed page 748): an unpacked array connection is split across
-// an array of instances, each element of the connection matched to the port
-// left index to left index and right index to right index in each of the
-// array's dimensions, the connection's slowest varying ones. So the instance
-// standing `from_left[d]` places from the left in dimension d takes the
-// element that far from the connection's left bound in its dimension d. A
-// variable's bounds are its declared ones; a net array, and a dimension whose
-// bounds did not fold, are read as written `[size]`, from 0. Empty where the
-// name is no unpacked array, a variable's or a net's.
 std::optional<std::vector<int64_t>> UnpackedElementForInstance(
     const InstArrayDistribCtx& ctx, std::string_view name,
     const std::vector<int64_t>& from_left) {
@@ -514,13 +362,6 @@ std::optional<std::vector<int64_t>> UnpackedElementForInstance(
   return std::nullopt;
 }
 
-// §23.3.3.5: rewrite one port connection for the instance at flat array
-// position `position` (0 = least-significant / every right index) of a `total`
-// instance array, standing `from_left` places from the left in each
-// dimension. An unpacked-array connection maps element-by-position; a packed
-// connection whose width is port_width*total is part-selected (rightmost
-// instance to the LSB); an equal-width connection is replicated to every
-// instance.
 Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
                                    const RtlirPortBinding& binding,
                                    uint32_t position, uint32_t total,
@@ -549,7 +390,6 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
   if (conn->kind == ExprKind::kConcatenation &&
       ConcatConnWidth(conn, ctx.parent_mod) == port_width * total) {
     if (ConcatElementsUniform(conn, total, port_width, ctx.parent_mod)) {
-      // Concatenation elements are stored most-significant first.
       return conn->elements[total - 1 - position];
     }
     return MakePartSelectPlusExpr(
@@ -559,14 +399,6 @@ Expr* DistributeInstanceConnection(const InstArrayDistribCtx& ctx,
   return conn;
 }
 
-// Materializes an instance array `c[l0:r0][l1:r1]...` as one instance per
-// element, each named by every index it stands at, `c[i0][i1]`, and carrying
-// its distributed port connections (§23.3.3.5). The resolved child module is
-// shared across copies; per-instance variable storage is created later under
-// each instance's prefix. §37.11: each element records the array it belongs
-// to -- its dimensions, the connections the instantiation wrote, and the
-// element's index in the leftmost dimension -- which its expanded name alone
-// does not say.
 void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                        const RtlirModuleInst& base,
                        const std::vector<InstArrayDim>& dims) {
@@ -577,8 +409,6 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
   array.left = dims.front().left;
   array.right = dims.front().right;
   array.dims = dims;
-  // A port the instantiation left unconnected was given a default it did not
-  // write, which is no connection of the list.
   for (const RtlirPortBinding& b : base.port_bindings) {
     array.connections.push_back(b.unconnected ? nullptr : b.connection);
   }
@@ -602,10 +432,6 @@ void PushInstanceArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
   }
 }
 
-// §23.3.2: the dimensions of the instance array `item` declares, each folded
-// against `scope`; empty where it declares none or a bound does not fold. A
-// dimension is an unpacked_dimension, whose `[size]` form §7.4.2 makes
-// `[0:size-1]`: `leaf arr[2]()` is arr[0] and arr[1].
 std::vector<InstArrayDim> InstanceArrayDims(const ModuleItem* item,
                                             const ScopeMap& scope) {
   std::vector<InstArrayDim> dims;
@@ -624,9 +450,6 @@ std::vector<InstArrayDim> InstanceArrayDims(const ModuleItem* item,
   return dims;
 }
 
-// Appends `inst` to `mod`, expanding an instance array of any number of
-// dimensions into one distributed instance per element (§23.3.3.5). Other forms
-// append a single instance unchanged.
 void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
                              const RtlirModuleInst& inst,
                              const ModuleItem* item, const ScopeMap& scope) {
@@ -640,10 +463,6 @@ void AppendModuleInstOrArray(const InstArrayDistribCtx& ctx, RtlirModule* mod,
 
 }  // namespace
 
-// Resolves the instantiation's own parameter overrides into child_params,
-// dispatching on whether they were written positionally or by name. Declared in
-// elaborator_module_inst_internal.h so the other elaborator translation units
-// that instantiate a module can reuse it.
 void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
                        const ScopeMap& parent_scope,
                        Elaborator::ParamList& child_params, DiagEngine& diag) {
@@ -655,9 +474,6 @@ void ResolveInstParams(const ModuleItem* item, const ModuleDecl* child_decl,
   }
 }
 
-// §17.3 with §14.14: a checker's sequence and property actuals are bound as
-// the checker's elaboration resolved them, $global_clock among their clocks
-// being its effective global clocking's event.
 static void BindCheckerTreeActuals(
     RtlirModuleInst& inst,
     const std::unordered_map<const RtlirModule*, ActualsByFormal>& trees) {
@@ -670,24 +486,6 @@ static void BindCheckerTreeActuals(
 }
 
 void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
-  // §27.4: a loop generate block stays a generate block even without begin-end,
-  // and like every generate block forms a scope of its own and a further level
-  // of hierarchy once instantiated. One instantiation written in a loop body is
-  // therefore elaborated once per iteration into a different scope each time,
-  // and declares its name afresh rather than again. The name is registered
-  // under the generate prefix that tells those scopes apart; outside a generate
-  // block ScopedName hands the name back unchanged, so a repeat at module level
-  // is still a redeclaration.
-  //
-  // The same subclause makes each instance of the block a scope of its own and
-  // a further level of hierarchy, so the record of the instantiation has to
-  // carry the scoped name as well as the redeclaration check does. Taking the
-  // raw name for RtlirModuleInst::inst_name and for current_inst_path_ gave
-  // every iteration one name and one instance path, which
-  // Lowerer::LowerChildModules keys an instance's declarations on. ScopedName
-  // is asked once and answers all three; ScopedName("") returns the generate
-  // prefix itself, which would name an unnamed instantiation after the block
-  // holding it.
   std::string_view scoped_inst_name =
       item->inst_name.empty() ? item->inst_name : ScopedName(item->inst_name);
   DeclareInModuleNameSpace(item->inst_name, item->loc);
@@ -695,11 +493,6 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   RtlirModuleInst inst;
   inst.module_name = item->inst_module;
   inst.inst_name = scoped_inst_name;
-  // §23.6 reads a hierarchical name one step at a time, and the instance's own
-  // name, set here, and the generate block steps above it, which
-  // EnterGenBlockInstance sets below, are the steps this instance answers
-  // with. inst_name is the two run together, which is the name the flattened
-  // design stores but not a name any path can be matched against.
   inst.simple_inst_name = item->inst_name;
 
   std::string saved_inst_path = current_inst_path_;
@@ -709,8 +502,6 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
       config_inst_path_,
       HierInstancePath(config_inst_path_, gen_block_path_, item->inst_name));
 
-  // §23.4: a name that resolves out of nested_module_decls_ names a module
-  // declared inside this one, which sees this module's names.
   inst.is_nested_decl = nested_module_decls_.find(item->inst_module) !=
                         nested_module_decls_.end();
   auto* child_decl = FindModuleInScope(item->inst_module);
@@ -750,9 +541,6 @@ void Elaborator::ElaborateModuleInst(ModuleItem* item, RtlirModule* mod) {
   CheckInstancePorts(inst, item, mod);
   CoerceDrivenInputPorts(inst, mod);
   inst.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
-  // §28.3.5: an instance-array range shall be given by two constant
-  // expressions; a non-constant bound in a [lhi:rhi] range is an error, the
-  // same rule the gate/switch-array path enforces.
   if (item->inst_range_left && item->inst_range_right &&
       (!ConstEvalInt(item->inst_range_left, parent_scope) ||
        !ConstEvalInt(item->inst_range_right, parent_scope))) {
@@ -771,8 +559,6 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
                                         ModuleDecl* child_decl,
                                         RtlirModule* mod,
                                         const ScopeMap& parent_scope) {
-  // §33.4.2: an instance bound to a configuration is configured, it and all
-  // beneath it, by that configuration's rules alone.
   RecordCellClauseListBinding(item->inst_module);
   const ConfigDecl* delegated = DelegatedConfigFor(item->inst_module);
   if (delegated != nullptr) EnterDelegatedConfig(delegated);
@@ -780,28 +566,13 @@ void Elaborator::ElaborateChildInstance(RtlirModuleInst& inst,
   Elaborator::ParamList child_params;
   ResolveInstParams(item, child_decl, parent_scope, child_params, diag_);
 
-  // A configuration may override (or reset) this instance's parameters on top
-  // of whatever the instantiation specified (§33.4.3).
   std::vector<std::string_view> config_locked;
   ApplyConfigParamOverrides(item, child_decl, child_params, parent_scope,
                             config_locked);
 
-  // §6.20.3/§23.10: publish the child's type-parameter substitutions into the
-  // shared typedef map so its dependent declarations resolve against the chosen
-  // types, then restore the map once the child has been elaborated.
   auto applied_type_params = ApplyChildTypeParams(
       TypeParamSourcesFor(item, instance_param_overrides_, config_inst_path_),
       child_decl, typedefs_, unit_, diag_);
-  // §16.15: the default disable iff extends to a nested declaration and not
-  // into an instance of a module declared elsewhere. §23.4 makes this scope's
-  // names visible inside such a declaration as well, whether the instance is
-  // written out here or implied by InstantiateImplicitNestedModules, so the
-  // same names are handed to ElaborateModule either way: without them every
-  // implicit net the nested module makes for an outer name counted as its own,
-  // and an instance materialized a net shadowing the outer one. Which names
-  // §6.10 settles by the declaration's place in the text rather than the
-  // instance's, so BeginNestedDeclScope prefers the snapshot ElaborateItems
-  // took there over the names declared so far.
   if (inst.is_nested_decl) {
     nested_default_disable_iff_ = mod->default_disable_iff;
     nested_default_clock_ = DefaultClockingEvent(mod);
@@ -825,11 +596,6 @@ void Elaborator::CheckInstancePorts(RtlirModuleInst& inst,
                                     const ModuleItem* item, RtlirModule* mod) {
   CheckPortCoercion(inst, item->loc);
   ReportActualsOnlyACheckerTakes(inst, item, diag_);
-  // A.4.1.1: a module's, interface's or program's port connection is an
-  // ordinary expression. One that is an implication as a whole is read as a
-  // property actual, which the check above rejects; one nested in a larger
-  // expression is read as an expression and is reported here. A checker's
-  // connections are property_actual_args (A.4.1.4), which may hold a property.
   if (!inst.resolved->is_checker) {
     for (const auto& port : item->inst_ports) {
       ReportImplicationOperators(port.second, diag_);

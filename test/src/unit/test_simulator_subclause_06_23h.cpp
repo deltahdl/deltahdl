@@ -13,14 +13,8 @@ using namespace delta;
 
 namespace {
 
-// §6.23 with §8.11, §8.13 and §6.22.1: in a method, a type reference may name
-// a property of the class bare or through `this`, a property the class
-// inherits, or `this` itself, the class; a comparison of two such references
-// holds exactly when the types match. A class declared in a module, in a
-// package and in the compilation unit each answer alike.
 struct ClassPlace {
   const char* name;
-  // {0} is the classes, {1} the module's handle type.
   const char* text;
 };
 
@@ -42,9 +36,6 @@ struct Compared {
   bool holds;
 };
 
-// x and w are C's own properties, ib one C inherits from B; D is a class
-// unrelated to C, and logic [0:7] differs from logic [7:0] by its bounds
-// (§6.22.1(f)).
 constexpr std::array kCompared = {
     Compared{"type(x) == type(byte)", true},
     Compared{"type(x) != type(byte)", false},
@@ -59,7 +50,6 @@ constexpr std::array kCompared = {
     Compared{"type(this) != type(B)", true},
 };
 
-// The classes, with C's check() writing each of kCompared by `write`.
 std::string Classes(std::string_view body) {
   return std::format(
       "  class D;\n  endclass\n"
@@ -70,7 +60,6 @@ std::string Classes(std::string_view body) {
       body);
 }
 
-// The bits kCompared gives, the first test's the most significant.
 uint64_t Expected() {
   uint64_t bits = 0;
   for (const Compared& test : kCompared) bits = (bits << 1) | test.holds;
@@ -109,12 +98,6 @@ TEST(ClassMethodTypeRefSim, ComparisonInAnAssignment) {
   ExpectInEveryPlace(body);
 }
 
-// §6.23 with §26.3: in a method of a class that another package or the
-// compilation unit declares, a package's variable, value parameter and
-// enumeration constant, named through the package or imported, have the types
-// their declarations give them, compared or declaring a variable. A byte is
-// signed and 2-state, so it differs from logic [7:0], which `p::v + 1'b0`
-// matches.
 TEST(ClassMethodTypeRefSim, PackageValuesInAnotherScopesClass) {
   constexpr std::array kHosts = {
       "package q;\n  import p::*;\n{}endpackage\nmodule t;\n  int res;\n"

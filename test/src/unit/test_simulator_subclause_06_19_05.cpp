@@ -1,19 +1,3 @@
-// §6.19.5 (printed pages 123-124) declares first(), last(), next(), prev(),
-// num() and name() on the enumerated type, so each is called on any expression
-// of an enumeration type, wherever the type and the expression are declared:
-// a class property named through a handle or a chain of them (§8.3), bare or
-// through `this` inside a method (§8.11), a static property named `C::se`
-// (§8.9), a property the parent class declares named through `super.` (§8.15),
-// a nested class's property (§8.23), a package's variable, parameter, member
-// literal and function result (§26.3), a subroutine formal (§13.3, §13.4), a
-// class localparam through a specialization (§8.25), a variable of a
-// class-scoped enum typedef (§8.23), a member literal, and a property read
-// after a task's timing control. Each case prints what the standard predicts
-// and reads the simulator's output whole, so a method that answered "" or 0
-// for a receiver it did not recognise as an enumeration fails on the value. A
-// module-scope enum variable and a method's local are the two receivers that
-// always worked, so every case names its receiver some other way.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -24,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.19.5.6 and §6.19.5.3 on a property named through a handle, `h.e.name()`,
-// and chained, `h.e.next().name()`.
 TEST(EnumMethodReceivers, PropertyThroughAHandle) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -42,9 +24,6 @@ TEST(EnumMethodReceivers, PropertyThroughAHandle) {
             "n=green v=1 nn=blue\n");
 }
 
-// §8.11: `this.e.next()` inside a method; §8.3: a chain of handles `d.c.e`
-// with three next() calls; §8.9: the static property as `C::se`; §6.19.5.5
-// and §6.19.5.2 on a property.
 TEST(EnumMethodReceivers, ThisChainedHandlesAndStaticProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -73,9 +52,6 @@ TEST(EnumMethodReceivers, ThisChainedHandlesAndStaticProperty) {
       "static=yellow sn=red cnt=4 last=yellow\n");
 }
 
-// §6.19.5.7's own loop written over a bare property inside a method: `e` is
-// the object's property, first(), last() and next() are called on the local
-// `k` and name() on it, and the walk visits every member once.
 TEST(EnumMethodReceivers, LoopOverABarePropertyInsideAMethod) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -103,9 +79,6 @@ TEST(EnumMethodReceivers, LoopOverABarePropertyInsideAMethod) {
             "loop: red green blue yellow\n");
 }
 
-// §26.3: a package's enum variable named `P::pc` and by its imported bare
-// name `pc`, its member literal `P::RED`, and the result of its function
-// `after(v)`; §6.19.5.1 and §6.19.5.2 on the imported variable.
 TEST(EnumMethodReceivers, PackageVariableLiteralAndFunctionResult) {
   SimFixture f;
   EXPECT_EQ(
@@ -133,8 +106,6 @@ TEST(EnumMethodReceivers, PackageVariableLiteralAndFunctionResult) {
       "pk=BLUE pkn=RED num=3 cmp=1\n");
 }
 
-// §26.3 with §8.3: a property declared with a package's enum typedef, named
-// through a handle.
 TEST(EnumMethodReceivers, PropertyOfAPackageEnumType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package P;\n"
@@ -153,9 +124,6 @@ TEST(EnumMethodReceivers, PropertyOfAPackageEnumType) {
             "e=GREEN n=1\n");
 }
 
-// §13.3 and §13.4: an input formal `c.next().name()`, a ref formal and an
-// output formal advanced by `c = c.next()`, a function's result `fret().name()`
-// and a local advanced then named.
 TEST(EnumMethodReceivers, SubroutineFormalsAndResult) {
   SimFixture f;
   EXPECT_EQ(
@@ -186,8 +154,6 @@ TEST(EnumMethodReceivers, SubroutineFormalsAndResult) {
       "in=blue ref=yellow out=green ret=red local=blue\n");
 }
 
-// §8.25 with §6.20.4: a class localparam of the enum type, named through a
-// specialization of the class, `P#(X)::LC.name()`.
 TEST(EnumMethodReceivers, ClassLocalparamThroughASpecialization) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -202,8 +168,6 @@ TEST(EnumMethodReceivers, ClassLocalparamThroughASpecialization) {
             "c=green\n");
 }
 
-// §6.24.2 with §8.3: a property `$cast` wrote inside a method, named through
-// a handle afterwards.
 TEST(EnumMethodReceivers, PropertyWrittenByDynamicCast) {
   SimFixture f;
   EXPECT_EQ(
@@ -224,8 +188,6 @@ TEST(EnumMethodReceivers, PropertyWrittenByDynamicCast) {
       "prop=1 pcol=green\n");
 }
 
-// §26.3 with §13.4: the result of a package function named `P::toc(2)`,
-// whose declared type is the package's enumeration.
 TEST(EnumMethodReceivers, ScopedPackageFunctionResult) {
   SimFixture f;
   EXPECT_EQ(
@@ -242,10 +204,6 @@ TEST(EnumMethodReceivers, ScopedPackageFunctionResult) {
       "pe=blue\n");
 }
 
-// §8.23 and §8.15: a property of a class-scoped enum typedef through a derived
-// class's handle, through `super.` inside the derived class's method, and a
-// nested class's property through a handle and bare inside its own method;
-// §6.19.5.4 and §6.19.5.5 on the nested class's property.
 TEST(EnumMethodReceivers, NestedClassAndSuper) {
   SimFixture f;
   EXPECT_EQ(
@@ -277,8 +235,6 @@ TEST(EnumMethodReceivers, NestedClassAndSuper) {
       "base=B1 sup=B2 nested=N1 nn=N0 cnt=2\n");
 }
 
-// §8.23: a module variable declared with a class-scoped enum typedef,
-// `C::e_t en`, names its member.
 TEST(EnumMethodReceivers, VariableOfAClassScopedEnumTypedef) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -295,8 +251,6 @@ TEST(EnumMethodReceivers, VariableOfAClassScopedEnumTypedef) {
             "en=TWO\n");
 }
 
-// §26.3 with §6.20: a package parameter of the package's enum type, named
-// bare through a wildcard import.
 TEST(EnumMethodReceivers, PackageParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package P;\n"
@@ -311,9 +265,6 @@ TEST(EnumMethodReceivers, PackageParameter) {
             "EC=GREEN\n");
 }
 
-// §6.19 with §6.19.5.3: a member literal is an expression of its enumeration's
-// type, so `IDLE.next().name()` names the member after IDLE, for an
-// enumeration declared on the variable itself rather than by a typedef.
 TEST(EnumMethodReceivers, MemberLiteral) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -324,8 +275,6 @@ TEST(EnumMethodReceivers, MemberLiteral) {
             "n=S1\n");
 }
 
-// §13.3: a property named bare in a task of the class after each of its
-// timing controls, advanced by `e = e.next()` between them.
 TEST(EnumMethodReceivers, PropertyAfterADelayInATask) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -347,11 +296,6 @@ TEST(EnumMethodReceivers, PropertyAfterADelayInATask) {
             "t=0 e=green\nt=5 e=blue\nt=10 e=yellow\n");
 }
 
-// §6.24.1 with A.8.4: a static cast to the enumeration is a primary of that
-// type, so §6.19.5.6's name() is called on it: `Cols'(Su)` holds Su's 6,
-// which is no member of Cols, so name() answers the empty string (§6.19.5.6),
-// and `Cols'(2)` holds Blue; `Cols'(1).next.name` chains without parentheses
-// (§6.19.5.7).
 TEST(EnumMethodReceivers, StaticCastResult) {
   SimFixture f;
   EXPECT_EQ(
@@ -367,10 +311,6 @@ TEST(EnumMethodReceivers, StaticCastResult) {
       "name=[] n2=Blue nn=Blue\n");
 }
 
-// §6.19.5.7 (printed page 124) writes its own example with `c.first`,
-// `c.name`, `c.last` and `c.next` and no argument list, the form A.8.6's
-// method_call_body admits for a method taking no arguments: each of the six
-// methods on a module-scope variable, spelled without parentheses.
 TEST(EnumMethodWithoutArgumentList, EveryMethodOnAVariable) {
   SimFixture f;
   EXPECT_EQ(
@@ -389,8 +329,6 @@ TEST(EnumMethodWithoutArgumentList, EveryMethodOnAVariable) {
       "name=blue next=3 prev=1 first=0 last=3 num=4 val=2\n");
 }
 
-// §6.19.5.7's loop as the subclause writes it, over a variable initialized
-// with `c.first`, visiting every member once and stopping at `c.last`.
 TEST(EnumMethodWithoutArgumentList, TheSubclausesOwnLoop) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -408,9 +346,6 @@ TEST(EnumMethodWithoutArgumentList, TheSubclausesOwnLoop) {
             "red : 0\ngreen : 1\nblue : 2\nyellow : 3\n");
 }
 
-// The argument-list-free form on a property through a handle, `h.e.name`, on
-// a bare property inside a method, and chained, `c.next.name` and
-// `h.e.next.next.name`, since §6.19.5.3 gives next() the enumeration's type.
 TEST(EnumMethodWithoutArgumentList, OnAPropertyAndChained) {
   SimFixture f;
   EXPECT_EQ(
@@ -431,10 +366,6 @@ TEST(EnumMethodWithoutArgumentList, OnAPropertyAndChained) {
       "p=green pn=blue cn=red hnn=yellow\n");
 }
 
-// §7.4.1 admits an enumeration as a packed array's element and §7.4 lets an
-// unpacked array hold one, and a select of one element is of the enumeration,
-// so the methods answer for `v[1]`, `v[2]` and `arr[1]` from the element's
-// own value (#7317).
 TEST(EnumMethodOnAnArrayElement, OnPackedAndUnpackedElements) {
   SimFixture f;
   EXPECT_EQ(
@@ -453,12 +384,6 @@ TEST(EnumMethodOnAnArrayElement, OnPackedAndUnpackedElements) {
       "B A R Q\n");
 }
 
-// An element of a packed array of an enumeration is of the enumeration
-// wherever its type is asked: §6.24.2's $cast writes it only a member's
-// value, and §19.5.3 gives a coverpoint of it one automatic bin per named
-// constant. A select of an int array's element, and one bit of a scalar
-// enumeration's value, are of no enumeration: the cast writes 5, and the bit
-// gets the two bins of its 1-bit range (#7317).
 TEST(EnumMethodOnAnArrayElement, ElementIsOfTheEnumWhereverItsTypeIsAsked) {
   SimFixture f;
   EXPECT_EQ(

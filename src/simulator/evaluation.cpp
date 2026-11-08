@@ -28,20 +28,10 @@
 #include "simulator/sim_context_types.h"
 #include "simulator/statement_assign.h"
 #include "simulator/statement_assign_internal.h"
-// AssertionSampleStore, the §16.5.1 sampled values a concurrent assertion
-// reads.
 #include "simulator/sva_engine_sampling.h"
 #include "simulator/virtual_interface.h"
 
 namespace delta {
-// Resolves an unqualified identifier that is not a local variable against the
-// running method's class scope. §8.10: a static method can directly access
-// static properties of the same class by unqualified reference. §8.6/§8.15: an
-// instance method reads it as a property of `this`, resolved against the class
-// in which the running method is defined so a base method reads the base field
-// even when a derived class shadows the name.
-// §8.25: whether `name` is a value parameter of the class `decl` declares,
-// one of its parameter port list.
 static bool DeclaresValueParam(const ClassDecl* decl, std::string_view name) {
   if (decl == nullptr) return false;
   for (const auto& [pname, pexpr] : decl->params) {
@@ -54,33 +44,21 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
                                           Arena& arena) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
   auto* self = ctx.CurrentThis();
-  // §8.25: a value parameter read inside a method of a specialized class is
-  // the value the object's specialization bound it to, held on the object
-  // (ApplyClassParamOverrides), and the class's own storage holds the
-  // default alone, so the object is asked first where there is one.
   if (self != nullptr && method_cls != nullptr &&
       DeclaresValueParam(method_cls->decl, expr->text)) {
     auto it = self->properties.find(std::string(expr->text));
     if (it != self->properties.end()) return it->second;
   }
-  // §8.23: the class's own static property, or one of a class lexically
-  // containing it, which a nested class's method names unqualified; §8.13
-  // (printed pages 189-190): or a base class's, read from that class's own
-  // storage, so D's method's bare `n` reads what `C::n = 4` wrote where D
-  // extends C, where asked of D's own static_properties it read 0.
   const ClassTypeInfo* owner =
       method_cls ? method_cls->StaticPropertyOwner(expr->text) : nullptr;
   if (owner)
     return owner->static_properties.find(std::string(expr->text))->second;
-  // §6.19: a literal of an enumeration the class declares, tried before the
-  // property read, which answers a value for an unknown name all the same.
   const ClassTypeInfo* scope = method_cls ? method_cls
                                : self     ? self->type
                                           : nullptr;
   Logic4Vec literal;
   if (TryClassScopeEnumLiteral(expr->text, scope, arena, literal))
     return literal;
-  // §13.5.5: a method of the class named bare is its call, `m` as `m()`.
   if (TryEvalParenFreeMethodCall(expr, ctx, arena, literal)) return literal;
   if (!self) return MakeLogic4Vec(arena, 1);
   if (method_cls)
@@ -88,7 +66,6 @@ static Logic4Vec EvalIdentifierClassScope(const Expr* expr, SimContext& ctx,
   return self->GetProperty(expr->text, arena);
 }
 
-// See evaluation.h.
 bool ClassScopeDeclares(std::string_view name, SimContext& ctx) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
   if (method_cls != nullptr && method_cls->StaticPropertyOwner(name) != nullptr)
@@ -106,12 +83,6 @@ bool NameDenotesVariable(std::string_view name, SimContext& ctx) {
   return !ClassScopeDeclares(name, ctx);
 }
 
-// §25.9: an interface instance named where a value is wanted -- the right
-// side of an assignment to a virtual interface, an argument to a subroutine or
-// to new(), an operand of == -- is the handle of that instance, the value a
-// virtual interface holds to represent it. It is answered only for a name no
-// variable, let or class scope declares, since an instance name is visible
-// from the module instantiating it and from the classes declared there alone.
 static bool TryInterfaceInstanceHandle(std::string_view name, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   if (ClassScopeDeclares(name, ctx)) return false;
@@ -121,31 +92,17 @@ static bool TryInterfaceInstanceHandle(std::string_view name, SimContext& ctx,
   return true;
 }
 
-// §16.14.6.1: the value the instance of a procedural concurrent assertion
-// being evaluated saved for `expr` when it was queued, a const cast's or an
-// automatic variable's, or nullptr where no instance is being evaluated or
-// the instance saved none for the site.
 static const Logic4Vec* BoundInstanceValue(const Expr* expr, SimContext& ctx) {
   const InstanceBindings* bindings = ctx.AssertionSamples().Bindings();
   return bindings == nullptr ? nullptr : bindings->Find(expr);
 }
 
-// The real and string kinds the declaration registered under `name`, given
-// to the value read from it: a package's or the unit's item under its
-// qualified key (ShapePackageVariable in lowerer_package_data.cpp), a
-// module's under the identifier's text. §6.12: the real kind is also read off
-// the variable itself, which is where a subroutine's `real a` formal and
-// `real l` local carry it (BindValueArg, CreateFuncLocalVar) -- no name table
-// holds them, since one keyed by the bare text would make every `a` in the
-// design a real.
 static void MarkDeclaredKinds(Logic4Vec& val, std::string_view name,
                               const Variable& var, SimContext& ctx) {
   if (var.is_real || ctx.IsRealVariable(name)) val.is_real = true;
   if (ctx.IsStringVariable(name)) val.is_string = true;
 }
 
-// §13.5.5 (printed page 351): a member select naming a class method, `C::m`
-// or `h.m`, is the method's call; any other is the member's read.
 static Logic4Vec EvalMemberAccessOrCall(const Expr* expr, SimContext& ctx,
                                         Arena& arena) {
   Logic4Vec call;
@@ -155,53 +112,16 @@ static Logic4Vec EvalMemberAccessOrCall(const Expr* expr, SimContext& ctx,
 
 static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
-  // §8.11: the keyword `this` is a predefined object handle naming the object
-  // the enclosing subroutine was invoked on. A bare `this` arrives as an
-  // ExprKind::kIdentifier node whose text is the keyword,
-  // Parser::ParseMemberAccessChain in src/parser/expr_parser.cpp building one
-  // for it, so it is answered here and reaches every reader of an expression
-  // rather than one site.
-  //
-  // It is answered before SimContext::FindVariable, which no source can reach
-  // first because `this` is a keyword and names no variable. Left to fall
-  // through, the name reached EvalIdentifierClassScope below and was looked up
-  // as a property called "this", which no class declares, so the value handed
-  // back was not a handle at all. TryClassCopyNewAssign in
-  // src/simulator/statement_assign_core.cpp then found no object for
-  // `p2 = new this;` and let TryClassNewAssign construct a fresh one, breaching
-  // all three steps §8.12 gives the shallow copy.
   if (expr->text == "this") {
     return MakeLogic4VecVal(arena, 64, ctx.CurrentThisHandle());
   }
-  // §23.6: a leading `$root` makes the name absolute from the top of the
-  // instantiated design, and §3.12.1 a leading `$unit::` the compilation
-  // unit's own declaration, past any module's; the parser keeps either in
-  // Expr::scope_prefix rather than in the identifier's text
-  // (Parser::MakeSysScopePrefix in src/parser/expr_parser_calls.cpp).
-  // Reading the text alone drops it and resolves the name in whichever
-  // instance is running, so `$unit::g` in a module declaring its own g
-  // read the module's. ResolveSignalToVariable in src/simulator/awaiters.h
-  // spells the `$root` name the same way, so an event control and an
-  // expression reading one signal reach one variable, and the argument
-  // binds of eval_function_args.cpp bind a ref formal by the same key
-  // (IdentifierLookupKey, eval_function_args_scoped.cpp). The unit's kinds
-  // stand under its key as its storage does, a `$root` name's under the
-  // text, as before (DeclaredKindsKey, which the store side asks by too).
   std::string scoped_name = IdentifierLookupKey(expr);
   std::string_view lookup_name = scoped_name;
   std::string kinds_name = DeclaredKindsKey(expr);
-  // §23.9 with §8.6: the class scope is searched before the scope enclosing
-  // the class, so a property named bare in a method is read as the property
-  // even where the instantiating module declares a variable of that name; a
-  // local of the method shadows both. Before this the module's variable won
-  // and the method read and wrote the wrong object.
   auto* var = NameDenotesVariable(lookup_name, ctx)
                   ? ctx.FindVariable(lookup_name)
                   : nullptr;
   if (!var) {
-    // §11.12 — a no-argument let referenced without parentheses appears here
-    // as a bare identifier. Expand its body at each use (re-evaluated, not
-    // snapshotted) before falling back to class-scope resolution.
     if (auto* let_decl = FindVisibleLet(ctx, expr->text);
         let_decl && let_decl->func_args.empty()) {
       return EvalLetExpansion(let_decl, expr, ctx, arena);
@@ -211,39 +131,18 @@ static Logic4Vec EvalIdentifier(const Expr* expr, SimContext& ctx,
       return instance;
     return EvalIdentifierClassScope(expr, ctx, arena);
   }
-  // §15.5.5.3: an event's value is the synchronization object it refers to,
-  // which two events merged by an assignment share (§15.5.5.1) and a null
-  // event has none of, reading 0. An event-indexed associative array keys its
-  // entries by it (§7.8.5), a queue of events holds it (EventIdentityOf), and
-  // a test of the event's truth reads it.
   if (var->is_event) {
     return MakeLogic4VecVal(
         arena, 64, var->is_null_event ? 0 : ctx.RegisterEventIdentity(var));
   }
   auto val = var->value;
-  // §16.5.2: inside an assertion, a variable's sampled value is the one value
-  // it has at a clock tick. While a clocked concurrent assertion's
-  // property is being evaluated, a variable named in it therefore reads the
-  // value §16.5.1 samples for this time slot rather than the value standing
-  // now. The store answers nothing for a variable no such assertion reads and
-  // nothing at all outside such an evaluation, so every other read of a
-  // variable in the design is the live read it was before.
-  // §16.18 with §17.3: a checker formal bound to a clocking block variable
-  // reads what the block sampled, as the variable does, and no sample of it.
   const Logic4Vec* sampled =
       ctx.AssertionSamples().ReadWithinProperty(var, ctx.CurrentTime());
   if (sampled != nullptr && !TryCheckerFormalClockvar(var, ctx, arena, val)) {
     val = *sampled;
   }
   MarkDeclaredKinds(val, kinds_name, *var, ctx);
-  // An object's signedness is fixed by its own declaration; it is never
-  // inherited from a value that flowed in from elsewhere (e.g. across a
-  // module port). Derive the read value's signedness from the declaration
-  // so a signed value stored into an unsigned object reads back unsigned.
   val.is_signed = var->is_signed;
-  // §5.7.1: what is read is the variable's value and no literal, so a 1-bit
-  // variable set from `'1` reads as a 1-bit 1 that zero-extends, whatever
-  // the value it was set from would have filled.
   val.fills_width = false;
   return val;
 }
@@ -253,26 +152,12 @@ bool HasUnknownBits(const Logic4Vec& v) {
   }
   return false;
 }
-// §6.8, Table 6-7's 'x, and the value §11.4.x gives an operation whose operand
-// carries an unknown bit. Only the bits the width names are x: MakeLogic4Vec
-// rounds up to whole words, and every bit above the width in the top word
-// stays clear, because §11.4.5 has === compare the x and z bits of its
-// operands and EvalCaseEquality compares them a word at a time. Filling those
-// bits left an all-x value built here comparing unequal to an all-x value of
-// the same declared type built by SimContext::CreateVariable, which masks --
-// `logic [7:0] arr [0:2]` against a `logic [7:0]` scalar of the same Table 6-7
-// default, and `(-a) === 4'bxxxx` with no array in sight.
 Logic4Vec MakeAllX(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   FillWithX(vec);
   return vec;
 }
 
-// §28.12: a value every bit of which is high impedance, which is what a source
-// driving none of a net contributes to resolution -- a driver at z drives
-// nothing, so the bits a partial driver leaves at z are resolved by the net's
-// other sources alone. Only the bits the width names are set, the rest of the
-// last word staying clear so that nothing above the value reads as driven.
 Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   for (uint32_t i = 0; i < vec.nwords; ++i) {
@@ -281,8 +166,6 @@ Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width) {
   return vec;
 }
 
-// Writes the low `w` bits of {aval,bval} into `result` starting at bit_pos,
-// spanning the 64-bit word boundary when the chunk straddles two words.
 static void WriteConcatChunk(Logic4Vec& result, uint32_t bit_pos, uint32_t w,
                              uint64_t aval, uint64_t bval) {
   uint32_t word = bit_pos / 64;
@@ -301,9 +184,6 @@ Logic4Vec AssembleConcatParts(const std::vector<Logic4Vec>& parts,
   auto result = MakeLogic4Vec(arena, total_width);
   uint32_t bit_pos = 0;
   for (auto it = parts.rbegin(); it != parts.rend(); ++it) {
-    // Concatenation places each operand's bits verbatim, so preserve the raw
-    // 4-state encoding (aval/bval, not ToUint64()); copy every word so operands
-    // wider than 64 bits (e.g. multi-character strings) are not truncated.
     uint32_t remaining = it->width;
     for (uint32_t pw = 0; pw < it->nwords && remaining > 0; ++pw) {
       uint32_t w = (remaining > 64) ? 64 : remaining;
@@ -320,8 +200,6 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t total_width = 0;
   bool any_string = false;
   std::vector<Logic4Vec> parts;
-  // §11.4.12: every operand of a concatenation is self-determined, an
-  // unbased unsized literal among them one bit wide (§5.7.1).
   for (auto* elem : expr->elements) {
     parts.push_back(EvalExpr(elem, ctx, arena));
     if (parts.back().is_string) any_string = true;
@@ -333,28 +211,15 @@ static Logic4Vec EvalConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return result;
 }
 
-// §11.3.6 with §10.4: the left-hand side is any target a blocking assignment
-// statement admits, so it is written as the statement writes it -- a member
-// access among them, a window of a packed structure or a property of the
-// object a handle refers to, which names no variable of its own. Asked first
-// for a variable whose width it would take, such a target found none, and the
-// expression yielded the right-hand side and wrote nothing: `z = (c.v = 5)`
-// left c.v as it was.
 static Logic4Vec EvalAssignInExpr(const Expr* expr, SimContext& ctx,
                                   Arena& arena) {
   auto rhs_val = EvalExpr(expr->rhs, ctx, arena);
   PerformBlockingAssign(expr->lhs, rhs_val, ctx, arena);
-  // §11.3.6: the value is the right-hand side cast to the left-hand side's
-  // type, which is what the assignment left there -- a real, a signed value,
-  // a 2-state one, every word -- and for a concatenation target the unsigned
-  // value its operands' widths sum to, so the target is read back.
   return EvalExpr(expr->lhs, ctx, arena);
 }
 
 static bool ArrayElementsEqual(std::string_view a, const ArrayInfo* ai,
                                std::string_view b, SimContext& ctx) {
-  // §7.6 with §7.4.2: a multidimensional array equals another of its shape
-  // where every leaf does, compared by position.
   if (ai->dim_sizes.size() >= 2) {
     for (const std::string& leaf : MultiDimLeafSuffixes(*ai)) {
       auto* av = ctx.FindVariable(std::string(a) + leaf);
@@ -395,10 +260,6 @@ static bool TryArrayEqualityOp(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §11.4.7 with §11.3.5: each logical operator reads its operands' truth
-// values (TruthOf), and `&&`, `||` and `->` evaluate the second only where the
-// first leaves the result open: a false first operand decides `&&` and `->`,
-// a true one decides `||`.
 static Logic4Vec EvalLogicalAnd(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   const Truth kLeft = TruthOf(EvalExpr(expr->lhs, ctx, arena));
@@ -443,8 +304,6 @@ static Logic4Vec EvalLogicalEquiv(const Expr* expr, SimContext& ctx,
     return TruthBit(Truth::kAmbiguous, arena);
   return TruthBit(kLeft == kRight ? Truth::kTrue : Truth::kFalse, arena);
 }
-// Operands of an identity-equality comparison, after resolving each side's
-// identifier node, bound variable, and null/event classification.
 struct IdentityEqualityOperands {
   const Expr* lhs_id;
   const Expr* rhs_id;
@@ -457,8 +316,6 @@ struct IdentityEqualityOperands {
   bool is_eq_op;
 };
 
-// Returns true when the operator is one of the four equality operators
-// (==, !=, ===, !==) and fills `ops` with the resolved operand information.
 static bool ResolveIdentityEqualityOperands(const Expr* expr, SimContext& ctx,
                                             IdentityEqualityOperands& ops) {
   if (expr->op != TokenKind::kEqEq && expr->op != TokenKind::kBangEq &&
@@ -482,8 +339,6 @@ static bool ResolveIdentityEqualityOperands(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// Compares two event operands by object identity (a null event compares equal
-// to an unbound/null event), producing the boolean comparison result.
 static Logic4Vec EvalEventIdentityEquality(const IdentityEqualityOperands& ops,
                                            Arena& arena) {
   bool equal = false;
@@ -497,9 +352,6 @@ static Logic4Vec EvalEventIdentityEquality(const IdentityEqualityOperands& ops,
   return MakeLogic4VecVal(arena, 1, (ops.is_eq_op == equal) ? 1u : 0u);
 }
 
-// §25.9: equality of a virtual interface against another virtual interface,
-// an interface instance, or null compares the interface instance each side
-// refers to (an unbound virtual interface and null compare equal).
 static Logic4Vec EvalVirtualInterfaceEquality(const Expr* expr, bool is_eq_op,
                                               SimContext& ctx, Arena& arena) {
   bool equal = VirtualInterfaceOperandHandle(expr->lhs, ctx, arena) ==
@@ -507,10 +359,6 @@ static Logic4Vec EvalVirtualInterfaceEquality(const Expr* expr, bool is_eq_op,
   return MakeLogic4VecVal(arena, 1, (is_eq_op == equal) ? 1u : 0u);
 }
 
-// Handles equality comparisons (==, !=, ===, !==) whose operands are event
-// variables or virtual interfaces, per the special object-identity semantics.
-// Returns true and sets `out` when the special handling applies; otherwise
-// returns false so the caller falls through to the generic binary operator.
 static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out) {
   IdentityEqualityOperands ops;
@@ -528,8 +376,6 @@ static bool TryEvalIdentityEquality(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §11.6.1 Table 11-21: the relational and equality operators, whose two
-// operands are sized to the larger of their lengths before they are compared.
 static bool IsSizedComparisonOp(TokenKind op) {
   using enum TokenKind;
   return op == kEqEq || op == kBangEq || op == kEqEqEq || op == kBangEqEq ||
@@ -537,11 +383,6 @@ static bool IsSizedComparisonOp(TokenKind op) {
          op == kLtEq || op == kGt || op == kGtEq;
 }
 
-// §11.6.1 with §11.8.2: both operands of a relational or equality operator are
-// evaluated at the larger of their two lengths and extended to it, by sign
-// where both are signed (§11.8.1) and by zero otherwise, so `a + b + c + d !=
-// 6` over two-bit operands adds at the literal's 32 bits and keeps its carry.
-// A real or string operand is compared as it stands.
 static Logic4Vec EvalSizedComparison(const Expr* expr, SimContext& ctx,
                                      Arena& arena) {
   uint32_t w =
@@ -557,17 +398,6 @@ static Logic4Vec EvalSizedComparison(const Expr* expr, SimContext& ctx,
   return EvalBinaryOp(expr->op, l, r, arena, 0);
 }
 
-// §11.6.1: evaluate a binary operator's context-determined operands at the
-// context width before combining them, so a wide sibling (or assignment
-// context) keeps a narrow operand from truncating an intermediate carry --
-// e.g. in `(a + b + 0) >> 1` the 32-bit literal 0 widens the addition's
-// context to 32 bits, preserving a+b's carry into bit 16.
-//
-// §11.8.1 makes the expression unsigned where any of its context-determined
-// operands is, and §11.8.2 propagates that type down with the size, so each
-// operand under an unsigned one is evaluated as unsigned: `(s + s) + u` over a
-// signed 4-bit s adds s zero-extended. A real operand keeps its sign, which
-// its conversion to real reads.
 static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
                                              Arena& arena,
                                              uint32_t context_width,
@@ -587,10 +417,6 @@ static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
   }
   if (IsLeftWidthBinaryOp(expr->op)) {
     uint32_t w = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
-    // §11.8.2: the left operand is extended to the size propagated down to it
-    // before the operator is applied, so `8'd1 << 8` into a 16-bit target
-    // keeps the bit the shift moves above the literal's own eight. A real
-    // base of `**` carries no bits to extend.
     Logic4Vec lhs =
         EvalExprInContext(expr->lhs, ctx, arena, w, unsigned_context);
     if (unsigned_context && !lhs.is_real) lhs.is_signed = false;
@@ -604,12 +430,6 @@ static Logic4Vec EvalContextDeterminedBinary(const Expr* expr, SimContext& ctx,
                       EvalExpr(expr->rhs, ctx, arena), arena, context_width);
 }
 
-// §6.23 — the concrete type a single type_reference operand denotes at run
-// time. A user class name (or `type(this)`, which stands for the class whose
-// method is executing, §8.11) resolves to that class, whether it was written as
-// a data type or as an expression; any other name resolves to a plain type
-// name. `resolved` is false when the operand is not a type reference or names a
-// class-less `this`.
 struct TypeRefRuntimeId {
   std::string_view name;
   bool is_class = false;
@@ -623,8 +443,6 @@ static TypeRefRuntimeId ResolveTypeRefRuntimeId(const Expr* op,
   if (op->lhs && op->lhs->kind == ExprKind::kIdentifier) {
     std::string_view name = op->lhs->text;
     if (name == "this") {
-      // §6.23/§8.11: type(this) is the lexically enclosing class of the running
-      // method, not the dynamic type of any handle.
       const ClassTypeInfo* cls = ctx.CurrentMethodClass();
       if (!cls) return id;
       id.name = cls->name;
@@ -639,17 +457,9 @@ static TypeRefRuntimeId ResolveTypeRefRuntimeId(const Expr* op,
   }
   if (!op->text.empty()) {
     id.name = op->text;
-    // A class name reaches here whenever it parses as a data type, which is
-    // what `type(C)` does, while `type(this)` arrives through the expression
-    // branch above. Both denote the same class, so both have to say so; asking
-    // the same question of each is what lets the two forms compare equal.
     ClassTypeInfo* cls = ctx.FindClassType(op->text);
     id.is_class = cls != nullptr;
     id.resolved = true;
-    // §8.25: a class written with parameter values, `type(registry #(byte))`,
-    // is the specialization they name, the class itself where they equal its
-    // defaults, and is held under the key type(this) gives in its methods;
-    // asked by the bare name, every specialization matched every other.
     if (cls != nullptr && op->type_value != nullptr &&
         !op->type_value->type_params.empty()) {
       id.name = SpecializationOf(cls, op->type_value->type_params, ctx,
@@ -664,10 +474,6 @@ static bool IsTypeRef(const Expr* operand) {
   return operand != nullptr && operand->kind == ExprKind::kTypeRef;
 }
 
-// §6.23 — evaluate a comparison of two type references to a one-bit result:
-// true exactly when the referenced types match (equality forms) or do not
-// (inequality forms). Returns false, leaving `out` untouched, when `expr` is
-// not an equality/inequality of two resolvable type references.
 static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   bool is_eq = expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq;
@@ -675,9 +481,6 @@ static bool TryTypeRefComparison(const Expr* expr, SimContext& ctx,
       expr->op == TokenKind::kBangEq || expr->op == TokenKind::kBangEqEq;
   if (!is_eq && !is_neq) return false;
   if (!IsTypeRef(expr->lhs) || !IsTypeRef(expr->rhs)) return false;
-  // §6.20.3: the elaborator judged the comparison against the types of the
-  // instance it stands in, by §6.22.1's matching, which the names below
-  // cannot answer.
   if (std::optional<bool> holds = ctx.TypeRefCompareHere(expr)) {
     out = MakeLogic4VecVal(arena, 1, *holds ? 1 : 0);
     return true;
@@ -706,9 +509,6 @@ static Logic4Vec EvalBinaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->op == TokenKind::kAmpAmp) return EvalLogicalAnd(expr, ctx, arena);
 
   if (expr->op == TokenKind::kAmpAmpAmp) {
-    // §12.6.3: a predicate of clauses can be true, false or ambiguous, an x
-    // or z filter making it ambiguous, and the conditional then combines both
-    // results (§11.4.11).
     Truth first = TruthOf(EvalExpr(expr->lhs, ctx, arena));
     if (first == Truth::kFalse) return TruthBit(first, arena);
     return TruthBit(
@@ -745,15 +545,6 @@ static Logic4Vec EvalRealOrTimeLiteral(const Expr* expr, Arena& arena) {
   return rv;
 }
 
-// §11.6.1: Table 11-21 sizes unary `+ - ~` by their operand and keeps only
-// `!` and the reductions self-determined, so the operand of the three is
-// context-determined and §11.8.2 propagates the expression's size down to it
-// before the operator is applied, extending it by its sign where it is signed
-// and by zero otherwise (§11.8.1). `logic [15:0] a = -8'd6` therefore negates
-// the 16-bit 6 and reads fffa, as §5.7.1's final paragraph has a sized
-// negative literal sign-extended into a wider logic object; negated at the
-// literal's 8 bits and widened afterwards, it read 00fa. A real operand is
-// not extended, and a context of 0 is a self-determined one.
 static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                                uint32_t context_width, bool unsigned_context) {
   if (expr->op == TokenKind::kPlusPlus || expr->op == TokenKind::kMinusMinus) {
@@ -766,8 +557,6 @@ static Logic4Vec EvalUnaryExpr(const Expr* expr, SimContext& ctx, Arena& arena,
   uint32_t width = std::max(context_width, SimSelfWidth(expr->lhs, ctx));
   Logic4Vec operand =
       EvalExprInContext(expr->lhs, ctx, arena, width, unsigned_context);
-  // §11.8.2: an operand an unsigned type is propagated down to is extended by
-  // zero, so `-s + u` negates s's 4 bits zero-extended.
   if (unsigned_context && !operand.is_real) operand.is_signed = false;
   if (!operand.is_real && operand.width < width)
     operand = ExtendVec(operand, width, operand.is_signed, arena);
@@ -796,7 +585,6 @@ static Logic4Vec EvalMinTypMax(const Expr* expr, SimContext& ctx, Arena& arena,
     result = EvalExpr(expr->rhs, ctx, arena, context_width);
   else
     result = EvalExpr(expr->condition, ctx, arena, context_width);
-  // Apply assignment-like context truncation (§10.8 mintymax expressions)
   if (context_width > 0 && result.width > context_width) {
     result = ResizeToWidth(result, context_width, arena);
   }
@@ -820,10 +608,6 @@ Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena) {
   return out;
 }
 
-// §11.12: a let instance is evaluated at the width of the expression it
-// stands in, which the call hands on to its expansion (CallContextWidth); the
-// width in force before it is put back after it, a call within the call
-// having installed its own.
 static Logic4Vec EvalCallInContext(const Expr* expr, SimContext& ctx,
                                    Arena& arena, uint32_t context_width) {
   const uint32_t kOuter = SetCallContextWidth(context_width);
@@ -849,10 +633,6 @@ Logic4Vec EvalExprInContext(const Expr* expr, SimContext& ctx, Arena& arena,
       return EvalIntLiteral(expr, arena, context_width);
     case ExprKind::kUnbasedUnsizedLiteral: {
       auto v = EvalUnbasedUnsized(expr, arena);
-      // §5.7.1: an unbased unsized literal takes the size of the context it
-      // appears in, filling every bit with its single-bit value. Where no
-      // context reaches it (context_width == 0) it is the 1-bit value that
-      // fills whatever width it is later resized to.
       if (context_width == 0 || context_width == v.width) return v;
       return FillUnbasedUnsized(v, context_width, arena);
     }

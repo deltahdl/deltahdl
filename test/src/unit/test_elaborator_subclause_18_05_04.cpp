@@ -9,14 +9,6 @@ using namespace delta;
 
 namespace {
 
-// These tests observe the elaborator rule of 18.5.4 (and its footnote 13): the
-// range_list of a uniqueness constraint shall contain only expressions that
-// denote singular or array variables. The rule is about what an operand
-// denotes, so it lives at the elaborator stage; the parser accepts the
-// range_list tokens regardless. Each program is built from real class source so
-// the check runs over the elaborated constraint, not a hand-built state.
-
-// 18.5.4: a group of singular variables denotes variables and is accepted.
 TEST(UniqueMemberForms, SingularVariableGroupAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -28,9 +20,6 @@ TEST(UniqueMemberForms, SingularVariableGroupAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.4: a slice of an unpacked array denotes an array variable, so a group
-// mixing a slice with singular variables (the unique {b, a[2:3], excluded}
-// example) is accepted.
 TEST(UniqueMemberForms, ArraySliceMemberAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -42,8 +31,6 @@ TEST(UniqueMemberForms, ArraySliceMemberAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.4 / footnote 13: a range_list member shall denote a variable. A literal
-// denotes no variable, so a group naming one is rejected.
 TEST(UniqueMemberForms, LiteralMemberRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -59,8 +46,6 @@ TEST(UniqueMemberForms, LiteralMemberRejected) {
                             3, "18.5.4"));
 }
 
-// 18.5.4 / footnote 13: an arithmetic expression is not a variable reference,
-// so a group naming one is rejected.
 TEST(UniqueMemberForms, ArithmeticExpressionMemberRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -77,9 +62,6 @@ TEST(UniqueMemberForms, ArithmeticExpressionMemberRejected) {
                             4, "18.5.4"));
 }
 
-// 18.5.4: a singular member may be of real type as well as integral, so a group
-// of real variables denotes variables and is accepted — the admitted-operand
-// form exercised here is the real singular variable.
 TEST(UniqueMemberForms, SingularRealVariableGroupAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -90,9 +72,6 @@ TEST(UniqueMemberForms, SingularRealVariableGroupAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.4: a whole unpacked array variable (not only a slice of one) is an
-// admitted member form, so a group naming an array beside a singular variable
-// is accepted.
 TEST(UniqueMemberForms, WholeUnpackedArrayMemberAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -103,10 +82,6 @@ TEST(UniqueMemberForms, WholeUnpackedArrayMemberAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.4 / footnote 13: a member/scope-qualified reference still denotes a
-// variable. A group written with the explicit object handle (this.x) is
-// accepted — this exercises the member-access member form, a distinct path from
-// a bare identifier or an array select.
 TEST(UniqueMemberForms, QualifiedMemberReferenceAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -117,9 +92,6 @@ TEST(UniqueMemberForms, QualifiedMemberReferenceAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.4: each member of a uniqueness group has an integral or real type. A
-// string variable is plainly neither, so a group naming one is rejected even
-// though the string does denote a variable.
 TEST(UniqueMemberForms, NonIntegralNonRealMemberRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -136,8 +108,6 @@ TEST(UniqueMemberForms, NonIntegralNonRealMemberRejected) {
                             4, "18.5.4"));
 }
 
-// 18.5.4: a uniqueness group admits no randc variable, so a group naming a
-// randc variable beside a rand one is rejected at the randc member.
 TEST(UniqueMemberForms, RandcMemberRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -154,8 +124,6 @@ TEST(UniqueMemberForms, RandcMemberRejected) {
                             4, "18.5.4"));
 }
 
-// 18.5.4: an inherited randc variable is as much a randc variable of the
-// group as one the class declares itself.
 TEST(UniqueMemberForms, InheritedRandcMemberRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -174,10 +142,6 @@ TEST(UniqueMemberForms, InheritedRandcMemberRejected) {
                             6, "18.5.4"));
 }
 
-// 18.5.4 with 18.7: an inline constraint block holds a uniqueness constraint as
-// a class's constraint block does, so the ban on a randc member reaches the
-// group of randomize() with called through a handle in a module, whether the
-// handle is declared in the module or in the procedure.
 TEST(UniqueMemberForms, InlineRandcMemberThroughHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -205,8 +169,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughHandleRejected) {
       "18.5.4"));
 }
 
-// 18.5.4 with 18.7: the same holds for randomize() with called on the object
-// itself in one of its methods, with or without this.
 TEST(UniqueMemberForms, InlineRandcMemberInMethodRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -232,8 +194,6 @@ TEST(UniqueMemberForms, InlineRandcMemberInMethodRejected) {
       "18.5.4"));
 }
 
-// 18.5.4 with 18.7: an inline group of rand members of the receiver's class is
-// accepted wherever randomize() with is called.
 TEST(UniqueMemberForms, InlineRandMembersAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -249,11 +209,6 @@ TEST(UniqueMemberForms, InlineRandMembersAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.4 with 18.7: the receiver of randomize() with may be any expression
-// that yields a handle, and its group is checked against the class of that
-// handle: an element of an array of handles, a handle property reached
-// through one or more other handles or through its class, and the handle a
-// method or a static method returns.
 TEST(UniqueMemberForms, InlineRandcMemberThroughReceiverExpressionRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -293,11 +248,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughReceiverExpressionRejected) {
   }
 }
 
-// 18.5.4 with 18.7: a method of another class may randomize an object through
-// a handle of its own -- a local, an argument, a property of its class or of a
-// class it extends -- in a class nested in another, and in a body written out
-// of the class's block, which names the same members (8.24); a method of a
-// subclass may randomize its own object through super.
 TEST(UniqueMemberForms, InlineRandcMemberThroughMethodHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -345,10 +295,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughMethodHandleRejected) {
   }
 }
 
-// 18.5.4 with 18.7: neither clause limits where the call stands, so a call in
-// a module's function or task, in a procedure of a generate block, in a
-// declaration's initializer or in a package's function is checked as one in
-// an initial block is.
 TEST(UniqueMemberForms, InlineRandcMemberOutsideModuleProcedureRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -391,10 +337,6 @@ TEST(UniqueMemberForms, InlineRandcMemberOutsideModuleProcedureRejected) {
   }
 }
 
-// 18.7: the receiver's name resolves in the innermost scope declaring it, so a
-// method's local handle of a class whose b is rand hides the module's handle
-// of a class whose b is randc, and the group is accepted; a name the method
-// does not redeclare still reaches the module's handle.
 TEST(UniqueMemberForms, InlineReceiverResolvesInInnermostScope) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -425,11 +367,6 @@ TEST(UniqueMemberForms, InlineReceiverResolvesInInnermostScope) {
       "18.5.4"));
 }
 
-// 18.5.4 with 18.12: a group of rand members is accepted whatever the
-// receiver -- a handle in another instance, one named upward through its
-// module, the handle an array method yields -- and so is a group of the scope
-// randomize, whose names are the calling scope's variables, written with or
-// without std::.
 TEST(UniqueMemberForms, InlineRandGroupAcceptedWhateverTheReceiver) {
   EXPECT_TRUE(
       ElabOk("class D;\n"
@@ -455,11 +392,6 @@ TEST(UniqueMemberForms, InlineRandGroupAcceptedWhateverTheReceiver) {
              "endmodule\n"));
 }
 
-// 18.5.4 with 18.7 and 6.18: a typedef of a class names that class, so a
-// handle declared through one -- of the compilation unit, through another
-// typedef, of a module, or of the class holding the handle -- is a handle of
-// that class; a forward typedef of the class leaves a handle declared with the
-// class's own name as it was.
 TEST(UniqueMemberForms, InlineRandcMemberThroughTypedefHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -497,9 +429,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughTypedefHandleRejected) {
   }
 }
 
-// 18.5.4 with 18.7 and 23.6: a hierarchical name reaches a handle in another
-// instance -- a child, a child's child, or an element of an array of
-// instances -- and the group is checked against that handle's class.
 TEST(UniqueMemberForms, InlineRandcMemberThroughInstanceHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -533,9 +462,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughInstanceHandleRejected) {
   }
 }
 
-// 18.5.4 with 18.7 and 26.3: a package variable is reached as p::g, or by its
-// bare name through a wildcard or an explicit import, and the group is
-// checked against its class.
 TEST(UniqueMemberForms, InlineRandcMemberThroughPackageHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -569,11 +495,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughPackageHandleRejected) {
   }
 }
 
-// 18.5.4 with 18.7 and 23.8: a hierarchical name may start with the name of a
-// module above, and the group is checked against the class of the handle it
-// reaches there. A name a scope declares is that declaration and no module's,
-// whether the scope is a class whose property it names or a module whose
-// variable a method of a class inside it reads.
 TEST(UniqueMemberForms, InlineRandcMemberThroughUpwardReferenceRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -609,10 +530,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughUpwardReferenceRejected) {
   }
 }
 
-// 18.5.4 with 18.7 and 27.6: a named generate block is a scope a hierarchical
-// name reaches into -- a conditional block, a case item's block, an element of
-// a loop's blocks, or a block inside another instance -- and the group is
-// checked against the class of the handle declared there.
 TEST(UniqueMemberForms, InlineRandcMemberThroughGenerateBlockHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -657,10 +574,6 @@ TEST(UniqueMemberForms, InlineRandcMemberThroughGenerateBlockHandleRejected) {
   }
 }
 
-// 18.5.4 with 18.7: a receiver whose name resolves to no declaration and no
-// module has no class to read the group's names in, so the uniqueness rule
-// reports nothing of its own there; resolving the name is left to the rules
-// of 23.8.
 TEST(UniqueMemberForms, InlineReceiverNamingNothingGetsNoUniquenessReport) {
   ElabFixture f;
   ElabOk(
@@ -678,9 +591,6 @@ TEST(UniqueMemberForms, InlineReceiverNamingNothingGetsNoUniquenessReport) {
       "18.5.4"));
 }
 
-// 18.5.4: the members of a uniqueness group are all of equivalent type. A byte
-// and an int differ in width, so the int is reported, in a class's block and
-// in an inline block alike.
 TEST(UniqueMemberForms, InequivalentMemberTypesRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -700,10 +610,6 @@ TEST(UniqueMemberForms, InequivalentMemberTypesRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 8, "18.5.4"));
 }
 
-// 18.5.4 with 6.22.2: a byte, the leaf elements of a byte array and of a slice
-// of it, and a signed 8-bit vector are all equivalent, so their group is
-// accepted. A member whose type the class text does not make plain -- a
-// select into a packed vector, a type given by name -- is left alone.
 TEST(UniqueMemberForms, EquivalentMemberTypesAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef int int_t;\n"

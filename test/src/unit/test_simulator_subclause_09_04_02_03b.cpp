@@ -1,13 +1,3 @@
-// Further tests for §9.4.2.3 "Conditional event controls", continuing
-// test_simulator_subclause_09_04_02_03a.cpp.
-//
-// The cases here are the ones the guard can get wrong without any of the
-// straightforward ones noticing: a condition whose truth is decided above the
-// low 64 bits, a condition that is high-impedance rather than unknown, an
-// operand that is a named event rather than a value-carrying variable, the
-// precedence of `iff` over `or` written the way the clause writes it, and a
-// procedural `@` statement rather than an `always` block.
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -18,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.2.3 refers the truth of the guard to §12.4, which makes any nonzero
-// value true. The guard here is nonzero only above the low 64 bits, so an
-// implementation that judges truth from a 64-bit projection of the value calls
-// it false and never runs the body.
 TEST(ConditionalEventIffSim, IffConditionSetAboveLow64BitsFires) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -43,9 +29,6 @@ TEST(ConditionalEventIffSim, IffConditionSetAboveLow64BitsFires) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.4: a nonzero value is true whichever of its bits are set, so a guard of
-// 8'hFE is true even though its low bit is zero. An implementation that read
-// the guard's low bit alone would suppress the body here.
 TEST(ConditionalEventIffSim, IffMultiBitGuardWithLowBitClearFires) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -66,8 +49,6 @@ TEST(ConditionalEventIffSim, IffMultiBitGuardWithLowBitClearFires) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.4 makes z false as it makes x false, and the two are separate values.
-// A guard held at high impedance therefore suppresses the body.
 TEST(ConditionalEventIffSim, IffConditionHighImpedanceSuppresses) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -88,10 +69,6 @@ TEST(ConditionalEventIffSim, IffConditionHighImpedanceSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2.3: the event expression triggers only when the expression after iff is
-// true. A named event is an event expression like any other, so a trigger
-// arriving while the guard is false leaves the waiting process where it was.
-// Both triggers here arrive with `en` at zero.
 TEST(ConditionalEventIffSim, IffOnNamedEventFalseSuppresses) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -117,8 +94,6 @@ TEST(ConditionalEventIffSim, IffOnNamedEventFalseSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2.3: the same wait resumes on a trigger that arrives while the guard is
-// true, so the guard gates the named event rather than disabling it.
 TEST(ConditionalEventIffSim, IffOnNamedEventTrueResumes) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -143,14 +118,6 @@ TEST(ConditionalEventIffSim, IffOnNamedEventTrueResumes) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2.3: iff binds tighter than or, so `@(a iff c or b)` is
-// `@((a iff c) or b)` and the guard covers `a` alone. `c` stays zero
-// throughout: the change to `a` is suppressed and the change to `b` is not, so
-// the body runs exactly once. A guard read as covering the whole list would
-// suppress both and leave the count at zero.
-//
-// The count is zeroed a time step after the operands are, because settling `b`
-// from x to 0 is itself a change of an unguarded operand and runs the body.
 TEST(ConditionalEventIffSim, IffGuardsOnlyItsOwnOperandOfAnOrList) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -172,9 +139,6 @@ TEST(ConditionalEventIffSim, IffGuardsOnlyItsOwnOperandOfAnOrList) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2.3: the qualifier belongs to the event control and not to the `always`
-// block, so a procedural `@` statement is gated the same way. Neither edge here
-// arrives with the guard true, and the statement after the wait never runs.
 TEST(ConditionalEventIffSim, ProceduralEventControlIffFalseKeepsWaiting) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -200,9 +164,6 @@ TEST(ConditionalEventIffSim, ProceduralEventControlIffFalseKeepsWaiting) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2.3: the same procedural wait resumes on the edge that arrives with the
-// guard true, which is what says the suppression above is the guard doing its
-// work rather than the wait never resuming at all.
 TEST(ConditionalEventIffSim, ProceduralEventControlIffTrueResumes) {
   SimFixture f;
   auto* var = RunAndFindVar(

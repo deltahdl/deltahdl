@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §15.2: semaphore and mailbox are classes of the std package (§26.7), so user
-// code may declare a class of either name, and a handle of it is checked
-// against the user's class rather than the std class's prototype (§G.3, §G.4).
-// The semaphore prototype's constructor takes at most one argument.
 TEST(BuiltinClassRedefinitionElab,
      ModuleClassNamedSemaphoreTakesItsConstructor) {
   ElabFixture f;
@@ -30,8 +26,6 @@ TEST(BuiltinClassRedefinitionElab,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.2: a class of the compilation unit's scope named mailbox is the one the
-// module's handle is of, whose methods the mailbox prototype does not declare.
 TEST(BuiltinClassRedefinitionElab, UnitClassNamedMailboxTakesItsMethods) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,8 +45,6 @@ TEST(BuiltinClassRedefinitionElab, UnitClassNamedMailboxTakesItsMethods) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.2: a module that declares no class of the name still reaches the std
-// package's semaphore, whose prototype the call is checked against.
 TEST(BuiltinClassRedefinitionElab, OtherModulesSemaphoreIsTheBuiltIn) {
   ElabFixture f;
   ElaborateSrc(

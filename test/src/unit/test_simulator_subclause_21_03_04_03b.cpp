@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.4.3 (printed page 670) with §8.5 and §8.6: each converted field is
-// stored in the argument after the format, in order, and a class property is
-// such an argument -- through a handle, `$sscanf("word", "%s", r.s)` and
-// `$fscanf(fd, "%d %s", r.n, r.w)`, or named bare inside one of the class's
-// methods -- as is an element of an unpacked array.
 TEST(ScanfDestinations, ClassPropertiesAndElementsTakeTheFields) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t21030403_props.txt";
@@ -49,10 +44,6 @@ TEST(ScanfDestinations, ClassPropertiesAndElementsTakeTheFields) {
   std::remove(path.c_str());
 }
 
-// §21.3.4.3 (printed page 671): the integer conversion codes, %u and %z among
-// them, are barred from every unpacked aggregate -- a queue, an associative
-// array and an unpacked struct or union as much as a fixed-size array -- so
-// each conversion below is refused with a warning and assigns nothing.
 TEST(ScanfDestinations, IntegerCodesIntoUnpackedAggregatesAreRefused) {
   SimFixture f;
   std::string out = RunCapture(

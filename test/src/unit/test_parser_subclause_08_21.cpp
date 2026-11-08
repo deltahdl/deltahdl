@@ -144,13 +144,6 @@ TEST(AbstractClassParsing, MultiplePureVirtualMethods) {
   EXPECT_TRUE(r.cu->classes[0]->members[1]->is_pure_virtual);
 }
 
-// §8.21 (printed page 199): a pure virtual method is marked by the keyword pure
-// and by having no method body. Syntax 8-1 (printed page 180) says it in the
-// grammar, admitting only `pure virtual { class_item_qualifier }
-// method_prototype ;`, and a prototype ends at the port list. The report stands
-// at the method declaration on line 2, not inside the body. The four accepting
-// cases above keep this one from being satisfied by a parser that refused every
-// `pure virtual` declaration.
 TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
   auto r = Parse(
       "virtual class Base;\n"
@@ -163,9 +156,6 @@ TEST(PureVirtualMethodParsing, PureVirtualWithBodyRejected) {
 }
 
 TEST(PureVirtualMethodParsing, PureVirtualWithBodyReportsExactlyOneError) {
-  // The body is discarded through its `endfunction`, so nothing inside it is
-  // read as a class member. Its first statement used to be, and
-  // Parser::ParseClassMembers reported the `return` under §8.5.
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual function void display();\n"
@@ -180,9 +170,6 @@ TEST(PureVirtualMethodParsing, PureVirtualWithBodyReportsExactlyOneError) {
 }
 
 TEST(PureVirtualMethodParsing, PureVirtualTaskWithBodyRejected) {
-  // Parser::ParseTaskDecl is a separate function from
-  // Parser::ParseFunctionDecl, so the function form does not answer for the
-  // task form, and the body ends at `endtask` rather than `endfunction`.
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual task run();\n"
@@ -194,10 +181,6 @@ TEST(PureVirtualMethodParsing, PureVirtualTaskWithBodyRejected) {
 }
 
 TEST(PureVirtualMethodParsing, PureVirtualWithEmptyBodyRejected) {
-  // §8.21's NOTE keeps a method with no statement body a legal method that can
-  // be called, so an empty body is a body. `endfunction` is the only evidence
-  // one was written, which is what a check reading a single token after the
-  // prototype has to get right.
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual function void display();\n"
@@ -208,10 +191,6 @@ TEST(PureVirtualMethodParsing, PureVirtualWithEmptyBodyRejected) {
 }
 
 TEST(PureVirtualMethodParsing, PureVirtualWithDeclarationBodyAddsNoProperty) {
-  // A body opening with a declaration parses as a class property, so the class
-  // used to gain an `x` the source declared inside a method. A body opening
-  // with `return` cannot fail that way, so the case above would pass a fix that
-  // reported the rule and still absorbed the declaration.
   auto r = Parse(
       "virtual class Base;\n"
       "  pure virtual function void display();\n"

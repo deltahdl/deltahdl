@@ -81,8 +81,6 @@ TEST(SpecifyTerminalElaboration, OutputPortRejectedAsInputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // `o` is legal as the destination, so the only report is the one about the
-  // source terminal this case is named for.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "module path source 'o' must be connected to an input or inout port", 3,
@@ -98,8 +96,6 @@ TEST(SpecifyTerminalElaboration, InputPortRejectedAsOutputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // `i` is legal as the source, so the destination report is the one this case
-  // is named for.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "module path destination 'i' must be connected to an "
@@ -116,9 +112,6 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsInputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // §25.6 states the ref-port prohibition once for both roles the specify block
-  // has, so a module path terminal reports the same subclause a timing-check
-  // terminal does, and it is the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'v' cannot be used as a terminal in a specify block", 3,
@@ -134,20 +127,12 @@ TEST(SpecifyTerminalElaboration, RefPortRejectedAsOutputIdentifier) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // §25.6 states the ref-port prohibition once for both roles the specify block
-  // has, so a module path terminal reports the same subclause a timing-check
-  // terminal does, and it is the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'v' cannot be used as a terminal in a specify block", 3,
       "25.6"));
 }
 
-// The first alternative of each production — input_identifier ::=
-// input_port_identifier and output_identifier ::= output_port_identifier — must
-// be *accepted*. Prior tests only exercised the inout alternative and the
-// direction negatives; this observes a clean pass where a plain input port is
-// taken as a path source and a plain output port as a path destination.
 TEST(SpecifyTerminalElaboration, PlainInputAndOutputPortsAcceptedAsTerminals) {
   ElabFixture f;
   auto* design = ElaborateSrc(

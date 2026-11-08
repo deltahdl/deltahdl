@@ -19,8 +19,6 @@ namespace delta {
 
 namespace {
 
-// Whether two clocks are the same event: the same edges over signals of
-// the same spelling, their whole paths included (§23.6).
 bool SameClock(const std::vector<EventExpr>& a,
                const std::vector<EventExpr>& b) {
   if (a.size() != b.size()) return false;
@@ -31,9 +29,6 @@ bool SameClock(const std::vector<EventExpr>& a,
   return true;
 }
 
-// §9.4.2: whether the change from `was` to `now` is the edge the event
-// names, a posedge the rise to true, a negedge the fall from it, and an
-// event with no edge any change.
 bool EdgeHappened(Edge edge, bool was, bool now) {
   switch (edge) {
     case Edge::kPosedge:
@@ -47,31 +42,22 @@ bool EdgeHappened(Edge edge, bool was, bool now) {
   return false;
 }
 
-// The variable the event's signal names, where it names one: a plain name, or,
-// §23.6, a path such as `i0.clk`, resolved as the event control an assertion's
-// process waits on resolves it.
 Variable* SignalOf(const EventExpr& ev, SimContext& ctx) {
   if (ev.signal == nullptr) return nullptr;
   return ResolveSignalToVariable(ev.signal, ctx);
 }
 
-// One event watched: the number of its clock, and its slot among the
-// events of every clock, where the signal's last reading is kept.
 struct WatchedEvent {
   int clock;
   size_t slot;
 };
 
-// Watches one event of a clock: at each change of its signal, the edge the
-// event names records the time step as a tick of the clock.
 void WatchEvent(PropertyClocks& clocks, WatchedEvent watched,
                 const EventExpr& ev, SimContext& ctx, Arena& arena) {
   Variable* var = SignalOf(ev, ctx);
   if (var == nullptr) return;
   clocks.was_true[watched.slot] = EvalExpr(ev.signal, ctx, arena).IsTruthy();
   var->AddWatcher([&clocks, watched, &ev, &ctx, &arena, var]() {
-    // §15.5.1: a named event holds no value that changes; each trigger is
-    // what `@(ev)` waits for, and so a tick of the clock.
     if (var->is_event) {
       clocks.ticks[watched.clock].push_back(ctx.CurrentTime());
       return false;
@@ -104,8 +90,6 @@ void InstallClockWatchers(PropertyClocks& clocks, SimContext& ctx,
     clocks.multiclock = true;
     clocks.installed_at = ctx.AssertionSamples().StepTime(ctx.CurrentTime());
   }
-  // The clocks not yet watched, from the first where the property has just
-  // met its second, so a clock an expansion brings is watched from then.
   while (clocks.ticks.size() < clocks.clocks.size()) {
     size_t i = clocks.ticks.size();
     clocks.ticks.emplace_back();

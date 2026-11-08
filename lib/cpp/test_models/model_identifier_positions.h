@@ -5,15 +5,6 @@
 #include <string>
 #include <string_view>
 
-// The identifier positions a word can be put in, each reached by its own
-// grammar production. A reserved-word sweep puts a word into a position and
-// checks that the source is accepted or rejected, so the positions are the
-// sweep's coverage: a declaration's own name slot is only one of them, and a
-// word that stopped being reserved in just one of the others would go
-// unnoticed by a sweep that used the declaration slot alone.
-
-// One position. `what` names the production for a failure message, and `tmpl`
-// is a source with '@' standing wherever the word under test goes.
 struct IdentifierPosition {
   const char* what;
   const char* tmpl;
@@ -67,7 +58,6 @@ inline constexpr IdentifierPosition kIdentifierPositions[] = {
      "endmodule\n"},
 };
 
-// Substitutes `word` for every placeholder in one position's template.
 inline std::string AtPosition(const IdentifierPosition& p, const char* word) {
   std::string src = p.tmpl;
   for (auto at = src.find('@'); at != std::string::npos;
@@ -77,9 +67,6 @@ inline std::string AtPosition(const IdentifierPosition& p, const char* word) {
   return src;
 }
 
-// Whether `p` is one of the positions `what` names, for a sweep that covers
-// some of them rather than all -- either because the rest are carried by
-// another sweep, or because a word cannot be driven through them.
 inline bool PositionIsOneOf(const IdentifierPosition& p,
                             std::initializer_list<std::string_view> what) {
   return std::find(what.begin(), what.end(), std::string_view(p.what)) !=

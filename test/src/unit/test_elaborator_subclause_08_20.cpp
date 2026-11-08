@@ -114,8 +114,6 @@ TEST(VirtualMethodElaboration, ExtendsFinalOk) {
              "endmodule\n"));
 }
 
-// 8.20: the ':extends' specifier implies the method is virtual, so the
-// 'virtual' keyword is optional when overriding a virtual base method.
 TEST(VirtualMethodElaboration, ExtendsWithoutVirtualKeywordOk) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -330,8 +328,6 @@ TEST(VirtualMethodElaboration, OverrideCovariantReturnTypeOk) {
              "endmodule\n"));
 }
 
-// 8.20: an override takes the same argument list as its prototype, so a
-// differing argument count is rejected.
 TEST(VirtualMethodElaboration, OverrideMismatchedArgCountError) {
   ElabFixture f;
   ElabOk(
@@ -350,8 +346,6 @@ TEST(VirtualMethodElaboration, OverrideMismatchedArgCountError) {
       "virtual method override has different number of arguments", 5, "8.20"));
 }
 
-// 8.20: a virtual function return type that is a class type must be the same
-// type or one derived from the prototype's; an unrelated class is rejected.
 TEST(VirtualMethodElaboration, OverrideNonCovariantReturnTypeError) {
   ElabFixture f;
   ElabOk(
@@ -402,12 +396,6 @@ TEST(VirtualMethodElaboration, OverrideDefaultPresenceMismatchError) {
                             "': presence of default must match", 5, "8.20"));
 }
 
-// §8.20 states the whole of the override signature rule: a virtual method
-// override in a subclass matches the prototype's argument types and repeats its
-// argument names, qualifiers and directions exactly. The subclause on the
-// report is what tells this rejection from §8.14's rule about which member a
-// base-class handle reaches, which the same two class declarations can also
-// breach.
 TEST(VirtualMethodElaboration,
      SignatureDiffersFromTheOverriddenMemberNames8_20) {
   ElabFixture f;
@@ -439,8 +427,6 @@ TEST(VirtualMethodElaboration, OverrideDefaultValueDifferentOk) {
              "endmodule\n"));
 }
 
-// §8.20's override rules hold over a class a module declares as over one at
-// compilation-unit scope.
 TEST(VirtualMethodElaboration, ModuleClassOverrideArgumentNameIsChecked) {
   ElabFixture f;
   ElabOk(
@@ -457,11 +443,6 @@ TEST(VirtualMethodElaboration, ModuleClassOverrideArgumentNameIsChecked) {
                             4, "8.20"));
 }
 
-// §8.20: an override's qualifiers are those of the method it overrides, and
-// `virtual` is the one it may leave off, so a local or protected qualifier
-// written on one and not the other is a mismatch either way round, k's local
-// as much as f's and g's protected. Matching qualifiers, the override of h,
-// are legal.
 TEST(VirtualMethodElaboration, OverrideQualifiersMatchTheOverriddenMethod) {
   ElabFixture f;
   ElabOk(
@@ -493,13 +474,6 @@ TEST(VirtualMethodElaboration, OverrideQualifiersMatchTheOverriddenMethod) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage[2], 11, "8.20"));
 }
 
-// §8.20 asks an override's argument types to match the prototype's and its
-// return type to match or derive from the base's, and §6.22.1 makes a typedef
-// name match the type it stands for, whether the design or the class declares
-// the typedef: the clause's Example 2 writes `T a` under `typedef int T` for
-// `int a`. A type named behind a package scope, p::N, matches itself. A class
-// return type is matched by a class derived from it, and by
-// no other type.
 TEST(VirtualMethodElaboration, TypedefsMatchTheTypesTheyNameInAnOverride) {
   ElabFixture f;
   ElabOk(
@@ -542,14 +516,6 @@ TEST(VirtualMethodElaboration, TypedefsMatchTheTypesTheyNameInAnOverride) {
   }
 }
 
-// §8.20 with §8.25: an override written in its class's own type parameter
-// matches or not according to the specialization, so the generic declaration
-// draws no report and each specialization a declaration uses is judged under
-// the types it gives the parameters, by position, by name, or by default. The
-// clause's Example 2: Y defaulting to logic is no match for int. A base
-// method written in its own class's type parameter is likewise left to the
-// specialization the subclass extends. An argument written in a type of its
-// own, g's b, is no specialization's to judge.
 TEST(VirtualMethodElaboration,
      AnOverrideInATypeParameterIsJudgedPerSpecialization) {
   ElabFixture f;
@@ -598,10 +564,6 @@ TEST(VirtualMethodElaboration,
   }
 }
 
-// §8.20 holds an override to the method of the class its own class extends,
-// that class being the one the extends name resolves to from the scope the
-// class is written in (§8.13), though another module declares a class of the
-// same name.
 TEST(VirtualMethodElaboration, AnOverrideIsJudgedAgainstItsOwnScopesBase) {
   ElabFixture f;
   ElabOk(

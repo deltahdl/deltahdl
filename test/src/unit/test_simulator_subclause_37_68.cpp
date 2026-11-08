@@ -13,23 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.68 Delay control: the object model diagram draws a delay control "#"
-// object with a vpiDelay relation (to an expression, plus the delay set reached
-// via vpi_get_delays(), §38.10) and a vpiStmt edge to a statement. The clause's
-// sole numbered Detail (D1) governs that statement edge: when the delay control
-// is associated with an assignment, the statement shall always be NULL. These
-// tests observe the production code that applies that rule
-// (VpiDelayControlStmt) both directly and through the public
-// vpi_handle(vpiStmt, ...) dispatch path.
-//
-// The statement objects below carry the kinds §37.4.1's dotted `stmt` class
-// groups rather than vpiStmt itself: that enclosure is a class grouping other
-// objects, so no statement of a design has the relation's tag for its own kind,
-// and a scan that asked for one found the guarded statement of no timing
-// control any design could hold.
-
-// The fixture installs a context so the public vpi_handle entry point runs its
-// real dispatch over the test objects.
 class DelayControl : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -37,9 +20,6 @@ class DelayControl : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// D1 (complement): a delay control that is not associated with an assignment
-// reaches its guarded statement normally - the rule is specific to the
-// assignment association and does not blanket-null every delay control's stmt.
 TEST_F(DelayControl, StandaloneDelayControlReachesItsStatement) {
   VpiObject stmt;
   stmt.type = vpiBegin;
@@ -50,17 +30,12 @@ TEST_F(DelayControl, StandaloneDelayControlReachesItsStatement) {
 
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), &stmt);
 
-  // A non-assignment parent (here the delay control sits inside an ordinary
-  // procedural statement) is still an ordinary delay control, so the statement
-  // is reached.
   VpiObject host_stmt;
   host_stmt.type = vpiBegin;
   delay_control.parent = &host_stmt;
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), &stmt);
 }
 
-// D1 edge: a null handle and a delay control with no statement child both
-// report no statement.
 TEST_F(DelayControl, NullAndEmptyDelayControlsReportNoStatement) {
   EXPECT_EQ(VpiDelayControlStmt(nullptr), nullptr);
 
@@ -69,10 +44,6 @@ TEST_F(DelayControl, NullAndEmptyDelayControlsReportNoStatement) {
   EXPECT_EQ(VpiDelayControlStmt(&bare), nullptr);
 }
 
-// D1 end to end: the rule is applied by the public vpi_handle(vpiStmt, ...)
-// dispatch. The assignment-associated delay control yields a null statement,
-// while a standalone delay control yields its statement child through the same
-// entry point.
 TEST_F(DelayControl, RuleAppliesThroughPublicVpiHandleDispatch) {
   VpiObject guarded;
   guarded.type = vpiBegin;
@@ -93,21 +64,15 @@ TEST_F(DelayControl, RuleAppliesThroughPublicVpiHandleDispatch) {
             &guarded);
 }
 
-// vpiDelay: a delay control reaches its "#" delay expression through vpiDelay.
-// The delay operand is the delay control's expression child; the guarded
-// statement child (a vpiStmt) is skipped. Observed through the public
-// vpi_handle(vpiDelay, ...) dispatch that calls VpiDelayControlDelayExpr.
 TEST_F(DelayControl, DelayControlReachesItsDelayExpressionThroughVpiDelay) {
   VpiObject delay_expr;
-  delay_expr.type = vpiConstant;  // e.g. the "5" in "#5 stmt;"
+  delay_expr.type = vpiConstant;
 
   VpiObject guarded;
   guarded.type = vpiBegin;
 
   VpiObject delay_control;
   delay_control.type = vpiDelayControl;
-  // The guarded statement precedes the delay operand in child order to prove
-  // the scan selects on expression kind, not on position.
   delay_control.children = {&guarded, &delay_expr};
 
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&delay_control))),
@@ -115,12 +80,9 @@ TEST_F(DelayControl, DelayControlReachesItsDelayExpressionThroughVpiDelay) {
   EXPECT_EQ(VpiDelayControlDelayExpr(&delay_control), &delay_expr);
 }
 
-// vpiDelay holds even for an intra-assignment delay control ("x = #5 y"): its
-// guarded statement is null (detail 1), yet the delay expression is still
-// reachable. A ref-obj operand ("#dly") stands in for the delay here.
 TEST_F(DelayControl, IntraAssignmentDelayStillReachesItsDelayExpression) {
   VpiObject delay_expr;
-  delay_expr.type = vpiRefObj;  // e.g. the "dly" in "x = #dly y;"
+  delay_expr.type = vpiRefObj;
 
   VpiObject assignment;
   assignment.type = vpiAssignment;
@@ -130,15 +92,11 @@ TEST_F(DelayControl, IntraAssignmentDelayStillReachesItsDelayExpression) {
   on_assignment.parent = &assignment;
   on_assignment.children = {&delay_expr};
 
-  // Detail 1: no guarded statement for the assignment-associated delay control.
   EXPECT_EQ(vpi_handle(vpiStmt, VpiHandleOf(&on_assignment)), nullptr);
-  // ... but the vpiDelay edge is unaffected by that carve-out.
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&on_assignment))),
             &delay_expr);
 }
 
-// vpiDelay edge cases: a null handle and a delay control with no expression
-// child both report no delay expression.
 TEST_F(DelayControl, NullAndDelaylessControlsReportNoDelayExpression) {
   EXPECT_EQ(VpiDelayControlDelayExpr(nullptr), nullptr);
 
@@ -150,14 +108,9 @@ TEST_F(DelayControl, NullAndDelaylessControlsReportNoDelayExpression) {
   EXPECT_EQ(VpiDelayControlDelayExpr(&only_stmt), nullptr);
 }
 
-// vpiDelay operand form: a computed delay ("#(a+b)") reaches its delay
-// expression just as a bare-constant delay does. The operand is an operation
-// object rather than a constant, so this covers the second admitted delay-
-// expression kind (the multiple/computed-delay form of §37.3.4) alongside the
-// bare-constant and reference forms exercised elsewhere.
 TEST_F(DelayControl, ComputedDelayExpressionReachedThroughVpiDelay) {
   VpiObject delay_expr;
-  delay_expr.type = vpiOperation;  // e.g. the "a+b" in "#(a+b) stmt;"
+  delay_expr.type = vpiOperation;
 
   VpiObject delay_control;
   delay_control.type = vpiDelayControl;
@@ -168,12 +121,6 @@ TEST_F(DelayControl, ComputedDelayExpressionReachedThroughVpiDelay) {
   EXPECT_EQ(VpiDelayControlDelayExpr(&delay_control), &delay_expr);
 }
 
-// vpiStmt negative/discriminator: the guarded-statement scan must not mistake
-// the delay operand for the guarded statement. A delay control that carries
-// only a delay expression (no statement child) reports a null statement,
-// proving the vpiStmt edge selects on the statement kind rather than returning
-// the first child. Mirror of the skip the vpiDelay scan performs on the
-// statement child.
 TEST_F(DelayControl, StatementScanSkipsDelayExpressionChild) {
   VpiObject delay_expr;
   delay_expr.type = vpiConstant;
@@ -186,9 +133,6 @@ TEST_F(DelayControl, StatementScanSkipsDelayExpressionChild) {
   EXPECT_EQ(VpiDelayControlStmt(&delay_control), nullptr);
 }
 
-// §38.10: a delay control with no delay expression, as one whose delay the
-// model built no object for, has no delay to give, so vpi_get_delays() writes
-// a zero delay over the caller's slot and records no error.
 TEST_F(DelayControl, ADelayControlWithNoDelayExpressionGivesAZeroDelay) {
   VpiObject guarded;
   guarded.type = vpiNullStmt;
@@ -208,11 +152,6 @@ TEST_F(DelayControl, ADelayControlWithNoDelayExpressionGivesAZeroDelay) {
   EXPECT_EQ(slot.low, 0U);
 }
 
-// §38.10 with §11.11: a min:typ:max delay holding fewer than three operands,
-// as one with an operand the model built no object for, cannot say which of
-// the three it holds, so under mtm_flag each reads the whole delay's value,
-// never an operand's: here the operation's, none, as it has no expression to
-// evaluate, where its first operand holds 9.
 TEST_F(DelayControl, AMinTypMaxDelayShortOfAnOperandGivesItsWholeValue) {
   Logic4Word nine{9, 0};
   Variable held{};
@@ -243,11 +182,8 @@ TEST_F(DelayControl, AMinTypMaxDelayShortOfAnOperandGivesItsWholeValue) {
   for (const s_vpi_time& slot : slots) EXPECT_EQ(slot.low, 0U);
 }
 
-// The delay controls of a run: those a design's procedures write, built from
-// the elaborated design rather than by hand (#5002).
 class DelayControlsOfARun : public VpiDesignRun {
  protected:
-  // The delay control the first procedure of `top` runs.
   static vpiHandle Control() {
     vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
     if (procs == nullptr) return nullptr;
@@ -258,8 +194,6 @@ class DelayControlsOfARun : public VpiDesignRun {
   }
 };
 
-// A delay control a procedure writes is an object of the run, reaching the
-// delay written through vpiDelay and the statement it delays through vpiStmt.
 TEST_F(DelayControlsOfARun, ADelayControlIsAnObjectOfTheRun) {
   Run("module top; int a; initial #5 a = 1; endmodule\n");
   vpiHandle control = Control();
@@ -277,8 +211,6 @@ TEST_F(DelayControlsOfARun, ADelayControlIsAnObjectOfTheRun) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLhs, delayed)), VpiObjectOf(By("top.a")));
 }
 
-// A delay written as a name is the variable or parameter the name stands for,
-// which §37.58 draws among simple expressions.
 TEST_F(DelayControlsOfARun, ADelayWrittenAsANameIsWhatItNames) {
   Run("module top; int d = 2; initial #d ; endmodule\n");
   vpiHandle control = Control();
@@ -290,9 +222,6 @@ TEST_F(DelayControlsOfARun, ADelayWrittenAsANameIsWhatItNames) {
   EXPECT_EQ(vpi_get(vpiType, delayed), vpiNullStmt);
 }
 
-// A delay control gives through vpi_get_delays() the one delay it waits, the
-// value its delay expression holds, read in simulation time units: 5 in a
-// module of 1ns units under a 1ps precision is 5000 of them.
 TEST_F(DelayControlsOfARun, ADelayControlGivesItsDelayThroughGetDelays) {
   Run("module top; timeunit 1ns; timeprecision 1ps;\n"
       "  int a; initial #5 a = 1;\n"
@@ -310,9 +239,6 @@ TEST_F(DelayControlsOfARun, ADelayControlGivesItsDelayThroughGetDelays) {
   EXPECT_EQ(slot.low, 5000U);
 }
 
-// §38.10 with §11.11: a delay written as an operation other than min:typ:max
-// has one value to give, the operation's, so under mtm_flag the minimum,
-// typical and maximum delays all read it: #(d + 1) with d 2 waits 3.
 TEST_F(DelayControlsOfARun, AComputedDelayGivesItsValueAsEachOfTheThree) {
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
       "  int d = 2; int a; initial #(d + 1) a = 1;\n"

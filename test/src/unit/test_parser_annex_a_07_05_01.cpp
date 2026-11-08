@@ -73,9 +73,6 @@ TEST(TimingCheckCommandParsing, SetupWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// The notifier in the optional [ , [ notifier ] ] tail may itself be omitted
-// while the separating comma is present; the trailing comma parses cleanly and
-// leaves the notifier empty.
 TEST(TimingCheckCommandParsing, SetupEmptyNotifierSlot) {
   auto r = Parse(
       "module m;\n"
@@ -104,8 +101,6 @@ TEST(TimingCheckCommandParsing, SetupAsSpecifyItem) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kSetup);
-  // Syntax 31-3 names the data_event first, so `d` is the data event and
-  // `posedge clk` the reference event.
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kNone);
   EXPECT_EQ(si->timing_check.data_terminal.name, "d");
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
@@ -132,8 +127,6 @@ TEST(TimingCheckCommandParsing, NochangeAsSpecifyItem) {
   ASSERT_GE(si->timing_check.limits.size(), 2u);
 }
 
-// $setuphold_timing_check carries two timing_check_limit arguments; the parser
-// records both in the limits list.
 TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
   auto r = Parse(
       "module m;\n"
@@ -149,8 +142,6 @@ TEST(TimingCheckCommandParsing, SetupholdTwoLimits) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// A $setuphold with only one timing_check_limit violates the production's
-// two-limit form and is rejected.
 TEST(TimingCheckCommandParsing, SetupholdSingleLimitRejected) {
   auto r = Parse(
       "module m;\n"
@@ -158,14 +149,11 @@ TEST(TimingCheckCommandParsing, SetupholdSingleLimitRejected) {
       "  $setuphold(posedge clk, data, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.3.3 owns the $setuphold argument list; the report stands at the
-  // check's own name.
   EXPECT_TRUE(ReportedError(
       r.diags, "$setuphold requires two timing_check_limit arguments", 3,
       "31.3.3"));
 }
 
-// $recrem_timing_check likewise takes two timing_check_limit arguments.
 TEST(TimingCheckCommandParsing, RecremTwoLimits) {
   auto r = Parse(
       "module m;\n"
@@ -180,7 +168,6 @@ TEST(TimingCheckCommandParsing, RecremTwoLimits) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// A $recrem with a single timing_check_limit violates its two-limit form.
 TEST(TimingCheckCommandParsing, RecremSingleLimitRejected) {
   auto r = Parse(
       "module m;\n"
@@ -188,13 +175,11 @@ TEST(TimingCheckCommandParsing, RecremSingleLimitRejected) {
       "  $recrem(posedge rst, posedge clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.3.6 owns the $recrem argument list.
   EXPECT_TRUE(ReportedError(r.diags,
                             "$recrem requires two timing_check_limit arguments",
                             3, "31.3.6"));
 }
 
-// $fullskew_timing_check is the two-limit member of the skew family.
 TEST(TimingCheckCommandParsing, FullskewTwoLimits) {
   auto r = Parse(
       "module m;\n"
@@ -209,7 +194,6 @@ TEST(TimingCheckCommandParsing, FullskewTwoLimits) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// A $fullskew with a single timing_check_limit violates its two-limit form.
 TEST(TimingCheckCommandParsing, FullskewSingleLimitRejected) {
   auto r = Parse(
       "module m;\n"
@@ -217,14 +201,11 @@ TEST(TimingCheckCommandParsing, FullskewSingleLimitRejected) {
       "  $fullskew(posedge clk1, posedge clk2, 50);\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.4.3 owns the $fullskew argument list.
   EXPECT_TRUE(ReportedError(
       r.diags, "$fullskew requires two timing_check_limit arguments", 3,
       "31.4.3"));
 }
 
-// $period_timing_check opens with a controlled_reference_event and has no
-// data_event; only the reference terminal is populated.
 TEST(TimingCheckCommandParsing, PeriodControlledReferenceNoDataEvent) {
   auto r = Parse(
       "module m;\n"
@@ -243,8 +224,6 @@ TEST(TimingCheckCommandParsing, PeriodControlledReferenceNoDataEvent) {
   ASSERT_EQ(tc->limits.size(), 1u);
 }
 
-// $width_timing_check has no data_event and carries a threshold after the
-// timing_check_limit, recorded as the second limits entry.
 TEST(TimingCheckCommandParsing, WidthThresholdNoDataEvent) {
   auto r = Parse(
       "module m;\n"
@@ -263,10 +242,6 @@ TEST(TimingCheckCommandParsing, WidthThresholdNoDataEvent) {
   ASSERT_EQ(tc->limits.size(), 2u);
 }
 
-// $recrem_timing_check writes the same tail $setuphold_timing_check does,
-// `[ , [ notifier ] [ , [ timestamp_condition ] [ , [ timecheck_condition ]
-// [ , [ delayed_reference ] [ , [ delayed_data ] ] ] ] ]`, and every one of
-// the five is read.
 TEST(TimingCheckCommandParsing, RecremTakesConditionsAndDelayedSignals) {
   auto r = Parse(
       "module m;\n"
@@ -285,11 +260,6 @@ TEST(TimingCheckCommandParsing, RecremTakesConditionsAndDelayedSignals) {
   EXPECT_EQ(tc->delayed_data, "dd");
 }
 
-// Four of the twelve productions write arguments past the notifier: the
-// conditions and delayed signals of $setuphold and $recrem, the flags of
-// $timeskew and $fullskew. The other eight end at `[ , [ notifier ] ] )`, so
-// an argument after the notifier of any of them stands where the ')' is due,
-// and the ',' before it is reported there under §31.2 as $skew's is.
 TEST(TimingCheckCommandParsing, ChecksEndingAtTheNotifierTakeNothingPastIt) {
   const char* const kChecks[] = {
       "$setup(d, posedge clk, 10, n, tsc)",
@@ -309,7 +279,6 @@ TEST(TimingCheckCommandParsing, ChecksEndingAtTheNotifierTakeNothingPastIt) {
   }
 }
 
-// The same eight with the notifier omitted and an argument behind its ','.
 TEST(TimingCheckCommandParsing,
      ChecksEndingAtTheNotifierTakeNothingPastItsSlot) {
   const char* const kChecks[] = {
@@ -337,7 +306,6 @@ TEST(TimingCheckCommandParsing, ErrorMissingCloseParen) {
       "  $setup(data, posedge clk, 10;\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.2 owns the system_timing_check parentheses.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "31.2"));
 }
 
@@ -348,8 +316,6 @@ TEST(TimingCheckCommandParsing, ErrorMissingSemicolon) {
       "  $setup(data, posedge clk, 10)\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.2 owns the terminating semicolon; the report stands at the
-  // 'endspecify' that arrived instead.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "31.2"));
 }

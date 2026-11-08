@@ -69,9 +69,6 @@ TEST(EvalOpXZ, LogicalNotNonzero) {
   EXPECT_EQ(result.words[0].bval, 0u);
 }
 
-// §11.4.7: an operand with an unknown bit and no known 1 may be zero or not,
-// so its truth is ambiguous and `!` gives x; a known 1 bit would make it
-// nonzero whatever the unknown bits hold.
 TEST(EvalOpXZ, LogicalNotX) {
   SimFixture f;
 
@@ -214,8 +211,6 @@ TEST(EvalOpXZ, ImplicationUnknownFalse) {
 }
 
 TEST(EvalOpXZ, ImplicationFalseUnknown) {
-  // A false antecedent makes the implication true regardless of the
-  // consequent, so the result is a known 1 even when the consequent is x.
   SimFixture f;
 
   MakeVar4(f, "ifu1", 1, 0, 0);
@@ -228,8 +223,6 @@ TEST(EvalOpXZ, ImplicationFalseUnknown) {
 }
 
 TEST(EvalOpXZ, EquivalenceResultIsOneBit) {
-  // The equivalence of two multibit operands reduces to a single-bit logical
-  // result; both operands here are nonzero, so they compare equal.
   SimFixture f;
 
   MakeVar4(f, "erw1", 4, 0b1010, 0);
@@ -417,9 +410,6 @@ TEST(OperatorSim, ShortCircuitImplicationSkipsRhs) {
 }
 
 TEST(OperatorSim, ShortCircuitAlwaysEvaluatesFirstOperand) {
-  // Short-circuit evaluation still requires the first operand to be evaluated.
-  // The first operand here has a side effect that must take place; the second
-  // operand forces the && result to false without undoing that side effect.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -443,10 +433,6 @@ TEST(OperatorSim, ShortCircuitAlwaysEvaluatesFirstOperand) {
 }
 
 TEST(OperatorSim, EquivalenceEvaluatesEachOperandOnce) {
-  // The equivalence operator is defined in terms of two implications, but the
-  // LRM requires each operand to be evaluated exactly once rather than once per
-  // implication. Each operand here increments its own counter as a side effect;
-  // a correct evaluation leaves both counters at 1.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -470,7 +456,6 @@ TEST(OperatorSim, EquivalenceEvaluatesEachOperandOnce) {
   ASSERT_NE(y, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 1u);
   EXPECT_EQ(b->value.ToUint64(), 1u);
-  // Both operands are nonzero, so the operands compare equal and y is true.
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
@@ -624,13 +609,6 @@ TEST(BlockingAssignSim, BlockingAssignUnaryLogicalNotAndMinus) {
 }
 
 TEST(OperatorSim, LogicalAndOfRelationalAndEqualityOperands) {
-  // Example 2 of 11.4.7: a logical-AND chain whose operands are a relational
-  // comparison (11.4.4) and two inequality comparisons (11.4.5). The &&
-  // operator consumes the 1-bit results of those comparisons; the run observes
-  // that the combined result is true only when every operand comparison is
-  // true. The second evaluation flips one operand (c) so that `b != c` becomes
-  // false, forcing the whole AND to 0 and proving the operands actually drive
-  // it.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -661,10 +639,6 @@ TEST(OperatorSim, LogicalAndOfRelationalAndEqualityOperands) {
 }
 
 TEST(OperatorSim, UnaryLogicalNotRealOperand) {
-  // 11.4.7: the unary logical negation admits a real operand. A nonzero real is
-  // a true value (negated to 0) and a zero real is a false value (negated to
-  // 1). The operands are declared `real` variables so the real data type flows
-  // through the whole pipeline rather than an integral one.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -689,9 +663,6 @@ TEST(OperatorSim, UnaryLogicalNotRealOperand) {
 }
 
 TEST(OperatorSim, LogicalAndOrRealOperands) {
-  // 11.4.7: the binary logical operators admit real operands, treating a
-  // nonzero real as true and a zero real as false. Real variables supply the
-  // operands so the real data type is exercised end-to-end for both && and ||.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -743,10 +714,6 @@ TEST(BlockingAssignSim, BlockingAssignLogicalOps) {
   EXPECT_EQ(r_or->value.ToUint64(), 1u);
 }
 
-// §11.4.7: an operand is true where any bit is a known 1, false where every
-// bit is a known 0 and ambiguous otherwise, every word of it taking part and a
-// real by its value; `&&`, `||` and `->` evaluate the second operand only
-// where the first leaves the result open (§11.3.5).
 TEST(LogicalOperatorSim, TruthIsReadFromEveryKnownBitAndARealsValue) {
   SimFixture f;
   EXPECT_EQ(

@@ -28,8 +28,6 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingErrors) {
                             5, "14.12"));
 }
 
-// §14.12: the clocking_identifier in a "default clocking <id>;" assignment
-// statement shall be the name of a clocking block declared in scope.
 TEST(DefaultClockingElab, AssignExistingClockingBlockOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -46,8 +44,6 @@ TEST(DefaultClockingElab, AssignExistingClockingBlockOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.12: assigning a default clocking by a name that does not designate any
-// clocking block is a compiler error.
 TEST(DefaultClockingElab, AssignUnknownClockingBlockErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,8 +58,6 @@ TEST(DefaultClockingElab, AssignUnknownClockingBlockErrors) {
                             2, "14.12"));
 }
 
-// §14.12 (claim B edge): the assignment-form identifier must name a clocking
-// block specifically; naming an unrelated signal of the same name is an error.
 TEST(DefaultClockingElab, AssignNonClockingEntityErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -79,8 +73,6 @@ TEST(DefaultClockingElab, AssignNonClockingEntityErrors) {
                             3, "14.12"));
 }
 
-// §14.12 (claim C boundary): exactly one default clocking in a scope is legal
-// and shall not raise a duplicate-default error.
 TEST(DefaultClockingElab, SingleDefaultClockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,8 +88,6 @@ TEST(DefaultClockingElab, SingleDefaultClockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.12 (claim C): specifying the default clocking more than once via the
-// assignment form is also a compiler error, not only via inline declarations.
 TEST(DefaultClockingElab, DuplicateDefaultClockingViaAssignmentErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -118,11 +108,6 @@ TEST(DefaultClockingElab, DuplicateDefaultClockingViaAssignmentErrors) {
                             8, "14.12"));
 }
 
-// §14.12 (claim E, mixed forms): the rule allowing a scope one default clocking
-// spans both spellings of a default. An inline default clocking declaration and
-// a later "default clocking <id>;" assignment together specify the default
-// twice in the same module and shall be a compiler error, even though the
-// assignment's identifier does name a real clocking block.
 TEST(DefaultClockingElab, DuplicateDefaultViaMixedInlineAndAssignmentErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -142,9 +127,6 @@ TEST(DefaultClockingElab, DuplicateDefaultViaMixedInlineAndAssignmentErrors) {
                             7, "14.12"));
 }
 
-// §14.12's Example 2: a nested module names, as its default clocking, a
-// clocking block its enclosing module declares. A name no enclosing module
-// declares as a clocking block is still reported.
 TEST(DefaultClockingElab, NestedModuleNamesEnclosingClockingBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -170,10 +152,6 @@ TEST(DefaultClockingElab, NestedModuleNamesEnclosingClockingBlock) {
                             "14.12"));
 }
 
-// The design-element keywords §14.12 limits to one default clocking apiece
-// beside a module, and the source of one such element holding two clocking
-// blocks and then `first` and `second` on lines 4 and 5, instantiated by a
-// top module.
 const char* const kDefaultScopes[] = {"interface", "program", "checker"};
 
 static std::string ScopeWithDefaults(const std::string& kind,
@@ -203,29 +181,21 @@ static void ExpectSecondDefaultReported(const std::string& first,
   }
 }
 
-// §14.12: an interface, a program and a checker each specify one default
-// clocking at most, so a second inline default clocking block in any of them
-// is reported at the second.
 TEST(DefaultClockingElab, SecondInlineDefaultInEachScopeIsReported) {
   ExpectSecondDefaultReported(
       "default clocking d1 @(posedge clk); endclocking",
       "default clocking d2 @(negedge clk); endclocking");
 }
 
-// §14.12: the same with the second default named by a statement after an
-// inline one.
 TEST(DefaultClockingElab, InlineThenNamedDefaultInEachScopeIsReported) {
   ExpectSecondDefaultReported("default clocking d1 @(posedge clk); endclocking",
                               "default clocking c1;");
 }
 
-// §14.12: the same with both defaults named by statements.
 TEST(DefaultClockingElab, TwoNamedDefaultsInEachScopeAreReported) {
   ExpectSecondDefaultReported("default clocking c1;", "default clocking c2;");
 }
 
-// §14.12: the nearest allowed form beside the three above -- one default in
-// each scope, by either way of writing it, is accepted without a report.
 TEST(DefaultClockingElab, OneDefaultInEachScopeIsAccepted) {
   for (const char* kind : kDefaultScopes) {
     for (const char* only : {"default clocking d1 @(posedge clk); endclocking",
@@ -239,10 +209,6 @@ TEST(DefaultClockingElab, OneDefaultInEachScopeIsAccepted) {
   }
 }
 
-// §14.12: the limit is one default per design element, so defaults in
-// different elements -- an interface and a program, a module and the module
-// nested inside it, a checker and the module instantiating it -- are accepted
-// without a report.
 TEST(DefaultClockingElab, DefaultsInDifferentElementsAreAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(

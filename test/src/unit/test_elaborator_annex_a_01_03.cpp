@@ -7,11 +7,6 @@
 
 namespace {
 
-// A.1.3 writes a non-ANSI port's port_reference as a port identifier and a
-// constant_select, so an index, a bound or a width its select writes that is
-// no constant expression is reported. A bit-select's index was never looked
-// at, and a part-select whose bounds did not fold was taken for the whole
-// vector (#7551).
 TEST(ModuleParametersAndPorts, APortSelectByAVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -54,8 +49,6 @@ TEST(ModuleParametersAndPorts, AnIndexedPortPartSelectByAVariableIsReported) {
                             1, "A.1.3"));
 }
 
-// A.1.3: an indexed part-select of a port is as wide as the width it writes,
-// neither one bit nor the whole vector it selects from (#7552).
 TEST(ModuleParametersAndPorts, AnIndexedPortPartSelectIsAsWideAsItsWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,8 +65,6 @@ TEST(ModuleParametersAndPorts, AnIndexedPortPartSelectIsAsWideAsItsWidth) {
   EXPECT_EQ(ports[1].width, 2u);
 }
 
-// A.1.3: a parameter is a constant expression, so a port selecting by one is
-// accepted, as is a concatenation of constant selects.
 TEST(ModuleParametersAndPorts, APortSelectByAParameterIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -85,12 +76,6 @@ TEST(ModuleParametersAndPorts, APortSelectByAParameterIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A.1.3's ansi_port_declaration gives a port declared with a net_port_header
-// or an interface_port_header unpacked_dimensions alone, each a constant range
-// or size (A.2.5), so a dynamic dimension on an interface port, a dynamic
-// dimension on a net port and a queue dimension on an inout net are each
-// reported. The dynamic ones were taken with no report, and the queue was
-// reported as a dimension that is not a constant expression (§7.4.2).
 TEST(ModuleParametersAndPorts,
      ANetOrInterfacePortOfANonFixedDimensionIsReported) {
   ElabFixture f;
@@ -114,8 +99,6 @@ TEST(ModuleParametersAndPorts,
                              2, "7.4.2"));
 }
 
-// A net port's constant range and constant size are the unpacked_dimensions
-// A.1.3 gives it, and draw no report.
 TEST(ModuleParametersAndPorts, ANetPortOfFixedSizeDimensionsIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -125,13 +108,6 @@ TEST(ModuleParametersAndPorts, ANetPortOfFixedSizeDimensionsIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A.1.3 gives a port declared with a variable_port_header variable_dimensions,
-// which A.2.5 makes a dynamic, an associative or a queue dimension as well as
-// a fixed one, so none of these four variable ports is reported. An output
-// written with a data type is a variable, and an input is one only with `var`,
-// being a net without it (§23.2.2.3). The queue and the two associative ones
-// were reported as unpacked dimensions that are not constant expressions
-// (§7.4.2).
 TEST(ModuleParametersAndPorts, AVariablePortTakesEveryVariableDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -142,8 +118,6 @@ TEST(ModuleParametersAndPorts, AVariablePortTakesEveryVariableDimension) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A variable port's fixed dimension is still folded, and one whose size names
-// nothing the module declares is still reported.
 TEST(ModuleParametersAndPorts, AVariablePortsUnfoldableDimensionIsReported) {
   ElabFixture f;
   ElaborateSrc(

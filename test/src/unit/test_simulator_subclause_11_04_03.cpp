@@ -19,10 +19,6 @@ using namespace delta;
 
 namespace {
 
-// Drives the runtime expression evaluator with two signed integer operands so
-// that the signed arithmetic path in production is exercised, returning the
-// evaluated result. The operands are plain signed variables; the rule under
-// test is applied by EvalExpr, not by this setup.
 Logic4Vec EvalSignedBin(SimFixture& f, TokenKind op, int64_t a, int64_t b,
                         uint32_t width = 8) {
   auto* va = f.ctx.CreateVariable("a", width);
@@ -403,8 +399,6 @@ TEST(EvalOp, NegativeBaseZeroExponentReturnsOne) {
   EXPECT_EQ(result.ToUint64() & 0xFF, 1u);
 }
 
-// Integer division truncates toward zero, not toward negative infinity, so a
-// negative quotient rounds up to the smaller-magnitude integer.
 TEST(EvalOp, SignedDivisionTruncatesTowardZero) {
   SimFixture f1;
   EXPECT_EQ(EvalSignedBin(f1, TokenKind::kSlash, -7, 2).ToUint64() & 0xFFu,
@@ -414,8 +408,6 @@ TEST(EvalOp, SignedDivisionTruncatesTowardZero) {
             static_cast<uint64_t>(-3) & 0xFFu);
 }
 
-// The modulus result carries the sign of the first operand regardless of the
-// sign of the second operand.
 TEST(EvalOp, SignedModulusTakesSignOfFirstOperand) {
   SimFixture f1;
   EXPECT_EQ(EvalSignedBin(f1, TokenKind::kPercent, -7, 2).ToUint64() & 0xFFu,
@@ -425,16 +417,12 @@ TEST(EvalOp, SignedModulusTakesSignOfFirstOperand) {
             1u);
 }
 
-// A zero base raised to a negative power yields an all-unknown result.
 TEST(EvalOp, ZeroToNegativePowerReturnsX) {
   SimFixture f;
   auto result = EvalSignedBin(f, TokenKind::kPower, 0, -1);
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// Table 11-4: a negative exponent over a nonzero base truncates the reciprocal
-// to zero unless the base magnitude is one, where the sign follows the parity
-// of the exponent.
 TEST(EvalOp, IntegralPowerNegativeExponentRuntime) {
   SimFixture f1;
   EXPECT_EQ(EvalSignedBin(f1, TokenKind::kPower, 2, -1).ToUint64() & 0xFFu, 0u);
@@ -448,15 +436,6 @@ TEST(EvalOp, IntegralPowerNegativeExponentRuntime) {
             1u);
 }
 
-// §11.4.3: the second operand of the power operator is treated as
-// self-determined. The exponent expression is therefore evaluated at its own
-// self width rather than being widened to the surrounding (result) context.
-// Here `e + 2'd2` is a two-bit addition, so 3 + 2 wraps to 1 and the result is
-// 3 ** 1 == 3. Had the exponent been context-determined it would evaluate at
-// the eight-bit result width, giving 3 ** 5 == 243. Observing 3 confirms the
-// runtime applies the self-determined-exponent rule. The exponent operand is
-// built from a real declared variable plus a sized literal and driven through
-// parse, elaborate, and run.
 TEST(EvalOp, PowerExponentIsSelfDetermined) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -473,10 +452,6 @@ TEST(EvalOp, PowerExponentIsSelfDetermined) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §11.4.3: if either operand of the power operator is real, the result type is
-// real. This input form has a real base and an integer exponent; driven end to
-// end into a real variable, the stored result is the real value 8.0 rather than
-// an integer-truncated one.
 TEST(EvalOp, PowerRealBaseIntegerExponentYieldsReal) {
   EXPECT_DOUBLE_EQ(RunAndGetReal("module t;\n"
                                  "  real r;\n"
@@ -486,9 +461,6 @@ TEST(EvalOp, PowerRealBaseIntegerExponentYieldsReal) {
                    8.0);
 }
 
-// §11.4.3: the "either operand real" rule also fires when only the exponent is
-// real. An integer base raised to a real exponent produces a real result, so
-// 4 ** 0.5 evaluates to the real square root 2.0.
 TEST(EvalOp, PowerIntegerBaseRealExponentYieldsReal) {
   EXPECT_DOUBLE_EQ(RunAndGetReal("module t;\n"
                                  "  real r;\n"
@@ -498,17 +470,6 @@ TEST(EvalOp, PowerIntegerBaseRealExponentYieldsReal) {
                    2.0);
 }
 
-// §11.6.1 makes a binary arithmetic operator's result as wide as its widest
-// operand, and §11.4.3's Table 11-3 defines `a + b` as "a plus b" over the
-// whole of it. Both operands were read through Logic4Vec::ToUint64 and the
-// result written through MakeLogic4VecVal, each of which touches words[0]
-// alone, so on a 128-bit declaration the only set bit of
-// 128'h1_0000_0000_0000_0000 was invisible and the sum read 1.
-//
-// The assertions are on the words rather than through ToUint64, which is the
-// projection under test and cannot express a high-word expectation. This first
-// case carries nothing across the word boundary, which is what isolates the
-// truncation from the carry.
 TEST(EvalOp, WideAdditionKeepsTheBitsAboveTheFirstWord) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -527,8 +488,6 @@ TEST(EvalOp, WideAdditionKeepsTheBitsAboveTheFirstWord) {
   EXPECT_EQ(r->value.words[1].aval, 1u);
 }
 
-// The carry the case above does not exercise: a sum whose low word wraps has to
-// carry into the next, which a word-wise addition gets wrong by forgetting.
 TEST(EvalOp, WideAdditionCarriesAcrossTheWordBoundary) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -547,7 +506,6 @@ TEST(EvalOp, WideAdditionCarriesAcrossTheWordBoundary) {
   EXPECT_EQ(r->value.words[1].aval, 1u);
 }
 
-// The borrow, which is the same boundary from the other side.
 TEST(EvalOp, WideSubtractionBorrowsAcrossTheWordBoundary) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -566,9 +524,6 @@ TEST(EvalOp, WideSubtractionBorrowsAcrossTheWordBoundary) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// A product whose operands each fit in one word and whose result does not:
-// 2**40 times 2**40 is 2**80, which lives entirely in the second word. The
-// single-word arm answered 0, the product having wrapped.
 TEST(EvalOp, WideMultiplicationReachesTheSecondWord) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -587,8 +542,6 @@ TEST(EvalOp, WideMultiplicationReachesTheSecondWord) {
   EXPECT_EQ(r->value.words[1].aval, uint64_t{1} << 16);
 }
 
-// Division across the boundary: 2**80 divided by 2**40 is 2**40, so the
-// dividend's bits live above the word the quotient's do.
 TEST(EvalOp, WideDivisionReadsTheWholeDividend) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -607,11 +560,6 @@ TEST(EvalOp, WideDivisionReadsTheWholeDividend) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// §11.6.1's signed interpretation above one word: SignExtend gives up at 64
-// bits and read a negative 128-bit value as whatever its low word held,
-// unsigned. -1 plus 2 is 1 whatever the width, and the high word of the sum
-// says whether the sign reached it: a value whose high word stayed all ones
-// would read 128'hFFFF...0001.
 TEST(EvalOp, WideSignedAdditionKeepsTheSignAboveTheFirstWord) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -630,9 +578,6 @@ TEST(EvalOp, WideSignedAdditionKeepsTheSignAboveTheFirstWord) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// A width that is not a multiple of the word size: the carry out of bit 95 has
-// nowhere to go, so the bits above it in the top word must stay clear rather
-// than holding what the arithmetic carried into them.
 TEST(EvalOp, WideAdditionMasksAboveADeclaredWidthInsideAWord) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -651,10 +596,6 @@ TEST(EvalOp, WideAdditionMasksAboveADeclaredWidthInsideAWord) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// §11.4.3 defines the unary minus over the whole of its operand, and §11.6.1
-// sizes the operand at 128 bits here, so the two's complement of 1 is all
-// ones in both words. The negation was taken on the low word alone and left
-// the high word clear, reading 2^64-1 in 128 bits.
 TEST(EvalOp, WideUnaryMinusNegatesAcrossEveryWord) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -669,11 +610,6 @@ TEST(EvalOp, WideUnaryMinusNegatesAcrossEveryWord) {
   EXPECT_EQ(r->value.words[1].aval, ~uint64_t{0});
 }
 
-// The carry of the two's complement stops at the first word that does not
-// overflow: -2^64 in 128 bits is a clear low word under a high word of all
-// ones, which discriminates a carry threaded through the words from an
-// inversion of each word on its own, which would read the high word the same
-// and the low word as all ones.
 TEST(EvalOp, WideUnaryMinusCarriesIntoTheHighWord) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -688,10 +624,6 @@ TEST(EvalOp, WideUnaryMinusCarriesIntoTheHighWord) {
   EXPECT_EQ(r->value.words[1].aval, ~uint64_t{0});
 }
 
-// §11.4.3 above one word: the modulus is the remainder of the division, and a
-// division or modulus by zero is x in every bit. The divisor 2^64 has a clear
-// low word, so a zero test that read the low word alone would have taken it
-// for zero.
 TEST(EvalOp, WideModulusAndDivisionByZero) {
   SimFixture f;
   auto out = RunCapture(
@@ -712,9 +644,6 @@ TEST(EvalOp, WideModulusAndDivisionByZero) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// §11.4.3 above one word on signed operands: the quotient truncates toward
-// zero and the remainder takes the first operand's sign, whichever operands
-// are negative. Read as unsigned, -7 is 2^128 - 7 and none of these holds.
 TEST(EvalOp, WideSignedDivisionAndModulusFollowTheOperandsSigns) {
   SimFixture f;
   auto out = RunCapture(
@@ -738,10 +667,6 @@ TEST(EvalOp, WideSignedDivisionAndModulusFollowTheOperandsSigns) {
   EXPECT_EQ(out, "1 1 1 1 1\n");
 }
 
-// §11.4.3's product above one word, truncated to the 128 bits §11.6.1 gives
-// it: all ones squared is 1, and all ones times 2^65 - 1 is its negation. The
-// partial products of the first overflow the word they are added into, and
-// those of the second overflow it again when the carry from below is added.
 TEST(EvalOp, WideMultiplicationCarriesOutOfEveryPartialSum) {
   SimFixture f;
   auto out = RunCapture(
@@ -760,8 +685,6 @@ TEST(EvalOp, WideMultiplicationCarriesOutOfEveryPartialSum) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// §11.4.3 and §11.6.1: a power above one word is as wide as its base, the
-// exponent self-determined and narrower, so (2^32) ** 3 is 2^96.
 TEST(EvalOp, WidePowerRaisesTheBaseByANarrowerExponent) {
   SimFixture f;
   auto out = RunCapture(
@@ -777,11 +700,6 @@ TEST(EvalOp, WidePowerRaisesTheBaseByANarrowerExponent) {
   EXPECT_EQ(out, "1\n");
 }
 
-// Table 11-4 above one word, a signed base under a signed exponent: a negative
-// exponent gives 1 for a base of 1, -1 or 1 for a base of -1 by the exponent's
-// parity, and 0 for a base of 3, while a positive one raises the base. Read as
-// the unsigned 2^128 - 1, the exponent -1 would raise 3 to an odd power, which
-// is no multiple of 2^128 and so no 0.
 TEST(EvalOp, WideSignedPowerTakesANegativeExponentByItsSign) {
   SimFixture f;
   auto out = RunCapture(
@@ -805,9 +723,6 @@ TEST(EvalOp, WideSignedPowerTakesANegativeExponentByItsSign) {
   EXPECT_EQ(out, "1 1 1 1 1\n");
 }
 
-// §11.4.3 and Table 11-4 above one word: a zero base under a negative exponent
-// is x in every bit, as `0 ** -1` is in Table 11-5. The bases other than 1 and
-// -1 were all given 0, zero among them.
 TEST(EvalOp, WideZeroBaseUnderANegativeExponentIsX) {
   SimFixture f;
   auto out = RunCapture(
@@ -823,11 +738,6 @@ TEST(EvalOp, WideZeroBaseUnderANegativeExponentIsX) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §11.4.3's Table 11-5 gives `2.0 ** -3'sb1` the value 0.5, and §11.3.1 has
-// an integral operand of a real operator converted to real by its value, which
-// for the signed 3'sb111 is -1. Converted as the unsigned 7, the exponent made
-// the power 128.0. A signed operand of the other real operators is converted
-// the same way, so `2.5 + -3'sd1` is 1.5 and not 9.5.
 TEST(ArithmeticOperatorSim, RealPowerTakesASignedExponentBySign) {
   SimFixture f;
   auto out = RunCapture(
@@ -839,8 +749,6 @@ TEST(ArithmeticOperatorSim, RealPowerTakesASignedExponentBySign) {
   EXPECT_EQ(out, "0.5 1.5 0\n");
 }
 
-// §11.4.3 at run time: the most negative longint divided by -1 wraps to itself
-// and leaves no remainder.
 TEST(ArithmeticOperatorSim, MostNegativeLongintDividedByMinusOneWraps) {
   SimFixture f;
   std::string out = RunCapture(
@@ -853,10 +761,6 @@ TEST(ArithmeticOperatorSim, MostNegativeLongintDividedByMinusOneWraps) {
   EXPECT_EQ(out, "-9223372036854775808 0 7\n");
 }
 
-// §11.4.3 with Table 11-4: `**` is typed by its base and its exponent is
-// self-determined, so a negative signed exponent gives 0 for a base above 1
-// and x for a zero base whatever the base's signedness, 1 for a base of 1, and
-// a signed base keeps the result signed. Above 64 bits the same holds.
 TEST(PowerOperatorSim, ExponentSignIsItsOwnAndResultTakesTheBasesType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

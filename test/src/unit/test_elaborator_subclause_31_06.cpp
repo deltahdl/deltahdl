@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §31.6 (printed page 915): the notifier is a variable of the module that
-// invokes the timing checks, and Syntax 31-2 writes
-// `notifier ::= variable_identifier`. A net of the module is no variable, so
-// naming one as the notifier is refused.
 TEST(TimingCheckNotifierElaboration, LocalNetNotifierRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -27,7 +23,6 @@ TEST(TimingCheckNotifierElaboration, LocalNetNotifierRejected) {
                             4, "31.6"));
 }
 
-// A port that is a net is refused the same way.
 TEST(TimingCheckNotifierElaboration, NetPortNotifierRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,8 +38,6 @@ TEST(TimingCheckNotifierElaboration, NetPortNotifierRejected) {
                             3, "31.6"));
 }
 
-// A reg, an integer and a logic variable are each a variable, and so is an
-// output port declared as one.
 TEST(TimingCheckNotifierElaboration, VariableNotifiersAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(

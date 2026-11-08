@@ -11,28 +11,14 @@
 
 using namespace delta;
 
-// Annex H.6.4 (Value changes for output and inout arguments): the
-// SystemVerilog simulator is responsible for handling value changes for
-// output and inout arguments, and such changes shall be detected and
-// handled after control returns from C code to SystemVerilog code. The
-// cases check which directions the simulator watches for a change, and
-// that a change an imported function makes to an output is not yet
-// detected while the C code runs and is once control has returned, the C
-// code having nothing to do to raise it.
-
 namespace {
 
-// §H.6.4: the simulator watches an output and an inout for a change, and
-// an input, which the foreign code may not modify (§H.6.2), not at all.
 TEST(DpiValueChanges, TheSimulatorHandlesChangesOfOutputsAndInouts) {
   EXPECT_TRUE(DpiSimulatorDetectsChangesOf(Direction::kOutput));
   EXPECT_TRUE(DpiSimulatorDetectsChangesOf(Direction::kInout));
   EXPECT_FALSE(DpiSimulatorDetectsChangesOf(Direction::kInput));
 }
 
-// §H.6.4: while the C code runs no change has been detected -- the
-// imported function sees none recorded even after it has written its
-// output -- and once control returns the change is there to handle.
 TEST(DpiValueChanges, AChangeIsDetectedAfterControlReturns) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -61,7 +47,6 @@ TEST(DpiValueChanges, AChangeIsDetectedAfterControlReturns) {
   EXPECT_EQ(changes[0].old_value.AsInt(), 7);
   EXPECT_EQ(changes[0].new_value.AsInt(), 42);
   EXPECT_EQ(actuals[0].AsInt(), 42);
-  // The input the function wrote to raised nothing and holds what it held.
   EXPECT_EQ(actuals[1].AsInt(), 3);
 }
 

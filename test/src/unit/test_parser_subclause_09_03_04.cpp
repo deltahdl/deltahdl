@@ -96,8 +96,6 @@ TEST(BlockNameParsing, NamedForkBlock) {
 }
 
 TEST(BlockNameParsing, NamedForkWithBareJoinOmittingEndLabel) {
-  // The matching name after the closing keyword is optional, so a named
-  // parallel block may be closed with a bare join and parse cleanly.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"

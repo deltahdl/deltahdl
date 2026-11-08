@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -87,9 +86,6 @@ TEST(OrderedPortSimulation, MultipleOrderedPortsPropagate) {
 }
 
 TEST(OrderedPortSimulation, NonAnsiChildInputPropagatesValue) {
-  // §23.2.2.1 dependency e2e: a child whose ports are declared non-ANSI, driven
-  // positionally through the full pipeline. The literal on the first ordered
-  // slot must reach the first declared input and propagate to the output.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(a, b);\n"
@@ -107,10 +103,6 @@ TEST(OrderedPortSimulation, NonAnsiChildInputPropagatesValue) {
 }
 
 TEST(OrderedPortSimulation, OrderedPortsBindByPositionDistinguishable) {
-  // The ordered mapping is positional in a way that is observable at runtime: a
-  // non-commutative child computation exposes the pairing. Were the two ordered
-  // operands swapped, the result would differ (10 - 30 wraps to 236), so a
-  // result of 30 - 10 == 20 confirms slot 0 -> 'a' and slot 1 -> 'b' by order.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b,\n"
@@ -127,9 +119,6 @@ TEST(OrderedPortSimulation, OrderedPortsBindByPositionDistinguishable) {
 }
 
 TEST(OrderedPortSimulation, OrderedNetIdentifierOperandPropagates) {
-  // A connection may be a simple reference to a net identifier. Here the first
-  // ordered slot is a driven wire (not a literal or compound expression); its
-  // value must supply the child input and propagate to the observed output.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, output logic [7:0] b);\n"

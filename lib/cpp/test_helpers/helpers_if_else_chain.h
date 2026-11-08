@@ -8,9 +8,6 @@
 
 using namespace delta;
 
-// Parse the canonical `if (a) x=1; else if (b) x=2; else x=3;` chain and verify
-// it produces a nested-if structure whose final else branch is a blocking
-// assignment.
 inline void VerifyIfElseIfElseChain() {
   auto r = Parse(
       "module m;\n"

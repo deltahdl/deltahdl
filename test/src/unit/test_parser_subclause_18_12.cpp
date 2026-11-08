@@ -8,15 +8,6 @@
 using namespace delta;
 namespace {
 
-// 18.12 / Syntax 18-11: a scope randomize is spelled
-//   [ std :: ] randomize ( [ variable_identifier_list ] ) [ with
-//   constraint_block ]
-// The parser leaves the callee as a plain identifier, so the bare form parses
-// as a call whose callee identifier is "randomize" and the std:: form as a call
-// whose callee is the "std::randomize" member access. This mirrors the
-// IsScopeRandomizeCall recognizer the later stages rely on; here we only assert
-// the production yields that shape (the with constraint_block form is exercised
-// in §18.12.1's file).
 bool IsBareScopeRandomize(const Expr* e) {
   return e && e->kind == ExprKind::kCall && e->lhs &&
          e->lhs->kind == ExprKind::kIdentifier && e->lhs->text == "randomize";
@@ -31,7 +22,6 @@ bool IsStdScopeRandomize(const Expr* e) {
          e->lhs->lhs->text == "std";
 }
 
-// Return the first statement-level call expression in the first initial block.
 const Expr* FirstCallInInitial(ParseResult& r) {
   Stmt* body = InitialBody(r);
   if (!body || body->kind != StmtKind::kBlock) return nullptr;
@@ -41,9 +31,6 @@ const Expr* FirstCallInInitial(ParseResult& r) {
   return nullptr;
 }
 
-// 18.12: the variable_identifier_list names the variables to be assigned random
-// values. The std:: form with a non-empty list parses to a scope randomize call
-// carrying one argument per named variable.
 TEST(ScopeRandomizeParsing, StdFormWithVariableList) {
   auto r = Parse(
       "module stim;\n"
@@ -61,9 +48,6 @@ TEST(ScopeRandomizeParsing, StdFormWithVariableList) {
   EXPECT_EQ(call->args.size(), 3u);
 }
 
-// 18.12: the std:: package qualifier is optional, so a bare randomize(...) with
-// a variable_identifier_list is the same scope randomize call. The LRM example
-// writes the call this way.
 TEST(ScopeRandomizeParsing, BareFormWithVariableList) {
   auto r = Parse(
       "module stim;\n"
@@ -81,9 +65,6 @@ TEST(ScopeRandomizeParsing, BareFormWithVariableList) {
   EXPECT_EQ(call->args.size(), 3u);
 }
 
-// 18.12: the variable_identifier_list is optional. A no-argument scope
-// randomize parses with an empty argument list — the form the standard
-// designates as a constraint checker.
 TEST(ScopeRandomizeParsing, NoArgumentForm) {
   auto r = Parse(
       "module stim;\n"

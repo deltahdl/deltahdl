@@ -15,10 +15,6 @@ namespace {
 constexpr std::string_view kNotCastCompatible =
     "is not cast compatible with the type of formal";
 
-// §11.12, rule 2, with §7.4: a compilation unit's typedef of an unpacked array
-// makes a variable the unit or a unit function declares with it an array, as
-// a module's does, so it fits a formal of that typedef, a unit let's or a
-// module let's, while an int does not.
 TEST(LetActualScopeElaboration, AUnitArrayTypedefsVariableIsAnArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -40,11 +36,6 @@ TEST(LetActualScopeElaboration, AUnitArrayTypedefsVariableIsAnArray) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §26.3 searches one scope at a time, each scope's declarations and explicit
-// imports ahead of its wildcard imports, and the module's scope ahead of the
-// compilation unit's: m's `import q::f` gives `f` q's untyped let over the
-// unit's `import p::f`, and the unit's own `g` comes ahead of the unit's
-// wildcard import of r. n imports nothing, so its `f` is p's.
 TEST(LetActualScopeElaboration, ImportsAreSearchedScopeByScope) {
   ElabFixture f;
   ElaborateSrc(
@@ -70,9 +61,6 @@ TEST(LetActualScopeElaboration, ImportsAreSearchedScopeByScope) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 14, "11.12"));
 }
 
-// §26.3: a wildcard import's candidate is whatever the package declares of the
-// name, so p's function `f` is what m's `f(arr)` calls, ahead of the
-// compilation unit's let `f`, which n, importing nothing, reaches.
 TEST(LetActualScopeElaboration, AWildcardImportedNonLetEndsTheSearch) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,9 +84,6 @@ TEST(LetActualScopeElaboration, AWildcardImportedNonLetEndsTheSearch) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 12, "11.12"));
 }
 
-// §3.12.1: `$unit::f` names the compilation unit's own `f`, whatever the
-// module imports, so `$unit::f(arr)` reaches the unit's untyped let rather
-// than p's, and `$unit::h(arr)` the unit's typed one rather than p's untyped.
 TEST(LetActualScopeElaboration, AUnitScopedCallReachesTheUnitsLet) {
   ElabFixture f;
   ElaborateSrc(
@@ -118,9 +103,6 @@ TEST(LetActualScopeElaboration, AUnitScopedCallReachesTheUnitsLet) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §3.12.1: a compilation unit's let and variable take the unit's typedef `t`,
-// an int, in a module declaring a `t` of its own, so `f(i)` and `g(v)` fit,
-// while an unpacked array of two ints is no actual for the unit's `t`.
 TEST(LetActualScopeElaboration, AUnitLetsFormalTakesTheUnitsTypedef) {
   ElabFixture f;
   ElaborateSrc(
@@ -141,9 +123,6 @@ TEST(LetActualScopeElaboration, AUnitLetsFormalTakesTheUnitsTypedef) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §26.3 within a package: a package's let formal written with a typedef the
-// package imports, or with its own typedef of one, takes that typedef's type,
-// an int here, though the calling module imports neither package.
 TEST(LetActualScopeElaboration, APackageLetsFormalTakesAnImportedTypedef) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,10 +145,6 @@ TEST(LetActualScopeElaboration, APackageLetsFormalTakesAnImportedTypedef) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 11, "11.12"));
 }
 
-// §3.12.1 and §26.3: a port, a parameter, a let's formal, a function's formal
-// and a variable a wildcard import brings in each hide a compilation unit's
-// string of the same name, so a real formal takes them; n declares none of the
-// names, so its `w` is the unit's string.
 TEST(LetActualScopeElaboration, LocalNamesHideAUnitVariable) {
   ElabFixture f;
   ElaborateSrc(
@@ -197,9 +172,6 @@ TEST(LetActualScopeElaboration, LocalNamesHideAUnitVariable) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 14, "11.12"));
 }
 
-// §26.3: a block's wildcard import is searched ahead of the scopes around the
-// block, so `f(arr)` within the block reaches p's let of an unpacked array,
-// which arr fits, and outside it the compilation unit's let of an int.
 TEST(LetActualScopeElaboration, ABlocksImportReachesAPackagesLet) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,9 +192,6 @@ TEST(LetActualScopeElaboration, ABlocksImportReachesAPackagesLet) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §26.2 with §6.22.5: a package's let formal written with the package's own
-// class takes that class, whatever another package's class of the same name,
-// so p's own handle fits it and q's is reported.
 TEST(LetActualScopeElaboration, APackageLetsFormalTakesThePackagesClass) {
   ElabFixture f;
   ElaborateSrc(
@@ -243,10 +212,6 @@ TEST(LetActualScopeElaboration, APackageLetsFormalTakesThePackagesClass) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §7.4 with §26.3: a variable written with a package's typedef of an unpacked
-// array, behind the package's prefix or through a wildcard import, is an
-// array, so it fits the package let's formal of that typedef, and an int does
-// not.
 TEST(LetActualScopeElaboration, APackageArrayTypedefsVariableIsAnArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -264,9 +229,6 @@ TEST(LetActualScopeElaboration, APackageArrayTypedefsVariableIsAnArray) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 6, "11.12"));
 }
 
-// §26.3 at the compilation unit: a unit variable and a unit let's formal
-// written with a typedef the unit imports take its type, an int, so a unit
-// function's calls passing the variable fit, while an unpacked array does not.
 TEST(LetActualScopeElaboration, AUnitImportedTypedefIsResolved) {
   ElabFixture f;
   ElaborateSrc(
@@ -286,9 +248,6 @@ TEST(LetActualScopeElaboration, AUnitImportedTypedefIsResolved) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §27.3 makes a generate block a scope of its own, so its let `f` is what a
-// call within the block reaches, and a call outside it reaches the module's
-// untyped `f`.
 TEST(LetActualScopeElaboration, AGenerateBlocksLetIsReachedWithinTheBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -308,12 +267,6 @@ TEST(LetActualScopeElaboration, AGenerateBlocksLetIsReachedWithinTheBlock) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §11.12, rule 2, with §7.6 and §6.24.3: an unpacked array fits an array
-// formal it is assignment compatible with -- equivalent elements and, for a
-// fixed-size formal, as many of them -- or one a bit-stream cast converts it
-// to, of the same number of bits. Two ints are neither for three ints nor for
-// two bytes; they are both for eight bytes and for two ints, and a dynamic
-// array's size is not known until it runs.
 TEST(LetActualScopeElaboration, ArrayActualsAreJudgedByCountAndSize) {
   ElabFixture f;
   ElaborateSrc(
@@ -336,11 +289,6 @@ TEST(LetActualScopeElaboration, ArrayActualsAreJudgedByCountAndSize) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §11.12, rule 2, with §6.24.3: a bit-stream cast converts between two
-// bit-stream types of the same number of bits, a structure and an array among
-// them, so a 32-bit structure or four bytes fit an int formal and two ints a
-// 64-bit structure's; a 24-bit structure does not fit an int, and a real is no
-// bit-stream type at all.
 TEST(LetActualScopeElaboration, AggregateActualsFitByBitStreamCast) {
   ElabFixture f;
   ElaborateSrc(
@@ -365,13 +313,6 @@ TEST(LetActualScopeElaboration, AggregateActualsFitByBitStreamCast) {
   }
 }
 
-// §11.12, rule 2, with §7.6: an array of two dimensions fits a formal of two
-// only where its faster-varying dimension is of the formal's size too, so two
-// rows of four ints, and three rows of three, fit two rows of three neither by
-// assignment nor by bit-stream cast (§6.24.3). A dimension written with the
-// module's parameter `K` folds from its value; one written with a generate
-// block's localparam is the block's own (§27.3), whose value is not folded
-// here, so `b2k` is not taken for two rows of the module's four.
 TEST(LetActualScopeElaboration, ArrayDimensionsFoldFromTheirOwnScopesNames) {
   ElabFixture f;
   ElaborateSrc(
@@ -403,11 +344,6 @@ TEST(LetActualScopeElaboration, ArrayDimensionsFoldFromTheirOwnScopesNames) {
   }
 }
 
-// §11.12, rule 2, with §6.24.3: an array of six ints fits two rows of three by
-// bit-stream cast, the same 192 bits, where five ints do not. A queue's size,
-// or a dynamic formal's, is not known before the design runs, and a dynamic
-// array of reals takes two reals by assignment (§7.6), as no bit-stream cast
-// could convert a real.
 TEST(LetActualScopeElaboration, ArrayActualsOfOtherShapesFitByBitStreamCast) {
   ElabFixture f;
   ElaborateSrc(
@@ -431,11 +367,6 @@ TEST(LetActualScopeElaboration, ArrayActualsOfOtherShapesFitByBitStreamCast) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 10, "11.12"));
 }
 
-// §11.12, rule 2, with §7.9.9 and §6.24.3: an associative array formal takes
-// another associative array by assignment and nothing by bit-stream cast, of
-// which it is never the destination, so an array of two ints does not fit it.
-// An associative actual is converted by a bit-stream cast whose size is known
-// only when the design runs.
 TEST(LetActualScopeElaboration,
      AnAssociativeFormalTakesOnlyAnAssociativeArray) {
   ElabFixture f;
@@ -455,10 +386,6 @@ TEST(LetActualScopeElaboration,
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
 }
 
-// §11.12, rule 2, with §6.20.3: a type parameter's type is the one each
-// instance gives it, here an array of two ints where the default is an int, so
-// neither a formal nor a variable of the parameter's type is judged by the
-// default.
 TEST(LetActualScopeElaboration, ATypeParametersTypeIsNotTakenFromItsDefault) {
   ElabFixture f;
   ElaborateSrc(
@@ -477,13 +404,6 @@ TEST(LetActualScopeElaboration, ATypeParametersTypeIsNotTakenFromItsDefault) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 5, "11.12"));
 }
 
-// §3.12.1: `$unit::` names the compilation unit's own declaration past a
-// module's of the same name, so `$unit::t` is the unit's structure of two
-// ints, which two ints fit by bit-stream cast and three do not, and
-// `$unit::N` the unit's parameter, three, never the module's. The typedefs are
-// structures, which no earlier pass rewrites into an element type and
-// dimensions as it does an array typedef, so the formal reaches the check
-// written `$unit::t`.
 TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
   ElabFixture f;
   ElaborateSrc(
@@ -504,9 +424,6 @@ TEST(LetActualScopeElaboration, UnitScopedNamesPassTheModulesOwn) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §6.18: a typedef of an interface port's type names a type the scopes of the
-// check do not hold, the port's array of two ints, so the formal written with
-// it is not judged, and three ints are not reported for it.
 TEST(LetActualScopeElaboration, TypesOfAnInterfacePortAreNotFollowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -528,12 +445,6 @@ TEST(LetActualScopeElaboration, TypesOfAnInterfacePortAreNotFollowed) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §8.23: a type a class declares is reached through the class's name, `C::t`,
-// a nested class's through the chain, `C::N::t`, and followed in the class's
-// scope, so `C::s2_t` is C's structure of two ints. Three ints are no actual
-// for it, nor it for three ints, nor three bytes for an int; two ints fit it
-// by bit-stream cast (§6.24.3). A prefix naming a variable the module
-// declares, `q`, still names the package q (§26.3).
 TEST(LetActualScopeElaboration, ATypeAClassDeclaresIsFollowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -572,10 +483,6 @@ TEST(LetActualScopeElaboration, ATypeAClassDeclaresIsFollowed) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 22, "11.12"));
 }
 
-// §8.23: a chain of prefixes is followed only through classes, so one whose
-// next prefix names a member of C that is no class, or nothing C declares,
-// reaches no typedef, and the calls passing variables declared with it are
-// left unjudged.
 TEST(LetActualScopeElaboration, AChainThroughNoClassLeavesItsTypeUnjudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -593,9 +500,6 @@ TEST(LetActualScopeElaboration, AChainThroughNoClassLeavesItsTypeUnjudged) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §11.12, rule 2, judges an actual by the declared type of the variable it
-// names, so an actual naming nothing any scope declares has no type to judge,
-// and the call is left to the report of the undeclared name.
 TEST(LetActualScopeElaboration, AnActualDeclaredNowhereIsNotJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -608,10 +512,6 @@ TEST(LetActualScopeElaboration, AnActualDeclaredNowhereIsNotJudged) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 3, "11.12"));
 }
 
-// §26.3 with §26.7: a wildcard import of the built-in package std offers the
-// names Annex G gives it and no other, so `u3` is still the compilation
-// unit's array of three ints, no actual for two, while `mailbox` is std's
-// class, which hides the unit's array of that name.
 TEST(LetActualScopeElaboration, AStdImportOffersStdsNamesAlone) {
   ElabFixture f;
   ElaborateSrc(
@@ -630,9 +530,6 @@ TEST(LetActualScopeElaboration, AStdImportOffersStdsNamesAlone) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
 }
 
-// §26.3: importing from a package no source declares is an error, and the
-// import brings in no name, so `u3` is the compilation unit's array of three
-// ints, no actual for two.
 TEST(LetActualScopeElaboration, AnUndeclaredPackagesImportBringsInNoName) {
   ElabFixture f;
   ElaborateSrc(
@@ -649,10 +546,6 @@ TEST(LetActualScopeElaboration, AnUndeclaredPackagesImportBringsInNoName) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 5, "11.12"));
 }
 
-// §26.3: a package imported twice by wildcard offers its own `f` once, which
-// stays the module's candidate. §12.7.1: a for loop's variable is declared by
-// its header, so an int for a 64-bit structure fits neither by assignment nor
-// by bit-stream cast, while the structure's own type fits it.
 TEST(LetActualScopeElaboration, ARepeatedImportAndALoopVariableAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -678,11 +571,6 @@ TEST(LetActualScopeElaboration, ARepeatedImportAndALoopVariableAreJudged) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 11, "11.12"));
 }
 
-// §6.24.3: a structure's members are sized through their typedefs, so two
-// members of a typedef of a typedef of byte make 16 bits, a shortint's size,
-// and three make 24; a member whose typedef names a real makes no bit-stream
-// type. An array declared with a range, [0:1], holds two elements and [1:3]
-// three.
 TEST(LetActualScopeElaboration, StructureMembersAreSizedThroughTheirTypedefs) {
   ElabFixture f;
   ElaborateSrc(
@@ -711,8 +599,6 @@ TEST(LetActualScopeElaboration, StructureMembersAreSizedThroughTheirTypedefs) {
   }
 }
 
-// §6.22.5: a chandle is cast compatible with no type but its own, so a real is
-// no actual for a chandle formal.
 TEST(LetActualScopeElaboration, ARealIsNoActualForAChandleFormal) {
   ElabFixture f;
   ElaborateSrc(
@@ -726,8 +612,6 @@ TEST(LetActualScopeElaboration, ARealIsNoActualForAChandleFormal) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 4, "11.12"));
 }
 
-// §7.6: an array of class handles takes another of its class, of as many
-// elements, by assignment.
 TEST(LetActualScopeElaboration, AnArrayOfHandlesFitsAnArrayOfItsClass) {
   ElabFixture f;
   ElaborateSrc(
@@ -744,8 +628,6 @@ TEST(LetActualScopeElaboration, AnArrayOfHandlesFitsAnArrayOfItsClass) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
 }
 
-// §6.23: a variable or a typedef written with a type reference takes the type
-// of what it names, an int for each here, which fits an int formal.
 TEST(LetActualScopeElaboration, TypeReferencesFitWhatTheyName) {
   ElabFixture f;
   ElaborateSrc(
@@ -763,11 +645,6 @@ TEST(LetActualScopeElaboration, TypeReferencesFitWhatTheyName) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §6.18: only a typedef written with no type at all is a forward one, so a
-// block's typedef of a type reference declares `kt` within the block, past the
-// module's structure of that name. The reference is not resolved there, which
-// leaves the call unjudged; taken for the module's structure of two ints, an
-// int would be reported.
 TEST(LetActualScopeElaboration, ABlocksTypeReferenceTypedefIsNoForwardOne) {
   ElabFixture f;
   ElaborateSrc(
@@ -785,10 +662,6 @@ TEST(LetActualScopeElaboration, ABlocksTypeReferenceTypedefIsNoForwardOne) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 7, "11.12"));
 }
 
-// §6.18: a chain of typedef names is followed to the type it ends in, 31 names
-// long here, so three ints are no actual for an array of two named at its far
-// end; a chain of 32 is taken for one that may run through a name twice and
-// is left unjudged.
 TEST(LetActualScopeElaboration, ALongTypedefChainIsFollowedToABound) {
   std::string src = "module m;\n  typedef int t0 [2];\n";
   for (int i = 1; i < 32; ++i)
@@ -808,10 +681,6 @@ TEST(LetActualScopeElaboration, ALongTypedefChainIsFollowedToABound) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 38, "11.12"));
 }
 
-// §6.24.3 names no unpacked union among the bit-stream types, so neither an
-// unpacked union nor a structure holding one is an actual for an int, which
-// no assignment converts them to either (§6.22.3); a packed union is an
-// integral type, which fits.
 TEST(LetActualScopeElaboration, AnUnpackedUnionIsNoBitStreamType) {
   ElabFixture f;
   ElaborateSrc(
@@ -834,12 +703,6 @@ TEST(LetActualScopeElaboration, AnUnpackedUnionIsNoBitStreamType) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §6.24.3 makes a class no bit-stream cast's destination, so a formal holding
-// class handles takes only what §7.6 assigns to it: handles of its own class
-// (§6.22.2), as many dimensions and, fixed size, as many elements. Two handles
-// for one, one for two, two ints, three handles or two of an unrelated class
-// for two are reported. Two handles for two ints are a bit-stream cast whose
-// size the objects decide when the design runs (§11.4.14.1).
 TEST(LetActualScopeElaboration, ArraysOfHandlesAreJudgedByAssignment) {
   ElabFixture f;
   ElaborateSrc(
@@ -867,13 +730,6 @@ TEST(LetActualScopeElaboration, ArraysOfHandlesAreJudgedByAssignment) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 13, "11.12"));
 }
 
-// §6.24.3: a class handle is a bit-stream cast's source unless its class
-// declares a local or protected member, or inherits one, and a handle gives
-// the members of the object it refers to, or nothing when null (§11.4.14.1),
-// so a C handle for an int or a string formal is not known to fail before the
-// design runs. A handle of L or of Q is reported, and so is a C handle for a
-// real, which is no bit-stream type, or for an associative array, which is
-// never the destination.
 TEST(LetActualScopeElaboration, AHandleIsABitStreamCastsSource) {
   ElabFixture f;
   ElaborateSrc(

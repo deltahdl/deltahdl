@@ -56,9 +56,6 @@ void DiagEngine::Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
     return;
   }
 
-  // A named subclause is appended to the sentence in the form the messages that
-  // spell it out already use, so a report that moved the subclause out of its
-  // sentence reads to a user exactly as it did before.
   auto loc_str = src_mgr_.FormatLoc(loc);
   auto subclause_str = subclause.Text().empty()
                            ? std::string()

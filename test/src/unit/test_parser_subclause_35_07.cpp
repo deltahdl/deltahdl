@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §35.7: an export declaration names the SystemVerilog function being
-// exported, so the parsed item carries that function_identifier and no task
-// flag. The annex A.2.6 file carries the production-level case, which checks
-// the task flag alone.
 TEST(FunctionDeclParsing, DpiExportFunctionRecordsFunctionIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -26,11 +22,6 @@ TEST(FunctionDeclParsing, DpiExportFunctionRecordsFunctionIdentifier) {
   EXPECT_FALSE(item->dpi_is_task);
 }
 
-// §35.7: the optional c_identifier supplies the name used from the foreign
-// language and defaults to the function_identifier, so an explicit one is
-// recorded beside the exported function's own name rather than replacing it.
-// The annex A.2.6 file carries the production-level case, which checks the
-// c_identifier alone.
 TEST(FunctionDeclParsing, DpiExportCIdentifierBesideFunctionIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -56,9 +47,6 @@ TEST(FunctionDeclParsing, DpiExportDpiLegacy) {
   EXPECT_EQ(r.cu->modules[0]->items[1]->kind, ModuleItemKind::kDpiExport);
 }
 
-// §35.7: class member functions cannot be exported. The parser rejects any
-// attempt to place a DPI export declaration inside a class body because the
-// only function it could designate from that scope is a class method.
 TEST(DpiParsing, DpiExportInsideClassBodyIsError) {
   auto r = Parse(R"(
     class C;
@@ -72,8 +60,6 @@ TEST(DpiParsing, DpiExportInsideClassBodyIsError) {
                             4, "35.7"));
 }
 
-// §35.7: Syntax 35-2 restricts dpi_spec_string to "DPI-C" or its deprecated
-// "DPI" alias. An export declaration carrying any other string is rejected.
 TEST(DpiParsing, DpiExportRejectsUnknownSpecString) {
   auto r = Parse(R"(
     module m;
@@ -81,7 +67,6 @@ TEST(DpiParsing, DpiExportRejectsUnknownSpecString) {
       export "DPI-X" function sv_func;
     endmodule
   )");
-  // §35.5.4 owns the dpi_spec_string report; the export path reuses it.
   EXPECT_TRUE(ReportedError(
       r.diags, "DPI specification string must be \"DPI-C\" or \"DPI\"", 4,
       "35.5.4"));

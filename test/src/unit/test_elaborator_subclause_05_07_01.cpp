@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -384,9 +382,6 @@ TEST(IntegerLiteralElaboration, XZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0xF);
 }
 
-// Elaborates a 6-bit octal literal "6'o7<digit>" where <digit> is an x or z
-// fill digit, lowers and runs it, then asserts the top octal group is the known
-// value 7 and the low octal group is fully x/z (bval set).
 static void ExpectOctalFillDigitFillsThreeBits(const char* src) {
   SimFixture f;
   auto* var = RunAndFindVar(src, f, "x");
@@ -520,10 +515,6 @@ TEST(IntegerLiteralElaboration, OctalXZCaseInsensitive) {
   LowerRunAndCompareBitPatterns(f, design, 0x3F);
 }
 
-// §5.7.1: the same literal rules apply when the literal is decoded through the
-// constant-evaluation path of a localparam initializer (distinct from the
-// procedural-assignment path). The based hex literal is const-evaluated into
-// the localparam and read back out, observing its value survives that path.
 TEST(IntegerLiteralElaboration, LiteralDecodedThroughLocalparam) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -537,10 +528,6 @@ TEST(IntegerLiteralElaboration, LiteralDecodedThroughLocalparam) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// §5.7.1: an unsized number is at least 32 bits and wider where its value needs
-// more, with a sign bit when it is signed, so a parameter folded from one keeps
-// every bit: 2147483648 is 33 bits, 'h7_0000_0000 is 35. The fold gave every
-// unsized literal 32 bits, turning P negative and Q to 0.
 TEST(IntegerLiteralElaboration, UnsizedLiteralFoldsAtTheWidthItsValueNeeds) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -556,8 +543,6 @@ TEST(IntegerLiteralElaboration, UnsizedLiteralFoldsAtTheWidthItsValueNeeds) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 0x700000000u);
 }
 
-// §5.7.1's widths reach $bits folded during elaboration: 35 for 'h7_0000_0000
-// and, a signed decimal needing a sign bit, 34 for 4294967296. Both were 32.
 TEST(IntegerLiteralElaboration, BitsOfAnUnsizedLiteralIsTheWidthItsValueNeeds) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -573,8 +558,6 @@ TEST(IntegerLiteralElaboration, BitsOfAnUnsizedLiteralIsTheWidthItsValueNeeds) {
   EXPECT_EQ(f.ctx.FindVariable("d")->value.ToUint64(), 34u);
 }
 
-// The type of an unsized literal has the literal's §5.7.1 width, so a variable
-// declared with type('h7_0000_0000) (§6.23) is 35 bits. It was 32.
 TEST(IntegerLiteralElaboration,
      TypeOfAnUnsizedLiteralHasTheWidthItsValueNeeds) {
   SimFixture f;

@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's fork: a thread seeding itself with 100 before drawing x, one
-// drawing y before seeding itself with 200, and one drawing z as the sum of
-// two values. `kDelayed` runs the first two threads' draws after delays of 2
-// and 1, so the threads run in the reverse order.
 const char* const kClauseFork =
     "    fork\n"
     "      begin\n"
@@ -49,10 +45,6 @@ const char* const kDelayed =
     "      end\n"
     "    join\n";
 
-// 18.14.2 thread locality: the values x, y and z of the clause's fork are
-// independent of the order of thread execution, so the fork run again with
-// its threads delayed into the reverse order returns the same three, as the
-// design test/src/e2e/thread_stability.sv runs it.
 TEST(ThreadStabilityRun, TheClausesForkDrawsTheSameInAnotherOrder) {
   SimFixture f;
   std::string out =
@@ -74,11 +66,6 @@ TEST(ThreadStabilityRun, TheClausesForkDrawsTheSameInAnotherOrder) {
   EXPECT_EQ(out, "3\n");
 }
 
-// 18.14.2 hierarchical seeding: each of the three forked threads has its
-// random state initialized with the next random value of the parent as a
-// seed, so x is the first value of a thread seeded with 100, and y and z are
-// what threads seeded by hand with the parent's second and third next values
-// return, as the design test/src/e2e/thread_stability.sv runs it.
 TEST(ThreadStabilityRun, EachThreadIsSeededWithTheParentsNextValue) {
   SimFixture f;
   std::string out =
@@ -121,11 +108,6 @@ TEST(ThreadStabilityRun, EachThreadIsSeededWithTheParentsNextValue) {
   EXPECT_EQ(out, "1 2\n");
 }
 
-// 18.14.2: a thread subtree's root decides how its child threads are seeded, so
-// a subtree whose root seeds itself with 77 before forking three threads and
-// drawing once more returns the same four values forked from two places of the
-// parent, seven draws apart, as the design test/src/e2e/thread_stability.sv
-// runs it.
 TEST(ThreadStabilityRun, ASubtreeSeededAtItsRootDrawsAlikeFromAnywhere) {
   SimFixture f;
   std::string out = RunCapture(

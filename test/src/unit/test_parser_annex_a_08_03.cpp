@@ -17,13 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Every expression node the tree under `e` holds, asserting each carries a
-// position and recording which ExprKind values were reached. A node built with
-// no position makes any report standing at it print "<unknown location>"
-// instead of a file, line and column, because SourceManager::FormatLoc in
-// src/common/source_mgr.cpp writes that sentence for a SourceLoc that fails
-// SourceLoc::IsValid(), and DiagEngine::Emit in src/common/diagnostic.cpp then
-// drops the source line and the caret as well.
 void ExpectSubtreeLocated(const Expr* e, std::set<ExprKind>& reached) {
   if (e == nullptr) return;
   EXPECT_TRUE(e->range.start.IsValid())
@@ -39,9 +32,6 @@ void ExpectSubtreeLocated(const Expr* e, std::set<ExprKind>& reached) {
   for (const Expr* sub : e->args) ExpectSubtreeLocated(sub, reached);
 }
 
-// The expressions a procedural statement roots: an assignment's two sides, an
-// expression statement's expression, a conditional statement's predicate, and
-// a delay control's delay value.
 void ExpectStmtExprsLocated(const Stmt* s, std::set<ExprKind>& reached) {
   ASSERT_NE(s, nullptr);
   for (const Expr* root : {s->lhs, s->rhs, s->expr, s->condition, s->delay}) {
@@ -259,9 +249,6 @@ TEST(ExpressionParsing, ConstantParamExpressionDollarWithBound) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.3 constant_param_expression ::= constant_mintypmax_expression |
-// data_type | $. The '$' alternative as a value-parameter default, built from
-// real parameter-declaration syntax (distinct from a queue dimension's '$').
 TEST(ExpressionParsing, ConstantParamExpressionDollarDefault) {
   auto r = Parse("module m; parameter P = $; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -455,22 +442,18 @@ TEST(ExpressionParsing, AllUnaryOperators) {
 
 TEST(ExpressionParsing, ErrorMissingTernaryColon) {
   auto r = Parse("module m; initial x = a ? b c; endmodule\n");
-  // §11.4.11 owns the conditional operator's ':'.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ':', got identifier", 1, "11.4.11"));
 }
 
 TEST(ExpressionParsing, ErrorInsideMissingBrace) {
   auto r = Parse("module m; initial if (x inside 1) a = 1; endmodule\n");
-  // §11.4.13 owns the open_range_list braces the 'inside' operator requires.
   EXPECT_TRUE(ReportedError(r.diags, "expected '{', got integer literal", 1,
                             "11.4.13"));
 }
 
 TEST(ExpressionParsing, ErrorIncompletePartSelect) {
   auto r = Parse("module m; initial x = a[7:]; endmodule\n");
-  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
-  // right bound; §11.5.1 states the part-select itself.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
@@ -505,7 +488,6 @@ TEST(ExpressionParsing, ErrorTaggedExpressionMissingMember) {
       "module m;\n"
       "  initial x = tagged ;\n"
       "endmodule\n");
-  // §7.3.2 owns the member name a tagged union expression names.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 2, "7.3.2"));
 }
@@ -515,13 +497,9 @@ TEST(ExpressionParsing, ErrorBinaryOperatorMissingRhs) {
       "module m;\n"
       "  initial x = a + ;\n"
       "endmodule\n");
-  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
-  // right operand.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// §A.8.3 expression ::= unary_operator { attribute_instance } primary — the
-// optional attribute sits between the unary operator and its operand.
 TEST(ExpressionParsing, UnaryOperatorWithAttribute) {
   auto r = Parse("module m; initial x = ~ (* keep *) a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -531,33 +509,24 @@ TEST(ExpressionParsing, UnaryOperatorWithAttribute) {
   EXPECT_EQ(rhs->kind, ExprKind::kUnary);
 }
 
-// §A.8.3 constant_expression ::= unary_operator { attribute_instance }
-// constant_primary — the attributed unary form in a constant context.
 TEST(ExpressionParsing, ConstantUnaryOperatorWithAttribute) {
   auto r = Parse("module m; localparam Q = - (* keep *) 8'd1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.3 inc_or_dec_expression ::= inc_or_dec_operator { attribute_instance }
-// variable_lvalue — prefix form with an intervening attribute.
 TEST(ExpressionParsing, PrefixIncrementWithAttribute) {
   auto r = Parse("module m; initial begin ++ (* keep *) i; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.3 inc_or_dec_expression ::= variable_lvalue { attribute_instance }
-// inc_or_dec_operator — postfix form with an intervening attribute.
 TEST(ExpressionParsing, PostfixDecrementWithAttribute) {
   auto r = Parse("module m; initial begin j (* keep *) --; end endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.3 module_path_conditional_expression ::= module_path_expression ?
-// { attribute_instance } module_path_expression : module_path_expression —
-// the ternary form as a state-dependent path condition.
 TEST(ExpressionParsing, ModulePathConditionalTernaryCondition) {
   auto r = Parse(
       "module m(input a, b, sel, output c);\n"
@@ -569,31 +538,18 @@ TEST(ExpressionParsing, ModulePathConditionalTernaryCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.8.3 inc_or_dec_expression requires a variable_lvalue operand; a prefix
-// ++/-- with no operand must be rejected.
 TEST(ExpressionParsing, ErrorPrefixIncrementMissingOperand) {
   auto r = Parse("module m; initial begin ++; end endmodule\n");
-  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
-  // operand of the prefix '++'.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
-// §A.8.3 indexed_range ::= expression +: constant_expression — the width after
-// '+:' is mandatory; omitting it must be rejected.
 TEST(ExpressionParsing, ErrorIndexedPartSelectMissingWidth) {
   auto r = Parse("module m; initial x = a[0+:]; endmodule\n");
-  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
-  // width; §11.5.1 states the indexed part-select itself.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
-// §A.8.3 constant_range ::= constant_expression : constant_expression — both
-// bounds are mandatory; a packed dimension missing its right bound must be
-// rejected.
 TEST(ExpressionParsing, ErrorConstantRangeMissingBound) {
   auto r = Parse("module m; logic [7:] x; endmodule\n");
-  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
-  // right bound; §6.9 states the packed dimension it belongs to.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
@@ -606,21 +562,6 @@ TEST(ExpressionParsing, ConstantRangeReversedBounds) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Covers every construction site in src/parser/ that builds an §A.8.3
-// expression, by holding one construct for each of the twenty-three values of
-// ExprKind and asserting that every node the parse produced carries a position.
-// Twelve sites assigned none before this commit, so a report standing at one of
-// their nodes named the rule it enforced and not where the source broke it.
-// Parser::TryParseSpecialInfix is the reason the whole of ExprKind::kTernary
-// was affected: §11.4.11 has one construction site in the parser and it was one
-// of the twelve, so a conditional expression rendered as "<unknown location>".
-// Parser::ParseWithClauseRange (§11.4.14.4), Parser::ParseInsideValueRange
-// (§11.4.13), ParserPortHelpers::ParseNonAnsiPortSelect (§23.2.2.1),
-// Parser::ParseAssocIndexDim (§7.8), Parser::ParseUnpackedDims (§7.4.2, §7.8.1
-// and §7.10) and Parser::ParseForeachArrayId (§12.7.3) are the rest.
-//
-// A construction site added later cannot pass this case without setting
-// range.start, which is what the per-construct cases beside it cannot say.
 TEST(ExpressionParsing, EveryParsedExpressionCarriesAPosition) {
   auto r = Parse(
       "module m;\n"
@@ -662,8 +603,6 @@ TEST(ExpressionParsing, EveryParsedExpressionCarriesAPosition) {
   ASSERT_FALSE(stmts.empty());
   for (const Stmt* s : stmts) ExpectStmtExprsLocated(s, reached);
 
-  // Which constructs the source actually reached, so a construct that stops
-  // parsing shrinks the coverage loudly rather than silently.
   const ExprKind kEveryKind[] = {ExprKind::kIntegerLiteral,
                                  ExprKind::kRealLiteral,
                                  ExprKind::kTimeLiteral,
@@ -694,10 +633,6 @@ TEST(ExpressionParsing, EveryParsedExpressionCarriesAPosition) {
   }
 }
 
-// A.8.3 writes an inc_or_dec_expression's operand as a variable_lvalue, which
-// A.8.5 makes a name under selects and no other expression: not a literal, an
-// operation, a name in parentheses or a call, before the operator or after it
-// (#8071).
 TEST(ExpressionParsing, ErrorIncrementOperandIsNoVariableLvalue) {
   auto r = Parse(
       "module m;\n"
@@ -721,9 +656,6 @@ TEST(ExpressionParsing, ErrorIncrementOperandIsNoVariableLvalue) {
   EXPECT_FALSE(ReportedError(r.diags, kMessage, 9, "A.8.3"));
 }
 
-// A.8.3 admits an operator_assignment within its own parentheses, and A.6.2
-// writes that assignment's target as a variable_lvalue, so a literal, an
-// operation or a name in parentheses is no target there (#8072).
 TEST(ExpressionParsing, ErrorParenthesizedAssignmentTargetIsNoVariableLvalue) {
   auto r = Parse(
       "module m;\n"
@@ -744,10 +676,6 @@ TEST(ExpressionParsing, ErrorParenthesizedAssignmentTargetIsNoVariableLvalue) {
   EXPECT_FALSE(ReportedError(r.diags, kMessage, 7, "A.6.2"));
 }
 
-// A.8.3 gives a tagged union expression's member a primary, so an operator
-// after the value applies to the whole tagged expression, and one straight
-// after the member name, a `-` included, leaves the member without a value
-// (#8073).
 TEST(ExpressionParsing, TaggedMemberValueIsAPrimary) {
   auto r = Parse(
       "module m;\n"
@@ -772,8 +700,6 @@ TEST(ExpressionParsing, TaggedMemberValueIsAPrimary) {
   EXPECT_EQ(NthInitialStmt(r, 1)->rhs->lhs->lhs, nullptr);
 }
 
-// A.6.7.1 gives a tagged pattern's member a pattern, which may be a constant
-// expression, so in a `matches` pattern the member takes `1 + 2` whole.
 TEST(ExpressionParsing, TaggedPatternMemberTakesAConstantExpression) {
   auto r = Parse(
       "module m; initial if (x matches tagged M 1 + 2) y = 1; endmodule\n");
@@ -789,11 +715,6 @@ TEST(ExpressionParsing, TaggedPatternMemberTakesAConstantExpression) {
   EXPECT_EQ(tagged->lhs->kind, ExprKind::kBinary);
 }
 
-// A.8.3 writes a parameter value as a param_expression, a mintypmax_expression
-// among its forms, and a class's parameter_value_assignment takes the values a
-// module instance's does: a min:typ:max triple specializes a class in a
-// declaration and in a class scope, ordered or named, and a named value may
-// still be left empty (#8074).
 TEST(ExpressionParsing, ClassParameterValueTakesAMinTypMax) {
   auto r = Parse(
       "class C #(int P = 0);\n"
@@ -812,9 +733,6 @@ TEST(ExpressionParsing, ClassParameterValueTakesAMinTypMax) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.8.3's param_expression may be a data_type, and a structure, a union and
-// an enumeration are data types, so each specializes a class type in a
-// declaration, ordered or named (#8075).
 TEST(ExpressionParsing, ClassTypeParameterValueTakesAnAggregate) {
   auto r = Parse(
       "class C #(type T = int);\n"

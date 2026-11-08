@@ -12,14 +12,6 @@
 
 namespace delta {
 
-// §6.23: a comparison of two type references is a constant expression, true
-// exactly when the types match by §6.22.1, which only the elaborator's type
-// tables can judge. Each one a procedure writes is handed to `fold`, which
-// keeps its answer for the instance being elaborated, so the procedure reads
-// its value; compared at run time by the names alone, `type(node) ==
-// type(bit)` under `typedef bit node` was 0. The expression itself is left as
-// written: every instance of the module shares it, and §6.20.3 lets each bind
-// parameters that give the comparison another answer.
 void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
   if (e == nullptr) return;
   if (IsTypeRefComparison(e) && fold(e).has_value()) return;
@@ -31,7 +23,6 @@ void FoldTypeRefComparesInExpr(Expr* e, const TypeRefCompareFolder& fold) {
   for (Expr* arg : e->args) FoldTypeRefComparesInExpr(arg, fold);
 }
 
-// Whether `e` writes an assignment operator, `(a = b)` or `(a += b)`.
 bool WritesAnAssignment(const Expr* e) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kBinary &&
@@ -50,9 +41,6 @@ bool WritesAnAssignment(const Expr* e) {
   return false;
 }
 
-// §11.3.6 (printed page 275): `fold` where an assignment operator is barred,
-// outside a procedural statement and in a procedural continuous assignment. A
-// comparison whose operand writes one is left whole for that rule's report.
 TypeRefCompareFolder BarringAssignments(const TypeRefCompareFolder& fold) {
   return [&fold](const Expr* e) -> std::optional<int64_t> {
     if (WritesAnAssignment(e)) return std::nullopt;
@@ -60,10 +48,7 @@ TypeRefCompareFolder BarringAssignments(const TypeRefCompareFolder& fold) {
   };
 }
 
-// The expressions of `s` alone; the statements it holds are each handed to
-// this in turn by the walk that knows the names in scope at them.
 void FoldTypeRefComparesOfStmt(Stmt* s, const TypeRefCompareFolder& fold) {
-  // §10.6: assign and force are the procedural continuous assignments.
   bool is_continuous =
       s->kind == StmtKind::kAssign || s->kind == StmtKind::kForce;
   FoldTypeRefComparesInExpr(s->rhs,
@@ -71,23 +56,14 @@ void FoldTypeRefComparesOfStmt(Stmt* s, const TypeRefCompareFolder& fold) {
   for (Expr* e : {s->lhs, s->expr, s->condition, s->assert_expr}) {
     FoldTypeRefComparesInExpr(e, fold);
   }
-  // §12.5: a case item's expressions are compared with the case expression
-  // while the procedure runs.
   for (CaseItem& item : s->case_items) {
     for (Expr* pattern : item.patterns) {
       FoldTypeRefComparesInExpr(pattern, fold);
     }
   }
-  // A declaration's initializer, a block parameter's value among them, is
-  // not a procedural statement (§11.3.6).
   FoldTypeRefComparesInExpr(s->var_init, BarringAssignments(fold));
 }
 
-// The comparisons of type references `item` writes outside a procedure where
-// a value is read while the design runs: a continuous assignment's right-hand
-// side and a net's or variable's initializer. A parameter's value is folded by
-// constant evaluation (TypedefRegistryGuard), and a let's body stands for its
-// formals' actuals, which are not yet known.
 void FoldItemTypeRefCompares(ModuleItem* item,
                              const TypeRefCompareFolder& fold) {
   if (item->kind != ModuleItemKind::kContAssign &&

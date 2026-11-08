@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// C1 (§6.6.3): each of the four wired keywords elaborates to a net of the
-// matching NetType, never a variable. The two paired declarations below cover
-// all four classifications (wand/triand and wor/trior) in one design each, so
-// no separate single-net cases are needed.
 TEST(WiredNetElaboration, WandAndTriandBothAreNets) {
   ElabFixture f;
   auto* design = ElaborateSrc(

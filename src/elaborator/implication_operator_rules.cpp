@@ -17,19 +17,12 @@ namespace delta {
 
 namespace {
 
-// Whether the statement `stmt` holds a property in its own expressions rather
-// than ordinary ones: a concurrent assertion or an expect statement in
-// procedural code, which the parser marks is_procedural_concurrent, or the
-// statement it builds for a static concurrent assertion's clocked boolean
-// form, which it marks is_concurrent_clocked.
 bool HoldsProperty(const Stmt& stmt) {
   return stmt.is_procedural_concurrent || stmt.is_concurrent_clocked;
 }
 
 void ReportStmtImplicationOperators(const Stmt* stmt, DiagEngine& diag) {
   if (stmt == nullptr) return;
-  // A let, typedef, nettype or import among a block's items is carried over
-  // the item its declaration makes; a let's body is an expression.
   if (stmt->kind == StmtKind::kBlockItemDecl) {
     ReportItemImplicationOperators(*stmt->decl_item, diag);
   }
@@ -43,10 +36,6 @@ void ReportStmtImplicationOperators(const Stmt* stmt, DiagEngine& diag) {
   });
 }
 
-// A generate construct's header (A.4.2): an if-generate's condition and the
-// else-if that follows it, a case-generate's selector and item values, and a
-// loop-generate's initialization, condition and iteration. Each is held in the
-// fields of its kind, and the others are empty.
 void ReportGenerateImplicationOperators(const ModuleItem& item,
                                         DiagEngine& diag) {
   ReportImplicationOperators(item.gen_cond, diag);
@@ -62,7 +51,6 @@ void ReportGenerateImplicationOperators(const ModuleItem& item,
   }
 }
 
-// The values of a covergroup_range_list (A.2.11).
 void ReportRangesImplicationOperators(
     const std::vector<CovergroupValueRange>& ranges, DiagEngine& diag) {
   for (const CovergroupValueRange& range : ranges) {
@@ -71,9 +59,6 @@ void ReportRangesImplicationOperators(
   }
 }
 
-// A bin's or a coverpoint option's expressions (A.2.11): an option's value, a
-// bin's array size, its values, its `with` filter, its set expression, each
-// transition step's values and repeat range, and its guard.
 void ReportBinsImplicationOperators(const BinsOrOptions& bins,
                                     DiagEngine& diag) {
   ReportImplicationOperators(bins.option.value, diag);
@@ -91,8 +76,6 @@ void ReportBinsImplicationOperators(const BinsOrOptions& bins,
   ReportImplicationOperators(bins.iff, diag);
 }
 
-// A select expression's intersect values, `with` filter or cross set
-// expression, and matches count, and those of its operands (A.2.11).
 void ReportSelectImplicationOperators(const SelectExpression* select,
                                       DiagEngine& diag) {
   if (select == nullptr) return;
@@ -103,8 +86,6 @@ void ReportSelectImplicationOperators(const SelectExpression* select,
   ReportSelectImplicationOperators(select->rhs, diag);
 }
 
-// A cross's guard, each of its options' values and bins selections' guards and
-// select expressions, and each function its body declares (A.2.11).
 void ReportCrossImplicationOperators(const CoverCrossDecl& cross,
                                      DiagEngine& diag) {
   ReportImplicationOperators(cross.iff, diag);
@@ -118,7 +99,6 @@ void ReportCrossImplicationOperators(const CoverCrossDecl& cross,
   }
 }
 
-// A tf_port_list's defaults (A.2.7).
 void ReportPortDefaultImplicationOperators(const std::vector<FunctionArg>& args,
                                            DiagEngine& diag) {
   for (const FunctionArg& arg : args) {
@@ -126,9 +106,6 @@ void ReportPortDefaultImplicationOperators(const std::vector<FunctionArg>& args,
   }
 }
 
-// A covergroup's and its sample function's port defaults, its clocking event's
-// events and guards (A.6.5), its options, each coverpoint's expression, guard
-// and bins, and each cross (A.2.11).
 void ReportCovergroupImplicationOperators(const CovergroupDecl& covergroup,
                                           DiagEngine& diag) {
   ReportPortDefaultImplicationOperators(covergroup.formals, diag);
@@ -151,9 +128,6 @@ void ReportCovergroupImplicationOperators(const CovergroupDecl& covergroup,
   }
 }
 
-// A class member's initializer and constraints, and its method's, nested
-// class's or embedded covergroup's expressions. A constraint is built from
-// expressions (A.1.10); the implication it does hold is `->`.
 void ReportMemberImplicationOperators(const ClassMember& member,
                                       DiagEngine& diag) {
   ReportImplicationOperators(member.init_expr, diag);
@@ -180,8 +154,6 @@ void ReportImplicationOperators(const Expr* expr, DiagEngine& diag) {
     if (sub->op != TokenKind::kPipeDashGt && sub->op != TokenKind::kPipeEqGt) {
       return;
     }
-    // An item elaborated more than once, in each instance of its module or of
-    // a loop generate block, is reported once.
     diag.ErrorOnce(
         sub->range.start,
         std::format(
@@ -222,15 +194,12 @@ void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
       ReportClassImplicationOperators(item.class_decl, diag);
       break;
     case ModuleItemKind::kModuleInst:
-      // A.4.1.1: the parameter values written in the instantiation. A checker
-      // instance takes none (A.4.1.4).
       for (const auto& param : item.inst_params) {
         ReportImplicationOperators(param.second, diag);
       }
       break;
     case ModuleItemKind::kGateInst:
     case ModuleItemKind::kUdpInst:
-      // A.3.3 and A.5.4: a gate's or a primitive's terminals.
       for (const Expr* terminal : item.gate_terminals) {
         ReportImplicationOperators(terminal, diag);
       }
@@ -246,7 +215,6 @@ void ReportItemImplicationOperators(const ModuleItem& item, DiagEngine& diag) {
     default:
       break;
   }
-  // A subroutine's or a let's port defaults (A.2.7, A.2.12).
   ReportPortDefaultImplicationOperators(item.func_args, diag);
   ReportStmtImplicationOperators(item.body, diag);
   for (const Stmt* stmt : item.func_body_stmts) {

@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Whether `message` is reported under A.2.11 at each of `reported` and at
-// none of `clean`.
 void ExpectReportedAt(const ParseResult& r, const std::string& message,
                       std::initializer_list<uint32_t> reported,
                       std::initializer_list<uint32_t> clean) {
@@ -26,8 +24,6 @@ void ExpectReportedAt(const ParseResult& r, const std::string& message,
   }
 }
 
-// A.2.11's covergroup_value_range admits `$` as one bound of a `:` range
-// alone: not as both bounds, and not as a tolerance's center.
 TEST(CovergroupItemSyntax, ADollarStandsForOneBoundOfARangeAlone) {
   auto r = Parse(
       "module m;\n"
@@ -47,10 +43,6 @@ TEST(CovergroupItemSyntax, ADollarStandsForOneBoundOfARangeAlone) {
       {5, 6, 7}, {8, 9});
 }
 
-// A.2.11's list_of_cross_items puts one comma between each two items, so a
-// comma before the first, after the last or beside another is reported, once
-// for the list however many it holds; a cross naming nothing has no comma
-// to report.
 TEST(CovergroupItemSyntax, ACrossListsItsItemsWithACommaBetweenEachTwo) {
   auto r = Parse(
       "module m;\n"
@@ -70,8 +62,6 @@ TEST(CovergroupItemSyntax, ACrossListsItsItemsWithACommaBetweenEachTwo) {
       {6, 7, 8}, {9, 10});
 }
 
-// A.2.11 lets a data type stand before a coverpoint's label alone; a cross
-// takes none.
 TEST(CovergroupItemSyntax, ACrossTakesNoDataType) {
   auto r = Parse(
       "module m;\n"
@@ -90,9 +80,6 @@ TEST(CovergroupItemSyntax, ACrossTakesNoDataType) {
                    {6}, {7, 8});
 }
 
-// A.2.11 leaves nothing between a complete coverpoint, cross or covergroup
-// option and the ';' or body that ends it, so the first token standing there
-// is reported.
 TEST(CovergroupItemSyntax, ATokenAfterACompleteItemIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -118,8 +105,6 @@ TEST(CovergroupItemSyntax, ATokenAfterACompleteItemIsReported) {
   }
 }
 
-// The end of the file after a coverpoint is a missing terminator, which the
-// covergroup's 'endgroup' report covers, not a token standing after the item.
 TEST(CovergroupItemSyntax, TheEndOfTheFileIsNoTokenAfterAnItem) {
   auto r = Parse(
       "module m;\n"
@@ -132,8 +117,6 @@ TEST(CovergroupItemSyntax, TheEndOfTheFileIsNoTokenAfterAnItem) {
                              "A.2.11"));
 }
 
-// A.2.11's select_expression negates a select_condition alone, so a `!`
-// before a parenthesized select_expression is reported.
 TEST(CovergroupItemSyntax, ANegationTakesABinsofCondition) {
   auto r = Parse(
       "module m;\n"
@@ -152,8 +135,6 @@ TEST(CovergroupItemSyntax, ANegationTakesABinsofCondition) {
                    {7}, {8});
 }
 
-// A.2.11's select_condition names a bins_expression inside binsof's
-// parentheses.
 TEST(CovergroupItemSyntax, ABinsofNamesWhatItSelects) {
   auto r = Parse(
       "module m;\n"
@@ -173,7 +154,6 @@ TEST(CovergroupItemSyntax, ABinsofNamesWhatItSelects) {
                    {7}, {8});
 }
 
-// A.2.11 names every bin, a coverpoint's and a cross's bins selection alike.
 TEST(CovergroupItemSyntax, ABinIsNamed) {
   auto r = Parse(
       "module m;\n"
@@ -196,10 +176,6 @@ TEST(CovergroupItemSyntax, ABinIsNamed) {
                    {5, 6, 11}, {7, 12});
 }
 
-// A.6.5's clocking_event writes `@` and a name, a package-scoped or a
-// hierarchical one whose prefixes may select, unless it parenthesizes an
-// event expression; so a coverage event that is an operation or ends in a
-// select is reported under A.6.5.
 TEST(CovergroupItemSyntax, AnUnparenthesizedCoverageEventIsAName) {
   auto r = Parse(
       "module m;\n"

@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5: a constraint expression may not use an operator that changes a value,
-// such as ++ or --.
 TEST(ConstraintSideEffect, IncrementOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -35,8 +33,6 @@ TEST(ConstraintSideEffect, DecrementOperatorRejected) {
       "18.5"));
 }
 
-// 18.5: the side-effect prohibition applies to the prefix position of the
-// increment operator as well as the postfix position exercised above.
 TEST(ConstraintSideEffect, PrefixIncrementOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -48,7 +44,6 @@ TEST(ConstraintSideEffect, PrefixIncrementOperatorRejected) {
       "18.5"));
 }
 
-// 18.5: likewise the prefix position of the decrement operator is rejected.
 TEST(ConstraintSideEffect, PrefixDecrementOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -60,7 +55,6 @@ TEST(ConstraintSideEffect, PrefixDecrementOperatorRejected) {
       "18.5"));
 }
 
-// A constraint without side-effecting operators parses cleanly.
 TEST(ConstraintSideEffect, PlainArithmeticAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -71,9 +65,6 @@ TEST(ConstraintSideEffect, PlainArithmeticAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5: a dist expression cannot be nested inside another expression. A bare
-// "expression dist { dist_list }" that terminates the constraint relation is
-// the accepting form.
 TEST(ConstraintDistNesting, TopLevelDistAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -83,9 +74,6 @@ TEST(ConstraintDistNesting, TopLevelDistAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5: a dist expression is a complete expression_or_dist, so it remains
-// legal as the whole relation of a constraint nested inside an if branch —
-// the restriction bars operand use, not a legal nested position.
 TEST(ConstraintDistNesting, DistInIfBranchAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -96,8 +84,6 @@ TEST(ConstraintDistNesting, DistInIfBranchAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5: using a dist expression as the operand of a surrounding expression
-// (here, parenthesized inside an equality) is rejected.
 TEST(ConstraintDistNesting, DistInsideParenthesizedOperandRejected) {
   auto r = Parse(
       "class C;\n"
@@ -110,8 +96,6 @@ TEST(ConstraintDistNesting, DistInsideParenthesizedOperandRejected) {
       "18.5"));
 }
 
-// 18.5: a dist expression may not be combined with another operator; an
-// arithmetic continuation after the dist_list is rejected.
 TEST(ConstraintDistNesting, DistFollowedByOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -124,8 +108,6 @@ TEST(ConstraintDistNesting, DistFollowedByOperatorRejected) {
       "18.5"));
 }
 
-// 18.5: a dist expression may not form the antecedent of an implication; the
-// left side of '->' must be a plain expression, so a dist there is rejected.
 TEST(ConstraintDistNesting, DistAsImplicationAntecedentRejected) {
   auto r = Parse(
       "class C;\n"
@@ -138,13 +120,6 @@ TEST(ConstraintDistNesting, DistAsImplicationAntecedentRejected) {
       "18.5"));
 }
 
-// §18.5 names every constraint block: Syntax 18-1 writes the declaration as
-// `constraint constraint_identifier constraint_block`. A block whose name is
-// missing is rejected at the '{' that stands where the name belongs, and the
-// report names §18.5 rather than the token it wanted. The case at the head of
-// this file rejects a source by the rule §18.5 states about dist expressions;
-// this one is rejected by the same subclause's syntax, so the file holds both
-// a rule-level rejection and a token-level one naming §18.5.
 TEST(ConstraintBlock, MalformedConstraintNames18_5) {
   auto r = Parse(
       "class C;\n"
@@ -154,8 +129,6 @@ TEST(ConstraintBlock, MalformedConstraintNames18_5) {
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier", 3, "18.5"));
 }
 
-// The first constraint block of the class `r` parsed, null where it declares
-// none.
 const ClassMember* BlockOf(const ParseResult& r) {
   if (r.cu == nullptr || r.cu->classes.empty()) return nullptr;
   for (const ClassMember* m : r.cu->classes[0]->members) {
@@ -164,7 +137,6 @@ const ClassMember* BlockOf(const ParseResult& r) {
   return nullptr;
 }
 
-// The kind of each of `items`, in order.
 std::vector<ConstraintItemKind> KindsOf(
     const std::vector<ConstraintItem*>& items) {
   std::vector<ConstraintItemKind> kinds;
@@ -173,9 +145,6 @@ std::vector<ConstraintItemKind> KindsOf(
   return kinds;
 }
 
-// §18.5 (A.1.10): a constraint block keeps its items in the order the source
-// wrote them, whatever their kinds, so it can be written back as it was
-// (#5040).
 TEST(ConstraintItems, ABlockKeepsItsItemsInSourceOrder) {
   auto r = Parse(
       "class C;\n"
@@ -197,7 +166,6 @@ TEST(ConstraintItems, ABlockKeepsItsItemsInSourceOrder) {
   EXPECT_TRUE(block->constraint_items[4]->soft);
 }
 
-// §18.5.9: a solve-before keeps both of its lists.
 TEST(ConstraintItems, ASolveBeforeKeepsBothLists) {
   auto r = Parse(
       "class C;\n"
@@ -211,8 +179,6 @@ TEST(ConstraintItems, ASolveBeforeKeepsBothLists) {
   EXPECT_EQ(block->constraint_items[0]->after.size(), 1U);
 }
 
-// §18.5.5: an implication keeps the constraint set it governs, a soft item
-// among it.
 TEST(ConstraintItems, AnImplicationKeepsTheSetItGoverns) {
   auto r = Parse(
       "class C;\n"
@@ -228,7 +194,6 @@ TEST(ConstraintItems, AnImplicationKeepsTheSetItGoverns) {
   EXPECT_TRUE(item->body[1]->soft);
 }
 
-// §18.5.6: an if-else keeps both its sets, an else binding to the closest if.
 TEST(ConstraintItems, AnElseBindsToTheClosestIf) {
   auto r = Parse(
       "class C;\n"
@@ -247,7 +212,6 @@ TEST(ConstraintItems, AnElseBindsToTheClosestIf) {
   EXPECT_EQ(inner->else_body.size(), 2U);
 }
 
-// §18.5.7.1: a foreach keeps its loop variables, a skipped one in its place.
 TEST(ConstraintItems, AForeachKeepsItsLoopVariables) {
   auto r = Parse(
       "class C;\n"

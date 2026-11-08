@@ -15,10 +15,6 @@
 namespace delta {
 namespace {
 
-// Helper that mirrors how a PLI application would forward an already-started
-// varargs list to vpi_mcd_vprintf(): it starts the list with va_start and hands
-// the live va_list to the routine under test, which is the distinguishing trait
-// of §38.29 versus vpi_mcd_printf() (§38.28).
 PLI_INT32 CallWithStartedVarargs(PLI_UINT32 mcd, const char* format, ...) {
   va_list ap;
   va_start(ap, format);
@@ -40,11 +36,6 @@ class VpiMcdVprintfSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.29: the routine performs the same function as vpi_mcd_printf() but on an
-// already-started varargs list. Forwarding a live va_list expands the C
-// fprintf()-style format against the caller's arguments, writes the result to
-// the channel named by the descriptor, and returns the number of characters
-// written.
 TEST_F(VpiMcdVprintfSim,
        ConsumesAnAlreadyStartedVarargsListAndWritesFormattedText) {
   char name[] = "v.log";
@@ -58,11 +49,6 @@ TEST_F(VpiMcdVprintfSim,
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "42-ok");
 }
 
-// §38.29: the routine writes to one or more files named by the multichannel
-// descriptor, exactly as vpi_mcd_printf() does. A descriptor that ORs together
-// two open channels delivers the same expanded text to both files in a single
-// call, while the returned count is the length of the formatted text and is
-// independent of how many channels received it.
 TEST_F(VpiMcdVprintfSim, WritesToEveryChannelNamedByTheDescriptor) {
   char first[] = "v1.log";
   char second[] = "v2.log";
@@ -79,9 +65,6 @@ TEST_F(VpiMcdVprintfSim, WritesToEveryChannelNamedByTheDescriptor) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd2), "x=7");
 }
 
-// §38.29: an error returns EOF. With no format string there is nothing to
-// print, so the routine reports the error and writes nothing - exercising the
-// error branch of the va_list-taking entry point itself.
 TEST_F(VpiMcdVprintfSim, ReturnsEofWhenFormatStringIsMissing) {
   char name[] = "verr.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -91,10 +74,6 @@ TEST_F(VpiMcdVprintfSim, ReturnsEofWhenFormatStringIsMissing) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
-// §38.29: an empty format string is not an error - it expands to zero
-// characters. The routine still completes against the started varargs list,
-// writes nothing to the channel, and returns a count of zero (exercising the
-// path where the formatted length is zero).
 TEST_F(VpiMcdVprintfSim, EmptyFormatStringWritesNothingAndReturnsZero) {
   char name[] = "vempty.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -106,14 +85,6 @@ TEST_F(VpiMcdVprintfSim, EmptyFormatStringWritesNothingAndReturnsZero) {
   EXPECT_EQ(vpi_ctx_.McdChannelBuffer(mcd), "");
 }
 
-// §38.29: the routine does what vpi_mcd_printf() does, and §38.28 bars that
-// function from writing to a file that an fd from $fopen stands for, which the
-// set MSB marks. An fd is one whole value rather than a set of discrete channel
-// bits, so the bits below the mark are part of that value: an fd whose index
-// bits happen to cover the bit naming channel 1 and the bit naming an open mcd
-// names neither of them. However the caller's started varargs would have
-// expanded, nothing reaches the tool's output channel, the log file or the open
-// file, and the count of characters written is zero.
 TEST_F(VpiMcdVprintfSim, WritesNothingWhereTheDescriptorIsAnFdFromFopen) {
   char opened[] = "vfd.log";
   PLI_UINT32 covered = vpi_mcd_open(opened);

@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.14.1 initialization RNG: each module instance has one, seeded with the
-// default seed, from which its static processes are seeded each with the next
-// value and the objects its static declaration initializers create are
-// seeded, so the first static process of two instances of one module draws
-// alike, so does the object each instance's declaration creates, and two
-// static processes of one instance differ, as the design
-// test/src/e2e/random_stability_properties.sv runs it.
 TEST(RandomStabilityPropertiesRun,
      TheInitializationRngOfEachInstanceIsSeededAlike) {
   SimFixture f;
@@ -47,12 +40,6 @@ TEST(RandomStabilityPropertiesRun,
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// 18.14.1 thread stability: a new dynamic thread's RNG is seeded with the
-// next random value of its parent thread, so a forked thread seeded by hand
-// with the value the parent would have drawn next draws the same four values
-// as one the fork seeded, and a thread added at the end of a fork leaves the
-// earlier two drawing as before, as the design
-// test/src/e2e/random_stability_properties.sv runs it.
 TEST(RandomStabilityPropertiesRun,
      AForkedThreadIsSeededWithTheParentsNextValue) {
   SimFixture f;
@@ -99,11 +86,6 @@ TEST(RandomStabilityPropertiesRun,
   EXPECT_EQ(out, "4 2\n");
 }
 
-// 18.14.1 object stability: an object created with new is seeded with the
-// next random value of the creating thread, so an object seeded by hand with
-// the value the thread would have drawn next draws the same four values as
-// one new seeded, and objects created after it leave its draw as before, as
-// the design test/src/e2e/random_stability_properties.sv runs it.
 TEST(RandomStabilityPropertiesRun,
      AnObjectIsSeededWithTheCreatingThreadsNextValue) {
   SimFixture f;
@@ -141,11 +123,6 @@ TEST(RandomStabilityPropertiesRun,
   EXPECT_EQ(out, "4 1\n");
 }
 
-// 18.14.1 manual seeding: every noninitialization RNG can be seeded by hand,
-// and with hierarchical seeding one seed at the root thread defines the whole
-// subtree, so the root seeded with 44 again replays two forked threads that
-// each create an object, randomize it and draw $urandom, as the design
-// test/src/e2e/random_stability_properties.sv runs it.
 TEST(RandomStabilityPropertiesRun, OneSeedAtTheRootDefinesTheForkedSubtree) {
   SimFixture f;
   std::string out = RunCapture(

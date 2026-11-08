@@ -22,9 +22,6 @@ TEST(OptionalSystemTaskExtendedParsing, ResetFamily) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// Annex D.8: $reset accepts an optional argument list carrying stop_value,
-// reset_value, and diagnostics_value. Observe that the full three-argument
-// form parses into a system call with all three operands attached.
 TEST(OptionalSystemTaskExtendedParsing, ResetWithArguments) {
   auto r = Parse("module m; initial $reset(1, 42, 3); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -37,8 +34,6 @@ TEST(OptionalSystemTaskExtendedParsing, ResetWithArguments) {
   ASSERT_EQ(stmt->expr->args.size(), 3u);
 }
 
-// Annex D.8: the argument list is nested-optional, so a $reset call may supply
-// stop_value alone. Observe that the single-argument form parses.
 TEST(OptionalSystemTaskExtendedParsing, ResetWithStopValueOnly) {
   auto r = Parse("module m; initial $reset(1); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -51,8 +46,6 @@ TEST(OptionalSystemTaskExtendedParsing, ResetWithStopValueOnly) {
   ASSERT_EQ(stmt->expr->args.size(), 1u);
 }
 
-// Annex D.8: stop_value and reset_value may be supplied without
-// diagnostics_value. Observe that the two-argument form parses.
 TEST(OptionalSystemTaskExtendedParsing, ResetWithStopAndResetValue) {
   auto r = Parse("module m; initial $reset(1, 42); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

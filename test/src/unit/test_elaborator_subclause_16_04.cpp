@@ -34,10 +34,6 @@ TEST(DeferredAssertionElaboration, UserTaskCallPassActionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.4: a deferred assertion action block may contain a single subroutine
-// call; a void function call is one of the permitted call forms (alongside a
-// task, task method, void function method, and system task), so it is accepted
-// with no single-call diagnostic, just like the task and system-task forms.
 TEST(DeferredAssertionElaboration, VoidFunctionCallActionAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -67,12 +63,6 @@ TEST(DeferredAssertionElaboration, OmittedActionsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.4: each pass or fail statement present in a deferred assertion's
-// action_block is required to be one subroutine call, and since begin is a
-// statement and no subroutine call, a begin-end block around either is ruled
-// out. §1.5 defines shall as a mandatory requirement admitting no deviation, so
-// each of the forms below is illegal source and elaboration rejects it rather
-// than reporting it and carrying on.
 TEST(DeferredAssertionElaboration, BeginEndPassBlockRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -119,11 +109,6 @@ TEST(DeferredAssertionElaboration, AssignmentInPassActionRejected) {
                             4, "16.4"));
 }
 
-// §16.3 gives the opposite rule for a simple immediate assertion: its fail
-// statement, as much as its pass statement, may be any legal procedural
-// statement. The same begin-end block that §16.4 rejects above is therefore
-// legal without the #0, and this pair pins that the rejection follows the
-// deferral rather than the block.
 TEST(DeferredAssertionElaboration, NonDeferredBeginEndAccepted) {
   ElabFixture deferred;
   ASSERT_NE(
@@ -241,9 +226,6 @@ TEST(DeferredAssertionElaboration, ClassMemberToRefFormalRejected) {
 
 TEST(DeferredAssertionElaboration, StaticVarToRefFormalAccepted) {
   ElabFixture f;
-  // §13.5.2: pass-by-reference is illegal for a subroutine with static
-  // lifetime, so the task must be automatic for the ref formal to be legal; a
-  // static variable is then accepted as the ref actual.
   auto* design = Elaborate(
       "module m;\n"
       "  int s;\n"
@@ -255,10 +237,6 @@ TEST(DeferredAssertionElaboration, StaticVarToRefFormalAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.4: it shall be an error to pass a dynamic variable as the actual for a
-// const ref formal too, not only a plain ref formal -- the restriction is on
-// the pass-by-reference direction regardless of constness. A class property
-// (dynamic storage) passed to a `const ref` formal is rejected.
 TEST(DeferredAssertionElaboration, ClassMemberToConstRefFormalRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -276,9 +254,6 @@ TEST(DeferredAssertionElaboration, ClassMemberToConstRefFormalRejected) {
                             5, "16.4"));
 }
 
-// §16.4: it shall be an error to pass an automatic variable as the actual for a
-// ref formal of a deferred-assertion action call. A local of an automatic task
-// has automatic storage, so passing it by reference is rejected.
 TEST(DeferredAssertionElaboration, AutomaticLocalToRefFormalRejected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -297,10 +272,6 @@ TEST(DeferredAssertionElaboration, AutomaticLocalToRefFormalRejected) {
                             5, "16.4"));
 }
 
-// §16.4: the automatic-variable restriction is on the variable's storage, not
-// on the enclosing subroutine's lifetime. A module-level static variable passed
-// by reference is accepted even from inside an automatic task, so the check
-// does not over-reject.
 TEST(DeferredAssertionElaboration,
      StaticVarFromAutomaticTaskToRefFormalAccepted) {
   ElabFixture f;
@@ -317,11 +288,6 @@ TEST(DeferredAssertionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.4: the report that refuses an action block which is not a single
-// subroutine call names the subclause stating the rule, and states it once.
-// The sentence opened with "§16.4:" until the field carried it, and
-// DiagEngine::Emit appends the field, so a message that still held the sign
-// would print the subclause twice.
 TEST(DeferredAssertionElaboration, AssignmentPassActionNames16_4) {
   ElabFixture f;
   Elaborate(
@@ -339,18 +305,6 @@ TEST(DeferredAssertionElaboration, AssignmentPassActionNames16_4) {
   }
 }
 
-// §16.4 refuses a final deferred assertion whose callee body holds a statement
-// the Postponed region cannot run, and it names no statement position the
-// restriction is suspended in. The seven cases below write the offending
-// assignment in each of the seven links ContainsPostponedIllegalStmt in
-// src/elaborator/elaborator_validate_assertion_actions.cpp did not descend
-// before it was handed the list ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states, so each one saw the
-// callee as legal in the Postponed region and made no report.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
-// holds an ordinary blocking assignment.
 TEST(DeferredAssertionElaboration,
      FinalDeferredCalleeAssignsInAForkArmFlagged) {
   ElabFixture f;
@@ -371,10 +325,6 @@ TEST(DeferredAssertionElaboration,
                               8, "16.4"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
-// the loop header's first clause is an assignment like any other. The step
-// clause is left empty here, which leaves the initialization as the only
-// assignment in the callee.
 TEST(DeferredAssertionElaboration,
      FinalDeferredCalleeAssignsInAForInitializationFlagged) {
   ElabFixture f;
@@ -393,10 +343,6 @@ TEST(DeferredAssertionElaboration,
                               6, "16.4"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, so an assignment stands in
-// the step clause too. The initialization clause is left empty here, which
-// leaves the step as the only assignment in the callee.
 TEST(DeferredAssertionElaboration,
      FinalDeferredCalleeAssignsInAForStepFlagged) {
   ElabFixture f;
@@ -415,11 +361,6 @@ TEST(DeferredAssertionElaboration,
                               6, "16.4"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so either arm of an immediate assertion inside the callee
-// holds an assignment. The assertion here is not deferred, so §16.4's
-// single-subroutine-call rule does not apply to it and the assignment is legal
-// where it stands.
 TEST(DeferredAssertionElaboration,
      FinalDeferredCalleeAssignsInAnAssertionPassActionFlagged) {
   ElabFixture f;
@@ -456,10 +397,6 @@ TEST(DeferredAssertionElaboration,
                               6, "16.4"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase arm holds the assignment directly. §16.4 is a rule about what the
-// callee's body can be asked to run, so it holds whether the weighted draw
-// would select the arm or not.
 TEST(DeferredAssertionElaboration,
      FinalDeferredCalleeAssignsInARandcaseArmFlagged) {
   ElabFixture f;
@@ -480,8 +417,6 @@ TEST(DeferredAssertionElaboration,
                               8, "16.4"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds the assignment.
 TEST(DeferredAssertionElaboration,
      FinalDeferredCalleeAssignsInARandsequenceCodeBlockFlagged) {
   ElabFixture f;
@@ -502,26 +437,6 @@ TEST(DeferredAssertionElaboration,
                               8, "16.4"));
 }
 
-// §16.4 bars an automatic variable as the actual for a pass-by-reference formal
-// of a deferred-assertion action call. Two walks in
-// src/elaborator/elaborator_validate_assertion_actions.cpp answer that
-// together: CollectAutomaticVarNames gathers the names an enclosing routine
-// declares automatic, and Elaborator::WalkStmtsForDeferredActions finds the
-// deferred assertion whose call passes one of them. Each wrote its own list of
-// the statement links to descend, and each omitted the same five, so the cases
-// below put the declaration and the deferred assertion in those links.
-//
-// A.6.8 admits in a for_initialization only a list_of_variable_assignments or a
-// for_variable_declaration, and in a for_step_assignment only an
-// operator_assignment, an inc_or_dec_expression or a function_subroutine_call.
-// No statement stands in either, so a deferred assertion cannot be written
-// there, and the parser records a for-header declaration as an assignment in
-// Stmt::for_inits rather than as a Stmt of kind kVarDecl, so no declaration is
-// collected there either. Those two links therefore take no case.
-
-// The deferred assertion in a fork arm, with the automatic declared at the top
-// of the enclosing automatic task, so the report turns on
-// Elaborator::WalkStmtsForDeferredActions reaching Stmt::fork_stmts.
 TEST(DeferredAssertionElaboration,
      AutomaticLocalToRefFormalInAForkArmRejected) {
   ElabFixture f;
@@ -582,14 +497,6 @@ TEST(DeferredAssertionElaboration,
                             6, "16.4"));
 }
 
-// The three pairs below turn on CollectAutomaticVarNames instead. §6.21 makes a
-// local of a static task static unless it is declared automatic, so each pair
-// writes the same source twice inside a static task and varies only the
-// lifetime keyword on the declaration: the automatic form is rejected because
-// the name is collected, and the static form is accepted because it is not.
-// The declaration and the use stand in the same block because a
-// block_item_declaration is local to the block that holds it, so no conforming
-// source declares the variable in one of these links and uses it outside.
 TEST(DeferredAssertionElaboration,
      AutomaticDeclaredInAForkArmToRefFormalRejected) {
   ElabFixture f;
@@ -703,11 +610,6 @@ TEST(DeferredAssertionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.4 has each action be a single subroutine call, and A.6.9 writes the
-// subroutine_call_statement two ways: the call, or `void'(...)` around a
-// nonvoid function's call, which §13.4.1 gives for discarding its result. The
-// cast form is that same call and is accepted, where a bare nonvoid call would
-// be accepted with §13.4.1's warning.
 TEST(DeferredAssertionElaboration, VoidCastOfAFunctionCallIsASingleCall) {
   ElabFixture f;
   auto* design = Elaborate(

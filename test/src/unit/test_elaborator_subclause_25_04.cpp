@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -51,11 +49,6 @@ TEST(InterfacePorts, InterfaceWithInoutPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[2].direction, Direction::kInout);
 }
 
-// §25.4 draws the line between the nets/variables in an interface's port list
-// and the other nets/variables declared inside it: only those in the port list
-// can be connected externally, by name or position, when the interface is
-// instantiated. This is the accepting half — a name that IS in the port list
-// (clk) connects with no diagnostic.
 TEST(InterfacePorts, PortListNameConnectsWithoutWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,10 +65,6 @@ TEST(InterfacePorts, PortListNameConnectsWithoutWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §25.4 rejecting half: `req` is declared inside the interface but is NOT in
-// its port list, so it cannot be connected externally. A named connection
-// giving it names no port of the interface, which §23.3.2.2 makes an error,
-// while the sibling `.clk`, a real port, is accepted.
 TEST(InterfacePorts, InternalNetNotConnectableExternally) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,13 +83,6 @@ TEST(InterfacePorts, InternalNetNotConnectableExternally) {
                              "23.3.2.2"));
 }
 
-// §25.4 (i1 example): the input, output, and inout wires of an interface port
-// list can each be individually connected to the interface when it is
-// instantiated. External connection of the port-list nets is what §25.4 permits
-// regardless of direction, so drive the LRM's three-direction interface through
-// elaboration and connect every port by name, confirming each binding resolves
-// to a port of the expected direction with no diagnostic. Prior tests only
-// connected an input port externally; this covers the output and inout forms.
 TEST(InterfacePorts, AllPortDirectionsConnectedExternally) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,13 +108,6 @@ TEST(InterfacePorts, AllPortDirectionsConnectedExternally) {
   EXPECT_EQ(inst.resolved->ports[2].direction, Direction::kInout);
 }
 
-// §25.4 ties interface port declaration syntax and semantics to those of
-// modules (§23.2.2), which includes the non-ANSI form where the header names
-// the ports and body declarations supply their directions. A non-ANSI
-// interface's ports are still externally connectable, so build one from
-// §23.2.2's non-ANSI syntax and instantiate it with named connections,
-// confirming the folded ports resolve as connection targets through the full
-// pipeline.
 TEST(InterfacePorts, NonAnsiInterfacePortsConnectExternally) {
   ElabFixture f;
   auto* design = ElaborateSrc(

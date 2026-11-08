@@ -22,10 +22,6 @@ TEST(Coverage, CoverGroupAsClassMember) {
   EXPECT_EQ(obj.cg->name, "cg_in_class");
 }
 
-// §19.4: an embedded covergroup is created only when the new() method assigns
-// the result of new() to its variable. If that assignment is absent the
-// covergroup is not created and no data is sampled. The constructor decides at
-// run time whether to instantiate; without instantiation no group exists.
 TEST(Coverage, UninstantiatedCoverGroupNotCreated) {
   struct MyClass {
     CoverageDB db;
@@ -44,9 +40,6 @@ TEST(Coverage, UninstantiatedCoverGroupNotCreated) {
   EXPECT_EQ(with.db.GroupCount(), 1u);
 }
 
-// §19.4: an embedded covergroup is instantiated by new in the enclosing
-// class's constructor, one instance per object, and samples the object's
-// members.
 TEST(CovergroupInstanceSim, EmbeddedCovergroupBuiltInConstructor) {
   SimFixture f;
   EXPECT_EQ(
@@ -71,9 +64,6 @@ TEST(CovergroupInstanceSim, EmbeddedCovergroupBuiltInConstructor) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §19.4: an embedded covergroup with a clocking event samples at
-// each occurrence of the event for the object whose instance the constructor
-// built: the posedge of clk samples m_x = 3 into the bin hi.
 TEST(CovergroupInstanceSim, EmbeddedCovergroupSamplesAtItsClockingEvent) {
   SimFixture f;
   EXPECT_EQ(
@@ -97,8 +87,6 @@ TEST(CovergroupInstanceSim, EmbeddedCovergroupSamplesAtItsClockingEvent) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.4 with §8.11: a method reaches its object's embedded covergroup as
-// `this.cg`, sampling and reading the object's own instance.
 TEST(CovergroupInstanceSim, EmbeddedCovergroupReachedThroughThis) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -124,8 +112,6 @@ TEST(CovergroupInstanceSim, EmbeddedCovergroupReachedThroughThis) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// A class C parameterized by N, embedding a covergroup cg whose coverpoint cp
-// has N bins over v, then `rest` with the module body that uses it.
 std::string ParameterizedOwner(const std::string& rest) {
   return "class C #(int N = 2);\n"
          "  bit [3:0] v;\n"
@@ -137,10 +123,6 @@ std::string ParameterizedOwner(const std::string& rest) {
          rest;
 }
 
-// §19.4 with §8.25: each specialization of a parameterized class is a type of
-// its own, and so is the covergroup it embeds, so get_coverage() of C #(2)'s
-// cg averages a1's 50 and a2's 50, and that of C #(4)'s cg is b's 25, for the
-// covergroup and for its coverpoint. Over all three instances both read 41.67.
 TEST(EmbeddedCovergroupSim,
      EachClassSpecializationEmbedsACovergroupTypeOfItsOwn) {
   SimFixture f;
@@ -163,9 +145,6 @@ TEST(EmbeddedCovergroupSim,
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.4 with §8.25: a class derived from C #(2) inherits C #(2)'s covergroup,
-// so its instance is one more of that covergroup type: a's 50 and d's 0
-// average to 25.
 TEST(EmbeddedCovergroupSim,
      ADerivedClassSharesItsBaseSpecializationsCovergroup) {
   SimFixture f;

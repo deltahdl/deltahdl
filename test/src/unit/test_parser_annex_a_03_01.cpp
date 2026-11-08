@@ -571,7 +571,6 @@ TEST(PrimitiveInstantiationParsing, Error_MissingSemicolon) {
       "module m;\n"
       "  and a1(o, i1, i2)\n"
       "endmodule\n");
-  // 'endmodule' stands where the ';' was demanded.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "28.3"));
 }
@@ -581,7 +580,6 @@ TEST(PrimitiveInstantiationParsing, Error_MissingClosingParen) {
       "module m;\n"
       "  and a1(o, i1, i2;\n"
       "endmodule\n");
-  // §28.3.6 owns the terminal list's closing ')'.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "28.3.6"));
 }
 
@@ -590,8 +588,6 @@ TEST(PrimitiveInstantiationParsing, Error_StrengthOnMosSwitch) {
       "module m;\n"
       "  nmos (strong0, weak1) n1(o, i, g);\n"
       "endmodule\n");
-  // §28.3.2 owns the drive-strength rule; the report stands on the gate
-  // keyword.
   EXPECT_TRUE(ReportedError(
       r.diags, "drive strength not allowed on this gate type", 2, "28.3.2"));
 }
@@ -628,7 +624,6 @@ TEST(PrimitiveInstantiationParsing, Error_PullGateTooManyTerminals) {
       "module m;\n"
       "  pullup (a, b);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count rule; the report stands on the gate keyword.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -669,20 +664,15 @@ TEST(PrimitiveInstantiationParsing, Error_NInputGateSingleTerminal) {
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
 
-// The pass-switch alternative of gate_instantiation carries no delay slot, so a
-// delay on a plain tran/rtran switch is a grammar violation.
 TEST(PrimitiveInstantiationParsing, Error_DelayOnPassSwitch) {
   auto r = Parse(
       "module m;\n"
       "  tran #5 (a, b);\n"
       "endmodule\n");
-  // §28.3.3 owns the gate-delay rule; the report stands on the gate keyword.
   EXPECT_TRUE(ReportedError(r.diags, "delay not allowed on this gate type", 2,
                             "28.3.3"));
 }
 
-// The pulldown/pullup alternatives accept only an optional strength, never a
-// delay, so a delay on a pull gate is rejected.
 TEST(PrimitiveInstantiationParsing, Error_DelayOnPullGate) {
   auto r = Parse(
       "module m;\n"
@@ -692,8 +682,6 @@ TEST(PrimitiveInstantiationParsing, Error_DelayOnPullGate) {
                             "28.3.3"));
 }
 
-// The n_input alternative uses the two-value delay form, so supplying a third
-// delay value exceeds what that alternative permits.
 TEST(PrimitiveInstantiationParsing, Error_ThreeDelaysOnNInputGate) {
   auto r = Parse(
       "module m;\n"
@@ -732,11 +720,6 @@ TEST(PrimitiveInstantiationParsing, GateInGenerateBlock) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Every instance production of A.3.1 opens with `[ name_of_instance ]`, which
-// A.4.1.1 spells `instance_identifier { unpacked_dimension }` and A.9.3 gives
-// the identifier `simple_identifier | escaped_identifier`. The parser looked
-// for a simple identifier alone, so an instance named by an escaped one was
-// reported as a missing '('.
 TEST(GateInstantiationParsing, EscapedInstanceName) {
   auto r = Parse(
       "module m;\n"
@@ -753,11 +736,6 @@ TEST(GateInstantiationParsing, EscapedInstanceName) {
   EXPECT_EQ(sw->gate_inst_name, "sw-0");
 }
 
-// §28.3.5 gives the one unpacked_dimension an array of instances takes: a
-// left-hand index (lhi) and a right-hand index (rhi), both constant
-// expressions, with a colon between. A.2.5's other unpacked_dimension,
-// `[ constant_expression ]`, was read and then dropped, so `g[3]` was accepted
-// silently as the one instance `g`.
 TEST(GateInstantiationParsing, SizeAloneIsNoInstanceRange) {
   auto r = Parse(
       "module m;\n"
@@ -768,10 +746,6 @@ TEST(GateInstantiationParsing, SizeAloneIsNoInstanceRange) {
       2, "28.3.5"));
 }
 
-// §28.3.5: an instance identifier declaring an array of instances takes one
-// range and no more. A second range after the first was reported as a missing
-// '(' under §28.3.6; it is now reported for what it is, and read past, the
-// first range standing.
 TEST(GateInstantiationParsing, SecondInstanceRangeIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -787,9 +761,6 @@ TEST(GateInstantiationParsing, SecondInstanceRangeIsRejected) {
   EXPECT_NE(g->inst_range_right, nullptr);
 }
 
-// A.3.1 opens a gate_instantiation with its gate or switch keyword and A.4.2 a
-// case_generate_construct with `case`; the `const` and the lifetime A.2.1.3
-// writes before a data_declaration open neither.
 TEST(GateInstantiationParsing, QualifierBeforeAGateOrAGenerateCase) {
   auto r = Parse(
       "module m;\n"

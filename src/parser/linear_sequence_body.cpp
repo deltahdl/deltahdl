@@ -13,8 +13,6 @@ namespace delta {
 
 namespace {
 
-// §16.9.9: a throughout inside the group, among the first `guards`, spans
-// the copy of the group `shift` operands on as it did the first.
 void CopyGroupGuards(SeqLinearBody& body, size_t first, size_t guards,
                      size_t shift) {
   for (size_t g = 0; g < guards; ++g) {

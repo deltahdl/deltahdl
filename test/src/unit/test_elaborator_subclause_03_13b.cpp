@@ -9,10 +9,6 @@
 
 namespace {
 
-// Elaborates `src` and asks whether an error containing `message` stands at
-// `line` under `subclause`. Each case below names one pair of declarations the
-// rule makes clash, so the source and the place of the report are all a case
-// has to state.
 ::testing::AssertionResult RedeclaredAt(const std::string& src,
                                         std::string_view message, uint32_t line,
                                         std::string_view subclause) {
@@ -21,9 +17,6 @@ namespace {
   return ReportedError(f.diag.Diagnostics(), message, line, subclause);
 }
 
-// §3.13 (f): a named block nested in a procedure's block is declared in that
-// block's name space, not the module's, so it clashes neither with a module
-// variable nor with a block of the same name in another procedure.
 TEST(NameSpaceElaboration, NestedNamedBlocksOutsideModuleNameSpaceOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -47,8 +40,6 @@ TEST(NameSpaceElaboration, NamedBlockInsideUnnamedBlockOutsideModuleNameSpace) {
              "endmodule\n"));
 }
 
-// A statement that is not a block opens no name space, so a block it holds is
-// still the procedure's outermost and is declared in the module's.
 TEST(NameSpaceElaboration, NamedBlockUnderIfClashesWithModuleVariable) {
   EXPECT_TRUE(
       RedeclaredAt("module m;\n"
@@ -69,8 +60,6 @@ TEST(NameSpaceElaboration, TwoNestedNamedBlocksOfOneNameInOneBlock) {
                    "redeclaration of 'n'", 4, "23.9"));
 }
 
-// §9.3.4 names a fork-join block as it names a begin-end block, and §3.13 (e)
-// puts the name in the module name space either way.
 TEST(NameSpaceElaboration, NamedForkSameNameAsVariableError) {
   EXPECT_TRUE(
       RedeclaredAt("module m;\n"
@@ -80,9 +69,6 @@ TEST(NameSpaceElaboration, NamedForkSameNameAsVariableError) {
                    "redeclaration of 'f'", 3, "23.9"));
 }
 
-// §3.13 (e): parameters, user-defined types, genvars, classes, lets,
-// covergroups, sequences, properties, clocking blocks and modports share the
-// module name space with its nets and variables.
 TEST(NameSpaceElaboration, ParameterSameNameAsVariableError) {
   EXPECT_TRUE(
       RedeclaredAt("module m;\n"
@@ -192,9 +178,6 @@ TEST(NameSpaceElaboration, ClockingBlockSameNameAsVariableError) {
                    "redeclaration of 'cb'", 3, "23.9"));
 }
 
-// `default clocking cb;` names the clocking block declared above it and
-// declares nothing, and §6.18's forward typedef announces the class its later
-// declaration declares.
 TEST(NameSpaceElaboration, DefaultClockingReferenceAndForwardTypedefOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -206,8 +189,6 @@ TEST(NameSpaceElaboration, DefaultClockingReferenceAndForwardTypedefOk) {
              "endmodule\n"));
 }
 
-// §3.13 (g): once a net declaration has reintroduced a non-ANSI port's name in
-// the module name space, the name is declared there.
 TEST(NameSpaceElaboration, SecondNetForTypedNonAnsiPortError) {
   EXPECT_TRUE(
       RedeclaredAt("module m(a);\n"
@@ -218,7 +199,6 @@ TEST(NameSpaceElaboration, SecondNetForTypedNonAnsiPortError) {
                    "redeclaration of 'a'", 4, "6.5"));
 }
 
-// §3.13 (g): only a net or variable may reintroduce a port's name.
 TEST(NameSpaceElaboration, FunctionAndInstanceReuseAnsiPortNames) {
   ElabFixture f;
   ElaborateSrc(
@@ -267,8 +247,6 @@ TEST(NameSpaceElaboration, GateAndUdpInstancesReusePortNames) {
                             6, "3.13"));
 }
 
-// §3.13 (f): a block's name space holds its named blocks and user-defined
-// types beside its variables, and a subroutine's holds its formal arguments.
 TEST(NameSpaceElaboration, NamedBlockSameNameAsBlockVariableError) {
   EXPECT_TRUE(
       RedeclaredAt("module m;\n"
@@ -313,8 +291,6 @@ TEST(NameSpaceElaboration, NamedBlockInFunctionSameNameAsLocalError) {
                    "redeclaration of 'x'", 4, "23.9"));
 }
 
-// §3.13 (e) counts modules, interfaces, programs and checkers among the names
-// of the module name space, so a nested declaration (§23.4) is one of them.
 TEST(NameSpaceElaboration, TwoNestedModulesOfOneNameError) {
   EXPECT_TRUE(
       RedeclaredAt("module top;\n"
@@ -333,7 +309,6 @@ TEST(NameSpaceElaboration, NestedCheckerSameNameAsVariableError) {
                    "redeclaration of 'c'", 3, "23.9"));
 }
 
-// §3.13 (e) gives a package a module name space of its own.
 TEST(NameSpaceElaboration, PackageItemsRedeclaredError) {
   ElabFixture f;
   ElaborateSrc(
@@ -369,8 +344,6 @@ TEST(NameSpaceElaboration, FunctionReusesCompleteNonAnsiPortName) {
                    "redeclaration of port 'a'", 3, "3.13"));
 }
 
-// §23.5: an extern module declares only the ports of the module whose
-// definition follows it, so the two are one name.
 TEST(NameSpaceElaboration, ExternNestedModuleAndItsDefinitionOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -379,7 +352,6 @@ TEST(NameSpaceElaboration, ExternNestedModuleAndItsDefinitionOk) {
              "endmodule\n"));
 }
 
-// §6.18: a block's forward typedef announces the type its definition declares.
 TEST(NameSpaceElaboration, BlockForwardTypedefAndItsDefinitionOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

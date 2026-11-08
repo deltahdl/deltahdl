@@ -1,16 +1,3 @@
-// §18.16's randcase statement and §18.17's randsequence, parsed: the
-// production and rule lists of Syntax 18-13, the if-else of §18.17.2, the case
-// of §18.17.3, the repeat of §18.17.4 and the rand join of §18.17.5, together
-// with the `:=` and `:/` scanning the weights of §18.17.1 need.
-//
-// Every function here is a Parser:: member declared in parser/parser.h and
-// reached from a dispatcher there, so the move out of parser_verify.cpp
-// changed no declaration and no call site. The two clauses travel together
-// because the simulator keeps them together for the same reason:
-// src/simulator/stmt_exec_randsequence.cpp answers §18.16 and §18.17 in one
-// file, randcase being the weighted selection randsequence's rule lists are
-// built on.
-
 #include <cstddef>
 #include <utility>
 #include <vector>
@@ -28,13 +15,6 @@ namespace delta {
 
 namespace {
 
-// A.6.12 writes an rs_code_block's declarations as data_declarations, and
-// three of A.2.8's block item declarations are none: a
-// local_parameter_declaration and a parameter_declaration, which
-// Parser::ParseBlockVarDecls carries as a parameter's kVarDecl, and a
-// let_declaration, which it carries as a kBlockItemDecl over the let's item.
-// Reports one at `loc`, where the declaration whose first statement is `decl`
-// opens.
 void ReportNonDataCodeBlockDecl(const Stmt* decl, SourceLoc loc,
                                 DiagEngine& diag) {
   const bool kIsLet = decl->kind == StmtKind::kBlockItemDecl &&
@@ -60,8 +40,6 @@ Stmt* Parser::ParseRandcaseStmt() {
     auto* body = ParseStmt();
     stmt->randcase_items.push_back({weight, body});
   }
-  // A.6.7 writes `randcase randcase_item { randcase_item } endcase`, so one
-  // item at least stands before endcase.
   if (stmt->randcase_items.empty()) {
     diag_.Error(CurrentLoc(), "a randcase statement holds at least one item",
                 Subclause("A.6.7"));
@@ -78,11 +56,6 @@ RsProductionItem Parser::ParseRsProductionItem() {
   item.loc = name.loc;
   if (Check(TokenKind::kLParen)) {
     Consume();
-    // §18.17.7 passes data to a production in a task call's syntax, so the
-    // list is A.8.4's list_of_arguments, read as a subroutine call's: an empty
-    // position is a null argument, and named arguments follow the positional
-    // ones with their names kept. `default` stands only in a constructor's
-    // list (§8.17), so it is left for the parenthesis below to report.
     if (!Check(TokenKind::kRParen) && !Check(TokenKind::kKwDefault)) {
       auto* call = arena_.Create<Expr>();
       if (Check(TokenKind::kDot)) {
@@ -118,20 +91,12 @@ RsCaseItem Parser::ParseRsCaseItem() {
 }
 
 void Parser::ParseRsCodeBlockStmts(std::vector<Stmt*>& stmts) {
-  // Records that a right brace now closes something, so that a block left open
-  // inside this code block stops at it rather than taking it for a statement.
-  // Parser::ClosesOpenRsCodeBlock in src/parser/parser.h is what reads the
-  // count, and the guard restores it however this returns.
   struct DepthGuard {
     int& d;
     explicit DepthGuard(int& d) : d(d) { ++d; }
     ~DepthGuard() { --d; }
   } guard(rs_code_block_depth_);
 
-  // A.6.12 writes a code block's declarations before its statement_or_nulls,
-  // so a declaration after the first statement, a null one included, is
-  // reported. Each declaration is still read, so that the names it declares
-  // resolve in the block.
   bool before_stmts = true;
   while (!Check(TokenKind::kRBrace) && !AtEnd()) {
     if (!IsBlockVarDeclStart()) {
@@ -181,8 +146,6 @@ void Parser::ParseRsProdCase(RsProd& prod) {
   prod.case_expr = ParseExpr();
   Expect(TokenKind::kRParen, Subclause("18.17.3"));
   bool seen_default = false;
-  // 18.17.3: a case production statement holds one default item at most; flag
-  // any additional default as illegal.
   while (!Check(TokenKind::kKwEndcase) && !AtEnd()) {
     auto item_loc = CurrentLoc();
     bool is_default_here = Check(TokenKind::kKwDefault);
@@ -194,7 +157,6 @@ void Parser::ParseRsProdCase(RsProd& prod) {
     }
     if (is_default_here) seen_default = true;
   }
-  // A.6.12 writes at least one rs_case_item before `endcase`.
   if (prod.case_items.empty()) {
     diag_.Error(CurrentLoc(), "a case production holds at least one item",
                 Subclause("A.6.12"));
@@ -244,9 +206,6 @@ bool Parser::MatchColonEq() {
   return false;
 }
 
-// 18.5.3: the distribution weight operator ":/" lexes as a colon immediately
-// followed by a slash. CheckColonSlash peeks for that pair without consuming;
-// MatchColonSlash consumes it on a match.
 bool Parser::CheckColonSlash() {
   if (!Check(TokenKind::kColon)) return false;
   auto saved = lexer_.SavePos();
@@ -296,8 +255,6 @@ void Parser::ParseRsRuleWeight(RsRule& rule) {
     rule.weight = ParseExpr();
     Expect(TokenKind::kRParen, Subclause("18.17.1"));
   } else {
-    // A.6.12's rs_weight_specification: written without parentheses, an
-    // integral number or a ps_identifier.
     rule.weight = ParsePrimaryExpr();
     if (rule.weight->kind != ExprKind::kIntegerLiteral &&
         !IsPsIdentifier(rule.weight)) {
@@ -345,17 +302,6 @@ RsRule Parser::ParseRsRule() {
 RsProduction Parser::ParseRsProduction() {
   RsProduction prod;
 
-  // Syntax 18-13 (§18.17): `rs_production ::= [ data_type_or_void ]
-  // rs_production_identifier [ ( tf_port_list ) ] : rs_rule { | rs_rule } ;`.
-  // A return type is present when the production opens on a data_type_or_void,
-  // which AtDataTypeOrVoid answers for the whole of A.2.2.1 rather than for
-  // its keyword cases alone. §18.17.7 sizes a returned value by that type.
-  //
-  // An identifier naming a declared type is either that return type or the
-  // production's own name, and the token after it decides which: Syntax 18-13
-  // admits only `(` or `:` after the rs_production_identifier. So `word v :`
-  // returns `word` from a production `v`, `word :` names a production `word`,
-  // and a scoped type name, followed by `::`, stays a return type.
   bool has_return_type = AtDataTypeOrVoid();
   if (has_return_type && Check(TokenKind::kIdentifier)) {
     auto saved = lexer_.SavePos();
@@ -363,19 +309,6 @@ RsProduction Parser::ParseRsProduction() {
     has_return_type = !Check(TokenKind::kLParen) && !Check(TokenKind::kColon);
     lexer_.RestorePos(saved);
   }
-  // Syntax 18-13 asks for a data_type_or_void, and A.2.2.1 writes `data_type
-  // ::= integer_vector_type [ signing ] { packed_dimension } | ...`, so a
-  // signing and a packed dimension follow a type keyword rather than standing
-  // alone. A bare one is an implicit_data_type, which data_type_or_implicit
-  // admits and which nothing in Syntax 18-13 reaches.
-  //
-  // AtDataTypeOrVoid answers for the wider set on purpose, because
-  // ParseFunctionReturnType consumes it: §13.4 gives a function a
-  // function_data_type_or_implicit, which really does admit an implicit type. A
-  // production is not a function, so the narrowing is stated here rather than
-  // there. The type is then parsed anyway, so the rest of the production is
-  // read and reported on as usual instead of the statement collapsing at its
-  // first production.
   if (has_return_type &&
       (Check(TokenKind::kKwSigned) || Check(TokenKind::kKwUnsigned) ||
        Check(TokenKind::kLBracket))) {
@@ -392,14 +325,6 @@ RsProduction Parser::ParseRsProduction() {
 
   prod.name = ExpectIdentifier(Subclause("18.17")).text;
 
-  // §18.17.7: productions that accept data declare a tf_port_list of formal
-  // arguments, using the same syntax as a task prototype. Parse and retain the
-  // formals so the value-passing engine can bind actual arguments to them.
-  //
-  // A.6.12's parentheses enclose a tf_port_list, which unlike a task's or a
-  // function's is not optional inside them; read empty, it is one tf_port_item
-  // with no port identifier, which A.2.7's footnote allows a prototype alone.
-  // So a production with no formal is written without the parentheses.
   if (Check(TokenKind::kLParen)) {
     prod.has_ports = true;
     const SourceLoc kOpen = CurrentLoc();
@@ -438,12 +363,8 @@ Stmt* Parser::ParseRandsequenceStmt() {
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
     stmt->rs_productions.push_back(ParseRsProduction());
-    // Missing endsequence: a token that cannot start a production (e.g. the
-    // enclosing end/endmodule) reaches here and ParseRsProduction consumes
-    // nothing. Stop and let the Expect below report the missing endsequence.
     if (lexer_.SavePos().pos == before) break;
   }
-  // A.6.12 writes at least one rs_production before `endsequence`.
   if (stmt->rs_productions.empty()) {
     diag_.Error(CurrentLoc(),
                 "a randsequence statement holds at least one production",

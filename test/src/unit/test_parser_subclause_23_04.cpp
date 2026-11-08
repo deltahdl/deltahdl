@@ -149,10 +149,6 @@ TEST(ModuleAndHierarchyParsing, NestedModulePortlessNoPorts) {
   EXPECT_TRUE(nested->ports.empty());
 }
 
-// §23.4: a module declared inside another module may also be explicitly
-// instantiated alongside its declaration (the form shown by the standard's
-// nested flip-flop example). The parser must yield both the nested module
-// declaration item and the instantiation item in the enclosing module's body.
 TEST(ModuleAndHierarchyParsing, NestedModuleDeclaredAndInstantiated) {
   auto r = Parse(
       "module outer;\n"
@@ -174,10 +170,6 @@ TEST(ModuleAndHierarchyParsing, ErrorNestedModuleMissingEndmodule) {
       "  module inner;\n"
       "    wire w;\n"
       "endmodule\n");
-  // The one `endmodule` closes `inner`, so `outer` runs to end of file and
-  // Parser::ParseModuleDecl in src/parser/parser.cpp reports the missing
-  // keyword under §23.2, the subclause that owns module_declaration's
-  // terminator.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endmodule', got EOF", 5, "23.2"));
 }

@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Creates an automatic function with a single const-ref `data` argument and an
-// empty body. Shared setup for the const-ref write-protection tests below.
 static ModuleItem* MakeConstRefDataFunc(SimFixture& f, const char* name) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
@@ -37,8 +35,6 @@ TEST(PassByRefValidation, RejectRefInStaticFunc) {
       {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
-  // The subroutine is built here rather than parsed, so it carries no source
-  // location and the report stands at line 0.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref argument 'v' not allowed in static subroutine 'bad_func'", 0,
@@ -85,7 +81,6 @@ TEST(PassByRefValidation, RejectRefInStaticTask) {
       {Direction::kRef, false, false, false, {}, "v", nullptr, {}}};
 
   ValidateRefLifetime(task, f.diag);
-  // Built rather than parsed, so the report stands at line 0.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref argument 'v' not allowed in static subroutine 'bad_task'", 0,
@@ -104,7 +99,6 @@ TEST(PassByRefValidation, ConstRefInStaticSubroutineRejected) {
       {Direction::kRef, true, false, false, {}, "data", nullptr, {}}};
 
   ValidateRefLifetime(func, f.diag);
-  // Built rather than parsed, so the report stands at line 0.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref argument 'data' not allowed in static subroutine 'bad_func'", 0,
@@ -126,9 +120,6 @@ TEST(PassByRefValidation, MultipleRefArgsInStaticFuncAllRejected) {
   };
 
   ValidateRefLifetime(func, f.diag);
-  // Both ref arguments are named, because one report answers HasErrors() while
-  // the other goes unreported. Built rather than parsed, so both stand at
-  // line 0.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref argument 'a' not allowed in static subroutine 'bad_func'", 0,
@@ -227,8 +218,6 @@ TEST(PassByRefValidation, ConstRefBlockingWriteRejected) {
   func->func_body_stmts = {MakeAssign(f.arena, "data", MakeInt(f.arena, 7))};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  // The statement is built here rather than parsed, so it carries no source
-  // location and the report stands at line 0.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot write to const ref argument 'data' in "
                             "subroutine 'read_only'",
@@ -251,7 +240,6 @@ TEST(PassByRefValidation, ConstRefNonblockingWriteRejected) {
   func->func_body_stmts = {nba};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  // Built rather than parsed, so the report stands at line 0.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot write to const ref argument 'data' in "
                             "subroutine 'read_only'",
@@ -299,7 +287,6 @@ TEST(PassByRefValidation, ConstRefWriteInIfBranchRejected) {
   func->func_body_stmts = {if_stmt};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  // Built rather than parsed, so the report stands at line 0.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot write to const ref argument 'data' in "
                             "subroutine 'guarded_write'",
@@ -318,7 +305,6 @@ TEST(PassByRefValidation, ConstRefWriteInElseBranchRejected) {
   func->func_body_stmts = {if_stmt};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  // Built rather than parsed, so the report stands at line 0.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot write to const ref argument 'data' in "
                             "subroutine 'guarded_write'",
@@ -344,7 +330,6 @@ TEST(PassByRefValidation, ConstRefWriteInCaseItemRejected) {
   func->func_body_stmts = {case_stmt};
 
   ValidateConstRefWriteProtection(func, f.diag);
-  // Built rather than parsed, so the report stands at line 0.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot write to const ref argument 'data' in "
                             "subroutine 'case_write'",
@@ -369,8 +354,6 @@ TEST(PassByRefValidation, NonRefArgsInStaticFuncAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §13.5.2: an element of an unpacked array is one of the constructs that may
-// legally be passed by reference (unlike a net).
 TEST(PassByRefValidation, UnpackedArrayElementPassedByRefAccepted) {
   ElabFixture f;
   Elaborate(
@@ -384,9 +367,6 @@ TEST(PassByRefValidation, UnpackedArrayElementPassedByRefAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.5.2: a ref argument shall not be used in any context forbidden for
-// automatic variables unless it is ref static, so a static subroutine's plain
-// ref argument is rejected, and the report names §13.5.2.
 TEST(PassByRefValidation, RefInStaticFuncNames13_5_2) {
   SimFixture f;
 
@@ -403,8 +383,6 @@ TEST(PassByRefValidation, RefInStaticFuncNames13_5_2) {
                             "not allowed in static subroutine", 0, "13.5.2"));
 }
 
-// §13.5.2: a const ref formal cannot be altered by the subroutine, and the
-// report that rejects the write names the same subclause.
 TEST(PassByRefValidation, ConstRefWriteNames13_5_2) {
   SimFixture f;
 
@@ -416,8 +394,6 @@ TEST(PassByRefValidation, ConstRefWriteNames13_5_2) {
                             "cannot write to const ref argument", 0, "13.5.2"));
 }
 
-// §13.5.2 matches a ref argument with an equivalent data type (§6.22.2) and
-// permits no cast: logic [7:0] is not equivalent to int, and int is (#6437).
 TEST(PassByRefValidation, RefActualOfANonEquivalentTypeError) {
   ElabFixture f;
   ElaborateSrc(
@@ -439,9 +415,6 @@ TEST(PassByRefValidation, RefActualOfANonEquivalentTypeError) {
       ReportedError(f.diag.Diagnostics(), "is passed 'w'", 7, "13.5.2"));
 }
 
-// Only a variable, a class property, a member of an unpacked structure or an
-// element of an unpacked array passes by reference, so a select of a packed
-// vector does not, and an element of an unpacked array does (#6438).
 TEST(PassByRefValidation, PackedSelectPassedByReferenceError) {
   ElabFixture f;
   ElaborateSrc(
@@ -462,8 +435,6 @@ TEST(PassByRefValidation, PackedSelectPassedByReferenceError) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "packed 'a'", 7, "13.5.2"));
 }
 
-// A ref static argument is passed only what has a static lifetime: an
-// automatic task's local has none, and a module variable has one (#6439).
 TEST(PassByRefValidation, RefStaticPassedAnAutomaticVariableError) {
   ElabFixture f;
   ElaborateSrc(
@@ -485,10 +456,6 @@ TEST(PassByRefValidation, RefStaticPassedAnAutomaticVariableError) {
       ReportedError(f.diag.Diagnostics(), "is passed 'g'", 7, "13.5.2"));
 }
 
-// A ref argument without the static qualifier has no static lifetime of its
-// own, so it is not passed on to a ref static one; an unpacked array whole and
-// a value of a typedef-named type are left to equivalence the walk does not
-// judge.
 TEST(PassByRefValidation, RefFormalWithoutStaticPassedToRefStaticError) {
   ElabFixture f;
   ElaborateSrc(

@@ -24,13 +24,8 @@ namespace delta {
 
 namespace {
 
-// A typedef chain longer than this runs in a cycle; no legal source writes one
-// this long, so the walk gives up rather than looping.
 constexpr int kMaxTypedefHops = 16;
 
-// §7.8 (printed page 160): the index types an associative array may be written
-// with as a keyword, which the parser keeps as the dimension's text; §7.8.5
-// adds a chandle and an event, whose equality §6.14 and §15.5.5.3 define.
 constexpr std::array<std::string_view, 12> kAssocIndexKeywords = {
     "string", "int",   "integer", "byte", "shortint", "longint",
     "bit",    "logic", "reg",     "time", "chandle",  "event"};
@@ -53,13 +48,8 @@ const DataType* FollowTypedefs(const DataType& dtype,
 
 bool IsFixedSizeUnpackedDim(const Expr* dim, const TypeShapeTables& tables) {
   if (dim == nullptr) return false;
-  // A.2.5: a type reference, which an index written as a data_type an
-  // expression cannot spell is kept as too, names an index type.
   if (dim->kind == ExprKind::kTypeRef) return false;
   if (dim->kind != ExprKind::kIdentifier) {
-    // §7.8 with §26.3 and §8.23: an index type may be named through a package
-    // or class scope, `[p::idx_t]`, which a constant so named, `[p::N]`, is
-    // not.
     const std::string kKey = ScopedTypeKey(dim);
     return tables.typedefs.count(kKey) == 0 &&
            tables.class_names.count(kKey) == 0;
@@ -113,12 +103,6 @@ void ValidateNetTypedefDims(const DataType& dtype,
 static bool PackedTypeIs4State(const DataType& dtype,
                                const TypedefMap& typedefs);
 
-// §7.2.1 (printed page 145): a member of a packed structure or union is
-// 4-state when its own type is, which for a member written through a typedef
-// name or as a nested aggregate or enumeration is the type that name or nesting
-// stands for. A name the table cannot resolve leaves nothing to judge, and it
-// is taken as 4-state so that the net is not rejected over a type it cannot
-// see.
 static bool PackedMemberIs4State(const StructMember& m,
                                  const TypedefMap& typedefs) {
   if (m.nested_type != nullptr) {
@@ -131,9 +115,6 @@ static bool PackedMemberIs4State(const StructMember& m,
   return Is4stateType(m.type_kind);
 }
 
-// §6.7.1 item a with §7.2.1: a packed structure or union is 4-state when any
-// member is, an enumeration when its base is, and anything else when its kind
-// is a 4-state one.
 static bool PackedTypeIs4State(const DataType& dtype,
                                const TypedefMap& typedefs) {
   std::vector<std::string_view> names;
@@ -152,9 +133,6 @@ static bool PackedTypeIs4State(const DataType& dtype,
 
 static bool IsValidNetType(const DataType& dtype, const TypedefMap& typedefs);
 
-// §6.7.1 item b: a member of an unpacked structure or union is valid when its
-// own type is a valid net data type, judged through a typedef name or into a
-// nested aggregate as the member's own type would be.
 static bool IsValidNetMember(const StructMember& m,
                              const TypedefMap& typedefs) {
   if (m.nested_type != nullptr) return IsValidNetType(*m.nested_type, typedefs);
@@ -179,8 +157,6 @@ static bool IsUnpackedAggregate(const DataType& dtype) {
          !dtype.is_packed && !dtype.is_soft;
 }
 
-// §6.7.1 items a and b for one type. A net type keyword standing where the data
-// type would (`wire w;`) leaves the data type implicit, which is logic.
 static bool IsValidNetType(const DataType& dtype, const TypedefMap& typedefs) {
   std::vector<std::string_view> names;
   const DataType* type = FollowTypedefs(dtype, typedefs, names);
@@ -218,8 +194,6 @@ void ValidateNetDataTypeIs4State(const DataType& dtype,
 static bool IsLegalNettypeElement(const DataType& type,
                                   const TypeShapeTables& tables);
 
-// §6.6.7 item d: a member of an unpacked structure or union is legal when its
-// dimensions are fixed-size and its own type is legal.
 static bool IsLegalNettypeMember(const StructMember& m,
                                  const TypeShapeTables& tables) {
   if (!AllFixedSize(m.unpacked_dims, tables)) return false;
@@ -233,9 +207,6 @@ static bool IsLegalNettypeMember(const StructMember& m,
   return IsLegalNettypeDataType(own, tables);
 }
 
-// §6.6.7 items a to d for a type no typedef name stands in front of. A packed
-// aggregate is integral (item a or b), and real and shortreal are item c; the
-// kinds below are none of these.
 static bool IsLegalNettypeElement(const DataType& type,
                                   const TypeShapeTables& tables) {
   switch (type.kind) {
@@ -264,8 +235,6 @@ std::string NamedTypeKey(const DataType& type) {
   return NamedTypeKey(type.scope_name, type.type_name);
 }
 
-// §26.7 with §G.1: a class of the std package named through the package,
-// `std::semaphore`, which the class names hold by its bare name alone.
 static bool NamesStdClass(const DataType& type) {
   if (type.scope_name != "std") return false;
   std::optional<StdPackageMember> member =
@@ -276,8 +245,6 @@ static bool NamesStdClass(const DataType& type) {
 
 bool IsLegalNettypeDataType(const DataType& dtype,
                             const TypeShapeTables& tables) {
-  // A name resolving to nothing ends the walk as a cyclic chain does, with
-  // nothing left to judge.
   const DataType* type = &dtype;
   for (int hops = 0; type != nullptr && hops < kMaxTypedefHops; ++hops) {
     if (type->kind != DataTypeKind::kNamed)
@@ -295,9 +262,6 @@ bool IsLegalNettypeDataType(const DataType& dtype,
   return true;
 }
 
-// §19.3: whether `dtype` names a covergroup, through the typedef names it is
-// written with: the name the chain ends in unresolved, which
-// `names_covergroup` answers for.
 static bool NamesCovergroup(
     const DataType& dtype, const TypedefMap& typedefs,
     const std::function<bool(std::string_view)>& names_covergroup) {

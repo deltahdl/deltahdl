@@ -54,12 +54,6 @@ TEST(IdentifierElaboration, IdentifierInExpressionElaborates) {
              "endmodule\n"));
 }
 
-// §5.6: identifiers are case sensitive. The elaborator files no report of its
-// own under §5.6 for this and should not: case sensitivity decides whether two
-// spellings are one name, so its only observable consequence is that `Foo`
-// names nothing. The rule that is reported is §23.9's, and naming it here is
-// what separates `Foo` failing to resolve from the source failing for any other
-// reason.
 TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
   ElabFixture f;
   ElaborateSrc(
@@ -74,17 +68,9 @@ TEST(IdentifierElaboration, CaseMismatchedReferenceFailsToResolve) {
                             "23.9"));
 }
 
-// §5.6: an identifier longer than the implementation's length limit draws an
-// error report. The limit may be no lower than 1024 characters, and
-// Lexer::LexIdentifier in src/lexer/lexer.cpp sets it at exactly 1024. The
-// report is the lexer's because the limit is a rule about the token, so the
-// subclause is asserted here rather than an elaborator report being added for
-// it.
 TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
-  // The report under test is the lexer's, so the source never parses and the
-  // permissive helper is what says so.
   ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  logic " +
@@ -97,11 +83,6 @@ TEST(IdentifierElaboration, IdentifierExceedingMaxLengthReportsError) {
       "identifier exceeds maximum length of 1024 characters", 2, "5.6"));
 }
 
-// The §5.6 length limit governs every identifier, escaped ones included. Here
-// the name is written with escaped-identifier syntax (a leading backslash and a
-// terminating space, the §5.6.1 dependency) and driven end-to-end through parse
-// and elaborate; a 1024-character escaped name stays within the limit and
-// elaborates cleanly.
 TEST(IdentifierElaboration, EscapedIdentifierMaxLengthElaborates) {
   std::string long_id(1024, 'a');
   EXPECT_TRUE(
@@ -115,14 +96,9 @@ TEST(IdentifierElaboration, EscapedIdentifierMaxLengthElaborates) {
              "endmodule\n"));
 }
 
-// Negative form of the length rule on the escaped-identifier input path: an
-// escaped name of 1025 characters exceeds the limit and is rejected during the
-// lexing performed by elaboration, exactly like an over-length simple name.
 TEST(IdentifierElaboration, EscapedIdentifierExceedingMaxLengthReportsError) {
   ElabFixture f;
   std::string long_id(1025, 'a');
-  // The report under test is the lexer's, so the source never parses and the
-  // permissive helper is what says so.
   ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  logic \\" +

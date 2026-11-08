@@ -116,11 +116,6 @@ TEST(ConditionalStatementSim, IfElseIfBlockBodyDefaultElseExecutes) {
   EXPECT_EQ(yv->value.ToUint64(), 66u);
 }
 
-// §12.4.1: the conditions are evaluated in order, and the first true one runs
-// its statement and ends the whole chain. When an earlier condition is true, a
-// later condition carrying a side effect must never be evaluated. The second
-// condition here post-increments i; because the first condition is true the
-// chain terminates before it, so i stays at its initial value.
 TEST(ConditionalStatementSim, IfElseIfFirstTrueSkipsLaterConditionSideEffect) {
   SimFixture f;
   auto [x, i] = RunModuleTwoVars(f,
@@ -135,14 +130,9 @@ TEST(ConditionalStatementSim, IfElseIfFirstTrueSkipsLaterConditionSideEffect) {
                                  "endmodule\n",
                                  "x", "i");
   EXPECT_EQ(x, 10u);
-  EXPECT_EQ(i, 0u);  // i++ in the skipped condition never ran
+  EXPECT_EQ(i, 0u);
 }
 
-// §12.4.1: conditions are evaluated in order until the first true one. The
-// first condition here is false but post-increments i as a side effect; the
-// second condition then observes the incremented i and is the one that matches.
-// x==20 with i==1 proves the earlier condition was evaluated in order before
-// the matching one.
 TEST(ConditionalStatementSim,
      IfElseIfEarlierConditionSideEffectAppliedInOrder) {
   SimFixture f;
@@ -158,20 +148,14 @@ TEST(ConditionalStatementSim,
                                  "endmodule\n",
                                  "x", "i");
   EXPECT_EQ(x, 20u);
-  EXPECT_EQ(i, 1u);  // first condition's i++ ran, then matched
+  EXPECT_EQ(i, 1u);
 }
 
-// §12.4.1: the chain's expressions are evaluated in order, and a condition that
-// is not a nonzero known value does not match — so the chain proceeds to the
-// next condition. Here the first condition is an uninitialized 4-state logic
-// (value x), which must not be taken as true; evaluation continues in order to
-// the following condition, which matches. x==20 (not 10) shows the x-valued
-// condition was skipped and the next one selected in order.
 TEST(ConditionalStatementSim, IfElseIfUnknownConditionSkippedContinuesInOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
-      "  logic cond;\n"  // uninitialized 4-state -> x
+      "  logic cond;\n"
       "  logic [7:0] x;\n"
       "  initial begin\n"
       "    x = 8'd0;\n"

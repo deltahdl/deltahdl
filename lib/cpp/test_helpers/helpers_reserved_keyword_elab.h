@@ -19,23 +19,6 @@
 
 using namespace delta;
 
-// §22.14: a version_specifier puts one reserved word list in force, and each
-// list includes the lists of the versions before it. The checks here carry the
-// reserving half of that -- a listed word cannot name anything the elaborator
-// builds, while under a specifier whose list leaves it free the same
-// declaration reaches the design. Pairing the two legs is the whole claim: a
-// rejection on its own could come from anything, and it is the acceptance
-// under the earlier specifier that pins the rejection on the word being
-// reserved.
-//
-// Every check takes the specifier as its parameter, because that is the only
-// thing that varies between one version's statement of a rule and the next's.
-
-// Every entry of `t` put in an identifier slot and rejected under `spec`, and
-// -- where an earlier specifier leaves the entry free -- the same declaration
-// elaborating there into a variable of the width it asked for. Reading the
-// variable back is what keeps the accepting leg from being any elaboration
-// that happens to succeed.
 inline void ExpectKeywordTableIsReserved(const char* spec,
                                          const KeywordTableSweep& t) {
   EXPECT_EQ(t.count, t.expected_count) << t.what;
@@ -46,18 +29,8 @@ inline void ExpectKeywordTableIsReserved(const char* spec,
     ++swept;
 
     ElabFixture reserved;
-    // Being reserved is what the parser enforces: the word lexes as a keyword
-    // token and the declaration's name slot wants an identifier, so
-    // Parser::ExpectIdentifier in src/parser/parser_inst.cpp reports by way of
-    // Parser::ParseVarDeclList in src/parser/parser_types.cpp. That report is
-    // this leg's subject, so the source is not required to parse.
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, VarDecl(word)),
                                                  reserved, "m");
-    // The report names the entry itself. VarDecl heads the declaration with
-    // `reg`, and Parser::ParseDataType in src/parser/parser_types.cpp takes
-    // the signing before the packed dimensions, so nothing after `[7:0]`
-    // is consumed and the word stands where the name is demanded -- `signed`
-    // and `unsigned` included.
     EXPECT_TRUE(
         ReportedError(reserved.diag.Diagnostics(),
                       std::string("expected identifier, got '") + word + "'",
@@ -80,10 +53,6 @@ inline void ExpectKeywordTableIsReserved(const char* spec,
   EXPECT_EQ(swept, t.expected_swept) << t.what;
 }
 
-// The ten words on which the two lists published for the same Verilog standard
-// disagree: each names a variable under the companion list that drops them,
-// which is what shows a version that inherits "1364-2001" inherits the full
-// list rather than the shorter one.
 inline void ExpectConfigurationWordsNameVariablesUnderNoconfig() {
   EXPECT_EQ(std::size(kConfigurationWords), 10u);
   for (const char* word : kConfigurationWords) {
@@ -98,18 +67,6 @@ inline void ExpectConfigurationWordsNameVariablesUnderNoconfig() {
   }
 }
 
-// Words no list in force reserves, checked from both sides. Each names an
-// object that really reaches the design, and none of them is a data type --
-// the half that would go unchecked if only the naming side were tested. When
-// `later_spec` is given, the same declaration is rejected there, which is what
-// makes the word a *later* one rather than one the implementation simply does
-// not know.
-//
-// None of the words a caller passes here opens a design element, so putting
-// one at the head of a line leaves the region machinery -- which tracks design
-// elements by a line's first word, without regard to the list in force -- out
-// of the picture, and the only thing that can reject the source is the word
-// not being a type.
 inline void ExpectWordsNameObjectsButAreNotTypes(
     const char* spec, std::initializer_list<const char*> words,
     const char* later_spec = nullptr) {
@@ -124,12 +81,6 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
     EXPECT_EQ(v->width, 8u) << word;
 
     ElabFixture as_type;
-    // The word heads no data type, so ParseImplicitTypeOrInst reads it as the
-    // name of a plain variable and the packed dimension that follows is where
-    // the declaration was meant to end: the semicolon demand in
-    // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp reports
-    // "expected ';', got '['". The rejection is the parser's, so the source is
-    // not required to parse.
     ElaborateWithPreprocessorAllowingParseErrors(
         In(spec,
            std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n"),
@@ -140,7 +91,6 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
 
     if (later_spec == nullptr) continue;
     ElabFixture later;
-    // Reserved under the later specifier, so this is the parser report above.
     ElaborateWithPreprocessorAllowingParseErrors(In(later_spec, VarDecl(word)),
                                                  later, "m");
     EXPECT_TRUE(
@@ -151,9 +101,6 @@ inline void ExpectWordsNameObjectsButAreNotTypes(
   }
 }
 
-// Declarations rejected inside a `begin_keywords region for `spec` and
-// elaborating outside one. The second leg is what shows the region -- and not
-// some unrelated limitation -- is doing the rejecting.
 inline void ExpectDeclsFailInRegionButElaborateOutside(
     const char* spec, std::initializer_list<const char*> decls) {
   for (const char* decl : decls) {
@@ -161,15 +108,6 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
 
     ElabFixture in_region;
     ElaborateWithPreprocessorAllowingParseErrors(In(spec, src), in_region, "t");
-    // Inside the region the declaration's head word is a plain identifier, and
-    // the packed dimension it carries decides which rule then refuses it. With
-    // one, the dimension is where the declaration was meant to end, so
-    // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp demands the
-    // semicolon under §6.8. Without one, the head word and the name read as a
-    // data declaration whose type_identifier is that head word, and §6.18,
-    // which requires a user-defined data type to be declared before any
-    // reference to its type_identifier, refuses it at elaboration, because
-    // inside the region the word declares no type.
     const bool kHasPackedDim =
         std::string_view(decl).find('[') != std::string_view::npos;
     std::string message = "expected ';', got '['";
@@ -192,10 +130,6 @@ inline void ExpectDeclsFailInRegionButElaborateOutside(
   }
 }
 
-// The four freed words whose declaration states a width, read back off the
-// elaborated design: each names a variable carrying the storage the
-// declaration asked for. `reg [63:0]`, `reg [7:0]`, `integer` and `time` are
-// the declarations, so 64, 8, 32 and 64 are the widths §6.11 gives them.
 inline void ExpectFreedWordsNameVariablesOfDeclaredWidth(RtlirDesign* design) {
   const auto* v = FindVar(design, "m", "logic");
   ASSERT_NE(v, nullptr);
@@ -214,9 +148,6 @@ inline void ExpectFreedWordsNameVariablesOfDeclaredWidth(RtlirDesign* design) {
   EXPECT_EQ(v->width, 64u);
 }
 
-// The two freed words whose declaration states a kind rather than a width.
-// `real` is one of the real types of §6.12 and `event` is the event of §6.17,
-// so each variable is read back by what it is and not by how wide it is.
 inline void ExpectFreedWordsNameRealAndEventVariables(RtlirDesign* design) {
   const auto* v = FindVar(design, "m", "shortreal");
   ASSERT_NE(v, nullptr);
@@ -227,10 +158,6 @@ inline void ExpectFreedWordsNameRealAndEventVariables(RtlirDesign* design) {
   EXPECT_TRUE(v->is_event);
 }
 
-// Words a later standard reserves, staying ordinary identifiers all the way
-// into the elaborated design: each names a variable that really exists there,
-// carrying the storage its declaration asked for. Getting past the parser is
-// not enough -- the design is what the rest of the tool works from.
 inline void ExpectFreedWordsNameElaboratedVariables(const char* spec) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(In(spec,
@@ -250,9 +177,6 @@ inline void ExpectFreedWordsNameElaboratedVariables(const char* spec) {
   ExpectFreedWordsNameRealAndEventVariables(design);
 }
 
-// The four names a two-module hierarchy is built from. A word free under one
-// specifier has to fill each of them, so a test names all four rather than
-// only the declaration slot.
 struct FreedHierarchyNames {
   const char* design_element;
   const char* input_port;
@@ -260,9 +184,6 @@ struct FreedHierarchyNames {
   const char* instance;
 };
 
-// A word free under `spec` naming the design element itself, its ports, and
-// the instance that binds to it -- the region governs a whole elaborated
-// hierarchy, not one declaration inside one module.
 inline void ExpectFreedWordsNameModulePortsAndInstance(
     const char* spec, const FreedHierarchyNames& names) {
   const std::string kChildName = names.design_element;
@@ -304,17 +225,6 @@ inline void ExpectFreedWordsNameModulePortsAndInstance(
   EXPECT_TRUE(found_instance);
 }
 
-// The constant forms that reach a declaration's width, which is where a
-// constant expression is actually required: a literal, a `parameter`, a
-// `localparam`, and a call to an `automatic` function that is folded. All four
-// have to arrive at the same width, and the two named constants are read back
-// so the overridable and the local form are told apart. `param_type` and
-// `localparam_type` type the two constants, and are empty for a version whose
-// list carries no data type word to put there.
-//
-// The remaining constant form, a genvar, shows its value in the copies its
-// loop produces rather than in a width, and Table 22-2's declaration check
-// observes it doing exactly that.
 inline void ExpectEveryConstantFormResolves(const char* spec,
                                             const char* param_type,
                                             const char* localparam_type) {
@@ -353,11 +263,6 @@ inline void ExpectEveryConstantFormResolves(const char* spec,
   }
 }
 
-// The three ports `child` declares in its module header, each carrying the
-// data type written on it into the elaborated design. §23.2.2.1 gives that
-// header form -- an ansi_port_declaration states a port's direction and its
-// data type in the one place -- so the type and the direction are both read
-// back off the port rather than off a body declaration.
 inline void ExpectAnsiHeaderPortsCarryDeclaredTypes(RtlirDesign* design) {
   const auto* child = FindModule(design, "child");
   ASSERT_NE(child, nullptr);
@@ -371,10 +276,6 @@ inline void ExpectAnsiHeaderPortsCarryDeclaredTypes(RtlirDesign* design) {
   EXPECT_EQ(child->ports[2].width, 32u);
 }
 
-// The parent's own objects, including the one whose declaration carries its
-// value rather than taking it from a separate assignment. §6.8 admits that
-// initializer on a variable declaration, so the elaborated variable has to
-// hold an initializing expression as well as its width.
 inline void ExpectParentObjectsAndInitializerElaborate(RtlirDesign* design) {
   const auto* dst = FindVar(design, "top", "dst");
   ASSERT_NE(dst, nullptr);
@@ -385,16 +286,6 @@ inline void ExpectParentObjectsAndInitializerElaborate(RtlirDesign* design) {
   EXPECT_NE(counted->init_expr, nullptr);
 }
 
-// A port typed in the module body rather than in the header, under `spec`.
-// §23.2.2.2 gives that separate style -- the header lists only port
-// identifiers and the body declares them -- and a port so declared may take a
-// variable declaration beside its port declaration, which is what `output
-// [7:0] y;` followed by `logic [7:0] y;` is. The design has to carry the
-// direction from the one and the variable from the other.
-//
-// This leg elaborates its own source and asserts on its own pointer, so the
-// ASSERT_NE below returns from this function with nothing left in it that
-// would read a null design.
 inline void ExpectNonAnsiPortDeclarationsElaborate(const char* spec) {
   ElabFixture non_ansi;
   auto* design = ElaborateWithPreprocessor(In(spec,
@@ -417,23 +308,6 @@ inline void ExpectNonAnsiPortDeclarationsElaborate(const char* spec) {
   EXPECT_EQ(y->width, 8u);
 }
 
-// The declaration forms a word sweep does not reach, carried into the
-// elaborated design. A declaration may bring its own initializer along, a port
-// may be typed in the module header, and a port may instead be typed in the
-// body in the separate style where the header lists only names. Each is a
-// production of its own, and they are exercised across a hierarchy rather than
-// inside one module, so a port's type has to survive the binding as well as
-// the declaration.
-//
-// The byte input is written `input var byte`. §23.2.2.3 makes an input whose
-// port kind is omitted a net of the default net type whatever data type it
-// names, and §6.7.1 admits only a 4-state integral type as a net's data type,
-// so an input net of a 2-state type is not legal source. `var` is what makes an
-// input a variable -- the clause's own `module mh7 (input var integer x);` --
-// and a variable is outside that rule. The word being exercised still types a
-// port declaration, which is what this covers. The `output int` beside it needs
-// no such help: §23.2.2.3 says an output whose data type is written with the
-// explicit data_type syntax is already a variable.
 inline void ExpectEveryDeclarationFormElaborates(const char* spec) {
   ElabFixture ansi;
   auto* design = ElaborateWithPreprocessor(

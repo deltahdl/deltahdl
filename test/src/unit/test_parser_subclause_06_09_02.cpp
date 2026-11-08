@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -153,11 +151,6 @@ TEST(VectorNetAccessibility, PlainWireNeitherFlag) {
   EXPECT_FALSE(item->data_type.is_scalared);
 }
 
-// §6.9.2 gives vectored and scalared to vector net declarations, and the
-// variable declaration grammar of §6.8 admits neither, so the keyword after a
-// variable's type is reported under §6.9.2 rather than as the identifier the
-// declarator list did not find. sv-tests' 6.9.2--vector_vectored_inv.sv writes
-// `logic vectored` for a vectored net, and a report under §6.8 scored it FAIL.
 TEST(VectorNetAccessibility,
      VectoredAfterVariableTypeIsReportedAsANetOnlyKeyword) {
   auto r = Parse(
@@ -191,8 +184,6 @@ TEST(VectorNetAccessibility,
   }
 }
 
-// The keyword is taken with the type, so the declarators after it are parsed
-// in step: the declaration still lands as a variable named as written.
 TEST(VectorNetAccessibility, VectoredAfterVariableTypeLeavesTheDeclarator) {
   auto r = Parse(
       "module top();\n"

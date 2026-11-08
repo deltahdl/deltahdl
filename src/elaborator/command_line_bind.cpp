@@ -15,21 +15,11 @@ namespace delta {
 
 namespace {
 
-// The names of the configurations that some configuration's instance clause
-// delegates to. Whether a use clause names a configuration at all rather than
-// an ordinary cell is §33.2.1's question, so it is asked there instead of
-// being answered here by looking for the ':config' extension alone -- a name
-// that reaches no other design element names the configuration of that name
-// without carrying the extension.
 std::unordered_set<std::string_view> DelegatedConfigNames(
     const CompilationUnit& unit) {
   std::unordered_set<std::string_view> names;
   for (const auto* cfg : unit.configs) {
     for (const auto* rule : cfg->rules) {
-      // §33.4.2 hands an instance to a config through an instance clause, and
-      // §33.4.1.4 lets a cell clause carry the same use expansion for every
-      // instance of the cell; either makes the named config a delegated-to
-      // one rather than a second one in force.
       if (rule->kind != ConfigRuleKind::kInstance &&
           rule->kind != ConfigRuleKind::kCell) {
         continue;
@@ -59,19 +49,10 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
                                   DiagEngine& diag) {
   auto in_force = ConfigsInForce(unit);
 
-  // §33.5.4: the config to be used is one of the two things the command line
-  // gives a binding tool, so a named one settles the design outright and the
-  // count of configurations in force decides nothing.
   if (!config.empty()) {
     for (const auto* cfg : in_force) {
       if (cfg->name == config) return elab.Elaborate(cfg);
     }
-    // The name came from the command line rather than from a source
-    // description, so there is nothing written anywhere for the report to
-    // stand at. A configuration the unit holds but that no design statement
-    // gives a design, or that another configuration delegates an instance to,
-    // is not in force and is not selectable: ConfigsInForce is what says which
-    // names this option takes.
     diag.Error(SourceLoc::None(),
                std::format("no configuration named '{}' is in force; the "
                            "command line put {} in force",
@@ -81,9 +62,6 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
   }
 
   if (in_force.size() > 1) {
-    // Each of them names a whole design, and a run builds one. Which was meant
-    // is not something the source descriptions record, so the command line is
-    // reported rather than one of them being picked for the user.
     diag.Error(
         SourceLoc::None(),
         std::format("command line puts {} configurations in force; "
@@ -94,8 +72,6 @@ RtlirDesign* ElaborateCommandLine(Elaborator& elab, const CompilationUnit& unit,
     return nullptr;
   }
 
-  // The design statement names the top-level cell, whatever cells the rest of
-  // the source descriptions on the command line leave uninstantiated.
   if (in_force.size() == 1) return elab.Elaborate(in_force.front());
 
   return elab.Elaborate(top);

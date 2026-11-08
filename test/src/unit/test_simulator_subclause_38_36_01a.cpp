@@ -21,19 +21,11 @@
 namespace delta {
 namespace {
 
-// §38.36.1 covers the simulation-event callback reasons registered through
-// vpi_register_cb(). Two registration-time rules follow from this subclause's
-// text - distinct from the firing semantics of the individual reasons: a
-// cbForce, cbRelease, or cbDisable callback may not be placed on a variable
-// bit-select, and a callback about one object's change of value or size is
-// placed on an object, the obj field holding NULL with a meaning for a force
-// or release alone. These tests observe vpi_register_cb() applying both rules.
 class VpiSimEventCb : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Build a handle to a single bit-select of a declared variable.
   vpiHandle MakeBitSelectHandle(const char* name) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);
@@ -50,8 +42,6 @@ class VpiSimEventCb : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.36.1: placing a cbForce callback on a variable bit-select is illegal;
-// vpi_register_cb() rejects it and reports an error.
 TEST_F(VpiSimEventCb, ForceCallbackOnBitSelectRejected) {
   vpiHandle bit = MakeBitSelectHandle("f");
   ASSERT_NE(bit, nullptr);
@@ -65,7 +55,6 @@ TEST_F(VpiSimEventCb, ForceCallbackOnBitSelectRejected) {
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// §38.36.1: the same prohibition holds for a cbRelease callback.
 TEST_F(VpiSimEventCb, ReleaseCallbackOnBitSelectRejected) {
   vpiHandle bit = MakeBitSelectHandle("r");
   ASSERT_NE(bit, nullptr);
@@ -79,7 +68,6 @@ TEST_F(VpiSimEventCb, ReleaseCallbackOnBitSelectRejected) {
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// §38.36.1: and for a cbDisable callback.
 TEST_F(VpiSimEventCb, DisableCallbackOnBitSelectRejected) {
   vpiHandle bit = MakeBitSelectHandle("d");
   ASSERT_NE(bit, nullptr);
@@ -93,10 +81,6 @@ TEST_F(VpiSimEventCb, DisableCallbackOnBitSelectRejected) {
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// §38.36.1: the obj field holds the object a callback is for, and a NULL one
-// means something for a force or release callback alone. A value change
-// callback placed on no object names nothing whose value could change, so
-// vpi_register_cb() refuses it and reports why.
 TEST_F(VpiSimEventCb, ValueChangeCallbackOnNoObjectRejected) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -109,10 +93,6 @@ TEST_F(VpiSimEventCb, ValueChangeCallbackOnNoObjectRejected) {
                "on an object");
 }
 
-// §38.36.1 and §38.36.1.1: so is every other callback about the one object its
-// obj field names: a size change of an array, queue or string, a statement
-// about to run, a disable of a block, task or call, and the making (on a class
-// typespec) or reclaiming (on one, or on a class object) of class objects.
 TEST_F(VpiSimEventCb, EveryCallbackAboutOneObjectIsRejectedOnNoObject) {
   for (int reason :
        {cbSizeChange, cbStmt, cbDisable, cbCreateObj, cbReclaimObj}) {
@@ -124,8 +104,6 @@ TEST_F(VpiSimEventCb, EveryCallbackAboutOneObjectIsRejectedOnNoObject) {
   }
 }
 
-// §38.36.1: a NULL obj stands for every force or release, so a force or
-// release callback placed on no object is accepted.
 TEST_F(VpiSimEventCb, ForceAndReleaseCallbacksOnNoObjectAccepted) {
   for (int reason : {cbForce, cbRelease}) {
     s_cb_data cb = {};
@@ -134,9 +112,6 @@ TEST_F(VpiSimEventCb, ForceAndReleaseCallbacksOnNoObjectAccepted) {
   }
 }
 
-// §38.36.1: the prohibition is specific to a bit-select target. A cbForce
-// callback on the whole variable (not a bit-select) is a legal registration and
-// produces a callback handle.
 TEST_F(VpiSimEventCb, ForceCallbackOnWholeVariableAccepted) {
   sim_ctx_.CreateVariable("whole", 1);
   vpi_ctx_.Attach(sim_ctx_);
@@ -149,9 +124,6 @@ TEST_F(VpiSimEventCb, ForceCallbackOnWholeVariableAccepted) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// §38.36.1: for a force/release callback a NULL obj means every force or
-// release should generate a callback - it is not a bit-select, so registration
-// is accepted rather than rejected by the bit-select rule.
 TEST_F(VpiSimEventCb, ForceCallbackWithNullObjectAccepted) {
   s_cb_data cb = {};
   cb.reason = cbForce;
@@ -159,9 +131,6 @@ TEST_F(VpiSimEventCb, ForceCallbackWithNullObjectAccepted) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// §38.36.1: the prohibition names only cbForce, cbRelease, and cbDisable. A
-// callback for a different reason (here cbValueChange) on the same variable
-// bit-select is outside the rule and is registered normally.
 TEST_F(VpiSimEventCb, ValueChangeCallbackOnBitSelectAccepted) {
   vpiHandle bit = MakeBitSelectHandle("v");
   ASSERT_NE(bit, nullptr);
@@ -172,10 +141,6 @@ TEST_F(VpiSimEventCb, ValueChangeCallbackOnBitSelectAccepted) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// A recording callback routine, used to observe what the simulator delivers to
-// a simulation-event callback when it fires. §38.36.1 states that the routine
-// is handed a pointer to an s_cb_data structure (not the one supplied at
-// registration) whose fields the simulator has shaped for the reason.
 int g_deliver_calls = 0;
 s_cb_data* g_delivered_ptr = nullptr;
 int g_delivered_reason = 0;
@@ -197,8 +162,6 @@ int RecordDelivery(s_cb_data* data) {
   return 0;
 }
 
-// Fixture for the delivery-time rules of §38.36.1: what the simulator passes to
-// the routine when a simulation-event callback fires.
 class VpiSimEventCbDelivery : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -220,14 +183,9 @@ class VpiSimEventCbDelivery : public ::testing::Test {
   DiagEngine diag_{mgr_};
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
-  // A variable to place a value change callback on where the case is about
-  // the delivery rather than the object.
   VpiObject watched_;
 };
 
-// §38.36.1: a cbReclaimObj callback has no relationship to simulation time, so
-// the time field passed to the routine is NULL - even though a time structure
-// with a concrete type was supplied at registration.
 TEST_F(VpiSimEventCbDelivery, ReclaimObjCallbackDeliveredWithoutTime) {
   s_vpi_time requested = {};
   requested.type = vpiSimTime;
@@ -246,12 +204,9 @@ TEST_F(VpiSimEventCbDelivery, ReclaimObjCallbackDeliveredWithoutTime) {
   EXPECT_EQ(fired, 1);
   EXPECT_EQ(g_deliver_calls, 1);
   EXPECT_EQ(g_delivered_reason, cbReclaimObj);
-  // The time->type supplied at registration is ignored; no time is passed.
   EXPECT_EQ(g_delivered_time, nullptr);
 }
 
-// §38.36.1: for cbEndOfObject as well, time information is not passed to the
-// callback routine, so the delivered time pointer is NULL.
 TEST_F(VpiSimEventCbDelivery, EndOfObjectCallbackDeliveredWithoutTime) {
   s_vpi_time requested = {};
   requested.type = vpiScaledRealTime;
@@ -268,10 +223,6 @@ TEST_F(VpiSimEventCbDelivery, EndOfObjectCallbackDeliveredWithoutTime) {
   EXPECT_EQ(g_delivered_time, nullptr);
 }
 
-// §38.36.1 (negative form of the time-drop rule): the rule names only
-// cbReclaimObj and cbEndOfObject. A different simulation-event reason that
-// asked for a time is given one, in a structure that belongs to the simulator
-// (§38.36) rather than the one the application registered.
 TEST_F(VpiSimEventCbDelivery, ValueChangeCallbackKeepsRequestedTime) {
   s_vpi_time requested = {};
   requested.type = vpiSimTime;
@@ -290,10 +241,6 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeCallbackKeepsRequestedTime) {
   EXPECT_NE(g_delivered_time, &requested);
 }
 
-// §38.36.1: when a simulation-event callback occurs the routine is passed a
-// pointer to an s_cb_data structure that is not the one supplied at
-// registration, and its user_data field is equivalent to the one that was
-// passed to vpi_register_cb().
 TEST_F(VpiSimEventCbDelivery,
        SimEventCallbackDeliversFreshStructPreservingUserData) {
   int payload = 42;
@@ -307,15 +254,10 @@ TEST_F(VpiSimEventCbDelivery,
   int fired = vpi_ctx_.DispatchCallbacks(cbValueChange);
 
   EXPECT_EQ(fired, 1);
-  // Not the structure passed to vpi_register_cb().
   EXPECT_NE(g_delivered_ptr, &cb);
-  // user_data reaches the routine unchanged.
   EXPECT_EQ(g_delivered_user_data, &payload);
 }
 
-// §38.36.1: for a cbForce callback the obj field delivered to the routine is a
-// handle to the force statement, which the simulator supplies when it fires the
-// callback.
 TEST_F(VpiSimEventCbDelivery, ForceCallbackDeliversForceStatementHandle) {
   VpiObject force_stmt;
   s_cb_data cb = {};
@@ -329,10 +271,6 @@ TEST_F(VpiSimEventCbDelivery, ForceCallbackDeliversForceStatementHandle) {
   EXPECT_EQ(g_delivered_obj, &force_stmt);
 }
 
-// §38.36.1: a force the run reports with no statement the model holds an
-// object for still calls a cbForce placed on no object, with no statement in
-// obj and, there being no left-hand side to read, the value structure it was
-// registered with as it was.
 TEST_F(VpiSimEventCbDelivery, AForceWithNoStatementObjectStillCallsBack) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -352,8 +290,6 @@ TEST_F(VpiSimEventCbDelivery, AForceWithNoStatementObjectStillCallsBack) {
   EXPECT_EQ(value.value.integer, 7);
 }
 
-// §38.36.1: the obj-is-the-statement rule covers cbRelease as well as cbForce;
-// a cbRelease callback is delivered a handle to the release statement.
 TEST_F(VpiSimEventCbDelivery, ReleaseCallbackDeliversReleaseStatementHandle) {
   VpiObject release_stmt;
   s_cb_data cb = {};
@@ -367,8 +303,6 @@ TEST_F(VpiSimEventCbDelivery, ReleaseCallbackDeliversReleaseStatementHandle) {
   EXPECT_EQ(g_delivered_obj, &release_stmt);
 }
 
-// §38.36.1: a cbAssign callback - fired after a procedural assign statement -
-// is likewise delivered a handle to that assign statement in obj.
 TEST_F(VpiSimEventCbDelivery, AssignCallbackDeliversAssignStatementHandle) {
   VpiObject assign_stmt;
   s_cb_data cb = {};
@@ -383,9 +317,6 @@ TEST_F(VpiSimEventCbDelivery, AssignCallbackDeliversAssignStatementHandle) {
   EXPECT_EQ(g_delivered_obj, &assign_stmt);
 }
 
-// §38.36.1: and a cbDeassign callback is delivered a handle to the deassign
-// statement, completing the four force/release/assign/deassign reasons whose
-// obj field is the responsible statement.
 TEST_F(VpiSimEventCbDelivery, DeassignCallbackDeliversDeassignStatementHandle) {
   VpiObject deassign_stmt;
   s_cb_data cb = {};
@@ -400,10 +331,6 @@ TEST_F(VpiSimEventCbDelivery, DeassignCallbackDeliversDeassignStatementHandle) {
   EXPECT_EQ(g_delivered_obj, &deassign_stmt);
 }
 
-// §38.36.1: for a cbDisable callback the obj field is a handle to the disabled
-// construct - a system task call, system function call, named begin, named
-// fork, task, or function. The simulator supplies that handle when it fires the
-// callback, so the routine sees it in obj.
 TEST_F(VpiSimEventCbDelivery, DisableCallbackDeliversDisabledConstructHandle) {
   VpiObject disabled_task;
   s_cb_data cb = {};
@@ -419,9 +346,6 @@ TEST_F(VpiSimEventCbDelivery, DisableCallbackDeliversDisabledConstructHandle) {
   EXPECT_EQ(g_delivered_obj, &disabled_task);
 }
 
-// §38.36.1 with §37.77: a disable the model holds no statement object for
-// names no block or task the callback could be given, so a cbDisable is not
-// called for it.
 TEST_F(VpiSimEventCbDelivery, ADisableWithNoStatementObjectCallsNothing) {
   s_cb_data cb = {};
   cb.reason = cbDisable;
@@ -436,8 +360,6 @@ TEST_F(VpiSimEventCbDelivery, ADisableWithNoStatementObjectCallsNothing) {
   EXPECT_EQ(g_deliver_calls, 0);
 }
 
-// §38.36.1: a cbReclaimObj placed on a class typespec is called as an object
-// of that class is reclaimed, and not as an object of another class is.
 TEST_F(VpiSimEventCbDelivery, AReclaimCallbackOnATypespecIsAboutItsClass) {
   VpiObject spec_c;
   spec_c.type = vpiClassTypespec;
@@ -465,8 +387,6 @@ TEST_F(VpiSimEventCbDelivery, AReclaimCallbackOnATypespecIsAboutItsClass) {
   EXPECT_EQ(g_delivered_obj, &of_c);
 }
 
-// §38.36.1: a cbReclaimObj placed on a class object is called as that object
-// is reclaimed, and not as another object of its class is.
 TEST_F(VpiSimEventCbDelivery, AReclaimCallbackOnAnObjectIsAboutItAlone) {
   VpiObject spec;
   spec.type = vpiClassTypespec;
@@ -490,9 +410,6 @@ TEST_F(VpiSimEventCbDelivery, AReclaimCallbackOnAnObjectIsAboutItAlone) {
   EXPECT_EQ(g_deliver_calls, 1);
 }
 
-// §38.36.1: a cbEndOfFrame, cbEndOfThread or cbEndOfObject placed on a frame, a
-// thread or a transient object is called as that one ends, and not as another
-// of its kind does.
 TEST_F(VpiSimEventCbDelivery, AnEndCallbackIsAboutTheObjectItIsPlacedOn) {
   VpiObject frames[2];
   VpiObject threads[2];
@@ -522,10 +439,6 @@ TEST_F(VpiSimEventCbDelivery, AnEndCallbackIsAboutTheObjectItIsPlacedOn) {
   EXPECT_EQ(g_deliver_calls, 3);
 }
 
-// §38.36.1: a cbValueChange callback may be placed on an event statement. Since
-// an event statement has no value, the value field the routine receives is
-// NULL, even though a value structure was supplied at registration. Here the
-// obj is the named-event object the trigger acts on.
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnNamedEventDeliversNullValue) {
   VpiObject named_event;
   named_event.type = vpiNamedEvent;
@@ -544,8 +457,6 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnNamedEventDeliversNullValue) {
   EXPECT_EQ(g_delivered_value, nullptr);
 }
 
-// §38.36.1: the same value-is-NULL delivery holds when the watched object is an
-// event statement itself, the other event-statement input form.
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnEventStatementDeliversNullValue) {
   VpiObject event_stmt;
   event_stmt.type = vpiEventStmt;
@@ -564,10 +475,6 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnEventStatementDeliversNullValue) {
   EXPECT_EQ(g_delivered_value, nullptr);
 }
 
-// §38.36.1: a cbValueChange callback may be placed on a class variable. Its
-// value is an opaque handle to a dynamic object and cannot be read through the
-// value field, so the routine receives a NULL value field (the referenced
-// object is identified through vpiObjId instead).
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnClassVarDeliversNullValue) {
   VpiObject class_var;
   class_var.type = vpiClassVar;
@@ -586,10 +493,6 @@ TEST_F(VpiSimEventCbDelivery, ValueChangeOnClassVarDeliversNullValue) {
   EXPECT_EQ(g_delivered_value, nullptr);
 }
 
-// §38.36.1 (negative form of the value-is-NULL rule): the NULL-value delivery
-// is specific to valueless/opaque objects. A cbValueChange callback on an
-// ordinary declared variable that asked for a value is given one, in a
-// structure that belongs to the simulator (§38.36).
 TEST_F(VpiSimEventCbDelivery, ValueChangeOnOrdinaryVariableKeepsValue) {
   sim_ctx_.CreateVariable("ord", 1);
   vpi_ctx_.Attach(sim_ctx_);
@@ -630,9 +533,6 @@ void ArmValueChanges() {
       vpi_handle_by_index(vpi_handle_by_name(VpiText("top.arr"), nullptr), 2));
 }
 
-// §38.36.1: a cbValueChange routine is called after each change of the value
-// of the object it was placed on, a write of the value it holds being no
-// change (#5106).
 TEST_F(EventCallbacksOfARun, AValueChangeCallbackFiresOnEachChange) {
   Armer() = &ArmValueChanges;
   Run(kValueChanges);
@@ -642,9 +542,6 @@ TEST_F(EventCallbacksOfARun, AValueChangeCallbackFiresOnEachChange) {
   EXPECT_EQ(EventDeliveries()[2].obj, "x");
 }
 
-// §38.36.1: the routine is given the current time and the object's new value
-// in the forms the registration asked for, and, for an array member, the
-// index of the member that changed (#5107).
 TEST_F(EventCallbacksOfARun, AValueChangeCallbackIsGivenTheTimeValueAndIndex) {
   Armer() = &ArmValueChanges;
   Run(kValueChanges);
@@ -658,8 +555,6 @@ TEST_F(EventCallbacksOfARun, AValueChangeCallbackIsGivenTheTimeValueAndIndex) {
   EXPECT_EQ(EventDeliveries()[2].time, 4u);
 }
 
-// §38.36.1 with §37.17 detail 14: a cbSizeChange routine is called after a
-// queue is resized, with its new size as its value (#5121).
 TEST_F(EventCallbacksOfARun, ASizeChangeCallbackFiresOnEachResize) {
   Armer() = [] { PlaceEventCallback(cbSizeChange, TopObject("top.q")); };
   Run("module top; timeunit 1ns; timeprecision 1ns; int q[$];\n"
@@ -675,9 +570,6 @@ TEST_F(EventCallbacksOfARun, ASizeChangeCallbackFiresOnEachResize) {
   EXPECT_EQ(kSizes[2].time, 2u);
 }
 
-// §38.36.1 with §37.17 detail 13: a cbValueChange routine placed on a bit of a
-// vector is called after each change of that bit, and not after a write that
-// changes only other bits of the vector (#7849).
 TEST_F(EventCallbacksOfARun,
        AValueChangeCallbackOnABitFiresWhenThatBitChanges) {
   Armer() = [] {
@@ -695,9 +587,6 @@ TEST_F(EventCallbacksOfARun,
   EXPECT_EQ(kChanges[1].time, 4u);
 }
 
-// §38.36.1: a resize calls the cbSizeChange routines placed on the queue it
-// resizes and none placed elsewhere, a queue watched for value changes alone
-// among them (#7849).
 TEST_F(EventCallbacksOfARun, AResizeCallsOnlyTheSizeCallbacksOfItsQueue) {
   Armer() = [] {
     PlaceEventCallback(cbValueChange, TopObject("top.q"));
@@ -714,8 +603,6 @@ TEST_F(EventCallbacksOfARun, AResizeCallsOnlyTheSizeCallbacksOfItsQueue) {
   EXPECT_EQ(kSizes[0].time, 2u);
 }
 
-// §38.36.1: cbStartOfThread is called whenever a thread is created, each
-// branch of a fork among them (#5122).
 TEST_F(EventCallbacksOfARun, AStartOfThreadCallbackFiresForEachForkBranch) {
   Armer() = [] { PlaceEventCallback(cbStartOfThread, nullptr); };
   Run("module top;\n"
@@ -724,8 +611,6 @@ TEST_F(EventCallbacksOfARun, AStartOfThreadCallbackFiresForEachForkBranch) {
   EXPECT_EQ(DeliveriesOf(cbStartOfThread).size(), 2u);
 }
 
-// §38.36.1: a cbCreateObj placed on a class typespec is called once each
-// constructor of an object of that type completes (#5123).
 TEST_F(EventCallbacksOfARun, ACreateObjCallbackFiresForEachNew) {
   Armer() = [] {
     PlaceEventCallback(cbCreateObj,
@@ -742,8 +627,6 @@ bool& BitPlacementRefused() {
   return refused;
 }
 
-// §38.36.1 with §37.17 detail 13: a cbForce, cbRelease or cbDisable may not
-// be placed on a bit-select of a variable, which a var bit is (#5124).
 TEST_F(EventCallbacksOfARun, AForceCallbackOnAVarBitIsRefused) {
   BitPlacementRefused() = false;
   Armer() = [] {
@@ -760,8 +643,6 @@ constexpr const char* kForceRelease =
     "  initial begin $arm; #1 force x = 5; #1 release x; end\n"
     "endmodule\n";
 
-// §38.36.1: a cbForce routine is called after a force of the object it was
-// placed on, given the forced value (#5125).
 TEST_F(EventCallbacksOfARun, AForceCallbackFiresAfterAForce) {
   Armer() = [] { PlaceEventCallback(cbForce, TopObject("top.x")); };
   Run(kForceRelease);
@@ -771,8 +652,6 @@ TEST_F(EventCallbacksOfARun, AForceCallbackFiresAfterAForce) {
   EXPECT_EQ(kForces[0].time, 1u);
 }
 
-// §38.36.1: a cbRelease routine is called after a release of the object it
-// was placed on, given its value after the release (#5126).
 TEST_F(EventCallbacksOfARun, AReleaseCallbackFiresAfterARelease) {
   Armer() = [] { PlaceEventCallback(cbRelease, TopObject("top.x")); };
   Run(kForceRelease);
@@ -782,8 +661,6 @@ TEST_F(EventCallbacksOfARun, AReleaseCallbackFiresAfterARelease) {
   EXPECT_EQ(kReleases[0].time, 2u);
 }
 
-// §38.36.1: a cbDisable routine is called after the named block it was
-// placed on is disabled (#5127).
 TEST_F(EventCallbacksOfARun, ADisableCallbackFiresWhenItsBlockIsDisabled) {
   Armer() = [] { PlaceEventCallback(cbDisable, TopObject("top.blk")); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"

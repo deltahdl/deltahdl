@@ -17,8 +17,6 @@ TEST(PackedUnionValidation, HardPackedUnion_SameWidth_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The equal-size obligation on a hard packed union is §7.3.1's own, so the
-// report here names the clause this file is named after.
 TEST(PackedUnionValidation, HardPackedUnion_DifferentWidth_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -32,10 +30,6 @@ TEST(PackedUnionValidation, HardPackedUnion_DifferentWidth_Error) {
                             2, "7.3.1"));
 }
 
-// What bars a real member is §7.2.1's restriction of packed structure and
-// union members to packed data types, not §7.3.1, which says only that a
-// packed union's members must be of equal size. The same holds for the string,
-// chandle and shortreal members below.
 TEST(PackedUnionValidation, PackedUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -105,8 +99,6 @@ TEST(PackedUnionValidation, SoftWithoutPackedKeyword_ValidatedAsPacked) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A soft union is a packed union too, so the §7.2.1 member-type restriction
-// reaches it although the equal-size rule of §7.3.1 does not.
 TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -120,9 +112,6 @@ TEST(PackedUnionValidation, SoftUnionRealMember_Rejected) {
                             2, "7.2.1"));
 }
 
-// shortreal is a non-integral real-family type distinct from `real`, and it
-// must also be rejected as a packed-union member. §7.2.1 is the rule that
-// rejects it, for the reason given above PackedUnionRealMember_Rejected.
 TEST(PackedUnionValidation, PackedUnionShortrealMember_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -136,9 +125,6 @@ TEST(PackedUnionValidation, PackedUnionShortrealMember_Rejected) {
                             2, "7.2.1"));
 }
 
-// §7.3.1 (integral-only, §6.11.1): the remaining predefined integral kinds
-// (byte/shortint/integer/time) are admissible packed-union members. Their sizes
-// differ, so the union is soft packed and its width is the largest (time = 64).
 TEST(PackedUnionValidation, SoftPackedUnionPredefinedIntegralKinds_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -153,12 +139,6 @@ TEST(PackedUnionValidation, SoftPackedUnionPredefinedIntegralKinds_Allowed) {
   EXPECT_EQ(vars[0].width, 64u);
 }
 
-// Table 6-8 gives time a predefined width of 64 bits, and §6.11.1 makes it a
-// simple bit vector type of that width wherever it appears -- including as a
-// union member. Pairing it with the narrowest predefined width isolates the
-// claim: the soft-packed union is as wide as its widest member, so 64 can only
-// have come from time. A time member read as a one-bit vector would leave byte
-// the widest and the union 8 bits.
 TEST(PackedUnionValidation, SoftPackedUnionTimeMemberIsSixtyFourBits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -173,10 +153,6 @@ TEST(PackedUnionValidation, SoftPackedUnionTimeMemberIsSixtyFourBits) {
   EXPECT_EQ(vars[0].width, 64u);
 }
 
-// §7.3.1: a union mixing a 4-state member with a 2-state member is 4-state.
-// This exercises the 4-state `integer` kind (distinct from `logic`) against
-// 2-state `int`; both are 32 bits, so the hard-packed same-size rule is
-// satisfied.
 TEST(PackedUnionValidation, MixedStateIntegerAndInt_UnionIs4State) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -215,8 +191,6 @@ TEST(PackedUnionValidation, EnumMemberInPackedUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Every member is measured against the first, so naming the third member and
-// the first in the report is what says the check did not stop at the second.
 TEST(PackedUnionValidation, HardPackedThreeMembers_ThirdDiffers_Error) {
   ElabFixture f;
   ElaborateSrc(

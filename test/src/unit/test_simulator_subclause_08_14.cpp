@@ -197,9 +197,6 @@ TEST(OverriddenMemberSimulation, E2eNonOverriddenMemberAccessibleThroughBase) {
             5u);
 }
 
-// §8.14: a write through a base-typed reference targets the base-level slot of
-// a shadowed property, leaving the derived level's slot untouched -- the
-// write-side static-binding production helper.
 TEST(OverriddenMemberSimulation, WriteThroughBaseTypeTargetsBaseSlot) {
   SimFixture f;
   auto* base = MakeClassType(f, "Packet", {"i"});
@@ -215,14 +212,6 @@ TEST(OverriddenMemberSimulation, WriteThroughBaseTypeTargetsBaseSlot) {
   EXPECT_EQ(obj->GetPropertyForType("i", derived, f.arena).ToUint64(), 2u);
 }
 
-// §8.14: the clause's headline example, verbatim in spirit. The base "get"
-// returns its own property "i" rather than a literal, so calling p.get()
-// through a base handle exercises BOTH facets of the rule at once: the
-// non-virtual call selects the base method, and inside that base method the
-// unqualified "i" binds to the base's property (1), never the derived override
-// (-2). The literal-returning method test above only observes method selection;
-// this one observes the claim that a base-class handle reaches the base class's
-// own original members.
 TEST(OverriddenMemberSimulation,
      E2eBaseMethodReadsBasePropertyThroughBaseHandle) {
   EXPECT_EQ(RunAndGet("class Packet;\n"
@@ -251,9 +240,6 @@ TEST(OverriddenMemberSimulation,
             1u);
 }
 
-// §8.14: static binding holds at every level of the chain, not just the root.
-// A mid-chain (B) handle pointing at a C object sees B's member, hiding C's
-// override -- exercised through the full elaborate/lower/run path.
 TEST(OverriddenMemberSimulation, E2eIntermediateHandleSeesIntermediateMember) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -280,13 +266,6 @@ TEST(OverriddenMemberSimulation, E2eIntermediateHandleSeesIntermediateMember) {
   LowerRunAndCheck(f, design, {{"result", 2u}});
 }
 
-// §8.14: the static-binding rule applies to a base handle produced by ARGUMENT
-// PASSING, not only by a local upcast assignment. A function formal typed as
-// the base class, bound to a derived actual, is a distinct production path for
-// the base handle (formal-argument binding records the declared type). Reading
-// the shadowed property through the formal must yield the base value (1), not
-// the derived override (2). Built from §8.5 property + §8.6 function + §8.13
-// extends real syntax and driven through the full pipeline.
 TEST(OverriddenMemberSimulation, E2eBasePropertyThroughBaseTypedArgument) {
   EXPECT_EQ(RunAndGet("class Packet;\n"
                       "  integer i = 1;\n"
@@ -309,10 +288,6 @@ TEST(OverriddenMemberSimulation, E2eBasePropertyThroughBaseTypedArgument) {
             1u);
 }
 
-// §8.14: the method-binding facet of the same argument-passing input form. A
-// non-virtual method called through a base-typed formal selects the base
-// method (10), not the derived override (20), because the formal's declared
-// type governs the dispatch.
 TEST(OverriddenMemberSimulation, E2eBaseMethodThroughBaseTypedArgument) {
   EXPECT_EQ(RunAndGet("class Packet;\n"
                       "  function integer get();\n"

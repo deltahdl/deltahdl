@@ -31,10 +31,6 @@
 
 namespace delta {
 
-// §23.11: a bind_target_scope shall be a module or an interface. A program or
-// checker name is not a legal target scope, so only module and interface names
-// are recognized here; anything else falls through to instance matching and, if
-// it names no instance either, is reported as an unbindable target.
 static bool IsBindTargetScope(std::string_view target,
                               const CompilationUnit* unit) {
   if (target.find('.') != std::string_view::npos) return false;
@@ -57,9 +53,6 @@ static std::unordered_set<std::string_view> CollectDeclaredNames(
   return names;
 }
 
-// §23.11: a bind directive and the module, interface or program it is written
-// in, empty for one at compilation-unit scope. §23.8 resolves the directive's
-// target instance from that scope, so the walk needs both.
 struct BindDirectiveSite {
   BindDirective* bd;
   std::string_view owner;
@@ -79,14 +72,11 @@ static std::vector<BindDirectiveSite> CollectBindDirectives(
   return binds;
 }
 
-// The last identifier of a dotted bind target path, the instance it names
-// within the one before.
 static std::string_view LastPathSegment(std::string_view path) {
   size_t dot = path.rfind('.');
   return dot == std::string_view::npos ? path : path.substr(dot + 1);
 }
 
-// Whether directive `bd` targets the instance `inst` of module `module`.
 static bool BindTargetsInstance(const BindDirective* bd,
                                 std::string_view module, std::string_view inst,
                                 const CompilationUnit* unit) {
@@ -111,26 +101,15 @@ bool BindIntroducesName(const CompilationUnit* unit, std::string_view module,
   return false;
 }
 
-// What the walk over the elaborated hierarchy carries: the directives being
-// matched, the modules already visited (a cycle guard), the directives that
-// matched a target, the entries of target instance lists that matched an
-// instance, and the module each hierarchical path visited so far names.
 struct BindWalkState {
   const std::vector<BindDirectiveSite>& binds;
   std::unordered_set<RtlirModule*> visited;
   std::unordered_set<const BindDirective*> applied;
   std::unordered_set<const BindTargetInstance*> matched;
   std::unordered_map<std::string, std::string_view> path_modules;
-  // Each target's path with its selects evaluated, as SelectedTargetPath
-  // gives it.
   std::unordered_map<const BindTargetInstance*, std::string> paths;
 };
 
-// A.1.4 with A.9.3: the path `target` names, each select of each of its levels
-// evaluated against `scope` as the constant_bit_select it is written as, so
-// that `u[1]` and `g[1].v` read as the walk spells an element of an instance
-// array and an instance in a loop generate block. A select that is no
-// constant is reported at `loc`, and the path then names no instance.
 static std::string SelectedTargetPath(const BindTargetInstance& target,
                                       const ScopeMap& scope, SourceLoc loc,
                                       DiagEngine& diag) {
@@ -157,13 +136,6 @@ static std::string SelectedTargetPath(const BindTargetInstance& target,
 
 struct Elaborator::BindWalkCtx : BindWalkState {};
 
-// §23.11: the bind_target_scope shall be a module or an interface, and a
-// bind_target_instance shall be an instance of a module or an interface. A
-// target naming a known scope is honored designwide even when that scope is
-// never instantiated, but a target that resolves to neither a known scope
-// nor any instance in the hierarchy denotes nothing bindable and is an error.
-// With a bind_target_instance_list, each entry names an instance of the
-// target scope, so an entry that matched none is reported as well.
 static void ReportUnmatchedBindTargets(const BindWalkState& ctx,
                                        const CompilationUnit* unit,
                                        DiagEngine& diag) {
@@ -186,8 +158,6 @@ static void ReportUnmatchedBindTargets(const BindWalkState& ctx,
   }
 }
 
-// An elaborated instance of the module `name` at or below `tops`, whose
-// parameters a bind directive written in that module selects its targets with.
 static const RtlirModule* AnInstanceOf(const std::vector<RtlirModule*>& tops,
                                        std::string_view name) {
   std::vector<const RtlirModule*> pending(tops.begin(), tops.end());
@@ -204,8 +174,6 @@ static const RtlirModule* AnInstanceOf(const std::vector<RtlirModule*>& tops,
 
 void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
   std::vector<BindDirectiveSite> binds = CollectBindDirectives(unit_);
-  // §27.5: a directive in a generate block no construct selected was never
-  // instantiated, and binds nothing.
   std::erase_if(binds, [this](const BindDirectiveSite& site) {
     return site.bd->in_generate_block && !generate_binds_.contains(site.bd);
   });
@@ -231,12 +199,6 @@ void Elaborator::ApplyBindDirectives(const std::vector<RtlirModule*>& tops) {
       tops, [this](std::string_view name) { return FindModule(name); }, diag_);
 }
 
-// §23.11 with §23.8: whether `target`, a bind target instance, names the
-// instance at `hier_path`. Its path names it in full from a top, as one
-// written from `$root` and every one at compilation-unit scope must; or, for
-// a directive written in module `owner`, from an instance of that module, as
-// `bind sub: s2` written in top names top's s2: the instance at `hier_path`
-// less the written path is then one of `owner`.
 static bool TargetInstanceNames(const BindTargetInstance& target,
                                 std::string_view owner,
                                 const std::string& hier_path,
@@ -272,28 +234,15 @@ static bool BindAppliesToModule(const BindDirectiveSite& site,
   return named;
 }
 
-// Build the dotted hierarchical path of a child instance from its parent path.
-// §23.11 names a bind target by its hierarchical path, which reaches an
-// instance in a generate block through the block's name (§27.3, §23.6), so the
-// path is built from the instance's own name and the generate block steps
-// above it rather than from RtlirModuleInst::inst_name, which flattens the
-// two into the one identifier the simulator keys storage on.
 static std::string BindChildPath(const std::string& hier_path,
                                  const RtlirModuleInst& child) {
   std::string path =
       HierInstancePath(hier_path, child.gen_block_path, child.simple_inst_name);
-  // PushInstanceArray names an element of a §23.3.3.5 instance array `u[1]` on
-  // inst_name alone, and the element's index is part of the path that names it.
   std::string_view flat = child.inst_name;
   if (flat.ends_with(']')) path.append(flat.substr(flat.rfind('[')));
   return path;
 }
 
-// §23.11 with §23.3.3.5: the elements of an instance array share one
-// module, and a directive that names one element binds into it alone, so
-// whether a directive names the element `elem` at `path`, which then needs a
-// module of its own. One whose target is a whole scope binds into every
-// element, and leaves them sharing.
 static bool BindNamesArrayElement(const RtlirModuleInst& elem,
                                   const std::string& path,
                                   const CompilationUnit* unit,
@@ -317,8 +266,6 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
 
   for (const auto& site : ctx.binds) {
     if (!BindAppliesToModule(site, mod, hier_path, unit_, ctx)) continue;
-    // The target resolved to a real scope or instance, so it is bindable even
-    // if elaboration of the instantiation later reports a different error.
     ctx.applied.insert(site.bd);
     if (under_bind) {
       diag_.Error(site.bd->loc,
@@ -329,9 +276,6 @@ void Elaborator::WalkForBind(RtlirModule* mod, const std::string& hier_path,
     ApplyBindInstance(site.bd, mod);
   }
 
-  // Every element a directive names gets its module before any child is
-  // walked, so that the copy does not carry what a directive binding the whole
-  // scope has put in the shared module already, and then get it again.
   for (auto& c : mod->children) {
     if (c.resolved &&
         BindNamesArrayElement(c, BindChildPath(hier_path, c), unit_, ctx)) {
@@ -355,8 +299,6 @@ static bool TargetHasSignal(const RtlirModule* target, std::string_view name) {
   return false;
 }
 
-// §26.3: whether the target reads `name` somewhere, in a continuous
-// assignment or a procedure, which is what imports a wildcard candidate.
 static bool TargetReferencesName(const RtlirModule* target,
                                  std::string_view name) {
   if (std::ranges::any_of(target->assigns, [name](const RtlirContAssign& ca) {
@@ -373,9 +315,6 @@ static bool TargetReferencesName(const RtlirModule* target,
       reads, [name](const Expr* read) { return read->text == name; });
 }
 
-// §23.11: a bound instance sees what is declared in or imported into its
-// target, a wildcard candidate once the target has imported it by a reference
-// and never through the bind itself.
 static bool TargetSeesSignal(const RtlirModule* target,
                              const CompilationUnit* unit,
                              std::string_view name) {
@@ -385,13 +324,6 @@ static bool TargetSeesSignal(const RtlirModule* target,
           TargetReferencesName(target, name));
 }
 
-// Every identifier port connection in the bind instantiation must name a signal
-// declared in the target scope. Returns false (after reporting) on the first
-// connection that refers to an undeclared signal. An ordered connection is
-// reported by the name of the port of `bound` it stands at.
-// The scopes a bind instantiation's connections are read against: the target
-// it is bound into, the module it instantiates, and the compilation unit
-// holding the packages the target imports from.
 struct BindConnScopes {
   const RtlirModule* target;
   const ModuleDecl* bound;
@@ -455,10 +387,6 @@ static void BuildBoundPortBindings(const ModuleItem* item,
   }
 }
 
-// §23.11 (printed page 773): every identifier of a bind instantiation is
-// resolved from the bind target's point of view, `.*` among them, so a port the
-// wildcard reaches connects to the target's signal of its name (§23.3.2.4), or
-// else takes its default value.
 static void BuildBoundWildcardBindings(const ModuleItem* item,
                                        const RtlirModule* resolved,
                                        const RtlirModule* target, Arena& arena,
@@ -527,16 +455,7 @@ void Elaborator::ApplyBindInstance(BindDirective* bd, RtlirModule* target) {
     return;
   }
 
-  // §23.11: a bind_instantiation admits the full range of instantiation syntax,
-  // so any parameter overrides written on it must take effect. Per the same
-  // subclause, the actuals refer to objects from the viewpoint of the bind
-  // target, so the override expressions are evaluated against the target
-  // scope's resolved parameter environment.
   ParamList child_params;
-  // §23.9: the generate blocks in force here belong to the module holding the
-  // bind, and `target` is another module, so none of its block-local parameters
-  // is visible to these actuals. The empty list is what a reference among
-  // `target`'s own items sees.
   ScopeMap target_scope = BuildParamScope(target, {});
   ResolveInstParams(item, child_decl, target_scope, child_params, diag_);
   auto* resolved = ElaborateModule(child_decl, child_params);
@@ -585,25 +504,16 @@ using FindModuleFn = std::function<ModuleDecl*(std::string_view)>;
 using ExportBuckets =
     std::unordered_map<ExportKey, std::vector<ExportSite>, ExportKeyHash>;
 
-// §25.7: a modport reference names the interface instance and, optionally, the
-// modport on that instance through which a subroutine is exported. The two
-// names always travel together when resolving and recording an export.
 struct ModportRef {
   std::string_view iface_inst;
   std::string_view modport;
 };
 
-// The child instance whose port bindings are scanned for modport exports: the
-// resolved instance plus the module declaration that may supply out-of-block
-// subroutine bodies.
 struct BoundChild {
   const RtlirModuleInst& child;
   const ModuleDecl* child_decl;
 };
 
-// Shared state for one export-conflict scan: the interface-instance type map
-// and module lookup used to resolve connections, the per-export-key buckets
-// that accumulate matched export sites, and the diagnostic sink.
 struct ExportScan {
   const std::unordered_map<std::string_view, std::string_view>&
       iface_inst_to_type;
@@ -658,9 +568,6 @@ CollectInterfaceInstances(const RtlirModule* mod,
   return iface_inst_to_type;
 }
 
-// Decode a port connection expression into the interface instance name and, if
-// the connection names a modport, the modport name. Returns false when the
-// connection is not a plain identifier or interface.modport member access.
 bool DecodeInterfaceConnection(const Expr* conn,
                                std::string_view& iface_inst_name,
                                std::string_view& modport_name) {
@@ -678,14 +585,9 @@ bool DecodeInterfaceConnection(const Expr* conn,
   return false;
 }
 
-// Record one matched export (modport port `pp` satisfied by `body`) into the
-// per-export-key buckets, reporting a prototype mismatch where one applies.
 void RecordExportSite(const ModportPort& pp, const ModuleItem* body,
                       const BoundChild& bound, const ModportRef& ref,
                       ExportScan& scan) {
-  // §25.7: an export written as a full prototype pins the signature
-  // the defining module must provide; a definition that does not
-  // match it exactly is an elaboration error.
   if (pp.prototype && !PrototypeMatchesSubroutine(pp.prototype, body)) {
     scan.diag.Error(
         body->loc,
@@ -711,12 +613,6 @@ void CollectModportExportSites(const ModportDecl* mp, const BoundChild& bound,
     const auto* body =
         FindOutOfBlockBodyInChild(bound.child_decl, binding.port_name, pp.name);
     if (!body) {
-      // §25.7: a module connected to a modport that exports a subroutine shall
-      // itself define that subroutine; a connected module that supplies no
-      // definition is an elaboration error. Enforced only for an explicitly
-      // named modport connection (ref.modport set), matching the standard's
-      // wording of a connection to a modport holding an exported subroutine; a
-      // whole-interface connection selects no single modport to bind against.
       if (!ref.modport.empty()) {
         scan.diag.Error(
             pp.prototype ? pp.prototype->loc : mp->loc,
@@ -733,9 +629,6 @@ void CollectModportExportSites(const ModportDecl* mp, const BoundChild& bound,
   }
 }
 
-// Resolve the interface declaration a port binding connects to, decoding the
-// interface instance and (optional) modport names. Returns null when the
-// binding does not connect to a known interface instance.
 const ModuleDecl* ResolveBoundInterface(
     const RtlirPortBinding& binding,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -751,8 +644,6 @@ const ModuleDecl* ResolveBoundInterface(
   return find_module(it->second);
 }
 
-// Collect export sites for one port binding, dispatching to the named modport
-// or, when no modport is named, to every modport of the connected interface.
 void CollectBindingExportSites(const BoundChild& bound,
                                const RtlirPortBinding& binding,
                                const ModuleDecl* iface_decl,
@@ -768,10 +659,6 @@ void CollectBindingExportSites(const BoundChild& bound,
   }
 }
 
-// §25.7: an interface "announces" a subroutine it does not define itself when
-// the interface body declares it `extern` or one of the interface's modports
-// `export`s it. A hierarchical (out-of-block) definition supplied by a module
-// is only legal for a subroutine the interface announces this way.
 bool InterfaceAnnouncesSubroutine(const ModuleDecl* iface,
                                   std::string_view name) {
   if (FindInterfaceExternPrototype(iface, name)) return true;
@@ -783,11 +670,6 @@ bool InterfaceAnnouncesSubroutine(const ModuleDecl* iface,
   return false;
 }
 
-// §25.7: when a module defines a subroutine for an interface using a
-// hierarchical name (an out-of-block body keyed to the interface port), that
-// subroutine shall also be declared `extern` in the interface or `export`ed by
-// one of its modports. A hierarchical definition the interface never announces
-// is an elaboration error.
 void CheckHierarchicalBodiesAnnounced(const BoundChild& bound,
                                       const RtlirPortBinding& binding,
                                       const ModuleDecl* iface_decl,
@@ -811,8 +693,6 @@ void CheckHierarchicalBodiesAnnounced(const BoundChild& bound,
   }
 }
 
-// Walk one child instance's port bindings, mapping every modport export it
-// satisfies into the per-export-key buckets used to detect conflicts.
 void CollectChildExportSites(const BoundChild& bound, ExportScan& scan) {
   for (const auto& binding : bound.child.port_bindings) {
     ModportRef ref;

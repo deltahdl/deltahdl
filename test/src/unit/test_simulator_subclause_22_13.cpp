@@ -32,11 +32,6 @@ TEST(FileAndLineMacroSimulation, LineValueDiffersPerLine) {
   EXPECT_EQ(result, 6u);
 }
 
-// Claim A: `__FILE__ expands to a string literal. The preprocessor tests
-// observe the literal text; this drives that expansion through the full
-// pipeline to confirm the produced token is a genuine, consumable SV string
-// literal. The top source is registered as "<test>", so the expansion equals
-// that path and the string comparison holds.
 TEST(FileAndLineMacroSimulation, FileExpandsToConsumableStringLiteral) {
   auto result = PreprocessAndGet(
       "module t;\n"
@@ -51,11 +46,6 @@ TEST(FileAndLineMacroSimulation, FileExpandsToConsumableStringLiteral) {
   EXPECT_EQ(result, 1u);
 }
 
-// Claim E, end-to-end through the §22.12 `line dependency: a `line directive
-// renumbers the following line, and `__LINE__ must reflect that override. Built
-// from real `line syntax and driven through parse/elaborate/run so the observed
-// simulated value (500, not the natural source line 4) confirms the macro
-// consumed the overridden number.
 TEST(FileAndLineMacroSimulation, LineDirectiveOverridesLineValueEndToEnd) {
   auto result = PreprocessAndGet(
       "module t;\n"
@@ -67,10 +57,6 @@ TEST(FileAndLineMacroSimulation, LineDirectiveOverridesLineValueEndToEnd) {
   EXPECT_EQ(result, 500u);
 }
 
-// Claim D, end-to-end through the §22.4 `include dependency: while processing
-// an included file, `__LINE__ corresponds to that file. The macro sits on line
-// 5 of the included file (padded), so the simulated value discriminates the
-// included file's line from the `include site's line 3 in the top source.
 TEST(FileAndLineMacroSimulation, IncludedFileLineValueEndToEnd) {
   std::string tmp_dir = "/tmp/dhl_22_13_sim_include";
   std::string inc_path = tmp_dir + "/incline.svh";

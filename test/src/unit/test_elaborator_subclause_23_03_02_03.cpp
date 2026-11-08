@@ -110,10 +110,6 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForNonEquivalentDataTypes) {
 
 TEST(ImplicitNamedPortConnectionElaboration,
      ImplicitConnectionDoesNotUseDefault) {
-  // 23.3.2.3: when an implicit .name connection is used it is assumed the
-  // coder intends to connect the like-named signal, so the input port's
-  // default value is NOT used even though one is specified. The binding must
-  // therefore be the like-named signal identifier, not the default literal.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a = 1'b1);\n"
@@ -132,17 +128,11 @@ TEST(ImplicitNamedPortConnectionElaboration,
   ASSERT_NE(bindings[0].connection, nullptr);
   EXPECT_EQ(bindings[0].connection->kind, ExprKind::kIdentifier);
   EXPECT_EQ(bindings[0].connection->text, "a");
-  // The connection is the signal, distinct from the port's default value.
   EXPECT_NE(bindings[0].connection,
             mod->children[0].resolved->ports[0].default_value);
 }
 
 TEST(ImplicitNamedPortConnectionElaboration, EmptyParensLeavesPortUnconnected) {
-  // 23.3.2.3: to leave a port that has a default value unconnected, empty
-  // parentheses are written after the name (.name()). In contrast to the
-  // implicit .name form -- which connects the like-named signal -- the empty
-  // form connects nothing, and the default value is still not used. The
-  // like-named signal 'a' exists in scope yet is deliberately NOT connected.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a = 1'b1);\n"
@@ -158,18 +148,12 @@ TEST(ImplicitNamedPortConnectionElaboration, EmptyParensLeavesPortUnconnected) {
   ASSERT_EQ(mod->children.size(), 1u);
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_EQ(bindings.size(), 1u);
-  // No signal is connected, and the default is present but left unused: the
-  // unconnected net port takes 'z (§23.3.3.3).
   ASSERT_NE(bindings[0].connection, nullptr);
   EXPECT_EQ(bindings[0].connection->kind, ExprKind::kUnbasedUnsizedLiteral);
   EXPECT_NE(mod->children[0].resolved->ports[0].default_value, nullptr);
 }
 
 TEST(ImplicitNamedPortConnectionElaboration, ErrorForDissimilarNetTypes) {
-  // 23.3.2.3: an implicit .name connection between two genuinely dissimilar
-  // net types is an error -- precisely the cases where an explicit named
-  // connection only warns (23.3.3.7). A wand port driven by a wor signal is
-  // such a case.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wand a);\n"
@@ -186,9 +170,6 @@ TEST(ImplicitNamedPortConnectionElaboration, ErrorForDissimilarNetTypes) {
 
 TEST(ImplicitNamedPortConnectionElaboration,
      ExplicitDissimilarNetTypesOnlyWarns) {
-  // Contrast with the implicit form above: an explicit .a(a) named connection
-  // of the same dissimilar net types is only a warning, not an error. The
-  // 23.3.2.3 escalation to an error applies only to the implicit .name form.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wand a);\n"
@@ -205,10 +186,6 @@ TEST(ImplicitNamedPortConnectionElaboration,
 
 TEST(ImplicitNamedPortConnectionElaboration,
      EquivalentNetTypesConnectWithoutError) {
-  // 23.3.2.3: the dissimilar-net-type error is limited to genuinely dissimilar
-  // nets. wire and tri are equivalent aliases, so an implicit .name connection
-  // between a wire port and a tri signal is accepted with no error and the
-  // signal is bound.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout wire a);\n"
@@ -227,11 +204,6 @@ TEST(ImplicitNamedPortConnectionElaboration,
   EXPECT_NE(bindings[0].connection, nullptr);
 }
 
-// 23.3.2.3: an implicit .name connection needs its name declared in the
-// instantiating scope, and an interface instance is one such declaration for an
-// interface port (§25.3.2). This is the control for that acceptance: with no
-// instance and no signal of the name `iface` in top -- the only `iface` being
-// the port of `sub` -- the connection is still reported, on line 7.
 TEST(ImplicitNamedPortConnectionElaboration,
      ErrorWhenInterfaceInstanceNotDeclared) {
   ElabFixture f;
@@ -250,11 +222,6 @@ TEST(ImplicitNamedPortConnectionElaboration,
                             "23.3.2.3"));
 }
 
-// §23.3.2.3 with §6.22.2: the declarations either side of the implicit
-// connection have equivalent data types, so an int port joined to a 4-state
-// unsigned vector of its width, and a signed port joined to an unsigned vector
-// of its width, are each reported, while a 4-state net port joined to a logic
-// vector, a 2-state port to a bit vector and an output to a wire are not.
 TEST(ImplicitNamedPortConnectionElaboration,
      SameWidthButNonEquivalentTypesAreReported) {
   ElabFixture f;
@@ -283,11 +250,6 @@ TEST(ImplicitNamedPortConnectionElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 10, "23.3.2.3"));
 }
 
-// §23.3.2.3: a `.name` connection to a variable a package import brings into
-// the instantiating module is no error, from an explicit import or a wildcard
-// one alike, whichever of the packages declares it; a name imported only
-// inside a generate block is not visible at module level (§26.3 with §27.5),
-// and a `.name` connection to it stays an error.
 TEST(ImplicitNamedPortConnectionElaboration, ImportedNamesAreDeclared) {
   ElabFixture f;
   ElaborateSrc(

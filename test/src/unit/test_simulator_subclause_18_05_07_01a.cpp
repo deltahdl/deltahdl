@@ -11,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// A plain integral rand variable over [lo, hi].
 RandVariable MakeVar(const std::string& name, int64_t lo, int64_t hi) {
   RandVariable v;
   v.name = name;
@@ -21,8 +20,6 @@ RandVariable MakeVar(const std::string& name, int64_t lo, int64_t hi) {
   return v;
 }
 
-// A single-variable equality constraint, used as a per-element foreach body or
-// as a top-level hard constraint pinning a value.
 ConstraintExpr Eq(const std::string& name, int64_t value) {
   ConstraintExpr c;
   c.kind = ConstraintKind::kEqual;
@@ -31,9 +28,6 @@ ConstraintExpr Eq(const std::string& name, int64_t value) {
   return c;
 }
 
-// 18.5.7.1: a foreach iterative constraint applies its constraint_set to the
-// elements of the array. For a fixed-size array (no size variable), every
-// per-element constraint is imposed.
 TEST(ForeachIterativeConstraint, AppliesConstraintToEveryElement) {
   ConstraintSolver solver(42);
   for (int i = 0; i < 3; ++i)
@@ -58,12 +52,6 @@ TEST(ForeachIterativeConstraint, AppliesConstraintToEveryElement) {
     EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
 }
 
-// 18.5.7.1: within a foreach block, the array's size reads as a state variable.
-// With the size pinned to 2, the iterative constraint applies only to the two
-// elements that exist (indices 0 and 1); the remaining elements are not
-// iterated, so their conflicting hard constraints can be satisfied. Were the
-// foreach to ignore the size and constrain all four elements, e2 == 0 would
-// clash with the hard e2 == 1 and randomization would fail.
 TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
   ConstraintSolver solver(7);
   RandVariable n = MakeVar("n", 2, 2);
@@ -72,7 +60,6 @@ TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
   for (int i = 0; i < 4; ++i)
     solver.AddVariable(MakeVar("e" + std::to_string(i), 0, 1));
 
-  // foreach (arr[i]) arr[i] == 0;  -- over a dynamically sized array 'arr'.
   ConstraintBlock fb;
   fb.name = "fc";
   ConstraintExpr fe;
@@ -83,7 +70,6 @@ TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
   fb.constraints.push_back(fe);
   solver.AddConstraintBlock(fb);
 
-  // Hard constraints on the elements beyond the current size.
   ConstraintBlock hb;
   hb.name = "tail";
   hb.constraints.push_back(Eq("e2", 1));
@@ -92,19 +78,12 @@ TEST(ForeachIterativeConstraint, SizeLimitsIteratedElements) {
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("n"), 2);
-  EXPECT_EQ(solver.GetValue("e0"), 0);  // iterated: foreach imposed e0 == 0
-  EXPECT_EQ(solver.GetValue("e1"), 0);  // iterated: foreach imposed e1 == 0
-  EXPECT_EQ(solver.GetValue("e2"), 1);  // beyond size: foreach did not apply
-  EXPECT_EQ(solver.GetValue("e3"), 1);  // beyond size: foreach did not apply
+  EXPECT_EQ(solver.GetValue("e0"), 0);
+  EXPECT_EQ(solver.GetValue("e1"), 0);
+  EXPECT_EQ(solver.GetValue("e2"), 1);
+  EXPECT_EQ(solver.GetValue("e3"), 1);
 }
 
-// 18.5.7.1: the solver settles size constraints before it turns to the
-// iterative ones; the size method behaves as a state variable in the foreach.
-// Here the size is itself random — its domain is [0:5] but a separate size
-// constraint confines it to 1 (A.size as a random variable). The foreach then
-// reads that committed value and constrains exactly the one element that
-// exists, leaving the trailing element (which carries a conflicting hard
-// constraint) free.
 TEST(ForeachIterativeConstraint, SizeConstraintSolvedBeforeIteration) {
   ConstraintSolver solver(123);
   RandVariable n = MakeVar("n", 0, 5);
@@ -113,7 +92,6 @@ TEST(ForeachIterativeConstraint, SizeConstraintSolvedBeforeIteration) {
   solver.AddVariable(MakeVar("e0", 0, 1));
   solver.AddVariable(MakeVar("e1", 0, 1));
 
-  // Size constraint: n inside [1:1] (A.size is a random variable here).
   ConstraintBlock sb;
   sb.name = "size_c";
   ConstraintExpr sz;
@@ -124,7 +102,6 @@ TEST(ForeachIterativeConstraint, SizeConstraintSolvedBeforeIteration) {
   sb.constraints.push_back(sz);
   solver.AddConstraintBlock(sb);
 
-  // Iterative constraint: foreach (arr[i]) arr[i] == 0 (A.size is a state var).
   ConstraintBlock fb;
   fb.name = "fc";
   ConstraintExpr fe;
@@ -135,7 +112,6 @@ TEST(ForeachIterativeConstraint, SizeConstraintSolvedBeforeIteration) {
   fb.constraints.push_back(fe);
   solver.AddConstraintBlock(fb);
 
-  // Hard constraint on the trailing element (beyond the chosen size of 1).
   ConstraintBlock hb;
   hb.name = "tail";
   hb.constraints.push_back(Eq("e1", 1));
@@ -143,15 +119,10 @@ TEST(ForeachIterativeConstraint, SizeConstraintSolvedBeforeIteration) {
 
   ASSERT_TRUE(solver.Solve());
   EXPECT_EQ(solver.GetValue("n"), 1);
-  EXPECT_EQ(solver.GetValue("e0"), 0);  // iterated: foreach imposed e0 == 0
-  EXPECT_EQ(solver.GetValue("e1"), 1);  // beyond size: foreach did not apply
+  EXPECT_EQ(solver.GetValue("e0"), 0);
+  EXPECT_EQ(solver.GetValue("e1"), 1);
 }
 
-// 18.5.7.1: when the array's size equals the number of elements, the foreach
-// iterates over all of them, so every per-element constraint is imposed. The
-// size method is still read as a state variable to bound the iteration; here
-// that bound covers the whole array, in contrast to the cases above where it
-// excludes the trailing elements.
 TEST(ForeachIterativeConstraint, SizeEqualToElementCountConstrainsAll) {
   ConstraintSolver solver(5);
   RandVariable n = MakeVar("n", 3, 3);
@@ -181,9 +152,6 @@ TEST(ForeachIterativeConstraint, SizeEqualToElementCountConstrainsAll) {
     EXPECT_GT(solver.GetValue("e" + std::to_string(i)), 0);
 }
 
-// 18.5.7.1: when the size method is zero, the foreach iterates over no
-// elements, so even a per-element constraint that is impossible in isolation
-// imposes nothing and randomization succeeds.
 TEST(ForeachIterativeConstraint, ZeroSizeMakesForeachVacuous) {
   ConstraintSolver solver(99);
   RandVariable n = MakeVar("n", 0, 0);
@@ -196,7 +164,6 @@ TEST(ForeachIterativeConstraint, ZeroSizeMakesForeachVacuous) {
   ConstraintExpr fe;
   fe.kind = ConstraintKind::kForeach;
   fe.size_var = "n";
-  // An unsatisfiable per-element constraint: e0 in [5:5] is outside its domain.
   ConstraintExpr impossible;
   impossible.kind = ConstraintKind::kRange;
   impossible.var_name = "e0";
@@ -210,13 +177,6 @@ TEST(ForeachIterativeConstraint, ZeroSizeMakesForeachVacuous) {
   EXPECT_EQ(solver.GetValue("n"), 0);
 }
 
-// 18.5.7.1: the clause's sorted array, a foreach over a dynamic array of
-// ints holding each element above the one before it under the guard that
-// keeps the index below the size, which the size constraint draws from 1 to
-// 10: each consequent derives the bound its element is drawn above, so every
-// one of 128 solves is ascending over the size drawn, which the draws tried
-// against the relations as a whole meet as good as never, and every size
-// from 1 to 10 is drawn.
 TEST(ForeachIterativeConstraint, GuardedChainOverDrawnSizeIsRepaired) {
   ConstraintSolver solver(3);
   RandVariable n = MakeVar("n", 0, 10);

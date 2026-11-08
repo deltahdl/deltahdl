@@ -158,11 +158,6 @@ TEST(CaseMatchesItemSim, PriorityCaseMatchesNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.6.1: `priority` implies some case item shall be selected, but a default
-// item counts as that selection. So a priority pattern-matching case that
-// matches no explicit item yet supplies a default runs the default with no
-// violation — the priority no-match check is reached only when no default
-// exists. This is the negative twin of PriorityCaseMatchesNoMatchViolation.
 TEST(CaseMatchesItemSim, PriorityCaseMatchesNoMatchWithDefaultNoViolation) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -218,8 +213,6 @@ TEST(CaseMatchesItemSim, CaseMatchesNoMatchNoDefault) {
             42u);
 }
 
-// §12.6.1: casez ignores the z bits of a pattern-matching case, so 4'b1???
-// matches 4'b1010; with case no bit is ignored (PlainCaseConstantPattern...).
 TEST(CaseMatchesItemSim, CaseMatchesWildcardPattern) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -293,9 +286,6 @@ TEST(CaseMatchesItemSim, CaseMatchesXInSelectorNoMatch) {
             99u);
 }
 
-// §12.6.1: the expression in parentheses of a pattern-matching case statement
-// shall be evaluated exactly once. A side-effecting function supplies the
-// selector; its counter must read 1 after the whole case statement runs.
 TEST(CaseMatchesItemSim, CaseMatchesSelectorEvaluatedExactlyOnce) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -324,9 +314,6 @@ TEST(CaseMatchesItemSim, CaseMatchesSelectorEvaluatedExactlyOnce) {
   EXPECT_EQ(x->value.ToUint64(), 22u);
 }
 
-// §12.6.1: during the linear search the default item is ignored; it is only
-// reached as a fallback when no item is selected. Here the default appears
-// first textually but a later item still matches, so the later item runs.
 TEST(CaseMatchesItemSim, CaseMatchesDefaultIgnoredDuringSearch) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -345,8 +332,6 @@ TEST(CaseMatchesItemSim, CaseMatchesDefaultIgnoredDuringSearch) {
             20u);
 }
 
-// §12.6.1: items are tested in the exact order given, so when two distinct
-// patterns both match, the earliest one in the list is selected.
 TEST(CaseMatchesItemSim, CaseMatchesFirstOfOverlappingPatternsWins) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -366,11 +351,6 @@ TEST(CaseMatchesItemSim, CaseMatchesFirstOfOverlappingPatternsWins) {
             1u);
 }
 
-// §12.6.1: a `unique` pattern-matching case implies not only that at most one
-// item is selected but also that *some* item is selected. With no item matching
-// the selector and no default present, that second requirement is violated, so
-// the unique check reports a violation. This is the other half of unique's
-// meaning from the already-covered overlap case.
 TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchViolation) {
   SimFixture f;
   RunModuleNoVar(f,
@@ -388,9 +368,6 @@ TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.6.1: the requirement of `unique` that some item be selected is satisfied
-// by a default item, so a unique pattern-matching case that matches no explicit
-// item but has a default runs the default without a violation.
 TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchWithDefaultNoViolation) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -410,9 +387,6 @@ TEST(CaseMatchesItemSim, UniqueCaseMatchesNoMatchWithDefaultNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.6.1: an item is selected only when the filter evaluates to a determined
-// value other than 0. An x-valued filter is not determined, so even though the
-// pattern matches, the item is not selected and the default runs instead.
 TEST(CaseMatchesItemSim, CaseMatchesGuardUnknownNotSelected) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -432,12 +406,6 @@ TEST(CaseMatchesItemSim, CaseMatchesGuardUnknownNotSelected) {
             99u);
 }
 
-// §12.6.1: a case-item left-hand side may be a constant-expression pattern, and
-// V is matched against it. The constant value can come from a parameter, which
-// takes a different evaluation path than an inline literal. Built from real
-// §11.2.1 parameter syntax and run: the selector equals the parameter's value,
-// so that item is selected. If the parameter resolved to 0 the default (x=0)
-// would run instead, so x==20 proves the parameter's value drove the match.
 TEST(CaseMatchesItemSim, CaseMatchesParameterPattern) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -456,9 +424,6 @@ TEST(CaseMatchesItemSim, CaseMatchesParameterPattern) {
             20u);
 }
 
-// §12.6.1: same rule as above, but the constant-expression pattern is produced
-// by a localparam. localparam resolution is a distinct path from a parameter or
-// a literal; x==70 confirms the localparam's value was matched against V.
 TEST(CaseMatchesItemSim, CaseMatchesLocalparamPattern) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -477,9 +442,6 @@ TEST(CaseMatchesItemSim, CaseMatchesLocalparamPattern) {
             70u);
 }
 
-// §12.6.1: the Boolean filter selects the item when it is a determined value
-// other than 0 — not only the single bit 1. Here the filter is a multi-bit
-// value (9), which is determined and non-zero, so the guarded item is selected.
 TEST(CaseMatchesItemSim, CaseMatchesGuardMultibitNonzeroTrue) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -499,11 +461,6 @@ TEST(CaseMatchesItemSim, CaseMatchesGuardMultibitNonzeroTrue) {
             10u);
 }
 
-// §12.6.1: casez pattern matching ignores z bits wherever two bits are
-// compared, including z bits on the selector side. Bit 3 of the selector is z,
-// so it is treated as a don't-care while the remaining bits equal the pattern,
-// giving a match. Complements CasezMatchesWildcard, which places the z bits in
-// the pattern.
 TEST(CaseMatchesItemSim, CasezMatchesZInSelectorIgnored) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -522,9 +479,6 @@ TEST(CaseMatchesItemSim, CasezMatchesZInSelectorIgnored) {
             1u);
 }
 
-// §12.6.1: the casex form ignores both z and x bits during pattern matching.
-// CasexMatchesXInSelectorDontCare covers the x case; here the selector's high
-// bit is z, and casex still treats it as a don't-care so the item matches.
 TEST(CaseMatchesItemSim, CasexMatchesZInSelectorIgnored) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -543,9 +497,6 @@ TEST(CaseMatchesItemSim, CasexMatchesZInSelectorIgnored) {
             1u);
 }
 
-// A module declaring the two tagged unions the pattern tests below match
-// against: `VInt` with a void and an int member, and `U` with two four-bit
-// members, so a member value can be the same under either tag.
 constexpr const char* kTaggedTypes =
     "  typedef union tagged { void Invalid; int Valid; } VInt;\n"
     "  typedef union tagged { logic [3:0] A; logic [3:0] B; } U;\n";
@@ -554,8 +505,6 @@ std::string TaggedModule(const std::string& body) {
   return "module t;\n" + std::string(kTaggedTypes) + body + "endmodule\n";
 }
 
-// §12.6: `tagged Valid .n` matches a value tagged Valid and binds `n` to its
-// member, which the item's statement reads (§12.6.1's Example 1).
 TEST(CaseMatchesItemSim, AnIdentifierMemberPatternBindsTheMember) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -573,8 +522,6 @@ TEST(CaseMatchesItemSim, AnIdentifierMemberPatternBindsTheMember) {
             37u);
 }
 
-// §12.6: a tagged pattern matches only a value carrying its tag, so
-// `tagged Valid .n` does not match a value tagged Invalid.
 TEST(CaseMatchesItemSim, ATaggedPatternRejectsAValueOfAnotherTag) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -592,7 +539,6 @@ TEST(CaseMatchesItemSim, ATaggedPatternRejectsAValueOfAnotherTag) {
             2u);
 }
 
-// §12.6: the wildcard `.*` under a tag matches any member of that tag.
 TEST(CaseMatchesItemSim, AWildcardMemberPatternMatchesItsTag) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -610,8 +556,6 @@ TEST(CaseMatchesItemSim, AWildcardMemberPatternMatchesItsTag) {
             1u);
 }
 
-// §12.6: a constant member pattern is compared only under its own tag, so
-// `tagged A 6` does not select a value tagged B whose member is also 6.
 TEST(CaseMatchesItemSim, AConstantMemberPatternComparesTheTagFirst) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -630,8 +574,6 @@ TEST(CaseMatchesItemSim, AConstantMemberPatternComparesTheTagFirst) {
             2u);
 }
 
-// §12.6.1: casez ignores a z bit wherever two bits are compared during the
-// match, member bits included, so the member 4'b1z01 matches 4'b1101.
 TEST(CaseMatchesItemSim, CasezIgnoresAZBitOfTheMember) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -649,9 +591,6 @@ TEST(CaseMatchesItemSim, CasezIgnoresAZBitOfTheMember) {
             1u);
 }
 
-// §12.6.1: the identifiers a pattern binds are in scope in the item's `&&&`
-// filter. A(3) passes `x < 8` and takes the first item; A(9) fails it and
-// falls to the second.
 TEST(CaseMatchesItemSim, TheFilterReadsTheBoundIdentifier) {
   SimFixture f;
   auto* design =
@@ -680,8 +619,6 @@ TEST(CaseMatchesItemSim, TheFilterReadsTheBoundIdentifier) {
   EXPECT_EQ(z->value.ToUint64(), 1u);
 }
 
-// A module declaring the structure and the tagged union of structures the
-// structure-pattern tests below match against.
 std::string StructModule(const std::string& body) {
   return "module t;\n"
          "  typedef struct { bit [3:0] a; bit [3:0] b; } S;\n"
@@ -692,8 +629,6 @@ std::string StructModule(const std::string& body) {
          body + "endmodule\n";
 }
 
-// §12.6: a positional structure pattern of constants matches a structure
-// whose members equal them in declaration order.
 TEST(CaseMatchesItemSim, APositionalStructurePatternMatchesEachMember) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -712,8 +647,6 @@ TEST(CaseMatchesItemSim, APositionalStructurePatternMatchesEachMember) {
             2u);
 }
 
-// §12.6: a wildcard element of a structure pattern matches any member, and
-// the rest still has to match.
 TEST(CaseMatchesItemSim, AStructurePatternWildcardMatchesAnyMember) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -732,8 +665,6 @@ TEST(CaseMatchesItemSim, AStructurePatternWildcardMatchesAnyMember) {
             2u);
 }
 
-// §12.6: a named structure pattern matches the member each name names and
-// binds an identifier to the member it stands for.
 TEST(CaseMatchesItemSim, ANamedStructurePatternBindsAMember) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -752,8 +683,6 @@ TEST(CaseMatchesItemSim, ANamedStructurePatternBindsAMember) {
             109u);
 }
 
-// §12.6.1's Example 6: a named structure pattern under a tag, its members in
-// an order of its own and one of them left out.
 TEST(CaseMatchesItemSim, ANamedStructurePatternUnderATagBindsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -784,8 +713,6 @@ TEST(CaseMatchesItemSim, ANamedStructurePatternUnderATagBindsItsMembers) {
   EXPECT_EQ(z->value.ToUint64(), 300u);
 }
 
-// §13.4: a function body selects the item and binds its identifiers as a
-// process does.
 TEST(CaseMatchesItemSim, AFunctionBodyBindsTheMatchedMember) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -807,9 +734,6 @@ TEST(CaseMatchesItemSim, AFunctionBodyBindsTheMatchedMember) {
             37u);
 }
 
-// §12.6.1 ignores bits only for casez (z) and casex (x and z). With case,
-// a constant pattern matches when every bit equals the value's, x and z
-// included: 4'b1x00 differs from 4'b1000 in bit 2, and 4'bx010 equals itself.
 TEST(CaseMatchesItemSim, PlainCaseConstantPatternComparesEveryBit) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -826,8 +750,6 @@ TEST(CaseMatchesItemSim, PlainCaseConstantPatternComparesEveryBit) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
-// §12.6 matches whatever expression yields the value, a member of a
-// structure included: s.u is a tagged union whose Valid member holds 5.
 TEST(CaseMatchesItemSim, TaggedPatternAgainstAStructureMember) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -847,7 +769,6 @@ TEST(CaseMatchesItemSim, TaggedPatternAgainstAStructureMember) {
   EXPECT_EQ(v->value.ToUint64(), 5u);
 }
 
-// And a structure pattern against a member that is a structure.
 TEST(CaseMatchesItemSim, StructurePatternAgainstAStructureMember) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -869,8 +790,6 @@ TEST(CaseMatchesItemSim, StructurePatternAgainstAStructureMember) {
   EXPECT_EQ(v->value.ToUint64(), 34u);
 }
 
-// §12.6.1 matches the value of a function call as of any expression, the tag
-// its body returned included.
 TEST(CaseMatchesItemSim, TaggedPatternAgainstACallResult) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -886,7 +805,6 @@ TEST(CaseMatchesItemSim, TaggedPatternAgainstACallResult) {
   EXPECT_EQ(v->value.ToUint64(), 4u);
 }
 
-// And a structure pattern against a function returning a structure.
 TEST(CaseMatchesItemSim, StructurePatternAgainstACallResult) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -902,9 +820,6 @@ TEST(CaseMatchesItemSim, StructurePatternAgainstACallResult) {
   EXPECT_EQ(v->value.ToUint64(), 78u);
 }
 
-// §12.6 binds a pattern identifier by ordinary procedural assignment, so one
-// bound to a member that is itself a tagged union keeps that member's tag,
-// and §12.6.1's Example 2 matches it in an inner case statement.
 TEST(CaseMatchesItemSim, BoundTaggedUnionKeepsItsTag) {
   SimFixture f;
   auto* v = RunAndFindVar(

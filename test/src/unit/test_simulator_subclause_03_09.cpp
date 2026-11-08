@@ -1,11 +1,3 @@
-// §3.9 (printed page 53) gives every module, interface, program and checker a
-// name space of its own: a name one of these building blocks declares belongs
-// to that block alone, so another block declaring the same name neither
-// collides with it nor reaches it. Each case below declares one name in a
-// child block and in the module instantiating it, with different values or
-// widths, and reads the child's own declaration back after the run; nothing is
-// reported.
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -15,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A program's `x` is its own: the program's initial reads 5 from its own
-// declaration, and the instantiating module's `x` keeps 9.
 TEST(BuildingBlockNameSpace, AProgramsVariableIsItsOwnBesideItsModules) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -38,8 +28,6 @@ TEST(BuildingBlockNameSpace, AProgramsVariableIsItsOwnBesideItsModules) {
   EXPECT_EQ(x->value.ToUint64(), 9u);
 }
 
-// A checker's `x` is its own: the checker variable `y` is initialized from the
-// checker's `x`, 5, and the instantiating module's `x` keeps 9.
 TEST(BuildingBlockNameSpace, ACheckersVariableIsItsOwnBesideItsModules) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -61,8 +49,6 @@ TEST(BuildingBlockNameSpace, ACheckersVariableIsItsOwnBesideItsModules) {
   EXPECT_EQ(x->value.ToUint64(), 9u);
 }
 
-// A child's typedef `t` is its own: the child's `a` takes the child's 4-bit
-// `t`, the top's `b` its own 8-bit `t`, whichever module is elaborated first.
 TEST(BuildingBlockNameSpace, AChildsTypedefIsItsOwnBesideItsModules) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -84,8 +70,6 @@ TEST(BuildingBlockNameSpace, AChildsTypedefIsItsOwnBesideItsModules) {
   EXPECT_EQ(b->value.width, 8u);
 }
 
-// A child's bare call of `f` runs the child's own function, returning 1, not
-// the instantiating module's `f` of the same name, returning 2.
 TEST(BuildingBlockNameSpace, AChildsCallRunsItsOwnFunctionBesideItsModules) {
   SimFixture f;
   auto* y = RunAndFindVar(

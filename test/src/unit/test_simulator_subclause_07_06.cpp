@@ -27,9 +27,6 @@ TEST(ArrayAssignmentSimulation, WholeArrayCopyEndToEnd) {
   EXPECT_EQ(v, 30u);
 }
 
-// §7.6: element-by-element copy applies to arrays of any element type, not just
-// int. Copy a whole array of a packed-vector element type and read an element
-// of the target to observe the per-element assignment for a non-int element.
 TEST(ArrayAssignmentSimulation, NonIntElementWholeArrayCopy) {
   auto v = RunAndGet(
       "module t;\n"
@@ -123,10 +120,6 @@ TEST(ArrayAssignmentSimulation, AssignmentPatternEndToEnd) {
   EXPECT_EQ(v, 15u);
 }
 
-// §7.4.2: an unpacked dimension given as a size means the same as [0:size-1],
-// so `int a[8]` declares a[0:7] and a slice of it runs from the lower index to
-// the higher one. Writing it the other way round names a range the array was
-// not declared with.
 TEST(ArrayAssignmentSimulation, SliceLhsTreatedAsSingleAssignment) {
   auto v = RunAndGet(
       "module t;\n"
@@ -245,9 +238,6 @@ TEST(ArrayAssignmentSimulation, DynamicToFixedSizeMismatchRuntimeError) {
   EXPECT_EQ(d1->value.ToUint64(), 99u);
 }
 
-// §7.6: copying a dynamic array or queue into a fixed-size target of a
-// different element count is a run-time error, and the report says §7.6 is the
-// rule it enforces.
 TEST(ArrayAssignmentSimulation, FixedSizeMismatchNames7_6) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -266,27 +256,6 @@ TEST(ArrayAssignmentSimulation, FixedSizeMismatchNames7_6) {
       "array size mismatch in assignment to fixed-size array", 4, "7.6"));
 }
 
-// §6.8 (printed p.105): a variable stands for a data storage element and keeps
-// its value from one assignment to the next. Each element of an unpacked array
-// is one such storage element, so `a[0]` and `b[0]` are two of them, and the
-// whole-array copy `b = a;` has to leave the destination element holding its
-// own words rather than the pointer to the source's that a plain Logic4Vec
-// assignment copies (types.h: the struct holds Logic4Word* words, and assigning
-// it copies the pointer).
-//
-// The claim is made on the storage identity rather than on a value read back
-// from SystemVerilog because no source-level reader can currently tell the two
-// apart: every writer that reaches an unpacked-array element replaces the
-// element's vector instead of depositing into it. WriteVar installs the fresh
-// value ResizeToWidth builds, WritePartSelect rebuilds the element with
-// ExtractBitField, and the one in-place depositor -- WriteResolvedField's
-// kBits arm -- is not reachable through a select, because BuildLhsName spells
-// a kSelect node as "". Add a writer that deposits into an unpacked-array
-// element in place, or a store on this path that coerces rather than replaces
-// (CoerceTo2State writes through whatever words it is handed), and the sharing
-// becomes visible from source as a write to `b[0]` that changes `a[0]`. Until
-// one of those exists the pointer is the only place this rule can be observed,
-// so the pointer assertion is the test rather than scaffolding around one.
 TEST(ArrayAssignmentSimulation,
      WholeArrayCopyGivesDestinationItsOwnElementWords) {
   SimFixture f;
@@ -306,15 +275,6 @@ TEST(ArrayAssignmentSimulation,
   ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, b0->value));
 }
 
-// The same §6.8 storage rule on the other arm of the copy: a queue source runs
-// through CopyResizableSourceToArray rather than CopyArrayElements, and a queue
-// entry outlives the statement that read it, so `a[0]` must not end up pointing
-// at the words `q[0]` still holds. This asserts on the pointer for the reason
-// the array-to-array case above spells out -- WriteVar, WritePartSelect and
-// WriteResolvedField all replace an unpacked-array element rather than deposit
-// into it, so shared words are invisible to any SystemVerilog reader until a
-// writer deposits in place or a store on this path coerces instead of
-// replacing.
 TEST(ArrayAssignmentSimulation,
      WholeArrayCopyFromQueueGivesDestinationItsOwnElementWords) {
   SimFixture f;
@@ -336,8 +296,6 @@ TEST(ArrayAssignmentSimulation,
   ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(a0->value, q->elements[0]));
 }
 
-// §6.22.2's example run: `C = A` copies A's elements left to right into C's,
-// so A[0] lands in C[6], and `A = C` copies them back, C[6] into A[0].
 TEST(ArrayAssignmentSimulation, TypedefElementArrayCopiesBothWays) {
   const char* src =
       "module t;\n"
@@ -358,9 +316,6 @@ TEST(ArrayAssignmentSimulation, TypedefElementArrayCopiesBothWays) {
   EXPECT_EQ(RunAndGet(src, "a0"), 9u);
 }
 
-// §7.6 with §8.5: a fixed array property assigned from another object's
-// property of the same shape takes every element, and the two stay
-// independent: a later write to one leaves the other as copied.
 TEST(ArrayAssignmentSimulation, FixedArrayPropertyCopiedBetweenObjects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -380,10 +335,6 @@ TEST(ArrayAssignmentSimulation, FixedArrayPropertyCopiedBetweenObjects) {
   EXPECT_EQ(out, "10 20 30 40 77\n");
 }
 
-// §7.6 with §7.5, §7.10 and §8.5: a queue property assigned to a dynamic array
-// property gives it the queue's size and elements, and the dynamic array
-// assigned back to the emptied queue refills it, inside a method as through
-// handles.
 TEST(ArrayAssignmentSimulation, QueueAndDynamicArrayPropertiesAssignedAcross) {
   SimFixture f;
   std::string out = RunCapture(
@@ -407,9 +358,6 @@ TEST(ArrayAssignmentSimulation, QueueAndDynamicArrayPropertiesAssignedAcross) {
   EXPECT_EQ(out, "3 20 3 30\n");
 }
 
-// §7.6 with §7.4.2: whole assignment and equality of multidimensional
-// fixed-size arrays of one shape take every element, a two- and a three-
-// dimensional array alike, and an unequal element makes the arrays unequal.
 TEST(ArrayAssignmentSimulation, MultidimensionalArraysCopiedAndComparedWhole) {
   SimFixture f;
   std::string out = RunCapture(
@@ -429,9 +377,6 @@ TEST(ArrayAssignmentSimulation, MultidimensionalArraysCopiedAndComparedWhole) {
   EXPECT_EQ(out, "21 123 1 1\n0 1\n");
 }
 
-// §7.4.4 with §7.6: a select omitting the fastest-varying indices names a
-// subarray, assigned from another subarray or a one-dimensional array of its
-// size and read into one, each by position.
 TEST(ArrayAssignmentSimulation, SubarraysAssignedByPosition) {
   SimFixture f;
   std::string out = RunCapture(
@@ -451,9 +396,6 @@ TEST(ArrayAssignmentSimulation, SubarraysAssignedByPosition) {
   EXPECT_EQ(out, "6 9 13 23 123\n");
 }
 
-// §7.6: a dynamic array assigned to a fixed-size subarray pairs left to
-// right, so B[0] reaches the left end of a `[100:1]` row, index 100; a
-// dynamic array of another size is a run-time error and writes nothing.
 TEST(ArrayAssignmentSimulation, DynamicArrayToAFixedSubarray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -487,9 +429,6 @@ TEST(ArrayAssignmentSimulation, DynamicArrayToAFixedSubarray) {
   EXPECT_EQ(kept->value.ToUint64(), 42u);
 }
 
-// §7.6 with §7.5: assigning a dynamic array of fixed-size arrays to another
-// copies every element, one never written as its default row: e[0] is d[0],
-// three zeros, and e[1][2] is the 5 written to d[1][2].
 TEST(ArrayAssignmentSimulation, DynamicArrayOfRowsCopiesEveryRow) {
   SimFixture f;
   auto out = RunCapture(

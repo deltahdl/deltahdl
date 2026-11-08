@@ -1,70 +1,3 @@
-// §34.5.11.2 data_method, Description.
-//
-// The subclause says four things about the keyword §34.5.11.1 spells.
-//
-//   Written in an encrypting tool's input, it states the encryption algorithm
-//   that shall be used to encrypt the begin-end blocks that follow it, named by
-//   an identifier commonly associated with a specific cipher.
-//
-//   Table 34-3 lists the identifiers the standard settles. des-cbc is required
-//   of every implementation; the rest are optional, an implementation offering
-//   one of those ciphers is required to offer it under the tabulated name, and
-//   further identifiers and their ciphers are implementation-defined.
-//
-//   The data_method is unchanged in the output file, except where a digital
-//   signature is used, in which case it is encrypted with the key_method and
-//   placed in a key_block.
-//
-//   Read in a protected envelope, it states the algorithm the data_block is to
-//   be decrypted with.
-//
-// The last of those is what this file opens with. This tool provides two
-// ciphers: Table 34-3's required des-cbc, written from FIPS 46-3 in
-// src/preprocessor/protect_des.h, and its own, under an implementation-defined
-// identifier §34.5.11.2 admits. It cannot read a block written under any of the
-// other fifteen, and reading such a block under a cipher it does have would
-// hand back whatever those bytes became rather than the design, so the
-// identifier the envelope states is checked before the block is opened
-// (Preprocessor::ReadProtectDataBlock,
-// src/preprocessor/preprocessor_protect_values.cpp).
-//
-// The cipher itself is the file's last section. A cipher is a function whose
-// answer is stated for stated inputs, so the published vectors are what say the
-// one behind des-cbc here is DES: a round trip alone closes over any invertible
-// function.
-//
-// The third of those is covered here as well, and it is the one an envelope
-// carrying key blocks answers differently. §34.5.11.2 excepts a single case
-// from the identifier standing unchanged: under a digital signature it is
-// encrypted with the key_method and put in a key_block instead. §34.5.27.2 has
-// an encrypting tool form a key block when it is requested to use a digital
-// signature, so an envelope carrying one is the excepted case, and the
-// identifier is absent from everything a reader holding no key can read. The
-// envelope of a region whose data name reached a key the tool holds carries no
-// key block, and states the identifier in the clear. The last case reads the
-// excepted envelope back, so the identifier is shown relocated rather than
-// dropped. Issue #3428 is the defect: the identifier stood in the clear whether
-// the envelope carried key blocks or not.
-//
-// The first and second of those are what the file closes with, read from the
-// side that writes an envelope rather than the side that reads one.
-// §34.5.11.2's ENCRYPTION INPUT states that the identifier names the algorithm
-// the following begin-end blocks are to be encrypted with, so a region naming
-// one has stated what its own block is to be produced with. A region naming
-// either identifier this tool encrypts under is sealed under it and told
-// nothing; a region naming any of the other fifteen has asked for a block this
-// tool cannot produce, and it is told so. Table 34-3 decides the second half of
-// that report: des-cbc is the one identifier the table marks Required and this
-// implementation now provides it, so what reaches that half is an optional
-// cipher spelled as the table spells it. Issue #3270 is the defect: the
-// encrypting half read the keyword nowhere, so a region asking for des-cbc was
-// sealed under this tool's stream cipher and its envelope claimed
-// x-deltahdl-stream as though that was what had been asked for.
-//
-// Table 34-3 itself is modelled in src/preprocessor/protect_key_method.h, which
-// §34.5.24 shares, so the identifiers written below are the tabulated spellings
-// rather than spellings invented here.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -89,17 +22,12 @@ using namespace delta;
 
 namespace {
 
-// The design a region seals, and the key it is sealed under.
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
 constexpr std::string_view kRegionKey = "one-key-of-the-authors-own";
 
-// The report a block naming an algorithm this implementation does not provide
-// draws.
 constexpr std::string_view kNotProvided =
     "states an encryption algorithm this implementation does not provide";
 
-// An envelope this tool wrote for a region holding the sealed design, which
-// states the tool's own identifier and carries a block it can open.
 std::string OurEnvelope() {
   std::string region = "`pragma protect begin\n";
   region.append(kSealedDesign);
@@ -109,10 +37,6 @@ std::string OurEnvelope() {
   return envelope;
 }
 
-// The envelope this tool writes for a region that asked for §34.5.11.2's
-// required cipher, which is the one an envelope another tool wrote under
-// des-cbc has the shape of: the identifier it states is the one its block was
-// produced under.
 std::string EnvelopeUnderDesCbc() {
   std::string region = "`pragma protect begin\n";
   region += "`pragma protect data_method=\"";
@@ -124,10 +48,6 @@ std::string EnvelopeUnderDesCbc() {
   return envelope;
 }
 
-// The same envelope with the algorithm it states replaced by `identifier`,
-// which is how a block written under some other tool's cipher reaches a
-// reading. Only the stated identifier changes; the block is left as it was, so
-// what a case observes is the identifier deciding whether the block is opened.
 std::string EnvelopeNaming(std::string_view identifier) {
   std::string envelope = OurEnvelope();
   std::string ours = "`pragma protect data_method=\"";
@@ -140,7 +60,6 @@ std::string EnvelopeNaming(std::string_view identifier) {
   return envelope.replace(at, ours.size(), theirs);
 }
 
-// A reading of `src` by a tool holding the key the region was sealed under.
 struct ReadBack {
   PreprocFixture f;
   std::string source;
@@ -157,35 +76,16 @@ struct ReadBack {
   }
 };
 
-// The 1-based line of `envelope` its data block is written on, which is the
-// line a report about that block stands at. §34.5.15.1 spells the announcing
-// expression as the keyword standing alone and §34.5.15.2 has the block begin
-// on the next line in the file, so the block is one line past that expression
-// (issue #3272).
 uint32_t TheCipheredBlocksLine(std::string_view envelope) {
   return LineHolding(envelope, "`pragma protect data_block\n") + 1;
 }
 
-// §34.5.11.2: the data_method states the algorithm the data block is decrypted
-// with, and des-cbc is the identifier Table 34-3 requires of an implementation.
-// A block naming it is opened under FIPS 46-3's cipher, so the design comes
-// back and nothing is reported.
-//
-// The envelope is one this tool wrote for a region that asked for des-cbc, so
-// the identifier it states is the identifier its block was really produced
-// under. Swapping the identifier of an envelope written under the other cipher
-// -- which is what EnvelopeNaming does for the cases below -- would name a
-// cipher the bytes were not made with, and reading those bytes under it is
-// what §34.5.11.2 has a reader refuse rather than attempt.
 TEST(ProtectDataMethodDescription, ABlockNamingTheRequiredCipherIsOpened) {
   ReadBack run(EnvelopeUnderDesCbc());
   EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
   EXPECT_TRUE(run.Recovered()) << run.text;
 }
 
-// §34.5.11.2: the same of one of Table 34-3's optional identifiers. An
-// implementation offering that cipher would have to offer it under this name,
-// and this one does not offer it at all.
 TEST(ProtectDataMethodDescription,
      ABlockNamingAnOptionalCipherWeLackIsReported) {
   ReadBack run(EnvelopeNaming("aes128-cbc"));
@@ -195,8 +95,6 @@ TEST(ProtectDataMethodDescription,
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
 
-// §34.5.11.2: further identifiers are implementation-defined, and one this tool
-// does not know names a cipher it cannot read with all the same.
 TEST(ProtectDataMethodDescription, ABlockNamingAnUnknownIdentifierIsReported) {
   ReadBack run(EnvelopeNaming("x-some-other-tools-cipher"));
   EXPECT_TRUE(ReportedError(run.f.diag.Diagnostics(), kNotProvided,
@@ -205,69 +103,40 @@ TEST(ProtectDataMethodDescription, ABlockNamingAnUnknownIdentifierIsReported) {
   EXPECT_FALSE(run.Recovered()) << run.text;
 }
 
-// §34.5.11.2: the identifier decides whether the block is read, so a block
-// naming the algorithm this tool does provide is read. Without this the three
-// cases above would hold of an implementation that refused every block.
 TEST(ProtectDataMethodDescription, ABlockNamingTheCipherWeProvideIsRead) {
   ReadBack run(OurEnvelope());
   EXPECT_FALSE(run.f.diag.HasErrors());
   EXPECT_TRUE(run.Recovered()) << run.text;
 }
 
-// A string holding nothing names no algorithm, so the block is read as one
-// naming none is -- under the cipher it was produced with -- rather than
-// refused as naming one this tool lacks.
 TEST(ProtectDataMethodDescription, AnEmptyIdentifierNamesNoAlgorithm) {
   ReadBack run(EnvelopeNaming(""));
   EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
   EXPECT_TRUE(run.Recovered()) << run.text;
 }
 
-// ---------------------------------------------------------------------------
-// The identifier travels in a key block where a digital signature is used.
-// ---------------------------------------------------------------------------
-
-// The entity that provided the key a region's own keys travel under, with the
-// name picking that key out of its list and the key itself. §34.5.27.2 forms a
-// key block for a region designating one, and that block is where §34.5.11.2
-// sends the identifier naming the cipher the region's data are under.
 constexpr std::string_view kBlockProvider = "meridian-trust";
 constexpr std::string_view kBlockProviderName = "wrapping-2029";
 constexpr std::string_view kBlockProviderKey = "meridian-trust-wrapping-key";
 
-// The entity a region names for its data, with the name picking a key out of
-// its list and the key itself.
 constexpr std::string_view kDataProvider = "kestrel-systems";
 constexpr std::string_view kDataProviderName = "kestrel-data-2029";
 constexpr std::string_view kDataProviderKey = "kestrel-region-exchange-key";
 
-// The expression announcing a key block, which is how a case below tells an
-// envelope carrying one from an envelope that carries none.
 constexpr std::string_view kKeyBlockLine = "`pragma protect key_block\n";
 
-// The directive an envelope states the cipher with, up to the value. What the
-// signed case claims is that no such directive is written at all, so the value
-// is left out of what it searches for.
 constexpr std::string_view kMethodDirective = "`pragma protect data_method=";
 
-// One directive carrying one keyword and the string that keyword records.
 std::string Writes(std::string_view keyword, std::string_view value) {
   std::string text = "`pragma protect ";
   text.append(keyword).append("=\"").append(value).append("\"\n");
   return text;
 }
 
-// The directive an envelope states the cipher its data block is under with,
-// carrying this tool's own identifier for the one cipher it provides.
 std::string StatesTheCipherWeProvide() {
   return Writes(kDataMethodKeyword, kDataMethod);
 }
 
-// The region the excepted cases below encrypt. It names an entity and a key
-// for its data and designates a provider for its own keys, and §34.5.25.2
-// (printed page 964) has the key a key_keyname names be the one the data
-// encryption keys are encrypted with, so wherever the tool holds that
-// provider's key the region's data key travels in a key block.
 std::string RegionNamingBothProviders() {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("data_keyowner", kDataProvider));
@@ -279,9 +148,6 @@ std::string RegionNamingBothProviders() {
   return text;
 }
 
-// The same region with no provider designated for its keys. Nothing asks for a
-// key block, so a tool holding the key the data name reaches seals the region
-// under it and writes none.
 std::string RegionNamingTheDataProviderAlone() {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("data_keyowner", kDataProvider));
@@ -291,16 +157,12 @@ std::string RegionNamingTheDataProviderAlone() {
   return text;
 }
 
-// The block provider's key alone. The region's data name reaches none of these,
-// so the region is sealed behind the key block §34.5.27.2 writes.
 ProtectKeyList OnlyTheBlockProvidersKey() {
   ProtectKeyList keys;
   keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
   return keys;
 }
 
-// Both keys. The region's data name now reaches one, which is what a region
-// designating no provider for its keys is sealed under.
 ProtectKeyList BothProvidersKeys() {
   ProtectKeyList keys;
   keys.Add(KeyOf(kBlockProvider, kBlockProviderName, kBlockProviderKey));
@@ -308,23 +170,6 @@ ProtectKeyList BothProvidersKeys() {
   return keys;
 }
 
-// §34.5.11.2: the identifier is unchanged in the output file, except where a
-// digital signature is used, in which case it is encrypted with the key_method
-// and placed in a key_block. §34.5.27.2 forms a key block on a request for a
-// digital signature, so this envelope is the excepted one, and the identifier
-// stands nowhere a reader holding no key can read it.
-//
-// The count of key blocks is asserted first. Without it an envelope that was
-// never written at all would satisfy the claim about the identifier, there
-// being no envelope for the identifier to stand in.
-//
-// What the identifier is inside the block cannot be asserted here. The block is
-// encrypted and then encoded, so its characters say nothing about what went
-// into it, and the case reading the envelope back is what shows the identifier
-// arrived. test_preprocessor_subclause_34_05_27_02.cpp holds the helper that
-// decodes and decrypts a block, and its case
-// ProtectKeyBlockDescription.TheBufferCarriesWhatOpensTheDataBlock reads the
-// identifier out of the recovered buffer directly.
 TEST(ProtectDataMethodEncryptionOutput,
      TheCipherLeavesTheClearWhereAKeyBlockCarriesIt) {
   std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), {},
@@ -334,11 +179,6 @@ TEST(ProtectDataMethodEncryptionOutput,
   EXPECT_FALSE(Holds(envelope, kMethodDirective)) << envelope;
 }
 
-// §34.5.11.2 excepts the digital signature and nothing else, so an envelope
-// carrying no key block states the identifier in the clear. The source text is
-// the case above's without the provider for its keys, and the tool holds the
-// key the region's data name reaches, so nothing asks for a key block and the
-// exception does not arise.
 TEST(ProtectDataMethodEncryptionOutput,
      TheCipherStandsInTheClearWhereNoKeyBlockCarriesIt) {
   std::string envelope = EncryptEnvelopes(RegionNamingTheDataProviderAlone(),
@@ -348,13 +188,6 @@ TEST(ProtectDataMethodEncryptionOutput,
   EXPECT_TRUE(Holds(envelope, StatesTheCipherWeProvide())) << envelope;
 }
 
-// The excepted envelope read back by the provider whose key opens its block.
-// §34.5.11.2 relocates the identifier rather than discarding it, so the region
-// still opens and the design comes back. That the identifier arrived is what
-// this shows: Preprocessor::TakeDataBlockValue
-// (src/preprocessor/preprocessor_protect_values.cpp) reads it out of the scope
-// the recovered key block wrote, and it stands there under no other writing,
-// the envelope having stated none in the clear.
 TEST(ProtectDataMethodEncryptionOutput,
      TheCipherInTheBlockStillOpensTheRegion) {
   std::string envelope = EncryptEnvelopes(RegionNamingBothProviders(), {},
@@ -367,45 +200,24 @@ TEST(ProtectDataMethodEncryptionOutput,
   EXPECT_TRUE(Holds(read, kSealedDesign)) << read;
 }
 
-// ---------------------------------------------------------------------------
-// ENCRYPTION INPUT: the cipher a region asks its own block to be made with.
-// ---------------------------------------------------------------------------
-
-// The design the regions below seal, and the key they are sealed under.
 constexpr std::string_view kAskedDesign = "module gasket_m; endmodule\n";
 constexpr std::string_view kAskingKey = "another-key-of-the-authors-own";
 
-// The design sealed by the one region below that asks for no cipher at all. It
-// is spelled apart from the design above so that a case reading an output for
-// it is reading for the text of its own region.
 constexpr std::string_view kUnaskedDesign = "module cradle_m; endmodule\n";
 
-// The report a region asking for a cipher this implementation does not produce
-// draws, up to the identifier that region named.
 constexpr std::string_view kNoSuchCipher =
     "asks for an encryption algorithm this implementation does not provide: ";
 
-// The half of Table 34-3 a report about a data_method can now name. des-cbc is
-// the one identifier the table marks Required and this implementation provides
-// it, so every identifier a region can be refused for is one the table leaves
-// optional; the other half of the message is reached through the key_method,
-// which §34.5.24.2 sends to the same table and which is covered in
-// test_preprocessor_subclause_34_05_24_02.cpp.
 constexpr std::string_view kTableAdmitsWithoutRequiring =
     ", which IEEE 1800-2023 Table 34-3 does not require of every "
     "implementation";
 
-// The whole of that report for one identifier drawn from one half of the table.
 std::string AsksFor(std::string_view identifier, std::string_view tabulated) {
   std::string message(kNoSuchCipher);
   message.append(identifier).append(tabulated);
   return message;
 }
 
-// Envelope encryption over a source text an author wrote, with the reports the
-// reading made kept beside the text it produced. The source is added to the
-// manager so that a report stands at the line of it the author wrote the
-// identifier on, that line being what the cases below name.
 struct SealingRun {
   PreprocFixture f;
   std::string text;
@@ -414,25 +226,11 @@ struct SealingRun {
       : text(EncryptEnvelopes(src, kAskingKey, ProtectKeyList(), &f.diag,
                               f.mgr.AddFile("<test>", src))) {}
 
-  // Whether the region holding `design` came back as a block rather than as
-  // the characters the author wrote.
   bool Sealed(std::string_view design) const {
     return !Holds(text, design) && Holds(text, kDataBlockKeyword);
   }
 };
 
-// §34.5.11.2: the identifier names the algorithm the following begin-end blocks
-// are to be encrypted with, so a region naming des-cbc has stated what its own
-// block is to be produced with, and Table 34-3 marks that one Required of every
-// implementation. So the region is sealed under it, the envelope states it, and
-// nothing is reported. Issue #3270 is the defect the case was written for: the
-// encrypting half read the keyword nowhere, so this region was sealed under the
-// tool's own cipher and its envelope claimed x-deltahdl-stream as though that
-// was what the author had asked for.
-//
-// The identifier the envelope states is asserted as well as the silence: a tool
-// that sealed under its own cipher and said so would be one that refused
-// nothing and honored nothing.
 TEST(ProtectDataMethodEncryptionInput,
      ARegionAskingForTheRequiredCipherIsSealedUnderIt) {
   std::string src = "`pragma protect begin\n";
@@ -448,12 +246,6 @@ TEST(ProtectDataMethodEncryptionInput,
       << run.text;
 }
 
-// §34.5.11.2 recommends the IV of a CBC algorithm be randomly generated for
-// each use of the cipher, and §34.5.15.2 has it prepended to the encrypted data
-// before encoding. So two envelopes made from one region under one key differ,
-// while the design each opens to is the same design: an IV fixed by the tool
-// would leave the two byte for byte alike, which is what says the
-// recommendation was taken.
 TEST(ProtectDataMethodEncryptionInput, TwoEnvelopesOfOneRegionCarryTheirOwnIv) {
   std::string first = EnvelopeUnderDesCbc();
   std::string second = EnvelopeUnderDesCbc();
@@ -465,14 +257,6 @@ TEST(ProtectDataMethodEncryptionInput, TwoEnvelopesOfOneRegionCarryTheirOwnIv) {
   EXPECT_TRUE(opened_second.Recovered()) << opened_second.text;
 }
 
-// §34.5.11.2: Table 34-3 marks aes256-cbc Optional, and the report says that
-// instead. An implementation offering that cipher is required to offer it under
-// this identifier, and this one offers it under no identifier at all. The half
-// of the table the identifier came from is the whole of what separates this
-// case from the one above, so the message is read for that half.
-//
-// The identifier stands on the third line here rather than the second, the
-// region opening inside a design element.
 TEST(ProtectDataMethodEncryptionInput,
      ARegionAskingForAnOptionalCipherSaysTheTableDoesNotRequireIt) {
   std::string src = "module bezel_m;\n`pragma protect begin\n";
@@ -485,12 +269,6 @@ TEST(ProtectDataMethodEncryptionInput,
       << run.text;
 }
 
-// §34.5.11.2: a region asking for the cipher this implementation does produce
-// is refused nothing, so it is sealed and no report is made. kDataMethod
-// (src/preprocessor/protect_envelope_output.h) is that identifier, and
-// §34.5.11.2 leaves an identifier outside Table 34-3 to the implementation that
-// coins it. Without this case the two above would hold of a tool that reported
-// every region whatever cipher it asked for.
 TEST(ProtectDataMethodEncryptionInput,
      ARegionAskingForTheCipherWeProvideIsSealedInSilence) {
   std::string src = "`pragma protect begin\n";
@@ -502,11 +280,6 @@ TEST(ProtectDataMethodEncryptionInput,
   EXPECT_TRUE(run.Sealed(kAskedDesign)) << run.text;
 }
 
-// §34.5.11.2 governs a region that named an algorithm, and a region naming none
-// asked for nothing that could be refused. Such a region is sealed under this
-// implementation's own cipher and the reading says nothing about it. Without
-// this case the two reported ones would hold of a tool that objected to every
-// region it read, the identifier notwithstanding.
 TEST(ProtectDataMethodEncryptionInput,
      ARegionAskingForNoCipherIsSealedInSilence) {
   std::string src = "`pragma protect begin\n";
@@ -517,12 +290,6 @@ TEST(ProtectDataMethodEncryptionInput,
   EXPECT_TRUE(run.Sealed(kUnaskedDesign)) << run.text;
 }
 
-// §34.4 makes the scope of a protect pragma keyword lexical, so an identifier
-// written ahead of a region is in effect inside that region and states what its
-// block is to be produced with. The report therefore stands on the line the
-// author wrote the identifier on, which is the first, and not on either
-// delimiter of the region, which are the third and the fifth. blowfish-cbc is
-// one of Table 34-3's optional identifiers.
 TEST(ProtectDataMethodEncryptionInput,
      ACipherNamedAheadOfTheRegionIsReportedOnItsOwnLine) {
   std::string src = Writes(kDataMethodKeyword, "blowfish-cbc");
@@ -535,10 +302,6 @@ TEST(ProtectDataMethodEncryptionInput,
       << run.text;
 }
 
-// -- Table 34-3's required cipher itself ------------------------------------
-
-// The eight bytes `hex` spells, most significant first, which is the order FIPS
-// 46-3 numbers the bits of a block and of a key in.
 std::string BytesOfHex(std::string_view hex) {
   std::string bytes;
   for (size_t at = 0; at + 1 < hex.size(); at += 2) {
@@ -554,8 +317,6 @@ std::string BytesOfHex(std::string_view hex) {
   return bytes;
 }
 
-// The same reading backwards, so a case that fails says which block came out
-// rather than printing eight bytes of ciphertext.
 std::string HexOfBytes(std::string_view bytes) {
   constexpr std::string_view kDigits = "0123456789ABCDEF";
   std::string hex;
@@ -567,11 +328,6 @@ std::string HexOfBytes(std::string_view bytes) {
   return hex;
 }
 
-// One published vector of the algorithm Table 34-3 names in its first row.
-// §34.5.11.2 marks it required of every implementation, so what a case has to
-// establish is that the cipher behind the identifier is FIPS 46-3's and not
-// something self-consistent: a round trip closes over any invertible function,
-// and a stated answer for stated inputs closes over one function only.
 void ExpectDesVector(std::string_view key_hex, std::string_view plain_hex,
                      std::string_view cipher_hex) {
   std::string key = BytesOfHex(key_hex);
@@ -582,28 +338,18 @@ void ExpectDesVector(std::string_view key_hex, std::string_view plain_hex,
             plain_hex);
 }
 
-// The worked example the algorithm is usually published with.
 TEST(ProtectDataMethodCipher, TheWorkedExampleVectorIsAnswered) {
   ExpectDesVector("133457799BBCDFF1", "0123456789ABCDEF", "85E813540F0AB405");
 }
 
-// A second vector, chosen because its answer is a block of zeros: a cipher that
-// returned its input, or that returned nothing at all, answers this one
-// differently from the one above and from this.
 TEST(ProtectDataMethodCipher, TheZeroCiphertextVectorIsAnswered) {
   ExpectDesVector("0E329232EA6D0D73", "8787878787878787", "0000000000000000");
 }
 
-// A third, with the key and the block both zero, which is the vector a cipher
-// that had confused the two would answer wrongly in a way the others hide.
 TEST(ProtectDataMethodCipher, TheZeroKeyAndZeroBlockVectorIsAnswered) {
   ExpectDesVector("0000000000000000", "0000000000000000", "8CA64DE9C1B123A7");
 }
 
-// §34.5.11.2's cipher runs in CBC mode, and what CBC is for is that one block
-// says nothing about the block beside it: a text of two identical blocks comes
-// out as two different ones. The text is recovered under the same key and IV,
-// which is what says the chaining is undone as well as done.
 TEST(ProtectDataMethodCipher, ChainingMakesTwoLikeBlocksDiffer) {
   const std::string kKey = BytesOfHex("133457799BBCDFF1");
   const std::string kIv = BytesOfHex("0011223344556677");
@@ -618,9 +364,6 @@ TEST(ProtectDataMethodCipher, ChainingMakesTwoLikeBlocksDiffer) {
   EXPECT_EQ(recovered, kText);
 }
 
-// The key participates: a block enciphered under one key does not come back
-// under another. Without this the vectors above would hold of a cipher that
-// ignored its key after the first round.
 TEST(ProtectDataMethodCipher, ADifferentKeyDoesNotGiveTheTextBack) {
   const std::string kIv = BytesOfHex("0011223344556677");
   const std::string kText = "module m; endmodule\n";
@@ -628,18 +371,12 @@ TEST(ProtectDataMethodCipher, ADifferentKeyDoesNotGiveTheTextBack) {
       DesCbcEncrypt(kText, BytesOfHex("133457799BBCDFF1"), kIv);
   ASSERT_FALSE(ciphered.empty());
 
-  // The two keys differ at bit 2 of their last byte. FIPS 46-3 leaves bit 8 of
-  // every key byte to parity and never reads it, so a pair differing only there
-  // is one key written twice and would come back.
   std::string recovered;
   bool opened =
       DesCbcDecrypt(ciphered, BytesOfHex("133457799BBCDFF5"), kIv, &recovered);
   EXPECT_FALSE(opened && recovered == kText);
 }
 
-// FIPS 46-3 defines the cipher over a 64-bit block and a 64-bit key, so a block
-// or a key of another length is enciphered to nothing rather than to something
-// the algorithm never defined.
 TEST(ProtectDataMethodCipher, ABlockOrKeyOfAnotherLengthGivesNothing) {
   const std::string kKey = BytesOfHex("133457799BBCDFF1");
   const std::string kBlock = BytesOfHex("0123456789ABCDEF");
@@ -648,7 +385,6 @@ TEST(ProtectDataMethodCipher, ABlockOrKeyOfAnotherLengthGivesNothing) {
   EXPECT_EQ(DesDecryptBlock(kBlock, kKey.substr(1)), "");
 }
 
-// The same of the chained mode's key and IV, whichever way it runs.
 TEST(ProtectDataMethodCipher, AKeyOrIvOfAnotherLengthChainsNothing) {
   const std::string kKey = BytesOfHex("133457799BBCDFF1");
   const std::string kIv = BytesOfHex("0011223344556677");
@@ -661,8 +397,6 @@ TEST(ProtectDataMethodCipher, AKeyOrIvOfAnotherLengthChainsNothing) {
   EXPECT_FALSE(DesCbcDecrypt(ciphered, kKey, kIv.substr(1), &recovered));
 }
 
-// The chained mode writes whole blocks and always at least one, so a
-// ciphertext of no blocks or of part of one is not something it wrote.
 TEST(ProtectDataMethodCipher, CiphertextThatIsNotWholeBlocksIsRefused) {
   const std::string kKey = BytesOfHex("133457799BBCDFF1");
   const std::string kIv = BytesOfHex("0011223344556677");
@@ -673,10 +407,6 @@ TEST(ProtectDataMethodCipher, CiphertextThatIsNotWholeBlocksIsRefused) {
                              &recovered));
 }
 
-// A block enciphered by hand, with an IV of zeros so that the one block the
-// chained mode deciphers is the block itself. Each ends in a count that is not
-// the padding RFC 5652 writes -- none, more than a block, or two with the byte
-// before it not a two -- and the last ends in the padding it does write.
 TEST(ProtectDataMethodCipher, PaddingThisNeverWritesIsRefused) {
   const std::string kKey = BytesOfHex("133457799BBCDFF1");
   const std::string kZeroIv(kDesBlockBytes, '\0');
@@ -693,8 +423,6 @@ TEST(ProtectDataMethodCipher, PaddingThisNeverWritesIsRefused) {
   EXPECT_EQ(recovered, "abcdef");
 }
 
-// §34.5.15.2 has the first cipher-block of a des-cbc block removed for the IV,
-// so a block no longer than that one cipher-block carries no data to decrypt.
 TEST(ProtectDataMethodCipher, ABlockNoLongerThanItsIvRecordsNoRegion) {
   std::string block = EncryptProtectedRegion(kSealedDesign, kRegionKey,
                                              kRawEnctype, kDesCbcMethod);
@@ -706,7 +434,6 @@ TEST(ProtectDataMethodCipher, ABlockNoLongerThanItsIvRecordsNoRegion) {
                                      kRegionKey, &recovered, kDesCbcMethod));
 }
 
-// An empty key encrypts nothing, whichever cipher is named.
 TEST(ProtectDataMethodCipher, AnEmptyKeyEncryptsNothing) {
   EXPECT_EQ(EncryptProtectedRegion(kSealedDesign, ""), "");
   EXPECT_EQ(
@@ -714,10 +441,6 @@ TEST(ProtectDataMethodCipher, AnEmptyKeyEncryptsNothing) {
       "");
 }
 
-// §34.5.15.2: what des-cbc encrypts is the region's contents, so a block holds
-// the IV cipher-block and the region padded to whole blocks, and nothing more.
-// Four bytes pad to one block; a four-byte prefix ahead of them would have made
-// two.
 TEST(ProtectDataMethodCipher, ADesCbcBlockRecordsTheRegionAlone) {
   std::string block =
       EncryptProtectedRegion("abcd", kRegionKey, kRawEnctype, kDesCbcMethod);
@@ -730,10 +453,6 @@ TEST(ProtectDataMethodCipher, ADesCbcBlockRecordsTheRegionAlone) {
   EXPECT_EQ(recovered, "abcd");
 }
 
-// A block written by another tool under the same DES key: the IV, then the
-// region alone encrypted under FIPS 46-3 in CBC mode. The DES key is the first
-// eight bytes of the SHA-1 digest of the region's key followed by a zero
-// counter, which is how this tool derives one from a key of any length.
 TEST(ProtectDataMethodCipher, ADesCbcBlockWithoutAPrefixIsOpened) {
   std::string counter(4, '\0');
   std::string des_key = Sha1Digest(std::string(kRegionKey) + counter);

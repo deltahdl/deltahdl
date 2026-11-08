@@ -19,10 +19,6 @@ std::string ScopedKey(std::string_view scope, std::string_view name) {
   return std::string(scope) + "::" + std::string(name);
 }
 
-// The name of the function `item`'s with clause names, qualified by the scope
-// declaring it: the scope the clause writes, or, for a bare name, `home`, the
-// package declaring the nettype, as the package's declarations see each
-// other by their bare names.
 std::string_view ResolveFuncName(const ModuleItem& item, std::string_view home,
                                  Arena& arena) {
   const std::string kScope = item.nettype_resolve_scope != nullptr
@@ -33,10 +29,6 @@ std::string_view ResolveFuncName(const ModuleItem& item, std::string_view home,
       ScopedKey(kScope, item.nettype_resolve_func));
 }
 
-// The key the type `source` names would be recorded under were it a nettype.
-// A.2.1.3 lets a renamed nettype be written through a package, "P::nt"; a bare
-// name in a package is one of `home`'s own nettypes when it declares one of
-// that name; and any other bare name is its own key.
 std::string SourceKey(const DataType& source, std::string_view home,
                       const std::unordered_set<std::string_view>& names) {
   if (!source.scope_name.empty())
@@ -48,9 +40,6 @@ std::string SourceKey(const DataType& source, std::string_view home,
   return std::string(source.type_name);
 }
 
-// The data type of a nettype package `pkg` declares. A bare name that `pkg`
-// declares is written through `pkg`: a typedef's name as InPackageScope writes
-// it, and that of a nettype the declaration renames.
 DataType InPackageNettypeScope(
     const DataType& type, const PackageDecl& pkg,
     const std::unordered_set<std::string_view>& names) {

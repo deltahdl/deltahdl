@@ -27,9 +27,6 @@ TEST(LoopStatementSim, ForeverBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// A forever-loop has no control expression to re-test (12.7.6), so a
-// continue simply repeats the body and only the break ends the loop. The
-// 12.8 file covers continue as a jump statement.
 TEST(LoopStatementSim, ForeverContinueRepeatsBodyUntilBreak) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -70,11 +67,6 @@ TEST(LoopStatementSim, ForeverImmediateBreak) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.7.6: the forever-loop repeatedly executes its statement. The three tests
-// above exercise the statement scheduler (ExecForever); this one observes the
-// same repeated execution on the function-body path, where the loop is
-// interpreted by ExecFuncForever. accumulate(5) runs the body once per pass,
-// summing 1+2+3+4+5 across five iterations before the return ends the loop.
 TEST(LoopStatementSim, ForeverInFunctionRunsBodyRepeatedly) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [31:0] result;\n"
@@ -97,13 +89,6 @@ TEST(LoopStatementSim, ForeverInFunctionRunsBodyRepeatedly) {
             15u);
 }
 
-// §12.7.6: a forever-loop repeatedly executes its statement. The other tests
-// run the loop to completion within a single time step (it ends via break or
-// return). This one exercises the canonical use shown in the subclause — a body
-// guarded by a timing control — so ExecForever suspends on each #10 delay and
-// is resumed by the scheduler on the next time step, executing the body once
-// per step. A parallel process ends the run with $finish after the fourth tick
-// but before the fifth, so the counter observes exactly four iterations.
 TEST(LoopStatementSim, ForeverWithDelayIteratesAcrossSimTime) {
   SimFixture f;
   auto* var = RunAndFindVar(

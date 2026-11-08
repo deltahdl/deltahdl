@@ -54,7 +54,6 @@ void WarnUwireNotMerged(DiagEngine& diag, SourceLoc loc, std::string_view port,
                Subclause("23.3.3.6"));
 }
 
-// The uwire inout connections of `inst` whose two nets are kept apart.
 static void WarnInstanceUwireNetsKeptApart(const RtlirModuleInst& inst,
                                            DiagEngine& diag) {
   for (const RtlirPortBinding& binding : inst.port_bindings) {

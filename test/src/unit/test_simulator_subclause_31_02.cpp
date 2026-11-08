@@ -1,59 +1,3 @@
-// Whether a run registers the timing checks a design declares.
-//
-// Each case elaborates a source, lowers it, runs it, and then asks
-// SpecifyManager -- the one the run installed on SimContext, reached through
-// SimContext::GetSpecifyManager -- what it holds. No case builds a
-// TimingCheckEntry of its own or calls
-// SpecifyManager::AddTimingCheckUnderOptions, which is what separates this file
-// from every other §31 simulator file in the tree: those construct the entry
-// the case then reads, or call the fixture helper RegisterTimingChecks in
-// lib/cpp/test_fixtures/fixture_specify_manager.h, so they pass whether or not
-// anything under src/ ever registers a check.
-//
-// Issue #3403 is that nothing did. RegisterSpecifyBlocks in
-// src/simulator/specify_register.cpp registered the specparam declarations, the
-// module path delays, the pulsestyle and showcancelled declarations and the
-// PATHPULSE$ specparams of Syntax 30-1, and none of its system timing checks,
-// so SpecifyManager::GetTimingChecks answered empty in every run of every
-// design. §31.2 puts a system timing check inside a specify block and §30.3
-// puts that block inside a module declaration, exactly as it puts a module path
-// declaration there, so a declared check belongs to one module instance the way
-// a declared path does.
-//
-// A registered check is not yet evaluated against a stimulus. Nothing under
-// src/ watches a reference or data signal and calls
-// SpecifyManager::CheckSetupViolation or any of its siblings; every caller of
-// those is a unit test. So no case here drives a design and expects a violation
-// report, and none asserts that one was produced. What these cases assert is
-// what the manager holds after the run.
-//
-// The literals are picked so that no two quantities a case tells apart share a
-// value, and so that none of them is the 0 that TimingCheckEntry::limit holds
-// before a limit expression has been evaluated into it. The three limits are 7,
-// 19 and 29, all distinct: a limit answered out of the wrong design or out of
-// an unevaluated entry reads as another of the three or as 0, never as the
-// right one. The two instances of one cell are told apart by
-// TimingCheckEntry::inst_prefix and not by their limits, both cells being the
-// same cell, so they share 19 the way two instances share a declaration.
-//
-// No module here is named `cell`. §33.4 gives `cell` to a config declaration's
-// cell clause, so Parser rejects it as a module name; the cells below carry a
-// suffix for that reason.
-//
-// Each source puts the cell first and the top last, because ElaborateSrc in
-// lib/cpp/test_fixtures/fixture_simulator.h elaborates
-// cu->modules.back()->name.
-//
-// §30.4.1's terminal direction rules govern a module path's source and
-// destination and not a timing check's signals: CheckSpecifyItemTerminals in
-// src/elaborator/elaborator_validate_specify.cpp applies CheckPathDeclTerminals
-// to a path declaration and applies CheckTimingTerminal to a timing check, and
-// CheckTimingTerminal enforces one rule only -- §25.6's ban on a `ref` port, or
-// on a signal reached through a `ref` modport member, standing as a specify
-// terminal. The one further rule a source here has to satisfy is §31.2's on the
-// limit, which ValidateTimingCheckLimitOperands enforces: every operand of a
-// timing_check_limit is a literal or a specparam in scope.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -70,9 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The SpecifyManager `source` leaves on `f.ctx` once it has been elaborated,
-// lowered and run. Null when the source did not elaborate cleanly, so a case
-// asserts on the pointer before reading anything through it.
 const SpecifyManager* SpecifyStateAfterRun(const std::string& source,
                                            SimFixture& f) {
   auto* design = ElaborateSrc(source, f);
@@ -81,9 +22,6 @@ const SpecifyManager* SpecifyStateAfterRun(const std::string& source,
   return f.ctx.GetSpecifyManager();
 }
 
-// The first registered timing check of kind `kind`. Used by the case whose
-// subject is that any check was registered at all, which has no instance to
-// name before it has read one.
 const TimingCheckEntry* RegisteredCheckOfKind(const SpecifyManager& mgr,
                                               TimingCheckKind kind) {
   for (const auto& check : mgr.GetTimingChecks()) {
@@ -92,9 +30,6 @@ const TimingCheckEntry* RegisteredCheckOfKind(const SpecifyManager& mgr,
   return nullptr;
 }
 
-// The registered timing check the instance whose hierarchical prefix is
-// `prefix` declared. Two instances of one cell declare checks naming identical
-// signals, so the prefix is the only thing that separates them.
 const TimingCheckEntry* RegisteredCheckIn(const SpecifyManager& mgr,
                                           std::string_view prefix) {
   for (const auto& check : mgr.GetTimingChecks()) {
@@ -103,12 +38,6 @@ const TimingCheckEntry* RegisteredCheckIn(const SpecifyManager& mgr,
   return nullptr;
 }
 
-// §31.2: a $setup declared in a specify block reaches the run. The entry is
-// read back whole -- its kind, its reference signal and edge, its data signal
-// and its limit -- because a registration that dropped any one of them would
-// leave the check unevaluatable while still answering that something was
-// registered. §31.3.1 orders the arguments data_event, reference_event,
-// timing_check_limit, so `d` is the data event and `clk` the reference.
 TEST(RegisteredDesignTimingChecks, DeclaredSetupCheckReachesTheManager) {
   SimFixture f;
   const SpecifyManager* mgr = SpecifyStateAfterRun(
@@ -124,24 +53,12 @@ TEST(RegisteredDesignTimingChecks, DeclaredSetupCheckReachesTheManager) {
   const TimingCheckEntry* check =
       RegisteredCheckOfKind(*mgr, TimingCheckKind::kSetup);
   ASSERT_NE(check, nullptr);
-  // Syntax 31-3 writes `$setup(data_event, reference_event, limit)` where
-  // Syntax 31-4 writes `$hold(reference_event, data_event, limit)`, so the two
-  // clauses order their events oppositely. Parser::ParseTimingCheck reads the
-  // terminals positionally and swaps them for $setup alone, which is why `clk`
-  // is the reference here and `d` the data.
   EXPECT_EQ(check->ref_signal, "clk");
   EXPECT_EQ(check->ref_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(check->data_signal, "d");
   EXPECT_EQ(check->limit, 7u);
 }
 
-// §30.3: the specify block holding a timing check stands in a module
-// declaration, so each instance of a cell declares its own check and a cell
-// instantiated twice registers two. §31.2 has the check name its signals by the
-// bare names of the module it stands in, so both entries carry the same
-// ref_signal and data_signal; inst_prefix is what tells them apart, and a
-// registration that recorded only the declaration would hold one entry rather
-// than two.
 TEST(RegisteredDesignTimingChecks,
      TwoInstancesOfOneCellRegisterTheirOwnChecks) {
   SimFixture f;
@@ -168,20 +85,6 @@ TEST(RegisteredDesignTimingChecks,
   EXPECT_FALSE(second->data_signal.empty());
 }
 
-// §31.2: a timing check's limit is a constant expression and may use
-// specparams. The specparam is declared inside the specify block, which is
-// where Syntax 30-1 puts a specparam_declaration beside the system_timing_check
-// that reads it, and which RegisterSpecparams binds under the instance prefix
-// before any other pass of RegisterSpecifyBlocks runs. §6.20.5 admits the
-// module body as a second site, and RegisterModuleSpecparams binds that one,
-// but it is bound after RegisterSpecifyBlocks has returned; the in-block site
-// is the one whose binding is settled by the time a limit in the same block is
-// evaluated.
-//
-// The limit is read back at 29, the value the cell declared. A limit evaluated
-// under the wrong instance prefix finds no variable of that name and folds to
-// 0, so the entry answering 29 says the specparam was read in the instance that
-// declared it.
 TEST(RegisteredDesignTimingChecks, SpecparamLimitIsReadInDeclaringInstance) {
   SimFixture f;
   const SpecifyManager* mgr = SpecifyStateAfterRun(
@@ -202,13 +105,6 @@ TEST(RegisteredDesignTimingChecks, SpecparamLimitIsReadInDeclaringInstance) {
   EXPECT_EQ(check->limit, 29u);
 }
 
-// Syntax 31-2 makes a timing check event a specify_terminal_descriptor, whose
-// input_identifier (A.7.3) may be `interface_identifier . port_identifier`: a
-// member of one of the module's interface ports. `$setup(b.d, posedge b.clk,
-// 5, n)` in `module dut(bus b)` then follows the members of the interface
-// instance the port is bound to. The entry kept only `d` and `clk`, which name
-// nothing in `u`, so the check never fired. d rises 2 before clk at 12, inside
-// the limit, and falls 6 before clk at 36, outside it: one toggle.
 TEST(RegisteredDesignTimingChecks, InterfacePortMemberTerminalsFollowTheBus) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface bus;\n"
@@ -235,7 +131,6 @@ TEST(RegisteredDesignTimingChecks, InterfacePortMemberTerminalsFollowTheBus) {
             "1\n");
 }
 
-// The same with the members driven by an initial block of the interface.
 TEST(RegisteredDesignTimingChecks,
      InterfacePortMemberTerminalsFollowTheInterfacesOwnDriver) {
   SimFixture f;
@@ -263,12 +158,6 @@ TEST(RegisteredDesignTimingChecks,
             "1\n");
 }
 
-// A.7.3 lets a terminal carry a select, `input_identifier [ [
-// constant_range_expression ] ]`, and the event is then a transition of the
-// selected bits alone. `d[1]` fires when bit 1 changes and `d[3:2]` when bit 3
-// or 2 does, neither when bit 0 does. The select was dropped, so `d[1]` and
-// `d[3:2]` watched the whole port -- and, standing on the same signals, the
-// second replaced the first.
 TEST(RegisteredDesignTimingChecks, SelectTerminalsFollowTheirBitsAlone) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module dut(input clk, input [3:0] d);\n"
@@ -296,9 +185,6 @@ TEST(RegisteredDesignTimingChecks, SelectTerminalsFollowTheirBitsAlone) {
             "1 1\n");
 }
 
-// A bit-select reference terminal: `posedge clk[1]` is bit 1's rising edge,
-// not bit 0's. d[0] rises at 10 and clk[0] at 12, which is no event of the
-// check; d[0] falls at 27 and clk[1] rises at 29, a violation.
 TEST(RegisteredDesignTimingChecks, BitSelectReferenceFollowsItsBit) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module dutv(input [1:0] clk, input d);\n"
@@ -323,11 +209,6 @@ TEST(RegisteredDesignTimingChecks, BitSelectReferenceFollowsItsBit) {
             "1\n");
 }
 
-// §31.2 (printed page 897): any timing check may carry a notifier, which
-// toggles each time that check finds a violation, and nothing in Clause 31
-// makes two checks on the same signals one. Three $setup checks differing only
-// in their notifier each toggle theirs; the checks were merged into the last,
-// whose notifier alone moved.
 TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsAreEachEvaluated) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(output reg clk = 0, output reg d = 0);\n"
@@ -346,8 +227,6 @@ TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsAreEachEvaluated) {
             "111\n");
 }
 
-// Two $skew checks differing only in their limit keep their own: c2 rising 7
-// after c1 is past the limit 5 and within the limit 9.
 TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsKeepTheirLimits) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(output reg c1 = 0, output reg c2 = 0);\n"
@@ -365,8 +244,6 @@ TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsKeepTheirLimits) {
             "10\n");
 }
 
-// §31.5's edge[01] and edge[10] on one reference are two checks, the first
-// answering the rising clock at 12 and the second the falling one at 22.
 TEST(RegisteredDesignTimingChecks, ChecksOnTheSameSignalsKeepTheirEdges) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(output reg clk = 0, output reg d = 0);\n"

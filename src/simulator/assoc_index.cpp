@@ -14,8 +14,6 @@ namespace {
 
 constexpr uint64_t kAllOnes = ~uint64_t{0};
 
-// Word `i` of `val`, extended past its width by its own signedness, x and z
-// bits read as 0: what a cast of `val` to a wider type reads there (§6.24.1).
 uint64_t ExtendedWord(const Logic4Vec& val, size_t i) {
   size_t count = (val.width + 63) / 64;
   uint32_t top_bits = val.width % 64;
@@ -42,9 +40,6 @@ AssocIndex AssocIndex::Of(const Logic4Vec& val, bool is_wildcard,
   size_t count = std::max<size_t>((width + 63) / 64, 1);
   std::vector<uint64_t> words(count + 1, 0);
   for (size_t i = 0; i < count; ++i) words[i] = ExtendedWord(val, i);
-  // The cast to the index type: cut to its width, then extended by its
-  // signedness. An unsigned value keeps the zero word above it, so its top bit
-  // is never read as a sign.
   uint32_t top_bits = width % 64;
   uint64_t& top = words[count - 1];
   uint32_t sign_bit = top_bits == 0 ? 63 : top_bits - 1;
@@ -99,7 +94,6 @@ Logic4Vec AssocIndex::ToSignedVec(Arena& arena) const {
 bool operator<(const AssocIndex& a, const AssocIndex& b) {
   bool a_negative = a.IsNegative();
   if (a_negative != b.IsNegative()) return a_negative;
-  // Of two values of one sign, the one of more words lies farther from zero.
   if (a.WordCount() != b.WordCount())
     return (a.WordCount() < b.WordCount()) != a_negative;
   for (size_t i = a.WordCount(); i-- > 0;) {

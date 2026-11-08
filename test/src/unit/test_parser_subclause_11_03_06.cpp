@@ -65,9 +65,6 @@ TEST(OperatorAndExpressionParsing, AssignInExprAsIfCondition) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kEq);
 }
 
-// §11.3.6: the target of an assignment within an expression may be a
-// concatenation (§11.4.12), not only a simple variable. The parenthesized form
-// with a concatenation left-hand side is admitted by the expression grammar.
 TEST(OperatorAndExpressionParsing, ConcatTargetAssignInExpr) {
   auto r = Parse(
       "module t;\n"
@@ -79,14 +76,6 @@ TEST(OperatorAndExpressionParsing, ConcatTargetAssignInExpr) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §11.3.6: a blocking assignment used within an expression is enclosed in
-// parentheses. The parenthesized chain `a = (b = (c = 5))` parses (see
-// ChainedAssignInExpr); the same nested assignment without the parentheses is
-// not admitted by the expression grammar, so the second `=` stands where the
-// statement terminator belongs, and that `=` is what the parser reports under
-// §11.3.6 -- the rule broken -- rather than under §12.3 as a missing
-// terminator. This observes the rejecting side of the parenthesization rule
-// alongside its accepting side.
 TEST(OperatorAndExpressionParsing, UnparenthesizedAssignInExprIsRejected) {
   auto r = Parse(
       "module t;\n"
@@ -100,10 +89,6 @@ TEST(OperatorAndExpressionParsing, UnparenthesizedAssignInExprIsRejected) {
   EXPECT_FALSE(ReportedError(r.diags, "expected ';', got '='", 3, "12.3"));
 }
 
-// The shape of sv-tests' 11.3.6--assign_in_expr_inv.sv: two assignments left
-// unparenthesized in one statement. The first stray `=` is reported once, the
-// rest of the chain is read with it, and the terminator is met where the
-// author's statement ends, so nothing after the statement is reported.
 TEST(OperatorAndExpressionParsing, ChainOfUnparenthesizedAssignsReportedOnce) {
   auto r = Parse(
       "module t;\n"
@@ -120,10 +105,6 @@ TEST(OperatorAndExpressionParsing, ChainOfUnparenthesizedAssignsReportedOnce) {
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
-// §11.3.6 names the mistake the parentheses exist to prevent: `a = b` written
-// for `a == b` in a condition. The parenthesized `if ((a = 0))` parses (see
-// AssignInExprAsIfCondition); the bare form leaves `=` where the condition's
-// closing parenthesis belongs and is reported under §11.3.6 at the `=`.
 TEST(OperatorAndExpressionParsing, UnparenthesizedAssignAsIfConditionRejected) {
   auto r = Parse(
       "module t;\n"
@@ -137,33 +118,21 @@ TEST(OperatorAndExpressionParsing, UnparenthesizedAssignAsIfConditionRejected) {
   EXPECT_FALSE(ReportedError(r.diags, "expected ')', got '='", 3, "12.4"));
 }
 
-// §11.3.6: a blocking assignment within an expression is permitted only when it
-// carries no timing control. An intra-assignment delay inside the parentheses
-// is therefore not accepted by the expression grammar.
 TEST(OperatorAndExpressionParsing, AssignWithTimingControlInExprIsRejected) {
   auto r = Parse(
       "module t;\n"
       "  int a, b, c;\n"
       "  initial b = (a = #5 c);\n"
       "endmodule\n");
-  // The '#' stands where the assignment's right-hand operand belongs, so
-  // §11.2's primary report is what fires: §11.3.6 has no report of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
-// §11.3.6: an assignment operator is legal in an expression, and §9.4.2's
-// event expression is built from expressions, but the assignment forms this
-// subclause admits are the parenthesized ones -- a bare assignment in the
-// event control is not an expression at all, so it is refused where the event
-// control is read.
 TEST(OperatorAndExpressionParsing, AssignInEventExpressionIsRejected) {
   auto r = Parse(
       "module t;\n"
       "  logic a, b;\n"
       "  always @(a = b) ;\n"
       "endmodule\n");
-  // §9.4.2 owns the event control's closing parenthesis, and that is where the
-  // '=' is refused.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '='", 3, "9.4.2"));
 }
 

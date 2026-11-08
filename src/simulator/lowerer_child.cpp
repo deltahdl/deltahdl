@@ -37,9 +37,6 @@ namespace delta {
 void Lowerer::CreateChildModuleVariables(const std::string& inst_prefix,
                                          const RtlirModule* resolved) {
   for (const auto& var : resolved->variables) {
-    // The prefixed name is interned in the arena because it is the key every
-    // map LowerVar records this declaration in stores the variable under, and
-    // each holds the key rather than a copy of it.
     auto* name =
         arena_.Create<std::string>(inst_prefix + std::string(var.name));
     LowerVar(*name, var);
@@ -49,17 +46,11 @@ void Lowerer::CreateChildModuleVariables(const std::string& inst_prefix,
 static void CreateChildModulePorts(const std::string& inst_prefix,
                                    const RtlirModule* resolved, SimContext& ctx,
                                    Arena& arena) {
-  // CreatePortStorage interns the prefixed name in the arena because it is the
-  // key both SimContext::CreateVariable and VcdDumpState::SetVcdVarKind store
-  // the port under, and each holds the key rather than a copy of it.
   for (const auto& port : resolved->ports) {
     CreatePortStorage(inst_prefix, port, ctx, arena);
   }
 }
 
-// Whether `name` is one of the module's ports. A port's net is the parent's,
-// reached through the binding CreateChildModulePorts makes, so the child does
-// not own one of its own under its prefix.
 static bool NetNamesAPortOf(const RtlirModule* mod, std::string_view name) {
   for (const auto& port : mod->ports) {
     if (port.name == name) return true;
@@ -67,28 +58,6 @@ static bool NetNamesAPortOf(const RtlirModule* mod, std::string_view name) {
   return false;
 }
 
-// Whether `child` owns `net` and so materializes it under its instance prefix.
-//
-// An interface keeps every one of its nets, ports included, because §25.3.2
-// has its members shared through the port by reference rather than driven
-// across it. A regular module's port is the parent's net, reached through the
-// binding CreateChildModulePorts makes, so a same-named net materialized here
-// would shadow that outer net and the assign would never reach it. §23.9's
-// module boundary makes every other net of an instantiated module its own,
-// with one exception a nested declaration brings: §23.4 has the outer name
-// space visible to a module declared and instantiated in the same scope, so a
-// name a continuous assignment or port connection inside it writes may be one
-// declared around it, and the net Elaborator::MaybeCreateImplicitNet
-// (src/elaborator/elaborator_items.cpp) pushed for that reference stands for
-// the outer object -- materialized under the instance it would shadow that
-// object and take the assignment with it. The elaborator, which sees the
-// enclosing declarations, marks such a net with RtlirNet::refers_outward, and
-// that mark alone is what leaves a net to the outer scope: a net the nested
-// module declares for itself is its own, §23.4's ff2 encapsulating its `wire
-// q2`, and so is an implicit net of a name no enclosing module declares,
-// which §6.10 gives to the scope the reference appears in -- one per instance,
-// as §36.10 has for m1.w and m2.w. RtlirNet::loc told the declared nets from
-// the implicit ones before, and put that last kind with the outer scope.
 static bool ChildOwnsNet(const RtlirModuleInst& child, const RtlirNet& net) {
   const RtlirModule* resolved = child.resolved;
   if (resolved->is_interface) return true;
@@ -96,20 +65,6 @@ static bool ChildOwnsNet(const RtlirModuleInst& child, const RtlirNet& net) {
   return !net.refers_outward;
 }
 
-// 25.3.2: a child instance's nets - e.g. an interface `wire` member accessed
-// through a port by reference - must be materialized under the child's instance
-// prefix, just like its variables. LowerModule does this for the top via
-// RegisterModuleNets; child instances need the prefixed form so a continuous
-// assign driven through the port resolves onto the shared net.
-//
-// §36.10 is why a regular module's nets are materialized too: a module m
-// holding a wire w and instantiated twice as m1 and m2 has m1.w and m2.w as
-// two distinct objects. A net a module declares for itself has one object
-// per instance, and with none created there was nothing under either name --
-// the design held the declaration and no storage for it. §23.4 makes a nested
-// declaration's instances such instances too: `and2 u1(...), u2(...), u3(...)`
-// of a module declared beside them are three, each with the nets it declares.
-// ChildOwnsNet says which nets are the child's own to materialize.
 static void CreateChildModuleNets(const std::string& inst_prefix,
                                   const RtlirModuleInst& child, SimContext& ctx,
                                   Arena& arena) {
@@ -121,28 +76,11 @@ static void CreateChildModuleNets(const std::string& inst_prefix,
   }
 }
 
-// §10.11: an alias statement makes the nets it lists one physical net, each a
-// driver and a receiver of the others, and §23.9 resolves the bare names it
-// writes in the module that declares them, so the alias of a module
-// instantiated twice joins each instance's own nets. The nets of an instance
-// are created under the instance's prefix by CreateChildModuleNets and the
-// top's under their bare names by RegisterModuleNets, so each name the alias
-// writes is keyed the same way: inst_prefix_ is empty for the top. Registered
-// under the bare name alone, an instance's alias found the top's like-named
-// net or none, and an instance's nets stayed apart. The prefixed name is
-// interned in the arena because the variable and net maps hold the key rather
-// than a copy of it.
-// §10.11: one bit an alias operand lists, as the net holding it and its offset
-// from the net's least significant end.
 struct AliasBit {
   Net* net;
   uint32_t offset;
 };
 
-// The offsets from the least significant end `sel` spans within `var`, low
-// then high: the bit it selects, the bits between its two bounds, or those of
-// an indexed part-select. None where a bound does not fold or runs off the
-// declaration.
 static std::optional<std::pair<int64_t, int64_t>> AliasSelectOffsets(
     const Expr* sel, const Variable& var, SimContext& ctx, Arena& arena) {
   auto value = [&](const Expr* e) {
@@ -163,8 +101,6 @@ static std::optional<std::pair<int64_t, int64_t>> AliasSelectOffsets(
   return std::make_pair(std::min(a, b), std::max(a, b));
 }
 
-// The scope an alias statement stands in: the instance's prefix and the
-// generate blocks around the statement, outermost first.
 struct AliasScope {
   const std::string& inst_prefix;
   const GenBlockPrefixes& gen_blocks;
@@ -180,8 +116,6 @@ std::string GenBlockObjectKey(const std::string& inst_prefix,
   return inst_prefix + std::string(name);
 }
 
-// Appends the bits of the net, the bit-select or the part-select `e`, the
-// most significant first. False where `e` names no net of the scope.
 static bool AppendNetOperandBits(const Expr* e, const AliasScope& scope,
                                  SimContext& ctx, Arena& arena,
                                  std::vector<AliasBit>& out) {
@@ -201,11 +135,6 @@ static bool AppendNetOperandBits(const Expr* e, const AliasScope& scope,
   return true;
 }
 
-// Appends the bits the alias operand `e` lists, the most significant first: a
-// net's, a bit-select's or a part-select's of one, or those of each operand
-// of a concatenation or of a positional assignment pattern in turn -- Annex
-// A.8.5's net_lvalue, the type of a typed pattern looked through. False where
-// `e` is none of these.
 static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
                             SimContext& ctx, Arena& arena,
                             std::vector<AliasBit>& out) {
@@ -221,9 +150,6 @@ static bool AppendAliasBits(const Expr* e, const AliasScope& scope,
 
 using AliasBitMap = std::vector<std::pair<uint32_t, uint32_t>>;
 
-// The bits `operands` join, as a map for every ordered pair of distinct nets
-// holding bits at one position of two operands: the bit of the first net,
-// then the bit of the second it is one with.
 static std::map<std::pair<Net*, Net*>, AliasBitMap> JoinedBitMaps(
     const std::vector<std::vector<AliasBit>>& operands) {
   std::map<std::pair<Net*, Net*>, AliasBitMap> maps;
@@ -239,12 +165,6 @@ static std::map<std::pair<Net*, Net*>, AliasBitMap> JoinedBitMaps(
   return maps;
 }
 
-// Joins the bits standing at one position of every operand of `operands` by
-// a link that always conducts and carries a bit map (SwitchLink::bit_map),
-// made between every two nets sharing a position so that no map is followed
-// across another net: each net then resolves from its own drivers and those
-// of the bits joined to it. Bits of one net joined to each other are left
-// apart.
 static void JoinOperandBits(const std::vector<std::vector<AliasBit>>& operands,
                             Arena& arena) {
   auto* join = arena.Create<BidirSwitchState>();
@@ -256,10 +176,6 @@ static void JoinOperandBits(const std::vector<std::vector<AliasBit>>& operands,
   }
 }
 
-// §10.11: an alias whose operands list bits rather than whole nets, `alias
-// {A[7:0], A[15:8], A[23:16], A[31:24]} = B;` of §10.11's byte_swap, joins
-// the bits standing at one position of every operand, each operand being as
-// wide as the others (JoinOperandBits).
 static void LowerBitAlias(const RtlirAlias& alias, const std::string& prefix,
                           SimContext& ctx, Arena& arena) {
   const AliasScope kScope{prefix, alias.gen_block_prefixes};
@@ -284,26 +200,14 @@ void JoinInoutPortBits(const Expr& connection, Net& port_net,
   std::vector<AliasBit> inside;
   for (uint32_t off = port_net.resolved->value.width; off-- > 0;)
     inside.push_back({&port_net, off});
-  // §23.3.3 sizes a port connection as an assignment is sized: the least
-  // significant bits of the two sides meet, and the bits of the wider side
-  // above the narrower one's width are joined to nothing.
   const auto kJoined =
       static_cast<std::ptrdiff_t>(std::min(inside.size(), outside.size()));
   inside.erase(inside.begin(), inside.end() - kJoined);
   outside.erase(outside.begin(), outside.end() - kJoined);
   JoinOperandBits({std::move(inside), std::move(outside)}, arena);
-  // A source that never writes a driver -- a tri0, tri1 or supply net's own,
-  // or a trireg's charge -- reaches the other side only through a resolution
-  // of the joined bits, which nothing else starts before a driver moves.
   port_net.Resolve(arena, &ctx.GetScheduler());
 }
 
-// §10.11 (printed page 268): the same nets may appear in several alias
-// statements and the effects are cumulative, so the statements naming whole
-// nets join them into groups, one group for every net any chain of statements
-// connects. The group is the union of the statements' nets: pointing each
-// statement's nets at its own first net instead split `alias a = b; alias c =
-// b;` in two, the second statement taking b from a.
 static std::string AliasGroupRoot(
     const std::unordered_map<std::string, std::string>& parent,
     std::string name) {
@@ -337,10 +241,6 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
       parent[other] = root;
     }
   }
-  // The aliased nets share one resolved storage. Both the variable map, which
-  // reads go through, and the net map, which continuous-assign driver
-  // resolution goes through, are redirected; otherwise a driver on the
-  // non-primary net writes a Variable the alias never sees.
   for (const auto& entry : parent) {
     const std::string& member = entry.first;
     std::string root = AliasGroupRoot(parent, member);
@@ -352,21 +252,6 @@ void Lowerer::LowerAliases(const RtlirModule* mod) {
   }
 }
 
-// §23.3.1 (printed page 740): each top-level module is instantiated once,
-// implicitly, under an instance name equal to its module name, and each such
-// instance is a scope of its own (§23.9), so two tops' declarations of one
-// name are two objects. The first top's are keyed under their bare names, as
-// every lookup from the top of the design expects; a later top is lowered as
-// an instance of that name, its declarations keyed under "name." as an
-// instance's are under its path, so `int x` in t1 and in t2 are t1's x and
-// t2.x. Keyed alike, the second top's x replaced the first's in the one table
-// both were written to, and each read the other's value.
-// §23.6: the path of the interface instance `name` an interface port's
-// actual names. The elaborator rewrites the actual to the instance's path
-// from the module it is written in, `h.i`, keyed under the instance being
-// lowered, or keeps a full path from a top-level module whole, `top.i`
-// written in a module under top (ResolveInstancePathActuals), which is keyed
-// from the design's root as any path starting at a top's name is.
 std::string Lowerer::ConnectedInstancePath(std::string_view name) const {
   std::string local = inst_prefix_ + std::string(name);
   std::string_view head = name.substr(0, name.find('.'));
@@ -382,14 +267,10 @@ void Lowerer::LowerParallelTop(const RtlirModule* mod) {
   inst.module_name = mod->name;
   inst.inst_name = mod->name;
   inst.simple_inst_name = mod->name;
-  // The instance only reads its module; RtlirModuleInst holds one to write.
   inst.resolved = const_cast<RtlirModule*>(mod);
   LowerChildInstance(inst);
 }
 
-// The name an actual's instance is written by: `i`, or `top.i` as the
-// elaborator stores a full path whole (ResolveInstancePathActuals), the
-// modport of `i.mp` aside; empty for an actual of any other shape.
 static std::string_view ActualHeadName(const Expr* conn) {
   while (conn != nullptr && conn->kind == ExprKind::kMemberAccess) {
     conn = conn->lhs;
@@ -398,13 +279,6 @@ static std::string_view ActualHeadName(const Expr* conn) {
   return conn->text;
 }
 
-// §23.6 with §25.3: an interface port's actual may be a full path into a later
-// top-level module, `t2.i` written in a module under the first top. The port
-// is joined to that instance's storage as its own instance is lowered
-// (AliasInterfacePortTo), and the later tops are lowered only after the first
-// top's whole hierarchy, so such a top is lowered here, ahead of its turn,
-// and Lower passes over it then. An instance of that name in the module the
-// actual is written in takes the name first, as in ConnectedInstancePath.
 void Lowerer::LowerTopNamedBy(const Expr* conn) {
   std::string_view text = ActualHeadName(conn);
   std::string_view name = text.substr(0, text.find('.'));
@@ -423,11 +297,6 @@ void Lowerer::LowerTopNamedBy(const Expr* conn) {
   ctx_.SetLoweringInstancePrefix(inst_prefix_);
 }
 
-// The level RegisterChildInstancePath names `child` by: its name as written,
-// carrying the index of the element when it is one of an array of instances.
-// §23.3.3.5 names each element `u[1]`, and PushInstanceArray
-// (src/elaborator/elaborator_module_inst.cpp) appends that index to
-// RtlirModuleInst::inst_name alone, leaving simple_inst_name the array's name.
 static std::string ChildInstanceLevel(const RtlirModuleInst& child) {
   std::string_view simple =
       child.simple_inst_name.empty() ? child.inst_name : child.simple_inst_name;
@@ -440,14 +309,6 @@ static std::string ChildInstanceLevel(const RtlirModuleInst& child) {
   return level;
 }
 
-// §23.6 with §27.4 (printed page 820): an instance a generate block holds is
-// named through the block instance, `g[0].pi`, while its storage is keyed on
-// the one flat name the elaborator gives it (RtlirModuleInst::inst_name,
-// "g_0_pi"). The path is the parent's path, the block instances and the name
-// as written, recorded for the child's key wherever it differs from the key,
-// so an instance below one inside a generate block is named through it too.
-// Returns the path where it differs from the key, and the empty string where
-// the key already spells it.
 static std::string RegisterChildInstancePath(const std::string& parent_prefix,
                                              const std::string& child_prefix,
                                              const RtlirModuleInst& child,
@@ -470,13 +331,6 @@ static std::string RegisterChildInstancePath(const std::string& parent_prefix,
   return path;
 }
 
-// §23.6 with §27.4: a hierarchical name reaches what such an instance declares
-// through the same path, `g.c.pass` or `g[0].c.pass`, while the instance stores
-// it under its flat key, "g_c.pass". Every variable and net stored under the
-// key is therefore answered under the path as well, shared rather than copied,
-// as a generate block's own members are (RegisterGenBlockMembers in
-// lowerer_gen_block_members.cpp). The keys are gathered before any alias is
-// added, an alias being an insertion into the map walked.
 static void AliasChildObjectsUnderPath(const std::string& child_prefix,
                                        const std::string& path, SimContext& ctx,
                                        Arena& arena) {
@@ -501,8 +355,6 @@ static void AliasChildObjectsUnderPath(const std::string& child_prefix,
 void RegisterModuleLets(const RtlirModule* mod, std::string_view prefix,
                         SimContext& ctx) {
   for (auto* item : mod->let_decls) {
-    // §19.3: a covergroup, held among the lets, is a type, which
-    // CovergroupOfType and CovergroupTypeNamed find by its bare name.
     if (item->kind == ModuleItemKind::kCovergroupDecl) {
       ctx.RegisterLetDecl(item->name, item);
     } else {
@@ -511,41 +363,18 @@ void RegisterModuleLets(const RtlirModule* mod, std::string_view prefix,
   }
 }
 
-// The subroutines, imports and assertion declarations an instance's module
-// declares, registered for the instance whose key is `prefix`.
 static void RegisterChildInstanceDecls(const RtlirModule* mod,
                                        const std::string& prefix,
                                        SimContext& ctx, Arena& arena) {
-  // 21.2.1.5: register the child instance's tasks/functions so a call within
-  // its own body resolves (and %m composes the instance + subroutine path);
-  // LowerModule registers these for the top only.
   RegisterModuleSubroutines(mod, ctx);
   RegisterModuleLets(mod, prefix, ctx);
-  // §13.3 with §23.6: and under the instance's own prefixed key, which an
-  // enable by hierarchical name from another instance resolves by.
   RegisterInstanceSubroutines(mod, prefix, ctx, arena);
-  // §27.4 with §13.4: and those of the instance's generate blocks under
-  // the instance's key too, "u1.blk[1].triple".
   RegisterGenBlockSubroutines(mod, prefix, prefix, ctx, arena);
-  // §35.5.4: an import declaration defines the subroutine in the scope
-  // that writes it, an instantiated module, interface or program as much as
-  // the top; the top's are registered by LowerModule.
   RegisterModuleDpiImports(mod, ctx);
-  // §35.7: and an export declaration makes the instance's subroutine one C
-  // code can call, in the instance's own scope (§35.5.3).
   RegisterModuleDpiExports(mod, prefix, ctx);
-  // §16.12.1: an assertion of the instance that instantiates a property or
-  // sequence the instance's module declares expands it at the run, so the
-  // declarations are registered as the top's are.
   RegisterModuleSequenceDecls(mod, ctx);
 }
 
-// §25.9 with §6.8: a virtual interface declared with an initializer naming
-// an instance of the module, `virtual SBus v = s;`, takes that instance's
-// handle as part of static initialization, before the instance itself is
-// lowered, so the key of each instance the module holds is registered ahead
-// of the module's variables. LowerChildInstance registers the same key again
-// when it lowers the instance.
 void Lowerer::RegisterChildInstanceKeys(const RtlirModule* mod) {
   for (const auto& child : mod->children) {
     if (child.resolved == nullptr) continue;
@@ -554,10 +383,6 @@ void Lowerer::RegisterChildInstanceKeys(const RtlirModule* mod) {
   }
 }
 
-// The sibling an actual of `child` names by its stored name where that sibling
-// is not yet placed: the interface instance `i`, or the `i` of `i.mp`, or the
-// module instance `h` of `h.i`, an interface instance h declares, which the
-// elaborator stores under that path as one name (§25.3).
 static const RtlirModuleInst* UnplacedInterfaceActual(
     const RtlirModuleInst& child, const std::vector<RtlirModuleInst>& siblings,
     const std::vector<bool>& placed, size_t& index) {
@@ -581,9 +406,6 @@ static const RtlirModuleInst* UnplacedInterfaceActual(
   return nullptr;
 }
 
-// §23.6: the full paths from a top-level module, `top.i` or `top.h.i`, that
-// the actuals of `inst` and of every instance below it name, each keyed from
-// the design's root as ConnectedInstancePath keys it.
 static void CollectFullPathActuals(const RtlirModuleInst& inst,
                                    const SimContext& ctx,
                                    std::vector<std::string>& paths) {
@@ -601,10 +423,6 @@ static void CollectFullPathActuals(const RtlirModuleInst& inst,
   }
 }
 
-// The sibling one of `paths` names where that sibling is not yet placed: the
-// instance itself, the `i` of `top.i` among the instances top holds, or the
-// instance holding it, the `h` of `top.h.i`. The siblings are the instances
-// the module keyed `prefix` holds.
 static const RtlirModuleInst* UnplacedPathTarget(
     const std::vector<std::string>& paths, const std::string& prefix,
     const std::vector<RtlirModuleInst>& siblings,
@@ -624,22 +442,11 @@ static const RtlirModuleInst* UnplacedPathTarget(
   return nullptr;
 }
 
-// §25.3: an interface port is joined to the storage of the interface instance
-// its actual names (Lowerer::TryAliasInterfacePort), which exists once that
-// instance is lowered, and the port is bound as soon as its own instance is.
-// An interface instance is therefore lowered ahead of a sibling written before
-// it that connects to it, and so is a module instance declaring one a sibling
-// written before it connects to by `h.i`. So is an instance a full path from
-// a top-level module names, `top.i` or `top.h.i`, from an actual anywhere
-// below a sibling written before it (§23.6); every other instance keeps its
-// place.
 void Lowerer::LowerChildModules(const RtlirModule* mod) {
   const std::vector<RtlirModuleInst>& children = mod->children;
   std::vector<bool> placed(children.size(), false);
   for (size_t i = 0; i < children.size(); ++i) {
     if (placed[i] || children[i].resolved == nullptr) continue;
-    // Placed now, so a path from below it naming the instance itself,
-    // `top.m.j` under m, never lowers it ahead of itself.
     placed[i] = true;
     std::vector<std::string> paths;
     CollectFullPathActuals(children[i], ctx_, paths);
@@ -662,18 +469,10 @@ void Lowerer::LowerChildModules(const RtlirModule* mod) {
 }
 
 void Lowerer::LowerChildBody(const RtlirModule* mod) {
-  // §10.11: the instance's alias statements join the nets LowerChildInstance
-  // created, ahead of the processes and continuous assignments that drive and
-  // read them, as LowerModule orders the top's.
   LowerAliases(mod);
   uint32_t child_block_id = mod->is_program ? next_program_block_id_++ : 0;
-  // §16.13.6: the instance's sequences are monitored as the top's are, so a
-  // `triggered` read in the instance, a checker's among them, sees their end
-  // points.
   LowerSequenceMonitors(mod);
   LowerFreeVariableSolver(mod);
-  // §17.7.3: a checker's statements sensitive to changes and its continuous
-  // assignments are scheduled in the Reactive region, as a program's are.
   bool reactive = mod->is_program || mod->is_checker;
   lowering_checker_ = mod->is_checker;
   LowerProcesses(mod->processes, reactive, child_block_id);
@@ -684,29 +483,14 @@ void Lowerer::LowerChildBody(const RtlirModule* mod) {
   for (const auto& sw : mod->bidir_switches) {
     LowerBidirSwitch(sw, mod->is_program);
   }
-  // §29.8: a primitive instance written in this child drives its output
-  // terminal wherever the child sits, so it is lowered under the child's
-  // prefix beside the child's continuous assignments.
   for (const auto& udp_inst : mod->udp_insts) {
     LowerUdpInst(udp_inst, mod->is_program);
   }
-  // §14.3: a clocking block belongs to the instance that declares it, so this
-  // instance's blocks are registered under this instance's prefix, beside its
-  // processes. Lowerer::AttachDesignClocking arms them all once the whole
-  // design is lowered.
   LowerClockingBlocks(mod);
 
   LowerChildModules(mod);
 }
 
-// §8 with §23.3: a class the instance's module declares is a type of that
-// module wherever it is instantiated, registered as LowerModule registers
-// the top's -- before the variables, so a handle's `C h = new;` finds it
-// -- and once, a second instance of the module declaring the same class.
-// §8.25 (printed page 204) makes a parameterized class an exception: each
-// instance of the module declaring it creates a generic class of its own,
-// with specializations and static members of its own, so a later instance
-// registers its own copy, held under its prefix.
 std::vector<const ClassDecl*> Lowerer::RegisterChildClasses(
     const RtlirModule* mod) {
   std::vector<const ClassDecl*> fresh_classes;
@@ -744,36 +528,14 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   if (child.resolved->is_interface) {
     interface_instance_prefixes_.push_back(child_prefix);
   }
-  // §23.9: the names a declaration initializer writes resolve within the
-  // instance the declaration sits in. That initializer is evaluated here,
-  // before any process exists to carry the instance, so the context is told
-  // which instance is being built. It moves in step with inst_prefix_
-  // throughout this function because the two mean the same thing.
   ctx_.SetLoweringInstancePrefix(inst_prefix_);
-  // §23.4: a module, program or interface declared inside this one sees the
-  // names declared here, so its scope keeps searching outward rather than
-  // stopping at the §23.9 module boundary.
   if (child.is_nested_decl) ctx_.RegisterNestedDeclScope(inst_prefix_);
 
   RegisterInstanceKeyBinding(inst_prefix_, child.resolved, ctx_);
   RegisterTypeRefCompares(inst_prefix_, child.resolved, ctx_);
   LowerParams(child.resolved);
-  // §30.3: the child's specify blocks belong to this instance, so they are
-  // recorded under this instance's prefix. Lower registers them once every
-  // module is lowered, because a module path delay may be written as a
-  // specparam and this instance's specparam variables are created below.
   RecordSpecifyScope(child.resolved);
-  // §26.3: an import makes a package's names visible in the scope that writes
-  // the import. A module writes its own imports whether it is the top or an
-  // instance, so the instance's are lowered here, and before its variables as
-  // LowerModule orders the top's: §6.8 sets a variable's initial value as part
-  // of its declaration, a reference the declaring scope makes with the
-  // imported names already visible. A name the instance declares itself is
-  // left to the declaration by LowerImports (§26.5).
   LowerImports(child.resolved);
-  // §6.19 with §23.3: an enumeration the instance's module declares is a type
-  // of that module wherever it is instantiated, registered as LowerModule
-  // registers the top's, so `name()` and `next()` answer on a variable of it.
   RegisterEnumTypes(child.resolved);
   RegisterParamEnumTypes(child.resolved);
   std::vector<const ClassDecl*> fresh_classes =
@@ -791,8 +553,6 @@ void Lowerer::LowerChildInstance(const RtlirModuleInst& child) {
   RecordStaticLocalSubroutines(child.resolved);
   DeclareModuleNamedScopes(*child.resolved, inst_prefix_, ctx_);
 
-  // Port connections resolve in the parent scope (see LowerPortBindings),
-  // then restore the child prefix for the child's own body.
   inst_prefix_ = saved_prefix;
   ctx_.SetLoweringInstancePrefix(inst_prefix_);
   LowerPortBindings(child, child.resolved->is_program);

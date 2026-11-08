@@ -18,12 +18,6 @@ std::string TypeCallError(const char* method, const char* type) {
          "'; only get_coverage() can";
 }
 
-// §19.8: get_coverage() is the one static covergroup method, called through
-// the covergroup type with `::` as well as on an instance; get_inst_coverage()
-// is invoked only with `.`, and the other methods act on an instance. A call
-// through the type to any of them, on the covergroup or on one of its
-// coverpoints, is an error, whether the type is the module's own or one the
-// compilation unit declares.
 TEST(CovergroupTypeCalls, OnlyGetCoverageIsCalledThroughTheType) {
   ElabFixture f;
   ElaborateSrc(
@@ -59,9 +53,6 @@ TEST(CovergroupTypeCalls, OnlyGetCoverageIsCalledThroughTheType) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
-// §19.8 with §8.23: a covergroup type the module declares is a base of `::`,
-// so its coverage and that of its coverpoint are read through it on the right
-// side of an assignment as on that of any other.
 TEST(CovergroupTypeCalls, AModulesCovergroupTypeIsABaseOfTheScopeOperator) {
   ElabFixture f;
   ElaborateSrc(
@@ -81,9 +72,6 @@ TEST(CovergroupTypeCalls, AModulesCovergroupTypeIsABaseOfTheScopeOperator) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §26.3: a covergroup type a wildcard import makes visible is
-// called through as the module's own is, and a class's static method called
-// through the class is no covergroup's.
 TEST(CovergroupTypeCalls, AnImportedTypeIsCalledThroughAsTheModulesOwn) {
   ElabFixture f;
   ElaborateSrc(
@@ -109,9 +97,6 @@ TEST(CovergroupTypeCalls, AnImportedTypeIsCalledThroughAsTheModulesOwn) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.8, Table 19-5: sample() and set_inst_name() are called on a covergroup
-// instance alone, so calling either on a coverpoint or a cross is an error;
-// stop() on a coverpoint is not.
 TEST(CovergroupItemMethods, SampleOrSetInstNameOnAnItemIsError) {
   ElabFixture f;
   ElaborateSrc(

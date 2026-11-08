@@ -10,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A.6.1 (printed page 1197): a continuous assignment's target is the net_lvalue
-// of a net_assignment or the variable_lvalue of a variable_assignment, and
-// A.8.5 (printed page 1212) writes neither in parentheses, whole or as an
-// element of a concatenation. The same target written without them stands.
 TEST(ContinuousAssignElaboration, ParenthesizedTargetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -36,11 +32,6 @@ TEST(ContinuousAssignElaboration, ParenthesizedTargetIsError) {
                              5, "10.3"));
 }
 
-// A.6.1 (printed page 1197): an assignment to a variable takes the second form
-// of continuous_assign, with no drive strength and a delay_control alone, and a
-// member of a structure variable is a variable_lvalue as the variable is. A
-// member access taken of an interface instance's name reaches the instance's
-// net, which keeps the net form's strength.
 TEST(ContinuousAssignElaboration, MemberOfStructureVariableTakesVariableForm) {
   ElabFixture f;
   Elaborate(
@@ -71,11 +62,6 @@ TEST(ContinuousAssignElaboration, MemberOfStructureVariableTakesVariableForm) {
       "10.3.4"));
 }
 
-// A.6.1 (printed page 1197) with A.8.5 (printed page 1212): a streaming
-// concatenation is among the forms of variable_lvalue alone, so a continuous
-// assignment to one takes the variable form, and a second delay and a drive
-// strength are each reported as written on an assignment to a variable, the
-// strength not as one on a net.
 TEST(ContinuousAssignElaboration, StreamingTargetTakesVariableForm) {
   ElabFixture f;
   ElaborateSrc(
@@ -99,9 +85,6 @@ TEST(ContinuousAssignElaboration, StreamingTargetTakesVariableForm) {
       "10.3.4"));
 }
 
-// A.6.1 (printed page 1197): each operand of a net_alias is a net_lvalue, which
-// A.8.5 (printed page 1212) writes in no parentheses, whole or as an element of
-// a concatenation.
 TEST(NetAliasElaboration, ParenthesizedOperandIsError) {
   ElabFixture f;
   ElaborateSrc(

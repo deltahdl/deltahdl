@@ -38,225 +38,63 @@ class Arena;
 Logic4Vec EvalExpr(const Expr* expr, SimContext& ctx, Arena& arena,
                    uint32_t context_width = 0);
 
-// §5.7.1/§11.6.1 — the self-determined bit length of an integer literal from
-// its text (sized literals carry an explicit width; an unsized decimal literal
-// is at least 32 bits, 64 when its value exceeds 32 bits).
 uint32_t LiteralWidth(std::string_view text, uint64_t val);
 
-// §6.18 -- the width a declared type stands for, where EvalTypeWidth alone
-// cannot say. A type_identifier is a data_type like any other (Syntax 6-4), but
-// the typedef table that resolves one belongs to the elaborator, so
-// EvalTypeWidth gives DataTypeKind::kNamed no width at all. The elaborated
-// width of every named type reaches the simulator as the type_widths table
-// RegisterDesignTypeWidths fills, so this asks that table rather than carrying
-// a second copy of the typedefs down here. A class typedef named through a
-// specialization, §8.26.3's `IntfA#(bit[1:0])::T2`, is in that table with its
-// type parameter unbound and so at no width; its width is read off the class
-// declaration with the actual the name carries (§8.25). Returns 0 for a type
-// nothing here can size -- void, a string, a class handle, a name the design
-// never declared -- which leaves each caller's own fallback in charge of the
-// answer.
-//
-// A packed dimension whose bounds name a parameter (§6.20.2, §7.4.1) is folded
-// against the values the running instance holds, so a declaration made while
-// the design runs is as wide in a block or a subroutine as at module scope.
 uint32_t DeclaredTypeWidth(const DataType& type, SimContext& ctx);
 
-// §6.18/§6.16: whether the declared type is a string, whether written as the
-// keyword or reached through a typedef name. Defined in
-// evaluation_literal.cpp beside DeclaredTypeWidth, which answers the other half
-// of the same question about a name.
 bool DeclaredTypeIsString(const DataType& type, const SimContext& ctx);
 
-// §6.12: whether the declared type is real, shortreal or realtime, whether
-// written as the keyword or reached through a typedef name. Defined in
-// evaluation_literal.cpp beside DeclaredTypeIsString, which answers the same
-// question about a string.
 bool DeclaredTypeIsReal(const DataType& type, const SimContext& ctx);
 
-// §6.20.2 with §6.12.1: `value` as a parameter declared with `type` holds it
-// where `type` is or names a real type -- an integral value converted to a
-// real, held in a shortreal's 32 bits (§6.12) or a real's or realtime's 64 --
-// and `value` unchanged where `type` is null or no real type.
 Logic4Vec ToDeclaredReal(const Logic4Vec& value, const DataType* type,
                          SimContext& ctx, Arena& arena);
 
-// §6.11.1/§6.18: whether the declared type is signed, resolving a typedef name
-// through the elaborated table. Defined in evaluation_literal.cpp beside
-// DeclaredTypeWidth and DeclaredTypeIsString, the other two facts a declaration
-// reads off a name.
 bool DeclaredTypeIsSigned(const DataType& type, const SimContext& ctx);
 
-// §6.18: the kind the declared type stands for, a keyword's own or, for a
-// typedef name, the kind the elaborated table resolves it to; kNamed for a
-// name the table does not hold. Defined in evaluation_literal.cpp beside
-// DeclaredTypeIsSigned, which reads the same table for the sign.
 DataTypeKind DeclaredTypeKind(const DataType& type, const SimContext& ctx);
 
-// §11.5.1: records on `v` the packed range its declaration `type` addresses
-// its bits by -- the dimension the declaration writes, through
-// RecordPackedRange, or else the one the type a name stands for was declared
-// with (§6.18), through the elaborated table -- so that a select of a
-// variable declared `Node::value_t v` on a `typedef bit [15:10] value_t` reads
-// `v[13:10]` as the four bits above its least significant two rather than as
-// four bits outside a six-bit vector. Records nothing for a type of neither
-// form, and nothing where the range does not span the variable's storage.
-// Defined in evaluation_literal.cpp beside the other facts a declaration
-// reads off a name; Lowerer::LowerVar reaches the same range through the
-// resolved type the elaborator sets on a module-scope declaration.
 void RecordDeclaredRange(const DataType& type, Variable* v, SimContext& ctx,
                          Arena& arena);
 
 bool HasUnknownBits(const Logic4Vec& v);
 
-// §23.9 with §8.6 and §8.13: whether a bare `name` denotes a variable -- a
-// local of the running subroutine (a formal or a body declaration), which
-// shadows the class scope, or a variable of the enclosing scope where the
-// class scope declares no such name -- rather than a property or a static of
-// the class whose method is running, which is searched before the scope
-// enclosing the class. Outside a method every declared name denotes a
-// variable. Defined in evaluation.cpp.
 bool NameDenotesVariable(std::string_view name, SimContext& ctx);
 
-// §8.13: whether the class scope a bare name inside a method resolves against
-// declares `name`, as a static property of the running method's class or as a
-// property of the object's class or one it inherits from. The class scope is
-// searched before the scope enclosing the class, so a name it declares is
-// never the instance of the same name in the enclosing module. Defined in
-// evaluation.cpp.
 bool ClassScopeDeclares(std::string_view name, SimContext& ctx);
 Logic4Vec MakeAllX(Arena& arena, uint32_t width);
 
-// §28.12: a value every bit of which is high impedance, for a source that
-// drives none of the bits it is built over.
 Logic4Vec MakeAllHighZ(Arena& arena, uint32_t width);
 int64_t SignExtend(uint64_t val, uint32_t width);
 
-// §11.5.1 — the integer a declared bit-select or part-select bound stands for.
-// Each of msb_expr and lsb_expr is a constant integer expression, and §5.7.1
-// treats a simple decimal number as signed, so on a
-// `logic [7:0] a` the bound `-2` is a negative index and `a[1:-2]` names the
-// four indices 1, 0, -1 and -2. That is the same select as `a[1 -: 4]`, which
-// §11.5.1 settles with its own `a_vect[15 -: 8] // == a_vect[15 : 8]`: the
-// indexed form is defined by the non-indexed form it equals, so the two
-// spellings shall resolve to one answer.
-//
-// Logic4Vec::ToUint64 is a projection of the stored low word and not a
-// sign-aware read, so the 32 bits §5.7.1 gives an unsized `-2` reached the
-// range as 4294967294. PartSelectStorageBits then clamped `a[1:-2]` to the
-// window a[7:1]: seven bits the clause forbids a write to touch, and not a[0],
-// which the same sentence requires it to reach.
-//
-// Only the signedness the value carries separates a negative bound from a
-// large unsigned one, and that is the separation the language draws: a bound
-// written `32'hFFFFFFFE` is unsigned, is nonsense as an index, and stays
-// 4294967294 rather than becoming -2. A bound 64 bits or wider has already
-// lost everything above bit 63 to ToUint64, and SignExtend hands such a width
-// back as a plain two's-complement cast, which is the answer every bound that
-// names a bit of a real object had before. A bound whose value those 64 bits
-// do not hold -- an unsigned one of 2**63 or more, or one with bits above 63
-// that are not the sign of the rest -- is beyond every object's bounds
-// (§11.5.1), and reads as kBeyondEveryBound rather than wrapping into them.
 inline constexpr int64_t kBeyondEveryBound = int64_t{1} << 62;
 int64_t SelectBoundValue(const Logic4Vec& val);
 
-// §6.24.1 with §11.8.2 — the value `val` takes cast to longint: sign-extended
-// when it is signed and zero-extended when it is not, then cut to 64 bits. The
-// size operand of new[] (§7.5.1) is read this way, so an unsigned operand with
-// its top bit set is a size and not a negative number.
 int64_t LongintValue(const Logic4Vec& val);
 
-// §7.10.1 — the value a read of a queue element that is not there yields. An
-// invalid index (a 4-state expression with an x or z bit, or a value outside
-// 0...$) reads as the value Table 7-1 in §7.4.5 gives a nonexistent array entry
-// of the queue's element type: x for a 4-state element type and '0 for a
-// 2-state one. The answer therefore follows the queue's own state-ness rather
-// than always being x. Every path that reads an element of a queue calls this,
-// so that all of them answer such a read alike.
 Logic4Vec NonexistentQueueElement(const QueueObject* q, Arena& arena);
 
-// §7.4.5's Table 7-1 for an element the select `select` reads from an array
-// whose element type is `is_4state` and `elem_width` bits wide, where the
-// element does not exist: the value NonexistentQueueElement gives, except that
-// an unpacked structure or union element, whose layout the array's root name
-// holds, takes the table's value member by member
-// (NonexistentAggregateElement), so that a `logic` member reads x and a member
-// with a declared default reads it, where the whole element read 0 because an
-// unpacked structure is not a 4-state type. Read by a fixed-size array's,
-// a queue's, a dynamic array's and an associative array's element select.
 Logic4Vec NonexistentElementOf(const Expr* select, bool is_4state,
                                uint32_t elem_width, SimContext& ctx,
                                Arena& arena);
 
-// §6.11 with §7.5 and §7.10: `val`, read out of an element of the queue or
-// dynamic array `q`, given the signedness of `q`'s element type
-// (QueueObject::is_signed), whichever the value written into the element had.
-// A string, a real and a class handle are left as they are.
 void TakeElementSignedness(const QueueObject& q, Logic4Vec& val);
 
-// §6.11 with §7.8: the same for an element of the associative array `aa`
-// (AssocArrayObject::is_signed). Defined in eval_select_assoc.cpp.
 void TakeElementSignedness(const AssocArrayObject& aa, Logic4Vec& val);
 
-// §6.12: a shortreal is a C float and a real is a C double, so the width of a
-// real vector says which pattern it carries — 32 bits a float, any other width
-// a double. This is the only correct way to read one back, and reading the
-// bytes as a double regardless turns a shortreal into a subnormal near zero.
-// The caller decides what a non-real vector contributes, so `v.is_real` shall
-// hold.
 double RealVecToDouble(const Logic4Vec& v);
 
-// §6.12.1 with §11.3.1: the value of `v` as a real, read from its pattern when
-// `v` is a real and converted from its integer value, by its sign, when it is
-// integral.
 double RealValueOf(const Logic4Vec& v);
 
-// The inverse of RealVecToDouble: lays `val` into a real vector of the given
-// width, rounding to single precision at 32 bits. A value written back at a
-// width other than the one it was read at changes the declared type it stands
-// for, so an operation on a shortreal shall pass 32.
 Logic4Vec MakeRealVec(Arena& arena, double val, uint32_t width);
 
-// §7.8.1/§7.8.4 — canonicalize an integral associative-array index into its
-// map key (AssocIndex::Of). A wildcard index ([*]) is self-determined and
-// treated as unsigned: leading zeros are dropped and the minimal numeric value
-// is used, so equal values of differing widths collapse to one entry. A typed
-// integral index is cast to its index type, however wide: sign-extended when
-// the index type is signed and zero-extended when it is unsigned, which fixes
-// the key ordering.
 AssocIndex AssocIntKey(const Logic4Vec& val, bool is_wildcard,
                        uint32_t index_width, bool is_signed = true);
 
-// §7.8.2 — the map key a string associative-array index evaluates to. The
-// index arrives as a vector holding the characters most significant first, and
-// the key is those characters in order with the null padding a wider vector
-// carries dropped.
 std::string AssocStringKey(const Logic4Vec& val);
 
-// §7.4.5/§11.5.1 — the contiguous run of positions a two-operand select
-// addresses, returned as {first position, count}. Three forms share that shape
-// and differ only in what the second operand means. A non-indexed part-select
-// [a:b] names both endpoints, in either order, and covers them inclusively. The
-// indexed forms name one endpoint and a width: [base +: w] runs upward from
-// `base` and [base -: w] runs downward to it, so both cover w positions and
-// only the ascending form starts at `base`. `expr` supplies which form it is
-// through is_part_select_plus / is_part_select_minus; both operands are
-// evaluated here, since only the width is required to be constant and the
-// position may vary at run time.
-//
-// Positions are whatever the operands index -- bits of a vector, or elements of
-// an unpacked array -- because the three forms are written and read identically
-// in either case.
 std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
                                           Arena& arena);
 
-// §7.4.5: a slice of an unpacked array is itself an unpacked array. Appends the
-// elements `expr` addresses to `out`, in ascending index order, when `expr` is
-// such a slice; returns false and leaves `out` untouched when it is not, so a
-// caller can fall back to reading the expression as a single value. Use this
-// wherever the destination can hold an unpacked array -- a queue, another
-// unpacked array -- since evaluating the slice instead yields the concatenation
-// of the same elements as one packed value.
 bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out);
 
@@ -277,77 +115,32 @@ Logic4Vec EvalFileIOSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
 Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name);
 
-// §16.5.1's sampled value of `arg`: a read of a variable answers the value it
-// held in the Preponed region of this time slot while this evaluates, which is
-// what §16.9.3's and §16.9.4's sampled value functions compare and return.
 Logic4Vec EvalSampledArg(const Expr* arg, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalVerifSysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            std::string_view name);
 
-// §20.16 / §20.16.1: evaluate a PLA modeling system task. Returns false when
-// the callee does not name one of the sixteen Table 20-12 tasks; otherwise it
-// evaluates the array, drives the output terms, and (for the asynchronous
-// forms) installs the change-driven re-evaluation watchers, returning true.
 bool TryEvalPlaSystemTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
 bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                              Logic4Vec& out);
 
-// §6.16 with §13.4: a value-answering string method (StringMethodAnswersAValue
-// in src/common/string_methods.h) called on `value`, the text a call answered,
-// `h.get().len()` or `s.toupper().substr(0, 2)`; `call_expr` is the call, a
-// member select of the method's name on the inner call, whose arguments the
-// method reads. False for a method of any other name, the six that write
-// their object among them, since a value is no object to write.
 bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
                                 SimContext& ctx, Arena& arena, Logic4Vec& out);
 
-// §6.16 with §8.7: whether `type`, or a class it extends, declares the
-// property `name` with the string type -- a string itself, written directly,
-// or, where `elements` says so, an array whose elements are strings, written
-// directly or through a typedef. The value the property stores does not say:
-// a literal stored into it is a packed value (§5.9) that carries no kind.
 bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
                       SimContext& ctx, bool elements = false);
 
-// §6.19.5: every enumeration method works from the variable's current value and
-// answers with a value of that variable's enumeration, so a call
-// of one has to be able to find out which enumeration the variable was declared
-// with. Record that for a variable created while the design runs -- one
-// declared inside a procedure, or inside a function or task body. A type named
-// by something other than an enumeration is left alone, so this may be called
-// for any declaration whatever.
 void RecordVariableEnumType(std::string_view var_name, const DataType& type,
                             SimContext& ctx);
 
-// §6.19.5 declares its methods on the enumeration type, so an expression of
-// that type is the receiver of one wherever it is declared: the enumeration
-// behind `e`, read from the declaration behind it -- a variable's record, a
-// class member's named bare inside a method, through `C::x`, a handle, a
-// chain of them, `this` or `super`, a package's variable, parameter or
-// literal, a member literal's declaring enumeration, or the declared result
-// type of the subroutine or §6.19.5 method a call names. Null for an
-// expression of no enumeration this can see. Also what §6.24.2's $cast asks
-// of its destination, which may be a property as well as a variable. Defined
-// in eval_enum.cpp.
 const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
                                    Arena& arena);
 
-// The enumeration a data type names, `color_t` or `p::color_t`, resolved as
-// a declaration in the current scope would resolve it; null for a type that
-// names none. Defined in eval_enum.cpp.
 const EnumTypeInfo* EnumTypeOfDataType(const DataType& type, SimContext& ctx);
 
-// §6.19.5: the call `expr`, `c.next(2)` or `h.e.name()`, when its receiver
-// is of an enumeration type and its method one of the six; false for any
-// other call, the receiver left unevaluated.
 bool TryEvalEnumMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out);
-// §6.19.5.7 with A.8.6: the member select `expr`, `c.name` or `c.next`, that
-// is one of the six methods written without an argument list, as the
-// subclause's own example writes them, on a receiver of an enumeration type;
-// `c.next` takes the default step. False for any other member select.
 bool TryEvalEnumMethodWithoutArgs(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out);
 
@@ -368,54 +161,21 @@ Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPrefixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalPostfixUnary(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena);
-// §23.6: the name a hierarchical reference `s.y` or `$root.top.s.y` stands
-// under -- its components joined by dots, with a leading `$root.<top>.`
-// stripped -- which is the key EvalMemberAccess reads a variable by and a net
-// declared in an instance is stored under. Defined in
-// eval_hierarchical_name.cpp.
 std::string HierarchicalReferenceName(const Expr* expr);
-// §23.3.1: the key a `$root.<top>.`-headed name is looked up by from the top
-// of the design, the name itself, and empty for a name $root does not head.
-// Defined in eval_hierarchical_name.cpp.
 std::string RootedReferenceKey(const std::string& name);
 std::string RootedReferenceKey(const Expr* expr);
-// The net a hierarchical reference names: from the top of the design for a
-// `$root`-headed one, else as HierarchicalReferenceName's key finds it.
-// Defined in eval_hierarchical_name.cpp.
 Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx);
-// The key the unpacked array an element select stands on is held under: a
-// bare or package-scoped name's (ScopedOrBareTargetKey), or a hierarchical
-// name's, `u.b` for the array b of instance u (§23.6), with `$root.` kept
-// ahead of a name $root heads. Empty for a base of any other shape. Defined
-// in eval_hierarchical_name.cpp.
 std::string_view ArrayRootKey(const Expr* base, Arena& arena);
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena);
 Logic4Vec EvalInside(const Expr* expr, SimContext& ctx, Arena& arena);
-// §11.4.13: where the set member `elem` names an unpacked array, its elements
-// down to singular values, appended to `out` in index order; answers whether
-// it named one. Defined in eval_expr_inside.cpp.
 bool CollectUnpackedSetMembers(const Expr* elem, SimContext& ctx,
                                std::vector<Logic4Vec>& out);
-// Evaluates `lhs inside { elem }` for one set member, returning 1 for a match,
-// 0 for a definite mismatch, and 2 when the comparison is ambiguous (x). Shared
-// with the case-inside statement path so both apply the same §11.4.6/§11.4.13
-// asymmetric wildcard matching.
 int EvalInsideElement(const Logic4Vec& lhs, const Expr* elem, SimContext& ctx,
                       Arena& arena);
 Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena);
-// §20.9: pack a bit-vector system function's expression operand into the packed
-// vector {>>{expression}} would produce (§11.4.14), so an aggregate bit-stream
-// argument contributes all of its bits when its ones/unknown bits are counted.
 Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena);
 Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena);
-// §10.9 with §10.9.1: the value of the positional pattern `pattern` for a
-// packed array of `width` bits whose packed dimensions hold `spans` elements
-// each, outermost first -- every item converted to its element, the first in
-// the leftmost, and an item that is itself a pattern filling its element over
-// the next dimension. None where the pattern is keyed or replicated or holds a
-// count of items the outermost dimension does not, which leaves the caller its
-// own evaluation.
 std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
                                                 std::span<const uint32_t> spans,
                                                 uint32_t width, SimContext& ctx,
@@ -423,50 +183,19 @@ std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
 
 Logic4Vec EvalStructPattern(const Expr* expr, const StructTypeInfo* info,
                             SimContext& ctx, Arena& arena);
-// §10.9.2: evaluate a structure assignment pattern (keyed or positional)
-// against a known struct layout, coercing each member expression to the
-// corresponding member's type/width. Falls back to width-summing concatenation
-// for the replication form and for structs wider than a single word.
-// §10.9.2: the value of the expression `elem` assigned to the structure member
-// `field` lays out: a pattern for a nested structure placed by that
-// structure's layout, one for an unpacked array member (§7.4.2) placed element
-// by element, and any other expression evaluated as it is. Defined in
-// eval_streaming.cpp.
 Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
                                 SimContext& ctx, Arena& arena);
 
-// §11.4.14.2: the bit count of a streaming operator's slice_size `size_expr`,
-// 1 where none is written, the same for packing and unpacking. Defined in
-// eval_streaming.cpp.
 uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx, Arena& arena);
 
-// §10.9.2 with §7.4 and §7.10: the value of the item `item` given to an element
-// of an array or queue whose elements are structures laid out by `layout`: a
-// pattern is packed by the layout, member by member at each member's width,
-// and any other item is evaluated as it is, as is every item where `layout`
-// is null. Defined in eval_streaming.cpp.
 Logic4Vec EvalItemForLayout(const Expr* item, const StructTypeInfo* layout,
                             SimContext& ctx, Arena& arena);
 
-// §10.9.1 (printed page 262): the value a `default:` item `value` gives an
-// element of an array whose elements are structures laid out by `layout`. A
-// value whose own type is that structure is assigned whole; any other is
-// applied to the element member by member by §10.9.2's rules for a default,
-// as `'{default: value}` would be. Evaluated as it is where `layout` is null.
-// Defined in eval_streaming.cpp.
 Logic4Vec EvalDefaultForElement(const Expr* value, const StructTypeInfo* layout,
                                 SimContext& ctx, Arena& arena);
 
-// §7.2.2: gives the structure `value` holds, laid out by `layout` from bit
-// `base`, the default value each member's declaration writes -- a member of a
-// nested structure its own -- leaving a member written with none as it is. A
-// variable of the structure takes these where it has no initializer, whether
-// it is a module's, a subroutine's or a block's variable, a package's, or a
-// class property. A union takes none. Defined in eval_streaming.cpp.
 void ApplyLayoutDefaults(Logic4Vec& value, const StructTypeInfo& layout,
                          uint32_t base, SimContext& ctx, Arena& arena);
-// The same for the variable `var` declared under `name`, by the layout
-// SimContext records for the name; nothing where it records none.
 void ApplyVariableLayoutDefaults(std::string_view name, Variable* var,
                                  SimContext& ctx, Arena& arena);
 Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
@@ -475,70 +204,23 @@ Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena);
 
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// §36.5: reports whether `expr` names a user-defined system task, meaning a
-// registration whose type is vpiSysTask. The clause has the type decide the way
-// the source code calls an application, and the two types differ in the
-// position the call may stand in: a task may stand wherever a void function
-// may, which §13.4.1 makes a statement, while a function may stand wherever a
-// non-void function may and yields a value. So the answer
-// here is what decides between the statement executor, which calls the task's
-// application, and the expression evaluator, which reports it. Defined beside
-// TryExecSystemCallTask (see stmt_exec.h) so that one reading of the registry
-// answers both.
 bool SystemCallNamesARegisteredTask(const Expr* expr);
 
-// The time unit and precision a delay or a time read is counted in (§22.7):
-// the compilation unit's inside a subroutine it declares (§3.14.2.3), else the
-// module's of the instance the running process stands in (Annex D.10's
-// invoking module), else the current scope's. Defined in
-// eval_systask_time.cpp.
 const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx);
 
-// §20.4.2: build the report line $printtimescale displays for `expr` against
-// the timescale state in `ctx` (see eval_function.cpp for the format).
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx);
 
-// §20.17.2: assemble the call-stack text $stacktrace reports for the context
-// invoking it, working from that context up to the top-level process. The
-// content is implementation dependent (see eval_function.cpp for the format).
 std::string BuildStackTraceReport(const SimContext& ctx);
 Logic4Vec EvalFunctionCall(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// §11.12 — expand a let into its body expression. `call` supplies the actual
-// arguments (it may be a bare identifier reference for a no-argument let, in
-// which case no actuals are bound).
-// §11.12: a let declared by the block item declaration `stmt` in a block or a
-// subroutine body is used after its declaration there, so it is made known as
-// the statement runs, in the frame of the block or the body declaring it,
-// where it hides a let of that name the enclosing scopes declare (§11.12).
-// Nothing for any other statement. Defined in eval_let.cpp.
 void RegisterBlockLet(const Stmt* stmt, SimContext& ctx);
-// §11.12 with §9.3.1: whether the begin-end block `block` declares a let, and
-// so needs a scope frame of its own for the let to end with the block, named
-// or not and inside a subroutine or not. Defined in eval_let.cpp.
 bool BlockDeclaresLet(const Stmt* block);
-// §11.12 with §23.9: registers `let`, a module's, under the key of the
-// instance `prefix` names; and finds the let a bare name refers to where the
-// running code stands -- one the enclosing blocks or subroutine body declare
-// (ScopeStack::FindLocalLet), else one the running instance declares, else
-// one the compilation unit declares or an import brings in, under its bare
-// name. Defined in eval_let.cpp.
 void RegisterInstanceLet(SimContext& ctx, std::string_view prefix,
                          ModuleItem* let);
 ModuleItem* FindVisibleLet(SimContext& ctx, std::string_view name);
-// §11.12: the value of the let instance `call` of `decl`, its body evaluated
-// at `context_width` as the parenthesized expression the expansion substitutes
-// is. Defined in eval_let.cpp.
 Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
                            Arena& arena, uint32_t context_width = 0);
-// §11.12 with §16.9.3: the let instance whose body is being evaluated, as a
-// number telling instances apart, 0 outside every let; each instance's
-// sampled value calls keep a history of their own. Defined in eval_let.cpp.
 uint64_t CurrentLetInstance();
-// §11.12: the width of the expression the call being evaluated stands in,
-// which a let instance's body is evaluated at; SetCallContextWidth installs
-// one for a call and answers the one it replaces, for the caller to put back.
-// Defined in eval_let.cpp.
 uint32_t CallContextWidth();
 uint32_t SetCallContextWidth(uint32_t width);
 
@@ -551,80 +233,32 @@ const ModuleItem* SetupTaskCall(const Expr* expr, SimContext& ctx,
 void TeardownTaskCall(const ModuleItem* func, const Expr* expr, SimContext& ctx,
                       Arena& arena);
 
-// Constructs an object of `class_type`. `new_expr` is the `new` call whose
-// arguments the constructor is passed, and is null for the argument-less
-// `T::new` form. `loc` is where the construction was written, which a report
-// about the class being abstract or an interface class names; it is separate
-// from `new_expr` because that form supplies no expression to take it from.
 Logic4Vec EvalClassNew(std::string_view class_type, const Expr* new_expr,
                        SimContext& ctx, Arena& arena, SourceLoc loc);
 
-// §8.8: construct an argument-less typed constructor call `T::new` (optionally
-// with parameter overrides, e.g. `E#(.N(7))::new`) used as a value expression.
-// This form parses as a bare scope-resolved member access rather than a call,
-// so it is not caught by the call-based class-scope dispatch; a declaration
-// initializer such as `C c = D::new;` must therefore route through here to
-// create an object of the specified type. Returns true (with the new object's
-// handle in out) when expr is such a call.
 bool TryEvalTypedConstructorNew(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out);
 
-// Bind the specialization parameters of a parameterized class scope (e.g. the
-// N in E#(.N(77))) as local variables so the constructor/method body sees the
-// overridden values. base_id is the identifier carrying the #(...) overrides in
-// its elements.
 struct ClassTypeInfo;
 struct ClassObject;
-// §6.19/§8.4: an enumeration declared in a class names its literals within
-// the class, so a bare literal in a method or a constraint of the class or
-// of a class derived from it reads as its value, found on the class the
-// enumeration was declared in by walking up from `cls`. Answers false where
-// no class of the chain declares the name.
 bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
                               Arena& arena, Logic4Vec& out);
 
-// §6.19 with §8.4: the literal `name` that `cls` declares, holding `value`,
-// read at its enumeration's width and signing.
 Logic4Vec ClassEnumLiteral(const ClassTypeInfo& cls, const std::string& name,
                            uint64_t value, Arena& arena);
 
 void BindClassParams(const ClassTypeInfo* cls, const Expr* base_id,
                      SimContext& ctx, Arena& arena);
 
-// §8.9 with §26.3: the class a doubly-qualified scoped name, `pk::Cfg::x`,
-// names -- `pk::Cfg` being the key the lowerer binds a package's class under
-// whether or not the package was imported -- and, in `member`, the name `x`
-// after it. Null for an expression of any other shape or a pair of names that
-// is no package's class. Defined in eval_static_method.cpp.
 const ClassTypeInfo* PackageQualifiedClassOf(const Expr* expr, SimContext& ctx,
                                              std::string_view& member);
 
-// §8.9: the static property `pk::Cfg::x` reads, where PackageQualifiedClassOf
-// answers the class and the class declares the name static, or §8.26's enum
-// literal the class declares (`std::process::RUNNING`); false otherwise.
 bool TryPackageClassStaticMember(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out);
 
-// §8.25: binds the actuals the declaration of `var_name` wrote in its
-// `#(...)` list on the object `handle` -- each type parameter to its type and
-// each value parameter to its actual's value, sized by the parameter's
-// declared type. Defined in eval_class_params.cpp.
 void ApplyClassParamOverrides(std::string_view var_name, uint64_t handle,
                               SimContext& ctx, Arena& arena);
 
-// §8.25 (printed page 204 of IEEE 1800-2023): binds each type parameter of
-// `obj`'s class to the actual the specialization that class is was made with
-// (ClassTypeInfo::param_actuals), the actuals being a fact about the type
-// rather than about the declaration each object of it is constructed on, so
-// that a name carrying no `#(...)` of its own -- a typedef of the
-// specialization, `typedef D#(integer) di;` -- still reaches them. Called as
-// the object is created and before its properties are built: a property whose
-// declared type names a parameter is sized as it is built (BoundPropertyWidth
-// in eval_class_new.cpp), which the declaration's own list, bound only once
-// construction has returned, comes too late for. Binds nothing for an object
-// of a class that is no specialization, which is §8.25.1's default
-// specialization and reads the declaration's defaults. Defined in
-// eval_class_params.cpp.
 void BindSpecializationTypeParams(ClassObject* obj);
 
 class DiagEngine;
@@ -635,112 +269,46 @@ void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 
 Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str);
 
-// Decode a packed string value (byte per octet, high-order byte first) back to
-// a std::string, dropping NUL padding. The inverse of StringToLogic4Vec, used
-// where a string-typed argument must be read as raw bytes (e.g. an RNG state
-// string handed to set_randstate()).
 std::string Logic4VecToString(const Logic4Vec& vec);
 
 struct MethodCallParts {
   std::string_view var_name;
   std::string_view method_name;
-  // Where the method's name was written, for a report about the call; the
-  // no-location value where the parts were built from no expression.
   SourceLoc loc = SourceLoc::None();
 };
 bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out);
 
-// §21.2: the optional rendering inputs a display task threads into
-// FormatDisplay alongside the format string and its value list. Each member
-// backs a format specifier that draws on something other than the raw value
-// stream: `p_fmts` carries the precomputed %p assignment-pattern strings,
-// `v_fmts` the precomputed %v net-strength strings (§21.2.1.4), `time_format`
-// the $timeformat configuration for %t (§20.4.3), and `ctx` the run-time
-// context %m / %l need to name the invoking scope (§21.2.1.5, §33.7). A null
-// vector pointer means "no precomputed strings"; every member defaults so an
-// ordinary "%d"-style call passes only fmt and vals.
 struct DisplayFormatOpts {
   const std::vector<std::string>* p_fmts = nullptr;
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>* v_fmts = nullptr;
-  // §21.2.1.4: one flag per positional value argument saying whether it is a
-  // reference to a net the clause does not admit -- 1 for a net that is not a
-  // scalar, 2 for a select of one that still names more than one bit, and 0 for
-  // everything else, which is every argument the clause does admit and every
-  // one that names no net at all. The clause gives each %v a scalar reference
-  // of its own, and the caller is who can see the net while the formatter is
-  // who knows which specifier consumed the argument, so the caller classifies
-  // and the formatter reports. A null pointer means the caller classified
-  // nothing.
   const std::vector<char>* arg_nonscalar_net = nullptr;
   SimContext* ctx = nullptr;
-  // §21.2.1.1 / §21.2.1.7: one flag per positional value argument classifying
-  // it as an unpacked aggregate: 0 = not one, 1 = one whose elements are not
-  // of type byte (integer specifiers and %s reject it), 2 = an unpacked array
-  // of byte (%s renders it through arg_byte_strings), 3 = an unpacked struct
-  // or union (integer specifiers but %u and %z reject it). A null pointer
-  // means the caller supplied no type information.
   const std::vector<char>* arg_unpacked_agg = nullptr;
-  // §21.2.1.7: one string per positional value argument holding the character
-  // rendering of an unpacked array of byte, elements ordered from the left
-  // bound of the declaration to the right bound; empty for any argument that
-  // is not such an array. A null pointer means none were precomputed.
   const std::vector<std::string>* arg_byte_strings = nullptr;
-  // Where the format string was written. A format specifier that cannot be
-  // applied to the argument it consumes is reported here: the rendering runs
-  // on values rather than on expressions, so this is the only position it can
-  // name.
   SourceLoc loc;
 };
 
-// §21.2.1.5: the %m specifier prints the hierarchical name of the scope that
-// invokes the display task. Rendering it requires the run-time context, so an
-// optional SimContext is threaded through `opts`; when null (no simulation
-// context), %m yields nothing.
 std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const DisplayFormatOpts& opts = {});
 std::string FormatArg(const Logic4Vec& val, char spec);
-// §21.2.1.2: FormatArg with the automatic sizing applied to values written to
-// the output -- decimal right-justified in a field sized to the largest value
-// the expression's bit width admits, leading zeros replaced by spaces.
 std::string FormatArgAutoSized(const Logic4Vec& val, char spec);
 std::string FormatStrength(const NetStrength& ns);
-// §20.4.3: `val`, a time in units of 10**value_order s, as %t renders it
-// under `spec`.
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
                                       const TimeFormatSpec& spec,
                                       int value_order);
 std::string FormatValueAsString(const Logic4Vec& val);
-// The format template a string literal argument of a display task supplies:
-// the literal's text between its delimiters, escapes undecoded. Defined in
-// eval_format_template.cpp.
 std::string ExtractFormatString(const Expr* first_arg);
-// How many expression arguments the conversions of the template `fmt` take,
-// §21.2.1.1's count of `%` other than `%%`, `%m` and `%l`. Defined in
-// eval_format_template.cpp.
 size_t CountFormatConversions(std::string_view fmt);
 
 Logic4Vec EvalUnbasedUnsized(const Expr* expr, Arena& arena);
 
-// §5.7.1: the unbased unsized literal's value `v` at `width` bits, its one
-// bit (0, 1, x or z) replicated across every bit, as the literal fills the
-// context it stands in. The result stands for no literal any more: its
-// fills_width is clear. Defined in evaluation.cpp.
 Logic4Vec FillUnbasedUnsized(const Logic4Vec& v, uint32_t width, Arena& arena);
-// §5.9: the string literal `expr` assigns to an unpacked array of bytes, alone
-// or under a cast to the array's type (§6.24), or null where it is neither.
-// Defined in lowerer_var.cpp.
 const Expr* StringLiteralSource(const Expr* expr);
-// §5.9: the byte a string literal's value `packed` gives the element `i`
-// places from the left of an unpacked byte array, left-justified: its first
-// character first, and 0 past its last. Defined in lowerer_var.cpp.
 uint8_t StringLiteralByteAt(const Logic4Vec& packed, uint32_t i);
 Logic4Vec EvalIntLiteral(const Expr* expr, Arena& arena,
                          uint32_t context_width = 0);
-// The text between a string literal token's delimiters, `"""` or `"`, with
-// its escape sequences still undecoded; text with neither is returned as it
-// is. Defined in evaluation_literal.cpp.
 std::string_view StringLiteralBody(std::string_view text);
 Logic4Vec EvalStringLiteral(const Expr* expr, Arena& arena);
 

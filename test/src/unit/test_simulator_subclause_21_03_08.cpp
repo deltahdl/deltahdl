@@ -10,16 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.8 governs $feof. Its single rule is stateful: the function yields
-// nonzero only when a read on the descriptor has previously detected
-// end-of-file. That state depends entirely on how the descriptor was produced
-// (§21.3.1 $fopen) and which reads ran against it (§21.3.4.1 $fgetc,
-// §21.3.4.2 $fgets, §21.3.4.3 $fscanf, §21.3.4.4 $fread), so every test
-// builds the descriptor and the reads from real source syntax and drives the
-// whole pipeline, observing $feof through $display.
-
-// §21.3.8: before any read has run, no end-of-file can have been detected, so
-// $feof yields zero on a freshly opened descriptor.
 TEST(DetectingEof, FeofZeroBeforeAnyRead) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_fresh.txt";
@@ -41,10 +31,6 @@ TEST(DetectingEof, FeofZeroBeforeAnyRead) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8: nonzero is reported only once an earlier read has met end-of-file --
-// consuming the last byte leaves the position at the end but no read has yet
-// come up short, so $feof still yields zero; only the following failed $fgetc
-// flips it to nonzero.
 TEST(DetectingEof, FeofZeroAtEndUntilAReadFails) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_lastbyte.txt";
@@ -69,9 +55,6 @@ TEST(DetectingEof, FeofZeroAtEndUntilAReadFails) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 with §21.3.4.2: a $fgets that delivers a full line stops at the
-// newline without touching end-of-file; the next $fgets finds nothing, and
-// that failed read is what makes $feof report nonzero.
 TEST(DetectingEof, FeofNonzeroAfterFgetsExhaustsFile) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_fgets.txt";
@@ -97,12 +80,6 @@ TEST(DetectingEof, FeofNonzeroAfterFgetsExhaustsFile) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 with §21.3.4.3: the canonical read loop -- $feof guarding $fscanf in
-// expression-operand position -- terminates. The scan that runs out of input
-// detects end-of-file even though $fscanf repositions the host stream
-// internally, so the guard observes it. The bounded for-loop keeps a
-// regression from hanging the test instead of failing it: two values convert,
-// the third scan returns EOF, and the guard stops the loop on its next test.
 TEST(DetectingEof, FeofGuardedFscanfLoopTerminates) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_loop.txt";
@@ -130,10 +107,6 @@ TEST(DetectingEof, FeofGuardedFscanfLoopTerminates) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 with §21.3.4.3: a numeric conversion is delimiter-terminated, so
-// converting a final token that has no trailing newline forces a look one
-// character past the field -- that look detects end-of-file even though the
-// conversion itself succeeded.
 TEST(DetectingEof, FeofNonzeroAfterFscanfReadsFinalUnterminatedToken) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_notrail.txt";
@@ -156,10 +129,6 @@ TEST(DetectingEof, FeofNonzeroAfterFscanfReadsFinalUnterminatedToken) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 with §21.3.4.3: %c takes exactly the characters it asks for and
-// never looks past them, so a scan whose %c consumes the final byte has not
-// detected end-of-file -- $feof stays zero, distinguishing detection from
-// mere position, through the buffered $fscanf path as well.
 TEST(DetectingEof, FeofZeroAfterFscanfExactCharTakesLastByte) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_exactc.txt";
@@ -183,9 +152,6 @@ TEST(DetectingEof, FeofZeroAfterFscanfExactCharTakesLastByte) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 with §21.3.4.4: a $fread that fills its destination from the
-// remaining bytes succeeds; the next $fread transfers nothing, and that
-// failed read is what $feof reports.
 TEST(DetectingEof, FeofNonzeroAfterFreadPastEnd) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_fread.bin";
@@ -210,10 +176,6 @@ TEST(DetectingEof, FeofNonzeroAfterFreadPastEnd) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8: the detection is stream state, not a permanent mark. After a
-// buffered $fscanf detects end-of-file, repositioning re-enables reading:
-// $rewind returns $feof to zero and the value converts again; a second
-// detection is then cleared the same way by $fseek to the start.
 TEST(DetectingEof, FeofClearedByRepositioningAfterFscanfDetection) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_rewind.txt";
@@ -243,9 +205,6 @@ TEST(DetectingEof, FeofClearedByRepositioningAfterFscanfDetection) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 against §21.3.7: a refused read on a write-only descriptor is an
-// error, not an end-of-file detection -- no read ever came up short against
-// the data, so $feof stays zero while $ferror has something to report.
 TEST(DetectingEof, FeofZeroOnWriteOnlyDescriptorAfterRefusedRead) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_wonly.txt";
@@ -267,10 +226,6 @@ TEST(DetectingEof, FeofZeroOnWriteOnlyDescriptorAfterRefusedRead) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 Syntax 21-11: the fd operand is an expression. The descriptor here
-// reaches $feof through an arithmetic expression rather than a bare variable,
-// and the detection state reads the same both before and after the failed
-// read that flips it.
 TEST(DetectingEof, FeofFdArgumentAsExpression) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_fdexpr.txt";
@@ -295,9 +250,6 @@ TEST(DetectingEof, FeofFdArgumentAsExpression) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 Syntax 21-11: the fd operand may be a function-call result -- the
-// descriptor flows straight from the §21.3.1 opening call into the detection
-// function. A descriptor no read has ever touched reports zero.
 TEST(DetectingEof, FeofOnDescriptorStraightFromFopen) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_direct.txt";
@@ -317,9 +269,6 @@ TEST(DetectingEof, FeofOnDescriptorStraightFromFopen) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.8 boundary: a closed descriptor can never deliver another byte, so
-// $feof reads it as end-of-file. This keeps the canonical
-// `while (!$feof(fd))` guard from spinning forever on a dead descriptor.
 TEST(DetectingEof, FeofNonzeroOnClosedDescriptor) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21308_closed.txt";

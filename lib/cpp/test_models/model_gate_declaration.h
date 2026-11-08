@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <cstdlib>
 
-// --- Local types for gate declaration (§28.3) ---
 enum class ModelGateType : uint8_t {
   kAnd,
   kNand,
@@ -111,7 +110,7 @@ inline uint32_t ComputeArraySize(int32_t lhi, int32_t rhi) {
 }
 
 inline bool ValidateStrengthSpec(StrengthLvl s0, StrengthLvl s1,
-                                 ModelGateType /*type*/) {
+                                 ModelGateType) {
   return s0 != StrengthLvl::kHighz || s1 != StrengthLvl::kHighz;
 }
 

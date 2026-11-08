@@ -18,20 +18,9 @@ namespace delta {
 class Arena;
 class SimContext;
 
-// §17.7.2: what one attempt of an assumption still owes from the time step
-// it is read at: the property left to hold, written as §16.12's operators
-// over booleans and sequences read from that step on, each on the clock it
-// is evaluated on (§16.13). Nodes are shared, so that attempts begun at
-// different ticks owing the same are one node.
 struct ObligationNode;
 enum class ObligationKind : uint8_t;
 
-// §17.7.2: the obligations of the assumptions of one assume set. A solution
-// attempt is held to the conditions under which no obligation in flight
-// fails in its time step, and once the active free variables take their
-// values each obligation steps to what it owes from the next tick on. The
-// clocks that ticked at the time step, a bit each by their number, say
-// which of the obligations' operands are read there.
 class AssumeObligations {
  public:
   AssumeObligations(SimContext& ctx, Arena& arena);
@@ -39,33 +28,19 @@ class AssumeObligations {
   AssumeObligations(const AssumeObligations&) = delete;
   AssumeObligations& operator=(const AssumeObligations&) = delete;
 
-  // The obligation an attempt of the concurrent assumption `body` begins
-  // with, read in `scope`, each expression it reads appended to `reads`; a
-  // sequence the flattening does not read puts no condition on the solve.
   const ObligationNode* Begin(const Stmt* body, ObligationScope scope,
                               std::vector<Expr*>& reads);
 
-  // Forgets the values read so far, the active free variables having taken
-  // new ones.
   void NewTimeStep();
 
-  // An expression read at its value in the current time step, once.
   bool Holds(Expr* e);
 
-  // §16.10: binds, in the innermost scope, the variables of the locals'
-  // values `e` reads, a condition NoFailCondition answered among them.
   void BindLocalsOf(const Expr* e) { terms_.BindLocalsOf(e); }
 
-  // The condition, over the values the time step reads, under which `node`
-  // does not fail in it, the clocks `ticked` having ticked; nullptr where
-  // it holds under any values.
   Expr* NoFailCondition(const ObligationNode* node, uint32_t ticked);
 
-  // What `node` owes from the next tick on, the expressions it reads taken
-  // at their values in the current time step.
   const ObligationNode* Step(const ObligationNode* node, uint32_t ticked);
 
-  // Whether `node` owes nothing more, having held or failed.
   bool Settled(const ObligationNode* node) const;
 
  private:
@@ -139,22 +114,14 @@ class AssumeObligations {
   SeqTerms terms_;
   std::map<std::string, std::unique_ptr<ObligationNode>> nodes_;
   std::vector<std::unique_ptr<ObligationScope>> scopes_;
-  // §16.12.17: the first instance met of each declaration and actuals, which
-  // the expansions of a recursive property share, and the declarations
-  // being expanded.
   std::map<std::string, Expr*> instances_;
   std::set<const ModuleItem*> expanding_;
   const ObligationNode* true_ = nullptr;
   const ObligationNode* false_ = nullptr;
-  // Within one time step: the clocks that ticked, the values read and the
-  // nodes already stepped.
   uint32_t ticked_ = ~0u;
   std::map<const Expr*, bool> values_;
   std::map<std::pair<const ObligationNode*, uint32_t>, const ObligationNode*>
       stepped_;
-  // §16.10: the locals of the properties being stepped, innermost last:
-  // the values their expressions read, and the values their match items
-  // leave.
   std::vector<std::pair<const LocalValues*, LocalValues>> frames_;
 };
 

@@ -1,12 +1,3 @@
-// §28.8: lowering a bidirectional pass switch. The switch drives neither of
-// its terminals from the other, so unlike every other gate it becomes no
-// continuous assignment: its two nets are linked to it (Net::switch_links),
-// and each resolves from the drivers it reaches across the switches that
-// conduct (ResolveSwitchGroup in simulator/switch_network.h). What is lowered
-// here is the switch's state, and for a tranif0, tranif1, rtranif0 or
-// rtranif1 the process that follows its control with the turn-on and
-// turn-off delays §28.8 gives it.
-
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -51,8 +42,6 @@ static BidirSwitchKind BidirKindOf(GateKind kind) {
   }
 }
 
-// The net a bidirectional terminal names: a net by its name, or one reached
-// by a hierarchical name (§23.6).
 static Net* BidirTerminalNet(const Expr* e, SimContext& ctx) {
   if (e == nullptr) return nullptr;
   if (e->kind == ExprKind::kIdentifier) return ctx.FindNet(e->text);
@@ -62,10 +51,6 @@ static Net* BidirTerminalNet(const Expr* e, SimContext& ctx) {
   return nullptr;
 }
 
-// One bidirectional terminal: the net it names and the offset from that net's
-// least significant end of the bit a bit-select terminal names, which §28.8
-// admits besides a scalar net. Null where the terminal names no net, or a bit
-// outside the vector's declared range.
 struct BidirTerminal {
   Net* net = nullptr;
   std::optional<uint32_t> bit;
@@ -82,10 +67,6 @@ static BidirTerminal ResolveBidirTerminal(const Expr* e, SimContext& ctx,
   return {net, static_cast<uint32_t>(range.OffsetOf(index))};
 }
 
-// The bits a link from terminal `from` to terminal `to` joins
-// (SwitchLink::bit_map): none where both name a net whole, which the link then
-// joins whole, and otherwise the one bit of each, a whole scalar net's being
-// its bit 0.
 static const std::vector<std::pair<uint32_t, uint32_t>>* TerminalBitMap(
     const BidirTerminal& from, const BidirTerminal& to, Arena& arena) {
   if (!from.bit && !to.bit) return nullptr;
@@ -94,7 +75,6 @@ static const std::vector<std::pair<uint32_t, uint32_t>>* TerminalBitMap(
           {from.bit.value_or(0), to.bit.value_or(0)}});
 }
 
-// What the control process of one switch reads and writes.
 struct BidirSwitchRun {
   BidirSwitchState* sw;
   Net* terminal;
@@ -111,12 +91,6 @@ static uint8_t TargetState(const BidirSwitchRun& run, SimContext& ctx,
   return BidirSwitchStateFor(run.sw->kind, low);
 }
 
-// §28.8: of two delays, the first is the turn-on delay of the control input
-// and the second its turn-off delay; a bidirectional switch between built-in
-// net types takes the lesser of them for a control moving to x or z; and a
-// single delay serves as both turn-on and turn-off delay. A switch joining
-// nets of user-defined net types is off for an x or z control, so it turns
-// off after the turn-off delay.
 static uint64_t TransitionDelay(const BidirSwitchRun& run, uint8_t target,
                                 SimContext& ctx, Arena& arena) {
   BidirSwitchDelaySpec spec;
@@ -135,12 +109,6 @@ static uint64_t TransitionDelay(const BidirSwitchRun& run, uint8_t target,
   return BidirSwitchBuiltinControlXZDelay(spec);
 }
 
-// Resolves the switch's group once at the start, which a tran with nothing
-// else to wait for does and is done, and then follows the control: each
-// change that moves the switch to another state lands after the delay for
-// that transition, the control being read again when it does, since §28.8
-// puts the delay on the control input and a control that moved on meanwhile
-// is where the switch goes next.
 static SimCoroutine MakeBidirSwitchCoroutine(BidirSwitchRun run,
                                              SimContext& ctx, Arena& arena) {
   std::unordered_set<std::string> read_strs;

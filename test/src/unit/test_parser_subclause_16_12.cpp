@@ -14,7 +14,6 @@ using namespace delta;
 
 namespace {
 
-// §16.12: minimal named property declaration.
 TEST(AssertionSemanticsParsing, PropertyDecl) {
   auto r = Parse(
       "module m;\n"
@@ -31,7 +30,6 @@ TEST(AssertionSemanticsParsing, PropertyDecl) {
   EXPECT_EQ(item->prop_disable_iff_count, 0);
 }
 
-// §16.12 Syntax 16-16: property_port_list captures formal arguments.
 TEST(AssertionSemanticsParsing, PropertyDeclWithFormals) {
   auto r = Parse(
       "module m;\n"
@@ -48,7 +46,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclWithFormals) {
   EXPECT_EQ(item->prop_formals[1], "b");
 }
 
-// §16.12: a disable iff clause on a property_spec is captured.
 TEST(AssertionSemanticsParsing, PropertyDeclDisableIffCounted) {
   auto r = Parse(
       "module m;\n"
@@ -62,7 +59,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclDisableIffCounted) {
   EXPECT_EQ(item->prop_disable_iff_count, 1);
 }
 
-// §16.12: a named property may be declared in a package.
 TEST(AssertionSemanticsParsing, PropertyDeclInPackage) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -72,7 +68,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclInPackage) {
               "endpackage\n"));
 }
 
-// §16.12: a named property may be declared in an interface.
 TEST(AssertionSemanticsParsing, PropertyDeclInInterface) {
   EXPECT_TRUE(
       ParseOk("interface i;\n"
@@ -82,7 +77,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclInInterface) {
               "endinterface\n"));
 }
 
-// §16.12: a named property may be declared in a program.
 TEST(AssertionSemanticsParsing, PropertyDeclInProgram) {
   EXPECT_TRUE(
       ParseOk("program prg;\n"
@@ -92,7 +86,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclInProgram) {
               "endprogram\n"));
 }
 
-// §16.12: a named property may be declared at compilation-unit scope.
 TEST(AssertionSemanticsParsing, PropertyDeclAtCuScope) {
   EXPECT_TRUE(
       ParseOk("property p_cu;\n"
@@ -100,7 +93,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclAtCuScope) {
               "endproperty\n"));
 }
 
-// §16.12: a named property may be declared in a clocking block.
 TEST(AssertionSemanticsParsing, PropertyDeclInClockingBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -112,7 +104,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclInClockingBlock) {
               "endmodule\n"));
 }
 
-// §16.12: a named property may be declared in a generate block.
 TEST(AssertionSemanticsParsing, PropertyDeclInGenerateBlock) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -126,9 +117,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclInGenerateBlock) {
               "endmodule\n"));
 }
 
-// §16.12: a named property may be declared in a checker. The checker body
-// routes through the same module-item parse path, so the property_declaration
-// is captured among the checker's items.
 TEST(AssertionSemanticsParsing, PropertyDeclInChecker) {
   auto r = Parse(
       "checker chk;\n"
@@ -145,7 +133,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclInChecker) {
   EXPECT_EQ(item->name, "p_chk");
 }
 
-// §16.12 Syntax 16-16: endproperty may carry a matching identifier label.
 TEST(AssertionSemanticsParsing, PropertyDeclMatchingEndLabel) {
   auto r = Parse(
       "module m;\n"
@@ -160,9 +147,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclMatchingEndLabel) {
   EXPECT_EQ(item->name, "p_lbl");
 }
 
-// §16.12 Syntax 16-16: a property_port_item may carry a default actual
-// argument (`= property_actual_arg`). The formal binds to that default when an
-// instance omits the argument.
 TEST(AssertionSemanticsParsing, PropertyDeclWithDefaultActualArg) {
   auto r = Parse(
       "module m;\n"
@@ -178,9 +162,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclWithDefaultActualArg) {
   EXPECT_EQ(item->prop_formals[0], "a");
 }
 
-// §16.12: beyond the positions listed in §16.8, a formal argument of a named
-// property may be referenced in place of a property_expr. Here the formal `pa`
-// stands as the whole body property_expr.
 TEST(AssertionSemanticsParsing, PropertyFormalReferencedAsPropertyExpr) {
   auto r = Parse(
       "module m;\n"
@@ -196,8 +177,6 @@ TEST(AssertionSemanticsParsing, PropertyFormalReferencedAsPropertyExpr) {
   EXPECT_EQ(item->prop_formals[0], "pa");
 }
 
-// §16.12: the disable iff clause guards on an expression_or_dist, so the
-// condition may carry a distribution (`dist`), not only a plain expression.
 TEST(AssertionSemanticsParsing, PropertyDisableConditionAcceptsExprOrDist) {
   auto r = Parse(
       "module m;\n"
@@ -212,7 +191,6 @@ TEST(AssertionSemanticsParsing, PropertyDisableConditionAcceptsExprOrDist) {
   EXPECT_EQ(item->prop_disable_iff_count, 1);
 }
 
-// §16.12: a named property may be instantiated prior to its declaration.
 TEST(AssertionSemanticsParsing, PropertyInstantiatedBeforeDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -227,7 +205,6 @@ TEST(AssertionSemanticsParsing, PropertyInstantiatedBeforeDeclaration) {
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kPropertyDecl), nullptr);
 }
 
-// §16.12: references to other property instances are captured for §F.4.1.
 TEST(AssertionSemanticsParsing, PropertyDeclCapturesInstanceRefs) {
   auto r = Parse(
       "module m;\n"
@@ -254,11 +231,6 @@ TEST(AssertionSemanticsParsing, PropertyDeclCapturesInstanceRefs) {
   EXPECT_TRUE(refs_leaf);
 }
 
-// §16.12 writes a property declaration's header as `property property_
-// identifier [ ( list_of_formals ) ] ;`, so the ';' closes the header before
-// the body begins. A header left without one is rejected at the token standing
-// where the ';' belongs, and the report names §16.12 rather than the token it
-// wanted.
 TEST(PropertyDeclaration, MalformedPropertyHeaderNames16_12) {
   auto r = Parse(
       "module m;\n"
@@ -269,12 +241,6 @@ TEST(PropertyDeclaration, MalformedPropertyHeaderNames16_12) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "16.12"));
 }
 
-// §16.12: a formal of a property declaration may declare a default actual
-// argument, which an instance that omits the formal takes, so the parser keeps
-// the expression beside the formal, and marks the formal as having one: an
-// identifier, a literal, and a property expression, where a formal with none,
-// and one whose default is §16.14.7's $inferred_clock, `untyped` so that the
-// int before it does not carry to it, keep none.
 TEST(AssertionSemanticsParsing, APropertyFormalsDefaultActualIsRecorded) {
   auto r = Parse(
       "module m;\n"
@@ -288,8 +254,6 @@ TEST(AssertionSemanticsParsing, APropertyFormalsDefaultActualIsRecorded) {
   EXPECT_FALSE(r.has_errors);
   auto* item = FindItemByKind(r, ModuleItemKind::kPropertyDecl);
   ASSERT_NE(item, nullptr);
-  // One letter per formal: '-' for no default recorded, 'I' an identifier,
-  // 'L' a literal, 'P' a property expression; and whether each has one.
   std::string recorded;
   for (const Expr* def : item->prop_formal_defaults) {
     if (def == nullptr) {
@@ -308,12 +272,6 @@ TEST(AssertionSemanticsParsing, APropertyFormalsDefaultActualIsRecorded) {
   EXPECT_EQ(marked, "01111");
 }
 
-// A.2.10 makes the ';' after a property declaration's spec optional, so a
-// spec that leaves it out is read as it would be with one: its clock, and the
-// boolean `a` as the tree. Each declaration is followed by an assertion
-// holding, before its own ';', what makes a spec a sequence -- a cycle delay, a
-// repetition and throughout -- so a look-ahead into the body running past
-// endproperty would read that declaration's `a` as a sequence.
 TEST(AssertionSemanticsParsing, ASpecWithoutItsSemicolonIsReadAsATree) {
   auto r = Parse(
       "module m;\n"
@@ -345,9 +303,6 @@ TEST(AssertionSemanticsParsing, ASpecWithoutItsSemicolonIsReadAsATree) {
   }
 }
 
-// The clocked boolean form an instance of the property is evaluated as
-// (§16.12.1) is kept from a spec without its ';' too: the clock, the disable
-// condition and the whole disjunction.
 TEST(AssertionSemanticsParsing, AClockedBooleanSpecWithoutItsSemicolonIsKept) {
   auto r = Parse(
       "module m;\n"

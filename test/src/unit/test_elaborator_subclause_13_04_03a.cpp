@@ -12,10 +12,6 @@ using namespace delta;
 
 namespace {
 
-// Returns the resolved value of the named parameter/localparam in the single
-// elaborated top module, or -1 if it is absent or was left unresolved. Used to
-// observe that a constant function CALL was actually folded at elaboration
-// (§13.4.3), not merely accepted without error.
 int64_t ResolvedParam(RtlirDesign* design, std::string_view name) {
   if (!design || design->top_modules.empty()) return -1;
   for (const auto& p : design->top_modules[0]->params) {
@@ -200,8 +196,6 @@ TEST(ConstantFunctionRulesElaboration, NonConstantContextOutputArgOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3 (g): a constant function may only call system functions admissible
-// in a constant_expression — and that whitelist comes from §11.2.1.
 TEST(ConstantFunctionRulesElaboration, NonConstantSystemFunctionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -218,8 +212,6 @@ TEST(ConstantFunctionRulesElaboration, NonConstantSystemFunctionError) {
                             5, "13.4.3"));
 }
 
-// §13.4.3 (h): identifiers must resolve to a parameter, function name, or
-// something declared inside the function.
 TEST(ConstantFunctionRulesElaboration, ExternalNetReferenceError) {
   ElabFixture f;
   ElaborateSrc(
@@ -239,8 +231,6 @@ TEST(ConstantFunctionRulesElaboration, ExternalNetReferenceError) {
                     6, "13.4.3"));
 }
 
-// §13.4.3 (h) positive: a local block-scope variable counts as a local
-// declaration.
 TEST(ConstantFunctionRulesElaboration, LocalVariableReferenceOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -257,7 +247,6 @@ TEST(ConstantFunctionRulesElaboration, LocalVariableReferenceOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3 (e): no hierarchical references inside the body.
 TEST(ConstantFunctionRulesElaboration, HierarchicalReferenceError) {
   ElabFixture f;
   ElaborateSrc(
@@ -275,8 +264,6 @@ TEST(ConstantFunctionRulesElaboration, HierarchicalReferenceError) {
                     5, "13.4.3"));
 }
 
-// §13.4.3 (k): when a default argument is supplied it must be a constant
-// expression in the §11.2.1 sense.
 TEST(ConstantFunctionRulesElaboration, NonConstantDefaultArgError) {
   ElabFixture f;
   ElaborateSrc(
@@ -294,7 +281,6 @@ TEST(ConstantFunctionRulesElaboration, NonConstantDefaultArgError) {
                             6, "13.4.3"));
 }
 
-// §13.4.3 (b): a DPI import is not eligible to back a constant function call.
 TEST(ConstantFunctionRulesElaboration, DpiImportCallError) {
   ElabFixture f;
   ElaborateSrc(
@@ -309,8 +295,6 @@ TEST(ConstantFunctionRulesElaboration, DpiImportCallError) {
                             3, "13.4.3"));
 }
 
-// §13.4.3 (c): a delay control schedules execution after the function would
-// otherwise return, so it is forbidden in a constant function body.
 TEST(ConstantFunctionRulesElaboration, DelayStatementError) {
   ElabFixture f;
   ElaborateSrc(
@@ -329,7 +313,6 @@ TEST(ConstantFunctionRulesElaboration, DelayStatementError) {
       6, "13.4.3"));
 }
 
-// §13.4.3 (c): event control inside the body also schedules later execution.
 TEST(ConstantFunctionRulesElaboration, EventControlError) {
   ElabFixture f;
   ElaborateSrc(
@@ -349,7 +332,6 @@ TEST(ConstantFunctionRulesElaboration, EventControlError) {
       7, "13.4.3"));
 }
 
-// §13.4.3 (c): triggering an event is itself an event-scheduling action.
 TEST(ConstantFunctionRulesElaboration, EventTriggerError) {
   ElabFixture f;
   ElaborateSrc(
@@ -369,8 +351,6 @@ TEST(ConstantFunctionRulesElaboration, EventTriggerError) {
       7, "13.4.3"));
 }
 
-// §13.4.3 definition: arguments to a constant function call must themselves
-// be constant expressions; a free net reference is not.
 TEST(ConstantFunctionRulesElaboration, NonConstantArgumentError) {
   ElabFixture f;
   ElaborateSrc(
@@ -386,8 +366,6 @@ TEST(ConstantFunctionRulesElaboration, NonConstantArgumentError) {
                             4, "13.4.3"));
 }
 
-// §13.4.3 (c): a wait statement suspends execution past the function's
-// natural return, so it cannot appear in a constant function body.
 TEST(ConstantFunctionRulesElaboration, WaitStatementError) {
   ElabFixture f;
   ElaborateSrc(
@@ -407,8 +385,6 @@ TEST(ConstantFunctionRulesElaboration, WaitStatementError) {
       7, "13.4.3"));
 }
 
-// §13.4.3 (f): the body must only invoke other constant functions. A task
-// call is not a constant function call, so the elaborator must reject it.
 TEST(ConstantFunctionRulesElaboration, TaskCallInBodyError) {
   ElabFixture f;
   ElaborateSrc(
@@ -428,10 +404,6 @@ TEST(ConstantFunctionRulesElaboration, TaskCallInBodyError) {
                     7, "13.4.3"));
 }
 
-// §13.4.3 (f): a constant function that calls another function which is
-// not itself a valid constant function must be rejected. The leaf function
-// here has an output argument that the outer call hides from the direct
-// validation walk — the recursive check needs to catch it.
 TEST(ConstantFunctionRulesElaboration, NestedCalleeWithOutputArgError) {
   ElabFixture f;
   ElaborateSrc(
@@ -447,8 +419,6 @@ TEST(ConstantFunctionRulesElaboration, NestedCalleeWithOutputArgError) {
       "  localparam int P = parent(4);\n"
       "endmodule\n",
       f);
-  // The report names the nested callee `leaf`, whose output argument the
-  // recursive §13.4.3 check reaches through the outer call to `parent`.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "constant function 'leaf' declares an argument of direction output, "
@@ -456,9 +426,6 @@ TEST(ConstantFunctionRulesElaboration, NestedCalleeWithOutputArgError) {
       10, "13.4.3"));
 }
 
-// §13.4.3 (f): two constant functions calling each other must terminate
-// (the recursive check guards against cycles) and validate successfully
-// when both are well-formed.
 TEST(ConstantFunctionRulesElaboration, MutualRecursionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -472,9 +439,6 @@ TEST(ConstantFunctionRulesElaboration, MutualRecursionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3 definition: a constant function call is EVALUATED at elaboration
-// time. A localparam initialized from a user function call must therefore fold
-// to the function's return value, not just elaborate without complaint.
 TEST(ConstantFunctionElaboration, LocalparamFoldsToFunctionResult) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -488,10 +452,6 @@ TEST(ConstantFunctionElaboration, LocalparamFoldsToFunctionResult) {
   EXPECT_EQ(ResolvedParam(design, "P"), 8);
 }
 
-// §13.4.3 canonical example: the clogb2 function returns ceil(log2). Its body
-// exercises the whole elaboration-time interpreter — a local-variable mutation,
-// a for loop, and assignment to the implicit result variable named after the
-// function — and must fold clogb2(256) to 8.
 TEST(ConstantFunctionElaboration, Clogb2ExampleFoldsAtElaboration) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -509,9 +469,6 @@ TEST(ConstantFunctionElaboration, Clogb2ExampleFoldsAtElaboration) {
   EXPECT_EQ(ResolvedParam(design, "addr_width"), 8);
 }
 
-// §13.4.3: the constant function argument may itself be a parameter reference
-// (the LRM example calls clogb2(ram_depth)). The argument is a constant
-// expression, so the call still folds.
 TEST(ConstantFunctionElaboration, ArgumentFromParameterFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -530,8 +487,6 @@ TEST(ConstantFunctionElaboration, ArgumentFromParameterFolds) {
   EXPECT_EQ(ResolvedParam(design, "addr_width"), 8);
 }
 
-// §13.4.3 (f): a constant function body may invoke another constant function.
-// The nested calls must fold through: quad(3) = twice(twice(3)) = 12.
 TEST(ConstantFunctionElaboration, NestedConstantCallFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -546,9 +501,6 @@ TEST(ConstantFunctionElaboration, NestedConstantCallFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 12);
 }
 
-// §13.4.1 / §13.4.3: the return value can be produced by assigning to the
-// implicit variable that shares the function's name; that assignment must be
-// honored by the elaboration-time evaluation.
 TEST(ConstantFunctionElaboration, FunctionNameResultFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -564,9 +516,6 @@ TEST(ConstantFunctionElaboration, FunctionNameResultFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 21);
 }
 
-// §13.4.3: a constant function may reference a module parameter defined before
-// the call. The reference resolves to the parameter's value during the fold:
-// adjust(3) with BIAS = 7 is 10.
 TEST(ConstantFunctionElaboration, ParameterReferenceInBodyFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -581,8 +530,6 @@ TEST(ConstantFunctionElaboration, ParameterReferenceInBodyFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 10);
 }
 
-// §13.4.3 (g): a constant function may call a system function admissible in a
-// constant_expression. $clog2(256) inside the body folds to 8.
 TEST(ConstantFunctionElaboration, SystemFunctionInBodyFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -596,8 +543,6 @@ TEST(ConstantFunctionElaboration, SystemFunctionInBodyFolds) {
   EXPECT_EQ(ResolvedParam(design, "W"), 8);
 }
 
-// §13.4.3 (k): when a call omits an argument that has a constant default value,
-// the fold uses that default. with_default() = 5 * 2 = 10.
 TEST(ConstantFunctionElaboration, DefaultArgumentValueFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -611,7 +556,6 @@ TEST(ConstantFunctionElaboration, DefaultArgumentValueFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 10);
 }
 
-// §13.4.3: an if/else selecting the return path folds along the taken branch.
 TEST(ConstantFunctionElaboration, ConditionalBodyFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -630,9 +574,6 @@ TEST(ConstantFunctionElaboration, ConditionalBodyFolds) {
   EXPECT_EQ(ResolvedParam(design, "Q"), 100);
 }
 
-// §13.4.3: a (non-severity) system task call inside a constant function body is
-// ignored during elaboration-time evaluation rather than aborting the fold. The
-// $display is skipped, yet compute(4) still folds to 8.
 TEST(ConstantFunctionElaboration, SystemTaskInBodyIgnoredWhileFolding) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -649,9 +590,6 @@ TEST(ConstantFunctionElaboration, SystemTaskInBodyIgnoredWhileFolding) {
   EXPECT_EQ(ResolvedParam(design, "P"), 8);
 }
 
-// §13.4.3: the folded constant function value is usable where a constant
-// expression is required — here to size a packed dimension. If clogb2(256) did
-// not fold to 8, the width of `x` would be wrong.
 TEST(ConstantFunctionElaboration, FoldedValueSizesDeclaration) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -674,9 +612,6 @@ TEST(ConstantFunctionElaboration, FoldedValueSizesDeclaration) {
   EXPECT_EQ(ResolvedParam(design, "P"), 8);
 }
 
-// §13.4.3 / §11.2.1: a constant function call argument may be a localparam
-// reference — a constant expression resolved on a different path from a literal
-// or a module parameter. calc(SZ) with SZ = 4 folds to 8.
 TEST(ConstantFunctionElaboration, ArgumentFromLocalparamFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -691,9 +626,6 @@ TEST(ConstantFunctionElaboration, ArgumentFromLocalparamFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 8);
 }
 
-// §13.4.3 / §11.2.1: a constant function call is itself a constant expression,
-// so it is admissible as the argument of another constant function call. The
-// inner call folds first: calc(twice(5)) = calc(10) = 12.
 TEST(ConstantFunctionElaboration, ArgumentFromNestedConstantCallFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -708,9 +640,6 @@ TEST(ConstantFunctionElaboration, ArgumentFromNestedConstantCallFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 12);
 }
 
-// §13.4.3 (k) / §11.2.1: a default argument value written as a module parameter
-// reference is a constant expression and must be accepted; f() then folds to
-// D * 2 = 10. (A literal default is covered by DefaultArgumentValueFolds.)
 TEST(ConstantFunctionElaboration, DefaultArgumentFromParameterFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -725,8 +654,6 @@ TEST(ConstantFunctionElaboration, DefaultArgumentFromParameterFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 10);
 }
 
-// §13.4.3 (k) / §11.2.1: a localparam reference is likewise a constant
-// expression admissible as a default argument value; f() folds to 14.
 TEST(ConstantFunctionElaboration, DefaultArgumentFromLocalparamFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -741,14 +668,6 @@ TEST(ConstantFunctionElaboration, DefaultArgumentFromLocalparamFolds) {
   EXPECT_EQ(ResolvedParam(design, "P"), 14);
 }
 
-// §13.4.3 (f) exception: calling a built-in method on a variable local to the
-// function is explicitly permitted, even though a general non-constant-function
-// call would be rejected. Here the array reduction `.sum()` is invoked on a
-// body-local array, so no error about a non-constant invocation is raised. (On
-// a root that is neither a local nor a parameter the same access would trip
-// the identifier/hierarchical rule, as ExternalNetReferenceError /
-// HierarchicalReferenceError show; one on a parameter is a constant built-in
-// method call, BuiltinMethodOnParameterAllowed in the b file.)
 TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -765,19 +684,6 @@ TEST(ConstantFunctionElaboration, BuiltinMethodOnLocalAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.3 has a constant function call evaluated during elaboration, and §27.4
-// makes a generate block a scope of its own and a further level of hierarchy
-// once instantiated without exempting anything written in it from that. The
-// function is among the module's own items and §23.9 makes it visible from a
-// block below, so P folds to 8 exactly as the module-level InputOnlyArgOk case
-// folds it.
-//
-// The test fails with P unresolved, which ResolvedParam reports as -1.
-// Elaborator::ResolveDefparamsAndGenerates in src/elaborator/elaborator.cpp
-// runs after Elaborator::ElaborateModule has returned for every module, and
-// ItemElaborationStateSaver in src/elaborator/elaborator_module.cpp has taken
-// module m's functions back out of ElaboratorData::func_decls_ by then, so
-// nothing names double_val here unless PendingGenerate carried it.
 TEST(ConstantFunctionRulesElaboration,
      ConstantFunctionCallFoldsInsideAGenerateBlock) {
   ElabFixture f;
@@ -795,16 +701,6 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(ResolvedParam(design, "P"), 8);
 }
 
-// The scope the call is folded in. §23.9 stops the upward search for a directly
-// referenced identifier at the edge of a module, interface, program or checker,
-// so the scale that block 'a' of module m2 calls is m2's own and P folds to 12
-// rather than to the 8 m1's scale would give it.
-//
-// This is the case that separates a captured function table from any table
-// built where the fold happens: both make the call fold, and only the captured
-// one makes it fold to the body §23.9 names. The two modules declare one name
-// with different bodies for exactly that reason, and neither is instantiated in
-// the other, so which of the two answers is not decided by elaboration order.
 TEST(ConstantFunctionRulesElaboration,
      ConstantFunctionOfOneModuleDoesNotFoldInAnothersGenerateBlock) {
   ElabFixture f;
@@ -827,10 +723,6 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(p->resolved_value, 12);
 }
 
-// §27.2 lets a function be declared inside a generate block, and §13.4.3
-// bars a constant function from being declared inside one (printed page 345).
-// So the triple block 'a' declares is no constant function, and its call in a
-// constant expression of the block is reported and left unfolded (#6433).
 TEST(ConstantFunctionRulesElaboration,
      ConstantCallOfAFunctionDeclaredInAGenerateBlockIsReported) {
   ElabFixture f;
@@ -852,13 +744,6 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_EQ(ResolvedParam(design, "P"), -1);
 }
 
-// §23.9 lists generate blocks among the elements that open a new scope, and
-// blocks 'a' and 'b' are siblings, so neither stands above the other in the
-// same branch of the name tree and the triple block 'a' declares is not what
-// a call in block 'b' names. N is left with no value.
-//
-// The test fails when N is resolved, which is what recording every generate
-// block's functions into one table for the module would leave.
 TEST(ConstantFunctionRulesElaboration,
      ConstantFunctionOfAGenerateBlockDoesNotFoldInASiblingBlock) {
   ElabFixture f;
@@ -880,10 +765,6 @@ TEST(ConstantFunctionRulesElaboration,
   EXPECT_FALSE(n->is_resolved);
 }
 
-// §23.9 carries a name across a generate block boundary, so block 'b' nested
-// inside block 'a' names block 'a''s triple, which is no constant function
-// for being declared inside a generate block (§13.4.3, #6433): the call in
-// block 'b' is reported as the one in block 'a' would be.
 TEST(ConstantFunctionRulesElaboration,
      ConstantCallInANestedBlockOfAnEnclosingBlocksFunctionIsReported) {
   ElabFixture f;

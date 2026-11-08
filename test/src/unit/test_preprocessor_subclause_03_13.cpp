@@ -148,9 +148,6 @@ TEST(NameSpacePreprocessing, TextMacroLaterDefinitionOverridesEarlier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §3.13(d): macros are defined in the order the text is read, so a use
-// standing between two definitions of one name expands to the first, and a
-// use after the second expands to the second.
 TEST(NameSpacePreprocessing, UseBetweenTwoDefinitionsTakesTheEarlier) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -164,10 +161,6 @@ TEST(NameSpacePreprocessing, UseBetweenTwoDefinitionsTakesTheEarlier) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §3.13(d): the text macro name space is global within the compilation unit,
-// whose input files are read in order, so a redefinition in a later file holds
-// for the files after it, while that file's own text before the redefinition
-// still reads the earlier definition.
 TEST(NameSpacePreprocessing, RedefinitionInALaterFileHoldsForTheFilesAfter) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

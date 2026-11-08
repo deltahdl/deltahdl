@@ -1,7 +1,3 @@
-// §25.9: the hierarchical references an interface's procedural bodies make to
-// objects outside the interface, which bar it from being the type of a virtual
-// interface.
-
 #include "elaborator/interface_body_references.h"
 
 #include <string_view>
@@ -19,8 +15,6 @@ namespace {
 
 using Names = std::unordered_set<std::string_view>;
 
-// Adds the names the statement `s` and the statements under it declare: a
-// block's variables, a foreach loop's index variables, and a block's label.
 void CollectBodyNames(const Stmt* s, Names& names) {
   if (s == nullptr) return;
   names.insert(s->var_name);
@@ -29,8 +23,6 @@ void CollectBodyNames(const Stmt* s, Names& names) {
   ForEachChildStmt(s, [&](Stmt* const& sub) { CollectBodyNames(sub, names); });
 }
 
-// The first name of the dotted name `e`, `top` of `top.u[0].x`; empty where
-// `::` stands along it, or where it starts with no name.
 std::string_view DottedRoot(const Expr* e) {
   while (e->kind == ExprKind::kMemberAccess || e->kind == ExprKind::kSelect) {
     if (e->is_scope_resolution) return {};
@@ -61,11 +53,8 @@ bool StmtRefersOutside(const Stmt* s, const Names& names) {
   return found;
 }
 
-// The statements of `item`'s body: a process's one, or a task's or a
-// function's list.
 bool ItemBodyRefersOutside(const ModuleItem* item, const Names& local) {
   Names names = local;
-  // The name an empty DottedRoot answers with, which is no reference.
   names.insert(std::string_view{});
   for (const FunctionArg& arg : item->func_args) names.insert(arg.name);
   CollectBodyNames(item->body, names);

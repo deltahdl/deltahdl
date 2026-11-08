@@ -16,16 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §6.18 (printed page 118) with §8.3 (printed 180): a typedef is a class item
-// and a name it declares stands for the type throughout the class, so
-// `typedef C this_type;` makes `this_type` a variable's class type as the
-// spelling `C` is, and `m_inst = new` on the static declared by it
-// constructs. This is uvm_callbacks#(T,CB)'s `local static this_type
-// m_inst; ... m_inst = new;`. get() constructs once and returns the one
-// object, whose k reads 2 both times, 22. The run bound a typedef of a
-// package, a module or the unit to its class and none of a class's own, so
-// `this_type` named no class, `new` evaluated to a null handle, and get()
-// returned null, 77.
 TEST(ClassScopeTypedefSim, StaticDeclaredByAClassScopeTypedefConstructs) {
   EXPECT_EQ(
       RunAndGet(
@@ -50,11 +40,6 @@ TEST(ClassScopeTypedefSim, StaticDeclaredByAClassScopeTypedefConstructs) {
       22u);
 }
 
-// §6.18 with §8.13 (printed pages 189-190): a subclass inherits the base's
-// members, its typedefs among them, so a local of D's method declared with
-// the `super_type` its base C declares is a C, and its `new` constructs one
-// whose k reads 5. Looked up in D alone, the name named no class and the
-// local stayed null, 7.
 TEST(ClassScopeTypedefSim, LocalDeclaredByABaseClassTypedefConstructs) {
   EXPECT_EQ(RunAndGet("class B;\n"
                       "  int k = 5;\n"
@@ -80,13 +65,6 @@ TEST(ClassScopeTypedefSim, LocalDeclaredByABaseClassTypedefConstructs) {
             5u);
 }
 
-// §6.18 with §8.3 (printed page 180) and §7.8: a property declared through a
-// class's typedef of an associative array is that array -- uvm_phase's
-// `protected edges_t m_successors;` under `typedef bit edges_t[uvm_phase];`
-// -- and so is one a subclass declares through the base's typedef (§8.13).
-// p links q once, D keys q and itself, and p's string-keyed count holds 4:
-// 110 + 4000 + 2. Read off the property's own declaration, which writes no
-// dimension, each was no array and every write was dropped.
 TEST(ClassScopeTypedefSim, PropertyDeclaredByAnAssociativeArrayTypedef) {
   EXPECT_EQ(RunAndGet("class P;\n"
                       "  typedef bit edges_t[P];\n"
@@ -123,14 +101,6 @@ TEST(ClassScopeTypedefSim, PropertyDeclaredByAnAssociativeArrayTypedef) {
             4112u);
 }
 
-// §6.18 with §7.4.4 and §8.3: a local of a method declared by a class-scope
-// typedef is an object of the type the typedef stands for, its associative
-// dimension included, whether named bare in the declaring class's function
-// or through the class scope in another class's task. N's link fills its
-// bare-typed local with two keys, 2; H's task fills a `N::edges_t` local
-// through a ref formal of the same type and sums the keys' ids, 2 + 3.
-// Declared as scalars, neither local held a key: the counts read 0 and the
-// foreach ran once with a null key.
 TEST(ClassScopeTypedefSim, MethodLocalDeclaredByAnAssociativeArrayTypedef) {
   EXPECT_EQ(RunAndGet("class N;\n"
                       "  int id;\n"
@@ -169,12 +139,6 @@ TEST(ClassScopeTypedefSim, MethodLocalDeclaredByAnAssociativeArrayTypedef) {
             205u);
 }
 
-// §6.18 makes a typedef name stand for the type it names, so `L x` in a
-// procedural block declares a `logic [3:0]`: it starts at x (§6.8, Table 6-7)
-// and keeps a z written to it, where §6.11.2 clears x and z only on the way
-// into a 2-state type. The `bit` typedef beside it is that 2-state type and
-// clears both. The block's variable was made 2-state by the name alone and
-// read 0000 and 1001.
 TEST(TypedefSim, BlockVariableOfFourStateTypedefKeepsXAndZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -193,12 +157,6 @@ TEST(TypedefSim, BlockVariableOfFourStateTypedefKeepsXAndZ) {
             "xxxx 0000\n1z01 1001\n");
 }
 
-// The same rule for a function's locals: §6.18 has `B y` declare the 2-state
-// `bit [3:0]` that B names, so it starts at 0 (§6.8, Table 6-7) and clears a
-// written z (§6.11.2), and so do an enumeration whose base is `int` (§6.19) and
-// a packed structure of `bit` members (§7.2.1) declared by name. The `logic`
-// typedef beside them keeps x and z. Every local declared by a name was made
-// 4-state and read xxxx, x, xxxx and then 1z01 for B.
 TEST(TypedefSim, FunctionLocalOfTwoStateTypedefClearsXAndZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -218,10 +176,6 @@ TEST(TypedefSim, FunctionLocalOfTwoStateTypedefClearsXAndZ) {
             "0000 xxxx 0 0000\n1001 1z01\n");
 }
 
-// §6.18 with §12.3: a typedef among a procedural block's declarations names
-// its type for the declarations after it, so `PP pp` and `UP up` are a packed
-// and an unpacked structure whose members keep what is written to them. The
-// block's structure typedef stood for no layout, and every member read 0.
 TEST(TypedefSim, BlockStructTypedefVariableKeepsMemberWrites) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -239,10 +193,6 @@ TEST(TypedefSim, BlockStructTypedefVariableKeepsMemberWrites) {
             "3 4 5 6 16\n");
 }
 
-// The same rule in a subroutine: a structure typedef written at the top of a
-// function's body, or in a begin-end within it, is the type of the locals
-// declared by its name, in a module's function and in a class method alike.
-// Each product read 0.
 TEST(TypedefSim, SubroutineBlockStructTypedefLocalKeepsMemberWrites) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"
@@ -279,10 +229,6 @@ TEST(TypedefSim, SubroutineBlockStructTypedefLocalKeepsMemberWrites) {
             "12 30 56\n");
 }
 
-// §6.18 with §6.19.5: an enumeration a class method's typedef declares is
-// the type of the local declared by its name, so name() answers the member
-// the local holds. The method's typedef was registered by no walk, and name()
-// answered the empty string.
 TEST(TypedefSim, MethodEnumTypedefLocalAnswersName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"
@@ -303,15 +249,6 @@ TEST(TypedefSim, MethodEnumTypedefLocalAnswersName) {
             "K\n");
 }
 
-// §6.18 with A.2.8: a block's typedef of a type that is no enumeration,
-// structure or union names that type for the declarations after it, so `T x`
-// is a 4-state `logic [7:0]` that starts at x and keeps eight bits of 9'h1FF,
-// `I i` a signed int and `R r` a real. §7.4.4 stacks a packed dimension
-// written where the name is used outside the type's own: `T [1:0] w` keeps
-// sixteen bits of 17'h1ABCD, and `B1 [3:0] v` four bits of 5'h1F. A function
-// body's `N n` keeps four bits of 5'h1F too. A4, whose unpacked dimension a
-// declaration would adopt, names no plain type and declares nothing here.
-// Each fell to the 32-bit carrier of a type nothing sizes, the real included.
 TEST(TypedefSim, BlockTypedefOfAPlainTypeNamesALaterDeclarationsType) {
   SimFixture f;
   EXPECT_EQ(
@@ -347,13 +284,6 @@ TEST(TypedefSim, BlockTypedefOfAPlainTypeNamesALaterDeclarationsType) {
       "xxxxxxxx\n8 255 -1 1.500000 16 abcd 15 15\n");
 }
 
-// §6.18 with §7.4.4: a block typedef whose type is another of the block's
-// type names stands for whatever that one does. `T2 z` is T's eight bits,
-// `T3 y` sixteen with T3's `[1:0]` stacked outside them, `E2 e` the block's
-// enumeration, whose name() answers K, and the type parameter `P q`, given
-// T2, eight bits again. A typedef of a package's type, `PT u`, is that
-// type's three bits. Each name through a block name stood for only the bare
-// name, which no table sizes.
 TEST(TypedefSim, BlockTypedefOfAnotherBlockTypeNameStandsForWhatThatOneDoes) {
   SimFixture f;
   EXPECT_EQ(
@@ -387,11 +317,6 @@ TEST(TypedefSim, BlockTypedefOfAnotherBlockTypeNameStandsForWhatThatOneDoes) {
       "8 254 16 abcd K 3 7 255\n");
 }
 
-// §6.18 with §7.4: a declaration writing unpacked dimensions after a block
-// typedef's name is an array of the typedef's type, so each element of
-// `T a [2]` is a `logic [7:0]` keeping eight bits of 9'h1FF, in a begin-end
-// block and a function body alike. The elements took nothing from the name
-// and fell to the 32-bit carrier.
 TEST(TypedefSim, ArrayOfABlockTypedefHasElementsOfItsType) {
   SimFixture f;
   EXPECT_EQ(
@@ -413,13 +338,6 @@ TEST(TypedefSim, ArrayOfABlockTypedefHasElementsOfItsType) {
       "8 255 15\n");
 }
 
-// The walk RegisterBlockEnumTypes makes over a subroutine body steps over a
-// null statement and goes on to the items after it, so a typedef following
-// one still reshapes the declaration by its name to the type it stands for,
-// here int. Parser::ParseSubroutineBody keeps whatever Parser::ParseStmt
-// answers, null included, and no source text the unit tests parse has it
-// answer null, so the body is built here. The module is walked with no
-// design, which leaves the compilation unit's constants and classes out.
 TEST(TypedefSim, BlockTypeNameWalkStepsOverANullStatement) {
   SimFixture f;
   auto* td = f.arena.Create<ModuleItem>();

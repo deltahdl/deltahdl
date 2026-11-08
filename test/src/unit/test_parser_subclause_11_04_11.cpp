@@ -620,10 +620,6 @@ TEST(CondPredicateParsing, MatchesPatternInTernaryCondition) {
   EXPECT_EQ(rhs->condition->op, TokenKind::kKwMatches);
 }
 
-// §11.4.11 writes the conditional operator as `cond ? expr : expr`, so the ':'
-// is what separates the two results. A conditional written without one is
-// rejected at the token standing where the ':' belongs, and the report names
-// §11.4.11 rather than the token it wanted.
 TEST(ConditionalOperator, MalformedConditionalNames11_4_11) {
   auto r = Parse(
       "module m;\n"
@@ -632,13 +628,6 @@ TEST(ConditionalOperator, MalformedConditionalNames11_4_11) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ':'", 2, "11.4.11"));
 }
 
-// Covers Parser::TryParseSpecialInfix in src/parser/expr_parser.cpp, the sole
-// site in the parser that builds an ExprKind::kTernary. It assigned no
-// range.start before this commit, so every conditional expression carried no
-// position and a report standing at one printed "<unknown location>" instead of
-// a file, line and column. §11.4.11 writes the conditional expression as
-// `cond_predicate ? { attribute_instance } expression : expression`, so it
-// begins where its condition begins: `sel`, at column 15 of line 2.
 TEST(OperatorAndExpressionParsing, TernaryStartsAtItsCondition) {
   auto r = Parse(
       "module m;\n"

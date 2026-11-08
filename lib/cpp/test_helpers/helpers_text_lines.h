@@ -7,17 +7,10 @@
 #include <string_view>
 #include <vector>
 
-// Splitting and searching the text a test captured -- a dump file, a tool's
-// stdout, a lexer's token spellings. Shared so that "the output has this line"
-// means the same thing in every test that asks it.
-
-// Whether `where` writes `what` anywhere in it.
 inline bool Holds(std::string_view where, std::string_view what) {
   return where.find(what) != std::string_view::npos;
 }
 
-// How many times `where` writes `what`, counting the writings that do not
-// overlap.
 inline size_t TimesWritten(std::string_view where, std::string_view what) {
   size_t written = 0;
   for (size_t at = where.find(what); at != std::string_view::npos;
@@ -27,16 +20,12 @@ inline size_t TimesWritten(std::string_view where, std::string_view what) {
   return written;
 }
 
-// The text split into its white-space-delimited tokens. For a free-format
-// language this projection alone -- no line or column information -- is enough
-// to recover every construct the text spells.
 inline std::vector<std::string> Tokens(const std::string& content) {
   std::istringstream iss(content);
   return {std::istream_iterator<std::string>(iss),
           std::istream_iterator<std::string>()};
 }
 
-// Occurrences of `target` as a complete token, never as a substring.
 inline size_t CountToken(const std::vector<std::string>& toks,
                          std::string_view target) {
   size_t n = 0;
@@ -46,7 +35,6 @@ inline size_t CountToken(const std::vector<std::string>& toks,
   return n;
 }
 
-// Splits captured stdout into its non-empty lines.
 inline std::vector<std::string> Lines(const std::string& out) {
   std::vector<std::string> lines;
   std::istringstream in(out);
@@ -57,10 +45,6 @@ inline std::vector<std::string> Lines(const std::string& out) {
   return lines;
 }
 
-// The text split at every newline, empty lines kept. A record-oriented file
-// makes an empty line a record of its own, and a test that indexes lines or
-// counts them needs the positions to line up with the file's, so it asks for
-// this projection rather than the non-empty one above.
 inline std::vector<std::string> AllLines(const std::string& content) {
   std::vector<std::string> out;
   std::string cur;
@@ -76,7 +60,6 @@ inline std::vector<std::string> AllLines(const std::string& content) {
   return out;
 }
 
-// Whether any line matches `target` exactly.
 inline bool HasLine(const std::vector<std::string>& lines,
                     std::string_view target) {
   for (const auto& l : lines) {
@@ -85,7 +68,6 @@ inline bool HasLine(const std::vector<std::string>& lines,
   return false;
 }
 
-// Lines matching `target` exactly.
 inline size_t CountLine(const std::vector<std::string>& lines,
                         std::string_view target) {
   size_t n = 0;
@@ -95,9 +77,6 @@ inline size_t CountLine(const std::vector<std::string>& lines,
   return n;
 }
 
-// Where `target` first appears, or the size when it appears nowhere -- the
-// end-iterator convention, so a caller compares against .size() rather than
-// against a sentinel of its own.
 inline size_t IndexOf(const std::vector<std::string>& toks,
                       std::string_view target) {
   for (size_t i = 0; i < toks.size(); ++i) {

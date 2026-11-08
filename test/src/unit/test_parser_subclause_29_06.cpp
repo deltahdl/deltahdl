@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §29.6: a table entry may carry a transition specification on at most one
-// input. Entries with two transitions, e.g. "(01)(01)0 : 0 : 1;", are illegal.
-// The parser rejects any row whose input field holds more than one edge.
-
 TEST(UdpEdgeSeq, SingleEdgeIndicatorInRowAccepted) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -30,20 +26,11 @@ TEST(UdpEdgeSeq, TwoParenthesizedEdgeIndicatorsInRowRejected) {
       "    (01) (10) 0 : 0 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // ValidateUdpRowEdgeCount in src/parser/parser_udp.cpp files the
-  // at-most-one-transition report under §29.3.4, not under §29.6.
   EXPECT_TRUE(ReportedError(
       r.diags, "UDP table row shall contain at most one input transition", 3,
       "29.3.4"));
 }
 
-// §29.6 names two ways to write a transition: a parenthesized pair such as
-// (01) or a single transition symbol such as `r`. The at-most-one-transition
-// rule must recognize the letter-symbol form as an edge too, so a row bearing
-// two letter edges is rejected the same way as two parenthesized edges. This
-// drives the count rule over the letter-symbol operand kind -- a different
-// token path from the parenthesized form, and the only case that observes the
-// counter treating a bare letter as a transition.
 TEST(UdpEdgeSeq, TwoLetterEdgeSymbolsInRowRejected) {
   auto r = Parse(
       "primitive bad(output reg q, input a, input b);\n"

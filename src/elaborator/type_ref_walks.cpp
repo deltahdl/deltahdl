@@ -25,14 +25,6 @@ namespace delta {
 
 namespace {
 
-// §6.23 with A.2.8: `var type(a) v;` among a block's items declares v with the
-// self-determined type of `a`, taken with the names in scope at the
-// declaration. A name the procedure declared earlier, in this block or one
-// enclosing it, or as a formal of the subroutine, hides the scope's around the
-// procedure, and v takes that declaration's type and unpacked dimensions; any
-// other reference is left to `resolve_outer`. The dimensions taken stand
-// inside those v writes, as an array typedef's do (§7.4.4). `locals` holds the
-// procedure's names in declaration order.
 void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
                          SourceLoc loc,
                          const std::vector<ProceduralLocal>& locals,
@@ -50,11 +42,6 @@ void ResolveLocalTypeRef(DataType& dt, std::vector<Expr*>& unpacked_dims,
   unpacked_dims.insert(unpacked_dims.end(), kTaken.begin(), kTaken.end());
 }
 
-// §6.23 with §12.7.1: the variables the header of `s`, where it is a for loop,
-// declares, each of whose type may be a type reference, resolved as a block's
-// declaration's is and then in scope for the loop's own statements. An
-// initialization whose type is implicit assigns a variable declared elsewhere.
-// A loop variable has no unpacked dimensions to take from what it names.
 void DeclareForLoopLocals(Stmt* s, std::vector<ProceduralLocal>& locals,
                           const TypeRefResolver& resolve_outer) {
   if (s->kind != StmtKind::kFor) return;
@@ -71,13 +58,6 @@ void DeclareForLoopLocals(Stmt* s, std::vector<ProceduralLocal>& locals,
   }
 }
 
-// A.2.5 with §6.23: the associative indexes among `dims`, the unpacked
-// dimensions of a declaration a procedure writes at `loc`, written as a type
-// reference to an expression, `[type(k)]`, given the type of `k` as a type
-// reference the declaration's own type writes is: a name the procedure
-// declared earlier takes that declaration's type, and any other is left to
-// `resolve_outer`. A name's unpacked dimensions are no part of an index type
-// and are not taken.
 void ResolveLocalIndexTypeRefs(std::vector<Expr*>& dims, SourceLoc loc,
                                const std::vector<ProceduralLocal>& locals,
                                const TypeRefResolver& resolve_outer,
@@ -91,10 +71,6 @@ void ResolveLocalIndexTypeRefs(std::vector<Expr*>& dims, SourceLoc loc,
       arena);
 }
 
-// The formals of `item`, a subroutine or a let, each resolved with `locals`,
-// the names in scope ahead of the item, and the formals before it, which are
-// added to `locals` in turn. A formal's own type may be a type reference, to
-// an earlier formal or to a name of the scope around the item.
 void ResolveFormalTypeRefs(ModuleItem* item,
                            std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena) {
@@ -107,14 +83,6 @@ void ResolveFormalTypeRefs(ModuleItem* item,
   }
 }
 
-// Resolves the block type references of `s` and the statements it holds, with
-// `locals` the names in scope ahead of it; a block's own names, and a for
-// loop's, are dropped when the walk leaves it. §11.12 lets a block declare a
-// let, whose formals see the block's names ahead of them and are in scope
-// only within the let. `visit`, where given, is shown each statement but a
-// let's declaration with the names in scope at it: a for loop's own names
-// among them, and a declaration's own name not, since its initializer sees
-// only the names declared ahead of it (§6.21).
 void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
                            const TypeRefResolver& resolve_outer, Arena& arena,
                            const ProceduralStmtVisitor& visit) {
@@ -143,8 +111,6 @@ void ResolveTypeRefsInStmt(Stmt* s, std::vector<ProceduralLocal>& locals,
   locals.push_back({s->var_name, &s->var_decl_type, &s->var_unpacked_dims});
 }
 
-// The name of a property the type reference `ref` writes in a method: bare,
-// or selected of `this` (§8.11). Null for any other expression.
 const Expr* PropertyName(const Expr& ref) {
   const Expr* name = &ref;
   if (ref.kind == ExprKind::kMemberAccess && !ref.is_scope_resolution &&
@@ -156,10 +122,6 @@ const Expr* PropertyName(const Expr& ref) {
   return name;
 }
 
-// §8.5 and §8.13: the property of `cls`, or of a class it extends, that the
-// type reference `ref` names; null where its argument names none, and where a
-// parameterized base class declares it, whose type the specialization `cls`
-// extends gives. Without `unit` the class's own properties alone are read.
 const ClassMember* PropertyNamed(const ClassDecl& cls, const Expr& ref,
                                  const CompilationUnit* unit) {
   const Expr* name = PropertyName(ref);
@@ -181,13 +143,6 @@ const ClassMember* PropertyNamed(const ClassDecl& cls, const Expr& ref,
   return owned.member;
 }
 
-// §8.5 and §8.13: the properties of `cls` and of the classes it extends, as
-// names in scope in its methods, those of the class furthest up the chain
-// first, so that a property a class declares hides one it inherits. The chain
-// stops at a parameterized base class, whose properties' types the
-// specialization `cls` extends gives (PropertyNamed), and at a base class
-// `unit` does not declare. The elaborator has broken every cycle of extends
-// clauses before the walk, so the chain ends.
 std::vector<ProceduralLocal> PropertiesInScope(const ClassDecl& cls,
                                                const CompilationUnit& unit) {
   std::vector<const ClassDecl*> chain = {&cls};
@@ -206,10 +161,6 @@ std::vector<ProceduralLocal> PropertiesInScope(const ClassDecl& cls,
   return properties;
 }
 
-// §8.11 and §8.15: the handles a method of `cls` reads its own object
-// through, `this` of the class's type and, where the class extends another,
-// `super` of the type of the class it extends, as names in scope in its
-// methods; their types are made in `arena`.
 std::vector<ProceduralLocal> SelfHandles(const ClassDecl& cls, Arena& arena) {
   static const std::vector<Expr*> kNoUnpackedDims;
   auto* self = arena.Create<DataType>();
@@ -226,7 +177,6 @@ std::vector<ProceduralLocal> SelfHandles(const ClassDecl& cls, Arena& arena) {
   return handles;
 }
 
-// The names `outer` holds followed by those `inner` holds, which hide them.
 std::vector<ProceduralLocal> NamesInScope(
     std::span<const ProceduralLocal> outer,
     std::span<const ProceduralLocal> inner) {
@@ -235,9 +185,6 @@ std::vector<ProceduralLocal> NamesInScope(
   return all;
 }
 
-// A.2.5 with §6.23: the associative indexes the declaration `item`, a
-// variable or a typedef, writes as type references, `[type(k)]`, given the
-// types `resolve` gives their arguments, made in `arena`.
 void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
                               Arena& arena) {
   ResolveTypeRefIndexDims(
@@ -245,12 +192,6 @@ void ResolveItemIndexTypeRefs(ModuleItem& item, const TypeRefResolver& resolve,
       arena);
 }
 
-// The type references the declarations of `items`, a package's or the
-// compilation unit's, write in their typedefs' and nettypes' types, their
-// typedefs' and variables' associative indexes (A.2.5), their subroutines,
-// their lets' formals (§11.12) and their classes, with `resolve` resolving a
-// name none of them declares more closely. `visit` is shown each statement of
-// their subroutines and methods as ResolveProceduralTypeRefs shows it.
 void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
                               const TypeRefResolver& resolve,
                               const CompilationUnit* unit, Arena& arena,
@@ -281,9 +222,6 @@ void ResolveScopeItemTypeRefs(const std::vector<ModuleItem*>& items,
   }
 }
 
-// §6.23: shows `on_ref` the operand of each type reference the declarations
-// among `items` write outside any statement, with where it is written: a
-// variable's or net's type and the expressions ForEachItemExprTypeRef names.
 void ForEachItemTypeRef(
     const std::vector<ModuleItem*>& items,
     const std::function<void(const Expr*, SourceLoc)>& on_ref) {
@@ -312,9 +250,6 @@ void AdoptReferencedType(DataType& dt, const DataType& type) {
   dt.type_ref_expr = nullptr;
 }
 
-// The procedures an item holds, an initial, final or always block's body and a
-// task's or function's, are walked with the subroutine's formals as the first
-// names in scope.
 void ResolveProceduralTypeRefs(ModuleItem* item,
                                const TypeRefResolver& resolve_outer,
                                Arena& arena,
@@ -328,9 +263,6 @@ void ResolveProceduralTypeRefs(ModuleItem* item,
   }
 }
 
-// A name `type(this)` writes, which §8.11 has stand for the class itself, is
-// none of the class's properties and is left to `resolve_outer`, which leaves
-// it as written for the method's evaluation to read.
 void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
                           const CompilationUnit* unit, Arena& arena,
                           const ProceduralStmtVisitor& visit) {
@@ -377,9 +309,6 @@ void ResolveClassTypeRefs(ClassDecl& cls, const TypeRefResolver& resolve_outer,
   }
 }
 
-// The package and compilation-unit scopes of `unit`: `on_items` is shown each
-// package's items with the package, then the unit's own with none; `on_class`
-// each class declared at the unit's top, outside every package.
 static void ForEachUnitScope(
     CompilationUnit* unit,
     const std::function<void(const PackageDecl*,

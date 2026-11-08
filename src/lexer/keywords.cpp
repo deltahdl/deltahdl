@@ -20,10 +20,6 @@ struct KeywordEntry {
   KeywordVersion min_version;
 };
 
-// Keyword data lives in a namespace-scope constexpr table: it is constant-
-// initialized (no throwing dynamic init) and is not a function body (so it does
-// not count against the function-size threshold). KeywordMap() builds the
-// lookup map from it lazily on first use.
 constexpr std::pair<std::string_view, KeywordEntry> kKeywordTable[] = {
     {"always", {TokenKind::kKwAlways, V::kVer13641995}},
     {"and", {TokenKind::kKwAnd, V::kVer13641995}},
@@ -347,10 +343,6 @@ std::optional<TokenKind> LookupKeyword(std::string_view text,
   return kind;
 }
 
-// The compound assignment operators §11.3 Table 11-1 lists, in the rows for
-// the arithmetic, modulus, bitwise and shift assignment operators. They are
-// answered separately from the operators below only so that neither function
-// grows past the statement count etc/clang_tidy/src.yml allows.
 static std::string_view CompoundAssignmentOperatorName(TokenKind kind) {
   switch (kind) {
     case TokenKind::kPlusEq:
@@ -382,8 +374,6 @@ static std::string_view CompoundAssignmentOperatorName(TokenKind kind) {
   }
 }
 
-// The remaining operator tokens §11.3 Table 11-1 lists. Empty for a kind that
-// is not one of them, so TokenKindName can fall through to its own cases.
 static std::string_view OperatorTokenName(TokenKind kind) {
   auto assignment = CompoundAssignmentOperatorName(kind);
   if (!assignment.empty()) return assignment;
@@ -463,10 +453,6 @@ static std::string_view OperatorTokenName(TokenKind kind) {
   }
 }
 
-// The punctuation kinds that are neither an operator §11.3 Table 11-1 lists
-// nor answered by TokenKindName's own switch. Empty for any other kind. They
-// are answered separately only so that TokenKindName stays inside the
-// statement count etc/clang_tidy/src.yml allows.
 static std::string_view PunctuationTokenName(TokenKind kind) {
   switch (kind) {
     case TokenKind::kAmpAmpAmp:
@@ -500,13 +486,6 @@ static std::string_view PunctuationTokenName(TokenKind kind) {
   }
 }
 
-// The name of a keyword kind is the source spelling kKeywordTable already
-// records for it, quoted. The quoted forms are built once into a function-
-// local static, the way KeywordMap() builds its lookup, so that the returned
-// std::string_view refers to storage that outlives the call: the map is never
-// written after that initialization, and an unordered_map never relocates the
-// mapped value of an element that stays in it. Empty for a kind the table
-// does not name, which is every kind that is not a keyword.
 static std::string_view KeywordTokenName(TokenKind kind) {
   static const auto kNames = [] {
     std::unordered_map<TokenKind, std::string> m;
@@ -522,10 +501,6 @@ static std::string_view KeywordTokenName(TokenKind kind) {
 }
 
 std::string_view TokenKindName(TokenKind kind) {
-  // Every operator §11.3 Table 11-1 lists, every keyword kKeywordTable holds
-  // and the punctuation PunctuationTokenName spells are answered above; a
-  // kind that reaches the switch is a literal, an identifier or one of the
-  // remaining punctuation marks.
   auto op = OperatorTokenName(kind);
   if (!op.empty()) return op;
   auto keyword = KeywordTokenName(kind);
@@ -595,7 +570,7 @@ std::string_view TokenKindName(TokenKind kind) {
       return "'*)'";
     case TokenKind::kPlusSlashMinus:
       return "'+/-'";
-    default:  // TokenKind::kPlusPercentMinus, the one kind left
+    default:
       return "'+%-'";
   }
 }

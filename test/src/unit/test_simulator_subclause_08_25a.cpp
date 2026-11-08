@@ -20,12 +20,6 @@ using namespace delta;
 
 namespace {
 
-// The value both a class parameter's default and an override of it are written
-// as here: a bare identifier naming a variable. §6.8 makes that variable and
-// the object's stored parameter two data storage elements, each keeping its
-// value from one assignment to the next, so a store of the value the identifier
-// produced has to take the words rather than the pointer to them -- EvalExpr
-// answers a bare identifier with the variable's own vector.
 constexpr uint64_t kSeed = 0xDEADBEEFu;
 constexpr uint64_t kSeedLowByteCleared = 0xDEADBE00u;
 
@@ -43,8 +37,6 @@ NamedVariable MakeVariableAndItsName(SimFixture& f) {
   return {var, expr};
 }
 
-// A class `P` with one #() value parameter `W`, whose default is `def` (null
-// for a parameter declared without one, which is what an override supplies).
 ClassTypeInfo* RegisterOneParamClass(SimFixture& f, Expr* def) {
   auto* decl = f.arena.Create<ClassDecl>();
   decl->name = "P";
@@ -56,8 +48,6 @@ ClassTypeInfo* RegisterOneParamClass(SimFixture& f, Expr* def) {
   return type;
 }
 
-// Both keys the parameter is stored under: the bare name a use inside the
-// class writes, and the "P::W" one a scoped access writes.
 void ExpectStoredParameterOwnsItsWords(const Variable* var,
                                        const ClassObject* obj) {
   ASSERT_NE(obj, nullptr);
@@ -67,9 +57,6 @@ void ExpectStoredParameterOwnsItsWords(const Variable* var,
       ExpectOwnWordsCopy(var->value, obj->properties.at("P::W")));
 }
 
-// The consequence of the sharing: DepositBitField writes through the words it
-// finds rather than replacing them, so one buffer under the object and the
-// variable carries a write to the stored parameter back to `n`.
 void ExpectDepositLeavesTheNamedVariableIntact(SimFixture& f,
                                                const Variable* var,
                                                ClassObject* obj) {
@@ -79,25 +66,17 @@ void ExpectDepositLeavesTheNamedVariableIntact(SimFixture& f,
   EXPECT_EQ(var->value.ToUint64(), kSeed);
 }
 
-// §8.25 gives a parameterized class's value parameter a default expression,
-// which InitClassPropertyDefaults evaluates and stores when an object is
-// constructed.
 ClassObject* ConstructWithParamDefault(SimFixture& f, Expr* def) {
   RegisterOneParamClass(f, def);
   auto handle = EvalClassNew("P", nullptr, f.ctx, f.arena, {});
   return f.ctx.GetClassObject(handle.ToUint64());
 }
 
-// §8.25 overrides a parameter where the handle is declared -- `P #(.W(n)) c;`
-// -- which the simulator records against the variable name and applies to the
-// object the declaration constructed.
 ClassObject* ConstructWithParamOverride(SimFixture& f, Expr* override_expr) {
   auto* type = RegisterOneParamClass(f, nullptr);
   auto* obj = f.arena.Create<ClassObject>();
   obj->type = type;
   auto handle = f.ctx.AllocateClassObject(obj);
-  // The actuals as the parser records a declaration's `#(...)`: a value
-  // actual is an implicit type carrying its expression.
   auto* actuals = f.arena.Create<std::vector<DataType>>();
   DataType actual;
   actual.type_ref_expr = override_expr;
@@ -242,11 +221,6 @@ TEST(ClassSim, LoweredMixedParams) {
   EXPECT_FALSE(info->decl->type_param_names.count("N"));
 }
 
-// §8.25: a specialization is a generic class combined with a specific set of
-// actual parameter values, and instances are declared with the same override
-// rules as modules. Two distinct value-parameter specializations of the same
-// generic class coexist and each object carries its own parameter value, read
-// back here through the full pipeline via instance-qualified access.
 TEST(ClassSim, ValueParameterDistinctPerSpecialization) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -268,12 +242,6 @@ TEST(ClassSim, ValueParameterDistinctPerSpecialization) {
   LowerRunAndCheck(f, design, {{"w8", 8u}, {"w16", 16u}});
 }
 
-// §8.25: all matching specializations of a generic class shall represent the
-// same type. Two variables independently declared with the identical value-
-// parameter specialization hold assignment-compatible handles: assigning one to
-// the other aliases the same object, so a property written through the first is
-// read back through the second. A mismatched type would make the handle
-// assignment illegal.
 TEST(ClassSim, MatchingSpecializationsAreSameType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -319,10 +287,6 @@ TEST(ClassSim, LoweredParamClassExtendsBase) {
   EXPECT_EQ(info->decl->params.size(), 1u);
 }
 
-// §8.25: instances use the same override rules as modules, which include named
-// parameter overrides. A named override supplies the value the instance reads
-// back (the positional form is covered by
-// ValueParameterDistinctPerSpecialization).
 TEST(ClassSim, NamedParameterOverrideApplied) {
   EXPECT_EQ(RunAndGet("class vector #(parameter width = 7);\n"
                       "  int data;\n"
@@ -339,8 +303,6 @@ TEST(ClassSim, NamedParameterOverrideApplied) {
             2u);
 }
 
-// §8.25: a type parameter (here its default, int) determines the type of a
-// class property, which is then usable at run time.
 TEST(ClassSim, TypeParameterDefaultYieldsUsableProperty) {
   EXPECT_EQ(RunAndGet("class C #(type T = int);\n"
                       "  T data;\n"
@@ -358,11 +320,6 @@ TEST(ClassSim, TypeParameterDefaultYieldsUsableProperty) {
             42u);
 }
 
-// uvm_pool's shape: a property whose associative index (§7.8) is a type
-// parameter of the class. §8.25 makes `pool #(string, int)` a specialization
-// binding KEY to string, so the property is a string-keyed array and the
-// entry add() writes is the one get() reads back through the class's own
-// methods.
 constexpr const char* kPoolClass =
     "class pool #(type KEY = int, type T = int);\n"
     "  protected T pool_[KEY];\n"
@@ -392,9 +349,6 @@ constexpr const char* kPoolClass =
     "  endfunction\n"
     "endclass\n";
 
-// Before the dimension naming a type parameter was read as one, IsAssocIndexDim
-// saw no width for KEY and the property was no array at all: add() went
-// nowhere and get() answered its 0.
 TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysAddsAndGets) {
   EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
                           "module t;\n"
@@ -410,8 +364,6 @@ TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysAddsAndGets) {
             0x2Au);
 }
 
-// §7.9.3 and §7.9.1 through the same specialization: the key add() wrote
-// exists, one it did not write does not, and num() counts the two entries.
 TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysReportsExistsAndNum) {
   EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
                           "module t;\n"
@@ -428,8 +380,6 @@ TEST(ClassSim, TypeParameterIndexedPoolBoundToStringKeysReportsExistsAndNum) {
             102u);
 }
 
-// §8.25.1: the unadorned name denotes the default specialization, KEY its
-// default int, so the property is an int-keyed array.
 TEST(ClassSim, TypeParameterIndexedPoolDefaultsToIntKeys) {
   EXPECT_EQ(RunAndGet(std::string(kPoolClass) + "module t;\n"
                                                 "  int out;\n"
@@ -461,9 +411,6 @@ TEST(ClassSim, TypeParameterIndexedPoolDefaultKeysReportExistsAndNum) {
             102u);
 }
 
-// §7.9.2 and §7.9.4 through §7.9.6 on the default specialization: delete()
-// removes the one entry, and first()/next() over a local of the KEY type
-// visit the two that remain.
 TEST(ClassSim, TypeParameterIndexedPoolDeletesAndTraverses) {
   EXPECT_EQ(RunAndGet(std::string(kPoolClass) +
                           "module t;\n"
@@ -481,10 +428,6 @@ TEST(ClassSim, TypeParameterIndexedPoolDeletesAndTraverses) {
             402u);
 }
 
-// §8.25 with §7.10: a queue property whose element type is a type parameter,
-// `T items[$]`, is a queue of the object in every specialization: the default
-// `stack` pops the 7 it pushed, and `stack #(bit [3:0])` pops the 4 pushed
-// last of two and then counts one element.
 TEST(ClassSim, TypeParameterQueuePropertyInEachSpecialization) {
   EXPECT_EQ(RunAndGet("class stack #(type T = int);\n"
                       "  local T items[$];\n"
@@ -513,12 +456,6 @@ TEST(ClassSim, TypeParameterQueuePropertyInEachSpecialization) {
             741u);
 }
 
-// §8.25 (printed page 203 of IEEE 1800-2023) instantiates an object under
-// the parameter override rules of §23.10, whose §23.10.2.2 binds an actual
-// written `.name(value)` to the parameter of that name whatever its
-// position. The value actuals were bound by position alone, so `#(.E(7))`
-// on a class whose first parameter is D wrote 7 into D and left E at its
-// default: mul() gave 7 * 1 rather than 3 * 7.
 TEST(ClassSim, NamedValueActualBindsTheParameterOfItsName) {
   EXPECT_EQ(RunAndGet("class G #(int D = 3, int E = 1);\n"
                       "  function int mul();\n"
@@ -537,16 +474,6 @@ TEST(ClassSim, NamedValueActualBindsTheParameterOfItsName) {
             21u);
 }
 
-// §8.25 (printed page 203 of IEEE 1800-2023): an object is instantiated
-// with the parameter override rules of §23.10, `vector #(10) vten;`, and inside
-// its methods a value parameter names what the specialization bound it to.
-// Declared at module scope, `G #(5) b = new;` constructed the class's default
-// specialization: the lowerer built the object without recording the
-// declaration's parameter value assignment, which only a declaration inside a
-// procedural block recorded, so a method of `b` read D as 3, whether as the
-// value or as the delay `#D`. The task reads D as a delay and as a value, so
-// the time and the value are both bound: a default-specialized object gives
-// 3 and 3 @ 3, the `#(5)` object 5 @ 8, packed as 5 * 100 + 8.
 TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationReadInAMethod) {
   EXPECT_EQ(RunAndGet("class G #(int D = 3);\n"
                       "  int seen;\n"
@@ -568,9 +495,6 @@ TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationReadInAMethod) {
             303u * 10000u + 508u);
 }
 
-// §8.25 with §23.10: the same at module scope where the handle is declared
-// with the specialization and constructed later in a procedural block,
-// `G #(5) b;` then `b = new;`, and the parameter is bound by name.
 TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationConstructedLater) {
   EXPECT_EQ(RunAndGet("class G #(int D = 3, int E = 1);\n"
                       "  function int mul();\n"
@@ -589,14 +513,6 @@ TEST(ClassSim, ValueParameterOfAModuleScopeSpecializationConstructedLater) {
             21u);
 }
 
-// §8.25's own generic class, `class vector #(int size = 1); bit [size-1:0]
-// a;` (printed page 203 of IEEE 1800-2023), sizes a property by the
-// class's value parameter, which §6.20.1 declares in the class's parameter port
-// list or its body (printed 125). The lowerer sized every property with no
-// parameter in scope, so `logic [W-1:0] v` was one bit wide: `c.v = '1`
-// stored 1 and `$bits(c.v)` answered 1. Here v is sized by the header
-// parameter and u by a body localparam derived from it, so the write of all
-// ones reads 255 and the widths 8 and 16: 255 + 16 * 1000 + 8 * 100000.
 TEST(ClassSim, PropertyWidthNamesTheClassParameters) {
   EXPECT_EQ(
       RunAndGet("class C #(int W = 8);\n"
@@ -617,13 +533,6 @@ TEST(ClassSim, PropertyWidthNamesTheClassParameters) {
       255u + 16u * 1000u + 8u * 100000u);
 }
 
-// §8.25: a specialization `stack #(bit [2:0])` binds the type parameter T to
-// `bit [2:0]` throughout the class body (printed pages 203-204 of IEEE
-// 1800-2023), so §20.6.2's `$bits(T)` in an instance method is 3, and the
-// object of the default specialization (§8.25.1) reads the default int's 32.
-// EvalBits asked the type table alone, which holds the class's default for the
-// name, so the specialized object read 32 too. The three objects are declared
-// at module scope, in a procedural block and with the actual bound by name.
 TEST(ClassSim, BitsOfATypeParameterReadsTheSpecializationsActual) {
   EXPECT_EQ(RunAndGet("class stack #(type T = int);\n"
                       "  function int bits();\n"
@@ -644,10 +553,6 @@ TEST(ClassSim, BitsOfATypeParameterReadsTheSpecializationsActual) {
             3u * 10000u + 7u * 100u + 32u);
 }
 
-// §8.25 with §7.8: `table_c #(string, int)` declared at module scope makes
-// `V m[K]` a string-keyed associative array of int, so two puts give num() 2
-// and get("b") 31, and the int-keyed `table_c #(int, int)` gets 42 back for
-// key 5 -- 2 * 10000 + 31 * 100 + 42.
 TEST(ClassSim, TypeParameterIndexedPropertyOfAModuleScopeSpecialization) {
   EXPECT_EQ(RunAndGet("class table_c #(type K = int, type V = int);\n"
                       "  V m[K];\n"
@@ -670,14 +575,6 @@ TEST(ClassSim, TypeParameterIndexedPropertyOfAModuleScopeSpecialization) {
             2u * 10000u + 31u * 100u + 42u);
 }
 
-// §8.25's own chain (printed page 204 of IEEE 1800-2023): a class
-// extending a parameterized class binds the base's type parameter as its
-// extends clause says -- `extends C` takes C's default bit, `extends C
-// #(integer)` binds integer, and `extends C #(P)` binds the derived class's own
-// type parameter, real by default -- so the inherited `T x` is 1, 32 and 64
-// bits wide through the base's `$bits(x)`. The base's properties were sized by
-// the base's defaults alone, 32 in every case (bit fell to the 32-bit carrier),
-// so d1 read 32 and d3 32 -- 1 * 100000 + 32 * 1000 + 64.
 TEST(ClassSim, BaseTypeParameterBoundThroughExtendsSizesTheProperty) {
   EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
                       "  T x;\n"
@@ -697,10 +594,6 @@ TEST(ClassSim, BaseTypeParameterBoundThroughExtendsSizesTheProperty) {
             1u * 100000u + 32u * 1000u + 64u);
 }
 
-// The binding reaches down two levels: E extends D3 #(bit [15:0]), whose P is
-// C's T, so E's inherited x is 16 bits; and a value written into the bound
-// property keeps the bound width, `x = 16'hFFFF` reading 65535 through the
-// base's method where a 1-bit x would read 1 -- 16 * 100000 + 65535.
 TEST(ClassSim, BaseTypeParameterBoundThroughTwoExtendsLevels) {
   EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
                       "  T x;\n"
@@ -721,15 +614,6 @@ TEST(ClassSim, BaseTypeParameterBoundThroughTwoExtendsLevels) {
             16u * 100000u + 65535u);
 }
 
-// §8.25's D4 (printed page 205 of IEEE 1800-2023): the base class may be
-// named by a type parameter of the derived class, `class D4 #(type P =
-// C#(byte)) extends P;` extending the class the parameter's default names with
-// the default's own actuals, so the default specialization of D4 inherits C's
-// members with T bound to byte and the inherited `T x` is 8 bits wide
-// through the base's `$bits(x)`. The lowerer looked the base up under the
-// parameter's name, found no class, and D4 inherited nothing, so `d4.w()`
-// ran no method and read 0; C's default bit would read 1 and an unbound T
-// the 32-bit carrier.
 TEST(ClassSim, BaseNamedByATypeParameterExtendsTheDefaultsClass) {
   EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
                       "  T x;\n"
@@ -745,12 +629,6 @@ TEST(ClassSim, BaseNamedByATypeParameterExtendsTheDefaultsClass) {
             8u);
 }
 
-// The parameter naming the base is bound through an extends clause of a
-// level below: E extends D4 #(C#(shortint)), so on an E object D4's P is
-// C#(shortint) and C's T is shortint, the inherited x 16 bits wide rather
-// than the default's 8, and a value written into it keeps the bound width,
-// `x = 16'hFFFF` reading 65535 through the base's method where an 8-bit x
-// would read 255 -- 16 * 100000 + 65535.
 TEST(ClassSim, BaseNamedByATypeParameterBoundThroughAnExtendsLevel) {
   EXPECT_EQ(RunAndGet("class C #(type T = bit);\n"
                       "  T x;\n"
@@ -771,13 +649,6 @@ TEST(ClassSim, BaseNamedByATypeParameterBoundThroughAnExtendsLevel) {
             16u * 100000u + 65535u);
 }
 
-// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter may be
-// bound to a class type, so a property declared with the parameter as its type,
-// `T obj` in `class Holder #(type T = Item)`, is a handle of the bound class --
-// of Item in the default specialization (§8.25.1) -- and `obj = new` in the
-// constructor builds an Item whose `get()` answers its `v`, 12. The `new`
-// was resolved against a class named T, which there is none of, so nothing
-// was built and `obj.get()` through the null handle read 0.
 TEST(ClassSim, TypeParameterClassPropertyBuiltInTheConstructor) {
   EXPECT_EQ(RunAndGet("class Item;\n"
                       "  int v = 12;\n"
@@ -797,12 +668,6 @@ TEST(ClassSim, TypeParameterClassPropertyBuiltInTheConstructor) {
             12u);
 }
 
-// The same property on a `Holder #(Item2)` object is a handle of Item2, whose
-// `get()` overrides Item's to answer 99: the class built is the one the
-// specialization binds T to, where one fixed to the default would build an
-// Item and read 12. The object is built by a method run after the
-// declaration has bound the actual to the object; #4344 covers binding it
-// before the constructor runs.
 TEST(ClassSim, TypeParameterClassPropertyBuiltAsTheBoundClass) {
   EXPECT_EQ(RunAndGet("class Item;\n"
                       "  int v = 12;\n"
@@ -828,10 +693,6 @@ TEST(ClassSim, TypeParameterClassPropertyBuiltAsTheBoundClass) {
             99u);
 }
 
-// A property of the bound class is read through the handle directly, `obj.v`,
-// beside the method: Item2's constructor sets v to 34, so the bound Item2
-// reads 34 * 100 + 99 where an Item would read 12 * 100 + 12 and a null
-// handle 0.
 TEST(ClassSim, TypeParameterClassPropertyReadThroughItsHandle) {
   EXPECT_EQ(RunAndGet("class Item;\n"
                       "  int v = 12;\n"
@@ -860,9 +721,6 @@ TEST(ClassSim, TypeParameterClassPropertyReadThroughItsHandle) {
             34u * 100u + 99u);
 }
 
-// §8.7 with §8.25: the `new` may stand as the property's initializer, `T obj
-// = new;`, which InitClassPropertyDefault resolves through the same class:
-// the default specialization builds an Item and reads 12.
 TEST(ClassSim, TypeParameterClassPropertyNewInitializer) {
   EXPECT_EQ(RunAndGet("class Item;\n"
                       "  int v = 12;\n"
@@ -881,9 +739,6 @@ TEST(ClassSim, TypeParameterClassPropertyNewInitializer) {
             12u);
 }
 
-// And through a handle from outside the class, `h2.obj = new`, where the
-// class is read off the object the handle refers to: bound to Item2, the
-// object built answers 99.
 TEST(ClassSim, TypeParameterClassPropertyBuiltThroughAHandle) {
   EXPECT_EQ(RunAndGet("class Item;\n"
                       "  int v = 12;\n"

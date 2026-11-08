@@ -89,14 +89,6 @@ TEST(ObjectPropertyParsing, PropertyReadAndWrite) {
       "endmodule\n");
 }
 
-// §8.5 puts no restriction on the data type of a class property, §26.3
-// references a package's declaration through the package scope resolution
-// operator, and A.2.2.1 lets a data_type be a type_identifier behind a
-// package_scope (printed pages 183, 808 and 1182 of IEEE 1800-2023). The
-// parser reads an identifier as a named type only where it knows the name as a
-// type, and a package name never is one, so `pk::sev_t s = pk::MED;` in a class
-// body was reported at the `::` where a `;` was expected. The property keeps
-// both halves of the scoped name and its initializer.
 TEST(ObjectPropertyParsing, PackageScopedTypeDeclaresAProperty) {
   auto r = Parse(
       "package pk;\n"
@@ -119,10 +111,6 @@ TEST(ObjectPropertyParsing, PackageScopedTypeDeclaresAProperty) {
   EXPECT_NE(s->init_expr, nullptr);
 }
 
-// A.2.7's function_data_type_or_implicit takes the same data_type, so a
-// method's return type spells a package-scoped type the same way. The method
-// is a member whose return type keeps the scope and the name, and the parse
-// after it is undisturbed: the property declared next is still read.
 TEST(ObjectPropertyParsing, PackageScopedTypeReturnedByAMethod) {
   auto r = Parse(
       "package pk;\n"
@@ -148,10 +136,6 @@ TEST(ObjectPropertyParsing, PackageScopedTypeReturnedByAMethod) {
   EXPECT_EQ(cls->members[1]->name, "after");
 }
 
-// §8.24's out-of-block declaration of a constructor names the class before
-// `::new`, and one of a method names it before `::name(`; neither spells a
-// type, so a class this parse does not know still opens the method's name
-// rather than a scoped return type.
 TEST(ObjectPropertyParsing, ScopedMethodNameIsNotAReturnType) {
   auto r = Parse(
       "package pkg;\n"

@@ -31,9 +31,6 @@ TEST(AlwaysCombParsing, NestedIfElseAndCase) {
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
-  // The always_comb body here is a begin/end block, so its first statement is
-  // the if; step through the block to reach it (cf.
-  // AlwaysCombNestedIfElseInBlock).
   auto* block = FirstAlwaysCombStmt(r);
   ASSERT_NE(block, nullptr);
   ASSERT_EQ(block->kind, StmtKind::kBlock);
@@ -293,10 +290,6 @@ TEST(AlwaysCombParsing, BeginEndBlock) {
 }
 
 TEST(AlwaysCombParsing, NonblockingAssignBody) {
-  // §9.2.2.2 shows `d <= #1ns b & c;` as a legal always_comb body: the
-  // procedure body may be a nonblocking assignment, not only a blocking one.
-  // Confirm the parser accepts that form and records it as an always_comb block
-  // whose body is a nonblocking assignment.
   auto r = Parse(
       "module m;\n"
       "  logic b, c, d;\n"

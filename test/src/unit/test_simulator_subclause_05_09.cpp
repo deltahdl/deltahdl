@@ -138,18 +138,12 @@ TEST(LexicalConventionSim, UnpackedByteArrayLeftJustifiedPadding) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
-// §5.9: an escaped character sequence in a string literal is a single 8-bit
-// ASCII value. "\n" occupies exactly one byte (0x0A), so it fits an 8-bit
-// target unchanged (the bit [7:0] d = "\n" example).
 TEST(LexicalConventionSim, EscapedNewlineIsSingleByte) {
   auto v = RunAndGet(
       "module t;\n  bit [7:0] d;\n  initial d = \"\\n\";\nendmodule\n", "d");
   EXPECT_EQ(v, 0x0Au);
 }
 
-// §5.9: a string literal can be cast to a packed array type, following the same
-// rules as assigning it. A width-16 cast of the two-character literal packs the
-// bytes exactly.
 TEST(LexicalConventionSim, CastStringLiteralToPackedArrayExactWidth) {
   auto v = RunAndGet(
       "module t;\n  bit [15:0] x;\n  initial x = 16'(\"AB\");\nendmodule\n",
@@ -157,16 +151,12 @@ TEST(LexicalConventionSim, CastStringLiteralToPackedArrayExactWidth) {
   EXPECT_EQ(v, 0x4142u);
 }
 
-// §5.9: casting a string literal to a narrower packed array right justifies and
-// truncates on the left, exactly as the assignment rules require.
 TEST(LexicalConventionSim, CastStringLiteralToPackedArrayTruncatesLeft) {
   auto v = RunAndGet(
       "module t;\n  bit [7:0] x;\n  initial x = 8'(\"AB\");\nendmodule\n", "x");
   EXPECT_EQ(v, 0x42u);
 }
 
-// §5.9: casting a string literal to a wider packed array right justifies and
-// zero-fills on the left.
 TEST(LexicalConventionSim, CastStringLiteralToPackedArrayZeroFillsLeft) {
   auto v = RunAndGet(
       "module t;\n  bit [23:0] x;\n  initial x = 24'(\"AB\");\nendmodule\n",
@@ -174,11 +164,6 @@ TEST(LexicalConventionSim, CastStringLiteralToPackedArrayZeroFillsLeft) {
   EXPECT_EQ(v, 0x004142u);
 }
 
-// §5.9 (printed page 80): a backslash immediately before a newline inside a
-// quoted string is ignored with the newline, so a `$display` format string
-// continued across a line prints as one line. The string variable initializer
-// already dropped both; the format string's own escape decoder dropped the
-// backslash and kept the newline, printing `[a` and `b]` on two lines.
 TEST(LexicalConventionSim, DisplayFormatLineContinuationJoinsTheLines) {
   SimFixture f;
   auto out = RunCapture(
@@ -189,9 +174,6 @@ TEST(LexicalConventionSim, DisplayFormatLineContinuationJoinsTheLines) {
   EXPECT_EQ(out, "[ab]\n");
 }
 
-// §5.9.1 (printed page 83): a double backslash before the newline is the
-// escape for one backslash and no continuation, so the third backslash is what
-// continues the line and the output carries the one backslash.
 TEST(LexicalConventionSim, DisplayFormatTripleBackslashKeepsOneBackslash) {
   SimFixture f;
   auto out = RunCapture(
@@ -202,9 +184,6 @@ TEST(LexicalConventionSim, DisplayFormatTripleBackslashKeepsOneBackslash) {
   EXPECT_EQ(out, "[a\\b]\n");
 }
 
-// §5.9's Example 2: an escaped `\n` before the continuation is the one newline
-// the output carries; the continuation's own newline is dropped, so no empty
-// line stands between the two.
 TEST(LexicalConventionSim, DisplayFormatEscapedNewlineThenContinuation) {
   SimFixture f;
   auto out = RunCapture(
@@ -215,11 +194,6 @@ TEST(LexicalConventionSim, DisplayFormatEscapedNewlineThenContinuation) {
   EXPECT_EQ(out, "[x\ny]\n");
 }
 
-// §5.9 (printed page 81): a triple-quoted string literal is the text between
-// its triple quotes and in every other way the same literal as a quoted one,
-// so as a `$display` format it prints that text. The format string's own
-// decoder stripped one quote at each end and printed `""plain""`; the string
-// variable initializer beside it was already right.
 TEST(LexicalConventionSim, TripleQuotedDisplayFormatPrintsItsText) {
   SimFixture f;
   auto out = RunCapture(
@@ -230,8 +204,6 @@ TEST(LexicalConventionSim, TripleQuotedDisplayFormatPrintsItsText) {
   EXPECT_EQ(out, "plain\n");
 }
 
-// §5.9 (printed page 81): a `"` stands directly inside a triple-quoted string,
-// so the format prints it as a character of the text.
 TEST(LexicalConventionSim, TripleQuotedDisplayFormatKeepsAnInnerQuote) {
   SimFixture f;
   auto out = RunCapture(
@@ -242,9 +214,6 @@ TEST(LexicalConventionSim, TripleQuotedDisplayFormatKeepsAnInnerQuote) {
   EXPECT_EQ(out, "[a \"b\"]\n");
 }
 
-// §5.9's Example 3 (printed page 81): a newline stands directly inside a
-// triple-quoted string, so the format prints its two lines as they are
-// written, the inner quotes with them.
 TEST(LexicalConventionSim, TripleQuotedDisplayFormatWithADirectNewline) {
   SimFixture f;
   auto out = RunCapture(
@@ -256,11 +225,6 @@ TEST(LexicalConventionSim, TripleQuotedDisplayFormatWithADirectNewline) {
   EXPECT_EQ(out, "sat on a \"wall\".\nhad a great fall. \n");
 }
 
-// §21.2.1 (printed page 655): every string literal argument of `$write` is
-// output literally, so a triple-quoted literal after another literal prints
-// its text after the first's. The literal was split at its first inner `"`
-// and printed `""a "b"""`. The `\"` is the escape a quoted string needs too,
-// since a bare `"` before the closing `"""` would close the literal early.
 TEST(LexicalConventionSim, TripleQuotedLiteralAfterAnotherPrintsItsText) {
   SimFixture f;
   auto out = RunCapture(
@@ -271,8 +235,6 @@ TEST(LexicalConventionSim, TripleQuotedLiteralAfterAnotherPrintsItsText) {
   EXPECT_EQ(out, "xa \"b\"");
 }
 
-// §22.5.1 with §5.9: a triple-quoted literal as a macro's whole body reaches
-// `$display` as the same literal and prints its text.
 TEST(LexicalConventionSim, TripleQuotedMacroBodyPrintsItsText) {
   SimFixture f;
   auto out = PreprocessAndCapture(
@@ -284,8 +246,6 @@ TEST(LexicalConventionSim, TripleQuotedMacroBodyPrintsItsText) {
   EXPECT_EQ(out, "say \"hi\" now\n");
 }
 
-// §22.5.1 with §5.9: a triple-quoted literal as a macro's actual argument is
-// substituted whole, its inner `"` included, and prints its text.
 TEST(LexicalConventionSim, TripleQuotedMacroArgumentPrintsItsText) {
   SimFixture f;
   auto out = PreprocessAndCapture(
@@ -297,12 +257,6 @@ TEST(LexicalConventionSim, TripleQuotedMacroArgumentPrintsItsText) {
   EXPECT_EQ(out, "arg \"x\" here\n");
 }
 
-// §5.9 (printed page 81, last paragraph) with §21.2.1.1 (printed 656): a
-// string literal used as an operand is the unsigned integer its 8-bit ASCII
-// codes make, an escape sequence one code, and each conversion of a format
-// takes the expression argument that follows it, a string literal being one.
-// The display path took every string literal argument as a template of its
-// own, so the five printed as their characters in place of `10 9 65 16706 65`.
 TEST(LexicalConventionSim, StringLiteralUnderDecimalConversionIsItsInteger) {
   SimFixture f;
   auto out = RunCapture(
@@ -314,9 +268,6 @@ TEST(LexicalConventionSim, StringLiteralUnderDecimalConversionIsItsInteger) {
   EXPECT_EQ(out, "10 9 65 16706 65\n");
 }
 
-// §5.9.1 Table 5-1 (printed page 83) with §5.9: an escape sequence in a string
-// literal operand is one 8-bit value, so `\\`, `\"` and `\a` are 92, 34 and 7
-// under a decimal conversion where the path printed the characters.
 TEST(LexicalConventionSim, EscapedStringLiteralUnderDecimalConversion) {
   SimFixture f;
   auto out = RunCapture(
@@ -327,9 +278,6 @@ TEST(LexicalConventionSim, EscapedStringLiteralUnderDecimalConversion) {
   EXPECT_EQ(out, "92 34 7\n");
 }
 
-// §21.2.1.1: a string literal under a `%s` conversion prints its characters,
-// which is what the template-of-its-own reading also printed; the conversion
-// is what takes it now, so it is pinned beside the decimal cases.
 TEST(LexicalConventionSim, StringLiteralUnderStringConversionPrintsItsText) {
   SimFixture f;
   auto out = RunCapture(
@@ -340,8 +288,6 @@ TEST(LexicalConventionSim, StringLiteralUnderStringConversionPrintsItsText) {
   EXPECT_EQ(out, "[abc]\n");
 }
 
-// §21.3.3 with §21.2.1.1: `$swrite` takes its arguments as `$write` does, so a
-// string literal following a decimal conversion is that conversion's integer.
 TEST(LexicalConventionSim, StringLiteralUnderSwriteDecimalConversion) {
   SimFixture f;
   auto out = RunCapture(
@@ -356,9 +302,6 @@ TEST(LexicalConventionSim, StringLiteralUnderSwriteDecimalConversion) {
   EXPECT_EQ(out, "65\n");
 }
 
-// §5.9: a string literal assigned to an unpacked array of bytes is
-// left-justified, the elements past its characters zero, in a procedural
-// assignment as in a declaration. The procedural assignment did nothing.
 TEST(LexicalConventionSim, ProceduralStringToUnpackedByteArrayLeftJustified) {
   SimFixture f;
   auto* c0 = RunAndFindVar(
@@ -373,9 +316,6 @@ TEST(LexicalConventionSim, ProceduralStringToUnpackedByteArrayLeftJustified) {
   EXPECT_EQ(f.ctx.FindVariable("c[2]")->value.ToUint64(), 0u);
 }
 
-// A cast of a string literal to an unpacked byte array type follows the same
-// rule, in a declaration and in a procedural assignment. The declaration left
-// every element its default, and the procedural assignment did nothing.
 TEST(LexicalConventionSim, CastStringToUnpackedByteArrayTypeLeftJustified) {
   SimFixture f;
   auto* b0 = RunAndFindVar(
@@ -395,9 +335,6 @@ TEST(LexicalConventionSim, CastStringToUnpackedByteArrayTypeLeftJustified) {
   EXPECT_EQ(f.ctx.FindVariable("c[2]")->value.ToUint64(), 0u);
 }
 
-// §5.9: a string literal assigned to an integral type is right-justified. A
-// range that does not end at zero holds the last character in its lowest
-// eight bits and the first in its highest, here exactly twelve characters.
 TEST(LexicalConventionSim, StringLiteralFillsARangeNotEndingAtZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -409,10 +346,6 @@ TEST(LexicalConventionSim, StringLiteralFillsARangeNotEndingAtZero) {
             "0a 48\n");
 }
 
-// A multidimensional packed array with 8-bit elements holds one character in
-// each element, the first character in the leftmost element and the last in
-// the rightmost, in a declaration's initializer and in a procedural
-// assignment.
 TEST(LexicalConventionSim, StringLiteralFillsAPackedArrayOfBytes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -428,8 +361,6 @@ TEST(LexicalConventionSim, StringLiteralFillsAPackedArrayOfBytes) {
             "48 0a 48 0a w\n");
 }
 
-// Fewer characters than elements leave the leftmost elements zero, the
-// literal being right-justified as for any packed target.
 TEST(LexicalConventionSim, ShortStringLiteralZeroFillsTheLeftElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -441,7 +372,6 @@ TEST(LexicalConventionSim, ShortStringLiteralZeroFillsTheLeftElements) {
             "00 00 48 69\n");
 }
 
-// More characters than elements drop the leftmost characters.
 TEST(LexicalConventionSim, LongStringLiteralDropsTheLeftCharacters) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -452,8 +382,6 @@ TEST(LexicalConventionSim, LongStringLiteralDropsTheLeftCharacters) {
             "62 63\n");
 }
 
-// A width that is no multiple of eight keeps the literal's low bits: twelve
-// of "AB"'s sixteen, which cuts the first character in half.
 TEST(LexicalConventionSim, StringLiteralInAWidthNotAMultipleOfEight) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -465,10 +393,6 @@ TEST(LexicalConventionSim, StringLiteralInAWidthNotAMultipleOfEight) {
             "142 04142\n");
 }
 
-// §5.9's Example 6: a string variable takes a triple-quoted literal spanning
-// several lines, and every newline written inside the quotes is a character
-// of it, the one after the opening quotes and the one before the closing
-// quotes included. A single and a double quote inside are characters too.
 TEST(LexicalConventionSim, MultiLineTripleQuotedLiteralKeepsEveryNewline) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -485,9 +409,6 @@ TEST(LexicalConventionSim, MultiLineTripleQuotedLiteralKeepsEveryNewline) {
             "\none 'a' \"b\"\ntwo\n|17\n");
 }
 
-// The same literal in a string variable's declaration, beside one whose line
-// ends in a backslash: the backslash and the newline after it are dropped, as
-// in a quoted literal.
 TEST(LexicalConventionSim, TripleQuotedLiteralInAStringDeclaration) {
   SimFixture f;
   EXPECT_EQ(
@@ -502,9 +423,6 @@ TEST(LexicalConventionSim, TripleQuotedLiteralInAStringDeclaration) {
       "3 2 xy\n");
 }
 
-// §5.9 with §6.16: a quoted literal assigned to a string variable, or written
-// beside a string operand, is converted to a string, so a concatenation with
-// one is a string and a comparison with one compares the characters.
 TEST(LexicalConventionSim, StringLiteralBesideAStringOperandIsAString) {
   SimFixture f;
   EXPECT_EQ(

@@ -11,7 +11,6 @@ namespace delta {
 
 namespace {
 
-// Puts on `scale` whichever of its unit and precision `decl` declares.
 template <typename Decl>
 void TakeDeclaredTimescale(TimeScale& scale, const Decl& decl) {
   if (decl.has_timeunit) {
@@ -35,8 +34,6 @@ const ModuleDecl* EnclosingDeclIn(const ModuleDecl* scope,
   return nullptr;
 }
 
-// The module, interface or program declaration `decl` is nested in, or null
-// for one written outside every other.
 const ModuleDecl* EnclosingDecl(const ModuleDecl* decl,
                                 const CompilationUnit& unit) {
   for (const auto* scopes :
@@ -88,7 +85,6 @@ TimeScale PackageTimescale(const PackageDecl& pkg,
 
 void ScaleTimeLiterals(const CompilationUnit& unit) {
   const TimeScale kUnitScale = CompilationUnitTimescale(unit);
-  // An element's scale is resolved once, however many literals it holds.
   std::unordered_map<const ModuleDecl*, TimeScale> module_scales;
   for (const TimeLiteralSite& site : unit.time_literals) {
     TimeScale scale = kUnitScale;

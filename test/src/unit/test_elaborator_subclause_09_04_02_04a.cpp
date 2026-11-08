@@ -1,13 +1,3 @@
-// §9.4.2.4 "Sequence events": a sequence instance used as an event control,
-// written where such a control is normally written -- at the top of a task
-// body.
-//
-// The cases writing it in one of the statement links
-// Elaborator::WalkStmtsForSequenceEvents reaches only since it took its list
-// from ForEachChildStmt are in test_elaborator_subclause_09_04_02_04b.cpp,
-// which the 1000-line cap in .github/workflows/deltahdl.yml separated this
-// file from.
-
 #include <gtest/gtest.h>
 
 #include <initializer_list>
@@ -35,8 +25,6 @@ TEST(SequenceEventElaboration, SequenceEventElaborates) {
 }
 
 TEST(SequenceEventElaboration, SequenceEventArgumentResolvesToInstance) {
-  // §9.4.2.4: the event_expression uses a sequence_instance whose argument is
-  // a non-automatic signal from the enclosing scope.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -71,10 +59,6 @@ TEST(SequenceEventElaboration, AutomaticVarAsSequenceArgErrors) {
                             8, "9.4.2.4"));
 }
 
-// §9.4.2.4 judges an argument by what it refers to: an automatic variable, a
-// formal of an automatic task, a local of one not declared static, or a
-// variable declared automatic in a procedure, is reported; a constant, a static
-// local and a module variable are not, wherever the event control stands.
 TEST(SequenceEventElaboration, AnArgumentIsJudgedByTheVariableItNames) {
   ElabFixture f;
   ElaborateSrc(

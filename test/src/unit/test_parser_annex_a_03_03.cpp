@@ -349,7 +349,6 @@ TEST(PrimitiveTerminalParsing, Error_OutputTerminalIntegerLiteral) {
       "module m;\n"
       "  and (1, a, b);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-lvalue rule; the report stands on the gate keyword.
   EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
                             "28.3"));
 }
@@ -388,14 +387,6 @@ TEST(PrimitiveTerminalParsing, GateInst_ComplexTerminalExpressions) {
               "endmodule\n"));
 }
 
-// A.3.3 makes the output_terminal and the inout_terminal a net_lvalue and the
-// four others an expression, and A.3.1 says which terminal is which by the
-// instance form of each A.3.4 type. The n_output_gate_instance is `(
-// output_terminal { , output_terminal } , input_terminal )`, so every terminal
-// but the last is an output and a literal in the second position is reported
-// as one; the cmos_switch_instance, mos_switch_instance and
-// enable_gate_instance open with their one output_terminal, and their control
-// and enable terminals after it take any expression.
 TEST(PrimitiveTerminalParsing, Error_NOutputGateMiddleOutputLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -430,9 +421,6 @@ TEST(PrimitiveTerminalParsing, ControlAndEnableTerminalsAreExpressions) {
               "endmodule\n"));
 }
 
-// A.8.5's net_lvalue is also `{ net_lvalue { , net_lvalue } }` and
-// `[ assignment_pattern_expression_type ] assignment_pattern_net_lvalue`, so
-// an output terminal may be written as either.
 TEST(PrimitiveTerminalParsing, OutputTerminal_AssignmentPatternNetLvalue) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -450,11 +438,6 @@ TEST(PrimitiveTerminalParsing, OutputTerminal_AssignmentPatternNetLvalue) {
                             "28.3"));
 }
 
-// A.8.5 writes a net_lvalue's selects and member accesses under the net's
-// name, ps_or_hierarchical_net_identifier, so a select of a concatenation is
-// no net_lvalue at a gate's output or inout terminal or at a UDP instance's
-// output terminal, while one under a structure net's member still stands under
-// the net's name.
 TEST(PrimitiveTerminalParsing, Error_SelectNotTakenOfANetName) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -476,9 +459,6 @@ TEST(PrimitiveTerminalParsing, Error_SelectNotTakenOfANetName) {
                              "28.3"));
 }
 
-// A.6.7.1 writes assignment_pattern_net_lvalue with positional elements alone,
-// so a keyed pattern, typed or not, is no net_lvalue at a gate's output or
-// inout terminal or at a UDP instance's output terminal.
 TEST(PrimitiveTerminalParsing, Error_KeyedPatternTerminal) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -504,10 +484,6 @@ TEST(PrimitiveTerminalParsing, Error_KeyedPatternTerminal) {
                              10, "28.3"));
 }
 
-// A.3.3 (printed page 1194) makes a gate's output_terminal and inout_terminal a
-// net_lvalue, whose forms A.8.5 (printed page 1212) writes in no parentheses,
-// whole, as an element of a concatenation or as the name a member select is
-// taken of. The same terminals written without them stand.
 TEST(PrimitiveTerminalParsing, Error_ParenthesizedDrivenTerminal) {
   auto r = Parse(
       "module m;\n"

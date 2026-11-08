@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// The error is specifically about source order: a showcancelled declaration
-// is only illegal once the output has *already* appeared in a module path
-// declaration. Listing it before the path leaves it legal, so this pins the
-// order sensitivity (and exercises the no-conflict branch of the check).
 TEST(SpecifyBlockDeclElaboration, ShowcancelledBeforeModulePathIsLegal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,9 +39,6 @@ TEST(SpecifyBlockDeclElaboration, ShowcancelledAfterModulePathIsError) {
                     4, "30.7.4.2"));
 }
 
-// The error applies to any output named in the declaration, not just the
-// first: here the conflicting output is the second entry in the list, so a
-// check that only inspected the head of the list would miss it.
 TEST(SpecifyBlockDeclElaboration,
      ConflictAmongMultipleShowcancelledOutputsIsError) {
   ElabFixture f;
@@ -65,9 +58,6 @@ TEST(SpecifyBlockDeclElaboration,
                     4, "30.7.4.2"));
 }
 
-// The output has already appeared in a module path declaration when an earlier
-// specify block of the module declared that path, so the later block's
-// showcancelled declaration of it is an error too.
 TEST(SpecifyBlockDeclElaboration,
      ShowcancelledAfterAPathOfAnEarlierBlockIsError) {
   ElabFixture f;

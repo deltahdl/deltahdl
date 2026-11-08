@@ -16,140 +16,60 @@ class PropertyRegistry;
 struct RtlirModule;
 struct RtlirModuleInst;
 
-// §16.12.1 and §16.13.4: what an instance of a named property or sequence,
-// written as a name or a call, gives the assertion that stands it as its
-// property_spec, whether the statement stands outside procedural code
-// (elaborator_items_assertions.cpp) or inside it (§16.14.6,
-// procedural_concurrent_assertion.cpp).
-
-// §16.12.18: whether the instance `instance` of the property `decl` is
-// evaluated as the boolean of decl's clocked boolean body with the actuals
-// substituted, rather than as the body's tree: the body is that form, and no
-// actual is one the boolean substitution does not read. Those are a
-// sequence_expr or a property_expr read into a tree, and, §16.8.1, a list of
-// names bound to the formal the boolean is, which stands where a
-// sequence_expr does, so the list is the sequence it reads as
-// (Expr::sequence_reading) rather than its events.
 bool TakesBooleanSubstitution(const Expr* instance, const ModuleItem* decl);
 
-// §16.12.18 by way of §16.8.1: the clock of the instantiated property or
-// sequence with the actuals in the formals' places, each event actual an
-// event expression standing for its events.
 std::vector<EventExpr> SubstituteClockEvents(
     const std::vector<EventExpr>& clock, const ActualsByFormal& actuals,
     Arena& arena);
 
-// §16.16 (f) with §16.8.1: the clock the named sequence `seq` is declared
-// with, as its instance `instance` has it, each formal the clock names
-// replaced by the instance's actual.
 std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
                                              const Expr* instance,
                                              const PropertyRegistry& registry,
                                              Arena& arena);
 
-// §16.16 (d) and (f): the leading clock the named property `decl` gives its
-// instance, whose actuals are `actuals`: the clock it is declared with or
-// that flows into its body (§16.13.3), else the clock the actual of a formal
-// its body is or opens with brings, else the unique leading clock its body
-// determines (§16.16.1), each with the actuals in the formals' places; empty
-// where none is determined.
 std::vector<EventExpr> PropertyInstanceClock(const ModuleItem* decl,
                                              const ActualsByFormal& actuals,
                                              const PropertyRegistry& registry,
                                              Arena& arena);
 
-// §16.16 (d) with §F.4.1: the leading clock a sequence or property actual
-// brings to the formal it replaces, `@(posedge clk) a` bringing posedge clk:
-// the clocking event it opens with, else its semantic leading clock where it
-// has one alone (§16.16.1), or, for an instance of a named sequence or
-// property, the clock its declaration gives it; empty for an actual that
-// writes none, or two.
 std::vector<EventExpr> ActualLeadingClock(const Expr* actual,
                                           const PropertyRegistry& registry,
                                           Arena& arena);
 
-// The clock the actual of a formal brings where the property `tree` is that
-// formal alone, the body of `property r(sequence s); s; endproperty`
-// instantiated as `r(@(posedge clk) a)`, or opens with it, `s ##1 b` or
-// `s |-> b`; empty otherwise.
 std::vector<EventExpr> FormalOpeningClock(const PropertyExprNode* tree,
                                           const ActualsByFormal& actuals,
                                           const PropertyRegistry& registry,
                                           Arena& arena);
 
-// The declaration `operand` instantiates where it names one of `kind`, an
-// identifier or a call naming a sequence or a property; nullptr otherwise.
 const ModuleItem* InstantiatedDecl(const Expr* operand, ModuleItemKind kind,
                                    const PropertyRegistry& registry);
 
-// §16.12.2 and §16.13.4: a sequence declaration of one operand, an instance
-// of the named sequence `instance` names, for the flattening to expand.
 ModuleItem* SequenceInstanceBody(Expr* instance, Arena& arena);
 
-// §16.13.3 and §16.13.4: the clock flowing into a property declared with
-// none, from the clocking event its body opens with or the clock of the
-// sequence it opens with; empty otherwise.
 const std::vector<EventExpr>& FlowedBodyClock(const ModuleItem* decl,
                                               const PropertyRegistry& registry);
 
-// §16.14.7: what stands at an instance for the two inferred functions: the
-// clocking event that would be inferred there, the assertion's own, the
-// procedure's or the default clocking's, and the disable condition, the
-// default disable iff in scope or nullptr where none is.
 struct InferredAtInstance {
   std::vector<EventExpr> clock;
   Expr* disable = nullptr;
 };
 
-// §16.14.7: an inferred clocking or disable function call is replaced by the
-// inferred expression as determined at the point the property or sequence is
-// instantiated: each formal of `decl` the instance supplies no actual for and
-// whose default is $inferred_clock takes the clocking event, written as the
-// actual of an event formal is, an edge keyword over the signal, and each
-// whose default is $inferred_disable takes the disable condition, 1'b0 where
-// the instance is within the scope of no default disable iff; the instance is
-// written as a call from here on, its actuals holding what was inferred. A
-// $inferred_clock default with no clocking event to stand for is reported to
-// `diag` where one is given, §16.14.7 making it an error.
 void FillInferredDefaults(Expr* instance, const ModuleItem* decl,
                           const InferredAtInstance& inferred, Arena& arena,
                           DiagEngine* diag = nullptr);
 
-// §17.4 with §16.14.7: the same at a checker instance `inst`: each formal it
-// leaves to a $inferred_clock default is bound to the clocking event, written
-// as the actual of an event formal is, and each it leaves to a
-// $inferred_disable default to the disable condition, so that the formals
-// take the context of the instantiation; a $inferred_clock default where no
-// clock is inferred is left as it stands.
 void FillInferredCheckerDefaults(RtlirModuleInst& inst,
                                  const InferredAtInstance& inferred,
                                  Arena& arena);
 
-// §14.12: the clocking event of the default clocking of `mod`, declared
-// inline or named by a default clocking statement, among the clocking blocks
-// elaborated so far, or else the one it inherits as a nested declaration from
-// the scope it is declared in; empty where it has neither.
 std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod);
 
-// §16.16 (b): a boolean that is a member access of two identifiers naming a
-// declaration of a clocking block through the block, `posedge_clk.q4`, is
-// made the one identifier the registry keys the declaration under; any
-// other expression is answered unchanged.
 Expr* QualifiedInstance(Expr* instance, const PropertyRegistry& registry,
                         Arena& arena);
 
-// §16.13.4: a boolean operand of the tree that is the bare name of a named
-// sequence, or a call of one, which the parser read as a boolean since a
-// variable's name reads the same, is the sequence, a node the flattening
-// expands; the walk reaches the trees an instance's actuals carry too.
 void PromoteSequenceInstances(PropertyExprNode* node,
                               const PropertyRegistry& registry, Arena& arena);
 
-// §16.12 with §26.3: an instance written by its package-qualified name,
-// `pk::pq` or `pk::pr(a, clk)`, which the parser left the scope resolution
-// it reads as since a package's variable reads the same, is made, once its
-// declaration is found, the instance named by the key the registry holds it
-// under, as the instance of a declaration in the scope is.
 void NameInstanceByKey(ModuleItem* item, Arena& arena);
 
 }  // namespace delta

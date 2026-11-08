@@ -1,6 +1,3 @@
-// §H.9.3: the scope-name registry the svGetScopeFromName and svGetNameFromScope
-// entry points consult, and the scope stack the context import frames of a
-// DpiRuntime push, whose entries are the registry's handles.
 #include <algorithm>
 #include <cstdint>
 #include <functional>
@@ -15,9 +12,6 @@
 namespace delta {
 
 namespace {
-// §H.9.3 scope-name registry storage. std::list keeps element addresses stable
-// as scopes are added, so a handle handed to C code stays valid for the life of
-// the simulation. The by-name index drives svGetScopeFromName().
 std::list<DpiScope>& DpiScopeRegistryStorage() {
   static std::list<DpiScope> storage;
   return storage;
@@ -50,9 +44,6 @@ const DpiScope* DpiScopeFromName(std::string_view name) {
 
 const char* DpiNameFromScope(const DpiScope* scope) {
   if (scope == nullptr) return "";
-  // Only handles this registry produced map back to a name; an unregistered
-  // pointer is not a recognized scope, so it yields an empty name rather than a
-  // dereference of an unknown address.
   for (const DpiScope& s : DpiScopeRegistryStorage()) {
     if (&s == scope) return s.name.c_str();
   }
@@ -60,8 +51,6 @@ const char* DpiNameFromScope(const DpiScope* scope) {
 }
 
 namespace {
-// The registry's own entry for a handle it produced, or nullptr for any other
-// pointer, which is not a recognized scope.
 DpiScope* RegisteredScope(const DpiScope* scope) {
   if (scope == nullptr) return nullptr;
   for (DpiScope& s : DpiScopeRegistryStorage()) {
@@ -98,11 +87,6 @@ bool DpiScopeTimescale(const DpiScope* scope, int32_t* time_unit,
 }
 
 void DpiRuntime::PushScope(DpiScope scope) {
-  // §H.9.3: a named scope is the instance scope its fully qualified name
-  // resolves to, one handle per name for the life of the simulation, so the
-  // frame's scope is the registry's handle and what the pushed scope knows of
-  // its module completes a handle registered by name alone. A scope without a
-  // name is nobody's instance and lives with its frame.
   if (scope.name.empty()) {
     unnamed_scopes_.push_back(std::move(scope));
     scope_stack_.push_back(&unnamed_scopes_.back());

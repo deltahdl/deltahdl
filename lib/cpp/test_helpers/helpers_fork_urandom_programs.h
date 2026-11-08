@@ -10,11 +10,6 @@
 
 using namespace delta;
 
-// Run a fork program whose parent calls process::self().srandom(parent_seed)
-// before forking two children that each draw one $urandom value. Returns the
-// two children's draws as {a, b}. The §18.14 random-stability tests reuse this
-// exact program to show that reseeding the parent shifts the seed material the
-// children inherit.
 inline std::vector<uint64_t> RunParentSeededTwoForkUrandom(
     uint32_t parent_seed) {
   std::string src =
@@ -35,10 +30,6 @@ inline std::vector<uint64_t> RunParentSeededTwoForkUrandom(
   return RunSeededAndRead(src, {"a", "b"});
 }
 
-// Run a fork that spawns four sibling children, each drawing one $urandom
-// value. Returns the four draws as {a, b, c, d}. The §18.14 tests reuse this
-// program to assert that many forked siblings receive pairwise-distinct
-// streams.
 inline std::vector<uint64_t> RunFourForkedSiblingUrandom() {
   return RunSeededAndRead(
       "module t;\n"
@@ -58,13 +49,6 @@ inline std::vector<uint64_t> RunFourForkedSiblingUrandom() {
       {"a", "b", "c", "d"});
 }
 
-// Run a fork whose two children each draw one $urandom_range value, twice over
-// from the same starting state, and check the two runs agree draw for draw.
-//
-// A value a thread draws is fixed by the stream that thread was seeded with
-// rather than by the order the scheduler happened to run the siblings in, so
-// replaying the same program from the same state reproduces both draws. A
-// scheduler-order dependence would let the two runs disagree.
 inline void ExpectForkedUrandomRangeDrawsReplay() {
   auto run = [](uint64_t& a, uint64_t& b) {
     auto vals = RunSeededAndRead(

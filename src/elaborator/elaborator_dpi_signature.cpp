@@ -17,8 +17,6 @@ namespace delta {
 
 namespace {
 
-// A dimension written as a range, `[left:right]`, which is the only form a
-// packed dimension takes.
 DpiDimension DimensionFromRange(const Expr* left, const Expr* right) {
   DpiDimension dim;
   dim.left = ConstEvalInt(left);
@@ -26,9 +24,6 @@ DpiDimension DimensionFromRange(const Expr* left, const Expr* right) {
   return dim;
 }
 
-// An unpacked dimension, which Parser::ParseUnpackedDims records as a null
-// pointer for the empty-bracket form, as a `:` binary for the range form, and
-// as a bare expression for the size form.
 DpiDimension DimensionFromUnpacked(const Expr* written) {
   DpiDimension dim;
   if (written == nullptr) {
@@ -38,8 +33,6 @@ DpiDimension DimensionFromUnpacked(const Expr* written) {
   if (written->kind == ExprKind::kBinary && written->op == TokenKind::kColon) {
     return DimensionFromRange(written->lhs, written->rhs);
   }
-  // §7.4.2: the size form `[N]` declares the range `[0:N-1]`, so recording it
-  // that way is what makes `[4]` and `[0:3]` one dimension.
   auto size = ConstEvalInt(written);
   if (size.has_value()) {
     dim.left = 0;
@@ -48,9 +41,6 @@ DpiDimension DimensionFromUnpacked(const Expr* written) {
   return dim;
 }
 
-// The direction and shape of every formal, in the order they were declared.
-// §35.5.4 puts that list into an import's signature and §35.4 into an export's,
-// so both builders below take it from here.
 std::vector<std::pair<Direction, DpiTypeShape>> BuildDpiArgShapes(
     const ModuleItem* item, const TypedefMap& typedefs) {
   std::vector<std::pair<Direction, DpiTypeShape>> args;
@@ -63,7 +53,6 @@ std::vector<std::pair<Direction, DpiTypeShape>> BuildDpiArgShapes(
   return args;
 }
 
-// The packed dimensions written on `type` itself, outermost first.
 void AppendPackedDims(const DataType& type,
                       std::vector<DpiDimension>* packed_dims) {
   if (type.packed_dim_left != nullptr) {
@@ -85,9 +74,6 @@ DpiTypeShape BuildDpiTypeShape(const DataType& type,
                                const std::vector<Expr*>& unpacked_dims,
                                const TypedefMap& typedefs) {
   DpiTypeShape shape;
-  // Dimensions written where a typedef name is used stand outside the ones
-  // the typedef declared, so they come first: `b_t [3:0]` with `typedef bit
-  // [7:0] b_t` is `bit [3:0][7:0]`.
   AppendPackedDims(type, &shape.packed_dims);
   DataType resolved = type;
   if (type.kind == DataTypeKind::kNamed) {

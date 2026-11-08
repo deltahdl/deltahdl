@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "elaborator/type_eval.h"
@@ -12,17 +10,12 @@ using namespace delta;
 
 namespace {
 
-// Collects every typedef in the first module into `typedefs` and returns the
-// single variable declaration item (or nullptr if none was found).
 static const ModuleItem* CollectTypedefsAndVar(ParseResult& r,
                                                TypedefMap& typedefs) {
   auto& items = r.cu->modules[0]->items;
   const ModuleItem* var = nullptr;
   for (auto* it : items) {
     if (it->kind == ModuleItemKind::kTypedef) {
-      // A typedef's aliased type is parsed into typedef_type (data_type is
-      // left empty for typedef items), matching how the elaborator builds its
-      // TypedefMap. Keying off data_type made every typedef look scalar.
       typedefs.emplace(it->name, it->typedef_type);
     } else if (it->kind == ModuleItemKind::kVarDecl) {
       var = it;
@@ -255,13 +248,6 @@ TEST(ScalarAndVectorDeclaration, MultidimensionalPackedArrayIsNotAVector) {
   EXPECT_FALSE(IsVector(item->data_type));
 }
 
-// A vector's malformed range is reported under §7.4.1 and not under §6.9.
-// §6.9 states no range form to cite: it defines a scalar and a vector and then
-// defers the form, calling vectors packed arrays of scalars (§7.4). §7.4.1 is
-// where the form is written, as a range specification [ constant_expression :
-// constant_expression ] for every packed dimension of a packed array
-// declaration. The case belongs in this file because the spelling under test is
-// a vector's.
 TEST(DataType, MalformedVectorRangeNamesThePackedArrayClause) {
   auto r = Parse(
       "module m;\n"

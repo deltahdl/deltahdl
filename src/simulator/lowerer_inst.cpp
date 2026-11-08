@@ -32,16 +32,6 @@
 
 namespace delta {
 
-// §23.2.2.1 (printed page 732), Example 3: a port written `a[7:4]` names no
-// storage of its own but a select of the module's `a`, the example's first
-// port being the top four bits of `a`, whose declaration `input [7:0] a` gives
-// its direction and width. That vector is what is created for it, once however
-// many ports select from it; a port with a name is created under the name.
-// Nothing for a port that is neither.
-// §21.7.4.3.1: the drivers of the signal connected to the input port
-// `port_name` are its test-fixture side, which an extended VCD record of the
-// port counts; recorded where the connection is a plain signal name, under the
-// parent instance's prefix `parent_prefix`.
 static void RecordInputPortSource(const RtlirPortBinding& binding,
                                   const std::string& port_name,
                                   const std::string& parent_prefix,
@@ -51,10 +41,6 @@ static void RecordInputPortSource(const RtlirPortBinding& binding,
       port_name, parent_prefix + std::string(binding.connection->text));
 }
 
-// §21.7.4.2 (printed page 699): a concatenated port appears in an extended
-// VCD file as separate entries, one per object it names, each facing the
-// port's way; the objects are the module's own, declared from its body, so
-// only their direction is recorded here, under the instance's prefix.
 static void RecordConcatPortDirections(const std::string& prefix,
                                        const Expr* expr, Direction direction,
                                        SimContext& ctx, Arena& arena) {
@@ -95,17 +81,12 @@ void CreatePortStorage(const std::string& prefix, const RtlirPort& port,
       arena);
 }
 
-// An output port connection the continuous-assignment lvalue writer can drive:
-// a bare net, or a part-select / element select / concatenation / member /
-// streaming concatenation produced by §23.3.3.5 instance-array distribution.
 static bool IsDrivableOutputConnection(ExprKind k) {
   return k == ExprKind::kIdentifier || k == ExprKind::kSelect ||
          k == ExprKind::kConcatenation || k == ExprKind::kAssignmentPattern ||
          k == ExprKind::kStreamingConcat || k == ExprKind::kMemberAccess;
 }
 
-// The data type of the port `binding` connects, kImplicit where the
-// instance names no such port.
 static DataTypeKind BoundPortType(const RtlirModuleInst& inst,
                                   const RtlirPortBinding& binding) {
   DataTypeKind type = DataTypeKind::kImplicit;
@@ -115,8 +96,6 @@ static DataTypeKind BoundPortType(const RtlirModuleInst& inst,
   return type;
 }
 
-// §6.16 and §6.17: a string and an event have no width, and a port of either
-// type is connected all the same.
 static bool IsConnectablePortBinding(const RtlirModuleInst& inst,
                                      const RtlirPortBinding& binding) {
   if (!binding.connection) return false;
@@ -145,13 +124,6 @@ static const RtlirPort* FindChildPort(const RtlirModuleInst& inst,
   return nullptr;
 }
 
-// §23.2.2.2 (printed page 734): an explicitly named port puts items the module
-// declares into the port list, so the port stands for its
-// expression, and its connection is joined to that expression inside the
-// instance. The copy names each object the expression reads under the
-// instance's segment, "u0.r" for r, as MakeLocalPortId names a port's own
-// storage, so that it resolves from the parent's scope where the binding is
-// lowered. A literal inside it is shared rather than copied.
 static Expr* QualifiedPortExpr(const Expr* e, const std::string& inst_seg,
                                Arena& arena) {
   if (e == nullptr) return nullptr;
@@ -160,7 +132,6 @@ static Expr* QualifiedPortExpr(const Expr* e, const std::string& inst_seg,
     copy->text = *arena.Create<std::string>(inst_seg + std::string(e->text));
     return copy;
   }
-  // A member access names its member, which is no object of the module.
   copy->lhs = QualifiedPortExpr(e->lhs, inst_seg, arena);
   if (e->kind != ExprKind::kMemberAccess) {
     copy->rhs = QualifiedPortExpr(e->rhs, inst_seg, arena);
@@ -178,10 +149,6 @@ static Expr* QualifiedPortExpr(const Expr* e, const std::string& inst_seg,
   return copy;
 }
 
-// The name of the storage an inout or a ref port's connection is aliased to:
-// the module's own object where the port is written `ref .Y(x)`, the port's
-// name for every other port, and for one whose expression names no single
-// object of the module.
 static std::string_view PortStorageName(const RtlirPortBinding& binding) {
   if (binding.port_expr != nullptr &&
       binding.port_expr->kind == ExprKind::kIdentifier) {
@@ -190,9 +157,6 @@ static std::string_view PortStorageName(const RtlirPortBinding& binding) {
   return binding.port_name;
 }
 
-// §23.3.2 with §23.3.3.4: an element of an array of interface instances,
-// `ia[0]`, is an interface instance of its own, connected to an interface port
-// as one; the elaborator names it by the array and the index (§23.6).
 static bool IsInstanceElement(const Expr* conn) {
   return conn->kind == ExprKind::kSelect && conn->base != nullptr &&
          conn->base->kind == ExprKind::kIdentifier && conn->index != nullptr &&
@@ -200,19 +164,12 @@ static bool IsInstanceElement(const Expr* conn) {
          conn->index_end == nullptr;
 }
 
-// The name the instance `head` denotes is stored under: its identifier, or the
-// array's name with the element's index, `ia[0]`.
 static std::string InstanceNameOf(const Expr* head) {
   if (head->kind == ExprKind::kIdentifier) return std::string(head->text);
   return std::string(head->base->text) + "[" +
          std::to_string(head->index->int_val) + "]";
 }
 
-// §25.5 (printed page 787): a connection names the modport through the
-// interface instance's hierarchy, `P pi(s.tb)`, which restricts the port
-// to the modport's list without naming another instance, so the port shares
-// the members of `s`. Returns the expression naming the connected interface
-// instance, or null where the connection names none.
 static const Expr* ConnectedInterfaceInstance(const Expr* conn,
                                               std::string_view type_name,
                                               const CompilationUnit* cu) {
@@ -233,11 +190,6 @@ static const Expr* ConnectedInterfaceInstance(const Expr* conn,
   return nullptr;
 }
 
-// §25.3.2: the interface port keyed `port_key` denotes the instance keyed
-// `instance_key`, which is recorded for the port's name to stand for that
-// instance as the head of a call through it (§25.7). §25.9: where a value is
-// wanted, `v = b` or `v == b`, the port's name is that instance, so the
-// storage CreatePortStorage gave the port holds the instance's handle.
 static void BindPortToInstance(const std::string& port_key,
                                const std::string& instance_key, SimContext& ctx,
                                Arena& arena) {
@@ -248,19 +200,12 @@ static void BindPortToInstance(const std::string& port_key,
   }
 }
 
-// §25.3.2: the key of the interface instance a connection's head `name`
-// denotes from the instance being lowered: the instance of that name, or,
-// where `name` is an interface port of that instance, passed down a level,
-// the instance connected to the port in turn.
 std::string Lowerer::ConnectedInstanceKey(std::string_view name) const {
   std::string key = ConnectedInstancePath(name);
   std::string_view through_port = ctx_.FindInterfacePortInstance(key);
   return through_port.empty() ? key : std::string(through_port);
 }
 
-// The expression at the head of an interface port's connection: the instance
-// itself, `sb` or the element `sb[1]`, or the instance a modport connection
-// names, `sb` of `sb.mp`; null for a connection of any other shape.
 static const Expr* ConnectedInstanceHead(const Expr* conn) {
   if (conn == nullptr) return nullptr;
   if (conn->kind == ExprKind::kIdentifier || IsInstanceElement(conn))
@@ -272,12 +217,6 @@ static const Expr* ConnectedInstanceHead(const Expr* conn) {
   return nullptr;
 }
 
-// §25.3.3: the interface a port connects to and, in `instance`, the
-// identifier naming the connected instance. An interface-typed port's own
-// interface, and for a generic port, `interface a` or `interface.mp b`, which
-// names none, the interface the connected instance is an instance of, which
-// RegisterChildInstanceKeys has recorded by the time any port is bound. Null
-// where the connection names no instance of a known interface.
 const RtlirModule* Lowerer::ConnectedInterface(const RtlirPort& port,
                                                const Expr* conn,
                                                std::string& instance) const {
@@ -294,8 +233,6 @@ const RtlirModule* Lowerer::ConnectedInterface(const RtlirPort& port,
   return it != design_->all_modules.end() ? it->second : nullptr;
 }
 
-// Registers `def` under `key`, interned by the caller, to run in the
-// instance `inst_prefix` whatever instance the call names it through.
 static void RegisterRunningIn(std::string_view key, ModuleItem* def,
                               const std::string& inst_prefix, SimContext& ctx) {
   ctx.RegisterFunction(key, def);
@@ -304,10 +241,6 @@ static void RegisterRunningIn(std::string_view key, ModuleItem* def,
   ctx.RegisterGenBlockSubroutineScope(key, std::move(scope));
 }
 
-// §25.3.2 with §25.10: the interface's variables and its parameters, the
-// `True` of `localparam True = 1;` among them, are members reached through
-// the port's name, `b.True`, so each answers under the port's prefix for the
-// connected instance's own.
 static void AliasVariableMembers(const RtlirModule* ifc,
                                  const std::string& port_prefix,
                                  const std::string& conn_prefix,
@@ -320,9 +253,6 @@ static void AliasVariableMembers(const RtlirModule* ifc,
   for (const auto& param : ifc->params) alias(param.name);
 }
 
-// §25.5: the modport of `ifc` a port selects: the one its connection names,
-// `i1.A`, or else the one its declaration names, `I.A i`; null where neither
-// names one `ifc` declares.
 static const ModportDecl* SelectedModport(const RtlirPort& port,
                                           const Expr* conn,
                                           const RtlirModule* ifc,
@@ -344,9 +274,6 @@ static const ModportDecl* SelectedModport(const RtlirPort& port,
   return nullptr;
 }
 
-// §25.5.4: each modport expression port of the modport the port `port`
-// selects, `.P(r[3:0])`, is recorded under the port's path to it,
-// "u1.i.P", with the expression and the instance it is read and written in.
 void Lowerer::RegisterModportExpressions(const RtlirPort& port,
                                          const Expr* conn,
                                          const RtlirModule* ifc,
@@ -363,8 +290,6 @@ void Lowerer::RegisterModportExpressions(const RtlirPort& port,
   }
 }
 
-// §25.7.4: whether the interface `ifc` declares the task `name` extern
-// forkjoin, which more than one connected module may define.
 static bool DeclaresForkjoin(const RtlirModule* ifc, std::string_view name) {
   for (const ModuleItem* proto : ifc->function_decls) {
     if (proto->name == name && proto->is_extern && proto->is_forkjoin)
@@ -373,16 +298,6 @@ static bool DeclaresForkjoin(const RtlirModule* ifc, std::string_view name) {
   return false;
 }
 
-// §25.7.3: a module defines a task or function of the interface connected
-// to its port `port_name`, `task a.Read(...)`, and exports it through the
-// port's modport; the body runs in the defining instance and reads its
-// declarations. Each such body is registered under the defining instance's
-// path to it, "mem.a.Read", which a call reaches that instance's alone by
-// (§25.7.4), and under the connected instance's key, "sb_intf.Read", which a
-// call through the instance or a port bound to it resolves by. §25.7.4: a
-// task the interface declares extern forkjoin may be defined by several
-// connected modules, so each definition is added to the task's own instead,
-// and a call runs them all.
 void Lowerer::RegisterExportedSubroutines(const RtlirModuleInst& inst,
                                           std::string_view port_name,
                                           const RtlirModule* ifc,
@@ -403,13 +318,6 @@ void Lowerer::RegisterExportedSubroutines(const RtlirModuleInst& inst,
   }
 }
 
-// §25.3.2: an interface passed through a port shares its members with the
-// connected interface instance. Alias each member of the child interface port
-// (mem.a.member) onto the connected instance's member (sb_intf.member) so reads
-// and writes through the port reach the shared storage. Returns true when the
-// binding was an interface port (handled here, skipping the scalar path). Alias
-// keys are interned in the arena because the SimContext maps key by string_view
-// and these member names are not otherwise created.
 bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
                                     const RtlirPortBinding& binding) {
   const RtlirPort* port = FindChildPort(inst, binding.port_name);
@@ -427,12 +335,6 @@ bool Lowerer::TryAliasInterfacePort(const RtlirModuleInst& inst,
   return true;
 }
 
-// §23.3.3.5 with §23.3.3.4: an interface port declared as an array, `ifc p[2]`,
-// connected to an array of interface instances, `ia`, joins each of its
-// elements to the array's element at the same position counted from the left
-// bound, left index to left index, as a scalar interface port is joined to its
-// instance. Each element of the array is an instance the parent holds, which
-// records the array it belongs to (InstArrayElement).
 bool Lowerer::AliasInterfaceArrayPort(const RtlirModuleInst& inst,
                                       const RtlirPortBinding& binding,
                                       const RtlirPort& port,
@@ -459,8 +361,6 @@ bool Lowerer::AliasInterfaceArrayPort(const RtlirModuleInst& inst,
   return true;
 }
 
-// §25.3.2: joins the interface port keyed `port_key` to the instance named
-// `instance`, an instance of `ifc`.
 void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
                                    const RtlirPortBinding& binding,
                                    const RtlirModule* ifc,
@@ -476,10 +376,6 @@ void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
   std::string conn_prefix = ConnectedInstancePath(instance) + ".";
   AliasVariableMembers(ifc, port_prefix, conn_prefix, ctx_, arena_);
   DrivePathDelayedMembers(inst, binding.port_name, ifc, port_prefix, instance);
-  // A net shares one storage between its net-map entry (driver resolution)
-  // and its variable-map entry (value reads). Alias both, like LowerAliases,
-  // so a continuous assign driven through the port reaches the shared net and
-  // the value is observable on the connected interface instance.
   auto alias_net = [&](std::string_view name) {
     auto* alias = arena_.Create<std::string>(port_prefix + std::string(name));
     std::string target = conn_prefix + std::string(name);
@@ -487,14 +383,7 @@ void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
     ctx_.AliasVariable(*alias, target);
   };
   for (const auto& net : ifc->nets) alias_net(net.name);
-  // The interface's own ports are members too, the `clk` of
-  // `interface bus(input logic clk)` among them, whether §23.2.2.3 makes the
-  // port a net or a variable.
   for (const RtlirPort& ifc_port : ifc->ports) alias_net(ifc_port.name);
-  // §25.5.5 (printed pages 791-792): the interface's clocking blocks are its
-  // members too, reached through the port as `b1.sb` is from the program the
-  // port is declared in, so each block, and the event variable §14.10 names by
-  // it, answers to the port's name for it.
   for (const ModuleItem* cb : ifc->clocking_blocks) {
     if (cb->name.empty()) continue;
     auto* alias =
@@ -505,11 +394,6 @@ void Lowerer::AliasInterfacePortTo(const RtlirModuleInst& inst,
   }
 }
 
-// The two halves of one §23.3.2 input port connection, as §32.4.4 names them:
-// the instance's port, which is the load an interconnect delay is annotated
-// onto, and the signal the parent connected to it, which is the source it is
-// annotated from. Bundled because they are the four things one such name is
-// built out of and the assignment they are written onto is a fifth.
 struct PortConnectionPath {
   const std::string& inst_prefix;
   const std::string& inst_seg;
@@ -517,11 +401,6 @@ struct PortConnectionPath {
   const Expr* connection;
 };
 
-// §32.4.4: names the load and the source of one input port connection on the
-// assignment that carries it, so the run can ask what was annotated between
-// them. A connection that is not a plain signal name leaves the source unnamed,
-// which still reads a PORT or NETDELAY delay, those being the delay from every
-// source on the net.
 static void NameInterconnectPath(const PortConnectionPath& path,
                                  RtlirContAssign& ca) {
   ca.interconnect_load = SdfHierName(path.inst_prefix + path.inst_seg +
@@ -534,22 +413,16 @@ static void NameInterconnectPath(const PortConnectionPath& path,
       SdfHierName(path.inst_prefix + std::string(path.connection->text));
 }
 
-// One unpacked dimension's addresses: the smaller bound, how many there are,
-// and whether the left bound is the larger.
 struct UnpackedDimShape {
   int64_t lo = 0;
   uint32_t size = 0;
   bool descending = false;
 
-  // The address `position` elements from the dimension's left bound.
   [[nodiscard]] int64_t AddressAt(uint32_t position) const {
     return descending ? lo + size - 1 - position : lo + position;
   }
 };
 
-// The dimension of an array a connection names: a whole array's first, or,
-// for a select of it, `arr[k]` of `int arr[3][3]`, the one the select leaves.
-// False where the connection names no array with that many dimensions.
 static bool ConnectionDimShape(const Expr* conn, SimContext& ctx, Arena& arena,
                                UnpackedDimShape& out) {
   size_t depth = 0;
@@ -572,10 +445,6 @@ static bool ConnectionDimShape(const Expr* conn, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The select of the element at `address`, whose index is the address's 32
-// bits, as every element is named, so `[-1:0]` selects [4294967295] and [0].
-// The literal is sized by its value, so -1 cast whole named
-// [18446744073709551615] and a bound held as its 32 bits plus one [4294967296].
 static Expr* MakeElementSelect(Expr* base, int64_t address, Arena& arena) {
   auto* index = arena.Create<Expr>();
   index->kind = ExprKind::kIntegerLiteral;
@@ -587,8 +456,6 @@ static Expr* MakeElementSelect(Expr* base, int64_t address, Arena& arena) {
   return select;
 }
 
-// An inout or ref array port and the array it is connected to, element by
-// element, left index to left index.
 struct ArrayPortAlias {
   std::string local;
   std::string target;
@@ -596,16 +463,10 @@ struct ArrayPortAlias {
   UnpackedDimShape conn_shape;
 };
 
-// "name[address]", an element named by its address's 32 bits, as
-// ArrayElementKey made it and every select names it, so `[-1:0]` holds
-// [4294967295] and [0] whether a bound arrived signed or as its 32 bits.
 static std::string ArrayElementName(const std::string& name, int64_t address) {
   return name + "[" + std::to_string(static_cast<uint32_t>(address)) + "]";
 }
 
-// §23.3.3.3 and §23.3.3.2 make an inout or a ref port one object with its
-// connection, as LowerPortBindings aliases a scalar one; an array port is so
-// element by element.
 static void AliasArrayPortElements(const ArrayPortAlias& a, SimContext& ctx,
                                    Arena& arena) {
   for (uint32_t p = 0; p < a.port_shape.size; ++p) {
@@ -617,21 +478,6 @@ static void AliasArrayPortElements(const ArrayPortAlias& a, SimContext& ctx,
   }
 }
 
-// §23.3.3.5 (printed page 748): an unpacked array port connected to an
-// unpacked array pairs its elements with the connection's, left index with
-// left index and right index with right index, and each pair
-// is connected as a port of the element's type would be: an input's element
-// takes the connection's continuously, an output's drives it, and an inout's
-// or ref's is the same storage. `input var int i[3]` on `int one[3]` reads
-// one[0] to one[2] in i[0] to i[2]; the whole array was lowered as one
-// assignment of an element's width, so the port read one value's bits. False
-// for a port that is no one-dimensional unpacked array, or a connection that
-// names no array of as many elements, which keep the scalar path.
-// §27.4: a port connection written in a loop generate block may read the
-// block's implicit localparam, and a name it reads may be one the block
-// declares, so the assignment a connection is lowered to carries the loop
-// constants and generate prefixes of the block instance holding the instance,
-// which Lowerer::LowerContAssign binds while evaluating it.
 static RtlirContAssign PortBindingAssign(const RtlirModuleInst& inst) {
   RtlirContAssign ca;
   ca.gen_block_consts = inst.gen_block_consts;
@@ -658,8 +504,6 @@ bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
   std::string local = inst_seg + std::string(binding.port_name);
   if (binding.direction == Direction::kInout ||
       binding.direction == Direction::kRef) {
-    // Only a connection naming the array itself is aliased, as a scalar
-    // inout's is.
     if (binding.connection->kind == ExprKind::kIdentifier) {
       AliasArrayPortElements(
           {inst_prefix_ + local,
@@ -684,9 +528,6 @@ bool Lowerer::LowerArrayPortBinding(const RtlirModuleInst& inst,
   return true;
 }
 
-// What an inout or ref port binding of one instance is joined in: the
-// instance and its segment, its parent's prefix, and the connection each of
-// the instance's objects was joined to first.
 struct InoutJoinScope {
   SimContext& ctx;
   Arena& arena;
@@ -696,23 +537,6 @@ struct InoutJoinScope {
   std::unordered_map<std::string_view, std::string_view>& joins;
 };
 
-// §23.3.3.2 ref ports and §23.3.3.3 inout ports both share storage with the
-// connected parent signal, so the child port is aliased onto it rather than
-// lowered as a one-way continuous assignment. An inout port is a net
-// (§23.3.3.3 connects it to a net and never to a variable), and §23.3.3.7
-// merges the port's net and the connected net into one simulated net, so the
-// net map is redirected beside the variable map, as LowerAliases and
-// TryAliasInterfacePort do: a continuous assignment inside the child resolves
-// its driver through SimContext::FindNet under the child's prefix, where
-// CreatePortVariable (lowerer_register.cpp) registered the port's own net,
-// and with the variable alone aliased that net took the driver and the
-// parent's net never saw it. A ref port's connection is a variable, which
-// FindNet does not answer, so its net alias is a no-op. The keys are interned
-// in the arena because the net map holds them rather than a copy.
-//
-// §23.2.2.1 (printed page 732), Example 4: `same_port (.a(i), .b(i))` has two
-// ports on the one inout i, so the two connections are one net with i. The
-// first is joined to i; a later one joins the first.
 static void JoinInoutPortBinding(const RtlirPortBinding& binding,
                                  const std::string& connection,
                                  const InoutJoinScope& scope) {
@@ -729,18 +553,6 @@ static void JoinInoutPortBinding(const RtlirPortBinding& binding,
   scope.ctx.AliasNet(local, target);
 }
 
-// §32.4.4: where an interconnect delay can reach the design while it runs
-// (`link`), an inout port binding of a net to a net is kept as the two nets,
-// joined by LinkInoutPortNets, so that a delay annotated to the port sits
-// between them; every other inout, ref or event port binding of a name is
-// joined to its connection (JoinInoutPortBinding). A connection naming a net
-// is an inout port's, since §23.3.3.2 connects a ref port to a variable alone
-// and §23.2.2.3 gives an inout port no variable type, so the port is the net
-// CreatePortVariable (lowerer_register.cpp) registered for it. The connection
-// is read where it is written, in the generate blocks around the instance. An
-// inout port on a select or a concatenation of nets (§23.3.3.3) cannot share
-// a net with them, so its bits are joined to the bits it names whatever `link`
-// says.
 static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
                                         const InoutJoinScope& scope,
                                         bool link) {
@@ -769,10 +581,6 @@ static void LinkOrJoinSharedPortBinding(const RtlirPortBinding& binding,
                     scope.ctx);
 }
 
-// §16.18 with §17.3: an input formal of a checker bound to a clocking block
-// variable, `cb.a`, stands for that variable in the checker's assertions,
-// which read what the block sampled rather than a sample of the formal; the
-// block is found by its name in the instance holding the checker when read.
 static void BindCheckerClockvarFormal(const RtlirModuleInst& inst,
                                       const RtlirPortBinding& binding,
                                       const std::string& parent_prefix,
@@ -790,17 +598,12 @@ static void BindCheckerClockvarFormal(const RtlirModuleInst& inst,
       std::string(actual->rhs->text));
 }
 
-// §6.16: the width the connection to an input port is evaluated and written
-// at, the port's own, or none for a string port, which holds as many
-// characters as its connection gives it.
 static uint32_t InputPortAssignWidth(const RtlirPortBinding& binding,
                                      const std::string& port_name,
                                      SimContext& ctx) {
   return ctx.IsStringVariable(port_name) ? 0 : binding.width;
 }
 
-// The port side of `binding`, qualified with the instance's segment: its port
-// expression where the header wrote one, else the port's own name.
 static Expr* LocalPortExpr(const RtlirPortBinding& binding,
                            const std::string& inst_seg, Arena& arena) {
   if (binding.port_expr != nullptr) {
@@ -809,15 +612,6 @@ static Expr* LocalPortExpr(const RtlirPortBinding& binding,
   return MakeLocalPortId(inst_seg + std::string(binding.port_name), arena);
 }
 
-// §17.3: the actuals a checker instance binds to its formals, registered under
-// the instance for its assertions to take a delay bound written as a formal's
-// name, an event, a sequence or a property from, each of the last three
-// reading its names in `parent_prefix`, the scope instantiating the checker.
-// §17.3 with §16.9.11: the end point a checker reads `triggered` on its
-// formal through, registered for `actual` under its full name: the end point
-// the lowering gave the sequence actual `connection`, or that of the named
-// sequence of the instantiating scope `connection` names alone. None where
-// the actual is neither.
 static void RegisterActualEndPoint(const Expr* connection, const Expr* actual,
                                    const std::string& parent_prefix,
                                    SimContext& ctx, Arena& arena) {
@@ -850,11 +644,6 @@ static void RecordCheckerActuals(const RtlirModuleInst& inst,
 
 void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
                                 bool from_program) {
-  // §23.3.2: the caller lowers bindings under the PARENT prefix; qualify the
-  // port (local) side with the child segment ("u0.a") so the connection side
-  // stays bare and resolves in the parent. Otherwise an implicit/wildcard
-  // connection (.a == .a(a)) resolves to the child's own same-named port and
-  // self-assigns instead of propagating.
   std::string inst_seg = std::string(inst.inst_name) + ".";
   RecordCheckerActuals(inst, inst_prefix_, inst_prefix_ + inst_seg, ctx_,
                        arena_);
@@ -867,9 +656,6 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
 
     Expr* local_id = LocalPortExpr(binding, inst_seg, arena_);
 
-    // An inout or ref port shares its connection's storage
-    // (JoinInoutPortBinding), and so does an event port, whose connection is
-    // triggered rather than assigned (§15.5).
     if (binding.direction == Direction::kInout ||
         binding.direction == Direction::kRef ||
         BoundPortType(inst, binding) == DataTypeKind::kEvent) {
@@ -888,24 +674,13 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
       ca.lhs = local_id;
       ca.rhs = binding.connection;
       ca.width = InputPortAssignWidth(binding, port_name, ctx_);
-      // §32.4.4: this assignment is the path an interconnect delay is annotated
-      // along -- from the signal the parent connected to the port of the
-      // instance -- so it carries the two names the annotator placed the delay
-      // between.
       NameInterconnectPath(
           {inst_prefix_, inst_seg, binding.port_name, binding.connection}, ca);
       RecordInputPortSource(binding, port_name, inst_prefix_, ctx_);
-      // §24.3.2: an input port net of a program is driven as soon as the
-      // design expression connected to it changes; only the program's own
-      // code runs in the reactive region set.
       LowerContAssign(ca, false);
       continue;
     }
 
-    // The output drives its connection; besides a bare net this may be a
-    // part-select, element select, or concatenation produced by §23.3.3.5
-    // instance-array distribution, all of which the continuous-assignment
-    // lvalue writer now handles.
     if (!IsDrivableOutputConnection(binding.connection->kind)) continue;
     RtlirContAssign ca = PortBindingAssign(inst);
     ca.lhs = binding.connection;
@@ -914,8 +689,6 @@ void Lowerer::LowerPortBindings(const RtlirModuleInst& inst,
     ca.module_path_port =
         inst_prefix_ + inst_seg + std::string(binding.port_name);
     path_delayed_ports_.insert(ca.module_path_port);
-    // §17.3: a checker's output formal is assigned to its actual as if by a
-    // continuous assignment of the Reactive region, as a program's is.
     LowerContAssign(ca, from_program || inst.resolved->is_checker);
   }
 }

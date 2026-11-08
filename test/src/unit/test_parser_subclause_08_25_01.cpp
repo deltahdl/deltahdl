@@ -134,14 +134,6 @@ TEST(ParameterizedScopeResolutionParsing, EmptyParamListWithMemberAccess) {
               "endmodule\n"));
 }
 
-// A.4.1.1's ordered_parameter_assignment is a param_expression (printed page
-// 1194 of IEEE 1800-2023), which A.8.3 lets be a data_type, and A.2.2.1
-// gives an integer type an optional signing and a virtual interface its
-// `virtual` keyword (printed page 1182). An expression reader spells a keyword
-// type as a bare name, so `int unsigned` stopped at `unsigned` and `virtual
-// ifc` at `virtual`, each reported as a missing `)` under §23.10.2; those
-// elements are now read as the data types they are and carried on the scope's
-// node.
 TEST(ParameterizedScopeResolutionParsing, SignedIntegerTypeAsParameterValue) {
   auto r = Parse(
       "class C #(type T = int);\n"
@@ -200,9 +192,6 @@ TEST(ParameterizedScopeResolutionParsing,
   EXPECT_EQ(scope->elements[0]->type_value->type_name, "ifc");
 }
 
-// A keyword type with no signing keeps the shape it had, a name the
-// elaborator reads as the type, so `logic [3:0]` still arrives as a select
-// on the name `logic`.
 TEST(ParameterizedScopeResolutionParsing, PlainKeywordTypeStaysAName) {
   auto r = Parse(
       "module m;\n"
@@ -221,11 +210,6 @@ TEST(ParameterizedScopeResolutionParsing, PlainKeywordTypeStaysAName) {
   EXPECT_EQ(scope->elements[0]->base->text, "logic");
 }
 
-// §8.25.1 tells C::T from C#()::T outside C, and both leave type_params
-// empty, so a declared type records whether the class it was written behind
-// was given a parameter_value_assignment, empty or not, on each path that
-// parses one: a module's declaration through the class or through its
-// package, and a declaration in a block.
 TEST(ParameterizedScopeResolutionParsing, ScopeAssignmentIsRecordedOnTheType) {
   auto r = Parse(
       "package p; class C #(int n = 1); typedef int T; endclass endpackage\n"

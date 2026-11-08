@@ -29,10 +29,6 @@ TEST(ResetAllSimulation, InsideExcludedBranchDoesNotAffectSimulation) {
   EXPECT_EQ(result, 50u);
 }
 
-// §22.3 with §22.9: `resetall ends the `unconnected_drive pull1 for the module
-// definitions after it, not for sub1 before it, whose unconnected input stays
-// pulled to 1 while sub2's is an undriven net reading z. The `resetall reached
-// back to sub1, which read x.
 TEST(ResetAllSimulation, LeavesTheModulesBeforeItTheirUnconnectedDrive) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`unconnected_drive pull1\n"

@@ -13,9 +13,6 @@ constexpr const char* kCycleDelayForm =
     "a cycle delay written without parentheses is an integral number or an "
     "identifier; any other expression is parenthesized";
 
-// A.6.11's cycle_delay: `##` and an integral number, `##` and an identifier,
-// or `##` and a parenthesized expression, whether it governs a statement
-// (A.6.5's procedural_timing_control) or stands in a synchronous drive.
 TEST(CycleDelaySyntaxParsing, NumberIdentifierAndParenthesizedFormsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -35,9 +32,6 @@ TEST(CycleDelaySyntaxParsing, NumberIdentifierAndParenthesizedFormsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Any other primary after a bare `##` is reported where it starts, a name
-// under `$root.` or `$unit::` among them, and the statement behind it is still
-// read.
 TEST(CycleDelaySyntaxParsing, OtherFormsWithoutParenthesesRejected) {
   auto r = Parse(
       "module m;\n"
@@ -61,8 +55,6 @@ TEST(CycleDelaySyntaxParsing, OtherFormsWithoutParenthesesRejected) {
   }
 }
 
-// A.6.5's clocking_event without parentheses is `@` and a name, plain or
-// hierarchical, for a default, a global and a plain clocking declaration alike.
 TEST(ClockingDeclarationEventParsing, NamedEventsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -73,9 +65,6 @@ TEST(ClockingDeclarationEventParsing, NamedEventsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// An expression written without parentheses leaves what follows its first name
-// where the declaration's semicolon belongs, and a name ending in a select is
-// no hierarchical identifier (A.9.3).
 TEST(ClockingDeclarationEventParsing, ExpressionsWithoutParenthesesRejected) {
   auto r = Parse(
       "module m;\n"

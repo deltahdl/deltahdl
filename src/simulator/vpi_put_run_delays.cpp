@@ -23,7 +23,6 @@ namespace delta {
 
 namespace {
 
-// The delays `obj` holds now, in simulation ticks.
 std::vector<uint64_t> TicksOf(const VpiObject& obj) {
   std::vector<uint64_t> ticks;
   ticks.reserve(obj.delays.size());
@@ -33,8 +32,6 @@ std::vector<uint64_t> TicksOf(const VpiObject& obj) {
   return ticks;
 }
 
-// §30.5.1 with §38.32: the module path's new delays, distributed over its
-// transitions as a declaration listing as many is.
 void PutPathDelays(PathDelay& path, const std::vector<uint64_t>& ticks) {
   const std::size_t kCount = std::min<std::size_t>(ticks.size(), 12);
   for (std::size_t i = 0; i < kCount; ++i) path.delays[i] = ticks[i];
@@ -42,10 +39,6 @@ void PutPathDelays(PathDelay& path, const std::vector<uint64_t>& ticks) {
   ExpandTransitionDelays(path);
 }
 
-// §28.16 with §38.32: the gate's or udp's new rise, fall and turn-off
-// delays, a turn-off it was given none of being the lesser of the other two,
-// filed with the primitive driving its output, below the instance its run key
-// names.
 void PutPrimitiveDelays(VpiObject& prim, const std::vector<uint64_t>& ticks,
                         SimContext& sim) {
   const VpiObject* output = VpiPrimitiveValueSource(&prim);
@@ -78,8 +71,6 @@ void VpiPutRunDelays(
     PutPathDelays(specify.MutablePathDelays()[kEntry->second], kTicks);
     return;
   }
-  // §31.2 with §38.32: a timing check's limits, the first and, for a check
-  // taking two, the second.
   TimingCheckEntry& check = specify.MutableTimingChecks()[kEntry->second];
   if (!kTicks.empty()) check.limit = kTicks[0];
   if (kTicks.size() > 1) check.limit2 = kTicks[1];

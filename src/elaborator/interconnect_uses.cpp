@@ -33,15 +33,10 @@ bool IsInterconnectNetLvalue(const Expr* e, const InterconnectNames& names) {
   }
 }
 
-// A connection that names no interconnect is no concern of §6.6.8's, and one
-// that does is legal only as an all-interconnect net_lvalue.
 static bool ConnectionIsLegal(const Expr* e, const InterconnectNames& names) {
   return !ExprUsesInterconnect(e, names) || IsInterconnectNetLvalue(e, names);
 }
 
-// The expressions of an instance that connect nothing: its parameter values,
-// its delays and the bounds of its instance array, in which an interconnect
-// has no place at all.
 static bool ValuesUseInterconnect(const ModuleItem& item,
                                   const InterconnectNames& names) {
   const Expr* const kValues[] = {item.gate_delay, item.gate_delay_fall,

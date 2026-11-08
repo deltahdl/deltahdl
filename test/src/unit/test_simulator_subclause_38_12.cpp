@@ -21,9 +21,6 @@ class VpiGetSystfInfoSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.12 shall #1 + Figure 38-5: given a handle to a system task/function
-// callback, the routine reports its registration in an s_vpi_systf_data
-// structure. Every Figure 38-5 member must survive the round trip.
 TEST_F(VpiGetSystfInfoSim, FillsStructFromSystfCallbackHandle) {
   int payload = 42;
   s_vpi_systf_data registered = {};
@@ -50,8 +47,6 @@ TEST_F(VpiGetSystfInfoSim, FillsStructFromSystfCallbackHandle) {
   EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&payload));
 }
 
-// §38.12 shall #1: each registered callback is reported on its own; asking
-// about the second handle yields the second registration, not the first.
 TEST_F(VpiGetSystfInfoSim, ReportsTheCallbackNamedByTheHandle) {
   s_vpi_systf_data first = {};
   first.type = vpiSysTask;
@@ -76,9 +71,6 @@ TEST_F(VpiGetSystfInfoSim, ReportsTheCallbackNamedByTheHandle) {
   EXPECT_EQ(out2.type, vpiSysFunc);
 }
 
-// §38.12 shall #2: the destination memory belongs to the application. The
-// routine fills a caller-owned structure in place rather than allocating one,
-// so a local on the caller's stack is populated and its address is unchanged.
 TEST_F(VpiGetSystfInfoSim, WritesIntoApplicationAllocatedMemory) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysTask;
@@ -91,14 +83,11 @@ TEST_F(VpiGetSystfInfoSim, WritesIntoApplicationAllocatedMemory) {
   s_vpi_systf_data* before = &caller_owned;
   vpi_get_systf_info(h, &caller_owned);
 
-  // The application's own object is the one that received the data.
   EXPECT_EQ(before, &caller_owned);
   EXPECT_STREQ(caller_owned.tfname, "$measure");
   EXPECT_EQ(caller_owned.type, vpiSysTask);
 }
 
-// §38.12 Arguments (mandatory per §38.1): both the handle and the destination
-// pointer are required. Missing either leaves nothing to do and must be safe.
 TEST_F(VpiGetSystfInfoSim, NullArgumentsAreSafe) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysTask;
@@ -109,19 +98,13 @@ TEST_F(VpiGetSystfInfoSim, NullArgumentsAreSafe) {
   s_vpi_systf_data out = {};
   out.tfname = VpiText("untouched");
 
-  vpi_get_systf_info(nullptr, &out);  // no handle
-  vpi_get_systf_info(h, nullptr);     // no destination
+  vpi_get_systf_info(nullptr, &out);
+  vpi_get_systf_info(h, nullptr);
   vpi_get_systf_info(nullptr, nullptr);
 
-  // The destination supplied with the null-handle call was left as the caller
-  // initialized it.
   EXPECT_STREQ(out.tfname, "untouched");
 }
 
-// §38.12 Arguments: obj is a handle to a system task/function callback.
-// A callback object that is not a registered system task/function (e.g. a
-// simulation callback) names no s_vpi_systf_data, so the destination is left
-// as the caller initialized it.
 TEST_F(VpiGetSystfInfoSim, NonSystfCallbackLeavesDestinationUnchanged) {
   s_cb_data cb = {};
   vpiHandle cb_handle = vpi_register_cb(&cb);
@@ -134,9 +117,6 @@ TEST_F(VpiGetSystfInfoSim, NonSystfCallbackLeavesDestinationUnchanged) {
   EXPECT_STREQ(out.tfname, "untouched");
 }
 
-// §38.12 Arguments: obj is a handle to a system task/function callback. A
-// handle to an object that is not a callback at all (here a module instance)
-// names no s_vpi_systf_data, so the destination is left untouched.
 TEST_F(VpiGetSystfInfoSim, NonCallbackHandleLeavesDestinationUnchanged) {
   VpiHandle module = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(module, nullptr);
@@ -148,12 +128,6 @@ TEST_F(VpiGetSystfInfoSim, NonCallbackHandleLeavesDestinationUnchanged) {
   EXPECT_STREQ(out.tfname, "untouched");
 }
 
-// §38.12 Arguments: obj is a handle to the system task or function *callback* -
-// the object vpi_register_systf() handed back. The object an application holds
-// while its calltf runs is a different one: §37.42 detail 3 reaches the system
-// task call itself through vpi_handle(vpiSysTfCall, NULL), and a call is not
-// the registration, so the routine reports nothing for it. This is the nearest
-// thing to a systf callback that is not one.
 TEST_F(VpiGetSystfInfoSim, ASystemTaskCallIsNotTheCallbackTheRoutineReports) {
   s_vpi_systf_data registered = {};
   registered.type = vpiSysTask;
@@ -171,9 +145,6 @@ TEST_F(VpiGetSystfInfoSim, ASystemTaskCallIsNotTheCallbackTheRoutineReports) {
   EXPECT_STREQ(out.tfname, "untouched");
 }
 
-// §38.12 reports the registration, which reading does not consume: the same
-// handle answers the same way however often it is asked, and a structure the
-// caller has since written over is filled again rather than left as it was.
 TEST_F(VpiGetSystfInfoSim, TheRegistrationIsReportedAsOftenAsItIsAsked) {
   int payload = 9;
   s_vpi_systf_data registered = {};

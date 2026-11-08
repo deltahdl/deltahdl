@@ -31,7 +31,6 @@ TEST(CaseMatchesElaboration, CaseMatchesWithGuardElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 admits only an integral type for a constant expression pattern.
 TEST(PatternMatching, RealLiteralPatternRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -53,8 +52,6 @@ TEST(PatternMatching, RealLiteralPatternRejected) {
       7, "12.6"));
 }
 
-// §12.6: same rule applied to a `matches` clause in a conditional operator's
-// predicate (§12.6.3).
 TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -73,10 +70,6 @@ TEST(PatternMatching, RealLiteralPatternInMatchesOperatorRejected) {
       6, "12.6"));
 }
 
-// §5.9 makes a string literal in an expression an unsigned integer constant,
-// so as a pattern it is an integral constant expression pattern. A string
-// value does not share that type, which §12.6's static check rejects; a bit
-// vector does.
 TEST(PatternMatching, StringLiteralPatternAgainstAStringValueRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -107,8 +100,6 @@ TEST(PatternMatching, StringLiteralPatternAgainstABitVectorAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: a constant expression pattern (11.2.1) may be a localparam, not just a
-// literal. An integral localparam is of integral type and shall be accepted.
 TEST(PatternMatching, LocalparamIntegralPatternAccepted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -128,8 +119,6 @@ TEST(PatternMatching, LocalparamIntegralPatternAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: a constant expression pattern (11.2.1) may also be a module parameter.
-// An integral parameter is of integral type and shall be accepted.
 TEST(PatternMatching, ParameterIntegralPatternAccepted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -148,9 +137,6 @@ TEST(PatternMatching, ParameterIntegralPatternAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: a constant expression pattern (11.2.1) may be a constant function
-// call. An integral-returning function used as a pattern is of integral type
-// and shall be accepted.
 TEST(PatternMatching, ConstFunctionCallIntegralPatternAccepted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -170,7 +156,6 @@ TEST(PatternMatching, ConstFunctionCallIntegralPatternAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: integer literal pattern is integral and shall be accepted.
 TEST(PatternMatching, IntegerLiteralPatternAccepted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -190,9 +175,6 @@ TEST(PatternMatching, IntegerLiteralPatternAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 keeps pattern identifiers distinct within a pattern: the same
-// identifier cannot bind in more than one position of a single pattern. Here
-// the structure pattern binds `r1` twice, which is rejected.
 TEST(PatternMatching, DuplicatePatternIdentifierRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -213,8 +195,6 @@ TEST(PatternMatching, DuplicatePatternIdentifierRejected) {
                             7, "12.6"));
 }
 
-// §12.6: distinct pattern identifiers in a single pattern are allowed, so the
-// uniqueness check does not over-reject a well-formed structure pattern.
 TEST(PatternMatching, DistinctPatternIdentifiersAccepted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -233,8 +213,6 @@ TEST(PatternMatching, DistinctPatternIdentifiersAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: the same uniqueness rule applies to a pattern matched in a
-// conditional operator's predicate (§12.6.3), not just a case item.
 TEST(PatternMatching, DuplicatePatternIdentifierInMatchesOperatorRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -251,9 +229,6 @@ TEST(PatternMatching, DuplicatePatternIdentifierInMatchesOperatorRejected) {
                             5, "12.6"));
 }
 
-// §12.6: the report that refuses a non-integral constant expression pattern
-// names the subclause stating the rule, so a caller learns which rule was
-// enforced without matching the wording of the message.
 TEST(PatternMatching, RealLiteralPatternNames12_6) {
   SimFixture f;
   ElaborateSrc(
@@ -275,20 +250,6 @@ TEST(PatternMatching, RealLiteralPatternNames12_6) {
       7, "12.6"));
 }
 
-// §12.6 requires a constant expression pattern to be of integral type and puts
-// no condition on where the pattern is written, so every position a statement
-// holds a statement in is a position the report is made at.
-// WalkStmtForMatchesPattern in
-// src/elaborator/elaborator_validate_matches.cpp had written out eight of the
-// thirteen child-statement links Stmt declares, and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
-// below cover one newly reached position each. Each writes the pattern in a
-// conditional operator's predicate, which §12.6.3 lets pattern matching stand
-// in. The conditional is an ordinary expression, so it can be written in a for
-// initializer and a for step as well as in the four statement positions.
-
-// §12.7.1's for loop holds its initialization statements in Stmt::for_inits,
-// apart from its body.
 TEST(PatternMatching, ARealLiteralPatternInAForInitializerIsReported) {
   SimFixture f;
   ElaborateSrc(
@@ -305,8 +266,6 @@ TEST(PatternMatching, ARealLiteralPatternInAForInitializerIsReported) {
       5, "12.6"));
 }
 
-// Stmt::for_steps holds the same loop's step assignments, a member of its own
-// beside the initializers.
 TEST(PatternMatching, ARealLiteralPatternInAForStepIsReported) {
   SimFixture f;
   ElaborateSrc(
@@ -323,10 +282,6 @@ TEST(PatternMatching, ARealLiteralPatternInAForStepIsReported) {
       5, "12.6"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(PatternMatching, ARealLiteralPatternInAnAssertionPassStatementIsReported) {
   SimFixture f;
   ElaborateSrc(
@@ -359,10 +314,6 @@ TEST(PatternMatching, ARealLiteralPatternInAnAssertionFailStatementIsReported) {
       5, "12.6"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(PatternMatching, ARealLiteralPatternInARandsequenceCodeBlockIsReported) {
   SimFixture f;
   ElaborateSrc(
@@ -382,10 +333,6 @@ TEST(PatternMatching, ARealLiteralPatternInARandsequenceCodeBlockIsReported) {
       6, "12.6"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(PatternMatching,
      ARealLiteralPatternInARandsequenceWeightCodeBlockIsReported) {
   SimFixture f;
@@ -408,16 +355,6 @@ TEST(PatternMatching,
       7, "12.6"));
 }
 
-// §12.6: a pattern of the form `. variable_identifier` declares a new variable
-// whose scope is the statement the pattern guards, so a read of it there
-// resolves against the pattern and is not §23.9's unresolved reference. The
-// cases below each read a bound variable in the guarded statement and ask that
-// the source elaborate with nothing reported; the union and the reads are
-// sv-tests' 12.6.1--case_pattern.sv, 12.6.2--if_pattern.sv and
-// 12.6.3--conditional_pattern.sv, which were reported "reference to unresolved
-// identifier 'v'" (#4353) because the names a procedural block declares were
-// collected from its declarations, loops and randsequences and never from a
-// pattern.
 constexpr const char* kTaggedUnion =
     "  typedef union tagged {\n"
     "    struct { bit [3:0] val1, val2; } a;\n"
@@ -438,8 +375,6 @@ TEST(PatternVariableReads, ACaseMatchesItemReadsTheVariablesItsPatternBinds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same through a `&&&` filter, which §12.6.1 puts to the right of the
-// pattern: the bound variable is read by the filter as well as by the item.
 TEST(PatternVariableReads, AFilteredCaseMatchesItemReadsItsVariable) {
   SimFixture f;
   ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
@@ -463,8 +398,6 @@ TEST(PatternVariableReads, AnIfMatchesBranchReadsTheVariableItsPatternBinds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6.3: the conditional operator's first operand may be a `matches`, and
-// the variable it binds is read by the second operand.
 TEST(PatternVariableReads,
      AConditionalOperatorReadsTheVariableItsPatternBinds) {
   SimFixture f;
@@ -476,8 +409,6 @@ TEST(PatternVariableReads,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The control: a name no pattern binds is still §23.9's unresolved reference,
-// read beside a bound one in the same item, on line 8.
 TEST(PatternVariableReads, ANameNoPatternBindsIsStillReported) {
   SimFixture f;
   ElaborateSrc(std::string("module t;\n") + kTaggedUnion +
@@ -491,9 +422,6 @@ TEST(PatternVariableReads, ANameNoPatternBindsIsStillReported) {
                             "23.9"));
 }
 
-// §12.6's wildcard pattern `.*` matches any value and names nothing, so as a
-// tagged member's pattern in an if or a conditional operator, with a `&&&`
-// filter or without, it is no read for §23.9 to resolve.
 TEST(PatternVariableReads, TheWildcardPatternIsNoRead) {
   SimFixture f;
   ElaborateSrc(
@@ -511,7 +439,6 @@ TEST(PatternVariableReads, TheWildcardPatternIsNoRead) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same in a class method, whose reads §23.9 resolves against the class.
 TEST(PatternVariableReads, TheWildcardPatternInAClassMethodIsNoRead) {
   SimFixture f;
   ElaborateSrc(
@@ -527,9 +454,6 @@ TEST(PatternVariableReads, TheWildcardPatternInAClassMethodIsNoRead) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 type-checks a pattern against the value it is matched with. A tagged
-// pattern needs a tagged union value, names a member that union declares, and
-// gives a void member no member pattern.
 TEST(PatternMatching, TaggedPatternsCheckedAgainstTheTaggedUnion) {
   SimFixture f;
   ElaborateSrc(
@@ -578,9 +502,6 @@ TEST(PatternMatching, TaggedPatternsFittingTheTaggedUnionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The check descends a nested pattern against the member's own type: Jmp is a
-// tagged union of its own, whose JmpC member is a structure (§12.6.1's
-// Example 2).
 TEST(PatternMatching, NestedPatternsCheckedAgainstTheMemberType) {
   SimFixture f;
   ElaborateSrc(
@@ -607,8 +528,6 @@ TEST(PatternMatching, NestedPatternsCheckedAgainstTheMemberType) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// A structure pattern names members of the structure; only a pattern naming
-// its members may leave some out, so a positional one lists them all.
 TEST(PatternMatching, StructurePatternsCheckedAgainstTheStructure) {
   SimFixture f;
   ElaborateSrc(
@@ -655,10 +574,6 @@ TEST(PatternMatching, StructurePatternsFittingTheStructureAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 checks statically that a pattern has the type of the value it is
-// matched with, and a structure pattern matches a structure's members, so one
-// matched with an int, a vector or an int member of a structure is reported.
-// One matched with a structure member draws no report.
 TEST(PatternMatching, StructurePatternAgainstANonStructureValueRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -686,9 +601,6 @@ TEST(PatternMatching, StructurePatternAgainstANonStructureValueRejected) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// A constant leaf of a pattern is a constant expression (§11.2.1); a variable
-// is none, and as a pattern it is no pattern identifier either, which is
-// written with a leading period.
 TEST(PatternMatching, VariableAsAConstantPatternRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -703,8 +615,6 @@ TEST(PatternMatching, VariableAsAConstantPatternRejected) {
                             3, "12.6"));
 }
 
-// A parameter declared with a range and no type is integral whatever its value
-// (§6.20.2), and an operation other than an arithmetic one is left unread.
 TEST(PatternMatching, ConstantPatternsAccepted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -725,9 +635,6 @@ TEST(PatternMatching, ConstantPatternsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A constant expression pattern is integral whatever form it takes, so a real
-// or a string parameter and a real constant expression are rejected as a real
-// literal is. An untyped parameter takes its value's type (§6.20.2).
 TEST(PatternMatching, NonIntegralConstantExpressionPatternsRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -752,9 +659,6 @@ TEST(PatternMatching, NonIntegralConstantExpressionPatternsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 10, "12.6"));
 }
 
-// An integral parameter is an integral constant pattern, which a real value
-// cannot share a type with, in a case statement (§12.6.1) as in an if
-// statement (§12.6.2).
 TEST(PatternMatching, IntegralParameterPatternAgainstARealValueRejected) {
   SimFixture f;
   ElaborateSrc(
@@ -780,8 +684,6 @@ TEST(PatternMatching, IntegralParameterPatternAgainstARealValueRejected) {
                             6, "12.6.1"));
 }
 
-// §12.6 states its rules of every pattern wherever it is written, and a class
-// method is no exception, in a class of the compilation unit or of a module.
 TEST(PatternMatching, PatternRulesHoldInAMethodOfAUnitClass) {
   SimFixture f;
   ElaborateSrc(

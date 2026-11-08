@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §16.17: the expect statement accepts the syntax an assert property does,
-// a named property among it, and one in a task takes the default clocking
-// where its spec opens with no clocking event, the task giving no
-// contextually inferred clock: the expect of wait_for is clocked by the
-// default's posedge clk once elaborated.
 TEST(ExpectStatementElaboration, ATaskExpectTakesTheDefaultClocking) {
   ElabFixture f;
   auto* design = Elaborate(

@@ -61,10 +61,6 @@ TEST(Constraint, RandcCyclic) {
   EXPECT_EQ(seen.size(), 4u);
 }
 
-// 18.4: an enum member of a packed structure or packed untagged union that is
-// declared rand is exempt from the 18.3 enum-domain restriction. With the
-// exception in effect the solver may pick a value outside the named-constant
-// set, drawing from the full declared range instead.
 TEST(Constraint, EnumMemberExceptionLiftsRestriction) {
   ConstraintSolver solver(5);
   RandVariable v;
@@ -88,8 +84,6 @@ TEST(Constraint, EnumMemberExceptionLiftsRestriction) {
   EXPECT_TRUE(saw_non_named);
 }
 
-// With the restriction in effect (the default) the same variable is confined
-// to the named-constant set, confirming the 18.4 flag is what relaxes 18.3.
 TEST(Constraint, EnumRestrictionConfinesByDefault) {
   ConstraintSolver solver(5);
   RandVariable v;
@@ -130,14 +124,6 @@ TEST(Constraint, RandcCycleResets) {
   EXPECT_EQ(cycle2.size(), 2u);
 }
 
-// 18.4: a class-handle member may be declared rand, but randomize() solves the
-// referenced object's members and shall not modify the handle itself. Here the
-// handle 'child' is left at its default null while a sibling rand int is
-// solved. A correct implementation never draws a value for the handle, so it
-// stays null; an implementation that treated the handle as an integral rand
-// variable would overwrite it with the solved (near-certainly nonzero) draw.
-// The randomize() call succeeds (so the write-back path runs), making this
-// discriminating.
 TEST(RandomVariableTypes, RandomizeLeavesObjectHandleUnmodified) {
   const char* src =
       "class Inner;\n"

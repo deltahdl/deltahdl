@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Annex D.2: $countdrivers returns 1 to flag bus contention when a net is
-// driven by more than one driver. Two continuous assignments place two drivers
-// on w.
 TEST(OptionalCountDriversSim, MultipleDriversReportContention) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wire w;\n"
@@ -28,8 +25,6 @@ TEST(OptionalCountDriversSim, MultipleDriversReportContention) {
             1u);
 }
 
-// Annex D.2: $countdrivers returns 0 when the net has no more than one driver,
-// so a single continuous assignment is not contention.
 TEST(OptionalCountDriversSim, SingleDriverIsNotContention) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wire w;\n"
@@ -46,9 +41,6 @@ TEST(OptionalCountDriversSim, SingleDriverIsNotContention) {
             0u);
 }
 
-// Annex D.2 / Table D.1: the optional output arguments receive, in declared
-// order, net_is_forced, number_of_01x_drivers, and the per-state 0/1/x tallies.
-// Here one driver holds 1 and the other holds 0.
 TEST(OptionalCountDriversSim, OptionalArgsCarryForcedStateAndDriverTallies) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -70,9 +62,6 @@ TEST(OptionalCountDriversSim, OptionalArgsCarryForcedStateAndDriverTallies) {
       {{"fc", 0u}, {"c01x", 2u}, {"c0", 1u}, {"c1", 1u}, {"cx", 0u}});
 }
 
-// Annex D.2 / Table D.1: a driver in the high-impedance (z) state is not
-// actively driving and is excluded from the 0/1/x tallies, while an x driver is
-// counted as an x driver.
 TEST(OptionalCountDriversSim, HighImpedanceExcludedAndXCounted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -91,10 +80,6 @@ TEST(OptionalCountDriversSim, HighImpedanceExcludedAndXCounted) {
                    {{"c01x", 1u}, {"c0", 0u}, {"c1", 0u}, {"cx", 1u}});
 }
 
-// Annex D.2: the specified net may be a bit-select of a vector net, and the
-// count is taken on that selected bit. Two whole-vector drivers drive bit 0 the
-// same (contention) but only one of them actively drives bit 1 (the other is
-// z), so the same pair of drivers yields a different verdict per selected bit.
 TEST(OptionalCountDriversSim, BitSelectOfVectorNetCountsSelectedBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -113,9 +98,6 @@ TEST(OptionalCountDriversSim, BitSelectOfVectorNetCountsSelectedBit) {
   LowerRunAndCheck(f, design, {{"nb0", 1u}, {"nb1", 0u}});
 }
 
-// Annex D.2: a net with at most one driver reports no contention, and that
-// includes a net with no driver at all, so an undriven net reports no
-// contention (0) and every Table D.1 tally is zero.
 TEST(OptionalCountDriversSim, NoDriversReportNoContention) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -138,9 +120,6 @@ TEST(OptionalCountDriversSim, NoDriversReportNoContention) {
                     {"cx", 0u}});
 }
 
-// Annex D.2 / Table D.1: drivers sharing a state are each tallied in that
-// state's count, and two drivers -- even with identical values -- still flag
-// contention. Here both drivers hold 0, so number_of_0_drivers is 2.
 TEST(OptionalCountDriversSim, DriversInSameStateBothTallied) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -162,8 +141,6 @@ TEST(OptionalCountDriversSim, DriversInSameStateBothTallied) {
       f, design, {{"n", 1u}, {"c01x", 2u}, {"c0", 2u}, {"c1", 0u}, {"cx", 0u}});
 }
 
-// Annex D.2 / Table D.1: the net_is_forced output argument reports 1 once the
-// net has been forced.
 TEST(OptionalCountDriversSim, NetIsForcedReportedAfterForce) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  wire w;\n"
@@ -181,11 +158,6 @@ TEST(OptionalCountDriversSim, NetIsForcedReportedAfterForce) {
             1u);
 }
 
-// Annex D.2: the net the call names must be scalar, or one bit selected from a
-// vector net. A vector net named whole is neither, and the call is reported
-// rather than answered from the vector's bit 0 -- which, driven twice here,
-// would have flagged contention as if the argument were the bit-select it is
-// not.
 TEST(OptionalCountDriversSim, AVectorNetNamedWholeIsRejected) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -211,8 +183,6 @@ TEST(OptionalCountDriversSim, AVectorNetNamedWholeIsRejected) {
   EXPECT_EQ(n->value.ToUint64(), 0u);
 }
 
-// The same rule for an argument that is no net at all, a variable here: the
-// drivers of no net were counted and the call answered 0 in silence.
 TEST(OptionalCountDriversSim, AnArgumentNamingNoNetIsRejected) {
   SimFixture f;
   auto* design = ElaborateSrc(

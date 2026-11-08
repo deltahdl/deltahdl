@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §16.9.1 / Table 16-1: the operators are listed highest precedence first.
-// The production helper must report a strictly descending precedence in that
-// same order: repetition, ##, throughout, within, intersect, and, or.
 TEST(SequenceOperatorPrecedence, TableOrderStrictlyDescending) {
   const SequenceOperator kOrdered[] = {
       SequenceOperator::kRepetition, SequenceOperator::kCycleDelay,
@@ -29,9 +26,6 @@ TEST(SequenceOperatorPrecedence, TableOrderStrictlyDescending) {
   }
 }
 
-// §16.9.1 / Table 16-1, associativity column: throughout associates right;
-// ##, within, intersect, and, and or associate left; the repetition forms have
-// no associativity.
 TEST(SequenceOperatorPrecedence, AssociativityMatchesTable) {
   EXPECT_EQ(SequenceOperatorAssociativity(SequenceOperator::kRepetition),
             SequenceOperatorAssoc::kNone);
@@ -49,9 +43,6 @@ TEST(SequenceOperatorPrecedence, AssociativityMatchesTable) {
             SequenceOperatorAssoc::kLeft);
 }
 
-// §16.9.1: the single-token operators map to their Table 16-1 category. The
-// cycle-delay token is `##`; throughout, within, intersect, and, and or are
-// keywords.
 TEST(SequenceOperatorPrecedence, TokenMappingForSingleTokenOperators) {
   SequenceOperator op{};
   ASSERT_TRUE(SequenceOperatorFromToken(TokenKind::kHashHash, &op));
@@ -68,7 +59,6 @@ TEST(SequenceOperatorPrecedence, TokenMappingForSingleTokenOperators) {
   EXPECT_EQ(op, SequenceOperator::kOr);
 }
 
-// A token that does not head a sequence operation is rejected by the mapping.
 TEST(SequenceOperatorPrecedence, TokenMappingRejectsNonOperator) {
   SequenceOperator op = SequenceOperator::kRepetition;
   EXPECT_FALSE(SequenceOperatorFromToken(TokenKind::kPlus, &op));

@@ -5,39 +5,17 @@
 #include <string_view>
 #include <vector>
 
-#include "simulator/vpi_user.h"
-// §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
 bool VpiIsExprType(int type) {
-  // §37.59: the member kinds the expr class draws - an operation, a constant, a
-  // part-select or indexed part-select, the func/method-func/sys-func calls, a
-  // let expression, and the `simple expr` class nested inside it.
-  //
-  // That nested class is a class, and §37.4.1 makes one a grouping of further
-  // objects and classes rather than a kind of its own, so what the expr class
-  // holds is what `simple expr` holds. §37.58 draws it holding a ref obj, a
-  // parameter, a spec param, a var select and a bit select, beside the nets and
-  // variables classes. Only the ref obj was named here, as though the reference
-  // were the whole of a simple expression: a parameter, a spec param and either
-  // kind of select were expressions to nothing, so every arrow the model draws
-  // to `expr` - a loop's condition (§37.66), a wait's (§37.67), a repeat
-  // control's count (§37.69), an if's (§37.71), a return's value (§37.78), a
-  // typespec member's default (§37.25 detail 7) and the operands of an
-  // operation among them - passed over a source expression written as any of
-  // the four.
-  //
-  // Variables and nets stay out, which is what the two classes drawn beside
-  // those five in §37.58 are: a protected variable keeps its properties
-  // guarded, §37.3.5 detail 8 carving out only protected expressions.
   switch (type) {
     case vpiOperation:
     case vpiConstant:
@@ -59,24 +37,6 @@ bool VpiIsExprType(int type) {
 }
 
 bool VpiIsAtomicStmtType(int type) {
-  // §37.60: the members drawn inside the atomic stmt class.
-  //
-  // Three of those members - `waits`, `disables` and `tf call` - are class
-  // references rather than object definitions, and §37.4.1 makes a class a
-  // grouping of every object drawn inside it, so each stands for all of its
-  // kinds. One kind of each stood in for the whole of it. §37.67 draws a wait,
-  // an ordered wait and a wait fork in `waits` and §37.77 draws a disable and a
-  // disable fork in `disables`, so an ordered wait, a wait fork and a disable
-  // fork were no more atomic statements than a module is, and with that no
-  // statements at all: every relation the model draws to the dotted `stmt`
-  // enclosure reaches the kinds that class groups, and those three were outside
-  // it. Both groupings are named here in full.
-  //
-  // `tf call` is held here as its three kinds that call a task, each a
-  // statement wherever it stands. §37.42 draws the three function calls in it
-  // too, and §37.59 draws them in `expr` as well, so a function call is a
-  // statement only where it was written as one. Its kind cannot say which, and
-  // VpiIsAtomicStmtObject below admits it by the object instead.
   if (VpiIsWaitType(type) || VpiIsDisableType(type)) return true;
   switch (type) {
     case vpiIf:
@@ -91,9 +51,9 @@ bool VpiIsAtomicStmtType(int type) {
     case vpiAssignment:
     case vpiAssignStmt:
     case vpiDeassign:
-    case vpiTaskCall:        // the "tf call" grouping: a task call ...
-    case vpiSysTaskCall:     // ... or a system-task call
-    case vpiMethodTaskCall:  // ... or a method task call
+    case vpiTaskCall:
+    case vpiSysTaskCall:
+    case vpiMethodTaskCall:
     case vpiForever:
     case vpiForce:
     case vpiRelease:
@@ -126,11 +86,6 @@ bool VpiIsScopeBodyStmtObject(VpiHandle obj) {
 }
 
 bool VpiIsPatternType(int type) {
-  // §37.72: `pattern` is drawn as a class definition - bold italic letters in a
-  // dotted enclosure - and §37.4.1 makes such an enclosure a grouping of the
-  // object definitions inside it rather than an object anything can be. These
-  // are its three pattern kinds; the expr it also holds is an object of its
-  // own kind (VpiPatternOf), and vpiPattern names the group, not a kind.
   switch (type) {
     case vpiAnyPattern:
     case vpiTaggedPattern:
@@ -142,10 +97,6 @@ bool VpiIsPatternType(int type) {
 }
 
 VpiHandle VpiPatternOf(VpiHandle pattern) {
-  // §37.72 (figure): a tagged pattern reaches the pattern it tags and a struct
-  // pattern the pattern of its member, each drawn to the `pattern` class: an
-  // object of a kind the class groups, an expr among them (§12.6's
-  // constant_expression), never one typed vpiPattern. Null where it holds none.
   if (!pattern) return nullptr;
   for (auto* child : pattern->children) {
     if (VpiIsPatternType(child->type) || VpiIsExprOperandType(child->type)) {
@@ -156,27 +107,11 @@ VpiHandle VpiPatternOf(VpiHandle pattern) {
 }
 
 bool VpiIsCaseItemConditionType(int type) {
-  // §37.72: a case item reaches its match expressions through the vpiExpr edge,
-  // which the diagram draws to both the pattern class and a plain expr. A
-  // condition is therefore a pattern of one of the kinds that class groups, or
-  // an expression.
   if (VpiIsPatternType(type)) return true;
   return type == vpiExpr || VpiIsExprType(type);
 }
 
 VpiHandle VpiCaseConditionExpr(VpiHandle case_stmt) {
-  // §37.72 (figure): a case statement reaches the expression it selects on
-  // through vpiCondition, exactly as the conditional and looping statements of
-  // §37.71, §37.74 and §37.75 reach theirs. The condition's own type is an
-  // expression kind rather than the vpiCondition relation tag, so it is found
-  // by scanning for the first expression child; the case items the diagram's
-  // other edge reaches are vpiCaseItem children this scan skips. Null when no
-  // condition is attached.
-  //
-  // Nothing resolved this relation at all, and the generic traversal it fell
-  // through to looks for a child whose own type is the requested one -- which
-  // for a relation tag is a kind no object has -- so the expression a case
-  // selects on was reachable from the case by no route.
   if (!case_stmt) return nullptr;
   for (auto* child : case_stmt->children) {
     if (VpiIsOperandObject(child)) return child;
@@ -185,12 +120,6 @@ VpiHandle VpiCaseConditionExpr(VpiHandle case_stmt) {
 }
 
 std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item) {
-  // §37.72 detail 1: a case item groups every case condition that branches to
-  // the same statement; those conditions are its match-expression members. The
-  // statement reached through the item's -> stmt edge is not one of them, so
-  // only the pattern/expr children are collected, in declaration order. The
-  // default case item has no condition expression (detail 2), so it groups none
-  // - enforced here even if the object carries stray children.
   std::vector<VpiHandle> conditions;
   if (!case_item || case_item->default_case_item) return conditions;
   for (auto* child : case_item->children) {
@@ -202,10 +131,6 @@ std::vector<VpiHandle> VpiCaseItemMatchExprs(VpiHandle case_item) {
 }
 
 int VpiAssignmentOpType(std::string_view assign_operator) {
-  // §37.64 detail 1: an assignment operator reports the operator combined with
-  // the assignment, per 11.4.1. The plain "=" and "<=" forms are normal
-  // assignments and report vpiAssignmentOp, as does any spelling that is not an
-  // assignment operator.
   if (assign_operator == "+=") return vpiAddOp;
   if (assign_operator == "-=") return vpiSubOp;
   if (assign_operator == "*=") return vpiMultOp;
@@ -222,22 +147,8 @@ int VpiAssignmentOpType(std::string_view assign_operator) {
 }
 
 std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
-  // §36.10.3: an expression of more than one operand is reached as a handle of
-  // type vpiOperation, and the routine the clause prints for walking one
-  // reaches those operands with vpi_iterate(vpiOperand, expr). An operand is
-  // itself an expression - the example recurses into each - so the operands are
-  // the operation's expression children, in the order it was written.
-  //
-  // §37.58 draws the nets and variables classes inside `simple expr`, so a net
-  // or variable an operation reads is one of its operands. VpiIsExprType leaves
-  // the two out for the protection rule it serves, and taken here alone it left
-  // every operation over the design's nets with no operand at all.
   std::vector<VpiHandle> operands;
   if (!operation || operation->type != vpiOperation) return operands;
-  // §37.52 draws a property operation's operands as property exprs, and
-  // §37.54 a sequence operation's as sequence exprs, a sequence inst among
-  // them; §37.59 draws them to a class holding §37.72's patterns, which a
-  // structure pattern's assignment pattern operation has (detail 6).
   for (auto* child : operation->children) {
     if (VpiIsExprOperandType(child->type) ||
         VpiIsPropertyExprType(child->type) ||
@@ -249,52 +160,15 @@ std::vector<VpiHandle> VpiOperationOperands(VpiHandle operation) {
 }
 
 bool VpiIsProcessType(int type) {
-  // §37.63: `process` is drawn as a class definition - bold italic letters in a
-  // dotted enclosure - holding the initial, final and always object
-  // definitions, and §37.4.1 makes such an enclosure a grouping rather than an
-  // object of its own. So vpiProcess is the group's name and these three are
-  // the kinds a procedure an application reaches actually has; detail 1's four
-  // always_comb/always_ff/always_latch forms are vpiAlwaysType values of the
-  // always object rather than object kinds beside it.
   return type == vpiAlways || type == vpiInitial || type == vpiFinal;
 }
 
 bool VpiIsAlwaysType(int always_type) {
-  // §37.63 detail 1: vpiAlwaysType can be exactly one of these four constants.
-  // vpiAlways names a general always procedure; vpiAlwaysComb, vpiAlwaysFF, and
-  // vpiAlwaysLatch name the three specialized
-  // always_comb/always_ff/always_latch forms. Nothing else is an always type.
   return always_type == vpiAlways || always_type == vpiAlwaysComb ||
          always_type == vpiAlwaysFF || always_type == vpiAlwaysLatch;
 }
 
 bool VpiIsBodyStmtOwnerType(int type) {
-  // The kinds that reach a body statement through vpiStmt by the object model
-  // drawing an untagged single arrow from them to the dotted `stmt` enclosure.
-  // §37.4.3 makes an untagged relation's type the enclosure's words with "vpi"
-  // in front, so one arrow drawn eight times is one relation. §37.63 draws it
-  // from a process and §37.66 from the enclosure holding `while` and `repeat`;
-  // §37.67 draws it from the `waits` enclosure; §37.70 from a forever, which is
-  // the whole of that clause, a forever carrying no condition, no property and
-  // no detail beside its body; §37.71 from the enclosure holding `if` and
-  // `if else`, where it is the then-branch the condition selects; §37.73 from
-  // an expect statement, where it is the action a passing property
-  // specification runs; §37.74 from a for statement, where it is the body the
-  // header loops over, the statements the header itself writes being held apart
-  // from the children so that none of them stands where the body is looked for;
-  // and §37.75 from a do-while and from a foreach statement, whose other edges
-  // reach a condition, the array being indexed and the index variables, none of
-  // them a statement; and §37.72 from a case item, whose others reach its
-  // conditions.
-  //
-  // Every kind but the process and §37.66's two loops was left out, so the
-  // relation fell through to the traversal that looks for a child whose own
-  // type is the relation tag. §37.4.1 makes the dotted `stmt` enclosure a class
-  // that groups other objects and classes rather than an object kind, so no
-  // statement a design holds has vpiStmt for its own type, and the body of
-  // every forever, for, do-while and foreach loop, the then-branch of every
-  // conditional and the pass action of every expect statement that could be
-  // written were reached by nothing.
   return VpiIsProcessType(type) || VpiIsWhileOrRepeatType(type) ||
          VpiIsWaitType(type) || type == vpiForever ||
          VpiIsIfOrIfElseType(type) || type == vpiExpectStmt || type == vpiFor ||
@@ -302,21 +176,10 @@ bool VpiIsBodyStmtOwnerType(int type) {
 }
 
 bool VpiIsWaitType(int type) {
-  // §37.67: the wait statements the diagram groups under the abstract "waits"
-  // label - a wait, an ordered wait, and a wait fork. All three reach a body
-  // statement through the generic vpiStmt edge; the wait and ordered wait
-  // additionally reach a controlling condition through vpiCondition.
   return type == vpiWait || type == vpiOrderedWait || type == vpiWaitFork;
 }
 
 VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
-  // §37.67: a wait or ordered wait statement reaches its controlling condition
-  // through vpiCondition. The diagram routes that edge to either an expression
-  // or a sequence instance, so the condition is the first child whose own type
-  // is an expression kind or a sequence instance - never the vpiCondition
-  // relation tag itself, which is why the generic child walk cannot serve it.
-  // Null when none is attached, as for a wait fork, which draws no condition
-  // edge.
   if (!wait) return nullptr;
   for (auto* child : wait->children) {
     if (VpiIsOperandObject(child) || child->type == vpiSequenceInst) {
@@ -326,24 +189,12 @@ VpiHandle VpiWaitConditionExpr(VpiHandle wait) {
   return nullptr;
 }
 
-// §37.47 (figure): the dotted enclosure holding `cont assign` and `cont assign
-// bit` carries no name, and §37.4.1 makes such an enclosure a grouping of the
-// objects drawn inside it that nothing elsewhere refers to as a group.
-// So what it groups is answered here rather than published as a class, and the
-// vpiLhs, vpiRhs and vpiDelay edges drawn on it belong to both of them.
 bool VpiIsContAssignKind(int type) {
   return type == vpiContAssign || type == vpiContAssignBit;
 }
 
 namespace {
 
-// The second of the statements an object carries, or null where it carries
-// fewer than two. §37.67's ordered wait, §37.71's if-else and §37.73's expect
-// statement each draw two arrows to the dotted `stmt` enclosure - a body or
-// pass action and an else action - and §37.4.1 makes that enclosure a class
-// grouping other objects and classes rather than a kind, so neither statement
-// carries the name of either arrow and position is what tells them apart,
-// unless a run recorded which is the else action, which §16.3 lets stand alone.
 VpiHandle SecondBodyStmt(VpiHandle stmt) {
   if (stmt->else_stmt != nullptr) return stmt->else_stmt;
   int seen = 0;
@@ -356,48 +207,21 @@ VpiHandle SecondBodyStmt(VpiHandle stmt) {
 
 }  // namespace
 
-// §37.67 (figure): the else action statement an ordered wait reaches through
-// vpiElseStmt. §9.4.4 gives a wait_order an action block of an optional
-// statement followed by an optional else statement, so the else is the second
-// of the two statements the object carries and the first is the body vpiStmt
-// reaches. vpiElseStmt is a relation tag rather than an object kind, so the
-// walk that looks for a child whose own type is the tag found the else action
-// of no ordered wait a design could hold; the statements are told apart by
-// their position instead, which is how §37.55 tells an assertion's pass action
-// from its fail action.
 VpiHandle VpiOrderedWaitElseStmt(VpiHandle wait) {
   if (!wait || wait->type != vpiOrderedWait) return nullptr;
   return SecondBodyStmt(wait);
 }
 
-// §37.73 (figure): the else action statement an expect statement reaches
-// through vpiElseStmt, drawn beside an untagged arrow to a pass action and one
-// to the property specification the statement watches. The two actions are the
-// two statements the object carries, in the order 16.17 writes them, so the
-// else is the second; the walk that looks for a child whose own type is the
-// vpiElseStmt tag reached the fail action of no expect statement a design could
-// hold, the tag naming a relation rather than a kind.
 VpiHandle VpiExpectElseStmt(VpiHandle expect) {
   if (!expect || expect->type != vpiExpectStmt) return nullptr;
   return SecondBodyStmt(expect);
 }
 
 bool VpiIsDisableType(int type) {
-  // §37.77: the two statements the disables diagram groups - a disable, which
-  // names the scope it terminates through vpiExpr, and a disable fork, which
-  // terminates the calling process's children and so names none. The grouping
-  // is a class definition, drawn in bold italic letters in a dotted enclosure,
-  // so vpiDisable is the kind of the one statement rather than the name of the
-  // pair, and §37.60 draws the class inside `atomic stmt` as a reference to
-  // both.
   return type == vpiDisable || type == vpiDisableFork;
 }
 
 bool VpiIsDisableTargetType(int type) {
-  // §37.77: the named scopes the disable diagram lists at the far end of the
-  // disable's vpiExpr edge - a task, a function, a named begin block, or a
-  // named fork block. A disable statement names exactly one of these to
-  // terminate.
   switch (type) {
     case vpiTask:
     case vpiFunction:
@@ -410,14 +234,6 @@ bool VpiIsDisableTargetType(int type) {
 }
 
 VpiHandle VpiDisableExpr(VpiHandle disable) {
-  // §37.77: a disable statement reaches the named scope it disables through
-  // vpiExpr. Unlike most vpiExpr targets the scope is not an expression: its
-  // own type is a task, function, named begin, or named fork kind rather than
-  // the vpiExpr relation tag, so the generic child walk cannot find it. It is
-  // located as the disable's first disable-target child; null when none is
-  // attached. The companion disable fork form carries no named operand and so
-  // is handled by the caller scoping this relation to the plain disable
-  // statement.
   if (!disable) return nullptr;
   if (disable->disable_target != nullptr) return disable->disable_target;
   for (auto* child : disable->children) {
@@ -427,21 +243,10 @@ VpiHandle VpiDisableExpr(VpiHandle disable) {
 }
 
 bool VpiIsIfOrIfElseType(int type) {
-  // §37.71: the two conditional statements the if/if-else diagram groups - a
-  // plain if statement and an if-else statement. Both reach a controlling
-  // condition expression (vpiCondition) and a then-branch body (the generic
-  // vpiStmt edge); the if-else additionally draws an else-branch body
-  // (vpiElseStmt).
   return type == vpiIf || type == vpiIfElse;
 }
 
 VpiHandle VpiIfConditionExpr(VpiHandle if_stmt) {
-  // §37.71: an if or if-else statement reaches its controlling condition
-  // through vpiCondition. The condition's own type is an expression kind (an
-  // operation, a reference, a constant, ...) rather than the vpiCondition
-  // relation tag, so it is found by scanning for the first expression child.
-  // The branch bodies are statement children and are skipped by this scan. Null
-  // when none is attached.
   if (!if_stmt) return nullptr;
   for (auto* child : if_stmt->children) {
     if (VpiIsOperandObject(child)) return child;
@@ -450,31 +255,11 @@ VpiHandle VpiIfConditionExpr(VpiHandle if_stmt) {
 }
 
 VpiHandle VpiIfElseStmt(VpiHandle if_stmt) {
-  // §37.71: an if-else statement reaches its else-branch body through
-  // vpiElseStmt. The then-branch and the else-branch are both drawn to the
-  // dotted `stmt` enclosure, and §9.4.2's conditional_statement writes them one
-  // after the other, so the two are told apart by position: the first statement
-  // child is the then-branch the untagged arrow reaches and the second is the
-  // else-branch. Null when the statement carries no second one.
-  //
-  // Both were counted by asking for a child whose own type is vpiStmt.
-  // §37.4.1 makes the dotted enclosure a class grouping other objects and
-  // classes rather than a kind, so a statement of a design carries the kind it
-  // is - a begin, an assignment, another if - and never the class's name; the
-  // count never reached one and no else-branch was found.
   if (!if_stmt) return nullptr;
   return SecondBodyStmt(if_stmt);
 }
 
 VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt) {
-  // §37.78: a return statement reaches the value it returns through the single
-  // edge the diagram draws, labeled vpiCondition. As with the looping and
-  // conditional statements (§37.66/§37.71/§37.74/§37.75), that value's own type
-  // is an expression kind (an operation, a reference, a constant, ...) rather
-  // than the vpiCondition relation tag, so it is found by scanning for the
-  // first expression child. A return from a void function or a task carries no
-  // value and so has no expression child; the scan then finds nothing and
-  // returns null.
   if (!return_stmt) return nullptr;
   for (auto* child : return_stmt->children) {
     if (VpiIsExprType(child->type)) return child;
@@ -482,18 +267,9 @@ VpiHandle VpiReturnConditionExpr(VpiHandle return_stmt) {
   return nullptr;
 }
 
-// ===========================================================================
-// §37.12 Scope.
-// ===========================================================================
-
 bool VpiIsBlockItemDeclType(int type) {
-  // §37.12 detail 1: a block item declaration is a variable declaration or a
-  // type declaration. The variable kinds are the concrete var objects (§37.17);
-  // a type declaration is a typedef. A localparam declared in a block is a
-  // parameter, which the diagram draws among a scope's members, so it counts as
-  // a block item declaration too.
   switch (type) {
-    case vpiLogicVar:  // == vpiReg
+    case vpiLogicVar:
     case vpiIntegerVar:
     case vpiRealVar:
     case vpiShortRealVar:
@@ -510,7 +286,7 @@ bool VpiIsBlockItemDeclType(int type) {
     case vpiClassVar:
     case vpiChandleVar:
     case vpiPackedArrayVar:
-    case vpiArrayVar:  // == vpiRegArray
+    case vpiArrayVar:
     case vpiTypedef:
     case vpiParameter:
       return true;
@@ -520,11 +296,6 @@ bool VpiIsBlockItemDeclType(int type) {
 }
 
 bool VpiBlockScopeIsScope(VpiHandle block) {
-  // §37.12 detail 1: a named begin or named fork is always a scope. An unnamed
-  // begin or unnamed fork is a scope only if it directly contains a block item
-  // declaration - a directly-nested declaration, not one buried in a deeper
-  // named block. §37.12 detail 2: a for statement is a scope exactly when it
-  // declares its loop control variables local to the loop (vpiLocalVarDecls).
   if (!block) return false;
   switch (block->type) {
     case vpiNamedBegin:
@@ -544,18 +315,10 @@ bool VpiBlockScopeIsScope(VpiHandle block) {
 }
 
 bool VpiIsLoopControlVarType(int type) {
-  // §37.12 details 2 and 3: a loop control variable is a variable - the var
-  // kinds a for or foreach statement declares as its index. A type declaration
-  // or a parameter, though both block item declarations, is not a loop
-  // variable.
   return VpiIsBlockItemDeclType(type) && type != vpiTypedef &&
          type != vpiParameter;
 }
 
-// §37.12 detail 7: an array of virtual interfaces is an array variable whose
-// elements are virtual interface vars (§37.29). Used to expand the array under
-// a scope's vpiVirtualInterfaceVar iteration and to report it as the single
-// array var under the scope's vpiVariables iteration.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj) {
   if (!obj || !VpiIsArrayVarType(obj->type)) return false;
   for (auto* elem : obj->children) {
@@ -565,22 +328,14 @@ bool VpiIsVirtualInterfaceArray(VpiHandle obj) {
 }
 
 bool VpiIsJoinType(int join_type) {
-  // §37.12 detail 6: vpiJoinType is exactly one of these three constants -
-  // vpiJoin for a plain join, vpiJoinNone for join_none, vpiJoinAny for
-  // join_any. Nothing else is a join type.
   return join_type == vpiJoin || join_type == vpiJoinNone ||
          join_type == vpiJoinAny;
 }
 
 bool VpiIsTaskFuncType(int type) {
-  // §37.12: the "task func" node groups tasks and functions; the combined
-  // vpiTaskFunc kind also denotes one.
   return type == vpiTask || type == vpiFunction || type == vpiTaskFunc;
 }
 
-// §37.12 detail 5: a statement child of a task or function body - the kinds a
-// task/func groups as its statements. The atomic statements (§37.60) plus the
-// block kinds (a begin/fork, named or not) that group several statements.
 bool VpiIsScopeBodyStmtType(int type) {
   if (VpiIsAtomicStmtType(type)) return true;
   switch (type) {
@@ -595,12 +350,6 @@ bool VpiIsScopeBodyStmtType(int type) {
 }
 
 VpiHandle VpiTaskFuncStmt(VpiHandle task_func) {
-  // §37.12 detail 5: a task or function can have zero or more statements. With
-  // none, vpiStmt is null. With more than one, the statements are grouped under
-  // an unnamed begin and that begin is the body; with exactly one, that
-  // statement is the body. In every nonzero case the body is the task/func's
-  // single statement child, so return the first statement child, or null when
-  // the body holds no statement.
   if (!task_func) return nullptr;
   for (auto* child : task_func->children) {
     if (VpiIsScopeBodyStmtObject(child)) return child;
@@ -610,8 +359,6 @@ VpiHandle VpiTaskFuncStmt(VpiHandle task_func) {
 
 std::vector<VpiHandle> VpiMultiConcatOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& concat_exprs) {
-  // §37.59 detail 1: the multiplier first, then the concatenation's expressions
-  // in order.
   std::vector<VpiHandle> operands;
   operands.reserve(concat_exprs.size() + 1);
   operands.push_back(multiplier);
@@ -621,9 +368,6 @@ std::vector<VpiHandle> VpiMultiConcatOperands(
 
 std::vector<VpiHandle> VpiMultiAssignmentPatternOperands(
     VpiHandle multiplier, const std::vector<VpiHandle>& pattern_exprs) {
-  // §37.59 detail 7: the multiplier first, then the assignment pattern's
-  // expressions in order - the same shape as a multiconcat (detail 1) but over
-  // a distinct operator.
   std::vector<VpiHandle> operands;
   operands.reserve(pattern_exprs.size() + 1);
   operands.push_back(multiplier);
@@ -632,18 +376,12 @@ std::vector<VpiHandle> VpiMultiAssignmentPatternOperands(
 }
 
 std::vector<VpiHandle> VpiCastOpOperands(VpiHandle cast_expr) {
-  // §37.59 detail 3: a cast is a unary operation; its only operand is the
-  // expression being cast (the target type is the typespec, not an operand).
   return {cast_expr};
 }
 
 std::vector<VpiHandle> VpiAssignmentPatternPositionalOperands(
     int slots, const std::vector<VpiAssignmentPatternEntry>& positioned,
     VpiHandle default_value) {
-  // §37.59 detail 6: seed every position with the default value, then place
-  // each explicitly positioned entry. Iterating the result reproduces the
-  // pattern in positional notation; nested patterns stay whole because each
-  // value is an opaque handle.
   size_t count = slots > 0 ? static_cast<size_t>(slots) : 0;
   std::vector<VpiHandle> operands(count, default_value);
   for (const auto& entry : positioned) {
@@ -656,10 +394,6 @@ std::vector<VpiHandle> VpiAssignmentPatternPositionalOperands(
 
 bool VpiTypespecAlwaysAvailable(int op_type, bool is_simple_expr,
                                 bool assignment_pattern_has_type_prefix) {
-  // §37.59 detail 5: guaranteed for a simple expression and a cast operation;
-  // guaranteed for an assignment-pattern operation only when its braces are
-  // prefixed by a data type name. Any other expression is implementation
-  // dependent, so the guarantee does not hold.
   if (is_simple_expr) return true;
   if (op_type == vpiCastOp) return true;
   if (op_type == vpiAssignmentPatternOp ||
@@ -671,16 +405,11 @@ bool VpiTypespecAlwaysAvailable(int op_type, bool is_simple_expr,
 
 bool VpiPartSelectConstantSelect(
     const VpiPartSelectConstantSelectQuery& query) {
-  // §37.59 detail 9: all three conditions must hold; otherwise FALSE.
   return query.parent_constant_select && query.parent_array_has_static_bounds &&
          query.all_range_exprs_constant;
 }
 
 std::string VpiPartSelectParentExpr(std::string_view select_expr) {
-  // §37.59 detail 10: remove the trailing bracketed selection. After trimming
-  // trailing white space, if the expression ends with ']' the matching '[' is
-  // located (honoring nested brackets) and everything from it onward is
-  // dropped, yielding the parent expression of Table 37-1.
   size_t end = select_expr.size();
   while (end > 0 &&
          std::isspace(static_cast<unsigned char>(select_expr[end - 1]))) {
@@ -705,9 +434,6 @@ std::string VpiPartSelectParentExpr(std::string_view select_expr) {
 }
 
 std::string VpiDecompileJoin(const std::vector<std::string>& pieces) {
-  // §37.59 detail 2: exactly one space between adjacent operands and operators.
-  // Empty pieces are skipped so the single-space rule never produces a double
-  // space or a leading/trailing space.
   std::string out;
   for (const auto& piece : pieces) {
     if (piece.empty()) continue;
@@ -718,20 +444,13 @@ std::string VpiDecompileJoin(const std::vector<std::string>& pieces) {
 }
 
 std::string VpiDecompileParenthesize(std::string_view inner) {
-  // §37.59 detail 2: parentheses add no white space - none inside and none
-  // around them.
   std::string out = "(";
   out += inner;
   out.push_back(')');
   return out;
 }
 
-// ===========================================================================
-// §37.42 Task and function call.
-// ===========================================================================
-
 bool VpiIsTfCallType(int type) {
-  // §37.42: the concrete call kinds the "tf call" class groups.
   switch (type) {
     case vpiFuncCall:
     case vpiTaskCall:
@@ -750,20 +469,10 @@ const std::vector<VpiObject*>& VpiSubexpressions(const VpiObject& expr) {
 }
 
 bool VpiIsMethodCallType(int type) {
-  // §37.42: the method-call kinds (method func call and method task call).
   return type == vpiMethodFuncCall || type == vpiMethodTaskCall;
 }
 
 bool VpiIsTfCallArgumentType(int type) {
-  // §37.42: the vpiArgument relation of a tf call reaches an expr, an interface
-  // expr, a scope, a primitive, a named event, or a named event array. An expr,
-  // an interface expr and a scope are themselves groupings (§37.4.1), so defer
-  // to their classifiers; the rest are concrete kinds. The scope class was
-  // taken for a kind of its own, which no object is, so a module passed as an
-  // argument was none.
-  //
-  // §37.58 holds nets and variables in simple expr, so a net or variable passed
-  // as an argument is one too.
   if (VpiIsExprOperandType(type) || VpiIsInterfaceExprType(type) ||
       VpiIsInternalScopeType(type)) {
     return true;
@@ -778,24 +487,18 @@ bool VpiIsTfCallArgumentType(int type) {
 }
 
 void VpiMakeEmptyArgument(VpiHandle arg) {
-  // §37.42 detail 8: an omitted argument is represented as an expression of
-  // type vpiOperation whose operator is the null operation.
   if (!arg) return;
   arg->type = vpiOperation;
   arg->op_type = vpiNullOp;
 }
 
 void VpiMakeNullArgument(VpiHandle arg) {
-  // §37.42 detail 8: an argument that is the special value null is represented
-  // as a constant expression whose constant type is the null constant.
   if (!arg) return;
   arg->type = vpiConstant;
   arg->const_type = vpiNullConst;
 }
 
 void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter) {
-  // §37.42: the arguments the call was written with, in order, each of a kind
-  // the vpiArgument arrow reaches.
   for (VpiObject* arg : call->arguments) {
     if (arg != nullptr && VpiIsTfCallArgumentType(arg->type)) {
       iter->children.push_back(arg);
@@ -803,42 +506,20 @@ void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter) {
   }
 }
 
-// ===========================================================================
-// §37.43 Frames (shared with §37.44's frame--thread edge and vpiActive).
-// ===========================================================================
-
 VpiHandle VpiFrameParent(VpiHandle frame) {
-  // §37.43 detail 5: vpiParent reaches the frame from which this child frame
-  // was activated, through the parent link when that parent is itself a frame.
-  // A root frame (no parent) and a null handle report none. This mirrors
-  // §37.44's VpiThreadParent, the same parent-chain relation one level up.
   if (!frame || !frame->parent) return nullptr;
   return frame->parent->type == vpiFrame ? frame->parent : nullptr;
 }
 
 VpiHandle VpiFrameOrigin(VpiHandle frame) {
-  // §37.43 detail 6: the elaboration-hierarchy point a frame was activated
-  // from, which the activation recorded (ActivateFrame).
   return frame != nullptr ? frame->frame_facts.origin : nullptr;
 }
 
 VpiHandle VpiFrameStmt(VpiHandle frame) {
-  // §37.43 details 4 and 5: the frame-to-stmt transition. For the active frame
-  // this is the currently active statement within it; for a parent frame it is
-  // the atomic statement or scope whose execution activated the child frame.
-  // Either way it is the statement that ran in the frame last, which the run
-  // records as each one begins (VpiContext::NoteStmtExecuting).
   return frame != nullptr ? frame->frame_facts.stmt : nullptr;
 }
 
 VpiHandle VpiFrameThread(VpiHandle frame) {
-  // §37.43 (frame--thread edge): the thread a frame belongs to, the reverse of
-  // §37.44's VpiThreadFrame. The thread holds the frame, and making the two
-  // each other's child would put a cycle in the object graph that
-  // ReleaseHandleSubtree walks. §37.43 detail 5 leaves the way up: a frame was
-  // activated from the frame above it and the outermost of a call chain from
-  // the thread itself, so the chain of parents ends at the thread this frame
-  // belongs to.
   if (!frame) return nullptr;
   VpiHandle up = frame;
   while (up->parent != nullptr && up->parent->type == vpiFrame) {
@@ -849,20 +530,10 @@ VpiHandle VpiFrameThread(VpiHandle frame) {
 }
 
 std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame) {
-  // §37.43 detail 1: the vpiAutomatics relation yields a frame's locally
-  // declared automatic objects - its variables, named events, and named event
-  // arrays - in order. A frame is an activation of the task or function its
-  // origin calls, so they are the automatic ones that subroutine declares. A
-  // null handle, and a frame activated from no call of a subroutine the model
-  // holds, yield none.
   std::vector<VpiHandle> automatics;
   VpiHandle origin = VpiFrameOrigin(frame);
   if (origin == nullptr || origin->tf_decl == nullptr) return automatics;
   for (auto* child : origin->tf_decl->children) {
-    // §37.4.1: the diagram draws the variables node as the `variables` class,
-    // which groups the object definitions inside its enclosure rather than
-    // being an object of its own, so the automatics are objects of those kinds
-    // (§37.17) alongside named events and named event arrays.
     const bool kDeclared = VpiIsVariablesType(child->type) ||
                            child->type == vpiNamedEvent ||
                            child->type == vpiNamedEventArray;
@@ -870,9 +541,5 @@ std::vector<VpiHandle> VpiFrameAutomatics(VpiHandle frame) {
   }
   return automatics;
 }
-
-// ===========================================================================
-// §37.22 Object range (shared with §37.17's range relations).
-// ===========================================================================
 
 }  // namespace delta

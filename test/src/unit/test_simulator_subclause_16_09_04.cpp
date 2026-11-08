@@ -54,73 +54,48 @@ TEST(SvaEngine, GotoRepetitionEndsAtMatch) {
   EXPECT_FALSE(MatchGotoRepetition(seq, {0, 1, 0}));
 }
 
-// §16.9.4: $rose_gclk/$fell_gclk report the LSB changing to 1 / to 0 between
-// the preceding and current global clock ticks.
 TEST(GlobalClockingSampledValue, PastEdgeFunctions) {
-  EXPECT_TRUE(RoseGclk(/*prev_lsb=*/0, /*cur_lsb=*/1));
-  EXPECT_FALSE(RoseGclk(/*prev_lsb=*/1, /*cur_lsb=*/1));
-  EXPECT_TRUE(FellGclk(/*prev_lsb=*/1, /*cur_lsb=*/0));
-  EXPECT_FALSE(FellGclk(/*prev_lsb=*/0, /*cur_lsb=*/0));
+  EXPECT_TRUE(RoseGclk(0, 1));
+  EXPECT_FALSE(RoseGclk(1, 1));
+  EXPECT_TRUE(FellGclk(1, 0));
+  EXPECT_FALSE(FellGclk(0, 0));
 }
 
-// §16.9.4: $stable_gclk reports the whole expression unchanged and
-// $changed_gclk reports it changed across global clock ticks.
 TEST(GlobalClockingSampledValue, PastStableAndChanged) {
-  EXPECT_TRUE(StableGclk(/*prev_value=*/5, /*cur_value=*/5));
-  EXPECT_FALSE(StableGclk(/*prev_value=*/5, /*cur_value=*/6));
-  EXPECT_TRUE(ChangedGclk(/*prev_value=*/5, /*cur_value=*/6));
-  EXPECT_FALSE(ChangedGclk(/*prev_value=*/5, /*cur_value=*/5));
+  EXPECT_TRUE(StableGclk(5, 5));
+  EXPECT_FALSE(StableGclk(5, 6));
+  EXPECT_TRUE(ChangedGclk(5, 6));
+  EXPECT_FALSE(ChangedGclk(5, 5));
 }
 
-// §16.9.4: the future functions use the subsequent value; $rising_gclk and
-// $falling_gclk report the LSB changing to 1 / to 0 at the next global tick.
 TEST(GlobalClockingSampledValue, FutureEdgeFunctions) {
-  EXPECT_TRUE(RisingGclk(/*cur_lsb=*/0, /*next_lsb=*/1));
-  EXPECT_FALSE(RisingGclk(/*cur_lsb=*/1, /*next_lsb=*/1));
-  EXPECT_TRUE(FallingGclk(/*cur_lsb=*/1, /*next_lsb=*/0));
-  EXPECT_FALSE(FallingGclk(/*cur_lsb=*/0, /*next_lsb=*/0));
+  EXPECT_TRUE(RisingGclk(0, 1));
+  EXPECT_FALSE(RisingGclk(1, 1));
+  EXPECT_TRUE(FallingGclk(1, 0));
+  EXPECT_FALSE(FallingGclk(0, 0));
 }
 
-// §16.9.4: $changing_gclk is the complement of $steady_gclk.
 TEST(GlobalClockingSampledValue, ChangingIsComplementOfSteady) {
-  EXPECT_TRUE(SteadyGclk(/*cur_value=*/3, /*next_value=*/3));
-  EXPECT_FALSE(SteadyGclk(/*cur_value=*/3, /*next_value=*/4));
+  EXPECT_TRUE(SteadyGclk(3, 3));
+  EXPECT_FALSE(SteadyGclk(3, 4));
   EXPECT_EQ(ChangingGclk(3, 3), !SteadyGclk(3, 3));
   EXPECT_EQ(ChangingGclk(3, 4), !SteadyGclk(3, 4));
 }
 
-// §16.9.4: the action block of an assertion using global clocking future
-// sampled value functions, including a default $error (see §16.14.1), is
-// delayed to the global clock tick that follows the last assertion-clock tick.
 TEST(GlobalClockingSampledValue, FutureActionBlockDelayedToFollowingTick) {
   EXPECT_TRUE(GclkFutureActionBlockDelayedToFollowingGlobalTick());
 }
 
-// §16.9.4: a $assertcontrol Kill (control_type 5, see §20.11) affects the
-// attempt only when it occurs at or before the last assertion-clock tick, not
-// in a later time step up to the following global clock tick.
 TEST(GlobalClockingSampledValue, FutureKillTimingBoundsTheAttempt) {
-  EXPECT_TRUE(GclkFutureKillAffectsAttempt(
-      /*kill_at_or_before_last_assertion_tick=*/true));
-  EXPECT_FALSE(GclkFutureKillAffectsAttempt(
-      /*kill_at_or_before_last_assertion_tick=*/false));
+  EXPECT_TRUE(GclkFutureKillAffectsAttempt(true));
+  EXPECT_FALSE(GclkFutureKillAffectsAttempt(false));
 }
 
-// §16.9.4 (Example 3): disable iff is the first-named asynchronous control that
-// acts with respect to the evaluation-attempt interval. With the attempt
-// interval ending at time 80 and the disable condition rst becoming active only
-// at time 82, the attempt is not disabled even though rst is active before the
-// delayed action block executes at time 90; a disable condition active no later
-// than time 80 would disable the attempt.
 TEST(GlobalClockingSampledValue, FutureDisableIffBoundedByAttemptInterval) {
-  EXPECT_FALSE(GclkFutureAttemptDisabledByDisableIff(
-      /*disable_active_time=*/82, /*attempt_interval_end_time=*/80));
-  EXPECT_TRUE(GclkFutureAttemptDisabledByDisableIff(
-      /*disable_active_time=*/80, /*attempt_interval_end_time=*/80));
+  EXPECT_FALSE(GclkFutureAttemptDisabledByDisableIff(82, 80));
+  EXPECT_TRUE(GclkFutureAttemptDisabledByDisableIff(80, 80));
 }
 
-// §16.9.4: $past_gclk and $future_gclk are value-bearing functions; the
-// evaluator recognizes them and yields the (sampled) value of their argument.
 TEST(GlobalClockingSampledValue, EvalValueBearingFunctions) {
   SysTaskFixture f;
   auto* past = MkSysCall(f.arena, "$past_gclk", {MkInt(f.arena, 42)});
@@ -129,8 +104,6 @@ TEST(GlobalClockingSampledValue, EvalValueBearingFunctions) {
   EXPECT_EQ(EvalExpr(future, f.ctx, f.arena).ToUint64(), 7u);
 }
 
-// §16.9.4: the global clocking value-change functions are recognized by the
-// evaluator and return a 1-bit Boolean result.
 TEST(GlobalClockingSampledValue, EvalValueChangeFunctionsAreOneBit) {
   SysTaskFixture f;
   auto* rose = MkSysCall(f.arena, "$rose_gclk", {MkInt(f.arena, 1)});
@@ -139,54 +112,25 @@ TEST(GlobalClockingSampledValue, EvalValueChangeFunctionsAreOneBit) {
   EXPECT_EQ(EvalExpr(changing, f.ctx, f.arena).width, 1u);
 }
 
-// §16.9.4: $rose_gclk/$fell_gclk and the future $rising_gclk/$falling_gclk are
-// defined on the LSB of the expression, so only bit 0 of a wider value matters.
 TEST(GlobalClockingSampledValue, EdgeFunctionsUseLeastSignificantBit) {
-  EXPECT_TRUE(RoseGclk(/*prev_lsb=*/0b10, /*cur_lsb=*/0b11));   // LSB 0 -> 1
-  EXPECT_FALSE(RoseGclk(/*prev_lsb=*/0b11, /*cur_lsb=*/0b10));  // LSB 1 -> 0
-  EXPECT_TRUE(FellGclk(/*prev_lsb=*/0b01, /*cur_lsb=*/0b10));   // LSB 1 -> 0
-  EXPECT_TRUE(RisingGclk(/*cur_lsb=*/0b100, /*next_lsb=*/0b101));
-  EXPECT_TRUE(FallingGclk(/*cur_lsb=*/0b011, /*next_lsb=*/0b010));
+  EXPECT_TRUE(RoseGclk(0b10, 0b11));
+  EXPECT_FALSE(RoseGclk(0b11, 0b10));
+  EXPECT_TRUE(FellGclk(0b01, 0b10));
+  EXPECT_TRUE(RisingGclk(0b100, 0b101));
+  EXPECT_TRUE(FallingGclk(0b011, 0b010));
 }
 
-// §16.9.4: $changed_gclk/$stable_gclk compare the whole expression value, so a
-// change in any bit registers as changed and not stable.
 TEST(GlobalClockingSampledValue, StableComparesWholeValue) {
-  EXPECT_FALSE(StableGclk(/*prev_value=*/0b10,
-                          /*cur_value=*/0b00));  // upper bit changed
-  EXPECT_TRUE(ChangedGclk(/*prev_value=*/0b10, /*cur_value=*/0b00));
+  EXPECT_FALSE(StableGclk(0b10, 0b00));
+  EXPECT_TRUE(ChangedGclk(0b10, 0b00));
 }
 
-// §16.9.4: the evaluator tolerates a global clocking function written with no
-// argument, yielding a defined zero rather than misbehaving.
 TEST(GlobalClockingSampledValue, EvalWithMissingArgumentIsDefined) {
   SysTaskFixture f;
   auto* past = MkSysCall(f.arena, "$past_gclk", {});
   EXPECT_EQ(EvalExpr(past, f.ctx, f.arena).ToUint64(), 0u);
 }
 
-// §16.9.4's five future functions read a value at the *next* global clock tick,
-// which is not the tick the assertion clock is on: $future_gclk(v) gives v as
-// sampled at the following global clock tick. The five cases below give the
-// assertion its own clock, `aclk`, and the global clocking declaration a
-// different one, `gclk`, so that the two ticks stand at different times and a
-// value read at the wrong one is a different value. A design clocking both from
-// one signal would answer the same either way, the sequence of values a run
-// visits being the same sequence shifted by a tick.
-//
-// Each run has one posedge of aclk, at t=5, and one posedge of gclk after it,
-// at t=10, so exactly one attempt is started and exactly one is completed.
-//
-// The operand moves between the two, at t=7, which is after the Preponed
-// region of t=5 and before that of t=10: §16.5.1 makes the sampled value at a
-// tick the value the variable holds in that slot's Preponed region, so the
-// attempt's own tick samples the value before the move and the global tick that
-// completes it samples the value after.
-
-// §16.9.4: $rising_gclk(expression) is true (1'b1) when the sampled LSB of the
-// expression goes to 1 at the following global clocking tick. req is 0 at the
-// assertion tick and 1 at the global tick that follows, so the property holds
-// and its pass action runs once.
 TEST(GlobalClockingFutureSim,
      RisingGclkHoldsWhereTheOperandRisesByTheNextTick) {
   SimFixture f;
@@ -210,10 +154,6 @@ TEST(GlobalClockingFutureSim,
   EXPECT_EQ(hits->value.ToUint64(), 1u);
 }
 
-// §16.9.4, the discriminating counterpart of the case above: req holds 0 across
-// the global tick that completes the attempt, so nothing rises to 1 and the
-// property fails. Without this case a $rising_gclk that answered true for
-// everything would pass the case above.
 TEST(GlobalClockingFutureSim, RisingGclkFailsWhereTheOperandIsSteady) {
   SimFixture f;
   auto* misses = RunAndFindVar(
@@ -237,11 +177,6 @@ TEST(GlobalClockingFutureSim, RisingGclkFailsWhereTheOperandIsSteady) {
   EXPECT_EQ(misses->value.ToUint64(), 1u);
 }
 
-// §16.9.4: $steady_gclk(expression) is true (1'b1) when the expression's
-// sampled value stays the same at the following global clock tick. This is the
-// one of the five whose right answer here is true where a constant 1'b0 is
-// false, so it separates a fix that answers the rising/falling pair from one
-// that answers all five.
 TEST(GlobalClockingFutureSim, SteadyGclkHoldsOverAnOperandThatDoesNotChange) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -263,10 +198,6 @@ TEST(GlobalClockingFutureSim, SteadyGclkHoldsOverAnOperandThatDoesNotChange) {
   EXPECT_EQ(hits->value.ToUint64(), 1u);
 }
 
-// §16.9.4: $future_gclk(v) gives v as sampled at the following global clock
-// tick. v is 8'd0 at the assertion tick and 8'd7 at the global tick that
-// follows, so the comparison against 8'd7 holds; reading v at the assertion's
-// own tick answers 8'd0 and the comparison fails.
 TEST(GlobalClockingFutureSim, FutureGclkReadsTheValueAtTheNextGlobalTick) {
   SimFixture f;
   auto* agree = RunAndFindVar(
@@ -290,11 +221,6 @@ TEST(GlobalClockingFutureSim, FutureGclkReadsTheValueAtTheNextGlobalTick) {
   EXPECT_EQ(agree->value.ToUint64(), 1u);
 }
 
-// §16.9.4: an assertion that holds global clocking future sampled value
-// functions runs its action block only at the global clocking tick after the
-// attempt's last assertion clock tick. The assertion clock ticks at t=5 and the
-// global clocking tick that follows is at t=10, so the pass action reads $time
-// as 10; an action run where the attempt started would read 5.
 TEST(GlobalClockingFutureSim, TheActionBlockRunsAtTheFollowingGlobalTick) {
   SimFixture f;
   auto* when = RunAndFindVar(
@@ -316,18 +242,6 @@ TEST(GlobalClockingFutureSim, TheActionBlockRunsAtTheFollowingGlobalTick) {
   EXPECT_EQ(when->value.ToUint64(), 10u);
 }
 
-// §16.9.4 gives each attempt its own interval, from its tick of the assertion
-// clock to the global clocking tick that follows, so an attempt is started at
-// every tick of the assertion clock while the one before it is still waiting
-// to be answered. The assertion here is clocked on the global clock itself and
-// v is sampled 0, 1, 1, 0, 1, 1, 0 at its seven ticks, each change made in the
-// slot of the tick before the one that samples it; the eighth tick answers the
-// seventh attempt. $rising_gclk(v) holds for the attempts at the first and
-// fourth ticks, so the pass action runs twice, the second time at the fifth
-// tick. An assertion that waited for the answering tick in its own process
-// would miss every other tick and pass once, at the first; one comparing with
-// the value a tick back rather than a tick ahead would pass at the second and
-// fifth attempts, the second time at the sixth tick.
 TEST(GlobalClockingFutureSim, AnAttemptStartsAtEveryTickWhileOneIsWaiting) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -359,12 +273,6 @@ TEST(GlobalClockingFutureSim, AnAttemptStartsAtEveryTickWhileOneIsWaiting) {
   EXPECT_EQ(last->value.ToUint64(), 45u);
 }
 
-// §16.9.4 puts no condition on the property's shape. An implication's
-// attempt at t=5 reads $falling_gclk(a) as a falls by the global tick at t=10,
-// so its antecedent holds, and its consequent b at the assertion tick t=15,
-// where b is 0. The failure's action block runs at the global tick after that
-// last assertion tick, t=20; one evaluated at the assertion's own ticks runs it
-// at t=15, or never, its antecedent not knowing what a does next.
 TEST(GlobalClockingFutureSim, AnImplicationFailsAtTheGlobalTickAfterItsLast) {
   SimFixture f;
   auto* when = RunAndFindVar(
@@ -388,10 +296,6 @@ TEST(GlobalClockingFutureSim, AnImplicationFailsAtTheGlobalTickAfterItsLast) {
   EXPECT_EQ(when->value.ToUint64(), 20u);
 }
 
-// §16.9.4, a sequence of two cycles: the attempt at t=5 sees a rise by the
-// global tick at t=10 and b at t=15, and passes; the attempt at t=15 sees a
-// hold at 1 and fails at once. Both verdicts are taken at the global tick
-// after t=15, so each action block runs once, at t=20.
 TEST(GlobalClockingFutureSim, ASequencesVerdictsComeAtTheGlobalTickAfterThem) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -422,11 +326,6 @@ TEST(GlobalClockingFutureSim, ASequencesVerdictsComeAtTheGlobalTickAfterThem) {
   EXPECT_EQ(when->value.ToUint64(), 20u);
 }
 
-// §16.9.4 times the attempt's interval as though the future values were known
-// in advance, so an operand beside the future function is the one sampled at
-// the attempt's own tick. en is 1 at t=5 and 0 by the global tick at t=10 that
-// answers $rising_gclk(req), so the property holds; reading en at that later
-// tick makes it fail.
 TEST(GlobalClockingFutureSim, AnOperandBesideAFutureFunctionIsReadAtItsTick) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -448,13 +347,6 @@ TEST(GlobalClockingFutureSim, AnOperandBesideAFutureFunctionIsReadAtItsTick) {
   EXPECT_EQ(hits->value.ToUint64(), 1u);
 }
 
-// §16.9.4 with §16.13: a property of two clocks is deferred the same way. The
-// attempt at clk's tick t=5 reads $rising_gclk(a) as a rises by the global
-// tick at t=10, and its consequent b at clk2's next tick, t=15, where b is 0;
-// the failure's action block runs at the global tick after t=15, t=20. The
-// step for t=15 is taken at t=20 and reads that clk2, not clk, ticked at
-// t=15; evaluated at its own ticks, the attempt reads a before it rises and
-// never fails.
 TEST(GlobalClockingFutureSim, AMulticlockedImplicationFailsAtTheGlobalTick) {
   SimFixture f;
   auto* when = RunAndFindVar(

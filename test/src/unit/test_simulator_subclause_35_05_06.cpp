@@ -66,7 +66,6 @@ TEST(DpiRuntime, ImportWithChandleArg) {
   EXPECT_EQ(result.AsChandle(), &dummy);
 }
 
-// The C functions the imports below are bound to.
 int CountCharacters(const char* s) {
   int n = 0;
   while (s[n] != '\0') ++n;
@@ -75,10 +74,6 @@ int CountCharacters(const char* s) {
 void GiveText(const char** o) { *o = "from C"; }
 const char* ReturnedText() { return "returned"; }
 
-// §35.5.6 admits a string formal and result, and §H.8.10 has a string cross
-// as its characters: the design's string reaches the C function as the text it
-// holds, and the text C gives back through an output or as the result is what
-// the design's string then holds.
 TEST(DpiStringFormals, ADesignsStringsCrossAsTheirCharacters) {
   SimFixture f;
   RunWithImportsBound(

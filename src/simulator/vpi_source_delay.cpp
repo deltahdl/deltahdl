@@ -31,10 +31,6 @@ VpiObject* VpiSourceDelayExpression(const std::vector<const Expr*>& delays,
   std::vector<VpiObject*> constants;
   for (const Expr* delay : delays) {
     if (delay == nullptr) break;
-    // Each written delay stands as a constant expression carrying the value
-    // evaluating it produced. The storage goes on the run's arena rather than
-    // through SimContext::CreateVariable, which would enter the delay under a
-    // name the design never declared.
     VpiObject* constant = alloc();
     constant->type = vpiConstant;
     constant->const_type = vpiIntConst;
@@ -46,8 +42,6 @@ VpiObject* VpiSourceDelayExpression(const std::vector<const Expr*>& delays,
   }
   if (constants.empty()) return nullptr;
   if (constants.size() == 1) return constants.front();
-  // The operands of an operation are its expression children (§36.10.3), so
-  // the delays hang there in the order the source wrote them.
   VpiObject* op = alloc();
   op->type = vpiOperation;
   op->op_type = vpiListOp;
@@ -57,8 +51,6 @@ VpiObject* VpiSourceDelayExpression(const std::vector<const Expr*>& delays,
 
 namespace {
 
-// The value `delay` evaluates to, in ticks, with the run's min:typ:max
-// selection set to `mode` (§11.11).
 double TicksUnder(const Expr* delay, DelayMode mode, SimContext& ctx) {
   const DelayMode kSaved = ctx.GetDelayMode();
   ctx.SetDelayMode(mode);
@@ -67,8 +59,6 @@ double TicksUnder(const Expr* delay, DelayMode mode, SimContext& ctx) {
   return static_cast<double>(kTicks);
 }
 
-// The smaller of each of `a`'s and `b`'s values, a turn-off delay none was
-// written for (§10.3.3, §28.16).
 VpiDelayInfo SmallerOf(const VpiDelayInfo& a, const VpiDelayInfo& b) {
   VpiDelayInfo smaller;
   smaller.delay = std::min(a.delay, b.delay);

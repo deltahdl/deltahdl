@@ -14,8 +14,6 @@ namespace delta {
 
 namespace {
 
-// §16.9.3: whether `e` calls one of the sampled value functions that look
-// back through the history of their argument.
 bool IsPastDirectedCall(const Expr* e) {
   if (e->kind != ExprKind::kSystemCall) return false;
   return e->callee == "$past" || e->callee == "$rose" || e->callee == "$fell" ||
@@ -30,14 +28,6 @@ void CollectPastDirectedSites(const Expr* e, std::vector<const Expr*>& sites) {
   });
 }
 
-// §16.9.3: a sampled value function in a sequence is clocked by the
-// sequence's clock, and the history it looks back through is sampled at
-// every tick of that clock whether or not an attempt reads the operand at
-// the tick -- `$rose(ready)` standing after `inst` in a chain still answers
-// the tick before. The calls are collected once, over every chain of the
-// body, and each is evaluated as the monitor resumes so that its sample for
-// the tick is recorded; an attempt reading it records the same value over
-// it.
 void CollectPastDirectedSites(const LinearSequence& body,
                               std::vector<const Expr*>& sites) {
   ForEachLinearSequenceExpr(

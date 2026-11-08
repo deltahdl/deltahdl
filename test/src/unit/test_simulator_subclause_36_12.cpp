@@ -12,16 +12,6 @@
 namespace delta {
 namespace {
 
-// §36.12 (VPI backwards compatibility features and limitations) summarizes, in
-// Table 36-10, how the VPI data model differs across the standards. The column
-// that binds a tool built to this standard is the last one - "2012 2017 2023" -
-// and the rows are read with the table key: Y is a behavior present in that
-// version, N one no longer present.
-//
-// The rows this simulator answers for structurally are the ones about arrays of
-// variables. §37.17 detail 19 makes vpiReg and vpiRegArray the same kinds as
-// vpiLogicVar and vpiArrayVar, and an unpacked array of any variable is a
-// vpiRegArray object, which is what rows 1, 2, 5, 6 and 7 are about.
 class VpiCompatibility : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -37,12 +27,6 @@ class VpiCompatibility : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Row 6 (Y): a vpiReg iteration on a vpiRegArray reaches objects of other kinds
-// too. The detail says why - the array object stands for an unpacked array of
-// any variable, so a vpiReg iteration on it can hand back elements such as
-// vpiIntegerVar or vpiTimeVar ones, which IEEE Std 1364-2001 and 1364-2005 did
-// not provide for. The iteration matched a child's own type against vpiReg, so
-// it retrieved the reg elements and walked past every element of another kind.
 TEST_F(VpiCompatibility, ARegIterationOnAnArrayRetrievesElementsOfEveryKind) {
   VpiObject reg_word;
   reg_word.type = vpiReg;
@@ -63,9 +47,6 @@ TEST_F(VpiCompatibility, ARegIterationOnAnArrayRetrievesElementsOfEveryKind) {
   EXPECT_EQ(VpiObjectOf(seen[2]), &time_word);
 }
 
-// Row 6 scope: the row is about an iteration on an array object. A scope's own
-// vpiReg iteration is the §37.12 one and keeps reporting the regs it declares,
-// so an int var standing beside them is not swept up as one.
 TEST_F(VpiCompatibility, ARegIterationOnAScopeIsUnaffected) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -82,9 +63,6 @@ TEST_F(VpiCompatibility, ARegIterationOnAScopeIsUnaffected) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &reg);
 }
 
-// Row 5 (Y): a vpiVariables iteration reaches vpiReg and vpiRegArray objects.
-// In the IEEE 1364 standards both were excluded from that iteration; here they
-// are among what it reaches.
 TEST_F(VpiCompatibility, AVariablesIterationIncludesRegsAndRegArrays) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -102,10 +80,6 @@ TEST_F(VpiCompatibility, AVariablesIterationIncludesRegsAndRegArrays) {
   EXPECT_EQ(VpiObjectOf(seen[1]), &array);
 }
 
-// Row 7 (Y): a vpiRegArray iteration reaches variable array objects. The detail
-// names the kinds - arrays of vpiIntegerVar, vpiTimeVar and vpiRealVar - which
-// are all vpiRegArray objects here, so one iteration reaches every array a
-// scope declares whatever its elements are.
 TEST_F(VpiCompatibility, ARegArrayIterationIncludesArraysOfEveryVariable) {
   VpiObject int_word;
   int_word.type = vpiIntegerVar;
@@ -130,10 +104,6 @@ TEST_F(VpiCompatibility, ARegArrayIterationIncludesArraysOfEveryVariable) {
   EXPECT_EQ(VpiObjectOf(seen[1]), &real_array);
 }
 
-// Rows 1 and 2 (N): vpiMemory and vpiMemoryWord no longer exist as objects.
-// §37.20 detail 1 leaves them as the methods returning vpiRegArray and vpiReg,
-// so each is a relation an application asks for and neither is a kind an object
-// carries - a scope's memories come back as arrays and their words as regs.
 TEST_F(VpiCompatibility, MemoryAndMemoryWordAreRelationsRatherThanObjects) {
   VpiObject word;
   word.type = vpiReg;
@@ -158,7 +128,6 @@ TEST_F(VpiCompatibility, MemoryAndMemoryWordAreRelationsRatherThanObjects) {
   EXPECT_EQ(vpi_get(vpiType, words[0]), vpiReg);
 }
 
-// What the application found in the design.
 int g_array_kind = 0;
 int g_integer_kind = 0;
 int g_real_kind = 0;
@@ -198,11 +167,6 @@ void RegisterKindProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// Rows 3, 4 and 7 against a design: an unpacked array is a vpiRegArray object
-// whatever it holds, and an integer, a real and a reg are each the kind they
-// were declared. Every variable of an elaborated design was stamped vpiReg, so
-// none of the three rows held for any of them and a vpiRegArray iteration
-// reached no array at all.
 TEST_F(VpiCompatibility, ADesignsVariablesCarryTheKindsTheTableRequires) {
   RegisterKindProbe();
 

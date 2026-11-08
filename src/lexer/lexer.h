@@ -14,16 +14,6 @@
 
 namespace delta {
 
-// Where the text a Lexer is given came from, which is what decides whether a
-// kKeywordMarker byte in it is a keyword-version marker or a byte the user
-// wrote. The two cannot be told apart by value, because the marker is carried
-// in the text rather than beside it.
-//
-// kPreprocessorOutput says Preprocessor::ProcessSource produced this text, so
-// every marker in it is one HandleBeginKeywords or HandleEndKeywords wrote:
-// ProcessSource reports and blanks every marker byte its input held.
-// kUserSource says the text is a file as the user wrote it, where §5.2 lists no
-// lexical token the byte can begin and LexOperator reports it.
 enum class TextOrigin : std::uint8_t { kUserSource, kPreprocessorOutput };
 
 class Lexer {
@@ -33,32 +23,21 @@ class Lexer {
 
   Token Next();
   Token Peek();
-  // Where the token Next last returned ends, the position of its last
-  // character: the end of a construct read up to and including that token. A
-  // token is written on one line but for a string literal continued over a
-  // line break, whose end this places on the line it starts on.
   SourceLoc TakenEnd() const;
 
   Token NextFilePathSpec();
 
   std::vector<Token> LexAll();
 
-  // §5.6.1: the escaped identifiers read so far that hold a period, each the
-  // text after its backslash. Such a name is one identifier, which a name built
-  // by joining scopes with periods cannot be split back into by its periods.
   const std::unordered_set<std::string_view>& DottedEscapedNames() const {
     return dotted_escaped_names_;
   }
 
-  // §40.4.1 — an FSM recognition "tool" pragma carried inside a block comment.
-  // The current-state form names the vector signal that holds the FSM state and
-  // may bind an enumeration name in the same comment; the enum-only form is the
-  // separate pragma written immediately after the signal's bit range.
   struct FsmStatePragma {
     enum class Form : std::uint8_t { kStateVector, kEnumOnly };
     Form form = Form::kStateVector;
-    std::string_view signal_name;  // populated for kStateVector
-    std::string_view enum_name;    // populated when has_enum is true
+    std::string_view signal_name;
+    std::string_view enum_name;
     bool has_enum = false;
     SourceLoc loc;
   };
@@ -67,16 +46,12 @@ class Lexer {
     return fsm_state_pragmas_;
   }
 
-  // §40.4.2 — an FSM "tool" pragma whose current state is held by a part-select
-  // of a vector signal. Because the state lives in a part-select rather than a
-  // whole signal, the pragma carries an explicit FSM name (which is distinct
-  // from the enumeration name) for the coverage tool to report the FSM under.
   struct FsmPartSelectPragma {
-    std::string_view signal_name;  // base vector signal of the part-select
-    int msb = 0;                   // part-select range [msb:lsb]
+    std::string_view signal_name;
+    int msb = 0;
     int lsb = 0;
-    std::string_view fsm_name;   // required name the FSM is reported under
-    std::string_view enum_name;  // enumeration name bound by the `enum` keyword
+    std::string_view fsm_name;
+    std::string_view enum_name;
     SourceLoc loc;
   };
 
@@ -84,15 +59,10 @@ class Lexer {
     return fsm_part_select_pragmas_;
   }
 
-  // §40.4.3 — an FSM "tool" pragma whose current state is held by a
-  // concatenation of signals. Like the part-select form it carries an explicit
-  // FSM name (distinct from the enumeration name) for the coverage tool. The
-  // concatenation is composed of every signal listed in the braces; bit-selects
-  // and part-selects of those signals are not permitted as members.
   struct FsmConcatPragma {
-    std::vector<std::string_view> signal_names;  // members of the concatenation
-    std::string_view fsm_name;   // required name the FSM is reported under
-    std::string_view enum_name;  // enumeration name bound by the `enum` keyword
+    std::vector<std::string_view> signal_names;
+    std::string_view fsm_name;
+    std::string_view enum_name;
     SourceLoc loc;
   };
 
@@ -100,12 +70,6 @@ class Lexer {
     return fsm_concat_pragmas_;
   }
 
-  // §40.4.1 and §40.4.6: the enumeration name of the last enum-only pragma,
-  // of those no declaration has claimed yet, that stands before `before`,
-  // where a declaration's first name stands: the pragma written right after
-  // the `parameter` keyword or the bit range of that declaration. It and every
-  // pragma before it are claimed, so a later declaration does not take them.
-  // Empty where no such pragma stands there.
   std::string_view ClaimFsmEnumPragma(SourceLoc before);
 
   struct SavedPos {
@@ -116,20 +80,13 @@ class Lexer {
     bool in_attribute;
     Token peeked;
     KeywordVersion keyword_version;
-    // A declaration parsed and backed out of gives back the pragmas it
-    // claimed, for the declaration parsed in its place.
     std::size_t fsm_pragmas_claimed;
   };
   SavedPos SavePos() const;
   void RestorePos(const SavedPos& saved);
 
  private:
-  // The next token of the text, read past what precedes it.
   Token Scan();
-  // The character at `p`, and '\0' at or past the end of the text. Every look
-  // at the text goes through this, so a comparison with any other character
-  // is false at the end without a separate test for it; a caller that has to
-  // tell the end from a NUL byte the text holds asks AtEnd.
   char CharAt(uint32_t p) const;
   char Current() const;
   char PeekChar() const;
@@ -137,9 +94,6 @@ class Lexer {
   bool AtEnd() const;
   SourceLoc MakeLoc() const;
 
-  // Whether `c` is white space, which §5.3 and A.9.4 make the space, the tab,
-  // the newline and the formfeed, a carriage return counting as part of a line
-  // ending. A vertical tab is none of them, though std::isspace answers for it.
   static bool IsWhiteSpace(char c);
   void SkipWhitespaceAndComments();
   bool SkipSpacesAndTabs();
@@ -155,7 +109,6 @@ class Lexer {
   void ReportConcatSelectProhibition(std::string_view inside, SourceLoc loc);
 
  public:
-  // Public so the free pragma-recognition helpers in lexer.cpp can call it.
   static bool IsSimplePragmaIdentifier(std::string_view word);
 
  private:
@@ -217,18 +170,13 @@ class Lexer {
   bool has_peeked_ = false;
   bool in_attribute_ = false;
   Token peeked_;
-  // The token Next last returned, whose end TakenEnd reports.
   Token taken_;
   KeywordVersion keyword_version_ = KeywordVersion::kVer18002023;
   std::vector<FsmStatePragma> fsm_state_pragmas_;
   std::vector<FsmPartSelectPragma> fsm_part_select_pragmas_;
   std::vector<FsmConcatPragma> fsm_concat_pragmas_;
   std::unordered_set<std::string_view> dotted_escaped_names_;
-  // The offset one past the start of the furthest comment body handed to
-  // TryRecognizeFsmStatePragma, so a comment read again after RestorePos is
-  // recognized once.
   uint32_t first_unseen_comment_ = 0;
-  // How many of fsm_state_pragmas_ ClaimFsmEnumPragma has claimed.
   std::size_t fsm_pragmas_claimed_ = 0;
 };
 

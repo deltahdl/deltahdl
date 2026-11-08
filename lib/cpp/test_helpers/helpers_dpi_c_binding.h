@@ -22,8 +22,6 @@
 
 using namespace delta;
 
-// A lookup finding each name in `functions`, the C functions a test binary
-// defines standing in for the global symbols of a loaded library.
 inline DpiSymbolLookup LookupIn(const std::map<std::string, void*>& functions) {
   return [functions](const std::string& name) -> void* {
     auto it = functions.find(name);
@@ -31,10 +29,6 @@ inline DpiSymbolLookup LookupIn(const std::map<std::string, void*>& functions) {
   };
 }
 
-// The directory under the test's temporary directory a binding builds its
-// calls in, one for each test: ctest runs every test in a process of its own,
-// several at once, and tests sharing `name` overwrote each other's library
-// while another loaded it.
 inline std::filesystem::path CallBuildDir(const std::string& name) {
   std::filesystem::path dir =
       std::filesystem::path(::testing::TempDir()) / name;
@@ -43,9 +37,6 @@ inline std::filesystem::path CallBuildDir(const std::string& name) {
   return dir / (std::string(test->test_suite_name()) + "." + test->name());
 }
 
-// Elaborates and lowers `src`, binds the imports it declares to `functions`
-// with the C compiler `compiler`, building in `dir_name`, and runs it. The
-// fixture keeps the run's variables and diagnostics for the test to read.
 inline void RunWithImportsBound(const std::string& src, SimFixture& f,
                                 const std::map<std::string, void*>& functions,
                                 const std::string& dir_name,
@@ -60,7 +51,6 @@ inline void RunWithImportsBound(const std::string& src, SimFixture& f,
   f.scheduler.Run();
 }
 
-// A formal of an import declaration, as the registration of one records it.
 inline DpiArg CFormal(std::string_view name, DataTypeKind type,
                       Direction direction, uint32_t width = 0) {
   DpiArg formal;
@@ -71,7 +61,6 @@ inline DpiArg CFormal(std::string_view name, DataTypeKind type,
   return formal;
 }
 
-// An import declaration named `name` in SystemVerilog and in C alike.
 inline DpiRtFunction CImport(std::string_view name, DataTypeKind result,
                              std::vector<DpiArg> formals) {
   DpiRtFunction import;
@@ -82,27 +71,18 @@ inline DpiRtFunction CImport(std::string_view name, DataTypeKind result,
   return import;
 }
 
-// Imports bound to C functions this test binary defines rather than to ones a
-// loaded library does: each is found under its linkage name in a table instead
-// of among the process's global symbols, and the binding is otherwise the
-// run's own -- the calls are generated as C, built with the system C compiler
-// and called with the prototype §H.8 gives each declaration.
 struct DpiCBinding {
   SourceManager mgr;
   DiagEngine diag{mgr};
   Diagnosed diagnosed{diag};
   DpiRuntime dpi;
 
-  // Binds every import registered on `dpi` to the function `functions` maps
-  // its linkage name to, building the calls in the directory `dir_name` under
-  // the test's temporary directory.
   void Bind(const std::map<std::string, void*>& functions,
             const std::string& dir_name) {
     BindDpiImports(dpi, LookupIn(functions), CallBuildDir(dir_name), "cc",
                    diag);
   }
 
-  // Calls the import `name` with `args`, as a call site does (§35.5.1.2).
   DpiArgValue Call(std::string_view name, std::vector<DpiArgValue>& args) {
     return dpi.CallImportWithArgs(name, args);
   }

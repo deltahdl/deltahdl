@@ -73,11 +73,6 @@ TEST(FunctionDeclParsing, DpiTaskImportContext) {
   EXPECT_TRUE(item->dpi_is_task);
 }
 
-// §35.5.4: the c_identifier of an import declaration names the foreign task
-// and defaults to the task_identifier, so an explicit one is recorded beside
-// the imported task's SystemVerilog name rather than replacing it. The annex
-// A.2.6 file carries the production-level case, which checks the task flag and
-// the c_identifier alone.
 TEST(FunctionDeclParsing, DpiImportCIdentifierBesideTaskIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -393,12 +388,6 @@ TEST(FunctionDeclParsing, DpiSpecStringInvalidIsError) {
       "DPI specification string must be \"DPI-C\" or \"DPI\"", 2, "35.5.4"));
 }
 
-// §35.5.4: writing the string "DPI" draws a compile-time warning or error whose
-// message carries two items: that "DPI" is deprecated and should be replaced
-// with "DPI-C", and that use of the "DPI-C" string may require changes in the
-// DPI application's C code. Both items are the requirement, so the report is
-// named by its whole sentence. A warning count is satisfied by any warning the
-// run happened to write, including one about something else entirely.
 TEST(FunctionDeclParsing, DpiDeprecatedStringWarnsButParses) {
   auto r = Parse(
       "module m;\n"
@@ -443,10 +432,6 @@ TEST(FunctionDeclParsing, DpiImportRefArgumentIsError) {
       "ref qualifier cannot be used in a DPI import declaration", 2, "35.5.4"));
 }
 
-// §35.5.4: the c_identifier carries the foreign-language linkage name and
-// must conform to C identifier syntax. SystemVerilog tolerates `$` inside an
-// identifier but C does not, so an SV-legal name like `foo$bar` must be
-// rejected when supplied as the linkage name.
 TEST(FunctionDeclParsing, DpiCIdentifierWithDollarIsError) {
   SourceManager mgr;
   Arena arena;
@@ -463,8 +448,6 @@ TEST(FunctionDeclParsing, DpiCIdentifierWithDollarIsError) {
       2, "35.5.4"));
 }
 
-// §35.5.4: the C-identifier conformance rule applies to export declarations
-// as well; the same parser-side check is reused on the export path.
 TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
   SourceManager mgr;
   Arena arena;
@@ -481,12 +464,6 @@ TEST(FunctionDeclParsing, DpiExportCIdentifierWithDollarIsError) {
       2, "35.5.4"));
 }
 
-// Syntax 35-1 in §35.5.4 writes every import declaration with `task` or
-// `function` after the optional properties, so an import naming neither
-// breaches §35.5.4. The report Parser::ParseDpiImport in
-// src/parser/parser_dpi.cpp writes for it names `function`. The first report
-// is this one: it is written before the parser goes on to read what follows as
-// a return type and a name.
 TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
   auto r = Parse(
       "module m;\n"
@@ -495,10 +472,6 @@ TEST(FunctionDeclParsing, DpiImportMissingFunctionKeywordNames35_5_4) {
   EXPECT_TRUE(ReportedError(r.diags, "expected 'function'", 2, "35.5.4"));
 }
 
-// §35.5.4 attaches the deprecation to the dpi_spec_string itself, and both
-// export alternatives of dpi_import_export in Syntax 35-1 are written with
-// that same dpi_spec_string, so an export naming "DPI" draws the same report
-// as an import does.
 TEST(FunctionDeclParsing, DpiExportDeprecatedStringWarns) {
   auto r = Parse(
       "module m;\n"
@@ -512,13 +485,6 @@ TEST(FunctionDeclParsing, DpiExportDeprecatedStringWarns) {
       2, "35.5.4"));
 }
 
-// §35.5.4: an absent c_identifier takes the SystemVerilog subroutine's name,
-// the linkage name must be a well-formed C identifier either way, and a
-// c_identifier that breaks that rule, written or so defaulted, is an error.
-// §5.6 admits '$' after the first character of a simple identifier, so
-// `foo$bar` is one SystemVerilog identifier; standing in for an absent
-// c_identifier it is the linkage name, and it is the indirect breach the clause
-// names.
 TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameWithDollarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -531,10 +497,6 @@ TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameWithDollarIsError) {
                             2, "35.5.4"));
 }
 
-// §35.5.4 states the c_identifier rule once for the whole of
-// dpi_import_export, and both export alternatives in Syntax 35-1 write the
-// c_identifier as optional, so an export that omits it defaults its linkage
-// name from the exported subroutine's name and is held to the same rule.
 TEST(FunctionDeclParsing, DpiExportDefaultedLinkageNameWithDollarIsError) {
   auto r = Parse(
       "module m;\n"
@@ -547,11 +509,6 @@ TEST(FunctionDeclParsing, DpiExportDefaultedLinkageNameWithDollarIsError) {
                             2, "35.5.4"));
 }
 
-// §35.5.4: a c_identifier that breaks the C rule, written or defaulted, is an
-// error. An escaped identifier is the other way a subroutine name reaches
-// characters C forbids: §5.6.1 has LexEscapedIdentifier in src/lexer/lexer.cpp
-// drop the leading backslash and the terminating white space, so the name
-// recorded here is `my-task`, and the hyphen in it is what the rule rejects.
 TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameFromEscapedNameIsError) {
   auto r = Parse(
       "module m;\n"
@@ -564,10 +521,6 @@ TEST(FunctionDeclParsing, DpiImportDefaultedLinkageNameFromEscapedNameIsError) {
                             2, "35.5.4"));
 }
 
-// §35.5.4: the c_identifier is the name the foreign language links the
-// subroutine by. The rule is about that linkage name and not about the
-// SystemVerilog subroutine name, so a c_identifier written out conforms on its
-// own and the SystemVerilog name beside it is free to hold a '$' §5.6 allows.
 TEST(FunctionDeclParsing, DpiImportExplicitCIdentifierLeavesSvNameFree) {
   auto r = Parse(
       "module m;\n"
@@ -580,10 +533,6 @@ TEST(FunctionDeclParsing, DpiImportExplicitCIdentifierLeavesSvNameFree) {
   EXPECT_EQ(item->name, "foo$bar");
 }
 
-// Footnote 25 of Syntax 35-1 in §35.5.4 keeps dynamic_override_specifiers to
-// the methods a class declares, and to no interface class.
-// An import declaration declares no class method, so `:initial` on one is
-// illegal wherever the import is written.
 TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
   auto r = Parse(
       "module m;\n"
@@ -596,10 +545,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionDynamicOverrideSpecifierIsError) {
       2, "35.5.4"));
 }
 
-// Footnote 25 of Syntax 35-1 in §35.5.4 governs the task form as well:
-// task_prototype is written "task [ dynamic_override_specifiers ]
-// task_identifier", carrying the same footnote, and an imported task is no
-// more a class method declaration than an imported function is.
 TEST(FunctionDeclParsing, DpiImportTaskDynamicOverrideSpecifierIsError) {
   auto r = Parse(
       "module m;\n"
@@ -612,9 +557,6 @@ TEST(FunctionDeclParsing, DpiImportTaskDynamicOverrideSpecifierIsError) {
       2, "35.5.4"));
 }
 
-// §35.5.4: a formal needs no name unless a call binds arguments by name.
-// Neither formal below is named, and the import is still a complete declaration
-// of two arguments.
 TEST(FunctionDeclParsing, DpiImportUnnamedFormalsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -628,11 +570,6 @@ TEST(FunctionDeclParsing, DpiImportUnnamedFormalsAccepted) {
   EXPECT_TRUE(item->func_args[1].name.empty());
 }
 
-// §35.5.4: an array formal must be named, since the name is what divides its
-// packed dimensions from its unpacked ones. The name `a` stands between the two
-// bracket groups, so `[7:0]` closes the packed part of the type and `[0:3]`
-// opens the unpacked part. The two ranges differ, so a formal that took both
-// groups into one part could not report one packed and one unpacked dimension.
 TEST(FunctionDeclParsing, DpiImportNamedFormalSeparatesPackedFromUnpacked) {
   auto r = Parse(
       "module m;\n"
@@ -650,10 +587,6 @@ TEST(FunctionDeclParsing, DpiImportNamedFormalSeparatesPackedFromUnpacked) {
   EXPECT_NE(arg.unpacked_dims[0], nullptr);
 }
 
-// §35.5.4 requires the name because the name is the only separator there is:
-// with it left out of the same declaration, nothing stands between the two
-// bracket groups and both belong to the packed part of the type. This is the
-// reading that makes the sentence quoted above true.
 TEST(FunctionDeclParsing, DpiImportUnnamedFormalKeepsBothGroupsPacked) {
   auto r = Parse(
       "module m;\n"
@@ -670,15 +603,6 @@ TEST(FunctionDeclParsing, DpiImportUnnamedFormalKeepsBothGroupsPacked) {
   EXPECT_TRUE(arg.unpacked_dims.empty());
 }
 
-// §35.5.4, Syntax 35-1: `dpi_function_import_property ::= context | pure`, one
-// alternative of two, and §35.5.1.3 says the same in prose -- an imported
-// subroutine may be given the special property pure or the special property
-// context. A declaration writing both is one no legal source can produce, and
-// §35.5.1.3 gives it no meaning, so the second property is reported where it
-// stands.
-//
-// Runs one import declaration and asserts the report at its line, so the two
-// orders differ only in how they spell the pair.
 void ExpectTwoDpiPropertiesReported(const std::string& properties) {
   SourceManager mgr;
   Arena arena;
@@ -700,16 +624,10 @@ TEST(FunctionDeclParsing, DpiImportWithTwoPropertiesRejected) {
   ExpectTwoDpiPropertiesReported("pure context");
 }
 
-// The other order, which was turned away already but by accident: the leftover
-// keyword stood where the c_identifier or the `function` keyword was due and
-// drew a report about a missing `function`. The rule rather than the token
-// order is what turns the source away, so the report is the same one.
 TEST(FunctionDeclParsing, DpiImportWithTwoPropertiesReversedRejected) {
   ExpectTwoDpiPropertiesReported("context pure");
 }
 
-// One property is what the production admits, so neither case above may be
-// satisfied by a parser that turns the context property away outright.
 TEST(FunctionDeclParsing, DpiImportWithOnePropertyAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -722,12 +640,6 @@ TEST(FunctionDeclParsing, DpiImportWithOnePropertyAccepted) {
   EXPECT_FALSE(item->dpi_is_pure);
 }
 
-// §35.5.4 (printed page 977 of IEEE 1800-2023) with A.1.9 and H.9.2: a
-// DPI import declaration is an item of a module, interface, program, package,
-// generate block or compilation unit, and a class body admits none. One written
-// in a class was reported as a package import under §26.3, naming a construct
-// the source does not contain; the string after the keyword is what tells the
-// two apart, and the report names the DPI import that was written.
 TEST(DpiParsing, DpiImportInsideClassBodyIsReportedAsADpiImport) {
   auto r = Parse(R"(
     module top;
@@ -745,7 +657,6 @@ TEST(DpiParsing, DpiImportInsideClassBodyIsReportedAsADpiImport) {
       "26.3"));
 }
 
-// §26.3: the package form keeps its own report.
 TEST(DpiParsing, PackageImportInsideClassBodyKeepsThePackageReport) {
   auto r = Parse(R"(
     class C;

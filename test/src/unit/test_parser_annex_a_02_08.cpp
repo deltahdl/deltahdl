@@ -267,8 +267,6 @@ TEST(BlockItemDeclParsing, ErrorBlockItemLocalparamMissingSemicolon) {
       "    $display(\"%0d\", W);\n"
       "  end\n"
       "endmodule\n");
-  // Parser::ParseParamDecl demands the terminating ';' under §6.20.1, and the
-  // token standing where it should be is the $display on the next line.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got system identifier", 4,
                             "6.20.1"));
 }
@@ -281,17 +279,10 @@ TEST(BlockItemDeclParsing, ErrorBlockItemParameterMissingSemicolon) {
       "    $display(\"%0d\", D);\n"
       "  end\n"
       "endmodule\n");
-  // Parser::ParseParamDecl demands the terminating ';' under §6.20.1, and the
-  // token standing where it should be is the $display on the next line.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got system identifier", 4,
                             "6.20.1"));
 }
 
-// block_item_declaration admits exactly four alternatives (data_declaration,
-// local_parameter_declaration, parameter_declaration, let_declaration); a
-// net_declaration is not among them. A net declared in procedural block
-// position is therefore outside the production and must be rejected, which
-// fixes the boundary of the alternative set rather than a missing terminal.
 TEST(BlockItemDeclParsing, ErrorNetDeclNotABlockItem) {
   auto r = Parse(
       "module m;\n"
@@ -300,14 +291,9 @@ TEST(BlockItemDeclParsing, ErrorNetDeclNotABlockItem) {
       "    w = 1;\n"
       "  end\n"
       "endmodule\n");
-  // Parser::IsBlockVarDeclStartCore does not admit `wire`, so the block parses
-  // it as a statement and §11.2 reports the primary that is not an expression.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
-// A.2.8 admits a data_declaration as a block item, and A.2.2.1 makes an inline
-// enum one of its data types, so `enum {p, q} z;` in a task body declares z of
-// that enumeration, members and all.
 TEST(BlockItemDeclParsing, InlineEnumVariableInATaskBody) {
   auto r = Parse(
       "module m;\n"
@@ -329,11 +315,6 @@ TEST(BlockItemDeclParsing, InlineEnumVariableInATaskBody) {
   EXPECT_EQ(z->var_decl_type.enum_members[1].name, "q");
 }
 
-// The struct_union alternative of A.2.2.1's data_type stands as a block item
-// as the enum one does: an inline struct with two declarators, a packed union
-// and an initialized inline enum at the head of an initial block are each a
-// variable declaration of their type, read once, with the statement after
-// them left a statement.
 TEST(BlockItemDeclParsing, InlineAggregateVariablesInAnInitialBlock) {
   auto r = Parse(
       "module m;\n"
@@ -362,11 +343,6 @@ TEST(BlockItemDeclParsing, InlineAggregateVariablesInAnInitialBlock) {
   EXPECT_NE(body[4]->kind, StmtKind::kVarDecl);
 }
 
-// A.2.1.3 counts a nettype_declaration among data_declaration's forms, and
-// A.2.8 makes every data_declaration a block item, so a seq_block, a task body
-// and a function body each declare a nettype among their items. Each is
-// carried as a block's typedef is, over the item Parser::ParseNettypeDecl
-// returns.
 TEST(BlockItemDeclParsing, NettypeDeclIsABlockItem) {
   auto r = Parse(
       "module m;\n"

@@ -35,11 +35,6 @@ TEST(Coverage, IllegalBinsExcludedFromCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-// --- LRM 19.5.6: illegal coverage point values or transitions ---------------
-
-// For state bins, each illegal value is removed from the set of values
-// associated with any coverage bin; every occurrence is dropped and the rest
-// keep their order. Removing values absent from the bin leaves it unchanged.
 TEST(Coverage, IllegalValuesRemovedFromStateBin) {
   EXPECT_EQ(CoverageDB::RemoveIllegalValues({5, 7, 8, 7, 9}, {7, 8}),
             (std::vector<int64_t>{5, 9}));
@@ -47,9 +42,6 @@ TEST(Coverage, IllegalValuesRemovedFromStateBin) {
             (std::vector<int64_t>{1, 2, 3}));
 }
 
-// The removal of illegal values occurs after the distribution of values to the
-// specified bins: distributing first and then removing yields the per-bin
-// contents the LRM requires.
 TEST(Coverage, IllegalValuesRemovedAfterDistribution) {
   auto distributed = CoverageDB::DistributeValues({1, 2, 3, 4, 5, 6}, 3);
   std::vector<int64_t> illegal = {3, 4};
@@ -61,46 +53,31 @@ TEST(Coverage, IllegalValuesRemovedAfterDistribution) {
   EXPECT_EQ(remaining, (std::vector<std::vector<int64_t>>{{1, 2}, {}, {5, 6}}));
 }
 
-// Removing every value of a bin leaves it empty — the precondition for the
-// empty-bin exclusion handled by 19.11.
 TEST(Coverage, IllegalRemovalCanEmptyStateBin) {
   EXPECT_TRUE(CoverageDB::RemoveIllegalValues({1, 2, 3}, {3, 1, 2}).empty());
 }
 
-// Edge case: an empty illegal set removes nothing, so the bin keeps all of its
-// values in their original order.
 TEST(Coverage, EmptyIllegalSetLeavesStateBinUnchanged) {
   EXPECT_EQ(CoverageDB::RemoveIllegalValues({4, 2, 4, 6}, {}),
             (std::vector<int64_t>{4, 2, 4, 6}));
 }
 
-// A covered transition is removed when it cannot occur without also matching an
-// illegal sequence, i.e. when the illegal sequence is a contiguous subsequence
-// of the covered one (an illegal 2=>3 removes the covered 1=>2=>3=>4).
 TEST(Coverage, CoveredTransitionRemovedWhenContainsIllegal) {
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIllegal({1, 2, 3, 4}, {2, 3}));
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIllegal({2, 3, 4}, {2, 3}));
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIllegal({1, 2, 3}, {2, 3}));
-  // Boundary: the illegal sequence may be the whole covered sequence.
   EXPECT_TRUE(CoverageDB::CoveredTransitionIsIllegal({2, 3}, {2, 3}));
-  // Non-contiguous occurrence, unrelated sequence, longer illegal sequence, and
-  // an empty illegal sequence never remove the covered transition.
   EXPECT_FALSE(CoverageDB::CoveredTransitionIsIllegal({2, 9, 3}, {2, 3}));
   EXPECT_FALSE(CoverageDB::CoveredTransitionIsIllegal({1, 2, 3, 4}, {5, 6}));
   EXPECT_FALSE(CoverageDB::CoveredTransitionIsIllegal({2, 3}, {1, 2, 3, 4}));
   EXPECT_FALSE(CoverageDB::CoveredTransitionIsIllegal({1, 2, 3}, {}));
 }
 
-// Specifying an illegal individual value has no effect on a transition that
-// includes the value.
 TEST(Coverage, IllegalValueDoesNotAffectTransition) {
   EXPECT_FALSE(CoverageDB::IllegalValueAffectsTransition(3, {1, 2, 3, 4}));
   EXPECT_FALSE(CoverageDB::IllegalValueAffectsTransition(7, {7, 7}));
 }
 
-// An illegal_bins transition cannot specify a sequence of unbounded or
-// undetermined varying length; only a bounded sequence is legal. The bounded
-// classification comes from the 19.5.2 repetition machinery.
 TEST(Coverage, IllegalTransitionMustBeBounded) {
   EXPECT_TRUE(CoverageDB::IllegalTransitionLengthLegal(
       CoverageDB::TransitionRepeatBounded(TransitionRepeatKind::kConsecutive)));
@@ -111,15 +88,11 @@ TEST(Coverage, IllegalTransitionMustBeBounded) {
           TransitionRepeatKind::kNonconsecutive)));
 }
 
-// Illegal bins take precedence over any other bins: an illegal hit raises a
-// run-time error whether or not the value is also included in another bin.
 TEST(Coverage, IllegalTakesPrecedenceOverOtherBins) {
   EXPECT_TRUE(CoverageDB::IllegalTakesPrecedence(true));
   EXPECT_TRUE(CoverageDB::IllegalTakesPrecedence(false));
 }
 
-// When an illegal value occurs during sampling, a run-time error is issued and
-// the illegal bin itself records no hit.
 TEST(Coverage, IllegalValueOccurrenceIssuesRuntimeError) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -136,8 +109,6 @@ TEST(Coverage, IllegalValueOccurrenceIssuesRuntimeError) {
   EXPECT_EQ(cp->bins[0].hit_count, 0u);
 }
 
-// A sampled value that hits no illegal bin raises no run-time error: the
-// illegal-occurrence path fires only for an actual illegal hit.
 TEST(Coverage, LegalValueRaisesNoIllegalViolation) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -158,8 +129,6 @@ TEST(Coverage, LegalValueRaisesNoIllegalViolation) {
   EXPECT_EQ(cp->bins[0].hit_count, 1u);
 }
 
-// Illegal precedence in effect: a value that lies in both an illegal bin and a
-// legal bin raises the run-time error and is counted toward no coverage bin.
 TEST(Coverage, IllegalValueInAnotherBinStillErrorsAndIsNotCounted) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -180,23 +149,17 @@ TEST(Coverage, IllegalValueInAnotherBinStillErrorsAndIsNotCounted) {
   EXPECT_EQ(cp->bins[0].hit_count, 0u);
 }
 
-// Specifying an illegal value has no effect on a transition that includes the
-// value: driven through the real sampling path, a legal transition bin whose
-// sequence passes through an illegal state value still completes and counts,
-// even though the illegal state value raises its own run-time error mid-way.
 TEST(Coverage, IllegalStateValueDoesNotSuppressTransitionThroughIt) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
   auto* cp = CoverageDB::AddCoverPoint(g, "s");
 
-  // Legal transition bin 1=>2=>3=>4.
   CoverBin trans;
   trans.name = "seq";
   trans.kind = CoverBinKind::kTransition;
   trans.transitions = {{1, 2, 3, 4}};
   CoverageDB::AddBin(cp, trans);
 
-  // Illegal state value 3, which the transition passes through.
   CoverBin bad;
   bad.name = "bad_state";
   bad.kind = CoverBinKind::kIllegal;
@@ -205,21 +168,13 @@ TEST(Coverage, IllegalStateValueDoesNotSuppressTransitionThroughIt) {
 
   db.Sample(g, {{"s", 1}});
   db.Sample(g, {{"s", 2}});
-  db.Sample(g, {{"s", 3}});  // illegal state hit — run-time error
-  db.Sample(g, {{"s", 4}});  // completes the legal transition
+  db.Sample(g, {{"s", 3}});
+  db.Sample(g, {{"s", 4}});
 
-  // The illegal state value raised exactly one run-time error, yet had no
-  // effect on the transition that includes it: the legal transition still hit.
   EXPECT_EQ(cp->illegal_violations, 1u);
   EXPECT_EQ(cp->bins[0].hit_count, 1u);
 }
 
-// Samples `values` in order against a coverpoint carrying one illegal
-// transition bin over the sequence 4, 5, 6, then checks how many run-time
-// errors that bin raised and how many hits it recorded.
-//
-// An illegal transition bin issues its error when the sequence it names
-// completes, and records no hit either way, so both counts are read together.
 void ExpectIllegalTransitionOutcome(std::initializer_list<int64_t> values,
                                     uint32_t violations, uint32_t hits) {
   CoverageDB db;
@@ -237,18 +192,10 @@ void ExpectIllegalTransitionOutcome(std::initializer_list<int64_t> values,
   EXPECT_EQ(cp->bins[0].hit_count, hits);
 }
 
-// When an illegal transition sequence completes during sampling, a run-time
-// error is issued; the illegal transition bin records no hit.
 TEST(Coverage, IllegalTransitionOccurrenceIssuesRuntimeError) {
   ExpectIllegalTransitionOutcome({4, 5, 6}, 1u, 0u);
 }
 
-// The transition form of illegal_bins is excluded from coverage just as the
-// value-set form is: a coverpoint carrying one legal transition bin and one
-// illegal transition bin reports coverage over the legal bin alone. The illegal
-// transition bin never joins the coverage total — an uncovered illegal bin
-// would otherwise drag coverage to 50%. (Companion input form to
-// IllegalBinsExcludedFromCoverage, which covers the value-set form.)
 TEST(Coverage, IllegalTransitionBinExcludedFromCoverage) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -266,26 +213,16 @@ TEST(Coverage, IllegalTransitionBinExcludedFromCoverage) {
   bad.transitions = {{7, 8}};
   CoverageDB::AddBin(cp, bad);
 
-  // Complete only the legal transition; the illegal transition never occurs.
   db.Sample(g, {{"s", 1}});
   db.Sample(g, {{"s", 2}});
 
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 100.0);
 }
 
-// Negative form of the run-time error rule for the transition case: an illegal
-// transition bin issues its error only when the illegal sequence actually
-// completes. A sampled stream that starts down the illegal sequence but
-// diverges before completing it raises no error. (Companion negative to
-// LegalValueRaisesNoIllegalViolation, which covers the illegal-value case.)
 TEST(Coverage, NonMatchingSequenceRaisesNoIllegalTransitionViolation) {
-  // The 9 diverges from the expected 6, so the sequence never completes.
   ExpectIllegalTransitionOutcome({4, 5, 9}, 0u, 0u);
 }
 
-// §19.5.6: a sampled value an illegal_bins holds is a run-time error, reported
-// at the sample() that took it, and the run goes on; the legal value sampled
-// first draws nothing.
 TEST(CovergroupInstanceSim, IllegalBinHitIsRunTimeError) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -310,10 +247,6 @@ TEST(CovergroupInstanceSim, IllegalBinHitIsRunTimeError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.5.6: a covered sequence is removed when it cannot be matched without
-// also matching an excluded one, so `2 => 3` removes `1 => 2 => 3 => 4`,
-// leaving t no sequence and out of coverage; `2 => 4`, which does not hold
-// it, stays: one of the two remaining bins, v, is hit.
 TEST(CovergroupInstanceSim, IllegalTransitionRemovesASequenceContainingIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

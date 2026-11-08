@@ -438,11 +438,6 @@ TEST(UdpInstantiationParsing, UdpInst_ExternUdp) {
   EXPECT_EQ(insts[0]->inst_module, "my_udp");
 }
 
-// udp_instance ::= [ name_of_instance ] ( output_terminal , input_terminal
-//   { , input_terminal } )
-// Two terminals at least. An instance with one was read and left to
-// elaboration, which reports the count for a primitive it resolves; it is now
-// reported where the instance is read, and the instance kept as written.
 TEST(UdpInstantiationParsing, SingleTerminalError) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -460,8 +455,6 @@ TEST(UdpInstantiationParsing, SingleTerminalError) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 1u);
 }
 
-// The output_terminal is A.3.3's, a net_lvalue; one that is no net_lvalue was
-// accepted silently, where a gate's is reported under §28.3.
 TEST(UdpInstantiationParsing, OutputTerminalMustBeNetLvalue) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -481,9 +474,6 @@ TEST(UdpInstantiationParsing, OutputTerminalMustBeNetLvalue) {
                              "28.3"));
 }
 
-// A.5.4 (printed page 1197) gives a UDP instance the output_terminal A.3.3
-// makes a net_lvalue, whose forms A.8.5 (printed page 1212) writes in no
-// parentheses.
 TEST(UdpInstantiationParsing, ParenthesizedOutputTerminalIsError) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -564,9 +554,6 @@ TEST(UdpInstantiationParsing, ThreeInstances) {
   EXPECT_EQ(insts[2]->gate_inst_name, "u3");
 }
 
-// The udp_instantiation production permits only delay2 (at most two delay
-// values), unlike continuous_assign which uses delay3. A third delay value
-// must therefore be rejected.
 TEST(UdpInstantiationParsing, UdpInstThreeDelaysRejected) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -577,13 +564,10 @@ TEST(UdpInstantiationParsing, UdpInstThreeDelaysRejected) {
       "  inv #(1, 2, 3) u1(y, a);\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §29.8 owns UDP instances; A.5.4 only states the production.
   EXPECT_TRUE(ReportedError(
       r.diags, "UDP instantiation shall have at most two delays", 6, "29.8"));
 }
 
-// The udp_instantiation production terminates with a mandatory semicolon;
-// omitting it after the instance list must be flagged as an error.
 TEST(UdpInstantiationParsing, UdpInstMissingSemicolonRejected) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -594,13 +578,10 @@ TEST(UdpInstantiationParsing, UdpInstMissingSemicolonRejected) {
       "  inv u1(y, a)\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §29.8 owns UDP instances; A.5.4 only states the production.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 7, "29.8"));
 }
 
-// The udp_instance production wraps its terminals in parentheses; a terminal
-// list left unclosed must be flagged as an error.
 TEST(UdpInstantiationParsing, UdpInstMissingCloseParenRejected) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -611,8 +592,6 @@ TEST(UdpInstantiationParsing, UdpInstMissingCloseParenRejected) {
       "  inv u1(y, a ;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // ParseGateInstanceTail parses the terminal list for gate and UDP instances
-  // alike and files its reports under §28.3.6, the gate-instance subclause.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 6, "28.3.6"));
 }
 
@@ -640,10 +619,6 @@ TEST(UdpInstantiationParsing, AllStrengthKeywords) {
   }
 }
 
-// udp_instantiation lets a parenthesised delay2 stand before an unnamed
-// udp_instance. A module instance always names its instance after `#( )`, so a
-// `(` straight after the parentheses is a UDP's terminal list, whether or not
-// the primitive has been declared yet.
 TEST(UdpInstantiationParsing, UnnamedInstanceWithParenthesisedDelayBeforeDecl) {
   auto r = Parse(
       "module m(output o, input i);\n"
@@ -665,8 +640,6 @@ TEST(UdpInstantiationParsing, UnnamedInstanceWithParenthesisedDelayBeforeDecl) {
   EXPECT_EQ(insts[0]->gate_delay_fall->int_val, 3u);
 }
 
-// With an instance name after the parentheses the item is still read as the
-// module instance it may be, its `#( )` as a parameter value assignment.
 TEST(UdpInstantiationParsing, NamedInstanceAfterParenthesesStaysAModuleInst) {
   auto r = Parse(
       "module m(output o, input i);\n"

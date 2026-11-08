@@ -45,8 +45,6 @@ TEST(IfnoneConditionParsing, ErrorMissingPath) {
       "    ifnone = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the '(' that opens a path description, and the missing path is
-  // reported there; §30.4.4.4 reports only the not-a-simple-path rule below.
   EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '='", 3, "30.4"));
 }
 
@@ -61,10 +59,6 @@ TEST(IfnoneConditionParsing, ErrorEdgeSensitiveParallel) {
       r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"));
 }
 
-// The simple-only restriction also rejects a data-source path description,
-// which §30.4.3 permits without an edge identifier. This case carries no edge,
-// so it observes the data_source branch of the restriction independently of the
-// edge branch exercised by ErrorEdgeSensitiveParallel.
 TEST(IfnoneConditionParsing, ErrorDataSourcePath) {
   auto r = Parse(
       "module m;\n"
@@ -76,11 +70,6 @@ TEST(IfnoneConditionParsing, ErrorDataSourcePath) {
       r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"));
 }
 
-// Claim B admits any SIMPLE module path under ifnone. §30.4.2 defines two
-// simple-path connection forms: parallel (=>), exercised by ParallelPath, and
-// full (*>). A full-connection ifnone is still a simple path, so it must parse
-// cleanly and be flagged as ifnone. This covers the second admitted syntactic
-// form of the accept side, distinct from the parallel form.
 TEST(IfnoneConditionParsing, FullConnectionPath) {
   auto sp = ParseSpecifySingle(
       "module m(input a, input b, output c);\n"

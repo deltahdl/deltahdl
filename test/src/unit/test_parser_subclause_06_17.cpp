@@ -60,17 +60,6 @@ TEST(DataTypeParsing, EventInitFromAnotherEvent) {
   EXPECT_EQ(aliased->init_expr->text, "done");
 }
 
-// A.2.2.1 gives data_type the bare alternative `event`, so an event
-// declaration is a data_declaration, and A.2.8's block_item_declaration carries
-// a data_declaration wherever A.6.3's seq_block and par_block put one. Neither
-// §6.17 nor §15.5 narrows that: §6.17's own example is `event done;` with no
-// enclosing scope stated.
-//
-// The declaration was read as an expression statement instead, so the event was
-// never declared and every later reference to the name resolved to whatever
-// else it happened to mean. Declaring one at module scope reaches the parser by
-// another path and cannot fail this.
-
 TEST(DataTypeParsing, EventDeclaredInASequentialBlock) {
   auto r = Parse(
       "module t;\n"
@@ -87,9 +76,6 @@ TEST(DataTypeParsing, EventDeclaredInASequentialBlock) {
   EXPECT_EQ(first->var_name, "done");
 }
 
-// A.6.3 gives par_block the same block_item_declaration position, and §15.5's
-// synchronization between two arms of a fork is what an event declared in a
-// procedural block is for.
 TEST(DataTypeParsing, EventDeclaredInAParallelBlock) {
   auto r = Parse(
       "module t;\n"
@@ -107,8 +93,6 @@ TEST(DataTypeParsing, EventDeclaredInAParallelBlock) {
   EXPECT_EQ(fork_stmt->fork_stmts[0]->var_decl_type.kind, DataTypeKind::kEvent);
 }
 
-// A.2.7's tf_item_declaration carries a block_item_declaration into a task
-// body, which is a third position the same check answers for.
 TEST(DataTypeParsing, EventDeclaredInATaskBody) {
   auto r = Parse(
       "module t;\n"

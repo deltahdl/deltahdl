@@ -18,8 +18,6 @@ TEST(ConfigInstanceClause, InstancePathStartingOutsideDesignIsRejected) {
       "  instance other.a liblist work;\n"
       "endconfig\n",
       f, "top");
-  // The report stands at the line of the `config` keyword, not at the instance
-  // clause: ValidateConfigInstanceClausesOne emits at `cfg->range.start`.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance path 'other.a' in config 'c' does not "
                             "start at a top-level cell",
@@ -63,8 +61,6 @@ TEST(ConfigInstanceClause, InstancePathPicksAmongMultipleDesignCells) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Only the root segment of the hierarchical name is constrained to a design
-// cell; the path below it may descend arbitrarily deep.
 TEST(ConfigInstanceClause, DeepInstancePathRootedAtDesignCellAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -77,8 +73,6 @@ TEST(ConfigInstanceClause, DeepInstancePathRootedAtDesignCellAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// When the design statement names the cell with a library qualifier, the root
-// of an instance path matches the cell name rather than the library name.
 TEST(ConfigInstanceClause, InstancePathRootMatchesLibraryQualifiedDesignCell) {
   ElabFixture f;
   ElaborateSrc(
@@ -91,8 +85,6 @@ TEST(ConfigInstanceClause, InstancePathRootMatchesLibraryQualifiedDesignCell) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A library name is not a valid instance-path root; using it instead of the
-// cell name is rejected.
 TEST(ConfigInstanceClause, InstancePathRootedAtLibraryNameRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -102,16 +94,12 @@ TEST(ConfigInstanceClause, InstancePathRootedAtLibraryNameRejected) {
       "  instance lib1.a liblist work;\n"
       "endconfig\n",
       f, "top");
-  // The design statement contributes the cell name `top`, so the root `lib1`
-  // matches no design cell. The report stands at the `config` keyword's line.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "instance path 'lib1.a' in config 'c' does not "
                             "start at a top-level cell",
                             4, "33.4.1.3"));
 }
 
-// The module bound to the instance named `inst_name` directly inside the
-// generate block `block` of the design's one top, or empty where there is none.
 std::string_view ModuleBoundInBlock(const ConfigElaboration& run,
                                     std::string_view block,
                                     std::string_view inst_name) {
@@ -127,10 +115,6 @@ std::string_view ModuleBoundInBlock(const ConfigElaboration& run,
   return {};
 }
 
-// §33.4.1.3 (printed page 939): an instance clause names its instance by a
-// SystemVerilog hierarchical name that begins at the config's top-level module,
-// and §23.6 makes a generate block a level of such a name, so `top.g.u` names
-// the instance u inside the block g and the clause rebinds it.
 TEST(ConfigInstanceClause, InstancePathThroughAGenerateBlockIsApplied) {
   ConfigElaboration run;
   ElaborateUnderConfig(
@@ -150,9 +134,6 @@ TEST(ConfigInstanceClause, InstancePathThroughAGenerateBlockIsApplied) {
   EXPECT_EQ(ModuleBoundInBlock(run, "g", "u"), "m_gate");
 }
 
-// The flattened name the instance is stored under, `g_u`, is not a
-// hierarchical name of it, so a clause spelled that way selects nothing and
-// the instance keeps the module it was written with.
 TEST(ConfigInstanceClause, FlattenedGenerateNameSelectsNothing) {
   ConfigElaboration run;
   ElaborateUnderConfig(
@@ -171,8 +152,6 @@ TEST(ConfigInstanceClause, FlattenedGenerateNameSelectsNothing) {
   EXPECT_EQ(ModuleBoundInBlock(run, "g", "u"), "m");
 }
 
-// A library list a clause names for an instance inside a generate block is
-// the list that instance is searched in (§33.4.1.5).
 TEST(ConfigInstanceClause, LiblistThroughAGenerateBlockGovernsTheInstance) {
   auto diags = ConfigElaborationReports(
       "module m; endmodule\n"

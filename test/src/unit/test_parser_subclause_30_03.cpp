@@ -119,8 +119,6 @@ TEST(SpecifyBlockDeclParsing, ErrorMissingEndspecify) {
       "  specify\n"
       "    (a => b) = 5;\n"
       "endmodule\n");
-  // The specify block runs to the `endmodule` on line 4, which stands where
-  // the `endspecify` that closes it belongs.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endspecify', got 'endmodule'",
                             4, "30.3"));
 }
@@ -130,8 +128,6 @@ TEST(SpecifyBlockDeclParsing, ErrorSpecifyOutsideModule) {
       "specify\n"
       "  (a => b) = 5;\n"
       "endspecify\n");
-  // §3.12.1 owns the set of top-level descriptions, and that is the rule the
-  // parser reports for a specify block at file scope; §30.3 has no report here.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
@@ -159,9 +155,6 @@ TEST(SpecifyBlockDeclParsing, ErrorUnknownSpecifyItem) {
       ReportedError(r.diags, "unexpected token in specify block", 3, "30.3"));
 }
 
-// A specify_item admits system_timing_check as its only system-call form, so a
-// general system task (here $display) is not a valid specify_item and the
-// parser must reject it.
 TEST(SpecifyBlockDeclParsing, ErrorNonTimingCheckSystemTask) {
   auto r = Parse(
       "module m;\n"
@@ -169,8 +162,6 @@ TEST(SpecifyBlockDeclParsing, ErrorNonTimingCheckSystemTask) {
       "    $display(\"hi\");\n"
       "  endspecify\n"
       "endmodule\n");
-  // §31.2 owns the system timing checks a specify block admits, and the parser
-  // files the rejection of any other system task under it, not under §30.3.
   EXPECT_TRUE(ReportedError(
       r.diags, "system task cannot appear in specify block", 3, "31.2"));
 }
@@ -180,18 +171,11 @@ TEST(SpecifyBlockDeclParsing, ErrorStrayEndspecify) {
       "module m;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §23.2.4 owns the module item list, and a stray endspecify is reported as a
-  // module body item there rather than under §30.3.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
 
 TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {
-  // §30.3, Syntax 30-1: specify_item admits a path_declaration, and every
-  // path_declaration form opens with the '(' of a path description. A source
-  // that starts one with a bare terminal name matches no specify_item, and the
-  // report names §30.3 so a case can tell this rejection from the timing-check
-  // and edge-descriptor rules a specify block breaks with the same has_errors.
   auto r = Parse(
       "module m(input a, output b);\n"
       "  specify\n"
@@ -202,11 +186,6 @@ TEST(SpecifyBlock, MalformedPathDeclarationNames30_3) {
       ReportedError(r.diags, "unexpected token in specify block", 3, "30.3"));
 }
 
-// §30.3, Syntax 30-1: a specify_block runs from `specify` to `endspecify`, and
-// this source runs out before the keyword arrives, so Parser::Expect writes
-// `expected 'endspecify', got EOF` for it. The specify block's report comes
-// first because it is the innermost construct the source ran out of; the
-// module's follows.
 TEST(SpecifyBlock, MissingEndspecifyNames30_3) {
   auto r = Parse(
       "module m;\n"

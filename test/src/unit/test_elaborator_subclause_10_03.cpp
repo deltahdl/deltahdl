@@ -18,7 +18,6 @@ TEST(ContinuousAssignElab, Delay3OnVariableIsError) {
       "  assign #(1, 2, 3) v = 8'd1;\n"
       "endmodule\n",
       f);
-  // §10.3.3 owns the multiple-delay rule; §10.3 has no report of its own here.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "multiple delays not allowed on continuous "
                             "assignment to a variable",
@@ -44,9 +43,6 @@ TEST(VectoredOrScalaredPackedDim, VectoredRequiresPackedDim) {
       "  wire vectored w;\n"
       "endmodule\n",
       f);
-  // §6.9.2 owns this rule, not clause 10: vectored and scalared are advisory
-  // keywords for vector net declarations, so one without a packed dimension
-  // has no declaration to advise about.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "vectored or scalared requires at least one packed "
                             "dimension",
@@ -60,7 +56,6 @@ TEST(VectoredOrScalaredPackedDim, ScalaredRequiresPackedDim) {
       "  wire scalared w;\n"
       "endmodule\n",
       f);
-  // §6.9.2, as above: the same site answers for both keywords.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "vectored or scalared requires at least one packed "
                             "dimension",
@@ -78,8 +73,6 @@ TEST(VectoredOrScalaredPackedDim, VectoredWithPackedDimOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.3 Syntax 10-1: a continuous assignment's target is a net or variable
-// lvalue, and an operator expression is neither.
 TEST(ContinuousAssignElab, TargetThatIsNoLvalueIsError) {
   ElabFixture f;
   Elaborate(
@@ -97,9 +90,6 @@ TEST(ContinuousAssignElab, TargetThatIsNoLvalueIsError) {
   }
 }
 
-// §10.3: a continuous assignment drives a net or a variable, and a parameter
-// is a constant (§6.20), whether the target names it whole or as an element of
-// a concatenation.
 TEST(ContinuousAssignElab, ParameterTargetIsError) {
   ElabFixture f;
   Elaborate(
@@ -117,10 +107,6 @@ TEST(ContinuousAssignElab, ParameterTargetIsError) {
   }
 }
 
-// §10.3 states its rules wherever a continuous assignment stands, and a
-// generate block's items are module items (§27.3): the (highz0, highz1) pair,
-// a non-constant select on the left-hand side, and a variable driven both by a
-// continuous and by a procedural assignment.
 TEST(ContinuousAssignElab, RulesReachGenerateBlockItems) {
   ElabFixture f;
   Elaborate(
@@ -147,9 +133,6 @@ TEST(ContinuousAssignElab, RulesReachGenerateBlockItems) {
                             7, "6.5"));
 }
 
-// §6.5 with §27.3: a generate block's continuous assignment to a variable the
-// module writes procedurally is as illegal as the module's own would be, and a
-// genvar is a constant select index.
 TEST(ContinuousAssignElab, GenerateDriverMeetsModuleProcedure) {
   ElabFixture f;
   Elaborate(

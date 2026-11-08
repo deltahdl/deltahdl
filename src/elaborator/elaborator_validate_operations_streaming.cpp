@@ -57,12 +57,6 @@ void ElaboratorOperationRules::WalkStmtsForStringConcatLvalue(const Stmt* s) {
       s->kind == StmtKind::kForce) {
     CheckStringConcatLvalue(s->lhs);
   }
-  // §11.4.12.2 bars a concatenation of strings from the left-hand side of an
-  // assignment and names no statement the assignment is allowed to stand in,
-  // so every position a statement holds a statement in is one this report
-  // reaches. ForEachChildStmt in elaborator_validate_internal.h states those
-  // positions once for the whole elaborator, which is why the list is not
-  // written out again here.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtsForStringConcatLvalue(sub); });
 }
@@ -84,20 +78,12 @@ static bool ClassHasHiddenMember(const ClassDecl* cls);
 
 namespace {
 
-// §11.4.14.1: validate a single streaming-concatenation operand for the two
-// statically recognisable illegal cases (a class handle exposing local or
-// protected members, and a non-bit-stream scalar type).
 void CheckStreamingConcatOperand(
     const Expr* elem, DiagEngine& diag,
     const std::unordered_map<std::string_view, std::string_view>&
         class_var_types,
     const std::unordered_map<std::string_view, DataTypeKind>& var_types,
     CompilationUnit* unit) {
-  // §11.4.14.1: when a non-null class handle is streamed, its data members
-  // are packed in turn. Streaming a handle whose class exposes local or
-  // protected members is illegal unless those members are accessible at
-  // the streaming operator, approximated here (as in the bit-stream cast
-  // rule of §6.24.3) by allowing only the current instance `this`.
   if (elem && elem->kind == ExprKind::kIdentifier && elem->text != "this") {
     auto it = class_var_types.find(elem->text);
     if (it != class_var_types.end() &&
@@ -110,11 +96,6 @@ void CheckStreamingConcatOperand(
                  Subclause("11.4.14.1"));
     }
   }
-  // §11.4.14.1: an operand that is none of a bit-stream type, an unpacked
-  // array, a struct, an untagged union, or a class handle cannot be packed
-  // into the stream; such an operand is skipped and an error is issued. The
-  // statically recognizable non-bit-stream scalar types are the real
-  // family, event, chandle, and virtual interface.
   if (elem && elem->kind == ExprKind::kIdentifier) {
     auto vt = var_types.find(elem->text);
     if (vt != var_types.end()) {
@@ -131,19 +112,9 @@ void CheckStreamingConcatOperand(
   }
 }
 
-// §11.4.14.2: a slice_size written as a constant integral expression names
-// the block width used to re-order the generic stream, so its value must be
-// positive; a zero or negative slice size is illegal. A slice_size given as
-// a simple type instead names a block width equal to that type's size,
-// which is inherently positive and therefore exempt from this check. The
-// parser keeps a number as its literal and a lone name as an identifier,
-// which names a type or a parameter.
 void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
                              const ScopeMap& param_scope) {
   if (!slice) return;
-  // A constant-expression slice_size may name a parameter or localparam
-  // (§11.2.1), so it is folded in the module's parameter scope; a type folds
-  // to nothing and is exempt.
   std::optional<int64_t> value = ConstEvalInt(slice, param_scope);
   if (value && *value <= 0) {
     diag.Error(slice->range.start,
@@ -152,11 +123,6 @@ void CheckStreamingSliceSize(const Expr* slice, DiagEngine& diag,
   }
 }
 
-// §11.4.14.1 streams an untagged union through its first-declared member and
-// a packed union as the bit-stream type it is, and names no rule for an
-// unpacked tagged union, so one is skipped with an error. Whether the type a
-// variable was declared with is such a union, written inline or through a
-// typedef.
 bool IsUnpackedTaggedUnion(const DataType* type, const TypedefMap& typedefs) {
   if (type->kind == DataTypeKind::kNamed) {
     auto it = typedefs.find(type->type_name);
@@ -167,8 +133,6 @@ bool IsUnpackedTaggedUnion(const DataType* type, const TypedefMap& typedefs) {
          !type->is_packed;
 }
 
-// Reports a streaming operand that names a variable of an unpacked tagged
-// union type.
 void CheckTaggedUnionStreamOperand(
     const Expr* elem,
     const std::unordered_map<std::string_view, const DataType*>& types,
@@ -183,14 +147,6 @@ void CheckTaggedUnionStreamOperand(
              Subclause("11.4.14.1"));
 }
 
-// A.10 footnote 52, on A.8.5's variable_lvalue: no streaming concatenation
-// stands nested within another variable_lvalue, and a streaming concatenation
-// written as an assignment's target, `target` here, is one. Reports each
-// streaming concatenation among its stream expressions, and among theirs in
-// turn. §11.4.14 lets a stream used as a source nest another, so the context
-// rule walks a stream's own elements as valid contexts and reaches none of
-// these; one nested through a concatenation or any other operator is an
-// operand that rule reports.
 void ReportStreamsNestedInTarget(const Expr* target, DiagEngine& diag) {
   if (target->kind != ExprKind::kStreamingConcat) return;
   for (const Expr* elem : target->elements) {
@@ -234,11 +190,6 @@ void ElaboratorOperationRules::WalkExprForStreamingContext(
     WalkExprForStreamingContext(expr->lhs, true);
     return;
   }
-  // A.8.3 makes `( operator_assignment )` an expression, which the parser keeps
-  // as a kBinary carrying the assignment operator. Its `=` form is an
-  // assignment, whose target and source §11.4.14 allows; A.10 footnote 52 lets
-  // no compound operator take a streaming target, so one is read below as the
-  // operator it applies.
   if (expr->kind == ExprKind::kBinary && expr->op == TokenKind::kEq) {
     ReportStreamsNestedInTarget(expr->lhs, diag_);
     WalkExprForStreamingContext(expr->lhs, true);
@@ -255,12 +206,6 @@ void ElaboratorOperationRules::WalkExprForStreamingContext(
   for (auto* arg : expr->args) WalkExprForStreamingContext(arg, false);
 }
 
-// §11.4.14: a streaming_concatenation used as the source of an assignment
-// requires a target that is either another streaming_concatenation or a data
-// object of bit-stream type. Reject the obviously-non-bit-stream targets we
-// can recognise from the variable-type map (real family, event, chandle,
-// virtual interface). Targets we cannot type-check from a simple identifier
-// (selects, member accesses) are left to type-aware downstream checks.
 void ElaboratorOperationRules::CheckStreamingSourceTargetType(const Expr* lhs,
                                                               const Expr* rhs) {
   if (!lhs || !rhs) return;
@@ -281,13 +226,6 @@ void ElaboratorOperationRules::CheckStreamingSourceTargetType(const Expr* lhs,
   }
 }
 
-// §11.4.14.3: when a streaming_concatenation is the target of an assignment (an
-// unpack), the source expression shall be of bit-stream type or the result of
-// another streaming_concatenation. This is the mirror of the pack-direction
-// rule above: reject the obviously-non-bit-stream sources we can recognise from
-// the variable-type map (real family, event, chandle, virtual interface). A
-// source that is itself a streaming_concatenation is allowed, and any source we
-// cannot type-check from a simple identifier is left to downstream checks.
 void ElaboratorOperationRules::CheckStreamingUnpackSourceType(const Expr* lhs,
                                                               const Expr* rhs) {
   if (!lhs || !rhs) return;
@@ -318,28 +256,12 @@ void ElaboratorOperationRules::WalkStmtsForStreamingContext(const Stmt* s) {
     CheckStreamingUnpackSourceType(s->lhs, s->rhs);
     ReportStreamsNestedInTarget(s->lhs, diag_);
   }
-  // §11.4.14 lets a streaming concatenation stand whole as an assignment's
-  // target or source. §13.4.1 assigns a return statement's expression to the
-  // function's result, and §6.8 a block variable's initializer to the
-  // variable, so each is the source of an assignment as well. Every other
-  // expression a statement holds, a loop's condition, a case item, an event
-  // control and a delay among them, holds the concatenation as an operand.
-  // ForEachChildExpr in elaborator_validate_internal.h names those positions
-  // once for the whole elaborator, and an assignment's own expressions are told
-  // from the rest by the member each one stands in.
   ForEachChildExpr(s, [&](const Expr* e) {
     bool assigned = (is_assign && (e == s->lhs || e == s->rhs)) ||
                     (s->kind == StmtKind::kReturn && e == s->expr) ||
                     (s->kind == StmtKind::kVarDecl && e == s->var_init);
     WalkExprForStreamingContext(e, assigned);
   });
-  // §11.4.14 confines a streaming concatenation to an assignment or a
-  // bit-stream cast, §11.4.14.1 rules on its operands and §11.4.14.2 on its
-  // slice_size, and none of the three names a statement the concatenation is
-  // allowed to stand in, so every position a statement holds a statement in is
-  // one these reports reach. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtsForStreamingContext(sub); });
 }
@@ -356,10 +278,6 @@ void ElaboratorOperationRules::ValidateStreamingConcatContext(
     if (is_proc && item->body) {
       WalkStmtsForStreamingContext(item->body);
     }
-    // §11.4.14 holds a streaming concatenation to its contexts wherever it is
-    // written: a declaration's initializer is the source of an assignment to
-    // the declared object (§6.8, §10.3.1), and a subroutine's statements are
-    // procedural statements as a process's are.
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl)
       WalkExprForStreamingContext(item->init_expr, true);
@@ -374,9 +292,6 @@ void ElaboratorOperationRules::ValidateStreamingConcatContext(
   }
 }
 
-// §6.24.3: a class is illegal as a bit-stream-cast source when it exposes any
-// local or protected member, except when the source handle is the keyword
-// `this` (the current instance retains private access).
 static bool ClassHasHiddenMember(const ClassDecl* cls) {
   if (!cls) return false;
   for (const auto* m : cls->members) {
@@ -396,19 +311,11 @@ static uint32_t CastTargetSimpleWidth(std::string_view t) {
 
 namespace {
 
-// §6.24.3: the bit-stream cast under validation, named for the two domain
-// facts that identify it -- the cast operand expression and the destination
-// type the operand is being cast to.
 struct BitStreamCast {
   const Expr* expr;
   std::string_view target;
 };
 
-// §6.24.3: the elaboration context the bit-stream-cast checks consult to
-// resolve the types named in a cast: the diagnostic sink plus the type maps
-// (class names, class-handle variable types, unpacked-array variable info,
-// typedefs, the widths of the unpacked-array typedefs, the module variables'
-// declared types) and the enclosing compilation unit.
 struct BitStreamCastCtx {
   DiagEngine& diag;
   const std::unordered_set<std::string_view>& class_names;
@@ -421,8 +328,6 @@ struct BitStreamCastCtx {
   CompilationUnit* unit;
 };
 
-// The size of the cast's destination type, a keyword type, an unpacked-array
-// typedef, or another typedef; zero where none is known.
 uint32_t BitStreamDestinationWidth(std::string_view target,
                                    const BitStreamCastCtx& ctx) {
   if (uint32_t simple = CastTargetSimpleWidth(target)) return simple;
@@ -433,8 +338,6 @@ uint32_t BitStreamDestinationWidth(std::string_view target,
   return BitStreamTypeWidth(td->second, ctx.typedefs);
 }
 
-// The size of the unpacked operand named `name`, a fixed-size unpacked array or
-// a variable of an unpacked structure; zero for any other operand.
 uint32_t UnpackedOperandWidth(std::string_view name,
                               const BitStreamCastCtx& ctx) {
   auto var_it = ctx.var_array_info.find(name);
@@ -455,10 +358,6 @@ uint32_t UnpackedOperandWidth(std::string_view name,
   return BitStreamTypeWidth(*type, ctx.typedefs);
 }
 
-// §6.24.3: a class handle whose class exposes local or protected members is an
-// illegal bit-stream-cast source, except for the current instance `this` and
-// when the destination is itself a class type. Returns true if the operand was
-// flagged (the caller must then stop checking this cast).
 bool CheckBitStreamCastClassSource(const BitStreamCast& cast,
                                    const BitStreamCastCtx& ctx) {
   const Expr* expr = cast.expr;
@@ -481,10 +380,6 @@ bool CheckBitStreamCastClassSource(const BitStreamCast& cast,
   return false;
 }
 
-// §6.24.3: when both source and destination are fixed-size types of different
-// sizes and either is unpacked, the cast generates a compile-time error. This
-// handles the case where the operand is a fixed-size unpacked-array variable
-// or a variable of an unpacked structure.
 void CheckBitStreamCastUnpackedOperand(const BitStreamCast& cast,
                                        const BitStreamCastCtx& ctx) {
   const Expr* expr = cast.expr;
@@ -509,8 +404,6 @@ void ElaboratorOperationRules::CheckBitStreamCastExpr(const Expr* expr) {
   auto target = expr->text;
   if (target.empty()) return;
 
-  // §6.24.3: an associative array type shall be illegal as a destination type
-  // for a bit-stream cast.
   if (assoc_typedef_names_.count(target) > 0) {
     diag_.Error(expr->range.start,
                 std::format("associative array type '{}' is illegal as a "
@@ -530,26 +423,14 @@ void ElaboratorOperationRules::CheckBitStreamCastExpr(const Expr* expr) {
                        bit_stream_var_types_,
                        unit_};
 
-  // §6.24.3: a class handle whose class exposes local or protected members
-  // shall be illegal as a source type, except when the handle is the current
-  // instance `this`. The rule applies to a bit-stream cast, i.e., when the
-  // destination is not itself a class type.
   if (CheckBitStreamCastClassSource(cast, ctx)) {
     return;
   }
 
-  // §6.24.3: when both source and destination are fixed-size types of
-  // different sizes and either is unpacked, the cast generates a compile-time
-  // error. Two paths are checked: the operand is an unpacked-array variable,
-  // or the destination is an unpacked-array typedef. Dynamic-size cases are
-  // left to the simulator since their sizes are not known until runtime.
   if (!expr->lhs) return;
 
   auto dst_unpacked_it = fixed_unpacked_typedef_widths_.find(target);
   if (dst_unpacked_it != fixed_unpacked_typedef_widths_.end()) {
-    // An unpacked structure operand is as wide as all its members' elements,
-    // which InferExprWidth, answering one element of an unpacked member, is
-    // not.
     uint32_t src_width = expr->lhs->kind == ExprKind::kIdentifier
                              ? UnpackedOperandWidth(expr->lhs->text, ctx)
                              : 0;
@@ -589,12 +470,6 @@ void ElaboratorOperationRules::WalkStmtsForBitStreamCast(const Stmt* s) {
   WalkExprForBitStreamCast(s->rhs);
   WalkExprForBitStreamCast(s->expr);
   WalkExprForBitStreamCast(s->condition);
-  // §6.24.3 rules on the source and destination types of a bit-stream cast
-  // and names no statement the cast is allowed to stand in, so every position
-  // a statement holds a statement in is one these reports reach.
-  // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator, which is why the list is not written out
-  // again here.
   ForEachChildStmt(s,
                    [&](Stmt* const& sub) { WalkStmtsForBitStreamCast(sub); });
 }

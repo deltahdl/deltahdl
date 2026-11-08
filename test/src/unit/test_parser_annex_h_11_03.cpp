@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §H.11.3, the SystemVerilog side of Example 5: a typedef A of bit [2:0], a
-// packed struct S of three bits, a packed union U of an A and an S, one
-// variable of each, an import f8 taking one of each as input, and an initial
-// block setting the struct's members, the array and the union's array
-// member before calling f8 with the three.
 class ExampleFiveParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -45,8 +40,6 @@ TEST_F(ExampleFiveParsing, TheSystemVerilogSideParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The three typedefs: the packed array A, the packed struct S of three bit
-// members and the packed union U of an A and an S.
 TEST_F(ExampleFiveParsing, ThePackedArrayStructAndUnionAreDeclared) {
   ASSERT_NE(r_.cu, nullptr);
   const std::vector<ModuleItem*>& items = r_.cu->modules[0]->items;
@@ -68,7 +61,6 @@ TEST_F(ExampleFiveParsing, ThePackedArrayStructAndUnionAreDeclared) {
   EXPECT_EQ(typedefs[2]->typedef_type.struct_members.size(), 2u);
 }
 
-// The import f8 takes the three as inputs, each under its type's name.
 TEST_F(ExampleFiveParsing, TheImportTakesOneOfEachType) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f8 =

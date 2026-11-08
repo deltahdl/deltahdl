@@ -19,10 +19,6 @@
 namespace delta {
 namespace {
 
-// §39.4.2: the routine is given a pointer to the callback's time - the model
-// keeps a time as
-// one 64-bit count of simulation time units, and s_vpi_time carries it in the
-// two halves vpiSimTime names.
 s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
   s_vpi_time time = {};
   time.type = vpiSimTime;
@@ -31,10 +27,6 @@ s_vpi_time VpiAssertionCallbackTime(std::uint64_t model_time) {
   return time;
 }
 
-// §39.4.2: the expression the assertion `assertion` holds whose source text
-// is `text`, found over the objects its expression or its property spec hangs
-// below it; null where it holds none. A net or variable an operand names is
-// its scope's, and what that object holds is no part of the assertion.
 VpiObject* ExpressionWritten(VpiObject* assertion, std::string_view text) {
   if (text.empty()) return nullptr;
   VpiContext& vpi = GetGlobalVpiContext();
@@ -53,20 +45,6 @@ VpiObject* ExpressionWritten(VpiObject* assertion, std::string_view text) {
   return nullptr;
 }
 
-// §39.4.2: call the application's routine with the five arguments the clause
-// lists - the reason, a pointer to the time of the callback, the handle for the
-// assertion, a pointer to an attempt information structure, and the user data
-// supplied when the callback was registered.
-//
-// The attempt information follows the clause's own rule about when there is
-// any: a lock, unlock, disable, enable, reset, kill, pass action, fail action,
-// vacuous action or nonvacuous action callback is given a NULL
-// p_vpi_attempt_info pointer, which is what the model reports through the args
-// it delivers, and attemptStartTime is what fills it. A failure callback's
-// detail is the failExpr, and a step callback's the step: the expressions it
-// matched and the states it went from and to. The model holds each expression
-// as the source text the run read it by, which names the object of the
-// assertion that decompiles to it.
 void VpiCallAssertionRoutine(vpi_assertion_callback_func* cb_rtn,
                              VpiHandle assertion,
                              const AssertionCallbackArgs& args) {
@@ -98,10 +76,6 @@ void VpiCallAssertionRoutine(vpi_assertion_callback_func* cb_rtn,
          static_cast<PLI_BYTE8*>(args.user_data));
 }
 
-// §20.11: what an assertion control task selects the assertion `obj` by. Its
-// kind gives its Table 20-6 assertion_type bit -- concurrent, or a simple,
-// observed deferred or final deferred immediate assertion -- and its Table 20-7
-// directive_type bit; a restrict has none (§16.14.4).
 AssertionControlTarget ControlTargetOf(const VpiObject& obj) {
   struct KindBits {
     int type;
@@ -130,8 +104,6 @@ AssertionControlTarget ControlTargetOf(const VpiObject& obj) {
 std::string VpiAssertionKeyOf(const VpiObject& obj) {
   if (!obj.full_name.empty()) return obj.full_name;
   if (!obj.name.empty()) return std::string(obj.name);
-  // The scope is the nearest enclosing object with a full name; a procedure
-  // or a statement the assertion stands under has none.
   const VpiObject* scope = obj.parent;
   while (scope != nullptr && scope->full_name.empty()) scope = scope->parent;
   return AssertionKey(scope != nullptr ? scope->full_name : "", {},
@@ -162,18 +134,8 @@ VpiHandle VpiLabelledAssertionsBeginOr(VpiHandle found) {
 VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
                                  vpi_assertion_callback_func* cb_rtn,
                                  PLI_BYTE8* user_data) {
-  // §39.4.2: the placement names an assertion and a routine to call on it.
-  // Neither is optional - a placement with no assertion has nothing to be
-  // specific to, and one with no routine has nothing to call each time the
-  // event occurs - so either missing is an error on placing the callback, which
-  // the clause answers with a NULL handle.
   if (assertion == nullptr || cb_rtn == nullptr) return nullptr;
 
-  // §39.4.2: which reasons may be placed on which handle is the model's rule -
-  // every reason on a concurrent or immediate assertion, and cbAssertionStart,
-  // cbAssertionSuccess and cbAssertionFailure also on a sequence or property
-  // instance. A reason the assertion cannot carry is an error on placing, and
-  // the placement answers with the NULL handle for it.
   AssertionApi& api = GetGlobalAssertionApi();
   const std::string kKey = VpiAssertionKeyOf(*assertion);
   AssertionCallbackHandle placed = api.PlaceAssertionCallback(
@@ -189,18 +151,12 @@ VpiHandle VpiRegisterAssertionCb(VpiHandle assertion, int reason,
 }
 
 bool VpiRemoveAssertionCb(VpiHandle cb_handle) {
-  // §39.4.2: only the handle a placement answered with names a placed assertion
-  // callback. Anything else - a null handle, or the handle of a simulation
-  // callback - is left to vpi_remove_cb()'s own removal.
   if (cb_handle == nullptr || !cb_handle->is_assertion_cb) return false;
   if (!GetGlobalAssertionApi().RemoveAssertionCallback(
           cb_handle->assertion_cb_handle)) {
     return false;
   }
 
-  // §37.2.2 a): removing a callback releases its handle, which is what stops
-  // the removed callback's handle from being a live handle to its object, as it
-  // does for a simulation callback.
   GetGlobalVpiContext().ReleaseHandle(cb_handle);
   return true;
 }

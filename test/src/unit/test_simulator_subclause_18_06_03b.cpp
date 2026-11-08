@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A Root holding a rand Leaf, each kept above 10 and at or below a ceiling
-// a test can drop to make it infeasible, and each counting its
-// post_randomize() calls.
 const char* const kRootAndLeaf =
     "class Leaf;\n"
     "  rand bit [7:0] y;\n"
@@ -28,8 +25,6 @@ const char* const kRootAndLeaf =
     "  function void post_randomize(); post_calls++; endfunction\n"
     "endclass\n";
 
-// Runs `body` on a Root r holding a Leaf, both at 0, and displays the call's
-// result, then r.x, r.leaf.y and both post_randomize() counts.
 std::string RunRootAndLeaf(const std::string& body) {
   SimFixture f;
   return RunCapture(std::string(kRootAndLeaf) +
@@ -48,11 +43,6 @@ std::string RunRootAndLeaf(const std::string& body) {
                     f);
 }
 
-// 18.6.3: a static random variable has one copy for the whole class, so each
-// randomize() call changes it for every instance: over 32 rounds of a call on
-// each of two Shared, both read the same v after every call, and a call on the
-// second changes what the first reads in some round, as the design
-// test/src/e2e/randomization_behavior.sv runs it.
 TEST(RandomizationBehaviorRun, AStaticVariableChangesInEveryInstance) {
   SimFixture f;
   std::string out = RunCapture(
@@ -80,11 +70,6 @@ TEST(RandomizationBehaviorRun, AStaticVariableChangesInEveryInstance) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.6.3: a failed randomize() leaves every random variable at its old value
-// and skips post_randomize(): with the ceiling at 0 no x lies at or below it
-// and above the inline 0, so the call returns 0, x and y keep the values the
-// first call drew, and the counter post_randomize() steps stays at that call's
-// 1.
 TEST(RandomizationBehaviorRun, AFailedCallRetainsTheValuesWithoutPost) {
   SimFixture f;
   std::string out = RunCapture(
@@ -115,9 +100,6 @@ TEST(RandomizationBehaviorRun, AFailedCallRetainsTheValuesWithoutPost) {
   EXPECT_EQ(out, "0 1 1\n");
 }
 
-// 18.6.3: randomize() implements object random stability, an object's RNG
-// seeded by srandom(): two Seeded seeded alike draw the same a and b on
-// each of 8 calls, and one seeded otherwise draws another pair in some.
 TEST(RandomizationBehaviorRun, ObjectsSeededAlikeDrawAlike) {
   SimFixture f;
   std::string out = RunCapture(
@@ -148,17 +130,10 @@ TEST(RandomizationBehaviorRun, ObjectsSeededAlikeDrawAlike) {
   EXPECT_EQ(out, "8 1\n");
 }
 
-// §18.6.3: a randomize() that fails leaves every random variable as it was
-// and calls no post_randomize(), its random object members' failure being
-// its own: the Leaf held at or below 0 cannot be solved, so the Root keeps
-// its x at 0 and neither post_randomize() runs, on the restricted with (x)
-// form as on the plain one.
 TEST(RandomizationBehaviorRun, AMembersFailureLeavesTheObjectAsItWas) {
   EXPECT_EQ(RunRootAndLeaf("    r.leaf.ceiling = 0;\n"), "0 0 0 0 0\n");
 }
 
-// §18.6.3: likewise the Root held at or below 0 cannot be solved, so its
-// Leaf keeps its y at 0 and neither post_randomize() runs.
 TEST(RandomizationBehaviorRun, AnObjectsFailureLeavesItsMembersAsTheyWere) {
   EXPECT_EQ(RunRootAndLeaf("    r.ceiling = 0;\n"), "0 0 0 0 0\n");
 }

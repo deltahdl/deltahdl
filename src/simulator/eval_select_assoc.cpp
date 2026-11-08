@@ -20,9 +20,6 @@ void TakeElementSignedness(const AssocArrayObject& aa, Logic4Vec& val) {
   val.is_signed = aa.is_signed;
 }
 
-// §7.8.6: the value a read of a nonexistent entry of `aa` by the select
-// `select` yields: the array's default where it has one, and otherwise the
-// value Table 7-1 gives its element type (NonexistentElementOf).
 static Logic4Vec AssocDefault(const AssocArrayObject* aa, const Expr* select,
                               SimContext& ctx, Arena& arena) {
   if (aa->has_default) return aa->default_value;
@@ -30,8 +27,6 @@ static Logic4Vec AssocDefault(const AssocArrayObject* aa, const Expr* select,
                               arena);
 }
 
-// `loc` is where the index was written, which the report names: the array
-// object carries no position and the name is a string.
 static void WarnAssocMiss(const AssocArrayObject* aa, std::string_view name,
                           SimContext& ctx, SourceLoc loc) {
   if (!aa->has_default)
@@ -58,9 +53,6 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* select,
   const Expr* idx_expr = select->index;
   auto val = EvalExpr(idx_expr, ctx, arena);
   if (HasUnknownBits(val)) {
-    // §7.8.6: an x/z index is an invalid read. A configured user default
-    // suppresses the diagnostic and supplies the returned value (see §7.9.11),
-    // matching the nonexistent-entry path in WarnAssocMiss.
     if (!aa->has_default)
       ctx.GetDiag().Warning(
           idx_expr->range.start,
@@ -76,18 +68,6 @@ static Logic4Vec AssocReadInt(AssocArrayObject* aa, const Expr* select,
   return AssocDefault(aa, select, ctx, arena);
 }
 
-// §7.8: the array an element select reads is a declared one under its bare
-// name or, §8.5 restricting no property's type, a property of an object -- the
-// running method's own by its bare name (§8.11) or any object's through a
-// handle, `o.count[k]` -- which FindAssocArrayOfBase resolves. Only the bare
-// name of a declared array was read here before, so `m_severity_count[s]` in a
-// method of UVM's uvm_report_server fell to a bit-select of the property's
-// scalar carrier and read 0 whatever the entry held. The name a §7.8.6 report
-// gives is the property's own for a property.
-//
-// §7.8 with §7.4: the array may be an element of an associative array whose
-// elements are associative arrays, `m["a"][2]`, and the report then names the
-// array it is an element of.
 static std::string_view AssocReportName(const Expr* base) {
   while (base->kind == ExprKind::kSelect && base->base != nullptr)
     base = base->base;

@@ -84,24 +84,21 @@ TEST(IpcSync, SemaphoreGetAfterPutSucceeds) {
   EXPECT_EQ(sem.key_count, 3);
 }
 
-// §15.3.3: a get() with more keys required than available blocks until the
-// keys become available; the process then runs. Two processes block on an
-// empty bucket; each put() of one key releases the head of the queue in turn.
 TEST(IpcSync, SemaphoreGetBlocksThenRunsInArrivalOrder) {
   SemaphoreObject sem(0);
   std::vector<int> ran;
   auto first = SpawnGetter(sem, 1, ran, 1);
   auto second = SpawnGetter(sem, 1, ran, 2);
-  first.h.resume();   // arrives first, blocks
-  second.h.resume();  // arrives second, blocks
+  first.h.resume();
+  second.h.resume();
   ASSERT_EQ(sem.waiters.size(), 2u);
   EXPECT_TRUE(ran.empty());
 
-  sem.Put(1);  // releases the earliest arrival
+  sem.Put(1);
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 1);
 
-  sem.Put(1);  // releases the next
+  sem.Put(1);
   ASSERT_EQ(ran.size(), 2u);
   EXPECT_EQ(ran[1], 2);
 
@@ -109,31 +106,26 @@ TEST(IpcSync, SemaphoreGetBlocksThenRunsInArrivalOrder) {
   second.h.destroy();
 }
 
-// §15.3.3: the waiting queue is FIFO and arrival order shall be preserved. The
-// earliest arrival requires two keys; a process that arrived later requiring a
-// single key must not be served ahead of it. A lone key satisfies neither, and
-// once two keys are available the head runs first, then the later arrival.
 TEST(IpcSync, SemaphoreGetFifoPreservesArrivalOrderUnderHeadOfLine) {
   SemaphoreObject sem(0);
   std::vector<int> ran;
-  auto head = SpawnGetter(sem, 2, ran, 1);   // first in, needs 2
-  auto later = SpawnGetter(sem, 1, ran, 2);  // second in, needs 1
+  auto head = SpawnGetter(sem, 2, ran, 1);
+  auto later = SpawnGetter(sem, 1, ran, 2);
   head.h.resume();
   later.h.resume();
   ASSERT_EQ(sem.waiters.size(), 2u);
 
-  sem.Put(1);  // one key available, but head needs 2; FIFO holds the later,
-               // single-key request behind it rather than letting it jump ahead
+  sem.Put(1);
   EXPECT_TRUE(ran.empty());
   EXPECT_EQ(sem.key_count, 1);
 
-  sem.Put(1);  // bucket reaches 2 — the head runs and consumes both keys
+  sem.Put(1);
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 1);
   EXPECT_EQ(sem.key_count, 0);
   ASSERT_EQ(sem.waiters.size(), 1u);
 
-  sem.Put(1);  // the later arrival is served next
+  sem.Put(1);
   ASSERT_EQ(ran.size(), 2u);
   EXPECT_EQ(ran[1], 2);
   EXPECT_TRUE(sem.waiters.empty());
@@ -142,16 +134,11 @@ TEST(IpcSync, SemaphoreGetFifoPreservesArrivalOrderUnderHeadOfLine) {
   later.h.destroy();
 }
 
-// §15.3.3: when the required key count is at most the number available, get()
-// reduces the bucket, the method returns, and execution continues. Observed
-// through the task path: a process spawned against a bucket that already holds
-// enough keys acquires them on its first resume without ever parking on the
-// waiter queue, and its body runs straight through.
 TEST(IpcSync, SemaphoreGetImmediateAcquireContinuesWithoutBlocking) {
   SemaphoreObject sem(5);
   std::vector<int> ran;
   auto getter = SpawnGetter(sem, 3, ran, 1);
-  getter.h.resume();  // keys available: acquires without suspending, body runs
+  getter.h.resume();
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 1);
   EXPECT_TRUE(sem.waiters.empty());
@@ -160,11 +147,6 @@ TEST(IpcSync, SemaphoreGetImmediateAcquireContinuesWithoutBlocking) {
   getter.h.destroy();
 }
 
-// §15.3.3 with §9.7 and §8.11: a class task that waits in get() goes on, once
-// the put() from another process frees the keys, as the process and on the
-// object that called it, so `got` is written on w and reads 7 and the time 4,
-// giving 71. Resumed under the process that called put(), the task read
-// `this.id` of no object and wrote `got` nowhere.
 TEST(SemaphoreSim, GetInAClassTaskResumesOnItsOwnObject) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -194,9 +176,6 @@ TEST(SemaphoreSim, GetInAClassTaskResumesOnItsOwnObject) {
   EXPECT_EQ(var->value.ToUint64(), 71u);
 }
 
-// §15.3.3 (printed page 373): a negative key count handed to get() is an
-// error, reported at the call, and the process does not wait for keys that
-// could never satisfy it: the empty bucket leaves r written at time 0, 5.
 TEST(SemaphoreSim, GetWithANegativeCountIsReported) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -216,11 +195,6 @@ TEST(SemaphoreSim, GetWithANegativeCountIsReported) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §15.4.3, §15.4.5, §15.4.7 and §15.3.3 with §8.6 and §11.3.1: a call
-// statement that may wait -- a mailbox's put(), peek() and get(), a
-// semaphore's get() -- through a property of a call's result runs the call
-// once, as the statement resolves the object it waits on, and acts on that
-// object: 5 is put, peeked into y and taken into x, and both keys are taken.
 TEST(IpcSync, AWaitingCallThroughACallsResultRunsTheCallOnce) {
   SimFixture f;
   auto out = RunCapture(

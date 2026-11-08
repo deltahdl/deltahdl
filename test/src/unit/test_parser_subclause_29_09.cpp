@@ -7,23 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §29.9 "Mixing level-sensitive and edge-sensitive descriptions". The clause's
-// governing permission is that a single UDP state table may contain both
-// level-sensitive rows (every input field is a level symbol) and edge-sensitive
-// rows (one input field names a transition). The parser satisfies this by
-// applying no per-table homogeneity restriction: its row validation (§29.6's
-// at-most-one-edge-per-row rule, etc.) is per row, so a table freely combining
-// the two kinds is accepted and both kinds survive into the produced AST.
-//
-// This is a parser-stage observation: build the primitive from real source and
-// confirm (a) it parses with no diagnostics and (b) the resulting table holds
-// at least one edge row AND at least one level row -- i.e. the mix was admitted
-// rather than rejected or collapsed. The runtime resolution of a mixed table
-// (edge cases first, level-sensitive case dominates on conflict) is observed in
-// test_simulator_subclause_29_09.cpp against the production evaluator.
-
-// Mirrors src/parser/parser_udp.cpp's edge-symbol classification. A
-// parenthesized transition is stored in the AST as the sentinel input '\x01'.
 bool RowIsEdge(const UdpTableRow& row) {
   for (char c : row.inputs) {
     if (c == 'r' || c == 'R' || c == 'f' || c == 'F') return true;
@@ -33,11 +16,6 @@ bool RowIsEdge(const UdpTableRow& row) {
   return false;
 }
 
-// The clause's own worked example: a JK flip-flop whose preset/clear logic is
-// level-sensitive while the normal clocking is edge-sensitive, all in one
-// table. Columns are written one symbol per field (the LRM's grouped "jk"/"pc"
-// notation is purely visual); input order after q is clock, j, k, preset,
-// clear. Active-low preset/clear: pc == 01 presets, pc == 10 clears.
 constexpr const char* kJkEdgeFf =
     "primitive jk_edge_ff (q, clock, j, k, preset, clear);\n"
     "  output q; reg q;\n"
@@ -70,18 +48,11 @@ TEST(MixedUdpTableParsing, MixedTableAcceptedWithBothRowKinds) {
       ++level_rows;
   }
 
-  // The mix is what §29.9 permits: neither kind was dropped or rejected.
   EXPECT_GT(edge_rows, 0);
   EXPECT_GT(level_rows, 0);
   EXPECT_EQ(edge_rows + level_rows, static_cast<int>(udp.table.size()));
 }
 
-// §29.9's permission covers every edge form §29.6 admits, including a
-// parenthesized transition. A table mixing a parenthesized-edge row (01) with a
-// pure level row must be accepted, and both kinds must survive into the AST --
-// the parenthesized transition is stored as the sentinel input '\x01', which
-// RowIsEdge recognizes. Distinct parser input form from the letter/`*` edges
-// exercised above.
 TEST(MixedUdpTableParsing, ParenthesizedEdgeRowMixesWithLevelRow) {
   constexpr const char* kSrc =
       "primitive paren_mix (q, clk, d);\n"

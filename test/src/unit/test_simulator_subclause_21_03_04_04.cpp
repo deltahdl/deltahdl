@@ -13,19 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.4.4 governs $fread, which loads raw bytes from a file descriptor into
-// either an integral variable (the variant applied for all packed data) or a
-// memory. Loading is byte-by-byte and big endian within each element; a
-// memory load starts at the optional start address (else the lowest declared
-// address) and walks toward the highest address, capped by the optional
-// count; loaded bits are always 2-value; the call returns the number of
-// bytes read, or zero on error, with $ferror describing a failure. Every
-// rule operates on a §21.3.1 descriptor and on a destination produced by a
-// declaration, so each test builds both from real source syntax and drives
-// the full pipeline.
-
-// Creates `path` holding the raw `bytes` so a read-type $fopen has binary
-// data to deliver.
 static void SeedBytes(const std::string& path,
                       const std::vector<uint8_t>& bytes) {
   std::ofstream ofs(path, std::ios::binary);
@@ -33,9 +20,6 @@ static void SeedBytes(const std::string& path,
             static_cast<std::streamsize>(bytes.size()));
 }
 
-// C1/C2/C8: the integral-variable variant loads the whole packed value at
-// once, big endian -- the first byte read fills the most significant byte
-// position. The return value is the number of bytes read.
 TEST(FreadBinary, IntegralVariantReadsBigEndian) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_int_be.bin";
@@ -58,8 +42,6 @@ TEST(FreadBinary, IntegralVariantReadsBigEndian) {
   std::remove(tmp.c_str());
 }
 
-// C2: a packed struct is packed data, so it is loaded through the integral
-// variant as one whole value rather than member by member.
 TEST(FreadBinary, PackedStructReadsAsWholeValue) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_packed.bin";
@@ -83,8 +65,6 @@ TEST(FreadBinary, PackedStructReadsAsWholeValue) {
   std::remove(tmp.c_str());
 }
 
-// C2/C8: a packed destination wider than 64 bits still loads every byte, the
-// first byte read occupying the most significant byte position.
 TEST(FreadBinary, WidePackedValueLoadsAllBytes) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_wide.bin";
@@ -110,10 +90,6 @@ TEST(FreadBinary, WidePackedValueLoadsAllBytes) {
   std::remove(tmp.c_str());
 }
 
-// C2: the integral variant is the one applied for all packed data -- an
-// integer destination (the standard's own example) loads big endian, and a
-// multi-dimensional packed array loads as one whole value whose remaining
-// byte fills the most significant element position.
 TEST(FreadBinary, IntegerAndMultidimPackedArrayUseIntegralVariant) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_intpa.bin";
@@ -139,9 +115,6 @@ TEST(FreadBinary, IntegerAndMultidimPackedArrayUseIntegralVariant) {
   std::remove(tmp.c_str());
 }
 
-// C8/C12: when the file ends before the packed value is full, the bytes that
-// were read keep their big-endian (most significant first) positions and the
-// call returns how many bytes it actually got.
 TEST(FreadBinary, PartialWordKeepsMostSignificantAlignment) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_partial.bin";
@@ -164,8 +137,6 @@ TEST(FreadBinary, PartialWordKeepsMostSignificantAlignment) {
   std::remove(tmp.c_str());
 }
 
-// C5: start and count are ignored when the destination is an integral
-// variable -- the value loads exactly as it would without them.
 TEST(FreadBinary, StartCountIgnoredForIntegralVariable) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_ignore.bin";
@@ -188,8 +159,6 @@ TEST(FreadBinary, StartCountIgnoredForIntegralVariable) {
   std::remove(tmp.c_str());
 }
 
-// C3/C6: with no start argument, loading begins at the lowest declared
-// address and fills consecutive words toward the highest.
 TEST(FreadBinary, MemoryFillsConsecutiveWordsFromLowest) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_consec.bin";
@@ -213,10 +182,6 @@ TEST(FreadBinary, MemoryFillsConsecutiveWordsFromLowest) {
   std::remove(tmp.c_str());
 }
 
-// C3/C7: start is the address of the first element loaded. This is the
-// standard's own example -- start=12 with memory up[10:20] puts the first
-// word at up[12]; lower locations stay untouched. start arrives as a
-// parameter and count as a localparam to cover the constant operand forms.
 TEST(FreadBinary, StartAddressSelectsFirstElement) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_start.bin";
@@ -243,9 +208,6 @@ TEST(FreadBinary, StartAddressSelectsFirstElement) {
   std::remove(tmp.c_str());
 }
 
-// C7: the standard's descending example -- for memory down[20:10] with
-// start=12, the first location loaded is down[12], then down[13]: addresses
-// ascend numerically regardless of the declared range direction.
 TEST(FreadBinary, DescendingMemoryLoadsAscendingAddresses) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_down.bin";
@@ -269,8 +231,6 @@ TEST(FreadBinary, DescendingMemoryLoadsAscendingAddresses) {
   std::remove(tmp.c_str());
 }
 
-// C4: count caps how many locations are loaded even when more data and more
-// memory are available; start and count here are plain variables.
 TEST(FreadBinary, CountLimitsWordsLoaded) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_count.bin";
@@ -295,9 +255,6 @@ TEST(FreadBinary, CountLimitsWordsLoaded) {
   std::remove(tmp.c_str());
 }
 
-// C3/C4: the $fread(mem, fd, , count) call form from the standard's example
-// list -- start is omitted, so loading begins at the lowest address while
-// count still caps the locations loaded.
 TEST(FreadBinary, OmittedStartFormDefaultsToLowestAddress) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_nostart.bin";
@@ -322,9 +279,6 @@ TEST(FreadBinary, OmittedStartFormDefaultsToLowestAddress) {
   std::remove(tmp.c_str());
 }
 
-// C4/C6: without a count, the memory is filled with whatever data are
-// available -- a short file loads only its own bytes and the return value
-// reports that shorter count.
 TEST(FreadBinary, NoCountFillsWithAvailableData) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_short.bin";
@@ -348,8 +302,6 @@ TEST(FreadBinary, NoCountFillsWithAvailableData) {
   std::remove(tmp.c_str());
 }
 
-// C8: a 9-bit-wide memory consumes two bytes per word, big endian; bits above
-// the element width are truncated away (0x02AA keeps only its low 9 bits).
 TEST(FreadBinary, NineBitWordsUseTwoBytesAndTruncate) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_nine.bin";
@@ -372,8 +324,6 @@ TEST(FreadBinary, NineBitWordsUseTwoBytesAndTruncate) {
   std::remove(tmp.c_str());
 }
 
-// C8: memory elements wider than 64 bits consume their full byte quota per
-// word, each word big endian.
 TEST(FreadBinary, WideMemoryWordsLoadAllBytes) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_widemem.bin";
@@ -402,9 +352,6 @@ TEST(FreadBinary, WideMemoryWordsLoadAllBytes) {
   std::remove(tmp.c_str());
 }
 
-// C9: an unpacked struct is read as though a separate $fread were performed
-// on each member in declaration order -- each member takes its own whole
-// number of bytes.
 TEST(FreadBinary, UnpackedStructReadsMembersInDeclarationOrder) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_ustruct.bin";
@@ -428,8 +375,6 @@ TEST(FreadBinary, UnpackedStructReadsMembersInDeclarationOrder) {
   std::remove(tmp.c_str());
 }
 
-// C9/C8: a member wider than 64 bits loads intact within an unpacked struct,
-// and the following member continues from the next file byte.
 TEST(FreadBinary, UnpackedStructWideMemberLoadsIntact) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_wstruct.bin";
@@ -456,8 +401,6 @@ TEST(FreadBinary, UnpackedStructWideMemberLoadsIntact) {
   std::remove(tmp.c_str());
 }
 
-// C10: an unpacked union is read as though the operation were performed on
-// the first member in declaration order only -- one byte here, not two.
 TEST(FreadBinary, UnpackedUnionReadsFirstMemberOnly) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_union.bin";
@@ -481,8 +424,6 @@ TEST(FreadBinary, UnpackedUnionReadsFirstMemberOnly) {
   std::remove(tmp.c_str());
 }
 
-// C11: the loaded data are 2-value -- a 4-state variable holding x before the
-// read holds a fully known value afterward; x or z can never be read in.
 TEST(FreadBinary, LoadedDataIsTwoValue) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_twoval.bin";
@@ -507,8 +448,6 @@ TEST(FreadBinary, LoadedDataIsTwoValue) {
   std::remove(tmp.c_str());
 }
 
-// C6: loading stops when the file is exhausted -- a location beyond the data
-// keeps whatever value it held before the call.
 TEST(FreadBinary, UnreadMemoryLocationKeepsPriorValue) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_partmem.bin";
@@ -532,8 +471,6 @@ TEST(FreadBinary, UnreadMemoryLocationKeepsPriorValue) {
   std::remove(tmp.c_str());
 }
 
-// C12 negative: reading through a descriptor opened for writing is an error
-// -- the call returns zero and $ferror reports a nonzero cause (§21.3.7).
 TEST(FreadBinary, ErrorReturnsZeroAndFerrorReports) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_wmode.bin";
@@ -556,8 +493,6 @@ TEST(FreadBinary, ErrorReturnsZeroAndFerrorReports) {
   std::remove(tmp.c_str());
 }
 
-// C12: exhausting the file is not an error -- a read at end-of-file simply
-// returns zero bytes and $ferror stays clear.
 TEST(FreadBinary, EndOfFileReturnsZeroWithoutError) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_eof.bin";
@@ -582,9 +517,6 @@ TEST(FreadBinary, EndOfFileReturnsZeroWithoutError) {
   std::remove(tmp.c_str());
 }
 
-// C2/C8/C12: a 2-state int destination also goes through the integral
-// variant -- a file shorter than the value still lands big endian, most
-// significant bytes first, and the count reports the shortfall.
 TEST(FreadBinary, TwoStateIntDestReadsBigEndian) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_int2s.bin";
@@ -607,8 +539,6 @@ TEST(FreadBinary, TwoStateIntDestReadsBigEndian) {
   std::remove(tmp.c_str());
 }
 
-// C12 negative: a descriptor that has been closed refuses the read -- the
-// call returns zero and $ferror reports a nonzero cause.
 TEST(FreadBinary, ClosedDescriptorReturnsZeroAndFerrorReports) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_closed.bin";
@@ -632,9 +562,6 @@ TEST(FreadBinary, ClosedDescriptorReturnsZeroAndFerrorReports) {
   std::remove(tmp.c_str());
 }
 
-// C3/C4/C6 over a §21.4-loaded memory: $readmemh seeds every location, then
-// a windowed $fread(mem, fd, start, count) overwrites only the window --
-// locations on either side keep the values the memory file gave them.
 TEST(FreadBinary, WindowedLoadOverReadmemSeededMemory) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_window.bin";
@@ -667,8 +594,6 @@ TEST(FreadBinary, WindowedLoadOverReadmemSeededMemory) {
   std::remove(mempath.c_str());
 }
 
-// C12 input form: $fread is a function, so its return value can sit directly
-// inside a larger expression such as an if condition.
 TEST(FreadBinary, ReturnValueUsableAsExpressionOperand) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_expr.bin";
@@ -690,12 +615,6 @@ TEST(FreadBinary, ReturnValueUsableAsExpressionOperand) {
   std::remove(tmp.c_str());
 }
 
-// C10 in an instantiated module: the unpacked union is declared in M, which
-// top instantiates as `m`, so its layout stands under "m.u" (§23.9) and the
-// destination's bare name is resolved through the instance. Looked up bare,
-// no layout was found and the union took the integral-variable form: both
-// seeded bytes were loaded, code read 2 and `a` read the low byte 5e. The
-// first-member form reads one byte, so code is 1 and `a` is dd.
 TEST(FreadBinary, ChildInstanceUnpackedUnionReadsFirstMemberOnly) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213404_child_union.bin";

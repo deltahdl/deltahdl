@@ -6,8 +6,6 @@
 
 using namespace delta;
 
-// Elaborates a module containing `localparam int DEPTH = 32;` and verifies that
-// the DEPTH parameter resolves to a localparam with value 32.
 inline void ExpectLocalparamDepth32ResolvesAsLocal(ElabFixture& f) {
   auto* design = Elaborate(
       "module m;\n"

@@ -25,15 +25,6 @@
 
 namespace delta {
 
-// §16.12's operators as an obligation holds them: a boolean, the constants
-// among them; the sequences an attempt may be in (§16.12.2); not, and and
-// or over operands; if-else over `expr`; an implication of a sequence
-// (§16.12.7), overlapping where `n` is set; nexttime `n` ticks on
-// (§16.12.10); unbounded always (§16.12.11); until and until_with
-// (§16.12.12); unbounded s_eventually (§16.12.13); the aborts over the
-// condition `expr` (§16.12.14); an instance of the named property `decl`
-// (§16.12.17); and a property under the values `locals` of its local
-// variables (§16.10, §16.13.7).
 enum class ObligationKind : uint8_t {
   kBool,
   kSeq,
@@ -57,22 +48,14 @@ struct ObligationNode {
   ObligationKind kind = ObligationKind::kBool;
   Expr* expr = nullptr;
   uint32_t n = 0;
-  // §16.13: the number of the clock the node is evaluated on; and, for the
-  // sequences, whether the tick read is the one they were begun at.
   int clock = 0;
   bool fresh = false;
   std::vector<const ObligationNode*> operands;
   std::vector<const SeqTerm*> terms;
-  // §16.12.17: an instance's declaration, the terms of the assumption it
-  // stands in, and the terms of the first body it was met in, which its
-  // actuals are read in.
   const ModuleItem* decl = nullptr;
   const ObligationScope* scope = nullptr;
   const ObligationScope* outer = nullptr;
   const LocalValues* locals = nullptr;
-  // The conditions under which the node does not fail at a tick and under
-  // which it holds by it, by the clocks that ticked, each read once; and an
-  // instance's expansion.
   mutable std::map<uint64_t, Expr*> conditions;
   mutable const ObligationNode* expansion = nullptr;
 };
@@ -81,7 +64,6 @@ namespace {
 
 using Kind = ObligationKind;
 
-// The clock of the constants, which hold or fail at every time step.
 constexpr int kEveryClock = 32;
 
 std::string Id(const void* p) {
@@ -144,9 +126,6 @@ const ObligationNode* AssumeObligations::Not(const ObligationNode* a) {
   return Over(Kind::kNot, {a});
 }
 
-// §16.12.4 and §16.12.5: an and of operands that hold and an or of operands
-// that fail drop them, one an operand decides is that operand's value, and
-// an operand of the same operator joins its operands to the others.
 const ObligationNode* AssumeObligations::Junction(
     Kind kind, const std::vector<const ObligationNode*>& operands) {
   bool conjunction = kind == Kind::kAnd;
@@ -169,8 +148,6 @@ const ObligationNode* AssumeObligations::Junction(
   return Over(kind, std::move(kept));
 }
 
-// §16.10: `inner` read under the locals' values `locals`; a node owing
-// nothing more reads none.
 const ObligationNode* AssumeObligations::WithLocals(
     const LocalValues* locals, const ObligationNode* inner) {
   if (Settled(inner)) return inner;
@@ -200,12 +177,6 @@ const ObligationNode* AssumeObligations::Over(
   return Intern(std::move(node));
 }
 
-// §16.12.11 to §16.12.13: the operators that carry an obligation to later
-// ticks of their clock, read as what they owe at this tick and from the
-// next on: `always p` as `p and nexttime always p`, `p until q` as `q or (p
-// and nexttime (p until q))`, until_with as `(p and q) or (p and nexttime
-// (p until_with q))`, and `s_eventually p` as `p or nexttime s_eventually
-// p`.
 const ObligationNode* AssumeObligations::Expand(const ObligationNode* node) {
   const ObligationNode* later = Next(1, node, node->clock);
   const ObligationNode* p = node->operands[0];
@@ -223,12 +194,6 @@ const ObligationNode* AssumeObligations::Expand(const ObligationNode* node) {
   }
 }
 
-// §16.12.17: an instance stands for the declaration's body read with the
-// actuals in the formals' places, its sequences' operands among them, on
-// the clock the declaration names or the one flowing to the instance; an
-// instance met while its own declaration is being expanded is expanded
-// when it is read, so that a recursive property is expanded a tick at a
-// time and its expansions, sharing the instance, are one node.
 const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
                                                    std::vector<Expr*>& reads) {
   if (node->expansion != nullptr) return node->expansion;
@@ -247,8 +212,6 @@ const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
   const ObligationNode* built =
       Build(decl->prop_body_tree, clock, inner, reads);
   expanding_.erase(decl);
-  // §16.13.7: each attempt holds copies of the property's locals of its
-  // own, begun at their initial values.
   if (!decl->prop_locals.empty()) {
     built =
         WithLocals(terms_.Locals(InitialLocals(decl->prop_locals, ctx_, arena_),
@@ -259,8 +222,6 @@ const ObligationNode* AssumeObligations::Expansion(const ObligationNode* node,
   return built;
 }
 
-// An elaboration-time constant (§16.12.10 to §16.12.13), `fallback` where
-// none was written.
 uint32_t AssumeObligations::ConstantOf(Expr* e, uint32_t fallback,
                                        const ObligationScope& scope) {
   if (e == nullptr) return fallback;
@@ -285,8 +246,6 @@ const ObligationNode* AssumeObligations::Begin(const Stmt* body,
   return Not(node);
 }
 
-// A boolean the property reads, or the named property the operand
-// instantiates (§16.12.17).
 const ObligationNode* AssumeObligations::BuildBool(Expr* e, int clock,
                                                    const ObligationScope& scope,
                                                    std::vector<Expr*>& reads) {
@@ -298,8 +257,6 @@ const ObligationNode* AssumeObligations::BuildBool(Expr* e, int clock,
   return Leaf(read, clock);
 }
 
-// §16.12.17: an instance of `decl`, expanded where it is met unless its
-// declaration is being expanded.
 const ObligationNode* AssumeObligations::BuildInstance(
     Expr* e, const ModuleItem* decl, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads) {
@@ -325,12 +282,10 @@ const ObligationNode* AssumeObligations::BuildSequence(
     const ModuleItem* item, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads, int& clock_out) {
   const SeqTerm* term = terms_.Begin(item, clock, scope, reads, clock_out);
-  // A sequence the flattening does not read puts no condition on the solve.
   if (term == nullptr) return true_;
   return Seq({term}, true);
 }
 
-// Each operand of `node` built in turn into `out`.
 void AssumeObligations::BuildOperands(const PropertyExprNode* node, int clock,
                                       const ObligationScope& scope,
                                       std::vector<Expr*>& reads,
@@ -340,9 +295,6 @@ void AssumeObligations::BuildOperands(const PropertyExprNode* node, int clock,
   }
 }
 
-// §16.12.10 to §16.12.13: nexttime, always and eventually over their
-// ranges, a bounded range being the and, or for eventually the or, of the
-// operand at each tick it covers.
 const ObligationNode* AssumeObligations::BuildRange(
     const PropertyExprNode* node, const ObligationNode* operand, int clock,
     const ObligationScope& scope) {
@@ -364,9 +316,6 @@ const ObligationNode* AssumeObligations::BuildRange(
   return Junction(always ? Kind::kAnd : Kind::kOr, ticks);
 }
 
-// §16.12.16: the first item whose expression the case expression matches
-// is selected, the default where none does, and the case holds where no
-// item is selected.
 const ObligationNode* AssumeObligations::BuildCase(
     const PropertyExprNode* node,
     const std::vector<const ObligationNode*>& items, int clock,
@@ -440,8 +389,6 @@ const ObligationNode* AssumeObligations::Build(const PropertyExprNode* node,
   }
 }
 
-// §16.12.6 and §16.12.14: an if-else, its else holding where none was
-// written, and an abort, over the condition they read.
 const ObligationNode* AssumeObligations::BuildConditional(
     const PropertyExprNode* node, std::vector<const ObligationNode*> ops,
     int clock, const ObligationScope& scope, std::vector<Expr*>& reads) {
@@ -455,9 +402,6 @@ const ObligationNode* AssumeObligations::BuildConditional(
               cond, 0, clock);
 }
 
-// §16.12.7: an implication whose antecedent is a sequence the obligations
-// model, overlapping where it is `|->`, its consequent on the clock flowing
-// out of the antecedent (§16.13.3).
 const ObligationNode* AssumeObligations::BuildImplication(
     const PropertyExprNode* node, int clock, const ObligationScope& scope,
     std::vector<Expr*>& reads) {
@@ -474,8 +418,6 @@ bool AssumeObligations::Ticked(int clock) const {
   return clock >= kEveryClock || ((ticked_ >> clock) & 1u) != 0;
 }
 
-// The condition under which an attempt in one of the sequences `node` holds
-// matches at this tick, or, `match` unset, goes on past it.
 Expr* AssumeObligations::SeqCondition(const ObligationNode* node, bool match) {
   Expr* any = conditions_.Never();
   for (const SeqTerm* term : node->terms) {
@@ -487,9 +429,6 @@ Expr* AssumeObligations::SeqCondition(const ObligationNode* node, bool match) {
   return any;
 }
 
-// The condition under which `node` does not fail at this tick, or, where
-// `decided` is set, under which it holds by this tick and owes nothing
-// more.
 Expr* AssumeObligations::Condition(const ObligationNode* node, bool decided) {
   uint64_t key =
       (static_cast<uint64_t>(ticked_) << 1) | static_cast<uint64_t>(decided);
@@ -504,8 +443,6 @@ Expr* AssumeObligations::ConditionOf(const ObligationNode* node, bool decided) {
   const auto& ops = node->operands;
   bool conjunction = node->kind == Kind::kAnd;
   Expr* all = conjunction ? conditions_.Always() : conditions_.Never();
-  // §16.13: an operand whose clock has not ticked is not read yet, so it
-  // neither fails nor holds.
   Expr* pending = decided ? conditions_.Never() : conditions_.Always();
   Expr* own = Ticked(node->clock) ? node->expr : conditions_.Never();
   std::vector<Expr*> reads;
@@ -547,10 +484,6 @@ Expr* AssumeObligations::ConditionOf(const ObligationNode* node, bool decided) {
   }
 }
 
-// §16.12.7: an implication fails at this tick where its antecedent matches
-// there and the consequent begun at the match fails at once, which a
-// nonoverlapped one, begun at the next tick, never does; it holds once its
-// antecedent can match no more and every consequent begun has held.
 Expr* AssumeObligations::ImplicationCondition(const ObligationNode* node,
                                               bool decided) {
   const ObligationNode* antecedent = node->operands[0];
@@ -593,8 +526,6 @@ bool AssumeObligations::Settled(const ObligationNode* node) const {
   return node == true_ || node == false_;
 }
 
-// The ways of the sequences `node` holds taken at this tick, `next`
-// collecting the terms they go on in; true where one matches.
 bool AssumeObligations::StepSeq(const ObligationNode* node,
                                 std::vector<const SeqTerm*>& next) {
   bool matched = false;
@@ -624,8 +555,6 @@ const ObligationNode* AssumeObligations::Step(const ObligationNode* node,
 }
 
 const ObligationNode* AssumeObligations::StepNode(const ObligationNode* node) {
-  // Under a property's locals, a step reads values and assigns locals of
-  // the attempt the frame is for, which no other attempt shares.
   if (!frames_.empty()) return StepOperator(node);
   auto key = std::make_pair(node, ticked_);
   auto found = stepped_.find(key);
@@ -676,9 +605,6 @@ const ObligationNode* AssumeObligations::StepOperator(
   }
 }
 
-// §16.10: the property under its locals steps with its expressions reading
-// the attempt's values and its match items assigning them, and goes on
-// under the values they leave.
 const ObligationNode* AssumeObligations::StepLocals(
     const ObligationNode* node) {
   frames_.emplace_back(node->locals, *node->locals);
@@ -688,16 +614,11 @@ const ObligationNode* AssumeObligations::StepLocals(
   return WithLocals(terms_.Locals(std::move(after.values), after.decls), inner);
 }
 
-// A condition read under the locals' values `locals`; one met under any
-// values stands as it is, so that it still puts no condition on the solve.
 Expr* AssumeObligations::UnderLocals(Expr* cond, const LocalValues* locals) {
   if (cond == conditions_.Always()) return cond;
   return SubstituteFormals(cond, locals->references, arena_);
 }
 
-// §16.12.7: each match of the antecedent at this tick begins an attempt of
-// the consequent, at this tick for `|->` and the next for `|=>`, and the
-// antecedent goes on while it can match again.
 const ObligationNode* AssumeObligations::StepImplication(
     const ObligationNode* node) {
   const ObligationNode* consequent = node->operands[1];
@@ -714,9 +635,6 @@ const ObligationNode* AssumeObligations::StepImplication(
   return Junction(Kind::kAnd, {begun, rest});
 }
 
-// §16.12.14: an abort whose condition holds at a tick of its clock decides
-// the property, accept_on as holding and reject_on as failing; otherwise
-// its operand goes on under it.
 const ObligationNode* AssumeObligations::StepAbort(const ObligationNode* node) {
   const ObligationNode* aborted = node->kind == Kind::kAccept ? true_ : false_;
   if (Ticked(node->clock) && Holds(node->expr)) return aborted;

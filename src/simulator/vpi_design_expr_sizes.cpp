@@ -23,7 +23,6 @@ namespace delta {
 
 namespace {
 
-// §11.6.1 Table 11-21: an operator whose result is one bit wide.
 bool IsOneBitOp(int op_type) {
   switch (op_type) {
     case vpiNotOp:
@@ -53,8 +52,6 @@ bool IsOneBitOp(int op_type) {
   }
 }
 
-// §11.6.1 Table 11-21: an operator whose result is as wide as its left
-// operand, the right one being self-determined.
 bool IsLeftWidthOp(int op_type) {
   switch (op_type) {
     case vpiLShiftOp:
@@ -68,10 +65,6 @@ bool IsLeftWidthOp(int op_type) {
   }
 }
 
-// §6.11 Table 6-8 and §6.12: the width of the built-in type a cast names by
-// keyword, 0 for one with no bit width (§37.59 leaves it to the typespec). A
-// bit or logic typespec a size, signing or const cast makes from its operand
-// records its own width (§6.24.1).
 int CastWidth(const VpiObject& op) {
   for (const VpiObject* child : op.children) {
     switch (child->type) {
@@ -95,9 +88,6 @@ int CastWidth(const VpiObject& op) {
   return 0;
 }
 
-// §11.4.12.1 with §11.6.1 Table 11-21: the width of the replication `expr`,
-// its count times the widths of the expressions it repeats, which follow the
-// count among `sizes` (§37.59 detail 1).
 int ReplicationWidth(const Expr& expr, const std::vector<int>& sizes,
                      const AssignBuild& build) {
   int sum = 0;
@@ -105,14 +95,8 @@ int ReplicationWidth(const Expr& expr, const std::vector<int>& sizes,
   return static_cast<int>(ConstantWhereWritten(expr.repeat_count, build)) * sum;
 }
 
-// §11.6.1 Table 11-21: the self-determined width of the operation `op`, built
-// for `expr`, over operands of the sizes `sizes`, in order, a cast to a type
-// of no bit width being as wide as its operand; 0 for one the table does not
-// size.
 int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
                    const Expr& expr, const AssignBuild& build) {
-  // A cast is as wide as the type it casts to, whose typespec it holds even
-  // where its operand has no object (§37.59 detail 5).
   if (op.op_type == vpiCastOp && CastWidth(op) != 0) return CastWidth(op);
   if (sizes.empty()) return 0;
   if (IsOneBitOp(op.op_type)) return 1;
@@ -129,8 +113,6 @@ int OperationWidth(const VpiObject& op, const std::vector<int>& sizes,
   }
 }
 
-// §11.5.1: the width the select `expr` selects, the span of a part select's
-// bounds or an indexed part select's width.
 int SelectWidth(const Expr& expr, const AssignBuild& build) {
   const int64_t kSecond = ConstantWhereWritten(expr.index_end, build);
   if (expr.is_part_select_plus || expr.is_part_select_minus) {

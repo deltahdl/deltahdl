@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <format>
@@ -14,10 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Returns the resolved net type of the named net in the named elaborated
-// module, or kNone when either is absent. Lets the interconnect-merge tests
-// observe the built-in net type the interconnect net ends up with after the
-// port connections are resolved (§23.3.3.7.1).
 static NetType InterconnectNetType(RtlirDesign* design, std::string_view module,
                                    std::string_view net_name) {
   auto it = design->all_modules.find(module);
@@ -27,14 +22,6 @@ static NetType InterconnectNetType(RtlirDesign* design, std::string_view module,
   }
   return NetType::kNone;
 }
-
-// §23.3.3.7.1: when only one side of a port connection is an interconnect net,
-// the merged net takes the type of the other net. The interconnect net has no
-// type of its own to contribute, so the merged simulated net adopts the child
-// port's built-in net type. One test per admitted built-in net type -- each is
-// a distinct input form that must be observed resolving to its own net type,
-// not merely accepted without error. The external (instantiation-side)
-// interconnect net is the one retyped, so its resolved type is inspected.
 
 TEST(InterconnectPortConnectionElaboration,
      ExternalInterconnectResolvesToWireType) {
@@ -228,8 +215,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "ic"), NetType::kSupply1);
 }
 
-// §23.3.3.7.1 through the positional connection form: the merge and its type
-// resolution apply the same way whether the port is named or ordered.
 TEST(InterconnectPortConnectionElaboration,
      PositionalExternalInterconnectResolvesToWireType) {
   ElabFixture f;
@@ -246,8 +231,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "ic"), NetType::kWire);
 }
 
-// §23.3.3.7.1 with an input-direction port: a port connection with an
-// interconnect net still merges and resolves to the port's net type.
 TEST(InterconnectPortConnectionElaboration,
      InputPortExternalInterconnectResolvesToWireType) {
   ElabFixture f;
@@ -264,7 +247,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "ic"), NetType::kWire);
 }
 
-// §23.3.3.7.1 with an output-direction port: same merge and type resolution.
 TEST(InterconnectPortConnectionElaboration,
      OutputPortExternalInterconnectResolvesToWireType) {
   ElabFixture f;
@@ -282,9 +264,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "ic"), NetType::kWire);
 }
 
-// §23.3.3.7.1: the interconnect net may be on the internal (child-port) side,
-// with a built-in net type externally. The merge is legal; the external net is
-// already its concrete type, so the connection elaborates without error.
 TEST(InterconnectPortConnectionElaboration,
      InternalInterconnectExternalWireNoError) {
   ElabFixture f;
@@ -315,10 +294,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.7.1 (negative form): when both sides of the connection are
-// interconnect, the merged net stays an interconnect net. An interconnect net
-// type is illegal for a simulated net at the end of elaboration, so this is
-// rejected.
 TEST(InterconnectPortConnectionElaboration,
      BothInterconnectIllegalAtEndOfElaboration) {
   ElabFixture f;
@@ -336,9 +311,6 @@ TEST(InterconnectPortConnectionElaboration,
                             5, "23.3.3.7.1"));
 }
 
-// §23.3.3.7.1 (negative form) reached through a positional connection: two
-// interconnect nets still merge to an interconnect net, which is illegal at the
-// end of elaboration.
 TEST(InterconnectPortConnectionElaboration,
      PositionalBothInterconnectIllegalAtEndOfElaboration) {
   ElabFixture f;
@@ -356,10 +328,6 @@ TEST(InterconnectPortConnectionElaboration,
                             5, "23.3.3.7.1"));
 }
 
-// §23.3.3.7.1 consuming §23.3.3.7 (Table 23-1 dominance): one interconnect net
-// reaches a wire net in one child and a wand net in another, all built from
-// real module/instance syntax. The single merged net resolves to the dominating
-// type of the dissimilar built-in nets, which is wand.
 TEST(InterconnectPortConnectionElaboration,
      InterconnectMergedAcrossDissimilarPortsResolvesToWand) {
   ElabFixture f;
@@ -381,12 +349,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "netlist", "iwire"), NetType::kWand);
 }
 
-// §23.3.3.7.1: the merging is transitive. An interconnect net joined to an
-// interconnect port whose instance passes it on to a wire port is one net with
-// that wire, so it is not of interconnect type at the end of elaboration,
-// though the port joining the two interconnect nets has interconnect on both
-// sides
-// (#7388).
 TEST(InterconnectPortConnectionElaboration,
      InterconnectChainReachingAWireBelowIsLegal) {
   ElabFixture f;
@@ -404,9 +366,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.7.1: the wire the chain reaches may stand above it, a bit of it
-// connected to the interconnect port that passes the net down to another
-// interconnect port.
 TEST(InterconnectPortConnectionElaboration,
      InterconnectChainReachingAWireAboveIsLegal) {
   ElabFixture f;
@@ -424,9 +383,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.7.1: the wire may also be reached through a later sibling instance,
-// whose port connection the merged net takes its type from after the first
-// instance's interconnect port has joined it.
 TEST(InterconnectPortConnectionElaboration,
      InterconnectChainReachingAWireThroughASiblingIsLegal) {
   ElabFixture f;
@@ -444,8 +400,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.7.1 with §23.3.3.7.2: a gate terminal gives the interconnect net on
-// it a net type of its own, and a chain reaching that net reaches the type.
 TEST(InterconnectPortConnectionElaboration,
      InterconnectChainReachingAGateTerminalIsLegal) {
   ElabFixture f;
@@ -462,10 +416,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.7.1 (negative form): a chain of interconnect nets that reaches no net
-// of another type anywhere is still of interconnect type at the end of
-// elaboration, and is reported at each port joining two of its nets, however
-// many other nets stand beside it.
 TEST(InterconnectPortConnectionElaboration,
      InterconnectChainReachingNoOtherTypeIsIllegal) {
   ElabFixture f;
@@ -491,9 +441,6 @@ TEST(InterconnectPortConnectionElaboration,
                             4, "23.3.3.7.1"));
 }
 
-// §23.3.3.7.1 with §23.2.2.3: an input port declared with a data type and no
-// net type keyword is a net of the default net type, so the interconnect net
-// connected to it merges into a wire (#7390).
 TEST(InterconnectPortConnectionElaboration,
      ExternalInterconnectOnADataTypedInputResolvesToWire) {
   ElabFixture f;
@@ -510,8 +457,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kWire);
 }
 
-// §23.3.3.7.1 with §23.2.2.3 and §22.8: the default net type in force where the
-// port's module is defined is the one the merged net takes.
 TEST(InterconnectPortConnectionElaboration,
      ExternalInterconnectOnADataTypedInputTakesTheDefaultNetType) {
   ElabFixture f;
@@ -528,10 +473,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(InterconnectNetType(design, "top", "c"), NetType::kTri);
 }
 
-// §23.3.3.7.1: an output port declared with a data type alone is a variable
-// (§23.2.2.3), no net, so it gives the interconnect net no net type. §23.3.3.2
-// (printed page 747) makes connecting a port variable to an interconnect net
-// illegal, and the connection is reported.
 TEST(InterconnectPortConnectionElaboration,
      ExternalInterconnectOnAVariablePortGetsNoNetType) {
   ElabFixture f;
@@ -551,10 +492,6 @@ TEST(InterconnectPortConnectionElaboration,
                     5, "23.3.3.2"));
 }
 
-// §23.3.3.7.1: the merging is transitive, so an interconnect net that reaches
-// a typed net only through another module's interconnect port takes that
-// net's type, and the typed net keeps its own. top.c meets mid's interconnect
-// port p, which meets sink's tri port q (#7396).
 TEST(InterconnectPortConnectionElaboration,
      AnInterconnectChainTakesTheTypeOfTheNetItReaches) {
   ElabFixture f;
@@ -578,12 +515,6 @@ TEST(InterconnectPortConnectionElaboration,
   EXPECT_EQ(sink->second->ports[0].net_type, NetType::kTri);
 }
 
-// §23.3.3.7.1 with Table 23-1: an interconnect chain reaching dissimilar typed
-// nets through an interconnect port is one net of the dominating type among
-// them, a wand over a wire whichever is connected first. Returns the type of
-// top's interconnect net c, which reaches through mid's interconnect port p one
-// sink port of type `first`, then one of type `second`, or kNone when the
-// design fails to elaborate cleanly.
 static NetType ChainTypeReachingSinks(std::string_view first,
                                       std::string_view second) {
   ElabFixture f;

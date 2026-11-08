@@ -141,8 +141,6 @@ TEST(AssertionDeclElaboration, SequenceDeclWithCoverElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.16 (a): the declarations carry no clock, so the assertions take the
-// default clocking's.
 TEST(AssertionDeclElaboration, PropertyAndSequenceDeclsTogether) {
   ElabFixture f;
   auto* design = Elaborate(

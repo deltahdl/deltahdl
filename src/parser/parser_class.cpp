@@ -20,17 +20,7 @@
 
 namespace delta {
 
-// CPD-dedup: an interface declaration and a program declaration are written
-// the same way apart from their keywords and their bodies, so the head and the
-// tail either one reads are parsed in one place here.
 struct ParserClassHelpers {
-  // The keyword, the optional lifetime, the name, and the parameter and port
-  // lists. Returns true when the ports were written in the non-ANSI style or
-  // as ( .* ), in which case the body still has their directions to read: A.1.2
-  // gives both forms a body of program_items or interface_items, whose first
-  // alternative is a port_declaration. The subclause is the caller's, since
-  // the two declarations this reads are stated in different places: §25.3
-  // gives the interface syntax and §24.3 the program construct.
   static bool ParseHead(Parser& p, ModuleDecl* decl, TokenKind keyword,
                         Subclause subclause) {
     p.Expect(keyword, subclause);
@@ -43,8 +33,6 @@ struct ParserClassHelpers {
     decl->name = p.Expect(TokenKind::kIdentifier, subclause).text;
     p.declared_design_elements_.insert(decl->name);
     p.ParseParamsPortsAndSemicolon(*decl);
-    // A.1.2 gives a lifetime to the ( .* ) form of a module alone; that of an
-    // interface or a program is its keyword and its name.
     if (kHasLifetime && decl->has_wildcard_ports) {
       p.diag_.Error(
           kLifetimeLoc,
@@ -58,9 +46,6 @@ struct ParserClassHelpers {
             decl->ports[0].direction == Direction::kNone);
   }
 
-  // The end keyword, the optional label repeating the name, and the end of the
-  // declaration's source range. The subclause is the caller's, for the reason
-  // given on ParseHead.
   static void ParseTail(Parser& p, ModuleDecl* decl, TokenKind end_keyword,
                         Subclause subclause) {
     p.Expect(end_keyword, subclause);
@@ -68,8 +53,6 @@ struct ParserClassHelpers {
     decl->range.end = p.CurrentLoc();
   }
 
-  // Reads one qualifier before a class member, if one stands there, into `m`;
-  // `proto` is set by the two that mark a method with no body.
   static bool ConsumeQualifier(Parser& p, ClassMember* m, bool& proto) {
     if (p.TryConsumeAccessQualifier(m) ||
         p.TryConsumeClassQualifier(m, TokenKind::kKwStatic,
@@ -88,16 +71,10 @@ struct ParserClassHelpers {
     }
     if (!p.Match(TokenKind::kKwExtern)) return false;
     proto = true;
-    // 18.5.1: 'extern constraint name;' is the explicit prototype form. The
-    // flag is only meaningful for constraint members.
     m->is_constraint_extern = true;
     return true;
   }
 
-  // Records on `m` where `kw`, the qualifier just read and the `index`th of
-  // the member's, stands among the others, for the order A.1.9 gives `extern`,
-  // `pure` and the random qualifiers; `extern_first` carries whether the first
-  // one read was `extern`.
   static void NoteQualifierOrder(Parser& p, ClassMember* m, TokenKind kw,
                                  int index, bool& extern_first) {
     if (kw == TokenKind::kKwExtern) {
@@ -111,9 +88,6 @@ struct ParserClassHelpers {
     }
   }
 
-  // A.1.9's class_method: its two extern forms open with `extern`, before
-  // every method qualifier, and method_qualifier writes `pure` directly before
-  // `virtual`. A `pure` with no `virtual` at all is reported on its own.
   static void RejectMethodQualifierOrder(Parser& p, const ClassMember& m) {
     if (m.extern_follows_qualifier) {
       p.diag_.Error(m.loc,
@@ -129,12 +103,6 @@ struct ParserClassHelpers {
     }
   }
 
-  // A.1.9's bodiless form of class_method, `pure virtual {
-  // class_item_qualifier } method_prototype ;`, opens with the pair, which
-  // only `extern` may precede. A method written with a body may take other
-  // qualifiers first, as `{ method_qualifier } function_declaration`, so this
-  // is asked of one with none. A `pure` apart from its `virtual` is already
-  // reported by RejectMethodQualifierOrder.
   static void RejectPureVirtualPrototypeOrder(Parser& p, const ClassMember& m) {
     if (!m.pure_follows_qualifier || m.pure_apart_from_virtual) return;
     p.diag_.Error(m.loc,
@@ -143,10 +111,6 @@ struct ParserClassHelpers {
                   Subclause("A.1.9"));
   }
 
-  // A.1.9's class_property: its first form puts every property qualifier
-  // before the data_declaration's own `const`, and its const form takes only
-  // class item qualifiers after `const`, so neither writes a random qualifier
-  // after `const`.
   static void RejectPropertyQualifiers(Parser& p, const ClassMember& m) {
     p.RejectMisplacedClassQualifiers(
         m,
@@ -160,11 +124,6 @@ struct ParserClassHelpers {
                   Subclause("A.1.9"));
   }
 
-  // A type_declaration, or a nettype_declaration where `is_nettype` says so,
-  // as a class_property: A.1.9 makes the property a data_declaration behind
-  // its qualifiers, and A.2.1.3 counts both among data_declaration's forms, so
-  // each takes the qualifiers a class_property takes. The member is carried
-  // over the item its parse returns, a nettype's as a typedef's is.
   static void ParseTypeMember(Parser& p, std::vector<ClassMember*>& members,
                               ClassMember* member, bool is_nettype) {
     p.RejectMisplacedClassQualifiers(
@@ -178,14 +137,6 @@ struct ParserClassHelpers {
     members.push_back(member);
   }
 
-  // A.1.9's interface_class_item (printed page 1179): an interface_class_method
-  // takes no qualifier but `pure virtual`, and a type_declaration takes none,
-  // where a class's items take more. Each member `decl` gained from `first` on
-  // is reported only for the qualifiers its item in a class that is no
-  // interface class admits, the others having been reported there already.
-  // `static` on a method is left to §8.10, since an interface class's methods
-  // are virtual. A nettype_declaration is a data_declaration and no
-  // type_declaration, so a nettype member is reported as no item of the class.
   static void CheckInterfaceClassItems(Parser& p, const ClassDecl& decl,
                                        size_t first) {
     if (!decl.is_interface) return;
@@ -259,21 +210,6 @@ ModuleDecl* Parser::ParseProgramDecl() {
   return decl;
 }
 
-// Makes the type names of the classes decl derives from type names in decl's
-// own body. §8.13 gives a subclass the base class's members, and §8.26.3 gives
-// an extending interface class the parameters and typedefs of the interface
-// class it extends.
-//
-// decl->implements_types is read here as well, although §8.26.3 passes an
-// interface class's parameters and typedefs to the interface classes that
-// extend it and not to the classes that implement it, and gives
-// `class ClassA implements IntfC; t1_t t1_i;` as an error on printed page 210.
-// That rule decides whether a reference is legal, and this table decides only
-// how the tokens group. Elaborator::CheckImplementsTypeAccessOfType in
-// src/elaborator/elaborator_validate_class_inheritance.cpp is what reports the
-// illegal reference against §8.26.3, and it can only report a declaration the
-// parser read as one. Leaving implements out here would replace that report
-// with Parser::ParseModuleInstList asking for a missing `(` under §23.3.2.
 void Parser::AdoptBaseClassTypeNames(const ClassDecl* decl) {
   auto adopt = [&](std::string_view base) {
     auto it = class_types_.find(base);
@@ -284,18 +220,6 @@ void Parser::AdoptBaseClassTypeNames(const ClassDecl* decl) {
   for (const auto& iface : decl->implements_types) adopt(iface.name);
 }
 
-// §8.24 has an out-of-block method declaration access every declaration of the
-// class whose prototype it implements: its example resolves the `T` of
-// `function void C::f(T x)` to `C::T` rather than to the compilation unit's T
-// (printed page 203 of IEEE 1800-2023). The class's own type names left
-// known_types_ at its `endclass`, so the method's tf_port_list and body are
-// given them back from class_types_, inside the guard ParseFunctionDecl or
-// ParseTaskDecl opened, which takes them out again at the method's end. The
-// return type is not read here: §8.24 has a return type the class defines
-// written with the class scope resolution operator, `function C::T C::f()`,
-// which reaches the name without it. A name class_types_ has no entry for --
-// a class declared in a file this parse never saw, or the interface name of
-// §25.7's `task ifc.method` -- adopts nothing.
 void Parser::AdoptMethodClassTypeNames(std::string_view class_name) {
   auto it = class_types_.find(class_name);
   if (it != class_types_.end()) AdoptTypeNames(it->second);
@@ -306,14 +230,8 @@ ClassDecl* Parser::ParseClassDecl() {
   decl->range.start = CurrentLoc();
   ParserClassHeaderHelpers::ParseHeadKeywords(*this, decl);
   decl->name = Expect(TokenKind::kIdentifier, Subclause("8.3")).text;
-  // §8.3 makes a class a type, so its own name is registered here, ahead of the
-  // scope below, and is a type name wherever the declaration is written.
   known_types_.insert(decl->name);
 
-  // §23.9 makes a class a scope, so a typedef in its body is not a type name
-  // after `endclass`. The guard opens ahead of the parameter port list, because
-  // §8.26.3 counts a type parameter among the names an extending class
-  // inherits, and what the body declared goes into class_types_ below.
   TypeNameScope type_scope(*this);
 
   if (Check(TokenKind::kHash)) {
@@ -376,10 +294,6 @@ void Parser::ValidateClassMethod(ClassMember* member) {
                 "method can be",
                 Subclause("8.10"));
   }
-  // §8.10 (printed page 187): the qualifier is the method's static-ness, not
-  // its lifetime, which the check above has already refused; it is recorded on
-  // its own flag so that a lifetime reader, §13.5.2's ref-formal rule among
-  // them, does not take a static method for a static-lifetime subroutine.
   if (member->is_static) member->method->is_static_method = true;
 }
 
@@ -397,20 +311,6 @@ void Parser::ValidateConstructorQualifiers(ClassMember* member) {
   }
 }
 
-// Reports a method body written after a `pure virtual` prototype, and discards
-// it. §8.21 (printed page 199) states the rule as a definition rather than as
-// an error: a pure virtual method is marked by the keyword pure and by having
-// no method body. Syntax 8-1 (printed page 180) says the same in the grammar,
-// admitting only `pure virtual { class_item_qualifier } method_prototype ;`,
-// and a prototype ends at the port list. An empty body still counts, because
-// §8.21's own NOTE keeps a method with no statement body a legal method that
-// can be called. The body's `endfunction` or `endtask` is not the next token
-// when the body holds statements, so this scans for it and restores the lexer
-// position when there is none. The scan stops at `endclass` and at a further
-// `function` or `task`, past which the keyword found would close something
-// else. The body is discarded rather than parsed, which is what keeps what it
-// declares out of the class: Parser::ParseClassMembers would otherwise read
-// `int x = 1;` as a class property and report the rest under §8.5.
 void Parser::RejectPureVirtualMethodBody(const ClassMember* member,
                                          bool is_func) {
   if (!member->is_pure_virtual) return;
@@ -447,8 +347,6 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
                                    kQualStatic | kQualProtected | kQualLocal |
                                        kQualVirtual | kQualPure | kQualExtern,
                                    "class method");
-    // A.1.9's method_qualifier is `[ pure ] virtual`: `pure` stands before
-    // `virtual` and before nothing else.
     if (member->is_pure_virtual && !member->is_virtual) {
       diag_.Error(member->loc,
                   "'pure' qualifies 'virtual'; a method is pure virtual or "
@@ -459,8 +357,6 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
     member->kind = ClassMemberKind::kMethod;
     member->method = is_func ? ParseFunctionDecl(proto) : ParseTaskDecl(proto);
     if (proto) ValidateClassMethodPrototype(diag_, member->method);
-    // Mirror the method name onto the ClassMember, like every other member kind
-    // (typedef/property/nested class); the name itself lives on member->method.
     member->name = member->method->name;
     ValidateClassMethod(member);
     if (is_func) ValidateConstructorQualifiers(member);
@@ -478,16 +374,6 @@ bool Parser::TryParseMethodOrConstraint(std::vector<ClassMember*>& members,
   return false;
 }
 
-// A.1.9's `local_parameter_declaration ;` and `parameter_declaration ;` class
-// items, each declarator of the declaration a member of its own, the first of
-// them `member`. §6.20/§8.25: the parameter's type and default value are
-// carried so the lowerer can evaluate it into the class type's
-// static-property store (a class parameter is a compile-time constant of the
-// class).
-// A local type parameter whose default is written as a data type, which a
-// class typedef can carry; one written as an expression, `type(x)`, is not,
-// and neither is one restricted to a kind, `type enum E`, which a typedef
-// item carrying the kind would read as a forward typedef (§6.18).
 static bool IsLocalTypeParam(const ModuleItem* item) {
   return item->data_type.kind == DataTypeKind::kVoid && item->is_localparam &&
          item->typedef_type.kind != DataTypeKind::kImplicit &&
@@ -502,11 +388,6 @@ void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
     auto* m = (i == 0) ? member : arena_.Create<ClassMember>();
     m->name = param_items[i]->name;
     if (IsLocalTypeParam(param_items[i])) {
-      // §6.20.3 with §8.25: a type parameter of the class body that cannot
-      // be overridden names one type in each specialization, as a typedef of
-      // it does, so it is carried as one: `localparam type U = T;` is `typedef
-      // T U;`. Carried as a value parameter, its type was lost and U named
-      // nothing.
       param_items[i]->kind = ModuleItemKind::kTypedef;
       m->kind = ClassMemberKind::kTypedef;
       m->typedef_item = param_items[i];
@@ -516,8 +397,6 @@ void Parser::ParseClassParameterMembers(std::vector<ClassMember*>& members,
     m->kind = ClassMemberKind::kProperty;
     m->is_param = true;
     m->data_type = param_items[i]->data_type;
-    // §6.20.1: a parameter declared with unpacked dimensions is an array of
-    // values, and the member is where every later reader looks for them.
     m->unpacked_dims = param_items[i]->unpacked_dims;
     m->init_expr = param_items[i]->init_expr;
     members.push_back(m);
@@ -542,9 +421,6 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                    "nested class declaration");
     member->kind = ClassMemberKind::kClassDecl;
     member->nested_class = ParseClassDecl();
-    // A.1.9's class_declaration opens with `[ virtual ] class`, and the
-    // `virtual` of a nested one was read as a member qualifier above, so the
-    // declaration takes it from the member.
     if (member->is_virtual) member->nested_class->is_virtual = true;
     member->name = member->nested_class->name;
     members.push_back(member);
@@ -557,8 +433,6 @@ bool Parser::TryParseKeywordClassMember(std::vector<ClassMember*>& members,
     ParseCovergroupDecl(temp);
     if (!temp.empty()) {
       member->name = temp[0]->name;
-      // §19.4.1: carry the extended base covergroup name onto the class member
-      // so a derived embedded covergroup can be recognized in class scope.
       member->covergroup_extends_base = temp[0]->covergroup_extends_base;
       member->covergroup = temp[0]->covergroup;
     }
@@ -574,11 +448,6 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
   if (Check(TokenKind::kKwImport)) {
     SourceLoc import_loc = CurrentLoc();
     Consume();
-    // §35.5.4 with A.1.9 and H.9.2: a DPI import declaration, told from a
-    // package import by the dpi_spec_string after the keyword, is an item of
-    // a module, interface, program, package, generate block or compilation
-    // unit and of no class, so it is reported as the DPI import it is; the
-    // package form keeps §26.3's report.
     if (Check(TokenKind::kStringLiteral)) {
       diag_.Error(import_loc,
                   "DPI import declaration is not allowed in class scope",
@@ -592,10 +461,6 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     Match(TokenKind::kSemicolon);
     return;
   }
-  // §35.7: a DPI export declaration must live in the scope where the
-  // function being exported is defined, so an export inside a class body
-  // would have to designate a class member function — explicitly forbidden
-  // by the standard's class-member exclusion.
   if (Check(TokenKind::kKwExport)) {
     diag_.Error(CurrentLoc(),
                 "DPI export declaration is not allowed in class scope; "
@@ -605,9 +470,6 @@ void Parser::ParseClassMembers(std::vector<ClassMember*>& members) {
     Match(TokenKind::kSemicolon);
     return;
   }
-  // §14.7: a class is none of the four scopes a clocking block may be declared
-  // in, so one written as a class member is rejected here rather than falling
-  // through to the class property form, which would ask for a property name.
   if (AtClockingDecl()) {
     RejectClockingDecl(
         "a class body cannot hold a clocking block; only a module, an "
@@ -654,13 +516,6 @@ void Parser::ParseExtraPropertyDecls(std::vector<ClassMember*>& members,
 
 namespace {
 
-// 18.5.11/18.5.13.1: the lexical context surrounding the leaf token just
-// consumed in a constraint block body. prev_was_qualifier records whether the
-// preceding token was a '.'/'::' (so a member/scope-qualified name is not taken
-// for an unqualified call); next_is_lparen/next_is_dot/next_is_coloncolon are
-// the one-token lookahead that distinguishes a call ('identifier (') from a
-// continued qualified reference. All four are computed by the caller so the
-// recording stays a pure operation on the member.
 struct ConstraintTokenContext {
   bool prev_was_qualifier;
   bool next_is_lparen;
@@ -668,11 +523,6 @@ struct ConstraintTokenContext {
   bool next_is_coloncolon;
 };
 
-// 18.5.11/18.5.13.1: from the leaf identifier token just consumed inside a
-// constraint block body, record an unqualified function call (the 'identifier (
-// ' form) and, while scanning a soft constraint, a bare local variable
-// reference. in_soft is cleared when the soft constraint's expression
-// terminates at its ';'.
 void RecordConstraintTokenRefs(ClassMember* member, const Token& tok,
                                const ConstraintTokenContext& ctx,
                                bool& in_soft) {
@@ -693,16 +543,9 @@ void RecordConstraintTokenRefs(ClassMember* member, const Token& tok,
       member->constraint_soft_refs.push_back(sref);
     }
   }
-  // The soft constraint's expression ends at its ';'.
   if (tok.kind == TokenKind::kSemicolon) in_soft = false;
 }
 
-// 18.5.3/18.5.7.1/18.5.11/18.5.13.1: the structural tokens that the constraint
-// block scan tracks for their own sake rather than as expression leaves: a
-// brace adjusts the block-nesting depth, and 'soft' opens a soft-constraint
-// expression whose bare local variables are collected until its ';'. The token
-// has just been consumed by the caller, so this only applies its pure effect on
-// the running depth/in_soft scan state.
 void ApplyConstraintStructuralToken(TokenKind kind, int& depth, bool& in_soft) {
   switch (kind) {
     case TokenKind::kLBrace:
@@ -719,19 +562,12 @@ void ApplyConstraintStructuralToken(TokenKind kind, int& depth, bool& in_soft) {
   }
 }
 
-// 18.5.11: a leaf token closes a member/scope qualifier when it is a '.' or
-// '::', so the identifier that follows is part of a qualified name rather than
-// an unqualified call on the enclosing class.
 bool LeafClosesQualifier(const Token& tok) {
   return tok.kind == TokenKind::kDot || tok.kind == TokenKind::kColonColon;
 }
 
 }  // namespace
 
-// 18.5.1: parse the qualifier list ('static'/'initial'/'extends'/'final' after
-// one or two ':' separators) and the constraint name. Returns true when the
-// constraint is a bodyless prototype (terminated by ';'), in which case the
-// caller is done; otherwise the opening '{' has been consumed.
 bool Parser::ParseConstraintHeader(ClassMember* member) {
   if (Match(TokenKind::kColon)) {
     if (Match(TokenKind::kKwInitial)) {
@@ -747,8 +583,6 @@ bool Parser::ParseConstraintHeader(ClassMember* member) {
   }
   member->name = Expect(TokenKind::kIdentifier, Subclause("18.5")).text;
 
-  // 18.5.1: a constraint with no block is a prototype, completed elsewhere by
-  // an external constraint block.
   if (Match(TokenKind::kSemicolon)) {
     member->is_constraint_prototype = true;
     return true;
@@ -757,39 +591,20 @@ bool Parser::ParseConstraintHeader(ClassMember* member) {
   return false;
 }
 
-// One step of the constraint-block body scan. Consumes the next structural or
-// leaf token, updating depth/in_soft and recording references on member.
-// carried_qualifier carries the previous leaf's '.'/'::' state; the function
-// returns it updated for the next iteration.
 bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
                                      bool& in_soft, bool carried_qualifier) {
   TokenKind kind = CurrentToken().kind;
-  // 18.5.7.1: 'foreach ( array_id [ loop_variables ] )' heads an iterative
-  // constraint; validate its header (the loop-variable naming rule) and
-  // record it for the elaborator's dimension check before the scan resumes.
   if (kind == TokenKind::kKwForeach) {
     CheckForeachConstraintHeader(member);
     return false;
   }
-  // 18.5.9: 'solve solve_before_list before solve_before_list ;' is consumed
-  // through its ';', recording the two lists for the elaborator's ordering
-  // and circular-dependency checks.
   if (kind == TokenKind::kKwSolve) {
     CheckSolveBeforeConstraint(member);
     return false;
   }
-  // 18.5.3: 'expression dist { dist_list }' hands the brace-enclosed
-  // dist_list to a dedicated scan so its default-item rules are enforced.
   if (kind == TokenKind::kKwDist) {
     Consume();
     CheckDistSet();
-    // 18.5: a dist expression is a whole expression_or_dist and cannot be
-    // nested inside another expression. Once the dist_list has been consumed,
-    // the only token that may legally follow is the ';' terminating the
-    // constraint_expression; an operator, ')', or any other continuation means
-    // the dist was used as an operand of a surrounding expression. A bare '}'
-    // (a missing terminator, or the constraint block's own close) is left to
-    // the ordinary terminator handling so this rule does not fire on it.
     if (!AtEnd() && !Check(TokenKind::kSemicolon) &&
         !Check(TokenKind::kRBrace)) {
       diag_.Error(CurrentLoc(),
@@ -798,17 +613,10 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
     }
     return false;
   }
-  // 18.5.13.2: 'disable soft constraint_primary ;' drops every lower-priority
-  // soft constraint naming the primary's variable. Capture the variable and
-  // consume the directive up to (not including) its ';', so its 'soft' keyword
-  // is not taken as opening a soft constraint and the terminator still resets
-  // the relation scan as usual.
   if (kind == TokenKind::kKwDisable) {
     CaptureDisableSoftConstraint(member);
     return false;
   }
-  // 18.5.13.1/structural: 'soft' opens a soft constraint and a brace adjusts
-  // the block-nesting depth; consume the token and apply its pure scan effect.
   if (kind == TokenKind::kKwSoft || kind == TokenKind::kLBrace ||
       kind == TokenKind::kRBrace) {
     Consume();
@@ -818,9 +626,6 @@ bool Parser::ScanConstraintBodyToken(ClassMember* member, int& depth,
   Token t = CurrentToken();
   CheckConstraintExprToken(t);
   Consume();
-  // 18.5.11/18.5.13.1: with the leaf token consumed, look at the next token
-  // to recognize an unqualified call ('identifier (') and a bare local
-  // variable named in a soft constraint, then record them on the member.
   RecordConstraintTokenRefs(
       member, t,
       ConstraintTokenContext{carried_qualifier, Check(TokenKind::kLParen),

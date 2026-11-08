@@ -142,8 +142,6 @@ TEST(StringConcatAndReplication, EndToEndNoTruncation) {
   EXPECT_EQ(VecToStr(var->value), "hi there everyone");
 }
 
-// The block's own s is out of reach of any name from outside it (§6.21), so
-// the block copies the replication into the module's r.
 TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -162,12 +160,6 @@ TEST(StringConcatAndReplication, EndToEndNonConstantMultiplier) {
   EXPECT_EQ(VecToStr(var->value), "boo boo boo ");
 }
 
-// §11.4.12.2: when any operand of a concatenation is of type string, every
-// other operand is implicitly converted to the string data type (per §6.16).
-// Here a genuine integral (byte) variable is concatenated onto a string
-// variable through the full pipeline, so the CONVERSION of the non-string
-// operand is observed by value ("hi" + byte 'X' -> "hiX"), not merely the
-// string-typing of the result.
 TEST(StringConcatAndReplication, EndToEndIntegralOperandConvertedToString) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -185,11 +177,6 @@ TEST(StringConcatAndReplication, EndToEndIntegralOperandConvertedToString) {
   EXPECT_EQ(VecToStr(var->value), "hiX");
 }
 
-// §11.4.12.2: a string replication accepts a non-constant multiplier, but a
-// constant multiplier is equally valid and takes a different code path than a
-// runtime variable — the count is folded from a parameter during elaboration
-// rather than read at run time. Here the multiplier is a module parameter, the
-// constant-expression form distinct from the literal and int-variable forms.
 TEST(StringConcatAndReplication, EndToEndParameterMultiplierReplication) {
   SimFixture f;
   auto* var = RunAndFindVar(

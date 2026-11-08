@@ -15,59 +15,40 @@ using namespace delta;
 
 namespace {
 
-// In the with_covergroup_expression, the cross_items stand for the values each
-// coverpoint takes in a value tuple. CountSatisfyingValueTuples enumerates the
-// Cartesian product of a candidate bin tuple's value sets and reports how many
-// of those value tuples satisfy the predicate (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, CountsSatisfyingValueTuplesOverCartesianProduct) {
-  // Bin tuple <{0,1,2}, {10,20}> has 3 x 2 = 6 value tuples.
   std::vector<std::vector<int64_t>> sets = {{0, 1, 2}, {10, 20}};
-  // a + b < 21 : <0,10> <0,20> <1,10> <2,10> satisfy; <1,20> <2,20> do not.
   auto pred = [](const std::vector<int64_t>& t) { return t[0] + t[1] < 21; };
 
   EXPECT_EQ(CoverageDB::CountSatisfyingValueTuples(sets, pred), 4u);
 }
 
-// A coverpoint with an empty value set (or no coverpoints at all) yields no
-// value tuples, so nothing can satisfy the expression (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, NoValueTuplesWhenAnySetIsEmpty) {
   auto any = [](const std::vector<int64_t>&) { return true; };
   EXPECT_EQ(CoverageDB::CountSatisfyingValueTuples({{1, 2}, {}}, any), 0u);
   EXPECT_EQ(CoverageDB::CountSatisfyingValueTuples({}, any), 0u);
 }
 
-// A bare cross_identifier select_expression (no with clause) selects every
-// candidate bin tuple of the enclosing cross (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, BareCrossIdentifierSelectsAllBinTuples) {
   std::vector<std::vector<std::vector<int64_t>>> candidates = {
       {{0}, {0}}, {{0}, {1}}, {{1}, {0}}, {{1}, {1}}};
-  CrossWithMatchPolicy policy;  // unused without a predicate
+  CrossWithMatchPolicy policy;
 
-  auto selected =
-      CoverageDB::SelectCrossBinTuples(candidates, /*pred=*/nullptr, policy);
+  auto selected = CoverageDB::SelectCrossBinTuples(candidates, nullptr, policy);
   EXPECT_EQ(selected, (std::vector<size_t>{0, 1, 2, 3}));
 }
 
-// With a with clause and no matches clause, the selection policy defaults to
-// one: a candidate is kept when at least one value tuple satisfies the
-// expression (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, WithClauseDefaultsToAtLeastOne) {
-  // candidate 0: <{0},{0}> sum 0; candidate 1: <{5},{5}> sum 10.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0}, {0}},
                                                                {{5}, {5}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
       [](const std::vector<int64_t>& t) { return t[0] + t[1] < 1; };
-  CrossWithMatchPolicy policy;  // default: require_all false, min_count 1
+  CrossWithMatchPolicy policy;
 
   auto selected = CoverageDB::SelectCrossBinTuples(candidates, &pred, policy);
-  EXPECT_EQ(selected, (std::vector<size_t>{0}));  // only candidate 0 satisfies
+  EXPECT_EQ(selected, (std::vector<size_t>{0}));
 }
 
-// A matches clause with a positive integer N keeps a candidate only when at
-// least N of its value tuples satisfy the expression (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, MatchesIntegerRequiresMinimumCount) {
-  // candidate 0: <{0,1},{0}>     -> tuples <0,0>,<1,0>, 2 satisfy a+b<2.
-  // candidate 1: <{0,5},{0}>     -> tuples <0,0>,<5,0>, 1 satisfies a+b<2.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0, 1}, {0}},
                                                                {{0, 5}, {0}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
@@ -78,16 +59,12 @@ TEST(CrossWithCovergroup, MatchesIntegerRequiresMinimumCount) {
   EXPECT_EQ(CoverageDB::SelectCrossBinTuples(candidates, &pred, two),
             (std::vector<size_t>{0}));
 
-  CrossWithMatchPolicy one;  // min_count 1
+  CrossWithMatchPolicy one;
   EXPECT_EQ(CoverageDB::SelectCrossBinTuples(candidates, &pred, one),
             (std::vector<size_t>{0, 1}));
 }
 
-// The $ matches form requires every value tuple of the candidate to satisfy the
-// expression for the candidate to be selected (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, MatchesDollarRequiresAllValueTuples) {
-  // candidate 0: <{0,1},{0}> -> all of <0,0>,<1,0> satisfy a+b<2.
-  // candidate 1: <{0,5},{0}> -> <5,0> fails a+b<2, so not all satisfy.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0, 1}, {0}},
                                                                {{0, 5}, {0}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
@@ -99,11 +76,7 @@ TEST(CrossWithCovergroup, MatchesDollarRequiresAllValueTuples) {
             (std::vector<size_t>{0}));
 }
 
-// Each cross_item maps to its own coverpoint's value within a value tuple:
-// position i of the tuple is the value of the i-th coverpoint of the cross. A
-// predicate that pins each position observes the ordering (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, ValueTupleMapsEachCrossItemToItsCoverpoint) {
-  // Three single-value coverpoints yield exactly one value tuple, <2,3,4>.
   std::vector<std::vector<int64_t>> sets = {{2}, {3}, {4}};
 
   auto ordered = [](const std::vector<int64_t>& t) {
@@ -111,31 +84,23 @@ TEST(CrossWithCovergroup, ValueTupleMapsEachCrossItemToItsCoverpoint) {
   };
   EXPECT_EQ(CoverageDB::CountSatisfyingValueTuples(sets, ordered), 1u);
 
-  // Expecting the values in reversed coverpoint order matches no value tuple.
   auto reversed = [](const std::vector<int64_t>& t) {
     return t[0] == 4 && t[1] == 3 && t[2] == 2;
   };
   EXPECT_EQ(CoverageDB::CountSatisfyingValueTuples(sets, reversed), 0u);
 }
 
-// A matches count greater than the candidate's total number of value tuples can
-// never be met, so the candidate is not selected even when every value tuple
-// satisfies the expression (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, MatchesCountAboveTupleCountSelectsNothing) {
-  // One candidate with 2 value tuples, both satisfying the predicate.
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{0, 1}, {0}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
       [](const std::vector<int64_t>&) { return true; };
 
   CrossWithMatchPolicy three;
-  three.min_count = 3;  // exceeds the 2 available value tuples
+  three.min_count = 3;
   EXPECT_TRUE(
       CoverageDB::SelectCrossBinTuples(candidates, &pred, three).empty());
 }
 
-// The $ form selects a candidate only when it has value tuples and all satisfy:
-// a candidate with an empty value set has no value tuples, so it is not
-// selected (LRM 19.6.1.2).
 TEST(CrossWithCovergroup, MatchesDollarRejectsCandidateWithNoValueTuples) {
   std::vector<std::vector<std::vector<int64_t>>> candidates = {{{1, 2}, {}}};
   std::function<bool(const std::vector<int64_t>&)> pred =
@@ -146,9 +111,6 @@ TEST(CrossWithCovergroup, MatchesDollarRejectsCandidateWithNoValueTuples) {
   EXPECT_TRUE(CoverageDB::SelectCrossBinTuples(candidates, &pred, all).empty());
 }
 
-// §19.6.1.2: `X with (a == b)` selects the bin tuples of the cross holding a
-// value tuple for which a == b: the four automatic products <a[i],b[i]> go to
-// the bin eq, which the sample a = b = 1 covers, and 12 automatic bins remain.
 TEST(CovergroupInstanceSim, CrossWithSelectsTheProductsWhoseValuesSatisfyIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -167,10 +129,6 @@ TEST(CovergroupInstanceSim, CrossWithSelectsTheProductsWhoseValuesSatisfyIt) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.6.1.2: a `with` is evaluated for each value tuple of the bin tuples it
-// is applied to; over two int coverpoints those number 2^64, more than
-// deltahdl evaluates, so the bin is reported and selects nothing, and the
-// instance is built with its 4096 automatic bins.
 TEST(CovergroupInstanceSim, CrossWithOverTooManyValueTuplesIsReported) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -193,9 +151,6 @@ TEST(CovergroupInstanceSim, CrossWithOverTooManyValueTuplesIsReported) {
                             5, "19.6.1.2"));
 }
 
-// §19.6.1.2 and §19.6.1.4: a matches count is a positive integer. A
-// covergroup formal giving it 0 is a run-time error at the building of the
-// instance, for a `with` as for a cross_set_expression; 1 is legal.
 TEST(CovergroupInstanceSim, NonPositiveMatchesCountFromAFormalIsReported) {
   SimFixture f;
   RunCapture(

@@ -20,8 +20,6 @@ namespace delta {
 
 namespace {
 
-// A cross whose bins are being checked: its covergroup's cross labels, what
-// the covergroup reads, the bin in hand and where the reports go.
 struct CrossSite {
   const CoverCrossDecl& cross;
   const std::unordered_set<std::string_view>& cross_labels;
@@ -30,7 +28,6 @@ struct CrossSite {
   DiagEngine& diag;
 };
 
-// The labels of the crosses `cg` declares.
 std::unordered_set<std::string_view> CrossLabels(const CovergroupDecl& cg) {
   std::unordered_set<std::string_view> labels;
   for (const CoverageSpecOrOption& item : cg.items) {
@@ -42,7 +39,6 @@ std::unordered_set<std::string_view> CrossLabels(const CovergroupDecl& cg) {
   return labels;
 }
 
-// §19.6.1.2: a constant `matches` count is a positive integer.
 void CheckMatches(const SelectExpression& s, const CrossSite& site) {
   if (s.matches == nullptr) return;
   std::optional<int64_t> count = ConstEvalInt(s.matches);
@@ -54,8 +50,6 @@ void CheckMatches(const SelectExpression& s, const CrossSite& site) {
                   Subclause("19.6.1.2"));
 }
 
-// The name a cross_identifier or a cross_set_expression written as a bare
-// name selects through; empty for any other select expression.
 std::string_view NameSelected(const SelectExpression& s) {
   if (s.kind == SelectExpressionKind::kCrossIdentifier) return s.cross_name;
   if (s.kind == SelectExpressionKind::kCrossSet &&
@@ -65,10 +59,6 @@ std::string_view NameSelected(const SelectExpression& s) {
   return {};
 }
 
-// §19.6.1.2: a cross_identifier names the enclosing cross alone; §19.6.1.4:
-// a cross_set_expression is a queue of CrossValType structures, so a name of
-// an integral, real or string value, or of an array of such elements, is
-// none.
 void CheckNameSelected(const SelectExpression& s, const CrossSite& site) {
   std::string_view name = NameSelected(s);
   if (name.empty()) return;

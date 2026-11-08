@@ -118,9 +118,6 @@ TEST(EvalOpXZ, LogicalRightShiftXAmount) {
   EXPECT_NE(result.words[0].bval, 0u);
 }
 
-// §11.4.10: an x or z in the shift amount makes the result unknown. This holds
-// for every shift operator, so the arithmetic left shift completes the set
-// already exercised for <<, >>, and >>>.
 TEST(EvalOpXZ, ArithLeftShiftXAmount) {
   SimFixture f;
   MakeVar(f, "v", 4, 0b1100);
@@ -176,11 +173,6 @@ TEST(OperatorSim, AllShiftOpsPreserveLhsSignedness) {
   }
 }
 
-// §11.4.10: the shift amount is always treated as an unsigned number. A signed
-// right operand whose sign bit is set is applied as its (large) unsigned
-// magnitude, never as a negative count. The 5-bit signed amount 0b10000 here is
-// 16 when read unsigned, shifting the 32-bit all-ones operand down to its upper
-// half rather than doing anything sign-driven.
 TEST(OperatorSim, ShiftAmountTreatedAsUnsigned) {
   SimFixture f;
   MakeVar(f, "u", 32, 0xFFFFFFFFu);
@@ -216,14 +208,6 @@ TEST(OperatorSim, ShiftByMoreThanWidth) {
   EXPECT_EQ(EvalExpr(expr_r, f.ctx, f.arena).ToUint64() & 0xFu, 0u);
 }
 
-// §11.4.10: the arithmetic right shift sign-fills the vacated high bits when
-// the result type is signed. Signedness is a property of the operand's
-// declaration, so this drives a real `logic signed` variable through the full
-// pipeline: the lowerer propagates the declared signedness onto the runtime
-// value and the runtime shift reads it to choose sign-fill over zero-fill.
-// 4'b1000 is -8, and an arithmetic right shift by 1 yields 4'b1100 (-4) rather
-// than the 4'b0100 a zero-fill would produce, so the fill source is observed
-// from source syntax.
 TEST(OperatorSim, ArithRightShiftSignedDeclSignFillsFromSource) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -240,11 +224,6 @@ TEST(OperatorSim, ArithRightShiftSignedDeclSignFillsFromSource) {
   EXPECT_EQ(r->value.ToUint64() & 0xFu, 0b1100u);
 }
 
-// §11.4.10: an x or z in the shift amount forces an unknown result. The
-// synthetic EvalOpXZ cases above hand-build a z amount (aval=0, bval=1); this
-// drives a true-x amount (the 4'bx literal lowers to aval=1, bval=1) through
-// the full pipeline from real source, so the HasUnknownBits gate is observed
-// acting on an amount produced exactly the way a design would produce one.
 TEST(OperatorSim, UnknownShiftAmountFromSourceYieldsUnknown) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -342,12 +321,6 @@ TEST(BlockingAssignSim, BlockingAssignShiftOps) {
   EXPECT_EQ(shr->value.ToUint64(), 0x03u);
 }
 
-// §11.4.10 (printed page 284) has every shift move the whole left operand by
-// the count and fill the vacated positions with zeros, so a 96-bit operand
-// shifted right by 64 reads its top word at the bottom. The runtime moved
-// words[0] alone by the count taken on a 64-bit machine word, where a count
-// of 64 is undefined and moved nothing on x86, so P >> 64 read
-// 0x89ABCDEF00112233 with the top word cleared.
 constexpr const char* kWideShiftHeader =
     "module t;\n"
     "  localparam logic [95:0] P = 96'h0123_4567_89AB_CDEF_0011_2233;\n"
@@ -366,8 +339,6 @@ TEST(WideShiftSim, LogicalRightShiftByAWholeWordReadsTheTopWord) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A count of 70 is one word and six bits: 0x01234567 >> 6 is 0x48D15. The
-// defect read 0x0226AF37BC004488, words[0] moved by six alone.
 TEST(WideShiftSim, LogicalRightShiftByAWordAndBitsCrossesTheWord) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -380,8 +351,6 @@ TEST(WideShiftSim, LogicalRightShiftByAWordAndBitsCrossesTheWord) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// A count under 64 still draws the top word's bits down into the low word:
-// P >> 32 is 0x0123456789ABCDEF, where the defect read 0x89ABCDEF.
 TEST(WideShiftSim, LogicalRightShiftWithinAWordDrawsFromTheWordAbove) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -394,8 +363,6 @@ TEST(WideShiftSim, LogicalRightShiftWithinAWordDrawsFromTheWordAbove) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// P << 64 carries the low word's low 32 bits into bits 95:64 and leaves the
-// low word clear. The defect left words[0] as P's and words[1] at 0.
 TEST(WideShiftSim, LeftShiftByAWholeWordFillsTheTopWord) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -408,8 +375,6 @@ TEST(WideShiftSim, LeftShiftByAWholeWordFillsTheTopWord) {
   EXPECT_EQ(r->value.words[1].aval, 0x00112233u);
 }
 
-// P << 70 puts 0x00112233 << 6, 0x04488CC0, in bits 95:64; the defect read
-// 0x6AF37BC004488CC0 in words[0] and nothing above.
 TEST(WideShiftSim, LeftShiftByAWordAndBitsCrossesTheWord) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -422,8 +387,6 @@ TEST(WideShiftSim, LeftShiftByAWordAndBitsCrossesTheWord) {
   EXPECT_EQ(r->value.words[1].aval, 0x04488CC0u);
 }
 
-// P << 32 keeps the low word's carry: words[1] takes P[63:32], 0x89ABCDEF,
-// which the defect dropped while it got words[0] right.
 TEST(WideShiftSim, LeftShiftWithinAWordCarriesIntoTheWordAbove) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -436,8 +399,6 @@ TEST(WideShiftSim, LeftShiftWithinAWordCarriesIntoTheWordAbove) {
   EXPECT_EQ(r->value.words[1].aval, 0x89ABCDEFu);
 }
 
-// §11.4.10: a count of the operand's width or more leaves no bit of it. The
-// defect took 96 as 32 and read 0x89ABCDEF, and 100 as 36.
 TEST(WideShiftSim, ShiftByTheWidthOrMoreIsAllZeros) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -461,8 +422,6 @@ TEST(WideShiftSim, ShiftByTheWidthOrMoreIsAllZeros) {
   }
 }
 
-// A shift by zero keeps every word; the defect rebuilt the result from the
-// low word alone and so cleared words[1].
 TEST(WideShiftSim, ShiftByZeroKeepsEveryWord) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -475,10 +434,6 @@ TEST(WideShiftSim, ShiftByZeroKeepsEveryWord) {
   EXPECT_EQ(r->value.words[1].aval, 0x01234567u);
 }
 
-// §11.4.10: >>> fills the vacated positions with the sign bit when the result
-// is signed. N is -2^80 as a 96-bit signed value; N >>> 70 is -2^10, ones
-// down to bit 10 in both words. The defect zero-filled a signed operand of 64
-// bits or more and read 0 in both words.
 TEST(WideShiftSim, ArithmeticRightShiftSignFillsAcrossWords) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -497,8 +452,6 @@ TEST(WideShiftSim, ArithmeticRightShiftSignFillsAcrossWords) {
   EXPECT_EQ(r->value.words[1].bval, 0u);
 }
 
-// A signed operand shifted by its width or more is the sign bit everywhere,
-// inside the width and not above it.
 TEST(WideShiftSim, ArithmeticRightShiftByTheWidthOrMoreIsAllSignBits) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -522,8 +475,6 @@ TEST(WideShiftSim, ArithmeticRightShiftByTheWidthOrMoreIsAllSignBits) {
   }
 }
 
-// The logical >> on the same bits zero-fills whatever the operand's sign:
-// N >> 70 is 0x3FFFC00.
 TEST(WideShiftSim, LogicalRightShiftOfASignedOperandZeroFills) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -540,9 +491,6 @@ TEST(WideShiftSim, LogicalRightShiftOfASignedOperandZeroFills) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// An x or z bit of the operand travels with the shift on both planes: 4'bx01z
-// deposited at q[95:92] and shifted down by 92 reads x01z at r[3:0], aval
-// 0b1010 and bval 0b1001. The defect read 0 on both planes.
 TEST(WideShiftSim, LogicalRightShiftCarriesUnknownBitsDownAcrossWords) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -563,9 +511,6 @@ TEST(WideShiftSim, LogicalRightShiftCarriesUnknownBitsDownAcrossWords) {
   EXPECT_EQ(r->value.words[1].bval, 0u);
 }
 
-// §11.4.10 treats the count as unsigned, so a count with a bit above its low
-// 64 is beyond any width and answers zeros. Read through the count's low word
-// alone it is 0 and left P untouched.
 TEST(WideShiftSim, ACountAboveSixtyFourBitsIsBeyondTheWidth) {
   SimFixture f;
   auto* r = RunAndFindVar(std::string(kWideShiftHeader) +
@@ -580,13 +525,6 @@ TEST(WideShiftSim, ACountAboveSixtyFourBitsIsBeyondTheWidth) {
   EXPECT_EQ(r->value.words[1].aval, 0u);
 }
 
-// §11.6.1 Table 11-21 makes a shift's left operand context-determined, and
-// §11.8.2 extends it to the size the context propagates down to it before the
-// shift is made, so a bit moved above the operand's own width is kept where
-// the context is wider: `8'd1 << 8` into a 16-bit target is 256 and a four-bit
-// `4'b1111 << 4` into an int is 240, alone or beside another operand. In a
-// concatenation the shift is self-determined (§11.4.12), so there the bits
-// are lost. Shifted at the operand's own width, every one of them was 0.
 TEST(ShiftOperatorSim, ShiftLeftOperandTakesTheContextsWidth) {
   SimFixture f;
   auto out = RunCapture(

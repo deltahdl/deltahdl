@@ -91,8 +91,6 @@ TEST(PortDeclParsing, OutputDeclWithDefault) {
 }
 
 TEST(PortDeclParsing, InterfacePortBareIdentifier) {
-  // interface_port_declaration: interface_identifier
-  // list_of_interface_identifiers
   auto r = Parse(
       "interface bus_if; logic clk; endinterface\n"
       "module m(bus_if b); endmodule");
@@ -104,8 +102,6 @@ TEST(PortDeclParsing, InterfacePortBareIdentifier) {
 }
 
 TEST(PortDeclParsing, InterfacePortWithModport) {
-  // interface_port_declaration:
-  // interface_identifier . modport_identifier list_of_interface_identifiers
   auto r = Parse(
       "interface bus_if;\n"
       "  logic clk;\n"
@@ -121,7 +117,6 @@ TEST(PortDeclParsing, InterfacePortWithModport) {
 }
 
 TEST(PortDeclParsing, InterfacePortWithInterfaceKeyword) {
-  // The generic-interface form using the 'interface' keyword.
   auto r = Parse(
       "interface bus_if; logic clk; endinterface\n"
       "module m(interface b); endmodule");
@@ -190,9 +185,6 @@ TEST(PortDeclParsing, NonAnsiRefDecl) {
   EXPECT_EQ(r.cu->modules[0]->ports[1].direction, Direction::kRef);
 }
 
-// A.2.1.2 writes a non-ANSI body port with a net_port_type, whose
-// implicit_data_type takes any number of packed dimensions, so a port typed by
-// its dimensions alone keeps every one of them (#7587).
 TEST(PortDeclParsing, NonAnsiImplicitTypeWithSeveralPackedDims) {
   auto r = Parse(
       "module m(a, b);\n"
@@ -209,9 +201,6 @@ TEST(PortDeclParsing, NonAnsiImplicitTypeWithSeveralPackedDims) {
   EXPECT_TRUE(ports[0].data_type.is_net);
 }
 
-// A.2.1.2 writes a non-ANSI output declaration of a variable port with a
-// list_of_variable_port_identifiers, and A.2.3 gives each of its ports an
-// optional `= constant_expression`, kept as the port's default_value (#7588).
 TEST(PortDeclParsing, NonAnsiOutputVariablePortInitializer) {
   auto r = Parse(
       "module m(q, r, s);\n"
@@ -227,9 +216,6 @@ TEST(PortDeclParsing, NonAnsiOutputVariablePortInitializer) {
   EXPECT_EQ(ports[2].default_value, nullptr);
 }
 
-// A body port declaration's net_port_type or variable_port_type takes a
-// data_type, which A.2.2.1 lets name a package's typedef through its scope,
-// with `var` before it or without.
 TEST(PortDeclParsing, BodyPortDeclarationOfAPackageScopedType) {
   auto r = Parse(
       "package pk;\n"
@@ -251,27 +237,17 @@ TEST(PortDeclParsing, BodyPortDeclarationOfAPackageScopedType) {
 }
 
 TEST(PortDeclParsing, ErrorInputMissingIdentifier) {
-  // The port_identifier following the data type is required by
-  // list_of_port_identifiers; the parser must reject input declarations that
-  // omit it.
   auto r = Parse("module m(input wire); endmodule");
-  // §23.2.2.2 owns the ANSI port list, so the port_identifier is demanded
-  // there rather than under §23.2.2.1.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
 TEST(PortDeclParsing, ErrorRefMissingIdentifier) {
   auto r = Parse("module m(ref logic); endmodule");
-  // §23.2.2.2 owns the ANSI port list, so the port_identifier is demanded
-  // there rather than under §23.2.2.1.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
-// A.2.1.2's port declarations take a data_type after `var`, which A.2.2.1
-// lets be a type_reference (§6.23), in the header and in a body port
-// declaration alike.
 TEST(PortDeclParsing, VarPortsOfATypeReference) {
   auto r = Parse(
       "module m(input int x, input var type(x) a);\n"
@@ -288,10 +264,6 @@ TEST(PortDeclParsing, VarPortsOfATypeReference) {
   EXPECT_NE(r.cu->modules[1]->ports[0].data_type.type_ref_expr, nullptr);
 }
 
-// §6.23 has a type reference follow a net type keyword in a net's declaration
-// and `var` in a variable's, and a port is one or the other (§23.2.2.3), so a
-// port's written with neither is reported, in the header and in a body port
-// declaration alike.
 TEST(PortDeclParsing, PortOfATypeReferenceWithNeitherKeywordIsReported) {
   auto r = Parse(
       "module m(input int x, input type(x) e);\n"

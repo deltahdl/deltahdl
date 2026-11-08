@@ -29,8 +29,6 @@ TEST_F(DpiParseTest, DpiImportBitLogicArgs) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: the C-compatible scalar types, string, and chandle are among the
-// permitted formal-argument types, so an import declaring them parses cleanly.
 TEST_F(DpiParseTest, DpiImportPermittedScalarArgsAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -53,9 +51,6 @@ TEST_F(DpiParseTest, DpiImportPermittedScalarArgsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: an event is not one of the permitted formal-argument types for a
-// DPI subroutine. The type parses as a data type but the clause restriction
-// rejects it as a formal argument.
 TEST_F(DpiParseTest, DpiImportEventArgRejected) {
   Parse(
       "module m;\n"
@@ -67,9 +62,6 @@ TEST_F(DpiParseTest, DpiImportEventArgRejected) {
                             2, "35.5.6"));
 }
 
-// §35.5.6: the remaining C-compatible scalar and integral types named by the
-// clause (byte, shortint, longint, integer, time, shortreal) are also part of
-// the permitted set, so a DPI import using them parses without error.
 TEST_F(DpiParseTest, DpiImportAdditionalScalarArgsAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -95,9 +87,6 @@ TEST_F(DpiParseTest, DpiImportAdditionalScalarArgsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: user-defined types built from the permitted set (here a typedef of
-// a permitted scalar) are themselves permitted as formal arguments. The named
-// type is accepted, not rejected, by the permitted-type restriction.
 TEST_F(DpiParseTest, DpiImportNamedTypeArgAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -113,9 +102,6 @@ TEST_F(DpiParseTest, DpiImportNamedTypeArgAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: the permitted-type restriction applies to every formal argument, so
-// a non-permitted type is rejected even when it follows permitted arguments in
-// the same import declaration.
 TEST_F(DpiParseTest, DpiImportNonPermittedArgAmongPermittedRejected) {
   Parse(
       "module m;\n"
@@ -130,9 +116,6 @@ TEST_F(DpiParseTest, DpiImportNonPermittedArgAmongPermittedRejected) {
                             2, "35.5.6"));
 }
 
-// §35.5.6: scalar bit and logic values are listed among the permitted
-// formal-argument types in their own right -- not only in packed-vector form.
-// Single-bit bit and logic formals are therefore accepted.
 TEST_F(DpiParseTest, DpiImportScalarBitLogicArgsAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -149,8 +132,6 @@ TEST_F(DpiParseTest, DpiImportScalarBitLogicArgsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: packed structs composed of bit and logic members are a permitted
-// formal-argument type. An inline packed struct argument is accepted.
 TEST_F(DpiParseTest, DpiImportPackedStructArgAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -165,8 +146,6 @@ TEST_F(DpiParseTest, DpiImportPackedStructArgAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: packed unions composed of bit and logic members are likewise a
-// permitted formal-argument type. An inline packed union argument is accepted.
 TEST_F(DpiParseTest, DpiImportPackedUnionArgAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -181,9 +160,6 @@ TEST_F(DpiParseTest, DpiImportPackedUnionArgAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: a union is a permitted type-constructing form only in its packed
-// form. An unpacked union formal argument is therefore rejected, in contrast to
-// the accepted packed-union case above.
 TEST_F(DpiParseTest, DpiImportUnpackedUnionArgRejected) {
   Parse(
       "module m;\n"
@@ -196,8 +172,6 @@ TEST_F(DpiParseTest, DpiImportUnpackedUnionArgRejected) {
                             2, "35.5.6"));
 }
 
-// §35.5.6: enumeration types are permitted as formal arguments (interpreted as
-// their associated base type). An inline enum argument is accepted.
 TEST_F(DpiParseTest, DpiImportEnumArgAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -211,10 +185,6 @@ TEST_F(DpiParseTest, DpiImportEnumArgAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: a struct is permitted as a formal argument only where it is
-// built from the supported types, and an event is not one of them. The argument
-// is rejected for the type of a member even though struct is itself a permitted
-// type-constructing form.
 TEST_F(DpiParseTest, DpiImportStructWithEventMemberRejected) {
   Parse(
       "module m;\n"
@@ -227,8 +197,6 @@ TEST_F(DpiParseTest, DpiImportStructWithEventMemberRejected) {
                             2, "35.5.6"));
 }
 
-// §35.5.6: a struct built only from the supported types is itself a permitted
-// formal-argument type, so an inline struct of permitted members is accepted.
 TEST_F(DpiParseTest, DpiImportStructWithPermittedMembersAccepted) {
   auto* unit = Parse(
       "module m;\n"
@@ -243,9 +211,6 @@ TEST_F(DpiParseTest, DpiImportStructWithPermittedMembersAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §35.5.6: a type is constructed from the supported types at every depth, so
-// the restriction reaches a member of a member. A struct whose only member is a
-// struct holding an event is rejected.
 TEST_F(DpiParseTest, DpiImportNestedStructWithEventMemberRejected) {
   Parse(
       "module m;\n"

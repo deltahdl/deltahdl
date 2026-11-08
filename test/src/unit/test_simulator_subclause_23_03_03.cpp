@@ -26,10 +26,6 @@ TEST(PortConnectionRulesSimulation, InputPortPropagatesSourceValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// §23.3.3: an inout port connection is a non-strength-reducing (bidirectional)
-// transistor connection between the internal and external nets, rather than a
-// one-directional continuous assignment. A value driven inside the instance
-// therefore passes out to the connected parent net undiminished.
 TEST(PortConnectionRulesSimulation,
      InoutPortConductsValueToParentUndiminished) {
   SimFixture f;
@@ -46,11 +42,6 @@ TEST(PortConnectionRulesSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }
 
-// §23.3.3: the item on the source side of a port connection may be an
-// expression, not just a bare identifier, and the connection acts as a
-// continuous assignment of that source to the port's sink. A widening (rather
-// than truncating) case keeps this observation tied to the head rule and
-// distinct from the width-limited forms owned by other subclauses.
 TEST(PortConnectionRulesSimulation, ExpressionSourceOnInputPortDrivesSink) {
   EXPECT_EQ(
       RunAndGet("module child(input logic [7:0] a, output logic [7:0] b);\n"
@@ -67,10 +58,6 @@ TEST(PortConnectionRulesSimulation, ExpressionSourceOnInputPortDrivesSink) {
       0xFFu);
 }
 
-// §23.3.3: compatible port types follow the same rules as assignment
-// compatibility (§6.22.3). A narrower assignment-compatible source is
-// width-converted (zero-extended for an unsigned source) into a wider input
-// port exactly as a variable assignment would convert it, observed at runtime.
 TEST(PortConnectionRulesSimulation,
      AssignmentCompatibleWidthConversionPropagates) {
   EXPECT_EQ(
@@ -87,11 +74,6 @@ TEST(PortConnectionRulesSimulation,
       0x0Au);
 }
 
-// §23.3.3: an output port connection is a continuous assignment whose source is
-// internal to the instance and whose sink is the connected item in the parent.
-// The child drives its output and the parent variable observes it — the source
-// side of the connection being inside the instance is a distinct form from the
-// input-port case, where the source is external.
 TEST(PortConnectionRulesSimulation, OutputPortConnectionDrivesParentSink) {
   EXPECT_EQ(RunAndGet("module child(output logic [7:0] y);\n"
                       "  assign y = 8'h5A;\n"
@@ -104,10 +86,6 @@ TEST(PortConnectionRulesSimulation, OutputPortConnectionDrivesParentSink) {
             0x5Au);
 }
 
-// §23.3.3 consuming §10.3: the value supplied to an input port may itself be
-// produced by a continuous assignment in the instantiating module. Built from
-// real continuous-assignment syntax, the port connection carries that
-// continuously-driven source through to the sink inside the instance.
 TEST(PortConnectionRulesSimulation,
      ContinuousAssignSourceFlowsThroughInputPort) {
   EXPECT_EQ(
@@ -126,10 +104,6 @@ TEST(PortConnectionRulesSimulation,
       0xF0u);
 }
 
-// §23.3.3 consuming §6.22.3: a 2-state source is assignment-compatible with a
-// 4-state port, so a `bit` vector connected to a `logic` input port propagates
-// its value through the connection unchanged. This exercises the 2-state
-// operand path, distinct from the width-conversion form above.
 TEST(PortConnectionRulesSimulation, TwoStateSourcePropagatesThroughInputPort) {
   EXPECT_EQ(
       RunAndGet("module child(input logic [7:0] a, output logic [7:0] b);\n"
@@ -145,9 +119,6 @@ TEST(PortConnectionRulesSimulation, TwoStateSourcePropagatesThroughInputPort) {
       0xC3u);
 }
 
-// §23.3.3: the source item of a port connection may be a parameter (constant)
-// reference rather than a variable, which resolves through a different path
-// than a signal reference. The elaborated constant is carried to the sink.
 TEST(PortConnectionRulesSimulation, ParameterValueSourceDrivesInputPort) {
   EXPECT_EQ(
       RunAndGet("module child(input logic [7:0] a, output logic [7:0] b);\n"
@@ -162,12 +133,6 @@ TEST(PortConnectionRulesSimulation, ParameterValueSourceDrivesInputPort) {
       0x77u);
 }
 
-// §23.3.3 with §25.10: a port connected to a member of an interface instance,
-// `gen dut(.clk(dif.clk), .o(dif.o))`, follows it as a port connected to any
-// variable does: the input takes dif.clk's rise, the module's always runs on
-// it, and the output drives dif.o. The input's continuous assignment watched
-// neither `dif` nor `clk` alone, so it never ran again after the first
-// evaluation and all three read 0.
 TEST(PortConnectionRulesSimulation,
      PortsConnectedToInterfaceMembersFollowThem) {
   SimFixture f;

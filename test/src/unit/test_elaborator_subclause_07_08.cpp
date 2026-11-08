@@ -43,9 +43,6 @@ TEST(AssocArrayElaboration, MultipleArrays) {
              "endmodule\n"));
 }
 
-// The rule that rejects this is not §7.8 but §7.4.6, which requires an array
-// operand to be selected down to an element before an arithmetic operator can
-// take it, so the report names §7.4.6.
 TEST(AssocArrayElaboration, WholeAssocInArithExprRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -71,10 +68,6 @@ TEST(AssocArrayElaboration, WholeAssocEqualityComparisonAccepted) {
              "endmodule\n"));
 }
 
-// §7.8 — the "select an element first" rule names two exceptions: copying and
-// comparing whole arrays. Comparison is covered above; this exercises the copy
-// exception: assigning one whole associative array to another (no element
-// selection) shall be legal.
 TEST(AssocArrayElaboration, WholeAssocCopyAssignmentAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -84,13 +77,6 @@ TEST(AssocArrayElaboration, WholeAssocCopyAssignmentAccepted) {
              "endmodule\n"));
 }
 
-// §7.8 gives an associative array no slice, and the report
-// WalkStmtsForAssocSlice emits names §7.4.6, which states the rule. Neither
-// clause conditions it on the statement the slice is written in, and the walk
-// wrote out six of the thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states, so a slice written in
-// any of the other seven was never looked at. The cases below write the same
-// `x = aa[1:2];` at the top level and then in each of those seven links.
 TEST(AssocArrayElaboration, AssocSliceRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -123,9 +109,6 @@ TEST(AssocArrayElaboration, AssocSliceInForkArmRejected) {
                             "7.4.6"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so a
-// slice may stand in the expression of a for-loop initialization.
 TEST(AssocArrayElaboration, AssocSliceInForInitRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -141,7 +124,6 @@ TEST(AssocArrayElaboration, AssocSliceInForInitRejected) {
                             "7.4.6"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment | ...`.
 TEST(AssocArrayElaboration, AssocSliceInForStepRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -157,9 +139,6 @@ TEST(AssocArrayElaboration, AssocSliceInForStepRejected) {
                             "7.4.6"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, which is Stmt::assert_pass_stmt here and
-// Stmt::assert_fail_stmt below.
 TEST(AssocArrayElaboration, AssocSliceInAssertPassRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -188,7 +167,6 @@ TEST(AssocArrayElaboration, AssocSliceInAssertFailRejected) {
                             "7.4.6"));
 }
 
-// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`.
 TEST(AssocArrayElaboration, AssocSliceInRandcaseItemRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -207,8 +185,6 @@ TEST(AssocArrayElaboration, AssocSliceInRandcaseItemRejected) {
                             "7.4.6"));
 }
 
-// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
-// statement_or_null } }`.
 TEST(AssocArrayElaboration, AssocSliceInRandsequenceCodeBlockRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -227,10 +203,6 @@ TEST(AssocArrayElaboration, AssocSliceInRandsequenceCodeBlockRejected) {
                             "7.4.6"));
 }
 
-// §7.8 with §12.7.3: a built-in index type is recorded by the keyword the
-// declaration wrote, which width and signedness alone leave ambiguous between
-// int and integer and between bit and logic, and a typedef index by its name
-// alone (#5065).
 TEST(AssocArrayElaboration, IndexKeywordIsRecorded) {
   ElabFixture f;
   auto* design = Elaborate(

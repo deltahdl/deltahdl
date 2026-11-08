@@ -7,24 +7,7 @@ using namespace delta;
 
 namespace {
 
-// §6.20: a constant is a named data object that never changes, and parameter,
-// localparam and specparam are the three elaboration-time constants. A
-// procedural assignment that writes one breaks that sentence, and the sentence
-// says nothing about the shape of the write or about where the statement making
-// it stands. The cases in the numbered files beside this one cover the
-// constants themselves; these cover the writes, one per shape the report used
-// to be absent from.
-//
-// Every case here uses a parameter unless it says otherwise, because
-// Elaborator::const_names_ takes the three kinds together and the report is the
-// same for all three.
-
 TEST(ConstAssignElaboration, ABitSelectWriteToAParameterIsReported) {
-  // §11.5.1's bit-select selects one bit of a named object and stores into that
-  // object, so the object written is the parameter and not the bit. This is the
-  // shape with no lvalue validator behind it: the checks in
-  // src/elaborator/elaborator_validate_operations_arrays.cpp judge whether a
-  // select is well formed and never whether its target may be written.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -37,9 +20,6 @@ TEST(ConstAssignElaboration, ABitSelectWriteToAParameterIsReported) {
 }
 
 TEST(ConstAssignElaboration, APartSelectWriteToAParameterIsReported) {
-  // The same shape with a range rather than a single index. It is a case of its
-  // own because a repair that unwrapped one particular select form would reach
-  // one and not the other.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -52,9 +32,6 @@ TEST(ConstAssignElaboration, APartSelectWriteToAParameterIsReported) {
 }
 
 TEST(ConstAssignElaboration, AConcatenationWriteToAParameterIsReported) {
-  // §11.4.12 makes a concatenation a legal left-hand side, and each operand of
-  // one is written. The parameter is the second operand, so a walk that asked
-  // only about the first would pass this source.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -68,9 +45,6 @@ TEST(ConstAssignElaboration, AConcatenationWriteToAParameterIsReported) {
 }
 
 TEST(ConstAssignElaboration, AWriteToAParameterFromATaskBodyIsReported) {
-  // §9.2 counts a task a structured procedure. Its statements are not under
-  // ModuleItem::body, so no unwrapping of the left-hand side reaches this
-  // source: the body has to be walked for the write to be seen at all.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -85,8 +59,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterFromATaskBodyIsReported) {
 }
 
 TEST(ConstAssignElaboration, AWriteToAParameterFromAFunctionBodyIsReported) {
-  // The same for a function, which ModuleItemKind gives a kind of its own, so a
-  // repair naming the task kind alone would miss it.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -102,8 +74,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterFromAFunctionBodyIsReported) {
 }
 
 TEST(ConstAssignElaboration, AWriteToAParameterInsideForkIsReported) {
-  // §9.3.2's fork-join keeps its statements in a member of its own, which the
-  // walk did not visit.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -118,8 +88,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInsideForkIsReported) {
 }
 
 TEST(ConstAssignElaboration, AWriteToAParameterInAForInitializerIsReported) {
-  // §12.7.1's for loop holds its initialization statements apart from its body,
-  // and a write there is a write.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -133,8 +101,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInAForInitializerIsReported) {
 }
 
 TEST(ConstAssignElaboration, AWriteToAParameterInAForStepIsReported) {
-  // The step assignments are a third member again, so this is a case of its own
-  // rather than the initializer case restated.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -148,8 +114,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInAForStepIsReported) {
 }
 
 TEST(ConstAssignElaboration, ABitSelectWriteToALocalparamIsReported) {
-  // §6.20 names localparam beside parameter, so a repair that narrowed to the
-  // parameter keyword would leave this source accepted.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -162,10 +126,6 @@ TEST(ConstAssignElaboration, ABitSelectWriteToALocalparamIsReported) {
 }
 
 TEST(ConstAssignElaboration, AnElementWriteToAStringParameterIsReported) {
-  // §6.16's string is indexed like any other named object, so a write to one of
-  // its bytes writes the parameter. The report has to be made here: at run time
-  // a parameter is an ordinary variable, and the write reaches the string path
-  // in src/simulator/statement_assign_core.cpp with nothing left to refuse it.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -178,9 +138,6 @@ TEST(ConstAssignElaboration, AnElementWriteToAStringParameterIsReported) {
 }
 
 TEST(ConstAssignElaboration, AWriteToAVariableThroughABitSelectIsAccepted) {
-  // The other side of the first case: the same shape over a name that is not a
-  // constant is a write the standard allows, so widening the check must not
-  // have made every select of a name a report.
   EXPECT_TRUE(
       ElabOk("module top;\n"
              "  logic [7:0] v;\n"
@@ -188,11 +145,6 @@ TEST(ConstAssignElaboration, AWriteToAVariableThroughABitSelectIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.16.2's putc puts the given integral value in place of the ith character of
-// str, so the call writes S, and §6.20 says a constant never changes. A call is
-// not an assignment, so no walk over left-hand sides reaches it: at run time a
-// parameter is an ordinary variable with no flag marking it constant, and the
-// write reached StringWriteByte with nothing left to refuse it.
 TEST(ConstAssignElaboration, APutcOnAStringParameterIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -205,9 +157,6 @@ TEST(ConstAssignElaboration, APutcOnAStringParameterIsReported) {
                             3, "6.20"));
 }
 
-// §6.16.10's itoa writes the ASCII decimal form of i into str. It reaches a
-// different helper from putc, so a repair naming one method would leave the
-// other five.
 TEST(ConstAssignElaboration, AnItoaOnAStringParameterIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,8 +169,6 @@ TEST(ConstAssignElaboration, AnItoaOnAStringParameterIsReported) {
                             3, "6.20"));
 }
 
-// The last of the six, over the second of §6.20's three constant kinds, so the
-// pair that is not the first of each is covered too.
 TEST(ConstAssignElaboration, ARealtoaOnAStringLocalparamIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -234,9 +181,6 @@ TEST(ConstAssignElaboration, ARealtoaOnAStringLocalparamIsReported) {
                             3, "6.20"));
 }
 
-// The same call over an ordinary string variable, which is what the method is
-// for. Without this a repair could report every mutating call and pass the
-// three cases above.
 TEST(ConstAssignElaboration, APutcOnAStringVariableIsAccepted) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -245,10 +189,6 @@ TEST(ConstAssignElaboration, APutcOnAStringVariableIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.16.3's getc gives the ASCII code of str's ith character and writes
-// nothing, so it stays legal on a constant. This is what keeps the check on
-// whether the method writes its object rather than on whether a string method
-// was called on a constant at all.
 TEST(ConstAssignElaboration, AGetcOnAStringParameterIsAccepted) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -258,19 +198,6 @@ TEST(ConstAssignElaboration, AGetcOnAStringParameterIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.20 says a constant never changes and puts no condition on where the write
-// that would change one stands, so every position a statement holds a statement
-// in is a position the report is made at. The cases below cover one such
-// position each, and between them they cover every child-statement link Stmt
-// declares that no case above already reaches.
-// Elaborator::WalkStmtsForConstAssign takes that list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h instead of writing its own, so
-// a link dropped from the shared list drops §6.20 from that position with it,
-// and these are the cases that go red when it does.
-
-// A.6.3 gives `seq_block ::= begin [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } end`, whose statements the
-// parser keeps in Stmt::stmts.
 TEST(ConstAssignElaboration, AWriteToAParameterInABeginEndBlockIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -285,9 +212,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInABeginEndBlockIsReported) {
                             4, "6.20"));
 }
 
-// §12.4's conditional statement holds a statement per branch, kept in
-// Stmt::then_branch and Stmt::else_branch. This case and the next cover one
-// branch each, because a walk reaches one member without the other.
 TEST(ConstAssignElaboration, AWriteToAParameterInAnIfBranchIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -301,8 +225,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInAnIfBranchIsReported) {
                             4, "6.20"));
 }
 
-// The else arm of the same statement. Its then arm writes i, so the report the
-// case reads can only have come from the else arm.
 TEST(ConstAssignElaboration, AWriteToAParameterInAnElseBranchIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -316,10 +238,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInAnElseBranchIsReported) {
                             4, "6.20"));
 }
 
-// §12.7.4's while loop holds its statement in Stmt::body, which the parser also
-// fills for forever, repeat, foreach and do-while, so one case answers for the
-// member. §6.20 is broken by the write being written, whether the loop would
-// run it or not.
 TEST(ConstAssignElaboration, AWriteToAParameterInAWhileBodyIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -333,9 +251,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInAWhileBodyIsReported) {
                             4, "6.20"));
 }
 
-// §12.7.1's for loop holds its body in Stmt::for_body, a fourth member beside
-// the initializers and the steps the two cases above cover. The initializer and
-// the step here write i, so the report the case reads is the body's.
 TEST(ConstAssignElaboration, AWriteToAParameterInAForBodyIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -349,8 +264,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInAForBodyIsReported) {
                             4, "6.20"));
 }
 
-// §12.5's case statement holds a statement per item, kept in
-// Stmt::case_items rather than in Stmt::stmts.
 TEST(ConstAssignElaboration, AWriteToAParameterInACaseItemIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -367,9 +280,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInACaseItemIsReported) {
                             6, "6.20"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
-// Stmt::randcase_items. §6.20 is a rule about the source, so it holds whether
-// the weighted draw would select the item or not.
 TEST(ConstAssignElaboration, AWriteToAParameterInARandcaseItemIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -382,10 +292,6 @@ TEST(ConstAssignElaboration, AWriteToAParameterInARandcaseItemIsReported) {
                             3, "6.20"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(ConstAssignElaboration,
      AWriteToAParameterInAnAssertionPassStatementIsReported) {
   ElabFixture f;
@@ -414,10 +320,6 @@ TEST(ConstAssignElaboration,
                             4, "6.20"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(ConstAssignElaboration,
      AWriteToAParameterInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -435,10 +337,6 @@ TEST(ConstAssignElaboration,
                             5, "6.20"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(ConstAssignElaboration,
      AWriteToAParameterInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;

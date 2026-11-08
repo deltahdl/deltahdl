@@ -5,9 +5,6 @@
 #include <string>
 #include <vector>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
@@ -18,35 +15,13 @@
 namespace delta {
 namespace {
 
-// §21.7.2: format of the 4-state VCD file. The subclause's own text (its
-// descendants own the file grammar, the value formats, and the keyword
-// commands) makes two observable claims about the file as a whole:
-// (C1) the dump file is structured as free format -- no command is tied to a
-// line or column position, so tokenizing the file on white space alone
-// recovers its command structure; (C2) white space separates the commands
-// from one another and leaves the file plain line-oriented text a text editor
-// can display. Both are runtime rules about the file the dump leaves on disk,
-// so each test drives real source (using the dump tasks of §21.7.1.1-§21.7.1.5
-// to produce every kind of command) through parse, elaboration, lowering, and
-// the scheduler with the driver's per-timestep recording loop installed, then
-// inspects the file.
 class FourStateVcdFileFormat : public VcdDumpRunTestBase {
  protected:
-  // Runs a single-module source through the full pipeline with the driver's
-  // dump loop (timestamp + changed values at the end of each time unit) and
-  // returns the dump file contents. The module scope is opened around the
-  // variable definitions the way the simulation driver does, so the $scope
-  // and $upscope commands are among the commands whose separation is checked.
   std::string RunVcd(const std::string& src) {
     return RunVcdDump(src, {.scope = "t"});
   }
 };
 
-// C2 over the declaration commands: with a scalar, a vector, and a real
-// variable dumped, every declaration keyword the header and definitions carry
-// ($date, $version, $timescale, $scope, $var, $upscope, $enddefinitions, and
-// the $end that closes each section) stands apart as its own white-space
-// delimited token, and no token anywhere in the file fuses two commands.
 TEST_F(FourStateVcdFileFormat, DeclarationCommandsStandApartAsTokens) {
   auto content = RunVcd(
       "module t;\n"
@@ -63,19 +38,10 @@ TEST_F(FourStateVcdFileFormat, DeclarationCommandsStandApartAsTokens) {
       "  end\n"
       "endmodule\n");
   auto toks = Tokens(content);
-  // a, r and v each get a definition.
-  ExpectDeclarationCommandsStandApart(toks, /*var_count=*/3);
-  // The real variable's recorded value is itself a command bounded by white
-  // space like the rest: the $dumpvars section renders it on a line of its
-  // own (a -> '!', r -> '"', v -> '#').
+  ExpectDeclarationCommandsStandApart(toks, 3);
   EXPECT_TRUE(HasLine(AllLines(content), "r3.5 \""));
 }
 
-// C2 over the simulation commands: with the dump-control tasks of
-// §21.7.1.2-§21.7.1.4 all executed from real source, each simulation keyword
-// ($dumpvars, $dumpall, $dumpoff, $dumpon) is a standalone token, every
-// simulation-time command is a '#' immediately followed by decimal digits and
-// nothing else, and no two commands are ever juxtaposed without white space.
 TEST_F(FourStateVcdFileFormat, SimulationCommandsStandApartAsTokens) {
   auto content = RunVcd(
       "module t;\n"
@@ -100,11 +66,6 @@ TEST_F(FourStateVcdFileFormat, SimulationCommandsStandApartAsTokens) {
   EXPECT_TRUE(NoFusedCommands(toks));
 }
 
-// C2 between value changes, and its boundary: when a scalar and a vector both
-// change in one time unit, the timestamp and the two value-change commands
-// are each separated from their neighbors (rendered one command per line).
-// The separation applies BETWEEN commands only -- the scalar change itself
-// stays one unsplit token, since its interior belongs to the command.
 TEST_F(FourStateVcdFileFormat, ValueChangeCommandsSeparatedFromNeighbors) {
   auto content = RunVcd(
       "module t;\n"
@@ -118,22 +79,13 @@ TEST_F(FourStateVcdFileFormat, ValueChangeCommandsSeparatedFromNeighbors) {
       "  end\n"
       "endmodule\n");
   auto lines = AllLines(content);
-  // a -> '!', v -> '"': timestamp and both same-time changes each occupy a
-  // white-space-bounded command of their own.
   EXPECT_TRUE(HasLine(lines, "#10"));
   EXPECT_TRUE(HasLine(lines, "1!"));
   EXPECT_TRUE(HasLine(lines, "b1010 \""));
-  // The scalar change is one command: the separation rule does not reach
-  // inside it, so it tokenizes as a single unit.
   auto toks = Tokens(content);
   EXPECT_GE(CountToken(toks, "1!"), 1u);
 }
 
-// C1 (free format): white-space tokenization alone -- with every line and
-// column position discarded -- recovers the command structure. Each
-// section-opening keyword is closed by a matching standalone $end token, and
-// the single-token commands pair up adjacently ($upscope $end,
-// $enddefinitions $end) in the token stream.
 TEST_F(FourStateVcdFileFormat, WhitespaceTokenizationRecoversCommandStructure) {
   auto content = RunVcd(
       "module t;\n"
@@ -163,10 +115,6 @@ TEST_F(FourStateVcdFileFormat, WhitespaceTokenizationRecoversCommandStructure) {
   }
 }
 
-// C2 over a dumper-inserted command: the $comment section the dumper itself
-// inserts when the §21.7.1.5 size limit is reached joins the file as a
-// white-space-separated command like any other -- $comment and its closing
-// $end are standalone tokens and the opener/$end pairing still balances.
 TEST_F(FourStateVcdFileFormat, DumperInsertedCommentIsSeparatedCommand) {
   auto content = RunVcd(
       "module t;\n"
@@ -190,10 +138,6 @@ TEST_F(FourStateVcdFileFormat, DumperInsertedCommentIsSeparatedCommand) {
   EXPECT_EQ(CountToken(toks, "$end"), opened);
 }
 
-// The producing tasks are ordinary task enables: moved into a task body, the
-// same run yields a file with the same separation properties -- the command
-// text depends on what was dumped, not on the syntactic position of the tasks
-// that produced it.
 TEST_F(FourStateVcdFileFormat, TaskBodyProducedCommandsKeepSeparation) {
   auto content = RunVcd(
       "module t;\n"
@@ -214,10 +158,6 @@ TEST_F(FourStateVcdFileFormat, TaskBodyProducedCommandsKeepSeparation) {
   EXPECT_TRUE(NoFusedCommands(toks));
 }
 
-// C3 (readable by a text editor): the white space chosen between commands
-// renders the dump as ordinary newline-terminated lines of printable text --
-// every byte is printable ASCII or plain white space, the final command is
-// closed by a newline, and every non-empty line holds visible text.
 TEST_F(FourStateVcdFileFormat, FileIsPlainLineOrientedText) {
   auto content = RunVcd(
       "module t;\n"
@@ -232,16 +172,13 @@ TEST_F(FourStateVcdFileFormat, FileIsPlainLineOrientedText) {
       "  end\n"
       "endmodule\n");
   ASSERT_FALSE(content.empty());
-  EXPECT_EQ(content.back(), '\n');  // the last command is closed by whitespace
+  EXPECT_EQ(content.back(), '\n');
   for (unsigned char c : content) {
     bool text = (c >= 0x20 && c < 0x7F) || c == '\n' || c == '\t' || c == '\r';
     ASSERT_TRUE(text) << "non-text byte 0x" << std::hex << int{c};
   }
 }
 
-// Negative: with no writer installed (no dump file in place), the producing
-// tasks are harmless -- the design runs to completion and no file content
-// exists for the format rules to apply to.
 TEST_F(FourStateVcdFileFormat, WithoutWriterNoFileContentToFormat) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -258,7 +195,7 @@ TEST_F(FourStateVcdFileFormat, WithoutWriterNoFileContentToFormat) {
   ASSERT_NE(design, nullptr);
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
-  f.scheduler.Run();  // no VcdWriter installed anywhere
+  f.scheduler.Run();
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(ReadVcd().empty());
 }

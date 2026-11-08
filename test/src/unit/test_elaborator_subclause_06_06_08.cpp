@@ -91,11 +91,6 @@ TEST(InterconnectElaboration, DeclNetTypeIsInterconnect) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kInterconnect);
 }
 
-// A blocking assignment whose target is an interconnect net is rejected by
-// §10.4's requirement that a procedural assignment's left-hand side be a
-// variable, not by a report of its own: no §6.6.8 site names this shape,
-// because the interconnect net is a net and a net is none of the four forms
-// §10.4 admits.
 TEST(InterconnectElaboration, ProceduralAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -123,14 +118,6 @@ TEST(InterconnectElaboration, ForceIsError) {
                             3, "6.6.8"));
 }
 
-// The same force, moved out of `initial` and into `always_latch`. §9.2.2.3
-// makes an always_latch procedure a structured procedure like any other, and
-// §6.6.8 forbids the interconnect net in a procedural continuous assignment
-// whichever keyword introduced the procedure.
-// Elaborator::ValidateItemConstraints decides which module items carry a
-// procedural body, so a case that only ever writes `initial` or `always` cannot
-// tell whether the other four kinds reach CheckInterconnectProcContAssign at
-// all.
 TEST(InterconnectElaboration, ForceOnInterconnectFromAlwaysLatchIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -206,9 +193,6 @@ TEST(InterconnectElaboration, NetAliasWithInterconnectOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.6.8: an interconnect net shall not be used in any procedural context.
-// Reading it on the RHS of a procedural (blocking) assignment is illegal even
-// though the same read would be legal for an ordinary net.
 TEST(InterconnectElaboration, ProceduralRhsReadIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -224,8 +208,6 @@ TEST(InterconnectElaboration, ProceduralRhsReadIsError) {
       "6.6.8"));
 }
 
-// §6.6.8: reading an interconnect net inside a procedural if-condition is an
-// illegal use in a procedural context.
 TEST(InterconnectElaboration, ProceduralConditionReadIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -241,8 +223,6 @@ TEST(InterconnectElaboration, ProceduralConditionReadIsError) {
       "6.6.8"));
 }
 
-// §6.6.8: an interconnect net used only as a select index inside a procedural
-// read expression is still an illegal procedural use.
 TEST(InterconnectElaboration, ProceduralReadViaSelectIndexIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -259,10 +239,6 @@ TEST(InterconnectElaboration, ProceduralReadViaSelectIndexIsError) {
       "6.6.8"));
 }
 
-// §6.6.8 speaks of a net or port declared as interconnect: an interconnect PORT
-// is likewise a typeless/generic net. A module that declares an interconnect
-// port elaborates and the port is recorded as interconnect (Claim A, port input
-// form).
 TEST(InterconnectElaboration, InterconnectPortDeclIsGeneric) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -277,11 +253,6 @@ TEST(InterconnectElaboration, InterconnectPortDeclIsGeneric) {
   EXPECT_TRUE(mod->ports[0].is_interconnect);
 }
 
-// §6.6.8: the procedural/expression-use prohibition applies to an interconnect
-// PORT as well as a local net. Reading an interconnect port on the RHS of a
-// procedural assignment is illegal (Claim B/C, port input form). Reading an
-// ordinary net port there would be legal, so this isolates the interconnect
-// rule rather than a generic port-direction rule.
 TEST(InterconnectElaboration, ProceduralReadOfInterconnectPortIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -296,8 +267,6 @@ TEST(InterconnectElaboration, ProceduralReadOfInterconnectPortIsError) {
       "6.6.8"));
 }
 
-// §6.6.8: an interconnect PORT shall not be the target of a continuous
-// assignment (Claim B, port input form).
 TEST(InterconnectElaboration, ContAssignToInterconnectPortIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -335,17 +304,11 @@ TEST(InterconnectElaboration, ContAssignRhsUsingInterconnectIsError) {
       "  assign w = ic;\n"
       "endmodule\n",
       f);
-  // The RHS-use report, not the LHS-target one: the target `w` is an ordinary
-  // wire, so only the interconnect read on the right is illegal.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "interconnect net cannot be used in expression", 4,
                             "6.6.8"));
 }
 
-// An interconnect net stays valid even when its connections resolve to
-// dissimilar net types. The dissimilar-net-type diagnostic that fires for
-// ordinary nets is suppressed once an interconnect net is involved, so a
-// connection that mixes wire and wand resolutions is accepted.
 TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesWildcard) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -365,16 +328,6 @@ TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesWildcard) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The .name counterpart of the case above. §23.3.3.7.1 exempts a connection to
-// an interconnect net whatever the connection syntax, and this form runs a
-// stricter check than the ordered one -- §23.3.2.3 makes the implicit .name
-// form an error where an explicit connection would only warn -- so the
-// exemption has to be honoured here too.
-//
-// Both tests need two instances to mean anything. §23.3.3.7.1 merges each
-// connection into the net as it is bound, so the first one leaves a concrete
-// type behind and only the second can be judged against it. One instance would
-// pass without the exemption ever being consulted.
 TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesImplicitNamed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -394,13 +347,6 @@ TEST(InterconnectElaboration, ResolvesToDissimilarNetTypesImplicitNamed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.6.8's rule against an interconnect net in a procedural continuous
-// assignment is decided by the statement, not by where the statement stands,
-// and §9.3.2 makes a par_block a statement_or_null. ForceIsError above writes
-// the same force directly under `initial` and expects the same report;
-// CheckInterconnectProcContAssign skipped Stmt::fork_stmts before it recursed
-// through ForEachChildStmt, so that case could not tell whether a fork member
-// was reached at all.
 TEST(InterconnectElaboration,
      ProceduralContinuousAssignToAnInterconnectInAForkIsRejected) {
   ElabFixture f;
@@ -418,12 +364,6 @@ TEST(InterconnectElaboration,
                             4, "6.6.8"));
 }
 
-// §6.6.8's rule against reading an interconnect net in a procedural expression
-// is decided by the expression, not by where the statement stands, and §18.16
-// makes each randcase_item's body a statement_or_null.
-// ProceduralRhsReadIsError above writes the same assignment directly under
-// `initial` and expects the same report; CheckInterconnectProceduralRead
-// skipped Stmt::randcase_items before it recursed through ForEachChildStmt.
 TEST(InterconnectElaboration, ReadOfAnInterconnectInARandcaseArmIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -441,14 +381,6 @@ TEST(InterconnectElaboration, ReadOfAnInterconnectInARandcaseArmIsRejected) {
       "6.6.8"));
 }
 
-// The regression against a walk that reports on every statement it newly
-// reaches: §9.3.2 makes a par_block a statement_or_null, so both walkers now
-// descend into a fork member, and forcing an ordinary wire there is what
-// §6.6.8 leaves alone. The module declares an interconnect net as well, so the
-// set of interconnect names both walkers test against is non-empty and the
-// acceptance is the rule's answer rather than an empty set's.
-// ProceduralContinuousAssignToAnInterconnectInAForkIsRejected above writes the
-// same fork with an interconnect target.
 TEST(InterconnectElaboration, ForceOnAPlainNetInAForkIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -479,9 +411,6 @@ constexpr const char* kInExpression =
   return ReportedError(f.diag.Diagnostics(), message, line, "6.6.8");
 }
 
-// §6.6.8 keeps an interconnect out of every continuous assignment, wherever
-// the target writes it: selected, as an element of a concatenation, or in a
-// select's index.
 TEST(InterconnectElaboration, ContAssignTargetSelectOrElementIsError) {
   EXPECT_TRUE(
       InterconnectUseReported("module t(input logic a);\n"
@@ -512,8 +441,6 @@ TEST(InterconnectElaboration, ContAssignTargetSelectOrElementIsError) {
              "endmodule\n"));
 }
 
-// A procedural continuous assignment is barred the same way, a selected
-// interconnect or one in a concatenation among them.
 TEST(InterconnectElaboration, ProcContAssignTargetSelectOrElementIsError) {
   EXPECT_TRUE(
       InterconnectUseReported("module t;\n"
@@ -537,9 +464,6 @@ constexpr const char* kChild =
     "module c2(input wire [1:0] a);\n"
     "endmodule\n";
 
-// A port connection may be an interconnect only as a net_lvalue all of whose
-// nets are interconnects: an operator over one, a concatenation with a wire
-// and a parenthesized one are expressions, named or positional.
 TEST(InterconnectElaboration, PortConnectionExpressionIsError) {
   const std::string kHead = std::string(kChild) +
                             "module t;\n"
@@ -558,9 +482,6 @@ TEST(InterconnectElaboration, PortConnectionExpressionIsError) {
   }
 }
 
-// A select of an interconnect vector or array is a net_lvalue of interconnects
-// alone, as a port connection and as a terminal; a select whose index reads an
-// interconnect is not.
 TEST(InterconnectElaboration, SelectOfAnInterconnectConnects) {
   const std::string kHead = std::string(kChild) +
                             "module t(input logic x);\n"
@@ -576,8 +497,6 @@ TEST(InterconnectElaboration, SelectOfAnInterconnectConnects) {
                                       kInExpression, 9));
 }
 
-// A gate's terminal is a connection too: an interconnect as a terminal is one,
-// and an expression over it is not.
 TEST(InterconnectElaboration, GateTerminalExpressionIsError) {
   const std::string kHead =
       "module t(input logic b);\n"
@@ -590,8 +509,6 @@ TEST(InterconnectElaboration, GateTerminalExpressionIsError) {
   EXPECT_TRUE(ElabOk(kHead + "  and (o, ic, b);\nendmodule\n"));
 }
 
-// A parameter value, a delay and an instance array's range are expressions
-// that connect nothing, where an interconnect has no place.
 TEST(InterconnectElaboration, ParameterDelayAndRangeAreExpressions) {
   EXPECT_TRUE(
       InterconnectUseReported("module c #(parameter P = 1) (input wire a);\n"
@@ -624,9 +541,6 @@ TEST(InterconnectElaboration, ParameterDelayAndRangeAreExpressions) {
              "endmodule\n"));
 }
 
-// The rule holds of an interconnect port inside the module declaring it, and
-// in an interface and a generate block, of an interconnect the block declares
-// and of one its module does.
 TEST(InterconnectElaboration, PortInterfaceAndGenerateBlockForms) {
   EXPECT_TRUE(
       InterconnectUseReported("module m(interconnect [1:0] p, input logic a);\n"
@@ -679,9 +593,6 @@ TEST(InterconnectElaboration, PortInterfaceAndGenerateBlockForms) {
                                            "endmodule\n"));
 }
 
-// §27.2 makes a generate block a collection of module items, so the
-// procedural uses of an interconnect a module item may not make are barred
-// inside one too, of the module's interconnect and of the block's own.
 TEST(InterconnectElaboration, ProceduralUseInsideGenerateBlocksIsRejected) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "interconnect ic; logic y;", "initial y = ic;"},

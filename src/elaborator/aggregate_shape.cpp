@@ -40,8 +40,6 @@ DataType MemberWrittenType(const StructMember& m) {
   return type;
 }
 
-// The kind of the type a member is written with, through a typedef name. A
-// name that resolves to nothing keeps the kind written, `kNamed`.
 static DataTypeKind MemberKind(const StructMember& m,
                                const TypedefMap& typedefs) {
   const DataType* own = MemberOwnType(m, typedefs);
@@ -85,8 +83,6 @@ static void CheckUnpackedStructWithUnionDefaults(const DataType& dtype,
   }
 }
 
-// §7.2.2: a member default is a constant expression, which per §11.2.1 may
-// reference a parameter of the scope the declaration stands in.
 static void CheckStructMemberDefaultsConstant(const DataType& dtype,
                                               SourceLoc loc,
                                               const AggregateShapeCtx& ctx) {
@@ -177,19 +173,11 @@ static void CheckPackedStructMemberTypes(const DataType& dtype, SourceLoc loc,
   const char* container = (dtype.kind == DataTypeKind::kStruct)
                               ? "packed structure"
                               : "packed union";
-  // §7.3.2: a void member is legal in a packed tagged union — it carries no
-  // value bits, and in that extreme case only the tag is significant while the
-  // remaining bits are undefined (the packed VInt example). A void member
-  // elsewhere is already barred by CheckVoidMembers, so it need only be
-  // exempted from the packed-member-type check for the tagged-union case.
   bool tagged_union = dtype.kind == DataTypeKind::kUnion && dtype.is_tagged;
   for (const auto& m : dtype.struct_members) {
     if (m.type_kind == DataTypeKind::kVoid && tagged_union) continue;
     const DataType* own = MemberOwnType(m, ctx.tables.typedefs);
     DataTypeKind kind = own != nullptr ? own->kind : m.type_kind;
-    // §7.2.1: a structure or union member of a packed one is itself packed,
-    // since only packed types are admitted; an unpacked one written in place or
-    // through a typedef name is not.
     if (!IsLegalPackedMemberType(kind) || IsUnpackedAggregate(own)) {
       ctx.diag.Error(loc,
                      std::format("type of member '{}' is not allowed in a {}",
@@ -197,9 +185,6 @@ static void CheckPackedStructMemberTypes(const DataType& dtype, SourceLoc loc,
                      Subclause("7.2.1"));
       continue;
     }
-    // §7.2.1: only packed data types are permitted as members. A member that
-    // carries unpacked dimensions is an unpacked array, which is not a packed
-    // type, so it cannot appear in a packed structure or union.
     if (!m.unpacked_dims.empty()) {
       ctx.diag.Error(
           loc,
@@ -210,9 +195,6 @@ static void CheckPackedStructMemberTypes(const DataType& dtype, SourceLoc loc,
   }
 }
 
-// §7.5, §7.8 and §7.10: a dynamic array, an associative array and a queue are
-// dynamic types, their size changing as the program runs. A member is one when
-// any of its unpacked dimensions is not a fixed size.
 static bool HasDynamicDimension(const StructMember& m,
                                 const TypeShapeTables& tables) {
   for (const Expr* dim : m.unpacked_dims) {
@@ -221,8 +203,6 @@ static bool HasDynamicDimension(const StructMember& m,
   return false;
 }
 
-// The report an untagged union makes of member `m`, or the empty string when
-// the member is one it may hold.
 static std::string UntaggedUnionMemberReport(const StructMember& m,
                                              const TypeShapeTables& tables) {
   if (HasDynamicDimension(m, tables)) {
@@ -247,10 +227,6 @@ static void CheckUntaggedUnionMembers(const DataType& dtype, SourceLoc loc,
                                       const AggregateShapeCtx& ctx) {
   if (dtype.kind != DataTypeKind::kUnion) return;
   if (dtype.is_tagged) return;
-  // §7.3.2 carries the obligation this enforces: dynamic and chandle types are
-  // allowed in tagged unions and forbidden in untagged ones. §7.3 states the
-  // same fact as descriptive prose and states no obligation, so the report
-  // names the subclause that does.
   for (const auto& m : dtype.struct_members) {
     std::string report = UntaggedUnionMemberReport(m, ctx.tables);
     if (!report.empty()) {
@@ -310,8 +286,6 @@ void CheckAggregateShape(const DataType& dtype, SourceLoc loc,
   CheckUntaggedUnionMembers(dtype, loc, ctx);
   CheckVirtualInterfaceInUnion(dtype, loc, ctx);
   CheckPackedUnion(dtype, loc, ctx);
-  // A structure or union written in place as a member is a type of its own,
-  // under the same rules as one written anywhere else.
   for (const auto& m : dtype.struct_members) {
     if (m.nested_type != nullptr) CheckAggregateShape(*m.nested_type, loc, ctx);
   }

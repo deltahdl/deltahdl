@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.25's parameterized data types at run time: `C#(t_t0,3)::t_array` holds
-// three 8-bit elements, so an element keeps 200, $bits of one is 8, and $size
-// of the array is 3.
 TEST(ParameterizedDataTypesSim, SpecializedClassArrayTypedefHoldsItsElements) {
   const std::string kSrc =
       "module t;\n"
@@ -32,10 +29,6 @@ TEST(ParameterizedDataTypesSim, SpecializedClassArrayTypedefHoldsItsElements) {
   EXPECT_EQ(RunAndGet(kSrc, "sz"), 3u);
 }
 
-// §6.25's t_struct through `C#(bit,4)`: every member is written in the class's
-// parameters, so m2 is `bit [3:0]` and holds 4'hB, m0 is eight 4-bit vectors
-// as the same member written out with 4 for SIZE is, and the structure is
-// 8*4 + 4 + 4 = 40 bits, m1 being t_array's four bits.
 TEST(ParameterizedDataTypesSim,
      SpecializedClassStructTypedefSpecializesMembers) {
   const std::string kSrc =
@@ -67,8 +60,6 @@ TEST(ParameterizedDataTypesSim,
   EXPECT_EQ(RunAndGet(kSrc, "bs"), 40u);
 }
 
-// §6.6.7's Base#(32) structure reached through `typedef Base#(32) MyBaseT;`
-// and written out as Base#(16): the data member is p bits of each.
 TEST(ParameterizedDataTypesSim, StructTypedefThroughATypedefOfASpecialization) {
   const std::string kSrc =
       "module t;\n"

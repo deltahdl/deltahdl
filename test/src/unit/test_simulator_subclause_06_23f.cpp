@@ -11,14 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23 with §6.20.3: a comparison of two type references is true exactly
-// when the two types match in the scope the comparison is written in, and each
-// instance of a module, binding its own parameters, is a scope of its own, as
-// is each instance of a loop generate block (§27.4). So one comparison written
-// once in a module answers each instance with that instance's types.
-
-// The comparison of `operand`'s type with `type`, under ==, !=, === and !==,
-// most significant first: 4'b1010 where they match and 4'b0101 where not.
 std::string Comparisons(std::string_view operand, std::string_view type) {
   return std::format(
       "{{type({0}) == type({1}), type({0}) != type({1}), "
@@ -26,9 +18,6 @@ std::string Comparisons(std::string_view operand, std::string_view type) {
       operand, type);
 }
 
-// A module whose parameter sets the type of x, comparing x's type with
-// `type` in a procedure, a function, a continuous assignment and a variable's
-// initializer, and gathering the four results in r.
 std::string ComparingModule(std::string_view header, std::string_view decl,
                             std::string_view type) {
   const std::string kCompare = Comparisons("x", type);
@@ -73,8 +62,6 @@ TEST(TypeRefCompareInstanceSim, EachInstanceComparesItsOwnWidth) {
   }
 }
 
-// §25.3 and §24.3: an interface and a program are instantiated with their own
-// parameters as a module is, and a task's body is judged like a function's.
 TEST(TypeRefCompareInstanceSim, InterfaceProgramAndTaskCompareTheirOwnTypes) {
   const std::string kCompare = Comparisons("x", "int");
   const std::string kSrc = std::format(
@@ -107,9 +94,6 @@ TEST(TypeRefCompareInstanceSim, InterfaceProgramAndTaskCompareTheirOwnTypes) {
   }
 }
 
-// §6.23 with §6.22.1(f): a bound a parameter gives is folded with the value the
-// instance binds, in a localparam's value and a generate condition alike, so
-// `logic [W-1:0]` matches `logic [7:0]` only where W is 8.
 TEST(TypeRefCompareInstanceSim, ParameterWidthIsFoldedInConstantComparisons) {
   const std::string kSrc =
       "module w #(int W = 8);\n"
@@ -127,8 +111,6 @@ TEST(TypeRefCompareInstanceSim, ParameterWidthIsFoldedInConstantComparisons) {
   EXPECT_EQ(RunAndGet(kSrc, "d.r"), 0b100u);
 }
 
-// §27.4: each iteration of a loop generate block declares v with the width
-// its genvar gives, and compares the type of its own v.
 TEST(TypeRefCompareInstanceSim, EachLoopIterationComparesItsOwnWidth) {
   const std::string kCompare = Comparisons("v", "logic [0:0]");
   const std::string kSrc = std::format(

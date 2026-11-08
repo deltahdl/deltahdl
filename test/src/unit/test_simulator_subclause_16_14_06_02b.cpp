@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// A module around the procedures given, as
-// test/src/e2e/procedural_assertion_flush_points.sv is: clk rises at 5, 15,
-// ..., 45 and is the default clocking, not_a follows !a, ca and cb follow
-// src, a2_a rises at 10, a is 1 from 15 to 20 and src from 25 to 35, and
-// the run ends at 50.
 std::string FlushSource(const std::string& procedures) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -45,10 +40,6 @@ uint64_t Count(SimFixture& f, std::string_view name) {
   return var == nullptr ? 0 : var->value.ToUint64();
 }
 
-// §16.14.6.2: an always_comb resuming on a transition of a dependent signal
-// is at a flush point, so the clause's a1, queued once with not_a stale as
-// a changes and again once not_a follows, reports no failure: the instance
-// surviving each run of b1, at 0, 15 and 20, passes at the next tick.
 TEST(ProceduralAssertionFlushPointsRun,
      AnAlwaysCombResumingOnADependentSignalFlushesTheStaleInstance) {
   SimFixture f;
@@ -63,13 +54,6 @@ TEST(ProceduralAssertionFlushPointsRun,
   EXPECT_EQ(Count(f, "fails"), 0u);
 }
 
-// §16.14.6.2: a process resuming after suspending at an event control is at
-// a flush point, where the end of a delay is none: the clause's a2, queued
-// before b2's delay, matures in the Observed region before the delay ends,
-// and a3, queued after it with a2_b assigned a2_a behind it, nonblocking,
-// is flushed when a2_b's transition resumes the procedure at its event
-// control, so at 15 a2 fails with the values of 10 and passes with those
-// of 11, and a3 passes once with the values of 12.
 TEST(ProceduralAssertionFlushPointsRun,
      ResumingAtAnEventControlFlushesWhatADelayLetMature) {
   SimFixture f;
@@ -90,11 +74,6 @@ TEST(ProceduralAssertionFlushPointsRun,
             "$finish at time 50\n");
 }
 
-// §16.14.6.2: the clause's c1 covers const'(cb) != const'(ca) in an
-// always_comb while both follow src, so a run of b3 between the two
-// assignments queues a glitch that the second assignment's transition
-// flushes, and the instance queued after it finds the two equal: c1 is
-// attempted at 5, 25 and 35 and never covered.
 TEST(ProceduralAssertionFlushPointsRun, AFlushedGlitchIsNeverCovered) {
   SimFixture f;
   RunAndFindVar(FlushSource("  always_comb begin : b3\n"

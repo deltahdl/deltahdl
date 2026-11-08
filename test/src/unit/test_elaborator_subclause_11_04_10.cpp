@@ -48,11 +48,6 @@ TEST(ConstEval, ShiftByZero) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("42 >>> 0", f)), 42);
 }
 
-// §11.4.10: logical and arithmetic right shift fill vacated high bits
-// differently. A negative constant exposes the split during constant folding:
-// >>> sign-fills (the value stays negative), while >> zero-fills (the value
-// becomes a large nonnegative magnitude). Positive operands cannot tell the two
-// operators apart, so this is the case the elaborator-stage checks must add.
 TEST(ConstEval, RightShiftSignedVersusLogicalFill) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-8) >>> 1", f)), -4);
@@ -94,11 +89,6 @@ TEST(OperatorElaboration, LogicalRightShiftElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.10 also governs the shift when its operand is a constant expression
-// folded at elaboration. A parameter reference resolves through a different
-// const-eval path than a literal, so the left-shift rule is exercised here with
-// the operand produced by a `parameter` declaration: 3 << 2 folds to 12 with
-// the low bits zero-filled.
 TEST(ConstEval, LeftShiftOfParameterFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -115,10 +105,6 @@ TEST(ConstEval, LeftShiftOfParameterFolds) {
   EXPECT_EQ(q.resolved_value, 12);
 }
 
-// The logical right-shift rule at const-fold time with a localparam operand:
-// 16 >> 2 folds to 4, the high bits vacated by the shift filled with zeros. The
-// localparam operand takes the identifier-resolution path rather than the
-// literal path used by the sibling ConstEval cases.
 TEST(ConstEval, LogicalRightShiftOfLocalparamFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -135,11 +121,6 @@ TEST(ConstEval, LogicalRightShiftOfLocalparamFolds) {
   EXPECT_EQ(b.resolved_value, 4);
 }
 
-// The arithmetic right shift sign-fills at const-fold time when the operand is
-// a signed constant. Building the operand from a signed parameter declaration
-// (rather than a negative literal) drives the signed-result path: -8 >>> 1
-// folds to -4, whereas a logical >> on the same value would fold to a large
-// positive magnitude.
 TEST(ConstEval, ArithRightShiftOfSignedParameterSignFills) {
   ElabFixture f;
   auto* design = ElaborateSrc(

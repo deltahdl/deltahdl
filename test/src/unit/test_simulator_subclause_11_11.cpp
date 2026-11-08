@@ -13,11 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborate and run a single-module source under the given delay mode,
-// capturing everything the run writes to stdout. The min:typ:max expression
-// under test is built from real source syntax and driven through the full
-// pipeline; only the mode selection (an environment setting, not part of the
-// expression's syntax) is applied through the fixture.
 std::string RunCapture(const std::string& src, SimFixture& f, DelayMode mode) {
   f.ctx.SetDelayMode(mode);
   std::ostringstream captured;
@@ -30,9 +25,6 @@ std::string RunCapture(const std::string& src, SimFixture& f, DelayMode mode) {
   return captured.str();
 }
 
-// §11.11: the three colon-separated values represent minimum, typical, and
-// maximum — in that order. A single triplet used as an expression selects the
-// matching member for the active delay mode.
 TEST(MinTypMaxSim, SelectsMemberByModeInOrder) {
   const char* src =
       "module t;\n"
@@ -53,8 +45,6 @@ TEST(MinTypMaxSim, SelectsMemberByModeInOrder) {
   }
 }
 
-// §11.11 Example 1: two triplets combined by a binary operator. The operator
-// sees the per-mode member of each operand — min: 1+4, typ: 2+5, max: 3+6.
 TEST(MinTypMaxSim, TwoTripletsCombined) {
   const char* src =
       "module t;\n"
@@ -75,8 +65,6 @@ TEST(MinTypMaxSim, TwoTripletsCombined) {
   }
 }
 
-// §11.11 Example 2: a triplet mixed with a plain operand. The plain operand is
-// mode-independent; only the triplet contributes the selected member.
 TEST(MinTypMaxSim, TripletMixedWithPlainOperand) {
   const char* src =
       "module t;\n"
@@ -97,11 +85,6 @@ TEST(MinTypMaxSim, TripletMixedWithPlainOperand) {
   }
 }
 
-// §11.11 constant_mintypmax_expression: each member may itself be a constant
-// expression. Here the three members are localparams (a §11.2.1 constant form),
-// built from real source and driven through the full pipeline; the active mode
-// still selects the matching member, confirming the triplet accepts
-// constant-form operands rather than only literals.
 TEST(MinTypMaxSim, MembersFromLocalparamConstants) {
   const char* src =
       "module t;\n"
@@ -125,10 +108,6 @@ TEST(MinTypMaxSim, MembersFromLocalparamConstants) {
   }
 }
 
-// §11.11 constant_mintypmax_expression, parameter form: a module parameter is a
-// §11.2.1 constant that resolves along a different path than a localparam, so
-// it is exercised separately. Built from real source and driven end to end, the
-// active mode still selects the matching member.
 TEST(MinTypMaxSim, MembersFromParameterConstants) {
   const char* src =
       "module t;\n"
@@ -152,11 +131,6 @@ TEST(MinTypMaxSim, MembersFromParameterConstants) {
   }
 }
 
-// §11.11 lets the form stand wherever an expression may: the triplet members
-// may be arbitrary (non-constant) expressions, not just constants. Here they
-// are runtime variables assigned before the triplet is read; the selected
-// member still follows the active mode, confirming member evaluation runs at
-// simulation time over real variable values.
 TEST(MinTypMaxSim, MembersFromRuntimeVariables) {
   const char* src =
       "module t;\n"
@@ -181,10 +155,6 @@ TEST(MinTypMaxSim, MembersFromRuntimeVariables) {
   }
 }
 
-// §11.11's headline syntactic position: a min:typ:max triplet used as a
-// procedural delay control. The selected member becomes the delay amount, so
-// the simulation time reached after the delay reflects the active mode. Built
-// from real source and driven end to end; time is observed via $time.
 TEST(MinTypMaxSim, TripletAsProceduralDelay) {
   const char* src =
       "module t;\n"
@@ -209,8 +179,6 @@ TEST(MinTypMaxSim, TripletAsProceduralDelay) {
   }
 }
 
-// mintypmax_expression's first alternative is a plain expression: a
-// parenthesized single value yields that value regardless of delay mode.
 TEST(MinTypMaxSim, SingleValueIsModeIndependent) {
   const char* src =
       "module t;\n"

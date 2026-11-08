@@ -1,7 +1,3 @@
-/* Helpers shared by the vpi_acceptance_* e2e cases (#4338). Each probe is a VPI
- * application (§36.6): a C file compiled to a shared library that the tool
- * loads, whose vlog_startup_routines[] entry (§36.9.1, §38.37.2) registers
- * system tasks and callbacks. */
 #ifndef VPI_PROBE_H
 #define VPI_PROBE_H
 #include <stdint.h>
@@ -66,8 +62,6 @@ static vpiHandle reg_cb(int reason, PLI_INT32 (*rtn)(p_cb_data), vpiHandle obj,
   cb.user_data = user_data;
   return vpi_register_cb(&cb);
 }
-/* Collects the vpiName of every object an iteration yields, sorted, so that
- * a probe's expectation does not depend on the tool's iteration order. */
 static int names_sorted(int type, vpiHandle ref, char out[][64], int max) {
   vpiHandle it = vpi_iterate(type, ref), h;
   int n = 0;

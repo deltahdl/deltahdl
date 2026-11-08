@@ -20,9 +20,6 @@ TEST(LexicalConventionElaboration, StringWithOctalEscapeElaborates) {
              "endmodule\n"));
 }
 
-// Table 5-1 makes an x_digit or a z_digit illegal in a `\ddd` or `\xdd`
-// escape, so a design whose display argument holds one is rejected as a whole
-// rather than printing the character and then the letter.
 TEST(LexicalConventionElaboration,
      DisplayArgumentWithXDigitInHexEscapeIsRejected) {
   ElabFixture f;

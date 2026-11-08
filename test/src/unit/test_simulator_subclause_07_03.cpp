@@ -51,12 +51,6 @@ TEST(UnionSimulation, UnpackedUnionDefaultInit_IntFirstMember) {
 }
 
 TEST(UnionSimulation, UnpackedUnionDefaultInit_FourStateFirstMemberIsX) {
-  // §7.3: a variable of an unpacked union type with no initial value takes the
-  // default initial value of the *first member's* type, in declaration order.
-  // Here the first member is a 4-state logic vector, so the default is x --
-  // distinct from the value a 2-state first member (e.g. int -> 0) would give.
-  // This exercises the first-member 4-state rule, not an "any 4-state member"
-  // rule: the union also has a 2-state member, yet the default must be x.
   auto v = RunAndGet(
       "module t;\n"
       "  typedef union { logic [7:0] a; int b; } u_t;\n"
@@ -71,11 +65,6 @@ TEST(UnionSimulation, UnpackedUnionDefaultInit_FourStateFirstMemberIsX) {
 }
 
 TEST(UnionSimulation, UnpackedUnionCommonInitialSequenceSharedPrefix) {
-  // §7.3: when an unpacked union holds several unpacked structures that share a
-  // common initial sequence, the common initial part written through one member
-  // can be inspected through another. Both structures share `int tag` as their
-  // first member; writing it through one struct member and reading it through
-  // the other observes the shared union storage aliasing the common prefix.
   auto v = RunAndGet(
       "module t;\n"
       "  typedef struct { int tag; int x; } sa_t;\n"

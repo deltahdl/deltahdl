@@ -20,27 +20,6 @@
 namespace delta {
 namespace {
 
-// §37.38 Constraint expression: the VPI object model for a constraint
-// expression - the group spanning an implication, a constraint if / if-else, a
-// foreach constraint, a distribution, a bare (optionally soft) expression, and
-// a soft disable. This clause's own rules are its three numbered Details, and
-// the tests below observe the production code that applies them, together with
-// the figure edges that reach nothing without a rule of their own - the
-// vpiCondition of a guarded constraint, the vpiElseConst of a constraint
-// if-else and the vpiExpr of a soft disable:
-//   D1 - the variable reached from a foreach constraint via vpiVariables
-//        represents the array being indexed (the designated-pointer Handle
-//        case).
-//   D2 - the vpiLoopVars iteration returns the foreach index variables in
-//        left-to-right order, with a skipped position reported as a
-//        vpiOperation whose vpiOpType is vpiNullOp (the dedicated loop-var walk
-//        of Iterate).
-//   D3 - the vpiConstraintExpr iteration returns the body expressions of an
-//        implication / if / if-else / foreach in the order they occur (the
-//        dedicated body-list walk of Iterate).
-
-// The fixture installs a context so the public vpi_handle/vpi_iterate/vpi_scan
-// entry points run their real dispatch.
 class ConstraintExpression : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -54,13 +33,9 @@ class ConstraintExpression : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D1: a foreach constraint's vpiVariables relation reaches the variable that
-// represents the array being indexed. The array variable's own type is a
-// variable kind, so it is held as a designated pointer and reached through the
-// scoped Handle case rather than a generic child match.
 TEST_F(ConstraintExpression, ForeachVariablesReachesIndexedArray) {
   VpiObject array;
-  array.type = vpiArrayVar;  // the array the foreach iterates over
+  array.type = vpiArrayVar;
 
   VpiObject foreach;
   foreach
@@ -72,19 +47,12 @@ TEST_F(ConstraintExpression, ForeachVariablesReachesIndexedArray) {
             &array);
 }
 
-// D1: the relation is specific to a foreach constraint and reports NULL when no
-// array is attached; it does not pick up a stray variable on another object
-// kind. A non-foreach object with a vpiVariables-typed child is unaffected by
-// the foreach case and still resolves through the generic walk.
 TEST_F(ConstraintExpression, ForeachVariablesIsScopedAndNullWhenAbsent) {
   VpiObject foreach;
   foreach
-    .type = vpiConstrForEach;  // no array attached
+    .type = vpiConstrForEach;
   EXPECT_EQ(vpi_handle(vpiVariables, VpiHandleOf(&foreach)), nullptr);
 
-  // The foreach Handle case does not fire for a different object kind: an
-  // implication leaves vpiVariables to the generic traversal, which finds a
-  // child whose own type is literally vpiVariables.
   VpiObject vars_child;
   vars_child.type = vpiVariables;
   VpiObject implication;
@@ -94,10 +62,6 @@ TEST_F(ConstraintExpression, ForeachVariablesIsScopedAndNullWhenAbsent) {
             &vars_child);
 }
 
-// D2: the vpiLoopVars iteration returns the foreach index variables in
-// left-to-right order. A skipped index position - a null slot in the loop-var
-// list - comes back as a placeholder operation whose operator is the null
-// operation, so the caller still sees a value occupying that slot.
 TEST_F(ConstraintExpression, LoopVarsIterationOrdersVarsWithNullOpPlaceholder) {
   VpiObject var_i;
   var_i.type = vpiIntVar;
@@ -107,8 +71,6 @@ TEST_F(ConstraintExpression, LoopVarsIterationOrdersVarsWithNullOpPlaceholder) {
   VpiObject foreach;
   foreach
     .type = vpiConstrForEach;
-  // The middle index was skipped in the foreach header (a[i, , k]); a null slot
-  // marks it.
   foreach
     .loop_vars = {&var_i, nullptr, &var_k};
 
@@ -117,19 +79,15 @@ TEST_F(ConstraintExpression, LoopVarsIterationOrdersVarsWithNullOpPlaceholder) {
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 3u);  // every position is reported, in order
-  EXPECT_EQ(VpiObjectOf(seen[0]), &var_i);  // left-to-right order is preserved
+  ASSERT_EQ(seen.size(), 3u);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &var_i);
   EXPECT_EQ(VpiObjectOf(seen[2]), &var_k);
-  EXPECT_NE(VpiObjectOf(seen[1]),
-            &var_i);  // the skipped slot is a fresh placeholder
+  EXPECT_NE(VpiObjectOf(seen[1]), &var_i);
   EXPECT_NE(VpiObjectOf(seen[1]), &var_k);
   EXPECT_EQ(vpi_get(vpiType, seen[1]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[1]), vpiNullOp);
 }
 
-// D2: a foreach constraint with no skipped indices returns exactly its index
-// variables, and a foreach with no index variables at all yields a null
-// iterator - there is nothing to walk.
 TEST_F(ConstraintExpression, LoopVarsIterationWithoutSkipsAndWhenEmpty) {
   VpiObject var_i;
   var_i.type = vpiIntVar;
@@ -146,13 +104,10 @@ TEST_F(ConstraintExpression, LoopVarsIterationWithoutSkipsAndWhenEmpty) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 
   VpiObject empty_foreach;
-  empty_foreach.type = vpiConstrForEach;  // no loop vars
+  empty_foreach.type = vpiConstrForEach;
   EXPECT_EQ(vpi_iterate(vpiLoopVars, VpiHandleOf(&empty_foreach)), nullptr);
 }
 
-// D2: every skipped index position is represented independently. With two
-// skipped slots the iteration yields a distinct null-op placeholder for each,
-// not a single shared one, so each skipped position is reported on its own.
 TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
   VpiObject var_j;
   var_j.type = vpiIntVar;
@@ -160,7 +115,6 @@ TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
   VpiObject foreach;
   foreach
     .type = vpiConstrForEach;
-  // The first and last indices were skipped (a[ , j, ]).
   foreach
     .loop_vars = {nullptr, &var_j, nullptr};
 
@@ -170,18 +124,14 @@ TEST_F(ConstraintExpression, LoopVarsIterationRepresentsEachSkipIndependently) {
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(VpiObjectOf(seen[1]), &var_j);  // the present index keeps its slot
-  EXPECT_NE(seen[0], seen[2]);              // each skip is its own placeholder
+  EXPECT_EQ(VpiObjectOf(seen[1]), &var_j);
+  EXPECT_NE(seen[0], seen[2]);
   EXPECT_EQ(vpi_get(vpiType, seen[0]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[0]), vpiNullOp);
   EXPECT_EQ(vpi_get(vpiType, seen[2]), vpiOperation);
   EXPECT_EQ(vpi_get(vpiOpType, seen[2]), vpiNullOp);
 }
 
-// D3: the vpiConstraintExpr iteration returns the body expressions of a
-// container constraint expression in the order they occur. Here the container
-// is an implication whose body holds three constraint expressions; the
-// iteration hands them back in source order.
 TEST_F(ConstraintExpression, ConstraintExprIterationReturnsBodyInOrder) {
   VpiObject e0;
   e0.type = vpiConstraintExpr;
@@ -200,14 +150,11 @@ TEST_F(ConstraintExpression, ConstraintExprIterationReturnsBodyInOrder) {
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
   ASSERT_EQ(seen.size(), 3u);
-  EXPECT_EQ(VpiObjectOf(seen[0]), &e0);  // occurrence order is preserved
+  EXPECT_EQ(VpiObjectOf(seen[0]), &e0);
   EXPECT_EQ(VpiObjectOf(seen[1]), &e1);
   EXPECT_EQ(VpiObjectOf(seen[2]), &e2);
 }
 
-// D3: the body walk fires for every container kind the Detail names - an
-// implication, a constraint if, a constraint if-else, and a foreach - so each
-// reaches its own body list through vpiConstraintExpr.
 TEST_F(ConstraintExpression, ConstraintExprIterationFiresForEachContainerKind) {
   for (int kind :
        {vpiImplication, vpiConstrIf, vpiConstrIfElse, vpiConstrForEach}) {
@@ -225,40 +172,26 @@ TEST_F(ConstraintExpression, ConstraintExprIterationFiresForEachContainerKind) {
   }
 }
 
-// D3: the dedicated body walk is scoped to the container kinds. A constraint
-// expression that is not a container (here a distribution) does not expose a
-// body through vpiConstraintExpr, so the iteration falls back to the generic
-// child match and finds nothing when no such child is present.
 TEST_F(ConstraintExpression, ConstraintExprIterationScopedToContainerKinds) {
   VpiObject stray_body;
   stray_body.type = vpiConstraintExpr;
 
   VpiObject distribution;
   distribution.type = vpiDistribution;
-  // A body list on a non-container is ignored: the special walk does not fire.
   distribution.constraint_exprs = {&stray_body};
 
   EXPECT_EQ(vpi_iterate(vpiConstraintExpr, VpiHandleOf(&distribution)),
             nullptr);
 }
 
-// D3: a container that holds no body expressions has nothing to walk, so its
-// vpiConstraintExpr iteration yields a null iterator even though the special
-// container walk does fire for its kind.
 TEST_F(ConstraintExpression,
        ConstraintExprIterationEmptyWhenContainerHasNoBody) {
   VpiObject implication;
-  implication.type =
-      vpiImplication;  // a container kind, but with an empty body
+  implication.type = vpiImplication;
 
   EXPECT_EQ(vpi_iterate(vpiConstraintExpr, VpiHandleOf(&implication)), nullptr);
 }
 
-// The figure's vpiCondition edge. An implication, a constraint if and a
-// constraint if-else are each guarded by an expression the figure draws
-// vpiCondition to. None of the three was named by the condition resolver, so
-// the relation fell through to a walk looking for a child whose own type is the
-// vpiCondition tag - a type no object has - and reached nothing.
 TEST_F(ConstraintExpression, ConditionReachesTheGuardingExpression) {
   for (int kind : {vpiImplication, vpiConstrIf, vpiConstrIfElse}) {
     VpiObject condition;
@@ -277,8 +210,6 @@ TEST_F(ConstraintExpression, ConditionReachesTheGuardingExpression) {
   }
 }
 
-// The same edge is drawn on no other constraint expression: a distribution, a
-// soft disable and a bare expression are not guarded by a condition.
 TEST_F(ConstraintExpression, ConditionIsScopedToTheGuardedKinds) {
   VpiObject expr;
   expr.type = vpiOperation;
@@ -290,10 +221,6 @@ TEST_F(ConstraintExpression, ConditionIsScopedToTheGuardedKinds) {
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&dist)), nullptr);
 }
 
-// The figure's vpiElseConst edge. A constraint if-else has two branches, and
-// vpiConstraintExpr reaches the then branch, so the else branch is drawn as a
-// relation of its own. Nothing recognized it, so the else branch's expressions
-// were reachable from the if-else by nothing.
 TEST_F(ConstraintExpression, ElseConstReachesTheElseBranchInOrder) {
   VpiObject then_expr;
   then_expr.type = vpiOperation;
@@ -313,16 +240,12 @@ TEST_F(ConstraintExpression, ElseConstReachesTheElseBranchInOrder) {
   EXPECT_EQ(VpiObjectOf(vpi_scan(itr)), &else_second);
   EXPECT_EQ(vpi_scan(itr), nullptr);
 
-  // D3 is unchanged by it: vpiConstraintExpr still reaches the then branch
-  // alone, which is what makes the two branches two sets of expressions.
   vpiHandle body = vpi_iterate(vpiConstraintExpr, VpiHandleOf(&if_else));
   ASSERT_NE(body, nullptr);
   EXPECT_EQ(VpiObjectOf(vpi_scan(body)), &then_expr);
   EXPECT_EQ(vpi_scan(body), nullptr);
 }
 
-// The else branch belongs to the if-else alone: a constraint if has one branch,
-// so the relation reaches nothing from it.
 TEST_F(ConstraintExpression, ElseConstIsScopedToTheIfElse) {
   VpiObject branch;
   branch.type = vpiOperation;
@@ -335,9 +258,6 @@ TEST_F(ConstraintExpression, ElseConstIsScopedToTheIfElse) {
   EXPECT_TRUE(itr == nullptr || vpi_scan(itr) == nullptr);
 }
 
-// §37.38 (figure): a guarded constraint reaches its condition through
-// vpiCondition. A null handle has none, nor does an implication holding no
-// expression child, a typespec among its children not being one.
 TEST(ConstraintCondition, NoConditionWithoutAnExpressionChild) {
   EXPECT_EQ(VpiConstraintConditionExpr(nullptr), nullptr);
   VpiObject typespec;
@@ -348,11 +268,8 @@ TEST(ConstraintCondition, NoConditionWithoutAnExpressionChild) {
   EXPECT_EQ(VpiConstraintConditionExpr(&implication), nullptr);
 }
 
-// A design run with a PLI application registered, whose constraints' items are
-// read back from the model the run built.
 class ConstraintExpressionsOfARun : public VpiDesignRun {
  protected:
-  // What `ref` iterates through `type`, in the iteration's order.
   static std::vector<vpiHandle> All(int type, vpiHandle ref) {
     std::vector<vpiHandle> all;
     vpiHandle it = vpi_iterate(type, ref);
@@ -361,18 +278,12 @@ class ConstraintExpressionsOfARun : public VpiDesignRun {
     return all;
   }
 
-  // The operand at `index` of the operation `op`.
   static VpiObject* Operand(vpiHandle op, std::size_t index) {
     const std::vector<vpiHandle> kOperands = All(vpiOperand, op);
     return index < kOperands.size() ? VpiObjectOf(kOperands[index]) : nullptr;
   }
 };
 
-// §37.34 detail 5 with §37.38: a constraint holds a constraint expression per
-// one its block writes, in order: an expression, written soft or not (a name
-// standing alone being the variable it names), an implication, a constr if, a
-// constr if else, a constr foreach and a soft disable. A uniqueness
-// constraint, which §37.38 draws no object for, is none of them (#5840).
 TEST_F(ConstraintExpressionsOfARun, AConstraintHoldsItsExpressionsInOrder) {
   Run("module top;\n"
       "  class C; rand int x, y; rand bit b;\n"
@@ -398,9 +309,6 @@ TEST_F(ConstraintExpressionsOfARun, AConstraintHoldsItsExpressionsInOrder) {
   ASSERT_EQ(kItems.size(), 7u);
   EXPECT_EQ(vpi_get(vpiSoft, kItems[0]), 1);
   EXPECT_EQ(vpi_get(vpiSoft, kItems[2]), 0);
-  // An implication and a constr if reach their guards through vpiCondition,
-  // a name standing alone among them, and what they govern through
-  // vpiConstraintExpr; an if-else's else branch is reached apart.
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiCondition, kItems[3])),
             vpiOperation);
   EXPECT_EQ(All(vpiConstraintExpr, kItems[3]).size(), 1u);
@@ -412,9 +320,6 @@ TEST_F(ConstraintExpressionsOfARun, AConstraintHoldsItsExpressionsInOrder) {
   EXPECT_EQ(All(vpiElseConst, kItems[4]).size(), 0u);
 }
 
-// §8.13 with §37.38: a name in a constraint of a class finds the class's
-// property, one the class inherits among them, and else a declaration of the
-// module declaring the class (#5840).
 TEST_F(ConstraintExpressionsOfARun, AConstraintsNamesFindTheClassFirst) {
   Run("module top; int m, x;\n"
       "  class B; rand int y; endclass\n"
@@ -434,10 +339,6 @@ TEST_F(ConstraintExpressionsOfARun, AConstraintsNamesFindTheClassFirst) {
   EXPECT_EQ(Operand(kItems[1], 1), VpiObjectOf(By("top.m")));
 }
 
-// §37.38 details 1 and 2: a constr foreach reaches the array it indexes
-// through vpiVariables and its index variables through vpiLoopVars, a skipped
-// one standing as a null operation; a name in its body finds the index
-// variables first, ahead of a property of the class of the same name (#5840).
 TEST_F(ConstraintExpressionsOfARun, AForeachConstraintReachesItsArray) {
   Run("module top;\n"
       "  class C; rand int a[2][2], j;\n"
@@ -461,11 +362,6 @@ TEST_F(ConstraintExpressionsOfARun, AForeachConstraintReachesItsArray) {
   EXPECT_EQ(Operand(kBody[0], 0), VpiObjectOf(kIndices[1]));
 }
 
-// §18.7 with §37.38: a name in a randomize call's inline constraint block
-// finds the randomized object's class's property ahead of a declaration of the
-// module, and else a declaration of the block the call stands in. A call on
-// an object of a class the design does not declare finds the scope's only
-// (#5840).
 TEST_F(ConstraintExpressionsOfARun, AnInlineBlocksNamesFindTheClassFirst) {
   Run("module top; int x;\n"
       "  class C; rand int x; endclass\n"
@@ -493,8 +389,6 @@ TEST_F(ConstraintExpressionsOfARun, AnInlineBlocksNamesFindTheClassFirst) {
   EXPECT_EQ(Operand(kScopes[0], 0), VpiObjectOf(By("top.x")));
 }
 
-// §37.33 with §37.38: a name in a constraint of a class obj finds the
-// object's variable (#5840).
 TEST_F(ConstraintExpressionsOfARun, AClassObjsConstraintFindsItsVariables) {
   Run("module top; int m;\n"
       "  class C; rand int x; constraint c { x < m; } endclass\n"
@@ -509,10 +403,6 @@ TEST_F(ConstraintExpressionsOfARun, AClassObjsConstraintFindsItsVariables) {
   EXPECT_EQ(Operand(kItems[0], 1), VpiObjectOf(By("top.m")));
 }
 
-// §18.5.9 with §37.34: a solve-before item is a constraint ordering among a
-// constraint's items, reaching the expressions it solves before through
-// vpiSolveBefore and those it solves after through vpiSolveAfter, each in the
-// order written (#5842).
 TEST_F(ConstraintExpressionsOfARun, ASolveBeforeItemIsAConstraintOrdering) {
   Run("module top;\n"
       "  class C; rand int x, y, z;\n"
@@ -537,13 +427,6 @@ TEST_F(ConstraintExpressionsOfARun, ASolveBeforeItemIsAConstraintOrdering) {
   EXPECT_EQ(All(vpiElseConst, kItems[0]).size(), 0u);
 }
 
-// §18.5.3 with §37.34 and §37.38: a dist item of a constraint block is a
-// distribution among the constraint's items, reaching the expression it
-// weights and a dist item per entry, in order. A dist item reaches its value,
-// or the range [lo:hi] it gives, through vpiValueRange, its weight through
-// vpiWeight, and reports := as vpiEqualDist and :/ as vpiDivDist. A default
-// item and a range about a centre reach no value range, and an item written
-// with no weight no weight (#5843).
 TEST_F(ConstraintExpressionsOfARun, ADistItemIsADistribution) {
   Run("module top;\n"
       "  class C; rand int x;\n"
@@ -579,9 +462,6 @@ TEST_F(ConstraintExpressionsOfARun, ADistItemIsADistribution) {
   EXPECT_EQ(vpi_handle(vpiCondition, kEntries[0]), nullptr);
 }
 
-// §18.5.13.2 with §37.38: a soft disable reaches through vpiExpr the
-// expression whose soft constraints it discards, the second of two properties
-// here, and reaches no condition (#7136).
 TEST_F(ConstraintExpressionsOfARun, ASoftDisableReachesItsExpression) {
   Run("module top;\n"
       "  class C; rand int x, y;\n"
@@ -599,11 +479,6 @@ TEST_F(ConstraintExpressionsOfARun, ASoftDisableReachesItsExpression) {
   EXPECT_EQ(vpi_handle(vpiCondition, disable), nullptr);
 }
 
-// §37.19 with §37.38: a select through two unpacked dimensions of a class's
-// array property, written as a size or as a range either way, is a var select
-// of a var select, in a constraint of the class defn and of a class obj
-// alike; one through a dynamic array's one dimension is a var select too
-// (#5844).
 TEST_F(ConstraintExpressionsOfARun, ASelectThroughAPropertysDimensions) {
   Run("module top;\n"
       "  class C; rand int a[2][2], b[3:0][1:2], d[];\n"

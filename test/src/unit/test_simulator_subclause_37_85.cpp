@@ -14,42 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.85 Generates: the object model diagram draws a gen scope array, the gen
-// scopes it contains, and the gen var that drives a generate. There is no BNF
-// and no syntax in this clause; it owns the VPI data model for generates. The
-// claims this pass carries through production code and observes here are:
-//   * the gen scope array's -> size property (vpiSize), governed by detail 1:
-//     the size is the number of elements (gen scopes) in the array;
-//   * the gen scope array's -> access by index, drawn with
-//   vpi_handle_by_index()
-//     / vpi_handle_by_multi_index(): a gen scope array is a valid index-select
-//     reference object whose indices select its gen scope elements;
-//   * the gen scope's vpiIndex -> expr edge: an array-member gen scope reaches
-//     the index expression that locates it within its gen scope array; and
-//   * the gen scope's -> is implicitly declared property (vpiImplicitDecl),
-//     governed by detail 2: the implicit scope created for an unnamed generate
-//     reports TRUE.
-// Every other relation in the diagram (vpiInstance, vpiInternalScope,
-// vpiMemory, vpiParameter, vpiTypedef, vpiNetTypedef and the names) is served
-// by generic scope, instance, typedef, and property machinery owned by §37.10,
-// §37.12, §37.23, and §37.25, so it is not re-tested here; the gen var, the
-// gen scope's vpiProtected and deprecated vpiArray, and its cont assigns, are
-// tested on a run below. Details 5 and 6 (the vpiTypedef/vpiNetTypedef
-// iterations) restate the instance rule already implemented for §37.10, so
-// they add no production for this clause.
-//
-// Details 3 and 4 - a reference to a gen var inside the gen scope, and a
-// parameter inside it, each count as a local parameter - were read as
-// elaboration semantics with no VPI query of their own. They have one: §37.28
-// draws vpiLocalParam on a parameter, and being treated as a local parameter is
-// what that property reports. It reported the flag the declaration set, so a
-// parameter written as a plain parameter inside a gen scope answered that an
-// override could still reach it, which one elaboration of a generate has
-// already settled.
-//
-// The fixture installs a context so the public vpi_get, vpi_handle, and
-// vpi_handle_by_index entry points run their real dispatch over the test
-// objects.
 class Generates : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -57,41 +21,30 @@ class Generates : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Property (-> size, int: vpiSize), detail 1: a gen scope array reports the
-// number of elements in the array - the gen scopes it holds. The count is taken
-// from the array's gen scope element children, so a non-element child is not
-// counted and a stale stored width is ignored.
 TEST_F(Generates, SizeCountsGenScopeElements) {
   VpiObject elem0;
   elem0.type = vpiGenScope;
   VpiObject elem1;
   elem1.type = vpiGenScope;
-  VpiObject not_an_element;  // some other related object hanging off the array
+  VpiObject not_an_element;
   not_an_element.type = vpiNet;
 
   VpiObject array;
   array.type = vpiGenScopeArray;
-  array.size = 99;  // a stored width must not be reported in place of the count
+  array.size = 99;
   array.children = {&elem0, &not_an_element, &elem1};
 
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&array)), 2);
 }
 
-// Property (-> size, int: vpiSize), detail 1, boundary: a gen scope array that
-// holds no gen scopes reports a size of zero. The count is still computed from
-// the (empty) element children, so a stale stored width is not reported in its
-// place even at the zero boundary.
 TEST_F(Generates, SizeIsZeroForEmptyGenScopeArray) {
   VpiObject array;
   array.type = vpiGenScopeArray;
-  array.size = 7;  // a stale stored width must not surface for an empty array
+  array.size = 7;
 
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&array)), 0);
 }
 
-// Edge (-> access by index, vpi_handle_by_index()): a gen scope array is a
-// valid index-select reference object, and its indices select its gen scope
-// elements. An index that names no element yields a null handle.
 TEST_F(Generates, ElementsAccessedByIndex) {
   VpiObject elem0;
   elem0.type = vpiGenScope;
@@ -109,10 +62,6 @@ TEST_F(Generates, ElementsAccessedByIndex) {
   EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&array), 2), nullptr);
 }
 
-// Edge (-> access by index, vpi_handle_by_multi_index()): the diagram draws the
-// multi-index routine alongside the single-index one, so a gen scope array also
-// serves as a valid reference object for a multi-index select. The supplied
-// index level selects the matching gen scope element.
 TEST_F(Generates, ElementSelectedByMultiIndex) {
   VpiObject elem0;
   elem0.type = vpiGenScope;
@@ -131,8 +80,6 @@ TEST_F(Generates, ElementSelectedByMultiIndex) {
       &elem1);
 }
 
-// Edge (vpiIndex -> expr): an array-member gen scope reaches the index
-// expression that locates it within its gen scope array.
 TEST_F(Generates, IndexReachesArrayMemberIndexExpression) {
   VpiObject index_expr;
   index_expr.type = vpiConstant;
@@ -146,9 +93,6 @@ TEST_F(Generates, IndexReachesArrayMemberIndexExpression) {
             &index_expr);
 }
 
-// Edge (vpiIndex -> expr), gate: a gen scope that is not an element of a gen
-// scope array has no locating index, so vpiIndex reports NULL rather than
-// returning some other expression child the generic walk might reach.
 TEST_F(Generates, IndexIsNullWhenGenScopeIsNotAnArrayMember) {
   VpiObject stray_expr;
   stray_expr.type = vpiConstant;
@@ -156,15 +100,11 @@ TEST_F(Generates, IndexIsNullWhenGenScopeIsNotAnArrayMember) {
   VpiObject gen_scope;
   gen_scope.type = vpiGenScope;
   gen_scope.array_member = false;
-  gen_scope.index_expr = &stray_expr;  // present but not a locating index
+  gen_scope.index_expr = &stray_expr;
 
   EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&gen_scope)), nullptr);
 }
 
-// Property (-> is implicitly declared, bool: vpiImplicitDecl), detail 2: the
-// implicit scope created for an unnamed generate reports TRUE, while a gen
-// scope that was explicitly named reports FALSE - so the property reflects the
-// scope's own flag rather than a fixed value.
 TEST_F(Generates, ImplicitlyDeclaredScopeReportsTrue) {
   VpiObject implicit_scope;
   implicit_scope.type = vpiGenScope;
@@ -177,23 +117,17 @@ TEST_F(Generates, ImplicitlyDeclaredScopeReportsTrue) {
   EXPECT_EQ(vpi_get(vpiImplicitDecl, VpiHandleOf(&named_scope)), 0);
 }
 
-// Detail 4: a parameter declared within a gen scope is treated as a local
-// parameter, so vpi_get(vpiLocalParam, ...) reports TRUE however it was
-// written - the generate has fixed its value for that elaboration of the scope.
-// A parameter written as a localparam reports TRUE wherever it stands, so the
-// case that tells the rule apart is the plain one.
 TEST_F(Generates, ParameterInAGenScopeIsALocalParameter) {
   VpiObject gen_scope;
   gen_scope.type = vpiGenScope;
 
   VpiObject plain_parameter;
   plain_parameter.type = vpiParameter;
-  plain_parameter.local_param = false;  // written as a plain parameter
+  plain_parameter.local_param = false;
   plain_parameter.parent = &gen_scope;
 
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&plain_parameter)), 1);
 
-  // The same declaration outside a gen scope is what it was written as.
   VpiObject module;
   module.type = vpiModule;
 
@@ -205,8 +139,6 @@ TEST_F(Generates, ParameterInAGenScopeIsALocalParameter) {
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&outside)), 0);
 }
 
-// The generates of a run: those a design writes, built from the elaborated
-// design rather than by hand (#4958, #5069).
 class GeneratesOfARun : public VpiDesignRun {};
 
 constexpr const char* kGenerates =
@@ -215,8 +147,6 @@ constexpr const char* kGenerates =
     "  if (1) begin : c logic w; end\n"
     "endmodule\n";
 
-// A loop generate's block instance is a gen scope, an element of the loop's
-// array reaching its index, the genvar's value in its iteration.
 TEST_F(GeneratesOfARun, ALoopBlockInstanceIsAGenScope) {
   Run(kGenerates);
   vpiHandle block = By("top.g[2]");
@@ -231,9 +161,6 @@ TEST_F(GeneratesOfARun, ALoopBlockInstanceIsAGenScope) {
   EXPECT_EQ(value.value.integer, 2);
 }
 
-// The instances of a loop generate's block are the elements of a gen scope
-// array the instance reaches, sized by their number (detail 1) and reaching
-// each by its index.
 TEST_F(GeneratesOfARun, ALoopsBlocksAreAGenScopeArray) {
   Run(kGenerates);
   EXPECT_EQ(KindsOf(vpiGenScopeArray, By("top")),
@@ -248,8 +175,6 @@ TEST_F(GeneratesOfARun, ALoopsBlocksAreAGenScopeArray) {
             VpiObjectOf(By("top.g[1]")));
 }
 
-// A conditional generate's block instance is a gen scope of its own, the
-// element of no array.
 TEST_F(GeneratesOfARun, AConditionalBlockInstanceIsAGenScope) {
   Run(kGenerates);
   vpiHandle block = By("top.c");
@@ -259,9 +184,6 @@ TEST_F(GeneratesOfARun, AConditionalBlockInstanceIsAGenScope) {
   EXPECT_EQ(vpi_handle(vpiIndex, block), nullptr);
 }
 
-// A named block instance is a gen scope whatever it declares: one declaring
-// only a task, one declaring nothing, and one holding only another block, a
-// gen scope full-named under it (#5738).
 TEST_F(GeneratesOfARun, ABlockDeclaringNoDataIsAGenScope) {
   Run("module top;\n"
       "  if (1) begin : t task run(); endtask end\n"
@@ -277,10 +199,6 @@ TEST_F(GeneratesOfARun, ABlockDeclaringNoDataIsAGenScope) {
   EXPECT_NE(Named(vpiTaskFunc, By("top.t"), "run"), nullptr);
 }
 
-// Detail 2 with §27.6: an unnamed block instance is an implicit gen scope
-// named genblk<n> after its construct's number, of a loop's array where the
-// construct is a loop, holding what the block declares; a named block's scope
-// is no implicit one (#5737).
 TEST_F(GeneratesOfARun, AnUnnamedBlockIsAnImplicitGenScope) {
   Run("module top;\n"
       "  if (1) begin task t(); endtask end\n"
@@ -298,8 +216,6 @@ TEST_F(GeneratesOfARun, AnUnnamedBlockIsAnImplicitGenScope) {
   EXPECT_NE(Named(vpiTaskFunc, By("top.genblk1"), "t"), nullptr);
 }
 
-// §37.85 detail 5: vpiTypedef reaches the typespecs of a scope's typedefs; a
-// type parameter is a typespec but no typedef, and is passed over.
 TEST_F(Generates, TheTypedefIterationPassesOverATypeParameter) {
   VpiObject type_param;
   type_param.type = vpiTypeParameter;
@@ -314,9 +230,6 @@ TEST_F(Generates, TheTypedefIterationPassesOverATypeParameter) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// Detail 5: a gen scope's vpiTypedef iteration returns the typespecs of the
-// typedefs its generate block declares, and a property formal of one written
-// in the block reaches it (#5759).
 TEST_F(GeneratesOfARun, AGenScopeReachesTheTypedefsItsBlockDeclares) {
   Run("module top; logic clk;\n"
       "  if (1) begin : g\n"
@@ -335,11 +248,6 @@ TEST_F(GeneratesOfARun, AGenScopeReachesTheTypedefsItsBlockDeclares) {
       vpi_handle(vpiTypespec, Named(vpiPropFormalDecl, decl, "v")), nib));
 }
 
-// §23.6 with §27.4: an instance a generate block instance holds is a module
-// of the block's gen scope, named as written and full-named through the
-// block's name, as is everything it holds; its module holds no instance under
-// the name the run keys it by. A call in it still reaches the task of the
-// module enclosing it (§23.8, §37.42) (#5805).
 TEST_F(GeneratesOfARun, AnInstanceOfAGenerateBlockIsInItsGenScope) {
   Run("module deep; initial begin : b t(); end endmodule\n"
       "module top; task t; endtask\n"
@@ -362,11 +270,6 @@ TEST_F(GeneratesOfARun, AnInstanceOfAGenerateBlockIsInItsGenScope) {
             VpiObjectOf(Named(vpiTaskFunc, By("top"), "t")));
 }
 
-// The gen var of a loop generate (§27.4): the gen scope array of the loop's
-// blocks reaches it, named and full-named as the genvar the loop iterates
-// over, and it reaches the array back; an unnamed loop's array, genblk<n>
-// (§27.6), reaches its own. It is no element of the array, which no index
-// selects it as and whose size counts it not (detail 1).
 TEST_F(GeneratesOfARun, ALoopsGenScopeArrayReachesItsGenVar) {
   Run("module top;\n"
       "  for (genvar i = 0; i < 3; i++) begin : g logic v; end\n"
@@ -387,10 +290,6 @@ TEST_F(GeneratesOfARun, ALoopsGenScopeArrayReachesItsGenVar) {
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiGenVar, unnamed)), "j");
 }
 
-// The gen scope's vpiProtected, FALSE for a gen scope no decryption envelope
-// seals, and the deprecated vpiArray, which reports what vpiArrayMember does:
-// TRUE for an element of a loop's array and FALSE for a conditional block's
-// scope.
 TEST_F(GeneratesOfARun, AGenScopeAnswersProtectedAndArray) {
   Run(kGenerates);
   EXPECT_EQ(vpi_get(vpiProtected, By("top.g[1]")), 0);
@@ -399,9 +298,6 @@ TEST_F(GeneratesOfARun, AGenScopeAnswersProtectedAndArray) {
   EXPECT_EQ(vpi_get(vpiArray, By("top.c")), 0);
 }
 
-// Detail 3 with §27.4: a reference to a gen var within the gen scope is the
-// local parameter §27.4 declares in each block instance under the genvar's
-// name, holding the genvar's value in that instance.
 TEST_F(GeneratesOfARun, AGenVarReferenceIsALocalParameter) {
   Run("module top;\n"
       "  for (genvar i = 0; i < 2; i++) begin : g\n"
@@ -428,10 +324,6 @@ TEST_F(GeneratesOfARun, AGenVarReferenceIsALocalParameter) {
   EXPECT_EQ(values, (std::vector<int>{0, 1}));
 }
 
-// The gen scope's cont assign: a continuous assignment a generate block
-// writes is one of the gen scope of the block instance it stands in, the
-// innermost where blocks nest, and none of the module's or of an enclosing
-// block's.
 TEST_F(GeneratesOfARun, AGenerateBlocksAssignmentIsOneOfItsGenScope) {
   Run("module top;\n"
       "  wire a;\n"
@@ -454,10 +346,6 @@ TEST_F(GeneratesOfARun, AGenerateBlocksAssignmentIsOneOfItsGenScope) {
   }
 }
 
-// §27.4 with §37.28: the implicit localparam an iteration of a loop declares
-// in its block instance under the genvar's name is a local parameter of the
-// gen scope, holding the genvar's value in that iteration, and none of the
-// scope's variables.
 TEST_F(GeneratesOfARun, AnIterationsGenvarLocalparamIsAParameterOfItsScope) {
   Run(kGenerates);
   vpiHandle i = Named(vpiParameter, By("top.g[2]"), "i");
@@ -472,10 +360,6 @@ TEST_F(GeneratesOfARun, AnIterationsGenvarLocalparamIsAParameterOfItsScope) {
             std::vector<std::string>{"v"});
 }
 
-// Detail 4 with §27.4: a parameter a generate block declares is a local
-// parameter of its block instance's gen scope, named as declared and holding
-// the value it has in that instance, and none of the scope's variables; the
-// module holds nothing under the name the elaborator flattens it to.
 TEST_F(GeneratesOfARun, AGenerateBlocksParameterIsALocalParameterOfItsScope) {
   Run("module top;\n"
       "  for (genvar i = 0; i < 2; i++) begin : g\n"

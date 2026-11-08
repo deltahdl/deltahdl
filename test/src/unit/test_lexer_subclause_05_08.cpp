@@ -58,13 +58,6 @@ TEST(TimeLiteralLexing, SpaceSeparatesNumberAndUnit) {
   EXPECT_EQ(tokens[1].text, "ns");
 }
 
-// §5.8 gives the time unit as one of s, ms, us, ns, ps and fs, so `ns` followed
-// by more identifier characters is not one. Lexer::TryLexTimeSuffix() requires
-// a word boundary after the two-character suffix, so it declines `nsec` whole
-// rather than matching its `ns` prefix and stopping. The test fails if the
-// lexer takes that prefix, which leaves tokens[0] the time literal `1ns` and
-// tokens[1] the identifier `ec`, and it fails if `1nsec` is lexed as one token
-// of any kind.
 TEST(TimeLiteralLexing, NotTimeLiteralIfMoreChars) {
   auto tokens = Lex("1nsec ");
   ASSERT_GE(tokens.size(), 2u);
@@ -95,8 +88,6 @@ TEST(TimeLiteralLexing, UnlistedSuffixIsNotTimeLiteral) {
   EXPECT_EQ(tokens[1].text, "cs");
 }
 
-// A time unit is a whole word: one an underscore continues is an identifier,
-// and the number before it an integer.
 TEST(TimeLiteralLexing, UnitContinuedByAnUnderscoreIsNotTimeLiteral) {
   auto tokens = Lex("10ns_x");
   ASSERT_GE(tokens.size(), 2u);

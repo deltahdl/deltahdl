@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -252,9 +250,6 @@ TEST(NetAndVariableTypeParsing, StructUnionSoft) {
   EXPECT_TRUE(FirstItem(r)->typedef_type.is_soft);
 }
 
-// data_type ::= ... struct_union [ packed [ signing ] ] { ... }  — the optional
-// signing on a packed structure (`struct packed signed`), a distinct input form
-// from the bare and plain-packed structures tested above.
 TEST(NetAndVariableTypeParsing, StructUnionPackedSigned) {
   auto r = Parse(
       "module m;\n"
@@ -615,8 +610,6 @@ TEST(NetAndVariableTypeParsing, PackageScopedTypeIdentifierAsDataType) {
 }
 
 TEST(NetAndVariableTypeParsing, CastingTypeConstantPrimaryWidth) {
-  // The constant_primary alternative of casting_type — a width literal as the
-  // cast's target type, e.g. 8'(x) reshapes x to eight bits.
   auto r = Parse(
       "module m;\n"
       "  logic [3:0] a;\n"
@@ -639,9 +632,6 @@ TEST(NetAndVariableTypeParsing, ClassScopeTypeAccess) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// enum_base_type ::= integer_atom_type [ signing ] | ...  The integer_atom
-// alternative (e.g. `enum int`), distinct from the integer_vector and
-// type_identifier bases exercised above.
 TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerAtom) {
   auto r = Parse(
       "module m;\n"
@@ -655,9 +645,6 @@ TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerAtom) {
   EXPECT_EQ(item->typedef_type.enum_base_kind, DataTypeKind::kInt);
 }
 
-// enum_name_declaration ::= enum_identifier
-//   [ [ integral_number [ : integral_number ] ] ] [ = constant_expression ]
-// The two-bound range form (`X[0:3]`), distinct from the single-index `S[4]`.
 TEST(NetAndVariableTypeParsing, EnumNameDeclarationRangeWithBounds) {
   auto r = Parse(
       "module m;\n"
@@ -671,10 +658,6 @@ TEST(NetAndVariableTypeParsing, EnumNameDeclarationRangeWithBounds) {
   EXPECT_NE(item->typedef_type.enum_members[0].range_end, nullptr);
 }
 
-// type_reference ::= type ( data_type_or_incomplete_class_scoped_type )  over a
-// class-scoped type name (`type(c::inner_t)`), exercising the scoped
-// alternative of data_type_or_incomplete_class_scoped_type rather than a bare
-// data_type.
 TEST(NetAndVariableTypeParsing, TypeReferenceClassScopedType) {
   auto r = Parse(
       "class c;\n"
@@ -690,9 +673,6 @@ TEST(NetAndVariableTypeParsing, TypeReferenceClassScopedType) {
   EXPECT_NE(item->data_type.type_ref_expr, nullptr);
 }
 
-// var_data_type ::= data_type | var data_type_or_implicit  — the implicit
-// alternative: `var` followed by only a signing and a packed dimension, no
-// explicit data_type (contrast with `var int` above).
 TEST(NetAndVariableTypeParsing, VarDataTypeImplicitSignedPacked) {
   auto r = Parse("module m(input var signed [3:0] x); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -704,9 +684,6 @@ TEST(NetAndVariableTypeParsing, VarDataTypeImplicitSignedPacked) {
   EXPECT_NE(mod->ports[0].data_type.packed_dim_left, nullptr);
 }
 
-// casting_type ::= simple_type | ...  The simple_type alternative admits a
-// non_integer_type (`real`), a different keyword-cast path than the integer
-// atom `int'` exercised above.
 TEST(NetAndVariableTypeParsing, CastingTypeNonIntegerType) {
   auto r = Parse(
       "module m;\n"
@@ -717,9 +694,6 @@ TEST(NetAndVariableTypeParsing, CastingTypeNonIntegerType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// casting_type simple_type ::= ... | ps_type_identifier  — a user-defined type
-// name as the cast target (`my_t'(...)`), routed through the identifier-cast
-// path rather than the keyword-cast path.
 TEST(NetAndVariableTypeParsing, CastingTypeUserDefinedType) {
   auto r = Parse(
       "module m;\n"
@@ -731,8 +705,6 @@ TEST(NetAndVariableTypeParsing, CastingTypeUserDefinedType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// enum_base_type ::= integer_atom_type [ signing ] | ...  The optional signing
-// on an integer_atom base (`enum int unsigned`).
 TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerAtomWithSigning) {
   auto r = Parse(
       "module m;\n"
@@ -746,8 +718,6 @@ TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerAtomWithSigning) {
   EXPECT_FALSE(item->typedef_type.is_signed);
 }
 
-// enum_base_type ::= ... | integer_vector_type [ signing ] [ packed_dimension ]
-// The optional signing on an integer_vector base (`enum logic signed [3:0]`).
 TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerVectorWithSigning) {
   auto r = Parse(
       "module m;\n"
@@ -761,24 +731,15 @@ TEST(NetAndVariableTypeParsing, EnumBaseTypeIntegerVectorWithSigning) {
   EXPECT_TRUE(item->typedef_type.is_signed);
 }
 
-// NEGATIVE: struct_union ::= struct | union [ soft | tagged ] permits at most
-// one qualifier on a union; `union soft tagged` violates that structure and
-// must be rejected.
 TEST(NetAndVariableTypeParsing, UnionRejectsBothSoftAndTagged) {
   auto r = Parse(
       "module m;\n"
       "  typedef union soft tagged { int a; bit b; } u_t;\n"
       "endmodule");
-  // §7.2 is where Parser::ParseUnionQualifiers files the rule, not §7.3.2.
   EXPECT_TRUE(ReportedError(
       r.diags, "union may have at most one of 'soft' or 'tagged'", 2, "7.2"));
 }
 
-// interface_class_type ::= ps_class_identifier [ parameter_value_assignment ]
-// This production appears in a class's implements clause; the parameterized
-// form exercises both the class identifier and the optional
-// parameter_value_assignment in one shot. Built from real class syntax but
-// observing THIS production's parse.
 TEST(NetAndVariableTypeParsing, InterfaceClassTypeInImplementsClause) {
   auto r = Parse(
       "interface class I #(int W = 1);\n"
@@ -794,13 +755,6 @@ TEST(NetAndVariableTypeParsing, InterfaceClassTypeInImplementsClause) {
   EXPECT_FALSE(c->implements_types[0].type_params.empty());
 }
 
-// A.2.2.1 lets a data_type open with a package_scope, and A.9.3 makes `$unit
-// ::` one, so a type the compilation unit declares is named through it
-// (§3.12.1) wherever a data_type stands: here a port's, a module item's, a
-// typedef's, a structure member's, a function argument's, a function's and a
-// procedure's local, and a class property's. `$unit` is a system identifier
-// and no type the parser knows, and each declaration is read whole with
-// `$unit` kept as the scope, outermost where a class scope follows it (#7595).
 TEST(NetAndVariableTypeParsing, DataTypeNamedThroughTheUnitScope) {
   auto r = Parse(
       "typedef logic [3:0] T;\n"

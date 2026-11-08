@@ -84,9 +84,6 @@ TEST(AssocArrayAllocation, EndToEndAssignCreatesElement) {
   EXPECT_EQ(v, 55u);
 }
 
-// §7.8.7: a string-keyed nonexistent element is allocated the same way when it
-// is the target of a plain assignment. Driven end-to-end through the write
-// path so the allocation is observed via production, not a direct map insert.
 TEST(AssocArrayAllocation, EndToEndStringKeyAssignCreatesElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -230,9 +227,6 @@ TEST(AssocArrayAllocation, StringKeyIncrementAllocates) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.8.7: a nonexistent element shall be allocated when used as the actual to
-// an argument passed by reference. The callee's write to the ref then persists
-// back into the freshly allocated entry.
 TEST(AssocArrayAllocation, RefArgToNonexistentElementAllocatesAndPersists) {
   auto v = RunAndGet(
       "module t;\n"
@@ -283,9 +277,6 @@ TEST(AssocArrayAllocation, RefArgToNonexistentStringKeyAllocates) {
   EXPECT_EQ(v, 8u);
 }
 
-// §7.8.7's own example. b[2] does not exist when the member write executes, so
-// the element is allocated holding the initial values its members declare and
-// the write then updates x. The read of b[2].x observes the update.
 TEST(AssocArrayAllocation, MemberWriteAllocatesElementThenUpdatesTheMember) {
   auto v = RunAndGet(
       "module t;\n"
@@ -301,9 +292,6 @@ TEST(AssocArrayAllocation, MemberWriteAllocatesElementThenUpdatesTheMember) {
   EXPECT_EQ(v, 5u);
 }
 
-// The other half of the same example: y is not written, so it holds the value
-// the element type initializes it to rather than zero. This is what separates
-// §7.8.7's allocation value from Table 7-1's nonexistent-entry value.
 TEST(AssocArrayAllocation, MemberWriteLeavesTheOtherMemberAtItsInitialValue) {
   auto v = RunAndGet(
       "module t;\n"
@@ -334,8 +322,6 @@ TEST(AssocArrayAllocation, MemberWriteAllocatesExactlyOneEntry) {
   EXPECT_EQ(v, 1u);
 }
 
-// A second member write finds the element already allocated, so it updates its
-// own member and leaves the one the first write set.
 TEST(AssocArrayAllocation, MemberWriteToExistingElementKeepsTheOtherMember) {
   auto v = RunAndGet(
       "module t;\n"
@@ -352,9 +338,6 @@ TEST(AssocArrayAllocation, MemberWriteToExistingElementKeepsTheOtherMember) {
   EXPECT_EQ(v, 5u);
 }
 
-// §7.8.7 allocates for a write, not for a read: reading a member of an element
-// that does not exist leaves the array empty. §7.8.6 governs what that read
-// yields.
 TEST(AssocArrayAllocation, MemberReadOfNonexistentElementAllocatesNothing) {
   auto v = RunAndGet(
       "module t;\n"
@@ -371,9 +354,6 @@ TEST(AssocArrayAllocation, MemberReadOfNonexistentElementAllocatesNothing) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.8.7: a bit within an element is still a target of an assignment, so the
-// element is allocated. The other bits hold the 2-state element type's initial
-// value, which is what makes the whole element read back as 8'h04.
 TEST(AssocArrayAllocation, BitSelectWriteAllocatesElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -402,8 +382,6 @@ TEST(AssocArrayAllocation, PartSelectWriteAllocatesElement) {
   EXPECT_EQ(v, 0xABu);
 }
 
-// The entry the bit-select write allocated is an entry of the array, not a
-// variable standing beside it named "aa[3]".
 TEST(AssocArrayAllocation, BitSelectWriteAllocatesExactlyOneEntry) {
   auto v = RunAndGet(
       "module t;\n"
@@ -433,10 +411,6 @@ TEST(AssocArrayAllocation, PartSelectWriteToExistingElementKeepsItsOtherBits) {
   EXPECT_EQ(v, 0xFF0Au);
 }
 
-// §7.8.7 allocates a referenced element with the array's user-specified initial
-// value. The task reads its formal without writing it, so the value observed is
-// the one the entry was allocated holding rather than one a later read of the
-// array could have supplied.
 TEST(AssocArrayAllocation, RefArgAllocatesWithTheUserSpecifiedDefault) {
   auto v = RunAndGet(
       "module t;\n"
@@ -453,17 +427,6 @@ TEST(AssocArrayAllocation, RefArgAllocatesWithTheUserSpecifiedDefault) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.8.7: the nonexistent element is allocated holding its default or
-// user-specified initial value. Allocated *with* the value -- the entry takes
-// it, and §6.8 then makes the entry a data storage element that keeps its value
-// from one assignment to the next. AssocAllocValue returned the array's own
-// default_value rather than a copy of it, and Logic4Vec carries its `words`
-// pointer rather than the words, so the entry this write allocates was the
-// stored default. The write is a part-select, which deposits into the words it
-// finds instead of replacing them, so the deposit landed in the default too and
-// the array's default read 16'h00AB from then on. The read is of a key that was
-// never allocated, which §7.8.6 answers with the user-specified default of
-// §7.9.11.
 TEST(AssocArrayAllocation, PartSelectWriteLeavesTheUserDefaultIntact) {
   auto v = RunAndGet(
       "module t;\n"
@@ -478,11 +441,6 @@ TEST(AssocArrayAllocation, PartSelectWriteLeavesTheUserDefaultIntact) {
   EXPECT_EQ(v, 0x00FFu);
 }
 
-// The same defect between two entries rather than between an entry and the
-// default: both keys are allocated from the default, so both were the default,
-// so both were each other. The two writes are to disjoint halves of the
-// element and the read is of the first key, which holds 16'h00AB where the
-// entries are two storage elements and 16'hCDAB where they are one.
 TEST(AssocArrayAllocation, PartSelectWriteToOneKeyLeavesAnotherKeyAlone) {
   auto v = RunAndGet(
       "module t;\n"
@@ -498,13 +456,6 @@ TEST(AssocArrayAllocation, PartSelectWriteToOneKeyLeavesAnotherKeyAlone) {
   EXPECT_EQ(v, 0x00ABu);
 }
 
-// §7.8.7's own example, with a second key added. The clause's element type
-// carries its members' initializers, which the array stores as the initial
-// value every allocation copies, and TryWriteAssocMemberField deposits a
-// member into the entry it finds. So `b[2].x = 5` followed by `b[3].y = 7`
-// wrote both members into the one buffer the stored initial value was, and
-// b[3].x read the 5 the other key was given. Where the two entries are two
-// storage elements, b[3].x is the x its own allocation gave it.
 TEST(AssocArrayAllocation, MemberWriteToOneKeyLeavesAnotherKeysMemberAtInit) {
   auto v = RunAndGet(
       "module t;\n"
@@ -521,8 +472,6 @@ TEST(AssocArrayAllocation, MemberWriteToOneKeyLeavesAnotherKeysMemberAtInit) {
   EXPECT_EQ(v, 1u);
 }
 
-// The same pair read the other way round, which is the claim the first one
-// cannot make: the second key's write must not reach the first key either.
 TEST(AssocArrayAllocation, MemberWriteToASecondKeyLeavesTheFirstKeyAlone) {
   auto v = RunAndGet(
       "module t;\n"
@@ -539,14 +488,6 @@ TEST(AssocArrayAllocation, MemberWriteToASecondKeyLeavesTheFirstKeyAlone) {
   EXPECT_EQ(v, 2u);
 }
 
-// §7.9.11's default key may name a variable, and the value it names is the
-// array's from then on rather than a second name for that variable's storage:
-// §6.8 gives the variable its own storage and the array keeps a value. The
-// literal was stored as the Logic4Vec EvalExpr answers a bare identifier with,
-// which is the variable's own, so a bit-select write to seed -- a deposit into
-// the words rather than a replacement of them -- rewrote the array's default,
-// and with it every entry allocated from the default. The read is of a key
-// that was never allocated, so what it answers is the default itself.
 TEST(AssocArrayAllocation, UserDefaultDoesNotShareWithTheVariableItNames) {
   auto v = RunAndGet(
       "module t;\n"
@@ -562,13 +503,6 @@ TEST(AssocArrayAllocation, UserDefaultDoesNotShareWithTheVariableItNames) {
   EXPECT_EQ(v, 9u);
 }
 
-// The stored initial value of a struct element is read back off the element
-// model, a live Variable created under the array's own name, so it is copied
-// on the way into the array. Nothing in SystemVerilog names that variable --
-// `b` names the array -- so the claim is made against the storage: equal bits
-// in two buffers rather than one buffer read twice. Its worth is that the two
-// go on being independent as the model gains writers; the entries allocated
-// from the stored value are already covered above.
 TEST(AssocArrayAllocation, StoredElementInitialValueOwnsItsWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -588,11 +522,6 @@ TEST(AssocArrayAllocation, StoredElementInitialValueOwnsItsWords) {
   ASSERT_NO_FATAL_FAILURE(ExpectOwnWordsCopy(model->value, aa->elem_init));
 }
 
-// §7.8.7 on a class property (§8.5 restricts no property's type): the entry a
-// method's assignment allocates is the entry the method's later read of the
-// same key finds. Before the property was an array of the object the write
-// went nowhere and the read fell to a bit-select of the property's scalar
-// carrier, so this read 0.
 TEST(AssocArrayAllocation, ClassPropertyWriteThenReadOfTheSameKeyInAMethod) {
   auto v = RunAndGet(
       "class C;\n"
@@ -613,11 +542,6 @@ TEST(AssocArrayAllocation, ClassPropertyWriteThenReadOfTheSameKeyInAMethod) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.8.7: an increment of a nonexistent element of the property allocates it
-// with its initial value, 0 for an int, before the read, so three increments
-// in a method leave the entry at 3. This is uvm_report_server's
-// incr_severity_count. A read of the carrier answered 0 each time and the
-// write went nowhere, so the entry never moved past 1.
 TEST(AssocArrayAllocation, ClassPropertyIncrementedThreeTimesInAMethod) {
   auto v = RunAndGet(
       "package p;\n"
@@ -650,8 +574,6 @@ TEST(AssocArrayAllocation, ClassPropertyIncrementedThreeTimesInAMethod) {
   EXPECT_EQ(v, 3u);
 }
 
-// §7.8.7 for the compound assignment: `aa[k] += 1` in a method allocates the
-// string-keyed entry at 0 and adds to it, so three of them read 3.
 TEST(AssocArrayAllocation, ClassPropertyCompoundAddAssignedInAMethod) {
   auto v = RunAndGet(
       "class C;\n"
@@ -678,10 +600,6 @@ TEST(AssocArrayAllocation, ClassPropertyCompoundAddAssignedInAMethod) {
   EXPECT_EQ(v, 3u);
 }
 
-// §7.8.7 with §7.2: a write to a member of a member of a structure an
-// associative array element holds, `va[1].in.k = 4`, allocates the element
-// as a write to a direct member does, and the nested member holds the value
-// written to it, a string member (§6.16) among them.
 TEST(AssocArrayAllocation, NestedMemberWriteAllocatesTheElement) {
   SimFixture f;
   auto out = RunCapture(

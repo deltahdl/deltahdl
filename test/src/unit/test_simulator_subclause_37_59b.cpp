@@ -14,9 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.59 detail 2: the vpiDecompile text of an expression, read off
-// expressions and constraint blocks built by hand, so that each part a run
-// rarely writes, and each part that cannot be written, can be named.
 class DecompileByHand : public ::testing::Test {
  protected:
   Expr* Make(ExprKind kind, std::string_view text = {}) {
@@ -28,7 +25,6 @@ class DecompileByHand : public ::testing::Test {
   Expr* Name(std::string_view text) {
     return Make(ExprKind::kIdentifier, text);
   }
-  // A literal written with no text, which nothing can render.
   Expr* Unrenderable() { return Make(ExprKind::kIntegerLiteral); }
   Expr* Operation(ExprKind kind, TokenKind op, Expr* lhs, Expr* rhs) {
     Expr* expr = Make(kind);
@@ -69,7 +65,6 @@ class DecompileByHand : public ::testing::Test {
     item.expr = expr;
     return &item;
   }
-  // A randomize() call with `items` as its inline constraint block.
   Expr* Randomize(std::vector<ConstraintItem*> items, bool parsed = true) {
     ClassMember& block = members_.emplace_back();
     block.constraint_items = std::move(items);
@@ -85,8 +80,6 @@ class DecompileByHand : public ::testing::Test {
   std::deque<ClassMember> members_;
 };
 
-// An expression one of whose parts cannot be rendered has no decompiled text
-// at all, whichever part that is.
 TEST_F(DecompileByHand, AnUnrenderablePartLeavesNoText) {
   const std::vector<Expr*> kCases = {
       nullptr,
@@ -150,10 +143,6 @@ TEST_F(DecompileByHand, AnUnrenderablePartLeavesNoText) {
   EXPECT_EQ(VpiExprDecompile(with_call), "");
 }
 
-// The parts a run seldom writes: an argument bound by name, a name under
-// $root or a package, a time literal, a cast to a size, the ranges of an
-// inside expression's set, a streaming slice size and a with clause written
-// without parentheses.
 TEST_F(DecompileByHand, PartsARunSeldomWrites) {
   Expr* call = Make(ExprKind::kCall);
   call->lhs = Name("f");
@@ -202,11 +191,6 @@ TEST_F(DecompileByHand, PartsARunSeldomWrites) {
   EXPECT_EQ(VpiExprDecompile(with_call), "find() with x");
 }
 
-// §37.59 detail 2 with A.8.1: a stream operand's `with [
-// array_range_expression ]` is part of the text, written after the operand as
-// the range of a select with nothing before it; left out, `{>> {a}}` would
-// name the whole array where §11.4.14.4 streams only the items in the range.
-// A range that cannot be written leaves no text at all.
 TEST_F(DecompileByHand, StreamOperandWritesItsRange) {
   Expr* first = Name("a");
   first->stream_range = Select(nullptr, Name("lo"), Name("hi"));
@@ -226,8 +210,6 @@ TEST_F(DecompileByHand, StreamOperandWritesItsRange) {
   EXPECT_EQ(VpiExprDecompile(blank), "");
 }
 
-// An operator kind whose name is no quoted spelling, as a token's kind that is
-// no operator is, writes as nothing in the streaming operator's place.
 TEST_F(DecompileByHand, AKindWithNoSpellingWritesNothing) {
   for (TokenKind op : {TokenKind::kApostrophe, TokenKind::kEof}) {
     Expr* stream = WithElements(ExprKind::kStreamingConcat, {Name("a")});
@@ -236,8 +218,6 @@ TEST_F(DecompileByHand, AKindWithNoSpellingWritesNothing) {
   }
 }
 
-// §18.7 with §18.5: a randomize() call's inline constraint block is written
-// back item by item, each kind of constraint item as the source writes it.
 TEST_F(DecompileByHand, AnInlineConstraintBlockIsWrittenBack) {
   ConstraintItem* dist = Item(ConstraintItemKind::kExpression, Name("x"));
   dist->soft = true;
@@ -283,8 +263,6 @@ TEST_F(DecompileByHand, AnInlineConstraintBlockIsWrittenBack) {
             "c -> {a;} if (c) {a;} else {b;} foreach (arr[i, j]) {a;}}");
 }
 
-// An inline constraint block one of whose items cannot be written back, or
-// that was never parsed into items, leaves the call no decompiled text.
 TEST_F(DecompileByHand, AnUnwritableConstraintItemLeavesNoText) {
   auto unrenderable_dist = [&](int which) {
     ConstraintItem* item = Item(ConstraintItemKind::kExpression, Name("x"));
@@ -336,7 +314,7 @@ TEST_F(DecompileByHand, AnUnwritableConstraintItemLeavesNoText) {
   for (std::size_t i = 0; i < kItems.size(); ++i) {
     EXPECT_EQ(VpiExprDecompile(Randomize({kItems[i]})), "") << i;
   }
-  EXPECT_EQ(VpiExprDecompile(Randomize({}, /*parsed=*/false)), "");
+  EXPECT_EQ(VpiExprDecompile(Randomize({}, false)), "");
 }
 
 }  // namespace

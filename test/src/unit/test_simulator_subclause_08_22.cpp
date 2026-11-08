@@ -59,9 +59,6 @@ TEST(ClassSim, E2eVirtualDispatchThroughBaseVariable) {
             20u);
 }
 
-// Late binding is not limited to virtual functions: a virtual task called
-// through a superclass handle likewise resolves to the override belonging to
-// the object's dynamic type. The task reports through an output argument.
 TEST(ClassSim, E2eVirtualTaskDispatchThroughBaseVariable) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  virtual task get(output int v);\n"

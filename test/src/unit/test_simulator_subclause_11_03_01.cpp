@@ -221,8 +221,6 @@ TEST(RealOperandResult, E2eMixedRealIntArithResultIsReal) {
   EXPECT_DOUBLE_EQ(v, 3.5);
 }
 
-// §11.3.1: for the conditional operator a real selected branch makes the result
-// real, so a chosen real arm produces a real result.
 TEST(RealOperandResult, ConditionalWithRealBranchResultIsReal) {
   SimFixture f;
   MakeRealVar(f, "a", 1.5);
@@ -234,8 +232,6 @@ TEST(RealOperandResult, ConditionalWithRealBranchResultIsReal) {
   EXPECT_TRUE(result.is_real);
 }
 
-// §11.3.1: the operand before the ? is excluded when determining realness, so a
-// real condition with integral arms yields an integral (non-real) result.
 TEST(RealOperandResult, ConditionalConditionRealDoesNotForceRealResult) {
   SimFixture f;
   MakeRealVar(f, "rc", 1.5);
@@ -248,13 +244,6 @@ TEST(RealOperandResult, ConditionalConditionRealDoesNotForceRealResult) {
   EXPECT_FALSE(result.is_real);
 }
 
-// §11.3.1: for operators other than the single-bit ones, when an operand is
-// shortreal and none is real, the result is shortreal. Observed end-to-end from
-// a real shortreal declaration so the sum itself is computed at shortreal
-// (single) precision, not merely truncated on assignment. 2^24 and 1.0 are each
-// representable in a C float, but their sum 2^24+1 is not, so a shortreal sum
-// rounds to 2^24 while the same sum in reals stays exact. Comparing the widened
-// shortreal sum against the real sum makes the shortreal result type visible.
 TEST(RealOperandResult, E2eShortrealArithResultIsShortreal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -273,11 +262,6 @@ TEST(RealOperandResult, E2eShortrealArithResultIsShortreal) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.3.1: when one operand is real and another is shortreal, the real operand
-// wins and the result is real (double), not shortreal. Driven end-to-end from a
-// real and a shortreal declaration. 2^24+1 is exact in a C double but not a C
-// float, so a real result preserves it whereas a shortreal result would round
-// it to 2^24; observing 2^24+1 survives proves the result was real.
 TEST(RealOperandResult, E2eRealOperandWinsOverShortreal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -295,10 +279,6 @@ TEST(RealOperandResult, E2eRealOperandWinsOverShortreal) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.3.1: a real array element (the LRM's realarray[intval] form) is a valid
-// real operand. Read end-to-end from a real unpacked array indexed by an int
-// variable and used in a real arithmetic expression, the element carries its
-// stored real value into the result.
 TEST(RealOperandResult, E2eRealArrayElementIsRealOperand) {
   auto v = RunAndGetReal(
       "module t;\n"
@@ -315,10 +295,6 @@ TEST(RealOperandResult, E2eRealArrayElementIsRealOperand) {
   EXPECT_DOUBLE_EQ(v, 8.0);
 }
 
-// §11.3.1: the single-bit result rule for relational operators applies to every
-// real-variable type, including shortreal operands (not just real). Driven
-// end-to-end from shortreal declarations so the comparison operates on 32-bit
-// real values produced by the shortreal decl path.
 TEST(RealOperandResult, E2eRelationalOnShortrealIsSingleBit) {
   auto v = RunAndGet(
       "module t;\n"
@@ -334,12 +310,6 @@ TEST(RealOperandResult, E2eRelationalOnShortrealIsSingleBit) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.3.1: when one operand is shortreal and the other is a (non-real) integer,
-// no operand is real, so the result is shortreal. Driven end-to-end from a
-// shortreal declaration and an integer literal operand. 2^24+1 is exact in a C
-// double but not a C float, so a shortreal result rounds the sum to 2^24 while
-// the reference real sum stays exact; the mismatch proves the mixed
-// shortreal/integer result took shortreal (single) precision.
 TEST(RealOperandResult, E2eShortrealIntArithResultIsShortreal) {
   auto v = RunAndGet(
       "module t;\n"

@@ -120,10 +120,6 @@ TEST(ReactiveRegionSim, ReactiveEventsAllProcessedAndAnyOrderIsAttested) {
 }
 
 TEST(ReactiveRegionSim, ReactiveIsReactiveSetDualOfActive) {
-  // §4.4.2.6/§4.4.2.7/§4.4.2.8: the reactive region set mirrors the active set
-  // — Reactive is the dual of Active, Re-Inactive of Inactive, and Re-NBA of
-  // NBA. A region that is not itself an active-set member (e.g. Reactive) has
-  // no dual.
   EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kActive), Region::kReactive);
   EXPECT_EQ(Scheduler::ReactiveSetDualOf(Region::kInactive),
             Region::kReInactive);
@@ -136,16 +132,6 @@ TEST(ReactiveRegionSim, ReactiveIsReactiveSetDualOfActive) {
   EXPECT_TRUE(Scheduler::IsAnyOrderRegion(Region::kReactive));
 }
 
-// §4.4.2.6 D2, driven end-to-end from real source: a blocking assignment inside
-// a program block is scheduled in the Reactive region, which the stratified
-// scheduler runs strictly after the Active region of the same time slot (the
-// Reactive region being the reactive-set dual of Active). Rather than stub the
-// home region with a helper, this builds a genuine program block plus a design
-// initial and observes the runtime consequence of the region placement: the
-// program's blocking read sees the value the design's Active-region initial has
-// already committed, and the program's blocking write to a shared signal wins
-// over the design's Active write. Both outcomes hold only if production homes
-// the program's blocking-assignment code in the Reactive region.
 TEST(ReactiveRegionSim, ProgramBlockBlockingAssignRunsInReactiveRegion) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -174,20 +160,10 @@ TEST(ReactiveRegionSim, ProgramBlockBlockingAssignRunsInReactiveRegion) {
   ASSERT_NE(seen, nullptr);
   ASSERT_NE(shared, nullptr);
 
-  // Reactive runs after Active: the program's read observes the value the
-  // design's Active-region initial committed.
   EXPECT_EQ(seen->value.ToUint64(), 42u);
-  // Reactive runs after Active: the program's blocking write is applied last.
   EXPECT_EQ(shared->value.ToUint64(), 99u);
 }
 
-// §4.4.2.6 D2, checker input form: a blocking assignment appearing in a checker
-// body is scheduled in the Reactive region. Unlike a program block, a checker
-// body has no execution path in this simulator — the rule is realized entirely
-// as the static region placement the lowering consults, so it is observed at
-// that single stage via the production mapping rather than end-to-end. A
-// nonblocking update to a checker variable, by contrast, is homed in Re-NBA,
-// which pins down that the Reactive placement is specific to blocking code.
 TEST(ReactiveRegionSim, CheckerBlockingAssignmentHomeIsReactive) {
   EXPECT_EQ(HomeRegionForCheckerStatement(CheckerStatementKind::kBlocking),
             Region::kReactive);
@@ -196,27 +172,10 @@ TEST(ReactiveRegionSim, CheckerBlockingAssignmentHomeIsReactive) {
             Region::kReactive);
 }
 
-// §4.4.2.6 D2, concurrent-assertion input form: the code in an action block of
-// a concurrent assertion is scheduled in the Reactive region. The action arm
-// runs from the assertion engine's fail/pass callback whose home region the
-// engine fixes to Reactive, so the rule is observed at that stage via the
-// production region selector the engine uses to schedule the action.
 TEST(ReactiveRegionSim, ConcurrentAssertionActionBlockHomeIsReactive) {
   EXPECT_EQ(ConcurrentAssertActionRegion(), Region::kReactive);
 }
 
-// §4.4.2.6 D2 end-to-end: the code of a concurrent assertion's action blocks is
-// scheduled in the Reactive region, and §4.4 puts that region after the whole
-// active region set. A design reading in the same time slot therefore sees the
-// value from before the action ran, whichever process the scheduler reached
-// first.
-//
-// The reader waits one #0 so it reads from the Inactive region rather than
-// racing the assertion inside the Active one: Inactive precedes Observed and
-// Reactive both, so the read is ordered against the action by the region order
-// alone. The action ran where the assertion body ran -- the Active region, for
-// a concurrent assertion embedded in procedural code -- so `saw` read 1 here,
-// the design seeing a testbench's reaction before it had settled.
 TEST(ReactiveRegionSim,
      ConcurrentAssertionActionIsNotSeenFromTheInactiveRegion) {
   SimFixture f;
@@ -240,20 +199,10 @@ TEST(ReactiveRegionSim,
   auto* flag = f.ctx.FindVariable("flag");
   ASSERT_NE(saw, nullptr);
   ASSERT_NE(flag, nullptr);
-  // Inactive runs before Reactive: the design read the value from before the
-  // action, rather than the 99 that would say it never read at all.
   EXPECT_EQ(saw->value.ToUint64(), 0u);
-  // The action still ran, in its own region of the same time slot.
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
 
-// The other half of the pair: the action block runs in the reactive region set
-// of the same time slot, not in some later one. A program block's code is
-// scheduled in the Reactive region too (§4.4.2.6), and an explicit #0 there
-// suspends it into the Re-Inactive region (§4.4.2.7), which §4.4 orders after
-// every Reactive event of the slot -- so a read made there sees an action block
-// that has run and would not see one deferred to the Postponed region or to the
-// next time slot.
 TEST(ReactiveRegionSim,
      ConcurrentAssertionActionIsSeenFromTheReInactiveRegion) {
   SimFixture f;
@@ -281,14 +230,6 @@ TEST(ReactiveRegionSim,
   EXPECT_EQ(seen->value.ToUint64(), 1u);
 }
 
-// An action block is code the region holds rather than code the assertion runs
-// on its way past, so a delay in one delays the action and nothing else. The
-// assertion is back at its clocking event for the next edge while its first
-// action is still waiting, and both actions run.
-//
-// The action was executed inline by the process carrying the assertion, so a
-// `#20` in it parked that process: the second posedge arrived while it was
-// waiting and no attempt started, leaving one increment instead of two.
 TEST(ReactiveRegionSim,
      ConcurrentAssertionActionDelayDoesNotStallTheAssertion) {
   SimFixture f;

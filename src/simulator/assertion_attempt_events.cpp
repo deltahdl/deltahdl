@@ -32,9 +32,6 @@ namespace delta {
 
 namespace {
 
-// §16.14.3: the results record of a concurrent cover statement, the clocked
-// body a cover property or a cover sequence is lowered to, in the scope the
-// process stands in; nullptr for every other assertion statement.
 ConcurrentCoverResult* ConcurrentCoverRecord(const Stmt* stmt,
                                              SimContext& ctx) {
   if (stmt->kind != StmtKind::kCoverImmediate || !stmt->is_concurrent_clocked) {
@@ -46,21 +43,13 @@ ConcurrentCoverResult* ConcurrentCoverRecord(const Stmt* stmt,
                            : CoverStatementCategory::kProperty);
 }
 
-// §16.14.3: one verdict of a concurrent cover's attempt counted in its
-// results: a cover sequence's match, with multiplicity, or a cover
-// property's success, at most once per attempt and apart where it is by
-// vacuity; a verdict that does not hold counts nothing, and a disabled
-// attempt reaches none. Nothing for any other assertion.
 void RecordConcurrentCoverVerdict(const Stmt* stmt,
                                   const PropertyVerdict& verdict,
                                   SimContext& ctx) {
   ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx);
   if (record == nullptr || !verdict.holds) return;
   if (stmt->cover_sequence) {
-    // The evaluation drops an attempt at the tick the disable condition is
-    // true at, so a match that reaches a verdict completed without it.
-    record->matched +=
-        CoverSequenceMatchDelta({/*disable_iff_occurred=*/false});
+    record->matched += CoverSequenceMatchDelta({false});
     return;
   }
   CoverPropertyAttemptOutcome outcome;
@@ -70,10 +59,6 @@ void RecordConcurrentCoverVerdict(const Stmt* stmt,
   record->vacuous += CoverPropertyVacuousSuccessDelta(outcome);
 }
 
-// The key of the assertion `stmt` the current process is evaluating. A
-// labelled statement runs inside its label's own named scope (§21.2.1.5),
-// which is the assertion's name rather than a scope it is written in, so that
-// level is left out.
 std::string KeyHere(const Stmt* stmt, SimContext& ctx) {
   std::string scope = ScopeHierName(ctx);
   const std::vector<std::string_view>& named = ctx.ActiveNamedScopes();
@@ -84,9 +69,6 @@ std::string KeyHere(const Stmt* stmt, SimContext& ctx) {
   return RunAssertionKey(stmt, scope, ctx);
 }
 
-// §40.2.2 with §40.5.2: one `outcome` of the assertion `stmt` the current
-// process evaluates, counted for its coverage; nothing is looked up for a
-// statement no instance counts.
 void NoteCoverageHere(const Stmt* stmt, AssertionOutcome outcome,
                       SimContext& ctx) {
   CoverageControlState& cov = ctx.GetCoverageControlState();
@@ -96,8 +78,6 @@ void NoteCoverageHere(const Stmt* stmt, AssertionOutcome outcome,
       [&] { return KeyHere(stmt, ctx); }, cov);
 }
 
-// §39.4.2: calls each `reason` callback placed on the assertion `stmt`,
-// handed `info`; nothing is looked up where no callback is placed at all.
 void RaiseAttemptEvent(const Stmt* stmt, int reason,
                        const AssertionAttemptInfo& info, SimContext& ctx) {
   AssertionApi& api = GetGlobalAssertionApi();
@@ -106,9 +86,6 @@ void RaiseAttemptEvent(const Stmt* stmt, int reason,
                             info);
 }
 
-// §39.4.2.1: waits for the tick of `gclk_event` strictly after
-// `event_time`, then calls the `reason` control callbacks placed on the
-// assertion `key` with cb_time `event_time`.
 SimCoroutine DeferredControlCallback(std::string key, int reason,
                                      uint64_t event_time,
                                      const std::vector<EventExpr>& gclk_event,
@@ -119,10 +96,6 @@ SimCoroutine DeferredControlCallback(std::string key, int reason,
   GetGlobalAssertionApi().DeliverAssertionEvent(key, reason, event_time, {});
 }
 
-// §16.9.4: the process asserting the assertion the API keeps under `key`
-// where its property names a global clocking future sampled value function,
-// the one process carrying a global clocking event that was started from that
-// assertion; null for every other assertion.
 const Process* FutureGclkAsserting(std::string_view key, SimContext& ctx) {
   for (const Process* proc : ctx.GetScheduler().Threads()) {
     if (proc->gclk_future_event.empty() || proc->origin == nullptr) continue;
@@ -134,21 +107,16 @@ const Process* FutureGclkAsserting(std::string_view key, SimContext& ctx) {
   return nullptr;
 }
 
-// The attempt information of the attempt begun at `started`, in ticks.
 AssertionAttemptInfo AttemptBegunAt(uint64_t started) {
   AssertionAttemptInfo info;
   info.attempt_start_time = started;
   return info;
 }
 
-// The source text of `expr`, the name the model keeps an expression by; empty
-// for none.
 std::string TextOf(const Expr* expr) {
   return expr != nullptr ? VpiExprDecompile(expr) : std::string();
 }
 
-// The operand an attempt failed at among `reads`, what it read at one tick:
-// the last it read false, else the last it read; null where it read none.
 const OperandRead* FailedRead(const AttemptLog& reads) {
   const OperandRead* last = nullptr;
   for (auto read = reads.rbegin(); read != reads.rend(); ++read) {
@@ -159,8 +127,6 @@ const OperandRead* FailedRead(const AttemptLog& reads) {
   return last;
 }
 
-// The reads of each attempt in `log`, in the order the attempts were
-// stepped, each led by the note of its step.
 std::vector<AttemptLog> AttemptsIn(const std::vector<OperandRead>& log) {
   std::vector<AttemptLog> attempts;
   for (const OperandRead& read : log) {
@@ -170,9 +136,6 @@ std::vector<AttemptLog> AttemptsIn(const std::vector<OperandRead>& log) {
   return attempts;
 }
 
-// The verdict among `decided` of the attempt begun at `started`, null where
-// it was decided at no verdict this tick; a failure is given the operand it
-// failed at, `failed`, where one is known.
 const PropertyVerdict* DecisionOf(std::vector<PropertyVerdict>& decided,
                                   uint64_t started, const OperandRead* failed) {
   PropertyVerdict* verdict = nullptr;
@@ -197,13 +160,11 @@ std::string RunAssertionKey(const Stmt* stmt, std::string_view scope,
 void NoteAttemptBegun(const Stmt* stmt, SimContext& ctx) {
   NoteCoverageHere(stmt, AssertionOutcome::kAttempt, ctx);
   if (ConcurrentCoverResult* record = ConcurrentCoverRecord(stmt, ctx)) {
-    record->attempted += stmt->cover_sequence
-                             ? CoverSequenceAttemptDelta()
-                             : CoverPropertyAttemptDelta(/*outcome=*/{});
+    record->attempted += stmt->cover_sequence ? CoverSequenceAttemptDelta()
+                                              : CoverPropertyAttemptDelta({});
   }
   AssertionApi& api = GetGlobalAssertionApi();
   if (api.PlacedCallbackCount() == 0) return;
-  // §39.5.2: stepping enabled for the attempt before it began is frozen now.
   const uint64_t kNow = ctx.CurrentTime().ticks;
   const std::string kKey = KeyHere(stmt, ctx);
   if (api.AssertionStepEnabled(kKey, kNow)) {
@@ -275,7 +236,6 @@ void RaiseAssertionControlCallback(std::string_view key, int reason,
   }
   Process* p =
       CreateAssertionChildProcess(ctx, ctx.GetArena(), Region::kActive);
-  // The event is the asserting instance's, whichever process controlled it.
   p->inst_prefix = asserting->inst_prefix;
   p->gen_prefixes = asserting->gen_prefixes;
   p->gen_block_name = asserting->gen_block_name;

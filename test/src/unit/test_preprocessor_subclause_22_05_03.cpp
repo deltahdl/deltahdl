@@ -11,9 +11,6 @@
 using namespace delta;
 namespace fs = std::filesystem;
 
-// A compilation unit is not a single file, so the reach of `undefineall has to
-// be checked across an `include boundary. This writes the extra files the
-// multi-file cases need.
 struct UndefineAllUnitDir {
   fs::path dir;
 
@@ -33,24 +30,6 @@ struct UndefineAllUnitDir {
   }
 };
 
-// §22.5.3 `undefineall. Three requirements live in this subclause:
-//   C1  the directive removes every text macro `define created earlier in the
-//       compilation unit,
-//   C2  it takes no arguments,
-//   C3  it may appear anywhere in the source description.
-// The macros it operates on are built with the real `define syntax of §22.5.1
-// (object-like, function-like, defaulted arguments, escaped names, empty and
-// continued bodies), and removal is observed through `ifdef and through a
-// macro usage that would otherwise expand.
-
-// ---------------------------------------------------------------------------
-// C1: every previously defined macro is removed.
-// ---------------------------------------------------------------------------
-
-// The claim reaches every macro at once and names no macro shape, so each form
-// §22.5.1 can define has to go: object-like, function-like, function-like with
-// argument defaults, an escaped-identifier name, an empty body, and a
-// backslash-continued body.
 TEST(UndefineAllPreprocessing, UndefineAllRemovesEveryMacroForm) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -89,8 +68,6 @@ TEST(UndefineAllPreprocessing, UndefineAllRemovesEveryMacroForm) {
   EXPECT_EQ(result.find("continued_visible"), std::string::npos);
 }
 
-// Removal is observable at the point of use, not just through `ifdef: a body
-// that would have been substituted before the directive no longer is after it.
 TEST(UndefineAllPreprocessing, UndefineAllStopsLaterExpansion) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -105,16 +82,11 @@ TEST(UndefineAllPreprocessing, UndefineAllStopsLaterExpansion) {
       "`endif\n",
       f);
   EXPECT_NE(result.find("before 8"), std::string::npos);
-  // The old body is gone rather than lingering behind the new definition.
   EXPECT_EQ(result.find("after 8"), std::string::npos);
   EXPECT_NE(result.find("after 64"), std::string::npos);
-  // WITNESS is never redefined, so this is what shows a removal happened at
-  // all — the WORDSIZE half alone would read the same if it had not.
   EXPECT_EQ(result.find("witness_survived"), std::string::npos);
 }
 
-// Repeating the define/remove cycle leaves nothing behind from any earlier
-// round — the directive is not a one-shot.
 TEST(UndefineAllPreprocessing, RepeatedDefineUndefineAllCyclesLeaveNothing) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -134,8 +106,6 @@ TEST(UndefineAllPreprocessing, RepeatedDefineUndefineAllCyclesLeaveNothing) {
   EXPECT_EQ(result.find("two_visible"), std::string::npos);
 }
 
-// The compilation unit spans every file pulled in by `include, so a macro that
-// an included file defined is removed by a directive in the including file.
 TEST(UndefineAllPreprocessing, UndefineAllRemovesMacroDefinedInIncludedFile) {
   UndefineAllUnitDir tmp;
   tmp.WriteFile("defs.svh", "`define FROM_INCLUDE 1\n");
@@ -158,8 +128,6 @@ TEST(UndefineAllPreprocessing, UndefineAllRemovesMacroDefinedInIncludedFile) {
   EXPECT_EQ(result.find("after_visible"), std::string::npos);
 }
 
-// And the reach runs the other way: the directive sitting in an included file
-// removes a macro the including file defined ahead of the `include.
 TEST(UndefineAllPreprocessing, UndefineAllInsideIncludedFileRemovesOuterMacro) {
   UndefineAllUnitDir tmp;
   tmp.WriteFile("wipe.svh", "`undefineall\n");
@@ -178,8 +146,6 @@ TEST(UndefineAllPreprocessing, UndefineAllInsideIncludedFileRemovesOuterMacro) {
   EXPECT_EQ(result.find("outer_visible"), std::string::npos);
 }
 
-// With nothing defined there is simply nothing to remove; the directive is not
-// an error and a repeat run is equally harmless.
 TEST(UndefineAllPreprocessing, UndefineAllWithNoMacrosDefinedIsNotAnError) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -191,8 +157,6 @@ TEST(UndefineAllPreprocessing, UndefineAllWithNoMacrosDefinedIsNotAnError) {
   EXPECT_NE(result.find("int x = 5;"), std::string::npos);
 }
 
-// NEGATIVE for C1. Text a conditional excluded is not part of the compilation
-// unit, so a `undefineall sitting in the dead branch removes nothing.
 TEST(UndefineAllPreprocessing, UndefineAllInFalseBranchDoesNotRemoveMacros) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -208,7 +172,6 @@ TEST(UndefineAllPreprocessing, UndefineAllInFalseBranchDoesNotRemoveMacros) {
   EXPECT_NE(result.find("keep_visible"), std::string::npos);
 }
 
-// The same holds for the `else arm that a taken `ifdef compiles away.
 TEST(UndefineAllPreprocessing,
      UndefineAllInUntakenElseBranchDoesNotRemoveMacros) {
   PreprocFixture f;
@@ -226,9 +189,6 @@ TEST(UndefineAllPreprocessing,
   EXPECT_NE(result.find("int x = 7;"), std::string::npos);
 }
 
-// NEGATIVE for C1, directive identity. `undefineall is a whole keyword: a name
-// character against it makes the run a longer macro name, which is a macro
-// usage and leaves the table alone.
 TEST(UndefineAllPreprocessing,
      LongerNameStartingWithUndefineallIsNotTheDirective) {
   PreprocFixture f;
@@ -245,13 +205,6 @@ TEST(UndefineAllPreprocessing,
   EXPECT_NE(result.find("keep_visible"), std::string::npos);
 }
 
-// ---------------------------------------------------------------------------
-// C2: the directive takes no arguments.
-// ---------------------------------------------------------------------------
-
-// Because the directive accepts no arguments, anything following it on the
-// same line is not parsed as an argument: it is emitted unchanged as ordinary
-// source text and raises no diagnostic. The removal still happens in full.
 TEST(UndefineAllPreprocessing, UndefineAllPassesTrailingSameLineTextThrough) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -266,9 +219,6 @@ TEST(UndefineAllPreprocessing, UndefineAllPassesTrailingSameLineTextThrough) {
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// NEGATIVE for C2, and the sharp line between this directive and `undef. A
-// name on the line is not an operand naming the one macro to remove: every
-// macro goes, and the name is left behind as plain source text.
 TEST(UndefineAllPreprocessing, UndefineAllWithTrailingNameIsNotAnUndefOperand) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -283,14 +233,11 @@ TEST(UndefineAllPreprocessing, UndefineAllWithTrailingNameIsNotAnUndefOperand) {
       "`endif\n",
       f);
   EXPECT_FALSE(f.diag.HasErrors());
-  // `undef FOO would have spared BAR; this directive does not.
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
   EXPECT_EQ(result.find("bar_visible"), std::string::npos);
   EXPECT_NE(result.find("FOO"), std::string::npos);
 }
 
-// NEGATIVE for C2. A parenthesized list is not an argument list either — it is
-// still just source text, and the macros are still removed.
 TEST(UndefineAllPreprocessing, UndefineAllDoesNotConsumeParenthesizedList) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -305,10 +252,6 @@ TEST(UndefineAllPreprocessing, UndefineAllDoesNotConsumeParenthesizedList) {
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// A comment is the third thing that can share the line. With no argument to
-// take, the directive leaves it to ordinary comment handling — it passes on to
-// the lexer as a comment rather than being mistaken for an operand, and the
-// removal still happens.
 TEST(UndefineAllPreprocessing, UndefineAllFollowedByCommentOnSameLine) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -323,8 +266,6 @@ TEST(UndefineAllPreprocessing, UndefineAllFollowedByCommentOnSameLine) {
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// A dead-branch `undefineall must also stay silent in the output; the text
-// after it belongs to the excluded region.
 TEST(UndefineAllPreprocessing, UndefineAllInFalseBranchEmitsNothing) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -336,12 +277,6 @@ TEST(UndefineAllPreprocessing, UndefineAllInFalseBranchEmitsNothing) {
   EXPECT_EQ(result.find("excluded_source_token"), std::string::npos);
 }
 
-// ---------------------------------------------------------------------------
-// C3: it may appear anywhere in the source description.
-// ---------------------------------------------------------------------------
-
-// Unlike the directives that are confined to the space between design
-// elements, this one takes effect inside a module body.
 TEST(UndefineAllPreprocessing, UndefineAllInsideDesignElementRemovesMacros) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -357,7 +292,6 @@ TEST(UndefineAllPreprocessing, UndefineAllInsideDesignElementRemovesMacros) {
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// Leading white space before the backtick still leaves it a directive.
 TEST(UndefineAllPreprocessing, UndefineAllIndentedIsStillTheDirective) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -371,9 +305,6 @@ TEST(UndefineAllPreprocessing, UndefineAllIndentedIsStillTheDirective) {
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// Some directives are confined to the space between design elements and are
-// rejected inside one. This is not among them, in a package body or an
-// interface body any more than in a module body.
 TEST(UndefineAllPreprocessing,
      UndefineAllInsidePackageAndInterfaceRemovesMacros) {
   PreprocFixture f;
@@ -398,8 +329,6 @@ TEST(UndefineAllPreprocessing,
   EXPECT_EQ(result.find("bar_visible"), std::string::npos);
 }
 
-// The remaining design element kinds the language defines are legal places for
-// it too, not just the module/package/interface trio.
 TEST(UndefineAllPreprocessing,
      UndefineAllInsideRemainingDesignElementKindsRemovesMacros) {
   PreprocFixture f;
@@ -448,8 +377,6 @@ TEST(UndefineAllPreprocessing,
   EXPECT_EQ(result.find("macromodule_visible"), std::string::npos);
 }
 
-// The gap between two design elements is a distinct position from inside one:
-// the tracker has come back down to top level by then.
 TEST(UndefineAllPreprocessing,
      UndefineAllBetweenTwoDesignElementsRemovesMacros) {
   PreprocFixture f;
@@ -468,7 +395,6 @@ TEST(UndefineAllPreprocessing,
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// Deep inside a procedural block is still a legal place for it.
 TEST(UndefineAllPreprocessing, UndefineAllInsideProceduralBlockRemovesMacros) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -486,8 +412,6 @@ TEST(UndefineAllPreprocessing, UndefineAllInsideProceduralBlockRemovesMacros) {
   EXPECT_EQ(result.find("foo_visible"), std::string::npos);
 }
 
-// The last line of the file, with no newline closing it, is still the
-// directive and still takes effect.
 TEST(UndefineAllPreprocessing, UndefineAllAsFinalLineWithoutNewline) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -501,8 +425,6 @@ TEST(UndefineAllPreprocessing, UndefineAllAsFinalLineWithoutNewline) {
   EXPECT_NE(result.find("foo_visible"), std::string::npos);
 }
 
-// The very first line of a file is a legal place for it, with nothing before
-// it to undefine.
 TEST(UndefineAllPreprocessing, UndefineAllAtStartOfFile) {
   PreprocFixture f;
   auto result = Preprocess(

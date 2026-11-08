@@ -7,11 +7,6 @@
 
 namespace {
 
-// A package p declaring `typedef mailbox mb_t` and the subroutine
-// `subroutine`, whose formal is written `mb_t m` bare, with a module that
-// imports nothing of p, puts one message into its own mailbox and reaches the
-// subroutine through `call`, the package scope resolution operator naming it
-// (§26.3, printed page 808).
 std::string PackageTypedefFormalSrc(const std::string& subroutine,
                                     const std::string& call) {
   return "package p;\n"
@@ -28,16 +23,6 @@ std::string PackageTypedefFormalSrc(const std::string& subroutine,
          "endmodule\n";
 }
 
-// §26.2 (printed page 808) makes a package's declarations visible by their
-// bare names throughout the package -- the clause's own ComplexPkg declares
-// `add(Complex a, b)` with the package's typedef written bare -- and §6.18
-// (printed 118) makes the typedef name stand for the type it renames, so
-// `mb_t m` is a `mailbox m` formal, which §13.5.1 (printed 348) with §8.2
-// copies in as the handle to the caller's mailbox: count(mb) reads the one
-// message as 1. The run keys the package's typedef "p::mb_t" and a module's
-// `import p::*` is what adds the bare key, so with no import the bare name
-// the formal wrote found nothing, the formal was a plain 32-bit value, num()
-// found no mailbox on any path and y read 0.
 TEST(PassByValueSim, PackageFunctionMailboxFormalThroughThePackagesOwnTypedef) {
   EXPECT_EQ(RunAndGet(PackageTypedefFormalSrc(
                           "  function automatic int count(mb_t m);\n"
@@ -48,11 +33,6 @@ TEST(PassByValueSim, PackageFunctionMailboxFormalThroughThePackagesOwnTypedef) {
             1u);
 }
 
-// The same binding for a package task's formal, which §13.3 (printed page
-// 335) enables as a statement and whose actuals are bound as a function's
-// are: `p::count_into(mb, y)` writes its output formal from the mailbox
-// formal's num(), 1 for the one message, where the plain-value formal left
-// y at 0.
 TEST(PassByValueSim, PackageTaskMailboxFormalThroughThePackagesOwnTypedef) {
   EXPECT_EQ(RunAndGet(PackageTypedefFormalSrc(
                           "  task automatic count_into(mb_t m, output int n);\n"
@@ -63,15 +43,6 @@ TEST(PassByValueSim, PackageTaskMailboxFormalThroughThePackagesOwnTypedef) {
             1u);
 }
 
-// §13.5.1 with §8.2 (printed page 180): a formal declared with a class type
-// is passed the object handle, so it is as wide as one and the body may
-// assign it an object whatever the actual was. uvm_init's `cs =
-// dcs` under `uvm_coreservice_t cs = null` is this. init(null) and init()
-// both construct a D and store it in cs, whose get() reads D's 9, packed as
-// 909. The formal took the width of the actual it arrived with, and the
-// literal null is a bit wide, so the handle was cut to its low bit: 0, the
-// null that answered 1, or 1, the handle of the C the module constructed
-// first, whose get() answered 5.
 TEST(PassByValueSim, ClassFormalBoundFromNullHoldsTheObjectTheBodyAssigns) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int k = 5;\n"
@@ -99,12 +70,6 @@ TEST(PassByValueSim, ClassFormalBoundFromNullHoldsTheObjectTheBodyAssigns) {
             909u);
 }
 
-// §13.5 with §10.8 and §10.9.1: an assignment pattern written as the actual of
-// an unpacked-array input formal is assigned to the formal, so each element
-// takes the value the pattern gives its position -- positional, replicated by
-// default or keyed, on an ascending or a descending formal -- evaluated in the
-// caller. Bound as a value, the pattern's concatenated bits reached the formal
-// as one vector, and f('{1, 2, 3}) read 110.
 TEST(PassByValueSim, AssignmentPatternActualFillsAnArrayFormal) {
   EXPECT_EQ(
       RunAndGet(
@@ -122,12 +87,6 @@ TEST(PassByValueSim, AssignmentPatternActualFillsAnArrayFormal) {
       123u + 222000u + 123000000u - 511u);
 }
 
-// §13.5 with §6.18 and §7.4.4: a formal declared through a typedef of an
-// unpacked array has the typedef's dimensions, so an assignment pattern bound
-// to it fills its elements, typed or untyped, and an output formal of it
-// hands its elements back. Taken for one element, the pattern's bits reached
-// the formal as one vector, f('{1, 2, 3}) reading 110, and the output
-// formal's elements went nowhere.
 TEST(PassByValueSim, FormalOfAnArrayTypedefHasItsDimensions) {
   SimFixture f;
   EXPECT_EQ(
@@ -147,10 +106,6 @@ TEST(PassByValueSim, FormalOfAnArrayTypedefHasItsDimensions) {
       "123 123 222 '{4, 5, 6}\n");
 }
 
-// §13.5.1 with §7.2.1: a fixed-size array formal passed by value holds copies
-// of the caller's elements, each of the formal's element type, so `b[1].lo`
-// selects a member of a packed structure element in a function and in a task
-// alike. The element variables were bound to no layout, and the member read 0.
 TEST(PassByValueSim, MemberOfAnElementOfAPackedStructureArrayFormal) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -174,12 +129,6 @@ TEST(PassByValueSim, MemberOfAnElementOfAPackedStructureArrayFormal) {
             "23 9\n");
 }
 
-// §13.3 has an output formal copy its value out when the subroutine returns,
-// and §6.21 with §6.8 (Table 6-7) starts each variable of an automatic
-// subroutine's call at its type's default: x for `logic` and for the
-// elements of a `logic` array, 0 for `int` and `bit`. An output the body never
-// writes therefore copies out that default. Every output formal started at 0,
-// and the 4-state ones copied out 0 where they hold x.
 TEST(PassByValueSim, UnwrittenOutputFormalCopiesOutItsTypesDefault) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -200,12 +149,6 @@ TEST(PassByValueSim, UnwrittenOutputFormalCopiesOutItsTypesDefault) {
             "xxxx 0 0000 xx xx\n");
 }
 
-// §13.5.1 copies an output formal into its actual when the subroutine returns,
-// and §6.16 gives a string variable the length of whatever it is assigned. So
-// a string actual holding shorter text than the output takes all of it, and
-// one holding longer text keeps none of what it held. The copy was resized to
-// the length of the actual's old text, so `a` kept "ef", the last two
-// characters of "abcdef".
 TEST(PassByValueSim, StringOutputReplacesTheActualsTextWhateverItsLength) {
   SimFixture f;
   EXPECT_EQ(

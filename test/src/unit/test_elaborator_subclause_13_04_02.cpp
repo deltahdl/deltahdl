@@ -35,10 +35,6 @@ TEST(FunctionLifetimeElaboration, RecursiveAutomaticFunctionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.2: hierarchical references cannot reach the items of an automatic
-// function. A path into an automatic function's local is rejected, and the
-// report names §13.4.2 rather than §13.3.1, which states the same rule for a
-// task and is a different rule about a different construct.
 TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -56,8 +52,6 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInContAssignError) {
       "hierarchical reference to object in automatic function", 7, "13.4.2"));
 }
 
-// Contrast: a static function allocates its items statically, so the same
-// hierarchical path is permitted and the §13.4.2 restriction must not fire.
 TEST(FunctionLifetimeElaboration, StaticFunctionItemHierRefAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -74,7 +68,6 @@ TEST(FunctionLifetimeElaboration, StaticFunctionItemHierRefAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The restriction also applies to references from within procedural blocks.
 TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInInitialError) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,22 +85,6 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInInitialError) {
       "hierarchical reference to object in automatic function", 7, "13.4.2"));
 }
 
-// §13.4.2 puts the items of an automatic function out of reach of hierarchical
-// references and names no position such a reference is allowed to stand in, so
-// every position a statement holds a statement in is one the report reaches.
-// WalkStmtsForAutoRef in src/elaborator/elaborator_validate_hier_refs.cpp had
-// written out nine of the thirteen child-statement links Stmt declares and now
-// takes the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
-// the four positions it was missing, once for this clause's report; the same
-// four for §13.3.1's task report are in
-// test/src/unit/test_elaborator_subclause_13_03_01.cpp, which is a different
-// rule about a different construct and a report of its own.
-
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
 TEST(FunctionLifetimeElaboration,
      AutoFunctionItemHierRefInAnAssertionPassStatementError) {
   ElabFixture f;
@@ -127,8 +104,6 @@ TEST(FunctionLifetimeElaboration,
       "hierarchical reference to object in automatic function", 8, "13.4.2"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(FunctionLifetimeElaboration,
      AutoFunctionItemHierRefInAnAssertionFailStatementError) {
   ElabFixture f;
@@ -148,10 +123,6 @@ TEST(FunctionLifetimeElaboration,
       "hierarchical reference to object in automatic function", 8, "13.4.2"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §13.4.2
-// bars the reference rather than the execution, so the report stands whether
-// the weighted draw would select the item or not.
 TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInARandcaseItemError) {
   ElabFixture f;
   ElaborateSrc(
@@ -169,10 +140,6 @@ TEST(FunctionLifetimeElaboration, AutoFunctionItemHierRefInARandcaseItemError) {
       "hierarchical reference to object in automatic function", 7, "13.4.2"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(FunctionLifetimeElaboration,
      AutoFunctionItemHierRefInARandsequenceCodeBlockError) {
   ElabFixture f;

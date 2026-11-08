@@ -10,26 +10,13 @@
 
 using namespace delta;
 
-// Annex H.1 says what the annex is about: the foreign language side of the
-// DPI. The interface has two sides, and a subroutine crossing it is
-// implemented on one and called from the other under that side's name for
-// it. The cases check which clause describes each side, which side
-// implements and which calls an import and an export, and that the runtime
-// knows a subroutine on the SystemVerilog side by its SystemVerilog name and
-// on the foreign side by its linkage name, each name reaching it on its own
-// side and not on the other.
-
 namespace {
 
-// §H.1: the annex describes the foreign language side; Clause 35 the
-// SystemVerilog side.
 TEST(DpiForeignSide, TheAnnexDescribesTheForeignSide) {
   EXPECT_EQ(DpiSideDescribedIn(DpiSide::kForeign), "H");
   EXPECT_EQ(DpiSideDescribedIn(DpiSide::kSystemVerilog), "35");
 }
 
-// §H.1 with §H.2: an import is implemented on the foreign side and called
-// from the SystemVerilog side; an export the other way about.
 TEST(DpiForeignSide, EachKindIsImplementedOnOneSideAndCalledFromTheOther) {
   DpiRtFunction import;
   DpiRtExport exported;
@@ -41,11 +28,6 @@ TEST(DpiForeignSide, EachKindIsImplementedOnOneSideAndCalledFromTheOther) {
   EXPECT_NE(DpiImplementingSide(exported), DpiCallingSide(exported));
 }
 
-// §H.1 with §35.4: a subroutine is known on each side by that side's name.
-// The runtime finds an import under its SystemVerilog name where the
-// SystemVerilog side calls it and under its linkage name where the foreign
-// side links it, and neither name reaches it on the other side; likewise an
-// export.
 TEST(DpiForeignSide, EachSideKnowsASubroutineByItsOwnName) {
   DpiRuntime rt;
   DpiRtFunction import;
@@ -86,8 +68,6 @@ TEST(DpiForeignSide, EachSideKnowsASubroutineByItsOwnName) {
                 DpiNameOnSide(exported, DpiSide::kSystemVerilog)),
             nullptr);
 
-  // A declaration giving no linkage name is known on the foreign side by its
-  // SystemVerilog name, so the one name reaches it on both sides.
   DpiRtFunction unnamed;
   unnamed.sv_name = "same_on_both";
   unnamed.return_type = DataTypeKind::kInt;

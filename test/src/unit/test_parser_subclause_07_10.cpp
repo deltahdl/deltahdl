@@ -46,9 +46,6 @@ TEST(QueueDeclarationParsing, QueueDimUnbounded) {
   EXPECT_EQ(item->unpacked_dims[0]->rhs, nullptr);
 }
 
-// Exercises the right-hand branch of the queue_dimension BNF:
-// `[ $ [ : constant_expression ] ]`. With the colon and bound present, the
-// parser shall store the bound expression on the dim node's rhs.
 TEST(QueueDeclarationParsing, QueueDimBoundedHasRhsExpr) {
   auto r = Parse("module m; int q [$:7]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -60,13 +57,6 @@ TEST(QueueDeclarationParsing, QueueDimBoundedHasRhsExpr) {
   ASSERT_NE(item->unpacked_dims[0]->rhs, nullptr);
 }
 
-// Covers the `$` branch of Parser::ParseUnpackedDims in
-// src/parser/parser_types.cpp, which builds the ExprKind::kIdentifier standing
-// for a queue dimension. It assigned no range.start before this commit, and
-// src/parser/parser_types.cpp assigned none at any site, so a report standing
-// at the dimension printed "<unknown location>" instead of a file, line and
-// column. §7.10 writes the dimension as `[ $ [ : constant_expression ] ]`, so
-// the node begins at the `$`, at column 10 of line 2.
 TEST(QueueDeclarationParsing, QueueDimStartsAtItsDollar) {
   auto r = Parse(
       "module m;\n"

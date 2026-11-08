@@ -33,10 +33,6 @@ TEST(ArgumentBindingElaboration, UnknownNamedArgError) {
                             4, "13.5.4"));
 }
 
-// §13.5.4: a named argument binds to the formal of that name, so a name no
-// formal carries binds to nothing. The report that rejects it names the
-// subclause stating the rule, so a caller learns which rule was enforced
-// without matching the wording of the message.
 TEST(ArgumentBindingElaboration, NamedArgumentNamesNoFormalNames13_5_4) {
   ElabFixture f;
   ElaborateSrc(
@@ -74,9 +70,6 @@ TEST(ArgumentBindingElaboration, MissingRequiredNamedArgError) {
       "  initial x = add(.a(1));\n"
       "endmodule\n",
       f);
-  // A formal left unbound and carrying no default is reported under §13.5.3,
-  // which is the rule that gives an omitted argument its value, rather than
-  // under §13.5.4, which only decides which formal a name binds to.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "missing argument 'b' in call to 'add'", 4,
                             "13.5.3"));

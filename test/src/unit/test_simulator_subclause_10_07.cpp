@@ -379,8 +379,6 @@ TEST(AssignmentExtensionTruncationSim, SignedLiteralTruncatedToUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-// Truncation discards the high bits even when they are unknown (x): the
-// surviving low bits are fully known and retain their value.
 TEST(AssignmentExtensionTruncationSim, TruncationDiscardsUnknownMSBs) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -396,9 +394,6 @@ TEST(AssignmentExtensionTruncationSim, TruncationDiscardsUnknownMSBs) {
   EXPECT_EQ(var->value.ToUint64(), 0x5u);
 }
 
-// Sign-extension of a signed right-hand side replicates the sign bit even when
-// that bit is unknown: the padded high bits become unknown too. Checked via the
-// unknown-flag (bval) so the result is independent of the x/z encoding.
 TEST(AssignmentExtensionTruncationSim, SignExtensionPropagatesUnknownSignBit) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -412,13 +407,9 @@ TEST(AssignmentExtensionTruncationSim, SignExtensionPropagatesUnknownSignBit) {
 
   EXPECT_EQ(var->value.width, 8u);
   EXPECT_FALSE(var->value.IsKnown());
-  // The four padded bits [7:4] are all unknown, mirroring the unknown sign bit.
   EXPECT_EQ((var->value.words[0].bval >> 4) & 0xFull, 0xFull);
 }
 
-// Sign-extension spanning a 64-bit word boundary: a 68-bit signed value with
-// its sign bit set widens to 72 bits, and the padded high bits are filled with
-// ones (sign, not zero), exercising the multi-word fill path of the resize.
 TEST(AssignmentExtensionTruncationSim, WideSignExtensionAcrossWordBoundary) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -434,13 +425,10 @@ TEST(AssignmentExtensionTruncationSim, WideSignExtensionAcrossWordBoundary) {
   ASSERT_GE(var->value.nwords, 2u);
   EXPECT_EQ(var->value.words[0].aval, ~uint64_t{0});
   EXPECT_EQ(var->value.words[0].bval, 0u);
-  // Top word holds bits [71:64]; sign-extension fills the low 8 with ones.
   EXPECT_EQ(var->value.words[1].aval & 0xFFull, 0xFFull);
   EXPECT_EQ(var->value.words[1].bval & 0xFFull, 0u);
 }
 
-// Truncation from a value wider than 64 bits discards the entire high word and
-// keeps the low bits of the narrow target.
 TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -457,12 +445,6 @@ TEST(AssignmentExtensionTruncationSim, WideTruncationDiscardsHighWord) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-// A variable declaration initializer is a procedural assignment, so §10.7's
-// width adjustment applies at that syntactic position too: an initializer wider
-// than the declared target has its excess high bits discarded. Distinct from
-// the blocking/nonblocking/continuous positions above because the initializer
-// flows through the variable-lowering path rather than a statement-execution
-// path.
 TEST(AssignmentExtensionTruncationSim, DeclarationInitializerTruncates) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -476,9 +458,6 @@ TEST(AssignmentExtensionTruncationSim, DeclarationInitializerTruncates) {
   EXPECT_EQ(x->value.ToUint64(), 0xBu);
 }
 
-// The complementary direction at the initializer position: an unsigned
-// initializer narrower than the declared target is zero-padded up to the
-// declared width.
 TEST(AssignmentExtensionTruncationSim, DeclarationInitializerExtendsUnsigned) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -492,11 +471,6 @@ TEST(AssignmentExtensionTruncationSim, DeclarationInitializerExtendsUnsigned) {
   EXPECT_EQ(y->value.ToUint64(), 0x0Au);
 }
 
-// §10.7 extends a narrower right-hand side by sign-extension when the RHS is
-// signed. Here the signedness is carried by the built-in type — byte and int
-// are signed by default (§6.11.1), with no explicit `signed` keyword — so a
-// negative byte widened into an int replicates its sign bit across the added
-// high bits.
 TEST(AssignmentExtensionTruncationSim, BuiltinSignedTypeSignExtends) {
   SimFixture f;
   auto* wide = RunAndFindVar(
@@ -511,10 +485,6 @@ TEST(AssignmentExtensionTruncationSim, BuiltinSignedTypeSignExtends) {
   EXPECT_EQ(wide->value.ToUint64(), 0xFFFFFFFDu);
 }
 
-// §10.7 states an implementation may, but need not, warn on an assignment size
-// mismatch. This implementation takes the permissive path: a right-hand side
-// wider than the left-hand side is accepted without an error and silently
-// truncated, rather than being rejected during elaboration.
 TEST(AssignmentExtensionTruncationSim, SizeMismatchAcceptedNotRejected) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -534,17 +504,6 @@ TEST(AssignmentExtensionTruncationSim, SizeMismatchAcceptedNotRejected) {
   EXPECT_EQ(narrow->value.ToUint64(), 0xDu);
 }
 
-// §10.7 applies to a procedural assignment wherever it is written, and a
-// subroutine body is where it was not applied: eval_function_body.cpp runs a
-// function or task body on a statement executor of its own, and that executor
-// wrote the right-hand side over the target rather than into it, so the
-// target's width became the expression's and nothing was discarded. The cases
-// below are that rule inside a subroutine; every case above is the same rule
-// outside one.
-
-// §10.7's Example 1, moved into a function body: `logic [5:0] a; a = 8'hff;`
-// leaves a reading 6'h3f. 255 is the whole literal, which is what a target that
-// took the expression's eight bits reported.
 TEST(AssignmentExtensionTruncationSim, FunctionBodyTruncatesToTheTargetWidth) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -565,15 +524,6 @@ TEST(AssignmentExtensionTruncationSim, FunctionBodyTruncatesToTheTargetWidth) {
   EXPECT_EQ(x->value.ToUint64(), 0x3Fu);
 }
 
-// A task called with parentheses runs its body on the ordinary statement
-// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl
-// and ExecInlineTaskCall walks the body through ExecStmt, where a void
-// function of the same shape is declined there and reaches ExecFunctionBody.
-// So this is the rule read through a task call rather than a second reading of
-// the subroutine executor, and the function case above is what claims that.
-// Both assignments here are subject to the rule: the six-bit local discards the
-// literal's high bits, and the output formal then takes the six-bit value into
-// its own thirty-two.
 TEST(AssignmentExtensionTruncationSim, TaskBodyTruncatesToTheTargetWidth) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -594,11 +544,6 @@ TEST(AssignmentExtensionTruncationSim, TaskBodyTruncatesToTheTargetWidth) {
   EXPECT_EQ(x->value.ToUint64(), 0x3Fu);
 }
 
-// The six-bit cases cannot say a target wider than one word is truncated to its
-// own width rather than to a word: 48'hFFFF00000001 into a forty-bit target
-// reads 1095216660481, where the untruncated value reads 281470681743361 and a
-// truncation to thirty-two would read 1. The expected value has bits set above
-// the first word, so the high word survives rather than being masked away.
 TEST(AssignmentExtensionTruncationSim,
      FunctionBodyTruncationKeepsTheHighWordOfAWideTarget) {
   SimFixture f;
@@ -620,11 +565,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 1095216660481ull);
 }
 
-// §6.16 gives a string no declared width -- it is as long as what it holds --
-// so there is nothing for §10.7 to truncate a later assignment to. The second
-// assignment is what says so: a rule that read the target's width from the
-// value already in it would cut "hello world" down to the two characters of
-// "hi" and report a length of 2.
 TEST(AssignmentExtensionTruncationSim, StringLocalHasNoWidthToTruncateTo) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -646,17 +586,6 @@ TEST(AssignmentExtensionTruncationSim, StringLocalHasNoWidthToTruncateTo) {
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
-// §6.8 executes a declaration's initializer as though an initial procedure made
-// the assignment, which §10.8 makes an assignment-like context, so §10.7
-// truncates it into the width the declaration established.
-// DeclarationInitializerTruncates above claims that for a declaration at module
-// scope, which Lowerer::CoerceVarInitValue serves; a declaration written inside
-// a procedural block is created and initialized by ExecVarDeclImpl in
-// statement_assign_decl.cpp instead, which put the initializer's own width in
-// the declaration's place and left `logic [3:0] v = 8'hAB` eight bits reading
-// 171. The block-local cannot be found once the block has ended, so the value
-// is carried out through a module-level variable wide enough not to truncate it
-// a second time.
 TEST(AssignmentExtensionTruncationSim, BlockDeclarationInitializerTruncates) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -673,11 +602,6 @@ TEST(AssignmentExtensionTruncationSim, BlockDeclarationInitializerTruncates) {
   EXPECT_EQ(x->value.ToUint64(), 0x0Bu);
 }
 
-// The four-bit case cannot say the initializer is truncated to the declared
-// width rather than to a word: forty bits spans two, and the three answers
-// separate -- 48'hFFFF00000001 kept whole reads 281470681743361, cut to
-// thirty-two reads 1, and held in the forty bits declared reads 1095216660481,
-// whose set bits above the first word are what say the high word survived.
 TEST(AssignmentExtensionTruncationSim,
      BlockDeclarationInitializerTruncationKeepsTheHighWord) {
   SimFixture f;
@@ -695,12 +619,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 1095216660481ull);
 }
 
-// §6.16 gives a string no declared width for §10.7 to truncate an initializer
-// to. The width such a declaration is created at is a carrier for a type
-// nothing could size rather than a width the source asked for, and truncating
-// to it would cut "hello world" down to the four characters 32 bits hold and
-// report a length of 4. Eleven is what says the carrier was not mistaken for a
-// declared width.
 TEST(AssignmentExtensionTruncationSim,
      StringBlockDeclarationInitializerHasNoWidthToTruncateTo) {
   SimFixture f;
@@ -718,16 +636,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
-// §10.4 lists bit-selects, part-selects and slices of packed arrays among the
-// left-hand sides a procedural assignment may take, alongside the elements of
-// Clause 7's arrays, and puts such assignments inside procedures, always,
-// initial, task and function among them. The subroutine body's executor looked
-// for an element variable named `a[i]` and nothing else, so of those forms only
-// an unpacked array element was reached, and what it reached it wrote whole.
-
-// The §10.7 rule at the element: the element is an object of the array's
-// element type, so a value too wide for it is truncated into it rather than
-// taking its place. Four bits read 15 where the value's own eight read 255.
 TEST(AssignmentExtensionTruncationSim,
      TaskBodyArrayElementWriteTruncatesToTheElementWidth) {
   SimFixture f;
@@ -748,12 +656,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0xFu);
 }
 
-// §11.5.1's part-select of a packed variable, which the body's executor reached
-// not at all: it built a name from the msb expression, found no variable
-// answering to it, and wrote nothing. `v` is loaded with 8'hF0 beforehand, so
-// the reading separates three answers -- 0xF0 where nothing was written, 0xFB
-// where the selected bits took the value's low nibble and the rest of the
-// variable stood, and 0xAB where the value replaced the variable whole.
 TEST(AssignmentExtensionTruncationSim,
      FunctionBodyPartSelectWriteReachesOnlyTheSelectedBits) {
   SimFixture f;
@@ -774,10 +676,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0xFBu);
 }
 
-// A bit-select is the other form §11.5.1 defines and was dropped by the same
-// silence, the name `v[5]` answering to no variable of a packed vector. Bit 5
-// alone is set, so a write that landed anywhere else reads a different number
-// rather than a shifted one.
 TEST(AssignmentExtensionTruncationSim,
      FunctionBodyBitSelectWriteReachesTheSelectedBit) {
   SimFixture f;
@@ -798,12 +696,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0x20u);
 }
 
-// A task called with parentheses runs its body on the ordinary statement
-// executor rather than the subroutine one: SetupTaskCall claims a kTaskDecl
-// and ExecInlineTaskCall walks the body through ExecStmt, where a void
-// function of the same shape is declined there and reaches ExecFunctionBody.
-// So this is the rule read through a task call rather than a second reading of
-// the subroutine executor, and the function case above is what claims that.
 TEST(AssignmentExtensionTruncationSim,
      TaskBodyPartSelectWriteReachesOnlyTheSelectedBits) {
   SimFixture f;
@@ -824,17 +716,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0xBFu);
 }
 
-// A class method is the one route from a task into the subroutine-body
-// executor. SetupTaskCall claims a module-level task called with parentheses
-// and runs its body on the ordinary executor, so the task cases above read the
-// rule through that one; EvalClassMethodCall (src/simulator/eval_function.cpp)
-// reaches ExecFunctionBody for a method whether it is declared function or
-// task, and nothing exercised that. The value is carried out through an output
-// formal, a class method's own locals going away with the call.
-
-// §10.7 at a subroutine local, reached through a class method task. The local
-// is four bits, so the eight the literal carries are cut to 15 before the wider
-// formal takes them out; a local that kept the literal's width hands out 255.
 TEST(AssignmentExtensionTruncationSim,
      ClassMethodTaskTruncatesToTheTargetWidth) {
   SimFixture f;
@@ -861,10 +742,6 @@ TEST(AssignmentExtensionTruncationSim,
   EXPECT_EQ(x->value.ToUint64(), 0x0Fu);
 }
 
-// The select forms by the same route. The formal is loaded before the
-// part-select is written to it, so the three answers separate as they do for a
-// module-level variable: 0xF0 where the select reached nothing, 0xFB where it
-// wrote the bits it named, and 0xAB where the value replaced the formal whole.
 TEST(AssignmentExtensionTruncationSim,
      ClassMethodTaskPartSelectWriteReachesOnlyTheSelectedBits) {
   SimFixture f;

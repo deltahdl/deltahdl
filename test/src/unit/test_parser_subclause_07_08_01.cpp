@@ -30,13 +30,6 @@ TEST(AggregateTypeParsing, AssocArrayWildcard) {
   EXPECT_FALSE(item->unpacked_dims.empty());
 }
 
-// Covers the `*` branch of Parser::ParseUnpackedDims in
-// src/parser/parser_types.cpp, which builds the ExprKind::kIdentifier standing
-// for a wildcard index. It assigned no range.start before this commit, and
-// src/parser/parser_types.cpp assigned none at any site, so a report standing
-// at the dimension printed "<unknown location>" instead of a file, line and
-// column. §7.8.1 writes the dimension as `[ * ]`, so the node begins at the
-// `*`, at column 11 of line 2.
 TEST(DeclarationRangeParsing, AssocWildcardDimStartsAtItsStar) {
   auto r = Parse(
       "module m;\n"

@@ -36,12 +36,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.3 criterion: the same edge-sensitive path may carry different delays
-// only when every port is referenced the same way in each declaration. Here the
-// destination is a part-select in one declaration and a bit-select in the
-// other, which is illegal (LRM Example 4). The tests of this rule that select
-// or name a whole vector destination write a full connection, which §30.4.3
-// allows such a destination where a parallel one does not.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      InconsistentPortReferenceIsIllegal) {
   ElabFixture f;
@@ -59,10 +53,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Criterion 2 also distinguishes naming the whole port as a reference style:
-// referencing the whole port in one declaration and a select in another for the
-// same path is likewise illegal (exercises the entire-port branch of the
-// consistency check).
 TEST(EdgeSensitiveStateDependentPathElaboration,
      EntirePortVsBitSelectIsIllegal) {
   ElabFixture f;
@@ -80,10 +70,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Criterion 2 applies to every port on the path, not just the destination.
-// Here the destination is referenced consistently (whole port) but the edge
-// source is a part-select in one declaration and a bit-select in the other,
-// which is illegal (exercises the source-side branch of the consistency check).
 TEST(EdgeSensitiveStateDependentPathElaboration,
      InconsistentSourceReferenceIsIllegal) {
   ElabFixture f;
@@ -101,8 +87,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Positive control: identical reference style across declarations is accepted,
-// confirming the consistency check above does not reject matching part-selects.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      ConsistentPartSelectReferenceElaborates) {
   ElabFixture f;
@@ -119,11 +103,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.3 criterion 1: different delays may be assigned to the same
-// edge-sensitive path only when the edge, condition, or both make each
-// declaration unique. Here both declarations share the same edge, the same
-// condition, and identically referenced terminals, so they are not unique and
-// must be rejected.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      DuplicateEdgeAndConditionIsIllegal) {
   ElabFixture f;
@@ -142,11 +121,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Criterion 1 input form: whether two declarations describe one path is decided
-// by the exact terminal, so two declarations that share edge and condition but
-// address different bits are distinct paths and both are accepted. Exercises
-// the literal bit-select index compared unequal (0 vs 1) in the path-identity
-// test.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      DistinctBitSelectPathsElaborate) {
   ElabFixture f;
@@ -163,11 +137,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// Criterion 1 negative, literal-index input form: repeating the identical
-// bit-select terminal with the same edge and condition is not unique and must
-// be rejected. Exercises the literal bit-select index compared equal (0 vs 0)
-// in the path-identity test -- a different code path from the whole-port
-// duplicate above.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      DuplicateBitSelectPathIsIllegal) {
   ElabFixture f;
@@ -186,11 +155,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             5, "30.4.4.3"));
 }
 
-// Criterion 1 negative, parameter-index input form: a parameter used as the
-// bit-select index takes the identifier comparison path rather than the literal
-// one, so this covers a distinct code path from the literal duplicate. Two
-// declarations with the same parameter index, edge, and condition are not
-// unique and must be rejected.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      DuplicateParameterIndexPathIsIllegal) {
   ElabFixture f;
@@ -210,11 +174,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
                             6, "30.4.4.3"));
 }
 
-// Criterion 2 input form: an indexed part-select ([base +: width]) is a
-// part-select for reference-style purposes, so two declarations that both use
-// the indexed form are referenced consistently and elaborate. Exercises the
-// indexed part-select classification, which existing tests (whole port,
-// bit-select, ranged part-select) do not reach.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      IndexedPartSelectReferenceElaborates) {
   ElabFixture f;
@@ -231,9 +190,6 @@ TEST(EdgeSensitiveStateDependentPathElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A module's specify blocks together declare its module paths, so two
-// declarations of one edge-sensitive path in separate blocks are held to the
-// same reference rule as two in one block.
 TEST(EdgeSensitiveStateDependentPathElaboration,
      InconsistentReferenceAcrossSpecifyBlocksIsIllegal) {
   ElabFixture f;

@@ -1,23 +1,3 @@
-// A.6.4's statement productions, together with A.6.5's timing controls,
-// A.6.7's case statements and A.6.12's randsequence, decide which positions a
-// statement holds another statement in and which it holds an expression in.
-// src/elaborator/elaborator_validate_internal.h states each of those two lists
-// exactly once, as ForEachChildStmt and ForEachChildExpr, so that every
-// elaborator walk runs its rule over the same positions rather than over the
-// ones its author remembered.
-//
-// These two cases are what fails when a member is added to Stmt, reaches the
-// parser, and does not reach the helper. Every other test of a walk asks
-// whether one rule holds at one position; only these ask whether the shared
-// list is the whole list, which is the failure that makes every walk wrong at
-// once. #3301 and #3303 each ask for one, having each found walks that had
-// silently exempted a construct from a rule.
-//
-// Each case names every position rather than counting them. A count says a
-// visit went missing and not which, so the report would name the number of
-// positions instead of the member that was dropped; a set of names makes the
-// failure read as the member.
-
 #include <gtest/gtest.h>
 
 #include <set>
@@ -33,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// One statement per position ForEachChildStmt is required to reach, each
-// labelled with the member it stands in. Held by value so the addresses stay
-// good for the walk, and referenced from `s` by pointer as the parser would.
 struct StmtTreeWithEveryChildStatement {
   Stmt owner;
   Stmt stmts;
@@ -97,10 +74,6 @@ struct StmtTreeWithEveryChildStatement {
   }
 };
 
-// A.6.4 and its neighbours admit a statement in fourteen positions of Stmt,
-// which is the thirteen members src/parser/ast_stmt.h declares counting
-// rs_productions as the two lists A.6.12 reaches through it: an rs_prod may be
-// a code block and a weight_specification may be followed by one.
 TEST(StatementChildPositions, ForEachChildStmtVisitsEveryStatementPosition) {
   StmtTreeWithEveryChildStatement tree;
   std::set<std::string> visited;
@@ -125,15 +98,10 @@ TEST(StatementChildPositions, ForEachChildStmtVisitsEveryStatementPosition) {
   EXPECT_EQ(visited, kExpected);
 }
 
-// One expression per position ForEachChildExpr is required to reach, each
-// carrying the member it stands in as its text.
 struct StmtTreeWithEveryChildExpression {
   Stmt owner;
   std::vector<Expr> exprs;
 
-  // Returns a pointer to a fresh Expr tagged with `where`. The vector is
-  // reserved up front so that no push_back reallocates and invalidates a
-  // pointer already handed out.
   Expr* Make(std::string_view where) {
     exprs.emplace_back();
     exprs.back().text = where;
@@ -194,11 +162,6 @@ struct StmtTreeWithEveryChildExpression {
   }
 };
 
-// The counterpart claim for expressions. src/parser/ast_stmt.h declares ten
-// scalar Expr* members of Stmt and reaches six further positions through
-// members it holds, and A.6.12 reaches eleven more inside a randsequence, none
-// of which is a statement and so none of which ForEachChildStmt above answers
-// for.
 TEST(StatementChildPositions, ForEachChildExprVisitsEveryExpressionPosition) {
   StmtTreeWithEveryChildExpression tree;
   std::set<std::string> visited;

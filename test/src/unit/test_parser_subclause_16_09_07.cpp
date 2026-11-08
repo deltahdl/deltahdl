@@ -14,9 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// §16.9.7 Syntax 16-9: `sequence_expr ::= sequence_expr or sequence_expr`. The
-// `or` of two sequence operands is accepted in the property spec of an
-// assertion.
 TEST(AssertionSemanticsParsing, Or) {
   auto r = Parse(
       "module m;\n"
@@ -28,9 +25,6 @@ TEST(AssertionSemanticsParsing, Or) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.7: the operands of `or` may be plain Boolean expressions rather than
-// multi-tick sequences. The same sequence_expr production accepts that
-// expression-operand form, so it too parses into an assertion item.
 TEST(AssertionSemanticsParsing, OrOfBooleanExpressions) {
   auto r = Parse(
       "module m;\n"
@@ -41,10 +35,6 @@ TEST(AssertionSemanticsParsing, OrOfBooleanExpressions) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.7: the `or` of two sequences is a sequence_expr, so it is accepted in
-// every position that admits one. A cover-property spec is a distinct syntactic
-// position (parsed by a separate item path from an assert), so the operator is
-// exercised there too.
 TEST(AssertionSemanticsParsing, OrInCoverProperty) {
   auto r = Parse(
       "module m;\n"
@@ -55,9 +45,6 @@ TEST(AssertionSemanticsParsing, OrInCoverProperty) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kCoverProperty));
 }
 
-// §16.9.7: a named sequence declaration is another syntactic position for the
-// `or` operator — its body is a sequence_expr. The declaration parses as a
-// sequence item with the operator in its body.
 TEST(AssertionSemanticsParsing, OrInSequenceDeclaration) {
   auto r = Parse(
       "module m;\n"

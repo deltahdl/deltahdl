@@ -38,9 +38,6 @@ TEST(IoSystemTaskParsing, ReadmembWithAddresses) {
               "endmodule\n"));
 }
 
-// Syntax 21-12: the finish_addr is nested inside the start_addr option, so a
-// three-argument call (filename, memory_name, start_addr) is a distinct,
-// legal form of the production.
 TEST(IoSystemTaskParsing, ReadmemhWithStartAddrOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -49,8 +46,6 @@ TEST(IoSystemTaskParsing, ReadmemhWithStartAddrOnly) {
               "endmodule\n"));
 }
 
-// §21.4: memory_name may name its lowest dimension with slice syntax (see
-// 7.4.5). The task call still parses as a legal load_memory_tasks production.
 TEST(IoSystemTaskParsing, ReadmemhWithSliceMemoryName) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -59,8 +54,6 @@ TEST(IoSystemTaskParsing, ReadmemhWithSliceMemoryName) {
               "endmodule\n"));
 }
 
-// §21.4: memory_name may be a partially indexed multidimensional unpacked array
-// that resolves to a lesser-dimensioned array; the higher dimension is indexed.
 TEST(IoSystemTaskParsing, ReadmemhWithPartiallyIndexedMemoryName) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

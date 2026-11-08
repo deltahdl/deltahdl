@@ -17,26 +17,6 @@
 
 namespace delta {
 
-// §13.4.3 bars a constant function from holding a statement that directly
-// schedules an event to run once it has returned, and from holding any fork
-// construct. Neither says where the offending statement may stand, so every
-// position a statement holds a statement in is one the search has to look at,
-// and BodyContainsStmt takes those positions from ForEachChildStmt in
-// elaborator_validate_internal.h rather than listing them again.
-// ForEachChildStmt hands the visitor the field itself, so a walk that only
-// reads takes a `Stmt* const&`, and it visits every link with no way to stop,
-// so the first hit is kept in `found` and the recursion runs only while `found`
-// is false.
-//
-// Stmt::rs_productions is descended with the rest: §18.17.6 gives break and
-// return a meaning in a randsequence production code block that they have
-// nowhere else, neither is matched here, and A.6.12's rs_code_block holds the
-// ordinary procedural statements that do spawn a fork and schedule an event.
-// Three links can never be the one that answers and are walked because the
-// shared list is walked whole: src/parser/parser_stmt_block.cpp fills
-// Stmt::fork_stmts on a StmtKind::kFork alone, which `match` answers at first,
-// and A.6.8 admits no fork, nonblocking assignment or timing control in a
-// for_initialization or a for_step.
 template <typename Match>
 static bool BodyContainsStmt(const Stmt* s, Match match) {
   if (!s) return false;
@@ -58,9 +38,6 @@ static bool BodyContainsNonblocking(const Stmt* s) {
       s, [](const Stmt* n) { return n->kind == StmtKind::kNonblockingAssign; });
 }
 
-// §13.4.3 (c): every timing-control, waiting and event-trigger statement
-// schedules an event to fire after the function has returned, not just the
-// nonblocking assignment BodyContainsNonblocking answers for.
 static bool SchedulesPostReturnEvent(const Stmt* s) {
   switch (s->kind) {
     case StmtKind::kDelay:
@@ -83,19 +60,6 @@ static bool BodyContainsEventScheduling(const Stmt* s) {
   return BodyContainsStmt(s, SchedulesPostReturnEvent);
 }
 
-// §13.4.3 lets a constant function reference a name declared locally in the
-// function, and a declaration is local wherever in the body it is written, so
-// the collection takes every position a statement holds a statement in from
-// ForEachChildStmt in elaborator_validate_internal.h. A position it misses is
-// one a name declared there goes uncollected from, and CheckConstFuncIdentifier
-// below then reports a reference to that name.
-// §18.17.6 is about break and return, which declare nothing, so descending
-// Stmt::rs_productions is what §13.4.3 asks for: A.6.12 puts a data_declaration
-// at the head of an rs_code_block. Stmt::for_steps holds no declaration, A.6.8
-// admitting only an operator_assignment, an inc_or_dec_expression or a call.
-// Stmt::for_inits does: §12.7.1 makes a variable the initialization declares
-// a local of the implicit block around the loop, held as an assignment whose
-// type Stmt::for_init_types gives (ForHeaderDeclaredNames).
 static void CollectLocalDeclNames(const Stmt* s,
                                   std::unordered_set<std::string_view>& out) {
   if (!s) return;
@@ -107,15 +71,11 @@ static void CollectLocalDeclNames(const Stmt* s,
                    [&](Stmt* const& sub) { CollectLocalDeclNames(sub, out); });
 }
 
-// §13.4.3 (e) — true when the expr is a `.`-separated path that reaches
-// outside the function's own scope (any kMemberAccess whose leftmost LHS is
-// not a name the function declared, that isn't a built-in method call).
 static const Expr* LeftmostIdentifier(const Expr* e) {
   while (e && e->kind == ExprKind::kMemberAccess) e = e->lhs;
   return e;
 }
 
-// Whether `call` is a built-in method called on a variable `names` holds.
 static bool IsBuiltinMethodOn(
     const Expr* call, const std::unordered_set<std::string_view>& names) {
   if (!call || call->kind != ExprKind::kCall) return false;
@@ -125,13 +85,6 @@ static bool IsBuiltinMethodOn(
   return names.count(root->text) > 0;
 }
 
-// §13.4.3 — the recursion-invariant scope a constant function is validated
-// against: the names visible to its body (module parameters and the set of
-// callable function names), the function-declaration map used to recurse into
-// nested constant-function calls, the visited-name guard against (mutual)
-// recursion, and the diagnostic sink. One scope object threads through the
-// whole constant-function check; only `func`, its source location, and the
-// per-function set of body-local names vary between calls.
 struct ConstFuncScope {
   const std::unordered_set<std::string_view>& param_names;
   const std::unordered_set<std::string_view>& function_names;
@@ -171,8 +124,6 @@ static void WalkConstFuncExprChildren(const Expr* e, ConstFuncBodyCheck& chk) {
   for (auto* el : e->elements) WalkConstFuncExpr(el, chk);
 }
 
-// §13.4.3 (h) — an identifier referenced inside a constant function must name
-// the function itself, a local, a parameter, or another function.
 static void CheckConstFuncIdentifier(const Expr* e, ConstFuncBodyCheck& chk) {
   if (e->text == chk.func_name) return;
   if (chk.local_names.count(e->text)) return;
@@ -188,8 +139,6 @@ static void CheckConstFuncIdentifier(const Expr* e, ConstFuncBodyCheck& chk) {
   chk.failed = true;
 }
 
-// §13.4.3 (e) — `.` paths from a non-local root mean a hierarchical reach
-// outside the function.
 static void CheckConstFuncMemberAccess(const Expr* e, ConstFuncBodyCheck& chk) {
   const Expr* root = LeftmostIdentifier(e);
   if (root && root->kind == ExprKind::kIdentifier &&
@@ -207,10 +156,6 @@ static void CheckConstFuncMemberAccess(const Expr* e, ConstFuncBodyCheck& chk) {
   WalkConstFuncExprChildren(e, chk);
 }
 
-// §13.4.3 (g) — only the §11.2.1 constant-system-function whitelist is legal
-// inside a constant function body. The single carve-out is the elaboration
-// severity tasks (§20.10.1), which are statements, not expressions, so they
-// are handled when the simulator evaluates the function body.
 static void CheckConstFuncSystemCall(const Expr* e, ConstFuncBodyCheck& chk) {
   if (!IsConstantSysFunc(e->callee)) {
     chk.diag.Error(
@@ -225,13 +170,6 @@ static void CheckConstFuncSystemCall(const Expr* e, ConstFuncBodyCheck& chk) {
   WalkConstFuncExprChildren(e, chk);
 }
 
-// §13.4.3 (f) — built-in methods invoked on a local variable are the explicit
-// exception in the LRM, and §11.2.1 makes one invoked on a parameter with
-// constant arguments a constant built-in method call, which a constant
-// function may make as any constant expression may (`S.len()` on a string
-// parameter S); the arguments are walked under the usual rules. Otherwise the
-// callee must be a known function so that the recursive constant-function
-// check applies.
 static void CheckConstFuncCall(const Expr* e, ConstFuncBodyCheck& chk) {
   if (IsBuiltinMethodOn(e, chk.local_names) ||
       IsBuiltinMethodOn(e, chk.param_names)) {
@@ -250,9 +188,6 @@ static void CheckConstFuncCall(const Expr* e, ConstFuncBodyCheck& chk) {
     chk.failed = true;
     return;
   }
-  // The nested callee must itself satisfy the constant-function constraints.
-  // Recurse into its body, guarding against direct or mutual recursion by
-  // tracking visited names.
   if (!e->callee.empty() && chk.func_decls && chk.visited &&
       e->callee != chk.func_name && !chk.visited->count(e->callee)) {
     auto it = chk.func_decls->find(e->callee);
@@ -289,46 +224,11 @@ static void WalkConstFuncExpr(const Expr* e, ConstFuncBodyCheck& chk) {
   }
 }
 
-// The one expression §13.4.3 leaves to the statement it stands in: a system
-// task call written as a statement is ignored when the constant function is
-// evaluated rather than rejected when it is validated, so the §11.2.1
-// constant-system-function whitelist is not put to it and only its arguments
-// are walked, for the identifier-scope and hierarchical-reference rules.
-// Returns the call for WalkConstFuncStmt to walk that way and to skip when the
-// shared expression list hands it over as Stmt::expr.
 static const Expr* StatementFormSystemCall(const Stmt* s) {
   if (s->kind != StmtKind::kExprStmt || !s->expr) return nullptr;
   return s->expr->kind == ExprKind::kSystemCall ? s->expr : nullptr;
 }
 
-// §13.4.3's rules on what a constant function body may reference — no
-// hierarchical reference, no non-constant function invocation, only a constant
-// system function, and no identifier that is not a parameter, a function name
-// or a local declaration — bar the reference itself and say nothing about
-// which of a statement's expressions holds it, so every position a statement
-// holds an expression in is one they reach. The walk takes those positions
-// from ForEachChildExpr in elaborator_validate_internal.h and the
-// child-statement links from ForEachChildStmt beside it, rather than listing
-// either again. §18.17.6 is about break and return, neither an expression, so
-// descending Stmt::rs_productions is what §13.4.3 asks for. Stmt::fork_stmts is
-// walked because the shared lists are walked whole, and no body reaches here
-// holding a fork: ValidateConstFuncBodyContent rejects one first.
-//
-// Two of the positions ForEachChildExpr hands over cannot carry a reference
-// this walk reports, and both are visited rather than skipped because the list
-// is one list. A.6.5 gives `wait_statement ::= wait_order ( hierarchical_
-// identifier { , hierarchical_identifier } ) action_block`, and
-// Stmt::wait_order_events is filled for that statement alone, which §13.4.3's
-// ban on a statement whose own action leaves an event pending past the
-// function's return has ValidateConstFuncBodyContent reject before this runs.
-// Stmt::cycle_delay is the same: A.6.5 admits a cycle_delay in a
-// procedural_timing_control, rejected there as well, and A.6.11 admits one in a
-// clocking_drive, which is written with `<=` and so is rejected as a
-// nonblocking assignment. A.6.2's blocking_assignment takes a
-// delay_or_event_control, which A.6.5 gives no cycle_delay alternative:
-// src/parser/parser_stmt.cpp builds that statement anyway, from the intra-
-// assignment timing shared with the nonblocking form, and §14.11's "cycle delay
-// (##) is not a legal intra-assignment delay" is what answers it.
 static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   if (!s || chk.failed) return;
   const Expr* sys_call = StatementFormSystemCall(s);
@@ -341,12 +241,6 @@ static void WalkConstFuncStmt(const Stmt* s, ConstFuncBodyCheck& chk) {
   ForEachChildStmt(s, [&](Stmt* const& sub) { WalkConstFuncStmt(sub, chk); });
 }
 
-// §13.4.3 — a constant function may not take output/inout/ref arguments, and
-// each default argument value must itself be a constant expression. The
-// enclosing scope's parameter/localparam names are made visible so that a
-// default value written as a parameter reference (a constant expression per
-// §11.2.1) is accepted rather than mistaken for a non-constant. Returns false
-// (after reporting) on the first violation.
 static bool ValidateConstFuncArgs(
     const ModuleItem* func, SourceLoc loc,
     const std::unordered_set<std::string_view>& param_names, DiagEngine& diag) {
@@ -367,8 +261,6 @@ static bool ValidateConstFuncArgs(
                  Subclause("13.4.3"));
       return false;
     }
-    // §13.4.3 (k) — a default argument value, if supplied, must itself be a
-    // constant expression per §11.2.1.
     if (arg.default_value &&
         !IsConstantExpr(arg.default_value, default_scope)) {
       diag.Error(
@@ -384,9 +276,6 @@ static bool ValidateConstFuncArgs(
   return true;
 }
 
-// §13.4.3 (c) — a constant function body may not contain fork, nonblocking
-// assignments, or anything that schedules a post-return event. Returns false
-// (after reporting) on the first violating top-level body statement.
 static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
                                          DiagEngine& diag) {
   for (auto* s : func->func_body_stmts) {
@@ -420,9 +309,6 @@ static bool ValidateConstFuncBodyContent(const ModuleItem* func, SourceLoc loc,
   return true;
 }
 
-// §13.4.3 — collects the set of names local to a constant function body: each
-// named argument, the function's own name (its implicit result variable), and
-// every variable declared inside the body.
 static std::unordered_set<std::string_view> CollectConstFuncLocalNames(
     const ModuleItem* func) {
   std::unordered_set<std::string_view> local_names;
@@ -433,30 +319,27 @@ static std::unordered_set<std::string_view> CollectConstFuncLocalNames(
   return local_names;
 }
 
-// §13.4.3 — walks the body of a constant function, applying the
-// identifier-scope, hierarchical-reference, system-call, and nested-call rules.
-// Returns false (the body failed) once any §13.4.3 violation is reported.
 static bool CheckConstFuncBody(
     const ModuleItem* func, SourceLoc loc, const ConstFuncScope& scope,
     const std::unordered_set<std::string_view>& local_names) {
-  ConstFuncBodyCheck chk{
-      func->name,       scope.param_names, scope.function_names, local_names,
-      scope.func_decls, scope.visited,     scope.diag,           loc,
-      /*failed=*/false};
+  ConstFuncBodyCheck chk{func->name,
+                         scope.param_names,
+                         scope.function_names,
+                         local_names,
+                         scope.func_decls,
+                         scope.visited,
+                         scope.diag,
+                         loc,
+                         false};
   for (auto* s : func->func_body_stmts) WalkConstFuncStmt(s, chk);
   return !chk.failed;
 }
 
-// Whether `e` calls a subroutine, by name or through a package.
 static bool ExprCallsSubroutine(const Expr* e) {
   if (e == nullptr) return false;
   return e->kind == ExprKind::kCall || AnyExprChild(e, ExprCallsSubroutine);
 }
 
-// §13.4.3 bars a constant function from calling a constant function in a
-// context requiring a constant expression, which a local parameter's
-// initializer in its body is (A.2.8's local_parameter_declaration, kept as a
-// declaration statement marked var_is_param).
 static bool StmtCallsInLocalParam(const Stmt* s) {
   if (s == nullptr) return false;
   if (s->kind == StmtKind::kVarDecl && s->var_is_param &&
@@ -504,14 +387,9 @@ struct ConstFuncCallCtx {
   const std::unordered_set<std::string_view>& function_names;
   const std::unordered_set<std::string_view>& dpi_import_names;
   DiagEngine& diag;
-  // §13.4.3: the functions the generate blocks enclosing the items walked
-  // declare, none of which is a constant function; null outside every block.
   const std::unordered_set<std::string_view>* gen_funcs;
 };
 
-// §13.4.3 — the arguments to a constant function call must all be constant
-// expressions per §11.2.1. The only names in scope are the enclosing
-// (constant) context's parameters; the arguments are otherwise self-contained.
 static void CheckConstFuncCallArgs(const Expr* expr, SourceLoc loc,
                                    const ConstFuncCallCtx& ctx) {
   ScopeMap arg_scope;
@@ -528,12 +406,8 @@ static void CheckConstFuncCallArgs(const Expr* expr, SourceLoc loc,
   }
 }
 
-// Validates a single call node `expr` (already known to be a non-empty-callee
-// kCall) used in a constant context, recursing into a resolved callee.
 static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
                                       const ConstFuncCallCtx& ctx) {
-  // §13.4.3 bars a constant function from being declared inside a generate
-  // block, so a function one declares is called in no constant context.
   if (ctx.gen_funcs != nullptr && ctx.gen_funcs->contains(expr->callee)) {
     ctx.diag.Error(loc,
                    std::format("function '{}' is declared inside a generate "
@@ -542,8 +416,6 @@ static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
                    Subclause("13.4.3"));
     return;
   }
-  // §13.4.3 (b) — DPI imports cannot be constant functions, so any attempt to
-  // invoke one in a constant context is rejected here.
   if (ctx.dpi_import_names.count(expr->callee)) {
     ctx.diag.Error(
         loc,
@@ -561,12 +433,6 @@ static void ValidateConstFuncCallNode(const Expr* expr, SourceLoc loc,
   CheckConstFuncCallArgs(expr, loc, ctx);
 }
 
-// §6.23 (printed page 138): the expression a type reference names is not
-// evaluated, and A.2.2.1's type_reference takes an expression rather than a
-// constant_expression, so a function called in it is not called in the
-// constant context: it makes no constant function call (§13.4.3, printed page
-// 345, one evaluated at elaboration time) and is held to none of that clause's
-// rules.
 static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
                                             const ConstFuncCallCtx& ctx) {
   if (!expr || expr->kind == ExprKind::kTypeRef) return;
@@ -586,8 +452,6 @@ static void ValidateConstantFuncCallsInExpr(const Expr* expr, SourceLoc loc,
 static void ValidateConstFuncCallsInItems(const std::vector<ModuleItem*>& items,
                                           const ConstFuncCallCtx& ctx);
 
-// The items `items` of one generate block, with the functions the block
-// declares joining those of the blocks around it (ConstFuncCallCtx::gen_funcs).
 static void ValidateConstFuncCallsInBlock(const std::vector<ModuleItem*>& items,
                                           const ConstFuncCallCtx& ctx) {
   std::unordered_set<std::string_view> gen_funcs;
@@ -601,8 +465,6 @@ static void ValidateConstFuncCallsInBlock(const std::vector<ModuleItem*>& items,
   ValidateConstFuncCallsInItems(items, inner);
 }
 
-// Validates constant-function calls within a generate construct's condition
-// and all of its nested bodies (then/else/case arms).
 static void ValidateConstFuncCallsInGenerate(const ModuleItem* item,
                                              const ConstFuncCallCtx& ctx) {
   if (item->gen_cond) {

@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Every word this implementation reserves that Table 22-1 does not list. Each
-// one entered the language in a standard later than IEEE Std 1364-1995, so
-// under the "1364-1995" specifier each is an ordinary identifier. They are the
-// exclusivity side of the rule: naming that version must free all of them, not
-// just the few the LRM's examples happen to mention.
 constexpr const char* kWordsAddedAfterVerilog1995[] = {
     "accept_on",
     "alias",
@@ -164,13 +159,6 @@ constexpr const char* kWordsAddedAfterVerilog1995[] = {
     "within",
 };
 
-// Membership: each of Table 22-1's identifiers is a reserved word when the
-// "1364-1995" list is the one in force. Membership is also all the version
-// list decides — a word the table lists is the same reserved word under this
-// list as under the implementation's default, down to the token it produces.
-// Comparing against the default list rather than against a hand-written
-// expectation keeps the check exhaustive while still pinning each word to one
-// specific token rather than merely to "reserved".
 TEST(Lexer, Verilog1995KeywordsYieldTheirOwnToken) {
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
   for (const char* kw : kVerilog1995Keywords) {
@@ -184,11 +172,6 @@ TEST(Lexer, Verilog1995KeywordsYieldTheirOwnToken) {
   }
 }
 
-// Exclusivity, swept over every reserved word this implementation knows that
-// Table 22-1 omits. The second half of each case is the witness that keeps the
-// first half honest: the word really is reserved somewhere, so its absence
-// under "1364-1995" is that list's doing rather than a word missing from the
-// keyword table altogether.
 TEST(Lexer, WordsOutsideVerilog1995ListAreNotReserved) {
   for (const char* kw : kWordsAddedAfterVerilog1995) {
     EXPECT_FALSE(LookupKeyword(kw, KeywordVersion::kVer13641995).has_value())
@@ -198,17 +181,11 @@ TEST(Lexer, WordsOutsideVerilog1995ListAreNotReserved) {
   }
 }
 
-// A word that no standard has ever reserved is not reserved here either — the
-// version list narrows the reserved set, it does not widen it.
 TEST(Lexer, OrdinaryIdentifierIsReservedByNoList) {
   auto kw = LookupKeyword("my_signal", KeywordVersion::kVer13641995);
   EXPECT_FALSE(kw.has_value());
 }
 
-// Exclusivity at its narrowest margin: the list names exact spellings, so a
-// word that differs from a listed one only in case, or that merely contains
-// one, falls outside it. These are the inputs a membership test built on
-// prefixes or case-insensitive matching would wrongly accept.
 TEST(Lexer, WordsResemblingListedKeywordsAreNotReserved) {
   const char* const kNearMisses[] = {
       "REG",     "Reg",   "WIRE",   "Wire",     "MODULE",

@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Keywords used by §A.6.5 timing-control BNF.
-
 TEST(TimingControlKeywordLexing, RepeatKeyword) {
   auto r = LexOne("repeat");
   EXPECT_EQ(r.token.kind, TokenKind::kKwRepeat);
@@ -73,8 +71,6 @@ TEST(TimingControlKeywordLexing, OrKeyword) {
   auto r = LexOne("or");
   EXPECT_EQ(r.token.kind, TokenKind::kKwOr);
 }
-
-// Operators used by §A.6.5 timing-control BNF.
 
 TEST(TimingControlOperatorLexing, HashAsDelayPrefix) {
   auto tokens = Lex("#5");

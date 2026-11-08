@@ -1,6 +1,3 @@
-// §20.4.3: Syntax 20-5 gives $timeformat no argument list or all four of its
-// arguments.
-
 #include <algorithm>
 #include <cstddef>
 #include <vector>
@@ -15,13 +12,8 @@ namespace delta {
 
 namespace {
 
-// Syntax 20-5's argument list: units_number, precision_number, suffix_string
-// and minimum_field_width.
 constexpr size_t kTimeformatArgs = 4;
 
-// The list is optional as a whole, but each of its four arguments is required:
-// an empty `()` and an empty position, which the parser keeps as a null
-// argument, match neither form.
 bool IsTimeformatArgListValid(const Expr* call) {
   if (!call->has_arg_list) return true;
   if (call->args.size() != kTimeformatArgs) return false;
@@ -41,8 +33,6 @@ void CheckTimeformatExpr(const Expr* e, DiagEngine& diag) {
       e, [&](const Expr* child) { CheckTimeformatExpr(child, diag); });
 }
 
-// §20.4.3 names no position the call may stand in, so every expression of
-// every statement is one the check is owed at.
 void CheckTimeformatStmt(const Stmt* s, DiagEngine& diag) {
   if (s == nullptr) return;
   ForEachChildExpr(s, [&](const Expr* e) { CheckTimeformatExpr(e, diag); });

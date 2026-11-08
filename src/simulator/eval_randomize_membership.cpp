@@ -20,33 +20,22 @@ namespace delta {
 
 namespace {
 
-// The value of a constant operand of a constraint, read as the type it was
-// written in, so a signed operand holding a negative number stays negative.
 int64_t ConstantOperand(const Expr* e, RandomizeCtx& rc) {
   auto cv = EvalExpr(e, rc.ctx, rc.arena);
   return cv.is_signed ? SignExtend(cv.ToUint64(), cv.width)
                       : static_cast<int64_t>(cv.ToUint64());
 }
 
-// The most values a set membership is enumerated into; a wider one is left
-// to the kCustom path, which tries draws against the relation.
 constexpr size_t kMaxEnumeratedMembers = 65536;
 
-// §11.4.13: the `$` a range bound may be written as, its lowest or highest
-// value, which the parser leaves as the identifier.
 bool IsDollarBound(const Expr* e) {
   return e->kind == ExprKind::kIdentifier && e->text == "$";
 }
 
-// Adds the values `elem`, one item of an inside range list, names to `out`:
-// a single value, or every value of a closed range of constants. Answers
-// false for an item this path does not enumerate, one with a `$` bound, a
-// tolerance or a span past kMaxEnumeratedMembers.
 bool EnumerateInsideItem(const Expr* elem, RandomizeCtx& rc,
                          std::vector<int64_t>& out) {
   bool is_range = elem->kind == ExprKind::kSelect && elem->index != nullptr &&
                   elem->index_end != nullptr;
-  // §11.4.13: an unpacked array adds each of its elements to the set.
   std::vector<Logic4Vec> members;
   if (!is_range && CollectUnpackedSetMembers(elem, rc.ctx, members)) {
     for (const Logic4Vec& m : members) {
@@ -84,11 +73,6 @@ bool EnumerateInsideItems(const std::vector<Expr*>& elements,
   return true;
 }
 
-// §18.4.1 with §11.4.13: `rel`, a real variable inside a set of reals, which
-// lies in the closed interval between a single range's bounds, drawn as the
-// two comparisons bound it, or takes a value or a value within a range of any
-// other set, drawn as a distribution of its items. False for a set with a `$`
-// bound.
 static bool TryRealSetMembership(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, ConstraintExpr& out) {
   if (std::any_of(
@@ -101,8 +85,6 @@ static bool TryRealSetMembership(const Expr* rel, std::vector<RandInfo>& rands,
     return false;
   }
   const Expr* range = rel->elements.size() == 1 ? rel->elements[0] : nullptr;
-  // Any other set, values and tolerance ranges among it, is drawn from as
-  // a distribution of its items is.
   if (range == nullptr || range->kind != ExprKind::kSelect ||
       range->index == nullptr || range->index_end == nullptr ||
       range->op == TokenKind::kPlusSlashMinus ||
@@ -124,15 +106,9 @@ static bool TryRealSetMembership(const Expr* rel, std::vector<RandInfo>& rands,
   both->op = TokenKind::kAmpAmp;
   both->lhs = compare(TokenKind::kGtEq, range->index);
   both->rhs = compare(TokenKind::kLtEq, range->index_end);
-  return TryConjunctionConstraint(both, rands, rc, out, /*fold=*/true);
+  return TryConjunctionConstraint(both, rands, rc, out, true);
 }
 
-// 18.5.4: `x inside { ... }` over a rand variable and items free of random
-// variables is a set membership the solver draws a member of, which a
-// domain as wide as an int's needs: a draw tried against the relation
-// finds one of a few members among 2^32 values as good as never. Fills
-// `out` and answers true; any other shape answers false for the kCustom
-// path.
 bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                                 RandomizeCtx& rc, ConstraintExpr& out) {
   if (rel == nullptr || rel->kind != ExprKind::kInside || rel->lhs == nullptr ||
@@ -154,7 +130,6 @@ bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
 
 namespace {
 
-// A decimal literal of `value`, standing where `like` does.
 Expr* BitLiteral(uint32_t value, const Expr* like, Arena& arena) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -165,8 +140,6 @@ Expr* BitLiteral(uint32_t value, const Expr* like, Arena& arena) {
   return e;
 }
 
-// §18.4: the variable of its own a rand member of a rand unpacked structure,
-// `h1.addr`, is solved as; null for any other expression.
 Expr* StructMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
                            Arena& arena) {
   if (n->kind != ExprKind::kMemberAccess || n->lhs == nullptr ||
@@ -180,10 +153,6 @@ Expr* StructMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
                                             : nullptr;
 }
 
-// §18.7.1: given obj.randomize() with, local::obj binds to the scope of the
-// class of the object being randomized, so a random variable of it named
-// through local::obj, `local::obj.x`, is that variable, `x`; null for any
-// other expression.
 Expr* ReceiverMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
                              RandomizeCtx& rc) {
   if (rc.inline_receiver.empty() || n->kind != ExprKind::kMemberAccess)
@@ -197,8 +166,6 @@ Expr* ReceiverMemberVariable(const Expr* n, std::vector<RandInfo>& rands,
              : nullptr;
 }
 
-// §18.4: the part-select, `p[7:4]`, of the bits a member of a rand packed
-// structure, `p.hi`, occupies; null for any other expression.
 Expr* PackedMemberSelect(const Expr* n, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc) {
   PackedMemberBits bits;
@@ -239,13 +206,7 @@ bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
       rel->rhs == nullptr) {
     return false;
   }
-  // The consequent's bounds hold only where the antecedent does, so none of
-  // them folds the variable's domain. A consequent the solver would try as
-  // a whole is left to be tried with its antecedent, unless it derives one
-  // variable from the others, which the solver's repair of the implication
-  // applies where the antecedent holds (18.5.7.1).
-  ConstraintExpr consequent =
-      TranslateRelation(rel->rhs, rands, rc, /*fold=*/false);
+  ConstraintExpr consequent = TranslateRelation(rel->rhs, rands, rc, false);
   if (consequent.kind == ConstraintKind::kCustom && !consequent.derive_fn)
     return false;
   std::vector<std::string> names;
@@ -263,16 +224,12 @@ bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
 
 ConstraintExpr SoftImplication(const Expr* rel, std::vector<RandInfo>& rands,
                                RandomizeCtx& rc) {
-  ConstraintExpr consequent =
-      TranslateRelation(rel->rhs, rands, rc, /*fold=*/false);
+  ConstraintExpr consequent = TranslateRelation(rel->rhs, rands, rc, false);
   std::vector<std::string> names;
   names.reserve(rands.size());
   for (const auto& ri : rands) names.push_back(ri.name);
   ConstraintExpr out;
   out.kind = ConstraintKind::kImplication;
-  // 18.5.13.2: the antecedent only gates the soft constraint, so the
-  // variables the soft constraint directly references, which a 'disable
-  // soft' directive discards it by, are the consequent's alone.
   out.ref_vars = consequent.ref_vars;
   out.cond_fn = [antecedent = rel->lhs, names,
                  &rc](const std::unordered_map<std::string, int64_t>& vals) {

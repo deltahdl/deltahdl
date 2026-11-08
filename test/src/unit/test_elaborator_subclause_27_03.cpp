@@ -17,10 +17,6 @@ int CountVariablesNamed(const RtlirModule* mod, char last) {
   return count;
 }
 
-// §27.3: the expressions in a generate scheme are constant expressions
-// resolved against the enclosing scope (see §23.9). A generate-if whose
-// condition is a module parameter elaborates cleanly and instantiates the
-// selected block's declarations into the module.
 TEST(GenerateConstructSyntax, ConstantConditionFromEnclosingScopeElaborates) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -35,11 +31,6 @@ TEST(GenerateConstructSyntax, ConstantConditionFromEnclosingScopeElaborates) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 1);
 }
 
-// §27.3: a generate-scheme expression is a constant expression, which admits a
-// localparam operand as well as a parameter. localparam resolution runs through
-// a different declaration path than parameter, so a generate-if gated on a
-// localparam is exercised on its own: the selected block's declaration reaches
-// the module.
 TEST(GenerateConstructSyntax, ConstantConditionFromLocalparamElaborates) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -54,9 +45,6 @@ TEST(GenerateConstructSyntax, ConstantConditionFromLocalparamElaborates) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 1);
 }
 
-// §27.3: all expressions in generate schemes shall be constant expressions,
-// deterministic at elaboration time. A condition that depends on a runtime
-// variable is not constant, and the elaborator reports it as an error.
 TEST(GenerateConstructSyntax, NonConstantGenerateSchemeIsDiagnosed) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -70,9 +58,6 @@ TEST(GenerateConstructSyntax, NonConstantGenerateSchemeIsDiagnosed) {
                             "27.5"));
 }
 
-// §27.3: the constant-expression requirement covers every generate-scheme
-// expression, including a case-generate selector. A selector that depends on
-// a runtime variable is not constant and is reported as an error.
 TEST(GenerateConstructSyntax, NonConstantCaseSelectorIsDiagnosed) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -91,9 +76,6 @@ TEST(GenerateConstructSyntax, NonConstantCaseSelectorIsDiagnosed) {
                             "27.5"));
 }
 
-// §27.3: elaboration of a generate construct results in zero or more
-// instances of a generate block. A false condition yields zero, so the
-// block's declarations never reach the module.
 TEST(GenerateConstructSyntax, FalseConditionYieldsZeroInstances) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -106,9 +88,6 @@ TEST(GenerateConstructSyntax, FalseConditionYieldsZeroInstances) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 0);
 }
 
-// §27.3: a loop generate construct may produce more than one instance of its
-// generate block; each iteration contributes its own copy of the block's
-// declarations.
 TEST(GenerateConstructSyntax, LoopProducesMultipleInstances) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -122,11 +101,6 @@ TEST(GenerateConstructSyntax, LoopProducesMultipleInstances) {
   EXPECT_EQ(CountVariablesNamed(r.design->top_modules[0], 'a'), 3);
 }
 
-// §27.3: every expression of a generate scheme is a constant expression, and
-// Syntax 27-1 writes each item expression of a case-generate as one. An item
-// that reads a variable is reported where it stands, rather than read as an
-// alternative that does not match, which would build the default block in its
-// place with nothing said.
 TEST(GenerateConstructSyntax, NonConstantCaseItemExpressionIsReported) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -141,10 +115,6 @@ TEST(GenerateConstructSyntax, NonConstantCaseItemExpressionIsReported) {
                             "27.3"));
 }
 
-// The requirement holds of every item expression, not only of those read
-// before the one that matches: here the first item selects its block, and the
-// item after it still reads a variable. A check made while searching for the
-// match stops at line 4 and never reaches line 5.
 TEST(GenerateConstructSyntax, NonConstantCaseItemAfterTheMatchIsReported) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -159,9 +129,6 @@ TEST(GenerateConstructSyntax, NonConstantCaseItemAfterTheMatchIsReported) {
                             "27.3"));
 }
 
-// Item expressions that fold are constant, so a case-generate built from them
-// elaborates with no report, and the alternative listing the selector's value
-// second builds its block.
 TEST(GenerateConstructSyntax, ConstantCaseItemExpressionsElaborate) {
   auto r = RunGenerateElaboration(
       "module top;\n"

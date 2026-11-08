@@ -28,13 +28,6 @@ TEST(UpwardNameReferenceElaboration, UpwardNetReferenceResolves) {
              "endmodule\n"));
 }
 
-// §23.8: the upward reference is read in a procedural assignment rather than in
-// a localparam initializer, because §6.20.2 rules that a value parameter may be
-// set only to an expression of literals, value parameters or local parameters,
-// genvars, enumerated names, or a constant function of those, and forbids
-// hierarchical names. The vehicle a §23.8 case uses has to be one the vehicle's
-// own clause permits, and every other case in this file reads its upward name
-// the same way.
 TEST(UpwardNameReferenceElaboration, UpwardParameterReferenceResolves) {
   EXPECT_TRUE(
       ElabOk("module child;\n"
@@ -145,11 +138,6 @@ TEST(UpwardNameReferenceElaboration, ScopeNameFoundInInstantiationParentScope) {
              "endmodule\n"));
 }
 
-// §23.8: the first name of a hierarchical name is looked for downward and
-// then upward, as an instance, a scope or a module name, and one no scope
-// answers names nothing. nosuch, nosuch2 and nosuch3 are declared nowhere,
-// as a method call's receiver, alone and with a member between, and on an
-// assignment's right side; each was accepted.
 TEST(UpwardNameReferenceElaboration, FirstNameDeclaredNowhereIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -177,7 +165,6 @@ TEST(UpwardNameReferenceElaboration, FirstNameDeclaredNowhereIsReported) {
                             8, "23.8"));
 }
 
-// The same in a function of the module: a read nothing declares the head of.
 TEST(UpwardNameReferenceElaboration, FirstNameDeclaredNowhereInAFunction) {
   ElabFixture f;
   ElaborateSrc(
@@ -193,12 +180,6 @@ TEST(UpwardNameReferenceElaboration, FirstNameDeclaredNowhereInAFunction) {
                             3, "23.8"));
 }
 
-// Every head here is something a name resolves to: a variable of a structure,
-// a class handle, a string, a queue and an event of the module, a port of an
-// interface, a clocking block, a function's static local through the
-// function's name, a named block, a generate block, an instance, a module
-// name reached upward, a package's variable brought in by an import, and an
-// array method's `with` clause reading its iterator. None is reported.
 TEST(UpwardNameReferenceElaboration, DeclaredFirstNamesAreNotReported) {
   EXPECT_TRUE(
       ElabOk("package p;\n"

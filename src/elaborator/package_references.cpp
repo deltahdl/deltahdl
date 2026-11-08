@@ -1,6 +1,3 @@
-// §26.6 with §26.3: the names a package's declarations write, which decide
-// what a wildcard import of it actually imported.
-
 #include "elaborator/package_references.h"
 
 #include <string_view>

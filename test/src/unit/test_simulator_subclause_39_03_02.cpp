@@ -12,18 +12,6 @@
 namespace delta {
 namespace {
 
-// §39.3.2 "Obtaining static assertion information" lists what is static about
-// an assertion, and the list is the whole of the subclause: the assertion name;
-// the instance in which the assertion occurs; the module definition containing
-// it; the assertion type, of which it names nine kinds; the assertion source
-// information, which is the file, line and column the assertion is written at;
-// and the assertion clocking block/expression. Each is reached through
-// machinery §37.49 and §37.52 draw - the assertion's location and name
-// properties, its edges to the instance and to the clocking block, and the
-// property specification's vpiClockingEvent edge - so these tests ask for the
-// six items the way an application would and read what comes back.
-
-// The nine kinds §39.3.2 lists under "assertion type".
 struct AssertionKind {
   int type;
   const char* label;
@@ -49,10 +37,6 @@ class AssertionStaticInformationItems : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §39.3.2, "assertion type": the nine kinds the subclause lists are each an
-// assertion, each reports itself through vpi_get(vpiType), and the type read
-// back is the kind the assertion was written as rather than the class the nine
-// belong to.
 TEST_F(AssertionStaticInformationItems, EveryListedAssertionTypeReportsItself) {
   for (const AssertionKind& kind : kAssertionKinds) {
     VpiObject assertion;
@@ -65,12 +49,6 @@ TEST_F(AssertionStaticInformationItems, EveryListedAssertionTypeReportsItself) {
   }
 }
 
-// §39.3.2, the items for the assertion's name, the instance it occurs in and
-// the module definition that holds it: the name is the assertion's own, the
-// instance is the one it is written in, and the definition that instance is an
-// instance of is what names the module the assertion was written in - the same
-// assertion in a second instance of that module reports the other instance and
-// the same definition.
 TEST_F(AssertionStaticInformationItems, NameInstanceAndModuleDefinition) {
   VpiObject first_instance;
   first_instance.type = vpiModule;
@@ -105,9 +83,6 @@ TEST_F(AssertionStaticInformationItems, NameInstanceAndModuleDefinition) {
       "handshake");
 }
 
-// §39.3.2, the source information item, the file, line and column the assertion
-// is written at: §37.49 draws all three on the assertion's location, and the
-// column is what separates two assertions written on one line.
 TEST_F(AssertionStaticInformationItems, SourceInformationIsFileLineAndColumn) {
   VpiObject first;
   first.type = vpiAssert;
@@ -129,17 +104,12 @@ TEST_F(AssertionStaticInformationItems, SourceInformationIsFileLineAndColumn) {
   EXPECT_EQ(vpi_get(vpiEndLine, VpiHandleOf(&first)), 12);
   EXPECT_EQ(vpi_get(vpiEndColumn, VpiHandleOf(&first)), 30);
 
-  // Same file, same line: the column is the only thing that tells the two
-  // assertions apart by where they were written.
   EXPECT_EQ(vpi_get(vpiStartLine, VpiHandleOf(&second)),
             vpi_get(vpiStartLine, VpiHandleOf(&first)));
   EXPECT_NE(vpi_get(vpiColumn, VpiHandleOf(&second)),
             vpi_get(vpiColumn, VpiHandleOf(&first)));
 }
 
-// §39.3.2, "assertion clocking block/expression", first half: §37.49 draws the
-// assertion's edge to the clocking block that governs it, and an assertion
-// governed by none reports none.
 TEST_F(AssertionStaticInformationItems, TheClockingBlockGoverningTheAssertion) {
   VpiObject clocking;
   clocking.type = vpiClockingBlock;
@@ -156,10 +126,6 @@ TEST_F(AssertionStaticInformationItems, TheClockingBlockGoverningTheAssertion) {
   EXPECT_EQ(vpi_handle(vpiClockingBlock, VpiHandleOf(&unclocked)), nullptr);
 }
 
-// §39.3.2, "assertion clocking block/expression", the other half: an assertion
-// written with a clocking event of its own carries it on the property
-// specification, which §37.52 draws the vpiClockingEvent edge from. The clocked
-// property the specification may hold instead carries it the same way.
 TEST_F(AssertionStaticInformationItems, TheClockingExpressionOfTheAssertion) {
   VpiObject event;
   event.type = vpiEventControl;

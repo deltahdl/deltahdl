@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §16.8.2: the actual of an inout or output local variable formal argument is,
-// in its entirety, a reference to a local variable in scope at the instance:
-// v + 1 is an expression and g a module variable, while top3's v is a local.
 TEST(LocalFormalElaboration, AnOutwardActualIsALocalVariable) {
   const char* const kReport =
       "the actual of the inout or output local variable formal 'lv' of 'sub' "
@@ -40,8 +37,6 @@ TEST(LocalFormalElaboration, AnOutwardActualIsALocalVariable) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 16, "16.8.2"));
 }
 
-// §16.8.2: one local variable is not the actual of two inout or output local
-// variable formal arguments of an instance.
 TEST(LocalFormalElaboration, OneLocalBoundToTwoOutwardFormalsIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,9 +59,6 @@ TEST(LocalFormalElaboration, OneLocalBoundToTwoOutwardFormalsIsReported) {
                              "16.8.2"));
 }
 
-// §16.8.2: no match of a sequence leaves an output local variable formal
-// argument unassigned at its completion: the b alternative of sub assigns no
-// o, while every match of sub2 assigns it.
 TEST(LocalFormalElaboration, AnOutputUnassignedByAMatchIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -113,8 +105,6 @@ TEST(LocalFormalElaboration, AnOutputUnassignedByAMatchIsReported) {
                              21, "16.8.2"));
 }
 
-// §16.8.2: an instance of a sequence with an inout or output local variable
-// formal argument admits no empty match: sub's body, repeated from zero, does.
 TEST(LocalFormalElaboration, AnOutwardInstanceAdmittingAnEmptyMatchIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -135,8 +125,6 @@ TEST(LocalFormalElaboration, AnOutwardInstanceAdmittingAnEmptyMatchIsReported) {
                             8, "16.8.2"));
 }
 
-// §16.8.2: triggered and matched apply to no instance of a sequence with an
-// input or inout local variable formal argument.
 TEST(LocalFormalElaboration, TriggeredOfAnInstanceWithAnInputLocalIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -165,8 +153,6 @@ TEST(LocalFormalElaboration, TriggeredOfAnInstanceWithAnInputLocalIsReported) {
                             11, "16.8.2"));
 }
 
-// §16.8.2: the actual of an input local variable formal argument references
-// no local variable unassigned where the instance stands, as v is.
 TEST(LocalFormalElaboration, AnUnassignedLocalAsAnInputActualIsReported) {
   ElabFixture f;
   ElaborateSrc(

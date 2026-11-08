@@ -21,10 +21,6 @@ TEST(SubroutineCallExprSim, SystemTfCallClog2) {
   EXPECT_EQ(var->value.ToUint64(), 8u);
 }
 
-// Claim D: an argument value of 0 produces a result of 0; the boundary at 1
-// (log base 2 of 1 is 0) likewise produces 0. Both arguments are held in
-// runtime variables so the values reach $clog2 through the simulator's
-// EvalClog2 path rather than being folded away during elaboration.
 TEST(UtilitySystemTaskTest, Clog2ZeroAndOneFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -53,9 +49,6 @@ TEST(UtilitySystemTaskTest, Clog2ZeroAndOneFromSource) {
   EXPECT_EQ(x1->value.ToUint64(), 0u);
 }
 
-// Claim C: the argument is treated as unsigned. A negative 32-bit value is
-// read over its unsigned bit pattern (-2 is 0xFFFFFFFE), so the result is the
-// clog2 of that large magnitude rather than 0.
 TEST(UtilitySystemTaskTest, Clog2TreatsArgumentAsUnsigned) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -72,7 +65,6 @@ TEST(UtilitySystemTaskTest, Clog2TreatsArgumentAsUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 32u);
 }
 
-// Claim B: the argument may be an arbitrary-sized vector value.
 TEST(UtilitySystemTaskTest, Clog2VectorArgument) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -89,9 +81,6 @@ TEST(UtilitySystemTaskTest, Clog2VectorArgument) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// Claim B edge case: the argument may be a vector wider than the native
-// machine integer. 0x2_0000_0001 (2**33 + 1) sits just past a power of two,
-// so the unsigned, wide-operand result rounds up to 34.
 TEST(UtilitySystemTaskTest, Clog2WideVectorArgument) {
   SimFixture f;
   auto* var = RunAndFindVar(

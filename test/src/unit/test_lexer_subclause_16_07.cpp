@@ -50,8 +50,6 @@ TEST(SequenceLexing, RepetitionStarAndPlusTokenize) {
 }
 
 TEST(SequenceLexing, GotoRepetitionUsesArrow) {
-  // §16.7 goto_repetition: `[->` opens the form, so the arrow must lex as
-  // one token to keep the brackets recognizable as repetition delimiters.
   auto tokens = Lex("[->3]");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kLBracket);
@@ -61,7 +59,6 @@ TEST(SequenceLexing, GotoRepetitionUsesArrow) {
 }
 
 TEST(SequenceLexing, NonconsecutiveRepetitionUsesEquals) {
-  // §16.7 nonconsecutive_repetition: `[=N]` shape.
   auto tokens = Lex("[=2]");
   ASSERT_GE(tokens.size(), 4u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kLBracket);

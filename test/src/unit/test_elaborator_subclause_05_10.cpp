@@ -60,10 +60,6 @@ TEST(StructLiteralElaboration, StructLiteralVarInit) {
              "endmodule\n"));
 }
 
-// §5.10 opens by making a structure literal a structure assignment pattern or
-// pattern expression with constant member expressions (§10.9.2), so it states
-// no member-key rule of its own and the report names §10.9.2, where the rule
-// is.
 TEST(StructLiteralElaboration, InvalidMemberName) {
   ElabFixture f;
   ElaborateSrc(
@@ -99,13 +95,6 @@ TEST(StructLiteralElaboration, NestedBracesArrayOfStructs) {
              "endmodule\n"));
 }
 
-// §5.10 (printed page 84) has the nested braces of a structure literal reflect
-// the structure, names the C-like flat alternative of its own two-element
-// example as not allowed, and has the braces of an initialized array of
-// structures reflect the array and the structure. The flat form is what the
-// spelling breaks, so the report is §5.10's, not the §10.9.1 element count
-// that flattening two two-member structures into a two-element array also
-// fails.
 TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -122,9 +111,6 @@ TEST(StructLiteralElaboration, CLikeFlatLiteralForArrayOfStructsRejected) {
                              "assignment pattern has 4 elements", 3, "10.9.1"));
 }
 
-// The module of 5.10-structure-arrays-illegal.sv, whose rejection is scored
-// against §5.10: the same flat form, and no §10.9.2 report for it, since the
-// pattern initializes an array, not a structure.
 TEST(StructLiteralElaboration,
      FlatLiteralForStructArrayIsReportedAsAStructureLiteral) {
   ElabFixture f;
@@ -149,9 +135,6 @@ TEST(StructLiteralElaboration,
                              "10.9.2"));
 }
 
-// The flat form whose count happens to agree with the array's: two literals
-// for two structures is still no nesting, and only the type of each element
-// tells it from the nested form.
 TEST(StructLiteralElaboration, CountAgreeingFlatLiteralForStructArrayRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,8 +149,6 @@ TEST(StructLiteralElaboration, CountAgreeingFlatLiteralForStructArrayRejected) {
                             3, "5.10"));
 }
 
-// A structure variable per element is the nesting the clause asks for,
-// written through names rather than braces.
 TEST(StructLiteralElaboration, StructVariablesPerElementOfStructArrayAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -178,8 +159,6 @@ TEST(StructLiteralElaboration, StructVariablesPerElementOfStructArrayAccepted) {
              "endmodule\n"));
 }
 
-// §7.2.1 has a packed structure take an integral value as a whole, so a
-// literal per element of an array of packed structures is no flat form.
 TEST(StructLiteralElaboration, LiteralPerElementOfPackedStructArrayAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -188,9 +167,6 @@ TEST(StructLiteralElaboration, LiteralPerElementOfPackedStructArrayAccepted) {
              "endmodule\n"));
 }
 
-// The nested form at a declaration, with an array extent that differs from
-// the member count: the pattern is an array pattern, so the structure's
-// member count has nothing to say about how many elements it lists.
 TEST(StructLiteralElaboration,
      NestedPatternsForThreeElementStructArrayAccepted) {
   EXPECT_TRUE(
@@ -210,9 +186,6 @@ TEST(StructLiteralElaboration, ReplicationStructLiteral) {
              "endmodule\n"));
 }
 
-// §5.10 (printed page 84) has a replication set the values for the exact
-// number of members, its multiplier times its items. Three values for two
-// members was let through, every replication excused from the count.
 TEST(StructLiteralElaboration, ReplicationSupplyingTooManyMembersRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -226,8 +199,6 @@ TEST(StructLiteralElaboration, ReplicationSupplyingTooManyMembersRejected) {
                             2, "5.10"));
 }
 
-// The count is the multiplier times the items: two copies of two values fill
-// four members, which a count of the multiplier alone would reject.
 TEST(StructLiteralElaboration,
      ReplicationOfSeveralItemsFillingMembersAccepted) {
   EXPECT_TRUE(
@@ -236,9 +207,6 @@ TEST(StructLiteralElaboration,
              "endmodule\n"));
 }
 
-// The flat form of §5.10 is just as wrong in a procedural assignment and in
-// the initializer of a declaration inside a block as at a module-level
-// declaration. Only the module-level declaration was checked.
 TEST(StructLiteralElaboration, FlatLiteralOutsideModuleDeclarationRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -258,9 +226,6 @@ TEST(StructLiteralElaboration, FlatLiteralOutsideModuleDeclarationRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 6, "5.10"));
 }
 
-// An array of structures whose unpacked dimension comes from its typedef is
-// the same array, and the flat form is as wrong for it: the declaration takes
-// the typedef's dimension before its pattern is checked.
 TEST(StructLiteralElaboration, FlatLiteralForTypedefArrayOfStructsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -276,9 +241,6 @@ TEST(StructLiteralElaboration, FlatLiteralForTypedefArrayOfStructsRejected) {
                             4, "5.10"));
 }
 
-// A replication inside a structure literal fills its member: two copies of two
-// values fill a four-element array member, and the literal elaborates without
-// a report.
 TEST(StructLiteralElaboration, ReplicationFillingAnArrayMemberAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

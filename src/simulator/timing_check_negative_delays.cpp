@@ -1,33 +1,3 @@
-// §31.9.1 (printed pages 920-922): a negative $setuphold or $recrem is
-// evaluated on delayed copies of its reference and data signals. Each signal
-// has one delayed copy whichever checks name it, and the delays shift every
-// check's window onto its delayed reference edge. The adjusted limits are the
-// declared ones moved by the two delays: the limit bounding the side before the
-// edge grows by the reference's delay and shrinks by the data's, and the limit
-// bounding the side after it the other way round.
-//
-// The clause states no formula for the delays. Figure 31-6 (printed page 923)
-// works three checks on a 10 ps precision to dCP 10.01, dD 0, dTI 20.02 and dTE
-// 2.02, which are the least delays that leave every non-zero limit of every
-// check, adjusted, at least one unit of precision. That is what is solved here:
-// each such limit is a difference constraint between two delays, and the least
-// non-negative solution is the longest path to each signal. One unit is also
-// what §31.3.3 and §31.3.6 ask a negative check's two limits to sum to more
-// than, which is exactly when one check's own two constraints can both hold.
-//
-// Limits no delays satisfy are what the clause calls mutually inconsistent. The
-// run warns, sets the least negative limit to 0 and solves again, until a
-// solution is reached; at worst every negative limit is 0 and nothing lags.
-//
-// Every other check naming a delayed signal is evaluated on the delayed copy
-// too, but $skew, $fullskew and $timeskew, and its limits are adjusted by the
-// same two delays so that its window stays where it was declared and only the
-// moment it reports moves. An adjusted limit that is no longer positive is set
-// to 0 with a warning. $width and $period watch one signal, whose edges are
-// delayed alike, and keep their limits. WatchConditionedEdge
-// (simulator/timing_check_driver_internal.h) is what delivers such a check's
-// transitions late.
-
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -46,7 +16,6 @@
 namespace delta {
 namespace {
 
-// d[later] - d[earlier] >= gap, in ticks.
 struct DelayConstraint {
   std::size_t later = 0;
   std::size_t earlier = 0;
@@ -59,8 +28,6 @@ bool TakesNegativeDelays(const TimingCheckEntry& e) {
           e.kind == TimingCheckKind::kRecrem);
 }
 
-// $setuphold's setup limit and $recrem's removal limit bound the side before
-// the reference edge, and the declaration writes them first and second.
 int64_t& BeforeLimit(TimingCheckEntry& e) {
   return e.kind == TimingCheckKind::kRecrem ? e.signed_limit2 : e.signed_limit;
 }
@@ -69,8 +36,6 @@ int64_t& AfterLimit(TimingCheckEntry& e) {
   return e.kind == TimingCheckKind::kRecrem ? e.signed_limit : e.signed_limit2;
 }
 
-// §31.3.3 and §31.3.6: with a limit negative, the two sum to more than one
-// unit of simulation precision.
 void ReportLimitSum(const TimingCheckEntry& e, int64_t unit_ticks,
                     DiagEngine& diag) {
   const int64_t kSum = e.signed_limit + e.signed_limit2;
@@ -92,9 +57,6 @@ std::size_t NodeOf(std::unordered_map<std::string, std::size_t>& nodes,
   return it->second;
 }
 
-// A limit L adjusted by the two delays stays at least one unit U: before the
-// edge L + d(ref) - d(data) >= U, after it L - d(ref) + d(data) >= U. A zero
-// limit bounds no window on its side and constrains nothing.
 std::vector<DelayConstraint> ConstraintsOf(
     std::vector<TimingCheckEntry>& checks, int64_t unit_ticks,
     std::unordered_map<std::string, std::size_t>& nodes) {
@@ -113,10 +75,6 @@ std::vector<DelayConstraint> ConstraintsOf(
   return constraints;
 }
 
-// The least non-negative delays meeting every constraint, which is the
-// longest path to each signal. A pass that still raises a delay after as many
-// passes as there are signals is on a cycle that raises it without end, and
-// then there is no solution.
 bool SolveLeastDelays(const std::vector<DelayConstraint>& constraints,
                       std::size_t count, std::vector<int64_t>& delays) {
   delays.assign(count, 0);
@@ -132,10 +90,6 @@ bool SolveLeastDelays(const std::vector<DelayConstraint>& constraints,
   return false;
 }
 
-// Sets the least negative limit of the negative checks to 0, with §31.9.1's
-// warning at its check. Limits with none negative always solve, every delay
-// at 0 leaving each non-zero limit as it was and so at least one unit, so the
-// caller asks this only where some limit is negative.
 void ZeroLeastNegativeLimit(std::vector<TimingCheckEntry>& checks,
                             DiagEngine& diag) {
   std::vector<int64_t*> places;
@@ -161,7 +115,6 @@ void ZeroLeastNegativeLimit(std::vector<TimingCheckEntry>& checks,
   *places[i] = 0;
 }
 
-// A limit moved by `shift`, with §31.9.1's warning where it was set to 0.
 void ShiftLimit(uint64_t& limit, int64_t& signed_limit, int64_t shift,
                 const SourceLoc& loc, DiagEngine& diag) {
   const AdjustedNegativeTimingLimit kAdjusted =
@@ -177,9 +130,6 @@ void ShiftLimit(uint64_t& limit, int64_t& signed_limit, int64_t shift,
   signed_limit = static_cast<int64_t>(kAdjusted.limit);
 }
 
-// Records the shift and moves the check's limits by it. $nochange's offsets
-// move its window's two ends the same way; §31.4.6 gives an offset that is not
-// positive a meaning of its own, so they are moved and never set to 0.
 void AdjustLimitsForDelays(TimingCheckEntry& e, int64_t shift,
                            DiagEngine& diag) {
   e.delayed_signal_shift = shift;
@@ -195,11 +145,6 @@ void AdjustLimitsForDelays(TimingCheckEntry& e, int64_t shift,
 
 }  // namespace
 
-// A limit bounding the side before the reference edge grows by d(ref) - d(data)
-// and one bounding the side after it shrinks by as much. $setup's, $removal's
-// and $setuphold's first limits are before it, and $hold's, $recovery's and
-// $recrem's after it, the second limit of the two-sided checks bounding the
-// other side.
 int64_t FirstLimitDelayShift(const TimingCheckEntry& check) {
   const bool kFirstBefore = check.kind == TimingCheckKind::kSetup ||
                             check.kind == TimingCheckKind::kSetuphold ||

@@ -46,8 +46,6 @@ TEST(JumpStatementSim, JumpReturnVoidFunction) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §12.8 runtime return rule exercised through a §13.3 task built from real
-// source: an early return exits the task, so the statement after it never runs.
 TEST(JumpStatementSim, JumpReturnExitsTask) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -68,9 +66,6 @@ TEST(JumpStatementSim, JumpReturnExitsTask) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// continue (12.8) is taken on every odd iteration of a forever-loop, and
-// the loop keeps running until the break. The 12.7.6 file makes the
-// matching claim about the forever-loop construct.
 TEST(LoopStatementSim, ContinueSkipsOddForeverIterations) {
   SimFixture f;
   auto* count = RunAndFindVar(
@@ -132,9 +127,6 @@ TEST(LoopStatementSim, RepeatContinue) {
   EXPECT_EQ(count->value.ToUint64(), 4u);
 }
 
-// break jumps out of the loop (12.8); the while control expression never
-// goes false, so break is the only way out. The 12.7.4 file makes the
-// matching claim about the while-loop construct.
 TEST(LoopStatementSim, BreakJumpsOutOfWhileLoop) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -171,9 +163,6 @@ TEST(LoopStatementSim, ForBreak) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// continue (12.8) is taken on two selected iterations of one for-loop, and
-// the loop control still runs the remaining iterations. The 12.7.1 file
-// makes the matching claim about the for-loop construct.
 TEST(LoopStatementSim, ContinueSkipsSelectedForIterations) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -193,9 +182,6 @@ TEST(LoopStatementSim, ContinueSkipsSelectedForIterations) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// break jumps out of the do...while loop (12.8) even though its control
-// expression is constantly true. The 12.7.5 file makes the matching claim
-// about the do...while construct's end-of-loop test.
 TEST(LoopStatementSim, BreakJumpsOutOfDoWhileLoop) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -214,9 +200,6 @@ TEST(LoopStatementSim, BreakJumpsOutOfDoWhileLoop) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// continue jumps to the end of the loop (12.8), skipping the rest of the
-// do...while body on the selected iteration. The 12.7.5 file makes the
-// matching claim about the do...while construct's end-of-loop test.
 TEST(LoopStatementSim, ContinueSkipsRemainderOfDoWhileBody) {
   SimFixture f;
   auto* count = RunAndFindVar(
@@ -384,9 +367,6 @@ TEST(JumpStatementSim, JumpBreakExitsMultiDimForeach) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// continue (12.8) is taken on every odd iteration of one while-loop. The
-// 12.8.2 file covers a single continue and the 12.7.4 file makes the
-// matching claim about the while-loop construct.
 TEST(LoopStatementSim, ContinueSkipsOddWhileIterations) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -407,8 +387,6 @@ TEST(LoopStatementSim, ContinueSkipsOddWhileIterations) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // continue jumps back to the while condition, skipping the count bump on odd
-  // values; the loop still runs to completion, tallying the five even values.
   auto* count = f.ctx.FindVariable("count");
   ASSERT_NE(count, nullptr);
   EXPECT_EQ(count->value.ToUint64(), 5u);
@@ -439,9 +417,6 @@ TEST(JumpStatementSim, ContinueAdvancesMultiDimForeach) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // In a multidimensional foreach, continue ends only the current set of loop
-  // variable values and proceeds to the next combination, so every element but
-  // the skipped 3 is summed: 1+2+4+5+6 == 18.
   auto* sum = f.ctx.FindVariable("sum");
   ASSERT_NE(sum, nullptr);
   EXPECT_EQ(sum->value.ToUint64(), 18u);
@@ -468,10 +443,6 @@ TEST(LoopStatementSim, NestedLoopInnerContinue) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// §12.8: a break jumps out of the loop, and §13.4 lets a function body hold
-// the loop. The loop is bounded by a return at 99 so that a break the
-// interpreter passed over gives 99 rather than a run that never ends; with
-// the break acted on the count is 4.
 TEST(JumpStatementSim, BreakEndsForeverLoopInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -490,9 +461,6 @@ TEST(JumpStatementSim, BreakEndsForeverLoopInFunction) {
             4u);
 }
 
-// A break in a for loop of a function body leaves the loop before the step:
-// the values 0 to 4 are summed, 10, where a loop the break did not end sums
-// 0 to 9, 45.
 TEST(JumpStatementSim, BreakEndsForLoopInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -510,8 +478,6 @@ TEST(JumpStatementSim, BreakEndsForLoopInFunction) {
             10u);
 }
 
-// A break in a while loop of a function body: the counter stops at 6 where
-// the condition alone would run it to 10.
 TEST(JumpStatementSim, BreakEndsWhileLoopInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -529,9 +495,6 @@ TEST(JumpStatementSim, BreakEndsWhileLoopInFunction) {
             6u);
 }
 
-// A break in a do-while loop of a function body leaves before the condition
-// is read again: the counter stops at 3 where the condition alone runs it to
-// 10.
 TEST(JumpStatementSim, BreakEndsDoWhileLoopInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -549,9 +512,6 @@ TEST(JumpStatementSim, BreakEndsDoWhileLoopInFunction) {
             3u);
 }
 
-// A break in a foreach loop of a function body jumps out of the whole loop:
-// three elements are counted before the index reaches 3, where a loop the
-// break did not end counts all eight.
 TEST(JumpStatementSim, BreakEndsForeachLoopInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int arr[8];\n"
@@ -570,10 +530,6 @@ TEST(JumpStatementSim, BreakEndsForeachLoopInFunction) {
             3u);
 }
 
-// §12.8: a continue jumps to the end of the loop body and the loop control
-// then runs, so the for loop's step is what carries it past the odd values:
-// the even values below 10 sum to 20, where a continue that skipped nothing
-// sums every value to 45, and one that skipped the step never reaches 10.
 TEST(JumpStatementSim, ContinueRunsForStepInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -591,11 +547,6 @@ TEST(JumpStatementSim, ContinueRunsForStepInFunction) {
             20u);
 }
 
-// The shape of uvm_report_server::reset_severity_counts: a class method
-// walks an enumeration from first() to last() with next() (§6.19.5) in a
-// forever loop that breaks at the last member. Four members are visited;
-// the guard at 99 turns a break the method did not act on into 99 rather
-// than a run that never ends.
 TEST(JumpStatementSim, BreakEndsEnumForeverInClassMethod) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef enum { INFO, WARNING, ERROR, FATAL } sev_t;\n"
@@ -625,9 +576,6 @@ TEST(JumpStatementSim, BreakEndsEnumForeverInClassMethod) {
             4u);
 }
 
-// The break stands in a begin-end block inside an if inside the loop, and
-// each of the block and the if hands it up to the loop: the count stops at 7,
-// where a break the block or the if consumed gives 99.
 TEST(JumpStatementSim, BreakInsideNestedBlockInFunctionLoop) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -650,10 +598,6 @@ TEST(JumpStatementSim, BreakInsideNestedBlockInFunctionLoop) {
             7u);
 }
 
-// A labeled loop in a function body (§9.3.5) is left by a break as an
-// unlabeled one is, and the statement after it runs: the count stops at 5
-// and the return past the loop adds 100, so 105 where the loop ended at the
-// 99 guard would give 199.
 TEST(JumpStatementSim, BreakEndsLabeledForeverInFunction) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"

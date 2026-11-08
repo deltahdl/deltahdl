@@ -53,10 +53,6 @@ TEST(NamedSequenceLowering, MultipleSequencesEachGetEndPoint) {
   EXPECT_NE(f.ctx.FindVariable("__seq_second"), nullptr);
 }
 
-// The source the instantiation cases share: clk rises at 5, 15, 25, ...; req
-// is high for the tick at 15 alone and gnt for the ticks at 35, 45 and 55; and
-// a process counts the ticks at which the named sequence `rule`, declared as
-// `decls` has it, reaches its end point, keeping the last such time.
 std::string InstanceSource(const std::string& decls) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -82,11 +78,6 @@ std::string InstanceSource(const std::string& decls) {
          "endmodule\n";
 }
 
-// §16.8: a named sequence declared without a clock inherits one from the
-// sequence that instantiates it, and the instance behaves as the flattened
-// sequence, `req ##1 gnt` here: the clause's `rule` example in miniature. gnt
-// is low at the tick after req's, so nothing ends there; `req ##2 gnt` would
-// end at 35, and the inherited-clock instance reads the delay §16.7 gives ##1.
 TEST(NamedSequenceInstance, ClocklessSequenceInheritsTheInstantiatingClock) {
   SimFixture f;
   auto* hits = RunAndFindVar(InstanceSource("  sequence s;\n"
@@ -101,9 +92,6 @@ TEST(NamedSequenceInstance, ClocklessSequenceInheritsTheInstantiatingClock) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
-// §16.8: the delay before an instance and the instantiated body's own leading
-// delay add: `req ##1 s` with `s` being `##1 gnt` reads gnt two ticks after
-// req, at 35.
 TEST(NamedSequenceInstance, DelayBeforeAnInstanceAddsToItsLeadingDelay) {
   SimFixture f;
   auto* hits = RunAndFindVar(InstanceSource("  sequence s;\n"
@@ -118,10 +106,6 @@ TEST(NamedSequenceInstance, DelayBeforeAnInstanceAddsToItsLeadingDelay) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
-// §16.8: actual arguments bound to formals by position are substituted for
-// the formals' references, in an operand and in a delay bound alike, and `$`
-// as an actual is the upper bound of a cycle_delay_const_range_expression:
-// win(req, gnt, 3, $) is `req ##[3:$] gnt`, which ends at 45 and 55.
 TEST(NamedSequenceInstance, PositionalActualsSubstituteForTheFormals) {
   SimFixture f;
   auto* hits =
@@ -137,9 +121,6 @@ TEST(NamedSequenceInstance, PositionalActualsSubstituteForTheFormals) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
 }
 
-// §16.8: actual arguments may be bound to formals by name, in any order, and
-// an actual that is an expression stands as one term: win(.hi(2), .lo(2),
-// .y(gnt && !req), .x(req)) is `req ##[2:2] (gnt && !req)`, ending at 35.
 TEST(NamedSequenceInstance, NamedActualsSubstituteForTheFormals) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -156,8 +137,6 @@ TEST(NamedSequenceInstance, NamedActualsSubstituteForTheFormals) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
-// §16.8: a named sequence may be instantiated before its declaration, the
-// reference being resolved when the sequences are lowered together.
 TEST(NamedSequenceInstance, InstanceMayPrecedeTheDeclaration) {
   SimFixture f;
   auto* hits = RunAndFindVar(InstanceSource("  sequence rule;\n"
@@ -172,9 +151,6 @@ TEST(NamedSequenceInstance, InstanceMayPrecedeTheDeclaration) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
-// §16.8: an instance that omits a formal with a default actual takes the
-// default. a is high at the rises of 5, 25 and 55 and b at 15, 35, 65 and 85,
-// so `a ##1 b` with y defaulted to b matches from 5, 25 and 55.
 TEST(NamedSequenceInstance, AnOmittedFormalTakesItsDefault) {
   SimFixture f;
   std::string out = RunCapture(
@@ -192,9 +168,6 @@ TEST(NamedSequenceInstance, AnOmittedFormalTakesItsDefault) {
   EXPECT_NE(out.find("cdef=3\n"), std::string::npos);
 }
 
-// A typed formal's default stands where the formal does, a cycle delay among
-// them: with d defaulted to 3, `a ##3 b` matches from 5 and 55 alone, where
-// the delay read as 1 matched three times.
 TEST(NamedSequenceInstance, AnOmittedDelayFormalTakesItsDefault) {
   SimFixture f;
   std::string out = RunCapture(
@@ -212,11 +185,6 @@ TEST(NamedSequenceInstance, AnOmittedDelayFormalTakesItsDefault) {
   EXPECT_NE(out.find("c1=2\n"), std::string::npos);
 }
 
-// §16.8 with §26.3: a sequence declared in a package, instantiated through an
-// import and by its package-qualified name as the consequent of `|->`, starts
-// at the end of the antecedent's match. a is high at the rises of 15 and 45
-// and b at 25 alone, so the attempt of 15 holds, that of 45 fails at 55, and
-// the other eight hold vacuously.
 TEST(NamedSequenceInstance, APackageSequenceIsInstantiatedByImportAndByScope) {
   SimFixture f;
   std::string out = RunCapture(
@@ -238,11 +206,6 @@ TEST(NamedSequenceInstance, APackageSequenceIsInstantiatedByImportAndByScope) {
   EXPECT_EQ(out, "p=9 f=1 p2=9 f2=1\n");
 }
 
-// §16.8 with §26.3: a package sequence with no formals is named through the
-// package scope with no parentheses, `pk::s`, as it is declared. As the
-// consequent of `|->` it starts at the antecedent's tick and matches at the
-// next, so every attempt holds; read as a Boolean the two attempts whose
-// antecedent holds, at 15 and 45, would fail.
 TEST(NamedSequenceInstance, APackageSequenceIsNamedThroughTheScopeAlone) {
   SimFixture f;
   std::string out = RunCapture(
@@ -262,10 +225,6 @@ TEST(NamedSequenceInstance, APackageSequenceIsNamedThroughTheScopeAlone) {
   EXPECT_EQ(out, "p=10 f=0\n");
 }
 
-// §16.8 with §16.8.1 b) and §16.16: a sequence clocked on its event formal,
-// the formal left to its default, `posedge clk`, is the whole property of the
-// statement, so the statement is attempted at every rise of clk, the default
-// in the formal's place, as it is with the event given.
 TEST(NamedSequenceInstance, AnEventFormalLeftToItsDefaultClocksTheStatement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -282,10 +241,6 @@ TEST(NamedSequenceInstance, AnEventFormalLeftToItsDefaultClocksTheStatement) {
   EXPECT_NE(out.find("c3=10 c4=10\n"), std::string::npos);
 }
 
-// §16.8 with §23.6: the run of an interface bus whose sequence `seq` is
-// instantiated through the instance u as `inst`, the consequent of `|->`, so
-// that it starts at the end of the antecedent's match. req is high at the
-// rises of 15 and 45 and gnt at 25 alone.
 std::string RunInterfaceSequence(const std::string& seq,
                                  const std::string& inst) {
   SimFixture f;
@@ -310,9 +265,6 @@ std::string RunInterfaceSequence(const std::string& seq,
       f);
 }
 
-// A sequence declared in an interface is instantiated through an instance of
-// it, `u.s`, its body reading that instance's req and gnt: the attempt of 15
-// holds, that of 45 fails at 55, and the other eight hold vacuously.
 TEST(NamedSequenceInstance,
      AnInterfaceSequenceIsInstantiatedThroughAnInstance) {
   EXPECT_EQ(
@@ -320,9 +272,6 @@ TEST(NamedSequenceInstance,
       "fail at 55\np=9 f=1\n");
 }
 
-// The formal g and the local v of an interface sequence are no members of the
-// instance: g stands for the actual u.gnt and v holds the req it samples, so
-// `(1, v = req) ##1 (v && g)` matches as `req ##1 gnt` does.
 TEST(NamedSequenceInstance,
      AnInterfaceSequenceKeepsItsFormalsAndLocalsThroughAnInstance) {
   EXPECT_EQ(
@@ -332,11 +281,6 @@ TEST(NamedSequenceInstance,
       "fail at 55\np=9 f=1\n");
 }
 
-// The harness the event-actual cases share: clk rises at 5, 15, ..., 95; en
-// is true from 42, so at the six rises of 45 to 95; h is true from 22 to 62,
-// so at the four rises of 25 to 55; and a is 1 throughout. `decls` declares
-// the named sequences and properties, and `covers` the cover statements,
-// counting into c1 and c2, printed at 98.
 std::string RunEventActualCase(const std::string& decls,
                                const std::string& covers) {
   SimFixture f;
@@ -353,10 +297,6 @@ std::string RunEventActualCase(const std::string& decls,
       f);
 }
 
-// §16.8.1 b) with §9.4.2 and §16.16: an event formal's actual may carry an
-// iff guard, and the sequence clocked on the formal is then attempted at each
-// rise of clk at which en holds, six, where the event without its guard gives
-// all ten.
 TEST(NamedSequenceInstance, AGuardedEventActualClocksWhereTheGuardHolds) {
   std::string out = RunEventActualCase(
       "  sequence s_g(untyped x, event e); @(e) x; endsequence\n",
@@ -365,8 +305,6 @@ TEST(NamedSequenceInstance, AGuardedEventActualClocksWhereTheGuardHolds) {
   EXPECT_NE(out.find("c1=6 c2=10\n"), std::string::npos);
 }
 
-// §16.8 with §9.4.2: an event formal's default may carry an iff guard, and an
-// instance leaving the formal to it is clocked where the guard holds.
 TEST(NamedSequenceInstance, AGuardedEventDefaultClocksWhereTheGuardHolds) {
   std::string out = RunEventActualCase(
       "  sequence s_d(untyped x, event e = posedge clk iff en);\n"
@@ -377,9 +315,6 @@ TEST(NamedSequenceInstance, AGuardedEventDefaultClocksWhereTheGuardHolds) {
   EXPECT_NE(out.find("c1=6 c2=10\n"), std::string::npos);
 }
 
-// §16.8 with §9.4.2: an event formal's default may join events with `or`,
-// and an instance leaving the formal to it is clocked on either, the ten
-// rises and the nine falls of clk to 98, as one given `edge clk` is.
 TEST(NamedSequenceInstance, AnOrEventDefaultClocksOnEitherEvent) {
   std::string out = RunEventActualCase(
       "  sequence s_o(untyped x, event e = posedge clk or negedge clk);\n"
@@ -390,9 +325,6 @@ TEST(NamedSequenceInstance, AnOrEventDefaultClocksOnEitherEvent) {
   EXPECT_NE(out.find("c1=19 c2=19\n"), std::string::npos);
 }
 
-// §16.8.1 b) with §9.4.2: a clock that guards the event formal it names,
-// `@(e iff g)`, holds where its own guard and the actual's both do, at the
-// rises of 45 and 55, and where the actual carries none, at those h guards.
 TEST(NamedSequenceInstance, AClocksGuardHoldsBesideTheActualsGuard) {
   std::string out = RunEventActualCase(
       "  sequence s_c(untyped x, event e, untyped g);\n"
@@ -403,8 +335,6 @@ TEST(NamedSequenceInstance, AClocksGuardHoldsBesideTheActualsGuard) {
   EXPECT_NE(out.find("c1=2 c2=4\n"), std::string::npos);
 }
 
-// §16.12.18 with §16.8.1 b): a property clocked on its event formal takes a
-// guarded actual and an `or` of two as a sequence does.
 TEST(NamedSequenceInstance, APropertyClockedOnItsEventFormalTakesEither) {
   std::string out = RunEventActualCase(
       "  property p_g(untyped x, event e); @(e) x; endproperty\n",
@@ -413,11 +343,6 @@ TEST(NamedSequenceInstance, APropertyClockedOnItsEventFormalTakesEither) {
   EXPECT_NE(out.find("c1=6 c2=19\n"), std::string::npos);
 }
 
-// §16.8: an actual bound to an untyped formal is cast to its self-determined
-// type before it stands for the formal, so the 4-bit `p + q`, 15 + 1, wraps
-// to 0 and `x == 0` holds at every tick, where widened to the 32 bits of the
-// 0 it would sum to 16; §16.12 has a named property's untyped formal do the
-// same.
 TEST(NamedSequenceInstance, AnUntypedFormalsActualIsSelfDetermined) {
   std::string out = RunEventActualCase(
       "  logic [3:0] p = 4'hF, q = 4'h1;\n"
@@ -428,9 +353,6 @@ TEST(NamedSequenceInstance, AnUntypedFormalsActualIsSelfDetermined) {
   EXPECT_NE(out.find("c1=10 c2=10\n"), std::string::npos) << out;
 }
 
-// §16.8: so are a unary and a conditional operator's results: the 4-bit ~p
-// is 0 where widened it is not, and `1 ? p + q : 0` is p + q's 4 bits. A real
-// keeps its type: r + 0.5 is 1.75, above 1.5 at every tick.
 TEST(NamedSequenceInstance, EveryOperatorActualIsSelfDetermined) {
   std::string out = RunEventActualCase(
       "  logic [3:0] p = 4'hF, q = 4'h1;\n"

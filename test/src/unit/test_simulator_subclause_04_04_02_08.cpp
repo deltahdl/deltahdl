@@ -12,12 +12,6 @@
 
 using namespace delta;
 
-// D1 (Re-NBA drains after all Re-Inactive) is covered by the stronger
-// four-region order test below and by the mid-drain test, which asserts the
-// same reinactive<renba relation over both statically and dynamically
-// scheduled Re-Inactive events; standalone pairwise/batch variants were
-// redundant and were removed (mirrors the §4.4.2.4 NBA suite dedup).
-
 TEST(ReNbaRegionSim, ReNBAToReactiveIteration) {
   VerifyIterationChain(Region::kReactive, "reactive", Region::kReNBA, "renba");
 }
@@ -95,9 +89,6 @@ TEST(ReNbaRegionSim, NonblockingAssignFromReactiveSetSchedulesReNBA) {
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 3u);
 }
 
-// The program's initial waits out the delay, since its end would end the run
-// (§24.3) before the update's time step; the update lands in that step's
-// Re-NBA region, which the step runs before the run ends.
 TEST(ReNbaRegionSim,
      NonblockingAssignFromReactiveSetWithDelaySchedulesReNBALater) {
   SimFixture f;
@@ -117,12 +108,6 @@ TEST(ReNbaRegionSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
 }
 
-// D2, array-concatenation nonblocking-assign form: an unpacked-array target
-// assigned a concatenation from within a reactive-set process (program block)
-// still defers its per-element updates to the Re-NBA region. Exercises the
-// distinct array-concat routing site in production. Discriminates deferral: a
-// blocking write to mem[0] after the nonblocking assign is overwritten by the
-// deferred Re-NBA update (mem[0] ends at 10, not the later blocking 7).
 TEST(ReNbaRegionSim,
      ArrayConcatNonblockingAssignFromReactiveSetSchedulesReNBA) {
   SimFixture f;
@@ -147,12 +132,6 @@ TEST(ReNbaRegionSim,
   EXPECT_EQ(f.ctx.FindVariable("mem[1]")->value.ToUint64(), 20u);
 }
 
-// D2, streaming-concatenation nonblocking-assign form (§11.4.14.3): a streaming
-// target of a nonblocking assign executed in a reactive-set process defers its
-// reverse (unpack) writes to the Re-NBA region. Exercises the distinct
-// streaming routing site in production. Discriminates deferral: the later
-// blocking write to `a` is overwritten by the deferred Re-NBA unpack, so `a`
-// ends at the unpacked 0xAB rather than the blocking 9.
 TEST(ReNbaRegionSim,
      StreamingConcatNonblockingAssignFromReactiveSetSchedulesReNBA) {
   SimFixture f;

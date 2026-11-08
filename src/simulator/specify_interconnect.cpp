@@ -1,18 +1,3 @@
-// §32.5: the delay an SDF INTERCONNECT, PORT or NETDELAY entry puts between a
-// driving port and a driven port.
-//
-// The file answers §32.4.4, which decides what an entry's names stand for
-// before any delay is stored: CollectInterconnectTopology builds the
-// InterconnectTopology whose nets a port connection merges, the free functions
-// in the anonymous namespace compare and walk the hierarchical names SDF and
-// the design spell differently, and SpecifyManager::AnnotateSdfInterconnect and
-// the AnnotateSdf* members beside it place an InterconnectDelay onto every load
-// port an entry reaches. SpecifyManager::ReadInterconnectReference then answers
-// which annotated load a reading signal follows.
-//
-// §31's timing checks stand in src/simulator/specify_timing_check.cpp, and the
-// verdicts they produce in src/simulator/specify_timing_violation.cpp.
-
 #include <algorithm>
 #include <cstddef>
 #include <optional>
@@ -35,9 +20,6 @@ namespace delta {
 
 namespace {
 
-// §32.4.4: SDF writes a hierarchical name with `/` between levels, while the
-// design writes it with `.`. Neither spelling is preferred -- a name is kept as
-// whoever wrote it spelled it -- so the two dividers compare equal instead.
 bool IsInterconnectDivider(char c) { return c == '/' || c == '.'; }
 
 bool InterconnectNameEq(std::string_view a, std::string_view b) {
@@ -57,8 +39,6 @@ std::string JoinInterconnectScope(const std::string& scope,
   return scope + "/" + std::string(leaf);
 }
 
-// The enclosing scope of a hierarchical name -- "u2" for "u2/in", empty for a
-// name at the top level.
 std::string InterconnectScopeOf(const std::string& name) {
   for (std::size_t i = name.size(); i > 0; --i) {
     if (IsInterconnectDivider(name[i - 1])) return name.substr(0, i - 1);
@@ -66,9 +46,6 @@ std::string InterconnectScopeOf(const std::string& name) {
   return {};
 }
 
-// How deep in the hierarchy a name sits. A larger number is further from the
-// top, which is what standing below another in the hierarchy means for the up-
-// and down-hierarchy annotation rules.
 std::size_t InterconnectDepth(const std::string& name) {
   std::size_t depth = 0;
   for (char c : name) {
@@ -85,8 +62,6 @@ bool IsWithinInterconnectScope(std::string_view name, std::string_view scope) {
          IsInterconnectDivider(name[scope.size()]);
 }
 
-// §32.4.4: a load port shall be an input or an inout port, and a source port
-// shall be an output or an inout port.
 bool IsInterconnectLoadDirection(Direction dir) {
   return dir == Direction::kInput || dir == Direction::kInout;
 }
@@ -111,8 +86,6 @@ const InterconnectNet* FindInterconnectNet(const InterconnectTopology& topo,
   return nullptr;
 }
 
-// §32.4.4: interconnect delays go between module ports and never between
-// primitive pins, so a name that reaches into a gate instantiation is refused.
 bool NamesInterconnectPrimitivePin(const InterconnectTopology& topo,
                                    std::string_view name) {
   for (const auto& inst : topo.primitive_instances) {
@@ -141,15 +114,6 @@ std::vector<const InterconnectTerminal*> InterconnectSourcesOnNet(
   return out;
 }
 
-// §32.4.4: the load ports one entry's load name stands for. A name that is a
-// port is just that port. A name that is a net stands for every load port of
-// that net at or hierarchically within the net's own scope, and any other name
-// stands for every load port hierarchically within it -- which is how two
-// annotations onto the same net can cover different, overlapping subsets of its
-// ports.
-// A name that is a port is just that port, plus the ports of the net at or
-// hierarchically within that point -- the ports inside the instance whose port
-// was named.
 static std::vector<const InterconnectTerminal*> LoadsUnderPort(
     const InterconnectTopology& topo, const InterconnectTerminal* exact) {
   std::vector<const InterconnectTerminal*> out;
@@ -165,8 +129,6 @@ static std::vector<const InterconnectTerminal*> LoadsUnderPort(
   return out;
 }
 
-// A name that is a net stands for every load port of that net at or
-// hierarchically within the net's own scope.
 static std::vector<const InterconnectTerminal*> LoadsOnNamedNet(
     const InterconnectTopology& topo, const InterconnectNet* net) {
   const std::string kScope = InterconnectScopeOf(net->name);
@@ -177,7 +139,6 @@ static std::vector<const InterconnectTerminal*> LoadsOnNamedNet(
   return out;
 }
 
-// Any other name stands for every load port hierarchically within it.
 static std::vector<const InterconnectTerminal*> LoadsWithinScope(
     const InterconnectTopology& topo, std::string_view name) {
   std::vector<const InterconnectTerminal*> out;
@@ -207,8 +168,6 @@ std::vector<const InterconnectTerminal*> ResolveInterconnectLoads(
   return LoadsWithinScope(topo, name);
 }
 
-// The module a hierarchical instantiation names, or null when the compilation
-// unit declares no such module.
 const ModuleDecl* FindInterconnectModule(const CompilationUnit& cu,
                                          std::string_view name) {
   for (const auto* mod : cu.modules) {
@@ -217,10 +176,6 @@ const ModuleDecl* FindInterconnectModule(const CompilationUnit& cu,
   return nullptr;
 }
 
-// §32.4.4: builds the topology. Nets that a port connection joins are merged
-// into one identity, so the ports on either side of a hierarchy boundary come
-// out on the same net -- which is what lets an annotation to a port reach the
-// connected ports at higher and lower levels.
 class InterconnectTopologyBuilder {
  public:
   explicit InterconnectTopologyBuilder(const CompilationUnit& cu) : cu_(cu) {}
@@ -263,8 +218,6 @@ class InterconnectTopologyBuilder {
       if (!item.name.empty()) AddNet(JoinInterconnectScope(scope, item.name));
       return;
     }
-    // §32.4.4: an interconnect delay is never annotated to a primitive's pin,
-    // and a user-defined primitive (§29) is a primitive as a gate is.
     if (item.kind == ModuleItemKind::kGateInst ||
         item.kind == ModuleItemKind::kUdpInst) {
       if (!item.gate_inst_name.empty()) {
@@ -278,7 +231,7 @@ class InterconnectTopologyBuilder {
   }
 
   void Walk(const ModuleDecl& mod, const std::string& scope, int depth) {
-    if (depth > 16) return;  // a self-instantiating module cannot be elaborated
+    if (depth > 16) return;
     for (const auto& port : mod.ports) {
       if (!port.name.empty()) AddNet(JoinInterconnectScope(scope, port.name));
     }
@@ -287,8 +240,6 @@ class InterconnectTopologyBuilder {
     }
   }
 
-  // §23.3.2.1: a connection with no formal name is positional, so the port it
-  // reaches is the one declared in that position.
   void AddInstancePortTerminal(const ModuleItem& item, const ModuleDecl& child,
                                std::size_t i, const std::string& scope,
                                const std::string& inst) {
@@ -325,8 +276,6 @@ class InterconnectTopologyBuilder {
     const ModuleDecl* child = FindInterconnectModule(cu_, item.inst_module);
     const std::string kInst = JoinInterconnectScope(scope, item.inst_name);
     if (child == nullptr) {
-      // A user-defined primitive instantiated the way a module is still names
-      // a primitive, whose pins no interconnect delay reaches.
       const bool kIsUdp = std::ranges::any_of(
           cu_.udps,
           [&](const UdpDecl* udp) { return udp->name == item.inst_module; });
@@ -369,9 +318,6 @@ const InterconnectDelay* SpecifyManager::PriorInterconnectDelay(
 
 namespace {
 
-// §32.5: a transition the entry left as it stood keeps the delay in force for
-// it, and an INCREMENT adds nothing to it. With no record in force its delay
-// is 0.
 void HoldInterconnectDelays(InterconnectDelay& delay,
                             const SdfInterconnectAnnotation& annotation,
                             const InterconnectDelay* prior) {
@@ -383,10 +329,6 @@ void HoldInterconnectDelays(InterconnectDelay& delay,
   }
 }
 
-// §32.4.4 with §32.5: the limits an entry stated beside its delays,
-// `((d) (r) (e))`, in place of the ones the percentages derived; a limit it
-// held, or every limit of a transition whose delay it held, keeps the one in
-// force.
 void PlaceStatedInterconnectLimits(InterconnectDelay& delay,
                                    const SdfInterconnectAnnotation& annotation,
                                    const InterconnectDelay* prior) {
@@ -422,15 +364,8 @@ void SpecifyManager::PlaceInterconnectDelay(
   HoldInterconnectDelays(delay, annotation, prior);
   delay.rise = delay.delays[0];
   delay.fall = delay.delays[1];
-  // §32.4.4: an interconnect delay carries its own reject and error pulse limit
-  // for each of the twelve transitions, and it gets them by the rule a specify
-  // path delay's limits follow -- each limit derived from that transition's own
-  // delay under whatever pulse-limit percentages are in effect, or stated
-  // beside the delay as a path's may be.
   delay.covered_sources = std::move(covered_sources);
   if (annotation.is_increment) {
-    // §32.7: an INCREMENT entry's limits are amounts added to the limits in
-    // place, as its delays are; a limit it left unstated or empty adds 0.
     for (std::size_t i = 0; i < 12; ++i) {
       delay.reject_limit[i] =
           annotation.held.reject[i] ? 0 : annotation.reject_limit[i];
@@ -446,8 +381,6 @@ void SpecifyManager::PlaceInterconnectDelay(
   AddInterconnectDelay(std::move(delay));
 }
 
-// §32.4.4: a PORT entry names the load port directly and carries no source, so
-// its delay is the delay from every source on the net to that port.
 SdfInterconnectOutcome SpecifyManager::AnnotateSdfPortDelay(
     const SdfInterconnectAnnotation& annotation, const std::string& load_name) {
   SdfInterconnectOutcome out;
@@ -467,9 +400,6 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfPortDelay(
   return out;
 }
 
-// §32.4.4: a NETDELAY entry names either a port or a net, and the annotator has
-// to work out which before it can decide what to annotate. Annotating to a net
-// reaches every load port connected to it.
 SdfInterconnectOutcome SpecifyManager::AnnotateSdfNetDelay(
     const SdfInterconnectAnnotation& annotation, const std::string& load_name) {
   SdfInterconnectOutcome out;
@@ -506,8 +436,6 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfNetDelay(
   return out;
 }
 
-// §32.4.4: a load port shall be an input or inout port; one that is not is
-// dropped from the set the annotation reaches, with a warning.
 std::vector<const InterconnectTerminal*>
 SpecifyManager::ResolveInterconnectLoadPorts(const std::string& load_name,
                                              SdfInterconnectOutcome& out) {
@@ -532,8 +460,6 @@ SpecifyManager::ResolveInterconnectLoadPorts(const std::string& load_name,
   return loads;
 }
 
-// §32.4.4: a source port shall be an output or inout port; one that is not
-// cannot be the source of this delay.
 const InterconnectTerminal* SpecifyManager::ResolveInterconnectSourcePort(
     const std::string& source_name, SdfInterconnectOutcome& out) const {
   const InterconnectTerminal* source =
@@ -547,8 +473,6 @@ const InterconnectTerminal* SpecifyManager::ResolveInterconnectSourcePort(
   return source;
 }
 
-// Whether the instance `inner` is held, at any depth, by the instance
-// `outer`; the top of the design, empty, holds every instance.
 static bool InterconnectScopeWithin(std::string_view inner,
                                     std::string_view outer) {
   if (outer.empty()) return true;
@@ -557,9 +481,6 @@ static bool InterconnectScopeWithin(std::string_view inner,
          IsInterconnectDivider(inner[outer.size()]);
 }
 
-// §32.4.4: a delay from a source port is the delay from every source
-// hierarchically above or below it -- a port of an instance holding the
-// source's instance or held by it -- and from no other source on the net.
 std::vector<std::string> SpecifyManager::CoveredSourcesOnSameNet(
     const InterconnectTerminal* source) const {
   std::vector<std::string> covered{source->name};
@@ -575,11 +496,6 @@ std::vector<std::string> SpecifyManager::CoveredSourcesOnSameNet(
   return covered;
 }
 
-// §32.4.4: a source that is not found, or that is not on the load's net, is
-// warned about, but the delay still reaches the load, as the delay from all
-// its sources -- on a multisource net exactly as a PORT delay is, and on a
-// single-source net from the one source the load has, which the source the
-// entry named is not.
 std::vector<std::string> SpecifyManager::CoveredSourcesOffNet(
     const InterconnectTerminal* source, const std::string& source_name,
     const std::string& load_name, SdfInterconnectOutcome& out) const {
@@ -593,8 +509,6 @@ std::vector<std::string> SpecifyManager::CoveredSourcesOffNet(
   return {};
 }
 
-// §32.4.4: an up-hierarchy annotation, where the load sits above the source,
-// gives every load port above that load the same delay as the load itself.
 void SpecifyManager::ExtendLoadsUpHierarchy(
     const InterconnectTerminal* source,
     std::vector<const InterconnectTerminal*>& loads) const {
@@ -607,8 +521,6 @@ void SpecifyManager::ExtendLoadsUpHierarchy(
   }
 }
 
-// §32.4.4: an INTERCONNECT entry names a source and a load, and the delay is
-// annotated onto every load port the load name reaches.
 SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnectPath(
     const SdfInterconnectAnnotation& annotation, const std::string& load_name,
     const std::string& source_name) {
@@ -645,13 +557,9 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnectPath(
 SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
     const SdfInterconnectAnnotation& annotation) {
   SdfInterconnectOutcome out;
-  // The names stay exactly as the file spelled them; only comparison is
-  // divider-insensitive, so nothing an entry carries is rewritten.
   const std::string& load_name = annotation.load;
   const std::string& source_name = annotation.source;
 
-  // With no design bound there is nothing to look the entry's names up in, so
-  // the entry is taken as written.
   if (topology_.terminals.empty() && topology_.nets.empty()) {
     std::vector<std::string> covered;
     if (!source_name.empty()) covered.push_back(source_name);
@@ -661,8 +569,6 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
     return out;
   }
 
-  // §32.4.4: an interconnect delay is annotated between module ports, never
-  // between primitive pins.
   if (NamesInterconnectPrimitivePin(topology_, load_name) ||
       (!source_name.empty() &&
        NamesInterconnectPrimitivePin(topology_, source_name))) {
@@ -682,31 +588,11 @@ SdfInterconnectOutcome SpecifyManager::AnnotateSdfInterconnect(
 
 const InterconnectDelay* SpecifyManager::FindInterconnectDelay(
     std::string_view source, std::string_view load) const {
-  // §32.5: a PORT annotation followed by an INTERCONNECT annotation to the same
-  // load leaves both entries standing, and only the delay from the source the
-  // INTERCONNECT named is meant to have changed. So an entry that names this
-  // very source is what the source reads, and the all-sources entry the PORT
-  // left behind is what every other source keeps reading. Only these two can
-  // coexist: a PORT written afterwards discards the source-specific entries on
-  // its load, so preferring the named source is also preferring the later
-  // annotation.
-  //
-  // §32.4.4 (printed pages 928-929): the run asks by the signal a port
-  // connection names, `w` in `.din(w)`, where an entry names the port driving
-  // it, `u1/dout`, so where the asked name is such a signal rather than a port
-  // an entry whose source sits on its net is the delay from that source, taken
-  // where no entry names the asked name itself. A port asked by its own name
-  // reads only its own entries, so on a net with two sources one source's
-  // delay does not answer for the other. Compared by name alone, an
-  // INTERCONNECT from an instance's output port was never found and its load
-  // waited on nothing.
   const InterconnectDelay* all_sources = nullptr;
   const InterconnectDelay* same_net = nullptr;
   const std::string kSourceNet = AskedSourceNet(source);
   for (const auto& delay : interconnect_delays_) {
     if (!InterconnectNameEq(delay.dst_port, load)) continue;
-    // A delay recorded with no source is the delay from all sources, so it is
-    // the delay from whichever source is being asked about.
     if (delay.covered_sources.empty()) {
       if (all_sources == nullptr) all_sources = &delay;
       continue;
@@ -733,12 +619,6 @@ std::optional<InterconnectDelay> SpecifyManager::ConnectionInterconnectDelay(
   const InterconnectDelay* at_load = FindInterconnectDelay(source, load);
   if (at_load == nullptr) return std::nullopt;
   InterconnectDelay remaining = *at_load;
-  // §32.4.4: an annotated delay is the delay from the sources to the port it
-  // names, however many connections lie between, so a connection whose own
-  // source is a port the same sources' delay already reached carries only
-  // what remains of it. NETDELAY annotates every load port on a net, one
-  // above another among them, and the port further down would otherwise wait
-  // out the delay once per level.
   const InterconnectTerminal* via = FindInterconnectTerminal(topology_, source);
   if (via == nullptr || !IsInterconnectLoadDirection(via->direction)) {
     return remaining;
@@ -758,11 +638,6 @@ std::optional<InterconnectDelay> SpecifyManager::ConnectionInterconnectDelay(
   return remaining;
 }
 
-// The net whose sources answer for `source` where no entry names it: the net a
-// signal sits on, or the net of an input or inout port, which a connection
-// further down reads and which passes on what the net's sources drive
-// (§32.4.4's down-hierarchy annotation). Empty for a source port, which reads
-// only its own entries.
 std::string SpecifyManager::AskedSourceNet(std::string_view source) const {
   const InterconnectTerminal* asked =
       FindInterconnectTerminal(topology_, source);
@@ -771,9 +646,6 @@ std::string SpecifyManager::AskedSourceNet(std::string_view source) const {
   return {};
 }
 
-// How the sources `delay` covers answer for the asked `source`, which sits on
-// the net `source_net` (empty where it sits on none the topology knows): one
-// of them is that very name, one sits on that net, or neither.
 SpecifyManager::SourceMatch SpecifyManager::CoveredSourceMatch(
     const InterconnectDelay& delay, std::string_view source,
     const std::string& source_net) const {
@@ -786,8 +658,6 @@ SpecifyManager::SourceMatch SpecifyManager::CoveredSourceMatch(
   return match;
 }
 
-// The net a name sits on, whether it names a terminal or the net itself. Empty
-// when the name is on no net the topology knows.
 std::string SpecifyManager::InterconnectNetIdOf(std::string_view name) const {
   if (const auto* terminal = FindInterconnectTerminal(topology_, name))
     return terminal->net;
@@ -795,8 +665,6 @@ std::string SpecifyManager::InterconnectNetIdOf(std::string_view name) const {
   return {};
 }
 
-// Whether one annotated delay's load is the load `name` reads through: the load
-// sits on the same net, and `name` is hierarchically within the load's scope.
 bool SpecifyManager::DelayLoadCoversReference(const InterconnectDelay& delay,
                                               const std::string& net_id,
                                               std::string_view name) const {
@@ -813,9 +681,6 @@ InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
       return {true, delay.delays[0], delay.dst_port};
     }
   }
-  // §32.4.4: a reference hierarchically after the load reads the delayed value
-  // too, which is any reference inside the instance whose port is the load and
-  // that still names the same net.
   const std::string kNetId = InterconnectNetIdOf(name);
   if (!kNetId.empty()) {
     for (const auto& delay : interconnect_delays_) {
@@ -823,8 +688,6 @@ InterconnectReferenceRead SpecifyManager::ReadInterconnectReference(
       return {true, delay.delays[0], delay.dst_port};
     }
   }
-  // §32.4.4: everything else -- the source itself, and every point on the net
-  // before the load -- reads the undelayed value.
   return {};
 }
 

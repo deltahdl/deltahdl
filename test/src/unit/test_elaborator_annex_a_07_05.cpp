@@ -1,10 +1,3 @@
-// Annex A.7.5 "System timing checks" holds no production of its own beyond
-// those A.7.5.1, A.7.5.2 and A.7.5.3 track. What A.7.5.2 gives the two flags
-// of $timeskew and $fullskew, `event_based_flag ::= constant_expression` and
-// `remain_active_flag ::= constant_mintypmax_expression`, Table 31-8 and
-// Table 31-9 state again for each: "Constant expression". These cases observe
-// the elaborator holding a flag to that.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -14,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A flag that is a literal, a parameter, a localparam, a specparam of the
-// block or a specparam of the module body is a constant expression.
 TEST(TimingCheckFlagElaboration, ConstantFlagsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -34,9 +25,6 @@ TEST(TimingCheckFlagElaboration, ConstantFlagsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A variable is no constant expression: $timeskew's event_based_flag naming
-// one is reported at the check under §31.4.2, whose Table 31-8 describes the
-// flag.
 TEST(TimingCheckFlagElaboration, TimeskewVariableEventBasedFlagIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,8 +40,6 @@ TEST(TimingCheckFlagElaboration, TimeskewVariableEventBasedFlagIsRejected) {
       "$timeskew event_based_flag is not a constant expression", 4, "31.4.2"));
 }
 
-// A net is no constant expression either: $timeskew's remain_active_flag
-// naming one is reported, the event_based_flag before it being a literal.
 TEST(TimingCheckFlagElaboration, TimeskewNetRemainActiveFlagIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -70,9 +56,6 @@ TEST(TimingCheckFlagElaboration, TimeskewNetRemainActiveFlagIsRejected) {
                     4, "31.4.2"));
 }
 
-// $fullskew's flags are held the same way, under §31.4.3, whose Table 31-9
-// describes them; a variable inside a larger expression is found there too,
-// as is one inside a min:typ:max triple.
 TEST(TimingCheckFlagElaboration, FullskewVariableFlagsAreRejected) {
   ElabFixture f;
   ElaborateSrc(

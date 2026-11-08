@@ -48,8 +48,6 @@ TEST(DpiDeclElab, SameImportNameInDifferentModulesOk) {
 }
 
 TEST(DpiDeclElab, SignatureMismatchAcrossModulesByDefaultLinkageIsError) {
-  // §35.5.4: when no c_identifier is given, the linkage name defaults to the
-  // SystemVerilog name. Two declarations sharing that linkage must agree.
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -85,14 +83,6 @@ TEST(DpiDeclElab, SignatureMismatchOnExplicitLinkageIsError) {
 }
 
 TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
-  // §35.5.4 includes the pure/context qualifiers in the type signature.
-  // The qualifier precedes the c_identifier: §35.5.4 gives
-  // `import "DPI-C" pure function real sin(real);` and
-  // `import "DPI-C" newQueue=function chandle newAnonQueue(...);` on printed
-  // page 978, and Parser::ParseDpiImport in src/parser/parser_dpi.cpp reads
-  // pure/context before ParserDpiHelpers::TryParseDpiCName. Written the other
-  // way round the source does not parse, and the signature rule is never
-  // reached.
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -110,12 +100,6 @@ TEST(DpiDeclElab, PureVsContextDifferenceUnderSameLinkageIsError) {
 }
 
 TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
-  // The two declarations agree in every component the signature holds, and
-  // they differ in the one thing outside it: the name of the formal, 'x' in
-  // one and 'y' in the other. §35.5.4 licenses exactly that difference: one
-  // imported or exported subroutine may be declared in several scopes, so its
-  // argument names and default values may differ between them as long as the
-  // types stay compatible.
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -129,11 +113,6 @@ TEST(DpiDeclElab, MatchingSignatureUnderSameLinkageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.4: one imported or exported subroutine may be declared in several
-// scopes, so its argument names and default values may differ between them as
-// long as the types stay compatible. A default value is no part of the type
-// signature the clause enumerates, so two declarations differing in nothing
-// else are both accepted.
 TEST(DpiDeclElab, DifferingDefaultValuesUnderSameLinkageOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -149,7 +128,6 @@ TEST(DpiDeclElab, DifferingDefaultValuesUnderSameLinkageOk) {
 }
 
 TEST(DpiDeclElab, SignatureReturnTypeMismatchUnderSameLinkageIsError) {
-  // The shared-linkage signature comparison includes the return type.
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -167,7 +145,6 @@ TEST(DpiDeclElab, SignatureReturnTypeMismatchUnderSameLinkageIsError) {
 }
 
 TEST(DpiDeclElab, SignatureSpecStringMismatchUnderSameLinkageIsError) {
-  // The signature also includes the dpi_spec_string ("DPI-C" vs "DPI").
   ElabFixture f;
   Elaborate(R"(
     module m;
@@ -178,8 +155,6 @@ TEST(DpiDeclElab, SignatureSpecStringMismatchUnderSameLinkageIsError) {
     endmodule
   )",
             f, "m");
-  // The "DPI" spec string also draws the §35.4 version-string error and the
-  // §35.5.4 deprecation warning; the §35.5.4 signature error is the one here.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "DPI declaration of linkage name 'link' disagrees "
                             "with the earlier declaration's type signature",
@@ -203,10 +178,6 @@ TEST(DpiDeclElab, SignatureArgDirectionMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: the dimensions and bounds of every array are part of the type. Two
-// packed dimensions of different widths are two types, and the declarations
-// below agree in every other component of the signature, so the packed bounds
-// are what this rejection rests on.
 TEST(DpiDeclElab, SignaturePackedBoundsMismatchUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -224,9 +195,6 @@ TEST(DpiDeclElab, SignaturePackedBoundsMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: the dimensions and bounds of every array are part of the type. The
-// sentence names the bounds and not the width, so [0:7] and [7:0] are two types
-// although each is eight bits wide.
 TEST(DpiDeclElab, SignaturePackedBoundsReversedUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -244,9 +212,6 @@ TEST(DpiDeclElab, SignaturePackedBoundsReversedUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: the dimensions and bounds of every array are part of the type, which
-// says the same of an unpacked dimension as of a packed one. The two formals
-// below are both arrays of int and differ in the bounds alone.
 TEST(DpiDeclElab, SignatureUnpackedBoundsMismatchUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -264,11 +229,6 @@ TEST(DpiDeclElab, SignatureUnpackedBoundsMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4 makes the bounds part of the type, and §7.4.1 writes each of them as
-// a constant_expression -- each packed dimension of a packed array declaration
-// takes a range specification [ constant_expression : constant_expression ] --
-// so a bound is the value its expression evaluates to and not the text it was
-// written with. [3+4:0] and [7:0] are one type, and the two declarations agree.
 TEST(DpiDeclElab, SignaturePackedBoundsAgreeingAfterFoldingUnderSameLinkageOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -283,11 +243,6 @@ TEST(DpiDeclElab, SignaturePackedBoundsAgreeingAfterFoldingUnderSameLinkageOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.4: a signature is the return type together with how many arguments
-// there are and each one's position, direction and type. The two declarations
-// below give the same two arguments in opposite order, and the arguments differ
-// in their direction and in their type, which are what the signature records of
-// an argument. The order is therefore the only thing left between them.
 TEST(DpiDeclElab, SignatureArgOrderMismatchUnderSameLinkageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -305,11 +260,6 @@ TEST(DpiDeclElab, SignatureArgOrderMismatchUnderSameLinkageIsError) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: every declaration of one c_identifier, whatever its scope, must
-// carry exactly the same type signature. A package body is one such scope —
-// A.1.11 makes dpi_import_export a package_item — so an import declared there
-// is compared against the declarations of its linkage name in every other
-// scope.
 TEST(DpiDeclElab, APackageImportJoinsTheSignatureAgreementForItsLinkageName) {
   ElabFixture f;
   Elaborate(R"(
@@ -327,8 +277,6 @@ TEST(DpiDeclElab, APackageImportJoinsTheSignatureAgreementForItsLinkageName) {
                             6, "35.5.4"));
 }
 
-// §35.5.4: one scope may not import the same subroutine name twice. The scope a
-// package body makes is one scope for that rule.
 TEST(DpiDeclElab, DuplicateImportNameInOnePackageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -346,15 +294,6 @@ TEST(DpiDeclElab, DuplicateImportNameInOnePackageIsError) {
                             4, "35.5.4"));
 }
 
-// §35.5.4, footnote 27 of Syntax 35-1: the formals of a dpi_function_proto or
-// dpi_task_proto cannot be passed by reference, and no class type can be passed
-// at all. A class handle has no representation in the DPI's C layer, so the
-// prohibition is absolute rather than a type the permitted list happens to
-// omit, and the report names it as such.
-//
-// The class stands at compilation-unit scope and the import inside a module,
-// which is where a source would write them: the check has to see a name
-// declared in a scope other than the declaration's own.
 TEST(DpiDeclElab, AClassTypedImportFormalIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -373,9 +312,6 @@ TEST(DpiDeclElab, AClassTypedImportFormalIsError) {
       6, "35.5.4"));
 }
 
-// The same class as the result. §35.5.5 restricts an imported function's result
-// to small values and a class handle is not one, so the resolution that hid the
-// formal hid a second rule beside it.
 TEST(DpiDeclElab, AClassTypedImportResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -394,9 +330,6 @@ TEST(DpiDeclElab, AClassTypedImportResultIsError) {
       6, "35.5.5"));
 }
 
-// The export side reaches the same prohibition: §35.7 exports a SystemVerilog
-// subroutine through the DPI, and what cannot be passed cannot be passed in
-// that direction either.
 TEST(DpiDeclElab, AClassTypedExportFormalIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -417,11 +350,6 @@ TEST(DpiDeclElab, AClassTypedExportFormalIsError) {
       6, "35.5.4"));
 }
 
-// The case the check must not catch. A name that resolves to a permitted type
-// stays permitted, and a name that resolves to nothing at all is left alone --
-// which is what keeps a forward-declared or imported type from being reported
-// as a bad one. Without this, a check rejecting every unresolved name would
-// satisfy the three cases above.
 TEST(DpiDeclElab, ATypedefOfAPermittedTypeStaysPermitted) {
   ElabFixture f;
   Elaborate(R"(
@@ -434,9 +362,6 @@ TEST(DpiDeclElab, ATypedefOfAPermittedTypeStaysPermitted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §35.5.4 puts the type of every argument into the signature, and a type's
-// signing is part of it (§6.22.1), so `int` and `int unsigned` under one
-// linkage name are two signatures.
 TEST(DpiDeclElab, FormalsDifferingOnlyInSigningDisagree) {
   ElabFixture f;
   Elaborate(R"(
@@ -455,7 +380,6 @@ TEST(DpiDeclElab, FormalsDifferingOnlyInSigningDisagree) {
                             6, "35.5.4"));
 }
 
-// The same of the result type.
 TEST(DpiDeclElab, ResultsDifferingOnlyInSigningDisagree) {
   ElabFixture f;
   Elaborate(R"(
@@ -474,8 +398,6 @@ TEST(DpiDeclElab, ResultsDifferingOnlyInSigningDisagree) {
                             6, "35.5.4"));
 }
 
-// The signing compared is the type's, not the keyword's: `int` is signed by
-// default, so `int` and `int signed` are one type and one signature.
 TEST(DpiDeclElab, OneSigningSpelledTwoWaysAgrees) {
   ElabFixture f;
   Elaborate(R"(
@@ -490,8 +412,6 @@ TEST(DpiDeclElab, OneSigningSpelledTwoWaysAgrees) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A typedef name stands for the type it names (§6.18), so a formal written
-// through one has the signature of the type written directly.
 TEST(DpiDeclElab, ATypedefAgreesWithTheTypeItNames) {
   ElabFixture f;
   Elaborate(R"(
@@ -507,8 +427,6 @@ TEST(DpiDeclElab, ATypedefAgreesWithTheTypeItNames) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// And two typedef names standing for different types are two signatures,
-// though both are written as names.
 TEST(DpiDeclElab, TypedefsOfDifferentTypesDisagree) {
   ElabFixture f;
   Elaborate(R"(
@@ -529,9 +447,6 @@ TEST(DpiDeclElab, TypedefsOfDifferentTypesDisagree) {
                             8, "35.5.4"));
 }
 
-// A name that resolves to no typedef in reach -- a type parameter, whose type
-// is the one each instance is given -- is compared by its spelling, which is
-// the one thing known of it there, so the same name on both sides agrees.
 TEST(DpiDeclElab, OneUnresolvedNameOnBothSidesAgrees) {
   ElabFixture f;
   Elaborate(R"(
@@ -546,9 +461,6 @@ TEST(DpiDeclElab, OneUnresolvedNameOnBothSidesAgrees) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §35.5.4 makes an import the definition of a subroutine of its name in the
-// scope it stands in, and a name is defined once per scope (§35.2.1), so an
-// import may not take the name of a function the scope already defines.
 TEST(DpiDeclElab, AnImportTakingANativeFunctionsNameIsARedeclaration) {
   ElabFixture f;
   Elaborate(R"(
@@ -562,7 +474,6 @@ TEST(DpiDeclElab, AnImportTakingANativeFunctionsNameIsARedeclaration) {
                             "23.9"));
 }
 
-// Nor that of a variable of the scope.
 TEST(DpiDeclElab, AnImportTakingAVariablesNameIsARedeclaration) {
   ElabFixture f;
   Elaborate(R"(
@@ -576,8 +487,6 @@ TEST(DpiDeclElab, AnImportTakingAVariablesNameIsARedeclaration) {
                             "23.9"));
 }
 
-// Two imports of one name are the case §35.5.4 states on its own, and that is
-// the one report they draw rather than a redeclaration besides.
 TEST(DpiDeclElab, TwoImportsOfOneNameDrawOneReport) {
   ElabFixture f;
   Elaborate(R"(

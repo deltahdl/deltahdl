@@ -14,18 +14,8 @@
 
 using namespace delta;
 
-// Annex H.8.9 (Function result): the type of a function result is
-// restricted to byte, shortint, int, longint, real, shortreal, chandle and
-// string, and scalar values of type bit and logic, each returned as the C
-// type Table H.1 gives it, the encodings of bit and logic being those
-// svdpi.h gives (§H.10.1.1). The cases check the list of result types and
-// the C type each is returned as, and the scalar encoding.
-
 namespace {
 
-// §H.8.9: the ten result types in the clause's order, each with a C type
-// to be returned as, where an integer, a time, a packed array's kind under
-// a width and a struct are not among them.
 TEST(DpiCFunctionResult, TheResultTypesAreTheTenTheClauseLists) {
   const std::vector<DataTypeKind> kExpected = {
       DataTypeKind::kByte,    DataTypeKind::kShortint, DataTypeKind::kInt,
@@ -43,10 +33,6 @@ TEST(DpiCFunctionResult, TheResultTypesAreTheTenTheClauseLists) {
   EXPECT_FALSE(DpiTypeMayBeAResult(DataTypeKind::kEvent));
 }
 
-// §H.8.9 with Table H.1: each result type is returned as its C type --
-// char, short int, int, long long, double, float, void*, const char* --
-// and a scalar bit or logic as svBit or svLogic, the unsigned char of
-// svdpi.h whose codes are sv_0, sv_1, sv_z and sv_x.
 TEST(DpiCFunctionResult, EachResultIsReturnedAsItsTableType) {
   EXPECT_EQ(DpiCTypeOfResult(DataTypeKind::kByte), "char");
   EXPECT_EQ(DpiCTypeOfResult(DataTypeKind::kShortint), "short int");
@@ -63,8 +49,6 @@ TEST(DpiCFunctionResult, EachResultIsReturnedAsItsTableType) {
   EXPECT_EQ(kCodes[3], 3);
 }
 
-// The C functions the imports below are bound to, each returning a value of
-// the C type Table H.1 gives its import's result.
 char ReturnByte() { return -100; }
 short ReturnShortint() { return -30000; }
 int ReturnInt() { return 70000; }
@@ -82,11 +66,6 @@ int ReturnFromTask() {
   return 0;
 }
 
-// §H.8.9: a function result is returned by value as the C type Table H.1
-// maps its type to -- a scalar bit or logic in the svBit or svLogic encoding
-// -- and comes back as a value of the declared result type. A function with
-// no result, and an imported task, whose int §35.9 reads, return nothing the
-// call site uses.
 TEST(DpiCFunctionResult, EachResultComesBackAsItsDeclaredType) {
   const std::map<std::string, DataTypeKind> kResults = {
       {"return_byte", DataTypeKind::kByte},

@@ -52,8 +52,6 @@ TEST(Coverage, IffGuardAllowsSampling) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 }
 
-// LRM 19.5: a value bin's count is incremented each time the coverage point
-// matches one of the values in the bin's set.
 TEST(Coverage, ValueBinCountIncrementsOnEachMatch) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -69,7 +67,6 @@ TEST(Coverage, ValueBinCountIncrementsOnEachMatch) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 2u);
 }
 
-// LRM 19.5: a value outside the bin's set leaves its count unchanged.
 TEST(Coverage, ValueBinCountUnchangedOnMiss) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -84,8 +81,6 @@ TEST(Coverage, ValueBinCountUnchangedOnMiss) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
-// LRM 19.5: a transition bin's count is incremented when the coverage point
-// matches the entire sequence of value transitions.
 TEST(Coverage, TransitionBinCountsOnSequenceMatch) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -102,7 +97,6 @@ TEST(Coverage, TransitionBinCountsOnSequenceMatch) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 }
 
-// LRM 19.5: a transition bin does not count until the full sequence occurs.
 TEST(Coverage, TransitionBinDoesNotCountWithoutSequence) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -119,9 +113,6 @@ TEST(Coverage, TransitionBinDoesNotCountWithoutSequence) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 0u);
 }
 
-// LRM 19.5: a transition bin counts only once the coverage point matches its
-// entire sequence of value transitions, including a sequence of more than two
-// states. The count advances on the sample that completes the full run.
 TEST(Coverage, TransitionBinCountsOnMultiStepSequence) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -140,8 +131,6 @@ TEST(Coverage, TransitionBinCountsOnMultiStepSequence) {
   EXPECT_EQ(g->coverpoints[0].bins[0].hit_count, 1u);
 }
 
-// LRM 19.5: a default bin catches values that do not lie within any of the
-// defined bins.
 TEST(Coverage, DefaultBinCatchesUnmatchedValue) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -161,8 +150,6 @@ TEST(Coverage, DefaultBinCatchesUnmatchedValue) {
   EXPECT_EQ(g->coverpoints[0].bins[1].hit_count, 1u);
 }
 
-// LRM 19.5: the default bin shall not catch a value that already lies within a
-// defined bin.
 TEST(Coverage, DefaultBinSkipsDefinedValue) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -182,8 +169,6 @@ TEST(Coverage, DefaultBinSkipsDefinedValue) {
   EXPECT_EQ(g->coverpoints[0].bins[1].hit_count, 0u);
 }
 
-// LRM 19.5: the number of automatically created bins is controlled by the
-// auto_bin_max coverage option.
 TEST(Coverage, AutoBinMaxControlsAutoBinCount) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -194,7 +179,6 @@ TEST(Coverage, AutoBinMaxControlsAutoBinCount) {
   EXPECT_EQ(cp->bins.size(), 4u);
 }
 
-// LRM 19.5: automatically created bins are distinguished from explicit bins.
 TEST(Coverage, AutoBinsAreMarkedAuto) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -205,10 +189,6 @@ TEST(Coverage, AutoBinsAreMarkedAuto) {
   EXPECT_EQ(cp->bins[0].kind, CoverBinKind::kAuto);
 }
 
-// LRM 19.5: automatic bins shall not be created for a coverpoint over a real
-// expression; such a coverpoint must instead specify at least one explicit bins
-// construct. Asking the engine to auto-create bins for a real coverpoint yields
-// none, complementing the integral auto_bin_max case above.
 TEST(Coverage, NoAutoBinsForRealCoverpoint) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -221,8 +201,6 @@ TEST(Coverage, NoAutoBinsForRealCoverpoint) {
   EXPECT_TRUE(cp->bins.empty());
 }
 
-// LRM 19.5: coverage calculation shall not take into account the coverage
-// captured by default bins.
 TEST(Coverage, DefaultBinExcludedFromCoverage) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -238,14 +216,10 @@ TEST(Coverage, DefaultBinExcludedFromCoverage) {
   def.kind = CoverBinKind::kDefault;
   CoverageDB::AddBin(cp, def);
 
-  // Hit only the defined bin; the default bin remains unhit but must not drag
-  // the coverpoint below 100%.
   db.Sample(g, {{"x", 0}});
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(&g->coverpoints[0]), 100.0);
 }
 
-// §19.5: a default bin catches the values no other bin holds and is not
-// counted toward coverage, so sampling 2 leaves both counted bins uncovered.
 TEST(CovergroupInstanceSim, DefaultBinFromDeclarationNotCounted) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -265,9 +239,6 @@ TEST(CovergroupInstanceSim, DefaultBinFromDeclarationNotCounted) {
             "n=0 t=2\n");
 }
 
-// §19.5: a coverpoint with a data type samples its expression converted to
-// that type, and its automatic bins span the type's values: four bins for
-// bit [1:0], the 8-bit 5 sampled as 1.
 TEST(CovergroupInstanceSim, CoverpointDataTypeConvertsTheSample) {
   SimFixture f;
   EXPECT_EQ(
@@ -286,10 +257,6 @@ TEST(CovergroupInstanceSim, CoverpointDataTypeConvertsTheSample) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.5: a coverpoint with a data type samples its expression as though it
-// were assigned to a variable of that type, so the 2-bit operands of a + b
-// widen to 3 bits and 3 + 1 keeps its carry: bin f (4) is hit, not s (5) and
-// not the 0 the self-determined sum would give.
 TEST(CovergroupInstanceSim, CoverpointDataTypeWidensTheExpression) {
   SimFixture f;
   EXPECT_EQ(
@@ -310,8 +277,6 @@ TEST(CovergroupInstanceSim, CoverpointDataTypeWidensTheExpression) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.5: a sample taken while a coverpoint's iff guard is false is ignored for
-// that coverpoint, so only hi is hit.
 TEST(CovergroupInstanceSim, CoverpointIffGuardIgnoresSample) {
   SimFixture f;
   EXPECT_EQ(
@@ -332,8 +297,6 @@ TEST(CovergroupInstanceSim, CoverpointIffGuardIgnoresSample) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.5 with §27.4: a covergroup declared in a loop generate block reads the
-// block instance's genvar in its bins, one bin in G[1] and two in G[2].
 TEST(CovergroupInstanceSim, BinsReadTheGenerateBlockGenvar) {
   SimFixture f;
   EXPECT_EQ(

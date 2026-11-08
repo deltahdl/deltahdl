@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -209,10 +207,6 @@ TEST(EnableGates, MultipleInstancesMixed) {
   EXPECT_TRUE(gates[1]->gate_inst_name.empty());
 }
 
-// §28.3.4: when instances are declared as an array, the identifier that names
-// the array is what makes the declaration legal. Accepting path — the name is
-// present and is captured against the array range (§28.3.5 supplies the range
-// syntax the identifier attaches to).
 TEST(PrimitiveInstantiationParsing, ArrayInstanceWithIdentifierIsNamed) {
   auto r = Parse(
       "module m;\n"
@@ -226,29 +220,20 @@ TEST(PrimitiveInstantiationParsing, ArrayInstanceWithIdentifierIsNamed) {
   EXPECT_NE(g->inst_range_right, nullptr);
 }
 
-// §28.3.4: rejecting path — an array range with no naming identifier is
-// illegal.
 TEST(PrimitiveInstantiationParsing, ArrayInstanceWithoutIdentifierIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  and [0:3] (out, a, b);\n"
       "endmodule\n");
-  // With no identifier the range cannot be reached, so the terminal list of
-  // §28.3.6 is what the parser demands and what its report is filed under.
   EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '['", 2, "28.3.6"));
 }
 
-// §28.3.4: the array-needs-a-name rule holds in every instance position, not
-// only the first. A later instance in a comma-separated list that carries a
-// range but no identifier is equally illegal.
 TEST(PrimitiveInstantiationParsing,
      ArrayWithoutIdentifierInCommaListIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  and a1[0:3] (o1, a, b), [4:7] (o2, c, d);\n"
       "endmodule\n");
-  // The second instance reaches the same demand for the §28.3.6 terminal list
-  // that the first one satisfied, and its report is filed under that subclause.
   EXPECT_TRUE(ReportedError(r.diags, "expected '(', got '['", 2, "28.3.6"));
 }
 

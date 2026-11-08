@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -6,15 +5,6 @@
 #include "simulator/variable.h"
 
 using namespace delta;
-
-// §23.3.3.7.2 at runtime: an interconnect net on a primitive terminal behaves
-// as a plain wire. The rule is blind to the gate kind, so one representative
-// per rule-relevant runtime form is kept: interconnect on a gate input carries
-// a driven value into the primitive, interconnect on a gate output receives the
-// primitive's value, and interconnect as the sole terminal of a source
-// primitive receives that primitive's value. The input case is fed through a
-// module port (§23.3.3.7.1) so the value reaching the gate is produced by real
-// source syntax.
 
 namespace {
 

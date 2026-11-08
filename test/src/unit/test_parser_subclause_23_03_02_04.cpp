@@ -101,13 +101,10 @@ TEST(WildcardPortConnectionParsing, ParametersArrayAndWildcardCombined) {
 }
 
 TEST(WildcardPortConnectionParsing, WildcardAppearsAtMostOnce) {
-  // §23.3.2.4: the .* token pair may appear at most once in the port list.
   auto r = Parse(
       "module top;\n"
       "  sub u1(.*, .clk(c), .*);\n"
       "endmodule\n");
-  // Parser::ParsePortConnection in src/parser/parser_inst.cpp files this report
-  // under §23.3.2, the parent of the subclause this file is named for.
   EXPECT_TRUE(ReportedError(
       r.diags, ".* already appears earlier in this port connection list", 2,
       "23.3.2"));
@@ -118,9 +115,6 @@ TEST(WildcardPortConnectionParsing, WildcardCannotMixWithPositional) {
       "module top;\n"
       "  sub u1(a, .*);\n"
       "endmodule\n");
-  // Parser::ParseModuleInstList in src/parser/parser_inst.cpp files the
-  // ordered/named mix under §23.3.2, the parent of the subclause this file is
-  // named for.
   EXPECT_TRUE(ReportedError(
       r.diags, "ordered and named port connections cannot be mixed", 2,
       "23.3.2"));
@@ -139,8 +133,6 @@ TEST(WildcardPortConnectionParsing, MixedStylesInSameParent) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
   auto& items = r.cu->modules[1]->items;
-  // `logic a, b, c, d;` yields four separate var-decl items before the four
-  // instantiations, so the instances are items[4..7].
   ASSERT_GE(items.size(), 8u);
   EXPECT_FALSE(items[4]->inst_wildcard);
   EXPECT_FALSE(items[5]->inst_wildcard);

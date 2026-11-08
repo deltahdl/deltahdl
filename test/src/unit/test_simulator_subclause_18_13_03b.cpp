@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.13.3: srandom() gives an object's RNG the seed passed to it, so four
-// randomize() draws of a Packet after srandom(7) are replayed in full after a
-// second srandom(7) and after srandom(3 + 4), changed by srandom(8), and
-// matched by a second Packet seeded with 7, as the design
-// test/src/e2e/srandom_method.sv runs it.
 TEST(SrandomRun, TheSeedSelectsAnObjectsSequence) {
   SimFixture f;
   std::string out = RunCapture(
@@ -52,10 +47,6 @@ TEST(SrandomRun, TheSeedSelectsAnObjectsSequence) {
   EXPECT_EQ(out, "4 4 1 4\n");
 }
 
-// 18.13.3: a process's own srandom() method (9.7) seeds that process's RNG, so
-// four $urandom draws after p.srandom(55) are replayed in full after a second
-// p.srandom(55) though an object was seeded and drawn from between the two, the
-// object's RNG being its own (18.14), and changed by p.srandom(56).
 TEST(SrandomRun, TheProcessSeedIsItsOwn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -87,9 +78,6 @@ TEST(SrandomRun, TheProcessSeedIsItsOwn) {
   EXPECT_EQ(out, "4 1\n");
 }
 
-// 18.13.3 with 8.4: srandom() is a method of the object any handle expression
-// yields, so two elements of an array of handles seeded alike draw the same
-// four values.
 TEST(SrandomRun, AnArrayElementIsSeeded) {
   SimFixture f;
   std::string out = RunCapture(

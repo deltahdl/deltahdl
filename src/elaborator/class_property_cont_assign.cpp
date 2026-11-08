@@ -26,9 +26,6 @@ struct PropertyWriteScan {
 
 }  // namespace
 
-// The `h.x` a target is rooted at, its selects and the members selected out
-// of the property taken off; null for a target that is not a member reached
-// through a plain name.
 static const Expr* HandleMemberRoot(const Expr* e) {
   for (;;) {
     if (e->kind == ExprKind::kSelect) {

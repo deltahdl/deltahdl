@@ -1,6 +1,3 @@
-// §28.3.6: the terminals of an array of gate or switch instances, measured and
-// shared out a bit per instance.
-
 #include "elaborator/elaborator_gate_array_terminals.h"
 
 #include <algorithm>
@@ -24,7 +21,6 @@ namespace delta {
 
 namespace {
 
-// `base[index]`, the one bit an instance of the array connects to.
 Expr* MakeBitSelectAt(Arena& arena, Expr* base, int64_t index) {
   auto* lit = arena.Create<Expr>();
   lit->kind = ExprKind::kIntegerLiteral;
@@ -36,8 +32,6 @@ Expr* MakeBitSelectAt(Arena& arena, Expr* base, int64_t index) {
   return e;
 }
 
-// §5.7.1: the literal of one bit whose 4-state encoding is `aval` and `bval`,
-// 1'b0, 1'b1, 1'bz or 1'bx.
 Expr* OneBitLiteral(Arena& arena, size_t aval, size_t bval) {
   static constexpr std::string_view kBitTexts[] = {"1'b0", "1'b1", "1'bz",
                                                    "1'bx"};
@@ -48,9 +42,6 @@ Expr* OneBitLiteral(Arena& arena, size_t aval, size_t bval) {
   return e;
 }
 
-// §5.7.1: the bit `bit` above the least significant end of the integer
-// literal `lit`, a 0, 1, x or z, as a literal of one bit of its own, the
-// constant one instance of the array connects to.
 Expr* LiteralBitAt(Arena& arena, const Expr* lit, uint32_t bit) {
   const Logic4Vec kValue = EvalIntLiteral(lit, arena);
   const Logic4Word& word = kValue.words[bit / 64];
@@ -59,9 +50,6 @@ Expr* LiteralBitAt(Arena& arena, const Expr* lit, uint32_t bit) {
                        static_cast<size_t>((word.bval & kMask) != 0));
 }
 
-// §11.4.10: whether `t` is an operator that works a bit at a time, the ~ of
-// one operand or the &, | or ^ of two, whose bit k is made of the operands'
-// bits k alone.
 bool IsBitwise(const Expr* t) {
   if (t->kind == ExprKind::kUnary) return t->op == TokenKind::kTilde;
   return t->kind == ExprKind::kBinary &&
@@ -69,9 +57,6 @@ bool IsBitwise(const Expr* t) {
           t->op == TokenKind::kCaret);
 }
 
-// Whether every operand under the bitwise operators of `t` measures a width
-// (GateTerminalWidth), so that each of its bits can be addressed. Any other
-// operation among them measures none, and its bits are not its operands'.
 bool OperandsMeasured(const Expr* t, const RtlirModule* mod,
                       const ScopeMap& scope) {
   if (!IsBitwise(t)) return GateTerminalWidth(t, mod, scope) != 0;
@@ -79,9 +64,6 @@ bool OperandsMeasured(const Expr* t, const RtlirModule* mod,
          (t->rhs == nullptr || OperandsMeasured(t->rhs, mod, scope));
 }
 
-// §11.8.1: whether the bitwise terminal `t` is signed, which it is where every
-// operand under its operators is: a signal declared signed or a literal
-// written signed. A select, a concatenation and anything else is unsigned.
 bool TerminalSigned(const Expr* t, const RtlirModule* mod) {
   if (IsBitwise(t)) {
     return TerminalSigned(t->lhs, mod) &&
@@ -92,11 +74,6 @@ bool TerminalSigned(const Expr* t, const RtlirModule* mod) {
          FindSignalDecl(t->text, mod).is_signed;
 }
 
-// The bit `bit` of `t`, an operand under the bitwise operators of a terminal,
-// each operand extended to the terminal's width before the operators apply
-// (§11.6.1): past an operand's own width its bit is the operand's sign bit
-// where `extend_sign`, the terminal being signed (§11.8.2), and 0 where not.
-// An operand of one bit is its own bit.
 Expr* OperandBitAt(Expr* t, uint32_t bit, bool extend_sign,
                    const GateArraySite& site) {
   if (IsBitwise(t)) {
@@ -120,9 +97,6 @@ Expr* OperandBitAt(Expr* t, uint32_t bit, bool extend_sign,
              : GateTerminalBit(t, bit, site.mod, site.scope, site.arena);
 }
 
-// How far above the least significant end of the range `range` the low end of
-// the select `sel` stands: its least significant bit, whichever bound or
-// indexed form writes it.
 int64_t SelectLowOffset(const Expr* sel, const PackedRange& range,
                         const ScopeMap& scope) {
   int64_t first = ConstEvalInt(sel->index, scope).value_or(0);
@@ -132,17 +106,10 @@ int64_t SelectLowOffset(const Expr* sel, const PackedRange& range,
   return std::min(range.OffsetOf(first), range.OffsetOf(second));
 }
 
-// How many indices `range` covers.
 int64_t RangeWidth(const PackedRange& range) {
   return range.HighIndex() - range.LowIndex() + 1;
 }
 
-// §7.4.5 and §7.4.6: the packed dimensions, outermost first, of what the
-// select `sel` names where it is written with one index of a signal and names
-// more than a bit: every packed dimension of an unpacked array's element, or
-// those inside the outermost one of a packed array, the subarray the index
-// selects. None for a part-select, a select of a vector's bit, or a select of
-// a name that is no variable, net or port of `mod`.
 std::vector<PackedRange> SelectedDims(const Expr* sel, const RtlirModule* mod,
                                       const ScopeMap& scope) {
   if (sel->index_end != nullptr) return {};
@@ -163,9 +130,6 @@ std::vector<PackedRange> SelectedDims(const Expr* sel, const RtlirModule* mod,
   return dims;
 }
 
-// The bit `bit` above the least significant end of the select `sel`, whose
-// packed dimensions are `dims`, outermost first: a select of it per
-// dimension, the innermost dimension's index running fastest (§7.4.5).
 Expr* SelectedBitAt(Arena& arena, Expr* sel, int64_t bit,
                     const std::vector<PackedRange>& dims) {
   std::vector<int64_t> indices(dims.size());
@@ -183,9 +147,6 @@ Expr* SelectedBitAt(Arena& arena, Expr* sel, int64_t bit,
 
 uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
                            const ScopeMap& scope) {
-  // A select of a subarray or an unpacked element is as wide as its
-  // dimensions. SelectLhsWidth gives any select written with one index one
-  // bit, so `p[1]` of `wire [1:0][1:0] p` was connected whole.
   if (t->kind == ExprKind::kSelect) {
     const std::vector<PackedRange> kDims = SelectedDims(t, mod, scope);
     if (kDims.empty()) return SelectLhsWidth(t, scope);
@@ -193,14 +154,9 @@ uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
     for (const PackedRange& dim : kDims) width *= RangeWidth(dim);
     return static_cast<uint32_t>(width);
   }
-  // §5.7.1: a sized literal is as wide as its size says, and an unsized one
-  // at least 32 bits. Asked of the declared signals, a literal measured 0 and
-  // was connected whole, every instance reading its least significant bit.
   if (t->kind == ExprKind::kIntegerLiteral) {
     return LiteralWidth(t->text, t->int_val);
   }
-  // §11.6.1: ~ is as wide as its operand, and &, | and ^ as the wider of
-  // theirs; any other operator connects whole.
   if (IsBitwise(t)) {
     const uint32_t kLhs = GateTerminalWidth(t->lhs, mod, scope);
     return t->rhs == nullptr
@@ -217,10 +173,6 @@ uint32_t GateTerminalWidth(const Expr* t, const RtlirModule* mod,
   return total;
 }
 
-// A named signal's bit, and a select's of one, are named by their index in the
-// signal's declared range, so the bit an output terminal is written through
-// stays a net lvalue; a concatenation's bit is its operand's that holds it.
-// Called with a terminal GateTerminalWidth measures as wide as the array.
 Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
                       const ScopeMap& scope, Arena& arena) {
   if (t->kind == ExprKind::kIdentifier) {
@@ -235,20 +187,12 @@ Expr* GateTerminalBit(Expr* t, uint32_t bit, const RtlirModule* mod,
     return MakeBitSelectAt(arena, t->base, range.IndexAtOffset(offset));
   }
   if (t->kind == ExprKind::kIntegerLiteral) return LiteralBitAt(arena, t, bit);
-  // §11.4.10: a bitwise operator's bit is the operator over its operands'
-  // bits, so each instance connects to an expression of its own one bit, the
-  // operands' bits the VPI model reports it over. Selected whole, the
-  // operation had no object for its bit.
   if (IsBitwise(t) && OperandsMeasured(t, mod, scope)) {
     return OperandBitAt(t, bit, TerminalSigned(t, mod), {mod, scope, arena});
   }
-  // Any other operator expression, an input terminal alone, is addressed as
-  // [width-1:0].
   if (t->kind != ExprKind::kConcatenation) {
     return MakeBitSelectAt(arena, t, bit);
   }
-  // A concatenation, which GateTerminalWidth measures as wide as the array,
-  // holds the bit in one of its operands, counted from its last.
   auto it = t->elements.rbegin();
   while (bit >= GateTerminalWidth(*it, mod, scope)) {
     bit -= GateTerminalWidth(*it, mod, scope);
@@ -263,9 +207,6 @@ std::vector<Expr*> InstanceArrayElementTerminals(
   std::vector<Expr*> bit_terms;
   bit_terms.reserve(terms.size());
   for (auto* t : terms) {
-    // §28.3.6: a terminal as wide as one instance's, one bit, connects to it
-    // whole, so an array of one element, whose length is that width too,
-    // takes its terminals as written.
     const bool kShared =
         array_len > 1 &&
         GateTerminalWidth(t, site.mod, site.scope) == array_len;

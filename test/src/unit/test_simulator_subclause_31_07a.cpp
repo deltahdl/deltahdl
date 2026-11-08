@@ -1,19 +1,3 @@
-// §31.7's `&&&` conditioned event, asked of the functions that answer it
-// rather than of a run. Every case here builds an Expr from a parsed source, or
-// names a TimingCheckConditionKind outright, and hands it to
-// ClassifyTimingCheckCondition, IsDeterministicTimingCheckCondition or
-// TimingCheckConditionEnables (all in src/simulator/specify_timing_check.h).
-// What each case claims is that the function answers the clause once something
-// asks it.
-//
-// test_simulator_subclause_31_07b.cpp beside this file claims the other half:
-// that a run asks. Every case there drives a design whose timing check carries
-// a `&&&` condition and reads back what the run reported. Issue #3410 is that
-// nothing asked -- the condition reached TimingCheckEntry only as the text
-// §32.4.1's SDF COND matching compares, every caller of the two predicates in
-// the tree was a unit test, and a conditioned check therefore fired whether or
-// not its condition held.
-
 #include <gtest/gtest.h>
 
 #include "common/types.h"
@@ -96,24 +80,14 @@ TEST(TimingCheckCondition, NeqConditionDiffersFromScalarConstant) {
 }
 
 TEST(TimingCheckCondition, ConditionUsesOnlyLeastSignificantBit) {
-  // A multibit conditioning value is reduced to its LSB before being tested,
-  // so the upper bits never affect whether the check is enabled.
-  constexpr Logic4Word kLsbZero{2, 0};  // ...10 -> LSB 0
-  constexpr Logic4Word kLsbOne{3, 0};   // ...11 -> LSB 1
+  constexpr Logic4Word kLsbZero{2, 0};
+  constexpr Logic4Word kLsbOne{3, 0};
   EXPECT_FALSE(TimingCheckConditionEnables(TimingCheckConditionKind::kPlain,
                                            kLsbZero, 0));
   EXPECT_TRUE(TimingCheckConditionEnables(TimingCheckConditionKind::kPlain,
                                           kLsbOne, 0));
 }
 
-// Parse a module carrying a single conditioned timing check and run the parsed
-// reference-event `&&&` condition through the production classifier, returning
-// the small result POD. Syntax 31-3 writes `$setup(data_event,
-// reference_event, timing_check_limit)`, so the reference event this condition
-// rides on is the second argument, spelled as §31.6 Example 2 spells it. The
-// ParseResult (and its arena) stays alive across the
-// ClassifyTimingCheckCondition call, so the classifier observes the expression
-// exactly as the parser built it from real syntax -- not a hand-built AST.
 TimingCheckConditionClass ClassifyRefCondition(const std::string& cond_src) {
   std::string src =
       "module m;\n"
@@ -131,8 +105,6 @@ TimingCheckConditionClass ClassifyRefCondition(const std::string& cond_src) {
   return ClassifyTimingCheckCondition(tc->ref_condition);
 }
 
-// §31.7: a bare conditioning signal parses to the plain scalar_timing_check_
-// condition form. The classifier recovers that from the parsed expression.
 TEST(ConditionedTimingCheckClassification, BareSignalIsPlain) {
   EXPECT_EQ(ClassifyRefCondition("en").kind, TimingCheckConditionKind::kPlain);
 }
@@ -142,14 +114,11 @@ TEST(ConditionedTimingCheckClassification, ParenthesizedSignalIsPlain) {
             TimingCheckConditionKind::kPlain);
 }
 
-// §31.7: `~ expression` is the deterministic negate form.
 TEST(ConditionedTimingCheckClassification, TildeIsNegate) {
   EXPECT_EQ(ClassifyRefCondition("~reset").kind,
             TimingCheckConditionKind::kNegate);
 }
 
-// §31.7: the four comparison forms map to their kinds and carry the LSB of the
-// scalar_constant operand -- derived here from the real parsed literal.
 TEST(ConditionedTimingCheckClassification, EqualityCarriesConstantBit) {
   auto c0 = ClassifyRefCondition("(en == 1'b0)");
   EXPECT_EQ(c0.kind, TimingCheckConditionKind::kEq);
@@ -178,17 +147,10 @@ TEST(ConditionedTimingCheckClassification, CaseInequalityIsCaseNeq) {
 }
 
 TEST(ConditionedTimingCheckClassification, NullConditionIsPlain) {
-  // An unconditioned event (no `&&&`) presents a null condition expression.
   EXPECT_EQ(ClassifyTimingCheckCondition(nullptr).kind,
             TimingCheckConditionKind::kPlain);
 }
 
-// §31.7 end-to-end from real syntax: the operator chosen in the parsed `&&&`
-// clause decides whether an x on the conditioning signal enables the check.
-// A deterministic comparison (===) built from source shall disable on x; a
-// nondeterministic comparison (==) built from source shall enable on x. The
-// classifier and the enable predicate are chained exactly as production code
-// would, so the whole rule is observed on parsed input.
 TEST(ConditionedTimingCheckClassification, DeterministicSyntaxDisablesOnX) {
   auto c = ClassifyRefCondition("(en === 1'b1)");
   EXPECT_TRUE(IsDeterministicTimingCheckCondition(c.kind));
@@ -211,10 +173,6 @@ TEST(ConditionedTimingCheckClassification, NondeterministicSyntaxEnablesOnX) {
       TimingCheckConditionEnables(c.kind, kBit0, c.scalar_constant_bit));
 }
 
-// §31.7: the scalar_constant production admits the bare decimal 1/0 and the
-// unsized-base 'b1/'b0 spellings, not just the sized 1'b1/1'b0 forms. Built
-// from real source, each still classifies as the equality form and carries the
-// matching constant bit.
 TEST(ConditionedTimingCheckClassification,
      EqualityAcceptsBareAndUnsizedConstants) {
   auto one = ClassifyRefCondition("(en == 1)");
@@ -228,9 +186,6 @@ TEST(ConditionedTimingCheckClassification,
   EXPECT_EQ(unsized.scalar_constant_bit, 1u);
 }
 
-// §31.7: a `&&&` condition can attach to the data event as well as the
-// reference event; the data-position condition feeds the same classification.
-// Build it from real $hold source and classify the parsed data_condition.
 TEST(ConditionedTimingCheckClassification, DataPositionConditionClassifies) {
   ParseResult r = Parse(
       "module m;\n"
@@ -246,25 +201,17 @@ TEST(ConditionedTimingCheckClassification, DataPositionConditionClassifies) {
   EXPECT_EQ(c.scalar_constant_bit, 0u);
 }
 
-// §31.7: the comparison form need not be parenthesized. A bare
-// `expression == scalar_constant` built from source classifies as the equality
-// kind, exactly like its parenthesized twin.
 TEST(ConditionedTimingCheckClassification, BareComparisonClassifies) {
   auto c = ClassifyRefCondition("en == 1'b1");
   EXPECT_EQ(c.kind, TimingCheckConditionKind::kEq);
   EXPECT_EQ(c.scalar_constant_bit, 1u);
 }
 
-// §31.7: the `~` form wrapped in the parenthesized timing_check_condition
-// production (as the LRM's own low-enable example spells it) still classifies
-// as the deterministic negate form.
 TEST(ConditionedTimingCheckClassification, ParenthesizedNegateClassifies) {
   EXPECT_EQ(ClassifyRefCondition("(~clr)").kind,
             TimingCheckConditionKind::kNegate);
 }
 
-// §31.7: scalar_constant also admits the upper-case-base spellings 1'B0/1'B1.
-// Built from source, each yields the equality kind with the matching bit.
 TEST(ConditionedTimingCheckClassification,
      EqualityAcceptsCapitalBSizedConstants) {
   auto one = ClassifyRefCondition("(en == 1'B1)");
@@ -275,7 +222,6 @@ TEST(ConditionedTimingCheckClassification,
   EXPECT_EQ(zero.scalar_constant_bit, 0u);
 }
 
-// §31.7: scalar_constant admits the unsized upper-case-base spellings 'B0/'B1.
 TEST(ConditionedTimingCheckClassification,
      EqualityAcceptsCapitalBUnsizedConstants) {
   auto one = ClassifyRefCondition("(en == 'B1)");
@@ -286,18 +232,12 @@ TEST(ConditionedTimingCheckClassification,
   EXPECT_EQ(zero.scalar_constant_bit, 0u);
 }
 
-// §31.7: the unsized lower-case-base zero 'b0 completes the scalar_constant
-// spelling coverage.
 TEST(ConditionedTimingCheckClassification, EqualityAcceptsUnsizedZeroConstant) {
   auto c = ClassifyRefCondition("(en == 'b0)");
   EXPECT_EQ(c.kind, TimingCheckConditionKind::kEq);
   EXPECT_EQ(c.scalar_constant_bit, 0u);
 }
 
-// §31.7 end-to-end over a §31.4.4 $width check (a single-signal timing check)
-// with a §31.5 negedge reference: the `&&&` condition parses on a check whose
-// argument shape differs from $setup, and the parsed condition still feeds the
-// classifier. Built from real $width source, not a hand-made event.
 TEST(ConditionedTimingCheckClassification,
      SingleSignalWidthCheckConditionClassifies) {
   ParseResult r = Parse(
@@ -313,9 +253,6 @@ TEST(ConditionedTimingCheckClassification,
   EXPECT_EQ(c.kind, TimingCheckConditionKind::kPlain);
 }
 
-// §31.7 end-to-end over a §31.4.5 $period check: a case-equality condition
-// built from real $period source classifies as the deterministic case-eq form
-// and carries the scalar_constant bit.
 TEST(ConditionedTimingCheckClassification, PeriodCheckConditionClassifies) {
   ParseResult r = Parse(
       "module m;\n"

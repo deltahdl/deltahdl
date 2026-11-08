@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.8.1: an operator yields an integral or a real value, and neither type
-// has a member or a built-in method, so a method call or a member select
-// applied to the result is reported: a binary operator's, a compound
-// assignment's, a unary operator's, an increment's and inside's (§11.4.13).
 TEST(ExpressionTypeElaboration, MemberOfOperatorResultIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,10 +44,6 @@ TEST(ExpressionTypeElaboration, MemberOfOperatorResultIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
-// §11.3.6: a parenthesized assignment yields the value it assigns, of its
-// left-hand side's type, so the methods of a string apply to `((s = t))`, the
-// assignment in a second pair of parentheses being the primary A.8.2 roots a
-// method call in.
 TEST(ExpressionTypeElaboration, ParenthesizedAssignmentKeepsItsTargetsMethods) {
   EXPECT_TRUE(
       ElabOk("module top;\n"

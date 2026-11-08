@@ -157,9 +157,6 @@ TEST(NameSpaceParsing, PortNameReintroducedAsVariableInModuleScope) {
               "endmodule\n"));
 }
 
-// §3.13 keeps package names in a name space apart from module names, so the
-// directives recorded at a module's header never reach a package of the same
-// name, which keeps none when no package header was recorded.
 TEST(NameSpaceParsing, ModuleHeaderRecordSkipsPackageOfSameName) {
   auto r = Parse("package p;\nendpackage\nmodule p;\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -173,8 +170,6 @@ TEST(NameSpaceParsing, ModuleHeaderRecordSkipsPackageOfSameName) {
   EXPECT_TRUE(r.cu->modules[0]->has_directive_timescale);
 }
 
-// §3.13 (g): an interface and a program each open a port name space, where a
-// non-ANSI port declared a second time is reported as a module's is.
 TEST(NameSpaceParsing, AnInterfacesNonAnsiPortDeclaredTwice) {
   auto r = Parse(
       "interface i(a);\n"
@@ -195,7 +190,6 @@ TEST(NameSpaceParsing, AProgramsNonAnsiPortDeclaredTwice) {
                             "23.2.2.1"));
 }
 
-// The nearest allowed form: each port of the list declared once.
 TEST(NameSpaceParsing, AnInterfacesAndAProgramsPortsDeclaredOnceEach) {
   EXPECT_TRUE(
       ParseOk("interface i(a, b);\n"
@@ -208,9 +202,6 @@ TEST(NameSpaceParsing, AnInterfacesAndAProgramsPortsDeclaredOnceEach) {
               "endprogram\n"));
 }
 
-// §3.13 (g): a primitive opens a port name space too, where an input declared
-// twice, in two declarations or one, an input named like the output, or the
-// output named like an input, is a port declared a second time.
 TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
   const auto kInputTwice = Parse(
       "primitive p(q, a);\n"
@@ -249,7 +240,6 @@ TEST(NameSpaceParsing, APrimitivesPortDeclaredTwice) {
                             "redeclaration of primitive port 'a'", 3, "3.13"));
 }
 
-// The same in a primitive's ANSI header, whose entries declare its ports.
 TEST(NameSpaceParsing, AnAnsiPrimitivesPortDeclaredTwice) {
   const auto kInputTwice = Parse(
       "primitive p(output q,\n"
@@ -268,8 +258,6 @@ TEST(NameSpaceParsing, AnAnsiPrimitivesPortDeclaredTwice) {
                             "redeclaration of primitive port 'q'", 2, "3.13"));
 }
 
-// The nearest allowed forms: each port declared once, and a sequential
-// primitive's reg declaration of its output, which declares no second port.
 TEST(NameSpaceParsing, APrimitivesPortsDeclaredOnceEach) {
   EXPECT_TRUE(
       ParseOk("primitive p(q, a, b);\n"

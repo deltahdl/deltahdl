@@ -11,35 +11,16 @@ using namespace delta;
 
 namespace {
 
-// §16.9.11 describes composing a complex sequence from simpler subsequences.
-// One of its two methods is to detect the end point of another sequence with
-// the triggered method, which, evaluated in an expression, tells whether its
-// operand sequence has reached its end point at that moment, whatever point the
-// match started at.
-//
-// The production path exercised here is the live sequence monitor
-// (simulator/sequence_monitor.cpp), which fires a named sequence's end-point
-// event when its clocked linear body matches, and the member-access evaluation
-// in simulator/eval_expr.cpp that turns `seq.triggered` into the single-bit
-// end-point status for the current time step. The named sequences are declared
-// and matched using real §16.8/§16.7 syntax and driven through the full
-// parse/elaborate/lower/run pipeline.
-
-// Two sequences reach their end point at the same clock tick even though their
-// matches BEGAN at different ticks: the three-cycle sequence starts matching
-// two ticks before the one-cycle sequence. Because triggered reports only the
-// end point at that instant and has no bearing on where the match started, the
-// composing process observes both sequences as triggered simultaneously.
 TEST(SequenceCompositionSim, TriggeredReflectsEndpointIndependentOfStartPoint) {
   uint64_t result = RunAndGet(
       "module t;\n"
       "  logic clk, a, b, c;\n"
       "  logic [7:0] result;\n"
       "  sequence long_seq;\n"
-      "    @(posedge clk) a ##1 b ##1 c;\n"  // match starts at the a tick
+      "    @(posedge clk) a ##1 b ##1 c;\n"
       "  endsequence\n"
       "  sequence short_seq;\n"
-      "    @(posedge clk) c;\n"  // match starts at the c tick
+      "    @(posedge clk) c;\n"
       "  endsequence\n"
       "  initial begin\n"
       "    clk = 0; a = 0; b = 0; c = 0; result = 0;\n"
@@ -55,18 +36,9 @@ TEST(SequenceCompositionSim, TriggeredReflectsEndpointIndependentOfStartPoint) {
       "  end\n"
       "endmodule\n",
       "result");
-  // Both end points coincide despite different start points, so the composed
-  // expression evaluates both operands as true.
   EXPECT_EQ(result, 42u);
 }
 
-// §16.9.11: triggered's result is true (1'b1) or false (1'b0) and tests whether
-// the operand sequence has reached its end point AT THAT PARTICULAR POINT IN
-// TIME. When the end point has not been reached, the composed expression sees
-// the false result. Here the sequence's match is in progress (its leading
-// Boolean is held true across ticks, so attempts advance past the start) but
-// the trailing Boolean never becomes true, so no end point is reached and the
-// production end-point event never fires: triggered evaluates to 1'b0.
 TEST(SequenceCompositionSim, TriggeredIsFalseWhenEndpointNotReached) {
   uint64_t result = RunAndGet(
       "module t;\n"
@@ -77,8 +49,8 @@ TEST(SequenceCompositionSim, TriggeredIsFalseWhenEndpointNotReached) {
       "  endsequence\n"
       "  initial begin\n"
       "    clk = 0; a = 1; b = 0; result = 8'hee;\n"
-      "    #1 clk = 1; #1 clk = 0;\n"  // a seen: an attempt starts and advances
-      "    #1 clk = 1; #1 clk = 0;\n"  // b never true: end point not reached
+      "    #1 clk = 1; #1 clk = 0;\n"
+      "    #1 clk = 1; #1 clk = 0;\n"
       "    result = ab.triggered ? 8'd1 : 8'd0;\n"
       "    #5 $finish;\n"
       "  end\n"
@@ -87,15 +59,6 @@ TEST(SequenceCompositionSim, TriggeredIsFalseWhenEndpointNotReached) {
   EXPECT_EQ(result, 0u);
 }
 
-// --- The clause's examples over the tick-driven module ---
-
-// The module the cases below share: sysclk rises at 5, 15, 25, ..., tick n at
-// 10n - 5, the tick counter counting through; trans, start_trans, a, b, c and
-// end_trans are high at ticks 1 to 6 in turn; reset, inst, proc1, proc2 and
-// branch_back at 11 to 14 and again at 21, 22, 24, 25 and 26, ready from 11
-// to 13 and from 23 to 25; and req at 31 and 32. `decls` declares the
-// sequences and a process counts the ticks at which `watched` reaches its
-// end point.
 std::string CompositionSource(const std::string& decls,
                               const std::string& watched) {
   return "module t;\n"
@@ -138,9 +101,6 @@ const char* const kE1 =
     "    @(posedge sysclk) $rose(ready) ##1 proc1 ##1 proc2;\n"
     "  endsequence\n";
 
-// §16.9.11: a named sequence referenced by name must match from the tick the
-// reference is reached at: s, `a ##1 b ##1 c`, matches from tick 3, the tick
-// after start_trans, so rule ends at 6 with end_trans.
 TEST(SequenceComposition, InstanceMatchesFromTheTickItIsReached) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -158,13 +118,6 @@ TEST(SequenceComposition, InstanceMatchesFromTheTickItIsReached) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 6u);
 }
 
-// §16.9.11: e1.triggered as an operand is true at a tick e1 reaches its end
-// point at, whatever the match's start, where an instance of e1 must match
-// from that tick. e1 matches from 11 to 13, one tick after inst at 12, so
-// `reset ##1 inst ##1 e1.triggered ##1 branch_back` ends at 14 and not at 26,
-// where e1 has an end point at 25 only; `reset ##1 inst ##1 e1 ##1
-// branch_back` needs e1 to match from 13 or 23, which it does from 23 alone,
-// so it ends at 26 and not at 14.
 TEST(SequenceComposition, TriggeredDetectsTheEndPointWhateverTheStart) {
   SimFixture f;
   auto* by_endpoint = RunAndFindVar(
@@ -192,9 +145,6 @@ TEST(SequenceComposition, TriggeredDetectsTheEndPointWhateverTheStart) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 26u);
 }
 
-// §16.9.11: triggered applies to an instance with arguments, `e2(ready,
-// proc1, proc2).triggered` being `e2_instantiated.triggered` for a sequence
-// whose body is that instance; both end at 14.
 TEST(SequenceComposition, TriggeredAppliesToAnInstanceWithArguments) {
   const std::string kE2 =
       "  sequence e2(a, b, c);\n"
@@ -228,10 +178,6 @@ TEST(SequenceComposition, TriggeredAppliesToAnInstanceWithArguments) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 14u);
 }
 
-// §16.9.11: a sequence's empty match does not activate triggered.
-// zero_or_one_req, `(req==1'b1)[*0:1]`, admits the empty match at every
-// tick, and reaches an end point that triggered reports at the two ticks
-// req is high at alone.
 TEST(SequenceComposition, EmptyMatchDoesNotActivateTriggeredLive) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -245,12 +191,6 @@ TEST(SequenceComposition, EmptyMatchDoesNotActivateTriggeredLive) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 32u);
 }
 
-// §16.9.11 with §16.8.1 (a): `triggered` applied to a formal of type sequence
-// is `triggered` on the sequence bound to it, an instance with arguments
-// among them. x rises at the tick of 15 and y and z hold at 25 and 35, so
-// e2(x, y, z) reaches its end point at 35, and e3's `a.triggered ##1 b`,
-// with w at 45, matches once, as `e2(x, y, z).triggered` written directly
-// does at 35.
 TEST(SequenceComposition, TriggeredAppliesToASequenceFormalsInstanceActual) {
   SimFixture f;
   auto* c = RunAndFindVar(
@@ -279,12 +219,6 @@ TEST(SequenceComposition, TriggeredAppliesToASequenceFormalsInstanceActual) {
   EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 1u);
 }
 
-// §16.9.11 with §16.13.5 and §16.16: a sequence declared without a clock takes
-// the clock of the context applying `triggered` to it, here posedge clk, from
-// a clockless sequence the assertion reads and from the assertion itself, so
-// its end points are the rises its matches end at, from 15 on: r's attempts
-// from 15 to 85 match, eight, and the assertion's from 15 to 95, nine. r,
-// declared first, has its monitor made after e's, which it reads.
 TEST(SequenceComposition, AClocklessSequenceTakesTheClockOfItsContext) {
   SimFixture f;
   std::string out = RunCapture(
@@ -301,9 +235,6 @@ TEST(SequenceComposition, AClocklessSequenceTakesTheClockOfItsContext) {
   EXPECT_NE(out.find("c1=8 c2=9\n"), std::string::npos);
 }
 
-// §16.9.11 with §16.13.5: an instance with arguments of a sequence declared
-// without a clock, `sub_plain(1).triggered`, takes the clock of the context
-// applying the method as a named sequence does.
 TEST(SequenceComposition, AClocklessInstanceTakesTheClockOfItsContext) {
   SimFixture f;
   std::string out = RunCapture(
@@ -319,10 +250,6 @@ TEST(SequenceComposition, AClocklessInstanceTakesTheClockOfItsContext) {
   EXPECT_NE(out.find("c1=8\n"), std::string::npos);
 }
 
-// §16.9.11 with §16.13.5: a sequence declared without a clock read by
-// `triggered` in contexts on two clocks ends in each on that context's clock,
-// its matches ending at the rises of 15 to 95 in the one and at the falls of
-// 20 to 90 in the others, two contexts on the falls sharing their ends.
 TEST(SequenceComposition, EachContextClockGivesAClocklessSequenceItsEnds) {
   SimFixture f;
   std::string out = RunCapture(

@@ -9,10 +9,6 @@
 
 namespace delta {
 
-// Report the first position at or after `p` holding something other than white
-// space, as Lexer::IsWhiteSpace holds it to §5.3's set. Nothing is consumed, so
-// a caller can ask what stands after the white space and still decline to step
-// over it.
 uint32_t Lexer::SkipWhitespaceFrom(uint32_t p) const {
   while (IsWhiteSpace(CharAt(p))) {
     ++p;
@@ -20,21 +16,6 @@ uint32_t Lexer::SkipWhitespaceFrom(uint32_t p) const {
   return p;
 }
 
-// Decide what the apostrophe at the current position opens.
-//
-// The left brace and left parenthesis are looked for past any white space.
-// §5.3 ignores white space except where it separates lexical tokens, A.8.4
-// writes the cast as `casting_type ' ( expression )` and A.6.7.1 writes
-// `assignment_pattern ::= ' { expression { , expression } }`, so the apostrophe
-// and the bracket after it are two terminals apiece and `int ' (x)` and
-// `' {1, 2}` are legal.
-//
-// The single-bit forms are looked for at the next character only. A.8.7 writes
-// `unbased_unsigned_literal ::= '0 | '1 | 'x | 'X | 'z | 'Z`, six terminals
-// whole, so no white space stands inside one and `' 0` remains the error it is.
-// §5.7.1 forbids white space before the base format character in the same way,
-// which is why Lexer::ApostropheStartsBaseSpecifier reads past it only to let
-// Lexer::LexBasedNumber report the breach.
 Token Lexer::LexApostrophe() {
   char next = PeekChar();
   uint32_t after_space = SkipWhitespaceFrom(pos_ + 1);
@@ -251,10 +232,6 @@ Token Lexer::LexOpHash(SourceLoc loc, uint32_t start) {
 }
 
 Token Lexer::LexOpDot(SourceLoc loc, uint32_t start) {
-  // A point against a digit, as in `.12` and `.2e-7`, is the decimal point of
-  // a real literal missing the digit §5.7.2 wants before it: no legal token
-  // starts that way, since the member or port name a point introduces is an
-  // identifier, which never begins with a digit.
   if (std::isdigit(static_cast<unsigned char>(Current()))) {
     return LexRealMissingDigit(loc, start, "before");
   }
@@ -350,10 +327,6 @@ Token Lexer::LexAngleRight(SourceLoc loc, uint32_t start) {
   return MakeOp(TokenKind::kGtGt, loc, start);
 }
 
-// The report for a byte that begins no token: the character itself where it
-// prints, and otherwise its value, so that a control byte or one byte of a
-// multi-byte UTF-8 sequence is named legibly rather than written raw into the
-// message.
 static std::string UnexpectedCharacterMessage(char c) {
   const auto kByte = static_cast<unsigned char>(c);
   if (kByte >= 0x20 && kByte < 0x7F) {

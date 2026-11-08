@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Parses an always block whose two-event sensitivity list should resolve to a
-// guarded posedge first event (with an iff condition) followed by an
-// unguarded negedge second event. Shared by tests that exercise different
-// surface syntaxes (or-chained vs. parenthesized group) yielding this same
-// structure.
 void ExpectGuardedPosedgeThenUnguardedNegedge(const char* src) {
   auto r = Parse(src);
   ASSERT_NE(r.cu, nullptr);
@@ -300,8 +295,6 @@ TEST(ConditionalEventIffParsing, IffGuardPosedgeBasic) {
   EXPECT_EQ(item->sensitivity[0].edge, Edge::kPosedge);
   EXPECT_NE(item->sensitivity[0].signal, nullptr);
   EXPECT_NE(item->sensitivity[0].iff_condition, nullptr);
-  // Folds in the former IffConditionFieldPosedge: the iff guard expression
-  // parses to a binary comparison node.
   EXPECT_EQ(item->sensitivity[0].iff_condition->kind, ExprKind::kBinary);
 }
 
@@ -476,23 +469,14 @@ TEST(ConditionalEventIffParsing, TwoEventsOrBothWithIff) {
   EXPECT_NE(stmt->events[1].iff_condition, nullptr);
 }
 
-// Error condition: an iff qualifier must be followed by a guard expression.
-// The parser consumes the iff keyword and then requires an expression, so a
-// missing one is reported as a parse error rather than silently accepted.
 TEST(ConditionalEventIffParsing, IffWithoutConditionIsError) {
   auto r = Parse(
       "module m;\n"
       "  always @(posedge clk iff) q <= d;\n"
       "endmodule\n");
-  // The guard is an expression, so Parser::ParseSingleEvent files its absence
-  // under §11.2 rather than under §9.4.2.3.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// Edge case for iff-over-or precedence: wrapping a single guarded event in
-// parentheses (the spec's suggested way to make the binding explicit) yields
-// the same structure as the unparenthesized form -- two events with the iff
-// attached only to the first.
 TEST(ConditionalEventIffParsing, IffPrecedenceParenthesizedGroup) {
   ExpectGuardedPosedgeThenUnguardedNegedge(
       "module m;\n"

@@ -193,22 +193,6 @@ TEST(CovergroupDeclElaboration, FullCovergroupElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.2.11 gives covergroup_declaration a second alternative,
-//
-//   covergroup extends covergroup_identifier ;
-//     { coverage_spec_or_option }
-//   endgroup [ : covergroup_identifier ]
-//
-// which carries a footnote, and §19.4.1 is where that footnote leads: the
-// alternative belongs to embedded covergroups, and an extends declaration is an
-// error unless a base class of the enclosing class has already defined the
-// covergroup_identifier. A covergroup declared in a module has no enclosing
-// class, so no covergroup_identifier can satisfy that requirement and the form
-// is rejected wherever it appears outside one.
-//
-// Note the alternative names no derived covergroup of its own -- the identifier
-// follows extends and names the base, and the derived covergroup takes that
-// same name. The legal in-class uses live in the §19.4.1 file.
 TEST(CovergroupDeclElaboration, CovergroupExtendsOutsideAClassIsError) {
   ElabFixture f;
   Elaborate(

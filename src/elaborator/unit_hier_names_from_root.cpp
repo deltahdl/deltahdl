@@ -25,8 +25,6 @@ namespace delta {
 
 namespace {
 
-// The names the compilation-unit scope of `unit` declares: its items' own,
-// the classes it declares, and the enumeration constants its types declare.
 std::unordered_set<std::string_view> UnitScopeOwnNames(
     const CompilationUnit& unit) {
   std::unordered_set<std::string_view> names;
@@ -41,9 +39,6 @@ std::unordered_set<std::string_view> UnitScopeOwnNames(
   return names;
 }
 
-// The names the path `e` joins, first to last, where it is a path of names
-// joined by `.` alone; false where a select, a call, a `::` or any other
-// operation stands in it.
 bool PathNames(const Expr* e, std::vector<const Expr*>& names) {
   if (e->kind == ExprKind::kIdentifier) {
     names.push_back(e);
@@ -57,9 +52,6 @@ bool PathNames(const Expr* e, std::vector<const Expr*>& names) {
   return true;
 }
 
-// The names `decl` declares within itself, its own name aside: the parameters
-// of its header, its ports, and what its items declare, an instance, a named
-// or generate block and a nested declaration among them.
 ScopeNameSet ScopeContents(const ModuleDecl* decl) {
   ScopeNameSet names;
   for (const auto& param : decl->params) names.Insert(param.first);
@@ -68,8 +60,6 @@ ScopeNameSet ScopeContents(const ModuleDecl* decl) {
   return names;
 }
 
-// The walk ReportHierNamesReachingTheUnit makes. `chain` holds the instance
-// whose code is read and the instances above it, the top-level one first.
 class UnitPathCheck {
  public:
   using Chain = std::vector<const RtlirModule*>;
@@ -87,8 +77,6 @@ class UnitPathCheck {
     chain.pop_back();
   }
 
-  // §3.12.1 (printed page 56): the compilation-unit scope is a top-level
-  // design element, so a path its subroutines write is read from the top.
   void CheckItems(const std::vector<ModuleItem*>& items, const Chain& chain) {
     for (const ModuleItem* item : items) {
       CheckStmt(item->body, chain);
@@ -106,8 +94,6 @@ class UnitPathCheck {
     ForEachChildStmt(s, [&](Stmt* const& sub) { CheckStmt(sub, chain); });
   }
 
-  // A path's own operands are the shorter paths it extends, so a path is
-  // read whole and not descended into.
   void CheckExpr(const Expr* e, const Chain& chain) {
     if (e == nullptr) return;
     std::vector<const Expr*> names;
@@ -120,10 +106,6 @@ class UnitPathCheck {
     ForEachExprChild(e, [&](const Expr* sub) { CheckExpr(sub, chain); });
   }
 
-  // Follows the path down through the instances its names name, from $root
-  // (null) or from the instance its first name names, and reports the first
-  // name no instance gives where the instance reached declares no such name
-  // and the unit does.
   void CheckPath(const std::vector<const Expr*>& names, const Chain& chain) {
     const RtlirModule* scope = nullptr;
     size_t next = 0;
@@ -144,10 +126,6 @@ class UnitPathCheck {
     }
   }
 
-  // §23.8: the instance the first name of a path names, searched for from the
-  // referencing instance upward by the name of each instance's module, then
-  // among the top-level instances. Null where a scope on the way declares the
-  // name, so the path is read from something this walk does not follow.
   const RtlirModule* HeadInstance(std::string_view name, const Chain& chain) {
     for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
       if (ContentsOf((*it)->decl).Contains(name)) return nullptr;
@@ -156,8 +134,6 @@ class UnitPathCheck {
     return Step(nullptr, name);
   }
 
-  // The instance `name` names below `scope`, the top-level instances being
-  // those below $root (null).
   const RtlirModule* Step(const RtlirModule* scope,
                           std::string_view name) const {
     if (scope == nullptr) {
@@ -183,7 +159,6 @@ class UnitPathCheck {
     return it->second;
   }
 
-  // One report per path, however many instances of its module there are.
   void Report(const std::vector<const Expr*>& names, size_t last) {
     if (!reported_.insert(names.front()).second) return;
     std::string path = names.front()->scope_prefix.empty() ? "" : "$root.";

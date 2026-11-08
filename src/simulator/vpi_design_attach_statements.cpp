@@ -22,25 +22,16 @@ namespace delta {
 
 namespace {
 
-// §11.4.1: whether `stmt` is written with an assignment operator such as +=.
-// The parser writes `a op= b` as an assignment of `a op b` whose operation's
-// left operand is the very expression the assignment's left side is, which an
-// assignment written out as `a = a op b` never has.
 bool IsOperatorAssignment(const Stmt& stmt) {
   return stmt.rhs != nullptr && stmt.rhs->kind == ExprKind::kBinary &&
          stmt.lhs != nullptr && stmt.rhs->lhs == stmt.lhs;
 }
 
-// The spelling of the assignment operator `op`, which TokenKindName gives
-// between quotes, as it gives every operator.
 std::string_view OperatorSpelling(TokenKind op) {
   const std::string_view kName = TokenKindName(op);
   return kName.substr(1, kName.size() - 2);
 }
 
-// §37.59: an operation of `op_type` over `operands`, in order; null where an
-// operand is not modelled, since an operation missing one would stand for an
-// expression the source never wrote.
 VpiObject* MakeOperation(int op_type,
                          std::initializer_list<VpiObject*> operands,
                          const VpiAttachBuild& build) {
@@ -54,20 +45,12 @@ VpiObject* MakeOperation(int op_type,
   return op;
 }
 
-// §9.4.2 with §37.59: the expression one event of an event control is
-// written as - the expression, net, variable or named event it names, under
-// the posedge or negedge operation its edge makes, or both joined by or for
-// the edge keyword, which §37.59 gives no operation of its own, and under the
-// iff operation where a condition guards it. A sequence (§9.4.2.4) is the
-// sequence inst its name writes (§37.65 with §37.54).
 VpiObject* EventItem(const EventExpr& event, const VpiStmtBuild& with) {
   if (event.is_sequence_event) {
     return VpiSequenceOperandObject(*event.signal, with);
   }
   VpiObject* item = with.expression(event.signal);
   if (event.edge == Edge::kEdge) {
-    // §9.4.2: an edge is detected whenever a posedge or a negedge is, and no
-    // operation type of Annex K or M stands for the keyword itself.
     item = MakeOperation(
         vpiEventOrOp,
         {MakeOperation(vpiPosedgeOp, {item}, with.build),
@@ -86,11 +69,6 @@ VpiObject* EventItem(const EventExpr& event, const VpiStmtBuild& with) {
   return item;
 }
 
-// §37.65: the condition an event control is written over. §9.4.2.1 joins the
-// events of a list with `or`, a comma meaning the same, and the grammar nests
-// each `or` around the events before it, so the condition is the event or
-// operation of the list so far and the next event. Null where an event is not
-// modelled, and for the implicit event list of §9.4.2.2, which writes none.
 VpiObject* EventCondition(const std::vector<EventExpr>& events,
                           const VpiStmtBuild& with) {
   VpiObject* condition = nullptr;
@@ -105,9 +83,6 @@ VpiObject* EventCondition(const std::vector<EventExpr>& events,
   return condition;
 }
 
-// A timing control of `type` hung from `holder`, reaching `operand`: the
-// condition of an event control (§37.65), the delay of a delay control
-// (§37.68), or the count of a repeat control (§37.69).
 VpiObject* MakeControl(int type, VpiObject* holder, VpiObject* operand,
                        const VpiAttachBuild& build) {
   VpiObject* control = build.alloc();
@@ -118,10 +93,6 @@ VpiObject* MakeControl(int type, VpiObject* holder, VpiObject* operand,
   return control;
 }
 
-// §37.64 with §9.4.5: the timing control written inside the assignment
-// `obj` stands for, hung from it - a delay control, an event control, or a
-// repeat control reaching the event control it repeats (§37.69). Details 1 of
-// §37.65 and §37.68 have such a control guard no statement of its own.
 void MakeIntraAssignmentControl(VpiObject* obj, const Stmt& stmt,
                                 const VpiStmtBuild& with) {
   if (stmt.delay != nullptr) {
@@ -138,16 +109,10 @@ void MakeIntraAssignmentControl(VpiObject* obj, const Stmt& stmt,
   }
 }
 
-// §37.64: an assignment's two sides, its operator - detail 1's vpiAssignmentOp
-// for `=` and `<=`, and for an assignment operator the operator it combines
-// with the assignment, the right side being the operand written - whether it
-// blocks, and the timing control written inside it.
 void FillAssignment(VpiObject* obj, const Stmt& stmt,
                     const VpiStmtBuild& with) {
   const bool kOperator = IsOperatorAssignment(stmt);
   obj->lhs = with.expression(stmt.lhs);
-  // §37.59 detail 6: the left side orders a keyed pattern, where it is an
-  // object the model made.
   obj->rhs = kOperator             ? with.expression(stmt.rhs->rhs)
              : obj->lhs != nullptr ? with.assigned(stmt.rhs, obj->lhs)
                                    : with.expression(stmt.rhs);
@@ -157,13 +122,6 @@ void FillAssignment(VpiObject* obj, const Stmt& stmt,
   MakeIntraAssignmentControl(obj, stmt, with);
 }
 
-// §37.21 and §37.46: hangs `holder` among the children of each net and
-// variable the expression object `expr` reads: one it names, itself or a part
-// of it, as an operand or a call's argument at any depth, and one the index,
-// the bounds, or the base and width of a select in it read, a select through
-// another, m[i][j], reading the indices of both. A target is hung by what it
-// names alone, through the two walks a port and a terminal are hung by too,
-// since neither is a driver of what its connection's index reads.
 void HangOnObjectsRead(VpiObject* holder, VpiObject* expr) {
   if (expr == nullptr) return;
   if (expr->type == vpiOperation || VpiIsTfCallType(expr->type)) {
@@ -187,10 +145,6 @@ void HangOnObjectsRead(VpiObject* holder, VpiObject* expr) {
   VpiHangOnVariablesNamed(holder, expr);
 }
 
-// §37.79: the target an assign, deassign, force or release names, and the
-// expression an assign or force drives it with. An assign or a force drives
-// the variables its target names, a force the nets too (§37.21, §37.46), and
-// each loads the nets and variables its expression reads.
 void FillProceduralAssignment(VpiObject* obj, const Stmt& stmt,
                               const VpiStmtBuild& with) {
   obj->lhs = with.expression(stmt.lhs);
@@ -201,16 +155,10 @@ void FillProceduralAssignment(VpiObject* obj, const Stmt& stmt,
   HangOnObjectsRead(obj, obj->rhs);
 }
 
-// `child` among the children of `obj`, where one was made.
 void AddChild(VpiObject* obj, VpiObject* child) {
   if (child != nullptr) obj->children.push_back(child);
 }
 
-// §37.71 and §37.72: the qualifier a unique, unique0 or priority keyword gives
-// an if or case statement, with §37.72's inside and tagged bits for a case
-// inside (§12.5.4) and a case matches (§12.6.1). Annex M gives unique0 no bit
-// of its own; §12.4.2 makes it a unique that reports no violation where no
-// branch matches, so it reports the unique bit.
 int QualifierOf(const Stmt& stmt) {
   int qualifier = vpiNoQualifier;
   if (stmt.qualifier == CaseQualifier::kUnique ||
@@ -224,7 +172,6 @@ int QualifierOf(const Stmt& stmt) {
   return qualifier;
 }
 
-// §37.25: the typespec `obj` reaches, null for none or for no object.
 VpiObject* TypespecOf(const VpiObject* obj) {
   if (obj == nullptr) return nullptr;
   for (VpiObject* child : obj->children) {
@@ -233,15 +180,11 @@ VpiObject* TypespecOf(const VpiObject* obj) {
   return nullptr;
 }
 
-// §37.25 detail 3: the typespec members of the structure or union typespec
-// `typespec`, in the order its members are declared; none for no typespec.
 const std::vector<VpiObject*>& MembersOf(const VpiObject* typespec) {
   static const std::vector<VpiObject*> kNone;
   return typespec != nullptr ? typespec->children : kNone;
 }
 
-// §12.6: the pattern a structure pattern written with member names, `keyed`,
-// writes for the member `name`; null where it leaves the member out.
 const Expr* KeyedMemberPattern(const Expr& keyed, std::string_view name) {
   for (std::size_t i = 0; i < keyed.pattern_keys.size(); ++i) {
     if (keyed.pattern_keys[i]->text == name) return keyed.elements[i];
@@ -252,8 +195,6 @@ const Expr* KeyedMemberPattern(const Expr& keyed, std::string_view name) {
 VpiObject* PatternObject(const Expr* pattern, VpiObject* parent,
                          const VpiObject* typespec, const VpiStmtBuild& with);
 
-// §37.72: an any pattern hung from `parent`, named after the variable it
-// binds, none for `.*` or for a member a structure pattern leaves out.
 VpiObject* AnyPattern(std::string_view binds, VpiObject* parent,
                       const VpiStmtBuild& with) {
   VpiObject* any = with.build.alloc();
@@ -263,15 +204,6 @@ VpiObject* AnyPattern(std::string_view binds, VpiObject* parent,
   return any;
 }
 
-// §37.72 with §37.59 detail 6: a structure pattern `pattern` matching a value
-// of the typespec `typespec`, hung from `parent`, as the assignment pattern
-// operation it is. Its operands are those of the pattern written
-// positionally: written with member names, a struct pattern per member of
-// the structure in declaration order, named after the member and reaching the
-// pattern written for it, an any pattern binding no name for one left out,
-// since §12.6 has an omitted member match anything; written positionally, the
-// member patterns themselves. A member's pattern matches a value of that
-// member's typespec.
 VpiObject* StructurePattern(const Expr& pattern, VpiObject* parent,
                             const VpiObject* typespec,
                             const VpiStmtBuild& with) {
@@ -304,9 +236,6 @@ VpiObject* StructurePattern(const Expr& pattern, VpiObject* parent,
   return op;
 }
 
-// §37.25 detail 3: the typespec of the member `name` of the structure or
-// union typespec `typespec`; null where it has no such member or the member
-// no typespec.
 VpiObject* MemberTypespec(const VpiObject* typespec, std::string_view name) {
   const std::vector<VpiObject*>& members = MembersOf(typespec);
   const auto kMember = std::ranges::find_if(
@@ -314,13 +243,6 @@ VpiObject* MemberTypespec(const VpiObject* typespec, std::string_view name) {
   return kMember != members.end() ? TypespecOf(*kMember) : nullptr;
 }
 
-// §37.72: the object the pattern `pattern` of a case matches item stands as,
-// matching a value of the typespec `typespec`, null for none, and hung from
-// `parent`: an any pattern for `.name`, named after the variable it binds, or
-// for `.*`, which binds none; a tagged pattern, named after the member it is
-// tagged with, reaching the typespec of that member and holding the pattern
-// of the member; a structure pattern as StructurePattern makes it; and the
-// expression it is for any other.
 VpiObject* PatternObject(const Expr* pattern, VpiObject* parent,
                          const VpiObject* typespec, const VpiStmtBuild& with) {
   if (pattern == nullptr) return nullptr;
@@ -346,10 +268,6 @@ VpiObject* PatternObject(const Expr* pattern, VpiObject* parent,
   return with.expression(pattern);
 }
 
-// §37.72: a case statement's type, the keyword it opens with, its qualifier,
-// the expression it selects on, and an item per case item of §12.5 grouping
-// the expressions that branch to its statement (detail 1); a default item
-// groups none (detail 2).
 void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->case_type = stmt.case_kind == TokenKind::kKwCasex   ? vpiCaseX
                    : stmt.case_kind == TokenKind::kKwCasez ? vpiCaseZ
@@ -357,7 +275,6 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->qualifier = QualifierOf(stmt);
   VpiObject* condition = with.expression(stmt.condition);
   AddChild(obj, condition);
-  // §37.72: a pattern matches a value of the type the expression is of.
   const VpiObject* case_typespec = TypespecOf(condition);
   for (const CaseItem& item : stmt.case_items) {
     VpiObject* made = with.build.alloc();
@@ -375,8 +292,6 @@ void FillCase(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   }
 }
 
-// §37.74: the statements one part of a for header writes, built under the for
-// statement and held apart from its children, where the body is looked for.
 std::vector<VpiObject*> HeaderStmts(VpiObject* obj,
                                     const std::vector<Stmt*>& stmts,
                                     const VpiStmtBuild& with) {
@@ -389,8 +304,6 @@ std::vector<VpiObject*> HeaderStmts(VpiObject* obj,
   return made;
 }
 
-// §37.74: a for statement's header, its condition and its body, and whether
-// it declares its loop variables, which §37.12 detail 2 makes it a scope for.
 void FillFor(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->local_var_decls =
       !stmt.for_init_types.empty() &&
@@ -401,11 +314,6 @@ void FillFor(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->body = with.statement(stmt.for_body, obj);
 }
 
-// §37.75: the array a foreach statement indexes (detail 1), its index
-// variables in order with none for one skipped (detail 2), and its body.
-// §12.7.3 declares each index variable of the statement with the type of the
-// array's index: the index type for an associative first dimension, int for
-// every other.
 void FillForeach(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->foreach_array = with.expression(stmt.expr);
   for (std::string_view name : stmt.foreach_vars) {
@@ -422,8 +330,6 @@ void FillForeach(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->body = with.statement(stmt.body, obj);
 }
 
-// §37.67: an ordered wait's events, in order, and the statements of its
-// action block, the else action second.
 void FillOrderedWait(VpiObject* obj, const Stmt& stmt,
                      const VpiStmtBuild& with) {
   for (const Expr* event : stmt.wait_order_events) {
@@ -433,16 +339,11 @@ void FillOrderedWait(VpiObject* obj, const Stmt& stmt,
   obj->else_stmt = with.statement(stmt.else_branch, obj);
 }
 
-// The objects a statement holding a condition and the statements it runs
-// reaches: §37.66's while and repeat, §37.67's wait, §37.70's forever,
-// §37.71's if and if-else, and §37.75's do-while.
 void FillConditional(VpiObject* obj, const Stmt& stmt,
                      const VpiStmtBuild& with) {
   if (stmt.kind == StmtKind::kIf) obj->qualifier = QualifierOf(stmt);
   AddChild(obj, with.expression(stmt.condition));
   if (stmt.kind == StmtKind::kIf) {
-    // §37.71: each branch is recorded as the one it is, so a then branch that
-    // stands as no object leaves the else branch vpiElseStmt's still.
     obj->body = with.statement(stmt.then_branch, obj);
     obj->else_stmt = with.statement(stmt.else_branch, obj);
     return;
@@ -450,8 +351,6 @@ void FillConditional(VpiObject* obj, const Stmt& stmt,
   obj->body = with.statement(stmt.body, obj);
 }
 
-// The components of the hierarchical name `expr` is written as, outermost
-// first; false for an expression that is no such name.
 bool NameParts(const Expr* expr, std::vector<std::string_view>& parts) {
   if (expr == nullptr) return false;
   if (expr->kind == ExprKind::kIdentifier) {
@@ -466,12 +365,6 @@ bool NameParts(const Expr* expr, std::vector<std::string_view>& parts) {
   return true;
 }
 
-// §37.77 with §9.6.2: the task, function, named begin or named fork the
-// disable written as `name` names, the name resolved upward from `from`, the
-// block or statement the disable stands in (§23.8): the first component is a
-// scope around the statement of that name, which is how a block disables
-// itself, or one a scope around it holds, and each further component is held
-// by the one before. Null where the name reaches none of the four.
 VpiObject* DisableTarget(VpiObject* from, const Expr* name) {
   std::vector<std::string_view> parts;
   if (!NameParts(name, parts)) return nullptr;
@@ -486,9 +379,6 @@ VpiObject* DisableTarget(VpiObject* from, const Expr* name) {
   return nullptr;
 }
 
-// §37.55 and §37.50: the kind of assertion `stmt` writes, an immediate one
-// (§37.60 counts it among the atomic statements) or, embedded in procedural
-// code (§16.14.6), a concurrent one, by its keyword.
 int AssertionStmtKind(const Stmt& stmt) {
   const bool kConcurrent = stmt.is_procedural_concurrent;
   switch (stmt.kind) {
@@ -501,12 +391,6 @@ int AssertionStmtKind(const Stmt& stmt) {
   }
 }
 
-// §37.55: what an immediate assertion reaches - the expression it asserts and
-// its pass and fail actions, the fail action recorded as such since §16.3 lets
-// the pass action go unwritten - and whether it is deferred and whether final
-// (§16.4). §37.50: a concurrent one reports whether it covers a sequence, and
-// holds its clock, its property spec and its actions likewise, as §37.73's
-// expect statement holds its property spec and its actions.
 void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->cover_sequence = stmt.cover_sequence;
   if (!stmt.is_procedural_concurrent) {
@@ -516,8 +400,6 @@ void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   } else {
     if (stmt.kind != StmtKind::kExpect) VpiFillAssertionClock(obj, stmt, with);
     if (stmt.assert_instance != nullptr && stmt.kind == StmtKind::kExpect) {
-      // §37.73: an expect stmt reaches a property spec whatever it watches,
-      // the spec's property expr being the instance of a declared property.
       VpiObject* spec = with.build.alloc();
       spec->type = vpiPropertySpec;
       spec->parent = obj;
@@ -537,8 +419,6 @@ void FillAssertion(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
   obj->else_stmt = with.statement(stmt.assert_fail_stmt, obj);
 }
 
-// §14.13: whether `clock` is the event of the clocking block `name`, the
-// block named alone as `@(name)`.
 bool NamesClockingBlock(const std::vector<EventExpr>& clock,
                         std::string_view name) {
   return clock.size() == 1 && clock[0].edge == Edge::kNone &&
@@ -546,11 +426,6 @@ bool NamesClockingBlock(const std::vector<EventExpr>& clock,
          clock[0].signal->text == name;
 }
 
-// §37.49 with §39.3.2: the clocking block that clocks the assertion `obj` on
-// `property`'s clock, the nearest from the scope it stands in outward: the
-// block its clock names (§14.13), or the default clocking where its clock was
-// inferred from one (§16.16 (a), §16.14.6). Null where no block clocks it, as
-// where its clock is a procedure's.
 VpiObject* ClockingBlockClocking(const VpiObject* obj, const Stmt& property) {
   const bool kFromDefault = property.assert_clock_from_default_clocking;
   for (const VpiObject* at = obj->parent; at != nullptr; at = at->parent) {
@@ -570,26 +445,17 @@ VpiObject* ClockingBlockClocking(const VpiObject* obj, const Stmt& property) {
 
 void VpiFillAssertionClock(VpiObject* obj, const Stmt& property,
                            const VpiStmtBuild& with) {
-  // §37.50 detail 1: the clock the assertion is evaluated on, the one its spec
-  // writes or the one inferred for it, which vpiIsClockInferred tells apart.
   obj->clocking_event = EventCondition(property.assert_clock, with);
   obj->clock_inferred = property.assert_clock_inferred;
-  // §37.49: the clocking block clocking it, reached through vpiClockingBlock
-  // as VpiAssertionClockingBlock reads it, a child of that type.
   AddChild(obj, ClockingBlockClocking(obj, property));
 }
 
 VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
                                const VpiStmtBuild& with) {
-  // A spec the parser skipped left no property to stand for.
   if (property.assert_expr == nullptr && property.assert_sequence == nullptr &&
       property.assert_property == nullptr) {
     return nullptr;
   }
-  // §16.16 (a) has an inferred clock stand as though written, and §16.15 lets
-  // a default disable iff give the condition. A property of operators is the
-  // tree the parser read, a sequential property the sequence (§37.54), and a
-  // negated Boolean the not over it (§16.12.3).
   PropertyExprNode boolean;
   boolean.boolean = property.assert_expr;
   PropertyExprNode negated;
@@ -598,8 +464,6 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
   PropertyExprNode sequence;
   sequence.kind = PropertyExprNode::Kind::kSequence;
   sequence.sequence = property.assert_sequence;
-  // §16.12.2: written strong(...), or in a statement that evaluates a bare
-  // sequence as strong, a cover's or an expect's.
   sequence.strong = property.assert_strong;
   const PropertyExprNode* tree = property.assert_property;
   if (tree == nullptr && property.assert_sequence != nullptr) {
@@ -617,13 +481,11 @@ VpiObject* VpiMakePropertySpec(VpiObject* holder, const Stmt& property,
 VpiObject* VpiMakePropertySpecOf(VpiObject* holder,
                                  const VpiPropertySpecParts& parts,
                                  const VpiStmtBuild& with) {
-  // §37.52: the clock, the disable condition and the property expression.
   VpiObject* spec = with.build.alloc();
   spec->type = vpiPropertySpec;
   spec->parent = holder;
   spec->clocking_event = EventCondition(parts.clock, with);
   spec->disable_condition = with.expression(parts.disable);
-  // §16.13.3: the spec's clock flows into its property expr.
   AddChild(spec,
            VpiPropertyExprObject(parts.property, with,
                                  parts.clock.empty() ? nullptr : &parts.clock));
@@ -712,15 +574,11 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
       FillAssignment(obj, stmt, with);
       return;
     case StmtKind::kEventControl:
-      // §37.65: the condition the control waits on, which an implicit event
-      // list leaves unwritten, and the statement it guards.
       AddChild(obj, stmt.is_star_event ? nullptr
                                        : EventCondition(stmt.events, with));
       obj->body = with.statement(stmt.body, obj);
       return;
     case StmtKind::kDelay:
-      // §37.68: the delay the control waits, reached through vpiDelay, and the
-      // statement it delays.
       AddChild(obj, with.expression(stmt.delay));
       obj->body = with.statement(stmt.body, obj);
       return;
@@ -744,13 +602,9 @@ void VpiFillStmt(VpiObject* obj, const Stmt& stmt, const VpiStmtBuild& with) {
       return;
     case StmtKind::kWaitFork:
     case StmtKind::kDisableFork:
-    // §37.77: what a disable names is resolved once every scope has its
-    // object (VpiResolveDisableTargets).
     case StmtKind::kDisable:
       return;
     case StmtKind::kReturn:
-      // §37.78: the value returned, which vpiCondition reaches; none for a
-      // return from a task or a void function.
       AddChild(obj, with.expression(stmt.expr));
       return;
     case StmtKind::kAssertImmediate:

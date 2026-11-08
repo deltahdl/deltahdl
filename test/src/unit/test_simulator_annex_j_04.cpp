@@ -22,9 +22,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// §J.4: compiled object code is specified by an entry in a bootstrap file,
-// whose location -sv_liblist gives, or by -sv_lib naming the file without
-// its extension; either switch can be used multiple times.
 TEST(ForeignCodeObjectInclusion, EachMethodHasItsSwitchAndEitherMayRepeat) {
   EXPECT_EQ(ForeignCodeLibListSwitch(), "-sv_liblist");
   EXPECT_EQ(ForeignCodeLibSwitch(), "-sv_lib");
@@ -38,16 +35,11 @@ TEST(ForeignCodeObjectInclusion, EachMethodHasItsSwitchAndEitherMayRepeat) {
   EXPECT_FALSE(ForeignCodeSwitchMayRepeat("-sv_root"));
 }
 
-// §J.4: both methods shall be provided and made available concurrently, any
-// mixture of their usage permitted.
 TEST(ForeignCodeObjectInclusion, BothMethodsAreConcurrentAndMayBeMixed) {
   EXPECT_TRUE(ForeignCodeMethodsAreAvailableConcurrently());
   EXPECT_TRUE(ForeignCodeMethodsMayBeMixed());
 }
 
-// §J.4: the object code is a shared library with the platform's extension,
-// which the application identifies and appends to the path name -sv_lib or
-// a bootstrap entry gives without it.
 TEST(ForeignCodeObjectInclusion, TheApplicationAppendsThePlatformExtension) {
   const std::string kExtension(ForeignCodeSharedLibraryExtension());
   ASSERT_FALSE(kExtension.empty());
@@ -63,10 +55,6 @@ TEST(ForeignCodeObjectInclusion, TheApplicationAppendsThePlatformExtension) {
             ForeignCodeParty::kApplication);
 }
 
-// §J.4: the provider of the compiled code resolves its external references,
-// avoids interference with other software and selects the software version;
-// the application need only load the object code SystemVerilog code or
-// registration functions reference.
 TEST(ForeignCodeObjectInclusion, TheProviderAnswersForTheObjectsContents) {
   EXPECT_EQ(
       ForeignCodeResponsibleFor(ForeignCodeDuty::kResolveExternalReferences),
@@ -81,9 +69,6 @@ TEST(ForeignCodeObjectInclusion, TheProviderAnswersForTheObjectsContents) {
             ForeignCodeLoadScope::kReferencedObjectCodeOnly);
 }
 
-// §J.4: all compiled object code is loaded in specification order -- the
-// bootstrap file's content from its first line, then the -sv_lib switches in
-// order of occurrence.
 TEST(ForeignCodeObjectInclusion, TheBootstrapFileLoadsBeforeTheSwitches) {
   const std::vector<ForeignCodeLibrary> kOrder = ForeignCodeLoadOrder(
       {"/home/user/myclibs/lib1", "/home/user/myclibs/lib3"},
@@ -98,10 +83,6 @@ TEST(ForeignCodeObjectInclusion, TheBootstrapFileLoadsBeforeTheSwitches) {
   EXPECT_EQ(kOrder[3].path, "/home/user/proj3/clibs/lib2");
 }
 
-// §J.4: any library is loaded only once, and among multiple occurrences of
-// the same file the specification order gives the precedence: a file the
-// bootstrap file located overrides the same file -sv_lib specified, and of
-// two -sv_lib occurrences the first is the one that loads.
 TEST(ForeignCodeObjectInclusion, ALibraryLoadsOnceAndTheBootstrapEntryWins) {
   const std::vector<ForeignCodeLibrary> kOrder =
       ForeignCodeLoadOrder({"/ip/a"}, {"/ip/b", "/ip/a", "/ip/b", "/ip/c"});
@@ -114,8 +95,6 @@ TEST(ForeignCodeObjectInclusion, ALibraryLoadsOnceAndTheBootstrapEntryWins) {
   EXPECT_EQ(kOrder[2].path, "/ip/c");
 }
 
-// A directory of shared library files for the identity of §J.4 to be read
-// off the filesystem, removed when the test ends.
 struct ForeignCodeLibraryDir {
   fs::path dir;
 
@@ -127,7 +106,6 @@ struct ForeignCodeLibraryDir {
 
   ~ForeignCodeLibraryDir() { fs::remove_all(dir); }
 
-  // The path name without extension of a library written under `name`.
   std::string Library(const std::string& name) const {
     const fs::path kWithout = dir / name;
     const std::ofstream kFile(
@@ -135,8 +113,6 @@ struct ForeignCodeLibraryDir {
     return kWithout.string();
   }
 
-  // The path name without extension of a shared library the system C
-  // compiler built from `c_source` under `name`.
   std::string Built(const std::string& name,
                     const std::string& c_source) const {
     const fs::path kWithout = dir / name;
@@ -146,7 +122,6 @@ struct ForeignCodeLibraryDir {
     return kWithout.string();
   }
 
-  // The path name without extension of a link to the library `target`.
   std::string Link(const std::string& name, const std::string& target) const {
     const fs::path kWithout = dir / name;
     fs::create_symlink(ForeignCodeSharedLibraryFileName(target),
@@ -155,9 +130,6 @@ struct ForeignCodeLibraryDir {
   }
 };
 
-// §J.4: files having the same path name, or that can be identified as being
-// identical -- by comparing inodes where links refer to one file -- are
-// occurrences of the same file; files that are neither are not.
 TEST(ForeignCodeObjectInclusion, TheSameFileIsKnownByPathNameOrByInode) {
   EXPECT_TRUE(ForeignCodeIsSameFile("/ip/a", "/ip/a"));
   EXPECT_TRUE(ForeignCodeIsSameFile("/ip/x/../a", "/ip/a"));
@@ -175,10 +147,6 @@ TEST(ForeignCodeObjectInclusion, TheSameFileIsKnownByPathNameOrByInode) {
   EXPECT_EQ(kOrder[1].path, kOther);
 }
 
-// §J.4 with §J.3: the driver takes -sv_lib and -sv_liblist, each any number
-// of times in order, each value resolved as it is processed -- a relative
-// name before -sv_root against the working directory, one after against the
-// root, and an absolute name as it is.
 TEST(ForeignCodeObjectInclusion, TheDriverTakesSvLibAndSvLiblistAsProcessed) {
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine(
@@ -195,8 +163,6 @@ TEST(ForeignCodeObjectInclusion, TheDriverTakesSvLibAndSvLiblistAsProcessed) {
   EXPECT_EQ(opts.source_files, std::vector<std::string>{"top.sv"});
 }
 
-// A switch written last with its value left off is the switch with a missing
-// value rather than an unknown option, and the parse is refused.
 TEST(ForeignCodeObjectInclusion, ASwitchWithoutItsValueIsRefused) {
   CliOptions lib;
   EXPECT_FALSE(ParseCommandLine({"top.sv", "-sv_lib"}, lib));
@@ -208,8 +174,6 @@ TEST(ForeignCodeObjectInclusion, ASwitchWithoutItsValueIsRefused) {
   EXPECT_TRUE(list.sv_liblists.empty());
 }
 
-// A library whose constructor appends `letter` to DELTAHDL_ANNEX_J_04_ORDER
-// when the library is loaded, and which defines `symbol`, returning 7.
 std::string OrderRecordingLibrary(const std::string& letter,
                                   const std::string& symbol) {
   return "#include <stdio.h>\n"
@@ -226,9 +190,6 @@ std::string OrderRecordingLibrary(const std::string& letter,
          symbol + "(void) { return 7; }\n";
 }
 
-// §J.2 and §J.4: the object code a specification names is loaded into the
-// simulator, the bootstrap file's entries ahead of the -sv_lib values, and
-// what a library defines is a global symbol from then on.
 TEST(ForeignCodeObjectLoading, EachLibraryIsLoadedInTheOrderJ4Gives) {
   const ForeignCodeLibraryDir kDir;
   const std::string kSwitch = kDir.Built(
@@ -245,8 +206,6 @@ TEST(ForeignCodeObjectLoading, EachLibraryIsLoadedInTheOrderJ4Gives) {
   EXPECT_NE(GlobalSymbol("deltahdl_annex_j_04_entry"), nullptr);
 }
 
-// §J.4: a location naming no file once the platform's extension is appended
-// is a failure of the run, reported against the location as written.
 TEST(ForeignCodeObjectLoading, ALocationWithNoFileIsReported) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -257,9 +216,6 @@ TEST(ForeignCodeObjectLoading, ALocationWithNoFileIsReported) {
                             0, "J.4"));
 }
 
-// §J.4: a file that is there but is no shared library the loader can load is
-// reported with the loader's own account, and the libraries after it in the
-// order are loaded all the same.
 TEST(ForeignCodeObjectLoading, AFileTheLoaderRejectsIsReportedWithItsAccount) {
   const ForeignCodeLibraryDir kDir;
   const std::string kEmpty = kDir.Library("not_object_code");

@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.12.1's conversion also applies at elaboration when a real constant
-// initializes an integer-typed parameter: the value is rounded to the nearest
-// integer, not truncated. 35.7 truncates to 35 but rounds to 36, so this
-// observes the elaborator's round-to-nearest path (not a bit copy).
 TEST(RealConversion, IntParameterFromRealLiteralRounds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -26,8 +22,6 @@ TEST(RealConversion, IntParameterFromRealLiteralRounds) {
   EXPECT_EQ(p.resolved_value, 36);
 }
 
-// The exact-half tie rounds away from zero in both directions at elaboration:
-// 2.5 -> 3 (discriminating round-half-to-even's 2) and -1.5 -> -2.
 TEST(RealConversion, IntParameterRealTieRoundsAwayFromZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -43,8 +37,6 @@ TEST(RealConversion, IntParameterRealTieRoundsAwayFromZero) {
   EXPECT_EQ(design->top_modules[0]->params[1].resolved_value, -2);
 }
 
-// A localparam is a distinct declaration form but is subject to the same
-// real-to-integer rounding when it carries an integer type. 2.5 -> 3.
 TEST(RealConversion, IntLocalparamFromRealLiteralRounds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -61,9 +53,6 @@ TEST(RealConversion, IntLocalparamFromRealLiteralRounds) {
   EXPECT_EQ(l.resolved_value, 3);
 }
 
-// A parameter placed in an integer context by a packed range (rather than an
-// explicit integer keyword) reaches the conversion through a different branch;
-// the rounding rule still applies: 35.5 -> 36.
 TEST(RealConversion, RangedParameterFromRealLiteralRounds) {
   ElabFixture f;
   auto* design = ElaborateSrc(

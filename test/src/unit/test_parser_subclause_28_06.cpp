@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -20,7 +18,6 @@ TEST(TristateGateParsing, TooManyTerminals) {
       "module m;\n"
       "  bufif0 b1(out, in, en, extra);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.6 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -30,7 +27,6 @@ TEST(TristateGateParsing, SingleTerminalRejected) {
       "module m;\n"
       "  bufif0 b1(out);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.6 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -40,7 +36,6 @@ TEST(TristateGateParsing, TwoTerminalsRejected) {
       "module m;\n"
       "  notif1 b1(out, data);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.6 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -92,8 +87,6 @@ TEST(TristateGateParsing, FourValueDelayRejected) {
       "module m;\n"
       "  bufif0 #(1, 2, 3, 4) b1(o, d, c);\n"
       "endmodule\n");
-  // The delay list closes after three values, and §28.16 is the subclause the
-  // parser files that demand for ')' under; §28.6 has no report of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 

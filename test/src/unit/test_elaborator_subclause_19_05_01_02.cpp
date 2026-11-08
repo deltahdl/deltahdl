@@ -13,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.1.2: a set_covergroup_expression may yield any array whose element type
-// is assignment compatible with the coverpoint type. An integral element type
-// is assignment compatible with an integral coverpoint.
 TEST(CoverpointBinSetExpression, ElementTypeAssignmentCompatibleIsAllowed) {
   DataType coverpoint_type;
   coverpoint_type.kind = DataTypeKind::kInt;
@@ -25,9 +22,6 @@ TEST(CoverpointBinSetExpression, ElementTypeAssignmentCompatibleIsAllowed) {
   EXPECT_TRUE(SetExpressionElementTypeAllowed(coverpoint_type, element_type));
 }
 
-// §19.5.1.2: an element type that is not assignment compatible with the
-// coverpoint type is rejected. A string element type cannot be assigned to an
-// integral coverpoint.
 TEST(CoverpointBinSetExpression, IncompatibleElementTypeIsRejected) {
   DataType coverpoint_type;
   coverpoint_type.kind = DataTypeKind::kInt;
@@ -37,9 +31,6 @@ TEST(CoverpointBinSetExpression, IncompatibleElementTypeIsRejected) {
   EXPECT_FALSE(SetExpressionElementTypeAllowed(coverpoint_type, element_type));
 }
 
-// §19.5.1.2: the coverpoint type is not restricted to integral -- a coverpoint
-// may be a real type (§19.5), and a real element type is assignment compatible
-// with a real coverpoint, so a set expression yielding a real array is allowed.
 TEST(CoverpointBinSetExpression, RealCoverpointAcceptsRealElement) {
   DataType coverpoint_type;
   coverpoint_type.kind = DataTypeKind::kReal;
@@ -49,9 +40,6 @@ TEST(CoverpointBinSetExpression, RealCoverpointAcceptsRealElement) {
   EXPECT_TRUE(SetExpressionElementTypeAllowed(coverpoint_type, element_type));
 }
 
-// §19.5.1.2: an element type that is not assignment compatible with a real
-// coverpoint is still rejected -- a string element cannot be assigned to a real
-// coverpoint, exercising the reject path in the real coverpoint domain.
 TEST(CoverpointBinSetExpression, RealCoverpointRejectsStringElement) {
   DataType coverpoint_type;
   coverpoint_type.kind = DataTypeKind::kReal;
@@ -61,11 +49,6 @@ TEST(CoverpointBinSetExpression, RealCoverpointRejectsStringElement) {
   EXPECT_FALSE(SetExpressionElementTypeAllowed(coverpoint_type, element_type));
 }
 
-// §19.5.1.2: assignment compatibility spans the integral/real boundary, so a
-// real coverpoint admits an integral element type -- the integral values are
-// assignment compatible with the real coverpoint. This exercises the
-// cross-domain assignment-compatibility path, distinct from the same-domain
-// integral and real cases above.
 TEST(CoverpointBinSetExpression, RealCoverpointAcceptsIntegralElement) {
   DataType coverpoint_type;
   coverpoint_type.kind = DataTypeKind::kReal;
@@ -75,9 +58,6 @@ TEST(CoverpointBinSetExpression, RealCoverpointAcceptsIntegralElement) {
   EXPECT_TRUE(SetExpressionElementTypeAllowed(coverpoint_type, element_type));
 }
 
-// §19.5.1.2: the cross-domain path holds in the other direction as well -- an
-// integral coverpoint admits a real element type, since a real value is
-// assignment compatible with an integral coverpoint.
 TEST(CoverpointBinSetExpression, IntegralCoverpointAcceptsRealElement) {
   DataType coverpoint_type;
   coverpoint_type.kind = DataTypeKind::kInt;
@@ -87,7 +67,6 @@ TEST(CoverpointBinSetExpression, IntegralCoverpointAcceptsRealElement) {
   EXPECT_TRUE(SetExpressionElementTypeAllowed(coverpoint_type, element_type));
 }
 
-// §19.5.1.2: every array kind (fixed-size, dynamic, queue) is permitted.
 TEST(CoverpointBinSetExpression, NonAssociativeArrayKindsAreAllowed) {
   EXPECT_TRUE(
       SetExpressionArrayKindAllowed(SetExpressionArrayKind::kFixedSize));
@@ -95,14 +74,11 @@ TEST(CoverpointBinSetExpression, NonAssociativeArrayKindsAreAllowed) {
   EXPECT_TRUE(SetExpressionArrayKindAllowed(SetExpressionArrayKind::kQueue));
 }
 
-// §19.5.1.2: associative arrays are the one exception that is not permitted.
 TEST(CoverpointBinSetExpression, AssociativeArrayKindIsRejected) {
   EXPECT_FALSE(
       SetExpressionArrayKindAllowed(SetExpressionArrayKind::kAssociative));
 }
 
-// §19.5.1.2: identifiers declared within the covergroup (coverpoint identifiers
-// and bin identifiers) are not visible within the expression.
 TEST(CoverpointBinSetExpression, CovergroupLocalNamesAreNotVisible) {
   EXPECT_FALSE(
       SetExpressionNameVisible(SetExpressionNameOrigin::kCoverpointIdentifier));
@@ -110,14 +86,10 @@ TEST(CoverpointBinSetExpression, CovergroupLocalNamesAreNotVisible) {
       SetExpressionNameVisible(SetExpressionNameOrigin::kBinIdentifier));
 }
 
-// §19.5.1.2: a name declared outside the covergroup remains visible.
 TEST(CoverpointBinSetExpression, ExternalNameIsVisible) {
   EXPECT_TRUE(SetExpressionNameVisible(SetExpressionNameOrigin::kExternal));
 }
 
-// §19.5.1.2: the array a set_covergroup_expression yields may be of any kind
-// but associative. A module's associative array is reported where a bin reads
-// it; its fixed-size, dynamic and queue arrays are accepted.
 TEST(CoverpointBinSetExpression, AssociativeArrayOfModuleIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -148,8 +120,6 @@ TEST(CoverpointBinSetExpression, AssociativeArrayOfModuleIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5.1.2: the rule binds a covergroup embedded in a class (§19.4) as well;
-// there the array read is a property of the class.
 TEST(CoverpointBinSetExpression, AssociativeArrayOfClassIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -172,10 +142,6 @@ TEST(CoverpointBinSetExpression, AssociativeArrayOfClassIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.5.1.2: a coverpoint identifier and a bin identifier, of a coverpoint or
-// of a cross, declared within the covergroup are not visible in a
-// set_covergroup_expression, so a bin naming one reads nothing. A name
-// declared outside the covergroup is read.
 TEST(CoverpointBinSetExpression, CovergroupOwnNameIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -206,9 +172,6 @@ TEST(CoverpointBinSetExpression, CovergroupOwnNameIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.5.1.2: a bin identifier hides nothing from a set_covergroup_expression,
-// so where a variable outside the covergroup shares the bin's name, the
-// expression reads the variable.
 TEST(CoverpointBinSetExpression, OuterNameSharingABinNameIsRead) {
   ElabFixture f;
   ElaborateSrc(
@@ -225,10 +188,6 @@ TEST(CoverpointBinSetExpression, OuterNameSharingABinNameIsRead) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.5.1.2 with §7.8: an associative array's index may be a type the module
-// declares, a typedef or a class; a dimension naming a parameter declares a
-// fixed-size array, and packed dimensions alone a packed array (§7.4.1), either
-// of which a set_covergroup_expression may yield.
 TEST(CoverpointBinSetExpression, IndexTypeOfModuleMakesArrayAssociative) {
   ElabFixture f;
   ElaborateSrc(
@@ -261,9 +220,6 @@ TEST(CoverpointBinSetExpression, IndexTypeOfModuleMakesArrayAssociative) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5.1.2: a formal of the covergroup is visible to its set expressions, so
-// a formal sharing a bin's name is read, and a formal that is an associative
-// array is no more allowed there than a variable that is one.
 TEST(CoverpointBinSetExpression, FormalOfCovergroupIsReadAsItsArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -286,10 +242,6 @@ TEST(CoverpointBinSetExpression, FormalOfCovergroupIsReadAsItsArray) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.5.1.2 with §7.8: in a class, an index type may be a typedef or a class
-// the class declares, a class of the compilation unit, or a typedef of the
-// module that declares the class, for a property and a covergroup formal
-// alike; and a covergroup of the class reads the module's arrays too.
 TEST(CoverpointBinSetExpression, IndexTypeAndArrayOfClassScope) {
   ElabFixture f;
   ElaborateSrc(
@@ -334,10 +286,6 @@ TEST(CoverpointBinSetExpression, IndexTypeAndArrayOfClassScope) {
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
-// §19.5.1.2 with §23.9: a set_covergroup_expression reads the names of the
-// scope that declares the covergroup, and one naming nothing declared there,
-// nor a formal of the covergroup, is an unresolved reference. A name of the
-// covergroup's own, reported by the rule above, is not reported again.
 TEST(CoverpointBinSetExpression, UndeclaredNameIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -368,12 +316,6 @@ TEST(CoverpointBinSetExpression, UndeclaredNameIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.5.1.2: the array a set_covergroup_expression yields has elements
-// assignment compatible with the coverpoint's type, the type its data type
-// declares or else the type of the variable it covers. A string is
-// assignment compatible with neither an integral nor a real type (§6.16),
-// while a real or byte element is, and an element of a named type is left to
-// the rules of its declaration.
 TEST(CoverpointBinSetExpression, StringElementOfNumericCoverpointIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -410,8 +352,6 @@ TEST(CoverpointBinSetExpression, StringElementOfNumericCoverpointIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
-// §19.5.1.2: a covergroup of a class reads the class's arrays under the same
-// rule.
 TEST(CoverpointBinSetExpression, StringElementOfClassCoverpointIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -435,10 +375,6 @@ TEST(CoverpointBinSetExpression, StringElementOfClassCoverpointIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.5.1.2 with §23.9: a covergroup a class embeds reads its set expression
-// in the class, the class's members and the declaring module's names among
-// what it reaches, so `zz`, which nothing declares, is unresolved, while the
-// class's array ia and the module's array mq resolve.
 TEST(CoverpointBinSetExpression, UndeclaredNameInClassCovergroupIsError) {
   ElabFixture f;
   ElaborateSrc(

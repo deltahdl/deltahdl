@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §15.2: semaphore and mailbox are classes of the std package (§26.7), so a
-// class the module declares under the name is the one a module variable and
-// a procedural variable of that type hold, built by its own constructor and
-// read through its own properties: s.keys is 2 + 40 and t.keys 5 + 40. Built
-// as the built-in semaphore, neither held an object of the user's class.
 TEST(BuiltinClassRedefinitionSim, ModuleClassNamedSemaphoreIsTheUsersClass) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -32,9 +27,6 @@ TEST(BuiltinClassRedefinitionSim, ModuleClassNamedSemaphoreIsTheUsersClass) {
   EXPECT_EQ(var->value.ToUint64(), 4245u);
 }
 
-// §15.2: a class of the compilation unit named mailbox is the type of both the
-// unit's variable and the module's, and their put() is the class's own: mb
-// reads 7 + 30 and umb 7 + 5.
 TEST(BuiltinClassRedefinitionSim, UnitClassNamedMailboxIsTheUsersClass) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -58,8 +50,6 @@ TEST(BuiltinClassRedefinitionSim, UnitClassNamedMailboxIsTheUsersClass) {
   EXPECT_EQ(var->value.ToUint64(), 3712u);
 }
 
-// §15.2: a package's class named semaphore is the type of the package's own
-// variable, constructed by the class's new: p::s.keys reads 3 + 40.
 TEST(BuiltinClassRedefinitionSim, PackageClassNamedSemaphoreIsTheUsersClass) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -79,8 +69,6 @@ TEST(BuiltinClassRedefinitionSim, PackageClassNamedSemaphoreIsTheUsersClass) {
   EXPECT_EQ(var->value.ToUint64(), 43u);
 }
 
-// §15.2 with §7.4: an element of an array of the user's semaphore class is
-// given an object of that class by new: arr[1].keys reads 4 + 40.
 TEST(BuiltinClassRedefinitionSim, ArrayOfAClassNamedSemaphoreHoldsItsObjects) {
   SimFixture f;
   auto* var = RunAndFindVar(

@@ -12,28 +12,14 @@
 
 using namespace delta;
 
-// One generate-block item, with the declarations it reads and the text written
-// ahead of the module that declares them.
 struct GenerateBlockItem {
-  // Written on the first line, before `module m;`: a class or an interface the
-  // declarations name.
   std::string head;
-  // The declarations `item` reads.
   std::string decls;
-  // The item written inside the generate block.
   std::string item;
 };
 
-// The line every source InsideGenerateBlocks builds writes the item on.
 inline constexpr uint32_t kGenerateBlockItemLine = 4;
 
-// `module m` holding `form.item` on its fourth line inside a generate block,
-// once for each place the block can stand: a conditional generate block, a
-// block nested in a loop generate block, the default block of a case generate
-// construct, and a conditional generate block that declares `form.decls`
-// itself rather than reading the module's. §27.2 makes every one of them a
-// collection of module items, so a rule that holds of a module item holds of
-// the item in each.
 inline std::vector<std::string> InsideGenerateBlocks(
     const GenerateBlockItem& form) {
   const std::string kModule = form.head + "module m;\n";
@@ -50,8 +36,6 @@ inline std::vector<std::string> InsideGenerateBlocks(
   };
 }
 
-// Whether every source InsideGenerateBlocks builds of `form` is rejected with
-// `message` under `subclause` on the item's line.
 inline ::testing::AssertionResult RejectedInsideGenerateBlocks(
     const GenerateBlockItem& form, std::string_view message,
     std::string_view subclause) {
@@ -65,8 +49,6 @@ inline ::testing::AssertionResult RejectedInsideGenerateBlocks(
   return ::testing::AssertionSuccess();
 }
 
-// Whether every source InsideGenerateBlocks builds of `form` elaborates
-// without an error.
 inline ::testing::AssertionResult AcceptedInsideGenerateBlocks(
     const GenerateBlockItem& form) {
   for (const std::string& src : InsideGenerateBlocks(form)) {

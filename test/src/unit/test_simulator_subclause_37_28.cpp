@@ -20,25 +20,6 @@
 namespace delta {
 namespace {
 
-// §37.28 Parameter, spec param, def param, param assign: the VPI object model
-// for parameters (vpiParameter), type parameters (vpiTypeParameter), def
-// params, and param assigns (vpiParamAssign). These tests observe the
-// production code that applies the clause's five numbered "Details":
-//   - Detail 1: vpi_get_value() of a value parameter returns its value (served
-//   by
-//     §38.34's reader over the parameter's stored value).
-//   - Detail 2: vpiTypespec of a type parameter returns the typespec it has at
-//   the
-//     end of elaboration, without resolving typedef aliases.
-//   - Detail 3: vpiExpr of a parameter returns its default (a value parameter's
-//     default expression, a type parameter's default typespec).
-//   - Detail 4: vpiLhs of a param assign returns the overridden parameter.
-//   - Detail 5: a value parameter declared without an explicit range reports a
-//     null handle for vpiLeftRange and vpiRightRange.
-// together with the figure's vpiLocalParam / vpiConnByName Boolean properties.
-
-// The fixture installs a context so the public vpi_get / vpi_get_value /
-// vpi_handle entry points run their real dispatch over the test objects.
 class Parameter : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -46,9 +27,6 @@ class Parameter : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Figure properties: a parameter reports vpiLocalParam, and a param assign
-// reports vpiConnByName, each as a Boolean served through the public vpi_get
-// dispatch.
 TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   VpiObject local_param;
   local_param.type = vpiParameter;
@@ -56,7 +34,7 @@ TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&local_param)), 1);
 
   VpiObject plain_param;
-  plain_param.type = vpiParameter;  // not a localparam
+  plain_param.type = vpiParameter;
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&plain_param)), 0);
 
   VpiObject by_name;
@@ -65,29 +43,21 @@ TEST_F(Parameter, LocalParamAndConnByNameProperties) {
   EXPECT_EQ(vpi_get(vpiConnByName, VpiHandleOf(&by_name)), 1);
 
   VpiObject by_position;
-  by_position.type = vpiParamAssign;  // connects by position
+  by_position.type = vpiParamAssign;
   EXPECT_EQ(vpi_get(vpiConnByName, VpiHandleOf(&by_position)), 0);
 }
 
-// Figure input form: the vpiLocalParam property attaches to the whole
-// "parameters" group of the figure - both a value parameter and a type
-// parameter. A `localparam type` declaration yields a local type parameter, so
-// the same Boolean dispatch must report vpiLocalParam for a vpiTypeParameter,
-// not only for a vpiParameter.
 TEST_F(Parameter, LocalParamPropertyAppliesToTypeParameter) {
   VpiObject local_type_param;
   local_type_param.type = vpiTypeParameter;
-  local_type_param.local_param = true;  // e.g. `localparam type T = int;`
+  local_type_param.local_param = true;
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&local_type_param)), 1);
 
   VpiObject plain_type_param;
-  plain_type_param.type = vpiTypeParameter;  // a non-local `parameter type`
+  plain_type_param.type = vpiTypeParameter;
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&plain_type_param)), 0);
 }
 
-// D1: vpi_get_value() of a value parameter returns the value the parameter
-// holds. The reader is §38.34's; this observes it serving a vpiParameter
-// object.
 TEST_F(Parameter, ValueParameterValueIsReadable) {
   Arena arena;
   Variable backing;
@@ -103,20 +73,15 @@ TEST_F(Parameter, ValueParameterValueIsReadable) {
   EXPECT_EQ(value.value.integer, 0xABCD);
 }
 
-// D2: vpiTypespec of a type parameter returns the typespec it resolved to,
-// handed back without following any typedef alias. The recorded typespec is
-// itself an alias whose underlying type is reachable as a child; the relation
-// returns the alias, not the resolved underlying type.
 TEST_F(Parameter, TypeParameterTypespecReturnedWithoutAliasResolution) {
-  VpiObject resolved_ts;  // what the alias ultimately denotes
+  VpiObject resolved_ts;
   resolved_ts.type = vpiTypespec;
 
-  VpiObject alias_ts;  // a typedef-alias typespec referencing the resolved type
+  VpiObject alias_ts;
   alias_ts.type = vpiTypespec;
   alias_ts.children = {&resolved_ts};
 
-  VpiObject
-      default_ts;  // the type parameter's default typespec (the vpiExpr end)
+  VpiObject default_ts;
   default_ts.type = vpiTypespec;
 
   VpiObject type_param;
@@ -124,22 +89,16 @@ TEST_F(Parameter, TypeParameterTypespecReturnedWithoutAliasResolution) {
   type_param.param_typespec = &alias_ts;
   type_param.param_default = &default_ts;
 
-  // The alias is returned as-is, not resolved to its underlying type.
   EXPECT_EQ(VpiTypeParameterTypespec(&type_param), &alias_ts);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&type_param))),
             &alias_ts);
   EXPECT_NE(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&type_param))),
             &resolved_ts);
 
-  // vpiTypespec (detail 2) and vpiExpr (detail 3) are distinct relations
-  // reaching distinct typespecs.
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&type_param))),
             &default_ts);
 }
 
-// D2 edge: the typespec helper speaks only for a type parameter. A value
-// parameter's vpiTypespec is the generic child relation, not detail 2, so the
-// helper returns null for it (and for a null handle).
 TEST_F(Parameter, TypespecHelperOnlyForTypeParameter) {
   VpiObject ts;
   ts.type = vpiTypespec;
@@ -150,16 +109,13 @@ TEST_F(Parameter, TypespecHelperOnlyForTypeParameter) {
 
   EXPECT_EQ(VpiTypeParameterTypespec(&value_param), nullptr);
   EXPECT_EQ(VpiTypeParameterTypespec(nullptr), nullptr);
-  // The generic walk still serves a value parameter's vpiTypespec child.
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTypespec, VpiHandleOf(&value_param))),
             &ts);
 }
 
-// D3: vpiExpr of a value parameter reaches its default value expression.
 TEST_F(Parameter, ValueParameterExprReachesDefaultExpression) {
   VpiObject default_expr;
-  default_expr.type =
-      vpiOperation;  // a concrete expr kind, not literally vpiExpr
+  default_expr.type = vpiOperation;
 
   VpiObject param;
   param.type = vpiParameter;
@@ -170,11 +126,9 @@ TEST_F(Parameter, ValueParameterExprReachesDefaultExpression) {
             &default_expr);
 }
 
-// D3 edge: a parameter carrying no default reports null for vpiExpr, and the
-// helper speaks only for parameter kinds.
 TEST_F(Parameter, ParameterExprIsNullWithoutDefault) {
   VpiObject param;
-  param.type = vpiParameter;  // no default recorded
+  param.type = vpiParameter;
   EXPECT_EQ(VpiParameterDefaultExpr(&param), nullptr);
   EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&param)), nullptr);
 
@@ -184,8 +138,6 @@ TEST_F(Parameter, ParameterExprIsNullWithoutDefault) {
   EXPECT_EQ(VpiParameterDefaultExpr(nullptr), nullptr);
 }
 
-// D4: vpiLhs of a param assign reaches the overridden parameter - the value
-// parameter for a value override and the type parameter for a type override.
 TEST_F(Parameter, ParamAssignLhsReachesOverriddenParameter) {
   VpiObject overridden_value;
   overridden_value.type = vpiParameter;
@@ -208,15 +160,13 @@ TEST_F(Parameter, ParamAssignLhsReachesOverriddenParameter) {
             &overridden_type);
 }
 
-// D4 edge: a param assign with no parameter-kind child reaches no lhs, and the
-// helper speaks only for a param assign.
 TEST_F(Parameter, ParamAssignLhsIsNullWithoutParameterChild) {
   VpiObject rhs;
   rhs.type = vpiOperation;
 
   VpiObject assign;
   assign.type = vpiParamAssign;
-  assign.children = {&rhs};  // only an rhs expression, no overridden parameter
+  assign.children = {&rhs};
   EXPECT_EQ(VpiParamAssignLhs(&assign), nullptr);
   EXPECT_EQ(vpi_handle(vpiLhs, VpiHandleOf(&assign)), nullptr);
 
@@ -225,19 +175,15 @@ TEST_F(Parameter, ParamAssignLhsIsNullWithoutParameterChild) {
   EXPECT_EQ(VpiParamAssignLhs(&not_assign), nullptr);
 }
 
-// D5: a value parameter declared without an explicit range reports a null
-// handle for both vpiLeftRange and vpiRightRange.
 TEST_F(Parameter, UnrangedValueParameterReportsNullRanges) {
   VpiObject param;
-  param.type = vpiParameter;  // explicit_param_range stays false
+  param.type = vpiParameter;
   EXPECT_EQ(VpiParameterLeftRange(&param), nullptr);
   EXPECT_EQ(VpiParameterRightRange(&param), nullptr);
   EXPECT_EQ(vpi_handle(vpiLeftRange, VpiHandleOf(&param)), nullptr);
   EXPECT_EQ(vpi_handle(vpiRightRange, VpiHandleOf(&param)), nullptr);
 }
 
-// D5: a value parameter with an explicit range reaches its range-bound
-// expressions; the range helpers speak only for a parameter.
 TEST_F(Parameter, RangedValueParameterReachesRangeBounds) {
   VpiObject left_bound;
   left_bound.type = vpiConstant;
@@ -262,8 +208,6 @@ TEST_F(Parameter, RangedValueParameterReachesRangeBounds) {
   EXPECT_EQ(VpiParameterRightRange(nullptr), nullptr);
 }
 
-// A design run with a PLI application registered, its parameters read back
-// once the run is over.
 class ParametersOfARun : public VpiDesignRun {};
 
 constexpr const char* kParameters =
@@ -273,7 +217,6 @@ constexpr const char* kParameters =
     "  parameter type T = logic [3:0];\n"
     "endmodule\n";
 
-// The object `scope` holds under `name`, among those `type` reaches.
 vpiHandle ChildOf(int type, vpiHandle scope, std::string_view name) {
   vpiHandle it = vpi_iterate(type, scope);
   if (it == nullptr) return nullptr;
@@ -286,15 +229,12 @@ vpiHandle ChildOf(int type, vpiHandle scope, std::string_view name) {
   return nullptr;
 }
 
-// The figure: a module's vpiParameter iteration reaches the `parameters`
-// class, its value parameters and its type parameter alike (§37.10)...
 TEST_F(ParametersOfARun, AModulesParametersAndTypeParametersAreParameters) {
   Run(kParameters);
   EXPECT_EQ(NamesOf(vpiParameter, vpi_handle_by_name(VpiText("top"), nullptr)),
             (std::vector<std::string>{"L", "P", "T"}));
 }
 
-// ...each saying through vpiLocalParam whether it is a localparam...
 TEST_F(ParametersOfARun, ALocalparamIsALocalParam) {
   Run(kParameters);
   EXPECT_EQ(
@@ -307,7 +247,6 @@ TEST_F(ParametersOfARun, AParameterIsNotALocalParam) {
       vpi_get(vpiLocalParam, vpi_handle_by_name(VpiText("top.P"), nullptr)), 0);
 }
 
-// ...and holding its value.
 TEST_F(ParametersOfARun, AParametersValueIsRead) {
   Run(kParameters);
   s_vpi_value value = {};
@@ -316,7 +255,6 @@ TEST_F(ParametersOfARun, AParametersValueIsRead) {
   EXPECT_EQ(value.value.integer, 5);
 }
 
-// Detail 2: a type parameter is a vpiTypeParameter of its scope.
 TEST_F(ParametersOfARun, ATypeParameterIsATypeParameter) {
   Run(kParameters);
   EXPECT_NE(ChildOf(vpiTypeParameter,
@@ -324,8 +262,6 @@ TEST_F(ParametersOfARun, ATypeParameterIsATypeParameter) {
             nullptr);
 }
 
-// The typespec the type parameter `name` of the scope `scope` names reaches
-// through vpiTypespec.
 vpiHandle TypespecOf(const char* scope, std::string_view name) {
   return vpi_handle(vpiTypespec,
                     ChildOf(vpiTypeParameter,
@@ -351,21 +287,16 @@ constexpr const char* kTypeParameterTypes =
     "  e x();\n"
     "endmodule\n";
 
-// Detail 2: a type parameter's vpiTypespec is the typespec of the type it has
-// at the end of elaboration, the typedef it names left unresolved...
 TEST_F(ParametersOfARun, ATypeParametersTypespecIsTheTypedefItNames) {
   Run(kTypeParameterTypes);
   EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top", "L")), "e_t");
 }
 
-// ...one of the compilation unit among them...
 TEST_F(ParametersOfARun, ATypeParametersTypespecIsTheUnitsTypedefItNames) {
   Run(kTypeParameterTypes);
   EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top", "U")), "ue_t");
 }
 
-// ...the one an instance's parameter value assignment gave it over its
-// default...
 TEST_F(ParametersOfARun,
        AnOverriddenTypeParametersTypespecIsTheTypeItWasGiven) {
   Run(kTypeParameterTypes);
@@ -374,8 +305,6 @@ TEST_F(ParametersOfARun,
   EXPECT_STREQ(vpi_get_str(vpiName, typespec), "ue_t");
 }
 
-// ...and, of a type no typedef names, a typespec of its kind, for a
-// parameter declared among the items or as a parameter port.
 TEST_F(ParametersOfARun, ATypeParametersTypespecIsOfItsTypesKind) {
   Run(kParameters);
   EXPECT_EQ(vpi_get(vpiType, TypespecOf("top", "T")), vpiLogicTypespec);
@@ -386,8 +315,6 @@ TEST_F(ParametersOfARun, AParameterPortsTypespecIsOfItsTypesKind) {
   EXPECT_EQ(vpi_get(vpiType, TypespecOf("top.v", "T")), vpiShortIntTypespec);
 }
 
-// A parameter port's typedef is left unresolved too, whether an instance's
-// parameter value assignment named it...
 TEST_F(ParametersOfARun,
        AnOverriddenParameterPortsTypespecIsTheTypedefItNames) {
   Run(kTypeParameterTypes);
@@ -396,7 +323,6 @@ TEST_F(ParametersOfARun,
   EXPECT_STREQ(vpi_get_str(vpiName, typespec), "ue_t");
 }
 
-// ...or its default.
 TEST_F(ParametersOfARun, AParameterPortsTypespecIsTheTypedefItsDefaultNames) {
   Run(kTypeParameterTypes);
   EXPECT_STREQ(vpi_get_str(vpiName, TypespecOf("top.x", "T")), "ue_t");
@@ -410,8 +336,6 @@ constexpr const char* kPackageParameters =
     "endpackage\n"
     "module top; endmodule\n";
 
-// The figure with §37.10: a package's vpiParameter iteration reaches its
-// value parameters and its type parameter, as a module's does (#5102)...
 TEST_F(ParametersOfARun, APackagesParametersAndTypeParametersAreParameters) {
   Run(kPackageParameters);
   EXPECT_EQ(NamesOf(vpiParameter, vpi_handle_by_name(VpiText("pkg"), nullptr)),
@@ -420,8 +344,6 @@ TEST_F(ParametersOfARun, APackagesParametersAndTypeParametersAreParameters) {
             vpiParameter);
 }
 
-// ...each a local parameter, since §6.20.4 makes a `parameter` written in a
-// package mean `localparam` (#5102)...
 TEST_F(ParametersOfARun, APackagesParameterIsALocalParam) {
   Run(kPackageParameters);
   EXPECT_EQ(
@@ -429,8 +351,6 @@ TEST_F(ParametersOfARun, APackagesParameterIsALocalParam) {
       1);
 }
 
-// ...and its type parameters are vpiTypeParameters full-named through the
-// package, reaching the typespec of their type (Detail 2) (#5102).
 TEST_F(ParametersOfARun, APackagesTypeParameterIsATypeParameter) {
   Run(kPackageParameters);
   vpiHandle type = ChildOf(vpiTypeParameter,
@@ -440,9 +360,6 @@ TEST_F(ParametersOfARun, APackagesTypeParameterIsATypeParameter) {
   EXPECT_EQ(vpi_get(vpiType, TypespecOf("pkg", "T")), vpiLogicTypespec);
 }
 
-// §27.4: in a loop generate block a genvar reference stands as a localparam,
-// and nothing else the block holds does -- not a variable, and not a ref obj
-// bound to nothing -- so both report vpiLocalParam FALSE.
 TEST_F(Parameter, OnlyAGenvarReferenceInAGenScopeIsALocalParam) {
   VpiObject scope;
   scope.type = vpiGenScope;
@@ -456,8 +373,6 @@ TEST_F(Parameter, OnlyAGenvarReferenceInAGenScopeIsALocalParam) {
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&unbound)), 0);
 }
 
-// Details 4 and 5: no param assign has no lhs, and no parameter -- nor an
-// object of another kind -- has a left or right range.
 TEST_F(Parameter, NoObjectOrAnotherKindHasNoLhsOrRange) {
   EXPECT_EQ(VpiParamAssignLhs(nullptr), nullptr);
   EXPECT_EQ(VpiParameterLeftRange(nullptr), nullptr);
@@ -466,7 +381,6 @@ TEST_F(Parameter, NoObjectOrAnotherKindHasNoLhsOrRange) {
   EXPECT_EQ(VpiParameterRightRange(&constant), nullptr);
 }
 
-// The integer value of `obj`, -1 where nothing is written.
 int IntValueOf(vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -475,7 +389,6 @@ int IntValueOf(vpiHandle obj) {
   return value.value.integer;
 }
 
-// The type of what `relation` reaches from `ref`, 0 for nothing.
 int KindOf(int relation, vpiHandle ref) {
   vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
   return reached == nullptr ? 0 : vpi_get(vpiType, reached);
@@ -502,8 +415,6 @@ vpiHandle In(const char* scope, const char* name) {
                  name);
 }
 
-// §37.28 (figure): a value parameter reports through vpiConstType the kind
-// of constant its value is (#7110).
 TEST_F(ParametersOfARun, AValueParameterReportsItsConstType) {
   Run(kDescribed);
   EXPECT_EQ(vpi_get(vpiConstType, In("top", "P")), vpiIntConst);
@@ -511,8 +422,6 @@ TEST_F(ParametersOfARun, AValueParameterReportsItsConstType) {
   EXPECT_EQ(vpi_get(vpiConstType, In("top", "S")), vpiStringConst);
 }
 
-// §37.28 detail 5: a parameter declared with a range reaches its bounds, and
-// one declared with none reaches nothing (#7111).
 TEST_F(ParametersOfARun, AParameterWithARangeReachesItsBounds) {
   Run(kDescribed);
   EXPECT_EQ(IntValueOf(vpi_handle(vpiLeftRange, In("top", "R"))), 7);
@@ -520,9 +429,6 @@ TEST_F(ParametersOfARun, AParameterWithARangeReachesItsBounds) {
   EXPECT_EQ(vpi_handle(vpiLeftRange, In("top", "P")), nullptr);
 }
 
-// §37.28 detail 3: vpiExpr of a value parameter reaches its default
-// expression, an override notwithstanding, and of a type parameter the
-// typespec of its default type (#7112, #7113).
 TEST_F(ParametersOfARun, AParameterReachesItsDefault) {
   Run(kDescribed);
   EXPECT_EQ(IntValueOf(vpi_handle(vpiExpr, In("top", "P"))), 5);
@@ -531,9 +437,6 @@ TEST_F(ParametersOfARun, AParameterReachesItsDefault) {
   EXPECT_EQ(KindOf(vpiExpr, In("top.u", "T")), vpiIntTypespec);
 }
 
-// §37.28 (figure) with §6.20.2: a value parameter reaches the typespec of the
-// type it was declared with, with the range it was declared with, and one
-// declared with no type the type of its value (#7109).
 TEST_F(ParametersOfARun, AValueParameterReachesItsTypespec) {
   Run(kDescribed);
   EXPECT_EQ(KindOf(vpiTypespec, In("top", "P")), vpiIntTypespec);
@@ -551,8 +454,6 @@ TEST_F(ParametersOfARun, AValueParameterReachesItsTypespec) {
   EXPECT_NE(vpi_iterate(vpiRange, of_q), nullptr);
 }
 
-// §37.28: a type parameter declared in a generate block is a type parameter
-// of the block's gen scope (#7108).
 TEST_F(ParametersOfARun, AGenerateBlocksTypeParameterIsItsOwn) {
   Run(kDescribed);
   vpiHandle gt = In("top.g", "GT");
@@ -561,9 +462,6 @@ TEST_F(ParametersOfARun, AGenerateBlocksTypeParameterIsItsOwn) {
   EXPECT_EQ(KindOf(vpiTypespec, gt), vpiBitTypespec);
 }
 
-// §37.28 detail 4 and the figure: an instance holds a param assign per value
-// its parameter value assignment gives, reaching the parameter it assigns
-// and the value, and saying whether it names the parameter (#7114).
 TEST_F(ParametersOfARun, AnInstanceHoldsItsParamAssigns) {
   Run(kDescribed);
   for (const auto& [scope, value, by_name] :
@@ -579,9 +477,6 @@ TEST_F(ParametersOfARun, AnInstanceHoldsItsParamAssigns) {
   }
 }
 
-// Detail 3 with §23.4: a type parameter of an instance of a module declared
-// nested in another's body reaches the typespec of the default type that
-// declaration wrote (#8266).
 TEST_F(ParametersOfARun, ANestedModulesTypeParameterReachesItsDefault) {
   Run("module top;\n"
       "  module inner #(parameter type T = byte); endmodule\n"

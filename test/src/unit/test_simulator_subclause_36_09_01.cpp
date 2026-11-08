@@ -16,9 +16,6 @@ class UserDefinedSystfRegistration : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.9.1: a user-defined system task or system function name shall begin
-// with a dollar sign. A name lacking the leading '$' is not a legal
-// user-defined name, so registration of it must be refused.
 TEST_F(UserDefinedSystfRegistration, NameWithoutDollarIsRejected) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -30,8 +27,6 @@ TEST_F(UserDefinedSystfRegistration, NameWithoutDollarIsRejected) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-// §36.9.1: a name beginning with the dollar sign is the legal form, so the
-// same registration succeeds once the leading '$' is present.
 TEST_F(UserDefinedSystfRegistration, NameWithDollarIsAccepted) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -44,9 +39,6 @@ TEST_F(UserDefinedSystfRegistration, NameWithDollarIsAccepted) {
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$get_vector");
 }
 
-// §36.9.1: a name shall begin with a dollar sign. A null name string carries
-// no leading '$' at all, so registration must be refused rather than
-// dereferencing into it.
 TEST_F(UserDefinedSystfRegistration, NullNameIsRejected) {
   s_vpi_systf_data data = {};
   data.type = vpiSysFunc;
@@ -59,9 +51,6 @@ TEST_F(UserDefinedSystfRegistration, NullNameIsRejected) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-// §36.9.1: the registration of system tasks shall occur prior to elaboration
-// or the resolution of references. Before elaboration begins, registration is
-// permitted.
 TEST_F(UserDefinedSystfRegistration, RegistrationBeforeElaborationSucceeds) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -73,9 +62,6 @@ TEST_F(UserDefinedSystfRegistration, RegistrationBeforeElaborationSucceeds) {
   EXPECT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1);
 }
 
-// §36.9.1: once elaboration (or reference resolution) has begun, the window
-// for registering system tasks and functions has closed, so a later
-// registration must be refused.
 TEST_F(UserDefinedSystfRegistration, RegistrationAfterElaborationIsRejected) {
   vpi_ctx_.MarkElaborationStarted();
 
@@ -89,10 +75,6 @@ TEST_F(UserDefinedSystfRegistration, RegistrationAfterElaborationIsRejected) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-// §36.9.1: an application defines whether each PLI application is a function
-// (returns a value) or a task. The registration accepts both forms and the
-// stored entry preserves which one was requested, so callers can later treat
-// them as functions or tasks accordingly.
 TEST_F(UserDefinedSystfRegistration,
        RegistrationDistinguishesFunctionFromTask) {
   s_vpi_systf_data task = {};
@@ -131,10 +113,6 @@ void StartupRoutineRegistersFunc() {
 
 }  // namespace
 
-// §36.9.1: the intended use model places a reference to a routine inside the
-// vlog_startup_routines[] array, and that routine registers user-defined
-// system tasks and functions when invoked. Walking such an array must call
-// every listed routine so that all registrations happen.
 TEST_F(UserDefinedSystfRegistration,
        VlogStartupRoutinesArrayInvokesEachRoutine) {
   VlogStartupRoutine routines[] = {
@@ -150,9 +128,6 @@ TEST_F(UserDefinedSystfRegistration,
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[1].tfname, "$startup_func");
 }
 
-// §36.9.1: a vlog_startup_routines[] array is a conventional null-terminated
-// list. The first null entry marks the end, so iteration must stop there and
-// not call anything that follows it.
 TEST_F(UserDefinedSystfRegistration, VlogStartupRoutinesStopAtNullSentinel) {
   VlogStartupRoutine routines[] = {
       &StartupRoutineRegistersTask,

@@ -94,10 +94,6 @@ TEST(PrimaryElaboration, NullPrimaryElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.8.4 lists null among the constant primaries, so it stands where a constant
-// expression is asked for: on its own, beside an undeclared name that is none,
-// and as a class-typed input port's default, which §23.2.2.4 asks to be a
-// constant expression, beside a $random default reported there.
 TEST(PrimaryElaboration, NullIsAConstantPrimary) {
   EvalFixture e;
   EXPECT_TRUE(IsConstantExpr(ParseExprFrom("null", e), {}));
@@ -119,11 +115,6 @@ TEST(PrimaryElaboration, NullIsAConstantPrimary) {
                             3, "23.2.2.4"));
 }
 
-// A.10 footnote 50 makes a constant let expression's body constant, with its
-// formals counted as constants there. A let whose body reads a variable is no
-// constant expression even given a constant argument, nor is a let given a
-// variable as its argument; a let over its formal and a parameter is one
-// (#8084).
 TEST(PrimaryElaboration, ALetCallIsConstantOnlyWhereItsBodyIs) {
   ElabFixture f;
   ElaborateSrc(
@@ -148,10 +139,6 @@ TEST(PrimaryElaboration, ALetCallIsConstantOnlyWhereItsBodyIs) {
       "localparam 'R' initializer is not a constant expression", 8, "6.20.4"));
 }
 
-// A.8.4 counts a constant let expression among the constant primaries, so a
-// let call folds at elaboration wherever a constant expression stands. Each
-// formal takes its argument by position or by name, or its default where the
-// argument is left out, and the call's value is the body's (#8085).
 TEST(PrimaryElaboration, AConstantLetExpressionFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -193,11 +180,6 @@ TEST(PrimaryElaboration, AConstantLetExpressionFolds) {
   EXPECT_EQ(width("u"), 10U);
 }
 
-// A let is its declaring module's, read only while that module is elaborated,
-// so a call in a package's or the compilation unit's localparam names that
-// scope's function and never a module's let of the same name: the unit's is
-// still a constant expression, and the package's never takes the let's value
-// (#8085).
 TEST(PrimaryElaboration, ALetStandsForNoCallOutsideItsModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(

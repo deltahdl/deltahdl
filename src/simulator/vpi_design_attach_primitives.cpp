@@ -29,12 +29,6 @@ namespace delta {
 
 namespace {
 
-// §28.2 to §28.6, §29.8 and §37.35: what a primitive is - the definition it is
-// an instance of (a gate or switch keyword, or a UDP's name), its vpiPrimType,
-// its object type (a gate, a switch or a udp), and how its terminals run:
-// `outputs` leading ones that are outputs (-1 for all but the last, the buf and
-// not gates' form), and `inouts` for a switch whose leading two are
-// bidirectional.
 struct PrimShape {
   std::string_view definition;
   int prim_type = 0;
@@ -95,15 +89,11 @@ PrimShape ShapeOf(GateKind kind) {
       return {"rcmos", vpiRcmosPrim, vpiSwitch};
     case GateKind::kPullup:
       return {"pullup", vpiPullupPrim};
-    default:  // GateKind::kPulldown, the one kind left.
+    default:
       return {"pulldown", vpiPulldownPrim};
   }
 }
 
-// The direction of terminal `index` of `count` a primitive of `shape` has:
-// §28.4's buf and not gates drive every terminal but the last, a pullup or
-// pulldown (§28.10) every terminal, a bidirectional switch (§28.8) passes
-// both ends of its channel, and every other primitive drives its first.
 int TerminalDirection(const PrimShape& shape, std::size_t index,
                       std::size_t count) {
   if (shape.inouts) return index < 2 ? kVpiInout : kVpiInput;
@@ -115,21 +105,14 @@ int TerminalDirection(const PrimShape& shape, std::size_t index,
                                                          : kVpiInput;
 }
 
-// Where a primitive is instantiated: the instance, keyed under `prefix` among
-// the run's `objects`, whose names its terminals' expressions resolve in.
 struct PrimSite {
   VpiObject* instance;
   const std::string& prefix;
   const VpiObjectMap& objects;
-  // §37.83: the instance's table of operator attributes.
   const RtlirNodeAttributes* attrs = nullptr;
-  // §37.42: the instance's module, whose declarations a terminal's call finds
-  // its callee among.
   const RtlirModule* mod = nullptr;
 };
 
-// The expression object of the terminal `terminal` written at `site`, a call
-// in it standing in the instance (§37.42).
 VpiObject* TerminalExpression(const Expr* terminal, const PrimSite& site,
                               SimContext& ctx, const VpiAttachBuild& build) {
   static const std::vector<std::string_view> kNoGenBlocks;
@@ -140,11 +123,6 @@ VpiObject* TerminalExpression(const Expr* terminal, const PrimSite& site,
       ctx, build);
 }
 
-// §37.35: a primitive of `shape` hung from `instance`, named `name`, reporting
-// its definition name, its primitive type and as its size the number of its
-// inputs (detail 1), with a prim term per terminal in the order written - its
-// direction, its index from zero (detail 3) and the expression it connects,
-// `terminals` giving each in turn.
 VpiObject* MakePrimitiveObject(const PrimShape& shape, std::string_view name,
                                const std::vector<VpiObject*>& terminals,
                                VpiObject* instance,
@@ -169,7 +147,6 @@ VpiObject* MakePrimitiveObject(const PrimShape& shape, std::string_view name,
     term->direction = TerminalDirection(shape, i, kCount);
     if (term->direction == kVpiInput) ++inputs;
     if (terminals[i] != nullptr) term->children.push_back(terminals[i]);
-    // §37.46: the term is a driver or a load of the net it connects.
     VpiHangOnNetsNamed(term, terminals[i]);
     prim->children.push_back(term);
   }
@@ -177,8 +154,6 @@ VpiObject* MakePrimitiveObject(const PrimShape& shape, std::string_view name,
   return prim;
 }
 
-// §37.3.4: the delay expression vpiDelay reaches from a primitive whose
-// instantiation at `site` wrote `delays`; null where it wrote none.
 VpiObject* PrimitiveDelayExpression(const std::vector<const Expr*>& delays,
                                     const PrimSite& site, SimContext& ctx,
                                     const VpiAttachBuild& build) {
@@ -186,7 +161,6 @@ VpiObject* PrimitiveDelayExpression(const std::vector<const Expr*>& delays,
                                   build.alloc);
 }
 
-// The same for a gate or switch instantiation `item`.
 VpiObject* GateDelayExpression(const ModuleItem& item, const PrimSite& site,
                                SimContext& ctx, const VpiAttachBuild& build) {
   return PrimitiveDelayExpression(
@@ -194,9 +168,6 @@ VpiObject* GateDelayExpression(const ModuleItem& item, const PrimSite& site,
       build);
 }
 
-// §37.35 with §28.16: the delays the gate or switch instantiation `item` at
-// `site` was written with, a rise, a fall and a turn-off, as vpi_get_delays
-// reads them.
 std::vector<VpiDelayInfo> GateDelays(const ModuleItem& item,
                                      const PrimSite& site, SimContext& ctx) {
   return VpiWrittenDelays(
@@ -204,7 +175,6 @@ std::vector<VpiDelayInfo> GateDelays(const ModuleItem& item,
       VpiFlatName(site.prefix, ""), ctx);
 }
 
-// The expressions `item`'s terminals are written as at `site`.
 std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
                                         const PrimSite& site, SimContext& ctx,
                                         const VpiAttachBuild& build) {
@@ -216,11 +186,6 @@ std::vector<VpiObject*> TerminalObjects(const ModuleItem& item,
   return terminals;
 }
 
-// What one instance array of primitives is made of: the instantiation `item`
-// writing its range and terminals, the shape its elements share, the kind of
-// array, the delay each element is instantiated with, the udp defn a udp
-// array's elements reach, null for a gate or switch array, and the delays each
-// element reports through vpi_get_delays.
 struct PrimArraySpec {
   const ModuleItem& item;
   PrimShape shape;
@@ -230,10 +195,6 @@ struct PrimArraySpec {
   std::vector<VpiDelayInfo> delays = {};
 };
 
-// §37.11 with §28.3.6: the instance array `spec` describes at `site`, a gate,
-// switch or udp array over a primitive per element, each named by its index
-// and reaching it (§37.35 detail 4), and the array reaching the delay every
-// element is instantiated with.
 void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
                         SimContext& ctx, const VpiAttachBuild& build) {
   const ModuleItem& item = spec.item;
@@ -246,14 +207,6 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
   VpiObject* array = VpiMakeInstanceArray(site.instance, spec.kind,
                                           item.gate_inst_name, kRange, build);
   array->delay_expr = spec.delay;
-  // §28.3.6 with §37.35: each element's prim terms reach what the elaborator
-  // connected that element to, the terminals InstanceArrayElementTerminals
-  // gives it under the module's parameter values: a terminal as wide as the
-  // array its bit -- a vector's net bit or var bit, a bit of a packed
-  // subarray or of an unpacked element, a literal's bit as a constant -- and
-  // any other whole. Shared out by the model's objects instead, a terminal
-  // whose object held no bit objects, `p[1]` or `mem[1]`, stood whole for
-  // every element.
   const ScopeMap kScope = DpiParameterScope(*site.mod);
   const GateArraySite kTerms{site.mod, kScope, build.arena};
   for (int64_t index = kRange.LowIndex(); index <= kRange.HighIndex();
@@ -271,41 +224,28 @@ void MakePrimitiveArray(const PrimArraySpec& spec, const PrimSite& site,
     prim->delay_expr = spec.delay;
     prim->delays = spec.delays;
     prim->udp_defn = spec.udp_defn;
-    // §37.35 detail 2 and §38.32: the name a put to a sequential udp element
-    // finds the running instance under, as for a udp standing alone
-    // (MakeUdpObject), and a vpi_put_delays files its new delays below.
     prim->run_key = VpiFlatName(site.prefix, kName);
     VpiRecordWrittenLocation(prim, item.loc, ctx);
     VpiAddArrayElement(array, prim, index, build);
   }
 }
 
-// §29.8 with §37.35: the shape of an instance of the UDP `decl`, of the type
-// its state makes it.
 PrimShape UdpShape(const UdpDecl& decl) {
   return {decl.name, decl.is_sequential ? vpiSeqPrim : vpiCombPrim, vpiUdp};
 }
 
-// §29.8 with §37.3.4: the delay a UDP instantiation `inst` was written with at
-// `site`, the two §29.8 admits.
 VpiObject* UdpDelayExpression(const RtlirUdpInst& inst, const PrimSite& site,
                               SimContext& ctx, const VpiAttachBuild& build) {
   return PrimitiveDelayExpression({inst.delay, inst.delay_fall}, site, ctx,
                                   build);
 }
 
-// §37.35 with §29.8: the same delays as vpi_get_delays reads them, a rise and
-// a fall, a UDP having no z to turn off to.
 std::vector<VpiDelayInfo> UdpDelays(const RtlirUdpInst& inst,
                                     const PrimSite& site, SimContext& ctx) {
   return VpiWrittenDelays({inst.delay, inst.delay_fall, nullptr}, false,
                           VpiFlatName(site.prefix, ""), ctx);
 }
 
-// §29.8 with §37.35: the udp the instantiation `inst` of a UDP makes at `site`,
-// its output terminal first and its inputs after it as §29.8 writes them, and
-// reaching the udp defn `defn` of the UDP it instantiates. Answers the object
-// made.
 VpiObject* MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
                          VpiObject* defn, SimContext& ctx,
                          const VpiAttachBuild& build) {
@@ -320,17 +260,11 @@ VpiObject* MakeUdpObject(const RtlirUdpInst& inst, const PrimSite& site,
   udp->udp_defn = defn;
   udp->delay_expr = UdpDelayExpression(inst, site, ctx, build);
   udp->delays = UdpDelays(inst, site, ctx);
-  // §37.35 detail 2: the name a put to a sequential UDP finds the running
-  // instance under.
   udp->run_key = VpiFlatName(site.prefix, inst.name);
-  // §37.3.3: where the instantiation was written.
   VpiRecordWrittenLocation(udp, inst.loc, ctx);
   return udp;
 }
 
-// §29.8 with §37.11: the udps the instance at `site` instantiates. An
-// instantiation writing a range, which the elaborator expanded into an
-// instance per element, is one udp array over them (§28.3.6), made once.
 void MakeInstanceUdps(const RtlirModule& mod, const PrimSite& site,
                       const VpiUdpDefnOf& udp_defn_of, SimContext& ctx,
                       const VpiAttachBuild& build) {
@@ -358,11 +292,6 @@ void MakeInstanceUdps(const RtlirModule& mod, const PrimSite& site,
 void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiUdpDefnOf& udp_defn_of, SimContext& ctx,
                       const VpiAttachBuild& build) {
-  // §37.35: an instance reaches the gates, switches and udps it instantiates,
-  // each with its terminals and, §37.3.4, the delay it was written with.
-  // RtlirModule::gate_insts kept each gate and switch instantiation and
-  // udp_insts each UDP one, and no pass read either, so vpiPrimitive reached
-  // nothing for any design.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,
@@ -370,8 +299,6 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
         for (const ModuleItem* item : mod->gate_insts) {
           const PrimSite kSite{instance, prefix, objects, &mod->node_attrs,
                                mod};
-          // §28.3.6: an instantiation declaring a range is an
-          // instance array.
           if (item->inst_range_left != nullptr) {
             const PrimShape kShape = ShapeOf(item->gate_kind);
             MakePrimitiveArray(
@@ -387,12 +314,8 @@ void AttachPrimitives(const RtlirDesign* design, const VpiObjectMap& objects,
               TerminalObjects(*item, kSite, ctx, build), instance, build);
           prim->delay_expr = GateDelayExpression(*item, kSite, ctx, build);
           prim->delays = GateDelays(*item, kSite, ctx);
-          // §38.32: the name the run keys the instance under, which a
-          // vpi_put_delays files its new delays below.
           prim->run_key = VpiFlatName(prefix, item->gate_inst_name);
-          // §37.3.3: where the instantiation was written.
           VpiRecordWrittenLocation(prim, item->loc, ctx);
-          // §37.83: the attributes it is written with.
           VpiAttachAttributes(prim, VpiNodeAttributes(mod, item), false, ctx,
                               build);
         }

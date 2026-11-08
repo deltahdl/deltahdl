@@ -12,8 +12,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborates `src`, lowers it, and runs the scheduler. Returns the elaborated
-// design (or nullptr on elaboration failure) so callers can assert on it.
 RtlirDesign* ElaborateLowerRun(SimFixture& f, const std::string& src) {
   auto* design = ElaborateSrc(src, f);
   if (design == nullptr) {
@@ -25,9 +23,6 @@ RtlirDesign* ElaborateLowerRun(SimFixture& f, const std::string& src) {
   return design;
 }
 
-// Builds the standard color_t-enum module whose `initial` block contains `body`
-// (with `c` declared as color_t and `ok` as int), elaborates/lowers/runs it,
-// then reads back `ok` and `c`. Asserts both variables exist.
 void RunEnumCast(SimFixture& f, const std::string& body, uint64_t& ok_out,
                  uint64_t& c_out) {
   std::string src =
@@ -50,9 +45,6 @@ void RunEnumCast(SimFixture& f, const std::string& body, uint64_t& ok_out,
   c_out = c->value.ToUint64();
 }
 
-// Builds the color_t-enum module with an int `flag` (initialized to 0) and `c`,
-// whose `initial` block runs `body` after the `flag = 0;` init. Reads back
-// `flag` and `c`. Asserts both variables exist.
 void RunEnumCondCast(SimFixture& f, const std::string& body, uint64_t& flag_out,
                      uint64_t& c_out) {
   std::string src =
@@ -222,9 +214,6 @@ TEST(DynamicCastSim, CastEnumFirstMember) {
   EXPECT_EQ(c, 0u);
 }
 
-// §6.24.2: casting between cast-compatible singular (integral) operands is a
-// valid assignment, so the function form assigns the destination and returns 1.
-// Exercises the success path for a non-enum destination.
 TEST(DynamicCastSim, FunctionFormIntegralCastSucceeds) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f,
@@ -245,11 +234,6 @@ TEST(DynamicCastSim, FunctionFormIntegralCastSucceeds) {
   EXPECT_EQ(d->value.ToUint64(), 5u);
 }
 
-// §6.24.2: the source_expression admits any constant form of 11.2.1. A
-// parameter whose value names a valid enum member drives the singular cast
-// rule: the function form assigns the destination and returns 1. Building the
-// operand from real parameter syntax exercises an input form the literal-only
-// tests above do not.
 TEST(DynamicCastSim, FunctionFormParameterSourceSucceeds) {
   SimFixture f;
   auto* design =
@@ -271,9 +255,6 @@ TEST(DynamicCastSim, FunctionFormParameterSourceSucceeds) {
   EXPECT_EQ(c->value.ToUint64(), 2u);
 }
 
-// §6.24.2 negative: the source is a parameter constant whose value is not a
-// valid member of the enum destination. The function form makes no assignment
-// and returns 0, leaving the previously assigned destination unchanged.
 TEST(DynamicCastSim, FunctionFormParameterSourceOutOfRangeFails) {
   SimFixture f;
   auto* design =
@@ -295,13 +276,9 @@ TEST(DynamicCastSim, FunctionFormParameterSourceOutOfRangeFails) {
   EXPECT_EQ(ok->value.ToUint64(), 0u);
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 1u);  // still GREEN, no assignment made
+  EXPECT_EQ(c->value.ToUint64(), 1u);
 }
 
-// §6.24.2: the source_expression may also be a localparam constant, a distinct
-// constant declaration from a parameter. Driven through the task form, a
-// localparam whose value names a valid enum member assigns the destination and
-// raises no run-time error.
 TEST(DynamicCastSim, TaskFormLocalparamSourceAssigns) {
   SimFixture f;
   auto* design =
@@ -320,8 +297,6 @@ TEST(DynamicCastSim, TaskFormLocalparamSourceAssigns) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.2: the task form of a valid integral cast assigns the destination and,
-// because the assignment is valid, raises no run-time error.
 TEST(DynamicCastSim, TaskFormIntegralCastAssignsNoError) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f,
@@ -339,9 +314,6 @@ TEST(DynamicCastSim, TaskFormIntegralCastAssignsNoError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.2: the $cast task reached through a statement whose expression is the
-// call itself is a second path to the same rule, and its report names the same
-// subclause.
 TEST(DynamicCastSim, TaskCallInvalidAssignmentNames6_24_2) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f,
@@ -358,12 +330,6 @@ TEST(DynamicCastSim, TaskCallInvalidAssignmentNames6_24_2) {
                             "6.24.2"));
 }
 
-// A void function whose body casts an out-of-range value into the module's
-// color_t variable, called as `f()` from an initial block that has already set
-// the destination to GREEN. The parentheses are what put the body on the path
-// under test: `f;` names a void function without them, which is the one form
-// SetupTaskCallFromIdentifier claims, and that form runs through the coroutine
-// executor that already raises the report.
 const char* const kInvalidCastInFunction =
     "module t;\n"
     "  typedef enum {RED, GREEN, BLUE} color_t;\n"
@@ -377,10 +343,6 @@ const char* const kInvalidCastInFunction =
     "  end\n"
     "endmodule\n";
 
-// §6.24.2: $cast called as a task tries to assign the source expression to the
-// destination variable, and an invalid assignment is a run-time error. The
-// clause says nothing about where the call is written, so a subroutine body
-// owes the same report as an initial block.
 TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyRaisesRuntimeError) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
@@ -390,8 +352,6 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyRaisesRuntimeError) {
                             5, "6.24.2"));
 }
 
-// §6.24.2: the report a function body raises is the same rule as the one an
-// initial block raises, so it names the same subclause.
 TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyNames6_24_2) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
@@ -401,10 +361,6 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyNames6_24_2) {
                             5, "6.24.2"));
 }
 
-// §6.24.2: the destination variable keeps its value. The destination holds
-// GREEN when the invalid cast runs, so it still holds GREEN afterwards. Raising
-// the report while letting the assignment through would satisfy the two tests
-// above and break this one.
 TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyLeavesDestUnchanged) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f, kInvalidCastInFunction);
@@ -412,17 +368,13 @@ TEST(DynamicCastSim, TaskFormInvalidInFunctionBodyLeavesDestUnchanged) {
 
   auto* c = f.ctx.FindVariable("c");
   ASSERT_NE(c, nullptr);
-  EXPECT_EQ(c->value.ToUint64(), 1u);  // still GREEN
+  EXPECT_EQ(c->value.ToUint64(), 1u);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "$cast task could not assign the source expression "
                             "to the destination; assignment is invalid",
                             5, "6.24.2"));
 }
 
-// §6.24.2 through §8.16: a downcast written as a task inside a class method is
-// the ordinary shape of the rule. A method body reaches the same executor a
-// module function body does, by a different call path, so it is asserted
-// separately rather than assumed from the function case.
 TEST(DynamicCastSim, TaskFormInvalidInClassMethodRaisesRuntimeError) {
   SimFixture f;
   auto* design =
@@ -447,9 +399,6 @@ TEST(DynamicCastSim, TaskFormInvalidInClassMethodRaisesRuntimeError) {
                             6, "6.24.2"));
 }
 
-// §6.24.2: the run-time error belongs to the invalid assignment and not to the
-// task form, so a valid cast in a function body reports nothing. Without this
-// case a fix that reports on every $cast task passes every test above.
 TEST(DynamicCastSim, TaskFormValidInFunctionBodyRaisesNoError) {
   SimFixture f;
   auto* design =

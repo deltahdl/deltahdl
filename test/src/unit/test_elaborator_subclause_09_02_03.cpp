@@ -187,9 +187,6 @@ TEST(FinalProcedureElaboration, DelayInNestedIfErrors) {
 }
 
 TEST(FinalProcedureElaboration, DelayInCaseBranchErrors) {
-  // §9.2.3: only statements permitted inside a function declaration are allowed
-  // in a final procedure, so a timing control nested inside a case branch is
-  // rejected just as one nested inside an if is.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -209,7 +206,6 @@ TEST(FinalProcedureElaboration, DelayInCaseBranchErrors) {
 }
 
 TEST(FinalProcedureElaboration, CaseBranchWithoutTimingValid) {
-  // Companion accept path: a case whose branches only assign is function-legal.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -228,10 +224,6 @@ TEST(FinalProcedureElaboration, CaseBranchWithoutTimingValid) {
 }
 
 TEST(FinalProcedureElaboration, IntraAssignDelayInFinalErrors) {
-  // §9.2.3: a final procedure admits only the timing-free statements permitted
-  // in a function. A blocking assignment is a legal statement kind, but an
-  // intra-assignment delay attaches a timing control to it and must be rejected
-  // — a distinct syntactic form from a statement-leading delay.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -245,8 +237,6 @@ TEST(FinalProcedureElaboration, IntraAssignDelayInFinalErrors) {
 }
 
 TEST(FinalProcedureElaboration, IntraAssignEventControlInFinalErrors) {
-  // Companion form: an intra-assignment event control is likewise a timing
-  // control and is rejected inside a final procedure.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -261,10 +251,6 @@ TEST(FinalProcedureElaboration, IntraAssignEventControlInFinalErrors) {
 }
 
 TEST(FinalProcedureElaboration, IntraAssignNonblockingDelayInFinalErrors) {
-  // §9.2.3: the timing-control prohibition applies to a nonblocking assignment
-  // carrying an intra-assignment delay too, not only the blocking form — a
-  // distinct assignment kind. (Such a delay is legal in some always procedures,
-  // but a final procedure admits no timing control at all.)
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -301,10 +287,6 @@ TEST(FinalProcedureElaboration, DisplayCallInFinalValid) {
 }
 
 TEST(FinalProcedureElaboration, FunctionCallInFinalValid) {
-  // §9.2.3: a final procedure admits exactly the statements a function permits.
-  // A call to a user-defined function (declared with real §13.4 syntax) is such
-  // a statement, so it elaborates without error — the accept companion to the
-  // timing-control and fork-join rejections above.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -317,9 +299,6 @@ TEST(FinalProcedureElaboration, FunctionCallInFinalValid) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.2.3 allows in a final procedure only the statements a function allows,
-// and a function shall not enable a task (§13.4), so a task enabled in a final
-// procedure is reported; a function called there is legal.
 TEST(FinalProcedureElaboration, ATaskEnabledInAFinalProcedureIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -337,8 +316,6 @@ TEST(FinalProcedureElaboration, ATaskEnabledInAFinalProcedureIsReported) {
                              "9.2.3"));
 }
 
-// A.8.2 writes a tf_call's argument list optionally, so `t;` enables t as
-// `t();` does (#6426).
 TEST(FinalProcedureElaboration, ATaskEnabledByItsBareNameIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -351,8 +328,6 @@ TEST(FinalProcedureElaboration, ATaskEnabledByItsBareNameIsReported) {
                             "final procedure enables task 't'", 3, "9.2.3"));
 }
 
-// A task is no less a task for being declared in a package or at
-// compilation-unit scope (#6427).
 TEST(FinalProcedureElaboration, APackageOrUnitTaskEnabledIsReported) {
   ElabFixture f;
   ElaborateSrc(

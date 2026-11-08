@@ -84,9 +84,6 @@ TEST(RealConversion, ImplicitIntToReal) {
   EXPECT_NEAR(VecToDouble(var->value), 42.0, 1e-10);
 }
 
-// Per-bit form of the x/z rule: the known bits of a partly-unknown vector must
-// survive the conversion to real while only the x bits collapse to zero. With
-// the high nibble known (1010) and the low nibble x, the result is 0xA0 = 160.
 TEST(RealConversion, KnownBitsSurviveWhileXBitsZeroOnRealConversion) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -103,8 +100,6 @@ TEST(RealConversion, KnownBitsSurviveWhileXBitsZeroOnRealConversion) {
   EXPECT_NEAR(VecToDouble(var->value), 160.0, 1e-10);
 }
 
-// The rule names both x and z; exercise the high-impedance half explicitly.
-// High nibble known (1010), low nibble z -> 0xA0 = 160.
 TEST(RealConversion, HighZBitsBecomeZeroOnRealConversion) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -121,8 +116,6 @@ TEST(RealConversion, HighZBitsBecomeZeroOnRealConversion) {
   EXPECT_NEAR(VecToDouble(var->value), 160.0, 1e-10);
 }
 
-// Round-to-nearest must hold for negative non-tie magnitudes too, not just the
-// exact-half tie: -2.7 rounds to -3 and -2.2 rounds to -2 on implicit assign.
 TEST(RealConversion, ImplicitNegativeNonTieRoundsToNearest) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -145,9 +138,6 @@ TEST(RealConversion, ImplicitNegativeNonTieRoundsToNearest) {
             static_cast<uint32_t>(-2));
 }
 
-// A declaration initializer is an assignment, so a real initializer of an
-// integer variable rounds to the nearest integer rather than reinterpreting the
-// raw double bits. int'(truncate) or a bit copy would not yield 36 here.
 TEST(RealConversion, DeclInitRealToIntRoundsNotTruncates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -159,8 +149,6 @@ TEST(RealConversion, DeclInitRealToIntRoundsNotTruncates) {
   EXPECT_EQ(var->value.ToUint64(), 36u);
 }
 
-// Ties-away-from-zero must hold on the declaration-initializer path too, in
-// both sign directions: 35.5 -> 36, 1.5 -> 2, -1.5 -> -2.
 TEST(RealConversion, DeclInitRealToIntTiesAwayFromZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,9 +168,6 @@ TEST(RealConversion, DeclInitRealToIntTiesAwayFromZero) {
             static_cast<uint32_t>(-2));
 }
 
-// The reverse direction on the declaration-initializer path: an integer
-// initializer of a real variable is converted numerically, so the stored value
-// is the double 5.0 (its bit pattern), not the raw integer bits.
 TEST(RealConversion, DeclInitIntToReal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -194,8 +179,6 @@ TEST(RealConversion, DeclInitIntToReal) {
   EXPECT_NEAR(VecToDouble(var->value), 5.0, 1e-10);
 }
 
-// x/z bits read as zero on the declaration-initializer conversion to real while
-// the known bits survive: high nibble 1010, low nibble x -> 0xA0 = 160.0.
 TEST(RealConversion, DeclInitXzBitsBecomeZeroOnRealConversion) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -207,11 +190,6 @@ TEST(RealConversion, DeclInitXzBitsBecomeZeroOnRealConversion) {
   EXPECT_NEAR(VecToDouble(var->value), 160.0, 1e-10);
 }
 
-// A nonblocking assignment is an assignment too, so the conversion applies at
-// that distinct syntactic position (a separate scheduling call site from the
-// blocking and declaration-initializer paths). real->int rounds with a tie away
-// from zero (2.5 -> 3, discriminating round-half-to-even's 2), and int->real
-// converts numerically (7 -> 7.0).
 TEST(RealConversion, NonblockingAssignConvertsBothDirections) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -236,9 +214,6 @@ TEST(RealConversion, NonblockingAssignConvertsBothDirections) {
   EXPECT_NEAR(VecToDouble(f.ctx.FindVariable("s")->value), 7.0, 1e-10);
 }
 
-// shortreal is one of the real variable types (§6.12), so the round-to-nearest
-// conversion applies to it as well; the value travels the 32-bit-float branch
-// of the real read path. 2.5 is exact in float and ties to 3.
 TEST(RealConversion, ShortRealToIntRoundsToNearest) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -255,8 +230,6 @@ TEST(RealConversion, ShortRealToIntRoundsToNearest) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// realtime is synonymous with real (§6.12), so it is likewise converted by
-// rounding; 1.5 ties to 2.
 TEST(RealConversion, RealtimeToIntRoundsToNearest) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -273,8 +246,6 @@ TEST(RealConversion, RealtimeToIntRoundsToNearest) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// The conversion target may be any integer type (§6.11), not just int. Rounding
-// into a 64-bit longint exercises the full-width target path; 35.5 ties to 36.
 TEST(RealConversion, RealToLongintRoundsToNearest) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -291,13 +262,6 @@ TEST(RealConversion, RealToLongintRoundsToNearest) {
   EXPECT_EQ(var->value.ToUint64(), 36u);
 }
 
-// DeclInitIntToReal above is a declaration at module scope, which the lowerer
-// initializes. A declaration written inside a procedural block is initialized
-// by ExecVarDeclImpl in statement_assign_decl.cpp instead, and §6.12.1's
-// conversion has to reach it there too: a plain resize of the initializer to
-// the variable's 64 bits would store the integer 5's bit pattern, which read as
-// a double is 2.47e-323 rather than 5.0. The block-local cannot be found once
-// the block has ended, so the value is carried out through a module-level real.
 TEST(RealConversion, BlockDeclInitIntToReal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -313,10 +277,6 @@ TEST(RealConversion, BlockDeclInitIntToReal) {
   EXPECT_NEAR(VecToDouble(var->value), 5.0, 1e-10);
 }
 
-// §10.8 makes passing a value to a subroutine argument an assignment-like
-// context, so §6.12.1's rounding reaches a real actual passed to an int
-// formal: `fi(12.5)` reads 13.
-// The value's 64-bit pattern resized to the formal's 32 read 0.
 TEST(RealConversion, RealActualRoundsIntoAnIntFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -330,7 +290,6 @@ TEST(RealConversion, RealActualRoundsIntoAnIntFormal) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-// The same through a real variable rather than a literal.
 TEST(RealConversion, RealVariableActualRoundsIntoAnIntFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -345,8 +304,6 @@ TEST(RealConversion, RealVariableActualRoundsIntoAnIntFormal) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-// §6.12.1 rounds a half away from zero, so -3.5 into a shortint formal is the
-// 16-bit -4, fffc.
 TEST(RealConversion, NegativeRealActualRoundsAwayIntoAShortintFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -360,8 +317,6 @@ TEST(RealConversion, NegativeRealActualRoundsAwayIntoAShortintFormal) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFCu);
 }
 
-// A longint formal is as wide as the real's pattern, so no resize stood
-// between them and the pattern itself was the formal's value.
 TEST(RealConversion, RealActualRoundsIntoALongintFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -375,7 +330,6 @@ TEST(RealConversion, RealActualRoundsIntoALongintFormal) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-// -3.5 into a byte formal is the 8-bit -4, fc.
 TEST(RealConversion, NegativeRealActualRoundsAwayIntoAByteFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -389,8 +343,6 @@ TEST(RealConversion, NegativeRealActualRoundsAwayIntoAByteFormal) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// §8.7 binds a constructor's actuals as any subroutine's, so `new(6.5)` into
-// `input int v` stores 7.
 TEST(RealConversion, RealActualRoundsIntoAConstructorIntFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -410,7 +362,6 @@ TEST(RealConversion, RealActualRoundsIntoAConstructorIntFormal) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// A class method's formal takes the same conversion: `c.m(12.5)` returns 13.
 TEST(RealConversion, RealActualRoundsIntoAClassMethodIntFormal) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -429,11 +380,6 @@ TEST(RealConversion, RealActualRoundsIntoAClassMethodIntFormal) {
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-// §8.9 gives a static property one copy that takes its initializer as the
-// class is built, and §6.12.1 rounds a real initializer into an int, so
-// `static int t = 3.6` reads 4 through `C::t`; the instance property `int p =
-// 3.5` beside it already read 4 while the static was stored as the real's
-// pattern and read back truncated to 3.
 TEST(RealConversion, StaticPropertyRealInitializerRoundsIntoAnInt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -449,8 +395,6 @@ TEST(RealConversion, StaticPropertyRealInitializerRoundsIntoAnInt) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §6.12.1 rounds a half away from zero, so `static int u = -2.5` is -3, where
-// a truncation would read -2.
 TEST(RealConversion, StaticPropertyNegativeRealInitializerRoundsAway) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -466,9 +410,6 @@ TEST(RealConversion, StaticPropertyNegativeRealInitializerRoundsAway) {
   EXPECT_EQ(var->value.ToUint64(), static_cast<uint32_t>(-3));
 }
 
-// §6.12.1 converts a real assigned to an integral object, rounding to the
-// nearest, an element of an unpacked array among them, and an integral value
-// assigned to a real element to its real value.
 TEST(RealConversionSim, AssignmentToAnArrayElementConverts) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

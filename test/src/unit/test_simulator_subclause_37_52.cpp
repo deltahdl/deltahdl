@@ -14,21 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.52 property specification: the VPI object model for a property
-// specification and the property-expr class. A property spec traverses to a
-// clocking event, a disable condition and a property expression; the property
-// expr class groups operations, clocked properties, case properties and others;
-// an operation's vpiOpType is drawn from a fixed set of property operators with
-// defined operand orders and a strength flag; and a case property item groups
-// the case conditions that branch to the same property statement. The
-// property-expr classification is reused by §37.51's property-declaration
-// model, weaving the two subclauses together. These tests observe the
-// production helpers in vpi.cpp and the VpiContext methods that apply those
-// rules.
-
-// Diagram: the property-expr class groups the member kinds the diagram draws -
-// an operation, a multiclock sequence expression, a property instance, a
-// clocked property and a case property. Unrelated kinds are not members.
 TEST(PropertySpecModel, PropertyExprClassGroupsItsMemberKinds) {
   EXPECT_TRUE(VpiIsPropertyExprType(vpiOperation));
   EXPECT_TRUE(VpiIsPropertyExprType(vpiMulticlockSequenceExpr));
@@ -40,20 +25,14 @@ TEST(PropertySpecModel, PropertyExprClassGroupsItsMemberKinds) {
   EXPECT_FALSE(VpiIsPropertyExprType(vpiModule));
 }
 
-// Diagram edge: the property-expr class selector names the class, not a
-// concrete member kind, so it is not itself classified as a member.
 TEST(PropertySpecModel, PropertyExprClassSelectorIsNotItselfAMemberKind) {
   EXPECT_FALSE(VpiIsPropertyExprType(vpiPropertyExpr));
 }
 
-// Detail 1: property variables are declarations whose value cannot be accessed
-// through VPI.
 TEST(PropertySpecModel, PropertyVariableValueCannotBeAccessed) {
   EXPECT_FALSE(VpiIsPropertyVariableValueAccessible());
 }
 
-// Detail 2: within a property expr vpiOpType is one of exactly the twenty
-// listed property operators.
 TEST(PropertySpecModel, OpTypeSetCoversTheTwentyPropertyOperators) {
   for (int op : {vpiAcceptOnOp,
                  vpiAlwaysOp,
@@ -79,8 +58,6 @@ TEST(PropertySpecModel, OpTypeSetCoversTheTwentyPropertyOperators) {
   }
 }
 
-// Detail 2 edge: operators outside the property set (ordinary expression ops
-// and sequence-only operators) are rejected.
 TEST(PropertySpecModel, OpTypeSetRejectsNonPropertyOperators) {
   EXPECT_FALSE(VpiIsPropertyExprOpType(vpiAddOp));
   EXPECT_FALSE(VpiIsPropertyExprOpType(vpiLogAndOp));
@@ -88,8 +65,6 @@ TEST(PropertySpecModel, OpTypeSetRejectsNonPropertyOperators) {
   EXPECT_FALSE(VpiIsPropertyExprOpType(vpiIntersectOp));
 }
 
-// Detail 2: an operation reports its operation type through vpi_get(vpiOpType);
-// for a property operation that value is one of the property operators.
 TEST(PropertySpecModel, OperationReportsItsPropertyOpType) {
   VpiContext ctx;
   VpiObject op;
@@ -100,33 +75,24 @@ TEST(PropertySpecModel, OperationReportsItsPropertyOpType) {
   EXPECT_TRUE(VpiIsPropertyExprOpType(ctx.Get(vpiOpType, &op)));
 }
 
-// Detail 2 (vpiNexttimeOp exception): operands are property then constant, and
-// the constant is given only when it differs from 1.
 TEST(PropertySpecModel, NexttimeOperandOrderAndConstantOmission) {
   VpiObject prop;
   VpiObject k;
 
-  auto with_constant =
-      VpiNexttimeOperands(&prop, &k, /*constant_differs_from_one=*/true);
+  auto with_constant = VpiNexttimeOperands(&prop, &k, true);
   ASSERT_EQ(with_constant.size(), 2u);
   EXPECT_EQ(with_constant[0], &prop);
   EXPECT_EQ(with_constant[1], &k);
 
-  // A constant equal to 1 is omitted, leaving just the property.
-  auto unit_constant =
-      VpiNexttimeOperands(&prop, &k, /*constant_differs_from_one=*/false);
+  auto unit_constant = VpiNexttimeOperands(&prop, &k, false);
   ASSERT_EQ(unit_constant.size(), 1u);
   EXPECT_EQ(unit_constant[0], &prop);
 
-  // No constant supplied at all -> just the property.
-  auto no_constant =
-      VpiNexttimeOperands(&prop, nullptr, /*constant_differs_from_one=*/true);
+  auto no_constant = VpiNexttimeOperands(&prop, nullptr, true);
   ASSERT_EQ(no_constant.size(), 1u);
   EXPECT_EQ(no_constant[0], &prop);
 }
 
-// Detail 2 (vpiAlwaysOp/vpiEventuallyOp exception): operands are property, left
-// range, right range; a null bound is omitted.
 TEST(PropertySpecModel, AlwaysEventuallyOperandOrderAndRangeOmission) {
   VpiObject prop;
   VpiObject lo;
@@ -138,30 +104,21 @@ TEST(PropertySpecModel, AlwaysEventuallyOperandOrderAndRangeOmission) {
   EXPECT_EQ(ranged[1], &lo);
   EXPECT_EQ(ranged[2], &hi);
 
-  // Unranged operator -> just the property.
   auto unranged = VpiAlwaysEventuallyOperands(&prop, nullptr, nullptr);
   ASSERT_EQ(unranged.size(), 1u);
   EXPECT_EQ(unranged[0], &prop);
 
-  // One-sided range: only the present bound follows the property, and it keeps
-  // its position. A present left bound with an absent right bound yields
-  // [property, left].
   auto left_only = VpiAlwaysEventuallyOperands(&prop, &lo, nullptr);
   ASSERT_EQ(left_only.size(), 2u);
   EXPECT_EQ(left_only[0], &prop);
   EXPECT_EQ(left_only[1], &lo);
 
-  // A present right bound with an absent left bound yields [property, right] -
-  // the right bound occupies the immediately-following slot, since the omitted
-  // left bound is not represented by a placeholder.
   auto right_only = VpiAlwaysEventuallyOperands(&prop, nullptr, &hi);
   ASSERT_EQ(right_only.size(), 2u);
   EXPECT_EQ(right_only[0], &prop);
   EXPECT_EQ(right_only[1], &hi);
 }
 
-// Detail 3: vpiOpStrong is valid only for nexttime, always, eventually, until
-// and until_with; for every other property operator it does not apply.
 TEST(PropertySpecModel, OpStrongIsValidOnlyForTheStrongCapableOperators) {
   for (int op : {vpiNexttimeOp, vpiAlwaysOp, vpiEventuallyOp, vpiUntilOp,
                  vpiUntilWithOp}) {
@@ -173,8 +130,6 @@ TEST(PropertySpecModel, OpStrongIsValidOnlyForTheStrongCapableOperators) {
   EXPECT_FALSE(VpiIsOpStrongValidOp(vpiAcceptOnOp));
 }
 
-// Detail 3: an operation reports its operator strength through
-// vpi_get(vpiOpStrong) - TRUE for the strong version, FALSE otherwise.
 TEST(PropertySpecModel, OperationReportsOpStrongProperty) {
   VpiContext ctx;
   VpiObject strong;
@@ -189,9 +144,6 @@ TEST(PropertySpecModel, OperationReportsOpStrongProperty) {
   EXPECT_EQ(ctx.Get(vpiOpStrong, &weak), 0);
 }
 
-// Detail 4: a case property item groups all case conditions that branch to the
-// same property statement; the property-expr branch, held apart from them, is
-// not one of the conditions, though it may be an object of a condition's kind.
 TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   VpiContext ctx;
   VpiObject item;
@@ -201,7 +153,7 @@ TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   VpiObject c1;
   c1.type = vpiExpr;
   VpiObject branch;
-  branch.type = vpiExpr;  // the property statement, a Boolean property
+  branch.type = vpiExpr;
   item.children = {&c0, &c1};
   item.body = &branch;
 
@@ -210,22 +162,17 @@ TEST(PropertySpecModel, CaseItemGroupsConditionsBranchingToOneStatement) {
   EXPECT_EQ(conditions[0], &c0);
   EXPECT_EQ(conditions[1], &c1);
 
-  // The branch is reached as the item's property expression, not as a
-  // condition.
   EXPECT_EQ(ctx.Handle(vpiPropertyExpr, &item), &branch);
 }
 
-// Detail 5: the default case item has no condition expression, so it groups
-// none and vpi_iterate() over its conditions returns null.
 TEST(PropertySpecModel, DefaultCaseItemHasNoConditionsAndIteratesToNull) {
   VpiContext ctx;
   VpiObject default_item;
-  default_item.type = vpiCasePropertyItem;  // default: no condition children
+  default_item.type = vpiCasePropertyItem;
 
   EXPECT_TRUE(VpiCaseItemConditions(&default_item).empty());
   EXPECT_EQ(ctx.Iterate(vpiExpr, &default_item), nullptr);
 
-  // A non-default item with condition children does iterate to them.
   VpiObject item;
   item.type = vpiCasePropertyItem;
   VpiObject c0;
@@ -234,28 +181,20 @@ TEST(PropertySpecModel, DefaultCaseItemHasNoConditionsAndIteratesToNull) {
   VpiHandle it = ctx.Iterate(vpiExpr, &item);
   ASSERT_NE(it, nullptr);
   EXPECT_EQ(ctx.Scan(it), &c0);
-  EXPECT_EQ(ctx.Scan(it), nullptr);  // drains and frees the iterator
+  EXPECT_EQ(ctx.Scan(it), nullptr);
 }
 
-// Diagram (case property -- vpiCondition --> expr): a case property selects on
-// a controlling expression reached through vpiCondition. The selecting
-// expression is the case property's expression child - distinct from the case
-// property items - and the relation resolves through the generic vpi_handle()
-// dispatch as well as the dedicated helper. A case property with no condition
-// reports none.
 TEST(PropertySpecModel, CasePropertySelectsOnItsConditionExpression) {
   VpiContext ctx;
   VpiObject case_prop;
   case_prop.type = vpiCaseProperty;
   VpiObject sel;
-  sel.type = vpiExpr;  // the expression the case selects on
+  sel.type = vpiExpr;
   VpiObject item;
-  item.type = vpiCasePropertyItem;  // a branch, not the selecting condition
+  item.type = vpiCasePropertyItem;
   case_prop.children = {&sel, &item};
 
   EXPECT_EQ(VpiCasePropertyConditionExpr(&case_prop), &sel);
-  // The figure's vpiCondition edge is not served by the generic child walk
-  // (no child's type is vpiCondition); the wired relation resolves it.
   EXPECT_EQ(ctx.Handle(vpiCondition, &case_prop), &sel);
 
   VpiObject no_condition;
@@ -268,10 +207,6 @@ TEST(PropertySpecModel, CasePropertySelectsOnItsConditionExpression) {
   EXPECT_EQ(VpiCasePropertyConditionExpr(nullptr), nullptr);
 }
 
-// Diagram (property spec / clocked property -- vpiClockingEvent --> expr): a
-// property spec and a clocked property both traverse to their clocking event,
-// reporting none when no clocking event is attached. The relation is shared
-// between the two member kinds.
 TEST(PropertySpecModel, ClockingEventRelationIsSharedBySpecAndClockedProperty) {
   VpiObject spec;
   spec.type = vpiPropertySpec;
@@ -293,9 +228,6 @@ TEST(PropertySpecModel, ClockingEventRelationIsSharedBySpecAndClockedProperty) {
   EXPECT_EQ(VpiClockingEvent(nullptr), nullptr);
 }
 
-// Diagram (property spec -- vpiClockingEvent --> expr): the clock a run records
-// on a property spec is the expression it reaches, ahead of any event control
-// among its children.
 TEST(PropertySpecModel, ARecordedClockIsTheClockingEvent) {
   VpiObject spec;
   spec.type = vpiPropertySpec;
@@ -308,13 +240,11 @@ TEST(PropertySpecModel, ARecordedClockIsTheClockingEvent) {
   EXPECT_EQ(VpiClockingEvent(&spec), &clock);
 }
 
-// Diagram (property spec / clocked property -> property expr): the "-> property
-// expr" edge reaches the object's property-expr-kind child.
 TEST(PropertySpecModel, PropertySpecReachesItsPropertyExpr) {
   VpiObject spec;
   spec.type = vpiPropertySpec;
   VpiObject pe;
-  pe.type = vpiOperation;  // a property-expr kind
+  pe.type = vpiOperation;
   spec.children = {&pe};
   EXPECT_EQ(VpiPropertyExprChild(&spec), &pe);
 
@@ -323,15 +253,11 @@ TEST(PropertySpecModel, PropertySpecReachesItsPropertyExpr) {
   EXPECT_EQ(VpiPropertyExprChild(&empty), nullptr);
 }
 
-// Diagram (clocked property -> property expr): a clocked property reaches its
-// property-expr child through the same "-> property expr" edge a property spec
-// uses; the relation is shared across the two member kinds. None when no
-// property expr is attached.
 TEST(PropertySpecModel, ClockedPropertyReachesItsPropertyExpr) {
   VpiObject clocked;
   clocked.type = vpiClockedProp;
   VpiObject pe;
-  pe.type = vpiOperation;  // a property-expr kind
+  pe.type = vpiOperation;
   clocked.children = {&pe};
   EXPECT_EQ(VpiPropertyExprChild(&clocked), &pe);
 
@@ -340,16 +266,12 @@ TEST(PropertySpecModel, ClockedPropertyReachesItsPropertyExpr) {
   EXPECT_EQ(VpiPropertyExprChild(&empty), nullptr);
 }
 
-// Diagram (case property -> case property item): a case property iterates to
-// its case property items through vpi_iterate(vpiCasePropertyItem, ...), in
-// order. Its selecting condition expression (the vpiCondition edge) is not one
-// of the items.
 TEST(PropertySpecModel, CasePropertyIteratesToItsCasePropertyItems) {
   VpiContext ctx;
   VpiObject case_prop;
   case_prop.type = vpiCaseProperty;
   VpiObject sel;
-  sel.type = vpiExpr;  // the selecting condition, not an item
+  sel.type = vpiExpr;
   VpiObject item0;
   item0.type = vpiCasePropertyItem;
   VpiObject item1;
@@ -365,10 +287,6 @@ TEST(PropertySpecModel, CasePropertyIteratesToItsCasePropertyItems) {
   EXPECT_EQ(seen[1], &item1);
 }
 
-// Diagram (property spec -- vpiDisableCondition --> expr | distribution): a
-// property specification's disable condition reaches a bare expression or a
-// distribution. The relation is shared with §37.51's property instance, whose
-// disable condition reaches only an expression.
 TEST(PropertySpecModel, DisableConditionReachesExpressionOrDistribution) {
   EXPECT_TRUE(VpiIsDisableConditionType(vpiExpr));
   EXPECT_TRUE(VpiIsDisableConditionType(vpiDistribution));
@@ -378,7 +296,6 @@ TEST(PropertySpecModel, DisableConditionReachesExpressionOrDistribution) {
   EXPECT_FALSE(VpiIsDisableConditionType(vpiNet));
 }
 
-// One assertion per operator form of §16.12, each named for what it shows.
 constexpr const char* kPropertyOperators =
     "module top; logic clk, a, b, c;\n"
     "  i1: assert property (@(posedge clk) a |-> b);\n"
@@ -408,10 +325,8 @@ constexpr const char* kPropertyOperators =
     "  g4: cover property (@(posedge clk) a ##1 b);\n"
     "endmodule\n";
 
-// What reads the property expr of an assertion back from a run.
 class PropertyExprsOfARun : public VpiDesignRun {
  protected:
-  // The names of the operands of `op`, an operand without one as "".
   static std::vector<std::string> OperandNames(vpiHandle op) {
     std::vector<std::string> names;
     for (vpiHandle operand : OperandsOf(op)) {
@@ -430,9 +345,6 @@ class PropertyOperationsOfARun : public PropertyExprsOfARun {
   }
 };
 
-// An implication is an operation of its overlap, antecedent first, and a
-// followed-by the operation of the one written (detail 2, §16.12.7, §16.12.9)
-// (#5087).
 TEST_F(PropertyOperationsOfARun, ImplicationsAndFollowedBysAreTheirOperators) {
   EXPECT_EQ(OpOf(PropertyOf("i1")), vpiOverlapImplyOp);
   EXPECT_EQ(OpOf(PropertyOf("i2")), vpiNonOverlapImplyOp);
@@ -444,8 +356,6 @@ TEST_F(PropertyOperationsOfARun, ImplicationsAndFollowedBysAreTheirOperators) {
   }
 }
 
-// A not reaches the operation it negates, and an until reports through
-// vpiOpStrong whether it was written strong (detail 3) (#5087).
 TEST_F(PropertyOperationsOfARun, UntilsReportTheirStrength) {
   vpiHandle negation = PropertyOf("n1");
   EXPECT_EQ(OpOf(negation), vpiNotOp);
@@ -459,9 +369,6 @@ TEST_F(PropertyOperationsOfARun, UntilsReportTheirStrength) {
   EXPECT_EQ(vpi_get(vpiOpStrong, weak), 0);
 }
 
-// A nexttime takes its property and its constant, the constant only where it
-// differs from 1; an always and an eventually their property and the two
-// bounds of their range (detail 2) (#5087).
 TEST_F(PropertyOperationsOfARun, CountedOperatorsTakeTheirBounds) {
   vpiHandle counted = PropertyOf("x1");
   EXPECT_EQ(OpOf(counted), vpiNexttimeOp);
@@ -480,8 +387,6 @@ TEST_F(PropertyOperationsOfARun, CountedOperatorsTakeTheirBounds) {
   EXPECT_EQ(vpi_get(vpiOpStrong, eventually), 1);
 }
 
-// An abort takes its condition before its property, and the conditional
-// operators their condition first (detail 2, §16.12.14, §16.12.10) (#5087).
 TEST_F(PropertyOperationsOfARun, ConditionsComeFirst) {
   EXPECT_EQ(OpOf(PropertyOf("r1")), vpiAcceptOnOp);
   EXPECT_EQ(OpOf(PropertyOf("r2")), vpiSyncRejectOnOp);
@@ -495,8 +400,6 @@ TEST_F(PropertyOperationsOfARun, ConditionsComeFirst) {
             (std::vector<std::string>{"a", "b"}));
 }
 
-// The binary property operators join two properties, each an operation of
-// its own (detail 2, §16.12.3 to §16.12.8) (#5087).
 TEST_F(PropertyOperationsOfARun, BinaryOperatorsJoinTwoProperties) {
   const struct {
     const char* name;
@@ -515,9 +418,6 @@ TEST_F(PropertyOperationsOfARun, BinaryOperatorsJoinTwoProperties) {
   }
 }
 
-// An always or an eventually whose range ends in `$` takes the unbounded
-// constant as its right bound (detail 2, §37.59 detail 4), and one written
-// with no range its property alone (#7181).
 TEST_F(PropertyOperationsOfARun, ARangeToDollarEndsInTheUnboundedConstant) {
   for (const char* name : {"w2", "e2"}) {
     const std::vector<vpiHandle> kOperands = OperandsOf(PropertyOf(name));
@@ -530,9 +430,6 @@ TEST_F(PropertyOperationsOfARun, ARangeToDollarEndsInTheUnboundedConstant) {
   EXPECT_EQ(OperandsOf(PropertyOf("w3")).size(), 1u);
 }
 
-// A sequence expression written strong(...) is the strong version, and so is
-// a cover's bare one, which §16.12.2 evaluates as strong; an assert's bare one
-// is weak (detail 3) (#7182).
 TEST_F(PropertyOperationsOfARun, AStrongSequenceReportsItsStrength) {
   vpiHandle strong = PropertyOf("g1");
   EXPECT_EQ(OpOf(strong), vpiCycleDelayOp);
@@ -549,10 +446,6 @@ TEST_F(PropertyOperationsOfARun, AStrongSequenceReportsItsStrength) {
   EXPECT_EQ(vpi_get(vpiOpStrong, covered), 1);
 }
 
-// A disable iff condition written as a dist is a distribution (§16.12),
-// reaching the expression it weights and a dist item per entry of its list
-// with its weight's form (§37.34), rather than the inside operation the dist
-// is evaluated as (#7179).
 TEST_F(PropertyExprsOfARun, ADisableConditionWrittenAsADistIsADistribution) {
   Run("module top; logic clk, a, b; logic [1:0] x;\n"
       "  d1: assert property (@(posedge clk)\n"
@@ -575,9 +468,6 @@ TEST_F(PropertyExprsOfARun, ADisableConditionWrittenAsADistIsADistribution) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiValueRange, kEntries[1])), vpiRange);
 }
 
-// A property named inside a property expression is a property inst, reaching
-// its declaration and an argument per formal, rather than a func call
-// (§16.12) (#7180).
 TEST_F(PropertyExprsOfARun, ANamedPropertyOperandIsAPropertyInst) {
   Run("module top; logic clk, a, b;\n"
       "  property p1(x); x; endproperty\n"
@@ -610,7 +500,6 @@ TEST_F(PropertyExprsOfARun, ANamedPropertyOperandIsAPropertyInst) {
   EXPECT_EQ(NamesOf(vpiArgument, kEither[0]), (std::vector<std::string>{"a"}));
 }
 
-// A clocked property and a case property, each named for what it shows.
 constexpr const char* kClockedAndCaseProperties =
     "module top; logic clk1, clk2, a, b; logic [1:0] sel;\n"
     "  k1: assert property (@(posedge clk1) a |=> @(posedge clk2) b);\n"
@@ -625,7 +514,6 @@ class ClockedAndCasePropertiesOfARun : public PropertyExprsOfARun {
     Run(kClockedAndCaseProperties);
   }
 
-  // The objects of `type` `ref` reaches, in order; none for a null iterator.
   static std::vector<vpiHandle> Reached(int type, vpiHandle ref) {
     std::vector<vpiHandle> reached;
     vpiHandle it = ref == nullptr ? nullptr : vpi_iterate(type, ref);
@@ -637,8 +525,6 @@ class ClockedAndCasePropertiesOfARun : public PropertyExprsOfARun {
   }
 };
 
-// An operand written under a clocking event of its own is a clocked property,
-// reaching that event and the property it clocks (§16.13.2) (#5095).
 TEST_F(ClockedAndCasePropertiesOfARun, AClockedOperandIsAClockedProperty) {
   vpiHandle implication = PropertyOf("k1");
   EXPECT_EQ(OpOf(implication), vpiNonOverlapImplyOp);
@@ -655,9 +541,6 @@ TEST_F(ClockedAndCasePropertiesOfARun, AClockedOperandIsAClockedProperty) {
   EXPECT_STREQ(vpi_get_str(vpiName, clocked_property), "b");
 }
 
-// A case property reaches its case expression and an item per property it
-// branches to, each grouping its expressions (detail 4), the default's
-// iteration NULL (detail 5) (§16.12.16) (#5096).
 TEST_F(ClockedAndCasePropertiesOfARun, ACasePropertyReachesItsItems) {
   vpiHandle property = PropertyOf("s1");
   ASSERT_NE(property, nullptr);
@@ -677,9 +560,6 @@ TEST_F(ClockedAndCasePropertiesOfARun, ACasePropertyReachesItsItems) {
   EXPECT_STREQ(vpi_get_str(vpiName, second), "b");
 }
 
-// Detail 4: only a case property item groups conditions; a vpiExpr iteration
-// of the case property itself is not that relation, so the nested walk leaves
-// it to the general one and collects nothing.
 TEST(PropertySpecModel, AnExprIterationOfANonItemIsNoConditionWalk) {
   VpiObject case_prop;
   case_prop.type = vpiCaseProperty;
@@ -691,10 +571,6 @@ TEST(PropertySpecModel, AnExprIterationOfANonItemIsNoConditionWalk) {
   EXPECT_TRUE(iter.children.empty());
 }
 
-// §37.52: a null case item groups no condition; a case property's condition
-// is its first expression child, past a child of another kind and past its
-// items; a constant and a reference are disable conditions; and a property
-// expression is found among an object's children or not at all.
 TEST(PropertySpecificationModel, ConditionsAndPropertyExpressionLookups) {
   EXPECT_TRUE(VpiCaseItemConditions(nullptr).empty());
 
@@ -719,10 +595,6 @@ TEST(PropertySpecificationModel, ConditionsAndPropertyExpressionLookups) {
   EXPECT_EQ(VpiPropertyExprChild(&spec), nullptr);
 }
 
-// §37.52: a property spec's property expression is its first child of the
-// property expr class, a sequence instance among the kinds that class groups
-// (§37.54); a spec holding none reaches nothing, and asked for a relation it
-// does not draw it resolves nothing here.
 TEST(PropertySpecModel, PropertyExprOfASpecAndTagsItDoesNotDraw) {
   VpiObject attribute;
   attribute.type = vpiAttribute;
@@ -743,9 +615,6 @@ TEST(PropertySpecModel, PropertyExprOfASpecAndTagsItDoesNotDraw) {
   EXPECT_FALSE(TryResolveProcessAndStmtRelation(vpiTypespec, &spec, out));
 }
 
-// §16.12 with §16.8 and §37.15: the property expr of a property declaration
-// naming its formal is a ref obj named after the formal, bound to no actual
-// since no instance binds one there (detail 3) (#7303).
 TEST_F(PropertyExprsOfARun, ADeclarationsBodyReachesItsFormalAsARefObj) {
   Run("module top; logic clk;\n"
       "  property p(x); @(posedge clk) x; endproperty\n"
@@ -761,9 +630,6 @@ TEST_F(PropertyExprsOfARun, ADeclarationsBodyReachesItsFormalAsARefObj) {
   EXPECT_EQ(vpi_handle(vpiActual, x), nullptr);
 }
 
-// A.2.10 makes the ';' after a property declaration's spec optional, so a
-// declaration that leaves it out has the property spec it would have with
-// one: its clock, and the formal its body names as the property expr.
 TEST_F(PropertyExprsOfARun, ADeclarationsSpecWithoutItsSemicolonIsItsSpec) {
   Run("module top; logic clk;\n"
       "  property p(x); @(posedge clk) x endproperty\n"
@@ -779,11 +645,6 @@ TEST_F(PropertyExprsOfARun, ADeclarationsSpecWithoutItsSemicolonIsItsSpec) {
   EXPECT_STREQ(vpi_get_str(vpiName, x), "x");
 }
 
-// Detail 3 with §37.58: a strong sequence written over an operand that stands
-// for no object is no sequence expr, so no strength is set on one. A select
-// of an array net by a varying index, nw[i], is one the model makes no object
-// for (BitSelectObject); the same sequence over a net is the strong operation
-// it writes.
 TEST_F(PropertyExprsOfARun, AStrongSequenceOverAnOperandOfNoObjectIsNone) {
   Run("module top; logic clk, b; wire nw[2]; int i;\n"
       "  k1: assert property (@(posedge clk) strong(nw[i] ##1 b));\n"

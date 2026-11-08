@@ -23,8 +23,6 @@ class VpiGetTimeSim : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Advance the simulation clock to `t` by draining a no-op event scheduled
-  // there; after Run() the scheduler's current time is that slot.
   void AdvanceTo(uint64_t t) {
     auto* ev = scheduler_.GetEventPool().Acquire();
     ev->callback = []() {};
@@ -32,8 +30,6 @@ class VpiGetTimeSim : public ::testing::Test {
     scheduler_.Run();
   }
 
-  // Leave a future event pending at `t` without running, so the current time is
-  // unchanged but the next-future-event time is `t`.
   void SchedulePendingAt(uint64_t t) {
     auto* ev = scheduler_.GetEventPool().Acquire();
     ev->callback = []() {};
@@ -45,9 +41,6 @@ class VpiGetTimeSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.13 shall #1 + Syntax (Figure 38-6): vpi_get_time() retrieves the current
-// simulation time; a vpiSimTime result is the full 64-bit count split across
-// the high and low 32-bit halves.
 TEST_F(VpiGetTimeSim, SimTimeSplitsAcrossHighAndLow) {
   const uint64_t kTicks = (static_cast<uint64_t>(3) << 32) | 5u;
   AdvanceTo(kTicks);
@@ -60,9 +53,6 @@ TEST_F(VpiGetTimeSim, SimTimeSplitsAcrossHighAndLow) {
   EXPECT_EQ(out.low, 5u);
 }
 
-// §38.13 shall #2: the caller's time_p->type chooses the form of the result.
-// At the same instant, vpiSimTime fills high/low while vpiScaledRealTime fills
-// real.
 TEST_F(VpiGetTimeSim, TypeFieldSelectsSimVersusScaledReal) {
   AdvanceTo(7);
 
@@ -79,16 +69,13 @@ TEST_F(VpiGetTimeSim, TypeFieldSelectsSimVersusScaledReal) {
   EXPECT_EQ(as_real.low, 0u);
 }
 
-// §38.13 shall #1: a scaled-real result uses the timescale of the object. With
-// the simulation counting in picoseconds and the object's unit a nanosecond,
-// 1000 ps reads back as 1.0 in the object's unit.
 TEST_F(VpiGetTimeSim, ScaledRealUsesObjectTimescale) {
-  vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
+  vpi_ctx_.SetSimTimeUnit(-12);
   AdvanceTo(1000);
 
   VpiHandle obj = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(obj, nullptr);
-  obj->time_unit = -9;  // object's timescale is 1 ns
+  obj->time_unit = -9;
 
   s_vpi_time out = {};
   out.type = vpiScaledRealTime;
@@ -97,11 +84,8 @@ TEST_F(VpiGetTimeSim, ScaledRealUsesObjectTimescale) {
   EXPECT_DOUBLE_EQ(out.real, 1.0);
 }
 
-// §38.13 D1: when obj is null the time is retrieved using the simulation time
-// unit, so no per-object scaling is applied and the scaled real equals the raw
-// picosecond count.
 TEST_F(VpiGetTimeSim, NullObjectUsesSimulationTimeUnit) {
-  vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
+  vpi_ctx_.SetSimTimeUnit(-12);
   AdvanceTo(1000);
 
   s_vpi_time out = {};
@@ -111,11 +95,8 @@ TEST_F(VpiGetTimeSim, NullObjectUsesSimulationTimeUnit) {
   EXPECT_DOUBLE_EQ(out.real, 1000.0);
 }
 
-// §38.13 D2: a time queue object reports the scheduled time of the next future
-// event, not the current time. With current time 0 and an event pending at 50,
-// the time queue reads 50 while a current-time query reads 0.
 TEST_F(VpiGetTimeSim, TimeQueueReportsNextFutureEvent) {
-  SchedulePendingAt(50);  // pending future event; current time stays 0
+  SchedulePendingAt(50);
 
   s_vpi_time now = {};
   now.type = vpiSimTime;
@@ -131,8 +112,6 @@ TEST_F(VpiGetTimeSim, TimeQueueReportsNextFutureEvent) {
   EXPECT_EQ(future.low, 50u);
 }
 
-// §38.13: a time queue with no scheduler behind it, outside any run, has no
-// event to come, and reads time 0.
 TEST_F(VpiGetTimeSim, ATimeQueueWithNoSchedulerReadsZero) {
   VpiContext bare;
   SetGlobalVpiContext(&bare);
@@ -145,8 +124,6 @@ TEST_F(VpiGetTimeSim, ATimeQueueWithNoSchedulerReadsZero) {
   EXPECT_EQ(future.low, 0u);
 }
 
-// §38.13 D2: a time queue object is read in the simulation time unit, so its
-// scaled-real result is not scaled by any object timescale.
 TEST_F(VpiGetTimeSim, TimeQueueUsesSimulationTimeUnit) {
   vpi_ctx_.SetSimTimeUnit(-12);
   SchedulePendingAt(1000);
@@ -161,13 +138,8 @@ TEST_F(VpiGetTimeSim, TimeQueueUsesSimulationTimeUnit) {
   EXPECT_DOUBLE_EQ(out.real, 1000.0);
 }
 
-// §38.13 D2: each time queue object produced by the vpi_iterate(vpiTimeQueue,
-// NULL) walk (§37.81) reports the scheduled time of ITS OWN slot, not a single
-// shared next-event time. Two slots are seeded at 10 and 40 while an unrelated
-// event pends at 50 (so the scheduler's next-event time differs from either
-// slot); vpi_get_time() on each scanned slot reads back that slot's time.
 TEST_F(VpiGetTimeSim, IteratedSlotsReportTheirOwnScheduledTime) {
-  SchedulePendingAt(50);  // scheduler next-event time is 50, matching no slot
+  SchedulePendingAt(50);
   vpi_ctx_.SetTimeQueueSlots({{40, false, false}, {10, false, false}});
 
   vpiHandle it = vpi_iterate(vpiTimeQueue, nullptr);
@@ -189,9 +161,6 @@ TEST_F(VpiGetTimeSim, IteratedSlotsReportTheirOwnScheduledTime) {
   EXPECT_EQ(t1.low, 40u);
 }
 
-// §38.13 shall #3: the destination memory belongs to the application. The
-// routine fills a caller-owned structure in place rather than allocating one,
-// so the caller's local keeps its address and receives the data.
 TEST_F(VpiGetTimeSim, WritesIntoApplicationAllocatedMemory) {
   AdvanceTo(9);
 
@@ -204,16 +173,12 @@ TEST_F(VpiGetTimeSim, WritesIntoApplicationAllocatedMemory) {
   EXPECT_EQ(caller_owned.low, 9u);
 }
 
-// §38.13 / §38.1: the destination is mandatory. With no structure to fill there
-// is nothing to do, and the call must be safe.
 TEST_F(VpiGetTimeSim, NullDestinationIsSafe) {
   AdvanceTo(3);
   vpi_get_time(nullptr, nullptr);
   SUCCEED();
 }
 
-// What the calltf of `$probe` read at its call: the time in the simulation
-// time unit, and the time scaled to `top` and to its instance `top.s`.
 struct ProbedTimes {
   uint32_t sim_low = 0;
   uint32_t sim_high = 0;
@@ -226,7 +191,7 @@ ProbedTimes& ProbedTimesOfTheCall() {
   return times;
 }
 
-PLI_INT32 ReadTimesCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 ReadTimesCalltf(PLI_BYTE8*) {
   ProbedTimes& times = ProbedTimesOfTheCall();
   s_vpi_time t = {};
   t.type = vpiSimTime;
@@ -241,8 +206,6 @@ PLI_INT32 ReadTimesCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-// A design whose precision is 1 ps, with `top` in 1 ns units and its
-// instance `s` in 1 ps units, calling `$probe` at 7 ns.
 class TimesOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -261,22 +224,16 @@ class TimesOfARun : public VpiDesignRun {
   }
 };
 
-// §38.13: with a NULL object, vpi_get_time gives the current simulation time
-// in the simulation time unit, the design's 1 ps precision: 7000 at 7 ns
-// (#5103).
 TEST_F(TimesOfARun, ANullObjectReadsTheRunsTimeInTheSimulationUnit) {
   EXPECT_EQ(ProbedTimesOfTheCall().sim_low, 7000u);
   EXPECT_EQ(ProbedTimesOfTheCall().sim_high, 0u);
 }
 
-// §38.13: with an object, vpiScaledRealTime gives the time in that object's
-// own time unit, scaled from the simulation time unit (#5104).
 TEST_F(TimesOfARun, AnObjectReadsTheRunsTimeInItsOwnUnit) {
   EXPECT_DOUBLE_EQ(ProbedTimesOfTheCall().top_scaled, 7.0);
   EXPECT_DOUBLE_EQ(ProbedTimesOfTheCall().sub_scaled, 7000.0);
 }
 
-// What the `$scaled` calltf below read and the callback it placed saw.
 double scaled_net_time = 0.0;
 double callback_scaled_time = 0.0;
 
@@ -289,12 +246,12 @@ double ScaledTimeOfTopS() {
   return time.real;
 }
 
-PLI_INT32 AfterDelayCallback(p_cb_data /*data*/) {
+PLI_INT32 AfterDelayCallback(p_cb_data) {
   callback_scaled_time = ScaledTimeOfTopS();
   return 0;
 }
 
-PLI_INT32 ScaledCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 ScaledCalltf(PLI_BYTE8*) {
   scaled_net_time = ScaledTimeOfTopS();
   s_vpi_value value = {};
   value.format = vpiScalarVal;
@@ -334,14 +291,10 @@ class ScaledTimeOfAVariable : public VpiDesignRun {
   }
 };
 
-// §38.13 with §3.14.2: a variable has the timescale of the module declaring
-// it, so its vpiScaledRealTime time is read in that module's 1ns (#7457).
 TEST_F(ScaledTimeOfAVariable, ItsTimeIsReadInItsModulesUnit) {
   EXPECT_DOUBLE_EQ(scaled_net_time, 7.0);
 }
 
-// §38.34: a vpiScaledRealTime delay put on the variable is in its module's
-// unit, so a delay of 2.0 at 7ns changes it at 9ns.
 TEST_F(ScaledTimeOfAVariable, APutDelayIsInItsModulesUnit) {
   s_vpi_value value = {};
   value.format = vpiRealVal;
@@ -349,8 +302,6 @@ TEST_F(ScaledTimeOfAVariable, APutDelayIsInItsModulesUnit) {
   EXPECT_DOUBLE_EQ(value.value.real, 9.0);
 }
 
-// §38.36.2: a cbAfterDelay with a vpiScaledRealTime delay is scaled by its
-// obj's timescale, so 3.0 placed at 7ns fires at 10ns.
 TEST_F(ScaledTimeOfAVariable, AnAfterDelayCallbackIsInItsModulesUnit) {
   EXPECT_DOUBLE_EQ(callback_scaled_time, 10.0);
 }

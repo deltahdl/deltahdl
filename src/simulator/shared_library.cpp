@@ -25,10 +25,6 @@ namespace delta {
 
 namespace {
 
-// The environment the simulator runs under, handed on to the compiler so that
-// it finds its own tools the way it would from the shell. A shared library on
-// macOS has no `environ` of its own to name, and reaches the process's through
-// _NSGetEnviron.
 char** ProcessEnvironment() {
 #if defined(__APPLE__)
   return *_NSGetEnviron();
@@ -37,10 +33,6 @@ char** ProcessEnvironment() {
 #endif
 }
 
-// Runs `argv`, its first element looked up on the search path, with standard
-// output and standard error both written to `log`, and answers whether it ran
-// and exited with status 0. A program that cannot be started leaves the status
-// at -1, which is no exit status.
 bool RunToCompletion(const std::vector<std::string>& argv,
                      const std::string& log) {
   std::vector<char*> args;
@@ -92,8 +84,6 @@ std::string BuildCSharedLibrary(std::string_view c_source,
                                 const std::string& compiler) {
   const std::string kSource = path_without_extension + ".c";
   const std::string kLog = path_without_extension + ".log";
-  // A source that could not be written leaves the compiler nothing to read,
-  // and its failure then reports that.
   std::ofstream(kSource) << c_source;
   if (RunToCompletion(
           {compiler, "-shared", "-fPIC", "-o",

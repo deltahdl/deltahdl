@@ -13,21 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.50 concurrent assertion: the VPI object model for a concurrent assertion.
-// The concurrent-assertion class is realized by the
-// assert/assume/cover/restrict directives; a concurrent assertion traverses to
-// its clocking event (always the actual event, explicit or inferred), to its
-// property (a property instance or specification), and - except for restrict -
-// to its pass action statement; assert and assume additionally carry an else
-// (fail) statement. A cover reports whether it covers a sequence, every
-// assertion reports whether its clock was inferred, and a restrict is not
-// simulated and so has no pass/fail statement and generates no run-time
-// information. These tests observe the production helpers in vpi.cpp and the
-// VpiContext methods that apply those rules.
-
-// Claim 1: the four directive kinds the diagram draws are concurrent
-// assertions; the immediate kinds and sequence/property instances (the broader
-// §37.49 class) and unrelated kinds are not.
 TEST(ConcurrentAssertionModel, ConcurrentAssertionTypeCoversTheFourDirectives) {
   EXPECT_TRUE(VpiIsConcurrentAssertionType(vpiAssert));
   EXPECT_TRUE(VpiIsConcurrentAssertionType(vpiAssume));
@@ -40,8 +25,6 @@ TEST(ConcurrentAssertionModel, ConcurrentAssertionTypeCoversTheFourDirectives) {
   EXPECT_FALSE(VpiIsConcurrentAssertionType(vpiModule));
 }
 
-// Claim 8: vpiProperty reaches a property instance or a property specification;
-// no other kind is a concurrent assertion's property.
 TEST(ConcurrentAssertionModel, PropertyRelationTargetKinds) {
   EXPECT_TRUE(VpiIsConcurrentAssertionPropertyType(vpiPropertyInst));
   EXPECT_TRUE(VpiIsConcurrentAssertionPropertyType(vpiPropertySpec));
@@ -50,8 +33,6 @@ TEST(ConcurrentAssertionModel, PropertyRelationTargetKinds) {
   EXPECT_FALSE(VpiIsConcurrentAssertionPropertyType(vpiOperation));
 }
 
-// Claim 8: an assertion traverses through vpiProperty to its property
-// instance/specification child, and reports none when no property is attached.
 TEST(ConcurrentAssertionModel, AssertionReachesItsProperty) {
   VpiObject assertion;
   assertion.type = vpiAssert;
@@ -73,10 +54,6 @@ TEST(ConcurrentAssertionModel, AssertionReachesItsProperty) {
   EXPECT_EQ(VpiConcurrentAssertionProperty(nullptr), nullptr);
 }
 
-// Claim 2 + Detail 1: the same clocking event is reported whether it was
-// written explicitly or inferred; the vpiIsClockInferred Boolean is what
-// distinguishes the two, not the clocking-event traversal. The event is the
-// expression the assertion records as its clock.
 TEST(ConcurrentAssertionModel, ClockingEventIsTheActualEventForBothForms) {
   VpiContext ctx;
 
@@ -98,8 +75,6 @@ TEST(ConcurrentAssertionModel, ClockingEventIsTheActualEventForBothForms) {
   EXPECT_EQ(ctx.Get(vpiIsClockInferred, &inferred_clk), 1);
 }
 
-// Claim 2 edge: an assertion with no clocking event, and a null handle, report
-// no clocking event.
 TEST(ConcurrentAssertionModel, MissingClockingEventReportsNull) {
   VpiObject assertion;
   assertion.type = vpiAssume;
@@ -107,8 +82,6 @@ TEST(ConcurrentAssertionModel, MissingClockingEventReportsNull) {
   EXPECT_EQ(VpiConcurrentAssertionClockingEvent(nullptr), nullptr);
 }
 
-// Claim 4: a cover reports whether it covers a sequence through
-// vpi_get(vpiIsCoverSequence).
 TEST(ConcurrentAssertionModel, CoverReportsIsCoverSequence) {
   VpiContext ctx;
   VpiObject seq_cover;
@@ -121,9 +94,6 @@ TEST(ConcurrentAssertionModel, CoverReportsIsCoverSequence) {
   EXPECT_EQ(ctx.Get(vpiIsCoverSequence, &prop_cover), 0);
 }
 
-// Claim 4, the false arm: vpiIsCoverSequence is meaningful only for a cover, so
-// a concurrent assertion of a different kind (here an assert) reports 0 for the
-// same property - the other input kind for the same query.
 TEST(ConcurrentAssertionModel, NonCoverReportsIsCoverSequenceFalse) {
   VpiContext ctx;
   VpiObject assertion;
@@ -135,8 +105,6 @@ TEST(ConcurrentAssertionModel, NonCoverReportsIsCoverSequenceFalse) {
   EXPECT_EQ(ctx.Get(vpiIsCoverSequence, &assume_obj), 0);
 }
 
-// Claim 3 + Detail 2: assert, assume and cover carry a pass action statement; a
-// restrict has none.
 TEST(ConcurrentAssertionModel, PassStatementPresenceByKind) {
   EXPECT_TRUE(VpiConcurrentAssertionHasPassStmt(vpiAssert));
   EXPECT_TRUE(VpiConcurrentAssertionHasPassStmt(vpiAssume));
@@ -144,8 +112,6 @@ TEST(ConcurrentAssertionModel, PassStatementPresenceByKind) {
   EXPECT_FALSE(VpiConcurrentAssertionHasPassStmt(vpiRestrict));
 }
 
-// Claim 5 + Detail 2: only assert and assume carry an else (fail) statement; a
-// cover has no else statement and a restrict has no fail statement.
 TEST(ConcurrentAssertionModel, ElseStatementPresenceByKind) {
   EXPECT_TRUE(VpiConcurrentAssertionHasElseStmt(vpiAssert));
   EXPECT_TRUE(VpiConcurrentAssertionHasElseStmt(vpiAssume));
@@ -153,10 +119,6 @@ TEST(ConcurrentAssertionModel, ElseStatementPresenceByKind) {
   EXPECT_FALSE(VpiConcurrentAssertionHasElseStmt(vpiRestrict));
 }
 
-// Claims 3 and 5: an assert traverses to its pass statement through vpiStmt and
-// to its else statement through vpiElseStmt; each is null when absent. A
-// statement's own type is a statement kind, so the two are told apart by the
-// else action the assertion records and by position.
 TEST(ConcurrentAssertionModel, AssertReachesPassAndElseStatements) {
   VpiObject assertion;
   assertion.type = vpiAssert;
@@ -169,7 +131,6 @@ TEST(ConcurrentAssertionModel, AssertReachesPassAndElseStatements) {
   EXPECT_EQ(VpiConcurrentAssertionStmt(&assertion), &pass);
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(&assertion), &els);
 
-  // A cover draws no else edge, however many statements it holds.
   VpiObject pass_only;
   pass_only.type = vpiCover;
   VpiObject p2;
@@ -180,7 +141,6 @@ TEST(ConcurrentAssertionModel, AssertReachesPassAndElseStatements) {
   EXPECT_EQ(VpiConcurrentAssertionStmt(&pass_only), &p2);
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(&pass_only), nullptr);
 
-  // A fail action written alone is no pass action.
   VpiObject fail_only;
   fail_only.type = vpiAssume;
   VpiObject f;
@@ -194,8 +154,6 @@ TEST(ConcurrentAssertionModel, AssertReachesPassAndElseStatements) {
   EXPECT_EQ(VpiConcurrentAssertionElseStmt(nullptr), nullptr);
 }
 
-// Detail 2: a restrict is not simulated and so generates no run-time
-// information; the other concurrent assertion kinds are simulated.
 TEST(ConcurrentAssertionModel, RestrictIsNotSimulated) {
   EXPECT_FALSE(VpiConcurrentAssertionIsSimulated(vpiRestrict));
 
@@ -203,12 +161,9 @@ TEST(ConcurrentAssertionModel, RestrictIsNotSimulated) {
   EXPECT_TRUE(VpiConcurrentAssertionIsSimulated(vpiAssume));
   EXPECT_TRUE(VpiConcurrentAssertionIsSimulated(vpiCover));
 
-  // A non-concurrent-assertion kind is not a simulated concurrent assertion.
   EXPECT_FALSE(VpiConcurrentAssertionIsSimulated(vpiModule));
 }
 
-// Claim 6: a concurrent assertion exposes its name and full name through
-// vpi_get_str(vpiName/vpiFullName).
 TEST(ConcurrentAssertionModel, AssertionReportsNameAndFullName) {
   VpiContext ctx;
   std::string name = "req_ack";
@@ -221,8 +176,6 @@ TEST(ConcurrentAssertionModel, AssertionReportsNameAndFullName) {
   EXPECT_STREQ(ctx.GetStr(vpiFullName, &assertion), "top.u_dut.req_ack");
 }
 
-// Claim 8 edge: the property traversal matches by kind, so an assertion whose
-// only child is an unrelated object reaches no property.
 TEST(ConcurrentAssertionModel, PropertyTraversalSkipsNonPropertyChildren) {
   VpiObject assertion;
   assertion.type = vpiAssert;
@@ -232,8 +185,6 @@ TEST(ConcurrentAssertionModel, PropertyTraversalSkipsNonPropertyChildren) {
   EXPECT_EQ(VpiConcurrentAssertionProperty(&assertion), nullptr);
 }
 
-// Claim 2 edge: the clocking event is the expression the assertion records,
-// so an assertion carrying an event control among its children reports none.
 TEST(ConcurrentAssertionModel, ClockingEventIsNoChildOfTheAssertion) {
   VpiObject assertion;
   assertion.type = vpiAssume;
@@ -243,9 +194,6 @@ TEST(ConcurrentAssertionModel, ClockingEventIsNoChildOfTheAssertion) {
   EXPECT_EQ(VpiConcurrentAssertionClockingEvent(&assertion), nullptr);
 }
 
-// Claims 3 and 5 edge: the pass- and else-statement traversals each match their
-// own statement child, so an assertion with only unrelated children reaches
-// neither a pass nor an else statement.
 TEST(ConcurrentAssertionModel, StatementTraversalsSkipNonStatementChildren) {
   VpiObject assertion;
   assertion.type = vpiAssert;
@@ -258,14 +206,11 @@ TEST(ConcurrentAssertionModel, StatementTraversalsSkipNonStatementChildren) {
 
 class ConcurrentAssertionsOfARun : public VpiDesignRun {
  protected:
-  // The name of what `relation` reaches from `ref`, empty for nothing.
   static std::string NameReached(int relation, vpiHandle ref) {
     vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
     return reached == nullptr ? "" : vpi_get_str(vpiName, reached);
   }
 
-  // The edge operation `event` stands for and the name of what it is taken
-  // of, as "posedge clk"; empty where it is no edge operation.
   static std::string EdgeOf(vpiHandle event) {
     if (event == nullptr || vpi_get(vpiType, event) != vpiOperation) return "";
     const int kOp = vpi_get(vpiOpType, event);
@@ -278,8 +223,6 @@ class ConcurrentAssertionsOfARun : public VpiDesignRun {
   }
 };
 
-// An assertion written as an item reaches its pass action through vpiStmt and
-// its fail action through vpiElseStmt (#5079).
 TEST_F(ConcurrentAssertionsOfARun, AnItemReachesBothActions) {
   Run("module top; logic clk, a;\n"
       "  a1: assert property (@(posedge clk) a) $display(\"p\");\n"
@@ -296,8 +239,6 @@ TEST_F(ConcurrentAssertionsOfARun, AnItemReachesBothActions) {
   EXPECT_EQ(ActionReached(vpiElseStmt, c1), "");
 }
 
-// A fail action written alone is reached through vpiElseStmt and is no pass
-// action (#5079).
 TEST_F(ConcurrentAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
   Run("module top; logic clk, a;\n"
       "  a1: assert property (@(posedge clk) a) else $write(\"f\");\n"
@@ -308,8 +249,6 @@ TEST_F(ConcurrentAssertionsOfARun, AFailActionAloneIsTheElseStatement) {
   EXPECT_EQ(ActionReached(vpiElseStmt, a1), "$write");
 }
 
-// An assertion embedded in a procedure reaches its actions the same way
-// (#5079).
 TEST_F(ConcurrentAssertionsOfARun, AProceduralAssertionReachesBothActions) {
   Run("module top; logic clk, a;\n"
       "  always @(posedge clk)\n"
@@ -321,8 +260,6 @@ TEST_F(ConcurrentAssertionsOfARun, AProceduralAssertionReachesBothActions) {
   EXPECT_EQ(ActionReached(vpiElseStmt, p1), "$write");
 }
 
-// An assertion reaches the clock it writes through vpiClockingEvent, which was
-// not inferred (#5080).
 TEST_F(ConcurrentAssertionsOfARun, AnAssertionReachesTheClockItWrites) {
   Run("module top; logic clk, a;\n"
       "  a1: assert property (@(posedge clk) a);\n"
@@ -333,8 +270,6 @@ TEST_F(ConcurrentAssertionsOfARun, AnAssertionReachesTheClockItWrites) {
   EXPECT_EQ(vpi_get(vpiIsClockInferred, a1), 0);
 }
 
-// An assertion writing no clock reaches the default clocking's event, inferred
-// (§16.16), and one embedded in a procedure the procedure's (§16.14.6) (#5080).
 TEST_F(ConcurrentAssertionsOfARun, AnInferredClockIsReachedAndReported) {
   Run("module top; logic clk, a;\n"
       "  default clocking cb @(negedge clk); endclocking\n"
@@ -351,8 +286,6 @@ TEST_F(ConcurrentAssertionsOfARun, AnInferredClockIsReachedAndReported) {
   EXPECT_EQ(vpi_get(vpiIsClockInferred, p1), 1);
 }
 
-// An assertion reaches its property spec through vpiProperty, and the spec its
-// clock, its disable condition and its property expression (#5081).
 TEST_F(ConcurrentAssertionsOfARun, AnAssertionReachesItsPropertySpec) {
   Run("module top; logic clk, rst, a;\n"
       "  a1: assert property (@(posedge clk) disable iff (rst) a);\n"
@@ -367,8 +300,6 @@ TEST_F(ConcurrentAssertionsOfARun, AnAssertionReachesItsPropertySpec) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
-// A spec that is a name declaring no property is a Boolean property spec, on
-// the default clocking's event as though written (§16.16) (#5081).
 TEST_F(ConcurrentAssertionsOfARun, ABareNameIsABooleanPropertySpec) {
   Run("module top; logic clk, a;\n"
       "  default clocking cb @(negedge clk); endclocking\n"
@@ -383,9 +314,6 @@ TEST_F(ConcurrentAssertionsOfARun, ABareNameIsABooleanPropertySpec) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
-// A restrict property reaches the clock it writes, or the default clocking's
-// inferred, and its property spec, as any concurrent assertion does, though
-// the run never checks it (§16.14.4) (#5088).
 TEST_F(ConcurrentAssertionsOfARun, ARestrictReachesItsClockAndPropertySpec) {
   Run("module top; logic clk, a;\n"
       "  default clocking cb @(negedge clk); endclocking\n"
@@ -406,9 +334,6 @@ TEST_F(ConcurrentAssertionsOfARun, ARestrictReachesItsClockAndPropertySpec) {
   EXPECT_EQ(NameReached(vpiPropertyExpr, spec), "a");
 }
 
-// An assertion on $global_clock reaches the event the global clocking
-// declaration its instance resolves to names (§16.5.2, §14.14), each instance
-// of one module its own (#5089).
 TEST_F(ConcurrentAssertionsOfARun, AGlobalClockIsTheEventItsInstanceResolves) {
   Run("module child(input logic clk, a);\n"
       "  a1: assert property (@$global_clock a);\n"
@@ -437,7 +362,6 @@ TEST_F(ConcurrentAssertionsOfARun, AGlobalClockIsTheEventItsInstanceResolves) {
   EXPECT_EQ(vpi_get(vpiOpType, falling), vpiNegedgeOp);
 }
 
-// One embedded in a procedure is clocked the same way (#5089).
 TEST_F(ConcurrentAssertionsOfARun, AProceduralGlobalClockIsTheDeclaredEvent) {
   Run("module top; logic clk, a;\n"
       "  global clocking @(negedge clk); endclocking\n"
@@ -449,8 +373,6 @@ TEST_F(ConcurrentAssertionsOfARun, AProceduralGlobalClockIsTheDeclaredEvent) {
   EXPECT_EQ(vpi_get(vpiIsClockInferred, p1), 0);
 }
 
-// §37.50: a null handle has no pass action statement, and detail 2 gives a
-// restrict none either.
 TEST(ConcurrentAssertionStmt, ANullHandleOrARestrictHasNoPassStatement) {
   EXPECT_EQ(VpiConcurrentAssertionStmt(nullptr), nullptr);
   VpiObject restrict_property;

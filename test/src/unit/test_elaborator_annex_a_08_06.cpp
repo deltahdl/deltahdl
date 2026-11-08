@@ -14,7 +14,6 @@ using namespace delta;
 
 namespace {
 
-// Whether the A.8.6 report of the property operator `op` stands at `line`.
 ::testing::AssertionResult ReportedImplication(const ElabFixture& f,
                                                std::string_view op,
                                                uint32_t line) {
@@ -25,8 +24,6 @@ namespace {
                        line, "A.8.6");
 }
 
-// Expects a `|->` reported at each of `overlapped` and a `|=>` at each of
-// `nonoverlapped`, and no other report under A.8.6.
 void ExpectImplicationReports(const ElabFixture& f,
                               std::initializer_list<uint32_t> overlapped,
                               std::initializer_list<uint32_t> nonoverlapped) {
@@ -43,13 +40,6 @@ void ExpectImplicationReports(const ElabFixture& f,
       static_cast<std::ptrdiff_t>(overlapped.size() + nonoverlapped.size()));
 }
 
-// A.8.6's binary_operator holds neither `|->` nor `|=>`, which A.2.10 writes
-// as property operators alone (§16.12.7), so an ordinary expression joined by
-// either is reported wherever it stands: a parameter's value, a continuous
-// assignment, a variable's initializer, a procedural assignment, a condition,
-// an immediate assertion's expression and a concurrent assertion's action
-// block. A concurrent assertion's property, in a module or in a procedure, and
-// an expect statement's are property expressions, which hold them legally.
 TEST(OperatorElaboration, ImplicationJoiningOrdinaryExpressionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -70,9 +60,6 @@ TEST(OperatorElaboration, ImplicationJoiningOrdinaryExpressionIsError) {
   ExpectImplicationReports(f, {1, 3, 7, 8}, {4, 6, 9});
 }
 
-// A.2.12 writes a let's body and each of its ports' defaults as an
-// expression, at module level and among a block's items (A.2.8) alike, and an
-// expression holds no property operator.
 TEST(OperatorElaboration, ImplicationInLetDeclarationIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -88,7 +75,6 @@ TEST(OperatorElaboration, ImplicationInLetDeclarationIsError) {
   ExpectImplicationReports(f, {3}, {4, 6});
 }
 
-// A.2.7 writes a task's or a function's port default as an expression.
 TEST(OperatorElaboration, ImplicationInSubroutinePortDefaultIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -103,10 +89,6 @@ TEST(OperatorElaboration, ImplicationInSubroutinePortDefaultIsError) {
   ExpectImplicationReports(f, {2}, {5});
 }
 
-// A class's parameter values, a property's initializer, a constraint
-// (A.1.10), a method's statements, a nested class's own and the arguments a
-// class hands its base's constructor are all expressions. The implication a
-// constraint does hold is `->`.
 TEST(OperatorElaboration, ImplicationInClassDeclarationIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -129,8 +111,6 @@ TEST(OperatorElaboration, ImplicationInClassDeclarationIsError) {
   ExpectImplicationReports(f, {2, 5, 7, 13}, {4, 5, 10});
 }
 
-// A package's declarations and those of the compilation unit outside every
-// design element (§3.12.1) hold ordinary expressions as a module's do.
 TEST(OperatorElaboration, ImplicationInPackageAndUnitScopeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -154,11 +134,6 @@ TEST(OperatorElaboration, ImplicationInPackageAndUnitScopeIsError) {
   ExpectImplicationReports(f, {2, 5, 10}, {3, 8, 13});
 }
 
-// A.4.1.1 writes a module instance's ordered and named port connections as
-// expressions, so an implication nested in one is reported. One that is the
-// whole connection reads as a property, which §23.3.2 rejects for a module's
-// port, and a checker instance's connections are property_actual_args
-// (A.4.1.4), which may hold a property; neither is an A.8.6 report.
 TEST(OperatorElaboration, ImplicationInInstancePortConnectionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -181,7 +156,6 @@ TEST(OperatorElaboration, ImplicationInInstancePortConnectionIsError) {
                             9, "23.3.2"));
 }
 
-// A.4.1.1 writes an ordered and a named parameter value as a param_expression.
 TEST(OperatorElaboration, ImplicationInInstanceParameterValueIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -195,7 +169,6 @@ TEST(OperatorElaboration, ImplicationInInstanceParameterValueIsError) {
   ExpectImplicationReports(f, {4}, {5});
 }
 
-// A.3.3 writes a gate's input and enable terminals as expressions.
 TEST(OperatorElaboration, ImplicationInGateTerminalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -209,8 +182,6 @@ TEST(OperatorElaboration, ImplicationInGateTerminalIsError) {
   ExpectImplicationReports(f, {4}, {5});
 }
 
-// A.4.2 writes an if-generate construct's condition as a constant expression,
-// that of an else-if among them.
 TEST(OperatorElaboration, ImplicationInIfGenerateConditionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -224,8 +195,6 @@ TEST(OperatorElaboration, ImplicationInIfGenerateConditionIsError) {
   ExpectImplicationReports(f, {3}, {4});
 }
 
-// A.4.2 writes a case-generate construct's selector and item values as
-// constant expressions.
 TEST(OperatorElaboration, ImplicationInCaseGenerateIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -240,8 +209,6 @@ TEST(OperatorElaboration, ImplicationInCaseGenerateIsError) {
   ExpectImplicationReports(f, {3}, {4});
 }
 
-// A.4.2 writes a loop-generate construct's initialization, condition and
-// iteration as expressions.
 TEST(OperatorElaboration, ImplicationInLoopGenerateHeaderIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -259,9 +226,6 @@ TEST(OperatorElaboration, ImplicationInLoopGenerateHeaderIsError) {
   ExpectImplicationReports(f, {4, 8}, {6});
 }
 
-// A.2.11 writes a covergroup option's value, a coverpoint's expression and
-// guard, and a bin's option, values, array size, filter, set expression and
-// guard as expressions.
 TEST(OperatorElaboration, ImplicationInCovergroupIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -282,8 +246,6 @@ TEST(OperatorElaboration, ImplicationInCovergroupIsError) {
   ExpectImplicationReports(f, {4, 5, 7, 8, 9}, {5, 6, 7, 8, 10});
 }
 
-// A.5.4 gives a user-defined primitive instance input terminals, which A.3.3
-// writes as expressions.
 TEST(OperatorElaboration, ImplicationInUdpInstanceTerminalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -302,9 +264,6 @@ TEST(OperatorElaboration, ImplicationInUdpInstanceTerminalIsError) {
   ExpectImplicationReports(f, {10}, {10});
 }
 
-// A.2.11 writes a cross's guard, its options' values and a bins selection's
-// guard as expressions, and a select expression's intersect values, with
-// filter and matches count as covergroup expressions.
 TEST(OperatorElaboration, ImplicationInCovergroupCrossIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -326,8 +285,6 @@ TEST(OperatorElaboration, ImplicationInCovergroupCrossIsError) {
   ExpectImplicationReports(f, {7, 9, 10}, {8, 9, 10});
 }
 
-// A.2.11 lets a cross body hold a function_declaration, whose port defaults
-// and statements are ordinary expressions like any subroutine's.
 TEST(OperatorElaboration, ImplicationInCrossBodyFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -348,9 +305,6 @@ TEST(OperatorElaboration, ImplicationInCrossBodyFunctionIsError) {
   ExpectImplicationReports(f, {9}, {8});
 }
 
-// A.2.11 gives a covergroup and its sample function a tf_port_list, whose
-// defaults are expressions (A.2.7), and a clocking event, whose events and
-// guards are expressions (A.6.5).
 TEST(OperatorElaboration, ImplicationInCovergroupEventOrFormalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -367,8 +321,6 @@ TEST(OperatorElaboration, ImplicationInCovergroupEventOrFormalIsError) {
   ExpectImplicationReports(f, {3, 7}, {5, 7});
 }
 
-// A.2.11 writes a transition bin's values and repeat range as covergroup
-// expressions.
 TEST(OperatorElaboration, ImplicationInTransitionBinIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -385,8 +337,6 @@ TEST(OperatorElaboration, ImplicationInTransitionBinIsError) {
   ExpectImplicationReports(f, {6}, {6});
 }
 
-// A covergroup embedded in a class (§19.4) is the covergroup_declaration a
-// module holds, its expressions alike.
 TEST(OperatorElaboration, ImplicationInClassCovergroupIsError) {
   ElabFixture f;
   ElaborateSrc(

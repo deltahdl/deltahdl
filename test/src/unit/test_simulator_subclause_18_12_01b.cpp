@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.12.1: the clause's first call, std::randomize(a, b, c) with a below b
-// and their sum below the task argument length: the three arguments are
-// the random variables and length a state variable, so over 32 calls of
-// stimulus(50) every call succeeds with a < b and a + b < 50, and c is
-// drawn though no constraint names it, as the design
-// test/src/e2e/scope_randomize_with.sv runs it.
 TEST(ScopeRandomizeWithRun, TheFirstCallDrawsThreeUnderTwoRelations) {
   SimFixture f;
   std::string out = RunCapture(
@@ -35,10 +29,6 @@ TEST(ScopeRandomizeWithRun, TheFirstCallDrawsThreeUnderTwoRelations) {
   EXPECT_EQ(out, "32 32 1\n");
 }
 
-// 18.12.1: the clause's second call, std::randomize(a, b) with their
-// difference above length: a and b are the random variables and c, no
-// argument of it, a state variable, so b - a exceeds 50 on every call and
-// c keeps the value the first call gave it.
 TEST(ScopeRandomizeWithRun, TheSecondCallHoldsTheUnnamedLocal) {
   SimFixture f;
   std::string out = RunCapture(
@@ -61,8 +51,6 @@ TEST(ScopeRandomizeWithRun, TheSecondCallHoldsTheUnnamedLocal) {
   EXPECT_EQ(out, "32 32 32\n");
 }
 
-// 18.12.1: a relation between two arguments alone, a below b over whole
-// ints, holds on every one of 32 calls.
 TEST(ScopeRandomizeWithRun, ARelationBetweenTwoArgumentsHoldsOverInts) {
   SimFixture f;
   std::string out = RunCapture(
@@ -80,8 +68,6 @@ TEST(ScopeRandomizeWithRun, ARelationBetweenTwoArgumentsHoldsOverInts) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// 18.12.1: a sum of two arguments bounded by the state length alone, over
-// whole ints, holds on every one of 32 calls.
 TEST(ScopeRandomizeWithRun, ASumBoundAgainstTheStateHoldsOverInts) {
   SimFixture f;
   std::string out = RunCapture(
@@ -99,8 +85,6 @@ TEST(ScopeRandomizeWithRun, ASumBoundAgainstTheStateHoldsOverInts) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// 18.12.1: the clause's two relations over 8-bit arguments hold on every
-// one of 32 calls.
 TEST(ScopeRandomizeWithRun, TwoRelationsOverNarrowArgumentsHold) {
   SimFixture f;
   std::string out = RunCapture(
@@ -119,8 +103,6 @@ TEST(ScopeRandomizeWithRun, TwoRelationsOverNarrowArgumentsHold) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// 18.12.1: the clause's two relations over whole ints, the two arguments
-// they name alone, hold on every one of 32 calls.
 TEST(ScopeRandomizeWithRun, TwoRelationsOverTwoIntArgumentsHold) {
   SimFixture f;
   std::string out = RunCapture(
@@ -138,9 +120,6 @@ TEST(ScopeRandomizeWithRun, TwoRelationsOverTwoIntArgumentsHold) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// §18.12.1: inside a class method the scope randomize may name a property of
-// the object, bare, beside a local, and its block may read the method's
-// formal: p is drawn within lim to lim + 2 and q is twice it.
 TEST(ScopeRandomizeRun, APropertyNamedInAMethodIsRandomized) {
   SimFixture f;
   std::string out = RunCapture(
@@ -165,12 +144,6 @@ TEST(ScopeRandomizeRun, APropertyNamedInAMethodIsRandomized) {
   EXPECT_EQ(out, "0 1\n");
 }
 
-// 18.12.1 with 18.5: every relation of the block holds of the values a
-// successful call draws, a disjunction among them beside a relation over
-// y alone, whose values the solve enumerates before x is drawn; 200 calls
-// never leave x and y both 1. Bound as a real while y's values were
-// enumerated, x read its integral draw as a real ever after, and the
-// disjunction held of x == 1, y == 1 in about a quarter of the calls.
 TEST(ScopeRandomizeWithRun, ADisjunctionHoldsBesideARelationOverOneVariable) {
   SimFixture f;
   std::string out = RunCapture(

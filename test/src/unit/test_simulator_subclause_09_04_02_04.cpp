@@ -65,11 +65,6 @@ TEST(SequenceEventSim, MultipleWaitersOnSequenceEndpoint) {
 }
 
 TEST(SequenceEventSim, ProcessStaysBlockedWhenSequenceNeverMatches) {
-  // §9.4.2.4: the process executing the event control shall block until the
-  // sequence reaches its end point. This is the blocking half of the rule:
-  // the sequence `a ##1 b ##1 c` never completes because c is held low, so
-  // the endpoint never fires and the waiting process never runs its action.
-  // result must keep its initial value.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -82,7 +77,7 @@ TEST(SequenceEventSim, ProcessStaysBlockedWhenSequenceNeverMatches) {
       "    clk = 0; a = 0; b = 0; c = 0; result = 0;\n"
       "    #1 a = 1; #1 clk = 1; #1 clk = 0;\n"
       "    #1 b = 1; #1 clk = 1; #1 clk = 0;\n"
-      "    #1 clk = 1; #1 clk = 0;\n"  // c stays 0 -> no full match
+      "    #1 clk = 1; #1 clk = 0;\n"
       "    #10 $finish;\n"
       "  end\n"
       "  initial begin\n"
@@ -94,9 +89,6 @@ TEST(SequenceEventSim, ProcessStaysBlockedWhenSequenceNeverMatches) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §9.4.2.1 with §9.4.2.4: a sequence instance or-ed with another event is one
-// operand among the others, so the edge wakes the process though the sequence
-// never matches.
 TEST(SequenceEventSim, AnOrListWakesOnItsOtherOperands) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; logic clk = 0, a = 0;\n"
@@ -112,8 +104,6 @@ TEST(SequenceEventSim, AnOrListWakesOnItsOtherOperands) {
             "woke 5\n$finish at time 5\n");
 }
 
-// §9.4.2.3: an iff qualifier on a sequence instance lets a match wake the
-// process only where its condition holds, so the match at 5 passes it by.
 TEST(SequenceEventSim, AnIffQualifierGatesTheSequence) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; logic clk = 0, a = 1; bit en = 0;\n"
@@ -130,8 +120,6 @@ TEST(SequenceEventSim, AnIffQualifierGatesTheSequence) {
             "woke 15\n$finish at time 15\n");
 }
 
-// §9.4.2.1: an or-ed event control resumes its process once, on the first
-// operand to occur, so s2's later match leaves the process in its delay.
 TEST(SequenceEventSim, TwoSequencesResumeTheProcessOnce) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; logic clk = 0, a = 1, b = 0;\n"

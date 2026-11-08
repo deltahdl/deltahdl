@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.3: a constraint that uses a 4-state operator (===, !==) is an error.
 TEST(ConstraintFourState, TripleEqualOperatorRejected) {
   auto r = Parse(
       "class C;\n"
@@ -30,7 +29,6 @@ TEST(ConstraintFourState, TripleNotEqualOperatorRejected) {
       "18.3"));
 }
 
-// 18.3: a constraint may not contain an x or z value.
 TEST(ConstraintFourState, FourStateLiteralRejected) {
   auto r = Parse(
       "class C;\n"
@@ -41,8 +39,6 @@ TEST(ConstraintFourState, FourStateLiteralRejected) {
       r.diags, "4-state value is not allowed in a constraint", 3, "18.3"));
 }
 
-// 18.3 with 5.7.1: a question mark is a z digit, so a literal that spells its
-// z bits with it holds a 4-state value all the same.
 TEST(ConstraintFourState, QuestionMarkDigitRejected) {
   auto r = Parse(
       "class C;\n"
@@ -53,7 +49,6 @@ TEST(ConstraintFourState, QuestionMarkDigitRejected) {
       r.diags, "4-state value is not allowed in a constraint", 3, "18.3"));
 }
 
-// A constraint that uses only 2-state values and 2-state operators is legal.
 TEST(ConstraintFourState, TwoStateConstraintAccepted) {
   auto r = Parse(
       "class C;\n"

@@ -1,20 +1,3 @@
-// §16.14 concurrent assertions that deltahdl does not evaluate, and the report
-// that says so. The clause rules that a property alone is never evaluated to
-// check anything; only an assertion statement (§16.2) that uses it brings that
-// about. A source that writes one of the five concurrent assertion statements
-// of Syntax 16-18 has written that assertion statement, so every case here
-// hands deltahdl a form it cannot evaluate and reads back the warning naming
-// the reason, plus one control that hands it the form it can evaluate and reads
-// back no warning at all.
-//
-// The cases go with the warning: as each form gains an evaluation path under
-// #2923, #2924 and #2927, the case asserting it is unevaluated is replaced by
-// one asserting what it evaluates to.
-//
-// The subclause here is §16.14 rather than §16.14.1 through §16.14.4 because
-// the sentence quoted above is the parent clause's, and because one report
-// covers all four statements.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -29,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// How many §16.14 non-evaluation reports a run made. The control below rests
-// on this rather than on the size of the whole record, so a report about some
-// other rule can neither satisfy it nor break it.
 int UnevaluatedReports(const ParseResult& r) {
   int count = 0;
   for (const auto& diag : r.diags) {
@@ -44,12 +24,6 @@ int UnevaluatedReports(const ParseResult& r) {
   return count;
 }
 
-// §16.14 Syntax 16-18 lists assume_property_statement among the concurrent
-// assertion statements, and Annex F.5.3.1 gives it the assert property
-// statement's satisfaction, so Parser::ParsePropertyAssertLike takes the
-// clocked-boolean path for an assume as for an assert: the one form deltahdl
-// evaluates is reported as nothing, and a spec beyond what it reads is
-// reported for its body as an assert's is.
 TEST(ConcurrentAssertionEvaluationReporting,
      AssumePropertyInTheClockedBooleanFormIsEvaluated) {
   auto r = Parse(
@@ -69,9 +43,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));
 }
 
-// §16.14 Syntax 16-18 lists cover_property_statement, whose satisfaction Annex
-// F.5.3.1 defines over the same words, so Parser::ParseCoverProperty takes the
-// clocked-boolean path too and reports the other specs by their body.
 TEST(ConcurrentAssertionEvaluationReporting,
      CoverPropertyInTheClockedBooleanFormIsEvaluated) {
   auto r = Parse(
@@ -81,8 +52,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.12.2: a sequence_expr is a sequential property the evaluation reads,
-// strong in a cover, so a cover of `a ##1 b` is reported by nothing.
 TEST(ConcurrentAssertionEvaluationReporting,
      ASequentialCoverPropertyIsEvaluated) {
   auto r = Parse(
@@ -92,9 +61,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.14 Syntax 16-18 lists cover_sequence_statement beside
-// cover_property_statement, its spec a sequence_expr under a clocking event,
-// which is read as a cover property's is and evaluated.
 TEST(ConcurrentAssertionEvaluationReporting, CoverSequenceIsEvaluated) {
   auto r = Parse(
       "module m;\n"
@@ -107,12 +73,6 @@ TEST(ConcurrentAssertionEvaluationReporting, CoverSequenceIsEvaluated) {
   EXPECT_NE(item->body->assert_sequence, nullptr);
 }
 
-// §16.14 Syntax 16-18 lists restrict_property_statement, which
-// Parser::ParseRestrictProperty skips outright, and that is no gap: §16.2 has
-// a simulator not check a restrict property, and §16.14.4 says the statement
-// is not verified in simulation. So the skip draws none of the reports above,
-// which name what this tool cannot evaluate rather than what the standard has
-// it leave alone.
 TEST(ConcurrentAssertionEvaluationReporting,
      RestrictPropertyGoesUnevaluatedWithoutAReport) {
   auto r = Parse(
@@ -123,8 +83,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.12.7: |-> and |=> are the implication operators, which the evaluation
-// reads as a property of operands, so neither spec is reported.
 TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   auto overlapped = Parse(
       "module m;\n"
@@ -138,10 +96,6 @@ TEST(ConcurrentAssertionEvaluationReporting, ImplicationsAreEvaluated) {
   EXPECT_EQ(UnevaluatedReports(nonoverlapped), 0);
 }
 
-// §16.7: ## is the cycle delay range, and §16.12.2 has a sequence_expr be a
-// sequential property, which the evaluation reads as weak in an assert; a
-// spec that holds a cycle delay and no property operator is reported by
-// nothing.
 TEST(ConcurrentAssertionEvaluationReporting,
      CycleDelayIsEvaluatedAsASequentialProperty) {
   auto r = Parse(
@@ -151,13 +105,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.16 (a) has a concurrent assertion outside procedural code take its
-// clock from the default clocking where its spec opens with none, which the
-// elaborator has and the parser does not, so an assert property written
-// without a clock is read into a body with no clock and reported by
-// nothing here. The boolean is two names joined rather than one name,
-// because one name alone is read as a property instance (see the next
-// case).
 TEST(ConcurrentAssertionEvaluationReporting, AssertWithoutAClockIsRead) {
   auto r = Parse(
       "module m;\n"
@@ -174,13 +121,6 @@ TEST(ConcurrentAssertionEvaluationReporting, AssertWithoutAClockIsRead) {
   EXPECT_TRUE(assertion->body->is_concurrent_clocked);
 }
 
-// §16.12.1 lets an instance of a named property stand as the property_spec,
-// and a spec that is one name is such an instance when the name is a
-// property's. The parser cannot know whether it is, since the declaration may
-// follow the assertion and a variable's name reads the same, so it records the
-// name and reports nothing; Elaborator::ElaborateAssertPropertyItem makes the
-// substitution or the report, and test_elaborator_subclause_16_12_01.cpp reads
-// both.
 TEST(ConcurrentAssertionEvaluationReporting,
      ABareNameSpecIsLeftToTheElaborator) {
   auto r = Parse(
@@ -190,16 +130,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// A clocked assert whose property_spec is not exhausted by what the
-// evaluation reads: §16.11's subroutine call attached to a sequence of one
-// boolean and no cycle delay, `(b, $display("m"))`, is read as the boolean
-// alone, which stops at the comma, so the spec is not the whole of what
-// stands after the clock, and the report names this rather than the missing
-// clock, because the clock is present. `a and b`, `if (a) b else c`,
-// `nexttime b`, `s_always [1:3] b`, `eventually [1:3] b`, `accept_on (rst)
-// b`, `case (sel) 1: b; endcase`, `b dist {1 := 1}` and `b dist {default :/
-// 1}` stood here until §16.12.5, §16.12.6, §16.12.10, §16.12.11, §16.12.13,
-// §16.12.14, §16.12.16 and §16.14.2 were evaluated.
 TEST(ConcurrentAssertionEvaluationReporting,
      ClockedNonBooleanPropertyIsNotEvaluated) {
   auto r = Parse(
@@ -210,12 +140,6 @@ TEST(ConcurrentAssertionEvaluationReporting,
       r.diags, "holds more than the @(event) boolean_expression", 2, "16.14"));
 }
 
-// THE CONTROL. §16.14 has the property within an assertion statement evaluated,
-// and this is the one form deltahdl does evaluate: an assert property whose
-// spec is a leading clocking event and a boolean.
-// Parser::TryParseSimpleConcurrentProperty lowers it to a clocked process, so
-// nothing is discarded and there is nothing to report. Without this case a
-// warning on every concurrent assertion would satisfy all nine cases above.
 TEST(ConcurrentAssertionEvaluationReporting, ClockedBooleanAssertIsEvaluated) {
   auto r = Parse(
       "module m;\n"
@@ -224,10 +148,6 @@ TEST(ConcurrentAssertionEvaluationReporting, ClockedBooleanAssertIsEvaluated) {
   EXPECT_EQ(UnevaluatedReports(r), 0);
 }
 
-// §16.14 lists where a concurrent assertion statement may be specified, and
-// the only procedural code among them is an always or an initial procedure.
-// A class method, a task or function and a final procedure are not in the
-// list, so the statement written in one is reported where it stands.
 constexpr const char* kPlacementMessage =
     "a concurrent assertion statement in procedural code shall be in an "
     "always or an initial procedure";
@@ -278,9 +198,6 @@ TEST(ConcurrentAssertionPlacement, InAFinalProcedureIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kPlacementMessage, 4, "16.14"));
 }
 
-// §16.14.3 has a rule of its own against a concurrent assertion statement in a
-// cover statement's pass statement, which the elaborator reports, so the
-// placement report above is not made a second time for the same statement.
 TEST(ConcurrentAssertionPlacement, InACoverPassStatementIsLeftToItsOwnRule) {
   auto r = Parse(
       "module t;\n"
@@ -294,7 +211,6 @@ TEST(ConcurrentAssertionPlacement, InACoverPassStatementIsLeftToItsOwnRule) {
   }
 }
 
-// The two procedures the list names, the statement nested in a block of each.
 TEST(ConcurrentAssertionPlacement, InAnAlwaysOrAnInitialProcedureIsAccepted) {
   auto r = Parse(
       "module t;\n"

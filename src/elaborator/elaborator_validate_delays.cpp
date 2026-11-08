@@ -12,25 +12,10 @@ namespace delta {
 
 namespace {
 
-// §28.16: a delay is a duration between two moments, taken in that order -- a
-// net delay is the time from any driver of the net changing value to the net's
-// value being updated and passed on, and §28.16.2 gives a trireg's charge decay
-// time as the delay from its drivers turning off to its stored charge no longer
-// being determinable. No form the clause gives a delay runs backwards, so a
-// delay that folds to a negative value is a source the standard does not
-// describe.
-//
-// A delay that does not fold is not reported. It may name a parameter this
-// scope cannot see, and what value it will have is not this pass's to settle;
-// only a value the pass can compute and see to be negative is a breach.
 void CheckOneDelay(const Expr* delay, const ScopeMap& scope, DiagEngine& diag) {
   if (delay == nullptr) return;
   std::optional<int64_t> value = ConstEvalInt(delay, scope);
   if (!value.has_value()) {
-    // A.2.2.3 admits a real_number as a delay_value, which ConstEvalInt does
-    // not fold. §3.14.1 rounds a delay value to the precision before it is
-    // used, so the sign of what a real delay becomes is the sign of the value
-    // written, and a negative one is as much a breach as a negative integer.
     if (auto real_value = ConstEvalReal(delay, scope)) {
       value = std::llround(*real_value);
     }
@@ -43,12 +28,6 @@ void CheckOneDelay(const Expr* delay, const ScopeMap& scope, DiagEngine& diag) {
              Subclause("28.16"));
 }
 
-// §28.16.1: a delay may be written as three expressions -- each delay's
-// minimum, typical and maximum values, any three expressions, separated by
-// colons -- and which of them is the delay is settled per run rather than per
-// source. Each is the delay in some run, so each is checked; reading only the
-// folded scalar would see whichever member the active mode selects and pass the
-// other two.
 void CheckDelay(const Expr* delay, const ScopeMap& scope, DiagEngine& diag) {
   if (delay == nullptr) return;
   if (delay->kind == ExprKind::kMinTypMax) {
@@ -74,13 +53,6 @@ bool ItemCarriesDelay(const ModuleItem* item) {
 
 void ValidateItemDelaysNonNegative(const ModuleItem* item,
                                    const ScopeMap& scope, DiagEngine& diag) {
-  // Every delay this item can carry, rather than the one slot a wrap was first
-  // seen through: §28.16 states one rule over the delays of nets, gates,
-  // primitives and continuous assignments, and a check on one of them would
-  // leave the rest reading as an oversight. The net's three slots are the
-  // rise, the fall and -- on a trireg, per §28.16.2.2 -- the charge decay time;
-  // the other six are the continuous assignment's and the gate or primitive
-  // instance's.
   CheckDelay(item->net_delay, scope, diag);
   CheckDelay(item->net_delay_fall, scope, diag);
   CheckDelay(item->net_delay_decay, scope, diag);

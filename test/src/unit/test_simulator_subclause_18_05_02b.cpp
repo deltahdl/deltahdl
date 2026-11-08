@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The classes of test/src/e2e/constraint_inheritance.sv around the
-// statements of an initial that holds a Base b, a Derived d, a Fixed f, a
-// Range r, a Sealed s and a Base handle h, with the module's counters.
 std::string Design(const std::string& body) {
   return "class Base;\n"
          "  rand int x;\n"
@@ -54,9 +51,6 @@ std::string Design(const std::string& body) {
          "endmodule\n";
 }
 
-// 18.5.2: a derived constraint of an inherited name replaces the inherited
-// one and one of a new name adds to the rest, while the base's own blocks
-// still hold for the base.
 TEST(ConstraintInheritanceRun,
      ADerivedBlockReplacesItsNamesakeAndAddsToTheRest) {
   const std::string kSrc = Design(
@@ -76,8 +70,6 @@ TEST(ConstraintInheritanceRun,
   EXPECT_EQ(RunCapture(kSrc, f), "32 1 32\n$finish at time 0\n");
 }
 
-// 18.5.2: randomize() is virtual, so through a Base handle it honors the
-// Derived object's constraints.
 TEST(ConstraintInheritanceRun, RandomizeThroughABaseHandleHonorsTheObjects) {
   const std::string kSrc = Design(
       "    h = d;\n"
@@ -89,8 +81,6 @@ TEST(ConstraintInheritanceRun, RandomizeThroughABaseHandleHonorsTheObjects) {
   EXPECT_EQ(RunAndGet(kSrc, "through_base"), uint64_t{32});
 }
 
-// 18.5.2: a derived prototype of an inherited name replaces the inherited
-// constraint, completed as 18.5.1 has it.
 TEST(ConstraintInheritanceRun, ADerivedPrototypeReplacesTheInheritedBlock) {
   const std::string kSrc = Design(
       "    repeat (32) begin\n"
@@ -101,8 +91,6 @@ TEST(ConstraintInheritanceRun, ADerivedPrototypeReplacesTheInheritedBlock) {
   EXPECT_EQ(RunAndGet(kSrc, "fixed_42"), uint64_t{32});
 }
 
-// 18.5.2: the non-abstract class's constraint of a pure constraint's name
-// implements it and holds; a block with :initial :final holds as any does.
 TEST(ConstraintInheritanceRun,
      APureConstraintsImplementationAndASealedBlockHold) {
   const std::string kSrc = Design(

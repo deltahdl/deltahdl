@@ -22,38 +22,17 @@ namespace delta {
 
 void Lowerer::LowerParams(const RtlirModule* mod) {
   for (const auto& p : mod->params) {
-    // §23.10/§6.20: a parameter is an instance-specific runtime value, so its
-    // variable is scoped by the instance prefix (empty for a top module). This
-    // makes a child instance's parameters — including any defparam override —
-    // visible to that instance's processes. The name is arena-persisted because
-    // SimContext keys variables by string_view.
-    //
-    // §27.4 and §27.5 make a generate block a scope of its own, so a parameter
-    // declared in one is keyed under the block's prefix as its variables are:
-    // a bare read in the block finds it there first (GenerateBlockKeys), and
-    // the module's parameter of the same name, or another block's, is a
-    // different variable.
     auto* full = arena_.Create<std::string>(
         inst_prefix_ + std::string(p.gen_block_prefix) + std::string(p.name));
-    // §21.7.2.1: dumped, the parameter is declared with the parameter var_type.
     ctx_.Vcd().MarkVcdParameter(*full);
     LowerParam(*mod, p, *full);
   }
-  // §23.10.1 with §23.10.2: the defparams that redefine a parameter of one of
-  // this instance's named blocks, read when the block's declaration runs.
   for (const auto& redefined : mod->block_param_overrides) {
     ctx_.RegisterBlockParamOverride(inst_prefix_, redefined.decl,
                                     redefined.init);
   }
 }
 
-// §6.20.1 (printed page 124) with §6.20.2: a parameter declared with unpacked
-// dimensions is an array of values, assigned by an assignment pattern, so it
-// is given the element variables and the ArrayInfo CreateArrayElements
-// (lowerer_var.cpp) gives a module's array variable, under the parameter's own
-// key, each element filled from the pattern by §10.9.1's rules. The value fold
-// takes no pattern and leaves such a parameter unresolved, which left it no
-// storage at all and every element reading x.
 static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
                              SimContext& ctx, Arena& arena) {
   ParamStorageShape shape = ParamStorageShapeOf(p);
@@ -78,9 +57,6 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   var.is_descending = outer.left > outer.right;
   var.num_unpacked_dims = static_cast<uint32_t>(p.unpacked_bounds.size());
   CreateArrayElements(full, var, ctx, arena);
-  // §23.10.2: an instance's override, `sub #(.A('{5, 6}))`, gives the
-  // parameter its value in place of the declaration's, and the pattern is
-  // written in the instantiating instance, so its items are read there.
   if (p.override_expr == nullptr) return;
   var.init_expr = p.override_expr;
   std::string own = ctx.ActiveInstancePrefix();
@@ -89,9 +65,6 @@ static void CreateParamArray(const RtlirParamDecl& p, std::string_view full,
   ctx.SetLoweringInstancePrefix(own);
 }
 
-// §6.19: whether `expr` names an enumeration constant `mod` declares, which
-// hides a parameter of that name outside the module but is lowered after the
-// module's parameters, so evaluating `expr` here would read the hidden one.
 static bool NamesOwnEnumConstant(const Expr* expr, const RtlirModule& mod) {
   bool found = false;
   ForEachSubExpr(expr, [&](const Expr* e) {
@@ -115,11 +88,6 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
     return;
   }
   if (!p.is_resolved && !UnfoldedParamEvaluable(p, ctx_)) return;
-  // §6.20.2: a parameter declared real holds a real value, so it is lowered
-  // the way a real variable is -- the double's bit pattern in 64 bits, marked
-  // real and registered as one. Everything that reads a real reads it from
-  // that mark, so without it the same 64 bits are taken for the integer they
-  // spell. §6.12: one declared shortreal is held in a shortreal's 32 bits.
   if (p.is_real_value) {
     Logic4Vec real = ToDeclaredReal(MakeRealVec(arena_, p.resolved_real, 64),
                                     ParamValueType(p), ctx_, arena_);
@@ -129,41 +97,12 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
     ctx_.RegisterRealVariable(full);
     return;
   }
-  // §6.16: a parameter declared string holds a value of arbitrary length, and
-  // the subclause rules that such a value is never truncated. Neither half of
-  // the lowering below can honour that. EvalTypeWidth gives kString no width,
-  // so decl_width is 0 and the fallback takes 32, keeping four characters of
-  // the ten in §6.16's own example `parameter string default_name = "John
-  // Smith"`; and resolved_value is 64 bits, which is why the characters are
-  // read from resolved_string instead. StringToLogic4Vec packs one byte per
-  // character with the leftmost character in the most significant byte, and
-  // StripStringZeros drops the "\0" §6.16 forbids a string to contain,
-  // leaving a value exactly as wide as the characters need. Registering the
-  // variable as a string is the same second half the real arm above has,
-  // because what reads a string reads SimContext::IsStringVariable rather
-  // than the width.
-  //
-  // An overridden parameter is read here too, because is_string_value being
-  // set says resolved_string holds the value the parameter has now rather
-  // than the one it was declared with. ApplyParamOverride records the
-  // characters for §23.10.2's two instance forms and for a configuration, on
-  // a parameter whose is_string_value is still clear and whose declared
-  // initializer Elaborator::ElaborateParamPortList then withholds; an
-  // override that is not a string literal therefore leaves the flag clear.
-  // Elaborator::ApplyDefparams records them for §23.10.1's defparam, where
-  // the declaration's own characters are already recorded by then, so it
-  // clears the flag itself when the right-hand side is not a string literal.
   if (p.is_string_value) {
     auto chars =
         StripStringZeros(StringToLogic4Vec(arena_, p.resolved_string), arena_);
     auto* svar = ctx_.CreateVariable(full, chars.width);
     svar->value = chars;
     ctx_.RegisterStringVariable(full);
-    // §21.7.5: Table 21-11 gives string no row, and §21.7.2.3 has a $var's
-    // size give the variable's number of bits, which no size states for a
-    // value whose length §6.16 lets vary. SimContext decides that by the
-    // declared kind, so without this the parameter is dumped with a $var size
-    // that follows its character count.
     ctx_.Vcd().SetVcdVarKind(full, DataTypeKind::kString);
     return;
   }
@@ -172,17 +111,8 @@ void Lowerer::LowerParam(const RtlirModule& mod, const RtlirParamDecl& p,
   auto* var = ctx_.CreateVariable(full, width);
   var->value =
       MakeLogic4VecVal(arena_, width, static_cast<uint64_t>(p.resolved_value));
-  // §6.20.2: a value wider than 64 bits is re-evaluated whole from its own
-  // expression, the folded value holding the low word alone, as is one
-  // whose expression holds an x or a z (§5.7.1), which the fold holds as 0.
-  // The elaborator's value stands for an expression of the declaration that
-  // names one of the module's own enumeration constants.
   if (p.override_expr != nullptr || !NamesOwnEnumConstant(p.default_value, mod))
     ReevaluateParamValue(p, var, ctx_, arena_);
-  // §11.8.2: an operand is sign-extended to the propagated width only when it
-  // is signed, so a parameter declared signed, or an untyped one whose final
-  // value is (§6.20.2), has to reach evaluation carrying that. Without it
-  // `parameter signed [3:0] P = -4'sd1` reads back as 15.
   var->is_signed = shape.is_signed;
   var->value.is_signed = shape.is_signed;
 }

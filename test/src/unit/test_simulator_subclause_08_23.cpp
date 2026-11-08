@@ -226,8 +226,6 @@ TEST(ClassScopeResolutionSim, SuperclassStaticAccessFromDerived) {
 }
 
 TEST(ClassScopeResolutionSim, StaticPropertyWrittenViaScope) {
-  // C8: class-scope-resolved static property written in an assignment, then
-  // read back through the same `::` access -- full pipeline.
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static int count;\n"
                       "endclass\n"
@@ -243,7 +241,6 @@ TEST(ClassScopeResolutionSim, StaticPropertyWrittenViaScope) {
 }
 
 TEST(ClassScopeResolutionSim, EnumNamedConstantViaScope) {
-  // C8: enumeration named constant reachable via `::` -- full pipeline.
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  typedef enum { RED, GREEN = 3, BLUE } color_e;\n"
                       "endclass\n"
@@ -255,11 +252,6 @@ TEST(ClassScopeResolutionSim, EnumNamedConstantViaScope) {
             3u);
 }
 
-// §8.23 (printed page 200-201 of the LRM): a class declared inside another
-// is a type of its own, named `Outer::Inner` from outside, whose objects have
-// their own properties and methods. `int v = 5` reading 0 and `twice()` 0 is
-// the object built with no class behind it, so the product cannot be 510 by
-// accident.
 TEST(ClassScopeResolutionSim, ModuleScopeNestedObjectPropertyAndMethod) {
   EXPECT_EQ(RunAndGet("class Outer;\n"
                       "  class Inner;\n"
@@ -276,11 +268,6 @@ TEST(ClassScopeResolutionSim, ModuleScopeNestedObjectPropertyAndMethod) {
             510u);
 }
 
-// §8.23: inside the containing class the nested class is named bare, both by
-// a method's local `Inner i = new` and by a property `Inner mine` the
-// constructor builds with `mine = new`. 8 is `i.v = 4` doubled and 5 the
-// property's initializer read through `mine`; a local or a property with no
-// class behind it answers 0 for either.
 TEST(ClassScopeResolutionSim, NestedObjectBuiltInsideAnOuterMethod) {
   EXPECT_EQ(RunAndGet("class Outer;\n"
                       "  class Inner;\n"
@@ -305,11 +292,6 @@ TEST(ClassScopeResolutionSim, NestedObjectBuiltInsideAnOuterMethod) {
             85u);
 }
 
-// §8.23's Outer/Inner example: a nested class's method has lexically scoped,
-// unqualified access to the containing class's static properties, the local
-// one included, and reaches a non-static one only through a handle. 7, 4 and
-// 9 are the three initializers; each digit that reads 0 is a lookup that did
-// not reach the containing class.
 TEST(ClassScopeResolutionSim, NestedMethodReadsTheContainingClassStatics) {
   EXPECT_EQ(RunAndGet("class Outer;\n"
                       "  int outerProp = 9;\n"
@@ -338,10 +320,6 @@ TEST(ClassScopeResolutionSim, NestedMethodReadsTheContainingClassStatics) {
             749u);
 }
 
-// §8.23's `outerStaticProp = 0` in innerMethod: the unqualified name written
-// from the nested class's method is the containing class's own storage, which
-// `Outer::outerStaticProp` then reads. 31 is neither the initializer nor a
-// write that landed on the nested object.
 TEST(ClassScopeResolutionSim, NestedMethodWritesTheContainingClassStatic) {
   EXPECT_EQ(RunAndGet("class Outer;\n"
                       "  static int outerStaticProp = 7;\n"
@@ -363,11 +341,6 @@ TEST(ClassScopeResolutionSim, NestedMethodWritesTheContainingClassStatic) {
             31u);
 }
 
-// §8.23's StringList/Node example, with a depth and a push that links each
-// new node ahead of the head: after pushing "beta" then "alpha" the head is
-// the "alpha" node at depth 2, linked to the "beta" node at depth 1. A Node
-// built with no class behind it holds neither name nor depth, reading "" and
-// 0 for every line.
 TEST(ClassScopeResolutionSim, StringListNodeExampleLinksNestedObjects) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -404,17 +377,6 @@ TEST(ClassScopeResolutionSim, StringListNodeExampleLinksNestedObjects) {
       {{"head_depth", 2u}, {"link_depth", 1u}, {"head_is_alpha", 1u}});
 }
 
-// §8.23 (printed pages 200-201 of the LRM): from outside the containing
-// class the nested class is named `Outer::Inner`, and a nested class's
-// method has unqualified access to the containing class's static
-// properties. The three tests below declare such an object as a subroutine
-// body's local -- a module function's, a task's and a class method's --
-// which CreateFuncLocalVar (eval_function_body.cpp) creates, where a
-// procedural block's declaration goes through TryExecClassVarDecl. Looked
-// up by the bare `Inner`, the local was a plain variable, `i.bump()` ran
-// nothing and `Outer::n` stayed 0; through the `Outer::Inner` key
-// LowerNestedClass registers, bump() adds 5. The shared Outer/Inner
-// prelude is one string so the three do not repeat it.
 static std::string OuterInnerBumpDesign(std::string_view rest) {
   return "class Outer;\n"
          "  static int n = 0;\n"
@@ -470,12 +432,6 @@ TEST(ClassScopeResolutionSim, ClassMethodLocalOfANestedClassIsConstructed) {
             5u);
 }
 
-// §8.23 (printed pages 200-201), §7.10 (printed 169) and §8.4 (printed 181):
-// a queue whose element type is the nested class named `Outer::Inner` holds
-// handles, so `q[0].v` reads the property of the object the element refers
-// to. The two tests share the Outer/Inner prelude and read 7, Inner's `v`
-// initializer: a queue of plain values answers 0 for `q[0].v`, and so does a
-// declaration that built no queue at all.
 static std::string OuterInnerQueueDesign(std::string_view rest) {
   return "class Outer;\n"
          "  class Inner;\n"
@@ -485,10 +441,6 @@ static std::string OuterInnerQueueDesign(std::string_view rest) {
          std::string(rest);
 }
 
-// A procedural declaration in an initial block: ExecVarDeclImpl
-// (statement_assign_decl.cpp) took `Outer::Inner q[$]` for a scalar handle
-// once DeclaredClassKey named the class, building no queue, and
-// CreateBlockQueue had flagged the queue by the bare `Inner`.
 TEST(ClassScopeResolutionSim, ProceduralQueueOfANestedClassHoldsHandles) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("module t;\n"
                                             "  int y;\n"
@@ -503,10 +455,6 @@ TEST(ClassScopeResolutionSim, ProceduralQueueOfANestedClassHoldsHandles) {
             7u);
 }
 
-// A class property of another class: ElementTypeIsClass
-// (eval_array_class_queue.cpp) asked for the bare `Inner` where the
-// declaration wrote `Outer::Inner`, so the property's queue held plain values
-// and `h.q[0].v` read 0.
 TEST(ClassScopeResolutionSim, PropertyQueueOfANestedClassHoldsHandles) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class Holder;\n"
                                             "  Outer::Inner q[$];\n"
@@ -524,13 +472,6 @@ TEST(ClassScopeResolutionSim, PropertyQueueOfANestedClassHoldsHandles) {
             7u);
 }
 
-// §7.8 (printed page 163) declares an associative array by its index type
-// whatever the element type, and §8.4 (printed 181) makes each element of
-// one declared with a class's name a handle, constructed by `new` into the
-// entry (§7.8.1). Declared in an initial block with the nested class's
-// scoped name, TryExecClassVarDecl (statement_assign_decl.cpp) took
-// `Outer::Inner aa[string]` for one scalar handle and built no array, so
-// `aa["k"] = new` constructed nothing and `aa["k"].v` read 0.
 TEST(ClassScopeResolutionSim, ProceduralAssocArrayOfANestedClassHoldsHandles) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("module t;\n"
                                             "  int y;\n"
@@ -544,13 +485,6 @@ TEST(ClassScopeResolutionSim, ProceduralAssocArrayOfANestedClassHoldsHandles) {
             7u);
 }
 
-// §7.4.2 (printed pages 153-154) declares a fixed-size array by its range
-// whatever the element type, so `Outer::Inner arr[2]` in an initial block is
-// two elements each holding a handle (§8.4, printed 181). Taken for one
-// scalar handle, `arr[0] = b` set one bit of it, and what the queue then
-// received from `arr[0]` was that bit, no handle: 97 is b's 9 then a's 7
-// read back through the queue, where the scalar's bits gave a null handle
-// and at most a's 7.
 TEST(ClassScopeResolutionSim, ProceduralFixedArrayOfANestedClassHoldsHandles) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("module t;\n"
                                             "  int y;\n"
@@ -571,13 +505,6 @@ TEST(ClassScopeResolutionSim, ProceduralFixedArrayOfANestedClassHoldsHandles) {
             97u);
 }
 
-// §8.23 (printed pages 200-201): the nested class's bare name is visible
-// throughout the containing class, so Outer's own property `Inner q[$]` is a
-// queue of Outer::Inner handles. The queue is built on its first reference,
-// here from the module's initial block, where no method of Outer is running:
-// ElementTypeIsClass (eval_array_class_queue.cpp) asked SimContext's lookup,
-// which resolves a bare nested name through the running method's class
-// alone, so the property held plain values and `o.q[0].v` read 0.
 TEST(ClassScopeResolutionSim,
      BareNestedNameQueuePropertyFirstReferencedFromAModule) {
   EXPECT_EQ(RunAndGet("class Outer;\n"
@@ -599,13 +526,6 @@ TEST(ClassScopeResolutionSim,
             7u);
 }
 
-// §8.23 (printed pages 200-201) with §8.4 (printed 181): a property of
-// another class declared with the nested class's scoped name is a handle of
-// Outer::Inner, so `x.h = new` constructs one and `x.h.v` reads its 7.
-// PropertyClassName (eval_array_class_assoc.cpp) resolved the property's
-// class by the bare `Inner`, which names no class outside Outer, so
-// TryMemberClassNewAssign declined, the generic assignment stored no object,
-// and the read answered 0.
 TEST(ClassScopeResolutionSim, HandlePropertyOfANestedClassIsConstructed) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class H;\n"
                                             "  Outer::Inner h;\n"
@@ -622,11 +542,6 @@ TEST(ClassScopeResolutionSim, HandlePropertyOfANestedClassIsConstructed) {
             7u);
 }
 
-// §7.4.2 (printed pages 153-154): the array property `Outer::Inner kids[2]`
-// holds two handles, each constructed by `new` into its element and read
-// through it. ElementsAreHandles (eval_class_array_handles.cpp) asked for the
-// bare `Inner`, so the elements were plain values: nothing was constructed
-// and `x.kids[1].v` read 0.
 TEST(ClassScopeResolutionSim, ArrayPropertyOfANestedClassHoldsHandles) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class H;\n"
                                             "  Outer::Inner kids[2];\n"
@@ -643,11 +558,6 @@ TEST(ClassScopeResolutionSim, ArrayPropertyOfANestedClassHoldsHandles) {
             7u);
 }
 
-// §8.23: inside Outer the nested class is named bare, so Outer's property
-// `Inner h` is a handle of Outer::Inner, constructed from a module by `o.h =
-// new` where no method of Outer runs. The bare name was resolved through the
-// running method's class alone, so the property named no class from the
-// module and `o.h.v` read 0.
 TEST(ClassScopeResolutionSim,
      BareNestedNameHandlePropertyConstructedFromAModule) {
   EXPECT_EQ(RunAndGet("class Outer;\n"
@@ -668,12 +578,6 @@ TEST(ClassScopeResolutionSim,
             7u);
 }
 
-// §7.8 (printed page 163) with §8.23: the associative array property
-// `Outer::Inner m[string]` of another class holds handles of the nested
-// class, constructed by `new` into an entry through the handle and read
-// through it. The property's element class was resolved by nothing -- the
-// element paths served declared arrays alone -- so `x.m["k"] = new`
-// constructed nothing and `x.m["k"].v` read 0.
 TEST(ClassScopeResolutionSim, AssocArrayPropertyOfANestedClassHoldsHandles) {
   EXPECT_EQ(RunAndGet(OuterInnerQueueDesign("class H;\n"
                                             "  Outer::Inner m[string];\n"
@@ -690,10 +594,6 @@ TEST(ClassScopeResolutionSim, AssocArrayPropertyOfANestedClassHoldsHandles) {
             7u);
 }
 
-// §8.23 with §7.2: a structure typedef a class declares is a type like any
-// other in a subroutine -- a method's return value and local named bare,
-// `S`, and a module function's named `P2::S` -- whose members, the real one
-// above bit 32 included, keep what is written to them.
 TEST(ClassScopeResolutionSim, SubroutineVariablesOfAClassStructTypedef) {
   SimFixture f;
   std::string out = RunCapture(
@@ -717,9 +617,6 @@ TEST(ClassScopeResolutionSim, SubroutineVariablesOfAClassStructTypedef) {
   EXPECT_EQ(out, "7 1.500000 9 4 5\n");
 }
 
-// §8.13 with §8.23: a static method a class inherits is called through that
-// class's scope, and runs under the level declaring it, the specialization
-// `Mem #(4)` for `E::sk()`.
 TEST(ClassScopeResolutionSim, InheritedStaticMethodThroughTheDerivedScope) {
   auto v = RunAndGet(
       "class Mem #(int K = 1);\n"
@@ -740,13 +637,6 @@ TEST(ClassScopeResolutionSim, InheritedStaticMethodThroughTheDerivedScope) {
   EXPECT_EQ(v, 54u);
 }
 
-// §8.23 makes a typedef a class declares a name of the class scope, usable
-// bare in the class, and §6.18 makes a property declared by it an object of
-// the type it names, so a method selects the members of an unpacked or a packed
-// structure property by name (§7.2.1) and $bits counts both int members. The
-// layout was asked for under the bare name, which the class's typedef is not
-// registered by, so the members read 0 and the property was the 32-bit
-// carrier.
 TEST(ClassScopeTypedefSim, PropertyOfOwnStructureTypedefSelectsMembers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class Box;\n"
@@ -770,12 +660,6 @@ TEST(ClassScopeTypedefSim, PropertyOfOwnStructureTypedefSelectsMembers) {
             "3 5 2 7 64\n");
 }
 
-// §8.13 has a derived class inherit its base's members, and §8.23 makes a
-// typedef the base declares a name of its class scope, which the derived class
-// reaches bare, so its property declared by the base's `S` holds that
-// structure: its members select by name in a method and $bits counts both int
-// members. Looked for in the derived class's declaration alone, the typedef
-// was not found, the members read 0 and the property was 32 bits.
 TEST(ClassScopeTypedefSim, PropertyOfBaseClassStructureTypedefSelectsMembers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class Base;\n"

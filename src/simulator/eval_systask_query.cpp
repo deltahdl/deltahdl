@@ -27,9 +27,6 @@
 
 namespace delta {
 
-// Build an all-x integer result. §20.7 calls for 'x whenever a query has no
-// well-defined answer (a dimensionless first argument or an out-of-range
-// dimension index).
 static Logic4Vec MakeUnknownInt(Arena& arena, uint32_t width) {
   auto vec = MakeLogic4Vec(arena, width);
   uint64_t mask = (width < 64) ? ((uint64_t{1} << width) - 1) : ~uint64_t{0};
@@ -40,7 +37,6 @@ static Logic4Vec MakeUnknownInt(Arena& arena, uint32_t width) {
   return vec;
 }
 
-// Bounds of a single array dimension, as the array query functions report them.
 struct QueryDimBounds {
   int64_t left = 0;
   int64_t right = 0;
@@ -48,27 +44,19 @@ struct QueryDimBounds {
   int64_t high = 0;
   int64_t increment = 1;
   int64_t size = 0;
-  bool low_high_unknown = false;  // $low/$high are 'x for an empty assoc array
+  bool low_high_unknown = false;
 };
 
-// Classification of the first argument's outermost (slowest varying)
-// dimension, used to compute the array query results.
 struct QueryArgInfo {
   AssocArrayObject* assoc = nullptr;
   QueueObject* queue = nullptr;
   const ArrayInfo* arr = nullptr;
   bool dynamic_outer = false;
   bool has_unpacked = false;
-  uint32_t elem_width = 32;  // packed element dimension [n-1:0]
+  uint32_t elem_width = 32;
   bool is_real = false;
   bool is_string = false;
-  // §7.4.4: the packed dimensions of an element, outermost first and as
-  // declared, each a dimension of its own; empty where elem_width describes
-  // the one there is.
   std::vector<PackedRange> packed_dims;
-  // §20.7.1: for a fixed-size array whose elements are dynamic arrays or
-  // queues, `int a[3][][5]`, its first element's, whose shape gives the
-  // dimensions past the fixed one; null for any other argument.
   QueueObject* element_queue = nullptr;
 };
 
@@ -78,8 +66,6 @@ std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena) {
   if (arg0->kind != ExprKind::kMemberAccess || arg0->is_scope_resolution) {
     return {};
   }
-  // §25.9: a member of the instance a virtual interface represents, named by
-  // its full path, `top.i1.mem` for `vif.mem`.
   if (arg0->lhs != nullptr && arg0->rhs != nullptr) {
     VirtualInterfaceBase vi =
         ResolveVirtualInterfaceBaseExpr(arg0->lhs, ctx, arena);
@@ -90,16 +76,12 @@ std::string ArrayArgPath(const Expr* arg0, SimContext& ctx, Arena& arena) {
   return FlattenHierPath(arg0);
 }
 
-// §20.7 with §8.5: describes into `class_array` the dimension of the unpacked
-// array class property `arg0` names, answering whether it names one.
 static bool DescribeClassArray(const Expr* arg0, SimContext& ctx, Arena& arena,
                                ArrayInfo& class_array) {
   ClassArrayRef ref;
   if (arg0 == nullptr || !ResolveClassArray(arg0, ctx, arena, ref)) {
     return false;
   }
-  // §7.4.2: a property of more than one dimension is described whole by
-  // DescribeMultiDimProperty; a subarray of it, `h.g[1]`, is one dimension.
   if (ref.dim == 0 && ref.prop->dim_sizes.size() >= 2) return false;
   class_array.lo = static_cast<uint32_t>(ref.lo);
   class_array.size = ref.size;
@@ -110,10 +92,6 @@ static bool DescribeClassArray(const Expr* arg0, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §20.7 with §7.4.2 and §8.5: describes into `class_array` the unpacked
-// dimensions of the property with more than one that `arg0` names -- bare
-// in a method of the object, where no local shadows it, or through a handle
-// -- answering whether it names one.
 static bool DescribeMultiDimProperty(const Expr* arg0, SimContext& ctx,
                                      Arena& arena, ArrayInfo& class_array) {
   const ClassObject* obj = nullptr;
@@ -138,9 +116,6 @@ static bool DescribeMultiDimProperty(const Expr* arg0, SimContext& ctx,
   return true;
 }
 
-// §20.7 with §7.2 and §7.4.2: describes into `class_array` the unpacked array
-// member of a structure `arg0` names, `m.v`, `r.v` bare in a method or
-// `h.r.v`, from the structure's layout, answering whether it names one.
 static bool DescribeStructArrayMember(const Expr* arg0, SimContext& ctx,
                                       ArrayInfo& class_array) {
   const StructFieldInfo* field = ResolveStructArrayMember(arg0, ctx);
@@ -154,11 +129,6 @@ static bool DescribeStructArrayMember(const Expr* arg0, SimContext& ctx,
   return true;
 }
 
-// The container `arg0` names where no declared array answers its name: a
-// queue property, bare in a method or `h.q` through a handle, the queue its
-// object holds (§7.10 with §8.5); a fixed, dynamic or multidimensional array
-// property; or a structure's unpacked array member -- the last three
-// described into `class_array`.
 static void ClassifyUnnamedArray(const Expr* arg0, SimContext& ctx,
                                  Arena& arena, QueryArgInfo& info,
                                  ArrayInfo& class_array) {
@@ -171,11 +141,6 @@ static void ClassifyUnnamedArray(const Expr* arg0, SimContext& ctx,
   }
 }
 
-// §20.7 with §7.4.4: the packed dimensions the argument `arg0` names, or an
-// element of the fixed-size array it names, declares, as declared and
-// outermost first, `[3:0]` then `[7:0]` for `bit [3:0][7:0] joe [1:10]` and
-// `[0:3]` for `logic [0:3] u`; empty where it declares none, and for a queue
-// or an associative array.
 static std::vector<PackedRange> PackedDimsOf(const Expr* arg0, Arena& arena,
                                              const QueryArgInfo& info,
                                              SimContext& ctx) {
@@ -193,9 +158,6 @@ static std::vector<PackedRange> PackedDimsOf(const Expr* arg0, Arena& arena,
   return dims;
 }
 
-// §20.7: an integer type with a predefined width is a packed array of one
-// `[n-1:0]` dimension, and a single-bit vector type a simple bit vector of one
-// bit; 0 for a name that is no integral type keyword.
 static uint32_t IntegralKeywordBits(std::string_view name) {
   if (name == "bit" || name == "logic" || name == "reg") return 1;
   if (name == "byte") return 8;
@@ -205,10 +167,6 @@ static uint32_t IntegralKeywordBits(std::string_view name) {
   return 0;
 }
 
-// §20.7 with §6.18: the packed dimensions of the data type a typedef name, or
-// an integral type keyword, stands for, as declared and outermost first --
-// `[16:1]` for `typedef logic [16:1] Word` -- the typedef followed through
-// any name it renames; empty where `name` names no such type.
 static std::vector<PackedRange> TypeNameDims(std::string_view name,
                                              SimContext& ctx, Arena& arena) {
   if (uint32_t bits = IntegralKeywordBits(name); bits > 0) {
@@ -238,14 +196,6 @@ static std::vector<PackedRange> TypeNameDims(std::string_view name,
   return {};
 }
 
-// Resolve the first argument to an unpacked container (if any) and determine
-// the width/kind of its packed element dimension. §20.7: a string is a nonarray
-// type equivalent to a simple bit vector (one packed dimension); a real type
-// contributes no packed dimension.
-//
-// The element of the container `info` found for `arg0`: its width, or, where
-// `arg0` names no container, whether it is a string or a real and the width
-// of its value.
 static void DescribeElement(const Expr* arg0, SimContext& ctx, Arena& arena,
                             QueryArgInfo& info) {
   if (info.assoc) {
@@ -264,12 +214,6 @@ static void DescribeElement(const Expr* arg0, SimContext& ctx, Arena& arena,
   }
 }
 
-// §20.7 with §8.5: an unpacked array property of a class object, named bare in
-// one of its methods or through a handle, is an array too, a queue one
-// included, and so is an unpacked array member of a structure. A fixed or
-// dynamic one's dimension, a multidimensional one's dimensions, or the
-// member's, are described into `class_array`, which the caller keeps for as
-// long as it reads the result.
 static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
                                      Arena& arena, ArrayInfo& class_array) {
   QueryArgInfo info;
@@ -293,8 +237,6 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
       info.assoc != nullptr || info.queue != nullptr || info.arr != nullptr;
 
   info.packed_dims = PackedDimsOf(arg0, arena, info, ctx);
-  // §20.7: the argument may be a data type, a type keyword or a typedef name
-  // naming no variable.
   if (!info.has_unpacked && arg0 != nullptr &&
       arg0->kind == ExprKind::kIdentifier &&
       ctx.FindVariable(arg0->text) == nullptr) {
@@ -305,9 +247,6 @@ static QueryArgInfo ClassifyQueryArg(const Expr* arg0, SimContext& ctx,
   return info;
 }
 
-// Bounds for an associative array dimension with an integral index type.
-// §20.7: $right is the highest index value the index type can hold, which for
-// a signed type is its largest positive value, 2**31-1 for `int`.
 static QueryDimBounds AssocDimBounds(AssocArrayObject* assoc) {
   QueryDimBounds q;
   uint32_t iw = assoc->index_width ? assoc->index_width : 32;
@@ -327,7 +266,6 @@ static QueryDimBounds AssocDimBounds(AssocArrayObject* assoc) {
   return q;
 }
 
-// Bounds for a fixed-size unpacked dimension with declared bounds.
 static QueryDimBounds FixedUnpackedDimBounds(const ArrayInfo* arr) {
   QueryDimBounds q;
   int64_t lo = arr->lo;
@@ -341,11 +279,6 @@ static QueryDimBounds FixedUnpackedDimBounds(const ArrayInfo* arr) {
   return q;
 }
 
-// Bounds for a queue or dynamic array dimension: indices run 0 .. size-1,
-// descending.
-//
-// §7.4.2: a queue keeping an element that is a fixed-size array, `q[0]` of
-// `int q[$][1:3]`, answers that array's declared bounds.
 static QueryDimBounds DynamicDimBounds(const QueryArgInfo& info) {
   if (info.queue != nullptr &&
       (info.queue->index_lo != 0 || info.queue->index_descending)) {
@@ -360,7 +293,7 @@ static QueryDimBounds DynamicDimBounds(const QueryArgInfo& info) {
                       ? static_cast<int64_t>(info.queue->elements.size())
                       : static_cast<int64_t>(info.arr ? info.arr->size : 0);
   q.left = 0;
-  q.right = count - 1;  // -1 when the dimension is currently empty
+  q.right = count - 1;
   q.low = 0;
   q.high = count - 1;
   q.increment = -1;
@@ -368,13 +301,6 @@ static QueryDimBounds DynamicDimBounds(const QueryArgInfo& info) {
   return q;
 }
 
-// Bounds for the dim-th unpacked dimension of a multidimensional fixed array,
-// where dim is 1-based and dimension 1 is the slowest varying (outermost)
-// dimension. dim_los/dim_sizes are stored outermost-first, so index dim-1 names
-// dimension dim. Only the outermost dimension carries a tracked direction; the
-// inner dimensions' declared extents are recorded low-first, so
-// $size/$low/$high are exact for every dimension and $left/$right/$increment
-// follow the ascending order in which those inner extents are held.
 static QueryDimBounds MultiDimUnpackedDimBounds(const ArrayInfo* arr,
                                                 uint32_t dim) {
   QueryDimBounds q;
@@ -390,7 +316,6 @@ static QueryDimBounds MultiDimUnpackedDimBounds(const ArrayInfo* arr,
   return q;
 }
 
-// Bounds for the packed element dimension [elem_width-1 : 0].
 static QueryDimBounds PackedElemDimBounds(uint32_t elem_width) {
   QueryDimBounds q;
   q.left = static_cast<int64_t>(elem_width) - 1;
@@ -402,7 +327,6 @@ static QueryDimBounds PackedElemDimBounds(uint32_t elem_width) {
   return q;
 }
 
-// §7.4.4: bounds for one of several packed dimensions, as declared.
 static QueryDimBounds PackedDimBounds(const PackedRange& range) {
   QueryDimBounds q;
   q.left = range.left;
@@ -414,22 +338,12 @@ static QueryDimBounds PackedDimBounds(const PackedRange& range) {
   return q;
 }
 
-// §20.7.1: the unpacked dimensions the dynamic array or queue `q` holds, its
-// own and, where its elements are arrays, theirs: a fixed-size element's
-// dimension and those after it, or one more for each level of queues beneath.
 static uint32_t QueueDimCount(const QueueObject* q) {
   if (q->element_array_size > 0)
     return 2 + static_cast<uint32_t>(q->element_inner_dims.size());
   return q->elements_are_queues ? 2 + q->nested_queue_levels : 1;
 }
 
-// The number of unpacked dimensions the first argument contributes. A fixed
-// multidimensional array carries every extent in dim_sizes; every other
-// unpacked container (single fixed dimension, queue, dynamic array, or
-// associative array) contributes exactly one.
-//
-// §7.10 with §7.4: a queue or dynamic array whose elements are fixed-size
-// arrays, `int q[$][3]`, contributes the element's dimension as its second.
 static uint32_t UnpackedDimCount(const QueryArgInfo& info) {
   if (info.element_queue != nullptr)
     return 1 + QueueDimCount(info.element_queue);
@@ -439,8 +353,6 @@ static uint32_t UnpackedDimCount(const QueryArgInfo& info) {
   return info.has_unpacked ? 1 : 0;
 }
 
-// Bounds for the fixed-size dimension of the elements of the queue or dynamic
-// array `q`, `[3]` of `int q[$][3]`, numbered from 0 up.
 static QueryDimBounds ElementArrayDimBounds(const QueueObject* q) {
   ArrayInfo element;
   element.size = q->element_array_size;
@@ -449,10 +361,6 @@ static QueryDimBounds ElementArrayDimBounds(const QueueObject* q) {
   return FixedUnpackedDimBounds(&element);
 }
 
-// §20.7 with §7.4.4: the unpacked dimensions of the queue or dynamic array
-// `q`, outermost first: its own, then, where its elements are fixed-size
-// arrays, theirs as declared. A dimension of queues past the first, which a
-// query may not name (§20.7.1), reads as the elements' first.
 static std::vector<QueryDimBounds> QueueShapeDims(QueueObject* q) {
   QueryArgInfo queue;
   queue.queue = q;
@@ -468,16 +376,11 @@ static std::vector<QueryDimBounds> QueueShapeDims(QueueObject* q) {
   return dims;
 }
 
-// The dim-th of `dims`, the last for a dim past them.
 static QueryDimBounds DimOf(const std::vector<QueryDimBounds>& dims,
                             uint32_t dim) {
   return dims[std::min<size_t>(dim - 1, dims.size() - 1)];
 }
 
-// §20.7.1: the dim-th unpacked dimension of a fixed-size array whose elements
-// are dynamic arrays, `int a[3][][5]`: its own first, then the dimensions of
-// its first element's queue (QueueShapeDims). A query naming the dynamic
-// dimension is an error the elaborator reports (§20.7.1's `$size(a, 2)`).
 static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
                                                  uint32_t dim) {
   std::vector<QueryDimBounds> dims = QueueShapeDims(info.element_queue);
@@ -485,9 +388,6 @@ static QueryDimBounds ElementQueueShapeDimBounds(const QueryArgInfo& info,
   return DimOf(dims, dim);
 }
 
-// The bounds of the dim-th unpacked dimension, which the argument has: one of
-// an associative array, a queue or dynamic array, or a fixed-size array, the
-// last in `info.arr` when none of the others answers.
 static QueryDimBounds UnpackedQueryDimBounds(const QueryArgInfo& info,
                                              uint32_t dim) {
   if (info.element_queue != nullptr)
@@ -500,10 +400,6 @@ static QueryDimBounds UnpackedQueryDimBounds(const QueryArgInfo& info,
   return FixedUnpackedDimBounds(info.arr);
 }
 
-// Compute the bounds reported for the queried dimension. Dimensions are
-// numbered slowest-varying first: dimensions 1..unpacked_dims are the unpacked
-// dimensions (outermost first) and the packed element dimension, when present,
-// is the next (last) dimension.
 static QueryDimBounds ComputeQueryDimBounds(const QueryArgInfo& info,
                                             uint32_t dim,
                                             uint32_t unpacked_dims) {
@@ -515,10 +411,6 @@ static QueryDimBounds ComputeQueryDimBounds(const QueryArgInfo& info,
   return PackedElemDimBounds(info.elem_width);
 }
 
-// Count the packed and unpacked dimensions contributed by the first argument.
-// A simple bit-vector type (string included) contributes one packed dimension;
-// a real (or any other nonvector) type contributes none. An array contributes
-// one unpacked dimension per declared unpacked extent.
 static uint32_t CountTotalDims(const QueryArgInfo& info,
                                uint32_t& unpacked_dims) {
   uint32_t packed_dims =
@@ -529,11 +421,8 @@ static uint32_t CountTotalDims(const QueryArgInfo& info,
   return packed_dims + unpacked_dims;
 }
 
-// Produce the integer result for a per-dimension query ($left/$right/...).
 static Logic4Vec SelectDimQueryResult(std::string_view name,
                                       const QueryDimBounds& q, Arena& arena) {
-  // §20.7: each function returns an integer, which is signed, so the -1 of
-  // $increment for an ascending dimension reads -1 and not 4294967295.
   auto as_int = [&](int64_t v) {
     Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(v));
     out.is_signed = true;
@@ -546,14 +435,13 @@ static Logic4Vec SelectDimQueryResult(std::string_view name,
     return q.low_high_unknown ? MakeUnknownInt(arena, 32) : as_int(q.low);
   if (name == "$high")
     return q.low_high_unknown ? MakeUnknownInt(arena, 32) : as_int(q.high);
-  return as_int(q.size);  // $size
+  return as_int(q.size);
 }
 
 Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                 std::string_view name) {
   const Expr* arg0 = expr->args.empty() ? nullptr : expr->args[0];
 
-  // Classify the first argument's outermost (slowest varying) dimension.
   ArrayInfo class_array;
   QueryArgInfo info = ClassifyQueryArg(arg0, ctx, arena, class_array);
 
@@ -564,23 +452,16 @@ Logic4Vec EvalArrayQuerySysCall(const Expr* expr, SimContext& ctx, Arena& arena,
   if (name == "$unpacked_dimensions")
     return MakeLogic4VecVal(arena, 32, unpacked_dims);
 
-  // §20.7: 'x when the first argument has no dimensions ($dimensions would be
-  // 0) or when the optional dimension index is out of range.
   if (total_dims == 0) return MakeUnknownInt(arena, 32);
   uint32_t dim = 1;
   if (expr->args.size() > 1)
     dim = static_cast<uint32_t>(EvalExpr(expr->args[1], ctx, arena).ToUint64());
   if (dim < 1 || dim > total_dims) return MakeUnknownInt(arena, 32);
 
-  // Dimensions are numbered slowest-varying first: the unpacked dimensions
-  // (outermost = dimension 1) precede the packed element dimension, which is
-  // the last dimension when the element is a bit vector.
   QueryDimBounds q = ComputeQueryDimBounds(info, dim, unpacked_dims);
   return SelectDimQueryResult(name, q, arena);
 }
 
-// The element count of the unpacked dimension `dim`, `[36:1]` or `[3]`; 0
-// for a dynamic one or one of no positive size.
 static int64_t FixedDimCount(const Expr* dim, SimContext& ctx, Arena& arena) {
   if (dim == nullptr) return 0;
   auto bound = [&](const Expr* e) {
@@ -598,8 +479,6 @@ uint64_t TypedefBits(std::string_view name, SimContext& ctx, Arena& arena,
   if (uint32_t bits = IntegralKeywordBits(name); bits > 0) return bits;
   const ModuleItem* item = ctx.FindTypedefItem(name);
   if (item == nullptr || item->unpacked_dims.empty() || depth > 8) {
-    // §20.6.2 with §6.18: a typedef's width as its declared type folds now,
-    // a range naming a parameter included, or else as recorded.
     uint32_t width =
         item != nullptr ? DeclaredTypeWidth(item->typedef_type, ctx) : 0;
     return width > 0 ? width : ctx.FindTypeWidth(name);

@@ -23,9 +23,6 @@ using namespace delta;
 
 namespace {
 
-// --- What a resolution function may do with its argument (§6.6.7) ---
-
-// The function shall neither write any part of its driver array nor resize it.
 TEST(NettypeElaboration, ResolutionFunctionWritingItsDriverArrayRejected) {
   ElabFixture f;
   Elaborate(
@@ -61,10 +58,6 @@ TEST(NettypeElaboration, ResolutionFunctionResizingItsDriverArrayRejected) {
                             4, "6.6.7"));
 }
 
-// The function shall have no side effects, and a write to a variable it does
-// not declare is one: the count would depend on how often the simulator
-// resolves the net. The write is reported whether it is an increment or one
-// name of a concatenation on an assignment's left side.
 TEST(NettypeElaboration, ResolutionFunctionWritingAModuleVariableRejected) {
   ElabFixture f;
   Elaborate(
@@ -90,9 +83,6 @@ TEST(NettypeElaboration, ResolutionFunctionWritingAModuleVariableRejected) {
                             6, "6.6.7"));
 }
 
-// The counterpart, the clause's own Tsum: it writes its local result through
-// the function's name and a member of it, inside a foreach over the drivers,
-// and reads the driver array alone. None of that is a write the rule forbids.
 TEST(NettypeElaboration, ResolutionFunctionWritingOnlyItsOwnResultAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -111,8 +101,6 @@ TEST(NettypeElaboration, ResolutionFunctionWritingOnlyItsOwnResultAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A nonblocking assignment and a decrement write as an assignment and an
-// increment do, so either one to a module variable is a side effect.
 TEST(NettypeElaboration,
      ResolutionFunctionNonblockingOrDecrementWriteRejected) {
   ElabFixture f;
@@ -135,9 +123,6 @@ TEST(NettypeElaboration,
   }
 }
 
-// A call written as a statement writes nothing the rule names unless it is
-// one of the methods that change an array in place: a system task, a plain or
-// a package-scoped subroutine, and a method of another name all pass.
 TEST(NettypeElaboration, ResolutionFunctionCallingWithoutWritingAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -167,8 +152,6 @@ TEST(NettypeElaboration, ResolutionFunctionCallingWithoutWritingAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A function with no argument has no driver array whose writes the body could
-// be judged by; the count of its arguments is what is reported.
 TEST(NettypeElaboration, ResolutionFunctionWithoutAnArgumentReportsItsCount) {
   ElabFixture f;
   Elaborate(
@@ -183,10 +166,6 @@ TEST(NettypeElaboration, ResolutionFunctionWithoutAnArgumentReportsItsCount) {
                             "shall take a single input argument", 5, "6.6.7"));
 }
 
-// A write through a package, a class scope, `$unit` or `$root` reaches
-// something outside the function whatever the function declares, so each one
-// is a side effect, named as it is written. The local `u` does not hide
-// `$unit::u`.
 TEST(NettypeElaboration, ResolutionFunctionWritingThroughAScopeRejected) {
   ElabFixture f;
   Elaborate(
@@ -226,14 +205,6 @@ TEST(NettypeElaboration, ResolutionFunctionWritingThroughAScopeRejected) {
   }
 }
 
-// --- Where a nettype may be named (§6.6.7) ---
-
-// A nettype may be used only to declare a net, so it is refused as the type of
-// a variable written with `var` or declared in a procedural block, of a
-// structure member at any depth, of a function's return or a subroutine's
-// argument, of a parameter in the body or the header, and of a cast. A net
-// declared with it, a member of a package's type of the same name and a size
-// cast are no such uses.
 TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -288,11 +259,6 @@ TEST(NettypeElaboration, NettypeNamedAsTheTypeOfAnythingButANetRejected) {
   }
 }
 
-// A module-scope declaration written with `const` or a lifetime is a data
-// declaration, so naming a nettype in one declares a variable, as `var` does.
-// Inside a class the nettype is refused as a property's type, through a
-// method, a typedef and a nested class alike, while a property of another
-// type is accepted.
 TEST(NettypeElaboration, NettypeNamedInAConstStaticOrClassDeclarationRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -331,11 +297,6 @@ TEST(NettypeElaboration, NettypeNamedInAConstStaticOrClassDeclarationRejected) {
                              "6.6.7"));
 }
 
-// The compilation unit and a package are scopes no module's elaboration
-// reaches, and a nettype is held to nets in them as in a module: refused as a
-// structure member's, a variable's, a function's return, a class property's
-// and a parameter's type, while a net declared with it, and a variable of
-// another type, are accepted. Each scope is judged by the nettypes it declares.
 TEST(NettypeElaboration, NettypeNamedAtUnitOrPackageScopeRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -384,12 +345,6 @@ TEST(NettypeElaboration, NettypeNamedAtUnitOrPackageScopeRejected) {
   }
 }
 
-// --- A nettype's type or source named through a package (§6.6.7) ---
-
-// A.2.2.1 lets a nettype's data type be written through a package, and the
-// name means the type that package declares and no same-named one elsewhere:
-// P's T is a structure of a real, which §6.6.7 admits, though the compilation
-// unit declares a class T, which it would not (#7596).
 TEST(NettypeElaboration, NettypeOfAPackageTypeIsJudgedAsThePackagesType) {
   ElabFixture f;
   Elaborate(
@@ -405,9 +360,6 @@ TEST(NettypeElaboration, NettypeOfAPackageTypeIsJudgedAsThePackagesType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same reading rejects what the package declares: P's C is a class and
-// P's DA a dynamic array, neither of which §6.6.7 admits, though nothing else
-// in the design is named C or DA (#7596).
 TEST(NettypeElaboration, NettypeOfAPackageClassOrDynamicArrayRejected) {
   ElabFixture f;
   Elaborate(
@@ -432,11 +384,6 @@ TEST(NettypeElaboration, NettypeOfAPackageClassOrDynamicArrayRejected) {
   }
 }
 
-// A.2.1.3's renaming form may name its source through a package, and the new
-// name is that package's nettype: pnt resolves through P's pres, though the
-// module declares an nt of its own resolved by mres, and under §6.22.6 pnt
-// matches P's nt alone, so a pass switch joining a net of pnt to one of the
-// module's nt joins two different nettypes, which §28.8 reports (#7597).
 TEST(NettypeElaboration, NettypeRenamingAPackagesNettypeIsThatNettype) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -467,10 +414,6 @@ TEST(NettypeElaboration, NettypeRenamingAPackagesNettypeIsThatNettype) {
                             15, "28.8"));
 }
 
-// A package's declarations see each other by their bare names, so P's nt2,
-// renaming P's nt, resolves through P's pres, as a module's nettype renaming
-// nt2 through P does; P's tn, declared over P's typedef T, is a nettype of its
-// own, with no resolution function (#7597).
 TEST(NettypeElaboration, NettypeRenamingWithinAPackageIsReachedThroughIt) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -500,10 +443,6 @@ TEST(NettypeElaboration, NettypeRenamingWithinAPackageIsReachedThroughIt) {
   EXPECT_EQ(w->resolve_func, "");
 }
 
-// A declaration naming a package's nettype through the package declares a net
-// of that nettype: r is a net of P's rnt, and the real it carries is the
-// nettype's data type, which §6.7.1's rule for a built-in net's data type does
-// not judge (#7600).
 TEST(NettypeElaboration, NetOfAPackageScopedNettypeIsANetOfThatNettype) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -522,11 +461,6 @@ TEST(NettypeElaboration, NetOfAPackageScopedNettypeIsANetOfThatNettype) {
   EXPECT_EQ(net->nettype_name, "P::rnt");
 }
 
-// A nettype written through its package, or through `$unit`, is the nettype
-// it names wherever it is written, so naming one as the type of anything but a
-// net is reported as naming it bare is, under the name it is written with: a
-// structure member, a function's return and argument, a parameter, a class
-// property, a procedural variable and a cast (#7601).
 TEST(NettypeElaboration,
      NettypeWrittenThroughAScopeNamedAsANonNetTypeRejected) {
   ElabFixture f;
@@ -583,10 +517,6 @@ TEST(NettypeElaboration,
   }
 }
 
-// The same report at the compilation unit's scope and in another package, which
-// reach P's nettype through P as a module does: a member of the unit's
-// structure, the return of its function, its class's property, and a parameter
-// of package Q (#7601).
 TEST(NettypeElaboration, NettypeWrittenThroughAPackageAtUnitScopeRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -619,10 +549,6 @@ TEST(NettypeElaboration, NettypeWrittenThroughAPackageAtUnitScopeRejected) {
   }
 }
 
-// A.2.8 lets a block or a subroutine body declare a nettype among its items,
-// and §6.6.7's list of the data types a nettype may name holds wherever one is
-// declared: a string and an event are refused in an initial block and in a
-// function body, and the logic vector beside them is not.
 TEST(NettypeElaboration, BlockNettypeIsHeldToTheLegalDataTypes) {
   ElabFixture f;
   ElaborateSrc(
@@ -651,9 +577,6 @@ TEST(NettypeElaboration, BlockNettypeIsHeldToTheLegalDataTypes) {
                              "6.6.7"));
 }
 
-// A.1.9 makes a class_property a data_declaration, a nettype among them, and
-// §6.6.7's list holds there too: a string in a class of the compilation unit
-// and a chandle in a class a module declares are refused, and a real is not.
 TEST(NettypeElaboration, ClassNettypeIsHeldToTheLegalDataTypes) {
   ElabFixture f;
   ElaborateSrc(
@@ -682,10 +605,6 @@ TEST(NettypeElaboration, ClassNettypeIsHeldToTheLegalDataTypes) {
                              "6.6.7"));
 }
 
-// A nettype a begin-end block, a fork-join block or a task body declares is a
-// nettype for the declarations after it there and in the blocks inside it, and
-// a procedural block declares variables alone, so each declaration below
-// names a nettype without declaring a net.
 TEST(NettypeElaboration, BlockNettypeNamedAsAVariablesTypeIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -722,9 +641,6 @@ TEST(NettypeElaboration, BlockNettypeNamedAsAVariablesTypeIsReported) {
   }
 }
 
-// A nettype a class declares is a nettype for the class's properties, for the
-// variables its methods declare and for a class nested in it, none of which
-// declares a net.
 TEST(NettypeElaboration, ClassNettypeNamedAsAPropertysTypeIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -753,13 +669,6 @@ TEST(NettypeElaboration, ClassNettypeNamedAsAPropertysTypeIsReported) {
   }
 }
 
-// The walk over a subroutine body steps over a null statement on its way to
-// the body's nettypes and the declarations after them.
-// Parser::ParseSubroutineBody keeps whatever Parser::ParseStmt answers, null
-// included, and no source the tests parse has it answer null, so the body is
-// built here. The module declares no nettype of its own, which leaves the
-// body's the only one, and the statements carry no source location, so the
-// report stands at line 0.
 TEST(NettypeElaboration, SubroutineBodyNettypeScanStepsOverANullStatement) {
   ElabFixture f;
   auto* nettype = f.arena.Create<ModuleItem>();
@@ -788,10 +697,6 @@ TEST(NettypeElaboration, SubroutineBodyNettypeScanStepsOverANullStatement) {
                             0, "6.6.7"));
 }
 
-// A.2.2.1 lets a data_type name a type through a class_scope, so `C::nt` names
-// the nettype class C declares, and a block variable, a cast, a function's
-// return and argument, and a property of another class each name it without
-// declaring a net.
 TEST(NettypeElaboration, ClassNettypeNamedThroughItsScopeIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -828,11 +733,6 @@ TEST(NettypeElaboration, ClassNettypeNamedThroughItsScopeIsReported) {
   }
 }
 
-// A.2.1.3 writes a net of a nettype with the nettype's bare name, so an item
-// whose type names a class's nettype through the class's scope declares a
-// variable among a package's, the unit's or a module's items, written with
-// `var` or not, and a package's such variable is no net with an implicit
-// continuous assignment.
 TEST(NettypeElaboration, ItemNamingAClassNettypeThroughItsScopeIsAVariable) {
   ElabFixture f;
   ElaborateSrc(

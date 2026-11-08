@@ -7,8 +7,6 @@
 
 namespace delta {
 
-// What keeps a name in `pool`, answering the kept copy, which lives as long
-// as `pool` does: the keeper of the names VpiContext gives its objects.
 VpiNameKeeper VpiPoolKeeper(std::deque<std::string>& pool);
 
 }  // namespace delta

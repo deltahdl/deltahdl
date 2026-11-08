@@ -35,7 +35,6 @@ namespace delta {
 
 namespace {
 
-// §6.11, §6.12 and §6.17: the data type a type keyword names alone.
 struct KeywordType {
   TokenKind keyword;
   DataTypeKind type;
@@ -57,11 +56,6 @@ constexpr KeywordType kKeywordTypes[] = {
     {TokenKind::kKwEvent, DataTypeKind::kEvent},
 };
 
-// The data type `keyword` names alone. `keyword` is a formal's or a local
-// variable's type keyword other than sequence or property, which
-// kKeywordTypes holds every one of: the parser rejects chandle, the one other
-// keyword it reads there, as a formal's type (§16.8) and a local variable's
-// (§16.10).
 DataTypeKind KeywordDataType(TokenKind keyword) {
   return std::find_if(std::begin(kKeywordTypes), std::end(kKeywordTypes),
                       [keyword](const KeywordType& entry) {
@@ -70,10 +64,6 @@ DataTypeKind KeywordDataType(TokenKind keyword) {
       ->type;
 }
 
-// §37.51 detail 3 with §37.25: the kind of typespec a property formal declared
-// with the type keyword `keyword` reaches. §16.12 adds sequence and property
-// to the data types a formal may be declared with; §6.12 makes realtime a
-// synonym for real.
 int FormalTypespecKind(TokenKind keyword) {
   switch (keyword) {
     case TokenKind::kKwSequence:
@@ -89,10 +79,6 @@ int FormalTypespecKind(TokenKind keyword) {
   }
 }
 
-// §37.25: the typespec the typedef `name` declares in the scopes from
-// `holder` out to the instance, or else among the compilation unit's, or else
-// in a package an import of the module makes it visible from; null where none
-// of them declares one.
 VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
                            const VpiPropertyDeclSite& at) {
   for (const VpiObject* scope = holder; scope != nullptr;
@@ -107,9 +93,6 @@ VpiObject* TypedefTypespec(const VpiObject* holder, std::string_view name,
              : VpiImportedTypespec(name, at.imports, at.unit_typespecs);
 }
 
-// §37.25 with §37.31: a class typespec of the class `name`, hung from
-// `formal`, reaching the class defn of that name a scope from the property out
-// to the instance declares, where one does.
 VpiObject* ClassTypespec(VpiObject* formal, std::string_view name,
                          const VpiAttachBuild& build) {
   VpiObject* typespec = build.alloc();
@@ -128,20 +111,12 @@ VpiObject* ClassTypespec(VpiObject* formal, std::string_view name,
   return typespec;
 }
 
-// §37.51 detail 3 with §37.25: the typespec of the packed type the formal
-// `index` of `decl` is declared with, hung from `formal`: the one the typedef
-// it names declares, which other objects of that type share (§37.17), a
-// class typespec where it names a class (§16.8), or one of the type's own,
-// reaching a range per packed dimension it was written with (§37.22); null
-// for an untyped formal.
 VpiObject* FormalPackedTypespec(const ModuleItem& decl, size_t index,
                                 VpiObject* formal,
                                 const VpiPropertyDeclSite& at,
                                 const VpiAttachBuild& build) {
   const DataType* type = decl.prop_formal_types[index];
   if (type != nullptr && type->kind == DataTypeKind::kNamed) {
-    // §26.3: a package's typedefs are answered among the compilation unit's
-    // as pk::name, which a name written through its package, pk::t, matches.
     const std::string kWritten = type->scope_name.empty()
                                      ? std::string(type->type_name)
                                      : std::string(type->scope_name) +
@@ -167,10 +142,6 @@ VpiObject* FormalPackedTypespec(const ModuleItem& decl, size_t index,
   return typespec;
 }
 
-// §37.25 detail 2 with §7.8: the typespec of the index type an associative
-// dimension of the formal `formal` writes as `written`: a keyword's own, left
-// for the array typespec to hang from itself, or the one a typedef of that
-// name declares where the property stands; none for the wildcard.
 VpiObject* FormalIndexTypespec(std::string_view written,
                                const VpiObject* formal,
                                const VpiPropertyDeclSite& at,
@@ -183,11 +154,6 @@ VpiObject* FormalIndexTypespec(std::string_view written,
   return TypedefTypespec(formal->parent, written, at);
 }
 
-// §37.51 detail 3 with §37.25 detail 8: the typespec the formal `index` of
-// `decl` is declared with, hung from `formal`: its packed type's, or, where
-// the class-scoped typedef it names writes unpacked dimensions (§7.4.4), an
-// unnamed array typespec ranging over them whose element typespec is the
-// packed type's, an associative one reaching its index type's (detail 2).
 void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
@@ -205,11 +171,6 @@ void MakeFormalTypespec(const ModuleItem& decl, size_t index, VpiObject* formal,
   formal->children.push_back(shapes.Unnamed(formal, dims, typespec));
 }
 
-// §37.51: the prop formal decl the formal `index` of `decl` stands as, hung
-// from `property`: named, of no direction unless it is a local variable
-// argument (detail 5), reaching the typespec of the type it is declared with
-// (detail 3) and the default value it declares, where it declares one,
-// through vpiExpr (detail 4).
 void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
                     const VpiPropertyDeclSite& at, const VpiStmtBuild& with) {
   VpiObject* formal = with.build.alloc();
@@ -223,10 +184,6 @@ void MakePropFormal(const ModuleItem& decl, size_t index, VpiObject* property,
   property->children.push_back(formal);
 }
 
-// §37.53: the vpiDirection of the formal `index` of the sequence `decl`:
-// none unless it is a local variable argument, which has the direction
-// §16.8.2 gives it, written or inferred, `decl` recording one per such
-// argument in the order declared.
 int SeqFormalDirection(const ModuleItem& decl, size_t index) {
   if (!decl.prop_formal_is_local[index]) return vpiNoDirection;
   const size_t kLocal = static_cast<size_t>(std::count(
@@ -243,11 +200,6 @@ int SeqFormalDirection(const ModuleItem& decl, size_t index) {
   }
 }
 
-// §37.53: the seq formal decl the formal `index` of `decl` stands as, hung
-// from `sequence`: named, of the direction SeqFormalDirection gives it
-// (detail 4), reaching the typespec of the type it is declared with (detail
-// 2) and the default value it declares, where it declares one, through
-// vpiExpr (detail 3).
 void MakeSeqFormal(const ModuleItem& decl, size_t index, VpiObject* sequence,
                    const VpiPropertyDeclSite& at, const VpiStmtBuild& with) {
   VpiObject* formal = with.build.alloc();
@@ -261,14 +213,6 @@ void MakeSeqFormal(const ModuleItem& decl, size_t index, VpiObject* sequence,
   sequence->children.push_back(formal);
 }
 
-// §37.51 and §37.53 with §16.10: the variable the local variable `local` a
-// property or a sequence declares stands as, hung from its declaration
-// `declared` and named in it, of the kind its type is (§37.17), the kind the
-// type name it is declared with stands for where it names one (§6.18),
-// resolved in `ctx`. §37.52 detail 1 gives its value no access, so it holds
-// none. A logic or bit one with packed dimensions is a vector with a var bit
-// per bit, and one of a structure or union type a struct or union var with a
-// member variable per field (§37.17 details 3, 12, 17 and 26).
 void MakeDeclaredVariable(const SeqLocalDecl& local, VpiObject* declared,
                           SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
@@ -282,24 +226,18 @@ void MakeDeclaredVariable(const SeqLocalDecl& local, VpiObject* declared,
   declared->children.push_back(var);
   VpiMakeVarBits(*var, LocalDataType(local),
                  LocalWidth(local, ctx, ctx.GetArena()), ctx, build);
-  // §7.4.1: a type name with packed dimensions written after it stands for
-  // an array of its type, whose members are its elements', not the local's.
   if (!local.packed_dims.empty()) return;
   if (const StructTypeInfo* layout = NamedLayout(local.named_type, ctx)) {
     VpiMakeLocalMembers(var, *layout, ctx, build);
   }
 }
 
-// §16.8.2: the kind of variable a local variable formal declared with `type`
-// is, the kind the type name stands for where it names one (§6.18), resolved
-// in `ctx`, as MakeDeclaredVariable gives a local declared in the body.
 int FormalVariableKind(const DataType& type, const SimContext& ctx) {
   return VpiDataTypeVariableKind(type.kind == DataTypeKind::kNamed
                                      ? DeclaredTypeKind(type, ctx)
                                      : type.kind);
 }
 
-// The child of `scope` of `type` named `name`; null where none is.
 VpiObject* ChildOfType(const VpiObject* scope, int type,
                        std::string_view name) {
   for (VpiObject* child : scope->children) {
@@ -308,21 +246,12 @@ VpiObject* ChildOfType(const VpiObject* scope, int type,
   return nullptr;
 }
 
-// The scope among the children of `scope` that the prefix `prefix` of a
-// property's name names: a clocking block, `cb.p` (§16.16 (b)), or an
-// interface instance, `i0.p` (§16.12 with §23.6); null where it names
-// neither.
 VpiObject* PropertyHolderNamed(const VpiObject* scope,
                                std::string_view prefix) {
   VpiObject* block = ChildOfType(scope, vpiClockingBlock, prefix);
   return block != nullptr ? block : ChildOfType(scope, vpiInterface, prefix);
 }
 
-// §37.51 and §37.53: the declaration of `type`, a property decl or a
-// sequence decl, named `name` that `from` or a scope standing around it
-// declares, the nearest from a generate block instance out to the instance;
-// null where none was built. A name written through a clocking block or an
-// interface instance is the declaration that block or instance holds.
 VpiObject* DeclAround(const VpiObject* from, int type, std::string_view name) {
   const size_t kDot = name.find('.');
   for (const VpiObject* scope = from; scope != nullptr;
@@ -338,7 +267,6 @@ VpiObject* DeclAround(const VpiObject* from, int type, std::string_view name) {
   return nullptr;
 }
 
-// The typespec the formal `formal` was declared with, null for an untyped one.
 const VpiObject* TypespecOf(const VpiObject* formal) {
   for (const VpiObject* child : formal->children) {
     if (VpiIsTypespecType(child->type)) return child;
@@ -346,13 +274,6 @@ const VpiObject* TypespecOf(const VpiObject* formal) {
   return nullptr;
 }
 
-// §37.51 detail 2: the argument the actual `actual` of a property inst
-// stands as, bound to a formal declared with the typespec `target`, null for
-// an untyped one; null for an actual the instance leaves out. A sequence or
-// property the actual writes (§16.12) is the property expr of the tree the
-// parser carries it as (§37.52); §37.59 detail 4 makes the terminal `$`,
-// which §16.8 admits as an actual, the unbounded constant; and a typed
-// formal's typespec orders a keyed pattern (detail 6).
 VpiObject* ActualArgument(const Expr* actual, const VpiObject* target,
                           const VpiStmtBuild& with) {
   if (actual == nullptr) return nullptr;
@@ -369,16 +290,10 @@ VpiObject* ActualArgument(const Expr* actual, const VpiObject* target,
   return dollar;
 }
 
-// §37.51 and §37.53 with §37.12: the declaration of `type` the property or
-// sequence `declared` stands for, hung from the scope declaring it,
-// `at.scope` or the clocking block it holds that declares it, named in it.
 VpiObject* MakeDeclHead(const RtlirAssertionItemDecl& declared, int type,
                         const VpiPropertyDeclSite& at,
                         const VpiAttachBuild& build) {
   VpiObject* scope = at.scope;
-  // §37.12 with §14.3: a declaration a clocking block holds is of that block,
-  // which AttachClockingBlocks has made under the same scope, the generate
-  // block instance both are stamped with or the instance.
   if (declared.clocking_block != nullptr) {
     scope = ChildOfType(scope, vpiClockingBlock, declared.clocking_block->name);
   }
@@ -386,8 +301,6 @@ VpiObject* MakeDeclHead(const RtlirAssertionItemDecl& declared, int type,
   VpiObject* obj = build.alloc();
   obj->type = type;
   obj->parent = scope;
-  // §16.16 (b): the run keys a clocking block's declaration under the block's
-  // name and its own, `cb.p`, the block being its scope here.
   const std::string_view kName =
       declared.clocking_block == nullptr
           ? decl.name
@@ -398,10 +311,6 @@ VpiObject* MakeDeclHead(const RtlirAssertionItemDecl& declared, int type,
   return obj;
 }
 
-// §26.3: the declaration of `type` named `name` a package declares that one
-// of `imports` makes visible. The first import naming it, the module's own
-// or, ahead of them, the compilation unit's (§3.12.1), gives it. §26.7: the
-// std package every scope imports has no object of its own.
 VpiObject* ImportedDecl(int type, std::string_view name,
                         const std::vector<RtlirImport>& imports,
                         const VpiObjectMap& objects) {
@@ -418,12 +327,6 @@ VpiObject* ImportedDecl(int type, std::string_view name,
   return found;
 }
 
-// §37.53 with §37.56: the sequence the body of `decl` is, built through
-// `with`: a multiclock sequence expr where its operands name clocks, the
-// clock the body opens with flowing into its first run, and otherwise the
-// sequence expr it is, under a clocked seq of a multiclock sequence expr of
-// its own where the body opens with a clock, which no sequence expr reaches;
-// null where the parser read no body of the shapes §37.54 builds.
 VpiObject* SequenceDeclBody(const ModuleItem& decl, const VpiStmtBuild& with) {
   VpiObject* body =
       VpiSequenceExprObject(decl.seq_linear, with, &decl.seq_clock);
@@ -442,18 +345,11 @@ VpiObject* SequenceDeclBody(const ModuleItem& decl, const VpiStmtBuild& with) {
   return multiclock;
 }
 
-// §37.54: the sequence inst `instance`, a name or a call naming the sequence
-// `decl` declares, writes, reaching `decl` and an argument per formal of it
-// in the order declared, each built through `with` (detail 1).
 VpiObject* MakeSequenceInst(VpiObject* decl, const Expr& instance,
                             const VpiStmtBuild& with) {
   VpiObject* inst = with.build.alloc();
   inst->type = vpiSequenceInst;
   inst->sequence_decl = decl;
-  // §37.54 detail 1: an argument per formal, in the order declared, the
-  // formal's default standing for an actual the instance leaves out. One that
-  // stands for no object, an actual not modelled, the vpiArgument iteration
-  // passes over.
   const std::vector<VpiHandle> kFormals = VpiSeqFormals(decl);
   std::vector<VpiHandle> provided;
   std::vector<VpiSequenceFormal> formals;
@@ -467,10 +363,6 @@ VpiObject* MakeSequenceInst(VpiObject* decl, const Expr& instance,
   return inst;
 }
 
-// §37.51 and §37.54: the declaration of `type` the operand `operand` names,
-// written bare, `s`, called, `s(a)`, or through a package's path, `pk::s` or
-// `pk::s(a)`, which is how elaboration writes the names a package's own
-// sequences and properties read (§26.3); null where it names none.
 VpiObject* NamedDecl(const Expr& operand, int type, const VpiStmtBuild& with) {
   switch (operand.kind) {
     case ExprKind::kIdentifier:
@@ -489,11 +381,6 @@ VpiObject* NamedDecl(const Expr& operand, int type, const VpiStmtBuild& with) {
   }
 }
 
-// §37.51: the property inst `instance`, a name or a call naming the property
-// `decl` declares, writes, reaching `decl` and an argument per formal of it in
-// the order declared, the formal's default standing for an actual the
-// instance leaves out (detail 2); with no declaration built, the actuals as
-// written.
 VpiObject* PropertyInstOf(VpiObject* decl, const Expr& instance,
                           const VpiStmtBuild& with) {
   VpiObject* inst = with.build.alloc();
@@ -529,8 +416,6 @@ VpiObject* VpiMakePropertyInst(VpiObject* holder, const Expr& instance,
   VpiObject* inst = PropertyInstOf(NamedDecl(instance, vpiPropertyDecl, with),
                                    instance, with);
   inst->parent = holder;
-  // §37.51 with §16.15: the condition the instance is disabled under, the one
-  // its property declares or else the default disable iff in scope.
   inst->disable_condition = with.expression(disable);
   holder->children.push_back(inst);
   return inst;
@@ -546,8 +431,6 @@ VpiObject* VpiPropertyOperandObject(const Expr& operand,
 VpiObject* VpiAssertionDeclNamed(const VpiAssertionDeclName& named,
                                  const std::vector<RtlirImport>& imports,
                                  const VpiObjectMap& objects) {
-  // §26.3: a name written through a package's path, `pk::s`, is the one that
-  // package declares, as an import of it would make it visible.
   if (!named.package.empty()) {
     RtlirImport path;
     path.package_name = named.package;
@@ -572,19 +455,12 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
                                      const VpiObjectMap& unit_typespecs,
                                      SimContext& ctx,
                                      const VpiAttachBuild& build) {
-  // §16.8 and §16.12 with §37.10 detail 1: a sequence or a property a package
-  // declares is a sequence decl or a property decl of the package, its
-  // expressions resolving among the package's names, and a sequence or a
-  // property it names among the package's.
   const std::vector<RtlirImport> kNoImports;
   const std::vector<std::string_view> kNoGenBlocks;
   for (const PackageDecl* pkg : design.packages) {
     const std::string kPrefix(pkg->name);
     VpiObject* package = FindObjectForFlatName(objects, pkg->name);
-    // §37.42: a call a declaration makes stands in the package.
     const VpiCallStand kStand{package, nullptr, pkg->name};
-    // §37.83: an operation carries the attributes its operator is written
-    // with, which elaboration kept for a package's items on the design.
     const VpiExprNames kNames{
         objects, kPrefix, kNoGenBlocks, nullptr, &design.node_attrs, &kStand};
     const VpiStmtBuild kWith{
@@ -600,8 +476,6 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
                                        objects);
         }};
     const VpiPropertyDeclSite kAt{package, unit_typespecs, ctx, kNoImports};
-    // §16.8 and §16.12: a sequence or a property may name one the package
-    // declares after it, so each is declared before any body is built.
     std::vector<std::pair<VpiObject*, const ModuleItem*>> made;
     for (const ModuleItem* item : pkg->items) {
       const RtlirAssertionItemDecl kDeclared{item, {}, {}, nullptr};
@@ -612,7 +486,6 @@ void AttachPackageAssertionItemDecls(const RtlirDesign& design,
       }
     }
     for (const auto& [declared, item] : made) {
-      // §16.8 and §16.12: the body's names find the formals first.
       const VpiExprNames kBodyNames{objects,
                                     kPrefix,
                                     kNoGenBlocks,
@@ -668,9 +541,6 @@ VpiObject* VpiFormalNames(VpiObject* made, const ModuleItem& decl,
     stand->full_name = VpiScopedFullName(made, decl.prop_formals[i]);
     names->children.push_back(stand);
     if (!decl.prop_formal_is_local[i]) continue;
-    // §16.8.2: a local variable formal is a local variable of its type, a
-    // packed logic or bit one with a var bit per bit as MakeDeclaredVariable
-    // gives a local declared in the body.
     const DataType& type = *decl.prop_formal_types[i];
     stand->type = FormalVariableKind(type, ctx);
     VpiMakeVarBits(*stand, type, DeclaredTypeWidth(type, ctx), ctx, build);
@@ -684,9 +554,6 @@ void VpiFillAssertionItemDeclBody(VpiObject* made, const ModuleItem& decl,
     made->body = SequenceDeclBody(decl, with);
     return;
   }
-  // §37.52: the body the parser read, its clock, its disable condition and,
-  // for a Boolean property, its expression; a body of another shape was not
-  // read and stands for no spec.
   const PropertyExprNode* tree = decl.prop_body_tree;
   if (tree == nullptr) return;
   VpiMakePropertySpecOf(

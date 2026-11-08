@@ -3,8 +3,6 @@
 #include <cstddef>
 #include <string>
 
-// Counts the number of (non-overlapping) occurrences of `sub` in `s`. Used by
-// the §21.7 dump tests to assert how many checkpoint markers were emitted.
 inline std::size_t CountOccurrences(const std::string& s,
                                     const std::string& sub) {
   std::size_t n = 0;

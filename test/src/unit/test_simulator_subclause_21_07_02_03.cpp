@@ -5,9 +5,6 @@
 #include <string>
 #include <vector>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
@@ -18,33 +15,14 @@
 namespace delta {
 namespace {
 
-// §21.7.2.3: the keyword commands of the 4-state VCD file. The general
-// information is presented as keyword-delimited sections; the declaration
-// keywords describe the dump ($comment, $date, $enddefinitions, $scope,
-// $timescale, $upscope, $var, $version) and the simulation keywords delimit
-// the value checkpoints ($dumpall, $dumpoff, $dumpon, $dumpvars). Rules whose
-// behavior depends on how the dumped object or the $dumpfile call is written
-// in the source are driven through the full pipeline (parse, elaborate,
-// lower, run) and observed in the dump file; only writer-confined formatting
-// rules use the writer directly.
 class VcdKeywordCommandsE2E : public VcdDumpRunTestBase {
  protected:
-  // Runs a single-module source through the full pipeline with the driver's
-  // dump loop (timestamp + changed values at the end of each time unit) and
-  // returns the dump file contents, mirroring the driver's registration
-  // sequence (header, module scope, one registration per model variable,
-  // $enddefinitions). Identifier codes ascend from '!' in name order.
   std::string RunVcd(const std::string& src, const std::string& scope = "t") {
     return RunVcdDump(
         src, {.scope = scope,
               .registration = VcdSignalRegistration::kContextFiltered});
   }
 
-  // Runs the source (executing its $dumpfile call, which records the
-  // unevaluated filename literal), then writes the header from what the run
-  // captured. Mirrors a driver that opens the dump once $dumpfile has named
-  // it. Returns the file contents; *resolved_name receives the evaluated
-  // filename when non-null.
   std::string HeaderAfterRun(const std::string& src,
                              std::string* resolved_name = nullptr) {
     SimFixture f;
@@ -64,8 +42,6 @@ class VcdKeywordCommandsE2E : public VcdDumpRunTestBase {
   }
 };
 
-// The $var declaration line whose reference name is `name` ($var var_type
-// size identifier_code reference $end), or an empty line when absent.
 std::string FindVarLine(const std::vector<std::string>& lines,
                         std::string_view name) {
   for (const auto& l : lines) {
@@ -75,8 +51,6 @@ std::string FindVarLine(const std::vector<std::string>& lines,
   return {};
 }
 
-// The body of the section opened by `keyword`, up to (not including) the next
-// $end. Empty when the keyword is absent.
 std::string Section(const std::string& content, std::string_view keyword) {
   auto start = content.find(keyword);
   if (start == std::string::npos) return {};
@@ -85,11 +59,6 @@ std::string Section(const std::string& content, std::string_view keyword) {
   return content.substr(start, end - start);
 }
 
-// §21.7.2.3 (intro + Table 21-10): the general information is presented as
-// keyword-delimited sections, and $enddefinitions marks the end of the header
-// information and definitions -- every declaration section precedes it and no
-// declaration keyword follows it. The header, scope, and variable sections
-// come from a real module driven through the whole pipeline.
 TEST_F(VcdKeywordCommandsE2E, DeclarationSectionsEndAtEnddefinitions) {
   auto content = RunVcd(
       "module t;\n"
@@ -104,26 +73,16 @@ TEST_F(VcdKeywordCommandsE2E, DeclarationSectionsEndAtEnddefinitions) {
        {"$date", "$version", "$timescale", "$scope", "$var", "$upscope"}) {
     auto pos = content.find(kw);
     ASSERT_NE(pos, std::string::npos) << kw;
-    // Each declaration section closes with $end...
     EXPECT_NE(content.find("$end", pos), std::string::npos) << kw;
-    // ...and sits before the $enddefinitions boundary.
     EXPECT_LT(pos, content.find("$enddefinitions")) << kw;
   }
-  // Past the boundary only simulation commands appear: no declaration keyword
-  // may follow $enddefinitions.
   auto sim = content.substr(content.find("$enddefinitions"));
   EXPECT_EQ(sim.find("$var "), std::string::npos);
   EXPECT_EQ(sim.find("$scope "), std::string::npos);
   EXPECT_EQ(sim.find("$upscope"), std::string::npos);
-  // The $timescale section carries the timescale the simulation ran with.
   EXPECT_NE(Section(content, "$timescale").find("1ns"), std::string::npos);
 }
 
-// §21.7.2.3: the $date section indicates the date on which the VCD file was
-// generated. The stamp comes from the writer's own clock, so the section body
-// must carry an actual date (a four-digit year), not a fixed banner. Date
-// production is confined to the writer and independent of the model, so the
-// writer is driven directly.
 TEST_F(VcdKeywordCommandsE2E, DateSectionCarriesGenerationDate) {
   {
     VcdWriter vcd(tmp_path_);
@@ -132,17 +91,10 @@ TEST_F(VcdKeywordCommandsE2E, DateSectionCarriesGenerationDate) {
   }
   auto date = Section(ReadVcd(), "$date");
   ASSERT_FALSE(date.empty());
-  // A generation date names a 20xx year; the negative form -- a dateless
-  // banner -- carries no such year and must not appear.
   EXPECT_NE(date.find(", 20"), std::string::npos) << date;
   EXPECT_EQ(date.find("Generated by"), std::string::npos) << date;
 }
 
-// §21.7.2.3: the scope type of a $scope section indicates the kind of scope --
-// module (module instances), task, function, begin (named sequential block),
-// or fork (named parallel block). The kind-to-keyword mapping is confined to
-// the writer, so each kind is checked directly; no other spelling (and no
-// keyword from a different kind) may be substituted.
 TEST_F(VcdKeywordCommandsE2E, ScopeKeywordIndicatesScopeKind) {
   {
     VcdWriter vcd(tmp_path_);
@@ -161,14 +113,9 @@ TEST_F(VcdKeywordCommandsE2E, ScopeKeywordIndicatesScopeKind) {
   EXPECT_TRUE(HasLine(lines, "$scope function f1 $end"));
   EXPECT_TRUE(HasLine(lines, "$scope begin b1 $end"));
   EXPECT_TRUE(HasLine(lines, "$scope fork fk1 $end"));
-  // §21.7.2.3: each $scope is closed by an $upscope returning to the next
-  // higher level, so the five openings balance with five $upscope sections.
   EXPECT_EQ(CountLine(lines, "$upscope $end"), 5u);
 }
 
-// §21.7.2.3: a module scope in the model is recorded with the module scope
-// type, and $upscope returns to the next higher level -- observed from a real
-// module driven through the pipeline.
 TEST_F(VcdKeywordCommandsE2E, ModuleScopeFromRealModuleUsesModuleKeyword) {
   auto content = RunVcd(
       "module t;\n"
@@ -178,24 +125,15 @@ TEST_F(VcdKeywordCommandsE2E, ModuleScopeFromRealModuleUsesModuleKeyword) {
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "$scope module t $end"));
   EXPECT_TRUE(HasLine(lines, "$upscope $end"));
-  // The scope opens before its variables and closes after them, before the
-  // definitions end.
   EXPECT_LT(content.find("$scope module t $end"), content.find("$var "));
   EXPECT_LT(content.find("$var "), content.find("$upscope $end"));
   EXPECT_LT(content.find("$upscope $end"), content.find("$enddefinitions"));
-  // Negative form: a module construct is indicated only by the module
-  // keyword, never by one of the other four scope types.
   EXPECT_EQ(content.find("$scope task"), std::string::npos);
   EXPECT_EQ(content.find("$scope function"), std::string::npos);
   EXPECT_EQ(content.find("$scope begin"), std::string::npos);
   EXPECT_EQ(content.find("$scope fork"), std::string::npos);
 }
 
-// §21.7.2.3: the $var section prints the name and identifier code of each
-// dumped variable; the size gives how many bits are in the variable, and the
-// identifier (the reference) is the variable's name in the model. Declared
-// widths of 1, 8, and 16 bits from real declarations must each be reflected
-// in the size field, and the identifier code is a printable-ASCII code.
 TEST_F(VcdKeywordCommandsE2E, VarSectionPrintsSizeIdentifierCodeAndReference) {
   auto content = RunVcd(
       "module t;\n"
@@ -214,19 +152,15 @@ TEST_F(VcdKeywordCommandsE2E, VarSectionPrintsSizeIdentifierCodeAndReference) {
     auto line = FindVarLine(lines, c.name);
     ASSERT_FALSE(line.empty()) << c.name;
     auto toks = Tokens(line);
-    EXPECT_EQ(toks[2], c.size) << line;     // size = bits in the variable
-    ASSERT_EQ(toks[3].size(), 1u) << line;  // one identifier-code character
-    EXPECT_GE(toks[3][0], '!') << line;     // printable ASCII code
+    EXPECT_EQ(toks[2], c.size) << line;
+    ASSERT_EQ(toks[3].size(), 1u) << line;
+    EXPECT_GE(toks[3][0], '!') << line;
     EXPECT_LE(toks[3][0], '~') << line;
-    EXPECT_EQ(toks[4], c.name) << line;  // reference = model name
+    EXPECT_EQ(toks[4], c.name) << line;
     EXPECT_EQ(toks[5], "$end") << line;
   }
 }
 
-// §21.7.2.3: the $var size and the $dumpvars initial value also hold for a
-// variable produced by a declaration initializer rather than a procedural
-// assignment -- the declared width drives the size field and the initializer
-// supplies the initial value the $dumpvars section lists.
 TEST_F(VcdKeywordCommandsE2E, VarFromDeclarationInitializer) {
   auto content = RunVcd(
       "module t;\n"
@@ -235,17 +169,12 @@ TEST_F(VcdKeywordCommandsE2E, VarFromDeclarationInitializer) {
       "endmodule\n");
   auto line = FindVarLine(AllLines(content), "v");
   ASSERT_FALSE(line.empty()) << content;
-  EXPECT_EQ(Tokens(line)[2], "8") << line;  // size = declared bit count
-  // The initializer's value is what $dumpvars records as the initial value.
+  EXPECT_EQ(Tokens(line)[2], "8") << line;
   auto dumpvars = Section(content, "$dumpvars");
   ASSERT_FALSE(dumpvars.empty()) << content;
   EXPECT_NE(dumpvars.find("b101 !"), std::string::npos) << dumpvars;
 }
 
-// §21.7.2.3 (shall): in the $var section a net of net type uwire shall have a
-// var_type of wire. The net type comes from the real declaration -- a scalar
-// and a vector uwire net both flow through elaboration and lowering into the
-// registration -- and the uwire keyword itself never appears as a var_type.
 TEST_F(VcdKeywordCommandsE2E, UwireNetVarTypeIsWire) {
   auto content = RunVcd(
       "module t;\n"
@@ -264,14 +193,9 @@ TEST_F(VcdKeywordCommandsE2E, UwireNetVarTypeIsWire) {
   ASSERT_FALSE(uv_line.empty()) << content;
   EXPECT_EQ(Tokens(uv_line)[1], "wire") << uv_line;
   EXPECT_EQ(Tokens(uv_line)[2], "4") << uv_line;
-  // Negative form: the uwire spelling never reaches the file as a var_type.
   EXPECT_EQ(content.find("uwire"), std::string::npos);
 }
 
-// §21.7.2.3: the $version section indicates the version of the VCD writer and
-// the $dumpfile system task used to create the file. A string-literal
-// filename is reproduced, quotes and all, inside the $dumpfile(...) entry of
-// the $version section -- driven by a real $dumpfile call.
 TEST_F(VcdKeywordCommandsE2E, VersionReproducesStringLiteralDumpfile) {
   auto content = HeaderAfterRun(
       "module t;\n"
@@ -284,11 +208,6 @@ TEST_F(VcdKeywordCommandsE2E, VersionReproducesStringLiteralDumpfile) {
       << version;
 }
 
-// §21.7.2.3 (shall): when a variable specifies the filename within $dumpfile,
-// the unevaluated variable literal shall appear in the $version string. The
-// variable is declared and assigned in real source; the run resolves the
-// filename to the variable's value, yet $version shows the variable name and
-// not that value.
 TEST_F(VcdKeywordCommandsE2E, VersionKeepsVariableFilenameUnevaluated) {
   std::string resolved;
   auto content = HeaderAfterRun(
@@ -300,20 +219,13 @@ TEST_F(VcdKeywordCommandsE2E, VersionKeepsVariableFilenameUnevaluated) {
       "  end\n"
       "endmodule\n",
       &resolved);
-  // The run really evaluated the variable for the file name...
   EXPECT_EQ(resolved, "resolved_name.vcd");
   auto version = Section(content, "$version");
   ASSERT_FALSE(version.empty()) << content;
-  // ...but the $version entry carries the unevaluated variable literal.
   EXPECT_NE(version.find("$dumpfile(fn)"), std::string::npos) << version;
-  // Negative form: the evaluated value must not replace the literal.
   EXPECT_EQ(content.find("resolved_name"), std::string::npos) << content;
 }
 
-// §21.7.2.3 (shall): when an expression specifies the filename, the
-// unevaluated expression literal appears in $version. A concatenation of two
-// string literals resolves to their joined value, yet $version reproduces the
-// expression form rather than the resolved name.
 TEST_F(VcdKeywordCommandsE2E, VersionKeepsExpressionFilenameUnevaluated) {
   auto content = HeaderAfterRun(
       "module t;\n"
@@ -323,13 +235,9 @@ TEST_F(VcdKeywordCommandsE2E, VersionKeepsExpressionFilenameUnevaluated) {
   ASSERT_FALSE(version.empty()) << content;
   EXPECT_NE(version.find("$dumpfile({\"part1\",\".vcd\"})"), std::string::npos)
       << version;
-  // Negative form: the evaluated concatenation must not appear.
   EXPECT_EQ(content.find("part1.vcd"), std::string::npos) << content;
 }
 
-// §21.7.2.3 (shall): a parameter naming the file is likewise an expression
-// specifying the filename, so its unevaluated identifier -- not the constant
-// it resolves to -- appears in the $version string.
 TEST_F(VcdKeywordCommandsE2E, VersionKeepsParameterFilenameUnevaluated) {
   auto content = HeaderAfterRun(
       "module t;\n"
@@ -339,13 +247,9 @@ TEST_F(VcdKeywordCommandsE2E, VersionKeepsParameterFilenameUnevaluated) {
   auto version = Section(content, "$version");
   ASSERT_FALSE(version.empty()) << content;
   EXPECT_NE(version.find("$dumpfile(P)"), std::string::npos) << version;
-  // Negative form: the parameter's constant value must not replace it.
   EXPECT_EQ(content.find("param_name"), std::string::npos) << content;
 }
 
-// §21.7.2.3 (shall): a localparam naming the file takes the same
-// constant-identifier path as a parameter, and its unevaluated identifier is
-// what $version shows.
 TEST_F(VcdKeywordCommandsE2E, VersionKeepsLocalparamFilenameUnevaluated) {
   auto content = HeaderAfterRun(
       "module t;\n"
@@ -355,13 +259,9 @@ TEST_F(VcdKeywordCommandsE2E, VersionKeepsLocalparamFilenameUnevaluated) {
   auto version = Section(content, "$version");
   ASSERT_FALSE(version.empty()) << content;
   EXPECT_NE(version.find("$dumpfile(LP)"), std::string::npos) << version;
-  // Negative form: the localparam's constant value must not replace it.
   EXPECT_EQ(content.find("local_name"), std::string::npos) << content;
 }
 
-// §21.7.2.3 (shall): a function call is an expression specifying the
-// filename, so $version reproduces the call form -- callee and parentheses --
-// rather than the string the call returned at run time.
 TEST_F(VcdKeywordCommandsE2E, VersionKeepsFunctionCallFilenameUnevaluated) {
   std::string resolved;
   auto content = HeaderAfterRun(
@@ -372,19 +272,13 @@ TEST_F(VcdKeywordCommandsE2E, VersionKeepsFunctionCallFilenameUnevaluated) {
       "  initial $dumpfile(mkname());\n"
       "endmodule\n",
       &resolved);
-  // The run really called the function to resolve the filename...
   EXPECT_EQ(resolved, "fn_name.vcd");
   auto version = Section(content, "$version");
   ASSERT_FALSE(version.empty()) << content;
-  // ...but the $version entry carries the unevaluated call expression.
   EXPECT_NE(version.find("$dumpfile(mkname())"), std::string::npos) << version;
-  // Negative form: the returned string must not replace the call form.
   EXPECT_EQ(content.find("fn_name"), std::string::npos) << content;
 }
 
-// §21.7.2.3: the $dumpfile entry is reproduced in $version only when a
-// $dumpfile call supplied a filename. With no such call the gating condition
-// is false and $version carries no $dumpfile entry.
 TEST_F(VcdKeywordCommandsE2E, VersionOmitsDumpfileWithoutCall) {
   auto content = HeaderAfterRun(
       "module t;\n"
@@ -395,11 +289,6 @@ TEST_F(VcdKeywordCommandsE2E, VersionOmitsDumpfileWithoutCall) {
   EXPECT_EQ(content.find("$dumpfile("), std::string::npos);
 }
 
-// §21.7.2.3: the $comment section provides the means of inserting a comment
-// in the VCD file, whether the text is a single line or spans several lines;
-// each comment section is closed by its own $end. The section form is
-// confined to the writer (the text originates from the dumper itself), so the
-// writer is driven directly.
 TEST_F(VcdKeywordCommandsE2E, CommentSectionDelimitsSingleAndMultiLineText) {
   {
     VcdWriter vcd(tmp_path_);
@@ -421,18 +310,9 @@ TEST_F(VcdKeywordCommandsE2E, CommentSectionDelimitsSingleAndMultiLineText) {
   auto second_end = content.find("$end", second);
   ASSERT_NE(second_end, std::string::npos);
   auto body = content.substr(second, second_end - second);
-  // The multiple-line text survives intact, line break included.
   EXPECT_NE(body.find("first line\nsecond line"), std::string::npos) << body;
 }
 
-// §21.7.2.3: the simulation keyword sections and their value lists --
-// $dumpvars lists the initial values of all variables dumped, $dumpoff
-// indicates all variables dumped with x values, $dumpon lists the current
-// values on resumption, and $dumpall specifies the current values of all
-// variables. The checkpoints are produced by the corresponding system tasks
-// in real source (§21.7.1.2 through §21.7.1.4 machinery); this test observes
-// that each section covers every dumped variable with the value form the
-// keyword implies. Identifier codes: 'a' -> ! and 'v' -> " (name order).
 TEST_F(VcdKeywordCommandsE2E, SimulationKeywordSectionsListDumpedValues) {
   auto content = RunVcd(
       "module t;\n"
@@ -465,11 +345,6 @@ TEST_F(VcdKeywordCommandsE2E, SimulationKeywordSectionsListDumpedValues) {
   EXPECT_NE(dumpall.find("b11 \""), std::string::npos) << dumpall;
 }
 
-// §21.7.2.3: the $dumpvars section lists the initial values of the variables
-// dumped -- and which variables those are follows the selection the source's
-// $dumpvars call made. A call naming one individual variable produces a
-// section that records that variable's initial value and nothing for the
-// unselected variable (identifier codes: 'a' -> ! and 'v' -> ").
 TEST_F(VcdKeywordCommandsE2E, DumpvarsSectionCoversOnlySelectedVariables) {
   auto content = RunVcd(
       "module t;\n"
@@ -483,34 +358,13 @@ TEST_F(VcdKeywordCommandsE2E, DumpvarsSectionCoversOnlySelectedVariables) {
   auto dumpvars = Section(content, "$dumpvars");
   ASSERT_FALSE(dumpvars.empty()) << content;
   EXPECT_NE(dumpvars.find("0!"), std::string::npos) << dumpvars;
-  // Negative form: the unselected variable contributes no record -- its
-  // identifier code never appears inside the section.
   EXPECT_EQ(dumpvars.find('"'), std::string::npos) << dumpvars;
 }
 
-// §21.7.2.3: the $timescale keyword gives the timescale the simulation ran
-// under, and Syntax 21-20 spells the command as a time_number of 1, 10 or 100
-// followed by a time_unit of s, ms, us, ns, ps or fs. What the section names is
-// the unit the simulation_time commands under it are counted in, so it has to
-// follow the precision the design elaborated to; a fixed unit puts every time
-// in the file out by whatever factor separates the two.
-//
-// These cases run the source's own $dumpfile and $dumpvars, because the unit
-// is read off the design's precision at the moment the dump is opened. A
-// writer a test constructs and hands a timescale to cannot disagree with the
-// string it was handed, which is why the cases above -- and every other §21.7
-// case driven through VcdDumpRunTestBase -- say nothing about this.
 class VcdTimescaleFromSource : public VcdDumpFromSourceTestBase {
  protected:
-  // The dump file every source below names. Relative, so it lands in the
-  // scratch directory the fixture stands the run in.
   static constexpr const char* kDumpName = "ts.vcd";
 
-  // The dump left by a module declaring `unit` and `precision` that opens a
-  // dump and moves a dumped variable one of its time units later. The file
-  // carries both the $timescale section and a simulation_time command whose
-  // value came out of the same precision, so a test can ask whether the two
-  // agree rather than only what the section says.
   std::string DumpAfterOneUnit(const std::string& unit,
                                const std::string& precision) {
     RunSource(
@@ -532,25 +386,14 @@ class VcdTimescaleFromSource : public VcdDumpFromSourceTestBase {
   }
 };
 
-// §21.7.2.3: the timescale the section states is the one the simulation used.
-// A design whose precision is a picosecond counts its value change times in
-// picoseconds, so the section names ps -- and naming ns beside those times
-// would place every change a thousand times later than it happened.
 TEST_F(VcdTimescaleFromSource, TimescaleNamesTheDesignsOwnPrecision) {
   auto timescale = Section(DumpAfterOneUnit("1ns", "1ps"), "$timescale");
   ASSERT_FALSE(timescale.empty());
   auto toks = Tokens(timescale);
   EXPECT_EQ(CountToken(toks, "1ps"), 1u) << timescale;
-  // Negative form: the unit the design did not run at appears nowhere in it.
   EXPECT_EQ(CountToken(toks, "1ns"), 0u) << timescale;
 }
 
-// §21.7.2.3 with §21.7.2.4: each simulation_time command is a count of the
-// units the $timescale section named. A module whose time unit is a
-// nanosecond and whose precision is a picosecond turns its `#1` into a
-// thousand ticks, so the change is stamped #1000 and the section has to say
-// 1ps for that stamp to mean one nanosecond. This case is what shows the two
-// agreeing with each other rather than the section merely being written.
 TEST_F(VcdTimescaleFromSource, ValueChangeTimesAreCountedInTheStatedUnit) {
   auto content = DumpAfterOneUnit("1ns", "1ps");
   EXPECT_TRUE(HasLine(AllLines(content), "#1000")) << content;
@@ -558,18 +401,12 @@ TEST_F(VcdTimescaleFromSource, ValueChangeTimesAreCountedInTheStatedUnit) {
       << content;
 }
 
-// §21.7.2.3: a design that does run at nanosecond precision is named as such.
-// Without this case, a unit derived wrongly but consistently -- one step finer
-// than the design's, say -- satisfies both cases above.
 TEST_F(VcdTimescaleFromSource, TimescaleNamesNsWhenThatIsTheDesignsPrecision) {
   auto timescale = Section(DumpAfterOneUnit("1ns", "1ns"), "$timescale");
   ASSERT_FALSE(timescale.empty());
   EXPECT_EQ(CountToken(Tokens(timescale), "1ns"), 1u) << timescale;
 }
 
-// §21.7.2.3 with Syntax 21-20's time_unit: s, ms, us, ns, ps and fs are each
-// named as written. The cases above name ps and ns; these name the other four,
-// so a writer that spelt one unit as another's name is caught whichever it is.
 TEST_F(VcdTimescaleFromSource, TimescaleNamesSWhenThatIsTheDesignsPrecision) {
   auto timescale = Section(DumpAfterOneUnit("1s", "1s"), "$timescale");
   EXPECT_EQ(CountToken(Tokens(timescale), "1s"), 1u) << timescale;
@@ -590,10 +427,6 @@ TEST_F(VcdTimescaleFromSource, TimescaleNamesFsWhenThatIsTheDesignsPrecision) {
   EXPECT_EQ(CountToken(Tokens(timescale), "1fs"), 1u) << timescale;
 }
 
-// §21.7.2.3: the definitions nest one $scope module per module instance, and a
-// $var declares an object by its own name within the scope holding it. A
-// variable of the instance u of t is declared as `deep` inside `$scope module
-// u`, itself inside `$scope module t`, and one level further down the same.
 TEST_F(VcdKeywordCommandsE2E, SubInstanceVariablesAreDeclaredInTheirOwnScope) {
   auto content = RunVcd(
       "module leaf; logic [3:0] x = 1; endmodule\n"
@@ -616,17 +449,10 @@ TEST_F(VcdKeywordCommandsE2E, SubInstanceVariablesAreDeclaredInTheirOwnScope) {
   EXPECT_LT(u_scope, content.find(" deep $end"));
   EXPECT_LT(content.find(" deep $end"), l_scope);
   EXPECT_LT(l_scope, content.find(" x $end"));
-  // Each of the three scopes is closed by its own $upscope before the
-  // definitions end.
   EXPECT_EQ(CountLine(lines, "$upscope $end"), 3u) << content;
   EXPECT_LT(content.rfind("$upscope $end"), content.find("$enddefinitions"));
 }
 
-// §21.7.2.3 (printed page 691): the scope type of a $scope names the kind of
-// scope it opens -- begin for a named sequential block, fork for a named
-// parallel block, task for a task -- and a variable those declare is dumped
-// within its own, the fork's inside the begin block holding it. None of them
-// is a module.
 class VcdScopeKindSim : public VcdDumpFromSourceTestBase {};
 
 TEST_F(VcdScopeKindSim, BlocksAndTasksOpenScopesOfTheirOwnKind) {
@@ -664,11 +490,6 @@ TEST_F(VcdScopeKindSim, BlocksAndTasksOpenScopesOfTheirOwnKind) {
   EXPECT_EQ(kDump.find("$scope module tk"), std::string::npos) << kDump;
 }
 
-// §21.7.2.3: a `module` scope is a top-level module or a module instance, and
-// a package is instantiated nowhere, so its variables are declared under a
-// scope of its own at the top level of the definitions, beside the module's:
-// no scope is open where p's opens. It was opened inside m, as if p were an
-// instance m declared.
 class VcdPackageScopeSim : public VcdDumpFromSourceTestBase {};
 
 TEST_F(VcdPackageScopeSim, APackageIsATopLevelScopeOfTheDump) {

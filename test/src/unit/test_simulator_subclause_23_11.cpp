@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §23.11 (printed page 773): every identifier of a bind instantiation is
-// resolved as seen from the bind target, and the standard's example binds
-// `i_mycheck(.*, ...)`, so the ports `.*` reaches connect to the target's
-// signals of their names (§23.3.2.4). A bound instance built its connections
-// from the named and ordered ones alone, and v1 read x and v2 0.
 TEST(BindInstantiation, WildcardConnectsPortsToTargetSignals) {
   SimFixture f;
   EXPECT_EQ(
@@ -35,8 +30,6 @@ TEST(BindInstantiation, WildcardConnectsPortsToTargetSignals) {
       "p1 4 p2 68 v1 1 v2 7\n");
 }
 
-// Each instance of the target gives `.*` its own signals, a target's port among
-// them, and a port the target has no name for takes its default value.
 TEST(BindInstantiation, WildcardReadsEachTargetInstanceAndPortDefaults) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module unit(input var int a);\n"
@@ -56,9 +49,6 @@ TEST(BindInstantiation, WildcardReadsEachTargetInstanceAndPortDefaults) {
             "2 20 5\n3 30 5\n");
 }
 
-// §23.11 with §23.6: a hierarchical name from top reads the variables of the
-// instance a bind puts in each sub, s1.c.pass reading s1's 3 and s2.c.pass
-// s2's 4. The reference was reported unresolved and nothing ran.
 TEST(BindInstantiation, HierarchicalNameReadsABoundInstancesVariable) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m2(input var int a);\n"
@@ -78,9 +68,6 @@ TEST(BindInstantiation, HierarchicalNameReadsABoundInstancesVariable) {
             "3 4\n");
 }
 
-// §23.11: `bind sub: s2` written in top inserts the instance into top's s2
-// alone, so only s2's prints, 4; bound into both, s1's would print 3 as well.
-// Nothing was bound and nothing printed.
 TEST(BindInstantiation, TargetInstanceListBindsTheListedInstanceAlone) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m2(input var int a);\n"

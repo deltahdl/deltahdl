@@ -1,6 +1,3 @@
-// §26.3: the scope-resolution references a design element's code makes,
-// `p::x`, gathered for the checks on what their bases name.
-
 #include "elaborator/scope_resolution_bases.h"
 
 #include <vector>
@@ -39,11 +36,6 @@ void CollectProcScopeBases(const Stmt* s, std::vector<const Expr*>& out) {
       s->kind == StmtKind::kNonblockingAssign) {
     CollectScopeBases(s->rhs, out);
   }
-  // §26.3 puts no condition on where the assignment carrying a scope-resolution
-  // prefix stands, so every position a statement holds a statement in is one
-  // this collection reaches. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
   ForEachChildStmt(s,
                    [&](Stmt* const& sub) { CollectProcScopeBases(sub, out); });
 }

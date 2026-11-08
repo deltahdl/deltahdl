@@ -11,54 +11,31 @@
 namespace delta {
 namespace {
 
-// §36.10.3 (Traversing expressions) says how an application walks an expression
-// the source wrote: an expression of several operands comes back as a
-// vpiOperation handle, vpiOpType tells how many operands it has, and the
-// operation is evaluated after its subexpressions, so it binds least tightly of
-// anything in the expression. It then prints the routine that does the walking
-// - traverseExpr(), which switches on vpi_get(vpiType, expr), and for a
-// vpiOperation iterates vpiOperand and recurses into each operand vpi_scan()
-// hands back.
-//
-// Nothing served vpiOperand. It is a relation tag and no object's type is one,
-// so the generic traversal - which looks for a child whose own type is the type
-// asked for - reached no operand of any operation, and the routine the clause
-// prints descended into nothing.
 class TraversingExpressions : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // The operation arm of §36.10.3's traverseExpr(): iterate vpiOperand and
-  // recurse into each operand vpi_scan() hands back.
   void TraverseOperands(vpiHandle expr) {
     vpiHandle sub_expr_i = vpi_iterate(vpiOperand, expr);
-    if (sub_expr_i == nullptr) return;  // else it is of op type vpiNullOp
+    if (sub_expr_i == nullptr) return;
     while (vpiHandle sub_expr_h = vpi_scan(sub_expr_i)) {
       TraverseExpr(sub_expr_h);
     }
   }
 
-  // §36.10.3's own traverseExpr(), with the leaves recorded rather than
-  // processed so a case can say which of them the walk arrived at. The clause
-  // writes the two arms as a switch on vpi_get(vpiType, expr); they are written
-  // here as the operation test and the default beside it, which the nesting
-  // limit clang-tidy holds a test function under leaves room for.
   void TraverseExpr(vpiHandle expr) {
     if (vpi_get(vpiType, expr) == vpiOperation) {
       TraverseOperands(expr);
       return;
     }
-    leaves_.push_back(expr);  // do whatever to the leaf object
+    leaves_.push_back(expr);
   }
 
   std::vector<vpiHandle> leaves_;
   VpiContext ctx_;
 };
 
-// §36.10.3: an operation reaches the operands it was written with, in that
-// order. They carry their own expression kinds, which is what the recursion in
-// the clause's routine switches on.
 TEST_F(TraversingExpressions, AnOperationReachesItsOperands) {
   VpiObject left;
   left.type = vpiConstant;
@@ -77,22 +54,19 @@ TEST_F(TraversingExpressions, AnOperationReachesItsOperands) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// §36.10.3: the clause's routine run over a complex expression. The operation
-// standing over the others is evaluated after its subexpressions, so the walk
-// descends through it and arrives at every leaf, in written order.
 TEST_F(TraversingExpressions, TheClausesRoutineArrivesAtEveryLeaf) {
   VpiObject a;
   a.type = vpiConstant;
   VpiObject b;
   b.type = vpiRefObj;
-  VpiObject inner;  // a + b, the subexpression evaluated first
+  VpiObject inner;
   inner.type = vpiOperation;
   inner.op_type = vpiAddOp;
   inner.children = {&a, &b};
 
   VpiObject c;
   c.type = vpiConstant;
-  VpiObject outer;  // (a + b) * c, the least precedence in the expression
+  VpiObject outer;
   outer.type = vpiOperation;
   outer.op_type = vpiMultOp;
   outer.children = {&inner, &c};
@@ -105,9 +79,6 @@ TEST_F(TraversingExpressions, TheClausesRoutineArrivesAtEveryLeaf) {
   EXPECT_EQ(VpiObjectOf(leaves_[2]), &c);
 }
 
-// §36.10.3: vpiOpType is the property that tells how many operands there are. A
-// null operation takes none, which is the case the clause's routine comments on
-// where the iteration yields no iterator.
 TEST_F(TraversingExpressions, ANullOperationTakesNoOperands) {
   VpiObject null_op;
   null_op.type = vpiOperation;
@@ -120,9 +91,6 @@ TEST_F(TraversingExpressions, ANullOperationTakesNoOperands) {
   EXPECT_TRUE(leaves_.empty());
 }
 
-// §36.10.3: the relation belongs to the operation. A leaf the walk arrives at
-// is not one, so asking it for operands reaches none even when it carries
-// expression children of its own.
 TEST_F(TraversingExpressions, TheRelationIsTheOperationsOwn) {
   VpiObject child;
   child.type = vpiConstant;

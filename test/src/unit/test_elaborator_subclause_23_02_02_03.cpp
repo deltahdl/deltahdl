@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -85,16 +84,11 @@ TEST(PortKindDataTypeDirection, ExplicitPortTakesExpressionDataType) {
   EXPECT_FALSE(f.has_errors);
   auto& ports = design->top_modules[0]->ports;
   ASSERT_EQ(ports.size(), 3u);
-  // §23.2.2.3: the explicitly named port p_b takes the self-determined data
-  // type of its connection expression s_b, a 6-bit value declared in the body.
   EXPECT_EQ(ports[1].direction, Direction::kInput);
   EXPECT_EQ(ports[1].type_kind, DataTypeKind::kLogic);
   EXPECT_EQ(ports[1].width, 6u);
 }
 
-// §23.2.2.3 with §11.4.12: an explicitly named port over a concatenation of
-// 2-state variables takes the 2-state type the concatenation has, and one
-// reading a 4-state operand the 4-state type (#7346).
 TEST(PortKindDataTypeDirection, ExplicitPortOverTwoStateObjectsIsBit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -113,14 +107,6 @@ TEST(PortKindDataTypeDirection, ExplicitPortOverTwoStateObjectsIsBit) {
 }
 
 TEST(PortKindDataTypeDirection, VarFirstPortDefaultedToInoutIsRejected) {
-  // §23.2.2.3 (LRM example mh4): a first port declared only with var omits the
-  // direction, which defaults to inout. An inout port may not carry a variable
-  // data type, so applying the default-direction rule surfaces the error the
-  // LRM documents for mh4. The rejection is observable only after elaboration.
-  // The report is the §23.3.3.2 rule against a variable data type on an inout
-  // port, emitted by DiagnosePortTypeConstraints in
-  // src/elaborator/elaborator_module_ports.cpp once §23.2.2.3's default
-  // direction has made this port an inout.
   ElabFixture f;
   ElaborateSrc("module m(var x); endmodule", f, "m");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -130,10 +116,6 @@ TEST(PortKindDataTypeDirection, VarFirstPortDefaultedToInoutIsRejected) {
 }
 
 TEST(PortKindDataTypeDirection, FirstPortExplicitTypeElaboratesAsInoutNet) {
-  // §23.2.2.3: an explicit data type on the first port with no direction
-  // keyword still resolves to an inout port (direction default) that is a net
-  // (inout port kind default), carrying the explicit type's width through
-  // elaboration.
   ElabFixture f;
   auto* design = ElaborateSrc("module m(integer x); endmodule", f, "m");
   ASSERT_NE(design, nullptr);
@@ -146,8 +128,6 @@ TEST(PortKindDataTypeDirection, FirstPortExplicitTypeElaboratesAsInoutNet) {
 }
 
 TEST(PortKindDataTypeDirection, InputOmittedKindElaboratesAsNet) {
-  // §23.2.2.3: for an input port with the port kind omitted, the kind defaults
-  // to a net; the elaborated port therefore is not a variable.
   ElabFixture f;
   auto* design = ElaborateSrc("module m(input x); endmodule", f, "m");
   ASSERT_NE(design, nullptr);
@@ -156,8 +136,6 @@ TEST(PortKindDataTypeDirection, InputOmittedKindElaboratesAsNet) {
 }
 
 TEST(PortKindDataTypeDirection, OutputImplicitTypeElaboratesAsNet) {
-  // §23.2.2.3: an output port whose data type is left implicit (only a packed
-  // range here) defaults its port kind to a net, so is_var is false.
   ElabFixture f;
   auto* design = ElaborateSrc("module m(output [5:0] x); endmodule", f, "m");
   ASSERT_NE(design, nullptr);
@@ -168,8 +146,6 @@ TEST(PortKindDataTypeDirection, OutputImplicitTypeElaboratesAsNet) {
 }
 
 TEST(PortKindDataTypeDirection, OutputExplicitTypeElaboratesAsVariable) {
-  // §23.2.2.3: an output port declared with an explicit data type defaults its
-  // port kind to variable, so the elaborated port reports is_var.
   ElabFixture f;
   auto* design = ElaborateSrc("module m(output logic x); endmodule", f, "m");
   ASSERT_NE(design, nullptr);
@@ -180,7 +156,6 @@ TEST(PortKindDataTypeDirection, OutputExplicitTypeElaboratesAsVariable) {
 }
 
 TEST(PortKindDataTypeDirection, RefPortElaboratesAsVariable) {
-  // §23.2.2.3: a ref port is always a variable, independent of its data type.
   ElabFixture f;
   auto* design = ElaborateSrc("module m(ref [5:0] x); endmodule", f, "m");
   ASSERT_NE(design, nullptr);
@@ -190,9 +165,6 @@ TEST(PortKindDataTypeDirection, RefPortElaboratesAsVariable) {
   EXPECT_TRUE(port.is_var);
 }
 
-// §23.2.2.3: a ref port is always a variable, so one written with a net type
-// is reported, in the ANSI header and in a non-ANSI body declaration alike,
-// while a ref port of a variable type in the same design is not.
 TEST(PortKindDataTypeDirection, RefPortDeclaredWithANetTypeIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -214,12 +186,6 @@ TEST(PortKindDataTypeDirection, RefPortDeclaredWithANetTypeIsReported) {
       ReportedError(f.diag.Diagnostics(), "ref port 'y'", 1, "23.2.2.3"));
 }
 
-// §23.2.2.3 makes an input or inout with no port kind a net, and §6.7.1 gives
-// a net only a 4-state integral type or an unpacked aggregate of such types,
-// so `input string s`, `input real r` and `inout event e` each declare an
-// illegal net and are reported at their own line, where `input var string v`
-// declares a variable and is not. Only integral and aggregate types were
-// judged, and none of the three was reported.
 TEST(PortKindDataTypeDirection, ANetPortOfATypeNoNetCanHaveIsRejected) {
   ElabFixture f;
   ElaborateSrc(

@@ -16,18 +16,13 @@ using namespace delta;
 
 namespace {
 
-// The recipient: its owner identity, the name of the key of its that the
-// sender holds, and the key.
 constexpr std::string_view kRecipient = "cygnus-eda";
 constexpr std::string_view kRecipientsKeyName = "cygnus-2026";
 constexpr std::string_view kRecipientsKey = "cygnus-envelope-key";
 
-// The owner and name of the symmetric key the design is under, which no run
-// holds and the sender's run therefore makes.
 constexpr std::string_view kProvider = "halo-ip";
 constexpr std::string_view kProvidersKeyName = "halo-2026";
 
-// The design, and the licences written beside it inside the block.
 constexpr std::string_view kDesign = "  initial result = 42;\n";
 constexpr std::string_view kDecryptLicense =
     "`pragma protect decrypt_license=(library=\"lic.so\", "
@@ -40,7 +35,6 @@ bool Holds(std::string_view text, std::string_view needle) {
   return text.find(needle) != std::string_view::npos;
 }
 
-// The keys the sender's run and the recipient's run hold.
 ProtectKeyList RecipientsKeys() {
   ProtectKeyList keys;
   keys.Add({std::string(kRecipient), std::string(kRecipientsKeyName),
@@ -48,10 +42,6 @@ ProtectKeyList RecipientsKeys() {
   return keys;
 }
 
-// An input of §O.5.1 with cleartext on either side of its one block: the
-// recipient's key designated ahead of the block with the author's name and
-// information, the data key's owner and name, and a digest asked for, and
-// the licences and the design inside it.
 std::string TheSendersInput() {
   std::string src = "module m;\n";
   src += "`pragma protect author=\"Halo Author\"\n";
@@ -72,12 +62,10 @@ std::string TheSendersInput() {
   return src;
 }
 
-// The envelope the sender's run writes for that input.
 std::string TheEnvelope() {
   return EncryptEnvelopes(TheSendersInput(), "", RecipientsKeys());
 }
 
-// The line on which `envelope` records `block` beneath its keyword.
 std::string BlockBeneath(std::string_view envelope, std::string_view block) {
   std::string keyword = "`pragma protect ";
   keyword.append(block).append("\n");
@@ -87,8 +75,6 @@ std::string BlockBeneath(std::string_view envelope, std::string_view block) {
   return std::string(envelope.substr(from, envelope.find('\n', from) - from));
 }
 
-// The text the recipient's run, holding its own key and the licence the block
-// carries (§34.5.28.2), produces from `envelope`.
 std::string TheRecipientGets(const std::string& envelope) {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -99,10 +85,6 @@ std::string TheRecipientGets(const std::string& envelope) {
   return pp.Preprocess(mgr.AddFile("<recipient>", envelope));
 }
 
-// §O.5.2: the output is the cleartext copied to its sections and, for each
-// block, the eleven expressions, the key block holding the data key's owner,
-// the data_method and the data key itself, the data composed of the
-// licences and the text, and the blocks on the lines beneath their keywords.
 TEST(DigitalEnvelopeOutput, TheOutputIsWhatTheAnnexHasTheToolGenerate) {
   EXPECT_TRUE(CleartextIsCopiedToTheDigitalEnvelopeOutput());
   auto expressions = ExpressionsTheDigitalEnvelopeOutputCarries();
@@ -133,10 +115,6 @@ TEST(DigitalEnvelopeOutput, TheOutputIsWhatTheAnnexHasTheToolGenerate) {
   EXPECT_TRUE(DigitalEnvelopeKeyBlockDataStandBeneathTheKeyword());
 }
 
-// §O.5.2 against the flow: the cleartext on either side of the block is in
-// the output, and the block became a region carrying each of the eleven
-// expressions, the author's name and information among them since the
-// input provided them, with the digest and the data beneath their keywords.
 TEST(DigitalEnvelopeOutput, TheCleartextIsCopiedAndTheExpressionsGenerated) {
   std::string envelope = TheEnvelope();
   EXPECT_TRUE(Holds(envelope, "module m;\n"));
@@ -153,10 +131,6 @@ TEST(DigitalEnvelopeOutput, TheCleartextIsCopiedAndTheExpressionsGenerated) {
   EXPECT_FALSE(BlockBeneath(envelope, "data_block").empty());
 }
 
-// §O.5.2 against the flow: the key block, opened under the recipient's key,
-// holds the data key's owner, the data_method and the data key itself, none
-// of which is in the clear; and the data block holds the licences and the
-// text, none in the clear either, which the recipient's run gets back.
 TEST(DigitalEnvelopeOutput, TheKeyBlockAndTheDataBlockHoldWhatTheAnnexSays) {
   std::string envelope = TheEnvelope();
   std::string key_block;

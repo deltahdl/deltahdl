@@ -21,11 +21,6 @@ namespace delta {
 
 namespace {
 
-// The declaration of the property `name` on the class chain from `type` where
-// it is an event, `event e` or `static event e`, with the class declaring it
-// in `declaring`. The nearest declaration of the name answers (§8.13), so a
-// class between that redeclares it as anything else hides the event and
-// answers null.
 const ClassMember* EventPropertyDecl(const ClassTypeInfo* type,
                                      std::string_view name,
                                      const ClassTypeInfo*& declaring) {
@@ -45,8 +40,6 @@ const ClassMember* EventPropertyDecl(const ClassTypeInfo* type,
   return nullptr;
 }
 
-// The event in `slot`, made on the first reference: a variable of the event
-// kind, one bit wide, that no trigger has set.
 Variable* EventIn(Variable*& slot, Arena& arena) {
   if (slot == nullptr) {
     slot = arena.Create<Variable>();
@@ -56,8 +49,6 @@ Variable* EventIn(Variable*& slot, Arena& arena) {
   return slot;
 }
 
-// The event the property `name` holds on the object `obj`, the class's own
-// where the property is static (§8.9).
 Variable* OnObject(ClassObject* obj, std::string_view name, Arena& arena) {
   const ClassTypeInfo* declaring = nullptr;
   const ClassMember* member = EventPropertyDecl(obj->type, name, declaring);
@@ -69,7 +60,6 @@ Variable* OnObject(ClassObject* obj, std::string_view name, Arena& arena) {
   return EventIn(obj->event_properties[std::string(name)], arena);
 }
 
-// The event the static property `name` of the class chain from `cls` holds.
 Variable* OnClass(const ClassTypeInfo* cls, std::string_view name,
                   Arena& arena) {
   const ClassTypeInfo* declaring = nullptr;
@@ -78,8 +68,6 @@ Variable* OnClass(const ClassTypeInfo* cls, std::string_view name,
   return EventIn(declaring->static_event_properties[std::string(name)], arena);
 }
 
-// A bare name inside a method: the running object's event property, else the
-// running class's static one.
 Variable* OfBareName(std::string_view name, SimContext& ctx, Arena& arena) {
   if (ClassObject* self = ctx.CurrentThis()) {
     if (Variable* ev = OnObject(self, name, arena)) return ev;
@@ -88,16 +76,12 @@ Variable* OfBareName(std::string_view name, SimContext& ctx, Arena& arena) {
   return cls != nullptr ? OnClass(cls, name, arena) : nullptr;
 }
 
-// The object the left side of `side.ev` designates: a handle path names its
-// object without evaluating anything (HandleSideObject), and an element of an
-// array of handles, `m_events[obj]`, is read for the handle it holds.
 ClassObject* ObjectOfSide(const Expr* side, SimContext& ctx, Arena& arena) {
   if (ClassObject* obj = HandleSideObject(side, ctx, arena)) return obj;
   if (side->kind != ExprKind::kSelect) return nullptr;
   return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
 }
 
-// `C::ev`, a static event property named through its class.
 Variable* OfScopeForm(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->lhs->kind != ExprKind::kIdentifier) return nullptr;
   const ClassTypeInfo* cls = ctx.FindClassType(expr->lhs->text);
@@ -119,16 +103,11 @@ Variable* ClassEventVariable(const Expr* expr, SimContext& ctx, Arena& arena) {
   return obj != nullptr ? OnObject(obj, expr->rhs->text, arena) : nullptr;
 }
 
-// The text one index of an element's name spells: a string key quoted, any
-// other value its number, as the declaration named the element.
 static std::string EventIndexText(const Logic4Vec& index) {
   return index.is_string ? "\"" + Logic4VecToString(index) + "\""
                          : std::to_string(index.ToUint64());
 }
 
-// The name of the element a chain of single-index selects names, `grid[1][0]`
-// of `grid[j][k]`, each index evaluated now, and the identifier at its root;
-// false where the chain holds a range select or roots in anything else.
 static bool EventElementKey(const Expr* expr, SimContext& ctx, Arena& arena,
                             std::string& key, const Expr*& root) {
   if (expr == nullptr) return false;
@@ -146,9 +125,6 @@ static bool EventElementKey(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The event at the position a one-index select `q[i]` names in the queue of
-// events `q`, held there by its identity; null where the queue holds no events
-// or the index is unknown or past its end.
 static Variable* QueueEventElement(const QueueObject& q, const Expr* select,
                                    SimContext& ctx, Arena& arena) {
   Logic4Vec index = EvalExpr(select->index, ctx, arena);
@@ -159,8 +135,6 @@ static Variable* QueueEventElement(const QueueObject& q, const Expr* select,
   return ctx.EventOfIdentity(q.elements[i].ToUint64());
 }
 
-// The event of an associative array's element under `key`, made on its first
-// reference so that every trigger and wait of that key reaches one event.
 static Variable* NewAssocEventElement(std::string key, SimContext& ctx,
                                       Arena& arena) {
   auto* stored =

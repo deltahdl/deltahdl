@@ -20,7 +20,6 @@ TEST_F(AnnexHParseTest, UrandomCallForms) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// The $urandom syntax permits an optional seed argument: $urandom [ (seed) ].
 TEST_F(AnnexHParseTest, UrandomAcceptsSeedArgument) {
   auto* unit = Parse(
       "module m;\n"

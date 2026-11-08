@@ -41,9 +41,6 @@ TEST(ChargeDecayParsing, ThreeDelaysSlotIntoRiseFallDecay) {
   EXPECT_EQ(item->net_delay_decay->int_val, 9u);
 }
 
-// §28.16.2: a trireg net declaration can contain up to three delays. With a
-// single delay, only the rise/transition delay slot is filled; there is no fall
-// delay and no charge decay time.
 TEST(ChargeDecayParsing, OneDelayFillsRiseOnly) {
   auto r = Parse(
       "module t;\n"
@@ -60,10 +57,6 @@ TEST(ChargeDecayParsing, OneDelayFillsRiseOnly) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// §28.16.2: with two delays the first two slots (the 1 and 0 transition delays)
-// are filled, but no third delay is present, so there is no charge decay time
-// -- the decay slot stays empty. This is the boundary that distinguishes a
-// decaying trireg from one whose stored charge is ideal.
 TEST(ChargeDecayParsing, TwoDelaysGiveRiseAndFallNoDecay) {
   auto r = Parse(
       "module t;\n"
@@ -81,15 +74,11 @@ TEST(ChargeDecayParsing, TwoDelaysGiveRiseAndFallNoDecay) {
   EXPECT_EQ(item->net_delay_decay, nullptr);
 }
 
-// §28.16.2 negative form: a trireg accepts at most three delays. A fourth delay
-// term exceeds that limit and is rejected as a syntax error.
 TEST(ChargeDecayParsing, MoreThanThreeDelaysRejected) {
   auto r = Parse(
       "module t;\n"
       "  trireg #(1, 2, 3, 4) cap;\n"
       "endmodule\n");
-  // Parser::ParseGateDelay closes the delay list after the third value and
-  // files the missing ')' under §28.16, not under §28.16.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 

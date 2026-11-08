@@ -110,11 +110,6 @@ TEST(PliPostNbaSim, PostNBAEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// Edge case: an event created from within a Post-NBA callback that lands back
-// in the Post-NBA region of the same time slot must still be evaluated, and
-// still only after the NBA region has run. Exercises the scheduler draining the
-// region to empty so the "create events after NBA" guarantee holds for
-// re-entrant scheduling.
 TEST(PliPostNbaSim, PostNBAReentrantEventStillRunsAfterNBA) {
   Arena arena;
   Scheduler sched(arena);
@@ -141,15 +136,6 @@ TEST(PliPostNbaSim, PostNBAReentrantEventStillRunsAfterNBA) {
   EXPECT_EQ(order[2], "post_nba_reentrant");
 }
 
-// End-to-end coverage of the guarantee that Post-NBA follows the NBA region,
-// building the consumed NBA update from the dependency §4.4.2.4's real source
-// syntax: a nonblocking assignment. Parsing/elaborating/lowering `q <= 42`
-// schedules q's update into the real NBA region at time 0. A Post-NBA callback
-// registered in that same slot (the only way PLI code reaches this region -
-// there is no HDL syntax for it) must sample the value the NBA update wrote,
-// which can only be true if the Post-NBA region drains after NBA. Driving the
-// whole pipeline - not a hand-built NBA event - is what ties the ordering rule
-// to a genuine nonblocking-assignment update.
 TEST(PliPostNbaSim, PostNBAReadsValueFromRealNonblockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(

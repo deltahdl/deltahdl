@@ -25,8 +25,6 @@ namespace delta {
 std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod) {
   std::vector<RtlirNet> nets = mod.nets;
   for (const RtlirPort& port : mod.ports) {
-    // A variable port, an interface port among them, declares no net, and an
-    // interconnect port's net is made apart (FillInterconnectNetObject).
     if (port.net_type == NetType::kNone || port.is_interconnect) continue;
     const bool kDeclared = std::ranges::any_of(
         mod.nets, [&](const RtlirNet& net) { return net.name == port.name; });
@@ -36,8 +34,6 @@ std::vector<RtlirNet> VpiDeclaredNets(const RtlirModule& mod) {
     net.width = port.width;
     net.dtype = port.dtype;
     net.data_kind = port.data_kind;
-    // An inline enum holds its base type's range where a dimension written over
-    // a named type or a struct or union is held (§37.16 detail 1).
     net.has_declared_packed_dim = port.dtype != nullptr &&
                                   port.dtype->packed_dim_left != nullptr &&
                                   port.dtype->kind != DataTypeKind::kEnum;
@@ -56,9 +52,7 @@ bool VpiNetIsInterconnect(const RtlirNet& net) {
 std::vector<RtlirVariable> VpiDeclaredVariables(const RtlirModule& mod) {
   std::vector<RtlirVariable> vars = mod.variables;
   for (const RtlirPort& port : mod.ports) {
-    // A net port declares a net, and an interface port (§25.3) no variable.
     if (port.net_type != NetType::kNone || port.is_interface_port) continue;
-    // A structure or union port already declares its variable (§7.2.1).
     const bool kDeclared = std::ranges::any_of(
         mod.variables,
         [&](const RtlirVariable& var) { return var.name == port.name; });
@@ -93,8 +87,6 @@ std::vector<std::string> VpiDeclaredNetKeys(const RtlirNet& net,
 
 namespace {
 
-// Whether §37.17 detail 12 gives `obj` bits: a logic or bit variable, a packed
-// array of them, or a packed struct or union, which detail 20 makes a vector.
 bool HasVarBits(const VpiObject& obj) {
   if (obj.type == kVpiReg || obj.type == vpiBitVar ||
       obj.type == vpiPackedArrayVar) {
@@ -104,8 +96,6 @@ bool HasVarBits(const VpiObject& obj) {
          obj.decl_vector;
 }
 
-// The bits of a variable: those its packed dimensions index, or for a packed
-// struct or union declared with none, its implicit [n-1:0] (§7.2.1).
 std::optional<PackedDims> VarBitDims(const VpiObject& obj,
                                      const RtlirVariable& var,
                                      SimContext& ctx) {
@@ -116,21 +106,16 @@ std::optional<PackedDims> VarBitDims(const VpiObject& obj,
   return PackedDims{PackedRange::Implicit(var.width)};
 }
 
-// One object a vector's bits hang from, the kind of bit it has and the
-// dimensions they are indexed by.
 struct BitTarget {
   VpiObject* parent;
   int bit_type;
   PackedDims dims;
 };
 
-// The nets the instance at `prefix` declares that have bits, its vector nets.
 void AddNetBitTargets(const RtlirModule* mod, const std::string& prefix,
                       const VpiObjectMap& objects, SimContext& ctx,
                       std::vector<BitTarget>& targets) {
   for (const RtlirNet& net : VpiDeclaredNets(*mod)) {
-    // §37.24: an interconnect's packed dimensions make interconnect arrays
-    // rather than bits (AttachInterconnects).
     if (VpiNetIsInterconnect(net)) continue;
     auto dims = DeclaredPackedDims(net.dtype, net.width, ctx);
     if (!dims) continue;
@@ -142,10 +127,6 @@ void AddNetBitTargets(const RtlirModule* mod, const std::string& prefix,
   }
 }
 
-// The keys the run holds `var`'s objects under, `key` being the variable's:
-// that key alone, or for an array whose every unpacked dimension is fixed, the
-// key of each of its elements, which is a variable of the element's type and
-// has bits as one (§37.17 details 2 and 18).
 std::vector<std::string> VariableBitKeys(const RtlirVariable& var,
                                          const std::string& key) {
   std::vector<std::string> keys{key};
@@ -165,10 +146,6 @@ std::vector<std::string> VariableBitKeys(const RtlirVariable& var,
   return keys;
 }
 
-// The objects of the instance at `prefix` that have bits: its vector nets and
-// its packed logic and bit variables, the elements of arrays of them included.
-// The ranges are the declarations', read in the instance's own scope, where
-// its parameters have their instance's values.
 std::vector<BitTarget> BitTargets(const RtlirModule* mod,
                                   const std::string& prefix,
                                   const VpiObjectMap& objects,
@@ -189,8 +166,6 @@ std::vector<BitTarget> BitTargets(const RtlirModule* mod,
   return targets;
 }
 
-// The indices, outermost first, naming the bit `offset` places above the least
-// significant end of a value of `dims`.
 std::vector<int64_t> IndicesAtOffset(const PackedDims& dims, int64_t offset) {
   std::vector<int64_t> indices(dims.size());
   for (std::size_t k = dims.size(); k-- > 0;) {
@@ -201,14 +176,6 @@ std::vector<int64_t> IndicesAtOffset(const PackedDims& dims, int64_t offset) {
   return indices;
 }
 
-// §37.16, §37.17: the bits of `target.parent`, in declaration order with the
-// left index first, each holding its offset into the parent's storage, size 1
-// and its index, which vpiIndex reaches as a constant (detail 13). Of a value
-// with more than one packed dimension, a bit is named by an index in each, and
-// its index is the innermost. A net bit's and a var bit's vpiIndex iteration
-// reaches its indices, starting with its own and working outward (§37.16
-// detail 10). The parent keeps the
-// dimensions, which a select of it indexes.
 void MakeVectorBits(const BitTarget& target, const VpiAttachBuild& build) {
   VpiObject* parent = target.parent;
   parent->packed_dims = target.dims;
@@ -240,10 +207,6 @@ void MakeVectorBits(const BitTarget& target, const VpiAttachBuild& build) {
 
 void AttachVectorBits(const RtlirDesign* design, const VpiObjectMap& objects,
                       SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.16 and §37.17: a vector net has a net bit per bit and a packed logic or
-  // bit variable a var bit per bit, each reached by its index (§38.19) and
-  // holding that bit of its parent's value. A run made none, so neither the
-  // vpiBit iteration nor an index reached a bit of any object.
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {

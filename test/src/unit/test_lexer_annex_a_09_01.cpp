@@ -50,10 +50,6 @@ TEST(AttributeTokenLexing, AttrStartNoSpaceBetweenParenStar) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kAttrEnd);
 }
 
-// A.9.1 gives attribute_instance ::= (* attr_spec { , attr_spec } *), so the
-// (* opening one is two adjacent characters. The space in "(a * b)" leaves an
-// ordinary parenthesized expression, and this fails if the lexer returns
-// anything but kLParen, kIdentifier, kStar, kIdentifier, kRParen for it.
 TEST(AttributeTokenLexing, ParenStarParenNotAttribute) {
   auto tokens = Lex("(a * b)");
   ASSERT_GE(tokens.size(), 5u);

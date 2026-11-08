@@ -544,11 +544,6 @@ TEST(DesignBuildingBlockParsing, TimeunitMatchingRepeatInProgramAccepted) {
   EXPECT_EQ(r.cu->programs[0]->time_unit, TimeUnit::kNs);
 }
 
-// The slash form of `timeunit` is admitted in every design-element scope, not
-// only in modules and the compilation unit. These exercise it in an interface,
-// a program, and a package so each syntactic position's combined unit/precision
-// parse is observed; the package case drives the distinct code path that stores
-// the slash-supplied precision onto the package declaration.
 TEST(DesignBuildingBlockParsing, TimeunitSlashInInterfaceSetsBoth) {
   auto r = PreprocessAndParse(
       "interface ifc;\n"
@@ -654,11 +649,6 @@ TEST(DesignBuildingBlockParsing, TimeunitBeforeNonAnsiPortDeclAccepted) {
   EXPECT_EQ(r.cu->modules[0]->time_unit_magnitude, 10);
 }
 
-// §3.14.2.2: the time scope's timeunit and timeprecision declarations precede
-// every other item, A.10 footnote 3 making one written later legal only as a
-// matching repeat. A null item, an anonymous program, a modport and a bind
-// directive are items like any other, though none is kept in the body's item
-// list, so a declaration after one is a later item (#7586).
 TEST(DesignBuildingBlockParsing, TimeunitAfterAnUnlistedItemIsALaterItem) {
   auto r = Parse(
       "package p1;\n"
@@ -700,8 +690,6 @@ TEST(DesignBuildingBlockParsing, TimeunitAfterAnUnlistedItemIsALaterItem) {
   EXPECT_TRUE(ReportedError(r.diags, kUnit, 24, "3.14.2.2"));
 }
 
-// The declaration that opens the body is the scope's first, and a null item
-// after it leaves a matching repeat legal (#7586).
 TEST(DesignBuildingBlockParsing, TimeunitBeforeANullItemIsTheFirst) {
   auto r = Parse(
       "timeunit 1ns;\n"
@@ -723,9 +711,6 @@ TEST(DesignBuildingBlockParsing, TimeunitBeforeANullItemIsTheFirst) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// The compilation-unit scope is a time scope of its own, and the null item and
-// a bind directive written in it are items that leave none of its lists longer
-// (#7586).
 TEST(DesignBuildingBlockParsing, TimeunitAfterAnUnlistedCuItemIsALaterItem) {
   const char* const kUnit =
       "timeunit as a later item requires a matching prior declaration in the "

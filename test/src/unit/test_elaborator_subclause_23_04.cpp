@@ -159,13 +159,6 @@ TEST(NestedModuleElaboration, MultiplePortlessImplicitlyInstantiated) {
   ASSERT_EQ(mod->children.size(), 2u);
 }
 
-// §23.4: the implicit-instantiation rule triggers on a nested module having no
-// PORTS. A parameter is not a port, so a port-less nested module that merely
-// carries a defaulted parameter is still implicitly instantiated once with an
-// instance name equal to the module name. The default is applied when the
-// implicit instance is elaborated, sizing the nested net -- proving the
-// instance is a real elaboration and that parameter ports do not count as ports
-// for this rule.
 TEST(NestedModuleElaboration,
      PortlessParameterizedNestedModuleImplicitlyInstantiated) {
   ElabFixture f;
@@ -261,11 +254,6 @@ TEST(NestedModuleElaboration, MixedPortlessAndPortedNested) {
   EXPECT_EQ(mod->children[0].inst_name, "portless");
 }
 
-// §23.4: a name declared in a local (nested) module hides an outer name of the
-// same kind. A nested module declaration therefore shadows a top-level module
-// sharing its name, so the same identifier can denote different modules in
-// different parts of the design. Here the instance of `sub` inside `m` must
-// bind to the nested `sub` (whose net is local_net), not the top-level `sub`.
 TEST(NestedModuleElaboration, NestedModuleShadowsTopLevelModuleOfSameName) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -294,12 +282,6 @@ TEST(NestedModuleElaboration, NestedModuleShadowsTopLevelModuleOfSameName) {
   EXPECT_FALSE(has_global);
 }
 
-// §23.4: nested module declarations can build a library of modules local to
-// part of a design, letting the same module name appear in different parts and
-// denote different modules (the standard's `and2`-in-different-parts example).
-// Two sibling parts each declare a nested `and2` with a distinguishing net and
-// each instantiates it; every instance must bind to the `and2` local to its own
-// part, proving each enclosing scope keeps its own nested-module table.
 TEST(NestedModuleElaboration, SameNestedNameInDifferentPartsBindsLocally) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -343,17 +325,12 @@ TEST(NestedModuleElaboration, SameNestedNameInDifferentPartsBindsLocally) {
   ASSERT_NE(a_and2, nullptr);
   ASSERT_NE(b_and2, nullptr);
 
-  // Each part's `and2` carries only its own local net -- the two same-named
-  // nested modules are distinct definitions, not one shared module.
   EXPECT_TRUE(has_net(a_and2, "net_a"));
   EXPECT_FALSE(has_net(a_and2, "net_b"));
   EXPECT_TRUE(has_net(b_and2, "net_b"));
   EXPECT_FALSE(has_net(b_and2, "net_a"));
 }
 
-// §23.4: the implicit instantiation of a port-less nested module is a real
-// instantiation -- the nested module's body is elaborated, not merely
-// registered. The resolved instance must carry the nested module's contents.
 TEST(NestedModuleElaboration, ImplicitInstanceElaboratesNestedBody) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -375,8 +352,6 @@ TEST(NestedModuleElaboration, ImplicitInstanceElaboratesNestedBody) {
   EXPECT_TRUE(has_inner_net);
 }
 
-// The net named `name` among the nested module's, which is the first child of
-// the design's top module, or null when it holds none of the name.
 const RtlirNet* NestedModuleNet(const RtlirDesign* design,
                                 std::string_view name) {
   const auto& children = design->top_modules[0]->children;
@@ -387,11 +362,6 @@ const RtlirNet* NestedModuleNet(const RtlirDesign* design,
   return nullptr;
 }
 
-// §6.10 with §23.4: a name a continuous assignment inside a nested module
-// writes that no module declares, the enclosing ones included, is an implicit
-// net of the nested module's own scope, so the net the elaborator makes for
-// it refers to nothing outward. The lowerer reads RtlirNet::refers_outward to
-// materialize such a net under each instance.
 TEST(NestedModuleElaboration, UndeclaredImplicitNetOfNestedModuleIsItsOwn) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -411,10 +381,6 @@ TEST(NestedModuleElaboration, UndeclaredImplicitNetOfNestedModuleIsItsOwn) {
   EXPECT_FALSE(q->refers_outward);
 }
 
-// §23.4: a continuous assignment inside a nested module to a name the
-// enclosing module declares reaches that outer net, and the net the elaborator
-// pushes onto the nested module's list for the reference stands for it, so it
-// is marked as referring outward and no instance materializes it.
 TEST(NestedModuleElaboration, ImplicitNetForAnOuterNameRefersOutward) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -433,14 +399,6 @@ TEST(NestedModuleElaboration, ImplicitNetForAnOuterNameRefersOutward) {
   EXPECT_TRUE(w->refers_outward);
 }
 
-// §6.10 with §23.4: the outer name space being visible does not make a name
-// declared below the nested module's text one the nested module's assignment
-// was preceded by, and §6.10 assumes an implicit net of the assignment's own
-// scope for a name with no earlier declaration there or in a scope it can
-// directly reference. An outer w declared between M's endmodule and its
-// instance is declared after the assignment, so M's net w refers to nothing
-// outward. The names visible to M were taken where the instance stood, so w was
-// among them and the net was marked outward.
 TEST(NestedModuleElaboration,
      ImplicitNetForAnOuterNameDeclaredBelowTheNestedDeclarationIsItsOwn) {
   ElabFixture f;
@@ -460,10 +418,6 @@ TEST(NestedModuleElaboration,
   EXPECT_FALSE(w->refers_outward);
 }
 
-// The same rule for an instance §23.4 implies at the end of the module: the
-// names visible to M were taken there, after every item, so an outer w
-// declared anywhere below M counted as declared previously and the net was
-// marked outward. It is M's own.
 TEST(NestedModuleElaboration,
      ImplicitlyInstantiatedNestedModuleOwnsANetDeclaredBelowIt) {
   ElabFixture f;
@@ -482,12 +436,6 @@ TEST(NestedModuleElaboration,
   EXPECT_FALSE(w->refers_outward);
 }
 
-// §6.10 measures "previously" from the assignment's text, which stands in M's
-// declaration, wherever M's instance is written. With the instance above the
-// declaration and the outer w between the two, w is declared above M's text,
-// so M's assignment writes the outer net and M's net for it refers outward.
-// The names visible to M were taken where the instance stood, above w, so w
-// was not among them and M took the net as its own.
 TEST(NestedModuleElaboration,
      OuterNetDeclaredBetweenAnInstanceAboveAndTheNestedDeclarationIsOuter) {
   ElabFixture f;
@@ -507,9 +455,6 @@ TEST(NestedModuleElaboration,
   EXPECT_TRUE(w->refers_outward);
 }
 
-// The same instance above its declaration with the outer w declared below
-// the declaration: w is declared after M's assignment at every point, so M's
-// net is its own, as it is when the instance is written below.
 TEST(NestedModuleElaboration,
      InstanceAboveTheNestedDeclarationOwnsANetDeclaredBelowTheDeclaration) {
   ElabFixture f;
@@ -529,8 +474,6 @@ TEST(NestedModuleElaboration,
   EXPECT_FALSE(w->refers_outward);
 }
 
-// The net named `name` among the nets of the nested module two levels down:
-// the first child of the top module's first child, or null.
 const RtlirNet* DoublyNestedModuleNet(const RtlirDesign* design,
                                       std::string_view name) {
   const auto& children = design->top_modules[0]->children;
@@ -543,11 +486,6 @@ const RtlirNet* DoublyNestedModuleNet(const RtlirDesign* design,
   return nullptr;
 }
 
-// §23.4 through two levels: B is declared and instantiated in A, itself
-// declared and instantiated in top, so top's names are visible in B by way of
-// A's chain of enclosing scopes, and a v declared above A is what B's
-// assignment writes -- its net refers outward. Declared below A, v is not
-// declared previously at either level, and B's net is its own.
 TEST(NestedModuleElaboration, DoublyNestedImplicitNetRefersOutwardByOrder) {
   ElabFixture above;
   auto* design_above = Elaborate(
@@ -588,7 +526,6 @@ TEST(NestedModuleElaboration, DoublyNestedImplicitNetRefersOutwardByOrder) {
   EXPECT_FALSE(v_below->refers_outward);
 }
 
-// The module the instance `inst` of `m` resolved to, null for none.
 const RtlirModule* ChildModule(const RtlirModule* m, std::string_view inst) {
   for (const auto& c : m->children) {
     if (c.inst_name == inst) return c.resolved;
@@ -596,7 +533,6 @@ const RtlirModule* ChildModule(const RtlirModule* m, std::string_view inst) {
   return nullptr;
 }
 
-// Whether `m` declares a net named `name`.
 bool DeclaresNet(const RtlirModule* m, std::string_view name) {
   for (const auto& net : m->nets) {
     if (net.name == name) return true;
@@ -604,11 +540,6 @@ bool DeclaresNet(const RtlirModule* m, std::string_view name) {
   return false;
 }
 
-// §23.4: the outer name space is visible to a module declared nested in
-// another, the modules and interfaces its enclosing modules declare nested
-// among it, at any depth: inner instantiates sib and names bus, both nested in
-// top, deep names bus from two levels down, and a nested declaration of its
-// own of the same name hides an enclosing one (#8268).
 TEST(NestedModuleElaboration, AnEnclosingModulesNestedDeclarationsAreVisible) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -638,9 +569,6 @@ TEST(NestedModuleElaboration, AnEnclosingModulesNestedDeclarationsAreVisible) {
   EXPECT_FALSE(DeclaresNet(leaf, "outer_leaf"));
 }
 
-// ...but not to a module declared at the top level, though a nested module
-// instantiates it: no enclosing module's text surrounds its declaration
-// (#8268).
 TEST(NestedModuleElaboration, ATopLevelModuleSeesNoEnclosingNestedDeclaration) {
   ElabFixture f;
   Elaborate(

@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §23.8.1 inserts a lookup in the complete compilation unit between step a) and
-// step b) of the upward hierarchical resolution. The elaborator implements that
-// by gathering the unit-scope tasks and functions of the reference into a
-// dedicated list, distinct from any module's local subroutines, so a bare name
-// can later resolve to them from any point in the hierarchy.
 bool CuListHas(const RtlirDesign* design, std::string_view name) {
   for (const auto* item : design->cu_function_decls) {
     if ((item->kind == ModuleItemKind::kFunctionDecl ||
@@ -73,8 +68,6 @@ TEST(TaskAndFunctionNameResolutionElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  // A module-local subroutine is found in step a) and never belongs to the
-  // compilation-unit lookup, so it must not appear in that list.
   EXPECT_FALSE(CuListHas(design, "local_f"));
 }
 
@@ -156,10 +149,6 @@ TEST(TaskAndFunctionNameResolutionElaboration,
 TEST(TaskAndFunctionNameResolutionElaboration,
      ForwardDefinedCompilationUnitFunctionIsGathered) {
   ElabFixture f;
-  // The compilation-unit lookup that §23.8.1 inserts is independent of source
-  // order: a bare call in an earlier module resolves to a function whose
-  // definition appears later in the unit. This is the exception §3.12.1 carves
-  // out from its rule that names be defined already for task/function names.
   auto* design = ElaborateSrc(
       "module m;\n"
       "  integer x;\n"
@@ -191,15 +180,9 @@ TEST(TaskAndFunctionNameResolutionElaboration,
       f);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
-  // The compilation-unit lookup is sourced only from the enclosing unit's
-  // items, so the unit-scope 'f' stays in the list even though a module
-  // declares its own 'f' under the same name.
   EXPECT_TRUE(CuListHas(design, "f"));
 }
 
-// §23.8 with §13.3: a task enabled by its name alone that the module does not
-// declare is found in a module enclosing an instance of it, two levels up and
-// through either of two instance paths (#5804).
 TEST(TaskAndFunctionNameResolutionElaboration,
      ABareEnableFindsAnEnclosingModulesTask) {
   ElabFixture f;
@@ -212,8 +195,6 @@ TEST(TaskAndFunctionNameResolutionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.8 with §23.9: a call naming no task or function in the module or any
-// module enclosing an instance of it is an undeclared identifier (#5806).
 TEST(TaskAndFunctionNameResolutionElaboration,
      ACallNamingNothingAnywhereIsUndeclared) {
   ElabFixture f;

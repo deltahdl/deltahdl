@@ -14,14 +14,10 @@ namespace delta {
 
 namespace {
 
-// §37.35 (figure): the expression the prim term `term` connects, null for
-// none.
 VpiHandle ConnectedExpr(const VpiObject& term) {
   return term.children.empty() ? nullptr : term.children.front();
 }
 
-// The character a state table holds for the bit `word` gives in its least
-// significant place: 0, 1, or x for an x or a z (§29.3.5).
 char StateBit(const Logic4Word& word) {
   if ((word.bval & 1) != 0) return 'x';
   return (word.aval & 1) != 0 ? '1' : '0';

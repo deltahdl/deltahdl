@@ -111,12 +111,6 @@ TEST(HierarchicalNameSimulation, HierarchicalNameInEventExpression) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-// §23.6 (printed page 754): an element of an array of instances is named by
-// the instance name and its index, `arr[1]`, and its items are reached
-// through it as any instance's. §23.3.2 writes the dimension as an
-// unpacked_dimension, so `leaf arr[2]()` is arr[0] and arr[1] (§7.4.2's
-// `[size]`); it was one instance named arr, and the name dropped its index,
-// so `arr[1].v = 11` wrote that one instance and `arr[1].v` read nothing.
 TEST(HierarchicalNames, InstanceArrayElementIsReachedByItsIndex) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf #(parameter K = 0)();\n"
@@ -135,8 +129,6 @@ TEST(HierarchicalNames, InstanceArrayElementIsReachedByItsIndex) {
             "11 11 51\n");
 }
 
-// An element of an array written with a range and connected through ports is
-// reached the same way; each element drives its own slice of the bus.
 TEST(HierarchicalNames, RangedInstanceArrayElementIsReachedByItsIndex) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf(input i, output o);\n"
@@ -152,10 +144,6 @@ TEST(HierarchicalNames, RangedInstanceArrayElementIsReachedByItsIndex) {
             "10 1 0\n");
 }
 
-// §11.8.1 (printed page 302) with §23.6: an operand's signedness is its
-// declaration's, reached by a simple name or a hierarchical one alike. A
-// one-bit `logic w` set to the signed literal 1 through `a.w` read back as -1
-// under %0d; a signed declaration still reads signed.
 TEST(HierarchicalNames, ReadOfAnUnsignedVariableByHierarchicalNameIsUnsigned) {
   SimFixture f;
   EXPECT_EQ(
@@ -177,10 +165,6 @@ TEST(HierarchicalNames, ReadOfAnUnsignedVariableByHierarchicalNameIsUnsigned) {
       "1 1 -3 -5\n");
 }
 
-// §23.6: an element select of an array named from $root reads and writes
-// the top's array, never the like-named one of the instance running it: sub
-// sets its own arr[1] to 0, writes 0 into top's arr[0] by the rooted name,
-// and reads top's arr[1], which stays 1.
 TEST(HierarchicalNames, RootHeadedArrayElementIsTheTopsElement) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"
@@ -200,11 +184,6 @@ TEST(HierarchicalNames, RootHeadedArrayElementIsTheTopsElement) {
             "1 0 1\n");
 }
 
-// §23.6 with §7.2: a hierarchical name writes a member of another instance's
-// structure, blocking and nonblocking: s1.v.B takes 9 and s1.v.A 4 while the
-// other member keeps what sub wrote. The name was split at its first dot,
-// taking the instance s1 for the variable, and both writes were dropped,
-// printing A=1 B=2.
 TEST(HierarchicalNames, MemberOfAnotherInstancesStructureIsWritten) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef struct { int A; int B; } s_t;\n"
@@ -223,8 +202,6 @@ TEST(HierarchicalNames, MemberOfAnotherInstancesStructureIsWritten) {
             "A=4 B=9\n");
 }
 
-// The same through a structure whose type is the module's type parameter,
-// overridden at the instance, as §6.20.3's `s2.v3.A = 9` writes it.
 TEST(HierarchicalNames, MemberOfATypeParameterStructureIsWritten) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef struct { int A; } a_t;\n"
@@ -240,10 +217,6 @@ TEST(HierarchicalNames, MemberOfATypeParameterStructureIsWritten) {
             "A=9\n");
 }
 
-// §23.6 with §27.4 and §27.5: a hierarchical name reaches a variable of an
-// instance a generate block holds through the block instance, `g.c.n` and
-// `h[1].d.n`, and a write through it is a write to the instance's own n, which
-// the instance's always procedure doubles into dbl.
 TEST(HierarchicalNames, NameThroughAGenerateBlockReachesAnInstancesVariable) {
   SimFixture f;
   std::string out = RunCapture(

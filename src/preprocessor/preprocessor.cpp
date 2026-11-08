@@ -19,30 +19,6 @@
 
 namespace delta {
 
-// Return `text` with every kKeywordMarker byte replaced by a space, calling
-// `report` with the line and column each one stood at.
-//
-// §5.2 makes a source file a stream of lexical tokens and lists the seven kinds
-// there are; §5.3 gives white space its characters. The byte begins none of
-// them, which is what the caller reports. It has to go as well as be reported,
-// because the Preprocessor writes that same byte to introduce a keyword-version
-// change and Lexer reads every one it finds in preprocessed text: a byte left
-// in place would set the reserved word list to whatever followed it, which is
-// the whole of the language's keywords rather than a diagnostic.
-//
-// A space is what replaces it so that every later line, column and offset is
-// the one the text already had. §5.3 makes a space a token separator, so the
-// substitution cannot join two tokens that the byte held apart.
-//
-// Every byte is read, including the ones inside a comment or a string literal.
-// Exempting those would mean deciding where they start, and the byte being
-// looked for is the one that decides which words are keywords, so a text
-// holding it is a text whose tokens are not yet known.
-//
-// Two kinds of text reach the output and so both come through here: a source
-// file, which ProcessSource passes, and the value of a define supplied to
-// PreprocConfig, which the constructor below passes. They report differently
-// because only one of them has a line to report against.
 static std::string BlankKeywordMarkers(
     std::string_view text,
     const std::function<void(uint32_t, uint32_t)>& report) {
@@ -70,12 +46,6 @@ Preprocessor::Preprocessor(SourceManager& src_mgr, DiagEngine& diag,
   for (const auto& [name, value] : config_.defines) {
     MacroDef def;
     def.name = name;
-    // A define supplied here was never read as a source file, so nothing has
-    // scanned it: ExpandInlineMacros writes the body into the output, and a
-    // marker byte carried in it would reach the Lexer as text this Preprocessor
-    // appears to have written. The report names the define rather than a
-    // position, because a value given to PreprocConfig stands on no line of any
-    // file and SourceLoc::None() is what the run itself reports against.
     def.body = BlankKeywordMarkers(value, [&](uint32_t, uint32_t) {
       diag_.Error(
           SourceLoc::None(),
@@ -113,10 +83,6 @@ void Preprocessor::DefinePredefined(std::string name, std::string body) {
 
 std::string Preprocessor::Preprocess(uint32_t file_id) {
   auto content = src_mgr_.FileContent(file_id);
-  // The table accumulates across calls rather than starting afresh, because a
-  // driver given several source files concatenates what each call returns:
-  // PreprocessSources in src/main.cpp appends to one string, so the origins of
-  // the whole of it are what describe the text the lexer is handed.
   recording_origins_ = true;
   auto output = ProcessSource(content, file_id, 0);
   recording_origins_ = false;
@@ -125,13 +91,6 @@ std::string Preprocessor::Preprocess(uint32_t file_id) {
 }
 
 void Preprocessor::NoteOutputLine(uint32_t file_id, uint32_t line) {
-  // §22.12's `line directive sets the line number and file name of the lines
-  // after it, so an origin for one of those names what the directive said
-  // rather than where the text stands. The arithmetic is the one
-  // Preprocessor::TryPredefinedMacro answers `__LINE__ with in
-  // src/preprocessor/preprocessor_inline.cpp, so a report and a `__LINE__
-  // on the same line agree. The directive's own line is not one of the lines
-  // after it and keeps the position it really has.
   if (has_line_override_ && line > line_override_src_line_) {
     line = line_offset_ + (line - line_override_src_line_ - 1);
     file_id = line_file_override_id_;
@@ -172,10 +131,6 @@ std::string_view Preprocessor::Trim(std::string_view s) {
   return s;
 }
 
-// Every name Clause 22 gives a directive meaning, plus the delay and trireg
-// directives Annex E keeps from 1364. __FILE__ and __LINE__ (22.13) substitute
-// a value in place rather than opening a region, but they are directives all
-// the same, so a name spelling one of them is not available as a macro name.
 bool IsCompilerDirective(std::string_view name) {
   static constexpr std::string_view kDirectives[] = {
       "__FILE__",
@@ -213,10 +168,6 @@ bool IsCompilerDirective(std::string_view name) {
   return false;
 }
 
-// Every directive IsCompilerDirective names but `__FILE__ and `__LINE__
-// (22.13), the two that stand for a value where they are written. The rest read
-// the text after them, or change how the lines after them are read, so a scan
-// of ordinary text for macro usages stops at one of them.
 bool IsDirectiveOtherThanValue(std::string_view name) {
   return IsCompilerDirective(name) && name != "__FILE__" && name != "__LINE__";
 }
@@ -261,7 +212,6 @@ bool HasUnterminatedString(std::string_view body) {
   bool in_triple = false;
   for (size_t i = 0; i < body.size(); ++i) {
     if (SkipBacktickQuote(body, i)) continue;
-    // §5.6.1: a '"' inside an escaped identifier opens no string.
     if (!in_string && !in_triple && body[i] == '\\') {
       i = EndOfEscapedIdentifier(body, i);
       continue;
@@ -332,11 +282,6 @@ std::pair<std::string_view, std::string_view> SplitQuotedArg(
   return {s.substr(0, end), Preprocessor::Trim(s.substr(end))};
 }
 
-// Writes the text of a comment's body in place of `body`: as blanks of its
-// length, or, when `comments` is given, as kCommentMark, the index under which
-// the body is appended to `comments`, and kCommentMark again, for
-// RestoreComments to put the text back once the line is expanded. The body
-// becomes no text a macro usage or a directive could be read from either way.
 static void PutCommentBody(std::string_view body, std::string& result,
                            std::vector<std::string>* comments) {
   if (comments == nullptr) {
@@ -362,8 +307,6 @@ static bool StripBlockCommentContent(std::string_view line, size_t& i,
   return true;
 }
 
-// A.9.2 ends a one-line comment at the newline, which a text joined from
-// several lines holds; the newline itself is the next character's to copy.
 static void StripNormalChar(std::string_view line, size_t& i,
                             std::string& result, bool& in_block_comment,
                             std::vector<std::string>* comments) {
@@ -387,12 +330,6 @@ bool AtTripleQuote(std::string_view line, size_t i) {
   return line.substr(i, 3) == "\"\"\"";
 }
 
-// Copies one item of an open triple_quoted_string, or the `"""` that closes
-// it, clearing `in_triple_string` at the close. A.8.8's
-// triple_quoted_string_item is any ASCII character but '\', so a "//" or "/*"
-// inside is string content and no A.9.2 comment, and a lone '"' is an item
-// rather than the string's end; a '\' opens a string_escape_seq, so the
-// character behind it is the sequence's and closes nothing.
 static void CopyTripleQuotedChar(std::string_view line, size_t& i,
                                  std::string& result, bool& in_triple_string) {
   if (AtTripleQuote(line, i)) {
@@ -405,11 +342,6 @@ static void CopyTripleQuotedChar(std::string_view line, size_t& i,
   if (i < line.size()) result += line[i++];
 }
 
-// A line that begins inside a triple_quoted_string opened on an earlier line
-// (A.8.8) holds that string's text up to the `"""` closing it, and §22.5.1
-// substitutes nothing in a string, so that text is copied to `output` as
-// written and `line` is narrowed to what follows the close. Answers whether the
-// line began inside such a string.
 static bool CopyOpenTripleString(std::string_view& line, std::string& output,
                                  bool& in_triple_string) {
   bool was_open = in_triple_string;
@@ -421,18 +353,6 @@ static bool CopyOpenTripleString(std::string_view& line, std::string& output,
   return was_open;
 }
 
-// Blanks the body of every A.9.2 comment on `line`, keeping the delimiters,
-// and leaves what a string literal holds alone. A block comment and a
-// triple_quoted_string each may span lines, so each is carried from one line
-// to the next by its flag; a quoted_string cannot, A.8.8's quoted_string_item
-// excluding the newline, so its state is the line's own.
-// Copies the `"""` that opens a triple_quoted_string, the '"' that opens or
-// closes a quoted_string, one character inside an open quoted_string, or a
-// §5.6.1 escaped identifier, and answers whether it copied any; answers false
-// at another character outside every string, which is the comment stripper's
-// to read. A '\' inside a quoted_string opens a string_escape_seq (A.8.8), and
-// one outside every string opens an escaped identifier; each is copied whole,
-// so no '"' inside it opens or closes a string.
 static bool CopyStringLiteralChar(std::string_view line, size_t& i,
                                   std::string& result, bool& in_string,
                                   bool& in_triple_string) {
@@ -485,9 +405,6 @@ std::string StripComments(std::string_view line, bool& in_block_comment,
   return result;
 }
 
-// Whether the kCommentMark at `i` opens a mark PutCommentBody wrote, which
-// holds an index: a kKeywordMarker, the same byte, is followed by its version
-// byte instead, never by a digit.
 static bool OpensCommentMark(const std::string& text, size_t i) {
   return text[i] == kCommentMark &&
          std::isdigit(static_cast<unsigned char>(text[i + 1]));
@@ -509,7 +426,7 @@ void RestoreComments(std::string& text, size_t from,
       index = index * 10 + static_cast<size_t>(text[i] - '0');
     }
     restored += comments[index];
-    ++i;  // The kCommentMark that closes the mark.
+    ++i;
   }
   text.replace(from, std::string::npos, restored);
 }
@@ -553,16 +470,6 @@ static size_t FindDirectiveInStripped(std::string_view stripped) {
   return std::string_view::npos;
 }
 
-// 22.2: a language element is allowed on the same line before a directive.
-// FindDirectiveInStripped only reports a directive that begins the line; this
-// locates a directive that follows code, so the preceding element is emitted
-// and the directive still acts. Backticks inside string literals are not
-// directives, and a backtick that introduces a name absent from the directive
-// set is a macro usage rather than a directive, so both are skipped. So are
-// `__FILE__ and `__LINE__ (22.13): they stand for a value where they are
-// written and the inline expander substitutes it, so splitting the line at one
-// would cut the element it stands inside -- a macro usage taking `__LINE__ as
-// an argument was left unexpanded, its opening half emitted as text.
 static bool BacktickIntroducesDirective(std::string_view s, size_t i) {
   size_t start = i + 1;
   size_t end = start;
@@ -598,8 +505,6 @@ bool Preprocessor::ProcessBlockCommentLine(std::string_view line,
   in_block_comment_ = false;
   auto remainder = line.substr(close + 2);
   if (!Trim(remainder).empty()) {
-    // The line is active, and a remainder ProcessDirective declines changed
-    // nothing, so it is still active text.
     if (!ProcessDirective(remainder, file_id, line_num, depth, output)) {
       ExpandAndAppendLine(remainder, file_id, line_num, output);
     }
@@ -618,10 +523,6 @@ void Preprocessor::SkipBlockCommentLine(std::string_view line, uint32_t file_id,
     in_block_comment_ = false;
     auto remainder = line.substr(close + 2);
     if (!Trim(remainder).empty()) {
-      // Text after the comment close may be a directive (e.g. `endif) that
-      // must still act on the conditional stack while the block is skipped. A
-      // remainder ProcessDirective declines changed nothing, so it is still
-      // skipped text, read only for the comments it opens.
       if (!ProcessDirective(remainder, file_id, line_num, depth, output)) {
         StripComments(remainder, in_block_comment_, in_triple_string_);
       }
@@ -641,42 +542,19 @@ ActiveLineSplit ClassifyActiveLine(std::string_view stripped) {
   return {ActiveLineSplit::Kind::kPlainText, 0};
 }
 
-// Callbacks the line loop uses to act on each physical source line. Each wraps
-// private Preprocessor work so the loop itself can live as a free function.
 struct PreprocLoopOps {
   std::function<bool()> in_block_comment;
   std::function<void(std::string_view)> continue_block_comment;
   std::function<bool(std::string_view)> run_directive;
   std::function<bool()> is_active;
-  // What a function-like macro usage on the text leaves unfinished at its end
-  // (22.5.1), which is what JoinMacroUsage reads lines ahead to finish.
   std::function<MacroUsageEnd(std::string_view)> end_of_macro_usage;
-  // Copies the text an open triple_quoted_string still holds at the start of
-  // the line and narrows the line to the rest, answering whether one was open.
   std::function<bool(std::string_view&)> copy_open_string;
   std::function<void(std::string_view)> emit_active_line;
   std::function<void(std::string_view)> note_ignored_line;
-  // Taken before a source line is written, and handed back once the newline
-  // ending it has been appended, which is where the output lines it wrote are
-  // known to be complete and which source line wrote them.
   std::function<OutputMark()> mark_output;
   std::function<void(OutputMark)> note_output_lines;
 };
 
-// Process one ordinary (non-block-comment) source line: a `define whose body
-// spans multiple physical lines is first joined, as is a macro usage whose
-// argument list runs onto the lines after it, then the line is run as a
-// directive, emitted as active text, or (inside an ignored block) only scanned
-// so an opening block comment is tracked across lines (22.6). Returns the
-// number of lines a usage join consumed beyond this one, for the loop's line
-// counter. A usage is joined only where its expansion will be emitted: inside
-// an ignored block the lines are not read, and a line an ignored block ends on
-// is a directive the join would otherwise swallow.
-//
-// An active line that begins inside a triple_quoted_string is that string's
-// text up to its closing `"""`, which no directive, join or usage reads; what
-// follows the close is active text standing after a language element, which
-// §22.2 lets a directive follow.
 static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
                                     const PreprocLoopOps& ops) {
   std::string joined;
@@ -686,9 +564,6 @@ static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
     return usage_lines;
   }
   if (DefineSpansMultipleLines(line)) {
-    // The `define is run as the directive on the line it opens on, which is
-    // where a report about it belongs; the lines it was joined from are the
-    // loop's to count past afterwards.
     uint32_t opened = cursor.line_num;
     joined = JoinDefineBody(cursor);
     uint32_t last = std::exchange(cursor.line_num, opened);
@@ -708,9 +583,6 @@ static uint32_t ProcessOrdinaryLine(std::string_view line, LineCursor& cursor,
   return usage_lines;
 }
 
-// Drive the per-line preprocessing loop (22.x). An open block comment continues
-// with its own newline handling; every other line is processed and followed by
-// a single newline. Emitted text is appended to output.
 static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
                            const PreprocLoopOps& ops, std::string& output) {
   size_t pos = 0;
@@ -733,18 +605,6 @@ static void RunPreprocLoop(std::string_view src, uint32_t& line_num,
   }
 }
 
-// §34.5.4.2 states what the expression closing a decryption envelope settles
-// about the block that envelope carries: the pragma expressions gathered up to
-// it are the whole of what opens that block, and they suffice to open it.
-//
-// Both halves are put into effect by letting nothing of that run outlive it. An
-// announcement still waiting for its line was never answered, so it is dropped
-// rather than spent on whatever the text goes on to write; a key the run
-// recovered and never used belonged to this block, so it is put away rather
-// than offered to the next one. What the source text wrote against a keyword is
-// untouched here -- §34.4 gives those values a lexical scope that runs past the
-// envelope, and the expression that puts them back to their defaults is a
-// keyword of its own.
 void Preprocessor::ResetAnnouncementsAndRecoveredKeys() {
   key_public_key_value_next_ = false;
   key_block_value_next_ = false;
@@ -760,27 +620,11 @@ void Preprocessor::ResetAnnouncementsAndRecoveredKeys() {
 
 void Preprocessor::EndAccumulatedProtectPragmas() {
   ResetAnnouncementsAndRecoveredKeys();
-  // A block half gathered when the run of pragmas ends belongs to an envelope
-  // that is over, so it is discarded rather than carried into whatever the text
-  // goes on to hold. §34.5.9 states a byte count against a whole block, and
-  // half of one would be measured against a count for all of it.
   gathering_block_ = ProtectBlockKind::kNone;
   gathering_block_text_.clear();
-  // §34.5.22 has the digest of a key block or a data block written in the
-  // digest block immediately following that block, so the block a digest can
-  // still be owed belongs to the envelope it was recovered from. An envelope
-  // that closed without one leaves nothing for the next envelope's digest to
-  // vouch for, and a digest block that reached a block of somebody else's
-  // envelope would report an alteration of a block it never followed.
   digest_target_ = ProtectDigestTarget();
 }
 
-// Emit an already comment-stripped active line.
-//
-// An inline `ifdef…`endif resolved on this line (22.6) must go through the
-// inline conditional expander; the mid-line directive dispatch would instead
-// push it onto the multi-line conditional stack and drop the trailing text.
-// Whether the line holds one is settled by the caller, which is what can ask.
 static void EmitStrippedActiveLine(const std::string& stripped,
                                    bool inline_conditional,
                                    const ActiveLineEmit& emit,
@@ -792,9 +636,6 @@ static void EmitStrippedActiveLine(const std::string& stripped,
   EmitActiveLine(stripped, emit, output);
 }
 
-// §40.4's FSM pragmas are read by the lexer from a comment's text, so each
-// comment the line holds goes out with the text it was written with, put back
-// once the rest of the line has been expanded around its mark.
 void Preprocessor::EmitCommentedActiveLine(std::string_view line,
                                            const ActiveLineEmit& emit,
                                            std::string& output) {
@@ -818,12 +659,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     return "";
   }
 
-  // Every path text takes into the Preprocessor arrives here -- Preprocess for
-  // a file named on the command line, ProcessIncludeFile for a `include, and
-  // the protected-envelope cleartext Preprocessor::ReadProtectDataBlock in
-  // src/preprocessor/preprocessor_protect_values.cpp hands over -- so this is
-  // the one place that has to hold for the marker to mean what Lexer takes it
-  // to mean.
   std::string without_markers = WithoutKeywordMarkers(src, file_id);
   if (!without_markers.empty()) src = without_markers;
 
@@ -831,8 +666,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   std::string output;
   output.reserve(src.size());
 
-  // Conditionally expand a fragment (22.5.1 inline conditionals + macros),
-  // track any design element it introduces, then emit it.
   ActiveLineEmit emit;
   emit.expand_and_emit = [&](std::string_view fragment) {
     auto conditioned = ExpandInlineConditionals(
@@ -841,8 +674,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     TrackDesignElement(Trim(expanded));
     output.append(expanded);
   };
-  // Run a fragment through ProcessDirective; if it was not a directive, emit it
-  // as ordinary text with full expansion.
   emit.emit_directive_or_text = [&](std::string_view fragment) {
     if (!ProcessDirective(fragment, file_id, line_num, depth, output))
       emit.expand_and_emit(fragment);
@@ -864,8 +695,6 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
     return CopyOpenTripleString(line, output, in_triple_string_) ||
            CopyContinuedQuotedString(line, output, in_continued_string_);
   };
-  // An open block comment (22.6) emits or skips its text and handles its own
-  // trailing newline; a directive may still follow the comment close.
   ops.continue_block_comment = [&](std::string_view line) {
     if (IsActive())
       ProcessBlockCommentLine(line, file_id, line_num, depth, output);
@@ -879,22 +708,15 @@ std::string Preprocessor::ProcessSource(std::string_view src, uint32_t file_id,
   ops.emit_active_line = [&](std::string_view line) {
     EmitCommentedActiveLine(line, emit, output);
   };
-  // Inside an ignored block nothing is emitted, but track an opening block
-  // comment so a later in-comment directive stays hidden (22.6).
   ops.note_ignored_line = [&](std::string_view line) {
     NoteIgnoredLine(line, {file_id, line_num, 1});
   };
   ops.mark_output = [&] { return MarkOutput(output); };
-  // The lines just ended are this file's, at the number this frame is on.
   ops.note_output_lines = [&](OutputMark mark) {
     NoteOutputLines(file_id, line_num, output, mark);
   };
 
   RunPreprocLoop(src, line_num, ops, output);
-  // A block whose lines ran to the end of this text is complete: there is no
-  // further line that could belong to it. Reading it here is also what keeps a
-  // block begun inside a recovered block from being carried out into the text
-  // that carried it, this function being what runs such text.
   FinishProtectedReading(depth, output);
   return output;
 }

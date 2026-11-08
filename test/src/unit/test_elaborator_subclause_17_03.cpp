@@ -9,15 +9,11 @@ using namespace delta;
 namespace {
 
 TEST(CheckerInstantiation, AllowedInConcurrentAssertionContext) {
-  // §17.3: a checker may be instantiated wherever a concurrent assertion may
-  // appear.
   EXPECT_TRUE(CheckerInstantiationSiteIsLegal(
       CheckerInstantiationSite::kConcurrentAssertionContext));
 }
 
 TEST(CheckerInstantiation, IllegalInForkJoinBlocks) {
-  // §17.3: it is illegal to instantiate checkers in fork-join, fork-join_any,
-  // or fork-join_none blocks.
   EXPECT_FALSE(
       CheckerInstantiationSiteIsLegal(CheckerInstantiationSite::kForkJoin));
   EXPECT_FALSE(
@@ -27,15 +23,11 @@ TEST(CheckerInstantiation, IllegalInForkJoinBlocks) {
 }
 
 TEST(CheckerInstantiation, IllegalInProcedureOfAnotherChecker) {
-  // §17.3: it is illegal to instantiate a checker in a procedure of another
-  // checker.
   EXPECT_FALSE(CheckerInstantiationSiteIsLegal(
       CheckerInstantiationSite::kProcedureOfAnotherChecker));
 }
 
 TEST(CheckerInstantiation, OutputActualArgMustBeVariableOrNetLvalue) {
-  // §17.3: each checker actual output argument shall be a variable_lvalue or a
-  // net_lvalue.
   EXPECT_TRUE(
       CheckerOutputActualArgIsLegal(CheckerOutputActualArg::kVariableLvalue));
   EXPECT_TRUE(
@@ -44,8 +36,6 @@ TEST(CheckerInstantiation, OutputActualArgMustBeVariableOrNetLvalue) {
 }
 
 TEST(CheckerInstantiation, AllFourPortConnectionStylesSupported) {
-  // §17.3: formal arguments may be connected like module ports, using
-  // positional, fully explicit named, implicit named, and wildcard styles.
   EXPECT_TRUE(IsSupportedCheckerPortConnectionStyle(
       CheckerPortConnectionStyle::kPositional));
   EXPECT_TRUE(IsSupportedCheckerPortConnectionStyle(
@@ -57,9 +47,6 @@ TEST(CheckerInstantiation, AllFourPortConnectionStylesSupported) {
 }
 
 TEST(CheckerInstantiation, DollarFormalReferencePermittedUses) {
-  // §17.3: a reference of a formal bound to `$` is legal only as a cycle-delay
-  // range upper bound, an actual to a sequence/property/checker instance, or a
-  // nested checker default argument.
   EXPECT_TRUE(DollarFormalReferenceIsLegal(
       DollarFormalReferenceUse::kCycleDelayRangeUpperBound));
   EXPECT_TRUE(DollarFormalReferenceIsLegal(
@@ -74,52 +61,20 @@ TEST(CheckerInstantiation, DollarFormalReferencePermittedUses) {
 }
 
 TEST(CheckerInstantiation, DollarActualRequiresUntypedFormalAndPermittedRefs) {
-  // §17.3: when `$` is an actual input argument, the corresponding formal shall
-  // be untyped and each of its references shall be a permitted use.
-  EXPECT_TRUE(
-      DollarActualArgumentIsLegal(/*formal_is_untyped=*/true,
-                                  /*all_formal_references_permitted=*/true));
-  EXPECT_FALSE(
-      DollarActualArgumentIsLegal(/*formal_is_untyped=*/false,
-                                  /*all_formal_references_permitted=*/true));
-  EXPECT_FALSE(
-      DollarActualArgumentIsLegal(/*formal_is_untyped=*/true,
-                                  /*all_formal_references_permitted=*/false));
-  EXPECT_FALSE(
-      DollarActualArgumentIsLegal(/*formal_is_untyped=*/false,
-                                  /*all_formal_references_permitted=*/false));
+  EXPECT_TRUE(DollarActualArgumentIsLegal(true, true));
+  EXPECT_FALSE(DollarActualArgumentIsLegal(false, true));
+  EXPECT_FALSE(DollarActualArgumentIsLegal(true, false));
+  EXPECT_FALSE(DollarActualArgumentIsLegal(false, false));
 }
 
 TEST(CheckerInstantiation, ConstCastOrAutomaticActualRestrictsFormalUsage) {
-  // §17.3: an actual input argument carrying a const cast or automatic value
-  // from procedural code forbids using the formal in a continuous assignment or
-  // in the checker's procedural code.
-  EXPECT_TRUE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic_value=*/false,
-      /*formal_used_in_continuous_assignment=*/true,
-      /*formal_used_in_procedural_code=*/true));
-  EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic_value=*/true,
-      /*formal_used_in_continuous_assignment=*/true,
-      /*formal_used_in_procedural_code=*/false));
-  EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic_value=*/true,
-      /*formal_used_in_continuous_assignment=*/false,
-      /*formal_used_in_procedural_code=*/true));
-  EXPECT_TRUE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic_value=*/true,
-      /*formal_used_in_continuous_assignment=*/false,
-      /*formal_used_in_procedural_code=*/false));
-  // Edge: both forbidden usages present at once is still rejected.
-  EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(
-      /*actual_has_const_cast_or_automatic_value=*/true,
-      /*formal_used_in_continuous_assignment=*/true,
-      /*formal_used_in_procedural_code=*/true));
+  EXPECT_TRUE(ConstCastOrAutomaticActualFormalUsageIsLegal(false, true, true));
+  EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(true, true, false));
+  EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(true, false, true));
+  EXPECT_TRUE(ConstCastOrAutomaticActualFormalUsageIsLegal(true, false, false));
+  EXPECT_FALSE(ConstCastOrAutomaticActualFormalUsageIsLegal(true, true, true));
 }
 
-// §17.2 and §17.3: a checker formal of type event takes any event expression,
-// a plain signal among them, its actual substituted rather than assigned, so
-// §23.3.3's assignment compatibility, a module port's rule, does not apply.
 TEST(CheckerInstantiation, APlainSignalBindsAnEventFormal) {
   ElabFixture f;
   ElaborateSrc(
@@ -134,8 +89,6 @@ TEST(CheckerInstantiation, APlainSignalBindsAnEventFormal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.3: only a checker may stand where a concurrent assertion may, so a
-// module instantiated in an always procedure is refused.
 TEST(ProceduralCheckerInstantiation, AModuleCannotBeInstantiatedInAProcedure) {
   ElabFixture f;
   ElaborateSrc(
@@ -154,8 +107,6 @@ TEST(ProceduralCheckerInstantiation, AModuleCannotBeInstantiatedInAProcedure) {
                             6, "17.3"));
 }
 
-// §17.3: procedural code inside one checker cannot instantiate another
-// checker.
 TEST(ProceduralCheckerInstantiation, NotInAProcedureOfAnotherChecker) {
   ElabFixture f;
   ElaborateSrc(
@@ -178,8 +129,6 @@ TEST(ProceduralCheckerInstantiation, NotInAProcedureOfAnotherChecker) {
                             6, "17.3"));
 }
 
-// A.4.1.4: a checker instantiated in a procedure is held to the one instance
-// a checker_instantiation names, as one written as a module item is.
 TEST(ProceduralCheckerInstantiation, OneInstanceToAnInstantiation) {
   ElabFixture f;
   ElaborateSrc(
@@ -199,8 +148,6 @@ TEST(ProceduralCheckerInstantiation, OneInstanceToAnInstantiation) {
                             7, "A.4.1.4"));
 }
 
-// §17.3 with §23.3.2: an instantiation in a procedure naming no design
-// element is reported as one written as a module item is.
 TEST(ProceduralCheckerInstantiation, AnUnknownNameIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -215,9 +162,6 @@ TEST(ProceduralCheckerInstantiation, AnUnknownNameIsReported) {
                             "23.3.2"));
 }
 
-// §17.3: no checker instance may stand inside a fork-join, fork-join_any or
-// fork-join_none block, a block nested in the fork among its statements;
-// one standing after the join is a procedural checker instance as usual.
 TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -243,9 +187,6 @@ TEST(ProceduralCheckerInstantiation, NotInAForkBlock) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 11, "17.3"));
 }
 
-// §17.3: each output actual of a checker instance is a variable or net
-// lvalue: f & g is neither, while h, the concatenation {g, h}, the element
-// arr[0] and the member st.x are, and u4 leaves `both` unconnected.
 TEST(CheckerActuals, AnOutputActualThatIsNoLvalueIsReported) {
   const char* const kReport =
       "the output actual of the formal 'failure' of checker 'c' is neither a "
@@ -274,10 +215,6 @@ TEST(CheckerActuals, AnOutputActualThatIsNoLvalueIsReported) {
       ReportedError(f.diag.Diagnostics(), "neither a variable", 7, "17.3"));
 }
 
-// §17.3: a $ actual binds an untyped formal the checker reads only as a
-// range's upper bound, an instance's actual or a nested checker's default:
-// c1's n is typed and c2 reads m as an operand, while c3, c4 and c5 use k as
-// a bound, as an instance's actual and as a nested checker's default.
 TEST(CheckerActuals, ADollarActualOnATypedOrOperandFormalIsReported) {
   const char* const kReport =
       "which shall be untyped and referenced only as the upper bound of a "
@@ -316,10 +253,6 @@ TEST(CheckerActuals, ADollarActualOnATypedOrOperandFormalIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 23, "17.3"));
 }
 
-// §17.3: a formal bound to an actual holding a const cast or an automatic
-// value is used in no continuous assignment and no procedural code of the
-// checker: c assigns its formal a, while d reads its formal in an assertion
-// alone.
 TEST(CheckerActuals, AConstOrAutomaticActualsFormalInAnAssignIsReported) {
   ElabFixture f;
   ElaborateSrc(

@@ -15,62 +15,31 @@
 using namespace delta;
 
 namespace {
-// The first included list, swept at this stage. There is no earlier version to
-// pair these against -- they have been reserved since the first of the four
-// lists this version names -- so the accepting side of the claim is the test
-// below, where the same words build the design in their keyword roles.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog1995WordsAreReserved) {
   ExpectKeywordTableIsReserved("1800-2009", kVerilog1995KeywordSweep);
 }
 
-// The second included list at this stage, swept whole. Each of Table 22-2's
-// entries is reserved here, and under "1364-1995" -- the first of the four
-// lists this version includes, where it is not yet a keyword -- the same
-// declaration elaborates into a variable of the width it asked for. The ten
-// configuration words carry a second accepting leg, under the companion list
-// that drops exactly them, which is how this stage shows the full list is what
-// gets inherited.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2001WordsAreReserved) {
   ExpectKeywordTableIsReserved("1800-2009", kVerilog2001AddedKeywordSweep);
   ExpectConfigurationWordsNameVariablesUnderNoconfig();
 }
 
-// The third included list. Its one word cannot name an elaborated variable
-// here, names one under both of the lists the version it comes from is built
-// on, and still carries its net type into the design -- inclusion means the
-// keyword role survives, not only that the identifier slot closes.
 TEST(SystemVerilog2009KeywordElaboration, IncludedVerilog2005WordIsReserved) {
   ExpectKeywordTableIsReserved("1800-2009", kVerilog2005AddedKeywordSweep);
   ExpectVerilog2005DeclarationsElaborate("1800-2009");
 }
 
-// The fourth included list swept whole at this stage. Each entry is reserved
-// here and, under "1364-2005" -- the union of the three lists that one is
-// itself built on -- the same declaration reaches the design as a variable of
-// the width it asked for, so the inclusion traces to the fourth list.
 TEST(SystemVerilog2009KeywordElaboration,
      IncludedSystemVerilog2005WordsAreReserved) {
   ExpectKeywordTableIsReserved("1800-2009",
                                kSystemVerilog2005AddedKeywordSweep);
 }
 
-// Table 22-5 swept whole at this stage, with the leg that makes each entry an
-// addition. The word cannot name an elaborated variable here, and under
-// "1800-2005" -- the union of everything this version includes -- the same
-// declaration reaches the design as a variable of the width it asked for.
-// Reading the variable back is what keeps the accepting leg from being any
-// elaboration that happens to succeed.
 TEST(SystemVerilog2009KeywordElaboration, AddedWordsCannotNameVariables) {
   ExpectKeywordTableIsReserved("1800-2009",
                                kSystemVerilog2009AddedKeywordSweep);
 }
 
-// The added word whose construct the elaborator carries into the design in a
-// list of its own. A `let` declaration may be written at the compilation unit's
-// scope or inside a design element, and the two land in different places, so
-// both are here. The declaration is the only Table 22-5 construct that becomes
-// elaborated structure rather than staying inside a statement or a property
-// body, which is why it carries this stage's addition claim.
 TEST(SystemVerilog2009KeywordElaboration, AddedLetDeclarationsReachTheDesign) {
   const std::string kSrc =
       "let gain = 21;\n"
@@ -89,21 +58,12 @@ TEST(SystemVerilog2009KeywordElaboration, AddedLetDeclarationsReachTheDesign) {
   ExpectLetDeclarationsElaborated(design);
 
   ElabFixture included;
-  // `let` is an ordinary identifier under 1800-2005, so it heads the file
-  // where no top-level production can take it and
-  // Parser::ReportUnexpectedTopLevelToken in src/parser/parser.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                             "expected top-level declaration", LineInRegion(1),
                             "3.12.1"));
 }
 
-// The added word pair that brackets a design element. A checker is elaborated
-// through an instantiation inside a module, so the instance has to resolve to
-// the element `checker`/`endchecker` opened -- something no other Table 22-5
-// word reaches, since the rest name statements, operators, or qualifiers. The
-// body is written with the assertion vocabulary of the fourth included list, so
-// the inclusion and the addition are observed working together.
 TEST(SystemVerilog2009KeywordElaboration, AddedCheckerElementIsInstantiable) {
   const std::string kSrc =
       "checker handshake (logic clk, logic req);\n"
@@ -132,29 +92,14 @@ TEST(SystemVerilog2009KeywordElaboration, AddedCheckerElementIsInstantiable) {
   EXPECT_TRUE(instance_seen);
 
   ElabFixture included;
-  // `checker` is an ordinary identifier under 1800-2005, so it heads the file
-  // where no top-level production can take it and
-  // Parser::ReportUnexpectedTopLevelToken in src/parser/parser.cpp reports.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                             "expected top-level declaration", LineInRegion(1),
                             "3.12.1"));
 }
 
-// The added word whose effect the elaborator itself acts on. `global` marks a
-// clocking block as the one such block a scope may have, and two elaborator
-// rules turn on that mark: a second one in the same scope is rejected, and a
-// reference to the global clock is only resolvable when a block carrying the
-// mark is in scope. Both are driven from real source here, and each is shown
-// both ways round -- a plain clocking block alongside a global one is fine
-// while two global ones are not, and the same global-clock reference resolves
-// with the block present and fails without it. That is the elaborator reading
-// the word, not merely tolerating it. Neither source can be written at all
-// under the union of everything this version includes, where `global` is an
-// ordinary identifier.
 TEST(SystemVerilog2009KeywordElaboration,
      AddedGlobalClockingIsCountedAtElaboration) {
-  // One marked block beside an unmarked one: the mark is what tells them apart.
   const std::string kOne =
       "module m (input logic clk);\n"
       "  global clocking gcb @(posedge clk); endclocking\n"
@@ -165,8 +110,6 @@ TEST(SystemVerilog2009KeywordElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(one.has_errors);
 
-  // Two marked blocks in the same scope: rejected, which only a rule counting
-  // the mark can do.
   ElabFixture two;
   ElaborateWithPreprocessor(
       InSv2009("module m (input logic clk);\n"
@@ -179,8 +122,6 @@ TEST(SystemVerilog2009KeywordElaboration,
                             "scope",
                             LineInRegion(3), "14.14"));
 
-  // A reference to the global clock, resolvable only because a marked block is
-  // in scope.
   const std::string kReference =
       "module m (input logic clk, input logic a);\n"
       "  global clocking gcb @(posedge clk); endclocking\n"
@@ -202,14 +143,9 @@ TEST(SystemVerilog2009KeywordElaboration,
       "$global_clock has no effective global clocking declaration",
       LineInRegion(2), "14.14"));
 
-  // The addition leg: neither source exists under the included lists. `global`
-  // is an ordinary identifier under 1800-2005, so the clocking block reads as
-  // one name followed by a keyword and Parser::ParsePlainVarDecl in
-  // src/parser/parser_items.cpp reports rather than the elaborator.
   for (const auto& src : {kOne, kReference}) {
     ElabFixture included;
     ElaborateWithPreprocessorAllowingParseErrors(InSv2005(src), included, "m");
-    // Both sources carry the clocking block on the second line of the body.
     EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                               "expected ';', got 'clocking'", LineInRegion(2),
                               "6.8"))
@@ -217,13 +153,6 @@ TEST(SystemVerilog2009KeywordElaboration,
   }
 }
 
-// The two remaining added words with a construct of their own, carried into the
-// elaborated design. `unique0` qualifies a case statement, and the qualifier
-// has to survive into the process the elaborator builds -- it is read back off
-// that process's body rather than off the parse tree. `restrict` opens a module
-// item of its own kind, and a design holding one elaborates clean alongside the
-// assertion items the fourth included list already offers. Both sources are
-// unwritable under the union of everything this version includes.
 TEST(SystemVerilog2009KeywordElaboration,
      AddedQualifierAndRestrictConstructsReachTheDesign) {
   const std::string kSrc =
@@ -259,88 +188,36 @@ TEST(SystemVerilog2009KeywordElaboration,
   EXPECT_TRUE(qualified_case_seen);
 
   ElabFixture included;
-  // `restrict` is an ordinary identifier under 1800-2005, so `restrict
-  // property` reads as a name followed by a keyword and
-  // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp reports, the same
-  // site the `global clocking` leg above reaches.
   ElaborateWithPreprocessorAllowingParseErrors(InSv2005(kSrc), included, "m");
   EXPECT_TRUE(ReportedError(included.diag.Diagnostics(),
                             "expected ';', got 'property'", LineInRegion(4),
                             "6.8"));
 }
 
-// Table 22-1 doing its work under this version, read back as elaborated
-// structure. The net types are the sharpest part: each resolved and driven type
-// the first included list names has to survive into the design as itself rather
-// than collapsing onto a plain wire, which would leave the inclusion
-// unobserved.
 TEST(SystemVerilog2009KeywordElaboration,
      IncludedVerilog1995WordsStillBuildDesign) {
   ExpectVerilog1995DeclarationsElaborate("1800-2009");
 }
 
-// Table 22-2 doing its work, likewise as structure rather than as tokens.
-// `localparam` resolves to a constant, `genvar`/`generate`/`endgenerate`
-// produce one copy of the loop body per iteration, and `signed`/`unsigned`
-// select what they select. The three are tied together on purpose: the
-// localparam is the loop bound, so the count of declarations reaching the
-// design depends on it resolving, and the nested condition picks out a single
-// iteration, so the genvar has to hold a different constant on each pass.
 TEST(SystemVerilog2009KeywordElaboration,
      IncludedVerilog2001WordsStillBuildDesign) {
   ExpectVerilog2001DeclarationsElaborate("1800-2009");
 }
 
-// The fourth included list doing its work, which is the largest thing this
-// version inherits. The data types are read back with their widths and with the
-// four-state flag that separates the two-state additions from `reg` and
-// `logic`; the user-defined types carry their widths and their resolved
-// members; the inferred processes reach the design each as its own kind; and
-// the design element words open elements the elaborator distinguishes. The same
-// source is not a design at all under the union of the three lists that fourth
-// one is itself built on.
 TEST(SystemVerilog2009KeywordElaboration,
      IncludedSystemVerilog2005WordsStillBuildDesign) {
   ExpectSystemVerilog2005DeclarationsElaborate("1800-2009");
 }
 
-// The constant forms that reach a declaration's width, which is where a
-// constant expression is actually required. A literal and a `parameter` come
-// from the first included list, `localparam` and the `automatic` that lets a
-// constant function be written come from the second, and `int` -- the type the
-// function returns and the declarations take -- comes from the fourth. So all
-// four forms are reachable here only because of what this version includes, and
-// the width the design ends up with is what shows each constant resolved.
-//
-// The remaining constant form, a genvar, shows its value in the copies its loop
-// produces rather than in a width, and it is observed doing exactly that in
-// IncludedVerilog2001WordsStillBuildDesign above -- there against a loop bound
-// that is itself a constant and with a nested condition singling out one
-// iteration. Repeating a weaker version of it here would add nothing.
 TEST(SystemVerilog2009KeywordElaboration,
      EveryConstantFormResolvesUnderThisVersion) {
   ExpectEveryConstantFormResolves("1800-2009", "int ", "byte");
 }
 
-// The declaration forms the sweeps do not reach, carried into the elaborated
-// design. A declaration may bring its own initializer along, a port may be
-// typed in the module header, and a port may instead be typed in the body in
-// the separate style where the header lists only names. Each is a production of
-// its own, and they are exercised across a hierarchy here rather than inside
-// one module. All three are written with types from the fourth included list --
-// this version adds no type of its own -- so what the forms show is that
-// everything the additions are written alongside keeps working under the same
-// region.
 TEST(SystemVerilog2009KeywordElaboration, EveryDeclarationFormStillElaborates) {
   ExpectEveryDeclarationFormElaborates("1800-2009");
 }
 
-// The negative the five tables imply, carried to this stage. A word none of
-// them lists is an ordinary identifier here, so it names an object that really
-// reaches the design -- and it is not a data type, which is the half that would
-// go unchecked if only the naming side were tested. Each word is one the next
-// standard reserves, so what is bounded is this version's list rather than the
-// vocabulary at large.
 TEST(SystemVerilog2009KeywordElaboration, LaterWordsNameObjectsButAreNotTypes) {
   ExpectWordsNameObjectsButAreNotTypes(
       "1800-2009", {"implements", "interconnect", "nettype", "soft"},

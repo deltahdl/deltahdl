@@ -45,7 +45,6 @@ TEST(TimingControlElaboration, DelayInAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  // §9.2.2.2.2 is reported at the always_comb keyword, not at the delay.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_comb shall not contain timing controls", 3,
                             "9.2.2.2.2"));
@@ -104,8 +103,6 @@ TEST(TimingControlElaboration, EventControlInAlwaysCombError) {
       "  end\n"
       "endmodule\n",
       f);
-  // The event control is a statement inside the block, not the block's own
-  // sensitivity list, so §9.2.2.2.2 reports it as a timing control.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_comb shall not contain timing controls", 3,
                             "9.2.2.2.2"));
@@ -331,8 +328,6 @@ TEST(TimingControlElaboration, EventControlNestedInForeverFuncError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // The report stands on the event control nested in the forever, which shares
-  // line 3 with the forever itself.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "time-controlling statement is not allowed inside a function", 3,

@@ -20,23 +20,6 @@
 
 using namespace delta;
 
-// §22.14: each version_specifier's reserved word list includes the lists of
-// the versions before it, so every construct an earlier table's words open
-// stays writable under a later specifier. The checks here state that at the
-// parse stage -- a source written in one included table's words is parsed
-// under the specifier `spec` names, and the constructs those words exist to
-// open are looked for in the syntax tree. Reserving a word is only half the
-// claim; a word that stayed reserved but stopped opening its construct would
-// pass a reservation sweep and fail here.
-//
-// One check per table, taking the specifier as its parameter: the table fixes
-// what is written, the specifier fixes what is in force, and inclusion is the
-// claim that the two go together for every specifier at or after the table's
-// own version.
-
-// Table 22-1, the Verilog-1995 list, in its keyword role: the resolved net
-// types and drive strengths, the variable types, the gate primitives building
-// structure, and the procedural statements building control flow.
 inline void ExpectVerilog1995ConstructsParse(const char* spec) {
   auto r = ParseWithPreprocessor(
       In(spec,
@@ -75,11 +58,6 @@ inline void ExpectVerilog1995ConstructsParse(const char* spec) {
   EXPECT_NE(FindGateByKind(items, GateKind::kNmos), nullptr);
 }
 
-// Table 22-2, the Verilog-2001 list, in its keyword role: `localparam`
-// declares a constant, `genvar`/`generate`/`endgenerate` build a loop generate
-// construct, `automatic` qualifies a subroutine, `signed` and `unsigned`
-// qualify declarations, and the four pulse-control words are specify items --
-// each the construct its word exists to open.
 inline void ExpectVerilog2001ConstructsParse(const char* spec) {
   auto r = ParseWithPreprocessor(
       In(spec,
@@ -124,14 +102,6 @@ inline void ExpectVerilog2001ConstructsParse(const char* spec) {
   }
 }
 
-// The other half of Table 22-2: the ten words a configuration is written with,
-// which is what separates that list from the configuration-free companion list
-// published alongside it. Seven of them appear here and the declaration is
-// built, while under the companion specifier the very same source cannot be
-// written -- so a specifier that reaches this check inherits the full list
-// rather than the reduced one. The module alongside the configuration parses
-// under both, which is what keeps the rejection attributable to the
-// configuration rather than to the source as a whole.
 inline void ExpectConfigurationWordsParse(const char* spec) {
   const std::string kSrc =
       "module top;\n"
@@ -149,13 +119,8 @@ inline void ExpectConfigurationWordsParse(const char* spec) {
   ASSERT_EQ(r.cu->configs.size(), 1u);
   auto* cfg = r.cu->configs[0];
   EXPECT_EQ(cfg->name, "config_a");
-  // One rule per clause below the design statement: the default liblist, the
-  // instance rule, and the cell rule.
   EXPECT_EQ(cfg->rules.size(), 3u);
 
-  // The companion list leaves `config` an ordinary identifier, so the
-  // declaration heading line 3 of the source above is no top-level declaration
-  // at all and Parser::ParseTopLevel in src/parser/parser.cpp says so.
   auto dropped = ParseWithPreprocessor(InNoconfig(kSrc));
   EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
                             LineInRegion(3), "3.12.1"));
@@ -163,8 +128,6 @@ inline void ExpectConfigurationWordsParse(const char* spec) {
   EXPECT_TRUE(ParseWithPreprocessorOk(InNoconfig("module top;\nendmodule\n")));
 }
 
-// Table 22-3, the Verilog-2005 list, whose lone entry is a net type of its
-// own: `uwire` shall still open a net declaration and type a port.
 inline void ExpectVerilog2005ConstructsParse(const char* spec) {
   auto r = ParseWithPreprocessor(In(spec,
                                     "module m (output uwire y);\n"
@@ -182,11 +145,6 @@ inline void ExpectVerilog2005ConstructsParse(const char* spec) {
   }
 }
 
-// The design elements Table 22-4 adds beside the module, each read back by the
-// name its declaration gave it: `package` heads a package, `interface` heads an
-// interface with a `modport` in it, and `class` heads a class. A word that
-// stayed reserved but stopped heading its declaration would leave one of these
-// lists empty.
 inline void ExpectSystemVerilog2005DesignElementsParse(CompilationUnit* cu) {
   ASSERT_EQ(cu->packages.size(), 1u);
   EXPECT_EQ(cu->packages[0]->name, "pkg");
@@ -196,11 +154,6 @@ inline void ExpectSystemVerilog2005DesignElementsParse(CompilationUnit* cu) {
   EXPECT_EQ(cu->classes[0]->name, "base");
 }
 
-// Table 22-4's user-defined types, inferred process forms and verification
-// declarations, read off `items`: `typedef` names the enumeration, the packed
-// structure and the plain alias; `always_comb`, `always_ff`, `always_latch` and
-// `final` each build the process form their word exists to infer; and
-// `property` and `sequence` each build the declaration their word opens.
 inline void ExpectSystemVerilog2005TypesAndProcessesParse(
     const std::vector<ModuleItem*>& items) {
   for (const char* name : {"byte_t", "state_t", "pair_t"}) {
@@ -217,10 +170,6 @@ inline void ExpectSystemVerilog2005TypesAndProcessesParse(
       HasItemKindNamed(items, ModuleItemKind::kSequenceDecl, "s_pulse"));
 }
 
-// Table 22-4's data type words in the role each holds: every entry of the table
-// below heads a variable declaration in `items`, and the declaration carries
-// the DataTypeKind its word names. Reading the kind back is what separates a
-// word that still types a declaration from one the parser merely accepted.
 inline void ExpectSystemVerilog2005DataTypeKindsParse(
     const std::vector<ModuleItem*>& items) {
   struct TypedDecl {
@@ -248,11 +197,6 @@ inline void ExpectSystemVerilog2005DataTypeKindsParse(
   }
 }
 
-// The closing leg the accepting checks above rest on: "1364-2005", the last
-// specifier before Table 22-4, reserves none of the words `src` is written in,
-// so `package` on its first line heads no top-level declaration and
-// Parser::ParseTopLevel in src/parser/parser.cpp says so. Without this leg an
-// accepting check would hold for any source that happened to parse.
 inline void ExpectSystemVerilog2005SourceUnwritableBeforeSystemVerilog(
     const std::string& src) {
   auto before = ParseWithPreprocessor(In2005(src));
@@ -260,13 +204,6 @@ inline void ExpectSystemVerilog2005SourceUnwritableBeforeSystemVerilog(
                             LineInRegion(1), "3.12.1"));
 }
 
-// Table 22-4, the SystemVerilog-2005 list, the largest thing a later specifier
-// inherits: the design elements beyond the module, the data types with their
-// kinds, the user-defined types, the inferred process forms, and the
-// verification vocabulary. The closing leg is the same source under
-// "1364-2005", the last specifier before this table, where none of it can be
-// written -- which is what keeps the accepting leg from being any parse that
-// happens to succeed.
 inline void ExpectSystemVerilog2005ConstructsParse(const char* spec) {
   const std::string kSrc =
       "package pkg;\n"
@@ -324,12 +261,6 @@ inline void ExpectSystemVerilog2005ConstructsParse(const char* spec) {
   ExpectSystemVerilog2005SourceUnwritableBeforeSystemVerilog(kSrc);
 }
 
-// The reserving half at this stage, table by table. Every entry of `t` is put
-// in a declaration's identifier slot and rejected under `spec`, and -- where an
-// earlier specifier leaves the entry free -- the same declaration is parsed
-// there and read back off the tree as the variable declaration it spells.
-// Reading it back is what keeps the accepting leg from being any parse that
-// happens to succeed.
 inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
                                                 const KeywordTableSweep& t) {
   EXPECT_EQ(t.count, t.expected_count) << t.what;
@@ -339,12 +270,6 @@ inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
     if (t.skip != nullptr && t.skip(word)) continue;
     ++swept;
 
-    // VarDecl heads its declaration with `reg`, so the list is a variable
-    // declaration and Parser::ParseVarDeclList in src/parser/parser_types.cpp
-    // reads the name under §6.8 -- that function makes the choice against
-    // §6.7. The report names the entry itself, because Parser::ParseDataType
-    // in src/parser/parser_types.cpp takes the signing before the packed
-    // dimensions and so consumes nothing after `[7:0]`.
     auto reserved = ParseWithPreprocessor(In(spec, VarDecl(word)));
     EXPECT_TRUE(ReportedError(
         reserved.diags, std::string("expected identifier, got '") + word + "'",
@@ -365,10 +290,6 @@ inline void ExpectKeywordTableIsReservedAtParse(const char* spec,
   EXPECT_EQ(swept, t.expected_swept) << t.what;
 }
 
-// The design element and the ports of the source
-// ExpectFreedWordsNameDeclaredEntities below parses: `bit` names the module and
-// `logic` and `byte` name its two ports, each read back off the declaration the
-// parser built.
 inline void ExpectFreedWordNamesModuleAndPorts(ModuleDecl* m) {
   EXPECT_EQ(m->name, "bit");
   ASSERT_EQ(m->ports.size(), 2u);
@@ -376,10 +297,6 @@ inline void ExpectFreedWordNamesModuleAndPorts(ModuleDecl* m) {
   EXPECT_EQ(m->ports[1].name, "byte");
 }
 
-// The declarations inside that same module, one freed word per declaration
-// kind: `int` names the parameter, `string` the net, `longint` the variable and
-// `shortint` the task. Each is looked up by kind as well as by name, so a word
-// read back off some other declaration does not answer for its own.
 inline void ExpectFreedWordsNameModuleDeclarations(
     const std::vector<ModuleItem*>& items) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kParamDecl, "int"));
@@ -388,9 +305,6 @@ inline void ExpectFreedWordsNameModuleDeclarations(
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "shortint"));
 }
 
-// The instantiation that source writes in its second module: `bit` names the
-// module being instantiated and `interface` names the instance, a position no
-// declaration reaches.
 inline void ExpectFreedWordNamesInstance(
     const std::vector<ModuleItem*>& items) {
   auto* u = FindItemByKind(items, ModuleItemKind::kModuleInst);
@@ -399,11 +313,6 @@ inline void ExpectFreedWordNamesInstance(
   EXPECT_EQ(u->inst_name, "interface");
 }
 
-// A word no list in force reserves is an ordinary identifier, so it can name
-// anything an identifier names. Declarations are only the most obvious
-// position: this runs words a later standard reserves through the module name,
-// both port names, a parameter, a net, a variable, a task, a named block, and
-// an instance name, and reads each back off the parsed tree.
 inline void ExpectFreedWordsNameDeclaredEntities(const char* spec) {
   auto r = ParseWithPreprocessor(
       In(spec,
@@ -430,9 +339,6 @@ inline void ExpectFreedWordsNameDeclaredEntities(const char* spec) {
   ExpectFreedWordNamesInstance(r.cu->modules[1]->items);
 }
 
-// The same freed word as an expression operand and as the target of a
-// procedural assignment -- positions that carry a value rather than introduce a
-// name, and so reach the parser by a different path than a declaration does.
 inline void ExpectFreedWordIsAnOperandAndAssignmentTarget(const char* spec) {
   auto r = ParseWithPreprocessor(In(spec,
                                     "module m;\n"
@@ -460,10 +366,6 @@ inline void ExpectFreedWordIsAnOperandAndAssignmentTarget(const char* spec) {
   EXPECT_EQ(second->rhs->lhs->text, "logic");
 }
 
-// The ten words on which the two lists published for the same Verilog standard
-// disagree: each names a variable under the companion list that drops them,
-// which is what shows a version that inherits "1364-2001" inherits the full
-// list rather than the shorter one.
 inline void ExpectConfigurationWordsNameVariablesAtParse() {
   EXPECT_EQ(std::size(kConfigurationWords), 10u);
   for (const char* word : kConfigurationWords) {
@@ -476,10 +378,6 @@ inline void ExpectConfigurationWordsNameVariablesAtParse() {
   }
 }
 
-// Table 22-3's word in the keyword role it exists for: `uwire` still opens a
-// net declaration and types a port under `spec`, which is what makes the
-// inclusion about the role surviving rather than only about the identifier
-// slot closing.
 inline void ExpectUwireStillOpensNetDeclarations(const char* spec) {
   auto as_net = ParseWithPreprocessor(
       In(spec,

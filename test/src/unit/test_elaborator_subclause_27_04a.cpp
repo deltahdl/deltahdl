@@ -122,10 +122,6 @@ TEST(GenerateElaboration, NestedGenerateForIf) {
 
 TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
   ElabFixture f;
-  // The budget is lowered because this case is the only one in the file that
-  // reaches it, and its cost is the budget. At the default of 262144 it would
-  // elaborate a quarter of a million generate blocks to arrive at a report
-  // that says the same thing at 256.
   f.configure = [](Elaborator& elab) { elab.SetMaxGenerateIterations(256); };
   ElabOk(
       "module top();\n"
@@ -136,30 +132,12 @@ TEST(GenerateElaboration, GenerateForNonTerminatingLoopErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // §27.4 states the rule at stake, so the report names it alongside the three
-  // other §27.4 rules this file covers. The assertion reads the budget out of
-  // the message on purpose: reaching the budget does not establish that a
-  // scheme fails to terminate, since one that would have stopped just past it
-  // arrives at the same place, and a message asserting non-termination
-  // outright would be a claim about this source that the elaborator cannot
-  // make. Naming the number is what keeps the report true of both sources that
-  // reach it, and naming the budget in force rather than a constant is what
-  // lets this case set its own.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "loop generate scheme did not terminate within 256 iterations", 3,
       "27.4"));
 }
 
-// A design of this size was refused while the budget was a fixed 65536, and
-// §27.4 gives no rule it breaches: the four are a generate block instance
-// array name conflicting with another declaration, a scheme that does not
-// terminate, a repeated genvar value, and a genvar bit set to x or z. This
-// scheme terminates after 65600 iterations, so it elaborates.
-//
-// The size is just past the old budget on purpose. What the case has to show
-// is that a design the elaborator used to refuse now builds, and running it to
-// 262143 would cost four times as much and show nothing further.
 TEST(GenerateElaboration, LoopGenerateAboveTheOldBoundElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -176,13 +154,6 @@ TEST(GenerateElaboration, LoopGenerateAboveTheOldBoundElaborates) {
   EXPECT_EQ(design->top_modules[0]->variables.size(), 65600u);
 }
 
-// The budget decides in both directions, which is what makes it a budget and
-// not a rule: one source, two budgets, two outcomes. Holding the source fixed
-// and varying only the budget is what attributes the difference to the budget.
-//
-// The 300-iteration scheme below terminates, so the rejection under a budget
-// of 256 is exactly the defect this case guards against -- a scheme that stops
-// on its own, refused for a count §27.4 does not state.
 TEST(GenerateElaboration, LoopGenerateBoundDecidesWhetherASchemeIsReported) {
   const std::string kSrc =
       "module t #(parameter N = 300) ();\n"
@@ -264,11 +235,6 @@ TEST(GenerateElaboration, GenerateForInitReferencesOwnGenvarErrors) {
                             3, "27.4"));
 }
 
-// §27.4: a named loop generate block declares a generate block instance array,
-// and its name conflicting with another declaration in the same scope is an
-// error. Here the block name collides with a variable. The loop also runs zero
-// times, exercising the rule that the array is declared even when the scheme
-// produces no instances.
 TEST(GenerateElaboration, GenerateForNamedBlockConflictsWithVariableErrors) {
   ElabFixture f;
   ElabOk(
@@ -288,9 +254,6 @@ TEST(GenerateElaboration, GenerateForNamedBlockConflictsWithVariableErrors) {
                             5, "27.4"));
 }
 
-// §27.4: the conflict rule explicitly covers a clash between two generate block
-// instance arrays. Two loop generate blocks sharing one array name in the same
-// scope is an error.
 TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
   ElabFixture f;
   ElabOk(
@@ -306,20 +269,12 @@ TEST(GenerateElaboration, GenerateForDuplicateBlockArrayNameErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // The second loop is the one that finds the name taken, so its `for` on
-  // line 7 is where the report stands.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block array 'a' conflicts with an "
                             "existing declaration in the same scope",
                             7, "27.4"));
 }
 
-// §27.4: a generate block forms a scope of its own and a further level of
-// hierarchy once instantiated, so the enclosing scope of a nested array is one
-// instance of the outer block rather than the module. The inner array 'h' is
-// declared once per instance of 'g', in two different scopes, so the second
-// instantiation is not a conflict with the first. Both instances of the inner
-// body are elaborated, giving one 'x' per (i, j) pair.
 TEST(GenerateElaboration, NestedBlockArrayNameRepeatsPerOuterInstanceOk) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -338,11 +293,6 @@ TEST(GenerateElaboration, NestedBlockArrayNameRepeatsPerOuterInstanceOk) {
   EXPECT_EQ(design->top_modules[0]->variables.size(), 4u);
 }
 
-// §27.4: the conflict rule still applies within one generate block instance.
-// Two inner arrays written side by side under the same enclosing block share
-// that block's scope, so naming both 'h' is an error exactly as it would be at
-// module level -- the separate scope belongs to the instance, not to the
-// nesting.
 TEST(GenerateElaboration, SiblingBlockArrayNamesInsideOneBlockConflictErrors) {
   ElabFixture f;
   ElabOk(
@@ -360,17 +310,12 @@ TEST(GenerateElaboration, SiblingBlockArrayNamesInsideOneBlockConflictErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // The second inner loop, on line 8, is the one that finds 'h' taken.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate block array 'h' conflicts with an "
                             "existing declaration in the same scope",
                             8, "27.4"));
 }
 
-// §27.4: it shall be an error if any bit of the genvar is set to x or z
-// during evaluation of the loop generate scheme. A genvar initialized to a
-// 4-state literal carries an x bit, so the elaborator rejects it with a
-// dedicated x/z diagnostic rather than a generic constant-expression error.
 TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -382,10 +327,6 @@ TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // Without the dedicated x/z rule the init case is only a warning and the
-  // step case silently ends the loop; the rule turns both into errors. Both
-  // reports stand at the `for` keyword on line 3, so the half of the header
-  // the message names is the only thing that separates them.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate-for genvar must hold no x or z bit while "
                             "the loop is evaluated, and the initialization "
@@ -393,9 +334,6 @@ TEST(GenerateElaboration, GenerateForGenvarXZInitErrors) {
                             3, "27.4"));
 }
 
-// §27.4: the x/z prohibition holds throughout the loop, not just at
-// initialization. An iteration assignment driving the genvar to a z bit is an
-// error reported by the same dedicated diagnostic.
 TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -407,10 +345,6 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
       "  endgenerate\n"
       "endmodule\n",
       f);
-  // The iteration site names the iteration assignment, which is what
-  // separates this case from GenerateForGenvarXZInitErrors: the two reports
-  // stand at the same line under the same subclause, so the message is the only
-  // thing that can.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "generate-for genvar must hold no x or z bit while "
                             "the loop is evaluated, and the iteration "
@@ -418,12 +352,6 @@ TEST(GenerateElaboration, GenerateForGenvarXZStepErrors) {
                             3, "27.4"));
 }
 
-// The property the two checks exist to be told apart by. Both stand at the
-// `for` keyword under §27.4, so while they shared one sentence
-// `for (i = 2'b0z; i < 4; i = i + 1)` and `for (i = 0; i < 4; i = 2'b0z)`
-// produced identical output and a test written for either was satisfied by the
-// other. Each source here puts exactly one x/z literal in the half it is named
-// for, and the negative assertion is what says the reports do not overlap.
 TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
   constexpr const char* kInitMsg =
       "generate-for genvar must hold no x or z bit while the loop is "
@@ -460,33 +388,12 @@ TEST(GenerateElaboration, GenerateForGenvarXZReportsNameWhichHalfOfTheHeader) {
   EXPECT_FALSE(ReportedError(step.diag.Diagnostics(), kInitMsg, 3, "27.4"));
 }
 
-// Every name the module's variable declarations carry. A set rather than the
-// order elaboration produced, because what §27.4 fixes about two sibling
-// generate block instance arrays is that their declarations are distinct
-// objects: two declarations that collapse onto one name leave one entry here
-// whichever order the blocks were visited in.
 static std::set<std::string> VariableNames(const RtlirModule* mod) {
   std::set<std::string> names;
   for (const auto& var : mod->variables) names.insert(std::string(var.name));
   return names;
 }
 
-// §27.4: a named generate block declares an array of generate block instances,
-// and its indices are the values the genvar takes during elaboration. What
-// identifies an instance is therefore the block and the index, not the genvar.
-// Two loop generate constructs written side by side over one genvar declare two
-// arrays, and §27.4 rules that a generate block forms a scope of its own, so
-// `blk_a`'s `v` and `blk_b`'s `v` are two declarations and the flattened design
-// has to spell them apart.
-//
-// Naming the flattened declaration after the genvar gave both arrays the prefix
-// `i_4_`, so the four declarations collapsed onto two names and one instance's
-// `v` answered a reference from the other.
-//
-// The loop runs over 4 and 5 rather than 0 and 1 so that no index equals the
-// storage offset of the variable it names: at 0 and 1 an implementation that
-// wrote the offset where §27.4 requires the genvar value would produce the same
-// four names.
 TEST(GenerateElaboration,
      SiblingNamedBlocksOverOneGenvarNameTheirDeclarationsApart) {
   ElabFixture f;
@@ -513,22 +420,6 @@ TEST(GenerateElaboration,
                                    "blk_b_5_v"}));
 }
 
-// §27.4: the same rule reaches the continuous assignments inside the two
-// blocks. The body AST is shared across instances and writes the simple name
-// the block declared, so an assignment reaches its own instance's declaration
-// only through the last entry of RtlirContAssign::gen_block_prefixes
-// (src/elaborator/rtlir.h:263).
-// Two sibling arrays over one genvar are separate scopes, so the two
-// assignments cannot carry one prefix. Spelling the prefix from the genvar gave
-// both of them `i_4_`, and a prefix that does not say which block an assignment
-// came from resolves a simple name written in both blocks to one declaration.
-//
-// The assertion is that the prefixes differ rather than that they read some
-// spelling, because §27.4 fixes that the scopes are separate and fixes nothing
-// about how a flattened design spells a prefix. ASSERT_FALSE on emptiness
-// states the premise the inequality rests on, that both assignments were
-// stamped at all: two unstamped assignments agree on the empty string and would
-// otherwise be reported as differing from nothing.
 TEST(GenerateElaboration,
      SiblingNamedBlocksOverOneGenvarStampDistinctContAssignPrefixes) {
   ElabFixture f;
@@ -559,17 +450,6 @@ TEST(GenerateElaboration,
   EXPECT_NE(first, second);
 }
 
-// §27.6: every unnamed generate block is named genblk<n>, <n> being the number
-// of the generate construct holding it, numbering the constructs of a scope
-// from 1 in textual order. That naming is applied by
-// Elaborator::AssignGenerateBlockNames before elaboration, so the two unnamed
-// constructs here are `genblk1` and `genblk2`, and the §27.4 rule that
-// separates two named sibling arrays separates these two as well.
-//
-// This is the case that says the separation does not depend on the source
-// having written a label: with the prefix spelled from the genvar both unnamed
-// blocks were `i_4_` and `i_5_` and their `v` declarations collapsed onto two
-// names. The indices are 4 and 5 for the reason the named case gives.
 TEST(GenerateElaboration,
      SiblingUnnamedBlocksOverOneGenvarNameTheirDeclarationsApart) {
   ElabFixture f;
@@ -596,11 +476,6 @@ TEST(GenerateElaboration,
                                    "genblk2_5_v"}));
 }
 
-// Every name the module's child instances carry, gathered the way
-// VariableNames above gathers the declarations and for the same reason: two
-// instances that collapse onto one name leave one entry here whichever order
-// the iterations were elaborated in, so the set states both that the names are
-// distinct and what each one is.
 static std::set<std::string> InstanceNames(const RtlirModule* mod) {
   std::set<std::string> names;
   for (const auto& child : mod->children)
@@ -608,22 +483,6 @@ static std::set<std::string> InstanceNames(const RtlirModule* mod) {
   return names;
 }
 
-// §27.4: a generate block forms a scope of its own and a further level of
-// hierarchy once instantiated, and a named loop generate block declares an
-// array of generate block instances whose indices are the values the genvar
-// takes during elaboration. A module instantiated in the block body is
-// therefore a different instance in every iteration, and
-// RtlirModuleInst::inst_name is where the flattened design has to say so.
-//
-// Recording the name the source wrote gave both iterations `u`, so the two
-// children of `top` shared a name and a hierarchical path and nothing told them
-// apart. GenerateForCreatesInstances above asserts the instance count and not
-// the names, which is why it passed throughout.
-//
-// The loop runs over 4 and 5 rather than 0 and 1 so that no index equals the
-// storage offset of the child it names: at 0 and 1 an implementation writing
-// the offset where §27.4 requires the genvar value would produce the same two
-// names.
 TEST(GenerateElaboration, LoopGenerateBlockNamesEachIterationsInstanceApart) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -645,17 +504,6 @@ TEST(GenerateElaboration, LoopGenerateBlockNamesEachIterationsInstanceApart) {
   EXPECT_EQ(InstanceNames(mod), (std::set<std::string>{"blk_4_u", "blk_5_u"}));
 }
 
-// §27.4: the index alone does not identify an instance, because two loop
-// generate constructs written side by side over one genvar declare two arrays
-// and each forms a scope of its own. So the block name has to reach the
-// instance name as well as the index does: with the index alone, `blk_a`'s `u`
-// and `blk_b`'s `u` at one iteration are one name, and with the name alone the
-// two iterations of one block are.
-//
-// This is the instance-side counterpart of
-// SiblingNamedBlocksOverOneGenvarNameTheirDeclarationsApart above, which asks
-// the same question of the variable declarations. The indices are 4 and 5 for
-// the reason that case gives.
 TEST(GenerateElaboration,
      SiblingNamedBlocksOverOneGenvarNameTheirInstancesApart) {
   ElabFixture f;

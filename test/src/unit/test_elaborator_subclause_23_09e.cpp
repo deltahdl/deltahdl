@@ -1,13 +1,3 @@
-// Tests for the §23.9 scope rules as they reach a name read in a concurrent
-// assertion, a named sequence or a named property. §23.9 resolves an
-// identifier referenced without a hierarchical path against the declarations
-// its scope can reach, and §16.8 and §16.12 resolve a name in a sequence or
-// property body other than a formal from the scope of the declaration, so a
-// name those scopes do not declare is unresolved there as in a statement.
-//
-// The reads in statements are in test_elaborator_subclause_23_09a.cpp to
-// 23_09d.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -23,8 +13,6 @@ namespace {
 constexpr std::string_view kUnresolved =
     "reference to unresolved identifier 'undeclared'";
 
-// Elaborates `items`, module items of a module declaring `logic clk;` and
-// `bit a;`, and asserts the §23.9 report stands on the line holding `anchor`.
 void ExpectReportedIn(std::string_view items, std::string_view anchor) {
   ElabFixture f;
   std::string src = "module m;\n  logic clk;\n  bit a;\n" + std::string(items) +
@@ -65,10 +53,6 @@ TEST(AssertionReads, UndeclaredNameInAPropertyBodyIsReported) {
       "a |=> undeclared");
 }
 
-// Every name below is declared where its read can reach it: a formal and a
-// local of the declaration, a sequence and a property instantiated by name, a
-// parameter, an enumeration constant, a function, a package's names reached
-// by import and by `pkg::`, an interface instance's signal and `$` as a bound.
 TEST(AssertionReads, NamesTheScopesDeclareAreAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -103,11 +87,6 @@ TEST(AssertionReads, NamesTheScopesDeclareAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.9.2: an assignment pattern's member keys name members of its type, not
-// objects of the scope, so a pattern passed as an actual reads none of them,
-// whether written first or after a comma, while the names it reads as
-// values, a ternary's and a concatenation's among them, still resolve
-// (#5762).
 TEST(AssertionReads, APatternsMemberKeysAreNoReads) {
   ElabFixture f;
   auto* design = Elaborate(

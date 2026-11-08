@@ -22,9 +22,6 @@ TEST(LogicValuesLexer, LongerWordStartingWithLogicIsIdentifier) {
 }
 
 TEST(LogicValuesLexer, KeywordMatchIsCaseSensitive) {
-  // §6.3.1 names the basic 4-state type with the exact keyword "logic".
-  // Keyword recognition is case-sensitive, so a capitalized spelling is an
-  // ordinary identifier rather than the type keyword.
   auto tokens = Lex("Logic");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kIdentifier);

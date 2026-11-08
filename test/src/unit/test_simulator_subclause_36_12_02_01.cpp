@@ -1,29 +1,8 @@
 #include <gtest/gtest.h>
 
-// §36.12.2.1 -- Mechanism 1: compile-based binding to a compatibility
-// mode. These tests observe the production header
-// (src/simulator/vpi_compatibility.h) applying the mechanism: selecting a
-// single compatibility version retargets the standard VPI entry points to that
-// mode's variants, and leaving every version unselected performs no remapping.
-//
-// Each entry point is a function name that the header redefines (as an
-// object-like macro) when a mode is active. The two-step stringizer below reads
-// the post-preprocessing spelling of such a name so a test can assert which
-// variant it currently resolves to. Because the macro state of a translation
-// unit is global, the mark the header leaves of its reading -- §L.2 has it
-// reject a second reading rather than ignore it -- is reset between sections
-// so the same source file can exercise several modes in textual order.
-
 #define DELTA_VPI_STR2(x) #x
 #define DELTA_VPI_STR(x) DELTA_VPI_STR2(x)
 
-// Clears any previously selected version and remapping so the next inclusion of
-// the header starts from a clean slate.
-//
-//   undo the 14 retargeted entry points, every selectable version symbol
-//   (including the chained 1800v2012), and the mark of the reading.
-
-// --- Section: no version selected (default, native data model) ---
 #include "simulator/vpi_compatibility.h"
 
 namespace {
@@ -72,9 +51,6 @@ TEST(VpiCompatibilityModeBinding, DefaultLeavesEntryPointsUnmapped) {
 #undef VPI_COMPATIBILITY_VERSION_1800v2023
 #undef VPI_COMPATIBILITY_H
 
-// --- Section: 1364v2001 selected (matches the standard's own example) ---
-// Selecting exactly one version is admitted by the at-most-one guard and must
-// redefine all fourteen entry points to that version's variant.
 #define VPI_COMPATIBILITY_VERSION_1364v2001 1
 #include "simulator/vpi_compatibility.h"
 
@@ -101,12 +77,6 @@ TEST(VpiCompatibilityModeBinding, SelectedVersionRetargetsEveryEntryPoint) {
   EXPECT_STREQ(DELTA_VPI_STR(vpi_scan), "vpi_scan_1364v2001");
 }
 
-// Selecting one version must keep the selection singular: the header may not
-// leave a second version symbol defined behind the application's back, which is
-// the at-most-one invariant the compile-time guard exists to protect. (The
-// guard's rejection of an explicit double selection halts compilation and so
-// cannot be observed by a passing test.) 1364v2001 carries no internal version
-// chaining, so none of the other seven symbols may be set here.
 TEST(VpiCompatibilityModeBinding, SingleSelectionStaysSingular) {
 #if defined(VPI_COMPATIBILITY_VERSION_1364v1995) || \
     defined(VPI_COMPATIBILITY_VERSION_1364v2005) || \
@@ -121,11 +91,6 @@ TEST(VpiCompatibilityModeBinding, SingleSelectionStaysSingular) {
 #endif
 }
 
-// The redefinition mechanism is scoped to exactly the enumerated entry points.
-// A standard VPI routine that is not on that list (e.g. vpi_chk_error,
-// vpi_free_object) must be left untouched even while a mode is active, so an
-// application's calls to it are not silently retargeted. With 1364v2001
-// selected, these names must still spell themselves.
 TEST(VpiCompatibilityModeBinding, SelectionDoesNotRetargetUnlistedRoutines) {
   EXPECT_STREQ(DELTA_VPI_STR(vpi_chk_error), "vpi_chk_error");
   EXPECT_STREQ(DELTA_VPI_STR(vpi_free_object), "vpi_free_object");
@@ -158,14 +123,6 @@ TEST(VpiCompatibilityModeBinding, SelectionDoesNotRetargetUnlistedRoutines) {
 #undef VPI_COMPATIBILITY_VERSION_1800v2017
 #undef VPI_COMPATIBILITY_VERSION_1800v2023
 #undef VPI_COMPATIBILITY_H
-
-// --- Section: each remaining selectable version, one at a time ---
-// Re-including the header under a different single selection exercises the rule
-// for the other listed symbols; vpi_handle stands in for the whole entry-point
-// set verified above. Versions that the header carries a direct variant for are
-// pinned to that variant; 1800v2017 and 1800v2023 share the 1800v2012 data
-// model (their variant naming is defined in Annex L), so they are only required
-// to perform some redefinition away from the native name.
 
 #define VPI_COMPATIBILITY_VERSION_1364v1995 1
 #include "simulator/vpi_compatibility.h"
@@ -419,15 +376,6 @@ TEST(VpiCompatibilityModeBinding, Version1800v2023Retargets) {
 #undef VPI_COMPATIBILITY_VERSION_1800v2023
 #undef VPI_COMPATIBILITY_H
 
-// --- Section: the redefinition is performed by vpi_user.h ---
-// §36.12.2.1 puts the mechanism in the file the application includes: one of
-// the listed compiler symbols is defined before any standard VPI include file
-// is compiled, and once a mode is chosen that way, preprocessor constructs in
-// vpi_user.h redefine the listed VPI functions to that mode's versions. So the
-// clause's own example - define the symbol, then include vpi_user.h - is what
-// has to perform the retargeting, and it is what this section does. The
-// constructs were reached only by including the header that holds them, which
-// no application the clause describes names.
 #define VPI_COMPATIBILITY_VERSION_1364v2005 1
 #include "simulator/vpi_user.h"
 

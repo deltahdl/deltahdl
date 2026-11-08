@@ -4,30 +4,9 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
-// §6.22.3 "Assignment compatible" is a definitional subclause: it carries no
-// BNF production and no "shall". It defines the category of
-// assignment-compatible types as all equivalent types (see §6.22.2) plus all
-// nonequivalent types that have implicit casting rules defined between them
-// (§6.24), and gives three illustrating facts: all integral types are mutually
-// assignment compatible, conversion can lose data by truncation or rounding,
-// and compatibility can be one-directional (an enum value flows into an
-// integral without a cast, but not the reverse). The whole classification is an
-// elaborator-stage predicate, IsAssignmentCompatible in type_eval.cpp, so this
-// clause's coverage lives at the elaborator stage. The runtime data-loss note
-// is observed separately in the simulator canonical file.
-
 using namespace delta;
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// Full-pipeline observation: production code applies IsAssignmentCompatible.
-// A value-returning function's return statement is checked against its return
-// type with IsAssignmentCompatible (elaborator_validate_funcchecks.cpp). This
-// drives real source through parse+elaborate and observes the rule accepting a
-// compatible return and rejecting an incompatible one -- the only difference
-// between the two modules is the declared return type.
-// ---------------------------------------------------------------------------
 
 TEST(AssignmentCompatibleElaboration, FunctionReturnAcceptsIntegralValue) {
   ElabFixture f;
@@ -42,13 +21,6 @@ TEST(AssignmentCompatibleElaboration, FunctionReturnAcceptsIntegralValue) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A string return type is not assignment compatible with an integral literal
-// (no equivalence and no implicit casting rule), so IsAssignmentCompatible
-// returns false and the return statement is rejected. §6.22.3 states only the
-// definition of assignment-compatible types as the equivalent types plus the
-// nonequivalent types with implicit casting rules between them, with no
-// "shall", so the obligation the report enforces is §12.8's on a return
-// statement and the report names §12.8.
 TEST(AssignmentCompatibleElaboration, FunctionReturnRejectsIncompatibleValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -66,10 +38,6 @@ TEST(AssignmentCompatibleElaboration, FunctionReturnRejectsIncompatibleValue) {
                             3, "12.8"));
 }
 
-// End-to-end input form: a real operand into an integral target. A real and an
-// integral type have an implicit numeric conversion, so the return is accepted;
-// this drives the real<->integral branch from real source rather than a
-// hand-built type.
 TEST(AssignmentCompatibleElaboration,
      FunctionReturnAcceptsRealValueIntoIntegral) {
   ElabFixture f;
@@ -84,8 +52,6 @@ TEST(AssignmentCompatibleElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// End-to-end input form: an integral operand into a real target -- the other
-// direction of the real<->integral implicit conversion.
 TEST(AssignmentCompatibleElaboration,
      FunctionReturnAcceptsIntegralValueIntoReal) {
   ElabFixture f;
@@ -100,14 +66,6 @@ TEST(AssignmentCompatibleElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// End-to-end NEGATIVE input form: a string operand into an integral target.
-// A string is nonequivalent to an integral type and has no implicit casting
-// rule, so the return is rejected. This is the reverse direction of the
-// integral-into-string rejection above and exercises the residual (return
-// false) branch from real source. The operand is a string variable: a string
-// literal is no string value here, §5.9 making it an unsigned integer
-// constant in an assignment. The report names §12.8 for the reason given
-// above FunctionReturnRejectsIncompatibleValue.
 TEST(AssignmentCompatibleElaboration,
      FunctionReturnRejectsStringValueIntoIntegral) {
   ElabFixture f;
@@ -127,11 +85,6 @@ TEST(AssignmentCompatibleElaboration,
                             4, "12.8"));
 }
 
-// End-to-end input form built from dependency §6.22.2 syntax: the return type
-// is a sized signed packed vector (bit signed [31:0]), which §6.22.2 governs
-// and which the §6.22 head treats as interchangeable with int. Assigning an
-// integral literal to it is accepted -- the operand type is produced by real
-// declaration syntax, not hand-built, and production applies the rule.
 TEST(AssignmentCompatibleElaboration,
      FunctionReturnAcceptsSizedSignedVectorType) {
   ElabFixture f;
@@ -145,11 +98,6 @@ TEST(AssignmentCompatibleElaboration,
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.diag.HasErrors());
 }
-
-// ---------------------------------------------------------------------------
-// Full-pipeline accept paths: assignment-compatible declarations elaborate
-// clean. int <-> bit signed [31:0] interchange is the §6.22 head example.
-// ---------------------------------------------------------------------------
 
 TEST(AssignmentCompatibleElaboration, AssignRealToInt) {
   ElabFixture f;
@@ -180,14 +128,6 @@ TEST(AssignmentCompatibleElaboration, IntAndBitSignedAreInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// ---------------------------------------------------------------------------
-// Classification matrix. IsAssignmentCompatible is a pure elaborator-stage
-// predicate over two data types; these exercise the type-pair cases that a
-// single accepting/rejecting source site cannot all reach at once.
-// ---------------------------------------------------------------------------
-
-// C1: all equivalent types are assignment compatible (equivalent branch, which
-// consumes §6.22.2). logic and reg are equivalent.
 TEST(AssignmentCompatibleElaboration, EquivalentTypesAreCompatible) {
   DataType a;
   a.kind = DataTypeKind::kLogic;
@@ -197,7 +137,6 @@ TEST(AssignmentCompatibleElaboration, EquivalentTypesAreCompatible) {
   EXPECT_TRUE(IsAssignmentCompatible(a, b));
 }
 
-// C2: all integral types are assignment compatible in both directions.
 TEST(AssignmentCompatibleElaboration, IntegralCompatibilityIsSymmetric) {
   DataType i;
   i.kind = DataTypeKind::kInt;
@@ -215,8 +154,6 @@ TEST(AssignmentCompatibleElaboration, IntegralCompatibilityIsSymmetric) {
   EXPECT_TRUE(IsAssignmentCompatible(shortint_t, byte_t));
 }
 
-// C2/C1: real and integral types have implicit numeric conversion, both ways;
-// the real family is mutually compatible.
 TEST(AssignmentCompatibleElaboration, RealAndIntegralNumericConversion) {
   DataType real_t;
   real_t.kind = DataTypeKind::kReal;
@@ -233,9 +170,6 @@ TEST(AssignmentCompatibleElaboration, RealAndIntegralNumericConversion) {
   EXPECT_TRUE(IsAssignmentCompatible(realtime_t, shortreal_t));
 }
 
-// C5: compatibility can be one-directional. An enum value is assignment
-// compatible with an integral type, but an integral value is not assignment
-// compatible with an enum (it needs an explicit cast).
 TEST(AssignmentCompatibleElaboration, EnumToIntegralIsOneDirectional) {
   DataType enum_t;
   enum_t.kind = DataTypeKind::kEnum;
@@ -250,8 +184,6 @@ TEST(AssignmentCompatibleElaboration, EnumToIntegralIsOneDirectional) {
   EXPECT_FALSE(IsAssignmentCompatible(logic_t, enum_t));
 }
 
-// C1 residual: nonequivalent types with no implicit casting rule between them
-// are not assignment compatible.
 TEST(AssignmentCompatibleElaboration, UnrelatedTypesAreNotCompatible) {
   DataType int_t;
   int_t.kind = DataTypeKind::kInt;

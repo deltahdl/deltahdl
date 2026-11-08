@@ -11,26 +11,14 @@
 
 using namespace delta;
 
-// §40.4: an FSM is identified by its state register or expression, its
-// optional next-state register and its legal states, each named by a pragma
-// the lexer recognizes in a comment. The parser gives each module the FSMs its
-// pragmas identify: the signal or signals holding the current state, the
-// enumeration name tying the pragmas of one FSM together, and the parameters
-// that name its legal states.
-
 namespace {
 
 using Names = std::vector<std::string_view>;
 
-// The FSMs the only module of `src` was given.
 const std::vector<FsmDecl>& FsmsOf(const ParseResult& result) {
   return result.cu->modules.front()->fsms;
 }
 
-// §40.4.1 and §40.4.6: a state_vector pragma naming its signal and its
-// enumeration, and the parameters a declaration tagged with that enumeration
-// declares, are one FSM whose legal states are those parameters, and only
-// those: a parameter declared by another declaration is none of them.
 TEST(FsmPragmaBinding, AStateVectorAndItsEnumParametersAreOneFsm) {
   auto r = Parse(
       "module top;\n"
@@ -48,11 +36,6 @@ TEST(FsmPragmaBinding, AStateVectorAndItsEnumParametersAreOneFsm) {
   EXPECT_EQ(fsm.states, (Names{"IDLE", "RUN", "DONE"}));
 }
 
-// §40.4.1 with §40.4.5 and §40.4.7: a state_vector pragma that names no
-// enumeration takes the one a separate pragma gives right after the bit range
-// of the signal's declaration, the first signal declared there holding the
-// current state; a pragma in a one-line comment counts as one in a block
-// comment.
 TEST(FsmPragmaBinding, ASeparateEnumPragmaInTheDeclarationNamesTheEnum) {
   auto r = Parse(
       "module top;\n"
@@ -68,8 +51,6 @@ TEST(FsmPragmaBinding, ASeparateEnumPragmaInTheDeclarationNamesTheEnum) {
   EXPECT_EQ(FsmsOf(r).front().states, (Names{"S0", "S1"}));
 }
 
-// §40.4.2: a part-select holding the current state keeps its bounds and the
-// FSM name the pragma gives it.
 TEST(FsmPragmaBinding, APartSelectStateKeepsItsBoundsAndName) {
   auto r = Parse(
       "module top;\n"
@@ -88,8 +69,6 @@ TEST(FsmPragmaBinding, APartSelectStateKeepsItsBoundsAndName) {
   EXPECT_EQ(fsm.states, (Names{"A", "B"}));
 }
 
-// §40.4.3: a concatenation holding the current state is every signal it
-// lists, in order.
 TEST(FsmPragmaBinding, AConcatenationStateIsEverySignalItLists) {
   auto r = Parse(
       "module top;\n"
@@ -103,8 +82,6 @@ TEST(FsmPragmaBinding, AConcatenationStateIsEverySignalItLists) {
   EXPECT_EQ(FsmsOf(r).front().fsm_name, "cat_fsm");
 }
 
-// §40.4.1: a pragma belongs to the module definition it is written in, so
-// each of two modules holds only its own FSM.
 TEST(FsmPragmaBinding, EachModuleHoldsTheFsmsWrittenInIt) {
   auto r = Parse(
       "module a;\n"

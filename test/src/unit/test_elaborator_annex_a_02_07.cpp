@@ -74,8 +74,6 @@ TEST(TaskDeclElaboration, TaskPortDefaultValueElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
-  // §13.5.2: pass-by-reference is illegal in a static-lifetime subroutine, so a
-  // ref/const ref port requires an automatic (or ref static) subroutine.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task automatic my_task(const ref int x);\n"
@@ -83,8 +81,6 @@ TEST(TaskDeclElaboration, TaskConstRefPortElaborates) {
              "endmodule\n"));
 }
 
-// The prototype stands in an interface, A.1.6's extern_tf_declaration being
-// an interface_or_generate_item and no item of a module body.
 TEST(TaskDeclElaboration, TaskPrototypeExternElaborates) {
   EXPECT_TRUE(
       ElabOk("interface ifc;\n"
@@ -110,8 +106,6 @@ TEST(TaskDeclElaboration, MultipleTasksElaborate) {
 }
 
 TEST(TaskDeclElaboration, TaskLifetimeAutomaticElaborates) {
-  // task_declaration may carry an explicit `automatic' lifetime; the elaborator
-  // must accept the resulting AST.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task automatic my_task;\n"
@@ -120,7 +114,6 @@ TEST(TaskDeclElaboration, TaskLifetimeAutomaticElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskAnsiEmptyParensElaborates) {
-  // task_body_declaration's ANSI form permits an empty tf_port_list.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task my_task();\n"
@@ -129,7 +122,6 @@ TEST(TaskDeclElaboration, TaskAnsiEmptyParensElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskVarPortElaborates) {
-  // tf_port_item permits the optional `var' before data_type_or_implicit.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task my_task(input var int x);\n"
@@ -139,9 +131,6 @@ TEST(TaskDeclElaboration, TaskVarPortElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskLocalVarDeclInBodyElaborates) {
-  // task_body_declaration's { block_item_declaration } slot: a local variable
-  // declared inside the body (built from the §A.2.8 block_item_declaration
-  // dependency's real syntax) is consumed and survives elaboration end-to-end.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task automatic my_task(output int b);\n"
@@ -153,9 +142,6 @@ TEST(TaskDeclElaboration, TaskLocalVarDeclInBodyElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskPortDefaultFromParameterElaborates) {
-  // tf_port_item's optional [ = expression ] default value, built from a
-  // §A.8.3 expression that references a §6.20 parameter (a distinct code path
-  // from a bare literal), is consumed and elaborates end-to-end.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  parameter int P = 7;\n"
@@ -165,9 +151,6 @@ TEST(TaskDeclElaboration, TaskPortDefaultFromParameterElaborates) {
 }
 
 TEST(TaskDeclElaboration, TaskArrayPortElaborates) {
-  // tf_port_item's { variable_dimension } slot, built from the §A.2.5
-  // declaration-ranges dependency's real syntax (an unpacked dimension on the
-  // port), is consumed and elaborates end-to-end.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  task my_task(input int data [4]);\n"

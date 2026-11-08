@@ -3,21 +3,10 @@
 #include <cstdint>
 #include <type_traits>
 
-// svdpi.h is included alone, as every case exercising it does: it redefines
-// VPI names vpi.h spells otherwise.
 #include "simulator/svdpi.h"
 
 namespace {
 
-// Annex I.3 lists the source code of svdpi.h, and this file is that source:
-// the cases below observe the listing's structure in it -- its guard, its
-// linkage macros and what becomes of them at the file's end, the types its
-// canonical representation and time value are built on, the constants
-// that go with them and the spelling of its mask macro -- beside the names
-// test_simulator_annex_h_03.cpp counts and the contents
-// test_simulator_annex_h_10_01.cpp reads.
-
-// §I.3: the file is guarded by INCLUDED_SVDPI.
 TEST(SvdpiSourceCode, TheFileIsGuardedByIncludedSvdpi) {
 #ifdef INCLUDED_SVDPI
   const bool kGuarded = true;
@@ -27,10 +16,6 @@ TEST(SvdpiSourceCode, TheFileIsGuardedByIncludedSvdpi) {
   EXPECT_TRUE(kGuarded);
 }
 
-// §I.3: the file defines DPI_DLLISPEC and DPI_DLLESPEC for importing and
-// exporting a symbol from a DLL, empty on every platform but Windows, and
-// leaves the two defined; DPI_EXTERN, DPI_PROTOTYPES, XXTERN and EETERN it
-// undefines at its end, so that none of the four survives the inclusion.
 TEST(SvdpiSourceCode, TheLinkageMacrosEndAsTheListingHasThem) {
 #if defined(DPI_DLLISPEC) && defined(DPI_DLLESPEC)
   const bool kSpecsDefined = true;
@@ -47,10 +32,6 @@ TEST(SvdpiSourceCode, TheLinkageMacrosEndAsTheListingHasThem) {
   EXPECT_FALSE(kAnySurvives);
 }
 
-// §I.3: the scalar type is uint8_t, shared by svBit and svLogic, and the
-// canonical representation's chunk types are the listing's -- svBitVecVal a
-// uint32_t and svLogicVecVal the s_vpi_vecval of two uint32_t, guarded by
-// VPI_VECVAL with its pointer typedef beside it.
 TEST(SvdpiSourceCode, TheScalarAndChunkTypesAreTheListings) {
   EXPECT_TRUE((std::is_same<svScalar, uint8_t>::value));
   EXPECT_TRUE((std::is_same<svBit, svScalar>::value));
@@ -68,10 +49,6 @@ TEST(SvdpiSourceCode, TheScalarAndChunkTypesAreTheListings) {
   EXPECT_TRUE(kVecvalGuarded);
 }
 
-// §I.3: the time value is the s_vpi_time of an int32_t type, uint32_t high
-// and low and a double real, guarded by VPI_TIME with its pointer typedef,
-// and the three VPI time-type codes the listing defines beside it are the
-// ones the sv_ names stand for.
 TEST(SvdpiSourceCode, TheTimeValueAndItsCodesAreTheListings) {
   EXPECT_TRUE((std::is_same<svTimeVal, s_vpi_time>::value));
   EXPECT_TRUE((std::is_same<p_vpi_time, s_vpi_time*>::value));
@@ -92,15 +69,6 @@ TEST(SvdpiSourceCode, TheTimeValueAndItsCodesAreTheListings) {
   EXPECT_TRUE(kTimeGuarded);
 }
 
-// §I.3: the listing spells SV_MASK(N) as the complement of -1 shifted left
-// by N, so the mask is an int, the low N bits set; a spelling that shifts
-// an unsigned zero's complement instead gives the same bits in an unsigned
-// int, which is what the file carried before it was the listing's text.
-// The two macros built on the mask keep their values at both ends of the
-// width, where N is 0, 31 and the 32 the macros pass the value through at.
-// The signed macro reads its values from variables, as the run-time values
-// it is written for are: handed a literal, its and of the value with the
-// sign bit folds to the literal and is reported as an ineffective operation.
 TEST(SvdpiSourceCode, TheMaskMacroIsTheListingsSignedOne) {
   EXPECT_TRUE((std::is_same<decltype(SV_MASK(4)), int>::value));
   EXPECT_EQ(SV_MASK(0), 0);
@@ -116,8 +84,6 @@ TEST(SvdpiSourceCode, TheMaskMacroIsTheListingsSignedOne) {
             0x0000000Fu);
 }
 
-// §I.3: the scope and open array handles are void pointers, and the version
-// routine returns the implementation's string.
 TEST(SvdpiSourceCode, TheHandlesAndTheVersionRoutineAreTheListings) {
   EXPECT_TRUE((std::is_same<svScope, void*>::value));
   EXPECT_TRUE((std::is_same<svOpenArrayHandle, void*>::value));
@@ -125,12 +91,6 @@ TEST(SvdpiSourceCode, TheHandlesAndTheVersionRoutineAreTheListings) {
   EXPECT_STREQ(svDpiVersion(), "1800-2005");
 }
 
-// §I.3: the listing's comments on svGetTime, svGetTimeUnit and
-// svGetTimePrecision make calling any of them with an invalid svScope -- one
-// that names no instance scope -- an error, which each answers with -1,
-// leaving its output as it was. A NULL scope is no such handle: it asks for
-// the simulation time unit. All three answered 0 with the simulation's own
-// time and unit, the address of an object standing as a scope.
 TEST(SvdpiSourceCode, TheTimeFunctionsRefuseAHandleThatNamesNoScope) {
   static int not_a_scope = 0;
   auto invalid = reinterpret_cast<svScope>(&not_a_scope);

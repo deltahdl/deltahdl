@@ -44,8 +44,6 @@ static ResolvedAttribute EvalAttribute(const Attribute& attr,
       ra.string_value = txt;
     }
   } else {
-    // §A.9.1/§5.12: an attribute value is a constant expression that may
-    // reference module parameters, so evaluate it against the param scope.
     ra.resolved_value = ConstEvalInt(attr.value, scope);
   }
   return ra;
@@ -62,9 +60,6 @@ std::vector<ResolvedAttribute> ResolveAttributes(
     const ScopeMap& scope, const ScopeMap& constants) {
   std::vector<ResolvedAttribute> result;
   for (const auto& attr : attrs) {
-    // §5.12: an attribute's value is a constant expression. One that does not
-    // fold to an integer may still be a constant, a real or a string, so the
-    // report asks constancy rather than whether EvalAttribute folded a number.
     if (attr.value && !IsConstantExpr(attr.value, constants)) {
       diag.Error(attr.loc,
                  std::format("value of attribute '{}' is not a constant "
@@ -95,21 +90,6 @@ using DefinitionNames =
 
 void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
                                   DiagEngine& diag) {
-  // §3.13(a) states the prohibition for a module, a primitive, a program and
-  // an interface, and names no config. Two of those of one name in one
-  // library are §33.3.1.1's case, which WriteCellsToLibraries settles by
-  // keeping the one encountered last. §33.2 is what puts a config
-  // into the same name space: a config is a design element, much like a
-  // module, of the SystemVerilog name space. A collision involving a config
-  // therefore enforces §33.2, and is reported below.
-  //
-  // A config shares its name with a module or primitive lawfully. §33.2.1
-  // (printed page 935): the optional :config extension names a config
-  // explicitly where a config shares its name with a module or primitive, and
-  // §33.4.1.6 adds the suffix to a use clause's lib.cell for that case. A
-  // config is otherwise in the name space §33.2 puts it in, so one of an
-  // interface's or a program's name, or a second config of its own, is still a
-  // name defined twice.
   DefinitionNames config_names;
   for (auto* p : unit->programs)
     config_names.try_emplace({p->library, p->name}, p->range);
@@ -127,18 +107,6 @@ void ValidateNameSpaceDefinitions(const CompilationUnit* unit,
   }
 }
 
-// True where a compilation-unit item declares a name of the unit's scope that
-// §3.13(c) holds to one declaration. An import or export declares none, nor
-// does a §35.5.4 DPI export, which names a subroutine declared elsewhere; an
-// item an anonymous program contributed is that program's; §6.18's forward
-// typedef (`typedef interface class IC;`, carried as a kTypedef with an
-// implicit aliased type) is a forward declaration and not a definition, so it
-// does not redeclare the eventual class or typedef of the same name, an
-// unresolved one being reported separately; and §8.24's out-of-block method
-// body, the item whose method_class names its class, declares its name in the
-// class's scope and none in the unit's, so `Base::compute` and
-// `Derived::compute` standing together are two methods and no redeclaration,
-// a class's own duplicate members being the class checks' to report.
 static bool DeclaresACuScopeName(const ModuleItem* item) {
   if (item->kind == ModuleItemKind::kImportDecl ||
       item->kind == ModuleItemKind::kExportDecl ||
@@ -166,10 +134,6 @@ void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
                  "be declared by the user",
                  Subclause("26.7"));
     }
-    // §3.13 (e) (printed page 58) introduces a module name space with each
-    // package, unifying its subroutines, parameters, named events, nets,
-    // variables and user-defined types; a package item is one of those names
-    // by the test a compilation-unit item is.
     std::unordered_set<std::string_view> item_names;
     for (const auto* item : pkg->items) {
       if (!DeclaresACuScopeName(item) || item->name.empty() ||
@@ -185,13 +149,6 @@ void ValidateNameSpacePackages(const CompilationUnit* unit, DiagEngine& diag) {
 
 void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
                                       DiagEngine& diag) {
-  // The library a declaration belongs to is part of what identifies it.
-  // §3.13(c) unifies these names within one compilation-unit scope, and §33.2.1
-  // has a library be a collection of cells whose names are that library's, so
-  // two libraries each holding a cell of one name hold two design elements
-  // rather than one name declared twice. A declaration no library map reached
-  // carries no library, which is the ordinary compilation the subclause
-  // describes, and there the key is the name alone.
   std::map<std::pair<std::string_view, std::string_view>, SourceLoc>
       cu_scope_names;
   auto check_cu = [&](std::string_view library, std::string_view name,
@@ -209,9 +166,6 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
     if (DeclaresACuScopeName(item)) check_cu({}, item->name, item->loc);
   }
   for (auto* cls : unit->classes) check_cu({}, cls->name, cls->range.start);
-  // §3.2 counts a checker a design element and §33.2.1 counts a design element
-  // a cell, so a checker is one of the things a library holds under its own
-  // name.
   for (auto* chk : unit->checkers) {
     check_cu(chk->library, chk->name, chk->range.start);
   }
@@ -222,8 +176,6 @@ void ValidateNameSpaceCompilationUnit(const CompilationUnit* unit,
 void Elaborator::ValidateNameSpaces() {
   ValidateNameSpaceDefinitions(unit_, diag_);
   ValidateNameSpacePackages(unit_, diag_);
-  // §3.13: each unit of a compilation where every file is one has a
-  // compilation-unit scope name space of its own.
   if (units_.views.empty()) {
     ValidateNameSpaceCompilationUnit(unit_, diag_);
   } else {
@@ -231,9 +183,6 @@ void Elaborator::ValidateNameSpaces() {
       ValidateNameSpaceCompilationUnit(view, diag_);
     }
   }
-  // After the checks above, so that two checkers of one name in one unit are
-  // still §3.13(c)'s redeclaration there, the one encountered first being
-  // among those §33.3.1.1 then drops.
   WriteCellsToLibraries(*unit_, diag_);
 }
 
@@ -252,10 +201,6 @@ void Elaborator::ValidateConfigDesignStatements() {
   std::unordered_set<std::string_view> config_names;
   for (auto* cfg : unit_->configs) config_names.insert(cfg->name);
 
-  // A design cell is allowed to share its name with a config; when a cell of
-  // that name also exists, the design statement denotes the cell rather than
-  // the like-named config. A name that resolves only to a config is therefore
-  // the case that must be rejected as a design target.
   std::unordered_set<std::string_view> cell_names = NonConfigCellNames(unit_);
 
   for (auto* cfg : unit_->configs) {
@@ -279,9 +224,6 @@ void Elaborator::ValidateConfigDesignStatements() {
 
 void Elaborator::ValidateConfigDefaultClauses() {
   for (auto* cfg : unit_->configs) {
-    // The surplus clauses are kept rather than counted, because the report
-    // stands at the second default clause: that is the one §33.4.1.2 refuses,
-    // and a count on its own leaves the reader to find it.
     std::vector<const ConfigRule*> defaults;
     for (auto* rule : cfg->rules) {
       if (rule->kind == ConfigRuleKind::kDefault) defaults.push_back(rule);
@@ -335,8 +277,6 @@ void Elaborator::ValidateConfigCellClauses() {
       if (rule->kind != ConfigRuleKind::kCell) continue;
       if (rule->cell_lib.empty()) continue;
 
-      // §33.4.3's `use #()` is a use expansion too, one that names no cell
-      // and carries no assignment, only the reset of every parameter.
       bool is_use_expansion = !rule->use_cell.empty() ||
                               !rule->use_lib.empty() || rule->use_config ||
                               !rule->use_params.empty() ||
@@ -355,8 +295,6 @@ void Elaborator::ValidateConfigCellClauses() {
 
 namespace {
 
-// §3.13(b): the names of packages no module, interface, program or primitive
-// shares, which are the names a cell or use clause can only mean a package by.
 std::unordered_set<std::string_view> NamesOnlyAPackageHolds(
     const CompilationUnit* unit) {
   std::unordered_set<std::string_view> names;
@@ -371,16 +309,6 @@ std::unordered_set<std::string_view> NamesOnlyAPackageHolds(
 }  // namespace
 
 void Elaborator::ValidateConfigPackageBinding() {
-  // §33.4: a configuration's rules may redirect the binding of module,
-  // primitive, interface, and program instances, but the binding of a package
-  // is fixed and a config may not change it. A package is not instantiated, so
-  // any clause that names a package — whether the cell selected for
-  // reconfiguration or the cell an instance is bound to — is rejected.
-  //
-  // §3.13(b) gives packages a name space of their own, so a name a package and
-  // a module, interface, program or primitive share names that design element
-  // in a cell or use clause, and only a name no such element holds names the
-  // package.
   const std::unordered_set<std::string_view> kPackageNames =
       NamesOnlyAPackageHolds(unit_);
   if (kPackageNames.empty()) return;
@@ -411,10 +339,6 @@ void Elaborator::ValidateConfigPackageBinding() {
 
 namespace {
 
-// The instance paths this config hands over to another config. Which use
-// clauses name a config is §33.2.1's question, not a matter of the ':config'
-// extension being written: a use clause whose name reaches no cell other than
-// the config of that name names the config with the extension left off.
 std::vector<std::string_view> CollectDelegatedSubhierarchies(
     const ConfigDecl* cfg, const CompilationUnit* unit) {
   std::vector<std::string_view> delegated;
@@ -508,8 +432,6 @@ bool WalkExprAnyChildren(const Expr* expr, Visitor&& v) {
 void Elaborator::ValidateConfigLocalparams() {
   for (auto* cfg : unit_->configs) {
     for (const ConfigLocalparam& lp : cfg->local_params) {
-      // A type is no literal value, so a `localparam type` breaks the rule
-      // whatever type it names.
       if (lp.is_type) {
         diag_.Error(lp.loc,
                     std::format("config '{}' localparam '{}' is a type, not "
@@ -550,16 +472,10 @@ bool IsPureTermTree(const Expr* e) {
   return false;
 }
 
-// A step of a hierarchical name. `p::X` reaches into a package (§26.3), which
-// is a scope resolution and no hierarchical reference.
 bool IsHierarchicalStep(const Expr* e) {
   return e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution;
 }
 
-// §33.4.3 restricts the indexes of a hierarchical name, which are the selects
-// standing inside one of its steps and those applied to a name that holds a
-// step. A select on a plain name resolves in the instance's parent scope like
-// any other name, and is not restricted.
 std::unordered_set<const Expr*> HierarchicalNameSelects(const Expr* expr) {
   std::unordered_set<const Expr*> selects;
   const auto kCollect = [&selects](const Expr* within) {
@@ -646,9 +562,6 @@ void ValidateOneParamOverride(
 
 namespace {
 
-// The names a pure hierarchical reference is written with, outermost first,
-// or nothing where it selects anywhere along the way (the array-of-instances
-// report covers that shape).
 std::vector<std::string_view> HierReferenceNames(const Expr* e) {
   std::vector<std::string_view> names;
   while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
@@ -662,7 +575,6 @@ std::vector<std::string_view> HierReferenceNames(const Expr* e) {
   return names;
 }
 
-// Whether `item` is a generate construct one of whose blocks is named `name`.
 bool NamesGenerateBlock(const ModuleItem* item, std::string_view name) {
   switch (item->kind) {
     case ModuleItemKind::kGenerateFor:
@@ -681,8 +593,6 @@ bool NamesGenerateBlock(const ModuleItem* item, std::string_view name) {
   }
 }
 
-// Whether `mod` holds, among its own items, a generate construct one of whose
-// blocks is named `name`.
 bool DeclaresGenerateBlock(const ModuleDecl* mod, std::string_view name) {
   return std::any_of(mod->items.begin(), mod->items.end(),
                      [name](const ModuleItem* item) {
@@ -690,7 +600,6 @@ bool DeclaresGenerateBlock(const ModuleDecl* mod, std::string_view name) {
                      });
 }
 
-// The module instantiated as `inst_name` among `mod`'s own items, or nullptr.
 const ModuleDecl* InstantiatedModule(const ModuleDecl* mod,
                                      std::string_view inst_name,
                                      const CompilationUnit* unit) {
@@ -706,9 +615,6 @@ const ModuleDecl* InstantiatedModule(const ModuleDecl* mod,
   return nullptr;
 }
 
-// The module the scopes `names` descend into from `mod`, stopping short of the
-// last name; nullptr where one of them is a generate block, which is what
-// `through_generate` then reports, or names nothing that can be followed.
 const ModuleDecl* DescendScopes(const ModuleDecl* mod,
                                 std::span<const std::string_view> names,
                                 const CompilationUnit* unit,
@@ -735,11 +641,6 @@ std::vector<std::string_view> SplitDots(std::string_view path) {
   return parts;
 }
 
-// §33.4.3 (printed page 940): a hierarchical reference may pass through no
-// generate scope and no array of instances. A reference is resolved from the
-// instance's parent scope, or from the design's top-level cell where it is
-// written from there, and whether a scope it passes through is a generate block
-// is a fact about the design rather than about the text.
 bool OverrideReferenceCrossesGenerate(const ConfigDecl* cfg,
                                       const ConfigRule* rule, const Expr* expr,
                                       const CompilationUnit* unit) {
@@ -770,8 +671,6 @@ bool OverrideReferenceCrossesGenerate(const ConfigDecl* cfg,
   return through_generate;
 }
 
-// Every parameter override one config's rules write, judged against the
-// config's own localparams and against the design the config selects.
 void ValidateConfigOverrides(const ConfigDecl* cfg, const CompilationUnit* unit,
                              DiagEngine& diag) {
   std::unordered_set<std::string_view> lp_names;
@@ -796,9 +695,6 @@ void ValidateConfigOverrides(const ConfigDecl* cfg, const CompilationUnit* unit,
 }  // namespace
 
 void Elaborator::ValidateConfigParamOverrides() {
-  // §27.6 names each unnamed generate block genblk<n>, and that block is a
-  // generate scope an override may not refer through, so the names are given
-  // before the references are judged.
   if (!unit_->configs.empty()) AssignUnitGenerateBlockNames(unit_, arena_);
   for (const auto* cfg : unit_->configs) {
     ValidateConfigOverrides(cfg, unit_, diag_);
@@ -807,15 +703,6 @@ void Elaborator::ValidateConfigParamOverrides() {
 
 namespace {
 
-// §24.6: an item declared in an anonymous program shares the name space of the
-// package or compilation-unit scope the program stands in, so a name declared
-// there and again outside it is one name declared twice. A.1.11 lists what an
-// anonymous_program_item may be -- a task, a function, a class, an interface
-// class, a covergroup, a class constructor -- and every one of them declares a
-// name into that shared space, so every one of them is compared. Comparing only
-// the subroutines would leave a class or a covergroup unreported by this check
-// and by the §3.13 one below, which passes over an anonymous program's items
-// precisely because this check is what judges them.
 bool DeclaresSharedAnonymousProgramName(const ModuleItem* item) {
   switch (item->kind) {
     case ModuleItemKind::kFunctionDecl:
@@ -828,30 +715,18 @@ bool DeclaresSharedAnonymousProgramName(const ModuleItem* item) {
   }
 }
 
-// §24.6: one declaration judged against the shared name space -- the name it
-// declares, where it stands, and whether an anonymous program declared it.
-// Two lists hold the declarations of one compilation-unit scope, so a
-// declaration is carried here rather than compared where it is stored.
 struct SharedNameDecl {
   std::string_view name;
   SourceLoc loc;
   bool from_anonymous_program;
 };
 
-// Which of two declarations the source writes first. The collision is reported
-// at the later one, so the report stands at the declaration that could not be
-// made rather than at the one it collided with.
 bool DeclaredBefore(const SharedNameDecl& a, const SharedNameDecl& b) {
   if (a.loc.file_id != b.loc.file_id) return a.loc.file_id < b.loc.file_id;
   if (a.loc.line != b.loc.line) return a.loc.line < b.loc.line;
   return a.loc.column < b.loc.column;
 }
 
-// An item of the anonymous program declares a name of the shared space where
-// it is one of A.1.11's kinds; an item beside the program does where §3.13
-// counts it a name of the package or compilation-unit scope, since §24.6 makes
-// a variable, a parameter or a type declared there as much the program's
-// collision as a subroutine is.
 bool JoinsSharedNameSpace(const ModuleItem* item) {
   return item->from_anonymous_program ? DeclaresSharedAnonymousProgramName(item)
                                       : DeclaresACuScopeName(item);
@@ -890,12 +765,6 @@ void CheckAnonymousProgramScope(std::vector<SharedNameDecl> decls,
 }  // namespace
 
 void Elaborator::ValidateAnonymousProgramNameSharing() {
-  // §24.6: the name space an anonymous program shares is the whole of the
-  // surrounding scope, not the part of it one list happens to hold. A class
-  // written at compilation-unit scope is kept in CompilationUnit::classes while
-  // everything else is kept among its items, so the two are judged together;
-  // a class written inside an anonymous program goes to the items and appears
-  // once.
   std::vector<SharedNameDecl> cu = SharedNameDecls(unit_->cu_items);
   for (const auto* cls : unit_->classes) {
     if (cls->name.empty()) continue;
@@ -907,9 +776,6 @@ void Elaborator::ValidateAnonymousProgramNameSharing() {
   }
 }
 
-// §3.12.1 and §26.2 keep a net declaration assignment out of the unit and a
-// package, whose nets ElaborateNetDecl never reaches, so §6.3.2's drive
-// strength rule, which asks a strength for one, is applied here as well.
 static void ReportScopeNets(const std::vector<ModuleItem*>& items,
                             const std::string& init_rule, Subclause subclause,
                             DiagEngine& diag) {

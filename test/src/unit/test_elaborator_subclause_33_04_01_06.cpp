@@ -20,8 +20,6 @@ using namespace delta;
 
 namespace {
 
-// Bundles the elaboration context and the three module libraries so the
-// BindOnlyChild helper stays under the parameter-count threshold.
 struct BindOnlyChildArgs {
   SourceManager& mgr;
   Arena& arena;
@@ -32,7 +30,6 @@ struct BindOnlyChildArgs {
   std::string_view lib2;
 };
 
-// Parses the source and assigns the three modules' libraries to lib0/lib1/lib2.
 CompilationUnit* ParseWithLibraries(const BindOnlyChildArgs& args) {
   auto fid = args.mgr.AddFile("<test>", args.src);
   Lexer lex(args.mgr.FileContent(fid), fid, args.diag);
@@ -45,15 +42,6 @@ CompilationUnit* ParseWithLibraries(const BindOnlyChildArgs& args) {
   return cu;
 }
 
-// Parses and config-elaborates the given source (three modules whose libraries
-// are set to lib0/lib1/lib2), returning the cell bound to the single child of
-// the design's top module.
-// Each step is checked before the next one reads what it produced. An
-// expectation is not enough on its own: EXPECT_ records the failure and lets
-// the function run on, so an empty top-module list or child list reaches an
-// out-of-range read and takes the whole executable down with it -- and a
-// crashed executable reports nothing about the tests it had not run yet.
-// Returning nullptr here leaves the caller's ASSERT_NE to fail the test.
 RtlirModule* BindOnlyChild(const BindOnlyChildArgs& args) {
   auto* cu = ParseWithLibraries(args);
   Elaborator elab(args.arena, args.diag, cu);
@@ -74,8 +62,6 @@ constexpr const char* kSubUsesWidget =
     "module top; sub u(); endmodule\n"
     "config c; design top; cell sub use widget; endconfig\n";
 
-// §33.4.1.6: a use clause that omits the library name inherits it from the
-// parent cell, so the selected cell binds within the parent's library.
 TEST(ConfigUseClause, UseWithoutLibraryInheritsParentLibrary) {
   SourceManager mgr;
   Arena arena;
@@ -87,8 +73,6 @@ TEST(ConfigUseClause, UseWithoutLibraryInheritsParentLibrary) {
   EXPECT_EQ(bound->library, "mainLib");
 }
 
-// Companion: the inherited library follows the parent cell, so relocating the
-// parent relocates the use-clause binding.
 TEST(ConfigUseClause, InheritedUseLibraryTracksParent) {
   SourceManager mgr;
   Arena arena;
@@ -100,9 +84,6 @@ TEST(ConfigUseClause, InheritedUseLibraryTracksParent) {
   EXPECT_EQ(bound->library, "otherLib");
 }
 
-// §33.4.1.6: a use clause binds one cell but does not add its library to the
-// current library list; a cell present only in that referenced library, but
-// not on the search list, stays unbound.
 TEST(ConfigUseClause, UseDoesNotAlterLibraryList) {
   SourceManager mgr;
   Arena arena;
@@ -126,17 +107,13 @@ TEST(ConfigUseClause, UseDoesNotAlterLibraryList) {
   ASSERT_NE(design, nullptr);
   auto* top = design->top_modules[0];
   ASSERT_EQ(top->children.size(), 2u);
-  // The use clause binds w to libB.w2 exactly.
   auto* w_bound = top->children[0].resolved;
   ASSERT_NE(w_bound, nullptr);
   EXPECT_EQ(w_bound->name, "w2");
   EXPECT_EQ(w_bound->library, "libB");
-  // But libB never joined the library list, so the libB-only cell is unbound.
   EXPECT_EQ(top->children[1].resolved, nullptr);
 }
 
-// §33.4.1.6: a use clause names the exact library and cell to bind; when no
-// such cell exists the selected instance is left unbound.
 TEST(ConfigUseClause, UseToMissingTargetLeavesInstanceUnbound) {
   SourceManager mgr;
   Arena arena;
@@ -159,14 +136,6 @@ TEST(ConfigUseClause, UseToMissingTargetLeavesInstanceUnbound) {
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
-// §33.4.1.6: the optional ':config' suffix on a use clause selects a like-named
-// configuration explicitly, rather than a plain module of the same name. Here a
-// module 'bot' exists (in lib1) and a configuration 'bot' is also declared; the
-// outer config's clause 'use lib1.bot:config' must bind through the
-// configuration, so the configuration's own rules govern bot's subtree. Config
-// 'bot' pins its child leaf to libB via its default liblist, while the outer
-// config's default liblist is libA -- observing libB on the grandchild proves
-// the configuration (not the bare module) was the thing selected by ':config'.
 TEST(ConfigUseClause, ConfigSuffixSelectsConfigurationNotSameNamedModule) {
   SourceManager mgr;
   Arena arena;
@@ -190,14 +159,12 @@ TEST(ConfigUseClause, ConfigSuffixSelectsConfigurationNotSameNamedModule) {
   auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());
   ASSERT_EQ(cu->modules.size(), 4u);
-  cu->modules[0]->library = "libA";    // leaf
-  cu->modules[1]->library = "libB";    // leaf
-  cu->modules[2]->library = "lib1";    // bot
-  cu->modules[3]->library = "libTop";  // top
+  cu->modules[0]->library = "libA";
+  cu->modules[1]->library = "libB";
+  cu->modules[2]->library = "lib1";
+  cu->modules[3]->library = "libTop";
   PlaceConfigsWithTheirTops(cu);
 
-  // Elaborate the outer config `c` (configs[0]); its use clause delegates top.b
-  // to config `bot` (configs[1]) because of the :config suffix.
   Elaborator elab(arena, diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
   ASSERT_NE(design, nullptr);
@@ -205,26 +172,17 @@ TEST(ConfigUseClause, ConfigSuffixSelectsConfigurationNotSameNamedModule) {
   auto* top = design->top_modules[0];
   ASSERT_EQ(top->children.size(), 1u);
 
-  // top.b binds to the use target's cell, module lib1.bot.
   auto* bot = top->children[0].resolved;
   ASSERT_NE(bot, nullptr);
   EXPECT_EQ(bot->name, "bot");
   EXPECT_EQ(bot->library, "lib1");
 
-  // The selected configuration's default liblist (libB) governs bot's subtree,
-  // so its leaf binds from libB rather than the outer config's default libA --
-  // only reachable if `:config` selected config `bot` over the module `bot`.
   ASSERT_EQ(bot->children.size(), 1u);
   auto* leaf = bot->children[0].resolved;
   ASSERT_NE(leaf, nullptr);
   EXPECT_EQ(leaf->library, "libB");
 }
 
-// §33.4.1.6: a use clause on an instance selection binds that exact instance to
-// the named library.cell. Here `widget` exists in both libA and libB and the
-// parent `top` is in a third library, so ordinary resolution would take the
-// first-declared libA copy; the clause `instance top.u use libB.widget` instead
-// pins top.u to the libB copy.
 TEST(ConfigUseClause, InstanceUseClauseBindsExactLibraryAndCell) {
   SourceManager mgr;
   Arena arena;
@@ -239,9 +197,9 @@ TEST(ConfigUseClause, InstanceUseClauseBindsExactLibraryAndCell) {
   Parser parser(lex, arena, diag);
   auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());
-  cu->modules[0]->library = "libA";    // widget
-  cu->modules[1]->library = "libB";    // widget
-  cu->modules[2]->library = "libTop";  // top
+  cu->modules[0]->library = "libA";
+  cu->modules[1]->library = "libB";
+  cu->modules[2]->library = "libTop";
   PlaceConfigsWithTheirTops(cu);
 
   Elaborator elab(arena, diag, cu);
@@ -255,11 +213,6 @@ TEST(ConfigUseClause, InstanceUseClauseBindsExactLibraryAndCell) {
   EXPECT_EQ(bound->library, "libB");
 }
 
-// §33.4.1.6: when the instance use clause omits the library, the library is
-// inherited from the parent cell. `top` (in libP) instantiates a `foo`, but the
-// clause `instance top.u use bar` rebinds it to `bar`; with no library named,
-// bar is sought in top's own library, libP -- and the rebinding makes the bound
-// cell name (bar) differ from the instance's declared name (foo).
 TEST(ConfigUseClause, InstanceUseWithoutLibraryInheritsParentLibrary) {
   SourceManager mgr;
   Arena arena;
@@ -274,9 +227,9 @@ TEST(ConfigUseClause, InstanceUseWithoutLibraryInheritsParentLibrary) {
   Parser parser(lex, arena, diag);
   auto* cu = parser.Parse();
   ASSERT_FALSE(diag.HasErrors());
-  cu->modules[0]->library = "libP";  // bar
-  cu->modules[1]->library = "libP";  // foo
-  cu->modules[2]->library = "libP";  // top
+  cu->modules[0]->library = "libP";
+  cu->modules[1]->library = "libP";
+  cu->modules[2]->library = "libP";
   PlaceConfigsWithTheirTops(cu);
 
   Elaborator elab(arena, diag, cu);
@@ -290,11 +243,6 @@ TEST(ConfigUseClause, InstanceUseWithoutLibraryInheritsParentLibrary) {
   EXPECT_EQ(bound->library, "libP");
 }
 
-// §33.4.1.6 (printed page 939): a use clause names the very library and cell a
-// selected cell or instance is bound to. Where that library holds no such cell
-// the binding fails because of the clause, and the report names the clause's
-// library and cell rather than only the module the instantiation was written
-// with, which work holds.
 TEST(ConfigUseClause, UseNamingNoCellReportsTheClausesTarget) {
   auto diags = ConfigElaborationReports(
       "module adder; endmodule\n"
@@ -315,8 +263,6 @@ TEST(ConfigUseClause, UseNamingAnAbsentLibraryReportsThatLibrary) {
                             "33.4.1.6"));
 }
 
-// Elaborates `src` under its first config, giving its primitives the
-// libraries `udp_libs` names in order and its modules and configs `lib`.
 RtlirDesign* ElaborateWithPrimitives(
     ConfigElaboration& run, const std::string& src,
     std::initializer_list<std::string_view> udp_libs, std::string_view lib) {
@@ -332,10 +278,6 @@ RtlirDesign* ElaborateWithPrimitives(
   return elab.Elaborate(cu->configs[0]);
 }
 
-// §33.4 lets a config rebind a primitive instance, and §33.4.1.6 has an
-// instance clause's use name the cell the instance binds to, a primitive
-// among cells (§33.2.1): top.a, written as an instance of module foo, becomes
-// an instance of the primitive prim.
 TEST(ConfigUseClause, InstanceClauseBindsAnInstanceToAPrimitive) {
   ConfigElaboration run;
   auto* design = ElaborateWithPrimitives(
@@ -353,9 +295,6 @@ TEST(ConfigUseClause, InstanceClauseBindsAnInstanceToAPrimitive) {
   EXPECT_EQ(top->udp_insts[0].decl->name, "prim");
 }
 
-// §33.4.1.3: an instance clause selects the instance its path names, and an
-// instance of a primitive declared before it is one: top.u, written in
-// rtlLib against rtlLib's u_and, takes gateLib's u_and from the clause's list.
 TEST(ConfigUseClause, InstanceClauseReachesAnEarlierDeclaredPrimitive) {
   ConfigElaboration run;
   auto* design = ElaborateWithPrimitives(

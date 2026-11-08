@@ -237,19 +237,6 @@ TEST(ConcatenationSim, ConcatMixedWidths) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCu);
 }
 
-// §11.4.12 bars unsized constant numbers from a concatenation, a property of
-// the concatenation and not of the statement holding it.
-//
-// ElaboratorOperationRules::WalkStmtsForUnsizedInConcat in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `a = {x, 1}` in one of the seven positions it did not read, every
-// one of which elaborated clean beforehand.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(ConcatenationElaboration, UnsizedConstantInConcatInAForkArmNames11_4_12) {
   ElabFixture f;
   ElaborateSrc(
@@ -268,10 +255,6 @@ TEST(ConcatenationElaboration, UnsizedConstantInConcatInAForkArmNames11_4_12) {
       "unsized constant is not allowed in a concatenation", 6, "11.4.12"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(ConcatenationElaboration,
      UnsizedConstantInConcatInAnAssertionPassStatementNames11_4_12) {
   ElabFixture f;
@@ -304,10 +287,6 @@ TEST(ConcatenationElaboration,
       "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(ConcatenationElaboration,
      UnsizedConstantInConcatInARandcaseItemNames11_4_12) {
   ElabFixture f;
@@ -323,10 +302,6 @@ TEST(ConcatenationElaboration,
       "unsized constant is not allowed in a concatenation", 4, "11.4.12"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(ConcatenationElaboration,
      UnsizedConstantInConcatInARandsequenceCodeBlockNames11_4_12) {
   ElabFixture f;
@@ -346,14 +321,6 @@ TEST(ConcatenationElaboration,
       "unsized constant is not allowed in a concatenation", 6, "11.4.12"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(ConcatenationElaboration,
      UnsizedConstantInConcatInAForLoopInitializationNames11_4_12) {
   ElabFixture f;
@@ -386,9 +353,6 @@ TEST(ConcatenationElaboration,
       "unsized constant is not allowed in a concatenation", 5, "11.4.12"));
 }
 
-// §10.5: a block item declaration's initializer is a procedural assignment to
-// the variable, so an unsized constant in a `{...}` initializing a scalar is
-// reported as one in `x = {1, 2}` is. The initializer was never looked at.
 TEST(ConcatenationElaboration, UnsizedInBlockScalarDeclInitError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -404,8 +368,6 @@ TEST(ConcatenationElaboration, UnsizedInBlockScalarDeclInitError) {
       "unsized constant is not allowed in a concatenation", 3, "11.4.12"));
 }
 
-// Initializing an unpacked array, the `{...}` is an unpacked array
-// concatenation (§10.10), whose items may be unsized.
 TEST(ConcatenationElaboration, UnsizedInBlockArrayDeclInitAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -420,9 +382,6 @@ TEST(ConcatenationElaboration, UnsizedInBlockArrayDeclInitAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.12: a concatenation or a multiple concatenation of operands that are
-// no strings is a vector of bits, a literal operand's among them, which has no
-// member and no built-in method.
 TEST(ConcatenationElaboration, MemberOfBitConcatenationIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -449,8 +408,6 @@ TEST(ConcatenationElaboration, MemberOfBitConcatenationIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §11.4.12 keeps unsized constants out of a concatenation, and a replication is
-// a multiple concatenation (§11.4.12.1).
 TEST(ConcatenationElaboration, UnsizedConstantInReplicationReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -465,10 +422,6 @@ TEST(ConcatenationElaboration, UnsizedConstantInReplicationReported) {
                             3, "11.4.12"));
 }
 
-// The concatenation rules hold in a function's and a task's statements as in a
-// process's: no unsized constant, no select of a concatenation as a target, no
-// replication on the left-hand side. A function returning an unpacked array
-// returns braces that are an unpacked array concatenation (§10.10).
 TEST(ConcatenationElaboration, ConcatenationRulesHeldInSubroutines) {
   ElabFixture f;
   ElaborateSrc(
@@ -498,12 +451,6 @@ TEST(ConcatenationElaboration, ConcatenationRulesHeldInSubroutines) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §11.4.12 bars a select of a concatenation as any variable_lvalue, and an
-// expression assigns one in two places: an increment's or decrement's operand,
-// which §11.4.2 makes an assignment, and the target of an assignment written
-// within an expression (A.8.3). A compound assignment statement, whose
-// right-hand side holds its target again as the operator's left operand, is
-// reported once, and a select of a concatenation read as a value stands.
 TEST(ConcatenationElaboration,
      SelectOnConcatAssignedWithinAnExpressionRejected) {
   ElabFixture f;

@@ -88,10 +88,6 @@ TEST(DynamicArrayNewSimulation, NewWithInitTruncates) {
 }
 
 TEST(DynamicArrayNewSimulation, NewWithInitTruncatesKeepsLeadingElements) {
-  // §7.5.1: when the initialization array is larger than the size argument it
-  // is truncated to the size argument, keeping the leading elements. Here
-  // new[2] of {10,20,30,40} must yield {10,20}, so d[1] is the second source
-  // element (20), not a trailing one.
   auto v = RunAndGet(
       "module t;\n"
       "  int src[] = '{10, 20, 30, 40};\n"
@@ -165,9 +161,6 @@ TEST(DynamicArrayNewSimulation, SelfReferenceResizeNewSize) {
 }
 
 TEST(DynamicArrayNewSimulation, NewNegativeSizeIsError) {
-  // §7.5.1: it shall be an error if the value of the size operand is negative.
-  // The report stands on the size operand itself, so it names line 6 where `n`
-  // is written inside new[], not line 5 where n took its negative value.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -202,11 +195,6 @@ TEST(DynamicArrayNewSimulation, SelfReferenceResizePadZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.5.1: the size argument of new[] is a constant expression. §11.2.1 admits a
-// parameter as a constant operand, so the size may be a parameter reference
-// rather than a literal. The existing tests all size with an integer literal;
-// this exercises the parameter-sized path, resolving the operand to the
-// parameter's value at run time.
 TEST(DynamicArrayNewSimulation, NewSizeFromParameter) {
   auto v = RunAndGet(
       "module t;\n"
@@ -222,12 +210,6 @@ TEST(DynamicArrayNewSimulation, NewSizeFromParameter) {
   EXPECT_EQ(v, 3u);
 }
 
-// §7.5.1: the new[] constructor applies to a dynamic array of any element type,
-// not only int. Here the element type is a logic [7:0] vector and the
-// initialization array is another dynamic array of the same element type; the
-// leading elements are copied, so d[1] is the second source element preserved
-// at its 8-bit value. This is the only end-to-end test exercising a non-int
-// element type through the new[](init) copy path.
 TEST(DynamicArrayNewSimulation, NewNonIntElementTypeCopiesElements) {
   auto v = RunAndGet(
       "module t;\n"
@@ -243,9 +225,6 @@ TEST(DynamicArrayNewSimulation, NewNonIntElementTypeCopiesElements) {
   EXPECT_EQ(v, 0xBBu);
 }
 
-// §7.5.1: a dynamic array declaration may use the new[] constructor as its
-// declaration-assignment right-hand side. These exercise the lowerer's
-// declaration-initializer path rather than a procedural blocking assignment.
 TEST(DynamicArrayNewSimulation, DeclNewSizesArray) {
   auto v = RunAndGet(
       "module t;\n"
@@ -281,8 +260,6 @@ TEST(DynamicArrayNewSimulation, DeclNewWithInitCopiesElements) {
 }
 
 TEST(DynamicArrayNewSimulation, DeclNewNegativeSizeIsError) {
-  // §7.5.1: a negative size operand is an error, including in the
-  // declaration-assignment form lowered at initialization.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -298,8 +275,6 @@ TEST(DynamicArrayNewSimulation, DeclNewNegativeSizeIsError) {
                             "7.5.1"));
 }
 
-// §7.5.1: it shall be an error if the size operand is negative, and the report
-// a procedural `d = new[n]` raises names §7.5.1.
 TEST(DynamicArrayNewSimulation, ProceduralNegativeSizeNames7_5_1) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -321,8 +296,6 @@ TEST(DynamicArrayNewSimulation, ProceduralNegativeSizeNames7_5_1) {
                             "7.5.1"));
 }
 
-// §7.5.1: the declaration-assignment form is lowered on its own path and
-// reaches the same rule, so its report names the same subclause.
 TEST(DynamicArrayNewSimulation, DeclNegativeSizeNames7_5_1) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -339,20 +312,6 @@ TEST(DynamicArrayNewSimulation, DeclNegativeSizeNames7_5_1) {
                             "7.5.1"));
 }
 
-// §7.5.1: `new[n]` with no initialization expression owes the array n storage
-// elements rather than one value read n times -- each element starts at its
-// type's default value, and §6.8 makes each a data storage element that keeps
-// its value from one assignment to the next. What a test of that asserts is
-// that no two entries name one buffer, since equal bits cannot tell a copy from
-// a shared buffer: a shared buffer reads equal by construction. The default
-// value read back beside the pointers is what stops a case passing on elements
-// the run never initialized at all. Both callers declare `int`, whose default
-// value under Table 6-7 is 0.
-//
-// Both spellings of the constructor make this claim and reach the store
-// through different code, so it is written once here and made twice. A fatal
-// assertion inside a helper returns from the helper rather than from the
-// test, so callers wrap the call in ASSERT_NO_FATAL_FAILURE.
 void ExpectDefaultElementsOwnWords(const QueueObject* q, size_t n) {
   ASSERT_NE(q, nullptr);
   ASSERT_EQ(q->elements.size(), n);
@@ -366,21 +325,6 @@ void ExpectDefaultElementsOwnWords(const QueueObject* q, size_t n) {
   }
 }
 
-// §7.5.1 on the constructor's other store: the optional initialization
-// expression initializes the dynamic array, and resizing or reinitializing an
-// already initialized dynamic array with new destroys its old data, unless it
-// is reinitialized with that data, and outdates every existing reference to its
-// elements. A destination entry left sharing a buffer with a live source entry
-// is exactly such a preexisting reference that did not become outdated: the
-// source goes on naming the storage the destination was just given, and a later
-// write through either name would be read back through the other.
-//
-// ExpectOwnWordsCopy carries the storage-identity claim at every position and
-// compares both planes of every word beside it. The expected values are what
-// says the copy delivered the source's contents rather than leaving the
-// destination at the default, and callers pass values that differ from each
-// other, so a run that filled every position from one entry fails here too.
-// The same ASSERT_NO_FATAL_FAILURE requirement applies as above.
 void ExpectElementsCopiedOwningWords(const QueueObject* src,
                                      const QueueObject* dst,
                                      const std::vector<uint64_t>& expected) {
@@ -396,13 +340,6 @@ void ExpectElementsCopiedOwningWords(const QueueObject* src,
   }
 }
 
-// The blocking-procedural spelling of `new[n]`, against the two claims the
-// helpers above make. The grow arm reached the size through
-// std::vector::resize(n, value), which copy-constructs every element it
-// appends from the single value it was handed; a Logic4Vec copy carries the
-// `words` pointer and not the words, so all three entries came back naming
-// the one buffer MakeLogic4VecVal had allocated, and a deposit into d[0] in
-// place would have been read back through d[1] and d[2] as well.
 TEST(DynamicArrayNewSimulation, NewWithoutInitGivesEachElementItsOwnWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -418,9 +355,6 @@ TEST(DynamicArrayNewSimulation, NewWithoutInitGivesEachElementItsOwnWords) {
       ExpectDefaultElementsOwnWords(f.ctx.FindQueue("d"), 3u));
 }
 
-// CopyNewInit finished with a plain per-element Logic4Vec assignment, which
-// carries the `words` pointer over, so `new[2](s)` handed each position of `d`
-// the buffer the matching position of `s` still holds.
 TEST(DynamicArrayNewSimulation, NewWithInitGivesDestinationItsOwnWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -442,14 +376,6 @@ TEST(DynamicArrayNewSimulation, NewWithInitGivesDestinationItsOwnWords) {
       f.ctx.FindQueue("s"), f.ctx.FindQueue("d"), {0x12345678u, 0x0BADF00Du}));
 }
 
-// §7.5.1 puts the two spellings of the constructor under one rule: it may stand
-// as the right-hand side of a variable declaration assignment or a blocking
-// procedural assignment whose left-hand side is a dynamic array. The
-// declaration half is lowered rather than executed, so its two stores are its
-// own and the pair above does not reach them. This one is
-// LowerDynArrayNewInit's std::vector::assign(n, value), which copy-constructs
-// every slot it makes from the one value it is handed, so `int d[] = new[3];`
-// held one buffer read three times.
 TEST(DynamicArrayNewSimulation, DeclNewWithoutInitGivesEachElementItsOwnWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -464,10 +390,6 @@ TEST(DynamicArrayNewSimulation, DeclNewWithoutInitGivesEachElementItsOwnWords) {
       ExpectDefaultElementsOwnWords(f.ctx.FindQueue("d"), 3u));
 }
 
-// The declaration half's copy loop, which was the same plain per-element
-// Logic4Vec assignment CopyNewInit ended with. The source array is filled
-// from an assignment-pattern declaration initializer, which evaluates each
-// item separately and so gives `s` two buffers of its own to be shared out.
 TEST(DynamicArrayNewSimulation, DeclNewWithInitGivesDestinationItsOwnWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -483,10 +405,6 @@ TEST(DynamicArrayNewSimulation, DeclNewWithInitGivesDestinationItsOwnWords) {
       f.ctx.FindQueue("s"), f.ctx.FindQueue("d"), {0x12345678u, 0x0BADF00Du}));
 }
 
-// §7.5.1: the initialization expression of new[] may be a fixed-size array,
-// whose elements are copied in order -- truncated to a shorter size and
-// padded with the element default to a longer one -- and a new[] without one
-// makes a new array rather than keeping what the old one held.
 TEST(DynamicArrayNewSimulation, NewCopiesAFixedArrayInitializer) {
   SimFixture f;
   std::string out = RunCapture(
@@ -505,9 +423,6 @@ TEST(DynamicArrayNewSimulation, NewCopiesAFixedArrayInitializer) {
   EXPECT_EQ(out, "5 7 2 6 7 0\n4 0\n");
 }
 
-// §7.5.1 with Table 6-7: new[] initializes each element to the default of its
-// type, x for a 4-state element and 0 for a 2-state one, in a declared
-// dynamic array and in one that is a class property alike.
 TEST(DynamicArrayNewSimulation, NewFillsA4StateArrayWithX) {
   SimFixture f;
   std::string out = RunCapture(
@@ -531,11 +446,6 @@ TEST(DynamicArrayNewSimulation, NewFillsA4StateArrayWithX) {
   EXPECT_EQ(out, "xxxx 1 0 xxxx 1 0\n");
 }
 
-// §7.5.1 with §7.4: new[] sizes a dynamic dimension that an array select
-// names, at any depth, and the elements it makes are variables. In a fixed
-// array of dynamic arrays of dynamic arrays, `arr[0] = new[4]` gives arr[0]
-// four elements and `arr[0][0] = new[2]` gives arr[0][0] two, while arr[1],
-// never sized, stays empty.
 TEST(DynamicArrayNewSimulation, NewSizesADynamicSubarrayOfAFixedArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -553,10 +463,6 @@ TEST(DynamicArrayNewSimulation, NewSizesADynamicSubarrayOfAFixedArray) {
   EXPECT_EQ(out, "4 2 77 0 0\n");
 }
 
-// §7.5.1 with §7.4.5: each element of `int a[3][][5]`, §20.7.1's own shape, is
-// a dynamic array whose elements are int [5], so new[4] on a[2] gives it four
-// of them, a write through all three dimensions reads back, and the array
-// itself keeps its three elements.
 TEST(DynamicArrayNewSimulation,
      NewSizesADynamicArrayOfFixedArraysInAFixedArray) {
   SimFixture f;
@@ -574,9 +480,6 @@ TEST(DynamicArrayNewSimulation,
   EXPECT_EQ(out, "7 3 4 0\n");
 }
 
-// The element's elements may themselves have more than one fixed dimension,
-// and a dimension written from its higher bound down, [3:1], still addresses
-// its elements by the bounds it declares.
 TEST(DynamicArrayNewSimulation, NewSizesAMultiDimFixedElementOfAFixedArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -594,10 +497,6 @@ TEST(DynamicArrayNewSimulation, NewSizesAMultiDimFixedElementOfAFixedArray) {
   EXPECT_EQ(out, "9 4 0 2\n");
 }
 
-// §7.5.1 with §7.4: a dynamic array of dynamic arrays and a fixed array of
-// dynamic arrays size each element by new[] on its select, declared among a
-// module's items and among a block's statements alike, and each element keeps
-// its own size and values.
 TEST(DynamicArrayNewSimulation, NewSizesEachElementOfAnArrayOfDynamicArrays) {
   SimFixture f;
   std::string out = RunCapture(
@@ -621,10 +520,6 @@ TEST(DynamicArrayNewSimulation, NewSizesEachElementOfAnArrayOfDynamicArrays) {
   EXPECT_EQ(out, "3 0 2 5 9\n0 3 6 4 8\n");
 }
 
-// §7.5.1: the size operand is a longint, and an unsigned operand converts to
-// one by zero-extension, so a 4-bit 8 with its top bit set is a size of eight
-// and not -8: in a declaration, in a procedural assignment and in an
-// assignment to a class's dynamic array property alike.
 TEST(DynamicArrayNewSimulation, UnsignedSizeWithTopBitSetIsNotNegative) {
   SimFixture f;
   std::string out = RunCapture(

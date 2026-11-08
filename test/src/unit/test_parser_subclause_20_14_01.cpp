@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §20.14.1, Syntax 20-14: random_function ::= $random [ ( seed ) ]. The seed is
-// optional, so a bare $random with no argument list is a well-formed call.
 TEST(RandomFunctionParsing, NoSeedArgument) {
   auto r = Parse(
       "module m;\n"
@@ -27,8 +25,6 @@ TEST(RandomFunctionParsing, NoSeedArgument) {
   EXPECT_TRUE(stmt->rhs->args.empty());
 }
 
-// §20.14.1, Syntax 20-14: the optional ( seed ) form supplies one argument that
-// selects the random stream.
 TEST(RandomFunctionParsing, WithSeedArgument) {
   auto r = Parse(
       "module m;\n"
@@ -45,11 +41,6 @@ TEST(RandomFunctionParsing, WithSeedArgument) {
   ASSERT_EQ(stmt->rhs->args.size(), 1u);
 }
 
-// §20.14.1, Syntax 20-14: the $random call is a primary, so it may appear as an
-// operand embedded in a larger expression rather than only as a whole
-// right-hand side — here as the left operand of a modulus, the shape the
-// clause's own example uses. The system call parses as the binary operator's
-// left operand.
 TEST(RandomFunctionParsing, AppearsAsExpressionOperand) {
   auto r = Parse(
       "module m;\n"

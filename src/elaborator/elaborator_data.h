@@ -48,51 +48,8 @@ struct RtlirVariable;
 struct RtlirModuleInst;
 struct RtlirParamDecl;
 
-// How many times a loop generate scheme may iterate before elaboration stops
-// and reports, unless a caller sets another bound with
-// Elaborator::SetMaxGenerateIterations.
-//
-// §27.4 states no such bound. Its four error rules are a generate block
-// instance array name conflicting with another declaration, a scheme that does
-// not terminate, a repeated genvar value and a genvar bit set to x or z, so
-// this is a budget of this elaborator's rather than a rule of the standard.
-//
-// The budget is what stands between a scheme that never terminates and an
-// elaboration that never returns. The genvar-repeats check catches a scheme
-// that revisits a value, which is the shape that can be proven
-// non-terminating. What reaches this bound has a distinct genvar value every
-// time round, which §27.4 permits outright -- the instances may form a sparse
-// array, since genvar values need not form a contiguous range of integers -- so
-// it cannot be told apart from a scheme that would have stopped one iteration
-// later.
-//
-// 262144 is measured rather than chosen, and the measurement is recorded here
-// so that questioning the number does not mean retaking it. A scheme reaching
-// 65536 iterations costs 0.69 s, measured as
-// GenerateElaboration.GenerateForNonTerminatingLoopErrors in
-// unit-test-coverage-shard-03 of run 31852899070, which is 10.5 us an
-// iteration. 262144 therefore costs under 3 s in the worst case, where a
-// scheme really does not terminate, and it clears the largest design the
-// budget has to admit by a factor of two: a per-bit generate over a 128Ki-entry
-// memory is 131072 iterations. A design needing more asks for it with
-// --max-generate-iterations, which is what makes this a budget and not a limit.
 inline constexpr int64_t kDefaultMaxGenerateIterations = 262144;
 
-// §23.10.1 (printed page 764): the generate block instance a module's
-// instance stands in or under, for the defparam statements the module
-// writes -- the module holding the block and the block steps of the instance
-// that entered it, as RtlirModuleInst::gen_block_path records them -- which
-// the clause makes the hierarchy such a statement may not change a parameter
-// outside of. The innermost such block, since standing inside it is standing
-// inside every block around it. At namespace scope because
-// elaborator_defparam.cpp judges a target against it from a function outside
-// the class.
-//
-// An element of an array of instances confines it as a generate block does:
-// `element` is then the element's module, which ApplyDefparamsRecursively
-// has made the element's own, and `steps` is empty. §25.3 confines an
-// instance whose port actuals refer to an arrayed interface to its own
-// hierarchy in the same way, which `arrayed_interface` marks.
 struct DefparamWriterBlock {
   RtlirModule* holder;
   HierPath steps;
@@ -102,31 +59,12 @@ struct DefparamWriterBlock {
 using DefparamWriterBlocks =
     std::unordered_map<const RtlirModule*, DefparamWriterBlock>;
 
-// The elaborator's state, held apart from the methods that act on it so that
-// neither half outgrows the file line cap on its own. Elaborator derives from
-// this, so every member is reached unqualified exactly as before and no
-// definition needed rewriting; the members are protected rather than private
-// for that reason.
 class ElaboratorData {
  public:
-  // The two types below are public so free helpers (e.g. FormalArrayInfo in
-  // elaborator_validate_class_array_*.cpp) can name and build them.
-  //
-  // §7.4.2 writes an unpacked dimension either as a constant_range — two
-  // bounds, in the order the declaration chose — or as a single size, which
-  // stands for the range [0:size-1]. Both bounds are kept rather than just the
-  // lower one, because the order they were written in is the order a range over
-  // that dimension has to be written in: §11.5.1 requires the first index of a
-  // range to address a more significant element than the second, and which of
-  // the two bounds is the more significant one is exactly what a lone size or a
-  // lone minimum cannot say.
   struct DeclaredDim {
     int64_t left = 0;
     int64_t right = 0;
 
-    // §11.5.1: a dimension written with its larger bound first counts downward,
-    // so the more significant element is the one with the larger index. Bounds
-    // that are equal describe a single element, which reads either way.
     [[nodiscard]] bool IsDescending() const { return left >= right; }
   };
 
@@ -141,48 +79,15 @@ class ElaboratorData {
     bool is_assoc = false;
     std::string_view assoc_index_type;
     std::vector<uint32_t> dim_sizes;
-    // One entry per unpacked dimension whose bounds fold to constants, in
-    // declaration order. A dimension whose bounds do not fold contributes
-    // nothing, so a vector shorter than num_unpacked_dims does not line up with
-    // the declaration and cannot be indexed by dimension.
     std::vector<DeclaredDim> declared_dims;
     bool is_queue = false;
-    // §7.4 with §7.10: each element is itself a queue, `int qq[$][$]` or
-    // `q_t fx[2]` under `typedef int q_t[$];` (RtlirVariable's own flag).
     bool elements_are_queues = false;
-    // §7.7: every unpacked dimension as UnpackedShapeOf gives it, its size or
-    // nullopt where it has none of its own, so that each dimension lines up
-    // with the declaration's; empty where the shape is not known.
     std::vector<std::optional<uint32_t>> unpacked_shape = {};
-    // §6.22.2: the name identifying an element type written as a name
-    // (ElementTypeIdentity), which is what equivalence compares for an
-    // enumeration or a class.
     std::string_view elem_type_name = {};
-    // §7.12: the element type is an unpacked structure or union, which has
-    // neither relational nor arithmetic operators.
     bool elem_is_unpacked_aggregate = false;
-    // §7.12: the type the elements are declared with, before typedef names are
-    // followed, through which a with expression reaches an element's members;
-    // null where the array is no declared variable.
     const DataType* elem_data_type = nullptr;
   };
 
-  // §23.9 (printed page 761) with §27.4 (printed 820): a module's
-  // declarations stand in the module's own scope, and a generate block
-  // instance is a scope of the module that holds the block, not of a module
-  // instantiated inside it. Elaborator::ElaborateModule holds one of these
-  // while it elaborates a module, taking the generate block prefixes, path
-  // and loop bindings of the instantiating scope out for the module's items
-  // and putting them back after, so that a child instantiated inside a block
-  // is elaborated as its own declaration reads and not as an item of the
-  // block. Left in force, the block's prefix reached the child's declarations
-  // -- a body parameter's RtlirParamDecl::gen_block_prefix, a variable's
-  // scoped name, an instance's gen_block_path -- so that Elaborator::
-  // RecomputeDependentParams, folding the child's parameters outside any
-  // block, saw none of them, and an instance's parameter value assignment
-  // reached no body parameter (ApplyBodyParamAssignment refuses a block's).
-  // Nested rather than a friend because the members it moves are protected
-  // and the only other route is a friend declaration in elaborator.h.
   struct GenerateScopeSaver {
     explicit GenerateScopeSaver(ElaboratorData& e)
         : e_(e),
@@ -217,134 +122,42 @@ class ElaboratorData {
   };
 
  protected:
-  friend struct ItemElaborationStateSaver;  // per-module state save/restore
-  friend struct UnitScopeTables;            // unit_scope_switch.h
+  friend struct ItemElaborationStateSaver;
+  friend struct UnitScopeTables;
 
-  // §3.12.1: the units of a compilation in which each file is one, each read
-  // through its own view; empty where the compilation is a single unit.
   CompilationUnitSet units_;
 
-  // §23.9/§24.3: stack of enclosing lexical scopes' visible names. A lexically
-  // nested module/program/interface sees names declared in the modules that
-  // textually enclose it; ElaborateModule pushes one entry per enclosing scope
-  // around a nested declaration's elaboration. A separately-instantiated module
-  // breaks the lexical chain, so its elaboration starts from an empty stack.
   std::vector<std::unordered_set<std::string_view>> enclosing_scope_names_;
   std::unordered_set<std::string_view> pending_enclosing_scope_;
   bool has_pending_enclosing_scope_ = false;
-  // §6.10 with §23.4: the enclosing scope's names as they stood when its item
-  // loop reached each nested declaration, keyed by that declaration. §6.10
-  // gives an implicit net to a name on the left of a continuous assignment
-  // that was not declared previously in the assignment's scope or in one it
-  // can directly reference, and a reference inside a nested module stands in
-  // the nested declaration's text, so what counts is what the enclosing module
-  // had declared above that text -- not above the instance, which may be
-  // written or implied any distance below it. Elaborator::ElaborateItems
-  // records the snapshot, and BeginNestedDeclScope hands it to ElaborateModule.
   std::unordered_map<const ModuleDecl*, std::unordered_set<std::string_view>>
       nested_decl_scope_names_;
-  // The names the enclosing scope's items above each nested declaration
-  // declare, read from the text before any item is elaborated, keyed by that
-  // declaration. An instance written above its declaration is elaborated
-  // before the item loop reaches the declaration and takes its snapshot, and
-  // the names declared between the instance and the declaration -- previous
-  // to the declaration's text by §6.10 -- are then known from the text alone.
-  // Elaborator::ElaborateItems records these through
-  // RecordNestedDeclNamesAbove before its item loop. The names are owned
-  // strings rather than views: the constants a `name[N]` or `name[N:M]`
-  // enumeration member generates (§6.19.2) are spelled by no text, and this
-  // class holds no arena to intern them in.
   std::unordered_map<const ModuleDecl*, std::unordered_set<std::string>>
       nested_decl_names_above_;
-  // Records, for each kNestedModuleDecl among `items`, the names the items
-  // above it declare as the text shows them: each item's declared name, its
-  // instance name and its gate instance name, the constants of each
-  // enumeration it writes inline (§6.19), a ranged member's generated
-  // constants among them (§6.19.2), and the identifier a continuous
-  // assignment's left side names (§6.10's implicit net).
   void RecordNestedDeclNamesAbove(const std::vector<ModuleItem*>& items);
-  // Hands ElaborateModule, through pending_enclosing_scope_, the enclosing
-  // scope's names a nested declaration `nested` may treat as declared: the
-  // snapshot recorded at its declaration; or, when the instance is written
-  // above the declaration and no snapshot has been taken yet, `at_instance`,
-  // the names declared so far, joined with the names the text declares above
-  // the declaration.
   void BeginNestedDeclScope(const ModuleDecl* nested,
                             std::unordered_set<std::string_view> at_instance);
-  // §16.15: the default disable iff of the scope a nested declaration is
-  // elaborated in, which extends to the declaration unless it has one of its
-  // own; set by the two sites instantiating a nested declaration, taken by
-  // Elaborator::ElaborateModule as it enters, and null for every other
-  // instance, into which the default does not extend.
   Expr* nested_default_disable_iff_ = nullptr;
   Expr* inherited_default_disable_iff_ = nullptr;
-  // §14.12: likewise the event of the scope's default clocking, which extends
-  // to the modules, interfaces and checkers declared in the scope.
   std::vector<EventExpr> nested_default_clock_;
   std::vector<EventExpr> inherited_default_clock_;
-  // §17.3: the formals the checker instance being elaborated binds, with the
-  // constant values of their actuals, taken by Elaborator::ElaborateModule.
   BoundCheckerFormals pending_checker_actuals_;
-  // §17.3: the formals each checker instance binds to a sequence or a
-  // property, with the actuals, keyed by the instance's module; the pending
-  // ones are taken by Elaborator::ElaborateModule.
   ActualsByFormal pending_checker_tree_actuals_;
   std::unordered_map<const RtlirModule*, ActualsByFormal> checker_tree_actuals_;
-  // §37.28 detail 2: the types the type parameters of the module about to be
-  // elaborated were given, as written (AppliedTypeParams::written); set by the
-  // two sites calling ApplyChildTypeParams and taken by
-  // Elaborator::ElaborateParamPortList.
   TypedefMap pending_type_param_types_;
 
   std::unordered_set<std::string_view> declared_names_;
-  // §35.5.4: the scoped names the scope's import declarations took, so a second
-  // import of one is left to CheckDuplicateImportNamesInScope's report rather
-  // than drawing a redeclaration besides.
   std::unordered_set<std::string_view> dpi_import_names_;
-  // §23.9: the declared names of each elaborated module scope, keyed by the
-  // module they belong to. A generate construct is elaborated after every
-  // module has returned, by which point ItemElaborationStateSaver::Restore
-  // (src/elaborator/elaborator_module.cpp) has taken the module's own names
-  // back out of declared_names_, so the names a generate block is judged
-  // against are captured as its module returns. One entry is shared by every
-  // generate construct of that module and by no other module's, which is what
-  // §23.9 asks for: a generate block is a scope inside its module (§27.4
-  // printed page 821, §27.5 printed page 824), so a name declared in another
-  // module decides nothing about it.
-  //
-  // The key is one elaborated module scope rather than one module declaration:
-  // Elaborator::ElaborateModule creates a fresh RtlirModule per call and
-  // Elaborator::ElaborateModuleInst calls it once per instance, so
-  // instantiating one module twice yields two keys and neither instance's
-  // names are offered to the other.
-  // ModuleScopeNames (src/elaborator/module_scope_names.h) says what the entry
-  // holds.
   std::unordered_map<const RtlirModule*, ModuleScopeNames> module_scope_names_;
-  // Exchanges the sets ModuleScopeNames keeps with the ones in force, which
-  // installs a module's for its generate blocks and, done again, puts the
-  // enclosing ones back with the module's as the blocks left them.
   void SwapModuleScopeNames(ModuleScopeNames& names);
-  // §27.4: genvar names of the loop generate constructs currently being
-  // elaborated. Used to reject a nested loop generate construct that reuses an
-  // enclosing loop's genvar, which is illegal because the inner reference names
-  // the outer block's implicit localparam rather than a genvar.
   std::unordered_set<std::string_view> active_loop_genvars_;
   std::unordered_set<std::string_view> net_names_;
   std::unordered_map<std::string_view, SourceLoc> cont_assign_targets_;
-  // §6.6.2: the uwire nets of the scope being elaborated and what of each its
-  // drivers reach, and the same of every compilation unit's uwire nets, which
-  // drivers throughout the design reach.
   UwireDrivers uwire_drivers_;
   UnitUwireDrivers unit_uwire_drivers_;
   std::unordered_map<std::string_view, SourceLoc> proc_assign_targets_;
   std::unordered_map<std::string_view, DataTypeKind> var_types_;
   std::unordered_map<std::string_view, VarArrayInfo> var_array_info_;
-  // §11.5.2: the unpacked dimensions of a net array, kept apart from
-  // var_array_info_ because that map is read by rules written about variables
-  // -- §7.6's array assignment comparison among them -- which have never seen a
-  // net and decide nothing correct about one. Only
-  // Elaborator::CheckArrayElementPartSelectNode reads this, for the one rule
-  // §11.5.2 states of net and variable arrays alike.
   std::unordered_map<std::string_view, VarArrayInfo> net_array_info_;
   std::unordered_map<std::string_view, const ModuleItem*> dpi_import_decls_;
 
@@ -352,91 +165,45 @@ class ElaboratorData {
   std::unordered_set<std::string_view> specparam_names_;
   std::unordered_set<std::string_view> enum_var_names_;
   std::unordered_set<std::string_view> enum_member_names_;
-  // §7.12.1 with §6.19.3: the associative arrays indexed by an enumeration,
-  // whose index locators return a queue of that enumeration
-  // (Elaborator::ValidateEnumAssignments).
   std::unordered_set<std::string_view> enum_keyed_arrays_;
-  // §6.19: the name the enumeration of the inline enum declaration list being
-  // elaborated is declared under, its first declarator's (SetEnumTypeInfo).
   std::string_view inline_enum_list_key_;
   std::unordered_set<std::string_view> const_names_;
-  // §6.19: const *variables* only (not parameters/specparams), which unlike
-  // elaboration-time constants may not appear in an enum named-constant value.
   std::unordered_set<std::string_view> const_var_names_;
 
   std::unordered_map<std::string_view, DataTypeKind> forward_typedef_kinds_;
   std::unordered_set<std::string_view> class_names_;
-  // §8.26: the classes a module, interface or program declares, by name, as
-  // their bodies are elaborated; the compilation unit's own classes are
-  // CompilationUnit::classes.
   std::unordered_map<std::string_view, const ClassDecl*> module_classes_;
   std::unordered_set<std::string_view> parameterized_class_names_;
   std::unordered_set<std::string_view> class_var_names_;
   std::unordered_map<std::string_view, std::string_view> class_var_types_;
   std::unordered_set<std::string_view> var_init_names_;
   std::unordered_map<std::string_view, SourceLoc> output_port_targets_;
-  // §10.6.2: the variable each force or release statement names, with that
-  // statement's own location. Read after every item has been walked, because
-  // the rule tests the name against the continuous and procedural assignments
-  // the whole module makes, and neither set is complete while one item is
-  // being elaborated.
   std::unordered_map<std::string_view, SourceLoc> force_release_targets_;
   std::unordered_set<std::string_view> nettype_net_names_;
   std::unordered_set<std::string_view> nettype_names_;
   std::unordered_map<std::string_view, std::string_view> nettype_resolve_funcs_;
   std::unordered_map<std::string_view, std::string_view> nettype_canonical_;
   std::unordered_set<std::string_view> interconnect_names_;
-  // §23.3.3.7.1: the nets the design's interconnect port connections merge,
-  // judged once every instance is elaborated (ElaborateTops).
   InterconnectMerges interconnect_merges_;
   std::unordered_set<std::string_view> scalar_var_names_;
-  // §11.5.1: the real variables the rule barring a bit-select or part-select of
-  // a scalar, a real variable or a real parameter names in its second
-  // alternative. A variable is here only when it was declared with no unpacked
-  // dimension, because §11.5.2 makes indexing an unpacked array an array
-  // element select rather than a bit-select: `real arr[4]; v = arr[i];` selects
-  // an element whose type is real and is legal, so `arr` is not in this set
-  // even though its element type is real.
   std::unordered_set<std::string_view> real_var_names_;
-  // §11.5.1: the real parameters the same sentence names beside the real
-  // variables. The two are kept apart because the report names the noun the
-  // clause gives the operand, and a parameter is not a variable. The same
-  // §11.5.2 reason keeps a parameter declared with an unpacked dimension out.
   std::unordered_set<std::string_view> real_param_names_;
-  // §11.5.2: the dimensions each variable declares, which is what a chain of
-  // selects written on that variable is measured against. The three sets above
-  // answer for a select carrying one address; this map answers for a select
-  // carrying more, where §11.5.2 sends the address past the last dimension back
-  // to §11.5.1.
   std::unordered_map<std::string_view, VarSelectShape> var_select_shapes_;
   std::unordered_set<std::string_view> task_names_;
-  std::unordered_set<std::string_view> let_names_;  // §11.12 let decl names
+  std::unordered_set<std::string_view> let_names_;
   std::unordered_set<std::string_view> sequence_names_;
-  // §16.12/§F.4.1: property+sequence registry to flatten an instance body.
   PropertyRegistry property_registry_;
 
   std::unordered_map<std::string_view, const ModuleItem*> func_decls_;
-  // §9.2.2.2.1: func_decls_ and the functions a call by a scoped name reaches
-  // besides (AddScopedCallFunctions), read only to infer a sensitivity list.
   InferenceFuncs inference_funcs_;
-  // §23.8: the declarations of the modules being elaborated, outermost first
-  // and the one whose header or items are in hand last, through which an upward
-  // or downward call path and a type reference's name (ResolveTypeRef) resolve.
   std::vector<const ModuleDecl*> module_decl_path_;
-  // §6.14 with §35.5.5: the functions of the module declared to return a
-  // chandle, native and imported, whose call is a chandle for the assignment
-  // rules ValidateChandleOps holds; filled by it for each module.
   std::unordered_set<std::string_view> chandle_result_funcs_;
   std::unordered_map<std::string_view, std::string_view> var_named_types_;
-  // §10.11: flag an alias correspondence specified more than once across
-  // statements, bit by bit. AliasBitRef = (scoped net name, bit offset above
-  // the net's least significant end).
   using AliasBitRef = std::pair<std::string_view, uint32_t>;
   std::set<std::pair<AliasBitRef, AliasBitRef>> alias_bit_pairs_;
 
   std::unordered_set<std::string_view> non_ansi_complete_ports_;
   std::unordered_map<std::string_view, uint32_t> non_ansi_partial_ports_;
-  // Non-ANSI partial ports whose port direction declaration carried `signed`.
   std::unordered_set<std::string_view> non_ansi_signed_ports_;
 
   std::unordered_set<std::string_view> ansi_port_names_;
@@ -445,59 +212,27 @@ class ElaboratorData {
   std::unordered_map<std::string_view, std::string_view>
       vi_var_interface_types_;
   std::unordered_map<std::string_view, std::string_view> vi_var_modports_;
-  // §25.9 with §7.4: the kinds of var_types_ less those of the variables the
-  // module declares with unpacked dimensions, an array of virtual interfaces
-  // being no virtual interface itself, so the operations §25.9 forbids a
-  // virtual interface are not looked for on one; CheckVirtualInterfaceExpr
-  // reads this.
   std::unordered_map<std::string_view, DataTypeKind> vi_expr_types_;
-  // §25.9 with §7.4: the number of unpacked dimensions of each array of
-  // virtual interfaces the module declares, a select past which selects into
-  // a virtual interface.
   std::unordered_map<std::string_view, std::size_t> vi_array_dims_;
 
-  // §25.9: explicit parameter value overrides, evaluated to constants, for
-  // virtual interface variables and for interface instances. Used to verify
-  // that the actual parameter values match for a virtual interface and the
-  // interface (instance or other virtual interface) it is assigned from.
   std::unordered_map<std::string_view, std::vector<int64_t>>
       vi_var_param_values_;
   std::unordered_map<std::string_view, std::vector<int64_t>>
       interface_inst_param_values_;
-  // §25.9: interface instances targeted by a defparam declared outside the
-  // interface; such an instance shall not be assigned to a virtual interface.
   std::unordered_set<std::string_view> vi_external_defparam_insts_;
 
   std::unordered_set<std::string_view> checker_inst_names_;
   std::unordered_set<std::string_view> program_inst_names_;
   std::unordered_set<std::string_view> auto_task_func_names_;
   std::unordered_map<std::string_view, ModuleDecl*> nested_module_decls_;
-  // §23.4: the modules, interfaces and programs the scopes textually enclosing
-  // the declaration being elaborated declare nested, which its own nested
-  // declarations hide (Elaborator::FindModuleInScope). The two sites
-  // instantiating a nested declaration hand them on through
-  // pending_enclosing_nested_decls_ (NestedDeclsSeenInside), and
-  // ElaborateModule takes them as it enters; a separately-instantiated module
-  // starts with none.
   std::unordered_map<std::string_view, ModuleDecl*> enclosing_nested_decls_;
   std::unordered_map<std::string_view, ModuleDecl*>
       pending_enclosing_nested_decls_;
-  // The nested declarations a declaration nested in the scope being elaborated
-  // sees: those enclosing it, with the scope's own hiding theirs.
   std::unordered_map<std::string_view, ModuleDecl*> NestedDeclsSeenInside()
       const;
-  // Takes what the site instantiating a nested declaration handed on, the
-  // enclosing scope's default disable iff and default clocking and the
-  // declarations the enclosing scopes nest, as ElaborateModule enters; none of
-  // it reaches any other instance.
   void TakeNestedDeclInheritance();
 
-  // The names each package makes directly visible, each with the package
-  // declaring it (elaborator_scope_rules_names.h), filled on first use.
   ProvidedNameCache pkg_provided_names_;
-  // §23.8: the names of the whole unit a hierarchical name's first name may
-  // resolve to (UnitHierHeadNames, class_method_reads.h), built when the
-  // first module's references are checked.
   std::shared_ptr<const UnitHierHeadNames> unit_hier_head_names_;
 
   std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>
@@ -509,127 +244,48 @@ class ElaboratorData {
 
   struct ClockingSignalInfo {
     Direction direction;
-    // §14.16.2: the variables the clockvar's clocking signal names, which no
-    // continuous assignment, procedural continuous assignment or primitive
-    // may write while the clockvar is an output or inout.
     std::vector<std::string_view> associated;
   };
   std::unordered_map<std::string_view,
                      std::unordered_map<std::string_view, ClockingSignalInfo>>
       clocking_signals_;
 
-  // §14.14: true while elaborating a module (or checker/interface/program)
-  // whose own scope, or some enclosing ancestor instance up to the top-level
-  // hierarchy block, declares a global clocking. A $global_clock reference is
-  // legal when this is set; the flag implements the hierarchical lookup (rule
-  // b) that climbs the instance tree. Saved and restored around each
-  // ElaborateModule call so it tracks the ancestor chain of the current cell.
   bool global_clocking_in_scope_ = false;
 
-  // §14.14: the global clocking declarations in scope along the instance path,
-  // one entry per declaring instance, outermost first. The clause's lookup
-  // rules search the design hierarchy step by step for the global clocking
-  // declaration nearest the point of reference, which is back(). Pushed and
-  // popped around each Elaborator::ElaborateModule call, so the stack holds the
-  // declarations of the current cell and of its ancestor instances.
   struct GlobalClockingScope {
-    // §14.14's event expression of that global clocking declaration.
     const std::vector<EventExpr>* events = nullptr;
-    // current_inst_path_ of the declaring instance. The event expression names
-    // signals of the scope that declares it, so a reference in a descendant
-    // needs to know which instance that is (§23.6).
     std::string inst_path;
   };
   std::vector<GlobalClockingScope> global_clocking_scopes_;
 
-  // §14.14: the event expression a $global_clock reference in the cell being
-  // elaborated resolves to, or null where the lookup reaches no declaration.
-  // §16.5.2 makes this the clock of a concurrent assertion written
-  // `assert property(@$global_clock a);`, which under a
-  // `global clocking @clk; endclocking` is equivalent to
-  // `assert property(@clk a);`. EffectiveGlobalClockingEvent in
-  // elaborator/global_clock_assertion_event.h computes it from the innermost
-  // entry of global_clocking_scopes_ above.
   const std::vector<EventExpr>* module_global_clocking_event_ = nullptr;
 
-  // The conditional generates queued until every module has been elaborated.
   std::vector<PendingGenerate> pending_generates_;
 
-  // One defparam statement together with where it was written. `prefix` and
-  // `consts` are empty for a statement among a module's own items, and hold the
-  // generate block instance's Elaborator::ScopedName prefix and loop-index
-  // bindings for one written inside a block. §23.10.1 needs both: the prefix
-  // decides which hierarchy the statement is allowed to reach, since the clause
-  // rules that a defparam in or under a generate block instance may not change
-  // a parameter outside that hierarchy, and the bindings are what its
-  // right-hand side reads when it names a genvar, as the clause's own example
-  // does with `defparam somename[i+1].my_flop.xyz = i`.
   struct DefparamSite {
     const ModuleItem* item;
     std::string_view prefix;
-    // §23.9: the generate block prefixes the statement stands in, outermost
-    // first, which decide which of the module's parameters a name on the
-    // right-hand side may mean. `prefix` is the innermost of these flattened
-    // into one string and cannot stand in for them, because no reader can split
-    // it back into steps -- a defparam in a block nested in another has to see
-    // both blocks' parameters.
     GenBlockPrefixes scopes;
     GenBlockConsts consts;
-    // §23.6: the generate block instances the statement stands in, which is
-    // where a path written in it starts. `prefix` says the same thing as one
-    // string and is kept because applied_defparams_ needs a key it can hash.
     HierPath path;
   };
 
-  // The defparam statements that generate block instances contributed to each
-  // module. ModuleDecl::items does not hold them, and a walk of the AST could
-  // not tell one in a selected block from one in an alternative §27.5 left out
-  // of the model. Elaborator::ElaborateGenerateItems records an entry as it
-  // elaborates each block instance, so what is here is exactly what was
-  // instantiated.
   std::unordered_map<RtlirModule*, std::vector<DefparamSite>>
       generate_defparams_;
 
-  // §23.11 with §27.5: the bind directives of the generate blocks elaborated,
-  // the blocks a generate construct selected; one in any other binds nothing.
   std::unordered_set<const BindDirective*> generate_binds_;
 
-  // Keyed by the block instance's prefix as well as the statement, because the
-  // one body AST is shared by every iteration of a loop generate block: without
-  // the prefix, applying the statement for the first iteration would mark it
-  // handled for all the rest.
   std::set<
       std::tuple<RtlirModule*, const ModuleItem*, size_t, std::string_view>>
       applied_defparams_;
 
-  // §23.10.1 (printed page 764): the generate block instance each
-  // instantiated module stands in or under, keyed by the module, for every
-  // module under one; a module under none is absent. Filled by
-  // Elaborator::ApplyDefparamsRecursively as it descends the instance tree,
-  // from RtlirModuleInst::gen_block_path, for ResolveDefparamFromTop to
-  // refuse a module-level statement whose top-rooted name reaches outside
-  // that block as a statement written in the block is refused.
   DefparamWriterBlocks defparam_writer_blocks_;
-  // §23.10.1 with §23.3.3.5: gives `elem`, an element of an instance array
-  // of `parent`, a module tree of its own where it shares one with another
-  // element (PushInstanceArray elaborates the array's module once), so that a
-  // defparam reaching through the element changes it alone. Each module of the
-  // tree is copied once, with the defparams and the generate constructs still
-  // pending for it. IsolateArrayElements does so for each element `mod`
-  // holds, where the design writes a defparam at all (WritesDefparams).
-  // Defined in elaborator_defparam_isolate.cpp.
   void IsolateArrayElement(const RtlirModule& parent, RtlirModuleInst& elem,
                            Arena& arena);
   void IsolateArrayElements(RtlirModule& mod, Arena& arena,
                             const CompilationUnit& unit);
   bool WritesDefparams(const CompilationUnit& unit);
   std::optional<bool> declares_defparams_;
-  // §23.10.1 with §23.10.2: applies the assignment `path = value` of a defparam
-  // written in `mod`, under the generate block instances `writer`, to a
-  // parameter a named block declares, recording the initializer on the
-  // reached instance's module (RtlirModule::block_param_overrides). False
-  // where the path reaches no such parameter. Defined in
-  // elaborator_defparam.cpp.
   struct BlockParamDefparam {
     Expr* value;
     const ScopeMap& scope;
@@ -643,59 +299,22 @@ class ElaboratorData {
   RtlirModule* CopyModuleTree(
       RtlirModule* mod, Arena& arena,
       std::unordered_map<const RtlirModule*, RtlirModule*>& copies);
-  // §23.8: the top-level modules of the design being elaborated, which are
-  // the roots a defparam's hierarchical name is read from once its leading
-  // step names no scope of the writing module. Filled once the tops exist and
-  // read while defparams are applied and while the unresolved ones are
-  // reported, both of which run outside every module.
   std::vector<RtlirModule*> defparam_top_roots_;
-  // §23.6: the declarations of the design's top-level modules, which a full
-  // path in an interface port's actual starts at.
   std::vector<const ModuleDecl*> top_decls_;
 
   std::unordered_map<std::string_view, const ModuleItem*>
       deferred_subroutine_map_;
 
   std::string gen_prefix_;
-  // §23.9: every generate block prefix in force, outermost first, with
-  // gen_prefix_ itself last. A reference written in a nested block is resolved
-  // against each enclosing block in turn -- the search climbs until it finds an
-  // item of that name or meets a module, interface, program or checker boundary
-  // -- and gen_prefix_ alone cannot answer that, being the innermost prefix
-  // flattened into a string no reader can split back into steps. Each entry is
-  // interned in arena_ and is the whole of gen_prefix_ at that depth, so an
-  // entry and a simple name concatenate to the key Elaborator::ScopedName
-  // produced for a declaration in that block.
   std::vector<std::string_view> gen_prefix_scopes_;
-  // §23.6: the generate block instances currently being elaborated into,
-  // outermost first. Maintained beside gen_prefix_, which flattens the same
-  // information into a string no reader can split back into steps.
   HierPath gen_block_path_;
 
-  // §20.10.1: the constant bindings (genvars, and any localparams introduced
-  // by the enclosing generate blocks) in effect while a generate body is being
-  // elaborated. An elaboration severity task's argument list may reference a
-  // genvar (see §20.10.1 Example 2, `$info("i = %0d ...", i)`), which is a
-  // constant expression per §11.2.1 but is absent from BuildParamScope. This
-  // overlay makes those bindings visible to the constant-argument check. Empty
-  // outside any generate construct.
   ScopeMap gen_const_scope_;
 
-  // §27.4: the implicit localparam of each loop generate block currently being
-  // unrolled, outermost first, paired with this instance's loop-index value.
-  // Stamped onto every process elaborated inside the block so that the value
-  // survives to simulation, where the shared body AST can no longer tell the
-  // instances apart. Empty outside a loop generate construct.
   std::vector<std::pair<std::string_view, int64_t>> gen_loop_consts_;
 
-  // §20.10.1: any $fatal or $error elaboration severity task that survives
-  // generate-construct expansion sets this to true. Propagated onto the
-  // resulting RtlirDesign so the simulator can refuse to start.
   bool elab_simulation_blocked_ = false;
 
-  // §20.10.1: details of the most recent elaboration severity task call.
-  // Propagated onto the RtlirDesign so observers can inspect what was
-  // emitted (severity tag, source location, hierarchical scope, user text).
   std::string elab_last_severity_;
   std::string elab_last_severity_msg_;
   std::string elab_last_severity_scope_;
@@ -707,11 +326,6 @@ class ElaboratorData {
 
   int64_t max_generate_iterations_ = kDefaultMaxGenerateIterations;
 
-  // A cell selection clause paired with a use expansion clause (§33.4.1.4,
-  // §33.4.1.6). src_lib is the library qualifying the selected cell, empty when
-  // the clause is unqualified and so applies to the cell in any library.
-  // use_lib/use_cell name the binding target; an empty use_lib means the
-  // library is inherited from the parent cell.
   struct CellUseOverride {
     std::string src_lib;
     std::string use_lib;
@@ -719,15 +333,9 @@ class ElaboratorData {
   };
   std::unordered_map<std::string, CellUseOverride> cell_clause_use_overrides_;
 
-  // §33.4.2: the instance clauses binding an instance to a configuration, by
-  // the instance's path, and the cell clauses binding every instance of a cell
-  // to one, by the cell's name. Below such an instance that configuration's
-  // rules govern in place of these.
   std::vector<std::pair<std::string, const ConfigDecl*>> config_delegations_;
   std::unordered_map<std::string, const ConfigDecl*> cell_config_delegations_;
 
-  // A cell selection clause paired with a liblist expansion clause: the named
-  // cell is searched for in this ordered library list (§33.4.1.4, §33.4.1.5).
   std::unordered_map<std::string, std::vector<std::string>>
       cell_clause_liblist_overrides_;
 
@@ -737,72 +345,34 @@ class ElaboratorData {
   std::vector<std::tuple<std::string, std::string, std::string>>
       instance_use_overrides_;
 
-  // An instance selection clause paired with a plain use expansion clause
-  // (§33.4.1.6): the exact instance at inst_path is bound to use_lib.use_cell.
-  // Kept separate from instance_use_overrides_ (which carries the config
-  // delegation of a use ...:config clause) so delegation is unaffected. An
-  // empty use_lib means the target library is inherited from the parent cell.
   std::vector<std::tuple<std::string, std::string, std::string>>
       instance_bind_overrides_;
 
-  // §33.4.1.5, §33.4.1.6 (printed page 939): reports the instantiation `item`,
-  // whose cell nothing bound, as the failure of the configuration rule in
-  // force for the instance being resolved -- the use clause whose library
-  // holds no such cell, or the library list holding no cell of the
-  // instantiated name -- and returns true. Returns false, reporting nothing,
-  // where no configuration rule governed the lookup.
   bool ReportConfigRuleBindingNothing(CompilationUnit* unit,
                                       const ModuleItem* item,
                                       DiagEngine& diag) const;
-  // The library and cell the use clause in force for the instance at `path`,
-  // or else for the cell `name`, binds to; nullopt where none is in force.
   std::optional<std::pair<std::string, std::string>> UseTargetInForce(
       CompilationUnit* unit, const std::string& path,
       std::string_view name) const;
 
-  // A configuration's parameter overrides for one instance path (§33.4.3).
-  // reset_all marks an empty "#()" list that returns every parameter to its
-  // module default; within params, a null expression returns that single
-  // parameter to its default while a present expression supplies a new value.
   struct ConfigParamOverride {
     std::string inst_path;
     bool reset_all = false;
     std::vector<std::pair<std::string_view, Expr*>> params;
-    // The instance clause's own position -- its `instance` keyword, as
-    // Parser::ParseConfigRule records it -- where a report about one of the
-    // clause's assignments stands.
     SourceLoc loc;
   };
   std::vector<ConfigParamOverride> instance_param_overrides_;
-  // §33.4.1.4: the same for a cell clause, applied to every instance of the
-  // cell `inst_path` then names.
   std::vector<ConfigParamOverride> cell_param_overrides_;
 
-  // Literal values of the localparams declared in the configuration being
-  // elaborated, used to evaluate parameter-override expressions (§33.4.3).
   ScopeMap config_localparam_scope_;
 
-  // §33.4.3: the parameter values of each instance a configuration's override
-  // has been applied below so far, by hierarchical path, so an override can
-  // read a parameter of any instance above the one it configures.
   std::unordered_map<std::string, ScopeMap> config_ancestor_scopes_;
 
-  // §33.4.1.5: the lists cell clauses selected, by the path of the instance
-  // each was selected for, which the instances below inherit as liblists are
-  // inherited downward. RecordCellClauseListBinding grows it as each instance
-  // is bound.
   std::vector<std::pair<std::string, std::vector<std::string>>>
       cell_liblist_bindings_;
-  // Records the list a cell clause selected for the instance of `cell` at
-  // config_inst_path_, where no instance clause names that instance.
   void RecordCellClauseListBinding(std::string_view cell);
-  // §33.4.1.5: the list a configuration selected for the instance of `name` at
-  // config_inst_path_, or null.
   const std::vector<std::string>* SelectedLiblist(std::string_view name) const;
 
-  // §33.4.2: every table above that one configuration's rules fill, set aside
-  // for the configurations whose subtrees enclose a delegated instance while
-  // the delegated configuration's rules govern beneath it.
   struct ConfigRuleTables {
     std::vector<std::string> library_order;
     bool library_order_strict = false;
@@ -820,106 +390,34 @@ class ElaboratorData {
     std::string_view config;
   };
   std::vector<ConfigRuleTables> enclosing_config_rules_;
-  // §33.7: the library.cell of the configuration whose rules are in force,
-  // which every module elaborated under them records as its controller.
   std::string_view active_config_;
 
   std::string current_inst_path_;
-  // §33.4.1.3 (printed page 939): the instance clause's instance name is a
-  // hierarchical name starting at the config's top-level module. This is the
-  // instance being elaborated named that way, §23.6's path with each generate
-  // block instance it sits in a level of its own (`top.g.u`, `top.g[1].u`),
-  // which is what a configuration rule's path is matched against.
-  // current_inst_path_ runs a generate block's name into the instance's
-  // (`top.g_u`), the flattened key the simulator stores the instance under.
   std::string config_inst_path_;
-  // Library of the cell currently being elaborated; the parent cell's library
-  // while its child instances are resolved (§33.4.1.5, §33.4.1.6).
   std::string current_library_;
-  // True while elaborating from a configuration, so config-specific library
-  // resolution rules apply (§33.4.1.5).
   bool in_config_elaboration_ = false;
 
   TypedefMap typedefs_;
-  // Every typedef any module registered, union of them all, for the design's
-  // type-width table (§20.6.2 $bits), which carries one width per typedef name
-  // for the whole design and is built once the last module has been elaborated,
-  // with no module scope left to be read in.
-  // Elaborator::ProcessPendingGenerate does not read this union; it installs
-  // the per-module maps held on its PendingGenerate.
-  // ItemElaborationStateSaver folds a module's entries in here as it takes them
-  // back out of typedefs_, and Elaborator::ElaborateTopModules puts the union
-  // back once every top module is elaborated.
   TypedefMap all_typedefs_;
-  // §6.18: every name a typedef gives to an unpacked aggregate -- a fixed-size
-  // unpacked array, a dynamic array, a queue or an associative array -- keyed
-  // as typedefs_ keys it, so that the elaborated type-width table can say that
-  // such a name has no single width instead of answering with one element's.
-  // Filled at each site that enters a typedef under its bare name, which is
-  // the spelling every reader of that table looks up.
   std::unordered_set<std::string_view> aggregate_typedef_names_;
-  // §6.24.3: names of typedefs whose unpacked dimensions designate an
-  // associative array. A bit-stream cast must reject any such typedef as a
-  // destination type.
   std::unordered_set<std::string_view> assoc_typedef_names_;
-  // §6.24.3: total bit width of a typedef whose unpacked dimensions are all
-  // fixed-size (no dynamic, queue, or associative dims). Used to detect
-  // fixed-size mismatch when the destination of a bit-stream cast is an
-  // unpacked-array typedef.
   std::unordered_map<std::string_view, uint32_t> fixed_unpacked_typedef_widths_;
   std::unordered_map<std::string_view, std::vector<Expr*>> td_array_dims_;
   std::unordered_set<std::string_view> cu_scope_names_;
-  // §24.6: the names anonymous programs declare into the program-wide space,
-  // gathered from the compilation-unit scope and from every package. The space
-  // is reachable from programs alone, so a scope that is not a program block
-  // may reference none of these names.
   std::unordered_set<std::string_view> anonymous_program_names_;
   ScopeMap cu_param_scope_;
-  // The same union for the parameter scope; see all_typedefs_ above.
   ScopeMap all_cu_param_scope_;
-  // The same union for td_array_dims_, whose entries a module adds are taken
-  // back out with its typedefs (§3.13 (e)).
   std::unordered_map<std::string_view, std::vector<Expr*>> all_td_array_dims_;
 
-  // §11.4.12.1: the replication-multiplier checks (non-negative, zero-only-
-  // within-a-concatenation) evaluate the multiplier as a constant expression.
-  // The clause's own examples use a parameter multiplier, so the checks must
-  // resolve parameters/localparams rather than only literals. This holds the
-  // parameter scope of the module currently under constraint validation.
   ScopeMap replicate_multiplier_scope_;
 
-  // §11.4.14.2: a streaming slice_size written as a constant expression may be
-  // a parameter or localparam (a §11.2.1 constant form), so the zero/negative
-  // slice-size check must fold it in the module's parameter scope rather than
-  // an empty one. Holds the parameter scope of the module currently under
-  // constraint validation, published alongside replicate_multiplier_scope_.
   ScopeMap streaming_slice_size_scope_;
 
-  // §20.7.1/§20.7: the dimension argument n of an array query function is a
-  // constant expression, so it may be a parameter, localparam, or genvar (a
-  // §11.2.1 constant form) rather than only an integer literal. The
-  // variable-sized-dimension check folds n in the module's parameter scope so a
-  // parameter-valued dimension index is recognized the same way a literal one
-  // is. Holds the parameter scope of the module currently under constraint
-  // validation.
   ScopeMap array_query_dim_scope_;
-  // §7.7: a formal's unpacked dimensions are compared with its actual's by
-  // size, and their bounds may be parameters, so the argument check folds them
-  // in the parameter scope of the module currently under constraint validation.
   ScopeMap array_arg_dim_scope_;
 
-  // §20.16.3: the ascending-order requirement on a PLA memory or term is tested
-  // against its declared packed and unpacked ranges. Those range bounds are
-  // §11.2.1 constant expressions, so they may be a parameter or localparam
-  // rather than an integer literal (the LRM's own example declares the memory
-  // with symbolic bounds). The check folds each bound in the module's parameter
-  // scope so a parameter-valued bound resolves the same way a literal one does.
   ScopeMap pla_ascending_scope_;
 
-  // §8.25.1: a subroutine's formal, its return type or a procedural variable
-  // written with a specialization, `C#(W)::t`, has the specialization's
-  // arguments folded in the parameter scope of the module currently under
-  // constraint validation (Elaborator::AdoptProceduralTypedefDims).
   ScopeMap procedural_typedef_scope_;
 };
 

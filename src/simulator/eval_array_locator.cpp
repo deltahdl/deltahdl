@@ -25,9 +25,6 @@ namespace delta {
 
 bool IsStringArray(std::string_view var_name, const ArrayInfo& info,
                    SimContext& ctx) {
-  // §7.12.1 with §6.16: an array declared of string elements holds strings,
-  // which its with clause compares lexicographically, whatever its first
-  // element's variable was registered as.
   if (info.elem_type_kind == DataTypeKind::kString) return true;
   if (info.is_dynamic) return ctx.IsStringVariable(var_name);
   auto name = std::string(var_name) + "[" + std::to_string(info.lo) + "]";
@@ -49,19 +46,10 @@ struct LocatorCtx {
   Arena& arena;
   std::string_view iter_name = "item";
   std::string idx_var_name = "item.index";
-  // §7.4.4: the multidimensional fixed-size array whose elements are the
-  // subarrays the iterator is bound to, and its shape; null for an array
-  // whose elements are values.
   std::string_view subarray_owner = {};
   const ArrayInfo* subarray_info = nullptr;
-  // §7.10: the queue or dynamic array whose elements are queues or fixed-size
-  // arrays, each of which the iterator is bound to; null for any other array.
   const QueueObject* element_queue_owner = nullptr;
-  // §7.12.4 with §7.4.2: the index of the first element, a fixed-size array's
-  // low bound, which every reported index and the index iterator count from.
   uint32_t index_base = 0;
-  // §7.12.1 with §7.4.2: whether the array's range was declared from the high
-  // index down, which puts its leftmost element at the end of `elems`.
   bool is_descending = false;
 };
 
@@ -78,12 +66,6 @@ static LocatorCtx MakeLocatorCtx(const std::vector<Logic4Vec>& elems,
                     std::move(names.idx_var_name)};
 }
 
-// Pushes a fresh scope and binds the per-iteration locator iterators: the
-// element iterator (item_val, optionally registered as a string, and signed
-// where the element type is, §7.12 with §6.11, or the subarray at item_index
-// of a multidimensional array, §7.4.4) and the index iterator (item_index,
-// 32-bit). The caller is responsible for evaluating the with expression in
-// this scope and calling PopScope afterwards.
 static void SetupLocatorScope(const LocatorCtx& lc, const Logic4Vec& item_val,
                               size_t item_index) {
   lc.ctx.PushScope();
@@ -121,11 +103,6 @@ static Logic4Vec EvalLocatorWithExpr(const LocatorCtx& lc,
   return result;
 }
 
-// §7.12.1: whether the first- or last-finding locator `method` scans from the
-// highest index down. The first element is the one closest to the leftmost
-// index and the last the one closest to the rightmost, which are the lowest
-// and highest indices of an ascending range and the other way round for a
-// descending one.
 static bool ScansFromHighEnd(std::string_view method, const LocatorCtx& lc) {
   bool is_last = method == "find_last" || method == "find_last_index";
   return is_last != lc.is_descending;
@@ -194,8 +171,6 @@ static void LocatorUnique(const std::vector<Logic4Vec>& elems, Arena&,
   }
 }
 
-// unique_index without a with clause: the index of the first element of each
-// distinct value, counted from `index_base` (§7.12.4 with §7.4.2).
 static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
                                uint32_t index_base, Arena& arena,
                                std::vector<Logic4Vec>& out) {
@@ -216,9 +191,6 @@ static void LocatorUniqueIndex(const std::vector<Logic4Vec>& elems,
   }
 }
 
-// §7.12.1 with §6.11: the element whose value, or whose with expression's
-// value, is least for min() and greatest for max(), the first of several equal
-// ones, ordered by the signedness of the element type or of the expression.
 static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
                           std::vector<Logic4Vec>& out) {
   if (lc.elems.empty()) return;
@@ -237,9 +209,6 @@ static void LocatorMinMax(std::string_view method, const LocatorCtx& lc,
   out.push_back(lc.elems[best_idx]);
 }
 
-// De-duplicates by the value of the with expression. For each first-seen
-// distinct with-value, pushes either the matching element (use_index=false) or
-// its index as a 32-bit value (use_index=true).
 static void DedupeLocatorResults(const LocatorCtx& lc, bool use_index,
                                  std::vector<Logic4Vec>& out) {
   std::vector<uint64_t> seen;
@@ -263,18 +232,14 @@ static void DedupeLocatorResults(const LocatorCtx& lc, bool use_index,
 
 static void LocatorUniqueWith(const LocatorCtx& lc,
                               std::vector<Logic4Vec>& out) {
-  DedupeLocatorResults(lc, /*use_index=*/false, out);
+  DedupeLocatorResults(lc, false, out);
 }
 
 static void LocatorUniqueIndexWith(const LocatorCtx& lc,
                                    std::vector<Logic4Vec>& out) {
-  DedupeLocatorResults(lc, /*use_index=*/true, out);
+  DedupeLocatorResults(lc, true, out);
 }
 
-// The receiver's name and the method of the locator `expr`, the call
-// `recv.method(...)` or the bare member access `recv.method with (...)`.
-// §26.3 admits a package-qualified array as the receiver, `p::a.find(...)`,
-// by the "p.a" key ExtractHandleAccessParts answers.
 static bool ExtractLocatorParts(const Expr* expr, Arena& arena,
                                 MethodCallParts& out) {
   if (expr->kind == ExprKind::kMemberAccess)
@@ -282,9 +247,6 @@ static bool ExtractLocatorParts(const Expr* expr, Arena& arena,
   return ExtractHandleMethodCallParts(expr, arena, out);
 }
 
-// The receiver of the locator call `expr`, in either of its spellings -- the
-// call `recv.method(...)` and the bare member access `recv.method with (...)`
-// -- or null for an expression of another shape.
 static const Expr* LocatorReceiver(const Expr* expr) {
   const Expr* access = expr->kind == ExprKind::kCall ? expr->lhs : expr;
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||
@@ -295,13 +257,6 @@ static const Expr* LocatorReceiver(const Expr* expr) {
   return access->lhs;
 }
 
-// §7.12: the associative array a locator or map call is on, whatever names it
-// -- a declared array by its bare name, or a property of an object (§8.5): the
-// running method's own by its bare name (§8.11) or any object's through a
-// handle -- as FindAssocArrayOfBase resolves it. `parts` receives the method
-// name, and the receiver's name where the receiver is a bare one. Null where
-// the method is no locator, so that no receiver of another method is
-// evaluated here, or the receiver names no associative array.
 static AssocArrayObject* LocatorAssocReceiver(const Expr* expr,
                                               MethodCallParts& parts,
                                               SimContext& ctx, Arena& arena) {
@@ -314,11 +269,6 @@ static AssocArrayObject* LocatorAssocReceiver(const Expr* expr,
   return FindAssocArrayOfBase(receiver, ctx, arena);
 }
 
-// Holds the per-entry state shared by the associative-array locator helpers:
-// the source keys/values, the iterator-binding context, and the index-type
-// width. It also caches the small lambdas (key vector builder, with-expr
-// evaluator, match predicate, and sort key) so each dispatch arm reads the same
-// way as the indexed-array path.
 struct AssocLocatorState {
   const std::vector<Logic4Vec>& keys;
   const std::vector<Logic4Vec>& vals;
@@ -328,8 +278,6 @@ struct AssocLocatorState {
   Arena& arena;
 
   Logic4Vec KeyVec(size_t i) const { return keys[i]; }
-  // Evaluates the with expression for entry i, binding the element iterator to
-  // the value and the index iterator to the key, a string for a string index.
   Logic4Vec EvalWith(size_t i) const {
     ctx.PushScope();
     auto* item_var =
@@ -343,16 +291,11 @@ struct AssocLocatorState {
     return r;
   }
   bool Matches(size_t i) const { return EvalWith(i).ToUint64() != 0; }
-  // The value min() and max() order entry i by: its with expression's where
-  // there is one, and its own where there is not.
   Logic4Vec OrderValue(size_t i) const {
     return lc.with_expr ? EvalWith(i) : vals[i];
   }
 };
 
-// Forward scan over every entry, pushing the projection of each matching entry.
-// Used by the "find all" (no break) and "find first" (break) arms; the latter
-// passes stop_after_first=true.
 static void AssocScanForward(const AssocLocatorState& st, bool stop_after_first,
                              Logic4Vec (*project)(const AssocLocatorState&,
                                                   size_t),
@@ -364,7 +307,6 @@ static void AssocScanForward(const AssocLocatorState& st, bool stop_after_first,
     }
 }
 
-// Reverse scan, pushing the projection of the last matching entry only.
 static void AssocScanLast(const AssocLocatorState& st,
                           Logic4Vec (*project)(const AssocLocatorState&,
                                                size_t),
@@ -388,10 +330,10 @@ static void AssocLocatorFind(std::string_view method,
                              const AssocLocatorState& st,
                              std::vector<Logic4Vec>& out) {
   if (method == "find") {
-    AssocScanForward(st, /*stop_after_first=*/false, ProjectVal, out);
+    AssocScanForward(st, false, ProjectVal, out);
   } else if (method == "find_first") {
-    AssocScanForward(st, /*stop_after_first=*/true, ProjectVal, out);
-  } else {  // find_last
+    AssocScanForward(st, true, ProjectVal, out);
+  } else {
     AssocScanLast(st, ProjectVal, out);
   }
 }
@@ -400,10 +342,10 @@ static void AssocLocatorFindIndex(std::string_view method,
                                   const AssocLocatorState& st,
                                   std::vector<Logic4Vec>& out) {
   if (method == "find_index") {
-    AssocScanForward(st, /*stop_after_first=*/false, ProjectKey, out);
+    AssocScanForward(st, false, ProjectKey, out);
   } else if (method == "find_first_index") {
-    AssocScanForward(st, /*stop_after_first=*/true, ProjectKey, out);
-  } else {  // find_last_index
+    AssocScanForward(st, true, ProjectKey, out);
+  } else {
     AssocScanLast(st, ProjectKey, out);
   }
 }
@@ -413,7 +355,6 @@ static void AssocLocatorMinMax(std::string_view method,
                                std::vector<Logic4Vec>& out) {
   const auto& vals = st.vals;
   if (vals.empty()) return;
-  // §7.12.1 with §6.11: ordered as LocatorMinMax orders an indexed array's.
   size_t best = 0;
   Logic4Vec best_key = st.OrderValue(0);
   for (size_t i = 1; i < vals.size(); ++i) {
@@ -446,9 +387,6 @@ static void AssocLocatorUnique(std::string_view method,
   }
 }
 
-// Dispatches a single associative-array locator method to its dedicated helper.
-// Returns false for any method name that is not a 7.12.1 locator (mirroring the
-// indexed-array fall-through), true otherwise.
 static bool DispatchAssocLocator(std::string_view method,
                                  const AssocLocatorState& st,
                                  std::vector<Logic4Vec>& out) {
@@ -467,16 +405,6 @@ static bool DispatchAssocLocator(std::string_view method,
   return true;
 }
 
-// §7.12.1 — array locator methods over an associative array. Two rules differ
-// from the indexed-array case: index locators (find_index/.../unique_index)
-// return a queue of the *index type* holding the matching keys rather than a
-// queue of int holding 0-based positions; and "first"/"last" are the entries
-// with the smallest/largest index (the first()/last() ordering of 7.9), which a
-// std::map gives for free by visiting keys in ascending order, for integral
-// and string keys alike.
-// Emits the mandatory-with-clause diagnostic for the associative-array find*
-// locators. Returns false (with an error raised) when a with clause is required
-// but absent; true otherwise.
 static bool CheckAssocWithClauseRequired(std::string_view method,
                                          const Expr* expr, SimContext& ctx) {
   const bool kNeedsWith = method == "find" || method == "find_index" ||
@@ -511,23 +439,12 @@ void CollectAssocKeyVals(const AssocArrayObject& aa, Arena& arena,
   }
 }
 
-// §7.12.1 — the evaluation environment shared by every array locator entry
-// point: the method-call expression (which carries the optional with clause),
-// the simulator context the iterators are bound in, and the arena that backs
-// the freshly built result vectors. Bundled so the locator helpers stay at or
-// below the parameter cap while still naming a single domain object.
 struct LocatorEnv {
   const Expr* expr;
   SimContext& ctx;
   Arena& arena;
 };
 
-// §7.12.1 — the indexed-array subject of a locator query: the collapsed element
-// vector and whether those elements are strings, evaluated inside a LocatorEnv.
-// The indexed locator family (unique/unique_index/min/max and find*) all act on
-// exactly this object, so they share one struct. `var_name` and `info` name
-// the array and its shape, which a multidimensional array's subarray
-// elements are bound from (§7.4.4).
 struct IndexedLocatorInput {
   LocatorEnv env;
   const std::vector<Logic4Vec>& elems;
@@ -536,8 +453,6 @@ struct IndexedLocatorInput {
   const ArrayInfo& info;
 };
 
-// §7.10: the queue or dynamic array `name` names, where `info` describes one
-// and its elements are queues or fixed-size arrays; null otherwise.
 static const QueueObject* QueueOfQueuesNamed(std::string_view name,
                                              const ArrayInfo& info,
                                              SimContext& ctx) {
@@ -546,10 +461,6 @@ static const QueueObject* QueueOfQueuesNamed(std::string_view name,
   return q != nullptr && q->elements_are_queues ? q : nullptr;
 }
 
-// The iterator context of the indexed locator `in`, its indices counted from
-// the array's low bound and its iterator bound to each subarray where the
-// array's elements are subarrays, or to each element's queue where they are
-// queues or fixed-size arrays kept as queues.
 static LocatorCtx MakeIndexedLocatorCtx(const IndexedLocatorInput& in) {
   const LocatorEnv& env = in.env;
   LocatorCtx lc =
@@ -569,7 +480,7 @@ static bool TryCollectAssocLocatorResult(const LocatorEnv& env,
                                          AssocArrayObject& aa,
                                          std::vector<Logic4Vec>& out) {
   std::string_view method = parts.method_name;
-  if (method == "map") return false;  // not a 7.12.1 locator method
+  if (method == "map") return false;
 
   if (!CheckAssocWithClauseRequired(method, env.expr, env.ctx)) return false;
 
@@ -577,18 +488,11 @@ static bool TryCollectAssocLocatorResult(const LocatorEnv& env,
   std::vector<Logic4Vec> vals;
   CollectAssocKeyVals(aa, env.arena, keys, vals);
 
-  LocatorCtx lc =
-      MakeLocatorCtx(vals, /*is_str=*/false, env.expr, env.ctx, env.arena);
+  LocatorCtx lc = MakeLocatorCtx(vals, false, env.expr, env.ctx, env.arena);
   AssocLocatorState st{keys, vals, lc, aa.is_string_key, env.ctx, env.arena};
   return DispatchAssocLocator(method, st, out);
 }
 
-// Handles the indexed-array locators whose with clause is optional (unique,
-// unique_index, min, max): builds the iterator context only when a with clause
-// is present and routes to the matching helper. Sets *handled when the method
-// is one of these and returns the result the caller should propagate.
-// unique: dedupe by with-value when a with clause is present, otherwise by the
-// element value itself.
 static void RunIndexedUnique(const IndexedLocatorInput& in,
                              std::vector<Logic4Vec>& out) {
   const LocatorEnv& env = in.env;
@@ -600,7 +504,6 @@ static void RunIndexedUnique(const IndexedLocatorInput& in,
   }
 }
 
-// unique_index: same dedupe rule as unique, but emits indices.
 static void RunIndexedUniqueIndex(const IndexedLocatorInput& in,
                                   std::vector<Logic4Vec>& out) {
   const LocatorEnv& env = in.env;
@@ -640,15 +543,8 @@ static bool TryIndexedOptionalWithLocator(std::string_view method,
   return false;
 }
 
-// Emits the mandatory-with-clause diagnostics for the indexed-array locators
-// that have no value without a predicate (map and the find* family). Returns
-// false when an error was raised so the caller can short-circuit; returns true
-// when the with clause is present and evaluation may proceed.
 static bool CheckIndexedWithClauseRequired(std::string_view method,
                                            const Expr* expr, SimContext& ctx) {
-  // §7.12.5 — map() replaces each element with the value of its with clause,
-  // and that clause is required: there is nothing to evaluate without it, so a
-  // bare map() is illegal rather than a silent no-op.
   if (method == "map" && !expr->with_expr) {
     ctx.GetDiag().ErrorOnce(expr->range.start,
                             "array method 'map' requires a 'with' clause",
@@ -657,10 +553,6 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
   }
 
   if (!expr->with_expr) {
-    // §7.12.1 — the with clause is mandatory for the element- and
-    // index-finding locators; it carries the Boolean predicate they filter on.
-    // A bare find* call is illegal, so flag it instead of silently yielding
-    // nothing.
     if (method == "find" || method == "find_index" || method == "find_first" ||
         method == "find_first_index" || method == "find_last" ||
         method == "find_last_index") {
@@ -674,10 +566,6 @@ static bool CheckIndexedWithClauseRequired(std::string_view method,
   return true;
 }
 
-// §7.12.1 — locator methods operate on any unpacked array, which includes a
-// queue (§7.10). A queue carries no ArrayInfo of its own, so it is described as
-// a dynamic array; the element-collection path then reads its elements from the
-// queue store keyed by the same name.
 static bool DescribeQueueAsArray(std::string_view name, SimContext& ctx,
                                  ArrayInfo& queue_info) {
   auto* q = ctx.FindQueue(name);
@@ -687,7 +575,6 @@ static bool DescribeQueueAsArray(std::string_view name, SimContext& ctx,
   return true;
 }
 
-// §7.12.1/§7.12.5 — run the named locator (or map) over the collapsed elements.
 static void DispatchIndexedLocator(std::string_view method,
                                    const LocatorCtx& lc,
                                    std::vector<Logic4Vec>& out) {
@@ -703,8 +590,6 @@ static void DispatchIndexedLocator(std::string_view method,
   LocatorFindDispatch(method, lc, out);
 }
 
-// The offsets 0 to `count` - 1, one for each element of an array whose
-// elements are arrays.
 static std::vector<Logic4Vec> SubarrayOffsets(size_t count, Arena& arena) {
   std::vector<Logic4Vec> offsets;
   offsets.reserve(count);
@@ -713,12 +598,6 @@ static std::vector<Logic4Vec> SubarrayOffsets(size_t count, Arena& arena) {
   return offsets;
 }
 
-// The element list a locator over the array `name` walks: each element's
-// value, or, where the elements are arrays that no one value holds -- the
-// subarrays of a multidimensional array (§7.4.4) and the queues or
-// fixed-size arrays of a queue or dynamic array (§7.10) -- each element's
-// offset, which a locator that returns elements returns for
-// TryCollectLocatorRows to read the elements by.
 static std::vector<Logic4Vec> LocatorElements(std::string_view name,
                                               const ArrayInfo& info,
                                               SimContext& ctx, Arena& arena) {
@@ -729,10 +608,6 @@ static std::vector<Logic4Vec> LocatorElements(std::string_view name,
   return CollectVecElements(name, info, ctx, arena);
 }
 
-// §7.12.1 with §7.4.4: `parts` for a locator on a subarray select of a
-// multidimensional array, `m[1].min()`, named by the prefix its elements'
-// names extend, and the subarray's shape in `sub`; false for any other call,
-// whose receiver's indexes are left unevaluated.
 static bool SubarrayLocatorParts(const Expr* expr, SimContext& ctx,
                                  Arena& arena, MethodCallParts& parts,
                                  ArrayInfo& sub) {
@@ -753,8 +628,6 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::vector<Logic4Vec>& out) {
   MethodCallParts parts;
   ArrayInfo sub;
-  // A property reached through a handle has no bare name to extract, so the
-  // associative receiver is asked for first, by expression.
   AssocArrayObject* aa = LocatorAssocReceiver(expr, parts, ctx, arena);
   const bool kSubarray =
       aa == nullptr && SubarrayLocatorParts(expr, ctx, arena, parts, sub);
@@ -769,13 +642,8 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
     return false;
   }
 
-  // §7.12 with §7.2: the iterator of every locator's with clause, optional or
-  // required, over an associative or an indexed array, reads the members of
-  // the structure element it holds.
   IteratorLayout layout(ExtractIterNames(expr).iter_name, parts.var_name, ctx);
 
-  // Associative arrays are stored separately and honor index-type returns
-  // and key ordering through a dedicated path.
   if (aa != nullptr)
     return TryCollectAssocLocatorResult(LocatorEnv{expr, ctx, arena}, parts,
                                         *aa, out);
@@ -804,17 +672,11 @@ static bool CollectLocatorResult(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §7.12.1: the locators that return elements of the array rather than their
-// indices or the values of a with clause.
 static bool ReturnsElements(std::string_view method) {
   return method == "find" || method == "find_first" || method == "find_last" ||
          method == "min" || method == "max" || method == "unique";
 }
 
-// Every locator that returns elements needs a with clause to select rows, as
-// the find family requires one and the relational operators min, max and
-// unique would otherwise order by are not defined for an unpacked array; a
-// call without one is left to the path that reports it.
 bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
                            LocatorRows& out) {
   MethodCallParts parts;
@@ -836,8 +698,6 @@ bool TryCollectLocatorRows(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §7.12.1 with §8.5: a locator on a queue property, `h.q.find with (...)` or
-// a bare `q` in a method, is run on the queue QueuePropertyReceiver names.
 bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::vector<Logic4Vec>& out) {
   if (CollectLocatorResult(expr, ctx, arena, out)) return true;
@@ -851,11 +711,6 @@ bool TryCollectLocatorResult(const Expr* expr, SimContext& ctx, Arena& arena,
          CollectLocatorResult(receiver.Call(), ctx, arena, out);
 }
 
-// Maps a string-keyed associative source: preserves the string key set and
-// replaces each stored value with the with expression, binding the element
-// iterator to the value and the index iterator to the key string (so a with
-// expression may reference either). Split out so the integer- and string-keyed
-// index types each read straightforwardly.
 static void MapStringKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
                                 const AssocArrayObject& aa,
                                 AssocArrayObject& out) {
@@ -876,8 +731,6 @@ static void MapStringKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
   }
 }
 
-// Maps an integer-keyed associative source, binding the element iterator to the
-// stored value and the index iterator to the key at the source's index width.
 static void MapIntKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
                              const AssocArrayObject& aa,
                              AssocArrayObject& out) {
@@ -897,14 +750,6 @@ static void MapIntKeyedAssoc(const LocatorEnv& env, const LocatorCtx& lc,
   }
 }
 
-// §7.12.5 — map() over an associative array. Unlike the locator methods, map
-// does not collapse the array to a queue: it produces an associative array
-// whose set of index values and index type match the source, with each stored
-// value replaced by the value of the with expression. The with clause is
-// required, and each result element takes the self-determined type of that
-// expression (carried by the width of the evaluated value). Both integer- and
-// string-keyed index types are handled; the returned array carries the source's
-// key set and index type unchanged.
 bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
                               AssocArrayObject& out) {
   MethodCallParts parts;
@@ -918,8 +763,6 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
     return false;
   }
 
-  // The returned array's range and index type match the source: carry over the
-  // index metadata and reuse the source keys unchanged.
   out.index_width = aa->index_width;
   out.is_index_signed = aa->is_index_signed;
   out.is_wildcard = aa->is_wildcard;
@@ -931,14 +774,14 @@ bool TryCollectAssocMapResult(const Expr* expr, SimContext& ctx, Arena& arena,
   if (aa->is_string_key) {
     vals.reserve(aa->str_data.size());
     for (const auto& [k, v] : aa->str_data) vals.push_back(v);
-    LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
+    LocatorCtx lc = MakeLocatorCtx(vals, false, expr, ctx, arena);
     MapStringKeyedAssoc(LocatorEnv{expr, ctx, arena}, lc, *aa, out);
     return true;
   }
 
   vals.reserve(aa->int_data.size());
   for (const auto& [k, v] : aa->int_data) vals.push_back(v);
-  LocatorCtx lc = MakeLocatorCtx(vals, /*is_str=*/false, expr, ctx, arena);
+  LocatorCtx lc = MakeLocatorCtx(vals, false, expr, ctx, arena);
   MapIntKeyedAssoc(LocatorEnv{expr, ctx, arena}, lc, *aa, out);
   return true;
 }

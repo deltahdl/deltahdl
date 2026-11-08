@@ -21,9 +21,6 @@ namespace delta {
 bool DeclaresAVirtualInterface(const DataType& type, const SimContext& ctx) {
   if (type.kind == DataTypeKind::kVirtualInterface) return true;
   if (type.kind != DataTypeKind::kNamed) return false;
-  // The key the elaborated table records a typedef under, which
-  // DeclaredTypeWidth in evaluation_literal.cpp forms the same way: the bare
-  // name, or `scope::name` for one reached through a package or class scope.
   std::string key =
       type.scope_name.empty()
           ? std::string(type.type_name)
@@ -31,8 +28,6 @@ bool DeclaresAVirtualInterface(const DataType& type, const SimContext& ctx) {
   return ctx.FindTypeKind(key) == DataTypeKind::kVirtualInterface;
 }
 
-// §8.10: a static property is the class's own, read from the class that
-// declares it whichever class the running method belongs to.
 static uint64_t StaticPropertyHandle(const ClassTypeInfo* scope,
                                      std::string_view name) {
   for (const auto* t = scope; t != nullptr; t = t->parent) {
@@ -42,12 +37,6 @@ static uint64_t StaticPropertyHandle(const ClassTypeInfo* scope,
   return kNullVirtualInterface;
 }
 
-// §8.15: an instance property is read against the class the running method is
-// defined in, so a base method reads the base declaration even where a derived
-// class shadows the name, as EvalIdentifierClassScope in evaluation.cpp reads
-// any other property by its bare name. With no such class, `name` is read
-// against the object's own type, which is how a property of an object reached
-// through a handle is read.
 static uint64_t InstancePropertyHandle(const ClassObject* self,
                                        const ClassTypeInfo* method_cls,
                                        std::string_view name, Arena& arena) {
@@ -58,9 +47,6 @@ static uint64_t InstancePropertyHandle(const ClassObject* self,
   return held.ToUint64();
 }
 
-// §25.9: the property `name` of `scope`, when the class declares it a virtual
-// interface: static ones read from the class, instance ones from `self`
-// against `method_cls`.
 static VirtualInterfaceBase PropertyBase(const ClassTypeInfo* scope,
                                          const ClassObject* self,
                                          const ClassTypeInfo* method_cls,
@@ -76,9 +62,6 @@ static VirtualInterfaceBase PropertyBase(const ClassTypeInfo* scope,
   return base;
 }
 
-// §7: whether the variable `name` is a container -- an array, a queue or an
-// associative array -- whose elements, not the variable itself, are what a
-// declaration with virtual interface elements makes virtual interfaces.
 static bool NamesAContainer(std::string_view name, SimContext& ctx) {
   return ctx.FindArrayInfo(name) != nullptr || ctx.FindQueue(name) != nullptr ||
          ctx.FindAssocArray(name) != nullptr;
@@ -102,26 +85,14 @@ VirtualInterfaceBase ResolveVirtualInterfaceBase(std::string_view name,
   return PropertyBase(scope, self, method_cls, name, arena);
 }
 
-// §8.3: whether property `name` of `type` is declared with a class type and
-// so holds a handle to an object. A virtual interface property holds a handle
-// of another kind, issued from another table, and a structure-typed property
-// holds a value, so neither denotes an object whatever its value is.
 static bool HoldsAClassHandle(const ClassTypeInfo* type, std::string_view name,
                               SimContext& ctx) {
   std::string_view class_name = MemberClassTypeName(type, name);
   return !class_name.empty() && ctx.FindClassType(class_name) != nullptr;
 }
 
-// §8.3: the object a bare name denotes when it holds a class handle: `this`
-// is the object the running method runs on (§8.11); a variable of the running
-// scope declared with a class type holds a handle to one; and, where no
-// variable answers the name, a class-typed property of the running method's
-// object does. A virtual interface holds a handle of another kind, so a name
-// declared so denotes no object here, whatever its value.
 static const ClassObject* ObjectOfName(std::string_view name, SimContext& ctx,
                                        Arena& arena) {
-  // §8.15: `super` denotes the same object, its members looked up from the
-  // base of the running method's class (ResolveVirtualInterfaceBaseExpr).
   if (name == "this" || name == "super") return ctx.CurrentThis();
   if (const Variable* var = ctx.FindVariable(name); var != nullptr) {
     if (var->is_virtual_interface || ctx.GetVariableClassType(name).empty())
@@ -135,11 +106,6 @@ static const ClassObject* ObjectOfName(std::string_view name, SimContext& ctx,
       InstancePropertyHandle(self, ctx.CurrentMethodClass(), name, arena));
 }
 
-// §8.3: the object an expression denotes when it holds a class handle: a
-// bare name as ObjectOfName reads it, or a member access `h.p` with `h` an
-// object and `p` a class-typed property of it, followed as deep as the
-// expression goes. nullptr for an expression of any other shape, for a
-// property that is no class handle, and for a null handle.
 static const ClassObject* ObjectOf(const Expr* e, SimContext& ctx,
                                    Arena& arena) {
   if (e == nullptr) return nullptr;
@@ -156,10 +122,6 @@ static const ClassObject* ObjectOf(const Expr* e, SimContext& ctx,
       InstancePropertyHandle(holder, nullptr, e->rhs->text, arena));
 }
 
-// §7 with §25.9: the element `select` picks out of a container whose
-// elements are virtual interfaces holds the handle of the instance it
-// represents, read by evaluating the select; an element holding an unknown
-// bit represents none.
 static VirtualInterfaceBase SelectedElementBase(const Expr* select,
                                                 SimContext& ctx, Arena& arena) {
   if (select->index_end != nullptr) return {};
@@ -181,8 +143,6 @@ static VirtualInterfaceBase SelectedElementBase(const Expr* select,
   return base;
 }
 
-// §8.23: `C::p` names the static property p of the class C, which a
-// virtual interface declared so holds once for the class.
 static VirtualInterfaceBase ClassScopedBase(const Expr* base, SimContext& ctx,
                                             Arena& arena) {
   if (base->lhs == nullptr || base->lhs->kind != ExprKind::kIdentifier ||
@@ -212,12 +172,6 @@ VirtualInterfaceBase ResolveVirtualInterfaceBaseExpr(const Expr* base,
   }
   const ClassObject* holder = ObjectOf(base->lhs, ctx, arena);
   if (holder == nullptr) return {};
-  // §8.15: `this.p` names the property as the running method's class
-  // declares it, which is what a bare `p` in the same method names; a
-  // property of any other object is read against that object's own type.
-  // `super.p` names it as the base of that class declares it, and read
-  // against the running method's class instead, `super.vif.a` found no
-  // `vif` and read 0 where `this.vif.a` read the member.
   const ClassTypeInfo* method_cls =
       holder == ctx.CurrentThis() ? ctx.CurrentMethodClass() : nullptr;
   if (method_cls != nullptr && base->lhs->kind == ExprKind::kIdentifier &&
@@ -270,9 +224,6 @@ uint64_t VirtualInterfaceOperandHandle(const Expr* operand, SimContext& ctx,
   return EvalExpr(operand, ctx, arena).ToUint64();
 }
 
-// Whether the path `expr` starts at a name that holds storage of the running
-// scope rather than at an instance, a generate block or a top: a variable,
-// an array, a net or a property of the class whose method is running.
 static bool PathHeadHoldsStorage(const Expr* expr, SimContext& ctx) {
   const Expr* head = expr;
   while (head != nullptr && (head->kind == ExprKind::kSelect ||

@@ -9,21 +9,6 @@
 namespace delta {
 namespace {
 
-// The table of encryption algorithm identifiers, in the order it lists them:
-// the identifier, whether every implementation provides the cipher behind it,
-// and the published cipher the identifier stands for.
-//
-// One identifier is marked required, so it is the one a tool may be handed a
-// block under without having been told anything about the tool that wrote it.
-// The rest are named here without being provided, which is what the optional
-// column allows: what the table asks of an implementation offering one of them
-// is that it offer it under this name rather than a name of its own.
-//
-// The list is the one §34.5.11 writes for the cipher a region's data are under.
-// §34.5.24 gives the cipher a region's keys are under no list of its own and
-// sends the reader to that one, so what is written once here answers for both
-// keywords -- a second copy would be a second place for the two to drift apart
-// in, and the standard gives them one set of values rather than two alike.
 constexpr ProtectEncryptionAlgorithm kProtectEncryptionAlgorithms[] = {
     {"des-cbc", true, "Data Encryption Standard in CBC mode, see FIPS 46-3"},
     {"3des-cbc", false,
@@ -61,9 +46,6 @@ std::span<const ProtectEncryptionAlgorithm> ProtectEncryptionAlgorithms() {
   return kProtectEncryptionAlgorithms;
 }
 
-// The values this keyword identifies a cipher by are the tabulated ones, that
-// being the whole of what the subclause says about which values it takes: it
-// admits the identifiers the other method keyword admits and adds none.
 bool IsProtectKeyMethodIdentifier(std::string_view identifier) {
   return RowOfEncryptionTable(identifier) != nullptr;
 }
@@ -73,23 +55,6 @@ bool IsRequiredProtectEncryptionAlgorithm(std::string_view identifier) {
   return row != nullptr && row->required;
 }
 
-// A directive that wrote the keyword with nothing against it named no cipher
-// any more than leaving the keyword out did, so nothing stands in effect in
-// either case and both are reported the same way.
-//
-// Nothing in a run asks this. §34.5.24.2 has a reader decrypt a key block under
-// the algorithm the identifier names, and this implementation opens one under
-// the single cipher it has whatever the envelope says. A block under any other
-// cipher fails to open and is passed over in silence, which §34.5.27.2 calls
-// for whatever the reason: several key blocks are alternative ways into one
-// envelope, so a block written for some other reader is not an error.
-//
-// An envelope this tool writes states the cipher its blocks are really under.
-// #3278 settled that: the same subclause has the identifier unchanged in the
-// output file and has the keys encrypted under the algorithm it names, and a
-// tool with one cipher cannot honour both for a region naming another, so
-// ReportUnprovidedKeyMethod (preprocessor/protect_processing.cpp) refuses such
-// a region rather than writing out an identifier its blocks contradict.
 ProtectKeywordValue ProtectKeyMethodInEffect(const ProtectKeywordScope& scope) {
   ProtectKeywordValue written = scope.ValueOf(kKeyMethodKeyword);
   if (!written.defaulted && !written.value.empty()) return written;

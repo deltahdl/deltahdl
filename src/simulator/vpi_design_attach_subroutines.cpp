@@ -33,14 +33,6 @@ namespace delta {
 
 namespace {
 
-// Where the tasks and functions of one scope are made: the scope object
-// holding them, null for the compilation unit where its data made none; the
-// flat name the made objects are keyed under; whether the scope's default
-// lifetime is automatic (§13.3.1, §13.4.2); the module of an instance, among
-// whose declarations a named type resolves, null for a package or the
-// compilation unit; the instance prefix a declared width's parameters are
-// read under; and the package, among whose declarations a named type
-// resolves, null for an instance or the compilation unit.
 struct SubroutineScope {
   VpiObject* scope;
   std::string key;
@@ -50,8 +42,6 @@ struct SubroutineScope {
   const PackageDecl* package = nullptr;
 };
 
-// What every task and function is made with: the design, the run a declared
-// width is evaluated in, the build, and the objects made so far.
 struct SubroutineBuild {
   const RtlirDesign& design;
   SimContext& ctx;
@@ -59,24 +49,16 @@ struct SubroutineBuild {
   VpiSubroutineObjects& made;
 };
 
-// Whether `item` declares a task or function, or imports one through DPI
-// (§35.5.4).
 bool IsSubroutine(const ModuleItem* item) {
   return item->kind == ModuleItemKind::kTaskDecl ||
          item->kind == ModuleItemKind::kFunctionDecl ||
          item->kind == ModuleItemKind::kDpiImport;
 }
 
-// Whether the task or function `item` declares or imports is a task.
 bool IsTask(const ModuleItem& item) {
   return item.kind == ModuleItemKind::kTaskDecl || item.dpi_is_task;
 }
 
-// §37.41 details 6 to 10: marks `tf` as the task or function the DPI import
-// or export declaration `decl` names, imported or exported, pure or context as
-// an import declares it (§35.5.1.3), of the flavor its specification string
-// names, and linking to the C name it writes or, where it writes none, to its
-// own name (§35.5.4).
 void MarkDpi(VpiObject* tf, const ModuleItem& decl) {
   tf->is_dpi = true;
   tf->dpi_export = decl.kind == ModuleItemKind::kDpiExport;
@@ -87,9 +69,6 @@ void MarkDpi(VpiObject* tf, const ModuleItem& decl) {
       std::string(decl.dpi_c_name.empty() ? decl.name : decl.dpi_c_name);
 }
 
-// §35.7: marks as exported each task or function of `scope` that an export
-// declaration among `items` names, an export naming one its own scope
-// declares.
 void MarkDpiExports(VpiObject* scope, const std::vector<ModuleItem*>& items) {
   for (const ModuleItem* item : items) {
     if (item->kind != ModuleItemKind::kDpiExport) continue;
@@ -101,29 +80,18 @@ void MarkDpiExports(VpiObject* scope, const std::vector<ModuleItem*>& items) {
   }
 }
 
-// §8.24: whether `item` is the body of a method written outside its class,
-// `C::name`, for a class `mod` declares. It defines a method of the class
-// (§37.31 detail 1) and declares no task or function of the module. A body a
-// module writes for a task of an interface port, `a.name` (§25.7.3), is the
-// module's own.
 bool DefinesClassMethod(const RtlirModule& mod, const ModuleItem* item) {
   return std::ranges::any_of(mod.class_decls, [item](const ClassDecl* decl) {
     return decl->name == item->method_class;
   });
 }
 
-// Whether `item` is a task or function one of `mod`'s generate blocks
-// declares (§27.4), which the elaborator lists among the module's own too.
 bool DeclaredInGenerateBlock(const RtlirModule& mod, const ModuleItem* item) {
   return std::ranges::any_of(
       mod.gen_block_subroutines,
       [item](const RtlirGenBlockSubroutine& sub) { return sub.decl == item; });
 }
 
-// §37.17 with §6.18: the object kind of a variable `where` declares with the
-// named type `type`, resolved among the declarations of the instance's module,
-// or of the package or the compilation unit, or of the package written before
-// the name (§26.3).
 int NamedVariableKind(const DataType& type, const SubroutineScope& where,
                       const RtlirDesign& design) {
   if (where.mod != nullptr && type.scope_name.empty()) {
@@ -133,8 +101,6 @@ int NamedVariableKind(const DataType& type, const SubroutineScope& where,
       design, where.package != nullptr ? where.package->name : "", type);
 }
 
-// §37.17 with §37.27: the object kind of a variable `where` declares with
-// `type`, an array var or a named event array where `unpacked`.
 int DeclaredVariableKind(const DataType& type, bool unpacked,
                          const SubroutineScope& where,
                          const RtlirDesign& design) {
@@ -145,8 +111,6 @@ int DeclaredVariableKind(const DataType& type, bool unpacked,
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiArrayVar;
 }
 
-// §37.12: the variable `name` of `kind` the task or function `tf` declares,
-// full-named under it, with its lifetime (§37.3.7).
 VpiObject* MakeVariable(VpiObject* tf, std::string_view name, int kind,
                         bool automatic, const VpiAttachBuild& build) {
   VpiObject* var = build.alloc();
@@ -155,16 +119,12 @@ VpiObject* MakeVariable(VpiObject* tf, std::string_view name, int kind,
   var->full_name = tf->full_name + "." + std::string(name);
   var->parent = tf;
   var->automatic = automatic;
-  // §37.3.7: an automatic variable is allocated with the frame of its call.
   var->alloc_scheme = VpiAllocSchemeFor(automatic ? VpiAllocKind::kFrameOrThread
                                                   : VpiAllocKind::kOther);
   tf->children.push_back(var);
   return var;
 }
 
-// §37.13 detail 1: the vpiDirection of an argument declared `direction`. The
-// parser gives an argument written without one the direction of the argument
-// before it, and the first such argument an input (§13.3).
 int ArgumentDirection(Direction direction) {
   switch (direction) {
     case Direction::kOutput:
@@ -178,9 +138,6 @@ int ArgumentDirection(Direction direction) {
   }
 }
 
-// §37.41 (figure): an io decl per argument `item` declares, in order, each
-// reaching through vpiExpr (§37.13) the variable the argument declares in the
-// task's or function's scope.
 void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
                  const SubroutineScope& where, const SubroutineBuild& sb) {
   for (const FunctionArg& arg : item.func_args) {
@@ -194,8 +151,6 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
         VpiVirtualInterfaceOf(sb.design, &arg.data_type, where.mod);
     AttachDeclaredRanges(var, arg.data_type, arg.unpacked_dims, sb.ctx,
                          sb.build);
-    // §37.13: the io decl reports the size, signing and shape of the variable
-    // it declares, which no RtlirVariable records for an argument.
     VpiRecordDeclaredShape(var, arg.data_type);
     if (arg.unpacked_dims.empty()) {
       var->size = static_cast<int>(DeclaredTypeWidth(arg.data_type, sb.ctx));
@@ -205,9 +160,6 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
     io_decl->name = var->name;
     io_decl->full_name = var->full_name;
     io_decl->parent = tf;
-    // §37.13 details 1 and 3: vpiRef for an argument passed by reference, its
-    // vpiExpr a ref obj whose actual is the variable (detail 2), and no
-    // direction for a virtual interface (§25.9).
     io_decl->direction =
         VpiIoDeclDirection(ArgumentDirection(arg.direction), false, false,
                            var->type == vpiVirtualInterfaceVar);
@@ -225,9 +177,6 @@ void MakeIoDecls(VpiObject* tf, const ModuleItem& item,
   }
 }
 
-// §37.41 (figure): the vpiFuncType of a function returning `type`, the kind
-// of value it returns. A type none of the Verilog kinds describes returns
-// another type.
 int FuncTypeOf(const DataType& type) {
   switch (type.kind) {
     case DataTypeKind::kInteger:
@@ -252,11 +201,6 @@ int FuncTypeOf(const DataType& type) {
   }
 }
 
-// §37.41 details 1 to 3 and 12: the variable a function holds its return
-// value in, of the function's own name and of the kind its return type
-// takes, which vpiReturn reaches; the function's vpiFuncType; and its
-// vpiSize, the variable's where the declaration determines it. A void
-// function returns nothing and has size 0.
 void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
                         const SubroutineScope& where,
                         const SubroutineBuild& sb) {
@@ -276,8 +220,6 @@ void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
   if (item.return_array_dims.empty()) {
     ret->size = static_cast<int>(DeclaredTypeWidth(type, sb.ctx));
   }
-  // The figure's vpiLeftRange and vpiRightRange: the bounds of the leftmost
-  // packed dimension the return type writes, none where it writes none.
   const PackedDims kDims = WrittenPackedDims(&type, sb.ctx);
   if (!kDims.empty()) {
     tf->left_range = VpiIntConstant(kDims.front().left, sb.build);
@@ -286,13 +228,9 @@ void MakeReturnVariable(VpiObject* tf, const ModuleItem& item,
   tf->return_var = ret;
   tf->func_type = FuncTypeOf(type);
   tf->decl_signed = type.is_signed;
-  tf->size =
-      VpiFunctionSize(/*is_void_function=*/false, ret->size != 0, ret->size);
+  tf->size = VpiFunctionSize(false, ret->size != 0, ret->size);
 }
 
-// §37.41 with §37.12: the variables the body of `item` declares, each
-// automatic where it is declared so, or declared without a lifetime in an
-// automatic task or function (§6.21).
 void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
                        const SubroutineScope& where,
                        const SubroutineBuild& sb) {
@@ -315,12 +253,6 @@ void MakeBodyVariables(VpiObject* tf, const ModuleItem& item,
   }
 }
 
-// §37.41 with §37.3.7, §13.3.1 and §13.4.2: the task or function `item`
-// stands as in `where`, named after it, full-named under the scope (detail 5
-// for a package's), automatic where it is declared so or declared without a
-// lifetime in a scope whose default is automatic, and holding its io decls,
-// its return variable and the variables its body declares. Answers the object
-// made.
 VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
                           const SubroutineBuild& sb) {
   VpiObject* tf = sb.build.alloc();
@@ -332,12 +264,9 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   if (item->kind == ModuleItemKind::kDpiImport) MarkDpi(tf, *item);
   where.scope->children.push_back(tf);
   sb.made[{item, where.key}] = tf;
-  // §37.3.3: where the task or function was written.
   VpiRecordWrittenLocation(tf, item->loc, sb.ctx);
-  // §37.83: the attributes it is written with.
   VpiAttachAttributes(tf, VpiNodeAttributes(where.mod, item), false, sb.ctx,
                       sb.build);
-  // A declared width or range reads the parameters of the scope declaring it.
   InstancePrefixOverride scope(sb.ctx.InstancePrefixOverride(), where.params);
   MakeIoDecls(tf, *item, where, sb);
   MakeReturnVariable(tf, *item, where, sb);
@@ -345,9 +274,6 @@ VpiObject* MakeSubroutine(const SubroutineScope& where, const ModuleItem* item,
   return tf;
 }
 
-// The tasks and functions the instance `scope` of `mod`, keyed under
-// `prefix`, declares, those of its generate blocks under the block instance
-// declaring them (§27.4), keyed under that block's full name.
 void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
                           VpiObject* scope, const std::string& prefix) {
   const bool kAutomatic = mod.is_automatic;
@@ -369,7 +295,6 @@ void MakeScopeSubroutines(const SubroutineBuild& sb, const RtlirModule& mod,
   MarkDpiExports(scope, mod.dpi_export_decls);
 }
 
-// The tasks and functions each module instance declares.
 void MakeInstanceSubroutines(const SubroutineBuild& sb,
                              const VpiObjectMap& objects) {
   WalkInstancePaths(
@@ -380,7 +305,6 @@ void MakeInstanceSubroutines(const SubroutineBuild& sb,
       });
 }
 
-// The tasks and functions each package declares, among its other items.
 void MakePackageSubroutines(const SubroutineBuild& sb,
                             const VpiObjectMap& objects) {
   for (const PackageDecl* pkg : sb.design.packages) {
@@ -392,8 +316,6 @@ void MakePackageSubroutines(const SubroutineBuild& sb,
                                  "",
                                  pkg};
     for (const ModuleItem* item : pkg->items) {
-      // §8.24: a package names no interface port, so a body written `C::name`
-      // in it is a method of its class C.
       if (IsSubroutine(item) && item->method_class.empty()) {
         MakeSubroutine(kWhere, item, sb);
       }
@@ -402,15 +324,11 @@ void MakePackageSubroutines(const SubroutineBuild& sb,
   }
 }
 
-// The tasks and functions each compilation unit declares or imports through
-// DPI (§35.5.4), each held by the scope object of the unit declaring it
-// (§3.12.1), which is one of its own for each file where each file is a unit.
 void MakeUnitSubroutines(const SubroutineBuild& sb,
                          const VpiObjectMap& objects) {
   for (const VpiUnitScope& at : VpiUnitScopes(sb.design, objects)) {
     const SubroutineScope kWhere{at.scope, "$unit", false, nullptr, ""};
     for (const ModuleItem* item : at.unit->cu_items) {
-      // §8.24: as in a package, a body written `C::name` is a method of C.
       if (IsSubroutine(item) && item->method_class.empty()) {
         MakeSubroutine(kWhere, item, sb)->in_compilation_unit = true;
       }
@@ -419,8 +337,6 @@ void MakeUnitSubroutines(const SubroutineBuild& sb,
   }
 }
 
-// The task or function `decls` declare under `name`, null where they declare
-// none.
 const ModuleItem* SubroutineNamed(const std::vector<ModuleItem*>& decls,
                                   std::string_view name) {
   for (const ModuleItem* decl : decls) {
@@ -429,8 +345,6 @@ const ModuleItem* SubroutineNamed(const std::vector<ModuleItem*>& decls,
   return nullptr;
 }
 
-// §35.5: the task or function `mod` imports through DPI under `name`, null
-// for none.
 const ModuleItem* DpiImportNamed(const RtlirModule& mod,
                                  std::string_view name) {
   for (const ModuleItem* item : mod.dpi_import_decls) {
@@ -439,10 +353,6 @@ const ModuleItem* DpiImportNamed(const RtlirModule& mod,
   return nullptr;
 }
 
-// §3.12.1 with §35.5.4: the task or function the compilation unit a site of
-// `mod` stands in declares or imports through DPI under `name`: the unit `mod`
-// was declared in where each file is a unit of its own, whose subroutines
-// alone its names reach, and otherwise the one unit; null for none.
 const ModuleItem* UnitSubroutineNamed(const RtlirDesign& design,
                                       const RtlirModule& mod,
                                       std::string_view name) {
@@ -453,16 +363,12 @@ const ModuleItem* UnitSubroutineNamed(const RtlirDesign& design,
   return unit == nullptr ? nullptr : SubroutineNamed(unit->cu_items, name);
 }
 
-// `decl` with the object made for it in the scope keyed `key`, null where
-// none was made there.
 VpiCalledSubroutine Called(const ModuleItem* decl, const std::string& key,
                            const VpiSubroutineObjects& made) {
   auto found = made.find({decl, key});
   return {decl, found == made.end() ? nullptr : found->second};
 }
 
-// §27.4: the task or function `name` of a generate block enclosing `site`,
-// the innermost block declaring one first, null where none does.
 VpiCalledSubroutine GenerateBlockSubroutine(const VpiCallSite& site,
                                             std::string_view name) {
   for (const VpiObject* scope = site.scope; scope != nullptr;
@@ -476,9 +382,6 @@ VpiCalledSubroutine GenerateBlockSubroutine(const VpiCallSite& site,
   return {};
 }
 
-// The task or function `name` the instance's module declares outside every
-// generate block, null where it declares none. The module's function_decls
-// hold its tasks and functions alone.
 const ModuleItem* InstanceSubroutine(const RtlirModule& mod,
                                      std::string_view name) {
   for (const ModuleItem* decl : mod.function_decls) {
@@ -489,9 +392,6 @@ const ModuleItem* InstanceSubroutine(const RtlirModule& mod,
   return nullptr;
 }
 
-// §23.4: the declaration whose body declares `decl` nested, among those `unit`
-// declares and the ones they nest at any depth; null for a declaration `unit`
-// declares at its top level.
 const ModuleDecl* EnclosingDecl(const CompilationUnit& unit,
                                 const ModuleDecl* decl) {
   std::vector<const ModuleDecl*> work;
@@ -542,9 +442,6 @@ VpiSubroutineObjects AttachSubroutines(const RtlirDesign& design,
                                        const VpiObjectMap& objects,
                                        SimContext& ctx,
                                        const VpiAttachBuild& build) {
-  // §37.41: each task and function a design declares is a task or function
-  // object of the instance, generate block or package declaring it. Nothing
-  // made one, so vpiTaskFunc reached none and no call reached what it calls.
   VpiSubroutineObjects made;
   const SubroutineBuild kBuild{design, ctx, build, made};
   MakeInstanceSubroutines(kBuild, objects);
@@ -560,8 +457,6 @@ void VpiMakeMethodContents(VpiObject* method, const ModuleItem& item,
   for (const PackageDecl* decl : where.design.packages) {
     if (decl->name == where.package) package = decl;
   }
-  // A method is reached through its class defn, so nothing files it among the
-  // tasks and functions a call finds by declaration.
   VpiSubroutineObjects unfiled;
   const SubroutineBuild kBuild{where.design, ctx, build, unfiled};
   const SubroutineScope kWhere{method->parent, "",           true,
@@ -589,9 +484,6 @@ VpiCalledSubroutine VpiPackageSubroutine(const RtlirDesign& design,
 
 namespace {
 
-// The module of the instance whose objects are keyed under `prefix`, reached
-// from the first top through the child each component names; null where a
-// component names no child, as a generate block's does.
 const RtlirModule* ModuleAtPrefix(const RtlirDesign& design,
                                   std::string_view prefix) {
   if (design.top_modules.empty()) return nullptr;
@@ -610,9 +502,6 @@ const RtlirModule* ModuleAtPrefix(const RtlirDesign& design,
   return mod;
 }
 
-// §23.8: the task or function `name` the module of an instance enclosing the
-// call's declares, the nearest first, up to the root of the hierarchy, with
-// the object made for it there; none where no enclosing module declares one.
 VpiCalledSubroutine EnclosingSubroutine(const VpiCallSite& site,
                                         std::string_view name) {
   std::string prefix = site.prefix;
@@ -627,11 +516,6 @@ VpiCalledSubroutine EnclosingSubroutine(const VpiCallSite& site,
   return {};
 }
 
-// §26.2 with §26.3: the packages a call of `name` standing in the package
-// `package` finds its callee among, in the order it looks: the package
-// itself, then the one each import it writes names, a named import of `name`
-// or a wildcard one, in the order written. A package refers to none of the
-// compilation unit's declarations (§26.2).
 std::vector<std::string_view> PackagesSearched(const RtlirDesign& design,
                                                std::string_view package,
                                                std::string_view name) {
@@ -649,8 +533,6 @@ std::vector<std::string_view> PackagesSearched(const RtlirDesign& design,
   return searched;
 }
 
-// The task or function `name` a call standing in a package reaches: the
-// first PackagesSearched names declares.
 VpiCalledSubroutine PackageVisibleSubroutine(const VpiCallSite& site,
                                              std::string_view name) {
   VpiCalledSubroutine called;
@@ -683,13 +565,9 @@ VpiCalledSubroutine VpiNamedSubroutine(const VpiCallSite& site,
         VpiPackageSubroutine(site.design, entry.package_name, name, site.made);
     if (called.decl != nullptr) return called;
   }
-  // §35.5.4: a task or function the module imports through DPI.
   if (const ModuleItem* found = DpiImportNamed(site.mod, name)) {
     return Called(found, site.prefix, site.made);
   }
-  // A generate block's task or function written where no block enclosing the
-  // call declares it still says what kind of call names it, though no task or
-  // function object stands for it there.
   if (const ModuleItem* local =
           SubroutineNamed(site.mod.function_decls, name)) {
     return {local, nullptr};

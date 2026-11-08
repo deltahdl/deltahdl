@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Section 9.4.5 — intra-assignment timing controls. The normative behaviour
-// lives entirely at the simulation stage: the right-hand expression is
-// evaluated when the assignment is encountered, the resulting value is held,
-// and the write to the left-hand side is postponed by the intra-assignment
-// delay or event control. These tests drive real source through the elaborator,
-// lowerer, and scheduler so that the production execution path (stmt_exec.cpp /
-// statement_assign_core.cpp) is the thing being observed.
-
-// --- Right-hand side evaluated before the delay (blocking, delay form) ------
-
 TEST(IntraAssignTimingSimulation, BlockingIntraDelayCapturesRhsBeforeDelay) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -32,8 +22,6 @@ TEST(IntraAssignTimingSimulation, BlockingIntraDelayCapturesRhsBeforeDelay) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // The value of b at statement time (10) is captured even though b is later
-  // mutated to 99 before the 5-tick delay elapses.
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
 
@@ -46,14 +34,12 @@ TEST(IntraAssignTimingSimulation, BlockingIntraDelayPostponesWrite) {
       "    a = 8'd0;\n"
       "    b = 8'd44;\n"
       "    a = #5 b;\n"
-      "    c = a;\n"  // runs only after the blocking delay; observes a == 44
+      "    c = a;\n"
       "  end\n"
       "endmodule\n",
       f);
   LowerRunAndCheck(f, design, {{"a", 44}, {"c", 44}});
 }
-
-// --- Right-hand side evaluated before the delay (nonblocking, delay form) ---
 
 TEST(IntraAssignTimingSimulation, NbaIntraAssignDelay) {
   SimFixture f;
@@ -78,8 +64,7 @@ TEST(IntraAssignTimingSimulation, NbaIntraDelayDoesNotBlock) {
       "  initial begin\n"
       "    b = 8'd10;\n"
       "    a <= #5 b;\n"
-      "    c = 8'd99;\n"  // a nonblocking intra-delay does not stall the
-                          // process
+      "    c = 8'd99;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -103,8 +88,6 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignDelayCapturesRhs) {
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 10u);
 }
-
-// --- Right-hand side evaluated before the event control --------------------
 
 TEST(IntraAssignTimingSimulation, BlockingIntraAssignEventCapturesRhs) {
   SimFixture f;
@@ -137,7 +120,7 @@ TEST(IntraAssignTimingSimulation, BlockingIntraAssignEventBlocks) {
       "    clk = 0;\n"
       "    b = 8'd20;\n"
       "    a = @(posedge clk) b;\n"
-      "    c = 8'd77;\n"  // blocked behind the event control
+      "    c = 8'd77;\n"
       "  end\n"
       "  initial #5 clk = 1;\n"
       "endmodule\n",
@@ -184,8 +167,6 @@ TEST(IntraAssignTimingSimulation, NbaIntraAssignEventDoesNotBlock) {
   LowerRunAndCheck(f, design, {{"a", 15}, {"c", 88}});
 }
 
-// --- repeat event control: delay by N occurrences of the event -------------
-
 TEST(IntraAssignTimingSimulation, BlockingRepeatEventWaitsNTimes) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -227,7 +208,6 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatEventCapturesRhs) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // The right-hand side is sampled once, when the assignment is encountered.
   EXPECT_EQ(a->value.ToUint64(), 25u);
 }
 
@@ -273,16 +253,8 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventDoesNotBlock) {
   LowerRunAndCheck(f, design, {{"a", 40}, {"c", 55}});
 }
 
-// --- repeat over a bare-signal event: any transition is counted ------------
-
 TEST(IntraAssignTimingSimulation, BlockingRepeatBareSignalCountsTransitions) {
   SimFixture f;
-  // §9.4.5's `repeat(num) @(clk)` example: with no posedge/negedge qualifier
-  // the event control fires on any transition of clk, and the repeat tallies
-  // each one until the count is reached. The count comes from a runtime
-  // variable, exactly as in the LRM example. Four transitions (two rising, two
-  // falling) are supplied; a posedge-only interpretation would see only two and
-  // never reach the count, so observing the write proves any transition counts.
   auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
@@ -296,19 +268,17 @@ TEST(IntraAssignTimingSimulation, BlockingRepeatBareSignalCountsTransitions) {
       "    a = repeat(num) @(clk) b;\n"
       "  end\n"
       "  initial begin\n"
-      "    #5 clk = 1;\n"  // transition 1
-      "    #5 clk = 0;\n"  // transition 2
-      "    #5 clk = 1;\n"  // transition 3
-      "    #5 clk = 0;\n"  // transition 4 => count reached, a <- 55
-      "    #5 clk = 1;\n"  // extra transition, no effect
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "    #5 clk = 1;\n"
+      "    #5 clk = 0;\n"
+      "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 55u);
 }
-
-// --- repeat count evaluated once, before scheduling ------------------------
 
 TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
   SimFixture f;
@@ -324,18 +294,15 @@ TEST(IntraAssignTimingSimulation, RepeatCountEvaluatedOnce) {
       "    a = repeat(n) @(posedge clk) b;\n"
       "  end\n"
       "  initial begin\n"
-      "    #1 n = 100;\n"  // changing n after scheduling has no effect
+      "    #1 n = 100;\n"
       "    #4 clk = 1; #5 clk = 0;\n"
       "    #5 clk = 1;\n"
       "  end\n"
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // Two posedges suffice because the count was fixed at 2 when encountered.
   EXPECT_EQ(a->value.ToUint64(), 33u);
 }
-
-// --- repeat count <= 0, unknown, or high-impedance => behave as no repeat ---
 
 TEST(IntraAssignTimingSimulation, RepeatCountZeroBypasses) {
   SimFixture f;
@@ -351,7 +318,6 @@ TEST(IntraAssignTimingSimulation, RepeatCountZeroBypasses) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // No clock edge ever arrives; with count 0 the assignment occurs at once.
   EXPECT_EQ(a->value.ToUint64(), 70u);
 }
 
@@ -377,14 +343,6 @@ TEST(IntraAssignTimingSimulation, RepeatCountNegativeBypasses) {
 TEST(IntraAssignTimingSimulation,
      RepeatCountUnsignedNegativeBitPatternDoesNotBypass) {
   SimFixture f;
-  // §9.4.5: whether a negative-looking count bypasses the repeat depends on the
-  // signedness of the count expression. The same bit pattern that reads as -3
-  // in a signed variable reads as a large positive count in an unsigned one, so
-  // the repeat must wait rather than assigning at once. Here `u` is an unsigned
-  // 8-bit logic holding 253; only a couple of clock edges are supplied, far
-  // fewer than the count, so the assignment never completes and `a` keeps its
-  // initial value. If the count were (wrongly) treated as signed, it would be
-  // <= 0 and the write of b would occur immediately.
   auto* a = RunAndFindVar(
       "module t;\n"
       "  logic clk;\n"
@@ -392,7 +350,7 @@ TEST(IntraAssignTimingSimulation,
       "  initial begin\n"
       "    clk = 0;\n"
       "    a = 8'd0;\n"
-      "    u = -3;\n"  // unsigned: bit pattern 8'hFD == 253
+      "    u = -3;\n"
       "    b = 8'd80;\n"
       "    a = repeat(u) @(posedge clk) b;\n"
       "  end\n"
@@ -403,7 +361,6 @@ TEST(IntraAssignTimingSimulation,
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // Still waiting for the 253rd edge; the assignment has not happened.
   EXPECT_EQ(a->value.ToUint64(), 0u);
 }
 
@@ -421,7 +378,6 @@ TEST(IntraAssignTimingSimulation, RepeatCountUnknownBypasses) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // An unknown count is treated as if there were no repeat construct.
   EXPECT_EQ(a->value.ToUint64(), 90u);
 }
 
@@ -439,11 +395,8 @@ TEST(IntraAssignTimingSimulation, RepeatCountHighZBypasses) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // A high-impedance count is treated as if there were no repeat construct.
   EXPECT_EQ(a->value.ToUint64(), 17u);
 }
-
-// --- repeat over an OR event list: each operand counted separately ---------
 
 TEST(IntraAssignTimingSimulation, RepeatCountsOrEdgesSeparatelyAtSameTime) {
   SimFixture f;
@@ -458,14 +411,12 @@ TEST(IntraAssignTimingSimulation, RepeatCountsOrEdgesSeparatelyAtSameTime) {
       "    a = repeat(2) @(posedge phi1 or negedge phi2) b;\n"
       "  end\n"
       "  initial begin\n"
-      "    #5 phi1 = 1;\n"  // posedge phi1 and ...
-      "    phi2 = 0;\n"  // ... negedge phi2 in the same time step => two events
+      "    #5 phi1 = 1;\n"
+      "    phi2 = 0;\n"
       "  end\n"
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // Both edges at the same simulation time are counted, so the count of two is
-  // reached and the held value is written. A single count would leave a at 0.
   EXPECT_EQ(a->value.ToUint64(), 44u);
 }
 
@@ -482,18 +433,14 @@ TEST(IntraAssignTimingSimulation, RepeatCountsAcrossOrListOverTime) {
       "    a = repeat(2) @(posedge x or posedge y) b;\n"
       "  end\n"
       "  initial begin\n"
-      "    #5 x = 1;\n"  // first occurrence
-      "    #5 y = 1;\n"  // second occurrence, different signal, later time
+      "    #5 x = 1;\n"
+      "    #5 y = 1;\n"
       "  end\n"
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
   EXPECT_EQ(a->value.ToUint64(), 66u);
 }
-
-// --- nonblocking repeat bypass: ≤0 / unknown / high-Z count, no repeat ------
-// These exercise the dedicated count==0 branch on the nonblocking path, which
-// is distinct from the blocking repeat path covered above.
 
 TEST(IntraAssignTimingSimulation, NbaRepeatCountZeroBypasses) {
   SimFixture f;
@@ -510,7 +457,6 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountZeroBypasses) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // No clock edge ever arrives; the nonblocking update is scheduled at once.
   EXPECT_EQ(a->value.ToUint64(), 70u);
 }
 
@@ -570,8 +516,6 @@ TEST(IntraAssignTimingSimulation, NbaRepeatCountHighZBypasses) {
   EXPECT_EQ(a->value.ToUint64(), 17u);
 }
 
-// --- nonblocking repeat samples its RHS once, when encountered -------------
-
 TEST(IntraAssignTimingSimulation, NbaRepeatEventCapturesRhs) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -591,14 +535,9 @@ TEST(IntraAssignTimingSimulation, NbaRepeatEventCapturesRhs) {
       "endmodule\n",
       f, "a");
   ASSERT_NE(a, nullptr);
-  // The value held is the one read when the statement executed (25), not the
-  // later 99, even though the write is deferred until the second posedge.
   EXPECT_EQ(a->value.ToUint64(), 25u);
 }
 
-// §9.4.5 lets a repeat event control count the occurrences of any event
-// expression, so `posedge v[0]`, a select naming no variable of its own, is
-// counted as the value of the select changes: the second posedge is at 15.
 TEST(IntraAssignTimingSimulation, RepeatCountsAnOperandThatIsASelect) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; logic [1:0] v = 0; int a, b = 7;\n"
@@ -612,9 +551,6 @@ TEST(IntraAssignTimingSimulation, RepeatCountsAnOperandThatIsASelect) {
             "a=7 15\n");
 }
 
-// §9.4.5 counts each edge Table 9-2 gives, whatever else watches the signal:
-// an always procedure waiting on negedge clk, judged first on each change,
-// leaves the repeat's posedges to it.
 TEST(IntraAssignTimingSimulation, RepeatCountsEdgesAnotherProcessWatches) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; logic clk = 0; int n, a, b = 3;\n"
@@ -629,10 +565,6 @@ TEST(IntraAssignTimingSimulation, RepeatCountsEdgesAnotherProcessWatches) {
             "a=3 15\n");
 }
 
-// §9.4.5 with §9.4.1: a negative intra-assignment delay is an unsigned time
-// value, so taken at time 5 a nonblocking update it delays lies past the last
-// time the simulation reaches and is never made, for a variable and for an
-// unpacked array assigned a concatenation alike; the simulation goes on.
 TEST(IntraAssignTimingSimulation, ANegativeNonblockingDelayNeverUpdates) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; int d; logic [7:0] x; int arr[2];\n"

@@ -11,7 +11,6 @@ struct RtlirModuleInst;
 struct RtlirPort;
 struct RtlirPortBinding;
 
-// §23.3.3 per-instance binding scope shared by the BindPorts helpers.
 struct PortBindScope {
   RtlirModuleInst& inst;
   const ModuleItem* item;
@@ -20,12 +19,11 @@ struct PortBindScope {
   bool is_ordered;
 };
 
-// Mutable per-connection state threaded through the BindExplicitPort helpers.
 struct ExplicitPortBind {
   RtlirPortBinding& binding;
   const Expr* conn_expr;
   std::string_view port_name;
-  const RtlirPort* child_port;  // nullptr when no port matches
+  const RtlirPort* child_port;
   bool is_implicit;
 };
 

@@ -8,14 +8,8 @@
 
 namespace delta {
 
-// ===========================================================================
-// §37.21 Variable drivers and loads.
-// ===========================================================================
-
 namespace {
 
-// Whether `obj` is `target` or stands inside it: a select, a bit, an element
-// or a member of it at any depth.
 bool Within(const VpiObject* obj, const VpiObject& target) {
   for (; obj != nullptr; obj = obj->parent) {
     if (obj == &target) return true;
@@ -37,8 +31,6 @@ bool VpiAssignTargetWrites(const VpiObject* lhs, const VpiObject& target) {
 bool VpiExpressionReads(const VpiObject* rhs, const VpiObject& target) {
   if (rhs == nullptr) return false;
   if (Within(rhs, target)) return true;
-  // A select reads what its index, its bounds, or its base and width read,
-  // which a select of a vector net holds apart from its children.
   if (std::ranges::any_of(
           std::initializer_list<const VpiObject*>{
               rhs->index_expr, rhs->base_expr, rhs->width_expr, rhs->left_range,
@@ -71,9 +63,6 @@ bool VpiIsVariableDriverOrLoad(const VpiObject& child, const VpiObject& var,
 
 void VpiCollectVariableDriversOrLoads(VpiObject* node, bool want_driver,
                                       bool descend, VpiObject* iter) {
-  // A var select holds the indices it is written with among its children
-  // (§37.19), and a variable read as an index is no part of the array, so the
-  // walk goes no further down from one.
   const bool kDescend = descend && node->type != vpiVarSelect;
   for (auto* child : node->children) {
     if (VpiIsVariableDriverOrLoad(*child, *node, want_driver)) {
@@ -91,9 +80,6 @@ void VpiHangOnVariablesNamed(VpiHandle holder, VpiHandle expr) {
     }
     return;
   }
-  // A select climbs to what it selects from, and an element or a member to
-  // the variable holding it, up to the variable the expression names a part
-  // of.
   VpiObject* var = expr;
   while (var != nullptr && var->parent != nullptr &&
          (VpiIsVariablesType(var->parent->type) || var->type == vpiVarSelect ||

@@ -12,18 +12,6 @@
 namespace delta {
 namespace {
 
-// A region encrypted under this implementation's own cipher records a
-// fingerprint of its own text ahead of the text itself. Recovering that
-// fingerprint is how the decrypting half tells the key the region was encrypted
-// under from any other key it might be given: a different key yields different
-// bytes throughout, and the fingerprint they carry no longer describes the text
-// beside it. §34.5.15.2 has des-cbc encrypt the region and nothing else, so a
-// block written under it carries none, and a key other than the region's is
-// told by the cipher's padding instead.
-//
-// "Throughout" is what KeyStream below is for. It held only of two keys
-// differing within the block's length while the bytes were combined with the
-// key's own characters, and #3274 is the defect that left.
 constexpr size_t kFingerprintBytes = 4;
 constexpr uint32_t kFingerprintBasis = 0x811C9DC5U;
 constexpr uint32_t kFingerprintFactor = 0x01000193U;
@@ -45,22 +33,6 @@ std::string FingerprintPrefix(uint32_t fingerprint) {
   return prefix;
 }
 
-// One run of the value the key is combined with, of the length `wanted`.
-//
-// Every byte of it depends on every character of the key. A run taken from the
-// key's own characters would depend on only as many of them as the run is long,
-// and two keys agreeing over that many characters would then produce the same
-// run: a block encrypted under one would open under the other, and the
-// fingerprint beside it would describe the text it recovered to. A digest block
-// is kFingerprintBytes plus a 20-byte digest, so 24 characters of a key would
-// have decided whether a digest sealed under some other key was accepted.
-//
-// The run is the digests of the key with a counter written after it, taken one
-// after another until it is long enough. A digest is a value in which a change
-// anywhere in the input changes the whole output, so a key differing at any one
-// character gives a different run from its first byte. The counter is what
-// makes the runs differ from each other, a run repeating itself being one in
-// which a block's own bytes could be read off against each other.
 std::string KeyStream(std::string_view key, size_t wanted) {
   std::string stream;
   stream.reserve(wanted);
@@ -69,20 +41,12 @@ std::string KeyStream(std::string_view key, size_t wanted) {
     for (size_t n = 4; n > 0; --n) {
       input.push_back(static_cast<char>((counter >> ((n - 1) * 8)) & 0xFFU));
     }
-    // The algorithm is this file's own choice rather than the one a text
-    // named. §34.5.21's identifier says what the digests written into an
-    // envelope are computed with, which is a thing a reader is told; this is
-    // the cipher's internal step and no envelope states it, so it is fixed
-    // here and both halves reach it through the same call.
     stream.append(Sha1Digest(input));
   }
   stream.resize(wanted);
   return stream;
 }
 
-// The keyed step of both halves. Combining the bytes with the key twice gives
-// the bytes back, which is what makes one key both encrypt and decrypt a
-// region.
 std::string CombineWithKey(std::string_view bytes, std::string_view key) {
   std::string stream = KeyStream(key, bytes.size());
   std::string combined;
@@ -95,23 +59,10 @@ std::string CombineWithKey(std::string_view bytes, std::string_view key) {
   return combined;
 }
 
-// §34.5.11.2's des-cbc takes a 64-bit key and a design's key is a string of any
-// length, so the key the cipher runs under is derived from it rather than being
-// it. The derivation is the same run KeyStream produces, of which the first
-// block is taken: a digest is a value in which a change anywhere in the input
-// changes the whole output, so two keys differing at any one character give
-// different DES keys.
-//
-// FIPS 46-3 leaves the low bit of each key byte to parity and never reads it,
-// so the derivation says nothing about those bits and the cipher ignores them.
 std::string DesKeyOf(std::string_view key) {
   return KeyStream(key, kDesKeyBytes);
 }
 
-// §34.5.11.2 recommends the IV be randomly generated for each use of the
-// cipher, so two envelopes made from one region under one key differ. The run
-// is taken from the key and the cleartext with a counter that moves on at every
-// call, which is what keeps two encryptions of the same text apart.
 std::string FreshInitializationVector(std::string_view key,
                                       std::string_view cleartext) {
   static uint64_t counter = 0;
@@ -124,16 +75,8 @@ std::string FreshInitializationVector(std::string_view key,
   return KeyStream(seed, kDesBlockBytes);
 }
 
-// Whether `method` names §34.5.11.2's required cipher. Every other identifier
-// reaching here is this implementation's own, an empty one included: a region
-// naming a cipher this implementation does not have is turned away where the
-// region closes, and one naming none takes the default.
 bool UsesDesCbc(std::string_view method) { return method == kDesCbcMethod; }
 
-// The bytes a block records under `method`, before any coding scheme is applied
-// to them: under this implementation's own cipher the fingerprint of the region
-// and the region, combined with the key; under des-cbc the region alone,
-// enciphered.
 std::string EncryptedRegionBytes(std::string_view cleartext,
                                  std::string_view key,
                                  std::string_view method) {
@@ -144,19 +87,11 @@ std::string EncryptedRegionBytes(std::string_view cleartext,
   }
   std::string iv = FreshInitializationVector(key, cleartext);
   std::string ciphertext = DesCbcEncrypt(cleartext, DesKeyOf(key), iv);
-  // §34.5.15.2: the IV cipher-block goes in front of the encrypted data, and
-  // the encoding is applied after, so it travels ahead of the ciphertext rather
-  // than beside it in the envelope's description.
   return iv + ciphertext;
 }
 
-// The region a des-cbc block records. False where the cipher cannot make
-// anything of it, which a key that is not the one the region was encrypted
-// under reaches as readily as bytes this never wrote.
 bool RecoverDesCbcRegion(std::string_view block, std::string_view key,
                          std::string* cleartext) {
-  // §34.5.15.2: once the data_block is decoded, its first cipher-block is taken
-  // off to serve as the IV, and what follows it is what gets decrypted.
   if (block.size() <= kDesBlockBytes) return false;
   return DesCbcDecrypt(block.substr(kDesBlockBytes), DesKeyOf(key),
                        block.substr(0, kDesBlockBytes), cleartext);
@@ -164,18 +99,9 @@ bool RecoverDesCbcRegion(std::string_view block, std::string_view key,
 
 }  // namespace
 
-// The block a region is recorded in is written as text by §34.5.9's coding
-// schemes, which are spelled out in protect_encoding.h. Which scheme is used is
-// what a text's encoding pragma expression settles, so the writing and the
-// reading of a block are given a scheme rather than holding one of their own.
-
 size_t ProtectedRegionBlockSize(std::string_view cleartext,
                                 std::string_view method) {
   if (!UsesDesCbc(method)) return kFingerprintBytes + cleartext.size();
-  // §34.5.15.2 has the IV cipher-block prepended to the encrypted region, and a
-  // block cipher writes whole blocks: the padding always adds at least one
-  // byte, so a region already a whole number of blocks long grows by a whole
-  // block of it.
   size_t padded =
       cleartext.size() + kDesBlockBytes - (cleartext.size() % kDesBlockBytes);
   return kDesBlockBytes + padded;

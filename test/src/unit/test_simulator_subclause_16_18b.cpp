@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's module A around the assertion given, driven as its Figure
-// 16-17 draws: clk rises at 5, 15, 25, 35, 45 and 55, a rises at 20 and
-// falls at 40, and the run ends at 60, so an assertion of a on posedge clk
-// passes at 25 and 35 and fails at the other edges.
 std::string Design(const std::string& assertion) {
   return "module A(input logic clk, input logic a);\n"
          "  clocking cb_with_input @(posedge clk);\n"
@@ -51,11 +47,6 @@ std::string Passes(const std::string& assertion) {
   return RunCapture(Design(assertion), f);
 }
 
-// §16.18: a clocking block variable used in a concurrent assertion is
-// sampled only in the clocking block, at posedge clk with the default
-// input skew, where the assertion samples the module's a as well, so the
-// clause's a3, asserting cb_with_input.a through p2, passes where its a1,
-// asserting a through p1, does: at 25 and 35.
 TEST(ClockingBlockAssertionRun, AClockingBlockVariableReadsTheBlocksSample) {
   const std::string kExpected =
       "passed at 25\npassed at 35\n$finish at time 60\n";
@@ -67,10 +58,6 @@ TEST(ClockingBlockAssertionRun, AClockingBlockVariableReadsTheBlocksSample) {
             kExpected);
 }
 
-// §16.18: the clause's a2 and a4 instantiate the p1 of each clocking
-// block, cb_with_input's asserting its clocking block variable a and
-// cb_without_input's the module's a, and both pass at 25 and 35 as a1
-// does, the four being equivalent.
 TEST(ClockingBlockAssertionRun, ThePropertiesOfBothBlocksAreEquivalent) {
   const std::string kExpected =
       "passed at 25\npassed at 35\n$finish at time 60\n";
@@ -82,10 +69,6 @@ TEST(ClockingBlockAssertionRun, ThePropertiesOfBothBlocksAreEquivalent) {
             kExpected);
 }
 
-// §16.18 with §17.3: a checker's formal stands for the actual bound to it, so
-// the assertion of a checker whose formal is bound to the clocking block
-// variable cb_with_input.a reads the block's sample, as the clause's a3 does,
-// and passes at 25 and 35.
 TEST(ClockingBlockAssertionRun, ACheckerFormalBoundToABlockVariableReadsIt) {
   SimFixture f;
   std::string out = RunCapture(

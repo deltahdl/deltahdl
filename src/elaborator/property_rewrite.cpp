@@ -20,9 +20,6 @@ namespace delta {
 
 namespace {
 
-// §16.8 three-color DFS body: `path` marks nodes on the current descent —
-// re-visiting one means there is a back-edge, which is exactly the cycle.
-// Only sequence-to-sequence edges count for the cycle rule.
 bool SequenceCycleDfs(const PropertyRegistry& registry, const ModuleItem* node,
                       std::unordered_set<const ModuleItem*>& path,
                       std::unordered_set<const ModuleItem*>& done) {
@@ -40,7 +37,6 @@ bool SequenceCycleDfs(const PropertyRegistry& registry, const ModuleItem* node,
   return false;
 }
 
-// The names `e` writes, as identifiers or as the callees of calls.
 void CollectNames(const Expr* e, std::vector<std::string_view>& out) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kIdentifier) out.push_back(e->text);
@@ -48,7 +44,6 @@ void CollectNames(const Expr* e, std::vector<std::string_view>& out) {
   ForEachExprChild(e, [&](const Expr* child) { CollectNames(child, out); });
 }
 
-// Each call `e` holds, `e` itself among them, handed to `fn`.
 template <typename Fn>
 void ForEachCall(const Expr* e, const Fn& fn) {
   if (e == nullptr) return;
@@ -56,7 +51,6 @@ void ForEachCall(const Expr* e, const Fn& fn) {
   ForEachExprChild(e, [&](const Expr* child) { ForEachCall(child, fn); });
 }
 
-// Each operand expression of the sequence body `body`.
 template <typename Fn>
 void ForEachBodyExpr(const SeqLinearBody& body, const Fn& fn) {
   for (const Expr* operand : body.operands) fn(operand);
@@ -69,8 +63,6 @@ void ForEachBodyExpr(const SeqLinearBody& body, const Fn& fn) {
   }
 }
 
-// Each expression of the property tree under `node` an instance may stand
-// in.
 template <typename Fn>
 void ForEachTreeExpr(const PropertyExprNode* node, const Fn& fn) {
   if (node == nullptr) return;
@@ -86,9 +78,6 @@ void ForEachTreeExpr(const PropertyExprNode* node, const Fn& fn) {
 
 bool DisableConditionSampledValueRequiresExplicitClock(
     SampledValueFunction fn) {
-  // §16.12 head: $sampled is the sole sampled value function that carries no
-  // clocking event of its own, so it alone may omit the explicit clock; every
-  // other sampled value function must name its clock in the disable condition.
   return fn != SampledValueFunction::kSampled;
 }
 
@@ -110,10 +99,6 @@ void PropertyRegistry::Register(const ModuleItem* decl) {
   RecordArgumentRefs(decl);
 }
 
-// §16.8 and §16.12: the edges of the dependency digraph the body scan does
-// not record: from `decl` to each declaration a formal's default actual
-// instantiates, and from the declaration each instance in `decl`'s body
-// names to each one the instance's actual arguments instantiate.
 void PropertyRegistry::RecordArgumentRefs(const ModuleItem* decl) {
   for (const Expr* actual : decl->prop_formal_defaults) {
     CollectNames(actual, argument_refs_[decl->name]);
@@ -163,7 +148,6 @@ const ModuleItem* PropertyRegistry::FindInstance(const Expr* instance) const {
 
 int PropertyRegistry::FlattenedDisableIffCount(const ModuleItem* decl) const {
   if (decl == nullptr) return 0;
-  // visited prevents recursive properties from forcing an infinite walk.
   std::unordered_set<const ModuleItem*> visited;
   std::vector<const ModuleItem*> stack;
   stack.push_back(decl);
@@ -194,19 +178,12 @@ FlattenedProperty PropertyRegistry::Flatten(
   fp.formal_count = decl->prop_formals.size();
   fp.disable_iff_count = FlattenedDisableIffCount(decl);
   fp.remaining_instances = 0;
-  // §F.4.1.1 step 2: each formal takes the actual bound to it in the
-  // instance, or the default actual declared for it where none is bound; so
-  // with the actuals bound positionally, the count may fall short of the
-  // formals only where every formal it leaves unbound declares a default,
-  // and may not exceed them.
   bool args_ok = actual_arg_count <= fp.formal_count;
   for (size_t i = actual_arg_count; i < fp.formal_count; ++i) {
     bool has_default = i < decl->prop_formal_has_default.size() &&
                        decl->prop_formal_has_default[i];
     args_ok = args_ok && has_default;
   }
-  // §16.12: nesting of disable iff, explicitly or through instantiation, is
-  // not allowed.
   bool no_disable_iff_nesting = fp.disable_iff_count <= 1;
   fp.legal = args_ok && no_disable_iff_nesting;
   return fp;
@@ -222,8 +199,6 @@ bool PropertyRegistry::HasCyclicSequenceDependency(
   if (decl == nullptr) return false;
   if (decl->kind != ModuleItemKind::kSequenceDecl) return false;
 
-  // Three-color DFS over sequence-to-sequence instance references (see
-  // SequenceCycleDfs); `decl` is on a cycle iff that walk finds a back-edge.
   std::unordered_set<const ModuleItem*> path;
   std::unordered_set<const ModuleItem*> done;
   return SequenceCycleDfs(*this, decl, path, done);
@@ -233,9 +208,6 @@ bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {
   if (decl == nullptr) return false;
   if (decl->kind != ModuleItemKind::kPropertyDecl) return false;
 
-  // Push every property reachable in one step from `node`. Edges run only
-  // between named properties; instantiations of named sequences are not part
-  // of the property dependency digraph.
   auto push_property_callees = [&](const ModuleItem* node,
                                    std::vector<const ModuleItem*>& stack) {
     for (auto ref : DependencyRefs(node)) {
@@ -246,8 +218,6 @@ bool PropertyRegistry::IsRecursiveProperty(const ModuleItem* decl) const {
     }
   };
 
-  // Recursive iff, starting from `decl`'s callees, we can arrive back at
-  // `decl`.
   std::unordered_set<const ModuleItem*> visited;
   std::vector<const ModuleItem*> stack;
   push_property_callees(decl, stack);
@@ -265,9 +235,6 @@ bool PropertyRegistry::IsOnZeroWeightCycle(const ModuleItem* decl) const {
   if (decl == nullptr) return false;
   if (decl->kind != ModuleItemKind::kPropertyDecl) return false;
 
-  // Push every property reached from `node` by a zero-weight (untimed) edge.
-  // These edges are the instances recorded with no preceding positive time
-  // advance; a cycle among them alone has total weight zero.
   auto push_zero_weight_callees = [&](const ModuleItem* node,
                                       std::vector<const ModuleItem*>& stack) {
     for (auto ref : node->prop_untimed_instance_refs) {
@@ -278,8 +245,6 @@ bool PropertyRegistry::IsOnZeroWeightCycle(const ModuleItem* decl) const {
     }
   };
 
-  // On a zero-weight cycle iff, following only zero-weight edges from `decl`'s
-  // callees, we can arrive back at `decl`.
   std::unordered_set<const ModuleItem*> visited;
   std::vector<const ModuleItem*> stack;
   push_zero_weight_callees(decl, stack);

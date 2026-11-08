@@ -21,8 +21,6 @@ const ModuleDecl* CheckerRegistry::Find(std::string_view name) const {
 }
 
 bool CheckerRegistry::AlgorithmAppliesToFormal(const PortDecl& formal) {
-  // §F.4.2: output-direction formals are treated differently (see §17.2) and
-  // are outside the rewriting algorithm. Everything else is an input formal.
   return formal.direction != Direction::kOutput;
 }
 
@@ -50,8 +48,6 @@ int CheckerRegistry::CheckerInstanceCount(const ModuleDecl* decl) const {
   for (const auto* item : decl->items) {
     if (item == nullptr) continue;
     if (item->kind != ModuleItemKind::kModuleInst) continue;
-    // An instance is a checker instance only when its target names a
-    // registered checker declaration.
     if (Find(item->inst_module) != nullptr) ++count;
   }
   return count;
@@ -63,21 +59,12 @@ FlattenedChecker CheckerRegistry::Flatten(
   fc.name = name;
   const ModuleDecl* decl = Find(name);
   if (decl == nullptr) {
-    // §F.4.2: an unresolved source cannot be flattened, so it is not legal.
     fc.legal = false;
     return fc;
   }
   fc.input_formal_count = InputFormalCount(decl);
   fc.output_formal_count = OutputFormalCount(decl);
-  // The flattened result is a checker without instances.
   fc.remaining_instances = 0;
-  // §F.4.2.1 step 2: each formal input argument takes the actual bound to it
-  // in the instance, or the default actual declared for it where none is
-  // bound; so with the actuals bound positionally to the input formals, the
-  // count may fall short of them only where every input formal it leaves
-  // unbound declares a default, and may not exceed them. Output formals are
-  // not bound by the algorithm and are excluded from the count.
-  // §F.4.2: a flattened checker that is not legal makes its source not legal.
   bool args_ok = actual_input_arg_count <= fc.input_formal_count;
   std::size_t input_index = 0;
   for (const auto& formal : decl->ports) {
@@ -94,9 +81,6 @@ FlattenedChecker CheckerRegistry::Flatten(
 
 bool CheckerRegistry::IsAcceptableAsCheckerInstance(
     const FlattenedChecker& fc) {
-  // §F.4.2: nested and top-level checker instances are equally acceptable
-  // targets of the algorithm once the flattened checker is legal and free of
-  // remaining instances.
   return fc.legal && fc.remaining_instances == 0;
 }
 

@@ -26,8 +26,6 @@ namespace delta {
 
 namespace {
 
-// An assert, assume or cover statement, or §16.17's expect, which takes a
-// property_spec as they do and resolves its clock as they do.
 bool IsAssertionStatement(const Stmt* s) {
   return s->kind == StmtKind::kAssertImmediate ||
          s->kind == StmtKind::kAssumeImmediate ||
@@ -38,8 +36,6 @@ bool IsProceduralConcurrent(const Stmt* s) {
   return s != nullptr && s->is_procedural_concurrent && IsAssertionStatement(s);
 }
 
-// The procedural concurrent assertions of the procedure in source order,
-// those in the action block of another among them.
 void CollectProceduralAssertions(Stmt* s, std::vector<Stmt*>& out) {
   if (s == nullptr) return;
   if (IsProceduralConcurrent(s)) out.push_back(s);
@@ -47,10 +43,6 @@ void CollectProceduralAssertions(Stmt* s, std::vector<Stmt*>& out) {
       s, [&out](Stmt* const& sub) { CollectProceduralAssertions(sub, out); });
 }
 
-// §16.14.6's requirements (a) and (b) read off the procedure: whether it
-// holds a blocking timing control, a delay or a wait, and the event
-// controls its body holds, which stand beside the one an always procedure
-// opens with.
 struct ProcedureTiming {
   bool blocking = false;
   std::vector<const Stmt*> event_controls;
@@ -66,11 +58,6 @@ void ScanTiming(const Stmt* s, ProcedureTiming& timing) {
   ForEachChildStmt(s, [&timing](Stmt* const& sub) { ScanTiming(sub, timing); });
 }
 
-// §16.14.6 (c)(2): the names the procedure references other than as a
-// clocking event or within an assertion statement, the operands of each
-// statement's expressions and the targets it writes; an event control's
-// events are clocking events and an assertion statement is skipped whole,
-// its action block with it.
 void CollectReferences(const Stmt* s, std::unordered_set<std::string>& out) {
   if (s == nullptr || IsAssertionStatement(s)) return;
   const Expr* exprs[] = {s->condition, s->lhs,      s->rhs,   s->for_cond,
@@ -84,9 +71,6 @@ void CollectReferences(const Stmt* s, std::unordered_set<std::string>& out) {
                    [&out](Stmt* const& sub) { CollectReferences(sub, out); });
 }
 
-// Whether `name` is an event variable or a clocking block of `mod`, the
-// two things §16.14.6 (c)(1) lets an event expression consist solely of
-// without an edge.
 bool NamesEventOrClockingBlock(std::string_view name, const RtlirModule* mod) {
   if (mod == nullptr) return false;
   for (const ModuleItem* block : mod->clocking_blocks) {
@@ -98,10 +82,6 @@ bool NamesEventOrClockingBlock(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-// §16.14.6 (c): whether `ev` is an event expression the clock can be
-// inferred from: solely an event variable or a clocking block identifier,
-// or an edge over an expression, with an iff or without, and in either
-// case naming nothing the procedure references elsewhere.
 bool QualifiesAsClock(const EventExpr& ev, const RtlirModule* mod,
                       const std::unordered_set<std::string>& references) {
   if (ev.signal == nullptr || ev.is_sequence_event) return false;
@@ -119,19 +99,12 @@ bool QualifiesAsClock(const EventExpr& ev, const RtlirModule* mod,
   return true;
 }
 
-// §16.14.6: the clock a procedure with the body `body` and the event control
-// `sensitivity`, `@*` where `is_star`, gives what it reads with none, an
-// assertion embedded in it among them, or an empty list where the
-// requirements fail.
 std::vector<EventExpr> InferredClockOf(
     const Stmt* body, const std::vector<EventExpr>& sensitivity, bool is_star,
     const RtlirModule* mod) {
   ProcedureTiming timing;
   ScanTiming(body, timing);
   if (timing.blocking) return {};
-  // (b): exactly one event control, the always procedure's own or one the
-  // body holds; an always_comb or always_latch infers its sensitivity and
-  // holds none, and an implicit `@*` names no clock.
   const std::vector<EventExpr>* events = nullptr;
   if (!sensitivity.empty() && !is_star) {
     if (!timing.event_controls.empty()) return {};
@@ -142,7 +115,6 @@ std::vector<EventExpr> InferredClockOf(
   } else {
     return {};
   }
-  // (c): one and only one of its event expressions qualifies.
   std::unordered_set<std::string> references;
   CollectReferences(body, references);
   std::vector<EventExpr> clock;
@@ -159,9 +131,6 @@ std::vector<EventExpr> InferredProcedureClock(const ModuleItem* procedure,
                          procedure->is_star_sensitivity, mod);
 }
 
-// Whether the body of `decl` is one the run reads; a statement instantiating
-// a property whose body was not captured is reported unevaluated, as a
-// static one is, and left as no concurrent assertion.
 bool BodyIsRead(Stmt* stmt, const ModuleItem* decl, DiagEngine& diag) {
   if (decl->prop_body_expr != nullptr || decl->prop_body_tree != nullptr) {
     return true;
@@ -176,12 +145,6 @@ bool BodyIsRead(Stmt* stmt, const ModuleItem* decl, DiagEngine& diag) {
   return false;
 }
 
-// §16.16 (c): the contextually inferred clocking event is treated as the
-// leading clocking event of an assertion that opens with none, which a
-// multiclocked property may not take, an operand clocked as the inferred
-// clock is being no other clock (§16.16.1's a4): the clause's a3 is
-// reported and left as no concurrent assertion. Answers whether the
-// statement goes on.
 bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
                         const PropertyRegistry& registry, DiagEngine& diag) {
   if (!stmt->assert_clock.empty() || inferred.empty() ||
@@ -196,9 +159,6 @@ bool TakesInferredClock(Stmt* stmt, const std::vector<EventExpr>& inferred,
   return false;
 }
 
-// §16.14.6: the statement's clock is the one its spec or the declaration it
-// instantiates gave it, else `context`, the procedure's inferred clock or
-// the default clocking's; with none, the statement is reported.
 void ResolveProceduralClock(Stmt* stmt, const std::vector<EventExpr>& context,
                             const PropertyRegistry& registry,
                             DiagEngine& diag) {
@@ -207,8 +167,6 @@ void ResolveProceduralClock(Stmt* stmt, const std::vector<EventExpr>& context,
     stmt->assert_clock_inferred = !context.empty();
   }
   if (!stmt->assert_clock.empty()) {
-    // §16.16 (e) and §16.16.1: a multiclocked property needs a unique
-    // semantic leading clock under the clock flowing in.
     if (!HasUniqueSemanticLeadingClock(stmt->assert_property,
                                        stmt->assert_clock, registry)) {
       diag.Error(stmt->range.start,
@@ -227,11 +185,6 @@ void ResolveProceduralClock(Stmt* stmt, const std::vector<EventExpr>& context,
              Subclause("16.14.6"));
 }
 
-// The body, the disable condition and the clock of the property `decl` the
-// statement instantiates, with the actuals in the formals' places: the
-// boolean body substituted, any other as a tree whose root is the instance
-// for the run to expand; the declaration's clock, or the one flowing into
-// it, where the spec opened with none.
 void SubstitutePropertyBody(Stmt* stmt, const ModuleItem* decl,
                             const PropertyRegistry& registry, Arena& arena) {
   Expr* instance = stmt->assert_expr;
@@ -252,14 +205,6 @@ void SubstitutePropertyBody(Stmt* stmt, const ModuleItem* decl,
   stmt->assert_clock = PropertyInstanceClock(decl, actuals, registry, arena);
 }
 
-// §16.12.1 and §16.13.4, for a statement in procedural code: the body of
-// the named property or sequence the spec instantiates, as
-// SubstitutePropertyInstance and SubstituteSequenceInstance give a static
-// statement's, the property's boolean body with the actuals in the
-// formals' places, any other body as a tree whose root is the instance for
-// the run to expand, and a sequence as a sequence declaration of one
-// operand; the declaration's clock, or the one flowing into it, is the
-// statement's where the spec opened with none.
 void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
                         const InferredAtInstance& inferred, Arena& arena,
                         DiagEngine& diag) {
@@ -269,9 +214,6 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   Expr* instance = QualifiedInstance(stmt->assert_expr, registry, arena);
   const ModuleItem* seq =
       InstantiatedDecl(instance, ModuleItemKind::kSequenceDecl, registry);
-  // §16.14.7: the inferred functions among the defaults are replaced by
-  // what is inferred at the statement, the clock its spec opens with, the
-  // procedure's or the default clocking's.
   InferredAtInstance here = inferred;
   if (!stmt->assert_clock.empty()) here.clock = stmt->assert_clock;
   FillInferredDefaults(
@@ -298,10 +240,6 @@ void SubstituteInstance(Stmt* stmt, const PropertyRegistry& registry,
   SubstitutePropertyBody(stmt, decl, registry, arena);
 }
 
-// What the statements of one procedure or subroutine resolve against: the
-// clock the procedure gives, empty where it gives none, and what an
-// instance takes at the statement, that clock or the default clocking
-// behind it and the default disable iff of the module.
 struct ProcedureContext {
   std::vector<EventExpr> inferred;
   InferredAtInstance at_instance;
@@ -318,7 +256,6 @@ ProcedureContext ContextOf(std::vector<EventExpr> inferred,
   return context;
 }
 
-// The statements collected, made ready under `context`.
 void ResolveProceduralAssertions(const std::vector<Stmt*>& assertions,
                                  const ProcedureContext& context,
                                  const PropertyRegistry& registry, Arena& arena,
@@ -329,16 +266,12 @@ void ResolveProceduralAssertions(const std::vector<Stmt*>& assertions,
     if (!stmt->is_concurrent_clocked) continue;
     SubstituteInstance(stmt, registry, at_instance, arena, diag);
     if (!stmt->is_concurrent_clocked) continue;
-    // §16.15: a statement without a disable iff clause of its own within the
-    // scope of a default disable iff declaration takes its condition.
     if (stmt->assert_disable_iff == nullptr) {
       stmt->assert_disable_iff = at_instance.disable;
     }
     PromoteSequenceInstances(stmt->assert_property, registry, arena);
     if (!TakesInferredClock(stmt, inferred, registry, diag)) continue;
     ResolveProceduralClock(stmt, at_instance.clock, registry, diag);
-    // §16.14.6: a procedure that gives no clock leaves the default clocking's
-    // to be inferred.
     stmt->assert_clock_from_default_clocking =
         stmt->assert_clock_inferred && inferred.empty();
   }
@@ -371,8 +304,6 @@ InferredAtInstance InferredInProcedure(const ModuleItem* procedure,
 
 namespace {
 
-// §16.9.3: a sampled value function other than $sampled whose call gives no
-// clocking event takes the one inferred where the call is written.
 bool IsUnclockedSampledValueCall(const Expr* e) {
   static constexpr std::array<std::string_view, 5> kNames{
       "$past", "$rose", "$fell", "$stable", "$changed"};
@@ -388,8 +319,6 @@ bool HoldsUnclockedSampledValueCall(const Expr* e) {
          });
 }
 
-// Reports each name of `lets` an expression under `e` refers to: a let
-// instance, written as a call or, with no arguments, as a bare name.
 void ReportUnclockedLetNames(const Expr* e,
                              const std::unordered_set<std::string_view>& lets,
                              DiagEngine& diag) {
@@ -407,8 +336,6 @@ void ReportUnclockedLetNames(const Expr* e,
   });
 }
 
-// A concurrent assertion clocks what it holds by the clock flow rules
-// (§16.13.3), its action blocks by its leading clock, so neither is walked.
 void ReportUnclockedLetInstances(
     const Stmt* s, const std::unordered_set<std::string_view>& lets,
     DiagEngine& diag) {

@@ -341,7 +341,6 @@ TEST(PrimitiveGateTypeParsing, PassSwitchtype_Rtran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// n_input_gatetype: the `and` alternative classifies to the AND gate kind.
 TEST(PrimitiveGateTypeParsing, NInputGatetype_And) {
   auto r = Parse(
       "module m;\n"
@@ -353,7 +352,6 @@ TEST(PrimitiveGateTypeParsing, NInputGatetype_And) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-// enable_gatetype: the `bufif0` alternative classifies to the BUFIF0 gate kind.
 TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif0) {
   auto r = Parse(
       "module m;\n"
@@ -365,7 +363,6 @@ TEST(PrimitiveGateTypeParsing, EnableGatetype_Bufif0) {
   EXPECT_EQ(g->gate_terminals.size(), 3u);
 }
 
-// n_output_gatetype: the `buf` alternative classifies to the BUF gate kind.
 TEST(PrimitiveGateTypeParsing, NOutputGatetype_Buf) {
   auto r = Parse(
       "module m;\n"
@@ -377,7 +374,6 @@ TEST(PrimitiveGateTypeParsing, NOutputGatetype_Buf) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// n_output_gatetype: the `not` alternative classifies to the NOT gate kind.
 TEST(PrimitiveGateTypeParsing, NOutputGatetype_Not) {
   auto r = Parse(
       "module m;\n"
@@ -389,7 +385,6 @@ TEST(PrimitiveGateTypeParsing, NOutputGatetype_Not) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// pass_switchtype: the `tran` alternative classifies to the TRAN gate kind.
 TEST(PrimitiveGateTypeParsing, PassSwitchtype_Tran) {
   auto r = Parse(
       "module m;\n"
@@ -401,10 +396,6 @@ TEST(PrimitiveGateTypeParsing, PassSwitchtype_Tran) {
   EXPECT_EQ(g->gate_terminals.size(), 2u);
 }
 
-// Edge case: the gate/switch type keywords are matched exactly. An uppercase
-// spelling is not one of the productions' alternatives, so it is not classified
-// as a primitive gate instance (it is taken as an ordinary instantiation type
-// identifier instead). Contrast the lowercase keyword, which does classify.
 TEST(PrimitiveGateTypeParsing, GateTypeKeywordIsExactMatch) {
   auto lower = Parse(
       "module m;\n"
@@ -422,11 +413,6 @@ TEST(PrimitiveGateTypeParsing, GateTypeKeywordIsExactMatch) {
             nullptr);
 }
 
-// A.3.4 gives each keyword a type, and A.3.1 writes its instance productions
-// against the types rather than the keywords: which of drive_strength, delay2
-// and delay3 an instance may carry, and how many terminals it takes, are the
-// type's. GateTypeOf is the classification, read here for every alternative of
-// the seven productions, and for the two pull gates A.3.1 keeps outside them.
 TEST(PrimitiveGateTypeParsing, EveryKeywordHasItsType) {
   struct Expected {
     GateKind kind;
@@ -465,10 +451,6 @@ TEST(PrimitiveGateTypeParsing, EveryKeywordHasItsType) {
   }
 }
 
-// The instance forms A.3.1 gives a type hold across the type's keywords: the
-// resistive spellings take what their non-resistive ones take. Here the
-// `r`-spelt alternative of each switch type and the negated one of each gate
-// type stand where the parser's tests on §28.3 write the first alternative.
 TEST(PrimitiveGateTypeParsing, InstanceFormsFollowTheType) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

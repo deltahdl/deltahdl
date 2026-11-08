@@ -127,11 +127,6 @@ TEST(BlockingAssignSim, BlockingAssignBitwiseOps) {
                    {{"r_and", 48u}, {"r_or", 252u}, {"r_xor", 204u}});
 }
 
-// §11.4.8 binary bitwise AND folded in a constant expression whose operand is a
-// `parameter`. A parameter reference resolves through the identifier path in
-// the constant evaluator, distinct from the literal path exercised by ConstEval
-// above, so the same bit-by-bit AND is observed on a differently produced
-// operand: 12 & 10 folds to 8.
 TEST(ConstEval, BinaryBitwiseAndOfParameterFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -148,8 +143,6 @@ TEST(ConstEval, BinaryBitwiseAndOfParameterFolds) {
   EXPECT_EQ(q.resolved_value, 8);
 }
 
-// §11.4.8 binary bitwise OR folded with a `localparam` operand, which likewise
-// takes the identifier-resolution path: 12 | 3 folds to 15.
 TEST(ConstEval, BinaryBitwiseOrOfLocalparamFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -166,8 +159,6 @@ TEST(ConstEval, BinaryBitwiseOrOfLocalparamFolds) {
   EXPECT_EQ(b.resolved_value, 15);
 }
 
-// §11.4.8 binary bitwise XOR folded with a `parameter` operand: 5 ^ 3 folds to
-// 6.
 TEST(ConstEval, BinaryBitwiseXorOfParameterFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -184,10 +175,6 @@ TEST(ConstEval, BinaryBitwiseXorOfParameterFolds) {
   EXPECT_EQ(q.resolved_value, 6);
 }
 
-// §11.4.8 binary bitwise XNOR (^~) folded with a `localparam` operand. XNOR is
-// the negated XOR: over the low 8 bits, 8'hFF ~^ 8'h0F yields ~(8'hF0) = 8'h0F.
-// The result is masked to the declared width so the check is independent of the
-// fold's internal carrier width.
 TEST(ConstEval, BinaryBitwiseXnorOfLocalparamFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -204,9 +191,6 @@ TEST(ConstEval, BinaryBitwiseXnorOfLocalparamFolds) {
   EXPECT_EQ(b.resolved_value & 0xFF, 0x0F);
 }
 
-// §11.4.8 unary bitwise negation folded with a `parameter` operand, driving the
-// per-bit negation on an identifier-resolved constant rather than a literal:
-// over the low 8 bits, ~8'h0F yields 8'hF0.
 TEST(ConstEval, UnaryBitwiseNotOfParameterFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -14,11 +14,6 @@
 
 namespace delta {
 
-// 4-state encoding (LRM Figure 38-8 / §H.7.7, canonical): a known bit is
-// bval=0; an unknown bit is bval=1 with aval distinguishing x=(aval=1,bval=1)
-// from z=(aval=0,bval=1). Per §11.4.x, logic operators treat z as x, so every
-// unknown result bit is normalized to x by forcing its aval set (|
-// result_bval).
 Logic4Word Logic4And(Logic4Word a, Logic4Word b) {
   uint64_t a_known_0 = ~a.aval & ~a.bval;
   uint64_t b_known_0 = ~b.aval & ~b.bval;
@@ -57,8 +52,6 @@ bool Logic4Vec::IsKnown() const {
 }
 
 bool Logic4Vec::IsTruthy() const {
-  // §6.12: a real is zero whatever its sign bit, so -0.0 is false; a real has
-  // no x or z bit, and the bits below the sign hold its magnitude.
   if (is_real) return (words[0].aval & ((uint64_t{1} << (width - 1)) - 1)) != 0;
   for (uint32_t i = 0; i < nwords; ++i) {
     if (words[i].aval & ~words[i].bval) {
@@ -69,7 +62,6 @@ bool Logic4Vec::IsTruthy() const {
 }
 
 bool Logic4Vec::SameValueAs(const Logic4Vec& other) const {
-  // The word count follows from the width, so equal widths hold equal words.
   if (width != other.width) return false;
   for (uint32_t i = 0; i < nwords; ++i) {
     if (words[i].aval != other.words[i].aval ||
@@ -84,9 +76,6 @@ uint64_t Logic4Vec::ToUint64() const {
   if (nwords == 0) {
     return 0;
   }
-  // 4-state -> integer projection: unknown bits (x, z) read as 0, matching the
-  // SystemVerilog 4-state-to-2-state cast. A known bit has bval=0, so masking
-  // by ~bval leaves defined values unchanged while collapsing x/z to 0.
   return words[0].aval & ~words[0].bval;
 }
 
@@ -131,12 +120,6 @@ void Logic4Snapshot::Capture(const Logic4Vec& src) {
 }
 
 Logic4Vec MakeLogic4Vec(Arena& arena, uint32_t width) {
-  // The rounding is done in 64 bits because it overflows in 32: a width above
-  // 0xFFFFFFC0 wrapped `width + 63` back to a small number and answered a word
-  // count far below the one the width needs -- 0 for the widths just under the
-  // maximum -- leaving a vector whose width and nwords disagree and which
-  // Logic4Vec::ToString then reads out of its own allocation. Every width a
-  // declaration can state rounds identically either way.
   auto nwords = static_cast<uint32_t>((static_cast<uint64_t>(width) + 63) / 64);
   auto* words = arena.AllocArray<Logic4Word>(nwords);
   return {width, nwords, words};
@@ -212,7 +195,6 @@ Strength ReduceResistive(Strength input) {
     case Strength::kSmall:
       return Strength::kSmall;
     default:
-      // Strength::kHighz, the one strength left, which no reduction changes.
       return input;
   }
 }
@@ -345,7 +327,6 @@ std::string_view TimeUnitStr(TimeUnit unit) {
     case TimeUnit::kPs:
       return "ps";
     default:
-      // TimeUnit::kFs, the one unit left.
       return "fs";
   }
 }
@@ -399,10 +380,6 @@ static uint64_t PowerOf10(int exp) {
   return result;
 }
 
-// The product of `a` and `b`, or the largest time where it would exceed it.
-// §9.4.1 reads a negative delay as an unsigned value of a time variable's
-// size, so a delay may already be near that largest time before it is scaled
-// to ticks, and a wrapped product would be a time before the delay began.
 static uint64_t SaturatingTickProduct(uint64_t a, uint64_t b) {
   constexpr uint64_t kMax = std::numeric_limits<uint64_t>::max();
   return a != 0 && b > kMax / a ? kMax : a * b;

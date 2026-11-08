@@ -78,10 +78,6 @@ TEST(LoopStatementSim, ProcessWithLoop) {
   EXPECT_EQ(result, 15u);
 }
 
-// A continue hands control to the next iteration of the for-loop, so the
-// step assignment and control expression of 12.7.1 still carry the loop
-// through its remaining iterations. The 12.8 file covers continue as a jump
-// statement.
 TEST(LoopStatementSim, ForContinueAdvancesToNextIteration) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -200,9 +196,6 @@ TEST(LoopStatementSim, ForCommaSeparatedInitAndStep) {
   EXPECT_EQ(val, 2u);
 }
 
-// When a for-loop initialization declares several locals, a later local's
-// initializer can read an earlier local. Here j starts at i + 3 == 3, so the
-// loop runs for i = 0..2 and the body executes three times.
 TEST(LoopStatementSim, ForLaterLocalInitUsesEarlierLocal) {
   auto val = RunAndGet(
       "module t;\n"
@@ -217,12 +210,6 @@ TEST(LoopStatementSim, ForLaterLocalInitUsesEarlierLocal) {
   EXPECT_EQ(val, 3u);
 }
 
-// §12.7.1 step c) admits a function call as a for_step form, alongside
-// assignment statements and increment/decrement expressions. Here the step is a
-// void function call that advances the loop-control variable through an inout
-// argument, so the loop runs while i < 4 and the body executes four times. This
-// observes the function-call step actually executing at run time, not merely
-// parsing.
 TEST(LoopStatementSim, ForFunctionCallStepAdvancesLoop) {
   auto val = RunAndGet(
       "module t;\n"
@@ -242,8 +229,6 @@ TEST(LoopStatementSim, ForFunctionCallStepAdvancesLoop) {
   EXPECT_EQ(val, 4u);
 }
 
-// The implicit block created by a for-loop's local declaration can be named
-// with a statement label; the labeled loop runs normally.
 TEST(LoopStatementSim, ForLabeledLoopRuns) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -260,64 +245,6 @@ TEST(LoopStatementSim, ForLabeledLoopRuns) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.7.1 has the for statement declare its control variable in the loop's own
-// implicit block -- the loop variable belongs to the loop alone -- so
-// `for (int i = seed; ...)` declares a storage element of its own and §6.8's
-// rule that a variable keeps its value from one assignment to the next holds
-// for `seed` across the whole loop: the header reads it once and no part of the
-// loop names it again. ExecFuncForInits stored what EvalExpr answered, EvalExpr
-// answers a bare identifier with the source variable's own Logic4Vec, and a
-// Logic4Vec copies its `words` pointer rather than the words, so the header
-// left `i` and `seed` one element until OwnRhsWords was put around the
-// initializer. This site does not even resize on the way in, so unlike a body
-// declaration it shared the buffer at any width the source has.
-//
-// The loop is written inside a function body because that is where this
-// header's variables are created: ExecFuncForInits builds them for a for in a
-// subroutine body and CreateForInitVars for one in a procedural block, so a
-// loop in an initial block reaches a different site and states nothing about
-// this one.
-//
-// This is a regression guard and it discriminates against nothing today: the
-// header could share its buffer again and `seed` would still read 8'b1x0z0000
-// out, because no writer left in the tree reaches a for-header local's words in
-// place. The writer that did reach them was §13.5.1's argument binding, which
-// copied the actual arguments' values by copying the pointer while §6.11.2 --
-// any x or z bits become zeros -- converted that copy in place, so handing the
-// loop variable to a `bit [7:0]` formal cleared `seed`'s unknowns in the
-// iteration that only read it. That binder takes its own copy since #3564, and
-// the writers beside it decline for reasons of their own: WritePartSelect
-// deposits into a fresh extract of the target rather than through it, so
-// `i[3] = 1'b1` cannot reach past `i`; this site marks no local 2-state (it
-// never writes is_4state), so no CoerceTo2State ever runs on one; and it
-// registers no struct fields, so no member deposit resolves against a
-// for-header local. A 2-state coercion added here without the copy above it is
-// the regression this stands against, and #3567 is the open reason someone will
-// come to add one.
-//
-// `turns` rather than `i` is what ends the loop, and it is a second header
-// local for that alone. It cannot hold an unknown bit: it is initialized from
-// the literal 0, and its step `turns = turns + 1` reaches EvalBinaryArith with
-// two known operands, which takes the arithmetic rather than §11.8.4's all-x
-// answer. So ExecFuncForLoop's `EvalExpr(for_cond).IsTruthy()` reads
-// EvalRelational on known operands three times -- 0 < 2, 1 < 2, 2 < 2 -- and
-// the body runs exactly twice.
-//
-// A condition written on `i` is what this case must not have, and once did: `i
-// + 1` is all-x by §11.8.4 as soon as the unknown bits survive into it, and
-// EvalSelect answers a single-bit select with `(base_val.ToUint64() >> off) &
-// 1`, which projects `aval & ~bval`, so `i[0]` read a known 0 out of an all-x
-// `i` and `i[0] == 1'b0` stayed true for ever. That hung the case for the whole
-// 60 s CTest allows once the binder above stopped clearing `i`; the bit-select
-// is #3566.
-//
-// ToUint64 projects aval & ~bval, so an unknown bit reads as 0 through it and
-// clearing it changes nothing it reports; the assertions read words[0].
-// 8'b1x0z0000 is stored as aval 0xC0 with bval 0x50, an x digit being aval 1
-// with bval 1 and a z digit aval 0 with bval 1, and the 2-state conversion of
-// it is aval 0x80 with bval 0x00 -- which is what the formal, and `noticed`
-// after it, alone are entitled to hold. `noticed` is also what says the body
-// ran at all: a loop that never entered it leaves it at 0.
 TEST(LoopStatementSim, ForHeaderLocalInitializedFromAVariableGetsItsOwnWords) {
   SimFixture f;
   auto* source = RunAndFindVar(
@@ -347,12 +274,6 @@ TEST(LoopStatementSim, ForHeaderLocalInitializedFromAVariableGetsItsOwnWords) {
   EXPECT_EQ(seen_in_loop->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// §10.7 sizes the right-hand side of an assignment to the left-hand side, and
-// a typed for-header init declares its variable exactly as any other
-// declaration does. The width the type gives reached the cell
-// CreateLocalVariable made and was then thrown away by the store -- a Logic4Vec
-// carries its own width -- so `for (int i = seed; ...)` over a `logic [7:0]`
-// left the counter eight bits wide for every later read, step and comparison.
 TEST(LoopStatementSim, ForHeaderLocalInASubroutineTakesItsDeclaredWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -373,13 +294,6 @@ TEST(LoopStatementSim, ForHeaderLocalInASubroutineTakesItsDeclaredWidth) {
   EXPECT_EQ(var->value.ToUint64(), 32u);
 }
 
-// §6.11.2: an automatic conversion of a 4-state value to a 2-state one turns
-// any x or z bits into zeros. `int` is one of the 2-state types, and
-// Variable::is_4state -- which is what every later store consults to make that
-// conversion -- defaults to true and was never set here, so the counter kept
-// the x and the z its initializer read. $isunknown is the instrument: the
-// value's own unknown bits are what a read of it into a 2-state variable would
-// hide.
 TEST(LoopStatementSim,
      ForHeaderLocalInASubroutineDropsItsInitializersUnknowns) {
   SimFixture f;
@@ -401,10 +315,6 @@ TEST(LoopStatementSim,
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// The same rule at the sibling site: a for header in a procedural block creates
-// its variable through CreateForInitVars and then runs the initializer as an
-// ordinary assignment, so §10.7's resize was already applied there by WriteVar
-// -- and WriteVar's §6.11.2 conversion was not, for want of the same flag.
 TEST(LoopStatementSim, ForHeaderLocalInABlockDropsItsInitializersUnknowns) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -422,10 +332,6 @@ TEST(LoopStatementSim, ForHeaderLocalInABlockDropsItsInitializersUnknowns) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §12.7.1's two loops that declare several variables after one data type: a
-// declarator with no data type of its own is a local of the loop like the
-// first, and a later initializer reads an earlier one. The second body copies
-// j at 10, 11 and 12, so j_end is 12.
 TEST(LoopStatementSim, ForSeveralDeclaratorsAfterOneDataType) {
   SimFixture f;
   std::string out = RunCapture(
@@ -449,11 +355,6 @@ TEST(LoopStatementSim, ForSeveralDeclaratorsAfterOneDataType) {
   EXPECT_EQ(out, "sum=66 last=11\npairs=3 j_end=12\n");
 }
 
-// §12.7.1 (printed page 330), step b): a for-loop whose expression is omitted
-// executes its statement, so in a function body it runs until a return or a
-// break leaves it -- g and h reach 3 and f3 returns 7 from its fourth pass. A
-// function's loop exited before its first pass when it had no expression, and
-// every value read 0.
 TEST(LoopStatementSim, ForWithoutExpressionRunsInFunctionBody) {
   SimFixture f;
   std::string out = RunCapture(
@@ -478,8 +379,6 @@ TEST(LoopStatementSim, ForWithoutExpressionRunsInFunctionBody) {
   EXPECT_EQ(out, "g=3 h=3 r=7 k=3\n");
 }
 
-// Syntax 12-5 with A.2.2.1: a for loop's variable declared with a package's
-// type runs the loop as one declared with that type written bare.
 TEST(LoopStatementSim, ForInitWithPackageScopedTypeRuns) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -493,10 +392,6 @@ TEST(LoopStatementSim, ForInitWithPackageScopedTypeRuns) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §12.7.1 makes a for loop's declared control variable a local of the type
-// the initialization writes. A real one steps by 0.25 and reaches 1.0 after
-// four passes; read as an integer it would never move off 0, which the bound
-// on n keeps from running for ever.
 TEST(LoopStatementSim, ForRealControlVariableIsReal) {
   EXPECT_EQ(
       RunAndGet("module t;\n"
@@ -509,8 +404,6 @@ TEST(LoopStatementSim, ForRealControlVariableIsReal) {
       4u);
 }
 
-// The same in a function body, and a string control variable, which grows by
-// a character each pass until it holds three.
 TEST(LoopStatementSim, ForStringAndRealControlVariablesInAFunction) {
   EXPECT_EQ(
       RunAndGet("module t;\n"

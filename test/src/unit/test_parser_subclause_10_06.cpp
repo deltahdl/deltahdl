@@ -49,8 +49,6 @@ TEST(ProceduralContinuousAssignmentParsing,
       "module m;\n"
       "  initial begin assign q; end\n"
       "endmodule\n");
-  // §10.6.1 owns the assign statement's own syntax, so
-  // Parser::ParseProceduralAssignStmt files the missing '=' under it.
   EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "10.6.1"));
 }
 

@@ -16,15 +16,6 @@
 namespace delta {
 namespace {
 
-// §37.8 Interface task or function declaration: the VPI object model for an
-// "interface tf decl", which a design run builds for each subroutine an
-// interface declares and a connected module defines (§25.7), reached from the
-// interface (§37.6) and reaching the definition through vpiTask or vpiFunction:
-//   D1 - an extern forkjoin task is one decl per module instance defining it,
-//        so vpi_iterate yields more than one for it.
-//   D2 - the access type reported for an interface tf decl is only ever
-//        vpiForkJoinAcc or vpiExternAcc; no third value escapes the property.
-
 class InterfaceTfDecl : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -33,8 +24,6 @@ class InterfaceTfDecl : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D2: a fork-join access type is one of the two legal values and is reported
-// back unchanged.
 TEST_F(InterfaceTfDecl, ForkJoinAccessTypeReportedVerbatim) {
   VpiObject tf_decl;
   tf_decl.type = vpiInterfaceTfDecl;
@@ -43,8 +32,6 @@ TEST_F(InterfaceTfDecl, ForkJoinAccessTypeReportedVerbatim) {
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&tf_decl)), vpiForkJoinAcc);
 }
 
-// D2: an extern access type is the other legal value and is also reported back
-// unchanged.
 TEST_F(InterfaceTfDecl, ExternAccessTypeReportedVerbatim) {
   VpiObject tf_decl;
   tf_decl.type = vpiInterfaceTfDecl;
@@ -53,36 +40,25 @@ TEST_F(InterfaceTfDecl, ExternAccessTypeReportedVerbatim) {
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&tf_decl)), vpiExternAcc);
 }
 
-// D2: any other stored value is not a legal access type for an interface tf
-// decl, so the property collapses to vpiUndefined rather than leaking a third
-// value - including the zero/unset default.
 TEST_F(InterfaceTfDecl, OutOfDomainAccessTypeCollapsesToUndefined) {
   VpiObject odd;
   odd.type = vpiInterfaceTfDecl;
-  odd.access_type = 99;  // neither vpiForkJoinAcc nor vpiExternAcc
+  odd.access_type = 99;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&odd)), vpiUndefined);
 
   VpiObject unset;
   unset.type = vpiInterfaceTfDecl;
-  unset.access_type = 0;  // default, still not a legal access type
+  unset.access_type = 0;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&unset)), vpiUndefined);
 }
 
-// D2 scope guard: the interface-tf-decl clamp is keyed on the object type, so
-// the other objects the property is drawn on keep their own rules. §37.41
-// draws it on the `task func` enclosure, and a task there reports the access it
-// was declared with rather than this clause's two values.
 TEST_F(InterfaceTfDecl, ClampIsScopedToInterfaceTfDecl) {
   VpiObject task;
   task.type = vpiTask;
-  task.access_type = 99;  // would be clamped if the guard were not type-keyed
+  task.access_type = 99;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&task)), 99);
 }
 
-// The property is drawn on the interface tf decl, on §37.34's constraint and on
-// §37.41's task func enclosure, and on nothing else. An object the data model
-// gives no access type reports none, rather than handing back a number the
-// diagrams never gave it.
 TEST_F(InterfaceTfDecl, AnObjectDrawnWithNoAccessTypeReportsNone) {
   VpiObject net;
   net.type = kVpiNet;
@@ -90,13 +66,8 @@ TEST_F(InterfaceTfDecl, AnObjectDrawnWithNoAccessTypeReportsNone) {
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&net)), vpiUndefined);
 }
 
-// A design run whose interface instance is read back for the interface tf
-// decls §37.6 draws it reaching.
 class InterfaceTfDeclOfARun : public VpiDesignRun {
  protected:
-  // The full names of what each interface tf decl of `iface` named `name`
-  // reaches through `relation`, vpiTask or vpiFunction, sorted, an empty name
-  // for a decl reaching none.
   static std::vector<std::string> DefinitionsOf(vpiHandle iface,
                                                 std::string_view name,
                                                 int relation) {
@@ -110,7 +81,6 @@ class InterfaceTfDeclOfARun : public VpiDesignRun {
     return defs;
   }
 
-  // The access types of the interface tf decls of `iface` named `name`.
   static std::vector<int> AccessOf(vpiHandle iface, std::string_view name) {
     std::vector<int> access;
     for (vpiHandle decl : ObjectsOf(vpiInterfaceTfDecl, iface)) {
@@ -122,14 +92,6 @@ class InterfaceTfDeclOfARun : public VpiDesignRun {
   }
 };
 
-// §37.6 with §25.7: an interface reaches an interface tf decl for each task or
-// function it declares extern, or a modport of it exports, for a connected
-// module to define: Load and Peek, of vpiExternAcc, each reaching the
-// definition in m, and Idle, which no module defines, reaching none. D1: the
-// extern forkjoin Ping is defined by both m and e (§25.7.4), so it is two decls
-// of vpiForkJoinAcc, one per definition, and Wait, defined by none, one
-// reaching none. Own, which the interface defines itself and a modport imports,
-// is no such declaration. A task reaches no function, nor a function a task.
 TEST_F(InterfaceTfDeclOfARun, AnInterfaceReachesADeclPerDefinitionOfItsTfs) {
   Run("interface bus;\n"
       "  extern task Load(input int x);\n"

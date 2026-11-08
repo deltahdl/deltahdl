@@ -239,9 +239,6 @@ TEST(QueueAssign, AssignEmptyClears) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-// The LRM writes the pop_front-equivalent form as a bare slice assigned
-// directly to the queue (q = q[1:$]), not wrapped in a concatenation. This
-// drives the top-level slice branch of the assignment collector.
 TEST(QueueAssign, BareSliceFromOneEquivPopFront) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -252,7 +249,6 @@ TEST(QueueAssign, BareSliceFromOneEquivPopFront) {
   ExpectQueueContents(f, "q", {20, 30});
 }
 
-// Bare slice form of the pop_back equivalent: q = q[0:$-1].
 TEST(QueueAssign, BareSliceToLastMinus1EquivPopBack) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -264,7 +260,6 @@ TEST(QueueAssign, BareSliceToLastMinus1EquivPopBack) {
   ExpectQueueContents(f, "q", {10, 20});
 }
 
-// Bare slice form yielding a new queue lacking the first two items: q = q[2:$].
 TEST(QueueAssign, BareSliceDropFirstTwo) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40, 50});
@@ -275,7 +270,6 @@ TEST(QueueAssign, BareSliceDropFirstTwo) {
   ExpectQueueContents(f, "q", {30, 40, 50});
 }
 
-// Bare slice form yielding a new queue lacking first and last: q = q[1:$-1].
 TEST(QueueAssign, BareSliceDropFirstAndLast) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40, 50});
@@ -287,9 +281,6 @@ TEST(QueueAssign, BareSliceDropFirstAndLast) {
   ExpectQueueContents(f, "q", {20, 30, 40});
 }
 
-// Second insert example: q = {q[0:pos], e, q[pos+1:$]} mirrors insert(pos+1,
-// e). With pos = 2 the new element lands after index 2, distinct from the
-// q[0:pos-1]/q[pos:$] form above.
 TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30, 40});
@@ -304,13 +295,6 @@ TEST(QueueAssign, ConcatInsertAfterPosEquivInsertPlus1) {
   ExpectQueueContents(f, "q", {10, 20, 30, 99, 40});
 }
 
-// The tests above build each right-hand side as an AST and hand it straight to
-// TryQueueBlockingAssign, which says nothing about whether a source file
-// written the way §7.10.4 writes it reaches that function. The tests below
-// state each of the subclause's forms as SystemVerilog, starting from the
-// declaration the subclause itself uses, `int q[$] = { 2, 4, 8 };`.
-
-// §7.10.4: `q = { q, 6 }` leaves what `q.push_back(6)` would leave.
 TEST(QueueAssign, SourceConcatAppendEquivPushBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -320,7 +304,6 @@ TEST(QueueAssign, SourceConcatAppendEquivPushBack) {
       "q", {2, 4, 8, 6});
 }
 
-// §7.10.4: `q = { e, q }` leaves what `q.push_front(e)` would leave.
 TEST(QueueAssign, SourceConcatPrependEquivPushFront) {
   RunAndExpectQueue(
       "module t;\n"
@@ -331,9 +314,6 @@ TEST(QueueAssign, SourceConcatPrependEquivPushFront) {
       "q", {6, 2, 4, 8});
 }
 
-// §7.10.4: `q = q[1:$]` leaves what `q.pop_front()` or `q.delete(0)` would
-// leave. The right-hand side reads the queue it is assigned to, so the
-// elements it names have to be taken before the assignment writes.
 TEST(QueueAssign, SourceSliceFromOneEquivPopFront) {
   RunAndExpectQueue(
       "module t;\n"
@@ -343,8 +323,6 @@ TEST(QueueAssign, SourceSliceFromOneEquivPopFront) {
       "q", {4, 8});
 }
 
-// §7.10.4: `q = q[0:$-1]` leaves what `q.pop_back()` or
-// `q.delete(q.size-1)` would leave.
 TEST(QueueAssign, SourceSliceToLastMinusOneEquivPopBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -354,9 +332,6 @@ TEST(QueueAssign, SourceSliceToLastMinusOneEquivPopBack) {
       "q", {2, 4});
 }
 
-// §7.10.4: `q = { q[0:pos-1], e, q[pos:$] }` leaves what `q.insert(pos, e)`
-// would leave. `pos` is a variable, which is what §7.10.1 means by saying the
-// slice bounds may be any integral expressions, constant or not.
 TEST(QueueAssign, SourceConcatInsertAtPosEquivInsert) {
   RunAndExpectQueue(
       "module t;\n"
@@ -368,8 +343,6 @@ TEST(QueueAssign, SourceConcatInsertAtPosEquivInsert) {
       "q", {2, 6, 4, 8});
 }
 
-// §7.10.4: `q = { q[0:pos], e, q[pos+1:$] }` leaves what `q.insert(pos+1, e)`
-// would leave, one place later than the form above from the same `pos`.
 TEST(QueueAssign, SourceConcatInsertAfterPosEquivInsertPlusOne) {
   RunAndExpectQueue(
       "module t;\n"
@@ -381,7 +354,6 @@ TEST(QueueAssign, SourceConcatInsertAfterPosEquivInsertPlusOne) {
       "q", {2, 4, 6, 8});
 }
 
-// §7.10.4: `q = q[2:$]` makes a new queue without the first two items.
 TEST(QueueAssign, SourceSliceDropsFirstTwo) {
   RunAndExpectQueue(
       "module t;\n"
@@ -391,7 +363,6 @@ TEST(QueueAssign, SourceSliceDropsFirstTwo) {
       "q", {8, 16, 32});
 }
 
-// §7.10.4: `q = q[1:$-1]` makes a new queue without the first and last items.
 TEST(QueueAssign, SourceSliceDropsFirstAndLast) {
   RunAndExpectQueue(
       "module t;\n"
@@ -401,9 +372,6 @@ TEST(QueueAssign, SourceSliceDropsFirstAndLast) {
       "q", {4, 8, 16});
 }
 
-// §7.10.3: the assignment outdates every reference to the queue's elements. A
-// reference taken after the assignment is not one of those, so it still writes
-// back.
 TEST(QueueAssign, SourceRefTakenAfterAssignWritesBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -419,10 +387,6 @@ TEST(QueueAssign, SourceRefTakenAfterAssignWritesBack) {
       "q", {2, 99, 8, 6});
 }
 
-// §7.10.4 with §10.4.2: a nonblocking assignment updates the queue variable in
-// the same nine forms a blocking one does. Its right-hand side is evaluated
-// where the statement stands and the queue is written in the NBA region, which
-// changes when the queue changes and not what it is left holding.
 TEST(QueueAssignNba, ConcatAppendEquivPushBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -432,7 +396,6 @@ TEST(QueueAssignNba, ConcatAppendEquivPushBack) {
       "q", {2, 4, 8, 6});
 }
 
-// §7.10.4: the nonblocking spelling of `q = { e, q }`.
 TEST(QueueAssignNba, ConcatPrependEquivPushFront) {
   RunAndExpectQueue(
       "module t;\n"
@@ -443,9 +406,6 @@ TEST(QueueAssignNba, ConcatPrependEquivPushFront) {
       "q", {6, 2, 4, 8});
 }
 
-// §7.10.4: the nonblocking spelling of `q = q[1:$]`. The right-hand side is a
-// slice and carries no braces, so a queue path that recognizes only a
-// concatenation reads it as the one value its elements concatenate to.
 TEST(QueueAssignNba, SliceFromOneEquivPopFront) {
   RunAndExpectQueue(
       "module t;\n"
@@ -455,7 +415,6 @@ TEST(QueueAssignNba, SliceFromOneEquivPopFront) {
       "q", {4, 8});
 }
 
-// §7.10.4: the nonblocking spelling of `q = q[0:$-1]`.
 TEST(QueueAssignNba, SliceToLastMinusOneEquivPopBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -465,9 +424,6 @@ TEST(QueueAssignNba, SliceToLastMinusOneEquivPopBack) {
       "q", {2, 4});
 }
 
-// §7.10.4: the nonblocking spelling of `q = { q[0:pos-1], e, q[pos:$] }`. A
-// slice written as an item of the concatenation contributes the run of
-// elements it names, not the single value they concatenate to.
 TEST(QueueAssignNba, ConcatInsertAtPosEquivInsert) {
   RunAndExpectQueue(
       "module t;\n"
@@ -479,7 +435,6 @@ TEST(QueueAssignNba, ConcatInsertAtPosEquivInsert) {
       "q", {2, 6, 4, 8});
 }
 
-// §7.10.4: the nonblocking spelling of `q = q[2:$]`.
 TEST(QueueAssignNba, SliceDropsFirstTwo) {
   RunAndExpectQueue(
       "module t;\n"
@@ -489,7 +444,6 @@ TEST(QueueAssignNba, SliceDropsFirstTwo) {
       "q", {8, 16, 32});
 }
 
-// §7.10.4: the nonblocking spelling of `q = q[1:$-1]`.
 TEST(QueueAssignNba, SliceDropsFirstAndLast) {
   RunAndExpectQueue(
       "module t;\n"
@@ -499,8 +453,6 @@ TEST(QueueAssignNba, SliceDropsFirstAndLast) {
       "q", {4, 8, 16});
 }
 
-// §7.10.4: the nonblocking spelling of `q = {}`, which §7.10 makes the empty
-// queue.
 TEST(QueueAssignNba, EmptyConcatClearsQueue) {
   RunAndExpectQueue(
       "module t;\n"
@@ -510,11 +462,6 @@ TEST(QueueAssignNba, EmptyConcatClearsQueue) {
       "q", {});
 }
 
-// §10.4.2: the right-hand side of a nonblocking assignment is evaluated when
-// the statement executes, so both statements below read the queue the
-// declaration left and the second one's value is what the NBA region writes.
-// A right-hand side evaluated in the NBA region instead would append 4 and
-// then append 5 to the result, leaving five elements.
 TEST(QueueAssignNba, RhsReadsQueueWhereTheStatementStands) {
   RunAndExpectQueue(
       "module t;\n"
@@ -527,10 +474,6 @@ TEST(QueueAssignNba, RhsReadsQueueWhereTheStatementStands) {
       "q", {2, 4, 8, 5});
 }
 
-// §7.10.3: a nonblocking assignment to the queue variable outdates the
-// references the queue held, and leaves the queue able to record a reference
-// taken afterwards. A path that dropped the element identities rather than
-// replacing them would leave this write-back with nothing to land on.
 TEST(QueueAssignNba, RefTakenAfterAssignWritesBack) {
   RunAndExpectQueue(
       "module t;\n"
@@ -546,13 +489,6 @@ TEST(QueueAssignNba, RefTakenAfterAssignWritesBack) {
       "q", {2, 99, 8, 6});
 }
 
-// §7.10.1: a read through an invalid index, a 4-state value with an x or z bit
-// or a value outside 0...$, returns what a nonexistent entry of the queue's
-// element type reads as (Table 7-1, §7.4.5). On a three-element queue the index
-// 5 lies outside 0...$, so `q[5]` written as an item of the §7.10.4
-// concatenation still contributes one element, and Table 7-1 makes that element
-// 'x for the 4-state element type `logic [31:0]`. A read that contributes
-// nothing leaves a queue of one element instead of two.
 TEST(QueueAssign, SourceConcatItemOutOfRangeIndexContributesX) {
   SimFixture f;
   ElaborateLowerRun(f,
@@ -567,11 +503,6 @@ TEST(QueueAssign, SourceConcatItemOutOfRangeIndexContributesX) {
   EXPECT_EQ(q->elements[1].ToUint64(), 1u);
 }
 
-// §7.10.1 makes an index expression carrying an x or z bit invalid on the same
-// terms as one lying outside 0...$, so `q[i]` with `i` holding x contributes
-// the same Table 7-1 value the case above expects. Collapsing the index to a
-// number instead reaches element 0 and contributes the known 10 stored there,
-// so the value and not just the count is what separates the two readings.
 TEST(QueueAssign, SourceConcatItemUnknownIndexContributesX) {
   SimFixture f;
   ElaborateLowerRun(f,
@@ -590,12 +521,6 @@ TEST(QueueAssign, SourceConcatItemUnknownIndexContributesX) {
   EXPECT_EQ(q->elements[1].ToUint64(), 1u);
 }
 
-// Table 7-1 in §7.4.5 gives a 2-state integral type '0 where it gives a 4-state
-// one 'x, and §7.10.1 sends an invalid queue index to that table, so the
-// element type decides the value the item contributes. Only the declared type
-// changes from the out-of-range case above: `bit [31:0]` is 2-state where
-// `logic [31:0]` is 4-state, at the same width and the same index. An
-// implementation that always yields x passes that case and fails this one.
 TEST(QueueAssign,
      SourceConcatItemOutOfRangeIndexOnTwoStateQueueContributesZero) {
   SimFixture f;
@@ -612,16 +537,6 @@ TEST(QueueAssign,
   EXPECT_EQ(q->elements[1].ToUint64(), 1u);
 }
 
-// §10.10 makes an item of an unpacked array concatenation that names an array
-// stand for all of that item's elements, in the left-to-right order the item
-// holds them, so `q = {a}` leaves the queue holding what `a[0]` and `a[1]`
-// hold. Holding, not naming: §7.10.3 says that an assignment to a whole queue
-// outdates every reference to an element of the original queue, and a queue
-// entry left sharing a buffer with the live array element it was collected from
-// is exactly such an outdated reference, one the next assignment to `a[0]`
-// would still write through. ExpectOwnWordsCopy makes the storage-identity
-// claim; the read of 0xA5 after it keeps the test from passing on a queue of
-// two entries the run never filled.
 TEST(QueueAssign, SourceConcatItemNamingArrayGivesQueueItsOwnElementWords) {
   SimFixture f;
   auto* a0 = RunAndFindVar(
@@ -642,14 +557,6 @@ TEST(QueueAssign, SourceConcatItemNamingArrayGivesQueueItsOwnElementWords) {
   EXPECT_EQ(q->elements[0].words[0].aval, 0xA5u);
 }
 
-// §7.10.4 with §8.5: the target of a whole-queue assignment may be a queue
-// property reached through a handle from the module, and §10.10 makes the
-// `{4, 5}` assigned to it an unpacked array concatenation, where an unsized
-// literal is an element and not the §11.4.12 operand a vector concatenation
-// forbids. The elaborator classified the concatenation by its target and knew
-// only a bare name as a queue, so `h.q = {4, 5}` was refused as a vector
-// concatenation of unsized constants; RunAndGet fails on that report. The
-// value reads the count and both elements: 2, 4 and 5 make 245.
 TEST(QueueAssign, ConcatOfUnsizedLiteralsThroughAHandleFillsTheProperty) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  class C;\n"
@@ -667,11 +574,6 @@ TEST(QueueAssign, ConcatOfUnsizedLiteralsThroughAHandleFillsTheProperty) {
             245u);
 }
 
-// §7.10.4: `h.q = {h.q, 6}` appends to the property through the handle, the
-// item naming the queue contributing its elements (§10.10) and the unsized 6
-// contributing one more. The elaborator refused this shape with the same
-// §11.4.12 report. After a fill of 7, 2 and 9 in a method the queue holds 4
-// elements, 7 first and 6 last: 476.
 TEST(QueueAssign, ConcatNamingThePropertyThroughAHandleAppendsToIt) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  class C;\n"
@@ -693,11 +595,6 @@ TEST(QueueAssign, ConcatNamingThePropertyThroughAHandleAppendsToIt) {
             476u);
 }
 
-// §8.9 with §7.10.4: a static queue property is assigned through the class
-// scope operator, `C::s = {5, 15, 25}`, and the same unpacked array
-// concatenation rule admits the unsized literals. The elaborator did not know
-// the `C::s` target as a queue and refused it. The value reads 3 for the size,
-// 5 for the first element and 25 for the last: 3075.
 TEST(QueueAssign, ConcatToAStaticQueuePropertyThroughTheClassScope) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  class C;\n"

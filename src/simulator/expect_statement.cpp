@@ -13,19 +13,6 @@
 
 namespace delta {
 
-// §16.17: the expect statement starts a single thread of evaluation of its
-// property on the subsequent clocking event, the first evaluation taking
-// place at the next tick and not at one the process has already seen, and
-// the process blocks until the property succeeds or fails, its attempt
-// advanced in the Observed region of each tick in the process itself, as
-// §16.5 evaluates a concurrent assertion; no further evaluation begins
-// until the statement is executed again. The verdict, written by the
-// attempt's conclusion, unblocks the process in the Reactive region, where
-// it executes the pass statement or the else clause, a failure with no
-// else clause having been reported through $error where it was concluded
-// (§20.11 having $assertcontrol able to suppress that). A statement whose
-// spec this tool does not evaluate blocks nothing; §20.11's On, Off and Kill
-// do not affect an expect statement, so none turns its checking off.
 ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   Process* proc = ctx.CurrentProcess();
   bool evaluated = proc != nullptr && stmt->is_concurrent_clocked &&
@@ -44,8 +31,6 @@ ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_await RegionAwaiter{ctx, Region::kReactive};
   const Stmt* action =
       proc->expect_holds ? stmt->assert_pass_stmt : stmt->assert_fail_stmt;
-  // §20.11: PassOff and FailOff stop the action block of an expect statement
-  // as they stop an assertion's.
   if (action != nullptr &&
       AssertionControlStatus(stmt, ctx).RunsAction(proc->expect_holds, false)) {
     co_return co_await ExecStmt(action, ctx, arena);

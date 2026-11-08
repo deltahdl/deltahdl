@@ -22,8 +22,6 @@ TEST(MailboxPeekElaborator, PeekCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.7: peek() copies the message into its argument, which shall be a
-// valid left-hand expression.
 TEST(MailboxPeekElaborator, PeekIntoAnOperatorExpressionIsReported) {
   ElabFixture f;
   ElaborateSrc(

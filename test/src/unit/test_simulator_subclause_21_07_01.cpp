@@ -2,9 +2,6 @@
 
 #include <string>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_vcd_file_form.h"
@@ -12,30 +9,11 @@
 namespace delta {
 namespace {
 
-// §21.7.1: creating the 4-state VCD file. The subclause's own text (its
-// descendants own the individual tasks) makes two observable claims:
-// (1) the file is created by inserting the VCD system tasks in the
-// SystemVerilog source -- one call defining the dump file name, one
-// specifying the variables to dump -- and then running the simulation
-// (the Figure 21-1 flow); (2) the resulting file is ASCII text holding, in
-// order, header information, variable definitions, and the value changes of
-// every variable the task calls specified. Both are runtime rules whose
-// observable is the dump file a full simulation leaves on disk, so each test
-// drives real source through parse, elaboration, lowering, and the scheduler
-// with the driver's per-timestep recording loop installed, then inspects the
-// file -- nothing is hand-driven on the writer.
 class CreatingFourStateVcd : public VcdDumpRunTestBase {
  protected:
-  // Runs a single-module source through the full pipeline with the driver's
-  // dump loop (timestamp + changed values at the end of each time unit) and
-  // returns the dump file contents.
   std::string RunVcd(const std::string& src) { return RunVcdDump(src); }
 };
 
-// The creation steps of Figure 21-1: the source inserts the VCD system tasks
-// -- $dumpfile defining the dump file name, then $dumpvars specifying the
-// variables -- and the simulation runs. The product is a non-empty dump file
-// recording the variable's later value change, ready for post-processing.
 TEST_F(CreatingFourStateVcd, InsertTasksAndRunSimulationProducesDumpFile) {
   auto content = RunVcd(
       "module t;\n"
@@ -50,13 +28,9 @@ TEST_F(CreatingFourStateVcd, InsertTasksAndRunSimulationProducesDumpFile) {
   ASSERT_FALSE(content.empty());
   EXPECT_NE(content.find("$enddefinitions"), std::string::npos);
   EXPECT_NE(content.find("#10"), std::string::npos);
-  EXPECT_NE(content.find("1!"), std::string::npos);  // clk's recorded change
+  EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-// A VCD file is an ASCII file: with the dump exercising the full 4-state
-// alphabet (0, 1, x, and z reaching the value-change section in both vector
-// and scalar encodings), every byte of the file is printable ASCII or
-// ordinary whitespace -- no byte outside the 7-bit printable range appears.
 TEST_F(CreatingFourStateVcd, DumpFileIsAsciiText) {
   auto content = RunVcd(
       "module t;\n"
@@ -73,17 +47,12 @@ TEST_F(CreatingFourStateVcd, DumpFileIsAsciiText) {
       "  end\n"
       "endmodule\n");
   ASSERT_FALSE(content.empty());
-  // The 4-state values are carried as ASCII letters in the change records:
-  // s -> '!' (scalar encoding), v -> '"' (vector encoding).
   EXPECT_NE(content.find("b10xz01zx \""), std::string::npos);
   EXPECT_NE(content.find("x!"), std::string::npos);
   EXPECT_NE(content.find("z!"), std::string::npos);
   ExpectFileIsAsciiText(content);
 }
 
-// The file's three parts appear in creation order: header information first,
-// then the variable definitions, then the value changes -- matching the
-// header / node information / value-change layout of Figure 21-1.
 TEST_F(CreatingFourStateVcd, HeaderThenDefinitionsThenValueChanges) {
   auto content = RunVcd(
       "module t;\n"
@@ -100,9 +69,6 @@ TEST_F(CreatingFourStateVcd, HeaderThenDefinitionsThenValueChanges) {
   EXPECT_NE(content.find("1!", p_change), std::string::npos);
 }
 
-// The file contains the value changes for ALL variables specified in the
-// task calls: with two variables specified and each changing at a different
-// time, both variables' definitions and both recorded changes are present.
 TEST_F(CreatingFourStateVcd, ValueChangesForAllSpecifiedVariables) {
   auto content = RunVcd(
       "module t;\n"
@@ -116,20 +82,14 @@ TEST_F(CreatingFourStateVcd, ValueChangesForAllSpecifiedVariables) {
       "    #10 b = 4'b1010;\n"
       "  end\n"
       "endmodule\n");
-  // Variable definitions cover each specified variable.
   EXPECT_NE(content.find("$var reg 1 ! a $end"), std::string::npos);
   EXPECT_NE(content.find("$var reg 4 \" b $end"), std::string::npos);
-  // Value changes cover each specified variable.
   auto p_defs_end = content.find("$enddefinitions");
   ASSERT_NE(p_defs_end, std::string::npos);
   EXPECT_NE(content.find("1!", p_defs_end), std::string::npos);
   EXPECT_NE(content.find("b1010 \"", p_defs_end), std::string::npos);
 }
 
-// Every variable specified includes one that never changes after the specifying
-// call: the checkpoint the specification produces records its value, so the
-// variable is represented in the file's value-change section even without a
-// later edge.
 TEST_F(CreatingFourStateVcd, SpecifiedButUnchangingVariableStillRepresented) {
   auto content = RunVcd(
       "module t;\n"
@@ -144,16 +104,11 @@ TEST_F(CreatingFourStateVcd, SpecifiedButUnchangingVariableStillRepresented) {
       "endmodule\n");
   auto p_defs_end = content.find("$enddefinitions");
   ASSERT_NE(p_defs_end, std::string::npos);
-  // a -> '!', steady -> '"': the never-changing variable's value is recorded
-  // by the $dumpvars checkpoint alongside the changing one's.
   EXPECT_NE(content.find("0!", p_defs_end), std::string::npos);
   EXPECT_NE(content.find("b110 \"", p_defs_end), std::string::npos);
   EXPECT_NE(content.find("1!", p_defs_end), std::string::npos);
 }
 
-// The creation tasks are ordinary task enables: inserted in a task body
-// rather than directly in the initial block, the same run produces the same
-// three-part dump file.
 TEST_F(CreatingFourStateVcd, TasksInsertedInTaskBodyStillCreateFile) {
   auto content = RunVcd(
       "module t;\n"
@@ -174,18 +129,8 @@ TEST_F(CreatingFourStateVcd, TasksInsertedInTaskBodyStillCreateFile) {
   EXPECT_NE(content.find("1!"), std::string::npos);
 }
 
-// §21.7.1 again, with the test supplying nothing but the source. The cases
-// above hand the run a dump file already opened, so they observe what a VCD
-// file holds and cannot observe that one gets created; these two observe the
-// creation. §21.7.1's two steps are the whole claim: insert the VCD system
-// tasks in the SystemVerilog source file, then run the simulation, and the
-// file of Figure 21-1 is what the pair produces.
 class CreatingFourStateVcdFromSourceAlone : public VcdDumpFromSourceTestBase {
  protected:
-  // The design Figure 21-1 draws, with the two creation tasks either present
-  // or absent, so the only difference between the cases below is the step
-  // §21.7.1 (a) calls for. `tasks` is inserted between the initial block's
-  // first assignment and the value change that follows it.
   static std::string DesignWith(const std::string& tasks) {
     return "module t;\n"
            "  logic a;\n"
@@ -198,13 +143,6 @@ class CreatingFourStateVcdFromSourceAlone : public VcdDumpFromSourceTestBase {
   }
 };
 
-// §21.7.1: the two steps that create the file are inserting the VCD system
-// tasks in the source and running the simulation, so a run of a source that
-// calls $dumpfile and $dumpvars leaves a dump file under the name $dumpfile
-// gave it. $enddefinitions is what says the file is a VCD file rather than an
-// empty one the run happened to touch: §21.7.2.1 makes it the declaration
-// command that closes the header and variable definitions, and a file holding
-// it has been through the whole of Figure 21-1's header and node information.
 TEST_F(CreatingFourStateVcdFromSourceAlone, InsertedTasksAndARunCreateTheFile) {
   RunSource(
       DesignWith("    $dumpfile(\"dump1.dump\");\n"
@@ -213,11 +151,6 @@ TEST_F(CreatingFourStateVcdFromSourceAlone, InsertedTasksAndARunCreateTheFile) {
   EXPECT_NE(DumpFile("dump1.dump").find("$enddefinitions"), std::string::npos);
 }
 
-// §21.7.1: the control for the case above. The file is created by inserting
-// the VCD system tasks, so the same design with neither task inserted creates
-// nothing -- run the simulation alone and step (a) is missing. Without this
-// case, a simulator that opened a dump file for every design whatever its
-// source called would satisfy every other §21.7 case in the tree.
 TEST_F(CreatingFourStateVcdFromSourceAlone, ASourceWithNoVcdTaskCreatesNoFile) {
   RunSource(DesignWith(""));
 

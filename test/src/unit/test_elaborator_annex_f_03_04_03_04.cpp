@@ -13,14 +13,6 @@
 
 using namespace delta;
 
-// §F.3.4.3.4 unfolds the conditional property operators into the §F.3.2
-// overlapping implication over the Boolean b read as a one-letter sequence:
-// (if (b) P) is (b |-> P), and (if (b) P1 else P2) is ((b |-> P1) and
-// (weak(b) or P2)). The cases check that each factory builds the tree its
-// identity names in both property models and that, under §F.5.3.1, the
-// then-branch is required exactly where b holds at the first letter and the
-// else-branch exactly where it does not.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
@@ -29,8 +21,6 @@ std::shared_ptr<const SequenceExpr> Atom(const std::string& name) {
   return SeqBoolean(BoolAtom(name));
 }
 
-// The unclocked if is the implication whose antecedent is the Boolean b as a
-// sequence and whose consequent is P itself.
 TEST(DerivedConditionalOperators, UnclockedIfIsAnImplicationOverTheBoolean) {
   auto p = PropStrong(Atom("b"));
   auto form = PropIf(BoolAtom("a"), p);
@@ -40,8 +30,6 @@ TEST(DerivedConditionalOperators, UnclockedIfIsAnImplicationOverTheBoolean) {
   EXPECT_EQ(form->lhs, p);
 }
 
-// The unclocked if-else is the and of (b |-> P1) and (weak(b) or P2), each
-// operand in the place the identity gives it.
 TEST(DerivedConditionalOperators, UnclockedIfElseIsTheStatedConjunction) {
   auto p1 = PropStrong(Atom("b"));
   auto p2 = PropStrong(Atom("c"));
@@ -63,8 +51,6 @@ TEST(DerivedConditionalOperators, UnclockedIfElseIsTheStatedConjunction) {
   EXPECT_EQ(else_branch.rhs, p2);
 }
 
-// The clocked forms are the same trees in the §F.5.1.2 model, and the if-else
-// is not the if with the else operand dropped.
 TEST(DerivedConditionalOperators, ClockedFormsAreTheStatedTrees) {
   auto q1 = ClkStrong(Atom("b"));
   auto q2 = ClkStrong(Atom("c"));
@@ -77,11 +63,6 @@ TEST(DerivedConditionalOperators, ClockedFormsAreTheStatedTrees) {
                                     *ClkIf(BoolAtom("a"), q1)));
 }
 
-// Under §F.5.3.1, if (a) strong(b) requires b on the letter with a, since
-// the implication it unfolds to is the overlapping one: it holds on a letter
-// with both atoms, fails on a lone a and on a then b, where b arrives a letter
-// too late, and holds vacuously on a word whose first letter lacks a, whatever
-// follows.
 TEST(DerivedConditionalOperators, IfRequiresTheBranchOnlyWhereTheBooleanHolds) {
   auto form = PropIf(BoolAtom("a"), PropStrong(Atom("b")));
   const Word kAWithB{A({"a", "b"})};
@@ -94,12 +75,6 @@ TEST(DerivedConditionalOperators, IfRequiresTheBranchOnlyWhereTheBooleanHolds) {
   EXPECT_TRUE(NeutrallySatisfies(kNoA, *form));
 }
 
-// Under §F.5.3.1, if (a) strong(b) else strong(c) is decided by the branch a
-// selects at the first letter and by that branch alone: with a it holds on a
-// letter with both atoms and fails on a lone a, where strong(a) would have
-// held had the else been consulted; without a it holds on c and fails on a
-// letter with neither atom, and fails on b, where strong(b) would have held
-// had the then been consulted.
 TEST(DerivedConditionalOperators, IfElseRequiresTheBranchTheBooleanSelects) {
   auto with_a_then_b =
       PropIfElse(BoolAtom("a"), PropStrong(Atom("b")), PropStrong(Atom("a")));

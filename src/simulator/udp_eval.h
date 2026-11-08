@@ -10,12 +10,6 @@ struct UdpDecl;
 class UdpEvalState {
  public:
   explicit UdpEvalState(const UdpDecl& decl);
-  // Seeds the output of a sequential primitive with `initial_output` -- '0',
-  // '1' or 'x' -- in place of the bit UdpDecl::initial_value carries, for a
-  // caller that has evaluated A.5.2's `output reg port_identifier =
-  // constant_expression` where the parser could only keep it. A combinational
-  // primitive's output starts at x whatever is passed, as under the other
-  // constructor.
   UdpEvalState(const UdpDecl& decl, char initial_output);
 
   char Evaluate(const std::vector<char>& inputs);
@@ -26,9 +20,6 @@ class UdpEvalState {
   void SetInputs(const std::vector<char>& inputs);
 
   char GetOutput() const { return output_; }
-  // §38.34: makes `output` the primitive's output, and so the current state
-  // its next evaluation matches against (§29.5), as a VPI put of a sequential
-  // primitive's value does.
   void SetOutput(char output) { output_ = output; }
 
  private:

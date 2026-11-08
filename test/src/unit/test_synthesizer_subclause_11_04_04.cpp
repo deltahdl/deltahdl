@@ -8,44 +8,22 @@ using namespace delta;
 
 namespace {
 
-// The value a four-bit raw pattern stands for when the operand carrying it is
-// signed: §11.4.4 rules that where both operands are signed the expression is a
-// comparison between signed values, and a four-bit two's-complement operand
-// reads the patterns 8 to 15 as -8 to -1.
 int64_t SignedFourBit(uint64_t raw) {
   return static_cast<int64_t>(raw) - (raw >= 8 ? 16 : 0);
 }
 
-// The test fails on a synthesizer that answers a netlist whose every bit of `y`
-// is constant zero, which is what `assign y = a < b;` lowers to today:
-// `SynthLower::LowerBinaryBit` in src/synthesizer/synth_lower.cpp answers
-// `AigGraph::kConstFalse` for the relational operators, on a module the
-// synthesizer accepts without a word. Table 11-8 of §11.4.4 defines `a < b` as
-// "a less than b", so the netlist owes 1 at the 120 pairs where `a` is below
-// `b` and 0 at the other 136.
 TEST(RelationalSynthesis, LessThanLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(
       ModuleAssigning("input [3:0] a, input [3:0] b", "a < b"), 16,
       [](uint64_t a, uint64_t b) { return a < b ? uint64_t{1} : uint64_t{0}; });
 }
 
-// The test fails on a fix that reaches `a < b` and leaves `a > b` building
-// nothing, which the case above passes. Table 11-8 of §11.4.4 defines `a > b`
-// as "a greater than b" in the one table that defines `a < b`, so the two are
-// owed together, and the greater-than arrives as its own token rather than as
-// the operands of the less-than swapped.
 TEST(RelationalSynthesis, GreaterThanLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(
       ModuleAssigning("input [3:0] a, input [3:0] b", "a > b"), 16,
       [](uint64_t a, uint64_t b) { return a > b ? uint64_t{1} : uint64_t{0}; });
 }
 
-// The test fails on a lowering that builds `a < b` for `a <= b`, which Table
-// 11-8 of §11.4.4 defines as "a less than or equal to b". The sixteen pairs
-// where `a` equals `b` are what tell the two apart, since the strict and the
-// non-strict comparison agree everywhere else, and the sweep drives every
-// combination of the two four-bit operands so those pairs are in it by
-// construction.
 TEST(RelationalSynthesis, LessThanOrEqualLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(ModuleAssigning("input [3:0] a, input [3:0] b", "a <= b"),
                     16, [](uint64_t a, uint64_t b) {
@@ -53,11 +31,6 @@ TEST(RelationalSynthesis, LessThanOrEqualLowersToTheComparisonOfItsOperands) {
                     });
 }
 
-// The test fails on a lowering that builds `a > b` for `a >= b`, which Table
-// 11-8 of §11.4.4 defines as "a greater than or equal to b". As with the case
-// above, the pairs where `a` equals `b` are what separate the two, and the
-// greater-than-or-equal is the fourth entry of the table rather than a spelling
-// of any of the other three.
 TEST(RelationalSynthesis,
      GreaterThanOrEqualLowersToTheComparisonOfItsOperands) {
   ExpectAssignSweep(ModuleAssigning("input [3:0] a, input [3:0] b", "a >= b"),
@@ -66,13 +39,6 @@ TEST(RelationalSynthesis,
                     });
 }
 
-// The test fails on a lowering that compares the raw bit patterns whatever the
-// operands were declared as. §11.4.4 rules that where both operands are signed
-// the expression is a comparison between signed values, so `4'b1000` is -8 and
-// stands below `4'b0111`, which is 7. A comparator that reads its operands as
-// unsigned passes the four cases above whole and fails only here, because those
-// modules declare no operand signed and an unsigned comparison is what §11.4.4
-// owes them.
 TEST(RelationalSynthesis, SignedComparisonReadsItsOperandsAsSigned) {
   ExpectAssignSweep(
       ModuleAssigning("input signed [3:0] a, input signed [3:0] b", "a < b"),
@@ -81,44 +47,12 @@ TEST(RelationalSynthesis, SignedComparisonReadsItsOperandsAsSigned) {
       });
 }
 
-// The test fails on a lowering that reads the comparison as signed because one
-// operand was declared signed. §11.4.4 reads a relational expression with an
-// unsigned operand as a comparison of unsigned values, so the module below owes
-// the comparison of the raw four-bit patterns even though `a` is signed. The
-// case above and this one disagree at every pair whose operands differ in their
-// top bit, so no lowering passes both without reading the signedness of both
-// operands.
 TEST(RelationalSynthesis, OneUnsignedOperandMakesTheComparisonUnsigned) {
   ExpectAssignSweep(
       ModuleAssigning("input signed [3:0] a, input [3:0] b", "a < b"), 16,
       [](uint64_t a, uint64_t b) { return a < b ? uint64_t{1} : uint64_t{0}; });
 }
 
-// The test fails on a lowering that runs the comparison over fewer positions
-// than the literal's size constant states. `SynthLower::CompareWidth` in
-// src/synthesizer/synth_lower_compare.cpp decides how many bit positions a
-// comparison runs over, and it took each operand's width from
-// `SynthLower::SignalWidth`, which answers 1 for a literal because a literal is
-// not a signal it holds a width for. A comparison against a literal was
-// therefore carried out over the wider signal operand or 64 positions,
-// whichever was larger, whatever the literal's size constant said.
-//
-// §11.4.4 carries the same extension rule as §11.4.5, which rules that the
-// narrower operand is zero-extended to the wider one's size.
-// `128'h1_0000_0000_0000_0000` is 128 bits, so the four-bit `a` is
-// zero-extended to 128 bits. Bit 64 of the literal is 1 and every bit of the
-// extended `a` from 4 up is 0, so the literal stands above `a` at all sixteen
-// values and `a >= 128'h1_0000_0000_0000_0000` is 0 at every one of them.
-//
-// Over 64 positions the chain answered `a >= 0`, which is constant 1, so the
-// netlist drove `y` to 1 at all sixteen values. This case therefore fails at
-// every value of `a` where the equality case fails at one.
-//
-// `EqualitySynthesis.EqualityAgainstALiteralWiderThanBothOperandsIsNeverSatisfied`
-// in test/src/unit/test_synthesizer_subclause_11_04_05.cpp does not stand in
-// for this case. `SynthLower::CompareAtLeast` is a separate loop from
-// `SynthLower::CompareEqual`, so a fix reaching one leaves the other, and that
-// is why both cases are owed.
 TEST(RelationalSynthesis,
      GreaterThanOrEqualAgainstALiteralWiderThanBothOperandsIsNeverSatisfied) {
   ExpectAssignSweep(
@@ -126,13 +60,6 @@ TEST(RelationalSynthesis,
       [](uint64_t, uint64_t) { return uint64_t{0}; });
 }
 
-// §11.8.1 makes a binary arithmetic expression signed where every operand is
-// signed, and §5.7.1 makes an unsized decimal literal signed, so `a - b < 0`
-// over two signed operands is a §11.4.4 comparison between signed values. It
-// holds exactly where `a` stands below `b`. The test fails on a lowering that
-// counts only a name declared signed as a signed operand: that compares the
-// difference as unsigned, never finds it below zero, and drives `y` to 0
-// everywhere.
 TEST(RelationalSynthesis, SignedExpressionOperandComparesAsSigned) {
   ExpectAssignSweep(
       ModuleAssigning("input signed [3:0] a, input signed [3:0] b",
@@ -142,11 +69,6 @@ TEST(RelationalSynthesis, SignedExpressionOperandComparesAsSigned) {
       });
 }
 
-// §5.7.1 makes the unsized decimal literal `1` signed, and §11.8.1 carries
-// that through unary minus, so `a < -1` over a signed `a` is a comparison
-// between signed values. It holds for `a` from -8 to -2. The test fails on a
-// lowering that reads the literal operand as unsigned: there -1 is the largest
-// value, every `a` stands below it, and `y` is driven to 1 everywhere.
 TEST(RelationalSynthesis, SignedLiteralOperandComparesAsSigned) {
   ExpectAssignSweep(ModuleAssigning("input signed [3:0] a", "a < -1"), 1,
                     [](uint64_t a, uint64_t) {
@@ -154,12 +76,6 @@ TEST(RelationalSynthesis, SignedLiteralOperandComparesAsSigned) {
                     });
 }
 
-// §5.7.1 makes `2'sb10` a signed two-bit literal, -2, and §11.8.2 sign-extends
-// it to the four bits of `a` in a comparison between signed values, so
-// `a < 2'sb10` holds for `a` from -8 to -3. The test fails on a lowering that
-// reads the literal as unsigned, where it is 2, and on one that compares as
-// signed but fills the literal's upper positions with zeros, which also makes
-// it 2.
 TEST(RelationalSynthesis, SizedSignedLiteralIsSignExtended) {
   ExpectAssignSweep(ModuleAssigning("input signed [3:0] a", "a < 2'sb10"), 1,
                     [](uint64_t a, uint64_t) {

@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -625,9 +624,6 @@ TEST(ClockingBlockParse, ErrorMissingClockingEvent) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // §14.3 owns the clocking_event, so Parser::ParseClockingDecl in
-  // src/parser/parser_clocking.cpp demands its '@' and the ';' closing the
-  // header is what stands there.
   EXPECT_TRUE(ReportedError(r.diags, "expected '@', got ';'", 2, "14.3"));
 }
 
@@ -637,8 +633,6 @@ TEST(ClockingBlockParse, ErrorMissingEndclocking) {
       "  clocking cb @(posedge clk);\n"
       "    input data;\n"
       "endmodule\n");
-  // Without endclocking the enclosing endmodule reaches the clocking_item list,
-  // where §14.3 reports it as a missing clocking_direction.
   EXPECT_TRUE(ReportedError(r.diags, "expected clocking direction", 4, "14.3"));
 }
 
@@ -649,8 +643,6 @@ TEST(ClockingBlockParse, EndLabelMismatchAccepted) {
       "    input data;\n"
       "  endclocking : wrong_name\n"
       "endmodule\n");
-  // §9.3.4 owns the rule that a block's end label repeats its name; §14.3 does
-  // not restate it for endclocking.
   EXPECT_TRUE(ReportedError(
       r.diags, "end label 'wrong_name' does not match 'cb'", 4, "9.3.4"));
 }
@@ -784,18 +776,10 @@ TEST(GlobalClockingParse, RejectsClockingItems) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // The global form parses no clocking_item list, so §14.3 requires endclocking
-  // straight after the event and reports the `input` that opens the item list.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endclocking', got 'input'", 3, "14.3"));
 }
 
-// A.6.11 writes `default_skew ::= input clocking_skew | output clocking_skew |
-// input clocking_skew output clocking_skew`, and `clocking_skew ::=
-// edge_identifier [ delay_control ] | delay_control`, so each direction of a
-// default item carries a skew of its own. §14.3 gives the item its purpose --
-// one skew written in a default clocking item applies to the whole block -- and
-// a direction written without one specifies nothing.
 TEST(ClockingSkewParse, DefaultInputWithoutSkewIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -822,7 +806,6 @@ TEST(ClockingSkewParse, DefaultOutputWithoutSkewIsRejected) {
       r.diags,
       "default output skew names no clocking_skew: an edge, a delay, or both",
       3, "A.6.11"));
-  // The input skew before the missing one is still the block's.
   auto* item = FindClockingBlockByIndex(r);
   ASSERT_NE(item, nullptr);
   EXPECT_NE(item->default_input_skew_delay, nullptr);
@@ -842,9 +825,6 @@ TEST(ClockingSkewParse, DefaultWithoutDirectionIsRejected) {
       "A.6.11"));
 }
 
-// The one two-direction form A.6.11 writes puts the input skew first. The
-// other order is reported, and both skews are still kept, so the report is the
-// only consequence of the order.
 TEST(ClockingSkewParse, DefaultOutputBeforeInputIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -862,8 +842,6 @@ TEST(ClockingSkewParse, DefaultOutputBeforeInputIsRejected) {
   EXPECT_NE(item->default_output_skew_delay, nullptr);
 }
 
-// An edge_identifier alone is a clocking_skew, so a default written with an
-// edge and no delay specifies a skew and draws no report.
 TEST(ClockingSkewParse, DefaultInputEdgeAloneIsASkew) {
   auto r = Parse(
       "module m;\n"

@@ -15,10 +15,6 @@
 
 namespace delta {
 
-// This translation unit is the single definition site for the generic word,
-// letter, and alphabet utilities declared in annex_f_word_ops_internal.h; the
-// other Annex F satisfaction layers include that header rather than copy these.
-
 Letter ComplementLetter(const Letter& letter) {
   switch (letter.kind) {
     case Letter::Kind::kTop:
@@ -161,8 +157,6 @@ namespace {
 
 bool NonVacuous(const Word& word, const PropertyExpr& property);
 
-// §F.5.3.3 abort/disable shape, specialized for the plain (no local-variable)
-// property layer: non-vacuity and neutral satisfaction take no context.
 bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
                           const PropertyExpr& operand) {
   return ::delta::NonVacuousAbortShape(
@@ -173,10 +167,6 @@ bool NonVacuousAbortShape(const Word& word, const BooleanExpr& boolean,
       });
 }
 
-// §F.5.3.3: w |=^non R |-> P iff there exists i >= 0 such that w^{0,i} |= R
-// (tight satisfaction of the sequence trigger) and w^{i.} |=^non P. Unlike
-// §F.5.3.1's neutral implication, the trigger is measured on w itself, not on
-// w-bar.
 bool NonVacuousImplication(const Word& word, const PropertyExpr& property) {
   if (!property.sequence || !property.lhs) {
     return false;
@@ -190,9 +180,6 @@ bool NonVacuousImplication(const Word& word, const PropertyExpr& property) {
   return false;
 }
 
-// §F.5.3.3: w |=^non ( P1 until P2 ) iff there exists 0 <= i < |w| with
-// ( w^{i.} |=^non P1 or w^{i.} |=^non P2 ) and, for all 0 <= j < i,
-// w^{j.} |= ( P1 and not P2 ) under neutral satisfaction.
 bool NonVacuousUntil(const Word& word, const PropertyExpr& property) {
   if (!property.lhs || !property.rhs) {
     return false;
@@ -223,42 +210,29 @@ bool NonVacuous(const Word& word, const PropertyExpr& property) {
   switch (property.kind) {
     case PropertyExpr::Kind::kStrong:
     case PropertyExpr::Kind::kWeak:
-      // §F.5.3.3 base: w |=^non strong(R) and w |=^non weak(R) hold for every
-      // w.
       return true;
     case PropertyExpr::Kind::kParen:
-      // §F.5.3.3: w |=^non ( P ) iff w |=^non P.
       return property.lhs && NonVacuous(word, *property.lhs);
     case PropertyExpr::Kind::kNot:
-      // §F.5.3.3: w |=^non not P iff w-bar |=^non P.
       return property.lhs && NonVacuous(ComplementWord(word), *property.lhs);
     case PropertyExpr::Kind::kImplication:
       return NonVacuousImplication(word, property);
     case PropertyExpr::Kind::kOr:
     case PropertyExpr::Kind::kAnd:
-      // §F.5.3.3: w |=^non ( P1 or P2 ) iff w |=^non P1 or w |=^non P2; and
-      // w |=^non ( P1 and P2 ) iff w |=^non P1 or w |=^non P2. A conjunction is
-      // nonvacuous when either conjunct is, not both, so both kinds share the
-      // same disjunctive shape.
       return (property.lhs && NonVacuous(word, *property.lhs)) ||
              (property.rhs && NonVacuous(word, *property.rhs));
     case PropertyExpr::Kind::kNexttime:
-      // §F.5.3.3: w |=^non ( nexttime P ) iff |w| > 0 and w^{1.} |=^non P.
       return !word.empty() && property.lhs &&
              NonVacuous(Suffix(word, 1), *property.lhs);
     case PropertyExpr::Kind::kUntil:
       return NonVacuousUntil(word, property);
     case PropertyExpr::Kind::kAcceptOn:
-      // §F.5.3.3: w |=^non ( accept_on (b) P ) shares the abort/disable shape.
       return property.boolean && property.lhs &&
              NonVacuousAbortShape(word, *property.boolean, *property.lhs);
   }
   return false;
 }
 
-// The guard the always and eventually rules of §F.5.3.3 place on the letters
-// before their witness: w |= P, or w |= not P, which is w-bar |/= P by the
-// negation rule of §F.5.3.1.
 bool GuardHolds(const Word& word, const PropertyExpr& p, bool negated) {
   if (negated) {
     return !NeutrallySatisfies(ComplementWord(word), p);
@@ -266,10 +240,6 @@ bool GuardHolds(const Word& word, const PropertyExpr& p, bool negated) {
   return NeutrallySatisfies(word, p);
 }
 
-// §F.5.3.3: the shape the always and eventually rules of the derived
-// operators share. Some index i in [first, last] has w^{i.} |=^non P, and
-// every j in [first, i) has w^{j.} |= P for the always rules or
-// w^{j.} |= not P for the eventually rules.
 bool NonVacuousAfterGuardedPrefix(const Word& word, const PropertyExpr& p,
                                   bool guard_negated, std::size_t first,
                                   std::size_t last) {
@@ -295,48 +265,37 @@ bool NonVacuousAfterGuardedPrefix(const Word& word, const PropertyExpr& p,
 
 bool NonVacuouslyEvaluatesIff(const Word& word, const PropertyExpr& p1,
                               const PropertyExpr& p2) {
-  // §F.5.3.3: either operand nonvacuous.
   return NonVacuous(word, p1) || NonVacuous(word, p2);
 }
 
 bool NonVacuouslyEvaluatesImplies(const Word& word, const PropertyExpr& p1,
                                   const PropertyExpr& p2) {
-  // §F.5.3.3: the antecedent holds and is nonvacuous, and the consequent is
-  // nonvacuous.
   return NeutrallySatisfies(word, p1) && NonVacuous(word, p1) &&
          NonVacuous(word, p2);
 }
 
 bool NonVacuouslyEvaluatesSUntil(const Word& word, const PropertyExpr& p1,
                                  const PropertyExpr& p2) {
-  // §F.5.3.3: the rule of the until, stated again for s_until.
   return NonVacuousUntil(word, *PropUntil(std::make_shared<PropertyExpr>(p1),
                                           std::make_shared<PropertyExpr>(p2)));
 }
 
 bool NonVacuouslyEvaluatesAlways(const Word& word, const PropertyExpr& p) {
-  // §F.5.3.3: some 0 <= i < |w| from which P is nonvacuous, P holding from
-  // every earlier letter.
   return !word.empty() &&
          NonVacuousAfterGuardedPrefix(word, p, false, 0, word.size() - 1);
 }
 
 bool NonVacuouslyEvaluatesAlwaysRange(const Word& word, const PropertyExpr& p,
                                       unsigned int m, unsigned int n) {
-  // §F.5.3.3: some m <= i <= n from which P is nonvacuous, P holding from
-  // every letter m through i-1.
   return NonVacuousAfterGuardedPrefix(word, p, false, m, n);
 }
 
 bool NonVacuouslyEvaluatesSAlwaysRange(const Word& word, const PropertyExpr& p,
                                        unsigned int m, unsigned int n) {
-  // §F.5.3.3: the rule of always [m:n], stated again for s_always [m:n].
   return NonVacuouslyEvaluatesAlwaysRange(word, p, m, n);
 }
 
 bool NonVacuouslyEvaluatesSEventually(const Word& word, const PropertyExpr& p) {
-  // §F.5.3.3: some 0 <= i < |w| from which P is nonvacuous, not P holding
-  // from every earlier letter.
   return !word.empty() &&
          NonVacuousAfterGuardedPrefix(word, p, true, 0, word.size() - 1);
 }
@@ -344,22 +303,17 @@ bool NonVacuouslyEvaluatesSEventually(const Word& word, const PropertyExpr& p) {
 bool NonVacuouslyEvaluatesEventuallyRange(const Word& word,
                                           const PropertyExpr& p, unsigned int m,
                                           unsigned int n) {
-  // §F.5.3.3: some m <= i <= n from which P is nonvacuous, not P holding from
-  // every letter m through i-1.
   return NonVacuousAfterGuardedPrefix(word, p, true, m, n);
 }
 
 bool NonVacuouslyEvaluatesSEventuallyRange(const Word& word,
                                            const PropertyExpr& p,
                                            unsigned int m, unsigned int n) {
-  // §F.5.3.3: the rule of eventually [m:n], stated again for
-  // s_eventually [m:n].
   return NonVacuouslyEvaluatesEventuallyRange(word, p, m, n);
 }
 
 bool NonVacuouslyEvaluatesRejectOn(const Word& word, const BooleanExpr& b,
                                    const PropertyExpr& p) {
-  // §F.5.3.3: w |=^non ( reject_on (b) P ) shares the abort/disable shape.
   return NonVacuousAbortShape(word, b, p);
 }
 
@@ -371,28 +325,23 @@ bool NonVacuouslyEvaluatesTopLevel(const Word& word,
                                    const TopLevelProperty& top) {
   switch (top.kind) {
     case TopLevelProperty::Kind::kProperty:
-      // §F.5.3.3 applies to the property directly.
       return top.property && NonVacuous(word, *top.property);
     case TopLevelProperty::Kind::kDisableIff:
-      // §F.5.3.3: w |=^non disable iff (b) P uses the same shape as accept_on.
       return top.disable_condition && top.property &&
              NonVacuousAbortShape(word, *top.disable_condition, *top.property);
     case TopLevelProperty::Kind::kParen:
-      // A parenthesized top-level property is transparent, as for ( P ).
       return top.inner && NonVacuouslyEvaluatesTopLevel(word, *top.inner);
   }
   return false;
 }
 
 bool SatisfiesNonVacuously(const Word& word, const PropertyExpr& property) {
-  // §F.5.3.3: w satisfies P nonvacuously iff w |= P and w |=^non P.
   return NeutrallySatisfies(word, property) &&
          NonVacuouslyEvaluates(word, property);
 }
 
 bool SatisfiesTopLevelNonVacuously(const Word& word,
                                    const TopLevelProperty& top) {
-  // §F.5.3.3 at the top level: neutral satisfaction together with non-vacuity.
   return NeutrallySatisfiesTopLevel(word, top) &&
          NonVacuouslyEvaluatesTopLevel(word, top);
 }

@@ -123,9 +123,6 @@ TEST(LevelSensitiveEventSimulation, WaitZeroConditionNeverUnblocks) {
   EXPECT_EQ(val, 0u);
 }
 
-// §9.4.3 keeps the statements after a wait blocked until its condition
-// becomes true, and a false condition that reads no variable never does, so
-// the statement after `wait (0);` never runs.
 TEST(LevelSensitiveEventSimulation, AFalseConditionReadingNothingBlocks) {
   auto val = RunAndGet(
       "module t;\n"
@@ -140,8 +137,6 @@ TEST(LevelSensitiveEventSimulation, AFalseConditionReadingNothingBlocks) {
   EXPECT_EQ(val, 0u);
 }
 
-// A variable condition already satisfied when the wait is reached must let the
-// following statement run without ever suspending the process.
 TEST(LevelSensitiveEventSimulation, WaitVariableAlreadyTrueProceeds) {
   auto val = RunAndGet(
       "module t;\n"
@@ -157,8 +152,6 @@ TEST(LevelSensitiveEventSimulation, WaitVariableAlreadyTrueProceeds) {
   EXPECT_EQ(val, 200u);
 }
 
-// A multi-bit condition follows the same truthiness rule as a scalar: it is
-// false while zero and becomes true once any bit is set, releasing the wait.
 TEST(LevelSensitiveEventSimulation, WaitVectorNonzeroConditionUnblocks) {
   auto val = RunAndGet(
       "module t;\n"
@@ -177,12 +170,6 @@ TEST(LevelSensitiveEventSimulation, WaitVectorNonzeroConditionUnblocks) {
   EXPECT_EQ(val, 123u);
 }
 
-// The clause requires that the statements *following* a wait remain blocked
-// until the condition holds. With a null body, the observable is the next
-// statement in the enclosing block. `tag` is latched to 77 one time step before
-// `ready` rises, so a process that correctly suspends copies 77; one that ran
-// at time 0 (never blocking) would have copied the initial 10. The distinct
-// final value is what proves the following statement was actually held off.
 TEST(LevelSensitiveEventSimulation, WaitNullBodyBlocksFollowingStatement) {
   auto val = RunAndGet(
       "module t;\n"
@@ -204,12 +191,6 @@ TEST(LevelSensitiveEventSimulation, WaitNullBodyBlocksFollowingStatement) {
   EXPECT_EQ(val, 77u);
 }
 
-// The blocking branch of the clause's example: `enable` is 1 on entry, so
-// wait(!enable) must suspend and only release once it clears. `b` is latched to
-// 55 a time step before that release, so the delayed body `#10 a = b`
-// copies 55. If the wait had failed to block, `a` would remain 0 because the
-// condition is false at time 0. Complements WaitConditionWithDelayInBody, which
-// exercises the already-true (no-block) branch of the same example.
 TEST(LevelSensitiveEventSimulation, WaitBlocksThenDelayedBodyExecutes) {
   auto val = RunAndGet(
       "module t;\n"
@@ -230,11 +211,6 @@ TEST(LevelSensitiveEventSimulation, WaitBlocksThenDelayedBodyExecutes) {
   EXPECT_EQ(val, 55u);
 }
 
-// statement_or_null may be a begin-end block; after the wait releases, every
-// statement in the block must run. `src` is latched to 9 one time step before
-// `go` rises, so a correctly blocked process copies 9 into both members of the
-// block (the second assignment reads the first), proving the whole block body
-// executed post-release. A process that never blocked would have copied 1.
 TEST(LevelSensitiveEventSimulation, WaitBlockBodyExecutesAfterUnblock) {
   auto val = RunAndGet(
       "module t;\n"
@@ -259,10 +235,6 @@ TEST(LevelSensitiveEventSimulation, WaitBlockBodyExecutesAfterUnblock) {
   EXPECT_EQ(val, 9u);
 }
 
-// The condition may be any integral expression, including a 2-state type. A
-// zero `int` is false and blocks; once it becomes nonzero the wait releases and
-// the following statement runs. This drives the §12.4 truth rule through a
-// 2-state operand rather than the 4-state `logic` used by the other tests.
 TEST(LevelSensitiveEventSimulation, WaitTwoStateIntConditionUnblocks) {
   auto val = RunAndGet(
       "module t;\n"
@@ -281,17 +253,6 @@ TEST(LevelSensitiveEventSimulation, WaitTwoStateIntConditionUnblocks) {
   EXPECT_EQ(val, 42u);
 }
 
-// §9.4.3: a wait statement evaluates its condition, and while the condition is
-// false the statements after the wait stay blocked until it becomes true. Every
-// case above writes its condition on a whole variable. This one writes it on a
-// single bit, which is the operand whose collected name is BuildSelectPrefix's
-// `v[1]` -- a position within a vector, which SimContext::FindVariable resolves
-// to no object, so ExecWaitStatement armed no watcher and the condition was
-// never re-tested.
-//
-// v starts all zero and x starts at 0, so a wait that never resumes leaves x
-// at 0 rather than at 42, and only the bit the condition reads is set at time
-// 10.
 TEST(LevelSensitiveEventSimulation, WaitOnABitSelectResumesWhenThatBitChanges) {
   auto val = RunAndGet(
       "module t;\n"
@@ -310,27 +271,6 @@ TEST(LevelSensitiveEventSimulation, WaitOnABitSelectResumesWhenThatBitChanges) {
   EXPECT_EQ(val, 42u);
 }
 
-// §9.4.3 states level-sensitive event control as an obligation about the truth
-// of a condition rather than as a reaction to a change: a wait statement
-// evaluates its condition, and while the condition is not true (in the §12.4
-// sense) the statements after the wait stay blocked until it becomes true. The
-// clause draws the contrast itself -- the wait is level-sensitive, unlike the
-// edge-sensitive basic event control written with @ -- so a §9.4.2 case does
-// not stand in for this one: any route that observes the condition becoming
-// true would satisfy §9.4.3. In this implementation, though, a wait parks on
-// the same AnyChangeAwaiter that @ parks on and is released only by the written
-// variable's watcher notification, so the two mechanisms fail together, which
-// is what earns this clause its own case.
-//
-// The writer has to be a void function called with parentheses, because that
-// is the only call form whose body runs through ExecFunctionBody and its
-// identifier-assignment path. A task call is inlined onto the ordinary
-// statement executor, which notifies already, so a task written here would
-// pass whether or not the function path notifies and would prove nothing.
-//
-// `done` holds 8'd3 when the process parks and the wait's body writes 8'd91,
-// neither of them a value a `logic [7:0]` reaches on its own, so a process
-// left parked for the rest of the run reads back as 3 rather than 91.
 TEST(LevelSensitiveEventSimulation, WaitResumesOnVoidFunctionWrite) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -355,35 +295,6 @@ TEST(LevelSensitiveEventSimulation, WaitResumesOnVoidFunctionWrite) {
   EXPECT_EQ(var->value.ToUint64(), 91u);
 }
 
-// §9.4.3 states level-sensitive event control as an obligation about the truth
-// of a condition: a wait statement evaluates its condition, and while the
-// condition is not true (in the §12.4 sense) the statements after the wait stay
-// blocked until it becomes true. The clause names its own contrast -- the wait
-// is level-sensitive, unlike the edge-sensitive basic event control written
-// with @ -- so a §9.4.2 case does not stand in for this one: any route that
-// observed the condition becoming true would satisfy §9.4.3, and the clause
-// asks for none in particular. In this implementation, though, ExecWait parks
-// on the same AnyChangeAwaiter that @ parks on, released only by the watcher
-// notification of a variable the condition reads, so the level-sensitive and
-// the edge-sensitive constructs fail together on one missing notification. That
-// shared dependence is what earns this clause a case of its own rather than a
-// §9.4.2 one standing in.
-//
-// The writer here is the increment operator in the ordinary body of a process:
-// a bare `i++;` is a kExprStmt, which ExecStmt routes through
-// ExecInlineTaskCall to EvalExpr and on to EvalIncDec, whose store to
-// var->value said nothing to the variable's watchers. §11.4.2 makes these
-// operators blocking assignments, so §9.4.2's change in the expression's value
-// covers an increment exactly as it covers an `=`, and a wait reading the
-// incremented variable must be released by one.
-//
-// Three processes, so that the value the released statement copies is written
-// by neither of the others at the moment it parks: `tag` holds 8'd12 when the
-// waiter suspends and 8'd64 from time 5 onward, while `i` reaches 3 only at
-// time 20. A waiter left parked for the rest of the run leaves `seen` at the
-// 8'd3 it was given at time 0; one released too early would copy 8'd12; only a
-// waiter released by the third increment reads 8'd64. None of the three is a
-// value a `logic [7:0]` reaches on its own, whose default is 8'hxx.
 TEST(LevelSensitiveEventSimulation, WaitResumesOnAnIncrementOperatorWrite) {
   auto val = RunAndGet(
       "module t;\n"
@@ -408,14 +319,6 @@ TEST(LevelSensitiveEventSimulation, WaitResumesOnAnIncrementOperatorWrite) {
   EXPECT_EQ(val, 64u);
 }
 
-// §9.4.3 with §8.6 and §8.11: inside a class task the condition may read the
-// object's own property, bare as `wait (go)`, as `wait (this.go)`, or in an
-// expression `wait (n == 2)`, and the statement stays blocked until another
-// process makes it true, here through a handle to the object. The property
-// names resolve to no variable of the design, so the awaiter armed nothing
-// and the three tasks never resumed, leaving the result at 0. Each task
-// records the time it resumed: `go` is set at 4, `this.go` reads the same
-// property, and `n` reaches 2 at 6, so the result is 4 * 100 + 4 * 10 + 6.
 TEST(LevelSensitiveEventSimulation, WaitOnAnOwnPropertyInsideAClassTask) {
   auto val = RunAndGet(
       "class C;\n"
@@ -454,14 +357,6 @@ TEST(LevelSensitiveEventSimulation, WaitOnAnOwnPropertyInsideAClassTask) {
   EXPECT_EQ(val, 446u);
 }
 
-// §9.4.3 (printed page 236) with §7.10.2.1: the condition reads a declared
-// queue through its size() method, and the wait stays blocked until a push
-// from another process makes the size nonzero. CollectExprReads gives a call
-// its arguments alone, so `q.size()` contributed nothing to the read set,
-// ExecWait took the empty set for a condition nothing could change and
-// returned at once: `q.pop_front()` on the still-empty queue read 0 at time 0,
-// so `result` read 0. Released by the push at time 10, the pop reads 7 and
-// the sum reads 7 * 100 + 10.
 TEST(LevelSensitiveEventSimulation, WaitOnAQueueSizeCallIsReleasedByAPush) {
   auto val = RunAndGet(
       "module t;\n"
@@ -478,14 +373,6 @@ TEST(LevelSensitiveEventSimulation, WaitOnAQueueSizeCallIsReleasedByAPush) {
   EXPECT_EQ(val, 710u);
 }
 
-// §9.4.3 with §7.5.1 and §7.5.2 (printed page 158): a dynamic array's size()
-// answers the size the last new[] gave it, so a wait on `d.size() == 3` is
-// released by `d = new[3]` in another process. As for the queue above, the
-// call contributed no read and the wait returned at once with the size still
-// 0, leaving `result` at 0 * 100 + 0; released at time 20 it reads 3 * 100 +
-// 20. The release also needs the new[] arm of TryQueueBlockingAssign
-// (statement_assign_pattern.cpp) to announce the resize to the array's
-// watchers, as every queue method announces its change.
 TEST(LevelSensitiveEventSimulation,
      WaitOnADynamicArraySizeCallIsReleasedByNew) {
   auto val = RunAndGet(
@@ -502,14 +389,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 320u);
 }
 
-// §9.4.3 with §8.5 and §8.11: inside a class task the condition reads the
-// object's own queue property through size(), and a push through a handle
-// from another process releases it. This is the shape of a blocking get on a
-// queue-backed FIFO: the task is called from a forever loop, so a wait that
-// returned at once spun at time 0, each pop reading 0 from the empty queue.
-// The result records the value the first pop gave and the time it happened,
-// 7 * 100 + 10, and the second pop the same for the push at 20, 9 * 100 + 20,
-// where the spinning task left `first` at 0 and never reached the second.
 TEST(LevelSensitiveEventSimulation,
      WaitOnAQueuePropertySizeCallInsideAClassTaskIsReleasedByAPush) {
   auto val = RunAndGet(
@@ -543,11 +422,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 7100920u);
 }
 
-// §9.4.3: a condition that is already true when the wait is reached blocks
-// nothing, and the receiver's read added for the call above must not turn a
-// true condition into a suspension. The queue holds 3 when the wait is
-// evaluated, so the pop reads 3 at time 0 and `result` 3 * 100 + 0; a wait
-// that parked until the push at time 10 would read 3 * 100 + 10.
 TEST(LevelSensitiveEventSimulation, WaitOnANonEmptyQueueSizeCallDoesNotBlock) {
   auto val = RunAndGet(
       "module t;\n"
@@ -564,15 +438,6 @@ TEST(LevelSensitiveEventSimulation, WaitOnANonEmptyQueueSizeCallDoesNotBlock) {
   EXPECT_EQ(val, 300u);
 }
 
-// §9.4.3 (printed page 236) with §8.9 (printed 186): the condition reads a
-// static queue property through the class scope operator, `C::all.size()`,
-// and a push through the same name from another process releases it. A
-// static property is the class's own storage, held by no object and named by
-// no variable, so AnnounceQueueChange (eval_array_class_queue.cpp), given no
-// owner and no declared queue's name, announced nothing and the wait, armed
-// on the class's static watchers, stayed parked for ever: `result` read 0.
-// Told to the class as a static value property's write is, the push at time
-// 15 releases the wait, and the pop reads 4 * 100 + 15.
 TEST(LevelSensitiveEventSimulation,
      WaitOnAStaticQueuePropertySizeCallIsReleasedByAPush) {
   auto val = RunAndGet(
@@ -592,13 +457,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 415u);
 }
 
-// §9.4.3 with §8.9 and §8.10: inside a static task the condition names the
-// static queue bare, `all.size()`, and a static function of the same class
-// pushes to it bare from another process. Resolved to the class's queue but
-// announced under the bare name, which no variable stands for, the push told
-// nothing and the task stayed parked with `result` at 0; the wait returning
-// at once instead would have popped 0 at time 0, reading 0 as well. Released
-// by the push at time 20, the pop reads 9 * 100 + 20.
 TEST(LevelSensitiveEventSimulation,
      WaitOnABareStaticQueueInAStaticTaskIsReleasedByAStaticFunctionsPush) {
   auto val = RunAndGet(
@@ -625,14 +483,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 920u);
 }
 
-// §9.4.3 with §8.9 and §26.3: the class is declared in a package, and its
-// static queue is named `p::C::all` from the module. The lowerer binds the
-// class under `p::C`, which ScopeResolvedQueueProperty read as a class named
-// by one identifier, so the queue was never found: the push pushed nothing,
-// size() answered 0, and the wait, its condition collecting no static
-// property, parked on nothing for ever with `result` at 0. Found through
-// PackageQualifiedClassOf on both sides, the push at time 30 releases the
-// wait and the pop reads 5 * 100 + 30.
 TEST(LevelSensitiveEventSimulation,
      WaitOnAPackageClassStaticQueueSizeCallIsReleasedByAPush) {
   auto val = RunAndGet(
@@ -654,15 +504,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 530u);
 }
 
-// §9.4.3 (printed page 236) with §8.13 (printed 189-190) and §8.9 (printed
-// 186): the static property is C's, and D extends C, so `D::n` and `C::n`
-// name one storage. The condition reads it as `D::n` and the release writes
-// it as `D::n` from another process; the wait has to arm on C, the declaring
-// class, which the write notifies. D's own static_properties hold D's
-// declarations alone, so asked of them the wait armed nothing and stayed
-// parked for ever: `result` read 0. Armed on the declaring class, the write
-// at time 10 releases it and the read through `C::n` gives 2 * 100 + 10; the
-// write of 1 at 5 shows the value, not the first write, releases it.
 TEST(LevelSensitiveEventSimulation,
      WaitOnAnInheritedStaticPropertyThroughTheDerivedClassIsReleased) {
   auto val = RunAndGet(
@@ -686,12 +527,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 210u);
 }
 
-// §9.4.2 (printed page 232) with §8.13: an event control on `D::n` inside a
-// module wakes on a write through `C::n`, the same storage. The operand
-// resolved against D's own static_properties named no property, so the
-// event control was skipped and the process waited for ever: `woke` read 0.
-// Armed on C, the write of 5 at time 7 wakes it and the read gives 7 * 10 +
-// 5.
 TEST(LevelSensitiveEventSimulation,
      EventControlOnAnInheritedStaticPropertyWakesOnTheBaseClassWrite) {
   auto val = RunAndGet(
@@ -709,12 +544,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 75u);
 }
 
-// §9.4.3 with §8.13 and §8.9: the static queue is C's and is named `D::all`
-// on both sides. The push resolves the queue through the extends chain to
-// C's storage and announces it to C's watchers, where the wait, asked of D's
-// own static_properties, had armed nothing and stayed parked for ever with
-// `result` at 0. Armed on the declaring class, the push at time 10 releases
-// it and the pop reads 7 * 100 + 10.
 TEST(LevelSensitiveEventSimulation,
      WaitOnAnInheritedStaticQueueSizeCallIsReleasedByAPushThroughTheDerived) {
   auto val = RunAndGet(
@@ -736,13 +565,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 710u);
 }
 
-// §9.4.3 with §8.13 and §8.10: inside a static task of D the condition names
-// the inherited static queue bare, `all.size()`, and a static function of C
-// pushes to it bare. The bare name resolves through the running method's
-// class, D, whose own static_properties hold no `all`, so the wait armed
-// nothing and the task stayed parked with `result` at 0. Resolved to the
-// declaring class C on both sides, the push at time 25 releases it and the
-// pop reads 6 * 100 + 25.
 TEST(LevelSensitiveEventSimulation,
      WaitOnABareInheritedStaticQueueInADerivedStaticTaskIsReleased) {
   auto val = RunAndGet(
@@ -771,13 +593,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 625u);
 }
 
-// §9.4.3 with §8.13 and §8.10: inside a static task of D the condition names
-// the inherited static value property bare, `n == 3`, and a static function
-// of D writes it bare. Both resolve through D to C's one storage, and the
-// write notifies C, where the wait is armed; asked of D's own
-// static_properties, the wait armed nothing and stayed parked with `result`
-// at 0. Released by the write at time 30, the read gives 3 * 100 + 30; the
-// write of 1 at 15 shows the value releases it.
 TEST(LevelSensitiveEventSimulation,
      WaitOnABareInheritedStaticPropertyInADerivedStaticTaskIsReleased) {
   auto val = RunAndGet(
@@ -807,11 +622,6 @@ TEST(LevelSensitiveEventSimulation,
   EXPECT_EQ(val, 330u);
 }
 
-// §9.4.3 (printed page 236) with §23.6 (printed page 753) and §24.3.1
-// (printed page 777): a wait whose condition reads a design variable by
-// hierarchical name is re-evaluated each time that variable changes, from a
-// program and from a submodule alike, and resumes at the change that makes it
-// true.
 TEST(LevelSensitiveEventSimulation, WaitOnHierarchicalNameResumesWhenTrue) {
   SimFixture fp;
   EXPECT_EQ(

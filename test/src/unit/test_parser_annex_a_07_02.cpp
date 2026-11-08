@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Returns the first module-path declaration parsed inside the first specify
-// block, or nullptr if there is none. Used to observe that the §A.7.2
-// productions are applied by the parser and recorded in the AST.
 const SpecifyPathDecl* FirstPathDecl(ModuleItem* block) {
   if (block == nullptr) return nullptr;
   for (auto* it : block->specify_items) {
@@ -21,9 +18,6 @@ const SpecifyPathDecl* FirstPathDecl(ModuleItem* block) {
   return nullptr;
 }
 
-// --- path_declaration: the terminating ';' and '=' separators, and the
-// parenthesization of the path description, are required (negative paths). ---
-
 TEST(SpecifyPathParsing, ErrorPathDeclMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -31,8 +25,6 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingSemicolon) {
       "    (a => b) = 5\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the path_declaration's terminating ';'; endspecify stands where
-  // it must be.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.4"));
 }
@@ -44,7 +36,6 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingEquals) {
       "    (a => b) 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.5 owns the '=' that introduces the path_delay_value.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '=', got integer literal", 3, "30.5"));
 }
@@ -66,15 +57,10 @@ TEST(SpecifyPathParsing, ErrorPathDeclMissingOpenParen) {
       "    a => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // Without the opening '(' nothing marks the item as a path_declaration, so
-  // §30.3's specify_item dispatch is what reports it.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in specify block", 3, "30.3"));
 }
 
-// A parallel path ('=>') is described with a single input and a single output
-// terminal descriptor (the full '*>' form is the one that takes input/output
-// lists). Supplying several terminals on a parallel path is rejected.
 TEST(SpecifyPathParsing, ErrorParallelPathMultipleTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -82,16 +68,12 @@ TEST(SpecifyPathParsing, ErrorParallelPathMultipleTerminals) {
       "    (a, b => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.5 owns the single-terminal rule for a parallel path.
   EXPECT_TRUE(ReportedError(r.diags,
                             "parallel path '=>' requires a single source and "
                             "destination terminal",
                             3, "30.4.5"));
 }
 
-// The single-terminal rule for parallel paths holds for the edge-sensitive
-// form too: an edge-sensitive '=>' path with several input terminals (a list,
-// which is only valid with '*>') is rejected.
 TEST(SpecifyPathParsing, ErrorEdgeSensitiveParallelMultipleTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -99,17 +81,12 @@ TEST(SpecifyPathParsing, ErrorEdgeSensitiveParallelMultipleTerminals) {
       "    (posedge a, b => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.5 owns the single-terminal rule for a parallel path, edge-sensitive
-  // or not.
   EXPECT_TRUE(ReportedError(r.diags,
                             "parallel path '=>' requires a single source and "
                             "destination terminal",
                             3, "30.4.5"));
 }
 
-// The 'ifnone' alternative of a state-dependent path declaration accepts only
-// a simple path declaration, so an edge-sensitive description after 'ifnone'
-// is rejected.
 TEST(SpecifyPathParsing, ErrorIfnoneRejectsEdgeSensitivePath) {
   auto r = Parse(
       "module m;\n"
@@ -117,14 +94,9 @@ TEST(SpecifyPathParsing, ErrorIfnoneRejectsEdgeSensitivePath) {
       "    ifnone (posedge clk => q) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.4.4 owns the ifnone alternative and its simple-path restriction.
   EXPECT_TRUE(ReportedError(
       r.diags, "ifnone requires a simple path declaration", 3, "30.4.4.4"));
 }
-
-// --- simple_path_declaration: the parallel ('=>') form followed by
-// '= path_delay_value'. The full ('*>') form is exercised by
-// FullPathDescriptionInputOutputLists below. ---
 
 TEST_F(SpecifyTest, SimpleParallelPathDeclaration) {
   auto* cu = Parse(
@@ -144,9 +116,6 @@ TEST_F(SpecifyTest, SimpleParallelPathDeclaration) {
   EXPECT_EQ(p->delays.size(), 1u);
 }
 
-// --- parallel_path_description: a single input/output terminal pair joined
-// by '=>' inside parentheses. ---
-
 TEST_F(SpecifyTest, ParallelPathDescriptionSingleTerminals) {
   auto* cu = Parse(
       "module m;\n"
@@ -164,8 +133,6 @@ TEST_F(SpecifyTest, ParallelPathDescriptionSingleTerminals) {
   EXPECT_EQ(p->dst_ports[0].name, "out");
 }
 
-// --- full_path_description: lists of inputs/outputs joined by '*>'. ---
-
 TEST_F(SpecifyTest, FullPathDescriptionInputOutputLists) {
   auto* cu = Parse(
       "module m;\n"
@@ -181,14 +148,6 @@ TEST_F(SpecifyTest, FullPathDescriptionInputOutputLists) {
   EXPECT_EQ(p->dst_ports.size(), 2u);
 }
 
-// --- Terminal-descriptor input forms consumed by the path descriptions.
-// parallel_path_description / full_path_description reference
-// specify_input/output_terminal_descriptor (§A.7.3); each descriptor may be a
-// plain identifier, a bit-/part-select, or an interface.port reference. Build
-// each from real source syntax and confirm the §A.7.2 path production accepts
-// and records it. ---
-
-// A parallel path whose input and output terminals are bit-selects.
 TEST_F(SpecifyTest, ParallelPathBitSelectTerminals) {
   auto* cu = Parse(
       "module m;\n"
@@ -207,7 +166,6 @@ TEST_F(SpecifyTest, ParallelPathBitSelectTerminals) {
   EXPECT_EQ(p->dst_ports[0].range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-// A full path whose terminals are part-selects.
 TEST_F(SpecifyTest, FullPathPartSelectTerminals) {
   auto* cu = Parse(
       "module m;\n"
@@ -225,8 +183,6 @@ TEST_F(SpecifyTest, FullPathPartSelectTerminals) {
   EXPECT_EQ(p->dst_ports[0].range_kind, SpecifyRangeKind::kPartSelect);
 }
 
-// A path whose terminals are interface.port references (the
-// interface_identifier '.' port_identifier form of input/output_identifier).
 TEST_F(SpecifyTest, PathInterfacePortTerminals) {
   auto* cu = Parse(
       "module m;\n"
@@ -246,12 +202,6 @@ TEST_F(SpecifyTest, PathInterfacePortTerminals) {
   EXPECT_EQ(p->dst_ports[0].name, "q");
 }
 
-// --- '= path_delay_value' input forms. A simple_path_declaration binds a
-// path_delay_value (§A.7.4), which may be a single expression or a
-// parenthesized list of expressions. The single-value form is covered above;
-// here the parenthesized multi-value list is built from real syntax and each
-// delay expression is recorded. ---
-
 TEST_F(SpecifyTest, SimplePathMultiValueDelay) {
   auto* cu = Parse(
       "module m;\n"
@@ -265,8 +215,6 @@ TEST_F(SpecifyTest, SimplePathMultiValueDelay) {
   EXPECT_EQ(p->path_kind, SpecifyPathKind::kParallel);
   EXPECT_EQ(p->delays.size(), 3u);
 }
-
-// --- polarity_operator ::= + | - (optional before '=>'/'*>'). ---
 
 TEST_F(SpecifyTest, PolarityOperatorPositiveParallel) {
   auto* cu = Parse(
@@ -295,9 +243,6 @@ TEST_F(SpecifyTest, PolarityOperatorNegativeFull) {
   EXPECT_EQ(p->polarity, SpecifyPolarity::kNegative);
   EXPECT_EQ(p->path_kind, SpecifyPathKind::kFull);
 }
-
-// --- edge_identifier ::= posedge | negedge | edge (leads an edge-sensitive
-// path description). ---
 
 TEST_F(SpecifyTest, EdgeIdentifierPosedge) {
   auto* cu = Parse(
@@ -338,9 +283,6 @@ TEST_F(SpecifyTest, EdgeIdentifierEdge) {
   EXPECT_EQ(p->edge, SpecifyEdge::kEdge);
 }
 
-// --- parallel_edge_sensitive_path_description: with and without the
-// parenthesized '( output [polarity] : data_source_expression )' form. ---
-
 TEST_F(SpecifyTest, ParallelEdgeSensitiveWithDataSource) {
   auto* cu = Parse(
       "module m;\n"
@@ -354,12 +296,9 @@ TEST_F(SpecifyTest, ParallelEdgeSensitiveWithDataSource) {
   EXPECT_EQ(p->edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(p->path_kind, SpecifyPathKind::kParallel);
   ASSERT_EQ(p->dst_ports.size(), 1u);
-  // data_source_expression ::= expression — a general (binary) expression.
   EXPECT_NE(p->data_source, nullptr);
 }
 
-// In the data-source form, the output terminal descriptor may carry its own
-// polarity_operator immediately before the ':'.
 TEST_F(SpecifyTest, EdgeSensitiveOutputPolarity) {
   auto* cu = Parse(
       "module m;\n"
@@ -388,9 +327,6 @@ TEST_F(SpecifyTest, ParallelEdgeSensitiveWithoutDataSource) {
   EXPECT_EQ(p->path_kind, SpecifyPathKind::kParallel);
   EXPECT_EQ(p->data_source, nullptr);
 }
-
-// --- full_edge_sensitive_path_description: with and without the
-// '( outputs [polarity] : data_source_expression )' form. ---
 
 TEST_F(SpecifyTest, FullEdgeSensitiveWithDataSource) {
   auto* cu = Parse(
@@ -422,9 +358,6 @@ TEST_F(SpecifyTest, FullEdgeSensitiveWithoutDataSource) {
   EXPECT_EQ(p->path_kind, SpecifyPathKind::kFull);
   EXPECT_EQ(p->data_source, nullptr);
 }
-
-// --- state_dependent_path_declaration: 'if (cond) simple', 'if (cond)
-// edge_sensitive', and 'ifnone simple'. ---
 
 TEST_F(SpecifyTest, StateDependentIfSimplePath) {
   auto* cu = Parse(
@@ -470,11 +403,6 @@ TEST_F(SpecifyTest, StateDependentIfnoneSimplePath) {
   EXPECT_EQ(p->condition, nullptr);
 }
 
-// --- The path operator: §30.4.2 gives a simple path two forms,
-// `source *> destination` and `source => destination`, and A.7.2 writes `=>`
-// into parallel_path_description and `*>` into full_path_description with no
-// third token in that place. ---
-
 TEST(SpecifyPathParsing, ErrorPathEqualsIsNoPathOperator) {
   auto r = Parse(
       "module m;\n"
@@ -482,8 +410,6 @@ TEST(SpecifyPathParsing, ErrorPathEqualsIsNoPathOperator) {
       "    (a = b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // The report stands at the '=' written where '=>' or '*>' belongs; the
-  // destination after it is still read, so nothing else is reported.
   EXPECT_TRUE(ReportedError(
       r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
       "30.4.2"));
@@ -510,8 +436,6 @@ TEST(SpecifyPathParsing, ErrorPolarityWithoutPathOperatorIsRejected) {
       "    (a +> b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.7.2 prefixes the polarity to '=>' or '*>'; a '>' alone after the
-  // '+' is neither.
   EXPECT_TRUE(ReportedError(
       r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
       "30.4.2"));
@@ -524,8 +448,6 @@ TEST(SpecifyPathParsing, ErrorPathWithoutOperatorIsRejected) {
       "    (a b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // The report stands at the destination terminal, which is where the
-  // operator was due, and that terminal is then read as the destination.
   EXPECT_TRUE(ReportedError(
       r.diags, "path joins its source to its destination with '=>' or '*>'", 3,
       "30.4.2"));

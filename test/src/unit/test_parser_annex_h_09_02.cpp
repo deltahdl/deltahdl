@@ -11,12 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §H.9.2: DPI imported and exported tasks and functions can be declared in a
-// module, program, interface, package, compilation-unit scope or generate
-// declarative scope. Each scope below declares an import and an export, and
-// the parser accepts the pair where the clause allows it.
-
-// The items of a scope carry one import and one export.
 void ExpectImportAndExport(const std::vector<ModuleItem*>& items) {
   const ModuleItem* imp = FindItemByKind(items, ModuleItemKind::kDpiImport);
   ASSERT_NE(imp, nullptr);
@@ -66,8 +60,6 @@ TEST(DpiDeclarativeScopeParsing, APackageDeclaresAnImportAndAnExport) {
   ExpectImportAndExport(r.cu->packages[0]->items);
 }
 
-// The compilation-unit scope: the declarations stand outside every module,
-// and the export is what the parser did not read there before this clause.
 TEST(DpiDeclarativeScopeParsing,
      TheCompilationUnitDeclaresAnImportAndAnExport) {
   auto r = Parse(kImportAndExport);
@@ -76,8 +68,6 @@ TEST(DpiDeclarativeScopeParsing,
   ExpectImportAndExport(r.cu->cu_items);
 }
 
-// A generate declarative scope: the pair stands in a generate block of a
-// module, under the block's own items rather than the module's.
 TEST(DpiDeclarativeScopeParsing, AGenerateBlockDeclaresAnImportAndAnExport) {
   auto r = Parse(std::string("module m;\n"
                              "  if (1) begin : blk\n") +

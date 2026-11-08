@@ -1,7 +1,3 @@
-// §25.9: what the interface a virtual interface type names has to be: an
-// interface, declaring the modport the type selects, and referring to no object
-// outside its body.
-
 #include "elaborator/virtual_interface_target.h"
 
 #include <format>
@@ -20,8 +16,6 @@ namespace delta {
 
 namespace {
 
-// §25.9: leftmost identifier of a (possibly hierarchical) reference, e.g.
-// "top" for the path top.u.sig.
 std::string_view ReferenceRootName(const Expr* e) {
   while (e != nullptr) {
     if (e->kind == ExprKind::kIdentifier) return e->text;
@@ -36,12 +30,6 @@ std::string_view ReferenceRootName(const Expr* e) {
   return {};
 }
 
-// §25.9: a reference is "external" to an interface when it is a hierarchical
-// (dotted or scope-qualified) reference whose root name is not declared
-// within the interface body.
-// §25.9: the node itself (ignoring children) is an external hierarchical
-// reference — either a member access whose root is not local, or a
-// scope-qualified identifier that is not local.
 bool NodeIsExternalReference(
     const Expr* e, const std::unordered_set<std::string_view>& local) {
   if (e->kind == ExprKind::kMemberAccess) {
@@ -58,7 +46,6 @@ bool NodeIsExternalReference(
 bool ExprRefsOutsideInterface(
     const Expr* e, const std::unordered_set<std::string_view>& local);
 
-// §25.9: recurse into the argument and element collections of a node.
 bool ChildListRefsOutsideInterface(
     const Expr* e, const std::unordered_set<std::string_view>& local) {
   for (const auto* a : e->args)
@@ -85,7 +72,6 @@ bool ExprRefsOutsideInterface(
   return false;
 }
 
-// §25.9: collect the port, parameter and modport names of an interface body.
 void CollectInterfaceHeaderNames(const ModuleDecl* iface,
                                  std::unordered_set<std::string_view>& local) {
   for (const auto& p : iface->ports)
@@ -96,7 +82,6 @@ void CollectInterfaceHeaderNames(const ModuleDecl* iface,
     if (mp && !mp->name.empty()) local.insert(mp->name);
 }
 
-// §25.9: collect the declared names and instance names of an interface's items.
 void CollectInterfaceItemNames(const ModuleDecl* iface,
                                std::unordered_set<std::string_view>& local) {
   for (const auto* it : iface->items) {
@@ -106,8 +91,6 @@ void CollectInterfaceItemNames(const ModuleDecl* iface,
   }
 }
 
-// §25.9: collect the names declared within an interface body (ports,
-// parameters, modports, items and instance names) that count as "local".
 std::unordered_set<std::string_view> CollectInterfaceLocalNames(
     const ModuleDecl* iface) {
   std::unordered_set<std::string_view> local;
@@ -117,8 +100,6 @@ std::unordered_set<std::string_view> CollectInterfaceLocalNames(
 }
 
 bool InterfaceContainsExternalReference(const ModuleDecl* iface) {
-  // §25.9: a port that references another interface also disqualifies the
-  // interface from being used as a virtual interface type.
   for (const auto& p : iface->ports) {
     if (p.is_interface_port) return true;
   }
@@ -161,9 +142,6 @@ void ValidateVirtualInterfaceTarget(const DataType& type, SourceLoc loc,
                  Subclause("25.9"));
     }
   }
-  // §25.9: an interface containing hierarchical references to objects outside
-  // its body (or ports that reference other interfaces) shall not be used as
-  // the type of a virtual interface.
   if (iface_decl && iface_decl->decl_kind == ModuleDeclKind::kInterface &&
       InterfaceContainsExternalReference(iface_decl)) {
     diag.Error(loc,

@@ -38,9 +38,6 @@ TEST(LoopStatementSim, WhileZeroIter) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// A while-loop with a control expression that is always true (12.7.4) runs
-// until a break leaves it. The 12.8 file carries the same shape as a claim
-// about the break statement itself.
 TEST(LoopStatementSim, WhileTrueConditionRunsUntilBreak) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -59,9 +56,6 @@ TEST(LoopStatementSim, WhileTrueConditionRunsUntilBreak) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// After a continue the while-loop re-evaluates its control expression and
-// keeps iterating until that expression is false (12.7.4). The 12.8 and
-// 12.8.2 files cover continue as a jump statement.
 TEST(LoopStatementSim, WhileConditionRetestedAfterContinue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -119,11 +113,6 @@ TEST(LoopStatementSim, WhileXConditionNoIteration) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.7.4: the body repeats as long as the control expression is true. A bare
-// multibit condition is true while any bit is set and false once the value is
-// zero, so the loop iterates until the register drains to zero. Mirrors the
-// count-ones example in the subclause and exercises truthiness of a wide
-// (non-relational) condition through ExecWhile.
 TEST(LoopStatementSim, WhileVectorConditionIteratesUntilZero) {
   SimFixture f;
   auto* count = RunAndFindVar(
@@ -141,10 +130,10 @@ TEST(LoopStatementSim, WhileVectorConditionIteratesUntilZero) {
       "endmodule\n",
       f, "count");
   ASSERT_NE(count, nullptr);
-  EXPECT_EQ(count->value.ToUint64(), 4u);  // 1011_0010 holds four set bits
+  EXPECT_EQ(count->value.ToUint64(), 4u);
   auto* tempreg = f.ctx.FindVariable("tempreg");
   ASSERT_NE(tempreg, nullptr);
-  EXPECT_EQ(tempreg->value.ToUint64(), 0u);  // ran until the register hit zero
+  EXPECT_EQ(tempreg->value.ToUint64(), 0u);
 }
 
 }  // namespace

@@ -20,9 +20,6 @@ using namespace delta;
 
 namespace {
 
-// Parses `src` and asserts it yields a valid, error-free compilation unit whose
-// design-element collections are all empty. Returns the parse result so callers
-// can make additional assertions (e.g. on classes or cu_items).
 static ParseResult ParseEmptyCompilationUnit(const char* src) {
   auto r = Parse(src);
   EXPECT_NE(r.cu, nullptr);
@@ -74,12 +71,6 @@ TEST(CompilationUnitParsing, TopLevelFunction) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// §3.12.1 (printed page 56) gives the compilation-unit scope every item a
-// package may hold, and §6.19 (printed 119) declares an enumeration's literals
-// where the enumeration is written, `enum {X, Y} v;` outside any module
-// declaring X, Y and v in the unit; a structure written in the declaration is
-// the same shape. The head keyword was refused as a top-level declaration, so
-// each was reported "expected top-level declaration" at line 1.
 TEST(CompilationUnitParsing, CuScopeBareEnumAndStructDataDeclarations) {
   auto r = ParseEmptyCompilationUnit(
       "enum {X, Y} v;\n"
@@ -182,12 +173,6 @@ TEST(CompilationUnitParsing, DollarUnitScopeResolutionExpr) {
   EXPECT_EQ(assign_stmt->rhs->scope_prefix, "$unit");
 }
 
-// The right-hand side of the one initial procedure's assignment in the
-// module `r` holds -- `y = <expr>;` -- with the compilation unit accepted
-// whole, or null where the source is refused, so that a case reads the
-// expression's shape rather than a placeholder the recovery left. The tree
-// lives in `r`'s arena and its names in `r`'s source buffer, so the caller
-// keeps `r` alive for as long as it reads the expression.
 static const Expr* InitialRhs(const ParseResult& r) {
   EXPECT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -198,9 +183,6 @@ static const Expr* InitialRhs(const ParseResult& r) {
   return initial->body->rhs;
 }
 
-// Checks that `id` is the `$unit::name` identifier: the prefix in
-// Expr::scope_prefix, as Parser::MakeSysScopePrefix leaves it, and the name
-// in the text.
 static void ExpectUnitPrefixedIdentifier(const Expr* id, const char* name) {
   ASSERT_NE(id, nullptr);
   EXPECT_EQ(id->kind, ExprKind::kIdentifier);
@@ -208,9 +190,6 @@ static void ExpectUnitPrefixedIdentifier(const Expr* id, const char* name) {
   EXPECT_EQ(id->scope_prefix, "$unit");
 }
 
-// Checks that `call` is the method call `$unit::<var>.<method>()`: a call
-// whose callee is the member access of `method` on the `$unit`-prefixed
-// identifier `var`.
 static void ExpectUnitPrefixedMethodCall(const Expr* call, const char* var,
                                          const char* method) {
   ASSERT_NE(call, nullptr);
@@ -223,12 +202,6 @@ static void ExpectUnitPrefixedMethodCall(const Expr* call, const char* var,
   ExpectUnitPrefixedIdentifier(call->lhs->lhs, var);
 }
 
-// §3.12.1 (printed page 56) makes `$unit::q` the explicit reference to the
-// unit scope's q, and A.8.4's primary (printed 1211) lets that identifier
-// carry the method call any name carries, so `$unit::q.size()` is a call of
-// size whose base is the prefixed identifier. Parser::ParseSystemCall
-// returned the identifier with no postfix chain, so the statement was
-// reported "expected ';'" at the `.`.
 TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAMethodCall) {
   auto r = Parse(
       "int q[$];\n"
@@ -240,8 +213,6 @@ TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAMethodCall) {
   ExpectUnitPrefixedMethodCall(rhs, "q", "size");
 }
 
-// The same chain on a string: `$unit::s.len()` is a call of len on the
-// prefixed identifier s, which §6.16's method takes with no argument.
 TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAStringMethodCall) {
   auto r = Parse(
       "string s;\n"
@@ -253,9 +224,6 @@ TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAStringMethodCall) {
   ExpectUnitPrefixedMethodCall(rhs, "s", "len");
 }
 
-// A.8.4's select on the prefixed identifier: `$unit::arr[0]` is a select
-// whose base is the `$unit`-prefixed arr and whose index is the literal,
-// with no part-select end. Reported "expected ';'" at the `[` before.
 TEST(CompilationUnitParsing, DollarUnitIdentifierTakesAnIndexSelect) {
   auto r = Parse(
       "int arr[4];\n"
@@ -555,8 +523,6 @@ TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedWildcard) {
   auto r = Parse(
       "import $unit::*;\n"
       "module m; endmodule\n");
-  // §26.3 owns the report: Parser::ParseImportItem files the prohibition
-  // under the package-import subclause the declaration belongs to.
   EXPECT_TRUE(ReportedError(r.diags,
                             "the compilation-unit scope cannot be used with "
                             "an import declaration",
@@ -567,7 +533,6 @@ TEST(CompilationUnitParsing, CompilationUnitScopeCannotBeImportedSelective) {
   auto r = Parse(
       "import $unit::foo;\n"
       "module m; endmodule\n");
-  // §26.3 owns the report, as above.
   EXPECT_TRUE(ReportedError(r.diags,
                             "the compilation-unit scope cannot be used with "
                             "an import declaration",
@@ -662,23 +627,11 @@ TEST(CompilationUnitParsing, DesignElementsInterleaveWithNonDesignElements) {
 }
 
 TEST(ModuleItem, ConstructNotAllowedAtTheTopLevelNames3_12_1) {
-  // §3.12.1: the compilation-unit scope may hold any item a package may (§26.2)
-  // and bind constructs too. An always procedure is neither, and it is not a
-  // design element, so it belongs to no compilation unit. The report names
-  // §3.12.1, which is what tells this rejection from a design element that
-  // failed inside its own body: both leave has_errors true and both leave
-  // r.cu->modules empty.
   auto r = Parse("always @(*) x = 1;\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
-// Checks that `item` is the variable declaration `C <name>` -- a kVarDecl of
-// the named type C -- which is the shape §3.12.1 admits at compilation-unit
-// scope through A.1.2's package_item and its data_declaration. Before the
-// unit-scope dispatch took a class's name as opening a data declaration the
-// item was reported "expected top-level declaration" and never recorded, so
-// the item's presence and its type are what tell the repaired parse apart.
 static void ExpectUnitClassVarDecl(const ModuleItem* item, const char* name) {
   ASSERT_NE(item, nullptr);
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
@@ -688,9 +641,6 @@ static void ExpectUnitClassVarDecl(const ModuleItem* item, const char* name) {
 }
 
 TEST(CompilationUnitParsing, CuScopeUnitClassVariable) {
-  // §8.3 (printed page 180) makes a class a type at its declaration, and
-  // §3.12.1 (printed 56) lets the compilation-unit scope hold any item a
-  // package may, a data declaration of that type among them.
   auto r = Parse(
       "class C; int v = 3; endclass\n"
       "C h;\n");
@@ -703,10 +653,6 @@ TEST(CompilationUnitParsing, CuScopeUnitClassVariable) {
 }
 
 TEST(CompilationUnitParsing, CuScopeWildcardImportedClassVariable) {
-  // §26.3 (printed page 810) has a wildcard import make every declaration of
-  // the package visible in the importing scope, the compilation unit here, so
-  // p's class C is a type name for the unit's `C h3 = new;` and its
-  // initializer is kept.
   auto r = Parse(
       "package p; class C; int v = 4; endclass endpackage\n"
       "import p::*;\n"
@@ -722,8 +668,6 @@ TEST(CompilationUnitParsing, CuScopeWildcardImportedClassVariable) {
 }
 
 TEST(CompilationUnitParsing, CuScopeExplicitlyImportedClassVariable) {
-  // §26.3's explicit import makes the one named declaration visible, so
-  // `import p::C;` at unit scope is enough for `C h2;` after it.
   auto r = Parse(
       "package p; class C; int v = 5; endclass endpackage\n"
       "import p::C;\n"
@@ -735,8 +679,6 @@ TEST(CompilationUnitParsing, CuScopeExplicitlyImportedClassVariable) {
 }
 
 TEST(CompilationUnitParsing, CuScopeNetDeclarationOfEveryNetType) {
-  // §3.12.1 (printed page 56) lets the compilation-unit scope hold any item a
-  // package may, and A.2.1.3's net_declaration takes every net_type keyword.
   auto r = Parse(
       "triand a;\n"
       "trior b;\n"
@@ -767,7 +709,6 @@ TEST(CompilationUnitParsing, CuScopeNetDeclarationOfEveryNetType) {
 }
 
 TEST(CompilationUnitParsing, CuScopeConstDataDeclaration) {
-  // A.2.1.3's data_declaration opens with an optional `const`.
   auto r = Parse(
       "const int C = 3;\n"
       "module m; endmodule\n");
@@ -781,7 +722,6 @@ TEST(CompilationUnitParsing, CuScopeConstDataDeclaration) {
 }
 
 TEST(CompilationUnitParsing, CuScopeVirtualInterfaceDeclaration) {
-  // A.2.2.1's data_type includes `virtual [ interface ] interface_identifier`.
   auto r = Parse(
       "interface ifc; endinterface\n"
       "virtual ifc vif;\n"
@@ -794,8 +734,6 @@ TEST(CompilationUnitParsing, CuScopeVirtualInterfaceDeclaration) {
 }
 
 TEST(CompilationUnitParsing, CuScopeStaticLifetimeDataDeclaration) {
-  // A.2.1.3's data_declaration may give a lifetime, and only `static`
-  // followed by `constraint` opens §18.5.1's external constraint block.
   auto r = Parse(
       "static int s;\n"
       "module m; endmodule\n");
@@ -809,7 +747,6 @@ TEST(CompilationUnitParsing, CuScopeStaticLifetimeDataDeclaration) {
 }
 
 TEST(CompilationUnitParsing, CuScopePackageScopedTypeDeclaration) {
-  // A.2.2.1's data_type may name a type behind a package scope.
   auto r = Parse(
       "package p; typedef logic [7:0] byte_t; endpackage\n"
       "p::byte_t v;\n"
@@ -823,7 +760,6 @@ TEST(CompilationUnitParsing, CuScopePackageScopedTypeDeclaration) {
   EXPECT_EQ(r.cu->cu_items[0]->data_type.type_name, "byte_t");
 }
 
-// Parses `src` as one file and answers Parser::EndedInsideDeclaration.
 static bool EndsInsideDeclaration(const std::string& src) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -835,8 +771,6 @@ static bool EndsInsideDeclaration(const std::string& src) {
   return parser.EndedInsideDeclaration();
 }
 
-// §3.12.1: a file ending inside a declaration leaves its compilation unit to
-// extend into the next file. A module whose endmodule never came is one.
 TEST(IncompleteDeclarationAtEnd, ModuleWithoutEndmodule) {
   EXPECT_TRUE(EndsInsideDeclaration("module m;\n  logic a;\n"));
 }
@@ -849,9 +783,6 @@ TEST(IncompleteDeclarationAtEnd, CompleteModuleIsNot) {
   EXPECT_FALSE(EndsInsideDeclaration("module m;\n  logic a;\nendmodule\n"));
 }
 
-// An error the parse reports inside the text, here §3.14.2.2's timeunit in a
-// generate block, leaves the input ending between items all the same, so it
-// is no incomplete declaration.
 TEST(IncompleteDeclarationAtEnd, ErrorBeforeTheEndIsNot) {
   EXPECT_FALSE(
       EndsInsideDeclaration("module top;\n"
@@ -861,10 +792,6 @@ TEST(IncompleteDeclarationAtEnd, ErrorBeforeTheEndIsNot) {
                             "endmodule\n"));
 }
 
-// §3.12.1 (printed page 57): `$unit` names the compilation-unit scope only
-// before the `::` that selects one of its declarations, and no hierarchical
-// name reaches a declaration of that scope, so `$unit.g` names nothing,
-// whether a module or a task or function of the unit writes it.
 TEST(UnitScopeName, DollarUnitBeforeADot) {
   struct Written {
     const char* src;
@@ -891,7 +818,6 @@ TEST(UnitScopeName, DollarUnitBeforeADot) {
   }
 }
 
-// The nearest allowed form: `$unit::g`, written in the same two places.
 TEST(UnitScopeName, DollarUnitBeforeAScopeResolution) {
   EXPECT_TRUE(
       ParseOk("int g;\n"

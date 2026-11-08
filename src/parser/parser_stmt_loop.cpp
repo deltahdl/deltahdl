@@ -1,9 +1,3 @@
-// The loop statements of IEEE 1800-2023 §12.7 other than for: while, forever,
-// repeat, foreach and do-while. The for statement stays in parser_stmt.cpp
-// because it reads its initialisers through ParserStmtHelpers, which is
-// file-local to that translation unit. The split keeps both files inside the
-// 1000-line limit assert-no-oversized-source-files enforces.
-
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -48,23 +42,6 @@ Stmt* Parser::ParseRepeatStmt() {
   return stmt;
 }
 
-// A.6.8 writes the foreach array as a ps_or_hierarchical_array_identifier,
-// which A.9.3 spells `[ implicit_class_handle . | class_scope | package_scope
-// ] hierarchical_array_identifier`: a name reached through `this.` or
-// `super.`, a class or package scope's `::`, or a hierarchical path's '.'.
-// Read as the member-access chain an expression's name is, which is the
-// shape the elaborator's and simulator's name walks take; the parser had
-// built a chain of its own shape that took '.' alone, so `pkg::arr`,
-// `this.arr` and `C::arr` were reported as a missing identifier or '['.
-//
-// A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
-// identifier` (printed page 1214 of IEEE 1800-2023), so a segment before
-// a '.' may select an element: in `foreach
-// (successors[s].m_predecessors[pred])` the array is the member of the selected
-// element and `[pred]` alone is the loop_variables §12.7.3 puts after the array
-// (printed page 331). A run of bracket groups is a select when a '.' follows it
-// and the loop_variables when the `)` does; the parser had taken the first
-// group for the loop variables and asked for `)` at the '.'.
 Expr* Parser::ParseForeachArrayId() {
   Token head = Check(TokenKind::kKwThis) || Check(TokenKind::kKwSuper)
                    ? Consume()
@@ -77,8 +54,6 @@ Expr* Parser::ParseForeachArrayId() {
     lexer_.RestorePos(saved);
     return before_member;
   };
-  // Each select before a period is a constant_bit_select (A.8.4), so one with
-  // a range, `[1:0]` or `[0+:2]`, is reported.
   while (Check(TokenKind::kLBracket) && selects_before_a_member()) {
     while (Check(TokenKind::kLBracket)) {
       SourceLoc loc = CurrentLoc();
@@ -107,8 +82,6 @@ Stmt* Parser::ParseForeachStmt() {
   ParseForeachVars(stmt->foreach_vars);
   Expect(TokenKind::kRBracket, Subclause("12.7.3"));
   Expect(TokenKind::kRParen, Subclause("12.7.3"));
-  // A.6.8 ends foreach with a statement, where the five other loops end with
-  // a statement_or_null: a ';' here is no body.
   if (Check(TokenKind::kSemicolon)) {
     diag_.Error(CurrentLoc(),
                 "a foreach loop's body is a statement; ';' alone is none",

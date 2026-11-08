@@ -13,15 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 31-3 writes `$setup(data_event, reference_event, timing_check_limit
-// [, notifier])`. §31.3.1 is the one check of Clause 31 that names its data
-// event first, where Syntax 31-4 writes `$hold(reference_event, data_event,
-// ...)` and Syntax 31-5 writes `$setuphold(reference_event, data_event, ...)`.
-// A $setup case below therefore reads its first argument out of the
-// data_terminal, data_edge, data_edge_descriptors and data_condition fields,
-// and its second out of the ref_terminal, ref_edge, ref_edge_descriptors and
-// ref_condition fields.
-
 TEST(TimingCheckEventDefParsing, ControlledTimingCheckEventPeriod) {
   auto r = Parse(
       "module m;\n"
@@ -102,8 +93,6 @@ TEST(TimingCheckEventDefParsing, TerminalSimpleIdentifier) {
   EXPECT_EQ(tc->ref_terminal.range_kind, SpecifyRangeKind::kNone);
 }
 
-// timing_check_event_control ::= ... | edge  -- bare 'edge' with no
-// edge_control_specifier descriptor list.
 TEST(TimingCheckEventDefParsing, TimingCheckEventControlBareEdge) {
   auto r = Parse(
       "module m;\n"
@@ -118,8 +107,6 @@ TEST(TimingCheckEventDefParsing, TimingCheckEventControlBareEdge) {
   EXPECT_TRUE(tc->ref_edge_descriptors.empty());
 }
 
-// edge_control_specifier ::= edge [ edge_descriptor { , edge_descriptor } ]
-// edge_descriptor ::= 01 | 10 ; covers the two zero_or_one zero_or_one forms.
 TEST(TimingCheckEventDefParsing, EdgeControlSpecifierZeroOneDescriptors) {
   auto r = Parse(
       "module m;\n"
@@ -136,8 +123,6 @@ TEST(TimingCheckEventDefParsing, EdgeControlSpecifierZeroOneDescriptors) {
   EXPECT_EQ(tc->ref_edge_descriptors[1], std::make_pair('1', '0'));
 }
 
-// edge_descriptor ::= z_or_x zero_or_one ; z_or_x ::= x|X|z|Z, zero_or_one ::=
-// 0|1.
 TEST(TimingCheckEventDefParsing, EdgeDescriptorZorXThenZeroOrOne) {
   auto r = Parse(
       "module m;\n"
@@ -156,8 +141,6 @@ TEST(TimingCheckEventDefParsing, EdgeDescriptorZorXThenZeroOrOne) {
   EXPECT_EQ(tc->ref_edge_descriptors[3], std::make_pair('X', '0'));
 }
 
-// edge_descriptor ::= zero_or_one z_or_x ; the leading 0/1 lexes as a separate
-// int literal token, so the descriptor uses the split-token parse path.
 TEST(TimingCheckEventDefParsing, EdgeDescriptorZeroOrOneThenZorX) {
   auto r = Parse(
       "module m;\n"
@@ -176,8 +159,6 @@ TEST(TimingCheckEventDefParsing, EdgeDescriptorZeroOrOneThenZorX) {
   EXPECT_EQ(tc->ref_edge_descriptors[3], std::make_pair('1', 'x'));
 }
 
-// timing_check_condition ::= scalar_timing_check_condition ; the bare
-// scalar_timing_check_condition ::= expression form after &&&.
 TEST(TimingCheckEventDefParsing, TimingCheckConditionBareExpression) {
   auto r = Parse(
       "module m;\n"
@@ -191,8 +172,6 @@ TEST(TimingCheckEventDefParsing, TimingCheckConditionBareExpression) {
   ASSERT_NE(tc->data_condition, nullptr);
 }
 
-// timing_check_condition ::= ( scalar_timing_check_condition ) --
-// parenthesized.
 TEST(TimingCheckEventDefParsing, TimingCheckConditionParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -206,7 +185,6 @@ TEST(TimingCheckEventDefParsing, TimingCheckConditionParenthesized) {
   ASSERT_NE(tc->data_condition, nullptr);
 }
 
-// scalar_timing_check_condition ::= ~ expression
 TEST(TimingCheckEventDefParsing, ScalarConditionNegation) {
   auto r = Parse(
       "module m;\n"
@@ -222,8 +200,6 @@ TEST(TimingCheckEventDefParsing, ScalarConditionNegation) {
   EXPECT_EQ(tc->data_condition->op, TokenKind::kTilde);
 }
 
-// scalar_timing_check_condition ::= expression == scalar_constant
-// scalar_constant ::= 1'b1
 TEST(TimingCheckEventDefParsing, ScalarConditionEqualityScalarConstant) {
   auto r = Parse(
       "module m;\n"
@@ -240,8 +216,6 @@ TEST(TimingCheckEventDefParsing, ScalarConditionEqualityScalarConstant) {
   EXPECT_NE(tc->data_condition->rhs, nullptr);
 }
 
-// scalar_timing_check_condition ::= expression === scalar_constant
-// scalar_constant ::= 1'b0
 TEST(TimingCheckEventDefParsing, ScalarConditionCaseEqualityScalarConstant) {
   auto r = Parse(
       "module m;\n"
@@ -257,8 +231,6 @@ TEST(TimingCheckEventDefParsing, ScalarConditionCaseEqualityScalarConstant) {
   EXPECT_EQ(tc->data_condition->op, TokenKind::kEqEqEq);
 }
 
-// scalar_timing_check_condition ::= expression != scalar_constant
-// scalar_constant ::= 'b1
 TEST(TimingCheckEventDefParsing, ScalarConditionInequalityScalarConstant) {
   auto r = Parse(
       "module m;\n"
@@ -274,8 +246,6 @@ TEST(TimingCheckEventDefParsing, ScalarConditionInequalityScalarConstant) {
   EXPECT_EQ(tc->data_condition->op, TokenKind::kBangEq);
 }
 
-// scalar_timing_check_condition ::= expression !== scalar_constant
-// scalar_constant ::= 1 (bare decimal form).
 TEST(TimingCheckEventDefParsing, ScalarConditionCaseInequalityScalarConstant) {
   auto r = Parse(
       "module m;\n"
@@ -291,11 +261,6 @@ TEST(TimingCheckEventDefParsing, ScalarConditionCaseInequalityScalarConstant) {
   EXPECT_EQ(tc->data_condition->op, TokenKind::kBangEqEq);
 }
 
-// specify_terminal_descriptor names its terminal by A.7.3's input_identifier
-// or output_identifier, each a port_identifier, which A.9.3 spells
-// `simple_identifier | escaped_identifier`. An escaped name in either event
-// is the terminal it names, without the backslash, and §5.6.1 ends it at the
-// white space before the ','.
 TEST(TimingCheckEventDefParsing, EscapedTerminalIdentifiers) {
   auto r = Parse(
       "module m;\n"
@@ -311,10 +276,6 @@ TEST(TimingCheckEventDefParsing, EscapedTerminalIdentifiers) {
   EXPECT_EQ(tc->ref_terminal.name, "clk-1");
 }
 
-// input_identifier ::= ... | interface_identifier . port_identifier, both
-// halves identifiers and so each an escaped_identifier where written so; a
-// controlled_timing_check_event names the terminal through that form as a
-// timing_check_event does.
 TEST(TimingCheckEventDefParsing, EscapedInterfacePortTerminal) {
   auto r = Parse(
       "module m;\n"
@@ -330,9 +291,6 @@ TEST(TimingCheckEventDefParsing, EscapedInterfacePortTerminal) {
   EXPECT_EQ(tc->ref_terminal.name, "rd-en");
 }
 
-// edge_descriptor enumerates a closed set (01|10|z_or_x zero_or_one|
-// zero_or_one z_or_x); a token outside it — here "00", whose two digits match
-// and so satisfy neither zero_or_one zero_or_one form — must be rejected.
 TEST(TimingCheckEventDefParsing, EdgeDescriptorInvalidRejected) {
   auto r = Parse(
       "module m;\n"
@@ -340,12 +298,9 @@ TEST(TimingCheckEventDefParsing, EdgeDescriptorInvalidRejected) {
       "  $setup(data, edge[01, 00] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.5 owns the edge_descriptor set.
   EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"));
 }
 
-// edge_control_specifier with a bracketed list requires at least one
-// edge_descriptor; an empty list must be rejected.
 TEST(TimingCheckEventDefParsing, EdgeControlSpecifierEmptyListRejected) {
   auto r = Parse(
       "module m;\n"
@@ -353,7 +308,6 @@ TEST(TimingCheckEventDefParsing, EdgeControlSpecifierEmptyListRejected) {
       "  $setup(data, edge[] clk, 10);\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.5 owns the edge_control_specifier list length.
   EXPECT_TRUE(ReportedError(
       r.diags, "edge-control specifier requires at least one edge_descriptor",
       3, "31.5"));

@@ -93,11 +93,6 @@ TEST(TimingCheckCommandParsing, ErrorNochangeEdgeControlSpecifier) {
       "31.4.6"));
 }
 
-// End-to-end over the §31.5 edge-control-specifier dependency: an edge[...]
-// descriptor list is built from real §31.5 source syntax and driven through the
-// parser. Table 31-12 admits only posedge/negedge on the reference, so the
-// $nochange edge-control rule rejects this genuine edge-control specifier
-// (distinct from the bare-`edge` case above).
 TEST(TimingCheckCommandParsing,
      ErrorNochangeEdgeControlSpecifierWithDescriptors) {
   auto r = Parse(
@@ -111,9 +106,6 @@ TEST(TimingCheckCommandParsing,
       "31.4.6"));
 }
 
-// Table 31-12 requires the reference_event to be edge triggered. A plain
-// terminal with no posedge/negedge keyword is the closest rejected input that
-// is distinct from an (also illegal) edge-control specifier.
 TEST(TimingCheckCommandParsing, ErrorNochangePlainReferenceNoEdge) {
   auto r = Parse(
       "module m;\n"
@@ -126,9 +118,6 @@ TEST(TimingCheckCommandParsing, ErrorNochangePlainReferenceNoEdge) {
       "31.4.6"));
 }
 
-// The start/end edge offsets are constant expressions (Table 31-12); a named
-// specparam is a constant form beyond the literal the LRM example shows, so the
-// mintypmax offset positions must accept it.
 TEST(TimingCheckCommandParsing, NochangeSpecparamOffsets) {
   auto r = Parse(
       "module m;\n"

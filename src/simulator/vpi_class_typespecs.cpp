@@ -26,10 +26,6 @@ namespace delta {
 
 namespace {
 
-// §37.32 details 5, 7, 8 and 11: the kinds of a class defn's children a class
-// specialization's typespec reaches as its members: its variables, methods,
-// constraints, named events and their arrays, virtual interface vars, and the
-// classes it nests, which are its internal scopes.
 bool IsSpecializationMember(int type) {
   if (VpiIsVariablesType(type) || VpiIsTaskFuncType(type)) return true;
   switch (type) {
@@ -44,8 +40,6 @@ bool IsSpecializationMember(int type) {
   }
 }
 
-// The typespec of the class specialization `type`, whose class `defn` stands
-// for, hung from it without being among its children yet.
 VpiObject* MakeSpecialization(const ClassTypeInfo& type, VpiObject* defn,
                               const VpiAttachBuild& build) {
   VpiObject* typespec = build.alloc();
@@ -66,17 +60,12 @@ VpiObject* MakeSpecialization(const ClassTypeInfo& type, VpiObject* defn,
     assign->type = vpiParamAssign;
     assign->parent = typespec;
     assign->children.push_back(param);
-    // §37.32 detail 3: a specialization's param assign may answer any object
-    // with the value or type the parameter has, which the parameter itself is.
     assign->rhs = param;
     typespec->children.push_back(assign);
   }
   return typespec;
 }
 
-// The actual the list `actuals` an extends clause writes gives the parameter
-// `name`, the `ordered`th of those a value may be given: one naming it, or
-// else the one at that place where the list names none there; null for none.
 const DataType* WrittenActual(const std::vector<DataType>& actuals,
                               std::string_view name, std::size_t ordered) {
   const auto kNamed =
@@ -88,8 +77,6 @@ const DataType* WrittenActual(const std::vector<DataType>& actuals,
   return &actuals[ordered];
 }
 
-// The parameter named `name` among the children of the class defn `defn`,
-// null for none.
 VpiObject* DefnParameter(const VpiObject& defn, std::string_view name) {
   const auto kFound =
       std::ranges::find_if(defn.children, [name](const VpiObject* child) {
@@ -100,9 +87,6 @@ VpiObject* DefnParameter(const VpiObject& defn, std::string_view name) {
   return kFound == defn.children.end() ? nullptr : *kFound;
 }
 
-// The class defn among `defns` the class type `type` is of: for a copy the
-// run holds of a class a module declares under a later instance of it, the
-// defn under that instance, and otherwise as VpiClassDefnOf finds one.
 VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
                        const ClassTypeInfo& type) {
   std::string_view scope = type.instance_scope;
@@ -110,10 +94,6 @@ VpiObject* DefnOfClass(const VpiClassDefnObjects& defns,
   return VpiClassDefnOf(defns, type.decl, std::string(scope), nullptr);
 }
 
-// §37.32 detail 3: what the extends clause of a derived class gives one
-// parameter `name` of its base a value may be given: the actual it writes,
-// null for none, and the parameter's default, an expression `declared` for a
-// value parameter and a type `declared_type` for a type parameter.
 struct ExtendsParam {
   std::string_view name;
   const DataType* actual = nullptr;
@@ -121,8 +101,6 @@ struct ExtendsParam {
   const DataType* declared_type = nullptr;
 };
 
-// What the extends clause of `derived` gives each parameter of `base`'s
-// parameter port list a value may be given, by name or in order.
 std::vector<ExtendsParam> ExtendsParams(const ClassDecl& derived,
                                         const ClassDecl& base) {
   std::vector<ExtendsParam> params;
@@ -138,9 +116,6 @@ std::vector<ExtendsParam> ExtendsParams(const ClassDecl& derived,
   return params;
 }
 
-// The type `param` is assigned: the type the clause writes for it, or else
-// the default type it was declared with; null where it is assigned an
-// expression or nothing.
 const DataType* AssignedType(const ExtendsParam& param) {
   if (param.actual != nullptr) {
     return param.actual->type_ref_expr == nullptr ? param.actual : nullptr;
@@ -148,9 +123,6 @@ const DataType* AssignedType(const ExtendsParam& param) {
   return param.declared == nullptr ? param.declared_type : nullptr;
 }
 
-// §37.32 detail 3: a typespec of the type `type` writes as a keyword, of that
-// keyword's kind; null for a type written as a name, whose typespec is made
-// after the class defns are (VpiAssignExtendsNamedTypes).
 VpiObject* KeywordTypespec(const DataType& type, const VpiAttachBuild& build) {
   const int kKind = VpiTypespecKind(type.kind);
   if (kKind == 0) return nullptr;
@@ -159,10 +131,6 @@ VpiObject* KeywordTypespec(const DataType& type, const VpiAttachBuild& build) {
   return typespec;
 }
 
-// §37.32 detail 3: what a lexical typespec's param assign of `param` reaches
-// through vpiRhs: the expression `expression` makes of the value the clause
-// writes for a value parameter, or else of its default; or a typespec of the
-// type it is assigned for a type parameter.
 VpiObject* AssignedValue(
     const ExtendsParam& param,
     const std::function<VpiObject*(const Expr*)>& expression,
@@ -175,8 +143,6 @@ VpiObject* AssignedValue(
   return written == nullptr ? nullptr : expression(written);
 }
 
-// The built-in classes §37.32's vpiClassType names, by the name each is
-// declared with in the std package (§15.3, §15.4, §9.7).
 constexpr std::array<std::pair<std::string_view, int>, 3> kBuiltinClasses{{
     {"mailbox", vpiMailboxClass},
     {"semaphore", vpiSemaphoreClass},

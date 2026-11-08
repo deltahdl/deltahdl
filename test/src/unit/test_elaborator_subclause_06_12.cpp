@@ -41,9 +41,6 @@ TEST(RealDataType, RealPosedgeError) {
                             "edge event on real type is illegal", 3, "6.12"));
 }
 
-// §6.12 lists a real index expression of a bit-select of a vector among the
-// cases it prohibits, so the report cites §6.12 rather than §11.5.1, which only
-// has the index be an integer expression; it stands at the select's base `b`.
 TEST(RealDataType, RealIndexInBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -138,8 +135,6 @@ TEST(RealDataType, RealPartSelectError) {
       "  assign b = a[3:0];\n"
       "endmodule\n",
       f);
-  // a[3:0] is a part-select, the second of the two constructs §6.12's
-  // prohibition names, so the report is the part-select one.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "part-select of a real variable is illegal", 4,
                             "6.12"));
@@ -159,8 +154,6 @@ TEST(RealDataType, ShortrealBitSelectError) {
                             "6.12"));
 }
 
-// §6.12: edge event controls are prohibited on every real-variable type, not
-// only real. A posedge on a shortreal is rejected the same way.
 TEST(RealDataType, ShortrealEdgeControlError) {
   ElabFixture f;
   ElaborateSrc(
@@ -174,8 +167,6 @@ TEST(RealDataType, ShortrealEdgeControlError) {
                             "edge event on real type is illegal", 3, "6.12"));
 }
 
-// §6.12: bit-select references of real variables are prohibited for every
-// real-variable type, so a bit-select of a realtime is rejected.
 TEST(RealDataType, RealtimeBitSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,8 +181,6 @@ TEST(RealDataType, RealtimeBitSelectError) {
                             "6.12"));
 }
 
-// §6.12: a real index expression is prohibited in a part-select of a vector,
-// just as in a bit-select. Here the real drives an indexed part-select (+:).
 TEST(RealDataType, RealIndexInPartSelectError) {
   ElabFixture f;
   ElaborateSrc(
@@ -222,10 +211,6 @@ TEST(RealDataType, RealAndRealtimeInterchangeable) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.12 bars an edge event on a real variable wherever the event control is
-// written, and §9.4.2's event control on a procedural statement is one such
-// place: `@(posedge r)` inside an initial block's fork is reported where the
-// statement stands.
 TEST(RealDataType, RealEdgeInAProceduralEventControlError) {
   ElabFixture f;
   ElaborateSrc(
@@ -243,9 +228,6 @@ TEST(RealDataType, RealEdgeInAProceduralEventControlError) {
                             "edge event on real type is illegal", 5, "6.12"));
 }
 
-// A real the block itself declares is a real variable too, so an edge on it in
-// a task's event control is reported, while a change event on a real, `@(r)`,
-// is not an edge and stays legal.
 TEST(RealDataType, RealEdgeOnABlockLocalRealError) {
   ElabFixture f;
   ElaborateSrc(
@@ -263,10 +245,6 @@ TEST(RealDataType, RealEdgeOnABlockLocalRealError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §27.2 makes a generate block a collection of module items, so an edge
-// event on a real and a select of one are barred inside one, while a value
-// change on a real, and a select of a vector the block declares over a real
-// of the module, are not.
 TEST(RealDataType, EdgeAndSelectOfARealInsideGenerateBlocksAreRejected) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "real r; logic y;", "always @(posedge r) y = 0;"},

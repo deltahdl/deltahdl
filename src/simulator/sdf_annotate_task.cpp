@@ -112,8 +112,6 @@ bool ParseSdfScaleFactors(std::string_view text, SdfScaleFactors& out) {
   return true;
 }
 
-// A magnitude as the file wrote it: the exact real value where the lexer kept
-// one, else the whole number a value built from an integer alone carries.
 static double ExactMagnitude(uint64_t whole, double real) {
   return real > 0.0 ? real : static_cast<double>(whole);
 }
@@ -123,11 +121,6 @@ static uint64_t RoundToTicks(double scaled) {
   return static_cast<uint64_t>(std::floor(scaled + 0.5));
 }
 
-// §32.7 (printed pages 930-931): each member keeps the sign of the value it is
-// scaled from, since a negative INCREMENT value lowers what it is added to and
-// the magnitudes above are scaled apart from their signs. Scaled from
-// magnitudes alone, every value of a $sdf_annotate call's file came out
-// positive and a negative INCREMENT raised the delay it was meant to lower.
 SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
                               const SdfScaleFactors& factors) {
   double src_min = 0.0;
@@ -168,8 +161,6 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
       out.min_empty = out.typ_empty = out.max_empty = value.max_empty;
       break;
   }
-  // §32.5: a value written empty still holds what it stands for once scaled,
-  // and the real magnitudes, which a real specparam reads, scale with it.
   out.empty = value.empty;
   out.min_real = src_min * factors.min_factor;
   out.typ_real = src_typ * factors.typ_factor;
@@ -180,8 +171,6 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
   return out;
 }
 
-// The delay and the two limits of every direction an IOPATH or interconnect
-// entry wrote.
 static void ScaleSdfDirections(std::vector<SdfIopathDirection>& directions,
                                SdfScaleType type,
                                const SdfScaleFactors& factors) {
@@ -192,9 +181,6 @@ static void ScaleSdfDirections(std::vector<SdfIopathDirection>& directions,
   }
 }
 
-// §32.5: scale every delay value one cell entry carries -- its IOPATH rise,
-// fall, turnoff and pulse limits, its timing-check limits, its specparams, its
-// interconnect delays, its PATHPULSE limits, and its DEVICE delays.
 static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
                          const SdfScaleFactors& factors) {
   for (auto& io : cell.iopaths) {
@@ -217,9 +203,6 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
     for (auto& v : ic.values) v = ApplySdfScaling(v, type, factors);
     ScaleSdfDirections(ic.directions, type, factors);
   }
-  // §32.7: a PATHPULSEPERCENT entry states percentages of the delay, which are
-  // not timing values, so neither the scale factors nor the file's time unit
-  // folded into them reach it.
   for (auto& pl : cell.pulse_limits) {
     if (pl.is_percent) continue;
     pl.reject = ApplySdfScaling(pl.reject, type, factors);
@@ -233,9 +216,6 @@ static void ScaleSdfCell(SdfCell& cell, SdfScaleType type,
   }
 }
 
-// How many ticks of `precision_seconds` one unit of an SDF file whose
-// TIMESCALE is `file_seconds` makes, 1 ns where the file named none; 1 where no
-// precision is given, leaving the values as the file wrote them.
 static double SdfUnitRatio(double file_seconds, double precision_seconds) {
   if (precision_seconds <= 0.0) return 1.0;
   const double kFileUnit = file_seconds > 0.0 ? file_seconds : 1e-9;
@@ -249,14 +229,6 @@ SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
   return out;
 }
 
-// §32.9: every individual annotation the file carries earns its own entry in
-// the log file. §32.6 lets several SDF files be annotated in turn, and a later
-// call naming the same log file adds its entries to the ones already there
-// rather than replacing them, so the log reads as the record of the whole run.
-// §32.9: write one log line per annotation one cell entry carries. A DEVICE
-// entry is annotated like any other delay, so it earns an entry of its own; an
-// entry that names no port instance reaches every output of the cell, which is
-// what the empty target stands for here.
 static void WriteSdfCellLogEntries(std::ostream& out, const SdfCell& cell) {
   const std::string kPrefix = cell.cell_type + "/" + cell.instance + ": ";
   for (const auto& io : cell.iopaths) {
@@ -295,8 +267,6 @@ bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
   if (!out.is_open()) return false;
 
   for (const auto& cell : file.cells) {
-    // §32.9: the log records the annotations that were made, and a cell outside
-    // the region the call named is never annotated, so it earns no entry.
     if (!SdfCellPrefixInRegion(cell.instance, region_prefix, design_root))
       continue;
     WriteSdfCellLogEntries(out, cell);
@@ -344,15 +314,12 @@ bool ReadSdfFile(std::string_view path, SdfFile& out) {
 
 namespace {
 
-// One configuration-file line reduced to the keyword it names and the text that
-// follows. A line that names nothing leaves `keyword` empty.
 struct SdfConfigLine {
   std::string keyword;
   std::string value;
 };
 
 SdfConfigLine SplitSdfConfigLine(std::string_view line) {
-  // A comment runs to the end of the line, and a trailing ';' closes an entry.
   const std::size_t kComment = line.find('#');
   if (kComment != std::string_view::npos) line = line.substr(0, kComment);
   const std::size_t kSlashes = line.find("//");
@@ -381,8 +348,6 @@ SdfConfigLine SplitSdfConfigLine(std::string_view line) {
   out.keyword = std::string(line.substr(0, kSplit));
   std::string_view rest = trim(line.substr(kSplit + 1));
   if (!rest.empty() && rest.front() == '=') rest = trim(rest.substr(1));
-  // The value may be quoted, as the same text is a quoted argument when it is
-  // written on the $sdf_annotate call instead.
   if (rest.size() >= 2 && rest.front() == '"' && rest.back() == '"') {
     rest = rest.substr(1, rest.size() - 2);
   }
@@ -392,10 +357,6 @@ SdfConfigLine SplitSdfConfigLine(std::string_view line) {
 
 }  // namespace
 
-// §32.9: the configuration file controls the same aspects of annotation the
-// call's own arguments do. The three the call can also name -- MTM_SPEC,
-// SCALE_FACTORS and SCALE_TYPE -- are read here; ResolveSdfAnnotateArgs is what
-// then lets an argument written on the call override the keyword read here.
 bool ReadSdfAnnotateConfigFile(std::string_view path, SdfAnnotateConfig& out) {
   if (path.empty()) return false;
   std::ifstream in{std::string(path)};
@@ -415,12 +376,6 @@ bool ReadSdfAnnotateConfigFile(std::string_view path, SdfAnnotateConfig& out) {
   return true;
 }
 
-// The file a call annotates: its values scaled by the call's scale factors
-// (§32.9) and, IEEE 1497 putting them in the unit the file's TIMESCALE names
-// (1 ns where it names none) while a delay is counted in ticks of the design's
-// precision, by the one unit over the other. A LABEL's value is a specparam's,
-// which the module's own expressions read in the module's time unit rather
-// than in ticks, so the LABEL values take the call's scale factors alone.
 static SdfFile ScaleSdfFileForRun(const SdfFile& file,
                                   const ResolvedSdfAnnotateArgs& resolved,
                                   double precision_seconds) {
@@ -438,11 +393,6 @@ static SdfFile ScaleSdfFileForRun(const SdfFile& file,
   return scaled;
 }
 
-// §32.9 with §27.5 and §23.6: a cell's INSTANCE path names its instance
-// through the levels of the hierarchy, a generate block among them, while the
-// instance's module paths carry the prefix it is stored under, `gb_u.` for the
-// path `gb/u`. Each path is rewritten from the design root to that key where
-// the two differ, which SdfCellPrefixInRegion then reads as any other path.
 static void TranslateSdfCellPaths(SdfFile& file,
                                   const SdfAnnotateTaskArgs& args) {
   if (!args.instance_key_of_path) return;
@@ -471,9 +421,6 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
   }
   TranslateSdfCellPaths(file, args);
 
-  // §32.9: the configuration file is read first, then whichever of mtm_spec,
-  // scale_factors and scale_type the call wrote overrides the matching keyword
-  // in it.
   SdfAnnotateConfig config;
   if (!args.config_file.empty() &&
       !ReadSdfAnnotateConfigFile(args.config_file, config)) {
@@ -483,9 +430,6 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
   const ResolvedSdfAnnotateArgs kResolved = ResolveSdfAnnotateArgs(
       args.mtm_spec, args.scale_factors, args.scale_type, config);
 
-  // §32.9: an mtm_spec or scale_type the annotator does not know is not one of
-  // the keywords Table 32-5 / Table 32-6 lists, so it is reported rather than
-  // quietly taken as the default it left in place.
   SdfMtmKeyword mtm_probe = SdfMtmKeyword::kToolControl;
   if (!args.mtm_spec.empty() && !ParseSdfMtmKeyword(args.mtm_spec, mtm_probe)) {
     result.warnings.push_back("SDF annotator: unknown mtm_spec " +
@@ -507,8 +451,6 @@ SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
     result.warnings.push_back(std::move(warning));
   }
 
-  // §32.9: with a log_file named, each individual annotation the file carries
-  // is written out as its own entry.
   if (!args.log_file.empty() &&
       !WriteSdfAnnotationLog(kScaled, args.log_file, args.region_prefix,
                              args.design_root)) {
@@ -534,10 +476,6 @@ std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena) {
       return SdfAnnotateScopeName(e->lhs, ctx, arena) + "." +
              (e->rhs != nullptr ? std::string(e->rhs->text) : std::string());
     case ExprKind::kSelect: {
-      // §32.9: array indices are permitted in a module_instance, so an indexed
-      // element of an instance array names its own level of the hierarchy. The
-      // index is evaluated, which is what lets it be written as anything that
-      // reduces to a value rather than only as a plain number.
       std::string s = SdfAnnotateScopeName(e->base, ctx, arena);
       if (e->index == nullptr) return s;
       const uint64_t kIndex = EvalExpr(e->index, ctx, arena).ToUint64();
@@ -551,14 +489,6 @@ std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena) {
 
 namespace {
 
-// §32.9 (printed page 932): the instance prefix, in PathDelay::inst_prefix's
-// spelling, of the level a module_instance operand names, `name` as
-// SdfAnnotateScopeName wrote it. A name whose first level is the top module's
-// own, `top.m2`, or one written from $root, names the level that path reaches
-// from the top; any other is read downward from the instance of the module
-// holding the call, `caller_prefix`, so `m2` in top is top.m2. Taken as text to
-// be compared from its first character, `top.m2` was the one spelling a cell
-// path from the top had to begin with.
 std::string SdfRegionPrefix(std::string_view name, std::string_view design_root,
                             std::string_view caller_prefix) {
   constexpr std::string_view kRoot = "$root.";
@@ -571,9 +501,6 @@ std::string SdfRegionPrefix(std::string_view name, std::string_view design_root,
   return std::string(caller_prefix) + std::string(name) + ".";
 }
 
-// §32.9: read one operand of a $sdf_annotate call as a character string. An
-// operand the call skipped over on its way to a later one is absent here and
-// reads as no text at all, which is the same as leaving it off the end.
 std::string SdfAnnotateStringArg(const Expr* call, std::size_t index,
                                  SimContext& ctx, Arena& arena) {
   if (index >= call->args.size() || call->args[index] == nullptr) return {};
@@ -582,11 +509,6 @@ std::string SdfAnnotateStringArg(const Expr* call, std::size_t index,
 
 }  // namespace
 
-// §32.9's Table 32-5 has TOOL_CONTROL, the default mtm_spec, annotate whichever
-// value the simulator picks. What this simulator
-// selects is what --mintypmax established, so a $sdf_annotate call that names
-// no mtm_spec annotates the same member of the min/typ/max triple that the
-// source-level min:typ:max expressions of §11.11 are evaluated at.
 static SdfMtm SdfMtmFromDelayMode(DelayMode mode) {
   switch (mode) {
     case DelayMode::kMin:
@@ -605,9 +527,6 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
   if (mgr == nullptr) return false;
 
   SdfAnnotateTaskArgs args;
-  // §32.9: sdf_file is the one required operand. It is an expression, so it may
-  // be written as a string literal, held in a `string` variable, or held in an
-  // integral variable whose bytes spell the name.
   args.sdf_file = SdfAnnotateStringArg(call, 0, ctx, arena);
   if (args.sdf_file.empty()) {
     ctx.GetDiag().Error(call->range.start,
@@ -616,20 +535,10 @@ bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena) {
     return false;
   }
 
-  // The root every hierarchical name in the run counts from. Lowerer::Lower
-  // sets it to the top module's own name.
   args.design_root = ctx.CurrentScopeName();
-  // The tick an annotated delay is counted in, which the file's values are
-  // scaled into from its TIMESCALE.
   args.precision_seconds =
       std::pow(10.0, static_cast<int>(ctx.GlobalPrecision()));
 
-  // §32.9: module_instance names a level of the design hierarchy rather than a
-  // readable value, so it is taken as the name it writes, and the region is
-  // the instance it names. Left out, the annotator works in the module the
-  // call sits in, which is the instance of that module running it --
-  // one of the two instances of a module instantiated twice, each call its
-  // own.
   if (call->args.size() > 1 && call->args[1] != nullptr) {
     args.module_instance = SdfAnnotateScopeName(call->args[1], ctx, arena);
     args.region_prefix = SdfRegionPrefix(args.module_instance, args.design_root,

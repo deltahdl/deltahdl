@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "elaborator/elaborator.h"
@@ -77,9 +75,6 @@ TEST(VectorSpecification, BitVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9.1: the range rule applies to reg, logic, and bit vectors alike. reg is
-// the third enumerated element type (logic and bit are covered above), so a
-// ranged reg declaration must elaborate to the width of its span.
 TEST(VectorSpecification, RegVectorWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; reg [7:0] r; endmodule\n", f);
@@ -90,8 +85,6 @@ TEST(VectorSpecification, RegVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.9.1: the range bounds are constant integer expressions, not just literals.
-// The elaborator folds an arithmetic bound expression before computing width.
 TEST(VectorSpecification, ConstantExpressionRange) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [2+1:0] v; endmodule\n", f);
@@ -102,8 +95,6 @@ TEST(VectorSpecification, ConstantExpressionRange) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9.1: range bounds may be any integer value, including negative on both
-// ends; the width is the magnitude of the span plus one.
 TEST(VectorSpecification, BothNegativeRangeWidth) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [-1:-4] v; endmodule\n", f);
@@ -114,9 +105,6 @@ TEST(VectorSpecification, BothNegativeRangeWidth) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9.1: implementations may cap the maximum vector length, but the cap shall
-// be no smaller than 2**16 bits. A vector at exactly that guaranteed minimum
-// must elaborate without error and carry its full declared width.
 TEST(VectorSpecification, GuaranteedMinimumMaxLength) {
   ElabFixture f;
   auto* design = Elaborate("module m; logic [65535:0] big; endmodule\n", f);
@@ -127,10 +115,6 @@ TEST(VectorSpecification, GuaranteedMinimumMaxLength) {
   EXPECT_EQ(mod->variables[0].width, 65536u);
 }
 
-// §6.9.1: the msb/lsb bounds shall be constant integer expressions (see
-// 11.2.1). A parameter is one of the constant forms 11.2.1 admits, so a range
-// built from a parameter reference must fold to the same width as the literal
-// range it stands for.
 TEST(VectorSpecification, ParameterConstantRange) {
   ElabFixture f;
   auto* design =
@@ -142,9 +126,6 @@ TEST(VectorSpecification, ParameterConstantRange) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9.1: a localparam is likewise a constant form of 11.2.1. Here both bounds
-// are localparam references, so the width comes from folding both constant
-// expressions and taking the span.
 TEST(VectorSpecification, LocalparamConstantRange) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -158,9 +139,6 @@ TEST(VectorSpecification, LocalparamConstantRange) {
   EXPECT_EQ(mod->variables[0].width, 4u);
 }
 
-// §6.9.1: a constant function call is another constant form of 11.2.1 that a
-// range bound may use. The elaborator evaluates the call at elaboration time to
-// obtain the bound before computing the vector width.
 TEST(VectorSpecification, ConstantFunctionCallRange) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -176,10 +154,6 @@ TEST(VectorSpecification, ConstantFunctionCallRange) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// A vector's range bound that is x or z is reported under §7.4.1, which states
-// the prohibition for every packed dimension of a packed array declaration and
-// so covers the one range a vector has. These two cases belong in this file
-// because the spelling under test is a vector's.
 TEST(VectorSpecification, XInRangeIsError) {
   ElabFixture f;
   Elaborate("module m; logic [1'bx:0] a; endmodule\n", f);

@@ -356,57 +356,30 @@ TEST(ConstExpr, FunctionCallWithNonConstantArgNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-// §11.2.1: such a built-in method call counts as constant once both its
-// identifier and its input arguments are constant expressions. `arr` is in no
-// scope here, so it is not a constant expression and neither is the call. This
-// is the case whose wrong answer went unseen: ConstEvalInt cannot evaluate
-// `arr.size()` either, so calling it constant left the value unresolved with
-// nothing reported.
 TEST(ConstExpr, BuiltinMethodSizeWithParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size()", f);
   EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-// §5.13 lets a built-in method with no arguments be called without parentheses,
-// so §11.2.1's rule on the identifier decides the paren-less form the same way.
 TEST(ConstExpr, BuiltinMethodSizeNoParensOnNonConstantIdentifierNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("arr.size", f);
   EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-// `bits` names no built-in method at all. `$bits` is a system function
-// (§20.6.2), and §7.11 gives the array query system functions as $left, $right,
-// $low, $high, $increment, $size, $dimensions and $unpacked_dimensions, each
-// spelled with its `$`. So `v.bits` is an ordinary member access, and an
-// ordinary member access is constant only when the compound name `v.bits` is a
-// parameter in scope. No scope is passed here.
 TEST(ConstExpr, MemberNamedBitsWithNoCompoundParameterNotConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.bits", f);
   EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-// A name off the array query list without its `$` names nothing the standard
-// defines. §7.11 names the system functions that report on an array: $left,
-// $right, $low, $high, $increment, $size, $dimensions and $unpacked_dimensions.
-// `left` alone is none of them, so `v.left` is decided as an ordinary member
-// access and is constant only when the compound name `v.left` is a parameter in
-// scope. No scope is passed here. This is the claim the §5.13 built-in method
-// names rest on, which are "dynamic_array.size, associative_array.num, and
-// string.len" and no others.
 TEST(ConstExpr, ArrayQueryNameWithoutItsDollarIsNotABuiltinMethod) {
   EvalFixture f;
   auto* e = ParseExprFrom("v.left", f);
   EXPECT_FALSE(IsConstantExpr(e, {}));
 }
 
-// `A.size()` names no built-in method. `A` is in scope with the value 0, so it
-// holds an integer, and §5.13 ties each built-in method to a particular data
-// type, associating none with an integer. §11.2.1 has a constant built-in
-// method call in a constant expression evaluated during elaboration, and there
-// is nothing here to evaluate at elaboration time.
 TEST(ConstExpr, BuiltinMethodSizeOnAnIntegerParameterNotConstant) {
   EvalFixture f;
   ScopeMap scope = {{"A", 0}};
@@ -414,15 +387,6 @@ TEST(ConstExpr, BuiltinMethodSizeOnAnIntegerParameterNotConstant) {
   EXPECT_FALSE(IsConstantExpr(e, scope));
 }
 
-// `S.len` names no built-in method. §6.16 makes len() a built-in method of a
-// string, and a ScopeMap holds an int64_t against each name, so `S` is not a
-// string and there is no declaration to read a length from. §11.2.1 requires a
-// constant built-in method call to be evaluated at elaboration time, so a call
-// that cannot be evaluated is not a constant expression. The elaborator does
-// fold len() on a parameter declared `string`, which
-// test/src/unit/test_elaborator_subclause_06_16_01.cpp covers; what separates
-// this case from that one is the declared type, and a ScopeMap holds an
-// int64_t against each name and records no declared type at all.
 TEST(ConstExpr, BuiltinMethodLenOnAnIntegerParameterNotConstant) {
   EvalFixture f;
   ScopeMap scope = {{"S", 0}};

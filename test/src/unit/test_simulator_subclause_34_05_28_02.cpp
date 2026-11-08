@@ -1,15 +1,3 @@
-// §34.5.28.2 decrypt_license, Description: the asking a run supplies.
-//
-// On meeting the expression in an encrypted model, and before processing the
-// decrypted text, the tool loads the library the value names, calls the entry
-// function in it with the feature string, and compares the value returned with
-// the match value; an exit function, where one is named, is called before the
-// tool exits so the licence is released. What the reading does with the
-// answer is stated in test_preprocessor_subclause_34_05_28_02.cpp. The cases
-// here are the asking itself, ProtectLicenseLibraries
-// (src/driver/protect_license_libraries.h), against a library built from C
-// for the purpose (helpers_license_library.h).
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -25,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// The library is loaded and the entry function called with the feature
-// string, the value it returns coming back with the answer.
 TEST(ProtectDecryptLicenseAsking, TheEntryFunctionIsCalledWithTheFeature) {
   LicenseLibrary library;
   ProtectLicenseLibraries libraries;
@@ -35,8 +21,6 @@ TEST(ProtectDecryptLicenseAsking, TheEntryFunctionIsCalledWithTheFeature) {
   EXPECT_EQ(answer.returned, 42);
 }
 
-// A different feature is a different question, and the library answers it
-// differently: the feature string is what the entry function was passed.
 TEST(ProtectDecryptLicenseAsking, AnotherFeatureIsAnsweredOtherwise) {
   LicenseLibrary library;
   ProtectLicenseLibraries libraries;
@@ -44,8 +28,6 @@ TEST(ProtectDecryptLicenseAsking, AnotherFeatureIsAnsweredOtherwise) {
   EXPECT_EQ(answer.returned, 5);
 }
 
-// A library that cannot be loaded leaves the entry function uncalled, and the
-// answer carries the loader's account of why, which names the file.
 TEST(ProtectDecryptLicenseAsking, ALibraryThatCannotBeLoadedIsNotCalled) {
   LicenseLibrary library;
   ProtectLicense license = library.Asking("open", 42);
@@ -57,7 +39,6 @@ TEST(ProtectDecryptLicenseAsking, ALibraryThatCannotBeLoadedIsNotCalled) {
       << answer.why_not_called;
 }
 
-// A library defining no function of the entry's name leaves it uncalled too.
 TEST(ProtectDecryptLicenseAsking, AnEntryTheLibraryLacksIsNotCalled) {
   LicenseLibrary library;
   ProtectLicense license = library.Asking("open", 42);
@@ -69,8 +50,6 @@ TEST(ProtectDecryptLicenseAsking, AnEntryTheLibraryLacksIsNotCalled) {
             "the library defines no function of that name");
 }
 
-// The exit function is called before the tool exits, which is when the run
-// releases what it asked, and not before.
 TEST(ProtectDecryptLicenseAsking, TheExitFunctionIsCalledOnRelease) {
   LicenseLibrary library;
   ProtectLicenseLibraries libraries;
@@ -80,8 +59,6 @@ TEST(ProtectDecryptLicenseAsking, TheExitFunctionIsCalledOnRelease) {
   EXPECT_EQ(library.Released(), 1);
 }
 
-// Each licence asked is released once: a release already made is not made
-// again when the libraries go.
 TEST(ProtectDecryptLicenseAsking, EachLicenceIsReleasedOnce) {
   LicenseLibrary library;
   {
@@ -92,8 +69,6 @@ TEST(ProtectDecryptLicenseAsking, EachLicenceIsReleasedOnce) {
   EXPECT_EQ(library.Released(), 1);
 }
 
-// And the libraries going release what was not released yet, which is how a
-// run ends.
 TEST(ProtectDecryptLicenseAsking, TheLibrariesGoingReleaseTheLicence) {
   LicenseLibrary library;
   {
@@ -103,8 +78,6 @@ TEST(ProtectDecryptLicenseAsking, TheLibrariesGoingReleaseTheLicence) {
   EXPECT_EQ(library.Released(), 1);
 }
 
-// The exit function is called where the licence was refused as well: either
-// way the tool goes on to exit.
 TEST(ProtectDecryptLicenseAsking, ARefusedLicenceIsReleasedToo) {
   LicenseLibrary library;
   ProtectLicenseLibraries libraries;
@@ -113,9 +86,6 @@ TEST(ProtectDecryptLicenseAsking, ARefusedLicenceIsReleasedToo) {
   EXPECT_EQ(library.Released(), 1);
 }
 
-// The whole of it through a reading: an envelope whose model states a
-// decrypt_license naming the library is decrypted where the library's answer
-// is the match value.
 TEST(ProtectDecryptLicenseAsking, AnEnvelopeLicensedByTheLibraryDecrypts) {
   LicenseLibrary library;
   std::string source = "`pragma protect begin\n";

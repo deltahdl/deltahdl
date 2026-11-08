@@ -216,10 +216,6 @@ TEST(SubroutineCallExprElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// constant_function_call folded in a constant-expression context where the
-// call's argument is itself a parameter (a distinct constant form from the
-// literal used in ConstantFunctionCallInParameterElaborates). The elaborator
-// must resolve the parameter before folding the call.
 TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithParameterArg) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -233,7 +229,6 @@ TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithParameterArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// constant_function_call folded where the argument is a localparam constant.
 TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithLocalparamArg) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -247,18 +242,6 @@ TEST(SubroutineCallExprElaboration, ConstantFunctionCallWithLocalparamArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Footnote 43 of A.8.2 bars `null` from the argument list of a scope
-// randomize_call and puts no condition on where that call is written; A.6.4
-// makes a subroutine_call_statement a statement_item, so every position a
-// statement holds a statement in is a position the report is owed at.
-// WalkStmtForScopeRandomize in
-// src/elaborator/elaborator_validate_subroutine_args.cpp had written out eight
-// of the thirteen child-statement links Stmt declares, and now takes the list
-// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
-// cases below cover one newly reached position each.
-
-// A.6.3's par_block holds statement_or_null between fork and its join_keyword,
-// which the parser keeps in Stmt::fork_stmts.
 TEST(SubroutineCallExprElaboration, ScopeRandomizeWithNullInForkArmRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -273,9 +256,6 @@ TEST(SubroutineCallExprElaboration, ScopeRandomizeWithNullInForkArmRejected) {
       "'null' is not a legal argument to a scope randomize call", 3, "A.8.2"));
 }
 
-// A.6.3's action_block gives an immediate assertion a statement in each arm,
-// held in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(SubroutineCallExprElaboration,
      ScopeRandomizeWithNullInAssertionPassStatementRejected) {
   ElabFixture f;
@@ -302,8 +282,6 @@ TEST(SubroutineCallExprElaboration,
       "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
 }
 
-// §18.16's `randcase_item ::= expression : statement_or_null` puts a statement
-// after each weight, held in Stmt::randcase_items.
 TEST(SubroutineCallExprElaboration,
      ScopeRandomizeWithNullInRandcaseItemRejected) {
   ElabFixture f;
@@ -319,8 +297,6 @@ TEST(SubroutineCallExprElaboration,
       "'null' is not a legal argument to a scope randomize call", 3, "A.8.2"));
 }
 
-// A.6.12's rs_code_block holds procedural statements, which the parser keeps in
-// RsProd::code_stmts under Stmt::rs_productions.
 TEST(SubroutineCallExprElaboration,
      ScopeRandomizeWithNullInRandsequenceCodeBlockRejected) {
   ElabFixture f;
@@ -338,9 +314,6 @@ TEST(SubroutineCallExprElaboration,
       "'null' is not a legal argument to a scope randomize call", 4, "A.8.2"));
 }
 
-// §18.17.1 admits a code block after a rule's weight specification, kept in
-// RsRule::weight_code. That is a second statement list under
-// Stmt::rs_productions, reached by a different member from the case above.
 TEST(SubroutineCallExprElaboration,
      ScopeRandomizeWithNullInRandsequenceWeightCodeBlockRejected) {
   ElabFixture f;
@@ -360,10 +333,6 @@ TEST(SubroutineCallExprElaboration,
       "'null' is not a legal argument to a scope randomize call", 5, "A.8.2"));
 }
 
-// A.8.2: a tf_call names a task or a function, so a bare call statement
-// naming a variable (#5796), and a call with an argument list naming a
-// variable or a net, as a statement or within an expression (#5798), are each
-// reported where they are written.
 TEST(SubroutineCallElaborationSyntax, ACallNamingAVariableOrANetIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -388,14 +357,6 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingAVariableOrANetIsReported) {
                             8, "A.8.2"));
 }
 
-// A.8.2 with §16.11: a call attached to a sequence names a task or a function
-// too, so one naming a module's variable or net, written with an argument list
-// or without, or a local variable of the sequence is reported, in a sequence
-// declaration, a first_match, a property declaration, one of its local
-// variables among them, a concurrent assertion at module level, a cover
-// sequence and an assertion in a procedure. A task
-// draws no report, nor does a formal argument, which stands for its actual
-// (§16.8.1) though a variable of the module bears its name.
 TEST(SubroutineCallElaborationSyntax,
      ACallAttachedToASequenceNamingDataIsReported) {
   ElabFixture f;
@@ -446,9 +407,6 @@ TEST(SubroutineCallElaborationSyntax,
   }
 }
 
-// A.8.2: a call of a task or a function the module declares, a call through a
-// class handle, a constructor call and a shallow copy of a handle (§8.12) name
-// no variable as a call, so none is reported.
 TEST(SubroutineCallElaborationSyntax, ACallOfATaskOrFunctionIsNotReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -470,9 +428,6 @@ TEST(SubroutineCallElaborationSyntax, ACallOfATaskOrFunctionIsNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.8.2 with §23.9: a call naming a variable a block or a fork declares is
-// reported inside it, though the variable shadows a function of the module,
-// and a call of that function outside the block is not (#5799).
 TEST(SubroutineCallElaborationSyntax, ACallNamingABlocksVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -496,10 +451,6 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingABlocksVariableIsReported) {
                              7, "A.8.2"));
 }
 
-// A.6.9: a call statement calls a task or a function, so one naming a let, a
-// sequence, a property, or a variable a package declares and the module
-// imports by name or with a wildcard, is reported, while the let named with an
-// argument list within an expression is not (#5800).
 TEST(SubroutineCallElaborationSyntax,
      ACallStatementNamingNoSubroutineIsReported) {
   ElabFixture f;
@@ -539,12 +490,6 @@ TEST(SubroutineCallElaborationSyntax,
                              16, "A.6.9"));
 }
 
-// A.6.9: a call statement calls a task or a function, so one naming a
-// parameter the module declares, bare or with an argument list, is reported;
-// a call of a task or a function the compilation unit declares, one imported
-// from a package by name or with a wildcard, a DPI import, a function a DPI
-// export names, a task of the module and a scope randomize call are not
-// (#5801).
 TEST(SubroutineCallElaborationSyntax, ACallStatementNamesASubroutine) {
   ElabFixture f;
   ElaborateSrc(
@@ -580,12 +525,6 @@ TEST(SubroutineCallElaborationSyntax, ACallStatementNamesASubroutine) {
   }
 }
 
-// A.8.2 with §3.12.1: a variable or a net the compilation unit declares is
-// data in every module, and a call naming one, as a statement, g(1), or within
-// an expression, w(1), is reported (#5829). A module's task hides the unit's
-// variable of its name, and the call of it is not reported; a module's
-// parameter hides one too, and the call statement naming it is reported as
-// naming no task or function.
 TEST(SubroutineCallElaborationSyntax, ACallNamingAUnitVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -623,10 +562,6 @@ TEST(SubroutineCallElaborationSyntax, ACallNamingAUnitVariableIsReported) {
   }
 }
 
-// A.6.8's for_step_assignment takes a function_subroutine_call, whose
-// parentheses a call of a task, a void function or a method may leave off
-// (A.8.2). So a step naming a variable alone is a call naming data and is
-// reported, and a step naming a void function or a task is not.
 TEST(SubroutineCallElaborationSyntax, AForStepNamingDataIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -648,11 +583,6 @@ TEST(SubroutineCallElaborationSyntax, AForStepNamingDataIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// A.8.2 writes a tf_call's argument list as optional, and footnote 42 of A.10
-// lets it be left off a task, a void function or a class method alone. So a
-// call statement naming a nonvoid function of the module or of a package
-// without one is reported; the same call with its parentheses, a void
-// function of either and a task of either are not.
 TEST(SubroutineCallElaborationSyntax, ANonvoidFunctionCallKeepsItsParentheses) {
   ElabFixture f;
   ElaborateSrc(
@@ -687,10 +617,6 @@ TEST(SubroutineCallElaborationSyntax, ANonvoidFunctionCallKeepsItsParentheses) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A void cast wraps a call as a call statement does (A.6.9), so a name alone
-// in one is judged alike: a variable is reported, and so is a nonvoid function
-// of the module. A method called through a handle or, in a method, by its
-// name alone, and a randomize call, may leave the argument list off.
 TEST(SubroutineCallElaborationSyntax, AVoidCastOfANameAloneIsJudgedAsACall) {
   ElabFixture f;
   ElaborateSrc(

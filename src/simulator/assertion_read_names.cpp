@@ -15,13 +15,6 @@ namespace delta {
 
 namespace {
 
-// The dotted spelling of a hierarchical reference, appended to `out`, and
-// whether `e` is one. §23.6 writes a name that crosses an instance boundary as
-// `u.req`, and the child instance's variable is keyed under exactly that
-// spelling, so the whole reference is the name to look up rather than the
-// identifiers it is built from. Anything else the walk meets -- a select, a
-// call, a class scope resolution -- names no variable of its own, and is
-// reported false rather than half a name.
 bool AppendHierarchicalName(const Expr* e, std::string& out) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier) {
@@ -36,7 +29,6 @@ bool AppendHierarchicalName(const Expr* e, std::string& out) {
   return AppendHierarchicalName(e->rhs, out);
 }
 
-// The walk over a tree, `depth` counting the instantiated bodies entered.
 void CollectTreeReadNames(const PropertyExprNode* node, SimContext& ctx,
                           Arena& arena, std::unordered_set<std::string>& names,
                           int depth) {
@@ -61,12 +53,6 @@ void CollectTreeReadNames(const PropertyExprNode* node, SimContext& ctx,
 
 }  // namespace
 
-// CollectExprReads is the reader-name walk §9.2.2.2.1's implicit sensitivity
-// list is built from, which reaches the base and index of a select, the
-// arguments of a call and the operands of every subexpression; a
-// hierarchical reference is added to what it answers, because it holds
-// `u.req` as a member access over two identifiers and so contributes `u` and
-// `req`, neither of which is the name the child's variable is keyed under.
 void CollectSampledOperandNames(const Expr* e,
                                 std::unordered_set<std::string>& out) {
   CollectExprReads(e, out);

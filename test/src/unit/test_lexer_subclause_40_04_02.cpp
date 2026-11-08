@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Plain-data copy of a recognized §40.4.2 part-select FSM pragma so that
-// assertions do not depend on string_views into a transient SourceManager.
 struct PartSelectPragmaInfo {
   std::string signal;
   int msb = 0;
@@ -36,9 +34,6 @@ std::vector<PartSelectPragmaInfo> CollectPartSelectPragmas(
   return out;
 }
 
-// §40.4.2: a part-select of a vector signal can hold the current state of the
-// FSM. The pragma names the base signal, its part-select range, an FSM name,
-// and the bound enumeration name.
 TEST(FsmPartSelectPragmaLexing, RecognizesPartSelectPragma) {
   auto pragmas = CollectPartSelectPragmas(
       "/* tool state_vector cur_state[3:0] my_fsm "
@@ -51,10 +46,6 @@ TEST(FsmPartSelectPragmaLexing, RecognizesPartSelectPragma) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-// §40.4.2's form names a part-select `signal_name[n:n]` — a vector bit range.
-// A bracketed reference that is not a two-bound numeric range (a missing colon,
-// or non-numeric bounds) does not match the part-select form and is not
-// recognized, even when the surrounding FSM and enum names are well formed.
 TEST(FsmPartSelectPragmaLexing, MalformedPartSelectRangeIsNotRecognized) {
   EXPECT_TRUE(
       CollectPartSelectPragmas("/* tool state_vector cur_state[3] my_fsm enum "
@@ -66,9 +57,6 @@ TEST(FsmPartSelectPragmaLexing, MalformedPartSelectRangeIsNotRecognized) {
           .empty());
 }
 
-// §40.4.2: when a part-select holds the current state, the user needs to also
-// specify a name for the FSM. A part-select pragma without an FSM name (the
-// word between the part-select and the `enum` binding) is not recognized.
 TEST(FsmPartSelectPragmaLexing, FsmNameIsRequired) {
   EXPECT_TRUE(
       CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] enum "
@@ -76,11 +64,6 @@ TEST(FsmPartSelectPragmaLexing, FsmNameIsRequired) {
           .empty());
 }
 
-// §40.4.2's pragma binds the enumeration with the literal `enum` keyword
-// (`... FSM_name enum enumeration_name`). A pragma with the full five trailing
-// words but some other token in the binding position — rather than too few
-// words — is not recognized: the keyword itself is required, not merely a word
-// in that slot.
 TEST(FsmPartSelectPragmaLexing, RequiresLiteralEnumKeywordInBinding) {
   EXPECT_TRUE(
       CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] my_fsm "
@@ -88,8 +71,6 @@ TEST(FsmPartSelectPragmaLexing, RequiresLiteralEnumKeywordInBinding) {
           .empty());
 }
 
-// The leading `tool` and `state_vector` keywords are required, just as for the
-// whole-signal current-state pragma.
 TEST(FsmPartSelectPragmaLexing, RequiresToolAndStateVectorKeywords) {
   EXPECT_TRUE(
       CollectPartSelectPragmas("/* state_vector cur_state[3:0] my_fsm enum "
@@ -101,9 +82,6 @@ TEST(FsmPartSelectPragmaLexing, RequiresToolAndStateVectorKeywords) {
           .empty());
 }
 
-// The pragma is written inside the module definition where the signal is
-// declared, and is recognized there while the surrounding source still lexes
-// into its ordinary token stream.
 TEST(FsmPartSelectPragmaLexing, RecognizedWithinModuleBody) {
   const std::string kSrc =
       "module fsm;\n"
@@ -118,9 +96,6 @@ TEST(FsmPartSelectPragmaLexing, RecognizedWithinModuleBody) {
   EXPECT_EQ(pragmas[0].fsm_name, "my_fsm");
 }
 
-// The part-select form is recorded as its own kind of FSM pragma: it does not
-// appear among the §40.4.1 whole-signal pragmas, and the whole-signal form does
-// not appear among the part-select pragmas.
 TEST(FsmPartSelectPragmaLexing, PartSelectIsSeparateFromSimpleSignalPragma) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -142,13 +117,6 @@ TEST(FsmPartSelectPragmaLexing, PartSelectIsSeparateFromSimpleSignalPragma) {
   EXPECT_EQ(lexer2.FsmStatePragmas().size(), 1u);
 }
 
-// §40.4.2's `signal_name[n:n]` names bit numbers of the vector signal, so a run
-// of digits too long to be one does not name a part-select and the pragma is
-// not recognized. Nothing is carried round into a bound the source never wrote:
-// a pragma accepted with a wrapped bound would have the coverage tool report
-// the FSM as held by a range of the signal nobody asked for, which is worse
-// than the pragma going unrecognized. A bound an index can hold is accepted, so
-// it is the overflow and not the size of the number that decides.
 TEST(FsmPartSelectPragmaLexing, BoundsTooLargeForAnIndexAreNotRecognized) {
   EXPECT_TRUE(CollectPartSelectPragmas(
                   "/* tool state_vector cs[4294967296:0] my_fsm enum e */")
@@ -164,11 +132,6 @@ TEST(FsmPartSelectPragmaLexing, BoundsTooLargeForAnIndexAreNotRecognized) {
   EXPECT_EQ(held[0].lsb, 0);
 }
 
-// §40.4.2's state operand is `signal_name[n:n]`. A word that is not a simple
-// identifier and does not open a concatenation is read against that shape, and
-// each way of missing it leaves the comment unrecorded: no bracket, a bracket
-// with no name before it, no closing bracket, a name that is not an
-// identifier, and a bound left out on either side of the colon.
 TEST(FsmPartSelectPragmaLexing, OperandNotShapedAsAPartSelectIsNotRecognized) {
   for (const char* operand : {"cur.state", "[3:0]", "cur_state[3:0",
                               "9cur[3:0]", "cur_state[:0]", "cur_state[3:]"}) {
@@ -179,9 +142,6 @@ TEST(FsmPartSelectPragmaLexing, OperandNotShapedAsAPartSelectIsNotRecognized) {
   }
 }
 
-// The form is exactly six words, and its FSM and enumeration names are
-// identifiers: one with the FSM name left out, and one naming either with a
-// word that is not an identifier, is not recorded.
 TEST(FsmPartSelectPragmaLexing, MissingOrMalformedNamesAreNotRecognized) {
   EXPECT_TRUE(
       CollectPartSelectPragmas("/* tool state_vector cur_state[3:0] enum e */")

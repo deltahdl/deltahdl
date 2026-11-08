@@ -32,10 +32,6 @@ TEST(DefaultClockingSim, SetAndGetDefaultClocking) {
   EXPECT_EQ(found->default_output_skew.ticks, 2u);
 }
 
-// §14.3 (printed page 355) makes the identifier of the default clocking
-// optional, and §14.12 has `##` count the default's events in its scope, so
-// `##3` waits for the posedges at 5, 15 and 25. The unnamed block had no name
-// to be registered under, was no default, and `##3` ran on at 0.
 TEST(DefaultClockingSim, UnnamedDefaultClockingBlockClocksCycleDelays) {
   SimFixture f;
   std::string out = RunCapture(
@@ -52,10 +48,6 @@ TEST(DefaultClockingSim, UnnamedDefaultClockingBlockClocksCycleDelays) {
   EXPECT_EQ(out, "25\n$finish at time 25\n");
 }
 
-// §14.12 (printed page 362), its Example 2: `default clocking busB;` makes
-// the block declared as busB the default, so `##2` counts busB's negedges at
-// 10 and 20 rather than busA's posedges. It declared nothing and made no
-// block the default, and `##2` ran on at 0.
 TEST(DefaultClockingSim, DefaultClockingByNameClocksCycleDelays) {
   SimFixture f;
   std::string out = RunCapture(
@@ -72,10 +64,6 @@ TEST(DefaultClockingSim, DefaultClockingByNameClocksCycleDelays) {
   EXPECT_EQ(out, "20\n$finish at time 20\n");
 }
 
-// §14.12 (printed page 361): a default clocking is the default within its own
-// module, so t's `##1` counts t's posedges and m's counts m's negedges, each
-// from time 1. The design kept one default, the last instance's, and t's
-// `##1` waited for m's negedge at 10.
 TEST(DefaultClockingSim, EachModuleCountsItsOwnDefaultClocking) {
   SimFixture f;
   std::string out = RunCapture(
@@ -94,11 +82,6 @@ TEST(DefaultClockingSim, EachModuleCountsItsOwnDefaultClocking) {
   EXPECT_EQ(out, "t 5\nm 10\n$finish at time 25\n");
 }
 
-// §14.12 extends a default clocking to the checkers declared in its scope,
-// and §17.2 has such a checker's assertions written without a clock take it:
-// `assert property (x)` in the checker is clocked by posedge clk, a low from
-// 12 to 32 failing it at 15 and 25 of the five ticks. The checker had no
-// default clocking of its own, and the assertion was rejected as unclocked.
 TEST(DefaultClockingSim, ANestedCheckersAssertionTakesTheDefaultClock) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -119,11 +102,6 @@ TEST(DefaultClockingSim, ANestedCheckersAssertionTakesTheDefaultClock) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
 }
 
-// §14.12 (printed page 362) extends a default clocking to the modules declared
-// in its scope, so n, declared in o with none of its own, counts o's posedges:
-// its `##1` from time 1 ends at 5. m's default, on the negedge, was lowered
-// after o's, and n's instance, with no default recorded under its own prefix,
-// took that last one lowered and ran on at 10.
 TEST(DefaultClockingSim, ANestedModuleCountsItsEnclosingModulesDefault) {
   SimFixture f;
   std::string out = RunCapture(

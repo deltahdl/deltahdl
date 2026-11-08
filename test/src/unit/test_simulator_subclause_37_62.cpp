@@ -14,19 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.62 Event statement: the object model diagram draws the event statement
-// object traversing to the named event it triggers, and gives the event
-// statement one property access edge - "-> blocking", bool: vpiBlocking. The
-// event-VpiObjectOf(stmt)->named-event edge is the generic one-to-one traversal
-// already provided by the data model (and the named event object is owned by
-// §37.27); the clause's only owned content is the Boolean property. These tests
-// observe the production code apply that property through the public
-// vpi_get(vpiBlocking) dispatch path - both the value it reports for an event
-// statement and the vpiUndefined it returns for an object kind the property is
-// not drawn on.
-
-// The fixture installs a context so the public vpi_get entry point runs its
-// real dispatch over the test objects.
 class EventStatement : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -34,10 +21,6 @@ class EventStatement : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Applied through the public dispatch: an event statement reports its blocking
-// flag through vpi_get(vpiBlocking), as 1 for a blocking trigger (->) and 0 for
-// a nonblocking trigger (->>). Driving both states exercises the production
-// code reading the stored Boolean rather than a constant.
 TEST_F(EventStatement, EventStatementReportsBlockingFlagThroughVpiGet) {
   VpiObject blocking_trigger;
   blocking_trigger.type = vpiEventStmt;
@@ -50,12 +33,6 @@ TEST_F(EventStatement, EventStatementReportsBlockingFlagThroughVpiGet) {
   EXPECT_EQ(vpi_get(vpiBlocking, VpiHandleOf(&nonblocking_trigger)), 0);
 }
 
-// Applied through the public dispatch: vpiBlocking is drawn on the event
-// statement object and, by §37.64, the assignment, so querying it on an if
-// statement, which §37.71 draws no such property on, is not a valid request
-// and the production guard returns vpiUndefined rather than handing back a
-// stored field. This distinguishes the clause's property edge, applied by the
-// guard, from an unconditional field read.
 TEST_F(EventStatement, BlockingIsUndefinedForNonEventStatement) {
   VpiObject not_an_event_stmt;
   not_an_event_stmt.type = vpiIf;
@@ -64,31 +41,15 @@ TEST_F(EventStatement, BlockingIsUndefinedForNonEventStatement) {
             vpiUndefined);
 }
 
-// The clause against a described design. Everything above drives the property
-// over objects a case built, and no pass under src/ ever built an event
-// statement: vpi_get(vpiBlocking, stmt) reported vpiUndefined for every design
-// there was, the figure's arrow to the named event reached nothing, and
-// §38.36.1.3's cbStmt fan-out over a module's statements found none of the ones
-// the source wrote. These cases read the clause back off a design.
-
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 std::vector<int> g_stmt_blocking;
 std::vector<std::string> g_triggered_event_names;
 std::vector<int> g_triggered_event_types;
 
-// Records the event statement `stmt` is, and every one the statements it
-// holds are, in the order written: those of a block through vpiStmt's
-// iteration (§37.12), and the body and else branch of any other statement
-// through vpiStmt and vpiElseStmt (§37.71).
 void ReadEventStatements(vpiHandle stmt) {
   if (stmt == nullptr) return;
   const int kType = vpi_get(vpiType, stmt);
   if (kType == vpiEventStmt) {
-    // §37.62: the one property the figure draws on the event statement.
     g_stmt_blocking.push_back(vpi_get(vpiBlocking, stmt));
-    // §37.4.3: the figure's untagged single arrow, walked with vpi_handle()
-    // under the name of the enclosure it reaches.
     vpiHandle event = vpi_handle(vpiNamedEvent, stmt);
     g_triggered_event_types.push_back(event ? vpi_get(vpiType, event) : 0);
     const char* name = event ? vpi_get_str(vpiName, event) : nullptr;
@@ -106,8 +67,6 @@ void ReadEventStatements(vpiHandle stmt) {
   ReadEventStatements(vpi_handle(vpiElseStmt, stmt));
 }
 
-// The statements the module's procedure runs, which is where §37.63 has an
-// application find them: the procedure reaches its body through vpiStmt.
 PLI_INT32 ReadEventStatementsCalltf(PLI_BYTE8*) {
   vpiHandle mod = vpi_handle_by_name(VpiText("top"), nullptr);
   if (mod == nullptr) return 0;
@@ -129,12 +88,6 @@ class EventStatementOfADesign : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// The whole of §37.62 on a design that writes both trigger forms: each event
-// statement the source wrote is an object of the figure's kind, the blocking
-// property tells the two forms apart, and the arrow reaches the named event
-// object the declaration itself stands as rather than a second object made for
-// the trigger. The two forms trigger one event, so a traversal that reached
-// some object of its own would be caught by the name as well as the kind.
 TEST_F(EventStatementOfADesign, BothTriggerFormsAreReadBackFromTheDesign) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -157,7 +110,6 @@ TEST_F(EventStatementOfADesign, BothTriggerFormsAreReadBackFromTheDesign) {
   LowerAndRun(design, f);
 
   ASSERT_EQ(g_stmt_blocking.size(), 2u);
-  // §9.7.2: "->" is the blocking trigger, "->>" the nonblocking one.
   EXPECT_EQ(g_stmt_blocking[0], 1);
   EXPECT_EQ(g_stmt_blocking[1], 0);
 
@@ -169,8 +121,6 @@ TEST_F(EventStatementOfADesign, BothTriggerFormsAreReadBackFromTheDesign) {
   EXPECT_EQ(g_triggered_event_names[1], "e");
 }
 
-// A trigger an if statement guards is an event statement of the design as much
-// as one written straight in the block.
 TEST_F(EventStatementOfADesign, ATriggerNestedInABlockIsFound) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -198,11 +148,8 @@ TEST_F(EventStatementOfADesign, ATriggerNestedInABlockIsFound) {
   EXPECT_EQ(g_triggered_event_names[0], "e");
 }
 
-// The event statements of a run, read back from the model it built.
 class EventStatementsOfARun : public VpiDesignRun {
  protected:
-  // The object of the named event the first event statement `scope` holds
-  // reaches, null for none.
   static VpiObject* EventReachedFrom(vpiHandle scope) {
     vpiHandle it = vpi_iterate(vpiEventStmt, scope);
     vpiHandle stmt = it == nullptr ? nullptr : vpi_scan(it);
@@ -211,9 +158,6 @@ class EventStatementsOfARun : public VpiDesignRun {
   }
 };
 
-// §23.6 and §23.8: a trigger naming its event hierarchically reaches the named
-// event the name resolves to, downward from the instance writing it or, by an
-// upward name, below an instance enclosing it (#5771).
 TEST_F(EventStatementsOfARun, AHierarchicalTriggerReachesItsEvent) {
   Run("module leaf; initial begin : b -> m.e; end endmodule\n"
       "module mid; event e; leaf s (); endmodule\n"
@@ -223,17 +167,12 @@ TEST_F(EventStatementsOfARun, AHierarchicalTriggerReachesItsEvent) {
   EXPECT_EQ(EventReachedFrom(By("top.m.s.b")), VpiObjectOf(By("top.m.e")));
 }
 
-// §23.9: a trigger of an event a block around it declares reaches the block's
-// event, not the module's event of the same name (#5772).
 TEST_F(EventStatementsOfARun, ATriggerReachesTheEventItsBlockDeclares) {
   Run("module top; event e; initial begin : b event e; -> e; end endmodule\n");
   ASSERT_NE(By("top.b.e"), nullptr);
   EXPECT_EQ(EventReachedFrom(By("top.b")), VpiObjectOf(By("top.b.e")));
 }
 
-// A trigger of an element of an array of events (§15.5.1) or of a class's
-// event property is an event statement all the same, its blocking property
-// telling the two trigger forms apart.
 TEST_F(EventStatementsOfARun,
        ATriggerOfAnElementOrAPropertyIsAnEventStatement) {
   Run("module top; class H; event ev; endclass\n"

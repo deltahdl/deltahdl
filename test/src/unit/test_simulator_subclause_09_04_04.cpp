@@ -158,12 +158,6 @@ TEST(LevelSensitiveSequenceSimulation, WaitMultipleTriggeredOr) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §9.4.4: after the wait unblocks, the triggered status persists through the
-// remainder of the time step, so a later read in the SAME time step still
-// identifies which sequence(s) reached their end point -- the matched sequence
-// reads exactly 1'b1 while an unmatched one reads exactly 1'b0. This mirrors
-// the example's post-wait `if (abc.triggered)` / `if (de.triggered)` re-reads
-// that report the causing sequence(s).
 TEST(LevelSensitiveSequenceSimulation,
      PersistedTriggeredIdentifiesCausingSequence) {
   SimFixture f;
@@ -203,11 +197,6 @@ TEST(LevelSensitiveSequenceSimulation,
   EXPECT_EQ(u->value.ToUint64(), 0u);
 }
 
-// §9.4.4: when several sequences reach their end point in the same time step,
-// a single wait on the OR of their triggered statuses unblocks once, and every
-// causing sequence's status persists so each reads true afterward in that step.
-// This is the plural case the example describes -- the wait reports *all* the
-// sequences that caused it to unblock, not just one.
 TEST(LevelSensitiveSequenceSimulation,
      WaitOrIdentifiesMultipleSimultaneousCausers) {
   SimFixture f;

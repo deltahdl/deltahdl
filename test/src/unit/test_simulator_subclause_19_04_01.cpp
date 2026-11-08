@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §19.4.1: when a derived covergroup defines a coverpoint whose name matches a
-// base coverpoint, that base coverpoint no longer contributes to the coverage
-// computation. Here the base covergroup has an uncovered coverpoint "a" and a
-// covered coverpoint "b" (50% before). Overriding "a" drops it from the
-// average, leaving only "b" — coverage becomes 100%.
 TEST(Coverage, DerivedOverridesBaseCoverpoint) {
   CoverageDB db;
   CoverGroup* base = db.CreateGroup("base_cg");
@@ -23,15 +18,15 @@ TEST(Coverage, DerivedOverridesBaseCoverpoint) {
   CoverPoint* a = CoverageDB::AddCoverPoint(base, "a");
   CoverBin a_bin;
   a_bin.name = "a0";
-  a_bin.values = {0};   // §19.5: a coverpoint bin holds a value set
-  a_bin.hit_count = 0;  // uncovered
+  a_bin.values = {0};
+  a_bin.hit_count = 0;
   CoverageDB::AddBin(a, a_bin);
 
   CoverPoint* b = CoverageDB::AddCoverPoint(base, "b");
   CoverBin b_bin;
   b_bin.name = "b0";
-  b_bin.values = {1};   // §19.5: a coverpoint bin holds a value set
-  b_bin.hit_count = 1;  // covered
+  b_bin.values = {1};
+  b_bin.hit_count = 1;
   CoverageDB::AddBin(b, b_bin);
 
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(base), 50.0);
@@ -40,15 +35,9 @@ TEST(Coverage, DerivedOverridesBaseCoverpoint) {
   EXPECT_TRUE(base->coverpoints[0].excluded_from_coverage);
   EXPECT_FALSE(base->coverpoints[1].excluded_from_coverage);
 
-  // The overridden coverpoint no longer contributes; only "b" remains.
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(base), 100.0);
 }
 
-// §19.4.1: even when a base coverpoint no longer contributes, a cross in the
-// base covergroup that includes that coverpoint still contributes to the
-// computation, provided the derived covergroup does not define a cross with the
-// same name. Overriding coverpoint "a" excludes it, but base cross "x1" keeps
-// contributing.
 TEST(Coverage, BaseCrossStillContributesAfterCoverpointOverride) {
   CoverageDB db;
   CoverGroup* base = db.CreateGroup("base_cg");
@@ -56,7 +45,7 @@ TEST(Coverage, BaseCrossStillContributesAfterCoverpointOverride) {
   CoverPoint* a = CoverageDB::AddCoverPoint(base, "a");
   CoverBin a_bin;
   a_bin.name = "a0";
-  a_bin.hit_count = 0;  // uncovered
+  a_bin.hit_count = 0;
   CoverageDB::AddBin(a, a_bin);
 
   CrossCover cross;
@@ -64,22 +53,19 @@ TEST(Coverage, BaseCrossStillContributesAfterCoverpointOverride) {
   cross.coverpoint_names = {"a"};
   CrossBin xb;
   xb.name = "xb0";
-  xb.hit_count = 1;  // covered
+  xb.hit_count = 1;
   cross.bins.push_back(xb);
   CoverageDB::AddCross(base, cross);
 
   CoverageDB::ApplyDerivedCoverpointOverrides(base, {"a"});
-  CoverageDB::ApplyDerivedCrossOverrides(base, /*derived_cross_names=*/{});
+  CoverageDB::ApplyDerivedCrossOverrides(base, {});
 
   EXPECT_TRUE(base->coverpoints[0].excluded_from_coverage);
   EXPECT_FALSE(base->crosses[0].excluded_from_coverage);
 
-  // The overridden coverpoint is gone, but the base cross still contributes.
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(base), 100.0);
 }
 
-// §19.4.1: a base cross stops contributing when, and only when, the derived
-// covergroup defines a cross with the same name.
 TEST(Coverage, DerivedCrossWithSameNameOverridesBaseCross) {
   CoverageDB db;
   CoverGroup* base = db.CreateGroup("base_cg");
@@ -92,22 +78,15 @@ TEST(Coverage, DerivedCrossWithSameNameOverridesBaseCross) {
   cross.bins.push_back(xb);
   CoverageDB::AddCross(base, cross);
 
-  CoverageDB::ApplyDerivedCrossOverrides(base, /*derived_cross_names=*/{"x1"});
+  CoverageDB::ApplyDerivedCrossOverrides(base, {"x1"});
   EXPECT_TRUE(base->crosses[0].excluded_from_coverage);
 }
 
-// §19.4.1: for get_coverage(), a derived covergroup and its base covergroup are
-// separate types, so no aggregation occurs across them. Only instances naming
-// the same covergroup type aggregate.
 TEST(Coverage, DerivedAndBaseAreSeparateTypesForGetCoverage) {
   EXPECT_FALSE(CoverageDB::CovergroupTypesAggregate("base_cg", "derived_cg"));
   EXPECT_TRUE(CoverageDB::CovergroupTypesAggregate("base_cg", "base_cg"));
 }
 
-// §19.4.1: a derived covergroup holds every item of its base it does not
-// override, beside its own, and may itself be extended: each class adds a
-// coverpoint of two bins, so the instances hold 2, 4 and 6 bins. Built from
-// its own body alone, each derived instance held 2.
 TEST(DerivedCovergroupSim, EachDerivedCovergroupAddsItsItemsToTheBases) {
   SimFixture f;
   auto out = RunCapture(
@@ -146,11 +125,6 @@ TEST(DerivedCovergroupSim, EachDerivedCovergroupAddsItsItemsToTheBases) {
   EXPECT_EQ(out, "2 4 6\n");
 }
 
-// §19.4.1: an option the base sets applies to the derived covergroup unless
-// the derived covergroup sets it too: at_least 2 inherited leaves y's one
-// sample uncovered until its second, and at_least 1 set in d2 covers z's
-// first. The derived instances took the default at_least of 1 and, with no
-// item of their own, none of the base's.
 TEST(DerivedCovergroupSim, ABasesOptionAppliesUnlessTheDerivedOneSetsIt) {
   SimFixture f;
   auto out = RunCapture(
@@ -192,9 +166,6 @@ TEST(DerivedCovergroupSim, ABasesOptionAppliesUnlessTheDerivedOneSetsIt) {
   EXPECT_EQ(out, "0.00 100.00 100.00\n");
 }
 
-// §19.4.1: a derived covergroup has its base's argument list, so new(4)
-// gives the inherited cp its five bins, and its base's coverage event, so
-// triggering e samples the derived ck. Neither reached the derived instance.
 TEST(DerivedCovergroupSim, ADerivedCovergroupTakesTheBasesArgumentsAndEvent) {
   SimFixture f;
   auto out = RunCapture(
@@ -227,9 +198,6 @@ TEST(DerivedCovergroupSim, ADerivedCovergroupTakesTheBasesArgumentsAndEvent) {
   EXPECT_EQ(out, "5 50.00\n");
 }
 
-// §19.4.1 with §19.5.3: a coverpoint the derived covergroup adds on the
-// deriving class's own `bit [1:0] d` has the 4 automatic bins its type gives.
-// The property's type was not found and the coverpoint took 64.
 TEST(DerivedCovergroupSim, ACoverpointOnTheDerivingClassesPropertyHasItsWidth) {
   SimFixture f;
   auto out = RunCapture(
@@ -259,11 +227,6 @@ TEST(DerivedCovergroupSim, ACoverpointOnTheDerivingClassesPropertyHasItsWidth) {
   EXPECT_EQ(out, "4\n");
 }
 
-// §19.4.1: a cross the derived covergroup declares under the label of one of
-// its base's replaces that cross, here with half of a's bins ignored, while
-// the coverpoints it crosses are inherited; the base class's other covergroup,
-// g0, embedded before g1, leaves g1's composition alone. The base instance
-// holds 2 + 2 + 4 bins and the derived one 2 + 2 + 2.
 TEST(DerivedCovergroupSim, ADerivedCrossOverridesTheBasesCrossOfItsLabel) {
   SimFixture f;
   auto out = RunCapture(
@@ -299,10 +262,6 @@ TEST(DerivedCovergroupSim, ADerivedCrossOverridesTheBasesCrossOfItsLabel) {
   EXPECT_EQ(out, "8 6\n");
 }
 
-// §19.4.1 with §8.13: c_c inherits b_c's derived covergroup g without
-// extending it again, so b's and c's instances are of one covergroup type and
-// get_coverage() averages b's 50 (two of four bins) and c's 0 to 25 for both.
-// Counted as two types they read 50 and 0.
 TEST(DerivedCovergroupSim, AFurtherSubclassSharesTheDerivedCovergroupType) {
   SimFixture f;
   auto out = RunCapture(

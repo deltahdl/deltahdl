@@ -24,38 +24,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// §33.5.4 is about what a command line settles. In the use models where source
-// descriptions are named on it, a configuration is put in force by naming its
-// own source description among them, and the design statement that
-// configuration carries then names the top-level module -- whatever cells the
-// rest of the named descriptions declare and leave uninstantiated. Where a
-// separate compilation tool did the compiling, the tool that binds is given the
-// name of the configuration instead of the names of the top-level cells, and
-// the configuration itself has to have been precompiled for that to be
-// possible.
-//
-// These tests build their input the way the clause describes it: source
-// descriptions on disk, mapped to libraries by a §33.3.1 library map and
-// compiled by §33.5.1's single-pass compiler, or written into a compiled form
-// and read back by §33.5.3's binder. What the rules turn on is precisely which
-// descriptions a command line named, so a compilation unit assembled by a test
-// would settle nothing.
-//
-// A command line names the configuration to be used as well as the source
-// descriptions. §33.5.4 puts that name beside the top-level cell's: the tool
-// that does the binding needs only the lib.cell of the top-level cell or cells,
-// or of the config to use, or both. The cases below that name one are given a
-// compilation unit holding two configurations that each name a design, and each
-// case gets back the design the configuration it named describes. Naming
-// neither of the two leaves nothing on the command line saying which design was
-// meant, so the command line is reported. Naming a configuration the command
-// line did not put in force is reported as well, both where the unit holds no
-// configuration of that name and where it holds one that is not in force. Issue
-// #3267 is the defect these carry: nothing on the command line named a
-// configuration, so a compilation unit holding two configurations that each
-// name a design could not be elaborated at all.
-
-// The infrastructure one command line is compiled and elaborated against.
 struct CommandLineHarness {
   SourceManager mgr;
   Arena arena;
@@ -63,17 +31,8 @@ struct CommandLineHarness {
   LibraryMap libs;
   CompilationUnit unit;
   SinglePassCompiler compiler{libs, mgr, arena, diag};
-  // Held rather than made and dropped inside Run, because the design Run
-  // produces is read after it returns.
   std::optional<Elaborator> elab;
 
-  // Loads the map beneath `dir`, compiles the descriptions `line` names, and
-  // elaborates what they assembled under `top` -- the cell the invocation
-  // named as the top-level module, empty where it named none.
-  //
-  // Returns nullptr where the map did not load, a description did not compile,
-  // or the run was reported, which is what a test about a rejected command
-  // line reads together with `diag`.
   RtlirDesign* Run(const fs::path& dir, const std::vector<fs::path>& line,
                    std::string_view top = "", std::string_view config = "") {
     if (!libs.LoadMapFile(dir / "lib.map")) return nullptr;
@@ -84,10 +43,6 @@ struct CommandLineHarness {
   }
 };
 
-// The library the design's one root took its one child instance out of, or an
-// empty view where the design does not have that shape. Which library an
-// instance bound out of is the verdict a configuration's rules produce, so a
-// test reads it in one step rather than walking down to it.
 std::string_view LibraryOfTheOnlyChild(const RtlirDesign* design) {
   if (design == nullptr || design->top_modules.size() != 1u) return {};
   const auto& children = design->top_modules[0]->children;
@@ -95,10 +50,6 @@ std::string_view LibraryOfTheOnlyChild(const RtlirDesign* design) {
   return children[0].resolved->library;
 }
 
-// The source descriptions a command line may name: a two-cell hierarchy, a
-// cell no instance names, and a configuration whose design statement names the
-// hierarchy's root. Every one of them is a file of its own, so a command line
-// can name any subset of them.
 struct Sources {
   fs::path top;
   fs::path child;
@@ -126,10 +77,6 @@ Sources WriteSources(ScratchDir& tmp) {
   return s;
 }
 
-// A command line whose descriptions come from two libraries, each holding a
-// cell of the name the other holds too. Which library a name is taken from is
-// then something the run has to settle, so a rule that settles it is visible in
-// the design it produces. The configuration's own description goes into rtlLib.
 struct TwoLibrarySources {
   fs::path rtl_top;
   fs::path rtl_child;
@@ -152,17 +99,12 @@ TwoLibrarySources WriteTwoLibrarySources(ScratchDir& tmp) {
                         "module top;\n"
                         "  child c();\n"
                         "endmodule\n");
-  // The gate-level root instantiates nothing, so which of the two roots a
-  // design is legible from the design alone.
   s.gate_top = tmp.Write("gate/top.v",
                          "module top;\n"
                          "endmodule\n");
   return s;
 }
 
-// The descriptions a delegating configuration works over: a root with two child
-// instances, the cell those instances are declared to be, the cell an inner
-// configuration puts in that cell's place, and the inner configuration itself.
 struct DelegationSources {
   fs::path child;
   fs::path alt;
@@ -191,9 +133,6 @@ DelegationSources WriteDelegationSources(ScratchDir& tmp) {
   return s;
 }
 
-// The delegation design elaborated under an outer configuration whose body is
-// `outer_config`, with the inner configuration on the command line beside it so
-// a delegating clause has something to reach.
 RtlirDesign* RunDelegation(ScratchDir& tmp, CommandLineHarness& h,
                            const std::string& outer_config) {
   auto s = WriteDelegationSources(tmp);
@@ -201,10 +140,6 @@ RtlirDesign* RunDelegation(ScratchDir& tmp, CommandLineHarness& h,
   return h.Run(tmp.dir, {s.child, s.alt, s.top, outer, s.inner});
 }
 
-// The cells the root's two instances bound, in the order it instantiates them.
-// What a delegating clause moved is read beside what it left alone, so both
-// bindings are read at once. An empty string stands for an instance that bound
-// nothing.
 std::vector<std::string_view> NamesBoundUnderTheRoot(RtlirDesign* design) {
   auto* top = design == nullptr || design->top_modules.size() != 1u
                   ? nullptr
@@ -218,12 +153,6 @@ std::vector<std::string_view> NamesBoundUnderTheRoot(RtlirDesign* design) {
   return names;
 }
 
-// A command line naming two configurations that each name a design of their
-// own, with a root apiece. cfg_top's design statement names top and
-// cfg_other's names other, so the two designs have roots of different names
-// and a run says which configuration it was given by the name of the root it
-// comes back with. Neither root instantiates the other, so a design rooted at
-// one of them holds no trace of the other.
 struct TwoConfigSources {
   fs::path child;
   fs::path top;
@@ -257,27 +186,11 @@ TwoConfigSources WriteTwoConfigSources(ScratchDir& tmp) {
   return s;
 }
 
-// Every description of TwoConfigSources, in the order a command line names
-// them. Each case below names all five, so what separates the cases is the
-// configuration the command line names and nothing else.
 std::vector<fs::path> TwoConfigCommandLine(const TwoConfigSources& s) {
   return {s.child, s.top, s.other, s.cfg_top, s.cfg_other};
 }
 
-// ---------------------------------------------------------------------------
-// Claim: in the single-pass use models the configuration is put in force by
-// naming its source description on the command line, and where that
-// configuration includes a design statement the cell it names is the top-level
-// module -- whatever uninstantiated cells the rest of the source files hold.
-// ---------------------------------------------------------------------------
-
 TEST(CommandLineBinding, DesignStatementOfTheNamedConfigRootsTheDesignAlone) {
-  // The configuration's description is on this command line, so its design
-  // statement settles the design: top roots it, and the cell top instantiates
-  // is bound beneath it. spare.v is on the same command line and no instance
-  // anywhere names the cell it declares, which is exactly the condition that
-  // would make it a top-level module of its own. The design statement is what
-  // stops it being one.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
 
@@ -292,17 +205,6 @@ TEST(CommandLineBinding, DesignStatementOfTheNamedConfigRootsTheDesignAlone) {
 }
 
 TEST(CommandLineBinding, ConfigHeldInTheLibraryOffThisCommandLineIsNotInForce) {
-  // The command line above with the configuration's description struck off it,
-  // so this is also what says that the test above measures the design statement
-  // rather than something about spare: spare is a top-level module here.
-  //
-  // cfg.v sits on disk beside the rest and an earlier command line has already
-  // compiled it, so its cell is in rtlLib right now, as the test asserts before
-  // elaborating. What puts a configuration in force is nevertheless this
-  // command line naming its source description, and this one does not: the
-  // uninstantiated cell roots a design of its own again. Leaving cfg.v out of
-  // the library altogether would prove less, because a tool that consulted the
-  // library instead of the command line would pass that case too.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
 
@@ -325,9 +227,6 @@ TEST(CommandLineBinding, ConfigHeldInTheLibraryOffThisCommandLineIsNotInForce) {
 }
 
 TEST(CommandLineBinding, DesignStatementOutranksTheTopNamedOnTheCommandLine) {
-  // A command line may name a top-level cell as well. The design statement is
-  // what says which cell is the top-level module, so naming spare alongside the
-  // configuration does not make spare root the design.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
 
@@ -340,9 +239,6 @@ TEST(CommandLineBinding, DesignStatementOutranksTheTopNamedOnTheCommandLine) {
 }
 
 TEST(CommandLineBinding, TopNamedOnTheCommandLineRootsADesignWithNoConfig) {
-  // The other half of the same command line: with no configuration in force the
-  // named top-level cell is what the design is rooted at, and the cell no
-  // instance names does not root one beside it.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
 
@@ -355,17 +251,6 @@ TEST(CommandLineBinding, TopNamedOnTheCommandLineRootsADesignWithNoConfig) {
 }
 
 TEST(CommandLineBinding, ConfigDelegatedToDoesNotRootADesignOfItsOwn) {
-  // Two configurations reach the command line, and both carry a design
-  // statement, but one of them is what the other delegates an instance to: it
-  // describes a subtree of the outer design rather than a design of its own.
-  // The outer configuration is the one in force, so the design is rooted at
-  // top -- and top.c binds to the cell the inner configuration names, which is
-  // how the delegation shows it was honoured rather than ignored.
-  //
-  // The outer configuration also carries the two rule shapes that are not a
-  // delegation -- a default clause, and an instance clause whose use names a
-  // cell outright -- so the question of which configuration was delegated to is
-  // asked of a configuration that holds more than delegations.
   ScratchDir tmp;
   CommandLineHarness h;
   auto* design = RunDelegation(tmp, h,
@@ -383,15 +268,6 @@ TEST(CommandLineBinding, ConfigDelegatedToDoesNotRootADesignOfItsOwn) {
 }
 
 TEST(CommandLineBinding, ConfigDelegatedToByBareNameDoesNotRootADesign) {
-  // The other way a use clause reaches a configuration: the plain name, with no
-  // extension after it. It reaches the configuration because nothing else the
-  // command line named answers to that name, and a configuration reached that
-  // way is as much a subtree of the outer design as one reached by the
-  // extension -- so it roots no design of its own here either.
-  //
-  // Only top.c is delegated. top.d keeps the cell its instantiation declares,
-  // which is what shows the delegation reached the one instance it named rather
-  // than everything below the root.
   ScratchDir tmp;
   CommandLineHarness h;
   auto* design = RunDelegation(tmp, h,
@@ -407,11 +283,6 @@ TEST(CommandLineBinding, ConfigDelegatedToByBareNameDoesNotRootADesign) {
 }
 
 TEST(CommandLineBinding, EveryCellTheDesignStatementNamesRootsTheDesign) {
-  // A design statement names zero or more cells, so the rule that its cell is
-  // the top-level module has to hold of each of them at once. Two of the three
-  // uninstantiated cells on this command line are named by it and root the
-  // design; the third is named by nothing and roots nothing, which is the whole
-  // of what the rule adds to the cells-no-instance-names default.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
   auto other = tmp.Write("src/other.v",
@@ -434,10 +305,6 @@ TEST(CommandLineBinding, EveryCellTheDesignStatementNamesRootsTheDesign) {
 }
 
 TEST(CommandLineBinding, LibraryQualifyingTheDesignCellPicksWhichCellRoots) {
-  // The other shape a design statement's cell takes: a library name in front of
-  // it. Two libraries on this command line each hold a cell called top, so the
-  // bare name would settle nothing; the qualified one settles it, and what
-  // comes out is the gate-level root, which instantiates nothing.
   ScratchDir tmp;
   auto s = WriteTwoLibrarySources(tmp);
   auto cfg = tmp.Write("rtl/cfg.v",
@@ -457,10 +324,6 @@ TEST(CommandLineBinding, LibraryQualifyingTheDesignCellPicksWhichCellRoots) {
 }
 
 TEST(CommandLineBinding, QualifiedDesignCellAbsentFromThatLibraryIsReported) {
-  // The negative of the qualified shape. The cell exists and the command line
-  // compiled it, but into the other library, and the qualification says which
-  // library the root comes from -- so there is no root and the run is reported
-  // rather than falling back on the like-named cell that is there.
   ScratchDir tmp;
   auto s = WriteTwoLibrarySources(tmp);
   auto only = tmp.Write("rtl/rtl_only.v",
@@ -482,10 +345,6 @@ TEST(CommandLineBinding, QualifiedDesignCellAbsentFromThatLibraryIsReported) {
 }
 
 TEST(CommandLineBinding, ConfigNamingNoCellAtAllPutsNoDesignInForce) {
-  // A design statement names zero or more cells, so one that names none is
-  // written legally. It puts no design in force: there is no cell for the rule
-  // to make the top-level module, so the cells no instance names root the
-  // design as they would have with no configuration on the command line at all.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
   auto empty = tmp.Write("src/cfg_empty.v",
@@ -503,10 +362,6 @@ TEST(CommandLineBinding, ConfigNamingNoCellAtAllPutsNoDesignInForce) {
 }
 
 TEST(CommandLineBinding, TwoConfigsNamingDesignsOfTheirOwnAreReported) {
-  // Neither configuration delegates to the other, so each names a whole design
-  // and the command line describes two. Nothing in the source descriptions says
-  // which was meant, so the command line is reported rather than one of the two
-  // being picked.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
   auto other = tmp.Write("src/cfg_spare.v",
@@ -517,8 +372,6 @@ TEST(CommandLineBinding, TwoConfigsNamingDesignsOfTheirOwnAreReported) {
   CommandLineHarness h;
   auto* design = h.Run(tmp.dir, {s.child, s.spare, s.top, s.cfg, other});
   EXPECT_EQ(design, nullptr);
-  // The report is about the command line rather than about anything written in
-  // a source description, so it stands at no position.
   EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
                             "command line puts 2 configurations in force; "
                             "'cfg' and 'cfg_spare' each name a design of their "
@@ -526,19 +379,7 @@ TEST(CommandLineBinding, TwoConfigsNamingDesignsOfTheirOwnAreReported) {
                             0, "33.5.4"));
 }
 
-// ---------------------------------------------------------------------------
-// Claim: a command line names the configuration to be used, and the design
-// that configuration's design statement describes is what comes back. The name
-// picks out one of the configurations the command line put in force, and a
-// name reaching none of them is reported.
-// ---------------------------------------------------------------------------
-
 TEST(CommandLineBinding, NamedConfigPicksItsOwnDesignFromTwoInForce) {
-  // Two configurations name designs of their own on this command line and the
-  // command line names cfg_top. The design comes back rooted at top, which is
-  // the cell cfg_top's design statement names. other is on the same command
-  // line and no instance names it, so it would root a design of its own were
-  // the configuration named not what settles the roots.
   ScratchDir tmp;
   auto s = WriteTwoConfigSources(tmp);
 
@@ -552,9 +393,6 @@ TEST(CommandLineBinding, NamedConfigPicksItsOwnDesignFromTwoInForce) {
 }
 
 TEST(CommandLineBinding, NamingTheOtherConfigInForcePicksTheOtherDesign) {
-  // The same command line with the other configuration named. The design comes
-  // back rooted at other, so the name is what chooses between the two rather
-  // than the first configuration in force being taken whatever was named.
   ScratchDir tmp;
   auto s = WriteTwoConfigSources(tmp);
 
@@ -568,36 +406,24 @@ TEST(CommandLineBinding, NamingTheOtherConfigInForcePicksTheOtherDesign) {
 }
 
 TEST(CommandLineBinding, TwoConfigsInForceAreStillReportedWithNoConfigNamed) {
-  // The same command line with no configuration named on it. Both
-  // configurations stay in force and the command line is reported, which is
-  // what says naming one resolves the ambiguity rather than the option's
-  // arrival having removed the report.
   ScratchDir tmp;
   auto s = WriteTwoConfigSources(tmp);
 
   CommandLineHarness h;
   auto* design = h.Run(tmp.dir, TwoConfigCommandLine(s));
   EXPECT_EQ(design, nullptr);
-  // The report is about the command line rather than about anything written in
-  // a source description, so it stands at no position.
   EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
                             "command line puts 2 configurations in force", 0,
                             "33.5.4"));
 }
 
 TEST(CommandLineBinding, ConfigNameMatchingNothingInTheUnitIsReported) {
-  // The name on the command line reaches no configuration the compilation unit
-  // holds. The run is reported rather than falling back on the two
-  // configurations that are in force, either of which a fallback could have
-  // picked.
   ScratchDir tmp;
   auto s = WriteTwoConfigSources(tmp);
 
   CommandLineHarness h;
   auto* design = h.Run(tmp.dir, TwoConfigCommandLine(s), "", "cfg_absent");
   EXPECT_EQ(design, nullptr);
-  // The name came off the command line, so it is written in no source
-  // description for the report to stand at.
   EXPECT_TRUE(ReportedError(
       h.diag.Diagnostics(),
       "no configuration named 'cfg_absent' is in force; the command line put 2 "
@@ -606,17 +432,6 @@ TEST(CommandLineBinding, ConfigNameMatchingNothingInTheUnitIsReported) {
 }
 
 TEST(CommandLineBinding, ConfigNamingNoDesignIsNotSelectableByName) {
-  // The compilation unit holds the configuration the command line names and
-  // ConfigsInForce leaves it out, so naming it is reported. The exclusion this
-  // case rests on is the one ConfigsInForce applies to a configuration whose
-  // design statement names no cell: cfg_empty describes no design, so there is
-  // no design for the command line to have meant by naming it.
-  //
-  // cfg is on the same command line and does name a design, so one
-  // configuration is in force while the run is reported. A unit holding
-  // cfg_empty alone would report the same sentence with a count of zero, and
-  // could not tell a name excluded by ConfigsInForce from a command line that
-  // put no configuration in force at all.
   ScratchDir tmp;
   auto s = WriteSources(tmp);
   auto empty = tmp.Write("src/cfg_empty.v",
@@ -635,18 +450,7 @@ TEST(CommandLineBinding, ConfigNamingNoDesignIsNotSelectableByName) {
       0, "33.5.4"));
 }
 
-// ---------------------------------------------------------------------------
-// Claim: the rules that bind the design's instances come either from the
-// configuration or, with none in force, from the library map file's defaults.
-// The tests above carry the second half, where no configuration reaches the
-// command line; these two carry the first.
-// ---------------------------------------------------------------------------
-
 TEST(CommandLineBinding, DefaultClauseOfTheConfigInForceBindsTheInstances) {
-  // Both libraries on this command line hold a cell called child, and the root
-  // comes from rtlLib. Its instance nonetheless binds to the gate-level child,
-  // which nothing but the configuration's default clause asks for -- so the
-  // rules the run works under are the ones the configuration carries.
   ScratchDir tmp;
   auto s = WriteTwoLibrarySources(tmp);
   auto cfg = tmp.Write("rtl/cfg.v",
@@ -664,10 +468,6 @@ TEST(CommandLineBinding, DefaultClauseOfTheConfigInForceBindsTheInstances) {
 }
 
 TEST(CommandLineBinding, CellClauseOfTheConfigInForceBindsTheInstances) {
-  // The third rule shape a configuration carries, over the same two libraries:
-  // a clause naming the cell rather than the instances. It reaches the run the
-  // same way the default clause does, by the configuration's description being
-  // on the command line.
   ScratchDir tmp;
   auto s = WriteTwoLibrarySources(tmp);
   auto cfg = tmp.Write("rtl/cfg.v",
@@ -684,14 +484,6 @@ TEST(CommandLineBinding, CellClauseOfTheConfigInForceBindsTheInstances) {
   EXPECT_EQ(LibraryOfTheOnlyChild(design), "gateLib");
 }
 
-// ---------------------------------------------------------------------------
-// Claim: where a separate compilation tool did the compiling, the tool that
-// binds needs only the configuration to be used -- and that configuration is
-// itself precompiled.
-// ---------------------------------------------------------------------------
-
-// The infrastructure one bind runs against. A fresh instance shares nothing
-// with the compiles that wrote the libraries it reads.
 struct ConfigBindHarness {
   SourceManager mgr;
   Arena arena;
@@ -714,8 +506,6 @@ constexpr const char* kConfig =
     "  design top;\n"
     "endconfig\n";
 
-// A second configuration, over the cell the design of kConfig leaves out, and
-// one whose design statement names no cell at all.
 constexpr const char* kSpareConfig =
     "config cfg_spare;\n"
     "  design spare;\n"
@@ -725,10 +515,6 @@ constexpr const char* kEmptyConfig =
     "  design;\n"
     "endconfig\n";
 
-// A gate-level root of the same name as kTop's, for a compiled form holding
-// both, and a configuration whose design statement says which library its root
-// is to come from. The gate-level one instantiates nothing, so which of the two
-// was bound is legible from the design.
 constexpr const char* kGateTop =
     "module top;\n"
     "endmodule\n";
@@ -738,14 +524,6 @@ constexpr const char* kQualifiedConfig =
     "endconfig\n";
 
 TEST(ConfigDrivenBinding, ConfigNameAloneDescribesTheWholeDesign) {
-  // The binder is told nothing but the name of the configuration: no top-level
-  // cell, and no source description at all. Everything it binds -- the
-  // configuration included -- comes out of the compiled forms, and what comes
-  // back is the design that name goes with. Two things compiled into the same
-  // library would otherwise have got in: spare, which no instance names and
-  // which a bind that went looking for uninstantiated cells would have rooted a
-  // design at, and a second configuration over spare, which the name given is
-  // what rules out.
   ScratchDir tmp;
   auto path = tmp.dir / "rtl.dpl";
   ASSERT_TRUE(PrecompiledLibrary::Save(kChild, "rtlLib", path));
@@ -766,10 +544,6 @@ TEST(ConfigDrivenBinding, ConfigNameAloneDescribesTheWholeDesign) {
 }
 
 TEST(ConfigDrivenBinding, ConfigNamingNoCellDescribesNoDesignToBind) {
-  // The configuration was precompiled and its design statement names no cell,
-  // so it says nothing about which cells root the design. There is nothing else
-  // a bind under it could fall back on -- the names of the top-level cells are
-  // precisely what naming a configuration stands in for -- so it is reported.
   ScratchDir tmp;
   auto path = tmp.dir / "rtl.dpl";
   ASSERT_TRUE(PrecompiledLibrary::Save(kTop, "rtlLib", path));
@@ -780,16 +554,12 @@ TEST(ConfigDrivenBinding, ConfigNamingNoCellDescribesNoDesignToBind) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   auto* design = h.binder.BindConfig("cfg_empty");
   EXPECT_EQ(design, nullptr);
-  // The report stands at the `config` keyword, the first line of kEmptyConfig.
   EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
                             "config 'cfg_empty' names no design", 1,
                             "33.4.1.1"));
 }
 
 TEST(ConfigDrivenBinding, ConfigNoCompiledFormHoldsIsReported) {
-  // Every cell of the design was precompiled and the configuration was not. A
-  // bind reads no source description, so there is nowhere else the
-  // configuration could come from and the bind cannot proceed.
   ScratchDir tmp;
   auto path = tmp.dir / "rtl.dpl";
   ASSERT_TRUE(PrecompiledLibrary::Save(kChild, "rtlLib", path));
@@ -799,16 +569,11 @@ TEST(ConfigDrivenBinding, ConfigNoCompiledFormHoldsIsReported) {
   ASSERT_TRUE(h.binder.LoadLibrary(path));
   auto* design = h.binder.BindConfig("cfg");
   EXPECT_EQ(design, nullptr);
-  // No source description reaches a bind, so the missing configuration is
-  // written nowhere this report could stand at.
   EXPECT_TRUE(ReportedError(h.diag.Diagnostics(),
                             "config 'cfg' was not precompiled", 0, "33.5.4"));
 }
 
 TEST(ConfigDrivenBinding, CellTheDesignStatementNamesMustBePrecompiledToo) {
-  // The configuration reached the binder and the cell its design statement
-  // names did not. Naming a configuration does not exempt a design from the
-  // restriction that every cell of it is precompiled before the bind begins.
   ScratchDir tmp;
   auto path = tmp.dir / "rtl.dpl";
   ASSERT_TRUE(PrecompiledLibrary::Save(kChild, "rtlLib", path));
@@ -823,18 +588,6 @@ TEST(ConfigDrivenBinding, CellTheDesignStatementNamesMustBePrecompiledToo) {
 }
 
 TEST(ConfigDrivenBinding, DesignStatementLibraryPicksWhichPrecompiledCell) {
-  // The specification a binding tool is given for a top-level cell carries a
-  // library as well as a cell name, and where the configuration stands in for
-  // that specification it is the design statement that carries the library.
-  // Two invocations of the compiler put a cell called top into two different
-  // libraries; the design statement names one of them, and the design that
-  // comes back is that library's.
-  //
-  // The library has to reach the check that every cell of the design was
-  // precompiled, not just the binding after it. The cell rtlLib's top
-  // instantiates is deliberately left uncompiled here, so a check that took the
-  // library off the specification and went looking for a top by name alone
-  // would walk the wrong hierarchy and report a cell this design never has.
   ScratchDir tmp;
   auto path = tmp.dir / "design.dpl";
   ASSERT_TRUE(PrecompiledLibrary::Save(kTop, "rtlLib", path));

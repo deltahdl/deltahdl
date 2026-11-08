@@ -38,8 +38,6 @@ bool MatchRepetition(const SvaSequence& seq,
       break;
     }
   }
-  // §16.9.2: a `$` maximum leaves the upper bound unbounded, so only the
-  // minimum iteration count constrains the match.
   return consecutive >= seq.rep_min &&
          (seq.rep_max_is_dollar || consecutive <= seq.rep_max);
 }
@@ -80,27 +78,18 @@ bool MatchDelaySequence(const SvaSequence& seq,
 
 EmptyConcatResult ConcatEmptyMatch(EmptyConcatSide side, uint32_t delay) {
   EmptyConcatResult result;
-  // (empty ##0 seq) and (seq ##0 empty): a length-0 endpoint can never align
-  // with the neighboring sequence at the same time step, so neither matches.
   if (delay == 0) {
     result.matchable = false;
     return result;
   }
-  // With delay n > 0 the empty operand contributes nothing, and the leftover
-  // delay collapses onto the surviving operand as ##(n-1).
   result.matchable = true;
   result.effective_delay = delay - 1;
-  // (seq ##n empty) is equivalent to (seq ##(n-1) `true), extending the match
-  // one tick past seq; (empty ##n seq) is equivalent to (##(n-1) seq), which
-  // merely prefixes the reduced delay.
   result.append_true = (side == EmptyConcatSide::kEmptyRight);
   return result;
 }
 
 bool MatchEmptyOrNonempty(uint32_t rep_min, bool empty_case_match,
                           bool nonempty_case_match) {
-  // A repetition that can take zero iterations is the disjunction of its empty
-  // and nonempty cases; otherwise only the nonempty case is reachable.
   if (rep_min == 0) return empty_case_match || nonempty_case_match;
   return nonempty_case_match;
 }
@@ -111,8 +100,6 @@ SequenceAndMatch EvalSequenceAndMatch(bool a_match, uint32_t a_end_time,
                                       bool b_match, uint32_t b_end_time) {
   SequenceAndMatch result;
   result.matched = a_match && b_match;
-  // The operands share a start time; the composite completes when the slower
-  // operand does, i.e. at the later of the two end times.
   result.end_time = std::max(a_end_time, b_end_time);
   return result;
 }
@@ -123,10 +110,6 @@ SequenceOrMatches EvalSequenceOrMatches(
     const std::vector<uint32_t>& a_end_times,
     const std::vector<uint32_t>& b_end_times) {
   SequenceOrMatches result;
-  // The match set is the union of the two operands' matches: each operand match
-  // carries through unchanged, keeping its own end time. Matches are not
-  // merged, so both operands matching on the same tick yields two separate
-  // entries.
   result.end_times = a_end_times;
   result.end_times.insert(result.end_times.end(), b_end_times.begin(),
                           b_end_times.end());
@@ -137,14 +120,9 @@ SequenceOrMatches EvalSequenceOrMatches(
 FirstMatchMatches EvalFirstMatch(
     const std::vector<uint32_t>& operand_end_times) {
   FirstMatchMatches result;
-  // No match of the operand means no match of first_match.
   if (operand_end_times.empty()) return result;
-  // The earliest ending clock tick among the operand's matches selects the
-  // first match; every match ending later is discarded.
   uint32_t earliest =
       *std::min_element(operand_end_times.begin(), operand_end_times.end());
-  // Ties at the earliest ending tick are all retained: when several operand
-  // matches end on that tick, each one is a match of first_match.
   for (uint32_t end_time : operand_end_times) {
     if (end_time == earliest) result.end_times.push_back(end_time);
   }
@@ -161,10 +139,6 @@ std::vector<IntersectOperandMatch> EvalSequenceIntersectMatches(
     const std::vector<IntersectOperandMatch>& a_matches,
     const std::vector<IntersectOperandMatch>& b_matches) {
   std::vector<IntersectOperandMatch> result;
-  // Pair each first-operand match with each second-operand match of the same
-  // length; every pair contributes one composite match. The operands co-start,
-  // so an equal-length pair also shares a match point, which the composite
-  // inherits.
   for (const auto& a : a_matches) {
     for (const auto& b : b_matches) {
       if (a.length == b.length) {
@@ -172,7 +146,6 @@ std::vector<IntersectOperandMatch> EvalSequenceIntersectMatches(
       }
     }
   }
-  // No equal-length pair leaves the result empty: the composite has no match.
   return result;
 }
 
@@ -184,15 +157,9 @@ bool EvalThroughout(const std::function<bool(uint64_t)>& check,
 SequenceWithinMatch EvalSequenceWithin(const SequenceMatchSpan& inner,
                                        const SequenceMatchSpan& outer) {
   SequenceWithinMatch result;
-  // seq1 within seq2 ≡ (1[*0:$] ##1 seq1 ##1 1[*0:$]) intersect seq2: both
-  // operands match and the match of seq1 falls inside the match of seq2. The
-  // leading 1[*0:$] lets seq1 start no earlier than seq2's start, and the
-  // trailing 1[*0:$] lets seq1 complete no later than seq2's completion.
   result.matched = inner.matched && outer.matched &&
                    inner.start_time >= outer.start_time &&
                    inner.end_time <= outer.end_time;
-  // The intersection makes the composite cover seq2's whole interval, so it
-  // completes at seq2's match point.
   result.end_time = outer.end_time;
   return result;
 }

@@ -32,9 +32,6 @@ TEST(VariableDeclaration, DataDeclVarPrefix) {
   EXPECT_EQ(item->kind, ModuleItemKind::kVarDecl);
 }
 
-// A comma-separated list_of_variable_decl_assignments yields one variable
-// declaration per element; the A.2.3 sibling file checks that each element
-// also carries its own initializer.
 TEST(DeclarationListParsing, ListOfVariableDeclAssignmentsOneDeclPerElement) {
   auto r = Parse("module m; int a = 1, b = 2, c = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -298,9 +295,6 @@ TEST(DataTypeParsing, VarImplicitLogicWithRange) {
 }
 
 TEST(DataTypeParsing, VarSignedRangeImplicitType) {
-  // §6.8: after the var keyword the data type is optional; specifying only a
-  // range and/or signing leaves the type implicit (resolved to logic during
-  // elaboration) while the signed qualifier is captured on the declaration.
   auto r = Parse(
       "module t;\n"
       "  var signed [7:0] v;\n"
@@ -419,10 +413,6 @@ TEST(VariableDeclarations, AutomaticAtModuleScopeWithoutDataTypeOrVarIsError) {
                             2, "6.8"));
 }
 
-// Footnote 14 of Syntax 6-3 holds at module scope whatever stands in place of
-// the data type: a sign alone, a sign with a packed range, `const` alone or
-// with a sign, and a lifetime with a sign. Written with `var`, `const var`
-// included, each declares a variable, as does a declaration with a data type.
 TEST(VariableDeclarations, ImplicitTypeAtModuleScopeWithoutVarIsError) {
   auto r = Parse(
       "module m;\n"

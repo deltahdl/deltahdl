@@ -1,7 +1,3 @@
-// §32.4.4's interconnect delay at run time: a port connection's source change
-// carried to its load across the delay annotated between them, with §30.7's
-// pulse handling, which interconnect delays share with specify path delays.
-
 #include "simulator/interconnect_drive.h"
 
 #include <cstddef>
@@ -32,8 +28,6 @@ namespace delta {
 
 namespace {
 
-// Schedules `transition` to arrive at the load. Its arrival does nothing, and
-// does not advance time, once the transition is superseded.
 void ScheduleArrival(const std::shared_ptr<InterconnectSchedule>& schedule,
                      const std::shared_ptr<InterconnectTransition>& transition,
                      SimContext& ctx,
@@ -49,12 +43,6 @@ void ScheduleArrival(const std::shared_ptr<InterconnectSchedule>& schedule,
                                    arrival);
 }
 
-// What a transition arriving at `arrives` through Table 32-4's slot `slot`
-// makes of the last transition still pending: whether that one is dropped --
-// crossed by the new one (§30.7.4.2), or rejected with it as a pulse too
-// narrow for the reject limit (§30.7) -- or stays, turned to x where the pulse
-// falls between the two limits. A limit above the delay behaves as one at it
-// (§32.7).
 bool DropsLastPending(InterconnectTransition& last, uint64_t arrives,
                       const InterconnectDelay& delay, uint8_t slot,
                       Arena& arena) {
@@ -81,8 +69,6 @@ void DriveAcrossInterconnect(
   auto& pending = schedule->pending;
   const uint64_t kNow = ctx.CurrentTime().ticks;
   for (;;) {
-    // Where the load is heading: the last transition still on its way, or the
-    // load as it stands where none is.
     const Logic4Vec& from =
         pending.empty() ? change.held : pending.back()->bits;
     if (from.SameValueAs(change.bits)) return;
@@ -110,9 +96,6 @@ void DriveAcrossInterconnect(
 
 ExecTask AwaitInterconnectArrivals(const InterconnectSchedule& schedule,
                                    SimContext& ctx) {
-  // A wait landing in the same time step as the last arrival may run first;
-  // the next one is then a zero delay, which waits out the region the arrival
-  // stands in.
   while (!schedule.pending.empty()) {
     const uint64_t kLast = schedule.pending.back()->ticks;
     co_await DelayAwaiter{ctx, kLast - ctx.CurrentTime().ticks};
@@ -122,8 +105,6 @@ ExecTask AwaitInterconnectArrivals(const InterconnectSchedule& schedule,
 
 namespace {
 
-// What one load following a net's drivers holds on to: the net, the load's
-// shadow of it, the load's name and how its connection commits.
 struct InterconnectFollow {
   Net& net;
   std::shared_ptr<InterconnectShadow> shadow;
@@ -131,8 +112,6 @@ struct InterconnectFollow {
   std::function<void(const Logic4Vec&)> commit;
 };
 
-// The shadow's slots for the net's drivers up to `slot`, each starting at the
-// value the net's driver holds.
 void GrowShadow(const InterconnectFollow& follow, std::size_t slot) {
   InterconnectShadow& shadow = *follow.shadow;
   while (shadow.net.drivers.size() <= slot) {
@@ -143,7 +122,6 @@ void GrowShadow(const InterconnectFollow& follow, std::size_t slot) {
   }
 }
 
-// A write of the net's driver `slot`, carried to the load's shadow.
 void FollowDriver(const std::shared_ptr<InterconnectFollow>& follow,
                   std::size_t slot, SimContext& ctx) {
   InterconnectShadow& shadow = *follow->shadow;
@@ -158,10 +136,6 @@ void FollowDriver(const std::shared_ptr<InterconnectFollow>& follow,
     shadow.net.driver_strengths[slot] = kStrength;
     return;
   }
-  // A driver standing for no output port -- the connection of the port above,
-  // say -- is asked about by the name the connection reads, as the
-  // connection's own lookup asks. ApplyContAssignToNet records the slot's port
-  // before it tells a listener.
   const std::string_view kPort = follow->net.driver_ports[slot];
   const std::optional<InterconnectDelay> kDelay =
       mgr->ConnectionInterconnectDelay(
@@ -193,9 +167,6 @@ void FollowNetDrivers(Net& net,
   shadow->resolved.value = MakeLogic4Vec(ctx.GetArena(), kWidth);
   auto follow = std::make_shared<InterconnectFollow>(
       InterconnectFollow{net, shadow, std::move(ends), std::move(commit)});
-  // A driver the net already carries starts the shadow where it stands, so
-  // its next write is measured from there; a source that moved before the
-  // load began following it would otherwise look unmoved.
   if (!net.drivers.empty()) GrowShadow(*follow, net.drivers.size() - 1);
   net.driver_listeners.emplace_back(
       [follow, &ctx](std::size_t slot) { FollowDriver(follow, slot, ctx); });

@@ -1,15 +1,3 @@
-// §8.10 "Static methods" and the part of §8.11 "This" that a static method
-// reaches: the `this` and `super` rule, an unqualified access to a non-static
-// property or method, the names that shadow one, and the statement links
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h admits,
-// each holding an access written as a right-hand side, an assignment target, a
-// condition or a call argument.
-//
-// The cases writing the access in one of the other twelve expression positions
-// a statement holds, and in the three Expr child links nested below them, are
-// in test_elaborator_subclause_08_10b.cpp, which the 1000-line cap in
-// .github/workflows/deltahdl.yml separated this file from.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -19,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// The report stands at the method's own declaration rather than at the
-// statement holding 'this', because §8.10's rule is about the method: the
-// elaborator scans a static method's body and reports the method once.
 TEST(StaticMethodElaboration, StaticMethodThisError) {
   ElabFixture f;
   ElabOk(
@@ -233,9 +218,6 @@ TEST(StaticMethodElaboration, ParamShadowsNonStaticOk) {
              "endmodule\n"));
 }
 
-// The line names which of the two static methods broke the rule: id is clean
-// and bad is not, so the report stands at bad's declaration and a test naming
-// line 3 would be answering for a method the source never faulted.
 TEST(StaticMethodElaboration, StaticMethodThisInCallArgError) {
   ElabFixture f;
   ElabOk(
@@ -257,37 +239,6 @@ TEST(StaticMethodElaboration, StaticMethodThisInCallArgError) {
       "'this' and 'super' shall not be used in a static method", 6, "8.10"));
 }
 
-// The fourteen cases below cover the child-statement links of Stmt that the two
-// §8.10 walks in src/elaborator/elaborator_validate_static_methods.cpp reach
-// for the first time now that both take their list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. StmtRefsNonStaticMember, which
-// finds the access, had written out six of the thirteen links, and the
-// collection of the names a block declares -- and so of which references
-// resolve locally -- seven. A reference in a link the first was missing was
-// never looked at, and a declaration in a link the second was missing left the
-// name out of the set.
-//
-// The two are converted together because either alone is wrong: the reporter
-// alone would report an access to a name the block does declare, and the
-// collector alone would suppress a report nothing was making. So each link
-// takes a pair of cases writing the same statement in the same position, one
-// naming the class property, which §8.10 rejects, and one naming a variable the
-// block declares itself, which shadows the property and is accepted. Only the
-// pair tells the two walks apart.
-//
-// The report stands at the method's own declaration, on line 3 of every source
-// below, because §8.10's rule is about the method:
-// Elaborator::ValidateOneClassStaticMethods scans a static method's body and
-// reports the method once.
-
-// §8.10: a static method cannot reach non-static members, whether class
-// properties or methods, and it puts no condition on the statement the access
-// is written in. A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, so a fork holds
-// both halves of this pair: the statement here, and the declaration in the case
-// below it, which Parser::ParseBlockVarDecls in
-// src/parser/parser_stmt_block.cpp puts in Stmt::fork_stmts beside the
-// statements.
 TEST(StaticMethodElaboration, NonStaticPropertyWrittenInAForkArmIsReported) {
   ElabFixture f;
   ElabOk(
@@ -324,10 +275,6 @@ TEST(StaticMethodElaboration, LocalDeclaredInAForkArmShadowsTheProperty) {
              "endmodule\n"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so a
-// for header assigns to a variable that may be any variable in scope, the class
-// property among them. The loop's control variable is declared above the loop
-// here, which leaves the header's assignment as the only access in the source.
 TEST(StaticMethodElaboration,
      NonStaticPropertyWrittenInAForInitializationIsReported) {
   ElabFixture f;
@@ -348,12 +295,6 @@ TEST(StaticMethodElaboration,
                             3, "8.10"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, so a for step writes a
-// variable the same way, and the class property is one such variable. None of
-// the three declares a name, so this link takes the access case alone: no
-// conforming source puts a declaration in a for step for NamesDeclaredUnder to
-// find.
 TEST(StaticMethodElaboration, NonStaticPropertyWrittenInAForStepIsReported) {
   ElabFixture f;
   ElabOk(
@@ -373,10 +314,6 @@ TEST(StaticMethodElaboration, NonStaticPropertyWrittenInAForStepIsReported) {
                             3, "8.10"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. The four cases
-// through the next pair cover one arm each.
 TEST(StaticMethodElaboration,
      NonStaticPropertyWrittenInAnAssertionPassStmtIsReported) {
   ElabFixture f;
@@ -449,10 +386,6 @@ TEST(StaticMethodElaboration,
              "endmodule\n"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §8.10 is a rule about the source, so it holds whether the weighted
-// draw would select the item or not.
 TEST(StaticMethodElaboration,
      NonStaticPropertyWrittenInARandcaseItemIsReported) {
   ElabFixture f;
@@ -492,11 +425,6 @@ TEST(StaticMethodElaboration, LocalDeclaredInARandcaseItemShadowsTheProperty) {
              "endmodule\n"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds both halves of this pair
-// directly. Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
-// them in RsProd::code_stmts, reached through Stmt::rs_productions and through
-// no other member of Stmt.
 TEST(StaticMethodElaboration,
      NonStaticPropertyWrittenInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -534,12 +462,6 @@ TEST(StaticMethodElaboration,
              "endmodule\n"));
 }
 
-// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
-// rs_code_block ] ]` puts a second code block after the weight, which the
-// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
-// a second statement position under Stmt::rs_productions, so it takes its own
-// pair: the production `alt` below holds a null statement, which leaves the
-// weight block as the only place the access and the declaration stand.
 TEST(StaticMethodElaboration,
      NonStaticPropertyWrittenInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;
@@ -579,15 +501,6 @@ TEST(StaticMethodElaboration,
              "endmodule\n"));
 }
 
-// §12.7.1: a for header that declares its control variables wraps the loop in
-// an implicit begin-end block that declares them with automatic lifetime, and
-// that block is a new hierarchical scope to which the variables are local. So
-// `i` in the body below is the header's own variable and not the class property
-// `i`. §8.10 therefore has nothing to report, and the source is as ordinary a
-// loop as SystemVerilog has. The property is declared for the case to mean
-// anything: without it §8.10 is silent whatever the collection does, because
-// CollectNonStaticMemberNames returns an empty set and
-// ValidateOneClassStaticMethods stops before it looks at any statement.
 TEST(StaticMethodElaboration, ForHeaderControlVariableShadowsTheProperty) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -602,16 +515,6 @@ TEST(StaticMethodElaboration, ForHeaderControlVariableShadowsTheProperty) {
              "endmodule\n"));
 }
 
-// The same loop with no type in the header. A.6.8 makes that a
-// list_of_variable_assignments rather than a for_variable_declaration, so
-// §12.7.1 declares nothing and `i` is the class property throughout. §8.10
-// bars a static method from reaching it, and the report is made three times
-// over -- the initialization, the condition and the step all name it -- which
-// is why the method is reported once, at its own declaration.
-//
-// This case is what keeps the one above from being answered by collecting
-// every name a for header mentions: such a fix passes that test and fails this
-// one.
 TEST(StaticMethodElaboration, UntypedForHeaderVariableIsStillTheProperty) {
   ElabFixture f;
   ElabOk(
@@ -631,11 +534,6 @@ TEST(StaticMethodElaboration, UntypedForHeaderVariableIsStillTheProperty) {
                             3, "8.10"));
 }
 
-// §12.7.1: a for header that declares its control variables wraps the loop in
-// an implicit begin-end block whose scope the variables are local to. `x = i;`
-// stands after that block has ended, so `i` there is the class property and
-// §8.10 bars the access. The loop body names nothing, which leaves the
-// statement after the loop as the only access in the source.
 TEST(StaticMethodElaboration,
      ForHeaderControlVariableIsOutOfScopeAfterTheLoop) {
   ElabFixture f;
@@ -657,11 +555,6 @@ TEST(StaticMethodElaboration,
                             3, "8.10"));
 }
 
-// §6.21: variables may also be declared in unnamed blocks, where the block and
-// every block nested in it can see them. The block below is named, which §9.3.4
-// makes no difference to here, and either way `i` is visible to the block and
-// not to the statement after it. So `i = 1;` inside is the block's own variable
-// and `x = i;` outside is the class property.
 TEST(StaticMethodElaboration, BlockLocalIsOutOfScopeAfterTheBlock) {
   ElabFixture f;
   ElabOk(
@@ -685,10 +578,6 @@ TEST(StaticMethodElaboration, BlockLocalIsOutOfScopeAfterTheBlock) {
                             3, "8.10"));
 }
 
-// The other direction of the same sentence of §6.21: a declaration is visible
-// to every block nested below it, so `i` declared in the outer block still
-// shadows the property two blocks down. This is what a fix that narrows the
-// scope too far breaks, and neither case above would catch that.
 TEST(StaticMethodElaboration, BlockLocalShadowsThePropertyInANestedBlock) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -707,15 +596,6 @@ TEST(StaticMethodElaboration, BlockLocalShadowsThePropertyInANestedBlock) {
              "endmodule\n"));
 }
 
-// §8.10 denies a static method the non-static members of the object it has no
-// handle to; §8.23 has the class scope resolution operator `::` name a member
-// of the class its left side stands for. The right side of a `::` is that
-// class's member and not this one's, so a static method calling another
-// class's static method through `::` is not the access §8.10 bars, whatever
-// name this class also declares. ExprRefsNonStaticMember searched the right
-// side of a `::` against this class's non-static names (#4352), so
-// `type_id::get()` in UVM's uvm_object_param_utils, where uvm_pool also has a
-// non-static `get`, was reported in every file that includes the library.
 TEST(StaticMethodClassScopeAccess,
      AnotherClassesStaticMethodCalledThroughItsScopeIsAccepted) {
   EXPECT_TRUE(
@@ -737,8 +617,6 @@ TEST(StaticMethodClassScopeAccess,
              "endmodule\n"));
 }
 
-// The UVM shape: the class the `::` names is a typedef of a parameterized
-// class specialization declared in the calling class itself.
 TEST(StaticMethodClassScopeAccess,
      AStaticMethodOfATypedefSpecializationIsAccepted) {
   EXPECT_TRUE(
@@ -761,8 +639,6 @@ TEST(StaticMethodClassScopeAccess,
              "endmodule\n"));
 }
 
-// The control: the same class calling its non-static `get` bare is still the
-// access §8.10 bars, reported at the static function on line 10.
 TEST(StaticMethodClassScopeAccess, TheOwnNonStaticMethodCalledBareIsReported) {
   ElabFixture f;
   ElabOk(
@@ -788,9 +664,6 @@ TEST(StaticMethodClassScopeAccess, TheOwnNonStaticMethodCalledBareIsReported) {
                             10, "8.10"));
 }
 
-// §8.10 reaches every expression a static method's body holds, so `this` in a
-// local variable's initializer is reported at the method, as `this` in a
-// return statement is (#8080).
 TEST(StaticMethodElaboration, StaticMethodThisInAnInitializerError) {
   ElabFixture f;
   ElabOk(

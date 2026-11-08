@@ -28,8 +28,6 @@ static Net MakeNettypeNet(Variable* var) {
   return net;
 }
 
-// §6.7.3: the guaranteed time-zero call happens even with no drivers, in which
-// case the resolution function is handed an empty driver array.
 TEST(NettypeInitialization, ResolutionAtTimeZeroEvenNoDrivers) {
   Arena arena;
   Net net = MakeNettypeNet(MakeVar(arena, 1));
@@ -47,7 +45,6 @@ TEST(NettypeInitialization, ResolutionAtTimeZeroEvenNoDrivers) {
   EXPECT_TRUE(activated);
 }
 
-// §6.7.3: the data-type default applies across every bit of a multi-bit net.
 TEST(NettypeInitialization, MultiBitDefaultIsAllX) {
   Arena arena;
   auto* var = MakeVar(arena, 8);
@@ -57,11 +54,10 @@ TEST(NettypeInitialization, MultiBitDefaultIsAllX) {
   nt.data_kind = NettypeDataKind::k4StateIntegral;
   InitializeUserDefinedNet(net, nt, arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // x = (aval=1, bval=1)
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// §6.7.3: a 2-state data type defaults to zero, not x.
 TEST(NettypeInitialization, TwoStateDefaultIsZero) {
   Arena arena;
   auto* var = MakeVar(arena, 4);
@@ -76,8 +72,6 @@ TEST(NettypeInitialization, TwoStateDefaultIsZero) {
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0x0u);
 }
 
-// §6.7.3: the initial value is set before the resolution call runs, so the
-// resolution function observes the data-type default.
 TEST(NettypeInitialization, InitialValueSetBeforeResolution) {
   Arena arena;
   auto* var = MakeVar(arena, 1);
@@ -96,8 +90,6 @@ TEST(NettypeInitialization, InitialValueSetBeforeResolution) {
   EXPECT_EQ(value_seen_by_resolution, kValX);
 }
 
-// §6.7.3 NOTE: a resolved nettype's value is determined by the resolution
-// function executed with an empty array of driver values.
 TEST(NettypeInitialization, ResolutionWithEmptyDriversSetsResolvedValue) {
   Arena arena;
   auto* var = MakeVar(arena, 1);
@@ -114,7 +106,6 @@ TEST(NettypeInitialization, ResolutionWithEmptyDriversSetsResolvedValue) {
   EXPECT_EQ(ValOf(*var), kVal0);
 }
 
-// §6.7.3 NOTE: an unresolved logic nettype bit with no drivers is x, not z.
 TEST(NettypeInitialization, DefaultIsXNotZ) {
   Arena arena;
   auto* var = MakeVar(arena, 1);
@@ -128,7 +119,6 @@ TEST(NettypeInitialization, DefaultIsXNotZ) {
   EXPECT_EQ(ValOf(*var), kValX);
 }
 
-// §6.7.3: the resolution result overrides the data-type default.
 TEST(NettypeInitialization, ResolutionOverwritesDefault) {
   Arena arena;
   auto* var = MakeVar(arena, 1);
@@ -144,7 +134,6 @@ TEST(NettypeInitialization, ResolutionOverwritesDefault) {
   EXPECT_EQ(ValOf(*var), kVal1);
 }
 
-// §6.7.3: a net with no resolved storage cannot be initialized.
 TEST(NettypeInitialization, NoResolvedStorageFails) {
   Arena arena;
   Net net;
@@ -154,36 +143,26 @@ TEST(NettypeInitialization, NoResolvedStorageFails) {
   EXPECT_FALSE(InitializeUserDefinedNet(net, nt, arena));
 }
 
-// §6.7.3: for a struct-typed nettype, initialization expressions for the
-// members within the struct are applied; members with no initializer keep the
-// data-type default (x).
 TEST(NettypeInitialization, StructMemberInitializersApplied) {
   Arena arena;
 
   std::vector<StructMemberInit> members(2);
-  // Low 4 bits: a member initialized to 0b1010.
   members[0].offset = 0;
   members[0].width = 4;
   members[0].has_initializer = true;
   members[0].init_value = MakeLogic4VecVal(arena, 4, 0xA);
-  // High 4 bits: a member with no initializer, expected to stay x.
   members[1].offset = 4;
   members[1].width = 4;
   members[1].has_initializer = false;
 
   Logic4Vec v = InitialStructNetValue(arena, 8, members);
 
-  // Initialized member: known value 0b1010.
   EXPECT_EQ(v.words[0].aval & 0xF, 0xAu);
   EXPECT_EQ(v.words[0].bval & 0xF, 0x0u);
-  // Uninitialized member: all x (aval 1, bval 1) across its bits.
   EXPECT_EQ((v.words[0].aval >> 4) & 0xF, 0xFu);
   EXPECT_EQ((v.words[0].bval >> 4) & 0xF, 0xFu);
 }
 
-// §6.7.3: the guaranteed time-zero call also occurs when a net has drivers
-// whose values do not change at time zero; the resolution function still runs
-// and is handed the present driver set.
 TEST(NettypeInitialization, ResolutionAtTimeZeroWithDriverPresent) {
   Arena arena;
   Net net = MakeNettypeNet(MakeVar(arena, 1));
@@ -205,7 +184,6 @@ TEST(NettypeInitialization, ResolutionAtTimeZeroWithDriverPresent) {
   EXPECT_EQ(ValOf(*net.resolved), kVal1);
 }
 
-// §6.7.3 + Table 6-7: a real data type defaults to a zero value, not x.
 TEST(NettypeInitialization, RealDataTypeDefaultIsZero) {
   Arena arena;
   auto* var = MakeVar(arena, 1);
@@ -218,17 +196,13 @@ TEST(NettypeInitialization, RealDataTypeDefaultIsZero) {
   EXPECT_EQ(ValOf(*var), kVal0);
 }
 
-// §6.7.3: a struct member initializer is applied at the member's own bit
-// offset; a lower member with no initializer is left at the default (x).
 TEST(NettypeInitialization, StructMemberInitAtNonZeroOffset) {
   Arena arena;
 
   std::vector<StructMemberInit> members(2);
-  // Low 4 bits: no initializer, expected to stay x.
   members[0].offset = 0;
   members[0].width = 4;
   members[0].has_initializer = false;
-  // High 4 bits: a member initialized to 0b0101 at offset 4.
   members[1].offset = 4;
   members[1].width = 4;
   members[1].has_initializer = true;
@@ -236,16 +210,12 @@ TEST(NettypeInitialization, StructMemberInitAtNonZeroOffset) {
 
   Logic4Vec v = InitialStructNetValue(arena, 8, members);
 
-  // Lower member untouched: all x = (aval=1, bval=1).
   EXPECT_EQ(v.words[0].aval & 0xF, 0xFu);
   EXPECT_EQ(v.words[0].bval & 0xF, 0xFu);
-  // Upper member: known value 0b0101 placed at offset 4.
   EXPECT_EQ((v.words[0].aval >> 4) & 0xF, 0x5u);
   EXPECT_EQ((v.words[0].bval >> 4) & 0xF, 0x0u);
 }
 
-// §6.7.3: when every struct member carries an initializer, the whole value is
-// known and no bits are left at the default x.
 TEST(NettypeInitialization, AllStructMembersInitialized) {
   Arena arena;
 
@@ -265,19 +235,13 @@ TEST(NettypeInitialization, AllStructMembersInitialized) {
   EXPECT_EQ(v.words[0].bval & 0xFF, 0x00u);
 }
 
-// §6.7.3 (+NOTE) end-to-end: a net of a user-defined nettype whose data type is
-// a 4-state logic takes that data type's default value at time zero, which is x
-// -- not the z that an ordinary net defaults to. The nettype net is declared
-// from real source (§6.7.2 syntax) with no driver and driven through the full
-// pipeline (parse, elaborate, lower, run); the value observed at time zero is
-// the one the production net-initialization code (InitNetDefaultValue) applies.
 TEST(NettypeInitialization, UndrivenLogicNettypeNetDefaultsToXNotZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
       "  nettype logic nt;\n"
-      "  nt n;\n"      // undriven net of a user-defined nettype
-      "  wire ord;\n"  // undriven ordinary net, for contrast
+      "  nt n;\n"
+      "  wire ord;\n"
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
@@ -290,17 +254,10 @@ TEST(NettypeInitialization, UndrivenLogicNettypeNetDefaultsToXNotZ) {
   ASSERT_NE(ordinary_net, nullptr);
   ASSERT_TRUE(nettype_net->is_user_nettype);
 
-  // §6.7.3 NOTE: the nettype net's logic data type defaults to x.
   EXPECT_EQ(ValOf(*nettype_net->resolved), kValX);
-  // §6.7.1: the ordinary net, in contrast, defaults to z until driven, so the
-  // divergent branch that gives the nettype net its data-type default is the
-  // one being exercised.
   EXPECT_EQ(ValOf(*ordinary_net->resolved), kValZ);
 }
 
-// §6.7.3 (+Table 6-7) end-to-end: the data-type default applies to every bit of
-// a multi-bit user-defined nettype net. A [7:0] logic nettype net declared from
-// real source and left undriven reads back as all-x at time zero.
 TEST(NettypeInitialization, UndrivenMultiBitLogicNettypeNetDefaultsToAllX) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -317,17 +274,10 @@ TEST(NettypeInitialization, UndrivenMultiBitLogicNettypeNetDefaultsToAllX) {
   ASSERT_NE(net, nullptr);
   ASSERT_TRUE(net->is_user_nettype);
 
-  // All eight bits are x = (aval=1, bval=1), matching the 4-state default.
   EXPECT_EQ(net->resolved->value.words[0].aval & 0xFF, 0xFFu);
   EXPECT_EQ(net->resolved->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// §6.7.3 end-to-end: the nettype net's initial (data-type default) value is in
-// place before any initial/always procedure begins. An initial block that
-// samples the undriven logic nettype net at time zero observes x -- and not z
-// -- which is only possible if the default was applied before the procedure
-// ran. Built from real source and driven through the full pipeline; the
-// captured result reflects what the production init code left on the net.
 TEST(NettypeInitialization, InitialValueVisibleToProcedureAtTimeZero) {
   SimFixture f;
   auto* res = RunAndFindVar(
@@ -339,8 +289,6 @@ TEST(NettypeInitialization, InitialValueVisibleToProcedureAtTimeZero) {
       "endmodule\n",
       f, "res");
   ASSERT_NE(res, nullptr);
-  // res[1] = (n===x) is 1, res[0] = (n===z) is 0 -> 2'b10: the net held its
-  // data-type default x when the initial block executed.
   EXPECT_EQ(res->value.words[0].aval & 0x3, 0x2u);
   EXPECT_EQ(res->value.words[0].bval & 0x3, 0x0u);
 }

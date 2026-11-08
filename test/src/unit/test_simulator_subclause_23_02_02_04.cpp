@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -42,13 +41,6 @@ TEST(DefaultPortValueSimulation, ExplicitConnectionOverridesDefault) {
 }
 
 TEST(DefaultPortValueSimulation, OrderedOmissionUsesDefault) {
-  // §23.2.2.4: the general rule is that an input port with a default may be
-  // omitted from the instantiation and the compiler inserts the default -- the
-  // subclause's own worked example uses positional (ordered) instances with a
-  // trailing input left off. The named-connection form is covered separately;
-  // this exercises the ordered form. Here datain is the trailing port and is
-  // omitted, so the child observes the declared default 8'hA5 and drives it
-  // out.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(output logic [7:0] dataout,\n"
@@ -65,12 +57,6 @@ TEST(DefaultPortValueSimulation, OrderedOmissionUsesDefault) {
 }
 
 TEST(DefaultPortValueSimulation, DefaultFromLocalparamConstant) {
-  // §23.2.2.4: a port default is a constant expression evaluated in the
-  // defining module's scope. A literal and a compilation-unit parameter are
-  // covered elsewhere; this covers the localparam form, which reaches the value
-  // through a different declaration/resolution path (a localparam declared in
-  // the child's own parameter port list). The default references W, so omitting
-  // datain must drive W's value 8'h3C.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child #(localparam logic [7:0] W = 8'h3C) (\n"
@@ -107,10 +93,6 @@ TEST(DefaultPortValueSimulation, DefaultEvaluatedInDefiningModuleScope) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFu);
 }
 
-// §23.2.2.4 with §6.12: a real port's default is a constant expression of
-// the module declaring the port, folded as a real, so a real parameter of that
-// module scaled by a real keeps its fraction, and an integer parameter plus a
-// real fraction does too.
 TEST(DefaultPortValueSimulation, RealDefaultReadsTheDefiningModulesParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub #(parameter real R = 2.5, parameter int K = "
@@ -126,9 +108,6 @@ TEST(DefaultPortValueSimulation, RealDefaultReadsTheDefiningModulesParameter) {
             "5.000000 3.250000\n");
 }
 
-// §23.2.2.4 with §11.6.1: a default wider than 64 bits keeps every bit, one
-// written as an expression of literals, one reading a parameter of the module
-// declaring the port, and a signed one whose sign extends through them all.
 TEST(DefaultPortValueSimulation, DefaultWiderThan64BitsKeepsEveryBit) {
   SimFixture f;
   EXPECT_EQ(RunCapture(

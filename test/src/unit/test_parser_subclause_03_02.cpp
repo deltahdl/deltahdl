@@ -7,16 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §3.2 decides what AppendCellDeclarations moves, because §33.2.1 makes a
-// library a named set of cells and a cell a design element in §3.2's sense.
-// §3.2 names seven: a module (Clause 23), program (Clause 24), interface
-// (Clause 25), checker (Clause 17), package (Clause 26), primitive (Clause 28)
-// or configuration (Clause 33).
-//
-// All seven are declared in one source here rather than one kind per case, so a
-// merge that drops a kind is caught whichever kind it drops. The checker is the
-// one it dropped when this was written, and it is the one §33.2.1's own list of
-// examples omits.
 TEST(AppendCellDeclarations, EveryDesignElementKindReachesTheTarget) {
   auto src = Parse(
       "module m;\n"
@@ -54,9 +44,6 @@ TEST(AppendCellDeclarations, EveryDesignElementKindReachesTheTarget) {
   EXPECT_EQ(target.configs.size(), 1u);
 }
 
-// The name as well as the count, for the one kind §33.2.1's examples leave out.
-// A count of 1 is reached by a merge that appended a null as readily as by one
-// that carried the declaration, and only the name separates them.
 TEST(AppendCellDeclarations, CheckerReachesTheTargetUnderItsOwnName) {
   auto src = Parse(
       "checker chk;\n"
@@ -73,17 +60,6 @@ TEST(AppendCellDeclarations, CheckerReachesTheTargetUnderItsOwnName) {
   EXPECT_EQ(target.checkers[0]->name, "chk");
 }
 
-// The boundary the two cases above need. §3.12.1 puts items defined in the
-// compilation-unit scope out of reach by name from outside the compilation
-// unit, so what a source declares outside every design element stays with the
-// unit that parsed it.
-//
-// Without this, widening the merge to every list CompilationUnit holds would
-// satisfy the two cases above while carrying a compilation-unit class and
-// typedef across a boundary §3.12.1 closes. The two assertions on `src.cu`
-// are what make the emptiness of the target mean something: they show the
-// source declared both, so an empty target is a merge that left them rather
-// than a source that never had them.
 TEST(AppendCellDeclarations, CompilationUnitScopeDeclarationsStayBehind) {
   auto src = Parse(
       "typedef int cu_t;\n"
@@ -104,11 +80,6 @@ TEST(AppendCellDeclarations, CompilationUnitScopeDeclarationsStayBehind) {
   EXPECT_TRUE(target.cu_items.empty());
 }
 
-// A run reaches this function once per source description, so what an earlier
-// description contributed has to survive the next call. A merge that assigned
-// rather than appended would leave the unit holding only the last description's
-// cells, and every case above would still pass because each merges into a
-// target that starts empty.
 TEST(AppendCellDeclarations, TargetKeepsWhatItAlreadyHeld) {
   auto first = Parse(
       "module one;\n"

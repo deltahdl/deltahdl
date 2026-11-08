@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -20,7 +18,6 @@ TEST(MosSwitchParsing, TooFewTerminals) {
       "module m;\n"
       "  nmos n1(out, data);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.7 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -30,7 +27,6 @@ TEST(MosSwitchParsing, TooManyTerminals) {
       "module m;\n"
       "  pmos p1(out, data, ctrl, extra);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.7 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -119,8 +115,6 @@ TEST(MosSwitchParsing, TooManyDelaysRejected) {
       "module m;\n"
       "  nmos #(1, 2, 3, 4) n1(o, i, g);\n"
       "endmodule\n");
-  // The delay list closes after three values, and §28.16 is the subclause the
-  // parser files that demand for ')' under; §28.7 has no report of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 

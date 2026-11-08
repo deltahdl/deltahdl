@@ -8,8 +8,6 @@
 
 using namespace delta;
 
-// Parse a module whose first initial statement is `void'(foo())`, then verify
-// the parsed expression is a void cast wrapping a call to `foo`.
 inline void VerifyVoidCastFunctionCall() {
   auto r = Parse(
       "module m;\n"

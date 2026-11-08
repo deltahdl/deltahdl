@@ -18,8 +18,6 @@ using namespace delta;
 
 namespace {
 
-// An integer literal carrying an x bit. The queue operators treat any index
-// whose value has x or z bits as invalid, so this drives those paths.
 Expr* MakeXLiteral(Arena& arena) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -27,7 +25,6 @@ Expr* MakeXLiteral(Arena& arena) {
   return e;
 }
 
-// Builds a queue slice expression q[lo:hi].
 Expr* MakeQueueSlice(Arena& arena, std::string_view base, Expr* lo, Expr* hi) {
   auto* slice = arena.Create<Expr>();
   slice->kind = ExprKind::kSelect;
@@ -37,7 +34,6 @@ Expr* MakeQueueSlice(Arena& arena, std::string_view base, Expr* lo, Expr* hi) {
   return slice;
 }
 
-// Assigns {expr} into the queue named dst and applies the write.
 void AssignSliceToDst(SimFixture& f, std::string_view dst, Expr* expr) {
   auto* rhs = f.arena.Create<Expr>();
   rhs->kind = ExprKind::kConcatenation;
@@ -224,7 +220,6 @@ TEST(QueueOps, SliceFullRangeCopiesAll) {
   EXPECT_EQ(dst->elements[2].ToUint64(), 30u);
 }
 
-// A slice bound that is a 4-state value containing x/z yields the empty queue.
 TEST(QueueOps, SliceXZBoundYieldsEmpty) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -238,15 +233,6 @@ TEST(QueueOps, SliceXZBoundYieldsEmpty) {
   EXPECT_EQ(dst->elements.size(), 0u);
 }
 
-// §7.10.1: Q[a:b] with a < 0 selects what Q[0:b] does -- the low bound clamps
-// up to 0.
-//
-// The low bound is built as the negation of 1 rather than as the bit pattern
-// 0xFFFFFFFF, because the two are not the same number. §5.7.1 sizes an unsized
-// signed literal to the smallest width that keeps its sign bit clear, so
-// 4294967295 carries 33 bits and is positive; a slice whose low bound exceeds
-// its high bound is empty, which is a different rule from this one. Negating a
-// 32-bit 1 yields an actual -1.
 TEST(QueueOps, SliceNegativeLowSameAsZero) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -264,7 +250,6 @@ TEST(QueueOps, SliceNegativeLowSameAsZero) {
   EXPECT_EQ(dst->elements[2].ToUint64(), 30u);
 }
 
-// q[n:n] with n outside the queue's range (here n > $) yields the empty queue.
 TEST(QueueOps, SliceSingleOutOfRangeYieldsEmpty) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20, 30});
@@ -278,7 +263,6 @@ TEST(QueueOps, SliceSingleOutOfRangeYieldsEmpty) {
   EXPECT_EQ(dst->elements.size(), 0u);
 }
 
-// Writing to q[$+1] is legal: on an unbounded queue it grows by one element.
 TEST(QueueOps, IndexedWriteDollarPlusOneGrowsQueue) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
@@ -290,8 +274,6 @@ TEST(QueueOps, IndexedWriteDollarPlusOneGrowsQueue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 99u);
 }
 
-// An indexed write whose index is a 4-state value with x/z is ignored and a
-// run-time warning is issued.
 TEST(QueueOps, IndexedWriteXZIndexIgnored) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
@@ -306,17 +288,10 @@ TEST(QueueOps, IndexedWriteXZIndexIgnored) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-// A negative index lies outside 0...$+1, so the indexed write through it is
-// ignored and a run-time warning is issued (the low-end counterpart of the
-// out-of-bounds-high case).
 TEST(QueueOps, NegativeIndexWriteIgnored) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});
   auto before = f.diag.WarningCount();
-  // Negating 1 rather than writing 0xFFFFFFFF, for the reason given above
-  // SliceNegativeLowSameAsZero: the bit pattern is a positive 33-bit number,
-  // which is invalid for lying above $ instead of below 0 and so would reach
-  // this outcome through the other half of the rule.
   auto* lhs = f.arena.Create<Expr>();
   lhs->kind = ExprKind::kSelect;
   lhs->base = MakeId(f.arena, "q");
@@ -329,8 +304,6 @@ TEST(QueueOps, NegativeIndexWriteIgnored) {
   EXPECT_EQ(q->elements[1].ToUint64(), 20u);
 }
 
-// A read through an index that is a 4-state value with x/z is invalid and
-// returns the value for a nonexistent element (x for a 4-state element type).
 TEST(QueueOps, XZIndexReadReturnsX) {
   SimFixture f;
   MakeQueue(f, "q", {10, 20});
@@ -340,12 +313,6 @@ TEST(QueueOps, XZIndexReadReturnsX) {
   EXPECT_FALSE(result.IsKnown());
 }
 
-// §7.10.1: an invalid queue index causes the read to return the value
-// appropriate for a nonexistent element of the queue's element type, as
-// specified by Table 7-1 in §7.4.5. For a 2-state element type (int) that value
-// is a known '0, not x. The queue and its element type are built from real
-// source so the 2-state-ness that selects the Table 7-1 row is produced by the
-// declaration rather than hand-set.
 TEST(QueueOps, OutOfBoundsReadOfTwoStateQueueYieldsZero) {
   SimFixture f;
   auto* res = RunAndFindVar(
@@ -360,10 +327,6 @@ TEST(QueueOps, OutOfBoundsReadOfTwoStateQueueYieldsZero) {
   EXPECT_EQ(res->value.ToUint64(), 0u);
 }
 
-// The 4-state counterpart: an out-of-bounds read of a 4-state (logic) queue
-// yields x, the Table 7-1 value for a 4-state element type. Same source-built
-// setup as the 2-state case; only the declared element type differs, so the
-// difference in result must come from the queue's element-type state-ness.
 TEST(QueueOps, OutOfBoundsReadOfFourStateQueueYieldsX) {
   SimFixture f;
   auto* res = RunAndFindVar(
@@ -377,10 +340,6 @@ TEST(QueueOps, OutOfBoundsReadOfFourStateQueueYieldsX) {
   EXPECT_FALSE(res->value.IsKnown());
 }
 
-// An index expression carrying x/z bits is an invalid index just as an
-// out-of-bounds position is; on a 2-state queue the read still yields the
-// Table 7-1 value '0. Driven from source: the x index is produced by assigning
-// an x literal to a variable used to index the queue.
 TEST(QueueOps, UnknownIndexReadOfTwoStateQueueYieldsZero) {
   SimFixture f;
   auto* res = RunAndFindVar(
@@ -399,13 +358,6 @@ TEST(QueueOps, UnknownIndexReadOfTwoStateQueueYieldsZero) {
   EXPECT_EQ(res->value.ToUint64(), 0u);
 }
 
-// §7.10.1: in a queue slice q[a:b], the bounds may be arbitrary integral
-// expressions and are NOT required to be constant — the distinguishing
-// relaxation of queues versus the fixed-size array slice/part-select of §7.4.5,
-// whose size must be constant. The slice bounds here are runtime variables
-// assigned at simulation time, and the whole flow (declare, initialize, slice,
-// observe) is driven from source so the non-constant-ness of the bounds is
-// genuinely produced rather than asserted.
 TEST(QueueOps, SliceBoundsMayBeRuntimeVariables) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -431,11 +383,6 @@ TEST(QueueOps, SliceBoundsMayBeRuntimeVariables) {
   EXPECT_EQ(dst->elements[2].ToUint64(), 40u);
 }
 
-// §7.10.1: a queue declared with a right bound (a bounded queue) shall be
-// limited so its size does not exceed N+1. Built from real source: the bound is
-// produced by the `[$:2]` declaration (N=2, so at most 3 elements), and an
-// assignment of five values through the full pipeline is truncated to the
-// limit.
 TEST(QueueOps, BoundedQueueFromSourceLimitsSize) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -452,9 +399,6 @@ TEST(QueueOps, BoundedQueueFromSourceLimitsSize) {
   EXPECT_EQ(q->elements.size(), 3u);
 }
 
-// End-to-end via the §10.9 dependency: a queue value may be written using an
-// assignment pattern. The queue is initialized from `'{...}` in real source and
-// the resulting elements are read back through indexed reads.
 TEST(QueueOps, QueueInitializedByAssignmentPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -479,9 +423,6 @@ TEST(QueueOps, QueueInitializedByAssignmentPattern) {
   EXPECT_EQ(f.ctx.FindVariable("c")->value.ToUint64(), 33u);
 }
 
-// End-to-end via the §10.10 dependency: a queue value may be written using an
-// unpacked array concatenation. Assigning `{...}` in real source grows the
-// queue to hold the concatenated elements, which are then observed directly.
 TEST(QueueOps, QueueValueFromUnpackedArrayConcat) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -501,8 +442,6 @@ TEST(QueueOps, QueueValueFromUnpackedArrayConcat) {
   EXPECT_EQ(q->elements[2].ToUint64(), 66u);
 }
 
-// §7.10.1: an index carrying x or z is invalid, so the write through it is
-// ignored and a run-time warning is issued. That warning names §7.10.1.
 TEST(QueueOps, XZIndexWriteWarningNames7_10_1) {
   SimFixture f;
   MakeQueue(f, "q", {31, 32});
@@ -514,8 +453,6 @@ TEST(QueueOps, XZIndexWriteWarningNames7_10_1) {
                               "queue write index contains x/z", 0, "7.10.1"));
 }
 
-// §7.10.1: a value outside 0...$+1 is invalid for the same reason, and the
-// report it raises names the same subclause.
 TEST(QueueOps, OutOfBoundsWriteWarningNames7_10_1) {
   SimFixture f;
   MakeQueue(f, "q", {51, 52});
@@ -529,12 +466,6 @@ TEST(QueueOps, OutOfBoundsWriteWarningNames7_10_1) {
                               "queue write index out of bounds", 0, "7.10.1"));
 }
 
-// §7.10: a queue is declared by writing the queue dimension `[$]`, and the
-// subclause puts no scope on that: a declaration inside a procedural block
-// declares a queue exactly as one among a module's items does. So the queue
-// methods of §7.10.2 operate on the elements the pushes left, and `q.size()`
-// reads back the two of them rather than answering for a scalar variable that
-// never held any.
 TEST(QueueOps, QueueDeclaredInProceduralBlockIsAQueue) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -552,13 +483,6 @@ TEST(QueueOps, QueueDeclaredInProceduralBlockIsAQueue) {
   EXPECT_EQ(n->value.ToUint64(), 2u);
 }
 
-// §10.7 (printed page 258) with §7.10.1: the element push_back, push_front
-// and insert put into a queue takes the element's width, so on a `logic
-// signed [3:0]` queue 12, 300 and 4'sd7 are held as the 4-bit -4, -4 and 7,
-// and $bits of one reads 4. The three stored the value as it arrived, the
-// 32-bit 12 among them, the same store the indexed write made (the §7.5
-// case ElementWriteTakesTheElementWidth). n reads 4, and s the three
-// elements' sum, -1.
 TEST(QueueOps, PushedElementsTakeTheElementWidth) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -581,13 +505,6 @@ TEST(QueueOps, PushedElementsTakeTheElementWidth) {
   EXPECT_EQ(static_cast<int32_t>(s->value.ToUint64()), -1);
 }
 
-// §7.10 (printed page 169): `$` in a queue's index stands for the queue's last
-// index, so `q[$] = 9` overwrites the last element, and §7.10.1 (printed page
-// 170) makes the write to `q[$+1]` legal, so `q[$+1] = 4` appends. The
-// statements run whole here, through the store that evaluates the target's
-// index once for every writer (§10.4.1): `$` has a value only while the queue
-// writer binds it, so an index naming it is left for that writer to evaluate,
-// where evaluating it ahead of the writer read an unbound `$`.
 TEST(QueueOps, DollarIndexedStatementsWriteLastAndAppend) {
   SimFixture f;
   auto out = RunCapture(

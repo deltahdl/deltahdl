@@ -41,13 +41,6 @@ TEST(StringLiteralPaddingSim, PaddingAffectsConcatComparison) {
 }
 
 TEST(StringLiteralPaddingSim, PaddingZerosMatchExplicitNulsInConcat) {
-  // Positive twin of the LRM's failing example. Using the same 8*10-wide s1/s2,
-  // the padded concatenation compares equal to a reconstruction that supplies
-  // the padding zeros explicitly (40'd0 ahead of "Hello", 24'd0 ahead of
-  // " world!"). The comparison and concatenation operators must not tell the
-  // left-pad zeros apart from those explicit NUL bytes, so the result is true
-  // -- the earlier comparison against "Hello world!" fails only because that
-  // literal lacks the interior zeros, not because padding is treated specially.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -87,9 +80,6 @@ TEST(StringLiteralPaddingSim, ExactWidthNoPadding) {
 }
 
 TEST(StringLiteralPaddingSim, LeadingNulStringCharsMatchPadding) {
-  // A string literal whose high-order characters are explicit NUL escapes packs
-  // the same bits as a shorter literal that the assignment left-pads with
-  // zeros. Equality must not tell the two sources of zero bytes apart.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -172,10 +162,6 @@ TEST(StringLiteralPaddingSim, PaddedStringSelfCompare) {
 }
 
 TEST(StringLiteralPaddingSim, FourStateVectorPaddingMatchesNul) {
-  // The rule admits 4-state operands too: a logic vector left-padded on a
-  // string assignment holds known zero bits, and equality (running the 4-state
-  // compare path) must not tell those padding zeros apart from explicit NUL
-  // characters.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -193,9 +179,6 @@ TEST(StringLiteralPaddingSim, FourStateVectorPaddingMatchesNul) {
 }
 
 TEST(StringLiteralPaddingSim, FourStateConcatPreservesPaddingZeros) {
-  // Concatenation over 4-state (logic) operands carries the interior padding
-  // zeros through unchanged, just as the 2-state path does -- the operator does
-  // not strip or specially treat the zeros produced by the string assignment.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"

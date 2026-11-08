@@ -42,12 +42,6 @@ TEST(TimescaleSimulation, LaterTimescaleOverrideSimulates) {
   EXPECT_EQ(result, 99u);
 }
 
-// §22.7 (printed page 716): `timescale sets the time unit and time precision of
-// the design elements after it, and the time unit is what time values, the
-// simulation time and delays among them, are measured in. A module under
-// `timescale 1us / 1ns reports that scale to $printtimescale, and its #1 is a
-// microsecond, which its own $time reads as 1. Every module reported 1ns / 1ns
-// whatever the directive said.
 TEST(TimescaleSimulation, DirectiveGivesTheModuleAfterItItsUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us / 1ns\n"
@@ -61,10 +55,6 @@ TEST(TimescaleSimulation, DirectiveGivesTheModuleAfterItItsUnit) {
             "Time scale of (t) is 1us / 1ns\n1\n");
 }
 
-// §3.14.2.3 (printed page 60): a module declaring no timeunit takes the units
-// of the most recent `timescale directive, so two directives before two modules
-// give each its own, and each module's $printtimescale with no argument reports
-// its own scope's.
 TEST(TimescaleSimulation, EachModuleTakesTheDirectiveBeforeIt) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us / 1ns\n"
@@ -81,11 +71,6 @@ TEST(TimescaleSimulation, EachModuleTakesTheDirectiveBeforeIt) {
             "Time scale of (t) is 1ns / 1ps\n");
 }
 
-// §22.7: a delay counts the unit of the module it is written in, and $time
-// reads the time in the unit of the module calling it. a's #10 is 10 ns, b's #2
-// is 2 us, and a's function called 10 us in reads 10000 of a's nanoseconds. The
-// two modules ran in one unit, so b's #2 fired before a's #10 and the last
-// line read 10.
 TEST(TimescaleSimulation, DelaysAndTimeReadEachModulesOwnUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(
@@ -108,11 +93,6 @@ TEST(TimescaleSimulation, DelaysAndTimeReadEachModulesOwnUnit) {
             "a 10\nb 2\na 10000\n");
 }
 
-// §3.14.2.3 (printed page 60): only a timeunit declaration, never a `timescale
-// directive, sets the compilation-unit scope's time unit, so a task of a class
-// the compilation unit declares waits its #5 in that scope's unit, the 1 ns
-// default, whichever module calls it: 0.005 of the calling module's
-// microseconds. The task waited 5 of the caller's units.
 TEST(TimescaleSimulation, CompilationUnitClassTaskWaitsInTheUnitsUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ns\n"
@@ -131,11 +111,6 @@ TEST(TimescaleSimulation, CompilationUnitClassTaskWaitsInTheUnitsUnit) {
             "0.005\n");
 }
 
-// §22.7: a gate's, a continuous assignment's and a nonblocking assignment's
-// delays, and a trireg's charge decay time, are delay values like a delay
-// control's, so under `timescale 1ns / 1ps a #3 is 3 ns and a #2.5 is 2.5 ns,
-// kept to the picosecond precision (§3.14.1). Each was taken as that many
-// ticks of the 1 ps precision, and a real one as its bit pattern.
 TEST(TimescaleSimulation, StructuralAndNonblockingDelaysCountTheUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(
@@ -166,9 +141,6 @@ TEST(TimescaleSimulation, StructuralAndNonblockingDelaysCountTheUnit) {
             "n=1 11.5\nz=1 12.5\ny=1 13\nc=x 16\n");
 }
 
-// §22.7: a gate in a module under `timescale 1us / 1ns delays by its own unit
-// when instantiated from a module under 1ns / 1ns, so its #2 is 2000 of the
-// instantiating module's nanoseconds.
 TEST(TimescaleSimulation, GateDelayCountsItsOwnModulesUnit) {
   SimFixture f;
   EXPECT_EQ(
@@ -189,11 +161,6 @@ TEST(TimescaleSimulation, GateDelayCountsItsOwnModulesUnit) {
       "y=1 2000\n");
 }
 
-// §22.7 (printed page 717): under `timescale 1 ns / 1 ps delays are rounded to
-// reals of three decimal places, the precision and not the unit deciding, so
-// under 1ns / 100ps a #1.46 is 1.5 ns: $realtime reads 1.50 and $time, an
-// integer (§20.3.1), 2. The delay was rounded to the whole unit and both read
-// 1.
 TEST(TimescaleSimulation, RealDelayRoundsToThePrecision) {
   SimFixture f;
   EXPECT_EQ(
@@ -209,12 +176,6 @@ TEST(TimescaleSimulation, RealDelayRoundsToThePrecision) {
       "1.50 2\nTime scale of (t) is 1ns / 100ps\n");
 }
 
-// §22.7 (printed page 717), the clause's own module: under `timescale 10 ns /
-// 1 ns, parameter d's 1.55 rounds to 1.6 by the time precision, so
-// `#d set = 0;` assigns at 16 ns and `#d set = 1;` at 32 ns, $realtime reading
-// 1.6 and 3.2 of the 10 ns unit. Neither assignment waited at all, and a real
-// literal, a real parameter and a real variable written as delay controls each
-// rounded to the whole unit.
 TEST(TimescaleSimulation, ClauseExampleRealParameterDelaysAssignments) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 10 ns / 1 ns\n"
@@ -252,10 +213,6 @@ TEST(TimescaleSimulation, ClauseExampleRealParameterDelaysAssignments) {
       "int 10.00\n");
 }
 
-// §22.7 with §3.2 and §3.14.2.3: the `timescale before a package is the
-// package's, so a task of a class the package declares reads its #3 in the
-// package's nanoseconds, 3000 of the module's picoseconds. It was read in the
-// calling module's unit, 3.
 TEST(TimescaleSimulation, APackageClassTaskRunsInThePackagesUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1ns / 1ns\n"

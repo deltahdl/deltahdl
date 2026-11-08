@@ -231,9 +231,6 @@ TEST(AggregateExprSim, ArrayPassedToFunction) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §11.2.2 with §7.5: unpacked structures compare member by member, a dynamic
-// array member by the elements it holds, however each structure came to hold
-// them; one differing element, or one more, makes them unequal.
 TEST(AggregateEqualityRun, StructuresCompareADynamicMemberByItsElements) {
   SimFixture f;
   std::string out = RunCapture(
@@ -253,9 +250,6 @@ TEST(AggregateEqualityRun, StructuresCompareADynamicMemberByItsElements) {
   EXPECT_EQ(out, "1 0 0\n0 1\n");
 }
 
-// §11.2.2 with §11.4.5: the case equality operators compare the dynamic
-// member by its elements too, and so does a comparison of two class
-// properties holding the structure.
 TEST(AggregateEqualityRun, CaseEqualityAndPropertiesCompareTheElements) {
   SimFixture f;
   std::string out = RunCapture(
@@ -276,9 +270,6 @@ TEST(AggregateEqualityRun, CaseEqualityAndPropertiesCompareTheElements) {
   EXPECT_EQ(out, "1 0 1\n");
 }
 
-// §11.2.2 with §11.4.5: a dynamic member of a nested structure is compared by
-// its elements too, and a member holding an unknown bit makes == answer x
-// where === still compares it as it stands.
 TEST(AggregateEqualityRun, NestedDynamicMembersAndUnknownBitsCompare) {
   SimFixture f;
   std::string out = RunCapture(

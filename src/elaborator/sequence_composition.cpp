@@ -16,8 +16,6 @@ bool IsSequenceCompositionMethodValid(SequenceCompositionMethod method) {
 bool NamedSequenceReferenceMatchesFromReferenceTick() { return true; }
 
 bool TriggeredEndPointOperandLegal(SequenceMethodOperandKind kind) {
-  // §16.9.11 admits exactly the operand kinds defined for the sequence methods
-  // in §16.13.6.
   return IsSequenceMethodOperandLegal(kind);
 }
 

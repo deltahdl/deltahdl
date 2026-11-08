@@ -27,16 +27,9 @@ namespace delta {
 
 using SequenceDeclMap = std::unordered_map<std::string_view, const ModuleItem*>;
 
-// §16.8: an instance of a named sequence shall provide an actual argument for
-// each formal argument that does not have a default actual argument declared.
-// This checks the positional-binding form of an instance used in an event
-// control; named or partially-omitted binding is left to the general
-// argument-binding machinery.
 static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
                                         const ModuleItem* decl,
                                         DiagEngine& diag) {
-  // Only the purely-positional, fully-supplied form is validated here: a named
-  // binding populates arg_names, and an omitted actual leaves a null arg.
   if (!call->arg_names.empty()) return;
   for (const auto* a : call->args) {
     if (!a) return;
@@ -62,13 +55,6 @@ static void CheckSequenceActualArgCount(Stmt* s, const Expr* call,
   }
 }
 
-// Mark a single event-control event that names a known sequence, flag the
-// §9.4.2.4 automatic-variable argument restriction, and enforce the §16.8
-// actual-argument count rule (`s` supplies the location).
-// §16.13: what a sequence used as an event is resolved against -- the named
-// sequences visible in the scope, their declarations (for the actual-argument
-// count check), the automatic variables the event control's scope declares,
-// and where a violation is reported.
 struct SequenceEventCtx {
   const std::unordered_set<std::string_view>& seq_names;
   const SequenceDeclMap& seq_decls;
@@ -111,25 +97,10 @@ static void WalkStmtsForSequenceEvents(Stmt* s, const SequenceEventCtx& ctx) {
   if (s->kind == StmtKind::kEventControl) {
     for (auto& ev : s->events) MarkSequenceEvent(s, ev, ctx);
   }
-  // §9.4.2.4 requires the arguments of a sequence used as an event control to
-  // be static, and §16.8 requires an actual for every formal that has no
-  // default. Neither names a statement the requirement is lifted in, so this
-  // descends every link ForEachChildStmt in elaborator_validate_internal.h
-  // names. It wrote out six of the thirteen, so an `@(s(a, b))` standing in a
-  // fork arm, a randcase arm, an assertion action block or a randsequence code
-  // block was neither marked a sequence event nor argument-counted.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtsForSequenceEvents(sub, ctx); });
 }
 
-// §6.21: adds to `out` the variables `s` and the statements inside it declare
-// with an automatic lifetime: each declared `automatic`, and, where
-// `automatic_by_default` (the body of an automatic task or function), each not
-// declared `static`. §9.4.2.4 bars an automatic variable as an argument of a
-// sequence used in an event control, and §16.4 as the actual for a
-// pass-by-reference formal of a deferred-assertion action call; neither puts a
-// condition on the statement the variable is declared under, so this descends
-// every link ForEachChildStmt in elaborator_validate_internal.h names.
 static void CollectAutomaticVarNames(
     const Stmt* s, bool automatic_by_default,
     std::unordered_set<std::string_view>& out) {
@@ -143,10 +114,6 @@ static void CollectAutomaticVarNames(
   });
 }
 
-// The automatic-variable names in scope for one module item, so a deferred
-// action call passing one of them by reference (§16.4), or a sequence event
-// written with one as an argument (§9.4.2.4), can be rejected. An automatic
-// task or function makes its formals and its non-static locals automatic.
 std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
     const ModuleItem* item) {
   bool routine_is_automatic = (item->kind == ModuleItemKind::kTaskDecl ||
@@ -163,13 +130,6 @@ std::unordered_set<std::string_view> CollectItemAutomaticVarNames(
   return auto_vars;
 }
 
-// Walk one module item's statements for sequence-event arguments. A process
-// block's statements live in item->body; a task body's statements live in
-// func_body_stmts (item->body is the module-process body form), so both are
-// walked for a task. §9.4.2.4: an argument to a sequence used in an event
-// control shall be static, so one referring to an automatic variable is an
-// error: a variable declared `automatic` anywhere, and in an automatic task its
-// formals and the locals not declared `static`.
 static void WalkItemForSequenceEvents(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& seq_names,
@@ -187,9 +147,6 @@ static void WalkItemForSequenceEvents(
   for (Stmt* s : bodies) WalkStmtsForSequenceEvents(s, kCtx);
 }
 
-// §16.5.2 with §9.4.2.4: a sequence named as a concurrent assertion's clocking
-// event clocks the assertion at its end points, as it wakes an event control,
-// so an event of `clock` naming a sequence of the scope is marked one.
 static void MarkSequenceClockEvents(
     std::vector<EventExpr>& clock,
     const std::unordered_set<std::string_view>& seq_names) {
@@ -203,7 +160,6 @@ static void MarkSequenceClockEvents(
 
 void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
                                            RtlirModule* mod) {
-  // The rules of Clause 16 no single item's elaboration checks.
   ValidateAssertionRules(decl, property_registry_, diag_);
   const ScopeMap kParams = BuildParamScope(mod);
   ValidateAssertionExprRules(ModuleInUnit{*decl, *unit_}, mod, kParams,
@@ -216,9 +172,6 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   ValidateCheckerInterfaceFormals(decl, unit_, kShapeTables, diag_);
   ValidateCheckerEnclosingRefs(decl, kShapeTables, func_decls_, diag_);
   if (sequence_names_.empty()) return;
-  // §16.8 actual-argument checks need each named sequence's formals, so map the
-  // sequences declared in this scope by name. A sequence instantiated across a
-  // scope boundary is absent here, and its count check is simply skipped.
   SequenceDeclMap seq_decls;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kSequenceDecl) {
@@ -228,8 +181,6 @@ void Elaborator::ValidateSequenceEventArgs(const ModuleDecl* decl,
   for (const auto* item : decl->items) {
     WalkItemForSequenceEvents(item, sequence_names_, seq_decls, diag_);
   }
-  // The processes hold their own copies of the clocks, made as the items were
-  // elaborated, which a sequence declared after its assertion follows.
   for (RtlirProcess& proc : mod->processes) {
     MarkSequenceClockEvents(proc.sensitivity, sequence_names_);
     if (proc.is_concurrent_clocked) {
@@ -263,18 +214,6 @@ static bool ContainsPostponedIllegalStmt(const Stmt* s) {
     default:
       break;
   }
-  // §16.4 refuses a final deferred assertion whose callee body holds a
-  // statement the Postponed region cannot run, and it names no statement
-  // position the restriction is suspended in, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
-  // of the thirteen, so an assignment or a timing control written in a fork
-  // arm, a for header, an assertion action block, a randcase arm or a
-  // randsequence code block left the callee looking legal in the Postponed
-  // region.
-  //
-  // ForEachChildStmt gives the visitor no way to stop, so the first offending
-  // statement is kept in `found` and the recursion runs only while `found` is
-  // false.
   bool found = false;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     if (found) return;
@@ -312,10 +251,6 @@ static void CheckFinalDeferredCallee(const Stmt* action,
   }
 }
 
-// §16.4: neither a dynamic variable (e.g. a class property, reached through a
-// member access) nor an automatic variable may be the actual for a
-// pass-by-reference formal of a deferred-assertion action call -- the storage
-// of either may no longer exist when the deferred action runs.
 static void CheckDeferredRefActual(
     const Expr* a, const FunctionArg& formal,
     const std::unordered_set<std::string_view>& auto_vars, DiagEngine& diag) {
@@ -328,8 +263,6 @@ static void CheckDeferredRefActual(
                Subclause("16.4"));
     return;
   }
-  // A bare identifier naming an automatic variable in scope -- a formal or
-  // local of the enclosing automatic subroutine -- is the automatic case.
   if (a->kind == ExprKind::kIdentifier &&
       auto_vars.find(a->text) != auto_vars.end()) {
     diag.Error(a->range.start,
@@ -365,14 +298,6 @@ static void CheckDeferredActionStmt(
       s->kind != StmtKind::kCoverImmediate) {
     return;
   }
-  // §16.4: a deferred assertion's pass and fail statements, where present, are
-  // each a single subroutine call. §1.5 defines shall as a mandatory
-  // requirement admitting no deviation, so an action block of any other shape
-  // is not legal source. It is reported as an error rather than a warning
-  // because there is no behaviour left to fall back on: §16.4.1 defers a report
-  // by remembering the subroutine call involved and executing it in a later
-  // region, and a statement that is not a call gives that machinery nothing to
-  // remember.
   if (s->assert_pass_stmt && !IsSingleSubroutineCall(s->assert_pass_stmt)) {
     diag.Error(s->assert_pass_stmt->range.start,
                "deferred assertion pass action shall be a single "
@@ -399,15 +324,6 @@ void Elaborator::WalkStmtsForDeferredActions(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars) {
   if (!s) return;
   CheckDeferredActionStmt(s, deferred_subroutine_map_, auto_vars, diag_);
-  // §16.4 states the shape a deferred assertion's action block takes and the
-  // actuals its subroutine call may pass, and it names no statement position
-  // either rule is lifted in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names. It wrote out eight of the thirteen,
-  // so a deferred assertion written in a fork arm, under a randcase arm or in a
-  // randsequence code block was checked for neither. A.6.8 admits no statement
-  // in a for header, so a deferred assertion cannot stand in for_inits or in
-  // for_steps; both are descended all the same because this walk names no link
-  // itself.
   ForEachChildStmt(s, [this, &auto_vars](Stmt* const& sub) {
     WalkStmtsForDeferredActions(sub, auto_vars);
   });
@@ -422,8 +338,6 @@ void Elaborator::ValidateDeferredAssertionActions(const ModuleDecl* decl) {
     }
   }
   for (const auto* item : decl->items) {
-    // A task or function keeps its body in func_body_stmts; procedural blocks
-    // (initial/always) keep theirs in body. Validate whichever this item uses.
     if (!item->body && item->func_body_stmts.empty()) continue;
     std::unordered_set<std::string_view> auto_vars =
         CollectItemAutomaticVarNames(item);

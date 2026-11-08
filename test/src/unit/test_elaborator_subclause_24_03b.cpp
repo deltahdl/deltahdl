@@ -11,9 +11,6 @@ constexpr const char* kProgramSignalRef =
     "hierarchical reference to program signal from outside the program is not "
     "permitted";
 
-// §24.3 bars a reference to a program signal from outside any program block
-// wherever the reference stands, so a display task's argument is reached as an
-// assignment's side is.
 TEST(ProgramSignalReference, DisplayArgumentFromTheModuleIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -29,7 +26,6 @@ TEST(ProgramSignalReference, DisplayArgumentFromTheModuleIsError) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 6, "24.3"));
 }
 
-// So is the value a module function returns.
 TEST(ProgramSignalReference, ReturnedValueInAModuleFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -47,9 +43,6 @@ TEST(ProgramSignalReference, ReturnedValueInAModuleFunctionIsError) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 7, "24.3"));
 }
 
-// A name that reaches the program instance through the design, `top.pi.v`
-// from another module, is a reference from outside any program block as much
-// as `pi.v` written beside the instance is.
 TEST(ProgramSignalReference, PathThroughTheDesignFromAnotherModuleIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -68,8 +61,6 @@ TEST(ProgramSignalReference, PathThroughTheDesignFromAnotherModuleIsError) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 5, "24.3"));
 }
 
-// §24.3 makes a hierarchical reference from one program scope to another
-// legal, so the same path written in a program is not reported.
 TEST(ProgramSignalReference, PathFromAnotherProgramIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -88,9 +79,6 @@ TEST(ProgramSignalReference, PathFromAnotherProgramIsLegal) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 5, "24.3"));
 }
 
-// §24.3: an anonymous program shall not contain a hierarchical reference to
-// another program scope, and `top.qi.v` reaches the program instance qi of
-// module top though no component of it names a program declaration.
 TEST(AnonymousProgramHierRef, PathReachingAProgramInstanceIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -107,8 +95,6 @@ TEST(AnonymousProgramHierRef, PathReachingAProgramInstanceIsError) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 3, "24.3"));
 }
 
-// A path that reaches a module's own variable steps through no program scope,
-// so the anonymous program may hold it.
 TEST(AnonymousProgramHierRef, PathReachingAModuleVariableIsLegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -125,11 +111,6 @@ TEST(AnonymousProgramHierRef, PathReachingAModuleVariableIsLegal) {
       ReportedError(f.diag.Diagnostics(), kProgramSignalRef, 3, "24.3"));
 }
 
-// §24.3 bars every hierarchical reference from an anonymous program to another
-// program scope, and the name of a subroutine it calls is one. In a module a
-// call's name is §24.5's rather than §24.3's, and the walk set it aside here as
-// well, so a task call into q, with or without its parentheses, went
-// unreported while a function call in an expression was refused.
 TEST(AnonymousProgramHierRef, TaskCallIntoAnotherProgramIsError) {
   ElabFixture f;
   ElaborateSrc(

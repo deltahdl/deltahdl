@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's CA: rand bytes x and y, bytes v and w, and c1 relating each
-// pair, run through the four calls the clause lists.
 const char* const kCA =
     "class CA;\n"
     "  rand byte x, y;\n"
@@ -18,12 +16,6 @@ const char* const kCA =
     "endclass\n"
     "module t;\n";
 
-// 18.11: called with no arguments, randomize() assigns every rand variable
-// and the rest are state; called with arguments, those are the complete set
-// of random variables, the rest state, a property not declared rand being
-// random for the call. Over the clause's four calls the constraint holds on
-// every draw and the unnamed variables keep their values, as the design
-// test/src/e2e/inline_random_variable_control.sv runs it.
 TEST(InlineRandomVariableControlRun, TheArgumentsAreTheRandomSetOfTheCall) {
   SimFixture f;
   std::string out = RunCapture(
@@ -63,9 +55,6 @@ TEST(InlineRandomVariableControlRun, TheArgumentsAreTheRandomSetOfTheCall) {
   EXPECT_EQ(out, "32 32 32 32\n");
 }
 
-// 18.11: naming a property not declared rand makes it random for the call:
-// v, a plain byte, moves between calls of randomize(v, w) while the rand x
-// it is drawn above keeps its value.
 TEST(InlineRandomVariableControlRun, ANamedNonRandPropertyIsDrawn) {
   SimFixture f;
   std::string out =
@@ -90,10 +79,6 @@ TEST(InlineRandomVariableControlRun, ANamedNonRandPropertyIsDrawn) {
   EXPECT_EQ(out, "1 32\n");
 }
 
-// 18.11: a local member's random mode can be switched only by a call with
-// access to it, within its class: a method's bare randomize(secret) names the
-// method of the object executing it, succeeds, and draws the local secret above
-// the lid on every call.
 TEST(InlineRandomVariableControlRun, ALocalMemberIsNamedWithinItsClass) {
   SimFixture f;
   std::string out = RunCapture(

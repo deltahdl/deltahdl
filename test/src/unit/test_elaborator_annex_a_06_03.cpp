@@ -25,10 +25,6 @@ TEST(SequentialBlockElaboration, NestedSeqBlocksElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Covers the { block_item_declaration } element of the A.6.3 seq_block
-// production: a declaration inside begin/end, followed by statements that
-// read it and write an enclosing-scope variable. The 9.3.1 sibling file
-// covers the prose case of a plain block-local declaration.
 TEST(SequentialBlockElaboration, SeqBlockItemDeclarationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -158,10 +154,6 @@ TEST(BlockNameElaboration, NamedSeqBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Covers the optional block_identifier on both ends of the A.6.3 par_block
-// production, fork [ : block_identifier ] ... join_keyword
-// [ : block_identifier ]. The 9.3.4 sibling file covers the prose rule that
-// a name after the join keyword shall match the name after fork.
 TEST(BlockNameElaboration, ParBlockWithBlockIdentifierElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -192,8 +184,6 @@ TEST(ParallelBlockElaboration, ForkInsideAlwaysCombErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  // The report stands at the always_comb keyword on line 3, which is the
-  // construct the rule forbids the fork inside, not at the fork on line 4.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_comb shall not contain fork-join "
                             "statements",
@@ -212,7 +202,6 @@ TEST(ParallelBlockElaboration, ForkInsideAlwaysLatchErrors) {
       "  end\n"
       "endmodule\n",
       f);
-  // As above, the report stands at the always_latch keyword on line 3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "always_latch shall not contain fork-join "
                             "statements",

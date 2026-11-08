@@ -26,11 +26,6 @@
 
 namespace delta {
 
-// Whether two drivers reach a common bit: down every step both take, they name
-// the same member or index ranges that meet, and where one stops short it
-// reaches every bit beneath. A member beside an index names the bits of one
-// structure two ways, which this does not line up, so they are not counted as
-// meeting.
 static bool PathsMeet(const UwirePath& a, const UwirePath& b) {
   const size_t kSteps = std::min(a.size(), b.size());
   for (size_t i = 0; i < kSteps; ++i) {
@@ -62,7 +57,6 @@ UnitUwireCounts CountUnitUwireDrivers(const UnitUwireDrivers& units) {
   return counts;
 }
 
-// The drivers `drivers` recorded since `counts`, with the net each drives.
 static std::vector<std::pair<std::string_view, UwirePath>> DriversSince(
     const UwireDrivers& drivers,
     const std::unordered_map<std::string_view, size_t>& counts) {
@@ -83,7 +77,6 @@ void RepeatUnitUwireDrivers(UnitUwireDrivers& units,
   static const std::unordered_map<std::string_view, size_t> kNone;
   for (auto& [unit, drivers] : units) {
     auto unit_counts = counts.find(unit);
-    // One more element already makes each of them a second driver.
     for (const auto& [net, path] :
          DriversSince(drivers, unit_counts != counts.end() ? unit_counts->second
                                                            : kNone))
@@ -91,9 +84,6 @@ void RepeatUnitUwireDrivers(UnitUwireDrivers& units,
   }
 }
 
-// The indices the select `e` names in the dimension it selects: a bit or an
-// element, a part between two bounds, or an indexed part from its base. Absent
-// where a bound is not constant.
 static std::optional<UwireStep> SelectStep(const Expr* e,
                                            const ScopeMap& constants) {
   std::optional<int64_t> index = ConstEvalInt(e->index, constants);
@@ -106,9 +96,6 @@ static std::optional<UwireStep> SelectStep(const Expr* e,
   return UwireStep{{}, std::min(*index, *end), std::max(*index, *end)};
 }
 
-// The name `target` is rooted at, with `path` holding the steps from it down
-// to what the target names, outermost first. Null where the target is rooted
-// at no name or selects with a bound that is not constant.
 static const Expr* RootAndPath(const Expr* target, const ScopeMap& constants,
                                UwirePath& path) {
   const Expr* e = target;
@@ -128,8 +115,6 @@ static const Expr* RootAndPath(const Expr* target, const ScopeMap& constants,
   return e->kind == ExprKind::kIdentifier ? e : nullptr;
 }
 
-// Whether the scope has an object of its own named `name`, bound to
-// `declared`: a variable or net, any other declaration, or a port.
 static bool ScopeDeclares(std::string_view name, std::string_view declared,
                           const UwireTargetScope& in) {
   if (in.types.count(name) != 0 || in.names.declared.count(declared) != 0)
@@ -155,8 +140,6 @@ void RecordUwireTarget(UwireDrivers& drivers, const Expr* target, SourceLoc loc,
     drivers.Record(name, declared, path, loc, diag);
     return;
   }
-  // §3.12.1: a name the scope does not declare is searched for in the part
-  // of the compilation unit written before it.
   if (ScopeDeclares(name, declared, in)) return;
   const ModuleItem* net = UnitNetBefore(in.unit, name, loc);
   if (net == nullptr || WrittenNetType(net->data_type) != NetType::kUwire)
@@ -171,10 +154,6 @@ void RecordUwirePrimitiveOutputs(UwireDrivers& drivers, const ModuleItem* item,
     if (type == GateType::kPassSwitch || type == GateType::kPassEnSwitch)
       return;
   }
-  // §28.3.6: an instance array gives each instance one bit of a terminal as
-  // wide as the array, and connects any other terminal whole to every
-  // instance, each of which then drives it; two of them are already more
-  // drivers than one.
   const uint32_t kInstances =
       InstanceArrayLength(item, in.constants).value_or(1);
   for (const Expr* terminal : PrimitiveOutputTerminals(item)) {

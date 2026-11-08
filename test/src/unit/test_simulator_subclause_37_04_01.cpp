@@ -14,20 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.4.1 (Diagram key for objects and classes) is the key the data model
-// diagrams of §37.5 onward are read with. It names five notations, and the two
-// that decide what an implementation answers are the enclosures: a solid one
-// holds an object, bold where the object is defined and normal where it is
-// referenced, and a dotted one holds a class -- a name in bold italics inside a
-// dotted enclosure defines a class, which groups other objects and classes. A
-// class is that grouping and nothing else. It has no object of its own, so no
-// object's vpiType is a class constant, and a relation drawn to a class reaches
-// the objects the class groups.
-//
-// §37.17 draws `variables` as such a class, and the object definitions inside
-// its enclosure are what vpiVariables names: a logic var, an int var, a string
-// var, an array var and the rest. §37.12 draws the scope's vpiVariables
-// relation to that class.
 class VpiVariablesClass : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -43,9 +29,6 @@ class VpiVariablesClass : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// Claim: a relation drawn to a class reaches the objects that class groups. The
-// scope holds one variable of each of three kinds §37.17 draws inside the
-// `variables` enclosure, and all three come back.
 TEST_F(VpiVariablesClass, TheRelationReachesEveryKindTheClassGroups) {
   VpiObject logic_var;
   logic_var.type = vpiLogicVar;
@@ -66,9 +49,6 @@ TEST_F(VpiVariablesClass, TheRelationReachesEveryKindTheClassGroups) {
   EXPECT_EQ(VpiObjectOf(seen[2]), &string_var);
 }
 
-// Claim: the grouping is what a class is, so a class constant is not a kind an
-// object has. A child stamped with the class constant itself is an object of no
-// definition the standard draws, and the relation does not report it.
 TEST_F(VpiVariablesClass, TheClassConstantIsNotAKindTheRelationReports) {
   VpiObject tagged_with_the_class;
   tagged_with_the_class.type = vpiVariables;
@@ -80,9 +60,6 @@ TEST_F(VpiVariablesClass, TheClassConstantIsNotAKindTheRelationReports) {
   EXPECT_TRUE(ScanAll(vpi_iterate(vpiVariables, VpiHandleOf(&scope))).empty());
 }
 
-// Claim: an object grouped by a class reports its own definition as its type,
-// never the class it is grouped by. §37.3.2 makes vpiType the object's type
-// constant, and a class has no object for one to name.
 TEST_F(VpiVariablesClass, AGroupedObjectReportsItsOwnDefinitionAsItsType) {
   VpiObject int_var;
   int_var.type = vpiIntVar;
@@ -91,8 +68,6 @@ TEST_F(VpiVariablesClass, AGroupedObjectReportsItsOwnDefinitionAsItsType) {
   EXPECT_NE(vpi_get(vpiType, VpiHandleOf(&int_var)), vpiVariables);
 }
 
-// Claim: an object kind outside the enclosure is not grouped by the class, so
-// the relation passes it over. A net is drawn in a class of its own (§37.16).
 TEST_F(VpiVariablesClass, AnObjectOutsideTheEnclosureIsNotReached) {
   VpiObject net;
   net.type = kVpiNet;
@@ -109,8 +84,6 @@ TEST_F(VpiVariablesClass, AnObjectOutsideTheEnclosureIsNotReached) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &logic_var);
 }
 
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 int g_vars_seen = 0;
 
 PLI_INT32 CountVariablesCalltf(PLI_BYTE8*) {
@@ -132,10 +105,6 @@ void RegisterVariableCountProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// Claim, against a design: the objects an elaborated design puts in a scope are
-// of the kinds the class groups, so the scope's vpiVariables relation reaches
-// them. Matching the class constant against an object's own type reached none
-// of them, VpiContext::Attach stamping a variable vpiReg.
 TEST_F(VpiVariablesClass, AScopeOfADesignReachesTheVariablesItDeclares) {
   RegisterVariableCountProbe();
 

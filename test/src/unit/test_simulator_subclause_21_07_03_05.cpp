@@ -2,9 +2,6 @@
 
 #include <string>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "fixture_simulator.h"
 #include "fixture_vcd_dump_run.h"
 #include "simulator/lowerer.h"
@@ -12,34 +9,13 @@
 namespace delta {
 namespace {
 
-// Exercises $dumpportsflush (§21.7.3.5) end to end: every test drives real
-// source through parse, elaboration, lowering, and the scheduler with the
-// driver's per-timestep recording loop installed, so the buffer-flushing rule
-// is observed as the production task path applies it to a dump opened by a
-// real $dumpports call (§21.7.3.1). The rule's observable is the dump file's
-// on-disk contents WHILE the simulation still runs, so each flushing test
-// plays the role of the reader from the $dumpflush machinery the extended VCD
-// file inherits (§21.7.1.6): procedural code in the design opens the dump
-// file mid-run, echoes its current bytes to stdout between marker lines, and
-// closes it again. The captured echo is the mid-simulation snapshot the
-// assertions inspect alongside the final file contents.
 class DumpportsflushSysTask : public VcdMidRunReaderTestBase {
  protected:
-  // Runs the source through the full pipeline with the driver's dump loop
-  // (timestamp + changed values at the end of each time unit), capturing
-  // stdout produced during the run so mid-simulation reader snippets can be
-  // inspected afterwards. The fixture is caller-owned so its diagnostics and
-  // context stay inspectable after the run. Returns the final dump contents.
   std::string RunVcd(SimFixture& f, const std::string& src) {
     return RunVcdDump(f, src, {.scope = "t", .captured_stdout = &run_output_});
   }
 };
 
-// §21.7.3.5: $dumpportsflush with the $dumpports filename writes all buffered
-// port values out to the associated file, clearing the simulator's VCD
-// buffer. A reader running during the same simulation therefore finds the
-// earlier timestamp and the vector change already on disk right after the
-// task executes.
 TEST_F(DumpportsflushSysTask, NamedFlushStoresBufferedRecordsMidSimulation) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -66,11 +42,6 @@ TEST_F(DumpportsflushSysTask, NamedFlushStoresBufferedRecordsMidSimulation) {
   EXPECT_NE(content.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5 baseline: the flush rule exists because simulators buffer VCD
-// output instead of writing line by line. Without a $dumpportsflush call, the
-// same mid-simulation reader does NOT yet find the recorded change on disk --
-// the record is still sitting in the buffer -- which is what makes the
-// flushing tests' positive observations discriminating.
 TEST_F(DumpportsflushSysTask, WithoutFlushBufferedRecordsNotYetOnDisk) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -91,13 +62,9 @@ TEST_F(DumpportsflushSysTask, WithoutFlushBufferedRecordsNotYetOnDisk) {
                             "endmodule\n");
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(MidDump("MID").find("b10100101 "), std::string::npos);
-  // The record does reach the file once the writer closes at end of run.
   EXPECT_NE(content.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the flush only empties the buffer -- it inserts no command text
-// into the dump, and dumping continues exactly as before, so a change after
-// the flush is still recorded under its own timestamp.
 TEST_F(DumpportsflushSysTask, FlushEmitsNoCommandAndDumpingContinues) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -119,9 +86,6 @@ TEST_F(DumpportsflushSysTask, FlushEmitsNoCommandAndDumpingContinues) {
   EXPECT_NE(content.find("b10100101 ", t20), std::string::npos);
 }
 
-// §21.7.3.5: if the filename is not specified, the VCD buffers shall be
-// flushed for all files opened by calls to $dumpports -- the bare form with
-// no argument list flushes this dump's buffer to disk mid-simulation.
 TEST_F(DumpportsflushSysTask, NoArgFlushCoversAllDumpportsFiles) {
   SimFixture f;
   RunVcd(f,
@@ -145,8 +109,6 @@ TEST_F(DumpportsflushSysTask, NoArgFlushCoversAllDumpportsFiles) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the empty-parenthesis spelling of the no-filename call performs
-// the same default action, flushing the buffers of every $dumpports file.
 TEST_F(DumpportsflushSysTask, EmptyParenFlushSameDefaultAction) {
   SimFixture f;
   RunVcd(f,
@@ -170,9 +132,6 @@ TEST_F(DumpportsflushSysTask, EmptyParenFlushSameDefaultAction) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the filename is an expression -- a string-typed variable holding
-// the character string given to $dumpports denotes the same file, here bound
-// through the variable's declaration initializer.
 TEST_F(DumpportsflushSysTask, StringVariableFilenameDeclInit) {
   SimFixture f;
   RunVcd(f,
@@ -197,8 +156,6 @@ TEST_F(DumpportsflushSysTask, StringVariableFilenameDeclInit) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the same string-typed filename variable works when the name is
-// stored by a procedural assignment before the flush executes.
 TEST_F(DumpportsflushSysTask, StringVariableFilenameProceduralAssign) {
   SimFixture f;
   RunVcd(f,
@@ -224,8 +181,6 @@ TEST_F(DumpportsflushSysTask, StringVariableFilenameProceduralAssign) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: an integral variable containing the character string is also an
-// accepted filename form, here initialized in its declaration.
 TEST_F(DumpportsflushSysTask, IntegralVariableFilenameDeclInit) {
   SimFixture f;
   RunVcd(f,
@@ -250,8 +205,6 @@ TEST_F(DumpportsflushSysTask, IntegralVariableFilenameDeclInit) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the integral filename variable equally denotes the file when the
-// character string is stored procedurally before the flush.
 TEST_F(DumpportsflushSysTask, IntegralVariableFilenameProceduralAssign) {
   SimFixture f;
   RunVcd(f,
@@ -277,10 +230,6 @@ TEST_F(DumpportsflushSysTask, IntegralVariableFilenameProceduralAssign) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the filename is an expression, so a parameter constant holding
-// the character string is also accepted. The name stays within four
-// characters: string parameters longer than that hit an upstream §6.20 32-bit
-// truncation defect outside this subclause.
 TEST_F(DumpportsflushSysTask, ParameterConstantFilename) {
   SimFixture f;
   RunVcd(f,
@@ -305,9 +254,6 @@ TEST_F(DumpportsflushSysTask, ParameterConstantFilename) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: a localparam constant holding the character string is likewise
-// an accepted filename expression (kept within four characters for the same
-// upstream §6.20 truncation limit as the parameter form).
 TEST_F(DumpportsflushSysTask, LocalparamConstantFilename) {
   SimFixture f;
   RunVcd(f,
@@ -332,10 +278,6 @@ TEST_F(DumpportsflushSysTask, LocalparamConstantFilename) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: the buffer is cleared by each flush and refills as dumping
-// continues, so a later flush shows the cumulative dump with no value change
-// lost -- the first mid-simulation read finds only the first change, and a
-// second read after another change and flush finds both records on disk.
 TEST_F(DumpportsflushSysTask, RepeatedFlushesAccumulateRecordsWithNoneLost) {
   SimFixture f;
   RunVcd(f,
@@ -370,10 +312,6 @@ TEST_F(DumpportsflushSysTask, RepeatedFlushesAccumulateRecordsWithNoneLost) {
   EXPECT_NE(mid2.find("b11000011 "), std::string::npos);
 }
 
-// §21.7.3.5: the filename denotes the file the $dumpports call named, so the
-// match is on the evaluated name regardless of the source form each side
-// used -- a $dumpports whose filename arrived through a string variable
-// (§21.7.3.1 syntax) is flushed by a literal spelling the same name.
 TEST_F(DumpportsflushSysTask, LiteralFlushMatchesDumpportsVariableFilename) {
   SimFixture f;
   RunVcd(f,
@@ -398,10 +336,6 @@ TEST_F(DumpportsflushSysTask, LiteralFlushMatchesDumpportsVariableFilename) {
   EXPECT_NE(MidDump("MID").find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5 negative: the filename denotes a file named by a $dumpports call.
-// A literal naming a file no $dumpports call opened matches nothing, so the
-// flush is ignored -- the mid-simulation reader still finds the record
-// buffered off disk -- while the dump itself is unaffected and completes.
 TEST_F(DumpportsflushSysTask, UnknownFilenameLiteralFlushIgnored) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -426,9 +360,6 @@ TEST_F(DumpportsflushSysTask, UnknownFilenameLiteralFlushIgnored) {
   EXPECT_NE(content.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5 negative: the unknown filename may equally arrive through a
-// string variable -- the evaluated name is what must match a $dumpports file,
-// and a non-matching variable-held name leaves the flush ignored too.
 TEST_F(DumpportsflushSysTask, UnknownFilenameVariableFlushIgnored) {
   SimFixture f;
   auto content = RunVcd(f,
@@ -454,10 +385,6 @@ TEST_F(DumpportsflushSysTask, UnknownFilenameVariableFlushIgnored) {
   EXPECT_NE(content.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5: flushing right after the $dumpports opening checkpoint (which
-// the dump schedules at the end of its own time unit, §21.7.3.1) pushes the
-// header and that initial checkpoint to disk, so a reader early in the run
-// already sees the definitions section and the scalar's opening value.
 TEST_F(DumpportsflushSysTask, FlushAfterOpeningCheckpointShowsHeaderMidSim) {
   SimFixture f;
   RunVcd(f,
@@ -480,9 +407,6 @@ TEST_F(DumpportsflushSysTask, FlushAfterOpeningCheckpointShowsHeaderMidSim) {
   EXPECT_NE(mid.find("1!"), std::string::npos);
 }
 
-// §21.7.3.5: the flush is not tied to the initial process that opened the
-// dump -- reached from an always process on a clock edge, it equally pushes
-// the buffered records to disk for a mid-simulation reader in that process.
 TEST_F(DumpportsflushSysTask, FlushFromAlwaysProcessOnClockEdge) {
   SimFixture f;
   RunVcd(f,
@@ -509,9 +433,6 @@ TEST_F(DumpportsflushSysTask, FlushFromAlwaysProcessOnClockEdge) {
   EXPECT_NE(mid.find("b10100101 "), std::string::npos);
 }
 
-// §21.7.3.5 edge: with no $dumpports call in the source there are no files
-// opened for port dumping, so the no-filename default action has nothing to
-// flush -- the task completes harmlessly with no diagnostic.
 TEST_F(DumpportsflushSysTask, FlushWithNoDumpportsFilesIsHarmless) {
   SimFixture f;
   RunVcd(f,

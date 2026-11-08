@@ -23,56 +23,15 @@ struct FormatArgs {
   const std::vector<std::string>& p_fmts;
   const TimeFormatSpec* time_format = nullptr;
   const std::vector<std::string>& v_fmts;
-  // §21.2.1.4: one flag per positional value argument, 1 where the argument
-  // names a net that is not a scalar. Classified by the calling task, which
-  // holds the net reference, and read where a %v consumes the argument.
   const std::vector<char>& nonscalar_nets;
   SimContext* ctx = nullptr;
-  // §21.2.1.1 / §21.2.1.7: per-argument aggregate classification. 0 means the
-  // argument is not an unpacked aggregate; 1 means it is one whose elements
-  // are not of type byte (an integer format specifier consuming it is
-  // rejected, and %s rejects it too); 2 means it is an unpacked array of
-  // byte, which %s renders through the precomputed string below; 3 means it
-  // is an unpacked struct or union, which only %u and %z among the integer
-  // specifiers take.
   const std::vector<char>& agg_flags;
-  // §21.2.1.7: per-argument character rendering of an unpacked array of byte,
-  // elements taken from the left bound to the right bound. Precomputed by the
-  // calling task, which holds the element variables; empty for any argument
-  // that is not such an array.
   const std::vector<std::string>& s_fmts;
-  // Where the format string was written, so a specifier that cannot be
-  // applied to the argument it consumes is reported at the call rather than
-  // nowhere.
   SourceLoc loc;
 };
 
-// §33.7: build the "library.cell" string that %l / %L expands to -- the actual
-// library and cell bound to the module instance that contains the running
-// display task. Like %m (which reports that instance's hierarchical name), the
-// instance is the one named by the running process's instance prefix; the
-// lowerer records each instance's resolved binding under that same prefix.
-//
-// A command whose text is produced later than the statement that issued it is
-// the exception. By the time such a command runs, the process that called it
-// has finished and the context has whatever process ran last installed, so the
-// running process no longer names the instance the command was written in. Such
-// a command records its own call site before deferring, and that recorded scope
-// is preferred here; the empty prefix it may hold is a value (the top instance)
-// rather than an absence, which is why the record is consulted for presence.
-//
-// When there is no simulation context, or the containing instance has no
-// recorded binding, the specifier still substitutes a generic library.cell
-// token so it never expands to nothing (the no-argument substitution rule of
-// §21.2.1).
 static std::string BuildInstanceBinding(SimContext* ctx) {
   if (ctx != nullptr) {
-    // §33.7: the instance containing the call. A subroutine called across the
-    // hierarchy runs in the instance holding it (EnterCalleeInstance), even
-    // while a deferred output reinstates its caller around it; a deferred
-    // output otherwise stands in its caller; and with no process at all, as a
-    // static initializer is evaluated during lowering, the instance being
-    // lowered is the one. Prefixes take the "u1.u2." form, empty at the top.
     const Process* proc = ctx->CurrentProcess();
     std::string prefix;
     if (proc != nullptr && !proc->caller_inst_prefixes.empty()) {
@@ -98,32 +57,18 @@ std::string FormatValueAsString(const Logic4Vec& val) {
     uint32_t bit = byte_offset % 64;
     uint64_t aval = (word < val.nwords) ? val.words[word].aval : 0;
     auto ch = static_cast<char>((aval >> bit) & 0xFF);
-    // §21.2.1.7: the value is read as 8-bit groups, high group first, and
-    // leading zeros are never printed. Only the zeros ahead of the first
-    // nonzero group are "leading"; a zero byte that follows a printed
-    // character is part of the value and passes through. No termination
-    // character is appended.
     if (ch == 0 && result.empty()) continue;
     result += ch;
   }
   return result;
 }
 
-// §21.2.1.1: the numeral of a known value of any width, every word read
-// (FormatDecimalDigits in eval_format_decimal.cpp); read through a 64-bit
-// word, a 96-bit value printed its low 64 bits.
 static std::string FormatDecimal(const Logic4Vec& val) {
   return FormatDecimalDigits(val);
 }
 
-// §21.2.1.3: a bit-range classification used by the decimal, hexadecimal, and
-// octal renderings to decide whether unknown (x) or high-impedance (z) bits
-// force a status character in place of the ordinary digit.
 enum class XZClass : std::uint8_t { kKnown, kAllX, kAllZ, kSomeX, kSomeZ };
 
-// Read the (aval, bval) pair of a single bit out of a 4-state vector. The
-// encoding matches Logic4Vec::ToString (canonical, Figure 38-8): bval clear is
-// a known bit, bval set with aval set is x, and bval set with aval clear is z.
 static void ReadBit(const Logic4Vec& val, uint32_t i, bool& a, bool& b) {
   uint32_t w = i / 64;
   uint64_t mask = uint64_t{1} << (i % 64);
@@ -131,11 +76,6 @@ static void ReadBit(const Logic4Vec& val, uint32_t i, bool& a, bool& b) {
   b = (val.words[w].bval & mask) != 0;
 }
 
-// §21.2.1.3: examine the bits in [lo, hi) and report which display rule
-// applies. A fully unknown range maps to a lowercase x and a fully
-// high-impedance range to a lowercase z. Any mix of states yields an uppercase
-// character: an unknown bit always wins (uppercase X), and only a
-// high-impedance bit with no unknown bit present yields uppercase Z.
 static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
   bool has_known = false, has_x = false, has_z = false;
   for (uint32_t i = lo; i < hi; ++i) {
@@ -154,8 +94,6 @@ static XZClass ClassifyBits(const Logic4Vec& val, uint32_t lo, uint32_t hi) {
   return has_x ? XZClass::kSomeX : XZClass::kSomeZ;
 }
 
-// Maps a non-known classification to its display character. Returns 0 for a
-// known group, signalling that the caller should render the ordinary value.
 static char XZDigitChar(XZClass c) {
   switch (c) {
     case XZClass::kAllX:
@@ -171,11 +109,6 @@ static char XZDigitChar(XZClass c) {
   }
 }
 
-// §21.2.1.3: render a value in hexadecimal (group_size 4) or octal
-// (group_size 3). Each group of bits collapses to a single digit; a group that
-// carries any x or z bit follows the status-character rules above instead of
-// the plain radix value. Fully known values reproduce the auto-sized,
-// leading-zero rendering of FormatArg.
 static std::string FormatRadixXZ(const Logic4Vec& val, uint32_t group_size) {
   uint32_t ndigits = (val.width + group_size - 1) / group_size;
   if (ndigits == 0) ndigits = 1;
@@ -201,19 +134,12 @@ static std::string FormatRadixXZ(const Logic4Vec& val, uint32_t group_size) {
   return out;
 }
 
-// §21.2.1.3: a decimal field shows a single status character when the value
-// holds unknown or high-impedance bits, rather than a numeral.
 static std::string FormatDecimalXZ(const Logic4Vec& val) {
   char xz = XZDigitChar(ClassifyBits(val, 0, val.width));
   if (xz != 0) return std::string(1, xz);
   return FormatDecimal(val);
 }
 
-// §21.2.1.2: the automatically sized decimal rendering. Suppressed leading
-// zeros are replaced by spaces, so the numeral sits right-justified in the
-// fixed-width field computed above; a §21.2.1.3 status character occupies the
-// same field. A converted result at or beyond the field width is emitted
-// whole -- never truncated.
 static std::string FormatDecimalAutoSized(const Logic4Vec& val) {
   std::string core = FormatDecimalXZ(val);
   uint32_t field = AutoDecimalFieldWidth(val);
@@ -221,20 +147,12 @@ static std::string FormatDecimalAutoSized(const Logic4Vec& val) {
   return std::string(field - core.size(), ' ') + core;
 }
 
-// §21.2.1.1: mask for the valid low bits of the top 32-bit chunk of a value.
-// Bits at and above `width` are not part of the value; the fully populated
-// chunks below the top return an all-ones mask.
 static uint32_t ChunkMask(uint32_t width, uint32_t off) {
   uint32_t valid = (width > off) ? (width - off) : 0;
   if (valid >= 32) return 0xFFFFFFFFu;
   return (uint32_t{1} << valid) - 1;
 }
 
-// §21.2.1.1: %u writes the value as raw, unformatted 2-value binary. Any
-// unknown (x) or high-impedance (z) bit shall be emitted as zero, so the
-// 2-value word is the aval bits with every bval-marked bit cleared. The value
-// is packed into 32-bit words, the word holding the LSB written first, each
-// word laid down in the machine's native (little-endian) byte order.
 static std::string FormatUnformatted2Value(const Logic4Vec& val) {
   std::string out;
   uint32_t nchunks = (val.width + 31) / 32;
@@ -252,11 +170,6 @@ static std::string FormatUnformatted2Value(const Logic4Vec& val) {
   return out;
 }
 
-// §21.2.1.1: %z writes the value as raw, unformatted 4-value binary, preserving
-// x and z. Each 32-bit chunk is emitted as the (aval, bval) pair of the
-// s_vpi_vecval layout (Figure 38-8), whose per-bit encoding already matches
-// Logic4Vec's (a known bit clears bval; x is aval&bval, z is bval alone). The
-// chunk holding the LSB is written first, each 32-bit word native-endian.
 static std::string FormatUnformatted4Value(const Logic4Vec& val) {
   std::string out;
   uint32_t nchunks = (val.width + 31) / 32;
@@ -276,11 +189,6 @@ static std::string FormatUnformatted4Value(const Logic4Vec& val) {
   return out;
 }
 
-// Apply the $timeformat configuration (20.4.3) to a time value, integral or
-// real, expressed in units of 10**value_order s. The value is converted to the
-// configured units_number, rendered with the configured decimal precision,
-// padded with leading spaces to the minimum field width, and tagged with the
-// suffix string.
 std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
                                       const TimeFormatSpec& spec,
                                       int value_order) {
@@ -307,9 +215,6 @@ std::string FormatTimeUnderTimeformat(const Logic4Vec& val,
 }
 
 std::string FormatArg(const Logic4Vec& val, char spec) {
-  // Table 21-1 and Table 21-2 spell every specifier as "%x or %X", so the
-  // dispatch below works in a single case after this normalization; a real
-  // specifier keeps its case for the renderer.
   char written = spec;
   if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
 
@@ -319,15 +224,11 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
   char buf[64];
   switch (spec) {
     case 'd':
-      // §21.2.1.3: decimal renders a status character for unknown/high-Z bits.
       return FormatDecimalXZ(val);
     case 'h':
     case 'x':
-      // §21.2.1.3: each group of four bits is one hex digit, with x/z groups
-      // rendered per the unknown/high-impedance rules.
       return FormatRadixXZ(val, 4);
     case 'o':
-      // §21.2.1.3: octal groups three bits per digit, otherwise as for hex.
       return FormatRadixXZ(val, 3);
     case 'b':
       return val.ToString();
@@ -340,117 +241,68 @@ std::string FormatArg(const Logic4Vec& val, char spec) {
     case 's':
       return FormatValueAsString(val);
     case 'u':
-      // §21.2.1.1: unformatted 2-value binary; x/z bits become zero.
       return FormatUnformatted2Value(val);
     case 'z':
-      // §21.2.1.1: unformatted 4-value binary; x and z are preserved.
       return FormatUnformatted4Value(val);
     case 'e':
     case 'f':
     case 'g':
       return FormatValueAsReal(val, written);
     default:
-      // A specifier that does not appear in Table 21-1 or Table 21-2 is a
-      // misuse of the format string. Surface it to stderr so a test or a
-      // user can see what was wrong, and leave the unrecognized pair in the
-      // output stream so the misuse does not silently masquerade as a
-      // valid rendering of the value.
       std::fprintf(stderr, "[deltahdl] unknown format specifier: %%%c\n", spec);
       return std::string("%") + spec;
   }
 }
 
-// Table 21-4 maps each strength level (0..7, the numeric value of the
-// Strength enum) to its two-letter mnemonic.
 static const char* StrengthMnemonic(uint8_t level) {
   static const char* k_mnemonics[8] = {"Hi", "Sm", "Me", "We",
                                        "La", "Pu", "St", "Su"};
   return k_mnemonics[level & 0x7];
 }
 
-// Renders the three-character strength format §21.2.1.4 gives a scalar net.
-// The first two characters describe the strength, as either a Table 21-4
-// mnemonic or a pair of decimal digits; the third is the logic value drawn
-// from Table 21-3. §21.2.1.4 states one rule for choosing between the two
-// forms for a known value and a different rule for the unknown value, so the
-// branches below decide it separately rather than from one test of the range.
 std::string FormatStrength(const NetStrength& ns) {
   auto s0_hi = static_cast<uint8_t>(ns.s0_hi);
   auto s0_lo = static_cast<uint8_t>(ns.s0_lo);
   auto s1_hi = static_cast<uint8_t>(ns.s1_hi);
   auto s1_lo = static_cast<uint8_t>(ns.s1_lo);
 
-  // A side "drives" when its strongest component is above the highz level.
   bool drives0 = s0_hi != 0;
   bool drives1 = s1_hi != 0;
 
-  // Neither side drives: the net floats. The high-impedance strength admits
-  // only the Z logic value, and its level is always the Hi mnemonic.
   if (!drives0 && !drives1) return "HiZ";
 
-  // Both sides drive, so the resolved logic value is unknown (X). §21.2.1.4
-  // renders an unknown value with a mnemonic when its 0 and its 1 strength
-  // components share one level, and otherwise writes two decimal digits, the
-  // 0 level and then the 1 level, ahead of the X. Those two components are the
-  // highest level of each side: §28.12.2 reads the 35X of Figure 28-9 as the
-  // result's highest strength0 level, 3, followed by its highest strength1
-  // level, 5. Neither form renders the low end of either side, so s0_lo and
-  // s1_lo do not appear here. Figure 28-4 combines We1 with We0 and prints
-  // WeX, and Figure 28-5 draws that result's range running down through high
-  // impedance on both sides, so a low bound below the mnemonic's level is what
-  // this case ordinarily has rather than a reason to fall to the digits.
   if (drives0 && drives1) {
     if (s0_hi == s1_hi) return std::string(StrengthMnemonic(s0_hi)) + "X";
     return std::string(1, static_cast<char>('0' + s0_hi)) +
            static_cast<char>('0' + s1_hi) + "X";
   }
 
-  // Exactly one side drives; take that side's level range and known value.
   uint8_t hi = drives0 ? s0_hi : s1_hi;
   uint8_t lo = drives0 ? s0_lo : s1_lo;
   char known = drives0 ? '0' : '1';
 
-  // A range reaching down to highz means the value is ambiguous between the
-  // driven level and a float: L (0 or Z) or H (1 or Z). Both always use a
-  // mnemonic to name the strength level.
   if (lo == 0) {
     char ambiguous = drives0 ? 'L' : 'H';
     return std::string(StrengthMnemonic(hi)) + ambiguous;
   }
 
-  // §21.2.1.4: a 0 or a 1 is rendered with a mnemonic when the signal holds a
-  // single strength, and otherwise written after two decimal digits giving the
-  // greatest and the least strength level. Table 21-5 reads 520 as a 0 whose
-  // strength may lie anywhere from pull drive down to medium capacitor.
   if (hi == lo) return std::string(StrengthMnemonic(hi)) + known;
   return std::string(1, static_cast<char>('0' + hi)) +
          static_cast<char>('0' + lo) + known;
 }
 
-// The digits of `full` from its first nonzero one, or a single 0 when every
-// digit is zero, so that a zero value still shows one.
 static std::string TrimLeadingZeros(const std::string& full) {
   size_t start = full.find_first_not_of('0');
   if (start == std::string::npos) return "0";
   return full.substr(start);
 }
 
-// §21.2.1.3: the hex or octal digits of `val`, `bits_per_digit` bits each, with
-// the full width's leading zeros trimmed so that no digit above bit 63 is lost.
-// Status characters carry meaning that cannot be stripped down to significant
-// digits, so a value bearing x/z keeps its full digit string.
 static std::string FormatRadixMinimal(const Logic4Vec& val,
                                       uint32_t bits_per_digit) {
   std::string full = FormatRadixXZ(val, bits_per_digit);
   return val.IsKnown() ? TrimLeadingZeros(full) : full;
 }
 
-// §21.2.1.2: the minimal-width rendering of a value for a given radix, the one
-// with no leading digit to spare, before any explicit field width is applied.
-// The decimal, string, and character forms already carry no leading fill, so
-// they defer to the auto-sized rendering; the hex/octal/binary radices, whose
-// auto rendering pads out to the full bit width with leading zeros, drop those
-// zeros here.
 static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
   switch (spec) {
     case 'h':
@@ -459,20 +311,12 @@ static std::string FormatArgMinimal(const Logic4Vec& val, char spec) {
     case 'o':
       return FormatRadixMinimal(val, 3);
     case 'b':
-      // Each bit prints separately; trim only the leading zeros.
       return TrimLeadingZeros(val.ToString());
     default:
       return FormatArg(val, spec);
   }
 }
 
-// §21.2.1.2: render a value while honoring an explicit field width taken from
-// the format specifier (e.g. "%3d" or "%0h"). With no width the value is
-// auto-sized exactly as FormatArg does. A width of zero selects the minimum
-// width with no leading fill. A non-zero width left-pads the minimal rendering
-// to that many columns -- spaces for the decimal, string, and character forms,
-// leading zeros for the hex/octal/binary radices. A value already wider than
-// the field is expanded rather than truncated.
 static std::string FormatArgWidth(const Logic4Vec& val, char spec,
                                   bool has_width, uint32_t width) {
   if (!has_width) return FormatArgAutoSized(val, spec);
@@ -480,8 +324,6 @@ static std::string FormatArgWidth(const Logic4Vec& val, char spec,
   char norm = spec;
   if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
 
-  // The real and time renderings are sized by their own rules, not by this
-  // subclause; leave them to the auto-sized path.
   if (norm == 'e' || norm == 'f' || norm == 'g' || norm == 't')
     return FormatArg(val, spec);
 
@@ -493,13 +335,6 @@ static std::string FormatArgWidth(const Logic4Vec& val, char spec,
   return std::string(width - core.size(), pad) + core;
 }
 
-// §21.2.1.2: automatic sizing of a displayed expression argument, applied when
-// no explicit field width overrides it -- both to a format-specifier argument
-// and to a bare argument rendered under a task's default radix (§21.2.1.1).
-// Decimal takes the fixed-width, space-filled field above; the other radices'
-// plain renderings (full bit width, leading zeros kept) are already
-// automatically sized, as are the real, string, and time forms. A real value
-// under %d has no bit-width to size against and keeps its plain rendering.
 std::string FormatArgAutoSized(const Logic4Vec& val, char spec) {
   char norm = spec;
   if (norm >= 'A' && norm <= 'Z') norm = static_cast<char>(norm - 'A' + 'a');
@@ -514,8 +349,6 @@ static int FormatHexDigitVal(char c) {
   return -1;
 }
 
-// The character a named escape of Table 5-1 produces, or 0 for a character
-// the table does not name.
 static char FormatNamedEscape(char c) {
   switch (c) {
     case 'n':
@@ -537,9 +370,6 @@ static char FormatNamedEscape(char c) {
   }
 }
 
-// Appends the byte an octal `\ddd` or hex `\xhh` escape names, `c` being the
-// character after the backslash and `i` left on the escape's last digit;
-// answers whether `c` opened one.
 static bool TryAppendNumericEscape(const std::string& fmt, size_t& i, char c,
                                    std::string& out) {
   if (c == 'x') {
@@ -562,17 +392,6 @@ static bool TryAppendNumericEscape(const std::string& fmt, size_t& i, char c,
   return false;
 }
 
-// §21.2.1: inside a $display/$write string-literal argument the special
-// character '\' introduces an escape whose meaning is that of Table 5-1 in
-// 5.9.1. Decode a single such sequence in place -- named escapes, octal '\ddd'
-// and hex '\xhh' -- and emit the resulting byte as a literal. Decoding here,
-// one character at a time, keeps an escaped byte (e.g. octal '\045') out of the
-// '%' format-specifier machinery even when it decodes to a '%'. §5.9 (printed
-// page 80) has a backslash immediately before a newline ignored together with
-// the newline, so a format string continued across a line prints as one line,
-// and §5.9.1 (printed 83) makes `\\` before the newline the one-backslash
-// escape with the newline kept, which this decoder's ordering gives. Any other
-// escaped character stands for itself, matching the string-literal decoder.
 static void AppendLiteralChar(const std::string& fmt, size_t& i,
                               std::string& out) {
   if (fmt[i] != '\\' || i + 1 >= fmt.size()) {
@@ -593,11 +412,6 @@ static void AppendLiteralChar(const std::string& fmt, size_t& i,
   out += c;
 }
 
-// §21.2.1.2: parse the optional field width that may sit between the '%' and
-// the radix letter. It shall be a non-negative decimal integer constant.
-// Starting at fmt[start] (the character after the '%'), advance past the run of
-// digits and report whether any were seen along with their value; leave start
-// pointing at the first non-digit (the radix letter).
 static void ParseFieldWidth(const std::string& fmt, size_t& start,
                             bool& has_width, uint32_t& width) {
   has_width = false;
@@ -613,7 +427,6 @@ static bool IsRealSpec(char spec) {
   return spec == 'e' || spec == 'f' || spec == 'g';
 }
 
-// Records into `flags` the C flag `c` is, answering whether it is one.
 static bool RecordCFlag(char c, FormatFieldSpec& flags) {
   switch (c) {
     case '-':
@@ -633,12 +446,6 @@ static bool RecordCFlag(char c, FormatFieldSpec& flags) {
   }
 }
 
-// §21.2.1.1 (printed page 658): Table 21-2's real specifiers format with all
-// of C's formatting abilities, its flags among them.
-// From fmt[start], the character after the '%', record the run of `-`, `+`,
-// space and `#` and advance past it when the conversion it opens ends in a
-// real specifier; any other specifier takes no flag, and the run is left for
-// the specifier position to read, as before.
 static void ParseRealFlags(const std::string& fmt, size_t& start,
                            FormatFieldSpec& field) {
   size_t j = start;
@@ -656,18 +463,11 @@ static void ParseRealFlags(const std::string& fmt, size_t& start,
   start = j;
 }
 
-// Specifiers that take no expression argument (%m, %l) substitute a scope-
-// derived token directly. Returns true when the spec was handled here; the
-// caller then leaves the argument cursor untouched.
 static bool TryNoArgScopeSpec(char spec, FormatArgs& args, std::string& out) {
-  // §21.2.1.5: %m expands to the hierarchical name of the scope that invokes
-  // the system task.
   if (spec == 'm') {
     if (args.ctx != nullptr) out += ScopeHierName(*args.ctx);
     return true;
   }
-  // §33.7: %l / %L expand to the library.cell binding of the module instance
-  // that contains the display task, consuming no argument the way %m does.
   if (spec == 'l') {
     out += BuildInstanceBinding(args.ctx);
     return true;
@@ -675,11 +475,6 @@ static bool TryNoArgScopeSpec(char spec, FormatArgs& args, std::string& out) {
   return false;
 }
 
-// The report §21.2.1.4 makes of an operand that is a reference to a net it does
-// not admit, named by which shape the calling task found it to be. Each is
-// named for itself because what a writer does about one is not what they do
-// about the other: a vector net wants a bit-select of it, and a select that
-// still names more than one bit is already one select too wide.
 static const char* NonScalarPercentVReport(char nonscalar) {
   if (nonscalar == 2) {
     return "a %v format specification takes a scalar reference, and the "
@@ -689,13 +484,6 @@ static const char* NonScalarPercentVReport(char nonscalar) {
          "it consumed is a net declared with a range";
 }
 
-// §21.2.1.4: each %v in a string literal is matched by a scalar reference
-// among the arguments that follow it, and the three-character group the
-// clause defines gives the strength of a scalar net, so it stands for one
-// scalar and not for however many bits a vector holds: a reference to a net
-// that is not a scalar is reported and nothing rendered for it. The rendering
-// itself is precomputed by the calling task, which holds the net reference,
-// and is substituted verbatim.
 static void AppendStrengthArg(FormatArgs& args, std::string& out) {
   char nonscalar =
       args.vi < args.nonscalar_nets.size() ? args.nonscalar_nets[args.vi] : 0;
@@ -710,14 +498,8 @@ static void AppendStrengthArg(FormatArgs& args, std::string& out) {
   ++args.vi;
 }
 
-// Specifiers whose substitution is precomputed by the calling task and held in
-// a parallel string vector indexed by the argument cursor: %v (§21.2.1.4 net
-// strength) and %p (assignment-pattern rendering). Returns true when the spec
-// was handled here; in that case the argument cursor has been advanced.
 static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
                                   std::string& out) {
-  // §21.2.1.4: %v prints the strength of a scalar net, and consumes one
-  // argument whether or not it renders anything for it.
   if (spec == 'v') {
     AppendStrengthArg(args, out);
     return true;
@@ -731,17 +513,11 @@ static bool TryPrecomputedArgSpec(char spec, FormatArgs& args,
   return false;
 }
 
-// Table 21-1 and Table 21-2 give each specifier in both cases (e.g. "%m or
-// %M"); collapse to a single case before deciding what to do.
 static char NormalizeFormatSpec(char spec) {
   if (spec >= 'A' && spec <= 'Z') return static_cast<char>(spec - 'A' + 'a');
   return spec;
 }
 
-// §21.2.1.1: the integer format specifiers may not be applied to an unpacked
-// aggregate argument. When the caller flagged this positional argument as one,
-// it is rejected and nothing rendered rather than a bogus value emitted. True
-// means the argument was consumed here.
 static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
   bool is_integer_spec = norm == 'd' || norm == 'h' || norm == 'x' ||
                          norm == 'o' || norm == 'b' || norm == 'c' ||
@@ -749,8 +525,6 @@ static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
   if (!is_integer_spec || args.vi >= args.agg_flags.size() ||
       args.agg_flags[args.vi] == 0)
     return false;
-  // §21.2.1.1 (printed page 657): %u and %z are defined on an unpacked struct
-  // or union.
   if (args.agg_flags[args.vi] == 3 && (norm == 'u' || norm == 'z'))
     return false;
   if (args.ctx != nullptr) {
@@ -760,15 +534,10 @@ static bool RejectIntegerSpecOnAggregate(char norm, FormatArgs& args) {
         "aggregate argument",
         Subclause("21.2.1.1"));
   }
-  ++args.vi;  // the argument is consumed even though nothing is rendered
+  ++args.vi;
   return true;
 }
 
-// §21.2.1.7: the string specifier admits, besides an integral or string-typed
-// value, an unpacked array of byte -- rendered as the characters its elements
-// spell from the left bound to the right bound (precomputed by the calling
-// task). Any other unpacked aggregate has no character rendering and is
-// rejected. True means the argument was consumed here.
 static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
                                         std::string& out) {
   if (norm != 's' || args.vi >= args.agg_flags.size() ||
@@ -783,22 +552,10 @@ static bool AppendStringSpecOnAggregate(char norm, FormatArgs& args,
         "elements of type byte",
         Subclause("21.2.1.7"));
   }
-  ++args.vi;  // one argument is consumed either way
+  ++args.vi;
   return true;
 }
 
-// §20.4.3: %t renders time through the active $timeformat configuration. An
-// explicitly threaded spec wins; otherwise the run-time context supplies the
-// configuration installed by the most recent $timeformat call (or the Table
-// 20-3 defaults when none has run yet). This is what makes a plain
-// $display/$fmonitor with %t honor $timeformat, whose setting governs every %t
-// in the design until the next $timeformat call replaces it. A field width
-// written into the specifier overrides that configuration's minimum field
-// width alone, as §21.2.1.3 has a field width override the automatic sizing
-// and a width of 0 mean the minimum width with no leading spaces: §16.3's
-// example prints `%0t` of a time of 10 as "10", not padded to Table 20-3's
-// default of 20 columns. §21.2.1.1: the C-style width.precision (e.g. %10.3g)
-// applies to reals.
 static void AppendRenderedValue(char spec, char norm,
                                 const FormatFieldSpec& field, FormatArgs& args,
                                 std::string& out) {
@@ -809,7 +566,6 @@ static void AppendRenderedValue(char spec, char norm,
     if (field.has_width) {
       widened.minimum_field_width = static_cast<int>(field.width);
     }
-    // §20.4.3: the value is a time in the unit of the scope that formats it.
     int value_order = widened.units_number;
     if (args.ctx != nullptr) {
       const TimeScale& scale = ActiveInstanceTimeScale(*args.ctx);
@@ -830,8 +586,6 @@ static void AppendRenderedValue(char spec, char norm,
       FormatArgWidth(args.vals[args.vi++], spec, field.has_width, field.width);
 }
 
-// Render the next value argument for an ordinary radix/real/time specifier,
-// advancing the argument cursor when a value is consumed.
 static void AppendValueArg(char spec, const FormatFieldSpec& field,
                            FormatArgs& args, std::string& out) {
   if (args.vi >= args.vals.size()) return;
@@ -858,29 +612,19 @@ static bool ProcessFormatSpec(const std::string& fmt, size_t& i,
                                       fmt[j + 1] >= '1' && fmt[j + 1] <= '9');
   ParseFieldWidth(fmt, j, has_width, width);
 
-  // §21.2.1.1: a real specifier may carry a C-style ".precision" after the
-  // optional field width (e.g. "%10.3g"). Consume it here so the fractional-
-  // digit count reaches the real renderer and never leaks into the output as
-  // literal text. A lone '.' selects a precision of zero, as in C.
   bool has_prec = false;
   uint32_t prec = 0;
   if (j < fmt.size() && fmt[j] == '.') {
     ++j;
     ParseFieldWidth(fmt, j, has_prec, prec);
-    has_prec = true;  // a lone '.' still means precision, defaulting to zero
+    has_prec = true;
   }
 
   char spec = (j < fmt.size()) ? fmt[j] : 'd';
 
-  // Table 21-1 and Table 21-2 give each specifier in both cases (e.g.
-  // "%m or %M"); collapse to a single case before deciding what to do. The
-  // case is kept for the real specifiers, which render as C's %E, %F and %G
-  // do.
   field.uppercase = spec == 'E' || spec == 'F' || spec == 'G';
   if (spec >= 'A' && spec <= 'Z') spec = static_cast<char>(spec - 'A' + 'a');
 
-  // No-argument scope specifiers leave the argument cursor untouched, so report
-  // false to the caller.
   if (TryNoArgScopeSpec(spec, args, out)) {
     i = j;
     return false;
@@ -905,8 +649,6 @@ std::string FormatDisplay(const std::string& fmt,
                           const std::vector<Logic4Vec>& vals,
                           const DisplayFormatOpts& opts) {
   std::string out;
-  // §21.2.1.4 / §21.2.1: a null precomputed-string pointer means the calling
-  // task supplied none, so bind the argument cursor to a shared empty list.
   static const std::vector<std::string> kEmpty;
   static const std::vector<char> kEmptyFlags;
   const std::vector<std::string>& p_fmts =

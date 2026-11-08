@@ -64,9 +64,6 @@ TEST(PortDeclElaboration, RefPortElaborates) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kRef);
 }
 
-// A.2.1.2 and A.2.3 let a non-ANSI output declaration of a variable port
-// initialize the port, and the initializer reaches it as it does from an ANSI
-// header (#7588).
 TEST(PortDeclElaboration, NonAnsiOutputVariablePortInitializerKept) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -83,9 +80,6 @@ TEST(PortDeclElaboration, NonAnsiOutputVariablePortInitializerKept) {
   EXPECT_NE(mod->ports[1].init_value, nullptr);
 }
 
-// Only an output variable port's non-ANSI declaration takes an initializer.
-// One written on an output net, an input, an inout or a ref port is reported
-// by the rule it breaks, at the port's place in the header (#7588).
 TEST(PortDeclElaboration, NonAnsiInitializerOnAnotherPortIsReported) {
   ElabFixture f;
   Elaborate(

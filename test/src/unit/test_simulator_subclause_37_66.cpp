@@ -11,20 +11,6 @@
 namespace delta {
 namespace {
 
-// §37.66 While, repeat: the object model diagram groups a while statement and a
-// repeat statement, drawing a vpiCondition edge from each to a controlling
-// condition expression and an untagged edge from each to a body statement (the
-// vpiStmt relation, §37.4.3 making an untagged arrow's type the enclosure's
-// word with "vpi" in front). The clause carries no numbered Details and no
-// 'shall' sentences. These tests observe the production code that serves the
-// diagram's two relations: the vpiCondition edge through the dedicated helper
-// VpiLoopConditionExpr, and the body edge through the resolver that reads the
-// dotted `stmt` enclosure as §37.4.1 reads it -- a class grouping other
-// objects, never a kind a statement of a design carries -- so the body is
-// reached by what it is rather than by the relation's own tag.
-
-// The fixture installs a context so the public vpi_handle entry point runs its
-// real dispatch over the test objects.
 class WhileRepeat : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -32,14 +18,12 @@ class WhileRepeat : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// vpiCondition edge: a while statement reaches its condition expression through
-// the public vpi_handle(vpiCondition, ...) dispatch path.
 TEST_F(WhileRepeat, WhileStatementReachesConditionThroughVpiCondition) {
   VpiObject condition;
-  condition.type = vpiOperation;  // an expression kind
+  condition.type = vpiOperation;
 
   VpiObject body;
-  body.type = vpiBegin;  // a statement kind the `stmt` class groups
+  body.type = vpiBegin;
 
   VpiObject while_stmt;
   while_stmt.type = vpiWhile;
@@ -49,11 +33,9 @@ TEST_F(WhileRepeat, WhileStatementReachesConditionThroughVpiCondition) {
             &condition);
 }
 
-// vpiCondition edge: a repeat statement reaches its condition expression the
-// same way - the grouping serves both looping kinds.
 TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
   VpiObject condition;
-  condition.type = vpiRefObj;  // another expression kind
+  condition.type = vpiRefObj;
 
   VpiObject repeat_stmt;
   repeat_stmt.type = vpiRepeat;
@@ -63,12 +45,9 @@ TEST_F(WhileRepeat, RepeatStatementReachesConditionThroughVpiCondition) {
             &condition);
 }
 
-// vpiCondition edge: the condition is found even when a non-expression child
-// (the loop body statement) precedes it in the child list. The scan skips the
-// body and returns the first expression child.
 TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
   VpiObject body;
-  body.type = vpiBegin;  // a non-expression child, listed first
+  body.type = vpiBegin;
 
   VpiObject condition;
   condition.type = vpiOperation;
@@ -81,20 +60,17 @@ TEST_F(WhileRepeat, ConditionFoundWhenItFollowsTheBodyChild) {
             &condition);
 }
 
-// vpiCondition edge: a null handle and a loop with no expression child both
-// report no condition.
 TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiLoopConditionExpr(nullptr), nullptr);
 
   VpiObject body;
-  body.type = vpiBegin;  // a statement kind the `stmt` class groups
+  body.type = vpiBegin;
 
   VpiObject bare_loop;
   bare_loop.type = vpiWhile;
-  bare_loop.children = {&body};  // only a body, no condition expression
+  bare_loop.children = {&body};
   EXPECT_EQ(VpiLoopConditionExpr(&bare_loop), nullptr);
 
-  // A statement of no looping kind has no loop condition, whatever it holds.
   VpiObject condition;
   condition.type = vpiOperation;
   VpiObject if_stmt;
@@ -103,12 +79,6 @@ TEST_F(WhileRepeat, ConditionIsNullWhenAbsentOrHandleNull) {
   EXPECT_EQ(VpiLoopConditionExpr(&if_stmt), nullptr);
 }
 
-// vpiCondition edge is scoped to the loop statements: asking a non-loop
-// statement for vpiCondition does not pick up an expression child through this
-// path. The negative control must be a genuinely condition-less statement -- a
-// forever loop (§37.70 draws no controlling-condition edge), not a wait (§37.67
-// draws its own vpiCondition, served publicly). A forever with an expression
-// child yields no condition from the while/repeat dispatch.
 TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -120,13 +90,6 @@ TEST_F(WhileRepeat, VpiConditionIsScopedToLoopStatements) {
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&forever_stmt)), nullptr);
 }
 
-// Body edge (the diagram's untagged arrow to `stmt`): a while statement reaches
-// its body, and a repeat statement reaches its own, through
-// vpi_handle(vpiStmt, ...). The body objects carry the kinds a statement of a
-// design carries -- an unnamed begin and a single assignment -- rather than
-// vpiStmt, which §37.4.1 makes the name of the class the enclosure groups and
-// not a kind any object has. Read that way the traversal found the body of no
-// loop at all.
 TEST_F(WhileRepeat, LoopBodyReachedByTheKindTheStmtClassGroups) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -151,9 +114,6 @@ TEST_F(WhileRepeat, LoopBodyReachedByTheKindTheStmtClassGroups) {
             &repeat_body);
 }
 
-// Body edge: the condition expression is not the body. A loop whose only child
-// is its controlling condition reaches no statement, which is what separates
-// the two arrows the enclosure draws from each other.
 TEST_F(WhileRepeat, TheConditionExpressionIsNotTakenForTheBody) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -167,8 +127,6 @@ TEST_F(WhileRepeat, TheConditionExpressionIsNotTakenForTheBody) {
             &condition);
 }
 
-// The while and repeat loops of a run: those a design's procedures write,
-// built from the elaborated design rather than by hand (#5000).
 class WhileAndRepeatLoopsOfARun : public VpiDesignRun {
  protected:
   static vpiHandle LoopOf(const char* scope) {
@@ -177,7 +135,6 @@ class WhileAndRepeatLoopsOfARun : public VpiDesignRun {
   }
 };
 
-// A while loop reaches the condition it tests and the statement it repeats.
 TEST_F(WhileAndRepeatLoopsOfARun, AWhileLoopIsAnObjectOfTheRun) {
   Run("module top; int i; initial while (i < 3) i = i + 1; endmodule\n");
   vpiHandle loop = LoopOf("top");
@@ -191,7 +148,6 @@ TEST_F(WhileAndRepeatLoopsOfARun, AWhileLoopIsAnObjectOfTheRun) {
   EXPECT_EQ(vpi_get(vpiType, body), vpiAssignment);
 }
 
-// A repeat loop's count written as a name is the variable it names.
 TEST_F(WhileAndRepeatLoopsOfARun, ARepeatLoopReachesItsCount) {
   Run("module top; int n = 2; initial repeat (n) #1 ; endmodule\n");
   vpiHandle loop = LoopOf("top");

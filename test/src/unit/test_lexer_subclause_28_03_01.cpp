@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_lexer.h"
@@ -17,11 +15,6 @@ TEST(GateKeywordLexing, AllTwentySixKeywords) {
   }
 }
 
-// §28.3.1 negative form: Table 28-1 fixes the exact spellings that begin a
-// gate/switch declaration. A near-miss identifier (a keyword with an extra
-// character, a wrong suffix, or the plain word "gate") is NOT one of the 26
-// entries, so the lexer must tokenize it as an ordinary identifier rather than
-// any gate-keyword token.
 TEST(GateKeywordLexing, NearMissSpellingsAreIdentifiers) {
   constexpr const char* kNearMisses[] = {
       "andx", "buff",  "nott",     "cmoss", "trann",   "bufif2",

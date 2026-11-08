@@ -22,12 +22,8 @@ using namespace delta;
 
 namespace {
 
-// §8.29: the marking half of the class garbage collector, read off one place a
-// run keeps a handle at a time. Each case gives the marker three objects,
-// handles 1 to 3, and checks which of them a store it is handed reaches.
 class ClassGcMarking : public ::testing::Test {
  protected:
-  // A value of `width` bits holding `handle` at bit 0.
   Logic4Vec Holding(uint64_t handle, uint32_t width = 64) {
     Logic4Vec value = MakeLogic4Vec(arena_, width);
     value.words[0].aval = handle;
@@ -42,9 +38,6 @@ class ClassGcMarking : public ::testing::Test {
   ClassGcMarker mark_{objects_, live_};
 };
 
-// Nothing a null store, an empty value, the null handle or a handle no object
-// has refers to is marked; nor is a window of a wide value above the highest
-// handle.
 TEST_F(ClassGcMarking, NothingIsMarkedThroughAnEmptyStore) {
   mark_.Var(nullptr);
   mark_.Queue(nullptr);
@@ -57,11 +50,6 @@ TEST_F(ClassGcMarking, NothingIsMarkedThroughAnEmptyStore) {
   EXPECT_TRUE(live_.empty());
 }
 
-// §7.2: a structure's class-typed members are read where its layout puts them
-// (#7226): a handle at bit 32, after the int below it, one in a nested
-// structure's member, and one starting the last word; a member of another
-// type, one running off the value's end, and one the value is too short to
-// hold, are not read as handles.
 TEST_F(ClassGcMarking, AStructuresClassMembersAreMarkedWhereTheyStand) {
   StructTypeInfo inner;
   inner.fields.push_back({"n", 0, 64, DataTypeKind::kNamed});
@@ -82,8 +70,6 @@ TEST_F(ClassGcMarking, AStructuresClassMembersAreMarkedWhereTheyStand) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2, 3}));
 }
 
-// A variable's value and the value a pending nonblocking assignment will write
-// to it are both roots.
 TEST_F(ClassGcMarking, AVariablesValueAndPendingValueAreMarked) {
   Variable var;
   var.value = Holding(1);
@@ -93,8 +79,6 @@ TEST_F(ClassGcMarking, AVariablesValueAndPendingValueAreMarked) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2}));
 }
 
-// A queue's elements are roots, and so are those of the queues its elements
-// are.
 TEST_F(ClassGcMarking, AQueuesElementsAndNestedQueuesAreMarked) {
   QueueObject inner;
   inner.elements.push_back(Holding(2));
@@ -105,8 +89,6 @@ TEST_F(ClassGcMarking, AQueuesElementsAndNestedQueuesAreMarked) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2}));
 }
 
-// An associative array's class-handle keys, values, default and nested arrays
-// are roots.
 TEST_F(ClassGcMarking, AnAssocArraysKeysValuesDefaultAndNestedAreMarked) {
   QueueObject queue;
   queue.elements.push_back(Holding(3));
@@ -124,7 +106,6 @@ TEST_F(ClassGcMarking, AnAssocArraysKeysValuesDefaultAndNestedAreMarked) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2, 3}));
 }
 
-// A mailbox's messages are roots.
 TEST_F(ClassGcMarking, AMailboxsMessagesAreMarked) {
   MailboxObject mailbox;
   Logic4Snapshot message;
@@ -134,8 +115,6 @@ TEST_F(ClassGcMarking, AMailboxsMessagesAreMarked) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{3}));
 }
 
-// A suspended process's parked scopes and the objects its method calls run on
-// are roots; a finished or killed process's are not.
 TEST_F(ClassGcMarking, OnlyALiveProcesssStacksAreMarked) {
   Variable var;
   var.value = Holding(1);
@@ -164,7 +143,6 @@ TEST_F(ClassGcMarking, OnlyALiveProcesssStacksAreMarked) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2, 3}));
 }
 
-// A class's static properties are roots, whatever container holds them.
 TEST_F(ClassGcMarking, AClasssStaticPropertiesAreMarked) {
   QueueObject queue;
   queue.elements.push_back(Holding(2));
@@ -183,8 +161,6 @@ TEST_F(ClassGcMarking, AClasssStaticPropertiesAreMarked) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2, 3}));
 }
 
-// What a live object refers to through any property, container or ref cell
-// is marked in turn.
 TEST_F(ClassGcMarking, AnObjectsReferencesArePropagated) {
   QueueObject queue;
   queue.elements.push_back(Holding(2));
@@ -202,8 +178,6 @@ TEST_F(ClassGcMarking, AnObjectsReferencesArePropagated) {
   EXPECT_EQ(live_, (std::unordered_set<uint64_t>{1, 2, 3}));
 }
 
-// A handle pinned twice stays pinned until both pins are released; releasing
-// one that was never pinned changes nothing.
 TEST(ClassGcPins, AHandlePinnedTwiceStaysPinnedUntilBothAreReleased) {
   Arena arena;
   Scheduler scheduler{arena};
@@ -216,8 +190,6 @@ TEST(ClassGcPins, AHandlePinnedTwiceStaysPinnedUntilBothAreReleased) {
   EXPECT_TRUE(scheduler.PinnedHandles().empty());
 }
 
-// The mailboxes held through a handle variable and inside a container are
-// both held mailboxes.
 TEST(ClassGcHeldMailboxes, HandleAndContainerMailboxesAreHeld) {
   DeclaredNameTables tables;
   MailboxObject by_handle;

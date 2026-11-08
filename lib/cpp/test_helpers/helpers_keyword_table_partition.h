@@ -8,9 +8,6 @@
 
 #include "model_keyword_table_sweeps.h"
 
-// How many entries of `tables`, counted across every table, spell `word`. A
-// word two of the tables both hold is counted once for each of them, which is
-// what a check for a table covering another table's ground reads.
 inline size_t CountWordInTables(std::initializer_list<KeywordTableSweep> tables,
                                 const std::string& word) {
   size_t seen = 0;
@@ -22,11 +19,6 @@ inline size_t CountWordInTables(std::initializer_list<KeywordTableSweep> tables,
   return seen;
 }
 
-// A version_specifier's reserved word list is exactly the tables §22.14 says
-// that version names, put together. Both halves of that have to be checked: a
-// per-table sweep passing for each table on its own leaves it open that the
-// tables between them cover less of the list than the whole of it, or that one
-// word is counted twice because two tables both hold it.
 inline void ExpectTablesPartitionTheList(
     std::initializer_list<KeywordTableSweep> tables, size_t expected_total) {
   size_t total = 0;

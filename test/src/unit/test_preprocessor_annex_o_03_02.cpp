@@ -12,11 +12,8 @@ using namespace delta;
 
 namespace {
 
-// The key standing in for the tool's embedded one.
 constexpr std::string_view kVendorKey = "vendor-secret-key";
 
-// The design the input asks to have encrypted, and the licences written
-// beside it inside the block.
 constexpr std::string_view kDesign = "  initial result = 42;\n";
 constexpr std::string_view kDecryptLicense =
     "`pragma protect decrypt_license=(library=\"lic.so\", "
@@ -29,9 +26,6 @@ bool Holds(std::string_view text, std::string_view needle) {
   return text.find(needle) != std::string_view::npos;
 }
 
-// An input of §O.3.1 with a cleartext section on either side of its one
-// block, the block naming its key and asking for a digest, and the licences
-// and the design inside it.
 std::string TheInput() {
   std::string src = "module m;\n";
   src += "`pragma protect author=\"Acme Author\"\n";
@@ -46,8 +40,6 @@ std::string TheInput() {
   return src;
 }
 
-// The line beneath the expression announcing `block` in `written`, which
-// §34.5.15.2 has the block written on.
 std::string LineBeneath(std::string_view written, std::string_view block) {
   std::string opening = "`pragma protect ";
   opening.append(block).append("\n");
@@ -59,12 +51,6 @@ std::string LineBeneath(std::string_view written, std::string_view block) {
   return std::string(written.substr(start, close - start));
 }
 
-// §O.3.2: the output the tool should generate for each block is a protected
-// region carrying, in the clear, its start and end, the key's owner and name,
-// the method and the encoding, the author's name and information if the
-// input provided them, and the digest and data blocks; the cleartext of the
-// input is copied to the output; and the data are composed of the licences
-// and the text between begin and end.
 TEST(ToolVendorSecretKeyOutput, TheOutputIsAsTheAnnexHasIt) {
   EXPECT_TRUE(CleartextIsCopiedToTheToolVendorSecretKeyOutput());
   auto expressions = ExpressionsTheToolVendorSecretKeyOutputCarries();
@@ -88,12 +74,6 @@ TEST(ToolVendorSecretKeyOutput, TheOutputIsAsTheAnnexHasIt) {
   EXPECT_EQ(composition[1], "runtime_license");
 }
 
-// §O.3.2 against the flow: the encrypting run copies the cleartext on either
-// side of the block to the output, and generates for the block a protected
-// region that carries every expression the annex lists in the clear -- the
-// author's name and information being the ones the input provided -- with
-// the encoded encrypted digest on the line beneath digest_block and the
-// encoded encrypted data on the line beneath data_block.
 TEST(ToolVendorSecretKeyOutput,
      TheRunGeneratesTheListedExpressionsForTheBlock) {
   std::string written = EncryptEnvelopes(TheInput(), kVendorKey);
@@ -111,10 +91,6 @@ TEST(ToolVendorSecretKeyOutput,
   EXPECT_TRUE(Holds(written, "`pragma protect end_protected\n"));
 }
 
-// §O.3.2 against the flow: the encrypted data are composed of the decryption
-// licence, the run-time licence and the text found between begin and end,
-// none of which stands in the clear, and all of which the block records
-// under the key.
 TEST(ToolVendorSecretKeyOutput,
      TheDataAreTheLicencesAndTheTextBetweenBeginAndEnd) {
   std::string written = EncryptEnvelopes(TheInput(), kVendorKey);

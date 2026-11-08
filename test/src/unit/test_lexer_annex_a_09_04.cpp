@@ -49,9 +49,6 @@ TEST(WhiteSpaceLexing, EmptyInputProducesOnlyEofToken) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kEof);
 }
 
-// A run mixing every printing white_space alternative (space, tab, newline,
-// formfeed) collapses to a single token boundary: the rule discards white space
-// rather than emitting a token per character, so two tokens remain, not more.
 TEST(WhiteSpaceLexing, MixedRunOfWhitespaceCollapsesToSingleSeparator) {
   auto tokens = Lex("a \t\n\f b");
   ASSERT_EQ(tokens.size(), 3u);
@@ -60,9 +57,6 @@ TEST(WhiteSpaceLexing, MixedRunOfWhitespaceCollapsesToSingleSeparator) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-// Leading and trailing white space is discarded, not turned into empty or
-// whitespace tokens: a single identifier surrounded by white space yields only
-// that identifier followed by eof.
 TEST(WhiteSpaceLexing, LeadingAndTrailingWhitespaceIsDiscarded) {
   auto tokens = Lex(" \t a \n ");
   ASSERT_EQ(tokens.size(), 2u);

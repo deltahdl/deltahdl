@@ -43,17 +43,8 @@ namespace {
 
 using NameSet = std::unordered_set<std::string_view>;
 
-// Where in an assertion an expression stands, which decides what it may
-// read: an operand of a sequence or property, the disable condition of a
-// disable iff (§16.12), the condition of an abort operator (§16.12.14), or a
-// clocking event.
 enum class Place : uint8_t { kOperand, kDisable, kAbort, kClock };
 
-// What the rules read besides the expression: the module's parameters, its
-// named sequences and properties in the registry, its named sequences and
-// its tasks and functions by name, the module, its declaration with the
-// compilation unit holding it, which resolve the subroutine a call attached to
-// a sequence names (AttachedCallTarget), and the diagnostics sink.
 struct RuleEnv {
   const ScopeMap& params;
   const PropertyRegistry& registry;
@@ -64,13 +55,10 @@ struct RuleEnv {
   DiagEngine& diag;
 };
 
-// One root expression and what holds where it stands.
 struct Site {
   Place place = Place::kOperand;
   const NameSet* locals = nullptr;
   const NameSet* automatics = nullptr;
-  // Whether the expression stands in a sequence or property, rather than in
-  // procedural code outside any assertion.
   bool in_assertion = true;
 };
 
@@ -91,8 +79,6 @@ bool MentionsAny(const Expr* e, const NameSet* names) {
   return names != nullptr && !names->empty() && ExprMentionsAny(e, *names);
 }
 
-// §16.9.3: the argument expressions of a sampled value function read no
-// local variable (§16.10) and no `matched`.
 void CheckSampledArguments(const Expr* call, const Site& site,
                            DiagEngine& diag) {
   for (const Expr* arg : call->args) {
@@ -107,8 +93,6 @@ void CheckSampledArguments(const Expr* call, const Site& site,
   }
 }
 
-// §16.9.3: $past's number_of_ticks is an elaboration-time constant of 1 or
-// greater.
 void CheckPastTicks(const Expr* call, const RuleEnv& env) {
   if (call->callee != "$past" || call->args.size() < 2 ||
       call->args[1] == nullptr) {
@@ -127,8 +111,6 @@ void CheckPastTicks(const Expr* call, const RuleEnv& env) {
   }
 }
 
-// §16.9.3: an automatic variable may stand in $past's expression1, but not
-// in its expression2 or in the clocking event of a sampled value function.
 void CheckSampledAutomatics(const Expr* call, const Site& site,
                             DiagEngine& diag) {
   if (site.automatics == nullptr) return;
@@ -144,9 +126,6 @@ void CheckSampledAutomatics(const Expr* call, const Site& site,
              Subclause("16.9.3"));
 }
 
-// §16.9.3 and §16.12.14: a sampled value function other than $sampled
-// written in a disable condition, a clocking event or an abort condition
-// gives its clocking event explicitly, none flowing to it there.
 void CheckSampledClock(const Expr* call, const Site& site, DiagEngine& diag) {
   if (site.place == Place::kOperand || call->callee == "$sampled" ||
       call->sampled_clock != nullptr) {
@@ -161,8 +140,6 @@ void CheckSampledClock(const Expr* call, const Site& site, DiagEngine& diag) {
              Subclause(abort ? "16.12.14" : "16.9.3"));
 }
 
-// §16.13.6: `triggered` in a disable condition applies to a sequence with an
-// explicit clocking event, none being inferred there.
 void CheckDisableTriggered(const Expr* e, const RuleEnv& env) {
   const ModuleItem* seq = InstantiatedDecl(e->lhs, env.sequences);
   if (seq == nullptr || !seq->seq_clock.empty()) return;
@@ -173,8 +150,6 @@ void CheckDisableTriggered(const Expr* e, const RuleEnv& env) {
                  Subclause("16.13.6"));
 }
 
-// §16.12.14: an abort condition references no local variable and no
-// sequence method.
 void CheckAbortCondition(const Expr* root, const Site& site, DiagEngine& diag) {
   bool method = false;
   std::vector<const Expr*> stack{root};
@@ -192,10 +167,6 @@ void CheckAbortCondition(const Expr* root, const Site& site, DiagEngine& diag) {
              Subclause("16.12.14"));
 }
 
-// §16.8.2: the actual of an inout or output local variable formal is, in its
-// entirety, a reference to a local variable in scope at the instance, no
-// local variable is the actual of two of them, and an instance of a sequence
-// with one admits no empty match.
 void CheckLocalActuals(const Expr* call, const ModuleItem* seq,
                        const Site& site, const RuleEnv& env) {
   std::vector<Direction> dirs = LocalFormalDirections(seq);
@@ -233,8 +204,6 @@ void CheckLocalActuals(const Expr* call, const ModuleItem* seq,
   }
 }
 
-// §16.8.2: triggered and matched apply to no instance of a sequence with an
-// input or inout local variable formal argument.
 void CheckLocalFormalsOfMethod(const Expr* e, const ModuleItem* seq,
                                const RuleEnv& env) {
   for (Direction dir : LocalFormalDirections(seq)) {
@@ -250,9 +219,6 @@ void CheckLocalFormalsOfMethod(const Expr* e, const ModuleItem* seq,
   }
 }
 
-// §16.10, and §16.13.5 for matched: a local variable passed to an instance
-// that triggered or matched is applied to is an entire actual argument,
-// never a proper subexpression of one.
 void CheckLocalsInMethodActuals(const Expr* e, const Site& site,
                                 const RuleEnv& env) {
   for (const Expr* arg : e->lhs->args) {
@@ -268,9 +234,6 @@ void CheckLocalsInMethodActuals(const Expr* e, const Site& site,
   }
 }
 
-// §16.13.6: matched stands only in a sequence expression, and triggered
-// outside one applies to no sequence that assigns a formal argument in a
-// match item, treating it as a local variable.
 void CheckMethodContext(const Expr* e, const ModuleItem* seq, const Site& site,
                         const RuleEnv& env) {
   bool matched = SequenceMethodOf(e) == "matched";
@@ -294,10 +257,6 @@ void CheckMethodContext(const Expr* e, const ModuleItem* seq, const Site& site,
                  Subclause("16.13.6"));
 }
 
-// Annex C.2.3: ended, the end-point method IEEE 1800-2005 had a sequence
-// expression read, is removed in favour of triggered, so a read of it off a
-// named sequence names a method the language no longer has, wherever it is
-// written and whether or not a run would evaluate it.
 void CheckRemovedEndedMethod(const Expr* e, const RuleEnv& env) {
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution ||
       e->rhs->text != "ended") {
@@ -326,8 +285,6 @@ bool IsFutureGclkCall(const Expr* e) {
          IsGlobalClockingFutureFunction(fn);
 }
 
-// §16.9.4: no global clocking future sampled value function stands in the
-// argument of another.
 void CheckFutureGclkNesting(const Expr* call, DiagEngine& diag) {
   bool nested = false;
   for (const Expr* arg : call->args) {
@@ -341,10 +298,7 @@ void CheckFutureGclkNesting(const Expr* call, DiagEngine& diag) {
              Subclause("16.9.4"));
 }
 
-// §16.6: a function called in a concurrent assertion takes no output, inout
-// or ref argument, is automatic or keeps no state, and has no side effect.
 void CheckAssertionFunctionCall(const Expr* call, const RuleEnv& env) {
-  // A call in an expression names a function, a task being no expression.
   auto it = env.subroutines.find(call->callee);
   if (it == env.subroutines.end()) return;
   const ModuleItem* fn = it->second;
@@ -363,9 +317,6 @@ void CheckAssertionFunctionCall(const Expr* call, const RuleEnv& env) {
                  Subclause("16.6"));
 }
 
-// §16.6: an increment or a decrement evaluated in a concurrent assertion is a
-// side effect, which a sequence match item assigning a local variable alone
-// may have.
 void CheckIncOrDec(const Expr* e, DiagEngine& diag) {
   bool inc_or_dec =
       (e->kind == ExprKind::kUnary || e->kind == ExprKind::kPostfixUnary) &&
@@ -381,12 +332,6 @@ void CheckIncOrDec(const Expr* e, DiagEngine& diag) {
 void CheckTree(const PropertyExprNode* node, const Site& site,
                const RuleEnv& env);
 
-// The rules on each subexpression of the root `e` standing at `site`. An
-// expression standing for a sequence or property the parser read into a tree
-// of its own is read through that tree: a group holding and, or, intersect or
-// within at its own depth, one operand of the chain around it (§16.9.5 to
-// §16.9.7 and §16.9.10), and an instance's actual written as a sequence or a
-// property (§16.8.1, §16.12.18).
 void CheckSubexpressions(const Expr* e, const Site& site, const RuleEnv& env) {
   if (e == nullptr) return;
   CheckTree(e->property_actual, site, env);
@@ -428,7 +373,6 @@ void CheckClock(const std::vector<EventExpr>& clock, const Site& site,
   }
 }
 
-// §16.11: how a subroutine's formal `arg` takes its actual.
 SubroutineArgPassing PassingOf(const FunctionArg& arg) {
   switch (arg.direction) {
     case Direction::kRef:
@@ -451,17 +395,9 @@ void ReportAttachedArg(std::string_view callee, const Expr* arg,
                  Subclause("16.11"));
 }
 
-// §13.4.1 with §16.11: what becomes of the result of a nonvoid function
-// attached to a sequence, which A.8.2 gives no void cast to discard.
 constexpr std::string_view kAttachedResultUnread =
     "a sequence receives nothing back from a call attached to it";
 
-// §16.11: an actual of a subroutine call attached to a sequence that holds
-// a local variable is passed by value; an automatic variable is passed by
-// value, as a constant input, from an assertion in procedural code alone;
-// and a variable passed by value is of a type §16.6 allows. A nonvoid
-// function is called there as if it had no return value, which §13.4.1
-// warns of.
 void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
   const ModuleItem* target = AttachedCallTarget(*call, env.scope);
   if (target == nullptr) return;
@@ -504,11 +440,6 @@ void CheckAttachedCall(const Expr* call, const Site& site, const RuleEnv& env) {
   }
 }
 
-// The expressions of a sequence body, its intersects, conjuncts and
-// alternatives included.
-// §16.10 and §16.11: no match item is attached to a sequence that admits an
-// empty match, as the parser marks those of `(b[*0:1], x = e)`; the
-// operand at `loc` carries `items`.
 void CheckEmptyMatchItems(const std::vector<SeqMatchAssign>& items,
                           SourceLoc loc, DiagEngine& diag) {
   for (bool call : {false, true}) {
@@ -529,8 +460,6 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
                      const RuleEnv& env) {
   for (const SeqMatchAssign& item : items) {
     CheckRoot(item.rhs, site, env);
-    // A.10 footnote 51: every select of the variable_lvalue a match item
-    // assigns is a constant_select, A.8.5's production the footnote is on.
     if (item.target != nullptr &&
         !SelectPathIsConstant(item.target, env.params)) {
       env.diag.Error(
@@ -538,10 +467,6 @@ void CheckMatchItems(const std::vector<SeqMatchAssign>& items, const Site& site,
           "a sequence match item assigns through a select that is not constant",
           Subclause("A.8.5"));
     }
-    // §16.11: a subroutine attached to a sequence may have side effects, so
-    // its arguments are checked as the assertion's expressions and the call
-    // by §16.11's own rules. The parser records the call as a kCall or, for
-    // a system task or function, a kSystemCall.
     if (item.call == nullptr) continue;
     for (const Expr* arg : item.call->args) CheckRoot(arg, site, env);
     if (item.call->kind == ExprKind::kCall) {
@@ -583,8 +508,6 @@ void CheckSequence(const ModuleItem* seq, const Site& site,
   CheckClock(seq->seq_clock, site, env);
 }
 
-// The expressions of the property tree under `node`, an abort's condition
-// at its own place.
 void CheckTree(const PropertyExprNode* node, const Site& site,
                const RuleEnv& env) {
   if (node == nullptr) return;
@@ -601,8 +524,6 @@ void CheckTree(const PropertyExprNode* node, const Site& site,
   }
 }
 
-// The local variables a declaration's body may read: those it declares and
-// its local variable formal arguments.
 NameSet DeclLocals(const ModuleItem* decl) {
   NameSet locals;
   CollectBodyLocals(decl->seq_linear, locals);
@@ -621,8 +542,6 @@ NameSet DeclLocals(const ModuleItem* decl) {
 bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
                           const RuleEnv& env);
 
-// Whether `operand` instantiates a named sequence binding `name` whole to
-// one of its inout or output local variable formal arguments.
 bool InstanceAssigns(const Expr* operand, std::string_view name,
                      const RuleEnv& env) {
   const ModuleItem* seq = InstantiatedDecl(operand, env.sequences);
@@ -635,10 +554,6 @@ bool InstanceAssigns(const Expr* operand, std::string_view name,
   return false;
 }
 
-// Whether every match of operand `i` of `body` assigns `name`: by a match
-// item written with it, or as the actual of an inout or output local
-// variable formal of the sequence it instantiates; an operand repeated from
-// zero has a match that assigns nothing.
 bool OperandAssigns(const SeqLinearBody& body, size_t i, std::string_view name,
                     const RuleEnv& env) {
   if (RepeatedFromZero(body, i)) return false;
@@ -646,9 +561,6 @@ bool OperandAssigns(const SeqLinearBody& body, size_t i, std::string_view name,
          InstanceAssigns(body.operands[i], name, env);
 }
 
-// Whether `name` is assigned at the completion of every match of `body`:
-// by one of its operands or the operands it is conjoined or intersected
-// with, and in every alternative of a top-level or.
 bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
                           const RuleEnv& env) {
   bool assigned = ItemsAssign(body.first_match_items, name);
@@ -667,9 +579,6 @@ bool AssignedOnEveryMatch(const SeqLinearBody& body, std::string_view name,
   return true;
 }
 
-// §16.8.2: no match of a sequence leaves an output local variable formal
-// argument unassigned at its completion, an inout one being assigned its
-// actual from the start.
 void CheckOutputsAssigned(const ModuleItem* seq, const RuleEnv& env) {
   if (seq->kind != ModuleItemKind::kSequenceDecl ||
       seq->seq_linear.operands.empty()) {
@@ -703,7 +612,6 @@ void CheckDeclaration(const ModuleItem* decl, const RuleEnv& env) {
   CheckRoot(decl->prop_disable_iff, disable, env);
 }
 
-// A concurrent assertion statement, static or procedural.
 void CheckAssertionStmt(const Stmt* s, const NameSet* automatics,
                         const RuleEnv& env) {
   NameSet locals;
@@ -714,10 +622,6 @@ void CheckAssertionStmt(const Stmt* s, const NameSet* automatics,
     CollectBodyLocals(s->assert_sequence->seq_linear, locals);
   }
   Site site{Place::kOperand, &locals, automatics};
-  // Where a tree or a sequence stands for the property, the expression is a
-  // placeholder or is held there as well: an instance standing as the whole
-  // property is its tree's root or its sequence's one operand. It is read
-  // through them alone, each breach in it reported once.
   if (s->assert_property == nullptr && s->assert_sequence == nullptr) {
     CheckRoot(s->assert_expr, site, env);
   }
@@ -729,9 +633,6 @@ void CheckAssertionStmt(const Stmt* s, const NameSet* automatics,
   CheckRoot(s->assert_disable_iff, disable, env);
 }
 
-// §16.9.3: a sampled value function other than $sampled outside an assertion
-// takes the clock the procedure infers (§16.14.6), else the default clocking;
-// a call with neither, and no clock of its own, is illegal.
 void CheckUnclockedCall(const Expr* e, const RuleEnv& env) {
   if (e == nullptr) return;
   if (IsSampledValueFunction(e) && e->callee != "$sampled" &&
@@ -747,8 +648,6 @@ void CheckUnclockedCall(const Expr* e, const RuleEnv& env) {
                    [&](const Expr* child) { CheckUnclockedCall(child, env); });
 }
 
-// The rules on the procedure or subroutine `item`: its concurrent assertion
-// statements as assertions, and its other expressions as procedural code.
 void CheckProcedure(const ModuleItem* item, const RtlirModule* mod,
                     const RuleEnv& env) {
   std::vector<const Stmt*> bodies(item->func_body_stmts.begin(),
@@ -773,16 +672,11 @@ void CheckProcedure(const ModuleItem* item, const RtlirModule* mod,
     if (no_clock) CheckUnclockedCall(e, env);
   };
   for (const Stmt* body : bodies) ForEachStmtReadExpr(body, visit);
-  // ForEachStmtReadExpr leaves out a wait's condition, a level-sensitive
-  // timing control, which the procedure evaluates as an expression all the
-  // same.
   ForEachProceduralStmt(item, [&](const Stmt* s) {
     if (s->kind == StmtKind::kWait) visit(s->condition);
   });
 }
 
-// The rules a continuous assignment, which stands outside every procedure and
-// assertion, is held to here: Annex C.2.3's on either side.
 void CheckContinuousAssign(const ModuleItem* item, const RuleEnv& env) {
   if (item->kind != ModuleItemKind::kContAssign) return;
   for (const Expr* side : {item->assign_lhs, item->assign_rhs}) {

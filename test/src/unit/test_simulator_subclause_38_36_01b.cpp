@@ -13,8 +13,6 @@
 namespace delta {
 namespace {
 
-// The first statement of `type` within `stmt`, searched through the
-// statements it holds, depth first; null for none.
 vpiHandle FirstStmtOf(int type, vpiHandle stmt) {
   if (stmt == nullptr) return nullptr;
   if (vpi_get(vpiType, stmt) == type) return stmt;
@@ -32,7 +30,6 @@ vpiHandle FirstStmtOf(int type, vpiHandle stmt) {
   return nullptr;
 }
 
-// The first statement of `type` in a process of `top`.
 vpiHandle FirstStmtOfTop(int type) {
   vpiHandle it = vpi_iterate(vpiProcess, TopObject("top"));
   if (it == nullptr) return nullptr;
@@ -45,8 +42,6 @@ vpiHandle FirstStmtOfTop(int type) {
   return nullptr;
 }
 
-// §38.36.1: a cbValueChange placed on an event statement is called each time
-// the statement executes, with no value (#7478).
 TEST_F(EventCallbacksOfARun, AValueChangeOnAnEventStatementFiresAsItRuns) {
   Armer() = [] {
     PlaceEventCallback(cbValueChange, FirstStmtOfTop(vpiEventStmt));
@@ -63,8 +58,6 @@ TEST_F(EventCallbacksOfARun, AValueChangeOnAnEventStatementFiresAsItRuns) {
   EXPECT_EQ(kChanges[1].now, 2u);
 }
 
-// §38.36.1: a cbValueChange registered in vpiStrengthVal is called when the
-// net's strength alone changes, and one in any other format is not (#7479).
 TEST_F(EventCallbacksOfARun, AStrengthOnlyChangeFiresOnlyAStrengthCallback) {
   Armer() = [] {
     PlaceEventCallback(cbValueChange, TopObject("top.w"), vpiStrengthVal);
@@ -94,8 +87,6 @@ constexpr const char* kForceReleaseOfA =
     "  initial begin $arm; #1 force a = 4'd9; #1 release a; end\n"
     "endmodule\n";
 
-// §38.36.1: a cbForce or cbRelease placed on no object is given the value of
-// the forced or released object after the statement (#7480).
 TEST_F(EventCallbacksOfARun, AForceCallbackOnNoObjectIsGivenTheValue) {
   Armer() = [] {
     PlaceEventCallback(cbForce, nullptr);
@@ -111,9 +102,6 @@ TEST_F(EventCallbacksOfARun, AForceCallbackOnNoObjectIsGivenTheValue) {
   EXPECT_EQ(kReleases[0].now, 2u);
 }
 
-// §38.36.1: a cbForce placed on a variable is called for a force of that
-// variable and not for one of another: placed on b, it is called once, after
-// b is forced to 5, and not after a is forced to 9.
 TEST_F(EventCallbacksOfARun, AForceCallbackOnOneVariableSkipsAnother) {
   Armer() = [] { PlaceEventCallback(cbForce, TopObject("top.b")); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
@@ -126,9 +114,6 @@ TEST_F(EventCallbacksOfARun, AForceCallbackOnOneVariableSkipsAnother) {
   EXPECT_EQ(kForces[0].now, 2u);
 }
 
-// §38.36.1 with §38.36: a cbForce registered with no value structure is given
-// none, one registered in vpiSuppressVal is given its structure unread, and
-// one registered with no routine calls nothing.
 TEST_F(EventCallbacksOfARun, AForceCallbackTakesTheValueItWasRegisteredFor) {
   Armer() = [] {
     s_cb_data data = {};
@@ -148,8 +133,6 @@ TEST_F(EventCallbacksOfARun, AForceCallbackTakesTheValueItWasRegisteredFor) {
   EXPECT_EQ(kForces[1].value, 0);
 }
 
-// §38.36.1: cbAssign is called after a procedural assign and cbDeassign after
-// a deassign, each given the statement and the target's value (#7481).
 TEST_F(EventCallbacksOfARun, AssignAndDeassignCallbacksFire) {
   Armer() = [] {
     PlaceEventCallback(cbAssign, TopObject("top.q"));
@@ -170,8 +153,6 @@ TEST_F(EventCallbacksOfARun, AssignAndDeassignCallbacksFire) {
   EXPECT_EQ(kDeassigns[0].now, 2u);
 }
 
-// §38.36.1: places a cbDisable on each block or task `names` names, which
-// the obj field of one is to be.
 void PlaceDisableOn(std::initializer_list<const char*> names) {
   for (const char* name : names) {
     vpiHandle scope = TopObject(name);
@@ -180,10 +161,6 @@ void PlaceDisableOn(std::initializer_list<const char*> names) {
   }
 }
 
-// §38.36.1: a cbDisable is called after a named block containing a system task
-// is disabled, with obj that block: the named begin of each of two instances
-// of a module, found among the blocks of the instance the disable ran in, and
-// a named fork.
 TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
   Armer() = [] { PlaceDisableOn({"top.a.blk", "top.b.blk", "top.f"}); };
   Run("module child; timeunit 1ns; timeprecision 1ns;\n"
@@ -207,11 +184,6 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackNamesEachDisabledBlock) {
             (std::vector<int>{vpiNamedBegin, vpiNamedBegin, vpiNamedFork}));
 }
 
-// §38.36.1 with §37.77: a cbDisable is called for the block or task the
-// disable statement names, resolved upward from where it stands (§23.8): a
-// task, the named begin a label creates around a statement (§9.3.5), the
-// block a hierarchical name reaches past another of its last name, and a
-// block of another instance.
 TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
   Armer() = [] {
     PlaceDisableOn({"top.t", "top.lbl", "top.b.inner", "top.c.blk"});
@@ -242,10 +214,6 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackIsCalledForTheScopeItNames) {
   EXPECT_EQ(times, (std::vector<uint32_t>{1, 2, 4, 5}));
 }
 
-// §38.36.1: a cbDisable is called after a named block holding a call of a
-// system task or system function is disabled, and not after one holding
-// none: a block whose one system call is a system function in an expression
-// holds one, and a block of assignments alone does not.
 TEST_F(EventCallbacksOfARun, ADisableCallbackNeedsASystemCallInTheBlock) {
   Armer() = [] { PlaceDisableOn({"top.plain", "top.calls"}); };
   Run("module top; timeunit 1ns; timeprecision 1ns; int x;\n"
@@ -260,9 +228,6 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackNeedsASystemCallInTheBlock) {
   EXPECT_EQ(kDisables[0].now, 2u);
 }
 
-// §38.36.1: a cbDisable placed on a system task call is called, with obj that
-// call, after a named block holding it is disabled, here the block around the
-// one it is written in; one placed on a call outside that block is not.
 TEST_F(EventCallbacksOfARun, ADisableCallbackOnASystemCallFiresWithItsBlock) {
   Armer() = [] {
     PlaceEventCallback(cbDisable,
@@ -284,8 +249,6 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackOnASystemCallFiresWithItsBlock) {
   EXPECT_EQ(kDisables[0].now, 1u);
 }
 
-// §38.36.1 with §9.6.2: a cbDisable is called after a function body disables
-// a named block of its own holding a system task call, with obj that block.
 TEST_F(EventCallbacksOfARun, ADisableCallbackFiresForAFunctionsBlock) {
   Armer() = [] { PlaceDisableOn({"top.f.body"}); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
@@ -306,8 +269,6 @@ TEST_F(EventCallbacksOfARun, ADisableCallbackFiresForAFunctionsBlock) {
   EXPECT_EQ(kDisables[0].now, 1u);
 }
 
-// §38.36.1: cbEnterThread is called each time a thread resumes execution,
-// given the thread (#7482).
 TEST_F(EventCallbacksOfARun, AnEnterThreadCallbackFiresOnEachResume) {
   Armer() = [] { PlaceEventCallback(cbEnterThread, nullptr); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"

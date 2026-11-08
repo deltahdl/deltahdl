@@ -14,10 +14,6 @@
 
 namespace delta {
 
-// §16.16 (d) with §F.4.1: a property that is a checker formal, or opens with
-// one, is on the clock its actual opens with, `@(posedge clk) a` or
-// `@($global_clock) a`, where the assertion `copy` of `item` writes none; the
-// statement is copied for the instance before it is marked so.
 static void TakeFormalActualClock(ModuleItem* copy, const ModuleItem* item,
                                   const ActualsByFormal& actuals,
                                   const PropertyRegistry& registry,
@@ -39,8 +35,6 @@ ModuleItem* CheckerInstanceAssertion(
   const ActualsByFormal& actuals = found->second;
   auto* copy = arena.Create<ModuleItem>(*item);
   const Stmt* stmt = item->body;
-  // The parser leaves a spec that is one name, `assert property (p)`, an
-  // instance of the property it may name, with no body yet.
   const Expr* spec = stmt != nullptr ? stmt->assert_expr : item->assert_expr;
   bool names_formal = (stmt == nullptr || (stmt->assert_property == nullptr &&
                                            stmt->assert_sequence == nullptr)) &&

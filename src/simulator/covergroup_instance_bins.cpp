@@ -30,14 +30,10 @@ namespace delta {
 
 namespace {
 
-// The values of a covergroup_range_list in the order written, duplicates
-// retained (§19.5.1), a single value held as a span of one.
 using ValueList = std::vector<CoverValueRange>;
 
 constexpr uint64_t kAllValues = std::numeric_limits<uint64_t>::max();
 
-// How many values a span holds; the 2^64 of a span over every int64_t, which
-// do not fit, read as the most a count can hold.
 uint64_t SpanSize(const CoverValueRange& r) {
   uint64_t size = static_cast<uint64_t>(r.hi) - static_cast<uint64_t>(r.lo);
   return size == kAllValues ? kAllValues : size + 1;
@@ -54,7 +50,6 @@ uint64_t CountValues(const ValueList& list) {
   return count;
 }
 
-// Appends `v` to `list`, extending the last span where `v` follows it.
 void AppendValue(ValueList& list, int64_t v) {
   if (!list.empty() && list.back().hi != std::numeric_limits<int64_t>::max() &&
       list.back().hi + 1 == v) {
@@ -64,9 +59,6 @@ void AppendValue(ValueList& list, int64_t v) {
   list.push_back({v, v});
 }
 
-// §19.5.4: each x, z or ? bit of a wildcard bin's value matches 0 and 1, so
-// the value stands for every value filling those bits both ways. The bits the
-// coverpoint has above the literal's width are 0.
 void AppendWildcardValue(const Logic4Vec& v, const SampledCoverpoint& point,
                          ValueList& out) {
   uint64_t unknown = v.words[0].bval;
@@ -78,9 +70,6 @@ void AppendWildcardValue(const Logic4Vec& v, const SampledCoverpoint& point,
   }
 }
 
-// §19.5.7: the effective type of `point`, to which a bin value is cast; a
-// width not known, like one of 64 bits or more, stands for every value a bin
-// value can hold, as PointTypeBounds has it.
 CoverpointEffectiveType EffectiveTypeOf(const SampledCoverpoint& point) {
   if (point.width == 0 || point.width >= 64) {
     return {64, point.width == 0 || point.is_signed};
@@ -88,8 +77,6 @@ CoverpointEffectiveType EffectiveTypeOf(const SampledCoverpoint& point) {
   return {point.width, point.is_signed};
 }
 
-// §19.5.7: the warning a bin value at `at` warrants by the condition
-// `resolution` names, the value taking no part in its bin.
 void WarnOfBinValue(SourceLoc at, int64_t value, BinValueResolution resolution,
                     DiagEngine& diag) {
   std::string message;
@@ -109,9 +96,6 @@ void WarnOfBinValue(SourceLoc at, int64_t value, BinValueResolution resolution,
   diag.Warning(at, message, Subclause("19.5.7"));
 }
 
-// §19.5.7: the bin value `value`, written at `at`, as the type of `point`
-// holds it, or nothing where that type cannot express it, which draws a
-// warning instead.
 std::optional<int64_t> ResolvedValue(const Logic4Vec& value, SourceLoc at,
                                      const SampledCoverpoint& point,
                                      DiagEngine& diag) {
@@ -125,8 +109,6 @@ std::optional<int64_t> ResolvedValue(const Logic4Vec& value, SourceLoc at,
   return CoverageDB::CastToEffectiveType(v, EffectiveTypeOf(point));
 }
 
-// §19.5.1 with §19.5.7: the singleton `range` names, as ResolvedValue gives
-// it.
 void AppendSingleton(const CovergroupValueRange& range,
                      const SampledCoverpoint& point, SimContext& ctx,
                      Arena& arena, ValueList& out) {
@@ -137,10 +119,6 @@ void AppendSingleton(const CovergroupValueRange& range,
   }
 }
 
-// §19.5.7 with §11.8.1: the values `point` expresses of a range whose bounds
-// are `unsigned_bounds`: those of its type, or, for unsigned bounds on a
-// signed type, whose comparison with them is unsigned, those whose bits fit
-// its width.
 CoverValueRange ExpressedValues(const SampledCoverpoint& point,
                                 bool unsigned_bounds) {
   CoverpointEffectiveType eff = EffectiveTypeOf(point);
@@ -150,8 +128,6 @@ CoverValueRange ExpressedValues(const SampledCoverpoint& point,
   return {0, CoverageDB::EffectiveTypeMax({eff.width, false})};
 }
 
-// §19.5.7: the values of `kept`, each expressed by `point`, as its type holds
-// them: a signed type casts the values past its largest to negative ones.
 void AppendAsHeld(CoverValueRange kept, const SampledCoverpoint& point,
                   ValueList& out) {
   CoverpointEffectiveType eff = EffectiveTypeOf(point);
@@ -166,10 +142,6 @@ void AppendAsHeld(CoverValueRange kept, const SampledCoverpoint& point,
        CoverageDB::CastToEffectiveType(kept.hi, eff)});
 }
 
-// §19.5.1 with §19.5.7: the range `range` names, a `$` bound standing for the
-// end of the coverpoint's values, kept to the values the coverpoint's type
-// expresses; a range reaching past them, or with an x or z bound, draws a
-// warning.
 void AppendRange(const CovergroupValueRange& range,
                  const SampledCoverpoint& point, SimContext& ctx, Arena& arena,
                  ValueList& out) {
@@ -214,8 +186,6 @@ void AppendRange(const CovergroupValueRange& range,
   AppendAsHeld(kept, point, out);
 }
 
-// §19.5.1: the values one covergroup_value_range adds; §11.4.13: a tolerance
-// range is the span around its center.
 void AppendValueRange(const CovergroupValueRange& range,
                       const SampledCoverpoint& point, SimContext& ctx,
                       Arena& arena, ValueList& out) {
@@ -254,8 +224,6 @@ ValueList ReadRangeList(const std::vector<CovergroupValueRange>& ranges,
   return values;
 }
 
-// §19.5.1.1: the values of `list` for which `with_expr` is true, in order,
-// the name `item` standing for the candidate value as the coverpoint's type.
 ValueList FilterWith(const ValueList& list, const Expr* with_expr,
                      const SampledCoverpoint& point, SimContext& ctx,
                      Arena& arena) {
@@ -278,10 +246,6 @@ ValueList FilterWith(const ValueList& list, const Expr* with_expr,
   return kept;
 }
 
-// §19.5.1.2: the elements of the array a set_covergroup_expression names, in
-// order: a fixed-size or dynamic array, or a queue (§7.10), which keeps its
-// elements as a queue rather than through array info. §19.5.7 resolves each
-// against the type of `point` as ResolvedValue does.
 ValueList SetExpressionValues(const Expr* e, const SampledCoverpoint& point,
                               SimContext& ctx, Arena& arena) {
   ValueList values;
@@ -301,7 +265,6 @@ ValueList SetExpressionValues(const Expr* e, const SampledCoverpoint& point,
   return values;
 }
 
-// The values of `list` at the positions [begin, end) of its order.
 ValueList SliceValues(const ValueList& list, uint64_t begin, uint64_t end) {
   ValueList slice;
   uint64_t pos = 0;
@@ -337,8 +300,6 @@ CoverBinKind BinKindOf(BinsKeyword keyword) {
   return CoverBinKind::kExplicit;
 }
 
-// Adds `bin` to the coverpoint, keeping the guard of a definition that ends
-// in `iff` (§19.5.1).
 void AddGuardedBin(SampledCoverpoint& point, const BinsOrOptions& bins,
                    CoverBin bin) {
   size_t index = point.point->bins.size();
@@ -346,9 +307,6 @@ void AddGuardedBin(SampledCoverpoint& point, const BinsOrOptions& bins,
   if (bins.iff != nullptr) point.bin_guards.emplace_back(index, bins.iff);
 }
 
-// §19.5.1: the number of bins `[N]` asks for. N is positive; a covergroup
-// formal giving it 0 or less is a run-time error, and the definition builds
-// no bin.
 std::optional<uint64_t> BinArraySize(const BinsOrOptions& bins, SimContext& ctx,
                                      Arena& arena) {
   int64_t size = CovergroupInt(bins.array_size, ctx, arena);
@@ -362,18 +320,11 @@ std::optional<uint64_t> BinArraySize(const BinsOrOptions& bins, SimContext& ctx,
   return std::nullopt;
 }
 
-// The values a bins definition holds, and the `with` that the
-// distribute_first type option holds back until they are distributed, null
-// where none is (§19.5.1.1).
 struct BinValues {
   ValueList values;
   const Expr* with_each = nullptr;
 };
 
-// §19.5.1: one bin for all the values, one per distinct value for `[]`, or
-// the values spread over the N bins of `[N]`, B = values / N to each and the
-// rest to the last, with a bin past the values left empty. A `with` held back
-// is applied to each bin's values (§19.5.1.1).
 void AddValueBins(SampledCoverpoint& point, const BinsOrOptions& bins,
                   const BinValues& held, SimContext& ctx, Arena& arena) {
   auto filtered = [&](const ValueList& list) {
@@ -411,10 +362,6 @@ void AddValueBins(SampledCoverpoint& point, const BinsOrOptions& bins,
   }
 }
 
-// §19.5.1 and §19.5.1.1: the bins of a covergroup_range_list, or for
-// `cover_point_identifier with` of every value of the coverpoint, filtered by
-// the definition's `with` before they are distributed unless the
-// distribute_first type option is set.
 void AddRangeListBins(const CovergroupInstance& inst, SampledCoverpoint& point,
                       const BinsOrOptions& bins, SimContext& ctx,
                       Arena& arena) {
@@ -431,8 +378,6 @@ void AddRangeListBins(const CovergroupInstance& inst, SampledCoverpoint& point,
                ctx, arena);
 }
 
-// One trans_range_list of a transition (§19.5.2): the values its trans_item
-// lists, and the repetition that follows it with its bounds.
 struct TransStep {
   std::vector<int64_t> values;
   TransRepetition repetition = TransRepetition::kNone;
@@ -462,7 +407,6 @@ bool RepeatsUnbounded(const TransStep& step) {
          step.repetition == TransRepetition::kNonconsecutive;
 }
 
-// Each of `heads` followed by each of `tails`.
 void AppendProducts(const std::vector<std::vector<int64_t>>& heads,
                     const std::vector<std::vector<int64_t>>& tails,
                     std::vector<std::vector<int64_t>>& out) {
@@ -474,9 +418,6 @@ void AppendProducts(const std::vector<std::vector<int64_t>>& heads,
   }
 }
 
-// §19.5.2: the sequences a trans_set of bounded steps expands to, each value
-// list crossed with the next and `[* lo:hi]` repeating its item lo to hi
-// times.
 std::vector<std::vector<int64_t>> ExpandTransSet(
     const std::vector<TransStep>& steps) {
   std::vector<std::vector<int64_t>> sequences = {{}};
@@ -494,11 +435,6 @@ std::vector<std::vector<int64_t>> ExpandTransSet(
   return sequences;
 }
 
-// §19.5.2: the patterns a trans_set holding a goto `[-> ]` or nonconsecutive
-// `[= ]` repetition matches, a consecutive repetition written out as that
-// many plain elements.
-// The element of a pattern one step matches, carrying the step's goto or
-// nonconsecutive repetition.
 TransitionPatternElement PatternElement(const TransStep& step) {
   TransitionPatternElement element;
   element.values = step.values;
@@ -532,9 +468,6 @@ std::vector<std::vector<TransitionPatternElement>> TransSetPatterns(
   return patterns;
 }
 
-// §19.5.2: a transition bin holding every sequence its trans_list writes, or
-// for `[]` one bin per sequence; §19.5.5 and §19.5.6: an ignore_bins or
-// illegal_bins of transitions.
 void AddTransitionBins(SampledCoverpoint& point, const BinsOrOptions& bins,
                        SimContext& ctx, Arena& arena) {
   CoverBin bin;
@@ -570,7 +503,6 @@ void AddTransitionBins(SampledCoverpoint& point, const BinsOrOptions& bins,
   }
 }
 
-// The spans of `r` left once the sorted, disjoint `excluded` are taken out.
 void SubtractSpans(const CoverValueRange& r, const ValueList& excluded,
                    ValueList& out) {
   int64_t cursor = r.lo;
@@ -589,10 +521,6 @@ bool IsExcludingBin(const CoverBin& bin) {
          bin.kind == CoverBinKind::kIllegal;
 }
 
-// §19.5.5 and §19.5.6: a value an ignore_bins or illegal_bins holds is
-// excluded from coverage, so it is taken out of the coverpoint's other value
-// bins, automatic ones included, after their values are distributed; a bin it
-// leaves holding nothing takes no part in coverage (§19.11.1).
 void ExcludeIgnoredAndIllegalValues(CoverPoint* cp) {
   ValueList excluded;
   for (const CoverBin& bin : cp->bins) {
@@ -617,11 +545,6 @@ void ExcludeIgnoredAndIllegalValues(CoverPoint* cp) {
   }
 }
 
-// §19.5.5 and §19.5.6: a transition an ignore_bins or illegal_bins holds is
-// excluded from coverage, so a covered sequence that cannot be matched
-// without also matching it, one holding it as a run of consecutive values, is
-// taken out of the coverpoint's transition bins; a bin it leaves holding none
-// takes no part in coverage.
 void ExcludeIgnoredAndIllegalTransitions(CoverPoint* cp) {
   std::set<std::vector<int64_t>> excluded;
   for (const CoverBin& bin : cp->bins) {
@@ -640,9 +563,6 @@ void ExcludeIgnoredAndIllegalTransitions(CoverPoint* cp) {
   }
 }
 
-// One item of a real coverpoint's covergroup_range_list (§19.5.1): a value,
-// as an interval holding it alone, or a range, a `$` bound reaching without
-// end.
 struct RealItem {
   RealInterval interval;
   bool is_value = false;
@@ -677,8 +597,6 @@ std::vector<RealItem> ReadRealItems(const BinsOrOptions& bins, SimContext& ctx,
   return items;
 }
 
-// §19.5.1: the items an array of real bins is made of, each range divided
-// into intervals of type_option.real_interval unless a `$` bounds it.
 std::vector<RealItem> PartitionRealItems(const std::vector<RealItem>& items,
                                          double real_interval) {
   std::vector<RealItem> parts;
@@ -701,8 +619,6 @@ std::string RealItemName(std::string_view base, const RealItem& item) {
                        : CoverageDB::RealIntervalBinName(base, item.interval);
 }
 
-// §19.5.1: the bins of `[N]` over a real coverpoint's values and intervals,
-// B = items / N to each and the rest to the last.
 void AddRealBinArray(SampledCoverpoint& point, const BinsOrOptions& bins,
                      const std::vector<RealItem>& parts, SimContext& ctx,
                      Arena& arena) {
@@ -725,10 +641,6 @@ void AddRealBinArray(SampledCoverpoint& point, const BinsOrOptions& bins,
   }
 }
 
-// §19.5.1: the bins of a real coverpoint, one for all of a definition's values
-// and ranges, one per value and interval for `[]`, the identical intervals of
-// several ranges merged, or its values and intervals spread over the N bins of
-// `[N]`.
 void AddRealBins(SampledCoverpoint& point, const BinsOrOptions& bins,
                  SimContext& ctx, Arena& arena) {
   CoverBin bin;
@@ -759,7 +671,6 @@ void AddRealBins(SampledCoverpoint& point, const BinsOrOptions& bins,
   }
 }
 
-// §19.5: the default bin, or §19.5.2: the default sequence bin, `kind`.
 void AddDefaultBin(SampledCoverpoint& point, const BinsOrOptions& bins,
                    CoverBinKind kind) {
   CoverBin bin;
@@ -792,9 +703,6 @@ void AddIntegralBins(const CovergroupInstance& inst, SampledCoverpoint& point,
   }
 }
 
-// §19.5.3: the named constants of an enumeration coverpoint, each with its
-// value as the coverpoint holds it; a constant holding x or z is left out,
-// as automatic bins hold 2-state values only.
 std::vector<std::pair<std::string_view, int64_t>> EnumMembers(
     const SampledCoverpoint& point) {
   std::vector<std::pair<std::string_view, int64_t>> members;

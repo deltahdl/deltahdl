@@ -8,14 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.13: the system functions of the family run together as the design
-// test/src/e2e/random_number_functions.sv runs them. $urandom returns a new
-// unsigned 32-bit number on each call and the same sequence for the same
-// seed (18.13.1), so a sequence begun by $urandom(254) is replayed in full by
-// a second $urandom(254), and the top bit is set in some of 32 draws.
-// $urandom_range(7, 0), $urandom_range(7) with minval omitted and
-// $urandom_range(0, 7) with its arguments reversed all stay within 0 to 7
-// (18.13.2).
 TEST(RandomNumberFunctionsRun, TheSystemFunctionsReplayASeedAndStayInRange) {
   SimFixture f;
   std::string out = RunCapture(
@@ -41,13 +33,6 @@ TEST(RandomNumberFunctionsRun, TheSystemFunctionsReplayASeedAndStayInRange) {
   EXPECT_EQ(out, "4 1 192\n");
 }
 
-// 18.13: the methods of the family, on an object and on the process. srandom
-// seeds the RNG with the given seed (18.13.3), so four draws after
-// srandom(7) are replayed by four draws after a second srandom(7), on an
-// object's randomize() and on the process's $urandom alike; get_randstate
-// retrieves the RNG's state (18.13.4) and set_randstate installs it again
-// (18.13.5), so four draws after the retrieval are replayed by four after
-// the reinstallation, again on both.
 TEST(RandomNumberFunctionsRun, TheMethodsSeedAndRestoreAnObjectAndTheProcess) {
   SimFixture f;
   std::string out = RunCapture(

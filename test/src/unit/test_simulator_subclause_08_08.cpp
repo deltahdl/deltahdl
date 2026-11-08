@@ -148,10 +148,6 @@ TEST(TypedConstructorCallSim, ParameterizedTypedConstructor) {
 }
 
 TEST(TypedConstructorCallSim, MultiLevelInheritanceConstructsSpecifiedType) {
-  // §8.8: the constructed object is the named (specified) type even when that
-  // type sits several levels below the target's type, and §8.7-style chained
-  // construction runs every level's constructor in order. The most-derived
-  // constructor runs last, so its assignment to the shared property wins.
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int x;\n"
                       "  function new(); x = 1; endfunction\n"
@@ -174,11 +170,6 @@ TEST(TypedConstructorCallSim, MultiLevelInheritanceConstructsSpecifiedType) {
             3u);
 }
 
-// §8.8: the canonical example `C c = D::new;` uses a typed constructor call as
-// a declaration initializer (not a procedural assignment). The object created
-// must still be of the specified type D, so a property only assigned by D's
-// constructor is observable through the base-typed handle. This exercises the
-// block-local declaration-initializer construction path.
 TEST(TypedConstructorCallSim, TypedConstructorAsBlockLocalDeclInit) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int x;\n"
@@ -198,10 +189,6 @@ TEST(TypedConstructorCallSim, TypedConstructorAsBlockLocalDeclInit) {
             42u);
 }
 
-// §8.8: the same declaration-initializer form must also construct the specified
-// type when the declaration is a static (module-level) variable, whose
-// initializer runs during static initialization rather than in a procedural
-// block.
 TEST(TypedConstructorCallSim, TypedConstructorAsStaticDeclInit) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int x;\n"
@@ -219,11 +206,6 @@ TEST(TypedConstructorCallSim, TypedConstructorAsStaticDeclInit) {
             42u);
 }
 
-// §8.8: arguments may be passed to a typed constructor call just as for an
-// ordinary constructor, so the argument conventions of §8.7 -- including the
-// use of default argument values -- apply. A typed call that supplies only the
-// leading actual leaves the trailing formal at its declared default, observed
-// here through the constructed object.
 TEST(TypedConstructorCallSim, TypedConstructorAppliesDefaultArgument) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int a;\n"
@@ -245,12 +227,6 @@ TEST(TypedConstructorCallSim, TypedConstructorAppliesDefaultArgument) {
             20u);
 }
 
-// §8.8/§8.25: the specified type of a typed constructor call may be a
-// parameterized class carrying a type-parameter specialization (as in the LRM's
-// `E#(.T(byte))::new` example), not only a value-parameter override. The
-// specialization is bound during construction and the constructor runs against
-// it, storing the passed value into an inherited property observed through the
-// base-typed handle.
 TEST(TypedConstructorCallSim, TypedConstructorWithTypeParameterSpecialization) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int val;\n"

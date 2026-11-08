@@ -1,8 +1,3 @@
-// §8.4 with §8.10: a call through a handle that refers to no object, named or
-// held in an expression -- the static method it may still reach, and the
-// report it otherwise draws. Split from eval_function.cpp, whose calls through
-// a handle resolve here when the handle is null.
-
 #include <string>
 #include <string_view>
 
@@ -16,13 +11,6 @@
 
 namespace delta {
 
-// §8.10 lets a static method be called through a handle referring to no
-// object: the method is the declared class's, found up its base chain, and it
-// runs in that class's scope with no object. §8.4 makes a non-static member
-// or a virtual method accessed through a null handle illegal, the result
-// indeterminate, and lets an implementation issue an error -- this one does,
-// at the call, so that the 0 the call then yields is not read as a valid
-// value. True where the static method was found and `info` names it.
 bool ResolveStaticThroughNull(std::string_view method_name,
                               std::string_view class_type, SimContext& ctx,
                               InstanceMethodInfo& info) {
@@ -48,8 +36,6 @@ void ReportNullHandleCall(std::string_view method_name, SourceLoc loc,
       Subclause("8.4"));
 }
 
-// The named-handle form of the rule above: a static method is found through
-// the handle's declared class, and any other is reported naming the handle.
 bool ResolveThroughNullHandle(const MethodCallParts& parts,
                               std::string_view class_type, SimContext& ctx,
                               InstanceMethodInfo& info) {

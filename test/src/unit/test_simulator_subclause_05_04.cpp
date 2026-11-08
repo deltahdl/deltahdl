@@ -131,11 +131,6 @@ TEST(CommentSim, CommentLineFollowedByBlock) {
   EXPECT_EQ(result, 66u);
 }
 
-// §5.4 with §5.9: the comment markers in a string literal are characters of
-// the string, which shows them, and the declaration after the string on the
-// same line is made, which it would not be had the `/*` opened a comment
-// running to the `*/` at the end of the line. A macro's string and a
-// triple-quoted string read the same way.
 TEST(CommentSim, CommentMarkersInsideAStringAreItsCharacters) {
   SimFixture f;
   std::string out = PreprocessAndCapture(

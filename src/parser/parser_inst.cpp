@@ -23,19 +23,12 @@ namespace delta {
 
 namespace {
 
-// Record the leading instance dimension of `item` as its instance range. This
-// is pure AST manipulation over an already-parsed instance, so it lives outside
-// the parser proper to keep ParseModuleInstList readable.
 void RecordInstRange(ModuleItem* item) {
   if (item->inst_dims.empty()) return;
   item->inst_range_left = item->inst_dims[0].first;
   item->inst_range_right = item->inst_dims[0].second;
 }
 
-// Allocate and seed the shared (non-name) fields of one module instance. These
-// fields are pure AST data copied from the surrounding instantiation header, so
-// the construction lives outside the parser proper. The caller fills in the
-// instance name and the parsed dimensions/ports.
 ModuleItem* MakeInstanceItem(
     Arena& arena, const Token& module_tok,
     const std::vector<std::pair<std::string_view, Expr*>>& params) {
@@ -47,8 +40,6 @@ ModuleItem* MakeInstanceItem(
   return item;
 }
 
-// Publish the fully parsed instance list to the caller's overflow vector when
-// one was supplied. Pure container manipulation, kept out of the parser proper.
 void PublishInstances(std::vector<ModuleItem*>* extra_items,
                       const std::vector<ModuleItem*>& instances) {
   if (!extra_items) return;
@@ -57,11 +48,6 @@ void PublishInstances(std::vector<ModuleItem*>* extra_items,
 
 }  // namespace
 
-// §17.3 with A.6.10: a checker_instantiation is a procedural assertion
-// statement, a ps_checker_identifier followed by the name of the instance
-// and its parenthesized port connections, the shape
-// LooksLikeScopedInstTail answers for the tokens after the checker's name;
-// no other statement opens with two names and a parenthesis.
 bool Parser::AtCheckerInstantiationStmt() {
   if (!CheckIdentifier()) return false;
   auto saved = lexer_.SavePos();
@@ -72,12 +58,6 @@ bool Parser::AtCheckerInstantiationStmt() {
   return is_inst;
 }
 
-// §17.3: a checker may be instantiated wherever a concurrent assertion may
-// appear, which in procedural code §16.14 limits to an always or an initial
-// procedure. The instantiation is read as the module-item one is; a list of
-// instances, which a checker_instantiation does not admit, is kept whole in
-// an unnamed block for the elaborator to report as it reports one written
-// as a module item.
 Stmt* Parser::ParseCheckerInstantiationStmt() {
   SourceLoc loc = CurrentLoc();
   if (always_or_initial_depth_ == 0) {
@@ -120,7 +100,6 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
   const bool kParamsWritten = Match(TokenKind::kHash);
   if (kParamsWritten) ParseParamValueAssignment(params);
 
-  // Parse the instance dimensions `( [ expr ( : expr )? ] )*` into `item`.
   auto parse_inst_dims = [&](ModuleItem* item) {
     while (Match(TokenKind::kLBracket)) {
       Expr* left = ParseExpr();
@@ -130,7 +109,6 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     }
   };
 
-  // Parse one trailing port connection, diagnosing a named/ordered mix once.
   auto parse_next_port = [&](ModuleItem* item, bool named, bool& mixed) {
     auto conn_loc = CurrentLoc();
     bool inconsistent = ParsePortConnection(item) != named && !mixed;
@@ -142,7 +120,6 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
     }
   };
 
-  // Parse the parenthesized port connection list into `item`.
   auto parse_inst_port_list = [&](ModuleItem* item) {
     Expect(TokenKind::kLParen, Subclause("23.3.2"));
     if (Check(TokenKind::kRParen)) return;
@@ -154,8 +131,6 @@ ModuleItem* Parser::ParseModuleInstList(const Token& module_tok,
   auto parse_one_instance = [&]() -> ModuleItem* {
     auto* item = MakeInstanceItem(arena_, module_tok, params);
     item->inst_param_assignment_written = kParamsWritten;
-    // A.4.1.1's name_of_instance opens with an instance_identifier, which
-    // A.9.3 spells `simple_identifier | escaped_identifier`.
     item->inst_name = ExpectIdentifier(Subclause("23.3.2")).text;
     parse_inst_dims(item);
     RecordInstRange(item);
@@ -185,12 +160,6 @@ void Parser::ParseParenList(std::vector<Expr*>& out) {
   Expect(TokenKind::kRParen, Subclause("13.5"));
 }
 
-// One entry of A.4.1.1's list_of_parameter_value_assignments: a
-// named_parameter_assignment, `. parameter_identifier ( [ param_expression ]
-// )`, or an ordered_parameter_assignment, a param_expression alone. A.8.3
-// spells param_expression `mintypmax_expression | data_type | $`, so the value
-// is a data_type where it opens one no expression spells, and otherwise a
-// mintypmax_expression, which is an expression where no ':' follows it.
 bool Parser::ParseParamValueEntry(
     std::vector<std::pair<std::string_view, Expr*>>& out) {
   if (Match(TokenKind::kDot)) {
@@ -248,13 +217,6 @@ void Parser::ParseParamValueAssignment(
   }
 }
 
-// §17.3: one actual of a port connection list. A checker's actuals are
-// A.2.10's property_actual_arg, an event expression, a sequence or a property
-// as well as an expression, while a module's, an interface's or a program's
-// are expressions. Which the instance names is not known here, so an actual
-// read whole as an event expression, a sequence or a property is kept as
-// ParsePropertyActualArg reads it for a property instance, and any other is
-// parsed again as an expression with its diagnostics.
 Expr* Parser::ParsePortActual() {
   auto saved = lexer_.SavePos();
   uint32_t errors = diag_.SuppressedErrorCount();
@@ -369,31 +331,6 @@ static bool IsDriveStrengthToken(TokenKind k) {
   }
 }
 
-// Report a drive strength written after the delay, given a parser positioned
-// where the delay ended and `delay` holding whatever the delay parse produced.
-// §10.3.4 rules that the strength specification comes right after the keyword,
-// the net type's or `assign`, and ahead of any delay, and the grammar writes
-// that order into both constructs the sentence names: `continuous_assign ::=
-// assign [ drive_strength ] [ delay3 ] list_of_net_assignments
-// ;` in §A.6.1, and `net_declaration ::= net_type [ drive_strength |
-// charge_strength ] [ vectored | scalared ] data_type_or_implicit [ delay3 ]
-// list_of_net_decl_assignments ;` in §A.2.1.3. A parenthesis opening a strength
-// at this point therefore stands after the delay, whichever of the two keywords
-// began the construct.
-//
-// A null `delay` means no delay was written, so nothing here is out of order
-// and the parenthesis belongs to whatever follows.
-//
-// The misplaced specification is consumed rather than left where it stands, so
-// that the rest of the construct still parses and the run names §10.3.4 once
-// instead of reporting the strength keyword as a missing expression or the
-// parenthesis as a missing net name. Nothing records it: §10.3.4 gives a
-// strength in this position no meaning to record.
-//
-// §28.3.2 (printed page 831) states the same order for a gate instance -- the
-// strength comes after the gate type keyword and before any delay -- so a
-// gate's delay is followed by the same check, reported
-// under `subclause`, the rule the construct being parsed falls under.
 void Parser::ReportDriveStrengthAfterDelay(const Expr* delay,
                                            std::string_view subclause) {
   if (delay == nullptr || !Check(TokenKind::kLParen)) {
@@ -403,8 +340,6 @@ void Parser::ReportDriveStrengthAfterDelay(const Expr* delay,
   auto loc = CurrentLoc();
   Consume();
   if (!IsDriveStrengthToken(CurrentToken().kind)) {
-    // A parenthesis after a delay can legitimately open an assignment target,
-    // so the parser has to see this one again.
     lexer_.RestorePos(saved);
     return;
   }
@@ -462,8 +397,6 @@ ModuleItem* Parser::ParseAlias() {
   item->loc = CurrentLoc();
   Expect(TokenKind::kKwAlias, Subclause("10.11"));
   item->alias_nets.push_back(ParseExpr());
-  // The grammar makes the first `=` and second net_lvalue mandatory; only
-  // further pairings are part of the optional repetition.
   Expect(TokenKind::kEq, Subclause("10.11"));
   item->alias_nets.push_back(ParseExpr());
   while (Match(TokenKind::kEq)) {
@@ -487,11 +420,6 @@ static ModuleItemKind AlwaysKindToItemKind(AlwaysKind kind) {
   return ModuleItemKind::kAlwaysBlock;
 }
 
-// A.6.2 (printed page 1197) gives an always procedure and a final procedure a
-// statement, where an initial procedure takes a statement_or_null, and A.6.4
-// (printed page 1198) writes the null statement as an alternative of
-// statement_or_null alone. `loc` is where the body opens, since a null
-// statement records no position of its own.
 static void ReportNullProcedureBody(const Stmt* body, SourceLoc loc,
                                     std::string_view procedure,
                                     DiagEngine& diag) {
@@ -503,13 +431,6 @@ static void ReportNullProcedureBody(const Stmt* body, SourceLoc loc,
              Subclause("A.6.2"));
 }
 
-// §16.14.5: `always assert property (ps) action_block ;` and `always cover
-// property (ps) statement_or_null` are the forms the concurrent assertion
-// statements outside procedural code are equivalent to, an evaluation
-// attempt of the property_spec beginning at every leading clock event, so
-// an always procedure whose body opens with one of §16.14's statements is
-// read as the statement it is equivalent to. An always procedure with a
-// clocking event of its own, or of the other three kinds, is a procedure.
 ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = AlwaysKindToItemKind(kind);
@@ -532,10 +453,6 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
   if (has_event_control) {
     auto saved = lexer_.SavePos();
     Consume();
-    // §9.4 Syntax 9-4 also writes the clocking event as `@` and a bare name,
-    // which the procedural event control statement reads. That statement's
-    // events become the procedure's sensitivity, as `@(e)`'s would, and the
-    // statement it guards the procedure's body.
     if (!Check(TokenKind::kStar) && !Check(TokenKind::kLParen)) {
       lexer_.RestorePos(saved);
       Stmt* control = ParseEventControlStmt();
@@ -556,8 +473,6 @@ ModuleItem* Parser::ParseAlwaysBlock(AlwaysKind kind) {
     }
   }
 
-  // An event control read above opens the procedure's statement, whose own
-  // body may be null.
   SourceLoc body_loc = CurrentLoc();
   item->body = ParseStmt();
   if (!has_event_control) {
@@ -591,15 +506,6 @@ ModuleItem* Parser::ParseFinalBlock() {
   return item;
 }
 
-// §5.6 has the first character of a simple identifier be a letter or an
-// underscore, not a digit or a `$`. The lexer reads a name that begins with a
-// `$` as a system identifier and one that begins with a digit as an integer
-// literal with the rest of the name as a separate identifier against it, each
-// the only thing the grammar makes of those characters; where a name is
-// expected, either is the misspelt identifier §5.6 speaks of, reported as
-// such and taken as the name so that what follows is parsed in step. The
-// adjacency test is what tells `0number` from the `0 number` that white space
-// writes, which is the two tokens it looks like.
 bool Parser::TryTakeIllFormedSimpleIdentifier(Token* out) {
   auto tok = CurrentToken();
   if (tok.Is(TokenKind::kSystemIdentifier)) {

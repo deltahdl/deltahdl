@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.17.2: when the expression of an if-else production is true the
-// production after it is generated and otherwise the one after else, so the
-// clause's PP_OP, generating PUSH while depth is below 2 and POP otherwise
-// with the code blocks moving depth, generates push, push, pop, push, pop
-// from a depth of 0 and leaves depth at 1, as the design
-// test/src/e2e/if_else_production.sv runs it.
 TEST(IfElseProductionRun, TheClausesPpOpPushesToTwoThenAlternates) {
   SimFixture f;
   std::string out = RunCapture(
@@ -39,10 +33,6 @@ TEST(IfElseProductionRun, TheClausesPpOpPushesToTwoThenAlternates) {
   EXPECT_EQ(out, "push push pop push pop depth 1\n");
 }
 
-// 18.17.2: an if-else production may omit its else, and its condition is any
-// expression with a Boolean value, so with no else a false expression generates
-// nothing and a true expression of two operands generates its production, as
-// the design test/src/e2e/if_else_production.sv runs it.
 TEST(IfElseProductionRun, WithoutElseAFalseExpressionGeneratesNothing) {
   SimFixture f;
   std::string out = RunCapture(

@@ -149,8 +149,6 @@ TEST(OperatorElaboration, ChandleInequalityWithNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.5: comparing a class handle with the literal null using the logical
-// equality operator is a legal operation, so elaboration reports no error.
 TEST(OperatorElaboration, ClassHandleEqualityWithNullElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -165,10 +163,6 @@ TEST(OperatorElaboration, ClassHandleEqualityWithNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.5: the rule permits a class-handle comparison when one operand is
-// assignment compatible with the other. A base handle and a handle of a class
-// derived from it satisfy that requirement, and case equality (===) is one of
-// the permitted operators, so this comparison elaborates cleanly.
 TEST(OperatorElaboration, ClassHandleCaseEqualityCompatibleElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -185,11 +179,6 @@ TEST(OperatorElaboration, ClassHandleCaseEqualityCompatibleElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.5 allows logical or case equality on a class handle or the literal null
-// only when one operand is assignment compatible with the other. Two handles of
-// unrelated classes are not assignment compatible, so the equality comparison
-// is rejected. This is the discriminating negative for the compatibility
-// requirement above.
 TEST(OperatorElaboration, ClassHandleEqualityIncompatibleRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -208,10 +197,6 @@ TEST(OperatorElaboration, ClassHandleEqualityIncompatibleRejected) {
       "class handle comparison requires assignment compatible", 7, "11.4.5"));
 }
 
-// §11.4.5: case equality (===) is one of the operators the rule permits between
-// a chandle and the literal null, so this comparison elaborates without error.
-// Complements the ==/!= chandle-null cases with the case-equality operator
-// form.
 TEST(OperatorElaboration, ChandleCaseEqualityWithNullElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -225,10 +210,6 @@ TEST(OperatorElaboration, ChandleCaseEqualityWithNullElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.5: two handles of the same class type are trivially assignment
-// compatible, so a logical-equality (==) comparison between them is a legal
-// operation and elaborates cleanly. Covers the == operator on two class handles
-// (the base/derived case above uses ===).
 TEST(OperatorElaboration, ClassHandleEqualitySameTypeElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -244,25 +225,6 @@ TEST(OperatorElaboration, ClassHandleEqualitySameTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.22.2 makes two variables of different named structure types
-// non-equivalent, so CheckAggregateCompareOp in
-// src/elaborator/elaborator_validate_operations.cpp rejects a comparison of one
-// against the other and names both type names in the report.
-// WalkStmtsForAggregateCompare carries that rule down a statement tree. It
-// wrote out six of the thirteen child-statement links Stmt declares and now
-// takes the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h, so the seven cases below cover
-// one newly reached position each. Each source elaborated clean before the
-// conversion: the walk never descended into the position, so the comparison
-// reached CheckAggregateCompareOp through nothing.
-//
-// §11.4.5 is the equality operators these comparisons are written with, and
-// §6.22.2 is the rule the report names, because it is what decides that two
-// aggregate operands of different named types may not be compared.
-//
-// `stmt` is written at line 8 of the source and may run to several lines, so
-// the line the report stands at is read back out of the source rather than
-// counted.
 void ExpectNonEquivalentAggregateCompareIn(const std::string& stmt) {
   ElabFixture f;
   std::string src =
@@ -282,8 +244,6 @@ void ExpectNonEquivalentAggregateCompareIn(const std::string& stmt) {
       LineHolding(src, "s == t"), "6.22.2"));
 }
 
-// §9.3.2 gives `fork { statement_or_null } join`, whose arms the parser keeps
-// in Stmt::fork_stmts.
 TEST(OperatorElaboration, NonEquivalentAggregateCompareInAForkArm) {
   ExpectNonEquivalentAggregateCompareIn(
       "fork\n"
@@ -291,29 +251,16 @@ TEST(OperatorElaboration, NonEquivalentAggregateCompareInAForkArm) {
       "    join");
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// `variable_assignment ::= variable_lvalue = expression`, so an equality
-// expression stands in a for-loop initialization. The parser keeps those
-// assignments in Stmt::for_inits.
 TEST(OperatorElaboration, NonEquivalentAggregateCompareInAForInit) {
   ExpectNonEquivalentAggregateCompareIn(
       "for (r = (s == t); r == 0; r = 0) r = 1;");
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
-// is a variable_lvalue, an assignment_operator and an expression, so the
-// equality expression stands in a for-loop step as well. The parser keeps those
-// in Stmt::for_steps.
 TEST(OperatorElaboration, NonEquivalentAggregateCompareInAForStep) {
   ExpectNonEquivalentAggregateCompareIn(
       "for (r = 0; r == 0; r = (s == t)) r = 1;");
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// which the parser keeps in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt.
-// This case and the next cover one arm each.
 TEST(OperatorElaboration, NonEquivalentAggregateCompareInAnAssertionPassStmt) {
   ExpectNonEquivalentAggregateCompareIn("assert (r) r = (s == t);");
 }
@@ -322,18 +269,10 @@ TEST(OperatorElaboration, NonEquivalentAggregateCompareInAnAssertionFailStmt) {
   ExpectNonEquivalentAggregateCompareIn("assert (r) else r = (s == t);");
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §6.22.2 is a rule about the source, so it holds whether the weighted
-// draw would select the item or not.
 TEST(OperatorElaboration, NonEquivalentAggregateCompareInARandcaseItem) {
   ExpectNonEquivalentAggregateCompareIn("randcase 1: r = (s == t); endcase");
 }
 
-// §18.17 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(OperatorElaboration,
      NonEquivalentAggregateCompareInARandsequenceCodeBlock) {
   ExpectNonEquivalentAggregateCompareIn(
@@ -344,9 +283,6 @@ TEST(OperatorElaboration,
       "    end");
 }
 
-// §11.4.5 makes equality with a class handle legal only where one operand is
-// assignment compatible with the other, or is null; a literal value is
-// neither, on either side.
 TEST(EqualityOperatorElaboration, ClassHandleComparedWithLiteralReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -372,10 +308,6 @@ TEST(EqualityOperatorElaboration, ClassHandleComparedWithLiteralReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
-// §11.4.5: an integral or real variable, and an expression over such operands,
-// is no more assignment compatible with a class handle than a literal is, so
-// comparing a handle with one is reported; null and a handle of the class are
-// not.
 TEST(EqualityOperatorElaboration,
      ClassHandleComparedWithIntegralValueReported) {
   ElabFixture f;

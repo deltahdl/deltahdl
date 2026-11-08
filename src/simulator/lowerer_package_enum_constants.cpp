@@ -1,8 +1,3 @@
-// §6.19 with §26.3 (printed page 808 of IEEE 1800-2023): a
-// package's enumeration constants given storage under their "pk.name" keys,
-// and the folds of the package's parameters they are numbered over. Moved out
-// of lowerer_register.cpp, which registers a module's own declarations, once
-// the package's constants outgrew it.
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -34,20 +29,6 @@ std::optional<int64_t> FoldPackageParamValue(const ModuleItem& item,
                                SimParamTypeIsSigned(type, ctx));
 }
 
-// §6.19 makes an enumeration's members constants of the scope the enumeration
-// is written in, and §26.3 references a package's declaration through the
-// package scope resolution operator, so `pk::MED` names the package's constant
-// from any scope, imported or not -- a class property's initializer, a write
-// through a handle, a module's own expression. A wildcard import emits the
-// literals as the importing module's variables (RegisterImportedEnumLiterals
-// in elaborator_typedef.cpp) and a package parameter is created under its
-// "pk.name" key (InitPackageDataVariables in lowerer.cpp), which is the key
-// EvalMemberAccess reads a scoped name by; the package's enumeration constants
-// alone had no storage, so `pk::MED` read 0 wherever it was written. Each is
-// created under that key with its member's value, folded as the elaborator's
-// RegisterPackageParams folds it: against the package's parameters and
-// constants declared before it, which §6.20.1 and §6.19 let a member's value
-// name, and at the width of the enumeration's base type.
 static void RegisterPackageItemEnumConstants(const ModuleItem* item,
                                              const PackageDecl& pkg,
                                              ScopeMap& values, SimContext& ctx,
@@ -58,17 +39,9 @@ static void RegisterPackageItemEnumConstants(const ModuleItem* item,
       values[item->name] = *v;
     return;
   }
-  // Syntax 6-5 lets the enumeration stand as the type a typedef names or as
-  // the type of a data declaration, and §7.2 as the type of a member of a
-  // structure or union either writes, which §23.9 makes no scope of its own;
-  // the constants are the package's in each case, and each enumeration is
-  // numbered on its own at the width of its own base type, which packed
-  // dimensions after the body (§7.4.1) do not widen.
   ForEachEnumTypeOfItem(item, [&](std::string_view, const DataType& type) {
     uint32_t width = EvalTypeWidth(EnumArrayElement(type), {});
     if (width == 0) width = 32;
-    // A constant is of the enumeration's type, so it reads with the base's
-    // signing as well as its width: -1 of a byte base widens to -1.
     bool is_signed = IsSignedType(type, TypedefMap{});
     for (const auto& m : FoldEnumMembers(type.enum_members, values, arena)) {
       values[m.name] = m.value;

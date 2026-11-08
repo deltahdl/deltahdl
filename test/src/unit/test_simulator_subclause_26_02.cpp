@@ -30,10 +30,6 @@ TEST(PackageDeclarationSim, VariableInitOccursBeforeInitialProcedure) {
   EXPECT_EQ(observed->value.ToUint64(), 42u);
 }
 
-// §26.2 requires package variable-declaration assignments to complete before
-// any initial OR always procedure starts. Here an always_comb procedure samples
-// the imported package variable; its initializer must already have run, so the
-// captured value is the initialized one.
 TEST(PackageDeclarationSim, PackageVariableInitObservedByAlwaysProcedure) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,11 +50,6 @@ TEST(PackageDeclarationSim, PackageVariableInitObservedByAlwaysProcedure) {
   EXPECT_EQ(captured->value.ToUint64(), 55u);
 }
 
-// §26.2: a package's declarations are visible by their bare names throughout
-// the package, the bodies of the classes it declares included. Each read here
-// answered 0 from an instance method before the method's frame carried the
-// package: the parameter is 17, the enum literal 8, the function's 5 and the
-// variable 42, none of them a value a lost name could give.
 TEST(PackageDeclarationSim, PackageClassInstanceMethodReadsPackageNamesBare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -87,9 +78,6 @@ TEST(PackageDeclarationSim, PackageClassInstanceMethodReadsPackageNamesBare) {
   LowerRunAndCheck(f, design, {{"k", 17u}, {"a", 8u}, {"fv", 5u}, {"v", 42u}});
 }
 
-// §26.2 with §8.10: a static method of the package's class reads the package
-// parameter by its bare name, as the instance method does; only the `p::K`
-// form answered 17 before, the bare one 0 in both.
 TEST(PackageDeclarationSim, PackageClassStaticMethodReadsPackageParameterBare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -114,8 +102,6 @@ TEST(PackageDeclarationSim, PackageClassStaticMethodReadsPackageParameterBare) {
   LowerRunAndCheck(f, design, {{"inst", 17u}, {"quals", 17u}, {"stat", 117u}});
 }
 
-// §26.2 with §8.24: an out-of-block method body declared in the package stands
-// in the package's scope as the class does, so its `K + e` is 50 + 7.
 TEST(PackageDeclarationSim, PackageClassOutOfBlockBodyReadsPackageNamesBare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,9 +129,6 @@ TEST(PackageDeclarationSim, PackageClassOutOfBlockBodyReadsPackageNamesBare) {
   LowerRunAndCheck(f, design, {{"s", 57u}});
 }
 
-// §26.2 with §8.7: a property initializer of the package's class names the
-// package's enum literal bare, so `e` starts at 8 beside the `m` that started
-// at 9 already; §8.7's constructor body reads the parameter the same way.
 TEST(PackageDeclarationSim,
      PackageClassPropertyInitializerAndNewReadPackageNames) {
   SimFixture f;
@@ -174,11 +157,6 @@ TEST(PackageDeclarationSim,
   LowerRunAndCheck(f, design, {{"e", 8u}, {"m", 9u}, {"k", 20u}});
 }
 
-// §26.2: the bare name inside the method is the package's variable itself, so
-// a write through it lands in the package's storage: the method's own read
-// after the write and the module's `p::pv` both answer 45. Before, the write
-// made a property of the object named pv, the method answered 3 and the
-// package's variable kept its 42.
 TEST(PackageDeclarationSim, PackageClassMethodWritesPackageVariableBare) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,9 +180,6 @@ TEST(PackageDeclarationSim, PackageClassMethodWritesPackageVariableBare) {
   LowerRunAndCheck(f, design, {{"ret", 45u}, {"after", 45u}});
 }
 
-// §26.2 with §8.23: a class of the compilation unit calling the package class's
-// method sees the method read its own package's K, 17, so `a + K` with -16 is
-// 1 and the sum with the static square is 50; the caller's `p::K` stays 17.
 TEST(PackageDeclarationSim,
      PackageClassMethodCalledFromUnitClassReadsItsOwnPackage) {
   SimFixture f;
@@ -236,10 +211,6 @@ TEST(PackageDeclarationSim,
   LowerRunAndCheck(f, design, {{"r", 50u}, {"k", 17u}});
 }
 
-// A design whose package p declares `int g = 5;` and then the class C of
-// `class_body`, and whose top declares its own `int g = 7;`, constructs a
-// `p::C` and reads `read * 10 + g` into y; answers y, in which the tens
-// digit is what the class read and the units the top's own g.
 static uint64_t PackageClassReadBesideTheTopsG(const std::string& class_body,
                                                const std::string& read) {
   return RunAndGet(
@@ -262,12 +233,6 @@ static uint64_t PackageClassReadBesideTheTopsG(const std::string& class_body,
       "y");
 }
 
-// §26.2 (printed page 808) with §8.9 (printed 186): the package class's
-// `static int s = g;` is an expression of the package's scope, whose g is 5,
-// initialized once, so `p::C::s * 10 + g` in a top declaring its own `int g
-// = 7` is 57. Passes since a544a27b7, which lowers a class inside a frame of
-// its declaring scope; the initializer was evaluated in no frame before,
-// resolving g through no key: s read 0 and y 7.
 TEST(PackageDeclarationSim,
      PackageClassStaticInitializerReadsPackageVariableBesideModulesOwn) {
   EXPECT_EQ(
@@ -275,29 +240,11 @@ TEST(PackageDeclarationSim,
       57u);
 }
 
-// §26.2 (printed page 808) with §8.7 (printed 184) and §23.9 (printed 761):
-// the package class's `int v = g;` default is read in the class's declaring
-// scope as the object is constructed, never in the constructing module's,
-// so `c.v * 10 + g` beside the top's own g is 57; a default resolving g
-// through the top's instance read 7: 77.
 TEST(PackageDeclarationSim,
      PackageClassPropertyInitializerReadsPackageVariableBesideModulesOwn) {
   EXPECT_EQ(PackageClassReadBesideTheTopsG("    int v = g;\n", "c.v"), 57u);
 }
 
-// §26.2 (printed page 808) with §8.4 (printed pages 181-182), §15.4.1
-// (printed 374) and §15.3.1 (printed 373): a package's variable declaration
-// assignments complete before any initial procedure starts, and a mailbox's
-// or a semaphore's is the new() that returns the handle its variable holds,
-// so `p::built` and `p::s` refer to the queue and the bucket when the
-// module reads them while `p::bare` and `p::h`, declared with no
-// initializer, hold the null handle §8.4's Table 8-1 gives a handle by
-// default. `p::built != null` adds 1, `p::bare == null` 10, `p::s != null`
-// 100 and `p::h == null` 1000: 1111. The package's new() sized the queue
-// and filled the bucket and left the variable's value at the 0 its storage
-// was created with, so built and s read as null; and a package's handle
-// with no initializer was shaped as a 4-state named type and filled with
-// x, so `p::bare == null` and `p::h == null` read x, the sum x and y 0.
 TEST(PackageDeclarationSim, PackageSyncVariableBuiltByItsDeclarationIsNotNull) {
   EXPECT_EQ(
       RunAndGet("package p;\n"
@@ -317,12 +264,6 @@ TEST(PackageDeclarationSim, PackageSyncVariableBuiltByItsDeclarationIsNotNull) {
       1111u);
 }
 
-// §26.2 with §6.18: a package's variable written with a typedef the package
-// itself declares has the type that typedef stands for -- a three-bit packed
-// structure three bits wide, keeping 7 of 7'h7f, a byte typedef signed, a
-// string typedef a string. Looked up by its bare name, the typedef was
-// found nowhere: the structure was 32 bits and kept 127, the byte read 200
-// for 200, and the string's len() answered 0.
 TEST(PackageDeclarationSim, VariableOfThePackagesOwnTypedefHasItsType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -345,12 +286,6 @@ TEST(PackageDeclarationSim, VariableOfThePackagesOwnTypedefHasItsType) {
             "3 7 -56 8 2\n");
 }
 
-// §26.2 with §6.8 and §10.7: a package variable's initializer is assigned to
-// it, so the value takes the variable's type -- a byte's eight bits, a
-// shortint's sixteen, a real rounded into an int, an unbased unsized literal
-// filling the width, a bit's x bits made 0. Stored as it evaluated, `byte b =
-// -1` held 32 bits and then kept 200 for 200, `int i = 3.7` read 3, and `'1`
-// made a one-bit vector.
 TEST(PackageDeclarationSim, InitializerIsConvertedToTheVariablesType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"

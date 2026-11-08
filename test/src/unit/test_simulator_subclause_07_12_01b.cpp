@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §7.12.1 with §7.4.4: over a two-dimensional array each element a locator
-// visits is a row, which the with clause reduces (the row sums are 3 and 12),
-// selects from (m[1][2] is 5) and reduces through a nested with clause, and
-// each index locator reports the row's index. Read as 0, the iterator would
-// match neither row of the first three queries and both rows of the last.
 TEST(ArrayLocatorRows, IndexLocatorsSeeEachRowOfA2DArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -33,9 +28,6 @@ TEST(ArrayLocatorRows, IndexLocatorsSeeEachRowOfA2DArray) {
   EXPECT_EQ(out, "'{1} '{1} '{1} '{0}\n");
 }
 
-// §7.12.1: unique_index over the rows of a two-dimensional array keeps one
-// index for each distinct value of the with clause, here the row sums 3, 3
-// and 10, so two indices remain, the last of them row 2's.
 TEST(ArrayLocatorRows, UniqueIndexSeesEachRowOfA2DArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -52,9 +44,6 @@ TEST(ArrayLocatorRows, UniqueIndexSeesEachRowOfA2DArray) {
   EXPECT_EQ(out, "2 2\n");
 }
 
-// §7.12.1 with §7.4.4: over a three-dimensional array each element a locator
-// visits is a two-dimensional subarray, from which the with clause selects:
-// k[1][1][1] is the only leaf equal to 7.
 TEST(ArrayLocatorRows, IndexLocatorsSeeEachSubarrayOfA3DArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -71,11 +60,6 @@ TEST(ArrayLocatorRows, IndexLocatorsSeeEachSubarrayOfA3DArray) {
   EXPECT_EQ(out, "'{1}\n");
 }
 
-// §7.12.1 with §7.4.2: the first element is the one closest to the leftmost
-// index and the last the one closest to the rightmost, so on a[3:1] the first
-// element above 5 is a[3] (30) and the last is a[1] (10), and over the rows of
-// m[1:0][2] the first row whose sum is above 0 is row 1. Counted from the low
-// index, each answer would come from the other end.
 TEST(ArrayLocatorRows, FirstAndLastFollowADescendingRange) {
   SimFixture f;
   auto out = RunCapture(
@@ -97,12 +81,6 @@ TEST(ArrayLocatorRows, FirstAndLastFollowADescendingRange) {
   EXPECT_EQ(out, "30 3 10 1 1\n");
 }
 
-// §7.12.1 with §7.4.4: the locators that return elements return rows of a
-// two-dimensional array, each a copy of the row's elements in the queue of
-// rows they are assigned to: find keeps row 1, {3, 4, 5}, the one row whose
-// sum passes 5; find_last and max pick row 1 and find_first and min row 0;
-// and unique keeps one row for each of the sums 3 and 10, the last of them
-// {5, 5}.
 TEST(ArrayLocatorRows, ElementLocatorsReturnTheRowsOfA2DArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -127,9 +105,6 @@ TEST(ArrayLocatorRows, ElementLocatorsReturnTheRowsOfA2DArray) {
   EXPECT_EQ(out, "1 3 4 5 2 5 5 2 2 5\n");
 }
 
-// §7.12.1: find requires a with clause over a two-dimensional array as over
-// any other, and the call without one is reported once, on its line, when its
-// result is assigned to a queue of rows.
 TEST(ArrayLocatorRows, FindWithoutAWithClauseIsReportedOnceIntoAQueueOfRows) {
   SimFixture f;
   RunCapture(
@@ -147,10 +122,6 @@ TEST(ArrayLocatorRows, FindWithoutAWithClauseIsReportedOnceIntoAQueueOfRows) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §7.12.1 with §7.10: over a queue whose elements are fixed-size arrays each
-// element a locator visits is one of those arrays: the rows whose sums pass 5
-// are 0 and 2, the row holding 9 at [1] is {0, 9, 0}, and the row of the
-// greatest sum is {4, 5, 6}.
 TEST(ArrayLocatorRows, LocatorsSeeEachElementOfAQueueOfArrays) {
   SimFixture f;
   auto out = RunCapture(
@@ -172,11 +143,6 @@ TEST(ArrayLocatorRows, LocatorsSeeEachElementOfAQueueOfArrays) {
   EXPECT_EQ(out, "'{0, 2} 1 9 1 6\n");
 }
 
-// §7.12.1 with §7.4.4: the locators that return elements return the
-// two-dimensional subarrays of a three-dimensional array into a queue of such
-// arrays, each a copy of every level of the subarray: find keeps k[1],
-// {{4, 5}, {6, 7}}, the one subarray holding 7 at [1][1], and min by its
-// first leaf keeps k[0].
 TEST(ArrayLocatorRows, ElementLocatorsReturnTheSubarraysOfA3DArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -196,11 +162,6 @@ TEST(ArrayLocatorRows, ElementLocatorsReturnTheSubarraysOfA3DArray) {
   EXPECT_EQ(out, "1 4 7 1 2\n");
 }
 
-// §7.12.1 with §7.4.4: a select of a multidimensional array's leading
-// dimension, `mg[1]`, is an unpacked array, which each locator searches as a
-// one-dimensional array: 4 is its least element and 9 its greatest, 6 and 9
-// exceed 5, 4 stands at indexes 1 and 3, and three values are unique. Each
-// returned a queue holding one 0.
 TEST(ArrayLocatorSubarray, LocatorsSearchTheElementsOfASubarraySelect) {
   SimFixture f;
   auto out = RunCapture(
@@ -224,10 +185,6 @@ TEST(ArrayLocatorSubarray, LocatorsSearchTheElementsOfASubarraySelect) {
   EXPECT_EQ(out, "'{4} '{9} '{6, 9} '{1, 3} '{0} '{4} 3 3\n");
 }
 
-// §7.12.1 with §7.4.4 and §8.5: a class property may be a multidimensional
-// array, and `h.g[1]` through a handle or `g[1]` bare in a method is its
-// subarray, which the locators search as they search a module array's. Each
-// returned a queue holding one 0.
 TEST(ArrayLocatorSubarray, LocatorsSearchTheElementsOfAClassPropertysSubarray) {
   SimFixture f;
   auto out = RunCapture(

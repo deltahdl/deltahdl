@@ -1,6 +1,3 @@
-// §25.9: the modport a virtual interface selects, as part of its type, held
-// to the modport the source of an assignment to it selects.
-
 #include "elaborator/virtual_interface_modports.h"
 
 #include <string_view>

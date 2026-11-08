@@ -125,9 +125,6 @@ void Scheduler::ScheduleEvent(SimTime time, Region region, Event* event) {
     ++illegal_postponed_schedule_count_;
   }
 
-  // §4.4.3.5: the Pre-Observed region only lets PLI routines read the
-  // stabilized active region set; scheduling any event into the current time
-  // slot from within it is illegal.
   if (current_region_ == Region::kPreObserved && time == current_time_) {
     ++illegal_pre_observed_schedule_count_;
   }
@@ -165,34 +162,13 @@ void Scheduler::ReleaseSlot(TimeSlot& slot) {
 }
 
 void Scheduler::Run() {
-  // §38.36.3: cbStartOfSimulation marks the start of simulation, the beginning
-  // of the time zero cycle. It is one of the action reasons, which the clause
-  // separates from the feature reasons by requiring every VPI-compliant tool to
-  // raise them, and this is where simulation starts: the design
-  // is built and no event has run.
   GetGlobalVpiContext().DispatchCallbacks(kCbStartOfSimulation);
-  // §39.4.1: the assertion system initializes and starts with the run.
   VpiStartAssertionSystem();
 
-  // §20.2: an explicit $finish/$stop/$fatal requests a hard halt through the
-  // SimContext, and the run ends where it was called. No later time slot runs
-  // -- a process suspended on a delay must not resume in a time step past the
-  // finish (e.g. `forever #10` with `#45 $finish` performs its t=40 iteration
-  // but not the t=50 one) -- and ExecuteTimeSlot stops the slot the halt came
-  // in, whose remaining events are released here unrun.
-  //
-  // §24.3: the implicit $finish due once every program initial has ended
-  // (ProgramsEnded) ends the run when the time slot it came in is done. The
-  // rest of that slot runs, the design's side of a port the program wrote in
-  // it among them, and no later slot does: a design process waiting on a
-  // delay past the program's end never resumes.
   while (!event_calendar_.empty() && !stop_requested_ && !Halted() &&
          !ProgramsEnded()) {
     auto it = event_calendar_.begin();
     if (!SlotHasLiveEvent(it->second)) {
-      // Every event here is a superseded inertial-delay timeout that an earlier
-      // operand change cancelled (IEEE 1800 §28). They do no work, so drop them
-      // without advancing simulation time past the last real activity.
       ReleaseSlot(it->second);
       event_calendar_.erase(it);
       continue;
@@ -201,19 +177,9 @@ void Scheduler::Run() {
     ExecuteTimeSlot(it->second);
     ReleaseSlot(it->second);
     event_calendar_.erase(it);
-    // §38.36.3: between time slots the run is at a safe point, where the
-    // cbSignal callbacks of the signals trapped meanwhile are called.
     GetGlobalVpiContext().DeliverRaisedSignals();
-    // §8.29: between time slots no process is mid-statement, so every handle
-    // a running process holds is in a stack the collector reads.
     if (ctx_ != nullptr && ClassCollectionDue()) ctx_->CollectGarbage();
   }
-  // The scheduler is now idle: no process is executing. An event callback that
-  // resumed a process left it installed as the context's current process (that
-  // is how a bare-name lookup during the process picks up its instance prefix).
-  // Clear it so a post-run hierarchical lookup - e.g. a testbench or PLI query
-  // after Run() returns - resolves in the top scope instead of inheriting the
-  // last-run instance's prefix and finding a same-named variable it shadows.
   if (ctx_) ctx_->SetCurrentProcess(nullptr);
   if (ProgramsEnded()) ctx_->RequestStop();
 }
@@ -221,24 +187,13 @@ void Scheduler::Run() {
 void Scheduler::EndSimulation() {
   ctx_->RunFinalBlocks();
   GetGlobalVpiContext().DispatchCallbacks(kCbEndOfSimulation);
-  // §39.4.1: the assertion system ends after the end of simulation.
   VpiEndAssertionSystem();
 }
 
-// §20.2 with §9.2.3: once a halt is requested the slot runs no further event,
-// whatever region it waits in, so a nonblocking update, a deferred assertion's
-// pending report (§16.4.1) or a $strobe (§21.2.2) queued behind the $finish in
-// its own time step is never reached. The post-timestep callbacks still run:
-// they record what the slot did before the halt, such as the value changes a
-// VCD dump writes for it, and execute no scheduled event.
 void Scheduler::ExecuteTimeSlot(TimeSlot& slot) {
   ExecuteRegion(slot, Region::kPreponed);
   for (const auto& cb : time_slot_start_cbs_) cb();
 
-  // §38.36.2: a cbNextSimTime callback is called before the events of the
-  // next time slot, the first after the one it was registered in, and Table
-  // 4-1 places it in the Pre-Active region, which §4.5 enters after the
-  // Preponed region has sampled the slot.
   current_region_ = Region::kPreActive;
   GetGlobalVpiContext().DispatchCallbacks(kCbNextSimTime);
   ExecuteRegion(slot, Region::kPreActive);
@@ -264,12 +219,6 @@ bool Scheduler::IterateActiveSet(TimeSlot& slot) {
   if (Halted() || !slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     return false;
   }
-  // §4.5 reference algorithm: drain the active region set together with the
-  // Observed regions, always taking the *earliest* nonempty region next. An
-  // event scheduled into an earlier region while a later one runs (e.g. an NBA
-  // created during the Observed region) is therefore processed before the
-  // reactive set, and the Pre-Observed/Observed regions sample only once every
-  // earlier active-set region — including Inactive→Active re-entries — settles.
   while (!Halted() &&
          slot.AnyNonemptyIn(Region::kActive, Region::kPostObserved)) {
     ExecuteIterativeRegion(
@@ -283,8 +232,6 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
   if (Halted() || !slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     return false;
   }
-  // §4.5 reference algorithm: same earliest-nonempty-first drain across the
-  // reactive region set (Reactive..Post-Re-NBA).
   while (!Halted() &&
          slot.AnyNonemptyIn(Region::kReactive, Region::kPostReNBA)) {
     ExecuteIterativeRegion(
@@ -294,14 +241,6 @@ bool Scheduler::IterateReactiveSet(TimeSlot& slot) {
   return true;
 }
 
-// §4.5 moves the events of the first nonempty region after `home` -- the
-// Active region, or the Reactive region for the reactive set -- into `home`
-// and executes `home`, so an event scheduled into that region while they run
-// stays there until `home` is empty again: a process resumed from `#0` in the
-// Inactive region that writes a variable and executes `#0` again resumes after
-// the Active events its write created (§4.4.2.3, §4.4.2.7). The region runs in
-// place, keeping its own identity for the region checks, but only the events
-// it held on entry.
 void Scheduler::ExecuteIterativeRegion(TimeSlot& slot, Region region,
                                        Region home) {
   if (region == home) {

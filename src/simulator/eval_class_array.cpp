@@ -76,9 +76,6 @@ uint32_t ClassArraySize(const ClassObject* obj,
 
 namespace {
 
-// §8.9: the value `ref` holds under `key` -- in the declaring class for a
-// static property, in the object for any other -- or null where it holds
-// none.
 const Logic4Vec* FindSlot(const ClassArrayRef& ref, const std::string& key) {
   if (ref.static_owner != nullptr) {
     auto it = ref.static_owner->static_properties.find(key);
@@ -89,9 +86,6 @@ const Logic4Vec* FindSlot(const ClassArrayRef& ref, const std::string& key) {
   return it != ref.obj->properties.end() ? &it->second : nullptr;
 }
 
-// Writes `value` under `key` where `ref` holds its elements, and tells the
-// object's watchers of the change (§9.4.2); a static property's storage is
-// the class's.
 void SetSlot(const ClassArrayRef& ref, const std::string& key,
              const Logic4Vec& value, SimContext& ctx) {
   if (ref.static_owner != nullptr) {
@@ -102,30 +96,22 @@ void SetSlot(const ClassArrayRef& ref, const std::string& key,
   ctx.NotifyClassHandleWatchers(ref.obj->handle);
 }
 
-// The object a member access's handle side names: the running method's object
-// for `this`, else the object the handle the side evaluates to refers to.
 ClassObject* HandleSideObject(const Expr* side, SimContext& ctx, Arena& arena) {
   if (side->kind == ExprKind::kIdentifier && side->text == "this")
     return ctx.CurrentThis();
   return ctx.GetClassObject(EvalExpr(side, ctx, arena).ToUint64());
 }
 
-// Whether `index` addresses an element of the array `ref`.
 bool IndexInRange(const ClassArrayRef& ref, int64_t index) {
   return index >= ref.lo && index < ref.lo + static_cast<int64_t>(ref.size);
 }
 
-// §7.4/§7.5.1: the value an element of `prop` holds before anything is
-// written to it, the element type's x or 0.
 Logic4Vec ElementDefault(const ClassTypeInfo::PropertyInfo& prop,
                          Arena& arena) {
   return prop.is_4state ? MakeAllX(arena, prop.width)
                         : MakeLogic4VecVal(arena, prop.width, 0);
 }
 
-// The reference `obj` and `prop` make, with the elements the object holds,
-// or, for a static property, the elements the class `type` or the base
-// declaring it holds (§8.9); `obj` may then be null.
 ClassArrayRef MakeRef(ClassObject* obj, const ClassTypeInfo* type,
                       const ClassTypeInfo::PropertyInfo* prop, bool bare) {
   ClassArrayRef ref{obj, prop, bare, prop->array_size,
@@ -146,8 +132,6 @@ ClassArrayRef MakeRef(ClassObject* obj, const ClassTypeInfo* type,
   return ref;
 }
 
-// The receiver and the method of a call `receiver.method(...)`, or null for a
-// call of any other shape.
 const Expr* CallReceiver(const Expr* expr, std::string_view& method) {
   if (expr == nullptr || expr->kind != ExprKind::kCall || expr->lhs == nullptr)
     return nullptr;
@@ -161,23 +145,17 @@ const Expr* CallReceiver(const Expr* expr, std::string_view& method) {
   return access->lhs;
 }
 
-// §7.12.2: whether `method` names one of the array ordering methods.
 bool IsOrderingMethod(std::string_view method) {
   return method == "sort" || method == "rsort" || method == "reverse" ||
          method == "shuffle";
 }
 
-// The declared index of the i-th element from the left of `ref`, the higher
-// bound first for a descending dimension (§7.4.2).
 int64_t IndexFromLeft(const ClassArrayRef& ref, uint32_t i) {
   return ref.prop->array_descending
              ? ref.lo + static_cast<int64_t>(ref.size) - 1 - i
              : ref.lo + i;
 }
 
-// §7.12.2: the value the with clause of the call `expr` maps the element
-// `elem` at `index` to, the iterator and its index bound as §7.12 names
-// them; the element itself where the call has no with clause.
 Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, int64_t index,
                     SimContext& ctx, Arena& arena) {
   if (expr->with_expr == nullptr) return elem;
@@ -192,9 +170,6 @@ Logic4Vec WithValue(const Expr* expr, const Logic4Vec& elem, int64_t index,
   return value;
 }
 
-// §7.12.2: the keys sort() and rsort() order the elements `elems` of `ref`
-// by: the value of the with clause of `expr` where it has one, of the
-// clause's signedness, and otherwise the elements themselves.
 std::vector<Logic4Vec> SortKeys(const Expr* expr, const ClassArrayRef& ref,
                                 const std::vector<Logic4Vec>& elems,
                                 SimContext& ctx, Arena& arena) {
@@ -206,10 +181,6 @@ std::vector<Logic4Vec> SortKeys(const Expr* expr, const ClassArrayRef& ref,
   return keys;
 }
 
-// §7.12.2: the order sort(), or rsort() where `ascending` is clear, puts
-// elements of the keys `keys` in: as text where `as_text` is set, a string
-// property's own elements (§6.16), and otherwise as numbers of each key's
-// signedness (§6.11). Elements of equal keys keep their order.
 std::vector<size_t> SortOrder(const std::vector<Logic4Vec>& keys, bool as_text,
                               bool ascending) {
   auto before = [&](size_t a, size_t b) {
@@ -224,12 +195,6 @@ std::vector<size_t> SortOrder(const std::vector<Logic4Vec>& keys, bool as_text,
   return order;
 }
 
-// §7.12.2 with §8.5: the ordering method `method` called on the fixed-size or
-// dynamic array property `ref` reorders its elements, read from the left and
-// written back in their new order: sorted, reversed, or shuffled at random
-// as a declared array is. Each element is read with the property's
-// signedness, which a with clause's iterator takes. Answers true, the call
-// having been served.
 bool OrderClassArray(const Expr* expr, const ClassArrayRef& ref,
                      std::string_view method, SimContext& ctx, Arena& arena) {
   std::vector<Logic4Vec> elems;
@@ -258,9 +223,6 @@ bool OrderClassArray(const Expr* expr, const ClassArrayRef& ref,
   return true;
 }
 
-// §7.4.4: the subarray at `index` of the array property `ref` holds
-// subarrays of: an array of the next dimension, its elements held under keys
-// extending the element's own, `g[1][2]`.
 ClassArrayRef SubarrayAt(const ClassArrayRef& ref, int64_t index) {
   ClassArrayRef sub = ref;
   sub.path = ClassArrayRefElementKey(ref, index);
@@ -270,9 +232,6 @@ ClassArrayRef SubarrayAt(const ClassArrayRef& ref, int64_t index) {
   return sub;
 }
 
-// An element of a multidimensional array property, the subarray `ref` of
-// the last dimension holding it at `index`, and the name of the variable
-// that stands for it while a pattern is distributed, `$pattern[1][2]`.
 struct ClassArrayLeaf {
   ClassArrayRef ref;
   int64_t index;
@@ -292,12 +251,6 @@ void CollectLeaves(const ClassArrayRef& ref, const std::string& name,
   }
 }
 
-// §10.9.1 with §7.4.4 and §8.5: a pattern into an array property holding
-// subarrays, `'{'{1, 2, 3}, '{4, 5, 6}}`, fills it as it fills a declared
-// array of the same shape -- nested patterns, replications, keys and
-// `default` alike (DistributePatternToArray) -- by being distributed into
-// variables of that shape, held in a scope pushed for the purpose, each
-// element then taking the value its variable was given.
 bool StoreNestedClassArrayPattern(const ClassArrayRef& dst, const Expr* rhs,
                                   SimContext& ctx, Arena& arena) {
   const ClassTypeInfo::PropertyInfo& prop = *dst.prop;
@@ -342,12 +295,6 @@ bool NamesOwnArrayProperty(const Expr* base, SimContext& ctx) {
          FindClassArrayProperty(self->type, base->text) != nullptr;
 }
 
-// §8.11 with §23.9: inside a method a bare name is the object's property
-// ahead of a variable of the module the class is declared in; only a local
-// of the method's own shadows it. Deferring to any variable of the name,
-// `d = new[2]` in a method sized the module's `d` and left the property
-// empty. §8.10: a static method has no object, and names its class's static
-// properties bare.
 static bool ResolveBareClassArray(const Expr* base, SimContext& ctx,
                                   ClassArrayRef& out) {
   if (ctx.FindLocalVariable(base->text) != nullptr) return false;
@@ -357,20 +304,12 @@ static bool ResolveBareClassArray(const Expr* base, SimContext& ctx,
   if (type == nullptr) return false;
   const auto* prop = FindClassArrayProperty(type, base->text);
   if (prop == nullptr || (self == nullptr && !prop->is_static)) return false;
-  out = MakeRef(self, type, prop, /*bare=*/true);
-  // 18.5.7.1: a constraint's trial binds a dynamic array's size as it binds
-  // its elements, so the size is the local's where one is in scope.
+  out = MakeRef(self, type, prop, true);
   if (auto* size = ctx.FindVariable(ClassArraySizeKey(base->text)))
     out.size = static_cast<uint32_t>(size->value.ToUint64());
   return true;
 }
 
-// §8.23: `C::sarr` names the static property of class C. §8.25 gives each
-// specialization its own static properties, so `P#(5)::sarr` names the copy
-// of the specialization the prefix names (ScopeNamedSpecialization), as a
-// scalar static read through the same prefix does; looked up by the bare
-// name, every specialization's scope form reached the generic class's one
-// set of elements.
 static bool ResolveScopedClassArray(const Expr* base, SimContext& ctx,
                                     Arena& arena, ClassArrayRef& out) {
   if (base->lhs->kind != ExprKind::kIdentifier) return false;
@@ -379,13 +318,10 @@ static bool ResolveScopedClassArray(const Expr* base, SimContext& ctx,
   if (cls == nullptr) return false;
   const auto* prop = FindClassArrayProperty(cls, base->rhs->text);
   if (prop == nullptr || !prop->is_static) return false;
-  out = MakeRef(nullptr, cls, prop, /*bare=*/false);
+  out = MakeRef(nullptr, cls, prop, false);
   return true;
 }
 
-// §7.4.2 with §7.4.4 and §8.5: `g[1]` of a property with more than one
-// unpacked dimension, `int g[2][3]`, is a subarray, an array of the next
-// dimension whose elements are held under keys extending its own, `g[1][2]`.
 static bool ResolveClassSubarray(const Expr* sel, SimContext& ctx, Arena& arena,
                                  ClassArrayRef& out) {
   if (sel->index == nullptr || sel->index_end != nullptr) return false;
@@ -417,7 +353,7 @@ bool ResolveClassArray(const Expr* base, SimContext& ctx, Arena& arena,
   if (obj == nullptr) return false;
   const auto* prop = FindClassArrayProperty(obj->type, base->rhs->text);
   if (prop == nullptr) return false;
-  out = MakeRef(obj, obj->type, prop, /*bare=*/false);
+  out = MakeRef(obj, obj->type, prop, false);
   return true;
 }
 
@@ -474,10 +410,6 @@ bool TryEvalClassArrayMethodCall(const Expr* expr, SimContext& ctx,
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
   }
-  // §7.12.2 with §8.5: the ordering methods reorder the property's own
-  // elements, which no other arm reaches: the array arm reads an array by the
-  // name it is declared with, and the copy QueuePropertyReceiver makes for the
-  // reductions and locators is written back to nothing.
   out = MakeLogic4VecVal(arena, 1, 0);
   return IsOrderingMethod(method) &&
          OrderClassArray(expr, ref, method, ctx, arena);
@@ -498,8 +430,6 @@ bool TryWriteClassArrayElement(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-// Selected as the property's own element, `h.inst[0]`, the select named no
-// array property and the write went nowhere.
 bool TryWriteClassArrayElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
                                    SimContext& ctx, Arena& arena) {
   if (lhs == nullptr || lhs->kind != ExprKind::kSelect ||
@@ -526,10 +456,6 @@ bool TryWriteClassArrayElementChar(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-// The element is read into a variable of the element's state set,
-// signedness and declared packed range, so that WriteBitSelect addresses its
-// bits as a variable of the element type's; left to the other writers, the
-// select named no storage and the write went nowhere.
 bool TryWriteClassArrayElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
                                    SimContext& ctx, Arena& arena) {
   if (lhs == nullptr || lhs->kind != ExprKind::kSelect ||
@@ -592,7 +518,6 @@ bool TryClassArrayNewAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       rhs->args.size() > 1 && ResolveClassArray(rhs->args[1], ctx, arena, init);
   ResizeClassArray(ref, static_cast<uint32_t>(size), has_init ? &init : nullptr,
                    ctx, arena);
-  // §18.4: a static array's rand_mode states are its declaring class's.
   DropDroppedElementModes(ref.static_owner != nullptr
                               ? ref.static_owner->static_rand_active
                               : ref.obj->rand_active,
@@ -620,7 +545,6 @@ bool PropertyArrayElements(const Expr* src, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §7.6 with §7.10: `lhs`, a queue property, rebuilt from `elems`.
 static bool AssignQueueProperty(const Expr* lhs,
                                 const std::vector<Logic4Vec>& elems,
                                 SimContext& ctx, Arena& arena) {
@@ -641,10 +565,6 @@ static bool AssignQueueProperty(const Expr* lhs,
   return true;
 }
 
-// §10.9.1 with §7.5: the element count the positional pattern `rhs` gives a
-// dynamic array assigned it -- its items, a replication `'{3{7, 8}}` counted
-// as many times as it says -- into `out`; false for a keyed pattern, which
-// names no count, and for a replication whose count is unknown.
 static bool PatternItemCount(const Expr* rhs, SimContext& ctx, Arena& arena,
                              uint32_t& out) {
   if (!rhs->pattern_keys.empty()) return false;
@@ -683,8 +603,6 @@ bool StoreClassArrayPattern(const ClassArrayRef& dst_ref, const Expr* rhs,
 
 bool TryClassArrayWholeAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   const Expr* lhs = stmt->lhs;
-  // §10.9.1 with §7.4.4: a pattern fills a subarray of a multidimensional
-  // property, `h.g[1] = '{7, 8, 9}`, as it fills the whole property.
   const bool kPattern =
       stmt->rhs != nullptr && stmt->rhs->kind == ExprKind::kAssignmentPattern;
   if (lhs == nullptr || (lhs->kind != ExprKind::kIdentifier &&

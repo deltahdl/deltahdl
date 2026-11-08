@@ -20,8 +20,6 @@ const std::vector<VpiObject*>* VpiConstraintListOf(int type,
 
 namespace {
 
-// The expression a distribution weights, its one child no dist item, or the
-// one a soft disable discards the soft constraints of, its one child.
 VpiObject* ConstraintItemExpr(const VpiObject* ref) {
   VpiObject* expr = nullptr;
   for (VpiObject* child : ref->children) {

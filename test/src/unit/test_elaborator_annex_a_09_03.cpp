@@ -230,9 +230,6 @@ TEST(IdentifierElaboration, UnresolvedHierarchicalIdentifierError) {
       "  assign x = u.nonexistent;\n"
       "endmodule\n",
       f);
-  // §23.6 governs the hierarchical name, not §23.9: the reference is well
-  // formed and names a module that exists, and what fails is resolving the
-  // member within it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "hierarchical reference 'u.nonexistent' is "
                             "unresolved: 'nonexistent' is not declared in "
@@ -248,8 +245,6 @@ TEST(IdentifierElaboration, PsIdentifierUnknownPackageIsError) {
       "  initial x = no_such_pkg::value;\n"
       "endmodule\n",
       f);
-  // The report names the scope-resolution base rather than the member, and
-  // stands under §26.3 because what is unresolved is the package qualifier.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "reference to unresolved package or scope "
                             "'no_such_pkg'",

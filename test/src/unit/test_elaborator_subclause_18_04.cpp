@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.4: a real variable may be rand, but randc is refused for it.
 TEST(RandomVariableTypes, RealRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -34,7 +33,6 @@ TEST(RandomVariableTypes, ShortrealRandcRejected) {
                             "18.4"));
 }
 
-// 18.4: a real variable may still be declared rand.
 TEST(RandomVariableTypes, RealRandAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -43,7 +41,6 @@ TEST(RandomVariableTypes, RealRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// An integral randc variable is legal.
 TEST(RandomVariableTypes, IntegralRandcAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -52,7 +49,6 @@ TEST(RandomVariableTypes, IntegralRandcAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: an object handle may be rand, but randc is refused for it.
 TEST(RandomVariableTypes, ObjectHandleRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -68,7 +64,6 @@ TEST(RandomVariableTypes, ObjectHandleRandcRejected) {
                             "18.4"));
 }
 
-// 18.4: an object handle may be declared rand.
 TEST(RandomVariableTypes, ObjectHandleRandAccepted) {
   EXPECT_TRUE(
       ElabOk("class D;\n"
@@ -79,7 +74,6 @@ TEST(RandomVariableTypes, ObjectHandleRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: neither rand nor randc is accepted on an unpacked union.
 TEST(RandomVariableTypes, UnpackedUnionRandRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -95,9 +89,6 @@ TEST(RandomVariableTypes, UnpackedUnionRandRejected) {
       "18.4"));
 }
 
-// 18.4: a packed untagged union may be declared rand (treated as integral).
-// The same declaration that is rejected when unpacked is accepted when packed,
-// isolating the rule to the union's packed/tagged shape.
 TEST(RandomVariableTypes, PackedUntaggedUnionRandAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef union packed { bit [7:0] a; bit [7:0] b; } u_t;\n"
@@ -107,11 +98,6 @@ TEST(RandomVariableTypes, PackedUntaggedUnionRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: because a packed untagged union is treated as an integral value, it may
-// also be declared randc, not just rand. This is the cyclic-qualifier form of
-// the positive legality above; the identical unpacked union is rejected under
-// randc (below via UnpackedUnionRandRejected's shape), isolating the rule to
-// the packed integral shape rather than to the qualifier.
 TEST(RandomVariableTypes, PackedUntaggedUnionRandcAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef union packed { bit [7:0] a; bit [7:0] b; } u_t;\n"
@@ -121,7 +107,6 @@ TEST(RandomVariableTypes, PackedUntaggedUnionRandcAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: neither rand nor randc is accepted on a packed tagged union.
 TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -137,8 +122,6 @@ TEST(RandomVariableTypes, PackedTaggedUnionRandRejected) {
       3, "18.4"));
 }
 
-// 18.4: rand is allowed on an unpacked structure, and its random members are
-// then solved together.
 TEST(RandomVariableTypes, UnpackedStructRandAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef struct { rand int a; int b; } s_t;\n"
@@ -148,9 +131,6 @@ TEST(RandomVariableTypes, UnpackedStructRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: an unpacked structure may be rand but is refused randc. The identical
-// declaration is accepted as rand above, isolating the rule to the randc
-// qualifier on an unpacked aggregate.
 TEST(RandomVariableTypes, UnpackedStructRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -165,9 +145,6 @@ TEST(RandomVariableTypes, UnpackedStructRandcRejected) {
                             3, "18.4"));
 }
 
-// 18.4: a packed structure is treated as an integral value, so it may be
-// declared rand or randc. The same structure that is rejected as randc when
-// unpacked is accepted when packed, isolating the rule to the packed shape.
 TEST(RandomVariableTypes, PackedStructRandcAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef struct packed { bit [7:0] a; bit [7:0] b; } s_t;\n"
@@ -177,20 +154,12 @@ TEST(RandomVariableTypes, PackedStructRandcAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: a member of an unpacked structure may carry a rand modifier in its
-// type declaration.
 TEST(RandomVariableTypes, UnpackedStructMemberRandAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef struct { rand int a; int b; } s_t;\n"
              "module m; endmodule\n"));
 }
 
-// 18.4: a member of a packed structure takes neither the rand nor the randc
-// modifier.
-// The same member declaration accepted when the structure is unpacked is
-// rejected when it is packed, isolating the rule to the packed shape.
-// What rejects the member is §7.2's restriction of the random qualifiers to
-// unpacked structures, not §18.4, so the report names that clause.
 TEST(RandomVariableTypes, PackedStructMemberRandRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -202,10 +171,6 @@ TEST(RandomVariableTypes, PackedStructMemberRandRejected) {
       "random qualifier is only allowed in unpacked structures", 1, "7.2"));
 }
 
-// 18.4: a member of a packed untagged union takes neither the rand nor the
-// randc modifier.
-// As above, the clause reported is §7.2, which allows a random qualifier only
-// on a member of an unpacked structure.
 TEST(RandomVariableTypes, PackedUnionMemberRandRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -217,12 +182,6 @@ TEST(RandomVariableTypes, PackedUnionMemberRandRejected) {
       "random qualifier is only allowed in unpacked structures", 1, "7.2"));
 }
 
-// 18.4: the rule holds wherever the typedef is written. The two cases above
-// declare it at compilation-unit scope; this declares the same packed structure
-// inside a module, which reaches the check by a different route through the
-// elaborator.
-// The report is the same §7.2 one the two cases above name, now standing on the
-// typedef's line inside the module.
 TEST(RandomVariableTypes, PackedStructMemberRandRejectedInsideModule) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -235,9 +194,6 @@ TEST(RandomVariableTypes, PackedStructMemberRandRejectedInsideModule) {
       "random qualifier is only allowed in unpacked structures", 2, "7.2"));
 }
 
-// 18.4: the "no real randc" rule covers every real flavor, not just 'real'.
-// 'realtime' is the third real type (with 'real' and 'shortreal', already
-// exercised), so a randc realtime property is likewise rejected.
 TEST(RandomVariableTypes, RealtimeRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -251,10 +207,6 @@ TEST(RandomVariableTypes, RealtimeRandcRejected) {
                             "18.4"));
 }
 
-// 18.4: the solver randomizes singular integral variables, so a plain packed
-// 2-state vector may carry the rand modifier. This is the rand (noncyclic)
-// counterpart of the already-covered randc bit-vector acceptance, confirming a
-// bare integral vector is a legal random variable under either qualifier.
 TEST(RandomVariableTypes, IntegralVectorRandAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -263,9 +215,6 @@ TEST(RandomVariableTypes, IntegralVectorRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: a 4-state integral vector is equally a singular integral random
-// variable, so a rand logic vector is accepted just as the 2-state form is;
-// the state-ness of the integral type does not bear on rand legality.
 TEST(RandomVariableTypes, FourStateLogicVectorRandAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -274,8 +223,6 @@ TEST(RandomVariableTypes, FourStateLogicVectorRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: an enumeration is an integral type, so an enum-typed property is a
-// legal singular random variable and may be declared rand.
 TEST(RandomVariableTypes, EnumRandAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef enum { RED, GREEN, BLUE } e_t;\n"
@@ -285,10 +232,6 @@ TEST(RandomVariableTypes, EnumRandAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.4: because an enum presents a single integral value it may also be
-// declared randc (cyclic), unlike an unpacked aggregate or a real variable.
-// This isolates the rule to the type's integral shape rather than to the
-// qualifier.
 TEST(RandomVariableTypes, EnumRandcAccepted) {
   EXPECT_TRUE(
       ElabOk("typedef enum { RED, GREEN, BLUE } e_t;\n"

@@ -9,14 +9,10 @@
 namespace delta {
 
 bool VpiGetInstanceProperty(int property, VpiHandle obj, int& value) {
-  // §37.10: a package is the compilation unit's own scope where the unit
-  // declares into it, the one whose objects detail 5 names "$unit::name".
   if (property == vpiUnit && obj->type == vpiPackage) {
     value = static_cast<int>(obj->in_compilation_unit);
     return true;
   }
-  // §37.36: a udp defn reports through vpiProtected whether it is protected
-  // code (§37.3.6).
   if (property == vpiProtected && obj->type == vpiUdpDefn) {
     value = static_cast<int>(obj->is_protected);
     return true;

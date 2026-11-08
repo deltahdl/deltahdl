@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §7.4.4 with §26.2: a package's array written on a typedef name that writes
-// unpacked dimensions of its own has arrays for its elements, so an index
-// past an element, read and written by the package's own function, addresses
-// the typedef's dimension rather than a bit of the element.
 TEST(MultidimensionalArraySimulation, PackageArrayOfStagedTypedefIsTwoDim) {
   auto v = RunAndGet(
       "package p;\n"
@@ -31,9 +27,6 @@ TEST(MultidimensionalArraySimulation, PackageArrayOfStagedTypedefIsTwoDim) {
   EXPECT_EQ(v, 8u);
 }
 
-// §7.4.4 with §23.2.2.2: a port array written on such a name is an array of
-// arrays as well, where a port array of a name standing for a vector is an
-// array of vectors.
 TEST(MultidimensionalArraySimulation, PortArrayOfStagedTypedefIsTwoDim) {
   auto v = RunAndGet(
       "typedef bit [1:5] bsix;\n"

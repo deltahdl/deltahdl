@@ -20,16 +20,6 @@
 
 using namespace delta;
 
-// A design whose envelopes were encrypted under the exchange key `key`, run in
-// the two ways a design reaches simulation: compiled where it is read, and
-// compiled into a library by one invocation and bound by another (§33.5.3,
-// §33.5.4). §37.3.6's protection and §34.5.32's viewports belong to the code
-// an envelope contained whichever invocation runs it, so a test of either runs
-// the design both ways. Each asserts that the design elaborates without error
-// before running it from `t`.
-
-// `source` preprocessed under `key`, its text registered with the origin of
-// each line, elaborated from `t` and run.
 inline void RunUnderKey(const std::string& source, std::string_view key,
                         SimFixture& f) {
   PreprocConfig config;
@@ -47,8 +37,6 @@ inline void RunUnderKey(const std::string& source, std::string_view key,
   LowerAndRun(design, f);
 }
 
-// `source` compiled into a library under `key` and bound from it, the binding
-// run reading the library's compiled form and never the source, and run.
 inline void RunBoundFromALibrary(const std::string& source,
                                  std::string_view key, SimFixture& f) {
   ScratchDir tmp;

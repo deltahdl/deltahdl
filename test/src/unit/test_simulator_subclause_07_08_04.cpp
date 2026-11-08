@@ -9,17 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §7.8.4 governs the runtime behavior of an associative array whose index is an
-// integral data type: the index expression is cast to the declared index type,
-// a 4-state index carrying x/z is invalid, and the iteration order follows the
-// signedness of the index type. Every test below builds the array (and, where
-// it matters, the index expression) from real source so the declared width and
-// signedness are produced by the elaborator and consumed by the run-time cast,
-// rather than hand-stamped onto an AssocArraySpec. Dependency §7.8.1 supplies
-// the associative-array declaration syntax; §6.24.1 the cast machinery.
-
-// Basic write-then-read through the full pipeline: an integral-index array
-// stores a value under a key and reads it back at that same key.
 TEST(IntegralIndexAssocArraySimulation, WriteAndReadEndToEnd) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int aa[int];\n"
@@ -33,11 +22,6 @@ TEST(IntegralIndexAssocArraySimulation, WriteAndReadEndToEnd) {
             42u);
 }
 
-// §7.8.4: the index expression is cast to the index type, then entries are
-// ordered by signed numerical value when the index type is signed. A signed
-// 4-bit index sign-extends 12 (0b1100) to -4, so it orders ahead of the key 3.
-// The same source keys ordered the opposite way under an unsigned index type
-// (next test), isolating the signedness of the ordering rule.
 TEST(IntegralIndexAssocArraySimulation, SignedIndexCastAndOrdering) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -46,7 +30,7 @@ TEST(IntegralIndexAssocArraySimulation, SignedIndexCastAndOrdering) {
       "  int aa[SNibble];\n"
       "  initial begin\n"
       "    aa[3] = 100;\n"
-      "    aa[12] = 200;\n"  // sign-extends to key -4
+      "    aa[12] = 200;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -57,16 +41,13 @@ TEST(IntegralIndexAssocArraySimulation, SignedIndexCastAndOrdering) {
   ASSERT_NE(aa, nullptr);
   ASSERT_EQ(aa->int_data.size(), 2u);
   auto it = aa->int_data.begin();
-  EXPECT_EQ(it->first, -4);  // 12 cast to signed 4-bit
+  EXPECT_EQ(it->first, -4);
   EXPECT_EQ(it->second.ToUint64(), 200u);
   ++it;
   EXPECT_EQ(it->first, 3);
   EXPECT_EQ(it->second.ToUint64(), 100u);
 }
 
-// §7.8.4: an unsigned index type zero-extends the cast and orders unsigned, so
-// the very same source keys (3 and 12) come out as 3 then 12 rather than -4
-// then 3 as under the signed index type above.
 TEST(IntegralIndexAssocArraySimulation, UnsignedIndexCastAndOrdering) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -75,7 +56,7 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedIndexCastAndOrdering) {
       "  int aa[UNibble];\n"
       "  initial begin\n"
       "    aa[3] = 100;\n"
-      "    aa[12] = 200;\n"  // zero-extends to key 12
+      "    aa[12] = 200;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -89,13 +70,10 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedIndexCastAndOrdering) {
   EXPECT_EQ(it->first, 3);
   EXPECT_EQ(it->second.ToUint64(), 100u);
   ++it;
-  EXPECT_EQ(it->first, 12);  // 12 cast to unsigned 4-bit stays 12
+  EXPECT_EQ(it->first, 12);
   EXPECT_EQ(it->second.ToUint64(), 200u);
 }
 
-// §7.8.4: a signed 8-bit index type sign-extends the cast, so the source key
-// 200 (0xC8, top bit set) becomes the negative key -56 and no entry lands at
-// 200. This mirrors the LRM's signed-nibble example at byte width.
 TEST(IntegralIndexAssocArraySimulation, SignedByteSignExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -114,8 +92,6 @@ TEST(IntegralIndexAssocArraySimulation, SignedByteSignExtension) {
   EXPECT_EQ(aa->int_data.count(200), 0u);
 }
 
-// §7.8.4: an unsigned 8-bit index type zero-extends, so the source key 200
-// stays 200 and does not alias the sign-extended value -56.
 TEST(IntegralIndexAssocArraySimulation, UnsignedByteZeroExtension) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -134,9 +110,6 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedByteZeroExtension) {
   EXPECT_EQ(aa->int_data.count(-56), 0u);
 }
 
-// §7.8.4: casting to the index type narrows a value wider than the index width.
-// With a 4-bit unsigned index, 19 (0x13) collapses onto the same key as 3
-// (0x13 & 0xF == 0x3), so the second write overwrites the first entry.
 TEST(IntegralIndexAssocArraySimulation, IndexTruncatedToWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -145,7 +118,7 @@ TEST(IntegralIndexAssocArraySimulation, IndexTruncatedToWidth) {
       "  int aa[UNibble];\n"
       "  initial begin\n"
       "    aa[3] = 1;\n"
-      "    aa[19] = 2;\n"  // 19 & 0xF == 3, collapses onto key 3
+      "    aa[19] = 2;\n"
       "  end\n"
       "endmodule\n",
       f);
@@ -159,9 +132,6 @@ TEST(IntegralIndexAssocArraySimulation, IndexTruncatedToWidth) {
   EXPECT_EQ(aa->int_data.at(3).ToUint64(), 2u);
 }
 
-// §7.8.4: the cast applies identically on reads and writes, so a value stored
-// under an unsigned 8-bit key of 200 is found again by reading 200. If the read
-// path sign-extended instead, it would look up -56 and miss.
 TEST(IntegralIndexAssocArraySimulation, UnsignedCastReadRoundtrip) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef bit [7:0] UByte;\n"
@@ -176,8 +146,6 @@ TEST(IntegralIndexAssocArraySimulation, UnsignedCastReadRoundtrip) {
             99u);
 }
 
-// §7.8.4: a signed index orders and keys by signed value, so a negative key is
-// a first-class entry that reads back at the same negative index.
 TEST(IntegralIndexAssocArraySimulation, SignedNegativeKeyRoundtrip) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int aa[int];\n"
@@ -191,9 +159,6 @@ TEST(IntegralIndexAssocArraySimulation, SignedNegativeKeyRoundtrip) {
             77u);
 }
 
-// §7.8.4: a 4-state index expression containing x or z is invalid, so a write
-// through it stores nothing and raises a diagnostic. The x/z is detected on the
-// evaluated index value before the cast, independent of the index type.
 TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidWrite) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -211,9 +176,6 @@ TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidWrite) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §7.8.4: the x/z-invalid rule applies to reads as well, so reading through an
-// x/z index misses (returning the array default) and raises a diagnostic; the
-// valid entry stored on the same array is untouched.
 TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidRead) {
   SimFixture f;
   auto* result = RunAndFindVar(
@@ -227,14 +189,10 @@ TEST(IntegralIndexAssocArraySimulation, XZIndexInvalidRead) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(result, nullptr);
-  EXPECT_EQ(result->value.ToUint64(), 0u);  // array default for a miss
+  EXPECT_EQ(result->value.ToUint64(), 0u);
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §7.8.4 + §6.24.1 end-to-end: an explicit real→int cast produces an integral
-// index built entirely from real cast syntax. int'(3.0) evaluates to key 3, so
-// the value stored through the cast is read back at 3. This drives the cast
-// dependency through the full pipeline rather than pre-computing the key.
 TEST(IntegralIndexAssocArraySimulation, ExplicitRealCastIndexEndToEnd) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int aa[int];\n"
@@ -250,9 +208,6 @@ TEST(IntegralIndexAssocArraySimulation, ExplicitRealCastIndexEndToEnd) {
             55u);
 }
 
-// §7.8.4: for the builtin signed `int` index type (the LRM example's first
-// form), entries iterate in signed numerical order, so a negative key sorts
-// ahead of the positive ones. Keys are inserted out of order from real source.
 TEST(IntegralIndexAssocArraySimulation, SignedBuiltinIntOrdering) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -279,10 +234,6 @@ TEST(IntegralIndexAssocArraySimulation, SignedBuiltinIntOrdering) {
   EXPECT_EQ(it->first, 10);
 }
 
-// §7.8.4: the x/z-invalid rule bites when the x/z arrives through a 4-state
-// index variable (only a 4-state type such as `integer` can hold x/z), not just
-// a literal. Using the LRM example's `integer` index type, an x-valued index
-// stores nothing and raises a diagnostic.
 TEST(IntegralIndexAssocArraySimulation, IntegerVariableXZIndexInvalid) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -304,13 +255,6 @@ TEST(IntegralIndexAssocArraySimulation, IntegerVariableXZIndexInvalid) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §7.8.4: the index expression is cast to the declared index type wherever the
-// assignment is written, so a write inside a subroutine body reaches the same
-// key as a read written among the module's items. Under a `bit [3:0]` index
-// type the source index -1 zero-extends to key 15 in both places, and the value
-// the function stored is the value the module-level read hands back. A
-// function-body write keyed off the uncast index value would store the element
-// under a second key, and this read would return the array default instead.
 TEST(IntegralIndexAssocArraySimulation, FunctionBodyWriteKeyMatchesModuleRead) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef bit [3:0] Nibble;\n"
@@ -330,11 +274,6 @@ TEST(IntegralIndexAssocArraySimulation, FunctionBodyWriteKeyMatchesModuleRead) {
             42u);
 }
 
-// §7.8.4: -1 and 15 cast to the same `bit [3:0]` key, so a write from inside a
-// function body and a write among the module's items address one element and
-// leave the array holding a single entry. A function-body write keyed off the
-// uncast index value would land under a key of its own, splitting the element
-// in two and reporting num() == 2.
 TEST(IntegralIndexAssocArraySimulation,
      FunctionBodyAndModuleWritesShareOneKey) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -356,15 +295,6 @@ TEST(IntegralIndexAssocArraySimulation,
             1u);
 }
 
-// §7.8.4 keys an entry off the index cast to the declared index width, and
-// A.2.2.1's `data_type ::= integer_vector_type [ signing ] { packed_dimension
-// }` lets that width be written inline as `bit [3:0]` rather than through a
-// typedef. Under that index type -1 and 15 cast to one key, so the two writes
-// address a single element and num() answers 1 -- the claim
-// FunctionBodyAndModuleWritesShareOneKey makes for the `typedef bit [3:0]
-// Nibble;` form, here for the inline one. An index type that dropped its
-// packed dimension would key off a wider width, where -1 and 15 are two
-// elements and num() answers 2.
 TEST(IntegralIndexAssocArraySimulation,
      InlinePackedDimensionIndexSharesOneKey) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -380,10 +310,6 @@ TEST(IntegralIndexAssocArraySimulation,
             1u);
 }
 
-// §7.8.4: entries of an integral index type are ordered numerically, signed
-// where the index type is signed -- a `byte` index and a `bit signed [4:1]`
-// typedef order -3 before 0 and 5 -- where an unsigned 4-bit index keys -1 as
-// 15, the largest.
 TEST(IntegralIndexAssocArraySimulation,
      SignedIndexTypesOrderNegativeKeysFirst) {
   SimFixture f;
@@ -407,12 +333,6 @@ TEST(IntegralIndexAssocArraySimulation,
   EXPECT_EQ(out, "-3 5 15 -3\n");
 }
 
-// §7.8.4: the index is cast to an index type that may be wider than 64 bits,
-// and two indices differing in any bit are two entries, ordered by their whole
-// value: the two keys below differ only above bit 63. An unsigned 64-bit index
-// type orders a key with bit 63 set after every small key, and a signed one
-// orders -1 first, and -2**64 ahead of -1 where the type is wider still.
-// first(), last(), next(), prev() and foreach hand back the whole index.
 TEST(IntegralIndexAssocArraySimulation, IndexIsKeyedAndOrderedByItsWholeValue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -469,11 +389,6 @@ TEST(IntegralIndexAssocArraySimulation, IndexIsKeyedAndOrderedByItsWholeValue) {
             "36893488147419103232\n");
 }
 
-// §7.8.4 with §7.8 and A.2.2.1: an index type written with packed
-// dimensions keys by their whole width wherever the array is declared: a
-// class property and an automatic variable of a function indexed by
-// `bit [79:0]` hold indices differing only above bit 63 as two entries.
-// Keyed by the keyword's one bit, both held one entry under the key 1.
 TEST(IntegralIndexAssocArraySimulation, APackedIndexKeysAClassPropertyWhole) {
   SimFixture f;
   std::string out = RunCapture(

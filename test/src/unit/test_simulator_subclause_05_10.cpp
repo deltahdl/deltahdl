@@ -190,12 +190,6 @@ TEST(StructLiteralSim, NestedBracesArrayOfStructs) {
   EXPECT_EQ(vr1->value.ToUint64(), 0x3344u);
 }
 
-// §5.10 requires a bare (prefixless) structure literal to acquire its type
-// from an assignment-like context (§10.8). Here the only source of a type is
-// the function's return type — a §10.8 assignment-like context that is neither
-// a plain LHS assignment nor a declaration initializer. Building the literal
-// from that dependency's real syntax and running it end-to-end confirms the
-// literal is typed and packed into the return value (0xDEAD).
 TEST(StructLiteralSim, TypedByFunctionReturnContext) {
   auto v = RunAndGet(
       "module t;\n"
@@ -210,12 +204,6 @@ TEST(StructLiteralSim, TypedByFunctionReturnContext) {
   EXPECT_EQ(v, 0xDEADu);
 }
 
-// §5.10 (printed page 83) with §10.9.2 (printed 263): a positional structure
-// literal assigns each member in declaration order, each expression evaluated
-// as an assignment to that member's type, and §6.12 (printed 110) makes a
-// real member a C double, so `'{8'hA5, 2.5}` into `struct { int a; real b; }`
-// gives a 165 and b 2.5. The real member was laid out one bit wide, so its
-// value was cut to one bit and read back as 0.
 TEST(StructLiteralSim, PositionalLiteralFillsARealMember) {
   SimFixture f;
   auto out = RunCapture(
@@ -228,7 +216,6 @@ TEST(StructLiteralSim, PositionalLiteralFillsARealMember) {
   EXPECT_EQ(out, "s.a=165 s.b=2.5\n");
 }
 
-// The member-name form of the same clauses places the real by its name.
 TEST(StructLiteralSim, NamedLiteralFillsARealMember) {
   SimFixture f;
   auto out = RunCapture(
@@ -241,8 +228,6 @@ TEST(StructLiteralSim, NamedLiteralFillsARealMember) {
   EXPECT_EQ(out, "s.a=7 s.b=1.25\n");
 }
 
-// With the real member declared first, the members after it sit below its 64
-// bits; a one-bit real would have put a at the wrong offset as well.
 TEST(StructLiteralSim, PositionalLiteralPlacesAMemberAfterAReal) {
   SimFixture f;
   auto out = RunCapture(
@@ -255,9 +240,6 @@ TEST(StructLiteralSim, PositionalLiteralPlacesAMemberAfterAReal) {
   EXPECT_EQ(out, "s.a=165 s.b=2.5\n");
 }
 
-// A real member read into a real variable is the real it holds (§6.12), so
-// arithmetic on the copy is real arithmetic: 2.5 + 1.0 is 3.5, not the
-// integer reading of the double's bit pattern plus one.
 TEST(StructLiteralSim, RealMemberReadsAsAReal) {
   SimFixture f;
   auto out = RunCapture(
@@ -274,9 +256,6 @@ TEST(StructLiteralSim, RealMemberReadsAsAReal) {
   EXPECT_EQ(out, "3.5\n");
 }
 
-// §5.10 and §10.9.2: a replication in a structure pattern gives each member one
-// item, at that member's width: '{3{1}} sets three byte members to 1. It was
-// concatenated as three 32-bit 1s, of which the structure kept 000001.
 TEST(StructLiteralSim, ReplicatedPatternFillsEachMember) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -292,13 +271,6 @@ TEST(StructLiteralSim, ReplicatedPatternFillsEachMember) {
   EXPECT_EQ(f.ctx.FindVariable("p")->value.ToUint64(), 0x020202u);
 }
 
-// §5.10's own example: a replication sets the values of the exact number of
-// members, its inner braces removed, and for an array of structures the nested
-// braces follow the array's two dimensions and then the structure. Each of the
-// six structures gets `a` and the four elements `b, c, b, c`, in a procedural
-// assignment and in a declaration's initializer. Each structure is copied out
-// whole before its member is read, which the elements of an array member
-// reached through an array element (#8975) do not yet allow directly.
 TEST(StructLiteralSim, NestedReplicationFillsAnArrayOfStructures) {
   SimFixture f;
   std::string out = RunCapture(
@@ -333,11 +305,6 @@ TEST(StructLiteralSim, NestedReplicationFillsAnArrayOfStructures) {
             "8:1212 8:1212 8:1212 8:1212 8:1212 8:1212 \n");
 }
 
-// The nested braces of a multidimensional array of structures give each
-// structure its members by the structure's own types, so a byte member takes
-// its item's low eight bits and a shortint member its low sixteen, as they
-// would in a structure assigned alone, in a procedural assignment and in a
-// declaration's initializer.
 TEST(StructLiteralSim, NestedBracesFillNarrowMembersOfAMultidimensionalArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -366,9 +333,6 @@ TEST(StructLiteralSim, NestedBracesFillNarrowMembersOfAMultidimensionalArray) {
   EXPECT_EQ(out, "1,2 3,4 5,6 7,8 \n1,2 3,4 5,6 7,8 \n");
 }
 
-// A replication filling an unpacked array member of one structure gives the
-// same structure as the member's elements written out, in a declaration's
-// initializer and in a procedural assignment.
 TEST(StructLiteralSim, ReplicationFillsAnArrayMember) {
   SimFixture f;
   std::string out = RunCapture(

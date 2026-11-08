@@ -28,9 +28,6 @@ class VpiVlogInfoSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.17: vpi_get_vlog_info() supplies the product and version strings, and
-// reports 1 (true) on success. With no invocation options recorded there are
-// zero argv entries.
 TEST_F(VpiVlogInfoSim, GetVlogInfoReturnsProductAndVersion) {
   s_vpi_vlog_info info = {};
   EXPECT_EQ(vpi_get_vlog_info(&info), 1);
@@ -41,36 +38,25 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReturnsProductAndVersion) {
   EXPECT_EQ(info.argc, 0);
 }
 
-// §38.17: the routine shall return 0 (false) on failure. A null result
-// structure has nowhere to place the information, so the call fails.
 TEST_F(VpiVlogInfoSim, GetVlogInfoReturnsZeroOnFailure) {
   EXPECT_EQ(vpi_get_vlog_info(nullptr), 0);
 }
 
-// §38.17: argc is the number of invocation options and argv carries their
-// values; there shall be argc entries in argv, each a NUL-terminated string,
-// and entry zero shall be the tool's name.
 TEST_F(VpiVlogInfoSim, GetVlogInfoReportsInvocationCommandLine) {
   vpi_ctx_.SetInvocationArguments("delta-sim", {"-top", "dut", "+define+FOO"});
 
   s_vpi_vlog_info info = {};
   EXPECT_EQ(vpi_get_vlog_info(&info), 1);
 
-  // There shall be argc entries in argv (tool name plus three options).
   ASSERT_EQ(info.argc, 4);
   ASSERT_NE(info.argv, nullptr);
 
-  // Entry zero shall be the tool's name; the remaining entries are the options
-  // in command-line order, each a distinct NUL-terminated string.
   EXPECT_STREQ(info.argv[0], "delta-sim");
   EXPECT_STREQ(info.argv[1], "-top");
   EXPECT_STREQ(info.argv[2], "dut");
   EXPECT_STREQ(info.argv[3], "+define+FOO");
 }
 
-// §38.17: the minimal non-empty command line is the tool name alone with no
-// invocation options. There shall then be exactly one argv entry, and entry
-// zero shall hold the tool's name, with argv still a valid pointer array.
 TEST_F(VpiVlogInfoSim, GetVlogInfoReportsToolNameWhenNoOptions) {
   vpi_ctx_.SetInvocationArguments("delta-sim", {});
 
@@ -82,14 +68,6 @@ TEST_F(VpiVlogInfoSim, GetVlogInfoReportsToolNameWhenNoOptions) {
   EXPECT_STREQ(info.argv[0], "delta-sim");
 }
 
-// §38.17: a tool may offer a command-line option that names a file of further
-// options. When it does, vpi_get_vlog_info() reports that option by its string
-// and then a pointer to a NULL-terminated array of character pointers holding
-// the file's parsed contents: entry zero is the file's name, each later entry
-// points to one of the file's options as a NULL-terminated string, and the
-// array ends with a NULL entry. deltahdl provides that option as -f, which
-// src/driver/cli_options.cpp reads, so the report takes that shape rather than
-// naming the file and stopping there.
 TEST_F(VpiVlogInfoSim, AnOptionsFileIsReportedAsAnArrayOfItsParsedContents) {
   std::string options = "/tmp/deltahdl_3817_options.f";
   SeedFile(options, "--top dut  # the rest of this line is a comment\n-Wall\n");
@@ -99,27 +77,21 @@ TEST_F(VpiVlogInfoSim, AnOptionsFileIsReportedAsAnArrayOfItsParsedContents) {
   s_vpi_vlog_info info = {};
   ASSERT_EQ(vpi_get_vlog_info(&info), 1);
 
-  // The command line's own entries: the file name is not among them, the
-  // pointer to its array standing where the name was written.
   ASSERT_EQ(info.argc, 5);
   EXPECT_STREQ(info.argv[0], "deltahdl");
   EXPECT_STREQ(info.argv[1], "-f");
   EXPECT_STREQ(info.argv[3], "-o");
   EXPECT_STREQ(info.argv[4], "a");
 
-  // Entry 2 is the pointer the clause describes, not a character array.
   const char* const* file = reinterpret_cast<const char* const*>(info.argv[2]);
   ASSERT_NE(file, nullptr);
-  EXPECT_STREQ(file[0], options.c_str());  // entry zero: the file's name
+  EXPECT_STREQ(file[0], options.c_str());
   EXPECT_STREQ(file[1], "--top");
   EXPECT_STREQ(file[2], "dut");
-  EXPECT_STREQ(file[3], "-Wall");  // the comment and its line's rest are gone
-  EXPECT_EQ(file[4], nullptr);     // the last entry
+  EXPECT_STREQ(file[3], "-Wall");
+  EXPECT_EQ(file[4], nullptr);
 }
 
-// §38.17: a vendor file option met among those options is reported the same
-// way, its next pointer leading to an array of its own. A file that names
-// another is reported with an array of its own inside the first one's.
 TEST_F(VpiVlogInfoSim, AnOptionsFileThatNamesAnotherNestsTheSameWay) {
   std::string inner = "/tmp/deltahdl_3817_inner.f";
   std::string outer = "/tmp/deltahdl_3817_outer.f";
@@ -147,8 +119,6 @@ TEST_F(VpiVlogInfoSim, AnOptionsFileThatNamesAnotherNestsTheSameWay) {
   EXPECT_EQ(outer_argv[3], nullptr);
 }
 
-// §38.17: the vendor option written with no file after it names none, so there
-// is no array to point at and the report holds the option alone.
 TEST_F(VpiVlogInfoSim, TheVendorOptionWrittenLastNamesNoFile) {
   vpi_ctx_.SetInvocationArguments("deltahdl", {"-f"});
 

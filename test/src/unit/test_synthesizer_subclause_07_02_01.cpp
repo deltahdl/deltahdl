@@ -8,23 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The case below fails on a run that answers a netlist and reports nothing for
-// an assignment whose target the synthesizer builds nothing for.
-// `SynthLower::LowerContAssign` and `SynthLower::LowerAssignStmt` in
-// src/synthesizer/synth_lower.cpp each return without touching the graph when
-// the target is not an `ExprKind::kIdentifier`, and none of the paths that
-// return early sets `lowering_incomplete_`, so `SynthLower::Lower` answers a
-// graph that never drives the signal the source drives and the run reports
-// success.
-//
-// `SynthLower::LowerStmt` in src/synthesizer/synth_lower.cpp already does the
-// opposite for a statement it has no lowering for: it sets
-// `lowering_incomplete_` and reports, and its comment says the location is what
-// tells the reader which statement went missing.
-
-// The test fails on a fix that covers `ExprKind::kSelect` alone. §7.2.1 makes a
-// packed structure a way of dividing a vector into subfields reached as
-// members, so the target names bits of a vector the netlist holds.
 TEST(PackedStructTarget, AssignToAStructMemberIsReportedRatherThanDropped) {
   SynthFixture f;
   const auto* mod =
@@ -44,20 +27,6 @@ TEST(PackedStructTarget, AssignToAStructMemberIsReportedRatherThanDropped) {
                             "assignment target has no lowering", 6, ""));
 }
 
-// The test fails on a fix that covers the member as an assignment target
-// alone. `p.hi` read on the right-hand side reaches
-// `SynthLower::LowerExprBit` in src/synthesizer/synth_lower.cpp as an
-// `ExprKind::kMemberAccess`, which is a kind that function has no lowering
-// for, and a run without the report answers a netlist in which every bit of
-// `y` is constant zero. §7.2.1 makes the member a subfield of a vector the
-// netlist holds, so the bits the source reads exist and the synthesizer is
-// what cannot reach them.
-//
-// The report carries the subclause `7.2.1`, where the report the case above
-// asserts carries none: `SynthLower::ReportUnloweredTarget` states a limit of
-// this synthesizer, while `NonSynthExprRule` names the construct of IEEE
-// 1800-2023 the design wrote. The line is what tells the reader which
-// expression the synthesizer built nothing for.
 TEST(PackedStructTarget, ReadOfAStructMemberIsReportedRatherThanDropped) {
   SynthFixture f;
   const auto* mod = ElaborateSrc(

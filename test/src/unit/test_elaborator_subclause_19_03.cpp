@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.3 (footnote 29): the extends specification of a covergroup is allowed
-// only within a class. The Annex A grammar accepts `covergroup extends base ;`
-// in any scope, so the restriction is applied at elaboration. A derived
-// covergroup declared at module scope has no enclosing class and is illegal.
 TEST(CovergroupExtendsScope, ExtendsInModuleError) {
   ElabFixture f;
   ElabOk(
@@ -26,8 +22,6 @@ TEST(CovergroupExtendsScope, ExtendsInModuleError) {
       "a covergroup may only use 'extends' inside a class", 2, "19.3"));
 }
 
-// §19.3 (footnote 29): a covergroup that does NOT use extends is legal at
-// module scope, so the check must not reject an ordinary covergroup.
 TEST(CovergroupExtendsScope, NonExtendsCovergroupInModuleOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -38,9 +32,6 @@ TEST(CovergroupExtendsScope, NonExtendsCovergroupInModuleOk) {
              "endmodule\n"));
 }
 
-// §19.3 (footnote 29): the extends form is permitted within a class. The base
-// covergroup is defined in a superclass, so the derived embedded covergroup
-// elaborates without the "outside class" error.
 TEST(CovergroupExtendsScope, ExtendsInsideClassOk) {
   EXPECT_TRUE(
       ElabOk("class Base; logic clk;\n"
@@ -56,9 +47,6 @@ TEST(CovergroupExtendsScope, ExtendsInsideClassOk) {
              "module m; endmodule\n"));
 }
 
-// §19.3: an instance of a covergroup is given by `new` an actual for each
-// formal that has no default, in a declaration, a procedural assignment and an
-// automatic variable's initializer alike.
 TEST(CovergroupNewActuals, FormalWithoutDefaultLeftWithoutActualIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -84,9 +72,6 @@ TEST(CovergroupNewActuals, FormalWithoutDefaultLeftWithoutActualIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.3 with §13.5: each actual of a covergroup's `new` binds a formal, so a
-// positional actual past the last formal and a named one naming no formal are
-// errors; the named one leaves `lo` without an actual besides.
 TEST(CovergroupNewActuals, ActualBindingNoFormalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -113,9 +98,6 @@ TEST(CovergroupNewActuals, ActualBindingNoFormalIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.3 with §13.5.2: a covergroup's ref formal is passed a variable, so an
-// expression, a literal and a net are errors as its actual; an element of an
-// array and a member of a structure are variables.
 TEST(CovergroupNewActuals, RefFormalGivenNoVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -144,9 +126,6 @@ TEST(CovergroupNewActuals, RefFormalGivenNoVariableIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.3: the formals of a covergroup are visible within its declaration
-// alone, so reading one through an instance is an error, in a continuous
-// assignment, in a procedure and before a method call alike.
 TEST(CovergroupFormals, FormalReadThroughAnInstanceIsError) {
   ElabFixture f;
   ElaborateSrc(

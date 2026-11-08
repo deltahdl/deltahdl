@@ -67,7 +67,6 @@ void ExpandTransitionDelays(PathDelay& pd) {
   pd.delays[11] = std::min(pd.delays[3], pd.delays[5]);
 }
 
-// Record a specparam name once; a name already collected is not repeated.
 static void AddSpecparamName(std::vector<std::string>& names,
                              std::string_view name) {
   if (name.empty()) return;
@@ -97,8 +96,6 @@ std::vector<std::string> CollectDeclaredSpecparams(const ModuleDecl& mod) {
 bool ExprReadsSpecparam(const Expr* expr,
                         const std::vector<std::string>& specparams);
 
-// True when any element of a concatenation, assignment pattern, or replication
-// reads one of the specparams.
 static bool AnyElementReadsSpecparam(
     const std::vector<Expr*>& elements,
     const std::vector<std::string>& specparams) {
@@ -148,11 +145,6 @@ bool ExprReadsSpecparam(const Expr* expr,
 
 namespace {
 
-// §32.4.1: how many leading terminals of a gate instantiation are outputs.
-// The buffer/inverter family drives every terminal but the trailing input; the
-// logic-gate, three-state-buffer and MOS-switch families drive their first
-// terminal; a pullup/pulldown drives all of them; the bidirectional pass-gate
-// family drives none, so a DEVICE delay has no primitive of its own to land on.
 std::size_t GateOutputTerminalCount(GateKind kind, std::size_t terminals) {
   switch (kind) {
     case GateKind::kBuf:
@@ -173,10 +165,6 @@ std::size_t GateOutputTerminalCount(GateKind kind, std::size_t terminals) {
   }
 }
 
-// §32.4.1: evaluate the gate's declared delay expressions into the twelve
-// transition slots. A gate lists at most a rise, a fall, and a turnoff delay,
-// which spread over the slots exactly as a module path's one/two/three delay
-// list does.
 void FillPrimitiveDriverDelays(PrimitiveDriver& driver, const ModuleItem& gate,
                                SimContext& ctx, Arena& arena) {
   Expr* const kDelayExprs[3] = {gate.gate_delay, gate.gate_delay_fall,
@@ -206,8 +194,6 @@ std::vector<PrimitiveDriver> BuildPrimitiveDriversFromGate(
       GateOutputTerminalCount(gate.gate_kind, gate.gate_terminals.size());
   for (std::size_t i = 0; i < kOutputs; ++i) {
     const Expr* terminal = gate.gate_terminals[i];
-    // Only a terminal that names a signal outright identifies an output this
-    // annotator can match a DEVICE operand against.
     if (terminal == nullptr || terminal->kind != ExprKind::kIdentifier) {
       continue;
     }
@@ -219,16 +205,6 @@ std::vector<PrimitiveDriver> BuildPrimitiveDriversFromGate(
   return drivers;
 }
 
-// The greatest transition time among the candidates §30.5.3 admits: those that
-// name a path and whose condition holds.
-//
-// The condition is tested here and again in SelectActivePath below, and taking
-// it first is the point. §30.5.3 states both halves in one sentence -- an
-// active path is one whose input changed latest and that is either
-// unconditioned or has a condition that holds -- and reading
-// the time first lets a path whose condition is false set it and drop every
-// live path at an earlier one, leaving nothing to govern an output that is
-// plainly transitioning.
 static uint64_t GreatestAdmittedTransitionTime(
     const std::vector<PathCandidate>& candidates) {
   uint64_t max_time = 0;
@@ -266,8 +242,6 @@ uint64_t SelectPathDelay(const std::vector<PathCandidate>& candidates,
 }
 
 bool StateDependentPathConditionEnables(Logic4Word condition_lsb) {
-  // An unknown (x or z) condition counts as true; otherwise the path is active
-  // only when the least-significant bit of the result is 1.
   const bool kUnknown = (condition_lsb.bval & 1u) != 0u;
   if (kUnknown) return true;
   return (condition_lsb.aval & 1u) != 0u;
@@ -282,9 +256,6 @@ void ReplacePathDelayRetaining(PathDelay& existing, PathDelay replacement,
     if (retain.reject[i]) existing.reject_limit[i] = kSaved.reject_limit[i];
     if (retain.error[i]) existing.error_limit[i] = kSaved.error_limit[i];
   }
-  // §30.7.3: a limit kept from the path being replaced keeps the standing of
-  // the source that set it, so a later source of lower precedence does not
-  // reach a limit it could not have reached before the replacement.
   if (std::ranges::all_of(retain.reject, std::identity{})) {
     existing.reject_limit_source = kSaved.reject_limit_source;
   }
@@ -295,15 +266,6 @@ void ReplacePathDelayRetaining(PathDelay& existing, PathDelay replacement,
 
 namespace {
 
-// Nonconditional update: overwrites every existing path delay between the same
-// ports, but keeps each entry's original condition/ifnone (and whichever pulse
-// limits are being held). Returns true if at least one entry matched.
-//
-// §30.3 puts a specify block inside a module declaration, so two instances of
-// one cell declare paths carrying the same src_port and dst_port and are told
-// apart only by PathDelay::inst_prefix. `match_inst_prefix` asks for that
-// comparison: SpecifyManager::AddPathDelay sets it, so registering a second
-// instance adds a path rather than overwriting the first instance's.
 bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
                                     const PathDelay& delay,
                                     PathDelayRetention retain,
@@ -326,13 +288,6 @@ bool UpdateNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
   return matched;
 }
 
-// §32.4.1 (printed page 925): whether the SDF entry `entry` names the declared
-// path `existing` by what it wrote on the ports beyond their names -- ports
-// and instance being compared by each caller. An entry whose source was
-// written with an edge, `(IOPATH (posedge clk) q ...)`, names the path
-// declared with that edge, and one whose port was written with a select,
-// `(IOPATH a[1] y ...)`, the path declared with that select; one written with
-// neither names the path whatever edge or select it was declared with.
 bool SdfEntryNamesPath(const PathDelay& existing, const PathDelay& entry) {
   return (entry.edge == SpecifyEdge::kNone || existing.edge == entry.edge) &&
          (entry.src_select.empty() ||
@@ -340,11 +295,6 @@ bool SdfEntryNamesPath(const PathDelay& existing, const PathDelay& entry) {
          (entry.dst_select.empty() || existing.dst_select == entry.dst_select);
 }
 
-// §32.4.1: whether the conditional or CONDELSE entry `entry` reaches the
-// declared path `existing`: the same two ports, the same condition or the
-// ifnone path, and what the entry wrote on the ports beyond their names. The
-// path is one of the instance the entry's cell names (§32.9), so
-// PathDelay::inst_prefix is compared alongside.
 bool ConditionalSdfEntryReaches(const PathDelay& existing,
                                 const PathDelay& entry) {
   return existing.src_port == entry.src_port &&
@@ -355,11 +305,6 @@ bool ConditionalSdfEntryReaches(const PathDelay& existing,
          SdfEntryNamesPath(existing, entry);
 }
 
-// §32.4.1: an SDF entry carries delays and pulse limits and nothing of the
-// path's shape, so the path it lands on keeps what its declaration gave it --
-// its kind, its edge, its selects and its condition, as text and as the
-// expression §30.5.3 selects on. Replaced whole, an edge-sensitive path took
-// the entry's edge, none, and a conditional one lost the expression.
 void ReplaceWithSdfDelays(PathDelay& existing, PathDelay entry,
                           PathDelayRetention retain) {
   entry.path_kind = existing.path_kind;
@@ -372,10 +317,6 @@ void ReplaceWithSdfDelays(PathDelay& existing, PathDelay entry,
   ReplacePathDelayRetaining(existing, std::move(entry), retain);
 }
 
-// §32.4.1 with §32.9: a nonconditional entry lands on every path of the
-// instance its cell named (PathDelay::inst_prefix, which SdfCellPrefixInRegion
-// in simulator/sdf_annotate.cpp stamped on it) between those two ports that it
-// names by edge. Returns true if at least one path matched.
 bool AnnotateNonconditionalSdfPaths(std::vector<PathDelay>& path_delays,
                                     const PathDelay& entry,
                                     PathDelayRetention retain) {
@@ -397,20 +338,10 @@ bool AnnotateNonconditionalSdfPaths(std::vector<PathDelay>& path_delays,
 void SpecifyManager::AddPathDelay(PathDelay delay, bool preserve_pulse_limits) {
   const PathDelayRetention kRetain = PathDelayRetention::PulseLimits(
       preserve_pulse_limits, preserve_pulse_limits);
-  // A declared path is unconditional when it carries no condition expression,
-  // not when its condition renders to no text. SpecifyConditionText in
-  // simulator/specify_condition_text.cpp spells a condition for §32.4.1's SDF
-  // COND matching and says outright that one it cannot spell yields nothing, so
-  // `if (act[i])` and `if (act[j])` both render empty when `i` and `j` are not
-  // literals; reading that as unconditional would send every such path through
-  // the overwrite-all branch below and leave one. A path built from an SDF
-  // record carries no expression and is judged by its text, which is the only
-  // thing such a record has.
   const bool kIsNonconditional = delay.condition_expr == nullptr &&
                                  delay.condition.empty() && !delay.is_ifnone;
   if (kIsNonconditional) {
-    if (!UpdateNonconditionalPathDelays(path_delays_, delay, kRetain,
-                                        /*match_inst_prefix=*/true)) {
+    if (!UpdateNonconditionalPathDelays(path_delays_, delay, kRetain, true)) {
       path_delays_.push_back(std::move(delay));
     }
     return;
@@ -435,18 +366,8 @@ bool SpecifyManager::AnnotateSdfPathDelay(const PathDelay& delay,
                                           PathDelayRetention retain) {
   const bool kSdfIsNonconditional = delay.condition.empty() && !delay.is_ifnone;
   if (kSdfIsNonconditional) {
-    // §32.4.1: a nonconditional entry reaches all the paths declared between
-    // those two ports. §32.4 has backannotation replace the values of
-    // declarations the design made, so an entry matching none lands nowhere
-    // and is left for §32.3's warning, rather than becoming a path.
     return AnnotateNonconditionalSdfPaths(path_delays_, delay, retain);
   }
-  // §32.4.1: a conditional entry lands *only* on the paths between those same
-  // two ports carrying the same condition, and on every one of them. Where the
-  // module declares no such path there is nothing for it to annotate, so it
-  // lands nowhere. Appending one instead would conjure up a specify path the
-  // design never wrote, and backannotation only ever updates what a design
-  // already declares.
   bool matched = false;
   for (auto& existing : path_delays_) {
     if (!ConditionalSdfEntryReaches(existing, delay)) continue;
@@ -458,8 +379,6 @@ bool SpecifyManager::AnnotateSdfPathDelay(const PathDelay& delay,
 
 namespace {
 
-// §32.7: an INCREMENT adds each amount, a negative one lowering the delay, and
-// §30.5.1 puts a delay that comes out below zero at zero.
 void AddPathDelayValues(PathDelay& existing,
                         const SdfPathDelayIncrement& deltas) {
   for (int i = 0; i < 12; ++i) {
@@ -468,13 +387,6 @@ void AddPathDelayValues(PathDelay& existing,
   }
 }
 
-// Adds `delta` to every existing path delay between the same ports of the same
-// instance (ignoring condition/ifnone). Returns true if at least one entry
-// matched. PathDelay::inst_prefix is always compared, unlike in
-// UpdateNonconditionalPathDelays above: §30.3 puts a specify block inside a
-// module declaration, so two instances of one cell hold paths spelled alike,
-// and SpecifyManager::IncrementSdfPathDelay is the sole caller and knows which
-// instance the SDF entry named.
 bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
                                        const PathDelay& delta,
                                        const SdfPathDelayIncrement& deltas) {
@@ -491,8 +403,6 @@ bool IncrementNonconditionalPathDelays(std::vector<PathDelay>& path_delays,
   return matched;
 }
 
-// Adds `delta` to every existing path delay the conditional entry reaches.
-// Returns true if at least one entry matched.
 bool IncrementConditionalPathDelays(std::vector<PathDelay>& path_delays,
                                     const PathDelay& delta,
                                     const SdfPathDelayIncrement& deltas) {
@@ -511,13 +421,8 @@ bool SpecifyManager::IncrementSdfPathDelay(
     const PathDelay& delta, const SdfPathDelayIncrement& deltas) {
   const bool kSdfIsNonconditional = delta.condition.empty() && !delta.is_ifnone;
   if (kSdfIsNonconditional) {
-    // §32.9: the entry reaches the paths of the instance its cell named, which
-    // AnnotateSdfIopathEntry (simulator/sdf_annotate_entry.cpp) stamped onto
-    // PathDelay::inst_prefix, so it is matched as AnnotateSdfPathDelay does.
     return IncrementNonconditionalPathDelays(path_delays_, delta, deltas);
   }
-  // §32.4.1, as above: with no declared path carrying that condition there is
-  // nothing to add to.
   return IncrementConditionalPathDelays(path_delays_, delta, deltas);
 }
 
@@ -534,8 +439,6 @@ void AddInterconnectDelayValues(InterconnectDelay& existing,
   }
 }
 
-// §32.5: the entry standing for every source on a load -- what a PORT entry
-// leaves behind -- or null where the load carries none.
 const InterconnectDelay* FindAllSourceInterconnectDelay(
     const std::vector<InterconnectDelay>& delays, const std::string& load) {
   for (const auto& delay : delays) {
@@ -544,12 +447,6 @@ const InterconnectDelay* FindAllSourceInterconnectDelay(
   return nullptr;
 }
 
-// §32.5: an increment naming its own source adds to the delay in force from
-// that source. Where the source has an entry of its own that is what it adds
-// to; where it has none, the delay in force is whatever the load's all-sources
-// entry carries, so the new source-specific entry starts from that rather than
-// from nothing. Adding to nothing would make an increment written after a PORT
-// entry read as though the PORT entry had never been there.
 void IncrementInterconnectDelayFromSource(
     std::vector<InterconnectDelay>& delays, const InterconnectDelay& delta) {
   for (auto& existing : delays) {
@@ -570,12 +467,6 @@ void IncrementInterconnectDelayFromSource(
   delays.push_back(std::move(seeded));
 }
 
-// §32.5: an increment carrying no source of its own is an increment to the
-// delay from every source, so it reaches each entry already standing on that
-// load as well as the load's all-sources entry, which it brings into being when
-// the load has none. Touching only the all-sources entry would leave a
-// source-specific entry holding a value the increment never reached, and that
-// entry is the one its source reads.
 void IncrementInterconnectDelayFromAllSources(
     std::vector<InterconnectDelay>& delays, const InterconnectDelay& delta) {
   bool has_all_sources = false;
@@ -599,11 +490,6 @@ void SpecifyManager::IncrementInterconnectDelay(
 }
 
 void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
-  // §31.2 has each timing check carry its own limits and notifier, and
-  // nothing in Clause 31 merges two checks on the same signals, so an entry
-  // built from a declaration replaces only the one built from that same
-  // declaration in that same instance -- the rebuild
-  // RebuildTimingChecksForSpecparam files after an SDF specparam change.
   if (check.decl != nullptr) {
     for (auto& existing : timing_checks_) {
       if (existing.decl == check.decl &&
@@ -616,11 +502,6 @@ void SpecifyManager::AddTimingCheck(TimingCheckEntry check) {
     return;
   }
   for (auto& existing : timing_checks_) {
-    // §31.2 puts a system timing check inside a specify block and §30.3 puts
-    // that block inside a module declaration, so two instances of one cell
-    // declare checks naming identically spelled signals. The instance is
-    // compared alongside the signals, or the second instance's check would
-    // replace the first instance's rather than stand beside it.
     if (existing.inst_prefix == check.inst_prefix &&
         existing.kind == check.kind &&
         existing.ref_signal == check.ref_signal &&
@@ -646,9 +527,6 @@ void SpecifyManager::AddPrimitiveDriversFromGate(
     std::string_view inst_prefix,
     const std::vector<std::string_view>* module_outputs) {
   for (auto& driver : BuildPrimitiveDriversFromGate(gate, ctx, arena)) {
-    // §28.4 names a gate's terminals by the declaring module's own port names,
-    // so the instance is what tells two instances of one cell apart when
-    // AnnotateSdfDeviceDelay looks for the primitives driving an output.
     driver.inst_prefix = inst_prefix;
     if (module_outputs != nullptr) {
       driver.drives_module_output =
@@ -657,12 +535,6 @@ void SpecifyManager::AddPrimitiveDriversFromGate(
     }
     AddPrimitiveDriver(std::move(driver));
   }
-  // §29.8 puts a primitive instance inside a module, so one gate declaration is
-  // registered once per instance of the cell holding it and the declaration
-  // alone does not identify what was already recorded. The instance travels
-  // with it because RebuildGateDriversForSpecparam evaluates the delay
-  // expression in, and files the rebuilt driver back at, the instance the
-  // declaration came from.
   for (const auto& seen : gate_decls_) {
     if (seen.gate == &gate && seen.inst_prefix == inst_prefix) return;
   }
@@ -673,8 +545,6 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
                                           SimContext& ctx, Arena& arena,
                                           bool default_pulse_limits,
                                           std::string_view inst_prefix) {
-  // §30.4.6 (printed page 880): a full connection declares a path from every
-  // source to every destination, and a parallel one the path between its two.
   const bool kFull = decl.path_kind == SpecifyPathKind::kFull;
   const std::size_t kSources =
       kFull ? std::max<std::size_t>(decl.src_ports.size(), 1) : 1;
@@ -683,24 +553,11 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
   for (std::size_t src = 0; src < kSources; ++src) {
     for (std::size_t dst = 0; dst < kDestinations; ++dst) {
       PathDelay pd = BuildPathDelayFromDecl(decl, ctx, arena, src, dst);
-      // §30.4 names a path's terminals by the declaring module's own port
-      // names, so the instance is what tells two instances of one cell apart.
       pd.inst_prefix = inst_prefix;
-      // §30.7.2 (printed page 888): the invocation options' percentages of
-      // each transition delay, 100% where none was given, which leaves the
-      // limits equal to the delay. A PATHPULSE$ specparam and SDF annotation
-      // reach the path later and outrank them.
       if (default_pulse_limits) {
         InitDefaultPulseLimits(pd);
         ApplyGlobalPulseLimits(pd, reject_pulse_pct_, error_pulse_pct_);
       }
-      // §30.5.3 (printed page 885): every declared path is a path of its own,
-      // a second declaration between the same terminals among them, and where
-      // more than one is active for a transition the least of their delays is
-      // used, so a declaration adds its paths rather than overwriting one it
-      // shares terminals, an edge or a condition with. The instance, the entry
-      // and the terminals travel with the declaration so
-      // RebuildPathDelaysForSpecparam replaces that very entry.
       path_decls_.push_back(
           {&decl, std::string(inst_prefix), path_delays_.size(), src, dst});
       path_delays_.push_back(std::move(pd));
@@ -711,10 +568,6 @@ void SpecifyManager::AddPathDelayFromDecl(const SpecifyPathDecl& decl,
 void SpecifyManager::BindDesignSpecparams(std::vector<std::string> names,
                                           SimContext& ctx, Arena& arena,
                                           std::string_view inst_prefix) {
-  // §32.4.3: the names are added to what is already bound rather than
-  // replacing it. RegisterSpecifyBlocks calls this once per module instance
-  // that declared a specify block, so replacing would leave only the last
-  // instance's specparams annotatable.
   for (auto& name : names) {
     if (IsDeclaredSpecparam(inst_prefix, name)) continue;
     declared_specparams_.push_back({std::string(inst_prefix), std::move(name)});

@@ -50,9 +50,6 @@ TEST_F(VpiGetPropertySim, GetSizeForVariable) {
   EXPECT_EQ(vpi_get(vpiSize, h), 32);
 }
 
-// §38.6 with §38.1: a NULL object is given a meaning for vpiTimeUnit and
-// vpiTimePrecision alone (and vpiSaveRestartID, §38.9); with any other
-// property it names no object, an error answered with vpiUndefined (#7455).
 TEST_F(VpiGetPropertySim, NullHandleIsAnErrorForAnObjectProperty) {
   EXPECT_EQ(vpi_get(vpiSize, nullptr), vpiUndefined);
   EXPECT_NE(vpi_chk_error(nullptr), 0);
@@ -61,8 +58,6 @@ TEST_F(VpiGetPropertySim, NullHandleIsAnErrorForAnObjectProperty) {
   EXPECT_EQ(vpi_get(vpiType, nullptr), vpiUndefined);
 }
 
-// §38.6: with vpiTimeUnit a NULL object asks for the simulation time unit, and
-// §38.9 has vpiSaveRestartID of NULL answer the run's id; neither is an error.
 TEST_F(VpiGetPropertySim, NullHandleStillAnswersTheRunsProperties) {
   EXPECT_EQ(vpi_get(vpiTimeUnit, nullptr),
             vpi_ctx_.SmallestModuleTimePrecision());
@@ -71,7 +66,6 @@ TEST_F(VpiGetPropertySim, NullHandleStillAnswersTheRunsProperties) {
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
-// §38.6: Boolean properties report 1 for TRUE and 0 for FALSE.
 TEST_F(VpiGetPropertySim, BooleanPropertyReportsOneForTrue) {
   sim_ctx_.CreateVariable("loc", 8);
   vpi_ctx_.Attach(sim_ctx_);
@@ -90,8 +84,6 @@ TEST_F(VpiGetPropertySim, BooleanPropertyReportsZeroForFalse) {
   EXPECT_EQ(vpi_get(vpiAutomatic, h), 0);
 }
 
-// §38.6: with a NULL object, vpiTimeUnit and vpiTimePrecision report the
-// simulation time unit.
 TEST_F(VpiGetPropertySim, TimePropertyWithNullObjectReportsSimulationTimeUnit) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   mod->time_precision = -9;
@@ -99,42 +91,25 @@ TEST_F(VpiGetPropertySim, TimePropertyWithNullObjectReportsSimulationTimeUnit) {
   EXPECT_EQ(vpi_get(vpiTimePrecision, nullptr), -9);
 }
 
-// §38.6: querying a protected object is an error, and on an error vpi_get()
-// returns vpiUndefined. Per §37.3.6 (printed p.1003) the vpiType and
-// vpiIsProtected properties are expressly allowed on every object, so the
-// refusal must be observed through some other property -- here vpiSize, which a
-// module (a non-expression object) does not exempt from the protection rule.
 TEST_F(VpiGetPropertySim, ProtectedObjectQueryReturnsVpiUndefined) {
   auto* mod = vpi_ctx_.CreateModule("locked", "locked");
   mod->is_protected = true;
 
-  // §37.3.6: vpiType stays accessible on a protected object.
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(mod)), vpiModule);
 
-  // C8: a refused (non-exempt) query makes vpi_get() yield vpiUndefined.
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(mod)), vpiUndefined);
 
-  // C7: the protected-object query is recorded as an error.
   s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
 
-// §38.6: the protected-object rule gives way wherever another rule says so.
-// vpiIsProtected is one of the properties otherwise specified to stay
-// accessible, so querying it on a protected object is NOT an error -- and being
-// a Boolean property it reports 1 for TRUE (the §38.6 Boolean rule) rather than
-// vpiUndefined. This exercises the accepting side of the carve-out through a
-// Boolean property, complementing the vpiType (integer) case above.
 TEST_F(VpiGetPropertySim, ProtectedObjectStillReportsIsProtectedAsBooleanTrue) {
   auto* mod = vpi_ctx_.CreateModule("sealed", "sealed");
   mod->is_protected = true;
 
-  // Boolean TRUE reported as 1, and the query is permitted (not refused).
   EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(mod)), 1);
 
-  // No error is recorded: the exempted property does not trip the protection
-  // refusal that a non-exempt query would.
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }

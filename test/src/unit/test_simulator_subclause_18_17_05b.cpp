@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's grammar with the given rand join head, its four terminals
-// recording their letter as 1 to 4 at the next position of seq.
 std::string Grammar(const std::string& head) {
   return "      randsequence( TOP )\n"
          "        TOP : " +
@@ -25,8 +23,6 @@ std::string Grammar(const std::string& head) {
          "      endsequence\n";
 }
 
-// The module's head: the six admissible orders as four-digit codes, a
-// lookup of a code's index, and the counters.
 const char* const kHead =
     "module t;\n"
     "  int i, p, code, seq[4], counts[6], codes[6];\n"
@@ -41,11 +37,6 @@ const char* const kHead =
     "    codes[3] = 3412; codes[4] = 3124; codes[5] = 3142;\n"
     "    for (i = 0; i < 6; i++) counts[i] = 0;\n";
 
-// 18.17.5: rand join interleaves the sequences keeping each one's relative
-// order, and the default weight of 0.5 prioritizes no length, so 600 runs of
-// the clause's TOP each produce one of the six admissible orders, all six
-// appear, and each is near a sixth of the runs, as the design
-// test/src/e2e/rand_join.sv runs it.
 TEST(RandJoinRun, TheSixOrdersOfTheClauseAppearEvenly) {
   SimFixture f;
   std::string out = RunCapture(
@@ -70,11 +61,6 @@ TEST(RandJoinRun, TheSixOrdersOfTheClauseAppearEvenly) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// 18.17.5: the real value after rand join weighs how much the remaining
-// sequences' lengths sway the choice, 0.0 giving the shortest remaining
-// sequences priority and 1.0 the longest, so with 0.0 A B C D and C D A B take
-// more than half of 600 runs and with 1.0 the four interleaved orders do, as
-// the design test/src/e2e/rand_join.sv runs it.
 TEST(RandJoinRun, TheExpressionPrioritizesTheShortestOrTheLongest) {
   SimFixture f;
   std::string out = RunCapture(
@@ -102,9 +88,6 @@ TEST(RandJoinRun, TheExpressionPrioritizesTheShortestOrTheLongest) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// 18.17.5: the generator interleaves nonterminals one level deep, so the two
-// items of a nonterminal inside S1 stay adjacent in every one of a hundred
-// runs, as the design test/src/e2e/rand_join.sv runs it.
 TEST(RandJoinRun, NonterminalsAreInterleavedToDepthOne) {
   SimFixture f;
   std::string out = RunCapture(
@@ -133,8 +116,6 @@ TEST(RandJoinRun, NonterminalsAreInterleavedToDepthOne) {
   EXPECT_EQ(out, "1\n");
 }
 
-// 18.17.5: the expression following rand join shall be a real number in 0.0
-// to 1.0, so 2.0 is reported; both operand sequences are still generated.
 TEST(RandJoinRun, AnExpressionOutsideZeroToOneIsReported) {
   SimFixture f;
   std::string out = RunCapture(

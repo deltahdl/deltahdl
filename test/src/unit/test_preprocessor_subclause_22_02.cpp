@@ -122,8 +122,6 @@ TEST(Preprocessor, MacroExpansionWithinIncludeDirective) {
   cfg.defines = {{"MY_FILE", "\"nonexistent.svh\""}};
   Preprocess("`include `MY_FILE\n", f, std::move(cfg));
 
-  // The macro is what put a filename on the directive, so the search running
-  // at all is what this shows; no file of that name exists to be found.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot find include file 'nonexistent.svh'", 1,
                             ""));
@@ -185,9 +183,6 @@ TEST(Preprocessor, DirectiveInUnusedMacroTextNotProcessed) {
       f.mgr.AddFile("<test>", "`define SET_TIMESCALE `timescale 1ns / 1ps\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // A directive embedded in macro text is processed only where the macro is
-  // expanded (22.2). Defining the macro without ever using it must not apply
-  // the embedded directive.
   EXPECT_FALSE(pp.HasTimescale());
 }
 
@@ -398,8 +393,6 @@ TEST(Preprocessor, MacroExpansionWithinTimescale) {
 TEST(Preprocessor, DirectiveInsideDirectiveArgIsError) {
   PreprocFixture f;
   Preprocess("`default_nettype `resetall\n", f);
-  // The inner word is left standing as text rather than acted on, so it
-  // reaches §22.8's net type check as the argument it was written as.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "invalid net type '`resetall'", 1, "22.8"));
 }
@@ -465,11 +458,6 @@ TEST(Preprocessor, DirectiveInRemainderOfAnotherDirective) {
                            "`endcelldefine\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // §22.10: `endcelldefine (the standalone directive on the last line) closes
-  // the celldefine region, so InCelldefine() is correctly false at
-  // end-of-preprocess. The remainder-directive feature under test is proven by
-  // HasTimescale() below: the `timescale in the remainder of `celldefine was
-  // still acted on.
   EXPECT_FALSE(pp.InCelldefine());
   EXPECT_TRUE(pp.HasTimescale());
 }
@@ -561,9 +549,6 @@ TEST(Preprocessor, DirectivePersistsToLaterFileUntilSuperseded) {
   pp.Preprocess(fid1);
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
 
-  // A directive's scope extends across all files of the compilation unit until
-  // something supersedes it; a later file that sets no directive of its own
-  // still sees the earlier directive in effect (22.2).
   auto fid2 = f.mgr.AddFile("<file2>", "wire w;\n");
   pp.Preprocess(fid2);
   EXPECT_FALSE(f.diag.HasErrors());
@@ -610,10 +595,7 @@ TEST(Preprocessor, LanguageElementBeforeDirectiveOnSameLine) {
   auto fid = f.mgr.AddFile("<test>", "bit b; `default_nettype none\n");
   auto result = pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // The directive still takes effect even though a language element precedes
-  // it.
   EXPECT_EQ(pp.DefaultNetType(), NetType::kNone);
-  // And the preceding language element is preserved in the output.
   EXPECT_NE(result.find("bit b;"), std::string::npos);
 }
 
@@ -623,8 +605,6 @@ TEST(Preprocessor, DirectiveKeywordInStringAfterCodeNotProcessed) {
   auto fid = f.mgr.AddFile("<test>", "string s = \"x `celldefine y\";\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // A directive keyword inside a string literal is not a directive, even when
-  // code precedes the string on the same line.
   EXPECT_FALSE(pp.InCelldefine());
 }
 
@@ -634,14 +614,9 @@ TEST(Preprocessor, DirectiveInTrailingLineCommentAfterCodeIgnored) {
   auto fid = f.mgr.AddFile("<test>", "int x = 1; // `celldefine\n");
   pp.Preprocess(fid);
   EXPECT_FALSE(f.diag.HasErrors());
-  // A directive keyword in a trailing line comment is not recognized as a
-  // directive (22.2), even though a language element precedes the comment on
-  // the same line.
   EXPECT_FALSE(pp.InCelldefine());
 }
 
-// A line that opens with a slash but no comment opens with no directive, and
-// is kept as the continuation of the expression the line before began.
 TEST(Preprocessor, LineOpeningWithASlashThatStartsNoComment) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -652,9 +627,6 @@ TEST(Preprocessor, LineOpeningWithASlashThatStartsNoComment) {
   EXPECT_NE(result.find("  / b;"), std::string::npos);
 }
 
-// The `" of §22.5.1 is not the opening quote of a string literal, so the text
-// after it is not taken for string content, and the directive later on the
-// line is still found and takes effect.
 TEST(Preprocessor, DirectiveAfterABacktickQuoteOnTheLine) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -669,12 +641,6 @@ TEST(Preprocessor, DirectiveAfterABacktickQuoteOnTheLine) {
 TEST(Preprocessor, DirectiveDoesNotSpanOntoNextLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
-  // §22.2: unless a directive is specified as supporting multiple lines (only
-  // `define does, via backslash continuation), a directive shall be all on one
-  // line. Placing the argument on the following physical line must not extend
-  // the directive: `default_nettype gets no argument on its own line, so it
-  // does not become 'none', and the second line is emitted as ordinary source
-  // rather than being consumed as the directive's argument.
   auto fid = f.mgr.AddFile("<test>",
                            "`default_nettype\n"
                            "none\n");

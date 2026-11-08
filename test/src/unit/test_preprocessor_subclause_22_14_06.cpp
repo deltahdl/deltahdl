@@ -14,10 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The directive carrying this version_specifier to the stage that applies it.
-// The list is selected by name in the source and travels to the lexer as the
-// marker the preprocessor emits, so the byte written has to be this version's
-// and not the one belonging to the Verilog standard of the same year.
 TEST(KeywordVersionPreprocessing, SystemVerilog2005DirectiveEmitsItsOwnMarker) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -43,16 +39,8 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2005DirectiveEmitsItsOwnMarker) {
   EXPECT_NE(out[pos + 1], other[other_pos + 1]);
 }
 
-// The negative for the specifier, driven from real source rather than from a
-// direct call on the string. Only the exact spelling names this list, so a word
-// differing from it by its year or by a separator selects nothing and leaves
-// the source that follows to be read under whatever list was already in force.
-// `checker` is what makes that visible: this version leaves it an ordinary
-// identifier while the default list reserves it, so the kind it lexes with says
-// which of the two governed the region.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2005OnlyTheExactSpecifierSelectsIt) {
-  // The spelling this subclause defines: the word is free.
   EXPECT_EQ(KindAfterSpecifier("1800-2005", "checker"), TokenKind::kIdentifier);
 
   const char* const kNearMisses[] = {
@@ -64,10 +52,6 @@ TEST(KeywordVersionPreprocessing,
   }
 }
 
-// The first included list carried through a real region, swept whole. Each word
-// arrives at the lexer holding the keyword it holds under the list it comes
-// from, which is what including the identifiers of "1364-1995" amounts to once
-// the directive is in force.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2005ReservesEveryVerilog1995Keyword) {
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
@@ -79,10 +63,6 @@ TEST(KeywordVersionPreprocessing,
   }
 }
 
-// The second included list the same way, and with the keyword named outright.
-// The paired leg under "1364-1995" is what makes each of these an inclusion:
-// under the earlier list the very same word is an ordinary identifier, so its
-// being a keyword here comes from the second list this version names.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2005ReservesEveryVerilog2001Keyword) {
   EXPECT_EQ(std::size(kVerilog2001AddedKeywordTokens), 21u);
@@ -93,9 +73,6 @@ TEST(KeywordVersionPreprocessing,
   }
 }
 
-// The third included list, which holds one word. Both of the lists that one is
-// built on leave it an identifier, so its being a keyword here traces to the
-// third inclusion and to nothing else.
 TEST(KeywordVersionPreprocessing, SystemVerilog2005ReservesTheVerilog2005Word) {
   EXPECT_EQ(KindInRegion("1800-2005", "uwire"), TokenKind::kKwUwire);
   EXPECT_EQ(KindInRegion("1364-2005", "uwire"), TokenKind::kKwUwire);
@@ -103,11 +80,6 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2005ReservesTheVerilog2005Word) {
   EXPECT_EQ(KindInRegion("1364-1995", "uwire"), TokenKind::kIdentifier);
 }
 
-// Table 22-4 driven through the directive, swept whole and word by word. Each
-// entry reaches the lexer as the keyword it names, and the paired leg under
-// "1364-2005" -- the union of everything this version includes -- has the very
-// same word arriving as an ordinary identifier. That pairing is the claim: the
-// words are additions of this version_specifier rather than anything inherited.
 TEST(KeywordVersionPreprocessing, SystemVerilog2005ReservesEveryWordItAdds) {
   EXPECT_EQ(std::size(kSystemVerilog2005AddedKeywordTokens), 97u);
   for (const auto& word : kSystemVerilog2005AddedKeywordTokens) {
@@ -117,9 +89,6 @@ TEST(KeywordVersionPreprocessing, SystemVerilog2005ReservesEveryWordItAdds) {
   }
 }
 
-// The negative the four tables imply: a word none of them lists reaches the
-// lexer as an ordinary identifier under this version, however firmly a later
-// standard reserves it.
 TEST(KeywordVersionPreprocessing,
      SystemVerilog2005LeavesLaterWordsAsIdentifiers) {
   const char* const kLater[] = {

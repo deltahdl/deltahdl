@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §11.5 para 1: a complete-form reference to a variable uses all of the
-// variable's bits as the operand. Built from a real §6.8 declaration and driven
-// end-to-end so the whole 32-bit value flows through to the target.
 TEST(Eval, VariableReferenceUsesAllBits) {
   auto v = RunAndGet(
       "module t;\n"
@@ -21,8 +18,6 @@ TEST(Eval, VariableReferenceUsesAllBits) {
   EXPECT_EQ(v, 0xDEADBEEFu);
 }
 
-// §11.5 para 1: for a scalar variable the operand is its whole (single-bit)
-// value.
 TEST(Eval, SingleBitVariableUsesAllBits) {
   auto v = RunAndGet(
       "module t;\n"
@@ -34,9 +29,6 @@ TEST(Eval, SingleBitVariableUsesAllBits) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.5 para 4: a concatenation (§11.4.12) is an operand whose bits are the
-// ordered bits of its elements. Elements come from real §6.8 declarations and
-// the concatenation is evaluated through the full pipeline.
 TEST(Eval, ConcatenationAsOperand) {
   auto v = RunAndGet(
       "module t;\n"
@@ -48,7 +40,6 @@ TEST(Eval, ConcatenationAsOperand) {
   EXPECT_EQ(v, 0xA5u);
 }
 
-// §11.5 para 4: a nested concatenation is likewise an operand.
 TEST(Eval, NestedConcatenationAsOperand) {
   auto v = RunAndGet(
       "module t;\n"

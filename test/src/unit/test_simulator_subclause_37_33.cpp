@@ -15,35 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.33 Class variables and class objects: the VPI object model for a class
-// variable (class var) and the class object (class obj) it references. The
-// figure's structural edges that are plain type matches (constraint, the
-// internal scope, the class typespec child) are served by the generic
-// object-model machinery; the tests below observe the Details that need
-// dedicated production code or that this clause specifically blesses:
-//   - Detail 1: a class object reports its own unique identifier (vpiObjId).
-//   - Detail 2: a class variable reports the identifier of the object it
-//     references, or 0 when it references none.
-//   - Detail 3: vpiWaitingProcesses on a class object (mailbox/semaphore)
-//   reaches
-//     the threads of the processes waiting on it.
-//   - Detail 4: vpiMessages on a class object (mailbox) reaches its messages.
-//   - Detail 5: vpiClassObj of a class variable reaches the referenced object
-//     (null when it references none); vpiClassTypespec distinguishes the type a
-//     variable was declared with from the type the object was created with.
-//   - Detail 6: vpiMethods from a class object returns the explicitly declared
-//     methods of both lifetimes and omits implicit built-ins.
-//   - Detail 7: vpiVirtualInterfaceVar expands a declared array of virtual
-//     interfaces into its elements, while vpiVariables reports that array
-//     whole.
-//   - Detail 8: vpiParameter returns both parameter-port-list and body
-//     parameters; vpiLocalParam is TRUE for the body ones (§37.28).
-//   - Detail 9: vpi_handle_by_name() reaches a non-static data member through
-//   the
-//     class variable that holds the object.
-
-// The fixture installs a context so the public vpi_get/vpi_iterate/vpi_scan/
-// vpi_handle/vpi_handle_by_name entry points run their real dispatch.
 class ClassVariablesAndObjects : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -59,7 +30,6 @@ std::vector<vpiHandle> ScanAll(vpiHandle it) {
   return seen;
 }
 
-// D1: a class object's vpiObjId is its own identifier.
 TEST_F(ClassVariablesAndObjects, ClassObjectReportsItsObjectId) {
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -68,9 +38,6 @@ TEST_F(ClassVariablesAndObjects, ClassObjectReportsItsObjectId) {
   EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&class_obj)), 42);
 }
 
-// D2: a class variable does not carry its own identifier - it reports the
-// identifier of the object it references. A class variable that references no
-// object (it holds null) reports 0.
 TEST_F(ClassVariablesAndObjects, ClassVariableReportsReferencedObjectId) {
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -82,13 +49,10 @@ TEST_F(ClassVariablesAndObjects, ClassVariableReportsReferencedObjectId) {
   EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&referencing_var)), 7);
 
   VpiObject null_var;
-  null_var.type = vpiClassVar;  // references nothing
+  null_var.type = vpiClassVar;
   EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&null_var)), 0);
 }
 
-// D3: a class object's vpiWaitingProcesses iteration reaches the thread objects
-// of the processes waiting on it (a mailbox or semaphore resource). The targets
-// are threads, so a non-thread child is never reported.
 TEST_F(ClassVariablesAndObjects,
        WaitingProcessesIterationReturnsWaitingThreads) {
   VpiObject waiter_a;
@@ -111,9 +75,6 @@ TEST_F(ClassVariablesAndObjects,
   EXPECT_EQ(VpiObjectOf(seen[1]), &waiter_b);
 }
 
-// D4: a class object's vpiMessages iteration reaches the messages a mailbox
-// holds, which are expression objects. A non-expression child is not a message
-// and never appears.
 TEST_F(ClassVariablesAndObjects, MessagesIterationReturnsMailboxMessages) {
   VpiObject message_a;
   message_a.type = vpiConstant;
@@ -135,9 +96,6 @@ TEST_F(ClassVariablesAndObjects, MessagesIterationReturnsMailboxMessages) {
   EXPECT_EQ(VpiObjectOf(seen[1]), &message_b);
 }
 
-// D5: vpiClassObj of a class variable reaches the object it references. A class
-// variable holding null references nothing, so the relation reports a null
-// handle.
 TEST_F(ClassVariablesAndObjects, ClassObjRelationReachesReferencedObject) {
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -149,21 +107,16 @@ TEST_F(ClassVariablesAndObjects, ClassObjRelationReachesReferencedObject) {
             &class_obj);
 
   VpiObject null_var;
-  null_var.type = vpiClassVar;  // references nothing
+  null_var.type = vpiClassVar;
   EXPECT_EQ(vpi_handle(vpiClassObj, VpiHandleOf(&null_var)), nullptr);
 }
 
-// D5: vpiClassTypespec of a class variable is the type the variable was
-// declared with, while vpiClassTypespec of the class object is the type the
-// object was created with. When a base-class variable references a
-// derived-class object the two differ (the LRM's Packet variable vs. its
-// LinkedPacket object).
 TEST_F(ClassVariablesAndObjects, ClassTypespecDiffersBetweenVariableAndObject) {
-  VpiObject declared_typespec;  // "Packet"
+  VpiObject declared_typespec;
   declared_typespec.type = vpiClassTypespec;
   declared_typespec.name = "Packet";
 
-  VpiObject created_typespec;  // "LinkedPacket"
+  VpiObject created_typespec;
   created_typespec.type = vpiClassTypespec;
   created_typespec.name = "LinkedPacket";
 
@@ -183,23 +136,19 @@ TEST_F(ClassVariablesAndObjects, ClassTypespecDiffersBetweenVariableAndObject) {
   EXPECT_NE(from_var, from_obj);
 }
 
-// D6: a class object's vpiMethods iteration returns the explicitly declared
-// methods - of both lifetimes, a static one and an automatic one - and omits an
-// implicit built-in method (one provided with no explicit declaration). A
-// non-method child is never a method.
 TEST_F(ClassVariablesAndObjects,
        MethodsIterationFromObjectExcludesBuiltinsAcrossLifetimes) {
   VpiObject static_method;
   static_method.type = vpiFunction;
-  static_method.automatic = false;  // static property/method
+  static_method.automatic = false;
   VpiObject implicit_builtin;
   implicit_builtin.type = vpiFunction;
-  implicit_builtin.implicit_builtin_method = true;  // dropped
+  implicit_builtin.implicit_builtin_method = true;
   VpiObject automatic_method;
   automatic_method.type = vpiTask;
-  automatic_method.automatic = true;  // automatic property/method
+  automatic_method.automatic = true;
   VpiObject member_var;
-  member_var.type = vpiLogicVar;  // not a method
+  member_var.type = vpiLogicVar;
 
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -215,19 +164,14 @@ TEST_F(ClassVariablesAndObjects,
   EXPECT_EQ(VpiObjectOf(seen[1]), &automatic_method);
 }
 
-// D6: a class object's vpiVariables iteration returns the class's data members
-// of both lifetimes - a static one and an automatic one - since the iteration
-// is not filtered by declared lifetime. (The companion rule that an array of
-// virtual interfaces is reported as a single array var is exercised
-// separately.)
 TEST_F(ClassVariablesAndObjects,
        VariablesIterationFromObjectReturnsBothLifetimes) {
   VpiObject static_var;
   static_var.type = vpiLogicVar;
-  static_var.automatic = false;  // static property
+  static_var.automatic = false;
   VpiObject automatic_var;
   automatic_var.type = vpiIntVar;
-  automatic_var.automatic = true;  // automatic property
+  automatic_var.automatic = true;
 
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -241,19 +185,14 @@ TEST_F(ClassVariablesAndObjects,
   EXPECT_EQ(VpiObjectOf(seen[1]), &automatic_var);
 }
 
-// D6: the same lifetime-agnostic rule covers the class object's named events.
-// vpiNamedEvent returns the class's named events of both lifetimes - a static
-// one and an automatic one - and vpiNamedEventArray returns its named event
-// arrays. Each relation reaches only objects of its own kind, so a child of the
-// other kind is not reported.
 TEST_F(ClassVariablesAndObjects,
        NamedEventIterationsFromObjectReturnBothLifetimes) {
   VpiObject static_event;
   static_event.type = vpiNamedEvent;
-  static_event.automatic = false;  // static property
+  static_event.automatic = false;
   VpiObject automatic_event;
   automatic_event.type = vpiNamedEvent;
-  automatic_event.automatic = true;  // automatic property
+  automatic_event.automatic = true;
   VpiObject event_array;
   event_array.type = vpiNamedEventArray;
 
@@ -275,10 +214,6 @@ TEST_F(ClassVariablesAndObjects,
   EXPECT_EQ(VpiObjectOf(arrays[0]), &event_array);
 }
 
-// D7: vpiVirtualInterfaceVar from a class object returns the virtual interface
-// var declarations, expanding a declared array of virtual interfaces into its
-// individual elements; whereas vpiVariables reports that same array declaration
-// as the single array var that declares it.
 TEST_F(ClassVariablesAndObjects,
        VirtualInterfaceVarIterationExpandsArrayWhileVariablesReportsItWhole) {
   VpiObject scalar_vif;
@@ -307,26 +242,19 @@ TEST_F(ClassVariablesAndObjects,
   vpiHandle var_it = vpi_iterate(vpiVariables, VpiHandleOf(&class_obj));
   ASSERT_NE(var_it, nullptr);
   std::vector<vpiHandle> vars = ScanAll(var_it);
-  // The scalar virtual interface var comes back beside the array, §37.17
-  // drawing `virtual interface var` inside the `variables` class enclosure this
-  // relation is drawn to (§37.4.1); the array is the one reported whole.
   ASSERT_EQ(vars.size(), 2u);
   EXPECT_EQ(VpiObjectOf(vars[0]), &scalar_vif);
   EXPECT_EQ(VpiObjectOf(vars[1]), &vif_array);
 }
 
-// D8: a class object's vpiParameter iteration returns both the parameters from
-// the parameter port list and those declared within the body as class items.
-// vpiLocalParam (§37.28) is TRUE for a body parameter and FALSE for a port-list
-// one, which is how the two origins are told apart.
 TEST_F(ClassVariablesAndObjects,
        ParameterIterationReturnsPortAndBodyParameters) {
   VpiObject port_param;
   port_param.type = vpiParameter;
-  port_param.local_param = false;  // parameter port list
+  port_param.local_param = false;
   VpiObject body_param;
   body_param.type = vpiParameter;
-  body_param.local_param = true;  // declared in the body
+  body_param.local_param = true;
 
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
@@ -343,21 +271,16 @@ TEST_F(ClassVariablesAndObjects,
   EXPECT_EQ(vpi_get(vpiLocalParam, VpiHandleOf(&port_param)), 0);
 }
 
-// D9: vpi_handle_by_name() accepts a full name down to a non-static data
-// member. The member lives on the class object the variable references, so
-// resolution descends through the class variable into that object's members;
-// the member is reachable even though it is non-static and therefore carries no
-// full name.
 TEST_F(ClassVariablesAndObjects, HandleByNameReachesNonStaticDataMember) {
-  VpiObject data_member;  // the "Id" member of class Packet
+  VpiObject data_member;
   data_member.type = vpiIntegerVar;
-  data_member.name = "Id";  // non-static: no vpiFullName of its own
+  data_member.name = "Id";
 
   VpiObject packet_obj;
   packet_obj.type = vpiClassObj;
   packet_obj.children = {&data_member};
 
-  VpiObject class_var;  // "p", a Packet handle
+  VpiObject class_var;
   class_var.type = vpiClassVar;
   class_var.name = "p";
   class_var.referenced_object = &packet_obj;
@@ -366,13 +289,10 @@ TEST_F(ClassVariablesAndObjects, HandleByNameReachesNonStaticDataMember) {
   top.type = vpiModule;
   top.children = {&class_var};
 
-  // Resolved relative to top, "p.Id" reaches the member through the variable.
   EXPECT_EQ(VpiObjectOf(vpi_handle_by_name(VpiText("p.Id"), VpiHandleOf(&top))),
             &data_member);
 }
 
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 int g_class_vars_seen = 0;
 std::string g_class_var_name;
 int g_declared_type = 0;
@@ -391,8 +311,6 @@ PLI_INT32 ProbeClassVarsCalltf(PLI_BYTE8*) {
     }
   }
 
-  // §37.4.1: a class var is one of the kinds the `variables` class groups, so
-  // the scope's vpiVariables relation reaches it too.
   vpiHandle vars = vpi_iterate(vpiVariables, mod);
   if (vars != nullptr) {
     while (vpiHandle var = vpi_scan(vars)) {
@@ -404,11 +322,6 @@ PLI_INT32 ProbeClassVarsCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §37.33 against a design. Every rule of the subclause is written about a class
-// var and the class obj it references, and a variable declared with a class
-// type was stamped vpiReg: a design's class variables were class vars to
-// nothing, so a vpiClassVar iteration over the scope that declares one reached
-// nothing and the clause's whole model stood over objects a test had made.
 TEST(ClassVariablesDesign, ADeclaredClassVariableIsAClassVarObject) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
@@ -446,12 +359,6 @@ TEST(ClassVariablesDesign, ADeclaredClassVariableIsAClassVarObject) {
   EXPECT_TRUE(g_variables_class_reached_it);
 }
 
-// §37.33 against a run: a class var reaches through vpiClassObj the object its
-// value names now (detail 5), made once per object, with that object's nonzero
-// vpiObjId, which the var reports too (details 1 and 2), the class typespec
-// the object was created with, and a variable per property, inherited ones
-// included, holding the value the object holds (detail 6). Nothing wrote the
-// reference a class var reads, so vpiClassObj reached nothing in a run.
 class ClassObjectsOfARun : public VpiDesignRun {
  protected:
   static int IntValueOf(vpiHandle obj) {
@@ -508,8 +415,6 @@ TEST_F(ClassObjectsOfARun, AClassVarReachesTheObjectItsValueNames) {
   EXPECT_EQ(vpi_get64(vpiObjId, z), 0);
 }
 
-// (#7121) A class obj's array of events is a named event array of it, and no
-// variable of it.
 TEST_F(ClassObjectsOfARun, AClassObjsEventArrayIsANamedEventArray) {
   Run("module top;\n"
       "  class A; event ea[2]; int ia[2]; endclass\n"
@@ -521,9 +426,6 @@ TEST_F(ClassObjectsOfARun, AClassObjsEventArrayIsANamedEventArray) {
   EXPECT_EQ(NamesOf(vpiVariables, obj), std::vector<std::string>{"ia"});
 }
 
-// Detail 6: a class obj's variables are the object's properties, so a value
-// put to one is the property's value, and a static property's is every
-// object's of the class (§8.9).
 TEST_F(ClassObjectsOfARun, AValuePutToAPropertyVariableIsTheObjects) {
   Run("module top;\n"
       "  class A; int n = 5; static int s = 3; endclass\n"
@@ -545,8 +447,6 @@ TEST_F(ClassObjectsOfARun, AValuePutToAPropertyVariableIsTheObjects) {
   EXPECT_EQ(IntValueOf(Named(vpiVariables, other, "n")), 5);
 }
 
-// The class typespec of a class obj is of the class its object was created
-// with, and reaches that class's defn (§37.32), not the declared type's.
 TEST_F(ClassObjectsOfARun, AClassObjsTypespecReachesTheClassDefn) {
   Run("module top;\n"
       "  class A; int n; endclass\n"
@@ -565,9 +465,6 @@ TEST_F(ClassObjectsOfARun, AClassObjsTypespecReachesTheClassDefn) {
             VpiObjectOf(Named(vpiClassDefn, By("top"), "C")));
 }
 
-// A class a module declares has a defn under each instance of the module
-// (§37.31), and an object's typespec reaches the one under the instance the
-// object was created in, by a declaration's initializer or by a process.
 TEST_F(ClassObjectsOfARun, AClassObjReachesTheDefnOfItsOwnInstance) {
   Run("module m;\n"
       "  class A; int n; endclass\n"
@@ -594,9 +491,6 @@ TEST_F(ClassObjectsOfARun, AClassObjReachesTheDefnOfItsOwnInstance) {
   }
 }
 
-// §37.33 detail 9: a full name passes through a class variable to a member of
-// the object it references; a variable referencing no object has no member to
-// reach.
 TEST_F(ClassObjectsOfARun, ANameThroughANullClassVariableReachesNothing) {
   Run("module top;\n"
       "  class C; int x; endclass\n"
@@ -605,9 +499,6 @@ TEST_F(ClassObjectsOfARun, ANameThroughANullClassVariableReachesNothing) {
   ASSERT_NE(vpi_handle_by_name(VpiText("top.c"), nullptr), nullptr);
   EXPECT_EQ(vpi_handle_by_name(VpiText("top.c.x"), nullptr), nullptr);
 }
-// Detail 6: a class obj reaches the methods its class declares and those it
-// inherits, static and automatic alike, an overridden one through its
-// override, each the method object of the class defn declaring it (#7130).
 TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssMethods) {
   Run("module top;\n"
       "  class A; function int f(); return 1; endfunction\n"
@@ -630,10 +521,6 @@ TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssMethods) {
       VpiObjectOf(Named(vpiMethods, Named(vpiClassDefn, By("top"), "A"), "t")));
 }
 
-// Detail 8: a class obj's parameters are those its class declares in its
-// parameter port list and within its body, the latter local, each with the
-// value the class typespec it was created with gives it; a type parameter is
-// one too (#7123).
 TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssParameters) {
   Run("module top;\n"
       "  class P #(int N = 2, type T = int);\n"
@@ -657,10 +544,6 @@ TEST_F(ClassObjectsOfARun, AClassObjReachesItsClasssParameters) {
   EXPECT_NE(Named(vpiTypeParameter, obj, "T"), nullptr);
 }
 
-// Detail 5: a class var reaches the class typespec it was declared with,
-// whatever its object was created as: a class the module declares, one a
-// package declares named through it, the compilation unit's, and one a named
-// import brings in, each reaching its class defn (#7129).
 TEST_F(ClassObjectsOfARun, AClassVarReachesTheTypespecItWasDeclaredWith) {
   Run("class U; endclass\n"
       "package pk; class C; endclass class P; endclass endpackage\n"
@@ -694,10 +577,6 @@ TEST_F(ClassObjectsOfARun, AClassVarReachesTheTypespecItWasDeclaredWith) {
             VpiObjectOf(Named(vpiClassDefn, By("pk"), "P")));
 }
 
-// ...and so does a property a class declares of a class type, a class var
-// under the class defn and under an object's class obj alike: A's `b`, of the
-// module's B though it holds a D, and its `q`, of the package's P, each reach
-// their class defn (#7295).
 TEST_F(ClassObjectsOfARun, AClassTypedPropertyReachesItsDeclaredTypespec) {
   Run("package p; class P; endclass endpackage\n"
       "module top;\n"
@@ -733,8 +612,6 @@ TEST_F(ClassObjectsOfARun, AClassTypedPropertyReachesItsDeclaredTypespec) {
                "D");
 }
 
-// ...a property of a package's class written through its scope, with nothing
-// importing the package, is a class var under a class obj too (#7300)...
 TEST_F(ClassObjectsOfARun, APackageScopedClassPropertyIsAClassVarOfTheObject) {
   Run("package p; class P; endclass endpackage\n"
       "module top; class A; p::P q; endclass\n"
@@ -750,8 +627,6 @@ TEST_F(ClassObjectsOfARun, APackageScopedClassPropertyIsAClassVarOfTheObject) {
             VpiObjectOf(Named(vpiClassDefn, By("p"), "P")));
 }
 
-// ...and one declared through a typedef of a class reaches that class's
-// typespec, under the class defn and the class obj alike (§6.18, #7301).
 TEST_F(ClassObjectsOfARun, ATypedefDeclaredClassPropertyReachesItsClass) {
   Run("module top; class C; endclass typedef C c_t;\n"
       "  class A; c_t x; endclass\n"
@@ -769,9 +644,6 @@ TEST_F(ClassObjectsOfARun, ATypedefDeclaredClassPropertyReachesItsClass) {
   }
 }
 
-// ...where the object's class has a class defn: an object of a nested class,
-// which has none yet (§8.23, #7124), still holds its class-typed property as a
-// class var.
 TEST_F(ClassObjectsOfARun, ANestedClassObjectHoldsItsClassTypedProperty) {
   Run("module top; class B; endclass\n"
       "  class O; class I; B b; endclass endclass\n"
@@ -784,11 +656,6 @@ TEST_F(ClassObjectsOfARun, ANestedClassObjectHoldsItsClassTypedProperty) {
   EXPECT_EQ(vpi_get(vpiType, b), vpiClassVar);
 }
 
-// §15.3 and §15.4: a mailbox or semaphore variable reaches the class obj of the
-// object it holds, of the built-in class, reaching no class defn (§37.32)
-// (#7294); detail 4: a mailbox's iterates the messages it holds, in queue
-// order (#7132); and detail 3: a mailbox's or semaphore's iterates the threads
-// waiting on it (#7131).
 TEST_F(ClassObjectsOfARun, AMailboxsClassObjIteratesItsMessagesAndWaiters) {
   Run("module top; mailbox m = new; mailbox e = new; semaphore s = new(0);\n"
       "  initial begin m.put(7); m.put(2.5); m.put(\"ab\"); end\n"
@@ -823,8 +690,6 @@ TEST_F(ClassObjectsOfARun, AMailboxsClassObjIteratesItsMessagesAndWaiters) {
       "semaphore");
 }
 
-// ...a parameterized mailbox's as the type its parameter fixes (§15.4.9): a
-// string's and a real's, each placed under no run-time type check (#7296).
 TEST_F(ClassObjectsOfARun,
        AParameterizedMailboxsMessagesHaveItsTypesConstType) {
   Run("module top; mailbox #(string) t = new; mailbox #(real) u = new;\n"
@@ -840,8 +705,6 @@ TEST_F(ClassObjectsOfARun,
   EXPECT_EQ(vpi_get(vpiConstType, kReals[0]), vpiRealConst);
 }
 
-// Detail 7: a class obj's vpiVirtualInterfaceVar iteration returns each
-// element of an array of virtual interfaces separately (#7133).
 TEST_F(ClassObjectsOfARun, AClassObjsVirtualInterfaceArrayIsIteratedByElement) {
   Run("interface ifc; endinterface\n"
       "module top; ifc i0 ();\n"

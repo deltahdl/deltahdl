@@ -33,12 +33,8 @@ RtlirNet MakeImplicitPortNet(std::string_view name, uint32_t port_width,
                              bool port_is_signed, NetType default_nettype) {
   RtlirNet net;
   net.name = name;
-  // §6.10: an implicit net assumed for a port expression takes the default net
-  // type and the vector width of the port expression declaration.
   net.net_type = default_nettype;
   net.width = port_width == 0 ? 1 : port_width;
-  // §23.2.2.1: nets connected to ports without an explicit net declaration are
-  // unsigned unless the port itself is declared signed.
   net.is_signed = port_is_signed;
   return net;
 }
@@ -76,21 +72,6 @@ RtlirProcessKind MapAlwaysKind(AlwaysKind ak) {
   return RtlirProcessKind::kAlwaysComb;
 }
 
-// §14.14: an event control naming $global_clock in the procedure body waits on
-// the event expression of the global clocking declaration in scope, so it is
-// rewritten into that expression here, where the body reaches the process.
-//
-// The rewrite is made on a copy of the statement rather than in place because
-// `item` belongs to the one ModuleDecl the parser built for the module, while
-// Elaborator::ElaborateModule runs once per instantiation of it: every
-// instance of a module builds its processes from the same Stmt objects, so a
-// statement written in place would carry one instance's substitution into
-// every other instance. Keep any further per-instance rewrite of a process
-// body on a copy for the same reason.
-//
-// SubstituteGlobalClockEventControls returns `item->body` itself where nothing
-// was rewritten, which is every procedure that does not name $global_clock, so
-// the copy costs an allocation only where the rewrite is actually made.
 static Stmt* BuildProcessBody(const ModuleItem* item,
                               const ProcessBuildEnv& env) {
   if (env.global_clocking_event == nullptr) return item->body;
@@ -106,12 +87,6 @@ static RtlirProcess BuildProcessWithSensitivity(RtlirProcessKind kind,
   proc.loc = item->loc;
   proc.body = BuildProcessBody(item, env);
   proc.sensitivity = item->sensitivity;
-  // §14.14: a procedure whose sensitivity list is the single clocking event
-  // $global_clock waits on the effective global clocking declaration's event
-  // expression. The substitution is made on the process's own copy because
-  // `item` belongs to the one ModuleDecl the parser built for the module while
-  // this runs once per instantiation, and rule b) can give two instances
-  // different events; writing `item` would give both whichever came first.
   if (env.global_clocking_event != nullptr) {
     SubstituteGlobalClockLeadingEvent(proc.sensitivity,
                                       *env.global_clocking_event);
@@ -149,8 +124,6 @@ void AddStaticAssertionProcess(RtlirProcessKind kind, ModuleItem* item,
   mod->processes.push_back(proc);
 }
 
-// §12.7.1: the variables a for loop's header declares, as in
-// `for (int j = 0; ...)`, appended to `locals`. Returns how many were appended.
 static size_t PushForHeaderLocals(const Stmt* stmt,
                                   std::vector<std::string_view>& locals) {
   if (stmt->kind != StmtKind::kFor) return 0;
@@ -166,8 +139,6 @@ static size_t PushForHeaderLocals(const Stmt* stmt,
   return pushed;
 }
 
-// §9.3.1 and §9.3.2: the variables a sequential or parallel block declares,
-// appended to `locals`. Returns how many were appended.
 static size_t PushBlockLocals(const Stmt* stmt,
                               std::vector<std::string_view>& locals) {
   if (stmt->kind != StmtKind::kBlock && stmt->kind != StmtKind::kFork) return 0;
@@ -180,62 +151,21 @@ static size_t PushBlockLocals(const Stmt* stmt,
   return pushed;
 }
 
-// Whether the base identifier of the longest static prefix `prefix`, its text
-// up to the first member or index select, is one of `locals`.
 static bool IsDeclaredLocal(std::string_view prefix,
                             const std::vector<std::string_view>& locals) {
   std::string_view base = prefix.substr(0, prefix.find_first_of(".["));
   return std::ranges::find(locals, base) != locals.end();
 }
 
-// Collects the longest static prefix (§11.5.3) of every assignment target
-// written in `stmt` or in any statement nested inside it.
-//
-// §9.2.2.2 states its rule of the variables assignments write and §10.3.2 of
-// every procedural assignment; neither puts a condition on which statement the
-// assignment stands in, so every position a statement holds a statement in is a
-// position this collection reaches.
-//
-// This is a collector, so a position it does not reach costs a name rather than
-// a report. The callers below compare the names gathered here against each
-// other and against the continuous-assignment targets, and a name that was
-// never gathered overlaps nothing: a variable assigned only in the unreached
-// position stays absent from every set, so §9.2.2.2's bar on any other process
-// assigning the variable and §10.3.2's error for a variable driven by a
-// continuous assignment or output that also takes a procedural assignment both
-// pass it in silence, however many drivers it has. The unreached position is an
-// exemption from the single-driver rule rather than a missing diagnostic.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions
-// once for the whole elaborator, which is why the list is not written out again
-// here. The visitor takes `Stmt* const&` because `stmt` is a `const Stmt*`,
-// which is how ForEachChildStmt lets a walk that only reads the tree share its
-// list with the walks that rewrite it.
-//
-// A variable the process declares for itself is none of the module's, so it is
-// no target the rules above compare: §12.7.1 makes a for loop's header variable
-// local to the loop, and §9.3.1 lets a block declare variables of its own.
-// `locals` holds the names so declared by the statements enclosing `stmt`, and
-// a target whose base identifier is one of them is left out.
 static void CollectLhsPrefixesInScope(const Stmt* stmt,
                                       std::unordered_set<std::string>& out,
                                       const ScopeMap& scope,
                                       std::vector<std::string_view>& locals) {
   if (!stmt) return;
-  // §6.5 (printed page 91) counts a procedural assign statement as a
-  // procedural assignment beside the blocking and nonblocking ones; a force
-  // statement it counts as neither.
   if (stmt->kind == StmtKind::kBlockingAssign ||
       stmt->kind == StmtKind::kNonblockingAssign ||
       stmt->kind == StmtKind::kAssign) {
     if (stmt->lhs) {
-      // §11.5.3: an indexing select stays inside the longest static prefix only
-      // when its index is a constant expression. The module parameter scope is
-      // threaded in so that a localparam/parameter index (a constant form of
-      // §11.2.1) resolves to a value and keeps the select in the prefix, rather
-      // than being mistaken for a run-time index and collapsing the prefix to
-      // the base identifier -- which would flag distinct constant-indexed
-      // elements as one over-driven target.
       std::string prefix = LongestStaticPrefix(stmt->lhs, scope);
       if (!prefix.empty() && !IsDeclaredLocal(prefix, locals))
         out.insert(std::move(prefix));
@@ -256,13 +186,6 @@ static void CollectStmtLhsPrefixes(const Stmt* stmt,
   CollectLhsPrefixesInScope(stmt, out, scope, locals);
 }
 
-// Collects the name of every subroutine called from `expr` or from any
-// expression nested inside it. AnyExprChild in elaborator_validate_internal.h
-// states the links an Expr holds, which is why the list is not written out
-// again here. This walk named nine of the thirteen, and the four it left out
-// are positions a call is written in: `w[3:f()]` puts one in Expr::index_end,
-// `q.sum() with (f())` in Expr::with_expr, `{f(){1'b0}}` in Expr::repeat_count,
-// and `'{f(): 1}` in Expr::pattern_keys.
 static void CollectCallNamesExpr(const Expr* expr,
                                  std::unordered_set<std::string_view>& out) {
   if (!expr) return;
@@ -272,30 +195,6 @@ static void CollectCallNamesExpr(const Expr* expr,
       expr, [&](const Expr* child) { CollectCallNamesExpr(child, out); });
 }
 
-// Collects the name of every subroutine called from `stmt` or from any
-// statement nested inside it. §9.2.2.2 says of an always_comb procedure that no
-// other process may assign the variables it assigns, counting those assigned in
-// functions it calls but not those assigned in tasks it calls. It states no
-// condition on where in the procedure the call is written, so every position a
-// statement holds an expression in is a position a call reaches the rule from.
-//
-// This is a collector, so a position it does not reach costs a name rather than
-// a report. CollectFuncLhsPrefixes below takes the names gathered here, and no
-// others, as the roots of its search of the function bodies; a function called
-// only from an unreached position is therefore never opened, its assignment
-// targets never join the procedure's own, and the variables it assigns are
-// exempt from that sentence however many other processes assign them. The same
-// holds one level down, since the closure re-enters this walk over each
-// function body it does open.
-//
-// ForEachChildExpr states the positions a statement holds an expression in and
-// ForEachChildStmt the positions it holds a statement in, both in
-// elaborator_validate_internal.h, which is why neither list is written out
-// again here. This walk named four of the sixteen expression positions, and the
-// twelve it left out are positions a call is written in: `int k = f();` puts
-// one in Stmt::var_init, `w[f()] = 1;` under Stmt::lhs, `z <= #(f()) a;` in
-// Stmt::delay, `assert (f());` in Stmt::assert_expr, and a case-item pattern
-// and a randcase weight each hold one too.
 static void CollectCallNamesStmt(const Stmt* stmt,
                                  std::unordered_set<std::string_view>& out) {
   if (!stmt) return;
@@ -304,11 +203,6 @@ static void CollectCallNamesStmt(const Stmt* stmt,
                    [&](Stmt* const& sub) { CollectCallNamesStmt(sub, out); });
 }
 
-// The names a function's own declarations give it: its name, which stands for
-// its return value in its body (§13.4.1), its formals, and the variables its
-// body declares at its top. None is a variable of the module, and each call
-// has its own where the function is automatic (§13.4.2), so an assignment to
-// one is no write of the variables §9.2.2.2's single-writer rule compares.
 static std::vector<std::string_view> FunctionOwnNames(const ModuleItem& func) {
   std::vector<std::string_view> names{func.name};
   for (const FunctionArg& arg : func.func_args) names.push_back(arg.name);
@@ -341,8 +235,6 @@ static void CollectFuncLhsPrefixes(const Stmt* body, const FuncMap& funcs,
   }
 }
 
-// The longest static prefix of every target the procedure `body` assigns,
-// directly or in a function it calls (§9.2.2.2), added to `out`.
 static void CollectProcedureLhsPrefixes(const Stmt* body,
                                         const FuncMap* func_map,
                                         std::unordered_set<std::string>& out,
@@ -352,9 +244,6 @@ static void CollectProcedureLhsPrefixes(const Stmt* body,
     CollectFuncLhsPrefixes(body, *func_map, out, scope);
 }
 
-// A prefix ending in a constant select, `v[5]` or `v[4:7]` as
-// LongestStaticPrefix spells it: the text before that select and the lowest
-// and highest addresses it reaches. Nothing for a prefix ending otherwise.
 struct TrailingSelect {
   std::string_view base;
   int64_t low;
@@ -366,8 +255,6 @@ static std::optional<TrailingSelect> SplitTrailingSelect(std::string_view p) {
   if (kOpen == std::string_view::npos || p.back() != ']') return std::nullopt;
   const char* begin = p.data() + kOpen + 1;
   const char* end = p.data() + p.size() - 1;
-  // LongestStaticPrefix writes only decimal addresses between the brackets, so
-  // the text there always reads as one, or as two around a colon.
   TrailingSelect sel{p.substr(0, kOpen), 0, 0};
   const std::from_chars_result kLow = std::from_chars(begin, end, sel.low);
   sel.high = sel.low;
@@ -381,8 +268,6 @@ static std::optional<TrailingSelect> SplitTrailingSelect(std::string_view p) {
 
 static bool PrefixesOverlap(const std::string& a, const std::string& b) {
   if (a == b) return true;
-  // §11.5.3: two constant selects of one base overlap where the addresses
-  // they reach do, `v[4:7]` and `v[5]` among them.
   auto sa = SplitTrailingSelect(a);
   auto sb = SplitTrailingSelect(b);
   if (sa && sb && sa->base == sb->base)
@@ -402,10 +287,6 @@ struct ProcInfo {
   ModuleItemKind kind;
 };
 
-// §9.2.2.2/§6.5: the driver targets a module's items contribute, each as a
-// longest static prefix (§11.5.3) -- one entry per always_comb/always_latch/
-// always_ff process, the targets of every continuous assignment, and the
-// targets of every general procedural (always/initial) block.
 struct ProcessDriverSets {
   std::vector<ProcInfo>& procs;
   std::unordered_set<std::string>& cont_assign_lhs;
@@ -423,9 +304,6 @@ static const char* ProcessKindLabel(ModuleItemKind k) {
   }
 }
 
-// §11.5.3: the assignment targets of one always_comb/always_latch/always_ff
-// process, as longest static prefixes. A target reached through a function call
-// counts as the process's own.
 static ProcInfo MakeProcInfo(const ModuleItem* item, const FuncMap* func_map,
                              const ScopeMap& scope) {
   ProcInfo info;
@@ -435,9 +313,6 @@ static ProcInfo MakeProcInfo(const ModuleItem* item, const FuncMap* func_map,
   return info;
 }
 
-// §6.5 (printed page 90): the targets an item writes as a continuous
-// assignment does -- a continuous assignment's left-hand side, or each output
-// terminal of a gate or UDP instance -- with nothing for any other item.
 static std::vector<const Expr*> ContinuousTargets(const ModuleItem* item) {
   if (item->kind == ModuleItemKind::kContAssign && item->assign_lhs)
     return {item->assign_lhs};
@@ -462,15 +337,6 @@ static void CollectProcessLhsInfo(const ModuleDecl* decl,
       std::string prefix = LongestStaticPrefix(target, scope);
       if (!prefix.empty()) drivers.cont_assign_lhs.insert(std::move(prefix));
     }
-    // §9.2.2.2: no other process may assign the variables an always_comb
-    // assigns. §9.2 makes the general purpose always procedure, the initial
-    // procedure and the final procedure each a process, so all three are
-    // gathered here, with what they assign in the functions they call, since
-    // such an assignment is still the calling process's write; their targets
-    // are kept apart from `procs` so an overlap with an always_comb prefix can
-    // be flagged. always_comb, always_latch and always_ff are the ones that go
-    // into `procs` instead, because a process is also compared against the
-    // other two of its own three kinds rather than only against an always_comb.
     if (item->kind == ModuleItemKind::kAlwaysBlock ||
         item->kind == ModuleItemKind::kInitialBlock ||
         item->kind == ModuleItemKind::kFinalBlock) {
@@ -513,14 +379,6 @@ static void CheckContAssignConflict(
   }
 }
 
-// §9.2.2.2: report an always_comb LHS that is also assigned by a general
-// process (a plain always block or an initial block). §9.2.2.3 states that all
-// of §9.2.2.2's rules apply to always_latch, and §9.2.2.4 puts an always_ff's
-// targets under the same restriction, so a latch or flip-flop target sharing a
-// prefix with a general procedural driver is flagged the same way, under the
-// procedure's own subclause. Element granularity comes for free from the
-// longest static prefix (§11.5.3): distinct array elements or struct fields do
-// not overlap and so are not reported.
 static void CheckGeneralProcOverlap(
     const std::string& var, const ProcInfo& proc,
     const std::unordered_set<std::string>& general_proc_lhs, DiagEngine& diag) {
@@ -565,47 +423,18 @@ void Elaborator::CheckAlwaysCombMultiDriver(const ModuleDecl* decl,
   std::vector<ProcInfo> procs;
   std::unordered_set<std::string> cont_assign_lhs;
   std::unordered_set<std::string> general_proc_lhs;
-  // The module parameter scope lets §11.5.3's longest-static-prefix analysis
-  // treat a localparam/parameter index as the constant expression it is.
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
   CollectProcessLhsInfo(decl, {procs, cont_assign_lhs, general_proc_lhs},
                         &func_decls_, scope);
   CheckDriverConflicts(procs, cont_assign_lhs, general_proc_lhs, diag_);
 }
 
-// §6.5: the single-driver rule is stated per term of a variable's longest
-// static prefix, so distinct elements of an aggregate (a struct member or an
-// array/part-select element) are independent driver targets. The name-keyed
-// cross-checks (ValidateContAssignIdentLhs / ValidateMixedAssignments) collapse
-// every element to the base variable name and so can only police whole-variable
-// targets; CheckAlwaysCombMultiDriver covers element granularity but only for
-// always_comb/always_latch/always_ff processes. This pass closes the remaining
-// gap for a continuous assignment whose target is an aggregate element: it
-// flags a second continuous driver, or a general procedural (initial / always)
-// driver, whose longest static prefix overlaps. Prefixes that are bare
-// identifiers stay with the name-keyed checks, and always_comb/latch/ff
-// processes stay with CheckAlwaysCombMultiDriver, so no conflict is reported
-// twice.
-// §6.5: one continuous-assignment target, as a longest static prefix, with a
-// note of whether that prefix reaches into an aggregate (a struct member or an
-// array/part-select element) rather than naming a whole variable.
 struct ContTarget {
   std::string prefix;
   bool aggregate;
   SourceLoc loc;
 };
 
-// Gather the continuous-assignment targets of `decl` and the assignment targets
-// of its general procedural blocks. always_comb, always_latch, and always_ff
-// are left out: CheckAlwaysCombMultiDriver already covers them at element
-// granularity. The initial, always and final procedures §9.2 defines have no
-// such second pass, so all three are gathered here.
-//
-// §6.5 (printed page 90) makes the rule one of variables alone: any number of
-// continuous assignments may write a net, whose values its net type resolves,
-// so a target rooted at one of the module's nets, `nets`, is not gathered --
-// `assign a[0] = 1; assign a[0] = 0;` on `wire [3:0] a` is two drivers of one
-// bit, and on `wor r[2]` two drivers of r[0].
 static void CollectAggregateDriverTargets(
     const ModuleDecl* decl, const ScopeMap& scope,
     const std::unordered_set<std::string>& nets, std::vector<ContTarget>& conts,
@@ -629,11 +458,6 @@ static void CollectAggregateDriverTargets(
   }
 }
 
-// Multiple continuous assignments writing to overlapping element prefixes,
-// which §6.5's precise rule states in terms of the longest static prefix.
-// Whole-identifier vs whole-identifier pairs are already diagnosed by
-// ValidateContAssignIdentLhs, so at least one side of a reported pair must be
-// an aggregate element.
 static void CheckOverlappingContTargets(const std::vector<ContTarget>& conts,
                                         DiagEngine& diag) {
   for (size_t i = 0; i < conts.size(); ++i) {
@@ -650,9 +474,6 @@ static void CheckOverlappingContTargets(const std::vector<ContTarget>& conts,
   }
 }
 
-// A continuous assignment to an aggregate element mixed with a procedural
-// driver of an overlapping prefix. The whole-identifier form is handled by
-// ValidateMixedAssignments, so only aggregate continuous targets are checked.
 static void CheckContProcElementMix(
     const std::vector<ContTarget>& conts,
     const std::unordered_set<std::string>& proc_prefixes, DiagEngine& diag) {
@@ -671,19 +492,6 @@ static void CheckContProcElementMix(
   }
 }
 
-// §6.5: the single-driver rule is stated per term of a variable's longest
-// static prefix, so distinct elements of an aggregate (a struct member or an
-// array/part-select element) are independent driver targets. The name-keyed
-// cross-checks (ValidateContAssignIdentLhs / ValidateMixedAssignments) collapse
-// every element to the base variable name and so can only police whole-variable
-// targets; CheckAlwaysCombMultiDriver covers element granularity but only for
-// always_comb/always_latch/always_ff processes. This pass closes the remaining
-// gap for a continuous assignment whose target is an aggregate element: it
-// flags a second continuous driver, or a general procedural (initial / always)
-// driver, whose longest static prefix overlaps. Prefixes that are bare
-// identifiers stay with the name-keyed checks, and always_comb/latch/ff
-// processes stay with CheckAlwaysCombMultiDriver, so no conflict is reported
-// twice.
 void Elaborator::CheckAggregateElementDrivers(const ModuleDecl* decl,
                                               RtlirModule* mod) {
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};

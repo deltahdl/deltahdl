@@ -24,9 +24,6 @@ namespace delta {
 
 namespace {
 
-// §8.25: the value each parameter of `cls` holds in the specialization it
-// is, over the compilation unit's constants, which its static properties
-// hold under the parameters' names.
 ScopeMap ParamValuesOf(const ClassTypeInfo& cls) {
   ScopeMap scope;
   if (cls.unit_constants != nullptr) scope = *cls.unit_constants;
@@ -43,8 +40,6 @@ ScopeMap ParamValuesOf(const ClassTypeInfo& cls) {
   return scope;
 }
 
-// §7.4.1: the bits the packed dimensions of `m` give it, each bound folded
-// against `scope`; nothing where a bound does not fold or none is written.
 std::optional<uint32_t> FoldedPackedWidth(const StructMember& m,
                                           const ScopeMap& scope) {
   if (m.packed_dim_left == nullptr || m.packed_dim_right == nullptr)
@@ -64,13 +59,6 @@ std::optional<uint32_t> FoldedPackedWidth(const StructMember& m,
   return width;
 }
 
-// §23.9 with §8.13 and §8.25: the bits member `m` of a typedef the class
-// `declarer` declares takes where it is written as the bare name of a typedef
-// that class reaches, its own or one up its extends chain
-// (ClassTypedefDeclarer): the typedef's type sized under the parameter values
-// of the class declaring it -- `scope` where that is `declarer` -- times the
-// packed dimensions written on the name folded against `scope` (§7.4.4).
-// Nothing for a member written otherwise.
 std::optional<uint32_t> ClassTypedefMemberWidth(const StructMember& m,
                                                 const ScopeMap& scope,
                                                 const ClassTypeInfo& declarer,
@@ -93,14 +81,6 @@ std::optional<uint32_t> ClassTypedefMemberWidth(const StructMember& m,
          FoldedPackedWidth(m, scope).value_or(1);
 }
 
-// The bits member `m` of a typedef the class `declarer` declares takes with
-// its dimensions folded against `scope`; 0 where they do not fold or say
-// nothing. Written as the name of a typedef the class reaches, that
-// typedef's (ClassTypedefMemberWidth); written as another typedef name, the
-// typedef's width in the design's type table times the packed dimensions
-// written on the name (§7.4.4), as SimParamTypeWidth sizes a parameter of
-// such a type -- never those dimensions alone, which are not the member's
-// width -- and 0 where the table holds no integral typedef of the name.
 uint32_t FoldedMemberWidth(const StructMember& m, const ScopeMap& scope,
                            const ClassTypeInfo& declarer,
                            const SimContext& ctx) {
@@ -118,9 +98,6 @@ uint32_t FoldedMemberWidth(const StructMember& m, const ScopeMap& scope,
   return SimParamTypeWidth(written, scope, ctx);
 }
 
-// `type`, a typedef the class `declarer` declares, with each member's width
-// folded against `scope`, which the layout builder then reads in place of the
-// unfolded dimensions.
 DataType* FoldedAggregate(const DataType& type, const ScopeMap& scope,
                           const ClassTypeInfo& declarer, SimContext& ctx) {
   auto* folded = ctx.GetArena().Create<DataType>(type);

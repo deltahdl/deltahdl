@@ -1,13 +1,3 @@
-// Tests for IEEE 1800-2023 clause 7.9.10 -- associative array arguments.
-// Passing an associative array by value creates a local copy of the array in
-// the callee. The copy is produced by the simulator's argument-binding path
-// (TryBindAssocArg), which duplicates the actual's entries into a fresh formal
-// array. Because that behavior depends on how the actual is declared and
-// written (clause 7.8, this pass's dependency) and on how the call binds it
-// (clause 13.5.1 pass-by-value), every test builds the array from real
-// declaration + indexed-assignment source and drives it through
-// parse -> elaborate -> lower -> run, observing the value the callee reads and
-// the value the caller retains after the call returns.
 #include <gtest/gtest.h>
 
 #include "helpers_scheduler.h"
@@ -16,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// The formal observes the actual's entries: the copy carries every element
-// into the callee, so reading a key inside the function returns what the caller
-// stored under that key.
 TEST(AssocMethods, AssocArgByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -37,8 +24,6 @@ TEST(AssocMethods, AssocArgByValueEndToEnd) {
   EXPECT_EQ(v, 55u);
 }
 
-// Because the formal is a local copy, mutating it inside the callee leaves the
-// caller's array untouched.
 TEST(AssocMethods, AssocArgCallerUnchangedEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -59,9 +44,6 @@ TEST(AssocMethods, AssocArgCallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 42u);
 }
 
-// A string-keyed associative array passed by value must reach the callee with
-// its entries copied, so the formal observes the actual's value. Exercises the
-// production str_data copy in the real argument-binding path.
 TEST(AssocMethods, AssocArgStringKeyByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -79,9 +61,6 @@ TEST(AssocMethods, AssocArgStringKeyByValueEndToEnd) {
   EXPECT_EQ(v, 77u);
 }
 
-// Because the copy is local, mutating a string-keyed formal inside the callee
-// leaves the caller's array untouched. Exercises the production binding path
-// rather than a hand-written copy.
 TEST(AssocMethods, AssocArgStringKeyCallerUnchangedEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -102,11 +81,6 @@ TEST(AssocMethods, AssocArgStringKeyCallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 12u);
 }
 
-// A subroutine argument also appears in a task call. An associative array
-// passed by value to a task input is copied into the callee, so the value the
-// task reads matches what the caller stored. Exercises the same production
-// argument-binding copy through the task-call path, with the read value carried
-// back out through a task output.
 TEST(AssocMethods, AssocArgByValueThroughTaskEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"

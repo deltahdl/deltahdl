@@ -27,8 +27,6 @@ class VpiMcdOpenSim : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Counts the set bits of an mcd; a freshly opened descriptor names exactly
-  // one channel.
   static int ChannelCount(PLI_UINT32 mcd) {
     int n = 0;
     for (PLI_UINT32 m = mcd; m != 0; m &= m - 1) ++n;
@@ -42,14 +40,10 @@ class VpiMcdOpenSim : public ::testing::Test {
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
 
-  // mcd channel 1 is the LSB, channel 32 is the MSB.
   static constexpr PLI_UINT32 kLsbChannel = 0x00000001u;
   static constexpr PLI_UINT32 kMsbChannel = 0x80000000u;
 };
 
-// §38.27: vpi_mcd_open() shall open a file for writing and return a
-// corresponding multichannel descriptor. The descriptor is nonzero and the file
-// is recorded as open under that descriptor.
 TEST_F(VpiMcdOpenSim, OpensFileForWritingAndReturnsMcd) {
   char name[] = "trace.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -59,10 +53,6 @@ TEST_F(VpiMcdOpenSim, OpensFileForWritingAndReturnsMcd) {
   EXPECT_EQ(vpi_ctx_.McdForFile("trace.log"), mcd);
 }
 
-// §38.27: channel 1 (LSB) is reserved for the tool's output channel and log
-// file, and channel 32 (MSB) is reserved for an fd from $fopen, so a fresh mcd
-// never selects either. Each open names exactly one channel and distinct files
-// receive distinct channels.
 TEST_F(VpiMcdOpenSim, FreshDescriptorsAvoidReservedLsbAndMsbChannels) {
   char a[] = "a.txt";
   char b[] = "b.txt";
@@ -77,9 +67,6 @@ TEST_F(VpiMcdOpenSim, FreshDescriptorsAvoidReservedLsbAndMsbChannels) {
   EXPECT_NE(mcd_a, mcd_b);
 }
 
-// §38.27: vpi_mcd_open() shall return 0 on error. An open that cannot be
-// carried out and a missing file name both take the error return, and nothing
-// is recorded.
 TEST_F(VpiMcdOpenSim, ReturnsZeroOnError) {
   vpi_ctx_.SetMcdOpenShouldFail(true);
   char name[] = "denied.log";
@@ -89,8 +76,6 @@ TEST_F(VpiMcdOpenSim, ReturnsZeroOnError) {
   EXPECT_EQ(vpi_mcd_open(nullptr), 0u);
 }
 
-// §38.27: if the file has already been opened by a previous vpi_mcd_open(), the
-// routine shall return that same descriptor without consuming another channel.
 TEST_F(VpiMcdOpenSim, ReopeningSameFileReturnsExistingDescriptor) {
   char name[] = "shared.log";
   PLI_UINT32 first = vpi_mcd_open(name);
@@ -99,39 +84,31 @@ TEST_F(VpiMcdOpenSim, ReopeningSameFileReturnsExistingDescriptor) {
   PLI_UINT32 second = vpi_mcd_open(name);
   EXPECT_EQ(second, first);
 
-  // A third, different file gets a new channel - re-opening did not consume
-  // one.
   char other[] = "other.log";
   PLI_UINT32 third = vpi_mcd_open(other);
   EXPECT_NE(third, first);
   EXPECT_EQ(ChannelCount(third), 1);
 }
 
-// §38.27: the mcd namespace is shared with $fopen, so a file already opened by
-// $fopen is reported on its existing descriptor rather than a new one - the
-// descriptors are compatible.
 TEST_F(VpiMcdOpenSim, FileOpenedByFopenSharesDescriptorNamespace) {
-  PLI_UINT32 fopen_mcd = 0x00000004u;  // channel 3, as $fopen might have chosen
+  PLI_UINT32 fopen_mcd = 0x00000004u;
   vpi_ctx_.RegisterFopenMcdFile("from_fopen.log", fopen_mcd);
 
   char name[] = "from_fopen.log";
   EXPECT_EQ(vpi_mcd_open(name), fopen_mcd);
 
-  // A new file opened afterwards must not collide with the $fopen channel.
   char fresh[] = "fresh.log";
   PLI_UINT32 mcd = vpi_mcd_open(fresh);
   EXPECT_EQ(mcd & fopen_mcd, 0u);
 }
 
-// §38.27: only channels 2..31 are available (channels 1 and 32 are reserved),
-// so once all are in use a further open has no free channel and returns 0.
 TEST_F(VpiMcdOpenSim, ExhaustedChannelsReturnZero) {
   PLI_UINT32 used = 0;
   for (int i = 0; i < 30; ++i) {
     std::string name = "file" + std::to_string(i) + ".log";
     PLI_UINT32 mcd = vpi_mcd_open(name.data());
     ASSERT_NE(mcd, 0u) << "channel " << i << " should have been available";
-    EXPECT_EQ(used & mcd, 0u);  // each open takes a distinct channel
+    EXPECT_EQ(used & mcd, 0u);
     used |= mcd;
   }
 
@@ -139,35 +116,26 @@ TEST_F(VpiMcdOpenSim, ExhaustedChannelsReturnZero) {
   EXPECT_EQ(vpi_mcd_open(overflow), 0u);
 }
 
-// §38.27: a value from $fopen with its MSB set is an fd file descriptor, which
-// does not mix with the mcd descriptors vpi_mcd_open() returns, and channel 32
-// - that MSB - is set aside to mark such an fd. So a file $fopen opened in its
-// fd form is not one this routine has open: it opens a channel of its own for
-// it rather than handing back a value its own descriptors are not compatible
-// with.
 TEST_F(VpiMcdOpenSim, AnFdFromFopenIsNotADescriptorThisRoutineHandsBack) {
-  PLI_UINT32 fopen_fd = 0x80000005u;  // the MSB set: an fd, not an mcd
+  PLI_UINT32 fopen_fd = 0x80000005u;
   vpi_ctx_.RegisterFopenMcdFile("opened_as_fd.log", fopen_fd);
 
   char name[] = "opened_as_fd.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
 
   EXPECT_NE(mcd, fopen_fd);
-  EXPECT_EQ(mcd & 0x80000001u, 0u);  // neither reserved channel
+  EXPECT_EQ(mcd & 0x80000001u, 0u);
   EXPECT_NE(mcd, 0u);
 
-  // The file now stands in the mcd namespace, so opening it again is the
-  // already-open case and reports the same channel rather than taking another.
   EXPECT_EQ(vpi_mcd_open(name), mcd);
 }
 
-// The file the case's application writes through a multichannel descriptor.
 std::string& McdFilePath() {
   static std::string path;
   return path;
 }
 
-PLI_INT32 WriteThroughAnMcd(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 WriteThroughAnMcd(PLI_BYTE8*) {
   PLI_UINT32 mcd = vpi_mcd_open(VpiText(McdFilePath().c_str()));
   vpi_mcd_printf(mcd, VpiText("line %d\n"), 1);
   vpi_mcd_printf(mcd, VpiText("line %d\n"), 2);
@@ -177,9 +145,6 @@ PLI_INT32 WriteThroughAnMcd(PLI_BYTE8* /*user_data*/) {
 
 class McdFilesOfARun : public VpiDesignRun {};
 
-// §38.27 with §38.28 and §38.24: vpi_mcd_open opens a file for writing,
-// vpi_mcd_printf writes to the file its descriptor names, and vpi_mcd_close
-// closes it, the text then in the file (#5132).
 TEST_F(McdFilesOfARun, TextPrintedOnAnMcdReachesItsFile) {
   McdFilePath() = ::testing::TempDir() + "mcd_files_of_a_run.txt";
   std::remove(McdFilePath().c_str());
@@ -196,14 +161,12 @@ TEST_F(McdFilesOfARun, TextPrintedOnAnMcdReachesItsFile) {
   std::remove(McdFilePath().c_str());
 }
 
-PLI_INT32 WriteThroughAnMcdLeftOpen(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 WriteThroughAnMcdLeftOpen(PLI_BYTE8*) {
   PLI_UINT32 mcd = vpi_mcd_open(VpiText(McdFilePath().c_str()));
   vpi_mcd_printf(mcd, VpiText("left open\n"));
   return 0;
 }
 
-// §38.27 with §38.24: a file vpi_mcd_open opened and no vpi_mcd_close closed is
-// closed with the tool, the text printed to it then in the file.
 TEST(McdFilesOfAContext, AFileLeftOpenIsClosedWithTheTool) {
   McdFilePath() = ::testing::TempDir() + "mcd_left_open.txt";
   std::remove(McdFilePath().c_str());
@@ -229,16 +192,12 @@ TEST(McdFilesOfAContext, AFileLeftOpenIsClosedWithTheTool) {
   std::remove(McdFilePath().c_str());
 }
 
-// What vpi_mcd_open returned for the file the design's $fopen had opened and
-// for one it had not.
 PLI_UINT32 reopened = 0;
 PLI_UINT32 fresh = 0;
 
 class ChannelsSharedWithFopen : public RunFilesRun {
  protected:
-  // Opens the design's file again and another, prints to the design's mcd and
-  // hands the other's mcd to the design in `top.from_vpi`.
-  static PLI_INT32 OpenAlongside(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 OpenAlongside(PLI_BYTE8*) {
     reopened = vpi_mcd_open(VpiText("design.txt"));
     fresh = vpi_mcd_open(VpiText("application.txt"));
     vpi_mcd_printf(DescriptorIn("top.mcd"), VpiText("from vpi\n"));
@@ -251,9 +210,6 @@ class ChannelsSharedWithFopen : public RunFilesRun {
   }
 };
 
-// §38.27 with §21.3.1: vpi_mcd_open and $fopen share one set of channels, so a
-// file the design opened is handed back on its channel, another file gets a
-// channel of its own, and each side writes through the other's mcd (#7467).
 TEST_F(ChannelsSharedWithFopen, EachSideWritesThroughTheOthersMcd) {
   RegisterTask("$open_alongside", &OpenAlongside);
   Run("module top; integer mcd, from_vpi;\n"
@@ -271,20 +227,16 @@ TEST_F(ChannelsSharedWithFopen, EachSideWritesThroughTheOthersMcd) {
   EXPECT_EQ(FileText("application.txt"), "from the design\n");
 }
 
-// What vpi_mcd_open returned for the file the design's $fopen opened as an fd.
 PLI_UINT32 beside_fd = 0;
 
 class ChannelBesideAnFd : public RunFilesRun {
  protected:
-  static PLI_INT32 OpenTheFdsFile(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 OpenTheFdsFile(PLI_BYTE8*) {
     beside_fd = vpi_mcd_open(VpiText("as_fd.txt"));
     return 0;
   }
 };
 
-// §38.27 with §21.3.1: a file the design's $fopen opened as an fd holds no
-// channel, the MSB of its descriptor set, so vpi_mcd_open of it hands back a
-// channel of its own rather than the fd.
 TEST_F(ChannelBesideAnFd, AnFdsFileIsOpenedOnAChannelOfItsOwn) {
   RegisterTask("$open_fds_file", &OpenTheFdsFile);
   Run("module top; integer fd;\n"

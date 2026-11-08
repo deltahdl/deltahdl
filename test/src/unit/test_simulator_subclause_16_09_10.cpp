@@ -28,23 +28,13 @@ struct SvaFixture {
 
 namespace {
 
-// §16.9.10: `seq1 within seq2` matches along an interval when seq2 matches the
-// whole interval and seq1 matches some contained subinterval. When seq1's match
-// sits strictly inside seq2's, the containment matches and completes at seq2's
-// match point. Mirrors the !trdy[*7] within ($fell(irdy) ##1 irdy[*8]) example,
-// which matches from clock tick 3 to clock tick 11.
 TEST(SvaEngine, WithinContainedSubintervalMatches) {
-  // seq2 spans ticks [3,11]; seq1 spans the contained [4,10].
-  auto m = EvalSequenceWithin(
-      SequenceMatchSpan{/*matched=*/true, /*start_time=*/4, /*end_time=*/10},
-      SequenceMatchSpan{/*matched=*/true, /*start_time=*/3, /*end_time=*/11});
+  auto m = EvalSequenceWithin(SequenceMatchSpan{true, 4, 10},
+                              SequenceMatchSpan{true, 3, 11});
   EXPECT_TRUE(m.matched);
-  // The composite spans seq2's interval, so it completes when seq2 completes.
   EXPECT_EQ(m.end_time, 11u);
 }
 
-// §16.9.10: both operands shall match. A non-matching operand defeats the
-// containment even when the time bounds would otherwise be satisfied.
 TEST(SvaEngine, WithinRequiresBothOperandsToMatch) {
   EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{false, 4, 10},
                                   SequenceMatchSpan{true, 3, 11})
@@ -57,41 +47,24 @@ TEST(SvaEngine, WithinRequiresBothOperandsToMatch) {
                    .matched);
 }
 
-// §16.9.10 first bullet: the start point of seq1 shall be no earlier than the
-// start point of seq2. A seq1 match that begins before seq2 does is not
-// contained and so does not match. Coincident starts are allowed (no earlier).
 TEST(SvaEngine, WithinStartNoEarlierThanOuterStart) {
-  // seq1 starts at tick 2, before seq2's start at 3: not contained.
   EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 2, 10},
                                   SequenceMatchSpan{true, 3, 11})
                    .matched);
-  // Coincident start at tick 3 satisfies the bound on how early it may start.
   EXPECT_TRUE(EvalSequenceWithin(SequenceMatchSpan{true, 3, 10},
                                  SequenceMatchSpan{true, 3, 11})
                   .matched);
 }
 
-// §16.9.10 second bullet: the match point of seq1 shall be no later than the
-// match point of seq2. A seq1 match completing after seq2 is not contained.
-// Coincident completion points are allowed (no later).
 TEST(SvaEngine, WithinEndNoLaterThanOuterEnd) {
-  // seq1 completes at tick 12, after seq2's completion at 11: not contained.
   EXPECT_FALSE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 12},
                                   SequenceMatchSpan{true, 3, 11})
                    .matched);
-  // Coincident completion at tick 11 satisfies the bound on how late it may
-  // complete.
   EXPECT_TRUE(EvalSequenceWithin(SequenceMatchSpan{true, 4, 11},
                                  SequenceMatchSpan{true, 3, 11})
                   .matched);
 }
 
-// --- Live cases: the linear sequence monitor over real source ---
-
-// §16.9.10: `te1[*2] within (te2 ##1 te3[*3])` matches where the outer
-// sequence does and te1[*2] matches along a subinterval of it. With te2 at
-// tick 3 and te3 at 4 to 6 the outer matches from 3 to 6, so with te1 at 4
-// and 5 the whole ends at 6, the tick at 55.
 TEST(SequenceWithin, MatchesWhereTheInnerLiesInsideTheOuter) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -103,9 +76,6 @@ TEST(SequenceWithin, MatchesWhereTheInnerLiesInsideTheOuter) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
 }
 
-// §16.9.10: the inner match may start where the outer does and end where
-// it does. With te1 at 3 to 6, te1[*4] matches from 3 to 6 as the outer
-// does, and the whole ends at 6, the tick at 55.
 TEST(SequenceWithin, InnerMayCoincideWithTheOuter) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -117,10 +87,6 @@ TEST(SequenceWithin, InnerMayCoincideWithTheOuter) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 55u);
 }
 
-// §16.9.10: the inner match may start no earlier than the outer and end no
-// later. te1 at 2 and 3 gives te1[*2] a match from 2, before the outer's 3,
-// and te1 at 6 and 7 one ending at 7, after the outer's 6; neither is a match
-// of the whole.
 TEST(SequenceWithin, InnerMayNotReachOutsideTheOuter) {
   const std::string kBody = "te1[*2] within (te2 ##1 te3[*3])";
   SimFixture f;
@@ -137,11 +103,6 @@ TEST(SequenceWithin, InnerMayNotReachOutsideTheOuter) {
   EXPECT_EQ(late->value.ToUint64(), 0u);
 }
 
-// §16.9.10: the clause's `!trdy[*7] within ($fell(irdy) ##1 !irdy[*8])`
-// over Figure 16-13's trace, te2 as irdy, high at 1 and 2 and from 12, and
-// te3 as trdy, high at 1 to 3 and from 11: the outer matches from 3, where
-// irdy falls, to 11, and !trdy[*7] from 4 to 10 inside it, so the whole ends
-// at 11, the tick at 105.
 TEST(SequenceWithin, ClauseExampleMatchesFromTickThreeToEleven) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -155,10 +116,6 @@ TEST(SequenceWithin, ClauseExampleMatchesFromTickThreeToEleven) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 105u);
 }
 
-// §16.9.10 and §16.7: a within written as a group is one operand of the
-// chain around it. From tick 2 the group begins at 3, te2 ##2 te3 spanning
-// 3 to 5 with te4 high at 4 inside it, so the sequence ends at 5, the tick
-// at 45; from tick 8 the span is 9 to 11 and te4 is high at 13 alone.
 TEST(SequenceWithin, AGroupIsOneOperandOfTheChainAroundIt) {
   SimFixture f;
   auto* hits = RunAndFindVar(

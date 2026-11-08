@@ -25,8 +25,6 @@ TEST_F(VerifyParseTest, CovergroupWithCross) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.6 / Syntax 19-4: list_of_cross_items requires at least two cross_items,
-// so a one-item `cross a;` is rejected.
 TEST_F(VerifyParseTest, SingleItemCrossIsError) {
   Parse(R"(
     module m;
@@ -41,9 +39,6 @@ TEST_F(VerifyParseTest, SingleItemCrossIsError) {
                             5, "19.6"));
 }
 
-// §19.6: a cross names coverage points or variables, so an expression has to
-// become a coverage point before it can be crossed, and `cross a + b, c;` is
-// rejected.
 TEST_F(VerifyParseTest, ExpressionCrossItemIsError) {
   Parse(R"(
     module m;
@@ -62,8 +57,6 @@ TEST_F(VerifyParseTest, ExpressionCrossItemIsError) {
                     7, "19.6"));
 }
 
-// §19.6: the cross label is optional and, when present, precedes the
-// two-or-more item list. A labeled two-item cross parses without error.
 TEST_F(VerifyParseTest, LabeledCrossParsesWithoutError) {
   auto* unit = Parse(R"(
     module m;
@@ -78,8 +71,6 @@ TEST_F(VerifyParseTest, LabeledCrossParsesWithoutError) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.6: a cross generalizes to more than two coverage points; a three-item
-// cross with an `iff` guard parses without error.
 TEST_F(VerifyParseTest, ThreeItemCrossWithIffParsesWithoutError) {
   auto* unit = Parse(R"(
     module m;
@@ -95,10 +86,6 @@ TEST_F(VerifyParseTest, ThreeItemCrossWithIffParsesWithoutError) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.6.1.4 with A.2.11: a cross bin may select with a cross_set_expression,
-// an expression yielding the tuples of the bin, so an assignment pattern
-// stands there, and a function declared in the cross body may build one; the
-// '{ of a pattern is no brace of the cross body.
 TEST_F(VerifyParseTest, CrossSetExpressionAssignmentPatternsParse) {
   auto* unit = Parse(R"(
     module m;
@@ -136,10 +123,6 @@ TEST_F(VerifyParseTest, CrossSetExpressionAssignmentPatternsParse) {
   EXPECT_EQ(x->body[3].bins.select->expr->kind, ExprKind::kAssignmentPattern);
 }
 
-// §19.6.1.2 with A.2.11: the clause's own example -- a cross name filtered by
-// `with` and `matches`, a parenthesized select filtered by `with`, and two
-// filtered selections joined by `||` -- is held on the tree with `with`
-// binding to the operand it follows.
 TEST_F(VerifyParseTest, CrossBinWithCovergroupExpressionsTree) {
   auto* unit = Parse(R"(
     module m;
@@ -193,10 +176,6 @@ TEST_F(VerifyParseTest, CrossBinWithCovergroupExpressionsTree) {
   EXPECT_TRUE(x->body[3].bins.select->matches_dollar);
 }
 
-// §19.6 with §19.6.1.4: a cross's name is seen only through a covergroup
-// variable or the covergroup's scope, so a lone identifier in its body is the
-// cross_identifier only where it is the cross's own label; any other, a queue
-// `q` or one in an unlabelled cross, is a cross_set_expression.
 TEST_F(VerifyParseTest, LoneIdentifierOtherThanTheCrossLabelIsACrossSet) {
   auto* unit = Parse(R"(
     module m;

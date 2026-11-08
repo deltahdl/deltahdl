@@ -32,14 +32,11 @@ bool IsAbortOperator(std::string_view keyword) {
 }
 
 bool IsSynchronousAbort(AbortOperator op) {
-  // §16.12.14: the sync_ forms are evaluated only at the clocking event and are
-  // the synchronous abort properties.
   return op == AbortOperator::kSyncAcceptOn ||
          op == AbortOperator::kSyncRejectOn;
 }
 
 bool AbortConditionForcesTrue(AbortOperator op) {
-  // §16.12.14: the accept variants make the overall evaluation true on abort.
   return op == AbortOperator::kAcceptOn || op == AbortOperator::kSyncAcceptOn;
 }
 
@@ -59,7 +56,6 @@ bool AbortConditionContentIsLegal(bool references_local_variable,
 }
 
 bool AbortConditionSampledValueRequiresExplicitClock(SampledValueFunction fn) {
-  // §16.12.14: only $sampled may be used without an explicit clock argument.
   return fn != SampledValueFunction::kSampled;
 }
 

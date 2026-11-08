@@ -150,8 +150,6 @@ TEST(Preprocessor, ResetAll_EndKeywordsWithoutBeginAfterResetallErrors) {
   PreprocessWithPP("`resetall\n", f, pp);
   PreprocessWithPP("`end_keywords\n", f, pp);
 
-  // `resetall restores the directive defaults and leaves no keyword region
-  // open, so the closer that follows it is the one §22.14 reports unmatched.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "`end_keywords without matching `begin_keywords", 1,
                             "22.14"));

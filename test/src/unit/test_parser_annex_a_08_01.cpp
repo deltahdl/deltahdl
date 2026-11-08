@@ -12,15 +12,6 @@ using namespace delta;
 namespace {
 
 TEST(ConcatenationParsing, ModulePathConcatenation) {
-  // A concatenation is NOT a legal specify path terminal. Per Annex A.7.2/A.7.3
-  // a parallel path is
-  //   ( specify_input_terminal_descriptor => specify_output_terminal_descriptor
-  //   )
-  // and specify_input_terminal_descriptor ::= input_identifier
-  // [ [ constant_range_expression ] ] — module_path_concatenation appears only
-  // in module_path_primary (A.8.4), never as a path terminal. §30.4.5 also
-  // states a parallel '=>' connection joins one source to one destination. So
-  // this must be rejected.
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -28,8 +19,6 @@ TEST(ConcatenationParsing, ModulePathConcatenation) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §30.4.5 owns the one-source, one-destination rule of the parallel path,
-  // and the report stands at the '(' opening the path declaration.
   EXPECT_TRUE(ReportedError(r.diags,
                             "parallel path '=>' requires a single source and "
                             "destination terminal",
@@ -123,10 +112,6 @@ TEST(ConcatenationParsing, EmptyUnpackedArrayConcat) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.8.1 makes concatenation recursive through primary, so every operand of a
-// concatenation may itself be a concatenation. This covers the case where all
-// of them are; test_parser_subclause_11_04_12.cpp covers a single nested
-// operand beside a scalar one.
 TEST(ConcatenationParsing, ConcatenationNestedInEveryOperand) {
   auto r = Parse(
       "module m;\n"
@@ -158,10 +143,6 @@ TEST(ConcatenationParsing, ConstantMultipleConcatenation) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// concatenation ::= { expression { , expression } } — the trailing repetition
-// is optional, so a lone expression is a well-formed production.
-// test_parser_subclause_11_04_12.cpp covers the same shape against the §11.4.12
-// prose.
 TEST(ConcatenationParsing, ConcatenationOneExpressionProduction) {
   auto r = Parse(
       "module m;\n"
@@ -206,7 +187,6 @@ TEST(ConcatenationParsing, ErrorConcatenationMissingCloseBrace) {
       "module m;\n"
       "  initial x = {a, b;\n"
       "endmodule\n");
-  // §11.4.12 owns the concatenation braces.
   EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 2, "11.4.12"));
 }
 
@@ -243,27 +223,18 @@ TEST(ConcatenationParsing, StreamExpressionWithIndexedMinusRange) {
 }
 
 TEST(ConcatenationParsing, ModulePathMultipleConcatenation) {
-  // A multiple concatenation is likewise not a legal specify path terminal
-  // (Annex A.7.2/A.7.3; §30.4.5). The parallel '=>' source must be a single
-  // specify_input_terminal_descriptor, so this is rejected.
   auto r = Parse(
       "module m(input a, input b, output c);\n"
       "  specify\n"
       "    ({2{a, b}} => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.5 owns the one-source, one-destination rule of the parallel path.
   EXPECT_TRUE(ReportedError(r.diags,
                             "parallel path '=>' requires a single source and "
                             "destination terminal",
                             3, "30.4.5"));
 }
 
-// A module_path_concatenation is no terminal of a full '*>' path either:
-// A.7.3's list_of_path_inputs and list_of_path_outputs are comma-separated
-// descriptors with no brace around them, and A.8.1's production is a
-// module_path_primary (A.8.4) that stands only in the module_path_expression
-// of a state-dependent path's `if`. The brace group is reported under A.7.3.
 TEST(ConcatenationParsing, ModulePathConcatenationInFullPathIsRejected) {
   auto r = Parse(
       "module m(input a, input b, output c, output d);\n"
@@ -278,8 +249,6 @@ TEST(ConcatenationParsing, ModulePathConcatenationInFullPathIsRejected) {
       3, "A.7.3"));
 }
 
-// The same for module_path_multiple_concatenation
-// ({ constant_expression module_path_concatenation }) in the full '*>' form.
 TEST(ConcatenationParsing,
      ModulePathMultipleConcatenationInFullPathIsRejected) {
   auto r = Parse(
@@ -295,8 +264,6 @@ TEST(ConcatenationParsing,
       3, "A.7.3"));
 }
 
-// Where the two productions do stand: the module_path_expression of a
-// state-dependent path's `if` (A.7.2 through A.8.3 and A.8.4).
 TEST(ConcatenationParsing, ModulePathConcatenationInPathCondition) {
   EXPECT_TRUE(
       ParseOk("module m(input a, input b, output y);\n"
@@ -307,11 +274,6 @@ TEST(ConcatenationParsing, ModulePathConcatenationInPathCondition) {
               "endmodule\n"));
 }
 
-// slice_size ::= simple_type | constant_expression. The constant_expression
-// alternative is exercised as a numeric literal by
-// StreamingConcatWithNumericSlice above; here it is a named parameter, the
-// other constant form admitted in this position. The parser accepts an
-// identifier ahead of the stream's inner brace.
 TEST(ConcatenationParsing, StreamingConcatWithParameterSliceSize) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -321,22 +283,14 @@ TEST(ConcatenationParsing, StreamingConcatWithParameterSliceSize) {
               "endmodule\n"));
 }
 
-// Negative form of stream_concatenation ::= { stream_expression
-// { , stream_expression } }: the inner brace list must hold at least one
-// stream_expression, so an empty stream body is rejected.
 TEST(ConcatenationParsing, StreamConcatenationEmptyRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial x = {>> {}};\n"
       "endmodule\n");
-  // §11.2 owns the report Parser::ParsePrimaryExpr makes for the missing
-  // stream_expression; §11.4.14 states the stream_concatenation itself.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// slice_size ::= simple_type | constant_expression, and the expression runs up
-// to the brace opening the stream_concatenation: an operator, a conditional
-// and a parenthesized operand are read whole into the slice size.
 TEST(ConcatenationParsing, StreamingSliceSizeOfAnyConstantExpression) {
   auto r = Parse(
       "module m;\n"
@@ -357,10 +311,6 @@ TEST(ConcatenationParsing, StreamingSliceSizeOfAnyConstantExpression) {
   EXPECT_EQ(body->stmts[2]->rhs->lhs->kind, ExprKind::kBinary);
 }
 
-// stream_expression ::= expression [ with [ array_range_expression ] ], so the
-// range follows the whole operand: a name, a parenthesized operand and a
-// member alike. Its select begins where its first bound does, the 1 at column
-// 28 of line 2.
 TEST(ConcatenationParsing, StreamExpressionRangeFollowsTheWholeOperand) {
   auto r = Parse(
       "module m;\n"
@@ -384,13 +334,6 @@ TEST(ConcatenationParsing, StreamExpressionRangeFollowsTheWholeOperand) {
   EXPECT_TRUE(operands[1]->stream_range->is_part_select_plus);
 }
 
-// §11.4.14.4 lets the expression before a stream's `with` be any
-// one-dimensional unpacked array, the queue an array locator call returns
-// among them, so the operand of A.8.1's stream_expression may carry A.8.2's
-// with clause of its own. The two are kept apart: the locator's parenthesized
-// predicate stays its with expression and the bracketed range is the
-// stream's, where one used to overwrite the other. A plain name carries the
-// range alone.
 TEST(ConcatenationParsing, StreamRangeKeptApartFromTheOperandsWithClause) {
   auto r = Parse(
       "module m;\n"
@@ -414,10 +357,6 @@ TEST(ConcatenationParsing, StreamRangeKeptApartFromTheOperandsWithClause) {
   EXPECT_EQ(name->stream_range->index_end, nullptr);
 }
 
-// A.8.1 writes `with [ array_range_expression ]` in stream_expression alone.
-// After a name, an array method call, a parenthesized expression, an operand
-// of a plain concatenation, a call's argument or a statement's call it is
-// reported where the `with` stands, and what follows it is still read.
 TEST(ConcatenationParsing, WithRangeOutsideAStreamExpressionRejected) {
   auto r = Parse(
       "module m;\n"
@@ -442,10 +381,6 @@ TEST(ConcatenationParsing, WithRangeOutsideAStreamExpressionRejected) {
   EXPECT_EQ(r.diags.size(), 6u);
 }
 
-// A.8.1's footnote 40 makes `{ }` the empty unpacked array concatenation of
-// §10.10 alone, used in no other form of concatenation: as an item of a
-// concatenation, of a multiple concatenation or of a stream it is reported
-// where it stands. A nested concatenation that holds an item is left alone.
 TEST(ConcatenationParsing, EmptyConcatenationAsAnItemRejected) {
   auto r = Parse(
       "module m;\n"

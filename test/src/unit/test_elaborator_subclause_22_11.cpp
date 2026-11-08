@@ -1,12 +1,3 @@
-// §22.11 `pragma -- the rule that a pragma leaves the meaning of the source
-// text unchanged, observed past the preprocessor.
-//
-// The directive itself is handled in src/preprocessor/preprocessor.cpp, but its
-// defining property is about what the rest of the pipeline sees. These tests
-// build real source with pragmas interleaved between design constructs, drive
-// it through preprocess -> parse -> elaborate, and compare the elaborated
-// design against the same source with the pragmas removed.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -21,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// A flat, comparable summary of everything the elaborator produced for one
-// module, so two elaborations can be checked for equality without depending on
-// pointer identity.
 struct ModuleShape {
   std::string name;
   std::vector<std::string> ports;
@@ -57,8 +45,6 @@ std::vector<ModuleShape> ShapeOfDesign(const RtlirDesign& d) {
   return shapes;
 }
 
-// The same design written twice: once with unrecognized pragmas sprinkled into
-// every position a directive line can occupy, once without any.
 const char* const kWithPragmas =
     "`pragma unknown_outer_a\n"
     "module sub(input logic i, output logic o);\n"
@@ -92,9 +78,6 @@ const char* const kWithoutPragmas =
     "  initial r = 8'd9;\n"
     "endmodule\n";
 
-// The defining property of the clause: an unrecognized pragma_name leaves the
-// interpretation of the surrounding source text alone, so the elaborated
-// design must be indistinguishable from the pragma-free one.
 TEST(PragmaElaboration, ElaboratedDesignMatchesPragmaFreeSource) {
   ElabFixture with;
   auto* design_with = ElaborateWithPreprocessor(kWithPragmas, with, "top");
@@ -112,8 +95,6 @@ TEST(PragmaElaboration, ElaboratedDesignMatchesPragmaFreeSource) {
             design_without->all_modules.size());
 }
 
-// A pragma line standing between a declaration and its use does not break the
-// binding, which would show up as an unresolved reference.
 TEST(PragmaElaboration, DeclarationAndUseStillBindAcrossAPragma) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -132,8 +113,6 @@ TEST(PragmaElaboration, DeclarationAndUseStillBindAcrossAPragma) {
   EXPECT_EQ(vars[0].width, 4u);
 }
 
-// The module the pragma sits inside is still the module the elaborator sees;
-// the directive does not terminate or reopen a design element.
 TEST(PragmaElaboration, PragmaInsideModuleDoesNotSplitIt) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -150,8 +129,6 @@ TEST(PragmaElaboration, PragmaInsideModuleDoesNotSplitIt) {
   EXPECT_EQ(design->all_modules.size(), 1u);
 }
 
-// A package is a syntactic position of its own; a pragma between its items
-// leaves the package and its contents where the elaborator expects them.
 TEST(PragmaElaboration, PragmaInsidePackageDoesNotDisturbIt) {
   const char* body =
       "package pkg;\n"
@@ -182,8 +159,6 @@ TEST(PragmaElaboration, PragmaInsidePackageDoesNotDisturbIt) {
   EXPECT_EQ(ShapeOfDesign(*design_with), ShapeOfDesign(*design_without));
 }
 
-// A generate block is unrolled during elaboration, so a pragma written inside
-// one must be gone well before the loop is expanded.
 TEST(PragmaElaboration, PragmaInsideGenerateBlockDoesNotDisturbIt) {
   const char* body =
       "module top;\n"
@@ -214,11 +189,6 @@ TEST(PragmaElaboration, PragmaInsideGenerateBlockDoesNotDisturbIt) {
   EXPECT_EQ(ShapeOfDesign(*design_with), ShapeOfDesign(*design_without));
 }
 
-// Syntax 22-8 in §22.11 gives the production "pragma_name ::=
-// simple_identifier", so the number 42 cannot name a pragma. The preprocessor
-// consumes the directive and reports it, which is why this rejection is read
-// off the diagnostic rather than off the elaborated design: the source never
-// reaches the elaborator well-formed.
 TEST(PragmaElaboration, MalformedPragmaIsDiagnosed) {
   ElabFixture f;
   ElaborateWithPreprocessorAllowingParseErrors(

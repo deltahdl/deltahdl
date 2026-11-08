@@ -65,8 +65,6 @@ namespace delta {
 Lowerer::Lowerer(SimContext& ctx, Arena& arena, DiagEngine&)
     : ctx_(ctx), arena_(arena) {}
 
-// §9.7: an initial procedure's process that reaches the end of its body has
-// terminated normally. The process is the one the coroutine starts in.
 static SimCoroutine MakeInitialCoroutine(const Stmt* body, SimContext& ctx,
                                          Arena& arena) {
   Process* self = ctx.CurrentProcess();
@@ -92,14 +90,6 @@ static SimCoroutine MakeAlwaysCoroutine(const Stmt* body, SimContext& ctx,
   }
 }
 
-// §16.9.3: a sampled value function in a procedure is clocked by the
-// procedure's event control, and the history it looks back through is
-// sampled at every tick of that clock whether or not the statement holding
-// the call is reached at the tick -- `$past(q)` written under an `if` still
-// answers the tick before. The calls are collected once, and each is
-// evaluated as the procedure resumes so that its sample for the tick is
-// recorded; the evaluation where the statement is reached records the same
-// value over it. $sampled looks back through nothing and is left out.
 static bool IsPastDirectedFunction(std::string_view name) {
   return name == "$past" || name == "$rose" || name == "$fell" ||
          name == "$stable" || name == "$changed";
@@ -118,10 +108,6 @@ static std::vector<const Expr*> CollectPastDirectedSites(const Stmt* body) {
   return sites;
 }
 
-// `reads_sampled`: §17.5 has every expression of a checker's always_ff but its
-// event control read sampled values, so the body runs with the sample store
-// answering its reads; such a procedure holds no timing control of its own,
-// so the body completes before any other process runs.
 static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
                                             const std::vector<EventExpr>& sens,
                                             bool reads_sampled, SimContext& ctx,
@@ -132,8 +118,6 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
     for (const Expr* site : past_sites) EvalExpr(site, ctx, arena);
 
     ctx.FlushPendingViolations();
-    // §16.4.2: resuming after suspending on this event control is a deferred
-    // assertion flush point; discard reports pending from before the suspend.
     ctx.FlushPendingDeferredReports();
     ctx.AssertionSamples().SetProcedureReadsSampled(reads_sampled);
     auto result = co_await ExecStmt(body, ctx, arena);
@@ -145,8 +129,6 @@ static SimCoroutine MakeAlwaysSensCoroutine(const Stmt* body,
 static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body,
                                             const std::vector<EventExpr>& sens,
                                             SimContext& ctx, Arena& arena) {
-  // §9.2.2.2.1: always_comb/always_latch watch the inferred sensitivity list,
-  // less what AlwaysCombWatchedNames (lowerer_always_comb.cpp) leaves out.
   std::vector<std::string_view> read_vars =
       AlwaysCombWatchedNames(body, sens, ctx);
   while (!ctx.StopRequested()) {
@@ -155,9 +137,6 @@ static SimCoroutine MakeAlwaysCombCoroutine(const Stmt* body,
     co_await AnyChangeAwaiter{ctx, read_vars};
 
     ctx.FlushPendingViolations();
-    // §16.4.2: an always_comb/always_latch procedure re-running because a
-    // dependent signal changed reaches a deferred assertion flush point on
-    // resume, clearing any report queued by the superseded evaluation.
     ctx.FlushPendingDeferredReports();
   }
 }
@@ -171,11 +150,6 @@ void ScheduleProcess(Process* proc, SimContext& ctx) {
     ctx.SetCurrentProcess(proc);
     proc->Resume();
   };
-  // §9.2.2.2, and §9.2.2.3 for always_latch: the procedure is triggered once at
-  // time zero after every initial and always procedure has started. Their
-  // start events are all queued while the design is lowered, so this one's,
-  // when it fires, queues the start behind them rather than running it ahead
-  // of an initial procedure lowered after it.
   if (proc->kind == ProcessKind::kAlwaysComb) {
     auto start = std::move(event->callback);
     event->callback = [proc, &ctx, start]() {
@@ -217,35 +191,12 @@ void RegisterInstanceKeyBinding(const std::string& inst_prefix,
   std::string key = inst_prefix;
   if (!key.empty() && key.back() == '.') key.pop_back();
   ctx.RegisterInstanceType(key, name);
-  // §40.3.2.1 Table 40-2: the coverage system functions name an instance by
-  // its hierarchical path and every instance of a module by the module's
-  // name, so each instance is a scope of the run's coverage-control state,
-  // which knows it as an instance of its definition; one the state was never
-  // told of reads as a nonexisting module, `SV_COV_ERROR.
   ctx.GetCoverageControlState().SetModuleDefinition(
       CoverageScopeOfInstanceKey(key, ctx), std::string(name));
-  // §33.7: record this instance's resolved library.cell so the %l/%L display
-  // specifier can report its binding. The cell is the module's design-element
-  // name; the library is the one it was compiled into.
   ctx.RegisterInstanceBinding(key, library, name);
   if (!mod->config.empty()) ctx.RegisterInstanceConfig(key, mod->config);
 }
 
-// A scope is recorded for the §30.3 specify blocks the module declares, for the
-// §28.4 gate instantiations it declares, and for the §6.20.5 specparams it
-// declares in its module body, because Lower registers all three from it. Any
-// one of the three on its own is enough. §32.4.1 has a DEVICE entry fall back
-// to the primitives driving an output when the module declares no specify path
-// for it, so a module with gates and no specify block still has timing data an
-// SDF file can annotate. A module that declares only a module-body specparam
-// has no path and no gate for §32.4.3's LABEL annotation to rebuild, but the
-// annotation still has work to do there:
-// SpecifyManager::ApplyAnnotatedSpecparam writes the annotated value into the
-// specparam's own storage, and §32.4.3 has every later evaluation of an
-// expression containing that specparam -- a §9.4.1 delay control among them --
-// read the annotated value back out of it. A module declaring none of the three
-// is not recorded, having nothing for RegisterSpecifyBlocks,
-// RegisterModuleGates or RegisterModuleSpecparams to walk.
 void Lowerer::RecordSpecifyScope(const RtlirModule* mod) {
   if (mod->specify_blocks.empty() && mod->gate_insts.empty() &&
       mod->specparam_names.empty()) {
@@ -263,30 +214,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterModuleNets(mod, ctx_, arena_);
   RegisterEnumTypes(mod);
   RegisterParamEnumTypes(mod);
-  // §8.7/§6.8: class types must be registered before module variables so a
-  // class-handle declaration with a `new` static initializer (e.g.
-  // `C h = new(42);`) can construct its object during static initialization.
-  // §8.9 (printed page 186) with §6.21 (printed 132-133): a static
-  // property's one copy takes its initializer at the static initialization,
-  // reading the declarations in scope, the module's variables among them,
-  // so the initializers wait for those variables below
-  // (InitClassStaticProperties); run here, with the classes' registration,
-  // `module top; int K = 3; class C; static int s = K; static mailbox mb =
-  // new(K); endclass` read K before LowerVar had given it 3: s was 0 and the
-  // mailbox unbounded. A package's K was already right, ConstructDesignData
-  // running ahead of every module.
-  //
-  // §6.8 sets a static variable's initial value as part of its declaration,
-  // a reference the declaring scope makes, and §26.3 makes an import's names
-  // visible throughout the importing scope, so the names the module's imports
-  // bring in are bound before any variable's initializer is evaluated;
-  // `import p1::*; int z = x;` read 0 while the binding came after the
-  // variables. They are bound before the module's classes too, whose extends
-  // clauses may name an imported class (§8.13): registered first, `class D
-  // extends B` after `import p::B` found no B and D inherited nothing. A class
-  // the module declares replaces an imported one of its name as it registers,
-  // and LowerImports leaves a name the module declares to the declaration
-  // (§26.5). LowerChildInstance orders an instance's the same way.
   LowerImports(mod);
   for (auto* cls : mod->class_decls) {
     RegisterClassDecl(cls, mod->function_decls);
@@ -297,27 +224,14 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   RegisterModuleSubroutines(mod, ctx_);
   RegisterModuleLets(mod, inst_prefix_, ctx_);
   for (auto* cls : mod->class_decls) InitClassStaticProperties(cls);
-  // §23.6 with §13.3: a top-level module's subroutine enabled from a parallel
-  // hierarchy is named through the top's name, `m.t1()` in the other top n,
-  // so it is registered under that key as an instance's is under its prefix;
-  // every top's bare names share one registry, so the key is what keeps m's
-  // t1 apart from n's. FindSubroutineTarget in eval_function_hier.cpp runs
-  // the body in the top's own instance, the one with no prefix.
   RegisterInstanceSubroutines(mod, std::string(mod->name) + ".", ctx_, arena_);
-  // §27.4 with §13.4: a subroutine of one of the top's generate block
-  // instances, `blk[1].triple()` from the top's own processes and
-  // `m.blk[1].triple()` from a parallel top.
   RegisterGenBlockSubroutines(mod, inst_prefix_, inst_prefix_, ctx_, arena_);
   RegisterGenBlockSubroutines(mod, std::string(mod->name) + ".", inst_prefix_,
                               ctx_, arena_);
   RecordSubroutineAssertionSampleScopes(mod);
   RecordStaticLocalSubroutines(mod);
   DeclareModuleNamedScopes(*mod, inst_prefix_, ctx_);
-  // §35.5.4: an imported subroutine is declared where the source writes it and
-  // called like a native one, so the declarations of the module being lowered
-  // go into the registry EvalDpiCall reaches an import through.
   RegisterModuleDpiImports(mod, ctx_);
-  // §35.7: the top's exports, in the top's own scope.
   RegisterModuleDpiExports(mod, inst_prefix_, ctx_);
   RegisterModuleSequenceDecls(mod, ctx_);
   LowerSequenceMonitors(mod);
@@ -327,9 +241,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
   LowerAliases(mod);
   LowerModuleProcesses(mod);
 
-  // §14.3: the block's clock and signals are variables of this module, so it is
-  // registered once they exist. AttachDesignClocking arms the watchers when the
-  // whole design has been lowered.
   LowerClockingBlocks(mod);
   RegisterGenBlockMembers(mod);
 
@@ -338,8 +249,6 @@ void Lowerer::LowerModule(const RtlirModule* mod) {
 
 void Lowerer::LowerModuleProcesses(const RtlirModule* mod) {
   uint32_t program_block_id = mod->is_program ? next_program_block_id_++ : 0;
-  // §17.7.3: a checker's statements sensitive to changes and its continuous
-  // assignments are scheduled in the Reactive region, as a program's are.
   bool reactive = mod->is_program || mod->is_checker;
   lowering_checker_ = mod->is_checker;
   LowerProcesses(mod->processes, reactive, program_block_id);
@@ -350,35 +259,17 @@ void Lowerer::LowerModuleProcesses(const RtlirModule* mod) {
   for (const auto& sw : mod->bidir_switches) {
     LowerBidirSwitch(sw, mod->is_program);
   }
-  // §29.8: a module instantiates a UDP just as it instantiates a gate, so a
-  // primitive instance is lowered beside the continuous
-  // assignments a gate instance elaborates to.
   for (const auto& udp_inst : mod->udp_insts) {
     LowerUdpInst(udp_inst, mod->is_program);
   }
 }
 
-// §16.5.1: the variables a concurrent assertion's property reads are enrolled
-// in the sampled-value store, so that the end of each time slot copies each
-// one's value and the property is evaluated against that copy rather than
-// against whatever stands at the clock tick. The functions below and those
-// of simulator/assertion_read_names.h name what is enrolled;
-// Lowerer::RegisterDesignAssertionSampling is where the enrolment happens.
-//
-// §16.9.3: these functions are not confined to assertions, and procedural code
-// may call them as expressions too. Each reads the sampled value of its
-// argument, so the variables that argument names have to be enrolled wherever
-// the call is written -- a `$sampled(x)` in a $display reads the store as much
-// as one inside a property does, and a variable the store never heard of
-// answers with its live value.
 static bool IsSampledValueFunction(std::string_view name) {
   return name == "$sampled" || name == "$past" || name == "$rose" ||
          name == "$fell" || name == "$stable" || name == "$changed" ||
          IsGlobalClockingSampledFunction(name);
 }
 
-// The names read by the argument of every sampled value function call anywhere
-// in `e`, which is the set those calls will ask the store for.
 static void CollectSampledFunctionArgs(const Expr* e,
                                        std::unordered_set<std::string>& out) {
   ForEachSubExpr(e, [&out](const Expr* sub) {
@@ -396,11 +287,6 @@ static void CollectSampledFunctionArgsInStmt(
       stmt, [&out](const Expr* e) { CollectSampledFunctionArgs(e, out); });
 }
 
-// The names the concurrent assertion `stmt` carries read: its boolean's
-// operands and, §16.12.2, the names its flattened sequence reads, the
-// sequences it instantiates included, which are read sampled as a boolean
-// property is, and, §16.12.4 and §16.12.5, those of each operand of a
-// property of operands.
 static void CollectAssertionReadNames(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena,
                                       std::unordered_set<std::string>& names) {
@@ -415,10 +301,6 @@ static void CollectAssertionReadNames(const Stmt* stmt, SimContext& ctx,
   }
 }
 
-// §16.14.6: a concurrent assertion embedded in procedural code is evaluated
-// as a separate concurrent assertion is, on §16.5.1's sampled values, so the
-// names each one in the procedure reads are enrolled as a static
-// assertion's are.
 static void CollectProceduralAssertionReadNames(
     const Stmt* s, SimContext& ctx, Arena& arena,
     std::unordered_set<std::string>& names) {
@@ -434,7 +316,6 @@ static void CollectProceduralAssertionReadNames(
 void Lowerer::RecordAssertionSampleScope(const RtlirProcess& proc) {
   if (proc.body == nullptr) return;
   RecordAssertionSampleScope(proc.body);
-  // §17.5: every name a checker's always_ff reads is read sampled.
   if (lowering_checker_ && proc.kind == RtlirProcessKind::kAlwaysFF) {
     AssertionSampleScope scope;
     scope.inst_prefix = inst_prefix_;
@@ -479,27 +360,10 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   p->is_reactive = from_program;
   p->inst_prefix = inst_prefix_;
   p->origin = proc.body;
-  // §16.5: the process carries a concurrent assertion's property, so it is
-  // evaluated in the Observed region on the sampled values of the variables the
-  // property names.
   p->is_concurrent_clocked = proc.is_concurrent_clocked;
-  // §16.9.4: an attempt of a property naming one of the five future sampled
-  // value functions is completed at the global clocking tick that follows its
-  // own clock's, which is the event carried here.
   p->gclk_future_event = proc.gclk_future_event;
-  // §16.9.3 lets the sampled value functions appear outside assertions too,
-  // so the variables they name are enrolled wherever the call is
-  // written and not only where a concurrent assertion's property stands. The
-  // names are recorded here and resolved once the whole design is lowered,
-  // because a property may name a variable of a child instance that does not
-  // exist yet. A process naming none records nothing, which is every process in
-  // a design that uses neither.
   RecordAssertionSampleScope(proc);
   LowerSampledClockMonitors(proc.body);
-  // §18.14.1: a static process is seeded with the next value from the
-  // initialization RNG of the enclosing instance. Lowering happens before any
-  // thread runs, so the active stream here is the initialization RNG of the
-  // instance being built, the one SetLoweringInstancePrefix last named.
   p->rng_seed = ctx_.DrawSeedForChild();
   p->gen_prefixes.assign(proc.gen_block_prefixes.begin(),
                          proc.gen_block_prefixes.end());
@@ -507,10 +371,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   InstallGenBlockConsts(proc.gen_block_consts, p);
   RecordStaticLocalProcess(p, proc.body);
 
-  // §16.4.4: a `disable` naming the outermost scope of a procedure flushes its
-  // pending deferred assertion reports even while that procedure sits suspended
-  // on its event control, so the label is recorded for the life of the process
-  // rather than left to the registration the block makes and takes back.
   if (proc.body != nullptr && proc.body->kind == StmtKind::kBlock &&
       !proc.body->label.empty()) {
     ctx_.RegisterOutermostScope(proc.body->label, p);
@@ -519,8 +379,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
   switch (proc.kind) {
     case RtlirProcessKind::kInitial:
       p->kind = ProcessKind::kInitial;
-      // A checker's processes are reactive as a program's are (§17.7.3),
-      // but only a program's initial procedures end its run (§24.7).
       if (program_block_id != 0) {
         ctx_.RegisterProgramInitial(program_block_id, p);
         p->coro =
@@ -532,8 +390,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
     case RtlirProcessKind::kAlways:
       p->kind = ProcessKind::kAlways;
       if (proc.is_star_sensitivity) {
-        // §9.4.2.2: an unpacked array the body reads is watched through each
-        // of its elements, which is what an element write notifies.
         p->coro =
             MakeAlwaysSensCoroutine(
                 proc.body, ImplicitListEvents(proc.sensitivity, ctx_, arena_),
@@ -555,11 +411,6 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
               .Release();
       break;
     case RtlirProcessKind::kAlwaysFF:
-      // §9.2.2.4: an always_ff is driven by its explicit edge event control
-      // (stored in proc.sensitivity), so it must wait on that event each
-      // iteration like a sensitized always. Using the always_comb re-trigger
-      // loop instead made it re-fire on its own nonblocking-assign updates and
-      // spin forever.
       p->kind = ProcessKind::kAlwaysFF;
       p->coro = MakeAlwaysSensCoroutine(proc.body, ClockOf(proc),
                                         lowering_checker_, ctx_, arena_)
@@ -572,16 +423,11 @@ void Lowerer::LowerProcess(const RtlirProcess& proc, bool from_program,
       return;
   }
 
-  // §16.14.6: the concurrent assertions the procedure embeds are evaluated
-  // by monitors of their own, armed on their clocking events before the
-  // procedure runs.
   StartProceduralAssertionMonitors(p, proc.body, ctx_, arena_);
   RecordCheckerInstantiations(proc, p);
   ScheduleProcess(p, ctx_);
 }
 
-// §3.14.3: the order of the smallest time precision of `mod` and of the
-// modules instantiated under it.
 static int FinestPrecisionOrder(const RtlirModule* mod) {
   int order = EffectiveTimeOrder(mod->timescale.precision,
                                  mod->timescale.prec_magnitude);
@@ -593,8 +439,6 @@ static int FinestPrecisionOrder(const RtlirModule* mod) {
   return order;
 }
 
-// A time scale whose unit and precision are both 10**order s, as a TimeUnit
-// and a magnitude of 1, 10 or 100.
 static TimeScale ScaleOfOrder(int order) {
   int base = order >= 0 ? (order / 3) * 3 : -(((-order) + 2) / 3) * 3;
   int magnitude = order - base == 2 ? 100 : (order - base == 1 ? 10 : 1);
@@ -602,14 +446,6 @@ static TimeScale ScaleOfOrder(int order) {
   return TimeScale{unit, magnitude, unit, magnitude};
 }
 
-// §20.4.1: publish each design element's resolved timescale under its module
-// name and instance name so a $timeunit/$timeprecision argument that names the
-// element (e.g. $timeunit(dut)) reports that element's value. Annex D.10 adds
-// the element's complete hierarchical instance path, `from_top` starting at
-// the top module's name and `below_top` starting under it, so a $scale
-// argument that names a value through the instances above it, top.m1.l1.d or
-// m1.l1.d, reaches the unit of the module holding the value, and the instance
-// a process runs in is reached by the prefix the process carries.
 static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
                                     const std::string& from_top,
                                     const std::string& below_top) {
@@ -631,31 +467,6 @@ static void RegisterScopeTimescales(const RtlirModule* mod, SimContext& ctx,
   }
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): a function or task
-// declared outside every module is nested in the compilation-unit scope,
-// whose declarations its body reads by their bare names, never in the
-// calling module's, so each is recorded as a subroutine of the unit's scope
-// under the name the unit's storage is keyed by -- "$unit", kUnitScope in
-// lowerer_package_data.cpp, which no package can be named, `$` starting no
-// identifier -- as RegisterPackageScopedSubroutines (lowerer_register.cpp)
-// records a package's; the call's frame then carries it
-// (SimContext::EnterSubroutinePackage) and FindInPackageScope resolves a
-// bare s to "$unit.s" ahead of the caller's. Registered under no scope, the
-// unit's `function int len_s(); return s.len(); endfunction` beside a unit
-// `string s = "unit"` read the calling top's own `string s` through the
-// frame's fall-through to the instance's names, 12 for "modulestring", and
-// its `s = "x"` wrote the top's s for the unit's.
-//
-// §23.8.1 (printed page 760): a subroutine name is looked up through the whole
-// compilation unit the reference stands in before the search proceeds past
-// the scope it is written in, so a bare call in a unit subroutine's body names
-// the unit's subroutine ahead of the caller's. In the standard's example,
-// `task t; ... x = f(1); endtask` followed by the unit's
-// `function int f(int y)`, t's f is that function whatever module or generate
-// block enables t. Each is registered
-// under "$unit::name" as well, the key FindFunctionInPackageScope asks while
-// such a frame is in force; registered under its bare name alone, a top's own
-// f, or a generate block's the caller stood in, answered t's call.
 static void RegisterFreeCuFunctions(const RtlirDesign* design, SimContext& ctx,
                                     Arena& arena) {
   ForEachUnitScope(
@@ -673,19 +484,6 @@ static void RegisterFreeCuFunctions(const RtlirDesign* design, SimContext& ctx,
       });
 }
 
-// §30.3, §32.4.1 and §6.20.5: the timing every module instance declared,
-// registered into the manager the run reads. Separate from Lower because it is
-// one step of it that grew its own paragraphs.
-// §32.4.4: hands the manager the design's interconnect connectivity, without
-// which an INTERCONNECT, PORT or NETDELAY entry has no ports, nets or
-// primitives to look its names up in and annotates nothing at all. The
-// connectivity is read off the parsed hierarchy rather than off the lowered
-// design, because an interconnect delay has no SystemVerilog declaration behind
-// it and §32.4.4's names are the design's own hierarchical names.
-//
-// The first top module is what is walked. §32.5's CELL records name an instance
-// by a hierarchical path rooted at a top, and a design with two of them gives
-// one path two readings, which is a question the SDF file cannot answer.
 static void BindInterconnectTopology(const RtlirDesign* design,
                                      SpecifyManager& mgr) {
   if (design->compilation_unit == nullptr || design->top_decls.empty()) return;
@@ -695,38 +493,12 @@ static void BindInterconnectTopology(const RtlirDesign* design,
 }
 
 void Lowerer::RegisterDesignTiming() {
-  // §30.3's specify block declares the design's specify data. The manager is
-  // acquired whether or not any module declared a specify block, because
-  // §32.9's $sdf_annotate reads timing data into it and has nowhere to put what
-  // it reads without one -- EvalSdfAnnotateTask in
-  // src/simulator/sdf_annotate_task.cpp returns immediately when
-  // GetSpecifyManager is null. Registration comes after the modules are lowered
-  // because a module path delay may be written as a specparam, and
-  // RegisterSpecifyBlockSpecparams in
-  // src/elaborator/elaborator_validate_specify.cpp lowers a specparam as a
-  // variable of the module declaring it. Every module instance that declared a
-  // specify block is registered under its own instance prefix, which is what
-  // tells two instances of one cell apart, §30.4 having a specify block name
-  // its terminals by the bare port names of the module it stands in. The
-  // lowering instance prefix is set around each registration because a delay
-  // written as a specparam is read back through SimContext::FindVariable, which
-  // prepends SimContext::ActiveInstancePrefix; no process is running here, so
-  // that prefix is the one SetLoweringInstancePrefix last set, and a specparam
-  // of an instantiated module is reachable only while it names that instance.
   SpecifyManager& mgr = ctx_.AcquireSpecifyManager();
   BindInterconnectTopology(design_, mgr);
   for (const auto& scope : specify_scopes_) {
     ctx_.SetLoweringInstancePrefix(scope.inst_prefix);
     RegisterSpecifyBlocks(scope.module->specify_blocks, scope.inst_prefix, ctx_,
                           arena_, mgr);
-    // §32.4.1: the primitives driving a module output are what a DEVICE entry
-    // annotates when the module declares no specify path for that output, so
-    // the gate instantiations are registered beside the specify blocks. They
-    // are registered here rather than where LowerModule rewrote them into
-    // continuous assignments for the reason the specify blocks are: a gate's
-    // propagation delay may be written as a specparam, and it is evaluated
-    // under the same lowering instance prefix so that
-    // SimContext::FindVariable reaches the specparam of this instance.
     std::vector<std::string_view> module_outputs;
     for (const RtlirPort& port : scope.module->ports) {
       if (port.direction == Direction::kOutput ||
@@ -736,57 +508,22 @@ void Lowerer::RegisterDesignTiming() {
     }
     RegisterModuleGates({scope.module->gate_insts, module_outputs},
                         scope.inst_prefix, ctx_, arena_, mgr);
-    // §6.20.5 admits two declaration sites for a specparam -- a specify block
-    // and the module body -- and §32.4.3 states no exception for
-    // either, so the module-body ones are bound beside the in-block ones
-    // RegisterSpecifyBlocks binds. Only the name has to be bound: the storage
-    // the annotated value lands in was lowered above, because
-    // Elaborator::ElaborateSpecparam (src/elaborator/elaborator_items.cpp)
-    // makes the declaration a variable of the module declaring it, which
-    // Lowerer::LowerModule lowers for a top and
-    // Lowerer::CreateChildModuleVariables lowers under the instance prefix for
-    // an instantiated module.
     RegisterModuleSpecparams(scope.module->specparam_names, scope.inst_prefix,
                              ctx_, arena_, mgr);
-    // §32.4.3: the initializers a LABEL reevaluates where they read a
-    // specparam it annotates, at both of §6.20.5's declaration sites.
     for (const RtlirVariable& var : scope.module->variables) {
       mgr.RecordSpecparamInitializer(scope.inst_prefix, var.name,
                                      var.init_expr);
     }
   }
   ctx_.SetLoweringInstancePrefix("");
-  // §31.9.1: the delays of the negative checks' delayed signals are settled
-  // across every check just registered, before any is armed, since settling
-  // them may zero a limit those checks are then evaluated against. They are
-  // counted in units of the simulation precision, $root's, which a tick is
-  // finer than where its magnitude is 10 or 100.
   const auto kUnitTicks = static_cast<int64_t>(DelayToTicks(
       1, *ctx_.FindScopeTimeScale("$root"), ctx_.GlobalPrecision()));
   mgr.ResolveNegativeTimingCheckDelays(kUnitTicks, ctx_.GetDiag());
-  // §30.5.3 selects among the module paths whose input changed latest, and
-  // nothing records when a signal last changed. This
-  // arms the watcher that does, on the source terminal of every path just
-  // registered, before the scheduler runs anything -- a source that transitions
-  // before it is watched leaves no time behind for the selection to read.
   WatchModulePathSources(mgr, ctx_);
-  // §31.3 reports a timing violation when the data signal transitions inside
-  // the window the reference signal defines, and nothing watches the two
-  // signals a registered check names. This arms the watchers that do, on the
-  // $setup and $hold checks just registered and before the scheduler runs
-  // anything -- a signal that transitions before it is watched leaves no
-  // transition behind for the check to measure.
   WatchTimingChecks(mgr, ctx_);
-  // §31.9.1 and §31.9.4: the delayed signals the $setuphold and $recrem checks
-  // just registered name follow their originals, lagging where the option
-  // enabling negative timing checks puts a delay on them.
   DriveTimingCheckDelayedSignals(mgr, ctx_, arena_);
 }
 
-// Annex D.11: the interactive scope consulted by the optional $scope system
-// task starts at the first top-level module, and a later $scope call retargets
-// it to one of the scopes registered here, each by its complete hierarchical
-// name. Each scope's timescale is registered beside it.
 static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   if (!design->top_modules.empty()) {
     ctx.SetInteractiveScope(design->top_modules.front()->name);
@@ -794,17 +531,11 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
   for (const std::string& name : CompleteHierarchicalScopeNames(design)) {
     ctx.RegisterHierarchicalScope(name);
   }
-  // Annex D.13: the reg and net variables $showvars reports for a module
-  // instance, under the instance's complete hierarchical name.
   for (ScopeDeclaredVariables& vars : ModuleInstanceVariables(design)) {
     ctx.RegisterScopeVariables(
         vars.scope,
         ScopeVariableSet{std::move(vars.prefix), std::move(vars.names)});
   }
-  // §20.4.1 / §3.14.3: seed the runtime timescale state read by
-  // $timeunit/$timeprecision. The simulation time unit and compilation-unit
-  // timescale come from the design; the top module is the initial current
-  // scope reported when those functions take no argument.
   ctx.SetGlobalPrecision(design->global_time_precision);
   ctx.SetCompUnitTimeScale(design->cu_timescale);
   RegisterUnitTimeScales(design, ctx, ctx.GetArena());
@@ -813,48 +544,24 @@ static void RegisterDesignScopes(const RtlirDesign* design, SimContext& ctx) {
     ctx.SetCurrentTimeScale(top->timescale);
     ctx.SetCurrentScopeName(top->name);
   }
-  // §3.14.3: the global precision counts the compilation unit's, the
-  // packages' and every `timescale directive's, which no instance holds.
   int finest = design->global_precision_order;
   for (auto* top : design->top_modules) {
-    // A later top is keyed under its name, as an instance (LowerParallelTop).
     std::string below_top =
         top == design->top_modules.front() ? "" : std::string(top->name);
     RegisterScopeTimescales(top, ctx, std::string(top->name), below_top);
     finest = std::min(finest, FinestPrecisionOrder(top));
   }
-  // §3.14.3: $root is the time scope of the simulation time unit, the
-  // smallest time precision of the design, which is its unit and its precision
-  // both (§20.4.1, §20.4.2).
   ctx.SetScopeTimeScale("$root", ScaleOfOrder(finest));
-  // §3.14.2.2: a package is a time scope of its own, which its subroutines run
-  // in. §3.14.2.3 (printed page 60) gives it each of its unit and precision
-  // from its own declaration, else from the `timescale before its header,
-  // else from the compilation unit's, which cu_timescale holds where the unit
-  // declares one and the default where it does not. A package is never
-  // nested, so no enclosing element stands ahead of those.
   for (const PackageDecl* pkg : design->packages) {
     ctx.SetScopeTimeScale(std::string(pkg->name) + "::",
                           PackageTimescale(*pkg, design->cu_timescale));
   }
 }
 
-// §3.12.1: the unit's imports are visible to its own class declarations and
-// to every module, and §26.5 has a declaration of the scope take the name
-// over an import, so the imports bind first (InitCompilationUnitData, which
-// Lower runs ahead of this) and a unit class rebinds its name over them; the
-// first of two unit classes of one name keeps it.
 void Lowerer::Lower(const RtlirDesign* design) {
   if (!design) return;
-  // §20.10.1: a $fatal or $error elaboration severity task that survived
-  // generate expansion marks the design as not startable. Refuse to lower
-  // any part of it so the scheduler sees an empty event calendar.
   if (design->simulation_blocked) return;
   design_ = design;
-  // §32.4.4 with §38.32: an interconnect delay can reach a port while the
-  // design runs when the design calls $sdf_annotate, or when an application
-  // loaded into the run, which registers a system task or a callback, can put
-  // one with vpi_put_delays.
   VpiContext& vpi = GetGlobalVpiContext();
   interconnect_annotatable_ = DesignCallsSdfAnnotate(*design) ||
                               !vpi.RegisteredSystfs().empty() ||
@@ -862,15 +569,6 @@ void Lowerer::Lower(const RtlirDesign* design) {
   RegisterDesignScopes(design, ctx_);
   LowerDesignData();
 
-  // §16.5.1 reads a concurrent assertion's variables as of the Preponed region
-  // of the time slot the clock tick falls in. No event reaches a Preponed
-  // region -- the scheduler drains it once, ahead of the iterative regions, and
-  // never returns to it -- and §4.4.2.1 makes that unnecessary: a sample taken
-  // in the Preponed region equals one taken in the Postponed region before it.
-  // The sample is therefore taken once a time slot has finished, where
-  // it is the next slot's Preponed value. Registering it here rather than
-  // beside the first assertion keeps it to one registration per run; it does
-  // nothing while no assertion has enrolled a variable.
   ctx_.GetScheduler().AddPostTimestepCallback(
       [ctx = &ctx_]() { ctx->AssertionSamples().Refill(ctx->GetArena()); });
 
@@ -879,14 +577,8 @@ void Lowerer::Lower(const RtlirDesign* design) {
   LowerCompilationUnitClasses();
   RegisterFreeCuFunctions(design, ctx_, arena_);
   RegisterDesignScopeDpiImports(design, ctx_);
-  // §23.6: a path from a parallel hierarchy starts at a top's name, the first
-  // top's here and a later top's as an instance's (LowerParallelTop), which
-  // an interface port's actual naming it may have lowered already
-  // (LowerTopNamedBy).
   const auto& tops = design->top_modules;
   if (!tops.empty()) ctx_.RegisterTopModule(tops.front()->name);
-  // §26.2 with §6.21: the packages' and the unit's objects exist before the
-  // first module's declaration initializer runs (lowerer_data_init.cpp).
   ConstructDesignData();
   for (auto* mod : tops) {
     if (mod == tops.front()) {
@@ -895,19 +587,11 @@ void Lowerer::Lower(const RtlirDesign* design) {
       LowerParallelTop(mod);
     }
   }
-  // §6.18: the typedef names the modules declare that denote a class, bound
-  // once the modules have bound their classes.
   RegisterClassTypeAliases(design, ctx_, arena_);
-  // §10.5: a static variable's declaration initializer is set before any
-  // initial or always procedure starts, the module variables it may read
-  // holding theirs by now, and so are those of every specialization the
-  // design's code names (§8.25), made first.
   MakeNamedSpecializations();
   InitializeStaticLocals();
 
   AttachDesignClocking();
-  // §40.2.2 with §40.4: the design's statements, signals, assertions and the
-  // FSMs its pragmas identify are counted from here, every module lowered.
   AttachCodeCoverage(design, ctx_);
   LinkCheckerInstantiations();
 
@@ -917,31 +601,14 @@ void Lowerer::Lower(const RtlirDesign* design) {
 
   RegisterUnitLets(design, ctx_, arena_);
 
-  // §H.7.3 and §H.7.4: every import is declared by now, and the typedef names
-  // its formals were written with are resolved to the types they cross as
-  // before any of them is bound to C.
   if (DpiRuntime* dpi = ctx_.GetDpiRuntime(); dpi != nullptr) {
     ResolveDpiFormalTypes(*dpi, *design, ctx_);
   }
 
-  // §36.6: the design is put within reach of the PLI applications here, ahead
-  // of the build period below and of every event after it, because a routine
-  // called in either period is one of the C functions the clause defines a PLI
-  // application as, which reach the running design through the PLI library and
-  // act on it as it executes.
   AttachDesignToPliApplications(design, ctx_);
 
-  // §36.8: the simulation data structure is built by the time this returns, so
-  // this is the period §36.8.1's sizetf and §36.8.2's compiletf are called in
-  // -- last of everything the build does, and before the scheduler runs an
-  // event.
   CallBuildPeriodSystfRoutines(design, ctx_, arena_);
 
-  // §38.36.3: cbEndOfCompile marks the end of compiling or building the
-  // simulation data structure, which is here: the structure is built and the
-  // build period's routines have run. §36.10.2 puts it in the same place, after
-  // the sizetf routines, and has every function available from then until the
-  // tool finishes, so the phase moves with it.
   vpi.DispatchCallbacks(kCbEndOfCompile);
   vpi.SetToolPhase(VpiToolPhase::kFull);
 }

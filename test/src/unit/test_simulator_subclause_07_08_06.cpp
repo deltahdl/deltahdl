@@ -1,22 +1,3 @@
-// Tests for IEEE 1800-2023 §7.8.6 -- accessing invalid indices of an
-// associative array. Three runtime rules, all observed end-to-end (parse ->
-// elaborate -> lower -> run) so the behavior reflects the production
-// read/write paths rather than a hand-built AssocArrayObject:
-//
-//   R1  A read whose index is a 4-state expression carrying x/z, or a read of
-//       a nonexistent entry, issues a warning and returns the nonexistent-entry
-//       value for the array's element type (Table 7-1, §7.4.5): 0 for a 2-state
-//       element, all-x for a 4-state element.
-//   R2  When the array has a user-specified default (the §7.9.11 default:value
-//       form), an invalid read issues NO warning and returns that default.
-//   W1  A write through an invalid (x/z) index is ignored and issues a warning.
-//
-// The invalid index and the element-type default both depend on how the array
-// is declared and how the index variable is produced, so every case is built
-// from real declaration/initializer syntax. Only a 4-state type (e.g.
-// `integer`) can carry x/z into an index, so the x/z cases route the unknown
-// value through such a variable.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -31,8 +12,6 @@ using namespace delta;
 
 namespace {
 
-// Run real source through the full pipeline and expose the diagnostic engine so
-// both a result variable and the warning count are observable in one run.
 struct RunResult {
   bool ok = false;
   uint64_t value = 0;
@@ -57,9 +36,6 @@ RunResult RunObserving(const std::string& src, const char* var_name) {
   return r;
 }
 
-// --- R1(a): a read with an x/z index warns and returns the type default ------
-
-// 2-state element: the x/z read yields 0 and raises a warning.
 TEST(AssocInvalidIndex, XzIndexRead2StateWarnsReturnsZero) {
   auto r = RunObserving(
       "module t;\n"
@@ -78,7 +54,6 @@ TEST(AssocInvalidIndex, XzIndexRead2StateWarnsReturnsZero) {
   EXPECT_GE(r.warnings, 1u);
 }
 
-// 4-state element: the x/z read yields the all-x default and raises a warning.
 TEST(AssocInvalidIndex, XzIndexRead4StateWarnsReturnsX) {
   auto r = RunObserving(
       "module t;\n"
@@ -96,9 +71,6 @@ TEST(AssocInvalidIndex, XzIndexRead4StateWarnsReturnsX) {
   EXPECT_GE(r.warnings, 1u);
 }
 
-// --- R1(b): a read of a nonexistent entry warns and returns the type default -
-
-// Missing integer key, 2-state element: returns 0 and warns.
 TEST(AssocInvalidIndex, MissingIntKeyRead2StateWarnsReturnsZero) {
   auto r = RunObserving(
       "module t;\n"
@@ -115,7 +87,6 @@ TEST(AssocInvalidIndex, MissingIntKeyRead2StateWarnsReturnsZero) {
   EXPECT_GE(r.warnings, 1u);
 }
 
-// Missing integer key, 4-state element: returns all-x and warns.
 TEST(AssocInvalidIndex, MissingIntKeyRead4StateWarnsReturnsX) {
   auto r = RunObserving(
       "module t;\n"
@@ -129,7 +100,6 @@ TEST(AssocInvalidIndex, MissingIntKeyRead4StateWarnsReturnsX) {
   EXPECT_GE(r.warnings, 1u);
 }
 
-// Missing string key: returns 0 and warns.
 TEST(AssocInvalidIndex, MissingStringKeyReadWarnsReturnsZero) {
   auto r = RunObserving(
       "module t;\n"
@@ -146,11 +116,6 @@ TEST(AssocInvalidIndex, MissingStringKeyReadWarnsReturnsZero) {
   EXPECT_GE(r.warnings, 1u);
 }
 
-// --- R1 negative: a valid read returns the stored value and does not warn
-// -----
-
-// The closest accepting input to R1: a present integer key reads back its value
-// with no diagnostic.
 TEST(AssocInvalidIndex, PresentIntKeyReadReturnsValueNoWarning) {
   auto r = RunObserving(
       "module t;\n"
@@ -167,7 +132,6 @@ TEST(AssocInvalidIndex, PresentIntKeyReadReturnsValueNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
-// String-keyed accepting variant.
 TEST(AssocInvalidIndex, PresentStringKeyReadReturnsValueNoWarning) {
   auto r = RunObserving(
       "module t;\n"
@@ -184,10 +148,6 @@ TEST(AssocInvalidIndex, PresentStringKeyReadReturnsValueNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
-// --- R2: a user-specified default suppresses the warning (§7.9.11 value)
-// ------
-
-// Missing integer key with a declared default: returns the default, no warning.
 TEST(AssocInvalidIndex, MissingIntKeyReadWithDefaultNoWarning) {
   auto r = RunObserving(
       "module t;\n"
@@ -201,9 +161,6 @@ TEST(AssocInvalidIndex, MissingIntKeyReadWithDefaultNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
-// x/z index read with a declared default: the invalid-index warning is likewise
-// suppressed and the default is returned. This is the §7.8.6-specific angle --
-// the default silences the x/z path, not just the missing-entry path.
 TEST(AssocInvalidIndex, XzIndexReadWithDefaultNoWarning) {
   auto r = RunObserving(
       "module t;\n"
@@ -221,7 +178,6 @@ TEST(AssocInvalidIndex, XzIndexReadWithDefaultNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
-// String-keyed default-suppression variant.
 TEST(AssocInvalidIndex, MissingStringKeyReadWithDefaultNoWarning) {
   auto r = RunObserving(
       "module t;\n"
@@ -235,9 +191,6 @@ TEST(AssocInvalidIndex, MissingStringKeyReadWithDefaultNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
-// --- W1: a write through an invalid (x/z) index is ignored and warns ---------
-
-// The x/z write stores nothing (num() stays 0) and raises a warning.
 TEST(AssocInvalidIndex, XzIndexWriteIgnoredWarns) {
   auto r = RunObserving(
       "module t;\n"
@@ -256,8 +209,6 @@ TEST(AssocInvalidIndex, XzIndexWriteIgnoredWarns) {
   EXPECT_GE(r.warnings, 1u);
 }
 
-// An ignored x/z write leaves already-present entries untouched: the pre-seeded
-// entry still reads back, the entry count stays 1, and a warning is raised.
 TEST(AssocInvalidIndex, XzIndexWriteDoesNotClobberExisting) {
   auto count = RunObserving(
       "module t;\n"
@@ -292,10 +243,6 @@ TEST(AssocInvalidIndex, XzIndexWriteDoesNotClobberExisting) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.8.6: the write is ignored wherever it is written, so the same x/z index
-// used from inside a subroutine body stores nothing either: the array is still
-// empty after the call. A function body runs on its own statement executor, so
-// the rule holds there only if that executor performs the check too.
 TEST(AssocInvalidIndex, XzIndexWriteFromFunctionBodyStoresNothing) {
   auto r = RunObserving(
       "module t;\n"
@@ -316,10 +263,6 @@ TEST(AssocInvalidIndex, XzIndexWriteFromFunctionBodyStoresNothing) {
   EXPECT_EQ(r.value, 0u);
 }
 
-// --- W1 negative: a valid write is not ignored -------------------------------
-
-// The closest accepting input to W1: a write through a well-defined index is
-// stored and reads back, with no diagnostic.
 TEST(AssocInvalidIndex, ValidIndexWriteNotIgnoredNoWarning) {
   auto r = RunObserving(
       "module t;\n"
@@ -336,20 +279,12 @@ TEST(AssocInvalidIndex, ValidIndexWriteNotIgnoredNoWarning) {
   EXPECT_EQ(r.warnings, 0u);
 }
 
-// --- The subclause each §7.8.6 report names ---------------------------------
-
-// Elaborates, lowers and runs `src`, leaving `f`'s recorded diagnostics for the
-// caller to read the subclause off. The four reports below are raised on four
-// different paths -- an indexed read, an indexed write, and the index argument
-// of an associative array method -- so each one runs its own source.
 void RunForDiags(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 }
 
-// §7.8.6: a read of a nonexistent entry issues a warning, and the warning says
-// that §7.8.6 is the rule it enforces.
 TEST(AssocInvalidIndex, MissingIndexReadWarningNames7_8_6) {
   SimFixture f;
   RunForDiags(
@@ -363,8 +298,6 @@ TEST(AssocInvalidIndex, MissingIndexReadWarningNames7_8_6) {
                               "': read of non-existent index", 4, "7.8.6"));
 }
 
-// §7.8.6: a read whose index carries x or z is invalid for a second reason,
-// and its warning names the same subclause.
 TEST(AssocInvalidIndex, XzIndexReadWarningNames7_8_6) {
   SimFixture f;
   RunForDiags(
@@ -382,8 +315,6 @@ TEST(AssocInvalidIndex, XzIndexReadWarningNames7_8_6) {
                               "7.8.6"));
 }
 
-// §7.8.6: a write through an invalid index is ignored and warned about by the
-// same subclause's second paragraph.
 TEST(AssocInvalidIndex, XzIndexWriteWarningNames7_8_6) {
   SimFixture f;
   RunForDiags(
@@ -401,10 +332,6 @@ TEST(AssocInvalidIndex, XzIndexWriteWarningNames7_8_6) {
                               "7.8.6"));
 }
 
-// §7.8.6: a write through an invalid index performs no operation and issues a
-// warning whether the assignment stands among a module's items or inside a
-// function body, and the report a function body raises names the same
-// subclause, at the line of the index expression the body wrote.
 TEST(AssocInvalidIndex, XzIndexWriteFromFunctionBodyWarningNames7_8_6) {
   SimFixture f;
   RunForDiags(
@@ -425,8 +352,6 @@ TEST(AssocInvalidIndex, XzIndexWriteFromFunctionBodyWarningNames7_8_6) {
                               "7.8.6"));
 }
 
-// §7.8.6: the index argument of an associative array method is checked on its
-// own path, and the warning it raises names §7.8.6 as well.
 TEST(AssocInvalidIndex, XzMethodIndexWarningNames7_8_6) {
   SimFixture f;
   RunForDiags(
@@ -446,11 +371,6 @@ TEST(AssocInvalidIndex, XzMethodIndexWarningNames7_8_6) {
                               "7.8.6"));
 }
 
-// §7.8.6: a read of a missing entry of an associative array whose elements
-// are queues or fixed-size arrays -- a method of the element's queue, an
-// element of the element's array -- warns as a read of any other missing
-// entry does. Found through the element's queue, each answered the default
-// unwarned.
 TEST(AssocInvalidIndex, MissingElementQueueReadWarningNames7_8_6) {
   SimFixture f;
   RunForDiags(
@@ -472,10 +392,6 @@ TEST(AssocInvalidIndex, MissingElementQueueReadWarningNames7_8_6) {
       "associative array 'af': read of non-existent index", 7, "7.8.6"));
 }
 
-// §7.8.7: a queue method statement that changes a missing element's queue,
-// `aq["b"].push_back(1);`, writes the element and allocates it, reading
-// nothing, so it raises no §7.8.6 warning. Its receiver was evaluated as a
-// value to look for a class handle, a read of the missing entry, and warned.
 TEST(AssocInvalidIndex, QueueMethodStatementOnAMissingElementDoesNotWarn) {
   SimFixture f;
   RunForDiags(
@@ -495,10 +411,6 @@ TEST(AssocInvalidIndex, QueueMethodStatementOnAMissingElementDoesNotWarn) {
   EXPECT_EQ(n->value.ToUint64(), 3u);
 }
 
-// R1 with Table 7-1 (§7.4.5): the nonexistent-entry value of an unpacked
-// structure is given member by member, a member's initial assignment
-// included, so a logic member reads x though the structure as a whole is not
-// a 4-state type, which read every member 0.
 TEST(AssocInvalidIndex, MissingEntryOfAStructureReadsMemberByMember) {
   SimFixture f;
   std::string out = RunCapture(

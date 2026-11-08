@@ -102,8 +102,6 @@ TEST(SpecparamParsing, ErrorSpecparamMissingSemicolon) {
       "module m;\n"
       "  specify specparam tRISE = 100 endspecify\n"
       "endmodule");
-  // `endspecify` is what the ';' the specparam declaration wants was found
-  // instead of.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 2, "6.20.5"));
 }

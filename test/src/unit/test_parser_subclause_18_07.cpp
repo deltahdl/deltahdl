@@ -34,8 +34,6 @@ TEST(ConstrainedRandomParsing, RandomizeWithRestrictedIdList) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// 18.7 identifier_list ::= identifier { , identifier }: the parenthesized list
-// after 'with' on an object randomize may name more than one variable.
 TEST(ConstrainedRandomParsing, RandomizeWithMultiIdentifierList) {
   auto r = Parse(
       "class C;\n"
@@ -49,12 +47,6 @@ TEST(ConstrainedRandomParsing, RandomizeWithMultiIdentifierList) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// 18.7: the block after 'with' accepts every constraint form a class constraint
-// accepts -- and, being a constraint block, is subject to the same rules. A
-// 4-state equality operator is illegal in any constraint (18.3), so it is
-// rejected inside an inline block too. This error is observable only because
-// the inline block is now captured and scanned rather than skipped at parse
-// time.
 TEST(ConstrainedRandomParsing, RandomizeWithBlockRejectsFourStateEquality) {
   auto r = Parse(
       "class C;\n"
@@ -63,16 +55,11 @@ TEST(ConstrainedRandomParsing, RandomizeWithBlockRejectsFourStateEquality) {
       "    this.randomize() with { x === y; };\n"
       "  endfunction\n"
       "endclass\n");
-  // §18.3 owns the 4-state operator rule and files the report under itself,
-  // whether the constraint block is inline or in the class.
   EXPECT_TRUE(ReportedError(
       r.diags, "4-state equality operator is not allowed in a constraint", 4,
       "18.3"));
 }
 
-// 18.7 inline_constraint_declaration admits 'null' as the random-variable
-// argument of an object randomize (the `variable_identifier_list | null`
-// alternative), here combined with an inline constraint block.
 TEST(ConstrainedRandomParsing, RandomizeNullArgumentWithBlock) {
   auto r = Parse(
       "class C;\n"

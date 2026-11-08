@@ -22,9 +22,6 @@ TEST(BufNotElaboration, ElaborateNotGate) {
   EXPECT_EQ(mod->assigns[0].rhs->op, TokenKind::kTilde);
 }
 
-// The last terminal connects to the input. buf lowers to a double complement
-// (Table 28-4 normalizes a z input to x), so the driven operand is reached by
-// stripping the two inversions.
 TEST(BufNotElaboration, LastTerminalIsInput) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -64,8 +61,6 @@ TEST(BufNotElaboration, MultiOutputBufEmitsOneAssignPerOutput) {
   ASSERT_EQ(mod->assigns.size(), 2u);
   EXPECT_EQ(mod->assigns[0].lhs->text, "o1");
   EXPECT_EQ(mod->assigns[1].lhs->text, "o2");
-  // Each output is driven by the shared input, normalized through the buf
-  // double complement (Table 28-4).
   for (auto& ca : mod->assigns) {
     ASSERT_NE(ca.rhs, nullptr);
     ASSERT_EQ(ca.rhs->kind, ExprKind::kUnary);

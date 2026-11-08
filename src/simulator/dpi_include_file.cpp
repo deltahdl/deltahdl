@@ -13,7 +13,7 @@ std::array<DpiSvdpiContent, 3> DpiSvdpiContents() {
           DpiSvdpiContent::kRoutineDeclarations};
 }
 
-bool DpiSvdpiHContains(DpiSvdpiContent /*content*/) { return true; }
+bool DpiSvdpiHContains(DpiSvdpiContent) { return true; }
 
 bool DpiSvdpiHIsProvidedByEverySimulator() { return true; }
 

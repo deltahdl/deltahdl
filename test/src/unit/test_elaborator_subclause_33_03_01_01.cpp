@@ -1,11 +1,3 @@
-// Tests for IEEE 1800-2023 §33.3.1.1 (printed page 937) at the elaborator: of
-// several cells of one name mapped into one library, the one encountered last
-// is the one written there, and several modules of one name mapped into one
-// library in a single invocation draw a warning. §33.3.1 compiles a file that
-// no library claims into work, so two definitions of one name in one run share
-// a library with or without a library map, and this clause, written for that
-// case, governs it ahead of §3.13(a)'s general rule.
-
 #include <gtest/gtest.h>
 
 #include "elaborator/elaborator.h"
@@ -43,7 +35,6 @@ TEST(LibraryCellRewrite, AThirdModuleOfTheNameWarnsAgain) {
                               3, "33.3.1.1"));
 }
 
-// The library holds the last m, so that is the m top.u binds.
 TEST(LibraryCellRewrite, TheModuleEncounteredLastIsTheOneBound) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -59,7 +50,6 @@ TEST(LibraryCellRewrite, TheModuleEncounteredLastIsTheOneBound) {
   EXPECT_EQ(bound->loc.line, 2u);
 }
 
-// The earlier m is no longer in the library, so it roots no second top.
 TEST(LibraryCellRewrite, AnOverwrittenModuleIsNoTop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,8 +61,6 @@ TEST(LibraryCellRewrite, AnOverwrittenModuleIsNoTop) {
   EXPECT_EQ(design->top_modules[0]->loc.line, 2u);
 }
 
-// The warning is for modules; two interfaces of one name are written over one
-// another without it.
 TEST(LibraryCellRewrite, TwoInterfacesOfOneNameNeitherErrNorWarn) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -107,9 +95,6 @@ TEST(LibraryCellRewrite, TwoPrimitivesOfOneNameNeitherErrNorWarn) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A module and an interface of one name are two cells of one name in one
-// library: the interface, encountered last, is what the library holds, and
-// with only one of the two a module, nothing warns.
 TEST(LibraryCellRewrite, AnInterfaceAfterAModuleOfItsNameReplacesIt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -124,8 +109,6 @@ TEST(LibraryCellRewrite, AnInterfaceAfterAModuleOfItsNameReplacesIt) {
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-// The module encountered after a program of its name replaces the program, so
-// the module is what roots the design.
 TEST(LibraryCellRewrite, AModuleAfterAProgramOfItsNameReplacesIt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -150,11 +133,6 @@ TEST(LibraryCellRewrite, APrimitiveAfterAModuleOfItsNameNeitherErrsNorWarns) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §3.2 counts a checker a design element and §33.2.1 a design element a cell,
-// so of two checkers of one name in work the one encountered last is bound.
-// Each unit has a compilation-unit scope of its own (§3.12.1), so §3.13(c)
-// finds no redeclaration between them. The second unit's checker stands on its
-// line 2, the first's on line 1.
 TEST(LibraryCellRewrite, TheCheckerEncounteredLastAcrossUnitsIsBound) {
   ElabFixture f;
   Elaborator elab(f.arena, f.diag,

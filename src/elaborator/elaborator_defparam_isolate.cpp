@@ -1,9 +1,3 @@
-// §23.10.1 with §23.3.3.5: the elements of an instance array share the one
-// module PushInstanceArray elaborated for the array, while a defparam may
-// select one element, u[1], and change a parameter under it alone. The
-// element the defparam reaches through is given a copy of that module tree
-// before the value is written.
-
 #include <algorithm>
 #include <cstddef>
 #include <unordered_map>
@@ -19,10 +13,6 @@
 
 namespace delta {
 
-// Copies `mod` and every module under it, each once however many instances
-// share it, with the defparams its generate block instances contributed and
-// the generate constructs still pending for it, which elaborate into the copy
-// with the parameter values the copy is given.
 RtlirModule* ElaboratorData::CopyModuleTree(
     RtlirModule* mod, Arena& arena,
     std::unordered_map<const RtlirModule*, RtlirModule*>& copies) {
@@ -67,7 +57,6 @@ void ElaboratorData::IsolateArrayElements(RtlirModule& mod, Arena& arena,
   for (auto& child : mod.children) IsolateArrayElement(mod, child, arena);
 }
 
-// Whether `decl` writes a defparam statement among its own items.
 static bool DeclaresDefparam(const ModuleDecl& decl) {
   return std::any_of(decl.items.begin(), decl.items.end(),
                      [](const ModuleItem* item) {
@@ -75,10 +64,6 @@ static bool DeclaresDefparam(const ModuleDecl& decl) {
                      });
 }
 
-// Whether a defparam statement is written anywhere in the design: among the
-// items of a module, interface or program of `unit`, the merged compilation
-// unit, which do not change, or in a generate block instance elaborated so far
-// (generate_defparams_).
 bool ElaboratorData::WritesDefparams(const CompilationUnit& unit) {
   if (!generate_defparams_.empty()) return true;
   if (!declares_defparams_) {

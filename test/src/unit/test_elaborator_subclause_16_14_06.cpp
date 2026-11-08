@@ -12,10 +12,6 @@ namespace {
 const char* const kNoClockReport =
     "no clock is inferred for the procedural concurrent assertion";
 
-// The clause's r3: no clock is inferred for the context of the always_ff
-// whose event control is clock iff reset == 0 or posedge reset, the first
-// expression having no edge identifier and reset being referenced within
-// the procedure, and in the absence of default clocking that is an error.
 TEST(ProceduralClockInference, NoEdgeAndAReferencedSignalInferNoClock) {
   ElabFixture f;
   Elaborate(
@@ -36,9 +32,6 @@ TEST(ProceduralClockInference, NoEdgeAndAReferencedSignalInferNoClock) {
       ReportedError(f.diag.Diagnostics(), kNoClockReport, 10, "16.14.6"));
 }
 
-// The clause's r4: a delay is a blocking timing control and a second event
-// control is one too many, so no clock is inferred for the always procedure
-// and the assertion is reported.
 TEST(ProceduralClockInference, ADelayAndASecondEventControlInferNoClock) {
   ElabFixture f;
   Elaborate(
@@ -59,10 +52,6 @@ TEST(ProceduralClockInference, ADelayAndASecondEventControlInferNoClock) {
       ReportedError(f.diag.Diagnostics(), kNoClockReport, 10, "16.14.6"));
 }
 
-// The clause's r2: posedge clock iff reset == 0 is inferred, reset being
-// referenced within the procedure and posedge clock being a proper
-// subexpression of the event expression that carries the iff, so the
-// assertion is not reported.
 TEST(ProceduralClockInference, AnEdgeWithAnIffIsInferredWhole) {
   ElabFixture f;
   Elaborate(
@@ -83,11 +72,6 @@ TEST(ProceduralClockInference, AnEdgeWithAnIffIsInferredWhole) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-// §16.14.6: where no clock can be inferred from the procedural context the
-// clocks are inferred from the default clocking, as if the assertion were
-// instantiated immediately before the procedure, so the clause's r4 under a
-// default clocking is not reported; and the clocking event the spec opens
-// with needs no inference at all.
 TEST(ProceduralClockInference, TheDefaultClockingAndAnOwnClockNeedNoContext) {
   ElabFixture f;
   Elaborate(
@@ -108,9 +92,6 @@ TEST(ProceduralClockInference, TheDefaultClockingAndAnOwnClockNeedNoContext) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-// §16.14.6: a procedural concurrent assertion's clocking event shall not use
-// an automatic variable: @(posedge clks[k]) reads the automatic k, while the
-// static clks alone is legal.
 TEST(ProceduralClockInference, AnAutomaticInTheClockingEventIsReported) {
   ElabFixture f;
   ElaborateSrc(

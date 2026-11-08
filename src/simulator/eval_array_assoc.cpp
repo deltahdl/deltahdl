@@ -1,23 +1,3 @@
-// §7.9: the associative array methods, and the key handling they need.
-//
-// §7.9.1 lets an associative array's index be any expression of a singular
-// type, so a key is either a string or an integral value and the
-// methods split along that line all the way down. §7.9.2's num() and size(),
-// §7.9.3's delete(), §7.9.4's exists(), and §7.9.5 through §7.9.8's first(),
-// last(), next() and prev() -- the traversal methods, which write the key they
-// reached back into the reference argument they were handed.
-//
-// These were in src/simulator/eval_array.cpp, which reached 973 lines against
-// the 1000 assert-no-oversized-source-files in .github/workflows/deltahdl.yml
-// fails at. What stays there is the fixed-size and dynamic array side: §7.12's
-// reduction, ordering and locator methods, which reach their elements through
-// ArrayInfo rather than through the key.
-//
-// The one name the two share is TryAssocReduction, declared in
-// simulator/eval_array_internal.h: §7.12.3's reductions are defined over an
-// associative array too, and both this file's method dispatch and its num()
-// have to offer them before falling through to §7.9's own.
-
 #include <cstddef>
 #include <cstdint>
 #include <optional>
@@ -39,8 +19,6 @@
 
 namespace delta {
 
-// The index-type spec of an associative array (§7.8): how an index expression
-// is reduced to a stored key. Mirrors the AssocArrayObject index fields.
 struct AssocKeySpec {
   uint32_t index_width = 64;
   bool is_wildcard = false;
@@ -125,9 +103,6 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
   }
   auto cur_key = Vec2Str(ref_var->value);
   if (method == "next") {
-    // §7.9.6 — next() yields the smallest index strictly greater than the
-    // argument value. The argument need not itself be a stored index, so
-    // compare by value rather than locating an existing entry first.
     auto it = m.upper_bound(cur_key);
     if (it == m.end()) {
       out = MakeLogic4VecVal(arena, 32, 0);
@@ -137,9 +112,6 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
     out = MakeLogic4VecVal(arena, 32, 1);
     return true;
   }
-  // §7.9.7 — prev() yields the largest index strictly smaller than the
-  // argument value. The argument need not itself be a stored index, so locate
-  // the lower bound by value and step back to its predecessor.
   auto it = m.lower_bound(cur_key);
   if (it == m.begin()) {
     out = MakeLogic4VecVal(arena, 32, 0);
@@ -151,9 +123,6 @@ static bool AssocStrTraversal(AssocArrayObject* aa, std::string_view method,
   return true;
 }
 
-// §7.9.4 to §7.9.7: the index the traversal reached, written into the index
-// variable at the variable's own width, -1 where that is too narrow to hold an
-// index of the array's index type.
 static int WriteTraversalKey(Variable* ref, const AssocIndex& key,
                              const AssocArrayObject& aa, Arena& arena) {
   uint32_t w = ref->value.width;
@@ -180,13 +149,9 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
-  // The argument is an index of the array's index type, read as one.
   AssocIndex cur_key = AssocIntKey(ref_var->value, aa->is_wildcard,
                                    aa->index_width, aa->is_index_signed);
   if (method == "next") {
-    // §7.9.6 — next() yields the smallest index strictly greater than the
-    // argument value. The argument need not itself be a stored index, so
-    // compare by value rather than locating an existing entry first.
     auto it = m.upper_bound(cur_key);
     if (it == m.end()) {
       out = MakeLogic4VecVal(arena, 32, 0);
@@ -196,9 +161,6 @@ static bool AssocIntTraversal(AssocArrayObject* aa, std::string_view method,
     out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(r));
     return true;
   }
-  // §7.9.7 — prev() yields the largest index strictly smaller than the
-  // argument value. The argument need not itself be a stored index, so locate
-  // the lower bound by value and step back to its predecessor.
   auto it = m.lower_bound(cur_key);
   if (it == m.begin()) {
     out = MakeLogic4VecVal(arena, 32, 0);
@@ -240,15 +202,6 @@ static bool AssocTraversal(AssocArrayObject* aa, std::string_view method,
   return AssocIntTraversal(aa, method, ref_var, arena, out);
 }
 
-// The associative array the call `receiver.method(...)` is on, and the method,
-// or null for a call of another shape or on a receiver that names no
-// associative array. §7.9's methods are defined on the array whatever names
-// it: a declared array by its bare name, and, §8.5 putting no restriction on
-// a property's type, a property of an object -- the running method's own by
-// its bare name (§8.11) or any object's through a handle, `o.count.size()` --
-// which FindAssocArrayOfBase resolves. Before it, only the bare name of a
-// declared array was read here, so `m_severity_count.size()` in a method of
-// UVM's uvm_report_server declined and read 0.
 static AssocArrayObject* CallReceiverAssoc(const Expr* expr,
                                            std::string_view& method,
                                            SimContext& ctx, Arena& arena) {
@@ -321,9 +274,6 @@ bool TryExecAssocMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   return false;
 }
 
-// §7.9.1 writes `imem.num` without parentheses, and the name on the left of
-// the dot is read as a call's receiver is: a declared array, or the property
-// of the running method's object (§8.11).
 bool TryEvalAssocProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
   auto* aa = FindAssocArrayOfName(var_name, ctx);

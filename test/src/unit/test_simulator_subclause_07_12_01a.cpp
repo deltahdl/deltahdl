@@ -248,9 +248,6 @@ TEST(ArrayLocator, MaxReturnsLargest) {
   EXPECT_EQ(out.ToUint64(), 50u);
 }
 
-// §7.12.1 — the with clause is mandatory for the find* locators. The report
-// names the method it rejected and stands on the call, which is hand-built here
-// rather than parsed from a source, so it carries no line and names line 0.
 TEST(ArrayLocator, FindWithoutWithIsError) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 15, 25});
@@ -276,8 +273,6 @@ TEST(ArrayLocator, FindIndexWithoutWithIsError) {
                             0, "7.12.1"));
 }
 
-// §7.12.1 — by contrast, min/max/unique/unique_index accept an omitted with
-// clause (the predicate defaults to the element value itself).
 TEST(ArrayLocator, UniqueWithoutWithIsNotError) {
   SimFixture f;
   MakeDynArray(f, "arr", {5, 5, 9});
@@ -288,10 +283,6 @@ TEST(ArrayLocator, UniqueWithoutWithIsNotError) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.12.1 — min()/max() return the element whose with expression is extreme,
-// which is not necessarily the element with the extreme value. For {3, 1, 2}
-// with (5 - item) the expression values are {2, 4, 3}: the minimum expression
-// (2) belongs to element value 3 and the maximum (4) to element value 1.
 TEST(ArrayLocator, MinUsesWithExpressionNotElementValue) {
   SimFixture f;
   MakeDynArray(f, "arr", {3, 1, 2});
@@ -318,9 +309,6 @@ TEST(ArrayLocator, MaxUsesWithExpressionNotElementValue) {
   EXPECT_EQ(out[0].ToUint64(), 1u);
 }
 
-// §7.12.1 — unique()/unique_index() collapse on the with expression value, so
-// {1, 2, 3, 4} with (item % 2) keeps one entry per parity: the first odd
-// element (value 1, index 0) and the first even element (value 2, index 1).
 TEST(ArrayLocator, UniqueGroupsByWithExpression) {
   SimFixture f;
   MakeDynArray(f, "arr", {1, 2, 3, 4});
@@ -349,9 +337,6 @@ TEST(ArrayLocator, UniqueIndexGroupsByWithExpression) {
   EXPECT_EQ(out[1].ToUint64(), 1u);
 }
 
-// §7.12.1 — locator methods operate on any unpacked array, not only dynamic
-// ones. A fixed-size array {7, 3, 9, 1} filtered with (item > 4) yields its
-// two matching elements, exercising the non-queue element-collection path.
 TEST(ArrayLocator, FindOnFixedSizeArray) {
   SimFixture f;
   MakeFixedArray(f, "fa", {7, 3, 9, 1});
@@ -366,8 +351,6 @@ TEST(ArrayLocator, FindOnFixedSizeArray) {
   EXPECT_EQ(out[1].ToUint64(), 9u);
 }
 
-// §7.12.1 — an omitted with clause behaves as if with(item) were given: the
-// expression value is the element itself, so both forms select the same min.
 TEST(ArrayLocator, OmittedWithEquivalentToWithItem) {
   SimFixture f;
   MakeDynArray(f, "arr", {50, 10, 30});
@@ -386,9 +369,6 @@ TEST(ArrayLocator, OmittedWithEquivalentToWithItem) {
   EXPECT_EQ(implicit_out[0].ToUint64(), 10u);
 }
 
-// §7.12.1 — index locators on an associative array return the matching keys
-// (the index type), not 0-based positions, and in ascending key order. Keys
-// {10:5, 20:15, 30:25} with (item > 10) match keys 20 and 30.
 TEST(ArrayLocator, AssocFindIndexReturnsKeys) {
   SimFixture f;
   MakeIntAssoc(f, "aa", {{10, 5}, {20, 15}, {30, 25}});
@@ -403,11 +383,9 @@ TEST(ArrayLocator, AssocFindIndexReturnsKeys) {
   EXPECT_EQ(out[1].ToUint64(), 30u);
 }
 
-// §7.12.1 — the returned index values carry the associative index type, so a
-// 16-bit index domain yields 16-bit results rather than int's 32 bits.
 TEST(ArrayLocator, AssocFindIndexReturnsIndexTypeWidth) {
   SimFixture f;
-  MakeIntAssoc(f, "aa", {{1, 100}, {2, 200}}, /*index_width=*/16);
+  MakeIntAssoc(f, "aa", {{1, 100}, {2, 200}}, 16);
   auto* pred = MakeBinary(f.arena, TokenKind::kEqEq, MakeId(f.arena, "item"),
                           MakeInt(f.arena, 200));
   auto* expr = MakeLocatorExpr(f.arena, "aa", "find_index", pred);
@@ -419,9 +397,6 @@ TEST(ArrayLocator, AssocFindIndexReturnsIndexTypeWidth) {
   EXPECT_EQ(out[0].width, 16u);
 }
 
-// §7.12.1 — for an associative array, first/last are the smallest/largest
-// index entries (the 7.9 ordering), independent of insertion order. find_first
-// returns the value at key 10, find_last the value at key 30.
 TEST(ArrayLocator, AssocFindFirstAndLastByKeyOrder) {
   SimFixture f;
   MakeIntAssoc(f, "aa", {{30, 25}, {10, 5}, {20, 15}});
@@ -439,17 +414,6 @@ TEST(ArrayLocator, AssocFindFirstAndLastByKeyOrder) {
   EXPECT_EQ(lo[0].ToUint64(), 25u);
 }
 
-// ===========================================================================
-// End-to-end tests: the locator input is built from a dependency subclause's
-// real declaration syntax and driven through the full pipeline (parse,
-// elaborate, lower, run), then the queue/scalar result is read back — rather
-// than hand-building the array and calling the locator helper directly.
-// ===========================================================================
-
-// §7.12.1 — find() returns every element satisfying the with expression.
-// Built from a real dynamic-array (§7.5) `{...}` initializer, filtered with
-// (item > 10) over {5,15,25,35}: three elements qualify, so the result queue's
-// size() is 3.
 TEST(ArrayLocator, FindOverDynamicArrayCountEndToEnd) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -465,9 +429,6 @@ TEST(ArrayLocator, FindOverDynamicArrayCountEndToEnd) {
   EXPECT_EQ(sz, 3u);
 }
 
-// §7.12.1 — find_first() returns the leftmost element satisfying the with
-// expression. Over the dynamic array {5,15,25,35} with (item > 10) the first
-// qualifying element is 15, read back from the single-element result queue.
 TEST(ArrayLocator, FindFirstOverDynamicArrayValueEndToEnd) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -483,9 +444,6 @@ TEST(ArrayLocator, FindFirstOverDynamicArrayValueEndToEnd) {
   EXPECT_EQ(v, 15u);
 }
 
-// §7.12.1 — index locator methods over a non-associative array return a queue
-// of int holding 0-based positions. find_index for the element equal to 30 in
-// {10,20,30} yields position 2.
 TEST(ArrayLocator, FindIndexReturnsPositionEndToEnd) {
   uint64_t p = RunAndGet(
       "module m;\n"
@@ -501,9 +459,6 @@ TEST(ArrayLocator, FindIndexReturnsPositionEndToEnd) {
   EXPECT_EQ(p, 2u);
 }
 
-// §7.12.1 — when no element satisfies the with expression the returned queue is
-// empty. Seeding sz to a nonzero value first proves the observed 0 comes from
-// the empty result rather than a default.
 TEST(ArrayLocator, FindNoMatchReturnsEmptyEndToEnd) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -520,9 +475,6 @@ TEST(ArrayLocator, FindNoMatchReturnsEmptyEndToEnd) {
   EXPECT_EQ(sz, 0u);
 }
 
-// §7.12.1 — with the with clause omitted, min() selects the smallest element
-// (as if with(item) were given). Over the dynamic array {50,10,30} the minimum
-// is 10, returned as a scalar.
 TEST(ArrayLocator, MinOverDynamicArrayEndToEnd) {
   uint64_t r = RunAndGet(
       "module m;\n"
@@ -534,9 +486,6 @@ TEST(ArrayLocator, MinOverDynamicArrayEndToEnd) {
   EXPECT_EQ(r, 10u);
 }
 
-// §7.12.1 — locator methods operate on any unpacked array, including a
-// fixed-size array (§7.4) built from an '{...} assignment pattern. max() over
-// {10,50,30} returns 50.
 TEST(ArrayLocator, MaxOverFixedArrayEndToEnd) {
   uint64_t r = RunAndGet(
       "module m;\n"
@@ -548,9 +497,6 @@ TEST(ArrayLocator, MaxOverFixedArrayEndToEnd) {
   EXPECT_EQ(r, 50u);
 }
 
-// §7.12.1 — unique() returns one entry per distinct value. Built from a real
-// queue (§7.10) {10,20,10,30,20}, three distinct values remain, so the result
-// queue's size() is 3.
 TEST(ArrayLocator, UniqueOverQueueEndToEnd) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -566,8 +512,6 @@ TEST(ArrayLocator, UniqueOverQueueEndToEnd) {
   EXPECT_EQ(sz, 3u);
 }
 
-// §7.12.1 — a find() locator with a predicate driven over a real queue (§7.10).
-// {5,15,25} with (item > 10) matches two elements.
 TEST(ArrayLocator, FindOverQueueCountEndToEnd) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -583,10 +527,6 @@ TEST(ArrayLocator, FindOverQueueCountEndToEnd) {
   EXPECT_EQ(sz, 2u);
 }
 
-// §7.12.1 — for an associative array (§7.8) an index locator returns a queue of
-// the index type holding the matching keys, not 0-based positions. With keys
-// {10:5, 20:15, 30:25} and (item > 10), the matching keys are 20 and 30; the
-// first (in ascending key order) is 20.
 TEST(ArrayLocator, AssocFindIndexReturnsKeyEndToEnd) {
   uint64_t k = RunAndGet(
       "module m;\n"
@@ -605,9 +545,6 @@ TEST(ArrayLocator, AssocFindIndexReturnsKeyEndToEnd) {
   EXPECT_EQ(k, 20u);
 }
 
-// §7.12.1 — for an associative array, "first" is the entry with the smallest
-// index (the §7.9 first() ordering), independent of insertion order. Inserting
-// keys 30,10,20, find_first returns the value stored at the smallest key 10.
 TEST(ArrayLocator, AssocFindFirstByKeyOrderEndToEnd) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -626,8 +563,6 @@ TEST(ArrayLocator, AssocFindFirstByKeyOrderEndToEnd) {
   EXPECT_EQ(v, 5u);
 }
 
-// §7.12.1 — likewise "last" is the entry with the largest index. find_last over
-// the same associative array returns the value stored at the largest key 30.
 TEST(ArrayLocator, AssocFindLastByKeyOrderEndToEnd) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -646,9 +581,6 @@ TEST(ArrayLocator, AssocFindLastByKeyOrderEndToEnd) {
   EXPECT_EQ(v, 25u);
 }
 
-// §7.12.1 — when a with clause is present, unique() collapses on the value of
-// that expression. {1,2,3,4} with (item % 2) keeps one element per parity, so
-// the result queue's size() is 2.
 TEST(ArrayLocator, UniqueGroupsByWithExpressionEndToEnd) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -664,8 +596,6 @@ TEST(ArrayLocator, UniqueGroupsByWithExpressionEndToEnd) {
   EXPECT_EQ(sz, 2u);
 }
 
-// §7.12.1: the with clause is mandatory for the find locators, and the report
-// a bare find() over an indexed array raises names §7.12.1.
 TEST(ArrayLocator, IndexedFindWithoutWithNames7_12_1) {
   SimFixture f;
   MakeDynArray(f, "arr", {2, 4, 6});
@@ -676,8 +606,6 @@ TEST(ArrayLocator, IndexedFindWithoutWithNames7_12_1) {
                             "7.12.1"));
 }
 
-// §7.12.1: an associative source is checked on its own path, and the report it
-// raises names the same subclause.
 TEST(ArrayLocator, AssocFindWithoutWithNames7_12_1) {
   SimFixture f;
   MakeIntAssoc(f, "aa", {{4, 40}, {5, 50}});
@@ -688,11 +616,6 @@ TEST(ArrayLocator, AssocFindWithoutWithNames7_12_1) {
                             "7.12.1"));
 }
 
-// §7.12.1 with §6.16: the item of a string array is a string, so a relational
-// operator in the with clause compares it lexicographically against the
-// literal. Only "abc" and "zed" sort after "Z", so find_index answers indices
-// 2 and 4 and find_last_index 4, and four sort before it; compared as packed
-// integers, every string of two or more characters sorted after "Z".
 TEST(ArrayLocator, StringItemComparesLexicographicallyInWith) {
   SimFixture f;
   std::string out = RunCapture(
@@ -715,10 +638,6 @@ TEST(ArrayLocator, StringItemComparesLexicographicallyInWith) {
   EXPECT_EQ(out, "2 2 4\n1 4\n4\n0\n");
 }
 
-// §7.12.1 with §6.16 and A.8.2: a string method written without parentheses
-// in a with clause, `item.atoi` or a renamed `s.tolower`, is called on the
-// element, so max orders "100" above "7" and unique folds "a" with "A" -- as
-// the same call on a variable and on an element does outside one.
 TEST(ArrayLocator, WithClauseCallsAStringMethodWithoutParentheses) {
   SimFixture f;
   std::string out = RunCapture(
@@ -737,9 +656,6 @@ TEST(ArrayLocator, WithClauseCallsAStringMethodWithoutParentheses) {
   EXPECT_EQ(out, "100 2 42 100\n");
 }
 
-// §7.12.1 with §7.8.1: the locators on a string-keyed associative array walk
-// its entries in first() order, the keys' lexicographic one -- apple, fig,
-// pear -- and the index locators return a queue of the string keys.
 TEST(ArrayLocator, LocatorsOnAStringKeyedAssociativeArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -760,10 +676,6 @@ TEST(ArrayLocator, LocatorsOnAStringKeyedAssociativeArray) {
   EXPECT_EQ(out, "2 apple pear pear 2 5 2\n");
 }
 
-// §7.12.1 with §6.11: min() and max() order the elements of a signed type as
-// signed numbers, -3 below 5, whichever kind of unpacked array holds them, and
-// the elements of an unsigned type as unsigned ones, -3 written into a
-// `bit [31:0]` element then being 4294967293, above 5.
 TEST(ArrayLocator, MinAndMaxOrderTheElementsByTheElementTypesSignedness) {
   SimFixture f;
   std::string out = RunCapture(
@@ -787,9 +699,6 @@ TEST(ArrayLocator, MinAndMaxOrderTheElementsByTheElementTypesSignedness) {
   EXPECT_EQ(out, "-3 5 -3 5 -3 5 5\n");
 }
 
-// §7.12.1: with a with clause, min() and max() order the elements by the
-// clause's value, as signed where the expression is signed and as unsigned
-// where it is not: `unsigned'(item)` puts -3 above 5.
 TEST(ArrayLocator, MinAndMaxWithAClauseOrderByTheClausesSignedness) {
   SimFixture f;
   std::string out = RunCapture(
@@ -810,9 +719,6 @@ TEST(ArrayLocator, MinAndMaxWithAClauseOrderByTheClausesSignedness) {
   EXPECT_EQ(out, "5 5 -3 -3\n");
 }
 
-// §7.12 with §6.11: the iterator of a with clause is a variable of the element
-// type, so over the elements of a signed type `item < 0` holds for -3, and
-// over those of an unsigned type it holds for none.
 TEST(ArrayLocator, TheIteratorReadsWithTheElementTypesSignedness) {
   SimFixture f;
   std::string out = RunCapture(
@@ -839,8 +745,6 @@ TEST(ArrayLocator, TheIteratorReadsWithTheElementTypesSignedness) {
   EXPECT_EQ(out, "-3 1 1 0 -3 -3\n");
 }
 
-// §7.12.5 with §7.12: map() over an associative array binds the iterator as a
-// variable of the element type too, for an integral and a string index alike.
 TEST(ArrayLocator, TheIteratorOfAnAssociativeMapReadsSigned) {
   SimFixture f;
   std::string out = RunCapture(
@@ -858,10 +762,6 @@ TEST(ArrayLocator, TheIteratorOfAnAssociativeMapReadsSigned) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// §7.12 with §7.2: over an array of structures the with clause's iterator is
-// laid out by the element type in min(), max(), unique() and unique_index() as
-// in find(), so `item.x` reads each element's member: -2 is the least x, 3 the
-// greatest, and the x values 1, -2, 3, 1 hold three distinct ones.
 TEST(ArrayLocator, AnOptionalWithClauseReadsTheIteratorsMembers) {
   SimFixture f;
   std::string out = RunCapture(
@@ -883,8 +783,6 @@ TEST(ArrayLocator, AnOptionalWithClauseReadsTheIteratorsMembers) {
   EXPECT_EQ(out, "30 20 3 2\n");
 }
 
-// §7.12 with §7.2 and §7.8: the same over an associative array of structures,
-// with an integral and a string index, for find() as for the others.
 TEST(ArrayLocator, AnAssociativeLocatorReadsTheIteratorsMembers) {
   SimFixture f;
   std::string out = RunCapture(

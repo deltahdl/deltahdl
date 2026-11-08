@@ -19,7 +19,6 @@
 
 namespace {
 
-// Inputs for BindAdderChild, bundled to keep the helper parameter list small.
 struct BindAdderInputs {
   SourceManager& mgr;
   Arena& arena;
@@ -30,8 +29,6 @@ struct BindAdderInputs {
   std::string_view lt;
 };
 
-// Parses `adder`, `alt`, and a `top` that instantiates `adder` under the
-// supplied config body, then tags the three modules with libraries la/lb/lt.
 CompilationUnit* ParseAdderUnit(const BindAdderInputs& in) {
   std::string src;
   src += "module adder; endmodule\n";
@@ -45,13 +42,10 @@ CompilationUnit* ParseAdderUnit(const BindAdderInputs& in) {
   cu->modules[0]->library = in.la;
   cu->modules[1]->library = in.lb;
   cu->modules[2]->library = in.lt;
-  // §33.4.1.1: the config compiles with its top module.
   for (auto* cfg : cu->configs) cfg->library = in.lt;
   return cu;
 }
 
-// Config-elaborates the parsed unit and returns the cell bound to top.u, so a
-// library-qualified cell clause can be observed through Elaborate(ConfigDecl).
 RtlirModule* BindAdderChild(const BindAdderInputs& in) {
   auto* cu = ParseAdderUnit(in);
   Elaborator elab(in.arena, in.diag, cu);
@@ -69,8 +63,6 @@ TEST(ConfigCellClause, LibQualifiedCellWithLiblistRejected) {
       "  cell rtlLib.adder liblist gateLib;\n"
       "endconfig\n",
       f, "top");
-  // The report stands at the line of the `config` keyword, not at the cell
-  // clause: ValidateConfigCellClauses emits at `cfg->range.start`.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cell clause 'rtlLib.adder' uses a liblist "
                             "expansion",
@@ -89,8 +81,6 @@ TEST(ConfigCellClause, UnqualifiedCellWithLiblistAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.3's `use #()` is a use expansion that resets every parameter, so a
-// library-qualified cell clause may expand through it.
 TEST(ConfigCellClause, LibQualifiedCellWithParameterResetAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -115,8 +105,6 @@ TEST(ConfigCellClause, LibQualifiedCellWithUseClauseAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.1.4: a library-qualified cell clause applies to instances bound to the
-// selected library and cell, so its use expansion rebinds the matching cell.
 TEST(ConfigCellClause, LibQualifiedCellClauseRebindsMatchingCell) {
   SourceManager mgr;
   Arena arena;
@@ -130,9 +118,6 @@ TEST(ConfigCellClause, LibQualifiedCellClauseRebindsMatchingCell) {
   EXPECT_EQ(bound->library, "gateLib");
 }
 
-// §33.4.1.4: a cell selection clause names the cell it applies to; an
-// unqualified clause applies to that cell whatever library holds it, so its
-// use expansion rebinds the named cell.
 TEST(ConfigCellClause, UnqualifiedCellClauseAppliesToNamedCell) {
   SourceManager mgr;
   Arena arena;
@@ -146,9 +131,6 @@ TEST(ConfigCellClause, UnqualifiedCellClauseAppliesToNamedCell) {
   EXPECT_EQ(bound->library, "gateLib");
 }
 
-// §33.4.1.4: a cell clause applies only to the cell it names; an instance of a
-// different cell is untouched even when the named cell exists. Here top.u is an
-// adder, but the clause names 'alt', so the instance binds to adder unchanged.
 TEST(ConfigCellClause, CellClauseDoesNotApplyToUnnamedCell) {
   SourceManager mgr;
   Arena arena;
@@ -161,9 +143,6 @@ TEST(ConfigCellClause, CellClauseDoesNotApplyToUnnamedCell) {
   EXPECT_EQ(bound->name, "adder");
 }
 
-// §33.4.1.4: the qualifying library scopes the clause; when that library does
-// not define the named cell, the clause matches nothing and the cell binds
-// normally.
 TEST(ConfigCellClause, LibQualifiedCellClauseDoesNotApplyToOtherLibraries) {
   SourceManager mgr;
   Arena arena;
@@ -176,8 +155,6 @@ TEST(ConfigCellClause, LibQualifiedCellClauseDoesNotApplyToOtherLibraries) {
   EXPECT_EQ(bound->name, "adder");
 }
 
-// A cell clause handing every adder to a config whose design statement binds
-// adder_gate, with the config written ahead of the one using it.
 constexpr std::string_view kCellClauseToAConfig =
     "module adder; endmodule\n"
     "module adder_gate; endmodule\n"
@@ -190,9 +167,6 @@ constexpr std::string_view kCellClauseToAConfig =
     "  design work.adder_gate;\n"
     "endconfig\n";
 
-// §33.4.1.4 has a cell clause's expansion apply to every instance bound to the
-// cell, and §33.4.2 has a use clause naming a config bind what that config's
-// design statement names, so both adders become adder_gate.
 TEST(ConfigCellClause, CellUseNamingAConfigBindsItsDesignCell) {
   ConfigElaboration run;
   ElaborateUnderConfig(kCellClauseToAConfig, run);
@@ -207,8 +181,6 @@ TEST(ConfigCellClause, CellUseNamingAConfigBindsItsDesignCell) {
   }
 }
 
-// The config a cell clause hands its instances to is delegated to, like one an
-// instance clause names, so it is not a second configuration in force.
 TEST(ConfigCellClause, ConfigACellClauseNamesIsNotInForce) {
   SourceManager mgr;
   Arena arena;
@@ -223,7 +195,6 @@ TEST(ConfigCellClause, ConfigACellClauseNamesIsNotInForce) {
   EXPECT_EQ(in_force[0]->name, "cfg");
 }
 
-// W as elaborated for each child of the design's one top, by instance name.
 std::string WidthsOfEachChild(const ConfigElaboration& run) {
   std::string out;
   if (run.design == nullptr || run.design->top_modules.size() != 1) return out;
@@ -238,9 +209,6 @@ std::string WidthsOfEachChild(const ConfigElaboration& run) {
   return out;
 }
 
-// §33.4.1.4 with Syntax 33-4's second use_clause form: a cell clause whose use
-// expansion carries named parameter assignments alone keeps the cell and
-// overrides the parameter on every instance of it.
 TEST(ConfigCellClause, ParameterOnlyUseOverridesEveryInstance) {
   ConfigElaboration run;
   ElaborateUnderConfig(
@@ -255,8 +223,6 @@ TEST(ConfigCellClause, ParameterOnlyUseOverridesEveryInstance) {
   EXPECT_EQ(WidthsOfEachChild(run), "x=12 y=12 ");
 }
 
-// The third form names the cell as well as the assignments; the binding and
-// the override both reach the instance.
 TEST(ConfigCellClause, CellAndParameterUseOverridesTheInstance) {
   ConfigElaboration run;
   ElaborateUnderConfig(
@@ -271,8 +237,6 @@ TEST(ConfigCellClause, CellAndParameterUseOverridesTheInstance) {
   EXPECT_EQ(WidthsOfEachChild(run), "x=12 ");
 }
 
-// An instance clause is the more specific selection, so where it and a cell
-// clause both set a parameter of one instance, the instance clause decides.
 TEST(ConfigCellClause, InstanceOverrideBeatsTheCellOverride) {
   ConfigElaboration run;
   ElaborateUnderConfig(
@@ -288,10 +252,6 @@ TEST(ConfigCellClause, InstanceOverrideBeatsTheCellOverride) {
   EXPECT_EQ(WidthsOfEachChild(run), "x=12 y=20 ");
 }
 
-// §33.4.1.4: a cell clause naming aLib selects only the instances bound to, or
-// being considered for, aLib's adder. The default list searches gateLib
-// before rtlLib and never aLib, so top.u binds gateLib.adder and the clause
-// does not apply.
 TEST(ConfigCellClause, LibQualifiedCellSkipsAnInstanceBoundElsewhere) {
   SourceManager mgr;
   Arena arena;

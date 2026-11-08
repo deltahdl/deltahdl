@@ -235,8 +235,6 @@ TEST(TypeDeclElaboration, ErrorRedeclarationDetected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // A variable redeclaring a variable is the case §6.5's closing sentence
-  // names, so the report carries §6.5 rather than §23.9's general rule.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "6.5"));
 }
@@ -265,13 +263,6 @@ TEST(TypeDeclElaboration, TriregChargeStrengthAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.2.1.3 with A.2.2.1: a with clause's class_scope names the class through
-// every name it writes, a package first or a class whose nested classes the
-// later names pick out (§8.23), and a specialization's parameter values pick
-// no other class. Each class reached here declares a static `res`, which
-// §6.6.7 admits, while the top-level classes of the same last name declare a
-// non-static one, which it rejects; a lookup by the last name alone reaches
-// those and reports them (#7592).
 constexpr const char* kNettypeScopeChains =
     "class C;\n"
     "  function real res(input real d[]); return 0.0; endfunction\n"
@@ -314,11 +305,6 @@ TEST(TypeDeclElaboration, NettypeResolutionFunctionFoundThroughAClassChain) {
   EXPECT_EQ(net->resolve_func, "Outer::Inner::res");
 }
 
-// A.2.2.1's package_scope `$unit ::` names the compilation unit, so
-// `$unit::ufn` is the unit's function and not the module's own `ufn`, whose
-// second argument §6.6.7 rejects, and `$unit::U` is the unit's class U, by its
-// own name or a unit typedef's: a class C only a package declares is not
-// reached through `$unit::C`.
 TEST(TypeDeclElaboration, NettypeResolutionFunctionFoundThroughUnitScope) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -343,9 +329,6 @@ TEST(TypeDeclElaboration, NettypeResolutionFunctionFoundThroughUnitScope) {
   EXPECT_EQ(net->resolve_func, "$unit::ufn");
 }
 
-// §6.6.7's two reports on a scope keep the whole chain: one that reaches no
-// class, here a package declaring no Nope and a unit declaring no class C
-// although P does, and one reaching a class that declares no such function.
 TEST(TypeDeclElaboration, NettypeResolutionClassChainReportsNameTheChain) {
   ElabFixture f;
   Elaborate(
@@ -375,9 +358,6 @@ TEST(TypeDeclElaboration, NettypeResolutionClassChainReportsNameTheChain) {
                             9, "6.6.7"));
 }
 
-// A.2.1.3 with A.2.2.1: a qualified data declaration of a package's type
-// declares a variable of that type, four bits from P::T where the module's own
-// T is eight (#7603).
 TEST(TypeDeclElaboration, AQualifiedDeclarationTakesThePackagesType) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -401,9 +381,6 @@ TEST(TypeDeclElaboration, AQualifiedDeclarationTakesThePackagesType) {
   }
 }
 
-// §6.6.7: a nettype may declare only a net, and `var` opens a data
-// declaration, so a package's nettype named after it is reported under the
-// name the package gives it.
 TEST(TypeDeclElaboration, AVarDeclarationOfAPackagesNettypeIsReported) {
   ElabFixture f;
   Elaborate(
@@ -420,9 +397,6 @@ TEST(TypeDeclElaboration, AVarDeclarationOfAPackagesNettypeIsReported) {
                             5, "6.6.7"));
 }
 
-// A.2.1.3 writes a net of a user-defined nettype as the nettype's name, an
-// optional delay and the net names, so no packed dimension follows the name,
-// bare or written through a package.
 TEST(TypeDeclElaboration, APackedDimensionAfterANettypeNameIsReported) {
   ElabFixture f;
   Elaborate(

@@ -1,47 +1,3 @@
-// §33.5.4's separate compilation options as the command line carries them:
-// which option names the config, which names an already compiled library, and
-// which two say where this invocation's compiled cells are written.
-//
-// Every case here calls ParseArgs (driver/cli_options.h) with a command line
-// and reads the CliOptions field the option is supposed to reach. No case
-// elaborates a design, which is what separates this file from
-// test_elaborator_subclause_33_05_04a.cpp beside it: every case there compiles
-// source descriptions and elaborates them, and none reads a command line.
-//
-// §33.5.4 is what gives these options meaning: the binding tool needs only the
-// lib.cell of the top-level cell or cells, or of the config to use, or both,
-// and under this strategy the config is precompiled too. --config names that
-// config and --load-lib names the compiled form the binding tool reads, which
-// §33.5.3 requires to have persisted: library cells have to outlive the
-// compile, so their compiled forms are kept somewhere in the filesystem.
-// --precompile-into and --precompile-out are the other end of the same flow,
-// naming the library this invocation's cells go into and the file they are
-// written to.
-//
-// A rejection here is asserted through ParseArgs's return value, which is the
-// whole of what ParseArgs answers about an unrecognized option.
-// .claude/memories/naming-the-report-in-a-rejection-test.md otherwise has a
-// test naming the report through ReportedError; that applies to a rule the
-// program reports through common/diagnostic.h, and ParseArgs writes to
-// std::cerr and returns a bool instead. A rejection an option made itself is
-// asserted through CliOptions::rejected_argument as well, which ParseArgs sets
-// for an option it recognized and whose value it refused.
-//
-// Issue #3425 is why this half exists. CliOptions and ParseArgs were in
-// src/main.cpp's anonymous namespace, where no test could name them, so an
-// option renamed, dropped or wired to the wrong field left every test passing.
-//
-// Issue #3426 is why the cases over a malformed command line are here. A
-// numeric option read its value with std::stoull, std::stoul or std::stoll,
-// which throw for text that is not a number and for a number too large;
-// nothing caught the exception, so a mistyped number terminated the process
-// and no case could report at all. An option written last with its value left
-// off reached ParseArgs's "unknown option" branch, which told the reader an
-// option that exists does not. A -f options file naming itself was read again
-// every time it was read, without bound. Each of the three has a case below,
-// and each is paired with a case giving the same option something it accepts,
-// so a parser that refused every value would fail the pair.
-
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -83,8 +39,6 @@ TEST(SeparateCompilationCommandLine, LoadLibWrittenTwiceKeepsBothInOrder) {
             (std::vector<std::string>{"rtl.dlib", "gates.dlib"}));
 }
 
-// §33.5.3 (printed page 944): the binding tool is told the top-level module or
-// modules of the design, so --top written twice names two tops, in order.
 TEST(SeparateCompilationCommandLine, TopWrittenTwiceKeepsBothInOrder) {
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"--top", "t1", "--top", "t2"}, opts));
@@ -150,10 +104,6 @@ TEST(SeparateCompilationCommandLine, SourceFileNameReachesTheSourceFiles) {
 }
 
 TEST(SeparateCompilationCommandLine, SeedWithTextForItsValueIsRejected) {
-  // std::from_chars answers that the text was not a number. std::stoull threw
-  // std::invalid_argument for it and nothing caught the exception, so before
-  // issue #3426 was fixed the process terminated here and no case could report
-  // at all.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"--seed", "random"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
@@ -161,19 +111,12 @@ TEST(SeparateCompilationCommandLine, SeedWithTextForItsValueIsRejected) {
 
 TEST(SeparateCompilationCommandLine,
      MaxGenerateIterationsWithTextForItsValueIsRejected) {
-  // The second of the two calls to TakeNumber, and the one whose field is
-  // signed.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"--max-generate-iterations", "many"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
 }
 
 TEST(SeparateCompilationCommandLine, SeedAboveTheFieldsRangeIsRejected) {
-  // A value too large for CliOptions::seed, a uint32_t, is
-  // std::errc::result_out_of_range, which std::from_chars reports separately
-  // from text that is no number at all. std::stoull threw std::out_of_range
-  // for such a value, which is a second way the same call terminated the
-  // process.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"--seed", "4294967296"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
@@ -181,18 +124,12 @@ TEST(SeparateCompilationCommandLine, SeedAboveTheFieldsRangeIsRejected) {
 }
 
 TEST(SeparateCompilationCommandLine, SeedReachesTheSeedField) {
-  // 7 is not the field's default of 0, so a parser that never read the value
-  // would fail this. The cases refusing a numeric value above would all pass
-  // against a parser that refused every value; this one and the next are what
-  // rule that parser out.
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"--seed", "7"}, opts));
   EXPECT_EQ(opts.seed, 7U);
 }
 
 TEST(SeparateCompilationCommandLine, MaxGenerateIterationsReachesItsField) {
-  // 5000 is not kDefaultMaxGenerateIterations, which
-  // src/elaborator/elaborator_data.h sets to 262144.
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine({"--max-generate-iterations", "5000"}, opts));
   EXPECT_EQ(opts.max_generate_iterations, 5000);
@@ -200,13 +137,6 @@ TEST(SeparateCompilationCommandLine, MaxGenerateIterationsReachesItsField) {
 
 TEST(SeparateCompilationCommandLine,
      ConfigWithNoNameFollowingSetsRejectedArgument) {
-  // --config was recognized and its value was missing, which ParseArgs marks
-  // by setting CliOptions::rejected_argument.
-  // UnrecognizedOptionSetsNoRejectedArgument above is the other half of the
-  // pair: the field stays false for an option that does not exist. Neither
-  // case alone says what the field means, and before issue #3426 was fixed an
-  // option written last with its value left off was reported as an option that
-  // does not exist.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"adder.sv", "--config"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
@@ -214,9 +144,6 @@ TEST(SeparateCompilationCommandLine,
 
 TEST(SeparateCompilationCommandLine,
      MinTypMaxWithNoValueFollowingSetsRejectedArgument) {
-  // --mintypmax answers its own missing value in TryParseMinTypMaxArg
-  // (src/driver/cli_options.cpp) rather than in the TakeValue the other
-  // options share, so it is a separate case from --config above.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"adder.sv", "--mintypmax"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
@@ -224,8 +151,6 @@ TEST(SeparateCompilationCommandLine,
 
 TEST(SeparateCompilationCommandLine,
      MinTypMaxWithAValueOutsideTheThreeIsRejected) {
-  // §11.11 gives a min:typ:max expression three values and no fourth, so
-  // "nominal" names none of them.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"--mintypmax", "nominal"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
@@ -233,10 +158,6 @@ TEST(SeparateCompilationCommandLine,
 }
 
 TEST(SeparateCompilationCommandLine, OptionsFileCarriesAnOptionToItsField) {
-  // -f names a file of further options, which ParseArgs reads in place. This
-  // case is what makes OptionsFileNamingItselfIsRefusedRatherThanRecursed
-  // below mean something, because a parser that refused every -f would pass
-  // that case.
   ScratchDir tmp;
   const std::string kOptionsFile =
       tmp.Write("args.f", "--top adder\n").string();
@@ -248,9 +169,6 @@ TEST(SeparateCompilationCommandLine, OptionsFileCarriesAnOptionToItsField) {
 
 TEST(SeparateCompilationCommandLine,
      OptionsFileNamingItselfIsRefusedRatherThanRecursed) {
-  // ReadOptionsFile in src/driver/cli_options.cpp refuses past
-  // kMaxOptionsFileDepth. Without that limit this command line reads the same
-  // file again every time it reads it, which is what issue #3426 reports.
   ScratchDir tmp;
   const std::string kSelfNaming = (tmp.dir / "self.f").string();
   tmp.Write("self.f", "-f " + kSelfNaming + "\n");
@@ -261,22 +179,11 @@ TEST(SeparateCompilationCommandLine,
 
 TEST(SeparateCompilationCommandLine,
      OptionsFileOptionWithNoFileFollowingSetsRejectedArgument) {
-  // -f is recognized and its file is missing, so it is refused the way an
-  // option missing its value is rather than reported as an option that does
-  // not exist.
   CliOptions opts;
   EXPECT_FALSE(ParseCommandLine({"adder.sv", "-f"}, opts));
   EXPECT_TRUE(opts.rejected_argument);
 }
 
-// -f is what puts an option somewhere the reader cannot see. The command line
-// names the file, the file names the option, and a report naming only the
-// option sends the reader to the command line, where `-f args.f design.sv` has
-// nothing wrong with it. So a report about a word read out of an options file
-// opens with the file and the line the word stood on, in the "<file>:<line>: "
-// form the rest of the tool uses for a position.
-//
-// Runs one command line with std::cerr captured and returns what was printed.
 std::string ParseCapturingStderr(const std::vector<std::string>& args,
                                  CliOptions& opts) {
   std::string err;
@@ -296,8 +203,6 @@ TEST(SeparateCompilationCommandLine, OptionsFileNamesItselfInAMissingValue) {
       << out;
 }
 
-// The other report site, which is a separate line of code: a fix to the one
-// above leaves this one saying nothing about where the option was written.
 TEST(SeparateCompilationCommandLine, OptionsFileNamesItselfInAnUnknownOption) {
   ScratchDir tmp;
   const std::string kOptionsFile =
@@ -310,9 +215,6 @@ TEST(SeparateCompilationCommandLine, OptionsFileNamesItselfInAnUnknownOption) {
       << out;
 }
 
-// An options file may name another, so the file a word came from is not the
-// file -f was given. A fix carrying the path of the file on the command line
-// would satisfy the two cases above and name the wrong file here.
 TEST(SeparateCompilationCommandLine, NestedOptionsFileNamesTheInnerFile) {
   ScratchDir tmp;
   const std::string kInner = tmp.Write("inner.f", "--tpo x\n").string();
@@ -326,9 +228,6 @@ TEST(SeparateCompilationCommandLine, NestedOptionsFileNamesTheInnerFile) {
   EXPECT_EQ(out.find(kOuter + ":"), std::string::npos) << out;
 }
 
-// The command line itself names no file, and must go on saying what it always
-// said: the reader has it in front of them. Without this a fix that always
-// printed a position would satisfy every case above.
 TEST(SeparateCompilationCommandLine, CommandLineOptionNamesNoFile) {
   CliOptions opts;
   std::string out = ParseCapturingStderr({"--tpo"}, opts);

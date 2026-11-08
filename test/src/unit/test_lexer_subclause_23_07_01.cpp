@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Integration robustness: the :: scope-resolution prefix tokenizes as
-// identifier / kColonColon / identifier so the elaborator can apply §23.7.1.
 TEST(ScopeResolutionPrefixLexing, TwoComponentPrefixTokens) {
   auto tokens = Lex("pkg::name");
   ASSERT_GE(tokens.size(), 4u);
@@ -19,8 +17,6 @@ TEST(ScopeResolutionPrefixLexing, TwoComponentPrefixTokens) {
   EXPECT_EQ(tokens[2].text, "name");
 }
 
-// Integration robustness: the scope-resolution operator is lexically distinct
-// from the dotted-name operator, so §23.7.1's :: rule never sees a kDot.
 TEST(ScopeResolutionPrefixLexing, PrefixTokensDistinctFromDot) {
   auto dot_tokens = Lex("a.b");
   auto scope_tokens = Lex("a::b");

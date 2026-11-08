@@ -4,8 +4,6 @@
 
 namespace {
 
-// §23.7.1 C3: a prefix that is not a resolvable scope name denotes the package
-// scope resolution operator; the qualified type resolves downward in pkg.
 TEST(ScopeResolutionPrefixElaboration, PackagePrefixResolvesDownward) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"
@@ -16,9 +14,6 @@ TEST(ScopeResolutionPrefixElaboration, PackagePrefixResolvesDownward) {
              "endmodule\n"));
 }
 
-// §23.7.1 C2: a prefix that resolves by the normal scope rules (a visible class
-// name) denotes the class scope resolution operator; the qualified type
-// resolves downward in the class.
 TEST(ScopeResolutionPrefixElaboration, ClassPrefixResolvesDownward) {
   EXPECT_TRUE(
       ElabOk("class C;\n"

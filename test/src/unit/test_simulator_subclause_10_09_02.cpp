@@ -14,11 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The struct the wide cases are written over. BuildStructTypeInfo lays a packed
-// struct out from the top down, so the first-declared member sits at the
-// highest bit offset: `a` is at bit 64, above the first word, which is where a
-// placement confined to words[0] had nowhere to put it. `w1` takes the keyed
-// spelling and `w2` the positional one.
 std::string WideStructSource(std::string_view body) {
   return std::string(
              "module t;\n"
@@ -33,11 +28,6 @@ std::string WideStructSource(std::string_view body) {
          "endmodule\n";
 }
 
-// §10.9.2: a member:value gives an explicit value to a named member of the
-// structure, and the member is the bits the member occupies. 8'hA5 and 64'h42
-// are chosen so that the answer a placement into words[0] alone gave -- the two
-// ORed together, 0xE7 -- is neither of them, and so that a case using all-ones
-// values could not pass on the OR by accident.
 TEST(StructPatternSimulation,
      WideStructNamedPatternPlacesAMemberAboveTheFirstWord) {
   SimFixture f;
@@ -47,16 +37,10 @@ TEST(StructPatternSimulation,
   ASSERT_EQ(var->value.nwords, 2u);
   EXPECT_EQ(var->value.words[1].aval, 0xA5u);
   EXPECT_EQ(var->value.words[0].aval, 0x42u);
-  // No unknown was invented on the way.
   EXPECT_EQ(var->value.words[1].bval, 0u);
   EXPECT_EQ(var->value.words[0].bval, 0u);
 }
 
-// §6.3.1: each bit of a 4-state vector may independently take any of the four
-// basic values, and §10.9.2 evaluates a member expression in the context of an
-// assignment to the member, which for a logic member carries x and z. `b`'s
-// known 0x42 is what makes this discriminating: a result that came out all-x or
-// all-0 fails, and only the per-member answer passes.
 TEST(StructPatternSimulation, NamedStructPatternCarriesAnUnknownMemberValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -72,11 +56,6 @@ TEST(StructPatternSimulation, NamedStructPatternCarriesAnUnknownMemberValue) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx01000010");
 }
 
-// The two spellings of one §10.9.2 pattern over one value. The positional form
-// falls through to EvalAssignmentPattern, which copies every word and both
-// planes, so it is the one that was already right: the assertion states the
-// disagreement rather than an expected value, and a fix reaching only the
-// keyed arm leaves it standing.
 TEST(StructPatternSimulation,
      WideStructNamedPatternAgreesWithThePositionalSpelling) {
   SimFixture f;
@@ -98,10 +77,6 @@ TEST(StructPatternSimulation,
   }
 }
 
-// §10.9.2's default: key reaches its own placement function, with its own
-// offset accumulation for a nested substructure, so the member above the first
-// word has to be asked of that one separately. 8'hA5 widens to the 64-bit
-// member as an assignment to it would.
 TEST(StructPatternSimulation,
      WideStructDefaultKeyPlacesEveryMemberAboveTheFirstWord) {
   SimFixture f;
@@ -179,10 +154,6 @@ TEST(StructPatternSimulation, PositionalWithExpression) {
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{1} << 32) | 3);
 }
 
-// §10.9.2: each member expression is evaluated in the context of an assignment
-// to the corresponding member's type, so a value wider than the member is
-// narrowed to the member's width -- observed here by truncating a 16-bit value
-// down to an 8-bit member.
 TEST(StructPatternSimulation, MemberValueCoercedToMemberWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -198,14 +169,6 @@ TEST(StructPatternSimulation, MemberValueCoercedToMemberWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xCD5Au);
 }
 
-// §10.9.2: a by-name member value is an arbitrary expression evaluated in the
-// context of an assignment to that member -- here a runtime `k + 1` is computed
-// through the named-key path and placed into member a.
-// §10.9.2: in a positional structure pattern each element is evaluated in the
-// context of an assignment to its corresponding member's type, so an element
-// wider than its member is narrowed to the member width -- it is not
-// concatenated at its self-determined width, which would spill into and corrupt
-// the following members.
 TEST(StructPatternSimulation, PositionalMemberValueCoercedToMemberWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -278,10 +241,6 @@ TEST(StructPatternSimulation, TypeKeyMultipleFieldsPipeline) {
   EXPECT_EQ(var->value.ToUint64(), (uint64_t{42} << 32) | 42);
 }
 
-// §10.9.2 with §6.22.1: a type key sets the members whose type matches its
-// own, and the one-bit `logic` matches no `logic [7:0]` member, which the
-// default then gives 0; a typedef of `logic [7:0]` matches both. Matched by
-// kind alone, `logic:` filled both members with CD.
 TEST(StructPatternSimulation, ALogicKeyLeavesVectorMembersToTheDefault) {
   const char* src =
       "module t;\n"
@@ -297,9 +256,6 @@ TEST(StructPatternSimulation, ALogicKeyLeavesVectorMembersToTheDefault) {
   EXPECT_EQ(RunAndGet(src, "q"), 0xCDCDu);
 }
 
-// §10.9.2: the default: key is applied recursively to each member of an
-// unmatched substructure, so every leaf of the nested struct receives the
-// default value -- not just the low bits of the substructure field.
 TEST(StructPatternSimulation, DefaultKeyRecursesIntoNestedStruct) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -319,8 +275,6 @@ TEST(StructPatternSimulation, DefaultKeyRecursesIntoNestedStruct) {
   EXPECT_EQ(var->value.ToUint64(), 0xABABABu);
 }
 
-// §10.9.2: when the same type key appears more than once, the last value is
-// used -- and it is applied to every field of that type.
 TEST(StructPatternSimulation, TypeKeyLastValueWinsPipeline) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -351,13 +305,6 @@ TEST(StructPatternSimulation, ReplicationInStructContext) {
   EXPECT_EQ(var->value.ToUint64(), 0xABABu);
 }
 
-// §10.9.2 (printed page 263): each member expression is evaluated in the
-// context of an assignment to the type of the corresponding member, so the
-// pattern initializing `p`, itself a structure, is placed by pair_t's own
-// members, keyed or not. The inner pattern was evaluated with no type to
-// place it by, its elements concatenated in written order: `'{b: 2, a: 1}`
-// put 2 where a lies and 1 where b lies, and the 96-bit outer took the same
-// concatenation, so the read gave 213 rather than 123.
 TEST(StructPatternSimulation,
      NestedPositionalPatternIsPlacedByTheMembersLayout) {
   SimFixture f;
@@ -378,12 +325,6 @@ TEST(StructPatternSimulation,
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
-// §10.9.2 (printed page 263): a member:value gives the named member its
-// value in the context of an assignment to that member's type, so the
-// pattern keyed to `p` is placed by pair_t's members, each byte widened to
-// the int it initializes. Evaluated untyped, the two bytes were concatenated
-// to sixteen bits and deposited at the low end of p: b read 258 and a
-// nothing, 2583 rather than 123.
 TEST(StructPatternSimulation, NestedKeyedPatternIsPlacedByTheMembersLayout) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -403,11 +344,6 @@ TEST(StructPatternSimulation, NestedKeyedPatternIsPlacedByTheMembersLayout) {
   EXPECT_EQ(var->value.ToUint64(), 123u);
 }
 
-// §10.9.2 with §7.8 and §21.2.1.6 (printed page 663, the %p example's own
-// declaration): a keyed assignment pattern initializes an associative array
-// element by element, the keys being index values and each value an
-// assignment pattern of the element type. It was matched against the element
-// struct instead, and every key was reported as no member of it.
 TEST(StructPatternSimulation,
      KeyedPatternInitializesAssociativeArrayOfStructs) {
   SimFixture f;
@@ -426,8 +362,6 @@ TEST(StructPatternSimulation,
   EXPECT_EQ(out, "2 2 5 8 1\n");
 }
 
-// §10.9.2 with §7.5: an item for a member declared as a dynamic array gives
-// it the elements the item lists, whether placed by name or by position.
 TEST(StructAssignmentPatternRun, AnItemFillsADynamicArrayMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -445,12 +379,6 @@ TEST(StructAssignmentPatternRun, AnItemFillsADynamicArrayMember) {
   EXPECT_EQ(out, "3 3 9 | 4 2 6\n");
 }
 
-// §10.9.2 with §6.16: the default: key's value is evaluated as an assignment
-// to each member it reaches, so a string member it reaches holds the string,
-// at the top level and inside a nested structure alike, while an int member
-// beside it takes the literal's bits. The string "first" is written before the
-// patterns, so a member left holding the value's bits as its handle would read
-// some other text, or none, rather than its own.
 TEST(StructPatternSimulation, DefaultKeyGivesAStringMemberTheString) {
   SimFixture f;
   std::string out = RunCapture(
@@ -472,12 +400,6 @@ TEST(StructPatternSimulation, DefaultKeyGivesAStringMemberTheString) {
   EXPECT_EQ(out, "26729 [hi] 4 [ok]\n");
 }
 
-// §10.9.2 with §10.9.1 and §6.16: a member key's pattern for an array of
-// strings gives each element its item as an assignment to a string would, the
-// whole text. Each item's own bits were deposited, cut to the element's 64,
-// and the member's value then taken as one string under one handle, so
-// neither element read back its text; the ten characters of the first item
-// are more than its 64 bits could hold whole.
 TEST(StructPatternSimulation, MemberKeyPatternGivesEachStringElementItsText) {
   SimFixture f;
   std::string out = RunCapture(
@@ -494,12 +416,6 @@ TEST(StructPatternSimulation, MemberKeyPatternGivesEachStringElementItsText) {
   EXPECT_EQ(out, "[abcdefghij] [xy]\n");
 }
 
-// §10.9.2 with §10.9.1: a type key or the default: key reaches an unpacked
-// array member through the rules for arrays, so it gives each element the
-// value: string: puts "z" in both elements of v and default: puts 5 in both of
-// a. Placed across the member as one value, 5 widened over a's 64 bits landed
-// in a[1] alone, and "z" became one handle over v's 128 bits, which neither
-// element read.
 TEST(StructPatternSimulation,
      TypeAndDefaultKeysFillEachElementOfAnArrayMember) {
   SimFixture f;
@@ -517,9 +433,6 @@ TEST(StructPatternSimulation,
   EXPECT_EQ(out, "5 5 [z] [z]\n");
 }
 
-// §10.9.2: the type keys, like the default, apply to each member of a nested
-// structure no member key matched. They reached the top-level members alone,
-// so the nested members took the default.
 TEST(StructPatternSim, ATypeKeyReachesTheMembersOfANestedStructure) {
   const char* src =
       "module t;\n"
@@ -535,9 +448,6 @@ TEST(StructPatternSim, ATypeKeyReachesTheMembersOfANestedStructure) {
   EXPECT_EQ(RunAndGet(src, "c"), 5u);
 }
 
-// §10.9.2: a default whose own type is a member's structure type is assigned
-// to that member whole, and applied member by member to a structure member of
-// any other type. It was spread over the fields of every structure member.
 TEST(StructPatternSim, ADefaultOfAMembersOwnTypeIsAssignedWhole) {
   const char* src =
       "typedef struct packed { logic [7:0] a, b; } pair_t;\n"
@@ -559,10 +469,6 @@ TEST(StructPatternSim, ADefaultOfAMembersOwnTypeIsAssignedWhole) {
   EXPECT_EQ(RunAndGet(src, "s2p"), 0x0707u);
 }
 
-// §10.9.2 with Syntax 10-5: a type key may be a typedef name, which sets each
-// member of a matching type -- one declared with the typedef or with the type
-// it names -- and leaves a member of another type to the default. The name was
-// read as a member name no member had, so the pattern set nothing.
 TEST(StructPatternSim, ATypedefKeySetsTheMembersOfItsType) {
   const char* src =
       "typedef logic [7:0] byte_t;\n"
@@ -578,9 +484,6 @@ TEST(StructPatternSim, ATypedefKeySetsTheMembersOfItsType) {
   EXPECT_EQ(RunAndGet(src, "u"), uint64_t{0x07} << 32);
 }
 
-// §10.9.2 with §6.22.1: `int` matches a `bit signed [31:0]` member, a vector of
-// its state, signing and range, and no `bit [31:0]` member, which is unsigned.
-// Matched by kind, `int:` reached neither.
 TEST(StructPatternSim, AnIntKeyMatchesASignedBitVectorOfItsRange) {
   const char* src =
       "module t;\n"
@@ -590,10 +493,6 @@ TEST(StructPatternSim, AnIntKeyMatchesASignedBitVectorOfItsRange) {
   EXPECT_EQ(RunAndGet(src, "s"), uint64_t{5} << 32);
 }
 
-// §10.9.2 with §6.22.1: two vector types match only over the same packed
-// bounds, so a `logic [7:0]` typedef key sets neither a `logic [8:1]` member
-// nor a `logic [1:0][3:0]` one, eight bits wide as both are, and the default
-// gives them 0.
 TEST(StructPatternSim, ATypeKeyMatchesOnlyAMemberOfItsPackedBounds) {
   const char* src =
       "typedef logic [7:0] byte_t;\n"
@@ -605,10 +504,6 @@ TEST(StructPatternSim, ATypeKeyMatchesOnlyAMemberOfItsPackedBounds) {
   EXPECT_EQ(RunAndGet(src, "s"), 0x5Au);
 }
 
-// §10.9.2: a member declared a dynamic array of longint is not of the type
-// longint, so the `longint` key sets the longint member alone and the default
-// leaves the dynamic array empty. Matched by kind, the key's value was written
-// over the array's handle.
 TEST(StructPatternSim, AnElementTypeKeyDoesNotSetADynamicArrayMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -624,9 +519,6 @@ TEST(StructPatternSim, AnElementTypeKeyDoesNotSetADynamicArrayMember) {
   EXPECT_EQ(out, "5 0\n");
 }
 
-// §10.9.2 with §6.22.1: a structure type matches only itself, so a key naming
-// one sets the member of that type whole and no member of another type, even
-// one as wide; the default gives the int member its value.
 TEST(StructPatternSim, AStructureTypeKeySetsOnlyAMemberOfThatType) {
   const char* src =
       "typedef struct packed { logic [7:0] a, b; } pair_t;\n"

@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.3 states as prose that a chandle may not be a member of an untagged
-// union; §7.3.2 states the obligation (no dynamic type or chandle type in an
-// untagged union), so the report names §7.3.2.
 TEST(UnionDeclarationValidation, ChandleInUnpackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -22,11 +19,6 @@ TEST(UnionDeclarationValidation, ChandleInUnpackedUnion_Rejected) {
                             "7.3.2"));
 }
 
-// What the packed keyword adds is a second, independent rule: §7.2.1 admits
-// only packed data types as members, and a chandle is not one. That rule is
-// what this case names, since it is what distinguishes the source from
-// ChandleInUnpackedUnion_Rejected above (the §7.3.2 report fires here too,
-// the union being untagged as well).
 TEST(UnionDeclarationValidation, ChandleInPackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -63,8 +55,6 @@ TEST(UnionDeclarationValidation, UnpackedUnionBasic_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The void-member rule is §7.2's (a void member only in a tagged union), not
-// §7.3's, so the report names §7.2 at both positions below.
 TEST(UnionDeclarationValidation, VoidMemberInUnpackedUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -89,9 +79,6 @@ TEST(UnionDeclarationValidation, VoidMemberInPackedUnion_Rejected) {
                             "7.2"));
 }
 
-// §7.2 confines the rand and randc qualifiers to unpacked structures, and that
-// is the rule a random qualifier in a union breaks; §7.3 states nothing about
-// random qualifiers.
 TEST(UnionDeclarationValidation, RandInUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -153,9 +140,6 @@ TEST(UnionDeclarationValidation, PackedDimOnSoftUnion_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Footnote 17 to Syntax 7-1 in §7.2 is what requires the packed (or soft)
-// keyword beside a packed dimension, so the report names §7.2 rather than the
-// union clause.
 TEST(UnionDeclarationValidation, PackedDimOnPlainUnion_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,10 +174,6 @@ TEST(UnionDeclarationValidation, StringInTaggedUnion_OK) {
 }
 
 TEST(UnionDeclarationValidation, EventInUntaggedUnion_Rejected) {
-  // An event is a handle-like dynamic type, so like chandle and string it may
-  // only appear as a member of a tagged union. In an untagged union it must be
-  // rejected -- without a tag a sibling member could reinterpret its bits. The
-  // obligation is §7.3.2's, not §7.3's, so the report names §7.3.2.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -206,8 +186,6 @@ TEST(UnionDeclarationValidation, EventInUntaggedUnion_Rejected) {
 }
 
 TEST(UnionDeclarationValidation, EventInTaggedUnion_OK) {
-  // §7.3: the same event member is permitted once the union is tagged, since
-  // the tag makes a type-safe read of the dynamic handle possible.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -250,10 +228,6 @@ TEST(UnionDeclarationValidation, UnpackedUnionOfStructsSharingInitial_OK) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.3.2: a dynamic array, an associative array and a queue are dynamic types,
-// which an untagged union may not hold and a tagged one may. A member written
-// through a typedef name is judged by the type the name stands for, and a
-// fixed-size array member is no dynamic type.
 TEST(UnionDeclarationValidation, DynamicMembersOfAnUntaggedUnionRejected) {
   ElabFixture f;
   ElaborateSrc(

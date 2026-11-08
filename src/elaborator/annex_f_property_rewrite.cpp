@@ -161,54 +161,35 @@ std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
     const std::shared_ptr<const BooleanExpr>& clock) {
   switch (property.kind) {
     case ClockedProperty::Kind::kBoolean:
-      // A Boolean already names a level-sensitive condition; nothing to push.
       return std::make_shared<ClockedProperty>(property);
     case ClockedProperty::Kind::kStrong:
-      // §F.5.1.2: T^p(strong(r), c) = (strong(T^s(r, c))).
       return ClkStrong(RewriteSequenceUnderClock(*property.sequence, clock));
     case ClockedProperty::Kind::kWeak:
-      // §F.5.1.2: T^p(weak(r), c) = (weak(T^s(r, c))).
       return ClkWeak(RewriteSequenceUnderClock(*property.sequence, clock));
     case ClockedProperty::Kind::kClock:
-      // §F.5.1.2: T^p((@(c2) p), c1) = T^p(p, c2). The inner clock c2 takes
-      // over and the incoming clock c1 is discarded.
       return RewritePropertyUnderClock(*property.lhs, property.boolean);
     case ClockedProperty::Kind::kDisableIff:
-      // §F.5.1.2: T^p((disable iff(b) p), c) = (disable iff(b) T^p(p, c)).
       return ClkDisableIff(property.boolean,
                            RewritePropertyUnderClock(*property.lhs, clock));
     case ClockedProperty::Kind::kAcceptOn:
-      // §F.5.1.2: T^p((accept_on(b) p), c) = (accept_on(b) T^p(p, c)). The
-      // asynchronous abort condition b is left untouched.
       return ClkAcceptOn(property.boolean,
                          RewritePropertyUnderClock(*property.lhs, clock));
     case ClockedProperty::Kind::kSyncAcceptOn:
-      // §F.5.1.2: T^p((sync_accept_on(b) p), c) = (accept_on(b && c) T^p(p,c)).
-      // The synchronous abort is sampled with the clock, so its condition is
-      // conjoined with c and it becomes an ordinary accept_on.
       return ClkAcceptOn(BoolAnd(property.boolean, clock),
                          RewritePropertyUnderClock(*property.lhs, clock));
     case ClockedProperty::Kind::kNot:
-      // §F.5.1.2: T^p((not p), c) = (not T^p(p, c)).
       return ClkNot(RewritePropertyUnderClock(*property.lhs, clock));
     case ClockedProperty::Kind::kImplication:
-      // §F.5.1.2: T^p((r |-> p), c) = (T^s(r, c) |-> T^p(p, c)).
       return ClkImplication(
           RewriteSequenceUnderClock(*property.sequence, clock),
           RewritePropertyUnderClock(*property.lhs, clock));
     case ClockedProperty::Kind::kOr:
-      // §F.5.1.2: T^p((p1 or p2), c) = (T^p(p1, c) or T^p(p2, c)).
       return ClkOr(RewritePropertyUnderClock(*property.lhs, clock),
                    RewritePropertyUnderClock(*property.rhs, clock));
     case ClockedProperty::Kind::kAnd:
-      // §F.5.1.2: T^p((p1 and p2), c) = (T^p(p1, c) and T^p(p2, c)).
       return ClkAnd(RewritePropertyUnderClock(*property.lhs, clock),
                     RewritePropertyUnderClock(*property.rhs, clock));
     case ClockedProperty::Kind::kNexttime: {
-      // §F.5.1.2: T^p((nexttime p), c) =
-      //   (!c until (c and nexttime(!c until (c and T^p(p, c))))).
-      // The clock may idle, then on a clock tick the body must hold one further
-      // clocked step later, with the same idle-then-tick pattern repeated.
       auto inner = RewritePropertyUnderClock(*property.lhs, clock);
       auto not_clock = ClkBoolean(BoolNot(clock));
       auto on_clock = ClkBoolean(clock);
@@ -217,10 +198,6 @@ std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
       return ClkUntil(not_clock, ClkAnd(on_clock, step));
     }
     case ClockedProperty::Kind::kUntil: {
-      // §F.5.1.2: T^p((p1 until p2), c) =
-      //   ((not(c and not T^p(p1, c))) until (c and T^p(p2, c))).
-      // Off the clock the obligation idles; on a clock tick p1 must hold until
-      // a clock tick on which p2 holds.
       auto left = RewritePropertyUnderClock(*property.lhs, clock);
       auto right = RewritePropertyUnderClock(*property.rhs, clock);
       auto on_clock = ClkBoolean(clock);
@@ -233,9 +210,6 @@ std::shared_ptr<const ClockedProperty> RewritePropertyUnderClock(
 }
 
 bool PropertyIsUnclocked(const ClockedProperty& property) {
-  // The two forms only a clocked property has, and then the operands: a
-  // sequence operand by §F.3.2's R against S, a property operand by this
-  // predicate again.
   if (property.kind == ClockedProperty::Kind::kClock ||
       property.kind == ClockedProperty::Kind::kSyncAcceptOn) {
     return false;

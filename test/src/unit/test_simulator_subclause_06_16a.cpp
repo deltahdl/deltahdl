@@ -212,9 +212,6 @@ TEST(StringDataType, StringLiteralImplicitlyConvertedInEquality) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-// §6.16, Table 6-9: a string replication with a zero multiplier produces
-// the empty string, so it contributes nothing to an enclosing string
-// concatenation.
 TEST(StringDataType, ZeroMultiplierStringReplicationIsEmpty) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -227,8 +224,6 @@ TEST(StringDataType, ZeroMultiplierStringReplicationIsEmpty) {
   EXPECT_EQ(VecToStr(s->value), "xy");
 }
 
-// §6.16: a string literal assigned to an integral variable whose width
-// equals the literal width is stored unchanged.
 TEST(StringDataType, StringLiteralToExactWidthIntegral) {
   SimFixture f;
   auto* c = RunAndFindVar(
@@ -241,8 +236,6 @@ TEST(StringDataType, StringLiteralToExactWidthIntegral) {
   EXPECT_EQ(c->value.ToUint64() & 0xFFu, 0x41u);
 }
 
-// §6.16: assigning a narrower string literal to a wider integral variable
-// right justifies it and zero-fills on the left.
 TEST(StringDataType, StringLiteralToWiderIntegralZeroFillsLeft) {
   SimFixture f;
   auto* b = RunAndFindVar(
@@ -256,9 +249,6 @@ TEST(StringDataType, StringLiteralToWiderIntegralZeroFillsLeft) {
   EXPECT_EQ(b->value.ToUint64(), 0x41u);
 }
 
-// §6.16: assigning a wider string literal to a narrower integral variable
-// right justifies it and truncates on the left (dropping the leading
-// characters, not the trailing ones).
 TEST(StringDataType, StringLiteralToNarrowerIntegralTruncatesLeft) {
   SimFixture f;
   auto* h = RunAndFindVar(
@@ -271,10 +261,6 @@ TEST(StringDataType, StringLiteralToNarrowerIntegralTruncatesLeft) {
   EXPECT_EQ(VecToStr(h->value), "ello");
 }
 
-// §6.16, Table 6-9: the multiplier of a string replication need not be a
-// constant expression. Here the count is read from a runtime integer
-// variable, and the replication still yields a string result (compare the
-// "a = {i{"Hi"}}; // OK (non-constant replication)" example on p.113).
 TEST(StringDataType, NonConstantMultiplierStringReplication) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -294,9 +280,6 @@ TEST(StringDataType, NonConstantMultiplierStringReplication) {
   EXPECT_EQ(VecToStr(s->value), "ababab");
 }
 
-// §6.16, Table 6-9: relational operators on strings compare using
-// lexicographic ordering. Built from real string variables and run through
-// the full pipeline so the comparison observes produced string values.
 TEST(StringDataType, StringRelationalLessThanFullPipeline) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -314,9 +297,6 @@ TEST(StringDataType, StringRelationalLessThanFullPipeline) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-// §6.16, Table 6-9: when every operand of a concatenation is a string literal,
-// the concatenation behaves as a concatenation of integral values. Assigned to
-// an integral target, {"A","B"} yields the two ASCII bytes packed as 0x4142.
 TEST(StringDataType, AllStringLiteralConcatenationAsIntegral) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -329,9 +309,6 @@ TEST(StringDataType, AllStringLiteralConcatenationAsIntegral) {
   EXPECT_EQ(x->value.ToUint64(), 0x4142u);
 }
 
-// §6.16: converting a string literal to a string variable removes every "\0"
-// character; when nothing remains, the result is the empty string. A literal
-// consisting only of a null byte therefore yields a zero-length string.
 TEST(StringDataType, StringLiteralAllZerosBecomesEmpty) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -343,8 +320,6 @@ TEST(StringDataType, StringLiteralAllZerosBecomesEmpty) {
   EXPECT_EQ(VecToStr(s->value), "");
 }
 
-// §6.16, Table 6-9: when both equality operands are string literals the compare
-// is the ordinary integral equality. Equal literals give 1, differing ones 0.
 TEST(StringDataType, BothStringLiteralsEqualityIsIntegral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -368,9 +343,6 @@ TEST(StringDataType, BothStringLiteralsEqualityIsIntegral) {
   EXPECT_EQ(r_ne->value.ToUint64(), 0u);
 }
 
-// §6.16, Table 6-9: when at least one concatenation operand is a string
-// expression, the string literals are converted and the result is a string.
-// Here a string variable is concatenated with a literal.
 TEST(StringDataType, MixedStringExprAndLiteralConcatenation) {
   SimFixture f;
   auto* c = RunAndFindVar(
@@ -386,9 +358,6 @@ TEST(StringDataType, MixedStringExprAndLiteralConcatenation) {
   EXPECT_EQ(VecToStr(c->value), "foobar");
 }
 
-// §6.16, Table 6-9: an all-literal concatenation used where a string is
-// expected is implicitly converted to string type. Assigned to a string
-// variable, {"A","B"} becomes "AB".
 TEST(StringDataType, AllLiteralConcatAssignedToStringConverts) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -401,9 +370,6 @@ TEST(StringDataType, AllLiteralConcatAssignedToStringConverts) {
   EXPECT_EQ(VecToStr(s->value), "AB");
 }
 
-// §6.16: string indices run 0..N-1 with index 0 the leftmost (first) character
-// and index N-1 the rightmost (last). Built from a real string assignment and
-// run so both ends of the ordering are observed.
 TEST(StringDataType, StringIndexLeftmostAndRightmostFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -429,10 +395,6 @@ TEST(StringDataType, StringIndexLeftmostAndRightmostFromSource) {
   EXPECT_EQ(last->value.ToUint64() & 0xFFu, 0x6Fu);
 }
 
-// §6.16: a string variable declared without an initializer is initialized to
-// the empty string "", which has zero length. Observed end to end by comparing
-// the freshly declared (uninitialized) variable against the empty-string
-// literal with the Table 6-9 equality operator; a default of "" yields 1.
 TEST(StringDataType, UninitializedStringDefaultsToEmpty) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -446,11 +408,6 @@ TEST(StringDataType, UninitializedStringDefaultsToEmpty) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-// §6.16: a string variable's declaration initializer may be a string data type
-// expression, not only a bare string literal or "". Here the initializer is a
-// concatenation of string literals in the declaration position (a distinct code
-// path from a procedural assignment); assigned to the string target it is
-// implicitly converted and the variable is initialized to the joined value.
 TEST(StringDataType, StringExpressionInitializer) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -462,11 +419,6 @@ TEST(StringDataType, StringExpressionInitializer) {
   EXPECT_EQ(VecToStr(s->value), "foobar");
 }
 
-// §6.16, Table 6-9 (comparison row): a relational operator admits a string-type
-// operand on one side and a string literal on the other, with the literal
-// implicitly converted to string for the comparison. This covers the mixed
-// string-variable/string-literal input form for a relational operator (the
-// equality operator's mixed form is covered separately); "abc" < "abd" is true.
 TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -483,13 +435,6 @@ TEST(StringDataType, RelationalLessThanWithStringLiteralOperand) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-// §6.16 (printed page 112): a string held in the string data type rather than
-// an integral variable may be any length and is never truncated. The source is
-// the declaration §6.16 gives as its own example,
-// `parameter string default_name = "John Smith"`, and ten characters is long
-// enough to fail both ways the value used to be cut: the §11.10 fold into
-// RtlirParamDecl::resolved_value keeps the low eight, and the 32-bit fallback
-// in Lowerer::LowerParams kept four of those, printing `mith`.
 TEST(StringDataType,
      StringParameterLongerThanFourCharactersKeepsEveryCharacter) {
   SimFixture f;
@@ -502,12 +447,6 @@ TEST(StringDataType,
   EXPECT_EQ(out, "John Smith\n");
 }
 
-// §6.16: five characters is the first length the 32-bit fallback truncated, so
-// this is the case that goes red the moment the boundary moves by one
-// character. Every string parameter the other §6.16 simulator tests declare is
-// four characters or fewer -- "cat", "ff", "7.5", "p.vc" -- and at that length
-// a lowering that truncates to 32 bits and one that does not produce the same
-// value, so none of them can fail whether the behaviour exists or not.
 TEST(StringDataType,
      StringParameterOfExactlyFiveCharactersKeepsEveryCharacter) {
   SimFixture f;
@@ -520,11 +459,6 @@ TEST(StringDataType,
   EXPECT_EQ(out, "hello\n");
 }
 
-// §6.16: a string parameter has to be known to be a string at run time and not
-// merely be wide enough to hold one, because SimContext::IsStringVariable is
-// what every string operation consults. A lowering that took the width from the
-// characters without registering the variable would satisfy both length
-// assertions above and still leave the value a packed number.
 TEST(StringDataType, StringParameterIsRegisteredAsAStringVariable) {
   SimFixture f;
   auto* p = RunAndFindVar(
@@ -536,12 +470,6 @@ TEST(StringDataType, StringParameterIsRegisteredAsAStringVariable) {
   EXPECT_TRUE(f.ctx.IsStringVariable("NAME"));
 }
 
-// §11.2.1 lists "parameters" among the operands a constant expression consists
-// of, so `parameter string B = A;` is one, and §6.16 lets a string-typed value
-// be any length without truncation. A fold that took only a literal left B
-// holding the §11.10 packed number instead, which is 32 bits wide because a
-// string carries no declared width, so exactly the last four characters
-// survived and this printed "mith".
 TEST(StringDataType,
      AParameterInitializedFromAnotherStringParameterKeepsEveryCharacter) {
   SimFixture f;
@@ -554,9 +482,6 @@ TEST(StringDataType,
             "John Smith\n");
 }
 
-// Table 6-9 of §6.16 defines concatenation over string operands, so this is a
-// second kind of constant string expression rather than the identifier case
-// restated: a repair that resolved only a name would leave this truncated.
 TEST(StringDataType,
      AParameterInitializedFromAStringConcatenationKeepsEveryCharacter) {
   SimFixture f;
@@ -568,10 +493,6 @@ TEST(StringDataType,
             "John Smith\n");
 }
 
-// Table 6-9 defines replication in the row below concatenation, and gives the
-// result as M copies of the inner concatenation joined end to end. Three copies
-// of two characters is six, which is more than the four a packed 32-bit value
-// holds, so a truncating fold cannot reach this answer.
 TEST(StringDataType,
      AParameterInitializedFromAStringReplicationKeepsEveryCharacter) {
   SimFixture f;
@@ -583,14 +504,6 @@ TEST(StringDataType,
             "ababab\n");
 }
 
-// §6.16: a string is an ordered collection of characters. An element of an
-// array of strings is a string, so a bare $display of one has to render its
-// characters. §21.2.1.1 gives $display the decimal default radix that a value
-// of any other type takes, and an element read back without the string mark
-// took it: `$display(a[0])` printed the packed number the six characters spell
-// instead of the characters. The assertion cannot use %s, because FormatArg in
-// src/simulator/eval_format.cpp renders %s through FormatValueAsString whatever
-// the value is marked, so a %s form passes either way.
 TEST(StringDataType, AnElementOfAnArrayOfStringsDisplaysItsCharacters) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"
@@ -604,15 +517,6 @@ TEST(StringDataType, AnElementOfAnArrayOfStringsDisplaysItsCharacters) {
             "planet\n");
 }
 
-// §6.16 makes a variable a string by its declaration, and §6.21 scopes a
-// declaration inside a task to that task, so a `string tag;` in one task says
-// nothing about a `tag` declared elsewhere. The mark used to be a set of
-// unqualified names that nothing erased, so the first declaration made every
-// variable called `tag` a string for the rest of the run: the second task's
-// integer was rendered as characters, 65 printing as A.
-//
-// The string task runs first, so the mark is in place when the second reads.
-// Running it second would leave the case passing whatever keyed the mark.
 TEST(StringSim, AStringInOneTaskDoesNotMakeALikeNamedVariableAStringElsewhere) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"
@@ -634,11 +538,6 @@ TEST(StringSim, AStringInOneTaskDoesNotMakeALikeNamedVariableAStringElsewhere) {
             "         65\n");
 }
 
-// The same rule for a block rather than a task, and for a name that no longer
-// has any declaration at all when it is read. §6.21 gives a begin-end block's
-// declaration the block's lifetime, so leaving the block releases the name;
-// this fails even where no two declarations are live at once, which is the half
-// a case with two live declarations cannot state.
 TEST(StringSim, AStringDeclarationDoesNotOutliveTheBlockThatDeclaredIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"
@@ -658,18 +557,6 @@ TEST(StringSim, AStringDeclarationDoesNotOutliveTheBlockThatDeclaredIt) {
             "         66\n");
 }
 
-// The leading spaces of each expectation are §21.2.1.2's auto-sized decimal
-// field, which $display gives an unformatted integer and which is not what
-// these cases are about; what they are about is that a number is rendered at
-// all. The format is left off deliberately: an explicit %0d states the radix
-// and would be answered the same way whether or not the variable is marked a
-// string, so a case written with one could not fail.
-
-// §18.17 scopes a production identifier to the randsequence statement that
-// declares it, so the implicit variable a string-returning production writes --
-// registered under the production's own name -- says nothing about a variable
-// of that name after the statement. The randsequence is a second writer of the
-// same registry and reaches it by its own path.
 TEST(StringSim, AStringProductionNameDoesNotMarkALaterVariable) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"
@@ -687,10 +574,6 @@ TEST(StringSim, AStringProductionNameDoesNotMarkALaterVariable) {
             "         67\n");
 }
 
-// §6.16 with §7.4: an element of an array of strings is a string, so
-// `sa[0][1] = "X"` replaces one of its characters, and one past its end
-// changes nothing. Taken as a select of the element's bits, it wrote bit 1 of
-// the text, "ab" becoming "a`".
 TEST(StringSim, CharacterWriteIntoAnElementOfAnArrayOfStrings) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -705,10 +588,6 @@ TEST(StringSim, CharacterWriteIntoAnElementOfAnArrayOfStrings) {
             "aX cd\n");
 }
 
-// §6.16 with §7.4.4: a leaf of a multidimensional array of strings is a
-// string, so its methods read its text and a character write replaces one
-// character. Recognized by neither path, m[1][0].len() read 0 and
-// `m[1][0][0] = "P"` wrote a bit of "pq", leaving "pp".
 TEST(StringSim, LeafOfAMultidimensionalArrayOfStringsIsAString) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

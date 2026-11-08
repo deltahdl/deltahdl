@@ -1,20 +1,3 @@
-// Tests for IEEE 1800-2023 §7.9.11 -- associative array literals.
-//
-// §7.9.11 defines four runtime rules, all observed here end-to-end (parse ->
-// elaborate -> lower -> run) so the behavior reflects the production read/
-// write/method paths rather than a hand-built AssocArrayObject:
-//   * an array's contents may be written one entry at a time or replaced whole
-//     by an '{index:value} literal, at declaration or in a procedural assign;
-//   * with a default defined, a read of a missing index returns that default
-//     and issues no warning;
-//   * with no default, a missing read returns the element type's Table 7-1
-//     default (§7.4.5): 0 for a 2-state element, all-x for a 4-state element;
-//   * a defined default does not change the associative array methods.
-//
-// The value expressions in a literal are constant expressions in a declaration
-// initializer, so the literal / parameter / localparam value forms are each
-// exercised (they take different constant-evaluation paths).
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -25,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- Claim: a literal establishes the array contents (declaration form) ------
-
-// A string-keyed literal with a trailing default seeds the named entries; a
-// read of a present key returns its value.
 TEST(AssocLiteral, DeclLiteralStringKeysSeedsEntries) {
   auto v = RunAndGet(
       "module t;\n"
@@ -41,7 +20,6 @@ TEST(AssocLiteral, DeclLiteralStringKeysSeedsEntries) {
   EXPECT_EQ(v, 20u);
 }
 
-// An integer-keyed literal seeds a present entry read back at runtime.
 TEST(AssocLiteral, DeclLiteralIntKeysSeedsEntries) {
   auto v = RunAndGet(
       "module t;\n"
@@ -53,8 +31,6 @@ TEST(AssocLiteral, DeclLiteralIntKeysSeedsEntries) {
   EXPECT_EQ(v, 70u);
 }
 
-// A literal value that is a parameter reference (constant-expression form
-// distinct from an integer literal) is evaluated into the seeded entry.
 TEST(AssocLiteral, DeclLiteralValueFromParameter) {
   auto v = RunAndGet(
       "module t;\n"
@@ -67,8 +43,6 @@ TEST(AssocLiteral, DeclLiteralValueFromParameter) {
   EXPECT_EQ(v, 22u);
 }
 
-// A literal value that is a localparam reference: a second constant-expression
-// form exercising the same seeding path.
 TEST(AssocLiteral, DeclLiteralValueFromLocalparam) {
   auto v = RunAndGet(
       "module t;\n"
@@ -81,11 +55,6 @@ TEST(AssocLiteral, DeclLiteralValueFromLocalparam) {
   EXPECT_EQ(v, 33u);
 }
 
-// --- Claim: whole-array replacement by a literal in a procedural assign
-// -------
-
-// A runtime literal assignment replaces the contents wholesale: the count
-// reflects only the new entries.
 TEST(AssocLiteral, RuntimeLiteralReplacesWholeContents) {
   auto v = RunAndGet(
       "module t;\n"
@@ -102,8 +71,6 @@ TEST(AssocLiteral, RuntimeLiteralReplacesWholeContents) {
   EXPECT_EQ(v, 2u);
 }
 
-// Prior entries are discarded by the replacement: a formerly present key now
-// reads back the 2-state Table 7-1 default (0).
 TEST(AssocLiteral, RuntimeLiteralDropsPriorEntries) {
   auto v = RunAndGet(
       "module t;\n"
@@ -119,7 +86,6 @@ TEST(AssocLiteral, RuntimeLiteralDropsPriorEntries) {
   EXPECT_EQ(v, 0u);
 }
 
-// The replacement establishes its new entries.
 TEST(AssocLiteral, RuntimeLiteralEstablishesNewEntry) {
   auto v = RunAndGet(
       "module t;\n"
@@ -135,7 +101,6 @@ TEST(AssocLiteral, RuntimeLiteralEstablishesNewEntry) {
   EXPECT_EQ(v, 60u);
 }
 
-// String-keyed whole replacement via a runtime literal.
 TEST(AssocLiteral, RuntimeLiteralStringKeyedReplaces) {
   auto v = RunAndGet(
       "module t;\n"
@@ -151,8 +116,6 @@ TEST(AssocLiteral, RuntimeLiteralStringKeyedReplaces) {
   EXPECT_EQ(v, 11u);
 }
 
-// A default supplied by a runtime replacement literal governs later missing
-// reads.
 TEST(AssocLiteral, RuntimeLiteralDefaultGovernsMissingRead) {
   auto v = RunAndGet(
       "module t;\n"
@@ -167,10 +130,6 @@ TEST(AssocLiteral, RuntimeLiteralDefaultGovernsMissingRead) {
   EXPECT_EQ(v, 77u);
 }
 
-// --- Claim: default defined -> missing read returns default, no warning
-// -------
-
-// A default-only literal makes every missing read return the default value.
 TEST(AssocLiteral, DeclDefaultOnlyReturnsDefaultOnMissingRead) {
   auto v = RunAndGet(
       "module t;\n"
@@ -182,9 +141,6 @@ TEST(AssocLiteral, DeclDefaultOnlyReturnsDefaultOnMissingRead) {
   EXPECT_EQ(v, 99u);
 }
 
-// Integer-keyed: a missing read with a default returns the default AND leaves
-// the warning count unchanged. Driven inline so the diagnostic engine is
-// observable; the default arrives from real declaration syntax.
 TEST(AssocLiteral, DefaultReadIntKeyIssuesNoWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -205,7 +161,6 @@ TEST(AssocLiteral, DefaultReadIntKeyIssuesNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// String-keyed variant of the no-warning rule.
 TEST(AssocLiteral, DefaultReadStringKeyIssuesNoWarning) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -226,10 +181,6 @@ TEST(AssocLiteral, DefaultReadStringKeyIssuesNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// --- Claim: no default -> missing read returns Table 7-1 default (§7.4.5)
-// -----
-
-// 2-state integer element, no default: a missing read yields 0.
 TEST(AssocLiteral, MissingReadNoDefaultIntKeyReturnsZero) {
   auto v = RunAndGet(
       "module t;\n"
@@ -241,7 +192,6 @@ TEST(AssocLiteral, MissingReadNoDefaultIntKeyReturnsZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// 2-state string-keyed element, no default: a missing read yields 0.
 TEST(AssocLiteral, MissingReadNoDefaultStringKeyReturnsZero) {
   auto v = RunAndGet(
       "module t;\n"
@@ -253,9 +203,6 @@ TEST(AssocLiteral, MissingReadNoDefaultStringKeyReturnsZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// 4-state element (integer), no default: a missing read yields the all-x
-// Table 7-1 default (§7.4.5). $isunknown reports 1 when any bit is x/z, so the
-// unknown default is observable end-to-end.
 TEST(AssocLiteral, MissingReadNoDefault4StateReturnsX) {
   auto v = RunAndGet(
       "module t;\n"
@@ -267,9 +214,6 @@ TEST(AssocLiteral, MissingReadNoDefault4StateReturnsX) {
   EXPECT_EQ(v, 1u);
 }
 
-// --- Claim: a defined default does not affect the array methods --------------
-
-// num() counts only the real entries, ignoring the default.
 TEST(AssocLiteral, DefaultDoesNotAffectNum) {
   auto v = RunAndGet(
       "module t;\n"
@@ -281,7 +225,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectNum) {
   EXPECT_EQ(v, 2u);
 }
 
-// size() (equivalent count method) likewise ignores the default.
 TEST(AssocLiteral, DefaultDoesNotAffectSize) {
   auto v = RunAndGet(
       "module t;\n"
@@ -293,8 +236,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectSize) {
   EXPECT_EQ(v, 1u);
 }
 
-// exists() on a missing key returns 0 even though a default is defined: the
-// default must not make a nonexistent key appear present.
 TEST(AssocLiteral, DefaultDoesNotAffectExistsMissing) {
   auto v = RunAndGet(
       "module t;\n"
@@ -306,7 +247,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectExistsMissing) {
   EXPECT_EQ(v, 0u);
 }
 
-// first() selects the smallest real index, not the default.
 TEST(AssocLiteral, DefaultDoesNotAffectFirst) {
   auto v = RunAndGet(
       "module t;\n"
@@ -323,7 +263,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectFirst) {
   EXPECT_EQ(v, 10u);
 }
 
-// last() selects the largest real index, not the default.
 TEST(AssocLiteral, DefaultDoesNotAffectLast) {
   auto v = RunAndGet(
       "module t;\n"
@@ -340,7 +279,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectLast) {
   EXPECT_EQ(v, 20u);
 }
 
-// next() traverses only the real entries; the default is not a traversal stop.
 TEST(AssocLiteral, DefaultDoesNotAffectNext) {
   auto v = RunAndGet(
       "module t;\n"
@@ -358,7 +296,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectNext) {
   EXPECT_EQ(v, 20u);
 }
 
-// prev() traverses only the real entries in reverse.
 TEST(AssocLiteral, DefaultDoesNotAffectPrev) {
   auto v = RunAndGet(
       "module t;\n"
@@ -376,7 +313,6 @@ TEST(AssocLiteral, DefaultDoesNotAffectPrev) {
   EXPECT_EQ(v, 10u);
 }
 
-// delete() removes a real entry regardless of a defined default.
 TEST(AssocLiteral, DefaultDoesNotAffectDelete) {
   auto v = RunAndGet(
       "module t;\n"

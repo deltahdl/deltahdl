@@ -17,75 +17,28 @@ namespace delta {
 
 struct Net;
 struct Variable;
-// Declared in parser/ast_type.h; named here only as the argument of the
-// Table 21-11 mapping below, which the header does not otherwise depend on.
 enum class DataTypeKind : uint8_t;
-// Declared in parser/ast_type.h; named here only as the declared direction of a
-// dumped port, which §21.7.4.3.1 makes the choice of state-character list.
 enum class Direction : uint8_t;
 
-// §21.7.5 (Table 21-11): SystemVerilog does not extend the IEEE Std 1364-2005
-// VCD format, so a SystemVerilog data type is dumped by masquerading as a
-// 1364-2005 type. This selects which type the dumped object maps to. kNet keeps
-// the net mapping of §21.7.2.3 (wire) and is the default so nets and the
-// 4-state objects of the earlier subclauses keep their existing declaration
-// form.
 enum class VcdDataType : uint8_t {
-  kNet,       // a net: var_type wire (§21.7.2.3)
-  kBit,       // -> reg, size = total packed dimension
-  kLogic,     // -> reg, size = total packed dimension
-  kInt,       // -> integer, size 32
-  kShortint,  // -> reg, size 16
-  kLongint,   // -> reg, size 64
-  kByte,      // -> reg, size 8
-  kEnum,      // -> integer, size 32 (default for an untyped enum)
-  kReal,      // -> real (also shortreal)
-  // The members below masquerade as nothing. Each names a type §21.7.2.1
-  // (Syntax 21-20) already lists among the var_type keywords, so the dumped
-  // object is declared as what it is rather than as the 1364-2005 type that
-  // Table 21-11 would lend it. What §21.7.2.3 gives them is the size, the
-  // number of bits in the variable, which Table 6-8 fixes for two of the three
-  // below and leaves to the declaration for the third.
-  kReg,      // -> reg, size = declared packed width (Table 6-8: user-defined)
-  kInteger,  // -> integer, size 32 (Table 6-8: 32-bit signed)
-  kTime,     // -> time, size 64 (Table 6-8: 64-bit unsigned)
-  // §6.17 makes an event a handle to a synchronization object rather than a
-  // number of bits, so its §21.7.2.3 size is 0.
-  kEvent,  // -> event, size 0
-  // §6.20 makes a parameter a constant rather than a variable or a net, and
-  // Syntax 21-20 lists parameter among the var_type keywords, so a dumped
-  // parameter is declared as one, at the width its value is stored in.
-  kParameter,  // -> parameter, size = stored width
+  kNet,
+  kBit,
+  kLogic,
+  kInt,
+  kShortint,
+  kLongint,
+  kByte,
+  kEnum,
+  kReal,
+  kReg,
+  kInteger,
+  kTime,
+  kEvent,
+  kParameter,
 };
 
-// §21.7.5 (Table 21-11): map a declared SystemVerilog type keyword to the
-// VcdDataType whose $var declaration masquerades as the matching 1364-2005
-// var_type -- int and enum as integer/32, byte/shortint/longint as reg with
-// their fixed sizes, and bit and logic as reg with the total packed width (also
-// covering a packed array or structure collapsed to one reg vector). Every
-// unmapped kind falls through to kNet, which keeps the net var_type default of
-// §21.7.2.3; real variables are classified separately by their real flag. The
-// lowerer has already reduced a typed enum to its base kind and a packed struct
-// to kBit, so no enum/struct case appears at the definition. Nor is there a
-// kString case: Table 21-11 gives a string no row, and
-// SimContext::RegisterVcdSignals drops one before registration. kEvent is not a
-// Table 21-11 masquerade at all; see its case.
-//
-// The net kinds reach the default and are meant to: DataTypeKind spells wire,
-// tri, uwire and the rest as kinds of their own, so a net never arrives here
-// carrying kLogic, and only an object declared with the logic data type does.
-//
-// Every registration that knows what its object was declared as passes the
-// result of this, so that one table decides the var_type wherever a $var is
-// written -- the simulation driver in SimContext::RegisterVcdSignals and the
-// test fixtures that register a run's variables themselves alike.
 VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind);
 
-// §21.7.2.3: the scope type of a $scope section indicates what kind of scope
-// holds the variables being dumped -- a module (top-level module or module
-// instance), a task, a function, a named sequential block (begin), or a named
-// parallel block (fork). §21.7.5 additionally dumps an unpacked structure as a
-// named fork-join block, reusing the fork kind.
 enum class VcdScopeKind : uint8_t {
   kModule,
   kTask,
@@ -94,36 +47,14 @@ enum class VcdScopeKind : uint8_t {
   kFork,
 };
 
-// §21.7: a VCD file is either a 4-state file, recording changes among 0, 1, x
-// and z without strength, or an extended file, recording changes in every
-// state along with strength. Which of the two a file is decides the form of
-// everything written into it -- the node information (§21.7.4.2 declares a
-// port where §21.7.2.1 declares a 4-state variable), the checkpoint keywords
-// (§21.7.3) and the value changes (§21.7.4.3 prefixes each with p) -- so it is
-// settled when the file is opened, before the first declaration goes out.
-// §21.7.1 gives the 4-state file to $dumpfile and $dumpvars, §21.7.3.1 the
-// extended file to $dumpports.
 enum class VcdFileType : uint8_t {
   kFourState,
   kExtended,
 };
 
-// §21.7.1.2: which of the registered objects the dump covers. $dumpvars chooses
-// the variables written to the dump file, and may be called any number of
-// times, each call adding to what is dumped rather than replacing it -- so a
-// call naming a scope list never takes back what a call with no arguments
-// already selected.
 enum class VcdVarSelection : uint8_t {
-  // No $dumpvars has narrowed the set. A writer driven without the task at all
-  // records every registered object, which is what a dump opened by something
-  // other than a VCD system task wants.
   kEveryObject,
-  // Only the objects a $dumpvars scope list named. Which those are is marked on
-  // the signals themselves, so a second call adds to them.
   kListedObjects,
-  // A $dumpvars with no arguments ran, which puts every variable of the model
-  // in the VCD file. A later scope list adds nothing to that, so this
-  // state does not narrow again.
   kEveryObjectByTask,
 };
 
@@ -132,73 +63,23 @@ struct VcdSignal {
   uint32_t width = 1;
   Variable* var = nullptr;
   char ident = '!';
-  // Net type of the dumped object, used to pick the $var var_type keyword
-  // (§21.7.2.3): a uwire net is recorded as wire.
   NetType net_type = NetType::kWire;
-  // §21.7.4.3.1: the declared direction of the port, which picks the list its
-  // state characters come from. Zero-initialized to kNone, the unknown
-  // direction, for a dumped object no port declaration covers.
   Direction direction{};
-  // §21.7.5 (Table 21-11): the SystemVerilog data type of the dumped object,
-  // used to pick the 1364-2005 var_type keyword and the size it masquerades as.
   VcdDataType data_type = VcdDataType::kNet;
-  // Extended VCD node information (§21.7.4.2): the declared index range of a
-  // port and the integer identifier code used in its $var declaration. msb/lsb
-  // are negative when no vector_index applies, in which case the port is a
-  // 1-bit scalar.
   int32_t msb = -1;
   int32_t lsb = -1;
   uint32_t port_id = 0;
-  // §21.7.4.3: the net behind this object, when it is one. The two strength
-  // components of a port value change report the strength0 and the strength1
-  // specification for the port, and for a net that is what net resolution
-  // settled -- Net::resolved_strength. Null for an object that is not a net,
-  // which has no drive strength at all.
   const Net* net = nullptr;
-  // §21.7.4.3.1: for an input port, the net the parent connected to it, whose
-  // drivers are the port's test-fixture side; null otherwise.
   const Net* source_net = nullptr;
-  // §21.7.5: a member of an unpacked structure is dumped as its own object even
-  // though the model holds the whole structure in one value. bit_offset is
-  // where this member's bits start within that value, and width is how many it
-  // spans, so the member's value is the slice [bit_offset, bit_offset + width).
-  // A plain object leaves the offset at zero and spans its whole value.
   uint32_t bit_offset = 0;
-  // True when this object is a structure member sharing its backing variable
-  // with sibling members. Change detection then compares this member's own
-  // slice against what was last emitted for it (prev_digits), because the
-  // words the whole variable holds are shared by every sibling and cannot tell
-  // which member moved.
   bool is_field = false;
-  // §21.7.1.2: true once a $dumpvars scope list named this object. Read only
-  // while the selection is kListedObjects, and never cleared, because each
-  // $dumpvars call adds to what is dumped.
   bool dump_selected = false;
   std::string prev_digits;
   bool has_prev_digits = false;
-  // §21.7.2.1: a time increment lists only the variables whose value changed
-  // during it, so the end-of-increment scan compares each object against the
-  // value it last put in the file. That value is kept here, and only the
-  // writer writes it. Variable::prev_value is not it: that field belongs to
-  // the §9.4.2 event controls, whose awaiters resync it to the current value
-  // whenever a watched variable moves without qualifying
-  // (EventAwaiter::EdgeGatePasses, src/simulator/awaiters.h), which would hide
-  // from this scan a change the file never recorded. The words are copied
-  // rather than pointed at, because a part-select assignment deposits into the
-  // variable's existing words (DepositBitField, src/common/types.h) and a
-  // shared pointer would move underneath the record. has_prev_words is false
-  // until the first record for this object is written.
   std::vector<Logic4Word> prev_words;
   bool has_prev_words = false;
 };
 
-// The descriptive identity of one dumped object passed to
-// VcdWriter::RegisterSignal (§21.7.5, Table 21-11; §21.7.2.3; §21.7.4.2): its
-// name and width, the backing Variable, the net type and SystemVerilog data
-// type that pick the $var var_type keyword, and the declared index range
-// (msb/lsb negative when no vector_index applies). This is everything that
-// describes the signal itself, distinct from the writer's per-registration
-// counter state (the identifier and port-id sequences).
 struct VcdSignalSpec {
   std::string_view name;
   uint32_t width = 1;
@@ -207,34 +88,15 @@ struct VcdSignalSpec {
   int32_t msb = -1;
   int32_t lsb = -1;
   VcdDataType data_type = VcdDataType::kNet;
-  // §21.7.5: bit position and member flag for an unpacked structure member
-  // registered against the structure's single backing variable. Declared last
-  // so existing positional initializations keep their meaning.
   uint32_t bit_offset = 0;
   bool is_field = false;
-  // §21.7.4.3: the net this object is, whose resolved strength answers the two
-  // strength components of its port value changes. Null when the object is not
-  // a net.
   const Net* net = nullptr;
-  // §21.7.4.3.1: the declared direction of the port, which picks the list its
-  // state characters come from. kNone for a dumped object no port declaration
-  // covers, which reads the unknown-direction list.
   Direction direction{};
-  // §21.7.2.3: the reference written in the object's $var declaration, its
-  // own name within the $scope it is declared in. Empty where that is `name`
-  // itself; `name` stays the hierarchical name $dumpvars selects on.
   std::string_view ref_name = {};
-  // §21.7.4.3.1: for an input port, the net the parent connected to it.
   const Net* source_net = nullptr;
 };
 
-// The §21.7.2.2 value character of one bit of a dumped object: 0, 1, x or z,
-// read out of the 4-state words the object's Variable holds. Shared because the
-// §21.7.4.3 port records in vcd_writer_port.cpp start from the same four values
-// before §21.7.4.3.1 respells them for the port's direction.
 char VcdBitChar(const VcdSignal& sig, int32_t bit);
-// §21.7.4.2 (Syntax 21-28): the extended file's $var declaration of the port
-// `sig`, declared under the reference `name`. Defined in vcd_writer_port.cpp.
 void WritePortVarDecl(std::ostream& ofs, const VcdSignal& sig,
                       std::string_view name);
 
@@ -248,30 +110,13 @@ class VcdWriter {
 
   bool IsOpen() const { return ofs_.is_open(); }
 
-  // Emit the VCD header (§21.7.2.3 keyword sections). When the $dumpfile
-  // filename was given by a variable or expression, dumpfile_literal carries
-  // that unevaluated literal so it can be reproduced in the $version section.
   void WriteHeader(std::string_view timescale,
                    std::string_view dumpfile_literal = {});
-  // §21.7.2.3: open a $scope section whose scope_type keyword indicates the
-  // kind of scope holding the dumped variables (module, task, function, begin,
-  // or fork). §21.7.5 dumps an unpacked structure as a named fork-join block,
-  // so it passes kFork.
   void BeginScope(std::string_view name,
                   VcdScopeKind kind = VcdScopeKind::kModule);
   void EndScope();
-  // §21.7.2.3: the $comment section is the dumper's means of inserting a
-  // comment in the VCD file. The text (single- or multi-line) is written
-  // between the $comment keyword and its $end.
   void WriteComment(std::string_view text);
-  // Register one dumped object from its descriptive identity (§21.7.5). The
-  // spec bundles the name/width/Variable plus the net type, declared index
-  // range, and SystemVerilog data type so the registration carries one entity
-  // rather than a long positional argument list.
   void RegisterSignal(const VcdSignalSpec& spec);
-  // Convenience overload for the common case of a plain net (§21.7.2.3): only
-  // the name, width, and backing Variable vary; the net type, index range, and
-  // data type take their defaults.
   void RegisterSignal(std::string_view name, uint32_t width, Variable* var) {
     RegisterSignal(VcdSignalSpec{name, width, var});
   }
@@ -279,170 +124,61 @@ class VcdWriter {
 
   void WriteTimestamp(uint64_t time);
   void DumpAllValues();
-  // §21.7.2.4: a checkpoint section belongs after the simulation_time command
-  // of the time unit in which its task executed, so the timed forms first
-  // record that time (once -- a marker already written for this time is not
-  // repeated) and then emit the section.
   void DumpAllValues(uint64_t time);
   void DumpSelectedValues(const std::vector<std::string_view>& names);
-  // §21.7.1.2: dump the values selected by a $dumpvars scope list. A scope that
-  // exactly names a signal is an individual variable and is always dumped; a
-  // scope that names a module instance selects every signal beneath it, with
-  // `level` bounding how many levels of hierarchy below the module to descend
-  // (0 means every level below).
   void DumpScopeSelectedValues(const std::vector<std::string_view>& names,
                                uint64_t level);
-  // §21.7.2.4: as DumpAllValues(time) -- record the execution time, then the
-  // scope-selected checkpoint section.
   void DumpScopeSelectedValues(const std::vector<std::string_view>& names,
                                uint64_t level, uint64_t time);
   void DumpChangedValues(uint64_t prev_time);
-  // §21.7.3.1: emits the opening $dumpports checkpoint whose start was
-  // deferred to the end of its execution time unit.
   void EmitPendingPortStartCheckpoint();
 
-  // Generate a checkpoint (§21.7.1.4): emit a $dumpall checkpoint recording the
-  // current value of every selected variable.
   void DumpAll();
-  // §21.7.2.4: the $dumpall section for time T sits after the #T command.
   void DumpAll(uint64_t time);
 
-  // Suspend the dump (§21.7.1.3): emit a checkpoint that records every selected
-  // variable as x and then stop recording further value changes.
   void DumpOff();
-  // §21.7.2.4: the $dumpoff section for time T sits after the #T command.
   void DumpOff(uint64_t time);
-  // Resume the dump (§21.7.1.3): re-enable recording and emit a checkpoint of
-  // each variable's current value.
   void DumpOn();
-  // §21.7.2.4: the $dumpon section for time T sits after the #T command.
   void DumpOn(uint64_t time);
 
   bool IsEnabled() const { return enabled_; }
 
-  // §21.7.1.3: value change dumping starts at the end of the simulation time
-  // unit in which $dumpvars executes. A driver that arms this gate keeps the
-  // per-timestep change recording (WriteTimestamp/DumpChangedValues) quiet
-  // until the first $dumpvars-driven checkpoint runs, so nothing earlier than
-  // that time unit reaches the file. The gate defaults open, so a writer
-  // driven without a $dumpvars call keeps recording as before.
   void ArmDumpvarsStart() { dump_started_ = false; }
 
-  // §21.7.1.2: name the module the run's registered signals are named relative
-  // to, which is the module the declarations were written under the $scope of.
-  // A $dumpvars scope argument is written from the top module down -- "top",
-  // "top.mod1" in the subclause's own examples -- while a signal is registered
-  // by its path below that module, the top module's own variables by their
-  // bare names. Without this the writer cannot tell which of a scope
-  // argument's components is the top module, and a scope naming it selects
-  // nothing at all.
   void SetTopScope(std::string_view name) { top_scope_ = std::string(name); }
 
-  // Read the dump file during simulation (§21.7.1.6): push any buffered output
-  // out to the file so an application reading the file mid-simulation sees
-  // every value change recorded so far. The dump state is untouched, so dumping
-  // continues afterward exactly as before and no value changes are lost.
   void Flush();
 
-  // Limit the dump file size (§21.7.1.5): once the file reaches limit_bytes the
-  // dumper stops recording and inserts a comment noting the limit was reached.
   void SetSizeLimit(uint64_t limit_bytes) { size_limit_ = limit_bytes; }
 
-  // Mark this writer as producing an extended VCD file (§21.7.3). The extended
-  // VCD format adds the $vcdclose keyword command over the 4-state format, so
-  // only an extended writer emits it.
   void SetExtended() { extended_ = true; }
 
-  // True when this writer produces an extended VCD file (§21.7.3), which is
-  // the form $vcdclose belongs to: §21.7.3.6 gives the keyword command to the
-  // extended format as its one addition over the 4-state format, whose keyword
-  // commands Table 21-10 lists without it.
   bool IsExtended() const { return extended_; }
 
-  // §21.7.3.1: $dumpports value change dumping starts at the end of the
-  // simulation time unit in which the task executed, not at the execution
-  // point. The task therefore schedules its opening checkpoint here; the next
-  // end-of-timestep recording pass (DumpChangedValues) emits it, so the
-  // checkpoint carries each selected object's value as it stands once the
-  // time unit has fully played out. An empty scope list selects every
-  // registered object (the calling-module default); a non-empty list keeps
-  // each named module scope's own objects only -- objects of instantiations
-  // below a listed scope stay out of the dump, both in the checkpoint and in
-  // the per-timestep recording that follows.
   void SchedulePortDumpStart(std::vector<std::string> scopes, uint64_t time);
 
-  // Emit the node information section in the extended VCD form (§21.7.4.2). The
-  // $dumpports task records ports rather than the 4-state nets/variables, so
-  // each $var declaration uses the var_type keyword port, prints the port's
-  // declared index range (or 1 for a scalar) as its size, and identifies the
-  // port with an integer code preceded by < that ascends from zero in
-  // declaration order. This is independent of the 4-state declaration form used
-  // by a plain writer.
   void SetExtendedPortNodes() { port_nodes_ = true; }
 
-  // §21.7.4.1 (Syntax 21-27): an extended file's version_text is a version
-  // identifier followed by the $dumpports commands that produced the file, and
-  // §21.7.3.1 lets a source issue several of them so long as they all execute
-  // at one simulation time. The last of those runs after the first has already
-  // opened the file, so a writer told to buffer builds the declaration
-  // commands in memory instead of on disk and keeps a place in the version
-  // section for the commands still to come. §21.7.1.2 has the same shape for
-  // $dumpvars, whose calls decide which objects are declared at all, so the
-  // held declarations are narrowed to the dumped objects as they are written
-  // out. Call before WriteHeader.
   void BufferDeclarations();
-  // §21.7.4.1: add one dumpports_command to the version_text. Does nothing on
-  // a writer that is not buffering, whose version section is already on disk
-  // and can take no more.
   void AddVersionCommand(std::string_view text);
 
-  // Emit the $vcdclose keyword command (§21.7.3.6.1): when an extended VCD file
-  // is closed, record the final simulation time so a reader knows the end time
-  // regardless of whether any signal changed at that time. Syntax 21-26:
-  // $vcdclose <final_simulation_time> $end. A 4-state writer emits nothing.
   void WriteVcdClose(uint64_t final_time);
 
  private:
-  // §21.7.2.4: write the simulation_time command for `time` unless the file's
-  // most recent time marker already names it. Bypasses the enabled/started
-  // gates: callers invoke it only when a checkpoint section is definitely
-  // about to be emitted (for example $dumpon, which runs while suspended).
   void EnsureTimestamp(uint64_t time);
   void WriteScalarChange(const VcdSignal& sig);
   void WriteVectorChange(const VcdSignal& sig);
-  // Emit a real value change (§21.7.2.1): real variables are dumped as real
-  // numbers using a %.16g format so all 53 mantissa bits are preserved.
   void WriteRealChange(const VcdSignal& sig);
-  // Emit a port value change in the extended VCD form (§21.7.4.3, Syntax
-  // 21-29): the key character p, the port_value state character(s), the
-  // strength0 and strength1 strength components, then the port's identifier
-  // code (< followed by its integer code as written in the $var declaration).
   void WritePortValueChange(const VcdSignal& sig);
-  // Takes a mutable signal because each object records the value it just put
-  // in the file (prev_words, or prev_digits for a structure member per
-  // §21.7.5), which is what its change detection compares against.
   void WriteSignalChange(VcdSignal& sig);
   void WriteSignalAllX(const VcdSignal& sig);
-  // Returns true once the configured size limit has been reached, emitting the
-  // limit comment exactly once when the threshold is first crossed.
   bool AtSizeLimit();
 
-  // Where a command goes: the buffer while the declarations are being held,
-  // the file otherwise. A checkpoint written while they are held is held
-  // behind them, so it still follows the $enddefinitions it belongs after.
   std::ostream& Out() {
     return buffer_decls_ ? static_cast<std::ostream&>(decl_buf_)
                          : static_cast<std::ostream&>(ofs_);
   }
-  // Put the held text on disk, the version_text's dumpports commands spliced
-  // into the place WriteHeader kept for them and the declarations narrowed to
-  // the objects the dump covers, and go back to writing straight through. The
-  // end-of-time-unit recording calls this first, as does every entry point
-  // that must see the file as it stands. Does nothing when nothing is held.
   void FlushDeclarations();
-  // §21.7.2.3: one $scope, $upscope or $var command in the held text, by its
-  // byte range, so a flush can leave out what the dump does not cover. A $var
-  // names the index of its object in signals_.
   enum class HeldDeclKind : uint8_t { kScope, kUpscope, kVar };
   struct HeldDecl {
     size_t begin;
@@ -450,63 +186,34 @@ class VcdWriter {
     HeldDeclKind kind;
     size_t signal;
   };
-  // Remember the command just written from `begin` to the buffer's end, when
-  // the declarations are being held.
   void HoldDecl(size_t begin, HeldDeclKind kind, size_t signal = 0);
-  // Which of held_decls_ stay: the $var of each object the dump covers, and
-  // each $scope section, with its $upscope, that is left holding one.
   std::vector<bool> KeptHeldDecls() const;
-  // The held text with the $var of every object the dump does not cover left
-  // out, and every $scope section left with no $var in it.
   std::string SelectedDeclarations(const std::string& text) const;
 
   std::ofstream ofs_;
-  // §21.7.4.1: the declaration commands, held until every dumpports_command
-  // that belongs in the version section is known. See BufferDeclarations.
   std::ostringstream decl_buf_;
   bool buffer_decls_ = false;
   std::vector<HeldDecl> held_decls_;
-  // Offset in decl_buf_ where a dumpports_command belongs: after the version
-  // identifier, before the $version section's $end.
   size_t version_commands_at_ = 0;
   std::vector<std::string> version_commands_;
   std::vector<VcdSignal> signals_;
   char next_ident_ = '!';
   bool enabled_ = true;
-  // §21.7.1.3: false only after ArmDumpvarsStart() and before the first
-  // $dumpvars checkpoint; gates the per-timestep change recording.
   bool dump_started_ = true;
-  // §21.7.1.2: the module a scope argument is written down from, empty when
-  // the caller named none. See SetTopScope.
   std::string top_scope_;
-  // §21.7.1.2: which objects the dump covers, which every checkpoint and the
-  // per-timestep change pass read through DumpsObject.
   VcdVarSelection var_selection_ = VcdVarSelection::kEveryObject;
 
-  // Whether one registered object is one of the variables to dump.
   bool DumpsObject(const VcdSignal& sig) const {
     return var_selection_ != VcdVarSelection::kListedObjects ||
            sig.dump_selected;
   }
 
-  // §21.7.1.2: narrow the dump to what $dumpvars scope lists have named. A
-  // no-argument call has already selected every variable in the model, and a
-  // later call adds to what is dumped, so that state stands.
-  //
-  // An extended file is left alone. §21.7.3.1 gives $dumpports a scope_list of
-  // its own and port_selection_active_/port_scopes_ are what answer it, and
-  // the opening $dumpports checkpoint reaches DumpScopeSelectedValues by way
-  // of EmitPendingPortStartCheckpoint rather than from a $dumpvars call.
   void NarrowSelectionToListed() {
     if (port_nodes_) return;
     if (var_selection_ != VcdVarSelection::kEveryObjectByTask)
       var_selection_ = VcdVarSelection::kListedObjects;
   }
   uint64_t last_time_ = 0;
-  // §21.7.2.4: true once any simulation_time command has been written, so a
-  // repeated marker for the same time (a checkpoint stamped its execution time
-  // and the per-timestep recording then reports the same time) is elided --
-  // each recorded time introduces one group of the commands that follow it.
   bool have_time_ = false;
   bool header_written_ = false;
   uint64_t size_limit_ = 0;
@@ -514,26 +221,13 @@ class VcdWriter {
   bool extended_ = false;
   bool port_nodes_ = false;
   uint32_t next_port_id_ = 0;
-  // §21.7.3.1: a $dumpports start scheduled for the end of its execution time
-  // unit but not yet emitted, with the time to stamp on the checkpoint and
-  // the module scopes selecting the dumped objects (empty selects all).
-  // port_selection_active_ keeps a non-empty scope_list in force for the
-  // per-timestep recording after the checkpoint, so objects outside the
-  // listed scopes are never dumped.
   bool port_start_pending_ = false;
   uint64_t port_start_time_ = 0;
   std::vector<std::string> port_scopes_;
   bool port_selection_active_ = false;
-  // True once any $dumpports start has been scheduled, so a further call is
-  // recognized as adding to the existing selection rather than opening it.
   bool port_start_scheduled_ = false;
 };
 
-// §21.7: one of the two dump files a source can ask for -- the writer it is
-// dumped through, the name the file stands under, and the unevaluated source
-// spelling of the argument that named it (§21.7.2.3). `owned` is null when the
-// writer was installed from outside and belongs to its caller, in which case
-// both dumps hold it and neither may destroy it.
 struct VcdDump {
   explicit VcdDump(std::string default_name)
       : file_name(std::move(default_name)) {}

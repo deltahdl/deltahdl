@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -9,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.6.2: a class may declare pre_randomize()/post_randomize() so long as the
-// declaration matches the built-in prototype 'function void <name>();' — a
-// void-returning function taking no arguments.
 TEST(PrePostRandomizePrototype, ConformingOverridesOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -23,8 +18,6 @@ TEST(PrePostRandomizePrototype, ConformingOverridesOk) {
              "endmodule\n"));
 }
 
-// 18.6.2: the prototype has a void return type; a value-returning override
-// does not conform.
 TEST(PrePostRandomizePrototype, NonVoidPreRandomizeError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -53,8 +46,6 @@ TEST(PrePostRandomizePrototype, NonVoidPostRandomizeError) {
                             "18.6.2"));
 }
 
-// 18.6.2: the prototype takes no arguments; an override with a formal does not
-// conform.
 TEST(PrePostRandomizePrototype, PreRandomizeWithArgError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -83,8 +74,6 @@ TEST(PrePostRandomizePrototype, PostRandomizeWithArgError) {
                             "18.6.2"));
 }
 
-// 18.6.2: the prototype is a function; a task named pre_randomize does not
-// conform.
 TEST(PrePostRandomizePrototype, PreRandomizeTaskFormError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -100,8 +89,6 @@ TEST(PrePostRandomizePrototype, PreRandomizeTaskFormError) {
                             2, "18.6.2"));
 }
 
-// 18.6.2: likewise a task named post_randomize does not conform to the
-// 'function void post_randomize();' prototype.
 TEST(PrePostRandomizePrototype, PostRandomizeTaskFormError) {
   ElabFixture f;
   EXPECT_FALSE(

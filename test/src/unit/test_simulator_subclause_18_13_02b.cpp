@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.13.2: the clause's three examples, $urandom_range(7, 0), (7) with
-// minval omitted and (0, 7) with the arguments reversed, each yield a value
-// from 0 to 7 inclusive: over 256 draws every draw of each form is within the
-// range and every one of the eight values is drawn, as the design
-// test/src/e2e/urandom_range_function.sv runs it.
 TEST(UrandomRangeRun, TheThreeExamplesEachYieldZeroToSeven) {
   SimFixture f;
   std::string out = RunCapture(
@@ -37,11 +32,6 @@ TEST(UrandomRangeRun, TheThreeExamplesEachYieldZeroToSeven) {
   EXPECT_EQ(out, "768 8 8 8\n");
 }
 
-// 18.13.2: the result and both arguments are unsigned, and the range is
-// maxval ... minval inclusive: equal bounds of 5 return 5 on all of 32 draws,
-// and bounds above the largest int, 32'hFFFF_FFF0 to 32'hFFFF_FFFF, keep
-// every one of 32 draws at or above the lower bound, which a signed reading
-// of either would not.
 TEST(UrandomRangeRun, EqualBoundsAndBoundsAboveTheLargestIntAreKept) {
   SimFixture f;
   std::string out = RunCapture(
@@ -61,9 +51,6 @@ TEST(UrandomRangeRun, EqualBoundsAndBoundsAboveTheLargestIntAreKept) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// 18.13.2: $urandom_range is automatically thread stable (18.14.2), so a
-// forked thread seeded with 9 draws the same eight values whether the thread
-// forked beside it draws eight numbers or a hundred and eight.
 TEST(UrandomRangeRun, ASeededThreadReplaysBesideABusierNeighbour) {
   SimFixture f;
   std::string out = RunCapture(

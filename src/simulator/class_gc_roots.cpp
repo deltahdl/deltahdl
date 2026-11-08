@@ -22,7 +22,6 @@ namespace delta {
 
 namespace {
 
-// The 64 bits of `value` from bit `at` up, zero past its last word.
 uint64_t WindowAt(const Logic4Vec& value, uint32_t at) {
   const uint32_t kWord = at / 64;
   const uint32_t kShift = at % 64;
@@ -52,10 +51,6 @@ void ClassGcMarker::Words(const Logic4Vec& value) {
 
 void ClassGcMarker::Fields(const Logic4Vec& value, const StructTypeInfo& layout,
                            uint32_t base) {
-  // §7.2: a member of an unpacked structure sits at whatever bit its layout
-  // puts it, which a reading of whole words misses unless it starts one, so a
-  // member of a class type is read where it stands, and a nested structure
-  // member at the bits its own layout gives within it.
   for (const StructFieldInfo& field : layout.fields) {
     const uint32_t kAt = base + field.bit_offset;
     if (field.nested != nullptr) {
@@ -69,8 +64,6 @@ void ClassGcMarker::Fields(const Logic4Vec& value, const StructTypeInfo& layout,
 void ClassGcMarker::Var(const Variable* var) {
   if (var == nullptr) return;
   Words(var->value);
-  // §8.29: a pending nonblocking assignment to the variable keeps what it will
-  // write reachable.
   if (var->has_pending_nba) Words(var->pending_nba);
 }
 
@@ -82,8 +75,6 @@ void ClassGcMarker::Queue(const QueueObject* queue) {
 
 void ClassGcMarker::Assoc(const AssocArrayObject* assoc) {
   if (assoc == nullptr) return;
-  // §7.8.5: an array indexed by a class keeps the objects of its keys as well
-  // as those its elements hold.
   for (const auto& [key, element] : assoc->int_data) {
     Handle(static_cast<uint64_t>(key.Low()));
     Words(element);
@@ -145,8 +136,6 @@ void ClassGcMarker::Propagate() {
 
 namespace {
 
-// The handles among the words of `value` that name class objects, added to
-// `handles`.
 void AddObjectHandles(SimContext& ctx, const Logic4Vec& value,
                       std::vector<uint64_t>& handles) {
   for (uint32_t i = 0; i < value.nwords; ++i) {
@@ -156,8 +145,6 @@ void AddObjectHandles(SimContext& ctx, const Logic4Vec& value,
   }
 }
 
-// A pin holding `handles` in the scheduler's pinned set until it is released;
-// null where there are none.
 std::shared_ptr<void> PinHandles(Scheduler& scheduler,
                                  std::vector<uint64_t> handles) {
   if (handles.empty()) return nullptr;
@@ -185,8 +172,6 @@ void PinEventHandles(Event& event, SimContext& ctx,
   std::vector<uint64_t> handles;
   for (const Logic4Vec& value : values) AddObjectHandles(ctx, value, handles);
   if (target != nullptr) handles.push_back(target->handle);
-  // A pin owns no pointer, only the deleter that unpins its handles, so it is
-  // the handles and not the pin that say whether there is anything to keep.
   if (handles.empty()) return;
   std::shared_ptr<void> pin =
       PinHandles(ctx.GetScheduler(), std::move(handles));

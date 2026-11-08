@@ -120,9 +120,6 @@ TEST(HierarchicalNameElaboration,
       "  assign x = m.my_task.local_var;\n"
       "endmodule\n",
       f);
-  // §13.3.1 is the clause that states the rule for a task, and it is what the
-  // report names; §23.6 governs the hierarchical name itself, which is
-  // well-formed here.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "hierarchical reference to object in automatic task is not permitted", 7,
@@ -143,7 +140,6 @@ TEST(HierarchicalNameElaboration,
       "  assign x = m.my_func.tmp;\n"
       "endmodule\n",
       f);
-  // §13.4.2 states the rule for a function, and names itself on the report.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "hierarchical reference to object in automatic "
                             "function is not permitted",
@@ -178,9 +174,6 @@ TEST(HierarchicalNameElaboration, NamedBeginEndBlockCreatesBranch) {
              "endmodule\n"));
 }
 
-// §23.6: a named fork-join block defines a new hierarchy branch, just like a
-// named begin-end block. This is the fork-join input form of the branch rule
-// (the begin-end form is covered separately).
 TEST(HierarchicalNameElaboration, NamedForkJoinBlockCreatesBranch) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -282,9 +275,6 @@ TEST(HierarchicalNameElaboration, InstanceSelectInRangeElaboratesOk) {
              "endmodule\n"));
 }
 
-// §23.6: the instance select is a constant expression, not just a literal. A
-// parameter is one of the constant forms of 11.2.1, so a parameter-valued
-// select that lands inside the array bounds is accepted.
 TEST(HierarchicalNameElaboration, InstanceSelectViaParameterInRangeOk) {
   EXPECT_TRUE(
       ElabOk("module child;\n"
@@ -298,9 +288,6 @@ TEST(HierarchicalNameElaboration, InstanceSelectViaParameterInRangeOk) {
              "endmodule\n"));
 }
 
-// §23.6: the constant expression shall evaluate to a legal index value. The
-// out-of-range check applies to a parameter-valued select exactly as it does to
-// a literal one -- the select is resolved against the module's parameter scope.
 TEST(HierarchicalNameElaboration, InstanceSelectViaParameterOutOfRangeError) {
   ElabFixture f;
   ElabOk(
@@ -320,10 +307,6 @@ TEST(HierarchicalNameElaboration, InstanceSelectViaParameterOutOfRangeError) {
       "23.6"));
 }
 
-// §23.6: the select is a constant expression, not just a single literal token.
-// A folded arithmetic expression that lands outside the array bounds is
-// likewise rejected -- exercising the expression-evaluation path rather than a
-// bare literal read.
 TEST(HierarchicalNameElaboration,
      InstanceSelectViaConstantExpressionOutOfRangeError) {
   ElabFixture f;
@@ -343,24 +326,6 @@ TEST(HierarchicalNameElaboration,
       "23.6"));
 }
 
-// §23.6 says a hierarchical name reference names its object by joining the
-// names of the modules, module instances, generate blocks, tasks, functions and
-// the rest that contain it, and puts no condition on where the reference is
-// written. Every position a statement holds a statement in is therefore one the
-// two rules below reach: the unresolved-member report, and the instance select
-// §23.6 requires when an instance array name is not the last path element.
-// CollectMemberAccessInStmt in src/elaborator/elaborator_scope_rules_hier.cpp,
-// which gathers the accesses both checks read, had written out twelve of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
-// missing link was Stmt::rs_productions; the cases below cover the two
-// statement lists a randsequence production holds, once for each of the two
-// rules.
-
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(HierarchicalNameElaboration,
      UnresolvedMemberInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -383,11 +348,6 @@ TEST(HierarchicalNameElaboration,
                             7, "23.6"));
 }
 
-// §18.17.1's Syntax 18-14 gives `rs_rule ::= rs_production_list [ :=
-// rs_weight_specification [ rs_code_block ] ]`, putting a second code block
-// after the weight. The parser keeps it in RsRule::weight_code, a list a walk
-// reaches without reaching RsProd::code_stmts, so the case above does not
-// answer for it.
 TEST(HierarchicalNameElaboration,
      UnresolvedMemberInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;
@@ -411,10 +371,6 @@ TEST(HierarchicalNameElaboration,
                             7, "23.6"));
 }
 
-// §23.6: an array name that is not the last element of a hierarchical path
-// needs its instance select expression. A reference written in a randsequence
-// production's code block is subject to that as one written in a continuous
-// assignment is.
 TEST(HierarchicalNameElaboration,
      InstanceArrayRefMissingSelectInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -438,10 +394,6 @@ TEST(HierarchicalNameElaboration,
                             9, "23.6"));
 }
 
-// The same rule in the weight code block RsRule::weight_code holds, which the
-// case above does not reach. The instance-array check reads the same collected
-// accesses as the unresolved-member check, so each position is covered once for
-// each rule.
 TEST(HierarchicalNameElaboration,
      InstanceArrayRefMissingSelectInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;
@@ -466,21 +418,6 @@ TEST(HierarchicalNameElaboration,
                             9, "23.6"));
 }
 
-// §23.6 ends by forbidding hierarchical references into checkers (Clause 17),
-// putting no condition on where the reference is written, so every position a
-// statement holds a statement in is one the report reaches.
-// WalkStmtsForCheckerRef in src/elaborator/elaborator_validate_hier_refs.cpp
-// had written out nine of the thirteen child-statement links Stmt declares and
-// now takes the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
-// the four positions it was missing, each of which elaborated clean beforehand
-// with the reference into the checker left unreported.
-
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement. The parser keeps it in
-// Stmt::assert_pass_stmt.
 TEST(HierarchicalNameElaboration,
      CheckerRefInAnAssertionPassStatementIsReported) {
   ElabFixture f;
@@ -501,8 +438,6 @@ TEST(HierarchicalNameElaboration,
                             8, "23.6"));
 }
 
-// The else arm of the same production, which the parser keeps in
-// Stmt::assert_fail_stmt -- a link the pass-arm case above does not reach.
 TEST(HierarchicalNameElaboration,
      CheckerRefInAnAssertionFailStatementIsReported) {
   ElabFixture f;
@@ -523,10 +458,6 @@ TEST(HierarchicalNameElaboration,
                             8, "23.6"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §23.6 is a
-// rule about the name rather than about what runs, so it holds whether the
-// weighted draw would ever select the item or not.
 TEST(HierarchicalNameElaboration, CheckerRefInARandcaseItemIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -545,10 +476,6 @@ TEST(HierarchicalNameElaboration, CheckerRefInARandcaseItemIsReported) {
                             7, "23.6"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(HierarchicalNameElaboration,
      CheckerRefInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -572,18 +499,6 @@ TEST(HierarchicalNameElaboration,
                             9, "23.6"));
 }
 
-// §23.6 bars a hierarchical reference into a checker, and §23.7 decides which
-// dotted names are hierarchical: the first component is resolved, and where it
-// names a data object or an interface port, the dotted name selects from that
-// object or port. §23.9 says which declaration that first component reaches --
-// a local declaration is the one used -- and a begin-end block is one of the
-// scopes it lists, so a block-local `chk_inst` is what `chk_inst.a` selects
-// from and the checker instance is not reached at all.
-//
-// The rule resolved nothing: it matched the leftmost component of a member
-// access against the set of checker instance names, so this legal source was
-// refused. The local carries the checker instance's name deliberately; one
-// named anything else cannot fail.
 TEST(HierarchicalNameElaboration,
      ABlockLocalOfACheckerInstanceNameIsNotAHierRefIntoTheChecker) {
   ElabFixture f;
@@ -605,13 +520,6 @@ TEST(HierarchicalNameElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The true positive beside the case above: the same block with the shadowing
-// declaration taken out, so the leftmost component reaches the checker instance
-// and §23.6's closing sentence applies. A fix that silenced the rule wherever a
-// member access stood inside a procedure would pass the case above and fail
-// this one, which is what makes the two a pair rather than one acceptance.
-// HierarchicalReferenceIntoCheckerProhibited above covers the same rule over a
-// continuous assignment, which no statement walk reads.
 TEST(HierarchicalNameElaboration,
      ACheckerRefInABlockWithNoShadowingDeclarationIsReported) {
   ElabFixture f;
@@ -633,12 +541,6 @@ TEST(HierarchicalNameElaboration,
                             8, "23.6"));
 }
 
-// §23.6 Example 3: a module-level assertion is a scope of the module under its
-// label, and an unlabelled one's named action block is a scope of the module
-// itself, so another module-level name equal to either is a redeclaration
-// (§23.9). A named action block under a labelled assertion is a scope of the
-// label instead, and clashes with nothing at module level; nor does an
-// unlabelled cover's named pass block that no other name shares.
 TEST(HierarchicalNameElaboration, AssertionScopesTakeModuleLevelNames) {
   ElabFixture f;
   ElaborateSrc(
@@ -670,10 +572,6 @@ TEST(HierarchicalNameElaboration, AssertionScopesTakeModuleLevelNames) {
   }
 }
 
-// §23.6 makes the instance select after the name of an instance array or a
-// loop generate block a constant expression, which a variable is not. A
-// parameter expression and a literal are constants, and a single instance
-// takes no select.
 TEST(HierarchicalNameElaboration, InstanceSelectNotConstantIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -707,10 +605,6 @@ TEST(HierarchicalNameElaboration, InstanceSelectNotConstantIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// An instance select is one expression naming one instance or one block
-// (§23.6), so a part-select or an indexed part-select stands in its place
-// illegally, and is reported as such rather than range-checked by its first
-// bound: `u[5:4]` draws no out-of-range report.
 TEST(HierarchicalNameElaboration, InstanceSelectRangeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -743,10 +637,6 @@ TEST(HierarchicalNameElaboration, InstanceSelectRangeIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// A local parameter a block declares is a constant of the statements after it
-// in the block, so it may stand as an instance select there, and the select is
-// range-checked by its value. After the block the name is the module's
-// variable again, which is no constant.
 TEST(HierarchicalNameElaboration, InstanceSelectNamesBlockLocalParam) {
   ElabFixture f;
   ElaborateSrc(

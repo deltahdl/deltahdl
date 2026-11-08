@@ -47,18 +47,6 @@ TEST(PackageImportInHeader, ConstantVisibleInParameterDefault) {
              "endmodule\n"));
 }
 
-// The declared width is what says the header import reached the body
-// declaration. Nothing reports an unresolved named type -- EvalTypeWidth in
-// src/elaborator/type_eval.cpp answers 0 for a DataTypeKind::kNamed it
-// could not resolve and the run carries on -- so an assertion that elaboration
-// succeeded holds whether pkg::nibble_t was registered or not. 4 is also not
-// the 1 that RtlirVariable::width defaults to.
-//
-// This is the header half of the pair PackageImport.
-// BodyImportedTypedefSizesTheVariable in
-// test/src/unit/test_elaborator_subclause_26_03a.cpp completes: §26.4 permits
-// the import to stand in the header, and §26.3 decides what importing does, so
-// the same declaration is sized the same way whichever form carried it.
 TEST(PackageImportInHeader, WildcardImportVisibleInBody) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -111,14 +99,7 @@ TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInBody) {
              "endmodule\n"));
 }
 
-// §26.4 lists port declarations explicitly among the places a header import is
-// visible, and names the interface as one of the three header kinds. Here the
-// imported type names an interface port; resolving that port type proves the
-// header import reached the port list, not just the body.
 TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInPortType) {
-  // A top-level interface (no enclosing module) must still be elaborable, so
-  // the test names it as the explicit top rather than relying on ElabOk's
-  // module default (§26.4 names the interface among the three header kinds).
   ElabFixture f;
   ElaborateSrc(
       "package pkg;\n"
@@ -132,9 +113,6 @@ TEST(PackageImportInHeader, InterfaceHeaderImportVisibleInPortType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Mirrors the §26.4 example: a single header mixes an explicit import with a
-// wildcard import from a second package, and both imported types are consumed
-// by ports while an imported-independent parameter sits between them.
 TEST(PackageImportInHeader, MixedExplicitAndWildcardHeaderImports) {
   EXPECT_TRUE(
       ElabOk("package A;\n"
@@ -149,10 +127,6 @@ TEST(PackageImportInHeader, MixedExplicitAndWildcardHeaderImports) {
              "endmodule\n"));
 }
 
-// §26.4 names module, interface, AND program as headers whose imports are
-// visible throughout the declaration, including in port declarations. The
-// imported type names the port and a body variable; if header import did not
-// make it visible, elaboration would fail to resolve the type.
 TEST(PackageImportInHeader, ProgramHeaderImportVisibleInPortAndBody) {
   ElabFixture f;
   ElaborateSrc(
@@ -180,17 +154,6 @@ TEST(PackageImportInHeader, WildcardProgramHeaderImportVisibleInPort) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §26.4 (printed page 812 of IEEE 1800-2023) types a port through a
-// header import, its own example writing `input instruction_t a` after `import
-// A::instruction_t`, and §7.2.1 makes a member of a packed structure a window
-// of the port's bits. §23.2.2.3 (printed 735) makes an input port with no port
-// kind a net of the default net type, and §6.7.1 (printed 103) admits a packed
-// structure as a net's data type, so the port is a net and the module declares
-// no variable for it; the port record carried a width alone, so a port so
-// typed had no layout for `a.opcode` to select from. The port now carries the
-// resolved structure, both members laid out, for the simulator to lay the net
-// out from. The instantiated module is the one that was probed, so the child
-// is elaborated through the top.
 TEST(PackageImportInHeader, WildcardImportedStructNetPortCarriesItsLayout) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -222,11 +185,6 @@ TEST(PackageImportInHeader, WildcardImportedStructNetPortCarriesItsLayout) {
   EXPECT_EQ(a.dtype->struct_members[1].name, "imm");
 }
 
-// The same declaration through the explicit form of §26.4's example, `import
-// A::instruction_t, B::*;` ahead of a parameter port list, on the top itself:
-// the module's own port list, not an instance's, is what declares the variable.
-// The `bit` members make the variable 2-state, which is read back as well since
-// a layout copied from the wrong type would as easily carry the wrong state.
 TEST(PackageImportInHeader,
      NamedImportedStructPortOfTheTopDeclaresItsVariable) {
   ElabFixture f;

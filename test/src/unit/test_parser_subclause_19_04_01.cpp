@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §19.4.1: a derived embedded covergroup is written with the inheritance form
-// `covergroup extends base ;`. There is no fresh name between `covergroup` and
-// `extends`; the derived covergroup adopts the base covergroup_identifier as
-// its own name. The form must parse, and the member must record both that name
-// and the base it extends.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormParses) {
   auto r = Parse(
       "class base;\n"
@@ -35,14 +30,10 @@ TEST(EmbeddedCovergroupInheritance, ExtendsFormParses) {
     if (m->kind == ClassMemberKind::kCovergroup) derived_cg = m;
   }
   ASSERT_NE(derived_cg, nullptr);
-  // The derived covergroup reuses the base covergroup's name.
   EXPECT_EQ(derived_cg->name, "g1");
   EXPECT_EQ(derived_cg->covergroup_extends_base, "g1");
 }
 
-// §19.4.1: the endgroup of a derived covergroup may carry the optional trailing
-// `: covergroup_identifier` label naming the (shared) covergroup. The label
-// repeating the base name is accepted.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormWithEndLabelParses) {
   auto r = Parse(
       "class base;\n"
@@ -60,9 +51,6 @@ TEST(EmbeddedCovergroupInheritance, ExtendsFormWithEndLabelParses) {
   ASSERT_FALSE(r.has_errors);
 }
 
-// §19.4.1: the inheritance form does not disturb the ordinary, non-derived
-// covergroup declaration. A plain embedded covergroup still parses and carries
-// no extended base.
 TEST(EmbeddedCovergroupInheritance, PlainCovergroupHasNoExtendsBase) {
   auto r = Parse(
       "class C;\n"
@@ -81,10 +69,6 @@ TEST(EmbeddedCovergroupInheritance, PlainCovergroupHasNoExtendsBase) {
   EXPECT_TRUE(cg->covergroup_extends_base.empty());
 }
 
-// §19.4.1: the derived covergroup's body is `{ coverage_spec_or_option }`,
-// which admits zero entries. A derived covergroup that adds and overrides
-// nothing — pure inheritance — is written `covergroup extends g1; endgroup`
-// with an empty body; it must parse and still record the shared base name.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormEmptyBodyParses) {
   auto r = Parse(
       "class base;\n"
@@ -109,9 +93,6 @@ TEST(EmbeddedCovergroupInheritance, ExtendsFormEmptyBodyParses) {
   EXPECT_EQ(derived_cg->covergroup_extends_base, "g1");
 }
 
-// §19.4.1: the extends form names the base covergroup with a required
-// covergroup_identifier. Omitting that identifier (`covergroup extends ;`) is a
-// syntax error reported by the parser.
 TEST(EmbeddedCovergroupInheritance, ExtendsFormRequiresBaseIdentifier) {
   auto r = Parse(
       "class base;\n"

@@ -12,64 +12,26 @@ namespace delta {
 
 class SynthLower;
 
-// The bits an integer literal's digits write: the value of each bit position in
-// `aval`, and the positions the literal wrote a don't-care digit at in
-// `dc_mask`. Both are indexed by bit position and hold no entry above the
-// highest position the digits reached, which §5.7.1 pads to the left with
-// zeros, or with the leftmost digit up to the size constant where that digit
-// is x or z, `dc_mask` then holding the padded positions too. A position is
-// addressed rather than a 64-bit word shifted, because §5.7.1 sizes a literal
-// by its size constant and admits one wider than any integer C++ has:
-// `128'h1_0000_0000_0000_0000` writes bit 64.
 struct PatternBits {
   std::vector<bool> aval;
   std::vector<bool> dc_mask;
 
-  // True where every position above the highest `dc_mask` holds is don't-care
-  // as well: §5.7.1 extends an unsized literal whose high-order digit is x or
-  // z to the size of the expression holding it, so `'b?1` under casez is
-  // don't-care at every bit of the selector above bit 0, however wide it is.
   bool dont_care_above = false;
 
-  // True where `aval` is the value the literal's digits form: a hex, octal or
-  // binary literal gives each digit its own bits, and a decimal one without a
-  // don't-care digit is folded from its digits by multiply-and-add, so a
-  // decimal value past the 64 bits Expr::int_val holds keeps its high bits.
-  // False for a decimal carrying a don't-care digit, which writes no value.
   bool has_digits = false;
 
-  // A decimal literal carrying a don't-care digit is don't-care throughout,
-  // since no digit of it stands for a bit position.
   bool all_dont_care = false;
 };
 
-// §5.7.1: the bits `text` writes, over the digits that follow its base. Under
-// `case_kind` the digits §12.5.1 makes don't-care are recorded in `dc_mask`
-// rather than in `aval`; pass TokenKind::kKwCase to read every digit as a
-// value.
 PatternBits ParsePatternLiteral(std::string_view text, TokenKind case_kind);
 
-// The value `bits` carries at bit position `b`, and false above every position
-// its digits reached.
 bool PatternBitValue(const PatternBits& bits, uint32_t b);
 
-// The lowering engine objects threaded through the pattern-match family: the
-// AIG being built and the SynthLower bit lowerer.
 struct LowerCtx {
   AigGraph& aig;
   SynthLower& synth;
 };
 
-// The literal answering whether `sel_expr` matches `pat` over `sel_width` bits,
-// with the bit positions `pat` wrote a don't-care digit at left out of the
-// comparison. A pattern that is not an integer literal, and every pattern at
-// all when `case_kind` is TokenKind::kKwCase, is compared bit for bit with no
-// position left out.
-//
-// §12.5.1 gives the two case kinds that read don't-care digits: casez takes z
-// and ? as don't-care, casex takes x as well. §11.4.6 makes `a ==? b` and
-// `a !=? b` the same comparison with both x and z acting as wildcards, so a
-// wildcard equality is built by calling this with TokenKind::kKwCasex.
 uint32_t BuildPatternMatch(const Expr* sel_expr, const Expr* pat,
                            const LowerCtx& ctx, uint32_t sel_width,
                            TokenKind case_kind);

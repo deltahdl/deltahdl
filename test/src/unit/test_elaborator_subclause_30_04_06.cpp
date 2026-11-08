@@ -21,16 +21,6 @@ TEST(MultiplePathDeclarationElaboration, MixedWidthsInBothLists) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.6: a multiple module path declaration is equivalent to the full set of
-// individual source-to-destination paths. Production realizes this by treating
-// every member of the destination list as its own path endpoint, so a non-first
-// destination that is not a legal endpoint must still be rejected. Here the
-// second listed destination is an input port; if only the first endpoint were
-// checked the error would be missed, so this observes the cross-product
-// expansion being applied across the whole list. §30.4.6 states the expansion
-// and no endpoint rule of its own; the rule that rejects y is §30.4.1's, that a
-// module path's destination must be a net or variable connected to a module
-// output or inout port, so the report carries §30.4.1.
 TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,15 +36,6 @@ TEST(MultiplePathDeclarationElaboration, EveryDestinationInListIsAnEndpoint) {
       "30.4.1"));
 }
 
-// §30.4.6: the expansion to individual paths is symmetric, so every member of
-// the source list is also an independent path source and is validated as such.
-// Production walks the source list with a loop separate from the destination
-// loop, so this exercises that path: the second listed source is an output
-// port, which is not a legal path source. A first-element-only check would miss
-// it, so the error confirms every source in the list participates in the
-// cross-product. As above, the rule that rejects b is §30.4.1's, that a module
-// path's source must be a net connected to a module input or inout port, so the
-// report carries §30.4.1.
 TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
   ElabFixture f;
   ElaborateSrc(
@@ -69,14 +50,6 @@ TEST(MultiplePathDeclarationElaboration, EverySourceInListIsAnEndpoint) {
       "module path source 'b' must be connected to an input", 3, "30.4.1"));
 }
 
-// §30.4.6: within a multiple module path the source and destination lists may
-// hold a mix of scalars and vectors of any size, because the connection is
-// always a full one (a full connection places no width relationship on the two
-// ends). Input form: a scalar source paired with a wider vector destination.
-// Production accepts because the full-connection width check is skipped for the
-// '*>' list form; if this statement were treated as a parallel connection the
-// unequal widths would be rejected, so acceptance observes the full-connection
-// rule being applied to the multi-path list.
 TEST(MultiplePathDeclarationElaboration,
      ScalarSourceToVectorDestinationAccepted) {
   ElabFixture f;
@@ -91,10 +64,6 @@ TEST(MultiplePathDeclarationElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.6: the allowance for vectors of any width is symmetric in width
-// direction. Input form: vector sources paired with narrower scalar
-// destinations. A parallel connection would reject the width difference; the
-// multi-path '*>' list accepts it.
 TEST(MultiplePathDeclarationElaboration,
      VectorSourceToScalarDestinationAccepted) {
   ElabFixture f;
@@ -109,10 +78,6 @@ TEST(MultiplePathDeclarationElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.6: letting the listed vectors be of any width means they need bear no
-// width relationship to each other or across the two lists. Input form: every
-// terminal is a vector and no two share a width. The multi-path '*>' list
-// accepts all cross-product pairs.
 TEST(MultiplePathDeclarationElaboration,
      UnequalVectorWidthsAcrossListsAccepted) {
   ElabFixture f;

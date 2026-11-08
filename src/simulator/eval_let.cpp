@@ -25,10 +25,7 @@
 namespace delta {
 
 static thread_local std::unordered_set<std::string_view> expanding_lets;
-// The let instances whose bodies are being evaluated, innermost last.
 static thread_local std::vector<const Expr*> let_instances;
-// The lets a block or a subroutine body declares, whose declaring scope is the
-// frame their instances stand in (RegisterBlockLet).
 static thread_local std::unordered_set<const ModuleItem*> block_lets;
 
 static thread_local uint32_t call_context_width = 0;
@@ -64,8 +61,6 @@ static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal, size_t i,
   if (found >= 0 && b.call->args[static_cast<size_t>(found)]) {
     return EvalExpr(b.call->args[static_cast<size_t>(found)], b.ctx, b.arena);
   }
-  // §11.12: a default names what the scope declaring the let gives its
-  // names, not what the call's scope does: a module's let reads the module's.
   if (formal.default_value) {
     auto caller_scopes = b.ctx.SwapScopeStack({});
     Logic4Vec value = EvalExpr(formal.default_value, b.ctx, b.arena);
@@ -75,11 +70,6 @@ static Logic4Vec EvalLetActualForFormal(const FunctionArg& formal, size_t i,
   return MakeLogic4Vec(b.arena, 32);
 }
 
-// §11.12: the actual for a non-event typed formal is cast to the formal's type
-// before substitution. A 2-state formal type (bit, byte, shortint, int,
-// longint) cannot hold x/z, so the cast forces every unknown or high-impedance
-// bit of the actual to 0 (example e spells this out: bits with an unknown logic
-// value or a high-impedance value become 0).
 static bool IsLetFormalTwoState(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -93,24 +83,16 @@ static bool IsLetFormalTwoState(DataTypeKind kind) {
   }
 }
 
-// §11.12 casts an actual to its formal's type, which a typedef name stands for
-// as written out: `bits x` under `typedef bit [15:0] bits` is a sixteen-bit
-// two-state formal (§6.18). The name alone gave neither a width nor a kind.
 static Logic4Vec ResizeLetActualToFormal(Logic4Vec val,
                                          const DataType& formal_type,
                                          SimContext& ctx, Arena& arena) {
   const DataType* resolved = ctx.PackedTypeBehind(formal_type);
   const auto& dt = resolved != nullptr ? *resolved : formal_type;
-  // A typed integral formal takes its own width and sign, an integer atom
-  // type's included, `int x` taking 8'hFF as 32 bits.
   uint32_t formal_width = EvalTypeWidth(dt);
   if (!val.is_real && formal_width > 0 && formal_width != val.width) {
     val = ResizeToWidth(val, formal_width, arena);
   }
   if (!val.is_real) val.is_signed = DeclaredTypeIsSigned(dt, ctx);
-  // §11.12 rule 2 / example e: casting to a 2-state typed formal drives every
-  // unknown (x) or high-impedance (z) actual bit to 0. Work on a fresh copy so
-  // the coercion never mutates a value shared with the actual's own storage.
   if (IsLetFormalTwoState(dt.kind)) {
     Logic4Vec coerced = ExtractBitField(arena, val, 0, val.width);
     coerced.is_signed = val.is_signed;
@@ -130,8 +112,6 @@ static std::vector<Logic4Vec> EvalLetActuals(ModuleItem* decl, const Expr* call,
   ActualBindingCtx binding{call, positional_count, ctx, arena};
   std::vector<Logic4Vec> vals;
   vals.reserve(formals.size());
-  // An untyped formal takes the actual as it is, its sign among it (§11.12's
-  // substitution); a typed one has it cast to the type it takes.
   std::vector<const DataType*> types = LetFormalTypes(formals);
   for (size_t i = 0; i < formals.size(); ++i) {
     Logic4Vec val = EvalLetActualForFormal(formals[i], i, binding);
@@ -158,26 +138,15 @@ static void BindLetArgs(ModuleItem* decl, const std::vector<Logic4Vec>& vals,
 Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
                            Arena& arena, uint32_t context_width) {
   if (expanding_lets.count(decl->name)) {
-    // §11.12: recursive let instantiations are not permitted. Report the
-    // illegal self-reference rather than silently expanding it away, then
-    // break the cycle by yielding x so the run can continue. The report stands
-    // at the reference that found the let already expanding, and call is never
-    // null because EvalLetActuals below reads call->args without checking.
     ctx.GetDiag().Error(call->range.start,
                         "recursive instantiation of let '" +
                             std::string(decl->name) + "' is not permitted",
                         Subclause("11.12"));
     return MakeAllX(arena, 32);
   }
-  // The actuals are expressions of the call, not of the body, so a call to
-  // the let among them, `add(add(1, 2), 3)`, is no recursion: they are
-  // evaluated before the let is marked as expanding.
   auto vals = EvalLetActuals(decl, call, ctx, arena);
   expanding_lets.insert(decl->name);
 
-  // §11.12 resolves the body's other names in the scope declaring the let: a
-  // block's or a subroutine's let sees that frame, which its instances stand
-  // within, and a module's sees the module's names alone.
   const bool kBlockLet = block_lets.contains(decl);
   std::vector<Scope> saved_scopes;
   if (!kBlockLet) saved_scopes = ctx.SwapScopeStack({});
@@ -192,9 +161,6 @@ Logic4Vec EvalLetExpansion(ModuleItem* decl, const Expr* call, SimContext& ctx,
   return result;
 }
 
-// The key an instance's let is registered under: no bare name and no
-// hierarchical path spells it, so neither a compilation unit's let nor an
-// instance's variable stands under it.
 static std::string InstanceLetKey(std::string_view prefix,
                                   std::string_view name) {
   return "let " + std::string(prefix) + std::string(name);

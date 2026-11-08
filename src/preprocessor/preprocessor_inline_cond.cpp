@@ -12,14 +12,6 @@
 
 namespace delta {
 
-// The conditional compilation directives of §22.6 met within a line or within
-// the text a macro's usage substitutes: FindInlineConditional locates an `ifdef
-// or `ifndef with its matching `endif, and ExpandInlineConditionals replaces
-// each such span with the branch its condition selects. The line-level readers
-// in preprocessor.cpp and ExpandSubstitutedBody in preprocessor_inline.cpp run
-// these before ExpandInlineMacros.
-
-// Every caller hands text it has already seen open with a backtick.
 static bool MatchesDirective(std::string_view text, std::string_view dir) {
   if (text.size() < 1 + dir.size()) return false;
   if (text.substr(1, dir.size()) != dir) return false;
@@ -47,8 +39,6 @@ static size_t FindInlineConditional(std::string_view line) {
   auto state = StringLiteralState::kOutside;
   for (size_t i = 0; i < line.size();
        i = StepOverStringSyntax(line, i, state)) {
-    // A directive sequence sitting inside a string literal is hidden and must
-    // not start an inline conditional expansion (22.6).
     if (!OutsideEveryString(state) || line[i] != '`') continue;
     auto rest = line.substr(i);
     bool is_ifdef = MatchesDirective(rest, "ifdef");
@@ -65,10 +55,6 @@ bool Preprocessor::HasInlineConditional(std::string_view line) const {
   return FindInlineConditional(line) != std::string_view::npos;
 }
 
-// The inline readers below run only on a conditional FindInlineConditional
-// found an `endif for, so the text after the directive name holds that
-// `endif's backtick, which is neither white space nor part of a name: a scan
-// over either stops at it before the text runs out.
 static size_t SkipWhitespace(const std::string& s, size_t pos) {
   while (std::isspace(static_cast<unsigned char>(s[pos]))) ++pos;
   return pos;
@@ -97,18 +83,12 @@ static size_t ParseInlineCondition(const std::string& result, size_t cond_start,
 }
 
 struct InlineCondBounds {
-  // §22.6 (Syntax 22-5): where each `elsif group of the conditional opens, in
-  // order, ahead of its `else.
   std::vector<size_t> elsif_pos;
   size_t else_pos;
   size_t endif_pos;
-  // §22.6 (Syntax 22-5): whether a second `else stands in the conditional.
   bool second_else;
 };
 
-// Notes the directive opening `jr`, standing at `j`, in `bounds`, `depth`
-// counting the conditionals open there; answers whether it is the `endif that
-// closes the conditional being read.
 static bool NoteInlineDirective(std::string_view jr, size_t j, int& depth,
                                 InlineCondBounds& bounds) {
   if (MatchesDirective(jr, "ifdef") || MatchesDirective(jr, "ifndef")) {
@@ -139,11 +119,6 @@ static InlineCondBounds FindElseAndEndif(const std::string& result,
   return bounds;
 }
 
-// §22.6 (Syntax 22-5): the text of the group a conditional selects -- the
-// first whose condition holds, the `ifdef's own (`cond_result`, its text from
-// `cond_end`) and then each `elsif's in order, `eval` answering the truth of
-// the condition an `elsif writes, and else the `else group, or nothing. Each
-// group's text runs to the next group's directive.
 static std::string SelectConditionalBlock(
     const std::string& result, bool cond_result, size_t cond_end,
     const InlineCondBounds& bounds,
@@ -188,7 +163,6 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line,
 
     auto condition =
         std::string_view(result).substr(cond_start, cond_end - cond_start);
-    // §22.6: a parenthesis the line never closes leaves no condition to read.
     if (has_expr && cond_end == result.size()) {
       diag_.Error(
           loc,
@@ -216,9 +190,6 @@ std::string Preprocessor::ExpandInlineConditionals(std::string_view line,
   return result;
 }
 
-// §5.9 inside a string of an ignored line: an escape takes the character after
-// its backslash with it, a backslash ending the line continues the string onto
-// the next one, and a quote closes it. Returns the index past what was read.
 static size_t StepInsideIgnoredString(std::string_view text, size_t i,
                                       bool& open, bool& continued) {
   if (text[i] == '\\') {
@@ -229,10 +200,6 @@ static size_t StepInsideIgnoredString(std::string_view text, size_t i,
   return i + 1;
 }
 
-// Outside a string: a backslash opens an escaped identifier (§5.6.1), which
-// runs to white space and opens no string whatever it holds; a quote opens a
-// string. A triple quote opens a string StripComments carries across lines
-// itself, so nothing after it on the line is read; npos says so.
 static size_t StepOutsideIgnoredString(std::string_view text, size_t i,
                                        bool& open) {
   if (text.substr(i, 3) == "\"\"\"") return std::string_view::npos;
@@ -246,10 +213,6 @@ static size_t StepOutsideIgnoredString(std::string_view text, size_t i,
   return i + 1;
 }
 
-// §22.6 (printed page 714): a block of text the compiler ignores still follows
-// the lexical conventions of Clause 5, so the string literals of an ignored
-// line are read as §5.9 has them read anywhere, and one left open at the end
-// of the line with no backslash continuing it is reported.
 void Preprocessor::NoteIgnoredLine(std::string_view line, SourceLoc loc) {
   bool line_opens_in_triple = in_triple_string_;
   std::string text = StripComments(line, in_block_comment_, in_triple_string_);

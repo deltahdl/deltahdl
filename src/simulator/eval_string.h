@@ -23,29 +23,11 @@ Logic4Vec StripStringZeros(const Logic4Vec& packed, Arena& arena);
 void StringWriteByte(Variable* var, uint32_t idx, uint8_t byte_val,
                      Arena& arena);
 
-// §6.16 with §8.5: whether `e` names a class property declared with the
-// string type -- bare or through `this` inside a method of the class, as a
-// static `C::name`, or through a handle -- rather than a variable of the run's
-// tables, which the caller asks about first.
 bool NamesStringProperty(const Expr* e, SimContext& ctx);
 
-// §6.16 with A.8.2: a method call's argument list is optional, so the member
-// access `s.atoi` is the call `s.atoi()`. `access` read as a call of the
-// string method it names, with no arguments, on a string receiver -- a
-// variable, an element of a string array, a string property, or a with
-// clause's iterator over strings -- into `out`; false where it names no
-// method answering a value or its receiver is no string.
 bool TryEvalStringMethodWithoutParens(const Expr* access, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out);
 
-// §6.16 (printed page 113): the indexed character assignment `s[i] = c` on a
-// string that is a class property rather than a variable of the run's tables
-// -- `h.p[0] = "x"` through a handle, `p[0] = "x"` bare or through `this`
-// inside a method of the class, `C::name[0] = "N"` on a static property --
-// replacing the character the index addresses in the property's text. True
-// when `lhs` selects one index of such a property, the write then made or,
-// for an index out of range, an unknown index or a null character, withheld
-// as StringWriteByte withholds it; false for any other target.
 bool TryWriteStringPropertyChar(const Expr* lhs, const Logic4Vec& rhs_val,
                                 SimContext& ctx, Arena& arena);
 

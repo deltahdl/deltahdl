@@ -140,10 +140,6 @@ TEST(AssertionDeclParsing, PropertyPortItem_DefaultValue) {
 }
 
 TEST(AssertionDeclParsing, PropertyPortItem_VariableDimension) {
-  // property_port_item admits {variable_dimension} after the
-  // formal_port_identifier: `property_formal_type formal_id
-  // {variable_dimension}
-  // [= property_actual_arg]`. Observe that a dimensioned formal is accepted.
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(int x [3:0]);\n"
@@ -335,10 +331,6 @@ TEST(AssertionDeclParsing, PropertyActualArg_Expr) {
 }
 
 TEST(AssertionDeclParsing, PropertyActualArg_SequenceActualArg) {
-  // property_actual_arg ::= property_expr | sequence_actual_arg. The first
-  // alternative is covered by PropertyActualArg_Expr; here exercise the second
-  // alternative, whose sequence_actual_arg form admits `$` as an actual passed
-  // to a property instance.
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  property p(x); x; endproperty\n"

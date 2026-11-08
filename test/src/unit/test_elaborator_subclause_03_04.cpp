@@ -5,10 +5,6 @@
 
 namespace {
 
-// §3.4 (printed page 51) with §24.3, §17.2 and §25.3: a generate block is part
-// of the design element it is written in (§27), so an instance written in one
-// is held to the element's placement rules exactly as one written among its
-// items is. Each element's items were checked, and its generate blocks' never.
 TEST(DesignElementPlacement, ModuleInstanceInAProgramGenerateBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -80,8 +76,6 @@ TEST(DesignElementPlacement, ModuleInstanceInAnInterfaceGenerateCase) {
                             4, "25.3"));
 }
 
-// A primitive declared before the element is read as one where it is written,
-// and draws the same report; the parser may report it there as well.
 TEST(DesignElementPlacement, EarlierUdpInstanceInACheckerGenerateBlock) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(

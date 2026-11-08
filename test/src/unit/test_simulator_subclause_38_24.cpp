@@ -27,13 +27,9 @@ class VpiMcdCloseSim : public ::testing::Test {
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
 
-  // mcd channel 1 is the LSB - the predefined output/log descriptor.
   static constexpr PLI_UINT32 kLsbChannel = 0x00000001u;
 };
 
-// §38.24 (C1, C3): vpi_mcd_close() shall close the file named by the descriptor
-// and return 0 on success. After the close the file is no longer open and its
-// channel is free again.
 TEST_F(VpiMcdCloseSim, ClosesFileAndReturnsZeroOnSuccess) {
   char name[] = "trace.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -43,14 +39,10 @@ TEST_F(VpiMcdCloseSim, ClosesFileAndReturnsZeroOnSuccess) {
   EXPECT_EQ(vpi_mcd_close(mcd), 0u);
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("trace.log"));
 
-  // The freed channel is handed out again by a later open.
   char again[] = "again.log";
   EXPECT_EQ(vpi_mcd_open(again), mcd);
 }
 
-// §38.24 (C2): channels are discrete bits of the mcd, so a single call closes
-// several channels at once. Passing the OR of two descriptors closes both
-// files.
 TEST_F(VpiMcdCloseSim, ClosesSeveralChannelsSimultaneously) {
   char a[] = "a.txt";
   char b[] = "b.txt";
@@ -64,32 +56,21 @@ TEST_F(VpiMcdCloseSim, ClosesSeveralChannelsSimultaneously) {
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("b.txt"));
 }
 
-// §38.24 (C4): on error the routine shall return the mcd of the unclosed
-// channels. A bit naming no open channel cannot be closed, so it is returned;
-// the channels that were open in the same call are still closed.
 TEST_F(VpiMcdCloseSim, ReturnsUnclosedChannelsOnError) {
   char name[] = "open.log";
   PLI_UINT32 open_mcd = vpi_mcd_open(name);
   ASSERT_NE(open_mcd, 0u);
 
-  // Pick a channel bit that is not currently allocated to anything.
   PLI_UINT32 stale = (open_mcd == 0x40000000u) ? 0x20000000u : 0x40000000u;
   ASSERT_EQ(open_mcd & stale, 0u);
 
-  // Close the live channel together with the stale one: only the stale bit is
-  // reported back as unclosed.
   EXPECT_EQ(vpi_mcd_close(open_mcd | stale), stale);
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("open.log"));
 }
 
-// §38.24 (C6): descriptor 1 (the LSB) is predefined for the tool's output
-// channel and current log file and cannot be closed. It is reported back as an
-// unclosed channel.
 TEST_F(VpiMcdCloseSim, PredefinedDescriptorOneCannotBeClosed) {
   EXPECT_EQ(vpi_mcd_close(kLsbChannel), kLsbChannel);
 
-  // Even bundled with a real channel, the LSB survives while the real one
-  // closes.
   char name[] = "real.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
   ASSERT_NE(mcd, 0u);
@@ -97,17 +78,11 @@ TEST_F(VpiMcdCloseSim, PredefinedDescriptorOneCannotBeClosed) {
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("real.log"));
 }
 
-// §38.24 (C2, C4): a single call may name channels that cannot be closed for
-// different reasons - the reserved descriptor 1 and a bit naming no open
-// channel
-// - alongside one that can. The live channel is closed and the returned mcd is
-// the OR of every channel left open, regardless of why each was left open.
 TEST_F(VpiMcdCloseSim, ReportsAllUnclosedChannelsWhileClosingTheRest) {
   char name[] = "live.log";
   PLI_UINT32 live = vpi_mcd_open(name);
   ASSERT_NE(live, 0u);
 
-  // A high channel bit that is not allocated to anything and differs from live.
   PLI_UINT32 stale = (live == 0x40000000u) ? 0x20000000u : 0x40000000u;
   ASSERT_EQ(live & stale, 0u);
 
@@ -116,39 +91,24 @@ TEST_F(VpiMcdCloseSim, ReportsAllUnclosedChannelsWhileClosingTheRest) {
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("live.log"));
 }
 
-// §38.24 (C5): the mcd namespace is shared with $fopen (§21.3.1), so a
-// descriptor opened by $fopen can be closed here. After closing, its channel is
-// free.
 TEST_F(VpiMcdCloseSim, ClosesDescriptorOpenedByFopen) {
-  PLI_UINT32 fopen_mcd = 0x00000004u;  // channel 3, as $fopen might have chosen
+  PLI_UINT32 fopen_mcd = 0x00000004u;
   vpi_ctx_.RegisterFopenMcdFile("from_fopen.log", fopen_mcd);
   ASSERT_TRUE(vpi_ctx_.IsMcdFileOpen("from_fopen.log"));
 
   EXPECT_EQ(vpi_mcd_close(fopen_mcd), 0u);
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("from_fopen.log"));
 
-  // §38.27: the channel freed by the close is available to a fresh open again.
-  // The LRM does not fix which channel an open returns -- it draws an unused
-  // one -- so to observe channel 3 (bit 2) being reclaimed, first consume the
-  // lower channel 2 (bit 1); the reclaimed channel 3 is then the one handed
-  // back.
   char filler[] = "filler.log";
   EXPECT_EQ(vpi_mcd_open(filler), 0x00000002u);
   char fresh[] = "fresh.log";
   EXPECT_EQ(vpi_mcd_open(fresh), fopen_mcd);
 }
 
-// §38.24: the routine also closes a file descriptor that $fopen opened. §38.27
-// reserves channel 32 - the MSB - to stand for such an fd, and an fd is one
-// value rather than a set of channels, so the descriptor names one file and
-// closing it closes that file alone. Read as channels, its own numbering would
-// have closed whatever files those bits named and left this one open.
 TEST_F(VpiMcdCloseSim, ClosesAnFdOpenedByFopen) {
-  PLI_UINT32 fopen_fd = 0x80000005u;  // the MSB set: an fd, not an mcd
+  PLI_UINT32 fopen_fd = 0x80000005u;
   vpi_ctx_.RegisterFopenMcdFile("opened_as_fd.log", fopen_fd);
 
-  // A file on channel 3 - which bit 2 of that fd's numbering would name if the
-  // value were read as a set of channels.
   char other[] = "channel_three.log";
   PLI_UINT32 other_mcd = vpi_mcd_open(other);
   ASSERT_NE(other_mcd, 0u);
@@ -156,30 +116,22 @@ TEST_F(VpiMcdCloseSim, ClosesAnFdOpenedByFopen) {
   EXPECT_EQ(vpi_mcd_close(fopen_fd), 0u);
   EXPECT_FALSE(vpi_ctx_.IsMcdFileOpen("opened_as_fd.log"));
 
-  // The file the fd's bits would have named is untouched, and so is the
-  // predefined channel 1 its low bit would have reported unclosed.
   EXPECT_TRUE(vpi_ctx_.IsMcdFileOpen("channel_three.log"));
 }
 
-// §38.24: on error the routine returns the descriptor of what it could not
-// close. An fd naming no open file closes nothing, so it comes back as it was
-// given rather than reporting success.
 TEST_F(VpiMcdCloseSim, AnFdNamingNoOpenFileIsReportedBack) {
   PLI_UINT32 unknown_fd = 0x80000007u;
 
   EXPECT_EQ(vpi_mcd_close(unknown_fd), unknown_fd);
 }
 
-// What vpi_mcd_close returned for the fd and the mcd the design's $fopen
-// opened.
 PLI_UINT32 fd_close_result = 1;
 PLI_UINT32 mcd_close_result = 1;
-// What vpi_mcd_close returned for an mcd naming a channel no file is open on.
 PLI_UINT32 unopened_close_result = 0;
 
 class CloseOfAFopenedFile : public RunFilesRun {
  protected:
-  static PLI_INT32 CloseBoth(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 CloseBoth(PLI_BYTE8*) {
     fd_close_result = vpi_mcd_close(DescriptorIn("top.fd"));
     mcd_close_result = vpi_mcd_close(DescriptorIn("top.mcd"));
     unopened_close_result = vpi_mcd_close(PLI_UINT32{1} << 20);
@@ -187,8 +139,6 @@ class CloseOfAFopenedFile : public RunFilesRun {
   }
 };
 
-// §38.24 with §21.3.1: vpi_mcd_close closes a file the design's $fopen opened,
-// as an fd or as an mcd, and the design writes nothing more to it (#7465).
 TEST_F(CloseOfAFopenedFile, BothFormsAreClosed) {
   RegisterTask("$close_both", &CloseBoth);
   Run("module top; integer fd, mcd;\n"
@@ -202,24 +152,19 @@ TEST_F(CloseOfAFopenedFile, BothFormsAreClosed) {
       "endmodule\n");
   EXPECT_EQ(fd_close_result, 0u);
   EXPECT_EQ(mcd_close_result, 0u);
-  // §38.24: a channel of the run with no file open is reported back unclosed.
   EXPECT_EQ(unopened_close_result, PLI_UINT32{1} << 20);
   EXPECT_EQ(FileText("fd.txt"), "");
   EXPECT_EQ(FileText("mcd.txt"), "");
 }
 
-// An fd naming no file the run has open: the MSB set, the rest a number the
-// run never handed out.
 constexpr PLI_UINT32 kUnopenedFd = SimContext::kFdMsb | 7u;
 
-// What vpi_mcd_close returned for the run's three standard stream fds, in
-// order, and for kUnopenedFd.
 std::vector<PLI_UINT32> stream_close_results;
 PLI_UINT32 unopened_fd_close_result = 0;
 
 class CloseOfAStreamFd : public RunFilesRun {
  protected:
-  static PLI_INT32 CloseStreams(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 CloseStreams(PLI_BYTE8*) {
     for (const PLI_UINT32 kFd :
          {SimContext::kStdinFd, SimContext::kStdoutFd, SimContext::kStderrFd}) {
       stream_close_results.push_back(vpi_mcd_close(kFd));
@@ -229,9 +174,6 @@ class CloseOfAStreamFd : public RunFilesRun {
   }
 };
 
-// §38.24 with §21.3.1: in a run, the fds of the standard streams are not
-// closed, nor is an fd naming no file the run has open; each comes back as it
-// was given, the descriptor of what was not closed.
 TEST_F(CloseOfAStreamFd, NeitherAStreamNorAnUnopenedFdIsClosed) {
   RegisterTask("$close_streams", &CloseStreams);
   Run("module top; initial $close_streams; endmodule\n");

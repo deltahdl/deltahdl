@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The whole module written on one line still puts the report on that line,
-// which is the line the `initial` keyword stands on.
 TEST(InitialProcedureSynthesis, RejectInitialBlock) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; initial begin end endmodule");
@@ -22,10 +20,6 @@ TEST(InitialProcedureSynthesis, RejectInitialBlock) {
                             "9.2.1"));
 }
 
-// §9.2.1: an initial procedure executes once and then ceases, so a module
-// whose only content is one has no hardware to synthesize. The report names
-// the initial procedure rather than lumping it in with the final procedure of
-// §9.2.3, which is a different construct in a different subclause.
 TEST(InitialProcedureSynthesis, InitialProcedureIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -41,9 +35,6 @@ TEST(InitialProcedureSynthesis, InitialProcedureIsRejectedByName) {
                             "9.2.1"));
 }
 
-// The first of two initial procedures is the one reported, so the position on
-// the report belongs to a procedure the module actually holds rather than to
-// whichever one the loop happened to end on.
 TEST(InitialProcedureSynthesis, FirstOfTwoInitialProceduresIsReported) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

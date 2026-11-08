@@ -65,26 +65,6 @@ TEST(ImplicitEventSynthesis, AlwaysStarCaseNoLatch) {
   EXPECT_TRUE(aig->latches.empty());
 }
 
-// The sweep fails on a netlist whose `sum` is not `a + b` or whose `diff` is
-// not `a - b`. The three assertions above it are what §9.4.2.2 makes this case
-// about, that an `always @(*)` block writing two outputs lowers to
-// combinational logic, and all three hold over a netlist in which every bit of
-// both outputs is a constant zero: such a graph is non-null, has outputs, and
-// has no latches. That is the netlist a `SynthLower::LowerBinaryBit` with no
-// arm for `+` builds, so the sweep is what states that the two statements
-// computed anything.
-//
-// `SynthLower::MapPorts` allocates an input for each bit of each input port in
-// declaration order, least significant bit first, and
-// `SynthLower::RegisterOutputs` registers the output ports the same way, so
-// input bit i carries `a[i]`, input bit i + 4 carries `b[i]`, output bit i
-// carries `sum[i]` and output bit i + 4 carries `diff[i]`.
-//
-// The ports are four bits wide so that all 256 pairs can be driven rather than
-// the 65536 pairs eight-bit ports would take. Four bits is a carry chain long
-// enough that a netlist propagating no carry disagrees, and it holds the wrap
-// at both ends: `4'hF + 4'h1` carries out of the top, and `4'h0 - 4'h1` leaves
-// `4'hF`.
 TEST(ImplicitEventSynthesis, AlwaysStarMultipleOutputs) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

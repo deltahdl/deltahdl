@@ -24,10 +24,6 @@ TEST(FunctionLifetimeSim, RecursiveAutomaticFunction) {
   EXPECT_EQ(val, 120u);
 }
 
-// §13.4.2: a function with no explicit lifetime, defined within a module that
-// is declared automatic, is implicitly automatic. It is therefore reentrant,
-// so this recursive function computes 5! correctly; a static function would
-// clobber its operand across the nested calls.
 TEST(FunctionLifetimeSim, DefaultFunctionInAutomaticModuleIsAutomatic) {
   auto val = RunAndGet(
       "module automatic t;\n"
@@ -46,11 +42,6 @@ TEST(FunctionLifetimeSim, DefaultFunctionInAutomaticModuleIsAutomatic) {
   EXPECT_EQ(val, 120u);
 }
 
-// §13.4.2: a function with no explicit lifetime, in an ordinary (non-automatic)
-// module, defaults to static — its items are statically allocated and shared
-// across successive calls. The implicit return variable therefore accumulates,
-// so the second call sees the first call's result (5 + 3 = 8). A reentrant
-// allocation would reset it and yield 3.
 TEST(FunctionLifetimeSim, DefaultLifetimeFunctionRetainsStaticStorage) {
   auto val = RunAndGet(
       "module t;\n"
@@ -68,10 +59,6 @@ TEST(FunctionLifetimeSim, DefaultLifetimeFunctionRetainsStaticStorage) {
   EXPECT_EQ(val, 8u);
 }
 
-// §13.4.2: a local declared static inside an automatic function overrides the
-// function's lifetime for that variable, so it is allocated once and retains
-// its value across calls. acc accumulates 5 then 3, so the second call returns
-// 8; if the static override were ignored the per-call value would be 3.
 TEST(FunctionLifetimeSim, StaticLocalInAutomaticFunctionRetainsValue) {
   auto val = RunAndGet(
       "module t;\n"
@@ -91,12 +78,6 @@ TEST(FunctionLifetimeSim, StaticLocalInAutomaticFunctionRetainsValue) {
   EXPECT_EQ(val, 8u);
 }
 
-// §13.4.2: the mirror override — a local declared automatic inside a static
-// function is reallocated (and re-initialized) on every call rather than
-// sharing the function's static storage. acc restarts at 0 each call, so the
-// second call returns 3, not the 8 a static local would accumulate. This is the
-// half of the override rule that makes a local automatic inside a static
-// function.
 TEST(FunctionLifetimeSim, AutomaticLocalInStaticFunctionIsFresh) {
   auto val = RunAndGet(
       "module t;\n"
@@ -116,13 +97,6 @@ TEST(FunctionLifetimeSim, AutomaticLocalInStaticFunctionIsFresh) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.4.2: a function with no explicit lifetime, defined in an ordinary
-// package, defaults to static -- the package input form of the default-static
-// rule (the clause names module, interface, program, and package). Its plain
-// local cnt is statically allocated and shared across calls made from the
-// importing module, so the second call sees the first call's accumulated value
-// (5 + 3 = 8). This exercises the dedicated package lifetime-defaulting path,
-// distinct from the module form (DefaultLifetimeFunctionRetainsStaticStorage).
 TEST(FunctionLifetimeSim, DefaultFunctionInPackageIsStatic) {
   auto val = RunAndGet(
       "package pk;\n"
@@ -145,10 +119,6 @@ TEST(FunctionLifetimeSim, DefaultFunctionInPackageIsStatic) {
   EXPECT_EQ(val, 8u);
 }
 
-// §13.4.2: a function with no explicit lifetime defined in a package marked
-// automatic is implicitly automatic (the package input form of the implicit-
-// automatic rule). Its local is reallocated each call, so cnt restarts and the
-// second call returns 3. Contrast DefaultFunctionInPackageIsStatic above.
 TEST(FunctionLifetimeSim, DefaultFunctionInAutomaticPackageIsAutomatic) {
   auto val = RunAndGet(
       "package automatic pk;\n"
@@ -171,11 +141,6 @@ TEST(FunctionLifetimeSim, DefaultFunctionInAutomaticPackageIsAutomatic) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.4.2 with §8.11: a class method is automatic and may call itself, and
-// `this.fib(...)` inside it names the same method on the object the call is
-// running on, exactly as the bare `fib(...)` does. Both spellings recurse
-// here, so h.fib(10) is 55; with every `this.`-qualified call answering 0 the
-// bare chain alone survives and the sum collapses to 1.
 TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAndBareName) {
   auto val = RunAndGet(
       "module t;\n"
@@ -194,9 +159,6 @@ TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAndBareName) {
   EXPECT_EQ(val, 55u);
 }
 
-// §13.4.2 with §8.11: the recursion written through `this` alone. Each frame
-// multiplies its own n by the inner call's result, so fact(5) is 120; a
-// `this.` call that reached no method would answer 0 and so would the product.
 TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAlone) {
   auto val = RunAndGet(
       "module t;\n"
@@ -216,9 +178,6 @@ TEST(FunctionLifetimeSim, ClassMethodRecursesThroughThisAlone) {
   EXPECT_EQ(val, 120u);
 }
 
-// §8.11: a `this.`-qualified call as a statement runs the method on the same
-// object, so two `this.bump();` inside twice() leave count at 2. A call that
-// resolved to nothing would leave it at 0.
 TEST(FunctionLifetimeSim, ThisQualifiedCallStatementWritesOwnProperty) {
   auto val = RunAndGet(
       "module t;\n"
@@ -243,9 +202,6 @@ TEST(FunctionLifetimeSim, ThisQualifiedCallStatementWritesOwnProperty) {
   EXPECT_EQ(val, 2u);
 }
 
-// §13.4.2: a static function's items are statically allocated, so a queue it
-// declares keeps its elements from one call to the next: the second call
-// pushes onto the element the first left.
 TEST(FunctionLifetimeSim, StaticFunctionQueueLocalKeptBetweenCalls) {
   auto val = RunAndGet(
       "module t;\n"
@@ -282,7 +238,6 @@ TEST(FunctionLifetimeSim, StaticFunctionAssociativeLocalKeptBetweenCalls) {
   EXPECT_EQ(val, 2u);
 }
 
-// A fixed-size array local keeps its elements too: `a[0]++` counts calls.
 TEST(FunctionLifetimeSim, StaticFunctionFixedArrayLocalKeptBetweenCalls) {
   auto val = RunAndGet(
       "module t;\n"
@@ -302,8 +257,6 @@ TEST(FunctionLifetimeSim, StaticFunctionFixedArrayLocalKeptBetweenCalls) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.4.2: an automatic function's items are allocated for each call, so its
-// queue starts empty every time.
 TEST(FunctionLifetimeSim, AutomaticFunctionQueueLocalFreshEachCall) {
   auto val = RunAndGet(
       "module t;\n"
@@ -322,7 +275,6 @@ TEST(FunctionLifetimeSim, AutomaticFunctionQueueLocalFreshEachCall) {
   EXPECT_EQ(val, 1u);
 }
 
-// A package function is static by default as a module's is.
 TEST(FunctionLifetimeSim, PackageFunctionQueueLocalKeptBetweenCalls) {
   auto val = RunAndGet(
       "package p;\n"
@@ -343,10 +295,6 @@ TEST(FunctionLifetimeSim, PackageFunctionQueueLocalKeptBetweenCalls) {
   EXPECT_EQ(val, 2u);
 }
 
-// §13.4.2 with §26.2: a package function has one declaration, so its static
-// local is one variable every caller shares, whatever instance it calls from:
-// u1's call, u2's and the top's count to 3. Kept per calling instance, each
-// instance counted its own and the top read 1.
 TEST(FunctionLifetimeSim, PackageFunctionStaticLocalSharedByEveryInstance) {
   auto val = RunAndGet(
       "package p;\n"
@@ -363,8 +311,6 @@ TEST(FunctionLifetimeSim, PackageFunctionStaticLocalSharedByEveryInstance) {
   EXPECT_EQ(val, 3u);
 }
 
-// §13.4.2 with §3.12.1: so has a function the compilation unit declares, and
-// so has a static local of a block in its body.
 TEST(FunctionLifetimeSim, UnitFunctionStaticLocalSharedByEveryInstance) {
   auto val = RunAndGet(
       "function int count();\n"

@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -176,11 +175,6 @@ TEST(PortConnectionRulesForNetsElaboration, InoutNetPortOmittedByNameNoError) {
              "endmodule\n"));
 }
 
-// §23.3.3.3 governs a port declaration with a net type, wire for one, and its
-// inout rule lets an inout connect to a net, or a concatenation of nets, of a
-// compatible data type, or stay unconnected, but never connect to a variable.
-// The port here is declared `inout wire`, so it is this rule rather than
-// §23.3.3.2's, which opens on a port declared with a variable data type.
 TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortErrors) {
   ElabFixture f;
@@ -197,9 +191,6 @@ TEST(PortConnectionRulesForNetsElaboration,
       "variable 'x' cannot be connected to inout port 'a'", 5, "23.3.3.3"));
 }
 
-// §23.3.3.3's inout rule is about what the connection is, not about how the
-// port was bound, so a positional connection of the same variable is rejected
-// under the same subclause.
 TEST(PortConnectionRulesForNetsElaboration,
      VariableConnectedToInoutNetPortPositionalErrors) {
   ElabFixture f;
@@ -216,9 +207,6 @@ TEST(PortConnectionRulesForNetsElaboration,
       "variable 'x' cannot be connected to inout port 'a'", 5, "23.3.3.3"));
 }
 
-// An input net port admits any compatible expression, including a constant
-// parameter reference. A parameter resolves through a different elaboration
-// path than a folded literal, so it is exercised as its own operand form.
 TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToParameter) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
@@ -229,8 +217,6 @@ TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToParameter) {
              "endmodule\n"));
 }
 
-// A localparam constant is another admitted operand for an input net port
-// connection, resolved distinctly from a parameter or a literal.
 TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToLocalparam) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
@@ -241,8 +227,6 @@ TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsToLocalparam) {
              "endmodule\n"));
 }
 
-// The input-net connection rule holds regardless of whether the port is bound
-// by name or by position; a positional compatible connection is equally legal.
 TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsPositionally) {
   EXPECT_TRUE(
       ElabOk("module child(input wire [7:0] a);\n"
@@ -253,9 +237,6 @@ TEST(PortConnectionRulesForNetsElaboration, InputNetPortConnectsPositionally) {
              "endmodule\n"));
 }
 
-// A design whose line 7 connects `connection` to the two-bit inout port `a` of
-// `child`, the parent having the nets `w` and `n` and the variables `v` and
-// `b`, the last one bit wide.
 std::string InoutConnectedTo(const std::string& connection) {
   return "module child(inout wire [1:0] a);\n"
          "endmodule\n"
@@ -269,10 +250,6 @@ std::string InoutConnectedTo(const std::string& connection) {
          "endmodule\n";
 }
 
-// §23.3.3.3 (printed page 747) connects an inout port to a net or a
-// concatenation of nets and never to a variable, and a select or a
-// concatenation reaches a variable as surely as its bare name does: each form
-// that names one is reported as the bare variable is, named or positional.
 TEST(PortConnectionRulesForNetsElaboration,
      VariableReachedThroughASelectOrConcatenationOnInoutErrors) {
   const char* const kConnections[] = {
@@ -289,7 +266,6 @@ TEST(PortConnectionRulesForNetsElaboration,
   }
 }
 
-// A bare variable among a concatenation's parts is the variable itself.
 TEST(PortConnectionRulesForNetsElaboration,
      BareVariableInAConcatenationOnInoutErrors) {
   ElabFixture f;
@@ -300,7 +276,6 @@ TEST(PortConnectionRulesForNetsElaboration,
                             7, "23.3.3.3"));
 }
 
-// The same forms reaching nets alone are what §23.3.3.3 permits.
 TEST(PortConnectionRulesForNetsElaboration,
      NetReachedThroughASelectOrConcatenationOnInoutIsAccepted) {
   const char* const kConnections[] = {".a(w[1])",         ".a(w[2:1])",

@@ -37,16 +37,6 @@
 
 namespace delta {
 
-// §6.21 with §9.3.1: a block declares variables of a scope of its own,
-// named or not. A named block's frame, and an unnamed block's declaring
-// variables outside any subroutine, is kept under StmtFrameName, so its
-// static variables last from one activation to the next and its names hide
-// the module's only inside it. Without it, the declaration replaced the
-// module's variable of the same name. Inside a task or function a variable's
-// declaration already lands in the subroutine's frame. One declaring a let
-// (§11.12) is given a frame wherever it stands, inside a subroutine too, so
-// that the let hides an enclosing scope's only inside the block rather than
-// for the rest of the body.
 static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
   if (!stmt->label.empty() || BlockDeclaresLet(stmt))
     return ctx.StmtFrameName(stmt);
@@ -56,9 +46,6 @@ static std::string_view BlockFrameName(const Stmt* stmt, SimContext& ctx) {
   return declares ? ctx.StmtFrameName(stmt) : std::string_view{};
 }
 
-// Pushes the frame BlockFrameName gives `stmt`, and for a named block the
-// named scope beside it, answering the frame's name, empty where none. §19.3:
-// a named block beginning is a block event a covergroup may sample at.
 static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   std::string_view frame = BlockFrameName(stmt, ctx);
@@ -73,10 +60,6 @@ static std::string_view EnterBlockScope(const Stmt* stmt, SimContext& ctx,
   return frame;
 }
 
-// Tears down what EnterBlockScope pushed. A no-op where it pushed nothing.
-// Always called immediately before ExecBlock returns so the scope stack is
-// balanced on every exit path. §19.3: a named block ending is a block event a
-// covergroup may sample at, unless the block was disabled, `ended` false.
 static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
                                std::string_view frame, bool ended) {
   if (frame.empty()) return;
@@ -89,12 +72,6 @@ static void TeardownBlockScope(const Stmt* stmt, SimContext& ctx, Arena& arena,
   ctx.PopStaticScope(frame);
 }
 
-// A named block is a scope of the hierarchy, and so is a task or function,
-// which stands under its module rather than under the blocks of the process
-// calling it; the path therefore starts at the innermost subroutine. §21.7.2.3:
-// each level's kind is recorded under the path reaching it, for the $scope a
-// dump opens there -- a task or a function where the level is a subroutine, a
-// named sequential block where it is a block no fork marked parallel.
 static void RecordVcdScopeKind(const std::string& path, std::string_view level,
                                SimContext& ctx) {
   if (const ModuleItem* sub = ctx.FindFunction(level)) {
@@ -128,9 +105,6 @@ std::string_view BindNamedBlockVariable(std::string_view name,
                                         SimContext& ctx) {
   if (ctx.ActiveNamedScopes().empty()) return {};
   std::string path = ActiveNamedScopePath(ctx) + "." + std::string(name);
-  // §27.4: a named block in a generate block instance is that instance's, so
-  // its variables are kept under the instance's name as the VPI model reads
-  // them (BlockVariableRunKey in vpi_design_attach_procedures.cpp).
   path.insert(ctx.ActiveInstancePrefix().size(), ctx.ActiveGenBlockPrefix());
   const std::string& key = *ctx.GetArena().Create<std::string>(std::move(path));
   ctx.RegisterBlockVariable(key);
@@ -226,9 +200,6 @@ static ExecTask ExecPriorityIf(const Stmt* stmt, SimContext& ctx,
   co_return StmtResult::kDone;
 }
 
-// §12.6.2: an if whose predicate binds pattern identifiers. They are created
-// in a scope that holds the predicate's later clauses and the true arm
-// (EvalMatchesPredicate); the else arm stands outside it.
 static ExecTask ExecIfBindingPredicate(const Stmt* stmt, SimContext& ctx,
                                        Arena& arena) {
   ctx.PushScope();
@@ -242,7 +213,6 @@ static ExecTask ExecIfBindingPredicate(const Stmt* stmt, SimContext& ctx,
   co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
 }
 
-// An if with no unique, unique0 or priority qualifier.
 static ExecTask ExecPlainIf(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (PatternBindsIdentifiers(stmt->condition)) {
     co_return co_await ExecIfBindingPredicate(stmt, ctx, arena);
@@ -276,11 +246,6 @@ static void CreateForInitVars(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     if (stmt->for_init_types[i].kind == DataTypeKind::kImplicit) continue;
     auto* init = stmt->for_inits[i];
     if (!init || !init->lhs) continue;
-    // §12.7.1: a declared control variable is a local of the type the
-    // initialization writes -- its width and signedness (§6.11.3), 2- or
-    // 4-state (§6.11.2), and a real, string, enumeration or class handle kind
-    // -- made as a subroutine body's local of that type is. Its initializer
-    // runs below as the ordinary assignment it is.
     CreateFuncLocalVar(init->lhs->text, stmt->for_init_types[i], nullptr, ctx,
                        arena);
   }
@@ -293,16 +258,6 @@ static bool HasTypedForInit(const Stmt* stmt) {
   return false;
 }
 
-// Pops the dynamic scope a typed for-init introduced and the static scope a
-// label introduced, in the order ExecFor pushed them. Called on every ExecFor
-// exit path to keep the scope stack balanced.
-// §9.3.5: a statement label on a foreach loop, or a for loop that declares its
-// loop variable, names the implicit begin-end block the loop creates. Pushing
-// the static scope alone (for hierarchical name resolution) is not enough for a
-// `disable <label>` to find the loop; registering the label as a named scope of
-// the running process — exactly as ExecBlock does for a named begin-end block —
-// lets the disable resolve so the loop can consume it. Paired 1:1 with
-// ExitLoopLabelScope so the scope stack stays balanced on every exit path.
 static void EnterLoopLabelScope(const Stmt* stmt, SimContext& ctx,
                                 bool labeled) {
   if (!labeled) return;
@@ -323,10 +278,6 @@ static void TeardownForScopes(const Stmt* stmt, SimContext& ctx, bool scoped,
   ExitLoopLabelScope(stmt, ctx, labeled);
 }
 
-// How a loop should react to the StmtResult returned by its body, factored out
-// of the repeated "break / propagate / keep looping" branch shared by every
-// loop executor in this file. kPropagate means the caller must unwind its
-// scopes and co_return the body's result unchanged.
 enum class LoopAction : std::uint8_t { kKeepLooping, kBreakLoop, kPropagate };
 
 static LoopAction ClassifyLoopBodyResult(StmtResult result) {
@@ -337,13 +288,6 @@ static LoopAction ClassifyLoopBodyResult(StmtResult result) {
   return LoopAction::kKeepLooping;
 }
 
-// §9.3.5: a statement label on a foreach loop, or on a for loop that declares
-// its loop variable, names the implicit begin-end block the loop creates. Per
-// §9.6.2, disabling a named block terminates it and resumes execution at the
-// following statement. So when the loop body bubbles up a kDisable that targets
-// the loop's own label, the disable is consumed here and turned into a normal
-// loop exit rather than propagating further up the process. Returns true when
-// the loop should stop.
 static bool LoopDisableTargetsOwnLabel(const Stmt* stmt, StmtResult result,
                                        bool labeled, SimContext& ctx) {
   if (result != StmtResult::kDisable || !labeled) return false;
@@ -352,9 +296,6 @@ static bool LoopDisableTargetsOwnLabel(const Stmt* stmt, StmtResult result,
   return true;
 }
 
-// Evaluates a for-loop's optional continuation condition. A loop with no
-// condition runs unconditionally; otherwise it continues only while the
-// condition is truthy.
 static bool ForConditionHolds(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->for_cond) return true;
   auto cond = EvalExpr(stmt->for_cond, ctx, arena);
@@ -416,11 +357,6 @@ ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// §12.7.2: derive how many times a repeat-loop body runs from the count
-// expression, already evaluated once before the loop begins. An unknown or
-// high-impedance value, or a negative value of a signed expression, yields no
-// iterations.
-// §6.12.1 rounds a real count to the integer it converts to.
 uint64_t RepeatIterationCount(const Logic4Vec& count_val) {
   if (count_val.is_real) {
     double rounded = std::round(RealVecToDouble(count_val));
@@ -482,10 +418,6 @@ static uint32_t GetArraySize(const Stmt* stmt, SimContext& ctx) {
   return name.empty() ? 0 : ForeachArraySize(name, ctx);
 }
 
-// §12.7.3: foreach is illegal on a wildcard-indexed associative array. Reports
-// the diagnostic and returns true when `aa` is such a wildcard array,
-// signalling that ExecForeach must abandon the loop. `loc` is where the loop
-// was written, which the report names along with the name the loop spells.
 static bool ForeachOnWildcardAssoc(const AssocArrayObject* aa,
                                    const std::string& arr_name, SimContext& ctx,
                                    SourceLoc loc) {
@@ -497,17 +429,6 @@ static bool ForeachOnWildcardAssoc(const AssocArrayObject* aa,
   return true;
 }
 
-// Result of the non-coroutine prologue of ExecForeach: the array name, its
-// iteration count, and whether the loop should run at all. `bail` is set when
-// the loop must terminate immediately (wildcard associative array, or a
-// zero-length iteration domain) without entering the body. For an associative
-// array `keys` holds the index values the loop variable steps through, one per
-// iteration, and `string_keys` whether they are strings. `lo` is the index
-// the first iteration takes where the array carries no array-info entry: the
-// lowest declared index of a fixed-size array property, 0 otherwise. `dims`
-// holds the dimensions the loop walks one named variable per dimension, as
-// nested loops (DeclaredForeachDims, ClassArrayForeachDims); empty where the
-// loop steps through `keys` or from `lo` instead.
 struct ForeachSetup {
   std::string arr_name;
   uint32_t size = 0;
@@ -519,18 +440,6 @@ struct ForeachSetup {
   std::vector<ForeachDim> dims;
 };
 
-// §12.7.3: resolves the array being iterated and how many iterations it
-// implies, reporting the wildcard-associative-array error as a side effect.
-// Pure prologue computation kept out of the ExecForeach coroutine so the
-// coroutine body stays small.
-//
-// An associative array is iterated over the indices it holds (§12.7.3: each
-// loop variable corresponds to one dimension, and the array's dimension is its
-// set of indices), in the array's own order, and the array is a declared one
-// or, §8.5 restricting no property's type, a property of an object -- named
-// through a handle, `o.count`, or bare in a method (§8.11) -- which
-// FindAssocArrayOfBase resolves. Before that an associative array was
-// iterated as the variable under its name, elem_width times from 0.
 static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
                                         Arena& arena) {
   ForeachSetup setup;
@@ -546,29 +455,14 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
     setup.aa = aa;
     setup.size = static_cast<uint32_t>(setup.keys.size());
   } else if (const QueueObject* q = FindQueueOfBase(stmt->expr, ctx, arena)) {
-    // §12.7.3 with §7.10: a queue's one dimension holds as many elements as
-    // the queue does, 0 to $, whether the queue is a declared one or a
-    // property of an object (§8.5) named bare in a method or through a
-    // handle. A declared dynamic array is stored the same way and answers the
-    // same. Before this the loop ran over the variable under a declared
-    // queue's name, once per bit of one element, and over a property not at
-    // all.
     setup.size = static_cast<uint32_t>(q->elements.size());
   } else if (const StructFieldInfo* member =
                  ResolveStructArrayMember(stmt->expr, ctx)) {
-    // §12.7.3 with §7.2 and §7.4.2: an unpacked array member of a structure,
-    // `m.v`, holds its elements in the structure's bits, from the lower of
-    // its bounds. Looked up as an array of its name, it was none.
     setup.size = member->elem_count;
     setup.lo = std::min(member->elem_left, member->elem_right);
     setup.dims = StructMemberForeachDims(stmt, *member);
   } else if (ClassArrayRef ref;
              ResolveClassArray(stmt->expr, ctx, arena, ref)) {
-    // §12.7.3 with §7.4.2 and §7.5: a fixed-size or dynamic array property
-    // (§8.5) holds its elements on the object, the declared dimension's count
-    // from its lowest index for a fixed one and the object's count from 0 for
-    // a dynamic one. Before this the property was looked up as a variable of
-    // its name, which it is not, and the loop ran no times.
     setup.size = ref.size;
     setup.lo = ref.lo;
     setup.dims = ClassArrayForeachDims(stmt, ref);
@@ -580,8 +474,6 @@ static ForeachSetup ComputeForeachSetup(const Stmt* stmt, SimContext& ctx,
   return setup;
 }
 
-// Returns the foreach loop-variable name, or an empty view when the iteration
-// dimension is unnamed (a `,` placeholder in the index list).
 static std::string_view ForeachIterName(const Stmt* stmt) {
   if (!stmt->foreach_vars.empty() && !stmt->foreach_vars[0].empty()) {
     return stmt->foreach_vars[0];
@@ -589,11 +481,6 @@ static std::string_view ForeachIterName(const Stmt* stmt) {
   return {};
 }
 
-// Assigns the loop variable for iteration `i`: the i-th index the associative
-// array holds, where the loop is over one, else the zero-based counter counted
-// up from `lo`. A no-op when the dimension is unnamed (`iter_var` is null).
-// §12.7.3 types the loop variable after the index type, so a string index
-// makes the variable a string.
 static void SetForeachIterVar(Variable* iter_var, const ForeachSetup& setup,
                               uint32_t i, Arena& arena) {
   if (!iter_var) return;
@@ -607,41 +494,23 @@ static void SetForeachIterVar(Variable* iter_var, const ForeachSetup& setup,
   iter_var->value.is_signed = iter_var->is_signed;
 }
 
-// Creates the loop variable `iter_name` names in the scope ExecForeach
-// pushed, or none where the dimension is unnamed. §12.7.3: the loop variable
-// has the index type of an associative array (TypeForeachIterVar).
 static Variable* CreateForeachIterVar(std::string_view iter_name,
                                       const ForeachSetup& setup,
                                       SimContext& ctx) {
   if (iter_name.empty()) return nullptr;
   Variable* iter_var = ctx.CreateLocalVariable(iter_name, 32);
   TypeForeachIterVar(iter_name, setup.aa, ctx);
-  // §12.7.3: over a fixed-size, dynamic or queue array the loop variable is
-  // an int, which is signed. §7.8.4: over an associative array a signed
-  // integral index type, `byte` or `bit signed [4:1]`, makes it signed, so the
-  // key -3 reads -3.
   iter_var->is_signed = setup.aa == nullptr ||
                         (!setup.aa->is_string_key && setup.aa->is_index_signed);
   return iter_var;
 }
 
-// Pops the dynamic scope ExecForeach pushed for the loop body and the static
-// scope a label introduced, in the order they were pushed. Called on every
-// ExecForeach exit path that runs after the body scope is established.
 static void TeardownForeachScopes(const Stmt* stmt, SimContext& ctx,
                                   bool labeled) {
   ctx.PopScope();
   ExitLoopLabelScope(stmt, ctx, labeled);
 }
 
-// §12.7.3: drives a foreach over `dims`, one named loop variable per
-// dimension, as nested loops. A flat odometer over the product of the
-// dimension sizes yields the same nesting the LRM prescribes: the last
-// (innermost) dimension changes most rapidly, the first (outermost) most
-// slowly, and each walks from its declared left bound (SetForeachDimVars). Each
-// step sets the variables before running the body once, so `continue` advances
-// to the next combination and `break` (or a disable of the loop's own label)
-// leaves the whole loop.
 static ExecTask ExecForeachDims(const Stmt* stmt, SimContext& ctx, Arena& arena,
                                 const std::vector<ForeachDim>& dims,
                                 bool labeled) {
@@ -663,11 +532,6 @@ static ExecTask ExecForeachDims(const Stmt* stmt, SimContext& ctx, Arena& arena,
   co_return StmtResult::kDone;
 }
 
-// The body of the foreach `stmt` run once per index of `element`, the
-// second loop variable `var` taking each: answers what the outer loop is to
-// do next, as one run of the body would -- kBreak where the body broke out,
-// kDone where every index ran or the body continued, and any other result as
-// the body gave it.
 static ExecTask ExecForeachElement(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena, Variable* var,
                                    const QueueObject* element) {
@@ -689,8 +553,6 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     ExitLoopLabelScope(stmt, ctx, labeled);
     co_return StmtResult::kDone;
   }
-  // §12.7.3: each loop variable walks the declared range of the dimension it
-  // names, from its left bound, as nested loops over every named dimension.
   if (!setup.dims.empty()) {
     co_return co_await ExecForeachDims(stmt, ctx, arena, setup.dims, labeled);
   }

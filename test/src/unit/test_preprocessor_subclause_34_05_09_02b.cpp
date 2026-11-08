@@ -1,31 +1,3 @@
-// §34.5.9.2 Description, continued from
-// test_preprocessor_subclause_34_05_09_02a for the two rows of Table 34-2 whose
-// algorithms write lines: uuencode, the historical algorithm of IEEE Std
-// 1003.1, and quoted-printable, IETF RFC 2045's other algorithm. The first file
-// reads each of them on a designation no part of this tool wrote; this one
-// writes each through EncodeProtectBlock, holds the writing to what the
-// published algorithm produces, reads it back, and refuses the characters
-// neither algorithm writes. base64, which RFC 2045 defines beside
-// quoted-printable, writes lines as well, and its line length and its reading
-// are held to RFC 2045 here too.
-//
-// Most of the writing is driven through EncodeProtectBlock, which holds it to
-// the published algorithm alone. The cases at the end drive it through an
-// envelope: the encrypting half writes its blocks under either of these two,
-// or raw, where a text asks for it, and keeps the values §34.5.13.2 and its
-// neighbours announce on the next line under a one-line scheme.
-//
-// A text written under either one runs to several lines by construction:
-// uuencode ends every line after a set number of bytes and closes its output
-// with a line carrying none, and quoted-printable breaks a line before the
-// byte that would carry it past the length, with an equals sign standing for
-// the break. §34.5.9.2's line_length is the most characters one such line may
-// hold, so the same length is asked of both.
-//
-// All of it is preprocessor-stage: src/preprocessor/protect_encoding.cpp picks
-// the algorithm by identifier and src/preprocessor/protect_encoding_codecs.cpp
-// carries both.
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -45,9 +17,6 @@ using namespace delta;
 
 namespace {
 
-// The descriptor a directive naming `enctype` with `length` against
-// line_length reads as, taken from the spelling §34.5.9.1 writes rather than
-// assembled by hand.
 ProtectEncoding Stated(std::string_view enctype, size_t length) {
   std::string list = "(enctype=\"";
   list.append(enctype).append("\"");
@@ -58,7 +27,6 @@ ProtectEncoding Stated(std::string_view enctype, size_t length) {
   return stated;
 }
 
-// The longest line of `text`.
 size_t LongestLine(std::string_view text) {
   size_t longest = 0;
   size_t at = 0;
@@ -71,39 +39,24 @@ size_t LongestLine(std::string_view text) {
   return longest;
 }
 
-// Data holding every byte value from zero up, so that a writing is asked about
-// bytes it writes as themselves, bytes it escapes, and more of them than one
-// line carries.
 std::string EveryByteUpTo(size_t count) {
   std::string data;
   for (size_t b = 0; b < count; ++b) data.push_back(static_cast<char>(b));
   return data;
 }
 
-// Whether `text` reads back under `enctype` as `data`.
 bool ReadsBackAs(std::string_view text, std::string_view enctype,
                  std::string_view data) {
   std::string bytes;
   return DecodeProtectBlock(text, enctype, &bytes) && bytes == data;
 }
 
-// ---------------------------------------------------------------------------
-// uuencode: a length character, the data six bits to a character, and a
-// closing line carrying no data.
-// ---------------------------------------------------------------------------
-
-// The key the first file reads out of kDesignationInUuencode, written here.
-// The line is that designation character for character, and a line of the
-// grave accent alone follows it: the length character of a line carrying no
-// data, which is how the algorithm says the data are complete.
 TEST(ProtectUuencodeWriting, TheWritingIsTheHistoricalAlgorithms) {
   std::string written =
       EncodeProtectBlock(kDesignatedKey, Stated(kUuencodeEnctype, 0));
   EXPECT_EQ(written, std::string(kDesignationInUuencode) + "\n`\n");
 }
 
-// No length stated, so each line carries the forty-five bytes the algorithm
-// puts on one: a length character and sixty characters of data.
 TEST(ProtectUuencodeWriting, WithNoLengthALineCarriesFortyFiveBytes) {
   std::string data = EveryByteUpTo(100);
   std::string written = EncodeProtectBlock(data, Stated(kUuencodeEnctype, 0));
@@ -111,8 +64,6 @@ TEST(ProtectUuencodeWriting, WithNoLengthALineCarriesFortyFiveBytes) {
   EXPECT_TRUE(ReadsBackAs(written, kUuencodeEnctype, data));
 }
 
-// A stated length puts as many whole groups of four characters on a line as
-// fit behind its length character. Nine leaves room for two groups.
 TEST(ProtectUuencodeWriting, AStatedLengthBoundsEveryLine) {
   std::string data = EveryByteUpTo(100);
   std::string written = EncodeProtectBlock(data, Stated(kUuencodeEnctype, 9));
@@ -120,9 +71,6 @@ TEST(ProtectUuencodeWriting, AStatedLengthBoundsEveryLine) {
   EXPECT_TRUE(ReadsBackAs(written, kUuencodeEnctype, data));
 }
 
-// A length too short for a length character and one group still gets one
-// group, a line of no data being the algorithm's mark that the data are over
-// rather than a line data can be written on.
 TEST(ProtectUuencodeWriting, ALengthShortOfOneGroupStillCarriesOne) {
   std::string data = EveryByteUpTo(10);
   std::string written = EncodeProtectBlock(data, Stated(kUuencodeEnctype, 3));
@@ -130,19 +78,12 @@ TEST(ProtectUuencodeWriting, ALengthShortOfOneGroupStillCarriesOne) {
   EXPECT_TRUE(ReadsBackAs(written, kUuencodeEnctype, data));
 }
 
-// A text written on a system that ends its lines with a carriage return as
-// well, with blank lines ahead of the data, one of each ending: all are
-// stepped over, and the designation reads as the one written with bare line
-// feeds.
 TEST(ProtectUuencodeReading, CarriageReturnsAndBlankLinesAreSteppedOver) {
   std::string text = "\n\r\n";
   text.append(kDesignationInUuencode).append("\r\n`\r\n");
   EXPECT_TRUE(ReadsBackAs(text, kUuencodeEnctype, kDesignatedKey));
 }
 
-// The characters the algorithm writes run from the space to the grave accent.
-// A small letter lies above that run and a tab below it, so neither came out
-// of the algorithm, whether it stands as a line's length or among its data.
 TEST(ProtectUuencodeReading, ACharacterOutsideTheAlgorithmsRunIsRefused) {
   std::string bytes;
   EXPECT_FALSE(DecodeProtectBlock("a86-M", kUuencodeEnctype, &bytes));
@@ -152,38 +93,23 @@ TEST(ProtectUuencodeReading, ACharacterOutsideTheAlgorithmsRunIsRefused) {
   EXPECT_TRUE(ReadsBackAs("#86-M", kUuencodeEnctype, "acm"));
 }
 
-// A line announcing more data than its characters carry. '#' announces three
-// bytes, which take a group of four characters, and only two stand behind it.
 TEST(ProtectUuencodeReading, ALineShortOfItsAnnouncedLengthIsRefused) {
   std::string bytes;
   EXPECT_FALSE(DecodeProtectBlock("#86", kUuencodeEnctype, &bytes));
 }
 
-// ---------------------------------------------------------------------------
-// quoted-printable: printable bytes as themselves, the rest as an equals sign
-// and two hex digits, and an equals sign ending a line to break it.
-// ---------------------------------------------------------------------------
-
-// The key the first file reads out of kDesignationInQuotedPrintable, written
-// here. The space is escaped and the letters stand for themselves.
 TEST(ProtectQuotedPrintableWriting, TheWritingIsRfc2045s) {
   EXPECT_EQ(
       EncodeProtectBlock(kDesignatedKey, Stated(kQuotedPrintableEnctype, 0)),
       kDesignationInQuotedPrintable);
 }
 
-// Which bytes stand for themselves: the printable run from '!' to '~' but for
-// the equals sign the scheme takes for its escape. The space below that run,
-// the equals sign inside it, and the bytes above it are escaped, the digits
-// in capitals.
 TEST(ProtectQuotedPrintableWriting, OnlyPrintablesOtherThanEqualsStandAlone) {
   EXPECT_EQ(EncodeProtectBlock(std::string_view(" !<=>~\x7f\xff", 8),
                                Stated(kQuotedPrintableEnctype, 0)),
             "=20!<=3D>~=7F=FF");
 }
 
-// No length stated, so a line runs to the seventy-six characters RFC 2045
-// allows, broken with the equals sign that stands for no data.
 TEST(ProtectQuotedPrintableWriting, WithNoLengthALineRunsToSeventySix) {
   std::string data = EveryByteUpTo(256);
   std::string written =
@@ -192,8 +118,6 @@ TEST(ProtectQuotedPrintableWriting, WithNoLengthALineRunsToSeventySix) {
   EXPECT_TRUE(ReadsBackAs(written, kQuotedPrintableEnctype, data));
 }
 
-// A stated length is the most characters a line holds, the equals sign that
-// breaks it among them.
 TEST(ProtectQuotedPrintableWriting, AStatedLengthBoundsEveryLine) {
   std::string data = EveryByteUpTo(256);
   std::string written =
@@ -202,9 +126,6 @@ TEST(ProtectQuotedPrintableWriting, AStatedLengthBoundsEveryLine) {
   EXPECT_TRUE(ReadsBackAs(written, kQuotedPrintableEnctype, data));
 }
 
-// RFC 2045 writes the digits in capitals and has a reading take either case,
-// a break written with a carriage return ahead of its line feed, and a line
-// ended without an equals sign; none of them is data.
 TEST(ProtectQuotedPrintableReading, WhatAReadingTakesBesidesItsOwnWriting) {
   EXPECT_TRUE(ReadsBackAs("acme=2a=2A", kQuotedPrintableEnctype, "acme**"));
   EXPECT_TRUE(ReadsBackAs("acme=\r\n=20public", kQuotedPrintableEnctype,
@@ -213,9 +134,6 @@ TEST(ProtectQuotedPrintableReading, WhatAReadingTakesBesidesItsOwnWriting) {
                           kDesignatedKey));
 }
 
-// An equals sign followed by neither a line break nor two hex digits: the
-// text ends after it or after one digit, or a digit is not hex. None of these
-// comes out of the algorithm.
 TEST(ProtectQuotedPrintableReading, AnEscapeTheAlgorithmNeverWritesIsRefused) {
   std::string bytes;
   EXPECT_FALSE(DecodeProtectBlock("acme=", kQuotedPrintableEnctype, &bytes));
@@ -224,9 +142,6 @@ TEST(ProtectQuotedPrintableReading, AnEscapeTheAlgorithmNeverWritesIsRefused) {
   EXPECT_FALSE(DecodeProtectBlock("acme=0G", kQuotedPrintableEnctype, &bytes));
 }
 
-// RFC 2045 §6.7 rule 3: the writing never ends a line in a space or a tab, so
-// one there was put in on the way and is deleted before the line is read,
-// whether it follows data or the equals sign of a soft break.
 TEST(ProtectQuotedPrintableReading, BlanksEndingALineAreNotData) {
   EXPECT_TRUE(ReadsBackAs("ab=  \ncd", kQuotedPrintableEnctype, "abcd"));
   EXPECT_TRUE(ReadsBackAs("ab \t\ncd", kQuotedPrintableEnctype, "abcd"));
@@ -234,12 +149,6 @@ TEST(ProtectQuotedPrintableReading, BlanksEndingALineAreNotData) {
   EXPECT_TRUE(ReadsBackAs("a b=20\ncd", kQuotedPrintableEnctype, "a b cd"));
 }
 
-// ---------------------------------------------------------------------------
-// base64: the data six bits to a character, in lines RFC 2045 bounds.
-// ---------------------------------------------------------------------------
-
-// RFC 2045 §6.8 holds a line of the writing to 76 characters, which is the
-// length an encoding expression stating no line_length leaves it at.
 TEST(ProtectBase64Writing, WithNoLengthALineRunsToSeventySix) {
   std::string data = EveryByteUpTo(256);
   std::string written = EncodeProtectBlock(data, Stated(kBase64Enctype, 0));
@@ -254,9 +163,6 @@ TEST(ProtectBase64Writing, AStatedLengthBoundsEveryLine) {
   EXPECT_TRUE(ReadsBackAs(written, kBase64Enctype, data));
 }
 
-// A value written on the one line beneath its keyword is never broken, under
-// base64 or the tool's own scheme, whatever length is stated; the identity
-// transformation writes the bytes as they are.
 TEST(ProtectBase64Writing, AOneLineValueIsNeverBroken) {
   std::string data = EveryByteUpTo(256);
   for (std::string_view enctype : {kBase64Enctype, kBlockEnctype}) {
@@ -267,9 +173,6 @@ TEST(ProtectBase64Writing, AOneLineValueIsNeverBroken) {
   EXPECT_EQ(EncodeProtectValue("a\nb", Stated(kRawEnctype, 0)), "a\nb");
 }
 
-// RFC 2045 §6.8 has a reading ignore every character outside the alphabet, so
-// a block indented, padded with blanks or broken where its writing never broke
-// it reads as the same bytes.
 TEST(ProtectBase64Reading, CharactersOutsideTheAlphabetAreSteppedOver) {
   std::string data = EveryByteUpTo(40);
   std::string clean = EncodeProtectBlock(data, Stated(kBase64Enctype, 0));
@@ -278,22 +181,12 @@ TEST(ProtectBase64Reading, CharactersOutsideTheAlphabetAreSteppedOver) {
   EXPECT_TRUE(ReadsBackAs(padded, kBase64Enctype, data));
 }
 
-// What is left once those characters are stepped over is still read by the
-// algorithm, so a single character ending it stops part way through a byte.
 TEST(ProtectBase64Reading, AGroupEndingPartWayThroughAByteIsRefused) {
   std::string bytes;
   EXPECT_FALSE(DecodeProtectBlock("QUJD R", kBase64Enctype, &bytes));
   EXPECT_TRUE(ReadsBackAs("QUJD Rg==", kBase64Enctype, "ABCF"));
 }
 
-// §34.5.9.2 ENCRYPTION INPUT: the encoding expression a text states decides how
-// the data_block, digest_block and key_block of the output are written, and
-// Table 34-2 sets four identifiers aside for it. A scheme that breaks its
-// output over several lines is honoured for the blocks, whose content runs to
-// the next pragma directive, so the data block is written in the scheme asked
-// for and reads back by that scheme's algorithm to the block the cipher
-// produced. Each case fails on an encrypting tool that writes its own one-line
-// scheme in place of the one requested.
 void ExpectTheDataBlockWrittenIn(std::string_view enctype) {
   std::string envelope = EnvelopeAround(NamesScheme(enctype));
   std::string stated = "`pragma protect encoding=(enctype=\"";
@@ -320,9 +213,6 @@ TEST(ProtectBlockWriting, ARawRequestWritesTheDataBlockRaw) {
   ExpectTheDataBlockWrittenIn(kRawEnctype);
 }
 
-// §34.5.9.2 DECRYPTION INPUT: a reader takes the scheme each block was written
-// in from the expression standing ahead of it, so the envelope written in the
-// scheme requested is read back to the design it sealed.
 TEST(ProtectBlockWriting, AnEnvelopeWrittenInUuencodeIsReadBack) {
   std::string envelope = EnvelopeAround(NamesScheme(kUuencodeEnctype));
   PreprocFixture f;
@@ -331,14 +221,6 @@ TEST(ProtectBlockWriting, AnEnvelopeWrittenInUuencodeIsReadBack) {
   EXPECT_TRUE(Holds(read, kEncodingSealedDesign));
 }
 
-// A region whose keys travel in key blocks, its data_decrypt_key written inside
-// a block's cleartext on the line beneath its keyword (§34.5.14). That value
-// stays on its one line, under a one-line scheme §34.2's sequential reading
-// puts in effect ahead of it, while the key block around it is written in the
-// scheme requested; a reader holding the provider's key reads the block, then
-// the key, then the data. The test fails on a writer that leaves the one-line
-// value in a scheme that breaks it over several lines, or a key block in a
-// scheme other than the one asked for.
 TEST(ProtectBlockWriting, AKeyBlockWrittenInUuencodeIsReadBack) {
   std::string sealed = SealedByDesignation(
       kUuencodeEnctype, kDesignationInUuencode, kDesignatedKey);

@@ -20,18 +20,12 @@ bool HasSubarrayElements(const ArrayInfo& info) {
   return info.dim_sizes.size() >= 2;
 }
 
-// The entries of `v` after its first, which describe the dimensions of one of
-// the array's elements.
 template <typename T>
 static std::vector<T> AfterFirst(const std::vector<T>& v) {
   auto skip = static_cast<std::ptrdiff_t>(std::min<size_t>(1, v.size()));
   return std::vector<T>(v.begin() + skip, v.end());
 }
 
-// §7.4.4: the shape of one element of the multidimensional array `info`
-// describes, a subarray of every dimension but the first. A subarray of one
-// dimension leaves dim_los and dim_sizes empty, as ArrayInfo describes any
-// one-dimensional array.
 static ArrayInfo SubarrayInfo(const ArrayInfo& info) {
   ArrayInfo sub;
   sub.lo = info.dim_los[1];
@@ -50,18 +44,12 @@ static ArrayInfo SubarrayInfo(const ArrayInfo& info) {
   return sub;
 }
 
-// The subarray whose leaves are being copied, `sub`, and the context and arena
-// the local copies are made in.
 struct LeafBinding {
   const ArrayInfo& sub;
   SimContext& ctx;
   Arena& arena;
 };
 
-// The leaves of the subarray `lb` describes, from dimension `dim` inward: each
-// leaf of the array under `src`, `src[j]...`, copied into a local variable of
-// the current scope under `dst`, `dst[j]...`, with the element type's
-// signedness (CollectVecElements).
 static void BindSubarrayLeaves(const LeafBinding& lb, const std::string& src,
                                const std::string& dst, size_t dim) {
   const ArrayInfo& sub = lb.sub;

@@ -234,15 +234,6 @@ TEST(ParallelBlockSimulation, ForkJoinNoneAllChildrenComplete) {
   EXPECT_EQ(c->value.ToUint64(), 3u);
 }
 
-// §9.3.2 with §8.6 and §8.11: a fork inside a class task spawns its branches
-// as processes of the same method, so a branch reads and writes the object's
-// properties, bare and as `this.a`, as the task itself does. Each branch is a
-// process of its own, and a process carries its `this` with it across a
-// suspension (§13.3.2); a spawned branch started with none, so `a` read 0 and
-// the writes to `a` and `b` reached no object. With a = 11 to start, the
-// first branch makes a 12 at time 2 and the second makes b 120 at time 3, so
-// the task's own reading after the join is 12 * 1000 + 120 = 12120; a branch
-// with no object left it at 11000 or 0.
 TEST(ParallelBlockSimulation, ForkBranchInsideAClassTaskKeepsThis) {
   auto val = RunAndGet(
       "class C;\n"
@@ -269,10 +260,6 @@ TEST(ParallelBlockSimulation, ForkBranchInsideAClassTaskKeepsThis) {
   EXPECT_EQ(val, 12120u);
 }
 
-// §9.3.2's join_none inside a class task, the shape of a component's
-// run-phase forking a monitor: the parent goes on and the branch, started
-// once the parent blocks, still runs on the parent's object. The branch
-// doubles the property after `#1`; the parent reads it after `#2`.
 TEST(ParallelBlockSimulation, JoinNoneBranchInsideAClassTaskKeepsThis) {
   auto val = RunAndGet(
       "class C;\n"
@@ -298,14 +285,6 @@ TEST(ParallelBlockSimulation, JoinNoneBranchInsideAClassTaskKeepsThis) {
   EXPECT_EQ(val, 42u);
 }
 
-// §9.3.2's own join_none example: a fork's block-item declaration,
-// `automatic int k = j`, initializes on entry to the fork, before the
-// processes are spawned, so each spawned copy holds the j of its own
-// iteration, while a variable declared in a nested block initializes when
-// the process runs, after the loop has left j at 4. The branches see the
-// enclosing scope's variables because a spawned process takes the scope
-// stack the spawning one had; with none, k and j read 0 in every branch. The
-// result sums k * 10 + m over the three branches: 14 + 24 + 34 = 72.
 TEST(ParallelBlockSimulation, ForkBranchSeesTheEnclosingScopesLocals) {
   auto val = RunAndGet(
       "module t;\n"
@@ -326,10 +305,6 @@ TEST(ParallelBlockSimulation, ForkBranchSeesTheEnclosingScopesLocals) {
   EXPECT_EQ(val, 72u);
 }
 
-// §9.3.2 with §13.3: a local of a class task is the variable a fork branch
-// inside the task writes, so the task reads the branch's write after the
-// join. A branch that started with no scope wrote a variable of its own and
-// the task read its 5 unchanged; with the scope shared it reads 7.
 TEST(ParallelBlockSimulation, ForkBranchWritesTheMethodsLocal) {
   auto val = RunAndGet(
       "class C;\n"
@@ -355,11 +330,6 @@ TEST(ParallelBlockSimulation, ForkBranchWritesTheMethodsLocal) {
   EXPECT_EQ(val, 7u);
 }
 
-// §9.3.2 with §23.9: the statements of a fork's branches are statements of the
-// scope the fork stands in, so a branch spawned in a submodule instance reads
-// and writes that instance's variables: the branch reads x as 7 and writes y,
-// read back as 7. Spawned with no instance, the branch read the top's
-// nonexistent x as 0 and wrote a y of its own.
 TEST(ForkSim, BranchInASubmoduleReadsAndWritesTheInstancesVariables) {
   SimFixture f;
   auto* var = RunAndFindVar(

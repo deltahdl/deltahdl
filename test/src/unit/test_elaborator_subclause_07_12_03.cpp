@@ -73,10 +73,6 @@ TEST(BuiltinMethodElaboration, ArraySumWithClauseOk) {
              "endmodule\n"));
 }
 
-// §7.12.3: a with clause may be left off a reduction only where the reduction
-// is defined for the array's element type, which for `int m[2][3]` is the
-// unpacked `int [3]`, one no operator adds, multiplies or combines bitwise;
-// each with-less reduction over it is reported on its line.
 TEST(BuiltinMethodElaboration, ReductionOverSubarraysRequiresAWithClause) {
   ElabFixture f;
   ElaborateSrc(
@@ -100,9 +96,6 @@ TEST(BuiltinMethodElaboration, ReductionOverSubarraysRequiresAWithClause) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §7.12.3: a reduction over the rows of `int m[2][3]` that reduces each row in
-// its with clause is well formed, as is a with-less reduction over a
-// one-dimensional array.
 TEST(BuiltinMethodElaboration, ReductionOverSubarraysWithAClauseIsOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -113,11 +106,6 @@ TEST(BuiltinMethodElaboration, ReductionOverSubarraysWithAClauseIsOk) {
              "endmodule\n"));
 }
 
-// §7.12.3: a reduction applies its operation to the elements, or to a with
-// expression that is the element: sum and product need the arithmetic
-// operators, which a string has not, and the bitwise reductions need bitwise
-// operators, which a real has not either. A class handle, an unpacked
-// structure, a chandle and an event have neither.
 TEST(BuiltinMethodElaboration, ReductionOverAnElementWithoutItsOperation) {
   ElabFixture f;
   ElaborateSrc(
@@ -158,15 +146,6 @@ TEST(BuiltinMethodElaboration, ReductionOverAnElementWithoutItsOperation) {
   }
 }
 
-// §7.12.3: given a with clause, a reduction applies its operation to the with
-// expression's values, whatever form the expression takes: a class handle
-// member, a string array's element, a real member under a bitwise reduction,
-// an unpacked union member, a subarray, a slice, an element's handle member,
-// a class handle variable and a whole array have no such operation; an int
-// member, a real member under sum, a packed structure member, a union's int
-// member, an element of an element, a string's character, a member of an
-// element of an array of more dimensions, a member of a variable, a member of
-// a call's result and a member of what has no members are left alone.
 TEST(BuiltinMethodElaboration, WithExpressionOfAnyFormNeedsTheReduction) {
   ElabFixture f;
   ElaborateSrc(

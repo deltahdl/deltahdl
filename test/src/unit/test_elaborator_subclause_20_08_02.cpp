@@ -11,15 +11,11 @@ using namespace delta;
 
 namespace {
 
-// The constant real value of `text`, NaN where it does not fold, which no
-// expectation below equals.
 double FoldReal(const char* text, EvalFixture& f) {
   return ConstEvalReal(ParseExprFrom(text, f))
       .value_or(std::numeric_limits<double>::quiet_NaN());
 }
 
-// §20.8.2, Table 20-4: each real math function of one argument folds in a
-// constant expression to the C function it corresponds to.
 TEST(ConstEvalRealMath, EachOneArgumentFunctionFolds) {
   EvalFixture f;
   EXPECT_DOUBLE_EQ(FoldReal("$ln(2.0)", f), std::log(2.0));
@@ -42,7 +38,6 @@ TEST(ConstEvalRealMath, EachOneArgumentFunctionFolds) {
   EXPECT_DOUBLE_EQ(FoldReal("$atanh(0.5)", f), std::atanh(0.5));
 }
 
-// §20.8.2, Table 20-4: the functions of two arguments fold the same way.
 TEST(ConstEvalRealMath, EachTwoArgumentFunctionFolds) {
   EvalFixture f;
   EXPECT_DOUBLE_EQ(FoldReal("$pow(3.0, 2.0)", f), 9.0);
@@ -50,8 +45,6 @@ TEST(ConstEvalRealMath, EachTwoArgumentFunctionFolds) {
   EXPECT_DOUBLE_EQ(FoldReal("$hypot(3.0, 4.0)", f), 5.0);
 }
 
-// §20.8.2: an integer argument is converted to real, and a real math function
-// nested in $rtoi folds to an integer constant.
 TEST(ConstEvalRealMath, IntegerArgumentsAndNestingFold) {
   EvalFixture f;
   EXPECT_DOUBLE_EQ(FoldReal("$sqrt(16)", f), 4.0);
@@ -59,8 +52,6 @@ TEST(ConstEvalRealMath, IntegerArgumentsAndNestingFold) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$rtoi($pow(3, 2))", f)), 9);
 }
 
-// §20.8.2: a call with an argument that does not fold, or with no argument,
-// does not fold either.
 TEST(ConstEvalRealMath, AnUnfoldableArgumentLeavesTheCallUnfolded) {
   EvalFixture f;
   EXPECT_FALSE(ConstEvalReal(ParseExprFrom("$sqrt(v)", f)).has_value());

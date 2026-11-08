@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §H.12.3: there are library functions for copying data between an open
-// array handle and a canonical form buffer the C programmer provides, and
-// functions to obtain the actual address of a SystemVerilog data object or
-// of an individual element of an unpacked array.
 TEST(DpiAccessFunctions, TwoFamiliesCopyThroughABufferOrYieldAnAddress) {
   EXPECT_EQ(DpiSideProvidingCanonicalBuffer(), DpiMemorySide::kC);
   EXPECT_TRUE(DpiAccessCopiesThroughCanonicalBuffer(
@@ -24,9 +20,6 @@ TEST(DpiAccessFunctions, TwoFamiliesCopyThroughABufferOrYieldAnAddress) {
       DpiOpenArrayAccess::kAddressOfElement));
 }
 
-// §H.12.3 with §H.12.4 and §H.12.5: the library function of each access --
-// the bit and logic copies to and from a canonical buffer, and the address
-// of the array and of an element, which serve either type.
 TEST(DpiAccessFunctions, EachAccessHasItsLibraryFunction) {
   EXPECT_EQ(DpiAccessFunction(DpiOpenArrayAccess::kCopyElementToCanonicalBuffer,
                               false),
@@ -50,10 +43,6 @@ TEST(DpiAccessFunctions, EachAccessHasItsLibraryFunction) {
             "svGetArrElemPtr");
 }
 
-// The two families over one open array `bit [7:0] arr [0:3]`: a value
-// copied in from the programmer's canonical buffer is what the element's
-// actual address then holds, and a value written at that address is what a
-// copy out to the buffer then yields.
 TEST(DpiAccessFunctions, TheCopyAndTheAddressReachTheSameElement) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};

@@ -1,11 +1,3 @@
-// Parser coverage for the BNF productions of LRM Annex A, A.1.5
-// "Configuration source text". Each test observes the parser applying one of
-// the grammar productions: config_declaration, design_statement,
-// config_rule_statement, default_clause, inst_clause, inst_name, cell_clause,
-// liblist_clause, and use_clause. The configuration parameter-override syntax
-// that spells parameters with '#(...)' is defined in 33.4.3, not here, so the
-// use_clause cases below exercise only the named_parameter_assignment list form
-// that this subclause's grammar defines.
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -16,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// --- config_declaration ----------------------------------------------------
-
-// config_declaration ::= config config_identifier ; ... endconfig
 TEST(ConfigSourceText, ConfigDeclarationBasic) {
   auto r = Parse(
       "config cfg;\n"
@@ -30,8 +19,6 @@ TEST(ConfigSourceText, ConfigDeclarationBasic) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// The trailing [ : config_identifier ] label is optional and, when present,
-// names the declaration being closed.
 TEST(ConfigSourceText, ConfigDeclarationOptionalEndLabel) {
   auto r = Parse(
       "config cfg;\n"
@@ -43,8 +30,6 @@ TEST(ConfigSourceText, ConfigDeclarationOptionalEndLabel) {
   EXPECT_EQ(r.cu->configs[0]->name, "cfg");
 }
 
-// { local_parameter_declaration ; } may appear between the header and the
-// design statement.
 TEST(ConfigSourceText, ConfigDeclarationLocalParams) {
   auto r = Parse(
       "config cfg;\n"
@@ -59,31 +44,23 @@ TEST(ConfigSourceText, ConfigDeclarationLocalParams) {
   EXPECT_EQ(r.cu->configs[0]->local_params[1].name, "DEPTH");
 }
 
-// The endconfig terminal is required to close the declaration.
 TEST(ConfigSourceText, ConfigDeclarationRequiresEndconfig) {
   auto r = Parse(
       "config cfg;\n"
       "  design top;");
-  // The source ends on line 2, so that is where the EOF standing in for the
-  // missing `endconfig` is reported.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endconfig', got EOF", 2, "33.4.1"));
 }
 
-// The grammar makes design_statement a mandatory member of config_declaration.
 TEST(ConfigSourceText, ConfigDeclarationRequiresDesign) {
   auto r = Parse(
       "config cfg;\n"
       "  default liblist work;\n"
       "endconfig\n");
-  // §33.4.1.1 owns design_statement, so the report over its absence is filed
-  // there rather than under §33.4.1 with config_declaration.
   EXPECT_TRUE(ReportedError(
       r.diags, "config 'cfg' is missing a 'design' statement", 1, "33.4.1.1"));
 }
 
-// config_declaration carries design_statement exactly once (it is not part of
-// the repeated config_rule_statement group), so a second design is rejected.
 TEST(ConfigSourceText, ConfigDeclarationRejectsSecondDesign) {
   auto r = Parse(
       "config cfg;\n"
@@ -94,9 +71,6 @@ TEST(ConfigSourceText, ConfigDeclarationRejectsSecondDesign) {
       r.diags, "duplicate 'design' statement in config 'cfg'", 3, "33.4.1.1"));
 }
 
-// --- design_statement ------------------------------------------------------
-
-// design_statement ::= design { [ library_identifier . ] cell_identifier } ;
 TEST(ConfigSourceText, DesignStatementQualifiedCell) {
   auto r = Parse(
       "config cfg;\n"
@@ -109,7 +83,6 @@ TEST(ConfigSourceText, DesignStatementQualifiedCell) {
   EXPECT_EQ(r.cu->configs[0]->design_cells[0].cell, "top");
 }
 
-// The library_identifier qualifier is optional on each cell.
 TEST(ConfigSourceText, DesignStatementUnqualifiedCell) {
   auto r = Parse(
       "config cfg;\n"
@@ -122,7 +95,6 @@ TEST(ConfigSourceText, DesignStatementUnqualifiedCell) {
   EXPECT_EQ(r.cu->configs[0]->design_cells[0].cell, "top");
 }
 
-// The braces permit a list of cells, qualified or not, in one statement.
 TEST(ConfigSourceText, DesignStatementMultipleCells) {
   auto r = Parse(
       "config cfg;\n"
@@ -140,7 +112,6 @@ TEST(ConfigSourceText, DesignStatementMultipleCells) {
   EXPECT_EQ(cells[2].cell, "cellonly");
 }
 
-// The cell list may be empty (zero repetitions of the braced group).
 TEST(ConfigSourceText, DesignStatementEmpty) {
   auto r = Parse(
       "config cfg;\n"
@@ -151,10 +122,6 @@ TEST(ConfigSourceText, DesignStatementEmpty) {
   EXPECT_EQ(r.cu->configs[0]->design_cells.size(), 0u);
 }
 
-// --- config_rule_statement -------------------------------------------------
-
-// { config_rule_statement } -- a configuration may carry any number of rules,
-// and each rule must be terminated by a semicolon.
 TEST(ConfigSourceText, ConfigRuleStatementsRepeat) {
   auto r = Parse(
       "config cfg;\n"
@@ -178,17 +145,10 @@ TEST(ConfigSourceText, ConfigRuleRequiresSemicolon) {
       "  design top;\n"
       "  default liblist work\n"
       "endconfig\n");
-  // `endconfig` is the token standing where the rule's ';' was wanted on
-  // line 4.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endconfig'", 4, "33.4.1"));
 }
 
-// --- default_clause and liblist_clause -------------------------------------
-
-// config_rule_statement ::= default_clause liblist_clause ;
-// default_clause ::= default ; liblist_clause ::= liblist { library_identifier
-// }
 TEST(ConfigSourceText, DefaultClauseWithLiblist) {
   auto r = Parse(
       "config cfg;\n"
@@ -205,7 +165,6 @@ TEST(ConfigSourceText, DefaultClauseWithLiblist) {
   EXPECT_EQ(rule->liblist[2], "lib3");
 }
 
-// liblist_clause's braced library list may be empty.
 TEST(ConfigSourceText, LiblistClauseEmpty) {
   auto r = Parse(
       "config cfg;\n"
@@ -219,11 +178,6 @@ TEST(ConfigSourceText, LiblistClauseEmpty) {
   EXPECT_EQ(rule->liblist.size(), 0u);
 }
 
-// --- inst_clause and inst_name ---------------------------------------------
-
-// inst_clause ::= instance inst_name ;
-// inst_name ::= topmodule_identifier { . instance_identifier } -- a single
-// top-level identifier with no instance suffix is the minimal form.
 TEST(ConfigSourceText, InstNameSingleIdentifier) {
   auto r = Parse(
       "config cfg;\n"
@@ -237,7 +191,6 @@ TEST(ConfigSourceText, InstNameSingleIdentifier) {
   EXPECT_EQ(rule->inst_path, "top");
 }
 
-// The braced instance_identifier group builds a dotted hierarchical path.
 TEST(ConfigSourceText, InstNameHierarchicalPath) {
   auto r = Parse(
       "config cfg;\n"
@@ -253,7 +206,6 @@ TEST(ConfigSourceText, InstNameHierarchicalPath) {
   EXPECT_EQ(rule->liblist[0], "mylib");
 }
 
-// config_rule_statement ::= inst_clause use_clause ;
 TEST(ConfigSourceText, InstClauseWithUseClause) {
   auto r = Parse(
       "config cfg;\n"
@@ -269,10 +221,6 @@ TEST(ConfigSourceText, InstClauseWithUseClause) {
   EXPECT_EQ(rule->use_cell, "alt_cell");
 }
 
-// --- cell_clause -----------------------------------------------------------
-
-// config_rule_statement ::= cell_clause liblist_clause ;
-// cell_clause ::= cell [ library_identifier . ] cell_identifier -- unqualified.
 TEST(ConfigSourceText, CellClauseUnqualified) {
   auto r = Parse(
       "config cfg;\n"
@@ -287,7 +235,6 @@ TEST(ConfigSourceText, CellClauseUnqualified) {
   EXPECT_EQ(rule->cell_name, "adder");
 }
 
-// cell_clause with the optional library_identifier qualifier.
 TEST(ConfigSourceText, CellClauseLibraryQualified) {
   auto r = Parse(
       "config cfg;\n"
@@ -302,7 +249,6 @@ TEST(ConfigSourceText, CellClauseLibraryQualified) {
   EXPECT_EQ(rule->cell_name, "and2");
 }
 
-// config_rule_statement ::= cell_clause use_clause ;
 TEST(ConfigSourceText, CellClauseWithUseClause) {
   auto r = Parse(
       "config cfg;\n"
@@ -317,10 +263,6 @@ TEST(ConfigSourceText, CellClauseWithUseClause) {
   EXPECT_EQ(rule->use_cell, "better_mux");
 }
 
-// --- use_clause ------------------------------------------------------------
-
-// use_clause ::= use [ library_identifier . ] cell_identifier [ : config ]
-// First alternative, library-qualified cell.
 TEST(ConfigSourceText, UseClauseQualifiedCell) {
   auto r = Parse(
       "config cfg;\n"
@@ -335,7 +277,6 @@ TEST(ConfigSourceText, UseClauseQualifiedCell) {
   EXPECT_FALSE(rule->use_config);
 }
 
-// First alternative without the library qualifier.
 TEST(ConfigSourceText, UseClauseUnqualifiedCell) {
   auto r = Parse(
       "config cfg;\n"
@@ -349,7 +290,6 @@ TEST(ConfigSourceText, UseClauseUnqualifiedCell) {
   EXPECT_EQ(rule->use_cell, "alt_cell");
 }
 
-// The optional [ : config ] suffix marks the bound cell as itself configured.
 TEST(ConfigSourceText, UseClauseConfigSuffix) {
   auto r = Parse(
       "config cfg;\n"
@@ -364,8 +304,6 @@ TEST(ConfigSourceText, UseClauseConfigSuffix) {
   EXPECT_TRUE(rule->use_config);
 }
 
-// Third alternative: a cell_identifier followed by a named_parameter_assignment
-// list, the first assignment directly after the cell.
 TEST(ConfigSourceText, UseClauseCellWithNamedParams) {
   auto r = Parse(
       "config cfg;\n"
@@ -382,7 +320,6 @@ TEST(ConfigSourceText, UseClauseCellWithNamedParams) {
   EXPECT_EQ(rule->use_params[1].first, "D");
 }
 
-// Second alternative: a bare named_parameter_assignment list with no cell.
 TEST(ConfigSourceText, UseClauseBareNamedParams) {
   auto r = Parse(
       "config cfg;\n"
@@ -398,7 +335,6 @@ TEST(ConfigSourceText, UseClauseBareNamedParams) {
   EXPECT_EQ(rule->use_params[1].first, "DEPTH");
 }
 
-// The [ : config ] suffix may close a parameterized use_clause as well.
 TEST(ConfigSourceText, UseClauseParamsWithConfigSuffix) {
   auto r = Parse(
       "config cfg;\n"
@@ -415,12 +351,6 @@ TEST(ConfigSourceText, UseClauseParamsWithConfigSuffix) {
   EXPECT_TRUE(rule->use_config);
 }
 
-// --- The three forms of use_clause each name something: a cell, a list of
-// named_parameter_assignment, or a cell with such a list, and §33.4.1.6 says
-// what the clause is for: naming the very library and cell a selected cell or
-// instance is bound to. A `use` followed by nothing but its terminator, or by
-// the `: config` suffix alone, is none of the three. ---
-
 TEST(ConfigSourceText, UseClauseNamingNothingIsRejected) {
   auto r = Parse(
       "config cfg;\n"
@@ -428,7 +358,6 @@ TEST(ConfigSourceText, UseClauseNamingNothingIsRejected) {
       "  instance top.u1 use;\n"
       "endconfig\n");
   ASSERT_NE(r.cu, nullptr);
-  // The report stands at the `use` keyword.
   EXPECT_TRUE(ReportedError(
       r.diags, "use clause names a cell, a parameter assignment, or both", 3,
       "A.1.5"));
@@ -458,8 +387,6 @@ TEST(ConfigSourceText, CellClauseUseNamingNothingIsRejected) {
       "A.1.5"));
 }
 
-// The second form, a parameter assignment list with no cell, is one of the
-// three and stays accepted.
 TEST(ConfigSourceText, UseClauseParamsAloneIsKept) {
   auto r = Parse(
       "config cfg;\n"
@@ -473,8 +400,6 @@ TEST(ConfigSourceText, UseClauseParamsAloneIsKept) {
   ASSERT_EQ(rule->use_params.size(), 1u);
 }
 
-// A.1.5 writes the third form's first named_parameter_assignment directly
-// after the cell_identifier, so a comma between them is reported (#7558).
 TEST(ConfigSourceText, UseClauseCommaBeforeTheFirstAssignmentIsReported) {
   auto r = Parse(
       "config cfg;\n"

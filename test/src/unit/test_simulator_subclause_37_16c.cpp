@@ -12,11 +12,8 @@
 namespace delta {
 namespace {
 
-// A design run with a PLI application registered, its nets read back once the
-// run is over.
 class NetDetailsOfARun : public VpiDesignRun {
  protected:
-  // The integer value of an object.
   static int IntOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -24,14 +21,12 @@ class NetDetailsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The integer values of the objects of `type` `ref` reaches, in order.
   static std::vector<int> IntsOf(int type, vpiHandle ref) {
     std::vector<int> values;
     for (vpiHandle obj : ObjectsOf(type, ref)) values.push_back(IntOf(obj));
     return values;
   }
 
-  // The bounds of each range `obj` reaches, left then right, in order.
   static std::vector<int> BoundsOf(vpiHandle obj) {
     std::vector<int> bounds;
     for (vpiHandle range : ObjectsOf(vpiRange, obj)) {
@@ -42,9 +37,6 @@ class NetDetailsOfARun : public VpiDesignRun {
   }
 };
 
-// §37.16 detail 10: a net bit's vpiIndex is its own index, and its vpiIndex
-// iteration reaches the index in each dimension that names it, starting with
-// its own and working outward. The first bit of w is w[1][2] (#7057).
 TEST_F(NetDetailsOfARun, ANetBitReachesItsIndicesWorkingOutward) {
   Run("module top; wire [1:0][2:0] w; endmodule\n");
   const std::vector<vpiHandle> kBits = ObjectsOf(vpiBit, By("top.w"));
@@ -54,12 +46,6 @@ TEST_F(NetDetailsOfARun, ANetBitReachesItsIndicesWorkingOutward) {
   EXPECT_EQ(IntsOf(vpiIndex, kBits[4]), (std::vector<int>{1, 0}));
 }
 
-// §37.16 (figure) and detail 25: a net in an array net reaches its index
-// through vpiIndex, and its vpiIndex iteration the indices that select it out
-// of the array net, its own first and working outward. Its own bits are none
-// of them, and a subarray of a multidimensional array net reaches its own
-// index alone (#7058); a net in one reaches its indices from every dimension
-// (#7394).
 TEST_F(NetDetailsOfARun, ANetInAnArrayNetReachesItsIndices) {
   Run("module top; wire [3:0] m [0:2]; wire n [0:2][4:5]; endmodule\n");
   vpiHandle m1 = vpi_handle_by_index(By("top.m"), 1);
@@ -76,11 +62,6 @@ TEST_F(NetDetailsOfARun, ANetInAnArrayNetReachesItsIndices) {
   EXPECT_EQ(IntsOf(vpiIndex, n15), (std::vector<int>{5, 1}));
 }
 
-// §37.16 detail 26: a packed array net's vpiRange iteration reaches its packed
-// ranges from the leftmost, an array net's its unpacked ranges, and a scalar
-// net none; vpiLeftRange and vpiRightRange are the bounds of the leftmost
-// packed dimension. A net in an array net is a packed array net of its own
-// (#7059).
 TEST_F(NetDetailsOfARun, ANetReachesTheRangesItDeclares) {
   Run("module top; wire [3:0][1:2] p; wire [7:0] a [5:4][6:8]; wire s;\n"
       "  wire [2:1] b [0:1];\n"
@@ -96,10 +77,6 @@ TEST_F(NetDetailsOfARun, ANetReachesTheRangesItDeclares) {
   EXPECT_EQ(BoundsOf(b0), (std::vector<int>{2, 1}));
 }
 
-// §37.16 (figure) and detail 20: vpiSimNet reaches the net an object of the
-// nets class is simulated as. The run collapses no nets across the hierarchy,
-// so a net, a net bit and an array net are each their own, and a net a port
-// joins is no other net's. An instance is no net and has none (#7061).
 TEST_F(NetDetailsOfARun, ANetIsItsOwnSimulatedNet) {
   Run("module leaf(input wire [1:0] p); endmodule\n"
       "module top; wire [1:0] w; wire a [0:1]; leaf u(w); endmodule\n");
@@ -112,10 +89,6 @@ TEST_F(NetDetailsOfARun, ANetIsItsOwnSimulatedNet) {
   EXPECT_EQ(vpi_handle(vpiSimNet, By("top.u")), nullptr);
 }
 
-// §37.16 (figure): a net answers vpiStrength0 and vpiStrength1 with the drive
-// strengths its declaration writes, each keyword its Annex K constant, and
-// with none where it writes none, an implicitly declared net among them
-// (#7064).
 TEST_F(NetDetailsOfARun, ANetReportsItsDeclaredDriveStrengths) {
   Run("module top;\n"
       "  wire (highz0, weak1) a = 1'b1;\n"
@@ -135,9 +108,6 @@ TEST_F(NetDetailsOfARun, ANetReportsItsDeclaredDriveStrengths) {
   EXPECT_EQ(vpi_get(vpiStrength1, By("top.e")), 0);
 }
 
-// §37.16 (figure) with §6.6.4.2: a trireg net answers vpiChargeStrength with
-// the charge strength it was declared with, medium where none was written,
-// and a net of any other type, which holds no charge, with none (#7063).
 TEST_F(NetDetailsOfARun, ATriregNetReportsItsChargeStrength) {
   Run("module top; trireg (small) s; trireg (large) l; trireg m; wire w;\n"
       "endmodule\n");
@@ -148,8 +118,6 @@ TEST_F(NetDetailsOfARun, ATriregNetReportsItsChargeStrength) {
   EXPECT_EQ(vpi_get(vpiChargeStrength, By("top")), 0);
 }
 
-// §37.16 (figure): a net object standing for no net of the run holds no
-// charge to report.
 TEST(NetChargeStrength, ANetStandingForNoRunNetHoldsNoCharge) {
   VpiObject net;
   net.type = vpiNet;
@@ -158,8 +126,6 @@ TEST(NetChargeStrength, ANetStandingForNoRunNetHoldsNoCharge) {
   EXPECT_EQ(charge, 0);
 }
 
-// §37.16 (figure): vpiExplicitScalared and vpiExplicitVectored say whether a
-// net's declaration wrote the scalared or the vectored keyword (#7065).
 TEST_F(NetDetailsOfARun, ANetReportsTheScalaredOrVectoredKeyword) {
   Run("module top; wire vectored [3:0] v; wire scalared [3:0] s;\n"
       "  wire [3:0] n;\n"
@@ -172,9 +138,6 @@ TEST_F(NetDetailsOfARun, ANetReportsTheScalaredOrVectoredKeyword) {
   EXPECT_EQ(vpi_get(vpiExplicitVectored, By("top.n")), 0);
 }
 
-// §37.16 (figure) and detail 21: a vectored net is not expanded into its bits,
-// so it and its bits answer vpiExpanded FALSE, while a scalared net and one
-// declared with neither keyword are expanded (#7066).
 TEST_F(NetDetailsOfARun, AVectoredNetIsNotExpanded) {
   Run("module top; wire vectored [3:0] v; wire scalared [3:0] s;\n"
       "  wire [3:0] n;\n"
@@ -187,8 +150,6 @@ TEST_F(NetDetailsOfARun, AVectoredNetIsNotExpanded) {
   EXPECT_EQ(vpi_get(vpiExpanded, By("top.n")), 1);
 }
 
-// §37.16 detail 33: vpiStructUnionMember is TRUE for a net whose vpiParent is
-// a struct or union net, and FALSE for the struct net itself (#7069).
 TEST_F(NetDetailsOfARun, AMemberOfAStructNetIsAStructUnionMember) {
   Run("module top;\n"
       "  typedef struct packed {\n"
@@ -203,8 +164,6 @@ TEST_F(NetDetailsOfARun, AMemberOfAStructNetIsAStructUnionMember) {
   EXPECT_EQ(vpi_get(vpiStructUnionMember, kMembers[0]), 1);
   EXPECT_EQ(vpi_get(vpiStructUnionMember, kMembers[1]), 1);
   EXPECT_EQ(vpi_get(vpiStructUnionMember, sn), 0);
-  // A member whose field is a union is a union net of its own (detail 31),
-  // whose members are struct union members in turn.
   EXPECT_EQ(vpi_get(vpiType, kMembers[2]), vpiUnionNet);
   EXPECT_EQ(vpi_get(vpiPacked, kMembers[2]), 1);
   const std::vector<vpiHandle> kInner = ObjectsOf(vpiMember, kMembers[2]);
@@ -212,9 +171,6 @@ TEST_F(NetDetailsOfARun, AMemberOfAStructNetIsAStructUnionMember) {
   EXPECT_EQ(vpi_get(vpiStructUnionMember, kInner[0]), 1);
 }
 
-// §37.16 detail 24: an unpacked structure net's vpiSize is its number of
-// members, and a packed one's, a net of an integral data type, its size in
-// bits, as a packed union net's is (#7072).
 TEST_F(NetDetailsOfARun, AnUnpackedStructNetsSizeIsItsMemberCount) {
   Run("module top;\n"
       "  typedef struct { logic a; logic [3:0] b; logic c; } u_t;\n"
@@ -229,17 +185,12 @@ TEST_F(NetDetailsOfARun, AnUnpackedStructNetsSizeIsItsMemberCount) {
   EXPECT_EQ(vpi_get(vpiSize, By("top.pu")), 5);
 }
 
-// §37.16 detail 28: a logic net with no packed dimension and a net bit are
-// scalars, and a logic net with one, even of a single bit, and a net of any
-// other integral data type are vectors; an array net answers as its element,
-// and an unpacked structure net is neither (#7073).
 TEST_F(NetDetailsOfARun, ANetIsAScalarOrAVectorByItsKind) {
   Run("module top;\n"
       "  typedef struct { logic a; logic b; } u_t;\n"
       "  wire w; wire [3:0] v; wire [0:0] o; wire integer i;\n"
       "  wire [3:0] arr [0:1]; wire u_t un;\n"
       "endmodule\n");
-  // Each net's vpiScalar, then its vpiVector.
   auto shape = [](vpiHandle net) {
     return std::vector<int>{vpi_get(vpiScalar, net), vpi_get(vpiVector, net)};
   };
@@ -253,9 +204,6 @@ TEST_F(NetDetailsOfARun, ANetIsAScalarOrAVectorByItsKind) {
   EXPECT_EQ(shape(By("top.un")), (std::vector<int>{0, 0}));
 }
 
-// §37.16 detail 31: the vpiParent of a net in a multidimensional array net,
-// and of a subarray of one, is the largest array net holding it, not the
-// subarray it is held in (#7074, #7394).
 TEST_F(NetDetailsOfARun, ANetsParentIsItsLargestArrayNet) {
   Run("module top; wire mda [1:0][1:0][2:3]; endmodule\n");
   vpiHandle mda = By("top.mda");
@@ -270,11 +218,6 @@ TEST_F(NetDetailsOfARun, ANetsParentIsItsLargestArrayNet) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(mda));
 }
 
-// §37.16 detail 32: a packed array net's vpiElement iteration reaches its
-// subelements one packed dimension at a time, packed array nets while
-// dimensions remain and its struct, union or enum nets past the last, each
-// named by its index and holding its share of the bits; detail 31 makes the
-// whole packed array net the vpiParent of every one of them (#7075).
 TEST_F(NetDetailsOfARun, APackedArrayNetReachesItsSubelements) {
   Run("module top;\n"
       "  typedef struct packed { integer i1; logic [1:0][2:3] bvec; } pst;\n"
@@ -305,9 +248,6 @@ TEST_F(NetDetailsOfARun, APackedArrayNetReachesItsSubelements) {
   EXPECT_EQ(vpi_get(vpiType, kEnums[0]), vpiEnumNet);
 }
 
-// §37.16 detail 2: vpiPackedArrayMember is TRUE for a subelement of a packed
-// array net, a packed array net or a struct net whose vpiParent is one, and
-// FALSE for the packed array net itself (#7397).
 TEST_F(NetDetailsOfARun, APackedArrayNetsSubelementsArePackedArrayMembers) {
   Run("module top;\n"
       "  typedef struct packed { integer i1; logic [1:0][2:3] bvec; } pst;\n"
@@ -323,9 +263,6 @@ TEST_F(NetDetailsOfARun, APackedArrayNetsSubelementsArePackedArrayMembers) {
   EXPECT_EQ(vpi_get(vpiPackedArrayMember, panet1), 0);
 }
 
-// §37.16 detail 32 with §37.26: a struct subelement of a packed array net has
-// a member net per field, named under the subelement and holding the field's
-// bits of that subelement's share of the net (#7393).
 TEST_F(NetDetailsOfARun, APackedArrayNetsStructSubelementHasMemberNets) {
   Run("module top;\n"
       "  typedef struct packed { integer i1; logic [3:0] bvec; } pst;\n"
@@ -346,9 +283,6 @@ TEST_F(NetDetailsOfARun, APackedArrayNetsStructSubelementHasMemberNets) {
   EXPECT_EQ(IntOf(i1), 5);
 }
 
-// §37.16 detail 34: a net decompiles to the name an expression writes it by,
-// with the struct nets it is a member of before it and an element's or a
-// bit's index after it (#7076).
 TEST_F(NetDetailsOfARun, ANetDecompilesToItsPrefixedName) {
   Run("module top;\n"
       "  typedef struct packed {\n"
@@ -367,9 +301,6 @@ TEST_F(NetDetailsOfARun, ANetDecompilesToItsPrefixedName) {
   EXPECT_STREQ(vpi_get_str(vpiName, By("top.str1.inner1.j1")), "j1");
 }
 
-// §37.16 detail 32 with §37.26 and §26.3: the struct subelements of a packed
-// array net of a package's typedef have the members of that typedef, which
-// the design's layouts key by the package's name (#7400).
 TEST_F(NetDetailsOfARun, APackageStructsPackedArrayNetHasMemberNets) {
   Run("package pk;\n"
       "  typedef struct packed { logic [3:0] a; logic [3:0] b; } ps_t;\n"
@@ -386,10 +317,6 @@ TEST_F(NetDetailsOfARun, APackageStructsPackedArrayNetHasMemberNets) {
   EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
 }
 
-// §37.16 details 1 and 32 with §37.26: a net of a packed structure written in
-// place with a packed dimension of its own is a packed array net, holding no
-// member itself, whose struct subelements each have a member net per field
-// of the structure (#7401, #7402).
 TEST_F(NetDetailsOfARun, AnInlineStructsPackedArrayNetHasMemberNets) {
   Run("module top;\n"
       "  wire struct packed { logic [3:0] a; logic [3:0] b; } [1:0] n;\n"
@@ -408,9 +335,6 @@ TEST_F(NetDetailsOfARun, AnInlineStructsPackedArrayNetHasMemberNets) {
   EXPECT_EQ(IntOf(Named(vpiMember, kLeaves[1], "b")), 4);
 }
 
-// §37.16 with §6.10: vpiImplicitDecl is TRUE for a net the left side of a
-// continuous assignment declares implicitly and FALSE for a declared one
-// (#7067).
 TEST_F(NetDetailsOfARun, AnImplicitlyDeclaredNetReportsImplicitDecl) {
   Run("module top;\n"
       "  assign y = 1'b0;\n"
@@ -420,9 +344,6 @@ TEST_F(NetDetailsOfARun, AnImplicitlyDeclaredNetReportsImplicitDecl) {
   EXPECT_EQ(vpi_get(vpiImplicitDecl, By("top.w")), 0);
 }
 
-// §37.16 detail 9: an implicitly declared net reports line 0 and the file of
-// the reference that declared it, where a declared net reports its
-// declaration's line (#7068).
 TEST_F(NetDetailsOfARun, AnImplicitNetReportsItsFirstReferencesFileAtLineZero) {
   Run("module top;\n"
       "  assign y = 1'b0;\n"

@@ -42,9 +42,6 @@ TEST(ConstEval, RelationalFalseResults) {
   }
 }
 
-// Constant-expression operand form: relational operands that are module
-// parameters are folded by the elaborator's constant evaluator to fix a
-// localparam's value; reading it at run time observes the result.
 TEST(ConstEval, RelationalOverParameters) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -60,8 +57,6 @@ TEST(ConstEval, RelationalOverParameters) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// Same rule with localparam operands, a distinct constant form that reaches the
-// constant evaluator through a different declaration path.
 TEST(ConstEval, RelationalOverLocalparams) {
   SimFixture f;
   auto* var = RunAndFindVar(

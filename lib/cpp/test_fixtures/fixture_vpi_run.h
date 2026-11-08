@@ -16,17 +16,10 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// A design elaborated and run while a PLI application is registered, which is
-// what has a run build its VPI model (AttachDesignToPliApplications), for a
-// case that reads the model back once the run is over: the object kinds §37
-// draws are built from a real design here rather than by hand.
-
 namespace delta {
 
-inline PLI_INT32 VpiDesignRunCalltf(PLI_BYTE8* /*user_data*/) { return 0; }
+inline PLI_INT32 VpiDesignRunCalltf(PLI_BYTE8*) { return 0; }
 
-// A design run with a PLI application registered, which is what has the run
-// build its VPI model, read back from the test once the run is over.
 class VpiDesignRun : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -46,10 +39,6 @@ class VpiDesignRun : public ::testing::Test {
     LowerAndRun(design, f_);
   }
 
-  // The names of the objects of `type` `ref` reaches, sorted. An object of no
-  // name, such as the property inst an assertion's spec holds, which a
-  // vpiAssertion iteration of an instance reaches as an assertion (§37.49,
-  // §39.3.1), contributes none.
   static std::vector<std::string> NamesOf(int type, vpiHandle ref) {
     std::vector<std::string> names;
     vpiHandle it = vpi_iterate(type, ref);
@@ -62,8 +51,6 @@ class VpiDesignRun : public ::testing::Test {
     return names;
   }
 
-  // The object of `type` named `name` that `ref` reaches, passing over those
-  // of no name; null for none.
   static vpiHandle Named(int type, vpiHandle ref, std::string_view name) {
     vpiHandle it = vpi_iterate(type, ref);
     if (it == nullptr) return nullptr;
@@ -74,7 +61,6 @@ class VpiDesignRun : public ::testing::Test {
     return nullptr;
   }
 
-  // The objects of `type` `ref` reaches, in the order reached.
   static std::vector<vpiHandle> ObjectsOf(int type, vpiHandle ref) {
     std::vector<vpiHandle> objects;
     vpiHandle it = vpi_iterate(type, ref);
@@ -83,10 +69,6 @@ class VpiDesignRun : public ::testing::Test {
     return objects;
   }
 
-  // §37.42: the name of what the call `call` calls, read off the task or
-  // function it reaches or, for a system task or function call, off the call
-  // it decompiles to (detail 9); empty for a call of a built-in method, which
-  // reaches neither (detail 11).
   static std::string CalleeOf(vpiHandle call) {
     for (const int kRelation : {vpiTask, vpiFunction}) {
       vpiHandle called = vpi_handle(kRelation, call);
@@ -98,9 +80,6 @@ class VpiDesignRun : public ::testing::Test {
     return std::string(kText.substr(0, kText.find('(')));
   }
 
-  // The call of `type` `ref` reaches that calls `callee`, null for none. A
-  // call statement is named by its label alone (§37.60 detail 1), so it is
-  // found by what it calls rather than by a name of its own.
   static vpiHandle CallOf(int type, vpiHandle ref, std::string_view callee) {
     for (vpiHandle call : ObjectsOf(type, ref)) {
       if (CalleeOf(call) == callee) return call;
@@ -108,16 +87,11 @@ class VpiDesignRun : public ::testing::Test {
     return nullptr;
   }
 
-  // What the action `relation` reaches from `ref`, an assertion's or an
-  // expect's, calls, empty for nothing: an action written as a call statement
-  // has no name of its own (§37.60 detail 1).
   static std::string ActionReached(int relation, vpiHandle ref) {
     vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
     return reached == nullptr ? "" : CalleeOf(reached);
   }
 
-  // §37.50 and §37.52: the property expr the property spec of the assertion
-  // `name` of `top` reaches, null for none.
   static vpiHandle PropertyOf(const char* name) {
     vpiHandle assertion = Named(vpiAssertion, By("top"), name);
     vpiHandle spec =
@@ -125,13 +99,11 @@ class VpiDesignRun : public ::testing::Test {
     return spec == nullptr ? nullptr : vpi_handle(vpiPropertyExpr, spec);
   }
 
-  // §37.59: the operator of the operation `op`, 0 where it is no operation.
   static int OpOf(vpiHandle op) {
     if (op == nullptr || vpi_get(vpiType, op) != vpiOperation) return 0;
     return vpi_get(vpiOpType, op);
   }
 
-  // The operands of `op` in the order vpiOperand reaches them.
   static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
     std::vector<vpiHandle> operands;
     vpiHandle it = op == nullptr ? nullptr : vpi_iterate(vpiOperand, op);
@@ -142,12 +114,10 @@ class VpiDesignRun : public ::testing::Test {
     return operands;
   }
 
-  // The object `name` reaches from the top of the design, null for none.
   static vpiHandle By(const std::string& name) {
     return vpi_handle_by_name(VpiText(name.c_str()), nullptr);
   }
 
-  // The kinds of the objects of `type` `ref` reaches, in the order reached.
   static std::vector<int> KindsOf(int type, vpiHandle ref) {
     std::vector<int> kinds;
     vpiHandle it = vpi_iterate(type, ref);
@@ -156,7 +126,6 @@ class VpiDesignRun : public ::testing::Test {
     return kinds;
   }
 
-  // The full name of the child of `scope` named `name`, read off the object.
   static std::string FullNameOfChild(vpiHandle scope, std::string_view name) {
     for (VpiObject* child : VpiObjectOf(scope)->children) {
       if (child->name == name) return child->full_name;

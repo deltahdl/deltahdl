@@ -12,9 +12,6 @@ namespace delta {
 
 namespace {
 
-// One instance's parenthesized argument list open at `depth`: the name of what
-// it instantiates, the position of the argument being read, how many tokens
-// that argument has, and the first of them.
 struct OpenInstance {
   std::string_view callee;
   int depth = 0;
@@ -23,11 +20,6 @@ struct OpenInstance {
   Token first;
 };
 
-// The token-level state of the scan: the tokens before the current one, the
-// parenthesis depth, the instances whose argument lists are open, the depth
-// of the cycle delay or repetition bracket the scan stands in, zero where it
-// stands in none, and how many braces are open, with the depth at which each
-// open assignment pattern (§10.9) opened.
 struct AssertionTextScan {
   ModuleItem* item = nullptr;
   Token prev;
@@ -46,8 +38,6 @@ struct AssertionTextScan {
     if (inst.tokens++ == 0) inst.first = t;
   }
 
-  // §16.8: an argument written as one identifier alone is recorded against
-  // the instance's formal at its position.
   void FinishArg() {
     OpenInstance& inst = open.back();
     if (inst.tokens == 1 && inst.first.Is(TokenKind::kIdentifier)) {
@@ -64,9 +54,6 @@ struct AssertionTextScan {
            next.Is(TokenKind::kPlus);
   }
 
-  // §10.9.2: a member key of an assignment pattern, written first or after a
-  // comma and followed by its colon, names a member of the pattern's type,
-  // no object of the scope.
   bool IsPatternKey(const Token& next) const {
     return !patterns.empty() && next.Is(TokenKind::kColon) &&
            (prev.Is(TokenKind::kApostropheLBrace) ||
@@ -88,15 +75,11 @@ struct AssertionTextScan {
         IsPatternKey(next)) {
       return;
     }
-    // The count of a cycle delay, `x ##delay1 y`, is read whatever follows.
     if (prev.Is(TokenKind::kHashHash)) {
       item->assertion_const_names.push_back(t.text);
       item->assertion_reads.push_back({t.text, t.loc});
       return;
     }
-    // A type name followed by the name it declares, `st_t v;`: the second
-    // is a local variable of the declaration. The operand after a delay
-    // count, `##delay1 y`, is no such name.
     if (prev.Is(TokenKind::kIdentifier) && !prev2.Is(TokenKind::kDot) &&
         !prev2.Is(TokenKind::kColonColon) && !prev2.Is(TokenKind::kHashHash)) {
       item->assertion_local_names.push_back(t.text);
@@ -112,8 +95,6 @@ struct AssertionTextScan {
     item->assertion_reads.push_back({t.text, t.loc, next.Is(TokenKind::kDot)});
   }
 
-  // An opening parenthesis after a name, not a member's, opens the argument
-  // list of an instance or a call written with that name.
   void OpenParen(const Token& t) {
     CountArgToken(t);
     ++parens;
@@ -156,9 +137,6 @@ struct AssertionTextScan {
   }
 
   void Step(const Token& t, const Token& next) {
-    // §5.12: an attribute instance, written after an operator, names the
-    // attribute rather than an object of the scope, and is passed over whole
-    // as though it were not written.
     if (in_attribute || t.Is(TokenKind::kAttrStart)) {
       in_attribute = !t.Is(TokenKind::kAttrEnd);
       return;
@@ -179,15 +157,6 @@ struct AssertionTextScan {
 
 }  // namespace
 
-// §23.9, §16.8 and §16.10: a scan of the text from the current token to `end`
-// (for `kRParen`, the one closing the parenthesis the caller consumed), which
-// records on `item` the names the text reads, marking each a member access
-// starts from (§26.2 judges that name in a package), the names it declares as
-// local variables of a user-defined type, the names it writes in a cycle delay
-// or a repetition bound, and the identifiers it passes whole as positional
-// actuals to the instances it writes. A name followed by an argument list is an
-// instance or a call, which other rules resolve, and a name after `.` or `::`
-// is a member, which the path resolves. The lexer is left where it was.
 void ParserPropertySpecHelpers::RecordAssertionReads(Parser& p,
                                                      ModuleItem* item,
                                                      TokenKind end) {

@@ -57,9 +57,6 @@ TEST(Preprocessor, UnconnectedDrive_InvalidArg) {
                             "22.9"));
 }
 
-// §22.9: `unconnected_drive requires one of the two arguments pull1 or pull0.
-// The closest rejected input to the accepting form is the directive with no
-// argument at all; the drive state stays at the default.
 TEST(Preprocessor, UnconnectedDrive_MissingArg) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -127,12 +124,6 @@ TEST(Preprocessor, NounconnectedDrive_NoOutput) {
   EXPECT_TRUE(trimmed.empty());
 }
 
-// §22.2 lets a directive whose syntax has a defined end be followed by another
-// language element on the same line, and §22.9 gives `nounconnected_drive no
-// argument, so its end is the directive name itself and the declaration after
-// it is source text. This case is what confines the argument check below to
-// the two strength keywords: any other text after the directive is a language
-// element for the parser to judge.
 TEST(Preprocessor, NounconnectedDrive_TrailingContent) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -141,11 +132,6 @@ TEST(Preprocessor, NounconnectedDrive_TrailingContent) {
   EXPECT_NE(out.find("wire x;"), std::string::npos);
 }
 
-// §22.9 gives `unconnected_drive one of the arguments pull1 or pull0 and gives
-// `nounconnected_drive none, so a strength keyword after the latter is an
-// argument the directive does not take, reported on the directive's line by
-// the preprocessor rather than handed to the parser as a stray keyword. The
-// argument is consumed with the directive, so nothing reaches the output.
 TEST(Preprocessor, NounconnectedDrive_Pull0ArgumentRejected) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -159,8 +145,6 @@ TEST(Preprocessor, NounconnectedDrive_Pull0ArgumentRejected) {
   EXPECT_TRUE(trimmed.empty());
 }
 
-// The other strength keyword, and the §22.2 allowance after it: the language
-// element that follows the rejected argument still reaches the output.
 TEST(Preprocessor, NounconnectedDrive_Pull1ArgumentRejected) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -172,9 +156,6 @@ TEST(Preprocessor, NounconnectedDrive_Pull1ArgumentRejected) {
   EXPECT_EQ(out.find("pull1"), std::string::npos);
 }
 
-// §22.9: `unconnected_drive governs the module definitions that follow it,
-// and `nounconnected_drive and `resetall (§22.3) end it, so the preprocessor
-// records at each header the drive in force there.
 TEST(Preprocessor, UnconnectedDrive_RecordedAtEachHeader) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

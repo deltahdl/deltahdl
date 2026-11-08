@@ -5,10 +5,6 @@
 
 namespace {
 
-// §33.4: a configuration may change the binding of a module, primitive,
-// interface, or program instance, but shall not change the binding of a
-// package. A cell clause that selects a package as the cell being
-// reconfigured therefore must be rejected.
 TEST(ConfigPackageBinding, CellClauseSelectingPackageIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -19,15 +15,11 @@ TEST(ConfigPackageBinding, CellClauseSelectingPackageIsRejected) {
       "  cell pkg use lib1.other;\n"
       "endconfig\n",
       f, "top");
-  // ValidateConfigPackageBinding reports at the offending cell clause on
-  // line 5, not at the 'config' keyword on line 3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' cell clause selects package 'pkg'", 5,
                             "33.4"));
 }
 
-// A use clause that binds a selected instance to a package likewise changes
-// the binding of a package and must be rejected (§33.4).
 TEST(ConfigPackageBinding, UseClauseBindingInstanceToPackageIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -38,17 +30,11 @@ TEST(ConfigPackageBinding, UseClauseBindingInstanceToPackageIsRejected) {
       "  instance top.a use pkg;\n"
       "endconfig\n",
       f, "top");
-  // The use-clause report, told apart from the cell-clause one above by
-  // "use clause binds an instance to package"; both end with the same
-  // "a configuration cannot change the binding of a package" and each stands
-  // at its own clause, which is line 5 here.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "config 'c' use clause binds an instance to package 'pkg'", 5, "33.4"));
 }
 
-// The companion positive case: a configuration may change the binding of a
-// module instance, so a use clause naming an ordinary module is accepted.
 TEST(ConfigPackageBinding, UseClauseBindingInstanceToModuleIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -62,8 +48,6 @@ TEST(ConfigPackageBinding, UseClauseBindingInstanceToModuleIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A package coexisting with configs that never reference it must not trip the
-// prohibition: the rule applies only when a clause actually names the package.
 TEST(ConfigPackageBinding, UnreferencedPackageDoesNotTripProhibition) {
   ElabFixture f;
   ElaborateSrc(
@@ -78,9 +62,6 @@ TEST(ConfigPackageBinding, UnreferencedPackageDoesNotTripProhibition) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The cell-clause path must not over-fire: selecting an ordinary module (not a
-// package) for reconfiguration is exactly what §33.4 permits, so it is
-// accepted.
 TEST(ConfigPackageBinding, CellClauseSelectingModuleIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -94,9 +75,6 @@ TEST(ConfigPackageBinding, CellClauseSelectingModuleIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §3.13(b): a package's name space is its own, so a cell clause naming a
-// module that shares a package's name selects the module, which a config may
-// rebind.
 TEST(ConfigPackageBinding, CellClauseNamingModuleSharingAPackagesNameAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -111,12 +89,6 @@ TEST(ConfigPackageBinding, CellClauseNamingModuleSharingAPackagesNameAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The cell-clause companion to the unreferenced-package guard above: with a
-// package actually present in the design, a cell clause selecting an ordinary
-// module must still be accepted. This exercises the prohibition's cell-clause
-// discrimination against a live set of package names — the non-firing path when
-// the selected cell is not a package — rather than the trivial case where no
-// package exists at all (§33.4).
 TEST(ConfigPackageBinding,
      CellClauseSelectingModuleWithPackageDeclaredIsAccepted) {
   ElabFixture f;
@@ -132,16 +104,6 @@ TEST(ConfigPackageBinding,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4 admits four element kinds on the accept side of the rule — module,
-// primitive, interface, and program instances — and only excludes packages.
-// The module case is covered above; the remaining three admitted kinds must
-// also pass the prohibition when named by a use clause. Each target below is
-// declared with that kind's own real syntax so the accepted input is built,
-// not stubbed, and the prohibition is observed discriminating package from the
-// full set of instantiable design elements rather than from module alone.
-
-// A configuration may change the binding of an interface instance, so a use
-// clause naming an interface is accepted (§33.4).
 TEST(ConfigPackageBinding, UseClauseBindingInstanceToInterfaceIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -155,8 +117,6 @@ TEST(ConfigPackageBinding, UseClauseBindingInstanceToInterfaceIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A configuration may change the binding of a program instance, so a use clause
-// naming a program is accepted (§33.4).
 TEST(ConfigPackageBinding, UseClauseBindingInstanceToProgramIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -170,8 +130,6 @@ TEST(ConfigPackageBinding, UseClauseBindingInstanceToProgramIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A configuration may change the binding of a primitive instance, so a use
-// clause naming a user-defined primitive is accepted (§33.4).
 TEST(ConfigPackageBinding, UseClauseBindingInstanceToPrimitiveIsAccepted) {
   ElabFixture f;
   ElaborateSrc(

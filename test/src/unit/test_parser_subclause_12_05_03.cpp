@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5.3 (N1): the parser attaches a CaseQualifier of kUnique, kUnique0, or
-// kPriority to a case statement whose keyword is preceded by the
-// corresponding qualifier keyword.
-
 TEST(CaseQualifierParsing, UniqueAttachedToCase) {
   auto r = Parse(
       "module m;\n"

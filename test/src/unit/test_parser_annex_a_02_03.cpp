@@ -314,8 +314,6 @@ TEST(DeclarationListParsing, ListOfPortIdentifiersPerElementUnpackedDim) {
   EXPECT_FALSE(r.cu->modules[0]->ports[1].unpacked_dims.empty());
 }
 
-// list_of_interface_identifiers admits `{ unpacked_dimension }` on each
-// interface identifier; observe the per-element dim being carried through.
 TEST(DeclarationListParsing, ListOfInterfaceIdentifiersWithUnpackedDim) {
   auto r = Parse("module m(interface a [3:0], interface b [1:0]); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -327,8 +325,6 @@ TEST(DeclarationListParsing, ListOfInterfaceIdentifiersWithUnpackedDim) {
   EXPECT_FALSE(r.cu->modules[0]->ports[1].unpacked_dims.empty());
 }
 
-// list_of_tf_variable_identifiers admits `{ variable_dimension }` on each
-// port_identifier; observe a dim carried on a list element of a tf arg list.
 TEST(DeclarationListParsing, ListOfTfVariableIdentifiersWithDim) {
   auto r = Parse(
       "module m;\n"
@@ -351,8 +347,6 @@ TEST(DeclarationListParsing, ListOfDefparamAssignmentsTrailingCommaErrors) {
       "module m;\n"
       "  defparam u.A = 1, ;\n"
       "endmodule\n");
-  // The trailing comma makes the parser read a defparam_assignment starting at
-  // the ';', and §11.2 owns the report for a primary that is not an expression.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 

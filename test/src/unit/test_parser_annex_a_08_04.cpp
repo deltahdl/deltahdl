@@ -37,9 +37,6 @@ TEST(PrimaryParsing, BitSelectMultiDim) {
   EXPECT_EQ(rhs->kind, ExprKind::kSelect);
 }
 
-// bit_select ::= { [ expression ] } admits a run of consecutive bracketed
-// indices; a two-level select on a multidimensional array exercises the
-// repetition, distinct from the single-index form.
 TEST(PrimaryParsing, ChainedBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -335,7 +332,6 @@ TEST(PrimaryParsing, ModulePathPrimaryParenthesizedMintypMax) {
 
 TEST(PrimaryParsing, ErrorUnclosedParenthesizedExpr) {
   auto r = Parse("module m; initial x = (1 + 2; endmodule\n");
-  // §11.5 owns the parenthesized operand form of a primary.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "11.5"));
 }
 
@@ -372,7 +368,6 @@ TEST(PrimaryParsing, ConstantPrimaryParenthesized) {
 
 TEST(PrimaryParsing, ErrorUnclosedBitSelect) {
   auto r = Parse("module m; initial x = a[3; endmodule\n");
-  // §11.5.1 owns the bit-select brackets.
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ';'", 1, "11.5.1"));
 }
 
@@ -394,8 +389,6 @@ TEST(PrimaryParsing, PrimaryLetExpression) {
               "endmodule\n"));
 }
 
-// primary ::= ... | cast, where cast ::= casting_type ' ( expression ). A value
-// cast in a procedural assignment RHS parses to a distinct cast primary.
 TEST(PrimaryParsing, PrimaryValueCast) {
   auto r = Parse(
       "module m;\n"
@@ -410,9 +403,6 @@ TEST(PrimaryParsing, PrimaryValueCast) {
   EXPECT_EQ(rhs->text, "int");
 }
 
-// constant_primary ::= ... | constant_cast, where
-// constant_cast ::= casting_type ' ( constant_expression ). A cast standing as
-// a parameter initializer is a constant_primary.
 TEST(PrimaryParsing, ConstantPrimaryConstantCast) {
   auto r = Parse("module m; parameter int P = shortint'(3); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -423,18 +413,11 @@ TEST(PrimaryParsing, ConstantPrimaryConstantCast) {
   EXPECT_EQ(param->init_expr->text, "shortint");
 }
 
-// cast ::= casting_type ' ( expression ) — the parenthesized operand is
-// mandatory; a cast whose closing parenthesis is missing must be rejected.
 TEST(PrimaryParsing, ErrorCastMissingCloseParen) {
   auto r = Parse("module m; initial x = int'(3; endmodule\n");
-  // §6.24.1 owns the cast operator's parentheses.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "6.24.1"));
 }
 
-// A.8.4 (printed page 1211): `primary` has no class_new alternative, and
-// A.6.2 (printed page 1198) admits class_new only as the right-hand side of a
-// blocking assignment, so `new(7)` written as a subroutine argument is no
-// expression. It was accepted, and the run pushed a null handle.
 TEST(PrimaryParsing, ErrorClassNewAsSubroutineArgument) {
   auto r = Parse(
       "module m;\n"
@@ -443,8 +426,6 @@ TEST(PrimaryParsing, ErrorClassNewAsSubroutineArgument) {
   EXPECT_TRUE(ReportedError(r.diags, "'new' is not an expression", 2, "A.8.4"));
 }
 
-// A.8.4 as above, for a dynamic_array_new, which A.6.2 likewise admits only
-// on the right-hand side of a blocking assignment, passed to a function.
 TEST(PrimaryParsing, ErrorDynamicArrayNewAsFunctionArgument) {
   auto r = Parse(
       "module m;\n"
@@ -453,10 +434,6 @@ TEST(PrimaryParsing, ErrorDynamicArrayNewAsFunctionArgument) {
   EXPECT_TRUE(ReportedError(r.diags, "'new' is not an expression", 2, "A.8.4"));
 }
 
-// A.8.4 (printed page 1211): a system function call is a primary, and a
-// method call's root is any primary, so a method may follow the call's
-// parentheses, and a select after it. `$sformatf("%s", s).len()` was reported
-// as a call missing its ')' at the '.'.
 TEST(PrimaryParsing, MethodCalledOnSystemFunctionResult) {
   auto r = Parse(
       "module m;\n"
@@ -473,9 +450,6 @@ TEST(PrimaryParsing, MethodCalledOnSystemFunctionResult) {
   EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kSystemCall);
 }
 
-// A.8.2 makes a method call's root a primary, and A.8.4 lists a concatenation
-// and a multiple concatenation among the primaries, so a method call may
-// follow either: len() on the string each yields (§11.4.12.2).
 TEST(PrimaryParsing, MethodCallOnConcatenation) {
   auto r = Parse(
       "module m;\n"
@@ -512,10 +486,6 @@ TEST(PrimaryParsing, MethodCallOnReplication) {
   EXPECT_EQ(rhs->lhs->lhs->kind, ExprKind::kReplicate);
 }
 
-// A.8.4 with A.9.3: a cast's casting type may be a type named through a
-// package_scope, and `$unit ::` is one (§3.12.1), so `$unit::T'(x)` is a cast
-// whose type is the scope resolution `$unit :: T`, the shape `P::T'(x)` takes.
-// The `'` after `$unit::T` was left unread (#7602).
 TEST(PrimaryParsing, ACastThroughUnitScopeIsACast) {
   auto r = Parse(
       "typedef logic [3:0] T;\n"
@@ -540,9 +510,6 @@ TEST(PrimaryParsing, ACastThroughUnitScopeIsACast) {
   EXPECT_EQ(rhs->lhs->text, "x");
 }
 
-// A.8.4 writes a select's part_select_range last, so no bracket follows a
-// part-select: a range, an indexed `+:` or a slice of an unpacked array. A
-// bit-select followed by one part-select stays legal (#8076).
 TEST(PrimaryParsing, ErrorBracketAfterAPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -565,10 +532,6 @@ TEST(PrimaryParsing, ErrorBracketAfterAPartSelect) {
   EXPECT_FALSE(ReportedError(r.diags, kMessage, 10, "A.8.4"));
 }
 
-// A.8.4 gives a subroutine call's result one bracket,
-// `function_subroutine_call [ [ range_expression ] ]`, so a second bracket
-// after a call or a system call is reported, and one bit-select or part-select
-// stays legal (#8077).
 TEST(PrimaryParsing, ErrorSecondBracketAfterACall) {
   auto r = Parse(
       "module m;\n"
@@ -591,10 +554,6 @@ TEST(PrimaryParsing, ErrorSecondBracketAfterACall) {
   EXPECT_FALSE(ReportedError(r.diags, kMessage, 10, "A.8.4"));
 }
 
-// A.10 footnote 48 confines the `local::` qualifier to an inline constraint
-// block, so one in a class's own constraint block and one in an ordinary
-// expression are each reported, and one in a randomize call's with block is
-// not (#8081).
 TEST(PrimaryParsing, ErrorLocalQualifierOutsideAnInlineConstraintBlock) {
   auto r = Parse(
       "class C;\n"
@@ -613,8 +572,6 @@ TEST(PrimaryParsing, ErrorLocalQualifierOutsideAnInlineConstraintBlock) {
   EXPECT_FALSE(ReportedError(r.diags, kMessage, 7, "A.8.4"));
 }
 
-// A class's own constraint block left open at the end of the file still has
-// its `local::` qualifier reported (#8081).
 TEST(PrimaryParsing, ErrorLocalQualifierInAnUnclosedConstraintBlock) {
   auto r = Parse(
       "class C;\n"

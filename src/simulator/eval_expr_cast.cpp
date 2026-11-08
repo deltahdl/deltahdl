@@ -43,17 +43,6 @@ static double ExtractDouble(const Logic4Vec& vec) {
   return RealVecToDouble(vec);
 }
 
-// §6.24.3: packs the elements of a bit-stream source into a single packed
-// value. The first element (index 0 of a fixed unpacked, dynamic, or queue
-// array) takes the most significant bit positions of the result. The aval
-// and bval (4-state mask) are propagated independently so a source carrying
-// any X or Z bit yields a 4-state packed value.
-//
-// BitStreamPack bundles the packing layout for one unpacked array: the source
-// array's name and shape (`info`) plus the element count, total packed width,
-// and the per-element bit mask derived from the element width. The mask is a
-// whole word, since an element is packed whole however wide it is, up to the
-// 64 bits a word holds.
 struct BitStreamPack {
   std::string_view name;
   const ArrayInfo& info;
@@ -62,15 +51,11 @@ struct BitStreamPack {
   uint64_t elem_mask;
 };
 
-// Accumulated packed result: the aval/bval mask pair of the packed value.
 struct PackedBits {
   uint64_t aval = 0;
   uint64_t bval = 0;
 };
 
-// Packs the low word of each queue element into the accumulated result using
-// the element-major shift expected by PackArrayBitStream (element 0 most
-// significant).
 static void PackQueueElements(const BitStreamPack& pack, SimContext& ctx,
                               PackedBits& out) {
   auto* q = ctx.FindQueue(pack.name);
@@ -85,8 +70,6 @@ static void PackQueueElements(const BitStreamPack& pack, SimContext& ctx,
   }
 }
 
-// Packs the low word of each fixed-unpacked-array element into `out` using the
-// same element-major shift.
 static void PackFixedArrayElements(const BitStreamPack& pack, SimContext& ctx,
                                    PackedBits& out) {
   for (uint32_t i = 0; i < pack.elem_count; ++i) {
@@ -105,12 +88,6 @@ static void PackFixedArrayElements(const BitStreamPack& pack, SimContext& ctx,
 static Logic4Vec PackArrayBitStream(std::string_view name,
                                     const ArrayInfo& info, SimContext& ctx,
                                     Arena& arena) {
-  // §6.24.3: a queue and a dynamic array are both dynamically sized bit-stream
-  // types, and at runtime both keep their elements in a QueueObject rather than
-  // in individually named element variables. A fixed-size unpacked array has no
-  // such backing store. Pack from the queue whenever one backs this name so the
-  // element count and values are taken from the live queue; index 0 still
-  // occupies the most significant bits either way.
   auto* q = ctx.FindQueue(name);
   uint32_t elem_count = info.size;
   if (q) elem_count = static_cast<uint32_t>(q->elements.size());
@@ -133,11 +110,6 @@ static Logic4Vec PackArrayBitStream(std::string_view name,
   return vec;
 }
 
-// §6.24.3: packs an associative-array bit-stream source. Items are packed in
-// index-sorted order -- the underlying std::map keeps its keys ordered -- with
-// the first key's element occupying the most significant bits, mirroring the
-// queue/array packing. Both halves of the 4-state encoding are carried so an
-// x/z in any element propagates into the packed value.
 static Logic4Vec PackAssocBitStream(const AssocArrayObject& aa, Arena& arena) {
   uint32_t elem_width = aa.elem_width;
   uint32_t elem_count = aa.Size();
@@ -179,10 +151,6 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
     result.is_signed = true;
     return result;
   }
-  // §6.24.1 (printed page 139): the value a variable of the casting type
-  // holds once the operand is assigned to it, the integer's value as a real,
-  // signed where the operand is. A shortreal is single precision in 32 bits
-  // (MakeRealVec), which a double's pattern cut to 32 bits read back as 0.
   uint64_t raw = inner.ToUint64();
   auto d = static_cast<double>(raw);
   if (inner.is_signed && inner.width > 0 && inner.width < 64 &&
@@ -195,9 +163,6 @@ static Logic4Vec CastRealConversion(const Logic4Vec& inner,
   return MakeRealVec(arena, d, target_width);
 }
 
-// The key the type tables hold the typedef `name` under as a declaration in
-// the class `cls` would name it: that class's, or that of a class enclosing
-// it or one it extends, and the bare name where none of them declares it.
 static std::string ClassScopedTypeKey(const ClassTypeInfo* cls,
                                       std::string_view name, SimContext& ctx) {
   for (; cls != nullptr; cls = cls->enclosing) {
@@ -209,16 +174,6 @@ static std::string ClassScopedTypeKey(const ClassTypeInfo* cls,
   return std::string(name);
 }
 
-// §6.24.1 with A.2.2.1: the key the type tables hold a named casting type
-// under. A casting type written behind a class or a package, `C::T'(v)` or
-// `p::S'(v)` (§8.23, §26.3), stands in the cast's rhs as a scope resolution
-// and is held under "C::T"; a bare name inside a method names the running
-// class's typedef, or that of a class enclosing it or one it extends, as it
-// would in a declaration there, held under that class's key. §18.7.1: a type
-// written behind local::, in the inline block of a randomize() with call,
-// names the type of the scope containing the call, bypassing the class of
-// the object being randomized that runs while the block is evaluated. Empty
-// for a cast that names no type this way.
 std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
   const Expr* rhs = expr->rhs;
   if (expr->text.empty()) {
@@ -237,16 +192,10 @@ std::string CastTypeKey(const Expr* expr, SimContext& ctx) {
   return ClassScopedTypeKey(ctx.CurrentMethodClass(), expr->text, ctx);
 }
 
-// §6.24.1: what a variable of the casting type is, which the cast's result
-// takes on: its width, whether it holds x and z (§6.11.2), and whether it is
-// signed (§6.11.3). A keyword answers by itself; a typedef by what the design
-// registered for its name, an enumeration by its base type (§6.19).
 struct CastTarget {
   uint32_t width = 32;
   bool is_4state = true;
   bool is_signed = false;
-  // §6.12: a real, shortreal or realtime type, which a type reference names
-  // where its type name does not spell one (TypeRefCastTarget).
   bool is_real = false;
 };
 
@@ -295,10 +244,6 @@ static CastTarget ResolveCastTarget(std::string_view key, SimContext& ctx) {
   return t;
 }
 
-// §6.23 with §11.4.11: the self-determined type of an expression a type
-// reference names, `type(n + n)`, as its form gives it; an operation with a
-// real operand is real, held in 64 bits whatever width its integral operands
-// have.
 static bool ExpressionCastTarget(const Expr* e, SimContext& ctx,
                                  CastTarget& out) {
   out.is_real = SimSelfReal(e, ctx);
@@ -308,10 +253,6 @@ static bool ExpressionCastTarget(const Expr* e, SimContext& ctx,
   return out.width > 0;
 }
 
-// The casting type a type reference to the name `name` stands for. The parser
-// reads `type(n)` as a type named n, so a variable so named is the expression
-// whose type the reference takes; any other name is a type's, real where
-// `written`, the type as the reference spells it, is one.
 static bool NamedCastTarget(std::string_view name, const DataType* written,
                             SimContext& ctx, CastTarget& out) {
   if (const Variable* var = ctx.FindVariable(name)) {
@@ -326,16 +267,6 @@ static bool NamedCastTarget(std::string_view name, const DataType* written,
   return true;
 }
 
-// §6.23 with §6.24.1: the casting type a type reference stands for,
-// `type(bit [11:0])'(v)` the data type written, `type(n)'(v)` the type n was
-// declared with, and a typedef's name the type it names. A data type written
-// holds its signing, the keyword's default (§6.11.3) or the `signed` or
-// `unsigned` written after it, so `type(int unsigned)` casts unsigned. Any
-// other expression, `type(n + n)'(v)`, stands for its self-determined type,
-// which its form gives without evaluating it. A real type, written,
-// declared or an expression's, is marked so the cast converts to it. False
-// where `ref` is no type reference or names nothing this resolves, the cast
-// then read as before.
 static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
                               CastTarget& out) {
   if (ref == nullptr || ref->kind != ExprKind::kTypeRef) return false;
@@ -347,9 +278,6 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
     out.is_real = DeclaredTypeIsReal(*written, ctx);
     return out.width > 0;
   }
-  // §7.4.4: a type name with packed dimensions written after it stands for a
-  // packed array of what the name stands for, `type(nib_t [1:0])`, which the
-  // name alone does not spell.
   if (written != nullptr && written->packed_dim_left != nullptr) {
     out.width = DeclaredTypeWidth(*written, ctx);
     out.is_4state = DeclaredTypeIs4State(*written, ctx);
@@ -368,12 +296,6 @@ static bool TypeRefCastTarget(const Expr* ref, SimContext& ctx,
   return NamedCastTarget(name, written, ctx, out);
 }
 
-// §6.24.1: the type a cast gives its result, which a type reference to an
-// expression holding the cast takes (§6.23): its operand's type made signed or
-// unsigned, `unsigned'(s)`; the type a keyword, a typedef or a type reference
-// names, `byte'(s)`, `w_t'(v)` or `type(b)'(v)`; or a size cast's size with
-// its operand's signing and state, `8'(n)`. Unknown for a cast to a real, a
-// string or another type nothing here sizes.
 SelfType CastSelfType(const Expr* cast, SimContext& ctx) {
   std::string_view name = cast->text;
   if (name == "signed" || name == "unsigned") {
@@ -404,19 +326,11 @@ uint32_t ResolveCastWidth(std::string_view type_name, SimContext& ctx) {
   return tw > 0 ? tw : 32;
 }
 
-// §6.24.3 bit-stream cast: when the cast source names an unpacked/dynamic/queue
-// array or an associative array, packs it and width-masks into the destination,
-// carrying both halves of the 4-state encoding so any X/Z in the source
-// propagates. Returns true and fills `out` when `expr` named such a source.
 static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   if (!expr->lhs || expr->lhs->kind != ExprKind::kIdentifier) return false;
   auto name = expr->lhs->text;
   auto* arr_info = ctx.FindArrayInfo(name);
-  // §6.24.3: a queue is a bit-stream type, but unlike a fixed unpacked array or
-  // a dynamic array it registers no ArrayInfo -- only a QueueObject. Synthesize
-  // the packing shape from the queue so a bare queue can be a bit-stream cast
-  // source and be packed like any other dynamically sized array.
   ArrayInfo synth;
   if (!arr_info) {
     if (auto* q = ctx.FindQueue(name)) {
@@ -432,8 +346,6 @@ static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
       (arr_info->size > 0 || arr_info->is_queue || arr_info->is_dynamic)) {
     inner = PackArrayBitStream(name, *arr_info, ctx, arena);
   } else if (auto* aa = ctx.FindAssocArray(name)) {
-    // §6.24.3: an associative array is a legal bit-stream cast source (it is
-    // illegal only as a destination), packed in index-sorted order.
     inner = PackAssocBitStream(*aa, arena);
   } else {
     return false;
@@ -451,22 +363,6 @@ static bool TryArrayBitStreamCast(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §6.24.1: a numeric size cast (a constant_primary casting type) records its
-// target width in an expression node rather than a type-name string: the parser
-// leaves `text` empty and carries the width expression in `rhs` and the operand
-// in `lhs`. Evaluate that width and pad/truncate the operand to it, letting the
-// operand's own signedness pass through unchanged. Returns true and fills `out`
-// when `expr` is such a cast. A cast that names a type (nonempty `text`), an
-// assignment-pattern cast (`lhs` is an assignment pattern), or a type-reference
-// cast (`rhs` is a type reference) is not a size cast and is left to the
-// caller.
-// §6.24.1: the result of a size cast is the value a packed [tw-1:0] vector
-// would hold after being assigned the operand, and the operand's own
-// (self-determined) signedness passes through unchanged. Widening a signed
-// operand therefore replicates its sign bit -- in both the value and the x/z
-// plane -- across the new high bits, exactly as an assignment of a signed
-// source does; a narrowing cast or an unsigned operand simply masks to the
-// target width.
 static void WriteSizeCastWord(const Logic4Vec& inner, uint32_t tw,
                               Logic4Word& out_word) {
   uint64_t mask = tw >= 64 ? ~uint64_t{0} : (uint64_t{1} << tw) - 1;
@@ -489,8 +385,6 @@ static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
   if (expr->lhs->kind == ExprKind::kAssignmentPattern ||
       expr->rhs->kind == ExprKind::kTypeRef)
     return false;
-  // A class's or a package's typedef, `C::T'(v)`, is a casting type rather
-  // than a size, though it stands where a size expression does.
   if (std::string key = CastTypeKey(expr, ctx);
       !key.empty() && ctx.FindTypeWidth(key) > 0)
     return false;
@@ -500,9 +394,6 @@ static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
   if (w64 == 0 || w64 > 0xFFFF) return false;
   auto tw = static_cast<uint32_t>(w64);
 
-  // §6.24.1 with §11.6.1: the operand is evaluated as if assigned to a
-  // [tw-1:0] vector, so tw is its context width, and `10'(x * y)` multiplies
-  // at 10 bits rather than at the wider operand's own.
   auto inner = EvalExpr(expr->lhs, ctx, arena, tw);
   auto result = MakeLogic4Vec(arena, tw);
   if (result.nwords > 0 && inner.nwords > 0)
@@ -512,9 +403,6 @@ static bool TrySizeCast(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// Handles the signedness/const/void cast keywords that simply re-tag or empty
-// the inner value. Returns true and fills `out` when `type_name` was one of
-// those keywords. `inner` may be mutated in place for the signedness cases.
 static bool TryKeywordCast(std::string_view type_name, Logic4Vec& inner,
                            Arena& arena, Logic4Vec& out) {
   if (type_name == "signed") {
@@ -538,13 +426,6 @@ static bool TryKeywordCast(std::string_view type_name, Logic4Vec& inner,
   return false;
 }
 
-// §16.5.1: the sampled value of a const cast expression is the current value
-// of its argument, where every other expression of a concurrent assertion is
-// evaluated over the sampled values of its variables. The property's sampling
-// mode is lowered for the length of the argument's evaluation and put back
-// after, so `const'(a)` reads a as it stands at the tick and `a` beside it
-// reads the Preponed value; outside a property the mode is already off and the
-// argument is read as any expression is.
 static Logic4Vec EvalCastOperand(const Expr* operand, std::string_view cast,
                                  SimContext& ctx, Arena& arena) {
   if (cast != "const") return EvalExpr(operand, ctx, arena);
@@ -556,9 +437,6 @@ static Logic4Vec EvalCastOperand(const Expr* operand, std::string_view cast,
   return inner;
 }
 
-// §10.9: the element count of each packed dimension of `dtype`, outermost
-// first, where it is a packed array of logic, bit or reg whose bounds are
-// known; empty for any other type.
 static std::vector<uint32_t> PackedDimSpans(const DataType& dtype,
                                             SimContext& ctx, Arena& arena) {
   std::vector<uint32_t> spans;
@@ -581,13 +459,6 @@ static std::vector<uint32_t> PackedDimSpans(const DataType& dtype,
   return spans;
 }
 
-// §10.9 (printed page 261): `T'{1,2}` is the value a variable of T holds once
-// initialized with the pattern, wherever it is written. With T a structure,
-// §10.9.2 places each member at its own offset and width, so `st'{3,4}` over
-// two bytes is 16'h0304; with T a packed array, each item fills its element at
-// the element's width -- 8'h12 for `typedef logic [1:0][3:0] T`. Evaluated as
-// a bare pattern and then cut to T's width, the items were concatenated at
-// their own 32 bits and only the last survived.
 static bool TryTypedPatternCast(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kAssignmentPattern)
@@ -609,32 +480,18 @@ static bool TryTypedPatternCast(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §6.24.3 (printed page 143): a member of an unpacked structure as a
-// bit-stream cast streams it -- where its bits stand among the structure's
-// stored bits, and whether it is dynamically sized: a string, which streams
-// as its bytes rather than as the handle those bits hold (§7.2 with §6.16),
-// or a dynamic array, which streams as its elements rather than as the handle
-// those bits hold to them (§7.2 with §7.5).
 struct StreamedMember {
   uint32_t offset = 0;
   uint32_t width = 0;
   bool is_string = false;
-  // The dynamic array member these bits are; null for any other member.
   const StructFieldInfo* dynamic = nullptr;
   bool IsDynamicallySized() const { return is_string || dynamic != nullptr; }
-  // The width of one of the units such a member streams in: a string's byte,
-  // a dynamic array's element, or, for a dynamic array of strings, the byte
-  // its strings are made of, each a dynamic array of bytes to the cast.
   uint32_t ElementWidth() const {
     if (is_string || dynamic->type_kind == DataTypeKind::kString) return 8;
     return dynamic->dyn_elem_width;
   }
 };
 
-// The members of `layout`, held from bit `base` of the stored bits, in the
-// order a bit-stream cast streams them: declaration order, a nested unpacked
-// structure's own members in its place and an unpacked array of strings' own
-// elements in its, leftmost first, each held in the more significant bits.
 static void AppendStreamedMembers(const StructTypeInfo& layout, uint32_t base,
                                   std::vector<StreamedMember>& out) {
   for (const StructFieldInfo& f : layout.fields) {
@@ -654,10 +511,6 @@ static void AppendStreamedMembers(const StructTypeInfo& layout, uint32_t base,
   }
 }
 
-// The members `layout` streams where it is an unpacked structure holding a
-// dynamically sized member, the one kind of member whose stored bits are not
-// the bits it streams; empty for any other layout, whose stored bits are its
-// stream.
 static std::vector<StreamedMember> DynamicStructMembers(
     const StructTypeInfo* layout) {
   if (layout == nullptr) return {};
@@ -669,10 +522,6 @@ static std::vector<StreamedMember> DynamicStructMembers(
   return {};
 }
 
-// §6.24.3 (printed page 143): appends to `parts` the elements `q` holds of the
-// dynamic array member `field`, in index order, and returns how many bits they
-// are. A string element streams as its bytes, a string being a dynamic array
-// of bytes to the cast, and an empty one as nothing.
 static uint32_t AppendDynamicElements(const QueueObject& q,
                                       const StructFieldInfo& field,
                                       std::vector<Logic4Vec>& parts,
@@ -691,10 +540,6 @@ static uint32_t AppendDynamicElements(const QueueObject& q,
   return width;
 }
 
-// §6.24.3 (printed page 142): appends to `parts` what the member `m`, whose
-// stored bits are `bits`, streams as -- its bits, a string's bytes or a
-// dynamic array's elements in index order -- and returns how many bits that
-// is.
 static uint32_t AppendStreamedBits(const Logic4Vec& bits,
                                    const StreamedMember& m,
                                    std::vector<Logic4Vec>& parts,
@@ -714,10 +559,6 @@ static uint32_t AppendStreamedBits(const Logic4Vec& bits,
   return parts.back().width;
 }
 
-// §6.24.3 (printed page 142): the generic packed value the stored bits
-// `stored` of a structure whose members are `members` stream to: each
-// member's bits in declaration order, a string member's bytes and a dynamic
-// array member's elements in their places.
 static Logic4Vec StreamDynamicStruct(const Logic4Vec& stored,
                                      const std::vector<StreamedMember>& members,
                                      Arena& arena) {
@@ -730,11 +571,6 @@ static Logic4Vec StreamDynamicStruct(const Logic4Vec& stored,
   return AssembleConcatParts(parts, width, arena);
 }
 
-// §6.24.3 (printed page 143): the handle of a new array of the dynamic member
-// `field` whose elements are the bits `bits`, the leftmost element first. The
-// elements of an array of strings are themselves dynamically sized, and the
-// cast is greedy among them too: the first takes every byte and no later one
-// is made, so the array holds one string.
 static Logic4Vec DynMemberOfStream(const Logic4Vec& bits,
                                    const StructFieldInfo& field, Arena& arena) {
   Logic4Vec handle;
@@ -755,12 +591,6 @@ static Logic4Vec DynMemberOfStream(const Logic4Vec& bits,
   return handle;
 }
 
-// §6.24.3 (printed page 143): the stored bits, `stored_width` of them, of a
-// structure whose members are `members` that the stream `stream` is cast
-// into. The members take the stream's bits left to right, the first
-// dynamically sized member the `remainder` bits the fixed-size members leave
-// and a later one none, a string member holding its bytes through a handle
-// and a dynamic array member its elements through one.
 static Logic4Vec UnstreamDynamicStruct(
     const Logic4Vec& stream, const std::vector<StreamedMember>& members,
     uint32_t stored_width, uint32_t remainder, Arena& arena) {
@@ -779,13 +609,6 @@ static Logic4Vec UnstreamDynamicStruct(
   return result;
 }
 
-// §6.24.3 (printed page 143): a bit-stream cast of the stream `stream` into
-// an unpacked structure holding a dynamically sized member, which takes its
-// size from the stream, as UnstreamDynamicStruct. A stream narrower than the
-// fixed-size members, or leaving the first dynamically sized member no whole
-// number of its elements, is the size mismatch the cast meets only at run
-// time, an error then, and the cast gives the structure's default value.
-// False for a cast into any other type.
 static bool TryCastIntoDynamicStruct(const Expr* expr, const Logic4Vec& stream,
                                      SimContext& ctx, Arena& arena,
                                      Logic4Vec& out) {
@@ -829,8 +652,6 @@ static bool TryCastIntoDynamicStruct(const Expr* expr, const Logic4Vec& stream,
 }
 
 Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // §16.8: an untyped formal's actual cast to its own self-determined type is
-  // its value with no context, its width, signedness and type its own.
   if (IsSelfDeterminedCast(expr)) return EvalExpr(expr->lhs, ctx, arena);
   Logic4Vec stream_out;
   if (TryArrayBitStreamCast(expr, ctx, arena, stream_out)) return stream_out;
@@ -845,8 +666,6 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   Logic4Vec kw_out;
   if (TryKeywordCast(type_name, inner, arena, kw_out)) return kw_out;
-  // §6.24.3: an unpacked structure holding a dynamically sized member streams
-  // as its members do, not as the handles among its stored bits.
   std::vector<StreamedMember> streamed =
       DynamicStructMembers(StructLayoutOfOperand(expr->lhs, ctx));
   if (!streamed.empty()) inner = StreamDynamicStruct(inner, streamed, arena);
@@ -858,9 +677,6 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!TypeRefCastTarget(expr->rhs, ctx, target))
     target = ResolveCastTarget(CastTypeKey(expr, ctx), ctx);
   uint32_t target_width = target.width;
-  // §6.24.3 (printed page 143): such a structure's stream is sized only at
-  // run time, where a stream of other than the casting type's size is an
-  // error.
   if (!streamed.empty() && inner.width != target_width) {
     ctx.GetDiag().Error(
         expr->range.start,
@@ -870,27 +686,12 @@ Logic4Vec EvalCast(const Expr* expr, SimContext& ctx, Arena& arena) {
         Subclause("6.24.3"));
   }
 
-  // §6.24.1 with §6.23: a type reference to a real type converts as the real
-  // keyword does, though the cast spells no type name (MakeNodeCast).
   if (inner.is_real != (target.is_real || IsRealCastTarget(type_name))) {
     return CastRealConversion(inner, type_name, target_width, arena);
   }
-  // §5.7.2 (printed page 80) has a cast convert a real literal to shortreal,
-  // and §6.24.1 (printed 139) has the cast return what a variable of the
-  // casting type holds after the expression is assigned to it, so
-  // `shortreal'(0.5)` is the single-precision 0.5 and `real'(s)` the double
-  // of a shortreal's value. The mask below is for an integral
-  // value; it cut the double's pattern to 32 bits and dropped is_real, which
-  // left `shortreal'(0.5) == 0.5` false and `s + 2.5` an integer's sum.
   if (inner.is_real) {
     return ConvertRealForKnownLhs(inner, true, target_width, arena);
   }
-  // §6.24.1: the value a variable of the casting type holds once the operand
-  // is assigned to it (§10.7): extended by the operand's own signedness or
-  // truncated, x and z kept for a 4-state type and read as 0 for a 2-state
-  // one (§6.3.2.2), and signed as the type is. Rebuilt from the operand's
-  // numeric projection, every cast came out 2-state, unsigned and at most 64
-  // bits wide: `integer'(4'bx)` was 0 and `byte'(8'h80) + 0` was 128.
   Logic4Vec result =
       OwnRhsWords(ResizeToWidth(inner, target_width, arena), arena);
   if (!target.is_4state) CoerceTo2State(result);

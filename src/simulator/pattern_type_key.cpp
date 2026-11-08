@@ -21,8 +21,6 @@ namespace delta {
 
 namespace {
 
-// §6.11 and §6.12: each built-in type keyword a type key may be, with the
-// width and signing its type has.
 struct KeywordType {
   std::string_view keyword;
   DataTypeKind kind;
@@ -46,8 +44,6 @@ constexpr std::array<KeywordType, 13> kKeywordTypes = {{
     {"string", DataTypeKind::kString, 0, false},
 }};
 
-// §6.11: the integral kinds, the 4-state ones among them, and the ones
-// §6.11.1 makes signed by default.
 constexpr std::array<DataTypeKind, 9> kIntegralKinds = {
     DataTypeKind::kBit,     DataTypeKind::kLogic,    DataTypeKind::kReg,
     DataTypeKind::kByte,    DataTypeKind::kShortint, DataTypeKind::kInt,
@@ -61,7 +57,6 @@ constexpr std::array<DataTypeKind, 5> kSignedKinds = {
 constexpr std::array<DataTypeKind, 3> kNominalKinds = {
     DataTypeKind::kStruct, DataTypeKind::kUnion, DataTypeKind::kEnum};
 
-// The entry of kKeywordTypes for `name`; null where `name` is no keyword.
 const KeywordType* FindKeywordType(std::string_view name) {
   for (const KeywordType& k : kKeywordTypes) {
     if (k.keyword == name) return &k;
@@ -107,17 +102,11 @@ bool PatternKeyMatches(const PatternKeyType& key,
            key.is_signed == subject.is_signed.value_or(false) &&
            key.range.left == range.left && key.range.right == range.right;
   }
-  // A structure, union or enum type matches only itself, the name compared
-  // above.
   if (KindIn(kNominalKinds, key.kind)) return false;
   return key.kind == subject.kind;
 }
 
 PatternKeySubject SubjectOf(PatternKeySubject subject, const SimContext& ctx) {
-  // A type written as a keyword carries the keyword as its type_name too, so
-  // a name is a typedef's only where it is no keyword; read as one, `int`'s
-  // signing came from a typedef table holding no `int`, and an int element
-  // took no `int:` key.
   bool named = !subject.type_name.empty() &&
                FindKeywordType(subject.type_name) == nullptr;
   if (subject.kind == DataTypeKind::kNamed)
@@ -144,14 +133,11 @@ PatternKeySubject SubjectOfElement(const ArrayInfo& info,
 
 PatternKeySubject SubjectOfField(const StructFieldInfo& field,
                                  const SimContext& ctx) {
-  // §10.9.2 with §10.9.1: a key reaches an unpacked array member through the
-  // rules for arrays, so it is matched against one element's type.
   uint32_t width =
       field.elem_count > 0 ? field.width / field.elem_count : field.width;
   std::optional<PackedRange> range = field.decl_range;
   if (field.packed_elem_width > 0)
     range = PackedRange{field.packed_left, field.packed_right};
-  // A member written as a typedef name takes the typedef's signing.
   std::optional<bool> is_signed = field.is_signed;
   if (field.type_kind == DataTypeKind::kNamed) is_signed = std::nullopt;
   return SubjectOf({.kind = field.type_kind,
@@ -163,16 +149,11 @@ PatternKeySubject SubjectOfField(const StructFieldInfo& field,
                    ctx);
 }
 
-// §10.9.1: the typedef name an array's element type was written as, which a
-// type key of its pattern names; empty for a built-in type.
 static std::string_view ElementTypeName(const RtlirVariable& var) {
   return var.written_type == nullptr ? std::string_view{}
                                      : var.written_type->type_name;
 }
 
-// §6.22.1: the bounds of the outermost packed dimension the array's element
-// type writes, folded as RecordPackedRange folds them for each element; empty
-// for an element type written with none, whose typedef or width gives them.
 static std::optional<PackedRange> ElementRange(const RtlirVariable& var,
                                                SimContext& ctx, Arena& arena) {
   const DataType* dt =

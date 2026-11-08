@@ -13,9 +13,6 @@ bool TriggeredEndingClockMatchesContext(std::string_view ending_clock,
 
 bool MatchedDetectsCrossClockEndPoint(std::string_view source_clock,
                                       std::string_view destination_clock) {
-  // matched is the method used when the source and destination clocks differ;
-  // its synchronization is what makes cross-clock end-point detection well
-  // defined.
   return source_clock != destination_clock;
 }
 

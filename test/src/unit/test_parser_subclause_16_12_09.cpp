@@ -14,8 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// §16.12.9: the overlapped followed-by form `sequence_expr #-# property_expr`
-// is accepted at the property level of a concurrent assertion.
 TEST(FollowedByPropertyParsing, OverlappedFollowedBy) {
   auto r = Parse(
       "module m;\n"
@@ -27,9 +25,6 @@ TEST(FollowedByPropertyParsing, OverlappedFollowedBy) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.9: the nonoverlapped followed-by form `sequence_expr #=#
-// property_expr` is likewise accepted at the property level of a concurrent
-// assertion.
 TEST(FollowedByPropertyParsing, NonoverlappedFollowedBy) {
   auto r = Parse(
       "module m;\n"
@@ -41,8 +36,6 @@ TEST(FollowedByPropertyParsing, NonoverlappedFollowedBy) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.9: a followed-by is especially convenient for a cover property over a
-// sequence followed by a property, so the form is accepted there too.
 TEST(FollowedByPropertyParsing, FollowedByInCoverProperty) {
   auto r = Parse(
       "module m;\n"
@@ -54,9 +47,6 @@ TEST(FollowedByPropertyParsing, FollowedByInCoverProperty) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kCoverProperty));
 }
 
-// §16.12.9: the antecedent of a followed-by is a full sequence_expr, so a
-// ranged-delay sequence ahead of the #=# operator is accepted at the property
-// level — the realistic shape of a sequence with a property after it.
 TEST(FollowedByPropertyParsing, FollowedByWithRangedAntecedent) {
   auto r = Parse(
       "module m;\n"
@@ -68,11 +58,6 @@ TEST(FollowedByPropertyParsing, FollowedByWithRangedAntecedent) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.9: the consequent operand is a property_expr, not merely a Boolean, so
-// a compound property on the right of #-# — here an `always` property, the
-// consequent shape the clause's own worked examples use — is accepted at the
-// property level. The lower precedence of `always` binds the whole followed-by
-// as `(seq) #-# (always ...)`.
 TEST(FollowedByPropertyParsing, OverlappedFollowedByWithPropertyConsequent) {
   auto r = Parse(
       "module m;\n"
@@ -84,9 +69,6 @@ TEST(FollowedByPropertyParsing, OverlappedFollowedByWithPropertyConsequent) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.9: the nonoverlapped operator likewise takes a property_expr
-// consequent — a compound `always` property after #=# is accepted at the
-// property level.
 TEST(FollowedByPropertyParsing, NonoverlappedFollowedByWithPropertyConsequent) {
   auto r = Parse(
       "module m;\n"

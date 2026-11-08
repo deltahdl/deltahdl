@@ -19,12 +19,6 @@ namespace {
 
 constexpr const char* kNotAdmitted = "is not one the grammar admits";
 
-// A.2.10's assertion_variable_declaration is `var_data_type
-// list_of_variable_decl_assignments ;`, and A.2.2.1's var_data_type is a
-// data_type or `var` before a data_type_or_implicit, a data_type naming a type
-// through a package or class scope among them. Each declaration below
-// declares its variable as a local of the sequence (§16.10), and the type
-// name's scope is read with it rather than as further variables.
 TEST(AssertionVariableDeclParsing, VarAndScopedTypesDeclareSequenceLocals) {
   auto r = Parse(
       "package P;\n"
@@ -66,9 +60,6 @@ TEST(AssertionVariableDeclParsing, VarAndScopedTypesDeclareSequenceLocals) {
   EXPECT_EQ(locals[6].named_type.scope_name, "C");
 }
 
-// The same declarations at the head of a property's body, and a body that
-// opens with a constant named through a package's scope, which declares
-// nothing.
 TEST(AssertionVariableDeclParsing, VarAndScopedTypesDeclarePropertyLocals) {
   auto r = Parse(
       "package P;\n"
@@ -96,8 +87,6 @@ TEST(AssertionVariableDeclParsing, VarAndScopedTypesDeclarePropertyLocals) {
   EXPECT_TRUE(sequence->prop_seq_assert_vars.empty());
 }
 
-// §16.10 with §16.6 rules chandle out as a local's type whether or not
-// `var` is written before it.
 TEST(AssertionVariableDeclParsing, ChandleAfterVarIsReported) {
   auto r = Parse(
       "module m(input logic clk, a);\n"
@@ -111,9 +100,6 @@ TEST(AssertionVariableDeclParsing, ChandleAfterVarIsReported) {
       "16.10"));
 }
 
-// A scope with no name after it, and a packed dimension the source ends in,
-// end the reading of a declaration's type rather than running past the
-// tokens there are, and what is left of the body is no sequence_expr.
 TEST(AssertionVariableDeclParsing, ATruncatedTypeEndsTheDeclaration) {
   auto scope = Parse(
       "module m;\n"
@@ -129,12 +115,6 @@ TEST(AssertionVariableDeclParsing, ATruncatedTypeEndsTheDeclaration) {
   EXPECT_TRUE(ReportedError(dimension.diags, kNotAdmitted, 3, "A.2.10"));
 }
 
-// A.2.10's property_port_item and sequence_port_item each name one
-// formal_port_identifier, after which only variable dimensions and a default
-// stand. An item with no formal, a trailing comma's empty item, a token
-// after a formal that is none of those, and a parenthesized group standing
-// where an item would are reported; an empty list, a dimension and a default
-// are not.
 void ExpectPortItemsHeldToTheirShape(const char* port, const char* end) {
   SCOPED_TRACE(port);
   const std::string kPort = port;
@@ -168,8 +148,6 @@ TEST(AssertionPortItemParsing, SequencePortItemsAreHeldToTheirShape) {
   ExpectPortItemsHeldToTheirShape("sequence", "endsequence");
 }
 
-// Attribute instances may open a port item and name no formal, so the
-// formals are the identifiers the items name after them.
 void ExpectAttributesReadPast(const char* port, const char* end,
                               ModuleItemKind kind) {
   SCOPED_TRACE(port);
@@ -197,13 +175,6 @@ TEST(AssertionPortItemParsing, SequencePortAttributesAreReadPast) {
                            ModuleItemKind::kSequenceDecl);
 }
 
-// A.2.10's property_list_of_arguments and sequence_list_of_arguments are
-// positional actuals, any of them empty, then named ones, or named ones from
-// the first; a named actual's own actual is never named. Each instance below
-// breaks that on line 3, a trailing comma's empty actual after a named one
-// among them, whether it is read as a property instance whose actual is a
-// sequence, as a sequence instance of a sequence_expr, or by the grammar's
-// own scan.
 TEST(InstanceArgumentListParsing, APositionalActualAfterANamedOneIsReported) {
   const char* const kSpecs[] = {
       "p(.x(a ##1 b),\nc)", "s(.x(a),\nb) ##1 c",   "p(.x(a ##1 b),\n)",
@@ -218,11 +189,6 @@ TEST(InstanceArgumentListParsing, APositionalActualAfterANamedOneIsReported) {
   }
 }
 
-// The lists the productions admit: named actuals one after another, empty
-// positional ones, an empty named one, and positional ones before a named
-// one. Each list holds a sequence, which no expression reads, and the match
-// item's subroutine call makes the evaluation's parse give the spec up, so
-// the grammar's scan reads every list as an instance's.
 TEST(InstanceArgumentListParsing, ListsTheProductionsWriteAreAccepted) {
   auto r = Parse(
       "module m(input logic clk, a, b, c);\n"
@@ -235,10 +201,6 @@ TEST(InstanceArgumentListParsing, ListsTheProductionsWriteAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A cover sequence statement's spec is a sequence_expr after its clock and
-// disable condition, so a property operator in it is reported whether or not
-// the evaluation's parse, which reads a property spec, reads it; a sequence
-// draws no report.
 TEST(CoverSequenceParsing, APropertyOperatorInTheSpecIsReported) {
   auto r = Parse(
       "module m(input logic clk, a, b);\n"
@@ -257,11 +219,6 @@ TEST(CoverSequenceParsing, APropertyOperatorInTheSpecIsReported) {
   }
 }
 
-// A sequence declaration's body after its assertion variable declarations is
-// A.2.10's sequence_expr, with the `;` that may end it: a property operator,
-// a delay with no operand after it, two operands with no operator between
-// them, a disable condition and an empty body are reported on their lines;
-// a clocked body, one with no `;` and one after a declaration are not.
 TEST(DeclarationBodyGrammar, ASequenceBodyIsHeldToSequenceExpr) {
   auto r = Parse(
       "module m(input logic clk, a, b);\n"
@@ -282,11 +239,6 @@ TEST(DeclarationBodyGrammar, ASequenceBodyIsHeldToSequenceExpr) {
   }
 }
 
-// A property declaration's body after its assertion variable declarations is
-// A.2.10's property_spec, with the `;` that may end it: an implication with
-// no consequent, one with a property on its left, two operands with no
-// operator between them and an empty body are reported on their lines; a
-// clocked, disabled body, a case and an if with no `;` are not.
 TEST(DeclarationBodyGrammar, APropertyBodyIsHeldToPropertySpec) {
   auto r = Parse(
       "module m(input logic clk, a, b);\n"
@@ -311,12 +263,6 @@ TEST(DeclarationBodyGrammar, APropertyBodyIsHeldToPropertySpec) {
   }
 }
 
-// A cover property statement and a cover sequence statement end in a
-// statement_or_null where an assert property statement ends in an
-// action_block, so an else written after either in procedural code is
-// reported, with or without a pass statement before it, and the statement
-// after the else is read rather than left for the enclosing block to report.
-// An assert property statement's else arm draws no report.
 TEST(CoverStatementParsing, AnElseArmInProceduralCodeIsReported) {
   auto r = Parse(
       "module m(input logic clk, a);\n"
@@ -335,14 +281,6 @@ TEST(CoverStatementParsing, AnElseArmInProceduralCodeIsReported) {
   EXPECT_EQ(r.diags.size(), 2u);
 }
 
-// A.2.10 with A.9.3: a property_instance and a sequence_instance name their
-// declaration by a ps_or_hierarchical identifier, a package scope among its
-// forms, and either stands alone as the whole property_spec. So each
-// statement kind below takes the package's instance, called positionally,
-// by name or with no list, as its spec, recorded as the instance of
-// "pk::name"; so does a named property's body and an expect statement. A
-// package instance with an operator after it, or after a clocking event, is
-// a property expression rather than one instance.
 TEST(PropertyInstanceSpecParsing, APackageScopedInstanceStandsAlone) {
   auto r = Parse(
       "package pk;\n"

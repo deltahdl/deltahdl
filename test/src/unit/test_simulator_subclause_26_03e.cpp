@@ -11,14 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §8.3 (printed page 180) with §7.10 (printed 169), §7.5 and §7.4.2 (printed
-// 154) and §26.2 (printed 808): a package queue, dynamic array and
-// fixed-size array declared with a class's name hold handles, each element
-// the 64 bits a module's handle has, so the queue's elements, the dynamic
-// array's and each element variable of the fixed-size array are 64 bits
-// wide. PackageDataWidth (lowerer_package_data.cpp) answered a handle's
-// width for a scalar with no unpacked dimension alone and fell to 32 bits
-// for the three, so an element held half an object id.
 TEST(PackageImportSim, PackageHandleArrayElementsAreSixtyFourBitsWide) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -48,12 +40,6 @@ TEST(PackageImportSim, PackageHandleArrayElementsAreSixtyFourBitsWide) {
   EXPECT_EQ(elem->value.width, 64u);
 }
 
-// §8.3 (printed page 180) with §7.10 (printed 169) and §26.3 (printed 808):
-// the handles a module pushes into the package's queue of C are read back
-// through the elements' property, `p1::q[0].v` the first object's 6 and
-// `p1::q[1].v` the second's 8: 8 * 100 + 6. Read together with the width
-// above so that an element held in a 64-bit slot still reaches its object as
-// it did in the narrower one.
 TEST(PackageImportSim, PackageQueueOfHandlesReadThroughElementProperties) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  class C;\n"
@@ -77,18 +63,6 @@ TEST(PackageImportSim, PackageQueueOfHandlesReadThroughElementProperties) {
             806u);
 }
 
-// §8.25 (printed pages 203 and 204) with §8.7 (printed 184) and §26.2
-// (printed 808): a package variable declared with a specialization and
-// constructed by its own declaration assignment, `G #(5) b = new;`, holds an
-// object of that specialization, whose N a method reads as 5, and a second
-// variable `G #(7) c = new;` beside it an object of another specialization
-// reading 7: 5 * 10 + 7. The initializer was evaluated as an ordinary
-// expression, which constructs nothing, so `p1::b.get_n()` ran on no object
-// and read the default 1 for both, 11; the object is now constructed once
-// the package's classes are lowered (ConstructDataClassInitializers in
-// lowerer_package_data.cpp) and bound to the declaration's actuals through
-// the same ApplyClassParamOverrides a module's `G #(5) b = new` goes
-// through, so 15 or 51 would say one specialization was bound to both.
 TEST(PackageScopeReferenceSim,
      PackageClassVariableInitializerConstructsItsSpecialization) {
   EXPECT_EQ(RunAndGet("package p1;\n"
@@ -108,15 +82,6 @@ TEST(PackageScopeReferenceSim,
             57u);
 }
 
-// §13.4 (printed page 340) with §26.3 (printed 808): a package void function
-// named through the qualifier as a statement, `p1::set(5);`, runs as the
-// call `p1::set(5)` in an expression does, and the value a nonvoid one
-// discards under a void cast, `void'(p1::bump(1))`, is computed all the
-// same, so the package's x reads 5 after the first and 6 after the second:
-// 5 * 10 + 6. A statement that never ran its body would read 0 after the
-// first, 50 or 0 in all, and a cast that skipped the call 55. Split off
-// PackageFunctionWritesItsOwnQueueAndAssociativeArrayBare (26_03c) to pin
-// the statement form apart from the objects that function writes.
 TEST(PackageImportSim, PackageVoidFunctionCalledAsAStatementWritesItsPackage) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int x;\n"
@@ -141,12 +106,6 @@ TEST(PackageImportSim, PackageVoidFunctionCalledAsAStatementWritesItsPackage) {
             56u);
 }
 
-// §7.10 (printed page 169) with §26.2 (printed 808): the package's own
-// queue, pushed by its own function's bare `q.push_back(v)` through the
-// "p1.q" key ScopedObjectKeys puts first, holds the two values the two
-// calls pushed, so size() reads 2 and q[1] the second: 2 * 10 + 6. The queue
-// half of the 26_03c case alone, which reads 0 there because the
-// associative-array half beside it answers x and the sum with it is x.
 TEST(PackageImportSim, PackageFunctionWritesItsOwnQueueBare) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int q[$];\n"
@@ -166,12 +125,6 @@ TEST(PackageImportSim, PackageFunctionWritesItsOwnQueueBare) {
             26u);
 }
 
-// §7.8 (printed page 163) with §26.2 (printed 808): the package's own
-// associative array, written by its function's bare `m["k"] = v` and read
-// by another's bare `m["k"]`, both through the "p1.m" key, holds the 5 the
-// first wrote: 5. The write side of the 26_03c case alone, read without the
-// qualifier so that the entry's presence is pinned apart from the read
-// through `p1::m[...]` below.
 TEST(PackageImportSim, PackageFunctionWritesItsOwnAssociativeArrayReadBare) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int m[string];\n"
@@ -193,16 +146,6 @@ TEST(PackageImportSim, PackageFunctionWritesItsOwnAssociativeArrayReadBare) {
             5u);
 }
 
-// §7.8 (printed page 163) with §26.3 (printed 808): the entry the package's
-// function wrote is read through the package scope resolution operator,
-// `p1::m["k"]`, which names the same array under its "p1.m" key: 5. The
-// select resolved no array -- ScopeResolvedAssocProperty
-// (eval_array_class_assoc.cpp) took `p1::m` for a static property of a class
-// named p1, unlike ScopeResolvedQueueProperty's `p1::q` -- so it fell to a
-// bit-select of the 32-bit carrier at the string's value, out of range, and
-// answered x, which the 2-state y stored as 0 with no diagnostic. An empty
-// array with the entry missed would answer 0 as well, which the bare read
-// above tells apart.
 TEST(PackageImportSim,
      PackageFunctionWritesItsOwnAssociativeArrayReadThroughTheQualifier) {
   EXPECT_EQ(RunAndGet("package p1;\n"
@@ -222,12 +165,6 @@ TEST(PackageImportSim,
             5u);
 }
 
-// §7.8 (printed page 163) with §26.3 (printed 808): the mirror, an entry
-// written through the qualifier, `p1::m["k"] = 7`, and read by the package's
-// own function: 7. The write goes through the same resolver as the read
-// above (TryAssocIndexedWrite through FindAssocArrayOfBase), so with `p1::m`
-// resolving no array it landed on the carrier and the function read the
-// missing entry's 0.
 TEST(PackageImportSim,
      PackageAssociativeArrayWrittenThroughTheQualifierReadBare) {
   EXPECT_EQ(RunAndGet("package p1;\n"
@@ -247,11 +184,6 @@ TEST(PackageImportSim,
             7u);
 }
 
-// §26.3 (printed page 808) with §8.7 and §13.3: `p::C c = new;` in a module
-// that imports nothing from p constructs an object of p's class, so the task
-// called through it runs its body and consumes its `#3` before the call
-// returns: $time reads 3. The handle was left null, the call ran nothing and
-// $time read 0.
 TEST(PackageImportSim, PackageQualifiedClassHandleWithoutImportRunsItsTask) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class C;\n"
@@ -270,9 +202,6 @@ TEST(PackageImportSim, PackageQualifiedClassHandleWithoutImportRunsItsTask) {
             3u);
 }
 
-// §26.3 with §8.7 and §8.5: the same handle declared bare and assigned by a
-// procedural `c = new` holds an object whose property initializer ran and
-// whose function writes its property: 4 * 10 + 7. A null handle read 0.
 TEST(PackageImportSim,
      PackageQualifiedClassHandleWithoutImportRunsItsFunction) {
   EXPECT_EQ(RunAndGet("package p;\n"
@@ -295,10 +224,6 @@ TEST(PackageImportSim,
             47u);
 }
 
-// §26.3 with §8.13: a class a module declares extending a class the module
-// imports, by name or by wildcard, inherits it: the package's B holds b = 3
-// and its get() adds 4, so 3 and 7 read as 37. The module registered its
-// classes before binding its imports, so D found no B and inherited nothing.
 TEST(PackageImportSim, AModuleClassExtendsAnImportedClass) {
   for (const char* import : {"import p::B;", "import p::*;"}) {
     EXPECT_EQ(RunAndGet(std::string("package p;\n"
@@ -324,11 +249,6 @@ TEST(PackageImportSim, AModuleClassExtendsAnImportedClass) {
   }
 }
 
-// §26.3 with §8.13 and §3.12.1: a class of the compilation unit extending
-// `p::B`, with nothing importing p, inherits the package's B, not the unit's
-// own B of that name, whose b is 9: 3 and 7 read as 37. The unit's classes
-// were lowered before the packages', so no "p::B" was found and the bare
-// name gave the unit's B.
 TEST(PackageImportSim, AUnitClassExtendsAClassNamedThroughAPackage) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  localparam int K = 4;\n"
@@ -352,12 +272,6 @@ TEST(PackageImportSim, AUnitClassExtendsAClassNamedThroughAPackage) {
             379u);
 }
 
-// §6.18 with §26.3: a variable declared through a package's typedef of a
-// class is a handle of that class, with nothing imported: p's `bt` names its
-// B, whose b is 3; its `ct` names q's C, whose c is 5; and its `bt2` names
-// `bt` and so B: 3, 5 and 3 read as 353. The same holds when a unit class
-// extending p::B has p lowered ahead of the unit's classes. Declared through
-// the typedef, the variable was no handle and its `new` constructed nothing.
 TEST(PackageImportSim, APackagesClassTypedefDeclaresAHandleOfItsClass) {
   for (const char* unit : {"", "class D extends p::B;\nendclass\n"}) {
     EXPECT_EQ(RunAndGet(std::string("package q;\n"

@@ -85,10 +85,6 @@ TEST(EventOrOperatorElaboration, MixedOrCommaCountPreserved) {
   EXPECT_EQ(procs[0].sensitivity.size(), 5u);
 }
 
-// §9.4.2.1: a comma-separated sensitivity list shall be synonymous to the
-// or-separated form. Elaborate one edge-qualified list spelled both ways and
-// confirm the elaborator emits structurally identical RTLIR sensitivity
-// (same length, same per-entry edge, same signal) for each spelling.
 TEST(EventOrOperatorElaboration, CommaAndOrYieldIdenticalSensitivity) {
   ElabFixture fo;
   auto* or_design = ElaborateSrc(

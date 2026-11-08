@@ -36,9 +36,6 @@ TEST(DeclarationRangeParsing, WildcardNotStringIndex) {
   EXPECT_FALSE(v.is_string_index);
 }
 
-// The rule reads the array's own identifier through the hierarchical name
-// A.6.8's ps_or_hierarchical_array_identifier lets a foreach write, which
-// Parser::ParseForeachArrayId reads into a member-access chain.
 TEST(WildcardIndexType, ForeachOnWildcardThroughHierarchicalNameIsError) {
   ElabFixture f;
   Elaborate(
@@ -53,8 +50,6 @@ TEST(WildcardIndexType, ForeachOnWildcardThroughHierarchicalNameIsError) {
                             3, "7.8.1"));
 }
 
-// §7.8.1 — a wildcard-indexed associative array may not be used in a foreach
-// loop.
 TEST(WildcardIndexType, ForeachOnWildcardIsError) {
   ElabFixture f;
   Elaborate(
@@ -69,8 +64,6 @@ TEST(WildcardIndexType, ForeachOnWildcardIsError) {
                             3, "7.8.1"));
 }
 
-// Contrast: a foreach over a non-wildcard array elaborates cleanly, confirming
-// the prohibition is specific to the wildcard index type.
 TEST(WildcardIndexType, ForeachOnFixedArrayIsAllowed) {
   ElabFixture f;
   Elaborate(
@@ -82,8 +75,6 @@ TEST(WildcardIndexType, ForeachOnFixedArrayIsAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.8.1 — an array-locator method that returns index values (find_index) is
-// not allowed on a wildcard-indexed associative array.
 TEST(WildcardIndexType, FindIndexOnWildcardIsError) {
   ElabFixture f;
   Elaborate(
@@ -99,8 +90,6 @@ TEST(WildcardIndexType, FindIndexOnWildcardIsError) {
                             4, "7.8.1"));
 }
 
-// §7.8.1 — find_first_index also returns indices and is rejected on a wildcard
-// associative array.
 TEST(WildcardIndexType, FindFirstIndexOnWildcardIsError) {
   ElabFixture f;
   Elaborate(
@@ -116,8 +105,6 @@ TEST(WildcardIndexType, FindFirstIndexOnWildcardIsError) {
                             4, "7.8.1"));
 }
 
-// §7.8.1 — likewise find_last_index is rejected on a wildcard associative
-// array.
 TEST(WildcardIndexType, FindLastIndexOnWildcardIsError) {
   ElabFixture f;
   Elaborate(
@@ -133,8 +120,6 @@ TEST(WildcardIndexType, FindLastIndexOnWildcardIsError) {
                             4, "7.8.1"));
 }
 
-// §7.8.1 — a nonintegral index value is illegal; a real-literal index on a
-// wildcard array is rejected.
 TEST(WildcardIndexType, NonintegralIndexIsError) {
   ElabFixture f;
   Elaborate(
@@ -149,8 +134,6 @@ TEST(WildcardIndexType, NonintegralIndexIsError) {
                             3, "7.8.1"));
 }
 
-// §7.8.1 — the nonintegral prohibition also covers a real-typed variable used
-// as the index, not just a real literal.
 TEST(WildcardIndexType, RealVariableIndexIsError) {
   ElabFixture f;
   Elaborate(
@@ -166,8 +149,6 @@ TEST(WildcardIndexType, RealVariableIndexIsError) {
                             4, "7.8.1"));
 }
 
-// §7.8.1 — the nonintegral prohibition covers every real-valued type. A
-// shortreal-typed variable used as the index is rejected.
 TEST(WildcardIndexType, ShortrealVariableIndexIsError) {
   ElabFixture f;
   Elaborate(
@@ -183,8 +164,6 @@ TEST(WildcardIndexType, ShortrealVariableIndexIsError) {
                             4, "7.8.1"));
 }
 
-// §7.8.1 — likewise a realtime-typed variable is nonintegral and rejected as a
-// wildcard index.
 TEST(WildcardIndexType, RealtimeVariableIndexIsError) {
   ElabFixture f;
   Elaborate(
@@ -200,8 +179,6 @@ TEST(WildcardIndexType, RealtimeVariableIndexIsError) {
                             4, "7.8.1"));
 }
 
-// §7.8.1 — unique_index returns an array of index values, so like the other
-// index-returning locators it is not allowed on a wildcard associative array.
 TEST(WildcardIndexType, UniqueIndexOnWildcardIsError) {
   ElabFixture f;
   Elaborate(
@@ -217,7 +194,6 @@ TEST(WildcardIndexType, UniqueIndexOnWildcardIsError) {
                             4, "7.8.1"));
 }
 
-// Contrast: an integral index on the same wildcard array elaborates cleanly.
 TEST(WildcardIndexType, IntegralIndexIsAllowed) {
   ElabFixture f;
   Elaborate(
@@ -229,20 +205,6 @@ TEST(WildcardIndexType, IntegralIndexIsAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.8.1 bars a wildcard-indexed associative array from a foreach loop, from
-// the §7.12 methods that return an index, and from a nonintegral index, and it
-// conditions none of the three on the statement the array is written in.
-// WalkStmtsForWildcardTraversal wrote out six of the thirteen statement links
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h states, so
-// each source below elaborated clean. The seven cases cover the seven links the
-// walk did not read.
-//
-// Stmt::for_inits and Stmt::for_steps get the nonintegral-index form rather
-// than the foreach form: A.6.8 admits only a list_of_variable_assignments or a
-// for_variable_declaration at the initialization and only an
-// operator_assignment, an inc_or_dec_expression or a function_subroutine_call
-// at the step, so no loop_statement can be written at either, while a select
-// with a real index is an ordinary expression that can.
 TEST(WildcardIndexType, ForeachOnWildcardInForkArmIsError) {
   ElabFixture f;
   Elaborate(
@@ -293,9 +255,6 @@ TEST(WildcardIndexType, NonintegralIndexInForStepIsError) {
                             5, "7.8.1"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, which is Stmt::assert_pass_stmt here and
-// Stmt::assert_fail_stmt below.
 TEST(WildcardIndexType, ForeachOnWildcardInAssertPassIsError) {
   ElabFixture f;
   Elaborate(
@@ -324,7 +283,6 @@ TEST(WildcardIndexType, ForeachOnWildcardInAssertFailIsError) {
                             3, "7.8.1"));
 }
 
-// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`.
 TEST(WildcardIndexType, ForeachOnWildcardInRandcaseItemIsError) {
   ElabFixture f;
   Elaborate(
@@ -343,8 +301,6 @@ TEST(WildcardIndexType, ForeachOnWildcardInRandcaseItemIsError) {
                             5, "7.8.1"));
 }
 
-// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
-// statement_or_null } }`.
 TEST(WildcardIndexType, ForeachOnWildcardInRandsequenceCodeBlockIsError) {
   ElabFixture f;
   Elaborate(
@@ -363,8 +319,6 @@ TEST(WildcardIndexType, ForeachOnWildcardInRandsequenceCodeBlockIsError) {
                             5, "7.8.1"));
 }
 
-// §7.8.1: a wildcard index shall be integral, whatever form the index takes:
-// an arithmetic or unary operator over a real gives a real.
 TEST(WildcardIndexElaboration, RealIndexExpressionOfAnyFormRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -389,10 +343,6 @@ TEST(WildcardIndexElaboration, RealIndexExpressionOfAnyFormRejected) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 8u) << d.message;
 }
 
-// §7.8.1: a wildcard index shall be integral, and a select, a cast or a
-// function call gives the type its declaration states: a real array's element,
-// a cast to real or to a typedef of real, a const cast of a real, and a
-// function returning real are no integral value.
 TEST(WildcardIndexElaboration, RealSelectCastAndCallIndexRejected) {
   ElabFixture f;
   ElaborateSrc(

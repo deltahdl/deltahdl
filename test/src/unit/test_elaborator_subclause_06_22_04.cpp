@@ -48,9 +48,6 @@ TEST(CastCompatibleElaboration, RealAndIntegralAreCastCompatible) {
   EXPECT_TRUE(IsCastCompatible(i, r));
 }
 
-// Two floating types are assignment compatible with each other (and hence
-// cast compatible) -- the both-real arm of the definition, distinct from the
-// real<->integral arm above.
 TEST(CastCompatibleElaboration, RealTypesAreCastCompatible) {
   DataType r;
   r.kind = DataTypeKind::kReal;
@@ -70,11 +67,6 @@ TEST(CastCompatibleElaboration, UnrelatedNonCastableTypesAreNotCastCompatible) {
   EXPECT_FALSE(IsCastCompatible(s, i));
 }
 
-// §6.22.4's own example: an integral requires a cast to be assigned to an
-// enum. That means the integral->enum pair is cast compatible yet NOT
-// assignment compatible -- exactly the distinction between §6.22.3 and
-// §6.22.4. The reverse direction (enum source) is assignment compatible and so
-// needs no cast.
 TEST(CastCompatibleElaboration,
      IntegralToEnumNeedsCastNotAssignmentCompatible) {
   DataType integral;
@@ -83,12 +75,9 @@ TEST(CastCompatibleElaboration,
   DataType enum_t;
   enum_t.kind = DataTypeKind::kEnum;
 
-  // Integral -> enum: cast compatible but not assignment compatible.
   EXPECT_TRUE(IsCastCompatible(integral, enum_t));
   EXPECT_FALSE(IsAssignmentCompatible(integral, enum_t));
 
-  // Enum -> integral: assignment compatible (hence also cast compatible), no
-  // cast required.
   EXPECT_TRUE(IsAssignmentCompatible(enum_t, integral));
   EXPECT_TRUE(IsCastCompatible(enum_t, integral));
 }
@@ -110,15 +99,6 @@ TEST(CastCompatibleElaboration, CastExpressionBetweenIntAndEnumElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Full-pipeline negative counterpart to the cast test above: because an
-// integral is only cast compatible (not assignment compatible) with an enum,
-// an integral-valued expression assigned to an enum with no cast must be
-// rejected. The RHS is a binary expression so it is unambiguously integral
-// (a bare name could otherwise be an enum member and needs no cast). §6.22.4
-// states only the definition of cast-compatible types as the
-// assignment-compatible types plus the nonequivalent types with explicit
-// casting rules defined, with no "shall", so the obligation the report enforces
-// is §6.19.3's strong typing of enumerations and the report names §6.19.3.
 TEST(CastCompatibleElaboration, IntegralAssignedToEnumWithoutCastIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -134,8 +114,6 @@ TEST(CastCompatibleElaboration, IntegralAssignedToEnumWithoutCastIsRejected) {
                             "6.19.3"));
 }
 
-// The reverse direction is assignment compatible, so an enum value flows into
-// an integral target with no cast and elaborates cleanly.
 TEST(CastCompatibleElaboration, EnumAssignedToIntegralWithoutCastIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -150,11 +128,6 @@ TEST(CastCompatibleElaboration, EnumAssignedToIntegralWithoutCastIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The same example in a different syntactic position: an enum variable's
-// declaration initializer. An integral initializer with no cast is rejected,
-// exercising the module-item initializer path rather than the procedural
-// assignment path covered above. The report names §6.19.3 for the reason given
-// above IntegralAssignedToEnumWithoutCastIsRejected.
 TEST(CastCompatibleElaboration,
      IntegralInitializerForEnumDeclWithoutCastIsRejected) {
   ElabFixture f;
@@ -169,8 +142,6 @@ TEST(CastCompatibleElaboration,
                             "6.19.3"));
 }
 
-// The cast form of that same initializer position is accepted: the §6.24 cast
-// makes the integral value legal to initialize the enum with.
 TEST(CastCompatibleElaboration, CastInitializerForEnumDeclIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(

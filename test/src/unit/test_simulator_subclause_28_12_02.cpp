@@ -1,26 +1,3 @@
-// Unit tests for IEEE 1800-2023 §28.12.2, "Ambiguous strengths: sources and
-// combinations".
-//
-// The last group, AmbiguousStrengthModelCombine, calls CombineAmbiguous in
-// lib/cpp/test_models/model_strength.h. Issue #3417 found that function called
-// from nowhere in the repository, so the claim it states about §28.12.2 was
-// evaluated by no run. Its five cases assert the result the clause states:
-// Figure 28-10's 35x, Figure 28-14's 56x, Figure 28-15's strong x, the range
-// covering two value-H components, and the range covering two value-1
-// components that reach no lower than We1.
-//
-// The last of the five is the case issue #3423 records. It is the only one
-// whose result holds no high-impedance level, the other four each answering a
-// range whose strength0_lo and strength1_lo fields are high impedance. Those
-// four therefore passed while CombineAmbiguous read strength0_hi and
-// strength1_hi alone and left every result's two _lo fields at high impedance,
-// and their expectations are unchanged: Figure 28-10, Figure 28-14 and Figure
-// 28-15 each draw a range that does reach high impedance.
-//
-// The earlier groups resolve a Net, classify a NetStrength, call the
-// simulator's own CombineAmbiguousStrength, and run drive-strength source end
-// to end.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -48,7 +25,7 @@ TEST(StrengthResolution, EqualStrengthConflictPerBit) {
   AddDriver(arena, net, 8, 0x0F, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 0xFFu, 0xFFu);  // all bits x
+  EXPECT_EQ(sn.var->value.words[0].aval & 0xFFu, 0xFFu);
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFFu, 0xFFu);
 }
 
@@ -61,8 +38,6 @@ TEST(StrengthResolution, EqualStrengthPartialConflictPerBit) {
   AddDriver(arena, net, 4, 0b1010, Strength::kStrong);
   net.Resolve(arena);
 
-  // bit3=1, bit2=x, bit1=x, bit0=0. Under Convention A an x bit sets aval, so
-  // aval = 0b1110 (the known 1 at bit3 plus the two x bits), bval = 0b0110.
   EXPECT_EQ(sn.var->value.words[0].aval & 0xFu, 0b1110u);
   EXPECT_EQ(sn.var->value.words[0].bval & 0xFu, 0b0110u);
 }
@@ -76,15 +51,13 @@ TEST(StrengthResolution, EqualStrengthConflictOnTriNetPopulatesAmbiguous) {
   AddDriver(arena, net, 1, 1, Strength::kStrong);
   net.Resolve(arena);
 
-  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(sn.var->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(sn.var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net.resolved_strength.s0_hi, Strength::kStrong);
   EXPECT_EQ(net.resolved_strength.s1_hi, Strength::kStrong);
   EXPECT_TRUE(net.resolved_strength.IsAmbiguous());
 }
 
-// Known-value-with-multi-level classification: only the value side carries
-// a non-singleton range; the opposite side stays HiZ.
 TEST(AmbiguousStrengthClass, KnownValueMultiLevelIsAmbiguous) {
   NetStrength ns;
   ns.s1_hi = Strength::kStrong;
@@ -94,7 +67,6 @@ TEST(AmbiguousStrengthClass, KnownValueMultiLevelIsAmbiguous) {
   EXPECT_EQ(ns.s0_lo, Strength::kHighz);
 }
 
-// X-value classification: levels straddle both halves of the scale.
 TEST(AmbiguousStrengthClass, XValueRangesOnBothSidesIsAmbiguous) {
   NetStrength ns;
   ns.s0_hi = Strength::kStrong;
@@ -106,7 +78,6 @@ TEST(AmbiguousStrengthClass, XValueRangesOnBothSidesIsAmbiguous) {
   EXPECT_NE(ns.s1_hi, Strength::kHighz);
 }
 
-// L-value classification: HiZ joined with a range in the strength0 part.
 TEST(AmbiguousStrengthClass, LValueIsHighZJoinedWithStrengthZeroRange) {
   NetStrength ns;
   ns.s0_hi = Strength::kStrong;
@@ -116,7 +87,6 @@ TEST(AmbiguousStrengthClass, LValueIsHighZJoinedWithStrengthZeroRange) {
   EXPECT_EQ(ns.s1_lo, Strength::kHighz);
 }
 
-// H-value classification: HiZ joined with a range in the strength1 part.
 TEST(AmbiguousStrengthClass, HValueIsHighZJoinedWithStrengthOneRange) {
   NetStrength ns;
   ns.s1_hi = Strength::kStrong;
@@ -126,9 +96,6 @@ TEST(AmbiguousStrengthClass, HValueIsHighZJoinedWithStrengthOneRange) {
   EXPECT_EQ(ns.s0_lo, Strength::kHighz);
 }
 
-// COMB-2 + COMB-3 via production CombineAmbiguousStrength: per-side hi widens
-// to the maximum and per-side lo shrinks to the minimum, so the result's
-// range on each side covers the ranges of both inputs.
 TEST(AmbiguousNetStrengthCombine, WidensPerSideToCoverBothInputRanges) {
   NetStrength a;
   a.s0_hi = Strength::kWeak;
@@ -150,8 +117,6 @@ TEST(AmbiguousNetStrengthCombine, WidensPerSideToCoverBothInputRanges) {
   EXPECT_TRUE(r.IsAmbiguous());
 }
 
-// COMB-2: combining two X-value (CLA-2) signals through production code
-// yields a result that is still ambiguous on both sides.
 TEST(AmbiguousNetStrengthCombine, XValueRangesProduceWiderXValueRange) {
   NetStrength a;
   a.s0_hi = Strength::kWeak;
@@ -173,8 +138,6 @@ TEST(AmbiguousNetStrengthCombine, XValueRangesProduceWiderXValueRange) {
   EXPECT_TRUE(r.IsAmbiguous());
 }
 
-// COMB-3: an L (CLA-3) and an H (CLA-4) input contribute their levels on
-// opposite halves of the scale; the union covers both halves.
 TEST(AmbiguousNetStrengthCombine, LAndHCombineToTwoSidedRange) {
   NetStrength l_signal;
   l_signal.s0_hi = Strength::kPull;
@@ -192,9 +155,6 @@ TEST(AmbiguousNetStrengthCombine, LAndHCombineToTwoSidedRange) {
   EXPECT_TRUE(r.IsAmbiguous());
 }
 
-// Idempotency edge case for COMB-3: combining an ambiguous signal with
-// itself returns an identical NetStrength. Per-side max/min on equal inputs
-// collapses to the input.
 TEST(AmbiguousNetStrengthCombine, SelfCombinationIsIdempotent) {
   NetStrength ns;
   ns.s0_hi = Strength::kPull;
@@ -211,10 +171,6 @@ TEST(AmbiguousNetStrengthCombine, SelfCombinationIsIdempotent) {
   EXPECT_TRUE(r.IsAmbiguous());
 }
 
-// Edge case for COMB-3: combining an ambiguous signal whose lo is non-HiZ
-// with a default (all-HiZ) NetStrength pushes the per-side lo down to HiZ
-// while preserving the per-side hi. HiZ acts as the bottom of the scale
-// for the min that defines the lo bound.
 TEST(AmbiguousNetStrengthCombine, CombiningWithDefaultStretchesLoToHighz) {
   NetStrength narrow;
   narrow.s1_hi = Strength::kPull;
@@ -229,17 +185,6 @@ TEST(AmbiguousNetStrengthCombine, CombiningWithDefaultStretchesLoToHighz) {
   EXPECT_EQ(r.s0_lo, Strength::kHighz);
 }
 
-// --- Full-pipeline observation of §28.12.2 Claim 1 --------------------------
-// When two signals of equal strength and opposite value combine, the result is
-// value x carrying the strength levels of both signals plus all the smaller
-// strength levels (Figure 28-4 / Figure 28-5). §28.12.1 explicitly delegates
-// this unlike-value/same-strength case here. The competing drivers are produced
-// from real drive-strength source (the machinery of §28.11), elaborated,
-// lowered, and run, so the resolved value and the ambiguous resolved strength
-// are observed exactly as the production resolver computes them -- rather than
-// from a hand-assembled Net or a test-model combiner.
-
-// Elaborates, lowers, and runs `src`, then returns the settled net named "w".
 static Net* RunAndFindNetW(SimFixture& f, const char* src) {
   auto* design = ElaborateSrc(src, f);
   if (design == nullptr) return nullptr;
@@ -247,14 +192,11 @@ static Net* RunAndFindNetW(SimFixture& f, const char* src) {
   return f.ctx.FindNet("w");
 }
 
-// Checks the settled net holds x and its resolved strength spans `hi` down to
-// HiZ on both sides of the scale, which is what the standard's rule adding
-// every weaker strength level makes an equal-strength conflict produce.
 static void ExpectXSpanningDownToHighz(SimFixture& f, Net* net, Strength hi) {
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x = (aval=1, bval=1)
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net->resolved_strength.s0_hi, hi);
   EXPECT_EQ(net->resolved_strength.s1_hi, hi);
@@ -263,9 +205,6 @@ static void ExpectXSpanningDownToHighz(SimFixture& f, Net* net, Strength hi) {
   EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
 }
 
-// Figure 28-4 exactly: a weak 1 and a weak 0 driving one wire settle to a weak
-// x. The resolved strength is ambiguous, its high bound the shared weak level
-// on both sides and its low bound HiZ -- i.e. weak plus every smaller level.
 TEST(StrengthResolutionPipeline, EqualWeakOppositeValueYieldsWeakX) {
   SimFixture f;
   Net* net = RunAndFindNetW(f,
@@ -277,9 +216,6 @@ TEST(StrengthResolutionPipeline, EqualWeakOppositeValueYieldsWeakX) {
   ExpectXSpanningDownToHighz(f, net, Strength::kWeak);
 }
 
-// The rule adding every weaker strength level, made explicit at strong: a
-// strong 1 opposing a strong 0 yields x whose range spans strong down to HiZ on
-// both sides of the scale, not just the strong endpoint.
 TEST(StrengthResolutionPipeline,
      EqualStrongOppositeValueSpansAllSmallerLevels) {
   SimFixture f;
@@ -292,54 +228,36 @@ TEST(StrengthResolutionPipeline,
   ExpectXSpanningDownToHighz(f, net, Strength::kStrong);
 }
 
-// Input-form coverage: the equal-strength opposite-value drivers originate from
-// gate primitive outputs (§28.4 gate syntax) rather than continuous
-// assignments. §28.12.2's rule resolves the drivers regardless of how they are
-// produced, so the same weak x results.
 TEST(StrengthResolutionPipeline, EqualStrengthConflictFromGateOutputs) {
   SimFixture f;
-  Net* net = RunAndFindNetW(
-      f,
-      "module t;\n"
-      "  wire w;\n"
-      "  wire a = 1'b1, b = 1'b1;\n"         // and -> 1
-      "  wire c = 1'b0, d = 1'b1;\n"         // and -> 0
-      "  and (weak0, weak1) g0(w, a, b);\n"  // weak-strength 1 driver
-      "  and (weak0, weak1) g1(w, c, d);\n"  // weak-strength 0 driver
-      "endmodule\n");
+  Net* net = RunAndFindNetW(f,
+                            "module t;\n"
+                            "  wire w;\n"
+                            "  wire a = 1'b1, b = 1'b1;\n"
+                            "  wire c = 1'b0, d = 1'b1;\n"
+                            "  and (weak0, weak1) g0(w, a, b);\n"
+                            "  and (weak0, weak1) g1(w, c, d);\n"
+                            "endmodule\n");
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);  // x
+  EXPECT_EQ(var->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(var->value.words[0].bval & 1u, 1u);
   EXPECT_EQ(net->resolved_strength.s0_hi, Strength::kWeak);
   EXPECT_EQ(net->resolved_strength.s1_hi, Strength::kWeak);
   EXPECT_TRUE(net->resolved_strength.IsAmbiguous());
 }
 
-// Input-form coverage: one of the conflicting drivers is produced by a
-// net-declaration assignment (§6.10 / §28.11) -- a continuous driver in a
-// different syntactic position than a standalone `assign`. It competes with an
-// opposite-value cont-assign driver of equal strength, and §28.12.2's rule
-// resolves the two into a strong x with a range down to HiZ.
 TEST(StrengthResolutionPipeline, EqualStrengthConflictFromNetDeclInitializer) {
   SimFixture f;
-  Net* net =
-      RunAndFindNetW(f,
-                     "module t;\n"
-                     "  wire (strong0, strong1) w = 1'b1;\n"    // net-decl 1
-                     "  assign (strong0, strong1) w = 1'b0;\n"  // 0 driver
-                     "endmodule\n");
+  Net* net = RunAndFindNetW(f,
+                            "module t;\n"
+                            "  wire (strong0, strong1) w = 1'b1;\n"
+                            "  assign (strong0, strong1) w = 1'b0;\n"
+                            "endmodule\n");
   ExpectXSpanningDownToHighz(f, net, Strength::kStrong);
 }
 
-// Input-form coverage: a vector operand driven end to end. §28.12.2's rule is
-// applied independently per bit, so on a multi-bit net each bit is resolved on
-// its own -- conflicting bits become x while agreeing bits keep their value.
-// The competing vector drivers come from real drive-strength source rather than
-// a hand-built Net: arrays of gates, one per bit, since §10.3.4 gives a
-// continuous assignment a strength only on a scalar net, each array reading a
-// net that holds its value (a literal terminal is #7623).
 TEST(StrengthResolutionPipeline, EqualStrengthConflictVectorResolvesPerBit) {
   SimFixture f;
   Net* net = RunAndFindNetW(f,
@@ -352,24 +270,10 @@ TEST(StrengthResolutionPipeline, EqualStrengthConflictVectorResolvesPerBit) {
   ASSERT_NE(net, nullptr);
   auto* var = f.ctx.FindVariable("w");
   ASSERT_NE(var, nullptr);
-  // bit3: 1 vs 1 -> 1; bit2: 1 vs 0 -> x; bit1: 0 vs 1 -> x; bit0: 0 vs 0 -> 0.
-  // Convention A: an x bit sets aval, so aval = 0b1110, bval = 0b0110.
   EXPECT_EQ(var->value.words[0].aval & 0xFu, 0b1110u);
   EXPECT_EQ(var->value.words[0].bval & 0xFu, 0b0110u);
 }
 
-// --- §28.12.2 against CombineAmbiguous in model_strength.h -----------------
-// Each case below calls CombineAmbiguous, the model of §28.12.2 that
-// lib/cpp/test_models/model_strength.h states, and asserts the fields §28.12.2
-// decides. Figure 28-2's scale numbers the levels Su0 7 down to HiZ0 0 and HiZ1
-// 0 up to Su1 7, so StrengthLevel::kWeak is the digit 3 and
-// StrengthLevel::kPull the digit 5 that the clause's two-digit strength numbers
-// name.
-
-// A signal whose strength levels lie in the strength0 part of Figure 28-2's
-// scale, spanning `lo` through `hi`. §28.12.2 classifies it as a signal with a
-// value L when `lo` is high impedance, and as a signal with a known value and
-// multiple strength levels otherwise.
 StrengthSignal Strength0Range(StrengthLevel lo, StrengthLevel hi) {
   StrengthSignal s;
   s.value = Val4::kV0;
@@ -378,10 +282,6 @@ StrengthSignal Strength0Range(StrengthLevel lo, StrengthLevel hi) {
   return s;
 }
 
-// A signal whose strength levels lie in the strength1 part of Figure 28-2's
-// scale, spanning `lo` through `hi`. §28.12.2 classifies it as a signal with a
-// value H when `lo` is high impedance, and as a signal with a known value and
-// multiple strength levels otherwise.
 StrengthSignal Strength1Range(StrengthLevel lo, StrengthLevel hi) {
   StrengthSignal s;
   s.value = Val4::kV1;
@@ -390,11 +290,6 @@ StrengthSignal Strength1Range(StrengthLevel lo, StrengthLevel hi) {
   return s;
 }
 
-// Figure 28-9's worked example: the pull H of Figure 28-7's shape and the weak
-// L of Figure 28-8's shape combine into the 35x signal Figure 28-10 draws.
-// In Figure 28-9, combining signals of ambiguous strength gives a range running
-// from the signals' extremes through every strength between them, which Figure
-// 28-10 draws.
 TEST(AmbiguousStrengthModelCombine, PullHAndWeakLGiveThreeFiveX) {
   StrengthSignal pull_h =
       Strength1Range(StrengthLevel::kHighz, StrengthLevel::kPull);
@@ -403,24 +298,13 @@ TEST(AmbiguousStrengthModelCombine, PullHAndWeakLGiveThreeFiveX) {
 
   StrengthSignal r = CombineAmbiguous(pull_h, weak_l);
 
-  // The result is an x, its range taking in both 1 and 0.
   EXPECT_EQ(r.value, Val4::kX);
-  // The 35 before the x is two digits run together: the 3 is the result's
-  // highest strength0 level and the 5 its highest strength1 level.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kWeak);
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kPull);
-  // Figure 28-10 draws the range from We0 through HiZ0 and HiZ1 up to Pu1, so
-  // high impedance is the low end on both sides.
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength1_lo, StrengthLevel::kHighz);
 }
 
-// Figure 28-11's worked example: the two switch-network signals combine into
-// the 56x signal Figure 28-14 draws. Combining the upper and lower
-// configurations of Figure 28-11 gives an unknown whose range (56x) is set by
-// the two signals' extremes, as Figure 28-14 shows. Neither component reaches
-// high impedance, Figure 28-12 drawing the upper signal 651 as Pu1 through St1
-// and Figure 28-13 drawing the lower signal 530 as We0 through Pu0.
 TEST(AmbiguousStrengthModelCombine, SwitchNetworkRangesGiveFiveSixX) {
   StrengthSignal upper =
       Strength1Range(StrengthLevel::kPull, StrengthLevel::kStrong);
@@ -429,27 +313,13 @@ TEST(AmbiguousStrengthModelCombine, SwitchNetworkRangesGiveFiveSixX) {
 
   StrengthSignal r = CombineAmbiguous(upper, lower);
 
-  // The result is an x, its range taking in both 1 and 0.
   EXPECT_EQ(r.value, Val4::kX);
-  // The 5 of 56x is the highest strength0 level and the 6 is the highest
-  // strength1 level, which are the Pu0 and St1 extremes Figure 28-14 draws.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kPull);
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
-  // Figure 28-14 draws one range from Pu0 up to St1, so it holds every level
-  // between them and reaches high impedance on both sides -- even though
-  // Figure 28-12's and Figure 28-13's components each stop short of it.
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength1_lo, StrengthLevel::kHighz);
 }
 
-// Figure 28-15's worked example: raising the lower component's extreme to
-// strong raises the result's strength0 extreme with it. Putting a supply0 in
-// place of the lower configuration's pulldown in Figure 28-11 turns the
-// result's range into the Stx of Figure 28-15, which is a strong x because the
-// value is unknown and both components reach strong, the lower one's extreme
-// being strong because its pmos weakens the supply0. The substitution moves
-// only that extreme, so the lower component keeps the We0 low end Figure 28-13
-// draws.
 TEST(AmbiguousStrengthModelCombine, StrongExtremesGiveStrongX) {
   StrengthSignal upper =
       Strength1Range(StrengthLevel::kPull, StrengthLevel::kStrong);
@@ -458,27 +328,13 @@ TEST(AmbiguousStrengthModelCombine, StrongExtremesGiveStrongX) {
 
   StrengthSignal r = CombineAmbiguous(upper, lower);
 
-  // The result is an x, its range taking in both 1 and 0.
   EXPECT_EQ(r.value, Val4::kX);
-  // Figure 28-15 draws the range from St0 up to St1, so strong is the high end
-  // on both sides and high impedance the low end on both sides.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kStrong);
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength1_lo, StrengthLevel::kHighz);
 }
 
-// Two components on one side of the scale: a pull H and the strong H of
-// Figure 28-7 combine into the strong H range. Two signals of ambiguous
-// strength combine into one of ambiguous strength, its range taking in every
-// strength level of either component. Both components run from high impedance,
-// the pull H up to Pu1 and the strong H up to St1, so the range holding the
-// levels of both is HiZ1 through St1 and no strength0 level joins it.
-//
-// The `value` field is not asserted. §28.12.2 classifies this result as a
-// signal with a value H, and Val4 in lib/cpp/test_models/model_val4.h has no H
-// among kV0, kV1, kX and kZ, so the clause decides nothing about what
-// CombineAmbiguous should put there.
 TEST(AmbiguousStrengthModelCombine, PullHAndStrongHGiveStrongHRange) {
   StrengthSignal pull_h =
       Strength1Range(StrengthLevel::kHighz, StrengthLevel::kPull);
@@ -493,24 +349,6 @@ TEST(AmbiguousStrengthModelCombine, PullHAndStrongHGiveStrongHRange) {
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
 }
 
-// Two components of the same value, neither of which reaches high impedance: a
-// value-1 signal spanning Pu1 through St1 combines with a value-1 signal
-// spanning We1 through La1 into a value-1 signal spanning We1 through St1.
-// Two signals of ambiguous strength combine into one of ambiguous strength, its
-// range taking in every strength level of either component, which Figure 28-9
-// draws as a range from the signals' extremes through every strength between
-// them. We1 is the lower extreme of the two components and St1 the upper, so
-// the range runs from one to the other and no further.
-//
-// This is the case issue #3423 records. Before that issue CombineAmbiguous read
-// the strength0_hi and strength1_hi fields alone, so it answered this
-// combination a strength1_lo of high impedance, which is a range down to HiZ1
-// holding six levels that neither component holds.
-//
-// The value is asserted here and not in PullHAndStrongHGiveStrongHRange above,
-// because a range clear of HiZ1 is one §28.12.2 gives a defined value. Of
-// Figure 28-12's Pu1 through St1 range the clause says the upper configuration
-// of Figure 28-11 gives a signal of value 1 and strength range (651).
 TEST(AmbiguousStrengthModelCombine,
      ValueOneRangesClearOfHighzKeepTheirExtreme) {
   StrengthSignal pull_to_strong_one =
@@ -523,15 +361,10 @@ TEST(AmbiguousStrengthModelCombine,
   EXPECT_EQ(r.value, Val4::kV1);
   EXPECT_EQ(r.strength1_hi, StrengthLevel::kStrong);
   EXPECT_EQ(r.strength1_lo, StrengthLevel::kWeak);
-  // No strength0 level lies between We1 and St1, so none of them is in the
-  // result.
   EXPECT_EQ(r.strength0_hi, StrengthLevel::kHighz);
   EXPECT_EQ(r.strength0_lo, StrengthLevel::kHighz);
 }
 
-// --- Figure 28-9, driven from source ---
-//
-// The strength a design's own net settles at, read back through §21.2.1.4's %v.
 std::string ResolvedStrengthOf(const std::string& body) {
   SimFixture f;
   return RunCapture("module t;\n  wire y;\n" + body +
@@ -539,18 +372,6 @@ std::string ResolvedStrengthOf(const std::string& body) {
                     f);
 }
 
-// §28.12.2's Figure 28-9: two three-state gates with unknown controls, one
-// passing Pu1 and one passing We0, drive one net. Each is an ambiguous signal
-// (§28.6's H and L), and two signals of ambiguous strength combine into one of
-// ambiguous strength whose range takes in every strength level of either
-// component -- which Figure 28-10 draws as one range from We0 across high
-// impedance to Pu1. §21.2.1.4 renders it 35X, the 3 being the result's highest
-// strength0 level and the 5 its highest strength1 level.
-//
-// That two-digit form was reachable from no source. The resolution answered
-// with the strongest driver alone, so the weaker gate's side of the scale was
-// not in the result and the two sides' strongest levels were always equal,
-// which §21.2.1.4 renders with a mnemonic instead.
 TEST(StrengthResolution, SourceTwoAmbiguousGatesCombineIntoOneAmbiguousRange) {
   EXPECT_EQ(ResolvedStrengthOf(
                 "  logic d1, d0, c;\n"
@@ -560,20 +381,10 @@ TEST(StrengthResolution, SourceTwoAmbiguousGatesCombineIntoOneAmbiguousRange) {
             "35X\n");
 }
 
-// The narrower claim underneath: one driver of unknown value at a known
-// strength gives the net that strength rather than high impedance. §28.12.2
-// puts such a signal on both the strength1 and the strength0 halves of the
-// scale, and with one level on each side §21.2.1.4 names it with that level's
-// mnemonic.
 TEST(StrengthResolution, SourceUnknownValueDriverGivesItsOwnStrength) {
   EXPECT_EQ(ResolvedStrengthOf("  assign (pull0, pull1) y = 1'bx;\n"), "PuX\n");
 }
 
-// §28.12.2 (printed page 847), Figure 28-11's upper combination: a switch with
-// an unknown control passing a strong 1 is an H, and with a pullup on the same
-// net it gives a signal of value 1 and strength range (651), every state the
-// two leave the net in being a 1 -- St1 where the switch passes, Pu1 where it
-// does not.
 TEST(StrengthResolution, SourceStrongHBesideAPullupIs651) {
   SimFixture f;
   auto out = RunCapture(
@@ -588,9 +399,6 @@ TEST(StrengthResolution, SourceStrongHBesideAPullupIs651) {
   EXPECT_EQ(out, "u=1 651\n");
 }
 
-// Figure 28-11's lower combination: a pulldown passed through a switch with an
-// unknown control is an L at the pull level, and with a weak 0 beside it the
-// net has value 0 and strength range (530).
 TEST(StrengthResolution, SourcePullLBesideAWeakZeroIs530) {
   SimFixture f;
   auto out = RunCapture(
@@ -606,11 +414,6 @@ TEST(StrengthResolution, SourcePullLBesideAWeakZeroIs530) {
   EXPECT_EQ(out, "l=0 530\n");
 }
 
-// Figure 28-14: the upper and lower combinations on one net give an unknown
-// whose range (56x) is set by the two signals' extremes. The L's pull 0 meets
-// the pullup's pull 1 where neither switch passes, so the 0 side reaches the
-// pull level; combined with the pullup first, the L was dropped as no stronger
-// than it, and the net read 36X.
 TEST(StrengthResolution, SourceHAndLCombinationsOnOneNetAre56X) {
   SimFixture f;
   auto out = RunCapture(
@@ -628,10 +431,6 @@ TEST(StrengthResolution, SourceHAndLCombinationsOnOneNetAre56X) {
   EXPECT_EQ(out, "y=x 56X\n");
 }
 
-// Figure 28-16 (printed page 848): an and gate declared (strong1, highz0) with
-// one input x drives StH, and with a weak 0 beside it the net takes the range
-// (36x) of Figure 28-19; an H beside a pullup alone stays 651, the weak 0 being
-// reached only where the H is z and the pullup is not.
 TEST(StrengthResolution, SourceStrongHWithWeakZeroIs36X) {
   SimFixture f;
   auto out = RunCapture(

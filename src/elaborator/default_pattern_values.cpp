@@ -12,8 +12,6 @@ namespace delta {
 
 namespace {
 
-// The parser keeps a keyed pattern's keys beside its elements, each key at the
-// index of the value it introduces.
 void CheckExpr(const Expr* e, DiagEngine& diag) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kAssignmentPattern) {

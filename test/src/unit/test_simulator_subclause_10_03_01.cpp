@@ -49,11 +49,6 @@ TEST(NetDeclAssignSim, NetDeclAssignReEvaluatesOnChange) {
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 42u);
 }
 
-// §10.3.1: the right-hand side of a net declaration assignment is a general
-// expression, so a parameter is an admitted operand. Built from real source
-// (a `parameter` declaration referenced by the net's initializer) and run
-// end-to-end, the continuous assignment drives the resolved parameter value
-// onto the net -- a different operand-resolution path than an inline literal.
 TEST(NetDeclAssignSim, NetDeclAssignDrivesParameterValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -66,10 +61,6 @@ TEST(NetDeclAssignSim, NetDeclAssignDrivesParameterValue) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// §10.3.1: a localparam is likewise an admitted right-hand-side operand of a
-// net declaration assignment. Declared with the `localparam` keyword and driven
-// through the full pipeline, the net receives its value, confirming the
-// continuous assignment resolves the named constant.
 TEST(NetDeclAssignSim, NetDeclAssignDrivesLocalparamValue) {
   SimFixture f;
   auto* var = RunAndFindVar(

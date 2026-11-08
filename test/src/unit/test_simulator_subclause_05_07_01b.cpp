@@ -180,10 +180,6 @@ TEST(IntegerLiteralSim, NegativeSizedLiteralIsTwosComplement) {
 }
 
 TEST(IntegerLiteralSim, SignedLiteralSignExtendsIntoUnsignedLogic) {
-  // §5.7.1 final paragraph: a sized signed literal is sign-extended when
-  // assigned to a logic object regardless of whether that object's type is
-  // signed. The 4-bit signed literal 4'shf is -1; widened into the unsigned
-  // 8-bit logic target it must become 0xFF (sign fill), not 0x0F (zero fill).
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -194,10 +190,6 @@ TEST(IntegerLiteralSim, SignedLiteralSignExtendsIntoUnsignedLogic) {
 }
 
 TEST(IntegerLiteralSim, UnsignedLiteralZeroExtendsIntoUnsignedLogic) {
-  // Discriminates the rule above: the same value with no s designator is an
-  // unsigned literal, so widening into the identical unsigned 8-bit logic
-  // target zero-fills to 0x0F. Only the literal's signedness — not the
-  // target's — decides between sign fill and zero fill.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [7:0] x;\n"
@@ -208,13 +200,6 @@ TEST(IntegerLiteralSim, UnsignedLiteralZeroExtendsIntoUnsignedLogic) {
 }
 
 TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInConcatenation) {
-  // {1'b1, '1, 1'b0} must be a 3-bit value (0b110 == 6) — the
-  // unbased unsized literal contributes a single bit in the
-  // self-determined concatenation operand position. If '1 carried
-  // its default wide width instead, the concatenation would be
-  // tens of bits and the lower bits would still match the 32-bit
-  // target — so the test pins a wider target and a value that only
-  // matches when the operand really is one bit.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -225,11 +210,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInConcatenation) {
 }
 
 TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInReplication) {
-  // {4{'1}} replicates a single bit four times, producing a 4-bit
-  // value of all ones (0xF). The target here is 32 bits, so without
-  // the self-determined rule '1 would carry its default width and
-  // the replicated result would span tens of bits whose lower
-  // portion would still saturate the target.
   auto result = RunAndGet(
       "module t;\n"
       "  logic [31:0] x;\n"
@@ -239,10 +219,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedIsOneBitInReplication) {
   EXPECT_EQ(result, 0xFu);
 }
 
-// §5.7.1: a sized negative literal is sign-extended when assigned to a logic
-// object. -4'sd1 is a 4-bit signed -1; widened into the 8-bit target it fills
-// with the sign bit to 0xFF, not 0x0F. Distinct input form from the s-only
-// literal (this one forms the negative via a leading unary minus).
 TEST(IntegerLiteralSim, NegativeLiteralSignExtendsIntoWiderLogic) {
   auto result = RunAndGet(
       "module t;\n"
@@ -253,11 +229,6 @@ TEST(IntegerLiteralSim, NegativeLiteralSignExtendsIntoWiderLogic) {
   EXPECT_EQ(result & 0xFFu, 0xFFu);
 }
 
-// §5.7.1: an unsized signed number must reserve a sign bit, so a value between
-// 2^31 and 2^32 stays non-negative rather than collapsing to a 32-bit negative.
-// The plain decimal 2147483648 is signed and unsized; widened into the 64-bit
-// signed target it must remain +2147483648, which only holds if the literal
-// reserved a 33rd (sign) bit instead of stopping at 32.
 TEST(IntegerLiteralSim, UnsizedSignedValueReservesSignBit) {
   auto result = RunAndGet(
       "module t;\n"
@@ -268,9 +239,6 @@ TEST(IntegerLiteralSim, UnsizedSignedValueReservesSignBit) {
   EXPECT_EQ(result, 2147483648ull);
 }
 
-// §5.7.1's own example: the unsized `'h7_0000_0000` is at least 35 bits, the
-// three the leading 7 needs over eight zero digits; the 17-digit all-ones hex
-// literal above is 68. A based value past 32 bits was sized 64 outright.
 TEST(IntegerLiteralSim, UnsizedHexLiteralIsAsWideAsItsDigitsNeed) {
   auto result = RunAndGet(
       "module t;\n"
@@ -281,12 +249,6 @@ TEST(IntegerLiteralSim, UnsizedHexLiteralIsAsWideAsItsDigitsNeed) {
   EXPECT_EQ(result, 0x0000004400000023u);
 }
 
-// §5.7.1 final paragraph, met at the declaration initializer rather than at a
-// procedural assignment: `int c = 4'shf` is the assignment `c = 4'shf` made
-// before any procedure runs (§6.8), and the sized signed literal is
-// sign-extended into the 32-bit int, so c is -1. The initializer lowering
-// widened the 4-bit value through its unsigned integer and read 15, where the
-// procedural `initial c = 4'shf` beside it read -1.
 TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoInt) {
   auto result = RunAndGet(
       "module t;\n"
@@ -296,9 +258,6 @@ TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoInt) {
   EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFFu);
 }
 
-// §5.7.1 final paragraph with §6.11.1: integer is a 32-bit signed 4-state
-// object, and the initializer's sized signed literal is sign-extended into it
-// as into an int.
 TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoInteger) {
   auto result = RunAndGet(
       "module t;\n"
@@ -308,9 +267,6 @@ TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoInteger) {
   EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFFu);
 }
 
-// §5.7.1 final paragraph: the object is an unsigned logic vector, and the
-// literal is still sign-extended, the clause saying the object's own
-// signedness does not decide. 4'shf into 16 bits is ffff, not 000f.
 TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoWiderLogic) {
   auto result = RunAndGet(
       "module t;\n"
@@ -320,9 +276,6 @@ TEST(IntegerLiteralSim, SignedLiteralInitializerSignExtendsIntoWiderLogic) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFFFu);
 }
 
-// §5.7.1 final paragraph: an 8-bit signed literal whose high bit is set,
-// 8'sh85, is -123 and fills the 16-bit object as ff85. The low byte
-// discriminates a sign fill from a value the widening misread.
 TEST(IntegerLiteralSim, SignedHexLiteralInitializerSignExtendsHighByte) {
   auto result = RunAndGet(
       "module t;\n"
@@ -332,9 +285,6 @@ TEST(IntegerLiteralSim, SignedHexLiteralInitializerSignExtendsHighByte) {
   EXPECT_EQ(result & 0xFFFFu, 0xFF85u);
 }
 
-// §5.7.1 final paragraph: a sized negative signed literal, -8'sd6, is the
-// 8-bit signed value fa and is sign-extended into the int, reading -6 rather
-// than 250.
 TEST(IntegerLiteralSim, NegativeSignedLiteralInitializerSignExtendsIntoInt) {
   auto result = RunAndGet(
       "module t;\n"
@@ -344,10 +294,6 @@ TEST(IntegerLiteralSim, NegativeSignedLiteralInitializerSignExtendsIntoInt) {
   EXPECT_EQ(result & 0xFFFFFFFFu, 0xFFFFFFFAu);
 }
 
-// Discriminates the four above: the same 8'h85 without the s designator is an
-// unsigned literal, so the initializer zero-extends it to 0085. Only the
-// literal's signedness decides the fill, in an initializer as in a procedural
-// assignment.
 TEST(IntegerLiteralSim, UnsignedLiteralInitializerZeroExtendsIntoWiderLogic) {
   auto result = RunAndGet(
       "module t;\n"
@@ -357,12 +303,6 @@ TEST(IntegerLiteralSim, UnsignedLiteralInitializerZeroExtendsIntoWiderLogic) {
   EXPECT_EQ(result & 0xFFFFu, 0x0085u);
 }
 
-// §5.7.1's final paragraph with §11.6.1 and §11.8.2: the operand of a unary
-// minus is context-determined (Table 11-21 keeps only `!` and the reductions
-// self-determined), so in `logic [15:0] a = -8'd6` the 8-bit literal is
-// extended to the 16 bits of the assignment before it is negated, and the
-// object holds the 16-bit two's complement fffa. The negation was done at the
-// literal's 8 bits and the 8-bit fa then zero-extended to 00fa.
 TEST(IntegerLiteralSim,
      NegativeUnsignedLiteralInitializerNegatesAtTargetWidth) {
   auto result = RunAndGet(
@@ -373,9 +313,6 @@ TEST(IntegerLiteralSim,
   EXPECT_EQ(result & 0xFFFFu, 0xFFFAu);
 }
 
-// §11.6.1 with §6.20.2: a parameter's value expression is the right-hand side
-// of an assignment to the parameter, so its declared 16 bits size the operand
-// of the negation as a variable's do.
 TEST(IntegerLiteralSim,
      NegativeUnsignedLiteralParameterNegatesAtDeclaredWidth) {
   auto result = RunAndGet(
@@ -387,10 +324,6 @@ TEST(IntegerLiteralSim,
   EXPECT_EQ(result & 0xFFFFu, 0xFFFAu);
 }
 
-// §8.7 with §6.8: a class property's initializer is an assignment to the
-// property, so the 16 bits the property declares size the negation's operand
-// as a module variable's do; the property's initializer was evaluated
-// self-determined and its 8-bit fa widened afterwards, reading 00fa.
 TEST(IntegerLiteralSim, NegativeUnsignedLiteralClassPropertyNegatesAtWidth) {
   auto result = RunAndGet(
       "module t;\n"
@@ -408,12 +341,6 @@ TEST(IntegerLiteralSim, NegativeUnsignedLiteralClassPropertyNegatesAtWidth) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFFAu);
 }
 
-// Discriminates the three above from a sign extension of the literal: `8'd6`
-// is unsigned, so extending it first gives 16'd6 and the negation fffa, while
-// a negation at 8 bits followed by a sign extension of the unsigned fa would
-// also give fffa. `-8'd130` tells them apart: extended first it is
-// -130 = ff7e; negated at 8 bits it is 7e, whose high bit is clear, and no
-// extension of that reads ff7e.
 TEST(IntegerLiteralSim, NegativeUnsignedLiteralAboveHalfRangeNegatesAtWidth) {
   auto result = RunAndGet(
       "module t;\n"
@@ -423,10 +350,6 @@ TEST(IntegerLiteralSim, NegativeUnsignedLiteralAboveHalfRangeNegatesAtWidth) {
   EXPECT_EQ(result & 0xFFFFu, 0xFF7Eu);
 }
 
-// §11.6.1 Table 11-21 gives `~` the same L(i) row as unary minus, so its
-// operand is extended to the context before the inversion: `~8'hFF` into 16
-// bits inverts sixteen bits of 00ff to ff00, not eight bits to 00 and then
-// widens.
 TEST(IntegerLiteralSim, BitwiseNotOfSizedLiteralInvertsAtTargetWidth) {
   auto result = RunAndGet(
       "module t;\n"
@@ -436,11 +359,6 @@ TEST(IntegerLiteralSim, BitwiseNotOfSizedLiteralInvertsAtTargetWidth) {
   EXPECT_EQ(result & 0xFFFFu, 0xFF00u);
 }
 
-// §5.7.1 (printed page 78): an unbased unsized literal sets every bit of the
-// value it stands for, and §6.20.2 gives a parameter declared with a range
-// that range, so `'1` as the default of an 8-bit parameter is 255. The
-// elaborator's fold had no case for the literal, the parameter stayed
-// unresolved, and every read of it gave 0.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsARangedParameter) {
   auto result = RunAndGet(
       "module t;\n"
@@ -451,9 +369,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsARangedParameter) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// The same literal into a 4-bit parameter is 15, which tells the fill at the
-// declared width from a fill at some fixed width: 255 masked to 16 bits would
-// read 255 for both.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAFourBitParameter) {
   auto result = RunAndGet(
       "module t;\n"
@@ -464,10 +379,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAFourBitParameter) {
   EXPECT_EQ(result & 0xFFFFu, 0xFu);
 }
 
-// §5.7.1: in a self-determined context the literal is one bit wide, and
-// §6.20.2 gives a parameter declared with neither type nor range the range of
-// its value, so `parameter R = '1` is a 1-bit 1 and not the 64 bits of ones
-// the literal's carrier holds.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneIsOneBitInAnUntypedParameter) {
   auto result = RunAndGet(
       "module t;\n"
@@ -478,7 +389,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneIsOneBitInAnUntypedParameter) {
   EXPECT_EQ(result, 1u);
 }
 
-// A localparam takes its default the same way (§6.20.4).
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsALocalparam) {
   auto result = RunAndGet(
       "module t;\n"
@@ -489,9 +399,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsALocalparam) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// §5.7.1's `'x` fills a 32-bit integer parameter with x, which case equality
-// against 32 bits of x observes and a 0 fails: the fold carries no unknown
-// bit, so the lowerer evaluates the parameter's own expression to restore it.
 TEST(IntegerLiteralSim, UnbasedUnsizedXFillsAnIntegerParameterWithX) {
   auto result = RunAndGet(
       "module t;\n"
@@ -503,8 +410,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedXFillsAnIntegerParameterWithX) {
   EXPECT_EQ(result, 1u);
 }
 
-// A sized literal's x digits reach the parameter's storage the same way:
-// `8'hx` is eight bits of x (§5.7.1's Example 2), which the folded 0 was not.
 TEST(IntegerLiteralSim, SizedXLiteralFillsAParameterWithX) {
   auto result = RunAndGet(
       "module t;\n"
@@ -516,8 +421,6 @@ TEST(IntegerLiteralSim, SizedXLiteralFillsAParameterWithX) {
   EXPECT_EQ(result, 1u);
 }
 
-// §23.2.3 with §6.20.2: a parameter port's default is folded as a body
-// parameter's is, so `'1` fills the 8 bits the port declares.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPortDefault) {
   auto result = RunAndGet(
       "module m #(parameter logic [7:0] A = '1);\n"
@@ -530,11 +433,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPortDefault) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// §26.3 with §6.20.2: a package's parameter has its declared range too, so
-// `parameter logic [11:0] W = '1` read through `p::W` is 4095. The package's
-// storage was sized at 32 bits whatever the declaration said and the
-// initializer evaluated self-determined, which put the literal's 64-bit
-// carrier there and read 18446744073709551615.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameter) {
   auto result = RunAndGet(
       "package p;\n"
@@ -547,9 +445,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameter) {
   EXPECT_EQ(result, 0xFFFu);
 }
 
-// §6.20.2 with §5.7.1: a parameter declared past 64 bits is filled to its
-// whole range, the words above bit 63 included, so `logic [95:0] G = '1`
-// reads ones in its top 32 bits as in its low 64.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPastSixtyFourBits) {
   const std::string kSrc =
       "module t;\n"
@@ -561,10 +456,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAParameterPastSixtyFourBits) {
   EXPECT_EQ(RunAndGet(kSrc, "lo"), ~uint64_t{0});
 }
 
-// §5.7.1 (printed page 78): in a self-determined context an unbased unsized
-// literal has a width of 1 bit, and §20.6.2 has $bits answer the width of its
-// expression, so $bits('1) is 1. The literal was carried as a 64-bit value
-// wherever nothing supplied a width, and $bits read the carrier's 64.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneIsOneBitUnderBits) {
   auto result = RunAndGet(
       "module t;\n"
@@ -575,7 +466,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneIsOneBitUnderBits) {
   EXPECT_EQ(result, 1u);
 }
 
-// The same for 'x, whose carrier was 64 bits of x.
 TEST(IntegerLiteralSim, UnbasedUnsizedXIsOneBitUnderBits) {
   auto result = RunAndGet(
       "module t;\n"
@@ -586,9 +476,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedXIsOneBitUnderBits) {
   EXPECT_EQ(result, 1u);
 }
 
-// §11.4.5 with §11.6.1: the operands of == are sized to the wider of the two,
-// so `'1 == 1'b1` compares a 1-bit 1 with a 1-bit 1 and is true. The 64-bit
-// carrier against the zero-extended 1'b1 was false.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneEqualsAOneBitOne) {
   auto result = RunAndGet(
       "module t;\n"
@@ -599,8 +486,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneEqualsAOneBitOne) {
   EXPECT_EQ(result, 1u);
 }
 
-// §21.2.1.2 formats the argument's value at its own width, so `%0d` of the
-// 1-bit literal prints 1; the carrier printed 18446744073709551615.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFormatsAsOne) {
   auto result = RunAndGet(
       "module t;\n"
@@ -611,10 +496,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFormatsAsOne) {
   EXPECT_EQ(result, 1u);
 }
 
-// §5.7.1 with §11.6.1: sized to the 8-bit operand beside it, the literal sets
-// all eight bits, so `x == '1` over ff is true. The 64-bit carrier against x
-// zero-extended to 64 was false, as a 1-bit literal zero-extended to 8 would
-// be: the extension has to replicate the literal's bit.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsTheOperandItIsComparedWith) {
   auto result = RunAndGet(
       "module t;\n"
@@ -626,8 +507,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsTheOperandItIsComparedWith) {
   EXPECT_EQ(result, 1u);
 }
 
-// §12.5: a case item is sized to the longest of the case expression and the
-// items, so `'1` matches an 8-bit selector of ff.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneCaseItemFillsTheSelectorWidth) {
   auto result = RunAndGet(
       "module t;\n"
@@ -642,8 +521,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneCaseItemFillsTheSelectorWidth) {
   EXPECT_EQ(result & 0xFFu, 1u);
 }
 
-// §13.5.1 with §6.20.2: a by-value actual is assigned to the formal, so `'1`
-// handed to an 8-bit formal fills it and the function returns ff.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAFormalArgument) {
   auto result = RunAndGet(
       "module t;\n"
@@ -657,9 +534,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAFormalArgument) {
   EXPECT_EQ(result & 0xFFu, 0xFFu);
 }
 
-// §10.4.2: a nonblocking assignment's right-hand side is sized by the
-// variable it updates, so `w <= '1` on a 128-bit variable sets the top word
-// as well as the low one.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneNonblockingFillsPastSixtyFourBits) {
   auto result = RunAndGet(
       "module t;\n"
@@ -674,9 +548,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneNonblockingFillsPastSixtyFourBits) {
   EXPECT_EQ(result, ~uint64_t{0});
 }
 
-// A 1-bit variable initialized from `'1` holds a 1-bit 1 and nothing more:
-// read into an 8-bit variable it zero-extends to 01 (§11.8.2, unsigned), the
-// fill being the literal's and not the stored value's.
 TEST(IntegerLiteralSim, OneBitVariableSetFromUnbasedUnsizedOneReadsAsOne) {
   auto result = RunAndGet(
       "module t;\n"
@@ -688,8 +559,6 @@ TEST(IntegerLiteralSim, OneBitVariableSetFromUnbasedUnsizedOneReadsAsOne) {
   EXPECT_EQ(result & 0xFFu, 1u);
 }
 
-// The same through a class property assigned `'1` after construction and
-// read back: the property is 1 bit, so the read is 01.
 TEST(IntegerLiteralSim, OneBitPropertySetFromUnbasedUnsizedOneReadsAsOne) {
   auto result = RunAndGet(
       "module t;\n"
@@ -708,8 +577,6 @@ TEST(IntegerLiteralSim, OneBitPropertySetFromUnbasedUnsizedOneReadsAsOne) {
   EXPECT_EQ(result & 0xFFu, 1u);
 }
 
-// An 8-bit property assigned `'1` after construction takes all eight bits
-// (§8.7 with §6.20.2's assignment context).
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPropertyAssignedThroughAHandle) {
   auto result = RunAndGet(
       "module t;\n"
@@ -728,12 +595,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPropertyAssignedThroughAHandle) {
   EXPECT_EQ(result & 0xFFu, 0xFFu);
 }
 
-// §8.25 (printed page 203) with §6.20.2 and §5.7.1: `'1` is a constant
-// expression and a legal default for a class value parameter, filling the
-// parameter's declared `logic [7:0]`, so a property initialized from it
-// reads 255. The elaborator rejected the default as not constant, and the
-// simulator evaluated a class parameter's default self-determined, at the
-// literal's one bit, whatever the declared type.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterDefault) {
   auto result = RunAndGet(
       "module t;\n"
@@ -751,10 +612,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterDefault) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// §8.25.1 lets a later parameter's declaration name an earlier one, so
-// `logic [W-1:0] INIT = '1` under `int W = 8` is eight bits of ones in the
-// default specialization; the width is folded against the earlier
-// parameters' values.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterSizedByAnother) {
   auto result = RunAndGet(
       "module t;\n"
@@ -772,10 +629,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterSizedByAnother) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// The default specialization `C#()` (§8.25.1), reached through the class
-// scope resolution operator (§8.23) with no object, binds the same eight bits
-// of ones for a static method to read; a parameterized class's bare name is
-// no specialization, so the read goes through `C#()::`.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterReadByScope) {
   auto result = RunAndGet(
       "module t;\n"
@@ -789,12 +642,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAClassParameterReadByScope) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFu);
 }
 
-// §8.25 with §6.20.2: a specialization's value actual is converted to the
-// parameter's declared type as an override of a module's parameter is
-// (§23.10.2), so `C #(12, 'h0f)` gives INIT the 12-bit 00f, and `C #(12,
-// 'hfff0)` the 12-bit ff0 -- the actual cut to the width W the same
-// specialization set, which discriminates the declared width from the
-// actual's own 32 bits.
 TEST(IntegerLiteralSim, ClassParameterOverrideIsCutToTheDeclaredWidth) {
   auto result = RunAndGet(
       "module t;\n"
@@ -812,10 +659,6 @@ TEST(IntegerLiteralSim, ClassParameterOverrideIsCutToTheDeclaredWidth) {
   EXPECT_EQ(result & 0xFFFFFFFFu, 0xFF0u);
 }
 
-// §26.3 with §6.20.1 and §6.20.2: a package parameter's range may name an
-// earlier package parameter, so `logic [N-1:0] M = '1` under `int N = 12` is
-// twelve bits of ones. The range was folded with no parameter in scope,
-// which left the type its base's one bit and M a single 1.
 TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameterSizedByAnother) {
   auto result = RunAndGet(
       "package p;\n"
@@ -829,11 +672,6 @@ TEST(IntegerLiteralSim, UnbasedUnsizedOneFillsAPackageParameterSizedByAnother) {
   EXPECT_EQ(result & 0xFFFFu, 0xFFFu);
 }
 
-// §5.7.1 (printed page 77, last paragraph): an unsized literal whose
-// high-order digit is x is extended with x to the size of the expression that
-// holds it, so `'bx1` in a declaration initializer is 32 bits of x over a 1
-// and the 8-bit object takes xxxxxxx1. The initializer's resize dropped every
-// x and left 00000001.
 TEST(IntegerLiteralSim, UnsizedBinaryXHighDigitExtendsWithXInAnInitializer) {
   auto result = RunAndGet(
       "module t;\n"
@@ -845,8 +683,6 @@ TEST(IntegerLiteralSim, UnsizedBinaryXHighDigitExtendsWithXInAnInitializer) {
   EXPECT_EQ(result, 1u);
 }
 
-// §5.7.1: the same extension with z, `'bz10` in an 8-bit object being
-// zzzzzz10 rather than the 00000010 the dropped z bits left.
 TEST(IntegerLiteralSim, UnsizedBinaryZHighDigitExtendsWithZInAnInitializer) {
   auto result = RunAndGet(
       "module t;\n"
@@ -858,9 +694,6 @@ TEST(IntegerLiteralSim, UnsizedBinaryZHighDigitExtendsWithZInAnInitializer) {
   EXPECT_EQ(result, 1u);
 }
 
-// §5.7.1: an x digit in an octal literal sets three bits, and a leading 0
-// digit pads with zeros, so `'o0x1` is 000 xxx 001 and the 8-bit object takes
-// 00xxx001; the three x bits read as zeros before.
 TEST(IntegerLiteralSim,
      UnsizedOctalXDigitBelowAZeroSetsThreeBitsInAnInitializer) {
   auto result = RunAndGet(
@@ -873,8 +706,6 @@ TEST(IntegerLiteralSim,
   EXPECT_EQ(result, 1u);
 }
 
-// §5.7.1: `'hx` is at least 32 bits of x, so the 8-bit object it initializes
-// is all x; it read 00000000.
 TEST(IntegerLiteralSim, UnsizedHexXFillsAnEightBitInitializer) {
   auto result = RunAndGet(
       "module t;\n"
@@ -886,8 +717,6 @@ TEST(IntegerLiteralSim, UnsizedHexXFillsAnEightBitInitializer) {
   EXPECT_EQ(result, 1u);
 }
 
-// §5.7.1: extended past the literal's own 32 bits as well, `'hz` initializing
-// a 64-bit object sets all 64 to z, as the procedural `x = 'hz` already did.
 TEST(IntegerLiteralSim, UnsizedHexZExtendsASixtyFourBitInitializer) {
   auto result = RunAndGet(
       "module t;\n"
@@ -899,10 +728,6 @@ TEST(IntegerLiteralSim, UnsizedHexZExtendsASixtyFourBitInitializer) {
   EXPECT_EQ(result, 1u);
 }
 
-// §5.7.1 (printed page 77): a based literal is up to three tokens, its size,
-// its base and its digits, and §5.4 makes a comment a token separator as
-// §5.3's white space is, so `8 /* c */ 'h11` is the sized 8'h11 and reads 17.
-// The size and the base were two literals, and the second a stray token.
 TEST(IntegerLiteralSim, BlockCommentBetweenSizeAndBaseReadsTheSizedValue) {
   auto result = RunAndGet(
       "module t;\n"
@@ -913,9 +738,6 @@ TEST(IntegerLiteralSim, BlockCommentBetweenSizeAndBaseReadsTheSizedValue) {
   EXPECT_EQ(result, 17u);
 }
 
-// §5.7.1 with §11.6.1: the size the comment separates is the literal's own, so
-// `4 /* c */ 'shf` is the 4-bit signed -1 and sign-extends to ffff in a 16-bit
-// object; read as the unsized `'shf` beside a stray 4 it would be 000f.
 TEST(IntegerLiteralSim, BlockCommentBetweenSizeAndBaseKeepsTheSizeSigned) {
   auto result = RunAndGet(
       "module t;\n"
@@ -926,8 +748,6 @@ TEST(IntegerLiteralSim, BlockCommentBetweenSizeAndBaseKeepsTheSizeSigned) {
   EXPECT_EQ(result, 0xFFFFu);
 }
 
-// §5.3 counts a newline as white space, so the base may open the next line,
-// here after a one-line comment closes the size's.
 TEST(IntegerLiteralSim, LineCommentBetweenSizeAndBaseReadsTheSizedValue) {
   auto result = RunAndGet(
       "module t;\n"

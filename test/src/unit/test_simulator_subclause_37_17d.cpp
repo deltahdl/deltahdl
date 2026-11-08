@@ -14,13 +14,8 @@
 namespace delta {
 namespace {
 
-// §37.17 Variables, read off the VPI model a run builds from an elaborated
-// design: the objects and properties detail by detail gives a variable, its
-// members, its elements and the selects into it.
-
 class VariablesOfARun : public VpiDesignRun {
  protected:
-  // The value of `obj` read as an integer.
   static int IntOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -29,9 +24,6 @@ class VariablesOfARun : public VpiDesignRun {
   }
 };
 
-// D12: a variable whose type is a typedef of a packed logic vector has a var
-// bit per bit, as one declared with the vector's dimension written out does
-// (#7349).
 TEST_F(VariablesOfARun, ATypedefPackedVectorVariableHasBits) {
   Run("typedef logic [2:0] t3;\n"
       "module top; t3 a; logic [2:0] b; endmodule\n");
@@ -39,12 +31,6 @@ TEST_F(VariablesOfARun, ATypedefPackedVectorVariableHasBits) {
   EXPECT_EQ(ObjectsOf(vpiBit, By("top.b")).size(), 3U);
 }
 
-// §6.18: a variable a module declares with a typedef name is the kind of the
-// type at the end of the name's chain, as a task's is: an int var for a typedef
-// of int, a virtual interface var for a typedef of a virtual interface type
-// (§37.29), and a struct var for a typedef a package declares, named through
-// the package (§26.3), where no fact the elaborator records on the variable
-// says so (#8205).
 TEST_F(VariablesOfARun, ATypedefNamedVariableIsTheKindItsTypedefNames) {
   Run("interface bus; endinterface\n"
       "package p; typedef struct { int a; int b; } ps_t; endpackage\n"
@@ -57,17 +43,11 @@ TEST_F(VariablesOfARun, ATypedefNamedVariableIsTheKindItsTypedefNames) {
   EXPECT_EQ(vpi_get(vpiType, By("top.s")), vpiStructVar);
 }
 
-// Detail 19 with §6.14: a variable a module declares with the chandle type is a
-// chandle var, the kind §37.17 draws for that type, rather than the logic var
-// a variable of no box of its own carries.
 TEST_F(VariablesOfARun, AModulesChandleVariableIsAChandleVar) {
   Run("module top; chandle h; endmodule\n");
   EXPECT_EQ(vpi_get(vpiType, By("top.h")), vpiChandleVar);
 }
 
-// An element of an array of a built-in type other than logic is a variable of
-// that type, an int var of `int a[4]`, so the array is no memory; an element of
-// a logic array stays a reg (#6996).
 TEST_F(VariablesOfARun, AnArrayElementIsAVariableOfItsElementType) {
   Run("module top; int a[4]; byte c[2]; logic [3:0] m[2]; endmodule\n");
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(By("top.a"), 0)), vpiIntVar);
@@ -77,9 +57,6 @@ TEST_F(VariablesOfARun, AnArrayElementIsAVariableOfItsElementType) {
   EXPECT_EQ(vpi_get(vpiIsMemory, By("top.m")), 1);
 }
 
-// A variable reaches the ports it connects as a net does: a variable port's
-// own variable its port through vpiPorts, and a variable connected to an
-// instance's port that port through vpiPortInst (#6997).
 TEST_F(VariablesOfARun, AVariableReachesThePortsItConnects) {
   Run("module m(output logic [3:0] v); endmodule\n"
       "module top; logic [3:0] w; m u(w); endmodule\n");
@@ -93,8 +70,6 @@ TEST_F(VariablesOfARun, AVariableReachesThePortsItConnects) {
   EXPECT_EQ(VpiObjectOf(insts[0]), VpiObjectOf(port));
 }
 
-// An array var reaches the var selects of it, each reaching the array back
-// through vpiParent, while an index still selects the array's element (#6998).
 TEST_F(VariablesOfARun, AnArrayVarReachesItsVarSelects) {
   Run("module top; int a[4]; int i; initial a[i] = 1; endmodule\n");
   std::vector<vpiHandle> selects = ObjectsOf(vpiVarSelect, By("top.a"));
@@ -104,8 +79,6 @@ TEST_F(VariablesOfARun, AnArrayVarReachesItsVarSelects) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(By("top.a"), 0)), vpiIntVar);
 }
 
-// A variable of a built-in type relates to a typespec of that type, which
-// §37.25 detail 1 leaves without a name (#6999).
 TEST_F(VariablesOfARun, ABuiltInTypedVariableHasAnUnnamedTypespec) {
   Run("module top; int x; byte b; endmodule\n");
   vpiHandle int_spec = vpi_handle(vpiTypespec, By("top.x"));
@@ -117,12 +90,6 @@ TEST_F(VariablesOfARun, ABuiltInTypedVariableHasAnUnnamedTypespec) {
   EXPECT_EQ(vpi_get(vpiType, byte_spec), vpiByteTypespec);
 }
 
-// D15, D16 and D22: a class property reports the randomization type it was
-// declared with, and any other variable vpiNotRand; a random property, randc
-// or rand, static or not, is randomized until rand_mode() turns it off, and
-// again once rand_mode() turns it back on, and so is one of the class defn,
-// which, being automatic, has no full name (D25). An object that is no
-// variable has no randomization type (#7000, #7001, #8190).
 TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   Run("module top;\n"
       "  class C; rand int r; randc bit [1:0] k; rand int off; int n;\n"
@@ -152,9 +119,6 @@ TEST_F(VariablesOfARun, AVariableReportsItsRandomization) {
   EXPECT_EQ(vpi_get(vpiRandType, By("top")), vpiUndefined);
 }
 
-// D21 with §37.16 and §38.6: an array var reports its kind of array, and an
-// array net and a logic var, neither of which carries vpiArrayType, answer
-// vpiUndefined (#8191).
 TEST_F(VariablesOfARun, OnlyAnArrayVarHasAnArrayType) {
   Run("module top; int q[$]; wire w[2]; logic l; endmodule\n");
   EXPECT_EQ(vpi_get(vpiArrayType, By("top.q")), vpiQueueArray);
@@ -163,10 +127,6 @@ TEST_F(VariablesOfARun, OnlyAnArrayVarHasAnArrayType) {
   EXPECT_EQ(vpi_get(vpiArrayType, By("top.l")), vpiUndefined);
 }
 
-// D16, D25 and D28 read off objects standing in no design. A static random
-// property of an object with no class type keeps its rand_mode() state with
-// the object, here off. A variable with no parent is full-named and
-// decompiled by its own name alone.
 TEST(VariablesStandingAlone, ReportTheirRandomizationNameAndDecompile) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -187,16 +147,12 @@ TEST(VariablesStandingAlone, ReportTheirRandomizationNameAndDecompile) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D17: a member of a structure variable is a struct union member, and a
-// variable of the module is not (#7002).
 TEST_F(VariablesOfARun, AStructMemberIsAStructUnionMember) {
   Run("module top; struct { int i1; } s; int x; endmodule\n");
   EXPECT_EQ(vpi_get(vpiStructUnionMember, By("top.s.i1")), 1);
   EXPECT_EQ(vpi_get(vpiStructUnionMember, By("top.x")), 0);
 }
 
-// A variable declared const, of a module or a class, is a constant variable,
-// and one declared without is not (#7003).
 TEST_F(VariablesOfARun, AConstVariableIsAConstantVariable) {
   Run("module top;\n"
       "  class C; const int c = 3; int d; endclass\n"
@@ -210,8 +166,6 @@ TEST_F(VariablesOfARun, AConstVariableIsAConstantVariable) {
   EXPECT_EQ(vpi_get(vpiConstantVariable, Named(vpiVariables, obj, "d")), 0);
 }
 
-// D24: a property reached through a class object reports the visibility it
-// was declared with, as one reached through the class defn does (#7011).
 TEST_F(VariablesOfARun, AClassObjectsPropertyReportsItsVisibility) {
   Run("module top;\n"
       "  class C; local int a; protected int b; int c; endclass\n"
@@ -226,9 +180,6 @@ TEST_F(VariablesOfARun, AClassObjectsPropertyReportsItsVisibility) {
             vpiPublicVis);
 }
 
-// D5 and D10: a var select reaches its index through vpi_handle, a select
-// through another reaches the indices of both, its own first, and a select
-// of an element is as wide as the element (#7004, #7005, #7007).
 TEST_F(VariablesOfARun, AVarSelectReachesItsIndicesAndSize) {
   Run("module top; logic [7:0] r[4]; int m[4][4]; int i, j;\n"
       "  initial begin r[i] = 0; m[i][j] = 1; end\n"
@@ -253,8 +204,6 @@ TEST_F(VariablesOfARun, AVarSelectReachesItsIndicesAndSize) {
   EXPECT_EQ(vpi_get(vpiSize, m_ij), 32);
 }
 
-// D8: a variable declared with an initialization expression reaches it
-// through vpiExpr, and one declared without reaches nothing (#7006).
 TEST_F(VariablesOfARun, AVariableReachesItsInitializationExpression) {
   Run("module top; int k = 2; int x = k + 5; int y; endmodule\n");
   vpiHandle init = vpi_handle(vpiExpr, By("top.x"));
@@ -264,8 +213,6 @@ TEST_F(VariablesOfARun, AVariableReachesItsInitializationExpression) {
   EXPECT_EQ(vpi_handle(vpiExpr, By("top.y")), nullptr);
 }
 
-// D11 with §37.26: a packed structure variable is packed and its value is
-// read, where an unpacked one is not packed (#7008).
 TEST_F(VariablesOfARun, APackedStructVariableIsPackedAndHasAValue) {
   Run("typedef struct packed { logic a, b; } s_t;\n"
       "module top; s_t s = 2'b10; struct { int a; } u; endmodule\n");
@@ -279,8 +226,6 @@ TEST_F(VariablesOfARun, APackedStructVariableIsPackedAndHasAValue) {
   EXPECT_EQ(value.value.integer, 2);
 }
 
-// D11: an array var and a class var have no value, so reading either is
-// refused with an error and leaves the value buffer as it was (#7009).
 TEST_F(VariablesOfARun, AnArrayOrClassVariableHasNoValue) {
   Run("module top; class C; endclass int a[4]; C c; endmodule\n");
   for (const char* name : {"top.a", "top.c"}) {
@@ -294,8 +239,6 @@ TEST_F(VariablesOfARun, AnArrayOrClassVariableHasNoValue) {
   }
 }
 
-// D11: having no value, an array var or a class var takes none put to it
-// either, the put being refused with an error (#7851).
 TEST_F(VariablesOfARun, AValuePutToAnArrayOrClassVariableIsRefused) {
   Run("module top; class D; endclass int m[2]; D d; endmodule\n");
   for (const char* name : {"top.m", "top.d"}) {
@@ -313,8 +256,6 @@ TEST_F(VariablesOfARun, AValuePutToAnArrayOrClassVariableIsRefused) {
   }
 }
 
-// D20: a member of a structure and an element of an array are scalars or
-// vectors as a variable of their type is (#7010).
 TEST_F(VariablesOfARun, AMemberOrElementIsAScalarOrAVectorByItsType) {
   Run("module top;\n"
       "  struct { int i1; logic l; logic [3:0] v; } s;\n"
@@ -328,9 +269,6 @@ TEST_F(VariablesOfARun, AMemberOrElementIsAScalarOrAVectorByItsType) {
   EXPECT_EQ(vpi_get(vpiScalar, vpi_handle_by_index(By("top.b"), 1)), 1);
 }
 
-// D25: a non-static data member of a class has no full name, reached through
-// a class object as through its class defn, though vpi_handle_by_name still
-// finds it by one (§37.33 detail 9) (#7012).
 TEST_F(VariablesOfARun, ANonStaticClassDataMemberHasNoFullName) {
   Run("module top;\n"
       "  class Packet; int n; endclass\n"
@@ -347,8 +285,6 @@ TEST_F(VariablesOfARun, ANonStaticClassDataMemberHasNoFullName) {
   EXPECT_EQ(vpi_get_str(vpiFullName, found), nullptr);
 }
 
-// D3 and D28's example: a member of a structure type has members of its own,
-// `str1.inner1.j1`, holding its bits of the outermost structure (#7013).
 TEST_F(VariablesOfARun, ANestedStructureMemberHasMembers) {
   Run("typedef struct { int j1; int j2; } in_t;\n"
       "module top; struct { in_t inner1; int k; } str1;\n"
@@ -362,9 +298,6 @@ TEST_F(VariablesOfARun, ANestedStructureMemberHasMembers) {
   EXPECT_EQ(IntOf(j2), 9);
 }
 
-// D12 and D28's example: a packed member of a structure has a var bit per bit,
-// `str1.vec[5]`, of its packed dimensions or a packed structure's implicit
-// one, each holding its bit of the outermost structure (#7014).
 TEST_F(VariablesOfARun, AStructureMemberHasBits) {
   Run("module top;\n"
       "  struct { logic [7:0] vec; bit [1:0][3:0] pv;\n"
@@ -378,9 +311,6 @@ TEST_F(VariablesOfARun, AStructureMemberHasBits) {
   EXPECT_EQ(IntOf(vpi_handle_by_index(By("top.str1.vec"), 4)), 0);
 }
 
-// D26: an element of an array of structures is a structure variable with a
-// member per field, each reaching the element as its parent and holding its
-// bits of the element (#7015).
 TEST_F(VariablesOfARun, AnElementOfAnArrayOfStructuresHasMembers) {
   Run("typedef struct { logic [7:0] bvec; int n; } s_t;\n"
       "module top; s_t spa[2][3];\n"
@@ -396,8 +326,6 @@ TEST_F(VariablesOfARun, AnElementOfAnArrayOfStructuresHasMembers) {
   EXPECT_EQ(IntOf(bvec), 0x11);
 }
 
-// D28: a variable decompiles to its name with the struct and union vars it is
-// a member of before it, a bit with its index as well (#7016).
 TEST_F(VariablesOfARun, AVariableDecompilesToItsPrefixedName) {
   Run("module top;\n"
       "  struct { struct { int j1; } inner1; logic [3:0] v; } str1; int x;\n"
@@ -410,9 +338,6 @@ TEST_F(VariablesOfARun, AVariableDecompilesToItsPrefixedName) {
       "str1.v[2]");
 }
 
-// D2, D18 and D26: a member of a structure declared with an unpacked dimension
-// is an array var, with an element per index that is a variable of the
-// member's type holding its bits of the structure (#7357).
 TEST_F(VariablesOfARun, AnUnpackedArrayMemberIsAnArrayVar) {
   Run("module top; struct { logic [3:0] a[2]; int n; } s;\n"
       "  initial begin s.a[0] = 4'h3; s.a[1] = 4'h9; end\n"
@@ -429,9 +354,6 @@ TEST_F(VariablesOfARun, AnUnpackedArrayMemberIsAnArrayVar) {
   EXPECT_EQ(IntOf(vpi_handle_by_index(a, 1)), 9);
 }
 
-// D2, D18 and D26: a member of a structure declared with two unpacked
-// dimensions is an array var whose subarrays are array vars of their own, each
-// holding an element per index of the second dimension (#7358).
 TEST_F(VariablesOfARun, AMultidimensionalArrayMemberHasSubarrays) {
   Run("module top; struct { logic [3:0] a[2][3]; } s; endmodule\n");
   vpiHandle a = By("top.s.a");
@@ -450,11 +372,6 @@ TEST_F(VariablesOfARun, AMultidimensionalArrayMemberHasSubarrays) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(row));
 }
 
-// D19 with Table 36-10: a variable a package declares is of the kind its type
-// makes it, as a module's is, through a typedef the package declares (§26.3),
-// an unpacked array of them one array var and of events a named event array;
-// one declared const is a constant variable, and a packed structure is a
-// packed struct var whose value is read whole (§37.26 detail 1) (#8207).
 TEST_F(VariablesOfARun, APackagesVariablesHaveTheKindsTheirTypesMake) {
   Run("interface bus; endinterface\n"
       "package pkg;\n"
@@ -484,8 +401,6 @@ TEST_F(VariablesOfARun, APackagesVariablesHaveTheKindsTheirTypesMake) {
   EXPECT_EQ(IntOf(ps), 5);
 }
 
-// D19: so is one the compilation unit declares (§3.12.1), the unit's scope
-// holding it (#8207).
 TEST_F(VariablesOfARun, TheCompilationUnitsVariablesHaveTheirTypesKinds) {
   Run("int g; real r;\n"
       "module top; endmodule\n");
@@ -495,10 +410,6 @@ TEST_F(VariablesOfARun, TheCompilationUnitsVariablesHaveTheirTypesKinds) {
   EXPECT_EQ(vpi_get(vpiType, Named(vpiVariables, unit, "r")), vpiRealVar);
 }
 
-// D19 with §26.3: a variable declared with a typedef another package
-// declares, written `a::t`, is of the kind `t` stands for whatever declares
-// it: a package, the compilation unit, a task or function of a module or of
-// the unit, or a block, as a module's is (#8209).
 TEST_F(VariablesOfARun, AQualifiedTypedefsVariableHasItsKindWhereverDeclared) {
   Run("package a; typedef int t; endpackage\n"
       "package b; a::t pv; endpackage\n"
@@ -522,9 +433,6 @@ TEST_F(VariablesOfARun, AQualifiedTypedefsVariableHasItsKindWhereverDeclared) {
   EXPECT_EQ(kKindOf(By("top.blk"), "bv"), vpiIntVar);
 }
 
-// D19 with §26.2: a variable a block of a package's task declares with the
-// package's own typedef is of the kind the typedef stands for, as one the
-// task declares at the head of its body is (#8213).
 TEST_F(VariablesOfARun, APackageTasksBlockVariableHasItsTypedefsKind) {
   Run("package pkg;\n"
       "  typedef int t;\n"
@@ -539,10 +447,6 @@ TEST_F(VariablesOfARun, APackageTasksBlockVariableHasItsTypedefsKind) {
       vpiIntVar);
 }
 
-// D19 and D20: a package's variable is signed, a scalar or a vector as its
-// declaration says, an int being signed (§6.11) and a vector, through a
-// typedef the package declares as through the type written out; so is the
-// compilation unit's (#8211).
 TEST_F(VariablesOfARun, APackagesVariablesAreSignedScalarOrVectorAsDeclared) {
   Run("package pkg;\n"
       "  typedef logic [3:0] nib_t;\n"
@@ -570,9 +474,6 @@ TEST_F(VariablesOfARun, APackagesVariablesAreSignedScalarOrVectorAsDeclared) {
   EXPECT_EQ(vpi_get(vpiVector, g), 1);
 }
 
-// D9 and D21: a package's array var reports the kind of array its first
-// unpacked dimension makes it, and a fixed-size one the number of variables
-// along that dimension, a package parameter's value among the bounds (#8212).
 TEST_F(VariablesOfARun, APackagesArrayVarsReportTheirArrayTypeAndSize) {
   Run("package pkg;\n"
       "  parameter int N = 3;\n"
@@ -594,9 +495,6 @@ TEST_F(VariablesOfARun, APackagesArrayVarsReportTheirArrayTypeAndSize) {
   EXPECT_EQ(kOf(vpiArrayType, "pm"), vpiAssocArray);
 }
 
-// §37.17 with §23.4: a variable of an instance of a module declared nested in
-// another's body reaches the typespec of the typedef that declaration declares
-// it with (#8266).
 TEST_F(VariablesOfARun, ANestedModulesVariableReachesItsTypedefsTypespec) {
   Run("module top;\n"
       "  module inner; typedef bit [3:0] nib_t; nib_t v; endmodule\n"

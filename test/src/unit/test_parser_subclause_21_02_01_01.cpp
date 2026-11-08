@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §21.2.1.1 (printed page 656): a string literal argument holding an undefined
-// format specifier is an error. The literal is in the source, so the misuse is
-// reported where the call is parsed, citing the subclause. `%q` printed a note
-// on stderr and then itself, and the run went on.
 TEST(FormatSpecifications, UndefinedSpecifierInADisplayLiteralIsAnError) {
   auto r = Parse(
       "module t;\n"
@@ -23,11 +19,6 @@ TEST(FormatSpecifications, UndefinedSpecifierInADisplayLiteralIsAnError) {
       2, "21.2.1.1"));
 }
 
-// §21.2.1.1: every string literal argument of a display task is a format, as
-// are those of the write, strobe and monitor tasks, their file forms, the
-// $swrite family and the severity tasks (§20.10); $sformat's format is its
-// second argument and $sformatf's its first (§21.3.3). An undefined letter in
-// any of them is an error, uppercase too.
 TEST(FormatSpecifications, UndefinedSpecifierIsAnErrorInEveryFormatTask) {
   for (const char* call :
        {"$display(\"a %0d\", 1, \" %Q\", 2)", "$write(\"%y\", 1)",
@@ -47,11 +38,6 @@ TEST(FormatSpecifications, UndefinedSpecifierIsAnErrorInEveryFormatTask) {
   }
 }
 
-// §21.2.1.2 (printed page 659): the field width between the % and an integer
-// specifier's letter is a non-negative decimal integer constant, and only
-// Table 21-2's real specifiers take C's flags (printed page 658), so `%-3d` is
-// a specifier neither table defines, which §21.2.1.1 makes an error. It was
-// warned about as a malformed field width alone.
 TEST(FormatSpecifications, FlaggedIntegerSpecifierIsAnError) {
   auto r = Parse(
       "module t;\n"
@@ -64,11 +50,6 @@ TEST(FormatSpecifications, FlaggedIntegerSpecifierIsAnError) {
                             3, "21.2.1.1"));
 }
 
-// §21.2.1.1 with Table 21-1 and Table 21-2: each defined specifier in either
-// case, with the field width §21.2.1.2 allows, a real specifier's precision and
-// the C flags a real specifier takes (printed page 658), and `%%`, are all
-// accepted. So are the string literal arguments $sformat does not read as its
-// format, and a `%` ending the literal.
 TEST(FormatSpecifications, DefinedSpecifiersAreAccepted) {
   auto r = Parse(
       "module t;\n"

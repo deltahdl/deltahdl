@@ -122,13 +122,6 @@ TEST(AssignmentPatternParsing, AssignmentPatternKeysPopulated) {
   EXPECT_EQ(rhs->elements.size(), 2u);
 }
 
-// §10.9: Syntax 10-5 writes an array key as `array_pattern_key ::=
-// constant_expression | assignment_pattern_key`, and a constant expression may
-// take as many tokens as it needs. Every other keyed pattern in this file
-// writes each key as one token, where the token and the key are the same thing
-// and a reader that takes exactly one token per key answers rightly. Here they
-// are not the same: taking one token finds `N` where the key is `N-1`, and then
-// a minus sign where a colon was expected.
 TEST(AssignmentPatternParsing, ArrayPatternKeyIsAConstantExpression) {
   auto r = Parse(
       "module m;\n"
@@ -214,8 +207,6 @@ TEST(AssignmentPatternParsing, ErrorReplicationMissingCloseBrace) {
       "    x = '{3{8'd5};\n"
       "  end\n"
       "endmodule\n");
-  // The inner '}' closes the replication under §10.9.1, so the brace the
-  // pattern itself is missing is the one §10.9 asks for at the ';'.
   EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 3, "10.9"));
 }
 
@@ -310,31 +301,6 @@ TEST(AssignmentPatternParsing, PsTypeIdentifierAsExpressionType) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// §10.9 gives the form its own production, `assignment_pattern_expression ::=
-// [ assignment_pattern_expression_type ] assignment_pattern`, whose type is one
-// of `ps_type_identifier`, `ps_parameter_identifier`, `integer_atom_type` or
-// `type_reference`, and the clause puts the whole of it on the left: an
-// assignment pattern used in a left-hand expression has to be positional. So
-// `pair_t'{a, b} = 16'hABCD;` is an assignment whose target carries a type-name
-// prefix, and the clause's own example writes exactly that as a procedural
-// statement.
-//
-// Between `begin` and `end` it was read instead as a §6.8 `data_declaration`
-// opening with the data type `pair_t`, and rejected at the apostrophe with
-// "expected identifier, got '{" and "expected ';', got '{", both citing §6.8.
-// The wrong answer is not visible in the values. Neither rejection consumes the
-// token it names, so the body loop goes on to read the bare `'{a, b} =
-// 16'hABCD;` that the abandoned declaration left standing, and §10.9 requires
-// each member expression to have as many bits as the matching element of the
-// assignment pattern expression's data type, which makes the bare pattern slice
-// the right-hand value exactly as the typed one does. Reading `a` and `b` back
-// therefore passes either way.
-//
-// The shape is what discriminates. A block that parsed this source holds one
-// statement; a block that misparsed it holds two, the fabricated declaration
-// and the recovered assignment behind it, and that recovered assignment has
-// lost the prefix, so its target is a bare pattern where §10.9 asks for a cast
-// over one.
 TEST(AssignmentPatternParsing,
      TypedLhsPatternInsideSequentialBlockIsNotADeclaration) {
   auto r = Parse(
@@ -359,20 +325,6 @@ TEST(AssignmentPatternParsing,
   EXPECT_EQ(stmt->lhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// §10.4.2 gives the nonblocking assignment the same target the blocking one
-// takes: its variable_lvalue is any data type a procedural assignment statement
-// accepts, as §10.4.1 says at Syntax 10-2. §10.9's typed assignment pattern
-// expression is such a target, so both spellings of the operator accept it and
-// both were rejected at the apostrophe with the two §6.8 reports.
-//
-// This is written out rather than folded into the case above because the
-// question is settled by a list that names the two operators separately, so an
-// answer can be given for `=` and withheld from `<=`. Neither operator is what
-// the decision actually turns on: the pattern stands between the type name and
-// whichever operator follows it, so the token that has to be admitted is the
-// `'{`, and admitting it answers for both at once. The same recovery hides the
-// same misparse from the values here, so the assertions are again the statement
-// count and the shape of the target.
 TEST(AssignmentPatternParsing,
      TypedLhsPatternInsideSequentialBlockTakesTheNonblockingOperator) {
   auto r = Parse(
@@ -397,17 +349,6 @@ TEST(AssignmentPatternParsing,
   EXPECT_EQ(stmt->lhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// §10.9 says nothing about which body an assignment pattern expression may be a
-// target in, and a function body is a body like any other, so `pair_t'{a, b} =
-// 16'hABCD;` written straight into one is the same assignment as inside a
-// `begin`-`end` block. The `begin` is deliberately absent: a function body
-// reads its statements from its own loop, and that loop asks the same question
-// about a leading known type name that the sequential block's loop asks. With
-// no block in the source there is no other loop this statement can be reached
-// through, so a source accepted here is one where the question was answered
-// where it is asked rather than in the sequential block alone -- which is what
-// carries the answer to the parallel block, the task body and the randsequence
-// code block, none of which is written out separately.
 TEST(AssignmentPatternParsing, TypedLhsPatternInsideFunctionBody) {
   auto r = Parse(
       "module m;\n"
@@ -428,25 +369,6 @@ TEST(AssignmentPatternParsing, ConstantAssignmentPatternExpressionInParameter) {
               "endmodule\n"));
 }
 
-// §10.9's syntax gives an assignment pattern a positional form and a keyed one
-// that can open with the very same token:
-//
-//   assignment_pattern ::= ' { expression { , expression } }
-//                        | ' { array_pattern_key : expression { ... } }
-//   array_pattern_key  ::= constant_expression | assignment_pattern_key
-//
-// A string literal is a constant expression, so it can be either an item or a
-// key, and only the colon after it settles which. Written without one it is the
-// first `expression` of the positional form, and §10.10.3 writes exactly that:
-//
-//   SQ = '{"element 0", "element 1"};   // assignment pattern, two strings
-//
-// Both positions are checked, and separately, because the two are reached by
-// different routes. Only the first item is the one the colon question hangs
-// over; every later item is read as an expression with nothing to decide. A
-// first item that came out as some other kind of node while the second was a
-// string literal is the signature of the lookahead being resolved by rebuilding
-// the token rather than by re-reading it.
 TEST(AssignmentPatternParsing, StringLiteralFirstItemIsAnExpressionNotAKey) {
   auto r = Parse(
       "module m;\n"
@@ -465,10 +387,6 @@ TEST(AssignmentPatternParsing, StringLiteralFirstItemIsAnExpressionNotAKey) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kStringLiteral);
 }
 
-// The other side of the same decision, so that reading the leading literal as
-// an item cannot be done by forgetting that it may be a key. With a colon after
-// it the literal is an `array_pattern_key` and the value behind the colon is
-// the element, which is how an associative array indexed by string is written.
 TEST(AssignmentPatternParsing, StringLiteralBeforeAColonIsAKey) {
   auto r = Parse(
       "module m;\n"
@@ -483,16 +401,6 @@ TEST(AssignmentPatternParsing, StringLiteralBeforeAColonIsAKey) {
   EXPECT_EQ(rhs->elements[0]->kind, ExprKind::kIntegerLiteral);
 }
 
-// §10.9 closes every assignment pattern with the '}' that Syntax 10-5 writes,
-// whichever of the two element forms the pattern used. A pattern left open is
-// rejected at the token standing where the '}' belongs, and the report names
-// §10.9 rather than the token it wanted.
-//
-// The rejection is written over the closing brace rather than over the ':' that
-// separates a key from its value, because a pattern element is read as an
-// expression first and only a ':' behind it makes what was read a key: the
-// parser reaches the ':' only once it has seen one, so no source makes that
-// call report.
 TEST(AssignmentPattern, MalformedPatternNames10_9) {
   auto r = Parse(
       "module m;\n"
@@ -501,8 +409,6 @@ TEST(AssignmentPattern, MalformedPatternNames10_9) {
   EXPECT_TRUE(ReportedError(r.diags, "expected '}'", 2, "10.9"));
 }
 
-// §10.9, Syntax 10-5: a pattern is positional throughout or keyed throughout,
-// so a keyed element after a positional one is as illegal as the reverse.
 TEST(AssignmentPatternParsing, KeyedElementAfterPositionalRejected) {
   auto r = Parse(
       "module m;\n"
@@ -516,9 +422,6 @@ TEST(AssignmentPatternParsing, KeyedElementAfterPositionalRejected) {
       3, "10.9"));
 }
 
-// §10.9, Syntax 10-5: a pattern's type prefix is a type or parameter name, an
-// integer atom type or a type reference; a keyword such as `logic` names none
-// of these.
 TEST(AssignmentPatternParsing, LogicTypePrefixRejected) {
   auto r = Parse(
       "module m;\n"
@@ -529,12 +432,6 @@ TEST(AssignmentPatternParsing, LogicTypePrefixRejected) {
       r.diags, "'logic' cannot prefix an assignment pattern", 3, "10.9"));
 }
 
-// §10.9: an assignment pattern shall not be written in a port expression of a
-// module declaration, whether it is the whole expression, typed, or an item of
-// the concatenation a port expression may be. The explicitly named ANSI port,
-// which §23.2.2.2 lets bind a pattern, takes an expression and no port
-// expression
-// (AnsiStylePortDeclarations.ExplicitlyNamedAnsiPortAssignmentPattern).
 TEST(AssignmentPatternParsing, PatternInExplicitPortExpressionRejected) {
   auto r = Parse(
       "module m(.p('{a, b}));\n"

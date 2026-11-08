@@ -19,11 +19,8 @@
 namespace delta {
 namespace {
 
-// A design run with a PLI application registered, its array nets read back
-// once the run is over.
 class ArrayNetsOfARun : public VpiDesignRun {
  protected:
-  // The integer value of an object.
   static int IntOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -37,20 +34,16 @@ class ArrayNetsOfARun : public VpiDesignRun {
 constexpr const char* kArrayNet =
     "module top; wire [3:0] n [0:2]; assign n[1] = 4'b1010; endmodule\n";
 
-// §37.16 detail 1: a net declared with an unpacked dimension is an array net.
 TEST_F(ArrayNetsOfARun, ANetWithAnUnpackedDimensionIsAnArrayNet) {
   Run(kArrayNet);
   EXPECT_EQ(vpi_get(vpiType, Array()), vpiNetArray);
 }
 
-// §37.16 detail 24: an array net's vpiSize is the number of nets it holds.
 TEST_F(ArrayNetsOfARun, AnArrayNetsSizeIsTheNumberOfItsNets) {
   Run(kArrayNet);
   EXPECT_EQ(vpi_get(vpiSize, Array()), 3);
 }
 
-// §37.16 detail 2: each net of an array net is an array member, whose
-// vpiParent is the array net.
 TEST_F(ArrayNetsOfARun, EachNetOfAnArrayNetIsAnArrayMember) {
   Run(kArrayNet);
   vpiHandle element = vpi_handle_by_index(Array(), 1);
@@ -60,8 +53,6 @@ TEST_F(ArrayNetsOfARun, EachNetOfAnArrayNetIsAnArrayMember) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(Array()));
 }
 
-// §37.16 (figure): a module reaches its array net through vpiNetArray and no
-// longer meets the array's nets among its own, which the array net reaches.
 TEST_F(ArrayNetsOfARun, TheArrayNetHoldsItsNetsInPlaceOfTheModule) {
   Run(kArrayNet);
   EXPECT_EQ(NamesOf(vpiNetArray, By("top")), std::vector<std::string>{"n"});
@@ -70,8 +61,6 @@ TEST_F(ArrayNetsOfARun, TheArrayNetHoldsItsNetsInPlaceOfTheModule) {
             (std::vector<std::string>{"n[0]", "n[1]", "n[2]"}));
 }
 
-// §37.16 (figure): the net bits are the array's nets', each holding its bit of
-// that net's value; the array net has none of its own.
 TEST_F(ArrayNetsOfARun, TheBitsAreTheArrayNetsNets) {
   Run(kArrayNet);
   vpiHandle element = vpi_handle_by_index(Array(), 1);
@@ -81,14 +70,10 @@ TEST_F(ArrayNetsOfARun, TheBitsAreTheArrayNetsNets) {
   EXPECT_EQ(vpi_iterate(vpiBit, Array()), nullptr);
 }
 
-// A design run with a PLI application registered, its nets' object kinds read
-// back once the run is over.
 class NetKindsOfARun : public VpiDesignRun {
  protected:
   static int KindOf(const char* name) { return vpi_get(vpiType, By(name)); }
 
-  // The kind of the typespec the object `name` reaches, 0 where it reaches
-  // none.
   static int TypespecKindOf(const char* name) {
     vpiHandle typespec = vpi_handle(vpiTypespec, By(name));
     return typespec != nullptr ? vpi_get(vpiType, typespec) : 0;
@@ -106,9 +91,6 @@ constexpr const char* kNetDataTypes =
     "  int_net n; bit_net b;\n"
     "endmodule\n";
 
-// §37.16 detail 3: a logic net has its net bits, a net of a named vector type
-// among them, indexed by the range the type declares. Detail 11: each bit of a
-// net of a nettype is a nettype net select, which vpiDriver is not iterated on.
 TEST_F(NetKindsOfARun, ANamedVectorTypesNetHasItsBits) {
   Run("module top;\n"
       "  typedef logic [3:0] t;\n"
@@ -136,46 +118,35 @@ TEST_F(NetKindsOfARun, ANamedVectorTypesNetHasItsBits) {
   EXPECT_EQ(vpi_iterate(vpiDriver, bit), nullptr);
 }
 
-// §37.16 (figure): a net with no data type of its own, or of logic, is a logic
-// net.
 TEST_F(NetKindsOfARun, ALogicTypedNetIsALogicNet) {
   Run(kNetDataTypes);
   EXPECT_EQ(KindOf("top.w"), vpiNet);
   EXPECT_EQ(KindOf("top.l"), vpiNet);
 }
 
-// §37.16 (figure): an integer net and a time net are the kinds of their types.
 TEST_F(NetKindsOfARun, IntegerAndTimeNetsAreTheirOwnKinds) {
   Run(kNetDataTypes);
   EXPECT_EQ(KindOf("top.i"), vpiIntegerNet);
   EXPECT_EQ(KindOf("top.t"), vpiTimeNet);
 }
 
-// §37.16 (figure): a net of an enum type, named or written in place, is an enum
-// net.
 TEST_F(NetKindsOfARun, AnEnumTypedNetIsAnEnumNet) {
   Run(kNetDataTypes);
   EXPECT_EQ(KindOf("top.e"), vpiEnumNet);
   EXPECT_EQ(KindOf("top.f"), vpiEnumNet);
 }
 
-// §37.16 detail 1: a packed struct net with a packed dimension of its own is a
-// packed array net.
 TEST_F(NetKindsOfARun, APackedStructNetWithADimensionIsAPackedArrayNet) {
   Run(kNetDataTypes);
   EXPECT_EQ(KindOf("top.p"), vpiPackedArrayNet);
 }
 
-// §37.16 (figure) with §6.6.7: a net of a user-defined nettype is the kind of
-// the nettype's data type, a 2-state one among them.
 TEST_F(NetKindsOfARun, ANettypeNetIsTheKindOfItsDataType) {
   Run(kNetDataTypes);
   EXPECT_EQ(KindOf("top.n"), vpiIntNet);
   EXPECT_EQ(KindOf("top.b"), vpiBitNet);
 }
 
-// §37.16 (figure): each net of an array net is the kind of the array's element
-// type.
 TEST_F(NetKindsOfARun, AnArrayNetsNetsAreTheKindOfItsElementType) {
   Run("module top; wire integer n [0:1]; endmodule\n");
   vpiHandle array = By("top.n");
@@ -184,10 +155,6 @@ TEST_F(NetKindsOfARun, AnArrayNetsNetsAreTheKindOfItsElementType) {
             (std::vector<int>{vpiIntegerNet, vpiIntegerNet}));
 }
 
-// §37.16 (figure) and detail 1: the kind of net each data type makes, a
-// dimension of its own turning a struct, union or enum net into a packed array
-// net, and a logic net for a type the figure draws no box of its own for;
-// §37.24: a generic interconnect is an interconnect net.
 TEST(NetKindModel, EachDataTypeMakesItsKindOfNet) {
   const std::vector<std::pair<DataTypeKind, int>> kKinds = {
       {DataTypeKind::kImplicit, vpiNet},
@@ -223,12 +190,8 @@ TEST(NetKindModel, EachDataTypeMakesItsKindOfNet) {
   }
 }
 
-// A design run with a PLI application registered, the ports its nets reach
-// read back once the run is over.
 class NetPortsOfARun : public VpiDesignRun {
  protected:
-  // The one object `ref` reaches through `type`, null unless there is exactly
-  // one.
   static vpiHandle OnlyOf(int type, vpiHandle ref) {
     vpiHandle it = vpi_iterate(type, ref);
     if (it == nullptr) return nullptr;
@@ -236,7 +199,6 @@ class NetPortsOfARun : public VpiDesignRun {
     return vpi_scan(it) == nullptr ? first : nullptr;
   }
 
-  // The bit of the net `name` at `index`.
   static vpiHandle BitOf(const char* name, int index) {
     return vpi_handle_by_index(By(name), index);
   }
@@ -258,14 +220,11 @@ constexpr const char* kNetPorts =
     "  for (genvar i = 0; i < 1; i++) begin : ga leaf l(.z(t2)); end\n"
     "endmodule\n";
 
-// §37.16 detail 6: a whole net reaches through vpiPorts the port of its
-// instance whose lowConn it is.
 TEST_F(NetPortsOfARun, AWholeNetReachesItsPort) {
   Run(kNetPorts);
   EXPECT_EQ(NamesOf(vpiPorts, By("top.u.a")), std::vector<std::string>{"a"});
 }
 
-// §37.16 detail 6: a net bit reaches the port bit whose lowConn it is.
 TEST_F(NetPortsOfARun, ANetBitReachesItsPortBit) {
   Run(kNetPorts);
   vpiHandle bit = BitOf("top.u.a", 2);
@@ -275,8 +234,6 @@ TEST_F(NetPortsOfARun, ANetBitReachesItsPortBit) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, port_bit)), VpiObjectOf(bit));
 }
 
-// §37.16 detail 7: a whole net reaches through vpiPortInst the whole port its
-// net is the highConn of, and a scalar net the scalar port.
 TEST_F(NetPortsOfARun, AWholeOrScalarNetReachesTheInstancePort) {
   Run(kNetPorts);
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.w")), std::vector<std::string>{"a"});
@@ -284,7 +241,6 @@ TEST_F(NetPortsOfARun, AWholeOrScalarNetReachesTheInstancePort) {
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.v")), std::vector<std::string>{"s"});
 }
 
-// §37.16 detail 7: a net bit reaches the port bit it is connected to.
 TEST_F(NetPortsOfARun, ANetBitReachesThePortBitItConnects) {
   Run(kNetPorts);
   vpiHandle port_bit = OnlyOf(vpiPortInst, BitOf("top.w", 1));
@@ -294,9 +250,6 @@ TEST_F(NetPortsOfARun, ANetBitReachesThePortBitItConnects) {
             VpiObjectOf(BitOf("top.u.a", 1)));
 }
 
-// §37.16 detail 7: within a concatenation, a scalar net reaches the port bit
-// its place lands on, and a net one bit of which the concatenation selects
-// reaches the whole port.
 TEST_F(NetPortsOfARun, AConcatenationPlacesEachNet) {
   Run(kNetPorts);
   vpiHandle port_bit = OnlyOf(vpiPortInst, By("top.q"));
@@ -306,16 +259,12 @@ TEST_F(NetPortsOfARun, AConcatenationPlacesEachNet) {
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.p")), std::vector<std::string>{"c"});
 }
 
-// §37.16 detail 8: a net the highConn holds but whose bits all fall beyond the
-// port's is connected to none of them, so its iteration leaves the port out.
 TEST_F(NetPortsOfARun, ANetBeyondThePortReachesNoPort) {
   Run(kNetPorts);
   EXPECT_TRUE(NamesOf(vpiPortInst, By("top.x")).empty());
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.y")), std::vector<std::string>{"d"});
 }
 
-// §37.16 detail 7: a net bit held in a highConn whose bit index cannot be told
-// reaches the whole port.
 TEST_F(NetPortsOfARun, AnUntoldPlaceReachesTheWholePort) {
   Run(kNetPorts);
   EXPECT_EQ(KindsOf(vpiPortInst, BitOf("top.m", 0)), std::vector<int>{vpiPort});
@@ -334,23 +283,17 @@ constexpr const char* kPortNets =
     "  sub u(.a(w), .i(j), .e(), .p(q), .o(r)); body v(.b(c));\n"
     "endmodule\n";
 
-// §37.16 (figure): the net an ANSI port declares has a net bit per bit, as a
-// net its module's body declares has.
 TEST_F(NetKindsOfARun, AnAnsiPortsNetHasItsBits) {
   Run(kPortNets);
   EXPECT_EQ(KindsOf(vpiBit, By("top.u.a")), std::vector<int>(4, vpiNetBit));
 }
 
-// §37.16 (figure) with §23.2.2.1: the net a non-ANSI port's body declares is
-// the port's own, and it has a net bit per bit.
 TEST_F(NetKindsOfARun, ANonAnsiPortsBodyNetHasItsBits) {
   Run(kPortNets);
   EXPECT_EQ(KindOf("top.v.b"), vpiNet);
   EXPECT_EQ(KindsOf(vpiBit, By("top.v.b")), std::vector<int>(2, vpiNetBit));
 }
 
-// §37.16 (figure) and detail 1: the net an ANSI port declares is the kind its
-// data type makes it.
 TEST_F(NetKindsOfARun, AnAnsiPortsNetIsTheKindOfItsDataType) {
   Run(kPortNets);
   EXPECT_EQ(KindOf("top.u.a"), vpiNet);
@@ -359,23 +302,18 @@ TEST_F(NetKindsOfARun, AnAnsiPortsNetIsTheKindOfItsDataType) {
   EXPECT_EQ(KindOf("top.u.p"), vpiPackedArrayNet);
 }
 
-// §37.16 detail 7: a net a select of which the highConn holds, at a place the
-// select leaves untold, reaches the whole port, as an array net does.
 TEST_F(NetPortsOfARun, ASelectedOrArrayNetReachesTheWholePort) {
   Run(kNetPorts);
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.r")), std::vector<std::string>{"g"});
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.arr")), std::vector<std::string>{"h"});
 }
 
-// §37.16 detail 7: the instances a net's module holds in its generate blocks
-// have ports it reaches as well.
 TEST_F(NetPortsOfARun, AnInstanceInAGenerateBlockIsReached) {
   Run(kNetPorts);
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.t")), std::vector<std::string>{"z"});
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.t2")), std::vector<std::string>{"z"});
 }
 
-// §37.16 details 6 and 7: a net or net bit no instance holds reaches no port.
 TEST(NetPortModel, ANetNoInstanceHoldsReachesNoPort) {
   VpiObject net;
   net.type = vpiNet;
@@ -395,9 +333,6 @@ TEST(NetPortModel, ANetNoInstanceHoldsReachesNoPort) {
   }
 }
 
-// §37.16 details 7 and 8: a bit select puts the selected bit at the port's
-// least significant end, so a bit of the net below it reaches none of the
-// port's bits, while the selected bit and the whole net reach the port.
 TEST_F(NetPortsOfARun, ABitBelowASelectReachesNoPort) {
   Run(kNetPorts);
   EXPECT_TRUE(NamesOf(vpiPortInst, BitOf("top.w3", 0)).empty());
@@ -406,9 +341,6 @@ TEST_F(NetPortsOfARun, ABitBelowASelectReachesNoPort) {
   EXPECT_EQ(NamesOf(vpiPortInst, By("top.w3")), std::vector<std::string>{"s2"});
 }
 
-// §37.16 detail 7 with §11.4.12: a net bit reaches the port bit of the place it
-// stands on, whatever order the concatenation holds its vector's bits in
-// (#7378).
 TEST_F(NetPortsOfARun, ABitReachesItsPlaceWhateverOrderItsVectorStandsIn) {
   Run("module sub(input wire [1:0] a); endmodule\n"
       "module top; wire [1:0] y; sub u(.a({y[0], y[1]})); endmodule\n");
@@ -422,11 +354,6 @@ TEST_F(NetPortsOfARun, ABitReachesItsPlaceWhateverOrderItsVectorStandsIn) {
             VpiObjectOf(BitOf("top.u.a", 0)));
 }
 
-// §37.16 (figure): a module's nets are those its body declares and those its
-// ANSI ports declare, a port declaring a net the body declares again counted
-// once; a variable port and an interconnect port declare none of them. A
-// packed dimension is one the port itself wrote, not one of the aggregate its
-// type resolves to.
 TEST(NetKindModel, AModulesNetsAreItsBodysAndItsNetPorts) {
   RtlirModule mod;
   RtlirNet body;
@@ -455,8 +382,6 @@ TEST(NetKindModel, AModulesNetsAreItsBodysAndItsNetPorts) {
   EXPECT_EQ(VpiNetObjectKind(kNets[1]), vpiStructNet);
 }
 
-// §37.16 (figure): the run makes the nets of a one-dimensional array net
-// alone, so a net array of more dimensions has no net keys to name.
 TEST(NetKindModel, AMultidimensionalNetArrayHasNoNetKeys) {
   RtlirNet net;
   net.name = "n";
@@ -465,17 +390,12 @@ TEST(NetKindModel, AMultidimensionalNetArrayHasNoNetKeys) {
   EXPECT_TRUE(VpiDeclaredNetKeys(net, "top").empty());
 }
 
-// §37.16 detail 1: a net array whose bounds run below zero is an array net all
-// the same, though the run makes none of its nets.
 TEST_F(ArrayNetsOfARun, ANetArrayBelowZeroIsAnArrayNet) {
   Run("module top; wire n [-1:0]; endmodule\n");
   EXPECT_EQ(vpi_get(vpiType, Array()), vpiNetArray);
   EXPECT_TRUE(NamesOf(vpiNet, Array()).empty());
 }
 
-// §37.16 (figure): the `net` class inside `nets` groups the concrete net
-// kinds, a user-defined net's among them, and leaves out the net bit, the
-// array net and the interconnect array that stand beside it in `nets`.
 TEST(NetKindModel, TheNetClassGroupsTheConcreteNetKinds) {
   for (int kind : {vpiNet, vpiStructNet, vpiUnionNet, vpiEnumNet, vpiIntegerNet,
                    vpiTimeNet, vpiBitNet, vpiByteNet, vpiShortIntNet, vpiIntNet,
@@ -488,9 +408,6 @@ TEST(NetKindModel, TheNetClassGroupsTheConcreteNetKinds) {
   }
 }
 
-// §37.10 with §37.16: an instance's vpiNet iteration reaches every net it
-// declares of a kind the `net` class groups, an enum, integer and struct net
-// as well as a logic one, and no array net.
 TEST_F(ArrayNetsOfARun, AnInstancesNetIterationReachesEveryNetKind) {
   Run("module top; typedef enum logic [1:0] {A, B} e_t;\n"
       "  typedef struct packed { logic x; } s_t;\n"
@@ -503,16 +420,13 @@ TEST_F(ArrayNetsOfARun, AnInstancesNetIterationReachesEveryNetKind) {
   EXPECT_EQ(vpi_get(vpiType, Named(vpiNet, By("top"), "s")), vpiStructNet);
 }
 
-// A design run whose nets are read back once the run is over.
 class NetRelationsOfARun : public VpiDesignRun {
  protected:
-  // How many of the objects of `type` `ref` reaches are of the kind `kind`.
   static int CountOf(int type, vpiHandle ref, int kind) {
     const std::vector<int> kKinds = KindsOf(type, ref);
     return static_cast<int>(std::ranges::count(kKinds, kind));
   }
 
-  // The bit of the net `name` at `index`.
   static vpiHandle BitOf(const char* name, int index) {
     return vpi_handle_by_index(By(name), index);
   }
@@ -541,10 +455,6 @@ class NetRelationsOfARun : public VpiDesignRun {
       "endmodule\n";
 };
 
-// §37.16 detail 5: a continuous assignment is reached from a scalar net or a
-// bit of a vector net, never from the vector net itself. From a bit, it is
-// each assignment writing or reading that bit, through the whole net, the bit
-// or a part select holding it (#7070).
 TEST_F(NetRelationsOfARun, AnAssignmentIsReachedFromAScalarOrABitAlone) {
   Run("module top; wire [3:0] w; wire s; wire [1:0] t;\n"
       "  assign w = 4'h1;\n"
@@ -561,17 +471,12 @@ TEST_F(NetRelationsOfARun, AnAssignmentIsReachedFromAScalarOrABitAlone) {
             std::vector<int>{vpiContAssign});
 }
 
-// §37.16 detail 5: a bit no vector holds reaches no continuous assignment.
 TEST(NetContAssignModel, ABitNoVectorHoldsReachesNoAssignment) {
   VpiObject bit;
   bit.type = vpiNetBit;
   EXPECT_TRUE(VpiNetContAssigns(&bit).empty());
 }
 
-// §37.16 detail 16: a net's drivers take in the ports driving it from
-// something other than a net or a net bit: an output port whose lower
-// connection is a variable, and an input port whose higher connection is one.
-// A port a net drives through either end is no such driver (#7077).
 TEST_F(NetRelationsOfARun, ADriverIterationReachesAPortAVariableDrives) {
   Run(kPortDesign);
   EXPECT_EQ(CountOf(vpiDriver, By("top.y"), vpiPort), 1);
@@ -579,9 +484,6 @@ TEST_F(NetRelationsOfARun, ADriverIterationReachesAPortAVariableDrives) {
   EXPECT_EQ(CountOf(vpiDriver, By("top.u.c"), vpiPort), 1);
   EXPECT_EQ(CountOf(vpiDriver, By("top.w.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.u.d"), vpiPort), 0);
-  // Nothing, a bit or a select of a net or a concatenation of nets drives the
-  // port as nets do; a select of a variable, a constant, a concatenation
-  // holding a variable or another operation drives it as something else.
   EXPECT_EQ(CountOf(vpiDriver, By("top.n.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.s.c"), vpiPort), 0);
   EXPECT_EQ(CountOf(vpiDriver, By("top.q.c"), vpiPort), 0);
@@ -592,9 +494,6 @@ TEST_F(NetRelationsOfARun, ADriverIterationReachesAPortAVariableDrives) {
   EXPECT_EQ(CountOf(vpiDriver, By("top.h.c"), vpiPort), 0);
 }
 
-// §37.16 detail 17: the local drivers and loads of a net are those its own
-// instance holds, with the ports of that instance it connects to: an input
-// port a driver, an output port a load and an inout port both (#7060).
 TEST_F(NetRelationsOfARun, LocalDriversAndLoadsTakeInTheInstancesOwnPorts) {
   Run(kPortDesign);
   EXPECT_EQ(CountOf(vpiLocalDriver, By("top.w.c"), vpiPort), 1);
@@ -608,28 +507,16 @@ TEST_F(NetRelationsOfARun, LocalDriversAndLoadsTakeInTheInstancesOwnPorts) {
   EXPECT_EQ(CountOf(vpiLocalLoad, By("top.w.io"), vpiPort), 1);
 }
 
-// §37.16 details 4, 16 and 17: vpiDriver and vpiLoad of a net reach across
-// the ports a net drives at both ends, to the drivers and loads of the nets on
-// the far side, while the local relations stop at the instance (#7376).
 TEST_F(NetRelationsOfARun, DriversAndLoadsReachAcrossAPortNetsDrive) {
   Run(kPortDesign);
   EXPECT_EQ(CountOf(vpiDriver, By("top.z"), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiLocalDriver, By("top.z"), vpiContAssign), 0);
   EXPECT_EQ(CountOf(vpiLoad, By("top.x"), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiLocalLoad, By("top.x"), vpiContAssign), 0);
-  // A concatenation of nets joins them to the port's net, an operation joins
-  // none: e reaches q's assignment, and r's, which reads x & e, neither.
   EXPECT_EQ(CountOf(vpiLoad, By("top.e"), vpiContAssign), 1);
-  // An assignment two joined nets both reach is reached once: pr's reads a2
-  // and b2, which g joins.
   EXPECT_EQ(CountOf(vpiLoad, By("top.g"), vpiContAssign), 1);
 }
 
-// §37.16 details 4 and 18: vpiDriver and vpiLoad of a net bit trace that bit
-// alone, to the assignments and forces writing or reading it, whether they
-// name the bit or its whole vector, in its own instance and in each bit a
-// port joins it to at the same place; the local relations stop at the
-// instance (#7377).
 TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsFollowItAcrossAPort) {
   Run("module sub(output [1:0] d, input [1:0] a);\n"
       "  assign d[0] = a[1];\n"
@@ -649,21 +536,15 @@ TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsFollowItAcrossAPort) {
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.z", 1), vpiForce), 1);
   EXPECT_EQ(CountOf(vpiLoad, BitOf("top.y", 0), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiLoad, BitOf("top.y", 1), vpiContAssign), 0);
-  // An assignment to the whole vector drives each of its bits, and a bit a
-  // port joins to one of them adds its own drivers to that bit alone.
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.v", 0), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.v", 1), vpiContAssign), 2);
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.o.d", 0), vpiContAssign), 1);
-  // An assignment reading a vector drives none of its bits.
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.y2", 1), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.y2", 0), vpiContAssign), 0);
   EXPECT_EQ(CountOf(vpiLocalDriver, BitOf("top.u.d", 0), vpiContAssign), 1);
   EXPECT_EQ(CountOf(vpiLocalDriver, BitOf("top.z", 0), vpiContAssign), 0);
 }
 
-// §37.16 details 4 and 18: a primitive terminal connected to a bit of a vector
-// drives or loads that bit and no other, in the bit's own instance and in each
-// bit a port joins it to (#7379).
 TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsTakeThePrimTermsOnIt) {
   Run("module sub(input [1:0] a); wire w; and h(w, a[1], a[0]); endmodule\n"
       "module top; wire [1:0] z; wire a, b, y;\n"
@@ -678,11 +559,6 @@ TEST_F(NetRelationsOfARun, ABitsDriversAndLoadsTakeThePrimTermsOnIt) {
   EXPECT_EQ(CountOf(vpiLocalLoad, BitOf("top.z", 1), vpiPrimTerm), 1);
 }
 
-// §37.16 details 16 and 18: a port bit is a driver of its net bit where what
-// its port's higher connection holds at its place is something other than a
-// net: a variable, a variable within a concatenation, or an operation; a net,
-// or nothing, past the connection's end or with no connection, makes it none
-// (#7380).
 TEST_F(NetRelationsOfARun, ABitsDriversTakeThePortBitsANonNetDrives) {
   Run("module sub(input [1:0] a, input [1:0] b, input [1:0] c,\n"
       "           input [1:0] d, input [1:0] e);\n"
@@ -699,9 +575,6 @@ TEST_F(NetRelationsOfARun, ABitsDriversTakeThePortBitsANonNetDrives) {
   EXPECT_EQ(CountOf(vpiDriver, BitOf("top.u.e", 0), vpiPortBit), 0);
 }
 
-// §37.16 (figure): a net reaches its typespec through vpiTypespec - the
-// typedef's its type names, and otherwise an unnamed one of the kind its data
-// type makes it, logic where the declaration writes no data type (#7062).
 TEST_F(NetKindsOfARun, ANetReachesTheTypespecOfItsType) {
   Run(kNetDataTypes);
   vpiHandle named = vpi_handle(vpiTypespec, By("top.e"));
@@ -713,9 +586,6 @@ TEST_F(NetKindsOfARun, ANetReachesTheTypespecOfItsType) {
   EXPECT_EQ(TypespecKindOf("top.t"), vpiTimeTypespec);
 }
 
-// §37.16 (figure): an array net reaches an array typespec of its unpacked
-// dimension, and the net an ANSI or a non-ANSI port declares the typespec of
-// the type the port declaration wrote (#7062).
 TEST_F(NetKindsOfARun, AnArrayOrPortNetReachesTheTypespecOfItsType) {
   Run("typedef logic [7:0] byte_t;\n"
       "module sub(input byte_t a, input wire [2:0] b); endmodule\n"
@@ -731,10 +601,6 @@ TEST_F(NetKindsOfARun, AnArrayOrPortNetReachesTheTypespecOfItsType) {
   EXPECT_STREQ(vpi_get_str(vpiName, c), "byte_t");
 }
 
-// §37.16 detail 12: vpiNetType of an interconnect net or array is
-// vpiInterconnect - the net or array an interconnect port declares, which no
-// net of the run's stands behind, and a body interconnect a port connects,
-// whose net in the run took the type of the wor net beyond the port (#7071).
 TEST_F(NetKindsOfARun, AnInterconnectsNetTypeIsInterconnect) {
   Run("module leaf(interconnect p, interconnect q [0:1]); endmodule\n"
       "module sink(inout wor r); endmodule\n"

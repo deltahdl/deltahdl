@@ -13,24 +13,8 @@
 
 using namespace delta;
 
-// §22.10: `celldefine and `endcelldefine tag modules as cell modules. The
-// preprocessor recognizes the directives and records which module headers fell
-// inside an open region; the tag itself lands on the module declaration the
-// parser built, as ModuleDecl::is_cell. That flag is the observable form of
-// the tag, so the checks here drive real module source through preprocessing
-// and parsing and read the flag off the resulting declarations.
-//
-// The directives carry no tokens of their own into the token stream, so the
-// parser has no grammar rule for them; what it must show is that a tagged
-// module is otherwise an ordinary module, and that an untagged one stays
-// untagged.
-
 namespace {
 
-// Preprocesses and parses `src`, then hands the collected cell-module names to
-// the production tagging routine. Going through delta::MarkCellModules rather
-// than a copy of the match inside the test keeps what these checks observe on
-// the production path.
 ParseResult ParseAndTagCells(const std::string& src) {
   ParseResult result;
   DiagEngine diag(result.mgr);
@@ -54,9 +38,6 @@ ModuleDecl* FindModule(const ParseResult& result, std::string_view name) {
   return nullptr;
 }
 
-// C1: a module declared between the directives reaches the parser as a cell
-// module, and it is still a fully formed module declaration -- the port count
-// shows the directives contributed no tokens of their own to the stream.
 TEST(CelldefineParsing, ModuleInRegionIsTaggedAsCell) {
   auto result = ParseAndTagCells(
       "`celldefine\n"
@@ -71,8 +52,6 @@ TEST(CelldefineParsing, ModuleInRegionIsTaggedAsCell) {
   EXPECT_EQ(inv->ports.size(), 2u);
 }
 
-// C1: a non-ANSI header takes a different path through the parser than the
-// ANSI one above, and the tag has to land on the declaration either way.
 TEST(CelldefineParsing, NonAnsiPortModuleIsTaggedAsCell) {
   auto result = ParseAndTagCells(
       "`celldefine\n"
@@ -89,9 +68,6 @@ TEST(CelldefineParsing, NonAnsiPortModuleIsTaggedAsCell) {
   EXPECT_TRUE(nonansi->is_cell);
 }
 
-// C2: the two directives are independent, so a `celldefine that is never
-// closed still tags every module that follows it -- the tag does not depend on
-// a matching `endcelldefine arriving later.
 TEST(CelldefineParsing, UnpairedCelldefineStillTagsModules) {
   auto result = ParseAndTagCells(
       "module leading_plain;\n"
@@ -110,8 +86,6 @@ TEST(CelldefineParsing, UnpairedCelldefineStillTagsModules) {
   EXPECT_TRUE(FindModule(result, "last_cell")->is_cell);
 }
 
-// C3/C4: more than one pair may appear, and the nearest preceding directive is
-// what decides each module's tag.
 TEST(CelldefineParsing, MultiplePairsTagOnlyTheirOwnModules) {
   auto result = ParseAndTagCells(
       "`celldefine\n"
@@ -133,9 +107,6 @@ TEST(CelldefineParsing, MultiplePairsTagOnlyTheirOwnModules) {
   EXPECT_TRUE(FindModule(result, "cell_c")->is_cell);
 }
 
-// C5: the directives may sit inside a design element. Placing `endcelldefine
-// in a module body is only discouraged, so the module parses normally, keeps
-// its items, and is still the cell its opening `celldefine made it.
 TEST(CelldefineParsing, DirectiveInsideModuleBodyStillParses) {
   auto result = ParseAndTagCells(
       "`celldefine\n"
@@ -156,8 +127,6 @@ TEST(CelldefineParsing, DirectiveInsideModuleBodyStillParses) {
   EXPECT_FALSE(t->items.empty());
 }
 
-// C6: `resetall carries the `endcelldefine effect, so the module after it is
-// not a cell while the one before it is.
 TEST(CelldefineParsing, ResetallClearsTheCellTag) {
   auto result = ParseAndTagCells(
       "`celldefine\n"

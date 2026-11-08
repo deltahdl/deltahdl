@@ -34,9 +34,6 @@ TEST(SequenceDeclarationPreprocessor, UntypedKeywordSurvives) {
 }
 
 TEST(SequenceDeclarationPreprocessor, EndsequenceLabelSurvives) {
-  // §16.8 sequence_declaration permits an optional trailing label on
-  // `endsequence`; the preprocessor must leave the label tokens intact for
-  // the parser to match against the header name.
   PreprocFixture f;
   auto result = Preprocess(
       "module m;\n"

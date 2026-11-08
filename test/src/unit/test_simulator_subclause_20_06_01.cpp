@@ -86,9 +86,6 @@ TEST(UtilitySystemTaskTest, TypenameNoArgsFallback) {
   EXPECT_EQ(DecodeAsciiBytes(result), "logic");
 }
 
-// Syntax 20-6 second form: $typename ( data_type ). A built-in type keyword
-// resolves to itself. Parsed from real source so the identifier/keyword
-// argument arrives exactly as the parser produces it (kIdentifier "int").
 TEST(UtilitySystemTaskTest, TypenameDataTypeFormBuiltinKeyword) {
   SimFixture f;
   auto* expr = ParseExprFrom("$typename(int)", f);
@@ -96,10 +93,6 @@ TEST(UtilitySystemTaskTest, TypenameDataTypeFormBuiltinKeyword) {
   EXPECT_EQ(DecodeAsciiBytes(result), "int");
 }
 
-// Syntax 20-6 second form with a packed dimension: $typename(logic [7:0])
-// resolves to the keyword with its range rendered as unsized decimal bounds
-// (step g). Parsed from real source so the range-select argument arrives as
-// the parser produces it (kSelect over the "logic" keyword).
 TEST(UtilitySystemTaskTest, TypenameDataTypeFormPackedVector) {
   SimFixture f;
   auto* expr = ParseExprFrom("$typename(logic [7:0])", f);
@@ -107,9 +100,6 @@ TEST(UtilitySystemTaskTest, TypenameDataTypeFormPackedVector) {
   EXPECT_EQ(DecodeAsciiBytes(result), "logic[7:0]");
 }
 
-// Expression form driven end-to-end: the type name of a real vector
-// declaration is reported with its range as an unsized decimal (step g),
-// observed through the full parse/elaborate/lower/run pipeline via $display.
 TEST(UtilitySystemTaskTest, TypenameExpressionFormVectorEndToEnd) {
   SimFixture f;
   std::string out = RunCapture(
@@ -121,9 +111,6 @@ TEST(UtilitySystemTaskTest, TypenameExpressionFormVectorEndToEnd) {
   EXPECT_EQ(out, "logic[7:0]\n");
 }
 
-// The expression argument yields the self-determined type and is never
-// evaluated: the operand carries a runtime value, yet $typename reports the
-// declared 2-state type independent of that value. Driven end-to-end.
 TEST(UtilitySystemTaskTest, TypenameExpressionOperandNotEvaluated) {
   SimFixture f;
   std::string out = RunCapture(
@@ -138,10 +125,6 @@ TEST(UtilitySystemTaskTest, TypenameExpressionOperandNotEvaluated) {
   EXPECT_EQ(out, "bit[3:0]\n");
 }
 
-// §20.6.1 notes that $typename produces a string usable for stricter type
-// comparison than a type reference (relating to the §6.22.1 type-matching
-// process). Built from real declarations: two vectors of the same type yield
-// identical strings, while a differently sized vector yields a distinct one.
 TEST(UtilitySystemTaskTest, TypenameDistinguishesTypesForStringComparison) {
   SimFixture f;
   std::string out = RunCapture(
@@ -159,9 +142,6 @@ TEST(UtilitySystemTaskTest, TypenameDistinguishesTypesForStringComparison) {
   EXPECT_EQ(out, "logic[7:0]\nlogic[7:0]\nlogic[3:0]\n");
 }
 
-// §20.6.1: $typename may stand in a constant expression, so a string parameter
-// or localparam initialized by it holds the type's name and compares equal to
-// it.
 TEST(TypenameSim, AStringParameterInitializedByTypenameHoldsTheName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -175,9 +155,6 @@ TEST(TypenameSim, AStringParameterInitializedByTypenameHoldsTheName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §20.6.1, step a: a typedef name resolves back to the type it names, both
-// alone and as the type of a variable with ranges of its own, here a typedef
-// a package declares that an import makes visible.
 TEST(TypenameSim, ATypedefNameResolvesToTheTypeItNames) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package A;\n"
@@ -195,8 +172,6 @@ TEST(TypenameSim, ATypedefNameResolvesToTheTypeItNames) {
             "bit\nbit[2:0]\n");
 }
 
-// §20.6.1, steps a and g: a variable of a package's typedef of a ranged vector
-// writes the range as declared, its sized bound as an unsized decimal.
 TEST(TypenameSim, APackageTypedefsRangeIsWrittenAsDeclared) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package A;\n"
@@ -211,9 +186,6 @@ TEST(TypenameSim, APackageTypedefsRangeIsWrittenAsDeclared) {
             "bit[9:1]\n");
 }
 
-// §20.6.1, steps c, e and f: an enumeration writes each constant with its
-// value, and its name behind its scope: a system-generated one for the
-// anonymous enumeration of a package's variable, the typedef's for a module's.
 TEST(TypenameSim, AnEnumerationWritesItsConstantsAndScopedName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package A;\n"
@@ -233,8 +205,6 @@ TEST(TypenameSim, AnEnumerationWritesItsConstantsAndScopedName) {
             "enum{RED=32'sd0,GREEN=32'sd5}top.col_t\n");
 }
 
-// §20.6.1, step e: an enumeration declared with a base type writes each
-// constant sized and signed as that type holds it, two unsigned bits here.
 TEST(TypenameSim, AnEnumerationConstantIsSizedByItsBaseType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -246,7 +216,6 @@ TEST(TypenameSim, AnEnumerationConstantIsSizedByItsBaseType) {
             "enum{X=2'd0,Y=2'd3}top.e_t\n");
 }
 
-// §20.6.1: a string variable's type is string.
 TEST(TypenameSim, AStringVariableIsAString) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -257,9 +226,6 @@ TEST(TypenameSim, AStringVariableIsAString) {
             "string\n");
 }
 
-// §20.6.1, steps d and f: a structure writes its members and the typedef's
-// name behind the module; an unpacked array of them appends "$" and its
-// range, and one element of it is the structure again.
 TEST(TypenameSim, AStructureWritesItsMembersAndScopedName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -277,8 +243,6 @@ TEST(TypenameSim, AStructureWritesItsMembersAndScopedName) {
             "struct{bit A;bit B;}top.AB_t\nstruct{bit A;bit B;}top.AB_t\n");
 }
 
-// §20.6.1: inside a method, a property, an element of a queue property and a
-// formal are written by the types they were declared with.
 TEST(TypenameSim, APropertyAndAFormalAreWrittenByTheirDeclaredTypes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"
@@ -298,8 +262,6 @@ TEST(TypenameSim, APropertyAndAFormalAreWrittenByTheirDeclaredTypes) {
             "int bit[7:0] string real\n");
 }
 
-// §20.6.1 with §8.25: a type parameter names the type the specialization
-// binds it to.
 TEST(TypenameSim, ATypeParameterNamesTheTypeItIsBoundTo) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C #(type T = int);\n"
@@ -319,9 +281,6 @@ TEST(TypenameSim, ATypeParameterNamesTheTypeItIsBoundTo) {
             "int\nbit[7:0]\n");
 }
 
-// §20.6.1, step b: only the default signing is removed, so an integer atom
-// type declared unsigned, and `time` or a vector declared signed, keep the
-// keyword, while `int signed` drops it.
 TEST(TypenameSim, ASigningOtherThanTheDefaultIsWritten) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -338,8 +297,6 @@ TEST(TypenameSim, ASigningOtherThanTheDefaultIsWritten) {
             "int unsigned|byte unsigned|time signed|int|bit signed[3:0]\n");
 }
 
-// §20.6.1, step f: a class handle is of its class, named behind the scope
-// declaring it, the compilation unit here.
 TEST(TypenameSim, AClassHandleIsOfItsScopedClass) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class R; endclass\n"
@@ -351,11 +308,6 @@ TEST(TypenameSim, AClassHandleIsOfItsScopedClass) {
             "$unit::R\n");
 }
 
-// §20.6.1 with §11.6.1 and §11.8.1: an expression's type is its
-// self-determined result's. A sum is as wide as its wider operand, a
-// concatenation as its operands together, and a part-select as its range,
-// each unsigned and here 2-state; `logic` alone is what an expression answered
-// before.
 TEST(TypenameSim, AnExpressionIsOfItsSelfDeterminedType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -371,11 +323,6 @@ TEST(TypenameSim, AnExpressionIsOfItsSelfDeterminedType) {
             "bit[7:0]\nbit[11:0]\nbit[3:0]\n");
 }
 
-// §20.6.1 with §11.8.1: a 4-state operand makes the result 4-state, a result
-// is signed only where its operands are, a comparison, a logical negation and
-// a bit-select are one unsigned bit, a shift takes its left operand's type,
-// an indexed part-select is as wide as its width, and a real operand makes the
-// result real (§11.4.11).
 TEST(TypenameSim, AnExpressionTakesItsStateSignAndWidthFromItsOperands) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -402,9 +349,6 @@ TEST(TypenameSim, AnExpressionTakesItsStateSignAndWidthFromItsOperands) {
             "bit[7:0]\nbit[1:0]\nbit\nreal\n");
 }
 
-// §20.6.1 with §7.4.1 and §11.5.1: a select of a packed array names whole
-// elements of its outermost dimension, so `p[1]` is one 8-bit element, `p[2:1]`
-// two of them, and a sum with a 4-bit operand as wide as the element.
 TEST(TypenameSim, ASelectOfAPackedArrayIsOfItsElementsWidth) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -420,8 +364,6 @@ TEST(TypenameSim, ASelectOfAPackedArrayIsOfItsElementsWidth) {
             "logic[7:0]\nlogic[15:0]\nlogic[7:0]\n");
 }
 
-// An operand naming no declaration gives the expression no type to write, and
-// $typename falls back to the answer it gives any argument it cannot type.
 TEST(UtilitySystemTaskTest, TypenameOfAnExpressionOverAnUnknownNameFallsBack) {
   SimFixture f;
   auto* expr = ParseExprFrom("$typename(no_such_var + 1)", f);

@@ -16,25 +16,12 @@ using namespace delta;
 
 namespace {
 
-// §6.23 (printed page 138): the expression a type reference names shall hold
-// no hierarchical reference and no reference to an element of a dynamic
-// object, wherever the type reference stands. A parameter's value (§6.20.2)
-// and a declaration's range (§11.2.1) are constant expressions, which a type
-// reference comparison is and a $bits of one is, and neither rule judges the
-// operand of a type reference by a dot written in it: a member of a structure
-// the module declares is no hierarchical name. The cases below write each form
-// in a body localparam, a body parameter, a header parameter, a packed range
-// and an unpacked range.
-
 constexpr std::string_view kHierarchicalReport =
     "type operator argument uses a hierarchical reference, which the type "
     "operator does not accept";
 constexpr std::string_view kDynamicElementReport =
     "type operator argument shall not reference elements of dynamic objects";
 
-// The declarations every case reads, at lines 1 to 9, so that the line the
-// case writes is line 10: an instance whose member is a hierarchical name, a
-// packed structure, and a dynamic array.
 constexpr const char* kPreamble =
     "module sub;\n"
     "  int q;\n"
@@ -52,8 +39,6 @@ std::string ModuleWriting(std::string_view line) {
   return kPreamble + std::string(line) + "\nendmodule\n";
 }
 
-// Whether the run reported an error under §6.23, or one that calls a name in
-// the source hierarchical, as §6.20.2's and §11.2.1's reports do.
 bool ReportsTheOperand(const std::vector<Diagnostic>& diags) {
   return std::ranges::any_of(diags, [](const Diagnostic& diag) {
     return diag.severity == DiagSeverity::kError &&
@@ -68,8 +53,6 @@ void ExpectReportedAtTheCase(std::string_view line, std::string_view report) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), report, kCaseLine, "6.23"));
 }
 
-// The structure member is neither a hierarchical name by §6.23 nor by §6.20.2
-// or §11.2.1.
 void ExpectStructureMemberAccepted(std::string_view line) {
   ElabFixture f;
   ElaborateSrc(ModuleWriting(line), f);
@@ -106,8 +89,6 @@ TEST(TypeOperatorConstantContexts, StructureMemberInAParameterIsAccepted) {
   ExpectStructureMemberAccepted("  parameter bit P = type(p.g) == type(bit);");
 }
 
-// A header's parameter port list is read before the body declares anything,
-// so the nearest allowed form names a parameter the list declares before it.
 TEST(TypeOperatorConstantContexts,
      HierarchicalNameInAHeaderParameterIsReported) {
   ElabFixture f;
@@ -155,13 +136,6 @@ TEST(TypeOperatorConstantContexts, StructureMemberInAnUnpackedRangeIsAccepted) {
   ExpectStructureMemberAccepted("  int a [$bits(type(p.f))];");
 }
 
-// §6.23 with §23.6: a `.` written on a value selects a member of it or calls a
-// built-in method of it, and names no scope, whatever names the value: an
-// enumeration's named constant (§6.19.3), a parameter (§6.20), a port, an
-// element a select reaches (§7.4), a call's result (§13.4), and a value a
-// package or the compilation unit declares, reached by its scope (§26.3,
-// §3.12.1) or by an import. The declarations every case reads are at lines 1
-// to 23, so that the line the case writes is line 24.
 constexpr const char* kValuePreamble =
     "package pk;\n"
     "  typedef struct packed { bit [7:0] f; bit g; } pst;\n"
@@ -208,9 +182,6 @@ constexpr std::array kValueOperands = {"E1.next()",
                                        "str.tolower().len()",
                                        "sf().g"};
 
-// The places a declaration written with a type reference stands in, each with
-// a `{}` the operand fills: a module's item, a procedural block's item, a
-// subroutine's item and a generate block's item.
 constexpr std::array kDeclarationPlaces = {
     "  var type({}) d;", "  initial begin var type({}) d; end",
     "  function automatic void fd(); var type({}) d; endfunction",
@@ -233,8 +204,6 @@ TEST(TypeOperatorMemberRoots, ADotOnAValueIsNoHierarchicalReference) {
   }
 }
 
-// The nearest forbidden forms: a `.` on an instance, and a name `$root.` heads,
-// which names a scope though a value of the module has the name after it.
 constexpr std::array kScopeOperands = {"s.q", "$root.str.len()"};
 
 TEST(TypeOperatorMemberRoots, ADotOnAScopeIsAHierarchicalReference) {
@@ -249,10 +218,6 @@ TEST(TypeOperatorMemberRoots, ADotOnAScopeIsAHierarchicalReference) {
   }
 }
 
-// §6.21 with §12.7.1 and §13.3: a variable or parameter a block declares, a
-// for loop's variable and a formal of a subroutine are values a `.` after them
-// reaches into, and a block's name hides the instance of the same name for the
-// rest of the block.
 constexpr std::array kLocalRoots = {
     "  initial for (string i = \"a\"; i.len() < 2; i = {i, \"a\"}) begin "
     "var type(i.len()) d; end",
@@ -272,10 +237,6 @@ TEST(TypeOperatorMemberRoots, ADotOnAProceduralValueIsNoHierarchicalReference) {
   }
 }
 
-// §8.5 and §8.6: a `.` on a class handle selects a property or a method of the
-// class, a member of the object rather than an element of it, whether the
-// handle is the module's, a block's or a subroutine's formal, and whether the
-// type reference declares a value or is compared in a parameter's value.
 constexpr std::array kClassHandleRoots = {
     "  hc h;\n  var type(h.x) d;",
     "  hc h;\n  initial begin var type(h.f()) d; end",

@@ -14,8 +14,6 @@ using namespace delta;
 
 namespace {
 
-// §16.12.2: when the strong/weak operator is omitted, a bare sequence_expr is
-// evaluated weakly inside an assert property or assume property statement.
 TEST(SequenceProperty, BareSequenceIsWeakUnderAssertAndAssume) {
   EXPECT_EQ(DefaultSequencePropertyStrength(AssertionKind::kAssert),
             SequencePropertyStrength::kWeak);
@@ -23,8 +21,6 @@ TEST(SequenceProperty, BareSequenceIsWeakUnderAssertAndAssume) {
             SequencePropertyStrength::kWeak);
 }
 
-// §16.12.2: a bare sequence_expr is evaluated strongly inside every other
-// assertion statement (the "otherwise" case, e.g. cover property).
 TEST(SequenceProperty, BareSequenceIsStrongOtherwise) {
   EXPECT_EQ(DefaultSequencePropertyStrength(AssertionKind::kCover),
             SequencePropertyStrength::kStrong);
@@ -32,32 +28,16 @@ TEST(SequenceProperty, BareSequenceIsStrongOtherwise) {
             SequencePropertyStrength::kStrong);
 }
 
-// §16.12.2: strong(sequence_expr) evaluates to true if, and only if, there is a
-// nonempty match of the sequence_expr. Because a single match suffices, this is
-// equivalent to strong(first_match(sequence_expr)).
 TEST(SequenceProperty, StrongHoldsExactlyWhenNonemptyMatchExists) {
-  EXPECT_EQ(EvalStrongSequenceProperty(/*has_nonempty_match=*/true),
-            PropertyResult::kPass);
-  EXPECT_EQ(EvalStrongSequenceProperty(/*has_nonempty_match=*/false),
-            PropertyResult::kFail);
+  EXPECT_EQ(EvalStrongSequenceProperty(true), PropertyResult::kPass);
+  EXPECT_EQ(EvalStrongSequenceProperty(false), PropertyResult::kFail);
 }
 
-// §16.12.2: weak(sequence_expr) evaluates to true if, and only if, no finite
-// prefix witnesses inability to match the sequence_expr. Equivalent to
-// weak(first_match(sequence_expr)).
 TEST(SequenceProperty, WeakFailsOnlyWhenAPrefixWitnessesInability) {
-  EXPECT_EQ(
-      EvalWeakSequenceProperty(/*finite_prefix_witnesses_inability=*/false),
-      PropertyResult::kPass);
-  EXPECT_EQ(
-      EvalWeakSequenceProperty(/*finite_prefix_witnesses_inability=*/true),
-      PropertyResult::kFail);
+  EXPECT_EQ(EvalWeakSequenceProperty(false), PropertyResult::kPass);
+  EXPECT_EQ(EvalWeakSequenceProperty(true), PropertyResult::kFail);
 }
 
-// Return a spread of operand match sets, each given as the clock ticks on which
-// a match of the underlying sequence_expr ends. The empty set is the no-match
-// case; the others cover a single match, several distinct end ticks, and ties
-// on the earliest end tick — the shapes §16.9.8 first_match reduces.
 const std::vector<std::vector<uint32_t>>& OperandMatchSets() {
   static const std::vector<std::vector<uint32_t>> kSets = {
       {}, {7}, {5, 3, 4, 2}, {4, 4, 6}, {3, 3, 3},
@@ -65,13 +45,6 @@ const std::vector<std::vector<uint32_t>>& OperandMatchSets() {
   return kSets;
 }
 
-// §16.12.2: strong(sequence_expr) is equivalent to
-// strong(first_match(sequence_expr)) because a nonempty match of the sequence
-// exists exactly when one exists for its first_match. Rather than assert this
-// by an identity, drive the operand match set through the real §16.9.8
-// first_match reduction (EvalFirstMatch) and confirm the strong verdict is
-// unchanged: strong holds iff the operand had any match, and first_match
-// preserves that existence.
 TEST(SequenceProperty, StrongEqualsStrongOfFirstMatch) {
   for (const auto& match_set : OperandMatchSets()) {
     bool seq_has_match = !match_set.empty();
@@ -81,13 +54,6 @@ TEST(SequenceProperty, StrongEqualsStrongOfFirstMatch) {
   }
 }
 
-// §16.12.2: weak(sequence_expr) is equivalent to
-// weak(first_match(sequence_expr)) because a finite prefix witnesses inability
-// to match the sequence exactly when it does for its first_match. Model the
-// witness as the absence of any match over the observed word, and derive the
-// first_match side through the real EvalFirstMatch reduction: because
-// first_match keeps a match exactly when the operand had one, the two inability
-// observations agree and the weak verdict is the same.
 TEST(SequenceProperty, WeakEqualsWeakOfFirstMatch) {
   for (const auto& match_set : OperandMatchSets()) {
     bool seq_prefix_inability = match_set.empty();
@@ -97,14 +63,6 @@ TEST(SequenceProperty, WeakEqualsWeakOfFirstMatch) {
   }
 }
 
-// --- Live cases: sequential properties over real source ---
-
-// The module the cases share: clk rises at 5, 15, 25 and 35, tick n at
-// 10n - 5, the tick counter counting through; b is high at ticks 2 to 4 and
-// c at 3, so b ##1 c matches from tick 2 alone, the attempt from 1 has no
-// match from its first tick, the one from 3 none from its second, and the
-// one from 4 is still in flight when the run ends; go is high at tick 4
-// alone; `items` declare the assertions, counting in `passes` and `fails`.
 std::string SequencePropertySource(const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -122,10 +80,6 @@ std::string SequencePropertySource(const std::string& items) {
          "endmodule\n";
 }
 
-// §16.12.2: a sequence_expr in an assert is evaluated as weak(sequence_expr),
-// true unless a finite prefix witnesses that the sequence cannot match: the
-// attempt from 2 passes at 3, those from 1 and 3 fail at 1 and 4, and the
-// one from 4, unfinished when the run ends, neither passes nor fails.
 TEST(SequenceProperty, BareSequenceInAssertIsWeak) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -137,10 +91,6 @@ TEST(SequenceProperty, BareSequenceInAssertIsWeak) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
 }
 
-// §16.12.2: strong(sequence_expr) is true if and only if there is a nonempty
-// match, so the attempt from 4, unfinished when the run ends, fails then as
-// well, in the final blocks the run ends with: one pass, two failures at
-// ticks and a third at the end.
 TEST(SequenceProperty, StrongSequenceFailsWhenUnfinishedAtTheEnd) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -155,7 +105,6 @@ TEST(SequenceProperty, StrongSequenceFailsWhenUnfinishedAtTheEnd) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 3u);
 }
 
-// §16.12.2: weak(sequence_expr) written out is the bare form of an assert.
 TEST(SequenceProperty, WeakSequenceWrittenOutIsTheBareForm) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -168,8 +117,6 @@ TEST(SequenceProperty, WeakSequenceWrittenOutIsTheBareForm) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
 }
 
-// §16.12.2: a sequence_expr in a cover is evaluated as strong, the pass
-// statement running once per match: once, at 3.
 TEST(SequenceProperty, BareSequenceInCoverIsStrong) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -180,9 +127,6 @@ TEST(SequenceProperty, BareSequenceInCoverIsStrong) {
   EXPECT_EQ(passes->value.ToUint64(), 1u);
 }
 
-// The count of pass statements run, the final blocks included, by the
-// cover `directive` over the sequence s, b ##1 c on clk, named as its whole
-// spec.
 uint64_t NamedSequenceCoverPasses(const std::string& directive) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -196,22 +140,14 @@ uint64_t NamedSequenceCoverPasses(const std::string& directive) {
   return passes->value.ToUint64();
 }
 
-// §16.12.2: a cover whose spec is the name of a sequence alone evaluates
-// the sequence as strong, as one written in the statement is, so the
-// attempt from 4, unfinished when the run ends, is no success then either:
-// the pass statement runs once, at 3, and not again in the final blocks.
 TEST(SequenceProperty, NamedSequenceInCoverPropertyIsStrong) {
   EXPECT_EQ(NamedSequenceCoverPasses("cover property"), 1u);
 }
 
-// §16.12.2: the same for a cover sequence, whose pass statement runs once
-// per match: the attempt from 4, unfinished when the run ends, is no match.
 TEST(SequenceProperty, NamedSequenceInCoverSequenceIsStrong) {
   EXPECT_EQ(NamedSequenceCoverPasses("cover sequence"), 1u);
 }
 
-// The pass and fail counts of `items`, the final blocks the run ends with
-// included.
 std::pair<uint64_t, uint64_t> CountsAtTheEnd(const std::string& items) {
   SimFixture f;
   auto* passes = RunAndFindVar(SequencePropertySource(items), f, "passes");
@@ -221,12 +157,6 @@ std::pair<uint64_t, uint64_t> CountsAtTheEnd(const std::string& items) {
           f.ctx.FindVariable("fails")->value.ToUint64()};
 }
 
-// §16.12.2 and F.3.4.3.1: a sequence written with no sequence operator is
-// strong in a cover wherever it stands, an operand of a property's or as
-// much as the whole spec. The attempt from 2 passes at 3; the one from 3,
-// its first operand failed at 4 and its second in flight, and the one from
-// 4, both in flight, fail when the run ends, so the pass statement runs
-// once.
 TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInCoverIsStrong) {
   auto counts = CountsAtTheEnd(
       "  cv: cover property (@(posedge clk) (b ##1 c) or (b ##2 c)) "
@@ -234,9 +164,6 @@ TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInCoverIsStrong) {
   EXPECT_EQ(counts.first, 1u);
 }
 
-// §16.12.2: the same property in an assert reads its sequences as weak, so
-// the attempts from 3 and 4 hold when the run ends beside the one from 2,
-// and the one from 1 fails at its tick.
 TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInAssertIsWeak) {
   auto counts = CountsAtTheEnd(
       "  a: assert property (@(posedge clk) (b ##1 c) or (b ##2 c)) "
@@ -245,10 +172,6 @@ TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInAssertIsWeak) {
   EXPECT_EQ(counts.second, 1u);
 }
 
-// §16.12.2's own example: p3, b ##1 c, is strong in the cover of go #-# p3,
-// which is not (go |-> not p3). At 4, go and b hold and no tick follows, so
-// p3 fails when the run ends, the implication holds and the cover does not:
-// the pass statement never runs.
 TEST(SequenceProperty, PlainSequenceOfAPropertyBodyIsStrongInACover) {
   auto counts = CountsAtTheEnd(
       "  property p3; b ##1 c; endproperty\n"
@@ -256,8 +179,6 @@ TEST(SequenceProperty, PlainSequenceOfAPropertyBodyIsStrongInACover) {
   EXPECT_EQ(counts.first, 0u);
 }
 
-// §16.12.2: weak(...) is weak in a cover too, so the attempts from 3 and 4
-// hold when the run ends beside the one from 2.
 TEST(SequenceProperty, WeakSequenceBeneathAnOperatorInCoverIsWeak) {
   auto counts = CountsAtTheEnd(
       "  cv: cover property (@(posedge clk) weak(b ##1 c) or weak(b ##2 c)) "
@@ -265,9 +186,6 @@ TEST(SequenceProperty, WeakSequenceBeneathAnOperatorInCoverIsWeak) {
   EXPECT_EQ(counts.first, 3u);
 }
 
-// §16.12.2: an expect reads a plain sequence as strong, so the attempt the
-// expect reached at 30 begins at 4, is in flight when the run ends and
-// fails then, running the else clause.
 TEST(SequenceProperty, PlainSequenceInExpectIsStrong) {
   auto counts = CountsAtTheEnd(
       "  initial begin #30; expect (@(posedge clk) b ##1 c) passes++; "
@@ -276,9 +194,6 @@ TEST(SequenceProperty, PlainSequenceInExpectIsStrong) {
   EXPECT_EQ(counts.second, 1u);
 }
 
-// §16.12.2: the same in an expect whose property is a property's or: both
-// operands of the attempt from 4 are in flight when the run ends and fail
-// then, running the else clause.
 TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInExpectIsStrong) {
   auto counts = CountsAtTheEnd(
       "  initial begin #30; expect (@(posedge clk) (b ##1 c) or (b ##2 c)) "
@@ -287,8 +202,6 @@ TEST(SequenceProperty, PlainSequenceBeneathAnOperatorInExpectIsStrong) {
   EXPECT_EQ(counts.second, 1u);
 }
 
-// §16.12.2: weak(...) as an expect's whole property is weak, so the same
-// attempt neither passes nor fails when the run ends.
 TEST(SequenceProperty, WeakSequenceInExpectIsWeak) {
   auto counts = CountsAtTheEnd(
       "  initial begin #30; expect (@(posedge clk) weak(b ##1 c)) passes++; "

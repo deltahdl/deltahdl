@@ -16,16 +16,11 @@ namespace delta {
 
 namespace {
 
-// What a callee naming no declared subroutine answers: an implicit result
-// type, which names no type a result could be read as.
 CalleeDeclaration Undeclared() {
   static const DataType kNoResult{};
   return {&kNoResult, nullptr, {}};
 }
 
-// Whether `e` is a name or a chain of member selects down from one, `h` or
-// `d.c`: reading it runs no subroutine, so it can be evaluated to find the
-// object it denotes and evaluated again for the value the method starts from.
 bool IsNamePath(const Expr* e) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier) return true;
@@ -34,8 +29,6 @@ bool IsNamePath(const Expr* e) {
          IsNamePath(e->lhs);
 }
 
-// §13.4 with §8.7: the method `name` of `cls` or of a class it extends, its
-// result resolved in the declaring class.
 CalleeDeclaration MethodDeclaration(const ClassTypeInfo* cls,
                                     std::string_view name) {
   for (const ClassTypeInfo* c = cls; c != nullptr; c = c->parent) {
@@ -46,9 +39,6 @@ CalleeDeclaration MethodDeclaration(const ClassTypeInfo* cls,
   return Undeclared();
 }
 
-// §13.4: a bare callee -- a function of the module, of a package the module
-// imports or the running frame's package (§26.3), or a method of the running
-// method's class named bare (§8.6).
 CalleeDeclaration BareCalleeDeclaration(std::string_view name,
                                         SimContext& ctx) {
   ModuleItem* func = ctx.FindFunction(name);
@@ -60,9 +50,6 @@ CalleeDeclaration BareCalleeDeclaration(std::string_view name,
   return MethodDeclaration(running != nullptr ? running : self->type, name);
 }
 
-// §8.9 and §26.3: `C::m()`, a static method of the class, or `P::f()`, a
-// package's function under the "P::f" key RegisterPackageScopedSubroutines
-// enters it by.
 CalleeDeclaration ScopedCalleeDeclaration(std::string_view scope,
                                           std::string_view name,
                                           SimContext& ctx) {

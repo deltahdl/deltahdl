@@ -24,13 +24,6 @@ struct DataType;
 
 using ScopeMap = std::unordered_map<std::string_view, int64_t>;
 
-// §13.4.3: a constant function call is evaluated at elaboration time. The
-// constant-expression folder cannot see the enclosing scope's function
-// declarations on its own, so the elaborator installs the visible function map
-// for the duration of a scope guard. While the guard is live, ConstEvalInt /
-// ConstEvalReal fold a call to any registered user function (with all-constant
-// arguments) by interpreting its body. The pointer is borrowed; the guard
-// restores whatever registry was previously active on destruction.
 class ConstFuncRegistryGuard {
  public:
   explicit ConstFuncRegistryGuard(
@@ -43,11 +36,6 @@ class ConstFuncRegistryGuard {
   const std::unordered_map<std::string_view, const ModuleItem*>* prev_;
 };
 
-// §13.4.3 ignores the system task calls of a constant function but for the
-// elaboration severity tasks of §20.10.1, which report as written as module
-// items would. The folder knows no diagnostic engine, so the elaborator hands
-// it one, and the arena a message is formatted in, for the duration of a guard
-// (ReportConstFuncSeverity). The guard restores whatever was live before it.
 class ConstFuncSeverityGuard {
  public:
   ConstFuncSeverityGuard(DiagEngine& diag, Arena& arena);
@@ -62,24 +50,9 @@ class ConstFuncSeverityGuard {
   Arena* prev_arena_;
 };
 
-// The function table a live ConstFuncRegistryGuard installed, or null when none
-// is live. §23.9 has the search for a directly referenced identifier climb
-// until it finds an item of that name or meets a module, interface, program or
-// checker boundary, so a scope nested inside another has to install what it
-// found plus its own declarations rather than its own alone. This is what such
-// a site reads to find what it found.
 const std::unordered_map<std::string_view, const ModuleItem*>*
 RegisteredConstFuncs();
 
-// §8.25.1: an explicit specialization used as a scope-resolution prefix in a
-// constant expression (e.g. `localparam W = C#(3)::p`) must fold to the
-// parameter value in that specialization, not the class default. The folder
-// keys parameterized-class access on the "Class.param" name alone and cannot
-// see the parameter port order on its own, so the elaborator installs the
-// visible parameterized-class declarations for the duration of a scope guard.
-// While the guard is live, ConstEvalInt resolves the specialization override
-// (ordered or named) for the accessed value parameter. The pointer is borrowed;
-// the guard restores the previously active registry on destruction.
 class ParamClassRegistryGuard {
  public:
   explicit ParamClassRegistryGuard(
@@ -92,17 +65,6 @@ class ParamClassRegistryGuard {
   const std::unordered_map<std::string_view, const ClassDecl*>* prev_;
 };
 
-// §11.5.1 puts a parameter among the operands a bit-select addresses -- a
-// vector, packed array, packed structure, parameter or concatenation -- and
-// §11.5 does the same for part-selects, so a parameter declared with a packed
-// range is addressed over that range. A folded constant carries no declaration
-// with it and a ScopeMap holds a value and nothing else, so the folder cannot
-// turn an index into a bit position on its own. The elaborator installs the
-// module whose parameter declarations are in scope for the duration of a guard.
-// While the guard is live, a select written on one of those parameters is
-// resolved against the range it was declared with rather than over [width-1:0].
-// The pointer is borrowed; the guard restores the previously active module on
-// destruction.
 class ParamRangeRegistryGuard {
  public:
   explicit ParamRangeRegistryGuard(const RtlirModule* mod);
@@ -115,27 +77,6 @@ class ParamRangeRegistryGuard {
   std::vector<std::string_view> prev_scopes_;
 };
 
-// §20.6.2 has $bits answer the number of bits a data type holds, its own
-// example sizing a structure typedef, and §6.18 lets a typedef name stand for
-// any data type under the scoping rules of a data identifier. A folded
-// constant sees a ScopeMap and the registered module, neither of which holds
-// a typedef, and RtlirDesign::type_widths is filled only once the last module
-// is elaborated, so `localparam int BT = $bits(my_t)` could not be sized
-// while the module's items were. The elaborator installs the typedef table of
-// the scope being elaborated for the duration of a guard, with the names in
-// it that stand for an unpacked aggregate -- a queue, a dynamic, an
-// associative or a fixed-size unpacked array, whose dimensions the table does
-// not carry -- so that such a name is left to the run rather than sized as
-// one element.
-//
-// §6.23 (printed page 138) makes a comparison of two type references a
-// constant expression, true where the types match (§6.22.1), and those types
-// are the scope's as well: a typedef the table holds, or a net or variable of
-// the module being elaborated. The guard installs with the table what answers
-// such a comparison against them, `compare`, which is handed the comparison
-// and the module a live ParamRangeRegistryGuard installed, and answers its
-// value or nothing where it cannot tell an operand's type. The pointers are
-// borrowed; the guard restores the previously active three on destruction.
 using TypeRefComparer =
     std::function<std::optional<int64_t>(const Expr*, const RtlirModule*)>;
 class TypedefRegistryGuard {
@@ -154,24 +95,8 @@ class TypedefRegistryGuard {
   const TypeRefComparer* prev_compare_;
 };
 
-// §6.23 (printed page 138): whether `expr` compares two type references by an
-// equality or a case equality operator, which is a constant expression.
 bool IsTypeRefComparison(const Expr* expr);
 
-// §23.9 lists generate blocks among the elements that open a new scope, so
-// which of the registered module's parameters an expression may name depends on
-// where in that module it stands. ParamRangeRegistryGuard installs the module
-// and nothing more, which is not enough: matching by name alone lets a
-// parameter one block declares answer an expression written anywhere in the
-// module, and refusing every block-local parameter denies a block its own,
-// which §23.9 grants by ruling that an identifier declared locally names the
-// local item.
-//
-// This guard installs the generate block prefixes in force where the expression
-// stands, outermost first, for the readers to hand to ParamVisibleFromScopes.
-// A ParamRangeRegistryGuard clears them when it installs a module, so an
-// expression among a module's own items needs no guard of this kind. The
-// prefixes are borrowed and must outlive the guard.
 class RegisteredGenScopeGuard {
  public:
   explicit RegisteredGenScopeGuard(const std::vector<std::string_view>& scopes);
@@ -183,15 +108,6 @@ class RegisteredGenScopeGuard {
   std::vector<std::string_view> prev_;
 };
 
-// Installs the min:typ:max member the constant folder selects, so that a
-// parameter folded at elaboration and a delay waited out during the run cannot
-// disagree. §11.11 gives a min:typ:max expression three values and says the
-// three let a design be tested with its minimum, typical or maximum delays, so
-// the choice is one setting for a whole run. The folder is a free function
-// reached from about fifty sites that hand it a const Expr* and a const
-// ScopeMap& and nothing else, so the mode is installed for the duration of an
-// elaboration exactly as ConstFuncRegistryGuard installs a function table. The
-// guard restores the previously active mode on destruction.
 class DelayModeGuard {
  public:
   explicit DelayModeGuard(DelayMode mode);
@@ -203,101 +119,36 @@ class DelayModeGuard {
   DelayMode prev_;
 };
 
-// The min:typ:max member a live DelayModeGuard installed, or DelayMode::kTyp
-// when none is live.
 DelayMode ActiveDelayMode();
 
-// §11.11: the one of a min:typ:max expression's three members that stands for
-// it in this run. A min:typ:max value may stand in an expression, anywhere an
-// expression may, and Example 1 reads `(a:b:c) + (d:e:f)` member by member --
-// its minimum is a+d, its typical b+e and its maximum c+f -- so the form is the
-// member the run selects rather than a value composed of the three. What it
-// folds to and how wide it is are the same question asked twice, and both are
-// answered from here.
 const Expr* SelectMinTypMaxMember(const Expr* expr);
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr);
 
 std::optional<int64_t> ConstEvalInt(const Expr* expr, const ScopeMap& scope);
 
-// §6.20.2 (printed pages 126-127) with §11.6.1 (printed 299): the value of a
-// parameter declared with `type` and the initializer `expr`, folded against
-// `scope` as the right-hand side of an assignment to the parameter -- its
-// context-determined operands sized by the declared width and the value cut
-// to it, the cut bits read with the declared type's signedness, where the
-// declaration writes a range or a type, and self-determined where it writes
-// neither and the value sizes the parameter. For a package's
-// or the compilation unit's parameter, whose declaration stands on its
-// ModuleItem alone; a module's has its RtlirParamDecl folded by FoldParamValue
-// (const_eval_internal.h). Defined in const_eval_bits.cpp.
 std::optional<int64_t> FoldDeclaredParamValue(const Expr* expr,
                                               const DataType& type,
                                               const ScopeMap& scope);
 
-// §6.20.2 with §6.11.2: what a parameter of a 4-state `type` given `expr`,
-// which folded to `value`, is worth to a parameter of a 2-state type whose
-// value names it: `expr` folded with each x, z and ? digit that reaches the
-// value in its own place read as the 0 bits a 2-state type keeps, where
-// `value` holds the digits up to the first such digit alone. Empty for a
-// 2-state `type`, where an operator spreads the unknown bits, and where the
-// reading is `value` itself. Defined in const_eval_bits.cpp.
 std::optional<int64_t> TwoStateReading(const Expr* expr, const DataType& type,
                                        const ScopeMap& scope, int64_t value);
 
-// Records `reading`, TwoStateReading's answer for the parameter `name`, in
-// `scope` beside the parameter's value, for a fold under a 2-state type to
-// read in place of it; an empty one erases any reading an outer scope's
-// parameter of the same name left there. Defined in const_eval_bits.cpp.
 void SetTwoStateReading(ScopeMap& scope, std::string_view name,
                         std::optional<int64_t> reading);
 
-// Binds `name` to `value` in `scope` for a declaration that hides any
-// parameter of that name an outer scope holds -- a genvar, an enumeration
-// constant, a local parameter -- and erases the reading SetTwoStateReading
-// recorded for the hidden parameter, which the new name does not carry
-// (§6.20.2 with §6.11.2, §23.9). Defined in const_eval_bits.cpp.
 void BindDeclaredConstant(ScopeMap& scope, std::string_view name,
                           int64_t value);
 
-// The reading SetTwoStateReading recorded in `scope` for the name or
-// qualified key `name`, or empty where it recorded none, so an import can
-// carry it to the name it binds. Defined in const_eval_bits.cpp.
 std::optional<int64_t> RecordedTwoStateReading(const ScopeMap& scope,
                                                std::string_view name);
 
-// The same fold at a width and signedness the caller has found for the
-// declared type itself, as the simulator does from the design's type tables
-// for a typedef name no TypedefRegistryGuard resolves; 0 leaves the value
-// self-determined. Defined in const_eval_bits.cpp.
 std::optional<int64_t> FoldParamValueAtWidth(const Expr* expr,
                                              const ScopeMap& scope,
                                              uint32_t width, bool is_signed);
 
-// The width a parameter declared with `type` is read at, as
-// PopulateParamTypeInfo (elaborator_module_params.cpp) and HasDeclaredWidth
-// (const_eval_bits.cpp) read it off an RtlirParamDecl: a range's, its bounds
-// folded against `scope`, where the declaration writes one -- §6.20.1 and
-// §8.25.1 let the bounds name an earlier parameter -- else the type's, and 0
-// where the declaration writes neither, the value then sizing the parameter
-// (§6.20.2), where a bound does not fold, and for a typedef name, with
-// packed dimensions written on it or without, that the typedef table a
-// TypedefRegistryGuard installs does not hold. Defined in const_eval_bits.cpp.
 uint32_t DeclaredParamTypeWidth(const DataType& type, const ScopeMap& scope);
 
-// §6.20.2 (printed pages 126-127): the width and signedness a value
-// parameter is read at wherever its name stands for its value -- the storage
-// the simulator gives it and the constant bits the synthesizer lowers it to.
-// A parameter declared with a range has the range of its declaration, and one
-// declared with a type and no range is of that type, whatever value either
-// took, so both are read at decl_width with the declaration's sign. One
-// declared with neither, or with a bare `signed`, takes the type and range of
-// its final value -- a logic vector as wide as that value's self-determined
-// width, 13 bits for `parameter p1 = 13'h7e`, 3 for `newconst3 = 3'h4` and at
-// least 32 for the unsized `newconst4 = 4`, the clause's own examples -- which
-// the elaborator records with the value as RtlirParamDecl::value_width and
-// value_is_signed (RecordResolvedHighWords). Where it recorded none, the value
-// not having folded, 32 bits with the declaration's sign, the implied range of
-// an unsized value. Defined in const_eval_bits.cpp.
 struct ParamStorageShape {
   uint32_t width;
   bool is_signed;
@@ -307,44 +158,18 @@ ParamStorageShape ParamStorageShapeOf(const RtlirParamDecl& param);
 std::optional<double> ConstEvalReal(const Expr* expr);
 std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope);
 
-// §6.16: the characters of a constant string expression -- a string literal
-// with its quotes removed and each escape replaced by the one character it
-// stands for, a parameter of the module a live ParamRangeRegistryGuard
-// registered, or a concatenation or replication of those, which Table 6-9
-// defines over string operands. §6.16 lets a string be any length without
-// truncation, which is why the characters are answered separately from the
-// §11.10 packed number ConstEvalStringLiteral computes: that keeps only the low
-// 64 bits, so a value of more than eight characters is no longer recoverable
-// from it.
-//
-// A string literal of no characters answers an empty string rather than
-// std::nullopt, which is what lets §6.16.1 -- str.len() of "" is 0 -- be
-// answered. Empty for every other expression, and for a name the registered
-// module declares no string parameter under.
 std::optional<std::string> ConstEvalString(const Expr* expr);
 
 bool IsConstantExpr(const Expr* expr, const ScopeMap& scope);
 
-// Shared with §13.4.3: the whitelist of system functions admissible inside a
-// constant_expression (§11.2.1) is the same set that a constant function may
-// invoke per §13.4.3 constraint (g).
 bool IsConstantSysFunc(std::string_view name);
 
-// §20.6.2 and §20.7: whether the system function call `call` is a constant
-// expression whatever its arguments are -- $typename, or $bits or an array
-// query on an argument whose dimensions are fixed -- since it answers from
-// the type of what it is called on and reads no value of it.
 bool IsConstantWhateverItsArguments(const Expr* call);
 
-// §5.13 with §7.12, §6.16 and §6.19.5: the member access a built-in method
-// call is written through, `q.size()` or, the parentheses dropped, `q.size`;
-// null for any other expression. Defined in const_eval_builtin_method.cpp.
 const Expr* BuiltinMethodMember(const Expr* expr);
 
 std::string LongestStaticPrefix(const Expr* expr, const ScopeMap& scope = {});
 
-// The longest static prefix of `expr` as the simulator names the object it
-// stands for: each folded index by its 32 bits, so `p[-1]` is "p[4294967295]".
 std::string LongestStaticStorageName(const Expr* expr);
 
 }  // namespace delta

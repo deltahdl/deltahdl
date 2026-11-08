@@ -9,13 +9,7 @@ namespace delta {
 
 class Parser;
 
-// §18.5 (A.1.10): the parse of a constraint block's items in source order
-// into ClassMember::constraint_items, read beside the token scan that fills
-// the block's other tables and leaving the scan where it found it. A friend of
-// Parser, defined in src/parser/parser_constraint_items.cpp.
 struct ParserConstraintItemHelpers {
-  // The items from just past the block's '{' through its '}', into `member`,
-  // or a report under A.1.10 where they do not parse.
   static void Capture(Parser& p, ClassMember* member);
   static void ReportLocalQualifiers(Parser& p);
   static bool ParseItemsToBrace(Parser& p, std::vector<ConstraintItem*>& out,

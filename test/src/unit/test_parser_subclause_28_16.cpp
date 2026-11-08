@@ -8,8 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(NetDelayParsing, NetWithThreeDelayValuesPopulatesAllSlots) {
-  // A wire declaration can carry rise, fall, and turn-off slots; the parser
-  // routes each into its dedicated AST field.
   auto r = Parse(
       "module m;\n"
       "  wire #(3, 5, 9) w;\n"
@@ -55,8 +53,6 @@ TEST(NetDelayParsing, NetWithSingleDelayLeavesFallAndDecayNull) {
 }
 
 TEST(NetDelayParsing, NetWithoutDelaySpecLeavesAllSlotsNull) {
-  // No delay specification on a net leaves every delay slot empty; the
-  // downstream stages then carry zero propagation through this net.
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
@@ -70,9 +66,6 @@ TEST(NetDelayParsing, NetWithoutDelaySpecLeavesAllSlotsNull) {
 }
 
 TEST(NetDelayParsing, NetWithMoreThanThreeDelayValuesIsRejected) {
-  // §28.16 caps a net at three delay values (rise, fall, turn-off). A fourth
-  // value in the delay list is outside the grammar and the parser reports an
-  // error rather than accepting it.
   auto r = Parse(
       "module m;\n"
       "  wire #(1, 2, 3, 4) w;\n"
@@ -81,9 +74,6 @@ TEST(NetDelayParsing, NetWithMoreThanThreeDelayValuesIsRejected) {
 }
 
 TEST(NetDelayParsing, GateWithMoreThanThreeDelayValuesIsRejected) {
-  // §28.16 caps a gate output at three delay values as well. A tristate gate
-  // accepts up to three (rise, fall, turn-off); a fourth value in the list is
-  // rejected by the parser.
   auto r = Parse(
       "module m;\n"
       "  wire y;\n"

@@ -11,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// A source and the line of the report it should draw.
 struct Written {
   const char* src;
   uint32_t line;
@@ -21,7 +20,6 @@ constexpr const char* kUnitNetInit =
     "a net declaration with an implicit continuous assignment cannot stand in "
     "the compilation-unit scope";
 
-// Whether elaborating `src` draws `message` at `line` under `subclause`.
 ::testing::AssertionResult ElabReports(const std::string& src,
                                        const char* message, uint32_t line,
                                        const char* subclause) {
@@ -30,11 +28,6 @@ constexpr const char* kUnitNetInit =
   return ReportedError(f.diag.Diagnostics(), message, line, subclause);
 }
 
-// §3.12.1 (printed page 56) gives the compilation-unit scope the items a
-// package may hold, and §26.2 (printed 807) keeps a net declaration with an
-// implicit continuous assignment out of a package, which holds no process. So
-// the unit holds none either, whatever the net type, the delay or the drive
-// strength written with the assignment.
 TEST(UnitNetDeclarationAssignment, EachNetTypeWithAnAssignment) {
   const char* const kDecls[] = {
       "wire w = 1'b1;",    "tri w = 1'b1;",
@@ -52,8 +45,6 @@ TEST(UnitNetDeclarationAssignment, EachNetTypeWithAnAssignment) {
   }
 }
 
-// A net of a user-defined nettype (§6.6.7) is a net, so its initializer is
-// the same implicit continuous assignment.
 TEST(UnitNetDeclarationAssignment, NettypeNetWithAnAssignment) {
   EXPECT_TRUE(
       ElabReports("nettype logic [3:0] n4;\n"
@@ -62,8 +53,6 @@ TEST(UnitNetDeclarationAssignment, NettypeNetWithAnAssignment) {
                   kUnitNetInit, 2, "3.12.1"));
 }
 
-// Of two nets declared together, the one written with an assignment is
-// reported, and the other is not.
 TEST(UnitNetDeclarationAssignment, OnlyTheAssignedNetOfTwo) {
   ElabFixture f;
   ElabOk(
@@ -75,10 +64,6 @@ TEST(UnitNetDeclarationAssignment, OnlyTheAssignedNetOfTwo) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kUnitNetInit, 1, "3.12.1"));
 }
 
-// The nearest allowed forms: the unit's net without an assignment, the unit's
-// variable with a declaration assignment, which §26.2 lets a package hold, and
-// the net declaration assignment in a module, an interface, a program and a
-// generate block, which hold continuous assignments.
 TEST(UnitNetDeclarationAssignment, TheNearestAllowedForms) {
   EXPECT_TRUE(
       ElabOk("wire w;\n"
@@ -99,11 +84,6 @@ TEST(UnitNetDeclarationAssignment, TheNearestAllowedForms) {
              "endmodule\n"));
 }
 
-// §3.12.1 (printed page 56): a name a module does not declare reaches the
-// net the compilation unit declares before it, so the reference names a net,
-// which §6.5 lets more than one continuous assignment or primitive output
-// drive, whatever its net type, written in a module, an interface, a program
-// or a generate block.
 TEST(UnitNetReference, SeveralDriversOfTheUnitsNet) {
   const char* const kNetTypes[] = {"wire",  "tri",  "wand", "wor",   "triand",
                                    "trior", "tri0", "tri1", "trireg"};
@@ -141,8 +121,6 @@ TEST(UnitNetReference, SeveralDriversOfTheUnitsNet) {
              "endmodule\n"));
 }
 
-// The nearest forms the rule reports: the unit's variable, which a module's
-// two continuous assignments, or two primitive outputs, drive.
 TEST(UnitNetReference, SeveralDriversOfTheUnitsVariable) {
   EXPECT_TRUE(
       ElabReports("logic v;\n"
@@ -164,8 +142,6 @@ TEST(UnitNetReference, SeveralDriversOfTheUnitsVariable) {
       5, "10.3.2"));
 }
 
-// §6.6.2: the unit's uwire takes one driver, so a module's second continuous
-// assignment to it is reported as the uwire's; one assignment is accepted.
 TEST(UnitNetReference, TheUnitsUwire) {
   EXPECT_TRUE(
       ElabReports("uwire w;\n"
@@ -183,10 +159,6 @@ TEST(UnitNetReference, TheUnitsUwire) {
              "endmodule\n"));
 }
 
-// §10.4: a procedural assignment writes a variable, and the unit's net is
-// none, wherever the assignment stands: each kind of procedure of a module, a
-// task and a function, a nonblocking assignment, an interface's and a
-// program's initial procedure, and a module's generate block.
 TEST(UnitNetReference, ProceduralAssignmentToTheUnitsNet) {
   const char* const kMessage = "net 'w' cannot be the target of a procedural";
   const Written kCases[] = {
@@ -266,9 +238,6 @@ TEST(UnitNetReference, ProceduralAssignmentToTheUnitsNet) {
   }
 }
 
-// The nearest allowed forms: the unit's variable written procedurally in each
-// of those places, and a module's own variable or output port of the net's
-// name, which the module's procedure writes rather than the unit's net.
 TEST(UnitNetReference, ProceduralAssignmentToTheUnitsVariable) {
   EXPECT_TRUE(
       ElabOk("logic v;\n"
@@ -304,8 +273,6 @@ TEST(UnitNetReference, ProceduralAssignmentToTheUnitsVariable) {
              "endmodule\n"));
 }
 
-// §10.6.1: a procedural continuous assignment and a deassign take a variable,
-// and the unit's net is none; the unit's variable is accepted.
 TEST(UnitNetReference, AssignAndDeassignOfTheUnitsNet) {
   const char* const kMessage =
       "net 'w' cannot be the target of a procedural assign or deassign";
@@ -331,9 +298,6 @@ TEST(UnitNetReference, AssignAndDeassignOfTheUnitsNet) {
              "endmodule\n"));
 }
 
-// §11.4.14.3: a streaming concatenation written as a continuous assignment's
-// target unpacks into variables, and the unit's net is none; the unit's
-// variable is accepted.
 TEST(UnitNetReference, StreamingTargetNamingTheUnitsNet) {
   EXPECT_TRUE(
       ElabReports("wire [7:0] w;\n"
@@ -350,9 +314,6 @@ TEST(UnitNetReference, StreamingTargetNamingTheUnitsNet) {
              "endmodule\n"));
 }
 
-// §10.6.2: a force may name a constant bit-select of a vector net, and of the
-// unit's net as of the module's own; a select of a variable, the unit's
-// variable among them, and a select of a net by a variable index are reported.
 TEST(UnitNetReference, ForceOfASelectOfTheUnitsNet) {
   EXPECT_TRUE(
       ElabOk("wire [3:0] w;\n"

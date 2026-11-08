@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §17.7.1: a checker holding a non-free variable with a continuous assignment
-// elaborates into a module carrying that variable and that assign.
 TEST(CheckerElab, ElaborateCheckerWithVars) {
   CheckerElabFixture f;
   auto* design = ElaborateSource(
@@ -25,12 +23,6 @@ TEST(CheckerElab, ElaborateCheckerWithVars) {
   EXPECT_FALSE(mod->assigns.empty());
 }
 
-// §17.7.1: a checker variable may be assigned by a blocking procedural
-// assignment. A non-free checker variable driven by a blocking assignment in an
-// always_comb procedure elaborates cleanly, exercising the blocking procedural
-// form of the opening allowance. The continuous form is covered by
-// ElaborateCheckerWithVars and the nonblocking form by
-// AlwaysFfNonblockingAssignmentElaborates below.
 TEST(CheckerVariableAssignment, BlockingAssignmentToCheckerVariableElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -42,11 +34,6 @@ TEST(CheckerVariableAssignment, BlockingAssignmentToCheckerVariableElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.7.1: a checker variable may not be assigned in an initial procedure. A
-// checker variable target of a blocking assignment inside an initial procedure
-// is rejected by the elaborator; the legal counterpart — initializing the same
-// variable in its declaration — is covered by DeclarationInitializerElaborates
-// below.
 TEST(CheckerVariableAssignment, AssignmentToCheckerVariableInInitialRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -61,13 +48,6 @@ TEST(CheckerVariableAssignment, AssignmentToCheckerVariableInInitialRejected) {
       "17.7.1"));
 }
 
-// The tests below drive each enforced §17.7.1 rule through the real
-// parse+elaborate pipeline, observing the production elaborator apply (or not
-// apply) the rule to a checker built from real source.
-
-// §17.7.1: in an always_ff procedure only nonblocking assignments are allowed.
-// A blocking assignment to a checker variable in a checker always_ff procedure
-// is rejected by the elaborator.
 TEST(CheckerVariableAssignment, AlwaysFfBlockingAssignmentRejectedInSource) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,9 +62,6 @@ TEST(CheckerVariableAssignment, AlwaysFfBlockingAssignmentRejectedInSource) {
                             3, "17.7.1"));
 }
 
-// §17.7.1: the accepting side of the always_ff rule — the same procedure using
-// a nonblocking assignment elaborates cleanly, isolating the blocking form as
-// the cause of the rejection above.
 TEST(CheckerVariableAssignment, AlwaysFfNonblockingAssignmentElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,9 +73,6 @@ TEST(CheckerVariableAssignment, AlwaysFfNonblockingAssignmentElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.7.1: referencing a checker variable through its hierarchical name in an
-// assignment (§23.6) is illegal. A module that writes an instantiated checker's
-// variable from a procedural assignment is rejected.
 TEST(CheckerVariableAssignment, HierarchicalWriteOfCheckerVariableRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -110,16 +84,11 @@ TEST(CheckerVariableAssignment, HierarchicalWriteOfCheckerVariableRejected) {
       "  always @(posedge clk) my_check.a = y;\n"
       "endmodule\n",
       f, "m");
-  // The rule the elaborator reports here is §23.6's, which is what forbids the
-  // hierarchical name; §17.7.1 is what makes the write it enables illegal.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "hierarchical reference into a checker is not permitted", 6, "23.6"));
 }
 
-// §17.7.1: the continuous-assignment form of the same rule — reading an
-// instantiated checker's variable through its hierarchical name on the
-// right-hand side of a continuous assignment is likewise illegal.
 TEST(CheckerVariableAssignment, HierarchicalReadOfCheckerVariableRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -132,16 +101,11 @@ TEST(CheckerVariableAssignment, HierarchicalReadOfCheckerVariableRejected) {
       "  assign x = my_check.a;\n"
       "endmodule\n",
       f, "m");
-  // As above, §23.6 is the rule the report names.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "hierarchical reference into a checker is not permitted", 7, "23.6"));
 }
 
-// §17.7.1 marks `wire x = my_check.a;` illegal: a net declaration assignment
-// reading an instantiated checker's variable through its hierarchical name is
-// the same reference as the continuous assignment above, and so is a variable
-// declaration's initializer.
 TEST(CheckerVariableAssignment, HierarchicalReadInADeclarationRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -154,7 +118,6 @@ TEST(CheckerVariableAssignment, HierarchicalReadInADeclarationRejected) {
       "  logic y = my_check.a;\n"
       "endmodule\n",
       f, "m");
-  // As above, §23.6 is the rule the report names.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "hierarchical reference into a checker is not permitted", 6, "23.6"));
@@ -163,10 +126,6 @@ TEST(CheckerVariableAssignment, HierarchicalReadInADeclarationRejected) {
       "hierarchical reference into a checker is not permitted", 7, "23.6"));
 }
 
-// §17.7.1: the left-hand-side position of the same rule — targeting an
-// instantiated checker's variable through its hierarchical name on the
-// left-hand side of a continuous assignment is illegal, a distinct assignment
-// position from the right-hand-side read above.
 TEST(CheckerVariableAssignment,
      HierarchicalContinuousWriteOfCheckerVariableRejected) {
   ElabFixture f;
@@ -179,15 +138,11 @@ TEST(CheckerVariableAssignment,
       "  assign my_check.a = y;\n"
       "endmodule\n",
       f, "m");
-  // As above, §23.6 is the rule the report names.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "hierarchical reference into a checker is not permitted", 6, "23.6"));
 }
 
-// §17.7.1: a continuous assignment to a free (rand) checker variable is
-// illegal. The free variable `x` driven by an `assign` is rejected by the
-// elaborator.
 TEST(CheckerVariableAssignment, ContinuousAssignmentToFreeVariableRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -202,9 +157,6 @@ TEST(CheckerVariableAssignment, ContinuousAssignmentToFreeVariableRejected) {
       "17.7.1"));
 }
 
-// §17.7.1: a blocking procedural assignment to a free (rand) checker variable
-// is illegal. The free variable `x` driven by a blocking assignment in an
-// always_comb procedure — the illegal form the clause names — is rejected.
 TEST(CheckerVariableAssignment, BlockingAssignmentToFreeVariableRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -219,9 +171,6 @@ TEST(CheckerVariableAssignment, BlockingAssignmentToFreeVariableRejected) {
       "17.7.1"));
 }
 
-// §17.7.1: the blocking-assignment prohibition on a free variable holds in any
-// procedure, not only always_comb. A free variable assigned by a blocking
-// assignment inside an always_latch procedure is rejected the same way.
 TEST(CheckerVariableAssignment,
      BlockingAssignmentToFreeVariableInLatchRejected) {
   ElabFixture f;
@@ -237,11 +186,6 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
-// §17.7.1: the accepting side of the free-variable rule — a free checker
-// variable driven by a nonblocking assignment in an always_ff procedure is the
-// one legal form, and elaborates cleanly. This also covers the allowance that
-// the left-hand side of a nonblocking assignment may hold a free checker
-// variable (the toggling `a <= !a` pattern).
 TEST(CheckerVariableAssignment, NonblockingAssignmentToFreeVariableElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -253,9 +197,6 @@ TEST(CheckerVariableAssignment, NonblockingAssignmentToFreeVariableElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.7.1: a checker variable may be initialized in its declaration. The
-// declaration initializer — the legal counterpart to an assignment inside an
-// initial procedure — elaborates cleanly.
 TEST(CheckerVariableAssignment, DeclarationInitializerElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -266,11 +207,6 @@ TEST(CheckerVariableAssignment, DeclarationInitializerElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.7.1: the right-hand side of a checker variable assignment may contain the
-// sequence method triggered (§16.13.6). A checker variable driven by a
-// nonblocking assignment whose right-hand side reads a named sequence's
-// triggered status elaborates cleanly, observing the allowance on real source
-// built from §16.13.6's own syntax.
 TEST(CheckerVariableAssignment, RhsSequenceTriggeredElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -285,28 +221,6 @@ TEST(CheckerVariableAssignment, RhsSequenceTriggeredElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.7.1 bars assigning a checker variable in an initial procedure, allowing
-// only an initializer in its declaration, and names no statement the assignment
-// is allowed to stand in, so every position a statement holds a statement in
-// that a checker initial procedure can reach is one the report reaches.
-// WalkStmtsForCheckerVarAssignInInitial in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out nine of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
-//
-// Of the four links it was missing, two are reachable and are covered below.
-// §17.5 settles which: an initial procedure in a checker body holds nothing but
-// let declarations, the immediate, deferred and concurrent assertions, and
-// procedural timing control statements whose control is an event control. An
-// immediate assertion is on that list and A.6.10 gives
-// `simple_immediate_assert_statement ::= assert ( expression ) action_block`,
-// whose two arms the parser keeps in Stmt::assert_pass_stmt and
-// Stmt::assert_fail_stmt. A randcase (§18.16) and a randsequence (A.6.12) are
-// on neither list, so no conforming checker initial procedure holds one and
-// Stmt::randcase_items and Stmt::rs_productions get no case here.
-
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so the pass arm of the assertion holds the assignment.
 TEST(CheckerVariableAssignment,
      CheckerVarAssignedInAnAssertionPassStatementOfAnInitialRejected) {
   ElabFixture f;
@@ -323,8 +237,6 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, which
-// the pass-arm case above does not reach.
 TEST(CheckerVariableAssignment,
      CheckerVarAssignedInAnAssertionFailStatementOfAnInitialRejected) {
   ElabFixture f;
@@ -341,30 +253,6 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
-// §17.7.1 leaves a free checker variable to the nonblocking assignment alone
-// and names no statement a blocking assignment to one is permitted in, so every
-// position a statement holds a statement in that a checker always procedure can
-// reach is one the report reaches. WalkStmtsForFreeBlockingAssign in
-// src/elaborator/elaborator_validate_hier_refs.cpp had written out eight of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h.
-//
-// Of the five links it was missing, three are reachable and are covered below.
-// §17.5 settles which, listing what a checker always procedure may contain:
-// blocking and nonblocking assignments, selection statements, loop statements,
-// timing event control, subroutine calls, immediate, deferred and concurrent
-// assertions, and let declarations. A loop statement is on that list and A.6.8
-// gives `for_initialization ::= list_of_variable_assignments | ...`; an
-// immediate assertion is on it too, and A.6.10's
-// `simple_immediate_assert_statement ::= assert ( expression ) action_block`
-// with §16.3's `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null` gives it two arms. A randcase (§18.16) and a randsequence
-// (A.6.12) are on neither list, so no conforming checker always procedure holds
-// one and Stmt::randcase_items and Stmt::rs_productions get no case here.
-
-// The assignment the loop header holds, kept in Stmt::for_inits. The step
-// assigns the loop counter, which is an ordinary checker variable and not a
-// free one, so the report can only be about the initializer.
 TEST(CheckerVariableAssignment,
      BlockingAssignmentToFreeVariableInAForInitializerRejected) {
   ElabFixture f;
@@ -383,7 +271,6 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
-// The pass arm of the immediate assertion, kept in Stmt::assert_pass_stmt.
 TEST(CheckerVariableAssignment,
      BlockingAssignmentToFreeVariableInAnAssertionPassStatementRejected) {
   ElabFixture f;
@@ -399,8 +286,6 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(CheckerVariableAssignment,
      BlockingAssignmentToFreeVariableInAnAssertionFailStatementRejected) {
   ElabFixture f;
@@ -416,18 +301,6 @@ TEST(CheckerVariableAssignment,
       "17.7.1"));
 }
 
-// §17.7.1 bars a blocking assignment to a free checker variable, and §23.9
-// decides which declaration the assignment target reaches -- a local
-// declaration is the one used -- listing a begin-end block among the scopes a
-// declaration can be local to. So the `x` assigned below is the block's own
-// `bit x`, the free variable is not written at all, and nothing is illegal
-// here.
-//
-// The rule resolved nothing: it matched the leftmost component of the target
-// against the set of free variable names, so this legal source was refused. The
-// local carries the free variable's name deliberately; one named anything else
-// cannot fail. The procedure is always_comb because a blocking assignment in an
-// always_ff is separately illegal under §17.5.
 TEST(CheckerVariableAssignment,
      ABlockLocalOfAFreeVariableNameIsNotAFreeVariableAssignment) {
   ElabFixture f;
@@ -444,13 +317,6 @@ TEST(CheckerVariableAssignment,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The true positive beside the case above: the same procedure with the
-// shadowing declaration taken out, so the target reaches the free variable and
-// §17.7.1's ban on continuous and blocking procedural assignments to free
-// checker variables applies. A fix that silenced the rule wherever the
-// assignment stood inside a block would pass the case above and fail this one.
-// BlockingAssignmentToFreeVariableRejected above covers the same rule over a
-// procedure whose body is the assignment itself, with no block between them.
 TEST(CheckerVariableAssignment,
      ABlockingAssignmentToAFreeVariableWithNoShadowingDeclarationIsReported) {
   ElabFixture f;

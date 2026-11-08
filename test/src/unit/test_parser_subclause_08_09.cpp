@@ -122,9 +122,6 @@ TEST(ClassObjectParsing, StaticPropertyWriteViaScope) {
       "endmodule\n");
 }
 
-// §8.9 C1 admits the static qualifier on a property of any data type (§8.5).
-// A packed-vector declarator exercises a different parse path (packed
-// dimensions) than the scalar forms above; the qualifier is still recorded.
 TEST(ClassObjectParsing, StaticPackedVectorProperty) {
   auto r = Parse(
       "class C;\n"
@@ -138,8 +135,6 @@ TEST(ClassObjectParsing, StaticPackedVectorProperty) {
   EXPECT_EQ(cls->members[0]->name, "flags");
 }
 
-// §8.9 C1 with a real-typed property: the real keyword is a distinct parse
-// path from the integral forms, and the static qualifier is still recorded.
 TEST(ClassObjectParsing, StaticRealProperty) {
   auto r = Parse(
       "class C;\n"

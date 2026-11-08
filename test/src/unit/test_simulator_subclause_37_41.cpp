@@ -17,30 +17,6 @@
 namespace delta {
 namespace {
 
-// §37.41 Task and function declaration: the object model diagram draws a "task
-// func" object with "function" and "task" specializations. A function reaches
-// its return-capture variable through vpiReturn and carries vpiSigned/vpiSize/
-// vpiFuncType; the shared "task func" carries vpiMethod, vpiAccessType,
-// vpiVisibility, vpiVirtual, vpiAutomatic, and the DPI properties vpiDPIPure,
-// vpiDPIContext, vpiDPICStr, and vpiDPICIdentifier. The structural edges
-// (vpiLeftRange/vpiRightRange, io decl, func/task call, class defn, vpiParent)
-// are descriptive or generic; the lifetime property vpiAutomatic belongs to
-// §37.3.7 and vpiVirtual is reported generically. The figure's vpiMethod and
-// vpiSigned carry no numbered detail of their own but are Booleans §37.4.2
-// reads with vpi_get(), so they are pinned below alongside the details. These
-// tests pin the twelve numbered Details that constrain the model:
-//   1-3) vpiReturn reaches a return-capture variable, always a var, that also
-//        carries a user-defined return type for inspection;
-//   4)   vpiVisibility falls back to vpiPublicVis;
-//   5)   a tf inside a package or class is named with a "::" qualifier;
-//   6-10) the DPI access type, pure, context, flavor, and C-identifier rules;
-//   12)  vpiSize of a function tracks its vpiReturn variable, or 0 for void.
-// Detail 11 (lifetime/memory allocation) is deferred to §37.3.7. The rules run
-// through the production dispatch in vpi.cpp (vpi_handle/vpi_get/vpi_get_str)
-// and the pure helpers it exposes.
-
-// The fixture installs a context so the public vpi_get/vpi_get_str/vpi_handle
-// entry points run their real dispatch.
 class TaskFuncDeclaration : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -48,39 +24,25 @@ class TaskFuncDeclaration : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Details 1, 2, and 3: a function contains a return-capture object that shares
-// its name, size, and type, and vpiReturn always reaches that var object - even
-// for a plain scalar return. Details 1-3 collapse to one production branch: the
-// relation hands back exactly the return variable. Reading vpiType off the
-// reached handle is how a caller inspects the return type, including a
-// user-defined one (detail 2); the rule §37.41 carries is that vpiReturn
-// reaches the variable, which this exercises directly.
 TEST_F(TaskFuncDeclaration, FunctionReturnReachesReturnCaptureVariable) {
   VpiObject ret;
-  ret.type = vpiIntVar;  // detail 3: a var object, even for a simple return
+  ret.type = vpiIntVar;
   ret.name = "adder";
   ret.size = 32;
 
   VpiObject fn;
   fn.type = vpiFunction;
-  fn.name = "adder";  // detail 1: same name as the function
-  fn.size = 32;       // detail 1: same size as the function
+  fn.name = "adder";
+  fn.size = 32;
   fn.return_var = &ret;
 
   vpiHandle reached = vpi_handle(vpiReturn, VpiHandleOf(&fn));
   ASSERT_EQ(VpiObjectOf(reached), &ret);
-  // Detail 3: the reached object is a variable; detail 2: its type is readable
-  // off the handle, which is how a user-defined return type is inspected.
   EXPECT_EQ(vpi_get(vpiType, reached), vpiIntVar);
-  // Detail 1: it mirrors the function's name and size.
   EXPECT_EQ(std::string(vpi_get_str(vpiFullName, reached)), "adder");
   EXPECT_EQ(vpi_get(vpiSize, reached), 32);
 }
 
-// The vpiReturn relation is gated to a function reference. A task returns
-// nothing, so even a stray return variable on a task is not reached; and
-// because vpiReturn shares its constant value with vpiImmediateAssume, the gate
-// keeps that other meaning from ever landing on this path.
 TEST_F(TaskFuncDeclaration, ReturnRelationIsGatedToFunctions) {
   VpiObject ret;
   ret.type = vpiIntVar;
@@ -91,26 +53,13 @@ TEST_F(TaskFuncDeclaration, ReturnRelationIsGatedToFunctions) {
   EXPECT_EQ(vpi_handle(vpiReturn, VpiHandleOf(&task)), nullptr);
 }
 
-// Detail 4: a task or function that is not a class member reports vpiPublicVis;
-// a method reports its declared visibility, and a method that is neither local
-// nor protected also reports vpiPublicVis.
 TEST_F(TaskFuncDeclaration, VisibilityFallsBackToPublic) {
-  // Not a class member -> public regardless of any declared value.
-  EXPECT_EQ(VpiTaskFuncVisibility(/*is_class_member=*/false, vpiLocalVis),
-            vpiPublicVis);
-  // A local or protected method reports that declared visibility verbatim.
-  EXPECT_EQ(VpiTaskFuncVisibility(/*is_class_member=*/true, vpiLocalVis),
-            vpiLocalVis);
-  EXPECT_EQ(VpiTaskFuncVisibility(/*is_class_member=*/true, vpiProtectedVis),
-            vpiProtectedVis);
-  // A member that is neither local nor protected reports public.
-  EXPECT_EQ(VpiTaskFuncVisibility(/*is_class_member=*/true, vpiPublicVis),
-            vpiPublicVis);
+  EXPECT_EQ(VpiTaskFuncVisibility(false, vpiLocalVis), vpiPublicVis);
+  EXPECT_EQ(VpiTaskFuncVisibility(true, vpiLocalVis), vpiLocalVis);
+  EXPECT_EQ(VpiTaskFuncVisibility(true, vpiProtectedVis), vpiProtectedVis);
+  EXPECT_EQ(VpiTaskFuncVisibility(true, vpiPublicVis), vpiPublicVis);
 }
 
-// Detail 5: a task or function declared inside a package or class is named with
-// the enclosing scope's full name, the "::" separator, then the tf name. The
-// qualified name flows through vpi_get_str(vpiFullName) for a function object.
 TEST_F(TaskFuncDeclaration, FullNameQualifiedByPackageOrClass) {
   VpiObject pkg_fn;
   pkg_fn.type = vpiFunction;
@@ -122,14 +71,11 @@ TEST_F(TaskFuncDeclaration, FullNameQualifiedByPackageOrClass) {
   VpiObject class_fn;
   class_fn.type = vpiFunction;
   class_fn.name = "run";
-  class_fn.full_name =
-      VpiClassMemberFullName(/*is_static=*/true, "top", "Driver", "run");
+  class_fn.full_name = VpiClassMemberFullName(true, "top", "Driver", "run");
   EXPECT_EQ(std::string(vpi_get_str(vpiFullName, VpiHandleOf(&class_fn))),
             "top.Driver::run");
 }
 
-// Detail 6: a DPI task or function reports vpiDPIExportAcc when it is an export
-// and vpiDPIImportAcc when it is an import; a non-DPI tf is outside this rule.
 TEST_F(TaskFuncDeclaration, DpiAccessTypeReportsImportAndExport) {
   VpiObject import_fn;
   import_fn.type = vpiFunction;
@@ -143,14 +89,11 @@ TEST_F(TaskFuncDeclaration, DpiAccessTypeReportsImportAndExport) {
   export_task.dpi_export = true;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&export_task)), vpiDPIExportAcc);
 
-  // A plain function is not a DPI tf, so it falls through to its stored value.
   VpiObject plain_fn;
   plain_fn.type = vpiFunction;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&plain_fn)), 0);
 }
 
-// Detail 7: vpiDPIPure reports TRUE for a pure DPI import function and FALSE
-// otherwise.
 TEST_F(TaskFuncDeclaration, DpiPureReportedForPureImportFunction) {
   VpiObject pure_fn;
   pure_fn.type = vpiFunction;
@@ -164,8 +107,6 @@ TEST_F(TaskFuncDeclaration, DpiPureReportedForPureImportFunction) {
   EXPECT_EQ(vpi_get(vpiDPIPure, VpiHandleOf(&impure_fn)), 0);
 }
 
-// Detail 8: vpiDPIContext reports TRUE for a context import DPI task or
-// function and FALSE otherwise.
 TEST_F(TaskFuncDeclaration, DpiContextReportedForContextImport) {
   VpiObject ctx_fn;
   ctx_fn.type = vpiFunction;
@@ -179,8 +120,6 @@ TEST_F(TaskFuncDeclaration, DpiContextReportedForContextImport) {
   EXPECT_EQ(vpi_get(vpiDPIContext, VpiHandleOf(&plain_fn)), 0);
 }
 
-// Detail 9: vpiDPICStr reports vpiDPIC for a "DPI-C" tf and vpiDPI for a "DPI"
-// tf; a tf that is not a DPI tf carries no flavor.
 TEST_F(TaskFuncDeclaration, DpiCStrDistinguishesDpiAndDpiC) {
   VpiObject dpi_c;
   dpi_c.type = vpiFunction;
@@ -199,8 +138,6 @@ TEST_F(TaskFuncDeclaration, DpiCStrDistinguishesDpiAndDpiC) {
   EXPECT_EQ(vpi_get(vpiDPICStr, VpiHandleOf(&not_dpi)), 0);
 }
 
-// Detail 10: vpiDPICIdentifier reports the C linkage name of a DPI tf, and null
-// when the object carries none.
 TEST_F(TaskFuncDeclaration, DpiCIdentifierReportsCLinkageName) {
   VpiObject fn;
   fn.type = vpiFunction;
@@ -214,29 +151,12 @@ TEST_F(TaskFuncDeclaration, DpiCIdentifierReportsCLinkageName) {
   EXPECT_EQ(vpi_get_str(vpiDPICIdentifier, VpiHandleOf(&no_id)), nullptr);
 }
 
-// Detail 12: vpiSize of a function equals the vpiSize of its return variable
-// when that size is defined and determinable without evaluating the function; a
-// void function reports 0; every other case is undefined (reported here as 0).
 TEST_F(TaskFuncDeclaration, FunctionSizeTracksReturnVariableOrZeroForVoid) {
-  // Defined and determinable -> the return variable's size.
-  EXPECT_EQ(VpiFunctionSize(/*is_void_function=*/false,
-                            /*return_size_defined=*/true, 16),
-            16);
-  // A void function -> 0.
-  EXPECT_EQ(VpiFunctionSize(/*is_void_function=*/true,
-                            /*return_size_defined=*/true, 16),
-            0);
-  // Not determinable without evaluating -> undefined, reported as 0.
-  EXPECT_EQ(VpiFunctionSize(/*is_void_function=*/false,
-                            /*return_size_defined=*/false, 16),
-            0);
+  EXPECT_EQ(VpiFunctionSize(false, true, 16), 16);
+  EXPECT_EQ(VpiFunctionSize(true, true, 16), 0);
+  EXPECT_EQ(VpiFunctionSize(false, false, 16), 0);
 }
 
-// The figure's "-> method / bool: vpiMethod" on the task func enclosure. Detail
-// 4 says what a method is - a task or function that is a class member - and
-// §37.31 detail 1 draws a class defn's vpiMethods relation to that enclosure.
-// No case answered the property, so the figure's Boolean read nothing whatever
-// the task or function was.
 TEST_F(TaskFuncDeclaration, MethodIsTrueForATaskOrFunctionOfAClass) {
   VpiObject cls;
   cls.type = vpiClassDefn;
@@ -252,8 +172,6 @@ TEST_F(TaskFuncDeclaration, MethodIsTrueForATaskOrFunctionOfAClass) {
   EXPECT_EQ(vpi_get(vpiMethod, VpiHandleOf(&task_method)), 1);
 }
 
-// The same property on a task or function declared outside a class, and on an
-// object that is not a task or function at all: neither is a method.
 TEST_F(TaskFuncDeclaration, MethodIsFalseOutsideAClass) {
   VpiObject module;
   module.type = vpiModule;
@@ -266,11 +184,6 @@ TEST_F(TaskFuncDeclaration, MethodIsFalseOutsideAClass) {
   EXPECT_EQ(vpi_get(vpiMethod, VpiHandleOf(&module)), 0);
 }
 
-// The figure's "-> sign / bool: vpiSigned" on the function. Detail 1 makes the
-// function's return object share its type and detail 2 reaches it through
-// vpiReturn, so the property is that object's signedness: §6.11 makes integer
-// and the sized integral kinds signed and leaves the 4-state vector kinds
-// unsigned.
 TEST_F(TaskFuncDeclaration, SignedFollowsTheReturnVariablesType) {
   VpiObject signed_ret;
   signed_ret.type = vpiIntVar;
@@ -288,24 +201,18 @@ TEST_F(TaskFuncDeclaration, SignedFollowsTheReturnVariablesType) {
   EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&unsigned_fn)), 0);
 }
 
-// A task returns nothing, so it has no return object to take a sign from, and
-// neither has a void function (detail 12's vpiSize-0 case).
 TEST_F(TaskFuncDeclaration, SignedIsFalseWithoutAReturnVariable) {
   VpiObject task;
   task.type = vpiTask;
   VpiObject void_fn;
-  void_fn.type = vpiFunction;  // no return_var: a void function
+  void_fn.type = vpiFunction;
 
   EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&task)), 0);
   EXPECT_EQ(vpi_get(vpiSigned, VpiHandleOf(&void_fn)), 0);
 }
 
-// A design run with a PLI application registered, whose tasks and functions
-// are read back from the model the run built.
 class TaskFuncsOfARun : public VpiDesignRun {};
 
-// The integer a bound `relation`, vpiLeftRange or vpiRightRange, of `obj`
-// reaches.
 int BoundOf(int relation, vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -313,8 +220,6 @@ int BoundOf(int relation, vpiHandle obj) {
   return value.value.integer;
 }
 
-// §37.41 (#4939): each task and function a module declares is a task or
-// function of each of its instances, full-named under the instance...
 TEST_F(TaskFuncsOfARun, AModuleDeclaresItsTasksAndFunctions) {
   Run("module top; function int f(); return 1; endfunction\n"
       "  task t(); endtask endmodule\n");
@@ -326,7 +231,6 @@ TEST_F(TaskFuncsOfARun, AModuleDeclaresItsTasksAndFunctions) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, f), "top.f");
 }
 
-// ...a package's is full-named through the package (detail 5)...
 TEST_F(TaskFuncsOfARun, APackageSubroutineIsFullNamedThroughItsPackage) {
   Run("package pkg; function int g(); return 1; endfunction endpackage\n"
       "module top; endmodule\n");
@@ -335,8 +239,6 @@ TEST_F(TaskFuncsOfARun, APackageSubroutineIsFullNamedThroughItsPackage) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, g), "pkg::g");
 }
 
-// ...and each reports its lifetime (detail 11), static unless declared
-// automatic or declared in a scope whose default lifetime is automatic.
 TEST_F(TaskFuncsOfARun, ASubroutineReportsItsLifetime) {
   Run("module top; function automatic int a(); return 1; endfunction\n"
       "  function int s(); return 1; endfunction endmodule\n"
@@ -348,10 +250,6 @@ TEST_F(TaskFuncsOfARun, ASubroutineReportsItsLifetime) {
   EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiTaskFunc, By("pkg"), "k")), 0);
 }
 
-// The figure's io decl relation (#5048): a task reaches an io decl per
-// argument it declares, each with the direction written or the one the
-// argument before it carries (§13.3), and reaching through vpiExpr the
-// variable the argument declares in the task's scope (§37.13).
 TEST_F(TaskFuncsOfARun, AnArgumentIsAnIoDeclOfItsTask) {
   Run("module top; task automatic t(input int a, output logic [3:0] b, c,\n"
       "  ref int d); endtask endmodule\n");
@@ -368,10 +266,6 @@ TEST_F(TaskFuncsOfARun, AnArgumentIsAnIoDeclOfItsTask) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, b), "top.t.b");
 }
 
-// Details 1 to 3 and 12 (#5049): a function holds its return in a variable
-// of its own name and type, reached through vpiReturn, whose size is the
-// function's, and the figure's vpiFuncType says what kind of value it
-// returns...
 TEST_F(TaskFuncsOfARun, AFunctionReturnsThroughAVariableOfItsOwnName) {
   Run("module top; function logic [7:0] f(); return 0; endfunction\n"
       "  function logic signed [3:0] s(); return 0; endfunction\n"
@@ -392,9 +286,6 @@ TEST_F(TaskFuncsOfARun, AFunctionReturnsThroughAVariableOfItsOwnName) {
   EXPECT_EQ(vpi_get(vpiSize, i), 32);
 }
 
-// The figure's vpiLeftRange and vpiRightRange: a function reaches the bounds
-// of the packed range its return type declares, as written, and none where
-// the type declares no range.
 TEST_F(TaskFuncsOfARun, AFunctionReachesTheBoundsOfItsReturnRange) {
   Run("module top; function logic [7:0] f(); return 0; endfunction\n"
       "  function logic [0:3] g(); return 0; endfunction\n"
@@ -411,10 +302,6 @@ TEST_F(TaskFuncsOfARun, AFunctionReachesTheBoundsOfItsReturnRange) {
   EXPECT_EQ(vpi_handle(vpiRightRange, h), nullptr);
 }
 
-// §37.17 details 4 and 6 (#5056): the return variable, an argument's variable
-// and a body's variable each reach the bounds of their leftmost dimension, an
-// unpacked one before a packed one, and a range object per dimension; a
-// variable whose type writes no range reaches neither.
 TEST_F(TaskFuncsOfARun, ATaskFuncsVariablesReachTheirRanges) {
   Run("module top; function logic [7:0] f(input logic [3:0] a);\n"
       "  logic [0:5] v; logic [1:0] w [2:9]; int n; return 0; endfunction\n"
@@ -442,8 +329,6 @@ TEST_F(TaskFuncsOfARun, ATaskFuncsVariablesReachTheirRanges) {
   EXPECT_EQ(vpi_handle(vpiLeftRange, n), nullptr);
 }
 
-// ...while a void function returns nothing and has size 0, and a function of
-// an integer, a real or a time returns the kind of value its type names.
 TEST_F(TaskFuncsOfARun, AVoidFunctionHasNoReturnVariable) {
   Run("module top; function void v(); endfunction\n"
       "  function integer n(); return 0; endfunction\n"
@@ -461,9 +346,6 @@ TEST_F(TaskFuncsOfARun, AVoidFunctionHasNoReturnVariable) {
             vpiTimeFunc);
 }
 
-// A task or function is a scope (#5050), reaching the variables its body
-// declares, each automatic as written or as the subroutine's lifetime makes it
-// (§13.3.1, §13.4.2).
 TEST_F(TaskFuncsOfARun, AFunctionDeclaresTheVariablesItsBodyDeclares) {
   Run("module top; function int f(); int tmp; automatic int a;\n"
       "  return tmp; endfunction\n"
@@ -480,8 +362,6 @@ TEST_F(TaskFuncsOfARun, AFunctionDeclaresTheVariablesItsBodyDeclares) {
   EXPECT_EQ(vpi_get(vpiAutomatic, Named(vpiVariables, g, "keep")), 0);
 }
 
-// A task a generate block declares is a task of the block's instance, one per
-// instance of a loop generate's block, and none of the module's (#5053).
 TEST_F(TaskFuncsOfARun, AGenerateBlockTaskIsATaskOfTheBlock) {
   Run("module top; for (genvar i = 0; i < 2; i++) begin : g\n"
       "  task t(); endtask end endmodule\n");
@@ -494,9 +374,6 @@ TEST_F(TaskFuncsOfARun, AGenerateBlockTaskIsATaskOfTheBlock) {
   EXPECT_NE(VpiObjectOf(t0), VpiObjectOf(t1));
 }
 
-// The figure's vpiFuncType for the remaining kinds of return: a real of
-// either precision returns a real, a vector or an integral atom a sized
-// value, signed where the type is (§6.11), and any other type another kind.
 TEST_F(TaskFuncsOfARun, EachKindOfReturnHasItsFuncType) {
   Run("module top; function shortreal sr(); return 0; endfunction\n"
       "  function realtime rt(); return 0; endfunction\n"
@@ -521,16 +398,12 @@ TEST_F(TaskFuncsOfARun, EachKindOfReturnHasItsFuncType) {
   EXPECT_EQ(kFuncType("st"), vpiOtherFunc);
 }
 
-// §37.13 detail 1: an argument declared inout is an io decl of that
-// direction.
 TEST_F(TaskFuncsOfARun, AnInoutArgumentIsAnInoutIoDecl) {
   Run("module top; task t(inout int x); endtask endmodule\n");
   vpiHandle t = Named(vpiTaskFunc, By("top"), "t");
   EXPECT_EQ(vpi_get(vpiDirection, Named(vpiIODecl, t, "x")), vpiInout);
 }
 
-// §37.17: a function returning, and an argument declared with, a type the
-// module names is a variable of the kind the named type has...
 TEST_F(TaskFuncsOfARun, AVariableOfANamedTypeHasTheTypesKind) {
   Run("module top; typedef enum {A, B} e_t;\n"
       "  function e_t f(e_t x); return x; endfunction endmodule\n");
@@ -540,8 +413,6 @@ TEST_F(TaskFuncsOfARun, AVariableOfANamedTypeHasTheTypesKind) {
             vpiEnumVar);
 }
 
-// ...and a function whose return type names an unpacked array returns
-// through an array var (§13.4.1).
 TEST_F(TaskFuncsOfARun, AFunctionOfAnArrayTypeReturnsThroughAnArrayVar) {
   Run("module top; typedef int arr_t [2];\n"
       "  function arr_t f(); return '{1, 2}; endfunction endmodule\n");
@@ -549,8 +420,6 @@ TEST_F(TaskFuncsOfARun, AFunctionOfAnArrayTypeReturnsThroughAnArrayVar) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiReturn, f)), vpiArrayVar);
 }
 
-// The kind of the object the task or function `tf` holds for its variable
-// `name`, 0 where it holds none.
 int VariableKindOf(vpiHandle tf, std::string_view name) {
   for (const VpiObject* child : VpiObjectOf(tf)->children) {
     if (child->name == name && child->type != vpiIODecl) return child->type;
@@ -558,9 +427,6 @@ int VariableKindOf(vpiHandle tf, std::string_view name) {
   return 0;
 }
 
-// §37.27 with §37.12: an unpacked array of events a body declares is a named
-// event array, beside an array var; a local parameter it declares is no
-// variable.
 TEST_F(TaskFuncsOfARun, ABodysEventArrayIsANamedEventArray) {
   Run("module top; task t(); event e [2]; int n [2];\n"
       "  localparam int P = 1; endtask endmodule\n");
@@ -571,9 +437,6 @@ TEST_F(TaskFuncsOfARun, ABodysEventArrayIsANamedEventArray) {
   EXPECT_EQ(VariableKindOf(t, "P"), 0);
 }
 
-// §37.17 with §26.3: a package's function reaches variables of the kind a type
-// the package names has: its own typedef, which the design records under the
-// package's qualified name, and a class it declares (#5736)...
 TEST_F(TaskFuncsOfARun, APackageFunctionsNamedTypesHaveTheirKinds) {
   Run("package p; typedef int t; class C; endclass\n"
       "  function t f(t a); C h; return a; endfunction endpackage\n"
@@ -586,8 +449,6 @@ TEST_F(TaskFuncsOfARun, APackageFunctionsNamedTypesHaveTheirKinds) {
   EXPECT_EQ(VariableKindOf(f, "h"), vpiClassVar);
 }
 
-// ...and a compilation unit's function those of the unit's typedefs and
-// classes.
 TEST_F(TaskFuncsOfARun, AUnitFunctionsNamedTypesHaveTheirKinds) {
   Run("int n = 0; typedef enum {A, B} e_t; class K; endclass\n"
       "function e_t g(e_t x); K k; return x; endfunction\n"
@@ -602,8 +463,6 @@ TEST_F(TaskFuncsOfARun, AUnitFunctionsNamedTypesHaveTheirKinds) {
   EXPECT_EQ(VariableKindOf(g, "k"), vpiClassVar);
 }
 
-// Detail 11 with §13.3.1: a task a generate block of an automatic module
-// declares without a lifetime is automatic, and one declared static is not.
 TEST_F(TaskFuncsOfARun, AGenerateBlockTaskTakesItsModulesLifetime) {
   Run("module automatic top; if (1) begin : g task t(); endtask\n"
       "  task static s(); endtask end endmodule\n");
@@ -615,8 +474,6 @@ TEST_F(TaskFuncsOfARun, AGenerateBlockTaskTakesItsModulesLifetime) {
   EXPECT_EQ(vpi_get(vpiAutomatic, s), 0);
 }
 
-// §37.41 with §37.10 details 5 and 6: a function of the compilation unit is
-// one of the unit's, full-named through "$unit::" and reached by no name.
 TEST_F(TaskFuncsOfARun, ACompilationUnitFunctionIsTheUnits) {
   Run("int g = 3;\n"
       "function int f(); return g; endfunction\n"
@@ -631,10 +488,6 @@ TEST_F(TaskFuncsOfARun, ACompilationUnitFunctionIsTheUnits) {
   EXPECT_EQ(vpi_handle_by_name(VpiText("f"), unit), nullptr);
 }
 
-// #7153: a task or function imported through DPI (§35.5) is a task or
-// function of the module declaring the import, holding the io decls and the
-// return variable its prototype declares, and the object a call of it
-// reaches...
 TEST_F(TaskFuncsOfARun, ADpiImportIsATaskOrFunctionOfItsModule) {
   Run("module top;\n"
       "  import \"DPI-C\" function int c_f(input int a);\n"
@@ -657,8 +510,6 @@ TEST_F(TaskFuncsOfARun, ADpiImportIsATaskOrFunctionOfItsModule) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, kCalls[0])), VpiObjectOf(f));
 }
 
-// ...and one a package or the compilation unit imports is the package's or
-// the unit's, which a module's call of it reaches.
 TEST_F(TaskFuncsOfARun, ADpiImportOfAPackageOrTheUnitIsTheirs) {
   Run("int n = 0;\n"
       "import \"DPI-C\" function int u_f();\n"
@@ -677,11 +528,6 @@ TEST_F(TaskFuncsOfARun, ADpiImportOfAPackageOrTheUnitIsTheirs) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, kCalls[0])), VpiObjectOf(u_f));
 }
 
-// #7152, details 6 to 10: an import reports vpiDPIImportAcc, pure or context
-// as declared, the DPI flavor its specification string names and the C name
-// it links to, written or defaulted to its own (§35.5.4); an exported function
-// reports vpiDPIExportAcc and its export's C name (§35.7); a function neither
-// imported nor exported reports none of them.
 TEST_F(TaskFuncsOfARun, ADpiTaskOrFunctionReportsItsDpiProperties) {
   Run("module top;\n"
       "  import \"DPI-C\" pure function int p_f(int a);\n"
@@ -716,10 +562,6 @@ TEST_F(TaskFuncsOfARun, ADpiTaskOrFunctionReportsItsDpiProperties) {
   EXPECT_EQ(vpi_get_str(vpiDPICIdentifier, s_f), nullptr);
 }
 
-// #7151, details 1 to 3 and 12 with the figure: a class's method holds the io
-// decls its arguments declare and, a function, the variable it returns
-// through, with the size, sign, function type and return range any function
-// has; a task returns through none.
 TEST_F(TaskFuncsOfARun, AMethodHoldsItsIoDeclsAndReturnVariable) {
   Run("module top;\n"
       "  class C;\n"
@@ -748,9 +590,6 @@ TEST_F(TaskFuncsOfARun, AMethodHoldsItsIoDeclsAndReturnVariable) {
   EXPECT_EQ(vpi_handle(vpiReturn, t), nullptr);
 }
 
-// ...a method of a package's class names the package's types (§26.3), and an
-// extern method holds the variables the body written outside its class
-// declares (§8.24).
 TEST_F(TaskFuncsOfARun, AMethodNamesItsPackagesTypesAndItsBodysVariables) {
   Run("package pk; typedef int t;\n"
       "  class D; extern function t e(t k); endclass\n"
@@ -765,9 +604,6 @@ TEST_F(TaskFuncsOfARun, AMethodNamesItsPackagesTypesAndItsBodysVariables) {
   EXPECT_EQ(VariableKindOf(e, "loc"), vpiIntVar);
 }
 
-// §37.41 detail 4 and (figure): no object is no method, nor is a function with
-// no parent; and a function returning a byte, short int, long int or integer
-// is signed (§6.11), where no object is not.
 TEST(TaskFuncModel, MethodAndSignOfLooseObjects) {
   EXPECT_FALSE(VpiTaskFuncIsMethod(nullptr));
   VpiObject loose;
@@ -784,7 +620,6 @@ TEST(TaskFuncModel, MethodAndSignOfLooseObjects) {
   }
 }
 
-// §37.41: no task or function has no statement.
 TEST(TaskFuncModel, NoObjectHasNoStatement) {
   EXPECT_EQ(VpiTaskFuncStmt(nullptr), nullptr);
 }

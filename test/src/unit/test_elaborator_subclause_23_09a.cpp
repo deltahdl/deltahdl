@@ -1,10 +1,3 @@
-// Tests for the §23.9 scope rules: one identifier declares one item within a
-// scope, and a direct reference searches upward from the scope it stands in
-// until a module boundary.
-//
-// The cases over what §23.9 says about a parameter declared inside a generate
-// block are in test_elaborator_subclause_23_09b.cpp.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -16,24 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §27.4, printed page 821: a generate block instance array may not share its
-// name with any other declaration, another such array included. The two cases
-// below ask that of a module-level declaration that is neither a net, a
-// variable nor a port, and they differ in that declaration alone, so the source
-// and the report are stated once here and each case supplies the one line that
-// changes.
-//
-// `module_level_decl` is written at line 4 of the source, so the `for` whose
-// array name collides always stands at line 6 and the report always stands
-// there. `module child;` is declared for the instance case to instantiate and
-// left uninstantiated by the others.
-//
-// Elaborator::RegisterGenerateForArrayName in
-// src/elaborator/elaborator_generate.cpp is the emission site: it formats
-// "generate block array '{}' conflicts with an existing declaration in the
-// same scope" and passes Subclause("27.4"): §23.9 rules that a name declares
-// one item in a scope, generate blocks included, and §27.4 states the same
-// for a generate block instance array in its own words.
 void ExpectLoopArrayNameConflictsWith(const std::string& module_level_decl) {
   ElabFixture f;
   ElabOk(
@@ -55,11 +30,6 @@ void ExpectLoopArrayNameConflictsWith(const std::string& module_level_decl) {
                             6, "27.4"));
 }
 
-// §23.9: an identifier shall be used to declare only one item within a
-// scope. Two nets sharing a name in the same module scope is illegal. §6.5's
-// closing sentence names this case, a net or variable redeclaring a name a net
-// or variable declared, so the report cites §6.5; §23.9 is the citation when
-// the earlier declaration is of another kind, as the task case below reads.
 TEST(ScopeRulesElaboration, DuplicateIdentifierInSameScopeRejected) {
   ElabFixture f;
   ElabOk(
@@ -72,10 +42,6 @@ TEST(ScopeRulesElaboration, DuplicateIdentifierInSameScopeRejected) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "6.5"));
 }
 
-// §23.9: the same rule applies to the construct the LRM names first — two
-// variable declarations sharing a name in one scope. This exercises the
-// variable declaration form rather than the net form above, and it is §6.5's
-// case for the same reason.
 TEST(ScopeRulesElaboration, DuplicateVariableDeclarationInSameScopeRejected) {
   ElabFixture f;
   ElabOk(
@@ -88,8 +54,6 @@ TEST(ScopeRulesElaboration, DuplicateVariableDeclarationInSameScopeRejected) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "6.5"));
 }
 
-// §23.9 also forbids naming a task the same as a variable in the same
-// module scope; the two declarations collide on one identifier.
 TEST(ScopeRulesElaboration, TaskNameMatchingVariableRejected) {
   ElabFixture f;
   ElabOk(
@@ -103,14 +67,8 @@ TEST(ScopeRulesElaboration, TaskNameMatchingVariableRejected) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'foo'", 3, "23.9"));
 }
 
-// §23.9 spells out one form of that collision explicitly: a gate instance
-// shall not share the name of the net connected to its output.
 TEST(ScopeRulesElaboration, GateInstanceNameMatchingOutputNetRejected) {
   ElabFixture f;
-  // CheckGateInstNameDiagnostics files this clash under its own report rather
-  // than the redeclaration one: `g1` names the output terminal, which is an
-  // implicit net the gate item itself creates, so the name is never entered
-  // into declared_names_ twice.
   ElabOk(
       "module m;\n"
       "  wire a, b;\n"
@@ -123,8 +81,6 @@ TEST(ScopeRulesElaboration, GateInstanceNameMatchingOutputNetRejected) {
                             3, "23.9"));
 }
 
-// §23.9: each module opens a new scope, so the same identifier may name an
-// item in two different modules without colliding.
 TEST(ScopeRulesElaboration, SameNameInSeparateModuleScopesAllowed) {
   EXPECT_TRUE(
       ElabOk("module child;\n"
@@ -136,10 +92,6 @@ TEST(ScopeRulesElaboration, SameNameInSeparateModuleScopesAllowed) {
              "endmodule\n"));
 }
 
-// §23.9: a package is another of the listed constructs that opens its own
-// scope, so a name declared in a package does not collide with a like-named
-// declaration in a module. Covers a scope-creating construct kind other than
-// the module-vs-module case above.
 TEST(ScopeRulesElaboration, SameNameInPackageAndModuleScopesAllowed) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -164,9 +116,6 @@ TEST(ScopeRulesElaboration, ConditionalGenerateBlocksAllowSameIdentifier) {
 
 TEST(ScopeRulesElaboration, DirectVariableReferenceStopsAtModuleBoundary) {
   ElabFixture f;
-  // The upward search inside `child` never reaches `parent`, so the write is
-  // reported as naming nothing rather than as reaching the enclosing module's
-  // variable.
   ElabOk(
       "module child;\n"
       "  initial outer_x = 1;\n"
@@ -191,11 +140,6 @@ TEST(ScopeRulesElaboration, InstanceNamePrecedenceOverModuleTypeName) {
              "endmodule\n"));
 }
 
-// §23.9: a name referenced directly inside a named block that is not declared
-// locally triggers an upward search, which continues until the item is found in
-// an enclosing scope. Here the write inside block b resolves upward to the
-// module-level net, so elaboration succeeds. This is the accepting counterpart
-// of DirectVariableReferenceStopsAtModuleBoundary.
 TEST(ScopeRulesElaboration, DirectReferenceResolvesUpwardToEnclosingScope) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -206,10 +150,6 @@ TEST(ScopeRulesElaboration, DirectReferenceResolvesUpwardToEnclosingScope) {
              "endmodule\n"));
 }
 
-// §23.9: a named begin-end block is one of the elements that occupies the
-// enclosing scope's namespace, so two blocks sharing a name in the same scope
-// declare one identifier twice and are illegal. This is the general rule whose
-// only exception is the conditional-generate case tested above.
 TEST(ScopeRulesElaboration, DuplicateNamedBlockLabelsInSameScopeRejected) {
   ElabFixture f;
   ElabOk(
@@ -224,10 +164,6 @@ TEST(ScopeRulesElaboration, DuplicateNamedBlockLabelsInSameScopeRejected) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'b'", 4, "23.9"));
 }
 
-// §23.9: the report that rejects a name declared twice in one scope names the
-// subclause stating the rule, so a caller learns which rule was enforced
-// without matching the wording of the message. A function reusing a net's
-// name is §23.9's general rule and not the net-or-variable case §6.5 names.
 TEST(ScopeRulesElaboration, DuplicateIdentifierNames23_9) {
   ElabFixture f;
   ElaborateSrc(
@@ -242,9 +178,6 @@ TEST(ScopeRulesElaboration, DuplicateIdentifierNames23_9) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'w'", 3, "23.9"));
 }
 
-// §23.9 lists "Functions" among the constructs that define a scope, and an
-// identifier shall be used to declare only one item within a scope, so a local
-// may not be redeclared by another local in the same function body.
 TEST(ScopeRulesElaboration, FunctionBodyDuplicateLocalError) {
   ElabFixture f;
   ElabOk(
@@ -260,8 +193,6 @@ TEST(ScopeRulesElaboration, FunctionBodyDuplicateLocalError) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
 }
 
-// §23.9 lists "Tasks" beside "Functions", so a task body is a scope on the
-// same terms and rejects a redeclared local the same way.
 TEST(ScopeRulesElaboration, TaskBodyDuplicateLocalError) {
   ElabFixture f;
   ElabOk(
@@ -276,16 +207,6 @@ TEST(ScopeRulesElaboration, TaskBodyDuplicateLocalError) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'y'", 4, "23.9"));
 }
 
-// §23.9 states one rule for every construct it lists as defining a scope, so
-// the two reports a run makes for it must name one subclause. This source
-// breaks the rule twice in one module: `fn_dup` is declared twice directly
-// inside a function body, which CheckBlockDeclDups in
-// src/elaborator/elaborator_validate_funcbody.cpp reports, and `blk_dup` is
-// declared twice directly inside an initial begin-end block, which
-// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp reports.
-// One elaboration runs both walks, so this case fails when the two sites
-// disagree about which subclause the rule is; a case holding one shape alone
-// reads its own site and cannot see the disagreement.
 TEST(ScopeRulesElaboration,
      DuplicateLocalReportsOneSubclauseWhereverTheBlockSits) {
   ElabFixture f;
@@ -308,21 +229,6 @@ TEST(ScopeRulesElaboration,
                             9, "23.9"));
 }
 
-// §23.9 lists fork-join blocks, named or not, beside begin-end blocks, named or
-// not, among the elements that define a new scope, and an identifier shall be
-// used to declare only one item within a scope, so two variables sharing a name
-// directly inside one fork are illegal. This case fails while
-// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp is reached
-// only for a StmtKind::kBlock node, because Parser::ParseForkStmt puts a
-// declaration written inside a fork into Stmt::fork_stmts on a StmtKind::kFork
-// node, which that guard never compares against itself.
-//
-// One source covers all three closing keywords. Parser::ParseForkStmt in
-// src/parser/parser_stmt.cpp records the closing keyword in
-// Stmt::join_kind and pushes the declarations into Stmt::fork_stmts whether
-// join, join_any or join_none closes the block, so the three shapes differ in
-// Stmt::join_kind alone and a case per keyword would hand the walk one input
-// three times.
 TEST(ScopeRulesElaboration, DuplicateLocalInForkJoinError) {
   ElabFixture f;
   ElabOk(
@@ -337,23 +243,6 @@ TEST(ScopeRulesElaboration, DuplicateLocalInForkJoinError) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
 }
 
-// §23.9 makes a fork-join block a scope wherever it is written, so the same
-// duplicate inside a function body is illegal for the same reason. A second
-// case is needed because a second walk reads this shape:
-// CheckSubroutineBodyRedeclarations in
-// src/elaborator/elaborator_validate_funcbody.cpp checks a function body and
-// CheckBlockLocalRedeclarations in src/elaborator/elaborator_scope_rules.cpp
-// checks an initial procedure, and each carried its own StmtKind::kBlock guard,
-// so repairing one leaves the other silent. This case fails when
-// CheckBlockDeclDups is called on Stmt::stmts alone and never on
-// Stmt::fork_stmts.
-//
-// The fork is closed by join_none rather than join because §13.4 rule a) lists
-// fork-join among the time-controlling statements a function shall not contain,
-// which src/elaborator/elaborator_validate_funcbody.cpp reports as "only
-// fork/join_none is permitted inside a function" under §13.4. Closing with join
-// here would break a second rule in the source and leave the case asserting on
-// one of two reports.
 TEST(ScopeRulesElaboration, DuplicateLocalInForkJoinInsideFunctionError) {
   ElabFixture f;
   ElabOk(
@@ -371,13 +260,6 @@ TEST(ScopeRulesElaboration, DuplicateLocalInForkJoinInsideFunctionError) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 5, "23.9"));
 }
 
-// §23.9 makes the fork-join block a new scope of its own, so a name declared in
-// the fork and in the begin-end block enclosing it declares one item in each of
-// two scopes and is legal shadowing. This case fails when the fork's
-// declarations are compared against the enclosing block's set instead of
-// against a set of their own, which is the shape a repair to
-// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp reaches for
-// by merging Stmt::fork_stmts into the list it walks.
 TEST(ScopeRulesElaboration, SameLocalNameInForkAndEnclosingBlockOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -390,12 +272,6 @@ TEST(ScopeRulesElaboration, SameLocalNameInForkAndEnclosingBlockOk) {
              "endmodule\n"));
 }
 
-// §23.9: a search for a variable stops at the module's edge. `v` is declared in
-// `top` and read in `child`, so the upward search from `child` ends at the
-// module boundary and the read names nothing. The elaborator is silent on this
-// shape today because the collector that gathers bare reads takes a single
-// identifier standing alone as the whole right-hand side, and here `v` sits
-// inside the larger expression `v + 0`.
 TEST(ScopeRulesElaboration,
      DirectVariableReadInExpressionStopsAtModuleBoundary) {
   ElabFixture f;
@@ -415,12 +291,6 @@ TEST(ScopeRulesElaboration,
                             4, "23.9"));
 }
 
-// §23.9: a search for a variable stops at the module's edge. The read is the
-// initializer of a module-item declaration rather than a statement, and `v` is
-// declared only in `top`, so the search from `child` stops at the boundary. The
-// elaborator is silent on this shape today because a declaration initializer is
-// visited by no collector: the walk gathers reads from statements and never
-// descends into the expression a declaration carries.
 TEST(ScopeRulesElaboration,
      DirectVariableReadInDeclarationInitializerStopsAtModuleBoundary) {
   ElabFixture f;
@@ -437,12 +307,6 @@ TEST(ScopeRulesElaboration,
                             2, "23.9"));
 }
 
-// §23.9: a search for a variable stops at the module's edge. The rule holds for
-// a read written in a task body as much as for one written in an initial
-// procedure, since the boundary the search stops at is the module's and not the
-// statement's. The elaborator is silent on this shape today because a task body
-// is a context the module-item walk does not enter: it reaches the task's
-// declaration and stops there rather than walking the statements inside.
 TEST(ScopeRulesElaboration, DirectVariableReadInTaskBodyStopsAtModuleBoundary) {
   ElabFixture f;
   ElabOk(
@@ -461,13 +325,6 @@ TEST(ScopeRulesElaboration, DirectVariableReadInTaskBodyStopsAtModuleBoundary) {
                             4, "23.9"));
 }
 
-// §23.9: a search for a variable stops at the module's edge. The read stands in
-// an initial procedure written directly in `child`, beside a for generate
-// construct that has nothing to do with it, and `v` is declared only in `top`.
-// The elaborator is silent on this shape today because a module holding a
-// generate construct is skipped whole: the presence of the generate item takes
-// the whole module out of the walk, so the reads written outside it are never
-// collected either.
 TEST(ScopeRulesElaboration,
      DirectVariableReadStopsAtModuleBoundaryInModuleHoldingGenerateFor) {
   ElabFixture f;
@@ -489,12 +346,6 @@ TEST(ScopeRulesElaboration,
                             7, "23.9"));
 }
 
-// §23.9 stops the upward search for a variable at the module boundary, and a
-// name a wildcard import supplies is not reached by that search at all: §26.3
-// makes `pv` a candidate for the bare name in `m` without `pv` being declared
-// in any scope the search walks. This holds the widening honest on the import
-// half, where a collector that reports every bare name it cannot find in an
-// enclosing scope would reject a legal source.
 TEST(ScopeRulesElaboration, BareNameSuppliedByAWildcardImportIsStillAccepted) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -509,12 +360,6 @@ TEST(ScopeRulesElaboration, BareNameSuppliedByAWildcardImportIsStillAccepted) {
              "endmodule\n"));
 }
 
-// §23.9 stops the upward search at the module boundary, not below it: a
-// generate block is a scope inside the module, so a name declared there is
-// found by a search starting inside that block and `r` is found by continuing
-// upward to the module. This holds the widening honest on the generate half,
-// where a collector that reads a module's declarations alone would take `gv`
-// for a name nothing declares.
 TEST(ScopeRulesElaboration, BareNameDeclaredInAGenerateBlockIsStillAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -529,19 +374,6 @@ TEST(ScopeRulesElaboration, BareNameDeclaredInAGenerateBlockIsStillAccepted) {
              "endmodule\n"));
 }
 
-// §23.9 lists generate blocks among the elements that open a new scope in
-// SystemVerilog, and rules that a scope may declare one item only under any one
-// identifier. Each module opens its own scope, so a generate block in one
-// module and a generate block in another declare their names in two scopes that
-// share nothing, and the same name in both is legal.
-//
-// A generate construct is not elaborated where it is written:
-// Elaborator::ElaborateItems queues it into pending_generates_ and
-// Elaborator::ResolveDefparamsAndGenerates drains every module's queue together
-// once every module has been elaborated. This case fails while the set that
-// judges a declaration belongs to the design rather than to a module, because
-// module `b`'s `w` then finds module `a`'s entry still there and is reported as
-// a redeclaration of a net in a module that is not its own.
 TEST(ScopeRulesElaboration,
      GenerateBlockDeclarationNamesDoNotCollideAcrossModules) {
   EXPECT_TRUE(
@@ -561,16 +393,6 @@ TEST(ScopeRulesElaboration,
              "endmodule\n"));
 }
 
-// §23.9 gives each instance of a generate block its own scope, so one module
-// instantiated twice declares its generate block's names once per instance
-// rather than twice in one scope.
-//
-// This is the same rule as the case above reached without a second module.
-// Elaborator::ElaborateModuleInst calls Elaborator::ElaborateModule once per
-// instance and each call queues that module's generate constructs again, so a
-// design-wide set is offered `g` and `w` twice and rejects the second
-// instantiation. Elaborator::ElaborateModule builds a fresh RtlirModule per
-// call, which is what tells the two instances' name sets apart.
 TEST(ScopeRulesElaboration,
      RepeatedInstantiationDoesNotRedeclareGenerateBlockNames) {
   EXPECT_TRUE(
@@ -585,57 +407,16 @@ TEST(ScopeRulesElaboration,
              "endmodule\n"));
 }
 
-// §27.4, printed page 821, rules that a generate block instance array may not
-// share its name with any other declaration. A module instance name is such a
-// declaration, and `a` names both the instance of `child` and the loop generate
-// block array.
-//
-// Elaborator::ElaborateModuleInst records an instance name in declared_names_
-// and nowhere else: IsNameDeclared in src/elaborator/elaborator_items.cpp reads
-// RtlirModule::variables, RtlirModule::nets and RtlirModule::ports, and an
-// instance is in none of them. This case is therefore silent while the generate
-// construct runs after ItemElaborationStateSaver::Restore has taken the
-// module's own declarations back out of the set, and it is the half of the
-// defect that loses a report rather than the half that invents one.
 TEST(ScopeRulesElaboration,
      GenerateBlockArrayNameConflictingWithAnInstanceNameErrors) {
   ExpectLoopArrayNameConflictsWith("child a();");
 }
 
-// §27.4 makes the same conflict an error against a function name, which is a
-// declaration of the enclosing module like any other.
-//
-// A second case is needed because CheckFunctionDeclDiagnostics in
-// src/elaborator/elaborator_items.cpp is a different insertion site from
-// Elaborator::ElaborateModuleInst, and it is the one that keeps a fix from
-// being written against module instances alone. A function name reaches
-// declared_names_ and nothing IsNameDeclared reads, so it is invisible to the
-// array-name check for exactly the reason the instance name is.
 TEST(ScopeRulesElaboration,
      GenerateBlockArrayNameConflictingWithAFunctionNameErrors) {
   ExpectLoopArrayNameConflictsWith("function void a(); endfunction");
 }
 
-// §27.4, printed page 821: a generate block forms a scope of its own and a
-// further level of hierarchy once instantiated, so an item written once in a
-// loop generate body is elaborated once per iteration into a different scope
-// each time and declares its name afresh rather than a second time in one
-// scope. §23.9 forbids only a second declaration within one scope, so the three
-// cases below are conforming sources and shall elaborate.
-//
-// The three differ in the item the loop body holds and in nothing else, because
-// three separate functions in src/elaborator/elaborator_items.cpp record the
-// name -- CheckGateInstNameDiagnostics, CheckUdpInstNameDiagnostics and
-// CheckFunctionDeclDiagnostics -- and a fix reaching one leaves the others
-// rejecting a legal source. So the module and the loop are stated once here and
-// each case supplies the item and whatever declaration the item needs ahead of
-// the module.
-//
-// The genvar runs 4 to 5 rather than 0 to 1 so that its value is never the
-// ordinal of the block instance the iteration creates, which are 0 and 1. An
-// index that equalled the ordinal would make a body keyed by the ordinal and a
-// body keyed by the genvar value produce the same key, and the case would pass
-// whichever the elaborator used.
 void ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
     const std::string& prelude, const std::string& loop_body_item) {
   EXPECT_TRUE(ElabOk(prelude +
@@ -651,17 +432,11 @@ void ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
                      "endmodule\n"));
 }
 
-// The gate instance form, which reaches CheckGateInstNameDiagnostics.
 TEST(ScopeRulesElaboration, LoopGenerateGateInstanceNameRepeatsPerIteration) {
   ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
       "", "and g (y[i], d[i], d[i]);");
 }
 
-// The UDP instance form, which reaches CheckUdpInstNameDiagnostics rather than
-// the gate one because Parser::ParseUdpInstList is taken for an instance whose
-// type name the parser has already seen declared as a primitive. This is the
-// shape test/src/e2e/udp_generate.sv is written in, which is the real source
-// the bare-name record rejects.
 TEST(ScopeRulesElaboration, LoopGenerateUdpInstanceNameRepeatsPerIteration) {
   ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
       "primitive udp_inv (y, a);\n"
@@ -675,29 +450,15 @@ TEST(ScopeRulesElaboration, LoopGenerateUdpInstanceNameRepeatsPerIteration) {
       "udp_inv g (y[i], d[i]);");
 }
 
-// The function declaration form, which reaches CheckFunctionDeclDiagnostics.
 TEST(ScopeRulesElaboration, LoopGenerateFunctionNameRepeatsPerIteration) {
   ExpectLoopBodyItemDeclaresItsNameOncePerIteration(
       "", "function int fn(); return 0; endfunction");
 }
 
-// The task form. Elaborator::ElaborateItem sends kTaskDecl to the same
-// CheckFunctionDeclDiagnostics as kFunctionDecl, by falling through one case
-// label to the next, so this reaches the same record the case above does. It is
-// written anyway: the two kinds share that code only for as long as the
-// fallthrough stands, and nothing else would report splitting them.
 TEST(ScopeRulesElaboration, LoopGenerateTaskNameRepeatsPerIteration) {
   ExpectLoopBodyItemDeclaresItsNameOncePerIteration("", "task tk(); endtask");
 }
 
-// §23.9 still rules that a scope may declare one item only under any one
-// identifier, so two gate instances sharing a name directly in one module scope
-// are illegal however a name inside a generate block is keyed. This case is
-// what a fix that deleted the check rather than scoping its key would break.
-//
-// src/elaborator/elaborator_items.cpp is the emission site:
-// CheckGateInstNameDiagnostics formats "redeclaration of '{}'" from
-// ModuleItem::gate_inst_name and passes Subclause("23.9").
 TEST(ScopeRulesElaboration, DuplicateGateInstanceNamesInOneScopeRejected) {
   ElabFixture f;
   ElabOk(
@@ -711,31 +472,6 @@ TEST(ScopeRulesElaboration, DuplicateGateInstanceNamesInOneScopeRejected) {
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'g'", 4, "23.9"));
 }
 
-// The ten cases below cover the child-statement links of Stmt that the two
-// §23.9 walks in src/elaborator/elaborator_scope_rules.cpp reach for the first
-// time now that both take their list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. CollectScopeWalk had written
-// out nine of the thirteen links and CheckBlockLocalRedeclarations nine, and
-// the four each was missing are the same four: Stmt::assert_pass_stmt,
-// Stmt::assert_fail_stmt, the body of a randcase item, and the two statement
-// lists Stmt::rs_productions holds. A randsequence production keeps statements
-// in RsProd::code_stmts and in RsRule::weight_code, which
-// ForEachRandsequenceRuleStmt reaches by different members, so each is its own
-// position and each gets its own case.
-
-// §23.9 rules that an identifier referenced directly, with no hierarchical
-// path, is declared in its own scope or in a module, interface, program,
-// checker, task, function, named block or generate block above it in the same
-// branch of the name tree, and puts no condition on the statement the reference
-// stands in. Each case here assigns to `z`, which nothing declares, from one
-// position CollectScopeWalk did not reach before.
-//
-// `stmt` is written at line 4 and may run to several lines, so the line the
-// report stands at is read back out of the source rather than counted.
-//
-// Elaborator::ValidateScopeRules in src/elaborator/elaborator_scope_rules.cpp
-// is the emission site: it formats "undeclared identifier '{}'" from the name
-// CollectScopeWalk recorded and passes Subclause("23.9").
 void ExpectUndeclaredAssignTargetIn(const std::string& stmt) {
   ElabFixture f;
   std::string src =
@@ -745,10 +481,6 @@ void ExpectUndeclaredAssignTargetIn(const std::string& stmt) {
                             LineHolding(src, "z = 1;"), "23.9"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(ScopeRulesElaboration, UndeclaredAssignTargetInAnAssertionPassStmt) {
   ExpectUndeclaredAssignTargetIn("assert (ok) z = 1;");
 }
@@ -757,18 +489,10 @@ TEST(ScopeRulesElaboration, UndeclaredAssignTargetInAnAssertionFailStmt) {
   ExpectUndeclaredAssignTargetIn("assert (ok) else z = 1;");
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §23.9 is a rule about the source, so it holds whether the weighted
-// draw would select the item or not.
 TEST(ScopeRulesElaboration, UndeclaredAssignTargetInARandcaseItem) {
   ExpectUndeclaredAssignTargetIn("randcase 1: z = 1; endcase");
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(ScopeRulesElaboration, UndeclaredAssignTargetInARandsequenceCodeBlock) {
   ExpectUndeclaredAssignTargetIn(
       "begin\n"
@@ -778,10 +502,6 @@ TEST(ScopeRulesElaboration, UndeclaredAssignTargetInARandsequenceCodeBlock) {
       "    end");
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(ScopeRulesElaboration,
      UndeclaredAssignTargetInARandsequenceWeightCodeBlock) {
   ExpectUndeclaredAssignTargetIn(
@@ -793,16 +513,6 @@ TEST(ScopeRulesElaboration,
       "    end");
 }
 
-// §23.9 rules that a scope may declare one item only under any one identifier
-// and lists begin-end blocks, named or not, among the elements that define one,
-// putting no condition on the statement the block stands in. Each case here
-// writes a block declaring `a` twice into one position
-// CheckBlockLocalRedeclarations did not reach before.
-//
-// CheckOneBlockLocals in src/elaborator/elaborator_scope_rules.cpp is the
-// emission site: it formats "redeclaration of '{}'" from Stmt::var_name and
-// passes Subclause("23.9"). The report stands at the second declaration, which
-// each source writes on the same line as the first.
 void ExpectDuplicateBlockLocalIn(const std::string& stmt) {
   ElabFixture f;
   std::string src =
@@ -844,30 +554,6 @@ TEST(ScopeRulesElaboration, DuplicateBlockLocalInARandsequenceWeightCodeBlock) {
       "    end");
 }
 
-// §23.9 rules that a scope may declare one item only under any one identifier
-// and lists begin-end blocks, named or not, among the elements that define one,
-// putting no condition on the statement the block stands in. The five cases
-// below write a block declaring `a` twice into one position
-// CheckSubroutineBodyRedeclarations in
-// src/elaborator/elaborator_validate_funcbody.cpp did not reach before it took
-// its list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h: it had written out nine of the
-// thirteen child-statement links of Stmt, and Stmt::assert_pass_stmt,
-// Stmt::assert_fail_stmt, the body of a randcase item and the two statement
-// lists Stmt::rs_productions holds were the four it was missing.
-//
-// The block is written inside a task rather than inside a procedural block
-// because those are two separate walks. CheckBlockLocalRedeclarations in
-// src/elaborator/elaborator_scope_rules.cpp is what checks a procedural block,
-// and Elaborator::ValidateScopeRules calls it only for an item
-// IsProceduralItemKind admits, so nothing but the subroutine walk reaches a
-// task body.
-//
-// CheckBlockDeclDups in src/elaborator/elaborator_validate_funcbody.cpp is the
-// emission site: it formats "redeclaration of '{}'" from Stmt::var_name and
-// passes Subclause("23.9"). The report stands at the second declaration, which
-// each source writes on the same line as the first; `stmt` may run to several
-// lines, so that line is read back out of the source rather than counted.
 void ExpectDuplicateTaskBlockLocalIn(const std::string& stmt) {
   ElabFixture f;
   std::string src =
@@ -878,10 +564,6 @@ void ExpectDuplicateTaskBlockLocalIn(const std::string& stmt) {
                             "23.9"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskAssertionPassStmt) {
   ExpectDuplicateTaskBlockLocalIn("assert (1) begin int a; int a; end");
 }
@@ -890,20 +572,11 @@ TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskAssertionFailStmt) {
   ExpectDuplicateTaskBlockLocalIn("assert (1) else begin int a; int a; end");
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §23.9 is a rule about the source, so it holds whether the weighted
-// draw would select the item or not.
 TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskRandcaseItem) {
   ExpectDuplicateTaskBlockLocalIn(
       "randcase 1: begin int a; int a; end endcase");
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements and a begin-end block is one of them. They are kept in
-// RsProd::code_stmts, reached through Stmt::rs_productions and through no other
-// member of Stmt.
 TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskRandsequenceCodeBlock) {
   ExpectDuplicateTaskBlockLocalIn(
       "randsequence(main)\n"
@@ -911,12 +584,6 @@ TEST(ScopeRulesElaboration, DuplicateBlockLocalInATaskRandsequenceCodeBlock) {
       "    endsequence");
 }
 
-// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
-// rs_code_block ] ]` puts a second code block after the weight, which the
-// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
-// a second statement position under Stmt::rs_productions, so it gets its own
-// case: the production `alt` below holds a null statement, which leaves the
-// weight block as the only place the declaring block can stand.
 TEST(ScopeRulesElaboration,
      DuplicateBlockLocalInATaskRandsequenceWeightCodeBlock) {
   ExpectDuplicateTaskBlockLocalIn(

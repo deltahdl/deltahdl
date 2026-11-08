@@ -40,7 +40,6 @@ bool VpiIsDynamicPrefixHolderType(int type) {
 
 namespace {
 
-// The clocking block named `name` that `from`, or a scope around it, declares.
 VpiObject* ClockingBlockOutFrom(const VpiObject* from, std::string_view name) {
   for (const VpiObject* at = from; at != nullptr; at = at->parent) {
     for (VpiObject* child : at->children) {
@@ -64,9 +63,6 @@ VpiObject* VpiClockingBlockAround(const VpiObject* scope,
                                   const VpiObjectMap& objects,
                                   const std::string& instance,
                                   std::string_view name) {
-  // §14.3: a clocking block is a scope of the instance rather than a name in
-  // it, found from the blocks around the expression out to the instance, and
-  // in the instance itself where those blocks are not yet hung from it.
   if (VpiObject* block = ClockingBlockOutFrom(scope, name)) return block;
   return ClockingBlockOutFrom(VpiScopeOrInstance(nullptr, objects, instance),
                               name);
@@ -103,23 +99,12 @@ VpiObject* VpiVirtualInterfaceClockingBlock(
 
 namespace {
 
-// §25.9: the interface instance a virtual interface holding the scope `scope`
-// refers to, found by that name through `by_name`; null for the empty scope
-// of one holding none.
 VpiObject* HeldInstance(
     std::string_view scope,
     const std::function<VpiObject*(const std::string&)>& by_name) {
   return scope.empty() ? nullptr : by_name(std::string(scope));
 }
 
-// The clocking block `block`, which a virtual interface var prefixes, stands
-// for now in the run `ctx` (VpiRefreshPrefixedClockingBlock): the clocking
-// block of its name the instance the var holds declares, and null while the
-// var holds none. The block is looked for by its kind as well as its name,
-// since the instance also holds the event variable §14.10 has the run name
-// after it. The instance declares it, the var's interface having been found
-// to (VpiVirtualInterfaceClockingBlock), so the walk out from the instance
-// ends there.
 VpiObject* PrefixedClockingBlockActual(
     const VpiObject& block, SimContext& ctx,
     const std::function<VpiObject*(const std::string&)>& by_name) {

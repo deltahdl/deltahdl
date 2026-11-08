@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §9.6.1: a wait fork statement blocks execution until every immediate child
-// subprocess has terminated, which no hardware does. It is a different
-// construct from the wait statement of §9.4.3 and from the disable fork
-// statement of §9.6.3, and the report says which of the three it rejected.
 TEST(WaitForkSynthesis, WaitForkIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

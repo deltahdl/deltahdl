@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A.6.7.1 writes an array pattern's index key as a constant_expression, which
-// names no variable (§11.2.1), so a key naming one is reported, in a
-// declaration's initializer and in a procedural assignment alike. A key naming
-// a parameter or a localparam, a literal key, a type key and `default` are
-// not.
 TEST(PatternElaboration, AnArrayPatternIndexKeyIsAConstantExpression) {
   ElabFixture f;
   ElaborateSrc(

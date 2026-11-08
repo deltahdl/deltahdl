@@ -13,10 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborates a child with a defaulted port `b` instantiated via `connection`
-// against a top scope that declares only `a`, then resolves the port's default
-// expression and its binding so the caller can assert how `.* ` treats the
-// default (§23.3.2.4 exception 1). On success both out-params are non-null.
 void ResolveDefaultedPortB(ElabFixture& f, const std::string& connection,
                            const Expr*& b_default,
                            const RtlirPortBinding*& b_binding) {
@@ -106,8 +102,6 @@ TEST(WildcardPortConnectionElaboration, NamedOverrideWithWildcard) {
   ASSERT_EQ(mod->children.size(), 1u);
   const auto& bindings = mod->children[0].port_bindings;
   ASSERT_GE(bindings.size(), 3u);
-  // §23.3.2.4: the named connection overrides what .* would have bound, so
-  // port a connects to the override expression x rather than the like-named a.
   const RtlirPortBinding* a_binding = nullptr;
   for (const auto& binding : bindings) {
     if (binding.port_name == "a") a_binding = &binding;
@@ -119,9 +113,6 @@ TEST(WildcardPortConnectionElaboration, NamedOverrideWithWildcard) {
 }
 
 TEST(WildcardPortConnectionElaboration, EmptyPortOverrideDisconnectsPort) {
-  // §23.3.2.4: a named connection mixed with .* overrides the wildcard. Here
-  // `.b()` explicitly leaves b unconnected even though a same-named `b` exists
-  // in the instantiating scope that .* would otherwise have connected.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic a, output logic b);\n"
@@ -144,10 +135,6 @@ TEST(WildcardPortConnectionElaboration, EmptyPortOverrideDisconnectsPort) {
 }
 
 TEST(WildcardPortConnectionElaboration, EmptyPortOverrideSuppressesDefault) {
-  // §23.3.2.4 exception 1 (second sentence): when a port has a default and its
-  // name is absent from the instantiating scope, .* alone would substitute the
-  // default (see DefaultValueUsedWhenNameNotInScope). Adding `.b()` to the .*
-  // forces b genuinely unconnected, so the default is NOT used here.
   ElabFixture f;
   const Expr* b_default = nullptr;
   const RtlirPortBinding* b_binding = nullptr;
@@ -156,9 +143,6 @@ TEST(WildcardPortConnectionElaboration, EmptyPortOverrideSuppressesDefault) {
 }
 
 TEST(WildcardPortConnectionElaboration, DefaultValueUsedWhenNameNotInScope) {
-  // §23.3.2.4 exception 1: unlike an explicit .name connection (which errors
-  // when the name is absent), .* uses the port's default value for any port
-  // whose name does not exist in the instantiating scope.
   ElabFixture f;
   const Expr* b_default = nullptr;
   const RtlirPortBinding* b_binding = nullptr;
@@ -168,10 +152,6 @@ TEST(WildcardPortConnectionElaboration, DefaultValueUsedWhenNameNotInScope) {
 
 TEST(WildcardPortConnectionElaboration,
      WildcardDoesNotReferenceWildcardImport) {
-  // §23.3.2.4 exception 2: .* does not create a sufficient reference for a
-  // wildcard package import. Even though `sig` is provided by `import pkg::*`,
-  // .* does not connect the port to it; the port's default value is used
-  // instead, exactly as for a name that is absent from the scope.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "package pkg;\n"
@@ -204,10 +184,6 @@ TEST(WildcardPortConnectionElaboration,
 }
 
 TEST(WildcardPortConnectionElaboration, WildcardBindsInoutPort) {
-  // §23.3.2.4 core rule: .* synthesizes a connection for EVERY declared port,
-  // covering a bidirectional inout port and not only inputs and outputs. The
-  // like-named net in the instantiating scope is bound with the port's own
-  // inout direction.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(inout [7:0] bus, output logic [7:0] mon);\n"
@@ -244,11 +220,6 @@ TEST(WildcardPortConnectionElaboration, MixedStylesInSameParent) {
              "endmodule\n"));
 }
 
-// §23.3.2.4 with §6.22.2: a `.*` connection is the implicit `.name` one of
-// every port, so its declarations too have equivalent data types: a shortint
-// port is not joined to a 16-bit logic vector, nor a byte port to an unsigned
-// one, while an integer port is joined to a signed 32-bit logic vector,
-// which is equivalent to it.
 TEST(WildcardPortConnectionElaboration,
      SameWidthButNonEquivalentTypesAreReported) {
   ElabFixture f;

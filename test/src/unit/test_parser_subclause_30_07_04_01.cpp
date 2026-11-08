@@ -64,9 +64,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOndetectSingleOutput) {
   EXPECT_EQ(item->path_outputs[0].name, "q");
 }
 
-// The list_of_path_outputs form of Syntax 30-8 applies to the ondetect
-// alternative as well, so the ondetect keyword must also accept a comma
-// separated list of outputs, completing the keyword x list cross-product.
 TEST(SpecifyBlockDeclParsing, PulsestyleOndetectMultipleOutputs) {
   auto r = Parse(
       "module m;\n"
@@ -86,9 +83,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOndetectMultipleOutputs) {
   EXPECT_EQ(item->path_outputs[1].name, "b");
 }
 
-// list_of_path_outputs requires at least one output; a pulsestyle declaration
-// with no output before the terminating semicolon is malformed and must be
-// rejected.
 TEST(SpecifyBlockDeclParsing, ErrorPulsestyleEmptyOutputList) {
   auto r = Parse(
       "module m;\n"
@@ -96,8 +90,6 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleEmptyOutputList) {
       "    pulsestyle_onevent ;\n"
       "  endspecify\n"
       "endmodule\n");
-  // The list is A.7.3's list_of_path_outputs, read as a path's destination
-  // side is, so the missing identifier is reported under §30.4 as a path's.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 3, "30.4"));
 }
@@ -109,7 +101,6 @@ TEST(SpecifyBlockDeclParsing, ErrorPulsestyleMissingSemicolon) {
       "    pulsestyle_onevent out1\n"
       "  endspecify\n"
       "endmodule\n");
-  // The report stands at the `endspecify` that followed the output list.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.1"));
 }

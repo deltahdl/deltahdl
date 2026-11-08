@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Holds the three variables of a cascaded a->b->c switch network so the
-// resolved logic values can be asserted after resolution.
 struct CascadeVars {
   Arena arena;
   Variable* va = nullptr;
@@ -22,9 +20,6 @@ struct CascadeVars {
   Variable* vc = nullptr;
 };
 
-// Builds and resolves a two-switch cascade: net a (driven to 1) connects to
-// undriven net b via a kTran switch, and b connects to undriven net c via a
-// switch of kind `second_kind`. Returns the variables for value assertions.
 static CascadeVars ResolveCascade(BidirSwitchKind second_kind) {
   CascadeVars cv;
   cv.va = cv.arena.Create<Variable>();
@@ -78,8 +73,7 @@ TEST(BidirectionalSwitchNetwork, AllSixSourceElementsAreBidirectional) {
 TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back(
-      {&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, false});  // x ctrl
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, false});
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
@@ -87,8 +81,7 @@ TEST(BidirectionalSwitchNetwork, BuiltinNetXControlAmbiguousGivesX) {
 TEST(BidirectionalSwitchNetwork, BuiltinNetZControlAmbiguousGivesX) {
   auto np = MakeNetPair(0);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back(
-      {&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, false});  // z ctrl
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, false});
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValX);
 }
@@ -133,8 +126,7 @@ TEST(BidirectionalSwitchNetwork,
 TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back(
-      {&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, true});  // x ctrl
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {1, 1}, true});
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }
@@ -142,8 +134,7 @@ TEST(BidirectionalSwitchNetwork, UserDefinedNetXControlIsOff) {
 TEST(BidirectionalSwitchNetwork, UserDefinedNetZControlIsOff) {
   auto np = MakeNetPair(1);
   std::vector<BidirSwitchInst> sw;
-  sw.push_back(
-      {&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, true});  // z ctrl
+  sw.push_back({&np.a, &np.b, BidirSwitchKind::kTranif1, {0, 1}, true});
   ResolveBidirSwitchNetwork(sw, np.arena);
   EXPECT_EQ(ValOf(*np.vb), kValZ);
 }

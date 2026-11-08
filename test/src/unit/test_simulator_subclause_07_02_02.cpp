@@ -134,11 +134,6 @@ TEST(StructAssignmentSimulation, MultipleDefaults_AllApplied) {
   LowerRunAndCheck(f, design, {{"ra", 10}, {"rb", 20}, {"rc", 30}});
 }
 
-// §7.2.2: a variable of a structure type with no initializer takes each
-// member's default, wherever the variable is declared -- a class property, a
-// method's local, a block's local and a package's variable, read through
-// `pkg::` and a wildcard import -- so every one reads a = 7 and b = 11, as a
-// module variable already did. Each read 0 0.
 TEST(StructDefaultSim, MemberDefaultsReachEveryKindOfVariable) {
   const char* src =
       "package p;\n"

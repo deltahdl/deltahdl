@@ -141,9 +141,6 @@ TEST(StrengthParsing, SameDirectionStrength0PairRejected) {
       "module m;\n"
       "  wire (weak0, strong0) w;\n"
       "endmodule");
-  // §10.3.4 owns the one-strength0-and-one-strength1 rule the net declaration
-  // here breaks; A.2.2.2 states the production alone. §10.3.4 calls a net
-  // declaration a continuous assignment, which is why the message names one.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "drive_strength on a continuous assignment requires one strength0", 2,
@@ -155,7 +152,6 @@ TEST(StrengthParsing, SameDirectionStrength1PairRejected) {
       "module m;\n"
       "  wire (pull1, supply1) w;\n"
       "endmodule");
-  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "drive_strength on a continuous assignment requires one strength0", 2,
@@ -167,7 +163,6 @@ TEST(StrengthParsing, Highz0WithStrength0Rejected) {
       "module m;\n"
       "  wire (highz0, weak0) w;\n"
       "endmodule");
-  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "drive_strength on a continuous assignment requires one strength0", 2,
@@ -179,7 +174,6 @@ TEST(StrengthParsing, Highz1WithStrength1Rejected) {
       "module m;\n"
       "  wire (highz1, weak1) w;\n"
       "endmodule");
-  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "drive_strength on a continuous assignment requires one strength0", 2,
@@ -216,7 +210,6 @@ TEST(StrengthParsing, ContAssignSameDirectionPairRejected) {
       "  wire w;\n"
       "  assign (strong0, weak0) w = 1'b0;\n"
       "endmodule");
-  // §10.3.4 owns the rule; A.2.2.2 states the production alone.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "drive_strength on a continuous assignment requires one strength0", 3,
@@ -232,8 +225,6 @@ TEST(StrengthParsing, UdpInstSingleStrengthRejected) {
       "  wire y, a;\n"
       "  my_udp (weak0) u1(y, a);\n"
       "endmodule");
-  // Parser::TryParseStrengthSpec files the UDP-instantiation strength pair
-  // under §28.3.2, not under §29.8.
   EXPECT_TRUE(ReportedError(
       r.diags, "drive_strength on a UDP instance requires one strength0", 6,
       "28.3.2"));
@@ -248,17 +239,11 @@ TEST(StrengthParsing, UdpInstSameDirectionPairRejected) {
       "  wire y, a;\n"
       "  my_udp (weak0, weak0) u1(y, a);\n"
       "endmodule");
-  // Parser::TryParseStrengthSpec files the UDP-instantiation strength pair
-  // under §28.3.2, not under §29.8.
   EXPECT_TRUE(ReportedError(
       r.diags, "drive_strength on a UDP instance requires one strength0", 6,
       "28.3.2"));
 }
 
-// Positive input form for drive_strength in UDP-instantiation position: a
-// valid strength0/strength1 pair is accepted and stored on the instance. The
-// existing UDP tests only exercise the reject paths, so this covers the accept
-// side of the same syntactic position.
 TEST(StrengthParsing, UdpInstDriveStrengthAccepted) {
   auto r = Parse(
       "primitive my_udp(output y, input a);\n"
@@ -275,8 +260,8 @@ TEST(StrengthParsing, UdpInstDriveStrengthAccepted) {
     if (it->kind == ModuleItemKind::kUdpInst) inst = it;
   }
   ASSERT_NE(inst, nullptr);
-  EXPECT_EQ(inst->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(inst->drive_strength1, 2u);  // weak1
+  EXPECT_EQ(inst->drive_strength0, 4u);
+  EXPECT_EQ(inst->drive_strength1, 2u);
 }
 
 TEST(ChargeStrengthParsing, Small) {

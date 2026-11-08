@@ -19,35 +19,21 @@
 #include "parser/ast_module.h"
 #include "parser/ast_type.h"
 
-// The value a member access a procedure writes is applied to, as far as the
-// scope elaborator_call_targets.cpp walks the procedure in tells it, and the
-// report of a member no value of its kind has: a string's or an enumeration's
-// name that is none of its type's built-in methods (§6.16, §6.19.5), and any
-// name applied to an integral or real value (§23.7).
-
 namespace delta {
 
 namespace {
 
-// §6.18 with §26.3: the type the type `type`, written among the items of the
-// scope, stands for, through each typedef it is written as (ThroughTypedefsAt).
 SitedType ThroughTypedefs(const DataScope& scope, const DataType& type) {
   return ThroughTypedefsAt(scope.unit, {&type, scope.Site()});
 }
 
-// §6.18 with §23.9: the type the type the variable `var` is declared with
-// stands for, its typedefs looked up from the scope declaring it.
 SitedType VarType(const DataScope& scope, const DeclaredVar& var) {
   return ThroughTypedefsAt(scope.unit, {var.type, scope.SiteOf(var)});
 }
 
-// §6.19.5: the built-in methods of an enumeration.
 constexpr std::string_view kEnumMethods[] = {"first", "last", "next",
                                              "prev",  "num",  "name"};
 
-// §8.13: the member of kind `kind` named `name` the class `cls` or the nearest
-// class it extends declares; null where none does. Each base is looked up from
-// the scope's site; no class is its own ancestor (§8.13), so the walk ends.
 const ClassMember* ChainMember(const ClassDecl& cls, ClassMemberKind kind,
                                std::string_view name, const DataScope& scope) {
   const TypeSite kSite = scope.Site();
@@ -60,20 +46,11 @@ const ClassMember* ChainMember(const ClassDecl& cls, ClassMemberKind kind,
   return nullptr;
 }
 
-// §6.18: the kind of the type `type` stands for, through the typedefs the
-// scope sees it written as, where it is a single value; kImplicit where those
-// typedefs make it an array (§7.4).
 DataTypeKind ScalarKind(const DataScope& scope, const DataType& type) {
   const SitedType kNamed = ThroughTypedefs(scope, type);
   return kNamed.dims == 0 ? kNamed.type->kind : DataTypeKind::kImplicit;
 }
 
-// §8.13: the type `written`, a method's return type (§13.4.1) or a property's
-// type (§8.5) the class `cls` declares, stands for: a name, written without a
-// scope, that the class or a class it extends declares as a type is its
-// typedef there, whose unpacked dimensions are added to `dims`, and any other
-// type is itself, as the scope sees it; null where the class's name is a type
-// parameter or a nested class.
 const DataType* ClassLocalType(const DataType& written, const ClassDecl& cls,
                                const DataScope& scope, std::size_t& dims) {
   std::unordered_set<std::string_view> local;
@@ -89,8 +66,6 @@ const DataType* ClassLocalType(const DataType& written, const ClassDecl& cls,
   return &def->typedef_item->typedef_type;
 }
 
-// The kind of that type as a single value; kImplicit where it is none, or its
-// class's typedef writes unpacked dimensions.
 DataTypeKind ClassTypeKind(const DataType& written, const ClassDecl& cls,
                            const DataScope& scope) {
   std::size_t dims = 0;
@@ -99,10 +74,6 @@ DataTypeKind ClassTypeKind(const DataType& written, const ClassDecl& cls,
                                       : ScalarKind(scope, *type);
 }
 
-// §G.1: the class of the std package whose handle `e` holds, where the scope
-// tells it for certain: a variable of the scope declared as one, process p,
-// where no class of the design takes the name, or a call of a method of one
-// returning one, process::self() or p.self(); none for anything else.
 std::optional<StdPackageMember> StdClassOf(const Expr& e,
                                            const DataScope& scope) {
   const Expr* callee = e.kind == ExprKind::kCall ? e.lhs : nullptr;
@@ -124,10 +95,6 @@ std::optional<StdPackageMember> StdClassOf(const Expr& e,
   return StdPackageMemberNamed(var->type->type_name);
 }
 
-// §G.3 to §G.7: the kind of type the method `method` of the std class `owner`
-// returns: an int, num()'s and the try_ methods' (§15.3, §15.4), a string,
-// get_randstate()'s, or process's enumeration state, status()'s (§9.7);
-// kImplicit for any other.
 DataTypeKind StdResultKind(StdPackageMember owner, std::string_view method) {
   const StdMethodPrototype* prototype = StdMethodNamed(owner, method);
   const std::string_view kReturns =
@@ -137,10 +104,6 @@ DataTypeKind StdResultKind(StdPackageMember owner, std::string_view method) {
   return kReturns == "state" ? DataTypeKind::kEnum : DataTypeKind::kImplicit;
 }
 
-// §13.4.1 with §23.9: the kind of type the call of `name`, written alone,
-// returns: in a method of a class, a method the class or a class it extends
-// declares (§8.13), else a function the items of the scope declare; kImplicit
-// where neither does.
 DataTypeKind PlainCallKind(std::string_view name, const DataScope& scope) {
   const ClassMember* method =
       scope.cls == nullptr
@@ -157,13 +120,6 @@ DataTypeKind PlainCallKind(std::string_view name, const DataScope& scope) {
   return DataTypeKind::kImplicit;
 }
 
-// §13.4.1: the kind of type the call whose callee is `callee` returns as a
-// single value, where the scope tells it for certain: a function or method
-// called by its name alone, f(); a method of a std class (§G.3 to §G.7),
-// p.status(); a method of the class a handle holds, h.get(); and one of the
-// methods every class has built in, randomize(), which returns an int
-// (§18.6.1), and get_randstate(), which returns a string (§18.13.4), the rest
-// being void; kImplicit for any other call.
 DataTypeKind CallResultKind(const Expr& callee, const DataScope& scope) {
   if (callee.kind != ExprKind::kMemberAccess) {
     return PlainCallKind(callee.text, scope);
@@ -185,13 +141,6 @@ DataTypeKind CallResultKind(const Expr& callee, const DataScope& scope) {
                                     : DataTypeKind::kImplicit;
 }
 
-// §20, §21 and §16.9: the kind of the value the system function `name`
-// returns, or of the element `selects` selects of it reach (A.8.4): a string,
-// whose element is a byte, for $sformatf (§21.3.3) and $typename (§20.6.1);
-// none told for one returning its argument's type, $sampled and $past
-// (§16.9.3) and the global clocking $past_gclk and $future_gclk (§16.9.4);
-// and an integral or real value for every other, one an application defines
-// through the VPI among them (§38.36).
 DataTypeKind SystemCallKind(std::string_view name, std::size_t selects) {
   constexpr std::string_view kStrings[] = {"$sformatf", "$typename"};
   constexpr std::string_view kArgumentTyped[] = {"$sampled", "$past",
@@ -203,20 +152,12 @@ DataTypeKind SystemCallKind(std::string_view name, std::size_t selects) {
   return kString ? DataTypeKind::kString : DataTypeKind::kInt;
 }
 
-// The value a member access is applied to, as far as the scope tells it: the
-// kind of its type, how a report names it, and whether it is a property of
-// the class whose method writes it, which may be random (§18.8).
 struct AppliedValue {
   DataTypeKind kind = DataTypeKind::kImplicit;
   std::string named;
   bool property = false;
 };
 
-// §8.5: the value the property `root` names of the class a handle holds, h.x,
-// written `selects` selects in front of a member access: of the property's
-// type where the selects reach an element of each unpacked dimension it
-// writes (§7.4); untyped where the scope tells no class the handle holds, or
-// that class declares no such property.
 AppliedValue HeldPropertyValue(const Expr& root, std::size_t selects,
                                const DataScope& scope) {
   AppliedValue value;
@@ -234,11 +175,6 @@ AppliedValue HeldPropertyValue(const Expr& root, std::size_t selects,
   return value;
 }
 
-// The value `root`, written `selects` selects in front of a member access,
-// stands for: a variable of the scope or an element of one, one select per
-// unpacked dimension its declaration and its typedefs write (§6.18, §7.4), the
-// result of a call (§13.4.1) or of a system function, or a property of the
-// class a handle holds.
 AppliedValue ValueOf(const Expr& root, std::size_t selects,
                      const DataScope& scope) {
   AppliedValue value;

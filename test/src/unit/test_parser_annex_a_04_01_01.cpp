@@ -161,9 +161,6 @@ TEST(ModuleInstantiationGrammar, AttributeOnPortConnection) {
               "endmodule"));
 }
 
-// ordered_port_connection ::= { attribute_instance } [ expression ]
-// The attribute_instance prefix is also permitted on a positional (ordered)
-// connection, not only on a named one; the connection still parses as ordered.
 TEST(ModuleInstantiationGrammar, AttributeOnOrderedPortConnection) {
   auto r = Parse(
       "module m; sub u0((* full_case *) x, (* parallel *) y); endmodule\n");
@@ -192,9 +189,6 @@ TEST(ModuleInstantiationGrammar, InstanceArrayMultipleDimensions) {
   EXPECT_EQ(item->inst_range_right, item->inst_dims[0].second);
 }
 
-// named_port_connection ::= ... | { attribute_instance } . *
-// The .* wildcard is a distinct alternative of named_port_connection; it sets
-// the instance's wildcard flag rather than appending an explicit connection.
 TEST(ModuleInstantiationGrammar, WildcardPortConnection) {
   auto r = Parse("module m; sub u0(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -205,20 +199,13 @@ TEST(ModuleInstantiationGrammar, WildcardPortConnection) {
   EXPECT_EQ(item->inst_ports.size(), 0u);
 }
 
-// A second .* in the same port-connection list is rejected.
 TEST(ModuleInstantiationGrammar, ErrorDuplicateWildcardPort) {
   auto r = Parse("module m; sub u0(.*, .*); endmodule\n");
-  // §23.3.2 owns the at-most-one rule for `.*`; A.4.1.1 only lists the
-  // alternative.
   EXPECT_TRUE(ReportedError(
       r.diags, ".* already appears earlier in this port connection list", 1,
       "23.3.2"));
 }
 
-// named_port_connection ::= { attribute_instance } . port_identifier
-//                           [ ( [ expression ] ) ]
-// With the parenthesized expression omitted, the port name is connected
-// implicitly; the parser records this via the implicit flag.
 TEST(ModuleInstantiationGrammar, ImplicitNamedPortConnection) {
   auto r = Parse("module m; sub u0(.clk, .data); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -232,8 +219,6 @@ TEST(ModuleInstantiationGrammar, ImplicitNamedPortConnection) {
   EXPECT_TRUE(item->inst_ports_implicit[1]);
 }
 
-// named_port_connection with the optional expression present but empty:
-// . port_identifier ( ) leaves the connection expression null.
 TEST(ModuleInstantiationGrammar, EmptyNamedPortExpression) {
   auto r = Parse("module m; sub u0(.clk()); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -246,9 +231,6 @@ TEST(ModuleInstantiationGrammar, EmptyNamedPortExpression) {
   EXPECT_FALSE(item->inst_ports_implicit[0]);
 }
 
-// ordered_port_connection ::= { attribute_instance } [ expression ]
-// The expression is optional, so an empty positional slot is permitted and
-// yields a null connection expression.
 TEST(ModuleInstantiationGrammar, OrderedPortConnectionEmptyExpression) {
   auto r = Parse("module m; sub u0(a, , c); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -262,36 +244,20 @@ TEST(ModuleInstantiationGrammar, OrderedPortConnectionEmptyExpression) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
-// list_of_port_connections ::= ordered_port_connection { ,
-// ordered_port_connection }
-//                            | named_port_connection { , named_port_connection
-//                            }
-// The two alternatives are mutually exclusive: a single list cannot combine
-// ordered and named port connections.
 TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedPortsCannotMix) {
   auto r = Parse("module m; sub u0(a, .b(c)); endmodule\n");
-  // §23.3.2 owns the rule; A.4.1.1 only states the two-alternative grammar.
   EXPECT_TRUE(ReportedError(
       r.diags, "ordered and named port connections cannot be mixed", 1,
       "23.3.2"));
 }
 
-// list_of_parameter_value_assignments has the same two-alternative shape, so
-// ordered and named parameter value assignments cannot be combined either.
 TEST(ModuleInstantiationGrammar, ErrorOrderedAndNamedParamsCannotMix) {
   auto r = Parse("module m; sub #(8, .D(4)) u0(a); endmodule\n");
-  // §23.3.2 owns the no-mixing rule, and Parser::ParseParamValueAssignment
-  // files the parameter-list report under it too.
   EXPECT_TRUE(ReportedError(
       r.diags, "ordered and named parameter value assignments cannot be mixed",
       1, "23.3.2"));
 }
 
-// A.4.1.1's hierarchical_instance names its instance before the `(`, so
-// `sub(a, b)` is no module instance. §29.8 makes a UDP instance's name
-// optional and §29.3 lets the UDP be declared later, so the parser, which does
-// not know what `sub` names, reads the item as a UDP instance and marks it.
-// Elaborator::ElaborateUdpInst reports one whose name reaches no primitive.
 TEST(ModuleInstantiationGrammar, NoInstanceNameReadsAsAnUnresolvedUdpInstance) {
   auto r = Parse("module m; sub(a, b); endmodule\n");
   EXPECT_FALSE(r.has_errors);
@@ -302,17 +268,6 @@ TEST(ModuleInstantiationGrammar, NoInstanceNameReadsAsAnUnresolvedUdpInstance) {
   EXPECT_TRUE(item->udp_undeclared_at_parse);
 }
 
-// A.4.1.1's hierarchical_instance makes the parenthesized
-// list_of_port_connections no part of optional, so `sub u0;` is not one -- but
-// it is what a data declaration of an undeclared type spells too, and this
-// parser holds no table of module names to tell them apart. The item recorded
-// is the data declaration, and the report belongs to the elaborator:
-// ModuleInstantiationElaboration.PortlessInstanceWithoutParensIsReported in
-// test/src/unit/test_elaborator_subclause_23_03_02.cpp asserts the §23.3.2 one
-// where the name is a module, and
-// UserDefinedTypeElaboration.NameThatIsNeitherTypeNorModuleIsReportedAsAnUndeclaredType
-// in test/src/unit/test_elaborator_subclause_06_18.cpp the §6.18 one where it
-// is nothing, which is what `sub` is here.
 TEST(ModuleInstantiationGrammar, MissingPortParenthesesLeavesADataDeclaration) {
   auto r = Parse("module m; sub u0; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -323,18 +278,12 @@ TEST(ModuleInstantiationGrammar, MissingPortParenthesesLeavesADataDeclaration) {
   EXPECT_TRUE(item->type_name_undeclared_at_parse);
 }
 
-// module_instantiation is terminated by a semicolon; omitting it is an error.
 TEST(ModuleInstantiationGrammar, ErrorMissingSemicolon) {
   auto r = Parse("module m; sub u0(a) endmodule\n");
-  // §23.3.2 owns the terminating semicolon of a module_instantiation.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.3.2"));
 }
 
-// name_of_instance ::= instance_identifier { unpacked_dimension }, and A.9.3
-// spells the identifier `simple_identifier | escaped_identifier`; the parser
-// looked for a simple identifier alone, so an instance named by an escaped one
-// was reported as a missing identifier.
 TEST(ModuleInstantiationParsing, EscapedInstanceName) {
   auto r = Parse(
       "module sub(input a, output b); endmodule\n"
@@ -349,11 +298,6 @@ TEST(ModuleInstantiationParsing, EscapedInstanceName) {
   EXPECT_EQ(inst->inst_name, "u.1");
 }
 
-// ordered_parameter_assignment ::= param_expression and
-// named_parameter_assignment ::= . parameter_identifier ( [ param_expression ]
-// ), where A.8.3 spells param_expression `mintypmax_expression | data_type |
-// $`; the parser read the value as an expression, so a min:typ:max value was
-// reported at its first ':'.
 TEST(ModuleInstantiationParsing, ParamExpressionMinTypMax) {
   auto r = Parse(
       "module sub #(parameter int W = 1) (); endmodule\n"
@@ -377,10 +321,6 @@ TEST(ModuleInstantiationParsing, ParamExpressionMinTypMax) {
   EXPECT_EQ(insts[1]->inst_params[0].second->kind, ExprKind::kMinTypMax);
 }
 
-// The data_type A.8.3 lets a param_expression be holds a signing and the
-// struct and enum types, which no expression spells: each is read whole into
-// a kTypeRef node, in a module instance's list as in a class
-// specialization's (#8066).
 TEST(ModuleInstantiationParsing, ParamExpressionDataTypeNoExpressionSpells) {
   auto r = Parse(
       "module m;\n"

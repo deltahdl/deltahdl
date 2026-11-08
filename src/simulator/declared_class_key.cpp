@@ -12,15 +12,6 @@
 
 namespace delta {
 
-// §26.7 with Syntax 26-5 (printed pages 816-817 of IEEE 1800-2023): the
-// built-in package's names are written with or without the `std::` qualifier
-// and reach one declaration, and no user package may be called std, so the run
-// holds its classes under the bare name and SimContext::FindClassType drops the
-// qualifier before asking its table. The scoped probe below then found
-// `std::process` and answered that spelling as the key, so `std::process p =
-// std::process::self();` recorded p's class as "std::process", which the
-// process dispatch compares with "process" and missed: p.status() read 0 and
-// p.kill() ran nothing.
 constexpr std::string_view kStdPackage = "std";
 
 std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
@@ -34,11 +25,6 @@ std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
     if (ctx.FindClassType(*scoped) != nullptr) return *scoped;
   }
   if (ctx.FindClassType(name) != nullptr) return name;
-  // §8.25 (printed page 204): a type parameter of the running method's class
-  // stands for the type its actual gives, so `T obj` in a method of R#(A)
-  // declares a handle of class A, and of the default's class where the
-  // specialization writes no actual (ClassNamedByTypeParam). The name is the
-  // one the class is held under, which outlives the call.
   if (scope.empty()) {
     if (const ClassTypeInfo* cls = ClassNamedByTypeParam(name, ctx, arena))
       return cls->name;
@@ -46,9 +32,6 @@ std::string_view DeclaredClassKey(const DataType& type, SimContext& ctx,
   return {};
 }
 
-// The `<scope>::<name>` key of the class `name` nested in `scope` or in a
-// class enclosing it, innermost first, built in the arena; empty where none
-// of them holds one.
 static std::string_view NestedClassKeyInScope(std::string_view name,
                                               const ClassTypeInfo* scope,
                                               SimContext& ctx, Arena& arena) {

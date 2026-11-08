@@ -50,8 +50,6 @@ TEST(SpecifyPathParsing, ParallelPathRejectsMultipleSources) {
       "    (a, b => c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.5 owns the one-source-one-destination rule for '=>', and the parser
-  // files the report there rather than under §30.4.2.
   EXPECT_TRUE(ReportedError(
       r.diags, "parallel path '=>' requires a single source and destination", 3,
       "30.4.5"));
@@ -64,8 +62,6 @@ TEST(SpecifyPathParsing, ParallelPathRejectsMultipleDestinations) {
       "    (a => b, c) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4.5 owns the one-source-one-destination rule for '=>', and the parser
-  // files the report there rather than under §30.4.2.
   EXPECT_TRUE(ReportedError(
       r.diags, "parallel path '=>' requires a single source and destination", 3,
       "30.4.5"));
@@ -209,11 +205,6 @@ TEST(SpecifyPathParsing, FullPathPolarityWithMultipleSources) {
   ASSERT_EQ(si->path.src_ports.size(), 2u);
 }
 
-// Syntax 30-3 gives full_path_description a list_of_path_outputs on the
-// destination side (a comma-separated list of
-// specify_output_terminal_descriptor). The multiple-source list is exercised
-// above; this isolates the output list by pairing a single source with two
-// destinations, so the list_of_path_outputs production is observed on its own.
 TEST(SpecifyPathParsing, FullPathMultipleDestinations) {
   auto r = Parse(
       "module m;\n"
@@ -232,9 +223,6 @@ TEST(SpecifyPathParsing, FullPathMultipleDestinations) {
   EXPECT_EQ(si->path.dst_ports[1].name, "c");
 }
 
-// Syntax 30-3 declares polarity_operator ::= + | - . The positive alternative
-// is exercised above; this covers the negative alternative within the parallel
-// path description, where the '-' before '=>' yields a negative polarity.
 TEST(SpecifyPathParsing, ParallelPathNegativePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -250,10 +238,6 @@ TEST(SpecifyPathParsing, ParallelPathNegativePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-// Syntax 30-3 allows polarity_operator in both syntactic positions. The '+'
-// alternative is exercised above only within a full path; this observes the
-// positive polarity in a parallel path description, the other operator
-// position.
 TEST(SpecifyPathParsing, ParallelPathPositivePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -269,8 +253,6 @@ TEST(SpecifyPathParsing, ParallelPathPositivePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-// The '-' polarity alternative in a full path description, completing the
-// polarity-operator/path-kind matrix (Syntax 30-3).
 TEST(SpecifyPathParsing, FullPathNegativePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -286,10 +268,6 @@ TEST(SpecifyPathParsing, FullPathNegativePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-// A positive polarity operator written flush against '=>' — the source spells
-// "+=>", which the lexer tokenizes as a compound '+=' followed by '>'. The
-// parser must recover the polarity and the parallel operator from that pair,
-// a distinct code path from the space-separated spellings above.
 TEST(SpecifyPathParsing, ParallelPathGluedPositivePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -305,7 +283,6 @@ TEST(SpecifyPathParsing, ParallelPathGluedPositivePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kPositive);
 }
 
-// The negative counterpart of the glued spelling: "-=>" lexes as '-=' then '>'.
 TEST(SpecifyPathParsing, ParallelPathGluedNegativePolarity) {
   auto r = Parse(
       "module m;\n"
@@ -321,10 +298,6 @@ TEST(SpecifyPathParsing, ParallelPathGluedNegativePolarity) {
   EXPECT_EQ(si->path.polarity, SpecifyPolarity::kNegative);
 }
 
-// specify_output_terminal_descriptor (Syntax 30-3) admits the same optional
-// constant_range_expression as the input descriptor, including the indexed
-// part-select forms. The input side covers +: and -: above; these observe them
-// on the output terminal.
 TEST(SpecifyPathParsing, OutputTerminalPlusIndexed) {
   auto r = Parse(
       "module m;\n"

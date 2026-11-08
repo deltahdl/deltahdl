@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// Integration robustness: a ::-prefixed name passes through the preprocessor
-// intact so the elaborator can apply the §23.7.1 resolution rules to it.
 TEST(ScopeResolutionPrefixPreprocessing, ExpressionPrefixSurvives) {
   auto r = ParseWithPreprocessor(
       "module t;\n"

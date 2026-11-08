@@ -27,11 +27,6 @@ TEST(GateDelayElaboration, GateWithDelayStillProducesAssign) {
 }
 
 TEST(GateDelayElaboration, GateDelayLoweredOntoContinuousAssign) {
-  // §28.3.3: a gate's delay specification specifies its propagation delay. The
-  // elaborator lowers the primitive to a continuous assignment and must move
-  // the single delay value onto that assignment so the simulator can apply it.
-  // A one-value delay populates only the rise slot; the fall/turn-off slots
-  // stay empty.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"

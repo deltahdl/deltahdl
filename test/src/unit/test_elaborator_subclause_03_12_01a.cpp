@@ -140,11 +140,6 @@ TEST(CompilationUnitElaboration, LocalScopeShadowsCuScopeLocalparam) {
              "endmodule\n"));
 }
 
-// The declared widths are what say WIDTH reached both modules. A bound that
-// folds to nothing is not reported: EvalRangeWidth in
-// src/elaborator/type_eval.cpp answers 0 and the declaration falls through to
-// one bit, so an assertion that elaboration succeeded holds whether WIDTH was
-// visible or not.
 TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInMultipleModules) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -167,16 +162,6 @@ TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInMultipleModules) {
   EXPECT_EQ(b->width, 8u);
 }
 
-// §3.12.1 puts a compilation-unit declaration in scope for every design element
-// in the unit, and the two modules here are siblings rather than a module and
-// its instance: neither is elaborated inside the other, so WIDTH has to survive
-// the first module's elaboration to size the second one's declaration.
-//
-// Elaborator::ElaborateModule takes back what a module adds to the elaborator's
-// typedef and parameter maps before the next module is elaborated, which is
-// what keeps one module's package import out of the next (§26.3). This states
-// the other half of that: what the compilation unit itself declared is written
-// before any module is elaborated and is still there afterwards.
 TEST(CompilationUnitElaboration, CuScopeLocalparamVisibleInASecondTopModule) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -206,12 +191,6 @@ TEST(CompilationUnitElaboration, CuScopeVarDeclElaborates) {
 TEST(CompilationUnitElaboration,
      DollarUnitPrefixResolvesToCompilationUnitScopeDespiteLocalShadow) {
   ElabFixture f;
-  // §3.12.1: the whole purpose of the $unit:: prefix is unambiguous access to
-  // the outermost (compilation-unit-scope) declaration. Here a module-local
-  // localparam K shadows a compilation-unit localparam K of a different value.
-  // The bare reference must see the local (width 3) while the $unit::K
-  // reference must reach past the shadow to the compilation-unit value
-  // (width 8).
   auto* design = Elaborate(
       "localparam int K = 8;\n"
       "module m;\n"
@@ -234,10 +213,6 @@ TEST(CompilationUnitElaboration,
 TEST(CompilationUnitElaboration,
      DollarUnitPrefixResolvesCompilationUnitParameterPastLocalShadow) {
   ElabFixture f;
-  // §3.12.1: the outermost declaration reached by $unit:: may be declared with
-  // the `parameter` keyword rather than `localparam`. At compilation-unit scope
-  // both name a constant, so a $unit:: reference must still bypass a same-named
-  // module-local parameter (here local 3) and resolve to the outermost value 8.
   auto* design = Elaborate(
       "parameter int K = 8;\n"
       "module m;\n"
@@ -257,12 +232,6 @@ TEST(CompilationUnitElaboration,
 TEST(CompilationUnitElaboration,
      DollarUnitPrefixResolvesToCompilationUnitScopeInParameterInitializer) {
   ElabFixture f;
-  // §3.12.1: the $unit:: disambiguation applies wherever a constant expression
-  // is evaluated, not only in a packed dimension. Here a module-local
-  // localparam M is initialized from $unit::K while a same-named local K
-  // shadows the compilation-unit K. M must be computed from the outermost K
-  // (8 + 1 == 9), giving a 9-bit vector, not from the local K (which would be
-  // 4 bits).
   auto* design = Elaborate(
       "localparam int K = 8;\n"
       "module m;\n"
@@ -299,21 +268,6 @@ TEST(CompilationUnitElaboration, ForwardReferenceToCuScopeTaskAccepted) {
 
 namespace {
 
-// §3.12.1 case a): every file on one compilation command line belongs to a
-// single compilation unit, whose declarations are visible across all of those
-// files under the normal visibility rules. Every test above hands the
-// elaborator one source description, which cannot tell that model from case b),
-// where every file is a compilation unit of its own, because with one file the
-// two agree. These drive a command line of two files through
-// SinglePassCompiler, which is the path that implements case a), and ask what a
-// declaration written outside every design element in one file is worth in the
-// other.
-//
-// The declaration kinds are the ones §3.12.1 names: the compilation-unit scope,
-// though no package, may hold any item a package may (§26.2) and bind
-// constructs too (§23.11).
-
-// The infrastructure one command line is compiled and elaborated against.
 struct CommandLineHarness {
   SourceManager mgr;
   Arena arena;
@@ -323,26 +277,14 @@ struct CommandLineHarness {
   SinglePassCompiler compiler{libs, mgr, arena, diag};
 };
 
-// The library map every test here compiles against. A compilation-unit
-// declaration belongs to no library, so the map claims the sources only so that
-// the design elements among them have somewhere to go.
 constexpr const char* kLibMap = "library rtlLib src/*.sv;\n";
 
-// Compiles `files` as one command line into `h` and elaborates nothing,
-// answering whether every description compiled. A case reading an item back
-// through this one is reading what the parser built: after elaboration,
-// Elaborator::ReclassifyForwardUdpInstances has rewritten every module
-// instantiation whose name turns out to be a primitive into a primitive
-// instance, so the kind read there is the same whichever parse produced it.
 bool CompileCommandLineOnly(CommandLineHarness& h, const ScratchDir& tmp,
                             const std::vector<fs::path>& files) {
   if (!h.libs.LoadMapFile(tmp.dir / "lib.map")) return false;
   return h.compiler.CompileCommandLine(files, h.unit);
 }
 
-// Compiles `files` as one command line into `h` and elaborates the compilation
-// unit that produced, returning the design or nullptr. The design outlives the
-// elaborator because it is arena-allocated, and the arena is the harness's.
 RtlirDesign* CompileCommandLineAndElaborate(CommandLineHarness& h,
                                             const ScratchDir& tmp,
                                             const std::vector<fs::path>& files,
@@ -352,19 +294,11 @@ RtlirDesign* CompileCommandLineAndElaborate(CommandLineHarness& h,
   return elab.Elaborate(top);
 }
 
-// The module `top` of a design that came out as exactly one top module, or
-// nullptr. Both typedef cases and the class case read the compilation-unit
-// scope through it.
 const RtlirModule* SoleTopModule(RtlirDesign* design) {
   if (design == nullptr || design->top_modules.size() != 1u) return nullptr;
   return design->top_modules[0];
 }
 
-// The one item of the module `module_name` that stands as a primitive
-// instance, or nullptr where no module of that name was parsed, where it holds
-// no such item, or where it holds more than one. The last of those is a source
-// description no case here writes, and answering nullptr for it keeps "the
-// instance" from naming whichever came first.
 const ModuleItem* SoleUdpInstance(const CompilationUnit& unit,
                                   std::string_view module_name) {
   const ModuleItem* found = nullptr;
@@ -379,14 +313,6 @@ const ModuleItem* SoleUdpInstance(const CompilationUnit& unit,
   return found;
 }
 
-// The primitive the cases below declare in the first file of their command
-// line and instantiate in the second. A.1.2 admits udp_declaration only as a
-// description at the outermost level, so it is written outside every design
-// element, which is what makes §3.12.1 case a) the rule that carries its name
-// to the next file. Three ports, so that a case reading gate_terminals back
-// reads a count no other arm of Parser::ParseImplicitTypeOrInst leaves there: a
-// module instantiation puts its connections in inst_ports and a data
-// declaration puts nothing anywhere near it.
 constexpr const char* kAndPrimitive =
     "primitive myudp(output q, input d, clk);\n"
     "  table\n"
@@ -397,8 +323,6 @@ constexpr const char* kAndPrimitive =
     "  endtable\n"
     "endprimitive\n";
 
-// The same declaration with one input, for the strength case alone, whose
-// instance §29.8 writes with two terminals.
 constexpr const char* kInverterPrimitive =
     "primitive myudp(output q, input d);\n"
     "  table\n"
@@ -409,12 +333,6 @@ constexpr const char* kInverterPrimitive =
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      PackageImportedInOneFileResolvesATypeDeclaredInAnother) {
-  // §26.3: an import declaration lets a package's identifiers be seen in the
-  // current scope without the package name in front, and §26.3 requires only
-  // that a package be compiled before any scope that imports it, which a
-  // command line naming the package's file first satisfies. The import put
-  // nothing back while the package's own entry stayed with the parse that read
-  // it, so `byte_t b;` was read as an instantiation of a module called byte_t.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto pkg = tmp.Write("src/pkg.sv",
@@ -438,10 +356,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      ExplicitPackageImportResolvesATypeDeclaredInAnotherFile) {
-  // §26.3's explicit form, which hands over the one name it writes rather than
-  // every name the package declared. Parser::ApplyImportedTypeNames reaches it
-  // by a different arm from the wildcard, so a repair carrying only one of them
-  // would leave this reading as an instantiation.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto pkg = tmp.Write("src/pkg.sv",
@@ -465,11 +379,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      ScopedPackageTypeNameResolvesAcrossFiles) {
-  // The same type reached by its qualified name instead, which needs no import
-  // and so no package entry. It is here to separate the two: a repair that
-  // carried the package entries would be credited with this case whether it
-  // worked or not, and this says the qualified spelling was never the one that
-  // failed.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto pkg = tmp.Write("src/pkg.sv",
@@ -492,11 +401,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      ClassExtendedInOneFileTakesTheTypeNamesOfABaseInAnother) {
-  // §8.13's extends clause gives a derived class the names its base declared,
-  // and Parser::ParseClassDecl puts them back from the entry it kept when the
-  // base's body closed. That entry is the class half of the same scope the
-  // package half above is in, so it crosses for the same reason and was lost
-  // for the same reason.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto base = tmp.Write("src/base.sv",
@@ -522,9 +426,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      TypedefDeclaredInOneFileIsVisibleInAnother) {
-  // The typedef is in the file compiled first and the use is in the file
-  // compiled second, so this is the visibility §3.12.1 case a) grants across
-  // the set of files.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto types = tmp.Write("src/types.sv", "typedef logic [7:0] byte_t;\n");
@@ -545,11 +446,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      TypedefIsVisibleInTheFileThatDeclaredIt) {
-  // One file declares the typedef and uses it, so no visibility crosses a file
-  // boundary at all. This separates a merge that drops the declaration from one
-  // that merely orders the command line's files wrongly: the unit the compiler
-  // builds is the only one the elaborator reads, so a declaration left behind
-  // is lost to its own file too.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto only = tmp.Write("src/only.sv",
@@ -570,10 +466,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      CompilationUnitClassIsVisibleInAnotherFile) {
-  // A class declared outside every design element is an item §26.2 allows in a
-  // package, so §3.12.1 puts it in the compilation-unit scope. The parser keeps
-  // it in CompilationUnit::classes rather than in cu_items, which is why this
-  // case is here beside the typedef ones rather than folded into them.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto cls = tmp.Write("src/cls.sv",
@@ -595,12 +487,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      ExternalConstraintBlockCompletesAPrototypeInAnotherFile) {
-  // §18.5.1 has an external constraint block complete the prototype of the
-  // class it names, and §3.12.1 is what puts the two in one scope when they are
-  // written in two files on one command line. The parser keeps the block in
-  // CompilationUnit::external_constraints and the class in
-  // CompilationUnit::classes, so this case turns on a different pair of lists
-  // from the ones above.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto cls = tmp.Write("src/cls.sv",
@@ -627,13 +513,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      CompilationUnitBindReachesTheDesign) {
-  // §3.12.1 names bind constructs alongside the package items: the
-  // compilation-unit scope may hold any item a package may (§26.2) and bind
-  // constructs too (§23.11). The bind is written in one file and its target
-  // `cpu` is declared in another, so this is the same visibility the typedef
-  // cases ask about. It is here because losing a bind changes the design rather
-  // than only a diagnostic: the bound instance is simply absent, and nothing is
-  // reported about it.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto probe = tmp.Write("src/probe.sv",
@@ -665,14 +544,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      PrimitiveDeclaredInOneFileParsesAsAPrimitiveInstanceInAnother) {
-  // src/prim.sv declares myudp and src/top.sv writes `myudp u (q, d, clk);`,
-  // which is §29.8's udp_instantiation. The item is read before anything is
-  // elaborated, because Elaborator::ReclassifyForwardUdpInstances turns a
-  // module instantiation whose name turns out to name a primitive into a
-  // primitive instance, so a kind read afterwards says nothing about which
-  // parse produced it. gate_inst_name is where Parser::ParseOneUdpInstance
-  // writes the instance name and inst_name is where Parser::ParseModuleInstList
-  // writes it, so the two together say which of them ran.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
@@ -695,16 +566,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      UnnamedPrimitiveInstanceParsesInAFileAfterTheDeclaration) {
-  // `myudp (q, d, clk);`, which §29.8 permits: its udp_instance is
-  // `[ name_of_instance ] ( output_terminal , input_terminal
-  // { , input_terminal } )`, and the prose leaves the instance name optional,
-  // as it is for gates. A parse that has not been told myudp names a primitive
-  // reaches neither instantiation arm of Parser::ParseImplicitTypeOrInst, since
-  // both want an identifier or a `#` after the name, so the item falls to
-  // Parser::ParsePlainVarDecl and the file does not parse. Nothing recovers
-  // this one during elaboration: there is no module instantiation left for
-  // Elaborator::ReclassifyForwardUdpInstances to reclassify. The item is read
-  // back as a primitive instance with no instance name and three terminals.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
@@ -727,16 +588,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      GateDelayOnAPrimitiveInstanceSurvivesTheFileThatDeclaredIt) {
-  // `myudp #5 u (q, d, clk);`, whose `#5` is the [ delay2 ] §29.8 writes
-  // between the primitive's name and its instance. Parser::ParseUdpInstList
-  // reads it into gate_delay; Parser::ParseModuleInstList reads the same `#5`
-  // as a parameter value assignment and puts it in inst_params, and
-  // Elaborator::ReclassifyForwardUdpInstances moves the ports across without
-  // moving that back. The instance then elaborates with no delay and no report,
-  // which is why this case reads both fields: the delay is where §29.8 puts it,
-  // and the parameter list it would otherwise sit in is empty. An unwritten
-  // delay leaves gate_delay null, so 5 is a value the two readings cannot
-  // share.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
@@ -761,15 +612,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      DriveStrengthOnAPrimitiveInstanceParsesInAFileAfterTheDeclaration) {
-  // `myudp (strong1, weak0) u (q, d);`. §29.8 writes the drive_strength after
-  // the primitive's name -- `udp_identifier [ drive_strength ] [ delay2 ]
-  // udp_instance { , udp_instance } ;` -- and Parser::TryParseStrengthSpec
-  // reads it there, inside Parser::ParseUdpInstList alone. A parse that has not
-  // been told myudp names a primitive reaches no arm that admits a `(` after
-  // the name at all, so the file does not parse. The two strengths differ from
-  // each other and from the 0 an unwritten strength leaves: 4 for strong1 in
-  // Parser::ParseStrength1, 2 for weak0 in Parser::ParseStrength0. An item that
-  // took one of them for the other therefore fails here.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kInverterPrimitive);
@@ -794,16 +636,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      PrimitiveNameDoesNotReachTheNextCommandLine) {
-  // The other direction: §3.12.1 case a) makes one command line one
-  // compilation unit and not all of them, so the primitive declared on the
-  // first command line is no primitive name to the second.
-  // SinglePassCompiler::CompileCommandLine empties the scope it carries at the
-  // start of each command line, and ModuleItem::udp_undeclared_at_parse is
-  // what says whether that still holds once a primitive name travels in it.
-  // The unnamed form `myudp (q, d, clk);` is a UDP instance whatever the parser
-  // knows, and the flag is set on it only where the parser held no declaration
-  // of myudp. The named form would parse as a module instantiation where the
-  // name is unknown, which carries no such flag to read.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto prim = tmp.Write("src/prim.sv", kAndPrimitive);
@@ -813,12 +645,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                        "  myudp (q, d, clk);\n"
                        "endmodule\n");
 
-  // The second command line is given a compilation unit of its own, which
-  // SinglePassCompiler::CompileCommandLine in src/parser/single_pass_compile.h
-  // requires: "Pass a compilation unit that no earlier command line has already
-  // been compiled into." The library map is loaded once for the same reason,
-  // since LibraryMap::LoadMapFile adds every declaration the file holds each
-  // time it is called.
   CommandLineHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   ASSERT_TRUE(h.compiler.CompileCommandLine({prim}, h.unit));
@@ -831,31 +657,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      ASkippedRecompileCarriesTheCompilationUnitTimeunit) {
-  // Two command lines off one SinglePassCompiler, each naming src/only.sv and
-  // nothing else, and each compiled into a compilation unit of its own. The
-  // first takes SinglePassCompiler::MapIntoLibrary, which parses the
-  // description and appends its declarations at
-  // src/parser/single_pass_compile.cpp:179-180. The second finds that
-  // description already compiled from this same text with its cell still held
-  // in rtlLib, so SinglePassCompiler::CompileSource takes the reuse path and
-  // appends the declarations of that same parse at
-  // src/parser/single_pass_compile.cpp:210-211 without parsing anything.
-  //
-  // §3.14.2.2 puts a timeunit declaration written outside every design element
-  // in the compilation-unit scope -- a module, program, package or interface
-  // definition, or a compilation-unit scope, has at most one time unit and one
-  // time precision -- and §20.4.1 makes that scope's time unit the $unit
-  // argument's, which is what RtlirDesign::cu_timescale holds. One description
-  // declares it, so the two runs have to report it alike: a carry written into
-  // MapIntoLibrary alone would make a design's time unit turn on whether this
-  // run compiled the file or an earlier one did, which is the difference
-  // §3.12.1 case a) leaves no room for.
-  //
-  // `timeunit 100ps / 10fs;` is §3.14.2.2's own example, and each of its four
-  // values differs from the one a compilation unit that declared nothing
-  // leaves: TimeScale in src/common/types.h starts at 1 ns / 1 ns. The unit
-  // and the precision also name different units, so a carry that wrote one of
-  // them into the other fails here as well.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto only = tmp.Write("src/only.sv",
@@ -863,9 +664,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
                         "module top;\n"
                         "endmodule\n");
 
-  // The library map is loaded once for both command lines, since
-  // LibraryMap::LoadMapFile adds every declaration the file holds each time it
-  // is called.
   CommandLineHarness h;
   ASSERT_TRUE(h.libs.LoadMapFile(tmp.dir / "lib.map"));
   ASSERT_TRUE(h.compiler.CompileCommandLine({only}, h.unit));
@@ -876,17 +674,8 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
   ASSERT_NE(compiled, nullptr);
   auto compiled_file_id = compiled->loc.file_id;
 
-  // The second command line is given a compilation unit of its own, which
-  // SinglePassCompiler::CompileCommandLine in src/parser/single_pass_compile.h
-  // requires: "Pass a compilation unit that no earlier command line has already
-  // been compiled into."
   CompilationUnit second_unit;
   ASSERT_TRUE(h.compiler.CompileCommandLine({only}, second_unit));
-  // That the second run reused the first parse rather than making another one.
-  // SourceManager::AddFile hands back a file identifier one higher than the
-  // last on every call, and MapIntoLibrary is what calls it, so top still
-  // standing in the file the first run registered says nothing parsed the
-  // description again.
   const LibraryCell* reused = h.libs.CellInLibrary("rtlLib", "top");
   ASSERT_NE(reused, nullptr);
   ASSERT_EQ(reused->loc.file_id, compiled_file_id);
@@ -907,10 +696,6 @@ TEST(CompilationUnitScopeAcrossCommandLineFiles,
 
 TEST(CompilationUnitScopeAcrossCommandLineFiles,
      UnitVariableDeclaredInALaterFileIsOutOfReach) {
-  // §3.12.1 makes a file's declarations visible in the files after it by the
-  // normal rules, so a compilation-unit variable written in the second file is
-  // no name a module of the first can read: the read in top is reported as
-  // §23.9's unresolved reference, as it is when both stand in one file.
   ScratchDir tmp;
   tmp.Write("lib.map", kLibMap);
   auto top = tmp.Write("src/top.sv",

@@ -79,9 +79,6 @@ TEST(ArrayMethodCallParsing, PropertyAccessAfterWithClause) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §7.12: the with clause carries an expression enclosed in parentheses (as
-// opposed to randomize's brace-delimited constraint set). The parser records
-// the parenthesized form so later stages can tell the two apart.
 TEST(ArrayMethodCallParsing, WithClauseUsesParentheses) {
   auto r = Parse(
       "module t;\n"
@@ -99,9 +96,6 @@ TEST(ArrayMethodCallParsing, WithClauseUsesParentheses) {
   EXPECT_TRUE(rhs->with_has_parens);
 }
 
-// §7.12: when no with clause is present, a property or range select instead
-// follows the array method call itself. This is the complement of
-// PropertyAccessAfterWithClause and exercises the no-with branch.
 TEST(ArrayMethodCallParsing, PropertyAccessWithoutWithClause) {
   auto r = Parse(
       "module t;\n"

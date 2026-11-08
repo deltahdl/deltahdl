@@ -14,40 +14,13 @@
 
 using namespace delta;
 
-// §29.8 states what a UDP instantiation writes into the design. Syntax 29-2
-// gives it as `udp_instantiation ::= udp_identifier [ drive_strength ]
-// [ delay2 ] udp_instance { , udp_instance } ;` over `udp_instance ::=
-// [ name_of_instance ] ( output_terminal , input_terminal
-// { , input_terminal } )`, and the prose adds that the instance name is
-// optional as it is for gates, that the terminals connect in the order the UDP
-// definition gives, and that at most two delays may be written, a UDP having no
-// z.
-//
-// Each case below elaborates one such instantiation and reads back the
-// RtlirUdpInst (src/elaborator/rtlir.h:247) that
-// Elaborator::ElaborateUdpInst (src/elaborator/elaborator_items_udp.cpp:198)
-// appends to RtlirModule::udp_insts. The call stands at
-// src/elaborator/elaborator_items.cpp:683, in the
-// `case ModuleItemKind::kUdpInst:` arm of Elaborator::ElaborateDeclItem
-// (src/elaborator/elaborator_items.cpp:622). Before #3197 that arm wrote
-// nothing, so the instance drove no terminal and every assertion here would
-// read an empty RtlirModule::udp_insts.
-
 namespace {
 
-// The top module of a design ElaborateSrc built, or nullptr when the elaborator
-// rooted none. Each case names its own top, so a design that reached the
-// assertions holds exactly that one.
 RtlirModule* TopModule(RtlirDesign* design) {
   if (design == nullptr || design->top_modules.empty()) return nullptr;
   return design->top_modules[0];
 }
 
-// §29.8: the instantiation is what drives the primitive's output terminal, so
-// elaborating a module that instantiates a combinational primitive shall leave
-// a driver behind naming the net the source connected first. This is the case
-// #3197 was filed on: with the kUdpInst arm writing nothing,
-// RtlirModule::udp_insts stayed empty and the net `q_out` had no driver at all.
 TEST(UdpInstanceElaboration, CombinationalPrimitiveDrivesItsOutputTerminal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,14 +44,6 @@ TEST(UdpInstanceElaboration, CombinationalPrimitiveDrivesItsOutputTerminal) {
   EXPECT_EQ(mod->udp_insts[0].output->text, "q_out");
 }
 
-// §29.8: `udp_instance ::= [ name_of_instance ] ( output_terminal ,
-// input_terminal { , input_terminal } )` puts the output terminal first and
-// the terminals connect in the order the UDP definition gives, so the terminal
-// the source wrote first reaches RtlirUdpInst::output and the rest reach
-// RtlirUdpInst::inputs in that order. The three terminals carry different
-// identifiers, so an implementation that filled output from a later terminal or
-// reversed the inputs reads back a different name here rather than the same
-// one.
 TEST(UdpInstanceElaboration, TerminalOrderFollowsThePrimitiveDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -108,12 +73,6 @@ TEST(UdpInstanceElaboration, TerminalOrderFollowsThePrimitiveDefinition) {
   EXPECT_EQ(inst.inputs[2]->text, "i_third");
 }
 
-// §29.8: a UDP instantiation names the primitive it instantiates, so
-// RtlirUdpInst::decl shall be the UdpDecl (src/parser/ast_specify.h:139) the
-// source declared under that name and not merely some primitive. The
-// assertions read UdpDecl::name and UdpDecl::output_name, which differ between
-// the two primitives this source declares, so resolving the instance to the
-// wrong declaration reads back `p_other1` rather than `p_named2`.
 TEST(UdpInstanceElaboration, InstanceCarriesTheDeclarationItNamed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -144,18 +103,6 @@ TEST(UdpInstanceElaboration, InstanceCarriesTheDeclarationItNamed) {
   EXPECT_EQ(mod->udp_insts[0].decl->output_name, "o_named");
 }
 
-// §29.8 admits a drive_strength and a delay2 on an instantiation, ordering them
-// in Syntax 29-2 as `udp_identifier [ drive_strength ] [ delay2 ] udp_instance`
-// -- which is why the strength spec below stands between the primitive's name
-// and the instance name rather than after it. Both reach the elaborated
-// instance: the `#5` reaches RtlirUdpInst::delay and the
-// `(strong1, weak0)` reaches RtlirUdpInst::drive_strength1 and
-// RtlirUdpInst::drive_strength0. The strength codes are the ones
-// Parser::ParseStrength0 (src/parser/parser_toplevel.cpp:291) and
-// Parser::ParseStrength1 (src/parser/parser_toplevel.cpp:309) return, where
-// strong is 4 and weak is 2; 0 is what an instantiation with no strength spec
-// leaves, so neither value here is one an instance that dropped the spec could
-// show.
 TEST(UdpInstanceElaboration, DelayAndDriveStrengthReachTheInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -180,12 +127,6 @@ TEST(UdpInstanceElaboration, DelayAndDriveStrengthReachTheInstance) {
   EXPECT_EQ(inst.drive_strength0, 2);
 }
 
-// §29.8: the instance name is optional, as it is for gates, so an instantiation
-// the source left unnamed still elaborates to an RtlirUdpInst, with
-// RtlirUdpInst::name empty. The terminals are asserted alongside the empty name
-// so the case cannot pass on an instance that was never recorded: an absent
-// instance has no terminals to read either, and reading them is what separates
-// an instance elaborated without a name from one not elaborated.
 TEST(UdpInstanceElaboration, UnnamedInstanceElaboratesWithAnEmptyName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -211,14 +152,6 @@ TEST(UdpInstanceElaboration, UnnamedInstanceElaboratesWithAnEmptyName) {
   EXPECT_EQ(inst.inputs[0]->text, "n_in");
 }
 
-// §29.8 covers the primitive instantiation only; §28.4 gives the `and` gate an
-// output computed by an operator, which Elaborator::ElaborateDeclItem sends to
-// ElaborateGateInst (src/elaborator/elaborator_gates.cpp:635) and which lands
-// in RtlirModule::assigns as an RtlirContAssign whose lhs is the gate's first
-// terminal. The two arms write to different members of the same RtlirModule, so
-// a module holding one of each shall show one entry in each: a gate that leaked
-// into RtlirModule::udp_insts, or a primitive that lowered to an
-// RtlirContAssign, changes one of these counts.
 TEST(UdpInstanceElaboration, GateInstanceInTheSameModuleStaysInAssigns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -246,25 +179,6 @@ TEST(UdpInstanceElaboration, GateInstanceInTheSameModuleStaysInAssigns) {
   EXPECT_EQ(mod->assigns[0].lhs->text, "g_out");
 }
 
-// §29.8: an array of UDP instances may carry a range, and UDP instances are
-// written inside modules as gates are (§28.3), so the four-element range below
-// shall leave four entries in RtlirModule::udp_insts rather than one. §28.3.6
-// says which bit each element connects to: where the widths differ, each
-// instance takes a part-select of the port expression as wide as its own port,
-// so the four elements take the four distinct bits of the 4-bit terminal
-// `r_out_v`.
-//
-// Both assertions are needed. The count alone passes an expansion that
-// connected the whole vector to all four instances, which is what the four
-// instances of one unexpanded terminal would look like, and the set of bits
-// alone passes a count of any size. The instance range is `[7:4]` and the
-// terminal is declared `[3:0]` so that no array index is also a bit position:
-// an implementation that used the instance's own index as the bit position
-// reads back bits 4 through 7, which are not bits of this terminal at all.
-//
-// This is the case #3199 was filed on: with the kUdpInst arm returning without
-// appending anything when the instance carries a range,
-// RtlirModule::udp_insts is empty and no bit of `r_out_v` is driven.
 TEST(UdpInstanceElaboration, InstanceArrayExpandsToOneInstancePerElement) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -294,17 +208,6 @@ TEST(UdpInstanceElaboration, InstanceArrayExpandsToOneInstancePerElement) {
   EXPECT_EQ(output_bits, (std::set<uint64_t>{0, 1, 2, 3}));
 }
 
-// §29.8: a UDP instance connects its terminals by §28.3.6's rules, and §28.3.6
-// rules that a terminal with too many or too few bits for all the instances is
-// an error. The array below has four elements, so its output terminal is either
-// 1 bit and broadcast to each element or 4 bits and distributed across them;
-// the 3-bit `w_out_v` is neither, and the three surplus-or-missing bits connect
-// to nothing.
-//
-// The report is named through ReportedError so the case cannot pass on some
-// other rejection of this source -- an unexpanded array reports nothing at all
-// today, and a source rejected for a different reason would satisfy a bare
-// "were there errors" question.
 TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -325,35 +228,6 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalOfAWrongWidthIsReported) {
       "gate or primitive array terminal width does not match", 10, "28.3.6"));
 }
 
-// §29.8 puts a primitive instance inside a module as it puts a gate, and §27.3
-// rules that instantiating a generate block makes the objects, behavioral
-// constructs and module instances inside it exist, so a loop generate construct
-// holding one instantiation leaves one RtlirUdpInst per iteration. §27.4 says
-// what tells those instances apart: inside a loop generate construct's block
-// there is an implicit localparam whose value in each block instance is the
-// loop index at the moment that instance was elaborated, usable wherever an
-// ordinary integer parameter could be within the block. A terminal written
-// `y_out_v[row]` is such a use, so the value that terminal resolves against has
-// to reach the instance, and RtlirUdpInst::gen_block_consts
-// (src/elaborator/rtlir.h:261) is where it rides: the iterations share one body
-// AST, so nothing in the AST distinguishes them.
-//
-// Both assertions are needed. The count alone passes a loop whose two instances
-// were elaborated with one localparam value between them, which is what two
-// instances driving the same bit look like, and the values alone say nothing
-// about how many instances the loop left.
-//
-// The genvar runs 5 to 6 so that no value it takes is also an index into
-// RtlirModule::udp_insts, which are 0 and 1, and the terminal is declared
-// `[7:4]` so that no value it takes is also a storage offset within the
-// terminal, which are 1 and 2. An implementation that stamped the iteration's
-// ordinal, or the offset the terminal select resolved to, reads back a value
-// this case does not accept.
-//
-// This is the case #3201 was filed on: Elaborator::ElaborateGenerateBlockItem
-// (src/elaborator/elaborator_generate.cpp:122) stamps RtlirModule::processes
-// and RtlirModule::assigns and not RtlirModule::udp_insts, so both instances
-// carry an empty gen_block_consts and the set below holds nothing.
 TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -385,30 +259,6 @@ TEST(UdpInstanceElaboration, GenerateLoopStampsEachInstanceWithItsIndex) {
   EXPECT_EQ(index_values, (std::set<int64_t>{5, 6}));
 }
 
-// §27.4: a generate block forms a scope of its own and a further level of
-// hierarchy once instantiated, so the `c_local` this block declares belongs to
-// the block instance rather than to `col_top`, and the elaborator names it
-// under a prefix that identifies the instance. The body AST is shared across
-// instances and still writes the simple name `c_local`, so the terminal of the
-// primitive instance can only reach that declaration through the prefix the
-// instance carries, which is the last entry of RtlirUdpInst::gen_block_prefixes
-// (src/elaborator/rtlir.h:299). Lowerer::LowerUdpInst
-// (src/simulator/lowerer_udp.cpp:321) copies the list to Process::gen_prefixes,
-// and SimContext prepends each entry to a name before looking the name up.
-//
-// The assertion is that the prefix, followed by the simple name the body wrote,
-// is the name the block instance's own declaration got. Stating it that way
-// rather than against a spelling asserts what the prefix is for: §27.4 fixes
-// that a named block instance has its own scope, and fixes nothing about how a
-// flattened design spells the prefix. ASSERT_NE above it states the premise the
-// equality rests on, that the declaration was named under a prefix at all,
-// which is what would otherwise let an unprefixed declaration and an unstamped
-// instance agree on the empty string.
-//
-// This is the second half of the case #3201 was filed on: with
-// Elaborator::ElaborateGenerateBlockItem not stamping RtlirModule::udp_insts,
-// gen_block_prefixes is empty and the primitive drives a name no instance of
-// the block declares.
 TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -444,19 +294,6 @@ TEST(UdpInstanceElaboration, GenerateBlockPrefixNamesTheInstanceDeclarations) {
       std::string(block_net->name));
 }
 
-// §29.8: `udp_instance ::= [ name_of_instance ] ( output_terminal ,
-// input_terminal { , input_terminal } )` and the terminals connect in the order
-// the UDP definition gives, so the list holds one terminal for the output port
-// and one per input port of the primitive, three for `p_two`. The instance
-// below writes two, leaving the second input port with nothing driving it. The
-// report stands on the instantiation's line rather than the primitive's, and
-// names the counts, so the case tells it from the §28.3.6 width report the
-// array case above expects and from any rejection of the primitive itself.
-//
-// Before this check nothing said so: ElaborateOneUdpInst split the list at
-// index 1 whatever its length, and UdpRowMatchesLevels
-// (src/simulator/udp_eval.cpp) compared that length against each row's field
-// count and answered no match, so the instance drove x for the whole run.
 TEST(UdpInstanceElaboration, InstanceWithTooFewTerminalsIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -477,11 +314,6 @@ TEST(UdpInstanceElaboration, InstanceWithTooFewTerminalsIsReported) {
       "29.8"));
 }
 
-// The other side of the rule above: a fourth terminal on an instance of a
-// two-input primitive names a net no port receives. The count is over the
-// terminals the instantiation wrote, so an implementation that stopped
-// reading at the primitive's port count and dropped the rest would find
-// nothing to report here.
 TEST(UdpInstanceElaboration, InstanceWithTooManyTerminalsIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -502,11 +334,6 @@ TEST(UdpInstanceElaboration, InstanceWithTooManyTerminalsIsReported) {
       "29.8"));
 }
 
-// §29.8 reads the terminal count off the primitive's port list, and an array
-// of instances writes one terminal list for every element, so an array whose
-// list is short is one mistake and draws one report rather than one per
-// element. The range declares four elements, so an implementation that ran
-// the check once per expanded element counts four here.
 TEST(UdpInstanceElaboration, InstanceArrayTerminalCountIsReportedOnce) {
   ElabFixture f;
   ElaborateSrc(
@@ -534,11 +361,6 @@ TEST(UdpInstanceElaboration, InstanceArrayTerminalCountIsReportedOnce) {
   EXPECT_EQ(count_reports, 1);
 }
 
-// A design whose one module instantiates p_fwd, a primitive declared only after
-// it, by the instantiation `inst` written on line 3. §29.3 lets a UDP be
-// declared anywhere, so the parser, which has not read p_fwd's declaration when
-// it reaches the instantiation, reads it as a module instance, and
-// Elaborator::ReclassifyForwardUdpInstances turns it into a UDP instance.
 std::string ForwardUdpSrc(const std::string& inst) {
   return "module fwd_top;\n"
          "  wire f_out, f_a, f_b;\n"
@@ -554,17 +376,12 @@ std::string ForwardUdpSrc(const std::string& inst) {
          "endprimitive\n";
 }
 
-// The one UDP instance of fwd_top, or nullptr when it elaborated none.
 const RtlirUdpInst* ForwardUdpInst(RtlirDesign* design) {
   auto* mod = TopModule(design);
   if (mod == nullptr || mod->udp_insts.size() != 1) return nullptr;
   return &mod->udp_insts[0];
 }
 
-// §29.8 gives a UDP instance a gate's delay2, whose parenthesised form is
-// `#( d )`. Read before p_fwd's declaration, `#(5)` is an ordered parameter
-// override of what the parser takes for a module, and the conversion to a UDP
-// instance left it there, so the instance had no delay at all.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesAParenthesisedDelay) {
   ElabFixture f;
   const auto* inst = ForwardUdpInst(ElaborateSrc(
@@ -576,10 +393,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesAParenthesisedDelay) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A.5.4 gives a UDP instance an optional delay2, whose parenthesised form holds
-// one or two values. Read before p_fwd's declaration, an empty `#( )` is an
-// empty parameter value assignment, which left inst_params empty, so the
-// conversion took it for no delay written at all.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyDelayIsReported) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd #() u(f_out, f_a, f_b);"), f, "fwd_top");
@@ -589,8 +402,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyDelayIsReported) {
                             3, "A.5.4"));
 }
 
-// The second of a delay2's two values is the fall delay, so `#(5, 3)` gives
-// the instance a rise delay of 5 and a fall delay of 3, in that order.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesRiseAndFallDelays) {
   ElabFixture f;
   const auto* inst = ForwardUdpInst(ElaborateSrc(
@@ -602,9 +413,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesRiseAndFallDelays) {
   EXPECT_EQ(inst->delay_fall->int_val, 3U);
 }
 
-// §29.8 allows a UDP instance two delays at most, a UDP having no z, and the
-// parser already reports a third for a primitive it has read. One declared
-// after its use draws the same report.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithThreeDelaysIsReported) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd #(5, 3, 1) u(f_out, f_a, f_b);"), f,
@@ -614,8 +422,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithThreeDelaysIsReported) {
                             3, "29.8"));
 }
 
-// A delay2 lists its delays in order and names none, so a named parameter
-// assignment on a UDP instance is no delay §29.8 admits.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithANamedAssignmentIsReported) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd #(.d(5)) u(f_out, f_a, f_b);"), f,
@@ -626,10 +432,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithANamedAssignmentIsReported) {
       "29.8"));
 }
 
-// §29.8 connects a UDP instance's terminals in the order its definition gives,
-// and Syntax 29-2 writes them as a list of terminals alone. The conversion
-// copied named connections into the terminal list in the order written, so
-// `.f_b(f_b)` became the output terminal and nothing was reported.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithNamedConnectionsIsReported) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u(.f_b(f_b), .f_out(f_out), .f_a(f_a));"),
@@ -640,8 +442,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithNamedConnectionsIsReported) {
       "29.8"));
 }
 
-// `.*` names no terminal at all, and the conversion found an empty terminal
-// list behind it. It is a connection by name, reported as the named ones are.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAWildcardIsReported) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u(.*);"), f, "fwd_top");
@@ -651,9 +451,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAWildcardIsReported) {
       "29.8"));
 }
 
-// A delay with no parentheses, which the parser reads as a UDP instance's
-// before it knows p_fwd, reaches the instance as one written after the
-// primitive's declaration does.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesADelayWithoutParentheses) {
   ElabFixture f;
   const auto* inst = ForwardUdpInst(ElaborateSrc(
@@ -663,8 +460,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesADelayWithoutParentheses) {
   EXPECT_EQ(inst->delay->int_val, 5U);
 }
 
-// A drive strength reaches the instance the same way. Strong is 4 and weak is
-// 2, so neither is the 0 an instance that dropped the strength holds.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesADriveStrength) {
   ElabFixture f;
   const auto* inst = ForwardUdpInst(
@@ -675,8 +470,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpTakesADriveStrength) {
   EXPECT_EQ(inst->drive_strength1, 2);
 }
 
-// An unnamed instance of p_fwd drives its output terminal, as one of a
-// primitive declared first does.
 TEST(UdpInstanceElaboration, UnnamedInstanceOfAForwardDeclaredUdp) {
   ElabFixture f;
   const auto* inst = ForwardUdpInst(
@@ -686,10 +479,6 @@ TEST(UdpInstanceElaboration, UnnamedInstanceOfAForwardDeclaredUdp) {
   EXPECT_EQ(inst->output->text, "f_out");
 }
 
-// The parser reads `m_child #5 u (...)` as a UDP instance before it knows what
-// m_child names, since no module instance is written that way. m_child is a
-// module, so the instantiation is neither a primitive's nor a module's, and
-// the instance was dropped without a report.
 TEST(UdpInstanceElaboration, ModuleWrittenAsAPrimitiveInstanceIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -706,10 +495,6 @@ TEST(UdpInstanceElaboration, ModuleWrittenAsAPrimitiveInstanceIsReported) {
                             5, "29.8"));
 }
 
-// §29.8 gives an array of UDP instances the one range §28.3.5 gives an array
-// of gates. Read before p_fwd's declaration, the instance is parsed as a
-// module's, whose name_of_instance takes any number of unpacked dimensions,
-// and the conversion kept the first range and dropped the second unreported.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithASecondRange) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u[1:0][1:0](f_out, f_a, f_b);"), f,
@@ -720,8 +505,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithASecondRange) {
                             3, "28.3.5"));
 }
 
-// A size written alone is the unpacked_dimension a module instance array may
-// take, and no range of two constant expressions at all.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithASizeAlone) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u[2](f_out, f_a, f_b);"), f, "fwd_top");
@@ -731,7 +514,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithASizeAlone) {
                             3, "28.3.5"));
 }
 
-// The single range §28.3.5 describes draws neither report.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithOneRange) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u[1:0](f_out, f_a, f_b);"), f, "fwd_top");
@@ -739,10 +521,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpArrayWithOneRange) {
                              "28.3.5"));
 }
 
-// A.3.3 makes a UDP instance's output terminal a net_lvalue, which A.5.4
-// writes first and does not let go unwritten. Read before p_fwd's declaration,
-// the empty connection is a module instance's omitted ordered connection, and
-// the conversion handed it on as a null output terminal.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyOutputTerminal) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u(, f_a, f_b);"), f, "fwd_top");
@@ -751,8 +529,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyOutputTerminal) {
                             "A.5.4"));
 }
 
-// An input terminal is an expression under A.3.3, which is no more optional
-// than the output terminal ahead of it.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyInputTerminal) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u(f_out, , f_b);"), f, "fwd_top");
@@ -764,10 +540,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnEmptyInputTerminal) {
                              3, "A.5.4"));
 }
 
-// A.5.4 writes a UDP instance's terminals with no attribute instance ahead of
-// any of them. Read before p_fwd's declaration, the attribute instance went
-// with a module instance's ordered connection, and the parser kept no trace of
-// it for the conversion to find.
 TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnAttributedTerminal) {
   ElabFixture f;
   ElaborateSrc(ForwardUdpSrc("p_fwd u(f_out, (* keep *) f_a, f_b);"), f,
@@ -778,8 +550,6 @@ TEST(UdpInstanceElaboration, ForwardDeclaredUdpWithAnAttributedTerminal) {
                             3, "A.5.4"));
 }
 
-// A.4.1.1 lets a module instance's ordered connection take an attribute
-// instance, so the same connection on a module's instance stays accepted.
 TEST(UdpInstanceElaboration, ModuleInstanceTakesAnAttributedConnection) {
   ElabFixture f;
   ElaborateSrc(

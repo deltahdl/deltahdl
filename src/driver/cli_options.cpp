@@ -34,11 +34,6 @@ void ParseDefine(std::string_view def, CliOptions& opts) {
                             std::string(def.substr(eq + 1)));
 }
 
-// One reading of a command line: where it has got to, how far it can go, the
-// arguments themselves, and what it has filled in. It travels as one value so
-// that a helper taking a destination as well stays inside the five parameters
-// readability-function-size.ParameterThreshold allows in
-// etc/clang_tidy/src.yml.
 struct ArgCursor {
   int& i;
   int argc;
@@ -46,24 +41,12 @@ struct ArgCursor {
   CliOptions& opts;
 };
 
-// Reports an option that was recognized and whose value the command line ended
-// before, and fails the parse through CliOptions::rejected_argument.
-//
-// The option is not an unrecognized one and must not be reported as one.
-// ParseArgs prints "unknown option" for an argument no parser took, and an
-// option written last with its value left off would reach that branch if the
-// parsers answered only "this is not my option"; the user would then be told
-// the option does not exist. Issue #3426 is that they were.
 void ReportMissingValue(std::string_view name, int i, CliOptions& opts) {
   std::cerr << ArgOriginPrefix(opts.arg_origins, i) << name
             << " expects a value\n";
   opts.rejected_argument = true;
 }
 
-// Whether `arg` is the option `name`, taking its value into `out` where the
-// command line carried one. The answer is the same for an option whose value is
-// missing: it was this option, and ReportMissingValue has said what is wrong
-// with it.
 bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
                std::string& out) {
   if (arg != name) return false;
@@ -75,8 +58,6 @@ bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
   return true;
 }
 
-// The same for an option a command line may write more than once, whose values
-// are kept in the order they were written.
 bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
                std::vector<std::string>& out) {
   if (arg != name) return false;
@@ -88,17 +69,12 @@ bool TakeValue(std::string_view arg, std::string_view name, ArgCursor cur,
   return true;
 }
 
-// The locator of §J.3 as it stands while an option is processed: the -sv_root
-// in force, the working directory while none is.
 ForeignCodeLocator LocatorInForce(const CliOptions& opts) {
   ForeignCodeLocator locator;
   locator.SetRoot(opts.sv_root);
   return locator;
 }
 
-// The same for a path name of Annex J, resolved as §J.3 has it against the
-// locator in force, so that the value kept is the location the switch
-// specified.
 bool TakeResolvedPath(std::string_view arg, std::string_view name,
                       ArgCursor cur, std::vector<std::string>& out) {
   const int kBefore = cur.i;
@@ -109,9 +85,6 @@ bool TakeResolvedPath(std::string_view arg, std::string_view name,
   return true;
 }
 
-// The same for -sv_liblist, which keeps beside the bootstrap file's location
-// the root in force when the switch was processed, since §J.4.2 c) has the
-// file's entries resolve against that root rather than against a later one.
 bool TakeLibList(std::string_view arg, ArgCursor cur,
                  std::vector<ForeignCodeLibList>& out) {
   const int kBefore = cur.i;
@@ -123,13 +96,6 @@ bool TakeLibList(std::string_view arg, ArgCursor cur,
   return true;
 }
 
-// The same for an option whose value is a number.
-//
-// std::from_chars answers whether the text was a number rather than throwing
-// for one that was not, which std::stoull and its siblings do: nothing caught
-// those, so a mistyped number terminated the process instead of being reported.
-// The whole of the value has to be consumed, so a number with anything after it
-// is refused rather than read up to the first character that is not a digit.
 template <typename T>
 bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
                 T& out) {
@@ -139,10 +105,6 @@ bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
     return true;
   }
   std::string_view text = cur.argv[++cur.i];
-  // Every option read here is a count: a simulation time, a seed, an iteration
-  // budget and a LUT input count. None of them has a meaning below zero, and
-  // std::from_chars would take a negative value into the one signed field
-  // without complaint, so the sign is refused before the digits are read.
   if (text.starts_with("-")) {
     std::cerr << name << " expects a number that is not negative: " << text
               << "\n";
@@ -161,10 +123,6 @@ bool TakeNumber(std::string_view arg, std::string_view name, ArgCursor cur,
   return true;
 }
 
-// The simulation options whose argument is a number rather than a name, split
-// out from TryParseSimArg below so that neither function's branch count grows
-// with the other's. A caller reaches these through TryParseSimArg; the split is
-// not visible on the command line.
 bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
                            const char* const argv[], CliOptions& opts) {
   ArgCursor cur{i, argc, argv, opts};
@@ -173,17 +131,6 @@ bool TryParseSimNumericArg(std::string_view arg, int& i, int argc,
                     opts.max_generate_iterations);
 }
 
-// §11.11's min:typ:max selection, split out of TryParseSimArg below for the
-// same reason TryParseSimNumericArg is: neither function's branch count grows
-// with the other's. A caller reaches it through TryParseSimArg; the split is
-// not visible on the command line.
-//
-// A value that is none of the three is consumed rather than left behind, and
-// answers true after setting CliOptions::rejected_argument. Answering false
-// would hand --mintypmax back to ParseArgs, which knows only that no parser
-// took it and would report the option as unrecognized after this function had
-// already printed what is actually wrong with it. A --mintypmax written with no
-// value at all is answered the same way, for the same reason.
 bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
                           const char* const argv[], CliOptions& opts) {
   if (arg != "--mintypmax") return false;
@@ -206,10 +153,6 @@ bool TryParseMinTypMaxArg(std::string_view arg, int& i, int argc,
   return true;
 }
 
-// §36.12.2.2 (printed page 997): the vpiCompatibilityMode value the mode
-// `name` stands for, spelled as the Annex L symbols spell it, and 0 for a name
-// Annex M's sv_vpi_user.h (printed page 1331) gives no value -- 1800v2012,
-// 1800v2017 and 1800v2023 among them, which the listing defines none for.
 int VpiCompatModeNamed(std::string_view name) {
   static constexpr std::pair<std::string_view, int> kModes[] = {
       {"1364v1995", vpiMode1364v1995},
@@ -223,12 +166,6 @@ int VpiCompatModeNamed(std::string_view name) {
   return 0;
 }
 
-// §36.12.2.2: the simulation provider has to offer a way to set the default VPI
-// compatibility mode, with one such default per simulation run. This is that
-// means. A name that is no mode, and a second switch naming a mode other than
-// the first's, are consumed and refused as TryParseMinTypMaxArg refuses a bad
-// value; the same mode named again selects nothing new and is accepted, as
-// VpiContext::SetDefaultCompatibilityMode accepts it.
 bool TryParseVpiCompatModeArg(std::string_view arg, int& i, int argc,
                               const char* const argv[], CliOptions& opts) {
   if (arg != "--vpi-compat-mode") return false;
@@ -303,10 +240,6 @@ bool TryParseGeneralFlag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-// §31.9.4 (printed page 923): an invocation option has to turn on a simulator's
-// handling of negative values in $setuphold and $recrem timing checks, and the
-// clause names an invocation option that turns off every timing check beside
-// it.
 bool TryParseTimingCheckFlag(std::string_view arg, CliOptions& opts) {
   if (arg == "--negative-timing-checks") {
     opts.negative_timing_checks = true;
@@ -319,9 +252,6 @@ bool TryParseTimingCheckFlag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-// §30.7.4.1 (printed page 889) and §30.7.4.2 (printed page 890): the invocation
-// options selecting on-event or on-detect pulse filtering, and showcancelled or
-// noshowcancelled, for every module path output. The one written last stands.
 bool TryParsePulseStyleFlag(std::string_view arg, CliOptions& opts) {
   if (arg == "--pulse-style-onevent") {
     opts.pulse_style_ondetect = false;
@@ -342,8 +272,6 @@ bool TryParsePulseStyleFlag(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-// §30.7.2 (printed page 888): a pulse limit percentage is an integer from 0 to
-// 100. A value TakeNumber refused, or one left off, has been reported there.
 bool TakePulseLimitPercent(std::string_view arg, std::string_view name,
                            ArgCursor cur, uint8_t& out) {
   const int kBefore = cur.i;
@@ -372,10 +300,6 @@ bool TryParsePulseLimitArg(std::string_view arg, int& i, int argc,
                                opts.pulse_error_percent);
 }
 
-// §30.7.2: an error limit percentage smaller than the reject limit percentage
-// is an error, and the error limit percentage is then set equal to the reject
-// limit percentage. The run goes on with that value, which is what the clause
-// says happens next, so the parse is not failed for it.
 void SettlePulseLimitPercents(CliOptions& opts) {
   if (opts.pulse_error_percent >= opts.pulse_reject_percent) return;
   std::cerr << "error: --pulse-error-limit "
@@ -411,11 +335,7 @@ bool TryParseLibArg(std::string_view arg, int& i, int argc,
   if (TakeValue(arg, "--precompile-out", cur, opts.precompile_output)) {
     return true;
   }
-  // Annex J.3: -sv_root receives a single directory path name, the root the
-  // annex's relative path names are prepended with from then on.
   if (TakeValue(arg, ForeignCodeRootSwitch(), cur, opts.sv_root)) return true;
-  // Annex J.4: -sv_lib and -sv_liblist each receive one path name and can
-  // each be written more than once.
   if (TakeResolvedPath(arg, ForeignCodeLibSwitch(), cur, opts.sv_libs)) {
     return true;
   }
@@ -448,22 +368,12 @@ bool TryParseSingleArg(std::string_view arg, int& i, int argc,
   if (TryParseSimArg(arg, i, argc, argv, opts)) return true;
   if (TryParseLibArg(arg, i, argc, argv, opts)) return true;
   if (delta::TryParseProtectArg(arg, i, argc, argv, opts.protect)) {
-    // §34.3.1's options record a refused value on their own struct, which is
-    // the one they are handed. Carrying it here is what makes ParseArgs fail
-    // the parse for one, as it does for every other option group.
     if (opts.protect.rejected_argument) opts.rejected_argument = true;
     return true;
   }
   return false;
 }
 
-// How deep a `-f` may nest. An options file naming another is ordinary, and one
-// naming itself recurses without bound; a limit refuses every cycle, including
-// two files that name each other, where a set of the files already read would
-// let a cycle of length two through unless it recorded the whole chain. The
-// figure is a budget rather than a rule: nothing about a command line says how
-// deep its options files may go, and sixteen is past any nesting a person
-// writes.
 constexpr int kMaxOptionsFileDepth = 16;
 
 bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth);
@@ -480,15 +390,9 @@ bool ReadOptionsFile(const std::string& path, CliOptions& opts, int depth) {
     std::cerr << "error: cannot open options file '" << path << "'\n";
     return false;
   }
-  // Read by line rather than by word so each word keeps the line it stood on,
-  // which is what a report about it names alongside the file. A word beginning
-  // with # comments out the rest of its line, as it did when the whole file was
-  // read a word at a time.
   std::vector<std::string> words;
   ArgOrigins origins;
   origins.path = path;
-  // argv[0] is the program name below and stands on no line of the file, so the
-  // line list is offset by one from the start and indexes as argv does.
   origins.lines.push_back(0);
   std::string line;
   int line_no = 0;
@@ -502,21 +406,12 @@ bool ReadOptionsFile(const std::string& path, CliOptions& opts, int depth) {
       origins.lines.push_back(line_no);
     }
   }
-  // ParseArgs reads from argv[1], so argv[0] is filled with the program name it
-  // skips. The name is held in a buffer of its own rather than pointed at a
-  // string literal, which would need casting away const to match char* argv[].
   std::string program = "deltahdl";
   std::vector<char*> ptrs;
   ptrs.push_back(program.data());
   for (auto& w : words) {
     ptrs.push_back(w.data());
   }
-  // The words this file carries are what the parse reads while it reads them,
-  // so a report names this file. The outer origin is put back on the way out:
-  // an options file may name another, and the words after that one's are the
-  // outer file's again -- while a report about a word of the inner file names
-  // the inner file, which is the whole point of carrying the path rather than
-  // the one -f was given.
   const ArgOrigins* outer = opts.arg_origins;
   opts.arg_origins = &origins;
   opts.protect.arg_origins = &origins;
@@ -536,8 +431,6 @@ bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
     opts.include_dirs.emplace_back(arg.substr(8));
     return true;
   }
-  // §21.6: every other argument starting with + is a plusarg, handed to the
-  // simulation rather than read by the tool.
   if (arg.starts_with("+")) {
     opts.plus_args.emplace_back(arg.substr(1));
     return true;
@@ -545,10 +438,6 @@ bool TryParsePlusArg(std::string_view arg, CliOptions& opts) {
   return false;
 }
 
-// Reads the options file `-f` names at `i`, and answers whether the parse may
-// go on. A `-f` written last has no file to read, which is reported the way
-// every other missing value is and leaves the parse to run to its end; a file
-// that could not be read, or that nests too deep, stops it.
 bool TakeOptionsFile(int& i, int argc, char* argv[], CliOptions& opts,
                      int depth) {
   if (i + 1 >= argc) {
@@ -578,9 +467,6 @@ bool ParseArgsAtDepth(int argc, char* argv[], CliOptions& opts, int depth) {
     }
     opts.source_files.emplace_back(arg);
   }
-  // A rejected argument fails the parse as an unrecognized option does, and
-  // the loop runs to its end first so that the remaining arguments are still
-  // checked. Nothing runs on this path: main returns 1 without preprocessing.
   return !opts.rejected_argument;
 }
 

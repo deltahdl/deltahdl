@@ -9,9 +9,6 @@
 
 using namespace delta;
 
-// Lexes a three-component dotted name "<a>.<b>.<c>" and asserts the resulting
-// token stream is identifier/dot/identifier/dot/identifier with the expected
-// identifier texts.
 inline void ExpectThreeComponentDottedNameTokens(const std::string& a,
                                                  const std::string& b,
                                                  const std::string& c) {

@@ -1,6 +1,3 @@
-// §37.83: the attribute objects of a design, each the attribute instance
-// (§5.12) elaboration resolved on the object it is a child of.
-
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -27,10 +24,6 @@ namespace delta {
 
 namespace {
 
-// §5.12: the value `attr` holds. One written with no value is a bit of 1; a
-// string is the string it was written as; any other is the integer it folded
-// to, at the width its expression is written with, or an integer's where the
-// expression fixes none. Null for one whose value folded to no constant.
 Variable* AttributeValue(const ResolvedAttribute& attr, Arena& arena) {
   if (attr.value != nullptr && attr.value->kind == ExprKind::kStringLiteral) {
     auto* storage = arena.Create<Variable>();
@@ -46,8 +39,6 @@ Variable* AttributeValue(const ResolvedAttribute& attr, Arena& arena) {
   return storage;
 }
 
-// §37.83: the attributes a net or variable of the instance at `prefix` is
-// written with, on the object the run's key for it made.
 template <typename Declared>
 void AttachDeclaredAttributes(const std::vector<Declared>& declared,
                               const std::string& prefix,
@@ -86,8 +77,6 @@ void VpiAttachAttributes(VpiObject* owner,
     obj->name = build.keep(std::string(attr.name));
     obj->def_attribute = on_definition;
     obj->var = AttributeValue(attr, build.arena);
-    // The definition location is where the attribute instance was written,
-    // restated where the preprocessor's joined text came from (§22.12).
     const SourceLoc kWritten = sources.ResolveToOrigin(attr.loc);
     obj->def_line_no = static_cast<int>(kWritten.line);
     obj->def_file = std::string(sources.FilePath(kWritten.file_id));
@@ -99,8 +88,6 @@ void VpiAttachAttributes(VpiObject* owner,
 void AttachPortAttributes(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build) {
-  // §37.83: a port carries the attributes its declaration is written with.
-  // Each port object holds the position its module declared it at.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string&, VpiObject* instance) {
@@ -115,9 +102,6 @@ void AttachPortAttributes(const RtlirDesign* design,
 
 void AttachAttributes(const RtlirDesign* design, const VpiObjectMap& objects,
                       SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.83: an instance carries the attributes its instantiation is written
-  // with and, as attributes on its definition, those its module's declaration
-  // is; a net or variable carries those it is declared with.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix,

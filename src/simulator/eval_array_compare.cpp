@@ -19,16 +19,12 @@
 
 namespace delta {
 
-// The assignment pattern `e` is, typed or untyped, or null.
 static const Expr* PatternOperand(const Expr* e) {
   if (e == nullptr) return nullptr;
   const Expr* p = UnwrapTypedPattern(e);
   return p->kind == ExprKind::kAssignmentPattern ? p : nullptr;
 }
 
-// The elements of the unpacked array `e` names, from the left: a fixed-size
-// one-dimensional array, a queue or dynamic array, or an array property of an
-// object. False where `e` names none of them.
 static bool ArrayOperandElements(const Expr* e, SimContext& ctx, Arena& arena,
                                  std::vector<Logic4Vec>& out) {
   if (e->kind == ExprKind::kIdentifier) {
@@ -46,8 +42,6 @@ static bool ArrayOperandElements(const Expr* e, SimContext& ctx, Arena& arena,
   return PropertyArrayElements(e, ctx, arena, out);
 }
 
-// The items of the positional pattern `pattern`, its one replication
-// `'{3{2}}` repeated as many times as it says. False for a keyed pattern.
 static bool PatternItems(const Expr* pattern, SimContext& ctx, Arena& arena,
                          std::vector<Logic4Vec>& out) {
   if (!pattern->pattern_keys.empty()) return false;
@@ -67,7 +61,6 @@ static bool PatternItems(const Expr* pattern, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// Whether `a` and `b`, of one width, hold the same bits, x and z included.
 static bool SameBits(const Logic4Vec& a, const Logic4Vec& b) {
   for (uint32_t w = 0; w < a.nwords && w < b.nwords; ++w) {
     if (a.words[w].aval != b.words[w].aval ||
@@ -103,7 +96,6 @@ bool TryArrayPatternEquality(const Expr* expr, SimContext& ctx, Arena& arena,
 
 namespace {
 
-// Whether `a` and `b`, of one width, agree at every bit known in both.
 bool KnownBitsMatch(const Logic4Vec& a, const Logic4Vec& b) {
   for (uint32_t w = 0; w < a.nwords && w < b.nwords; ++w) {
     uint64_t known = ~(a.words[w].bval | b.words[w].bval);
@@ -112,7 +104,6 @@ bool KnownBitsMatch(const Logic4Vec& a, const Logic4Vec& b) {
   return true;
 }
 
-// Whether `layout`, or a structure nested in it, holds a dynamic member.
 bool HoldsDynamicMember(const StructTypeInfo& layout) {
   for (const auto& f : layout.fields) {
     if (f.is_dynamic || (f.nested != nullptr && HoldsDynamicMember(*f.nested)))
@@ -121,8 +112,6 @@ bool HoldsDynamicMember(const StructTypeInfo& layout) {
   return false;
 }
 
-// Whether `a` and `b` lay out the same members, each variable holding a
-// layout of its own.
 bool SameLayout(const StructTypeInfo& a, const StructTypeInfo& b) {
   if (a.total_width != b.total_width || a.fields.size() != b.fields.size())
     return false;
@@ -136,7 +125,6 @@ bool SameLayout(const StructTypeInfo& a, const StructTypeInfo& b) {
   return true;
 }
 
-// The elements of the dynamic member `f` at bit `offset` of `value`.
 const QueueObject* DynamicElements(const Logic4Vec& value,
                                    const StructFieldInfo& f, uint32_t offset,
                                    Arena& arena) {
@@ -145,9 +133,6 @@ const QueueObject* DynamicElements(const Logic4Vec& value,
   return held != nullptr ? held : DynMemberEmpty(f);
 }
 
-// Whether the dynamic members of `layout`, from bit `base` of `a` and `b`,
-// hold equal elements; each member's handle is then cleared in both values,
-// so that the other members compare as bits.
 bool DynamicMembersEqual(const StructTypeInfo& layout, uint32_t base,
                          Logic4Vec& a, Logic4Vec& b, Arena& arena) {
   bool equal = true;
@@ -192,8 +177,6 @@ bool TryDynamicStructEquality(const Expr* expr, SimContext& ctx, Arena& arena,
   Logic4Vec b = OwnRhsWords(EvalExpr(expr->rhs, ctx, arena), arena);
   bool equal = DynamicMembersEqual(*layout, 0, a, b, arena);
   bool is_eq = expr->op == TokenKind::kEqEq || expr->op == TokenKind::kEqEqEq;
-  // §11.4.5: == answers x where no known bit differs but one is unknown, and
-  // === compares an unknown bit as it stands.
   if (logical_eq && equal && KnownBitsMatch(a, b) &&
       (!a.IsKnown() || !b.IsKnown())) {
     out = MakeLogic4Vec(arena, 1);

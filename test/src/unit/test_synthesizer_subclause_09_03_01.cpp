@@ -57,14 +57,6 @@ TEST(SequentialBlockSynthesis, EmptySeqBlockInAlwaysCombSynthesizes) {
   ASSERT_NE(aig, nullptr);
 }
 
-// §9.3.1: the statements of a sequential block execute in the order they are
-// written, so every one of them contributes to what the block leaves behind.
-// Naming the literal each output carries is what makes that testable. A
-// synthesizer that walks the block and quietly skips a statement it does not
-// recognise still returns a graph, so `ASSERT_NE(aig, nullptr)` above passes
-// over a netlist that has lost half the design; only an assertion about the
-// value an output ends up with can tell the two apart. `y` is the one that
-// catches it, since it is assigned by the second statement of the block.
 TEST(SequentialBlockSynthesis,
      LoweredAssignmentSurvivesEveryStatementInTheBlock) {
   SynthFixture f;

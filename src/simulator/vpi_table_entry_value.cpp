@@ -11,12 +11,6 @@ namespace delta {
 
 namespace {
 
-// The symbols of `row`, each one or two characters: a field written in
-// parentheses is an edge, the two levels it names; any other character but a
-// space or a field separator is a symbol of its own. The row is a table
-// entry's text as DecompiledUdpRow writes it, which no put can change
-// (§38.34): every edge field in it is `(`, two levels and `)`, and it ends in
-// an output symbol.
 std::vector<std::string_view> RowSymbols(std::string_view row) {
   std::vector<std::string_view> symbols;
   for (std::size_t i = 0; i < row.size(); ++i) {

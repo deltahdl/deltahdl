@@ -10,12 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §H.14.4, the SystemVerilog side of Example 9: the declarations of
-// §H.10.2's Example 2 annotated "DPI" rather than "DPI-C" -- a typedef
-// struct pair, an import f1 taking an int, a pair and an output logic
-// [63:0], an export of exported_sv_func and that function taking an int and
-// an output unpacked array of eight ints -- selecting the deprecated SV3.1a
-// argument passing semantics per §H.14.1.
 class ExampleNineParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -30,8 +24,6 @@ class ExampleNineParsing : public ::testing::Test {
       "endmodule\n");
 };
 
-// §H.14.4 with §35.5.4: the "DPI" annotation is deprecated and draws the
-// warning that says so, and the module parses under it.
 TEST_F(ExampleNineParsing, TheDeprecatedAnnotationWarnsAndParses) {
   ASSERT_NE(r_.cu, nullptr);
   EXPECT_FALSE(r_.has_errors);
@@ -43,8 +35,6 @@ TEST_F(ExampleNineParsing, TheDeprecatedAnnotationWarnsAndParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The import and the export carry the "DPI" spec string the semantics are
-// selected from, and f1's formals are the example's three.
 TEST_F(ExampleNineParsing, TheImportAndExportCarryTheDpiSpecString) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =

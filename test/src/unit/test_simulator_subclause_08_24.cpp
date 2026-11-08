@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §8.24 full-pipeline: a method whose body is declared out of the class block
-// (an `extern` prototype inside the class, the full definition qualified with
-// `ClassName::` after the class) must actually EXECUTE end-to-end and return
-// the value its out-of-block body computes. The elaborator links the qualified
-// definition back onto the class type (AttachCuMethodsToClasses); this drives
-// real source through parse+elaborate+lower+run to prove the linked body runs.
 TEST(ClassSim, E2eOutOfBlockFunctionBodyExecutes) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  extern function int foo(input int a);\n"
@@ -37,10 +31,6 @@ TEST(ClassSim, E2eOutOfBlockFunctionBodyExecutes) {
             42u);
 }
 
-// §8.24: the same out-of-block linkage for a TASK. The extern task prototype
-// lives in the class; the out-of-block body (`task C::set(...)`) assigns a
-// class property. An in-block getter reads that property back so the effect of
-// the out-of-block task body is observable at module scope.
 TEST(ClassSim, E2eOutOfBlockTaskBodyExecutes) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int val;\n"
@@ -177,12 +167,6 @@ TEST(ClassSim, MultipleOutOfBlockMethodsLinked) {
   EXPECT_EQ(obj->ResolveMethod("set")->kind, ModuleItemKind::kTaskDecl);
 }
 
-// §8.24 with §26.3: an out-of-block declaration stands in the same scope as
-// its class, so a class a package declares has its bodies among the package's
-// items, and they must be attached to the class whether it is reached through
-// a wildcard import or through `p::C`. Before the bodies were attached the
-// in-class prototype answered every call with 0, which each value below
-// differs from.
 TEST(ClassSim, PackageOutOfBlockStaticFunctionAfterWildcardImport) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class root;\n"
@@ -240,10 +224,6 @@ TEST(ClassSim, PackageOutOfBlockStaticFunctionThroughPackageScope) {
             11u);
 }
 
-// §8.9 with §8.24: the static-ness of the prototype is carried onto the body,
-// so the body is called without an object and reads the static property
-// through the class, 3 added to its initial 40 where an unattached body or a
-// non-static one gives 0.
 TEST(ClassSim, PackageOutOfBlockStaticMethodReadsStaticProperty) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class cnt;\n"
@@ -264,11 +244,6 @@ TEST(ClassSim, PackageOutOfBlockStaticMethodReadsStaticProperty) {
             43u);
 }
 
-// §8.24 with §23.9: a class declared inside a module has its out-of-block
-// bodies among the module's items, the scope the class is declared in, and
-// they are attached to the class as the compilation unit's and a package's
-// are. An instance body reads a property and a static one is called through
-// the class; the prototype alone gives 0 for each.
 TEST(ClassSim, ModuleClassOutOfBlockInstanceMethodReadsProperty) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  class root;\n"
@@ -303,10 +278,6 @@ TEST(ClassSim, ModuleClassOutOfBlockStaticFunctionThroughClassScope) {
             5u);
 }
 
-// §8.24: a default argument value is given in the `extern` prototype and may
-// be omitted from the out-of-block declaration; §13.5.3 has a call that omits
-// the argument take that default. The body replacing the prototype must keep
-// the prototype's default, or `c.g()` reads `a` as 0 and answers 10.
 TEST(ClassSim, OutOfBlockVirtualMethodTakesPrototypeDefault) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int base = 10;\n"
@@ -326,8 +297,6 @@ TEST(ClassSim, OutOfBlockVirtualMethodTakesPrototypeDefault) {
             11u);
 }
 
-// §8.24 for the constructor: `new(7)` against `extern function new(int a,
-// int b = 3)` whose out-of-block body names no default leaves `w` 3, not 0.
 TEST(ClassSim, OutOfBlockConstructorTakesPrototypeDefault) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int v, w;\n"
@@ -348,9 +317,6 @@ TEST(ClassSim, OutOfBlockConstructorTakesPrototypeDefault) {
             1403u);
 }
 
-// §8.24 and §13.5.3: two trailing defaults in the prototype of a non-virtual
-// method, the call giving the first argument alone; each omitted argument
-// takes its own default, so the sum is 5 + 20 + 300 rather than 5.
 TEST(ClassSim, OutOfBlockMethodTakesPrototypeDefaultsAfterFirstGiven) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  extern function int sum(int a, int b = 20,\n"
@@ -377,11 +343,6 @@ TEST(ClassSim, UnresolvedMethodReturnsNull) {
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
-// §23.2.4 (printed page 739) admits a class among a module's items, and §8.24
-// (printed page 202) has its out-of-block declarations made in the scope that
-// declares the class, so the bodies follow the class among the module's items
-// and `this` in them names the object. The elaborator took each for a
-// subroutine of the module and refused its `this` under §8.11.
 TEST(ClassSim, OutOfBlockBodiesAmongModuleItemsAreTheClassMethods) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -409,8 +370,6 @@ TEST(ClassSim, OutOfBlockBodiesAmongModuleItemsAreTheClassMethods) {
             "area 24 count 2 static 2\n");
 }
 
-// A void method whose body writes a property through `this`, called after the
-// constructor has set it, beside the constructor and a function reading it.
 TEST(ClassSim, OutOfBlockVoidMethodAmongModuleItemsWritesThroughThis) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

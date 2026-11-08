@@ -10,16 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §13.5.2 (printed page 348) forbids a ref formal to a subroutine whose
-// lifetime is static, and §13.3.1 (printed page 339) makes every method of a
-// class automatic; §8.10 (printed page 187) sets the static method qualifier
-// apart from the static lifetime. A class static method's ref formal is
-// therefore legal, and the write through it reaches the caller's handle: the
-// ref form reads 3 from the object it constructed, the output form beside it
-// 3, and the module's automatic function 3, packed as 333. The parser folded
-// the qualifier into the lifetime flag, so the method was refused as a static
-// subroutine and the run reported "ref argument 'q' not allowed in static
-// subroutine 'm_get_q'".
 TEST(PassByRef, RefFormalOfAClassStaticMethodWritesTheCallersHandle) {
   auto val = RunAndGet(
       "class Q;\n"
@@ -60,9 +50,6 @@ TEST(PassByRef, RefFormalOfAClassStaticMethodWritesTheCallersHandle) {
   EXPECT_EQ(val, 333u);
 }
 
-// §13.5.2 (printed page 348): the rule still holds for a subroutine whose
-// lifetime is static, `function static` written in a module, and the report
-// names the formal, the subroutine and the subclause at the declaration.
 TEST(PassByRef, RefFormalOfAStaticLifetimeModuleFunctionIsReported) {
   SimFixture f;
   ElaborateSrc(
@@ -80,11 +67,6 @@ TEST(PassByRef, RefFormalOfAStaticLifetimeModuleFunctionIsReported) {
                     3, "13.5.2"));
 }
 
-// §8.10 (printed page 187) with §13.3.1 (printed page 339): a static method's
-// variables are automatic, so a recursive call gets its own `acc` and two
-// calls do not share `v`. fact(4) reads 24 and the two writes through the ref
-// formal add 5 and 5 to `s`, packed as 2410; one shared cell apiece reads
-// fact(4) as 1 and `s` as 15, which is 115.
 TEST(PassByRef, ClassStaticMethodWithARefFormalKeepsAutomaticLocals) {
   auto val = RunAndGet(
       "class C;\n"
@@ -114,10 +96,6 @@ TEST(PassByRef, ClassStaticMethodWithARefFormalKeepsAutomaticLocals) {
   EXPECT_EQ(val, 2410u);
 }
 
-// §13.5.2 with §7.10 and §8.5: a queue property passed to a ref queue formal
-// is the object's queue, so a push through the formal is there at once and
-// after the task resumes from its delay -- one element at time 5 and two at
-// 15 -- and a push through the formal of a method's own bare property too.
 TEST(PassByRef, QueuePropertyActualIsTheObjectsQueue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -141,12 +119,6 @@ TEST(PassByRef, QueuePropertyActualIsTheObjectsQueue) {
   EXPECT_EQ(out, "1 1\n2 3 2\n");
 }
 
-// §13.5.2: a ref formal is the actual itself, so a write through it is seen
-// by another process while the task is suspended, and a write to the actual
-// is seen through it -- for a class property through a handle and an element
-// of a class array property as for a module variable. The formal was a copy
-// written back when the task returned: at #1 both read 0, and the task's
-// `v += 1` at #2 added to its own 1 and overwrote the caller's 11 with 2.
 TEST(PassByRef, RefFormalOfAClassPropertyIsWrittenInPlace) {
   SimFixture f;
   std::string out = RunCapture(

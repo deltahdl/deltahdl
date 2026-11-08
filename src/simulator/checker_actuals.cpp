@@ -18,27 +18,18 @@ namespace delta {
 
 namespace {
 
-// What a qualified copy needs: the parent's prefix, the locals left alone
-// and the arena the copy is made in.
 struct Qualifying {
   const std::string& prefix;
   const std::unordered_set<std::string_view>& locals;
   Arena& arena;
 };
 
-// §23.6: whether the identifier `e` is a simple name the qualifying rewrites,
-// rather than one written from a scope, a dotted path, a system name or `$`,
-// or a local of the actual.
 bool IsSimpleName(const Expr* e, const Qualifying& q) {
   return e->scope_prefix.empty() &&
          e->text.find('.') == std::string_view::npos &&
          !e->text.starts_with('$') && q.locals.count(e->text) == 0;
 }
 
-// A copy of `e` with each simple name written as `$root` followed by the
-// parent's prefix and the name, as §23.6 has a name from the top of the
-// design; a member access's member is left, as it names no object of the
-// scope.
 Expr* Qualified(const Expr* e, const Qualifying& q) {
   if (e == nullptr) return nullptr;
   auto* copy = q.arena.Create<Expr>(*e);
@@ -66,8 +57,6 @@ Expr* Qualified(const Expr* e, const Qualifying& q) {
   return copy;
 }
 
-// A copy of the tree under `node` whose nodes and sequences are its own, so
-// that its expressions can be rewritten for one instance.
 PropertyExprNode* CopiedTree(const PropertyExprNode* node, Arena& arena) {
   auto* copy = arena.Create<PropertyExprNode>(*node);
   if (node->sequence != nullptr) {

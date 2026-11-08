@@ -10,10 +10,6 @@ namespace delta {
 
 namespace {
 
-// The magnitude of `val` as 32-bit limbs, least significant first, the bits
-// above the width cleared, and negated in two's complement within the width
-// where `negative`, so that the limbs hold the magnitude of a signed value
-// whose top bit is set.
 std::vector<uint32_t> MagnitudeLimbs(const Logic4Vec& val, bool negative) {
   std::vector<uint32_t> limbs;
   uint32_t width = val.width == 0 ? 1 : val.width;
@@ -42,8 +38,6 @@ std::vector<uint32_t> MagnitudeLimbs(const Logic4Vec& val, bool negative) {
 constexpr uint32_t kChunkBase = 1000000000u;
 constexpr uint32_t kChunkDigits = 9;
 
-// Divides the limbs in place by 10^9 and returns the remainder; the limbs
-// read zero once the quotient is.
 uint32_t DivideLimbsByChunkBase(std::vector<uint32_t>& limbs) {
   uint64_t rem = 0;
   for (auto it = limbs.rbegin(); it != limbs.rend(); ++it) {
@@ -63,12 +57,6 @@ bool LimbsAreZero(const std::vector<uint32_t>& limbs) {
 
 }  // namespace
 
-// §21.2.1.1: a decimal renders the whole value, whatever its width, where
-// reading it through a 64-bit word rendered the low 64 bits alone -- the
-// suite's 11.4.14.3--unpack_stream-sim.sv displayed its 96-bit
-// 96'h00000003_00000002_00000001 as 8589934593 (#4363). The numeral is built
-// nine digits at a time by long division of the magnitude's 32-bit limbs by
-// 10^9, each remainder a chunk of the numeral from the right.
 std::string FormatDecimalDigits(const Logic4Vec& val) {
   uint32_t width = val.width == 0 ? 1 : val.width;
   uint32_t top = width - 1;
@@ -88,13 +76,6 @@ std::string FormatDecimalDigits(const Logic4Vec& val) {
   return negative ? "-" + digits : digits;
 }
 
-// §21.2.1.2: enough characters for the largest value the expression could
-// possibly hold. An unsigned width-w value tops out at 2^w - 1, whose digit
-// count is that of 2^w since no power of two is a power of ten; a signed one
-// is bounded in print length by its most negative value, whose magnitude
-// 2^(w-1) is joined by a sign column. The count is exact for a width the
-// 64-bit loop can hold and is read off the base-10 logarithm above it, where
-// a value sized as a 64-bit one gave a 96-bit field 20 columns instead of 29.
 uint32_t AutoDecimalFieldWidth(const Logic4Vec& val) {
   uint32_t bits = val.width;
   if (bits == 0) bits = 1;

@@ -103,10 +103,6 @@ TEST(ClassConstructorSim, PropertyExplicitDefaultInitialized) {
             7u);
 }
 
-// §8.7: a property with no explicit default is still initialized during
-// construction — to its uninitialized value, not left absent. Reading the
-// un-defaulted 2-state property straight after `new` yields 0, the other
-// branch of the property-initialization rule from PropertyExplicitDefault.
 TEST(ClassConstructorSim, UninitializedPropertyGetsDefault) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int with_default = 42;\n"
@@ -126,9 +122,6 @@ TEST(ClassConstructorSim, UninitializedPropertyGetsDefault) {
             0u);
 }
 
-// §8.7: for the no-default branch, the uninitialized value follows the
-// property's type. A 4-state property with no initializer comes out of
-// construction holding X, not a forced 0 — observed via $isunknown.
 TEST(ClassConstructorSim, FourStatePropertyUninitializedIsX) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  integer u;\n"
@@ -213,11 +206,6 @@ TEST(ClassConstructorSim, ConstructorArgPassedToProperty) {
             99u);
 }
 
-// §8.7: the derived constructor first runs the base constructor; once it
-// completes, each property of the derived class is initialized (so d2, whose
-// default reads the base property c2, sees the value the base constructor
-// left), and only then does the rest of the derived body run. Mirrors the
-// clause's C/D example. Built from §8.13 `extends` and §8.15 `super.new`.
 TEST(ClassConstructorSim, DerivedConstructionOrderFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -254,12 +242,6 @@ TEST(ClassConstructorSim, DerivedConstructionOrderFromSource) {
       {{"rc1", 1u}, {"rc2", 2u}, {"rd1", 4u}, {"rd2", 2u}, {"rd3", 6u}});
 }
 
-// §8.7, isolated: the clause-example test above exercises several rules at
-// once, so this pins the single one that a derived property's initializer sees
-// the value the base constructor left in a base property -- not the base
-// property's declared default. Only b is written by the base constructor and
-// only d reads it, so 5 can have come from nowhere else; a declared default
-// read too early would give 1.
 TEST(ClassConstructorSim, DerivedInitializerSeesBaseConstructorWrite) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int b = 1;\n"
@@ -282,10 +264,6 @@ TEST(ClassConstructorSim, DerivedInitializerSeesBaseConstructorWrite) {
             5u);
 }
 
-// §8.7: even when the derived class supplies no explicit constructor, its
-// implicit `new` first runs the base constructor. Constructing the child
-// therefore leaves the base property set by the base body. Built from §8.13
-// `extends` with an implicit derived constructor.
 TEST(ClassConstructorSim, ImplicitConstructorInvokesBaseConstructor) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int x;\n"
@@ -308,9 +286,6 @@ TEST(ClassConstructorSim, ImplicitConstructorInvokesBaseConstructor) {
             7u);
 }
 
-// §8.7: constructor argument conventions match ordinary subroutine calls, so a
-// call may supply some actuals positionally and let the rest fall back to their
-// declared defaults. new(7) binds cmd=7 and leaves addr at its default 15.
 TEST(ClassConstructorSim, ConstructorPartialDefaultArgs) {
   EXPECT_EQ(RunAndGet("class Packet;\n"
                       "  int command;\n"
@@ -332,9 +307,6 @@ TEST(ClassConstructorSim, ConstructorPartialDefaultArgs) {
             22u);
 }
 
-// §8.7: `new` construction also occurs in the declaration-initializer position
-// (`Type v = new;`), not only in a standalone procedural assignment. The
-// constructor body runs and its property assignment is observable.
 TEST(ClassConstructorSim, DeclarationInitializerConstructs) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int x;\n"
@@ -353,12 +325,6 @@ TEST(ClassConstructorSim, DeclarationInitializerConstructs) {
             55u);
 }
 
-// §8.7: `new` names no return type, so the assignment's left-hand side decides
-// it. Inside a constructor the left side may be a class-handle property of the
-// enclosing class, named without a `this.` prefix, and that property's declared
-// type is what is constructed. The constructed object's own constructor runs,
-// so reading a property through the nested handle observes the value it set --
-// which a null handle could not produce.
 TEST(ClassConstructorSim, ConstructorConstructsClassHandleProperty) {
   EXPECT_EQ(RunAndGet("class Inner;\n"
                       "  int q;\n"
@@ -383,9 +349,6 @@ TEST(ClassConstructorSim, ConstructorConstructsClassHandleProperty) {
             31u);
 }
 
-// §8.7 with the handle left null: the same shape without the constructing
-// assignment leaves the property null, so the test above is reading a real
-// object rather than a default that happens to match.
 TEST(ClassConstructorSim, ClassHandlePropertyIsNullUntilConstructed) {
   EXPECT_EQ(RunAndGet("class Inner;\n"
                       "  int q;\n"
@@ -404,8 +367,6 @@ TEST(ClassConstructorSim, ClassHandlePropertyIsNullUntilConstructed) {
             1u);
 }
 
-// §8.11 / §8.7: the `this.`-qualified form of the same assignment names the
-// same property and constructs the same type.
 TEST(ClassConstructorSim, ConstructorConstructsThisQualifiedHandleProperty) {
   EXPECT_EQ(RunAndGet("class Inner;\n"
                       "  int q;\n"
@@ -430,8 +391,6 @@ TEST(ClassConstructorSim, ConstructorConstructsThisQualifiedHandleProperty) {
             44u);
 }
 
-// §8.7: an ordinary method, not only the constructor, resolves `new` against
-// the property named on the left.
 TEST(ClassConstructorSim, MethodConstructsClassHandleProperty) {
   EXPECT_EQ(RunAndGet("class Inner;\n"
                       "  int q;\n"
@@ -457,25 +416,6 @@ TEST(ClassConstructorSim, MethodConstructsClassHandleProperty) {
             17u);
 }
 
-// §8.7: a class property may be declared with an initial value, and §6.8 runs
-// that initializer as an assignment into the property being declared -- so the
-// value it reads is a value it has no licence to write. EvalExpr answers a
-// property read with the object's own stored vector, and a Logic4Vec copies its
-// `words` pointer rather than the words, so §6.11.2's coercion of the unknowns
-// into a 2-state property reached back through the read and cleared `tag`'s own
-// x bits while initializing `snap` from it.
-//
-// Both halves of the shape carry weight. `snap` is `bit`, because a 4-state
-// property runs no coercion at all and there would be nothing to write through;
-// and the two are the same width, because ResizeToWidth answers a value already
-// at the target width with the value itself, while any other width allocates a
-// fresh buffer and the aliasing would not be reachable.
-//
-// ToUint64 cannot state the difference -- it projects `aval & ~bval`, so an x
-// already reads as 0 and clearing it changes nothing. ToString names each bit's
-// state instead: 8'hx5 is four x bits over 0101, so a tag left alone reads
-// "xxxx0101" while a tag written through reads "00000101", which is the value
-// that belongs to snap.
 TEST(ClassConstructorSim, TwoStateInitializerLeavesItsSourcesXBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -501,31 +441,6 @@ TEST(ClassConstructorSim, TwoStateInitializerLeavesItsSourcesXBits) {
   EXPECT_EQ(taken->value.ToUint64(), 5u);
 }
 
-// §8.7: each property the class declares starts at its explicit default value,
-// and §6.8 then has the property, being storage of its own, keep its value from
-// one assignment to the next. The property and the variable its initializer
-// read are two storage elements, so the value the constructor stores has to be
-// the property's own words.
-//
-// CoerceToPropertyType took its copy below its early return, and the early
-// return is the one this declaration takes: CollectClassMembers sizes a
-// property with EvalTypeWidth against an empty typedef map, so a property
-// declared by a typedef name has width_is_declared false and the function
-// handed the caller's own vector straight back. EvalExpr answers a bare
-// identifier with the variable's own Logic4Vec, so `pair_t snap = s;` made the
-// constructed property s's buffer, and `s.b = 8'h00` -- a packed-member
-// deposit, which writes the words it finds rather than replacing them -- then
-// wrote through the property that was initialized before it ran.
-//
-// The case discriminates three ways. The high byte separates a shared buffer
-// (00000000, the deposit read back through snap) from an owned one (10101010,
-// what s held when the constructor ran). The x nibble fails any copy that
-// drops the bval plane, which ExtractBitField carries and MakeLogic4VecVal
-// would not. And the property is declared by a typedef name, which is what
-// puts the case on the early return rather than on the copy
-// TwoStateInitializerLeavesItsSourcesXBits already guards. ToUint64 could
-// state none of it -- it projects `aval & ~bval` and reads an x as 0 -- so the
-// assertion is on ToString.
 TEST(ClassConstructorSim,
      InitializerOfAnUnsizedTypeDoesNotShareItsSourcesBuffer) {
   SimFixture f;
@@ -550,12 +465,6 @@ TEST(ClassConstructorSim,
   EXPECT_EQ(var->value.ToString(), "10101010xxxx1011");
 }
 
-// The same design read through the other key the constructor writes. A
-// property is stored twice, under its own name and under the scoped `C::snap`,
-// and an unqualified read inside a method resolves through GetPropertyForType,
-// which consults the scoped key first. Both entries are written from the one
-// value the initializer produced, so a fix that reached only the key the case
-// above reads would leave this one holding the source's buffer.
 TEST(ClassConstructorSim, InitializerOfAnUnsizedTypeIsOwnedUnderTheScopedKey) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -582,11 +491,6 @@ TEST(ClassConstructorSim, InitializerOfAnUnsizedTypeIsOwnedUnderTheScopedKey) {
   EXPECT_EQ(var->value.ToString(), "10101010xxxx1011");
 }
 
-// A.2.4 gives class_new a list_of_arguments, and A.8.2 lets that list bind an
-// argument by the formal's name. The named values below are written in the
-// reverse of the formals' order, and the second call carries one of them after
-// an ordered one, so a binding that took them by position answers 3*10+5 = 35
-// and 4*10+9 = 49 rather than 53 and 94.
 TEST(ClassConstructorSim, NewCallBindsArgumentsByName) {
   EXPECT_EQ(RunAndGet("class Packet;\n"
                       "  int command;\n"
@@ -629,8 +533,6 @@ TEST(ClassConstructorSim, NewCallBindsAnOrderedThenANamedArgument) {
             94u);
 }
 
-// §13.5.4: a named argument written with no value takes the formal's default,
-// so `.addr()` leaves addr at 7 while `.cmd(2)` beside it is bound.
 TEST(ClassConstructorSim, NewCallNamedArgumentWithoutAValueTakesTheDefault) {
   EXPECT_EQ(RunAndGet("class Packet;\n"
                       "  int command;\n"
@@ -652,15 +554,6 @@ TEST(ClassConstructorSim, NewCallNamedArgumentWithoutAValueTakesTheDefault) {
             27u);
 }
 
-// §8.7 has the target of an assignment decide what a `new` written without a
-// class name constructs, and §8.9 makes a static property one storage shared by
-// the class, which §8.10 lets a static method name bare. The singleton below is
-// UVM's own shape (`if (m_inst == null) m_inst = new;`), and a static method
-// has no `this` to resolve the name against: an evaluator that answered the
-// `new` only for a variable or for a property of the invoking object stored a
-// null handle in m_inst, so the call returned null and `a.tag` never read 7.
-// The second call has to find the first call's object, so the two handles are
-// compared and a null one answers 0.
 TEST(ClassConstructorSim,
      StaticMethodConstructsTheStaticHandlePropertyItTests) {
   EXPECT_EQ(RunAndGet("class root;\n"
@@ -684,10 +577,6 @@ TEST(ClassConstructorSim,
             7u);
 }
 
-// §8.24: the body of an extern static method is written outside the class with
-// the class name as its scope, and §8.10 still gives it the class's static
-// properties by bare name, so the `new` in it is resolved against the same
-// declared type as one written in the class body.
 TEST(ClassConstructorSim,
      OutOfBlockStaticMethodConstructsAStaticHandleProperty) {
   EXPECT_EQ(RunAndGet("class root;\n"
@@ -711,12 +600,6 @@ TEST(ClassConstructorSim,
             23u);
 }
 
-// §8.10 has a static method reach the class's own storage, and it keeps doing
-// so when an instance method is the caller: the caller's object is still the
-// running `this` while the static method executes, and the `new` has to land
-// in the class's static property rather than on that object. The module reads
-// the static back through §8.9's scope form, which a handle stored on the
-// caller's object never reaches, so that mistake answers 0.
 TEST(ClassConstructorSim,
      StaticMethodReachedFromAnInstanceConstructsTheClassesStorage) {
   EXPECT_EQ(RunAndGet("class leaf;\n"
@@ -747,9 +630,6 @@ TEST(ClassConstructorSim,
             41u);
 }
 
-// §8.7 with the argument list written out: `new()` and `new` are the one
-// constructor call, and an instance method's bare property name resolves the
-// type to construct from the property's declaration.
 TEST(ClassConstructorSim,
      InstanceMethodConstructsAHandlePropertyWithParenthesizedNew) {
   EXPECT_EQ(RunAndGet("class Inner;\n"
@@ -773,9 +653,6 @@ TEST(ClassConstructorSim,
             29u);
 }
 
-// §8.9's `C::x` names a static property from outside the class, and §8.7 gives
-// a `new` assigned to it the property's declared type, with no object of C and
-// no method of C involved.
 TEST(ClassConstructorSim,
      ClassScopedStaticHandlePropertyConstructedFromAModule) {
   EXPECT_EQ(RunAndGet("class leaf;\n"
@@ -797,12 +674,6 @@ TEST(ClassConstructorSim,
             53u);
 }
 
-// §8.7: the arguments of a `new` call are the caller's expressions, so a
-// method constructing another object of its own class with `new(depth - 1)`
-// hands the constructor its own object's depth less one. With the object
-// under construction standing as `this` while the actuals were bound, `depth`
-// read that object's default of 0, the child got -1, and a chain built this
-// way never reached its end.
 TEST(ClassConstructorSim, NewArgumentsReadTheCallersObject) {
   EXPECT_EQ(RunAndGet("class node;\n"
                       "  int depth;\n"

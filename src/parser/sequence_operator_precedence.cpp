@@ -5,10 +5,6 @@
 namespace delta {
 
 int SequenceOperatorPrecedence(SequenceOperator op) {
-  // Table 16-1 runs from highest precedence to lowest. Assign descending
-  // integer levels so that the topmost row (repetition) yields the largest
-  // value and the bottom row (or) the smallest. The gaps are uniform; only the
-  // ordering is consumed by callers.
   switch (op) {
     case SequenceOperator::kRepetition:
       return 7;

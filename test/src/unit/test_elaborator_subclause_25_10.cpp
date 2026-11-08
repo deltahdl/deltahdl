@@ -58,14 +58,6 @@ TEST(InterfaceObjectAccessElaboration, PortMemberReadOfSignalInModport_Ok) {
              "endmodule\n"));
 }
 
-// §25.10 states that a modport can limit access to an interface's objects
-// reached through a port connection or a virtual interface, by listing the
-// objects that may be reached. The restriction is the modport's own, stated in
-// §25.5: the interface declares modport lists with directions to limit what a
-// module may reach of it. The elaborator reports the refused access under
-// §25.5, and InterfaceModportAccess.UnlistedMemberNames25_5 in
-// test/src/unit/test_elaborator_subclause_25_05.cpp reads the same report back
-// and asserts that subclause.
 TEST(InterfaceObjectAccessElaboration,
      PortMemberAccessToSignalNotListedInModport_Error) {
   ElabFixture f;
@@ -143,10 +135,6 @@ TEST(InterfaceObjectAccessElaboration, VifMemberAccessToSignalInModport_Ok) {
              "endmodule\n"));
 }
 
-// §25.10 names the virtual interface as the second way a reference is subject
-// to the modport restriction, so the same refusal and the same §25.5 report
-// follow when the interface is reached through a virtual interface rather than
-// through a port connection.
 TEST(InterfaceObjectAccessElaboration,
      VifMemberAccessToSignalNotListedInModport_Error) {
   ElabFixture f;
@@ -192,9 +180,6 @@ TEST(InterfaceObjectAccessElaboration,
              "endmodule\n"));
 }
 
-// Claim 3, operand kind `parameter`: a parameter is not modport-listable, so a
-// modport-scoped port reference to it stays accessible, like the localparam and
-// typedef cases but exercising the distinct parameter declaration kind.
 TEST(InterfaceObjectAccessElaboration,
      PortMemberAccessToInterfaceParameter_Ok) {
   EXPECT_TRUE(
@@ -213,10 +198,6 @@ TEST(InterfaceObjectAccessElaboration,
              "endmodule\n"));
 }
 
-// Claim 3, continuous-assignment position: a non-listable object (localparam)
-// reached through a modport port inside a continuous assignment stays
-// accessible; this drives the elaborator's continuous-assignment walk arm
-// rather than the procedural-statement walk the other Claim 3 tests use.
 TEST(InterfaceObjectAccessElaboration,
      PortMemberAccessToLocalparamInContinuousAssign_Ok) {
   EXPECT_TRUE(
@@ -235,11 +216,6 @@ TEST(InterfaceObjectAccessElaboration,
              "endmodule\n"));
 }
 
-// Claim 1, virtual-interface-coexistence position: hierarchical access to a
-// non-modport member stays available even when the same interface instance is
-// also reached through a virtual interface, matching the part of the rule that
-// holds whether or not the instance is also reached through a virtual
-// interface.
 TEST(InterfaceObjectAccessElaboration,
      HierarchicalAccessBypassesModportWhenAlsoAccessedViaVirtualInterface_Ok) {
   EXPECT_TRUE(
@@ -258,9 +234,6 @@ TEST(InterfaceObjectAccessElaboration,
              "endmodule\n"));
 }
 
-// §25.10's own example: through a generic `interface.mp` port connected to
-// `ebus.mp`, i.I names an object the modport mp does not list, as through a
-// named `ebus_i.mp` port.
 TEST(InterfaceObjectAccessElaboration,
      GenericModportPortAccessOutsideModport_Error) {
   ElabFixture f;
@@ -286,7 +259,6 @@ TEST(InterfaceObjectAccessElaboration,
                     8, "25.5"));
 }
 
-// The listed object Q is reached through the same port with nothing reported.
 TEST(InterfaceObjectAccessElaboration, GenericModportPortListedAccess_Ok) {
   ElabFixture f;
   ElaborateSrc(
@@ -311,11 +283,6 @@ TEST(InterfaceObjectAccessElaboration, GenericModportPortListedAccess_Ok) {
                     8, "25.5"));
 }
 
-// §25.10: only a port declared of an interface names the interface a type is
-// taken from. A generic port, `interface i`, names none until it is
-// connected; a type the interface does not declare, and a name that is no
-// port at all, give nothing to take, and each typedef is left as written for
-// the elaboration to go on with.
 TEST(InterfacePortTypedef, TypedefsNoInterfaceAnswersElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(

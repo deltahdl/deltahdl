@@ -29,9 +29,6 @@ class VpiScanSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.40: vpi_scan() traverses the hierarchy and returns handles to the objects
-// directed by an iterator obtained from vpi_iterate() for a specific object
-// type. Each call hands back the next object, in iteration order.
 TEST_F(VpiScanSim, ScanReturnsObjectsDirectedByIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   VpiHandle p0 = vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -51,10 +48,6 @@ TEST_F(VpiScanSim, ScanReturnsObjectsDirectedByIterator) {
   EXPECT_EQ(VpiObjectOf(scanned[1]), p1);
 }
 
-// §38.40: once the iterator's objects are exhausted vpi_scan() returns NULL.
-// That NULL is the point at which the iterator handle is consumed and is no
-// longer valid, so the loop must stop using it (this test does not touch the
-// handle again after the NULL).
 TEST_F(VpiScanSim, ScanReturnsNullWhenExhausted) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -62,19 +55,14 @@ TEST_F(VpiScanSim, ScanReturnsNullWhenExhausted) {
   vpiHandle iter = vpi_iterate(vpiPort, VpiHandleOf(mod));
   ASSERT_NE(iter, nullptr);
 
-  EXPECT_NE(vpi_scan(iter), nullptr);  // the single port
-  EXPECT_EQ(vpi_scan(iter), nullptr);  // exhausted: NULL ends the scan
+  EXPECT_NE(vpi_scan(iter), nullptr);
+  EXPECT_EQ(vpi_scan(iter), nullptr);
 }
 
-// §38.40: vpi_scan() on a null iterator handle has nothing to traverse, so it
-// reports completion by returning NULL rather than dereferencing the argument.
 TEST_F(VpiScanSim, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 
-// §38.40: a fresh iterator obtained from a new vpi_iterate() call traverses the
-// objects independently, so a completed scan does not affect later iterations
-// over the same reference object.
 TEST_F(VpiScanSim, FreshIteratorScansIndependently) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -93,10 +81,6 @@ TEST_F(VpiScanSim, FreshIteratorScansIndependently) {
   EXPECT_EQ(second_count, 2);
 }
 
-// §38.40 Arguments: the handle vpi_scan() takes is that of an iterator
-// vpi_iterate() returned. A design object is not one, so it directs no
-// traversal and the routine reports the error rather than handing back the
-// objects hanging off it.
 TEST_F(VpiScanSim, ScanRefusesAHandleThatIsNotAnIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -105,16 +89,11 @@ TEST_F(VpiScanSim, ScanRefusesAHandleThatIsNotAnIterator) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.40: only an iterator is retired by a scan reaching its end. A refused
-// scan leaves the object it was handed exactly where it was, so the design it
-// belongs to still reaches it and still iterates over it.
 TEST_F(VpiScanSim, ARefusedScanLeavesTheObjectInPlace) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
   vpi_ctx_.CreatePort("p1", kVpiOutput, mod);
 
-  // Enough calls to walk past both ports, which is where an iterator would be
-  // retired and its storage returned.
   EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);
   EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);
   EXPECT_EQ(vpi_scan(VpiHandleOf(mod)), nullptr);

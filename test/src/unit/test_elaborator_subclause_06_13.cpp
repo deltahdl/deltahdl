@@ -1,9 +1,3 @@
-// Tests for §6.13 "Void data type", whose whole text says that void stands for
-// nonexistent data, may be a function's return type to show it returns nothing,
-// and may type a tagged union member (§7.3.2). §6.13 states no restriction of
-// its own, so a value-bearing return in a void function is reported under
-// §13.4.1.
-
 #include <gtest/gtest.h>
 
 #include "elaborator/type_eval.h"
@@ -27,9 +21,6 @@ TEST(VoidDataType, VoidNot4State) {
   EXPECT_FALSE(Is4stateType(DataTypeKind::kVoid));
 }
 
-// §6.13 says only that void may be a function's return type, showing it returns
-// nothing; §13.4.1 is where a return statement carrying an expression in such a
-// function is made illegal, so that is the subclause the report names.
 TEST(VoidDataType, VoidFunctionReturnsValue_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -67,9 +58,6 @@ TEST(VoidDataType, VoidFunctionNoReturn_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A value-bearing return is rejected even when nested inside a block, since a
-// void function has no return value to carry. Exercises the recursive walk of
-// the function body rather than only its top-level statements.
 TEST(VoidDataType, VoidFunctionNestedReturnValue_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -85,8 +73,6 @@ TEST(VoidDataType, VoidFunctionNestedReturnValue_Error) {
                             "void function returns a value", 4, "13.4.1"));
 }
 
-// A bare return nested inside a conditional is still legal: the recursive walk
-// must not mistake a value-less return for a value-bearing one.
 TEST(VoidDataType, VoidFunctionConditionalBareReturn_Ok) {
   ElabFixture f;
   ElaborateSrc(
@@ -99,10 +85,6 @@ TEST(VoidDataType, VoidFunctionConditionalBareReturn_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.13, third sentence: void may be used for members of a tagged union. This
-// is the permissive claim owned by §6.13 (the surrounding tagged-union rules
-// live in §7.3.2). A tagged union carrying a void member, built from real
-// declaration syntax and driven through parse + elaborate, must be accepted.
 TEST(VoidDataType, VoidMemberInTaggedUnion_Ok) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,9 +96,6 @@ TEST(VoidDataType, VoidMemberInTaggedUnion_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A void member is legal even when it is the sole member of the tagged union,
-// confirming the void data type itself is what the permission admits rather
-// than some incidental pairing with a non-void member.
 TEST(VoidDataType, SoleVoidMemberInTaggedUnion_Ok) {
   ElabFixture f;
   ElaborateSrc(
@@ -128,10 +107,6 @@ TEST(VoidDataType, SoleVoidMemberInTaggedUnion_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.13's permission also holds when the tagged union is packed. This is a
-// distinct production path: the packed-member type-legality check would
-// normally reject a void member, so it must be exempted specifically for a
-// tagged union. Exercises that packed path rather than the unpacked one.
 TEST(VoidDataType, VoidMemberInPackedTaggedUnion_Ok) {
   ElabFixture f;
   ElaborateSrc(

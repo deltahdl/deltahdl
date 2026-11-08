@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_synthesizer.h"
@@ -23,16 +22,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
   ASSERT_NE(aig, nullptr);
 }
 
-// The test fails on a run that refuses `top`, whose two assignments to the
-// elements of `arr` §11.5.2 addressing now lowers: `[2]` declares the addresses
-// 0 and 1, and each names eight bits of the array's storage.
-//
-// What the case asserts is that the module lowers, not what `y0` and `y1`
-// carry. `SynthLower::Lower` walks the assignments and processes of the one
-// module it is given, and an instance stays behind `RtlirModuleInst::resolved`,
-// so the child that drives those outputs is not part of this netlist and its
-// outputs stand at constant false whatever `arr` holds. The two cases above
-// assert the same of a scalar and a packed connection.
 TEST(UnpackedArrayPortsAndArraysOfInstancesSynthesis,
      UnpackedArrayConnectionToInstanceArrayLowers) {
   SynthFixture f;

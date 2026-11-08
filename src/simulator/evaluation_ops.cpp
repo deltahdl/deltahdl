@@ -86,17 +86,9 @@ static Logic4Vec EvalUnaryNot(Logic4Vec operand, Arena& arena) {
 
 static Logic4Vec EvalUnaryMinus(Logic4Vec operand, Arena& arena) {
   if (operand.is_real) {
-    // Negation leaves the declared type alone, so the result is packed at the
-    // width it was read at: negating a §6.12 shortreal yields a shortreal.
     return MakeRealVec(arena, -RealVecToDouble(operand), operand.width);
   }
   if (HasUnknownBits(operand)) return MakeAllX(arena, operand.width);
-  // §11.4.3 defines the negation over the whole width of the operand, which
-  // §11.8.2 has already sized to the expression's, so the two's complement is
-  // taken across every word -- each inverted, one added with the carry
-  // running up, the top word cut to the width. MakeLogic4VecVal over the
-  // negated low word wrote nothing above bit 63, so `-1` extended to 128 bits
-  // read 2^64-1 rather than all ones.
   auto r = MakeLogic4Vec(arena, operand.width);
   uint64_t carry = 1;
   for (uint32_t i = 0; i < r.nwords; ++i) {
@@ -116,8 +108,6 @@ Logic4Vec EvalUnaryOp(TokenKind op, Logic4Vec operand, Arena& arena) {
     case TokenKind::kTilde:
       return EvalUnaryNot(operand, arena);
     case TokenKind::kBang: {
-      // §11.4.7: `!` gives 1 for a false operand, 0 for a true one and x for
-      // one whose truth is ambiguous.
       const Truth kTruth = TruthOf(operand);
       if (kTruth == Truth::kAmbiguous) return MakeAllX(arena, 1);
       return TruthBit(kTruth == Truth::kTrue ? Truth::kFalse : Truth::kTrue,
@@ -143,10 +133,6 @@ static uint64_t IntPow(uint64_t base, uint64_t exp) {
   return result;
 }
 
-// §11.4.3 with Table 11-4: `**` is typed by its base (§11.6.1, §11.8.1) and
-// its exponent is self-determined, so the exponent is negative by its own
-// sign alone: a base of 0 then gives x, of 1 gives 1, of a signed -1 gives 1
-// or -1 by the exponent's parity, and of any other value 0.
 static Logic4Vec EvalIntegralPower(const Logic4Vec& lhs, const Logic4Vec& rhs,
                                    uint32_t width, Arena& arena) {
   const int64_t kBase = lhs.is_signed ? SignExtend(lhs.ToUint64(), lhs.width)
@@ -170,8 +156,6 @@ static Logic4Vec EvalIntegralPower(const Logic4Vec& lhs, const Logic4Vec& rhs,
   result.is_signed = lhs.is_signed;
   return result;
 }
-// `**` over every word above 64 bits (EvalWideArith) and in the machine word
-// below, the base's type and the exponent's own sign given to each.
 static Logic4Vec EvalPower(const Logic4Vec& lhs, const Logic4Vec& rhs,
                            uint32_t width, Arena& arena) {
   if (width > 64) {
@@ -198,9 +182,6 @@ static Logic4Vec EvalSignedArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
       break;
     case TokenKind::kSlash:
       if (rv == 0) return MakeAllX(arena, width);
-      // §11.4.3 wraps a signed result at its width, so a divisor of -1 is
-      // answered as a negation: the most negative value divided by it is the
-      // value itself, where the C++ quotient overflows.
       r = rv == -1 ? static_cast<int64_t>(-static_cast<uint64_t>(lv)) : lv / rv;
       break;
     case TokenKind::kPercent:
@@ -228,10 +209,6 @@ double RealVecToDouble(const Logic4Vec& v) {
   return d;
 }
 
-// §11.3.1: an integral operand of a real operator is converted to real by its
-// value, which for a signed operand is the value its sign gives: `-3'sb1` is
-// -1, and read as the unsigned 7 it made `2.0 ** -3'sb1` 128.0 where Table 11-5
-// gives 0.5.
 double RealValueOf(const Logic4Vec& v) {
   if (v.is_real) return RealVecToDouble(v);
   if (v.is_signed && v.width <= 64)
@@ -320,20 +297,11 @@ static Logic4Vec EvalBinaryArith(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
                         : ((lhs.width > rhs.width) ? lhs.width : rhs.width);
   uint32_t width = (context_width > self_w) ? context_width : self_w;
   if (HasUnknownBits(lhs) || HasUnknownBits(rhs)) {
-    // §11.8.4: any x/z bit in an operand makes a nonlogical operation produce
-    // an entirely unknown result whose type stays consistent with the
-    // expression's type, so a signed result must remain signed.
     auto result = MakeAllX(arena, width);
     result.is_signed = lhs.is_signed && rhs.is_signed;
     return result;
   }
 
-  // §11.6.1 makes the result as wide as the widest operand and §11.4.3 defines
-  // the operators over the whole of that width, so above one word the operands
-  // are read and the result written across every word rather than through the
-  // machine word the two arms below compute in: on a `logic [127:0]`,
-  // 128'h1_0000_0000_0000_0000 + 128'h1 read 1, the only set bit of the first
-  // operand being bit 64.
   if (op == TokenKind::kPower) return EvalPower(lhs, rhs, width, arena);
   if (width > 64) {
     return EvalWideArith(op, lhs, rhs, {width, lhs.is_signed && rhs.is_signed},
@@ -349,8 +317,6 @@ static Logic4Vec EvalBinaryBitwise(TokenKind op, Logic4Vec lhs, Logic4Vec rhs,
   uint32_t self_w = (lhs.width > rhs.width) ? lhs.width : rhs.width;
   uint32_t width = (context_width > self_w) ? context_width : self_w;
 
-  // §11.8.2: each operand narrower than the result is extended to it first,
-  // by sign where both are signed (§11.4.8), equal widths included.
   bool sign_ext = lhs.is_signed && rhs.is_signed;
   if (lhs.width < width) lhs = ExtendVec(lhs, width, sign_ext, arena);
   if (rhs.width < width) rhs = ExtendVec(rhs, width, sign_ext, arena);
@@ -416,8 +382,6 @@ static void ApplySignFill(Logic4Vec& result, const Logic4Vec& v,
 
 Logic4Vec ExtendVec(const Logic4Vec& v, uint32_t target_width, bool sign_ext,
                     Arena& arena) {
-  // §5.7.1: an unbased unsized literal sized to an operand beside it, `x ==
-  // '1`, sets every bit of that width, signed or not.
   if (v.fills_width && target_width > v.width)
     return FillUnbasedUnsized(v, target_width, arena);
   auto result = MakeLogic4Vec(arena, target_width);
@@ -441,20 +405,6 @@ bool EvalCaseEquality(Logic4Vec lhs, Logic4Vec rhs) {
   return true;
 }
 
-// §11.4.10 (printed page 284): the shift operators move the whole left
-// operand by the count and fill the vacated positions with zeros -- or, for
-// >>> on a signed result, with its sign bit. The count is a number of bit
-// positions and not a machine-word shift: a count of 64 or more moves whole
-// words and the machine's shift of a 64-bit word by 64 is undefined, so the
-// operand is read a word at a time with the count split into the words it
-// spans and the bits left over.
-//
-// One plane of the left operand, aval or bval, as the shift reads it: a word
-// of the value as stored, with the bits of the last word above the width and
-// every word beyond the value holding `fill`, which is the plane's sign bit
-// repeated for a sign-filling shift and 0 otherwise. A right shift then draws
-// the fill from above the value exactly as it draws any other bit, and a word
-// below the value is 0, which is what a left shift draws from below.
 struct ShiftPlane {
   const Logic4Vec* src = nullptr;
   bool bval = false;
@@ -471,10 +421,6 @@ static uint64_t ShiftPlaneWord(const ShiftPlane& p, int64_t index) {
   return (bits & mask) | (p.fill & ~mask);
 }
 
-// Word `index` of the plane moved by `count` positions: the word `count / 64`
-// away supplies its bits shifted by `count % 64`, and the word beyond that
-// the bits shifted out of it, taken only when the bit shift is nonzero so no
-// word is ever shifted by 64.
 static uint64_t ShiftedPlaneWord(const ShiftPlane& p, uint32_t index,
                                  uint64_t count, bool left) {
   auto word_shift = static_cast<int64_t>(count / 64);
@@ -490,9 +436,6 @@ static uint64_t ShiftedPlaneWord(const ShiftPlane& p, uint32_t index,
   return lo | (ShiftPlaneWord(p, i + word_shift + 1) << (64 - bit_shift));
 }
 
-// The plane's sign bit repeated over a word, for §11.4.10's sign fill. Each
-// plane fills from its own top bit, so a sign bit of x fills with x and one
-// of z with z rather than with a known value the operand does not hold.
 static uint64_t PlaneSignFill(const Logic4Vec& v, bool bval) {
   if (v.width == 0) return 0;
   uint32_t top = v.width - 1;
@@ -505,8 +448,6 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t count,
                            Arena& arena) {
   bool left = op == TokenKind::kLtLt || op == TokenKind::kLtLtLt;
   bool sign_fill = op == TokenKind::kGtGtGt && lhs.is_signed;
-  // §11.4.10: a count of the width or more leaves nothing of the operand, and
-  // clamping it there keeps the word arithmetic below in range.
   if (count > lhs.width) count = lhs.width;
   auto result = MakeLogic4Vec(arena, lhs.width);
   result.is_signed = lhs.is_signed;
@@ -520,10 +461,6 @@ static Logic4Vec EvalShift(TokenKind op, Logic4Vec lhs, uint64_t count,
   return result;
 }
 
-// §11.4.10 takes the right operand as an unsigned number of positions.
-// Logic4Vec::ToUint64 reads its first word alone, so a count with a bit set
-// above that word -- already more than any width -- is answered as the
-// largest count rather than as its low word, which may be small or 0.
 static uint64_t ShiftCount(const Logic4Vec& rhs) {
   for (uint32_t i = 1; i < rhs.nwords; ++i) {
     if (rhs.words[i].aval != 0) return ~uint64_t{0};
@@ -532,15 +469,6 @@ static uint64_t ShiftCount(const Logic4Vec& rhs) {
 }
 
 static constexpr uint64_t kResultX = 2;
-// §11.4.6: an x or z bit of the right operand is a wildcard at its own bit
-// position, matching whatever the left operand holds there; every other
-// position is compared as == compares it: a bit known on both sides and
-// different makes the relation false whatever the others hold, and a left x
-// or z at one of them leaves it unknown only where none does, so 4'b1x00 ==?
-// 4'b0000 is 0. EvalEqualityCompare hands the operands here
-// extended to one width as §11.4.6 extends them, and every word of that width
-// takes part: reading the first word alone had two 96-bit operands differing
-// at bit 80 equal, and a wildcard at bit 80 no wildcard at all.
 static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
   bool unknown = false;
@@ -552,15 +480,6 @@ static uint64_t EvalWildcardEq(Logic4Vec lhs, Logic4Vec rhs) {
   }
   return unknown ? kResultX : 1;
 }
-// §11.4.5 (printed page 279): == and != compare their operands bit for bit,
-// the narrower extended to the wider's width before EvalEqualityOp is
-// reached, so every word of the two is read rather than the first alone,
-// which had two 96-bit operands differing at bit 80 equal. The result is
-// 1'bx only where the unknown or high-impedance bits leave the relation
-// ambiguous: a bit position both operands hold known and differently makes
-// them unequal whatever the other positions hold, so 8'b1101x001 ==
-// 8'b1101x000 is 0, the suite's 11.4.5--equality-op.sv; asked whether either
-// operand held an unknown bit before any bit was compared, it read x.
 static uint64_t EvalLogicalEq(const Logic4Vec& lhs, const Logic4Vec& rhs) {
   uint32_t nwords = std::min(lhs.nwords, rhs.nwords);
   bool unknown = false;
@@ -633,10 +552,6 @@ std::string AssocStringKey(const Logic4Vec& val) {
   return s;
 }
 
-// §11.4.4: -1, 0 or 1 as `lhs` is below, equal to or above `rhs`, both
-// extended to the wider's width -- by sign where both are signed -- and
-// compared over every word from the most significant down, a sign bit first
-// deciding between a negative and a nonnegative signed operand.
 static int CompareIntegral(Logic4Vec lhs, Logic4Vec rhs, Arena& arena) {
   const uint32_t kWidth = std::max(lhs.width, rhs.width);
   const bool kSigned = lhs.is_signed && rhs.is_signed;

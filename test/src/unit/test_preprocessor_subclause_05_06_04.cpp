@@ -104,9 +104,6 @@ TEST(CompilerDirectivePreprocessor, ConcurrentCusIndependent) {
   EXPECT_EQ(cu2.DefaultNetType(), NetType::kTri);
 }
 
-// §5.6.4: a directive shall not affect another compilation unit, `line among
-// them. Carried into the next unit, the override of a.sv's line 10 numbered
-// b.sv's line 3 from it and named it x.v.
 TEST(CompilerDirectivePreprocessor, LineOverrideEndsWithItsCompilationUnit) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

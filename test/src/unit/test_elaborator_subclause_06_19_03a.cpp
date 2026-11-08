@@ -73,10 +73,6 @@ TEST(Elaboration, EnumNonblockingIntAssign_Error) {
                             "6.19.3"));
 }
 
-// §6.19.3: the strong-typing rule holds in every procedural block, not only in
-// `initial` and `always`. An integer assigned to an enum variable inside an
-// `always_comb` block is rejected exactly as EnumStrictTypeCheck_Error's
-// `initial` form is.
 TEST(Elaboration, EnumAlwaysCombIntAssign_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -108,10 +104,6 @@ TEST(Elaboration, EnumExprAssignNoCast_Error) {
                             "6.19.3"));
 }
 
-// A compound assignment writes the arithmetic result back into the enum
-// variable, which is an operand of that arithmetic, so the cast it lacks is the
-// one §6.19.4 states for an expression an enum takes part in; §6.19.3's own
-// case is a value outside the enumeration, and the report is a §6.19.4 one.
 TEST(Elaboration, EnumCompoundAssign_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -128,9 +120,6 @@ TEST(Elaboration, EnumCompoundAssign_Error) {
                             5, "6.19.4"));
 }
 
-// An increment likewise stores the result of arithmetic on the enum variable
-// back into it without a cast, and is reported under §6.19.4 as the compound
-// assignment is.
 TEST(Elaboration, EnumIncrement_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -187,9 +176,6 @@ TEST(Elaboration, EnumModuleLevelInitMember_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: enumeration values can still be used as constants in expressions and
-// the result assigned to a variable of a compatible integral type. The strong
-// typing only constrains the enum side, never the read-out into an integral.
 TEST(Elaboration, EnumValueAssignedToInt_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -207,9 +193,6 @@ TEST(Elaboration, EnumValueAssignedToInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: enumerated variables are auto-cast into integral values, so an enum
-// term may appear inside an arithmetic expression whose result feeds an
-// integral target without any explicit cast.
 TEST(Elaboration, EnumAutoCastInIntExpr_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -227,9 +210,6 @@ TEST(Elaboration, EnumAutoCastInIntExpr_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: enumerated variables are type-checked in arguments — passing a bare
-// integral value to an enum-typed formal requires an explicit cast, just as a
-// direct assignment would.
 TEST(Elaboration, EnumArgIntWithoutCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -249,7 +229,6 @@ TEST(Elaboration, EnumArgIntWithoutCast_Error) {
       "integer value passed to enum argument without cast", 8, "6.19.3"));
 }
 
-// §6.19.3: an enum member passed by name to an enum-typed formal is well-typed.
 TEST(Elaboration, EnumArgMember_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -268,7 +247,6 @@ TEST(Elaboration, EnumArgMember_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: an explicit cast supplies a legal value for an enum-typed formal.
 TEST(Elaboration, EnumArgCast_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -287,10 +265,6 @@ TEST(Elaboration, EnumArgCast_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: the strong-typing prohibition carves out an exception for an enum
-// that is a member of a union — such a member may take a direct out-of-set
-// value without an explicit cast, unlike a standalone enum variable (cf.
-// EnumStrictTypeCheck_Error, which rejects the same assignment).
 TEST(Elaboration, EnumUnionMemberDirectIntAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -307,9 +281,6 @@ TEST(Elaboration, EnumUnionMemberDirectIntAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: enumerated variables are type-checked with relational operators by
-// being auto-cast to their integral value, so comparing an enum against a plain
-// integer (cf. the `if (1 == c)` example) is well-typed and not an error.
 TEST(Elaboration, EnumRelationalCompareWithInt_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -327,11 +298,6 @@ TEST(Elaboration, EnumRelationalCompareWithInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: assigning a same-type enumerated variable to another is a well-typed
-// assignment and needs no cast — the strong-typing rule constrains only values
-// drawn from outside the enumeration, not another value of the very same type.
-// This exercises the enum-variable operand form, distinct from the enum
-// named-constant operand covered by EnumMemberAssign_Ok.
 TEST(Elaboration, EnumSameTypeVarAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -349,12 +315,6 @@ TEST(Elaboration, EnumSameTypeVarAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3: casting is the sanctioned route for placing a value of a different
-// type, or an out-of-set value, into an enum variable. Built from the §6.24.2
-// dynamic-cast dependency ($cast), the same integral value that a direct
-// assignment rejects (cf. EnumStrictTypeCheck_Error) reaches the enum without a
-// strong-typing diagnostic, distinct from the §6.24.1 static-cast form covered
-// by EnumCastAssign_Ok.
 TEST(Elaboration, EnumDynamicCastAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -370,22 +330,6 @@ TEST(Elaboration, EnumDynamicCastAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19.3 is stated of the assignment and names no statement it is suspended
-// in, so Elaborator::WalkStmtsForEnumAssign in
-// src/elaborator/elaborator_validate_types.cpp descends every link
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h names. The
-// cases below cover the seven links the walk used to omit. Each link that can
-// hold a declaration takes a pair, because the walk both reports the offending
-// assignment and collects the enum variables a statement declares into
-// Elaborator::enum_var_names_: the first case declares the variable outside the
-// link and assigns inside it, which exercises the report, and the second
-// declares it inside the link, which exercises the collection.
-
-// §9.3.2 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
-// holds both halves of this pair. Parser::ParseBlockVarDecls in
-// src/parser/parser_stmt_block.cpp puts the declarations in Stmt::fork_stmts
-// beside the statements.
 TEST(Elaboration, EnumIntAssignInAForkArmIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -422,16 +366,6 @@ TEST(Elaboration, EnumDeclaredAndAssignedInAForkArmIsReported) {
                             "6.19.3"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so a
-// for header assigns to any variable in scope, an enum variable among them.
-//
-// The other form A.6.8 admits there, `for_variable_declaration ::= [ var ]
-// data_type variable_identifier = expression { , ... }`, has cases of its own
-// below: Parser::ParseForLocalDeclInits in src/parser/parser_stmt.cpp records
-// the declared type in Stmt::for_init_types and pushes the initialization into
-// Stmt::for_inits as a plain assignment statement, so no statement in the link
-// satisfies StmtDeclaresEnumVar and the name has to be collected from the type
-// beside it.
 TEST(Elaboration, EnumIntAssignInAForInitializationIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -449,11 +383,6 @@ TEST(Elaboration, EnumIntAssignInAForInitializationIsReported) {
                             "6.19.3"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, so a for step assigns to
-// an enum variable the same way. None of the three declares a name, so this
-// link takes the assignment case alone: no conforming source puts a
-// declaration in a for step for the collecting half of the walk to find.
 TEST(Elaboration, EnumIntAssignInAForStepIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -471,12 +400,6 @@ TEST(Elaboration, EnumIntAssignInAForStepIsReported) {
                             "6.19.3"));
 }
 
-// §16.3 and A.6.10 give `action_block ::= statement_or_null | [ statement ]
-// else statement_or_null`, so an immediate assertion holds a statement in each
-// arm, kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. A
-// declaration is not a statement_or_null, so the collecting case of each pair
-// writes the declaration in a begin-end block the arm holds, which is reached
-// through that arm and through no other link.
 TEST(Elaboration, EnumIntAssignInAnAssertionPassStmtIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -545,10 +468,6 @@ TEST(Elaboration, EnumDeclaredAndAssignedInAnAssertionFailStmtIsReported) {
                             "6.19.3"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §6.19.3 is a rule about the source, so it holds whether the weighted
-// draw would select the item or not.
 TEST(Elaboration, EnumIntAssignInARandcaseItemIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -587,11 +506,6 @@ TEST(Elaboration, EnumDeclaredAndAssignedInARandcaseItemIsReported) {
                             "6.19.3"));
 }
 
-// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration }
-// { statement_or_null } }`, so a randsequence production's code block holds
-// both halves of this pair directly. Parser::ParseRsCodeBlockStmts in
-// src/parser/parser_verify.cpp puts them in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(Elaboration, EnumIntAssignInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -627,11 +541,6 @@ TEST(Elaboration, EnumDeclaredAndAssignedInARandsequenceCodeBlockIsReported) {
                             "6.19.3"));
 }
 
-// §12.7.1 makes a variable declared in a for header local to the loop, so every
-// use of it stands inside the region §6.19.3 has to hold over -- and a
-// declaration written there is not a StmtKind::kVarDecl, which is the only
-// shape the collecting half of the walk knew. The name went unregistered, so
-// the initializer was judged against nothing.
 TEST(Elaboration, EnumDeclaredInAForHeaderWithAnIntegerIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -647,11 +556,6 @@ TEST(Elaboration, EnumDeclaredInAForHeaderWithAnIntegerIsReported) {
                             "6.19.3"));
 }
 
-// The half that compounds: because the declaration was not judged the variable
-// was not registered, so nothing assigned to it anywhere in the loop was judged
-// either. The step assigns the integer result of an addition on the variable,
-// which is §6.19.4's case, and the header declares its variable with a cast so
-// that the report this asserts is the step's rather than the declaration's.
 TEST(Elaboration, AssignmentToAForHeaderEnumVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -667,9 +571,6 @@ TEST(Elaboration, AssignmentToAForHeaderEnumVariableIsReported) {
                             "6.19.4"));
 }
 
-// §6.19.3 admits a cast, so a header that writes one is accepted and the loop
-// body's assignment of an enum member with it. Without this, a fix reporting
-// every for-header declaration of an enum type would satisfy both cases above.
 TEST(Elaboration, EnumDeclaredInAForHeaderWithACastIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -683,11 +584,6 @@ TEST(Elaboration, EnumDeclaredInAForHeaderWithACastIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §26.3 has `p::BLUE` name the enumeration literal p declares, of the
-// enumeration's type, so §6.19.3 asks no cast of it where a bare BLUE needs
-// none. The scoped name was taken for an integer and each of the three sites
-// reported it, so the module declaration's initializer, the procedural
-// declaration's and the assignment each write one.
 TEST(Elaboration, ScopedPackageEnumLiteralAssignedToItsTypeIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -707,10 +603,6 @@ TEST(Elaboration, ScopedPackageEnumLiteralAssignedToItsTypeIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The scope resolution operator is not what exempts the value: a package
-// parameter named through it is an integer to §6.19.3 as a module's parameter
-// is, so the same package declaring the enumeration and the parameter has the
-// literal accepted above and the parameter reported here.
 TEST(Elaboration, ScopedPackageParameterAssignedToEnumIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -729,11 +621,6 @@ TEST(Elaboration, ScopedPackageParameterAssignedToEnumIsReported) {
                             "6.19.3"));
 }
 
-// §6.19.3 with §10.9.1: an unpacked array of the enum takes an assignment
-// pattern whose every item is a value of the enumeration -- positional, a
-// default item, and a nested pattern for a second dimension -- in a declaration
-// and in an assignment, each item initializing an element. It was reported as
-// an integer assigned without a cast.
 TEST(Elaboration, EnumArrayTakesAPatternOfEnumValues_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -750,8 +637,6 @@ TEST(Elaboration, EnumArrayTakesAPatternOfEnumValues_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The items are still screened: a pattern of integers initializing an array
-// of the enum assigns each element an integer without a cast.
 TEST(Elaboration, EnumArrayPatternOfIntegers_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -765,9 +650,6 @@ TEST(Elaboration, EnumArrayPatternOfIntegers_Error) {
                             "6.19.3"));
 }
 
-// §6.19.3: an enum variable is directly assigned only values of its own
-// enumeration set, so a value of another enumerated type, a Week variable or
-// a Week member, lies outside Colors' set and needs a cast.
 TEST(Elaboration, EnumAssignedFromAnotherEnumTypeRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -793,10 +675,6 @@ TEST(Elaboration, EnumAssignedFromAnotherEnumTypeRejected) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A value of the variable's own enumeration, named through a typedef that
-// renames it (§6.22.1 makes the two names one type), and one cast from another
-// enumeration, are assignable; so is a name a block declares, whatever the
-// module's variable of that name is.
 TEST(Elaboration, EnumAssignedFromItsOwnTypeOrThroughACastAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -816,10 +694,6 @@ TEST(Elaboration, EnumAssignedFromItsOwnTypeOrThroughACastAccepted) {
              "endmodule\n"));
 }
 
-// §6.19.3: a variable of a built-in type other than an enumeration holds a
-// value of that type, so it reaches an enum variable only through a cast,
-// whether assigned or written as an initializer; another enum variable, a
-// member and a cast do not need one, nor does a block's enum of the name.
 TEST(Elaboration, NonEnumVariableAssignedToEnumIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -853,11 +727,6 @@ TEST(Elaboration, NonEnumVariableAssignedToEnumIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
-// §13.4.1 assigns a function's return value to the function's return
-// variable, so §6.19.3 holds of a return in a function returning an
-// enumeration: an integer or a non-enum variable needs a cast, while a formal
-// or a local of the enumeration's type shadows the module's variable. A return
-// with no expression is §12.8's to report and draws no second report here.
 TEST(Elaboration, EnumFunctionReturnWithoutCastIsReported) {
   ElabFixture f;
   ElaborateSrc(

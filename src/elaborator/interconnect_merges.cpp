@@ -14,11 +14,6 @@ namespace delta {
 
 namespace {
 
-// The net `net` names given the type `merged` its merged net reaches, where
-// that is a built-in net type; an interconnect net whose chain reaches none
-// keeps the type it has, which a gate terminal may have made a wire
-// (§23.3.3.7.2). An interconnect port's own net stands among no module's nets,
-// and takes its type with the net the port is connected to.
 void GiveMergedType(const InterconnectMerges::Net& net, NetType merged) {
   if (NetTypeGroup(merged) < 0) return;
   for (RtlirNet& declared : net.first->nets) {

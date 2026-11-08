@@ -34,11 +34,6 @@ inline const RtlirModule* ElaborateSrc(SynthFixture& f,
   return design->top_modules[0];
 }
 
-// The first report whose message is exactly `message`, or null when none is.
-// Matching the whole message rather than a fragment of it is what lets one
-// rejection be told from another: every rejection the synthesizer writes ends
-// in the words "is not synthesizable", so a search for a fragment answers with
-// whichever construct the walk reached first.
 inline const Diagnostic* FindDiag(const SynthFixture& f,
                                   std::string_view message) {
   for (const auto& diag : f.diag.Diagnostics()) {

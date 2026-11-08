@@ -80,9 +80,6 @@ TEST(BlockStatementSimSyntax, ForkWithSingleBeginEnd) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// End-to-end for the block_item_declaration dependency (A.2.8): a variable is
-// declared inside a seq_block from real source, assigned, and read within the
-// same block, with the result observed after simulation.
 TEST(BlockStatementSimSyntax, SeqBlockDeclUsedAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -98,8 +95,6 @@ TEST(BlockStatementSimSyntax, SeqBlockDeclUsedAtRuntime) {
   LowerRunAndCheck(f, design, {{"out", 7u}});
 }
 
-// End-to-end for the block_identifier dependency (A.9.3): a named seq_block
-// built from real source runs to completion and its statement takes effect.
 TEST(BlockStatementSimSyntax, NamedSeqBlockRunsAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(

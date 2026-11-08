@@ -18,30 +18,6 @@
 
 namespace delta {
 
-// §16.14.3: a cover statement may have an optional pass statement
-// (statement_or_null), and that pass statement may hold no concurrent assert,
-// assume or cover statement. A procedural concurrent assertion is parsed as an
-// assert/assume/cover-immediate Stmt that carries is_procedural_concurrent;
-// ordinary immediate assertions leave that flag clear and remain permitted.
-// Returns the first offending statement, or nullptr when the pass statement
-// contains none.
-//
-// §16.14.3 says the pass statement holds none and names no statement the
-// prohibition is lifted in, so this descends every link ForEachChildStmt in
-// elaborator_validate_internal.h names. It wrote out nine of the thirteen, so a
-// concurrent assertion written in a randcase arm or a randsequence code block
-// was not found and the cover statement holding it elaborated clean. Two of the
-// four links it now reaches cannot hold one: A.6.8 admits in a
-// for_initialization only a list_of_variable_assignments or a
-// for_variable_declaration, and in a for_step only an operator_assignment, an
-// inc_or_dec_expression or a function_subroutine_call, so no assertion
-// statement stands in a for header. Descending them costs nothing and keeps the
-// walk from naming any link itself.
-//
-// ForEachChildStmt gives the visitor no way to stop, so the first offending
-// statement is kept in `hit` and the recursion runs only while `hit` is null.
-// That is what makes this walk report the first one in source order rather than
-// whichever link the list happens to visit last.
 const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
   if (s == nullptr) return nullptr;
   if (s->is_procedural_concurrent && (s->kind == StmtKind::kAssertImmediate ||
@@ -59,16 +35,11 @@ const Stmt* FindConcurrentAssertionInPassStmt(const Stmt* s) {
 
 namespace {
 
-// A procedural concurrent assertion's statement that is an assert or an
-// assume rather than a cover.
 bool IsAssertOrAssume(const Stmt* s) {
   return s->kind == StmtKind::kAssertImmediate ||
          s->kind == StmtKind::kAssumeImmediate;
 }
 
-// §16.14.1: the action block of a concurrent assert statement, and by §16.14.2
-// of an assume statement, holds no concurrent assert, assume or cover
-// statement, an immediate assertion being allowed there.
 void CheckActionBlock(const Stmt* pass, const Stmt* fail, SourceLoc loc,
                       DiagEngine& diag) {
   const Stmt* nested = FindConcurrentAssertionInPassStmt(pass);
@@ -80,8 +51,6 @@ void CheckActionBlock(const Stmt* pass, const Stmt* fail, SourceLoc loc,
              Subclause("16.14.1"));
 }
 
-// §16.14.6: the clocking events of a procedural concurrent assertion name no
-// automatic variable, though its other arguments may.
 void CheckClockAutomatics(
     const Stmt* s, const std::unordered_set<std::string_view>& automatics,
     DiagEngine& diag) {
@@ -92,15 +61,11 @@ void CheckClockAutomatics(
              Subclause("16.14.6"));
 }
 
-// The clock a sequence or property declaration writes itself, empty where
-// it writes none.
 const std::vector<EventExpr>& DeclaredClock(const ModuleItem* decl) {
   return decl->kind == ModuleItemKind::kSequenceDecl ? decl->seq_clock
                                                      : decl->prop_clock;
 }
 
-// The declarations of `outside` the body of the sequence or property
-// declaration `decl` instantiates, written as calls or as bare names.
 std::vector<const ModuleItem*> InstancesInBody(const ModuleItem* decl,
                                                const NamedDecls& outside) {
   std::vector<const ModuleItem*> found;
@@ -116,8 +81,6 @@ std::vector<const ModuleItem*> InstancesInBody(const ModuleItem* decl,
   return found;
 }
 
-// Whether the declaration `decl` is clocked on `block_clock` alone: written
-// with that one event, or with none, so taking it.
 bool ClockedOnAlone(const ModuleItem* decl, const EventExpr& block_clock) {
   const std::vector<EventExpr>& clock = DeclaredClock(decl);
   return decl->decl_clock_event_count <= 1 &&
@@ -126,10 +89,6 @@ bool ClockedOnAlone(const ModuleItem* decl, const EventExpr& block_clock) {
            SamePath(clock[0].signal, block_clock.signal)));
 }
 
-// §16.16 (b)(3): an instance, in a declaration of the clocking block `block`,
-// of a named sequence or property declared outside it is singly clocked, on
-// an event identical to the block's; one declared with no clock takes the
-// block's. `outside` holds the declarations of the module by name.
 void CheckClockingBlockInstances(const ModuleItem* block,
                                  const NamedDecls& outside, DiagEngine& diag) {
   if (block->clocking_event.size() != 1) return;
@@ -146,10 +105,6 @@ void CheckClockingBlockInstances(const ModuleItem* block,
   }
 }
 
-// §16.12.17 Restriction 1: whether `node` is `not` or one of the strong
-// operators s_nexttime, s_always, s_eventually, s_until and s_until_with,
-// which no property expression instantiating a recursive property may stand
-// under.
 bool NegatesOrStrengthens(const PropertyExprNode* node) {
   using Kind = PropertyExprNode::Kind;
   if (node->kind == Kind::kNot) return true;
@@ -158,10 +113,6 @@ bool NegatesOrStrengthens(const PropertyExprNode* node) {
           node->kind == Kind::kEventually || node->kind == Kind::kUntil);
 }
 
-// §16.12.17 Restriction 1, for the property `node` of an assertion statement
-// standing at `loc`: an instance of a property from which a recursive one is
-// reachable may stand under no `not` or strong operator, so the negation of
-// a recursive property is not asserted.
 void CheckRecursiveUnderNegation(const PropertyExprNode* node, bool negated,
                                  SourceLoc loc,
                                  const PropertyRegistry& registry,
@@ -184,8 +135,6 @@ void CheckRecursiveUnderNegation(const PropertyExprNode* node, bool negated,
   }
 }
 
-// The checks on each concurrent assertion statement the procedure or
-// subroutine `item` holds.
 void CheckProceduralAssertions(const ModuleItem* item,
                                const PropertyRegistry& registry,
                                DiagEngine& diag) {

@@ -94,9 +94,6 @@ TEST(EquivalentTypesElaboration, UnpackedFixedSizeArraySameSizeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2(d): unpacked fixed-size arrays are equivalent when their element
-// types are equivalent and the sizes are equal -- the actual range bounds may
-// differ ([0:5] vs [1:6]).
 TEST(EquivalentTypesElaboration,
      UnpackedFixedSizeArrayDifferentRangesEquivalent) {
   ElabFixture f;
@@ -111,8 +108,6 @@ TEST(EquivalentTypesElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2(e): dynamic arrays are equivalent when they are the same kind of
-// array with equivalent element types.
 TEST(EquivalentTypesElaboration, DynamicArraysSameElementTypeEquivalent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,8 +121,6 @@ TEST(EquivalentTypesElaboration, DynamicArraysSameElementTypeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2(e): queues are equivalent when they are the same kind of array with
-// equivalent element types.
 TEST(EquivalentTypesElaboration, QueuesSameElementTypeEquivalent) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -141,15 +134,6 @@ TEST(EquivalentTypesElaboration, QueuesSameElementTypeEquivalent) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.2: two unpacked structure variables are equivalent only when they are
-// declared with the same named type, so a comparison of variables of two
-// different structure types is illegal. The subclause on the report is what
-// tells this rejection from §6.22.1's matching-type rule, which two named
-// types breach independently of whether either is an aggregate. The two type
-// names are in the substring because CheckAggregateCompareOp in
-// src/elaborator/elaborator_validate_operations.cpp has a second report under
-// the same subclause, for whole unpacked arrays of differing size, and that
-// one names no type.
 TEST(EquivalentTypesElaboration, NonEquivalentStructComparisonNames6_22_2) {
   ElabFixture f;
   ElaborateSrc(
@@ -168,10 +152,6 @@ TEST(EquivalentTypesElaboration, NonEquivalentStructComparisonNames6_22_2) {
       "6.22.2"));
 }
 
-// §6.22.2's own example: item a) makes the typedef name uint10 equivalent to
-// `bit [10:1]`, and item d) makes that packed array equivalent to `bit [9:0]`,
-// both 2-state, unsigned and 10 bits, so §7.6 accepts the unpacked-array
-// assignment of `bit [9:0] A [0:5]` to `uint10 C [6:1]` in either direction.
 TEST(EquivalentTypesElaboration, TypedefElementArrayAssignmentAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -185,8 +165,6 @@ TEST(EquivalentTypesElaboration, TypedefElementArrayAssignmentAccepted) {
              "endmodule\n"));
 }
 
-// A typedef element type is compared as the type it names, so a `bit [8:0]`
-// element, nine bits against uint10's ten, is still not equivalent.
 TEST(EquivalentTypesElaboration, TypedefElementOfAnotherWidthRejected) {
   ElabFixture f;
   ElaborateSrc(

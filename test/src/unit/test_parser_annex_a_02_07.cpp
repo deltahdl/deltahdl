@@ -56,9 +56,6 @@ TEST(TaskDeclParsing, TaskBodyWithStatements) {
   EXPECT_GE(item->func_body_stmts.size(), 2u);
 }
 
-// tf_port_declaration in the first task_body_declaration alternative, with the
-// two declarations carrying different directions.
-// test_parser_subclause_13_03.cpp covers the repeated-input form.
 TEST(TaskDeclParsing, TaskBodyOldStyleMixedDirectionPorts) {
   auto r = Parse(
       "module m;\n"
@@ -76,9 +73,6 @@ TEST(TaskDeclParsing, TaskBodyOldStyleMixedDirectionPorts) {
   EXPECT_EQ(item->func_args[1].direction, Direction::kOutput);
 }
 
-// A tf_port_declaration takes a data_type_or_implicit, and A.2.2.1 lets the
-// data type be a package's typedef named through its scope, which the port
-// then has.
 TEST(TaskDeclParsing, TaskBodyPortOfAPackageScopedType) {
   auto r = Parse(
       "package pk;\n"
@@ -101,9 +95,6 @@ TEST(TaskDeclParsing, TaskBodyPortOfAPackageScopedType) {
   }
 }
 
-// End label on the task_body_declaration alternative that has no parenthesized
-// tf_port_list. test_parser_subclause_13_03.cpp covers the empty-port-list
-// form.
 TEST(TaskDeclParsing, TaskBodyWithEndLabelNoPortList) {
   auto r = Parse(
       "module m;\n"
@@ -213,9 +204,6 @@ TEST(TaskDeclParsing, TfPortItemWithUnpackedDims) {
   EXPECT_FALSE(item->func_args[0].unpacked_dims.empty());
 }
 
-// The task prototypes below stand in an interface, A.1.6's
-// extern_tf_declaration being an interface_or_generate_item and no item of a
-// module body.
 TEST(TaskDeclParsing, TfPortItemNoIdentifier) {
   auto r = Parse(
       "interface ifc;\n"
@@ -360,14 +348,6 @@ TEST(TaskDeclParsing, TfPortDeclConstRef) {
   EXPECT_EQ(item->func_args[0].direction, Direction::kRef);
 }
 
-// A.2.7: `tf_port_direction ::= port_direction | [ const ] ref [ static ]` --
-// the `const` of a tf_port_direction is the optional qualifier of a `ref`, and
-// never a direction on its own. A `const` not followed by `ref` at the head of
-// a subroutine body is therefore a data_declaration, one of the forms of
-// block_item_declaration (A.2.8), and belongs among the body's statements
-// rather than among its ports. The initializer settles it independently: a
-// tf_port_declaration's declarators are a list_of_tf_variable_identifiers,
-// which admits no `= expression`.
 TEST(TaskDeclParsing, ConstWithoutRefIsNotATfPortDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -533,9 +513,6 @@ TEST(TaskDeclParsing, TaskDeclLifetimeStatic) {
   EXPECT_TRUE(item->is_static);
 }
 
-// class_scope on the task_body_declaration alternative that has no
-// parenthesized tf_port_list. test_parser_subclause_08_24.cpp covers the form
-// that repeats the prototype's tf_port_list.
 TEST(TaskDeclParsing, TaskBodyClassScopeNoPortList) {
   auto r = Parse(
       "class c;\n"
@@ -622,9 +599,6 @@ TEST(TaskDeclParsing, TfPortDeclWithAttribute) {
 }
 
 TEST(TaskDeclParsing, TfPortDirectionConstRefStatic) {
-  // tf_port_direction permits all three optional decorations together:
-  // `const' before, `ref' as the direction, and `static' as a trailing
-  // qualifier.
   auto r = Parse(
       "module m;\n"
       "  task my_task(const ref static int a);\n"
@@ -640,8 +614,6 @@ TEST(TaskDeclParsing, TfPortDirectionConstRefStatic) {
 }
 
 TEST(TaskDeclParsing, ErrorTfPortDirectionInputCombinedWithRef) {
-  // tf_port_direction is a choice between port_direction (input/output/inout)
-  // and the [const] ref [static] form; mixing them is not in the grammar.
   auto r = Parse(
       "module m;\n"
       "  task my_task(input ref int a);\n"
@@ -664,8 +636,6 @@ TEST(TaskDeclParsing, ErrorTfPortDirectionRefCombinedWithInout) {
 }
 
 TEST(TaskDeclParsing, TaskBodyWithNullStatement) {
-  // task_body_declaration permits any number of statement_or_null entries.
-  // A bare `;' is a null statement and must be accepted.
   auto r = Parse(
       "module m;\n"
       "  task my_task;\n"
@@ -681,7 +651,6 @@ TEST(TaskDeclParsing, TaskBodyWithNullStatement) {
 }
 
 TEST(TaskDeclParsing, TaskPrototypeMultiplePorts) {
-  // task_prototype's optional ( [ tf_port_list ] ) accepts multi-item lists.
   auto r = Parse(
       "interface ifc;\n"
       "  extern task my_task(input int a, output int b);\n"
@@ -696,25 +665,15 @@ TEST(TaskDeclParsing, TaskPrototypeMultiplePorts) {
 }
 
 TEST(TaskDeclParsing, ErrorTaskDeclDynOverrideInitialAndExtends) {
-  // dynamic_override_specifiers is [ initial_or_extends_specifier ]
-  // [ final_specifier ]: at most one initial_or_extends_specifier is allowed,
-  // so `:initial :extends' (two of them) is not in the grammar and must be
-  // rejected. §8.20 states the same rule in prose, and that is what reports it.
   auto r = Parse(
       "class c;\n"
       "  virtual task :initial :extends my_task;\n"
       "  endtask\n"
       "endclass\n");
-  // Parser::ParseTaskDecl reaches the rule through the same
-  // Parser::ParseDynamicOverrideSpecifiers the function form uses, so the task
-  // form names the report the function form names.
   EXPECT_TRUE(ReportedError(
       r.diags, "':initial' and ':extends' are mutually exclusive", 2, "8.20"));
 }
 
-// A.2.7's tf_port_item and tf_port_declaration take a data_type after `var`,
-// which A.2.2.1 lets be a type_reference (§6.23), held on the formal for the
-// elaborator to resolve.
 TEST(TaskDeclParsing, FormalsOfATypeReference) {
   auto r = Parse(
       "module m;\n"
@@ -737,9 +696,6 @@ TEST(TaskDeclParsing, FormalsOfATypeReference) {
   }
 }
 
-// A formal is a variable of its subroutine, so §6.23 has its type reference
-// follow `var`, and one written without it, in the list or in the body, is
-// reported.
 TEST(TaskDeclParsing, FormalOfATypeReferenceWithoutVarIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -760,9 +716,6 @@ TEST(TaskDeclParsing, FormalOfATypeReferenceWithoutVarIsReported) {
   }
 }
 
-// A.2.7 writes a task body's declarations before its statements in both body
-// forms, so a declaration after the body's first statement is reported, and
-// one before it, beside a port declaration or after a port list, is not.
 TEST(TaskDeclParsing, DeclarationAfterAStatementIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -787,9 +740,6 @@ TEST(TaskDeclParsing, DeclarationAfterAStatementIsReported) {
   }
 }
 
-// A.2.7's tf_port_direction writes `const` only before `ref`, so a formal's
-// `const` before another direction or before its data type is reported, and
-// the formal is read without it; `const ref` is not reported and keeps it.
 TEST(TaskDeclParsing, ConstWithoutRefOnAFormalIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -816,10 +766,6 @@ TEST(TaskDeclParsing, ConstWithoutRefOnAFormalIsReported) {
   EXPECT_TRUE(items[2]->func_args[1].is_const);
 }
 
-// A.2.7 writes a tf_port_item's unpacked dimensions and default value after
-// its port_identifier, so a prototype's formal written without a name, which
-// footnote 28 allows, takes neither: a default and an unpacked dimension on
-// one are reported, and a nameless formal with neither is not.
 TEST(TaskDeclParsing, NamelessPrototypeFormalTakesNoDimensionOrDefault) {
   auto r = Parse(
       "interface ifc;\n"
@@ -836,10 +782,6 @@ TEST(TaskDeclParsing, NamelessPrototypeFormalTakesNoDimensionOrDefault) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 4, "A.2.7"));
 }
 
-// A.2.7 prefixes a task_body_declaration's name with an interface_identifier
-// and `.` or with a class_scope, one or the other, so a name written with an
-// interface prefix and then a class scope is reported, and either prefix alone
-// is not.
 TEST(TaskDeclParsing, InterfacePrefixWithAClassScopeIsReported) {
   auto r = Parse(
       "class C;\n"

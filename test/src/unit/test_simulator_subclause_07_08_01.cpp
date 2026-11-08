@@ -105,8 +105,6 @@ TEST(WildcardAssocArraySimulation, OverwriteKey) {
   EXPECT_EQ(v, 999u);
 }
 
-// §7.8.1 — the same numeric value carried by indices of differing widths
-// collapses to a single entry (leading zeros dropped, minimal value used).
 TEST(WildcardAssocArraySimulation, EquivalentWidthsCollapse) {
   auto v = RunAndGet(
       "module t;\n"
@@ -121,8 +119,6 @@ TEST(WildcardAssocArraySimulation, EquivalentWidthsCollapse) {
   EXPECT_EQ(v, 77u);
 }
 
-// §7.8.1 — a string literal index is cast to a bit vector of equivalent size,
-// so "AB" (16 bits) keys identically to its numeric value 0x4142.
 TEST(WildcardAssocArraySimulation, StringLiteralIndexCastToVector) {
   auto v = RunAndGet(
       "module t;\n"
@@ -137,8 +133,6 @@ TEST(WildcardAssocArraySimulation, StringLiteralIndexCastToVector) {
   EXPECT_EQ(v, 7u);
 }
 
-// §7.8.1 — the equivalent-size cast tracks the literal's length: a one-byte
-// string "A" becomes an 8-bit value 0x41, keying the same entry as 8'h41.
 TEST(WildcardAssocArraySimulation, SingleCharStringLiteralIndex) {
   auto v = RunAndGet(
       "module t;\n"
@@ -153,10 +147,6 @@ TEST(WildcardAssocArraySimulation, SingleCharStringLiteralIndex) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.8.1 — driven through the full pipeline: an x/z index is also invalid when
-// reading. A z-bearing index cannot match the stored key 5, so the read yields
-// the array default (0) rather than the stored 77. Exercises the read path,
-// distinct from the rejected write.
 TEST(WildcardAssocArraySimulation, UnknownIndexReadReturnsDefaultEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -171,11 +161,6 @@ TEST(WildcardAssocArraySimulation, UnknownIndexReadReturnsDefaultEndToEnd) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.8.1 — driven through the full pipeline: an index carrying x/z is invalid
-// at run time, so a write through it stores nothing. Observed with num(), which
-// returns a count (permitted on a wildcard array, unlike an index-returning
-// locator). The valid integral write on the same array is retained, isolating
-// the x/z rejection from ordinary storage.
 TEST(WildcardAssocArraySimulation, UnknownIndexNotStoredEndToEnd) {
   auto rejected = RunAndGet(
       "module t;\n"
@@ -202,14 +187,9 @@ TEST(WildcardAssocArraySimulation, UnknownIndexNotStoredEndToEnd) {
   EXPECT_EQ(stored, 1u);
 }
 
-// §7.8.1 — because indices are treated as unsigned, a key with its top bit set
-// is the largest value and orders after a small key, rather than sorting first
-// as it would under a signed interpretation.
 TEST(WildcardAssocArraySimulation, UnsignedKeyOrdering) {
   SimFixture f;
-  auto* aa = f.ctx.CreateAssocArray(
-      "aa", 32, /*is_string_key=*/false,
-      AssocArraySpec{/*index_width=*/32, /*is_wildcard=*/true});
+  auto* aa = f.ctx.CreateAssocArray("aa", 32, false, AssocArraySpec{32, true});
 
   for (int64_t k : {int64_t{1}, int64_t{0xFFFFFFFF}}) {
     auto* sel = MakeAssocSelect(f.arena, k);
@@ -229,12 +209,6 @@ TEST(WildcardAssocArraySimulation, UnsignedKeyOrdering) {
   EXPECT_EQ(it->first, 4294967295);
 }
 
-// §7.8.1 — driven through the full pipeline: an index expression is
-// self-determined and treated as unsigned. A signed 32-bit variable holding -1
-// keys on its unsigned bit pattern (0xFFFFFFFF == 4294967295), so it addresses
-// the same entry as the plain unsigned literal 32'hFFFFFFFF. Were the index
-// sign-extended instead, the two writes/reads would land on different keys and
-// the read would miss.
 TEST(WildcardAssocArraySimulation, SignedVarIndexTreatedAsUnsignedEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -251,8 +225,6 @@ TEST(WildcardAssocArraySimulation, SignedVarIndexTreatedAsUnsignedEndToEnd) {
   EXPECT_EQ(v, 55u);
 }
 
-// §7.8.1: an associative array with a wildcard index type shall not be used in
-// a foreach loop, and the report that rejects one names §7.8.1.
 TEST(WildcardAssocArraySimulation, ForeachRejectionNames7_8_1) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -274,9 +246,6 @@ TEST(WildcardAssocArraySimulation, ForeachRejectionNames7_8_1) {
                             6, "7.8.1"));
 }
 
-// §7.8.1: a wildcard index of any integral size is taken by its value, so two
-// indices that differ only above bit 63 are two entries, while 3'b101 and
-// 8'd5, one value at two widths, are one.
 TEST(WildcardAssocArraySimulation, IndexIsKeyedByItsWholeValue) {
   SimFixture f;
   std::string out = RunCapture(

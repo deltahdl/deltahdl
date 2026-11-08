@@ -20,13 +20,6 @@
 
 namespace delta {
 
-// §13.5 — the immutable lookup environment for resolving and type-checking a
-// subroutine call's array arguments: the visible function/task declarations,
-// the tracked-array map, the class-name set, the typedef map, the names of
-// typedefs of unpacked aggregates, the module's parameter scope for folding a
-// formal's bounds, and the diagnostic sink. It is threaded through the
-// argument-type tree walk so each recursive visit is a single short call rather
-// than a multi-argument forward.
 struct ArrayArgTypeCtx {
   const std::unordered_map<std::string_view, const ModuleItem*>& func_decls;
   const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -38,10 +31,6 @@ struct ArrayArgTypeCtx {
   DiagEngine& diag;
 };
 
-// §7.7: the formal side of an array argument binding, described as a tracked
-// array is so the two can be compared. The element type is resolved through
-// typedef names as a declared variable's is, so that `word_t a[3]` under
-// `typedef int word_t;` compares as int.
 static Elaborator::VarArrayInfo FormalArrayInfo(const FunctionArg& arg,
                                                 const ArrayArgTypeCtx& ctx) {
   Elaborator::VarArrayInfo info;
@@ -95,10 +84,6 @@ int ResolveActualArgIndex(const Expr* expr, size_t formal_index,
   return -1;
 }
 
-// Reports the associative-array compatibility errors for binding a single
-// identifier actual to an array-typed formal (associativity, index type, and
-// element type). At most one diagnostic is emitted per actual, and true is
-// returned when it was.
 static bool CheckArrayArgCompat(const Expr* actual,
                                 const Elaborator::VarArrayInfo& actual_info,
                                 const Elaborator::VarArrayInfo& formal_info,
@@ -117,8 +102,6 @@ static bool CheckArrayArgCompat(const Expr* actual,
                Subclause("7.9.10"));
     return true;
   }
-  // The value type carried by an associative actual must be equivalent to the
-  // value type of the associative formal it binds to.
   if (actual_info.is_assoc && formal_info.is_assoc &&
       !ElementTypesEquivalent(
           {actual_info.elem_type, actual_info.elem_width,
@@ -135,11 +118,6 @@ static bool CheckArrayArgCompat(const Expr* actual,
   return false;
 }
 
-// §7.7 with §7.6: a non-associative array actual is associated with its formal
-// only when the two have the same number of unpacked dimensions and, in every
-// dimension where both have a size of their own, the same size; an unsized
-// dimension on either side matches any size, its size checked at run time.
-// Returns true when a diagnostic was emitted.
 static bool ReportArrayArgShapeMismatch(
     const Expr* actual, std::string_view formal_name,
     const std::vector<std::optional<uint32_t>>& actual_shape,
@@ -170,10 +148,6 @@ static bool ReportArrayArgShapeMismatch(
   return false;
 }
 
-// §7.7 with §7.6 and §6.22.2: the elements of a non-associative array actual
-// shall be of a type equivalent to the formal's elements. A type left named --
-// a class, an enumeration, a name with no typedef -- is judged by the name that
-// identifies it, its width and state not being what the comparison needs.
 static void ReportArrayArgElementMismatch(
     const Expr* actual, std::string_view formal_name,
     const Elaborator::VarArrayInfo& actual_info,
@@ -194,11 +168,6 @@ static void ReportArrayArgElementMismatch(
              Subclause("7.7"));
 }
 
-// Checks the single formal at position `formal_index` of `func` against the
-// actual that binds to it in the call `expr`, reporting any associative-array
-// incompatibility and, for a non-associative formal, any §7.7 shape or element
-// type incompatibility. Array-typed formals with no bound identifier actual are
-// silently skipped, mirroring the caller's per-formal continues.
 static void CheckOneArrayFormalArg(const Expr* expr, const ModuleItem* func,
                                    size_t formal_index, size_t positional_count,
                                    const ArrayArgTypeCtx& ctx) {
@@ -214,7 +183,6 @@ static void CheckOneArrayFormalArg(const Expr* expr, const ModuleItem* func,
   if (ait == ctx.var_array_info.end()) return;
   const auto& actual_info = ait->second;
   if (CheckArrayArgCompat(actual, actual_info, formal_info, ctx.diag)) return;
-  // The shape of an associative array is its index type, compared above.
   if (formal_info.is_assoc) return;
   if (actual_info.unpacked_shape.empty() ||
       formal_info.unpacked_shape.empty()) {
@@ -253,26 +221,6 @@ static void WalkExprForArrayArgTypes(const Expr* expr,
   for (auto* e : expr->elements) WalkExprForArrayArgTypes(e, ctx);
 }
 
-// §7.9.10 puts no condition on where the call whose argument it governs is
-// written: it says an associative array can be passed only to an associative
-// formal of a compatible type and with the same index type, and says nothing
-// about the statement the call stands in. §13.5 makes a task or void function
-// call a statement of a procedural block, and A.6.9's
-// subroutine_call_statement is a statement, so such a call may appear in every
-// position a statement holds a statement in and the check is owed at each of
-// them.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out
-// again here. It hands the visitor the field itself, so a walker that only
-// reads the tree takes a `Stmt* const&`.
-//
-// Stmt::fork_stmts is descended into deliberately. A.6.3's par_block admits a
-// statement_or_null in each arm, and neither §7.9.10 nor §13.5 makes argument
-// compatibility depend on the process the call runs in, so a call in a fork
-// arm binds its actuals to the same formals as one written beside the fork.
-// That is what separates this rule from §13.4.4, which asks what a function
-// body may schedule and so turns on whether the fork is there at all.
 static void WalkStmtForArrayArgTypes(const Stmt* s,
                                      const ArrayArgTypeCtx& ctx) {
   if (!s) return;

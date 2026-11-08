@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §H.14.6, the SystemVerilog side of Example 11: an export of myfunc
-// annotated "DPI" and the function myfunc taking an output logic [31:0].
 TEST(ExampleElevenParsing, TheExportAndItsFunctionParse) {
   auto r = Parse(
       "module m;\n"

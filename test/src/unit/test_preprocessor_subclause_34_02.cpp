@@ -1,19 +1,3 @@
-// §34.2 Overview -- protected envelopes.
-//
-// The clause names one reserved pragma as the carrier of every piece of
-// envelope information, gives each of the two modes of processing an opening
-// and a closing pragma expression, pairs a closing expression with the most
-// recent still-open opening one, floors the supported nesting of decryption
-// envelopes, and splits the remaining expressions into the ones that describe
-// an envelope and the ones that describe its content.
-//
-// All of it is preprocessor-stage state. The pragma handler in
-// src/preprocessor/preprocessor_lines.cpp walks a directive's expressions and
-// hands the ones belonging to the reserved pragma to
-// src/preprocessor/protect_envelope.cpp, where the envelopes accumulate. Every
-// input here is written as the real directive syntax of §22.11 and driven
-// through Preprocessor::Preprocess.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -33,11 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Preprocesses `src` and keeps the Preprocessor alive afterwards. What these
-// rules leave behind is envelope state rather than output text, so the state
-// has to outlive the call that built it and the text is dropped. What a design
-// carried through that text goes on to do is observed at the simulator stage
-// instead.
 struct EnvelopeRun {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -52,9 +31,6 @@ struct EnvelopeRun {
   }
 };
 
-// Builds `count` directives, one per line, each holding the same expression.
-// Used by the nesting tests, where the interesting number is the depth rather
-// than any one line's text.
 std::string RepeatDirective(const std::string& keyword, size_t count) {
   std::string src;
   for (size_t n = 0; n < count; ++n) {
@@ -63,21 +39,12 @@ std::string RepeatDirective(const std::string& keyword, size_t count) {
   return src;
 }
 
-// ---------------------------------------------------------------------------
-// The protect pragma is what introduces envelope information.
-// ---------------------------------------------------------------------------
-
-// The reserved pragma name carries the expression that opens an encryption
-// envelope, so the directive leaves one envelope open.
 TEST(ProtectedEnvelopeOverview, ProtectPragmaOpensEncryptionEnvelope) {
   EnvelopeRun run("`pragma protect begin\n");
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 1U);
 }
 
-// The name is reserved for this description, so the same expression under any
-// other pragma_name describes no envelope. Without this the whole clause would
-// hang off the spelling of the expression rather than off the pragma.
 TEST(ProtectedEnvelopeOverview, OtherPragmaNameOpensNoEnvelope) {
   EnvelopeRun run(
       "`pragma acme_tool begin\n"
@@ -87,29 +54,18 @@ TEST(ProtectedEnvelopeOverview, OtherPragmaNameOpensNoEnvelope) {
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 0U);
 }
 
-// An opening expression is a pragma_keyword, and a pragma_keyword is a simple
-// identifier. The escaped spelling of the same name is a pragma_value instead,
-// so it opens nothing.
 TEST(ProtectedEnvelopeOverview, EscapedIdentifierOpensNoEnvelope) {
   EnvelopeRun run("`pragma protect \\begin\n");
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 0U);
 }
 
-// The expressions that act on envelopes are the pragma's own, not the ones
-// nested inside a parenthesized value that qualifies some other keyword.
 TEST(ProtectedEnvelopeOverview, KeywordNestedInsideAValueOpensNoEnvelope) {
   EnvelopeRun run("`pragma protect encoding = ( begin )\n");
   EXPECT_FALSE(run.diag.HasErrors());
   EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 0U);
 }
 
-// ---------------------------------------------------------------------------
-// Encryption envelopes: opened by begin, closed by end.
-// ---------------------------------------------------------------------------
-
-// The closing expression closes the region the opening one started, leaving a
-// finished envelope of the encryption mode behind.
 TEST(ProtectedEnvelopeOverview, EndClosesTheEncryptionEnvelope) {
   EnvelopeRun run("`pragma protect begin\n`pragma protect end\n");
   EXPECT_FALSE(run.diag.HasErrors());
@@ -119,10 +75,6 @@ TEST(ProtectedEnvelopeOverview, EndClosesTheEncryptionEnvelope) {
             EnvelopeMode::kEncryption);
 }
 
-// The pairing rule, and the reason the locations are kept: with two openings
-// outstanding, the closing expression takes the more recent one. Reading the
-// depth alone would not tell the two candidate pairings apart, so the line the
-// closed envelope opened on is what is checked.
 TEST(ProtectedEnvelopeOverview, EndPairsWithTheMostRecentBegin) {
   EnvelopeRun run(
       "`pragma protect begin\n"
@@ -135,21 +87,12 @@ TEST(ProtectedEnvelopeOverview, EndPairsWithTheMostRecentBegin) {
   EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 1U);
 }
 
-// The closest input the pairing rule has to turn away: with no opening
-// expression outstanding there is nothing for the closing one to be associated
-// with, so it closes no envelope and leaves no finished one behind.
 TEST(ProtectedEnvelopeOverview, EndWithNothingOpenClosesNoEnvelope) {
   EnvelopeRun run("`pragma protect end\n");
   EXPECT_EQ(run.Envelopes().EncryptionEnvelopeDepth(), 0U);
   EXPECT_TRUE(run.Envelopes().ClosedEnvelopes().empty());
 }
 
-// ---------------------------------------------------------------------------
-// Decryption envelopes: opened by begin_protected, closed by end_protected.
-// ---------------------------------------------------------------------------
-
-// The other mode of processing has its own opening expression, and the code it
-// encloses is protected code.
 TEST(ProtectedEnvelopeOverview, BeginProtectedOpensADecryptionEnvelope) {
   EnvelopeRun run("`pragma protect begin_protected\n");
   EXPECT_FALSE(run.diag.HasErrors());
@@ -157,15 +100,11 @@ TEST(ProtectedEnvelopeOverview, BeginProtectedOpensADecryptionEnvelope) {
   EXPECT_TRUE(run.Envelopes().InProtectedRegion());
 }
 
-// An encryption envelope encloses the cleartext that is still to be encrypted,
-// so what it encloses is not protected code. Without this the two modes would
-// be indistinguishable to a reader asking whether code is protected.
 TEST(ProtectedEnvelopeOverview, EncryptionEnvelopeDoesNotProtectItsCode) {
   EnvelopeRun run("`pragma protect begin\n");
   EXPECT_FALSE(run.Envelopes().InProtectedRegion());
 }
 
-// Closing the decryption envelope ends the protected region.
 TEST(ProtectedEnvelopeOverview, EndProtectedEndsTheProtectedRegion) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -177,8 +116,6 @@ TEST(ProtectedEnvelopeOverview, EndProtectedEndsTheProtectedRegion) {
             EnvelopeMode::kDecryption);
 }
 
-// The two modes keep their own openings: an encryption envelope's closing
-// expression is not the one that closes a decryption envelope, and vice versa.
 TEST(ProtectedEnvelopeOverview, ClosingExpressionsDoNotCrossModes) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -187,9 +124,6 @@ TEST(ProtectedEnvelopeOverview, ClosingExpressionsDoNotCrossModes) {
   EXPECT_TRUE(run.Envelopes().ClosedEnvelopes().empty());
 }
 
-// A decryption envelope may hold further envelopes, and its closing expression
-// takes the most recent opening one that is still open -- so the inner pair
-// closes first and the outer pair closes second.
 TEST(ProtectedEnvelopeOverview, EndProtectedPairsWithTheInnermostOpenEnvelope) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -203,20 +137,12 @@ TEST(ProtectedEnvelopeOverview, EndProtectedPairsWithTheInnermostOpenEnvelope) {
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 0U);
 }
 
-// The counterpart of the encryption mode's unmatched closing expression. The
-// two modes keep separate openings, so an unmatched closing expression in one
-// of them is not covered by the other's: with no decryption envelope open
-// there is nothing this expression can be associated with.
 TEST(ProtectedEnvelopeOverview, EndProtectedWithNothingOpenClosesNoEnvelope) {
   EnvelopeRun run("`pragma protect end_protected\n");
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 0U);
   EXPECT_TRUE(run.Envelopes().ClosedEnvelopes().empty());
 }
 
-// What a decryption envelope may enclose is envelopes, not merely further
-// decryption envelopes. An encryption envelope written inside an open
-// decryption envelope is paired off against its own opening expression, and
-// the enclosing pair closes after it.
 TEST(ProtectedEnvelopeOverview, EncryptionEnvelopeNestsInsideADecryptionOne) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -233,9 +159,6 @@ TEST(ProtectedEnvelopeOverview, EncryptionEnvelopeNestsInsideADecryptionOne) {
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[1].begin_loc.line, 1U);
 }
 
-// Protectedness follows the enclosing decryption envelope rather than the
-// innermost one: closing the inner pair leaves the code that follows still
-// inside the outer envelope, so it is still protected.
 TEST(ProtectedEnvelopeOverview, CodeStaysProtectedWhileAnOuterEnvelopeIsOpen) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -246,10 +169,6 @@ TEST(ProtectedEnvelopeOverview, CodeStaysProtectedWhileAnOuterEnvelopeIsOpen) {
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 1U);
 }
 
-// An encryption envelope does not protect its own code, but it does not
-// unprotect the decryption envelope it is nested in either: what decides is
-// whether a decryption envelope encloses the code, not which envelope opened
-// most recently.
 TEST(ProtectedEnvelopeOverview, NestedEncryptionEnvelopeKeepsCodeProtected) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -260,9 +179,6 @@ TEST(ProtectedEnvelopeOverview, NestedEncryptionEnvelopeKeepsCodeProtected) {
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 1U);
 }
 
-// How deep decryption envelopes may nest is the implementation's choice, but
-// the clause puts a floor under it. Eight nested envelopes are inside any
-// conforming implementation's capacity, so all eight are open at once.
 TEST(ProtectedEnvelopeOverview, EightNestedDecryptionEnvelopesAreProcessed) {
   EnvelopeRun run(RepeatDirective(
       "begin_protected", ProtectEnvelopeState::kMinNestedDecryptionEnvelopes));
@@ -271,9 +187,6 @@ TEST(ProtectedEnvelopeOverview, EightNestedDecryptionEnvelopesAreProcessed) {
             ProtectEnvelopeState::kMinNestedDecryptionEnvelopes);
 }
 
-// The eight nested envelopes close as eight envelopes rather than collapsing
-// into one, which is what makes the floor a nesting depth and not just a count
-// of directives that were tolerated.
 TEST(ProtectedEnvelopeOverview, EightNestedDecryptionEnvelopesAllClose) {
   const size_t kDepth = ProtectEnvelopeState::kMinNestedDecryptionEnvelopes;
   EnvelopeRun run(RepeatDirective("begin_protected", kDepth) +
@@ -281,19 +194,13 @@ TEST(ProtectedEnvelopeOverview, EightNestedDecryptionEnvelopesAllClose) {
   EXPECT_FALSE(run.diag.HasErrors());
   ASSERT_EQ(run.Envelopes().ClosedEnvelopes().size(), kDepth);
   EXPECT_EQ(run.Envelopes().DecryptionEnvelopeDepth(), 0U);
-  // The last envelope to close is the first that opened.
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes().back().begin_loc.line, 1U);
 }
 
-// Past the depth this implementation supports there is no envelope to open, so
-// the condition is reported rather than silently dropped.
 TEST(ProtectedEnvelopeOverview, NestingBeyondTheSupportedDepthIsReported) {
   EnvelopeRun run(RepeatDirective(
       "begin_protected",
       ProtectEnvelopeState::kNestedDecryptionEnvelopeLimit + 1));
-  // One directive per line, so the one past the bound stands on the line the
-  // bound numbers. The bound is this tool's own and no rule of the standard,
-  // so the report names no subclause.
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(),
       "protect pragma nests decryption envelopes more deeply than this "
@@ -305,12 +212,6 @@ TEST(ProtectedEnvelopeOverview, NestingBeyondTheSupportedDepthIsReported) {
             ProtectEnvelopeState::kNestedDecryptionEnvelopeLimit);
 }
 
-// ---------------------------------------------------------------------------
-// Envelope keywords and content keywords.
-// ---------------------------------------------------------------------------
-
-// An expression written where no envelope is open precedes the opening one, so
-// it describes the envelope that opening expression goes on to open.
 TEST(ProtectedEnvelopeOverview, ExpressionsBeforeBeginDescribeTheEnvelope) {
   EnvelopeRun run(
       "`pragma protect data_method = \"aes128-cbc\"\n"
@@ -320,13 +221,9 @@ TEST(ProtectedEnvelopeOverview, ExpressionsBeforeBeginDescribeTheEnvelope) {
   EXPECT_EQ(run.Envelopes().OpenEnvelopes()[0].envelope_keywords,
             std::vector<std::string>{"data_method"});
   EXPECT_TRUE(run.Envelopes().OpenEnvelopes()[0].content_keywords.empty());
-  // The opening expression took the waiting keyword with it.
   EXPECT_TRUE(run.Envelopes().PendingEnvelopeKeywords().empty());
 }
 
-// An expression written between an opening expression and the closing one it
-// pairs with sits in the region that gets transformed, so it describes the
-// envelope's content instead.
 TEST(ProtectedEnvelopeOverview, ExpressionsInsideAnEnvelopeDescribeItsContent) {
   EnvelopeRun run(
       "`pragma protect begin\n"
@@ -339,9 +236,6 @@ TEST(ProtectedEnvelopeOverview, ExpressionsInsideAnEnvelopeDescribeItsContent) {
   EXPECT_TRUE(run.Envelopes().ClosedEnvelopes()[0].envelope_keywords.empty());
 }
 
-// The content region stops at the closing expression: an expression written
-// after it is outside every envelope again, so it describes the next envelope
-// rather than joining the one that has just closed.
 TEST(ProtectedEnvelopeOverview, ExpressionsAfterEndDescribeTheNextEnvelope) {
   EnvelopeRun run(
       "`pragma protect begin\n"
@@ -355,11 +249,6 @@ TEST(ProtectedEnvelopeOverview, ExpressionsAfterEndDescribeTheNextEnvelope) {
   EXPECT_TRUE(run.Envelopes().ClosedEnvelopes()[0].envelope_keywords.empty());
 }
 
-// The role an expression is designated is decided by where it is written, not
-// by what its value looks like, so a keyword carrying a number is designated
-// the same way one carrying a string is. The number takes its own branch of
-// the pragma_value grammar, which is why it is written out rather than assumed
-// to follow the string case.
 TEST(ProtectedEnvelopeOverview, KeywordWithANumberValueTakesTheSameRole) {
   EnvelopeRun run(
       "`pragma protect begin\n"
@@ -372,9 +261,6 @@ TEST(ProtectedEnvelopeOverview, KeywordWithANumberValueTakesTheSameRole) {
   EXPECT_TRUE(run.Envelopes().ClosedEnvelopes()[0].envelope_keywords.empty());
 }
 
-// The same for a keyword whose value is a parenthesized list of further
-// expressions. The keyword takes its role from its position; the expressions
-// inside its value qualify the value, so they are designated nothing.
 TEST(ProtectedEnvelopeOverview, ParenthesizedValueKeywordTakesTheSameRole) {
   EnvelopeRun run(
       "`pragma protect encoding = ( enctype = \"base64\", line_length = 64 )\n"
@@ -386,17 +272,6 @@ TEST(ProtectedEnvelopeOverview, ParenthesizedValueKeywordTakesTheSameRole) {
   EXPECT_TRUE(run.Envelopes().OpenEnvelopes()[0].content_keywords.empty());
 }
 
-// A decryption envelope splits the two roles the same way its encryption
-// counterpart does.
-//
-// §34.5.15.1 spells data_block as the keyword standing alone and §34.5.15.2 has
-// a block begin on the line beneath it, so the expression written here speaks
-// for the line after it. §34.5.4.2 ends the run of gathered expressions at the
-// word closing the envelope, which
-// Preprocessor::EndAccumulatedProtectPragmas in
-// src/preprocessor/preprocessor.cpp applies before any line is offered a taker,
-// so the closing expression below is read as the expression it is rather than
-// as this envelope's block.
 TEST(ProtectedEnvelopeOverview, BeginProtectedSplitsTheSameTwoRoles) {
   EnvelopeRun run(
       "`pragma protect key_keyowner = \"Acme Corp\"\n"
@@ -411,10 +286,6 @@ TEST(ProtectedEnvelopeOverview, BeginProtectedSplitsTheSameTwoRoles) {
             std::vector<std::string>{"data_block"});
 }
 
-// A keyword describes the particular envelope it was written against, so two
-// envelopes in one source text keep their descriptions apart rather than
-// pooling them. Nothing in a one-envelope input can tell the two models apart,
-// which is why this input carries two.
 TEST(ProtectedEnvelopeOverview, EachEnvelopeKeepsItsOwnKeywords) {
   EnvelopeRun run(
       "`pragma protect data_method = \"aes128-cbc\"\n"
@@ -436,14 +307,6 @@ TEST(ProtectedEnvelopeOverview, EachEnvelopeKeepsItsOwnKeywords) {
   EXPECT_EQ(second.content_keywords, std::vector<std::string>{"data_block"});
 }
 
-// A keyword written inside a region belongs to the innermost envelope open at
-// that point, not to the one enclosing it, so nesting splits the descriptions
-// the same way separate envelopes do.
-//
-// The keyword written inside the inner envelope is one that speaks for its own
-// line alone. §34.5.15.2 has data_block speak for the line beneath it, so a
-// data_block here would take the expression closing the inner envelope for this
-// envelope's block and the inner envelope would never close.
 TEST(ProtectedEnvelopeOverview, NestedEnvelopesKeepTheirKeywordsApart) {
   EnvelopeRun run(
       "`pragma protect begin_protected\n"
@@ -454,25 +317,14 @@ TEST(ProtectedEnvelopeOverview, NestedEnvelopesKeepTheirKeywordsApart) {
       "`pragma protect end_protected\n");
   EXPECT_FALSE(run.diag.HasErrors());
   ASSERT_EQ(run.Envelopes().ClosedEnvelopes().size(), 2U);
-  // The inner envelope closes first and holds only what was written inside it.
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[0].mode,
             EnvelopeMode::kEncryption);
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[0].content_keywords,
             std::vector<std::string>{"data_keyname"});
-  // The keyword written before the inner envelope opened is already inside the
-  // enclosing region, so it describes that region's content.
   EXPECT_EQ(run.Envelopes().ClosedEnvelopes()[1].content_keywords,
             std::vector<std::string>{"key_keyowner"});
 }
 
-// ---------------------------------------------------------------------------
-// The order the expressions are read in, and how they are distributed.
-// ---------------------------------------------------------------------------
-
-// The expressions of one directive are read left to right. The opening
-// expression sits between the other two, so the one on its left describes the
-// envelope and the one on its right describes the content -- the reverse of
-// what reading the list from the right would give.
 TEST(ProtectedEnvelopeOverview, ExpressionsOfOneDirectiveAreReadLeftToRight) {
   EnvelopeRun run(
       "`pragma protect encrypt_agent = \"AcmeCrypt\", begin, "
@@ -485,9 +337,6 @@ TEST(ProtectedEnvelopeOverview, ExpressionsOfOneDirectiveAreReadLeftToRight) {
             std::vector<std::string>{"key_keyname"});
 }
 
-// The same sequence of expressions means the same thing however it is
-// distributed over directives, so writing the sequence above as three
-// directives leaves the identical roles behind.
 TEST(ProtectedEnvelopeOverview, SplittingASequenceOverDirectivesKeepsTheRoles) {
   EnvelopeRun run(
       "`pragma protect encrypt_agent = \"AcmeCrypt\"\n"
@@ -501,9 +350,6 @@ TEST(ProtectedEnvelopeOverview, SplittingASequenceOverDirectivesKeepsTheRoles) {
             std::vector<std::string>{"key_keyname"});
 }
 
-// The distribution does not change the envelopes either: an opening expression
-// in one directive is paired with a closing expression in another, and a pair
-// written into a single directive is paired just the same.
 TEST(ProtectedEnvelopeOverview, SplittingASequenceKeepsThePairing) {
   EnvelopeRun joined("`pragma protect begin, end\n");
   EnvelopeRun split("`pragma protect begin\n`pragma protect end\n");
@@ -513,9 +359,6 @@ TEST(ProtectedEnvelopeOverview, SplittingASequenceKeepsThePairing) {
   EXPECT_EQ(split.Envelopes().EncryptionEnvelopeDepth(), 0U);
 }
 
-// The encrypting run reads a directive left to right as a reading does, so the
-// same keyword written twice in one directive ends at the value written last:
-// the name reaching the key is the one written second.
 TEST(ProtectEnvelopeEncryptionOrder, TheLaterOfTwoValuesInOneDirectiveStands) {
   std::string later = DesignatesTheProvider();
   later.append("`pragma protect data_keyname=\"no-such-key\", data_keyname=\"");
@@ -529,9 +372,6 @@ TEST(ProtectEnvelopeEncryptionOrder, TheLaterOfTwoValuesInOneDirectiveStands) {
       Holds(Encrypted(earlier + RegionAround(kSealedDesign)), kBlockOpening));
 }
 
-// The closing word ends the region where it stands in its directive, so a name
-// written after it describes what follows: the region it closed keeps the key
-// it was under, and the next region is under the name written after the word.
 TEST(ProtectEnvelopeEncryptionOrder, ANameAfterTheClosingWordIsForWhatFollows) {
   std::string source = ReachesTheKey();
   source.append("`pragma protect begin\n").append(kSealedDesign);

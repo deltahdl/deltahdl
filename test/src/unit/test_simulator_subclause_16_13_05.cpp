@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// The design of test/src/e2e/matched_end_point.sv around one destination
-// sequence: e1 on clk, rising at 5, 15, ..., matches at 35 and 95, and the
-// destination is on sysclk, rising at 8, 24, 40, ..., never together with
-// clk; the process counts the end points the destination reaches and keeps
-// the time of the last.
 std::string MatchedSource(const std::string& destination) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -61,8 +56,6 @@ std::string MatchedSource(const std::string& destination) {
          "endmodule\n";
 }
 
-// The end points the destination sequence reached, and the time of the
-// last.
 struct EndPoints {
   uint64_t ends;
   uint64_t last_end;
@@ -76,9 +69,6 @@ EndPoints EndPointsOf(const std::string& destination) {
   return {ends->value.ToUint64(), last_end->value.ToUint64()};
 }
 
-// §16.13.5: matched stores the result of the source match, at 35 and 95 on
-// clk, until the first tick of sysclk after it, 40 and 104, where the
-// clause's e2 reads it and goes on to branch_back, ending at 56 and 120.
 TEST(MatchedEndPoint, MatchedStoresTheMatchUntilTheDestinationClockTicks) {
   EndPoints ends = EndPointsOf(
       "    @(posedge sysclk) reset ##1 inst ##1 "
@@ -87,11 +77,6 @@ TEST(MatchedEndPoint, MatchedStoresTheMatchUntilTheDestinationClockTicks) {
   EXPECT_EQ(ends.last_end, 120u);
 }
 
-// §16.13.5: triggered is true at the time step of the match alone, which
-// is no tick of sysclk, so the same sequence over triggered never ends. The
-// clause (printed page 471) also requires the sequence triggered is applied to
-// to end on the clock of the context reading it, so e1, ending on clk, is
-// reported where sysclk's sequence reads it.
 TEST(MatchedEndPoint, TriggeredIsNotSeenFromAnotherClock) {
   SimFixture f;
   auto* ends = RunAndFindVar(
@@ -108,20 +93,12 @@ TEST(MatchedEndPoint, TriggeredIsNotSeenFromAnotherClock) {
                     17, "16.9.11"));
 }
 
-// §16.13.5: the stored match is consumed by the first read after it, so a
-// second read at the next tick of sysclk is false, and a sequence reading
-// matched at consecutive ticks never ends.
 TEST(MatchedEndPoint, AReadConsumesTheStoredMatch) {
   EndPoints ends = EndPointsOf(
       "    @(posedge sysclk) e1_inst.matched ##1 e1_inst.matched;\n");
   EXPECT_EQ(ends.ends, 0u);
 }
 
-// §16.13.5: each match is consumed by the first read after it, however long
-// the sequence's name: a ##1 a matches at 25 and 85 on clk, so the reads at
-// the ticks of sysclk find it at 40 and 88 alone, and none of 56, 72, 104
-// and 120 reads a match already consumed. §16.13.6 lets matched stand only in a
-// sequence expression, so the read in the always procedure is reported.
 TEST(MatchedEndPoint, AReadConsumesTheMatchOfASequenceWithALongName) {
   SimFixture f;
   auto* reads = RunAndFindVar(

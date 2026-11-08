@@ -33,9 +33,6 @@ TEST(ImplicitNamedPortConnectionParsing,
 }
 
 TEST(ImplicitNamedPortConnectionParsing, ImplicitNameSynthesizesSelfReference) {
-  // 23.3.2.3: an implicit .name connection is the explicit form .name(name).
-  // The parser marks the entry implicit and synthesizes a connection
-  // expression that references the identically named signal.
   auto r = Parse("module m; sub u0(.clk); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

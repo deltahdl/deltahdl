@@ -21,10 +21,6 @@ TEST(LoopStatementElaboration, WhileLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.4 repeats a while loop while its condition is true, the truth rule of
-// §12.4, and §13.4.3 gives a constant function the meaning it has at run time.
-// The condition's only set bit is bit 64, so the body runs, and the fold
-// reads 4, only when the evaluator looks above the low 64 bits.
 TEST(LoopStatementElaboration, ConstantFunctionWhileReadsBitsAbove63) {
   ElabFixture f;
   auto* design = ElaborateSrc(

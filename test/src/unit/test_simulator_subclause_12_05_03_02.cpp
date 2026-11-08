@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -121,12 +119,6 @@ TEST(CaseViolationMultiProcessSim, Unique0OverlapReportsNoMatchSilent) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3.2: case violation reports behave the same way as if violation reports
-// across multiple processes (see §12.4.2.2). §12.4.2.2 demonstrates that
-// behavior with a check sitting inside a subroutine called from separate
-// processes. The mirror for case: a unique case inside a task whose items
-// overlap on the supplied argument queues a uniqueness violation against the
-// calling process, exactly as a unique if in a task would.
 TEST(CaseViolationMultiProcessSim, TaskUniqueCaseOverlapReportsViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -148,11 +140,6 @@ TEST(CaseViolationMultiProcessSim, TaskUniqueCaseOverlapReportsViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3.2 (via §12.4.2.2): when two distinct processes call the same task,
-// the case violation check runs once per caller and each execution is
-// independent. Both callers pass the overlapping argument, so the shared task's
-// uniqueness check fails in each calling process and the violation is reported
-// twice — one report per process, just as for an if.
 TEST(CaseViolationMultiProcessSim, TwoProcessesCallSharedTaskCaseReportTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -175,11 +162,6 @@ TEST(CaseViolationMultiProcessSim, TwoProcessesCallSharedTaskCaseReportTwice) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-// §12.5.3.2 (via §12.4.2.2): the per-caller executions are independent, so a
-// failure in one calling process does not implicate another. The first caller
-// supplies the overlapping argument (uniqueness violation) while the second
-// supplies an argument that matches exactly one item (no violation); exactly
-// one report is produced.
 TEST(CaseViolationMultiProcessSim, SharedTaskCaseOneCallerViolatesOtherPasses) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -203,15 +185,6 @@ TEST(CaseViolationMultiProcessSim, SharedTaskCaseOneCallerViolatesOtherPasses) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3.2: case violation reports behave like if violation reports across
-// multiple processes (see §12.4.2.2). Because each process owns its pending
-// violations, a flush in one process must not disturb another process's report.
-// Process A is an always_comb whose unique case transiently overlaps (a==1 and
-// b==1 both match 1'b1) and queues a violation; the nonblocking update of b
-// re-triggers A, whose settled single-match re-evaluation reaches a flush point
-// that discards A's pending violation. Process B holds a standing unique-case
-// overlap that never re-triggers. Exactly one report survives — B's — proving
-// A's flush did not suppress B's report and B did not flush A's.
 TEST(CaseViolationMultiProcessSim, RetriggerFlushInOneProcessSparesOther) {
   SimFixture f;
   auto* design = ElaborateSrc(

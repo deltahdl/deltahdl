@@ -108,8 +108,6 @@ TEST(MatchingTypesElaboration, SimpleTypedefMatchesUnderlyingBuiltin) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.1(c): an anonymous enum type matches itself among data objects
-// declared in the same declaration statement, so x and y are assignable.
 TEST(MatchingTypesElaboration, AnonymousEnumSameDeclAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -122,8 +120,6 @@ TEST(MatchingTypesElaboration, AnonymousEnumSameDeclAssignmentElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22.1(c): an anonymous union type likewise matches itself among data
-// objects of the same declaration statement.
 TEST(MatchingTypesElaboration, AnonymousUnionSameDeclAssignmentElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -136,14 +132,6 @@ TEST(MatchingTypesElaboration, AnonymousUnionSameDeclAssignmentElaborates) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.22: a type declared inside a module is a type of each instance's own, so
-// the example's s1.v5 = s2.v5 assigns between two distinct unpacked structure
-// types, as do the same assignment of an in-place structure or union, an
-// enumeration or a class each instance declares. The example's other four
-// assignments share a type, through a package, the compilation unit, a type
-// parameter the parent overrides, or `int`, and a packed structure is
-// equivalent to its counterpart, so none of those is reported, nor is an
-// assignment within one instance or one not between two instances' variables.
 TEST(MatchingTypesElaboration, TypesEachInstanceDeclaresAreDistinct) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,9 +208,6 @@ TEST(MatchingTypesElaboration, TypesEachInstanceDeclaresAreDistinct) {
   }
 }
 
-// The instances' module is found wherever the compilation unit declares it,
-// after the module instantiating it too, and a value a package names is no
-// instance's variable.
 TEST(MatchingTypesElaboration, InstanceOfALaterModuleIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -252,8 +237,6 @@ TEST(MatchingTypesElaboration, InstanceOfALaterModuleIsJudged) {
                              "each declare for themselves", 8, "6.22"));
 }
 
-// An interface instance is a scope of its own as a module instance is, so the
-// type each of two instances of one interface declares is its own.
 TEST(MatchingTypesElaboration, TypesEachInterfaceInstanceDeclaresAreDistinct) {
   ElabFixture f;
   ElaborateSrc(
@@ -280,9 +263,6 @@ TEST(MatchingTypesElaboration, TypesEachInterfaceInstanceDeclaresAreDistinct) {
                              "each declare for themselves", 11, "6.22"));
 }
 
-// Instances of a module the compilation unit does not declare have no
-// declarations to judge, so an assignment between their variables is left to
-// the report of the unknown module.
 TEST(MatchingTypesElaboration, InstancesOfAnUndeclaredModuleAreNotJudged) {
   ElabFixture f;
   ElaborateSrc(

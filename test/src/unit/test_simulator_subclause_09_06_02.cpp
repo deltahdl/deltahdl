@@ -75,10 +75,6 @@ TEST(DisableStatementExecution, DisableBlockFromOtherProcess) {
 }
 
 TEST(DisableStatementExecution, DisableNonExecutingBlockHasNoEffect) {
-  // §9.6.2: disabling a named block that is not currently executing has no
-  // effect. Here done_early completes at time 0; the later disable finds no
-  // active process for that scope, so it is a no-op and the disabling process
-  // continues normally to the following statement.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -361,9 +357,6 @@ TEST(DisableStatementExecution, DisableTaskWithProceduralAssignDoesNotCrash) {
 }
 
 TEST(DisableStatementExecution, DisableTaskWithInoutArgumentDoesNotCrash) {
-  // §9.6.2 lists inout arguments (alongside output arguments) among the
-  // activities whose results are unspecified once a task is disabled. Disabling
-  // a task with a pending inout write must remain well-behaved (no crash).
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -386,9 +379,6 @@ TEST(DisableStatementExecution, DisableTaskWithInoutArgumentDoesNotCrash) {
 }
 
 TEST(DisableStatementExecution, DisableTaskWithForceDoesNotCrash) {
-  // §9.6.2 lists procedural continuous assignments from both `assign` and
-  // `force` as activities whose results are unspecified when the task is
-  // disabled. Exercise the `force` form to keep disable robust for it too.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -410,16 +400,6 @@ TEST(DisableStatementExecution, DisableTaskWithForceDoesNotCrash) {
   LowerAndRun(design, f);
 }
 
-// §9.6.2: disable ends the activity of a task or a named block, and execution
-// resumes at the statement after the block or after the statement that enabled
-// the task. Runs `rules` as the body of a randsequence written inside the named
-// block `blk`. `in_rs` is written by a code block of the randsequence,
-// `after_rs` by the statement standing after the randsequence and still inside
-// `blk`, and `after_blk` by the statement standing after `blk`. A `disable blk`
-// the rules reach therefore terminates `blk`, leaving `after_rs` unwritten, and
-// resumes at `after_blk`. The two cases below differ only in which of the code
-// blocks §18.17.1 admits holds the disable, so they share the module, the
-// lowering and the run.
 void RunRandseqDisableTrial(SimFixture& f, std::string_view rules) {
   std::string src =
       "module t;\n"
@@ -439,12 +419,6 @@ void RunRandseqDisableTrial(SimFixture& f, std::string_view rules) {
                    {{"in_rs", 37u}, {"after_rs", 0u}, {"after_blk", 93u}});
 }
 
-// §9.6.2: a disable written inside a block or task can disable the very block
-// or task that holds it, and disabling a named block terminates it, execution
-// resuming at the statement following the block. A production code block of a
-// randsequence written inside `blk` is inside `blk`, so the disable it executes
-// terminates `blk` rather than being absorbed by the randsequence: §18.17.6
-// gives a randsequence a meaning for break and for return and none for disable.
 TEST(DisableStatementExecution,
      DisableInARandsequenceProductionCodeBlockTerminatesTheBlock) {
   SimFixture f;
@@ -452,14 +426,6 @@ TEST(DisableStatementExecution,
                          "        main : { in_rs = 8'd37; disable blk; };\n");
 }
 
-// §18.17.1 and Syntax 18-14 write a rule as
-// `rs_production_list [ := rs_weight_specification [ rs_code_block ] ]`, so a
-// code block may follow a weight as well as stand as a production. §9.6.2 makes
-// no distinction between them: a disable executed in either terminates the
-// named block containing the randsequence. This is a second statement list,
-// run by a loop of its own, so the production-code-block case does not answer
-// for it. §18.17.7 puts this block after the rule's production list, so `alt`
-// writes `in_rs` before the weight code block disables `blk`.
 TEST(DisableStatementExecution,
      DisableInARandsequenceWeightCodeBlockTerminatesTheBlock) {
   SimFixture f;
@@ -468,8 +434,6 @@ TEST(DisableStatementExecution,
                          "        alt : { in_rs = 8'd37; };\n");
 }
 
-// §9.6.2 with its Example 5: in a class function, disabling the named block
-// that is a loop's body ends that iteration and the loop goes on.
 TEST(DisableStatementExecution,
      DisableInAClassFunctionOfItsLoopBodyBlockActsAsContinue) {
   SimFixture f;
@@ -491,8 +455,6 @@ TEST(DisableStatementExecution,
             "cont sum=62 i=10\n");
 }
 
-// §9.6.2 with its Example 5: in a class function, disabling a named block
-// around a loop ends the whole loop, on the object's properties as on locals.
 TEST(DisableStatementExecution,
      DisableInAClassFunctionOfABlockAroundTheLoopActsAsBreak) {
   SimFixture f;
@@ -518,8 +480,6 @@ TEST(DisableStatementExecution,
       "method sum=6 i=3\n");
 }
 
-// §9.6.2: a disable issued by another process ends the named block where
-// its process waits, and that process goes on after the block.
 TEST(DisableStatementExecution,
      DisableFromAnotherProcessEndsTheBlockWhereItWaits) {
   SimFixture f;
@@ -537,8 +497,6 @@ TEST(DisableStatementExecution,
             "other @3 v=0\n");
 }
 
-// §9.6.2: disabling a task from another process ends the activation where
-// it waits, and its caller goes on after the call.
 TEST(DisableStatementExecution,
      DisableOfATaskFromAnotherProcessReturnsToItsCaller) {
   SimFixture f;
@@ -554,8 +512,6 @@ TEST(DisableStatementExecution,
       "back @4 v=0\n");
 }
 
-// §9.6.2: a fork branch may disable a named block of a sibling branch, in a
-// delay or on an event, and the fork then joins.
 TEST(DisableStatementExecution,
      ForkBranchDisablingASiblingBlockLetsTheForkJoin) {
   SimFixture f;
@@ -579,8 +535,6 @@ TEST(DisableStatementExecution,
             "B @4 y=0\n");
 }
 
-// §9.6.2's Example 6: the reset branch disables the block waiting on the
-// event expression, which then never acts, and the fork joins.
 TEST(DisableStatementExecution, ResetBranchDisablesTheEventExpressionBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -603,8 +557,6 @@ TEST(DisableStatementExecution, ResetBranchDisablesTheEventExpressionBlock) {
             "end @5 acted=0\n");
 }
 
-// §9.6.2: a branch disabling the named fork it belongs to ends every branch
-// of it, and the join completes at once.
 TEST(DisableStatementExecution, BranchDisablingItsOwnForkEndsEveryBranch) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -621,8 +573,6 @@ TEST(DisableStatementExecution, BranchDisablingItsOwnForkEndsEveryBranch) {
             "joined @1 x=0\n");
 }
 
-// §9.6.2: disabling a named fork from outside it ends its branches, and the
-// process waiting at its join goes on.
 TEST(DisableStatementExecution,
      DisableOfANamedForkFromAnotherProcessEndsTheJoin) {
   SimFixture f;
@@ -642,8 +592,6 @@ TEST(DisableStatementExecution,
       "joined @3 x=0 y=0\n");
 }
 
-// §9.6.2 with §23.6: a disable names its block by a hierarchical name, here
-// a block inside a task, and the task goes on after the block.
 TEST(DisableStatementExecution, HierarchicalDisableOfABlockInATask) {
   SimFixture f;
   EXPECT_EQ(
@@ -665,9 +613,6 @@ TEST(DisableStatementExecution, HierarchicalDisableOfABlockInATask) {
       "n=3 t=35 after=1\n");
 }
 
-// §9.6.2 with §23.8: a disable ends the block its name resolves to and no
-// other of the same name: a.blk is instance a's block, so instance b's goes on
-// and prints.
 TEST(DisableStatementExecution, DisablingOneInstancesBlockLeavesAnothers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child #(parameter int ID = 0);\n"
@@ -683,9 +628,6 @@ TEST(DisableStatementExecution, DisablingOneInstancesBlockLeavesAnothers) {
             "2 ran on\n");
 }
 
-// §9.6.2 with §23.8: a simple name is resolved upward from where the disable
-// stands, so a disable of blk in one instance of a module ends that
-// instance's blk alone.
 TEST(DisableStatementExecution, AModulesDisableEndsItsOwnInstancesBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child #(parameter int ID = 0, STOP = 0);\n"
@@ -701,8 +643,6 @@ TEST(DisableStatementExecution, AModulesDisableEndsItsOwnInstancesBlock) {
             "2 ran on\n");
 }
 
-// §9.6.2 with §23.8: each component of a hierarchical name narrows the
-// scope, so x.inner is not y.inner though both blocks are named inner.
 TEST(DisableStatementExecution, AHierarchicalDisableEndsOnlyTheBlockItReaches) {
   SimFixture f;
   EXPECT_EQ(
@@ -719,9 +659,6 @@ TEST(DisableStatementExecution, AHierarchicalDisableEndsOnlyTheBlockItReaches) {
       "y.inner ran on\n");
 }
 
-// §9.6.2 with §23.9: a name a generate block does not declare is looked for
-// in the module around it, so a disable written in one ends the module's
-// block of that name.
 TEST(DisableStatementExecution, AGenerateBlocksDisableEndsTheModulesBlock) {
   SimFixture f;
   EXPECT_EQ(
@@ -737,10 +674,6 @@ TEST(DisableStatementExecution, AGenerateBlocksDisableEndsTheModulesBlock) {
       "other ran on\n");
 }
 
-// §9.6.2 with §23.8: the first component of a hierarchical name not found in
-// the instance a disable is written in is looked for in the instances holding
-// it, so sib.blk written two levels down names the block of the instance sib
-// the top holds, and the block of that name in sib2 goes on.
 TEST(DisableStatementExecution, AnUpwardNameEndsTheEnclosingInstancesBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sibm #(parameter int ID = 0);\n"
@@ -758,10 +691,6 @@ TEST(DisableStatementExecution, AnUpwardNameEndsTheEnclosingInstancesBlock) {
             "2 ran on\n");
 }
 
-// §9.6.2: two disables in one time step of blocks a process waits in,
-// outer.inner and then outer around it, end the process: the first sets it to
-// unwind out of inner, and the second, finding it no longer waiting, ends it
-// outright, so neither block's later statements run.
 TEST(DisableStatementExecution, DisablingInnerThenOuterAtOnceEndsTheProcess) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -779,9 +708,6 @@ TEST(DisableStatementExecution, DisablingInnerThenOuterAtOnceEndsTheProcess) {
             "done\n");
 }
 
-// §9.6.2 with §9.3.2: a fork branch stands in the block the fork is written
-// in, so a disable of that block from another process ends the branch too,
-// though the branch has gone on into a named block of its own.
 TEST(DisableStatementExecution, DisablingABlockEndsItsRunningNamedBranch) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -797,9 +723,6 @@ TEST(DisableStatementExecution, DisablingABlockEndsItsRunningNamedBranch) {
             "done\n");
 }
 
-// §9.6.2 with §9.3.2: a fork branch's block is one a disable names from the
-// moment the branch is spawned, so a disable of it at once, before the branch
-// has begun, ends it in its own instance alone.
 TEST(DisableStatementExecution, DisablingAnUnstartedForkBranchEndsItsOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child #(parameter int ID = 0);\n"
@@ -817,9 +740,6 @@ TEST(DisableStatementExecution, DisablingAnUnstartedForkBranchEndsItsOwn) {
             "2 ran on\n");
 }
 
-// §9.6.2 with §9.3.5: a labelled foreach is a block its label names, which a
-// disable within it ends in its own instance alone; the other instance's loop
-// runs its three passes.
 TEST(DisableStatementExecution, DisablingALoopLabelEndsOnlyItsInstancesLoop) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child #(parameter int ID = 0);\n"
@@ -840,10 +760,6 @@ TEST(DisableStatementExecution, DisablingALoopLabelEndsOnlyItsInstancesLoop) {
             "1 done at 2\n2 done at 3\n");
 }
 
-// §9.6.2 with §12.7.3: a foreach is an implicit block its label names, so a
-// disable of that label inside a function ends the loop and the function goes
-// on after it. The fixed-size array is walked by its dimensions and the queue
-// by its index values, the function body's two foreach paths.
 TEST(DisableStatementExecution, DisablingAForeachLabelInAFunctionEndsTheLoop) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -871,9 +787,6 @@ TEST(DisableStatementExecution, DisablingAForeachLabelInAFunctionEndsTheLoop) {
             "102 201\n");
 }
 
-// §9.6.2 with §23.8: a disable's name is the nearest scope declaring it,
-// running or not. Written in outer.x, y names outer.y, which has not begun, so
-// the disable ends nothing and the module's block y runs on.
 TEST(DisableStatementExecution, ANearerBlockNotRunningLeavesAFartherOne) {
   SimFixture f;
   EXPECT_EQ(
@@ -889,8 +802,6 @@ TEST(DisableStatementExecution, ANearerBlockNotRunningLeavesAFartherOne) {
       "top.y ran on\n");
 }
 
-// The same where the nearer block is an instance's: written in c, y names c.y,
-// not begun at 1, and not the top's block y.
 TEST(DisableStatementExecution, AnInstancesBlockNotRunningLeavesTheTops) {
   SimFixture f;
   EXPECT_EQ(
@@ -906,8 +817,6 @@ TEST(DisableStatementExecution, AnInstancesBlockNotRunningLeavesTheTops) {
       "top.y ran on\n");
 }
 
-// And where it is a task: written in c, t names c.t, which nothing runs, and
-// not the top's block t, which is running.
 TEST(DisableStatementExecution, AnInstancesTaskNotRunningLeavesTheTopsBlock) {
   SimFixture f;
   EXPECT_EQ(
@@ -923,9 +832,6 @@ TEST(DisableStatementExecution, AnInstancesTaskNotRunningLeavesTheTopsBlock) {
       "top.t ran on\n");
 }
 
-// §9.6.2: a disable of a block that has finished ends nothing. In a class's
-// task, whose blocks are no instance's, the search for the name finds no scope
-// at all, and the task goes on after the disable.
 TEST(DisableStatementExecution, DisablingAClassTasksFinishedBlockEndsNothing) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"

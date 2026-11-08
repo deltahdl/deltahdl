@@ -340,8 +340,6 @@ TEST(FunctionDeclParsing, FunctionDynOverrideExtendsFinal) {
 }
 
 TEST(FunctionDeclParsing, FunctionLifetimeAutomatic) {
-  // function_declaration carries an optional lifetime ahead of the body; the
-  // 'automatic' keyword fills that slot and is recorded on the function.
   auto r = Parse(
       "module m;\n"
       "  function automatic int f(); return 0; endfunction\n"
@@ -355,8 +353,6 @@ TEST(FunctionDeclParsing, FunctionLifetimeAutomatic) {
 }
 
 TEST(FunctionDeclParsing, FunctionLifetimeStatic) {
-  // The same lifetime slot also accepts 'static', recorded distinctly from
-  // the automatic lifetime.
   auto r = Parse(
       "module m;\n"
       "  function static int f(); return 0; endfunction\n"
@@ -370,8 +366,6 @@ TEST(FunctionDeclParsing, FunctionLifetimeStatic) {
 }
 
 TEST(FunctionDeclParsing, FunctionBodyClassScopePrefix) {
-  // function_body_declaration permits a class_scope prefix before the
-  // function_identifier; the '::'-qualified name records the enclosing class.
   auto r = Parse(
       "module m;\n"
       "  function int C::f(); return 0; endfunction\n"
@@ -385,37 +379,28 @@ TEST(FunctionDeclParsing, FunctionBodyClassScopePrefix) {
 }
 
 TEST(FunctionDeclParsing, DpiImportSpecStringInvalidRejected) {
-  // dpi_spec_string admits only "DPI-C" or "DPI"; an import declaration that
-  // uses any other string violates the production and is rejected.
   auto r = Parse(
       "module m;\n"
       "  import \"DPI++\" function void f();\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §35.5.4 owns dpi_spec_string; A.2.6 states the production alone.
   EXPECT_TRUE(ReportedError(
       r.diags, "DPI specification string must be \"DPI-C\" or \"DPI\"", 2,
       "35.5.4"));
 }
 
 TEST(FunctionDeclParsing, DpiExportSpecStringInvalidRejected) {
-  // The same closed set governs the export side, enforced on its own parse
-  // path; an unrecognized string is likewise rejected.
   auto r = Parse(
       "module m;\n"
       "  export \"DPI++\" function g;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §35.5.4 owns dpi_spec_string; A.2.6 states the production alone.
   EXPECT_TRUE(ReportedError(
       r.diags, "DPI specification string must be \"DPI-C\" or \"DPI\"", 2,
       "35.5.4"));
 }
 
 TEST(FunctionDeclParsing, FunctionBodyInterfaceIdentifierPrefix) {
-  // The other prefix alternative of function_body_declaration is an
-  // interface_identifier followed by '.'; the dotted name records the
-  // qualifier separately from the function_identifier.
   auto r = Parse(
       "module m;\n"
       "  function int I.f(); return 0; endfunction\n"
@@ -428,12 +413,6 @@ TEST(FunctionDeclParsing, FunctionBodyInterfaceIdentifierPrefix) {
   EXPECT_EQ(item->name, "f");
 }
 
-// --- A class's extern and pure virtual prototypes ---
-// A.1.9 writes them with a method_prototype, A.2.6's function_prototype or
-// A.2.7's task_prototype, which take no lifetime, name the method with an
-// identifier alone and give a function a data_type_or_void for its result.
-// Read through a declaration's head, a class prototype carrying any of the
-// three drew no report.
 TEST(FunctionDeclParsing, ClassPrototypeLifetimeIsReported) {
   auto r = Parse(
       "class C;\n"
@@ -475,8 +454,6 @@ TEST(FunctionDeclParsing, ClassPrototypeImplicitResultIsReported) {
   }
 }
 
-// A constructor's prototype is A.1.9's class_constructor_prototype, which
-// writes no result type.
 TEST(FunctionDeclParsing, ClassPrototypesAsA26WritesThemAreAccepted) {
   auto r = Parse(
       "virtual class C;\n"
@@ -489,9 +466,6 @@ TEST(FunctionDeclParsing, ClassPrototypesAsA26WritesThemAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.2.6 writes a function body's declarations before its statements in both
-// body forms, so a declaration after the body's first statement is reported,
-// and one before it is not.
 TEST(FunctionDeclParsing, DeclarationAfterAStatementIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -513,10 +487,6 @@ TEST(FunctionDeclParsing, DeclarationAfterAStatementIsReported) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 3, "13.4"));
 }
 
-// A.2.6 prefixes a function_body_declaration's name with an
-// interface_identifier and `.` or with a class_scope, one or the other, so a
-// name written with a class scope and then an interface prefix is reported,
-// and either prefix alone is not.
 TEST(FunctionDeclParsing, ClassScopeWithAnInterfacePrefixIsReported) {
   auto r = Parse(
       "class C;\n"
@@ -538,8 +508,6 @@ TEST(FunctionDeclParsing, ClassScopeWithAnInterfacePrefixIsReported) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 11, "A.2.6"));
 }
 
-// A type reference is one of A.2.2.1's data_types, so a class's extern or pure
-// virtual prototype whose result is one writes its result type out.
 TEST(FunctionDeclParsing, ClassPrototypeTypeReferenceResultIsAccepted) {
   auto r = Parse(
       "virtual class C;\n"

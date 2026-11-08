@@ -16,13 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §20.7 states that an array query function call is legal within a constant
-// expression when the type of its first argument is a fixed-size type, even
-// though the data object named by that argument is not itself a constant. The
-// elaborator must therefore treat such a call as constant even when its
-// operand is not a constant operand. Each query function is exercised with a
-// non-constant (undeclared, hence out-of-scope) array operand.
-
 TEST(ArrayQueryConstExpr, SizeWithNonConstArgIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$size(arr)", f);
@@ -71,16 +64,12 @@ TEST(ArrayQueryConstExpr, IncrementWithNonConstArgIsConstant) {
   EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
-// A query with an explicit constant dimension expression is also constant.
 TEST(ArrayQueryConstExpr, SizeWithDimensionExprIsConstant) {
   EvalFixture f;
   auto* e = ParseExprFrom("$size(arr, 2)", f);
   EXPECT_TRUE(IsConstantExpr(e, {}));
 }
 
-// §20.7: applying an array query function directly to a dynamically sized type
-// identifier (here a queue typedef) is an elaboration error, because a dynamic
-// dimension has no extent outside of an object instance.
 TEST(ArrayQueryOnType, QueryOnQueueTypedefIsError) {
   ElabFixture f;
   Elaborate(
@@ -96,8 +85,6 @@ TEST(ArrayQueryOnType, QueryOnQueueTypedefIsError) {
                             4, "20.7"));
 }
 
-// §20.7: the same query on a fixed-size type identifier is legal, confirming
-// the rule rejects only dynamically sized type identifiers.
 TEST(ArrayQueryOnType, QueryOnFixedTypedefIsLegal) {
   ElabFixture f;
   Elaborate(
@@ -110,17 +97,6 @@ TEST(ArrayQueryOnType, QueryOnFixedTypedefIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.7 bars an array query function applied directly to a dynamically sized
-// type identifier and puts no condition on where the query is written, so every
-// position a statement holds a statement in is a position the report is made
-// at. CheckArrayQueryOnDynamicTypeStmt in
-// src/elaborator/elaborator_validate_matches.cpp had written out eight of the
-// thirteen child-statement links Stmt declares, and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
-// below cover one newly reached position each.
-
-// Stmt::for_steps holds a for loop's step assignments, a member of its own
-// beside the initializers the walk already reached.
 TEST(ArrayQueryOnType, QueryOnQueueTypedefInAForStepIsReported) {
   ElabFixture f;
   Elaborate(
@@ -137,10 +113,6 @@ TEST(ArrayQueryOnType, QueryOnQueueTypedefInAForStepIsReported) {
                             5, "20.7"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(ArrayQueryOnType,
      QueryOnQueueTypedefInAnAssertionPassStatementIsReported) {
   ElabFixture f;
@@ -175,9 +147,6 @@ TEST(ArrayQueryOnType,
                             5, "20.7"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
-// Stmt::randcase_items. §20.7 is a rule about the source, so it holds whether
-// the weighted draw would select the item or not.
 TEST(ArrayQueryOnType, QueryOnQueueTypedefInARandcaseItemIsReported) {
   ElabFixture f;
   Elaborate(
@@ -193,10 +162,6 @@ TEST(ArrayQueryOnType, QueryOnQueueTypedefInARandcaseItemIsReported) {
                             4, "20.7"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(ArrayQueryOnType, QueryOnQueueTypedefInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
   Elaborate(
@@ -216,10 +181,6 @@ TEST(ArrayQueryOnType, QueryOnQueueTypedefInARandsequenceCodeBlockIsReported) {
                             6, "20.7"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(ArrayQueryOnType,
      QueryOnQueueTypedefInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;
@@ -242,9 +203,6 @@ TEST(ArrayQueryOnType,
                             7, "20.7"));
 }
 
-// §20.7: use on an associative array dimension is restricted to index types
-// with integral values, so a query of the string-indexed dimension of `aa`,
-// with or without the dimension number, is an error.
 TEST(ArrayQueryElab, AQueryOfAStringIndexedDimensionIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -269,11 +227,6 @@ TEST(ArrayQueryElab, AQueryOfAStringIndexedDimensionIsRejected) {
                             6, "20.7"));
 }
 
-// §20.7: an integral index type, and $dimensions, which counts the dimensions
-// rather than querying one, stay legal on an associative array; so does a
-// query of a fixed dimension of an array whose second dimension is
-// string-indexed, a query whose dimension number does not fold, and a query
-// of a variable that is no array.
 TEST(ArrayQueryElab, IntegralIndexesAndOtherDimensionsAreAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -295,10 +248,6 @@ TEST(ArrayQueryElab, IntegralIndexesAndOtherDimensionsAreAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §20.7: a query folds only where its argument's dimensions are known here:
-// a range that does not fold, a part- or bit-select of a variable, a type
-// with no dimensions, a dimension number past the last or not constant, and a
-// call with no argument are left to the run.
 TEST(ArrayQueryConstExpr, AQueryWhoseDimensionsAreUnknownDoesNotFold) {
   EvalFixture f;
   for (const char* text : {"$size(logic [k:0])", "$size(v[3:0])", "$size(v[2])",
@@ -308,11 +257,6 @@ TEST(ArrayQueryConstExpr, AQueryWhoseDimensionsAreUnknownDoesNotFold) {
   }
 }
 
-// §20.7 with §6.18: a typedef answers for the type it names, so one naming an
-// unpacked aggregate, whose dimensions the table does not carry, one whose
-// packed range does not fold, one naming a real type and a name the table
-// does not hold are not folded; a `type(...)` argument answers for the type it
-// holds, with or without a table.
 TEST(ArrayQueryConstExpr, ATypedefOrTypeOperatorFoldsForTheTypeItHolds) {
   EvalFixture f;
   DataType alias;
@@ -336,11 +280,6 @@ TEST(ArrayQueryConstExpr, ATypedefOrTypeOperatorFoldsForTheTypeItHolds) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$size(type(logic [3:0]))", f)), 4);
 }
 
-// §20.7: a parameter or a variable answers for its declared dimensions only
-// where every one of them is fixed, so a dynamic dimension, `[]`, and a
-// variable whose dimension did not fold are not folded; a fixed parameter
-// array, [3] being [0:2], and a variable declared [7:4] are, $high of the
-// descending [7:4] being 7.
 TEST(ArrayQueryConstExpr, OnlyFixedDimensionsOfAParameterOrVariableFold) {
   EvalFixture f;
   std::vector<Expr*> dynamic_dims = {nullptr};
@@ -370,10 +309,6 @@ TEST(ArrayQueryConstExpr, OnlyFixedDimensionsOfAParameterOrVariableFold) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$high(dv)", f)), 7);
 }
 
-// §20.7: an array query is a constant expression only on an argument whose
-// dimensions are fixed, so one on a parameter declared with a dynamic
-// dimension, or on a queue, cannot initialize a localparam (§6.20.4); one on
-// a parameter whose dimension a parameter sizes can.
 TEST(ArrayQueryElab, AQueryOnADynamicDimensionIsNoConstantExpression) {
   ElabFixture f;
   ElaborateSrc(

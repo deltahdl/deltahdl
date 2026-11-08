@@ -14,18 +14,14 @@
 namespace delta {
 namespace {
 
-// A design whose one continuous assignment's right side is the expression a
-// case is about.
 class AssignedExpressionsOfARun : public VpiDesignRun {
  protected:
-  // The right side of the top's continuous assignment.
   static vpiHandle Rhs() {
     vpiHandle it = vpi_iterate(vpiContAssign, By("top"));
     if (it == nullptr) return nullptr;
     return vpi_handle(vpiRhs, vpi_scan(it));
   }
 
-  // The integer value of an expression object, -1 where none is written.
   static int IntOf(vpiHandle expr) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -34,7 +30,6 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The operands of an operation, in order.
   static std::vector<vpiHandle> OperandsOf(vpiHandle op) {
     std::vector<vpiHandle> operands;
     vpiHandle it = vpi_iterate(vpiOperand, op);
@@ -43,7 +38,6 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     return operands;
   }
 
-  // The integer values of `exprs`, in order.
   static std::vector<int> ValuesOf(const std::vector<vpiHandle>& exprs) {
     std::vector<int> values;
     values.reserve(exprs.size());
@@ -51,7 +45,6 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     return values;
   }
 
-  // The integer property `property` of each of `exprs`, in order.
   static std::vector<int> PropertiesOf(int property,
                                        const std::vector<vpiHandle>& exprs) {
     std::vector<int> values;
@@ -60,7 +53,6 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
     return values;
   }
 
-  // The right sides of the assignments top's one procedure runs, in order.
   static std::vector<vpiHandle> ProcedureRightSides() {
     const std::vector<vpiHandle> kProcs = ObjectsOf(vpiProcess, By("top"));
     if (kProcs.size() != 1) return {};
@@ -75,8 +67,6 @@ class AssignedExpressionsOfARun : public VpiDesignRun {
   }
 };
 
-// Detail 9: a part select is a constant select when its parent is, the parent
-// has static bounds and both bounds are elaboration-time constants.
 TEST_F(AssignedExpressionsOfARun, APartSelectWithConstantBoundsIsConstant) {
   Run("module top; logic [7:0] r; wire [3:0] w; assign w = r[3:0];\n"
       "endmodule\n");
@@ -86,7 +76,6 @@ TEST_F(AssignedExpressionsOfARun, APartSelectWithConstantBoundsIsConstant) {
   EXPECT_EQ(vpi_get(vpiConstantSelect, select), 1);
 }
 
-// Detail 9: an indexed part select whose base varies is not.
 TEST_F(AssignedExpressionsOfARun, AnIndexedPartSelectWithAVaryingBaseIsNot) {
   Run("module top; logic [7:0] r; logic [2:0] i; wire [3:0] w;\n"
       "  assign w = r[i+:4];\n"
@@ -97,12 +86,6 @@ TEST_F(AssignedExpressionsOfARun, AnIndexedPartSelectWithAVaryingBaseIsNot) {
   EXPECT_EQ(vpi_get(vpiConstantSelect, select), 0);
 }
 
-// Detail 9 read off objects standing in no design. A part select reaching no
-// parent is no constant select, nor is one whose parent is none, an element
-// of a dynamic array (§37.17 detail 27). Into an array, the parent's bounds
-// must be static, so one into a static array var is and one into a dynamic
-// array is not. Each range expression must be an elaboration-time constant,
-// so a variable written as either bound, or as the width, makes it none.
 TEST(PartSelectConstantSelect, ReadOffTheSelectItsParentAndItsRange) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -155,8 +138,6 @@ TEST(PartSelectConstantSelect, ReadOffTheSelectItsParentAndItsRange) {
   SetGlobalVpiContext(nullptr);
 }
 
-// Details 3 and 5: a cast is a unary operation whose typespec is the type it
-// casts to, a built-in type a keyword names...
 TEST_F(AssignedExpressionsOfARun, ACastToAKeywordTypeReachesItsTypespec) {
   Run("module top; logic [7:0] r; wire [31:0] w; assign w = int'(r);\n"
       "endmodule\n");
@@ -168,7 +149,6 @@ TEST_F(AssignedExpressionsOfARun, ACastToAKeywordTypeReachesItsTypespec) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
 }
 
-// ...or a typedef the module declares.
 TEST_F(AssignedExpressionsOfARun, ACastToATypedefReachesItsTypespec) {
   Run("module top; typedef logic [3:0] nib_t; logic [7:0] r; wire [3:0] w;\n"
       "  assign w = nib_t'(r);\n"
@@ -185,13 +165,11 @@ TEST_F(AssignedExpressionsOfARun, ACastToATypedefReachesItsTypespec) {
   EXPECT_STREQ(vpi_get_str(vpiName, typespec), "nib_t");
 }
 
-// The typespec a cast relates to, null for none.
 vpiHandle CastTypespec(vpiHandle cast) {
   if (cast == nullptr || vpi_get(vpiOpType, cast) != vpiCastOp) return nullptr;
   return vpi_handle(vpiTypespec, cast);
 }
 
-// The typespec kinds of the casts `rights` are, 0 for one with none.
 std::vector<int> CastTypespecKinds(const std::vector<vpiHandle>& rights) {
   std::vector<int> kinds;
   kinds.reserve(rights.size());
@@ -202,8 +180,6 @@ std::vector<int> CastTypespecKinds(const std::vector<vpiHandle>& rights) {
   return kinds;
 }
 
-// The number of elements the first range `typespec` reaches holds, 0 for a
-// typespec reaching none.
 int FirstRangeSize(vpiHandle typespec) {
   vpiHandle ranges = vpi_iterate(vpiRange, typespec);
   if (ranges == nullptr) return 0;
@@ -212,8 +188,6 @@ int FirstRangeSize(vpiHandle typespec) {
   return kSize;
 }
 
-// ...or, for a size cast, a vector keeping the operand's 2-state nature
-// (§6.24.1)...
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperandIsABitVector) {
   Run("module top; int i; wire [7:0] w; assign w = 8'(i); endmodule\n");
   vpiHandle typespec = CastTypespec(Rhs());
@@ -221,7 +195,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperandIsABitVector) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
 }
 
-// ...or its 4-state nature...
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfAFourStateOperandIsALogicVector) {
   Run("module top; logic [3:0] r; wire [7:0] w; assign w = 8'(r);\n"
       "endmodule\n");
@@ -230,7 +203,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAFourStateOperandIsALogicVector) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
-// ...an operation's being 2-state where every operand is (§11.8.1)...
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperationIsABitVector) {
   Run("module top; int i, j; wire [7:0] w; assign w = 8'(i + j);\n"
       "endmodule\n");
@@ -239,7 +211,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfATwoStateOperationIsABitVector) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
 }
 
-// ...and 4-state where one is not...
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfAMixedOperationIsALogicVector) {
   Run("module top; int i; logic [3:0] r; wire [7:0] w;\n"
       "  assign w = 8'(i + r);\n"
@@ -249,11 +220,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAMixedOperationIsALogicVector) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
-// ...a select being as its vector is, 2-state from a bit vector and 4-state
-// from a logic vector, a var select or an array net element, as is a bit,
-// byte, shortint or longint variable 2-state; an operation none of whose
-// operands has an object, such as a logical equivalence (§11.4.7), which no
-// operation type names, is any expression it cannot judge, 4-state...
 TEST_F(AssignedExpressionsOfARun, ASizeCastKeepsTheNatureOfWhatItCasts) {
   Run("module top; bit [7:0] b; logic [7:0] l; logic [0:3][7:0] r [1:4];\n"
       "  wire [7:0] n [4]; int i; logic a, c; bit [3:0] bt; byte y;\n"
@@ -271,7 +237,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastKeepsTheNatureOfWhatItCasts) {
   EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
-// ...as wide as its size expression's value, a parameter's included...
 TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsSizeExpression) {
   Run("module top; localparam W = 6; logic [3:0] r; wire [7:0] w;\n"
       "  assign w = W'(r);\n"
@@ -280,7 +245,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsSizeExpression) {
   EXPECT_EQ(vpi_get(vpiSize, Rhs()), 6);
 }
 
-// ...or, for a signing cast, the operand's type of the signedness it names...
 TEST_F(AssignedExpressionsOfARun, ASigningCastIsTheOperandsTypeSigned) {
   Run("module top; logic [7:0] r; wire [7:0] w; assign w = signed'(r);\n"
       "endmodule\n");
@@ -290,7 +254,6 @@ TEST_F(AssignedExpressionsOfARun, ASigningCastIsTheOperandsTypeSigned) {
   EXPECT_EQ(vpi_get(vpiSigned, typespec), 1);
 }
 
-// ...unsigned where it names that...
 TEST_F(AssignedExpressionsOfARun, AnUnsigningCastIsTheOperandsTypeUnsigned) {
   Run("module top; int i; wire [31:0] w; assign w = unsigned'(i);\n"
       "endmodule\n");
@@ -300,7 +263,6 @@ TEST_F(AssignedExpressionsOfARun, AnUnsigningCastIsTheOperandsTypeUnsigned) {
   EXPECT_EQ(vpi_get(vpiSigned, typespec), 0);
 }
 
-// ...or, for a const cast, the operand's own type.
 TEST_F(AssignedExpressionsOfARun, AConstCastIsTheOperandsType) {
   Run("module top; int i; wire [31:0] w; assign w = const'(i); endmodule\n");
   vpiHandle typespec = CastTypespec(Rhs());
@@ -308,8 +270,6 @@ TEST_F(AssignedExpressionsOfARun, AConstCastIsTheOperandsType) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiIntTypespec);
 }
 
-// A cast to a type parameter (§6.20.3) has the typespec of the type the
-// instance gives it, not the default its declaration writes.
 TEST_F(AssignedExpressionsOfARun, ACastToATypeParameterHasTheTypeItStandsFor) {
   Run("module sub #(parameter type T = logic [3:0]);\n"
       "  logic [7:0] x; wire [3:0] y; assign y = T'(x);\n"
@@ -323,12 +283,6 @@ TEST_F(AssignedExpressionsOfARun, ACastToATypeParameterHasTheTypeItStandsFor) {
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiBitTypespec);
 }
 
-// A cast to a type reference (§6.23) has the typespec of the type it refers
-// to: of a variable it names, the type the variable was declared with, a bit
-// vector of four bits or a byte; of a typedef it names, the typedef's; of a
-// built-in type it writes, that type over the range written, twelve bits; and
-// of an operation, its self-determined type, a 2-state vector where every
-// operand is 2-state (§11.8.1).
 TEST_F(AssignedExpressionsOfARun, ACastToATypeReferenceHasTheTypeItRefersTo) {
   Run("module top; typedef logic [5:0] six_t; bit [3:0] n; byte s;\n"
       "  logic [15:0] v; int d;\n"
@@ -348,10 +302,6 @@ TEST_F(AssignedExpressionsOfARun, ACastToATypeReferenceHasTheTypeItRefersTo) {
   EXPECT_EQ(FirstRangeSize(CastTypespec(kRights[3])), 12);
 }
 
-// A cast to a typedef a package declares has its typespec, whether it names
-// the typedef through the package (§26.3) or a wildcard or an explicit import
-// makes it visible; and so does a cast to one the compilation unit declares
-// (§3.12.1), which a name finds after the imports' (§26.3).
 TEST_F(AssignedExpressionsOfARun, ACastFindsATypedefOfAPackageOrTheUnit) {
   Run("package pk; typedef logic [3:0] nib_t; typedef bit [5:0] six_t;\n"
       "endpackage\n"
@@ -368,10 +318,6 @@ TEST_F(AssignedExpressionsOfARun, ACastFindsATypedefOfAPackageOrTheUnit) {
   EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
-// A cast in a variable's initialization expression (§37.17 detail 8), which
-// its instance writes in no scope of its own, has the typespec of a built-in
-// type it names and of a typedef its module declares, found from the
-// instance.
 TEST_F(AssignedExpressionsOfARun,
        ACastInAnInitializerFindsItsTypeInTheInstance) {
   Run("module sub; typedef bit [3:0] nib_t; logic [7:0] r;\n"
@@ -386,9 +332,6 @@ TEST_F(AssignedExpressionsOfARun,
   EXPECT_STREQ(vpi_get_str(vpiName, named), "nib_t");
 }
 
-// A cast in a variable's initialization expression finds a typedef a package
-// declares, named through the package or made visible by an import (§26.3),
-// and one the compilation unit declares (§3.12.1), as one in a procedure does.
 TEST_F(AssignedExpressionsOfARun,
        ACastInAnInitializerFindsATypedefOfAPackageOrTheUnit) {
   Run("package pk; typedef logic [3:0] nib_t; typedef bit [5:0] six_t;\n"
@@ -407,9 +350,6 @@ TEST_F(AssignedExpressionsOfARun,
             kKinds);
 }
 
-// A cast in the first top module's variable initializer finds a typedef the
-// top declares (§6.18), though the top's instance is keyed under its name
-// rather than under the empty prefix its expressions are written with.
 TEST_F(AssignedExpressionsOfARun,
        ACastInTheFirstTopsInitializerFindsItsTypedef) {
   Run("module top; typedef bit [3:0] nib_t; logic [7:0] r;\n"
@@ -420,9 +360,6 @@ TEST_F(AssignedExpressionsOfARun,
   EXPECT_STREQ(vpi_get_str(vpiName, typespec), "nib_t");
 }
 
-// A size cast is as wide as the constant its width is, an operation over a
-// parameter, a call of $bits on a variable or a package's parameter written
-// through the package among them (§11.2.1).
 TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsConstantWidth) {
   Run("package pk; parameter W = 2; endpackage\n"
       "module top; localparam W = 3; logic [4:0] b; logic [7:0] x;\n"
@@ -436,11 +373,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastIsAsWideAsItsConstantWidth) {
   EXPECT_EQ(PropertiesOf(vpiSize, kRights), (std::vector<int>{4, 5, 2}));
 }
 
-// A cast of an expression the model builds no object for, a logical
-// equivalence (§11.4.7) having no operation type, takes its nature as 4-state
-// and its width and signedness from its value: a size cast is a logic vector
-// as wide as its width, and a signing or const cast a logic vector as wide as
-// the one bit the equivalence is, of the signedness the signing cast names.
 TEST_F(AssignedExpressionsOfARun, ACastOfAnOperandWithNoObjectHasATypespec) {
   Run("module top; logic a, b; logic [3:0] y;\n"
       "  initial begin\n"
@@ -461,10 +393,6 @@ TEST_F(AssignedExpressionsOfARun, ACastOfAnOperandWithNoObjectHasATypespec) {
   EXPECT_EQ(signedness, (std::vector<int>{0, 1, 0}));
 }
 
-// A size cast of an element of an unpacked array of a 2-state type is a bit
-// vector, whether the array is fixed, a queue, a dynamic array or an
-// associative array (§7.4, §7.10, §7.5, §7.8), and so is one of a bit of such
-// an element; of an element of an array of a 4-state type, a logic vector.
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnArrayElementIsAsItsElementType) {
   Run("module top; bit [7:0] r [1:4]; bit [7:0] q [$]; bit [7:0] d [];\n"
       "  bit [7:0] m [int]; logic [7:0] l [4]; int i; logic [3:0] x;\n"
@@ -479,10 +407,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnArrayElementIsAsItsElementType) {
   EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
-// A size cast of a packed structure or union is a bit vector where every
-// member is 2-state (§7.2.1, §7.3.1), of an enumeration where its base type,
-// int by default, is (§6.19), and of a packed array of a 2-state structure
-// (§7.4.1); of a structure with a 4-state member, a logic vector.
 TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnAggregateIsAsItsMembersAre) {
   Run("module top;\n"
       "  typedef struct packed { bit [3:0] a; byte b; } s2_t;\n"
@@ -500,9 +424,6 @@ TEST_F(AssignedExpressionsOfARun, ASizeCastOfAnAggregateIsAsItsMembersAre) {
   EXPECT_EQ(CastTypespecKinds(ProcedureRightSides()), kKinds);
 }
 
-// A size cast of a structure with a 4-state member that a task declares as
-// its argument, a variable the run keeps no storage of its own for, is a
-// logic vector.
 TEST_F(AssignedExpressionsOfARun,
        ASizeCastOfATasksFourStateStructIsALogicVector) {
   Run("module top; typedef struct packed { logic [3:0] a; } s4_t;\n"
@@ -516,10 +437,6 @@ TEST_F(AssignedExpressionsOfARun,
   EXPECT_EQ(vpi_get(vpiType, typespec), vpiLogicTypespec);
 }
 
-// A size cast of a structure all of whose members are 2-state is a bit vector
-// (§7.2.1) wherever the structure is declared: as a task's argument or a
-// function's local, variables the run keeps no storage of their own for, and
-// as the member of a structure, whose storage is a copy of the member's bits.
 TEST_F(AssignedExpressionsOfARun,
        ASizeCastOfATwoStateStructWithoutItsOwnStorageIsABitVector) {
   Run("module top; typedef struct packed { bit [3:0] a; byte b; } s2_t;\n"
@@ -540,9 +457,6 @@ TEST_F(AssignedExpressionsOfARun,
             (std::vector<int>{vpiBitTypespec, vpiBitTypespec, vpiBitTypespec}));
 }
 
-// Every expression has vpiSize, an operation's being its self-determined
-// width (§11.6.1): a bitwise and is as wide as its wider operand, and an
-// equality is one bit.
 TEST_F(AssignedExpressionsOfARun, AnOperationIsSizedByItsSelfDeterminedWidth) {
   Run("module top; wire [7:0] a; wire [5:0] b; wire [7:0] y;\n"
       "  assign y = a & b;\n"
@@ -557,8 +471,6 @@ TEST_F(AssignedExpressionsOfARun, AnEqualityIsOneBit) {
   EXPECT_EQ(vpi_get(vpiSize, Rhs()), 1);
 }
 
-// A cast to a built-in type a keyword names is as wide as that type (§6.11
-// Table 6-8): byte 8 bits, shortint 16, integer 32, and longint and time 64.
 TEST_F(AssignedExpressionsOfARun, ACastIsAsWideAsTheKeywordTypeItNames) {
   Run("module top; logic [3:0] a; logic [63:0] x;\n"
       "  initial begin\n"
@@ -570,11 +482,6 @@ TEST_F(AssignedExpressionsOfARun, ACastIsAsWideAsTheKeywordTypeItNames) {
             (std::vector<int>{8, 16, 32, 64, 64}));
 }
 
-// A conditional is as wide as the wider of its two results (§11.6.1 Table
-// 11-21), which only its three operands tell. Neither Annex K nor Annex M
-// names an operation type for the logical equivalence a <-> b (§11.4.7), so
-// that operand has no object, the conditional has two operands, and it is
-// left unsized rather than sized from the wrong ones.
 TEST_F(AssignedExpressionsOfARun, AConditionalMissingAnOperandIsLeftUnsized) {
   Run("module top; logic a, b, c; logic [7:0] d, x;\n"
       "  initial begin x = c ? (a <-> b) : d; end\n"
@@ -586,8 +493,6 @@ TEST_F(AssignedExpressionsOfARun, AConditionalMissingAnOperandIsLeftUnsized) {
   EXPECT_EQ(vpi_get(vpiSize, kRights[0]), 0);
 }
 
-// A part select is as wide as its bounds span, and an indexed part select as
-// its width.
 TEST_F(AssignedExpressionsOfARun, PartSelectsAreSizedByTheirRanges) {
   Run("module top; wire [7:0] a; wire [2:0] y; assign y = a[6:4];\n"
       "endmodule\n");
@@ -603,10 +508,6 @@ TEST_F(AssignedExpressionsOfARun, AnIndexedPartSelectIsSizedByItsWidth) {
   EXPECT_EQ(vpi_get(vpiSize, Rhs()), 5);
 }
 
-// So are they, and a replication by its count (§11.4.12.1), where the bounds,
-// width or count read parameters or combine constants with an operator, as a
-// constant expression may (§11.2.1): a[W-1:0] is 4 bits, a[4:P] 3, a[i+:W+1]
-// 5, and {N{b}} 6.
 TEST_F(AssignedExpressionsOfARun,
        ConstantExpressionsSizeSelectsAndReplications) {
   Run("module top; localparam W = 4, P = 2, N = 3;\n"
@@ -619,10 +520,6 @@ TEST_F(AssignedExpressionsOfARun,
             (std::vector<int>{4, 3, 5, 6}));
 }
 
-// So does any other constant §11.2.1 admits there, which the run values where
-// the source wrote it: $bits of a variable (§20.6.2) as a replication's count,
-// and a constant function call (§13.4.3) as a part select's bound.
-// {$bits(b){c}} is 8 bits and a[f():0] 4.
 TEST_F(AssignedExpressionsOfARun, ConstantsTheRunValuesSizeTheirExpressions) {
   Run("module top; function automatic int f(); return 3; endfunction\n"
       "  logic [3:0] b; logic [1:0] c; logic [7:0] a, x;\n"
@@ -632,8 +529,6 @@ TEST_F(AssignedExpressionsOfARun, ConstantsTheRunValuesSizeTheirExpressions) {
             (std::vector<int>{8, 4}));
 }
 
-// A bit select and a part select hold no storage of their own; each reads the
-// bits it selects out of its parent's value.
 TEST_F(AssignedExpressionsOfARun, ABitSelectReadsItsBit) {
   Run("module top; integer n = 5; wire y; assign y = n[2]; endmodule\n");
   ASSERT_NE(Rhs(), nullptr);
@@ -649,9 +544,6 @@ TEST_F(AssignedExpressionsOfARun, APartSelectReadsItsBits) {
   EXPECT_EQ(IntOf(Rhs()), 0xA);
 }
 
-// Detail 6: a keyed pattern nested in a keyed pattern keeps its place, laid
-// out positionally by the subarray it fills, nesting preserved. §10.8 lets no
-// untyped pattern be a default key's value, so each subarray is keyed.
 TEST_F(AssignedExpressionsOfARun, ANestedKeyedPatternKeepsItsPlace) {
   Run("module top; logic [1:0] a [0:1][0:1];\n"
       "  assign a = '{0: '{1: 2'd1, default: 2'd0}, 1: '{default: 2'd3}};\n"
@@ -667,9 +559,6 @@ TEST_F(AssignedExpressionsOfARun, ANestedKeyedPatternKeepsItsPlace) {
   EXPECT_EQ(ValuesOf(OperandsOf(kOperands[1])), (std::vector<int>{3, 3}));
 }
 
-// Detail 10 with Table 37-1: the parent of r[i+1][3][j+:2] is r[i+1][3], a
-// select of one packed element out of the element r[i+1] selects, whose own
-// parent is that var select.
 TEST_F(AssignedExpressionsOfARun, APartSelectThroughAVarSelectHasItsParent) {
   Run("module top; logic [0:3][7:0] r [1:4]; int i, j; wire [1:0] w;\n"
       "  assign w = r[i+1][3][j+:2];\n"
@@ -686,17 +575,11 @@ TEST_F(AssignedExpressionsOfARun, APartSelectThroughAVarSelectHasItsParent) {
   EXPECT_EQ(vpi_get(vpiType, element), vpiVarSelect);
 }
 
-// §11.4.2: a design whose one procedure steps i within the right side of each
-// of four assignments, in each of the four forms an increment or decrement
-// takes.
 constexpr const char* kSteppedRightSides =
     "module top; int i, a, b, c, d;\n"
     "  initial begin a = i++; b = ++i; c = i--; d = --i; end\n"
     "endmodule\n";
 
-// An increment or decrement written within an expression is an operation
-// whose operator names which of the four forms it takes and whose one operand
-// is the variable it steps (#7280).
 TEST_F(AssignedExpressionsOfARun, AnIncrementOrDecrementIsAnOperation) {
   Run(kSteppedRightSides);
   const std::vector<vpiHandle> kRights = ProcedureRightSides();
@@ -713,8 +596,6 @@ TEST_F(AssignedExpressionsOfARun, AnIncrementOrDecrementIsAnOperation) {
   }
 }
 
-// Detail 2: each decompiles to the form it was written in, its operator one
-// space from the variable it steps (#7281).
 TEST_F(AssignedExpressionsOfARun, AnIncrementOrDecrementDecompilesAsWritten) {
   Run(kSteppedRightSides);
   const std::vector<vpiHandle> kRights = ProcedureRightSides();
@@ -728,8 +609,6 @@ TEST_F(AssignedExpressionsOfARun, AnIncrementOrDecrementDecompilesAsWritten) {
   }
 }
 
-// Detail 2: a stepped variable that is a select keeps its brackets and needs
-// no parentheses, and an operator before a postfix step takes it whole.
 TEST_F(AssignedExpressionsOfARun, AStepOfASelectDecompilesWithoutParentheses) {
   Run("module top; int r [4]; int i, x;\n"
       "  initial x = -r[i]++;\n"
@@ -743,9 +622,6 @@ TEST_F(AssignedExpressionsOfARun, AStepOfASelectDecompilesWithoutParentheses) {
   EXPECT_STREQ(decompiled, "- r[i] ++");
 }
 
-// §37.59 with §11.4: an expression written with a binary operator is an
-// operation reporting that operator's own vpiOpType, the two spellings of
-// exclusive nor (§11.4.8) reporting the one constant.
 TEST_F(AssignedExpressionsOfARun, EachBinaryOperatorReportsItsOwnOpType) {
   Run("module top; int a, b, x;\n"
       "  initial begin\n"
@@ -762,9 +638,6 @@ TEST_F(AssignedExpressionsOfARun, EachBinaryOperatorReportsItsOwnOpType) {
   EXPECT_EQ(PropertiesOf(vpiOpType, ProcedureRightSides()), kOps);
 }
 
-// §37.59 with §11.4: so is one written with a prefix unary operator, unary
-// plus and each reduction (§11.4.9) among them, both spellings of the
-// reduction exclusive nor reporting the one constant.
 TEST_F(AssignedExpressionsOfARun, EachUnaryOperatorReportsItsOwnOpType) {
   Run("module top; logic [3:0] a, x;\n"
       "  initial begin\n"

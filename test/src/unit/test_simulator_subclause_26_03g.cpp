@@ -12,14 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §26.3 (printed page 810) with §7.4.2 (printed 154) and §13.4: a wildcard
-// import makes the package's `int a[2]` visible under its bare name, and the
-// name denotes the package's own array, so `a[1] = 7` in the module writes
-// the element the package's function reads by its bare `a[1]`: 7 * 10 + 7.
-// The import bound the carrier variable alone, with no ArrayInfo and no
-// element aliases under the module's key (AliasVariableKinds in
-// lowerer_import.cpp), so the write set bit 1 of the 32-bit carrier, the
-// module's read answered that bit and the package's element held 0: 10.
 TEST(PackageImportSim, ImportedPackageFixedSizeArrayElementWrittenAndRead) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int a[2];\n"
@@ -39,10 +31,6 @@ TEST(PackageImportSim, ImportedPackageFixedSizeArrayElementWrittenAndRead) {
             77u);
 }
 
-// §12.7.3 with §7.4.2 (printed page 154) and §26.3 (printed 810): foreach
-// over the imported name reads the package array's shape, two elements, so
-// the loop runs twice. With no ArrayInfo under the import's key the loop
-// ran once per bit of the 32-bit carrier: 32.
 TEST(PackageImportSim, ImportedPackageFixedSizeArrayCountedByForeach) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int a[2];\n"
@@ -56,10 +44,6 @@ TEST(PackageImportSim, ImportedPackageFixedSizeArrayCountedByForeach) {
             2u);
 }
 
-// §20.7 with §7.4.2 (printed page 154) and §26.3 (printed 810): $size of the
-// imported name is the package array's element count, 2. With no ArrayInfo
-// under the import's key the query saw a 32-bit scalar and answered its
-// width: 32.
 TEST(PackageImportSim, ImportedPackageFixedSizeArraySizeQueried) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int a[2];\n"
@@ -73,12 +57,6 @@ TEST(PackageImportSim, ImportedPackageFixedSizeArraySizeQueried) {
             2u);
 }
 
-// §7.5 and §7.5.1 (printed pages 157-158) with §26.3 (printed 810): the
-// package's function sizes its `int d[]` to three elements and writes the
-// last, and the imported name is that dynamic array, so size() through it
-// reads 3 and d[2] reads 4: 3 * 10 + 4. The import bound the carrier alone,
-// with no QueueObject and no dynamic ArrayInfo under the module's key, so
-// both reads answered 0.
 TEST(PackageImportSim, ImportedPackageDynamicArraySizedByPackageFunction) {
   EXPECT_EQ(RunAndGet("package p1;\n"
                       "  int d[];\n"
@@ -99,14 +77,6 @@ TEST(PackageImportSim, ImportedPackageDynamicArraySizedByPackageFunction) {
             34u);
 }
 
-// §26.6 (printed pages 815-816) with §26.3 (printed 810) and §7.4.2 (printed
-// 154): p2's `export p1::*` hands p1's array on, so a module importing p2
-// reads p1's `a[1]` under the bare name, the element p1's set() wrote, 5,
-// and `p2::a` names the same array through the exporter's qualifier, so a
-// foreach over it runs twice: 5 * 10 + 2. The import's alias carried no
-// elements, so `a[1]` read bit 1 of the carrier, 0, and the exporter's key
-// "p2.a" held no ArrayInfo, so the loop ran once per bit of the carrier:
-// 0 * 10 + 32.
 TEST(PackageImportSim, ExportedPackageFixedSizeArrayReadThroughTheExporter) {
   EXPECT_EQ(
       RunAndGet("package p1;\n"
@@ -134,15 +104,6 @@ TEST(PackageImportSim, ExportedPackageFixedSizeArrayReadThroughTheExporter) {
       52u);
 }
 
-// §26.3 (printed page 810) with §27.3 (printed 818): an import written in a
-// generate block makes the package's names visible in the block, and the
-// block's process names the package's own `int a[2]` and `int q[$]` by their
-// bare names, so `a[1] = 7` writes the element p1's get(1) reads and the two
-// pushes fill the queue p1's qs() sizes: 7 * 10 + 2. The alias keyed the
-// array's shape, its elements and the queue under the block's import prefix
-// (AliasImportedPackageName in lowerer_import.cpp), which the process's
-// FindArrayInfo and FindQueue tried no key of: the write set bit 1 of the
-// carrier, so get(1) read 0, and the pushes reached no queue, so qs() read 0.
 TEST(PackageImportSim,
      GenerateBlockImportedArrayElementAndQueueReadByThePackage) {
   EXPECT_EQ(RunAndGet("package p1;\n"
@@ -171,11 +132,6 @@ TEST(PackageImportSim,
             72u);
 }
 
-// §12.7.3 with §26.3 (printed page 810) and §27.3 (printed 818): foreach
-// over the name a generate block's import brings in reads the package
-// array's shape, three elements, so the loop runs three times. With the
-// shape found under no key of the block the loop ran once per bit of the
-// 32-bit carrier: 32.
 TEST(PackageImportSim, GenerateBlockImportedArrayCountedByForeach) {
   EXPECT_EQ(RunAndGet("package p2;\n"
                       "  int a[3];\n"
@@ -191,10 +147,6 @@ TEST(PackageImportSim, GenerateBlockImportedArrayCountedByForeach) {
             3u);
 }
 
-// §20.7 with §26.3 (printed page 810) and §27.3 (printed 818): $size of each
-// name a generate block's import brings in is that package array's element
-// count, 2 and 4: 2 * 10 + 4. With the shapes found under no key of the
-// block each query saw a 32-bit scalar and answered its width: 352.
 TEST(PackageImportSim, GenerateBlockImportedArraySizeQueried) {
   EXPECT_EQ(RunAndGet("package p3;\n"
                       "  int a[2];\n"
@@ -211,12 +163,6 @@ TEST(PackageImportSim, GenerateBlockImportedArraySizeQueried) {
             24u);
 }
 
-// §7.4.2 (printed page 154) with §26.3 (printed 810) and §27.3 (printed
-// 818): the block's own process writes two elements of the imported array
-// and reads them back through the same import: 7 * 10 + 3. With the shape
-// found under no key of the block each write set one bit of the carrier,
-// bit 1 to 7's low bit and bit 0 to 3's, and each read answered that bit:
-// 1 * 10 + 1.
 TEST(PackageImportSim, GenerateBlockImportedArrayElementReadInTheBlock) {
   EXPECT_EQ(RunAndGet("package p4;\n"
                       "  int a[2];\n"
@@ -236,9 +182,6 @@ TEST(PackageImportSim, GenerateBlockImportedArrayElementReadInTheBlock) {
             73u);
 }
 
-// A design whose package p5 declares the packed structure st2, a 4-bit a
-// above a 12-bit b, and `st2 u = '{b: 12'hBCD, a: 4'hA};`, and a module top
-// whose items are `top_items`; answers the top's y.
 static uint64_t PackageStructRead(const std::string& top_items) {
   return RunAndGet(
       "package p5;\n"
@@ -250,25 +193,12 @@ static uint64_t PackageStructRead(const std::string& top_items) {
       "y");
 }
 
-// §26.3 (printed page 810) with §7.2.1 (printed 147) and §10.9.2 (printed
-// 263): `p5::u.b` names the member b of the package's own `st2 u`, laid out
-// as st2 lays it, so the keyed pattern's 12'hBCD is read back from b. The
-// package's storage stood under "p5.u" with no layout registered for it
-// (CreatePackageDataVariables in lowerer_package_data.cpp), so the read
-// resolved through no member and answered 0, and the pattern was
-// concatenated in written order rather than placed by member.
 TEST(PackageImportSim, PackageStructVariableMemberReadThroughItsScopedName) {
   EXPECT_EQ(PackageStructRead("  int y;\n"
                               "  initial y = p5::u.b;\n"),
             0xBCDu);
 }
 
-// §26.3 (printed page 810) with §7.2.1 (printed 147): a wildcard import
-// makes the package's u visible under its bare name, the one variable the
-// package declares, so `u.b` reads the same 12'hBCD `p5::u.b` does. The
-// import bound the carrier variable alone, with none of its layout
-// (AliasVariableKinds), so the read resolved through no member and answered
-// 0.
 TEST(PackageImportSim, ImportedPackageStructVariableMemberReadByItsBareName) {
   EXPECT_EQ(PackageStructRead("  import p5::*;\n"
                               "  int y;\n"
@@ -276,15 +206,6 @@ TEST(PackageImportSim, ImportedPackageStructVariableMemberReadByItsBareName) {
             0xBCDu);
 }
 
-// §26.3 (printed page 810) with §11.9 (printed 304): the imported bare u
-// and `p6::u` name the one package variable, which has one tag, so after the
-// module's `u = tagged Other 3;` the read `p6::u.Valid` is inconsistent with
-// Other and is reported at its line, naming the union by the scoped spelling
-// the read used. The retag was recorded under the module's bare name
-// (TagKeyOfName in eval_member_path.cpp) while the read asked under "p6.u"
-// and found the initializer's Valid there, so the 3 was read as Valid
-// unreported; the refused read's x becomes 0 in the 2-state y (§6.11.2),
-// which reads apart from that 3.
 TEST(PackageImportSim,
      ImportedPackageTaggedUnionRetaggedByItsBareNameIsOneTag) {
   SimFixture f;
@@ -315,11 +236,6 @@ TEST(PackageImportSim,
       10, "11.9"));
 }
 
-// §26.3 with §6.8 (Table 6-7, printed page 107): a package variable with no
-// declaration assignment holds its type's default -- 'x for a logic, 0 for
-// an int, "" for a string, 0.0 for a real -- and the one storage is read
-// through the package scope, `P::pl`, and through the bare name a wildcard
-// import binds, `pl`, alike. A package's `logic pl` read 0 both ways.
 TEST(PackageImportSim, UninitializedPackageVariablesHoldTheirTypesDefaults) {
   SimFixture f;
   EXPECT_EQ(
@@ -339,13 +255,6 @@ TEST(PackageImportSim, UninitializedPackageVariablesHoldTheirTypesDefaults) {
       "pl=x pn=0 ps=[] pr=0.000000\nql=x qn=0 qs=[] qr=0.000000\n");
 }
 
-// §26.3 with §6.8: a package variable a wildcard import makes visible is an
-// assignment target by its bare name as by `P::pn`, and the write is an
-// assignment to that variable: `pn = lv` from a 4-state `4'bx1z1` converts
-// as §6.11.2 has a 2-state variable take an unknown, 0101, and `pn = 1.5`
-// rounds as §6.12.1 has a real assigned to an integral variable, 2. The
-// bare write was reported "undeclared identifier 'pn'" (§23.9) while the
-// bare read resolved.
 TEST(PackageImportSim, ImportedPackageVariableIsAnAssignmentTarget) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package P; int pn; endpackage\n"
@@ -367,11 +276,6 @@ TEST(PackageImportSim, ImportedPackageVariableIsAnAssignmentTarget) {
             "a=17 b=17\nc=23 d=23\ne=5\nf=2\n");
 }
 
-// §26.3 with §23.7: a bare name the module's wildcard import supplies to a
-// reference in a generate block is imported into the module, so the block's
-// later declaration of the same name is not what the reference reads or
-// writes. The block reads p::q's 5 and writes 7 to it, and its own q keeps 9.
-// Before, both the read and the write reached the block's q.
 TEST(PackageImportSim, BlockReferenceBeforeItsDeclarationReadsTheImport) {
   SimFixture f;
   EXPECT_EQ(
@@ -388,12 +292,6 @@ TEST(PackageImportSim, BlockReferenceBeforeItsDeclarationReadsTheImport) {
       "r=5\np=7 b=9\n");
 }
 
-// §26.3 with §26.7: a class a package declares is visible to a module only
-// through an import or a scoped name, so in a module that does neither,
-// `semaphore` is std's built-in class: the element constructed with one key
-// gives it up once and then has none. Before, the package's class answered
-// the bare name for the whole run once the modules were lowered, and the
-// element was built as an object of p's class, which has no try_get.
 TEST(PackageImportSim, UnimportedPackageClassLeavesTheBuiltinName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -415,9 +313,6 @@ TEST(PackageImportSim, UnimportedPackageClassLeavesTheBuiltinName) {
             "a=1 b=0\n");
 }
 
-// §26.2: within the package its class is visible by its bare name, so p's
-// method constructs a Node by that name for a module that reaches the class
-// only as p::Node, never importing p.
 TEST(PackageImportSim, PackageClassMethodNamesItsClassBare) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -442,9 +337,6 @@ TEST(PackageImportSim, PackageClassMethodNamesItsClassBare) {
             "v=4\n");
 }
 
-// §26.3 with §3.12.1: a read written before the module's wildcard import is
-// not resolved through it, and the search ends in the compilation unit, whose
-// c holds 7; the read after the import reaches p's c. Both read p's 2 before.
 TEST(PackageImportSim, ReadBeforeTheWildcardImportReachesTheUnitsData) {
   SimFixture f;
   EXPECT_EQ(
@@ -461,10 +353,6 @@ TEST(PackageImportSim, ReadBeforeTheWildcardImportReachesTheUnitsData) {
       "y=7 z=2\n");
 }
 
-// §26.3 with §6.6.7: a net declared with a nettype imported from a package is
-// a net of that nettype, its drivers resolved through the package's function:
-// P's pres ANDs 3 and 5 to 1. The import used to leave the nettype out, and n
-// was elaborated as a variable with no resolution function (#7599).
 TEST(PackageImportSim, NetOfAnImportedNettypeResolvesThroughThePackagesFunc) {
   EXPECT_EQ(RunAndGet("package P;\n"
                       "  function automatic logic [3:0] pres(input logic [3:0] "

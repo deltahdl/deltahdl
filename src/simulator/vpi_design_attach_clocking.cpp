@@ -22,8 +22,6 @@ namespace delta {
 
 namespace {
 
-// §37.48 with §14.3: the vpiDirection of a clocking signal declared
-// `direction`.
 int ClockingDirectionOf(Direction direction) {
   switch (direction) {
     case Direction::kInput:
@@ -37,9 +35,6 @@ int ClockingDirectionOf(Direction direction) {
   }
 }
 
-// §37.48 detail 1 with §14.4: the edge a clocking skew is written with, as
-// vpiInputEdge and vpiOutputEdge report it. The `edge` keyword makes the skew
-// both edges'.
 int EdgeOf(Edge edge) {
   switch (edge) {
     case Edge::kPosedge:
@@ -53,8 +48,6 @@ int EdgeOf(Edge edge) {
   }
 }
 
-// §14.4: one clocking skew - the edge and the delay it is written with, either
-// absent.
 struct Skew {
   Edge edge = Edge::kNone;
   const Expr* delay = nullptr;
@@ -62,25 +55,16 @@ struct Skew {
   bool Written() const { return edge != Edge::kNone || delay != nullptr; }
 };
 
-// Where a clocking block is declared: the scope it stands in - its instance,
-// keyed under `prefix` among the run's `objects`, or a generate block instance
-// of it whose names `gen_prefixes` carries (§27.4) - in which its signals and
-// event resolve.
 struct ClockingSite {
   VpiObject* holder;
   VpiObject* instance;
   const std::string& prefix;
   const VpiObjectMap& objects;
   const std::vector<std::string_view>& gen_prefixes;
-  // §37.83: the instance's table of operator attributes.
   const RtlirNodeAttributes* attrs = nullptr;
-  // §37.42: the instance's module, whose declarations a call written in the
-  // block finds its callee among.
   const RtlirModule* mod = nullptr;
 };
 
-// What a clocking block is built with: its site, the run and the attach, and
-// where a call its expressions make stands (§37.42), none before the block is.
 struct ClockingBuild {
   const ClockingSite& site;
   SimContext& ctx;
@@ -96,10 +80,6 @@ struct ClockingBuild {
   }
 };
 
-// §37.48 detail 1: the delay of `skew` as vpiInputSkew or vpiOutputSkew
-// reaches it from `owner` - the delay expression itself where `bare`, as an io
-// decl's output skew is drawn, and otherwise a delay control over it (§37.68).
-// Null where the skew writes no delay.
 VpiObject* SkewDelay(const Skew& skew, VpiObject* owner, bool bare,
                      const ClockingBuild& with) {
   if (skew.delay == nullptr) return nullptr;
@@ -112,7 +92,6 @@ VpiObject* SkewDelay(const Skew& skew, VpiObject* owner, bool bare,
   return control;
 }
 
-// §37.48 detail 1: `owner`'s input and output skews, `input` and `output`.
 void SetSkews(VpiObject* owner, const Skew& input, const Skew& output,
               const ClockingBuild& with) {
   owner->input_edge = EdgeOf(input.edge);
@@ -122,10 +101,6 @@ void SetSkews(VpiObject* owner, const Skew& input, const Skew& output,
       SkewDelay(output, owner, owner->type == vpiClockingIODecl, with);
 }
 
-// §37.48 detail 4 with §14.3: what a clocking signal stands for - the
-// expression its hierarchical_expression is written as, and otherwise the
-// signal it is named after, found in the scope the block stands in and then in
-// those around it up to its instance.
 VpiObject* SignalTarget(const ClockingSignalDecl& signal,
                         const ClockingBuild& with) {
   if (signal.hier_expr != nullptr) return with.Expression(signal.hier_expr);
@@ -137,10 +112,6 @@ VpiObject* SignalTarget(const ClockingSignalDecl& signal,
   return nullptr;
 }
 
-// §37.48: the io decl of `block` for `signal`, named as declared, reporting
-// its direction, reaching through vpiExpr (detail 4) what it stands for, and
-// with the skews §14.4 gives it - its own where it writes one, and otherwise
-// the block's default for its direction (`input` and `output`).
 void MakeIoDecl(const ClockingSignalDecl& signal, VpiObject* block,
                 const Skew& input, const Skew& output,
                 const ClockingBuild& with) {
@@ -164,11 +135,6 @@ void MakeIoDecl(const ClockingSignalDecl& signal, VpiObject* block,
   SetSkews(decl, kInput, kOutput, with);
 }
 
-// §37.48: the clocking block `item` declares, named as declared, reaching
-// through vpiClockingEvent the event control its clocking event makes, its
-// default skews (detail 1) and an io decl per clocking signal, and marked
-// where §14.12 made it the scope's default clocking or §14.14 its global
-// clocking. Answers the object made.
 VpiObject* MakeClockingBlock(const ModuleItem& item,
                              const ClockingBuild& with) {
   VpiObject* holder = with.site.holder;
@@ -182,12 +148,8 @@ VpiObject* MakeClockingBlock(const ModuleItem& item,
   block->default_clocking = item.is_default_clocking;
   block->global_clocking = item.is_global_clocking;
   holder->children.push_back(block);
-  // §37.42 with §37.12: a call the block's expressions make stands in the
-  // block, a scope of its own.
   const VpiCallStand kStand{block, with.site.mod};
   const ClockingBuild kInBlock{with.site, with.ctx, with.build, &kStand};
-  // A clocking event instantiates no sequence: §16.5.2 marks a sequence event
-  // of an assertion's clock alone (§9.4.2.4).
   const VpiStmtBuild kWith{
       with.build, [&](const Expr* expr) { return kInBlock.Expression(expr); },
       nullptr,    nullptr,
@@ -209,8 +171,6 @@ VpiObject* MakeClockingBlock(const ModuleItem& item,
   return block;
 }
 
-// The generate block instance that declared the clocking block at `index` of
-// `mod`'s clocking blocks, null for one the module declares itself.
 const RtlirGenBlockClocking* GenBlockOf(const RtlirModule& mod,
                                         std::size_t index) {
   for (const RtlirGenBlockClocking& entry : mod.gen_block_clocking) {
@@ -224,11 +184,6 @@ const RtlirGenBlockClocking* GenBlockOf(const RtlirModule& mod,
 void AttachClockingBlocks(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build) {
-  // §37.48 with §37.5, §37.6 and §37.9: a scope reaches the clocking blocks it
-  // declares, and through vpiDefaultClocking and vpiGlobalClocking the one it
-  // named default and the one it named global. A block a generate block
-  // declares is that generate block instance's (§37.12, §27.4), one per
-  // instance, RtlirModule::gen_block_clocking naming which.
   const std::vector<std::string_view> kNoGenPrefixes;
   WalkInstanceObjects(
       design, objects,
@@ -251,7 +206,6 @@ void AttachClockingBlocks(const RtlirDesign* design,
               mod};
           VpiObject* block =
               MakeClockingBlock(*item, ClockingBuild{kSite, ctx, build});
-          // §37.83: the attributes the block is written with.
           VpiAttachAttributes(block, VpiNodeAttributes(mod, item), false, ctx,
                               build);
         }
@@ -261,9 +215,6 @@ void AttachClockingBlocks(const RtlirDesign* design,
 void AttachDefaultDisableIffs(const RtlirDesign* design,
                               const VpiObjectMap& objects, SimContext& ctx,
                               const VpiAttachBuild& build) {
-  // §37.5, §37.6 and §37.9: a scope reaches through vpiDefaultDisableIff the
-  // condition its default disable iff (§16.15) writes, and nothing where none
-  // is in force.
   WalkInstanceObjects(design, objects,
                       [&](const RtlirModule* mod, const std::string& prefix,
                           VpiObject* instance) {

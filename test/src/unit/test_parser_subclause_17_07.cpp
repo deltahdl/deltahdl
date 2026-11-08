@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §17.7: a checker variable may carry an optional rand qualifier, which makes
-// it a free variable. The parser records the qualifier on the declaration.
 TEST(CheckerVariables, RandQualifierMarksCheckerVariable) {
   auto r = Parse(
       "checker chk;\n"
@@ -24,8 +22,6 @@ TEST(CheckerVariables, RandQualifierMarksCheckerVariable) {
   EXPECT_TRUE(saw_rand);
 }
 
-// §17.7: an ordinary (non-rand) checker variable carries no free-variable
-// qualifier.
 TEST(CheckerVariables, PlainCheckerVariableIsNotRand) {
   auto r = Parse(
       "checker chk;\n"
@@ -39,8 +35,6 @@ TEST(CheckerVariables, PlainCheckerVariableIsNotRand) {
   }
 }
 
-// §17.7: a free variable declaration may additionally carry a const qualifier,
-// producing a constant free variable.
 TEST(CheckerVariables, ConstFreeVariableParses) {
   EXPECT_TRUE(
       ParseOk("checker chk;\n"
@@ -48,16 +42,12 @@ TEST(CheckerVariables, ConstFreeVariableParses) {
               "endchecker\n"));
 }
 
-// §17.7: a variable defined in a checker body shall have a static lifetime, so
-// an explicit automatic lifetime on a checker variable is rejected.
 TEST(CheckerVariables, AutomaticCheckerVariableIsIllegal) {
   auto r = Parse(
       "checker chk;\n"
       "  automatic bit flag;\n"
       "endchecker\n");
   ASSERT_NE(r.cu, nullptr);
-  // §6.8 owns the report: the parser rejects `automatic` on any
-  // data_declaration outside a procedural context, checker body included.
   EXPECT_TRUE(ReportedError(r.diags,
                             "'automatic' is not allowed in a data_declaration "
                             "outside a procedural context",

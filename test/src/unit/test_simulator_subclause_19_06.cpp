@@ -33,7 +33,6 @@ TEST(Coverage, CrossCoverageSampling) {
   EXPECT_EQ(g->crosses[0].bins[1].hit_count, 1u);
 }
 
-// Helper: a coverpoint with explicitly-named integral bins.
 static CoverPoint* AddPointWithBins(CoverGroup* g, const std::string& name,
                                     const std::vector<int64_t>& bin_values) {
   auto* cp = CoverageDB::AddCoverPoint(g, name);
@@ -46,8 +45,6 @@ static CoverPoint* AddPointWithBins(CoverGroup* g, const std::string& name,
   return cp;
 }
 
-// LRM 19.6: cross coverage of N coverage points is the Cartesian product of
-// their bins.
 TEST(Coverage, CrossCartesianProduct) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -60,21 +57,18 @@ TEST(Coverage, CrossCartesianProduct) {
   auto* xc = CoverageDB::AddCross(g, std::move(cross));
 
   CoverageDB::AutoCreateCrossBins(g, xc);
-  EXPECT_EQ(xc->bins.size(), 6u);  // 2 * 3
+  EXPECT_EQ(xc->bins.size(), 6u);
 
-  // Sampling a matching combination hits exactly one cross product bin.
   db.Sample(g, {{"a", 1}, {"b", 2}});
   uint64_t total_hits = 0;
   for (const auto& cb : xc->bins) total_hits += cb.hit_count;
   EXPECT_EQ(total_hits, 1u);
 }
 
-// LRM 19.6: no cross product bins are created for coverpoint bins that are
-// default, ignore, or illegal bins.
 TEST(Coverage, CrossExcludesDefaultIgnoreIllegalBins) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
-  auto* a = AddPointWithBins(g, "a", {0});  // one explicit bin
+  auto* a = AddPointWithBins(g, "a", {0});
   CoverBin def;
   def.name = "rest";
   def.kind = CoverBinKind::kDefault;
@@ -85,7 +79,7 @@ TEST(Coverage, CrossExcludesDefaultIgnoreIllegalBins) {
   ign.values = {9};
   CoverageDB::AddBin(a, ign);
 
-  AddPointWithBins(g, "b", {0, 1});  // two explicit bins
+  AddPointWithBins(g, "b", {0, 1});
 
   CrossCover cross;
   cross.name = "aXb";
@@ -93,22 +87,19 @@ TEST(Coverage, CrossExcludesDefaultIgnoreIllegalBins) {
   auto* xc = CoverageDB::AddCross(g, std::move(cross));
 
   CoverageDB::AutoCreateCrossBins(g, xc);
-  // Only the one explicit bin of "a" contributes: 1 * 2 == 2.
   EXPECT_EQ(xc->bins.size(), 2u);
 }
 
-// LRM 19.6: a bare variable used in a cross is given an implicit coverpoint.
 TEST(Coverage, CrossCreatesImplicitCoverpoint) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
-  AddPointWithBins(g, "a", {0, 1});  // "a" already a coverpoint
+  AddPointWithBins(g, "a", {0, 1});
 
   CoverageDB::EnsureCrossCoverPoints(g, {"a", "v"});
-  EXPECT_EQ(g->coverpoints.size(), 2u);  // "v" created implicitly
+  EXPECT_EQ(g->coverpoints.size(), 2u);
   EXPECT_EQ(g->coverpoints.back().name, "v");
 }
 
-// LRM 19.6: cross items must resolve to coverpoints of the same covergroup.
 TEST(Coverage, CrossItemsMustBeInSameGroup) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -119,13 +110,10 @@ TEST(Coverage, CrossItemsMustBeInSameGroup) {
   EXPECT_FALSE(CoverageDB::CrossItemsInSameGroup(g, {"a", "elsewhere"}));
 }
 
-// LRM 19.6: a real variable cannot be crossed directly, but a coverpoint of a
-// real expression can participate.
 TEST(Coverage, CrossRejectsBareRealVariable) {
-  EXPECT_TRUE(CoverageDB::CrossBareVariableAllowed(/*variable_is_real=*/false));
-  EXPECT_FALSE(CoverageDB::CrossBareVariableAllowed(/*variable_is_real=*/true));
+  EXPECT_TRUE(CoverageDB::CrossBareVariableAllowed(false));
+  EXPECT_FALSE(CoverageDB::CrossBareVariableAllowed(true));
 
-  // A coverpoint of a real expression is a coverpoint and may be crossed.
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
   auto* rp = CoverageDB::AddCoverPoint(g, "rexpr");
@@ -133,8 +121,6 @@ TEST(Coverage, CrossRejectsBareRealVariable) {
   EXPECT_TRUE(CoverageDB::CrossItemsInSameGroup(g, {"rexpr"}));
 }
 
-// LRM 19.6: a false cross-level iff guard ignores the whole cross; a false
-// per-bin iff guard ignores just that bin.
 TEST(Coverage, CrossIffGuards) {
   CoverageDB db;
   auto* g = SetupTwoPointCross(db);
@@ -143,21 +129,19 @@ TEST(Coverage, CrossIffGuards) {
   cross.has_iff_guard = true;
   cross.iff_guard_value = false;
   db.Sample(g, {{"a", 0}, {"b", 0}});
-  EXPECT_EQ(cross.bins[0].hit_count, 0u);  // whole cross ignored
+  EXPECT_EQ(cross.bins[0].hit_count, 0u);
 
   cross.iff_guard_value = true;
   cross.bins[0].has_iff_guard = true;
   cross.bins[0].iff_guard_value = false;
   db.Sample(g, {{"a", 0}, {"b", 0}});
-  EXPECT_EQ(cross.bins[0].hit_count, 0u);  // this bin ignored
+  EXPECT_EQ(cross.bins[0].hit_count, 0u);
 
   cross.bins[0].iff_guard_value = true;
   db.Sample(g, {{"a", 0}, {"b", 0}});
-  EXPECT_EQ(cross.bins[0].hit_count, 1u);  // now counted
+  EXPECT_EQ(cross.bins[0].hit_count, 1u);
 }
 
-// LRM 19.6: the cross label provides the cross's name and is the scope that
-// owns the bins defined within the cross.
 TEST(Coverage, CrossLabelNamesAndScopesBins) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -165,20 +149,17 @@ TEST(Coverage, CrossLabelNamesAndScopesBins) {
   AddPointWithBins(g, "b", {0, 1});
 
   CrossCover cross;
-  cross.name = "aXb";  // the label
+  cross.name = "aXb";
   cross.coverpoint_names = {"a", "b"};
   auto* xc = CoverageDB::AddCross(g, std::move(cross));
   CoverageDB::AutoCreateCrossBins(g, xc);
 
-  // The label names the cross, and its bins are reached only through it.
   EXPECT_EQ(xc->name, "aXb");
   EXPECT_EQ(g->crosses.size(), 1u);
   EXPECT_EQ(g->crosses[0].name, "aXb");
   EXPECT_FALSE(g->crosses[0].bins.empty());
 }
 
-// LRM 19.6 (edge case): cross coverage generalizes to more than two coverage
-// points -- the product is taken across all of them.
 TEST(Coverage, CrossCartesianProductThreeWay) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -191,11 +172,9 @@ TEST(Coverage, CrossCartesianProductThreeWay) {
   cross.coverpoint_names = {"a", "b", "c"};
   auto* xc = CoverageDB::AddCross(g, std::move(cross));
   CoverageDB::AutoCreateCrossBins(g, xc);
-  EXPECT_EQ(xc->bins.size(), 12u);  // 2 * 3 * 2
+  EXPECT_EQ(xc->bins.size(), 12u);
 }
 
-// LRM 19.6 (edge case): when a crossed coverpoint contributes no eligible bins
-// -- here it has only an illegal bin -- the whole cross product is empty.
 TEST(Coverage, CrossEmptyWhenCoverpointHasNoEligibleBins) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -204,7 +183,7 @@ TEST(Coverage, CrossEmptyWhenCoverpointHasNoEligibleBins) {
   bad.name = "bad";
   bad.kind = CoverBinKind::kIllegal;
   bad.values = {0};
-  CoverageDB::AddBin(a, bad);  // only an illegal bin contributes nothing
+  CoverageDB::AddBin(a, bad);
   AddPointWithBins(g, "b", {0, 1});
 
   CrossCover cross;
@@ -215,9 +194,6 @@ TEST(Coverage, CrossEmptyWhenCoverpointHasNoEligibleBins) {
   EXPECT_TRUE(xc->bins.empty());
 }
 
-// §19.6: a variable crossed directly gets an implicit coverpoint, as though
-// coverpoint y; had been written, with its two automatic bins; the cross has
-// four products, one of them hit.
 TEST(CovergroupInstanceSim, CrossedVariableGetsImplicitCoverpoint) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

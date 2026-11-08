@@ -11,12 +11,6 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// §38.39 vpi_remove_cb(): removes a simulation-related callback that was
-// registered with vpi_register_cb(). Its argument shall be a handle to the
-// callback object, it returns 1 on success and 0 on failure, and after a
-// successful call the supplied handle is no longer valid. (Registration itself
-// is §38.36 machinery, relied on here but not retested.)
-
 namespace delta {
 namespace {
 
@@ -48,13 +42,9 @@ class VpiRemoveCbSim : public ::testing::Test {
   DiagEngine diag_{mgr_};
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
-  // The variable the value change callbacks removed here are placed on.
   VpiObject watched_;
 };
 
-// §38.39: vpi_remove_cb() shall remove a callback registered with
-// vpi_register_cb(), and shall return 1 (true) on success. A removed callback
-// is no longer delivered when its reason next occurs.
 TEST_F(VpiRemoveCbSim, RemovesRegisteredCallbackAndReturnsOne) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -63,20 +53,15 @@ TEST_F(VpiRemoveCbSim, RemovesRegisteredCallbackAndReturnsOne) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  // While registered, the reason firing delivers the callback.
   ASSERT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 1);
   ASSERT_EQ(g_38_39_fired, 1);
 
   EXPECT_EQ(vpi_remove_cb(h), 1);
 
-  // After removal the same reason no longer delivers it.
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 0);
   EXPECT_EQ(g_38_39_fired, 1);
 }
 
-// §38.39: vpi_remove_cb() removes the specific callback named by its handle.
-// With two callbacks registered for the same reason, removing one leaves the
-// other registered, so the surviving callback still fires.
 TEST_F(VpiRemoveCbSim, RemovesOnlyTheTargetedCallback) {
   s_cb_data cb_a = {};
   cb_a.reason = cbValueChange;
@@ -94,15 +79,11 @@ TEST_F(VpiRemoveCbSim, RemovesOnlyTheTargetedCallback) {
 
   EXPECT_EQ(vpi_remove_cb(ha), 1);
 
-  // Only the survivor (b) is delivered when the reason next occurs.
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbValueChange), 1);
   EXPECT_EQ(g_38_39_fired, 0);
   EXPECT_EQ(g_38_39_fired_other, 1);
 }
 
-// §38.39: the argument shall be a handle to the callback object. A handle to a
-// different kind of object (here a net) is not a callback object, so removal
-// reports failure with 0 (false).
 TEST_F(VpiRemoveCbSim, NonCallbackHandleReturnsZero) {
   sim_ctx_.CreateVariable("n", 8);
   vpi_ctx_.Attach(sim_ctx_);
@@ -113,15 +94,10 @@ TEST_F(VpiRemoveCbSim, NonCallbackHandleReturnsZero) {
   EXPECT_EQ(vpi_remove_cb(net), 0);
 }
 
-// §38.39: the routine shall return 0 (false) on failure; a null argument is not
-// a handle to a callback object.
 TEST_F(VpiRemoveCbSim, NullHandleReturnsZero) {
   EXPECT_EQ(vpi_remove_cb(nullptr), 0);
 }
 
-// §38.39: after vpi_remove_cb() is called with a handle to the callback, the
-// handle is no longer valid. Reusing the now-stale handle for a second removal
-// therefore fails with 0 rather than reporting success again.
 TEST_F(VpiRemoveCbSim, HandleIsNoLongerValidAfterRemoval) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -132,9 +108,6 @@ TEST_F(VpiRemoveCbSim, HandleIsNoLongerValidAfterRemoval) {
   EXPECT_EQ(vpi_remove_cb(h), 0);
 }
 
-// §38.39 with §38.37: a vpi_register_systf() handle is a callback object
-// vpi_register_cb() did not register, so removing it fails and leaves the
-// callbacks vpi_register_cb() registered as they were (#7488).
 TEST_F(VpiRemoveCbSim, ASystfHandleIsNotRemoved) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;

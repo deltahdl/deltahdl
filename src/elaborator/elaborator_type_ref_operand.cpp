@@ -36,19 +36,8 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
-// §6.23: the data type each operand of a comparison of two type references
-// stands for, which the comparison folds by (§6.22.1): a type as written, a
-// name a typedef or a scope's typedef gives, or the self-determined type of an
-// expression.
-
 namespace delta {
 
-// §6.23 with §26.3, §8.23 and §6.25: the type a scope-qualified name in a type
-// reference stands for. A typedef of a parameterized class is specialized,
-// with arguments folded outside any module's scope; a package's or class's
-// typedef is read under its "scope::name" key, or from a class the key misses,
-// one declared inside a module. Nothing where the name resolves to none, or to
-// a type carrying unpacked dimensions, which a data type alone does not hold.
 static std::optional<DataType> ScopedTypeRefType(const DataType& dt,
                                                  const TypedefMap& typedefs,
                                                  const CompilationUnit* unit,
@@ -66,7 +55,6 @@ static std::optional<DataType> ScopedTypeRefType(const DataType& dt,
   return std::nullopt;
 }
 
-// Whether `e` is a scope resolution of one identifier by another, `p::t_s`.
 static bool IsScopedTypeName(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kMemberAccess &&
          e->is_scope_resolution && e->lhs != nullptr &&
@@ -74,28 +62,20 @@ static bool IsScopedTypeName(const Expr* e) {
          e->rhs->kind == ExprKind::kIdentifier;
 }
 
-// Whether `e` is a name written behind a scope: a scope resolution of one
-// identifier by another, `p::v`, or a name behind `$unit::`.
 static bool IsScopedName(const Expr* e) {
   return IsScopedTypeName(e) ||
          (e != nullptr && e->kind == ExprKind::kIdentifier &&
           !e->scope_prefix.empty());
 }
 
-// The data type a type reference names as written, before any name in it is
-// resolved: the one the parser read, or a name standing alone or behind a
-// package's scope. Nothing for a type reference to an expression.
 static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
   if (op->type_value != nullptr) {
-    // The data type the parser read, packed dimensions and signing included:
-    // `type(bit[12:0])` is a 13-bit vector, where its name alone is `bit`.
     return *op->type_value;
   }
   if (!op->text.empty()) return TypeNameToDataType(op->text);
   if (op->lhs && op->lhs->kind == ExprKind::kIdentifier)
     return TypeNameToDataType(op->lhs->text);
   if (!IsScopedTypeName(op->lhs)) return std::nullopt;
-  // `type(p::t_s)` with p a package reads as a scope resolution expression.
   DataType dt;
   dt.kind = DataTypeKind::kNamed;
   dt.scope_name = op->lhs->lhs->text;
@@ -103,16 +83,11 @@ static std::optional<DataType> TypeRefWrittenType(const Expr* op) {
   return dt;
 }
 
-// Whether the type a type reference writes is a name alone, which may name a
-// value rather than a type.
 static bool IsBareName(const DataType& dt) {
   return dt.kind == DataTypeKind::kNamed && dt.scope_name.empty() &&
          dt.packed_dim_left == nullptr && dt.extra_packed_dims.empty();
 }
 
-// The type `dt` stands for once each name it is written by is read through:
-// a built-in type keyword, a typedef, or a package's or class's typedef behind
-// its scope. Nothing where a name resolves to none of them.
 static std::optional<DataType> ThroughTypeNames(DataType dt,
                                                 const TypedefMap& typedefs,
                                                 const CompilationUnit* unit,
@@ -134,8 +109,6 @@ static std::optional<DataType> ThroughTypeNames(DataType dt,
   return dt;
 }
 
-// The function, or the imported DPI function (§35.5.4), named `name` among
-// `items`; an out-of-block class method (§8.24) is its class's.
 static const ModuleItem* FunctionAmong(const std::vector<ModuleItem*>& items,
                                        std::string_view name) {
   auto it = std::ranges::find_if(items, [&](const ModuleItem* item) {
@@ -147,8 +120,6 @@ static const ModuleItem* FunctionAmong(const std::vector<ModuleItem*>& items,
   return it != items.end() ? *it : nullptr;
 }
 
-// §26.3: the package `scoped`, a `p::f` scope resolution, names, and the
-// function or imported DPI function it declares by the name after it.
 static const ModuleItem* PackageFunction(const Expr* scoped,
                                          const CompilationUnit* unit) {
   if (unit == nullptr || scoped == nullptr ||
@@ -164,10 +135,6 @@ static const ModuleItem* PackageFunction(const Expr* scoped,
   return FunctionAmong((*pkg)->items, scoped->rhs->text);
 }
 
-// §13.4.1 with §26.3, §3.12.1 and §35.5.4: the function a call by a bare name
-// reaches: one the module declares or imports from a package, then an
-// imported DPI function the module declares, then a function or imported DPI
-// function of the compilation unit.
 const ModuleItem* ElaboratorOperationRules::BareNamedFunction(
     std::string_view name) const {
   auto it = func_decls_.find(name);
@@ -194,15 +161,11 @@ std::optional<DataType> ElaboratorOperationRules::CalledFunctionType(
   return fn->return_type;
 }
 
-// The arguments a class's unadorned name is written with: none, which makes
-// it the default specialization (§8.25).
 static const std::vector<DataType>& NoArguments() {
   static const std::vector<DataType> kNone;
   return kNone;
 }
 
-// §8.10 with §8.23: a static method called through the class scope operator,
-// `C::f()`, `p::C::f()` or `Outer::Inner::f()`, gives its return type.
 std::optional<DataType> ElaboratorOperationRules::ClassScopedCallType(
     const Expr* scoped) const {
   if (unit_ == nullptr || scoped == nullptr ||
@@ -224,13 +187,10 @@ std::optional<ClassSpecialization> ElaboratorOperationRules::ClassTypeOf(
   if (unit_ == nullptr) return std::nullopt;
   const DataType* at = &type;
   for (int names = 0; names < 16 && at->kind == DataTypeKind::kNamed; ++names) {
-    // §3.12.1: a name no typedef of the module's gives may name a class the
-    // compilation unit declares.
     auto named = typedefs_.find(at->type_name);
     if (!at->scope_name.empty() || class_names_.contains(at->type_name) ||
         named == typedefs_.end()) {
       const ClassDecl* cls = ClassOfDeclaredType(*at, {}, unit_);
-      // §8.26: a class a module declares is no class of the unit's.
       auto in_module = module_classes_.find(at->type_name);
       if (cls == nullptr && at->scope_name.empty() &&
           in_module != module_classes_.end())
@@ -243,9 +203,6 @@ std::optional<ClassSpecialization> ElaboratorOperationRules::ClassTypeOf(
   return std::nullopt;
 }
 
-// §26.3: `type` read behind the package `pkg` where it is written bare by the
-// name of a typedef or a class `pkg` declares, as the typedefs and classes of
-// the package are recorded; `type` as it is otherwise.
 static DataType InPackage(DataType type, const PackageDecl& pkg) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
     return type;
@@ -275,8 +232,6 @@ static std::optional<DeclaredValue> UnitScopeValue(
   return ValueInPackage(*std::move(value), pkg);
 }
 
-// §26.3: the typedef the package `pkg` declares by the name `type` is
-// written with, where `type` is written bare; none otherwise.
 static const ModuleItem* PackageTypedefNamed(const PackageDecl& pkg,
                                              const DataType& type) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty())
@@ -288,10 +243,6 @@ static const ModuleItem* PackageTypedefNamed(const PackageDecl& pkg,
   return found == pkg.items.end() ? nullptr : *found;
 }
 
-// §26.3: the type `written`, which a procedure of the package `pkg` names, as
-// the procedure sees it: the package's own where the package declares it
-// bare, a typedef's unpacked dimensions with it (§7.4); `written` alone where
-// `pkg` is null, the procedure belonging to no package.
 static UnpackedArrayType InProcedurePackage(DataType written,
                                             const PackageDecl* pkg) {
   if (pkg == nullptr) return UnpackedArrayType{std::move(written), {}};
@@ -303,8 +254,6 @@ static UnpackedArrayType InProcedurePackage(DataType written,
   return UnpackedArrayType{InPackage(std::move(written), *pkg), {}};
 }
 
-// §26.2: the package that declares the class `cls` among its items, or none
-// where another scope declares it.
 static const PackageDecl* PackageDeclaring(const ClassDecl* cls,
                                            const CompilationUnit& unit) {
   for (const PackageDecl* pkg : unit.packages) {
@@ -335,12 +284,8 @@ std::optional<UnpackedArrayType> ElaboratorOperationRules::MemberTypeOf(
   } else {
     return std::nullopt;
   }
-  // §26.3: a member of a class a package declares is written in the package,
-  // whose own typedefs and classes its bare type names name.
   if (const PackageDecl* pkg = PackageDeclaring(owned.owner, *unit_))
     written.type = InPackage(written.type, *pkg);
-  // §8.13: a member the class inherits is read in the class declaring it,
-  // specialized by the values the class extending it gives its parameters.
   ClassSpecialization owner = handle;
   while (owner.cls != owned.owner && owner.args != nullptr) {
     owner = {FindBaseClass(owner.cls, unit_),
@@ -369,7 +314,6 @@ std::optional<bool> ElaboratorOperationRules::DataTypesMatch(
   if (class_a && class_b)
     return SameSpecialization(*class_a, *class_b, constants, typedefs_);
   if (class_a || class_b) {
-    // §6.22.1(d): a class matches no type but a class.
     if (!ThroughTypeNames(class_a ? b : a, typedefs_, unit_, arena_))
       return std::nullopt;
     return false;
@@ -384,17 +328,11 @@ std::optional<bool> ElaboratorOperationRules::DataTypesMatch(
 
 std::optional<UnpackedArrayType> ElaboratorOperationRules::TypeRefOperandArray(
     const Expr* op, const RtlirModule* mod) const {
-  // §26.3 with §3.12.1: a name behind a package's scope or `$unit::` that
-  // names a value there, rather than a type, is an expression, standing for
-  // the value's type.
   if (IsScopedName(op->lhs)) {
     if (std::optional<UnpackedArrayType> value = TypeRefArrayType(op->lhs, mod))
       return value;
   }
   std::optional<DataType> written = TypeRefWrittenType(op);
-  // §6.23: a name the module declares a value by -- a net or variable, then a
-  // parameter or an enumeration's named constant -- is an expression,
-  // standing for the value's type, which a typedef or nettype names in turn.
   if (written && IsBareName(*written)) {
     std::optional<UnpackedArrayType> value;
     InOperandScope(mod, [&](const ExprTypeScope& scope) {
@@ -428,8 +366,6 @@ ElaboratorOperationRules::ResolveTypeRefOperandArray(
   if (!written) return std::nullopt;
   UnpackedArrayType array = WithTypedefDims(
       written->element, std::move(written->dims), ArrayTables());
-  // §8.4: a class is a type of its own, which DataTypesMatch matches by the
-  // class and its specialization.
   if (ClassTypeOf(array.element)) return array;
   std::optional<DataType> element =
       ThroughTypeNames(array.element, typedefs_, unit_, arena_);
@@ -445,9 +381,6 @@ std::optional<DataType> ElaboratorOperationRules::ResolveTypeRefOperandType(
   return std::move(array->element);
 }
 
-// §6.20.2: the type a value parameter stands for: the one it is declared
-// with, or, declared with none, real for a real value and otherwise the logic
-// vector of its range or of its final value.
 static DataType ParamValueType(const RtlirParamDecl& param, Arena& arena) {
   if (param.decl_type != nullptr && !param.decl_type_implicit) {
     return *param.decl_type;
@@ -457,9 +390,6 @@ static DataType ParamValueType(const RtlirParamDecl& param, Arena& arena) {
   return VectorType(shape.width, shape.is_signed, true, arena);
 }
 
-// §6.19.3: the type of an enumeration's named constant `name` that `mod`
-// declares: the typedef naming the enumeration, or the enumeration as written
-// where no typedef names it.
 static std::optional<DataType> EnumConstantType(const RtlirModule& mod,
                                                 std::string_view name,
                                                 const TypedefMap& typedefs) {
@@ -472,10 +402,6 @@ static std::optional<DataType> EnumConstantType(const RtlirModule& mod,
   return std::nullopt;
 }
 
-// Where a name an expression in a type reference writes is looked up: the
-// module, the generate blocks in force at the reference with the names their
-// declarations are recorded under, the typedefs, and the arena a parameter's
-// vector type is made in.
 namespace {
 struct ValueLookup {
   const RtlirModule& mod;
@@ -486,11 +412,6 @@ struct ValueLookup {
 };
 }  // namespace
 
-// The value `name` stands for: a net, variable or port, then a value
-// parameter the generate blocks in force see, then an enumeration's named
-// constant, and last a value outside the module, imported from a package or
-// declared by the compilation unit (OuterValue), which a name the module
-// declares hides (§3.12.1, §26.3).
 static std::optional<DeclaredValue> ValueIn(std::string_view name,
                                             const ValueLookup& lookup) {
   const ScopedDeclarations& declarations = lookup.declarations;
@@ -506,7 +427,6 @@ static std::optional<DeclaredValue> ValueIn(std::string_view name,
                ParamVisibleFromScopes(p.gen_block_prefix, declarations.scopes);
       });
   if (param != lookup.mod.params.end()) {
-    // §7.4: a parameter may be an unpacked array, of fixed size.
     DeclaredValue value{ParamValueType(*param, lookup.arena)};
     if (param->unpacked_dims != nullptr) {
       value.dims = *param->unpacked_dims;
@@ -518,15 +438,10 @@ static std::optional<DeclaredValue> ValueIn(std::string_view name,
           EnumConstantType(lookup.mod, name, lookup.typedefs)) {
     return DeclaredValue{*type};
   }
-  // A typedef in force names a type, hiding any outer value of its name.
   if (lookup.typedefs.contains(name)) return std::nullopt;
   return OuterValue(lookup.mod, name, lookup.outer);
 }
 
-// §11.2.1: the constants of `mod` an expression in a type reference may fold
-// a bound or a size against: the generate constants in force, `generate`,
-// over the module's resolved value parameters and its enumerations' named
-// constants.
 static ScopeMap ConstantsIn(const RtlirModule& mod, const ScopeMap& generate) {
   ScopeMap constants = generate;
   for (const RtlirParamDecl& param : mod.params) {
@@ -560,8 +475,6 @@ void ElaboratorOperationRules::InExprTypeScope(
       constants,
       arena_};
   scope.array_tables = &kTables;
-  // §23.9: a name the procedure the reference is written in declares hides
-  // the module's.
   scope.value_named =
       [&](std::string_view name) -> std::optional<DeclaredValue> {
     if (const BlockValue* local = InnermostBlockValue(name))
@@ -703,9 +616,6 @@ std::vector<Expr*> ElaboratorOperationRules::TypeRefUnpackedDims(
   return std::move(array->dims);
 }
 
-// §26.2 with §3.12.1: the constants a package's or the compilation unit's
-// procedure folds against: the unit's, which `all` holds, and those of the
-// package `pkg`, held there under "pkg.name", by their bare names as well.
 static ScopeMap UnitProcedureConstants(const ScopeMap& all,
                                        const PackageDecl* pkg) {
   ScopeMap constants = all;
@@ -718,20 +628,11 @@ static ScopeMap UnitProcedureConstants(const ScopeMap& all,
   return constants;
 }
 
-// §6.23 — a comparison of two type references is a constant expression whose
-// result is true exactly when the referenced types match per §6.22.1 (equality
-// forms yield that truth value; inequality forms its negation). Fold such a
-// comparison to 0/1 so it can drive an elaboration-time selection (e.g. a
-// generate-if). Returns nullopt when this is not a two-type-reference
-// comparison or either operand's type cannot be resolved.
 std::optional<bool> ElaboratorOperationRules::TypeRefsMatch(
     const Expr* a, const Expr* b, const RtlirModule* mod) const {
   std::optional<UnpackedArrayType> type_a = ResolveTypeRefOperandArray(a, mod);
   std::optional<UnpackedArrayType> type_b = ResolveTypeRefOperandArray(b, mod);
   if (!type_a || !type_b) return std::nullopt;
-  // §7.4.2 and §8.25: a fixed-size dimension's bounds and a specialization's
-  // values fold against the module's constants and the generate constants in
-  // force.
   const ScopeMap kConstants =
       mod != nullptr ? ConstantsIn(*mod, gen_const_scope_)
       : type_ref_in_unit_procedure_
@@ -755,9 +656,6 @@ std::optional<int64_t> ElaboratorOperationRules::EvalConstTypeRefCompare(
 
 void ElaboratorOperationRules::ElaborateUnitScopeProcedures() {
   type_ref_in_unit_procedure_ = true;
-  // §6.23: a declaration's reference to an expression takes the expression's
-  // type; one naming nothing the scope types, `type(this)` or a class's type
-  // parameter, is left as written for the run to read.
   const TypeRefResolver kResolve =
       [this](DataType& dt, SourceLoc,
              std::span<const ProceduralLocal> locals) -> std::vector<Expr*> {

@@ -11,20 +11,6 @@
 namespace delta {
 namespace {
 
-// §37.1 names what Clause 37 is for: working with the VPI data models and the
-// diagrams that draw them. Using one begins somewhere, and §37.5 detail 1 says
-// where - the top-level modules are reached by vpi_iterate() with a NULL
-// reference object. An application walks down from there.
-//
-// A design had no such object to reach. The simulator keys an instance's
-// objects on a flat name and a top module carries the empty prefix, so what the
-// attach entered were the top's own contents under their bare names and the top
-// itself was an object of no kind; the iteration that reaches the tops reached
-// none of them, and VpiObject::top_module - read by that iteration's filter and
-// by vpi_get(vpiTopModule) - was written by nothing. So the first step of using
-// the data model against a design took an application nowhere.
-
-// What the application found walking down from the top.
 int g_tops_seen = 0;
 std::string g_top_name;
 int g_top_is_top = 0;
@@ -46,7 +32,6 @@ PLI_INT32 WalkFromTheTopCalltf(PLI_BYTE8*) {
   if (name != nullptr) g_top_name = name;
   g_top_is_top = vpi_get(vpiTopModule, top);
 
-  // The diagrams' one-to-many traversal, from the top to what it holds.
   vpiHandle instances = vpi_iterate(vpiModule, top);
   if (instances != nullptr) {
     while (vpiHandle instance = vpi_scan(instances)) {
@@ -83,8 +68,6 @@ class UsingTheDataModel : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §37.1 with §37.5 detail 1: an application reaches the design's one top module
-// through the NULL-reference iteration, and the top says it is one.
 TEST_F(UsingTheDataModel, AnApplicationReachesTheDesignsTopModule) {
   RegisterWalkProbe();
 
@@ -106,9 +89,6 @@ TEST_F(UsingTheDataModel, AnApplicationReachesTheDesignsTopModule) {
   EXPECT_EQ(g_top_is_top, 1);
 }
 
-// §37.1: using the model is walking it. From the top the application reaches
-// the instance the design elaborates and the net that instance declares, which
-// is the one-to-many traversal §37.4.3 draws with a double arrow.
 TEST_F(UsingTheDataModel, TheWalkGoesDownFromTheTop) {
   RegisterWalkProbe();
 
@@ -127,8 +107,6 @@ TEST_F(UsingTheDataModel, TheWalkGoesDownFromTheTop) {
 
   EXPECT_TRUE(g_reached_instance);
   EXPECT_TRUE(g_reached_net);
-  // §37.5 detail 1: an instance below the top is a module too, and is not one
-  // of the tops - which is what the NULL-reference iteration selects on.
   EXPECT_EQ(g_instance_is_top, 0);
 }
 

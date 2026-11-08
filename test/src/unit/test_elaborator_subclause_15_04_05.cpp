@@ -22,8 +22,6 @@ TEST(MailboxGetElaborator, GetCallElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.5: get() stores the message into its argument, which shall be a
-// valid left-hand expression.
 TEST(MailboxGetElaborator, GetIntoAnOperatorExpressionIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -42,8 +40,6 @@ TEST(MailboxGetElaborator, GetIntoAnOperatorExpressionIsReported) {
       "15.4.5"));
 }
 
-// §15.4.5: the message get() retrieves into is singular, which a variable
-// of an unpacked structure type is not (§6.4).
 TEST(MailboxGetElaborator, GetIntoAnUnpackedStructIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -60,8 +56,6 @@ TEST(MailboxGetElaborator, GetIntoAnUnpackedStructIsReported) {
       "15.4.5"));
 }
 
-// §15.4.5: a variable, a select, a member and a concatenation of variables
-// are valid left-hand expressions to retrieve into.
 TEST(MailboxGetElaborator,
      GetIntoAVariableSelectMemberOrConcatenationElaborates) {
   ElabFixture f;

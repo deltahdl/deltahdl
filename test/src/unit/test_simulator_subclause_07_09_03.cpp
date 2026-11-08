@@ -1,13 +1,3 @@
-// Tests for IEEE 1800-2023 clause 7.9.3 -- the exists() associative array
-// method. exists() checks whether an element is present at the given index and
-// returns 1 if so, otherwise 0. Whether an entry is present is determined by
-// prior element allocation on write (clause 7.8, this pass's dependency), so
-// every test builds the array from real declaration + indexed-assignment source
-// and drives it through parse -> elaborate -> lower -> run, observing the value
-// exists() hands back rather than hand-building the array object. The index is
-// supplied through each dependency's real key syntax: integral keys (7.8.4) and
-// string keys (7.8.2).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -18,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A present integral index reports exists() == 1. The key is allocated by the
-// indexed write, then queried by value.
 TEST(AssocArrayExistsMethod, ReturnsOneForPresentIntKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -34,7 +22,6 @@ TEST(AssocArrayExistsMethod, ReturnsOneForPresentIntKey) {
   EXPECT_EQ(v, 1u);
 }
 
-// An index never written reports exists() == 0 -- the "not present" path.
 TEST(AssocArrayExistsMethod, ReturnsZeroForMissingIntKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -49,8 +36,6 @@ TEST(AssocArrayExistsMethod, ReturnsZeroForMissingIntKey) {
   EXPECT_EQ(v, 0u);
 }
 
-// The membership test is independent of the index data type: a string-keyed
-// array (dependency 7.8.2) reports a present key just the same.
 TEST(AssocArrayExistsMethod, ReturnsOneForPresentStringKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -79,8 +64,6 @@ TEST(AssocArrayExistsMethod, ReturnsZeroForMissingStringKey) {
   EXPECT_EQ(v, 0u);
 }
 
-// Wildcard index type (dependency 7.8.1): exists() reports a present key. The
-// key is allocated by the indexed write and then probed by value.
 TEST(AssocArrayExistsMethod, ReturnsOneForPresentWildcardKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -109,8 +92,6 @@ TEST(AssocArrayExistsMethod, ReturnsZeroForMissingWildcardKey) {
   EXPECT_EQ(v, 0u);
 }
 
-// Class index type (dependency 7.8.3): the index is a class handle produced by
-// a real 'new'. exists() reports the handle under which a value was stored.
 TEST(AssocArrayExistsMethod, ReturnsOneForPresentClassHandleKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -130,8 +111,6 @@ TEST(AssocArrayExistsMethod, ReturnsOneForPresentClassHandleKey) {
   EXPECT_EQ(v, 1u);
 }
 
-// A distinct handle from a separate 'new' is a different key, so exists()
-// reports 0 for a handle under which nothing was stored.
 TEST(AssocArrayExistsMethod, ReturnsZeroForMissingClassHandleKey) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -152,8 +131,6 @@ TEST(AssocArrayExistsMethod, ReturnsZeroForMissingClassHandleKey) {
   EXPECT_EQ(v, 0u);
 }
 
-// Boundary case: querying an array into which nothing has been written yields
-// 0.
 TEST(AssocArrayExistsMethod, ReturnsZeroForEmptyArray) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -165,9 +142,6 @@ TEST(AssocArrayExistsMethod, ReturnsZeroForEmptyArray) {
   EXPECT_EQ(v, 0u);
 }
 
-// exists() is a query: unlike a read or write access (clause 7.8.7), probing an
-// absent index does not allocate an entry. After a false exists() on a key that
-// was never written, the array's live entry count is unchanged.
 TEST(AssocArrayExistsMethod, AbsentQueryDoesNotAllocate) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -184,8 +158,6 @@ TEST(AssocArrayExistsMethod, AbsentQueryDoesNotAllocate) {
   EXPECT_EQ(v, 1u);
 }
 
-// The clause 7.9.3 worked example, present-key path: because "hello" exists,
-// the then-branch runs and increments the entry.
 TEST(AssocArrayExistsMethod, IfConditionTakesThenBranchWhenPresent) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -204,8 +176,6 @@ TEST(AssocArrayExistsMethod, IfConditionTakesThenBranchWhenPresent) {
   EXPECT_EQ(v, 6u);
 }
 
-// The clause 7.9.3 worked example, absent-key path: "hello" does not exist, so
-// exists() is false and the else-branch runs, seeding the entry with 0.
 TEST(AssocArrayExistsMethod, IfConditionTakesElseBranchWhenAbsent) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -223,12 +193,6 @@ TEST(AssocArrayExistsMethod, IfConditionTakesElseBranchWhenAbsent) {
   EXPECT_EQ(v, 7u);
 }
 
-// §7.9.3 on a class property (§8.5 restricts no property's type): the key a
-// method of the class wrote exists and one it did not write does not, read
-// in the method by the property's bare name. This is
-// uvm_report_server::get_severity_count's test before it reads the count.
-// Before the property was known as an array the write went nowhere and both
-// queries answered 0.
 TEST(AssocArrayExistsMethod, ReportsTheKeyAClassMethodWroteAndNotAnother) {
   uint64_t v = RunAndGet(
       "package p;\n"
@@ -255,8 +219,6 @@ TEST(AssocArrayExistsMethod, ReportsTheKeyAClassMethodWroteAndNotAnother) {
   EXPECT_EQ(v, 10u);
 }
 
-// §8.5: the same query through the instance from the module, `o.aa.exists(k)`,
-// sees the entry the method wrote and the one written through the handle.
 TEST(AssocArrayExistsMethod, ReportsThroughAHandleTheKeysAClassPropertyHolds) {
   uint64_t v = RunAndGet(
       "class C;\n"

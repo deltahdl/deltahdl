@@ -48,8 +48,6 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfReturnsDistinctHandles) {
   vpiHandle h1 = vpi_register_systf(&task);
   vpiHandle h2 = vpi_register_systf(&func);
 
-  // §38.37 Returns row: every registration produces its own callback object,
-  // so distinct registrations must hand back distinct, non-null handles.
   ASSERT_NE(h1, nullptr);
   ASSERT_NE(h2, nullptr);
   EXPECT_NE(h1, h2);
@@ -76,9 +74,6 @@ TEST_F(VpiSystfRegistrationSim, RegisterSystfPreservesEverySystfDataField) {
 
   vpi_register_systf(&data);
 
-  // §38.37: systf_data_p points to a s_vpi_systf_data structure as listed in
-  // Figure 38-18. Confirm registration preserves the whole structure shape,
-  // i.e. every Figure 38-18 member survives the call.
   ASSERT_EQ(vpi_ctx_.RegisteredSystfs().size(), 1);
   const auto& stored = vpi_ctx_.RegisteredSystfs()[0];
   EXPECT_EQ(stored.type, vpiSysFunc);

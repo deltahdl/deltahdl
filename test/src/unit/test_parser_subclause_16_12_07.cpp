@@ -23,8 +23,6 @@ ModuleItem* FirstItemOfKind(ParseResult& r, ModuleItemKind kind) {
   return nullptr;
 }
 
-// §16.12.7: the overlapped implication form `sequence_expr |-> property_expr`
-// is accepted at the property level of a concurrent assertion.
 TEST(AssertionSemanticsParsing, OverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -35,9 +33,6 @@ TEST(AssertionSemanticsParsing, OverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.7: the nonoverlapped implication form `sequence_expr |=>
-// property_expr` is likewise accepted at the property level of a concurrent
-// assertion.
 TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -48,11 +43,6 @@ TEST(AssertionSemanticsParsing, NonoverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.7 input form — antecedent operand type: the antecedent of an
-// implication is a sequence_expr, which may be a genuine multi-tick sequence
-// rather than a single sampled boolean. Built here from real §16.7 sequence
-// delay (`##`) syntax with a sequence consequent, the overlapped implication is
-// accepted at the property level of a concurrent assertion.
 TEST(AssertionSemanticsParsing, SequenceAntecedentOverlapImplication) {
   auto r = Parse(
       "module m;\n"
@@ -63,9 +53,6 @@ TEST(AssertionSemanticsParsing, SequenceAntecedentOverlapImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.7 input form — syntactic position: the nonoverlapped implication is
-// accepted at the property level of an `assume property` directive, a distinct
-// property-level position from `assert property`.
 TEST(AssertionSemanticsParsing, NonoverlapImplicationInAssumeProperty) {
   auto r = Parse(
       "module m;\n"
@@ -76,8 +63,6 @@ TEST(AssertionSemanticsParsing, NonoverlapImplicationInAssumeProperty) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssumeProperty));
 }
 
-// §16.12.7 input form — syntactic position: an implication is also accepted at
-// the property level of a `cover property` directive.
 TEST(AssertionSemanticsParsing, OverlapImplicationInCoverProperty) {
   auto r = Parse(
       "module m;\n"
@@ -88,10 +73,6 @@ TEST(AssertionSemanticsParsing, OverlapImplicationInCoverProperty) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kCoverProperty));
 }
 
-// §16.12.7 input form — syntactic position: an implication forms the body
-// property_spec of a named property declaration, another property-level
-// position. The nonoverlapped operator here is built over a real §16.9.2.1
-// clocking event.
 TEST(AssertionSemanticsParsing, ImplicationInNamedPropertyDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -104,10 +85,6 @@ TEST(AssertionSemanticsParsing, ImplicationInNamedPropertyDeclaration) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-// §16.12.7 input form — operand nesting: the consequent of an implication is
-// itself a property_expr, so implications nest (the nested-implication form the
-// LRM discusses). Here the right operand `b |=> c` is a further implication,
-// which the property level accepts.
 TEST(AssertionSemanticsParsing, NestedImplication) {
   auto r = Parse(
       "module m;\n"
@@ -118,14 +95,6 @@ TEST(AssertionSemanticsParsing, NestedImplication) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.12.7: the parser recognizes |-> and |=> as temporal property operators.
-// Production (BodyHasTemporalOperator) classifies a clocked property body
-// containing either operator as a full property spec — skipped to the
-// "<property_spec>" placeholder — rather than as a simple sampled boolean, so
-// seeing that placeholder confirms the operator was recognized. A clocked body
-// with no implication operator takes the simple-boolean path instead, keeping a
-// real parsed expression; contrasting the two shows the classification is
-// driven by the presence of the implication operator.
 TEST(AssertionSemanticsParsing,
      ImplicationOperatorDrivesTemporalClassification) {
   const std::string_view kPlaceholder = "<property_spec>";
@@ -150,8 +119,6 @@ TEST(AssertionSemanticsParsing,
   ASSERT_NE(no->assert_expr, nullptr);
   EXPECT_EQ(no->assert_expr->text, kPlaceholder);
 
-  // Contrast: a clocked property with no implication operator is a simple
-  // sampled boolean, so it is not reduced to the property-spec placeholder.
   auto boolean = Parse(
       "module m;\n"
       "  assert property (@(posedge clk) a && b);\n"

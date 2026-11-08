@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.13.1: the seed selects the sequence and the same seed yields the same
-// sequence every time, whatever integral expression carries it: a literal
-// 254, a parameter of 254, the expression 250 + 4 and a variable holding 254
-// each replay all eight numbers the literal's sequence began with, and 255
-// selects a different sequence, as the design test/src/e2e/urandom_function.sv
-// runs it.
 TEST(UrandomRun, TheSameSeedFromAnyIntegralExpressionReplaysTheSequence) {
   SimFixture f;
   std::string out = RunCapture(
@@ -48,11 +42,6 @@ TEST(UrandomRun, TheSameSeedFromAnyIntegralExpressionReplaysTheSequence) {
   EXPECT_EQ(out, "24 1\n");
 }
 
-// 18.13.1: each call returns a new number, and the number is unsigned and 32
-// bits wide, so 32 consecutive unseeded calls each differ from the last and an
-// assignment of the call to a 64-bit variable leaves the upper 32 bits zero
-// on every one of 32 draws while the top bit of the 32 is set in some, which
-// a signed result would have carried into the upper half.
 TEST(UrandomRun, EachCallIsANewUnsignedThirtyTwoBitNumber) {
   SimFixture f;
   std::string out = RunCapture(

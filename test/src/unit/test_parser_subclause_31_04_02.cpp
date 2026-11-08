@@ -58,8 +58,6 @@ TEST(TimingCheckCommandParsing, TimeskewWithFlags) {
 }
 
 TEST(TimingCheckCommandParsing, TimeskewEventFlagWithoutRemainActiveFlag) {
-  // P1's optional nesting lets event_based_flag appear while remain_active_flag
-  // is omitted; the extended-arg parser must close out after the event flag.
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -76,9 +74,6 @@ TEST(TimingCheckCommandParsing, TimeskewEventFlagWithoutRemainActiveFlag) {
 }
 
 TEST(TimingCheckCommandParsing, TimeskewEmptyNotifierWithFlags) {
-  // Syntax 31-10 leaves each trailing argument independently optional, so the
-  // notifier slot may be an empty (bare-comma) placeholder while the two flags
-  // are still supplied -- the form shown in the subclause's own example.
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -116,8 +111,6 @@ TEST(TimingCheckCommandParsing, TimeskewMissingLimitIsError) {
       "  $timeskew(posedge clk1, posedge clk2);\n"
       "endspecify\n"
       "endmodule\n");
-  // The shared timing-check parser files the missing separator under §31.2, the
-  // system_timing_check production, rather than under §31.4.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
@@ -128,8 +121,6 @@ TEST(TimingCheckCommandParsing, TimeskewEmptyArgListIsError) {
       "  $timeskew();\n"
       "endspecify\n"
       "endmodule\n");
-  // The reference_event's specify_terminal_descriptor is missing, and the
-  // shared terminal parser files that under §30.4.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }

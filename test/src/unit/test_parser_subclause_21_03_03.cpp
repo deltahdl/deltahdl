@@ -50,9 +50,6 @@ TEST(IoSystemTaskParsing, SformatfInExpression) {
               "endmodule\n"));
 }
 
-// §21.3.3 N1: the BNF for string_output_tasks marks the comma-prefixed
-// list_of_arguments as optional. A call carrying only the output variable
-// must still parse.
 TEST(IoSystemTaskParsing, SwriteOutputVarOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -61,8 +58,6 @@ TEST(IoSystemTaskParsing, SwriteOutputVarOnly) {
               "endmodule\n"));
 }
 
-// §21.3.3 N4: $sformatf's list_of_arguments is similarly optional in the BNF,
-// so a call providing just the format string must parse on its own.
 TEST(IoSystemTaskParsing, SformatfFormatOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

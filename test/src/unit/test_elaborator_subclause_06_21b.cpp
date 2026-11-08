@@ -13,10 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §6.21's top_illegal example: in a static procedural block, a variable
-// declared with an initializer states whether it is static or automatic, and
-// `int loop3 = 0;` in a loop body states neither, so it is reported where it is
-// declared and nothing else is.
 TEST(LifetimeIntentElaboration, InitializedLoopLocalInAnInitialReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -40,8 +36,6 @@ TEST(LifetimeIntentElaboration, InitializedLoopLocalInAnInitialReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §6.21's top_legal example: the same loop bodies with `automatic`, run on
-// each iteration, and with `static`, run once, state the intent.
 TEST(LifetimeIntentElaboration, LoopLocalsWithAStatedLifetimeAccepted) {
   EXPECT_TRUE(
       ElabOk("module top_legal;\n"
@@ -58,8 +52,6 @@ TEST(LifetimeIntentElaboration, LoopLocalsWithAStatedLifetimeAccepted) {
              "endmodule\n"));
 }
 
-// A loop local without an initializer has no initialization whose timing is
-// in question, so the rule does not reach it.
 TEST(LifetimeIntentElaboration, UninitializedLoopLocalAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -72,9 +64,6 @@ TEST(LifetimeIntentElaboration, UninitializedLoopLocalAccepted) {
              "endmodule\n"));
 }
 
-// A while loop's body is a loop body as a for loop's is, and a task written
-// with no lifetime in a module that writes none is static, so its loop local
-// with an initializer is reported too.
 TEST(LifetimeIntentElaboration, InitializedLocalInAStaticTaskLoopReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -94,8 +83,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalInAStaticTaskLoopReported) {
                             4, "6.21"));
 }
 
-// An automatic task's variables are automatic by default (§6.21), and so are
-// a `module automatic`'s blocks', so neither loop local needs a keyword.
 TEST(LifetimeIntentElaboration,
      InitializedLoopLocalInAnAutomaticScopeAccepted) {
   EXPECT_TRUE(
@@ -117,9 +104,6 @@ TEST(LifetimeIntentElaboration,
              "endmodule\n"));
 }
 
-// §6.21's top_illegal example also marks `int svar2 = 2;` at the top of an
-// initial block, outside any loop: the block is static, so the declaration
-// shall say whether its initializer runs once or on each entry.
 TEST(LifetimeIntentElaboration, InitializedLocalAtTheTopOfAnInitialReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -138,8 +122,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalAtTheTopOfAnInitialReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §6.21's top_legal example writes the same declaration `static`, and
-// `automatic` states the other intent; either keyword satisfies the rule.
 TEST(LifetimeIntentElaboration, TopLevelLocalsWithAStatedLifetimeAccepted) {
   EXPECT_TRUE(
       ElabOk("module top_legal;\n"
@@ -151,9 +133,6 @@ TEST(LifetimeIntentElaboration, TopLevelLocalsWithAStatedLifetimeAccepted) {
              "endmodule\n"));
 }
 
-// A block parameter is a constant, not a variable (§6.20.1), so §6.21's rule
-// on a variable's initializer does not reach it even though it is written with
-// a value and no lifetime.
 TEST(LifetimeIntentElaboration, BlockParameterWithAValueAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -165,9 +144,6 @@ TEST(LifetimeIntentElaboration, BlockParameterWithAValueAccepted) {
              "endmodule\n"));
 }
 
-// The blocks of a `module automatic` are automatic, and so is an automatic
-// task's body in a module that states no lifetime, so neither declaration
-// needs a keyword.
 TEST(LifetimeIntentElaboration, InitializedLocalsInAutomaticScopesAccepted) {
   EXPECT_TRUE(
       ElabOk("module automatic m;\n"
@@ -185,9 +161,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalsInAutomaticScopesAccepted) {
              "endmodule\n"));
 }
 
-// §18.17 makes a randsequence statement an automatic scope, and each code block
-// within it another, so a code block's initialized local is automatic by
-// default in a static initial block and needs no keyword.
 TEST(LifetimeIntentElaboration,
      InitializedLocalInARandsequenceCodeBlockAccepted) {
   EXPECT_TRUE(
@@ -201,8 +174,6 @@ TEST(LifetimeIntentElaboration,
              "endmodule\n"));
 }
 
-// A function with no lifetime in a module with none is static (§13.4.2), so
-// its initialized local outside any loop is reported as a static task's is.
 TEST(LifetimeIntentElaboration, InitializedLocalInAStaticFunctionReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -220,9 +191,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalInAStaticFunctionReported) {
                             3, "6.21"));
 }
 
-// A class method is automatic (§8.6), both written in its class and defined
-// out of block with the class scope operator, so its initialized local
-// needs no keyword.
 TEST(LifetimeIntentElaboration, InitializedLocalInAClassMethodAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -244,8 +212,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalInAClassMethodAccepted) {
              "endmodule\n"));
 }
 
-// §27.3: an initial block a generate block brings into existence acts as it
-// would in the module, so its initialized local is static and reported.
 TEST(LifetimeIntentElaboration, InitializedLocalInAGenerateIfBlockReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -265,8 +231,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalInAGenerateIfBlockReported) {
                             4, "6.21"));
 }
 
-// The same declaration saying `static`, and one inside a `module automatic`'s
-// generate block, state a lifetime and are accepted.
 TEST(LifetimeIntentElaboration, GenerateBlockLocalsWithALifetimeAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -288,8 +252,6 @@ TEST(LifetimeIntentElaboration, GenerateBlockLocalsWithALifetimeAccepted) {
              "endmodule\n"));
 }
 
-// A task with no lifetime inside a generate-for block of a module with none is
-// static (§13.3.1, §27.3), so its initialized local is reported.
 TEST(LifetimeIntentElaboration, InitializedLocalInAGenerateForTaskReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -309,8 +271,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalInAGenerateForTaskReported) {
                             4, "6.21"));
 }
 
-// An else branch and a case generate arm hold their blocks apart from the
-// construct's own body, so each is reached on its own.
 TEST(LifetimeIntentElaboration, InitializedLocalsInElseAndCaseArmsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -342,8 +302,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalsInElseAndCaseArmsReported) {
                             11, "6.21"));
 }
 
-// A package's function with no lifetime in a package with none is static
-// (§13.4.2), so its initialized local is reported.
 TEST(LifetimeIntentElaboration, InitializedLocalInAPackageFunctionReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -364,9 +322,6 @@ TEST(LifetimeIntentElaboration, InitializedLocalInAPackageFunctionReported) {
                             3, "6.21"));
 }
 
-// A lifetime on the declaration, on the function or on the package makes the
-// package function's initialized local legal, and so does the function being
-// a method of a class the package declares.
 TEST(LifetimeIntentElaboration, PackageLocalsWithALifetimeAccepted) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -401,8 +356,6 @@ TEST(LifetimeIntentElaboration, PackageLocalsWithALifetimeAccepted) {
              "endpackage\n"));
 }
 
-// §6.21 bars a nonblocking assignment to an automatic variable wherever the
-// procedural block holding it stands, a generate block included (§27.3).
 TEST(LifetimeIntentElaboration, GenerateBlockAutoVarNonblockingReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -420,9 +373,6 @@ TEST(LifetimeIntentElaboration, GenerateBlockAutoVarNonblockingReported) {
                             "6.21"));
 }
 
-// The procedural continuous assignments `assign` and `force` to an automatic
-// variable are barred in a generate-for block's initial as they are in the
-// module's, and a blocking assignment to it is not.
 TEST(LifetimeIntentElaboration, GenerateForAutoVarProcContAssignsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -455,13 +405,6 @@ TEST(LifetimeIntentElaboration, GenerateForAutoVarProcContAssignsReported) {
              "endmodule\n"));
 }
 
-// §6.21: a non-static class property lives in an object created at run time,
-// so neither a continuous assignment nor a procedural continuous one, `assign`
-// or `force` in a procedure or a task, may write it, whether the target is the
-// property itself, a select of it, a member of it or one name of a
-// concatenation. A static property belongs to the class and is left alone,
-// whether reached through a handle or the class, as are a structure's member
-// and a name the class does not declare.
 TEST(LifetimeElaboration, ContinuousWriteOfANonStaticPropertyRejected) {
   ElabFixture f;
   Elaborate(

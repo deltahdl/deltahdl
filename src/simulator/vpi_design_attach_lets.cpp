@@ -20,14 +20,10 @@ namespace delta {
 
 namespace {
 
-// Hangs `child` from `holder` where one was made.
 void HangIfMade(VpiObject* holder, VpiObject* child) {
   if (child != nullptr) holder->children.push_back(child);
 }
 
-// What the let decls of a package or the compilation unit are built with:
-// the design, whose operators' attributes it keeps, the objects its names
-// resolve among, the run and the model's allocation.
 struct LetScopeBuild {
   const RtlirDesign& design;
   const VpiObjectMap& objects;
@@ -35,9 +31,6 @@ struct LetScopeBuild {
   const VpiAttachBuild& build;
 };
 
-// The let decls of the lets among `items`, under `scope`, a package or the
-// compilation unit whose objects are keyed under `prefix`, each body's names
-// found first among its formals' stand-ins and then in `scope`.
 void AttachScopeLets(const std::vector<ModuleItem*>& items, VpiObject* scope,
                      const std::string& prefix, const LetScopeBuild& at) {
   const VpiAttachBuild& build = at.build;
@@ -115,7 +108,6 @@ void VpiAttachPackageAndUnitLets(const RtlirDesign& design,
     AttachScopeLets(pkg->items, FindObjectForFlatName(objects, pkg->name),
                     std::string(pkg->name), kAt);
   }
-  // §3.12.1: where each file is a unit, each unit's lets are its own scope's.
   for (std::size_t k = 0; k < design.compilation_units.size(); ++k) {
     const std::string kScope = UnitScopes::ScopeName(static_cast<int>(k));
     AttachScopeLets(design.compilation_units[k]->cu_items,

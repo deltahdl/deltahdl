@@ -23,8 +23,6 @@ constexpr const char* kB = "top.a2";
 
 auto noop_cb = [](const AssertionCallbackArgs&) {};
 
-// §39.4.2: the assertion callback reasons are all defined, distinct, and
-// recognized as assertion callback reasons.
 TEST(AssertionCallback, ReasonConstantsDefinedAndDistinct) {
   int reasons[] = {cbAssertionStart,
                    cbAssertionSuccess,
@@ -51,13 +49,9 @@ TEST(AssertionCallback, ReasonConstantsDefinedAndDistinct) {
       EXPECT_NE(reasons[i], reasons[j]);
     }
   }
-  // A constant from a different subclause is not an assertion callback reason.
   EXPECT_FALSE(AssertionApi::IsAssertionCallbackReason(vpiAssertionSysOff));
 }
 
-// §39.4.2: the registration prototype, callback typedef, and the attempt/step
-// information structures exist with the described shape. A null assertion
-// handle is an error, so the registration entry point returns a NULL handle.
 TEST(AssertionCallback, ApiSurfaceMatchesPrototype) {
   s_vpi_assertion_step_info step{};
   step.matched_expression_count = 0;
@@ -77,9 +71,6 @@ TEST(AssertionCallback, ApiSurfaceMatchesPrototype) {
   EXPECT_EQ(h, nullptr);
 }
 
-// §39.4.2: a successful placement returns a non-null handle; that handle
-// removes the callback (modeling vpi_remove_cb). An empty (invalid) handle
-// errors.
 TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
   AssertionApi api;
   AssertionCallbackHandle h = api.PlaceAssertionCallback(
@@ -89,17 +80,13 @@ TEST(AssertionCallback, PlaceReturnsHandleAndRemovesByHandle) {
 
   EXPECT_TRUE(api.RemoveAssertionCallback(h));
   EXPECT_EQ(api.PlacedCallbackCount(), 0u);
-  // Removing an already-removed handle reports no removal.
   EXPECT_FALSE(api.RemoveAssertionCallback(h));
 
-  // An empty handle is an error: the NULL handle is returned.
   EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionStart, "", vpiAssert, noop_cb,
                                        nullptr),
             0u);
 }
 
-// §39.4.2: an unrecognized reason cannot be placed; the NULL handle is
-// returned.
 TEST(AssertionCallback, UnknownReasonErrorsWithNullHandle) {
   AssertionApi api;
   EXPECT_EQ(api.PlaceAssertionCallback(vpiAssertionSysOff, kA, vpiAssert,
@@ -108,12 +95,6 @@ TEST(AssertionCallback, UnknownReasonErrorsWithNullHandle) {
   EXPECT_EQ(api.PlacedCallbackCount(), 0u);
 }
 
-// §39.4.2: every reason may be placed on a concurrent or immediate assertion,
-// a restrict among the concurrent ones (§16.14); only start, success, and
-// failure may also be placed on a sequence or property instance, the objects
-// of type vpiSequenceInst and vpiPropertyInst; no other handle type bears
-// assertion callbacks, a sequence or property declaration included (#7498,
-// #7499).
 TEST(AssertionCallback, HandleTypeValidity) {
   EXPECT_TRUE(
       AssertionApi::IsReasonValidForHandle(cbAssertionDisable, vpiAssert));
@@ -130,51 +111,36 @@ TEST(AssertionCallback, HandleTypeValidity) {
   EXPECT_TRUE(AssertionApi::IsReasonValidForHandle(cbAssertionFailure,
                                                    vpiPropertyInst));
 
-  // Reasons other than start/success/failure are not valid on a sequence or
-  // property instance.
   EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionDisable,
                                                     vpiSequenceInst));
   EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionStepSuccess,
                                                     vpiPropertyInst));
-  // A declaration is not an instance and accepts no assertion callbacks.
   EXPECT_FALSE(
       AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiSequenceDecl));
   EXPECT_FALSE(
       AssertionApi::IsReasonValidForHandle(cbAssertionSuccess, vpiProperty));
   EXPECT_FALSE(AssertionApi::IsReasonValidForHandle(cbAssertionFailure,
                                                     vpiPropertyDecl));
-  // A non-assertion handle accepts no assertion callbacks.
   EXPECT_FALSE(
       AssertionApi::IsReasonValidForHandle(cbAssertionStart, vpiModule));
 }
 
-// §39.4.2: placing a reason that is invalid for the handle type is rejected
-// with the NULL handle.
 TEST(AssertionCallback, PlaceRejectsReasonInvalidForHandle) {
   AssertionApi api;
   EXPECT_EQ(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiSequenceInst,
                                        noop_cb, nullptr),
             0u);
-  // The same reason is accepted on a concurrent assertion statement.
   EXPECT_NE(api.PlaceAssertionCallback(cbAssertionDisable, kA, vpiAssert,
                                        noop_cb, nullptr),
             0u);
 }
 
-// §39.4.2 (handle-validity, first sentence): every assertion callback reason
-// may be placed on any concurrent OR immediate assertion statement — that is,
-// on an assert, assume, or cover, whether immediate or concurrent, not only on
-// the assert form the other tests exercise. Each admitted statement handle type
-// is a distinct accepting input; every one yields a valid (non-null) placement.
 TEST(AssertionCallback, PlacesOnEveryAssertionStatementHandleType) {
   int handle_types[] = {vpiAssert,          vpiAssume,
                         vpiCover,           vpiImmediateAssert,
                         vpiImmediateAssume, vpiImmediateCover};
   for (int handle_type : handle_types) {
     AssertionApi api;
-    // A control-only reason (never valid on a sequence/property instance)
-    // confirms it is the statement-handle acceptance, not a start/success/
-    // failure carve-out, that admits the placement.
     EXPECT_NE(api.PlaceAssertionCallback(cbAssertionKill, kA, handle_type,
                                          noop_cb, nullptr),
               0u);
@@ -182,9 +148,6 @@ TEST(AssertionCallback, PlacesOnEveryAssertionStatementHandleType) {
   }
 }
 
-// §39.4.2: the callback is specific to the assertion it was placed on (events
-// on a different assertion do not trigger it), and it continues to be called
-// each time the event occurs until it is removed.
 TEST(AssertionCallback, FiresPerAssertionUntilRemoved) {
   AssertionApi api;
   int count = 0;
@@ -195,24 +158,18 @@ TEST(AssertionCallback, FiresPerAssertionUntilRemoved) {
   AssertionAttemptInfo info;
   info.attempt_start_time = 10;
 
-  // An event on a different assertion does not trigger this callback.
   api.DeliverAssertionEvent(kB, cbAssertionStart, 10, info);
   EXPECT_EQ(count, 0);
 
-  // Repeated events on its own assertion call it each time.
   api.DeliverAssertionEvent(kA, cbAssertionStart, 10, info);
   api.DeliverAssertionEvent(kA, cbAssertionStart, 12, info);
   EXPECT_EQ(count, 2);
 
-  // Once removed it is no longer called.
   api.RemoveAssertionCallback(h);
   api.DeliverAssertionEvent(kA, cbAssertionStart, 14, info);
   EXPECT_EQ(count, 2);
 }
 
-// §39.4.2: the callback is supplied the reason, the callback time, the
-// assertion handle, the attempt-info pointer, and the registered user data.
-// attemptStart- Time is the start time of the actual attempt.
 TEST(AssertionCallback, SuppliesFiveArguments) {
   AssertionApi api;
   int reason = 0;
@@ -244,9 +201,6 @@ TEST(AssertionCallback, SuppliesFiveArguments) {
   EXPECT_EQ(seen_user, &user);
 }
 
-// §39.4.2: classification of which reasons carry attempt information. The
-// control and action callbacks carry none; the attempt-outcome and step
-// callbacks do.
 TEST(AssertionCallback, ReasonCarriesAttemptInfoClassification) {
   int no_info[] = {cbAssertionLock,
                    cbAssertionUnlock,
@@ -276,8 +230,6 @@ TEST(AssertionCallback, ReasonCarriesAttemptInfoClassification) {
   }
 }
 
-// §39.4.2: on a control/action callback the attempt-info pointer delivered to
-// the callback is null.
 TEST(AssertionCallback, ControlReasonDeliversNullAttemptInfo) {
   AssertionApi api;
   bool had_info = true;
@@ -294,8 +246,6 @@ TEST(AssertionCallback, ControlReasonDeliversNullAttemptInfo) {
   EXPECT_FALSE(had_info);
 }
 
-// §39.4.2: on a failure callback the attemptStartTime and detail.failExpr are
-// valid.
 TEST(AssertionCallback, FailureDeliversFailExpr) {
   AssertionApi api;
   std::string fail_expr;
@@ -319,11 +269,6 @@ TEST(AssertionCallback, FailureDeliversFailExpr) {
   EXPECT_EQ(attempt_start, 5u);
 }
 
-// §39.4.2 (handle-validity, second sentence): a failure callback placed on a
-// property instance — not only a concurrent/immediate assertion statement — is
-// a valid placement that actually fires and delivers its attempt information.
-// Every other delivery test uses an assertion-statement handle; this observes
-// that the property-instance placement branch yields a live, firing callback.
 TEST(AssertionCallback, FailureCallbackFiresWhenPlacedOnPropertyInstance) {
   AssertionApi api;
   int count = 0;
@@ -339,7 +284,6 @@ TEST(AssertionCallback, FailureCallbackFiresWhenPlacedOnPropertyInstance) {
         }
       },
       nullptr);
-  // The property-instance placement succeeds (non-null handle).
   EXPECT_NE(h, 0u);
 
   AssertionAttemptInfo info;
@@ -352,9 +296,6 @@ TEST(AssertionCallback, FailureCallbackFiresWhenPlacedOnPropertyInstance) {
   EXPECT_EQ(attempt_start, 8u);
 }
 
-// §39.4.2: a placed step callback is invoked for both success and failure
-// steps, and the step exposes the source/destination states and matched
-// expressions. An empty expression set models an unconditional transition.
 TEST(AssertionCallback, StepCallbackFiresForSuccessAndFailure) {
   AssertionApi api;
   int count = 0;
@@ -373,7 +314,6 @@ TEST(AssertionCallback, StepCallbackFiresForSuccessAndFailure) {
       },
       nullptr);
 
-  // A successful, unconditional transition (zero expressions).
   AssertionAttemptInfo success;
   success.step.state_from = 0;
   success.step.state_to = 2;
@@ -384,7 +324,6 @@ TEST(AssertionCallback, StepCallbackFiresForSuccessAndFailure) {
   EXPECT_EQ(last_to, 2);
   EXPECT_EQ(last_exprs, 0u);
 
-  // The same callback also fires on a failure step (state_to 1 is accepting).
   AssertionAttemptInfo failure;
   failure.step.state_from = 2;
   failure.step.state_to = 1;
@@ -395,9 +334,6 @@ TEST(AssertionCallback, StepCallbackFiresForSuccessAndFailure) {
   EXPECT_EQ(last_exprs, 1u);
 }
 
-// §39.4.2 detail a): in a failing transition there shall always be at least one
-// element in the expression array. A malformed failing step is rejected by the
-// validator and fires no callback.
 TEST(AssertionCallback, FailingStepRequiresAtLeastOneExpression) {
   AssertionStepDetail empty;
   EXPECT_FALSE(AssertionApi::IsValidFailingStep(empty));
@@ -411,7 +347,7 @@ TEST(AssertionCallback, FailingStepRequiresAtLeastOneExpression) {
       cbAssertionStepFailure, kA, vpiAssert,
       [&count](const AssertionCallbackArgs&) { ++count; }, nullptr);
 
-  AssertionAttemptInfo bad;  // failing step with no expressions
+  AssertionAttemptInfo bad;
   EXPECT_EQ(api.DeliverAssertionEvent(kA, cbAssertionStepFailure, 10, bad), 0u);
   EXPECT_EQ(count, 0);
 
@@ -422,8 +358,6 @@ TEST(AssertionCallback, FailingStepRequiresAtLeastOneExpression) {
   EXPECT_EQ(count, 1);
 }
 
-// §39.4.2: on a success callback the attempt-info pointer is supplied with a
-// valid attemptStartTime and no failure expression.
 TEST(AssertionCallback, SuccessDeliversAttemptStartTime) {
   AssertionApi api;
   bool had_info = false;
@@ -448,9 +382,6 @@ TEST(AssertionCallback, SuccessDeliversAttemptStartTime) {
   EXPECT_TRUE(fail_expr_empty);
 }
 
-// §39.4.2: attemptStartTime is the start time of the actual attempt and serves
-// as a unique identifier distinguishing the attempts of a given assertion —
-// each delivery carries its own attempt's start time.
 TEST(AssertionCallback, AttemptStartTimeDistinguishesAttempts) {
   AssertionApi api;
   uint64_t first_seen = 0;
@@ -481,8 +412,6 @@ TEST(AssertionCallback, AttemptStartTimeDistinguishesAttempts) {
   EXPECT_NE(first_seen, second_seen);
 }
 
-// §39.4.2: a null handle is the value returned on a placement error; removing
-// with it removes nothing and reports failure, leaving placed callbacks intact.
 TEST(AssertionCallback, RemoveNullHandleReportsNoRemoval) {
   AssertionApi api;
   EXPECT_FALSE(api.RemoveAssertionCallback(0));
@@ -492,15 +421,6 @@ TEST(AssertionCallback, RemoveNullHandleReportsNoRemoval) {
   EXPECT_EQ(api.PlacedCallbackCount(), 1u);
 }
 
-// -----------------------------------------------------------------------------
-// §39.4.2 through its own entry point: vpi_register_assertion_cb() places the
-// callback, the placed routine is called with the five arguments the clause
-// lists, and vpi_remove_cb() removes it by the handle the placement answered
-// with. The rules about which reasons may be placed on which handle are the
-// ones above; these cases observe them reaching a PLI application.
-// -----------------------------------------------------------------------------
-
-// One call of an application's assertion routine, as the routine was handed it.
 struct RecordedAssertionCall {
   PLI_INT32 reason = 0;
   PLI_UINT32 time_high = 0;
@@ -550,9 +470,6 @@ class VpiAssertionCallbackEntry : public ::testing::Test {
   AssertionApi api_;
 };
 
-// §39.4.2: a callback placed without error comes back as a handle to it. The
-// placement reaches the assertion model - one callback stands placed afterwards
-// - and the handle is a callback object.
 TEST_F(VpiAssertionCallbackEntry, PlacementAnswersWithAHandleToTheCallback) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
 
@@ -564,14 +481,6 @@ TEST_F(VpiAssertionCallbackEntry, PlacementAnswersWithAHandleToTheCallback) {
   EXPECT_EQ(api_.PlacedCallbackCount(), 1u);
 }
 
-// §39.4.2: once placed, the application's function is called every time the
-// named event happens on that assertion, and each call hands it these
-// arguments: the reason, a pointer to the time of the callback, the handle for
-// the assertion, a pointer to an attempt information structure, and the user
-// data supplied at registration. On a start callback the attempt information is
-// the attempt's start time. The times here are past the 32-bit boundary, so a
-// routine handed only the low half of either would report a different number
-// from the one the event carried.
 TEST_F(VpiAssertionCallbackEntry, PlacedRoutineIsCalledWithTheFiveArguments) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   PLI_BYTE8 user_data[] = "from the registration";
@@ -597,10 +506,6 @@ TEST_F(VpiAssertionCallbackEntry, PlacedRoutineIsCalledWithTheFiveArguments) {
   EXPECT_EQ(call.user_data, user_data);
 }
 
-// §39.4.2: for the lock, unlock, disable, enable, reset, kill, pass action,
-// fail action, vacuous action and nonvacuous action callbacks there is no
-// attempt information, and the p_vpi_attempt_info pointer handed over is NULL.
-// The routine is still called; what it is handed for the attempt is nothing.
 TEST_F(VpiAssertionCallbackEntry, ReasonsThatCarryNoAttemptInfoPassNull) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionLock,
@@ -617,8 +522,6 @@ TEST_F(VpiAssertionCallbackEntry, ReasonsThatCarryNoAttemptInfoPassNull) {
   EXPECT_EQ(g_assertion_calls[0].user_data, nullptr);
 }
 
-// §39.4.2: each such callback belongs to the one assertion it was placed on,
-// and an event on any other assertion does not set it off.
 TEST_F(VpiAssertionCallbackEntry, ThePlacementIsSpecificToItsAssertion) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   ASSERT_NE(vpi_register_assertion_cb(VpiHandleOf(assertion), cbAssertionStart,
@@ -630,10 +533,6 @@ TEST_F(VpiAssertionCallbackEntry, ThePlacementIsSpecificToItsAssertion) {
   EXPECT_TRUE(g_assertion_calls.empty());
 }
 
-// §39.4.2: a placement that went wrong comes back as a NULL handle. A placement
-// with no assertion to be specific to, one with no routine to call, and one
-// whose reason may not be placed on a handle of that kind are each such an
-// error, and none of them leaves a callback placed.
 TEST_F(VpiAssertionCallbackEntry, ErrorsOnPlacingAnswerWithANullHandle) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   VpiObject module;
@@ -653,10 +552,6 @@ TEST_F(VpiAssertionCallbackEntry, ErrorsOnPlacingAnswerWithANullHandle) {
   EXPECT_EQ(api_.PlacedCallbackCount(), 0u);
 }
 
-// §39.4.2: the handle is what vpi_remove_cb() takes to remove the callback.
-// Removing it takes the placement out of the model, so the event that called
-// the routine before calls nothing after; the handle is spent once, and a
-// second removal through it reports no removal.
 TEST_F(VpiAssertionCallbackEntry, VpiRemoveCbRemovesThePlacedCallback) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   vpiHandle cb = vpi_register_assertion_cb(
@@ -675,9 +570,6 @@ TEST_F(VpiAssertionCallbackEntry, VpiRemoveCbRemovesThePlacedCallback) {
   EXPECT_EQ(vpi_remove_cb(cb), 0);
 }
 
-// §38.39 is what vpi_remove_cb() otherwise is, and an assertion callback's
-// handle is not a row of its table: a simulation callback registered alongside
-// is removed by its own handle and by nothing else.
 TEST_F(VpiAssertionCallbackEntry,
        ASimulationCallbackIsStillRemovedByItsHandle) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
@@ -690,16 +582,11 @@ TEST_F(VpiAssertionCallbackEntry,
       VpiHandleOf(assertion), cbAssertionStart, &RecordAssertionCall, nullptr);
   ASSERT_NE(assertion_cb, nullptr);
 
-  // The assertion callback's handle removes the placement and leaves the
-  // simulation callback registered.
   EXPECT_EQ(vpi_remove_cb(assertion_cb), 1);
   EXPECT_EQ(vpi_remove_cb(sim_cb), 1);
   EXPECT_EQ(vpi_remove_cb(nullptr), 0);
 }
 
-// §39.1: the assertion API answers out of one model per run. A run that
-// installed none still has one - the default - and it is the same one every
-// call reaches.
 TEST_F(VpiAssertionCallbackEntry, TheDefaultModelStandsWhereNoneWasInstalled) {
   EXPECT_EQ(&GetGlobalAssertionApi(), &api_);
 
@@ -709,10 +596,6 @@ TEST_F(VpiAssertionCallbackEntry, TheDefaultModelStandsWhereNoneWasInstalled) {
   EXPECT_EQ(&GetGlobalAssertionApi(), &fallback);
 }
 
-// §20.11 with Table 20-8: a placement records what an assertion control task
-// selects the assertion by. An observed deferred immediate assertion is of
-// Table 20-6's bit 4 and a final deferred one of bit 8, each with the Table
-// 20-7 bit of its directive, so a control naming either reaches its callbacks.
 TEST_F(VpiAssertionCallbackEntry, APlacementRecordsWhatAControlSelectsBy) {
   VpiHandle observed = vpi_ctx_.CreateAssertion(kA, vpiImmediateAssert);
   observed->is_deferred = true;

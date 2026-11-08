@@ -1,9 +1,3 @@
-// §21.4.1 Reading packed data — parse acceptance of the destination forms the
-// subclause adds to the $readmemb / $readmemh memory_name operand: unpacked
-// arrays of packed elements, dynamic arrays, queues, and associative arrays.
-// The subclause defines no BNF of its own (Syntax 21-12 belongs to §21.4);
-// these tests only pin down that each destination form reaches the parser as
-// an ordinary call operand alongside its real declaration syntax.
 #include <gtest/gtest.h>
 
 #include "fixture_program.h"
@@ -12,12 +6,8 @@ using namespace delta;
 
 namespace {
 
-// Descriptive suite name for this file's tests; the underlying fixture is the
-// shared program-parse fixture.
 using ReadmemDestinationParse = ProgramTestParse;
 
-// §21.4.1: a packed-struct element type, a dynamic array, a queue, and an
-// associative array each parse as a $readmem destination.
 TEST_F(ReadmemDestinationParse, PackedDataDestinationFormsParse) {
   auto* unit = Parse(R"(
     module m;
@@ -38,9 +28,6 @@ TEST_F(ReadmemDestinationParse, PackedDataDestinationFormsParse) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §21.4.1: enumerated, wildcard, and string index types on the associative
-// destination all parse; whether the index is integral is judged later, at
-// run time, not by the call grammar.
 TEST_F(ReadmemDestinationParse, AssocIndexTypeFormsParse) {
   auto* unit = Parse(R"(
     module m;
@@ -59,8 +46,6 @@ TEST_F(ReadmemDestinationParse, AssocIndexTypeFormsParse) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §21.4.1 / §21.4: start and finish address arguments follow the container
-// destinations too, in literal and parameter form.
 TEST_F(ReadmemDestinationParse,
        ContainerDestinationsWithAddressArgumentsParse) {
   auto* unit = Parse(R"(

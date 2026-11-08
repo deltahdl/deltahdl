@@ -9,7 +9,6 @@
 using namespace delta;
 namespace {
 
-// The module of `parent`'s instance `name`, or null where it has none.
 const RtlirModule* InstanceNamed(const RtlirModule* parent,
                                  std::string_view name) {
   for (const auto& child : parent->children) {
@@ -106,11 +105,6 @@ TEST(InterfaceInstantiationGrammar, ElaborationMultipleInstances) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-// §25.3: an interface is instantiated hierarchically like a module -- it may
-// carry a parameter override and be instantiated as an array. Mirrors the
-// clause's own example (`myinterface #(100) scalar1(), vector[9:0]();`): one
-// named instance plus a 10-element array yields 11 interface instances, each
-// resolved to the interface with the overridden parameter applied.
 TEST(InterfaceInstantiationGrammar, ParameterOverrideAndInstanceArray) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -220,11 +214,6 @@ TEST(InterfaceDefinitions, NestedInterfaceNotImplicitlyInstantiated) {
   EXPECT_TRUE(outer->children.empty());
 }
 
-// §25.3: interfaces are never implicitly instantiated. When no top module is
-// named and the elaborator roots every uninstantiated design element (§23.3.1),
-// an uninstantiated module becomes a top but an uninstantiated interface does
-// not -- the interface is left out of the auto-top set. Drives the auto-top
-// path directly (auto_top=true), which the explicitly-named-top tests bypass.
 TEST(InterfaceDefinitions, InterfaceExcludedFromAutoTopModules) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -233,18 +222,13 @@ TEST(InterfaceDefinitions, InterfaceExcludedFromAutoTopModules) {
       "endinterface\n"
       "module top;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);
   EXPECT_EQ(design->top_modules[0]->name, "top");
 }
 
-// §25.3: the actual of an interface port connection shall refer to an interface
-// instance. Built from real interface-port syntax (a module with an interface
-// port) and driven through the full pipeline: when the actual names an actual
-// interface instance the elaborator resolves it and roots both children with no
-// diagnostic. Observes the production port-binding check, not the model helper.
 TEST(InterfacePortActual, InterfaceInstanceActualElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -261,14 +245,9 @@ TEST(InterfacePortActual, InterfaceInstanceActualElaborates) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);
-  // top roots the interface instance `bus` and the module instance `s`.
   EXPECT_GE(design->top_modules[0]->children.size(), 2u);
 }
 
-// §25.3: the negative form -- an interface-port actual that does not name an
-// interface instance (here a plain variable) is rejected by the elaborator's
-// port-binding check. Full-pipeline counterpart of the synthetic
-// InterfacePortHierRef/NonInterfaceTargetIsIllegal model below.
 TEST(InterfacePortActual, NonInterfaceActualIsError) {
   ElabFixture f;
   Elaborate(
@@ -282,17 +261,12 @@ TEST(InterfacePortActual, NonInterfaceActualIsError) {
       "  sub s(.p(not_an_iface));\n"
       "endmodule\n",
       f, "top");
-  // The rule that fires is §23.3.3.4, on what an interface port may be
-  // connected to, rather than §25.3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "interface port 'p' must be connected to an "
                             "interface instance or interface port",
                             8, "23.3.3.4"));
 }
 
-// §25.3 lets an interface port's actual be a hierarchical reference to an
-// interface instance, and `h.i` names the instance i the module instance h
-// declares, so it connects the port as i itself would.
 TEST(InterfacePortHierRef, InstanceInAnotherModuleIsConnected) {
   EXPECT_TRUE(
       ElabOk("interface ifc; logic a; endinterface\n"
@@ -301,8 +275,6 @@ TEST(InterfacePortHierRef, InstanceInAnotherModuleIsConnected) {
              "module top; holder h(); user u(h.i); endmodule\n"));
 }
 
-// The reference may reach a modport of the instance, `h.i.mp`, and may step
-// through more than one module instance on its way, `o.h.i`.
 TEST(InterfacePortHierRef, ModportAndDeeperPathsAreConnected) {
   EXPECT_TRUE(
       ElabOk("interface ifc; logic a; modport mp(input a); endinterface\n"
@@ -314,9 +286,6 @@ TEST(InterfacePortHierRef, ModportAndDeeperPathsAreConnected) {
              "endmodule\n"));
 }
 
-// §25.3 with §23.8: the reference may start at the name of the module it is
-// written in, `top.i` in top, which names that module's own interface
-// instance, and reach a modport of it, `top.i.mp` (#7353).
 TEST(InterfacePortHierRef, PathFromTheModulesOwnNameIsConnected) {
   EXPECT_TRUE(
       ElabOk("interface ifc; logic a; modport mp(input a); endinterface\n"
@@ -325,10 +294,6 @@ TEST(InterfacePortHierRef, PathFromTheModulesOwnNameIsConnected) {
              "endmodule\n"));
 }
 
-// §25.3 with §23.6: the reference may be a full path from a top-level module
-// written in a module below it, `top.i` in mid, reaching the top's own
-// interface instance, a modport of it, `top.i.mp`, or an interface instance a
-// module instance of the top holds, `top.h.i` (#7354).
 TEST(InterfacePortHierRef, FullPathFromATopModuleIsConnected) {
   EXPECT_TRUE(
       ElabOk("interface ifc; logic a; modport mp(input a); endinterface\n"
@@ -339,10 +304,6 @@ TEST(InterfacePortHierRef, FullPathFromATopModuleIsConnected) {
              "module top; ifc i(); holder h(); mid m(); endmodule\n"));
 }
 
-// §25.3 requires the reference to land on an interface instance: a path
-// ending at a module instance, `h.k`, or at an array of interface instances,
-// `h.ia`, connects no instance, and nor does a name past a modport,
-// `h.i.mp.a`. Each is refused as §23.3.3.4 refuses any other actual.
 TEST(InterfacePortHierRef, PathNotEndingAtAnInstanceIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -364,9 +325,6 @@ TEST(InterfacePortHierRef, PathNotEndingAtAnInstanceIsRefused) {
   }
 }
 
-// §25.3: the reference shall not resolve through an arrayed instance, whether
-// it selects an element of the array, `h[0].i`, or names the array whole,
-// `h.i`. Each is reported once, under §25.3.
 TEST(InterfacePortHierRef, PathThroughArrayedInstanceIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -390,9 +348,6 @@ TEST(InterfacePortHierRef, PathThroughArrayedInstanceIsRefused) {
   }
 }
 
-// §25.3: the reference shall not resolve through a generate block either, a
-// conditional block's `g.i` or a loop block's `g[1].i`, though the instance
-// each names is one the block declares.
 TEST(InterfacePortHierRef, PathThroughGenerateBlockIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -417,10 +372,6 @@ TEST(InterfacePortHierRef, PathThroughGenerateBlockIsRefused) {
   }
 }
 
-// §25.3: a defparam inside an instance whose port actuals refer to an arrayed
-// interface shall not modify a parameter outside that instance's hierarchy.
-// u is connected to the array ia whole, and v to its element ia[0]; each
-// reaches top.o.P, outside itself, so each is refused and P keeps its value.
 TEST(ArrayedInterfaceDefparam, OutsideTheInstanceIsRefused) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -448,9 +399,6 @@ TEST(ArrayedInterfaceDefparam, OutsideTheInstanceIsRefused) {
   EXPECT_EQ(o->params[0].resolved_value, 1);
 }
 
-// The rule leaves a defparam free within the instance's own hierarchy: u's
-// statement reaching its own instance s, by a name starting from top, takes
-// effect.
 TEST(ArrayedInterfaceDefparam, WithinTheInstanceIsApplied) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -471,10 +419,6 @@ TEST(ArrayedInterfaceDefparam, WithinTheInstanceIsApplied) {
   EXPECT_EQ(s->params[0].resolved_value, 7);
 }
 
-// Syntax 25-1's extern interface header is a prototype as §23.5 describes: the
-// interface ifc defines comes after it with no duplicate definition, an
-// instance resolves to that definition and not the bodiless prototype, and
-// its `.*` takes the prototype's port.
 TEST(InterfaceDefinitions, ExternInterfacePrototypeIsNoDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(

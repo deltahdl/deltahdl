@@ -41,10 +41,6 @@ TEST(NameSpaceSynthesis, PortReintroducedAsNetLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The report comes from the elaborator, at the second declaration, before any
-// graph is built. Naming it is what says the source was stopped by §3.13's
-// compilation-unit name space rule rather than by anything the synthesizer
-// went on to find in a module that reached it in a bad state.
 TEST(NameSpaceSynthesis, DuplicateCuScopeTypedefRejectedBeforeSynth) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

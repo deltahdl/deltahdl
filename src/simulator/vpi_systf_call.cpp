@@ -11,9 +11,6 @@
 #include "parser/ast_expr.h"
 #include "simulator/evaluation.h"
 #include "simulator/sim_context.h"
-// §37.59's vpiRefObj -- the reference an expression naming a variable is --
-// and §37.29's vpiVirtualInterfaceVar are defined in the SystemVerilog VPI
-// header.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_context.h"
@@ -26,17 +23,10 @@
 #include "simulator/vpi_stmt_objects.h"
 #include "simulator/vpi_user.h"
 
-// The object a system task or function call stands as while a PLI application
-// runs for it (§37.42), with the arguments the call site wrote (§36.4), and
-// the systf object a call reaches, which the procedure walk finds too.
-
 namespace delta {
 
 namespace {
 
-// §37.59 with §37.58: the kind of expr an actual naming no variable is: a call
-// of a function a func call, of a system function a sys func call, a literal
-// a constant, and any other expression the operation its operator makes.
 int RunTimeArgumentKind(const Expr& actual) {
   switch (actual.kind) {
     case ExprKind::kCall:
@@ -53,37 +43,12 @@ int RunTimeArgumentKind(const Expr& actual) {
   }
 }
 
-// §37.58: the vpiConstType of a constant the literal `actual` is.
 int RunTimeConstType(const Expr& actual) {
   if (actual.kind == ExprKind::kRealLiteral) return vpiRealConst;
   if (actual.kind == ExprKind::kStringLiteral) return vpiStringConst;
   return vpiIntConst;
 }
 
-// §36.4: one task/function argument as the application reaches it. An actual
-// that names a variable is carried by that variable itself, so a write through
-// vpi_put_value lands where the design will read it and a read sees whatever
-// the design last wrote -- the clause asks for both, giving applications PLI
-// routines that read and write the task/function arguments. Anything else is an
-// expression rather than a name: its value goes into a holder of its own, which
-// reads correctly and which a write cannot carry back to a call site with
-// nowhere to put it.
-//
-// §37.42 detail 8 spells an omitted argument, which a call site writes as an
-// empty position, and VpiMakeEmptyArgument is what sets that shape; it spells
-// the special value null, which the parser reads as a name, as a null
-// constant, which VpiMakeNullArgument sets.
-//
-// `evaluate` is what separates the two periods a call object is built in.
-// §36.8.3 has the calltf called on every execution of its user-defined system
-// task or system function, so an actual that is an expression has
-// a value there and the holder is filled with it. §36.8.2 has the compiletf
-// called when the parse or compile meets the user-defined system task or
-// system function's name, where the design has not run: there
-// is no value to read, and reading one would mean running the source's own
-// functions once per call site before the simulation started, so the holder is
-// left empty and the argument stands for what the source wrote rather than for
-// what it will produce.
 VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
                              SimContext& ctx, Arena& arena, bool evaluate) {
   if (actual == nullptr) {
@@ -99,10 +64,6 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
                         : nullptr;
   if (named != nullptr) {
     arg->type = vpiRefObj;
-    // Expr::text is a view into the source buffer, which does not end where the
-    // identifier does, so the name is copied into the run's arena to be the
-    // standalone string VpiObject::name has to hold. Without the copy
-    // vpi_get_str(vpiName, arg) reported the rest of the source file.
     arg->name = std::string_view(
         arena.AllocString(actual->text.data(), actual->text.size()),
         actual->text.size());
@@ -114,29 +75,11 @@ VpiObject* SystfCallArgument(VpiObject* arg, const Expr* actual,
     if (evaluate) holder->value = EvalExpr(actual, ctx, arena);
     arg->var = holder;
   }
-  // §37.3.5: an application reaches the source's expressions, however complex,
-  // either as arguments of system tasks and functions (§36.4) or by walking the
-  // design hierarchy, and evaluating one can have side effects. This is that
-  // first way, and
-  // VpiObject::has_side_effects is the mark the value, property and relation
-  // routines settle the subclause's rules by. No pass wrote it, so no argument
-  // an application was ever handed was an expression with side effects and
-  // every one of those rules stood over an empty set.
   arg->has_side_effects = VpiSourceExprHasSideEffects(actual);
   arg->size = static_cast<int>(arg->var->value.width);
   return arg;
 }
 
-// §37.61 detail 1: vpiPrefix is non-NULL for an object standing for a source
-// expression or task call that a virtual interface or a clocking block
-// prefixes. A system task or
-// function argument written `vif.sig` is such an expression and `vif` is the
-// virtual interface var prefixing it, so this answers that variable and
-// nullptr for an actual written any other way. It is what decides whether the
-// argument object is built as a dynamically prefixed one at all: nothing in the
-// run ever wrote VpiObject::prefix, so vpi_handle(vpiPrefix, arg) reported NULL
-// for every object any design produced and the whole subclause stood over
-// objects a test had built by hand.
 Variable* DynamicPrefixBaseVar(const Expr* actual, SimContext& ctx) {
   if (actual == nullptr || actual->kind != ExprKind::kMemberAccess) {
     return nullptr;
@@ -146,27 +89,16 @@ Variable* DynamicPrefixBaseVar(const Expr* actual, SimContext& ctx) {
   return ctx.IsVirtualInterfaceVar(base) ? base : nullptr;
 }
 
-// §25.9: the interface member a prefixed argument names, the right side of the
-// member access, which the parser makes a plain name -- the shape the
-// expression evaluator reads such a reference in.
 std::string_view DynamicPrefixFieldName(const Expr* actual) {
   return actual->rhs->text;
 }
 
-// §37.61: what a dynamically prefixed argument is made from. `base` is the
-// virtual interface var the source wrote as the prefix; `member` is the
-// interface instance's variable the named member resolves to; `actual` is the
-// instance the prefix holds at the current simulation time, which §37.61 detail
-// 3 reads as whether the prefix has a corresponding actual. The last two are
-// null exactly while the virtual interface holds null.
 struct DynamicPrefix {
   Variable* base = nullptr;
   Variable* member = nullptr;
   VpiHandle actual = nullptr;
 };
 
-// §25.9: resolve the prefix against the run. An unbound virtual interface
-// denotes no instance, so it reaches neither a member variable nor an actual.
 DynamicPrefix ResolveDynamicPrefix(const Expr* actual, Variable* base,
                                    SimContext& ctx, VpiContext& vpi) {
   DynamicPrefix prefix;
@@ -179,44 +111,27 @@ DynamicPrefix ResolveDynamicPrefix(const Expr* actual, Variable* base,
   return prefix;
 }
 
-// The run's arena is where a string a VpiObject holds has to live: Expr::text
-// is a view into the source buffer, which does not end where the name does, and
-// a joined name is a temporary that the object would outlive.
 std::string_view ArenaName(Arena& arena, const std::string& name) {
   return std::string_view(arena.AllocString(name.data(), name.size()),
                           name.size());
 }
 
-// §37.61 (figure): fill `arg` as the dynamically prefixed object the actual
-// stands for and `prefix` as the object it is prefixed by. The figure draws the
-// vpiPrefix arrow from a simple expression -- §37.58's reference -- to the
-// virtual interface var, and gives the prefixed object the "-> has actual"
-// property that detail 3 answers off the prefix.
 void FillPrefixedArgument(VpiObject* arg, VpiObject* prefix, const Expr* actual,
                           const DynamicPrefix& resolved, Arena& arena) {
   prefix->type = vpiVirtualInterfaceVar;
   prefix->name = ArenaName(arena, std::string(actual->lhs->text));
   prefix->var = resolved.base;
-  // §37.29 (figure, Example 2): vpiActual of a virtual interface var is the
-  // interface instance it holds, and NULL while it holds none.
   prefix->actual = resolved.actual;
 
   arg->type = vpiRefObj;
   arg->name = ArenaName(arena, std::string(actual->lhs->text) + "." +
                                    std::string(DynamicPrefixFieldName(actual)));
   arg->prefix = prefix;
-  // §36.4: an actual that names a variable is carried by that variable itself,
-  // so an application reads and writes the interface instance's own storage. An
-  // unbound prefix names none, and a holder of its own stands where it would.
   arg->var =
       resolved.member != nullptr ? resolved.member : arena.Create<Variable>();
   arg->size = static_cast<int>(arg->var->value.width);
 }
 
-// What one invocation's arguments are built with: the context whose objects
-// they are and that an argument's prefix is resolved against, the run whose
-// variables they name, where their values live, whether their values are read
-// yet, and where an object is allocated.
 struct SystfArgumentBuild {
   VpiContext& vpi;
   SimContext& ctx;
@@ -225,21 +140,11 @@ struct SystfArgumentBuild {
   std::function<VpiObject*()> alloc;
 };
 
-// §36.4: the arguments the call site wrote, held as the call's arguments so
-// §37.42's vpiArgument iteration reaches them. Where the model built an
-// argument for an actual, the argument is the model's (§38.3): the variable
-// an actual names (detail 8), or an expression evaluated whenever an
-// application asks for its value rather than when the call is made (detail
-// 7), its side effects with it (§37.3.5).
 void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
                               const SystfArgumentBuild& build) {
   const std::vector<VpiObject*>& written = call->written_arguments;
   for (std::size_t i = 0; i < call_site.args.size(); ++i) {
     const Expr* actual = call_site.args[i];
-    // §37.61 detail 1: an actual the source prefixed by a virtual interface
-    // is the prefixed object the clause is written about, and it is built as
-    // one rather than as the anonymous expression holder every non-identifier
-    // actual used to become.
     Variable* base = DynamicPrefixBaseVar(actual, build.ctx);
     VpiObject* model = i < written.size() ? written[i] : nullptr;
     if (base == nullptr && model != nullptr) {
@@ -255,8 +160,6 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
           build.arena);
     } else {
       SystfCallArgument(arg, actual, build.ctx, build.arena, build.evaluate);
-      // §37.3.5: an argument written `a[i++]` is written through by no
-      // vpi_put_value().
       if (actual != nullptr) VpiNoteSelectIndexes(arg, actual, build.alloc);
     }
     call->arguments.push_back(arg);
@@ -265,77 +168,35 @@ void AppendSystfCallArguments(VpiObject* call, const Expr& call_site,
 
 }  // namespace
 
-// §37.42: the object standing for one system task or system function call,
-// carrying the arguments the call site wrote and, where the registration is a
-// system function, the storage its return value is written through. Both
-// periods that call a PLI application build one, and `evaluate_args` is the
-// whole of the difference between them: an execution-time call reads each
-// actual's value, a build-period call has none to read.
 VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
                                           const Expr* call_site,
                                           SimContext& ctx, Arena& arena,
                                           bool evaluate_args) {
-  // §37.42 detail 3: the system task or function call a PLI application is run
-  // for, which the application reaches with vpi_handle(vpiSysTfCall, NULL).
-  // Where the model holds the statement making the call, the call is that
-  // object, so the handle the application is given and the one it reaches by
-  // walking the design are one object under §38.3; a call the model holds no
-  // object for stands up an object of its own. Each invocation hangs its own
-  // arguments and value storage on the call.
   VpiObject* call = VpiCallSiteObjectFor(call_site_objects_, call_site,
                                          ctx.ActiveInstancePrefix());
   if (call == nullptr) {
-    // §38.14 with §38.33: such a call is still one call instance from one
-    // invocation to the next, the call site in the instance running it, and
-    // keeps the user data an application associated with it. The map is this
-    // lookup's alone, so the instance's prefix keys it as it stands.
     VpiObject*& made =
         invoked_call_objects_[{call_site, ctx.ActiveInstancePrefix()}];
     if (made == nullptr) {
       made = AllocObject();
-      // A registration is refused without a name (RegisterSystf). A system
-      // task is called only as a statement, which its label alone names
-      // (§37.60 detail 1), so only a system function's call is named after it.
       if (data.type == vpiSysFunc) made->name = std::string_view(data.tfname);
-      // §37.3.3: the call stands for the text its call site was written as.
       VpiRecordWrittenLocation(made, call_site->range.start, ctx);
     }
     call = made;
   }
   call->type = (data.type == vpiSysFunc) ? vpiSysFuncCall : vpiSysTaskCall;
-  // §37.42 with §38.37.1: a system function call's vpiFuncType is the kind of
-  // value its registration says the function returns.
   call->func_type = data.type == vpiSysFunc ? data.sysfunctype : 0;
-  // §37.42 detail 9: the call decompiles to the one the source wrote.
   call->decompile = VpiExprDecompile(call_site);
-  // §37.42 detail 5: every call built here is of a registration an
-  // application made, so it is user-defined, and the figure's arrow reaches
-  // the systf object that registration returned.
   call->user_defined = true;
-  // `data` is a registration ResolveSystf found, one of systfs_.
   call->user_systf =
       systf_objects_[static_cast<std::size_t>(&data - systfs_.data())];
   call->arguments.clear();
 
-  // It is also where a system function's return value is put: vpi_put_value
-  // writes through the object's own storage, so the call carries a variable
-  // of its own for the application to write and for this routine's caller to
-  // read back.
   auto* value_holder = arena.Create<Variable>();
-  // §36.8.1: a sizetf routine answers with the width in bits of the value the
-  // calltf routine returns for the system function, so the holder the
-  // application writes through is that wide. §38.37.1's default is what
-  // SystfResultSizeBits answers where no sizetf is provided: a user-defined
-  // system function of type vpiSizedFunc or vpiSizedSignedFunc then returns 32
-  // bits. A sizetf answering with no bits
-  // at all describes no value, so the default stands rather than a width
-  // nothing can hold.
   int result_bits = SystfResultSizeBits(data);
   auto width = static_cast<uint32_t>(
       result_bits > 0 ? result_bits : kVpiDefaultSizedFuncBits);
   value_holder->value = MakeLogic4VecVal(arena, width, 0);
-  // §38.34 with Annex K.2: a vpiRealFunc returns a real, which the calltf
-  // puts as one and the call reads back as one.
   if (data.type == vpiSysFunc && data.sysfunctype == vpiRealFunc) {
     value_holder->is_real = true;
     value_holder->value.is_real = true;
@@ -343,10 +204,6 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
   call->var = value_holder;
   call->size = static_cast<int>(width);
 
-  // §36.4: the arguments the call site wrote. They are attached before the
-  // routine runs, because the application reads them from inside it. Every
-  // caller hands the call expression it is running (CallRegisteredSystf,
-  // CallCompiletfForSourceCall).
   AppendSystfCallArguments(
       call, *call_site,
       SystfArgumentBuild{*this, ctx, arena, evaluate_args,
@@ -355,15 +212,6 @@ VpiHandle VpiContext::MakeSystfCallObject(const s_vpi_systf_data& data,
 }
 
 void VpiContext::NoteTimeFormatCall(const Expr* call_site, SimContext& ctx) {
-  // §37.82: the clause's one edge reaches the $timeformat() call that
-  // established the active time format, a tf call (§37.42), so where the model
-  // holds the statement making the call, that statement is what stands here
-  // and the handle reached and the one a walk of the design reaches are one
-  // object under §38.3. A call the model builds no statement for stands up an
-  // object of its own, unnamed as a system task's call is (§37.60 detail 1).
-  // Detail 1 reserves NULL for a run where $timeformat() has not been called.
-  // The call the format came from is the most recent, a later one replacing it
-  // as it replaces the format.
   VpiObject* call = VpiCallSiteObjectFor(call_site_objects_, call_site,
                                          ctx.ActiveInstancePrefix());
   if (call == nullptr) {

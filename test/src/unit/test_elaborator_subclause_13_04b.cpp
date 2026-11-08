@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §13.4 rule (a) bars a function from any statement containing `#` or `@`,
-// and a blocking assignment's intra-assignment delay or event control is one
-// the assignment contains: it suspends the calling process (#5919).
 TEST(FunctionElaboration, IntraAssignmentDelayInFunctionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -45,8 +42,6 @@ TEST(FunctionElaboration, IntraAssignmentEventControlInFunctionError) {
       "13.4"));
 }
 
-// A nonblocking assignment's intra-assignment delay is a `#` the statement
-// contains as well.
 TEST(FunctionElaboration, NonblockingIntraAssignmentDelayInFunctionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -63,8 +58,6 @@ TEST(FunctionElaboration, NonblockingIntraAssignmentDelayInFunctionError) {
       "13.4"));
 }
 
-// §13.4.4 lets a fork-join_none in a function hold what a task may, an
-// intra-assignment delay among it.
 TEST(FunctionElaboration, IntraAssignmentDelayUnderJoinNoneAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -81,8 +74,6 @@ TEST(FunctionElaboration, IntraAssignmentDelayUnderJoinNoneAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4 rule (b): a function cannot enable a task, and A.8.2's optional
-// argument list makes `t;` an enable of t (#6424).
 TEST(FunctionElaboration, FunctionEnablingATaskByItsBareNameError) {
   ElabFixture f;
   ElaborateSrc(
@@ -97,8 +88,6 @@ TEST(FunctionElaboration, FunctionEnablingATaskByItsBareNameError) {
                             "function cannot enable a task", 4, "13.4"));
 }
 
-// The same for a task declared in a package or at compilation-unit scope
-// (#6425).
 TEST(FunctionElaboration, FunctionEnablingAPackageOrUnitTaskError) {
   ElabFixture f;
   ElaborateSrc(
@@ -117,10 +106,6 @@ TEST(FunctionElaboration, FunctionEnablingAPackageOrUnitTaskError) {
                             "function cannot enable a task", 6, "13.4"));
 }
 
-// §13.4: a function with an output, inout or ref argument is called neither in
-// an event expression, which an assignment's intra-assignment event control
-// holds (#6429), nor in an expression outside every procedural statement,
-// which a module variable's initializer is (#6430).
 TEST(FunctionElaboration, OutputArgumentCallInIntraAssignmentEventError) {
   ElabFixture f;
   ElaborateSrc(
@@ -152,9 +137,6 @@ TEST(FunctionElaboration, OutputArgumentCallInModuleInitializerError) {
                             4, "13.4"));
 }
 
-// Footnote 25 of Syntax 13-1 and 13-2 bars the specifiers from every task and
-// function that is no method declared in a class, a package's and the
-// compilation unit's among them. These were reported in a module alone.
 TEST(FunctionElaboration, DynamicOverrideOnPackageAndUnitSubroutinesError) {
   ElabFixture f;
   ElaborateSrc(
@@ -178,11 +160,6 @@ TEST(FunctionElaboration, DynamicOverrideOnPackageAndUnitSubroutinesError) {
   EXPECT_TRUE(ReportedError(diags, kFunction, 5, "13.4"));
 }
 
-// The same footnote reaches a definition written outside its class (§8.24) or
-// through an interface prefix (§25.7): the class's own prototype carries the
-// specifiers, and §8.20's Example 3 has the external definition declare none.
-// So `C::f5` and `b.put` are reported, while C's prototypes and `C::f6`, which
-// writes none, are not. Each definition's prefix exempted it.
 TEST(FunctionElaboration, DynamicOverrideOnOutOfBlockDefinitionError) {
   ElabFixture f;
   ElaborateSrc(

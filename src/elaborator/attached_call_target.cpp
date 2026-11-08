@@ -21,7 +21,6 @@ bool IsSubroutineKind(ModuleItemKind kind) {
          kind == ModuleItemKind::kDpiImport;
 }
 
-// The task, function or DPI-imported subroutine named `name` among `items`.
 const ModuleItem* SubroutineAmong(const std::vector<ModuleItem*>& items,
                                   std::string_view name) {
   const auto kFound =
@@ -31,8 +30,6 @@ const ModuleItem* SubroutineAmong(const std::vector<ModuleItem*>& items,
   return kFound == items.end() ? nullptr : *kFound;
 }
 
-// The items of the package the unit declares as `name`; none where it
-// declares no such package.
 const std::vector<ModuleItem*>& PackageItems(const CompilationUnit& unit,
                                              std::string_view name) {
   static const std::vector<ModuleItem*> kNone;
@@ -42,8 +39,6 @@ const std::vector<ModuleItem*>& PackageItems(const CompilationUnit& unit,
   return kNone;
 }
 
-// §26.3: the subroutine `name` that an import among `items` makes visible,
-// `import p::name;` or `import p::*;` of a package declaring it.
 const ModuleItem* ImportedSubroutine(const std::vector<ModuleItem*>& items,
                                      std::string_view name,
                                      const CompilationUnit& unit) {
@@ -60,7 +55,6 @@ const ModuleItem* ImportedSubroutine(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// §8.13: the method `name` of `cls` or of a class it extends.
 const ModuleItem* MethodOf(const ClassDecl* cls, std::string_view name,
                            const CompilationUnit& unit) {
   for (; cls != nullptr; cls = FindBaseClass(cls, &unit)) {
@@ -73,8 +67,6 @@ const ModuleItem* MethodOf(const ClassDecl* cls, std::string_view name,
   return nullptr;
 }
 
-// The class whose handle the variable `name` among `items` is declared to
-// hold; null where `name` is no variable there or its type names no class.
 const ClassDecl* HandleClassOf(const std::vector<ModuleItem*>& items,
                                std::string_view name,
                                const CompilationUnit& unit) {
@@ -86,8 +78,6 @@ const ClassDecl* HandleClassOf(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// §23.6: the items of the module or interface the unit declares as `name`;
-// none where it declares neither.
 const std::vector<ModuleItem*>& ElementItems(const CompilationUnit& unit,
                                              std::string_view name) {
   static const std::vector<ModuleItem*> kNone;
@@ -100,9 +90,6 @@ const std::vector<ModuleItem*>& ElementItems(const CompilationUnit& unit,
   return kNone;
 }
 
-// §23.6: the items of the module or interface the hierarchical name `path`
-// names an instance of from `decl`: an instance `decl` declares, u, or one
-// within it, u.w; none where `path` names no instance.
 const std::vector<ModuleItem*>& InstanceItems(const Expr& path,
                                               const ModuleDecl& decl,
                                               const CompilationUnit& unit) {
@@ -120,7 +107,6 @@ const std::vector<ModuleItem*>& InstanceItems(const Expr& path,
                                 : (*kInstance)->inst_module);
 }
 
-// §23.9 and §26.3: the subroutine a name alone calls from `decl`.
 const ModuleItem* NamedSubroutine(std::string_view name, const ModuleDecl& decl,
                                   const CompilationUnit& unit) {
   if (const ModuleItem* own = SubroutineAmong(decl.items, name)) return own;

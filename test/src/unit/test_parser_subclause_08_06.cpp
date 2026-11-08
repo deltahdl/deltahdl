@@ -112,10 +112,6 @@ TEST(ObjectMethodParsing, TaskStaticLifetimeError) {
       r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
 
-// §8.24 lets a method's body be written outside its class, and that body is
-// the class's method, so §8.6 refuses it a static lifetime as it refuses one
-// written in the class. A task defined for an interface by a dotted name
-// (§25.7) is no class method and keeps the lifetime it is written with.
 TEST(ObjectMethodParsing, OutOfBlockStaticLifetimeIsReported) {
   auto r = Parse(
       "class C;\n"

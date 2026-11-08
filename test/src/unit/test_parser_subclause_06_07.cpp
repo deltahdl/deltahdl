@@ -149,8 +149,6 @@ TEST(Strength1Keywords, EachKeyword) {
 }
 
 TEST(ChargeStrengthSyntax, NonTriregKeywordRejectsChargeStrength) {
-  // §6.3.2.1 owns the rule that only trireg carries a charge strength, and it
-  // is where Parser::ParseNetStrength files the report.
   static constexpr std::string_view kMessage =
       "charge strength can only be used with trireg nets";
   auto wire_small = Parse("module m; wire (small) w; endmodule\n");

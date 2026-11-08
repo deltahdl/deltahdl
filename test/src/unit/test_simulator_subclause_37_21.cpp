@@ -13,24 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.21 Variable drivers and loads: the vpiDriver and vpiLoad edges relate a
-// variable to the objects that drive it and the objects that read it. A driver
-// is a port, a force, a continuous assignment (whole or single bit), or a
-// procedural assignment statement; a load is the same set without a port, since
-// a port only drives. The figure's structural edge and §37.21's two details are
-// exercised here through the public iterate/scan API:
-//   figure   - vpiDriver/vpiLoad reach the driver/load object kinds, and a port
-//              counts only as a driver;
-//   detail 1 - for a structure, union, or class variable the relation also
-//              includes the drivers/loads of any bit/part-select of the
-//              variable and of any member nested inside it;
-//   detail 2 - the variable-array recommendation is a "should", carrying no
-//              enforced behaviour, so it is not exercised here.
-
-// Figure: vpiDriver on a variable reaches every kind of driver object - a port,
-// a force, a continuous assignment, a single bit of a continuous assignment,
-// and a procedural assignment statement, each one whose target is the
-// variable - while skipping children that are neither.
 TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
   VpiContext ctx;
 
@@ -66,10 +48,6 @@ TEST(VariableDriversAndLoads, DriverIterationReachesEveryDriverKind) {
   EXPECT_FALSE(VpiIterationContains(drivers, &unrelated));
 }
 
-// Figure: vpiLoad reaches the load object kinds but never a port. A port drives
-// a variable only, so even though the variable carries one it is left out of
-// the load iteration while the force, continuous assignment, and assignment
-// statement are reported.
 TEST(VariableDriversAndLoads, LoadIterationExcludesPorts) {
   VpiContext ctx;
 
@@ -101,24 +79,18 @@ TEST(VariableDriversAndLoads, LoadIterationExcludesPorts) {
   EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
 }
 
-// Detail 1: a structure variable's vpiDriver iteration includes the driver of
-// the whole variable, the driver of a bit/part-select of it, and the driver of
-// a member nested inside it - all three categories the detail enumerates.
 TEST(VariableDriversAndLoads, AggregateDriverIncludesSelectsAndMembers) {
   VpiContext ctx;
 
-  // Whole-variable driver.
   VpiObject whole_driver;
   whole_driver.type = vpiContAssign;
 
-  // Driver reached through a part-select of the variable.
   VpiObject select_driver;
   select_driver.type = vpiForce;
   VpiObject part_select;
   part_select.type = vpiPartSelect;
   part_select.children = {&select_driver};
 
-  // Driver reached through a nested member of the variable.
   VpiObject member_driver;
   member_driver.type = vpiAssignStmt;
   VpiObject member;
@@ -140,9 +112,6 @@ TEST(VariableDriversAndLoads, AggregateDriverIncludesSelectsAndMembers) {
   EXPECT_TRUE(VpiIterationContains(drivers, &member_driver));
 }
 
-// Detail 1 (load side, class variable): the load of a member nested inside a
-// class variable is included, while the figure's port exclusion still holds
-// even for a port attached to that nested member.
 TEST(VariableDriversAndLoads, AggregateLoadIncludesNestedMembersNotPorts) {
   VpiContext ctx;
 
@@ -171,10 +140,6 @@ TEST(VariableDriversAndLoads, AggregateLoadIncludesNestedMembersNotPorts) {
   EXPECT_FALSE(VpiIterationContains(loads, &member_port));
 }
 
-// Detail 1 is scoped to structure/union/class variables: a plain
-// (non-aggregate) variable contributes only its own direct drivers. A driver
-// sitting under a select child of such a variable is not reached, so the
-// descent behaviour does not leak into ordinary variables.
 TEST(VariableDriversAndLoads, NonAggregateVariableDoesNotDescend) {
   VpiContext ctx;
 
@@ -200,20 +165,12 @@ TEST(VariableDriversAndLoads, NonAggregateVariableDoesNotDescend) {
   EXPECT_FALSE(VpiIterationContains(drivers, &select_driver));
 }
 
-// Detail 1 (union variable, nested aggregate member): the rule names structure,
-// union, and class variables alike. A union variable's vpiDriver iteration
-// therefore descends too, and because a member may itself be an aggregate the
-// descent recurses: the driver of a logic var nested inside a structure member
-// of the union is reached, alongside the whole-union driver.
 TEST(VariableDriversAndLoads, UnionDriverDescendsThroughNestedAggregateMember) {
   VpiContext ctx;
 
-  // Whole-variable driver on the union.
   VpiObject whole_driver;
   whole_driver.type = vpiContAssign;
 
-  // A structure member of the union, itself holding a member with a driver, so
-  // reaching it requires the descent to recurse past the first member level.
   VpiObject deep_driver;
   deep_driver.type = vpiForce;
   VpiObject inner_member;
@@ -236,13 +193,6 @@ TEST(VariableDriversAndLoads, UnionDriverDescendsThroughNestedAggregateMember) {
   EXPECT_TRUE(VpiIterationContains(drivers, &deep_driver));
 }
 
-// Detail 2: a variable array's vpiDrivers and vpiLoads take in the drivers and
-// loads of the whole array or vector and of every part of it a handle can be
-// had to. A var select is that portion (§37.19), so an array variable's
-// vpiDriver iteration reaches the driver of the element a select names
-// alongside the driver of the whole array. Only the detail 1 arm was applied,
-// so an array was walked as an ordinary variable and reported the whole-array
-// driver alone.
 TEST(VariableDriversAndLoads, ArrayDriverIncludesTheDriverOfAPortionOfIt) {
   VpiContext ctx;
 
@@ -268,9 +218,6 @@ TEST(VariableDriversAndLoads, ArrayDriverIncludesTheDriverOfAPortionOfIt) {
   EXPECT_TRUE(VpiIterationContains(drivers, &element_driver));
 }
 
-// Detail 2 on the load side, and on the vector the detail names beside the
-// array: a packed array variable is that vector, and the load of a part-select
-// of it is a load of a portion a handle can be obtained for.
 TEST(VariableDriversAndLoads, PackedArrayLoadIncludesAPartSelectsLoad) {
   VpiContext ctx;
 
@@ -296,10 +243,6 @@ TEST(VariableDriversAndLoads, PackedArrayLoadIncludesAPartSelectsLoad) {
   EXPECT_TRUE(VpiIterationContains(loads, &portion_load));
 }
 
-// Figure: an assignment hung on both what it writes and what it reads drives
-// only the first and loads only the second, the side naming a variable
-// deciding which it is, through a concatenation it writes and an operation it
-// reads alike (#7021).
 TEST(VariableDriversAndLoads, AnAssignmentDrivesItsTargetAndLoadsWhatItReads) {
   VpiContext ctx;
 
@@ -329,8 +272,6 @@ TEST(VariableDriversAndLoads, AnAssignmentDrivesItsTargetAndLoadsWhatItReads) {
   EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &read)).size(), 1u);
 }
 
-// Figure: an assignment drives a variable through the target it writes, so
-// one hung on the variable with no target drives nothing.
 TEST(VariableDriversAndLoads, AnAssignmentWithNoTargetDrivesNothing) {
   VpiContext ctx;
   VpiObject assign_stmt;
@@ -341,9 +282,6 @@ TEST(VariableDriversAndLoads, AnAssignmentWithNoTargetDrivesNothing) {
   EXPECT_TRUE(CollectVpiIteration(ctx, ctx.Iterate(vpiDriver, &var)).empty());
 }
 
-// §37.19 with §37.17 detail 5: a select through another, m[i][j], holds its
-// own index j as its index and reaches the outer index i only among its
-// children, and an assignment reading it is a load of both indices.
 TEST(VariableDriversAndLoads, ReadingASelectThroughASelectLoadsBothIndices) {
   VpiContext ctx;
   VpiObject i;
@@ -371,9 +309,6 @@ TEST(VariableDriversAndLoads, ReadingASelectThroughASelectLoadsBothIndices) {
   EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &j)).size(), 1u);
 }
 
-// Figure: the expression {v[k], f(k), u} is a load of u past a bit select and
-// a call reading other variables, of v through the select and of k through
-// the select's index.
 TEST(VariableDriversAndLoads, AnExpressionIsALoadPastASelectAndACall) {
   VpiContext ctx;
   VpiObject v;
@@ -404,11 +339,8 @@ TEST(VariableDriversAndLoads, AnExpressionIsALoadPastASelectAndACall) {
   EXPECT_EQ(CollectVpiIteration(ctx, ctx.Iterate(vpiLoad, &k)).size(), 1u);
 }
 
-// §37.21 against a design read and run whole.
 class VariableDriversOfARun : public VpiDesignRun {
  protected:
-  // The kinds of the objects `ref` reaches through `type`, in ascending
-  // order, since the iteration fixes none.
   static std::vector<int> KindsOf(int type, vpiHandle ref) {
     std::vector<int> kinds;
     vpiHandle it = ref == nullptr ? nullptr : vpi_iterate(type, ref);
@@ -436,8 +368,6 @@ class VariableDriversOfARun : public VpiDesignRun {
       "endmodule\n";
 };
 
-// Figure: `assign v = a` drives v and loads a, and is no load of v and no
-// driver of a (#7021); `force g = v | a` loads both through its operation.
 TEST_F(VariableDriversOfARun, AContinuousAssignmentDrivesOnlyItsTarget) {
   Run(kDesign);
   EXPECT_EQ(KindsOf(vpiDriver, By("top.v")), std::vector<int>{vpiContAssign});
@@ -447,32 +377,23 @@ TEST_F(VariableDriversOfARun, AContinuousAssignmentDrivesOnlyItsTarget) {
             (std::vector<int>{vpiAssignStmt, vpiContAssign, vpiForce}));
 }
 
-// Figure: a procedural assign and a force drive the variables they write
-// (#7022).
 TEST_F(VariableDriversOfARun, AnAssignStmtAndAForceDriveTheirTargets) {
   Run(kDesign);
   EXPECT_EQ(KindsOf(vpiDriver, By("top.f")), std::vector<int>{vpiAssignStmt});
   EXPECT_EQ(KindsOf(vpiDriver, By("top.g")), std::vector<int>{vpiForce});
 }
 
-// Figure: an input port drives the variable inside its instance, and an
-// output port the variable its connection names (#7023). The input is
-// declared `var`, since an input of a data type alone is a net (§23.2.2.3).
 TEST_F(VariableDriversOfARun, APortDrivesTheVariableItConnects) {
   Run(kDesign);
   EXPECT_EQ(KindsOf(vpiDriver, By("top.u.i")), std::vector<int>{vpiPort});
   EXPECT_EQ(KindsOf(vpiDriver, By("top.q")), std::vector<int>{vpiPort});
 }
 
-// Detail 1: `assign s.a = 1'b1` drives the structure variable s (#7024).
 TEST_F(VariableDriversOfARun, AnAssignmentToAMemberDrivesTheStructure) {
   Run(kDesign);
   EXPECT_EQ(KindsOf(vpiDriver, By("top.s")), std::vector<int>{vpiContAssign});
 }
 
-// Detail 2: a force reading a select through another select, m[i][j], is a
-// load of the array both selects are taken from, reached from the outer select
-// through the inner one.
 TEST_F(VariableDriversOfARun, AForceReadingASelectThroughASelectLoadsTheArray) {
   Run("module top;\n"
       "  logic m [0:1][0:1];\n"
@@ -482,10 +403,6 @@ TEST_F(VariableDriversOfARun, AForceReadingASelectThroughASelectLoadsTheArray) {
   EXPECT_EQ(KindsOf(vpiLoad, By("top.m")), std::vector<int>{vpiForce});
 }
 
-// Detail 2: an array takes in the drivers and loads of its parts, and a
-// variable a select of it reads as its index is none of them, so the force
-// on i drives nothing of m, `assign o2 = i` is no load of m, and
-// `assign o = m[i]` is reached once (#8167).
 TEST_F(VariableDriversOfARun, AnArrayTakesInNothingOfItsSelectsIndices) {
   Run("module top;\n"
       "  logic m [0:1];\n"
@@ -498,9 +415,6 @@ TEST_F(VariableDriversOfARun, AnArrayTakesInNothingOfItsSelectsIndices) {
   EXPECT_EQ(KindsOf(vpiDriver, By("top.m")), std::vector<int>{});
 }
 
-// Figure: a call reads what its arguments read, so a continuous assignment
-// passing a variable to a function or a system function is a load of it
-// (#8168).
 TEST_F(VariableDriversOfARun, AnAssignmentLoadsWhatACallsArgumentsRead) {
   Run("module top;\n"
       "  function automatic logic f(logic a); return a; endfunction\n"
@@ -512,9 +426,6 @@ TEST_F(VariableDriversOfARun, AnAssignmentLoadsWhatACallsArgumentsRead) {
   EXPECT_EQ(KindsOf(vpiLoad, By("top.u")), std::vector<int>{vpiContAssign});
 }
 
-// Figure: a force loads what the index of a select, the base of an indexed
-// part select, the indices of a select through another and a call's argument
-// read, each variable among them (#8166).
 TEST_F(VariableDriversOfARun, AForceLoadsWhatItsIndicesAndArgumentsRead) {
   Run("module top;\n"
       "  function automatic logic f(logic a); return a; endfunction\n"

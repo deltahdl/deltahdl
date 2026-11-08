@@ -64,11 +64,6 @@ TEST(PassByValueSim, TaskInputArgNotVisibleOutside) {
   LowerRunAndCheck(f, design, {{"x", 7u}, {"y", 107u}});
 }
 
-// C1 in the task syntactic position: a task argument written with no direction
-// qualifier defaults to input and is therefore passed by value. The callee
-// mutates its local copy, yet the caller's variable is unchanged (x stays 4),
-// while the copied-in value reaches the callee (y == 54). Distinct from the
-// function no-qualifier case and from the explicit-input task case.
 TEST(PassByValueSim, TaskDefaultDirectionArgPassedByValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -144,11 +139,6 @@ TEST(PassByValueSim, SameSourceBoundToTwoFormalsCopiesIndependently) {
   LowerRunAndCheck(f, design, {{"x", 7u}, {"result", 63u}});
 }
 
-// §13.5.1 illustrates the copy with an unpacked array formal (byte packet[]).
-// Passing an array by value copies every element into the subroutine area: the
-// callee reads the copied-in values (sum == 7) yet its later writes to the
-// local copy leave the caller's array untouched, so the mutation is not visible
-// outside the call.
 TEST(PassByValueSim, UnpackedArrayArgumentCopiedElementwise) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -173,18 +163,6 @@ TEST(PassByValueSim, UnpackedArrayArgumentCopiedElementwise) {
                    {{"packet[0]", 3u}, {"packet[1]", 4u}, {"total", 7u}});
 }
 
-// §13.5.1 copies each argument into the subroutine area, and §10.8 lists
-// passing a value to a subroutine's input, output or inout argument among the
-// assignment-like contexts, so §10.7 truncates or extends the actual into the
-// width the formal's type declares. §6.18 makes a formal written with a
-// user-defined type name an object of the type that name stands for, which is
-// the width in question here.
-//
-// Each case passes a value the formal's type is too narrow to hold, because
-// that is what the two answers disagree about: a formal the simulator could not
-// size was left at whatever width the caller's expression had, so `8'hFF` read
-// 255 where four bits read 15. A formal of exactly 32 bits, or a value that
-// fits the type, reads the same either way.
 TEST(PassByValueSim, TypedefNameInputFormalIsSizedByTheTypeItNames) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,10 +180,6 @@ TEST(PassByValueSim, TypedefNameInputFormalIsSizedByTheTypeItNames) {
   LowerRunAndCheck(f, design, {{"y", 15u}});
 }
 
-// A task's formals are bound by the same code as a function's, but a task is
-// reached by its own call path and neither case stands for the other. The
-// output formal here is how the value is read back and is a 32-bit `int`, so
-// what it reports is the input formal's width and not its own.
 TEST(PassByValueSim, TypedefNameTaskInputFormalIsSizedByTheTypeItNames) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -224,13 +198,6 @@ TEST(PassByValueSim, TypedefNameTaskInputFormalIsSizedByTheTypeItNames) {
   LowerRunAndCheck(f, design, {{"y", 15u}});
 }
 
-// The four-bit cases cannot say a formal wider than the 32 bits an unsized
-// formal used to fall back to keeps its own width: a clamp to 32 would truncate
-// 8'hFF to 15 as well. Forty bits spans two words, and the three answers
-// separate -- 48'hFFFF00000001 passed whole reads 281470681743361, clamped to
-// thirty-two reads 1, and truncated to the forty bits `wide` declares reads
-// 1095216660481, whose set bits above the first word are what say the high word
-// survived.
 TEST(PassByValueSim, TypedefNameFormalWiderThanOneWordKeepsItsHighBits) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -248,16 +215,6 @@ TEST(PassByValueSim, TypedefNameFormalWiderThanOneWordKeepsItsHighBits) {
   LowerRunAndCheck(f, design, {{"y", 1095216660481ull}});
 }
 
-// §8.3 makes a class variable a handle to an object rather than an object of a
-// width, so there is nothing here for §10.7 to truncate and the formal takes
-// the handle it was passed. What makes this worth a case of its own is that a
-// class name can reach the elaborated typedef table and answer a width there:
-// §8.27's forward declaration records the name before the class exists, with a
-// data type that is still DataTypeKind::kImplicit, which §6.10 makes a scalar.
-// A formal sized from that answer would hold one bit of the handle and read 0
-// rather than the 42 the object carries -- and only in a design that happens to
-// forward- declare the class, which is why the accompanying `typedef class
-// Packet;` is the whole point of the case and not decoration.
 TEST(PassByValueSim, ForwardDeclaredClassFormalKeepsTheWholeHandle) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -280,31 +237,6 @@ TEST(PassByValueSim, ForwardDeclaredClassFormalKeepsTheWholeHandle) {
   LowerRunAndCheck(f, design, {{"y", 42u}});
 }
 
-// §13.5.1 passes an input argument by copying the actual argument's value into
-// the formal, and §6.11.2 -- any x or z bits become zeros -- converts that copy
-// where the formal is declared 2-state. The conversion is entitled to the copy
-// and to nothing else: a call that names `carried` and does no more than read
-// it must leave every bit of `carried` standing. The binding handed it the
-// actual's own storage instead -- EvalExpr answers a bare identifier with the
-// caller's variable's Logic4Vec, and a Logic4Vec copies its words pointer -- so
-// the in-place conversion cleared the caller's unknowns from inside a call that
-// wrote nothing.
-//
-// The two widths must match, and 8 is written on both declarations for that
-// reason: on a width difference the resize allocates and hands the conversion
-// a buffer of its own, so a formal of any other width would be the path where
-// nothing was ever wrong and this case would say nothing.
-//
-// ToUint64 cannot see this. It projects aval & ~bval, so a bit that is already
-// unknown reads as 0 through it and clearing that bit changes nothing it
-// reports; the assertions read words[0] directly. 8'b0z1x0110 is stored as
-// aval 0x36 with bval 0x50, an x digit being aval 1 with bval 1 and a z digit
-// aval 0 with bval 1, and the 2-state conversion of it is aval 0x26 with bval
-// 0x00 -- which the formal, and `observed` after it, alone are entitled to
-// hold. Asserting on both is what says the conversion still happens and only
-// says where. bval is what separates the two unknown states: a conversion that
-// cleared the x bit and kept the z would answer the same aval and leave bval
-// at 0x40.
 TEST(PassByValueSim, ActualBoundToASameWidthTwoStateFormalKeepsItsUnknowns) {
   SimFixture f;
   auto* carried = RunAndFindVar(
@@ -330,27 +262,6 @@ TEST(PassByValueSim, ActualBoundToASameWidthTwoStateFormalKeepsItsUnknowns) {
   EXPECT_EQ(observed->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// The second expression the binding can be handed with no copy of its own, and
-// the reason the case above does not state the whole claim: §7.4.2 makes each
-// element of an unpacked array an object in its own right, and a select of one
-// is answered with that element variable's own Logic4Vec rather than with a
-// value read out of the array. The actual here is written only as an index, so
-// it reaches the binding by a different production from the bare identifier
-// above while arriving with the same storage shared -- and a whole-array
-// actual would not reach this path at all, being bound elementwise before the
-// by-value bind is consulted.
-//
-// Eight bits on both declarations again, so that no resize stands between the
-// element and the conversion: a formal of a different width would be handed a
-// freshly allocated buffer and the element could not be touched.
-//
-// z as well as x, because §6.11.2 converts both x and z bits and the two are
-// stored apart. 8'b11x0z101 is aval 0xE5 with bval 0x28, and the conversion of
-// it is aval 0xC5 with bval 0x00 -- what `copied` alone is entitled to hold,
-// while `lanes[1]`, read once and never written after the call, must still hold
-// what the initial block put there. A conversion that dropped the x bit and
-// kept the z would answer the same aval and leave bval at 0x08, which is why
-// bval is asserted on both.
 TEST(PassByValueSim, ArrayElementActualKeepsItsUnknownsAcrossTheBinding) {
   SimFixture f;
   auto* lane = RunAndFindVar(
@@ -376,30 +287,6 @@ TEST(PassByValueSim, ArrayElementActualKeepsItsUnknownsAcrossTheBinding) {
   EXPECT_EQ(copied->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// The boundary the two cases above are written to avoid, stated on purpose:
-// when the formal's declared width differs from the actual's, §10.7 truncates
-// the value into that width -- an assignment-like context by §10.8 -- and the
-// truncation produces a vector of its own, so the §6.11.2 conversion has never
-// had the caller's storage to write through. This case therefore reads the
-// same before and after the binding is made to copy, and it is not an exposure
-// of that: it pins that the path which was already correct still truncates and
-// still converts, and that the eight-bit actual keeps the four unknown-bearing
-// bits above the formal's width.
-//
-// The actual is a 4-state variable carrying unknowns on both sides of the
-// four-bit boundary, which is what no other case in this file offers the
-// resize: the typedef cases pass 2-state literals and read their answer
-// through ToUint64, which cannot report an unknown at all. 8'b1x01z100 is aval
-// 0xD4 with bval 0x48, and the caller's variable must still read that after
-// the call. The low nibble alone is aval 0x4 with bval 0x8, whose conversion
-// is aval 0x4 with bval 0x00.
-//
-// The formal is read back through a 32-bit `int` and not a four-bit variable,
-// because a four-bit destination would truncate a formal that had wrongly kept
-// all eight bits down to the same nibble and report 0x4 either way. Through an
-// `int` the two answers separate: 0x4 says the formal was sized by its own
-// declaration, and 0x94 -- the whole eight bits converted -- says it was left
-// at the actual's width.
 TEST(PassByValueSim, NarrowerFormalTruncatesWithoutTouchingTheActual) {
   SimFixture f;
   auto* source_bits = RunAndFindVar(
@@ -425,13 +312,6 @@ TEST(PassByValueSim, NarrowerFormalTruncatesWithoutTouchingTheActual) {
   EXPECT_EQ(read_back->value.words[0].bval & 0xFFu, 0x0u);
 }
 
-// §13.5.1: passing by value copies each argument into the subroutine's own
-// area, so a change the subroutine makes to an argument is not seen outside it.
-// The four aggregate binds copied the container and every entry's Logic4Vec,
-// which carries the words pointer rather than the words, so the formal's
-// entries were the actual's. §7.8.7's write to bits of an element is the writer
-// that shows it: DepositBitField writes through the words it finds, so the
-// callee's write landed in the caller's array as well.
 TEST(PassByValueSim, AssocFormalElementBitsAreNotTheActualsWords) {
   auto v = RunAndGet(
       "module t;\n"
@@ -450,10 +330,6 @@ TEST(PassByValueSim, AssocFormalElementBitsAreNotTheActualsWords) {
   EXPECT_EQ(v, 0x00u);
 }
 
-// The queue bind, whose elements live in a QueueObject rather than in
-// variables. A whole-element write replaces the entry's vector rather than
-// writing through it, so this passed before the copy and is the guard on it:
-// the fix must not have made the formal share the actual's container.
 TEST(PassByValueSim, QueueFormalElementWriteIsNotVisibleOutside) {
   auto v = RunAndGet(
       "module t;\n"
@@ -472,8 +348,6 @@ TEST(PassByValueSim, QueueFormalElementWriteIsNotVisibleOutside) {
   EXPECT_EQ(v, 0x11u);
 }
 
-// The fixed-size array bind, whose elements are per-element variables of the
-// caller, and the same guard over it.
 TEST(PassByValueSim, FixedArrayFormalElementWriteIsNotVisibleOutside) {
   auto v = RunAndGet(
       "module t;\n"
@@ -492,12 +366,6 @@ TEST(PassByValueSim, FixedArrayFormalElementWriteIsNotVisibleOutside) {
   EXPECT_EQ(v, 0x11u);
 }
 
-// §13.5.1's copy has to answer to the formal's name inside the call, and a
-// queue's elements live in a QueueObject registered by name rather than in
-// variables. Registered for the whole run and looked up without asking the
-// scope stack, a formal named after a module's queue was the module's queue to
-// every writer in the callee. The two names have to match for the two answers
-// to differ, which is the case none of the existing argument cases writes.
 TEST(PassByValueSim, QueueFormalNamedLikeTheModulesIsItsOwnCopy) {
   auto v = RunAndGet(
       "module t;\n"
@@ -516,8 +384,6 @@ TEST(PassByValueSim, QueueFormalNamedLikeTheModulesIsItsOwnCopy) {
   EXPECT_EQ(v, 7u);
 }
 
-// The associative array is a separate object, a separate map and a separate
-// lookup, so it needs its own case.
 TEST(PassByValueSim, AssocFormalNamedLikeTheModulesIsItsOwnCopy) {
   auto v = RunAndGet(
       "module t;\n"
@@ -536,9 +402,6 @@ TEST(PassByValueSim, AssocFormalNamedLikeTheModulesIsItsOwnCopy) {
   EXPECT_EQ(v, 7u);
 }
 
-// The other half of the same registration: §23.9 gives the copy the lifetime of
-// the scope that declared it, so once the call has returned the name reads the
-// module's queue again rather than the formal's copy.
 TEST(PassByValueSim, QueueFormalCopyDoesNotOutliveTheCall) {
   auto v = RunAndGet(
       "module t;\n"
@@ -557,12 +420,6 @@ TEST(PassByValueSim, QueueFormalCopyDoesNotOutliveTheCall) {
   EXPECT_EQ(v, 1u);
 }
 
-// §6.11.1 makes byte, shortint, int, integer and longint signed by default, and
-// §6.18 makes a formal declared with a name for one an object of that type, so
-// §10.7 sign-extends it into a wider target. The formal's cell was created by
-// asking IsSignedType with an empty typedef map, which resolves a name through
-// nothing and answers unsigned, so -1 came back as the magnitude 255. The value
-// has to be negative and the target wider for the two answers to differ.
 TEST(PassByValueSim, TypedefSignedFormalSignExtendsIntoAWiderTarget) {
   auto v = RunAndGet(
       "module t;\n"
@@ -577,9 +434,6 @@ TEST(PassByValueSim, TypedefSignedFormalSignExtendsIntoAWiderTarget) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
-// §6.11.1's default signedness and an explicit `signed` keyword reach
-// IsSignedType by different arms, so the typedef of an explicitly signed vector
-// is its own case.
 TEST(PassByValueSim, TypedefExplicitlySignedFormalSignExtends) {
   auto v = RunAndGet(
       "module t;\n"
@@ -594,9 +448,6 @@ TEST(PassByValueSim, TypedefExplicitlySignedFormalSignExtends) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
-// The sign read through an operator rather than through an assignment: §11.4.4
-// compares a signed operand as a signed value, which an unsigned cell makes
-// false for every value it can hold.
 TEST(PassByValueSim, TypedefSignedFormalComparesAsSigned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -611,8 +462,6 @@ TEST(PassByValueSim, TypedefSignedFormalComparesAsSigned) {
   EXPECT_EQ(v, 1u);
 }
 
-// A body local declared with the same name, which CreateFuncLocalVar creates by
-// its own path and asked the same empty map.
 TEST(PassByValueSim, TypedefSignedBodyLocalSignExtends) {
   auto v = RunAndGet(
       "module t;\n"
@@ -628,15 +477,6 @@ TEST(PassByValueSim, TypedefSignedBodyLocalSignExtends) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
-// §13.5.1 passes an input by value, and §10.7 sizes what arrives to the width
-// the formal declares. What b4_t declares is four bytes, not one -- §7.4.2's
-// unpacked array of four elements, whose bit-stream size §20.6.2 gives as 32 --
-// so a formal written with it must not be sized to a byte. The elaborated type
-// table answered one element's width for the aggregate name, and the actual
-// here is an assignment pattern rather than an identifier, so the bind that
-// intercepts an array argument by name declines and that width was applied:
-// three of the four elements were dropped before the body ran. Reading $bits
-// of the formal is what states the size the argument arrived at.
 TEST(PassByValueSim, FixedUnpackedArrayTypedefFormalIsNotSizedToOneElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -652,14 +492,6 @@ TEST(PassByValueSim, FixedUnpackedArrayTypedefFormalIsNotSizedToOneElement) {
   LowerRunAndCheck(f, design, {{"y", 32u}});
 }
 
-// §13.5.1 copies an input actual into the subroutine's own copy, and §7.2.1
-// makes a member of that copy a window of it, so `a.opcode` inside get_op
-// reads the opcode of the struct the caller passed. The caller is module M
-// instantiated as `m`, whose `s` is laid out under "m.s" (§23.9). The formal's
-// layout was bound by asking the layout table for bare `s`, which found
-// nothing, so the formal carried no layout and `a.opcode` answered 0; the
-// test reads 0xA5 through the formal, and imm is 0x123456 so a read of the
-// whole copy, 0xA5123456, cannot pass for the member either.
 TEST(PassByValueSim, ChildInstanceStructActualBindsTheFormalsLayout) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -684,14 +516,6 @@ TEST(PassByValueSim, ChildInstanceStructActualBindsTheFormalsLayout) {
   LowerRunAndCheck(f, design, {{"m.r", 0xA5u}});
 }
 
-// §13.3 (printed page 337) declares a formal with any data_type, a structure
-// written inline among them, and §13.5.1 (printed 348) copies the actual
-// into the subroutine's own variable of that type, whose members §7.2.1
-// (printed 147) makes windows of it. The formal's layout was resolved from
-// the actual's storage where the actual is an identifier; the formal's own
-// type is what lays it out, and a member read answers the same 12 either
-// way -- the case that says binding the formal's own layout first loses the
-// identifier actual nothing.
 TEST(PassByValueSim, InlineStructFormalBoundFromAStructVariable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -711,12 +535,6 @@ TEST(PassByValueSim, InlineStructFormalBoundFromAStructVariable) {
   LowerRunAndCheck(f, design, {{"y", 12u}});
 }
 
-// §13.5.1 (printed page 348) copies the actual's value whatever expression
-// produced it, and the copy is of the formal's type. A call's result has no
-// storage of its own to resolve a layout from, and an inline type has no
-// name the fallback could bind, so `f(g())` left the formal a plain vector:
-// `s.a` in the body was read through no member, and the body answered 0
-// where the members g placed, 3 and 4, read 34.
 TEST(PassByValueSim, InlineStructFormalBoundFromACallResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -735,14 +553,6 @@ TEST(PassByValueSim, InlineStructFormalBoundFromACallResult) {
   LowerRunAndCheck(f, design, {{"y", 34u}});
 }
 
-// §7.3.1 (printed page 150) lays every member of a packed union over the
-// same bits, and §13.5.1 copies a plain vector actual into a formal whose
-// packed union is written inline; the body reads the copy through the
-// union's second member, a structure whose low byte is the low byte of the
-// vector, 8'hCD of 16'hABCD. The actual is a vector variable with no layout
-// of its own, so the formal's layout can come from nowhere but its
-// declaration: read through no member the body reached nothing, and read as
-// the whole vector it would answer 16'hABCD.
 TEST(PassByValueSim, InlinePackedUnionFormalReadsItsSecondMember) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -759,14 +569,6 @@ TEST(PassByValueSim, InlinePackedUnionFormalReadsItsSecondMember) {
   LowerRunAndCheck(f, design, {{"y", 0xCDu}});
 }
 
-// §10.9.2 (printed page 263): a structure assignment pattern may name its
-// members in any order, each member expression evaluated in the context of
-// an assignment to that member, and §13.5.1 (printed 348) makes the binding
-// of an actual such an assignment to a variable of the formal's type. An
-// actual `'{b: 2, a: 1}` to a formal declared by the structure's typedef was
-// concatenated in written order at self-determined widths, with no type to
-// place it by, so the formal held 2 where `a` lies and 1 where `b` lies and
-// the body read 21; placed by member it reads 12.
 TEST(PassByValueSim, TypedefStructFormalPlacesAKeyedPatternByMemberName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -782,12 +584,6 @@ TEST(PassByValueSim, TypedefStructFormalPlacesAKeyedPatternByMemberName) {
   LowerRunAndCheck(f, design, {{"y", 12u}});
 }
 
-// §10.9.2 (printed page 263): by position, element i initializes member i,
-// evaluated in the context of an assignment to that member's type, so an
-// 8-bit literal is extended to the int member it initializes. Concatenated
-// at self-determined widths, `'{8'd1, 8'd2}` packed sixteen bits into the low
-// end of the formal: `a` read 0 and `b` read 258, where the placed members
-// read 1 and 2.
 TEST(PassByValueSim, TypedefStructFormalPlacesANarrowPositionalPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -803,11 +599,6 @@ TEST(PassByValueSim, TypedefStructFormalPlacesANarrowPositionalPattern) {
   LowerRunAndCheck(f, design, {{"y", 12u}});
 }
 
-// §13.3 (printed page 337) declares a formal with a structure written inline,
-// and §10.9.2 places a pattern actual by that structure's members exactly as
-// by a typedef's: the layout the formal is bound to is built from its own
-// declaration, and the keyed pattern lands `a` and `b` where the body reads
-// them, 12 rather than the 21 of a concatenation in written order.
 TEST(PassByValueSim, InlineStructFormalPlacesAKeyedPattern) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -822,12 +613,6 @@ TEST(PassByValueSim, InlineStructFormalPlacesAKeyedPattern) {
   LowerRunAndCheck(f, design, {{"y", 12u}});
 }
 
-// §10.9.2 (printed page 263) with §7.2.1: a member that is itself a structure
-// takes the value of the expression keyed to it as a whole, at the member's
-// own offset in the enclosing layout, and the body reads its members through
-// the nested layout. Keyed with the nested member last, `'{c: 3, p: x}`
-// concatenated in written order put x's 64 bits where `c` and the high half
-// of `p` lie; placed by member the body reads 123.
 TEST(PassByValueSim, TypedefStructFormalPlacesANestedMemberByName) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "elaborator/rtlir.h"
@@ -101,9 +100,6 @@ TEST(PortConnectionRulesElaboration, NettypeSignalOnInoutPortErrors) {
                             6, "23.3.3"));
 }
 
-// §23.3.3: a port with a user-defined nettype on one side only is an input or
-// an output, so an inout port declared with the nettype and joined to an
-// ordinary wire is reported, as one joined to a net of the nettype is not.
 TEST(PortConnectionRulesElaboration, InoutPortOfANettypeOnAPlainNetErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -125,11 +121,6 @@ TEST(PortConnectionRulesElaboration, InoutPortOfANettypeOnAPlainNetErrors) {
       ReportedError(f.diag.Diagnostics(), "inout port 'q'", 9, "23.3.3"));
 }
 
-// §23.3.3: where only one side of a port connection is of a user-defined
-// nettype, the two sides' data types match. A nettype port joined to a signed
-// vector or to an int, and a 2-state port joined to a nettype net, are each
-// reported, whichever side carries the nettype; a logic vector of the
-// nettype's width joined either way is not.
 TEST(PortConnectionRulesElaboration,
      OneSidedNettypeOfNonMatchingDataTypeErrors) {
   ElabFixture f;
@@ -177,10 +168,6 @@ TEST(PortConnectionRulesElaboration, InputPortConnectionIsSourceToSink) {
   ASSERT_EQ(design->top_modules[0]->children.size(), 1u);
 }
 
-// A binding records whether the instantiation wrote its connection: an
-// empty `.n()`, a port left out of `.*` and a trailing input each stand
-// unconnected though the elaborator supplies a value in their place, and a
-// written connection does not (§23.3.3, for §37.14 detail 10's vpiHighConn).
 TEST(PortConnectionRulesElaboration, AnUnwrittenConnectionIsMarkedUnconnected) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -202,10 +189,6 @@ TEST(PortConnectionRulesElaboration, AnUnwrittenConnectionIsMarkedUnconnected) {
   EXPECT_TRUE(saw_a);
 }
 
-// A port of a user-defined nettype is connected to a net of a matching nettype,
-// and a nettype written through its package is that package's on either side:
-// c's port of P::nt meets m's net of P::nt2, a different nettype, which is
-// reported, and m's net of P::nt, which is not (#7600).
 TEST(PortConnectionRulesElaboration, PackageScopedNettypesMatchedAcrossAPort) {
   ElabFixture f;
   ElaborateSrc(

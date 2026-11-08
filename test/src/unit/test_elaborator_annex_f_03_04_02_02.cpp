@@ -11,14 +11,6 @@
 
 using namespace delta;
 
-// §F.3.4.2.2 unfolds the delay and concatenation operators of §16.9.1 into
-// ##1, ##0 and a repetition of the constant 1 spanning the ticks a delay
-// covers, with a delay that may be zero unfolding to an or whose first
-// alternative is the fusion. Each case checks the tree a derived form unfolds
-// to against the identity the subclause states, then the words that tightly
-// satisfy it under §F.5.2, where a blank letter stands for a tick the delay
-// spans and nothing else holds.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
@@ -27,14 +19,12 @@ auto BoolSeq(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
 auto One() { return SeqBoolean(BoolTrue()); }
 
-// A blank letter, then `blanks` more, then the letter a.
 Word BlanksThenA(unsigned int blanks) {
   Word word(blanks, A({}));
   word.push_back(A({"a"}));
   return word;
 }
 
-// The letter a, `blanks` blank letters, then the letter b.
 Word AGapB(unsigned int blanks) {
   Word word{A({"a"})};
   for (unsigned int i = 0; i < blanks; ++i) word.push_back(A({}));
@@ -42,9 +32,6 @@ Word AGapB(unsigned int blanks) {
   return word;
 }
 
-// ##m R is (1[*m] ##1 R), ##[m:n] R is (1[*m:n] ##1 R) and ##[m:$] R is
-// (1[*m:$] ##1 R): the letter a is preceded by as many letters as the delay
-// names, whatever they hold.
 TEST(DerivedDelay, UnaryDelayPutsARepetitionOfOneBeforeTheSequence) {
   auto a = BoolSeq("a");
   EXPECT_TRUE(SequenceExprEqual(*SeqDelayExactly(2, a),
@@ -72,8 +59,6 @@ TEST(DerivedDelay, UnaryDelayPutsARepetitionOfOneBeforeTheSequence) {
   EXPECT_TRUE(TightlySatisfies(BlanksThenA(4), *one_or_more));
 }
 
-// ##[*] R is ##[0:$] R and ##[+] R is ##[1:$] R: a alone satisfies the first
-// and not the second, and a after any number of letters satisfies both.
 TEST(DerivedDelay, StarAndPlusDelaysAreTheUnboundedRanges) {
   auto a = BoolSeq("a");
   EXPECT_TRUE(
@@ -90,10 +75,6 @@ TEST(DerivedDelay, StarAndPlusDelaysAreTheUnboundedRanges) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a"}), A({})}, *plus));
 }
 
-// R1 ##m R2 for m > 1 is (R1 ##1 1[*m-1] ##1 R2), and R1 ##[m:n] R2 and
-// R1 ##[m:$] R2 for m > 0 put 1[*m-1:n-1] and 1[*m-1:$] between: the ##1
-// joining the operands is a tick of the delay, so a ##3 b has two letters
-// between a and b. R1 ##1 R2 is the primitive itself.
 TEST(DerivedDelay, PositiveBinaryDelayPutsOneTickFewerBetweenTheOperands) {
   auto a = BoolSeq("a");
   auto b = BoolSeq("b");
@@ -126,10 +107,6 @@ TEST(DerivedDelay, PositiveBinaryDelayPutsOneTickFewerBetweenTheOperands) {
   EXPECT_TRUE(TightlySatisfies(AGapB(3), *one_or_more));
 }
 
-// R1 ##[0:0] R2 is the fusion (R1 ##0 R2), and R1 ##[0:n] R2 for n > 0 and
-// R1 ##[0:$] R2 are that fusion or the same delay from one tick: one letter
-// holding both a and b satisfies each, and a then b satisfies the two ranges
-// that reach past zero.
 TEST(DerivedDelay, ZeroDelayIsTheFusionOrTheDelayFromOne) {
   auto a = BoolSeq("a");
   auto b = BoolSeq("b");

@@ -12,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §H.14.3: svdpi_src.h defines two symbols only, and an application that
-// does not need it is binary compatible while one that uses it is compiled
-// for each simulator it runs on.
 TEST(SvdpiSrcIncludeFile, TwoSymbolsDecideBinaryOrSourceCompatibility) {
   EXPECT_EQ(DpiSvdpiSrcSymbolCount(), 2u);
   EXPECT_EQ(DpiCompatibilityOfApplication(false),
@@ -25,9 +22,6 @@ TEST(SvdpiSrcIncludeFile, TwoSymbolsDecideBinaryOrSourceCompatibility) {
   EXPECT_TRUE(DpiApplicationIsRecompiledPerSimulator(true));
 }
 
-// §H.14.3: the macros declare variables representing packed arrays of bit
-// and of logic, and neither defines an array type -- each variable is a
-// struct of the width's chunks, sized as the simulator's representation.
 TEST(SvdpiSrcIncludeFile, TheMacrosDeclareNoArrayType) {
   EXPECT_FALSE(DpiPackedArrayMacroMayDefineAnArrayType());
   SV_BIT_PACKED_ARRAY(40, bits);
@@ -38,9 +32,6 @@ TEST(SvdpiSrcIncludeFile, TheMacrosDeclareNoArrayType) {
   EXPECT_EQ(sizeof(logic), static_cast<size_t>(svSizeOfLogicPackedArr(64)));
 }
 
-// §H.14.3 with §H.14.2: a variable the macro declares is what the SV3.1a
-// functions take a reference to -- written whole from a canonical buffer and
-// read back bit by bit.
 TEST(SvdpiSrcIncludeFile, ADeclaredVariableIsAPackedArrayReference) {
   SV_BIT_PACKED_ARRAY(40, bits);
   const svBitVec32 kIn[2] = {0x00000005u, 0x80u};

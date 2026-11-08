@@ -176,8 +176,6 @@ TEST(CaseInsideSyntaxParsing, CasexInsideIsError) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // The emission site files this under §12.5, which states the case statement
-  // the 'inside' keyword is restricted to, rather than under §12.5.4.
   EXPECT_TRUE(
       ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
@@ -192,7 +190,6 @@ TEST(CaseInsideSyntaxParsing, CasezInsideIsError) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // Filed under §12.5 for the same reason as CasexInsideIsError above.
   EXPECT_TRUE(
       ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
@@ -215,8 +212,6 @@ TEST(CaseInsideSyntaxParsing, CaseInsideWithDefault) {
   EXPECT_TRUE(HasDefaultCaseItem(stmt));
 }
 
-// Syntax 12-3 writes every case form with at least one item, so a case
-// statement that reaches endcase with none is reported there.
 TEST(CaseInsideSyntaxParsing, CaseInsideWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"

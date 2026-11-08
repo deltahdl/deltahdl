@@ -67,11 +67,6 @@ TEST(InterfaceClassRandomizeSim, RandomizeReturnValue) {
 }
 
 TEST(InterfaceClassRandomizeSim, InlineConstraintViaInterfaceHandleRandomizes) {
-  // §8.26.9: an inline constraint (randomize() with {...}) is legal through an
-  // interface class handle. An interface class holds no data members, so the
-  // inline block cannot name the object's rand fields; an empty block is the
-  // representative legal form. It must still drive a successful randomization
-  // that honors the implementing class's own constraint block.
   SimFixture f;
   auto* design = ElaborateSrc(
       "interface class IC;\n"

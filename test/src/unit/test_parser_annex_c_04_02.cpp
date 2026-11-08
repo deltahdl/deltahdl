@@ -1,17 +1,3 @@
-// Annex C.4.2: procedural assign and deassign statements.
-//
-// C.4.2 puts the procedural assign and deassign statements on the deprecation
-// list while still requiring tools to support them under this edition, which
-// §10.6.1 specifies and its tests observe. What C.4.2 states of its own is
-// where the two forms of the assign statement are placed: a continuous
-// assignment stands outside every procedure, and a procedural continuous
-// assignment stands inside one. A.6.2 has deassign, and the force and release
-// C.4.2 offers in place of assign and deassign, in the
-// procedural_continuous_assignment alone, a statement_item, so one of the three
-// written where a module item stands is a statement outside any procedure: the
-// parser reports it under C.4.2 at its keyword and reads on to the ';' so that
-// the items behind it are still read.
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -23,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// The two forms C.4.2 names, each in its place: the continuous assign outside
-// any procedure is a module item and the procedural assign within an initial
-// procedure is a statement, and a source writing both is accepted.
 TEST(ProceduralAssignDeassignPlacement, BothFormsInTheirPlacesAreAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -44,8 +27,6 @@ TEST(ProceduralAssignDeassignPlacement, BothFormsInTheirPlacesAreAccepted) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
 }
 
-// A deassign outside any procedure is the procedural statement misplaced, and
-// the item behind it is still the module's.
 TEST(ProceduralAssignDeassignPlacement, DeassignOutsideAProcedureIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -62,9 +43,6 @@ TEST(ProceduralAssignDeassignPlacement, DeassignOutsideAProcedureIsRejected) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kVarDecl));
 }
 
-// The force and release C.4.2 offers as the alternative are statements of the
-// same production, and are reported the same way outside a procedure, each
-// named by its own keyword.
 TEST(ProceduralAssignDeassignPlacement, ForceOutsideAProcedureIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -93,8 +71,6 @@ TEST(ProceduralAssignDeassignPlacement, ReleaseOutsideAProcedureIsRejected) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kVarDecl));
 }
 
-// The same misplacement in an interface body, which reads its items through
-// the module item parser as well.
 TEST(ProceduralAssignDeassignPlacement,
      DeassignOutsideAProcedureInAnInterface) {
   auto r = Parse(

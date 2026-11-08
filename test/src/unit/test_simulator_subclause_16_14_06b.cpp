@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-// A module around the procedures given, as
-// test/src/e2e/procedural_concurrent_assertions.sv is: mclk rises at 10,
-// 30, ..., 110, scanclk at 20, 60 and 100, fastclk at 5, 15, ..., 115 and
-// clock at 15, 45, 75 and 105; d is 1 throughout, d1 is 1 from 25 to 65,
-// reset is high from 40 to 50 and d2 is 1; the clause's r1 is q != d and
-// r2 is q2 != d2; the run ends at 120.
 std::string ProceduralSource(const std::string& procedures) {
   return "module t;\n"
          "  logic mclk = 0, scanclk = 0, fastclk = 0, clock = 0;\n"
@@ -52,11 +46,6 @@ uint64_t Count(SimFixture& f, std::string_view name) {
   return var == nullptr ? 0 : var->value.ToUint64();
 }
 
-// §16.14.6: the clause's r1_p1 takes the clock inferred from the procedure,
-// posedge mclk, its instance queued at each posedge maturing in the
-// Observed region of the same step, where the event occurred, so it is
-// evaluated at every posedge of mclk on the sampled q: 1 across the ticks
-// of 50 and 70, where it fails, and 0 at the four others.
 TEST(ProceduralConcurrentAssertionRun, AnInferredClockEvaluatesAtItsOwnTick) {
   SimFixture f;
   RunAndFindVar(ProceduralSource("  always @(posedge mclk) begin\n"
@@ -70,11 +59,6 @@ TEST(ProceduralConcurrentAssertionRun, AnInferredClockEvaluatesAtItsOwnTick) {
   EXPECT_EQ(Count(f, "fails"), 2u);
 }
 
-// §16.14.6: the clause's r1_p2 is clocked by scanclk as written, and mclk
-// runs at twice its frequency, so by every posedge of scanclk two pending
-// instances have matured and each posedge sees r1_p2 evaluated twice: the
-// instance of 10 at 20, those of 30 and 50 at 60, both failing, and those
-// of 70 and 90 at 100, the instance of 110 still waiting at the end.
 TEST(ProceduralConcurrentAssertionRun,
      ASlowerOwnClockEvaluatesEveryMaturedInstanceAtItsNextTick) {
   SimFixture f;
@@ -91,10 +75,6 @@ TEST(ProceduralConcurrentAssertionRun,
             "passed at 100\n$finish at time 120\n");
 }
 
-// §16.14.6: the clause's r1_p3 is clocked by fastclk, which runs at twice
-// the frequency of mclk, so only every other posedge of fastclk evaluates
-// it, the instance queued at each posedge of mclk at the posedge of fastclk
-// after it.
 TEST(ProceduralConcurrentAssertionRun,
      AFasterOwnClockEvaluatesOnlyAtTheTicksAfterAnInstanceWasQueued) {
   SimFixture f;
@@ -111,9 +91,6 @@ TEST(ProceduralConcurrentAssertionRun,
             "passed at 95\npassed at 115\n$finish at time 120\n");
 }
 
-// §16.14.6: a statement a loop reaches three times in one time step places
-// three pending instances in the queue, and each begins an attempt at the
-// tick, so r1 is evaluated three times at every posedge of mclk.
 TEST(ProceduralConcurrentAssertionRun, EachReachInAStepQueuesAnInstance) {
   SimFixture f;
   RunAndFindVar(
@@ -128,13 +105,6 @@ TEST(ProceduralConcurrentAssertionRun, EachReachInAStepQueuesAnInstance) {
   EXPECT_EQ(Count(f, "fails"), 6u);
 }
 
-// §16.14.6: the clause's r2_p under posedge clock iff reset == 0 or posedge
-// reset takes the inferred clock posedge clock iff reset == 0, reset being
-// referenced in the procedure: the instance queued at 40, when reset rose,
-// finds no occurrence of that event in its step and waits on the matured
-// queue, the event of 45 not occurring while reset is high, so two
-// instances are evaluated at 75 and one at 105, each failing, q2 having
-// taken d2 at 15, where the one instance passed.
 TEST(ProceduralConcurrentAssertionRun,
      AnInstanceWhoseClockDidNotOccurWaitsForItsNextTick) {
   SimFixture f;
@@ -154,10 +124,6 @@ TEST(ProceduralConcurrentAssertionRun,
             "$finish at time 120\n");
 }
 
-// §16.14.6: an initial procedure holding a delay gives no inferred clock,
-// so the clocks are inferred from the default clocking, posedge scanclk, as
-// if the assertion were instantiated before the procedure: the instance
-// queued at 12 is evaluated at 20, where r1 holds.
 TEST(ProceduralConcurrentAssertionRun,
      TheDefaultClockingClocksWhatNoContextDoes) {
   SimFixture f;
@@ -173,12 +139,6 @@ TEST(ProceduralConcurrentAssertionRun,
   EXPECT_EQ(Count(f, "fails"), 0u);
 }
 
-// §16.14.6: a cover statement embedded in procedural code is queued and
-// evaluated as an assert is, its results counted under the statement's
-// label, and a temporal property embedded there advances over the ticks
-// of its inferred clock after the instance matured: q rises the tick after
-// d1 does, so d1 |=> q holds at 50 and fails nowhere, its attempts of 30
-// and 50 in flight across a tick each.
 TEST(ProceduralConcurrentAssertionRun,
      ACoverAndATemporalPropertyAreQueuedAndEvaluated) {
   SimFixture f;
@@ -201,11 +161,6 @@ TEST(ProceduralConcurrentAssertionRun,
   EXPECT_EQ(Count(f, "fails"), 0u);
 }
 
-// §16.14.6: a procedure whose only timing control is a delay infers no clock,
-// and with no default clocking an assertion in it that writes none has no
-// leading clocking event, which is reported. The assertion is then queued for
-// no tick, and the procedure around it runs on: its delay of 7 steps cnt at 7,
-// 14, ..., 119, seventeen times before the run ends at 120.
 TEST(ProceduralConcurrentAssertionRun,
      AnAssertionNoClockReachesIsReportedAndItsProcedureRunsOn) {
   SimFixture f;

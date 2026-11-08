@@ -41,11 +41,8 @@ TEST_F(VpiHandleByNameSim, HandleByNameNullReturnsNullptr) {
   EXPECT_EQ(h, nullptr);
 }
 
-// §38.21 C6: when a scope is provided the search is confined to that scope's
-// contents. A child resolves through its parent scope, while a top-level object
-// that is not within the scope is not found via that scope.
 TEST_F(VpiHandleByNameSim, ScopeConfinesSearch) {
-  vpi_ctx_.CreateModule("alpha", "alpha");  // top-level, outside `top`
+  vpi_ctx_.CreateModule("alpha", "alpha");
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   VpiHandle beta = vpi_ctx_.CreatePort("beta", kVpiInput, top);
 
@@ -54,8 +51,6 @@ TEST_F(VpiHandleByNameSim, ScopeConfinesSearch) {
   EXPECT_EQ(vpi_handle_by_name(VpiText("alpha"), VpiHandleOf(top)), nullptr);
 }
 
-// §38.21 C4: the name may be hierarchical. A dotted path is walked component by
-// component, descending from the top-level scope into its children.
 TEST_F(VpiHandleByNameSim, HierarchicalNameResolves) {
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   VpiHandle beta = vpi_ctx_.CreatePort("beta", kVpiInput, top);
@@ -64,8 +59,6 @@ TEST_F(VpiHandleByNameSim, HierarchicalNameResolves) {
             beta);
 }
 
-// §38.21 C7: calling vpi_handle_by_name() for a protected scope object is an
-// error - no handle is returned and the error is recorded.
 TEST_F(VpiHandleByNameSim, ProtectedScopeIsError) {
   VpiHandle locked = vpi_ctx_.CreateModule("sec", "sec");
   locked->is_protected = true;
@@ -75,8 +68,6 @@ TEST_F(VpiHandleByNameSim, ProtectedScopeIsError) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.21 C8: a hierarchical name that passes through a protected scope is an
-// error; the protected intermediate scope cannot be descended into.
 TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
   VpiHandle root = vpi_ctx_.CreateModule("root", "root");
   VpiHandle mid = vpi_ctx_.CreatePort("mid", kVpiInput, root);
@@ -87,11 +78,6 @@ TEST_F(VpiHandleByNameSim, HierarchicalThroughProtectedScopeIsError) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.21 (negative of H1/H4): a well-formed name that matches no object is a
-// not-found result, not an error. The routine hands back a null handle and -
-// unlike the protected-scope cases above - records no error, distinguishing the
-// ordinary outcome of a name that matches nothing from the protected-access
-// error outcome.
 TEST_F(VpiHandleByNameSim, NameMatchingNoObjectReturnsNull) {
   vpi_ctx_.CreateModule("present", "present");
 
@@ -99,11 +85,6 @@ TEST_F(VpiHandleByNameSim, NameMatchingNoObjectReturnsNull) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.21 (H2 input form): the routine applies to any object carrying a full
-// name, including a variable in the simulation's live runtime state, not only
-// statically built module/port handles. A variable declared in the running
-// SimContext is exposed to VPI and then resolved by its simple name from the
-// top level of the design.
 TEST_F(VpiHandleByNameSim, HandleByNameFindsRuntimeVariable) {
   sim_ctx_.CreateVariable("counter", 8);
   vpi_ctx_.Attach(sim_ctx_);
@@ -115,9 +96,6 @@ TEST_F(VpiHandleByNameSim, HandleByNameFindsRuntimeVariable) {
 
 class NamesOfARun : public VpiDesignRun {};
 
-// §38.21 with §37.10 detail 5: a package member is found by its full name,
-// the package's name and `::` before its own, whatever the kind of member
-// (#4935).
 TEST_F(NamesOfARun, APackageMemberIsFoundByItsFullName) {
   Run("package pkg; parameter int P = 42; int pv = 8; endpackage\n"
       "module top; endmodule\n");
@@ -129,17 +107,12 @@ TEST_F(NamesOfARun, APackageMemberIsFoundByItsFullName) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, variable), "pkg::pv");
 }
 
-// §37.10 detail 6: splitting a name at `::` reaches no object of the
-// compilation unit, which no name reaches (#4935).
 TEST_F(NamesOfARun, ACompilationUnitItemIsNotFoundThroughItsScope) {
   Run("int g = 3;\n"
       "module top; int x = $unit::g; endmodule\n");
   EXPECT_EQ(By("$unit::g"), nullptr);
 }
 
-// §38.21 with §23.6 and §5.6.1: a component written as an escaped identifier
-// names the identifier without its backslash, the white space ending it
-// standing before the next separator (#5131).
 TEST_F(NamesOfARun, AnEscapedComponentIsFoundByItsIdentifier) {
   Run("module top; int \\my-var = 3; endmodule\n");
   vpiHandle var = By("top.\\my-var ");

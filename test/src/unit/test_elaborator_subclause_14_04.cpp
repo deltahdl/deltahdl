@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §14.4: a skew is a constant expression, and a parameter may supply it. A
-// plain integer-literal skew is the simplest constant form and must elaborate
-// cleanly.
 TEST(ClockingSkewConstExpr, LiteralSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -20,7 +17,6 @@ TEST(ClockingSkewConstExpr, LiteralSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: a parameter is explicitly permitted as a skew.
 TEST(ClockingSkewConstExpr, ParameterSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -32,8 +28,6 @@ TEST(ClockingSkewConstExpr, ParameterSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: an expression built only from constants (here a parameter scaled by a
-// literal) is still a constant expression and is accepted.
 TEST(ClockingSkewConstExpr, ConstantArithmeticSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -45,9 +39,6 @@ TEST(ClockingSkewConstExpr, ConstantArithmeticSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: a localparam is a constant-expression form (§11.2.1) and, like a
-// parameter, is an acceptable skew. Confirms the constant-expression check
-// resolves the localparam through the module's constant scope.
 TEST(ClockingSkewConstExpr, LocalparamSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -59,10 +50,6 @@ TEST(ClockingSkewConstExpr, LocalparamSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: a constant function call (§11.2.1) is a constant expression, hence a
-// legal skew. The call cannot always be folded to an integer at this check, so
-// the rule must accept it as constant rather than rejecting it as non-constant.
-// A call is no delay_value (A.2.2.3), so the skew writes it in parentheses.
 TEST(ClockingSkewConstExpr, ConstantFunctionCallSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -76,10 +63,6 @@ TEST(ClockingSkewConstExpr, ConstantFunctionCallSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: the constant-expression requirement also governs the block-wide
-// default skews (the `default input/output` item), which the elaborator checks
-// at a separate site from the per-signal skews. Constant default skews on both
-// directions must elaborate cleanly.
 TEST(ClockingSkewConstExpr, DefaultBlockSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -93,8 +76,6 @@ TEST(ClockingSkewConstExpr, DefaultBlockSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: the 1step skew is a valid constant skew form; the constant-expression
-// check must accept it rather than flagging it as non-constant.
 TEST(ClockingSkewConstExpr, OneStepSkewElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -105,8 +86,6 @@ TEST(ClockingSkewConstExpr, OneStepSkewElaborates) {
              "endmodule\n"));
 }
 
-// §14.4: a skew that references a variable is not a constant expression and is
-// rejected.
 TEST(ClockingSkewConstExpr, VariableInputSkewRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -124,7 +103,6 @@ TEST(ClockingSkewConstExpr, VariableInputSkewRejected) {
                             5, "14.4"));
 }
 
-// §14.4: the same constant-expression requirement applies to an output skew.
 TEST(ClockingSkewConstExpr, VariableOutputSkewRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -142,8 +120,6 @@ TEST(ClockingSkewConstExpr, VariableOutputSkewRejected) {
                             5, "14.4"));
 }
 
-// §14.4: the requirement covers the block-wide default skews as well as
-// per-signal skews.
 TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -162,10 +138,6 @@ TEST(ClockingSkewConstExpr, VariableDefaultSkewRejected) {
                             5, "14.4"));
 }
 
-// §14.4: the report that refuses a non-constant skew names the subclause
-// stating the rule, and states it once. The sentence carried "(§14.4)" until
-// the field did, and DiagEngine::Emit appends the field, so a message that
-// still held the sign would print the subclause twice.
 TEST(ClockingSkewConstExpr, VariableSkewNames14_4) {
   ElabFixture f;
   ElaborateSrc(

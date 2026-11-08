@@ -87,11 +87,6 @@ TEST(StructAssignmentValidation, UnpackedStructAssignment) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A typedef's shape is validated at the typedef's own location, so the report
-// stands at the `typedef` keyword rather than at the member carrying the
-// default (Elaborator::ValidateTypedefShape is passed ModuleItem::loc, which
-// Parser::ParseTypedef sets before consuming the keyword). That is why every
-// typedef case in this file names the typedef's line and not the member's.
 TEST(StructAssignmentValidation, PackedStructTypedefMemberDefault_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,11 +122,6 @@ TEST(StructAssignmentValidation, NonConstantMemberDefault_Rejected) {
                             3, "7.2.2"));
 }
 
-// §7.2.2/§11.2.1: a member default is a constant expression, which may be a
-// parameter reference. It must be evaluated in the module's parameter scope,
-// so a parameter default is accepted (contrast the `int n` variable case
-// above, which is genuinely non-constant and still errors). Uses an anonymous
-// inline struct, as in the sv-tests default-value case.
 TEST(StructAssignmentValidation, ParameterMemberDefault_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -147,9 +137,6 @@ TEST(StructAssignmentValidation, ParameterMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.2/§11.2.1: a member default is a constant expression, one form of which
-// is a localparam reference. Like the parameter case, it must resolve in the
-// module's parameter scope, so a localparam-valued default is accepted.
 TEST(StructAssignmentValidation, LocalparamMemberDefault_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -165,10 +152,6 @@ TEST(StructAssignmentValidation, LocalparamMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.2/§11.2.1: a constant function call is another form of constant
-// expression admitted as a member default. With constant arguments the call is
-// accepted, a distinct code path from a plain identifier (parameter/localparam)
-// reference.
 TEST(StructAssignmentValidation, ConstantFunctionCallMemberDefault_Allowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -187,12 +170,6 @@ TEST(StructAssignmentValidation, ConstantFunctionCallMemberDefault_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.2.2 (final sentence, see §6.7.1): the initial assignment expression within
-// a data type is ignored when the type is used to declare a net without a
-// user-defined nettype. The member default is legal on the (unpacked) struct
-// type, and using that type as a net is accepted -- the default is not applied
-// as an (illegal) net declaration assignment. The same type used as a variable
-// is accepted too, confirming the type itself is well-formed.
 TEST(StructAssignmentValidation, StructMemberDefaultIgnoredForNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -226,10 +203,6 @@ TEST(StructAssignmentValidation,
                             2, "7.2.2"));
 }
 
-// §7.2.2: a packed structure written in place inside an unpacked one is still
-// a packed structure whose members carry no defaults, and a union member
-// written through a typedef name is still a union beside which no member of
-// the unpacked structure carries one.
 TEST(StructAssignmentValidation, DefaultsJudgedThroughNestingAndNames) {
   ElabFixture f;
   ElaborateSrc(
@@ -252,9 +225,6 @@ TEST(StructAssignmentValidation, DefaultsJudgedThroughNestingAndNames) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 5u) << d.message;
 }
 
-// §7.2.2: a member default of a structure type declared in the compilation unit
-// is a constant expression as much as one declared in a module, and it may name
-// the compilation unit's own parameters (§11.2.1) but not its variables.
 TEST(StructAssignmentValidation, UnitTypedefMemberDefaultMustBeConstant) {
   ElabFixture f;
   ElaborateSrc(

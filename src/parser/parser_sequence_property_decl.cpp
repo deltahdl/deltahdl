@@ -19,9 +19,6 @@
 
 namespace delta {
 
-// Replicates Parser::Check directly against a Lexer so the free-function
-// helpers in this file see the same identifier/escaped-identifier folding the
-// member helpers use.
 bool LexerCheck(Lexer& lexer, TokenKind kind) {
   auto cur = lexer.Peek().kind;
   if (kind == TokenKind::kIdentifier) {
@@ -48,7 +45,7 @@ bool IsLocalVariableOfDecl(const ModuleItem* item, std::string_view name) {
 void ScanClockEventGroupForLocals(Lexer& lexer, DiagEngine& diag,
                                   const ModuleItem* item) {
   if (!LexerCheck(lexer, TokenKind::kLParen)) return;
-  lexer.Next();  // '('
+  lexer.Next();
   int depth = 1;
   while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
     if (LexerCheck(lexer, TokenKind::kLParen)) {
@@ -66,10 +63,6 @@ void ScanClockEventGroupForLocals(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// §16.12.17 Restriction 4: cross-token state for the actual-argument scan of
-// one property instance. `d` is the parenthesis depth; the per-argument fields
-// accumulate the identifiers and token count of the argument currently being
-// read so finalize() can classify it as a single-identifier actual.
 struct InstanceArgScan {
   PropertyInstanceArgInfo info;
   int d = 1;
@@ -87,8 +80,6 @@ struct InstanceArgScan {
     cur_tokens = 0;
   }
 
-  // Consumes one token of the argument list. Returns false once the matching
-  // ')' for the opening '(' has been consumed (scan complete).
   bool Step(Lexer& lexer, ModuleItem* item) {
     if (LexerCheck(lexer, TokenKind::kLParen)) {
       if (prev_was_ident) item->prop_instance_refs.push_back(prev_ident);
@@ -128,26 +119,17 @@ struct InstanceArgScan {
   }
 };
 
-// §16.12.17 Restriction 4: capture the actual-argument shape of one property
-// instance. On entry the lexer's current token is the opening '(' of the
-// argument list; on return the matching ')' has been consumed. Nested instance
-// references found within the arguments are still recorded into
-// prop_instance_refs so the dependency digraph is unaffected.
 static void CaptureInstanceArgs(Lexer& lexer, ModuleItem* item,
                                 std::string_view callee) {
   InstanceArgScan scan;
   scan.info.callee = callee;
-  lexer.Next();  // '('
+  lexer.Next();
   while (scan.d > 0 && !lexer.Peek().Is(TokenKind::kEof)) {
     if (!scan.Step(lexer, item)) break;
   }
   item->prop_instance_args.push_back(std::move(scan.info));
 }
 
-// §16.6/§16.10: a built-in scalar/integral/string type keyword that may head
-// the var_data_type of an assertion_variable_declaration. User-defined type
-// aliases also satisfy the grammar, but the parser's best-effort harvest only
-// needs to recognise the built-in cases.
 bool IsBuiltinTypeKwForLocalVar(TokenKind k) {
   switch (k) {
     case TokenKind::kKwReg:
@@ -170,15 +152,6 @@ bool IsBuiltinTypeKwForLocalVar(TokenKind k) {
   }
 }
 
-// §16.14.7: a system-function name that opens a formal's default value (it
-// directly follows `=`), in a sequence's or a property's port list.
-// $inferred_clock shall only default a formal that is untyped or of type
-// `event`, whatever its type was written or carried from (§16.8), so it is
-// rejected where `clock_default_allowed` is false. An inferred clocking or
-// disable function shall also be the entire default value expression: if any
-// further token of the default follows the call (the next token is neither the
-// formal separator ',' nor the port list's closing ')'), it is only part of a
-// larger expression. The function is recorded on the formal just harvested.
 void ScanSystemDefaultValue(Lexer& lexer, DiagEngine& diag, ModuleItem* item,
                             bool clock_default_allowed) {
   auto fn = lexer.Peek().text;
@@ -205,22 +178,12 @@ void ScanSystemDefaultValue(Lexer& lexer, DiagEngine& diag, ModuleItem* item,
   }
 }
 
-// §16.12 named-property body scan state carried across loop iterations. Groups
-// the §16.12.16 case-default stack and the §16.12.17 negation/time-advance
-// trackers as a single entity so cross-iteration state is preserved exactly as
-// in the original inline loop.
 struct PropertyBodyScanState {
-  // §16.12.16: per open case statement, the count of default items seen.
   std::vector<int> case_default_counts;
-  // §16.12.17 Restriction 1: the next instance reached is a negation operand.
   bool expect_negated_operand = false;
-  // §16.12.17 Restriction 3: a time-advancing operator has been seen.
   bool saw_time_advance = false;
 };
 
-// §16.12.16: handles the `case`/`endcase`/`default` family that maintains the
-// per-property-case default-item stack. Returns true if the current token was
-// consumed here.
 static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
                                  PropertyBodyScanState& state) {
   if (LexerCheck(lexer, TokenKind::kKwCase)) {
@@ -236,8 +199,6 @@ static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
   }
   if (LexerCheck(lexer, TokenKind::kKwDefault) &&
       !state.case_default_counts.empty()) {
-    // §16.12.16: the default statement is optional, but using more than one
-    // default in a single property case statement shall be illegal.
     auto default_loc = lexer.Peek().loc;
     if (++state.case_default_counts.back() == 2) {
       diag.Error(default_loc,
@@ -251,19 +212,10 @@ static bool ScanCaseDefaultToken(Lexer& lexer, DiagEngine& diag,
   return false;
 }
 
-// §16.12.10: the indexed nexttime forms `nexttime [ constant_expression ]` and
-// `s_nexttime [ constant_expression ]` carry a bracketed tick count that shall
-// be a non-negative integer constant expression. Like the literal cycle-delay
-// range check (§16.7), only the literal `[ [-] INTLIT ]` form is diagnosed
-// here: a negative integer literal index violates the non-negative requirement
-// and is rejected, while a symbolic index (for example a parameter) needs full
-// constant folding and is deferred to later stages. The bracket tokens are only
-// peeked under SavePos, so the surrounding body scan still walks past them.
-// Called with the current token positioned on the opening '['.
 static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   auto index_loc = lexer.Peek().loc;
   auto saved = lexer.SavePos();
-  lexer.Next();  // [
+  lexer.Next();
   bool negative = false;
   if (LexerCheck(lexer, TokenKind::kMinus)) {
     negative = true;
@@ -272,8 +224,6 @@ static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   bool is_int_literal = LexerCheck(lexer, TokenKind::kIntLiteral);
   lexer.RestorePos(saved);
 
-  // §16.12.10: a negative integer literal tick count is illegal. Non-literal
-  // (symbolic) indices are left for the constant-folding stages.
   if (negative && is_int_literal) {
     diag.Error(index_loc,
                "nexttime index must be a non-negative integer constant "
@@ -282,13 +232,8 @@ static void ValidateLiteralNexttimeIndex(Lexer& lexer, DiagEngine& diag) {
   }
 }
 
-// The literal shape a bracketed property range may take:
-// `[ [-]INTLIT [ : [-]INTLIT | : $ ] ]`. Only this form is diagnosed in the
-// parser -- a symbolic bound (for example a parameter) needs full constant
-// folding and is deferred to later stages -- so each field records what was
-// literally seen rather than a folded value.
 struct LiteralRangeBounds {
-  SourceLoc loc;  // the opening '[', which a diagnostic is anchored at
+  SourceLoc loc;
   bool min_negative = false;
   bool min_is_literal = false;
   bool max_negative = false;
@@ -298,16 +243,11 @@ struct LiteralRangeBounds {
   std::string max_text;
 };
 
-// Reports the literal shape of the bracketed range the lexer is positioned on.
-// The tokens are only peeked under SavePos, so the lexer is left where it
-// started and the surrounding body scan still walks past them. A range with no
-// `:` leaves every max field clear. Called with the current token positioned on
-// the opening '['.
 static LiteralRangeBounds ScanLiteralRange(Lexer& lexer) {
   LiteralRangeBounds r;
   r.loc = lexer.Peek().loc;
   auto saved = lexer.SavePos();
-  lexer.Next();  // [
+  lexer.Next();
   if (LexerCheck(lexer, TokenKind::kMinus)) {
     r.min_negative = true;
     lexer.Next();
@@ -318,7 +258,7 @@ static LiteralRangeBounds ScanLiteralRange(Lexer& lexer) {
     lexer.Next();
   }
   if (LexerCheck(lexer, TokenKind::kColon)) {
-    lexer.Next();  // :
+    lexer.Next();
     if (LexerCheck(lexer, TokenKind::kMinus)) {
       r.max_negative = true;
       lexer.Next();
@@ -334,8 +274,6 @@ static LiteralRangeBounds ScanLiteralRange(Lexer& lexer) {
   return r;
 }
 
-// Reads a plain decimal integer literal's magnitude. A sized or based literal
-// needs full constant evaluation, so it is not compared here and yields false.
 static bool PlainDecimalMagnitude(const std::string& text, uint64_t& out) {
   uint64_t value = 0;
   bool saw_digit = false;
@@ -350,12 +288,6 @@ static bool PlainDecimalMagnitude(const std::string& text, uint64_t& out) {
   return true;
 }
 
-// The two rules every bracketed property range shares: both bounds shall be
-// non-negative integer constant expressions, and when both are non-negative
-// integer constant literals the minimum shall not exceed the maximum. `what`
-// names the property in the diagnostic and `subclause` the subclause stating
-// the rule for it. Returns false once a violation has been reported, so a
-// caller stops before applying its own boundedness rule.
 static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
                                     DiagEngine& diag, std::string_view what,
                                     Subclause subclause) {
@@ -383,11 +315,6 @@ static bool CheckLiteralRangeBounds(const LiteralRangeBounds& r,
   return true;
 }
 
-// §16.12.11: validate the bracketed range of a ranged always property. Beyond
-// the bounds rules every property range shares, a strong always needs a
-// finite range, so a `$` maximum is illegal for `s_always` while it is allowed
-// for a weak always. Called with the current token positioned on the
-// opening '['.
 static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
                                        bool strong) {
   auto r = ScanLiteralRange(lexer);
@@ -400,15 +327,6 @@ static void ValidateLiteralAlwaysRange(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// §16.12.13: validate the bracketed range of a ranged eventually property. The
-// weak form carries a constant_range and the strong form a
-// cycle_delay_const_range_expression, but both share the literal shape. Beyond
-// the bounds rules every property range shares, the polarity of the
-// boundedness rule is the reverse of §16.12.11: a weak `eventually` needs a
-// finite range, so a `$` maximum is illegal there (the
-// `eventually [2:$]` form is illegal), while the range for a strong
-// `s_eventually` may be unbounded. Called with the current token positioned on
-// the opening '['.
 static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
                                            bool strong) {
   auto r = ScanLiteralRange(lexer);
@@ -422,7 +340,6 @@ static void ValidateLiteralEventuallyRange(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// Consumes the bracket group at the cursor, with the groups nested in it.
 static void SkipBracketGroup(Lexer& lexer) {
   int depth = 0;
   do {
@@ -435,15 +352,6 @@ static void SkipBracketGroup(Lexer& lexer) {
   } while (depth > 0 && !lexer.Peek().Is(TokenKind::kEof));
 }
 
-// §16.12.17 Restrictions 1 & 3: handles the prefix-negation operators and the
-// time-advancing operators that update the scan trackers. Returns true if the
-// current token was consumed here.
-// Consume one of the strong prefix/infix property operators and validate its
-// bracketed operand. §16.12.10: the strong indexed form is `s_nexttime [ c ]`.
-// The other bracketed operators in this group carry ranges: s_always's
-// constant_range is checked under §16.12.11, and s_eventually's
-// cycle_delay_const_range_expression under §16.12.13 -- the latter permitting
-// an unbounded `$` maximum that the weak forms forbid.
 static void ScanStrongPropertyOperator(Lexer& lexer, DiagEngine& diag,
                                        PropertyBodyScanState& state) {
   bool is_s_nexttime = LexerCheck(lexer, TokenKind::kKwSNexttime);
@@ -456,21 +364,14 @@ static void ScanStrongPropertyOperator(Lexer& lexer, DiagEngine& diag,
   if (is_s_nexttime)
     ValidateLiteralNexttimeIndex(lexer, diag);
   else if (is_s_always)
-    ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/true);
+    ValidateLiteralAlwaysRange(lexer, diag, true);
   else if (is_s_eventually)
-    ValidateLiteralEventuallyRange(lexer, diag, /*strong=*/true);
-  // The index or range is the operator's own, so the operand Restriction 1
-  // marks is the one after it, and the group is read past whole.
+    ValidateLiteralEventuallyRange(lexer, diag, true);
   SkipBracketGroup(lexer);
 }
 
 static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
                               PropertyBodyScanState& state) {
-  // §16.12.17 Restriction 1: the prefix operators not, s_nexttime,
-  // s_eventually, and s_always negate/strongly bind the property expression
-  // that follows. s_until and s_until_with are infix; their right operand is
-  // also a property expression. Mark that the next instance reached is one of
-  // these operands. (s_nexttime also advances time for Restriction 3.)
   if (LexerCheck(lexer, TokenKind::kKwNot) ||
       LexerCheck(lexer, TokenKind::kKwSNexttime) ||
       LexerCheck(lexer, TokenKind::kKwSEventually) ||
@@ -480,41 +381,26 @@ static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
     ScanStrongPropertyOperator(lexer, diag, state);
     return true;
   }
-  // §16.12.11: the weak `always` prefix admits a ranged form carrying a
-  // cycle_delay_const_range_expression. It is neither a negation nor a
-  // time-advancing operator for §16.12.17, so it is consumed here solely to
-  // validate the range literal. Resetting the pending-negation flag mirrors the
-  // generic token handling `always` previously fell through to, keeping the
-  // §16.12.17 scan state unchanged.
   if (LexerCheck(lexer, TokenKind::kKwAlways)) {
     state.expect_negated_operand = false;
     lexer.Next();
     if (LexerCheck(lexer, TokenKind::kLBracket))
-      ValidateLiteralAlwaysRange(lexer, diag, /*strong=*/false);
+      ValidateLiteralAlwaysRange(lexer, diag, false);
     return true;
   }
-  // §16.12.13: the weak `eventually` prefix admits only a ranged form, and that
-  // range has to be finite (a `$` maximum is illegal). Like weak `always`, it
-  // is neither a negation nor a time-advancing operator for §16.12.17, so it is
-  // consumed here solely to validate the range literal. Resetting the
-  // pending-negation flag mirrors the generic token handling `eventually`
-  // otherwise falls through to, leaving the §16.12.17 scan state unchanged.
   if (LexerCheck(lexer, TokenKind::kKwEventually)) {
     state.expect_negated_operand = false;
     lexer.Next();
     if (LexerCheck(lexer, TokenKind::kLBracket))
-      ValidateLiteralEventuallyRange(lexer, diag, /*strong=*/false);
+      ValidateLiteralEventuallyRange(lexer, diag, false);
     return true;
   }
-  // §16.12.17 Restriction 3: ##, |=> (suffix non-overlapping implication),
-  // and (s_)nexttime advance time. |-> (overlapping implication) does not.
   if (LexerCheck(lexer, TokenKind::kHashHash) ||
       LexerCheck(lexer, TokenKind::kPipeEqGt) ||
       LexerCheck(lexer, TokenKind::kKwNexttime)) {
     bool is_nexttime = LexerCheck(lexer, TokenKind::kKwNexttime);
     state.saw_time_advance = true;
     lexer.Next();
-    // §16.12.10: validate the weak indexed form `nexttime [ c ]`.
     if (is_nexttime && LexerCheck(lexer, TokenKind::kLBracket))
       ValidateLiteralNexttimeIndex(lexer, diag);
     return true;
@@ -522,9 +408,6 @@ static bool ScanOperatorToken(Lexer& lexer, DiagEngine& diag,
   return false;
 }
 
-// §16.12.18: reports whether `name` was declared as a `property`-typed formal
-// of this named property. The is-property flags are recorded in parallel with
-// the formal names during the port-list scan.
 static bool IsPropertyTypedFormal(const ModuleItem* item,
                                   std::string_view name) {
   for (size_t i = 0; i < item->prop_formals.size(); ++i) {
@@ -537,9 +420,6 @@ static bool IsPropertyTypedFormal(const ModuleItem* item,
   return false;
 }
 
-// Handles an identifier head: a following '(' makes it a property/sequence
-// instance reference (recorded, with §16.12.17 negation/self-recursion checks
-// and argument capture); otherwise it is a bare expression operand.
 static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
                                 ModuleItem* item,
                                 PropertyBodyScanState& state) {
@@ -549,10 +429,6 @@ static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
     if (state.expect_negated_operand) {
       item->prop_negated_instance_refs.push_back(tok.text);
     }
-    // §16.12.17 Restriction 3: an instance reached before any positive time
-    // advance is a zero-weight out-edge. The direct self-loop is flagged
-    // outright; every zero-weight edge is also recorded so the elaborator can
-    // reject zero-weight mutual-recursion cycles, not only direct ones.
     if (!state.saw_time_advance) {
       item->prop_untimed_instance_refs.push_back(tok.text);
       if (tok.text == item->name) {
@@ -562,15 +438,7 @@ static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
     state.expect_negated_operand = false;
     CaptureInstanceArgs(lexer, item, tok.text);
   } else {
-    // A bare identifier is not a property instance; if it stood as the
-    // operand of a pending negation, that operand is a simple expression.
     state.expect_negated_operand = false;
-    // §16.12.18: a formal argument of type `property` may not be referenced as
-    // the antecedent of an overlapping (`|->`) or non-overlapping (`|=>`)
-    // implication (see §16.12.7), regardless of the actual argument bound to
-    // it, because a property_expr may not be written in the antecedent
-    // position. When such a bare formal reference is immediately followed by an
-    // implication operator, it stands in that forbidden antecedent position.
     if ((LexerCheck(lexer, TokenKind::kPipeDashGt) ||
          LexerCheck(lexer, TokenKind::kPipeEqGt)) &&
         IsPropertyTypedFormal(item, tok.text)) {
@@ -582,10 +450,6 @@ static void ScanIdentifierToken(Lexer& lexer, DiagEngine& diag,
   }
 }
 
-// Processes one token of the named-property body scan that is not an assertion
-// variable declaration (those are harvested by the caller, which owns the
-// member helper). Carries the §16.12 scan state by reference so cross-iteration
-// state is preserved exactly as in the original inline loop.
 static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
                                   ModuleItem* item,
                                   PropertyBodyScanState& state) {
@@ -597,11 +461,6 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     }
     return;
   }
-  // §16.16(b2): an `@(...)` in the property body is an explicit clocking event.
-  // Count it so a multiclocked property can be recognized, and read its event
-  // group for the local variables §16.10 keeps out of a clocking event, which
-  // is what Annex F.5.1's clock rewrite requires of a property as of a
-  // sequence.
   if (LexerCheck(lexer, TokenKind::kAt)) {
     ++item->decl_clock_event_count;
     lexer.Next();
@@ -614,18 +473,11 @@ static void ScanPropertyBodyToken(Lexer& lexer, DiagEngine& diag,
     ScanIdentifierToken(lexer, diag, item, state);
     return;
   }
-  // Opening parentheses are skipped so a negation can still reach an instance
-  // wrapped in parentheses; any other token ends a pending negation operand.
   if (!LexerCheck(lexer, TokenKind::kLParen))
     state.expect_negated_operand = false;
   lexer.Next();
 }
 
-// §16.12.1: a property body is a property_spec, and one that is temporal --
-// holding an implication or a cycle delay -- is not the clocked boolean form
-// CaptureClockedBooleanPropertyBody records. ParseExpr would read `a |-> b` as
-// an expression, so the operators are looked for before it is tried. Scans from
-// the current token to `endproperty` and leaves the lexer where it was.
 bool Parser::PropertyBodyHasTemporalOperator() {
   auto scan = lexer_.SavePos();
   bool found = false;
@@ -642,37 +494,24 @@ bool Parser::PropertyBodyHasTemporalOperator() {
   return found;
 }
 
-// §16.12.1: an instance of a named property may stand as the property_spec of
-// a concurrent assertion, and the assertion is then the property's body in
-// that place. Trial-parses the body `@(event_list) boolean_expression` that
-// Parser::TryParseSimpleConcurrentProperty accepts in an assertion, with or
-// without the `;` A.2.10 makes optional after it, and records its clock in
-// prop_clock and its boolean in prop_body_expr so the elaborator can make that
-// substitution. Diagnostics are suppressed and the lexer is
-// rewound, so the body scan in ParsePropertyDecl re-reads the same tokens; a
-// body of any other shape leaves both fields empty.
 void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   if (!Check(TokenKind::kAt) || PropertyBodyHasTemporalOperator()) return;
   auto saved = lexer_.SavePos();
   diag_.PushSuppress();
-  Consume();  // '@'
+  Consume();
   std::vector<EventExpr> clock;
   bool ok = Match(TokenKind::kLParen);
   if (ok) {
     clock = ParseEventList();
     ok = Match(TokenKind::kRParen);
   }
-  // §16.12: a `disable iff ( expression_or_dist )` between the clock and the
-  // boolean is the body's disable condition.
   Expr* disable_iff = nullptr;
   if (ok) ok = TryParseDisableIff(disable_iff);
-  // §16.12.3: each `not` before the boolean negates it once more.
   bool negated = false;
   while (ok && Match(TokenKind::kKwNot)) negated = !negated;
   Expr* boolean =
       ok ? ParserPropertySpecHelpers::ParseExpressionOrDist(*this) : nullptr;
   ok = boolean != nullptr;
-  // A.2.10: the `;` after the spec is optional.
   if (ok) Match(TokenKind::kSemicolon);
   ok = ok && Check(TokenKind::kKwEndproperty);
   diag_.PopSuppress();
@@ -684,8 +523,6 @@ void Parser::CaptureClockedBooleanPropertyBody(ModuleItem* item) {
   item->prop_negated = negated;
 }
 
-// §16.12 + §F.4.1: capture formal names, body disable-iff count, and nested
-// property/sequence instance references so the rewriter has what it needs.
 ModuleItem* Parser::ParsePropertyDecl() {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kPropertyDecl;
@@ -701,29 +538,16 @@ ModuleItem* Parser::ParsePropertyDecl() {
   ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
                                                   TokenKind::kKwEndproperty);
 
-  // §16.16(b1): a property_spec may open with an explicit leading clocking
-  // event. Record its presence (the body's first token is `@`) so a clocking
-  // block, which forbids such an event on the declarations it contains, can
-  // reject it.
   item->decl_has_leading_clock = Check(TokenKind::kAt);
 
   CaptureClockedBooleanPropertyBody(item);
   ParserPropertySpecHelpers::CapturePropertyTreeBody(*this, item);
 
-  // §16.10: assertion_variable_declarations may appear at the head of a
-  // property body, just as in a sequence body. Harvest them before the
-  // body skip loop falls through to its existing instance-reference scan;
-  // what follows them is A.2.10's property_spec, held to the grammar.
   while (AtAssertionVariableDecl(lexer_, known_types_)) {
     HarvestAssertionVariableDecl(item);
   }
   ParserPropertyGrammar::CheckDeclarationBody(*this, false,
                                               TokenKind::kKwEndproperty);
-  // §16.12.16/§16.12.17: the case-default stack and the negation/time-advance
-  // trackers are the body scan's cross-iteration state. case_default_counts
-  // stacks nested `case`..`endcase` default counts; expect_negated_operand
-  // marks a pending prefix-negation operand; saw_time_advance records a
-  // time-advancing operator before a self-name instantiation.
   PropertyBodyScanState scan_state;
 
   while (!Check(TokenKind::kKwEndproperty) && !AtEnd()) {

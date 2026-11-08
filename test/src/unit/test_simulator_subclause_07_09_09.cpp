@@ -109,12 +109,6 @@ TEST(AssocArrayAssignment, AllEntriesCopied) {
   EXPECT_EQ(v, 60u);
 }
 
-// §7.9.9 with §8.5: an associative array property is assigned whole like any
-// associative array, the target cleared and each source entry copied in,
-// whichever side the property stands on: `a.m = x` through a handle takes x's
-// two entries and a third after it, `b.m = a.m` copies the three, and `x =
-// a.m` makes the module's array those three. With a property on either side
-// the assignment did nothing, and the counts read 1, 0 and 2.
 TEST(AssocArrayAssignment, PropertyOnEitherSideIsCopiedWhole) {
   auto v = RunAndGet(
       "class P;\n"
@@ -137,10 +131,6 @@ TEST(AssocArrayAssignment, PropertyOnEitherSideIsCopiedWhole) {
   EXPECT_EQ(v, 333u);
 }
 
-// The same inside a method by the property's bare name, and with class
-// handles as the index, as UVM's uvm_phase::add copies `typedef bit
-// edges_t[uvm_phase];` sets and then clears the source: the copy keeps the
-// two keys the source's delete() then removes from the source alone.
 TEST(AssocArrayAssignment, ClassKeyedPropertyCopiedInAMethodOutlivesTheSource) {
   auto v = RunAndGet(
       "class P;\n"

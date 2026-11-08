@@ -7,13 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 21-18: dumplimit_task ::= $dumplimit ( filesize ) ; -- a task enable
-// carrying one required parenthesized filesize argument and terminated by a
-// semicolon. The tests cover the argument forms filesize can take and the
-// syntactic positions the task enable can occupy.
-
-// The canonical shape: a literal filesize inside the dump-task idiom of an
-// initial begin-end block.
 TEST(IoSystemTaskParsing, DumplimitCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -25,8 +18,6 @@ TEST(IoSystemTaskParsing, DumplimitCall) {
               "endmodule\n"));
 }
 
-// A bare statement needs no begin-end: the task parses as the sole statement
-// of an initial construct behind a delay control.
 TEST(IoSystemTaskParsing, DumplimitAsSoleStatement) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -34,7 +25,6 @@ TEST(IoSystemTaskParsing, DumplimitAsSoleStatement) {
               "endmodule\n"));
 }
 
-// The task is an ordinary statement inside an always procedure.
 TEST(IoSystemTaskParsing, DumplimitInAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -45,7 +35,6 @@ TEST(IoSystemTaskParsing, DumplimitInAlwaysBlock) {
               "endmodule\n"));
 }
 
-// The task is an ordinary statement inside a task body.
 TEST(IoSystemTaskParsing, DumplimitInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -55,7 +44,6 @@ TEST(IoSystemTaskParsing, DumplimitInTaskBody) {
               "endmodule\n"));
 }
 
-// filesize is an expression: a parameter reference is an accepted argument.
 TEST(IoSystemTaskParsing, DumplimitParameterFilesize) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -64,7 +52,6 @@ TEST(IoSystemTaskParsing, DumplimitParameterFilesize) {
               "endmodule\n"));
 }
 
-// filesize is an expression: an arithmetic expression is an accepted argument.
 TEST(IoSystemTaskParsing, DumplimitExpressionFilesize) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -72,8 +59,6 @@ TEST(IoSystemTaskParsing, DumplimitExpressionFilesize) {
               "endmodule\n"));
 }
 
-// Negative: the production requires the terminating semicolon, so a
-// $dumplimit task enable running straight into the block end is rejected.
 TEST(IoSystemTaskParsing, DumplimitMissingSemicolonRejected) {
   auto result = Parse(
       "module t;\n"
@@ -81,8 +66,6 @@ TEST(IoSystemTaskParsing, DumplimitMissingSemicolonRejected) {
       "    $dumplimit(200)\n"
       "  end\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that terminates a subroutine call statement;
-  // §21.7.1.5 states the dumplimit_task production but reports nothing itself.
   EXPECT_TRUE(
       ReportedError(result.diags, "expected ';', got 'end'", 4, "12.3"));
 }

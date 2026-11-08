@@ -5,23 +5,8 @@
 
 using namespace delta;
 
-// §A.2.1.2 end-to-end coverage. The port-declaration productions
-// (inout/input/output/ref _declaration and interface_port_declaration) are
-// pure syntax whose observable runtime consequence is that the DIRECTION named
-// in each production actually governs how a value crosses the module boundary:
-// an input carries a value inward, an output carries a value outward, and each
-// admitted port type (net_port_type vs variable_port_type from §A.2.2.1) and
-// each identifier in a list_of_port_identifiers (§A.2.3) becomes an independent
-// port at runtime. The parser and elaborator files observe the productions
-// being parsed and carried; these tests instead build each port from the real
-// dependency syntax, instantiate the module, drive it, and run the design so
-// the direction is observed actually moving the value.
-
 namespace {
 
-// input_declaration / output_declaration, variable_port_type (§A.2.2.1) form.
-// The input carries the connected literal into the child; the output carries
-// the copied value back out to the parent signal read after the run.
 TEST(PortDeclSim, VariablePortTypeInputAndOutputCarryValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,10 +21,6 @@ TEST(PortDeclSim, VariablePortTypeInputAndOutputCarryValue) {
   LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
-// input_declaration, net_port_type (§A.2.2.1) form: the input is declared with
-// an explicit net type (`wire`) rather than a variable type. The value must
-// still cross the boundary inward, confirming the net alternative of the
-// production is wired at runtime just as the variable alternative is.
 TEST(PortDeclSim, NetPortTypeInputCarriesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,9 +35,6 @@ TEST(PortDeclSim, NetPortTypeInputCarriesValue) {
   LowerRunAndCheck(f, design, {{"result", 55u}});
 }
 
-// output_declaration in isolation: the child drives its output from an internal
-// constant with no input involved, so the observed parent value can only have
-// arrived through the output direction moving the value outward.
 TEST(PortDeclSim, OutputPortDrivesValueOutward) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -71,11 +49,6 @@ TEST(PortDeclSim, OutputPortDrivesValueOutward) {
   LowerRunAndCheck(f, design, {{"result", 123u}});
 }
 
-// list_of_port_identifiers (§A.2.3): a single input_declaration names two
-// identifiers in one comma list. At runtime that one declaration must yield two
-// independent input ports, each carrying its own connected value. Reading the
-// two distinct parent results shows the list produced separate ports rather
-// than collapsing them.
 TEST(PortDeclSim, PortIdentifierListYieldsIndependentPorts) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -92,10 +65,6 @@ TEST(PortDeclSim, PortIdentifierListYieldsIndependentPorts) {
   LowerRunAndCheck(f, design, {{"rx", 7u}, {"ry", 9u}});
 }
 
-// A body port declaration and a function's body port declaration (A.2.7) take
-// a data_type, which A.2.2.1 lets name a package's typedef through its scope.
-// Each port is then pk::nib_t's four bits, so 4'hA crosses whole; a one-bit
-// port would carry its low bit, 0.
 TEST(PortDeclSim, BodyPortsOfAPackageScopedTypeCarryItsWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -121,12 +90,6 @@ TEST(PortDeclSim, BodyPortsOfAPackageScopedTypeCarryItsWidth) {
   LowerRunAndCheck(f, design, {{"result", 0xAu}, {"passed", 0xAu}});
 }
 
-// A.2.1.2's port declarations take a data_type after `var`, which A.2.2.1 lets
-// be a type_reference (§6.23). Each port here is x's int, an earlier port of
-// the header and a variable of the body alike being x, so -5 crosses whole; a
-// one-bit port would carry its low bit, 1. The header's x is written with
-// `var`, since an input of no port kind is a net (§23.2.2.3), which §6.7.1
-// bars from a 2-state type.
 TEST(PortDeclSim, VarPortsOfATypeReferenceCarryTheReferencedType) {
   SimFixture f;
   auto* design = ElaborateSrc(

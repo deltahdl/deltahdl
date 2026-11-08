@@ -1,6 +1,3 @@
-// §27.4 and §27.5 with §23.6: what a generate block instance declares, listed
-// with the path that names the instance, for the run to reach through it.
-
 #include "elaborator/gen_block_members.h"
 
 #include <cstddef>
@@ -17,11 +14,6 @@ DeclarationCounts CountDeclarations(const RtlirModule* mod) {
           mod->clocking_blocks.size()};
 }
 
-// The instance's variables and nets are stored under its prefix and its
-// parameters under their simple names; a declaration stored under no such key
-// belongs to no member and is left out. A clocking block is registered by the
-// run rather than stored here, so it is listed with the prefixes a bare name
-// in it resolves through (§23.9) and the path that names it from outside.
 void RecordBlockItemMembers(RtlirModule* mod,
                             const GenBlockInstanceScope& scope,
                             const DeclarationCounts& before) {

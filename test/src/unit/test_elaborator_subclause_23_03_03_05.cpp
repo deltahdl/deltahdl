@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -77,9 +76,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      MultiDimensionalUnpackedArrayPortMatchingDimensionsAccepted) {
-  // A single instance whose port carries two unpacked dimensions matches a
-  // connection of the same shape: both dimension count and each per-dimension
-  // size line up, so the binding is accepted.
   EXPECT_TRUE(
       ElabOk("module child(input [7:0] data [2][3]);\n"
              "endmodule\n"
@@ -91,9 +87,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      MultiDimensionalUnpackedArrayPortInnerDimensionSizeMismatchErrors) {
-  // The dimension count matches (two unpacked dimensions on each side) and the
-  // outer size agrees, but the inner dimension differs (3 vs 4), which the
-  // per-dimension comparison must reject.
   ElabFixture f;
   ElaborateSrc(
       "module child(input [7:0] data [2][3]);\n"
@@ -181,9 +174,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
 
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      MultiDimensionalInstanceArrayPortDimensionSizeMismatchErrors) {
-  // The instance-array dimensions match ([8][4]), but the trailing dimension
-  // that must line up with the per-instance unpacked port (declared as [5])
-  // is connected with size 3, so the port-dimension comparison must fail.
   ElabFixture f;
   ElaborateSrc(
       "module child(output o, input i[5]);\n"
@@ -264,10 +254,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
              "endmodule\n"));
 }
 
-// Each element of an instance array records the array it belongs to - its
-// name as written and its declared bounds - and its own index, which its
-// expanded name alone does not say; an instance outside any array records no
-// array (§37.11, #5071).
 TEST(InstanceArrayElaboration, AnElementRecordsItsArrayAndIndex) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -290,10 +276,6 @@ TEST(InstanceArrayElaboration, AnElementRecordsItsArrayAndIndex) {
   }
 }
 
-// §23.3.3.5 with §10.8 and §10.9: a connection to an input port is an
-// assignment-like context, so an assignment pattern written without a type
-// takes the type of an unpacked array port and matches its dimensions by
-// construction.
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      UntypedPatternConnectedToUnpackedArrayInputIsAccepted) {
   ElabFixture f;
@@ -307,9 +289,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.5 with §7.4: an element of a multidimensional unpacked array and a
-// slice of an unpacked array are unpacked arrays in their own right, so either
-// connects to a port of the dimensions it leaves.
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      ElementAndSliceConnectedToMatchingPortAreAccepted) {
   ElabFixture f;
@@ -328,9 +307,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.5: the dimensions a select leaves are still matched against the
-// port's, so a slice of three elements on a port of two is reported, and so is
-// an element that leaves no unpacked dimension at all.
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      ElementAndSliceOfTheWrongShapeAreReported) {
   ElabFixture f;
@@ -353,10 +329,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
                             6, "23.3.3.5"));
 }
 
-// §23.3.3.5 with §7.4: a descending part-select keeps its dimension at its
-// width as an ascending one does, and a slice whose bounds do not fold to
-// constants leaves that dimension's size unknown, so only the count of
-// dimensions is matched against the port's.
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      DescendingAndUnfoldedSlicesConnectToAMatchingPort) {
   ElabFixture f;
@@ -382,8 +354,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
                              "23.3.3.5"));
 }
 
-// §23.3.3.5: a select reaching past an array's unpacked dimensions into its
-// element's bits names no unpacked array at all.
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      SelectPastTheUnpackedDimensionsIsReported) {
   ElabFixture f;
@@ -401,9 +371,6 @@ TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
                             5, "23.3.3.5"));
 }
 
-// §23.3.3.5: an interface port declared as an array takes an array of
-// interface instances of the same size in each dimension, and one of another
-// size is an error naming the two sizes.
 TEST(UnpackedArrayPortElaboration, InterfaceArrayOfAnotherSizeIsAnError) {
   ElabFixture f;
   ElaborateSrc(
@@ -419,8 +386,6 @@ TEST(UnpackedArrayPortElaboration, InterfaceArrayOfAnotherSizeIsAnError) {
                             5, "23.3.3.5"));
 }
 
-// A single interface instance names no array, so it cannot be the actual of
-// an interface port declared as an array.
 TEST(UnpackedArrayPortElaboration, ScalarInterfaceOnAnInterfaceArrayPortFails) {
   ElabFixture f;
   ElaborateSrc(
@@ -436,9 +401,6 @@ TEST(UnpackedArrayPortElaboration, ScalarInterfaceOnAnInterfaceArrayPortFails) {
                             "23.3.3.5"));
 }
 
-// The array an interface array port's actual names is found among the
-// instantiating module's items whatever declarations come before it, so the
-// connection matches and nothing is reported.
 TEST(UnpackedArrayPortElaboration, InterfaceArrayAfterDeclarationsMatches) {
   EXPECT_TRUE(
       ElabOk("interface ifc; logic a; endinterface\n"
@@ -450,9 +412,6 @@ TEST(UnpackedArrayPortElaboration, InterfaceArrayAfterDeclarationsMatches) {
              "endmodule\n"));
 }
 
-// §23.3.3.5 (printed page 748): `child c[8][4](o, i);` is an instance per
-// element of both dimensions, each named by both its indices, c[0][0] to
-// c[7][3]; it was one instance named c.
 TEST(UnpackedArrayPortsAndArraysOfInstancesElaboration,
      ATwoDimensionalInstanceArrayIsAnInstancePerElement) {
   ElabFixture f;

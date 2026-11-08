@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §17.6 with §16.11: a checker triggers its covergroup from a sequence match
-// item, `cg_1.sample()` beside the sequence's condition, and the call does not
-// alter the match. v1 is high at the posedges at 5 and 15 and v2 throughout,
-// so `v1 ##1 v2` matches at 15 and 25 and the cover property succeeds twice.
-// The call was not read as a match item, and the cover never succeeded.
 TEST(CheckerCovergroup, SampledFromASequenceMatchItem) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -43,9 +38,6 @@ TEST(CheckerCovergroup, SampledFromASequenceMatchItem) {
   EXPECT_EQ(hits->value.ToUint64(), 2u);
 }
 
-// §17.6 with §19.3: a covergroup declared in a checker is instantiated per
-// checker instance and sampled there, by an explicit sample() from an
-// always_ff and by its own clocking event alike.
 TEST(CheckerCovergroup, InstanceSampledExplicitlyAndByItsEvent) {
   SimFixture f;
   EXPECT_EQ(
@@ -71,7 +63,6 @@ TEST(CheckerCovergroup, InstanceSampledExplicitlyAndByItsEvent) {
           "endmodule\n",
           f),
       "$finish at time 52\n");
-  // The final procedure reports, run as the end of simulation runs it.
   std::ostringstream reported;
   std::streambuf* old_buf = std::cout.rdbuf(reported.rdbuf());
   f.ctx.RunFinalBlocks();

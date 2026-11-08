@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.7's `fun` example: an actual with fewer unpacked dimensions than the
-// formal cannot be associated with it.
 TEST(ArraySubroutineArgValidation, ActualWithFewerUnpackedDimsIsRejected) {
   ElabFixture f;
   ElabOk(
@@ -24,8 +22,6 @@ TEST(ArraySubroutineArgValidation, ActualWithFewerUnpackedDimsIsRejected) {
                             4, "7.7"));
 }
 
-// The same example's size error: the faster-varying dimension of the actual
-// has 4 elements where the formal's has 3.
 TEST(ArraySubroutineArgValidation, ActualWithDifferentFasterDimSizeIsRejected) {
   ElabFixture f;
   ElabOk(
@@ -41,8 +37,6 @@ TEST(ArraySubroutineArgValidation, ActualWithDifferentFasterDimSizeIsRejected) {
                             4, "7.7"));
 }
 
-// The sizes are compared in the slowest-varying dimension too, and a formal
-// written with sizes rather than ranges is compared the same way.
 TEST(ArraySubroutineArgValidation,
      ActualWithDifferentSlowestDimSizeIsRejected) {
   ElabFixture f;
@@ -60,8 +54,6 @@ TEST(ArraySubroutineArgValidation,
                             5, "7.7"));
 }
 
-// §7.7 accepts `int b[1:3][0:2]` for `fun`: the ranges differ but the number
-// of dimensions and the size of each are the same.
 TEST(ArraySubroutineArgValidation, ActualWithSameSizesInOtherRangesElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -71,8 +63,6 @@ TEST(ArraySubroutineArgValidation, ActualWithSameSizesInOtherRangesElaborates) {
              "endmodule\n"));
 }
 
-// A dynamic slowest dimension has no size until run time, so only the fixed
-// dimension behind it is compared; a matching one elaborates.
 TEST(ArraySubroutineArgValidation,
      DynamicOuterActualWithMatchingDimElaborates) {
   EXPECT_TRUE(
@@ -98,8 +88,6 @@ TEST(ArraySubroutineArgValidation, DynamicOuterActualWithOtherDimIsRejected) {
                             4, "7.7"));
 }
 
-// A queue actual still has to bring as many unpacked dimensions as the formal
-// has, whatever its size turns out to be.
 TEST(ArraySubroutineArgValidation, QueueActualForTwoDimFormalIsRejected) {
   ElabFixture f;
   ElabOk(
@@ -115,8 +103,6 @@ TEST(ArraySubroutineArgValidation, QueueActualForTwoDimFormalIsRejected) {
                             4, "7.7"));
 }
 
-// §7.7's `logic b[3:1][3:1]` for `fun`: logic is 4-state where int is 2-state,
-// so the element types are not equivalent.
 TEST(ArraySubroutineArgValidation,
      ActualOfLogicElementsForIntFormalIsRejected) {
   ElabFixture f;
@@ -133,7 +119,6 @@ TEST(ArraySubroutineArgValidation,
                             4, "7.7"));
 }
 
-// §7.7's `event b[3:1][3:1]` for `fun`: an event is no integral type at all.
 TEST(ArraySubroutineArgValidation,
      ActualOfEventElementsForIntFormalIsRejected) {
   ElabFixture f;
@@ -151,9 +136,6 @@ TEST(ArraySubroutineArgValidation,
                             5, "7.7"));
 }
 
-// §6.22.2 makes `bit signed [31:0]` equivalent to int, and a typedef name
-// equivalent to the type it names, so both actuals are associated with the
-// int formal.
 TEST(ArraySubroutineArgValidation, ActualOfEquivalentElementsElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -168,9 +150,6 @@ TEST(ArraySubroutineArgValidation, ActualOfEquivalentElementsElaborates) {
              "endmodule\n"));
 }
 
-// An element type that is itself an unpacked array by typedef brings its own
-// dimensions behind the declaration's, so `row_t b[3]` has the two dimensions
-// of the formal.
 TEST(ArraySubroutineArgValidation, ActualOfArrayTypedefElementsElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -181,9 +160,6 @@ TEST(ArraySubroutineArgValidation, ActualOfArrayTypedefElementsElaborates) {
              "endmodule\n"));
 }
 
-// §7.7: a dynamic array or queue may not be the actual of a DPI import's
-// open-array output formal, whichever way the call binds it, by position or
-// by name. A call that binds no actual to that formal has nothing to judge.
 TEST(ArraySubroutineArgValidation,
      DpiOpenArrayOutputJudgedWhicheverWayItIsBound) {
   ElabFixture f;
@@ -207,9 +183,6 @@ TEST(ArraySubroutineArgValidation,
   EXPECT_TRUE(ReportedError(diags, kReport, 7, "7.7"));
 }
 
-// §7.7 with §6.22.2: an actual whose elements are a different enumeration from
-// the formal's is not equivalent to it, however wide the two are; one whose
-// elements are a typedef renaming the formal's enumeration is.
 TEST(ArraySubroutineArgValidation, EnumElementTypesComparedByIdentity) {
   ElabFixture f;
   ElaborateSrc(

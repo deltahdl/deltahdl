@@ -55,9 +55,6 @@ TEST(ParameterPortListParsing, ParamPortMixedForms) {
   EXPECT_EQ(r.cu->modules[0]->params[3].first, "C");
 }
 
-// A.2.1.1's param_assignment takes { variable_dimension } after the name in a
-// parameter port list as among the items, so A is an array of two and B, the
-// next assignment of the same declaration, one of two by three.
 TEST(ParameterPortListParsing, ParamPortUnpackedDimensions) {
   auto r = Parse(
       "module m #(parameter int A[2] = '{1, 2}, B[2][3] = '{default: 0},\n"
@@ -81,8 +78,6 @@ TEST(ExpressionParsing, ParamExprBinaryOp) {
   EXPECT_EQ(r.cu->modules[0]->params[0].second->kind, ExprKind::kBinary);
 }
 
-// A one-element list_of_param_assignments under an explicit data type; the
-// A.2.3 sibling file covers the implicit-data-type form.
 TEST(DeclarationListParsing, ListOfParamAssignmentsSingleWithDataType) {
   auto r = Parse("module m; parameter int A = 1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -90,8 +85,6 @@ TEST(DeclarationListParsing, ListOfParamAssignmentsSingleWithDataType) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->kind, ModuleItemKind::kParamDecl);
 }
 
-// A multi-element list_of_param_assignments under an explicit data type; the
-// A.2.3 sibling file covers the implicit-data-type form.
 TEST(DeclarationListParsing, ListOfParamAssignmentsMultipleWithDataType) {
   auto r = Parse("module m; parameter int A = 1, B = 2, C = 3; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -103,17 +96,12 @@ TEST(DeclarationListParsing, ListOfParamAssignmentsMultipleWithDataType) {
   EXPECT_GE(count, 3);
 }
 
-// §6.20.1: in the declaration of a parameter in a parameter port list, the
-// specification for its default value may be omitted. The A.2.4 sibling file
-// covers the same omission through the param_assignment production.
 TEST(DeclarationAssignmentParsing, ParamAssignmentDefaultValueOmitted) {
   auto r = Parse("module m #(parameter int P); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
 
-// A type_assignment with a default written among the module items; the A.2.4
-// sibling file carries the parameter-port-list form.
 TEST(DeclarationAssignmentParsing, TypeAssignmentWithDefaultInModuleBody) {
   auto r = Parse("module m; parameter type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -385,7 +373,6 @@ TEST(ParameterPortListParsing, ForwardTypeParameterPortVariants) {
   }
 }
 
-// local_parameter_declaration ::= localparam type_parameter_declaration
 TEST(DeclarationListParsing, LocalparamTypeParameterDeclaration) {
   auto r = Parse("module m; localparam type T = int; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -396,9 +383,6 @@ TEST(DeclarationListParsing, LocalparamTypeParameterDeclaration) {
   EXPECT_TRUE(item->is_localparam);
 }
 
-// list_of_type_assignments ::= type_assignment { , type_assignment }
-// Each element names its own type parameter; the A.2.3 sibling file counts a
-// three-element list instead of checking the names.
 TEST(DeclarationListParsing, ListOfTypeAssignmentsMultipleNamedElements) {
   auto r = Parse("module m; parameter type T = int, U = logic; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -412,8 +396,6 @@ TEST(DeclarationListParsing, ListOfTypeAssignmentsMultipleNamedElements) {
   EXPECT_EQ(count, 2);
 }
 
-// param_assignment ::= parameter_identifier { variable_dimension }
-//                      [ = constant_param_expression ]
 TEST(DeclarationAssignmentParsing, ParamAssignmentWithVariableDimension) {
   auto r =
       Parse("module m; localparam int arr [0:2] = '{1, 2, 3}; endmodule\n");
@@ -425,11 +407,6 @@ TEST(DeclarationAssignmentParsing, ParamAssignmentWithVariableDimension) {
   EXPECT_GE(item->unpacked_dims.size(), 1u);
 }
 
-// specparam_declaration ::= specparam [ packed_dimension ]
-//                           list_of_specparam_assignments ;
-// list_of_specparam_assignments ::= specparam_assignment { ,
-// specparam_assignment } specparam_assignment ::= specparam_identifier =
-// constant_mintypmax_expression
 TEST(DeclarationListParsing, SpecparamDeclarationWithPackedDimAndList) {
   auto r = Parse("module m; specparam [3:0] d1 = 5, d2 = 10; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -448,11 +425,6 @@ TEST(DeclarationListParsing, SpecparamDeclarationWithPackedDimAndList) {
   EXPECT_NE(first->init_expr, nullptr);
 }
 
-// parameter_port_declaration ::= data_type list_of_param_assignments — a port
-// parameter may omit its own type and inherit an implicit type, a later
-// parameter may depend on an earlier one, and a value parameter may be typed
-// by a preceding type parameter. Mirrors the multi-parameter port-list example
-// in the clause text.
 TEST(ParameterPortListParsing, ImplicitTypeAndTypeParameterPorts) {
   auto r = Parse(
       "module mc #(int N = 5, M = N * 16, type T = int, T x = 0)();\n"
@@ -466,13 +438,9 @@ TEST(ParameterPortListParsing, ImplicitTypeAndTypeParameterPorts) {
   EXPECT_EQ(mod->params[2].first, "T");
   EXPECT_EQ(mod->params[3].first, "x");
   EXPECT_EQ(mod->type_param_names.count("T"), 1u);
-  // The implicit-typed parameter still carries a dependent default expression.
   EXPECT_NE(mod->params[1].second, nullptr);
 }
 
-// Footnote to the parameter declaration syntax: omitting the default type of a
-// localparam type parameter is only illegal inside a parameter_port_list, so
-// the same declaration is legal once a default is supplied.
 TEST(ParameterPortListParsing, LocalparamTypePortWithDefaultParses) {
   auto r = Parse("module m #(localparam type T = int)(); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

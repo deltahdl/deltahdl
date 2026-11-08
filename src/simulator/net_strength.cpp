@@ -1,18 +1,3 @@
-// The §28.12 strength algebra and the word-level net resolvers.
-//
-// §28.12.2 has a signal's strength be a range of levels rather than one level
-// where it is ambiguous, and §28.12.3 and §28.12.4 say what combining two such
-// signals gives: CombineAmbiguousStrength takes the per-side extremes of two
-// ambiguous signals, CombineWiredLogicAmbiguous does the same combination for
-// the wired-logic nets §28.12.4 excludes from that shortcut, and
-// CombineAmbigWithUnambig applies §28.12.3's rules a, b and c to an ambiguous
-// signal and a signal of known value and unambiguous strength. ResolveWireWord,
-// ResolveWandWord and ResolveWorWord resolve a whole 64-bit word of two drivers
-// at once, under the 4-state encoding of LRM Figure 38-8.
-//
-// The per-bit machinery that spends these -- the strength of one bit of a net,
-// and the resolution of a net as a whole -- is in src/simulator/net.cpp.
-
 #include <algorithm>
 #include <cstdint>
 #include <vector>
@@ -119,10 +104,6 @@ NetStrength CombineWiredLogicAmbiguous(NetStrength a, NetStrength b,
   return r;
 }
 
-// Net resolution under the canonical 4-state encoding (LRM Figure 38-8):
-// z=(aval=0,bval=1), x=(aval=1,bval=1). A z bit is detected as ~aval & bval and
-// an x bit as aval & bval. A z result contributes only to res_bval (its aval is
-// 0); an x result sets both res_aval and res_bval.
 Logic4Word ResolveWireWord(Logic4Word a, Logic4Word b) {
   uint64_t a_z = ~a.aval & a.bval;
   uint64_t b_z = ~b.aval & b.bval;
@@ -188,45 +169,6 @@ Logic4Word ResolveWorWord(Logic4Word a, Logic4Word b) {
   return {res_aval, res_bval};
 }
 
-// §28.12.3 combines a signal of known value and unambiguous strength with each
-// component of a signal of ambiguous strength, under three rules:
-//
-//   a) Levels of the ambiguous signal stronger than the unambiguous signal's
-//      level stay in the result.
-//   b) Levels of the ambiguous signal at or below the unambiguous signal's
-//      level drop out of the result, except as rule c) puts them back.
-//   c) Where rules a) and b) leave a gap in the levels because the two signals
-//      have opposite values, the levels in that gap join the result.
-//
-// What rule c's gap runs to is what the clause's words leave open and its
-// figures settle. Figure 28-23 combines an ambiguous signal occupying the
-// strength1 side with an unambiguous Pu0 and draws the result as one range
-// running Pu0 through high impedance to St1, which its prose describes as a
-// range bounded by the ambiguous signal's strongest level at one end and the
-// unambiguous signal's level at the other. The gap
-// is therefore bounded by the two surviving pieces rather than by the
-// unambiguous level, and since those pieces sit on opposite sides of Figure
-// 28-2's scale, filling it takes both sides down to high impedance.
-//
-// Where no opposite-value level survives there is no such gap, and the result
-// is what rules a and b leave on the side the two signals share: Figure 28-20
-// trims an ambiguous 0 range to [su, its own top], Figure 28-22 does the same
-// on the strength1 side, and Figure 28-21 does it where the ambiguous signal's
-// opposite-value component lies entirely at or below `su`. Two signals of one
-// value resolve to the stronger of the two, which is what puts the lower bound
-// at the greater of `su` and the ambiguous signal's own bound: a level above
-// `su` settles the combination on its own, so `su` cannot appear below a range
-// that begins above it.
-//
-// The consequence for the resolver is worth stating where it is read rather
-// than where it is called: §28.12.2 gives an equal-strength opposite-value
-// conflict the levels of both signals and every weaker level below them, so
-// every ambiguous signal Net::Resolve builds runs down to high
-// impedance on both sides, and combining one with any weaker driver returns it
-// unchanged. The function earns its keep on the one-sided ambiguous signal
-// Figure 28-23 draws, which is what a three-state gate with an unknown control
-// outputs (§28.12.2, Figure 28-6) and what this simulator does not build yet
-// (#3468).
 NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su) {
   NetStrength r;
   Strength amb_vu_lo = (vu == 0) ? ambig.s0_lo : ambig.s1_lo;
@@ -241,16 +183,11 @@ NetStrength CombineAmbigWithUnambig(NetStrength ambig, uint8_t vu, uint8_t su) {
   auto s_su = static_cast<Strength>(su);
   vu_hi = std::max(s_su, amb_vu_hi);
   if (static_cast<uint8_t>(amb_opp_hi) > su) {
-    // Rule a keeps the opposite-value levels above `su`, and rule c fills the
-    // gap between them and the unambiguous signal's own level. That gap crosses
-    // high impedance, so both sides reach it.
     opp_hi = amb_opp_hi;
     opp_lo = Strength::kHighz;
     vu_lo = Strength::kHighz;
     return r;
   }
-  // Rule b took the whole opposite side, which leaves the two signals agreeing
-  // on one value and no gap for rule c to fill.
   vu_lo = std::max(s_su, amb_vu_lo);
   return r;
 }

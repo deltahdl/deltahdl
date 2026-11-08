@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §3.14.3 (printed page 61): the global precision is the finest precision of
-// every `timescale in the design, so the 1 fs one before the package counts
-// even though the module's header is under 1 ns. ComputeGlobalTimePrecision
-// reads it from the compilation unit's preproc_global_precision; the fixture
-// left that unset, and counted only the directive at the module's header.
 TEST(GlobalTimePrecisionElaboration, FinerTimescaleBeforePackageCounts) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

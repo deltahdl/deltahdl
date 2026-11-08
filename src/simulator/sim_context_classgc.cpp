@@ -35,13 +35,6 @@ namespace delta {
 
 uint64_t SimContext::AllocateClassObject(ClassObject* obj) {
   uint64_t id = next_handle_id_++;
-  // §18.14.1 object stability: seed the new object's RNG with the next random
-  // value drawn from the active stream. While a thread is running this is the
-  // creating thread's generator, so an object built with new inherits the next
-  // value from that thread; with no thread current the draw comes from the
-  // initialization RNG of the instance being built, covering objects created
-  // by a static declaration initializer. Each object therefore receives its
-  // own stream.
   obj->rng_seed = DrawSeedForChild();
   class_objects_[id] = obj;
   obj->handle = id;
@@ -90,7 +83,6 @@ Reachability SimContext::GetReachability(uint64_t handle) const {
 
 namespace {
 
-// Clears every weak reference whose referent is no longer in the live set.
 void ClearDeadWeakReferences(
     const std::unordered_set<WeakReference*>& weak_references,
     const std::unordered_set<uint64_t>& live) {
@@ -102,9 +94,6 @@ void ClearDeadWeakReferences(
   }
 }
 
-// Erases every class object that is not live, zeroing its ref count before
-// removal, and tells the VPI of each, whose handles the reclaim releases
-// (§37.2.2).
 void SweepDeadObjects(
     const std::unordered_set<uint64_t>& live,
     std::unordered_map<uint64_t, ClassObject*>& class_objects) {
@@ -119,21 +108,16 @@ void SweepDeadObjects(
   }
 }
 
-// §8.29: the design's variables are roots, each structure among them read by
-// the layout `tables` records for it as well.
 void MarkVariables(
     ClassGcMarker& mark, const DeclaredNameTables& tables,
     const std::unordered_map<std::string_view, Variable*>& variables) {
   for (const auto& [name, var] : variables) {
     mark.Var(var);
-    // §7.2: a structure's class-typed members, where its layout puts them.
     const StructTypeInfo* layout = tables.GetVariableStructType(name);
     if (layout != nullptr) mark.Fields(var->value, *layout);
   }
 }
 
-// §8.29: the roots of the scopes of the process the run last switched to, the
-// static frames, and the objects that process's method calls run on.
 void MarkStorage(
     ClassGcMarker& mark, const std::vector<Scope>& scopes,
     const std::unordered_map<std::string_view,
@@ -149,8 +133,6 @@ void MarkStorage(
   }
 }
 
-// §8.29: the stacks every other process parked or carries, and those the
-// $monitor and $fmonitor callers keep.
 void MarkProcesses(
     ClassGcMarker& mark, const Scheduler& scheduler,
     const Process* monitor_caller,
@@ -163,7 +145,6 @@ void MarkProcesses(
   }
 }
 
-// The run's containers and classes, which MarkContainers reads as roots.
 struct RunContainers {
   const std::unordered_map<std::string_view, QueueObject*>& queues;
   const std::unordered_map<std::string_view, AssocArrayObject*>& assocs;
@@ -172,9 +153,6 @@ struct RunContainers {
   const std::unordered_map<std::string_view, ClassTypeInfo*>& class_types;
 };
 
-// §8.29: the queues, associative arrays and mailboxes the run holds by name,
-// by handle or in a container, the arrays dynamic structure members hold, and
-// each class's static properties.
 void MarkContainers(ClassGcMarker& mark, const RunContainers& run) {
   for (const auto& [name, queue] : run.queues) mark.Queue(queue);
   for (const QueueObject* queue : DynMemberQueues()) mark.Queue(queue);
@@ -196,8 +174,6 @@ void SimContext::NotifyClassHandleWatchers(uint64_t handle) {
     if (!var || !var_class_types_.count(name)) return;
     if (var->value.ToUint64() == handle) var->NotifyWatchers();
   };
-  // The variables a handle can be held in by name: the design's variables,
-  // every open scope, and every static frame.
   for (const auto& [name, var] : variables_) notify_if_designates(name, var);
   for (const auto& scope : scope_stack_) {
     for (const auto& [name, var] : scope.vars) notify_if_designates(name, var);
@@ -205,9 +181,6 @@ void SimContext::NotifyClassHandleWatchers(uint64_t handle) {
   for (const auto& [func, frame] : static_frames_) {
     for (const auto& [name, var] : frame) notify_if_designates(name, var);
   }
-  // §9.4.2: and the processes watching the object itself, which an event
-  // control on one of its members armed there (EventAwaiter in
-  // src/simulator/awaiters_event_control.h).
   if (auto* obj = GetClassObject(handle)) obj->NotifyWatchers();
 }
 
@@ -217,9 +190,6 @@ void SimContext::CollectGarbage() {
     return;
   }
 
-  // §8.29: an object is strongly reachable while a class handle in any active
-  // scope refers to it, and the places the run keeps one are the roots below;
-  // the objects any of them reach are reachable too.
   std::unordered_set<uint64_t> live;
   ClassGcMarker mark(class_objects_, live);
   MarkVariables(mark, *this, variables_);
@@ -295,8 +265,6 @@ Process* SimContext::FindProcessByHandle(uint64_t handle) const {
   return it != process_handles_.end() ? it->second : nullptr;
 }
 
-// §20.11 Table 20-6: the assertion_type bit of the violation reports a unique,
-// unique0 or priority statement generates.
 static uint32_t ViolationTypeBit(CaseQualifier qual) {
   switch (qual) {
     case CaseQualifier::kUnique0:
@@ -310,9 +278,6 @@ static uint32_t ViolationTypeBit(CaseQualifier qual) {
 
 void SimContext::AddPendingViolation(SourceLoc loc, std::string msg,
                                      Subclause subclause, CaseQualifier qual) {
-  // §20.11: an Off or a Kill that selects the report's type adds no new report
-  // to the queue until an On; one already queued is left to mature, or to the
-  // Kill's flush (AbortKilledAttempts).
   uint32_t type_bit = ViolationTypeBit(qual);
   std::string scope =
       assert_controls_.NamesScopes() ? ScopeHierName(*this) : std::string();
@@ -351,19 +316,9 @@ void SimContext::MaturePendingViolations() {
 }
 
 void SimContext::FlushPendingDeferredReports() {
-  // §16.4.2: bumping the generation invalidates every deferred report this
-  // process has queued but not yet run this time step; those reports observe
-  // the mismatch when their region fires and skip execution.
   if (current_process_) {
     current_process_->deferred_report_generation++;
-    // §16.14.6.2: the same points are the procedural assertion flush points,
-    // where the pending instances of the process's procedural concurrent
-    // assertions are cleared.
     FlushProceduralAssertionQueue(*current_process_);
-    // §16.4.4: a flush point discards every pending report anyway, so any
-    // specific-assertion cancellations recorded during the just-ended
-    // activation are now moot; reset them so a later activation's reports are
-    // not mistaken for the cancelled ones.
     current_process_->cancelled_deferred_labels.clear();
   }
 }

@@ -24,9 +24,6 @@ TEST(PackageExportParsing, ExportMixOfSpecificAndWildcard) {
 }
 
 TEST(PackageExportParsing, ExportListWithCommaSeparatedItems) {
-  // BNF alternative: export package_import_item { , package_import_item } ;
-  // A single export declaration may carry a comma-separated list, and the
-  // parser emits one export item per element of that list.
   auto r = Parse(
       "package pkg;\n"
       "  export other_pkg::a, other_pkg::b, other_pkg::c;\n"
@@ -42,9 +39,6 @@ TEST(PackageExportParsing, ExportListWithCommaSeparatedItems) {
 }
 
 TEST(PackageExportParsing, ExportListMixesSpecificAndWildcardItems) {
-  // Each package_import_item in the comma list may independently be a specific
-  // name (pkg::name) or a wildcard (pkg::*); the parser accepts a mix and
-  // flags the wildcard element accordingly.
   auto r = Parse(
       "package pkg;\n"
       "  export p1::a, p2::*;\n"
@@ -78,9 +72,6 @@ TEST(PackageExportParsing, PackageContainingOnlyExports) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 2u);
 }
 
-// §26.6 with A.1.11: a package export declaration is a package item, so one
-// written in a module body is reported at the export. It was parsed into the
-// module and ignored.
 TEST(PackageExportParsing, ExportInAModuleBodyIsReported) {
   auto r = Parse(
       "package p1; int x = 5; endpackage\n"
@@ -93,7 +84,6 @@ TEST(PackageExportParsing, ExportInAModuleBodyIsReported) {
       "26.6"));
 }
 
-// A DPI export (§35.5.4) shares the keyword and stays an item of the module.
 TEST(PackageExportParsing, DpiExportInAModuleBodyStaysLegal) {
   auto r = Parse(
       "module top;\n"
@@ -103,8 +93,6 @@ TEST(PackageExportParsing, DpiExportInAModuleBodyStaysLegal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Syntax 26-4: `export *::*` stands alone, so a list after it is a syntax error
-// at the comma. It was read as two exports.
 TEST(PackageExportParsing, ExportStarStarTakesNoList) {
   auto r = Parse(
       "package p1; int x = 5; endpackage\n"

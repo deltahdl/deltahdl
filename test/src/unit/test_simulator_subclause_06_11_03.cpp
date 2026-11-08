@@ -65,10 +65,6 @@ TEST(SignedAndUnsigned, PackedArraysOfUnsignedTypesAreUnsigned) {
 }
 
 TEST(SignedAndUnsigned, DefaultSignedByteSignExtendsAtRuntime) {
-  // byte defaults to signed, so widening its all-ones pattern to a wider
-  // destination sign-extends. This observes the default-signedness rule via
-  // its arithmetic consequence, not just the carried is_signed flag: an
-  // unsigned byte would zero-extend to 0x00000000000000FF instead.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -92,9 +88,6 @@ TEST(SignedAndUnsigned, DefaultSignedByteSignExtendsAtRuntime) {
 }
 
 TEST(SignedAndUnsigned, DefaultUnsignedPackedArrayZeroExtendsAtRuntime) {
-  // bit (and its packed array) defaults to unsigned, so widening its all-ones
-  // pattern zero-extends. Discriminates the default: a signed bit vector would
-  // sign-extend to all ones instead.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -164,10 +157,6 @@ TEST(SignedAndUnsigned, ExplicitUnsignedOverrideObservedAtRuntime) {
 }
 
 TEST(SignedAndUnsigned, DefaultSignedByteComparesAsSignedOperand) {
-  // Expression-operand form: a default-signed byte holding an all-ones
-  // pattern is a negative value, so a relational compare against zero takes
-  // the signed path. If byte defaulted to unsigned the operand would be 255
-  // and the comparison would be false, so result==1 pins the default.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -190,11 +179,6 @@ TEST(SignedAndUnsigned, DefaultSignedByteComparesAsSignedOperand) {
 }
 
 TEST(SignedAndUnsigned, DefaultUnsignedVectorComparesAsUnsignedOperand) {
-  // Expression-operand form: a default-unsigned bit vector holding an all-ones
-  // pattern is a large positive value, so a relational compare against zero
-  // takes the unsigned path and is true. Were bit signed by default the
-  // operand would be -1 and the comparison false, so result==1 pins the
-  // default.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -217,11 +201,6 @@ TEST(SignedAndUnsigned, DefaultUnsignedVectorComparesAsUnsignedOperand) {
 }
 
 TEST(SignedAndUnsigned, DefaultSignedIntegerReturnValueSignExtends) {
-  // integer defaults to signed, and a function's result carries the
-  // signedness of its declared return type, so widening a -1 result to a
-  // longint sign-extends. This observes the default through its arithmetic
-  // consequence at the one place a return type declares it: an unsigned
-  // integer return would zero-extend to 0x00000000FFFFFFFF instead.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -242,13 +221,6 @@ TEST(SignedAndUnsigned, DefaultSignedIntegerReturnValueSignExtends) {
   EXPECT_EQ(d->value.ToUint64(), 0xFFFFFFFFFFFFFFFFull);
 }
 
-// §6.11.3: byte, shortint, int, integer and longint are signed by default. A
-// for-init declaration declares a variable like any other, so an int loop
-// variable is signed and -1 < 3 holds. Created from its width alone it was
-// unsigned, -1 stood as 4294967295, and the body ran no times at all.
-//
-// The loop variable is popped when the loop ends, so what the count reaches is
-// what says it was signed; there is no variable left to read the flag off.
 TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAProceduralBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -265,10 +237,6 @@ TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAProceduralBlock) {
   EXPECT_EQ(f.ctx.FindVariable("count")->value.ToUint64(), 4u);
 }
 
-// The same loop inside a subroutine body, which a separate site creates the
-// variable at: a for in a function body is set up by ExecFuncForInits and one
-// in a procedural block by CreateForInitVars, so a fix reaching one leaves the
-// other.
 TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAFunctionBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -288,11 +256,6 @@ TEST(SignedAndUnsigned, ForInitIntLoopVariableIsSignedInAFunctionBody) {
   EXPECT_EQ(f.ctx.FindVariable("count")->value.ToUint64(), 4u);
 }
 
-// §6.11.3 again for the other half of the sentence: time, bit, reg and logic,
-// and arrays of them, are unsigned by default. A loop counting down from 8'hFF
-// while it exceeds zero runs 255 times unsigned and no times at all signed,
-// where 8'hFF is -1. Without this a fix that marked every loop variable signed
-// would satisfy the two cases above.
 TEST(SignedAndUnsigned, ForInitLogicVectorLoopVariableStaysUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -36,8 +36,6 @@ TEST(SequenceExprElaboration, RangedDelayConcatenationElaborates) {
 }
 
 TEST(SequenceExprElaboration, ParenthesizedSequenceWithRepetitionElaborates) {
-  // §16.7 `sequence_abbrev` attached to a parenthesized sequence_expr is
-  // accepted by the elaborator's downstream walk.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -66,10 +64,6 @@ TEST(SequenceExprElaboration, UnboundedDelayWithDollarElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.7: a cycle delay range written with parameters has its maximum no less
-// than its minimum, and a delay settled by a sequence's actual is 0 or
-// greater: [LO:HI] folds to [3:1], s(NEG) gives d the value -1, while s(LO)
-// and [HI:LO] are legal.
 TEST(CycleDelayElaboration, ParameterAndActualBoundsAreChecked) {
   ElabFixture f;
   ElaborateSrc(

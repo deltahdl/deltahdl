@@ -38,23 +38,11 @@
 
 namespace delta {
 
-// §7.10 (printed page 169): whether the declaration's first unpacked
-// dimension is a queue dimension, `[$]` or `[$:N]`.
 static bool DeclaresQueue(const Stmt* stmt) {
   return !stmt->var_unpacked_dims.empty() &&
          IsQueueDim(stmt->var_unpacked_dims[0]);
 }
 
-// §7.4 with §7.10 (printed pages 153 and 169): where each element of the
-// array `stmt` declares is itself a queue, the type those queues' own elements
-// have and how many levels of queues each element holds, counting itself --
-// its dimensions after the first each `[$]` or `[]`, `int aq[string][$]` or
-// `int d[][]`, or, the declaration writing a single dimension, a type naming
-// a typedef whose own unpacked dimensions are, UVM's `rsrc_sv_q_t all[int]`
-// under `typedef uvm_resource_base rsrc_sv_q_t[$];` (§6.18 making the
-// typedef's dimensions part of the type). A null type where the elements are
-// no queues. The typedef is looked for from the running method's class,
-// where a class-scope one is declared.
 struct ElementQueues {
   const DataType* type = nullptr;
   uint32_t levels = 0;
@@ -76,9 +64,6 @@ static ElementQueues ElementQueuesOf(const Stmt* stmt, SimContext& ctx) {
   return {&item->typedef_type, levels};
 }
 
-// §7.4.2: the extent of the fixed-size dimension `dim` a block declaration
-// writes, `[l:r]` or `[n]`; empty for a queue or dynamic dimension and for a
-// size that is not positive.
 static std::optional<FixedDimShape> BlockFixedDim(const Expr* dim,
                                                   SimContext& ctx,
                                                   Arena& arena) {
@@ -94,12 +79,6 @@ static std::optional<FixedDimShape> BlockFixedDim(const Expr* dim,
   return FixedDimShape{static_cast<uint32_t>(size), 0, false};
 }
 
-// §7.10 and §7.5 with §7.4.4: where each element of the queue or dynamic
-// array `stmt` declares is a fixed-size array, `int q[$][3]`, `int d[][1:2]`
-// or `int q[$][2][2]`, records its dimensions into `q` as
-// Lowerer::LowerVarAggregate records a module-scope declaration's
-// (RtlirElementShape): each element kept as a queue of the first dimension's
-// size, and each level below as queues of the next's.
 static void MarkFixedElementArray(const Stmt* stmt, QueueObject* q,
                                   SimContext& ctx, Arena& arena) {
   const std::vector<Expr*>& dims = stmt->var_unpacked_dims;
@@ -118,10 +97,6 @@ static void MarkFixedElementArray(const Stmt* stmt, QueueObject* q,
   q->element_inner_dims.assign(fixed.begin() + 1, fixed.end());
 }
 
-// §7.10: marks the queue or dynamic array `q` that `stmt` declares as one
-// whose elements are fixed-size arrays (MarkFixedElementArray) or queues,
-// where they are (ElementQueuesOf), with those queues' elements handles where
-// their type is a class (§8.4).
 static void MarkElementQueues(const Stmt* stmt, QueueObject* q, SimContext& ctx,
                               Arena& arena) {
   MarkFixedElementArray(stmt, q, ctx, arena);
@@ -132,20 +107,10 @@ static void MarkElementQueues(const Stmt* stmt, QueueObject* q, SimContext& ctx,
   q->holds_class_handles = !DeclaredClassKey(*queues.type, ctx, arena).empty();
 }
 
-// §7.10: a declaration whose first unpacked dimension is `[$]` or `[$:N]`
-// declares a queue, wherever the declaration stands. Creates the QueueObject
-// the queue methods of §7.10.2 operate on, so that a declaration inside a
-// procedural block gets the same backing store a declaration among a module's
-// items gets from Lowerer::LowerVarAggregate. Returns true when it made one.
 static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
                              SimContext& ctx, Arena& arena) {
   if (!DeclaresQueue(stmt)) return false;
   const auto* dim = stmt->var_unpacked_dims[0];
-  // §7.10.5: N in `[$:N]` bounds the queue at N + 1 elements, and `[$]` leaves
-  // it unbounded, which CreateQueue spells -1. A bound the subclause rules out
-  // is left unbounded here rather than reported: the elaborator's
-  // CheckBlockQueueBounds already reports it, and a second report of one
-  // declaration's one error would name the same rule twice.
   int32_t max_size = -1;
   if (dim->rhs) {
     auto bound =
@@ -155,30 +120,12 @@ static bool CreateBlockQueue(const Stmt* stmt, uint32_t elem_width,
   auto* q = ctx.CreateQueue(stmt->var_name, elem_width, max_size,
                             Is4stateType(stmt->var_decl_type.kind));
   q->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
-  // §8.4 (printed page 181): a queue of a class type holds handles, so
-  // `q[i].v` names a property of the object an element refers to
-  // (TryEvalQueueElementMember in eval_array_class_queue.h). §8.23 (printed
-  // 200-201): the class is looked for under the declaration's spelling,
-  // `Outer::Inner` for a nested class (DeclaredClassKey); by the bare
-  // `Inner` alone, `Outer::Inner q[$]` was a queue of plain values.
   q->holds_class_handles =
       !DeclaredClassKey(stmt->var_decl_type, ctx, arena).empty();
   MarkElementQueues(stmt, q, ctx, arena);
   return true;
 }
 
-// §7.8 makes an associative array's dimension the type its index has, so a
-// declaration written among a subroutine's statements builds one the way
-// Lowerer::LowerVar (src/simulator/lowerer_var.cpp) builds one for a variable a
-// module declares. Without it SimContext::CreateAssocArray was reached from
-// that lowering and from an assoc-array formal argument and from nowhere else,
-// so a local array existed for no name: ctx.FindAssocArray answered null, and
-// TryAssocIndexedWrite, TryAssocCopyAssign and the read beside them each
-// declined, storing nothing and reporting nothing (#3614).
-//
-// §7.8 with §7.10: the elements may themselves be queues, `int aq[string][$]`
-// or a queue typedef's `q_t all[int]` (ElementQueuesOf), and the array then
-// keeps a queue under each key it holds (eval_array_element_queue.h).
 static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
                                   SimContext& ctx, Arena& arena) {
   ElementQueues queues = ElementQueuesOf(stmt, ctx);
@@ -202,25 +149,12 @@ static bool CreateBlockAssocArray(const Stmt* stmt, uint32_t elem_width,
   return true;
 }
 
-// §7.5 (printed pages 157-158): a declaration whose first unpacked dimension
-// is `[]`, which the parser records as a null dimension, declares a dynamic
-// array, empty until new[] sizes it (§7.5.1), wherever the declaration
-// stands. It is given what Lowerer::LowerVarAggregate (lowerer_var.cpp) gives
-// a module's and CreatePackageDynArray (lowerer_package_data.cpp) a
-// package's: the unbounded QueueObject `d = new[3]`, `d[1] = 5` and
-// `d.size()` operate on, and the ArrayInfo marked dynamic that the
-// whole-array reads and writes consult, the latter registered for the
-// block's life as a fixed-size array's shape is. Before this the null
-// dimension reached CreateBlockArrayElements, which reads no bounds off it
-// and built nothing, so a block's or a subroutine body's `int d[]` had no
-// store: new[] sized nothing and the element read 0.
 static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
                                 SimContext& ctx, Arena& arena) {
   if (stmt->var_unpacked_dims.empty() || stmt->var_unpacked_dims[0] != nullptr)
     return false;
   bool is_4state = DeclaredTypeIs4State(stmt->var_decl_type, ctx);
-  QueueObject* q =
-      ctx.CreateQueue(stmt->var_name, elem_width, /*max_size=*/-1, is_4state);
+  QueueObject* q = ctx.CreateQueue(stmt->var_name, elem_width, -1, is_4state);
   q->is_signed = DeclaredTypeIsSigned(stmt->var_decl_type, ctx);
   MarkElementQueues(stmt, q, ctx, arena);
   ArrayInfo info;
@@ -231,20 +165,6 @@ static bool CreateBlockDynArray(const Stmt* stmt, uint32_t elem_width,
   return true;
 }
 
-// §10.5 (printed page 256): a variable declaration assignment is a kind of
-// procedural assignment, since it gives the variable a value, and
-// §10.9 and §10.10 (printed 260 and 264) make an assignment pattern or a
-// `{...}` assigned to an unpacked array fill its elements. The initializer of
-// a declaration with unpacked dimensions went onto the element-width carrier
-// alone -- the one exception being the `d = new[3]` of a dynamic array -- so
-// a block's or a subroutine body's `int a[3] = '{7, 8, 9}`, `int q[$] = {1,
-// 2}`, `int d[] = '{4, 5, 6}` and `int m[string] = '{"x": 1}` left the array
-// as the declaration made it, empty or zero. The initializer is run as the
-// assignment it is, through the procedure's own blocking assignment
-// (ExecImmediateBlockingAssign), which fills, sizes and constructs as the
-// statement `a = '{7, 8, 9}` does. A static local's declaration is executed
-// once (TryReuseExistingDeclVar and ExecFuncVarDecl refer to the kept
-// variable afterwards), so its initializer is, as §6.21 requires.
 void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->var_init == nullptr || stmt->var_unpacked_dims.empty()) return;
   auto* target = arena.Create<Expr>();
@@ -259,16 +179,6 @@ void AssignDeclAggregateInit(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   ExecImmediateBlockingAssign(assign, ctx, arena);
 }
 
-// §7.10 and §7.4.2: the storage a declaration's unpacked dimensions ask for
-// beside the variable that carries one element's width. A queue dimension is
-// not the range dimension of a fixed-size unpacked array, so a declaration is
-// one or the other and never both.
-//
-// Both procedural declaration paths call this: a declaration outside a
-// subroutine, which reaches CreateDeclVariable above, and one inside a
-// subroutine body, which the function-body executor creates its local for. The
-// two used to differ -- only the first made a queue -- so `int q[$];` written
-// in a task body was a plain vector and q.push_back had no store to reach.
 void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
                          Arena& arena) {
   if (CreateBlockAssocArray(stmt, elem_width, ctx, arena)) return;
@@ -278,14 +188,6 @@ void CreateDeclAggregate(const Stmt* stmt, uint32_t elem_width, SimContext& ctx,
   }
 }
 
-// The static frame a static local lives in: its subroutine's, or, for a
-// declaration written static outside any subroutine, a frame of the
-// declaration's own named after where it is written. §6.21 makes such a
-// variable one cell for the whole simulation, shared by every activation of
-// the block that declares it, and §18.17 puts one in the code block of a
-// randsequence, an anonymous automatic scope that is pushed afresh for every
-// activation and so cannot keep the cell itself. The name is arena-persisted
-// because the frame store keys on string_view.
 static std::string_view StaticFrameOf(const Stmt* stmt,
                                       std::string_view func_name,
                                       SimContext& ctx) {
@@ -299,8 +201,6 @@ static std::string_view StaticFrameOf(const Stmt* stmt,
   return *key;
 }
 
-// §6.21: a static local's variable is kept in its static frame, where the
-// next execution of the declaration finds it (TryReuseKeptStaticLocal).
 static void KeepStaticLocal(const Stmt* stmt, Variable* var, SimContext& ctx) {
   std::string_view func_name = ctx.CurrentFuncName();
   if (IsEffectivelyStaticLocal(stmt, func_name, ctx))
@@ -348,10 +248,6 @@ void RecordClassParamActuals(std::string_view var_name,
   }
   ctx.SetVariableClassParamExprs(var_name, std::move(exprs));
   ctx.RegisterVariableClassTypeParams(var_name, &type_params);
-  // §8.25: the declaration names a specialization, which is a type of its own
-  // holding its own static members, so the variable is recorded as being of
-  // that type rather than of the generic class the declaration's name alone
-  // would find.
   ClassTypeInfo* generic = ctx.FindClassType(class_name);
   if (generic == nullptr) return;
   ClassTypeInfo* spec =
@@ -359,8 +255,6 @@ void RecordClassParamActuals(std::string_view var_name,
   if (spec != generic) ctx.SetVariableClassType(var_name, spec->name);
 }
 
-// Handles `T v = new src;` shallow-copy construction. Returns true if `init`
-// names a copyable source object and the copy was installed into `var_name`.
 static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
                                     SimContext& ctx, Arena& arena) {
   if (!init->lhs || init->lhs->kind != ExprKind::kIdentifier) return false;
@@ -374,18 +268,6 @@ static bool TryExecClassShallowCopy(std::string_view var_name, const Expr* init,
   return true;
 }
 
-// §6.11.3: a declaration in a procedural block or a task body carries its
-// declared signedness as a module-scope declaration does (Lowerer sets the
-// same flag there) and as a subroutine body local does (CreateFuncLocalVar),
-// so an `int` declared in a task is a signed operand, and a solver drawing
-// it (18.12) draws it over the signed range rather than the unsigned one.
-// §23.9 (printed page 761) with §9.3.1: a variable an unnamed block declares
-// in an instance below the top is that instance's, stored under its prefix as
-// the instance's own variables are, since a name read from inside an instance
-// never steps up to the top's bare one. Stored under the bare name, `int i;
-// i = 9;` in a submodule's initial read i as no variable at all. A
-// declaration executed again stands in the storage it made the first time,
-// given a fresh value as a new variable would be.
 static Variable* CreateBlockVariable(std::string_view name, uint32_t width,
                                      SimContext& ctx) {
   std::string prefix = ctx.ActiveInstancePrefix();
@@ -411,12 +293,6 @@ static Variable* CreateVarInScope(std::string_view name, uint32_t width,
   return var;
 }
 
-// The variable a static local's declaration made the first time it ran,
-// and the static frame it is kept in; a null variable where the declaration
-// is not static or has not run yet. One a subroutine's named block declares
-// with an initializer is made before time 0 in the subroutine's frame
-// (InitSubroutineStatics), where it is found when its block's frame does not
-// hold it.
 struct KeptLocal {
   Variable* var = nullptr;
   std::string_view frame;
@@ -432,10 +308,6 @@ static KeptLocal KeptStaticLocal(const Stmt* stmt, SimContext& ctx) {
   return {ctx.FindStaticFuncVar(func_name, stmt->var_name), func_name};
 }
 
-// §9.3.4 with §23.6: a class handle a block declares is of its class under
-// its own name and, reached as `b.h` from another process, under the
-// hierarchical name its named block binds it by, so `b.h = new` constructs an
-// object of that class (TryClassNewAssign).
 static void BindClassHandle(std::string_view name, std::string_view class_type,
                             SimContext& ctx) {
   ctx.SetVariableClassType(name, class_type);
@@ -443,15 +315,6 @@ static void BindClassHandle(std::string_view name, std::string_view class_type,
   if (!path.empty()) ctx.SetVariableClassType(path, class_type);
 }
 
-// §6.21 with §10.5 (printed page 256): a static local is one variable for the
-// whole simulation, its initializer run once, before any procedure starts
-// (Lowerer::InitializeStaticLocals); its declaration, executed when its block
-// is entered, stands in that variable again and runs nothing. A handle's
-// class and specialization are recorded again for the frame entered, and a
-// named block's variable is bound under its hierarchical name (§9.3.4), as
-// the declaration does where it makes the variable. Made afresh instead, a
-// handle's `new` ran a second time and `process::self()` answered the
-// procedure, and `b1.cnt` named no variable.
 static bool TryReuseKeptStaticLocal(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   KeptLocal kept = KeptStaticLocal(stmt, ctx);
@@ -470,30 +333,12 @@ static bool TryReuseKeptStaticLocal(const Stmt* stmt, SimContext& ctx,
   return true;
 }
 
-// §8.23 (printed pages 200-201 of IEEE 1800-2023): a procedural
-// `Outer::Inner i = new;` names the nested class by its scoped spelling, which
-// DeclaredClassKey (declared_class_key.h) resolves to the key the run holds it
-// under; looked up by the bare `Inner` alone, the declaration found no class,
-// became a plain variable, and `i.take()` ran nothing.
-//
-// §7.10 (printed 169), §7.4.2 (printed 153-154), §7.5 (printed 157) and §7.8
-// (printed 163) with §8.4 (printed 181): `C q[$]`, `C arr[2]`, `C d[]` and
-// `C aa[string]` declare a queue or an array whose elements are handles, not
-// a handle, so a declaration with an unpacked dimension is left to
-// ExecVarDeclImpl's aggregate path, which builds the queue or the array
-// (CreateDeclAggregate) as Lowerer::LowerVar builds a module's. Taken here,
-// each became one scalar handle under the array's name: `q.push_back(i)`
-// found no queue, `aa["k"] = new` no array, and `arr[0] = b` set a bit of
-// the handle.
 static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena) {
   if (!stmt->var_unpacked_dims.empty()) return false;
   std::string_view class_type =
       DeclaredClassKey(stmt->var_decl_type, ctx, arena);
   if (class_type.empty()) return false;
-  // §8.11 (printed page 187): in a method, the handle is the innermost
-  // scope's and hides a property of its name; made design-wide instead, a
-  // task's `O d; d = new;` wrote the property d.
   KeepStaticLocal(stmt, CreateVarInScope(stmt->var_name, 64, false, ctx), ctx);
   BindClassHandle(stmt->var_name, class_type, ctx);
 
@@ -502,10 +347,6 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
 
   if (!stmt->var_init) return true;
 
-  // §8.8: an argument-less typed constructor call (`C c = D::new;`) constructs
-  // the specified type D, not the declared handle type C. It parses as a bare
-  // scope-resolved member access, so it is not a `new` call and must be
-  // dispatched before the generic expression path, which cannot construct it.
   {
     Logic4Vec typed;
     if (TryEvalTypedConstructorNew(stmt->var_init, ctx, arena, typed)) {
@@ -515,10 +356,6 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
     }
   }
 
-  // A class-handle initializer that is not a `new` call (e.g. a copy from
-  // another handle or a static call such as `process::self()`) is evaluated
-  // and stored like an ordinary assignment; only `new` needs the
-  // construction/shallow-copy handling below.
   if (stmt->var_init->kind != ExprKind::kCall ||
       stmt->var_init->text != "new") {
     auto val = EvalExpr(stmt->var_init, ctx, arena);
@@ -531,10 +368,6 @@ static bool TryExecClassVarDecl(const Stmt* stmt, SimContext& ctx,
     return true;
   }
 
-  // §8.25 (printed pages 203-204): the object built is of the specialization
-  // RecordClassParamActuals recorded the variable as, so `S #(byte) a = new;`
-  // runs S #(byte)'s constructor against S #(byte)'s static members, as
-  // `S #(byte) b; b = new;` does.
   auto handle =
       EvalClassNew(ctx.GetVariableClassType(stmt->var_name), stmt->var_init,
                    ctx, arena, stmt->var_init->range.start);
@@ -550,34 +383,18 @@ static void CreateDeclVariable(const Stmt* stmt, uint32_t width, bool is_real,
   if (width == 0 && DeclaredTypeIsString(stmt->var_decl_type, ctx)) {
     CreateVarInScope(stmt->var_name, 0, is_signed, ctx);
     ctx.RegisterStringVariable(stmt->var_name);
-    // §7.10 with §6.16: a queue or an array of strings is as much an array
-    // as one of ints, and its elements hold strings of no fixed width. This
-    // branch made the carrier alone, so `string s[$]; s = {"a", "b"};` in a
-    // block left s.size() 0 and s[1] reading a stray element variable.
     CreateDeclAggregate(stmt, 0, ctx, arena);
   } else {
     if (width == 0) width = 32;
     if (is_real && width < 64) width = 64;
     Variable* var = CreateVarInScope(stmt->var_name, width, is_signed, ctx);
-    // §6.12: marked on the variable as well as registered by name, so a
-    // reader holding the variable and one holding the name answer alike.
     var->is_real = is_real;
     if (is_real) ctx.RegisterRealVariable(stmt->var_name);
-    // §15.5 with §6.21: a block's or a task's local declared event is a named
-    // event, which `-> le` triggers and `@le` waits on as a module's does.
-    // Left unmarked, `@le` waited for a change of value no trigger makes.
     var->is_event = stmt->var_decl_type.kind == DataTypeKind::kEvent;
     CreateDeclAggregate(stmt, width, ctx, arena);
   }
 }
 
-// §9.3.4 with §6.21: true where a declaration that is not static is executed
-// again in the frame already holding its variable, which it then stands in.
-// One that is automatic, written so or in an automatic subroutine or a class
-// method, makes its variable afresh instead (IsAutomaticLocal).
-// The variable a block re-entered keeps is in its own frame; an enclosing
-// block's of the same name is another variable, which this declaration hides
-// rather than reuses. A static local made already is TryReuseKeptStaticLocal's.
 static bool TryReuseExistingDeclVar(const Stmt* stmt,
                                     std::string_view func_name,
                                     SimContext& ctx) {
@@ -587,95 +404,29 @@ static bool TryReuseExistingDeclVar(const Stmt* stmt,
   return ctx.InnermostScopeDeclares(stmt->var_name);
 }
 
-// §6.8's declared variable, as the declaration describes it rather than as the
-// cell happens to have been created: the cell itself, the width the type asked
-// for -- 0 where nothing could size it, which is not the carrier width
-// CreateDeclVariable may have created the cell at -- and whether the type is
-// one of the real family, whose initializer §6.12.1 converts rather than
-// resizes. The three travel together because the initializer needs all of them
-// to be assigned into the declared object rather than put in its place.
 struct DeclaredObject {
   Variable* var;
   uint32_t declared_width;
   bool is_real;
 };
 
-// Applies 4-state coercion and the optional initializer to a freshly created
-// variable, then records it in its static frame when it is static.
-//
-// §10.5 (printed page 256) makes a declaration's initializer a kind of
-// procedural assignment, which §10.8 makes an assignment-like context, so
-// §10.7 truncates or extends it into the width the declaration established. A
-// Logic4Vec carries its own width, so writing the value straight over the
-// variable put the expression's width in the declaration's place instead:
-// `bit [3:0] v = 8'hFF;` in a procedural block left v eight bits reading 255.
-// Lowerer::CoerceVarInitValue applies the same rule to a declaration at module
-// scope and CreateFuncLocalVar to one in a subroutine body; a declaration in a
-// procedural block runs here and had to be told it separately.
-//
-// The target is `declared_width`, the width the type asked for, rather than the
-// width the variable was created at, and the two differ on exactly the cases
-// this must leave alone. A type nothing could size is created at the 32-bit
-// carrier CreateDeclVariable substitutes, and truncating to a carrier would cut
-// a string reached through a typedef name (§6.16) down to the four characters
-// 32 bits hold. A declared width of 0 says there is no width to resize to,
-// which is what a string answers whether it is written bare or behind a name.
-//
-// A real is the one type whose created width is the target instead. §6.12.1
-// converts an initializer that crosses the real/integer boundary rather than
-// reinterpreting its bits, so `real r = 5;` has to hold the double 5.0; and
-// `shortreal` declares 32 bits while being carried in the 64 that conversion
-// needs. ConvertRealForKnownLhs performs the conversion, and resizes every
-// value that does not cross the boundary.
-//
-// A declaration carrying an unpacked dimension is left as it was. Its variable
-// is the element-width carrier that CreateBlockQueue and
-// CreateBlockArrayElements size the real storage from rather than an object the
-// initializer is assigned to; AssignDeclAggregateInit has already assigned the
-// initializer to the array itself, and evaluating it again here would run its
-// side effects twice.
 static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
                                    std::string_view func_name, SimContext& ctx,
                                    Arena& arena) {
   Variable* var = obj.var;
-  // §6.18: a typedef name stands for the type it names, so the 4-state
-  // question is asked of the kind the name resolves to (DeclaredTypeKind);
-  // asked of DataTypeKind::kNamed, a `typedef logic` local was made 2-state.
   var->is_4state = Is4stateType(DeclaredTypeKind(stmt->var_decl_type, ctx));
   if (!var->is_4state) CoerceTo2State(var->value);
-  // §6.8 (Table 6-7): a 4-state local starts as 'x whatever the scope's
-  // lifetime, as a module's does (§13.3, §13.4). A local of an automatic
-  // task or block is made by SimContext::CreateLocalVariable, which fills it
-  // with 0 where CreateVariable fills a module's with x, so `logic l;` in an
-  // automatic task read 0. A virtual interface keeps the null handle set
-  // above, and a declaration with unpacked dimensions is the element-width
-  // carrier its elements are sized from rather than a value.
   if (var->is_4state && !var->is_virtual_interface && !stmt->var_init &&
       stmt->var_unpacked_dims.empty() && var->value.width > 0) {
     var->value = MakeAllX(arena, var->value.width);
     var->value.is_signed = var->is_signed;
   }
-  // §7.3.2: an unpacked union keeps x and z for a 4-state member however its
-  // first member is typed, and starts at that first member's default (§7.3),
-  // which the value above already is, as a module's union does
-  // (MarkUnpackedStructStorage).
   if (const StructTypeInfo* info = ctx.GetVariableStructType(stmt->var_name);
       info != nullptr && info->is_union)
     MarkUnpackedStructStorage(stmt->var_name, var, false, ctx);
   if (stmt->var_init && stmt->var_unpacked_dims.empty()) {
-    // §11.9 with §7.3.2: a tagged initializer converts its member value to
-    // the member's type, a real member's to its real bits, as the assignment
-    // `u = tagged M v` does (EvalTaggedForLayout).
     Logic4Vec val = EvalTaggedOrPlain(
         stmt->var_init, ctx.GetVariableStructType(stmt->var_name), ctx, arena);
-    // §11.4.14 (printed page 291): a streaming concatenation initializing a
-    // fixed-size variable is left-aligned in it, widened with zero bits on
-    // the right, and reported where the variable is the narrower, as
-    // ApplyStreamPackToTargetWidening does for `d = {<< 32 {a, b, c}}`.
-    // Asked before §10.7's resizing below, which would extend the stream on
-    // the left to the declared width and leave nothing to widen: taken so,
-    // `bit [127:0] d = {<< 32 {a, b, c}}` held the 96-bit stream
-    // right-aligned and `int d = {<<{a, b, c}}` was accepted.
     if (stmt->var_init->kind == ExprKind::kStreamingConcat && !var->is_string &&
         !obj.is_real && obj.declared_width > 0) {
       val = WidenStreamPackToFixedTarget(
@@ -687,9 +438,6 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
     if (!var->is_4state) CoerceTo2State(var->value);
   }
 
-  // §13.3.2 (printed page 339): the queue, associative array or shape a
-  // static local's declaration made is kept with it (RetainStaticAggregate),
-  // and the next activation refers to it again (TryReuseExistingDeclVar).
   if (IsEffectivelyStaticLocal(stmt, func_name, ctx)) {
     std::string_view frame = StaticFrameOf(stmt, func_name, ctx);
     ctx.SaveStaticFuncVar(frame, stmt->var_name, var);
@@ -697,11 +445,6 @@ static void InitializeDeclVariable(const Stmt* stmt, const DeclaredObject& obj,
   }
 }
 
-// §6.19 with A.2.8 and §23.9: an enumeration a block's typedef declares has
-// its members as named constants of the block, declared where the typedef
-// stands with the values RegisterBlockEnumTypes (block_enums.cpp) folded, so
-// the statements after it read them. So does the inline enumeration of a
-// block variable's declaration.
 StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
   RegisterBlockLet(stmt, ctx);
@@ -717,10 +460,6 @@ StmtResult ExecBlockItemDeclImpl(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-// §6.19 with A.2.8: a block variable declared with an inline enumerated type
-// has its enumeration's members declared ahead of it, for its initializer to
-// read, and is declared through the copy RegisterBlockEnumTypes reshaped to
-// name that enumeration, so §6.19.5's methods answer for it.
 static const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
                                        Arena& arena) {
   if (stmt->var_decl_type.kind != DataTypeKind::kEnum) return stmt;
@@ -730,12 +469,6 @@ static const Stmt* DeclareInlineEnumOf(const Stmt* stmt, SimContext& ctx,
   return it == shaped.end() ? stmt : it->second;
 }
 
-// §7.2 and §7.3 with §6.21: a structure or union declared in a procedural
-// block or a static task is an object whose members are windows of its
-// layout, as a module's is (Lowerer::LowerVar) and a subroutine body's
-// (BindLocalAggregateLayout): a typedef name binds the layout registered
-// under it, and a type written inline registers one of its own under the
-// variable's name. Bound to none, `st.x = 9` wrote nothing and `st.x` read 0.
 static void BindBlockLocalLayout(const Stmt* stmt, uint32_t width,
                                  SimContext& ctx, Arena& arena) {
   const DataType& type = stmt->var_decl_type;
@@ -753,44 +486,11 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
   stmt = DeclShapedByTypedef(stmt, ctx, arena);
   stmt = DeclParameterTypedByValue(stmt, ctx, arena);
   if (TryReuseKeptStaticLocal(stmt, ctx, arena)) return StmtResult::kDone;
-  // §6.21: a class handle a block declares is as static as any other of its
-  // variables, so it too is reused rather than made null again on each entry.
   auto func_name = ctx.CurrentFuncName();
   if (TryReuseExistingDeclVar(stmt, func_name, ctx)) return StmtResult::kDone;
   if (TryExecWeakRefVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
   if (TryExecClassVarDecl(stmt, ctx, arena)) return StmtResult::kDone;
 
-  // §6.18: a variable declared with a user-defined type name is an object of
-  // the type that name stands for, so `nib v` is as wide as `nib` is.
-  // DeclaredTypeWidth is what reaches that width, asking the elaborated typedef
-  // table for a DataTypeKind::kNamed; the one-argument EvalTypeWidth gives such
-  // a type no width at all, and CreateDeclVariable's `width == 0` fallback then
-  // made every typedef'd local 32 bits. A type the table cannot size still
-  // answers 0 and still reaches that fallback, and a string (§6.16) still
-  // reaches the branch above it, because DeclaredTypeWidth answers 0 for a
-  // string typedef as well as for a bare one.
-  //
-  // §25.9: a virtual interface declared in a task body or a begin-end block,
-  // by the type or by a typedef name standing for it, holds the handle of the
-  // instance it represents, as wide as Lowerer::LowerVar makes a variable
-  // declared so and as CreateFuncLocalVar makes a function-body local
-  // declared so, and is flagged so that a member the block reaches through
-  // it, `v.clk` after `v = dif`, is a component of that instance
-  // (ResolveVirtualInterfaceBase). It holds the null handle
-  // before it is initialized, as the clause says and as Lowerer::LowerVar
-  // sets, rather than the x a 4-state declaration starts at. DeclaredTypeWidth
-  // answers 0 for the type, so before this such a local took the 32-bit
-  // carrier and no reader took it for a virtual interface.
-  //
-  // §8.4 (printed page 181): a queue or an array of a class type, which
-  // TryExecClassVarDecl leaves to this path, carries one handle per element,
-  // as wide as a handle variable is made (64), where DeclaredTypeWidth
-  // answers 0 for a class and the carrier below would have sized the elements
-  // at 32; and the class is recorded under the array's name as
-  // Lowerer::LowerVar records a module's (SetVariableClassType), which is
-  // what tells an associative array of handles from one of values when
-  // `aa["k"] = new` constructs into an entry and `aa["k"].v` reads through
-  // one (HandleArrayOfSelect in eval_assoc_class_handles.cpp).
   bool is_virtual_interface =
       DeclaresAVirtualInterface(stmt->var_decl_type, ctx);
   std::string_view class_key =
@@ -804,8 +504,6 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
                   stmt->var_decl_type.kind == DataTypeKind::kRealtime);
   CreateDeclVariable(stmt, width, is_real, ctx, arena);
   BindBlockLocalLayout(stmt, width, ctx, arena);
-  // §7.2.2: a block's structure variable with no initializer takes the
-  // default each member's declaration writes.
   if (stmt->var_init == nullptr)
     ApplyVariableLayoutDefaults(stmt->var_name,
                                 ctx.FindVariable(stmt->var_name), ctx, arena);
@@ -816,13 +514,6 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
     BindNamedBlockVariable(stmt->var_name, ctx);
     var->is_virtual_interface = is_virtual_interface;
     if (is_virtual_interface) var->value = MakeLogic4VecVal(arena, width, 0);
-    // §11.5.1: which bit an index of this variable addresses is decided by
-    // its declaration, and a declaration here recorded no range at all: a
-    // `bit [15:10] v` in a procedure was addressed as [5:0], and so was a
-    // `Node::value_t v` standing for it (§6.18), whose `v[13:10]` then read
-    // four bits outside a six-bit vector -- x, and 0 once assigned to a
-    // 2-state target (#3808). Lowerer::LowerVar records a module-scope
-    // declaration's range; this is the same fact for a procedure's.
     if (!is_virtual_interface)
       RecordDeclaredRange(stmt->var_decl_type, var, ctx, arena);
     AssignDeclAggregateInit(stmt, ctx, arena);
@@ -831,14 +522,9 @@ static StmtResult ExecVarDeclBody(const Stmt* stmt, SimContext& ctx,
   return StmtResult::kDone;
 }
 
-// §15.3.1 and §15.4.1 with §6.21: a semaphore or mailbox local of the block
-// is bound to an object of its own once whichever path above has created it
-// (CreateSyncObjectForLocal), and, §19.3, a covergroup local holds the
-// handle of the instance its `new` initializer builds.
 StmtResult ExecVarDeclImpl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (stmt->kind == StmtKind::kBlockItemDecl)
     return ExecBlockItemDeclImpl(stmt, ctx, arena);
-  // §6.21: a static local made already keeps the object it was bound to.
   if (KeptStaticLocal(stmt, ctx).var != nullptr)
     return ExecVarDeclBody(stmt, ctx, arena);
   StmtResult result = ExecVarDeclBody(stmt, ctx, arena);

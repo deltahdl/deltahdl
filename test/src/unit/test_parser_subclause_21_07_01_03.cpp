@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 21-16: dumpoff_task ::= $dumpoff ; and dumpon_task ::= $dumpon ; --
-// both tasks are argument-less task enables terminated by a semicolon. The
-// tests cover the syntactic positions a task enable can occupy.
-
-// The LRM example's shape: the tasks follow $dumpvars and delay controls
-// inside an initial begin-end block, bounding the dump window twice.
 TEST(IoSystemTaskParsing, DumpOffOnExampleSequence) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -25,8 +19,6 @@ TEST(IoSystemTaskParsing, DumpOffOnExampleSequence) {
               "endmodule\n"));
 }
 
-// A bare statement needs no begin-end: each task parses as the sole statement
-// of an initial construct behind a delay control.
 TEST(IoSystemTaskParsing, DumpOffOnAsSoleStatement) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -35,7 +27,6 @@ TEST(IoSystemTaskParsing, DumpOffOnAsSoleStatement) {
               "endmodule\n"));
 }
 
-// The tasks are ordinary statements inside an always procedure.
 TEST(IoSystemTaskParsing, DumpOffOnInAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -47,7 +38,6 @@ TEST(IoSystemTaskParsing, DumpOffOnInAlwaysBlock) {
               "endmodule\n"));
 }
 
-// The tasks are ordinary statements inside a task body.
 TEST(IoSystemTaskParsing, DumpOffOnInTaskBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -60,8 +50,6 @@ TEST(IoSystemTaskParsing, DumpOffOnInTaskBody) {
               "endmodule\n"));
 }
 
-// Negative: the production requires the terminating semicolon, so a $dumpoff
-// task enable running straight into the block end is rejected.
 TEST(IoSystemTaskParsing, DumpOffMissingSemicolonRejected) {
   auto result = Parse(
       "module t;\n"
@@ -69,8 +57,6 @@ TEST(IoSystemTaskParsing, DumpOffMissingSemicolonRejected) {
       "    $dumpoff\n"
       "  end\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that terminates a subroutine call statement;
-  // §21.7.1.3 states the dumpoff_task production but reports nothing itself.
   EXPECT_TRUE(
       ReportedError(result.diags, "expected ';', got 'end'", 4, "12.3"));
 }

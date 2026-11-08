@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// 18.17.4: a repeat production is generated as many times as its expression's
-// value says, so a hundred runs of the clause's repeat($urandom_range(2, 6))
-// PUSH each push 2 to 6 times and reach both ends, repeat(0) generates nothing
-// and repeat(1 + 2) three, as the design test/src/e2e/repeat_production.sv runs
-// it.
 TEST(RepeatProductionRun, TheExpressionCountsTheGenerations) {
   SimFixture f;
   std::string out = RunCapture(
@@ -52,10 +47,6 @@ TEST(RepeatProductionRun, TheExpressionCountsTheGenerations) {
   EXPECT_EQ(out, "1 1 1 1\n");
 }
 
-// 18.17.4: nothing ends a repeat early except a break, and a break in the
-// repeated production ends the whole randsequence block, so a break in the
-// third of five pushes leaves three pushes and the production after the repeat
-// ungenerated, as the design test/src/e2e/repeat_production.sv runs it.
 TEST(RepeatProductionRun, ABreakInTheRepeatedProductionEndsTheWholeBlock) {
   SimFixture f;
   std::string out = RunCapture(
@@ -76,9 +67,6 @@ TEST(RepeatProductionRun, ABreakInTheRepeatedProductionEndsTheWholeBlock) {
   EXPECT_EQ(out, "3 1\n");
 }
 
-// 18.17.4: the repeat expression shall come out as a non-negative integral
-// value, so a negative count, -1 held in a signed int, is reported, and the
-// production is generated no times rather than some 2^64 times.
 TEST(RepeatProductionRun, ANegativeCountIsReportedAndGeneratesNothing) {
   SimFixture f;
   std::string out = RunCapture(
@@ -101,8 +89,6 @@ TEST(RepeatProductionRun, ANegativeCountIsReportedAndGeneratesNothing) {
                             5, "18.17.4"));
 }
 
-// 18.17.4: a count with unknown bits is no integral value either, so it is
-// reported, and the production is generated no times.
 TEST(RepeatProductionRun, AnUnknownCountIsReportedAndGeneratesNothing) {
   SimFixture f;
   std::string out = RunCapture(

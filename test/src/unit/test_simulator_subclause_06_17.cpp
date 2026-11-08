@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.17: lowering a bare `event` declaration materializes an event handle.
 TEST(Lowerer, EventVariableCreated) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -26,8 +25,6 @@ TEST(Lowerer, EventVariableCreated) {
   EXPECT_TRUE(var->is_event);
 }
 
-// §6.17 para 2: an event variable has a persistent triggered state that lasts
-// for the whole time step. (The trigger/wait mechanism itself is §9.4.2/§15.5.)
 TEST(Simulator, EventTriggeredStatePersistsInTimestep) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -47,8 +44,6 @@ TEST(Simulator, EventTriggeredStatePersistsInTimestep) {
   EXPECT_TRUE(f.ctx.IsEventTriggered("ev"));
 }
 
-// §6.17 para 4: with no initializer, each event is bound to its own new
-// synchronization object -> distinct handles, none of them null.
 TEST(Simulator, EventDefaultInitYieldsDistinctSyncObjects) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -71,8 +66,6 @@ TEST(Simulator, EventDefaultInitYieldsDistinctSyncObjects) {
   EXPECT_FALSE(vb->is_null_event);
 }
 
-// §6.17 para 3: `event empty = null;` declares an event with no synchronization
-// object (the null-initializer form, driven from real source).
 TEST(Simulator, EventInitializedWithNullFlag) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -90,8 +83,6 @@ TEST(Simulator, EventInitializedWithNullFlag) {
   EXPECT_TRUE(var->is_null_event);
 }
 
-// §6.17 para 3: `event done_too = done;` aliases `done_too` to `done`, so both
-// names refer to the same synchronization object (the alias-initializer form).
 TEST(Simulator, EventAliasInitializerSharesSyncObject) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -112,10 +103,6 @@ TEST(Simulator, EventAliasInitializerSharesSyncObject) {
   EXPECT_EQ(done, done_too);
 }
 
-// §6.17 para 3: a procedural assignment `b = a` between event variables makes
-// both refer to the same synchronization object. Observed end-to-end: before
-// the assignment `a == b` is false (distinct default objects); after it is
-// true (shared object). Also exercises the event `==` comparison rule.
 TEST(Simulator, EventProceduralAssignAliasesObservedByEquality) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -143,9 +130,6 @@ TEST(Simulator, EventProceduralAssignAliasesObservedByEquality) {
   EXPECT_EQ(after_eq->value.ToUint64(), 1u);
 }
 
-// §6.17 para 3: the same aliasing rule observed through the event `!=`
-// comparison. Distinct default objects are unequal (before), the shared object
-// is not unequal (after).
 TEST(Simulator, EventProceduralAssignAliasesObservedByInequality) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -173,9 +157,6 @@ TEST(Simulator, EventProceduralAssignAliasesObservedByInequality) {
   EXPECT_EQ(after_ne->value.ToUint64(), 0u);
 }
 
-// §6.17 para 3: assigning `null` to an event variable breaks the association
-// with its synchronization object. Observed end-to-end via `ev == null`: false
-// while bound, true after nullification. Also exercises event-vs-null compare.
 TEST(Simulator, EventAssignNullBreaksAssociationObservedByNullCompare) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -202,10 +183,6 @@ TEST(Simulator, EventAssignNullBreaksAssociationObservedByNullCompare) {
   EXPECT_EQ(after_null->value.ToUint64(), 1u);
 }
 
-// §6.17 para 3: comparison against `null` is symmetric in operand order, so a
-// `null == ev` comparison (null on the left) tracks the event's association the
-// same way `ev == null` does: false while bound, true once nullified. Observed
-// end-to-end, exercising the null-on-left comparison path.
 TEST(Simulator, EventNullOnLeftComparesAgainstAssociation) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -232,10 +209,6 @@ TEST(Simulator, EventNullOnLeftComparesAgainstAssociation) {
   EXPECT_EQ(null_cmp->value.ToUint64(), 1u);
 }
 
-// §6.17 para 3: an event variable can also be compared to `null` with `!=`. A
-// bound event differs from null (true); after its association is broken it no
-// longer differs (false). Observed end-to-end, exercising the inequality path
-// of the event-vs-null comparison.
 TEST(Simulator, EventNotEqualNullTracksAssociation) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -262,8 +235,6 @@ TEST(Simulator, EventNotEqualNullTracksAssociation) {
   EXPECT_EQ(null_ne->value.ToUint64(), 0u);
 }
 
-// §6.17 para 3: an event variable compared to itself refers to the same
-// synchronization object, so `ev == ev` is true. Observed end-to-end.
 TEST(Simulator, EventSelfEqualityObservedEndToEnd) {
   LowerFixture f;
   auto* self_eq = RunAndFindVar(
@@ -277,12 +248,6 @@ TEST(Simulator, EventSelfEqualityObservedEndToEnd) {
   EXPECT_EQ(self_eq->value.ToUint64(), 1u);
 }
 
-// §6.17 para 3: nullifying one handle of an aliased pair breaks only that
-// handle's association; the other handle keeps referring to the synchronization
-// object. Starting from `event b = a;` (shared), `b = null` leaves `a` bound
-// (`a == null` false) while `b` becomes null (`b == null` true) and the two
-// handles no longer refer to the same object (`a == b` false). Observed
-// end-to-end.
 TEST(Simulator, EventNullifyOnAliasBreaksOnlyAssignedName) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -315,10 +280,6 @@ TEST(Simulator, EventNullifyOnAliasBreaksOnlyAssignedName) {
   EXPECT_EQ(still_equal->value.ToUint64(), 0u);
 }
 
-// §6.17 with §8.5: an event property is an event of the object, so an event
-// control on it through a handle, `@(e.ev)`, returns when a trigger through a
-// handle, `-> e.ev`, sets it (§9.4.2). With no event behind the property the
-// wait stayed parked and the fork never printed.
 TEST(Simulator, EventPropertyWaitedAndTriggeredThroughAHandle) {
   SimFixture f;
   auto out = RunCapture(
@@ -337,9 +298,6 @@ TEST(Simulator, EventPropertyWaitedAndTriggeredThroughAHandle) {
   EXPECT_EQ(out, "woke 1\ndone 2\n");
 }
 
-// The same inside the class: a method waits on the object's own event by its
-// bare name and another method triggers it, as #3719's `-> ev` in a task of
-// the class does for a wait written outside it.
 TEST(Simulator, EventPropertyWaitedAndTriggeredInsideTheClass) {
   SimFixture f;
   auto out = RunCapture(
@@ -360,9 +318,6 @@ TEST(Simulator, EventPropertyWaitedAndTriggeredInsideTheClass) {
   EXPECT_EQ(out, "woke 1\ndone 2\n");
 }
 
-// UVM's uvm_objection::wait_for waits on `@(m_events[obj].all_dropped)`, an
-// event property of an object held in an associative array keyed by a
-// handle, which m_forked_drain triggers with `->m_events[obj].all_dropped`.
 TEST(Simulator, EventPropertyOfAnAssociativeElementWakesItsWaiter) {
   SimFixture f;
   auto out = RunCapture(
@@ -390,9 +345,6 @@ TEST(Simulator, EventPropertyOfAnAssociativeElementWakesItsWaiter) {
   EXPECT_EQ(out, "woke 1\ndone 2\n");
 }
 
-// Each object's property is an event of its own: triggering a's wakes the
-// process waiting on a's and leaves the one waiting on b's parked, so b's
-// waiter wakes only at b's trigger a time unit later.
 TEST(Simulator, EventPropertiesOfTwoObjectsAreDistinctEvents) {
   SimFixture f;
   auto out = RunCapture(
@@ -414,13 +366,6 @@ TEST(Simulator, EventPropertiesOfTwoObjectsAreDistinctEvents) {
   EXPECT_EQ(out, "a 1\nb 2\ndone 3\n");
 }
 
-// §6.17 with §8.9: a static event property is one event for the class and
-// every object of it, so a wait by the scope form `@Sync::e` and a static
-// task's wait on the bare `e` both return at the trigger a static task of the
-// class makes, and a wait through an object's handle, `@x.e`, returns at a
-// trigger through the handle -- #3924's shapes, which woke nothing. A.6.5
-// names a trigger's event by a hierarchical identifier, so the class triggers
-// its event from within rather than through the scope form.
 TEST(Simulator, StaticEventPropertyIsTheClassesOneEvent) {
   SimFixture f;
   auto out = RunCapture(

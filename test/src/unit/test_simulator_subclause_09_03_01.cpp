@@ -117,11 +117,6 @@ TEST(SequentialBlockSimulation, ControlPassesOutAfterDelayedStatements) {
   EXPECT_EQ(after->value.ToUint64(), 99u);
 }
 
-// §9.3.1 (printed page 225) with §23.9 (printed page 761): a variable an
-// unnamed block declares in an instance below the top is that instance's, and
-// the block reads back what it writes there, `int`, a packed vector and a
-// module typedef alike, in each of two instances. The variable was stored
-// where no read from inside the instance reached, and read 0.
 TEST(SequentialBlockSimulation, UnnamedBlockLocalOfASubmoduleHoldsItsWrites) {
   SimFixture f;
   EXPECT_EQ(

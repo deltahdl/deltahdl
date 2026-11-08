@@ -33,9 +33,6 @@ TEST(IpcSync, SemaphoreTryGetZeroCount) {
   EXPECT_EQ(sem.key_count, 0);
 }
 
-// §15.3.4: a negative keyCount returns 0 and shall result in an error. The
-// error is distinct from the ordinary keys-unavailable 0, so the error channel
-// is set only on the negative path and the bucket is left unchanged.
 TEST(IpcSync, SemaphoreTryGetNegativeCountIsError) {
   delta::SemaphoreObject sem(5);
   bool error = false;
@@ -44,18 +41,12 @@ TEST(IpcSync, SemaphoreTryGetNegativeCountIsError) {
   EXPECT_EQ(sem.key_count, 5);
 }
 
-// The LRM prototype (function int try_get(int keyCount = 1)) carries no error
-// out-parameter; the error channel is an implementation extension. Exercised
-// through the bare, prototype-shaped call (no error pointer), a negative count
-// must still return 0 and leave the bucket untouched — the null channel guard
-// must not be dereferenced.
 TEST(IpcSync, SemaphoreTryGetNegativeWithoutErrorChannelReturnsZero) {
   delta::SemaphoreObject sem(5);
   EXPECT_EQ(sem.TryGet(-1), 0);
   EXPECT_EQ(sem.key_count, 5);
 }
 
-// A successful non-blocking procure is likewise not an error.
 TEST(IpcSync, SemaphoreTryGetSuccessIsNotError) {
   delta::SemaphoreObject sem(3);
   bool error = false;
@@ -64,11 +55,6 @@ TEST(IpcSync, SemaphoreTryGetSuccessIsNotError) {
   EXPECT_EQ(sem.key_count, 1);
 }
 
-// §15.3.4: try_get() is the non-blocking counterpart of get(). On a bucket that
-// cannot satisfy the request, get() reports a block (the caller would suspend),
-// whereas try_get() returns immediately with 0 and leaves the bucket untouched.
-// This contrast pins the subclause's defining behavior, a request that never
-// blocks.
 TEST(IpcSync, SemaphoreTryGetDoesNotBlockWhereGetWould) {
   delta::SemaphoreObject sem(1);
   EXPECT_EQ(sem.Get(2), delta::SemGetStatus::kBlock);
@@ -97,9 +83,6 @@ TEST(IpcSync, SemaphoreTryGetConsecutiveCalls) {
   EXPECT_EQ(sem.key_count, 3);
 }
 
-// §15.3.4 with §13.5.2: a `ref semaphore` formal is the actual itself, so the
-// body's try_get() takes the one key the caller's bucket holds and then finds
-// none, read as 10. Bound to no bucket, the formal answered 0 twice.
 TEST(SemaphoreSim, TryGetThroughARefFormalDrainsTheCallersBucket) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -119,9 +102,6 @@ TEST(SemaphoreSim, TryGetThroughARefFormalDrainsTheCallersBucket) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// §15.3.4 (printed page 374): a negative key count handed to try_get() is an
-// error, reported at the call, and try_get() returns 0 taking no key, which
-// the plain try_get() after it then takes: 0 and 1, read as 1.
 TEST(SemaphoreSim, TryGetWithANegativeCountIsReportedAndAnswersZero) {
   SimFixture f;
   auto* var = RunAndFindVar(

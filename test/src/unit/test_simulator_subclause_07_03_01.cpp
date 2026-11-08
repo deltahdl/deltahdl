@@ -49,8 +49,6 @@ TEST(PackedUnionSimulation, BitSelectOnPackedUnion) {
   EXPECT_EQ(v, 0x5u);
 }
 
-// §7.3.1: a single bit of a packed union can be selected as if the union were a
-// packed array (one-bit select, distinct from the part-select form).
 TEST(PackedUnionSimulation, SingleBitSelectOnPackedUnion) {
   auto v = RunAndGet(
       "module t;\n"
@@ -65,9 +63,6 @@ TEST(PackedUnionSimulation, SingleBitSelectOnPackedUnion) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.3.1: an explicitly unsigned packed union zero-extends when read as a whole
-// vector (the same result as the default, reached through the `unsigned`
-// keyword rather than by omission).
 TEST(PackedUnionSimulation, ExplicitUnsignedPackedUnion_ZeroExtends) {
   auto v = RunAndGet(
       "module t;\n"
@@ -82,9 +77,6 @@ TEST(PackedUnionSimulation, ExplicitUnsignedPackedUnion_ZeroExtends) {
   EXPECT_EQ(v, 255u);
 }
 
-// §7.3.1 + §7.4.1: a packed-array member (built from real §7.4.1
-// multi-dimension syntax) aliases the same storage as a plain vector member, so
-// a value written through one is read back through the other.
 TEST(PackedUnionSimulation, PackedArrayMemberReadBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -177,10 +169,6 @@ TEST(PackedUnionSimulation,
   EXPECT_EQ(v, 0xAB5u);
 }
 
-// §7.3.1: a packed union containing a 4-state member is 4-state, and reading a
-// 2-state member implicitly converts 4-state to 2-state (x/z -> 0). Writing x
-// into the logic member and reading through the bit member must yield 0, so the
-// case-equality against 8'h00 (which distinguishes x from 0) holds.
 TEST(PackedUnionSimulation, TwoStateMemberRead_ConvertsFourStateToZero) {
   auto v = RunAndGet(
       "module t;\n"
@@ -195,8 +183,6 @@ TEST(PackedUnionSimulation, TwoStateMemberRead_ConvertsFourStateToZero) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.3.1: the 4-state logic member of the same union preserves x/z (no
-// conversion), so reading it back is not equal to a known 0 value.
 TEST(PackedUnionSimulation, FourStateMemberRead_PreservesUnknown) {
   auto v = RunAndGet(
       "module t;\n"
@@ -211,11 +197,6 @@ TEST(PackedUnionSimulation, FourStateMemberRead_PreservesUnknown) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.3.1: writing a 2-state member of a 4-state packed union implicitly
-// converts 2-state to 4-state, so the previously-unknown union bits it covers
-// become known. After seeding the union with x through the logic member, a
-// full-width write through the bit member leaves the 4-state member reading the
-// known written value (case-equality against 8'h42 holds).
 TEST(PackedUnionSimulation, TwoStateMemberWrite_ConvertsTwoStateToFourState) {
   auto v = RunAndGet(
       "module t;\n"
@@ -259,11 +240,6 @@ TEST(PackedUnionSimulation, PackedUnionSignedQualifier_SignExtendsOnAssign) {
   EXPECT_EQ(v, 0xFFFFFFFFu);
 }
 
-// §7.3.1 with §7.4.1: a member of several packed dimensions selects an element
-// of its outermost dimension by one index, so `u.b[0]` and `u.b[1]` of a
-// packed union's `bit [1:0][7:0] b` read the bytes 8'h34 and 8'h12 that
-// `u.w = 16'h1234` wrote, and a packed struct's `bit [3:0][3:0] n` reads its
-// nibbles. Taken as the flat member, the index selected one bit.
 TEST(PackedUnionSim, IndexOnAPackedArrayMemberSelectsAnElement) {
   const char* src =
       "module t;\n"
@@ -287,10 +263,6 @@ TEST(PackedUnionSim, IndexOnAPackedArrayMemberSelectsAnElement) {
   EXPECT_EQ(RunAndGet(src, "n0"), 0xDu);
 }
 
-// §7.3.1: a packed union written in place is 4-state when any member is, so
-// a function's argument and return value of a union of logic members keep
-// 1x0z, while those of a union of bit members read 1000. Judged by its kind
-// alone, the logic union was taken as 2-state and read 1000 too.
 TEST(PackedUnionSimulation, AnInPlaceUnionsStateIsItsMembers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -311,10 +283,6 @@ TEST(PackedUnionSimulation, AnInPlaceUnionsStateIsItsMembers) {
             "1x0z 1000\n");
 }
 
-// §7.3.1 with §6.18: a member written with a typedef name is as 4-state as
-// the type the name stands for, so a union of members of a typedef naming
-// logic keeps 1x0z and one of a typedef naming bit reads 1000. Every name
-// was taken as 2-state, so the logic union read 1000 too.
 TEST(PackedUnionSimulation, AnInPlaceUnionOfATypedefMemberTakesItsState) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef logic [3:0] n4_t;\n"

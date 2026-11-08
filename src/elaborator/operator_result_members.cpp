@@ -16,17 +16,10 @@ namespace delta {
 
 namespace {
 
-// The value an expression yields, as far as its form and the types of its
-// operands tell it.
 enum class ResultValue : std::uint8_t { kUnknown, kNumber, kBits, kString };
 
 }  // namespace
 
-// §11.4.12.2: a concatenation, or a multiple concatenation, with an operand of
-// the string type is a string. §11.4.12 makes any other one a vector of bits,
-// whose operands are literals, a string literal among them (§5.9), or of a type
-// the scope knows. Unknown where an operand's type is not known: an unpacked
-// array concatenation (§10.10) is no such vector.
 static ResultValue ConcatenationValue(const Expr& e,
                                       const OperandKind& operand_kind) {
   ResultValue value = ResultValue::kBits;
@@ -41,8 +34,6 @@ static ResultValue ConcatenationValue(const Expr& e,
   return value;
 }
 
-// §11.8.1: a unary operator, an increment or a decrement, `inside` (§11.4.13)
-// and a binary operator other than `=` yield an integral or a real value.
 static ResultValue ResultValueOf(const Expr& e,
                                  const OperandKind& operand_kind) {
   switch (e.kind) {

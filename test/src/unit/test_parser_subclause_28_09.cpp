@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -16,8 +14,6 @@ TEST(CmosSwitches, CmosRejectsFiveTerminals) {
       "module m;\n"
       "  cmos c1(out, data, nctrl, pctrl, extra);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count rule for every gate; §28.9 states only which
-  // four terminals a cmos switch takes.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -180,8 +176,6 @@ TEST(CmosSwitches, CmosTooManyDelaysRejected) {
       "module m;\n"
       "  cmos #(1, 2, 3, 4) c1(out, data, nctrl, pctrl);\n"
       "endmodule\n");
-  // Parser::ParseGateDelay closes the delay list after the third value, and
-  // files the missing ')' under §28.16, where the delay forms are stated.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
@@ -202,8 +196,6 @@ TEST(CmosSwitches, CmosTerminalOrderIsOutDataNctrlPctrl) {
   EXPECT_EQ(g->gate_terminals[3]->text, "pctrl");
 }
 
-// rcmos carries the same up-to-three delay form as cmos; two delays map to the
-// rise then fall slots with no decay value retained.
 TEST(CmosSwitches, RcmosTwoValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -219,8 +211,6 @@ TEST(CmosSwitches, RcmosTwoValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// A single delay on rcmos applies to every output transition, so only the
-// first slot is populated.
 TEST(CmosSwitches, RcmosOneValueDelay) {
   auto r = Parse(
       "module m;\n"
@@ -235,7 +225,6 @@ TEST(CmosSwitches, RcmosOneValueDelay) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// With no delay specification rcmos retains no delay values at all.
 TEST(CmosSwitches, RcmosNoDelaySpec) {
   auto r = Parse(
       "module m;\n"
@@ -249,8 +238,6 @@ TEST(CmosSwitches, RcmosNoDelaySpec) {
   EXPECT_EQ(g->gate_delay_decay, nullptr);
 }
 
-// The delay form tops out at three values; a fourth is a parse error for rcmos
-// just as it is for cmos.
 TEST(CmosSwitches, RcmosTooManyDelaysRejected) {
   auto r = Parse(
       "module m;\n"
@@ -259,8 +246,6 @@ TEST(CmosSwitches, RcmosTooManyDelaysRejected) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
-// rcmos shares cmos's terminal ordering: data output, data input, then the
-// n-channel and p-channel control inputs.
 TEST(CmosSwitches, RcmosTerminalOrderIsOutDataNctrlPctrl) {
   auto r = Parse(
       "module m;\n"

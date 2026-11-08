@@ -182,12 +182,6 @@ TEST(BlockingAssignSchedulingSim, ContinuesWithNextStatementAndOtherEvents) {
   EXPECT_EQ(f.ctx.FindVariable("parallel_marker")->value.ToUint64(), 9u);
 }
 
-// §4.9.3 also covers the case where the assigning process returns immediately
-// because no intra-assignment delay is specified: it still performs the update
-// of the left-hand side and enables any events that depend on that update. This
-// exercises the immediate (no-delay) execution path, which is dispatched
-// separately from the delayed path, so the event-enabling behavior is verified
-// on its own rather than being inferred from the delayed cases above.
 TEST(BlockingAssignSchedulingSim,
      ImmediateAssignNoDelayEnablesEventsOnLhsUpdate) {
   SimFixture f;

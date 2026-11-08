@@ -25,20 +25,12 @@
 namespace delta {
 namespace {
 
-// §39.5.2: the attempt start time reaches vpi_control() as a pointer to an
-// s_vpi_time structure, and the model keeps an attempt's start as the one
-// 64-bit count the two halves of that structure spell. A caller that passed no
-// structure named no attempt, which is the zero attempt the model rejects.
 std::uint64_t VpiAssertionAttemptStart(const s_vpi_time* time) {
   if (time == nullptr) return 0;
   return (static_cast<std::uint64_t>(time->high) << 32) |
          static_cast<std::uint64_t>(time->low);
 }
 
-// §39.5.2: these controls take a handle to an assertion statement, and a
-// sequence or property instance is not one. A handle that is neither names
-// nothing this control can act on, and the assertion the model acts on is the
-// one instance that handle names (§39.3.1), kept under `key`.
 bool VpiAssertionControlTarget(VpiHandle assertion, std::string& key) {
   if (assertion == nullptr) return false;
   if (!AssertionApi::IsAssertionStatementHandle(assertion->type)) return false;
@@ -46,18 +38,7 @@ bool VpiAssertionControlTarget(VpiHandle assertion, std::string& key) {
   return true;
 }
 
-// §39.4.1 and §39.4.2: the callback reason that reports the control action
-// `operation` performs -- the assertion system callback of a §39.5.1 control,
-// the assertion callback of a §39.5.2 one -- and, §39.5.1 and §39.5.2, the
-// §20.11 control types (Table 20-5) it amounts to in the run, applied in
-// order: an end is a kill the assertions stay locked after, and a reset a
-// kill followed by the controls that put the assertions back as they were
-// at the outset. A step control has no row: no callback reports it, and the
-// run has no part in it; neither has vpiAssertionKill's one attempt, which
-// the run discards apart.
 using enum AssertControlType;
-// A control type as the §20.11 call carries it; the slots a row leaves
-// unused hold 0, which no control type is.
 constexpr uint32_t CallType(AssertControlType type) {
   return static_cast<uint32_t>(type);
 }
@@ -148,8 +129,6 @@ int ReasonReporting(int operation) {
   return found == std::end(kControlActions) ? 0 : found->reason;
 }
 
-// §39.4.2 detail c: a control callback's cb_time is the time of the control
-// action, the run's time now.
 std::uint64_t ControlTime() {
   s_vpi_time now = {};
   now.type = vpiSimTime;
@@ -157,10 +136,6 @@ std::uint64_t ControlTime() {
   return (static_cast<std::uint64_t>(now.high) << 32) | now.low;
 }
 
-// §39.4.2: the assertion callbacks of the control action `operation` has
-// just performed on the assertion `name`, called with no attempt
-// information, and, §39.4.2.1, in a run as the run raises its own control
-// callbacks; an operation that failed performed none.
 PLI_INT32 ReportAssertionControl(bool applied, int operation,
                                  std::string_view name) {
   if (!applied) return 0;
@@ -175,21 +150,12 @@ PLI_INT32 ReportAssertionControl(bool applied, int operation,
   return 1;
 }
 
-// §39.5: the assertion types (Table 20-6) a VPI control acts on, the
-// concurrent and the immediate assertions; neither an expect statement nor a
-// violation report is an assertion Clause 39 reaches.
 constexpr uint32_t kVpiControlledTypes =
     static_cast<uint32_t>(AssertionTypeBit::kConcurrent) |
     static_cast<uint32_t>(AssertionTypeBit::kSimpleImmediate) |
     static_cast<uint32_t>(AssertionTypeBit::kObservedDeferredImmediate) |
     static_cast<uint32_t>(AssertionTypeBit::kFinalDeferredImmediate);
 
-// §39.5.1 and §39.5.2: the control action `operation` acting on the run the
-// model is attached to, on every assertion where `selected` is empty and
-// otherwise on those the one name it holds selects -- a scope's assertions,
-// or the one assertion a key names -- as the §20.11 calls it amounts to, a
-// kill aborting the attempts in flight of those it selects. Nothing where no
-// run is attached.
 void ActOnRun(int operation, std::string_view selected) {
   SimContext* run = GetGlobalVpiContext().Run();
   if (run == nullptr) return;
@@ -258,15 +224,10 @@ bool VpiIsAssertionStepControl(int operation) {
 }
 
 PLI_INT32 VpiAssertionSysControl(int operation, VpiHandle scope) {
-  // §39.5.1: the scope handle is what the control is confined to, and a null
-  // handle is the whole of the design rather than a missing argument. A scope
-  // object carries the name the model confines the control by.
   std::string_view name = scope != nullptr ? scope->name : std::string_view();
   if (!GetGlobalAssertionApi().SysControl(operation, name)) return 0;
   ActOnRun(operation, scope != nullptr ? std::string_view(scope->full_name)
                                        : std::string_view());
-  // §39.4.1: the control action is reported to the assertion system
-  // callbacks of its kind.
   GetGlobalVpiContext().DispatchCallbacks(ReasonReporting(operation));
   return 1;
 }

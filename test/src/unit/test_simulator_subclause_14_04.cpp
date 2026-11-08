@@ -84,9 +84,6 @@ TEST(ClockingSkewSim, InputSkewSamplesBeforeClockEdge) {
 }
 
 TEST(ClockingSkewSim, OutputSkewDelaysDriveBySkewAmount) {
-  // §14.4: an output is driven skew time units *after* the clock event. With an
-  // output skew of 5, a drive requested at t=10 must not appear at t=12 and
-  // must be present once the skew has elapsed.
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -108,7 +105,6 @@ TEST(ClockingSkewSim, OutputSkewDelaysDriveBySkewAmount) {
   };
   f.scheduler.ScheduleEvent(SimTime{10}, Region::kActive, ev);
 
-  // Probe before the skew elapses: the new value must not have landed yet.
   uint64_t mid_value = 0xFF;
   auto* probe = f.scheduler.GetEventPool().Acquire();
   probe->callback = [&mid_value, data_out]() {
@@ -169,9 +165,6 @@ TEST(ClockingSkewSim, ZeroOutputSkewDrivesInReNbaRegion) {
 }
 
 TEST(ClockingSkewSim, OneStepInputSkewSamplesPreEdgeValue) {
-  // §14.4: an input skew of 1step samples the signal's last value immediately
-  // before the clock edge. Here the signal changes to 0x22 at the edge while
-  // its prior value was 0x11; the 1step skew must yield 0x11, not 0x22.
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -195,15 +188,10 @@ TEST(ClockingSkewSim, OneStepInputSkewSamplesPreEdgeValue) {
 
   cmgr.Attach(f.ctx, f.scheduler);
 
-  // A time step the signal lives through at 0x11 and which then ends: §14.13
-  // puts the value a 1step skew samples at the Postponed region of the step
-  // before the clocking event, so this is the step that supplies it.
   auto* settle = f.scheduler.GetEventPool().Acquire();
   settle->callback = []() {};
   f.scheduler.ScheduleEvent(SimTime{5}, Region::kActive, settle);
 
-  // The signal moves to 0x22 in the same step as the edge, which is what a
-  // 1step skew must not see -- it takes the value from before the edge.
   auto* change = f.scheduler.GetEventPool().Acquire();
   change->callback = [data, &f]() {
     data->value = MakeLogic4VecVal(f.arena, 8, 0x22);
@@ -215,13 +203,10 @@ TEST(ClockingSkewSim, OneStepInputSkewSamplesPreEdgeValue) {
   f.scheduler.Run();
 
   EXPECT_EQ(cmgr.GetSampledValue("cb", "step_in"), 0x11u);
-  // The value at the edge, which the skew steps back from.
   EXPECT_EQ(data->value.ToUint64(), 0x22u);
 }
 
 TEST(ClockingSkewSim, ExplicitZeroInputSkewSampledAtClockEvent) {
-  // §14.4: an input with an explicit #0 skew is sampled at the same time as its
-  // clocking event (in the Observed region) rather than skew units earlier.
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
   clk->value = MakeLogic4VecVal(f.arena, 1, 0);
@@ -272,12 +257,6 @@ TEST(ClockingSkewSim, DefaultSkewValues) {
   EXPECT_EQ(cmgr.GetOutputSkew("cb", "data").ticks, 0u);
 }
 
-// §14.4 (printed page 356) with §14.3: an input with a numeric skew samples
-// the signal that many time units before the clocking event, so at the edge
-// at 15 `#1` reads the 14 written at 14, `#3` the 12 written at 12, a block's
-// `default input #2` and a parameter skew `#S` the 13 written at 13, and
-// `#1step` the 14 standing before the edge's step. The skew was dropped, and
-// every input read what d held at the edge.
 TEST(ClockingSkewSim, NumericInputSkewSamplesThatLongBeforeTheEdge) {
   SimFixture f;
   std::string out = RunCapture(
@@ -302,11 +281,6 @@ TEST(ClockingSkewSim, NumericInputSkewSamplesThatLongBeforeTheEdge) {
   EXPECT_EQ(out, "14 12 14 13 13\n$finish at time 15\n");
 }
 
-// §14.3 (printed pages 355-356): a skew may be an edge of the clock. `input
-// negedge d` samples d at the negedge preceding the clocking event -- the 2
-// written at 7, not the 3 written at 12 -- and `output negedge q` drives q at
-// the negedge following the drive's event, 10 rather than the posedge at 5.
-// Both were taken for a zero skew: 3, and q at 6 by 9.
 TEST(ClockingSkewSim, EdgeSkewSamplesAndDrivesAtThatEdge) {
   SimFixture f;
   std::string out = RunCapture(

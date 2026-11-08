@@ -7,21 +7,8 @@
 
 using namespace delta;
 
-// §F.7 Recursive properties.
-//
-// §F.7 gives the precise versions of the four restrictions stated informally in
-// §16.12.17, founded on the dependency digraph: the vertices are the named
-// properties, and there is an edge (p, q) iff an instance of q appears in the
-// declaration of p. A named property is recursive iff it lies in a nontrivial
-// strongly connected component of that digraph (i.e. it can be reached from
-// itself). The elaborator's PropertyRegistry builds exactly this digraph, and
-// the same restriction checks are shared with §16.12.17.
-
 namespace {
 
-// §F.7: in the worked digraph <{p1,p2,p3},{(p1,p2),(p1,p3),(p3,p1)}> the
-// nontrivial strongly connected component is {p1, p3}; p2 is reached but is not
-// on a cycle. So p1 and p3 are recursive while p2 is not.
 TEST(RecursivePropertyDependencyDigraph,
      RecursiveIffInStronglyConnectedComponent) {
   PropertyRegistry reg;
@@ -32,7 +19,6 @@ TEST(RecursivePropertyDependencyDigraph,
   ModuleItem p2;
   p2.kind = ModuleItemKind::kPropertyDecl;
   p2.name = "p2";
-  // p2's body has no property instance.
   ModuleItem p3;
   p3.kind = ModuleItemKind::kPropertyDecl;
   p3.name = "p3";
@@ -46,9 +32,6 @@ TEST(RecursivePropertyDependencyDigraph,
   EXPECT_FALSE(reg.IsRecursiveProperty(&p2));
 }
 
-// §F.7: a recursive property can be *reached* from properties that are not
-// themselves recursive. RESTRICTION 1 is phrased over this reachability, about
-// any property that has a path to a recursive one.
 TEST(RecursivePropertyDependencyDigraph,
      ReachabilityToRecursivePropertyIsTransitive) {
   PropertyRegistry reg;
@@ -72,10 +55,6 @@ TEST(RecursivePropertyDependencyDigraph,
   EXPECT_FALSE(reg.ReachesRecursiveProperty(&unrelated));
 }
 
-// §F.7 RESTRICTION 1: not cannot be applied to a property expression that
-// instantiates a property from which a recursive property can be reached. Here
-// `bad` negates `mid`, which is not itself recursive but reaches the recursive
-// `rec` — so the negation is illegal.
 TEST(RecursivePropertyRestrictionEnforcement,
      NotOnPropertyReachingRecursiveRejected) {
   ElabFixture f;
@@ -92,17 +71,12 @@ TEST(RecursivePropertyRestrictionEnforcement,
       "  endproperty\n"
       "endmodule\n",
       f);
-  // The report stands at the `property bad` declaration, line 8 of the source,
-  // because Elaborator::ValidateRecursiveProperty passes the enclosing
-  // declaration's location.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "negation or strong operator applied to property \"mid\"",
                     8, "16.12.17"));
 }
 
-// §F.7 RESTRICTION 2: disable iff cannot be used in the declaration of a
-// recursive property.
 TEST(RecursivePropertyRestrictionEnforcement,
      DisableIffInRecursivePropertyRejected) {
   ElabFixture f;
@@ -120,9 +94,6 @@ TEST(RecursivePropertyRestrictionEnforcement,
       "16.12.17"));
 }
 
-// §F.7 RESTRICTION 3: in every cycle of the dependency digraph the sum of the
-// edge weights shall be positive. A self-loop whose single instance carries no
-// time advance has weight zero and is rejected.
 TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightSelfCycleRejected) {
   ElabFixture f;
   Elaborate(
@@ -138,8 +109,6 @@ TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightSelfCycleRejected) {
                             2, "16.12.17"));
 }
 
-// §F.7 RESTRICTION 3 (boundary): the same self-cycle is legal once the instance
-// carries a positive advance (|=> contributes weight one to the cycle).
 TEST(RecursivePropertyRestrictionEnforcement, PositiveWeightSelfCycleAllowed) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -153,10 +122,6 @@ TEST(RecursivePropertyRestrictionEnforcement, PositiveWeightSelfCycleAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §F.7 RESTRICTION 3: the weight sum shall be positive on *every* cycle of the
-// dependency digraph, not only on self-loops. Two properties that instantiate
-// each other with no time advance form a two-edge cycle whose weights are both
-// zero, so the cycle sums to zero and is illegal.
 TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightMutualCycleRejected) {
   ElabFixture f;
   Elaborate(
@@ -169,18 +134,12 @@ TEST(RecursivePropertyRestrictionEnforcement, ZeroWeightMutualCycleRejected) {
       "  endproperty\n"
       "endmodule\n",
       f);
-  // Both properties lie on the cycle, so both are reported; naming `a` at its
-  // declaration on line 2 is the report for the first of the two.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "recursive property \"a\" lies on a recursion "
                             "cycle with no positive advance in time",
                             2, "16.12.17"));
 }
 
-// §F.7 RESTRICTION 3 (boundary): a two-edge cycle is legal as soon as one edge
-// carries a positive advance, because the weight sum around the cycle is then
-// positive. Here a reaches b after |=> (weight one) while b reaches a with no
-// advance (weight zero), summing to one.
 TEST(RecursivePropertyRestrictionEnforcement,
      PositiveWeightMutualCycleAllowed) {
   ElabFixture f;
@@ -198,10 +157,6 @@ TEST(RecursivePropertyRestrictionEnforcement,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §F.7 RESTRICTION 4: for a recursive instance of q in p, each actual argument
-// must be a formal of p, mention no formal of p, or bind to a local variable
-// formal of q. Passing an expression over p's formals to a non-local formal is
-// illegal.
 TEST(RecursivePropertyRestrictionEnforcement,
      RecursiveArgumentToNonLocalFormalRejected) {
   ElabFixture f;
@@ -213,8 +168,6 @@ TEST(RecursivePropertyRestrictionEnforcement,
       "  endproperty\n"
       "endmodule\n",
       f);
-  // `a + b` and `n - 1` each break Restriction 4, so the same report stands
-  // twice at the `property fib` declaration on line 2.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "recursive instance of \"fib\" passes an actual "
                             "argument that contains a formal of \"fib\"",

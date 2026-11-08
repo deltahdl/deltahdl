@@ -7,7 +7,6 @@
 #include "common/arena.h"
 #include "parser/ast_expr.h"
 
-// Convenience aliases for sensitivity-analysis tests.
 inline Expr* SensId(Arena& arena, std::string_view name) {
   return MakeId(arena, name);
 }

@@ -12,17 +12,10 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// §37.34: the constraint object a constraint block stands as, which a class
-// defn, a class obj and a call of randomize written with an inline constraint
-// block each hold, with the constraint expressions of its block (§37.38).
-
 namespace delta {
 
 namespace {
 
-// What a constraint block's items are built with: the names their expressions
-// resolve in, `scope` and the scopes around it first, the run a constant's
-// value is evaluated in, and the build.
 struct ItemBuild {
   const VpiObjectMap& objects;
   const std::string& prefix;
@@ -30,9 +23,7 @@ struct ItemBuild {
   VpiObject* scope;
   SimContext& ctx;
   const VpiAttachBuild& build;
-  // §37.83: the table the operators' attributes are kept in; null for none.
   const RtlirNodeAttributes* attrs = nullptr;
-  // §37.42: where a call an item makes stands; null to leave it as made.
   const VpiCallStand* stand = nullptr;
 
   VpiObject* Expression(const Expr* expr) const {
@@ -48,9 +39,6 @@ void Append(std::vector<VpiObject*>& list, VpiObject* obj) {
 std::vector<VpiObject*> MakeItems(const std::vector<ConstraintItem*>& items,
                                   const ItemBuild& at);
 
-// §37.38: an implication, a constr if or a constr if else, reaching its guard
-// through vpiCondition and the constraint expressions it governs through
-// vpiConstraintExpr, those of an else branch through vpiElseConst.
 VpiObject* GuardedItem(int type, const ConstraintItem& item,
                        const ItemBuild& at) {
   VpiObject* guarded = at.build.alloc();
@@ -61,10 +49,6 @@ VpiObject* GuardedItem(int type, const ConstraintItem& item,
   return guarded;
 }
 
-// §37.38 details 1 and 2: a constr foreach, reaching the array it indexes
-// through vpiVariables and an int var per index variable it names through
-// vpiLoopVars, a skipped one standing as none. The names of its body find the
-// index variables first, and then what the foreach's own names find.
 VpiObject* ForeachItem(const ConstraintItem& item, const ItemBuild& at) {
   VpiObject* loop = at.build.alloc();
   loop->type = vpiConstrForEach;
@@ -86,8 +70,6 @@ VpiObject* ForeachItem(const ConstraintItem& item, const ItemBuild& at) {
   return loop;
 }
 
-// §37.38: a soft disable, reaching the expression whose soft constraints it
-// discards (§18.5.13.2).
 VpiObject* SoftDisableItem(const ConstraintItem& item, const ItemBuild& at) {
   VpiObject* disable = at.build.alloc();
   disable->type = vpiSoftDisable;
@@ -95,12 +77,6 @@ VpiObject* SoftDisableItem(const ConstraintItem& item, const ItemBuild& at) {
   return disable;
 }
 
-// §37.34: a dist item of the distribution `dist`, reaching its value, or the
-// range [lo:hi] it gives, through vpiValueRange and its weight through
-// vpiWeight, and reporting through vpiDistType whether the weight is given
-// each value of a range, :=, or the item as a whole, :/ (§18.5.3). A default
-// item and a range written about a centre (§11.4.13) reach no value range,
-// and an item written with no weight reaches none either.
 VpiObject* DistItem(const ConstraintDistItem& entry, VpiObject* dist,
                     const std::function<VpiObject*()>& alloc,
                     const std::function<VpiObject*(const Expr*)>& expression) {
@@ -122,16 +98,12 @@ VpiObject* DistItem(const ConstraintDistItem& entry, VpiObject* dist,
   return item;
 }
 
-// §37.34 and §37.38: the distribution a constraint's dist item stands as.
 VpiObject* DistributionItem(const ConstraintItem& item, const ItemBuild& at) {
   return VpiMakeDistribution(
       at.Expression(item.expr), item.dist, at.build.alloc,
       [&at](const Expr* expr) { return at.Expression(expr); });
 }
 
-// §37.34: a constraint ordering, reaching the expressions it solves before
-// through vpiSolveBefore and those it solves after through vpiSolveAfter
-// (§18.5.9).
 VpiObject* OrderingItem(const ConstraintItem& item, const ItemBuild& at) {
   VpiObject* ordering = at.build.alloc();
   ordering->type = vpiConstraintOrdering;
@@ -144,9 +116,6 @@ VpiObject* OrderingItem(const ConstraintItem& item, const ItemBuild& at) {
   return ordering;
 }
 
-// §37.34 and §37.38: the constraint item `item` writes, a constraint ordering
-// or a constraint expression; null for one §37.38 draws no object for, a
-// uniqueness constraint (§18.5.4).
 VpiObject* MakeItem(const ConstraintItem& item, const ItemBuild& at) {
   switch (item.kind) {
     case ConstraintItemKind::kExpression:
@@ -174,8 +143,6 @@ std::vector<VpiObject*> MakeItems(const std::vector<ConstraintItem*>& items,
   for (const ConstraintItem* item : items) {
     VpiObject* obj = MakeItem(*item, at);
     if (obj == nullptr) continue;
-    // §18.5.13: an expression written soft reports so through vpiSoft. A name
-    // standing alone is the variable it names, no object of the item's own.
     if (item->soft && VpiIsExprType(obj->type)) obj->soft = true;
     made.push_back(obj);
   }
@@ -232,9 +199,6 @@ VpiObject* VpiMakeConstraint(const ClassMember& block, VpiObject* holder,
   }
   constraint->parent = holder;
   constraint->automatic = !block.is_static;
-  // §18.5.2: the pure constraint of an abstract class is the virtual one,
-  // written with no block as a prototype is but completed by no external
-  // constraint block (§18.5.1), so it is not declared outside its class.
   constraint->is_virtual = block.is_pure_virtual;
   constraint->access_type =
       block.is_constraint_prototype && !block.is_pure_virtual ? vpiExternAcc

@@ -26,11 +26,6 @@ TEST(ConstEval, Unary) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("!5", f)), 0);
 }
 
-// Constant-expression operand form: logical operands that are module parameters
-// are folded by the elaborator's constant evaluator to fix a localparam's
-// value; reading the localparam at run time observes the folded result.
-// Parameters reach the constant evaluator through a different declaration path
-// than the integer literals exercised by ConstEval.Logical.
 TEST(ConstEval, LogicalOverParameters) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -56,8 +51,6 @@ TEST(ConstEval, LogicalOverParameters) {
   EXPECT_EQ(y_or->value.ToUint64(), 1u);
 }
 
-// Same constant-folding rule for the unary logical negation, with a localparam
-// operand — a distinct constant form from a literal.
 TEST(ConstEval, LogicalNotOverLocalparam) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -132,9 +125,6 @@ TEST(OperatorElaboration, BinaryLogicalOrElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.7 decides && and -> by a false first operand and || by a true one,
-// and §11.3.5 leaves the second operand unevaluated then, so a second operand
-// that does not fold, a division by zero, does not keep the result from it.
 TEST(LogicalOperatorElaboration, DecidedLogicalOperatorsFoldPastTheSecond) {
   EvalFixture f;
   ScopeMap scope = {{"N", 0}};

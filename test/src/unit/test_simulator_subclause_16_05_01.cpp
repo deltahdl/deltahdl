@@ -29,23 +29,12 @@ TEST(ConcurrentAssertionSampling, AutomaticVariableSamplesCurrentValue) {
   EXPECT_EQ(sv.mode, SampleMode::kCurrent);
 }
 
-// §16.5.1 / §16.10: a local variable is one of the exceptions to the Preponed
-// sampling rule. Like an automatic variable, its sampled value is its current
-// value, not a value read from the Preponed region. §16.10 states the same rule
-// (a local variable samples as its current value) and refers back to §16.5.1;
-// SampleLocalVariable is the production carrier for that weave.
 TEST(ConcurrentAssertionSampling, LocalVariableSamplesCurrentValue) {
   SampledValue sv = SampleLocalVariable(0x2468);
   EXPECT_EQ(sv.value, 0x2468u);
   EXPECT_EQ(sv.mode, SampleMode::kCurrent);
 }
 
-// §16.5.1: the default sampled value of a static variable is the value assigned
-// in its declaration, which is distinct from the plain uninitialized type
-// default that any other variable/net gets. At time 0 the static variable
-// therefore samples that declaration-assigned value (in kDefault mode) rather
-// than its live/Preponed running value. The third argument models the value
-// assigned in the declaration.
 TEST(ConcurrentAssertionSampling,
      StaticVariableDefaultIsDeclarationAssignedValue) {
   SampledValue sv = SampleStaticVariable(0xDEAD, SimTime{0}, 7);
@@ -53,9 +42,6 @@ TEST(ConcurrentAssertionSampling,
   EXPECT_EQ(sv.mode, SampleMode::kDefault);
 }
 
-// §16.5.1: active free checker variables are the third kind, alongside
-// automatic and local variables, that is excepted from Preponed sampling — its
-// sampled value is its current value.
 TEST(ConcurrentAssertionSampling,
      ActiveFreeCheckerVariableSamplesCurrentValue) {
   SampledValue sv = SampleActiveFreeCheckerVariable(0x1357);
@@ -63,20 +49,12 @@ TEST(ConcurrentAssertionSampling,
   EXPECT_EQ(sv.mode, SampleMode::kCurrent);
 }
 
-// §16.5.1: the current-value rule for a free checker variable has an exception
-// — when a sampled value function ($past/$future) asks for a past or future
-// value of an active free checker variable, that value comes from the Postponed
-// region instead.
 TEST(ConcurrentAssertionSampling, FreeCheckerPastFutureSamplesPostponedRegion) {
   SampledValue sv = SampleActiveFreeCheckerVarPastFuture(0x99);
   EXPECT_EQ(sv.value, 0x99u);
   EXPECT_EQ(sv.mode, SampleMode::kPostponed);
 }
 
-// §16.5.1: the complementary exception for automatic variables — a sampled
-// value function's request for a past or future value of an automatic variable
-// collapses to the automatic variable's current value rather than reaching into
-// another clock tick.
 TEST(ConcurrentAssertionSampling, AutomaticPastFutureCollapsesToCurrentValue) {
   SampledValue sv = SampleAutomaticVarPastFuture(0x42);
   EXPECT_EQ(sv.value, 0x42u);
@@ -153,11 +131,6 @@ TEST(ConcurrentAssertionSampling, ClockingBlockInputMustUseStep1Sampling) {
   EXPECT_FALSE(IsClockingBlockInputSamplingValid(ClockingInputSkew::kOther));
 }
 
-// One concurrent assertion on `a`, clocked by the posedge of `clk`, over a run
-// whose only clock tick is in the time step `tick_line` writes. `a` and `clk`
-// both settle to 0 at time 0 and `tick_line` is the whole of what happens at
-// time 5, so the order it writes the two in is the only thing that varies
-// between two sources built from this.
 std::string SourceWithTickStep(const std::string& tick_line) {
   return "module m;\n"
          "  logic clk;\n"
@@ -175,21 +148,6 @@ std::string SourceWithTickStep(const std::string& tick_line) {
          "endmodule\n";
 }
 
-// §16.5.1: in a time slot after time 0, a variable's sampled value is the value
-// it holds in that slot's Preponed region. The Preponed value of a time slot is
-// settled before the slot begins, so nothing a process writes during the slot
-// can change it and the order of the writes within the slot cannot change the
-// verdict either.
-//
-// Both runs below drive one clock tick at time 5 and raise `a` in that same
-// time step, one before the assignment to `clk` and one after. §16.5.1 gives
-// each the value `a` held in the Preponed region of time 5, which is the 0 it
-// settled to at time 0, so neither assertion passes.
-//
-// Either run on its own is satisfied by an implementation that reads `a` live:
-// the one writing `a` second reads 0 and agrees by accident, and the one
-// writing it first reads 1 and disagrees. The pair is the claim. Without
-// sampling the counts are 1 and 0.
 TEST(ConcurrentAssertionSampling, VerdictDoesNotDependOnWriteOrderInTheTick) {
   SimFixture before;
   auto* first_hits = RunAndFindVar(SourceWithTickStep("a = 1'b1; clk = 1'b1;"),
@@ -205,23 +163,10 @@ TEST(ConcurrentAssertionSampling, VerdictDoesNotDependOnWriteOrderInTheTick) {
   ASSERT_NE(second_misses, nullptr);
   EXPECT_EQ(first_hits->value.ToUint64(), second_hits->value.ToUint64());
   EXPECT_EQ(first_misses->value.ToUint64(), second_misses->value.ToUint64());
-  // Each run drove one tick, and each read the 0 that `a` carried into the time
-  // step rather than the 1 written within it.
   EXPECT_EQ(first_hits->value.ToUint64(), 0u);
   EXPECT_EQ(first_misses->value.ToUint64(), 1u);
 }
 
-// §16.5.1: in the time slot at time 0 a variable's sampled value is its default
-// sampled value, and for a static variable that is the value its declaration
-// assigns or, when the declaration assigns none, its type's default
-// (uninitialized) value. `a` is declared `logic` and its declaration assigns
-// nothing, so its default sampled value is 1'bx however early the initial
-// procedure raises it.
-//
-// The single clock tick here is at time 0, in the same time step that assigns
-// `a` its 1. The assertion reads 1'bx, which §12.4 makes false, so the fail
-// action runs and the pass action does not. An implementation reading the live
-// value reads 1 and counts the pass instead.
 TEST(ConcurrentAssertionSampling, TimeZeroTickReadsTheDefaultSampledValue) {
   SimFixture f;
   const std::string kSrc =
@@ -246,17 +191,6 @@ TEST(ConcurrentAssertionSampling, TimeZeroTickReadsTheDefaultSampledValue) {
   EXPECT_EQ(misses->value.ToUint64(), 1u);
 }
 
-// §16.5.1 puts no condition on where the variable a property reads is declared,
-// and §23.6 makes a hierarchical name an ordinary way to reach one, the
-// instance name giving unambiguous access to a name inside another instance. So
-// `u.req` is sampled exactly as a name the module declares itself, and the
-// value the property reads at a clock tick is the one `u.req` held in the
-// Preponed region of that time slot.
-//
-// The write and the tick stand in one time step here, which is the only shape
-// that tells a sampled read from a live one: `u.req` is 0 in the Preponed
-// region of time 5 and 1 by the time the property is evaluated, so the
-// assertion does not hold and its pass action does not run.
 TEST(ConcurrentAssertionSampling, ChildInstanceOperandReadsThePreponedValue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -278,12 +212,6 @@ TEST(ConcurrentAssertionSampling, ChildInstanceOperandReadsThePreponedValue) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// The other half of the pair. `u.req` is raised a whole time step before the
-// tick, so the Preponed value of the tick's time slot is the 1 it settled to,
-// and the assertion holds. Either case on its own is satisfied by an
-// implementation that answers one thing for every hierarchical operand -- the
-// live value passes this one and fails the case above, and a stuck default
-// passes that one and fails this.
 TEST(ConcurrentAssertionSampling,
      ChildInstanceOperandSettledBeforeTheTickHolds) {
   SimFixture f;
@@ -306,12 +234,6 @@ TEST(ConcurrentAssertionSampling,
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// Two instances of one module declare the same name, and one property reads
-// both. Each is sampled from its own instance: `u1.req` settled a time step
-// before the tick and `u2.req` is written in the tick's own time step, so the
-// property reads 1 and 0 and holds. An enrolment keyed by the declared name
-// rather than by the variable the reference resolves to samples neither, and
-// the live read of `u2.req` then makes the property false.
 TEST(ConcurrentAssertionSampling, LikeNamedOperandsAreSampledPerInstance) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -335,12 +257,6 @@ TEST(ConcurrentAssertionSampling, LikeNamedOperandsAreSampledPerInstance) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §16.5.1: a const cast expression samples as its argument's current value,
-// where the variable beside it reads its Preponed value. `a` is written 1 in
-// the tick's own time step, before the clock, so the property's `a` samples the
-// 0 the step began with and `const'(a)` reads the 1 standing at the tick: the
-// two differ and the pass statement counts. A const cast read through the
-// sampling reads 0 as well and the fail statement counts instead.
 TEST(ConcurrentAssertionSampling, ConstCastReadsTheCurrentValueAtTheTick) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -364,11 +280,6 @@ TEST(ConcurrentAssertionSampling, ConstCastReadsTheCurrentValueAtTheTick) {
   EXPECT_EQ(misses->value.ToUint64(), 0u);
 }
 
-// §16.5.1 with §16.6: an element of a fixed-size unpacked array is read at
-// its Preponed value too. The always procedure flips arr[3] at each posedge
-// before the Observed region, so the five ticks sample 1, 0, 1, 0, 1 where
-// the values standing at them are 0, 1, 0, 1, 0. The [2:5] bounds make the
-// element's name its declared index rather than its offset.
 TEST(ConcurrentAssertionSampling, AnArrayElementReadsItsPreponedValue) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -387,8 +298,6 @@ TEST(ConcurrentAssertionSampling, AnArrayElementReadsItsPreponedValue) {
   EXPECT_EQ(f.ctx.FindVariable("fail")->value.ToUint64(), 2u);
 }
 
-// §16.5.1 with §16.6: so is an element of an array of two unpacked
-// dimensions, read through a select of each.
 TEST(ConcurrentAssertionSampling,
      AMultidimensionalElementReadsItsPreponedValue) {
   SimFixture f;
@@ -408,11 +317,6 @@ TEST(ConcurrentAssertionSampling,
   EXPECT_EQ(f.ctx.FindVariable("fail")->value.ToUint64(), 2u);
 }
 
-// §16.5.1: a past value of the `triggered` method is the one in the Postponed
-// region of the past tick. a0's pass statement triggers e in the Reactive
-// region of every tick, after c1 is evaluated in the Observed region, so
-// e.triggered is 0 there and 1 by the Postponed region: $past(e.triggered)
-// holds at the ticks of 15, 25 and 35, and at 5 reads the default 0.
 TEST(ConcurrentAssertionSampling, APastTriggeredIsItsPostponedValue) {
   SimFixture f;
   auto* hits = RunAndFindVar(

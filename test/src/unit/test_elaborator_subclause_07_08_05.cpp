@@ -61,10 +61,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, EnumTypedefIndexAllowed) {
   EXPECT_TRUE(found);
 }
 
-// §7.8.5: equality is defined for a composite (struct) type and for the
-// dynamically sized types it may contain, so such a type is a legal index.
-// This mirrors the clause's own example of a struct holding an unsized
-// dynamic-array member used as the index type.
 TEST(UserDefinedTypeAssocArrayElaboration,
      StructIndexWithDynamicMemberAllowed) {
   ElabFixture f;
@@ -87,9 +83,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
   EXPECT_TRUE(found);
 }
 
-// §7.8.5: a type that contains a real or shortreal has no defined equality
-// operator and shall be an illegal index type, even when the real sits inside
-// a struct member rather than being the index type itself.
 TEST(UserDefinedTypeAssocArrayElaboration, StructIndexContainingRealRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -104,9 +97,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, StructIndexContainingRealRejected) {
                             3, "7.8.5"));
 }
 
-// §7.8.5: the illegality of a real index type follows the type through a
-// typedef chain, so an index named via a typedef that resolves to real is
-// rejected just as a bare real would be.
 TEST(UserDefinedTypeAssocArrayElaboration,
      TypedefResolvingToRealIndexRejected) {
   ElabFixture f;
@@ -122,9 +112,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
                             3, "7.8.5"));
 }
 
-// §7.8.5: "contains a real" reaches through a struct member that is itself a
-// typedef alias of real, so the real-ness has to be resolved before the index
-// type can be judged legal. Such a struct is still an illegal index type.
 TEST(UserDefinedTypeAssocArrayElaboration,
      StructMemberTypedefResolvingToRealRejected) {
   ElabFixture f;
@@ -141,10 +128,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
                             4, "7.8.5"));
 }
 
-// §7.8.5: "contains a real" reaches recursively through a nested aggregate. A
-// struct member that is itself a named struct type holding a real makes the
-// outer struct an illegal index type, so the check must descend into the inner
-// struct's own members rather than stopping at the first level.
 TEST(UserDefinedTypeAssocArrayElaboration,
      StructWithNestedTypedefStructContainingRealRejected) {
   ElabFixture f;
@@ -161,10 +144,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
                             4, "7.8.5"));
 }
 
-// §7.8.5: an inline (anonymous) nested struct member is written directly in the
-// enclosing struct rather than through a typedef, but a real buried inside that
-// inline aggregate still makes the enclosing type contain a real and therefore
-// an illegal index type.
 TEST(UserDefinedTypeAssocArrayElaboration,
      StructWithInlineNestedStructContainingRealRejected) {
   ElabFixture f;
@@ -180,13 +159,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
                             3, "7.8.5"));
 }
 
-// Two packages each declare a `real_holder_t`, q's holding a real and r's
-// not; the module imports one of them and declares `idx_t`, the index type,
-// through the other's qualifier -- `typedef_line` being that declaration.
-// §26.3 (printed page 808) reaches a package's declaration through its
-// qualifier, so the qualified name is the named package's and never the
-// imported bare name's. Found by the session that carried the qualifier to
-// the type resolver (4af839bf7).
 std::string TwoPackagesRealHolderIndex(std::string_view imported,
                                        std::string_view typedef_line) {
   return "package q;\n"
@@ -203,10 +175,6 @@ std::string TwoPackagesRealHolderIndex(std::string_view imported,
          "endmodule\n";
 }
 
-// §7.8.5 with §26.3: the member `q::real_holder_t h` holds q's real although
-// the imported bare `real_holder_t` is r's real-free structure. Looked up by
-// the bare name, the member resolved to r's and the index type was not
-// reported.
 TEST(UserDefinedTypeAssocArrayElaboration,
      StructMemberQualifiedByAnotherPackageHoldingRealRejected) {
   ElabFixture f;
@@ -219,9 +187,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
                             10, "7.8.5"));
 }
 
-// The mirror: `r::real_holder_t h` holds no real although q's real-holding
-// structure is what the imported bare name stands for, so the index type is
-// legal; the bare lookup reported it.
 TEST(UserDefinedTypeAssocArrayElaboration,
      StructMemberQualifiedByRealFreePackageAllowedDespiteImportedReal) {
   ElabFixture f;
@@ -233,10 +198,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.5 with §26.3 for a typedef of a qualified name rather than a member:
-// `typedef r::real_holder_t idx_t` names r's real-free structure although the
-// imported bare name is q's, so the index type is legal; ContainsRealType
-// looked the alias up by the bare name and reported it.
 TEST(UserDefinedTypeAssocArrayElaboration,
      TypedefOfQualifiedRealFreeTypeAllowedDespiteImportedReal) {
   ElabFixture f;
@@ -246,9 +207,6 @@ TEST(UserDefinedTypeAssocArrayElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.8.5: the ban on a real index type holds for every associative dimension
-// of a declaration, the second as much as the first, and through a typedef
-// name standing for a type that holds a real.
 TEST(AssocIndexTypeValidation, RealIndexTypeOnAnyDimensionRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -268,9 +226,6 @@ TEST(AssocIndexTypeValidation, RealIndexTypeOnAnyDimensionRejected) {
   }
 }
 
-// §7.8.5: the same ban wherever the array is declared: a typedef in the
-// compilation unit, a package variable, a class property, a subroutine's
-// argument and a variable of a procedural block.
 TEST(AssocIndexTypeValidation, RealIndexTypeRejectedInEveryScope) {
   ElabFixture f;
   ElaborateSrc(
@@ -294,11 +249,6 @@ TEST(AssocIndexTypeValidation, RealIndexTypeRejectedInEveryScope) {
   }
 }
 
-// §7.8 with §26.3 and §8.23: an index type named through a package or a class
-// scope is the type the scope declares, so `a` takes a 4-bit unsigned index,
-// `b` an 8-bit signed one and `k` a class index, while `p::N`, a constant,
-// still sizes `z` at four. Each scoped index was dropped, and its variable
-// built with no dimension.
 TEST(UserDefinedTypeAssocArrayElaboration, ScopedTypeNameIndexIsAssociative) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -342,8 +292,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, ScopedTypeNameIndexIsAssociative) {
   EXPECT_EQ(z->unpacked_size, 4u);
 }
 
-// §7.8.5: a real index type is illegal however it is named, and a package's
-// typedef of real is reached through its scope as a bare typedef is.
 TEST(UserDefinedTypeAssocArrayElaboration, ScopedRealIndexIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -358,9 +306,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, ScopedRealIndexIsReported) {
                             3, "7.8.5"));
 }
 
-// §6.7: a net's dimension is fixed-size, and an index type named through a
-// package scope, a typedef's or a class's, makes an associative one, so each
-// of w1 and w2 is reported. A range, which w3 writes, is fixed-size.
 TEST(UserDefinedTypeAssocArrayElaboration, NetOfScopedIndexDimIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -381,9 +326,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, NetOfScopedIndexDimIsReported) {
   }
 }
 
-// §7.8.5 with §6.7: `int a [<keyword>]` is associative with a 64-bit unsigned
-// index, and a net written with the same index, on line 3, is reported, a
-// net's dimensions being fixed-size.
 void ExpectKeywordIndexAssociative(const std::string& keyword) {
   ElabFixture f;
   auto* design = ElaborateSrc(std::format("module top;\n"
@@ -404,28 +346,14 @@ void ExpectKeywordIndexAssociative(const std::string& keyword) {
                             "6.7"));
 }
 
-// §7.8.5 admits an index type with equality defined, which §6.14 defines for a
-// chandle. The array was built with no dimension, and the net's index taken
-// for a size.
 TEST(UserDefinedTypeAssocArrayElaboration, ChandleIndexIsAssociative) {
   ExpectKeywordIndexAssociative("chandle");
 }
 
-// §15.5.5.3 defines equality for an event, by the object it refers to, whose
-// identity is the 64-bit index. The array was built with no dimension, and
-// the net's index taken for a size.
 TEST(UserDefinedTypeAssocArrayElaboration, EventIndexIsAssociative) {
   ExpectKeywordIndexAssociative("event");
 }
 
-// A.2.5 with §7.8.5: an index written as a data_type an expression cannot
-// spell, or as a type reference, is the type it names. `e` takes the
-// enumeration's 32-bit int base, `s` the structure's 4 bits, `t` k's 4
-// unsigned bits, `c` a class index and `str` string keys. A real reached
-// through `type(r)` or held by an unpacked structure is reported (§7.8.5),
-// and a net's type reference index under §6.7. A block's `type(k)`, which no
-// type is resolved for there, draws no §7.8.5 report. Each array was built
-// with no dimension, or its index failed to parse.
 TEST(UserDefinedTypeAssocArrayElaboration, DataTypeIndexFormsAreAssociative) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -473,12 +401,6 @@ TEST(UserDefinedTypeAssocArrayElaboration, DataTypeIndexFormsAreAssociative) {
                             "6.7"));
 }
 
-// A.2.5 with §6.23 and §7.8.5: an index written as a type reference has the
-// type its argument has wherever the array is declared, so `[type(r)]` of a
-// real is reported in a procedural block, a function's body and formal, a
-// class property and a package variable, each `r` the nearest declaration of
-// that name, while `[type(k)]` of a `bit [3:0]` beside each is not. Each was
-// left unresolved, naming no type, and so no real.
 TEST(AssocIndexTypeValidation, TypeRefRealIndexReportedInEveryScope) {
   ElabFixture f;
   ElaborateSrc(
@@ -510,9 +432,6 @@ TEST(AssocIndexTypeValidation, TypeRefRealIndexReportedInEveryScope) {
   }
 }
 
-// §7.8.5 bars a real index alone, so a typedef whose associative index is a
-// type reference to a value that holds no real, `[type(k)]` of a
-// `bit [3:0]`, draws no report.
 TEST(AssocIndexTypeValidation, TypeRefIndexWithoutRealInTypedefIsNotReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -527,12 +446,6 @@ TEST(AssocIndexTypeValidation, TypeRefIndexWithoutRealInTypedefIsNotReported) {
                              3, "7.8.5"));
 }
 
-// A.2.5 with §6.18, §6.23 and §7.8.5: a typedef's associative index written
-// as a type reference has its argument's type in every scope, so `[type(r)]`
-// of a real is reported in the compilation unit, a package, a module and a
-// class, and `tk x;` under `[type(k)]` of a `bit [3:0]` is an associative
-// array keyed by four unsigned bits. The index was resolved in none of them:
-// no typedef drew the report, and x was built with no associative dimension.
 TEST(AssocIndexTypeValidation, TypedefTypeRefIndexIsResolvedInEveryScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -562,11 +475,6 @@ TEST(AssocIndexTypeValidation, TypedefTypeRefIndexIsResolvedInEveryScope) {
   EXPECT_FALSE(x->is_index_signed);
 }
 
-// A.1.3 and A.2.5 with §6.23 and §7.8.5: a variable port's associative index
-// written as a type reference has the type of the earlier port it names, so
-// `[type(r)]` of a real port is reported at its line and `[type(k)]` of a
-// `bit [3:0]` port at the next is not. The port's index was resolved nowhere,
-// naming no type, and so no real.
 TEST(AssocIndexTypeValidation, TypeRefIndexOnVariablePortIsResolved) {
   ElabFixture f;
   ElaborateSrc(

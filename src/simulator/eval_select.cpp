@@ -47,9 +47,6 @@ int64_t LongintValue(const Logic4Vec& val) {
                        : static_cast<int64_t>(val.ToUint64());
 }
 
-// Whether LongintValue reads `val`'s whole value: the words above the first
-// repeat the sign LongintValue gives it, which an unsigned value never has
-// negative. Each word is compared within the bits of the value it holds.
 static bool HeldInSixtyFourBits(const Logic4Vec& val) {
   const int64_t kLow = LongintValue(val);
   const uint64_t kFill = kLow < 0 ? ~uint64_t{0} : 0;
@@ -74,37 +71,21 @@ static uint64_t ResolveQueueIdx(const Expr* idx_expr, QueueObject* q,
   auto val = EvalExpr(idx_expr, ctx, arena);
   ctx.PopScope();
   if (has_xz) *has_xz = HasUnknownBits(val);
-  // §7.4.2: an element that is a fixed-size array is addressed by its
-  // declared bounds (QueueObject::PositionOf).
   return static_cast<uint64_t>(q->PositionOf(SelectBoundValue(val)));
 }
 
-// §7.10: the queue an element select reads is a declared one under its bare
-// name or, §8.5 restricting no property's type, a property of an object -- the
-// running method's own by its bare name (§8.11), any object's through a
-// handle, `b.q[1]`, or a static one as `C::all[0]` -- which FindQueueOfBase
-// resolves. Only the bare name of a declared queue was read here before, so
-// `q[0]` in a method of the class declaring `int q[$]` fell to a bit-select
-// of the property's scalar carrier and read 0 whatever the element held.
 static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                            Logic4Vec& out) {
   if (!expr->base || expr->index_end) return false;
   auto* q = FindQueueOfBase(expr->base, ctx, arena);
   if (!q) return false;
 
-  // §7.10.1 makes two things an invalid index, and each needs a test of its
-  // own. An index expression holding an x or z bit still converts to some
-  // position, so a bounds test alone would let it read an element; it is
-  // checked first, and the bounds decide the rest.
   bool idx_xz = false;
   auto idx = ResolveQueueIdx(expr->index, q, ctx, arena, &idx_xz);
   if (idx_xz) {
     out = NonexistentElementOf(expr, q->is_4state, q->elem_width, ctx, arena);
     return true;
   }
-  // §16.6: within a concurrent assertion's property the element read is the
-  // one sampled for the tick, which exists for the evaluation though the queue
-  // may have shed or moved it since; the store answers nothing anywhere else.
   const std::vector<Logic4Vec>* sampled =
       ctx.AssertionSamples().ReadQueueWithinProperty(q, ctx.CurrentTime());
   const std::vector<Logic4Vec>& elements =
@@ -117,14 +98,6 @@ static bool TryQueueSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §7.4.6 (printed page 156) with §26.3 (printed 808): the key the array an
-// indexed name stands on is held under -- a bare name's own text, or the
-// "p.a" a package's array named through the package scope resolution
-// operator, `p::a`, is created under (CreatePackageArray in
-// lowerer_register.cpp), which ScopedOrBareTargetKey builds for both shapes.
-// Empty for a root of another shape. Only an identifier root was taken
-// before, so `p1::a[1]` found no ArrayInfo and fell to a bit-select of the
-// "p1.a" carrier, reading bit 1 of it.
 static std::string_view SelectRootKey(const Expr* expr, SimContext& ctx) {
   const Expr* root = expr->base;
   while (root && root->kind == ExprKind::kSelect) root = root->base;
@@ -136,19 +109,12 @@ static const ArrayInfo* FindRootArrayInfo(const Expr* expr, SimContext& ctx) {
   return key.empty() ? nullptr : ctx.FindArrayInfo(key);
 }
 
-// §7.4.5's Table 7-1, "Value read from a nonexistent array entry": 'x for a
-// 4-state integral element type and '0 for a 2-state one. Said once here for
-// the readers of a single element and of a slice of the same array.
 static Logic4Vec ElementDefault(bool is_4state, uint32_t elem_width,
                                 Arena& arena) {
   return is_4state ? MakeAllX(arena, elem_width)
                    : MakeLogic4VecVal(arena, elem_width, 0);
 }
 
-// The same table for an element of the array held under `key`, whose element
-// may be an unpacked structure or union: the table gives that a value member
-// by member (NonexistentAggregateElement) rather than one for the whole, where
-// a packed one is a vector like any other.
 static Logic4Vec NonexistentElement(std::string_view key, bool is_4state,
                                     uint32_t elem_width, SimContext& ctx,
                                     Arena& arena) {
@@ -165,16 +131,6 @@ Logic4Vec NonexistentElementOf(const Expr* select, bool is_4state,
                             ctx, arena);
 }
 
-// Reports whether the object a select reads from is four-state. An invalid
-// bit-select address yields x on a four-state object but 0 on a two-state one,
-// so the read result for an out-of-bounds or unknown index depends on this.
-//
-// A class property names no variable: `h.two[9]`, or `two[9]` by its bare name
-// in a method (§8.5, §8.11), reads from the object, so the property's own
-// declaration is asked, where it declared a type the collector could size.
-// The class property `root` names -- `h.two` through a handle, or `two` by its
-// bare name in a method (§8.5, §8.11) -- or a target of no kind where it names
-// none.
 static FieldTarget SelectedPropertyTarget(const Expr* root, SimContext& ctx) {
   FieldTarget target;
   if (root->kind == ExprKind::kMemberAccess) {
@@ -223,11 +179,6 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
   if (!info) return false;
   auto elem_name = std::string(key) + "[" + std::to_string(idx) + "]";
   auto* elem = ctx.FindVariable(elem_name);
-  // §6.16: an element of an array of strings is a string, and a string has no
-  // declared width to fill with x or zero; one that was never written is "",
-  // the empty string, of zero length. Both branches mark the value a string so
-  // it reads back as one, since what reads a string reads that mark rather
-  // than the width.
   bool elem_is_string = info->elem_type_kind == DataTypeKind::kString;
   if (!elem) {
     if (elem_is_string) {
@@ -240,15 +191,10 @@ static bool TryArrayElementSelect(const Expr* expr, uint64_t idx,
     return true;
   }
   out = elem->value;
-  // §16.5.1 with §16.6: within a concurrent assertion's property the element
-  // reads its sampled value, as EvalIdentifier reads a variable's.
   if (const Logic4Vec* sampled =
           ctx.AssertionSamples().ReadWithinProperty(elem, ctx.CurrentTime())) {
     out = *sampled;
   }
-  // As EvalIdentifier reads a variable: an element's signedness is its
-  // declaration's, never the value's that was last written into it, so
-  // `d[0] = 4'sd9` on `logic [3:0] d [2]` reads back 9.
   out.is_signed = elem->is_signed;
   if (elem_is_string) out.is_string = true;
   return true;
@@ -272,9 +218,6 @@ static bool BuildCompoundName(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// Fills `out` with the value Table 7-1 gives an element (NonexistentElement)
-// of the array a compound select reads from, when the addressed element does
-// not exist. Returns false when the root is not a recognized array.
 static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
                                    Arena& arena, Logic4Vec& out) {
   const ArrayInfo* info = FindRootArrayInfo(expr, ctx);
@@ -284,8 +227,6 @@ static bool TryCompoundDefaultElem(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// Whether a prefix of the select chain `expr`, short of the whole of it, names
-// a stored variable -- the element the remaining indices select within.
 static bool ChainStandsOnElement(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   for (const Expr* p = expr->base; p != nullptr && p->kind == ExprKind::kSelect;
@@ -310,7 +251,6 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
   auto* elem = ctx.FindVariable(compound);
   if (elem) {
     out = elem->value;
-    // §16.5.1 with §16.6: as TryArrayElementSelect reads a single dimension's.
     if (const Logic4Vec* sampled = ctx.AssertionSamples().ReadWithinProperty(
             elem, ctx.CurrentTime())) {
       out = *sampled;
@@ -318,15 +258,6 @@ static bool TryCompoundArraySelect(const Expr* expr, SimContext& ctx,
     out.is_signed = elem->is_signed;
     return true;
   }
-  // The full compound name is not a variable. If a prefix of the chain names
-  // a real packed element, the indices past it select within that element per
-  // §11.5.2 rather than further array dimensions -- §7.4.1 has the first of
-  // them select a subfield and the next a bit of it, so `y[0][3][1]` on a
-  // `logic [3:0][7:0] y[1:0]` stands on `y[0]` -- and this returns false so
-  // EvalSelect falls through to the packed select path. Only the base one
-  // index short was asked, so a chain of three answered Table 7-1's default
-  // for an element that exists. Only when the addressed array element itself
-  // is absent is this a genuine out-of-bounds read that defaults to x/0.
   if (ChainStandsOnElement(expr, ctx, arena)) return false;
   return TryCompoundDefaultElem(expr, ctx, arena, out);
 }
@@ -343,34 +274,15 @@ std::pair<uint32_t, uint32_t> SelectRange(const Expr* expr, SimContext& ctx,
   return {lo, std::max(start, end_val) - lo + 1};
 }
 
-// §7.4.5: the run of elements an unpacked-array slice addresses. The slice may
-// be written on the array itself (`arr[lo:hi]`) or on one dimension of a
-// multidimensional array whose other dimensions carry single index values
-// (`A[i][lo:hi]`) -- a slice spans one dimension only, while the others may
-// carry single index values. Either way the addressed elements are stored as
-// leaf variables under `base`, so the two forms differ only in how that name is
-// spelled.
 struct UnpackedSliceRun {
   std::string base;
   uint32_t lo;
   uint32_t count;
   uint32_t elem_width;
-  // The declared direction of the array the run is taken from. `lo` is the
-  // numerically lowest index either way, so this is what says which end of the
-  // run the slice's first element sits at.
   bool is_descending;
-  // §7.4.5's Table 7-1 answers a read of a nonexistent entry by the element
-  // type: 'x for a 4-state one and '0 for a 2-state one. The two readers below
-  // reach that table for an element the slice names and the array does not
-  // hold, and this is what tells them which row -- ArrayInfo carries it and
-  // neither could ask, so both answered the 2-state row for every array.
   bool is_4state;
 };
 
-// Names the run `expr` addresses, or declines when `expr` is not a slice of an
-// unpacked array. A compound base that is itself a stored packed element is not
-// an array: there the index pair is a bit part-select of that element per
-// §11.5.2, so it is declined and left to the packed part-select path.
 static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
                                     Arena& arena, UnpackedSliceRun& out) {
   if (!expr || expr->kind != ExprKind::kSelect) return false;
@@ -386,48 +298,16 @@ static bool ResolveUnpackedSliceRun(const Expr* expr, SimContext& ctx,
     info = FindRootArrayInfo(expr, ctx);
   }
   if (!info) return false;
-  // §7.4.5: the second operand of an indexed part-select is a width, not an
-  // end point, so the addressed run is taken from the form the expression was
-  // written in rather than from the two operands alone.
   auto [lo, count] = SelectRange(expr, ctx, arena);
   out.lo = lo;
   out.count = count;
   out.elem_width = info->elem_width;
   out.is_descending = info->is_descending;
   out.is_4state = info->is_4state;
-  // A compound name only reaches an array through the leaves it was built to
-  // reach, so an absent leaf means this is not that array; a direct name has
-  // already been matched against the array itself, and an absent element there
-  // is an out-of-range read the loops below answer from Table 7-1.
   return !compound ||
          ctx.FindVariable(out.base + "[" + std::to_string(lo) + "]") != nullptr;
 }
 
-// §7.4.5: a slice of an unpacked array is itself an unpacked array, and §7.6
-// pairs one unpacked array with another by position, matching elements by
-// their left-to-right order in each array, so `int A[7:0]` and `int B[1:8]`
-// assign `B[1]` to `A[7]`. The run is therefore appended in the declared order
-// of the array it comes from rather than by ascending index. §7.4.5's own
-// `busA[7:6]` is written on a `busA [7:0]`, whose first element is `busA[7]`;
-// that slice contributes `busA[7]` first. Reversing both ends of a copy changes
-// nothing, so this only becomes visible against a destination that runs the
-// other way.
-//
-// Each element is answered as a value, not as a handle on the element it was
-// read from. §6.8 makes that element its own storage -- a variable stands for
-// a data storage element and keeps its value from one assignment to the next
-// -- and an array element is such an element, so a
-// run pushed as `v->value` handed a whole row of them out by pointer. Every
-// caller stores what it collects, into a destination slice's elements, a
-// destination array's, or a queue's, and none reads back through the entries,
-// so the copy is taken once here where the run is produced rather than at each
-// of those stores. The fallback element is built fresh and needs none.
-//
-// This pair is quiet where it is made: no store on these paths coerces, so
-// nothing happens inside the statement that read the source, and the shared
-// buffer only shows on the next write to either side -- a resize that keeps
-// the words at equal widths and coerces through them, or a deposit into a
-// packed member that lands in both.
 bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::vector<Logic4Vec>& out) {
   UnpackedSliceRun run;
@@ -437,21 +317,12 @@ bool CollectUnpackedSliceElements(const Expr* expr, SimContext& ctx,
         run.is_descending ? (run.lo + run.count - 1 - i) : (run.lo + i);
     auto n = run.base + "[" + std::to_string(idx) + "]";
     auto* v = ctx.FindVariable(n);
-    // §7.4.5: a read of an unpacked array of any kind at an invalid index
-    // returns what Table 7-1 lists, which gives a 4-state
-    // element 'x and only a 2-state one '0. This is the same answer
-    // TryArrayElementSelect and TryCompoundDefaultElem give for the element
-    // spelling of the same read.
     out.push_back(v ? OwnRhsWords(v->value, arena)
                     : ElementDefault(run.is_4state, run.elem_width, arena));
   }
   return true;
 }
 
-// Reads an unpacked-array slice as one packed value, the concatenation of its
-// elements. This is what a context expecting a single value gets; a context
-// that can hold the unpacked array the clause calls for reads the same run
-// through CollectUnpackedSliceElements instead.
 static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   UnpackedSliceRun run;
@@ -461,20 +332,6 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   for (uint32_t i = 0; i < run.count; ++i) {
     auto n = run.base + "[" + std::to_string(run.lo + i) + "]";
     auto* v = ctx.FindVariable(n);
-    // The bit-field primitives rather than 64-bit integer arithmetic, which is
-    // four answers at once. ExtractBitField carries the bval plane, so §6.3.1's
-    // rule that each bit of a 4-state vector takes any of the four values on
-    // its own survives the read where ToUint64 projected `aval & ~bval` and
-    // every x and z arrived as 0; it reads every word, where ToUint64 returns
-    // words[0] alone. DepositBitField resolves the word each bit belongs in,
-    // where `|=` into `out.words[bit_off / 64]` wrote one word per element and
-    // dropped the part of an element that straddled the boundary. And no mask
-    // is left to shift: `(1ULL << ew) - 1` on a 64-bit element shifted a
-    // uint64_t by 64, which is undefined behaviour rather than a wide zero --
-    // on x86-64 the count is taken modulo 64, so the mask came out 0 and the
-    // whole slice read as zero. This is the instrument 7e036a31f moved the
-    // other two select read paths in this file onto, and it takes §7.4.5's
-    // Table 7-1 default in the same deposit.
     Logic4Vec elem = v != nullptr ? ExtractBitField(arena, v->value, 0, ew)
                                   : ElementDefault(run.is_4state, ew, arena);
     DepositBitField(out, i * ew, elem, ew);
@@ -482,21 +339,6 @@ static bool TryArraySliceSelect(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §11.5.1: a part-select that is partly out of range reads x for each bit that
-// falls outside it. `lo_off` is the storage offset
-// the result's least significant bit was read from; it is negative when the
-// select runs off the low end of the value, and `lo_off + width` exceeds the
-// value's width when it runs off the high end.
-//
-// This marking and the copy in EvalPartSelect below divide the result between
-// them: the copy owns the positions the value holds, this owns every other
-// one, which is why the `continue` is here and why neither writes where the
-// other does. See that function's comment for the copy's half of the bargain.
-// Both now resolve the word a result position lives in, so a select wider than
-// one word is marked above position 63 as well; the loop used to stop at 64
-// and leave the overhang of a partially out of range select at a known 0
-// there. An out-of-range bit reads x, not z, and Logic4Word spells x with aval
-// and bval both set, so the bit goes into both planes.
 static void MarkOutOfRangeBitsX(Logic4Vec* result, uint32_t base_width,
                                 int64_t lo_off, uint32_t width) {
   if (result->nwords == 0) return;
@@ -508,35 +350,12 @@ static void MarkOutOfRangeBitsX(Logic4Vec* result, uint32_t base_width,
   }
 }
 
-// Reads the bits between two storage offsets of `base_val`, either of which may
-// lie outside it.
-//
-// §11.5.1 gives a select the value the bits it addresses hold, and §6.3.1 sets
-// every bit of a 4-state vector independently to one of the four basic values,
-// so a bit holding x reads x and one holding z reads z. This function and the
-// bit-select ending EvalSelect both used to read through Logic4Vec::ToUint64,
-// the 2-state projection: it masks by ~bval, so an x and a z alike arrived as
-// 0, and MakeLogic4VecVal sets no bval, so neither could leave. `a[0:0]` and
-// `a[0]` name one window of one variable and have to answer alike; both
-// answered a known 0. ToUint64 returns words[0] alone besides, so neither
-// reached a bit at offset 64 or above -- this one clamped its shift to 63 and
-// read the top of the first word, the bit-select shifted a single word by its
-// own width, which C++ leaves undefined. ExtractBitField copies a window bit
-// by bit, carrying the bval plane and indexing the word each bit lives in, and
-// it is what TryPackedElementSelect below already read its own one-element
-// window with. It fills positions at or beyond `base_val.width` with 0 rather
-// than x, so the marking still runs after it; the marking writes only
-// positions outside the value, which the copy leaves clear, so the two agree
-// on every bit rather than contending for any.
 static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, int64_t idx,
                                 int64_t end_idx, Arena& arena) {
   int64_t lo = std::min(idx, end_idx);
   int64_t hi = std::max(idx, end_idx);
   auto width = static_cast<uint32_t>(hi - lo + 1);
   auto result = MakeLogic4Vec(arena, width);
-  // The window's own bits start at the first of them the value holds, and land
-  // that far up in the result when the select runs off the value's low end. A
-  // window lying wholly below the value reads none of it at all.
   int64_t start = std::max<int64_t>(lo, 0);
   if (start <= hi) {
     auto n = static_cast<uint32_t>(hi - start + 1);
@@ -548,24 +367,11 @@ static Logic4Vec EvalPartSelect(const Logic4Vec& base_val, int64_t idx,
   return result;
 }
 
-// The declared variable a select base stands on, and how many selects within
-// it the base is deep -- 0 where the base is the variable's own name.
 struct SelectBaseObject {
   const Variable* var = nullptr;
   size_t depth = 0;
 };
 
-// The declared variable the select base `base` stands on, or null where it
-// stands on none: a concatenation, a function result, a struct member. An
-// element of an unpacked array is a vector in its own right, declared with
-// the array's element type and so with that type's range, and is the object
-// at depth 0. A select within a packed object is a window of it, and the
-// object is found under the chain: `z[1]` stands on `z` at depth 1 and
-// `y[0][3]` on the element `y[0]` at depth 1. Only the base itself was asked
-// after, so the window was a vector with no declaration. An index of a queue
-// or of an associative array names a whole element rather than a window of
-// the variable under the name (§7.10, §7.8), so a chain on one of those stands
-// on nothing here, as the writers' PackedRootVariable declines them.
 static SelectBaseObject FindSelectBaseObject(const Expr* base, SimContext& ctx,
                                              Arena& arena) {
   size_t depth = 0;
@@ -584,10 +390,6 @@ static SelectBaseObject FindSelectBaseObject(const Expr* base, SimContext& ctx,
   return {};
 }
 
-// §7.4.4: the packed dimension the select base `base`, a window of `width`
-// bits, is indexed by, or none where the base stands on no declaration or
-// its selects have gone past the dimensions. A cast stands on its casting
-// type (CastTypeLevel).
 static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
                                                   uint32_t width,
                                                   SimContext& ctx,
@@ -597,21 +399,6 @@ static std::optional<PackedLevel> SelectBaseLevel(const Expr* base,
   return obj.var->PackedLevelWithin(obj.depth, width);
 }
 
-// §11.5.1: the range a select's indices are resolved against. When the select
-// names a vector it is that vector's declared range, since which bit an address
-// reaches depends in part on the declaration, and
-// when it names a subfield of a packed multidimensional array the range of
-// the dimension that subfield is indexed by (§7.4.4); a function result has
-// its return type's range (§13.4.1, CalledFunctionRange) and a cast its
-// casting type's (§16.8.1, CastTypeLevel); for anything else --
-// a concatenation, a struct member -- the value carries no declaration of its
-// own and is addressed as [width-1:0]. A dimension whose
-// index selects elements rather than bits keeps the flat view too, as
-// Variable::BitSelectRange does for the outermost.
-//
-// A class property's value is held on the object without its declaration, so
-// the range its member declaration wrote -- `logic [0:31] bv` -- is read off
-// the class, where the member writes one packed dimension spanning the value.
 static std::optional<PackedRange> SelectedPropertyRange(const Expr* base,
                                                         uint32_t width,
                                                         SimContext& ctx,
@@ -636,16 +423,6 @@ static PackedRange SelectBaseRange(const Expr* base, uint32_t width,
   return level->range;
 }
 
-// §11.5.1: how wide a non-indexed part-select is when one of its two bounds is
-// x or z. A part-select always has a constant width, and with one bound
-// unknown the span is not a number the expression states, so what bounds it is
-// the declaration: the pair runs from the more significant index to the less
-// significant one, and the widest such select the object admits runs from the
-// known bound -- brought inside the range, since a bound outside it addresses
-// no bit -- to the end the unknown one lies toward. An unknown first bound
-// therefore spans up to the most significant index and an unknown second bound
-// down to the least significant one, and a known bound sitting at that end
-// leaves the single bit the two offsets then name.
 static uint32_t UnknownBoundPartSelectWidth(const PackedRange& range,
                                             int64_t known_bound,
                                             bool unknown_is_more_significant) {
@@ -661,33 +438,12 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                                       Arena& arena) {
   auto end = EvalExpr(expr->index_end, ctx, arena);
   auto range = SelectBaseRange(expr->base, base.width, ctx, arena);
-  // §11.5.1: a part-select whose bound is x or z reads as x, and the clause
-  // makes both bounds of `vect[msb_expr:lsb_expr]` addresses, each a constant
-  // integer expression, so an unknown second bound is as much an unknown
-  // address as an unknown first one. Only the first was asked about, on the way
-  // in to this function, and the second reached SelectBoundValue, whose
-  // Logic4Vec::ToUint64 is the "4-state -> integer projection" its own comment
-  // in src/common/types.cpp calls it: x and z both arrived as the index 0, and
-  // the select silently became a different, well-formed one. On a
-  // `logic [7:0] a = 8'hA5`, `a[3 : 1'bx]` was read as `a[3:0]` and answered
-  // 4'b0101. SelectStorageBits (statement_assign.cpp), which every writer of a
-  // select now goes through, has asked this of both bounds all along, so the
-  // read was the one direction where the two bounds were not alike. The second
-  // expression of an indexed part-select is its width rather than an address,
-  // and an unknown one is no more a width than an unknown bound is an address
-  // -- §11.5.1 requires a positive constant integer expression there -- so it
-  // takes the same route, as it does at the writers.
   if (HasUnknownBits(end)) {
-    return MakeAllX(arena, UnknownBoundPartSelectWidth(
-                               range, idx,
-                               /*unknown_is_more_significant=*/false));
+    return MakeAllX(arena, UnknownBoundPartSelectWidth(range, idx, false));
   }
   auto target = PartSelectTargetIndices(idx, SelectBoundValue(end),
                                         expr->is_part_select_plus,
                                         expr->is_part_select_minus);
-  // §7.4.4 with §7.4.5: a part-select of a packed array of packed arrays
-  // selects whole elements of the dimension it indexes, `joe[7][3:2]` the two
-  // bytes 3 and 2 of a `bit [3:0][7:0]` element, rather than bits.
   auto level = SelectBaseLevel(expr->base, base.width, ctx, arena);
   if (level && level->elem_width > 1) {
     int64_t w = level->elem_width;
@@ -700,43 +456,16 @@ static Logic4Vec EvalPackedPartSelect(const Expr* expr, const Logic4Vec& base,
                         range.OffsetOf(target.second), arena);
 }
 
-// §11.5.1: how wide a part-select is whose first index is x or z. The clause
-// gives the second expression two meanings and the part-select flags are the
-// whole of what says which one this select carries: for `[base +: width]` and
-// `[base -: width]` it is the width, which has to be a positive constant
-// integer expression, and for `[msb_expr:lsb_expr]` it is the second index,
-// with the width being the span the two indices name. Reading it as a width for
-// both is what let `a[1'bx : -2]` ask for a vector of 4294967294 bits, since
-// SelectBoundValue's -2 was a width of 4294967294 to a uint32_t cast.
-//
-// The first index is x, so the span is not a number the expression states, and
-// §11.5.1 nonetheless holds a part-select's width constant. What bounds it is
-// the declaration. The clause's first index is the
-// more significant end of the pair, so the widest such select the object admits
-// runs from the known second index -- brought inside the range, since a bound
-// outside it addresses no bit of the object -- up to the most significant index
-// there is. A second index at or past that end leaves the one bit the minimum
-// below keeps, which is the same answer §11.5.1 gives a select wholly outside
-// the address bounds: the value x.
-//
-// A base with no declaration of its own is left at the implicit empty range
-// rather than evaluated for its width, since this arm runs before the base is
-// read and evaluating it here would run its side effects a second time.
 static uint32_t UnknownIndexPartSelectWidth(const Expr* expr, SimContext& ctx,
                                             Arena& arena) {
   int64_t end_val = SelectBoundValue(EvalExpr(expr->index_end, ctx, arena));
   if (expr->is_part_select_plus || expr->is_part_select_minus) {
     return end_val > 0 ? static_cast<uint32_t>(end_val) : 1;
   }
-  auto range = SelectBaseRange(expr->base, /*width=*/0, ctx, arena);
-  return UnknownBoundPartSelectWidth(range, end_val,
-                                     /*unknown_is_more_significant=*/true);
+  auto range = SelectBaseRange(expr->base, 0, ctx, arena);
+  return UnknownBoundPartSelectWidth(range, end_val, true);
 }
 
-// Computes the result of a select whose index evaluates to x/z. A single-bit
-// select over a known array yields that array's default element; a part-select
-// yields all-x of the part width; a bit-select otherwise yields x or 0
-// depending on whether the selected object is four-state.
 static Logic4Vec EvalUnknownIndexSelect(const Expr* expr, SimContext& ctx,
                                         Arena& arena) {
   Logic4Vec elem;
@@ -750,8 +479,6 @@ static Logic4Vec EvalUnknownIndexSelect(const Expr* expr, SimContext& ctx,
                                        : MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Reads byte `idx` from a string value (indexed from the low end), returning an
-// 8-bit result; out-of-range indices read as 0.
 static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
                                       Arena& arena) {
   uint32_t nbytes = base_val.width / 8;
@@ -764,34 +491,17 @@ static Logic4Vec EvalStringByteSelect(const Logic4Vec& base_val, uint64_t idx,
   return MakeLogic4VecVal(arena, 8, ch);
 }
 
-// §7.4.1: whether the single-index select `expr` of a packed array reaches an
-// element of a named type declared signed (Variable::signed_elem_depth), which
-// is signed where every other element is unsigned.
 static bool SelectsSignedElement(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   SelectBaseObject obj = FindSelectBaseObject(expr->base, ctx, arena);
   return obj.var != nullptr && obj.var->signed_elem_depth == obj.depth;
 }
 
-// §7.4.1: a single-index select of a packed multidimensional array selects an
-// outermost element (the inner-dimension width) as a vector, not a single
-// bit, unsigned unless SelectsSignedElement says it is of a signed named type.
-// Returns the element value when `expr` names such an array -- by its own name,
-// or as an element of an unpacked array declared with packed dimensions
-// (§7.4.4), `y[0][3]` on a `logic [3:0][7:0] y[1:0]` being subfield 3 of the
-// element `y[0]` -- or a subfield of one with a dimension still inside it,
-// `z[1][0]` on a `logic [1:0][1:0][7:0] z` being the eight-bit subfield 0 of
-// the sixteen-bit `z[1]`. Only a bare name was asked at first, so `y[0][3]`
-// read bit 3 of the element, and then only the outermost dimension was known,
-// so `z[1][0]` read bit 0 of `z[1]`.
 static std::optional<Logic4Vec> TryPackedElementSelect(
     const Expr* expr, int64_t idx, const Logic4Vec& base_val, SimContext& ctx,
     Arena& arena) {
   if (expr->index_end) return std::nullopt;
   auto level = SelectBaseLevel(expr->base, base_val.width, ctx, arena);
-  // §7.4.1 with §7.2: a structure member of several packed dimensions,
-  // `u.b[0]` of `bit [1:0][7:0] b`, selects an element of its outermost
-  // dimension; taken as the flat member, the index selected a bit.
   if (!level) {
     const StructFieldInfo* member = ResolveStructMember(expr->base, ctx);
     if (member != nullptr && member->packed_elem_width > 0 &&
@@ -815,9 +525,6 @@ static std::optional<Logic4Vec> TryPackedElementSelect(
   return elem;
 }
 
-// A select from the value `base_val` of a packed base: a byte of a string, a
-// part-select, an element of a packed array or one bit, the index `idx_val`
-// resolved against the base's declared range.
 static Logic4Vec SelectFromPackedValue(const Expr* expr,
                                        const Logic4Vec& base_val,
                                        const Logic4Vec& idx_val,
@@ -831,13 +538,7 @@ static Logic4Vec SelectFromPackedValue(const Expr* expr,
   if (auto elem =
           TryPackedElementSelect(expr, declared_idx, base_val, ctx, arena))
     return *elem;
-  // §11.5.1: which bit a bit-select addresses follows from the declared range
-  // of what is being selected from, so it is resolved against that range rather
-  // than taken as a storage offset.
   auto range = SelectBaseRange(expr->base, base_val.width, ctx, arena);
-  // One bit is a window of one, read the way EvalPartSelect above reads the
-  // other spelling of it and for the reasons set out there. It is an element
-  // of a one-bit named type where the declaration writes its dimensions on one.
   Logic4Vec bit =
       range.Contains(declared_idx)
           ? ExtractBitField(arena, base_val,
@@ -849,11 +550,6 @@ static Logic4Vec SelectFromPackedValue(const Expr* expr,
   return bit;
 }
 
-// §7.2 with §7.4.2: `m.v[1]` reads one element of an unpacked array member,
-// its window of the structure's bits; an index outside the member reads x.
-// Taken as a bit-select of the member's value, it read one bit. An element of
-// strings reads the text its handle names (§6.16), and one outside the member
-// reads the empty string (§7.4.6), which the x handle names.
 static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   StructArrayElementRef ref;
@@ -869,10 +565,6 @@ static bool TryStructArrayMemberSelect(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §7.4.2: an element of a class property declared as an array, which the
-// object holds one by one rather than as a value under the property's name.
-// §25.9 with §23.3.3.5: an element of an array of interface instances,
-// `s[1]`, is an instance, whose handle the select stands for.
 static bool TryPropertyElementOrInstanceSelect(const Expr* expr,
                                                const Logic4Vec& idx_val,
                                                SimContext& ctx, Arena& arena,
@@ -885,8 +577,6 @@ static bool TryPropertyElementOrInstanceSelect(const Expr* expr,
 Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   Logic4Vec result;
   if (TryStructArrayMemberSelect(expr, ctx, arena, result)) return result;
-  // §8.11 with §23.9: in a method, `d[1]` is an element of the object's array
-  // property ahead of a variable `d` of the module declaring the class.
   if (expr->index_end == nullptr && NamesOwnArrayProperty(expr->base, ctx)) {
     auto idx_val = EvalExpr(expr->index, ctx, arena);
     if (!HasUnknownBits(idx_val) &&
@@ -905,12 +595,6 @@ Logic4Vec EvalSelect(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (TryArraySliceSelect(expr, ctx, arena, result)) return result;
   if (TryPropertyElementOrInstanceSelect(expr, idx_val, ctx, arena, result))
     return result;
-  // §13.4.1: a call used as an expression is an implicit variable of its
-  // return type, so an index on a call that returned a queue, a dynamic array
-  // or a fixed-size unpacked array reads an element of it (§7.10.1, §7.4.5),
-  // where the vector the call hands back is one element's width and held the
-  // index itself as a bit-select. The call is run once, here; a slice of the
-  // aggregate is not read and takes the packed path as before.
   std::optional<ReturnedAggregate> returned;
   auto base_val = EvalWithReturnedAggregate(expr->base, ctx, arena, returned);
   if (returned && expr->index_end == nullptr)

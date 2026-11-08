@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// The three cases below write their output port from a procedure, so the port
-// is declared `output logic`: §23.2.2.3 makes `output y` with no data type a
-// net of the default net type, and §10.4 requires a procedural assignment's
-// left-hand side to be a variable, which the elaborator reports since
-// 40d5e271b registered such ports as nets.
 TEST(ProceduralBlockSynthesis, AlwaysCombBlockLowers) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -90,8 +85,6 @@ TEST(ProceduralBlockSynthesis, FinalBlockBypassedDuringSynthCheck) {
   EXPECT_NE(aig, nullptr);
 }
 
-// The initial block writes a variable of its own: y is a net, which §10.4 bars
-// from a procedural assignment.
 TEST(ProceduralBlockSynthesis, InitialBlockBypassedDuringSynthCheck) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -146,17 +139,6 @@ TEST(ProceduralBlockSynthesis, NonblockingAssignmentInsideAlwaysFFLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A.6.2 admits an inc_or_dec_expression as a statement, and §11.4.2 rules that
-// it behaves as a blocking assignment, so `tmp++` has to leave `tmp` carrying
-// one more than it did. The sweep over every value of `a` is what states that:
-// a synthesizer that passes the increment over silently still returns a graph,
-// so `ASSERT_NE(aig, nullptr)` holds over a netlist in which the increment
-// never happened. Every input value is driven because a single one proves
-// nothing about an adder, and because at width 1 an increment and a decrement
-// build the same netlist. The block writes `y` itself rather than through a
-// continuous assignment, since `SynthLower::Lower` lowers a module's continuous
-// assignments before its processes and a read through `assign y = tmp;` would
-// measure that order instead of the increment.
 TEST(ProceduralBlockSynthesis, IncDecExpressionCrossLinkInsideAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

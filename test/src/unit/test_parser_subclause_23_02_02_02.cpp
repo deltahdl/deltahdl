@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -270,36 +268,24 @@ TEST(PortDeclParsing, ErrorMissingCloseParen) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "23.2.2.2"));
 }
 
-// §23.2.2.2: a module shall be declared either entirely with the
-// list_of_ports syntax or entirely with the list_of_port_declarations syntax.
-// Mixing a bare non-ANSI port name with an ANSI port declaration in the same
-// header is therefore illegal.
 TEST(AnsiStylePortDeclarations, MixedAnsiAndNonAnsiHeaderIsError) {
   auto r = Parse("module m(a, input logic b); endmodule\n");
-  // The bare `a` puts the header on the non-ANSI list_of_ports path, so the
-  // report is the port reference §23.2.2.1 requires after the comma, not a
-  // report of the §23.2.2.2 rule against mixing the two styles.
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'input'", 1,
                             "23.2.2.1"));
 }
 
-// §23.2.2.2: generic interface ports cannot be declared using the non-ANSI
-// style list_of_ports syntax; declaring one in the module body is illegal.
 TEST(AnsiStylePortDeclarations, GenericInterfacePortNonAnsiIsError) {
   auto r = Parse(
       "module cpuMod(d, clk);\n"
       "  input interface d;\n"
       "  input logic clk;\n"
       "endmodule\n");
-  // §25.3.3 owns the generic interface port, and the report stands there.
   EXPECT_TRUE(ReportedError(r.diags,
                             "generic interface port must be declared with "
                             "ANSI-style port declarations",
                             2, "25.3.3"));
 }
 
-// §23.2.2.2: an explicitly named ANSI port may bind a concatenation of
-// elements declared inside the module, not just a single element select.
 TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortConcatenation) {
   auto r = Parse("module m(output .P1({a, b})); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -311,9 +297,6 @@ TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortConcatenation) {
   EXPECT_EQ(port.port_expr->kind, ExprKind::kConcatenation);
 }
 
-// §23.2.2.2: an explicitly named ANSI port may bind an element of a structure
-// declared inside the module, i.e. a member-access port expression, alongside
-// the array-element (select), concatenation, and assignment-pattern forms.
 TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortStructMember) {
   auto r = Parse("module m(output .P1(s.m)); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -326,8 +309,6 @@ TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortStructMember) {
   EXPECT_FALSE(port.port_expr->is_scope_resolution);
 }
 
-// §23.2.2.2: an explicitly named ANSI port may also bind an assignment
-// pattern expression of elements declared inside the module.
 TEST(AnsiStylePortDeclarations, ExplicitlyNamedAnsiPortAssignmentPattern) {
   auto r = Parse("module m(output .P1('{a, b})); endmodule\n");
   ASSERT_NE(r.cu, nullptr);

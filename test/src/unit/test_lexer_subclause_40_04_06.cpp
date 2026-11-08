@@ -8,36 +8,8 @@
 
 using namespace delta;
 
-// §40.4.6 — Specifying possible states of FSM.
-//
-// The possible states of an FSM can be specified with the same enumeration-name
-// pragma (§40.4.1's separate `/* tool enum E */` form), written on a parameter
-// declaration whose parameters enumerate the legal states. The LRM gives two
-// placements:
-//
-//     parameter /* tool enum enumeration_name */
-//     S0 = 0, s1 = 1, s2 = 2, s3 = 3;
-//
-// and, when a bit width is used for the parameters, immediately after the
-// width:
-//
-//     parameter [1:0] /* tool enum enumeration_name */
-//     S0 = 0, s1 = 1, s2 = 2, s3 = 3;
-//
-// Lexically nothing new happens here. §40.4.1 already recognizes the enum-only
-// pragma context-independently, so it is recognized just the same whether it
-// follows a `logic` bit range, the `parameter` keyword, or a parameter bit
-// width. The interpretation that these parameters are the FSM's possible states
-// is a semantic FSM-extraction layer on top of the tokens — the same kind of
-// semantic decision §40.4.4/§40.4.5 noted the lexer does not make. These tests
-// observe that the existing recognition surfaces the enum pragma in both
-// §40.4.6 placements, and that every state-naming parameter reaches the token
-// stream.
-
 namespace {
 
-// Collects the state-naming parameters S0, s1, s2, s3 from `src` in the order
-// they appear in the token stream.
 std::vector<std::string> CollectStateParams(const std::string& src) {
   auto idents = CollectIdentifiers(src);
   std::vector<std::string> states;
@@ -49,8 +21,6 @@ std::vector<std::string> CollectStateParams(const std::string& src) {
   return states;
 }
 
-// Asserts the single enum-only `myFSM` pragma surfaced by a §40.4.6 parameter
-// declaration; the pragma binds the enumeration and carries no signal name.
 void ExpectSingleMyFsmEnumPragma(const std::vector<FsmPragmaInfo>& pragmas) {
   ASSERT_EQ(pragmas.size(), 1u);
   EXPECT_EQ(pragmas[0].form, "enum_only");
@@ -59,11 +29,6 @@ void ExpectSingleMyFsmEnumPragma(const std::vector<FsmPragmaInfo>& pragmas) {
   EXPECT_TRUE(pragmas[0].signal.empty());
 }
 
-// Claim A — the possible states are specified with the enum-only pragma placed
-// immediately after the `parameter` keyword. The enum pragma is recognized in
-// this placement, binding the FSM enumeration name, and each state-naming
-// parameter (S0, s1, s2, s3) reaches the token stream — the raw material a
-// downstream extractor reads to learn the FSM's legal states.
 TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
   const std::string kSrc =
       "module fsm;\n"
@@ -72,7 +37,6 @@ TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
       "endmodule\n";
 
   auto pragmas = CollectFsmPragmas(kSrc);
-  // The enum-only pragma carries no signal name; it only binds the enumeration.
   ExpectSingleMyFsmEnumPragma(pragmas);
 
   auto states = CollectStateParams(kSrc);
@@ -83,10 +47,6 @@ TEST(FsmPossibleStatesPragmaLexing, RecognizesEnumPragmaAfterParameterKeyword) {
   EXPECT_EQ(states[3], "s3");
 }
 
-// Claim B — when a bit width is used for the parameters, the pragma is placed
-// immediately after the bit width instead. Recognition is unchanged: the same
-// enum pragma is surfaced, and the bit-range tokens between `parameter` and the
-// pragma do not disturb it. The state-naming parameters still reach the stream.
 TEST(FsmPossibleStatesPragmaLexing,
      RecognizesEnumPragmaAfterParameterBitWidth) {
   const std::string kSrc =
@@ -104,15 +64,6 @@ TEST(FsmPossibleStatesPragmaLexing,
   EXPECT_EQ(states[3], "s3");
 }
 
-// The clause's own directive, read off what the lexer records: the pragma goes
-// right after the `parameter` keyword, or, when the parameters are given a bit
-// width, right after that width. Both placements are what the token standing
-// before the pragma says they are - the `parameter` keyword in the one, the
-// closing bracket of the width in the other - and the possible states are the
-// names following it, as far as the semicolon that ends the parameter
-// declaration. Read that way the states come from the pragma rather than from a
-// list of names the case already held, so a parameter declared outside this
-// declaration is none of them.
 TEST(FsmPossibleStatesPragmaLexing, ThePragmaStandsWhereTheClausePutsIt) {
   const std::string kAfterKeyword =
       "module fsm;\n"

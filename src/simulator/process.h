@@ -121,32 +121,15 @@ struct Process {
   uint32_t id = 0;
   bool active = true;
   bool is_reactive = false;
-  // §37.33 detail 3: the semaphore or mailbox the process is parked on, which
-  // vpiWaitingProcesses reports it waiting on; null while it waits on none.
   const void* waiting_on_sync = nullptr;
-  // §37.27 detail 1: the named events the event control the process is
-  // suspended at waits on, which vpiWaitingProcesses of each reports it
-  // waiting on; empty while it waits at none.
   std::vector<const void*> waiting_on_events;
 
   uint32_t program_block_id = 0;
 
-  // §16.5: true where this process carries a concurrent assertion's property.
-  // A concurrent assertion is evaluated in the Observed region, so such a
-  // process is never resumed synchronously inside the process that assigned its
-  // clock, whatever edge its clocking event names.
   bool is_concurrent_clocked = false;
 
-  // §16.9.4: the global clocking event this process's attempt waits for before
-  // it evaluates, empty for every process whose property names none of the five
-  // future sampled value functions. RtlirProcess::gclk_future_event says why.
   std::vector<EventExpr> gclk_future_event;
-  // §16.9.4: the assertion whose one attempt this process carries until the
-  // global clocking tick answers it, which §20.11's Kill aborts; nullptr for
-  // every other process.
   const Stmt* future_gclk_attempt_of = nullptr;
-  // §37.44: the statement the process was started from, the body of its
-  // procedure or the fork branch it runs; null for one no statement starts.
   const Stmt* origin = nullptr;
 
   WaitForkState wait_fork_state;
@@ -155,83 +138,30 @@ struct Process {
 
   ProcessState sv_state = ProcessState::kRunning;
   bool is_suspended = false;
-  // §9.7: when a process is suspended, a one-shot delay wake that elapses
-  // during the suspension cannot simply be dropped -- it holds the only handle
-  // to the coroutine's parked continuation (which is nested below
-  // Process::coro, so resuming coro would resume the wrong frame). Stash that
-  // inner handle here and replay it on resume(). Empty when no elapsed wake is
-  // pending.
   std::coroutine_handle<> pending_wake;
-  // §9.6.2: the wait the process is parked in, for a disable from another
-  // process to take it out of (ParkSlot in exec_task.h).
   ParkSlot park;
-  // §9.7: a process suspended before its start ran is started by resume(),
-  // since its start event found it suspended and ran nothing.
   bool start_deferred = false;
   std::vector<std::coroutine_handle<>> await_waiters;
-  // §9.6.1 with §9.3.2: releases this process, where a fork spawned it, from
-  // that fork's join and wait-fork tallies (stmt_exec.cpp); empty for any other
-  // process, and emptied once run (ReleaseFromFork).
   std::function<void()> fork_release;
 
   uint32_t rng_seed = 0;
 
-  // Per §18.14.2 thread stability: each thread carries its own RNG so that
-  // draws made from this thread do not depend on the scheduler's interleaving
-  // with siblings. The owning SimContext seeds rng on creation, lazily marks
-  // rng_initialized true on first use, and may be reset by srandom().
   std::mt19937 rng;
   bool rng_initialized = false;
 
-  // §12.4.2.2: a violation report queued against this process, held until the
-  // Observed region so that a later flush point can discard it. The position
-  // and the subclause are carried alongside the message because the statement
-  // that raised it has been left by the time the report runs, and because
-  // §12.4.2.1 and §12.5.3.1 state the rule separately for an if statement and
-  // for a case statement.
   struct PendingViolation {
     SourceLoc loc;
     std::string msg;
     std::string_view subclause;
-    // §20.11: the report's Table 20-6 assertion_type bit (unique, unique0 or
-    // priority) and the hierarchical name of the scope it was raised in, by
-    // which an assertion control selects it.
     uint32_t type_bit = 0;
     std::string scope;
   };
   std::vector<PendingViolation> pending_violations;
 
-  // §16.4.2: a deferred immediate assertion's pass/fail action (or its default
-  // $error) is queued as a pending report and executed later in the current
-  // time step (see §16.4.1). Reaching a deferred assertion flush point clears
-  // this process's still-pending reports. Rather than track each queued report
-  // individually, every report captures the value of this counter when it is
-  // enqueued; flushing bumps the counter, so a report whose captured value no
-  // longer matches has been flushed and is skipped when its region is reached.
-  // A report scheduled but not yet run has not matured; once its region runs it
-  // has effectively matured and can no longer be flushed, which matches the
-  // rule that all flush points occur before the report's region.
   uint64_t deferred_report_generation = 0;
 
-  // §16.4.4: labels of deferred immediate assertions in this process whose
-  // still-pending reports have been individually cancelled by a
-  // `disable <assertion_label>` statement. Unlike a whole-queue flush (which
-  // bumps deferred_report_generation), a specific-assertion disable clears only
-  // the named assertion's reports and leaves the process running, so it cannot
-  // use the generation counter. Each pending report captures its assertion
-  // label and skips execution when that label is present here. The set is
-  // cleared whenever the process reaches a deferred assertion flush point
-  // (which already discards every pending report), so a cancellation never
-  // leaks past the activation that issued the disable.
   std::unordered_set<std::string> cancelled_deferred_labels;
 
-  // §20.11 and §39.5.3: a Kill flushes the pending reports of the deferred
-  // assertions it selects that have not matured, leaving the process's other
-  // reports queued. Each report this process queues is numbered from
-  // `deferred_reports_queued`; for each assertion that has queued one,
-  // `latest` is the number of its last and `flushed_through` that of the last
-  // a Kill flushed, a report numbered no higher being skipped when its region
-  // is reached.
   struct QueuedDeferredReports {
     uint64_t latest = 0;
     uint64_t flushed_through = 0;
@@ -240,114 +170,32 @@ struct Process {
   std::unordered_map<const Stmt*, QueuedDeferredReports>
       queued_deferred_reports;
 
-  // §16.12.2: the attempts in flight of each sequential property this
-  // process evaluates, keyed by the assertion statement; created at the
-  // statement's first tick.
   std::unordered_map<const Stmt*, SequencePropertyState*>
       sequence_property_states;
-  // §16.12.4 and §16.12.5: likewise for each property of operands under or
-  // and and.
   std::unordered_map<const Stmt*, PropertyTreeState*> property_tree_states;
-  // §9.4.2: the event of the process's last event control that resumed it,
-  // where that was an edge or a named event; one with no signal otherwise.
   EventExpr woken_by;
-  // §16.14.6: the procedural assertion queue of each concurrent assertion
-  // embedded in this process, keyed by the statement; filled as the process
-  // reaches the statement and drained by the statement's monitor process at
-  // its leading clocking event (procedural_assertion.h).
   std::unordered_map<const Stmt*, ProceduralAssertionState*>
       procedural_assertions;
-  // §17.3: the static assertions of the procedural checker instance each
-  // checker instantiation this process holds names, keyed by the statement
-  // and queued or reported each time the process reaches it.
   std::unordered_map<const Stmt*,
                      std::vector<const ProceduralCheckerAssertion*>>
       checker_instance_assertions;
-  // §16.17: the verdict of the expect statement this process is blocked
-  // on, `expect_decided` once the evaluation succeeded or failed and
-  // `expect_holds` which of the two, written where the attempt concludes
-  // and read by the statement to unblock (expect_statement.cpp).
   bool expect_decided = false;
   bool expect_holds = false;
 
   std::string inst_prefix;
 
-  // §27.4: the name prefixes of the generate block instances this process is
-  // in, outermost first, with its own block's prefix last. Empty outside any
-  // generate construct. Each instantiated generate block is a scope of its own
-  // and a fresh level of the hierarchy, so its declarations are stored
-  // under its prefix while the body the instances share still names them
-  // plainly; a lookup tries the prefixes ahead of the bare name and so reaches
-  // this instance's own declaration rather than missing it. §23.9 is why the
-  // enclosing ones are here too: a name a generate block uses without a
-  // hierarchical path is searched for outward, scope by scope, until a
-  // declaration of it turns up or a module, interface, program or checker
-  // boundary stops the search, so a name a nested block does
-  // not declare is looked for in the block around it before the module.
   std::vector<std::string> gen_prefixes;
-  // §21.2.1.5 and §27.3: the generate block instances the process stands
-  // in as levels of a hierarchical name, `g[0].h`, for %m; empty for a
-  // process of the module itself.
   std::string gen_block_name;
 
-  // §13.3.2: a task may be enabled more than once concurrently, and every
-  // variable of an automatic task (and, more generally, every block-scoped
-  // local) must be private to each activation. Automatic/block locals live on
-  // the context's single scope stack while this process runs; when the process
-  // suspends and another runs, its scope stack is parked here and swapped back
-  // in on resume by SimContext::SetCurrentProcess, so concurrent activations
-  // never see each other's locals. A frame carries the shape of an array a
-  // name stands for in that scope as well as the variables (see Scope in
-  // simulator/scope.h), so what §18.17 declares inside a randsequence is
-  // parked with the rest and is not visible to whichever process runs while
-  // this one is suspended. Kept last so adding it does not shift the offsets
-  // of the fields above.
   std::vector<Scope> saved_scope_stack;
-  // §21.2.1.5: the labels of the named blocks and statements this process
-  // stands inside, which %m reports as levels of the hierarchical name,
-  // parked while the process is suspended as saved_scope_stack is, so that
-  // a label one process is inside is not reported by another.
   std::vector<std::string_view> saved_named_scopes;
-  // §8.6 and §13.3: a class task enabled through a handle may suspend on a
-  // timing control, and the object it runs on (§8.11's `this`) and the class
-  // its body resolves unqualified members against (§8.15) are this activation's
-  // alone, so both are parked while the process is suspended as its locals
-  // are, and another process running meanwhile sees neither.
   std::vector<ClassObject*> saved_this_stack;
   std::vector<const ClassTypeInfo*> saved_method_class_stack;
-  // §13.3 with §23.6: a task enabled by hierarchical name, `u1.tk(3)`, runs
-  // in the instance that declares it and may suspend there on a timing
-  // control, so inst_prefix names the callee's instance for as long as the
-  // enable lasts, and the instance the enable was written in waits here, one
-  // entry per enable still running, to be put back when the task returns
-  // (EnterCalleeInstance and LeaveCalleeInstance in eval_function_hier.h).
   std::vector<std::string> caller_inst_prefixes;
-  // §27.4 with §13.3: and the generate block prefixes the process ran with
-  // before each enable, one entry per enable still running as above, put back
-  // when the subroutine returns; the enable of a generate block instance's
-  // subroutine by its hierarchical name, `blk[1].tk(3)`, replaces them with
-  // the block's for as long as the enable lasts, and any other enable leaves
-  // them as they were.
   std::vector<std::vector<std::string>> caller_gen_prefixes;
-  // §13.4.2: the owner each enable still running keeps its static frames
-  // under, one entry per enable as above -- the package or compilation unit
-  // declaring a subroutine of one (DeclaredNameTables::StaticFrameOwner),
-  // empty for an instance's subroutine, whose frames are its instance's --
-  // with the depth of the generate block instance declaring it (§27.4,
-  // FrameOwnerEntry).
   std::vector<FrameOwnerEntry> frame_owners;
-  // A copy of a calling process that carries its context to a display written
-  // later (SnapshotCallingProcess in deferred_caller.h); no thread of the run.
   bool stand_in = false;
-  // §10.5: the stand-in the initializers of static locals run under before
-  // any procedure starts (Lowerer::InitializeStaticLocals), which carries the
-  // instance they stand in and is no process at all.
   bool is_static_init = false;
-  // §9.3.2 with §9.6.2: the labels of the named scopes the fork that spawned
-  // this process stands in, outermost first: those its spawner was spawned in,
-  // then the ones its spawner stood in itself. A branch stands in them though
-  // it never enters them, so a disable of one of them reaches the branch
-  // (ProcessesInDisabledScope); empty for a process no fork spawned.
   std::vector<std::string_view> spawned_in_named_scopes;
 
   ~Process() {
@@ -360,8 +208,6 @@ struct Process {
 
   bool Done() const { return !coro || coro.done(); }
 
-  // §9.7: the process has terminated normally, so status() answers FINISHED
-  // and every await() on it returns. A process killed meanwhile stays KILLED.
   void Finish() {
     if (sv_state == ProcessState::kKilled) return;
     sv_state = ProcessState::kFinished;
@@ -372,9 +218,6 @@ struct Process {
     }
   }
 
-  // §9.7: the process is forcibly terminated, by kill() or a disable
-  // (TerminateProcess in process_termination.h), so status() answers KILLED
-  // and every await() on it returns.
   void Kill() {
     active = false;
     sv_state = ProcessState::kKilled;
@@ -383,15 +226,12 @@ struct Process {
     for (auto& w : waiters) w.resume();
   }
 
-  // Runs fork_release once, by whichever ends the process first: its own
-  // completion, its start event finding it already ended, or a kill.
   void ReleaseFromFork() {
     auto release = std::move(fork_release);
     fork_release = nullptr;
     if (release) release();
   }
 
-  // Starts the process: every caller is the event that begins its run.
   void Resume() {
     if (!active || !coro || coro.done()) return;
     if (is_suspended) {

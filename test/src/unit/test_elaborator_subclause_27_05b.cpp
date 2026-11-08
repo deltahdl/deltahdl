@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §27.5: a generate block holding nothing but another conditional generate
-// construct, with no begin-end around it, is no scope of its own, and the inner
-// construct's blocks count as the outer construct's. They are held to the
-// outer construct's naming rules, so the name dup below conflicts with logic
-// dup as it would written directly in the outer if-generate.
 TEST(GenerateElaboration, DirectlyNestedIfBlockCollidesWithDeclaration) {
   ElabFixture f;
   Elaborate(
@@ -30,8 +25,6 @@ TEST(GenerateElaboration, DirectlyNestedIfBlockCollidesWithDeclaration) {
       3, "27.5"));
 }
 
-// The same holds of a case-generate directly nested in the else branch of an
-// if-generate: its item block w conflicts with wire w.
 TEST(GenerateElaboration, DirectlyNestedCaseBlockCollidesWithDeclaration) {
   ElabFixture f;
   Elaborate(
@@ -48,9 +41,6 @@ TEST(GenerateElaboration, DirectlyNestedCaseBlockCollidesWithDeclaration) {
       3, "27.5"));
 }
 
-// A block of a directly nested construct may not share its name with a block of
-// another construct in the scope either: s on line 3 is a block of the
-// construct on line 3, and s on line 2 one of the construct on line 2.
 TEST(GenerateElaboration, DirectlyNestedBlockCollidesAcrossConstructs) {
   ElabFixture f;
   Elaborate(
@@ -65,10 +55,6 @@ TEST(GenerateElaboration, DirectlyNestedBlockCollidesAcrossConstructs) {
                             3, "27.5"));
 }
 
-// §27.5's Example 1 writes a case-generate directly nested in the else branch
-// of an if-generate and names every block of both u1. The inner blocks are the
-// outer construct's own alternatives, so sharing the name with its then-block
-// breaks no rule and the source elaborates with no report.
 TEST(GenerateElaboration, DirectlyNestedBlocksMayShareTheOuterBlocksName) {
   ElabFixture f;
   Elaborate(
@@ -83,11 +69,6 @@ TEST(GenerateElaboration, DirectlyNestedBlocksMayShareTheOuterBlocksName) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §27.5's naming rules hold in every scope that holds a conditional generate
-// construct, and a generate block is one: inside outer, the block dup conflicts
-// with outer's logic dup, and the block s of the case-generate with the block s
-// of the if-generate beside it. The parameter P is 0, so neither inner
-// construct selects a block, which §27.5 rules makes no difference.
 TEST(GenerateElaboration, BlockNameRulesHoldInsideAGenerateBlock) {
   ElabFixture f;
   Elaborate(
@@ -112,10 +93,6 @@ TEST(GenerateElaboration, BlockNameRulesHoldInsideAGenerateBlock) {
                             6, "27.5"));
 }
 
-// The rules reach a block the elaboration never instantiates and a loop
-// generate block as well: the then-block of if (0) is not selected, and the
-// conflict inside it is reported all the same, as is the one in each block of
-// the loop.
 TEST(GenerateElaboration, BlockNameRulesHoldInUnselectedAndLoopBlocks) {
   ElabFixture f;
   Elaborate(
@@ -142,10 +119,6 @@ TEST(GenerateElaboration, BlockNameRulesHoldInUnselectedAndLoopBlocks) {
       8, "27.5"));
 }
 
-// Each generate block is a scope of its own, so a name one block declares is no
-// conflict for a construct in another block, nor for the module's: the blocks
-// named x in a and in b, and the logic x of the module, are three scopes'
-// names.
 TEST(GenerateElaboration, BlockNameRulesStayWithinOneScope) {
   ElabFixture f;
   Elaborate(
@@ -162,12 +135,6 @@ TEST(GenerateElaboration, BlockNameRulesStayWithinOneScope) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §27.5 lets a module instantiate itself through a conditional generate
-// construct, the recursion ending where the condition folds false, and rules
-// that such a module is not a top-level module. Module r here instantiates
-// itself while N is above zero, so the one top is top, and its instance of r
-// with N = 2 heads a chain of three instances of r: N = 2, 1 and 0, the last
-// instantiating nothing.
 TEST(GenerateElaboration, SelfInstantiationEndsWhereTheConditionFails) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -196,8 +163,6 @@ TEST(GenerateElaboration, SelfInstantiationEndsWhereTheConditionFails) {
   EXPECT_EQ(depth, 3);
 }
 
-// The design whose top `top` holds the instance u of leaf and, in a generate
-// block selected when `cond` holds, a bind of checker module chk into leaf.
 std::string BindInGenerateBlock(const char* cond) {
   return std::string(
              "module chk; endmodule\n"
@@ -212,7 +177,6 @@ std::string BindInGenerateBlock(const char* cond) {
          "endmodule\n";
 }
 
-// How many children named c the instance u of the design's top holds.
 int BoundInU(const RtlirDesign* design) {
   int count = 0;
   for (const auto& ch : design->top_modules[0]->children) {
@@ -224,9 +188,6 @@ int BoundInU(const RtlirDesign* design) {
   return count;
 }
 
-// §27.5 with §23.11: a generate block a conditional generate construct does
-// not select is not instantiated, so a bind directive written in it binds
-// nothing (#7556).
 TEST(GenerateElaboration, ABindInAnUnselectedBlockBindsNothing) {
   ElabFixture f;
   auto* design = ElaborateSrc(BindInGenerateBlock("0"), f, "top");
@@ -235,8 +196,6 @@ TEST(GenerateElaboration, ABindInAnUnselectedBlockBindsNothing) {
   EXPECT_EQ(BoundInU(design), 0);
 }
 
-// The block the construct selects is instantiated, and its bind directive
-// binds as one written in the module would.
 TEST(GenerateElaboration, ABindInASelectedBlockBinds) {
   ElabFixture f;
   auto* design = ElaborateSrc(BindInGenerateBlock("1"), f, "top");

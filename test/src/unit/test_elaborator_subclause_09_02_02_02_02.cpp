@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "common/diagnostic.h"
@@ -155,11 +153,6 @@ TEST(AlwaysCombVsAlwaysStar, EventControlInAlwaysCombErrors) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, EmbeddedEventControlInAlwaysCombErrors) {
-  // An event control can appear in two syntactic positions: as the
-  // always_comb's own control (rejected via the block's sensitivity, see
-  // EventControlInAlwaysCombErrors) or as a statement nested inside the body.
-  // The body-embedded form reaches the statement-timing scan directly and must
-  // be rejected just the same.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -176,8 +169,6 @@ TEST(AlwaysCombVsAlwaysStar, EmbeddedEventControlInAlwaysCombErrors) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsEmbeddedEventControl) {
-  // always @* imposes no such restriction, so the same body-embedded event
-  // control is accepted — the permissive counterpart to the always_comb form.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -206,8 +197,6 @@ TEST(AlwaysCombVsAlwaysStar, WaitInAlwaysCombErrors) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, WaitForkInAlwaysCombErrors) {
-  // 'wait fork' is a statement that blocks (a distinct AST node from a plain
-  // wait), so always_comb must reject it just like other suspending forms.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -224,7 +213,6 @@ TEST(AlwaysCombVsAlwaysStar, WaitForkInAlwaysCombErrors) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWaitFork) {
-  // always @* places no such restriction, so the same wait fork is accepted.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -269,10 +257,6 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsWait) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, JoinAnyInAlwaysCombErrors) {
-  // The §9.2.2.2.2 prohibition names fork-join statements as a category, so it
-  // covers every join variant, not just plain join. fork...join_any parses to
-  // the same kFork node (with a join_any join_kind), and always_comb must
-  // reject it exactly as it rejects fork...join.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -291,9 +275,6 @@ TEST(AlwaysCombVsAlwaysStar, JoinAnyInAlwaysCombErrors) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, JoinNoneInAlwaysCombErrors) {
-  // fork...join_none is likewise a fork-join statement and is rejected in an
-  // always_comb even though its join_none form does not itself suspend the
-  // parent; the prohibition is categorical, not blocking-behavior based.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -312,8 +293,6 @@ TEST(AlwaysCombVsAlwaysStar, JoinNoneInAlwaysCombErrors) {
 }
 
 TEST(AlwaysCombVsAlwaysStar, AlwaysStarAllowsJoinAny) {
-  // always @* carries no fork-join restriction, so the same join_any block is
-  // accepted — the accepting counterpart to the always_comb rejection.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -363,20 +342,6 @@ TEST(AlwaysCombVsAlwaysStar, AlwaysCombRejectsNestedDelay) {
                             "9.2.2.2.2"));
 }
 
-// §9.2.2.2.2: an always_comb may hold no statement that blocks, no blocking
-// timing or event control and no fork-join. A cycle delay is a blocking timing
-// control: §14.11 lists cycle_delay under procedural_timing_control and has it
-// hold the process until the given count of clocking block events has passed.
-//
-// The three cases below assert through ReportedError, as every rejection case
-// in this file does, because any rejection satisfies a bare error flag
-// -- including a rejection of the source before it ever reached the always_comb
-// check. The line is the always_comb keyword's, which is where
-// ValidateCombLatchProcess reports, and not the offending statement's.
-//
-// The run reports a second error this case does not name: §14.11 also rules
-// that a ## with no default clocking in effect is an error, and this module
-// declares no clocking block.
 TEST(AlwaysCombVsAlwaysStar, CycleDelayInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -393,12 +358,6 @@ TEST(AlwaysCombVsAlwaysStar, CycleDelayInAlwaysCombErrors) {
                             "9.2.2.2.2"));
 }
 
-// §9.2.2.2.2 forbids a statement that blocks, and §15.5.4 has wait_order hold
-// the process that runs it until the events it names have all been triggered,
-// one after another in the order written. Its Syntax 15-2 is wait_order (
-// hierarchical_identifier { , hierarchical_identifier } ) action_block, where
-// action_block ::= statement_or_null, so the null action written here is the
-// whole statement and the two arguments are declared events.
 TEST(AlwaysCombVsAlwaysStar, WaitOrderInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -416,11 +375,6 @@ TEST(AlwaysCombVsAlwaysStar, WaitOrderInAlwaysCombErrors) {
                             "9.2.2.2.2"));
 }
 
-// §9.2.2.2.2 forbids a statement that blocks, and §16.17 makes the expect
-// statement a procedural statement that blocks, holding the process that runs
-// it until its property has passed or failed. Its Syntax 16-20 is
-// expect ( property_spec ) action_block, and the property spec here carries the
-// clocking event of the §16.17 example; the action block is the null one.
 TEST(AlwaysCombVsAlwaysStar, ExpectInAlwaysCombErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -437,14 +391,6 @@ TEST(AlwaysCombVsAlwaysStar, ExpectInAlwaysCombErrors) {
                             "9.2.2.2.2"));
 }
 
-// The boundary of the same rule. §9.2.2.2.2 reaches a statement that blocks,
-// and §15.5.1 has a statement using the ->> operator complete at once,
-// scheduling the trigger as a nonblocking assign update event, so a nonblocking
-// event trigger is not one and an always_comb containing it stands.
-//
-// The claim is only that no error cites §9.2.2.2.2, so any other diagnostic the
-// run records leaves it standing: this case is about which rule fired, not
-// about how quiet the run was.
 TEST(AlwaysCombVsAlwaysStar, NonblockingEventTriggerInAlwaysCombAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -468,36 +414,6 @@ TEST(AlwaysCombVsAlwaysStar, NonblockingEventTriggerInAlwaysCombAccepted) {
       << cited;
 }
 
-// §9.2.2.2.2 states two of its three rules on an always_comb's statements --
-// that none of them blocks, carries a blocking timing or event control, or is a
-// fork-join -- and names no statement either rule is suspended inside.
-// StmtHasForkJoin and StmtBlocks in src/elaborator/elaborator_process.cpp
-// answer the two, and each wrote out its own shorter list of the thirteen
-// statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h names. The cases below name one
-// newly reached link each.
-//
-// Stmt::for_inits and Stmt::for_steps have no case under either rule, and that
-// is a fact about the grammar rather than a gap. A.6.8 gives
-// `for_initialization ::= list_of_variable_assignments | for_variable_
-// declaration { , for_variable_declaration }` and `for_step_assignment ::=
-// operator_assignment | inc_or_dec_expression | function_subroutine_call`, so
-// neither position holds a statement at all: a par_block and a
-// procedural_timing_control_statement are statement_item alternatives and no
-// conforming source writes one in a for header.
-//
-// Stmt::fork_stmts has no case under the fork-join rule for a different reason:
-// a fork is the only statement that holds one, and StmtHasForkJoin answers true
-// on reaching it without descending, so no source can make that link change the
-// answer. The blocking rule does reach it, and
-// AlwaysCombVsAlwaysStar.ForkJoinInAlwaysCombErrors above already covers the
-// fork itself.
-
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null` and A.6.4 makes a par_block a statement_item, so a
-// fork-join is written in either arm. This case and the next cover one arm
-// each. §9.2.2.2.2 puts no condition on when the fork would run, so the arm the
-// assertion would take is not the question.
 TEST(AlwaysCombVsAlwaysStar, ForkJoinInAnAssertionPassStatementErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -524,10 +440,6 @@ TEST(AlwaysCombVsAlwaysStar, ForkJoinInAnAssertionFailStatementErrors) {
       "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`. The weighted
-// draw picks an item while the design runs; §9.2.2.2.2 is decided before it
-// does, so a fork in an item is reported whether the item would be drawn or
-// not.
 TEST(AlwaysCombVsAlwaysStar, ForkJoinInARandcaseItemErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -544,10 +456,6 @@ TEST(AlwaysCombVsAlwaysStar, ForkJoinInARandcaseItemErrors) {
       "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(AlwaysCombVsAlwaysStar, ForkJoinInARandsequenceCodeBlockErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -564,10 +472,6 @@ TEST(AlwaysCombVsAlwaysStar, ForkJoinInARandsequenceCodeBlockErrors) {
       "always_comb shall not contain fork-join statements", 3, "9.2.2.2.2"));
 }
 
-// The same four positions under the other rule. A.6.5 gives
-// `procedural_timing_control_statement ::= procedural_timing_control
-// statement_or_null`, which is a statement_item like any other, so a delay
-// control stands wherever a statement stands.
 TEST(AlwaysCombVsAlwaysStar, DelayInAnAssertionPassStatementErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -626,11 +530,6 @@ TEST(AlwaysCombVsAlwaysStar, DelayInARandsequenceCodeBlockErrors) {
                             "9.2.2.2.2"));
 }
 
-// A blocking assignment with an intra-assignment delay or event control holds
-// its process until the control completes (§9.4.5), so it is a statement that
-// blocks: §9.2.2.2.2 bars it from an always_comb, §9.2.2.3 from an
-// always_latch and §9.2.2.4 from an always_ff. The nonblocking form schedules
-// its update and goes on, and stays legal.
 TEST(AlwaysCombVsAlwaysStar, BlockingIntraAssignmentTimingIsRejected) {
   ElabFixture f;
   ElaborateSrc(

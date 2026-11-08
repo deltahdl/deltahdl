@@ -1,6 +1,3 @@
-// §25.7: the subroutines a modport imports, held to the interface's
-// declarations of them and to the calls made through them.
-
 #include "elaborator/elaborator_modport_imports.h"
 
 #include <cstddef>
@@ -25,25 +22,16 @@ bool PrototypeMatchesSubroutine(const ModuleItem* proto,
     const DataType& pa = proto->func_args[i].data_type;
     const DataType& ba = body->func_args[i].data_type;
     if (!TypesMatch(pa, ba)) return false;
-    // §25.7 requires an exact match: TypesMatch does not tell apart packed
-    // bounds that fold only in a scope, so widths are compared too, which
-    // rejects arguments such as logic [7:0] against logic [3:0] however their
-    // bounds are written.
     if (EvalTypeWidth(pa) != EvalTypeWidth(ba)) return false;
     if (proto->func_args[i].direction != body->func_args[i].direction)
       return false;
   }
-  // A modport function prototype keeps its return type in `data_type`, while a
-  // subroutine's body keeps it in `return_type`; compare the matching fields.
   return proto->kind != ModuleItemKind::kFunctionDecl ||
          TypesMatch(proto->data_type, body->return_type);
 }
 
 namespace {
 
-// The task or function `name` the interface `iface` defines among its own
-// items; null where it defines none, an `extern` prototype of one defined in a
-// module (§25.7.4) not being a definition.
 const ModuleItem* InterfaceSubroutine(const ModuleDecl* iface,
                                       std::string_view name) {
   for (const ModuleItem* item : iface->items) {
@@ -54,8 +42,6 @@ const ModuleItem* InterfaceSubroutine(const ModuleDecl* iface,
   return nullptr;
 }
 
-// §25.7: a formal name the prototype `proto` gives is the name the declaration
-// `decl`, of as many arguments, gives the formal in its place.
 bool FormalNamesAgree(const ModuleItem* proto, const ModuleItem* decl) {
   for (size_t i = 0; i < proto->func_args.size(); ++i) {
     std::string_view name = proto->func_args[i].name;
@@ -64,7 +50,6 @@ bool FormalNamesAgree(const ModuleItem* proto, const ModuleItem* decl) {
   return true;
 }
 
-// The subroutine `name` the modport `mp` imports, null where it imports none.
 const ModportPort* ModportImport(const ModportDecl* mp, std::string_view name) {
   for (const ModportPort& port : mp->ports) {
     if (port.is_import && port.name == name) return &port;
@@ -72,10 +57,6 @@ const ModportPort* ModportImport(const ModportDecl* mp, std::string_view name) {
   return nullptr;
 }
 
-// The slot of the call `call` holding the actual of the formal at `index`,
-// named `name`: its place among the ordered actuals, or the named actual of
-// that name; null where the call writes neither. `ordered` is how many of the
-// call's actuals are ordered ones, which come before every named one.
 Expr** ActualSlot(Expr* call, size_t ordered, size_t index,
                   std::string_view name) {
   if (index < ordered) return &call->args[index];
@@ -85,10 +66,6 @@ Expr** ActualSlot(Expr* call, size_t ordered, size_t index,
   return nullptr;
 }
 
-// §25.7: a call through the full prototype `proto` the modport `mp` imports.
-// Each formal the call leaves without an actual takes the default the
-// prototype gives it, which is written into the call in the formal's place;
-// one the prototype gives no default is reported.
 void FillPrototypeDefaults(Expr* call, const ModuleItem* proto,
                            const ModportDecl* mp, DiagEngine& diag) {
   size_t ordered = call->args.size() - call->arg_names.size();
@@ -116,9 +93,6 @@ void FillPrototypeDefaults(Expr* call, const ModuleItem* proto,
   }
 }
 
-// §25.7: a call through an import by the identifier alone of the interface's
-// own subroutine `decl`, which binds no actual by name and leaves no formal to
-// its default, since either needs a full prototype in the modport `mp`.
 void CheckIdentifierImportCall(const Expr* call, const ModuleItem* decl,
                                const ModportDecl* mp, DiagEngine& diag) {
   std::string_view need;
@@ -139,8 +113,6 @@ void CheckIdentifierImportCall(const Expr* call, const ModuleItem* decl,
              Subclause("25.7"));
 }
 
-// The call `call`, where it is made through a port `ports` names of a
-// subroutine the port's modport imports.
 void CheckCallThroughModport(Expr* call, const SelectedModports& ports,
                              DiagEngine& diag) {
   const Expr* callee = call->lhs;
@@ -154,8 +126,6 @@ void CheckCallThroughModport(Expr* call, const SelectedModports& ports,
     FillPrototypeDefaults(call, imported->prototype, mp, diag);
     return;
   }
-  // An identifier-only import of a subroutine the interface does not define
-  // is reported once, at the modport (CheckModportImport).
   const ModuleItem* decl =
       InterfaceSubroutine(it->second.iface, imported->name);
   if (decl != nullptr) CheckIdentifierImportCall(call, decl, mp, diag);

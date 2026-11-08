@@ -30,10 +30,6 @@ struct SimFixture {
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
   SimContext ctx{scheduler, arena, diag};
-  // Whether the engine held an error when the last source was handed over. A
-  // case that reads neither this nor the engine after a rejected source, or
-  // after a run that reported an error, is failed as the fixture is destroyed;
-  // see fixture_diagnosed.h.
   Diagnosed has_errors{diag};
 };
 
@@ -42,8 +38,7 @@ struct SimFixtureSeeded {
   Arena arena;
   Scheduler scheduler{arena};
   DiagEngine diag{mgr};
-  SimContext ctx{scheduler, arena, diag, /*seed=*/42};
-  // As SimFixture's.
+  SimContext ctx{scheduler, arena, diag, 42};
   Diagnosed has_errors{diag};
 };
 
@@ -62,15 +57,10 @@ using StmtFixture = SimFixtureSeeded;
 using ClockingSimFixture = SimFixtureSeeded;
 using MtSimFixture = SimFixture;
 
-// The last module is the top, as it is in every case written against these
-// fixtures; a unit with no module (a program standing alone, §24.3) names no
-// top, and the elaborator roots each uninstantiated program itself.
 inline std::string_view TopNameOf(const CompilationUnit* cu) {
   return cu->modules.empty() ? std::string_view() : cu->modules.back()->name;
 }
 
-// The body SimFixture's and SimFixtureSeeded's ElaborateSrc share: the two
-// fixtures differ only in the seed their SimContext is built with.
 template <typename Fixture>
 RtlirDesign* ElaborateSrcOn(const std::string& src, Fixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
@@ -87,10 +77,6 @@ inline RtlirDesign* ElaborateSrc(const std::string& src, SimFixture& f) {
   return ElaborateSrcOn(src, f);
 }
 
-// Elaborates `src` with no top named, the way the command line does: every
-// uninstantiated module and program is a top (§23.3.1, §24.3), for a case
-// about a parallel hierarchy that ElaborateSrc's choice of one top would
-// leave unelaborated.
 inline RtlirDesign* ElaborateSrcAllTops(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -121,29 +107,6 @@ inline void LowerAndRun(const RtlirDesign* design, SimFixture& f) {
   f.scheduler.Run();
 }
 
-// Asserts that a value and the copy taken from it are two storage elements
-// holding one value, rather than one storage element read twice.
-//
-// §6.8 makes a variable an abstract data storage element that keeps the value
-// one assignment gave it until the next, so a store that copies
-// between two of them has to leave each holding its own words. Logic4Vec copies
-// its `words` pointer rather than the words, so a store that skips the copy
-// leaves the pair sharing one buffer, and a later writer that deposits in place
-// -- a packed-member assignment, say -- then writes through both.
-//
-// Equal bits alone cannot tell the two cases apart, because a shared buffer
-// reads equal by construction; the pointer comparison is what carries the
-// claim. Both planes of every word are compared alongside it, so the copy is
-// shown to have carried x and z as well as the value, and to have carried the
-// whole width rather than the low word of it.
-//
-// The null checks are fatal assertions, and a fatal assertion in a helper
-// returns from the helper rather than from the test that called it. A caller
-// that goes on to read the words itself -- as one pinning the value against
-// the literal its source was given does -- has to wrap the call in
-// ASSERT_NO_FATAL_FAILURE, or a run where the words came back null would
-// dereference the null pointer here and take the binary down instead of
-// reporting the failure.
 inline void ExpectOwnWordsCopy(const Logic4Vec& src, const Logic4Vec& dst) {
   ASSERT_NE(src.words, nullptr);
   ASSERT_NE(dst.words, nullptr);
@@ -155,11 +118,6 @@ inline void ExpectOwnWordsCopy(const Logic4Vec& src, const Logic4Vec& dst) {
   }
 }
 
-// Elaborates, lowers and runs `src`, then returns the context variable `name`
-// the run left behind. Returns nullptr when the source does not elaborate or
-// when the run declared no such variable, so a test asserts on the pointer
-// before reading the value. The fixture is caller-owned, so its diagnostics
-// and context stay inspectable afterwards.
 inline Variable* RunAndFindVar(const std::string& src, SimFixture& f,
                                std::string_view name) {
   auto* design = ElaborateSrc(src, f);
@@ -168,10 +126,6 @@ inline Variable* RunAndFindVar(const std::string& src, SimFixture& f,
   return f.ctx.FindVariable(name);
 }
 
-// Elaborates, lowers and runs `src`, returning whatever the run wrote to
-// stdout. A source that does not elaborate produces no run and so no output,
-// which a test reads as the empty string. The fixture is caller-owned, so its
-// diagnostics stay inspectable afterwards.
 inline std::string RunCaptureDesign(
     RtlirDesign* (*elaborate)(const std::string&, SimFixture&),
     const std::string& src, SimFixture& f) {
@@ -187,21 +141,10 @@ inline std::string RunCapture(const std::string& src, SimFixture& f) {
   return RunCaptureDesign(ElaborateSrc, src, f);
 }
 
-// RunCapture with every uninstantiated module and program a top
-// (ElaborateSrcAllTops), for a case whose program or parallel hierarchy
-// ElaborateSrc's choice of one top would leave unelaborated.
 inline std::string RunCaptureAllTops(const std::string& src, SimFixture& f) {
   return RunCaptureDesign(ElaborateSrcAllTops, src, f);
 }
 
-// The first diagnostic at or after position `from` whose message contains
-// `needle`, or nullptr when there is none. A test that asserts which rule of
-// IEEE 1800-2023 a report enforces reads the subclause off this, and a null
-// return says the source never provoked the report the test is about -- which
-// a count of errors or warnings cannot distinguish from provoking a different
-// one. A caller whose subject is a report the run raises passes the number of
-// diagnostics standing before the run, so an identically worded report from an
-// earlier stage is not mistaken for it.
 inline const Diagnostic* FindDiagFrom(const SimFixture& f, size_t from,
                                       std::string_view needle) {
   const auto& diags = f.diag.Diagnostics();
@@ -216,17 +159,6 @@ inline const Diagnostic* FindDiag(const SimFixture& f,
   return FindDiagFrom(f, 0, needle);
 }
 
-// The position of the first diagnostic whose message contains `needle`, or the
-// number of diagnostics when none does.
-//
-// A test that claims a run reported exactly once, or at least twice, passes
-// this position plus one to FindDiagFrom, so what it asks for is a report
-// beyond the one it already named rather than a report beyond a position it
-// guessed. A clause that states how many violations a construct reports is what
-// makes such a claim worth writing: §31.8 has a $setup over a vector report one
-// timing violation however many of its bits transitioned, and
-// §31.4.3's event-based $fullskew continues its window after a violation where
-// the timer-based mode turns dormant.
 inline std::size_t PositionOfFirstDiag(const SimFixture& f,
                                        std::string_view needle) {
   const auto& diags = f.diag.Diagnostics();

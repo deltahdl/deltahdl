@@ -16,13 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §35.4: each imported subroutine must in the end resolve to a global symbol,
-// and each exported one defines one, so imported and exported tasks and
-// functions share a global name space of linkage names, apart from the
-// compilation unit's name space. The cases below hold the runtime to that name
-// space: the linkage name reaches the declaration, the SystemVerilog name does
-// not, and the two name spaces answer independently.
-
 DpiRtFunction MakeImport(const char* c_name, const char* sv_name) {
   DpiRtFunction func;
   func.c_name = c_name;
@@ -45,20 +38,12 @@ TEST(DpiGlobalNameSpace, AnImportResolvesToTheSymbolItsLinkageNameNames) {
   EXPECT_EQ(found->sv_name, "sv_add");
 }
 
-// §35.4: a subroutine given no global name takes its SystemVerilog name as one.
-// A declaration carrying no linkage name of its own therefore still resolves to
-// a global symbol.
 TEST(DpiGlobalNameSpace, AnImportWithNoLinkageNameResolvesUnderItsSvName) {
   DpiRuntime rt;
   rt.RegisterImport(MakeImport("", "sv_plain"));
   EXPECT_NE(rt.FindImportByGlobalName("sv_plain"), nullptr);
 }
 
-// §35.4: the global name space is apart from the compilation unit's name space,
-// so the name SystemVerilog calls a subroutine by is not a global name once the
-// declaration gives one. The import below is reachable by both names, each
-// through the lookup belonging to its own name space, and by neither through
-// the other's.
 TEST(DpiGlobalNameSpace, TheSystemVerilogNameIsNotAGlobalName) {
   DpiRuntime rt;
   rt.RegisterImport(MakeImport("c_add", "sv_add"));
@@ -67,10 +52,6 @@ TEST(DpiGlobalNameSpace, TheSystemVerilogNameIsNotAGlobalName) {
   EXPECT_EQ(rt.FindImport("c_add"), nullptr);
 }
 
-// §35.4: several import declarations, in different scopes or under different
-// SystemVerilog names or both, may refer to one global subroutine. Two such
-// declarations name one symbol, so the name space holds one entry while the
-// import registry holds two.
 TEST(DpiGlobalNameSpace, TwoImportsNamingOneSubroutineResolveToOneSymbol) {
   DpiRuntime rt;
   rt.RegisterImport(MakeImport("c_add", "sv_add"));
@@ -79,9 +60,6 @@ TEST(DpiGlobalNameSpace, TwoImportsNamingOneSubroutineResolveToOneSymbol) {
   EXPECT_EQ(rt.GlobalNameCount(), 1U);
 }
 
-// §35.4: where several declarations refer to one global subroutine, the symbol
-// is the one the first of them resolved to; a later reference to it does not
-// stand for a second symbol that could replace the first.
 TEST(DpiGlobalNameSpace, TheFirstDeclarationOfASymbolIsTheOneItResolvesTo) {
   DpiRuntime rt;
   rt.RegisterImport(MakeImport("c_add", "sv_add"));
@@ -91,8 +69,6 @@ TEST(DpiGlobalNameSpace, TheFirstDeclarationOfASymbolIsTheOneItResolvesTo) {
   EXPECT_EQ(found->sv_name, "sv_add");
 }
 
-// §35.4: each exported subroutine defines a global symbol, under the same
-// defaulting rule imports follow.
 TEST(DpiGlobalNameSpace, AnExportDefinesTheSymbolItsLinkageNameNames) {
   DpiRuntime rt;
   rt.RegisterExport(MakeExport("c_ready", "sv_ready"));
@@ -102,9 +78,6 @@ TEST(DpiGlobalNameSpace, AnExportDefinesTheSymbolItsLinkageNameNames) {
   EXPECT_EQ(rt.FindExportByGlobalName("sv_ready"), nullptr);
 }
 
-// §35.4: imports and exports have a global name space of their own — one name
-// space between them rather than one each — so it answers for a name either
-// kind of declaration resolved to.
 TEST(DpiGlobalNameSpace, ImportsAndExportsResolveIntoOneNameSpace) {
   DpiRuntime rt;
   rt.RegisterImport(MakeImport("c_add", "sv_add"));
@@ -121,13 +94,8 @@ TEST(DpiGlobalNameSpace, ANameNoDeclarationResolvedToIsNotInTheNameSpace) {
   EXPECT_FALSE(rt.HasGlobalName("sv_add"));
 }
 
-// The C function the imports below are bound to.
 int AddSeven(int a) { return a + 7; }
 
-// §35.4: an import resolves to the global symbol its linkage name names -- the
-// c_identifier where the declaration gives one -- and a call reaches the
-// function defined under that name. The SystemVerilog name `add7` names no
-// function here, so a binding looking it up would find nothing.
 TEST(DpiImportBinding, TheCallReachesTheFunctionTheLinkageNameNames) {
   SimFixture f;
   RunWithImportsBound(
@@ -144,9 +112,6 @@ TEST(DpiImportBinding, TheCallReachesTheFunctionTheLinkageNameNames) {
   EXPECT_EQ(r->value.ToUint64(), 42U);
 }
 
-// §35.5.4: an import no loaded code defines a symbol for stays unbound, and
-// only its call is reported; nothing is built for it, so a C compiler that
-// cannot be run goes unnoticed.
 TEST(DpiImportBinding, AnImportWithNoSymbolIsLeftForItsCallToReport) {
   SimFixture f;
   RunWithImportsBound(
@@ -167,10 +132,6 @@ TEST(DpiImportBinding, AnImportWithNoSymbolIsLeftForItsCallToReport) {
                            }));
 }
 
-// §35.4 with §35.5.6.1: an import whose symbol is found but whose formal is
-// an array sized by a constant function call, whose bound this simulator does
-// not fold for the C layout yet, is left unbound, and its call's report says
-// why.
 TEST(DpiImportBinding, AFormalWithNoCLayoutHereIsNamedAtTheCall) {
   SimFixture f;
   RunWithImportsBound(
@@ -190,9 +151,6 @@ TEST(DpiImportBinding, AFormalWithNoCLayoutHereIsNamedAtTheCall) {
                             6, "35.5.4"));
 }
 
-// A binding whose calls the C compiler cannot build is reported with what the
-// compiler said, and leaves every import it was building for unbound, each
-// call saying so.
 TEST(DpiImportBinding, CallsTheCompilerCannotBuildLeaveTheImportsUnbound) {
   SimFixture f;
   RunWithImportsBound(
@@ -215,9 +173,6 @@ TEST(DpiImportBinding, CallsTheCompilerCannotBuildLeaveTheImportsUnbound) {
                             4, "35.5.4"));
 }
 
-// §35.4 with Annex J: the run looks each linkage name up among the global
-// symbols of the process, where a library loaded with its symbols global puts
-// the functions it defines.
 TEST(DpiImportBinding, TheRunFindsFunctionsALoadedLibraryDefines) {
   const SharedLibraryLoad kLibrary = BuildAndLoadCSharedLibrary(
       "int deltahdl_subclause_35_04_triple(int a) { return 3 * a; }\n",
@@ -243,7 +198,6 @@ TEST(DpiImportBinding, TheRunFindsFunctionsALoadedLibraryDefines) {
   EXPECT_EQ(r->value.ToUint64(), 21U);
 }
 
-// A design that declares no import has no registry and nothing to bind.
 TEST(DpiImportBinding, ARunWithNoImportBindsNothing) {
   SimFixture f;
   BindDesignDpiImports(f.ctx);

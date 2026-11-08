@@ -15,9 +15,6 @@
 namespace delta {
 namespace {
 
-// §38.36: the simulator executes a callback by invoking its cb_rtn and passing
-// a pointer to the s_cb_data structure. This recorder lets a test observe the
-// production code applying that contract.
 int g_cb_invocations = 0;
 const s_cb_data* g_cb_seen_data = nullptr;
 int g_cb_seen_reason = 0;
@@ -33,8 +30,6 @@ int RecordingCb(s_cb_data* data) {
   return 0;
 }
 
-// A routine that returns a recognizable value, so a test can confirm the
-// simulator propagates the cb_rtn result back from executing the callback.
 int ReturningCb(s_cb_data*) { return 42; }
 
 class VpiCallbackSim : public ::testing::Test {
@@ -50,9 +45,6 @@ class VpiCallbackSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.36 (Returns row): vpi_register_cb() returns a handle to the callback
-// object. A bare non-null check does not distinguish that object from any other
-// handle kind, so confirm the handle reports its type as a callback object.
 TEST_F(VpiCallbackSim, RegisterCbReturnsCallbackObjectHandle) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -91,14 +83,10 @@ TEST_F(VpiCallbackSim, RemoveCbNullReturnsZero) {
   EXPECT_EQ(vpi_remove_cb(nullptr), 0);
 }
 
-// §38.36: cb_data_p shall point to an s_cb_data structure. A null pointer is
-// not a valid structure, so registration cannot produce a callback handle.
 TEST_F(VpiCallbackSim, RegisterCbNullDataReturnsNull) {
   EXPECT_EQ(vpi_register_cb(nullptr), nullptr);
 }
 
-// §38.36 (Figure 38-17): the s_cb_data structure carries a cb_rtn field that
-// shall be set to the application routine. vpi_register_cb() must preserve it.
 TEST_F(VpiCallbackSim, RegisterCbStoresCbRtn) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -108,8 +96,6 @@ TEST_F(VpiCallbackSim, RegisterCbStoresCbRtn) {
   EXPECT_EQ(vpi_ctx_.RegisteredCallbacks().back().cb_rtn, &RecordingCb);
 }
 
-// §38.36: the cb_rtn shall be invoked when the simulator executes the callback,
-// and the callback routine shall be passed a pointer to an s_cb_data structure.
 TEST_F(VpiCallbackSim, ExecuteCallbackInvokesCbRtnWithCbData) {
   g_cb_invocations = 0;
   g_cb_seen_data = nullptr;
@@ -128,8 +114,6 @@ TEST_F(VpiCallbackSim, ExecuteCallbackInvokesCbRtnWithCbData) {
   EXPECT_EQ(g_cb_seen_reason, cbEndOfSimulation);
 }
 
-// §38.36: with no application routine set, the simulator has nothing to invoke
-// when it executes the callback.
 TEST_F(VpiCallbackSim, ExecuteCallbackWithoutCbRtnDoesNothing) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -138,8 +122,6 @@ TEST_F(VpiCallbackSim, ExecuteCallbackWithoutCbRtnDoesNothing) {
   EXPECT_EQ(vpi_ctx_.ExecuteCallback(VpiObjectOf(h)), 0);
 }
 
-// §38.36: the cb_rtn returns a value to the simulator; executing the callback
-// shall hand that value back.
 TEST_F(VpiCallbackSim, ExecuteCallbackPropagatesCbRtnResult) {
   s_cb_data cb = {};
   cb.reason = cbEndOfSimulation;
@@ -149,8 +131,6 @@ TEST_F(VpiCallbackSim, ExecuteCallbackPropagatesCbRtnResult) {
   EXPECT_EQ(vpi_ctx_.ExecuteCallback(VpiObjectOf(h)), 42);
 }
 
-// §38.36: the structure passed to the callback routine is the one supplied at
-// registration, so application data placed in user_data reaches the routine.
 TEST_F(VpiCallbackSim, ExecuteCallbackPassesRegisteredUserData) {
   g_cb_invocations = 0;
   g_cb_seen_user_data = nullptr;
@@ -167,14 +147,10 @@ TEST_F(VpiCallbackSim, ExecuteCallbackPassesRegisteredUserData) {
   EXPECT_EQ(g_cb_seen_user_data, &payload);
 }
 
-// §38.36: a null handle does not identify any callback, so the simulator has
-// nothing to execute.
 TEST_F(VpiCallbackSim, ExecuteCallbackNullHandleReturnsZero) {
   EXPECT_EQ(vpi_ctx_.ExecuteCallback(nullptr), 0);
 }
 
-// §38.36: vpi_register_cb returns a handle to a callback object; a handle to
-// any other kind of object does not name a callback to execute.
 TEST_F(VpiCallbackSim, ExecuteCallbackNonCallbackHandleReturnsZero) {
   sim_ctx_.CreateVariable("sig", 1);
   vpi_ctx_.Attach(sim_ctx_);

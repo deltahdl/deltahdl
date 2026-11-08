@@ -17,11 +17,6 @@
 namespace delta {
 namespace {
 
-// A cbEndOfReset routine that reads the user-data field and then sets it
-// again, which §38.14 says an application may do during or after such a
-// callback. The handle, what the read found and what the routine put there are
-// file-scope so the routine, whose signature the standard fixes, can reach
-// them.
 VpiHandle g_reset_call = nullptr;
 void* g_seen_during_reset = nullptr;
 int g_value_set_during_reset = 0;
@@ -44,8 +39,6 @@ class VpiGetUserDataSim : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Build a system task/function call-instance handle of the given type, the
-  // kind of handle that owns a user-data storage location.
   VpiHandle MakeCall(int type) {
     VpiHandle obj = vpi_ctx_.CreateModule("c", "c");
     obj->type = type;
@@ -58,9 +51,6 @@ class VpiGetUserDataSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.14 (the first 'shall'): the routine returns the user-data value a
-// previous vpi_put_userdata() associated with the call instance. The pointer
-// read back is the very one the application stored.
 TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
@@ -70,26 +60,17 @@ TEST_F(VpiGetUserDataSim, ReturnsValueAssociatedByPut) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.14 (the second 'shall'): when no user data has ever been associated with
-// the object, the return value is NULL. The call handle is valid, so this is
-// case of an object with no user data rather than a failure.
 TEST_F(VpiGetUserDataSim, ReturnsNullWhenNothingAssociated) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
 
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.14 (the second 'shall', failure case): a null handle has no storage
-// location to read, so the routine fails and returns NULL, reporting an error
-// (§38.2).
 TEST_F(VpiGetUserDataSim, ReturnsNullForNullHandle) {
   EXPECT_EQ(vpi_get_userdata(nullptr), nullptr);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.14 (the second 'shall', failure case): the handle must name a system
-// task/function call instance. A handle of any other kind (here a module) is a
-// failure: the routine returns NULL and reports an error.
 TEST_F(VpiGetUserDataSim, ReturnsNullForNonCallHandle) {
   VpiHandle module = MakeCall(kVpiModule);
 
@@ -97,9 +78,6 @@ TEST_F(VpiGetUserDataSim, ReturnsNullForNonCallHandle) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.14 (the third 'shall'): after a restart, a vpi_get_userdata() returns
-// NULL. The association placed before the restart is dropped, so the reader
-// yields null once the restart sequence has run.
 TEST_F(VpiGetUserDataSim, ReturnsNullAfterRestart) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
@@ -111,9 +89,6 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterRestart) {
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.14 (the third 'shall', reset case): after a reset, a vpi_get_userdata()
-// returns NULL. As with a restart, the association placed before the reset is
-// dropped, so the reader yields null once the reset sequence has run.
 TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
@@ -125,11 +100,6 @@ TEST_F(VpiGetUserDataSim, ReturnsNullAfterReset) {
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.14's last sentence: the user-data field may be filled in again during or
-// after a cbEndOfRestart or cbEndOfReset callback. That puts the clear before
-// those callbacks rather than after them, which only a read from inside one can
-// tell: a routine delivered during the reset finds the field already null, and
-// what it puts there is what a later read finds.
 TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int before_reset = 0;
@@ -144,22 +114,19 @@ TEST_F(VpiGetUserDataSim, AReadDuringEndOfResetStartsFromNullAndCanBeSetAgain) {
   vpi_ctx_.DispatchReset();
 
   ASSERT_TRUE(g_reset_routine_ran);
-  EXPECT_EQ(g_seen_during_reset, nullptr);  // the clear came first
+  EXPECT_EQ(g_seen_during_reset, nullptr);
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_value_set_during_reset);
   EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_reset);
 }
 
-// What each invocation of `$count` read from its call's user data, before
-// putting back one more.
 std::vector<int> counts_read;
 
-// The counts the calls' user data point at, one per call that has run.
 std::deque<int>& CallCounts() {
   static std::deque<int> counts;
   return counts;
 }
 
-PLI_INT32 CountCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 CountCalltf(PLI_BYTE8*) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   auto* count = static_cast<int*>(vpi_get_userdata(call));
   if (count == nullptr) count = &CallCounts().emplace_back(0);
@@ -183,9 +150,6 @@ class UserDataOfACallInATask : public VpiDesignRun {
   }
 };
 
-// §38.14 with §38.33: a call written in a task's body is one call instance
-// each time the task runs it, so the user data one invocation put is there at
-// the next (#7458).
 TEST_F(UserDataOfACallInATask, ItLastsFromOneInvocationToTheNext) {
   Run("module top;\n"
       "  task t; $count; endtask\n"
@@ -194,9 +158,6 @@ TEST_F(UserDataOfACallInATask, ItLastsFromOneInvocationToTheNext) {
   EXPECT_EQ(counts_read, (std::vector<int>{1, 2}));
 }
 
-// ...and one call instance in each instance of the module declaring the task,
-// so each instance's invocations count up from its own user data rather than
-// one count running through both.
 TEST_F(UserDataOfACallInATask, EachInstanceOfItsModuleHasItsOwn) {
   Run("module child;\n"
       "  task t; $count; endtask\n"

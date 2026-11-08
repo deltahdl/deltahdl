@@ -10,28 +10,6 @@
 
 using namespace delta;
 
-// Annex A.4.1.2 Interface instantiation.
-//
-// The subclause defines a single BNF production:
-//
-//   interface_instantiation ::=
-//       interface_identifier [ parameter_value_assignment ]
-//           hierarchical_instance { , hierarchical_instance } ;
-//
-// Every sub-symbol is owned by another subclause: interface_identifier by
-// A.9.3, and parameter_value_assignment plus hierarchical_instance by A.4.1.1.
-// The only thing A.4.1.2 itself contributes is the rule assembling them: an
-// interface identifier, an optional parameter value assignment, one or more
-// hierarchical instances separated by commas, and a terminating semicolon.
-//
-// This production is syntactically identical to module_instantiation
-// (A.4.1.1), so the parser cannot tell from the grammar whether the leading
-// identifier names a module, an interface, or a program. All three share the
-// same parse path (Parser::ParseModuleInstList) and produce a kModuleInst
-// item; the distinction is resolved later, during elaboration. These tests
-// therefore observe that an interface identifier used in an instantiation is
-// accepted through that shared path with the A.4.1.2 shape.
-
 namespace {
 
 ModuleItem* FindInstantiation(const std::vector<ModuleItem*>& items) {
@@ -41,9 +19,6 @@ ModuleItem* FindInstantiation(const std::vector<ModuleItem*>& items) {
   return nullptr;
 }
 
-// interface_identifier hierarchical_instance ;
-// The minimal form: an interface name, a single instance, a semicolon, with
-// the optional parameter_value_assignment slot omitted (empty parameters).
 TEST(InterfaceInstantiationGrammar, BasicInterfaceInstantiation) {
   auto r = Parse(
       "interface ifc; endinterface\n"
@@ -60,8 +35,6 @@ TEST(InterfaceInstantiationGrammar, BasicInterfaceInstantiation) {
   EXPECT_EQ(inst->inst_params.size(), 0u);
 }
 
-// interface_identifier [ parameter_value_assignment ] hierarchical_instance ;
-// The optional parameter_value_assignment slot is present.
 TEST(InterfaceInstantiationGrammar, WithParameterValueAssignment) {
   auto r = Parse(
       "interface ifc; endinterface\n"
@@ -76,9 +49,6 @@ TEST(InterfaceInstantiationGrammar, WithParameterValueAssignment) {
   EXPECT_EQ(inst->inst_params.size(), 1u);
 }
 
-// interface_identifier ... hierarchical_instance { , hierarchical_instance } ;
-// The comma-separated repetition yields several instances sharing one
-// interface identifier.
 TEST(InterfaceInstantiationGrammar, MultipleHierarchicalInstances) {
   auto r = Parse(
       "interface ifc; endinterface\n"
@@ -91,8 +61,6 @@ TEST(InterfaceInstantiationGrammar, MultipleHierarchicalInstances) {
                                  {"u0", "u1", "u2"});
 }
 
-// The parameter value assignment, when present, is shared across every
-// instance in the comma-separated list.
 TEST(InterfaceInstantiationGrammar, MultipleInstancesShareParameters) {
   auto r = Parse(
       "interface ifc; endinterface\n"
@@ -108,38 +76,26 @@ TEST(InterfaceInstantiationGrammar, MultipleInstancesShareParameters) {
   EXPECT_EQ(i1->inst_params.size(), 1u);
 }
 
-// The production is terminated by a semicolon; omitting it is an error.
 TEST(InterfaceInstantiationGrammar, ErrorMissingSemicolon) {
   auto r = Parse(
       "interface ifc; endinterface\n"
       "module m;\n"
       "  ifc u0()\n"
       "endmodule\n");
-  // Parser::ParseModuleInstList files the shared instantiation reports under
-  // §23.3.2, the module_instantiation subclause A.4.1.2 duplicates.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "23.3.2"));
 }
 
-// In the { , hierarchical_instance } repetition each comma must be followed by
-// another instance; a trailing comma with no instance after it is an error.
 TEST(InterfaceInstantiationGrammar, ErrorTrailingCommaInInstanceList) {
   auto r = Parse(
       "interface ifc; endinterface\n"
       "module m;\n"
       "  ifc u0(), ;\n"
       "endmodule\n");
-  // §23.3.2 owns the hierarchical_instance name the parser demands after the
-  // comma.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 3, "23.3.2"));
 }
 
-// hierarchical_instance is A.4.1.1's, `name_of_instance ( [
-// list_of_port_connections ] )` with name_of_instance `instance_identifier {
-// unpacked_dimension }`, and A.9.3 gives the identifier `simple_identifier |
-// escaped_identifier`: an interface instance takes an escaped name, an
-// unpacked dimension, and the `.*` named_port_connection.
 TEST(InterfaceInstantiationGrammar, InstanceNameDimensionAndWildcard) {
   auto r = Parse(
       "interface ifc(input logic clk); endinterface\n"
@@ -158,8 +114,6 @@ TEST(InterfaceInstantiationGrammar, InstanceNameDimensionAndWildcard) {
   EXPECT_NE(items[1]->inst_range_right, nullptr);
 }
 
-// parameter_value_assignment is A.4.1.1's, whose param_expression A.8.3 spells
-// `mintypmax_expression | data_type | $`.
 TEST(InterfaceInstantiationGrammar, ParameterValueForms) {
   auto r = Parse(
       "interface ifc #(parameter int W = 8, parameter type T = logic);\n"
@@ -179,10 +133,6 @@ TEST(InterfaceInstantiationGrammar, ParameterValueForms) {
   EXPECT_EQ(items[1]->inst_params[1].first, "T");
 }
 
-// A.1.4's module_common_item admits interface_instantiation, and A.1.6's
-// interface_or_generate_item reaches module_common_item, so an interface is
-// instantiated inside a module, inside an interface, and inside a generate
-// block of either.
 TEST(InterfaceInstantiationGrammar, InstantiatedInsideInterfaceAndGenerate) {
   auto r = Parse(
       "interface leaf; endinterface\n"

@@ -16,52 +16,18 @@ enum class StmtKind : uint8_t;
 
 ExecTask ExecStmt(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Runs `expr` as the task form of the system call it names, and reports whether
-// it named one. §6.24.2 and §20.17.2 give $cast and $stacktrace a task form
-// whose behaviour differs from the function form that evaluating the expression
-// produces, so an executor that only evaluates a statement's expression gives
-// the source the wrong one of the two. Every executor of an expression
-// statement calls this first and evaluates the expression only when it returns
-// false, so a system call whose task form is added later is handled at all of
-// them at once. §36.5 makes that last sentence a rule rather than a
-// convenience: a user-defined system task may appear wherever a void function
-// may, which is this position and no other, so every registration whose type is
-// vpiSysTask is called from here. Defined in systf_call_statement.cpp rather
-// than stmt_exec.cpp, beside the SystemCallNamesARegisteredTask (see
-// evaluation.h) that the expression evaluator asks the same question with.
 bool TryExecSystemCallTask(const Expr* expr, SimContext& ctx, Arena& arena);
 
-// §13.4.4: spawn the background processes of a fork...join_none reached from a
-// synchronous (non-coroutine) executor such as a function body. No-op unless
-// the fork's join kind is join_none.
 void SpawnForkJoinNone(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §16.4.5 and §16.3: judge one attempt of an immediate assertion reached from a
-// function body. A deferred assertion's report is queued against the calling
-// process, so a function shared by several processes produces an independent
-// report per process; a simple immediate assertion's pass or fail statement is
-// returned for the caller to run inline, as the synchronous function-body
-// executor cannot co_await. Returns nullptr where there is nothing to run.
 const Stmt* ExecImmediateAssertInFunction(const Stmt* stmt, SimContext& ctx,
                                           Arena& arena);
 
-// §13.4.4 keeps time-controlled statements out of a function and §13.3.1 lets a
-// task called from a synchronous position, such as a deferred assertion's
-// action (§16.4), run only what a function may, and neither rules out an event
-// trigger: `-> e` fires at once and `->> e` schedules its update event without
-// blocking. Runs either from the synchronous function-body executor, which
-// cannot co_await, waking whatever waits on the event as the statement
-// executor would.
 void ExecEventTriggerInFunction(const Stmt* stmt, SimContext& ctx,
                                 Arena& arena);
 
-// §15.5.1: triggers the event `var` holds, as `-> e` does: the event records
-// the time step it was triggered in (§15.5.3), and every process waiting on it
-// resumes.
 void TriggerEvent(Variable* var, SimContext& ctx);
 
-// TriggerEvent with the region the woken processes resume in named, as the
-// update event of `->>` names the one of the process that issued it.
 void TriggerEventIn(Variable* var, SimContext& ctx, Region region);
 
 bool IsTimeControlStatement(StmtKind kind);

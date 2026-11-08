@@ -18,14 +18,6 @@ using namespace delta;
 
 namespace {
 
-// §32.5 is about what a *run* of SDF constructs does, so what each construct
-// finds already in place when its turn comes is the whole subject. That makes
-// the starting state -- the module path the design declared, the specparam its
-// delay expression reads, the sources and loads its nets carry -- part of every
-// test's input, so each test builds its SystemVerilog side from real source
-// (parsed, elaborated and lowered, then handed to the production collectors)
-// and its SDF side from real SDF text handed to ParseSdf. Nothing on either
-// side is hand-assembled.
 struct Design : SdfDesign {
   bool Build(const std::string& src) {
     if (!SdfDesign::Lower(src)) return false;
@@ -34,9 +26,6 @@ struct Design : SdfDesign {
     mgr.BindDesignInterconnect(CollectInterconnectTopology(*cu, top));
     AddPathsAndTimingChecks(top);
 
-    // A declared PATHPULSE$ specparam is the other way a path's pulse limits
-    // can already be set when annotation starts, so it is read from the
-    // declaration and applied through the production resolver.
     RegisterPathPulseSpecparams(top, f, mgr);
     return true;
   }
@@ -47,12 +36,6 @@ struct Design : SdfDesign {
     return AnnotateSdfToManager(file, mgr, SdfMtm::kTypical);
   }
 
-  // The whole module path delay entry, so a run of constructs can be checked
-  // across all twelve transition slots and across both pulse limits rather than
-  // through a single-value lookup. `condition` is how the path was declared --
-  // empty for a plain path, the condition text for a state-dependent one --
-  // because a run of constructs can leave two paths between the same terminals
-  // holding different values.
   const PathDelay* Path(std::string_view src, std::string_view dst,
                         std::string_view condition = {}) const {
     for (const auto& pd : mgr.GetPathDelays()) {
@@ -64,8 +47,6 @@ struct Design : SdfDesign {
     return nullptr;
   }
 
-  // The declared timing check of one kind, the other place a construct's turn
-  // in the run of annotations shows up.
   const TimingCheckEntry* Check(TimingCheckKind kind) const {
     for (const auto& tc : mgr.GetTimingChecks()) {
       if (tc.kind == kind) return &tc;
@@ -74,21 +55,14 @@ struct Design : SdfDesign {
   }
 };
 
-// Wraps whatever sections a test writes in the DELAYFILE/CELL structure an SDF
-// file always supplies, so each test writes only the constructs under test and
-// the order it writes them in is the only thing that varies.
 std::string SdfCellText(const std::string& sections) {
   return "(DELAYFILE (CELL (CELLTYPE \"c\") (INSTANCE u1) " + sections + "))";
 }
 
-// One ABSOLUTE DELAY section holding the run of entries a test writes.
 std::string SdfDelay(const std::string& body) {
   return SdfCellText("(DELAY (ABSOLUTE " + body + "))");
 }
 
-// A module path written with a literal delay, the plainest way a specify path
-// delay can already hold a value when annotation starts. 40 leaves room above
-// the pulse limits the tests annotate, so nothing is clipped to the delay.
 const char* const kLiteralPathSrc =
     "module c(input A, output Z);\n"
     "  specify\n"
@@ -96,10 +70,6 @@ const char* const kLiteralPathSrc =
     "  endspecify\n"
     "endmodule\n";
 
-// The same module path, but with its delay written as an expression reading a
-// specparam. This is the other way a path delay's value is produced, and it is
-// what lets a LABEL construct in one section change what a DELAY construct in
-// another section had already annotated.
 const char* const kSpecparamPathSrc =
     "module c(input A, output Z);\n"
     "  specify\n"
@@ -108,10 +78,6 @@ const char* const kSpecparamPathSrc =
     "  endspecify\n"
     "endmodule\n";
 
-// A module path whose pulse limits are already set when annotation starts, by
-// a module-wide PATHPULSE$ declared in the specify block rather than by an SDF
-// construct. This is the other way the "current" limits an empty-parenthesis
-// IOPATH holds can have been produced.
 const char* const kModulePathpulseSrc =
     "module c(input A, output Z);\n"
     "  specify\n"
@@ -120,8 +86,6 @@ const char* const kModulePathpulseSrc =
     "  endspecify\n"
     "endmodule\n";
 
-// The path-specific spelling of the same declaration, which reaches the path by
-// naming its two terminals instead of covering every path in the module.
 const char* const kPathSpecificPathpulseSrc =
     "module c(input A, output Z);\n"
     "  specify\n"
@@ -130,9 +94,6 @@ const char* const kPathSpecificPathpulseSrc =
     "  endspecify\n"
     "endmodule\n";
 
-// One plain module path and one state-dependent path between the same two
-// terminals, so a later construct can be narrower than the earlier one and
-// change only part of what the earlier one reached.
 const char* const kConditionalPathSrc =
     "module c(input A, input mode, output Z);\n"
     "  specify\n"
@@ -141,9 +102,6 @@ const char* const kConditionalPathSrc =
     "  endspecify\n"
     "endmodule\n";
 
-// A timing check whose constraint limit is written as an expression reading a
-// specparam. It is the other kind of value a LABEL construct reaches, so it is
-// what lets a TIMINGCHECK section and a LABEL section be put in either order.
 const char* const kSpecparamCheckSrc =
     "module c(input D, input CK);\n"
     "  specify\n"
@@ -152,9 +110,6 @@ const char* const kSpecparamCheckSrc =
     "  endspecify\n"
     "endmodule\n";
 
-// §32.5's own multiple-annotation example: a net with three sources and a
-// single load, so a PORT construct naming only the load and an INTERCONNECT
-// construct naming one of the three sources both have somewhere to land.
 const char* const kThreeSourceSrc =
     "module drv(out);\n"
     "  output out;\n"
@@ -172,8 +127,6 @@ const char* const kThreeSourceSrc =
     "  ld i15(.in(n));\n"
     "endmodule\n";
 
-// Two loads on one net, so a construct aimed at one load can be shown to leave
-// what was annotated to the other load alone.
 const char* const kTwoLoadSrc =
     "module drv(out);\n"
     "  output out;\n"
@@ -190,16 +143,6 @@ const char* const kTwoLoadSrc =
     "  ld i15(.in(n));\n"
     "endmodule\n";
 
-// ---------------------------------------------------------------------------
-// Annotation is an ordered process: constructs are applied in the order the
-// file writes them.
-// ---------------------------------------------------------------------------
-
-// §32.5's own example of the ordering: pulse limits are annotated to a path
-// first, then the whole path is annotated, which overwrites the limits that
-// were just put there. The two constructs are of different kinds, which is
-// exactly the point -- a construct's annotation can be undone by a later one
-// that is not the same construct.
 TEST(SdfMultipleAnnotations, PathpulseThenIopathLosesTheAnnotatedPulseLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -210,17 +153,12 @@ TEST(SdfMultipleAnnotations, PathpulseThenIopathLosesTheAnnotatedPulseLimits) {
   ASSERT_NE(pd, nullptr);
   EXPECT_EQ(pd->delays[0], 35u);
   EXPECT_EQ(pd->delays[1], 61u);
-  // Nothing of the PATHPULSE survives: each limit is back to what the IOPATH's
-  // own delay produces.
   EXPECT_EQ(pd->reject_limit[0], 35u);
   EXPECT_EQ(pd->error_limit[0], 35u);
   EXPECT_EQ(pd->reject_limit[1], 61u);
   EXPECT_EQ(pd->error_limit[1], 61u);
 }
 
-// The same two constructs the other way round produce the opposite result,
-// which is what makes the process an ordered one rather than a set of
-// independent updates.
 TEST(SdfMultipleAnnotations, IopathThenPathpulseKeepsTheAnnotatedPulseLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -235,8 +173,6 @@ TEST(SdfMultipleAnnotations, IopathThenPathpulseKeepsTheAnnotatedPulseLimits) {
   EXPECT_EQ(pd->error_limit[0], 34u);
 }
 
-// Two constructs of the same kind on the same path: the later one is what the
-// path is left holding.
 TEST(SdfMultipleAnnotations, LaterIopathReplacesTheEarlierOneOnTheSamePath) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -249,9 +185,6 @@ TEST(SdfMultipleAnnotations, LaterIopathReplacesTheEarlierOneOnTheSamePath) {
   EXPECT_EQ(pd->delays[1], 9u);
 }
 
-// The ordering runs across the cell's sections, not merely within one of them.
-// A LABEL construct reprices a specparam, and reevaluating the path delay
-// expression that reads it undoes the IOPATH written before it.
 TEST(SdfMultipleAnnotations, LabelAfterIopathOverwritesTheAnnotatedPathDelay) {
   Design d;
   ASSERT_TRUE(d.Build(kSpecparamPathSrc));
@@ -266,9 +199,6 @@ TEST(SdfMultipleAnnotations, LabelAfterIopathOverwritesTheAnnotatedPathDelay) {
   EXPECT_EQ(pd->delays[0], 30u);
 }
 
-// The same two sections the other way round: the IOPATH now runs last, so the
-// path is left holding the IOPATH's delay even though the specparam its
-// declared expression reads was annotated to something else.
 TEST(SdfMultipleAnnotations, IopathAfterLabelOverwritesTheReevaluatedDelay) {
   Design d;
   ASSERT_TRUE(d.Build(kSpecparamPathSrc));
@@ -279,14 +209,9 @@ TEST(SdfMultipleAnnotations, IopathAfterLabelOverwritesTheReevaluatedDelay) {
   const auto* pd = d.Path("A", "Z");
   ASSERT_NE(pd, nullptr);
   EXPECT_EQ(pd->delays[0], 7u);
-  // The LABEL still did its own job -- only its effect on this path was
-  // overwritten by the construct written after it.
   EXPECT_EQ(d.f.ctx.FindVariable("cap")->value.ToUint64(), 30u);
 }
 
-// The ordering reaches a TIMINGCHECK section too: a LABEL written after one
-// reprices the specparam the declared constraint limit reads, and reevaluating
-// it undoes the limit the TIMINGCHECK had just annotated.
 TEST(SdfMultipleAnnotations, LabelAfterTimingcheckOverwritesTheAnnotatedLimit) {
   Design d;
   ASSERT_TRUE(d.Build(kSpecparamCheckSrc));
@@ -300,8 +225,6 @@ TEST(SdfMultipleAnnotations, LabelAfterTimingcheckOverwritesTheAnnotatedLimit) {
   EXPECT_EQ(d.Check(TimingCheckKind::kSetup)->limit, 40u);
 }
 
-// The same two sections the other way round, so the TIMINGCHECK now runs last
-// and its constraint value is what the check is left holding.
 TEST(SdfMultipleAnnotations, TimingcheckAfterLabelUndoesTheReevaluation) {
   Design d;
   ASSERT_TRUE(d.Build(kSpecparamCheckSrc));
@@ -313,10 +236,6 @@ TEST(SdfMultipleAnnotations, TimingcheckAfterLabelUndoesTheReevaluation) {
   EXPECT_EQ(d.Check(TimingCheckKind::kSetup)->limit, 20u);
 }
 
-// A later construct may be narrower than an earlier one, in which case only the
-// part it reaches is changed and the rest keeps the earlier annotation. A plain
-// IOPATH reaches both paths between the two terminals; the conditioned one
-// after it reaches only the path declared under that condition.
 TEST(SdfMultipleAnnotations, NarrowerLaterIopathChangesOnlyThePathItNames) {
   Design d;
   ASSERT_TRUE(d.Build(kConditionalPathSrc));
@@ -331,9 +250,6 @@ TEST(SdfMultipleAnnotations, NarrowerLaterIopathChangesOnlyThePathItNames) {
   EXPECT_EQ(conditional->delays[0], 7u);
 }
 
-// A construct the annotator cannot take in drops out of the run without
-// disturbing it: the entries written on either side of it still apply in the
-// order they were written, and the one that could not be placed is reported.
 TEST(SdfMultipleAnnotations, UnannotatableEntryDoesNotDisturbTheRun) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -352,9 +268,6 @@ TEST(SdfMultipleAnnotations, UnannotatableEntryDoesNotDisturbTheRun) {
   EXPECT_TRUE(warned);
 }
 
-// The ordering spans the whole file, not one cell of it. Two cells naming the
-// same instance are one run of constructs, so the later cell's entry is what
-// the path is left holding.
 TEST(SdfMultipleAnnotations, LaterCellInTheSameFileOverwritesTheEarlierOne) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -372,13 +285,6 @@ TEST(SdfMultipleAnnotations, LaterCellInTheSameFileOverwritesTheEarlierOne) {
   EXPECT_EQ(pd->delays[1], 9u);
 }
 
-// ---------------------------------------------------------------------------
-// A later construct either overwrites (ABSOLUTE) or modifies (INCREMENT) what
-// an earlier one annotated.
-// ---------------------------------------------------------------------------
-
-// The modifying half: an INCREMENT section adds to the value standing after the
-// ABSOLUTE section rather than replacing it.
 TEST(SdfMultipleAnnotations, IncrementSectionModifiesTheEarlierAnnotation) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -393,11 +299,6 @@ TEST(SdfMultipleAnnotations, IncrementSectionModifiesTheEarlierAnnotation) {
   EXPECT_EQ(pd->delays[1], 66u);
 }
 
-// §32.5 (printed pages 929-930): constructs annotate in the order the file
-// writes them, and one DELAY section may hold more than one deltype, so an
-// INCREMENT written after an ABSOLUTE in the same section adds to it, as it
-// does from a section of its own above. Only the first deltype of a section was
-// read, and the ABSOLUTE's 35 and 61 stood.
 TEST(SdfMultipleAnnotations, IncrementDeltypeInTheSameSectionModifies) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -412,11 +313,6 @@ TEST(SdfMultipleAnnotations, IncrementDeltypeInTheSameSectionModifies) {
   EXPECT_EQ(pd->delays[1], 66u);
 }
 
-// §32.5 (printed page 929) with §32.7 (printed pages 930-931, whose example
-// increments by (-4) and (-5)): an INCREMENT adds the value the file wrote,
-// sign included, so -2 after an ABSOLUTE 35 and 61 leaves 33 and 59, and one
-// below what stands brings the delay to 0 rather than past it. The sign was
-// dropped and the entry added 2.
 TEST(SdfMultipleAnnotations, NegativeIncrementLowersTheEarlierAnnotation) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -434,9 +330,6 @@ TEST(SdfMultipleAnnotations, NegativeIncrementLowersTheEarlierAnnotation) {
   EXPECT_EQ(pd->delays[1], 57u);
 }
 
-// The overwriting half, and the negative form of the test above: an ABSOLUTE
-// section written after an INCREMENT section discards what the INCREMENT
-// accumulated instead of adding to it.
 TEST(SdfMultipleAnnotations, AbsoluteSectionOverwritesTheEarlierIncrement) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -451,9 +344,6 @@ TEST(SdfMultipleAnnotations, AbsoluteSectionOverwritesTheEarlierIncrement) {
   EXPECT_EQ(pd->delays[1], 61u);
 }
 
-// Modifying rather than overwriting applies to the interconnect constructs as
-// well: an INCREMENT INTERCONNECT adds to the delay the ABSOLUTE one annotated
-// to the same source and load.
 TEST(SdfMultipleAnnotations, IncrementInterconnectModifiesTheEarlierOne) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));
@@ -467,9 +357,6 @@ TEST(SdfMultipleAnnotations, IncrementInterconnectModifiesTheEarlierOne) {
   EXPECT_EQ(got->delays[0], 9u);
 }
 
-// §32.7: the limits an INCREMENT value states beside its delay are amounts too,
-// added to the limits in place as the delay is added to the delay: 10, 4 and 6
-// raised by 1, 2 and 3 are 11, 6 and 9.
 TEST(SdfMultipleAnnotations, IncrementInterconnectAddsItsStatedLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));
@@ -485,10 +372,6 @@ TEST(SdfMultipleAnnotations, IncrementInterconnectAddsItsStatedLimits) {
   EXPECT_EQ(got->error_limit[0], 9u);
 }
 
-// An increment modifies whatever delay is in force, which for a source with no
-// entry of its own is the one the PORT construct before it annotated. So the
-// named source ends up at the PORT delay plus the increment, and the sources
-// the increment did not name stay at the PORT delay.
 TEST(SdfMultipleAnnotations, IncrementInterconnectAddsToThePortDelay) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));
@@ -505,9 +388,6 @@ TEST(SdfMultipleAnnotations, IncrementInterconnectAddsToThePortDelay) {
   EXPECT_EQ(from_other->delays[0], 6u);
 }
 
-// The same rule the other way round: an increment carrying no source of its own
-// raises the delay from every source, so it reaches the entry a preceding
-// INTERCONNECT construct left for its own source as well as the rest.
 TEST(SdfMultipleAnnotations, IncrementPortAddsToEverySourceOnTheLoad) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));
@@ -524,9 +404,6 @@ TEST(SdfMultipleAnnotations, IncrementPortAddsToEverySourceOnTheLoad) {
   EXPECT_EQ(from_other->delays[0], 4u);
 }
 
-// The modifying half on the LABEL construct: an INCREMENT LABEL adds to the
-// specparam value the ABSOLUTE LABEL before it annotated, and the path delay
-// expression that reads the specparam follows the accumulated value.
 TEST(SdfMultipleAnnotations, IncrementLabelModifiesTheEarlierLabel) {
   Design d;
   ASSERT_TRUE(d.Build(kSpecparamPathSrc));
@@ -539,9 +416,6 @@ TEST(SdfMultipleAnnotations, IncrementLabelModifiesTheEarlierLabel) {
   EXPECT_EQ(pd->delays[0], 35u);
 }
 
-// The same run written as two lbl_types of one LABEL section, which SDF's
-// LABEL admits as DELAY admits more than one deltype: the INCREMENT still adds
-// to the ABSOLUTE before it. Only the first lbl_type of a section was read.
 TEST(SdfMultipleAnnotations, IncrementLabelTypeInTheSameSectionModifies) {
   Design d;
   ASSERT_TRUE(d.Build(kSpecparamPathSrc));
@@ -554,13 +428,6 @@ TEST(SdfMultipleAnnotations, IncrementLabelTypeInTheSameSectionModifies) {
   EXPECT_EQ(pd->delays[0], 35u);
 }
 
-// ---------------------------------------------------------------------------
-// Holding the current pulse limits with empty parentheses.
-// ---------------------------------------------------------------------------
-
-// §32.5's remedy for the first example above: writing the IOPATH's pulse limits
-// as empty parentheses holds whatever the earlier PATHPULSE annotated instead
-// of overwriting it, while the delays it does carry still take effect.
 TEST(SdfMultipleAnnotations, EmptyPulseParenthesesHoldTheCurrentPulseLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -579,9 +446,6 @@ TEST(SdfMultipleAnnotations, EmptyPulseParenthesesHoldTheCurrentPulseLimits) {
   EXPECT_EQ(pd->error_limit[1], 34u);
 }
 
-// Each of the two limits is held or overwritten on its own. Here the reject
-// limit is written as a value and the error limit as empty parentheses, so only
-// the error limit keeps what the PATHPULSE annotated.
 TEST(SdfMultipleAnnotations, EmptyErrorParenthesesHoldOnlyTheErrorLimit) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -597,8 +461,6 @@ TEST(SdfMultipleAnnotations, EmptyErrorParenthesesHoldOnlyTheErrorLimit) {
   EXPECT_EQ(pd->error_limit[0], 34u);
 }
 
-// The other way round: the reject limit is left empty and the error limit given
-// a value, so this time it is the reject limit that survives from before.
 TEST(SdfMultipleAnnotations, EmptyRejectParenthesesHoldOnlyTheRejectLimit) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -614,9 +476,6 @@ TEST(SdfMultipleAnnotations, EmptyRejectParenthesesHoldOnlyTheRejectLimit) {
   EXPECT_EQ(pd->error_limit[0], 30u);
 }
 
-// What is being held need not have come from an SDF construct at all. Here the
-// limits standing when annotation starts were set by a module-wide PATHPULSE$
-// declared in the specify block, and the empty parentheses hold those.
 TEST(SdfMultipleAnnotations, EmptyParenthesesHoldDeclaredModulePulseLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kModulePathpulseSrc));
@@ -632,8 +491,6 @@ TEST(SdfMultipleAnnotations, EmptyParenthesesHoldDeclaredModulePulseLimits) {
   EXPECT_EQ(pd->error_limit[0], 34u);
 }
 
-// The negative form for that same starting state: with the limits written as
-// values rather than left empty, nothing of the declared PATHPULSE$ survives.
 TEST(SdfMultipleAnnotations, PlainIopathDiscardsDeclaredModulePulseLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kModulePathpulseSrc));
@@ -646,8 +503,6 @@ TEST(SdfMultipleAnnotations, PlainIopathDiscardsDeclaredModulePulseLimits) {
   EXPECT_EQ(pd->error_limit[0], 35u);
 }
 
-// The path-specific spelling of the declaration reaches the path a different
-// way, and the limits it leaves behind are held just the same.
 TEST(SdfMultipleAnnotations, EmptyParenthesesHoldDeclaredPathPulseLimits) {
   Design d;
   ASSERT_TRUE(d.Build(kPathSpecificPathpulseSrc));
@@ -663,13 +518,6 @@ TEST(SdfMultipleAnnotations, EmptyParenthesesHoldDeclaredPathPulseLimits) {
   EXPECT_EQ(pd->error_limit[0], 34u);
 }
 
-// The pair of constructs above can be written as the single equivalent
-// statement that spells the held limits out, and the two forms shall leave the
-// path in the same state -- across every transition slot, not only the first.
-// Each direction of §32.5's form carries its own limits beside its delay, and
-// §32.8 spreads them over the transitions as it spreads the delays: the 1->0
-// transition takes the fall direction's 4 and 6, not the rise direction's 2
-// and 3.
 TEST(SdfMultipleAnnotations, EachDirectionsPulseLimitsReachItsTransitions) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -684,8 +532,6 @@ TEST(SdfMultipleAnnotations, EachDirectionsPulseLimitsReachItsTransitions) {
   EXPECT_EQ(pd->error_limit[1], 6u);
 }
 
-// The simple form too: the rise value written as empty parentheses holds the
-// declared 40, and the fall value 7 lands.
 TEST(SdfMultipleAnnotations, EmptySimpleValueHoldsTheCurrentDelay) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -698,9 +544,6 @@ TEST(SdfMultipleAnnotations, EmptySimpleValueHoldsTheCurrentDelay) {
   EXPECT_EQ(pd->delays[1], 7u);
 }
 
-// An empty delay holds what the path carries as an empty limit does: the rise
-// direction writes its limits and leaves its delay empty, so the rising
-// transitions keep the declared 40 while the falling ones take 7.
 TEST(SdfMultipleAnnotations, EmptyDelayParenthesesHoldTheCurrentDelay) {
   Design d;
   ASSERT_TRUE(d.Build(kLiteralPathSrc));
@@ -738,14 +581,6 @@ TEST(SdfMultipleAnnotations, CombinedIopathMatchesPathpulseThenHeldIopath) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// PORT followed by INTERCONNECT: only the delay from the named source changes.
-// ---------------------------------------------------------------------------
-
-// §32.5's own example: on a net with three sources and one load, a PORT
-// construct gives the load one delay from every source, and an INTERCONNECT
-// construct written after it changes only the delay from the source it names.
-// The other two sources keep the delay the PORT construct annotated.
 TEST(SdfMultipleAnnotations, InterconnectAfterPortChangesOnlyItsOwnSource) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));
@@ -763,14 +598,6 @@ TEST(SdfMultipleAnnotations, InterconnectAfterPortChangesOnlyItsOwnSource) {
   EXPECT_EQ(from_other2->delays[0], 6u);
 }
 
-// ---------------------------------------------------------------------------
-// INTERCONNECT followed by PORT: the interconnect annotation is overwritten.
-// ---------------------------------------------------------------------------
-
-// §32.5's second example: with the two constructs the other way round, the
-// PORT construct overwrites the INTERCONNECT annotation, so the delay from
-// every source to that load -- the one the INTERCONNECT named included --
-// becomes the PORT's delay.
 TEST(SdfMultipleAnnotations, PortAfterInterconnectOverwritesItForEverySource) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));
@@ -784,8 +611,6 @@ TEST(SdfMultipleAnnotations, PortAfterInterconnectOverwritesItForEverySource) {
   }
 }
 
-// The rule is about a PORT construct and an INTERCONNECT construct reaching the
-// same load. A PORT construct naming a different load overwrites nothing.
 TEST(SdfMultipleAnnotations, PortOverwritesOnlyTheLoadItNames) {
   Design d;
   ASSERT_TRUE(d.Build(kTwoLoadSrc));
@@ -801,9 +626,6 @@ TEST(SdfMultipleAnnotations, PortOverwritesOnlyTheLoadItNames) {
   EXPECT_EQ(annotated->delays[0], 6u);
 }
 
-// A run of three: the PORT construct in the middle wipes the first
-// INTERCONNECT, and the INTERCONNECT after it takes its own source back off the
-// PORT's baseline again.
 TEST(SdfMultipleAnnotations, PortBetweenInterconnectsResetsThenIsOverridden) {
   Design d;
   ASSERT_TRUE(d.Build(kThreeSourceSrc));

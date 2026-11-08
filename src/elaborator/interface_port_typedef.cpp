@@ -1,5 +1,3 @@
-// §25.10: a type a module takes from an interface through its port.
-
 #include "elaborator/interface_port_typedef.h"
 
 #include <functional>

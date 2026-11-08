@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §16.12.16 (Syntax 16-17): the `case` form of property_expr —
-// `case ( expression_or_dist ) property_case_item { property_case_item }
-// endcase` — is accepted in a named property body. This mirrors the LRM
-// decoding example with several items and a trailing default.
 TEST(PropertyCaseParsing, CaseWithItemsAndDefaultParses) {
   auto r = Parse(
       "module m;\n"
@@ -32,8 +28,6 @@ TEST(PropertyCaseParsing, CaseWithItemsAndDefaultParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.16: the default statement shall be optional — a property case with no
-// default item is legal and parses cleanly.
 TEST(PropertyCaseParsing, CaseWithoutDefaultParses) {
   auto r = Parse(
       "module m;\n"
@@ -48,8 +42,6 @@ TEST(PropertyCaseParsing, CaseWithoutDefaultParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.12.16 (property_case_item): an item may list several expression_or_dist
-// values separated by commas before the colon, all sharing one property_expr.
 TEST(PropertyCaseParsing, CaseItemWithCommaSeparatedExpressionListParses) {
   auto r = Parse(
       "module m;\n"
@@ -64,8 +56,6 @@ TEST(PropertyCaseParsing, CaseItemWithCommaSeparatedExpressionListParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.12.16 (property_case_item): the colon after `default` is optional in the
-// grammar (`default [ : ] property_expr ;`), so omitting it still parses.
 TEST(PropertyCaseParsing, DefaultWithoutColonParses) {
   auto r = Parse(
       "module m;\n"
@@ -80,8 +70,6 @@ TEST(PropertyCaseParsing, DefaultWithoutColonParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.12.16: use of multiple default statements in one property case statement
-// shall be illegal.
 TEST(PropertyCaseParsing, MultipleDefaultsIsError) {
   auto r = Parse(
       "module m;\n"
@@ -98,12 +86,6 @@ TEST(PropertyCaseParsing, MultipleDefaultsIsError) {
       6, "16.12.16"));
 }
 
-// §16.12.16: the multiple-default rule is triggered by the `default` keyword
-// itself, independent of the optional colon in `default [ : ] property_expr`.
-// Two defaults that both omit the colon (the colon-optional input form of
-// property_case_item) are therefore still illegal — the count is
-// keyword-driven, not colon-driven, so this exercises the intersection of the
-// optional-colon input form with the negative multiple-default path.
 TEST(PropertyCaseParsing, MultipleColonlessDefaultsIsError) {
   auto r = Parse(
       "module m;\n"
@@ -120,9 +102,6 @@ TEST(PropertyCaseParsing, MultipleColonlessDefaultsIsError) {
       6, "16.12.16"));
 }
 
-// §16.12.16: the at-most-one-default rule is per case statement. Two sibling
-// case property statements, each with its own single default, are legal — the
-// defaults are not pooled across the separate `case`..`endcase` regions.
 TEST(PropertyCaseParsing, DefaultsInSeparateCasesAreLegal) {
   auto r = Parse(
       "module m;\n"
@@ -142,12 +121,6 @@ TEST(PropertyCaseParsing, DefaultsInSeparateCasesAreLegal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.12.16: the at-most-one-default rule scopes to a single case statement, so
-// a case property nested inside another case item may carry its own default
-// while the enclosing case also has one. The inner default is charged to the
-// inner case, not pooled with the outer, so two single-default case statements
-// nested this way remain legal. The inner case is the outer item's
-// property_expr, which the item's `;` ends.
 TEST(PropertyCaseParsing, NestedCaseDefaultsCountedPerCase) {
   auto r = Parse(
       "module m;\n"
@@ -165,11 +138,6 @@ TEST(PropertyCaseParsing, NestedCaseDefaultsCountedPerCase) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.12.16 (property_case_item + default optional): a default item is itself a
-// valid property_case_item, so a case property whose sole item is the default
-// parses cleanly. A single default is legal — the at-most-one-default rule only
-// rejects a second one — so this exercises the boundary between "no error" and
-// the multiple-default error.
 TEST(PropertyCaseParsing, CaseWithOnlyDefaultItemParses) {
   auto r = Parse(
       "module m;\n"

@@ -42,14 +42,6 @@ namespace delta {
 
 namespace {
 
-// A.6.9 makes a bare identifier standing as a statement a
-// subroutine_call_statement, the enabling of a task of that name (§13.3), so
-// the name is a reference §23.9 resolves like any other. `delay_number` is
-// the text of the number a delay control written immediately before it takes
-// as its delay, `2.1` for `#2.1 ns;`, and empty for every other position:
-// §5.8 (printed page 80) has a time literal be its number followed without a
-// space by its unit, so a unit name standing there as a call is the one
-// mistake the report can name.
 struct BareCall {
   std::string_view name;
   SourceLoc loc;
@@ -60,24 +52,10 @@ struct ScopeWalk {
   std::unordered_set<std::string_view> local_names;
   std::vector<std::pair<std::string_view, SourceLoc>> proc_lhs;
   std::vector<BareCall> bare_calls;
-  // The statement each numeric delay control holds, keyed to the number's
-  // text, for CollectBareCall to read when the walk reaches the statement.
   std::unordered_map<const Stmt*, std::string_view> delayed_bodies;
-  // §12.7.1: control variables declared in a for-loop header are local to the
-  // loop's implicit block. This stack holds the names currently in scope while
-  // walking a loop's sub-statements, so assignments to them are not mistaken
-  // for writes to an undeclared identifier and the names never leak outward.
-  // §12.6.2 and §12.6.1 scope a pattern identifier the same way, to an if's
-  // true arm or a case item's statement, and it stands here while that
-  // statement is walked.
   std::vector<std::string_view> active_loop_vars;
 };
 
-// §12.7.1: a for loop whose header declares its control variables (e.g.
-// `for (int i = 0; ...)`) creates an implicit block; those variables are local
-// to the loop and visible only in its condition, step, and body. Pushes each
-// such name onto the active-loop-var stack and returns how many were pushed so
-// the caller can pop them once the loop's sub-statements have been walked.
 size_t PushTypedForInitVars(const Stmt* s, ScopeWalk& out) {
   size_t pushed = 0;
   for (size_t k = 0; k < s->for_inits.size(); ++k) {
@@ -92,10 +70,6 @@ size_t PushTypedForInitVars(const Stmt* s, ScopeWalk& out) {
   return pushed;
 }
 
-// §12.7.3: a foreach statement declares its loop variables, local to the loop
-// and read-only. Pushes each onto the active-loop-var stack, so an assignment
-// to one is left to the read-only rule rather than reported as undeclared,
-// and returns how many were pushed.
 size_t PushForeachVars(const Stmt* s, ScopeWalk& out) {
   size_t pushed = 0;
   for (auto v : s->foreach_vars) {
@@ -106,7 +80,6 @@ size_t PushForeachVars(const Stmt* s, ScopeWalk& out) {
   return pushed;
 }
 
-// The bare identifier `s` is when it is a statement of that shape, or null.
 const Expr* BareCallOf(const Stmt* s) {
   if (s == nullptr || s->kind != StmtKind::kExprStmt || s->expr == nullptr ||
       s->expr->kind != ExprKind::kIdentifier)
@@ -114,10 +87,6 @@ const Expr* BareCallOf(const Stmt* s) {
   return s->expr;
 }
 
-// Records the bare call `s` is, with the number of the delay control whose
-// statement it is when there is one. A delay control is walked before its
-// statement, so the statement a numeric delay holds is noted here and found
-// when the walk reaches it.
 void CollectBareCall(const Stmt* s, ScopeWalk& out) {
   if (s->kind == StmtKind::kDelay && s->delay != nullptr &&
       (s->delay->kind == ExprKind::kIntegerLiteral ||
@@ -146,28 +115,6 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
     out.proc_lhs.emplace_back(s->lhs->text, s->range.start);
   }
   CollectBareCall(s, out);
-  // §23.9 makes a local declaration and an assignment target part of the scope
-  // they are written in wherever the statement holding them stands, so every
-  // position a statement holds a statement in is one this collection reaches.
-  // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator, and ForEachChildStmtWithBindings takes them
-  // from it, which is why the list is not written out again here.
-  //
-  // §12.7.1: the control variables a for-loop header declares are in scope
-  // while the loop's own sub-statements are walked and are dropped afterwards
-  // so they do not leak outward. The push brackets the whole descent rather
-  // than Stmt::for_inits, Stmt::for_steps and Stmt::for_body alone, because
-  // PushTypedForInitVars pushes nothing unless Stmt::for_inits holds something,
-  // which A.6.8 admits on a for-loop statement alone, and a for-loop statement
-  // holds its sub-statements in those three members and no other. §12.7.3's
-  // foreach loop variables are bracketed the same way: Stmt::foreach_vars is
-  // filled on a foreach statement alone, whose one sub-statement is its body.
-  //
-  // §12.6 declares each pattern identifier a variable, in scope in the true
-  // arm of the if whose predicate binds it and the statement of the case item
-  // whose pattern does (ForEachChildStmtWithBindings), so it is pushed for the
-  // walk of that statement alone: `b = 4'd5;` there writes the variable the
-  // pattern declared, and the same assignment in the false arm names nothing.
   size_t pushed = PushTypedForInitVars(s, out) + PushForeachVars(s, out);
   ForEachChildStmtWithBindings(
       s,
@@ -180,10 +127,6 @@ void CollectScopeWalk(const Stmt* s, ScopeWalk& out) {
   out.active_loop_vars.resize(out.active_loop_vars.size() - pushed);
 }
 
-// §8.30.1: a weak_reference's type parameter shall name a class type. The same
-// rule already guards module-level variables, class members, and subroutine
-// arguments; this walk extends it to procedural-block local variables, which
-// are kVarDecl statements rather than ModuleItems.
 void ValidateLocalWeakRefDecls(
     const Stmt* s, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names, DiagEngine& diag) {
@@ -198,11 +141,6 @@ void ValidateLocalWeakRefDecls(
                  Subclause("8.30.1"));
     }
   }
-  // §8.30.1 puts no condition on where the declaration it governs is written,
-  // so every position a statement holds a statement in is a position a
-  // weak_reference variable is declared in. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     ValidateLocalWeakRefDecls(sub, typedefs, class_names, diag);
   });
@@ -218,8 +156,6 @@ bool PackageDeclared(const CompilationUnit* unit, std::string_view pkg_name) {
   return false;
 }
 
-// The package declaring `name` as the wildcard-imported package `pkg_name`
-// provides it, or empty where `pkg_name` does not provide the name.
 std::string_view ProvidedNameOrigin(const CompilationUnit* unit,
                                     ProvidedNameCache& provided_cache,
                                     std::string_view pkg_name,
@@ -255,9 +191,6 @@ bool ImportsProvideName(const CompilationUnit* unit,
   return false;
 }
 
-// §3.12.1 with §13.3: a task or function declared at compilation-unit scope
-// is what a bare call in a module of the unit reaches when the module declares
-// none of the name, as a unit's data declaration is for an assignment target.
 static bool UnitDeclaresSubroutine(const CompilationUnit* unit,
                                    std::string_view name) {
   for (const auto* item : unit->cu_items) {
@@ -271,16 +204,11 @@ static bool UnitDeclaresSubroutine(const CompilationUnit* unit,
   return false;
 }
 
-// Syntax 5-2: the six time_unit spellings.
 static bool IsTimeUnitName(std::string_view name) {
   return name == "s" || name == "ms" || name == "us" || name == "ns" ||
          name == "ps" || name == "fs";
 }
 
-// Reports each bare call that `visible` answers false for: a unit name that
-// stands as the statement of a numeric delay under §5.8, since `#2.1 ns;` is
-// the time literal `2.1ns` written with a space and nothing else the
-// standard admits, and any other name as §23.9's unresolved reference.
 static void ReportBareCallsNamingNothing(
     const ScopeWalk& walk, const std::function<bool(std::string_view)>& visible,
     DiagEngine& diag) {
@@ -302,9 +230,6 @@ static void ReportBareCallsNamingNothing(
 
 void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   ScopeWalk walk;
-  // §3.13 (e) and (f): a procedure opens no name space, so the outermost named
-  // blocks of its body are declared in the module's, and every block below
-  // them in the name space of the block holding it.
   std::vector<BlockLabel> labels;
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
@@ -316,18 +241,8 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
   }
   CollectAssertionNameSpaceLabels(decl->items, labels);
   for (const auto& [label, loc] : labels) DeclareInModuleNameSpace(label, loc);
-  // §3.12.1 (printed page 56) has an import written at compilation-unit
-  // scope stand for the module too, as the read-side check honours it, and
-  // the unit's own variable and net declarations likewise, which §6.21
-  // (printed 132) gives a static lifetime: `int g;` outside every module
-  // with `initial g = 5;` in a module was reported as undeclared, while a
-  // unit function's or class's name still is (UnitDeclaresData in
-  // unit_scope_order.cpp asks the unit's items for a data declaration). The
-  // search reaches only the part of the unit written before the module.
   const std::vector<ModuleItem*> kUnitBefore =
       UnitItemsBefore(unit_, decl->range.start);
-  // §26.3 with §24.3: the search for a name the module does not declare goes
-  // on through the scopes lexically enclosing it, among their imports.
   const EnclosingImports kEnclosingImports = EnclosingImportsOf(*unit_, *decl);
   auto target_visible = [&](std::string_view name) {
     return walk.local_names.count(name) != 0 || IsNameInModuleScope(name) ||
@@ -342,11 +257,6 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
     diag_.Error(loc, std::format("undeclared identifier '{}'", name),
                 Subclause("23.9"));
   }
-  // A bare call reaches every name an assignment target does, and the unit's
-  // tasks and functions besides, which no assignment target may name.
-  // §23.8: a task or function name the module does not declare is looked for
-  // in the modules enclosing its instances. §26.3: a call reaches too what an
-  // enclosing scope explicitly imports after the module's declaration.
   const std::unordered_set<std::string_view> kAbove =
       EnclosingSubroutineNames(*unit_, decl->name);
   const std::function<bool(std::string_view)> kCallVisible =
@@ -362,10 +272,6 @@ void Elaborator::ValidateScopeRules(const ModuleDecl* decl) {
 
 namespace {
 
-// The genvars declared among `items`. §27.4 lets a genvar be referenced only
-// within a loop generate scheme, so one of these read by the items themselves,
-// outside every loop generate construct, is a misuse rather than a name that
-// resolves.
 std::unordered_set<std::string_view> DeclaredGenvars(
     const std::vector<ModuleItem*>& items) {
   std::unordered_set<std::string_view> genvars;
@@ -375,14 +281,8 @@ std::unordered_set<std::string_view> DeclaredGenvars(
   return genvars;
 }
 
-// A.8.2 (printed page 1209) writes the scope randomize function of §18.12 as
-// `[ std:: ] randomize` with its argument list optional, so a bare randomize
-// read that no declaration of the scope names is that call.
 bool NamesScopeRandomize(std::string_view name) { return name == "randomize"; }
 
-// §23.9: reports every collected read that names no declaration the reference
-// can reach, and §27.4 every read of one of `genvars`, which are declared but
-// may not be read where these reads stand.
 template <typename Pred>
 void ReportUnresolvedRefs(const std::vector<const Expr*>& refs, Pred declared,
                           DiagEngine& diag,
@@ -403,9 +303,6 @@ void ReportUnresolvedRefs(const std::vector<const Expr*>& refs, Pred declared,
   }
 }
 
-// §23.9: rejects an unresolved bare identifier read on a procedural assignment
-// RHS. Block-local names are gathered first so a block-scoped declaration is
-// never flagged; `declared` resolves a name against the module/CU scope.
 template <typename Pred>
 void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
                           DiagEngine& diag) {
@@ -418,8 +315,6 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   for (const auto* item : decl->items) {
     if (!IsProceduralItemKind(item->kind)) continue;
     CollectProcRhsIdents(item->body, locals, refs);
-    // §9.4.2: an always construct's own event control, kept on the item
-    // rather than as a statement of its body, reads what it names as well.
     for (const EventExpr& ev : item->sensitivity) {
       CollectBareIdents(ev.signal, refs);
       CollectBareIdents(ev.iff_condition, refs);
@@ -428,12 +323,6 @@ void ReportProcUnresolved(const ModuleDecl* decl, Pred declared,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
-// §23.9: rejects an unresolved bare identifier read in the initializer or the
-// type reference of a variable or net declaration. §6.8 writes the
-// initializer as part of the declaration rather than as a statement, so no
-// procedural walk reaches it, and `int q = v;` read a name the module does not
-// declare with nothing said. §6.23's `var type(v) q;` reads v as an
-// expression's operand, which §6.10 declares nothing for.
 template <typename Pred>
 void ReportDeclReadsUnresolved(const ModuleDecl* decl, Pred declared,
                                DiagEngine& diag) {
@@ -448,15 +337,6 @@ void ReportDeclReadsUnresolved(const ModuleDecl* decl, Pred declared,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
-// The constant expressions among `items`, outside every loop generate
-// construct, that footnote 44 to §11.11's Syntax 11-7 (printed page 307)
-// keeps a genvar out of and no walk above reads: a parameter's value, a
-// generate-if condition, a generate-case selector and its item expressions, a
-// declaration's packed and unpacked dimensions, and the delays a continuous
-// assignment or a net declaration writes. The blocks of a generate-if or a
-// generate-case are reached in turn; a loop generate's are not, a genvar being
-// a constant within one.
-// Those constant expressions `item` writes itself, its blocks' left aside.
 void CollectItemConstantPositions(const ModuleItem* item,
                                   std::vector<const Expr*>& out) {
   if (item->kind == ModuleItemKind::kParamDecl)
@@ -490,8 +370,6 @@ void CollectGenvarConstantPositions(const std::vector<ModuleItem*>& items,
   }
 }
 
-// §27.4: reports each read of one of the module's genvars that
-// CollectGenvarConstantPositions gathers.
 void ReportGenvarConstantMisuse(const ModuleDecl* decl, DiagEngine& diag) {
   std::vector<const Expr*> refs;
   CollectGenvarConstantPositions(decl->items, refs);
@@ -500,10 +378,6 @@ void ReportGenvarConstantMisuse(const ModuleDecl* decl, DiagEngine& diag) {
       DeclaredGenvars(decl->items));
 }
 
-// The package import declarations a subroutine body opens with. A.2.8 admits
-// package_import_declaration as a block_item_declaration, which A.2.7's
-// tf_item_declaration takes, and the parser keeps each as a kBlockItemDecl
-// statement holding the import item (Parser::ParseBlockVarDecls).
 std::vector<ModuleItem*> SubroutineBodyImports(const ModuleItem* item) {
   std::vector<ModuleItem*> imports;
   for (const auto* stmt : item->func_body_stmts) {
@@ -517,25 +391,6 @@ std::vector<ModuleItem*> SubroutineBodyImports(const ModuleItem* item) {
   return imports;
 }
 
-// §23.9: rejects an unresolved bare identifier read in a task or function body.
-// §23.9 lists a task and a function among the scopes an identifier is searched
-// upward from, and rules that the search stops at a module boundary when the
-// item is a variable, so a subroutine body is held to the boundary exactly as a
-// procedural block of the same module is. An out-of-block method body (§8.24),
-// the item whose `method_class` names its class, is not held to it: §8.24 has
-// the body read every declaration of its class, the properties it inherits
-// under §8.13 included, none of which the module declares, so it is left to the
-// class rules as a body of the compilation unit's class is.
-//
-// §26.3 makes an import declaration provide its names in the current scope, and
-// the body is a scope of its own, so an import the body opens with
-// (SubroutineBodyImports) is honoured for the body's reads alone: `K` in
-// `function int calc(); import p::*; return K * five(); endfunction` is p's
-// parameter, which the module the function stands in never imported.
-//
-// Written over an item list rather than over a module because a subroutine the
-// compilation unit or a package holds is in no module's list (see
-// ReportUnresolvedInUnitScopeSubroutines below); a module passes its own.
 template <typename Pred>
 void ReportSubroutineUnresolved(const std::vector<ModuleItem*>& items,
                                 Pred declared, const CompilationUnit* unit,
@@ -562,14 +417,6 @@ void ReportSubroutineUnresolved(const std::vector<ModuleItem*>& items,
   }
 }
 
-// §26.3 (printed page 808) references a declaration made in a package through
-// the package scope resolution operator, and §26.6 (printed 815) has a
-// declaration the package imported reachable through the package only where
-// an export hands it on, `import p1::x; export p1::x;` making p1::x and p2::x
-// one declaration. `provided` answers whether the base package makes the
-// member available so, by its own declaration or by an exported one; a scoped
-// reference to a name the package imports without exporting, or never sees,
-// is reported.
 template <typename Provided>
 void ReportUnprovidedPackageMember(const Expr* ref, Provided provided,
                                    DiagEngine& diag) {
@@ -583,12 +430,6 @@ void ReportUnprovidedPackageMember(const Expr* ref, Provided provided,
              Subclause("26.3"));
 }
 
-// §26.3: a scope-resolution prefix `base::` shall name a package (or a class /
-// type, for static-member and type-scope access). `known` accepts those base
-// names; "std" is the always-available built-in package, its members Annex G's.
-// Any other base is an unresolved package or scope. A base that is known is
-// then asked for the member, which `provided` answers for a package of the unit
-// and accepts for every other base.
 template <typename Pred, typename Provided>
 void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
                              Provided provided, DiagEngine& diag) {
@@ -603,8 +444,6 @@ void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
   for (const auto* ref : refs) {
     const Expr* b = ref->lhs;
     if (b->text == "local") continue;
-    // §26.7 (printed pages 816-817): std's declarations are Annex G's, so a
-    // member std does not declare is reported as a user package's is.
     if (b->text == "std") {
       ReportUnprovidedPackageMember(
           ref,
@@ -625,9 +464,6 @@ void ReportUnknownScopeBases(const ModuleDecl* decl, Pred known,
   }
 }
 
-// True when `n` names a known scope-resolution base: a compilation-unit scope
-// name (package/class/interface), a module-local class or typedef, or a
-// declared package (§26.3).
 bool IsKnownScopeBase(std::string_view n,
                       const std::unordered_set<std::string_view>& cu_scope,
                       const std::unordered_set<std::string_view>& classes,
@@ -645,9 +481,6 @@ bool IsKnownScopeBase(std::string_view n,
 }  // namespace
 
 bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
-  // var_types_ records the bare name of every elaborated net and variable; the
-  // remaining sets cover names that are not signals (typedefs, nettypes,
-  // sequences, compilation-unit names) but may still be read by name.
   return var_types_.count(name) != 0 || sequence_names_.count(name) != 0 ||
          IsNameInModuleScope(name) || typedefs_.count(name) != 0 ||
          nettype_names_.count(name) != 0 ||
@@ -655,10 +488,6 @@ bool Elaborator::IsDeclaredNameForRhs(std::string_view name) const {
          cu_scope_names_.count(name) != 0;
 }
 
-// §26.3: an explicit import makes exactly its named symbol visible without a
-// package qualifier. A bare read of such a symbol resolves, while a read of a
-// package member that was NOT imported still falls through to the unresolved
-// diagnostic.
 static std::unordered_set<std::string_view> ExplicitlyImportedNames(
     const RtlirModule* mod) {
   std::unordered_set<std::string_view> explicit_imported;
@@ -670,9 +499,6 @@ static std::unordered_set<std::string_view> ExplicitlyImportedNames(
   return explicit_imported;
 }
 
-// True where any of `pkgs` declares `name`. §26.3 makes every name a
-// wildcard-imported package declares directly visible, so a bare read of one
-// resolves without the package qualifier.
 static bool AnyPackageProvidesName(const CompilationUnit* unit,
                                    ProvidedNameCache& provided_cache,
                                    const std::vector<std::string_view>& pkgs,
@@ -683,8 +509,6 @@ static bool AnyPackageProvidesName(const CompilationUnit* unit,
   return false;
 }
 
-// Report every bare identifier read by a continuous assignment that names
-// nothing visible in the module.
 template <typename Declared>
 static void ReportContAssignUnresolved(const ModuleDecl* decl,
                                        const Declared& declared,
@@ -697,8 +521,6 @@ static void ReportContAssignUnresolved(const ModuleDecl* decl,
   ReportUnresolvedRefs(refs, declared, diag, DeclaredGenvars(decl->items));
 }
 
-// The variables `infos` records, which are the unpacked arrays: a variable is
-// recorded only when it is declared with an unpacked dimension.
 static std::unordered_set<std::string_view> UnpackedArrayNames(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         infos) {
@@ -711,28 +533,15 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                                               const RtlirModule* mod) {
   if (!mod) return;
 
-  // §6.16: an assignment between a string and an integral or real value
-  // needs a cast whatever a module imports, so this check answers on its own
-  // and is stated before the §23.9 reads below.
   CheckStringNumericAssignments(decl->items, var_types_,
                                 UnpackedArrayNames(var_array_info_), diag_);
 
   std::unordered_set<std::string_view> explicit_imported =
       ExplicitlyImportedNames(mod);
-  // §26.3 makes every name a wildcard-imported package declares directly
-  // visible, and §23.9 makes a generate block a scope whose declarations the
-  // module's own symbol table does not list. Both used to skip the whole
-  // module, which silenced the check on every other name of it; each is now a
-  // set of names the check consults instead.
   std::vector<std::string_view> wildcard_packages =
       WildcardImportedPackages(mod);
   std::unordered_set<std::string_view> generate_names;
   CollectModuleGenerateNames(decl->items, generate_names);
-  // §3.12.1: a unit variable, net, parameter or enumeration constant written
-  // after the module is no name the module's references reach, unless the
-  // module, or a scope enclosing it, declares one of its own. The unit's
-  // constants are among the names the module's scope holds, so for those the
-  // module's own declarations are asked instead.
   auto declared = [this, decl, &explicit_imported, &wildcard_packages,
                    &generate_names](std::string_view n) {
     bool unit_later =
@@ -750,9 +559,6 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       *decl, *mod, *unit_,
       [this](std::string_view n) { return IsNameInEnclosingScope(n); }, diag_);
 
-  // §19.6 makes a cross item a coverpoint of its covergroup or a variable, and
-  // the variables it may name are the ones a bare read may: the module's
-  // covergroups are checked against the same predicate.
   const ValueScope kValues{var_types_,  var_named_types_, var_array_info_,
                            func_decls_, typedefs_,        class_names_};
   ValidateModuleCovergroups(decl, {kValues, const_names_}, declared, diag_);
@@ -775,19 +581,10 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       diag_);
   ReportSubroutineUnresolved(decl->items, declared, unit_, pkg_provided_names_,
                              diag_);
-  // §23.8: a hierarchical name's first name may resolve upward to a name the
-  // module's own scope chain does not hold, so it is also asked of every
-  // declaration of the unit, and one neither answers names nothing.
   if (!unit_hier_head_names_) {
-    // §27.6 gives each unnamed generate block a genblk<n> name, which
-    // Elaborator::ElaborateModule assigns as it reaches each module, so the
-    // modules not yet reached are named here, each such name marked as
-    // §27.6's, for the set to leave out as no name a hierarchical name may use.
     AssignUnitGenerateBlockNames(unit_, arena_);
     unit_hier_head_names_ = std::make_shared<const UnitHierHeadNames>(unit_);
   }
-  // A genblk<n> name of the module's own blocks is reported below under §27.6
-  // for the block it reaches into, and so is not reported again here.
   std::unordered_set<std::string_view> own_unnamed_blocks =
       UnnamedGenerateBlockNames(decl);
   ReportUnresolvedHierHeads(
@@ -797,33 +594,9 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
                unit_hier_head_names_->Admits(n);
       },
       diag_);
-  // §23.6 with §27.4 and §27.5: a first name that is one of the module's
-  // generate blocks resolves, and the name after it is then one the block has
-  // to declare.
   ReportUndeclaredGenerateBlockMembers(decl, diag_);
-  // §27.6: the genblk<n> name of an unnamed block is no name a hierarchical
-  // name may use, though §23.8 admits it above as a name the unit declares.
   ReportUnnamedGenerateBlockReaches(decl, diag_);
 
-  // §26.3: a `pkg::x` scope prefix must name a known package (or a class/type
-  // for static-member / type-scope access). cu_scope_names_ holds packages,
-  // classes, and interfaces; class_names_ and typedefs_ cover module-local
-  // classes and type names; and a class a package declares is visible by its
-  // bare name where an import, wildcard or explicit, has brought it in, so it
-  // stands as a base too -- `c = pk_t::get();` after `import p::*` was reported
-  // while `p::pk_t::get()` was not.
-  //
-  // §26.6: the member of a `pkg::x` written on a package the unit declares is
-  // one the package declares or exports; a class or typedef of the module
-  // standing under a package's name is the base §8.23 takes first, and a base
-  // that is no package of the unit -- a class, an interface, an imported class
-  // -- has its members checked elsewhere. A `name[N]` enumeration member of
-  // §6.19.2 stands in the provided names under the constants it generates,
-  // name0 through nameN-1, and not under the written name (Table 6-10,
-  // printed page 121), so `pkg::name` is reported while `pkg::name1` is
-  // provided; the constants are also read under their "pkg.name1" keys
-  // (RegisterPackageParams in elaborator_resolve.cpp), which is what answers
-  // for a member whose bound the provided-name walk could not fold.
   auto provided = [this](std::string_view base, std::string_view member) {
     bool unit_package = base != "std" && PackageDeclared(unit_, base) &&
                         class_names_.count(base) == 0 &&
@@ -838,8 +611,6 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
   ReportUnknownScopeBases(
       decl,
       [this, mod, &explicit_imported, &wildcard_packages](std::string_view n) {
-        // §8.23 with §19.8: a covergroup type is a base of `::` as well, for
-        // `cg::get_coverage()` and `cg::x::get_coverage()`.
         return IsKnownScopeBase(n, cu_scope_names_, class_names_, typedefs_,
                                 unit_) ||
                VisibleCovergroup(n, mod, unit_) != nullptr ||
@@ -850,29 +621,6 @@ void Elaborator::ValidateUnresolvedReferences(const ModuleDecl* decl,
       provided, diag_);
 }
 
-// §23.9 over the subroutines no module holds. Every walk above runs from
-// Elaborator::ValidateUnresolvedReferences, once per elaborated module and over
-// that module's items, and §3.12.1 puts a subroutine outside every design
-// element in the compilation-unit scope while Clause 26 puts one in a package;
-// neither is in any module's list, so a read in either body was never
-// resolved, and `function int f(); return undeclared; endfunction` at the top
-// of a file elaborated clean. This is the walk over those two scopes, run
-// from Elaborator::ValidatePerDeclarationRulesInUnitScopes beside the other
-// per-declaration rules that scope keeps.
-//
-// What a compilation-unit body can reach is what RegisterCuScopeItems recorded
-// of the unit's items, held in `names`: the item names, the constants (§6.19's
-// enumeration members and §6.20.4's local parameters, by bare name), the
-// typedefs and the classes; and the names the unit's own import declarations
-// provide (§26.3, ImportsProvideName over the unit's items). A package body
-// reaches its own items, the members of the enumerations its items declare
-// (§6.19 -- RegisterPackageParams records those in the constants map under the
-// qualified `pkg.NAME` alone, so they are read off the items here through
-// ForEachEnumTypeOfItem) and its own imports, on top of the unit's. The body's
-// formals, locals and body-level imports are the walk's own business, as they
-// are for a module's subroutine.
-// The names a package's own items declare: each named item, and the members
-// of every enumeration an item declares (§6.19), folded against `constants`.
 static std::unordered_set<std::string> PackageDeclaredNames(
     const PackageDecl* pkg, const ScopeMap& constants) {
   std::unordered_set<std::string> pkg_names;
@@ -890,7 +638,6 @@ static std::unordered_set<std::string> PackageDeclaredNames(
   return pkg_names;
 }
 
-// Whether `names` holds `n` or an import among `imports` provides it.
 static bool UnitDeclaresWith(const CompilationUnit* unit,
                              const UnitScopeNames& names,
                              ProvidedNameCache& provided_cache,
@@ -905,10 +652,6 @@ void ReportUnresolvedInUnitSubroutines(const CompilationUnit* unit,
                                        const UnitScopeNames& names,
                                        ProvidedNameCache& provided_cache,
                                        DiagEngine& diag) {
-  // §3.12.1: a subroutine of the unit reads only the part of the unit written
-  // before it, so neither a unit variable or net nor an import written after
-  // it is reached. ReportSubroutineUnresolved passes over an item that is no
-  // task or function.
   for (auto* sub : unit->cu_items) {
     const std::vector<ModuleItem*> kBefore = UnitItemsBefore(unit, sub->loc);
     auto declared_before = [&](std::string_view n) {

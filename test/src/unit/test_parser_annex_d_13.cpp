@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Annex D.13: $showvars may appear with no argument, parsing as an ordinary
-// system task call.
 TEST(OptionalSystemTaskParserParsing, ShowVarsNoArgument) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +14,6 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsNoArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.13: $showvars accepts a parenthesized list of variables.
 TEST(OptionalSystemTaskParserParsing, ShowVarsVariableList) {
   auto r = Parse(
       "module m;\n"
@@ -26,8 +23,6 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsVariableList) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.13: a variable in the list may be a bit-select or part-select of a
-// vector.
 TEST(OptionalSystemTaskParserParsing, ShowVarsSelectArgument) {
   auto r = Parse(
       "module m;\n"
@@ -37,7 +32,6 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsSelectArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.13: a single-variable list is the minimal parenthesized form.
 TEST(OptionalSystemTaskParserParsing, ShowVarsSingleVariable) {
   auto r = Parse(
       "module m;\n"
@@ -47,8 +41,6 @@ TEST(OptionalSystemTaskParserParsing, ShowVarsSingleVariable) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.13: an indexed part-select of a vector is also a valid list entry,
-// exercising the +: part-select syntax rather than a plain range.
 TEST(OptionalSystemTaskParserParsing, ShowVarsIndexedPartSelect) {
   auto r = Parse(
       "module m;\n"

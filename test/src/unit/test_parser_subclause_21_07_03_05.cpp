@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 21-25: the $dumpportsflush task names a $dumpports output to flush.
 TEST(IoSystemTaskParsing, DumpportsflushCallWithFileName) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -15,8 +14,6 @@ TEST(IoSystemTaskParsing, DumpportsflushCallWithFileName) {
               "endmodule\n"));
 }
 
-// §21.7.3.5: the filename is optional. With no filename the flush covers every
-// file opened by $dumpports, so the empty-argument form is accepted.
 TEST(IoSystemTaskParsing, DumpportsflushEmptyParenCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -24,8 +21,6 @@ TEST(IoSystemTaskParsing, DumpportsflushEmptyParenCall) {
               "endmodule\n"));
 }
 
-// §21.7.3.5: the no-filename default action is equally reachable through the
-// bare task name with no argument list at all.
 TEST(IoSystemTaskParsing, DumpportsflushBareCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -33,9 +28,6 @@ TEST(IoSystemTaskParsing, DumpportsflushBareCall) {
               "endmodule\n"));
 }
 
-// Syntax 21-25: the filename is an expression, so an identifier -- the form a
-// string-typed or integral variable holding the name takes -- parses in the
-// filename position.
 TEST(IoSystemTaskParsing, DumpportsflushVariableFilename) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -43,8 +35,6 @@ TEST(IoSystemTaskParsing, DumpportsflushVariableFilename) {
               "endmodule\n"));
 }
 
-// Syntax 21-25: a composite filename expression, such as a concatenation
-// assembling the name from parts, also parses in the filename position.
 TEST(IoSystemTaskParsing, DumpportsflushExpressionFilename) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -52,8 +42,6 @@ TEST(IoSystemTaskParsing, DumpportsflushExpressionFilename) {
               "endmodule\n"));
 }
 
-// Syntax 21-25: the task statement is not limited to initial blocks -- a call
-// inside a task body parses in that statement position too.
 TEST(IoSystemTaskParsing, DumpportsflushInsideTaskBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -63,16 +51,11 @@ TEST(IoSystemTaskParsing, DumpportsflushInsideTaskBody) {
               "endmodule\n"));
 }
 
-// Syntax 21-25 negative: the filename requires a parenthesized argument list;
-// a name butted against the task keyword without parentheses does not parse.
 TEST(IoSystemTaskParsing, DumpportsflushUnparenthesizedFilenameRejected) {
   auto result = Parse(
       "module t;\n"
       "  initial $dumpportsflush \"ports.vcd\";\n"
       "endmodule\n");
-  // The call parses as a subroutine call with no argument list, so the string
-  // that follows it stands where the statement's terminator belongs; §12.3
-  // owns that terminator and files the report.
   EXPECT_TRUE(ReportedError(result.diags, "expected ';', got string literal", 2,
                             "12.3"));
 }

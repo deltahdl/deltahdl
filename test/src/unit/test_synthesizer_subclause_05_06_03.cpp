@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A system function call on the right of a continuous assignment reaches
-// SynthLower::LowerExprBit as ExprKind::kSystemCall, and the synthesizer has no
-// lowering for it, so it reports the call under §5.6.3 and SynthLower::Lower
-// answers with nothing. The case used to assert only that a graph came back,
-// which held while kSystemCall fell through to constant zero: the netlist then
-// drove `w` to zero rather than to $clog2(16), and nothing said so.
 TEST(SystemNameSynthesis, SystemFunctionInAssignIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -30,11 +24,6 @@ TEST(SystemNameSynthesis, SystemFunctionInAssignIsReportedUnlowered) {
       "5.6.3"));
 }
 
-// The same ExprKind::kSystemCall report under §5.6.3 when the call is one
-// operand of a §11.4.3 addition rather than the whole right-hand side, so the
-// operand a lowered adder cannot supply is named where it is written. The case
-// used to assert only that a graph came back, which held while the call
-// contributed constant zero to every bit of that sum.
 TEST(SystemNameSynthesis, SystemFunctionInAdditionIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -51,10 +40,6 @@ TEST(SystemNameSynthesis, SystemFunctionInAdditionIsReportedUnlowered) {
       "5.6.3"));
 }
 
-// $bits, whose argument is a data type rather than an expression, is
-// ExprKind::kSystemCall like any other system function and is reported under
-// §5.6.3 alike. The case used to assert only that a graph came back, which held
-// while the call contributed constant zero to `w`.
 TEST(SystemNameSynthesis, SystemFunctionWithDataTypeArgIsReportedUnlowered) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -71,9 +56,6 @@ TEST(SystemNameSynthesis, SystemFunctionWithDataTypeArgIsReportedUnlowered) {
       "5.6.3"));
 }
 
-// §5.6.3: a system construct is not design semantics but refers to simulator
-// functionality, so it has no hardware to become. The report names the callee
-// and stands at the `$`, so a design calling several says which one and where.
 TEST(SystemNameSynthesis, SystemCallIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

@@ -47,11 +47,6 @@ TEST(IpcSync, MergedTriggerUnblocksOriginalWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// The merge can also be established by a declaration initializer (`event b =
-// a;`) rather than a procedural assignment. That syntactic position is lowered
-// by a distinct production path (TryLowerEventVarInit) at static-init time, so
-// it needs its own end-to-end observation: triggering the source event must
-// still unblock a process waiting on the initializer-merged handle.
 TEST(IpcSync, MergedViaDeclarationInitializerUnblocksWaiter) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -92,11 +87,6 @@ TEST(IpcSync, ProcessBlockedBeforeMergeDoesNotUnblock) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// A single trigger on one merged name must reach processes waiting on every
-// other name merged into the same synchronization object, not just one. This
-// observes the watcher list of the shared Variable being drained for multiple
-// distinct alias names (the case where one trigger reaches more than one other
-// name).
 TEST(IpcSync, MergedTriggerWakesAllAliasWaiters) {
   LowerFixture f;
   auto [r1, r2] = RunModuleTwoVars(f,
@@ -139,11 +129,6 @@ TEST(IpcSync, MergedEventTriggeredStateShared) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §15.5.5.1 with §13.5.1: an event output formal hands the caller's actual the
-// synchronization object the formal names when the task returns, so after
-// `getev(f)`, whose body merges ev with e, f is e: the wait on f is woken by
-// the trigger of e at 2. Copied out as a value, f stayed an event of its own
-// and the wait was never woken.
 TEST(NamedEventSim, EventOutputFormalHandsTheMergedEventBack) {
   SimFixture f;
   auto* var = RunAndFindVar(

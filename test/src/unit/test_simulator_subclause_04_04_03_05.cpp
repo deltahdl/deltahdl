@@ -133,9 +133,6 @@ TEST(PliPreObservedSim, PreObservedReadsFullyStabilizedActiveSetState) {
   EXPECT_EQ(sampled, 99);
 }
 
-// §4.4.3.5: within the Pre-Observed region it is illegal to schedule an event
-// within the current time slot. Scheduling into the current time slot from a
-// Pre-Observed callback is recorded as a violation.
 TEST(PliPreObservedSim, ScheduleIntoCurrentTimeSlotFromPreObservedIsFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -171,8 +168,6 @@ TEST(PliPreObservedSim, MultipleIllegalSchedulesFromPreObservedAreEachCounted) {
   EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 3u);
 }
 
-// Scheduling an event at a future time slot from a Pre-Observed callback is
-// legal - the restriction only bars events in the current time slot.
 TEST(PliPreObservedSim, FutureScheduleFromPreObservedIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -189,16 +184,11 @@ TEST(PliPreObservedSim, FutureScheduleFromPreObservedIsNotFlagged) {
   EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 0u);
 }
 
-// A schedule into the current time slot from a non-Pre-Observed region carries
-// no Pre-Observed violation.
 TEST(PliPreObservedSim, ScheduleFromActiveIsNotFlaggedAgainstPreObserved) {
   VerifyScheduleFromActiveIsNotFlagged(
       [](Scheduler& s) { return s.IllegalPreObservedScheduleCount(); });
 }
 
-// §4.4.3.5: within the Pre-Observed region it is illegal to write values to any
-// net or variable. A VPI write performed from a Pre-Observed callback is
-// recorded as a violation.
 TEST(PliPreObservedSim, VpiPutValueFromPreObservedRecordsWriteViolation) {
   Arena arena;
   Scheduler sched(arena);
@@ -248,8 +238,6 @@ TEST(PliPreObservedSim, MultipleIllegalWritesFromPreObservedAreEachCounted) {
   EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 4u);
 }
 
-// A VPI write from a writable region (e.g. Post-NBA, see §4.4.3.4) carries no
-// Pre-Observed violation.
 TEST(PliPreObservedSim, VpiPutValueFromPostNbaIsNotFlaggedAgainstPreObserved) {
   Arena arena;
   Scheduler sched(arena);
@@ -273,10 +261,6 @@ TEST(PliPreObservedSim, VpiPutValueFromPostNbaIsNotFlaggedAgainstPreObserved) {
   EXPECT_EQ(sched.IllegalPreObservedWriteCount(), 0u);
 }
 
-// §4.4.3.5 bars scheduling into the current time slot outright - unlike the
-// Preponed region, there is no exemption for scheduling back into the same
-// region. An event scheduled into Pre-Observed itself at the current time is
-// still a violation (the re-entrant event itself is harmless and runs).
 TEST(PliPreObservedSim,
      ScheduleIntoSamePreObservedRegionAtCurrentTimeIsFlagged) {
   Arena arena;
@@ -296,9 +280,6 @@ TEST(PliPreObservedSim,
   EXPECT_EQ(sched.IllegalPreObservedScheduleCount(), 1u);
 }
 
-// §4.4.3.5 forbids writing any net or variable from the region. A VPI write to
-// a net (rather than a variable) from a Pre-Observed callback is likewise
-// recorded as a write violation.
 TEST(PliPreObservedSim, VpiPutValueOnNetFromPreObservedRecordsWriteViolation) {
   Arena arena;
   Scheduler sched(arena);

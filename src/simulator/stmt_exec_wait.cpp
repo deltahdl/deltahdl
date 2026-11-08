@@ -33,9 +33,6 @@
 namespace delta {
 namespace {
 
-// Rewrites any sequence name in the wait condition's read set to its synthetic
-// endpoint event variable (creating that event variable on demand), so the wait
-// suspends on the sequence's completion event rather than on the name itself.
 void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
                                  SimContext& ctx) {
   std::unordered_set<std::string> seq_adds;
@@ -45,8 +42,6 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
       std::string ep_name = "__seq_" + name;
       auto* ep_var = ctx.FindVariable(ep_name);
       if (!ep_var) {
-        // variables_ keys by string_view, so intern the name in the arena;
-        // a local std::string key would dangle once this function returns.
         auto* stored = ctx.GetArena().Create<std::string>(ep_name);
         ep_var = ctx.CreateVariable(*stored, 1);
         ep_var->is_event = true;
@@ -55,9 +50,6 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
       seq_removes.insert(name);
       continue;
     }
-    // §16.13.6 with §23.6: a sequence named through the instance hierarchy,
-    // `u.s`, is waited on through the end point of the sequence s declared
-    // in the instance u, which s's monitor there fires.
     std::string ep_name = HierarchicalEndPoint(name, ctx);
     if (!ep_name.empty()) seq_adds.insert(ep_name);
   }
@@ -65,11 +57,6 @@ void SubstituteSequenceEndpoints(std::unordered_set<std::string>& reads,
   for (auto& a : seq_adds) reads.insert(a);
 }
 
-// §8.9 with §26.3: the class the scope resolution `e` names a member of --
-// `C` by one identifier, or `p::C`, the key the lowerer binds a package's
-// class under, which PackageQualifiedClassOf (eval_static_method.cpp) answers
-// for the doubly-qualified `p::C::all` -- and in `scope` the name the class
-// was written by. Null for a left side that is no class.
 const ClassTypeInfo* ScopedClassOf(const Expr* e, SimContext& ctx,
                                    std::string& scope) {
   if (e->lhs->kind == ExprKind::kIdentifier) {
@@ -84,24 +71,6 @@ const ClassTypeInfo* ScopedClassOf(const Expr* e, SimContext& ctx,
   return cls;
 }
 
-// §9.4.3 with §8.9: the static properties the wait condition reads through
-// the class scope operator, each added to `reads` as `C::n`, which is the
-// name AnyChangeAwaiter::AttachStaticPropertyWatcher arms on the class by.
-// CollectExprReads descends a scope resolution into its two identifiers, `C`
-// and `n`, and neither names the class's own storage: a class is not a
-// variable, and a wait on `C::n == 2` therefore armed nothing and waited for
-// ever. The two are left in the set, harmless where they name nothing and
-// dropped by the awaiter if they do not. §26.3: a package's class is named
-// `p::C`, so `p::C::all` is added as `p::C::all`, which the awaiter splits at
-// its last scope operator; read for a class named by one identifier alone,
-// `wait (p::C::all.size() != 0)` collected `p`, `C` and `all`, none a
-// variable, armed nothing and waited for ever. §8.13 (printed pages
-// 189-190): a derived class inherits its base's static properties, so `D::n`
-// and `D::all` name C's own storage where D extends C, and are added under
-// the written `D` for the awaiter to resolve to the declaring class
-// (ClassTypeInfo::StaticPropertyDeclarer); asked of D's own
-// static_properties, which hold D's declarations alone, neither was added
-// and each waited for ever.
 void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
                                 std::unordered_set<std::string>& reads) {
   ForEachSubExpr(cond, [&](const Expr* e) {
@@ -118,18 +87,6 @@ void CollectStaticPropertyReads(const Expr* cond, SimContext& ctx,
   });
 }
 
-// §15.5.3 (printed page 378) with §26.3 (printed 808): the wait condition
-// names a hierarchical_event_identifier's triggered state, and a package's
-// event is named through the package scope resolution operator,
-// `wait (p1::e.triggered)`, whose storage stands under the "p1.e" key
-// CreatePackageDataVariables (lowerer_package_data.cpp) creates it under.
-// CollectExprReads descends the scope resolution into `p1` and `e`, neither
-// of which names that storage, so nothing was armed on the event and the
-// process waited for ever; each scoped name whose key holds a variable is
-// added to `reads` under that key, which AnyChangeAwaiter arms on and the
-// trigger's `-> p1::e` wakes (ExecEventTriggerImpl in stmt_exec.cpp). A
-// scoped name of any other package item, a variable or a parameter, is
-// added the same way, its key holding its storage too.
 void CollectPackageScopedReads(const Expr* cond, SimContext& ctx,
                                std::unordered_set<std::string>& reads) {
   ForEachSubExpr(cond, [&](const Expr* e) {
@@ -143,25 +100,6 @@ void CollectPackageScopedReads(const Expr* cond, SimContext& ctx,
   });
 }
 
-// §9.4.3 with §7.10.2 and §7.5.2: the condition may read a queue or a dynamic
-// array through a method call, `wait (q.size() != 0)`, and the methods that
-// answer about the array are defined on the object the receiver names, as are
-// the ones that change it. CollectExprReads gives a call its arguments alone,
-// a callee being no variable, so a call on a receiver contributed nothing to
-// `reads`: the set was empty, and ExecWait returned at once with the condition
-// still false -- `wait (q.size() != 0)` on an empty queue popped 0 at time 0
-// where the push at time 10 should have released it, and a class task's
-// `wait (m_queue.size() != 0)` called from a forever loop spun at time 0. The
-// receiver's own reads are what the call adds: a declared queue's or dynamic
-// array's name, which every mutating method announces through NotifyOwningVar
-// (eval_array_queue.cpp) while the variable's value stands still, and which
-// AnyChangeAwaiter therefore wakes on without comparing; a property's bare
-// name inside a method, which the awaiter's own-property arm arms on the
-// running method's object; and the handle a property is reached through,
-// `h.m_queue.size()`, which AnnounceQueueChange (eval_array_class_queue.cpp)
-// reaches through SimContext::NotifyClassHandleWatchers. A parenthesis-less
-// `q.size` is a member access, whose two sides CollectExprReads already
-// descends, which is why that spelling was released and the call was not.
 void CollectMethodReceiverReads(const Expr* cond,
                                 std::unordered_set<std::string>& reads) {
   ForEachSubExpr(cond, [&](const Expr* e) {
@@ -172,12 +110,6 @@ void CollectMethodReceiverReads(const Expr* cond,
   });
 }
 
-// §15.5.4: one step of a wait_order, the wait for the next of the events
-// still to come, `events`, to be triggered; answers the position among them
-// of the one that was. §4.5: the waiting process resumes as itself, as an
-// event control's does (EventAwaiter::ResumeMaybeReactive); resumed inside the
-// process that triggered the event, the statements after the wait_order
-// queued their violation reports, among other per-process state, on that one.
 struct WaitOrderStepAwaiter {
   SimContext& ctx;
   const std::vector<Variable*>& events;
@@ -205,11 +137,6 @@ struct WaitOrderStepAwaiter {
   size_t await_resume() const noexcept { return triggered; }
 };
 
-// §15.5.4 with §6.17: the event each wait_order operand names -- a declared
-// event by its name, or a class's event property, `s.a` through a handle,
-// which no name finds (TriggerTargetEvent) -- null for an operand naming
-// neither. Found by name alone, `wait_order(s.a, s.b)` watched nothing and
-// never completed.
 std::vector<Variable*> WaitOrderEvents(const std::vector<Expr*>& operands,
                                        SimContext& ctx) {
   std::vector<Variable*> events;
@@ -231,12 +158,6 @@ void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
   CollectPackageScopedReads(expr, ctx, reads);
 }
 
-// §14.15 with §25.5.5 and §25.9.1: a clockvar the condition reads, through
-// whatever path reaches its block -- `cb.gnt`, `b1.sb.gnt`, `vif.sb.gnt` --
-// changes when its block samples a new value, which the block's sample
-// variable holds under the clockvar's full name. That name is read here, so
-// the wait wakes on the sample. Read by the path it was spelled with, the
-// clockvar named no variable and the wait never woke.
 static void CollectClockvarReads(const Expr* cond, SimContext& ctx,
                                  std::unordered_set<std::string>& reads) {
   auto* mgr = ctx.GetClockingManager();
@@ -266,24 +187,15 @@ ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena) {
 
   SubstituteSequenceEndpoints(reads, ctx);
   std::vector<std::string_view> read_vars(reads.begin(), reads.end());
-  // Shared with every watcher armed below: set true once the condition holds
-  // and this coroutine resumes for good, so a watcher still stranded on a
-  // sibling signal removes itself instead of resuming the (freed) frame.
   auto finished = std::make_shared<bool>(false);
   bool suspended = false;
   while (!ctx.StopRequested()) {
     auto cond = EvalExpr(stmt->condition, ctx, arena);
     if (cond.IsTruthy()) break;
-    // §9.4.3: the statements after a wait stay blocked until its condition
-    // becomes true. One that reads no variable never becomes true, so the
-    // awaiter, arming no watcher, leaves the process blocked for good.
     suspended = true;
     co_await AnyChangeAwaiter{ctx, read_vars, finished};
   }
   *finished = true;
-  // §12.4.2.1: resuming after suspending on a wait statement is a violation
-  // report flush point; drop any reports pending from before the wait.
-  // §16.4.2: the same resume is a deferred assertion flush point.
   if (suspended) {
     ctx.FlushPendingViolations();
     ctx.FlushPendingDeferredReports();
@@ -319,12 +231,8 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
         vars.begin() + static_cast<std::ptrdiff_t>(i), vars.end());
     size_t triggered = co_await WaitOrderStepAwaiter{ctx, remaining, 0};
     suspended = true;
-    // The first of the remaining events is the one expected next.
     if (triggered != 0) failed = true;
   }
-  // §12.4.2.1: resuming after suspending on a wait statement, `wait_order`
-  // among them (A.6.5), is a violation report flush point.
-  // §16.4.2: the same resume is a deferred assertion flush point.
   if (suspended) {
     ctx.FlushPendingViolations();
     ctx.FlushPendingDeferredReports();
@@ -335,9 +243,6 @@ ExecTask ExecWaitOrder(const Stmt* stmt, SimContext& ctx, Arena& arena) {
       co_return co_await ExecStmt(stmt->else_branch, ctx, arena);
     }
 
-    // §15.5.4: when no else (fail) clause is supplied, a failed sequence
-    // raises a default run-time error by calling $error (see §20.10), which
-    // records ERROR severity and lets the run continue.
     EmitSeverityHeader(ctx, "ERROR", "wait_order events triggered out of order",
                        std::cerr);
     co_return StmtResult::kDone;
@@ -355,11 +260,6 @@ ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     auto val = EvalExpr(stmt->cycle_delay, ctx, arena);
     cycles = static_cast<uint32_t>(val.ToUint64());
   }
-  // §14.11 (printed page 361): a zero count is a wait too -- `##0`, or
-  // `##(n)` with n at 0, suspends until the clocking block event of a time
-  // step in which it has not yet occurred -- so it reaches the awaiter, whose
-  // await_ready lets it through where the event has occurred. Skipped for a
-  // zero count, every `##0` ran on at once.
   co_await CycleDelayAwaiter{ctx, cycles};
   if (stmt->body) {
     co_return co_await ExecStmt(stmt->body, ctx, arena);
@@ -385,22 +285,13 @@ uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx) {
 uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
                              TimeUnit precision) {
   if (val.is_real) {
-    // §3.14.1: a real delay is rounded to the nearest multiple of the design
-    // element's time precision before it is used. The value carries IEEE-754
-    // bits in its low word; recover the number and let RealDelayToTicks apply
-    // the precision-step rounding and scale the result to global-precision
-    // ticks. A negative delay has no meaning here, so it collapses to no wait.
     double d = RealVecToDouble(val);
     if (d < 0.0) return 0;
     return RealDelayToTicks(d, scale, precision);
   }
-  // An integer delay has no fractional part to round, but is still scaled from
-  // the issuing element's time unit to the global tick base.
   return DelayToTicks(DelayTicksFromValue(val), scale, precision);
 }
 
-// A.2.2.3's fifth delay_value, which the parser writes as a literal spelled
-// `1step` (Parser::ParseDelayValue).
 static bool IsOneStepDelay(const Expr* delay) {
   return delay->kind == ExprKind::kIntegerLiteral && delay->text == "1step";
 }
@@ -429,23 +320,10 @@ ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return StmtResult::kDone;
 }
 
-// §15.5.2 (printed page 378): the key of the named event an event control's
-// one operand names, empty where the control names anything else. §26.3
-// (printed 808): the operand is a hierarchical_event_identifier, which a
-// package's event is written as through the package scope resolution
-// operator, `@(p1::e)`, so the operand is read as ScopedOrBareTargetKey
-// (eval_semaphore.cpp) reads a semaphore's `p1::s = new` target -- an
-// identifier's own text, or the "p1.e" key a scoped name's storage stands
-// under -- and the awaiter arms on that key. Read as an identifier alone,
-// the scoped operand fell to EventAwaiter, which resolved no variable for it
-// and never resumed the process.
 static std::string_view NamedEventKey(const Stmt* stmt, SimContext& ctx) {
   if (stmt->events.size() != 1) return {};
   const auto& ev = stmt->events[0];
   if (ev.edge != Edge::kNone) return {};
-  // §9.4.2.3: a guarded operand goes to EventAwaiter, which evaluates the
-  // condition before resuming. NamedEventAwaiter resumes on the trigger alone,
-  // so sending `@(e iff en)` there would fire the process however `en` read.
   if (ev.iff_condition) return {};
   std::string_view key = ScopedOrBareTargetKey(ev.signal, ctx.GetArena());
   if (key.empty()) return {};
@@ -460,11 +338,6 @@ static bool HasSequenceEvent(const Stmt* stmt) {
   return false;
 }
 
-// §6.17 with §9.4.2: the event a single event control with no edge and no
-// guard waits on where its operand names a class's event property, `@(h.ev)`
-// or `@(ev)` in a method (ClassEventVariable), or an element of an array of
-// events, `@arr[1]` (EventArrayElement); null otherwise, and where the
-// operand is a declared event NamedEventKey finds by name.
 static Variable* ClassEventOfControl(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (stmt->events.size() != 1) return nullptr;
@@ -479,32 +352,17 @@ ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     std::string_view named_event = NamedEventKey(stmt, ctx);
     Variable* class_event =
         named_event.empty() ? ClassEventOfControl(stmt, ctx, arena) : nullptr;
-    // §9.4.2.4: a list holding a sequence instance is EventAwaiter's, which
-    // arms the sequence and every other operand under one guard.
     if (!HasSequenceEvent(stmt) &&
         (!named_event.empty() || class_event != nullptr)) {
       co_await NamedEventAwaiter{ctx, named_event, class_event};
     } else {
       co_await EventAwaiter{ctx, stmt->events, arena};
     }
-    // §12.4.2.1: a process that suspended on an event control reaches a
-    // violation report flush point when it resumes; any unique/priority
-    // reports accumulated before the suspension are discarded.
     ctx.FlushPendingViolations();
-    // §16.4.2: that resume is equally a deferred assertion flush point, so
-    // deferred reports pending from before the suspend are cleared as well.
     ctx.FlushPendingDeferredReports();
   } else if (stmt->is_star_event && stmt->body) {
-    // §9.4.2.2: a procedural @* (or @(*)) carries no explicit operand list; it
-    // suspends until any net or variable read by its controlled statement
-    // changes. Derive that implicit event list from the statement's reads --
-    // the same read-collection rule the elaborator applies to `always @*` --
-    // and wait on it as though it had been written out as @(a or b or ...).
-    // The vector must outlive the suspension, so it lives in this coroutine
-    // frame. `exclude_written` is false because @* (unlike always_comb) still
-    // lists a signal that is both read and written.
-    std::vector<EventExpr> implicit_events = InferSensitivity(
-        stmt->body, arena, /*calls=*/nullptr, /*exclude_written=*/false);
+    std::vector<EventExpr> implicit_events =
+        InferSensitivity(stmt->body, arena, nullptr, false);
     if (!implicit_events.empty()) {
       co_await EventAwaiter{ctx, implicit_events, arena};
       ctx.FlushPendingViolations();

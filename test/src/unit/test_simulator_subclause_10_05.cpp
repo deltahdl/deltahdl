@@ -144,8 +144,6 @@ TEST(VariableInitSim, StaticClassMemberInitBeforeInitialBlock) {
             55u);
 }
 
-// The initial value is placed verbatim, so an initializer carrying x/z bits
-// leaves the variable in an unknown state rather than coercing to 0.
 TEST(VariableInitSim, FourStateInitializerPreservesXZ) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -157,8 +155,6 @@ TEST(VariableInitSim, FourStateInitializerPreservesXZ) {
   EXPECT_FALSE(v->value.IsKnown());
 }
 
-// A negative initializer is stored as its two's-complement bit pattern in the
-// declared width (here a 32-bit int).
 TEST(VariableInitSim, SignedNegativeInitializer) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -170,8 +166,6 @@ TEST(VariableInitSim, SignedNegativeInitializer) {
   EXPECT_EQ(x->value.ToUint64(), 0xFFFFFFFBull);
 }
 
-// The initialization has no duration: with no intervening assignment the
-// value is unchanged when read at a later simulation time.
 TEST(VariableInitSim, InitValuePersistsAcrossTime) {
   SimFixture f;
   auto* snap = RunAndFindVar(
@@ -185,12 +179,6 @@ TEST(VariableInitSim, InitValuePersistsAcrossTime) {
   EXPECT_EQ(snap->value.ToUint64(), 7u);
 }
 
-// §10.5's own example: `logic v = consta & constb;` where consta and constb
-// are themselves variables carrying declaration initializers. Because static
-// initialization runs in declaration order and completes before any procedure,
-// v's initializer sees the already-initialized consta/constb and evaluates to
-// their bitwise-AND. This drives the exact example shape end-to-end, unlike the
-// literal-operand VarInitWithExpression case.
 TEST(VariableInitSim, VarInitFromOtherInitializedVariables) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -204,11 +192,6 @@ TEST(VariableInitSim, VarInitFromOtherInitializedVariables) {
   EXPECT_EQ(v->value.ToUint64(), 0x3Cu);
 }
 
-// A variable initializer may name a parameter as its operand. The parameter is
-// an elaboration-time constant resolved during static initialization (its
-// storage is created before the variables that read it), so v receives the
-// parameter's value. This exercises the param-resolution path, distinct from a
-// literal or a plain-variable operand.
 TEST(VariableInitSim, VarInitFromParameterOperand) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  parameter [7:0] P = 8'h3C;\n"
@@ -218,9 +201,6 @@ TEST(VariableInitSim, VarInitFromParameterOperand) {
             0x3Cu);
 }
 
-// The initializer operand may also be a localparam, and may appear inside a
-// larger expression. Both the localparam resolution and the arithmetic happen
-// during static initialization, before any procedure runs.
 TEST(VariableInitSim, VarInitFromLocalparamInExpression) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  localparam [7:0] L = 8'd20;\n"
@@ -230,8 +210,6 @@ TEST(VariableInitSim, VarInitFromLocalparamInExpression) {
             23u);
 }
 
-// Static initialization completes before any procedure starts, so an
-// always_comb block evaluating at time 0 already sees the initialized value.
 TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
   SimFixture f;
   auto* o = RunAndFindVar(
@@ -245,11 +223,6 @@ TEST(VariableInitSim, VarInitBeforeAlwaysCombBlock) {
   EXPECT_EQ(o->value.ToUint64(), 10u);
 }
 
-// §10.5 makes a variable declaration assignment a procedural assignment to the
-// declared variable, and §10.9 and §10.10 make an assignment pattern or a
-// `{...}` assigned to an unpacked array fill its elements. A declaration in a
-// begin-end block assigned its initializer to the element-width carrier alone,
-// so the array stayed zero or empty.
 TEST(VariableInitSim, BlockFixedArrayInitFromPattern) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -311,9 +284,6 @@ TEST(VariableInitSim, BlockAssocArrayInitFromPattern) {
             22u);
 }
 
-// A queue or array of strings is an array like any other (§7.10 with §6.16),
-// and the declaration in a block made the carrier alone, so an assignment or
-// an initializer reached no queue.
 TEST(VariableInitSim, BlockStringQueueInitAndAssign) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -328,7 +298,6 @@ TEST(VariableInitSim, BlockStringQueueInitAndAssign) {
             23u);
 }
 
-// The same declarations in an automatic function's body.
 TEST(VariableInitSim, FunctionLocalArrayInits) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -344,7 +313,6 @@ TEST(VariableInitSim, FunctionLocalArrayInits) {
             923u);
 }
 
-// The initializer is evaluated once, on the array: a call in it runs once.
 TEST(VariableInitSim, BlockArrayInitEvaluatedOnce) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int cnt = 0;\n"
@@ -357,8 +325,6 @@ TEST(VariableInitSim, BlockArrayInitEvaluatedOnce) {
             1u);
 }
 
-// §6.21: a static variable's initializer is executed once, an automatic
-// one's on every entry to its scope.
 TEST(VariableInitSim, StaticBlockQueueInitRunsOnce) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -376,9 +342,6 @@ TEST(VariableInitSim, StaticBlockQueueInitRunsOnce) {
             42u);
 }
 
-// §13.3.2: a static function's local keeps its value between calls, and §10.5
-// runs its initializer once, before the procedures start, so no call runs it
-// again.
 TEST(VariableInitSim, StaticFunctionQueueInitRunsOnce) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int r;\n"
@@ -396,11 +359,6 @@ TEST(VariableInitSim, StaticFunctionQueueInitRunsOnce) {
             34u);
 }
 
-// §10.5 with §6.21: a static local's declaration initializer is set before any
-// initial or always procedure starts -- of a static function, an automatic
-// function, a block within a task, and a block within a procedure alike -- so
-// each reads g as 1, not the 2 the procedure writes before the declaration
-// first runs. It ran when the declaration first ran, and each read 2.
 TEST(VariableInitSim, AStaticLocalIsInitializedBeforeTheProceduresStart) {
   const char* src =
       "module t;\n"
@@ -423,11 +381,6 @@ TEST(VariableInitSim, AStaticLocalIsInitializedBeforeTheProceduresStart) {
   EXPECT_EQ(RunAndGet(src, "rb"), 31u);
 }
 
-// §10.5 with §23.6 and §27.4: a static local's initializer reads the names of
-// the scope its declaration stands in -- a child instance's own variable, and
-// a generate block instance's variable and loop index, for a procedure of the
-// block and for a function of it -- with the values they hold before the
-// procedures start.
 TEST(VariableInitSim, AStaticLocalInitializerReadsItsOwnScope) {
   const char* src =
       "module c;\n"
@@ -455,9 +408,6 @@ TEST(VariableInitSim, AStaticLocalInitializerReadsItsOwnScope) {
   EXPECT_EQ(RunAndGet(src, "rg"), 4u);
 }
 
-// §10.5 with §9.7: a static local's initializer runs before any process
-// exists, so process::self() there answers null; an automatic local's runs as
-// its block is entered and answers the procedure entering it.
 TEST(VariableInitSim, AStaticLocalsInitializerRunsInNoProcess) {
   const char* src =
       "module t;\n"
@@ -472,10 +422,6 @@ TEST(VariableInitSim, AStaticLocalsInitializerRunsInNoProcess) {
   EXPECT_EQ(RunAndGet(src, "own"), 1u);
 }
 
-// §10.5 with §8.30: a static weak_reference local is set before the
-// procedures start, when o is still null, and the procedure entering its
-// block stands in that reference rather than making it again from the o the
-// procedure has since set.
 TEST(VariableInitSim, AStaticWeakReferenceIsMadeBeforeTheProceduresStart) {
   const char* src =
       "class C; endclass\n"
@@ -493,10 +439,6 @@ TEST(VariableInitSim, AStaticWeakReferenceIsMadeBeforeTheProceduresStart) {
   EXPECT_EQ(RunAndGet(src, "still_null"), 1u);
 }
 
-// §10.5 with §26.2 and §3.12.1: a static local of a package's function and of
-// the compilation unit's is set before the procedures start, from the g its
-// package or unit holds then, 1 and 3, not from the 2 and 4 the procedure has
-// written by the time it calls the function.
 TEST(VariableInitSim, PackageAndUnitStaticLocalsAreSetBeforeTheProcedures) {
   const char* src =
       "int g = 3;\n"
@@ -513,10 +455,6 @@ TEST(VariableInitSim, PackageAndUnitStaticLocalsAreSetBeforeTheProcedures) {
   EXPECT_EQ(RunAndGet(src, "u"), 3u);
 }
 
-// §10.5 with §8.6: a class method is a task or function, so a static local
-// of one is set before the procedures start, whether the class is the
-// compilation unit's, called through the class scope, or a package's, whose
-// task is called on an object.
 TEST(VariableInitSim, UnitAndPackageClassMethodStaticLocalsAreSetEarly) {
   const char* src =
       "int g = 1;\n"
@@ -541,9 +479,6 @@ TEST(VariableInitSim, UnitAndPackageClassMethodStaticLocalsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "u"), 3u);
 }
 
-// §10.5 with §8.6: so is one of a method of a class a module declares, made
-// in the instance the module is, a child's included, and reading that
-// instance's variables.
 TEST(VariableInitSim, ModuleClassMethodStaticLocalsAreSetEarly) {
   const char* src =
       "module m;\n"
@@ -567,9 +502,6 @@ TEST(VariableInitSim, ModuleClassMethodStaticLocalsAreSetEarly) {
   EXPECT_EQ(RunAndGet(src, "v"), 5u);
 }
 
-// §10.5 with §8.25: each specialization the design names has its own method
-// static locals, each set before the procedures start with that
-// specialization's parameters.
 TEST(VariableInitSim, SpecializationMethodStaticLocalsAreSetEarly) {
   const char* src =
       "int g = 1;\n"

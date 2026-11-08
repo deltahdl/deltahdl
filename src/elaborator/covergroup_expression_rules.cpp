@@ -23,16 +23,12 @@ namespace {
 
 using Names = std::unordered_set<std::string_view>;
 
-// A covergroup whose covergroup_expressions are being checked, with what it
-// reads where it is declared and where the reports go.
 struct ExprSite {
   const CovergroupDecl& cg;
   const CovergroupContext& ctx;
   DiagEngine& diag;
 };
 
-// Adds to `reads` the names `s` and the statements it holds read, and to
-// `own` the names they declare.
 void CollectStmtReads(const Stmt* s, Names& own,
                       std::vector<const Expr*>& reads) {
   if (s == nullptr) return;
@@ -42,7 +38,6 @@ void CollectStmtReads(const Stmt* s, Names& own,
                    [&](const Stmt* sub) { CollectStmtReads(sub, own, reads); });
 }
 
-// §19.5: the restrictions on a function the call `call` makes.
 void CheckFunctionCall(const Expr* call, const ExprSite& site) {
   const ModuleItem* fn = site.ctx.function_named(call->callee);
   if (fn == nullptr) return;
@@ -72,7 +67,6 @@ void CheckFunctionCall(const Expr* call, const ExprSite& site) {
                   Subclause("19.5"));
 }
 
-// §19.5: the calls `e` and its subexpressions make.
 void CheckCalls(const Expr* e, const ExprSite& site) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kSystemCall && !IsConstantSysFunc(e->callee)) {
@@ -88,8 +82,6 @@ void CheckCalls(const Expr* e, const ExprSite& site) {
   ForEachExprChild(e, [&](const Expr* child) { CheckCalls(child, site); });
 }
 
-// §19.5: the names `e` reads, `free` holding those it may read whatever they
-// are.
 void CheckNames(const Expr* e, const Names& free, const ExprSite& site) {
   std::vector<const Expr*> reads;
   CollectBareIdents(e, reads);
@@ -112,8 +104,6 @@ void CheckNames(const Expr* e, const Names& free, const ExprSite& site) {
   }
 }
 
-// One covergroup_expression, `free` holding the names it may read whatever
-// they are.
 void CheckExpression(const Expr* e, const Names& free, const ExprSite& site) {
   if (e == nullptr) return;
   CheckNames(e, free, site);
@@ -150,8 +140,6 @@ void CheckCoverpointBins(const CoverPointDecl& cp, const ExprSite& site) {
   }
 }
 
-// §19.6: the covergroup_expressions of the select expression `s` of a cross
-// whose items are `items`.
 void CheckSelect(const SelectExpression* s, const Names& items,
                  const ExprSite& site) {
   if (s == nullptr) return;

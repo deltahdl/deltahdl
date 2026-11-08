@@ -81,10 +81,6 @@ TEST(BlockingTasksCycleEventMode, ModuleFunctionCalledFromProgramReturnsValue) {
   EXPECT_EQ(r->value.ToUint64(), 42u);
 }
 
-// §24.5 (printed page 778) with §23.6 (printed page 753): a program may enable
-// a design module's task by hierarchical name, and the task runs in the
-// program's thread, its delays consumed before the program goes on. Written
-// without its empty parentheses (§13.5.5), `top.T;` is that enable too.
 TEST(BlockingTasksCycleEventMode,
      ModuleTaskEnabledByHierarchicalNameFromProgramRunsItsBody) {
   SimFixture f;
@@ -109,7 +105,6 @@ TEST(BlockingTasksCycleEventMode,
             "T a=5 at 10\nT b=7 at 16\nprog done at 16\n");
 }
 
-// The same enable from a submodule, beside a function called upward.
 TEST(BlockingTasksCycleEventMode,
      ModuleTaskEnabledByHierarchicalNameFromSubmoduleRunsItsBody) {
   SimFixture f;
@@ -131,8 +126,6 @@ TEST(BlockingTasksCycleEventMode,
       "sub f=35 at 1\nT a=2 at 1\n");
 }
 
-// §24.5 with §23.6: a program calls a sibling instance's function through the
-// top's name, and another program's task, whose delay it waits out.
 TEST(BlockingTasksCycleEventMode,
      ProgramCallsThroughTheTopNameIntoInstancesAndPrograms) {
   SimFixture f;

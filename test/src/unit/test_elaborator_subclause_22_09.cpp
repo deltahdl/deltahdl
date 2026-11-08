@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Locate the binding for a named port on an instance, or null if the port was
-// left without a connection.
 const RtlirPortBinding* FindBinding(const RtlirModuleInst& inst,
                                     std::string_view port) {
   for (const auto& b : inst.port_bindings) {
@@ -21,12 +19,6 @@ const RtlirPortBinding* FindBinding(const RtlirModuleInst& inst,
   return nullptr;
 }
 
-// Elaborate a top wrapping a single unconnected-input child instance,
-// optionally guarded by the given `unconnected_drive directive line, then
-// return the binding for the child's input port. The shared assertions that
-// every §22.9 test relies on (design built, no errors, one top, one child,
-// present binding with a connection) run here; `out_binding` receives the
-// located binding.
 void ElaborateUnconnectedChild(std::string_view directive, ElabFixture& f,
                                const RtlirPortBinding** out_binding) {
   std::string src;
@@ -40,8 +32,6 @@ void ElaborateUnconnectedChild(std::string_view directive, ElabFixture& f,
       "module top;\n"
       "  child c();\n"
       "endmodule\n";
-  // The child takes the drive in force at its own definition (§22.9), which
-  // the directive above it sets.
 
   auto* design = ElaborateWithPreprocessor(src, f, "top");
   ASSERT_NE(design, nullptr);
@@ -55,8 +45,6 @@ void ElaborateUnconnectedChild(std::string_view directive, ElabFixture& f,
   *out_binding = b;
 }
 
-// §22.9: while `unconnected_drive pull1 is active, an unconnected input port is
-// driven high. Observe the synthesized port connection carrying the constant 1.
 TEST(UnconnectedDriveElaboration, Pull1DrivesUnconnectedInputHigh) {
   ElabFixture f;
   const RtlirPortBinding* b = nullptr;
@@ -66,8 +54,6 @@ TEST(UnconnectedDriveElaboration, Pull1DrivesUnconnectedInputHigh) {
   EXPECT_EQ(b->connection->int_val, 1u);
 }
 
-// §22.9: while `unconnected_drive pull0 is active, an unconnected input port is
-// driven low. Observe the synthesized port connection carrying the constant 0.
 TEST(UnconnectedDriveElaboration, Pull0DrivesUnconnectedInputLow) {
   ElabFixture f;
   const RtlirPortBinding* b = nullptr;
@@ -77,9 +63,6 @@ TEST(UnconnectedDriveElaboration, Pull0DrivesUnconnectedInputLow) {
   EXPECT_EQ(b->connection->int_val, 0u);
 }
 
-// §22.9: the pull takes the place of the usual default. Without the directive,
-// the same unconnected input keeps the default high-impedance connection rather
-// than a pulled constant.
 TEST(UnconnectedDriveElaboration, NoDirectiveLeavesUnconnectedInputDefault) {
   ElabFixture f;
   const RtlirPortBinding* b = nullptr;

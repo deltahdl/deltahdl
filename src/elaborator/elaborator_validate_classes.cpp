@@ -25,22 +25,14 @@ namespace delta {
 
 namespace {
 
-// Where a member access is judged from (§8.18): the classes it stands inside,
-// innermost first -- a method's class and the classes around it, which share
-// its access rights (§8.23) -- none outside every class; and, in a method,
-// the names the method declares itself, which hide a member of its class.
 struct AccessSite {
   std::vector<const ClassDecl*> inside;
   std::unordered_set<std::string_view> locals;
 
-  // §8.18: whether a local member `owner` declares is reachable here: inside
-  // that class, or a class nested in it.
   bool SeesLocal(const ClassDecl* owner) const {
     return std::ranges::find(inside, owner) != inside.end();
   }
 
-  // §8.18: whether a protected member `owner` declares is reachable here:
-  // inside that class or one derived from it.
   bool SeesProtected(const ClassDecl* owner,
                      const CompilationUnit* unit) const {
     return std::ranges::any_of(inside, [&](const ClassDecl* c) {
@@ -48,8 +40,6 @@ struct AccessSite {
     });
   }
 
-  // The class `this` or `super` stands for in a method (§8.11, §8.15); null
-  // for any other name and outside every class.
   const ClassDecl* ClassNamedBy(std::string_view name,
                                 const CompilationUnit* unit) const {
     if (inside.empty()) return nullptr;
@@ -60,10 +50,6 @@ struct AccessSite {
 
 }  // namespace
 
-// §8.18 (printed page 194 of IEEE 1800-2023): the report for a member reached
-// from where `site` stands, at `loc`, where `found` is that member with the
-// class declaring it; nothing for a public member, for one the site may reach,
-// or for no member at all.
 static void ReportHiddenMember(const OwnedMember& found, SourceLoc loc,
                                const AccessSite& site,
                                const CompilationUnit* unit, DiagEngine& diag) {
@@ -79,9 +65,6 @@ static void ReportHiddenMember(const OwnedMember& found, SourceLoc loc,
   }
 }
 
-// The member a `::` access names: `m_inst` of `C::m_inst` or of
-// `p::C::m_inst`, found in the class the prefix names or in a base of it,
-// with the class declaring it.
 static OwnedMember ScopedClassMember(const Expr* e,
                                      const CompilationUnit* unit) {
   if (e->rhs->kind != ExprKind::kIdentifier) return {};
@@ -91,15 +74,6 @@ static OwnedMember ScopedClassMember(const Expr* e,
                         : FindMemberAndOwner(kChain.back(), e->rhs->text, unit);
 }
 
-// The class the left side of a `.` access holds a handle to. A variable's is
-// the class `var_types` declares it with. A `::` access's is the class its
-// static property is declared with: §8.9 (printed 186) holds such a property
-// in one copy reachable as `C::m_inst` with no object, and §8.4 (printed
-// 181-182) reads a member through whatever handle it holds.
-//
-// This read a variable alone, so `C::m_inst.k` and `p::C::m_inst.k` reached
-// no class at all and a local `k` behind either was never reported, where
-// `c.k` through `C c;` was.
 static const ClassDecl* HandleClassOfBase(
     const Expr* base,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -133,10 +107,6 @@ static void CheckMemberAccessVisibility(
   if (!cls) return;
 
   if (cls->type_param_names.count(e->rhs->text) > 0) {
-    // §8.5 states this rule and gives this construct as its example: no data
-    // type may be reached through a class handle. §8.23 defines the `::`
-    // operator, which is the legal alternative rather than the rule being
-    // broken.
     diag.Error(e->rhs->range.start,
                "cannot access type parameter via class handle",
                Subclause("8.5"));
@@ -146,27 +116,12 @@ static void CheckMemberAccessVisibility(
                      e->rhs->range.start, site, unit, diag);
 }
 
-// §8.18 (printed 194) confines a local member to the methods of its class and
-// a protected one to those of the class and its subclasses, and the walk this
-// serves reads a module's procedures alone, which are outside every class. A
-// `::` access names a static member with no object, so the member itself is
-// what the qualifier is checked on: `C::m_inst` with `static local C m_inst;`
-// was accepted from a module, since only a `.` access was ever read.
-//
-// §8.23 (printed 200) lets `::` reach a class's static members, parameters and
-// types from outside it; a property or method written without `static`
-// belongs to an object, which `C::x` and `C::f()` name none of, so `C::x`
-// was read as 0 and `C::f()` run as though it were static. The constructor
-// is the one method §8.8 (printed 185) calls through `::` with no object,
-// `D::new(42)` being the typed constructor call that builds one.
 static void CheckScopedMemberVisibility(const Expr* e, const AccessSite& site,
                                         const CompilationUnit* unit,
                                         DiagEngine& diag) {
   const OwnedMember kFound = ScopedClassMember(e, unit);
   ReportHiddenMember(kFound, e->rhs->range.start, site, unit, diag);
   const ClassMember* m = kFound.member;
-  // §8.23: inside the class declaring the member, or one derived from it,
-  // `C::x` names the member of the object the method runs on.
   const bool kWithinHierarchy =
       m != nullptr && !site.inside.empty() &&
       IsClassDerivedFrom(site.inside.front()->name, kFound.owner->name, unit);
@@ -182,8 +137,6 @@ static void CheckScopedMemberVisibility(const Expr* e, const AccessSite& site,
   }
 }
 
-// Whether every class `cls` extends, up to the root, is one the unit
-// declares, so that a name none of them declares is surely no member.
 static bool BasesKnown(const ClassDecl* cls, const CompilationUnit* unit) {
   for (const ClassDecl* c = cls; !c->base_class.empty();) {
     c = FindBaseClass(c, unit);
@@ -192,28 +145,14 @@ static bool BasesKnown(const ClassDecl* cls, const CompilationUnit* unit) {
   return true;
 }
 
-// 18.11: naming a property in randomize()'s inline argument list changes that
-// property's random mode. The random mode of a local or protected member may
-// only be changed where the caller can reach that member. When randomize() is
-// invoked through an external class handle, its arguments name members of that
-// handle's class, so the same visibility rule that governs an obj.member access
-// applies to each argument here.
 static void CheckRandomizeArgItemVisibility(const Expr* arg,
                                             const ClassDecl* cls,
                                             const AccessSite& site,
                                             const CompilationUnit* unit,
                                             DiagEngine& diag) {
   if (!arg || arg->kind != ExprKind::kIdentifier) return;
-  // §18.11 states this rule: the random mode of a local class member changes
-  // only where the randomize() call can reach the member, inside the class that
-  // declares it. §8.18 states the general rule that a local or protected member
-  // is unreachable from outside, which CheckMemberAccessVisibility enforces.
-  // What is rejected here is a change of random mode rather than a read.
   const OwnedMember kFound = FindMemberAndOwner(cls, arg->text, unit);
   const ClassMember* m = kFound.member;
-  // §18.11: the arguments are resolved in the object's class and limited to
-  // the names of its properties, null aside, which names none; a class whose
-  // chain reaches a base the unit does not declare is left unjudged.
   if (m == nullptr && arg->text != "null" && BasesKnown(cls, unit)) {
     diag.Error(arg->range.start,
                std::format("'{}' is no property of class '{}', so randomize() "
@@ -266,10 +205,6 @@ static void CheckVisibilityExpr(
       CheckMemberAccessVisibility(e, var_types, site, unit, diag);
     }
   }
-  // §8.18: in a method, a name the method does not declare itself names a
-  // member of its class or of a class that class extends, and a local member
-  // a base declares is not visible in the subclass, bare as through this or
-  // super.
   if (e->kind == ExprKind::kIdentifier && !site.inside.empty() &&
       !site.locals.contains(e->text)) {
     ReportHiddenMember(FindMemberAndOwner(site.inside.front(), e->text, unit),
@@ -279,8 +214,6 @@ static void CheckVisibilityExpr(
     CheckRandomizeArgVisibility(e, var_types, site, unit, diag);
   }
   CheckVisibilityExpr(e->lhs, var_types, site, unit, diag);
-  // The right side of a member access names a member, which the access itself
-  // is judged by above, not a variable of the scope.
   if (e->kind != ExprKind::kMemberAccess) {
     CheckVisibilityExpr(e->rhs, var_types, site, unit, diag);
   }
@@ -293,17 +226,10 @@ static void CheckVisibilityExpr(
     CheckVisibilityExpr(arg, var_types, site, unit, diag);
 }
 
-// Whether `e` is a bare `new`, which constructs an object of the class of the
-// handle it initializes or is assigned to.
 static bool IsBareNew(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kCall && e->text == "new";
 }
 
-// §8.7 with §8.18: constructing an object of the class `name` names calls that
-// class's own constructor, which a class may declare local or protected; one
-// `site` may not reach is reported at `loc`. A constructor is no member a
-// subclass inherits, so only the class's own is read; a class declaring none
-// has the implicit one, which is public.
 static void CheckConstructorAccess(std::string_view name, SourceLoc loc,
                                    const AccessSite& site,
                                    const CompilationUnit* unit,
@@ -336,31 +262,11 @@ static void WalkStmtsForVisibility(
     CheckConstructorAccess(s->var_decl_type.type_name, s->range.start, site,
                            unit, diag);
   }
-  // §8.18 states that a local member is unreachable from outside its class and
-  // a protected member from outside its class hierarchy, and it names no
-  // statement the rules are suspended in, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
-  // of the thirteen, so `p.secret = 1;` written in a fork arm or in a for-loop
-  // initialization reached CheckVisibilityExpr through no link at all.
-  //
-  // CollectBlockClassVarDecls below takes its list from the same function, and
-  // the two are converted together: it is what records the class a block-local
-  // handle is declared with, so a walk reaching an access in a link the
-  // collection does not reach reads the name's type from the enclosing scope
-  // and reports the access against a class the block itself redeclared the name
-  // away from. That state is not reachable from a source today, because
-  // Elaborator::ValidateClassHandleOps in elaborator_validate_class_handles.cpp
-  // descends all thirteen links and records the same declarations in
-  // Elaborator::class_var_types_ before this pass copies it.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForVisibility(sub, var_types, site, unit, diag);
   });
 }
 
-// §8.18: collect class-typed handle variables declared inside a procedural
-// block. These block-local handles are not recorded in class_var_types_ (which
-// is seeded only from module-scope handles), yet member accesses through them
-// are still subject to the local/protected visibility rules.
 static void CollectBlockClassVarDecls(
     const Stmt* s, const std::unordered_set<std::string_view>& class_names,
     std::unordered_map<std::string_view, std::string_view>& var_types) {
@@ -370,19 +276,6 @@ static void CollectBlockClassVarDecls(
       class_names.count(s->var_decl_type.type_name)) {
     var_types[s->var_name] = s->var_decl_type.type_name;
   }
-  // A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-  // block_item_declaration } { statement_or_null } join_keyword` and A.6.12
-  // gives `rs_code_block ::= { { data_declaration } { statement_or_null } }`,
-  // so a handle declaration stands in a fork arm and in a randsequence
-  // production code block as it stands in a begin-end block. This therefore
-  // descends every link ForEachChildStmt in elaborator_validate_internal.h
-  // names rather than the six it wrote out, under which a handle declared in
-  // either place never entered var_types and every access through it was read
-  // with the class the enclosing scope bound the name to.
-  //
-  // WalkStmtsForVisibility above is converted in the same commit, for the
-  // reason given there: the walk that reports and the collection it reads are
-  // one rule, and either one alone answers §8.18 with the other's list.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     CollectBlockClassVarDecls(sub, class_names, var_types);
   });
@@ -396,7 +289,6 @@ void ElaboratorClassRules::ValidateLocalProtectedAccess(
     CheckVarInitConstructorAccess(*item);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (!is_proc || !item->body) continue;
-    // Combine module-scope handles with any declared inside this block.
     auto var_types = class_var_types_;
     CollectBlockClassVarDecls(item->body, class_names_, var_types);
     WalkStmtsForVisibility(item->body, var_types, kOutside, unit_, diag_);
@@ -404,8 +296,6 @@ void ElaboratorClassRules::ValidateLocalProtectedAccess(
   WalkSubroutinesForVisibility(decl->items, {}, class_var_types_);
 }
 
-// §8.7 with §8.18 for a declaration of the scope initialized with a bare new,
-// `L l = new;`, which reaches the constructor from outside every class.
 void ElaboratorClassRules::CheckVarInitConstructorAccess(
     const ModuleItem& item) {
   if (item.kind == ModuleItemKind::kVarDecl && IsBareNew(item.init_expr)) {
@@ -414,9 +304,6 @@ void ElaboratorClassRules::CheckVarInitConstructorAccess(
   }
 }
 
-// §8.18 over the subroutine bodies among `items` and `classes`, each judged
-// from the classes it stands inside, with the handles `scope_types` gives its
-// scope and those its own declarations add.
 void ElaboratorClassRules::WalkSubroutinesForVisibility(
     const std::vector<ModuleItem*>& items,
     const std::vector<const ClassDecl*>& classes,
@@ -436,9 +323,6 @@ void ElaboratorClassRules::WalkSubroutinesForVisibility(
   }
 }
 
-// §8.18 over the compilation unit's and each package's declarations,
-// subroutines and classes, read once, where a module's are read with each
-// module.
 void ElaboratorClassRules::ValidateLocalProtectedAccessOutsideModules() {
   for (const auto* item : unit_->cu_items) CheckVarInitConstructorAccess(*item);
   WalkSubroutinesForVisibility(
@@ -481,12 +365,6 @@ static void WalkStmtsForParamScope(
   CheckParamScopeExpr(s->rhs, param_classes, diag);
   CheckParamScopeExpr(s->expr, param_classes, diag);
   CheckParamScopeExpr(s->condition, param_classes, diag);
-  // §8.25.1 requires an explicit specialization before `::` wherever a
-  // parameterized class name prefixes the operator outside the class, and it
-  // names no statement that is exempt, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
-  // of the thirteen, so `result = C::q;` in a fork arm or in a randsequence
-  // production code block never reached CheckParamScopeExpr.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForParamScope(sub, param_classes, diag);
   });
@@ -499,9 +377,6 @@ void ElaboratorClassRules::ValidateParameterizedScopeResolution(
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckParamScopeExpr(item->assign_rhs, parameterized_class_names_, diag_);
     }
-    // §8.25.1 names no place outside the class that is exempt, so a
-    // declaration's initializer, `int x = C::p;`, is held to it as a
-    // statement is.
     CheckParamScopeExpr(item->init_expr, parameterized_class_names_, diag_);
     bool is_proc = IsProceduralItemKind(item->kind);
     if (is_proc && item->body) {
@@ -511,8 +386,6 @@ void ElaboratorClassRules::ValidateParameterizedScopeResolution(
   }
 }
 
-// §8.25.1 for what a scope declares besides its procedures: a subroutine's
-// body, and each method of a class the scope declares.
 void ElaboratorClassRules::CheckParamScopeInItem(const ModuleItem& item) {
   if (item.kind == ModuleItemKind::kFunctionDecl ||
       item.kind == ModuleItemKind::kTaskDecl) {
@@ -522,10 +395,6 @@ void ElaboratorClassRules::CheckParamScopeInItem(const ModuleItem& item) {
   }
 }
 
-// §8.25.1: the body of the subroutine `sub`, where the unadorned name of each
-// parameterized class but those `allowed` names is illegal before `::`. The
-// classes allowed are the one whose method `sub` is or defines out of block
-// and the classes around it, within whose scope the name is legal.
 void ElaboratorClassRules::CheckParamScopeInSubroutine(
     const ModuleItem& sub,
     const std::unordered_set<std::string_view>& allowed) {
@@ -538,8 +407,6 @@ void ElaboratorClassRules::CheckParamScopeInSubroutine(
   }
 }
 
-// §8.25.1 for the methods of `cls` and of the classes nested in it, inside
-// the classes `allowed` names and `cls` itself.
 void ElaboratorClassRules::CheckParamScopeInClass(
     const ClassDecl& cls, std::unordered_set<std::string_view> allowed) {
   allowed.insert(cls.name);
@@ -551,10 +418,6 @@ void ElaboratorClassRules::CheckParamScopeInClass(
   }
 }
 
-// §8.25.1 over the compilation unit's and each package's items, read once,
-// where a module's are read with each module elaborated: declarations'
-// initializers, subroutines' bodies and the methods of the classes declared
-// there.
 void ElaboratorClassRules::ValidateParameterizedScopeOutsideModules() {
   if (parameterized_class_names_.empty()) return;
   std::vector<const std::vector<ModuleItem*>*> scopes{&unit_->cu_items};
@@ -570,11 +433,6 @@ void ElaboratorClassRules::ValidateParameterizedScopeOutsideModules() {
 
 namespace {
 
-// §8.23 names three kinds of prefix that may resolve to a class type without
-// naming a class outright: an incomplete forward type, a type defined by an
-// interface-based typedef (§6.18), and a type parameter (§6.20.3). The
-// subclause states one restriction for all three, so one set per kind carries
-// the names each restriction applies to.
 struct RestrictedScopePrefixes {
   std::unordered_set<std::string_view> incomplete_forward_types;
   std::unordered_set<std::string_view> interface_based_typedefs;
@@ -586,21 +444,12 @@ struct RestrictedScopePrefixes {
   }
 };
 
-// The three contexts §8.23 permits, written once because the subclause states
-// them once for every prefix kind it restricts.
 constexpr std::string_view kPermittedScopePrefixContexts =
     "may prefix the class scope resolution operator only within a typedef "
     "declaration, the type operator, or a type parameter assignment";
 
 }  // namespace
 
-// §8.23 restricts the use of the class scope resolution operator to select a
-// type through any of its three prefix kinds to typedef declarations, the type
-// operator, and type parameter assignments. §6.20.3 states the type-parameter
-// case in its own words and carries the example the rule is usually met
-// through, so that leg is reported there; the other two kinds are stated by
-// §8.23 alone. `name` is the prefix written before the operator and `loc` is
-// where the expression or the declaration carrying it is reported.
 static void ReportRestrictedScopePrefix(std::string_view name, SourceLoc loc,
                                         const RestrictedScopePrefixes& r,
                                         DiagEngine& diag) {
@@ -623,9 +472,6 @@ static void ReportRestrictedScopePrefix(std::string_view name, SourceLoc loc,
   }
 }
 
-// The three contexts §8.23 permits are parsed as data types (carrying a
-// scope_name), never as expressions, so a prefix that surfaces in an expression
-// is outside the permitted set by construction.
 static void CheckRestrictedScopePrefixExpr(const Expr* e,
                                            const RestrictedScopePrefixes& r,
                                            DiagEngine& diag) {
@@ -652,20 +498,11 @@ static void WalkStmtsForRestrictedScopePrefix(const Stmt* s,
   CheckRestrictedScopePrefixExpr(s->rhs, r, diag);
   CheckRestrictedScopePrefixExpr(s->expr, r, diag);
   CheckRestrictedScopePrefixExpr(s->condition, r, diag);
-  // §8.23 confines a prefix of any of its three restricted kinds to a typedef
-  // declaration, the type operator and a type parameter assignment, none of
-  // which is a statement, so a prefix reached from any statement is outside the
-  // permitted set wherever the statement stands. This descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names rather than the
-  // six it wrote out, under which `x = C::val;` in a fork arm or in an
-  // immediate assertion's action block was left unreported.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForRestrictedScopePrefix(sub, r, diag);
   });
 }
 
-// Sorts the typedefs of one scope into the kinds §8.23 restricts, and collects
-// the names of the typedefs that give a forward declaration its definition.
 static void CollectScopePrefixTypedefs(
     const std::vector<ModuleItem*>& items, RestrictedScopePrefixes& r,
     std::unordered_set<std::string_view>& completed_forward_types) {
@@ -681,9 +518,6 @@ static void CollectScopePrefixTypedefs(
   }
 }
 
-// §6.18 makes a forward type declaration legal either before or after the
-// definition that resolves it, so a resolved name is a complete type at every
-// use; only an unresolved name is the incomplete forward type §8.23 restricts.
 static void DropCompletedForwardTypes(
     RestrictedScopePrefixes& r,
     const std::unordered_set<std::string_view>& completed_forward_types,
@@ -694,10 +528,6 @@ static void DropCompletedForwardTypes(
   });
 }
 
-// Collects the prefixes §8.23 restricts in one module scope. Type parameters
-// come from the parameter port list (recorded by the parser) and from body
-// declarations, where a `parameter type`/`localparam type` item is carried as a
-// parameter declaration whose data type is void.
 static RestrictedScopePrefixes CollectModuleRestrictedPrefixes(
     const ModuleDecl* decl, const CompilationUnit* unit,
     const std::unordered_set<std::string_view>& class_names) {
@@ -716,13 +546,6 @@ static RestrictedScopePrefixes CollectModuleRestrictedPrefixes(
   return r;
 }
 
-// §6.20.3's illegal example is a class property, `C::T x;` in the body of
-// `class P#(type C)`. A property declaration is none of the three contexts
-// §8.23 permits, so the prefix on its declared type is reported. A member
-// carrying is_param is a parameter declaration and a kTypedef member is a
-// typedef declaration, which are two of the contexts the subclause permits, so
-// neither is examined. A nested class sees the type parameters of the class it
-// is declared in as well as its own.
 static void CheckClassPropertyScopePrefixes(const ClassDecl* cls,
                                             const RestrictedScopePrefixes& r,
                                             DiagEngine& diag) {
@@ -740,9 +563,6 @@ static void CheckClassPropertyScopePrefixes(const ClassDecl* cls,
   }
 }
 
-// Checks one module item for a restricted prefix, in whichever of the two
-// positions that item kind can carry one: the declared data type of a variable
-// declaration or a class property, or an expression.
 static void CheckItemForRestrictedScopePrefix(const ModuleItem* item,
                                               const RestrictedScopePrefixes& r,
                                               DiagEngine& diag) {
@@ -782,9 +602,6 @@ void ElaboratorClassRules::ValidateRestrictedScopePrefixInClasses() {
   for (const auto* cls : unit_->classes) {
     RestrictedScopePrefixes restricted;
     restricted.type_params = cls->type_param_names;
-    // The scope enclosing a class declared at the outermost level is the
-    // compilation unit, so the forward types and interface-based typedefs it
-    // can name as a prefix are the ones declared there.
     std::unordered_set<std::string_view> completed_forward_types;
     CollectScopePrefixTypedefs(unit_->cu_items, restricted,
                                completed_forward_types);
@@ -795,8 +612,6 @@ void ElaboratorClassRules::ValidateRestrictedScopePrefixInClasses() {
   }
 }
 
-// A forward typedef is resolved if a class of the same name exists, or another
-// non-forward typedef in the same scope shares its name.
 static bool ForwardClassTypedefIsResolved(const ModuleItem* item,
                                           const CompilationUnit* unit) {
   for (const auto* cls : unit->classes) {
@@ -821,14 +636,6 @@ void ElaboratorClassRules::ValidateForwardClassTypedefs() {
                   std::format("forward typedef '{}' is never resolved by a "
                               "definition in the same scope",
                               item->name),
-                  // §6.18 is the rule: a forward typedef's actual data type
-                  // definition is resolved within the same local scope or
-                  // generate block. §8.27 restates it for a forward class
-                  // declaration and says so, opening with a pointer to the
-                  // forward typedefs of §6.18. This loop selects every forward
-                  // form Parser::ParseTypedef leaves implicit, a forward struct
-                  // and a bare typedef included, so §6.18 is the only clause
-                  // covering what it reports.
                   Subclause("6.18"));
     }
   }

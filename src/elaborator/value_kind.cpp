@@ -28,7 +28,6 @@ constexpr std::array kArithmeticOps = {TokenKind::kPlus,    TokenKind::kMinus,
 
 using KindByName = std::pair<std::string_view, ValueKind>;
 
-// §6.16.1 to §6.16.15: the kind of value each string method gives.
 constexpr std::array<KindByName, 14> kStringMethods = {
     {{"len", ValueKind::kIntegral},
      {"getc", ValueKind::kIntegral},
@@ -45,9 +44,6 @@ constexpr std::array<KindByName, 14> kStringMethods = {
      {"realtoa", ValueKind::kString},
      {"itoa", ValueKind::kString}}};
 
-// §6.24.1: the casting types written as a keyword, by the kind of value the
-// cast gives. signed and unsigned (§6.24.1) change only the signedness, of an
-// integral value.
 constexpr std::array<KindByName, 15> kCastKeywords = {
     {{"bit", ValueKind::kIntegral},
      {"logic", ValueKind::kIntegral},
@@ -84,12 +80,8 @@ ValueKind KindOfTypeKind(DataTypeKind kind) {
 
 namespace {
 
-// The kind of value a type left as the name `name` gives: a class handle has
-// none of the operators, and a typedef gives what it stands for.
 ValueKind KindOfTypeName(std::string_view name, const ValueScope& scope);
 
-// The type `type` stands for, through every typedef name it is written with;
-// null where a name resolves to no typedef.
 const DataType* Resolved(const DataType& type, const ValueScope& scope) {
   std::vector<std::string_view> names;
   return FollowTypedefs(type, scope.typedefs, names);
@@ -111,15 +103,10 @@ ValueKind KindOfTypeName(std::string_view name, const ValueScope& scope) {
   return KindOfType(it->second, scope);
 }
 
-// Whether `name` is the with expression's iterator, which hides any variable
-// of that name.
 bool IsIterator(std::string_view name, const ValueScope& scope) {
   return !name.empty() && name == scope.iterator.name;
 }
 
-// A variable written alone: the iterator is an element of its array, a whole
-// unpacked array has none of the operators, and any other variable is of the
-// type it is declared with.
 ValueKind KindOfVariable(std::string_view name, const ValueScope& scope) {
   if (IsIterator(name, scope))
     return KindOfElement(*scope.iterator.array, scope);
@@ -133,13 +120,8 @@ ValueKind KindOfVariable(std::string_view name, const ValueScope& scope) {
                                      : ValueKind::kUnknown;
 }
 
-// The structure or union an operand of a member select is, where a
-// declaration says: the iterator, an element of a one-dimensional array or a
-// variable declared with a typedef name, or a member that is one in turn.
 const DataType* AggregateOf(const Expr* e, const ValueScope& scope);
 
-// The member `name` of the structure or union `aggregate`; null where it has
-// none of that name.
 const StructMember* MemberNamed(const DataType& aggregate,
                                 std::string_view name) {
   auto it =
@@ -147,15 +129,11 @@ const StructMember* MemberNamed(const DataType& aggregate,
   return it != aggregate.struct_members.end() ? &*it : nullptr;
 }
 
-// The member the member select `e` names, where AggregateOf traces its
-// operand; null where it does not, or the operand has no member of that name.
 const StructMember* MemberOf(const Expr* e, const ValueScope& scope) {
   const DataType* outer = AggregateOf(e->lhs, scope);
   return outer != nullptr ? MemberNamed(*outer, e->rhs->text) : nullptr;
 }
 
-// The type the iterator's elements, or the variable `name`, is declared with
-// when that is a typedef name; null otherwise.
 const DataType* DeclaredTypeOfName(std::string_view name,
                                    const ValueScope& scope) {
   if (IsIterator(name, scope)) return scope.iterator.array->elem_data_type;
@@ -165,8 +143,6 @@ const DataType* DeclaredTypeOfName(std::string_view name,
   return td != scope.typedefs.end() ? &td->second : nullptr;
 }
 
-// The type the elements of the one-dimensional array `name` are declared with;
-// null for an array of more dimensions and for a name that is no array.
 const DataType* ElementDeclaredType(std::string_view name,
                                     const ValueScope& scope) {
   auto it = scope.arrays.find(name);
@@ -175,16 +151,11 @@ const DataType* ElementDeclaredType(std::string_view name,
              : nullptr;
 }
 
-// The type the member the member select `e` names is written with, through
-// typedef names; null where MemberOf finds no member.
 const DataType* MemberDeclaredType(const Expr* e, const ValueScope& scope) {
   const StructMember* m = MemberOf(e, scope);
   return m != nullptr ? MemberOwnType(*m, scope.typedefs) : nullptr;
 }
 
-// The declared type of the operand `e` of a member select, before typedef
-// names are followed: a variable's or the iterator's, an element's of a
-// one-dimensional array, or a member's.
 const DataType* DeclaredTypeOf(const Expr* e, const ValueScope& scope) {
   switch (e->kind) {
     case ExprKind::kIdentifier:
@@ -208,8 +179,6 @@ const DataType* AggregateOf(const Expr* e, const ValueScope& scope) {
              : nullptr;
 }
 
-// §7.2: a member select gives the member's type, and a member that is itself
-// an unpacked array has none of the operators.
 ValueKind KindOfMemberSelect(const Expr* e, const ValueScope& scope) {
   const StructMember* m = MemberOf(e, scope);
   if (m == nullptr) return ValueKind::kUnknown;
@@ -221,11 +190,6 @@ ValueKind KindOfMemberSelect(const Expr* e, const ValueScope& scope) {
              : KindOfTypeKind(m->type_kind);
 }
 
-// §7.4.3 and §11.5.1: a select through every unpacked dimension of an array
-// gives an element, and a further select a bit or part of one; a select
-// through fewer, or a slice of an unpacked dimension, gives an array. A bit or
-// part select of an integral variable or a string's character select (§6.16)
-// is integral.
 ValueKind KindOfSelect(const Expr* e, const ValueScope& scope) {
   std::vector<const Expr*> selects;
   const Expr* base = e;
@@ -242,7 +206,6 @@ ValueKind KindOfSelect(const Expr* e, const ValueScope& scope) {
   }
   size_t dims = it->second.num_unpacked_dims;
   if (selects.size() < dims) return ValueKind::kOther;
-  // `selects` runs outward in, so the select nearest the name is last.
   bool slices = std::any_of(
       selects.end() - static_cast<std::ptrdiff_t>(dims), selects.end(),
       [](const Expr* s) { return s->index_end != nullptr; });
@@ -251,9 +214,6 @@ ValueKind KindOfSelect(const Expr* e, const ValueScope& scope) {
                                 : ValueKind::kIntegral;
 }
 
-// §6.24.1: a cast gives its casting type, written as a keyword (cast->text) or
-// as an expression (cast->rhs), which is a type name or else a size, giving an
-// integral value. const changes nothing about the value.
 ValueKind KindOfCast(const Expr* e, const ValueScope& scope) {
   if (e->text == "const") return KindOfValue(e->lhs, scope);
   std::string_view type = e->text.empty() ? ExprIdent(e->rhs) : e->text;
@@ -263,9 +223,6 @@ ValueKind KindOfCast(const Expr* e, const ValueScope& scope) {
   return named != ValueKind::kUnknown ? named : ValueKind::kIntegral;
 }
 
-// A method call is the call of a member access, of which this reads the string
-// methods; a call of a function gives the function's return type; and `new`,
-// which the parser reads as a call, has no callee at all.
 ValueKind KindOfCall(const Expr* call, const ValueScope& scope) {
   if (call->lhs == nullptr) return ValueKind::kUnknown;
   if (call->lhs->kind == ExprKind::kMemberAccess) {

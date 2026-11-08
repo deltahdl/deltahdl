@@ -8,7 +8,6 @@
 
 using namespace delta;
 
-// Walk an iterator to completion, collecting every object it yields in order.
 inline std::vector<VpiHandle> CollectVpiIteration(VpiContext& ctx,
                                                   VpiHandle iterator) {
   std::vector<VpiHandle> objects;

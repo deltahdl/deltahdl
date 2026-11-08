@@ -29,9 +29,6 @@ bool Mentions(const Expr* e, std::string_view name) {
   return AnySubExpr(e, [&](const Expr* sub) { return IsNameRef(sub, name); });
 }
 
-// §17.3: the actual the instance `item` binds to the formal `i` of the
-// checker `decl`, by name or by position, else the formal's default; null
-// where it has neither.
 const Expr* ActualFor(const ModuleItem* item, const ModuleDecl* decl,
                       size_t i) {
   const PortDecl& port = decl->ports[i];
@@ -42,8 +39,6 @@ const Expr* ActualFor(const ModuleItem* item, const ModuleDecl* decl,
   return port.default_value;
 }
 
-// §17.3: whether `e` is a variable_lvalue or a net_lvalue, a name, a select
-// or member of one, or a concatenation of such.
 bool IsLvalue(const Expr* e) {
   if (e->kind == ExprKind::kConcatenation) {
     return std::ranges::all_of(e->elements, IsLvalue);
@@ -52,8 +47,6 @@ bool IsLvalue(const Expr* e) {
          e->kind == ExprKind::kMemberAccess;
 }
 
-// Each expression a procedure of `decl` reads, and each side of its
-// continuous assignments.
 void ForEachProceduralOrAssignExpr(const ModuleDecl* decl,
                                    const std::function<void(const Expr*)>& fn) {
   for (const ModuleItem* item : decl->items) {
@@ -61,19 +54,13 @@ void ForEachProceduralOrAssignExpr(const ModuleDecl* decl,
       fn(item->assign_lhs);
       fn(item->assign_rhs);
     }
-    // §17.5 admits no wait in a checker procedure, so the conditions
-    // ForEachStmtReadExpr leaves out are none a checker holds.
     if (IsProceduralItemKind(item->kind)) ForEachStmtReadExpr(item->body, fn);
   }
 }
 
-// §17.3: the references to the formal `name` in the checker `decl`, those a
-// `$` actual may reach counted as permitted: a range's upper bound, an
-// instance's actual written whole, and a nested checker formal's default.
 FormalReferences CheckerReferences(const ModuleDecl* decl,
                                    std::string_view name) {
   FormalReferences refs;
-  // A clocked boolean assertion keeps its expression in assert_expr alone.
   ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
     CountFormalInExpr(s->assert_expr, name, refs);
     CountFormalInTree(s->assert_property, name, refs);
@@ -99,8 +86,6 @@ FormalReferences CheckerReferences(const ModuleDecl* decl,
   return refs;
 }
 
-// §17.3: a `$` actual binds an untyped formal, each reference to which the
-// checker makes a permitted one.
 void CheckDollarActual(const ModuleItem* item, const ModuleDecl* checker,
                        size_t i, DiagEngine& diag) {
   const PortDecl& port = checker->ports[i];
@@ -122,8 +107,6 @@ bool IsConstCast(const Expr* e) {
   return e->kind == ExprKind::kCast && e->text == "const";
 }
 
-// §17.6: whether a covergroup the checker `decl` declares references the
-// formal `name`, in a coverpoint, its iff condition or the clocking event.
 bool CovergroupReferences(const ModuleDecl* decl, std::string_view name) {
   std::vector<const Expr*> exprs;
   for (const ModuleItem* item : decl->items) {
@@ -140,9 +123,6 @@ bool CovergroupReferences(const ModuleDecl* decl, std::string_view name) {
                              [&](const Expr* e) { return Mentions(e, name); });
 }
 
-// §17.3: a formal bound to an actual holding a `const` cast or an automatic
-// value is used in no continuous assignment and no procedural code of the
-// checker; `why` names the actual's kind.
 void CheckTaintedFormalUse(const ModuleItem* item, const ModuleDecl* checker,
                            size_t i, std::string_view why, DiagEngine& diag) {
   std::string_view name = checker->ports[i].name;
@@ -159,13 +139,6 @@ void CheckTaintedFormalUse(const ModuleItem* item, const ModuleDecl* checker,
              Subclause("17.3"));
 }
 
-// §6.21: whether the variable `item` declares is dynamic, an array with a
-// dimension that is not fixed-size, a dynamic array's `[]`, a queue's `[$]`
-// or an associative array's index, or a handle of a class `tables` names.
-// Annex P has a type that includes a dynamic one dynamic, and a typedef
-// carries its dimensions and the type it names into the variable declared
-// with it, so the chain of typedef names the type is written with is followed:
-// a dimension any of them wrote counts, and so does a class the chain names.
 bool IsDynamicVariable(const ModuleItem* item, const TypeShapeTables& tables) {
   std::vector<std::string_view> names;
   FollowTypedefs(item->data_type, tables.typedefs, names);
@@ -178,8 +151,6 @@ bool IsDynamicVariable(const ModuleItem* item, const TypeShapeTables& tables) {
          });
 }
 
-// Each expression the checker `decl` writes: its concurrent assertions, its
-// sequences and properties, its procedures and its continuous assignments.
 void ForEachCheckerExpr(const ModuleDecl* decl,
                         const std::function<void(const Expr*)>& fn) {
   ForEachConcurrentAssertion(decl, [&](const Stmt* s) {
@@ -194,9 +165,6 @@ void ForEachCheckerExpr(const ModuleDecl* decl,
   ForEachProceduralOrAssignExpr(decl, fn);
 }
 
-// §17.2: the references the checker `checker` makes to members or elements
-// of `dynamic`, and to elements of the fork-join blocks `forks`, the names
-// the scope enclosing it declares that it does not declare again.
 void CheckEnclosingRefs(const ModuleDecl* checker, NameSet dynamic,
                         NameSet forks, DiagEngine& diag) {
   for (const PortDecl& port : checker->ports) {
@@ -231,10 +199,6 @@ void CheckEnclosingRefs(const ModuleDecl* checker, NameSet dynamic,
   });
 }
 
-// §17.8 with §16.6: each call, on the right-hand side of a checker
-// variable assignment in the checker `checker`, of a function `funcs` names
-// that the checker does not declare again, which writes an argument back,
-// keeps state or has a side effect.
 void CheckOutsideFunctionCalls(const ModuleDecl* checker, NamedDecls funcs,
                                DiagEngine& diag) {
   for (const ModuleItem* item : checker->items) funcs.erase(item->name);

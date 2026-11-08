@@ -1,20 +1,3 @@
-// §31.9.1's requirements for accurate simulation, over the free functions in
-// src/simulator/specify_timing_violation.cpp and over
-// SpecifyManager::CheckSetupholdViolation and
-// SpecifyManager::CheckRecremViolation.
-//
-// The NegativeTimingChecks cases below build a TimingCheckEntry with
-// negative_timing_check_enabled set and read the violation window back through
-// a SpecifyManager. Four of them claim that each kind puts its declared limits
-// on the side §31.3.3's Table 31-3 and §31.3.6's Table 31-6 give them:
-// $setuphold's first declared limit, setup_limit, bounds the side before the
-// reference time, and $recrem's second declared limit, removal_limit, bounds
-// that side. Each of the four supplies a data time that falls inside one kind's
-// window and outside the window the other kind's order would build, so a run
-// that reads one order for both kinds goes red. That is issue #3419, where
-// CheckRecremViolation built its negative window in declaration order and so
-// checked a $recrem against a window with its two limits swapped.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -40,12 +23,6 @@ TimingCheckEntry MakeSignedSetuphold(int64_t setup, int64_t hold) {
   return tc;
 }
 
-// Syntax 31-8 writes $recrem(reference_event, data_event, recovery_limit,
-// removal_limit), so recovery is the first declared limit and removal the
-// second. limit and limit2 are left at zero: a check with
-// negative_timing_check_enabled set is answered from the signed pair alone, so
-// a run that reached the unsigned comparison instead would report no violation
-// at all.
 TimingCheckEntry MakeSignedRecrem(int64_t recovery, int64_t removal) {
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kRecrem;
@@ -88,8 +65,6 @@ TEST(AdjustNegativeTimingCheckLimit, ZeroClampsAndWarns) {
 }
 
 TEST(AdjustNegativeTimingCheckLimit, StrictlyNegativeClampsAndWarns) {
-  // The clamp rule covers zero and below: a strictly negative adjusted limit
-  // takes the branch below zero, distinct from the zero boundary above.
   const auto kResult = AdjustNegativeTimingCheckLimit(-3);
   EXPECT_EQ(kResult.limit, 0u);
   EXPECT_TRUE(kResult.warn);
@@ -113,9 +88,6 @@ TEST(NegativeTimingWindowCanYield, LargerPrecisionScalesThreshold) {
 }
 
 TEST(NegativeTimingWindowCanYield, InvertedWindowCannotYield) {
-  // An upper bound below the lower bound is a degenerate (negative-width)
-  // window and can never yield a violation, distinct from the equal-bounds
-  // empty case.
   EXPECT_FALSE(NegativeTimingWindowCanYieldViolation(110, 100, 1));
 }
 
@@ -159,21 +131,15 @@ TEST(ZeroSmallestNegativeTimingLimit, RepeatedApplicationTerminates) {
 }
 
 TEST(LatchedNegativeTimingWindowValue, SettledBeforeWindowLatchesNewValue) {
-  // Data reaches its new value at or before the window opens, so the new value
-  // is stable across the excluded-endpoint interior and is the one latched.
   EXPECT_EQ(LatchedNegativeTimingWindowValue(105, 110, 105, 0xAA, 0xBB), 0xBBu);
   EXPECT_EQ(LatchedNegativeTimingWindowValue(105, 110, 100, 0xAA, 0xBB), 0xBBu);
 }
 
 TEST(LatchedNegativeTimingWindowValue, InteriorTransitionLatchesOldValue) {
-  // A transition strictly inside the window is a violation (requirement (a));
-  // per requirement (b)/Example 1 the stale old value is the one clocked in.
   EXPECT_EQ(LatchedNegativeTimingWindowValue(105, 110, 107, 0xAA, 0xBB), 0xAAu);
 }
 
 TEST(LatchedNegativeTimingWindowValue, SettledAfterWindowLatchesOldValue) {
-  // Data does not change until at/after the window closes, so the old value is
-  // stable across the interior and is latched.
   EXPECT_EQ(LatchedNegativeTimingWindowValue(105, 110, 110, 0xAA, 0xBB), 0xAAu);
   EXPECT_EQ(LatchedNegativeTimingWindowValue(105, 110, 115, 0xAA, 0xBB), 0xAAu);
 }
@@ -192,22 +158,15 @@ TEST(ImplicitDelayedSignalsRequired, NoNegativeNeedsNoImplicit) {
 }
 
 TEST(EffectiveOutputDelayWithTimingCheckSignalDelay, DelayBelowPropUsesProp) {
-  // The applied timing-check delay does not exceed the propagation delay, so
-  // the output still changes at its nominal propagation delay.
   EXPECT_EQ(EffectiveOutputDelayWithTimingCheckSignalDelay(6, 4), 6u);
   EXPECT_EQ(EffectiveOutputDelayWithTimingCheckSignalDelay(6, 6), 6u);
 }
 
 TEST(EffectiveOutputDelayWithTimingCheckSignalDelay, DelayAbovePropOverrides) {
-  // The applied delay exceeds the propagation delay, so the output transitions
-  // when the delayed signal changes: the path delay becomes the applied delay.
   EXPECT_EQ(EffectiveOutputDelayWithTimingCheckSignalDelay(6, 7), 7u);
 }
 
 TEST(ResolveDelayedSignals, SharedSignalGetsSingleImplicitCopy) {
-  // Example 2: CLK is referenced by two checks alongside DATA1 and DATA2. One
-  // delayed copy is created per distinct signal -- CLK's single copy is shared
-  // across both checks rather than duplicated.
   const std::vector<std::pair<std::string, std::string>> kRefs = {
       {"clk", ""}, {"data1", ""}, {"clk", ""}, {"data2", ""}};
   const auto kResolved = ResolveDelayedSignals(kRefs);
@@ -219,10 +178,6 @@ TEST(ResolveDelayedSignals, SharedSignalGetsSingleImplicitCopy) {
 }
 
 TEST(ResolveDelayedSignals, ExplicitInOneCheckIsUsedForAll) {
-  // Example 3: CLK and DATA1 are declared explicitly (del_clk, del_data1) in
-  // the first check; the second check references CLK without declaring one. CLK
-  // ends up with exactly one delayed signal -- the explicit del_clk -- not a
-  // second implicit copy for the check that omitted it.
   const std::vector<std::pair<std::string, std::string>> kRefs = {
       {"clk", "del_clk"}, {"data1", "del_data1"}, {"clk", ""}, {"data2", ""}};
   const auto kResolved = ResolveDelayedSignals(kRefs);
@@ -231,13 +186,10 @@ TEST(ResolveDelayedSignals, ExplicitInOneCheckIsUsedForAll) {
   EXPECT_TRUE(kResolved[0].is_explicit);
   EXPECT_EQ(kResolved[0].delayed_name, "del_clk");
   EXPECT_EQ(kResolved[1].delayed_name, "del_data1");
-  EXPECT_FALSE(kResolved[2].is_explicit);  // DATA2 stays implicit
+  EXPECT_FALSE(kResolved[2].is_explicit);
 }
 
 TEST(ResolveDelayedSignals, ExplicitPromotesAnEarlierImplicitReference) {
-  // Order-independence of the precedence rule: even when a signal is first seen
-  // implicitly, a later check that declares it explicitly supplies the single
-  // shared copy for both.
   const std::vector<std::pair<std::string, std::string>> kRefs = {
       {"clk", ""}, {"clk", "del_clk"}};
   const auto kResolved = ResolveDelayedSignals(kRefs);
@@ -250,8 +202,6 @@ TEST(NegativeTimingChecks, RuntimeInteriorYieldsViolation) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeSignedSetuphold(-5, 10));
 
-  // Negative setup shifts the window to (105, 110); a data change strictly
-  // inside it triggers a violation per requirement (a).
   EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 107));
 }
 
@@ -273,17 +223,12 @@ TEST(NegativeTimingChecks, RuntimeChangeOutsideWindowIsNoViolation) {
   SpecifyManager mgr;
   mgr.AddTimingCheck(MakeSignedSetuphold(-5, 10));
 
-  // Negative setup shifts the window to (105, 110). A data change well before
-  // it opens or after it closes is genuinely outside -- not merely on an
-  // endpoint -- and reports no violation.
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 100));
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 120));
 }
 
 TEST(NegativeTimingChecks, RuntimeNegativeHoldWindowInteriorYieldsViolation) {
   SpecifyManager mgr;
-  // Negative hold (Figure 31-5's other case): the window shifts to before the
-  // reference edge -- here to (90, 95) -- rather than after it.
   mgr.AddTimingCheck(MakeSignedSetuphold(10, -5));
 
   EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 92));
@@ -293,14 +238,6 @@ TEST(NegativeTimingChecks, RuntimeNegativeHoldWindowInteriorYieldsViolation) {
 
 TEST(NegativeTimingChecks, RuntimeRecremRemovalBoundsTheEarlierSide) {
   SpecifyManager mgr;
-  // $recrem with recovery_limit -4 and removal_limit 14. Table 31-6 gives the
-  // removal limit the reference_event role, so removal bounds the side before
-  // the reference time and recovery the side after it: the window §31.9.1
-  // requirement (a) opens is (200 - 14, 200 + -4) = (186, 196). Reading the two
-  // limits in declaration order instead would bound the earlier side by
-  // recovery and the later side by removal, giving (200 - -4, 200 + 14) =
-  // (204, 214). The two intervals are disjoint. A data event at 190 is strictly
-  // inside (186, 196) and nowhere near (204, 214).
   mgr.AddTimingCheck(MakeSignedRecrem(-4, 14));
 
   EXPECT_TRUE(mgr.CheckRecremViolation("clk", 200, "rst", 190));
@@ -308,10 +245,6 @@ TEST(NegativeTimingChecks, RuntimeRecremRemovalBoundsTheEarlierSide) {
 
 TEST(NegativeTimingChecks, RuntimeRecremRecoveryDoesNotBoundTheEarlierSide) {
   SpecifyManager mgr;
-  // The same $recrem, and the mirror of the case above: the window is
-  // (186, 196) and the declaration-order window would be (204, 214). A data
-  // event at 209 is strictly inside (204, 214) and outside (186, 196), so the
-  // only order that reports a violation here is the wrong one.
   mgr.AddTimingCheck(MakeSignedRecrem(-4, 14));
 
   EXPECT_FALSE(mgr.CheckRecremViolation("clk", 200, "rst", 209));
@@ -319,13 +252,6 @@ TEST(NegativeTimingChecks, RuntimeRecremRecoveryDoesNotBoundTheEarlierSide) {
 
 TEST(NegativeTimingChecks, RuntimeSetupholdSetupBoundsTheEarlierSide) {
   SpecifyManager mgr;
-  // $setuphold with setup_limit -6 and hold_limit 22. Table 31-3 gives the
-  // setup limit the reference_event role, so setup bounds the side before the
-  // reference time and hold the side after it: the window is
-  // (300 - -6, 300 + 22) = (306, 322). $recrem's order applied here would bound
-  // the earlier side by hold and the later side by setup, giving
-  // (300 - 22, 300 + -6) = (278, 294). A data event at 314 is strictly inside
-  // (306, 322) and outside (278, 294).
   mgr.AddTimingCheck(MakeSignedSetuphold(-6, 22));
 
   EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 300, "data", 314));
@@ -333,11 +259,6 @@ TEST(NegativeTimingChecks, RuntimeSetupholdSetupBoundsTheEarlierSide) {
 
 TEST(NegativeTimingChecks, RuntimeSetupholdHoldDoesNotBoundTheEarlierSide) {
   SpecifyManager mgr;
-  // The same $setuphold, and the mirror of the case above: the window is
-  // (306, 322) and $recrem's order would give (278, 294). A data event at 285
-  // is strictly inside (278, 294) and outside (306, 322). This case and the one
-  // above fail if $recrem's fix is made by swapping the shared derivation, so
-  // the two kinds cannot trade the defect between them.
   mgr.AddTimingCheck(MakeSignedSetuphold(-6, 22));
 
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 300, "data", 285));

@@ -200,10 +200,6 @@ TEST(ClockingBlockSim, EdgeClockEdgeRegistered) {
   EXPECT_EQ(found->clock_edge, Edge::kEdge);
 }
 
-// §14.3 (printed page 354) with §23.6: a clocking event may name its clock by a
-// hierarchical name, `@(posedge top.clk)`, and the block then fires at that
-// signal's edges as at a local one's. Dropped, the program's `@(cb)` waited for
-// ever on a free-running clock.
 TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromAProgram) {
   SimFixture f;
   EXPECT_EQ(
@@ -221,7 +217,6 @@ TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromAProgram) {
       "prog at 15\n");
 }
 
-// The same clocking event in a submodule's block.
 TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromASubmodule) {
   SimFixture f;
   EXPECT_EQ(
@@ -239,9 +234,6 @@ TEST(ClockingBlockSim, HierarchicallyNamedClockFiresFromASubmodule) {
       "sub at 15\n$finish at time 15\n");
 }
 
-// §14.9 (printed page 359) with §25.5: a program's block clocked by a signal of
-// its interface port, `@(posedge a.clk)` with `bus_A.test a`, fires at that
-// edge, samples `data = a.data` and drives `write = a.write` through the port.
 TEST(ClockingBlockSim, ClockReachedThroughAnInterfacePortFires) {
   SimFixture f;
   EXPECT_EQ(
@@ -274,8 +266,6 @@ TEST(ClockingBlockSim, ClockReachedThroughAnInterfacePortFires) {
       "t=5 data=33\nt=6 write=1\n$finish at time 6\n");
 }
 
-// §14.3 with §9.4.2.3: the clocking event may carry an `iff` qualifier, and
-// the block samples and its event fires only at the edges where it holds.
 TEST(ClockingBlockSim, ClockingEventIffQualifierGatesTheEdges) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -301,8 +291,6 @@ TEST(ClockingBlockSim, ClockingEventIffQualifierGatesTheEdges) {
             "$finish at time 25\n");
 }
 
-// §14.3 with §23.9: the `iff` condition of a block declared in a module
-// instance names that instance's variables.
 TEST(ClockingBlockSim, ClockingEventIffReadsTheBlocksInstance) {
   SimFixture f;
   EXPECT_EQ(
@@ -325,11 +313,6 @@ TEST(ClockingBlockSim, ClockingEventIffReadsTheBlocksInstance) {
       "$finish at time 40\n");
 }
 
-// §14.3 with §23.6 (printed pages 354 and 741): a clocking block is a named
-// item of the module declaring it, so the parent reaches its submodule's block
-// by hierarchical name -- `@(u.cb)` waits for its event, `u.cb.d` reads its
-// sample and `u.cb.q <= 77` drives through it. The elaborator reported `u.cb`
-// as undeclared in module m.
 TEST(ClockingBlockSim, SubmoduleClockingBlockByHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m(input logic clk);\n"
@@ -355,11 +338,6 @@ TEST(ClockingBlockSim, SubmoduleClockingBlockByHierarchicalName) {
             "5:3 6:77\n$finish at time 6\n");
 }
 
-// §14.3 with §27.5 and §23.6: a clocking block written in a named generate
-// block is a named item of the block's scope, so a process outside the block
-// reaches it as `g.cb` -- `@(g.cb)` waits for its event, `g.cb.d` reads its
-// sample and `g.cb.q <= 77` drives through it. None answered to the path, and
-// the wait never woke.
 TEST(ClockingBlockSim, GenerateBlockClockingBlockByHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -385,8 +363,6 @@ TEST(ClockingBlockSim, GenerateBlockClockingBlockByHierarchicalName) {
             "5:4 6:77\n$finish at time 6\n");
 }
 
-// §14.3 with §23.6: the path to a generate block's clocking block may start at
-// a submodule instance, `u.g.cb`, whose block samples that instance's signal.
 TEST(ClockingBlockSim, SubmoduleGenerateBlockClockingBlockByHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m(input logic clk);\n"
@@ -412,10 +388,6 @@ TEST(ClockingBlockSim, SubmoduleGenerateBlockClockingBlockByHierarchicalName) {
             "5:6\n$finish at time 5\n");
 }
 
-// §14.3 with §23.9 and §27.4: a clocking block names its signals and its clock
-// as a reference written where it stands does, so in a generate block a bare
-// name is that block's own declaration. `cb.e` sampled 0, `e` naming nothing
-// outside the block, and a clock the block declared never fired.
 TEST(ClockingBlockSim, GenerateBlockClockingBlockSamplesTheBlocksSignals) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -438,10 +410,6 @@ TEST(ClockingBlockSim, GenerateBlockClockingBlockSamplesTheBlocksSignals) {
             "5:20\n$finish at time 5\n");
 }
 
-// §14.3 with §27.4: each instance of a loop generate block is a scope of its
-// own, so each declares its own clocking block, sampling its own signal and
-// reached from outside by its index, `g[1].cb`. Every instance registered its
-// block under the one name `cb`, and all of them reached the last.
 TEST(ClockingBlockSim, LoopGenerateInstancesDeclareTheirOwnClockingBlocks) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -469,11 +437,6 @@ TEST(ClockingBlockSim, LoopGenerateInstancesDeclareTheirOwnClockingBlocks) {
             "in0:20 in1:21 out:20\n$finish at time 7\n");
 }
 
-// §14.3: the iff of a clocking event names the signals of the block's own
-// instance whoever writes the clock. A program drives the clock of a top
-// module's block: at 10 the module's en is 0 and no clocking event occurs,
-// and at 20, en being 1, one does. Evaluated in the program's scope, the
-// condition found no en and the block never fired.
 TEST(ClockingBlockSim,
      ClockIffReadsTheBlocksInstanceWhenAProgramDrivesTheClock) {
   SimFixture f;

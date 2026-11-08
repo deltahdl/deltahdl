@@ -82,8 +82,6 @@ TEST(TimingCheckCommandParsing, ErrorSetupholdMissingBothLimits) {
       "  $setuphold(posedge clk, data);\n"
       "endspecify\n"
       "endmodule\n");
-  // With no limit at all the argument list stops matching at the separator, so
-  // the shared timing-check parser reports under §31.2 rather than §31.3.3.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
@@ -100,9 +98,6 @@ TEST(TimingCheckCommandParsing, SetupholdConstantExpressionLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// Syntax 31-5 productions timestamp_condition ::= mintypmax_expression and
-// timecheck_condition ::= mintypmax_expression: when present, each is parsed
-// into its own slot following the optional notifier.
 TEST(TimingCheckCommandParsing, SetupholdConditionsArePresent) {
   auto r = Parse(
       "module m;\n"
@@ -118,9 +113,6 @@ TEST(TimingCheckCommandParsing, SetupholdConditionsArePresent) {
   EXPECT_NE(tc->timecheck_cond, nullptr);
 }
 
-// Syntax 31-5 productions delayed_reference and delayed_data each admit the
-// terminal_identifier [ constant_mintypmax_expression ] alternative; the
-// bracket select is captured alongside the terminal name.
 TEST(TimingCheckCommandParsing, SetupholdDelayedSignalsAcceptConstantSelect) {
   auto r = Parse(
       "module m;\n"
@@ -137,9 +129,6 @@ TEST(TimingCheckCommandParsing, SetupholdDelayedSignalsAcceptConstantSelect) {
   EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
-// The optional trailing arguments of Syntax 31-5 nest independently: a
-// timestamp_condition may be supplied while the following timecheck_condition
-// is omitted, so the argument list closes right after the timestamp slot.
 TEST(TimingCheckCommandParsing,
      SetupholdTimestampConditionWithoutTimecheckCondition) {
   auto r = Parse(
@@ -157,9 +146,6 @@ TEST(TimingCheckCommandParsing,
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-// Likewise the innermost nesting: a delayed_reference may appear without a
-// trailing delayed_data, with the argument list closing after the delayed
-// reference terminal.
 TEST(TimingCheckCommandParsing, SetupholdDelayedReferenceWithoutDelayedData) {
   auto r = Parse(
       "module m;\n"
@@ -175,10 +161,6 @@ TEST(TimingCheckCommandParsing, SetupholdDelayedReferenceWithoutDelayedData) {
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-// Syntax 31-5: data_event ::= timing_check_event, so the data event admits an
-// edge control just as the reference event does. A negedge-qualified data event
-// parses with the edge captured on the data side (the earlier tests all use a
-// plain data terminal, so this covers the edged-data input form).
 TEST(TimingCheckCommandParsing, SetupholdDataEventWithEdge) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -195,10 +177,6 @@ TEST(TimingCheckCommandParsing, SetupholdDataEventWithEdge) {
   EXPECT_EQ(si->timing_check.data_terminal.name, "d");
 }
 
-// Syntax 31-5: reference_event ::= timing_check_event, whose edge control is
-// optional (unlike $width/$period/$nochange, $setuphold imposes no edge
-// requirement on its reference). A plain reference terminal parses with no edge
-// recorded -- the unedged-reference input form the other tests do not exercise.
 TEST(TimingCheckCommandParsing, SetupholdPlainReferenceEvent) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"

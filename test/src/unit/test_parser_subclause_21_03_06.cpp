@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.6: file_flush_task ::= $fflush ( [ mcd | fd ] ) ;
-// The flush task accepts an optional argument that is either a multi-channel
-// descriptor or a single file descriptor; with no argument it flushes all open
-// files. Each of the three forms must parse.
 TEST(IoSystemTaskParsing, FflushNoArgument) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -20,9 +16,6 @@ TEST(IoSystemTaskParsing, FflushNoArgument) {
               "endmodule\n"));
 }
 
-// The optional argument is a single expression regardless of whether it names
-// a multi-channel descriptor or a file descriptor, so one one-argument case
-// exercises that grammar branch.
 TEST(IoSystemTaskParsing, FflushSingleArgument) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -35,9 +28,6 @@ TEST(IoSystemTaskParsing, FflushSingleArgument) {
               "endmodule\n"));
 }
 
-// The argument slot admits any expression that yields a descriptor: a literal
-// mcd, a parameter, or a computed value such as the OR of two mcd variables
-// or an array element.
 TEST(IoSystemTaskParsing, FflushArgumentExpressionForms) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -53,8 +43,6 @@ TEST(IoSystemTaskParsing, FflushArgumentExpressionForms) {
               "endmodule\n"));
 }
 
-// The descriptor handed to $fflush may come from a variable whose $fopen is
-// its declaration initializer rather than a separate procedural assignment.
 TEST(IoSystemTaskParsing, FflushDescriptorFromDeclarationInitializer) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -66,8 +54,6 @@ TEST(IoSystemTaskParsing, FflushDescriptorFromDeclarationInitializer) {
               "endmodule\n"));
 }
 
-// file_flush_task is a statement, so besides an initial block it can sit in
-// any procedural context -- a task body and an always block here.
 TEST(IoSystemTaskParsing, FflushInTaskBodyAndAlwaysBlock) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -80,8 +66,6 @@ TEST(IoSystemTaskParsing, FflushInTaskBodyAndAlwaysBlock) {
               "endmodule\n"));
 }
 
-// Negative: an unterminated call -- the argument list never closes before the
-// statement ends -- must be rejected.
 TEST(IoSystemTaskParsing, FflushUnterminatedCallRejected) {
   auto r = Parse(
       "module t;\n"
@@ -90,9 +74,6 @@ TEST(IoSystemTaskParsing, FflushUnterminatedCallRejected) {
       "    $fflush(fd;\n"
       "  end\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a system task call's argument list,
-  // so Parser::ParseSystemCall files the report under it rather than under
-  // §21.3.6.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 

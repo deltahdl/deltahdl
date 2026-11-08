@@ -5,10 +5,6 @@
 
 namespace {
 
-// §12.8 asks a return in a function returning a value for an expression of the
-// right type, assignment compatible with the return type (§6.22.3) whatever
-// form the expression takes. A string variable is no integral value without a
-// cast (§6.16), and a class handle is none at all (§8.4).
 TEST(JumpStatementElaboration, ReturnStringVariableFromIntFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -43,8 +39,6 @@ TEST(JumpStatementElaboration, ReturnClassHandleFromIntFunctionIsError) {
                             4, "12.8"));
 }
 
-// A string method giving an integral value is a call whose type this check
-// does not read, and an int variable fits an int function.
 TEST(JumpStatementElaboration, ReturnIntegralValuesFromIntFunctionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -60,9 +54,6 @@ TEST(JumpStatementElaboration, ReturnIntegralValuesFromIntFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A return type written as a name is checked as the type it names: a class
-// takes a handle of itself or of a class derived from it, and neither a handle
-// of an unrelated class nor an integer (§8.4).
 TEST(JumpStatementElaboration, ReturnUnrelatedHandleFromClassFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -120,7 +111,6 @@ TEST(JumpStatementElaboration, ReturnFittingValuesFromNamedTypeFunctionsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A typedef of string takes no real, as string itself takes none.
 TEST(JumpStatementElaboration, ReturnRealFromStringTypedefFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -138,9 +128,6 @@ TEST(JumpStatementElaboration, ReturnRealFromStringTypedefFunctionIsError) {
                             4, "12.8"));
 }
 
-// A class's own typedef hides a name the module declares (§8.10 with §23.9):
-// the method's t_t is string, which takes the string literal, and not the
-// module's enumeration, which would not.
 TEST(JumpStatementElaboration, ReturnTypeNamedByAClassTypedefIsTheClasssType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -156,10 +143,6 @@ TEST(JumpStatementElaboration, ReturnTypeNamedByAClassTypedefIsTheClasssType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A begin-end block is a scope of its own (§23.9), so a variable it declares
-// hides the formal of the same name, and a return inside it gives the
-// block's variable. Here that is the class handle, which the class function
-// takes, and not the int formal, which it would not.
 TEST(JumpStatementElaboration,
      ReturnOfANameANestedBlockHidesReadsTheBlocksType) {
   ElabFixture f;
@@ -198,9 +181,6 @@ TEST(JumpStatementElaboration, ReturnOfAnIntANestedBlockDeclaresIsError) {
                             6, "12.8"));
 }
 
-// A nested block's unpacked array hides the class formal of its name too, so
-// the return gives the array the function's array type takes, and no class
-// handle.
 TEST(JumpStatementElaboration, ReturnOfAnArrayANestedBlockDeclaresElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -219,10 +199,6 @@ TEST(JumpStatementElaboration, ReturnOfAnArrayANestedBlockDeclaresElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A variable a for loop's initialization declares is local to the loop
-// (§12.7.1), so it hides the formal of its name, and a return inside the loop
-// gives the loop's class handle, which the class function takes. A for loop
-// that assigns the formal declares nothing.
 TEST(JumpStatementElaboration, ReturnOfANameAForLoopDeclaresReadsTheLoopsType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -257,11 +233,6 @@ TEST(JumpStatementElaboration, ReturnOfAnIntAForLoopDeclaresIsError) {
                             4, "12.8"));
 }
 
-// A foreach loop variable is local to the loop and hides the formal of its
-// name (§12.7.3). Over a fixed-size, a dynamic or a queue dimension, unpacked
-// or packed, it is an int, which the class function does not take. The
-// module's array is walked as the function's own are, and a loop variable
-// left out stands for no dimension.
 TEST(JumpStatementElaboration, ReturnOfAnIntIndexedForeachVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -292,10 +263,6 @@ TEST(JumpStatementElaboration, ReturnOfAnIntIndexedForeachVariableIsError) {
   }
 }
 
-// Over an associative dimension a foreach loop variable has the index type,
-// here a byte, and a typedef's dimensions, a member's and those of a variable
-// the function cannot see are not plain from the declarations in scope; each
-// loop variable still hides the class formal, so none is read as one.
 TEST(JumpStatementElaboration, ForeachVariableOfAnUnreadDimensionHidesFormal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -319,9 +286,6 @@ TEST(JumpStatementElaboration, ForeachVariableOfAnUnreadDimensionHidesFormal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A name the function does not declare is found in the module around it
-// (§23.9), so the return gives the module's int, which the class function does
-// not take.
 TEST(JumpStatementElaboration, ReturnOfAModuleVariableIsCheckedAgainstType) {
   ElabFixture f;
   ElaborateSrc(
@@ -340,8 +304,6 @@ TEST(JumpStatementElaboration, ReturnOfAModuleVariableIsCheckedAgainstType) {
                             5, "12.8"));
 }
 
-// The function's own declaration hides the module's variable of its name, so
-// the return gives the function's class handle.
 TEST(JumpStatementElaboration, AFunctionsDeclarationHidesAModuleVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -358,9 +320,6 @@ TEST(JumpStatementElaboration, AFunctionsDeclarationHidesAModuleVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A name a class method does not declare is found among its class's properties
-// (§8.4), so the return gives the property's int, which the method's class
-// return type does not take.
 TEST(JumpStatementElaboration, ReturnOfAClassPropertyIsCheckedAgainstType) {
   ElabFixture f;
   ElaborateSrc(
@@ -381,7 +340,6 @@ TEST(JumpStatementElaboration, ReturnOfAClassPropertyIsCheckedAgainstType) {
                             6, "12.8"));
 }
 
-// A property the class inherits is found too (§8.13).
 TEST(JumpStatementElaboration,
      ReturnOfAnInheritedPropertyIsCheckedAgainstType) {
   ElabFixture f;
@@ -401,8 +359,6 @@ TEST(JumpStatementElaboration,
                             5, "12.8"));
 }
 
-// A method defined outside its class's body reads that class's properties as
-// one written inside it does (§8.24).
 TEST(JumpStatementElaboration,
      ReturnOfAPropertyFromAnOutOfBlockMethodIsChecked) {
   ElabFixture f;
@@ -425,9 +381,6 @@ TEST(JumpStatementElaboration,
                             8, "12.8"));
 }
 
-// §6.19.3's check of a value returned from a function returning an enumeration
-// reads no class method, so the property's int is reported here, not taken by
-// the enumeration without a cast.
 TEST(JumpStatementElaboration, ReturnOfAPropertyFromAnEnumMethodIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -447,8 +400,6 @@ TEST(JumpStatementElaboration, ReturnOfAPropertyFromAnEnumMethodIsChecked) {
                             5, "12.8"));
 }
 
-// A class's own property hides an inherited one of its name, and the method's
-// own declaration hides a property, so each return gives a class handle.
 TEST(JumpStatementElaboration, ANearerDeclarationHidesAClassProperty) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -469,9 +420,6 @@ TEST(JumpStatementElaboration, ANearerDeclarationHidesAClassProperty) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A name neither a class method nor its class declares is found in the scope
-// around the class (§23.9), so the return gives the module's int, which the
-// method's class return type does not take.
 TEST(JumpStatementElaboration, ReturnOfAVariableAroundAClassIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -492,8 +440,6 @@ TEST(JumpStatementElaboration, ReturnOfAVariableAroundAClassIsChecked) {
                             6, "12.8"));
 }
 
-// A class declared outside every design element finds the compilation unit's
-// variables around it (§3.12.1).
 TEST(JumpStatementElaboration, ReturnOfAUnitVariableFromAUnitClassIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -511,8 +457,6 @@ TEST(JumpStatementElaboration, ReturnOfAUnitVariableFromAUnitClassIsChecked) {
                             4, "12.8"));
 }
 
-// The scope around a nested class is the class enclosing it (§8.23), whose
-// properties its methods find.
 TEST(JumpStatementElaboration,
      ReturnOfAnEnclosingClassPropertyFromANestedClassIsChecked) {
   ElabFixture f;
@@ -534,8 +478,6 @@ TEST(JumpStatementElaboration,
                             6, "12.8"));
 }
 
-// A method defined outside its class's body stands in the scope of the class
-// (§8.24), whose variables it finds as one written inside the class does.
 TEST(JumpStatementElaboration,
      ReturnOfAVariableAroundAClassFromAnOutOfBlockMethodIsChecked) {
   ElabFixture f;
@@ -558,8 +500,6 @@ TEST(JumpStatementElaboration,
                             8, "12.8"));
 }
 
-// A property, a parameter and an enumeration constant of the class each hide
-// the module's variable of their name, so no return gives a class handle.
 TEST(JumpStatementElaboration, AClassDeclarationHidesAVariableAroundIt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -579,9 +519,6 @@ TEST(JumpStatementElaboration, AClassDeclarationHidesAVariableAroundIt) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A class extending its type parameter inherits members the check does not
-// know, any of which may hide a variable around the class, so its methods read
-// none of those variables: here P's int hides the module's class handle.
 TEST(JumpStatementElaboration, AnUnknownBaseLeavesTheVariablesAroundUnread) {
   ElabFixture f;
   auto* design = ElaborateSrc(

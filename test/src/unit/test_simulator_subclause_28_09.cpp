@@ -164,8 +164,6 @@ TEST(CmosSwitches, RcmosBlocksOutputWhenBothHalvesOff) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// rcmos passes a low data value through its conducting n-channel half, observed
-// end to end through the elaborated-and-simulated design rather than a helper.
 TEST(CmosSwitches, RcmosPassesDataLowWhenNcontrolHigh) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -182,8 +180,6 @@ TEST(CmosSwitches, RcmosPassesDataLowWhenNcontrolHigh) {
   EXPECT_TRUE(SettledToKnown(f, "y", 0u));
 }
 
-// The p-channel half of rcmos conducts when its control is low, passing the
-// data value to the output through the real simulator path.
 TEST(CmosSwitches, RcmosPassesDataHighWhenPcontrolLow) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,8 +196,6 @@ TEST(CmosSwitches, RcmosPassesDataHighWhenPcontrolLow) {
   EXPECT_TRUE(SettledToKnown(f, "y", 1u));
 }
 
-// When the data input is high-impedance and a half conducts, the cmos output is
-// high-impedance too — exercised through the simulator rather than the helper.
 TEST(CmosSwitches, CmosPassesHighZDataAsHighZ) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -218,17 +212,6 @@ TEST(CmosSwitches, CmosPassesHighZDataAsHighZ) {
   EXPECT_TRUE(SettledToHighZ(f, "y"));
 }
 
-// §28.9 states two distinct strength behaviors for the two CMOS switch flavors:
-// the rcmos gate reduces the strength of the signal passing through it per the
-// resistive rules of §28.14, whereas the plain cmos gate alters strength in
-// only the single supply-drive case of §28.13. The two tests below observe that
-// distinction end to end through the elaborated-and-simulated design. The same
-// strong data drive is forwarded by each gate: the rcmos knocks it down to pull
-// (Table 28-8's Strong->Pull row, reached via the shared ReduceResistive that
-// §28.14 owns) while the cmos leaves it strong (ReduceNonresistive, §28.13).
-// That the two gates diverge on an identical input is what confirms §28.9's
-// rcmos-is-resistive / cmos-is-not classification is the rule being applied,
-// rather than any property of the drive or the switch's value semantics.
 TEST(CmosSwitches, RcmosReducesForwardedStrengthPerResistiveRule) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -265,16 +248,6 @@ TEST(CmosSwitches, CmosLeavesForwardedNonSupplyStrengthUnchanged) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
 }
 
-// §28.9 fixes how the switch's delay specification maps onto output
-// transitions: with three delays the first is the rise delay, the second the
-// fall delay, and the third the delay to z; two delays give rise then fall; a
-// lone delay governs every transition; and with no delay specification the
-// switch has no propagation delay. The helper elaborates and simulates a
-// cmos/rcmos switch held conducting (n-channel enabled) while its data input is
-// toggled from an initial block, and returns the time the output settled -- the
-// last scheduled event is the switch output, so the final scheduler time is the
-// delay production applied. This drives the real lowering + delay-selection
-// path, not a reference model.
 uint64_t CmosSettleTime(const std::string& decl, const std::string& stim) {
   SimFixture f;
   std::string src = "module t;\n  wire y;\n  logic src, nc, pc;\n  " + decl +
@@ -320,9 +293,6 @@ TEST(CmosSwitches, CmosSingleDelayAppliesToEveryTransition) {
             27u);
 }
 
-// Boundary/negative form: no delay specification means the switch adds no
-// propagation delay, so the output settles in the same time step as the data
-// change rather than at a later time.
 TEST(CmosSwitches, CmosNoDelaySpecPropagatesWithoutDelay) {
   uint64_t t =
       CmosSettleTime("cmos g(y, src, nc, pc);",
@@ -330,18 +300,12 @@ TEST(CmosSwitches, CmosNoDelaySpecPropagatesWithoutDelay) {
   EXPECT_EQ(t, 20u);
 }
 
-// rcmos carries the identical delay form; a lone delay governs each edge.
 TEST(CmosSwitches, RcmosSingleDelayAppliesToEveryTransition) {
   EXPECT_EQ(CmosSettleTime("rcmos #7 g(y, src, nc, pc);",
                            "nc = 1'b1; pc = 1'b0; src = 1'b0; #20 src = 1'b1;"),
             27u);
 }
 
-// §28.9 makes a cmos switch an nmos and a pmos sharing the data input and the
-// output, so with one part off and the other's control unknown it drives the
-// L or H that part does (Table 28-6), and with both controls unknown the same,
-// and z data drives z under any control. Built as one conditional, the switch
-// merged its data with the z of the off part into a strong x.
 TEST(CmosSwitchSim, AnUnknownControlDrivesTheLOrHOfThePairedSwitches) {
   SimFixture f;
   auto out = RunCapture(

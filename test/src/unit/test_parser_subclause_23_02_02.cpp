@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -103,8 +101,6 @@ TEST(PortDeclaration, ArrayAsPortType) {
   EXPECT_FALSE(mod->ports[1].unpacked_dims.empty());
 }
 
-// §23.2.2: a port data type may be an enumeration. An inline enum type in the
-// header parses as an enum-kind port carrying its members.
 TEST(PortDeclaration, EnumAsPortType) {
   auto r = Parse(
       "module m(\n"
@@ -121,15 +117,6 @@ TEST(PortDeclaration, EnumAsPortType) {
   EXPECT_EQ(mod->ports[0].data_type.enum_members.size(), 3u);
 }
 
-// §23.2.2: a port may name a user-defined (typedef) data type. It parses as a
-// named-kind port that remembers the type name, distinct from the port name
-// that follows it.
-//
-// byte_t is declared at compilation-unit scope, which §3.12.1 makes visible in
-// every design element of the unit. It used to be declared inside a preceding
-// module, which §23.9 makes a scope of its own: the source parsed only because
-// the parser kept one set of type names for the whole file, and this case
-// asserted that leak rather than the §23.2.2 rule it is named for.
 TEST(PortDeclaration, TypedefNamedAsPortType) {
   auto r = Parse(
       "typedef logic [7:0] byte_t;\n"
@@ -149,9 +136,6 @@ TEST(PortDeclaration, TypedefNamedAsPortType) {
   EXPECT_EQ(mod->ports[0].data_type.type_name, "byte_t");
 }
 
-// §23.2.2: a port data type may carry multiple packed dimensions (a vector of
-// vectors). Both dimensions attach to the port's data type as packed dims with
-// no unpacked dimension.
 TEST(PortDeclaration, PackedArrayAsPortType) {
   auto r = Parse(
       "module m(\n"
@@ -170,8 +154,6 @@ TEST(PortDeclaration, PackedArrayAsPortType) {
   EXPECT_TRUE(mod->ports[0].unpacked_dims.empty());
 }
 
-// §23.2.2: a port may be a multidimensional (2-D) unpacked array. Both trailing
-// unpacked dimensions attach to the port; the packed element type is preserved.
 TEST(PortDeclaration, MultiDimUnpackedArrayAsPortType) {
   auto r = Parse(
       "module m(\n"

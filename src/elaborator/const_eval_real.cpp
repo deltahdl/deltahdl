@@ -17,8 +17,6 @@ namespace delta {
 
 namespace {
 
-// The real-typed locals of the constant function call being folded, null
-// outside every call (ConstFuncRealFrame).
 std::unordered_map<std::string_view, double>* g_real_frame = nullptr;
 
 }  // namespace
@@ -50,8 +48,6 @@ bool IsConstFuncRealType(const DataType& type) {
          type.kind == DataTypeKind::kRealtime;
 }
 
-// §11.3.1: the relational, equality and logical operators take real
-// operands and give a 1-bit result.
 static std::optional<bool> RealComparison(TokenKind op, double lhs,
                                           double rhs) {
   switch (op) {
@@ -76,7 +72,6 @@ static std::optional<bool> RealComparison(TokenKind op, double lhs,
   }
 }
 
-// RealComparison's result read as the real it converts to, 1.0 or 0.0.
 static std::optional<double> EvalRealComparison(TokenKind op, double lhs,
                                                 double rhs) {
   std::optional<bool> result = RealComparison(op, lhs, rhs);
@@ -116,17 +111,12 @@ static std::optional<double> EvalRealUnary(TokenKind op, double operand) {
   }
 }
 
-// The §20.5 real-returning conversions each take a single integral argument.
 static std::optional<int64_t> ConstEvalFirstIntArg(const Expr* expr,
                                                    const ScopeMap& scope) {
   if (expr->args.empty()) return std::nullopt;
   return ConstEvalInt(expr->args[0], scope);
 }
 
-// §20.5: the real-returning conversion functions may appear in a constant real
-// context. Each folds from the constant integral value of its argument.
-// §20.8.2, Table 20-4: the real math functions, each the C function it
-// corresponds to, by the number of arguments it takes.
 using RealMathOne = double (*)(double);
 using RealMathTwo = double (*)(double, double);
 
@@ -165,8 +155,6 @@ RealMathTwoArgs() {
   return kFunctions;
 }
 
-// §20.8.2: a real math function may be used in a constant expression, so it
-// folds where each of its arguments, an integer one converted to real, does.
 static std::optional<double> ConstEvalRealMathCall(const Expr* expr,
                                                    const ScopeMap& scope) {
   std::vector<double> args;
@@ -212,17 +200,6 @@ static std::optional<double> ConstEvalRealSysCall(const Expr* expr,
   return ConstEvalRealMathCall(expr, scope);
 }
 
-// §6.20.2 (printed pages 126-127): a name standing for a real parameter of
-// the registered module is worth the double the elaborator resolved it to
-// (RtlirParamDecl::resolved_real), which the ScopeMap, holding one integer
-// per name, cannot carry: its slot for such a parameter holds the 0 the
-// integer fold never wrote, so `parameter average_delay = (r + f) / 2` over
-// `parameter r = 5.7` folded to 4.5 and `parameter twice = r1 * 2` over a
-// declared `real r1` to 0. The registered parameter is consulted only where
-// the scope holds its integer value or no value at all, as
-// RegisteredParamValue (const_eval_bits.cpp) consults it, because a
-// constant function's locals (§13.4.3) sit in the same map under bare names.
-// Any other name is the integer the scope holds, widened.
 static std::optional<double> ConstEvalRealIdentifier(const Expr* expr,
                                                      const ScopeMap& scope) {
   if (auto local = ConstFuncRealLocal(expr->text)) return local;
@@ -240,10 +217,6 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
 
   switch (expr->kind) {
     case ExprKind::kRealLiteral:
-    // §5.8: a time literal is interpreted as a realtime (real) value already
-    // scaled to the current time unit; the parser folds that scaling into
-    // real_val, so in a constant real context it evaluates exactly like any
-    // other real literal.
     case ExprKind::kTimeLiteral:
       return expr->real_val;
     case ExprKind::kIntegerLiteral:
@@ -267,8 +240,6 @@ std::optional<double> ConstEvalReal(const Expr* expr, const ScopeMap& scope) {
       return ConstEvalReal(*cond ? expr->true_expr : expr->false_expr, scope);
     }
     case ExprKind::kCall:
-      // §13.4.3: a call of a constant function folds to the value it returns,
-      // a real for one returning a real (ConstEvalUserCallReal).
       if (RegisteredConstFunc(expr) != nullptr)
         return ConstEvalUserCallReal(expr, scope);
       return ConstEvalRealSysCall(expr, scope);

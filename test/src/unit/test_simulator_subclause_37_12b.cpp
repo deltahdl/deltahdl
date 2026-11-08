@@ -11,13 +11,8 @@
 namespace delta {
 namespace {
 
-// §37.12 against a design run: the scope class's relations read back from the
-// objects a run builds.
 class ScopesOfARun : public VpiDesignRun {};
 
-// The figure: each internal scope reaches through vpiScope the scope that
-// holds it -- a task, a function and a module instance their module -- and a
-// top, held by none, reaches none.
 TEST_F(ScopesOfARun, AnInternalScopeReachesTheScopeHoldingIt) {
   Run("module sub; endmodule\n"
       "module top;\n"
@@ -35,9 +30,6 @@ TEST_F(ScopesOfARun, AnInternalScopeReachesTheScopeHoldingIt) {
   EXPECT_EQ(vpi_handle(vpiScope, top), nullptr);
 }
 
-// Detail 7 with §37.29 example 1: a scope's vpiVirtualInterfaceVar iteration
-// returns a virtual interface var standing alone and each element of an
-// array of virtual interfaces.
 TEST_F(ScopesOfARun, AnArrayOfVirtualInterfacesYieldsEachElement) {
   Run("interface ifc; endinterface\n"
       "module top;\n"
@@ -50,9 +42,6 @@ TEST_F(ScopesOfARun, AnArrayOfVirtualInterfacesYieldsEachElement) {
                                       "v32[4]"}));
 }
 
-// Detail 5: a task's or function's vpiStmt is its one statement, an unnamed
-// begin holding them where it holds more than one, the declaration it opens
-// with none of them, and null where it holds none.
 TEST_F(ScopesOfARun, ATaskReachesTheStatementOfItsBody) {
   Run("module top;\n"
       "  int y;\n"
@@ -72,9 +61,6 @@ TEST_F(ScopesOfARun, ATaskReachesTheStatementOfItsBody) {
   EXPECT_EQ(ObjectsOf(vpiStmt, two).size(), 2U);
 }
 
-// Detail 4: a scope's vpiImport iteration returns the objects its module's
-// imports bring in that it references, by name or through a wildcard, each
-// once however often it is referenced, and none it imports but never reads.
 TEST_F(ScopesOfARun, AScopeImportsWhatItReferencesThroughAnImport) {
   Run("package p1; int a; int b; int c; int d; endpackage\n"
       "package p2; int e; endpackage\n"
@@ -92,8 +78,6 @@ TEST_F(ScopesOfARun, AScopeImportsWhatItReferencesThroughAnImport) {
             (std::vector<std::string>{"a", "b", "e"}));
 }
 
-// The figure draws vpiScope from statements, calls and the kinds the scope
-// class groups; a net standing in no scope reaches none.
 TEST_F(ScopesOfARun, AnObjectOfNoScopeKindReachesNoScope) {
   Run("module top; endmodule\n");
   VpiObject net;
@@ -101,17 +85,11 @@ TEST_F(ScopesOfARun, AnObjectOfNoScopeKindReachesNoScope) {
   EXPECT_EQ(vpi_handle(vpiScope, VpiHandleOf(&net)), nullptr);
 }
 
-// The kind of the statement the task or function `tf` reaches through vpiStmt,
-// 0 where it reaches none.
 int StmtKindOf(vpiHandle tf) {
   vpiHandle stmt = vpi_handle(vpiStmt, tf);
   return stmt == nullptr ? 0 : vpi_get(vpiType, stmt);
 }
 
-// Detail 5 wherever a task or function is declared: a generate block
-// instance's, a package's and the compilation unit's, whose scope the unit's
-// variable gives it (§3.12.1), reach the statement of their body as a
-// module's do.
 TEST_F(ScopesOfARun, EveryTaskReachesTheStatementOfItsBody) {
   Run("int ug;\n"
       "function int uf(); return 1; endfunction\n"
@@ -131,8 +109,6 @@ TEST_F(ScopesOfARun, EveryTaskReachesTheStatementOfItsBody) {
   EXPECT_EQ(StmtKindOf(uf), vpiReturnStmt);
 }
 
-// Detail 5 for a generate block's function an expression calls by its
-// hierarchical name (§23.6): its body's one statement, the return.
 TEST_F(ScopesOfARun, AGenerateBlocksFunctionReachesItsReturn) {
   Run("module top; int r;\n"
       "  if (1) begin : b function int g(); return 2; endfunction end\n"
@@ -141,9 +117,6 @@ TEST_F(ScopesOfARun, AGenerateBlocksFunctionReachesItsReturn) {
   EXPECT_EQ(StmtKindOf(Named(vpiTaskFunc, By("top.b"), "g")), vpiReturnStmt);
 }
 
-// Detail 5 for a class's methods (§37.31): one written in the class, one an
-// out-of-block declaration defines for an `extern` prototype (§8.24), and a
-// package class's, each reach the statement of its body.
 TEST_F(ScopesOfARun, AClassMethodReachesTheStatementOfItsBody) {
   Run("package pk; class P; int q; task pt; q = 1; endtask endclass "
       "endpackage\n"

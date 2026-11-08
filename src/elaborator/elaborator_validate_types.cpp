@@ -178,8 +178,6 @@ static void CheckEnumMemberValueRefs(
 static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
                                      DiagEngine& diag) {
   if (!member.range_start) return 1;
-  // Table 6-10: each bound is an integral number, which one with an x or z
-  // digit is not, whatever its other digits fold to.
   if (ExprContainsXZ(member.range_start) || ExprContainsXZ(member.range_end)) {
     diag.Error(loc,
                std::format("enum range bound of '{}' has to be an integer, "
@@ -192,8 +190,6 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
   int64_t count = 1;
   if (member.range_end) {
     auto m = ConstEvalInt(member.range_end).value_or(0);
-    // Table 6-10: in the name[N:M] form, both bounds are integers and neither
-    // is negative.
     if (n < 0 || m < 0) {
       diag.Error(
           loc,
@@ -204,7 +200,6 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
     }
     count = (m >= n) ? (m - n + 1) : (n - m + 1);
   } else {
-    // Table 6-10: in the name[N] form, N is an integer of one or more.
     if (n < 1) {
       diag.Error(
           loc,
@@ -218,7 +213,6 @@ static int64_t ComputeEnumRangeCount(const EnumMember& member, SourceLoc loc,
   return count < 1 ? 1 : count;
 }
 
-// Representable range of an enum base type (§6.19, Table 6-10).
 struct EnumBaseRange {
   bool is_signed = false;
   uint32_t base_width = 0;
@@ -258,9 +252,6 @@ static void CheckEnumDuplicateValues(int64_t start, int64_t count,
   }
 }
 
-// Const-evaluates an explicitly-valued enum member, reports an out-of-range
-// value, and updates the running auto-increment cursor. Called only after the
-// member's literal width/x-z checks have passed.
 static void CheckEnumMemberValueInRange(const EnumMember& member,
                                         const EnumBaseRange& range,
                                         int64_t& next_val, DiagEngine& diag) {
@@ -276,15 +267,6 @@ static void CheckEnumMemberValueInRange(const EnumMember& member,
   next_val = *v;
 }
 
-// §6.19: an enumeration declares its named constants once, however many
-// declarators the declaration lists -- `enum {A, B} x, y;` declares A and B a
-// single time and both x and y take that type. Only the declarator that
-// declares them is measured against the names already in the scope; a later one
-// in the same list would otherwise report those constants as clashing with
-// themselves. Duplicates within the member list are still caught, by seen_names
-// in the caller.
-// A pointer rather than a reference, so that what is returned cannot outlive a
-// temporary the caller built: scope_names is the caller's own long-lived set.
 static const std::unordered_set<std::string_view>* NamesToClashAgainst(
     const std::unordered_set<std::string_view>& scope_names,
     bool declares_its_constants) {
@@ -292,9 +274,6 @@ static const std::unordered_set<std::string_view>* NamesToClashAgainst(
   return declares_its_constants ? &scope_names : &kNoDeclaredNames;
 }
 
-// §6.19: only a member that takes the incremented value is out of range; a
-// following member giving its own value takes none, as the last takes none at
-// all.
 static bool NextMemberIncrements(const DataType& dtype,
                                  const EnumMember& member) {
   return &member != &dtype.enum_members.back() && !(&member + 1)->value;
@@ -318,9 +297,6 @@ void Elaborator::ValidateEnumDecl(const DataType& dtype, SourceLoc loc,
   auto base_width = EvalTypeWidth(EnumArrayElement(dtype), typedefs_);
   bool is_2state = !Is4stateType(dtype, typedefs_);
   bool prev_had_xz = false;
-  // §6.19: the members' values are of the base type, whose signing is the one
-  // `int` has when no base is named and the one a typedef base resolves to,
-  // and not only a `signed` written on the declaration.
   EnumBaseRange range =
       ComputeEnumBaseRange(IsSignedType(dtype, typedefs_), base_width);
   std::unordered_set<std::string_view> seen_names;
@@ -388,14 +364,6 @@ static bool HasPredefinedWidth(DataTypeKind kind) {
 }
 
 void Elaborator::ValidatePackedDimRange(const DataType& dtype, SourceLoc loc) {
-  // §7.4.1 states this for every packed dimension of a packed array
-  // declaration, which covers the first dimension as squarely as the fifth, so
-  // the dimension a range was written on does not change the clause. §6.9.1
-  // states the same prohibition over a narrower subject, one range on a reg,
-  // logic or bit vector, and §7.4 makes that subject a one-dimensional packed
-  // array rather than a second rule. Nothing here reads the type kind or the
-  // dimension count, so §7.4.1 is the clause true of every declaration these
-  // three reports reach.
   if (dtype.packed_dim_left && ExprContainsXZ(dtype.packed_dim_left)) {
     diag_.Error(loc, "packed dimension range shall not contain x or z",
                 Subclause("7.4.1"));
@@ -428,9 +396,6 @@ void Elaborator::ValidateUnpackedDimRange(const std::vector<Expr*>& dims,
   }
 }
 
-// §7.4.4 (printed page 155): packed dimensions may be added in stages through
-// a typedef, so the element type of `t [3:0] x` is the type `t` stands for, and
-// §7.4.1's rules on it are judged through the name.
 static bool HasPredefinedWidthType(const DataType& dtype,
                                    const TypedefMap& typedefs) {
   if (const DataType* named = FindNamedType(dtype, typedefs)) {
@@ -465,9 +430,6 @@ static bool IsAllowedPackedElementKind(DataTypeKind kind) {
   }
 }
 
-// A structure or union a typedef name stands for is a packed element only when
-// it is packed; one written in place with a packed dimension is judged by the
-// footnote 17 rule on the `packed` keyword instead.
 static bool IsDisallowedPackedElement(const DataType& dtype,
                                       const TypedefMap& typedefs) {
   if (const DataType* named = FindNamedType(dtype, typedefs)) {
@@ -480,7 +442,6 @@ static bool IsDisallowedPackedElement(const DataType& dtype,
 void Elaborator::ValidatePackedDimOnDisallowedType(const DataType& dtype,
                                                    SourceLoc loc) {
   if (!dtype.packed_dim_left) return;
-  // A class is no packed type (§8.4), and its name is in no typedef table.
   bool names_class = dtype.kind == DataTypeKind::kNamed &&
                      class_names_.count(dtype.type_name) != 0;
   if (!names_class && !IsDisallowedPackedElement(dtype, typedefs_)) return;

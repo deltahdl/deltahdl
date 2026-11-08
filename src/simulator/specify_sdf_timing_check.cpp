@@ -1,7 +1,3 @@
-// §32.4.2: an SDF TIMINGCHECK annotation placed on the declared timing checks
-// it matches, with §31.9.1's adjustment of a limit annotated onto a check
-// evaluated on delayed signals.
-
 #include <charconv>
 #include <cstddef>
 #include <cstdint>
@@ -22,9 +18,6 @@ namespace delta {
 
 namespace {
 
-// §32.4.2: whether the select an SDF signal was written with, `[0]` or
-// `[3:2]`, names the select `declared` the check's terminal was written with.
-// A signal written with none names the terminal whatever select it carries.
 bool SdfSelectNames(const std::string& written,
                     const TerminalSelect& declared) {
   if (written.empty()) return true;
@@ -41,10 +34,6 @@ bool SdfSelectNames(const std::string& written,
   return declared.left == left && declared.right == right;
 }
 
-// §32.4.2: whether the edge an SDF signal was written with names the edge the
-// check's event on that signal was written with. A signal written with none
-// matches any edge; a transition, 01 or 1z, matches the declaration written
-// with that one descriptor.
 bool SdfEdgeNames(
     SpecifyEdge written,
     const std::vector<std::pair<char, char>>& written_descriptors,
@@ -56,9 +45,6 @@ bool SdfEdgeNames(
          declared_descriptors == written_descriptors;
 }
 
-// Whether the condition an SDF signal was written with names `declared`, the
-// condition the check's event on that signal was written with. A signal the
-// file wrote with none matches whatever condition it carries.
 bool SdfConditionNames(const std::string& written, const Expr* declared) {
   return written.empty() ||
          SpecifyConditionsMatch(SpecifyConditionText(declared), written);
@@ -67,15 +53,6 @@ bool SdfConditionNames(const std::string& written, const Expr* declared) {
 bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
                                const SdfTcAnnotation& a,
                                std::string_view inst_prefix) {
-  // §31.2 puts a system timing check inside a specify block, so two instances
-  // of one cell declare checks naming identically spelled signals and the
-  // instance is what tells them apart. The prefixes are compared exactly, an
-  // empty one naming the module the design was elaborated as rather than every
-  // instance: SdfCellPrefixInRegion (simulator/sdf_parser.h) answers a definite
-  // prefix for every cell, so no annotation arrives with its instance left
-  // unspecified. The SpecifyEdge::kNone and the empty condition below do reach
-  // a check carrying any edge or any condition, which is what §32.4.2 rules for
-  // an SDF check whose signals the file wrote no edge and no condition on.
   if (existing.inst_prefix != inst_prefix) return false;
   if (existing.kind != a.kind) return false;
   if (existing.ref_signal != a.ref_signal) return false;
@@ -88,15 +65,10 @@ bool SdfAnnotationMatchesCheck(const TimingCheckEntry& existing,
                     existing.data_edge_descriptors)) {
     return false;
   }
-  // §32.4.2: a condition the file wrote on a signal has to match the one the
-  // declaration wrote on that same signal.
   return SdfConditionNames(a.ref_condition, existing.ref_condition_expr) &&
          SdfConditionNames(a.data_condition, existing.data_condition_expr);
 }
 
-// §31.9.1: an annotated limit of a check evaluated on delayed signals is
-// adjusted for their delays as a declared one was, and set to 0 with a warning
-// where that leaves it no longer positive.
 uint64_t AnnotatedLimit(uint64_t limit, int64_t shift,
                         std::vector<std::string>& warnings) {
   const AdjustedNegativeTimingLimit kAdjusted =
@@ -110,11 +82,6 @@ uint64_t AnnotatedLimit(uint64_t limit, int64_t shift,
   return kAdjusted.limit;
 }
 
-// §32.4.2: one annotated limit and its signed form, the form a negative check
-// reads, which the annotation replaces as well. A value annotated below zero
-// keeps its sign in the signed form, which §31.9 reads on a $setuphold or a
-// $recrem under the enabling option, and reads as 0 in the unsigned one every
-// other reader takes.
 void ApplySdfLimit(uint64_t& limit, int64_t& signed_limit, int64_t value,
                    int64_t shift, std::vector<std::string>& warnings) {
   limit = AnnotatedLimit(value < 0 ? 0 : static_cast<uint64_t>(value), shift,
@@ -122,12 +89,6 @@ void ApplySdfLimit(uint64_t& limit, int64_t& signed_limit, int64_t value,
   signed_limit = value < 0 ? value : static_cast<int64_t>(limit);
 }
 
-// §31.9.4: a $setuphold or a $recrem is a negative check, under the enabling
-// option, while either of its limits is negative, an annotated one as much as
-// a declared one, and an ordinary check again once the annotation leaves
-// neither negative. §31.9.1 then has it evaluated on the delayed signals with
-// its limits adjusted by `delayed_shift`; a negative check is evaluated on the
-// signals themselves and its limits are taken as written.
 void SettleNegativeHandling(TimingCheckEntry& check, const SdfTcAnnotation& a,
                             const TimingCheckInvocationOptions& options,
                             int64_t delayed_shift) {
@@ -143,16 +104,11 @@ void SettleNegativeHandling(TimingCheckEntry& check, const SdfTcAnnotation& a,
       EvaluatedOnDelayedSignals(check) ? delayed_shift : 0;
 }
 
-// One limit of a check, as its unsigned and its signed form.
 struct SdfLimitPlace {
   uint64_t& limit;
   int64_t& signed_limit;
 };
 
-// §31.9.1: an annotated limit is adjusted by the whole of `shift`. A limit the
-// annotation leaves as it was already carries the adjustment the check had, so
-// where the annotation changed how the check is evaluated it moves by the
-// difference, `moved`, alone.
 void PlaceSdfLimit(SdfLimitPlace place, std::optional<int64_t> annotated,
                    int64_t shift, int64_t moved,
                    std::vector<std::string>& warnings) {
@@ -193,13 +149,6 @@ void ApplySdfAnnotationFields(TimingCheckEntry& check, const SdfTcAnnotation& a,
 bool SpecifyManager::AnnotateSdfTimingCheck(
     const SdfTcAnnotation& a, std::string_view inst_prefix,
     std::vector<std::string>& warnings) {
-  // §32.1: SDF back-annotates the timing checks a design already declares in
-  // its specify blocks; it never introduces a new check. A single SDF check
-  // (e.g. SETUPHOLD) expands into several candidate annotations (setup, hold,
-  // setuphold) so it can update whichever representation the specify block
-  // uses; candidates that match nothing are simply dropped, not appended.
-  // Appending them would fabricate checks the RTL never declared (turning one
-  // SETUPHOLD into three entries).
   bool applied = false;
   for (auto& existing : timing_checks_) {
     if (!SdfAnnotationMatchesCheck(existing, a, inst_prefix)) continue;

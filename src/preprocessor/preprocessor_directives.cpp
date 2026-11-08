@@ -98,8 +98,6 @@ void Preprocessor::HandleTimescale(std::string_view rest, SourceLoc loc) {
   }
 
   current_timescale_ = ts;
-  // §3.14.3: the finest precision is the one of the smallest order, its
-  // magnitude counted, so a 10ps directive is finer than a 100ps one.
   if (!has_global_precision_ ||
       EffectiveTimeOrder(ts.precision, ts.prec_magnitude) <
           EffectiveTimeOrder(global_precision_, global_precision_magnitude_)) {
@@ -230,19 +228,6 @@ void Preprocessor::HandleLine(std::string_view rest, SourceLoc loc) {
   TakeLineFileOverrideId();
 }
 
-// §22.12 has a `line directive set the file name of the line that follows it,
-// so the name it gave is registered and its id kept for the origins of those
-// lines. The file is registered with no content, because this run was handed
-// the file the directive appears in and never the one it names: a report can
-// say where the line came from, and SourceManager::GetLineText finds nothing
-// to quote back, which is correct.
-//
-// One id is kept per name rather than one per directive, because a
-// machine-generated source carries a `line on many of its lines and
-// registering each would leave SourceManager holding one entry per directive.
-//
-// The empty name `""` is a name too, a string literal §22.12 makes the file's
-// name like any other, so it is registered as one.
 void Preprocessor::TakeLineFileOverrideId() {
   auto it = line_file_override_ids_.find(line_file_override_);
   if (it == line_file_override_ids_.end()) {
@@ -254,19 +239,9 @@ void Preprocessor::TakeLineFileOverrideId() {
   line_file_override_id_ = it->second;
 }
 
-// §22.4 (printed page 705): a relative filename written in double quotes is
-// looked for in the compiler's current working directory and then in any
-// locations the user names, while an absolute filename is taken as it stands
-// and nowhere else. The including file's own directory, `src_dir`, and the -I
-// directories are this tool's user-specified locations, searched after the
-// working directory; a name in angle brackets is looked for in those alone.
-// Looked for beside the including file alone, a quoted name went unfound
-// whenever that file was named on the command line without a directory, since
-// its directory then read as empty.
 std::string Preprocessor::ResolveInclude(std::string_view filename,
                                          const std::string& src_dir,
                                          bool quoted) {
-  // HandleInclude, the one caller, has already refused an empty name.
   if (filename[0] == '/') {
     std::string path{filename};
     std::ifstream ifs(path);
@@ -312,11 +287,6 @@ void Preprocessor::HandleBeginKeywords(std::string_view rest, SourceLoc loc,
     return;
   }
   keyword_version_stack_.push_back({*version, loc});
-  // The marker and the version byte are the whole of this line's output.
-  // RunPreprocLoop in src/preprocessor/preprocessor.cpp ends the directive's
-  // line as it ends every other line, so a newline written here would be a
-  // second one and would put every line below the directive one line further
-  // down than the user wrote it.
   output += kKeywordMarker;
   output += static_cast<char>(static_cast<uint8_t>(*version));
 }
@@ -328,21 +298,13 @@ void Preprocessor::HandleEndKeywords(SourceLoc loc, std::string& output) {
     return;
   }
   keyword_version_stack_.pop_back();
-  // Nested pairs are stacked, so closing one returns to the version_specifier
-  // that was in effect just outside it; with nothing left the reserved word
-  // list falls back to this implementation's default set.
   auto version = keyword_version_stack_.empty()
                      ? KeywordVersion::kVer18002023
                      : keyword_version_stack_.back().version;
-  // Ended by RunPreprocLoop rather than here, for the reason given in
-  // HandleBeginKeywords.
   output += kKeywordMarker;
   output += static_cast<char>(static_cast<uint8_t>(version));
 }
 
-// §22.14 requires the two directives to be used as a pair, `begin_keywords
-// first and `end_keywords sometime later. Any region still open once the last
-// source file has been consumed never received its closing directive.
 void Preprocessor::ReportUnterminatedKeywordRegions() {
   for (const auto& region : keyword_version_stack_) {
     diag_.Error(region.loc, "`begin_keywords without matching `end_keywords",
@@ -356,12 +318,9 @@ void Preprocessor::BeginCompilationUnit() {
   macros_ = initial_macros_;
   ResetDirectiveState();
   ResetAllPragmas();
-  // §5.6.4: a `line read in the unit before shall not number this one's lines.
   has_line_override_ = false;
 }
 
-// The value the digit `c` stands for in base `radix`, or -1 where it is none
-// of that base's digits, as §5.7.1's x, z and ? digits are none.
 static int DigitValue(char c, unsigned radix) {
   static constexpr std::string_view kDigits = "0123456789abcdef";
   size_t value = kDigits.find(
@@ -369,8 +328,6 @@ static int DigitValue(char c, unsigned radix) {
   return value < radix ? static_cast<int>(value) : -1;
 }
 
-// §5.7.1's digits of base `radix`, with an underscore anywhere but first, as
-// the value they spell, or nothing where `text` is not such a run.
 static std::optional<uint64_t> ReadDigits(std::string_view text,
                                           unsigned radix) {
   if (text.empty() || DigitValue(text.front(), radix) < 0) return std::nullopt;
@@ -384,8 +341,6 @@ static std::optional<uint64_t> ReadDigits(std::string_view text,
   return value;
 }
 
-// The radix §5.7.1's base format letter `c` names, or 0 for a letter naming
-// none.
 static unsigned RadixOf(char c) {
   static constexpr std::string_view kLetters = "bodh";
   static constexpr unsigned kRadixes[] = {2, 8, 10, 16};
@@ -394,12 +349,6 @@ static unsigned RadixOf(char c) {
   return at == std::string_view::npos ? 0 : kRadixes[at];
 }
 
-// §5.7.1's based number, `size_text` the size written before its apostrophe,
-// empty where none was, and `format` the text after it: an optional s, the base
-// letter and the digits, white space allowed before the digits. The value is
-// held in the constant's width, its size where it has one and 64 bits where
-// not, so a narrower size truncates the digits from the left and a signed
-// constant whose top bit is set is negative.
 static std::optional<int64_t> ReadBasedConstant(std::string_view size_text,
                                                 std::string_view format) {
   bool is_signed = format.find_first_of("sS") == 0;
@@ -420,8 +369,6 @@ static std::optional<int64_t> ReadBasedConstant(std::string_view size_text,
   return static_cast<int64_t>(negative ? value | ~mask : value);
 }
 
-// An integer constant as §5.7.1 writes one, an unsized decimal number or a
-// based number, as the value it stands for, or nothing where `arg` is none.
 static std::optional<int64_t> ReadIntegerConstant(std::string_view arg) {
   size_t quote = arg.find('\'');
   if (quote != std::string_view::npos) {
@@ -433,8 +380,6 @@ static std::optional<int64_t> ReadIntegerConstant(std::string_view arg) {
   return static_cast<int64_t>(*value);
 }
 
-// The length of §5.7.1's unsigned number at the start of `text`, decimal digits
-// with underscores after the first, or 0 where none starts there.
 static size_t UnsignedNumberLength(std::string_view text) {
   if (text.empty() || !std::isdigit(static_cast<unsigned char>(text.front()))) {
     return 0;
@@ -448,10 +393,6 @@ static size_t UnsignedNumberLength(std::string_view text) {
   return length;
 }
 
-// A real constant as §5.7.2 writes one, in decimal notation with a digit on
-// each side of the point or in scientific notation with an optionally signed
-// exponent, underscores ignored, as the value it stands for, or nothing where
-// `arg` is none. A run of digits alone reads as a real too.
 static std::optional<double> ReadRealConstant(std::string_view arg) {
   size_t end = UnsignedNumberLength(arg);
   if (end == 0) return std::nullopt;
@@ -490,9 +431,6 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
     default_decay_time_is_real_ = false;
     return;
   }
-  // E.2 takes an integer constant or a real constant. A charge decay time has
-  // no negative value (§28.16.2), so a signed integer constant whose value is
-  // negative is no decay time.
   std::optional<double> value;
   bool is_real = false;
   if (auto integer = ReadIntegerConstant(arg)) {
@@ -507,12 +445,6 @@ void Preprocessor::HandleDefaultDecayTime(std::string_view rest,
         Subclause("E.2"));
     return;
   }
-  // §3.14.1: the time precision governs how a delay value is rounded before
-  // simulation uses it, and the precision is the governed module's, which is
-  // not known here. E.2 admits a real_constant and gives no conversion of its
-  // own, so the exact value stays in default_decay_time_real_, marked as a
-  // real for the elaborator to hand on, and default_decay_time_ holds it
-  // rounded to whole time units, which a precision equal to the unit gives.
   default_decay_time_real_ = *value;
   default_decay_time_ = static_cast<uint64_t>(std::llround(*value));
   default_decay_time_is_real_ = is_real;

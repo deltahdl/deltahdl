@@ -98,10 +98,6 @@ TEST(DeterminismSim, NBAExecutionOrderMatchesSourceOrder) {
   EXPECT_EQ(result, 1u);
 }
 
-// §4.6(b): the NBA scheduled by the last source statement is the one performed
-// last, no matter the values assigned. A high-then-low-then-high sequence rules
-// out any "largest value wins" misreading -- only source order decides, so the
-// final value must equal the last statement's right-hand side.
 TEST(DeterminismSim, NBALastSourceStatementWinsRegardlessOfValue) {
   auto result = RunAndGet(
       "module t;\n"
@@ -116,9 +112,6 @@ TEST(DeterminismSim, NBALastSourceStatementWinsRegardlessOfValue) {
   EXPECT_EQ(result, 7u);
 }
 
-// §4.6(a): source order is preserved when statements live inside an inner
-// begin-end block. Each assignment reads the result of the previous one, so any
-// reordering across the nested-block boundary would change the observed values.
 TEST(DeterminismSim, NestedBlockStatementsExecuteInSourceOrder) {
   SimFixture f;
   auto* design = ElaborateLowerRun(f,
@@ -157,12 +150,6 @@ TEST(DeterminismSim, SourceOrderPreservedAcrossSuspension) {
 
 namespace {
 
-// §4.6(b) (printed page 69): nonblocking updates are performed in the order
-// their statements were executed, not the order they are written in. A loop
-// that executes one nonblocking assignment three times, with the right-hand
-// side reading 5, 6 and 7 in turn, schedules three updates, and the last
-// execution's is performed last. Keeping one update per statement, or the
-// first, would leave 5.
 uint64_t RunNonblockingLoop(const std::string& loop) {
   return RunAndGet(
       "module t;\n"
@@ -199,10 +186,6 @@ TEST(DeterminismSim, NBAInAWhileLoopLeavesItsLastExecutionsValue) {
             7u);
 }
 
-// §4.6(b): the task's nonblocking assignment is written after the procedure's
-// in the text, but the task is enabled first, so its update is executed and
-// performed first and the procedure's value remains. Ordering the updates by
-// their place in the source would leave 2.
 TEST(DeterminismSim, NBAOfATaskEnabledFirstIsPerformedFirst) {
   auto result = RunAndGet(
       "module t;\n"

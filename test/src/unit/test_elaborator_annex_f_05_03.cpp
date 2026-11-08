@@ -18,32 +18,17 @@
 
 using namespace delta;
 
-// §F.5.3 heads the three notions of satisfaction -- neutral (§F.5.3.1), weak
-// and strong by finite words (§F.5.3.2) and vacuity (§F.5.3.3) -- and its
-// title fixes their common scope: satisfaction without local variables, the
-// assumption §F.5.3.1 opens with for every property, sequence and unclocked
-// property fragment. §F.5.6 restates the same three notions with local
-// variables, each as the rules of §F.5.3 with the understanding that the
-// underlying properties may carry them. The cases observe the scope -- which
-// sequences, properties, top-level properties and assertion statements of the
-// §F.3.2 grammar involve a local variable -- and that on every input within it
-// the §F.5.6 relations, entered from the empty context, agree with the §F.5.3
-// ones, while on an input outside it they part.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto Bs(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// ( int v; a ##1 (1, v = e) ): a sequence that declares and samples a local.
 std::shared_ptr<const SequenceExpr> WithLocal() {
   return SeqLocalVarDecl("int", "v",
                          SeqConcat(Bs("a"), SeqLocalVarSampling("v")));
 }
 
-// A property, top-level property and assertion statement in §F.5.3's scope,
-// and the same three with a local variable sequence in place of one operand.
 std::shared_ptr<const PropertyExpr> Clean() {
   return PropAnd(PropImplication(Bs("a"), PropStrong(Bs("b"))),
                  PropNot(PropWeak(SeqOr(Bs("c"), Bs("d")))));
@@ -53,9 +38,6 @@ std::shared_ptr<const PropertyExpr> Tainted() {
                  PropNot(PropWeak(SeqOr(Bs("c"), WithLocal()))));
 }
 
-// §F.5.3: a sequence involves a local variable iff a declaration or a sampling
-// form occurs in it, at any depth; the other §F.3.2 sequence forms, a clock
-// included, do not by themselves.
 TEST(SatisfactionWithoutLocalVariables, ASequenceInvolvesALocalByItsForms) {
   EXPECT_FALSE(SequenceInvolvesLocalVariables(*Bs("a")));
   EXPECT_FALSE(SequenceInvolvesLocalVariables(*SeqClock(
@@ -68,15 +50,10 @@ TEST(SatisfactionWithoutLocalVariables, ASequenceInvolvesALocalByItsForms) {
   EXPECT_TRUE(SequenceInvolvesLocalVariables(*SeqClock(
       BoolAtom("clk"),
       SeqParen(SeqConcat(Bs("a"), SeqOr(Bs("b"), SeqLocalVarSampling("v")))))));
-  // The right operand alone is enough, and so is the left.
   EXPECT_TRUE(SequenceInvolvesLocalVariables(*SeqConcat(Bs("a"), WithLocal())));
   EXPECT_TRUE(SequenceInvolvesLocalVariables(*SeqConcat(WithLocal(), Bs("a"))));
 }
 
-// §F.5.3: the property productions have no local variable form, so a property
-// involves a local variable iff a sequence operand does, under any operator
-// and at any depth -- here the right operand of an or under weak under not
-// under and.
 TEST(SatisfactionWithoutLocalVariables,
      APropertyInvolvesALocalThroughItsSequences) {
   EXPECT_FALSE(PropertyInvolvesLocalVariables(*Clean()));
@@ -93,9 +70,6 @@ TEST(SatisfactionWithoutLocalVariables,
                                BoolAtom("x"), PropStrong(Bs("b"))))))));
 }
 
-// §F.5.3: a top-level property involves a local variable iff the property it
-// carries does, through a disable iff guard or a parenthesis alike; the guard
-// condition is a Boolean and holds none.
 TEST(SatisfactionWithoutLocalVariables, ATopLevelPropertyFollowsItsProperty) {
   EXPECT_FALSE(TopLevelPropertyInvolvesLocalVariables(*TopProperty(Clean())));
   EXPECT_TRUE(TopLevelPropertyInvolvesLocalVariables(*TopProperty(Tainted())));
@@ -109,8 +83,6 @@ TEST(SatisfactionWithoutLocalVariables, ATopLevelPropertyFollowsItsProperty) {
       *TopParen(TopParen(TopProperty(Tainted())))));
 }
 
-// §F.5.3: a clocked property and a clocked top-level property involve a local
-// variable on the same terms, the clock and abort conditions being Booleans.
 TEST(SatisfactionWithoutLocalVariables, AClockedPropertyFollowsItsSequences) {
   auto clean =
       ClkClock(BoolAtom("clk"),
@@ -130,9 +102,6 @@ TEST(SatisfactionWithoutLocalVariables, AClockedPropertyFollowsItsSequences) {
       *ClockedTopParen(ClockedTopDisableIff(BoolAtom("rst"), tainted))));
 }
 
-// §F.5.3: an assertion statement involves a local variable iff its body does,
-// in the @( c ) T shape and in the U shape alike; the activation, the role and
-// the clock c change nothing.
 TEST(SatisfactionWithoutLocalVariables, AnAssertionStatementFollowsItsBody) {
   using Activation = AssertionStatement::Activation;
   using Role = AssertionStatement::Role;
@@ -150,10 +119,6 @@ TEST(SatisfactionWithoutLocalVariables, AnAssertionStatementFollowsItsBody) {
       ClockedTopProperty(ClkClock(BoolAtom("clk"), ClkStrong(WithLocal()))))));
 }
 
-// §F.5.3 is the fragment of §F.5.6 without local variables: the embedding of a
-// §F.5.3 property into the §F.5.6 model keeps each operator, sequence operand
-// and Boolean, adds no declaration form, and goes through a top-level
-// property's guard and parenthesis.
 TEST(SatisfactionWithoutLocalVariables, TheEmbeddingKeepsTheShape) {
   auto lv = AsPropertyWithLocalVariables(*Clean());
   ASSERT_EQ(lv->kind, LvProperty::Kind::kAnd);
@@ -198,8 +163,6 @@ TEST(SatisfactionWithoutLocalVariables, TheEmbeddingKeepsTheShape) {
             LvTopLevelProperty::Kind::kProperty);
 }
 
-// The words the agreement is observed on: enough shapes that each operator of
-// Clean() decides differently on some of them.
 std::vector<Word> Words() {
   return {Word{A({"a"}), A({"b"})},
           Word{A({"a"}), A({"x"})},
@@ -209,8 +172,6 @@ std::vector<Word> Words() {
           Word{A({"a"}), A({"b"}), A({"c"}), A({"d"})}};
 }
 
-// The properties the agreement is observed on: every §F.5.3.1 operator
-// appears, and each is within §F.5.3's scope.
 std::vector<std::shared_ptr<const PropertyExpr>> Properties() {
   return {Clean(),
           PropStrong(SeqConcat(Bs("a"), Bs("b"))),
@@ -224,10 +185,6 @@ std::vector<std::shared_ptr<const PropertyExpr>> Properties() {
           PropParen(PropAnd(PropStrong(Bs("a")), PropWeak(Bs("d"))))};
 }
 
-// §F.5.6.1 gives neutral satisfaction as the rules of §F.5.3.1 with local
-// variables understood to be allowed, so on a property that involves none
-// the two agree, §F.5.6.1 entered from the empty context, on every word --
-// and the verdicts are not all one way.
 TEST(SatisfactionWithoutLocalVariables,
      NeutralSatisfactionAgreesWithTheLocalVariableSemantics) {
   std::set<bool> verdicts;
@@ -245,10 +202,6 @@ TEST(SatisfactionWithoutLocalVariables,
   EXPECT_EQ(verdicts.size(), 2U);
 }
 
-// The same agreement at the top level: satisfaction, disabling and the
-// pass/disabled/fail trichotomy of §F.5.3.1 are those of §F.5.6.1 on a
-// top-level property without local variables, through a disable iff guard
-// and a parenthesis.
 TEST(SatisfactionWithoutLocalVariables,
      TopLevelVerdictsAgreeWithTheLocalVariableSemantics) {
   std::vector<std::shared_ptr<const TopLevelProperty>> tops;
@@ -279,9 +232,6 @@ TEST(SatisfactionWithoutLocalVariables,
   EXPECT_EQ(disabled.size(), 2U);
 }
 
-// §F.5.6.3 gives vacuity as the definition of §F.5.3.3 with local variables
-// understood to be allowed, so non-vacuity and nonvacuous satisfaction agree
-// on every property and top-level property without local variables.
 TEST(SatisfactionWithoutLocalVariables,
      VacuityAgreesWithTheLocalVariableSemantics) {
   std::set<bool> verdicts;
@@ -308,10 +258,6 @@ TEST(SatisfactionWithoutLocalVariables,
   EXPECT_EQ(verdicts.size(), 2U);
 }
 
-// Outside §F.5.3's scope the two part: a property whose sequence samples a
-// local is one §F.5.6.1 decides through the four-way relation, where the
-// sampling ( 1, v = e ) matches a letter and binds v, while §F.5.3.1 knows no
-// such form and finds no match. The disagreement is what the scope excludes.
 TEST(SatisfactionWithoutLocalVariables, OutsideTheScopeTheRelationsPart) {
   auto sampling = PropStrong(SeqConcat(Bs("a"), SeqLocalVarSampling("v")));
   ASSERT_TRUE(PropertyInvolvesLocalVariables(*sampling));

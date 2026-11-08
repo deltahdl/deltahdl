@@ -25,35 +25,22 @@ RepetitionCount MakeDollarRange(unsigned long long lo) {
 }
 
 bool IsRepetitionCountWellFormed(const RepetitionCount& c) {
-  // §16.9.2: exact count and dollar-max are always well-formed. A finite
-  // range requires min ≤ max.
   if (c.is_exact_count) return true;
   if (c.max_is_dollar) return true;
   return c.min <= c.max;
 }
 
-RepetitionCount NormalizeStarShortcut() {
-  // §16.9.2: [*] ≡ [*0:$].
-  return MakeDollarRange(0);
-}
+RepetitionCount NormalizeStarShortcut() { return MakeDollarRange(0); }
 
-RepetitionCount NormalizePlusShortcut() {
-  // §16.9.2: [+] ≡ [*1:$].
-  return MakeDollarRange(1);
-}
+RepetitionCount NormalizePlusShortcut() { return MakeDollarRange(1); }
 
 bool IsRepetitionAllowedOn(RepetitionKind kind, bool operand_is_boolean_expr,
                            bool boolean_has_attached_match_item) {
   switch (kind) {
     case RepetitionKind::kConsecutive:
-      // §16.9.2: consecutive repetition applies to any sequence_expr,
-      // Boolean or not, with or without an attached match item.
       return true;
     case RepetitionKind::kGoto:
     case RepetitionKind::kNonconsecutive:
-      // §16.9.2: goto and nonconsecutive repetition operators apply only to
-      // Boolean expressions; and they cannot be applied to a Boolean to
-      // which a sequence_match_item has been attached.
       if (!operand_is_boolean_expr) return false;
       return !boolean_has_attached_match_item;
   }
@@ -61,10 +48,6 @@ bool IsRepetitionAllowedOn(RepetitionKind kind, bool operand_is_boolean_expr,
 }
 
 bool IsZeroRepetitionPermitted(RepetitionKind kind) {
-  // §16.9.2: only the consecutive form has a defined zero-iteration case;
-  // goto/nonconsecutive require a successful match of the Boolean operand
-  // and a zero iteration count would leave no match for the operator's
-  // semantics to anchor on.
   return kind == RepetitionKind::kConsecutive;
 }
 

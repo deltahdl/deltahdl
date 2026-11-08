@@ -16,7 +16,6 @@ bool TryResolveInstanceRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiModuleOf(ref);
   } else if (type == vpiInstanceArray || type == vpiModuleArray ||
              type == vpiPrimitiveArray) {
-    // §37.5 and §37.11: an element reaches the array it belongs to.
     out = VpiInstanceArrayOf(ref, type);
   } else {
     return false;

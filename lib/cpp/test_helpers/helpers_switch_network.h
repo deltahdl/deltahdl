@@ -12,11 +12,6 @@
 
 using namespace delta;
 
-// Test fixtures around the production switch-network resolver. The algorithm
-// itself lives in src/simulator/switch_network.{h,cpp}; this header only
-// supplies the per-test wrappers and net builders the §4.9.5 / §28.8 unit
-// tests rely on.
-
 using SwitchKind = ::delta::BidirSwitchKind;
 
 struct SwitchInst {
@@ -25,9 +20,6 @@ struct SwitchInst {
   SwitchKind kind = SwitchKind::kTran;
   Logic4Word control{0, 0};
   bool user_defined_nets = false;
-  // §28.8: Delay spec applies only to the control input. Network resolution
-  // ignores it because the data path through the bidirectional terminals has
-  // no propagation delay; the field exists so tests can assert that property.
   PassSwitchDelaySpec delay{};
 };
 
@@ -60,7 +52,7 @@ inline Net MakeUndrivenNet(Arena& arena, Variable* var) {
   net.type = NetType::kWire;
   net.resolved = var;
   auto z = MakeLogic4Vec(arena, 1);
-  z.words[0].aval = 0;  // canonical Convention A: z = (aval=0, bval=1)
+  z.words[0].aval = 0;
   z.words[0].bval = 1;
   net.drivers.push_back(z);
   return net;
@@ -71,11 +63,10 @@ static constexpr uint8_t kVal1 = 1;
 static constexpr uint8_t kValX = 2;
 static constexpr uint8_t kValZ = 3;
 
-// Canonical Convention A: x=(aval=1,bval=1), z=(aval=0,bval=1).
 inline uint8_t ValOf(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
   uint8_t b = v.value.words[0].bval & 1;
-  if (b == 0) return a;  // kVal0 / kVal1
+  if (b == 0) return a;
   return a ? kValX : kValZ;
 }
 
@@ -98,12 +89,6 @@ inline NetPair MakeNetPair(uint64_t a_val) {
   return np;
 }
 
-// The same pair with net a's 1 side driven at `source` on both bounds of its
-// strength range.
-//
-// A rule about the strength a switch passes is read on the far net, so the
-// near one is given a definite strength to pass and the far one is left
-// undriven for the switch to drive.
 inline NetPair MakeStrengthDrivenNetPair(Strength source) {
   NetPair np = MakeNetPair(1);
   np.a.resolved_strength.s1_hi = source;

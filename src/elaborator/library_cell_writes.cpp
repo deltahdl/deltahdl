@@ -19,8 +19,6 @@ namespace {
 
 using CellKey = std::pair<std::string_view, std::string_view>;
 
-// Which of the unit's lists a cell came from; within one list the order of the
-// list is the order the cells were encountered in.
 enum class CellList : std::uint8_t {
   kModules,
   kInterfaces,
@@ -29,7 +27,6 @@ enum class CellList : std::uint8_t {
   kCheckers
 };
 
-// The cell a library holds so far under one name.
 struct WrittenCell {
   const void* decl;
   SourceLoc loc;
@@ -47,8 +44,6 @@ bool EncounteredLater(const SourceLoc& a, const SourceLoc& b) {
          std::tie(b.file_id, b.line, b.column);
 }
 
-// Every module comes from this invocation, so each after the first of a name
-// its library is given is warned about.
 void WarnIfModuleGivenAgain(const CellKey& key, SourceLoc loc,
                             CellWrites& writes, DiagEngine& diag) {
   int& given = writes.modules_given[key];
@@ -61,8 +56,6 @@ void WarnIfModuleGivenAgain(const CellKey& key, SourceLoc loc,
                Subclause("33.3.1.1"));
 }
 
-// §23.5 and Syntaxes 24-1, 25-1 and 29-1: an extern declaration is a prototype
-// of the cell, defining nothing a library is given.
 template <typename Decl>
 void WriteCells(const std::vector<Decl*>& decls, CellList list,
                 CellWrites& writes, DiagEngine& diag) {
@@ -105,8 +98,6 @@ void WriteCellsToLibraries(CompilationUnit& unit, DiagEngine& diag) {
   DropOverwritten(unit.interfaces, writes.overwritten);
   DropOverwritten(unit.programs, writes.overwritten);
   DropOverwritten(unit.udps, writes.overwritten);
-  // §3.13 leaves a checker's name out of the definitions name space a module's
-  // is in, so a checker replaces only a checker of its name.
   CellWrites checker_writes;
   WriteCells(unit.checkers, CellList::kCheckers, checker_writes, diag);
   DropOverwritten(unit.checkers, checker_writes.overwritten);

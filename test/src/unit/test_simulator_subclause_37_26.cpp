@@ -15,20 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.26 Structures and unions: the VPI object model for a structure or union
-// declared as a variable (struct/union var) or as a net (struct/union net). The
-// figure's structural relations (vpiParent to the enclosing object, vpiMember
-// to the member variables/nets) are served by the generic object-model
-// machinery, so the tests below observe the two rules this clause's own text
-// defines:
-//   - The figure's Boolean properties vpiPacked, vpiTagged, and vpiSoft, read
-//     through the vpi_get dispatch.
-//   - Detail 1: vpi_get_value()/vpi_put_value() cannot access the value of an
-//     entire unpacked structure or union, observed through the value routines.
-
-// The fixture installs a context so the public vpi_get/vpi_get_value/
-// vpi_put_value entry points run their real dispatch and so vpi_chk_error()
-// reports the error the value routines record.
 class StructuresAndUnions : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -37,14 +23,9 @@ class StructuresAndUnions : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// The four object kinds the figure models - a struct/union declared as a
-// variable and a struct/union declared as a net.
 constexpr int kStructUnionKinds[] = {vpiStructVar, vpiUnionVar, vpiStructNet,
                                      vpiUnionNet};
 
-// Figure: a struct/union object reports whether it is packed through the
-// vpiPacked Boolean property. A packed aggregate reports TRUE; one left
-// unpacked reports FALSE.
 TEST_F(StructuresAndUnions, PackedPropertyReportsDeclaredFlag) {
   VpiObject packed_struct;
   packed_struct.type = vpiStructVar;
@@ -52,12 +33,10 @@ TEST_F(StructuresAndUnions, PackedPropertyReportsDeclaredFlag) {
   EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&packed_struct)), 1);
 
   VpiObject unpacked_struct;
-  unpacked_struct.type = vpiStructVar;  // packed defaults false
+  unpacked_struct.type = vpiStructVar;
   EXPECT_EQ(vpi_get(vpiPacked, VpiHandleOf(&unpacked_struct)), 0);
 }
 
-// Figure: a union object reports whether it is a tagged union through the
-// vpiTagged Boolean property.
 TEST_F(StructuresAndUnions, TaggedPropertyReportsDeclaredFlag) {
   VpiObject tagged_union;
   tagged_union.type = vpiUnionVar;
@@ -69,8 +48,6 @@ TEST_F(StructuresAndUnions, TaggedPropertyReportsDeclaredFlag) {
   EXPECT_EQ(vpi_get(vpiTagged, VpiHandleOf(&plain_union)), 0);
 }
 
-// Figure: a packed union reports whether it is a soft-packed union through the
-// vpiSoft Boolean property.
 TEST_F(StructuresAndUnions, SoftPropertyReportsDeclaredFlag) {
   VpiObject soft_union;
   soft_union.type = vpiUnionVar;
@@ -84,17 +61,14 @@ TEST_F(StructuresAndUnions, SoftPropertyReportsDeclaredFlag) {
   EXPECT_EQ(vpi_get(vpiSoft, VpiHandleOf(&hard_union)), 0);
 }
 
-// D1: vpi_get_value() cannot read the value of an entire unpacked structure or
-// union. The read is refused for every struct/union object kind that is not
-// packed: an error is recorded and the caller's value buffer is left untouched.
 TEST_F(StructuresAndUnions, GetValueRejectsEntireUnpackedStructOrUnion) {
   for (int kind : kStructUnionKinds) {
     VpiObject aggregate;
-    aggregate.type = kind;  // unpacked (packed defaults false)
+    aggregate.type = kind;
 
     s_vpi_value value = {};
     value.format = vpiIntVal;
-    value.value.integer = 0x5eed;  // sentinel the routine must not overwrite
+    value.value.integer = 0x5eed;
 
     vpi_get_value(VpiHandleOf(&aggregate), &value);
 
@@ -104,13 +78,10 @@ TEST_F(StructuresAndUnions, GetValueRejectsEntireUnpackedStructOrUnion) {
   }
 }
 
-// D1: vpi_put_value() likewise cannot write the value of an entire unpacked
-// structure or union. The put is rejected for every unpacked struct/union kind:
-// it returns NULL and records an error.
 TEST_F(StructuresAndUnions, PutValueRejectsEntireUnpackedStructOrUnion) {
   for (int kind : kStructUnionKinds) {
     VpiObject aggregate;
-    aggregate.type = kind;  // unpacked
+    aggregate.type = kind;
 
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -125,10 +96,6 @@ TEST_F(StructuresAndUnions, PutValueRejectsEntireUnpackedStructOrUnion) {
   }
 }
 
-// D1: the restriction is on the *unpacked* aggregate only. A packed structure
-// or union has a single vector value, so neither value routine refuses it - the
-// §37.26 guard each carries is bypassed and no error is recorded. Both routines
-// carry an independent guard, so both are checked.
 TEST_F(StructuresAndUnions, PackedStructOrUnionValueIsNotRefused) {
   for (int kind : kStructUnionKinds) {
     VpiObject aggregate;
@@ -149,10 +116,6 @@ TEST_F(StructuresAndUnions, PackedStructOrUnionValueIsNotRefused) {
   }
 }
 
-// D1 scope: the restriction names structures and unions specifically. An
-// ordinary scalar object - a reg or a net - is not a struct/union aggregate, so
-// neither value routine refuses it on §37.26's account. Both routines carry an
-// independent guard whose type-membership arm must let an ordinary object pass.
 TEST_F(StructuresAndUnions, RestrictionDoesNotApplyToOrdinaryObjects) {
   for (int kind : {vpiReg, vpiNet}) {
     VpiObject obj;
@@ -171,18 +134,6 @@ TEST_F(StructuresAndUnions, RestrictionDoesNotApplyToOrdinaryObjects) {
   }
 }
 
-// -----------------------------------------------------------------------------
-// The member edge. §37.26 draws vpiMember from the struct and union var forms
-// to the `variables` class and from the struct and union net forms to `nets`.
-// The relation was served for §37.24's interconnect net alone, and every
-// structure and union fell through to the generic child walk, which looks for a
-// child whose own type is the type asked for; vpiMember is a relation tag and
-// no object's type is one, so a structure's members were reached by nothing.
-// -----------------------------------------------------------------------------
-
-// §37.26 (figure, struct var --vpiMember--> variables): a struct variable
-// reaches the variables it holds, whatever kind each of them is. An object that
-// is not one of its members is not among them.
 TEST_F(StructuresAndUnions, AStructVariableReachesTheVariablesItHolds) {
   VpiObject aggregate;
   aggregate.type = vpiStructVar;
@@ -193,7 +144,7 @@ TEST_F(StructuresAndUnions, AStructVariableReachesTheVariablesItHolds) {
   VpiObject second;
   second.type = vpiIntVar;
   second.parent = &aggregate;
-  VpiObject typespec;  // drawn by an edge of its own, not a member
+  VpiObject typespec;
   typespec.type = vpiStructTypespec;
   typespec.parent = &aggregate;
   aggregate.children = {&first, &typespec, &second};
@@ -205,8 +156,6 @@ TEST_F(StructuresAndUnions, AStructVariableReachesTheVariablesItHolds) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// §37.26 (figure, union var): the same edge is drawn on the union form, and a
-// member's own kind may be a further aggregate.
 TEST_F(StructuresAndUnions, AUnionVariableReachesItsMembers) {
   VpiObject aggregate;
   aggregate.type = vpiUnionVar;
@@ -222,8 +171,6 @@ TEST_F(StructuresAndUnions, AUnionVariableReachesItsMembers) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// §37.26 (figure, struct net --vpiMember--> nets): the net forms carry the same
-// edge, drawn to the nets they hold rather than to variables.
 TEST_F(StructuresAndUnions, AStructNetReachesTheNetsItHolds) {
   VpiObject aggregate;
   aggregate.type = vpiStructNet;
@@ -239,9 +186,6 @@ TEST_F(StructuresAndUnions, AStructNetReachesTheNetsItHolds) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// §37.26 (figure): an aggregate holding no member reaches none, which §38.23
-// reports as no iterator, and the edge stays the aggregate's own - a variable
-// that is not a structure reaches nothing through it.
 TEST_F(StructuresAndUnions, AnAggregateWithNoMembersReachesNone) {
   VpiObject empty;
   empty.type = vpiStructVar;
@@ -256,11 +200,8 @@ TEST_F(StructuresAndUnions, AnAggregateWithNoMembersReachesNone) {
   EXPECT_EQ(vpi_iterate(vpiMember, VpiHandleOf(&plain)), nullptr);
 }
 
-// The structures and unions of a run, built from the elaborated design rather
-// than by hand.
 class StructuresOfARun : public VpiDesignRun {
  protected:
-  // The integer value of an object.
   static int IntOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -269,10 +210,6 @@ class StructuresOfARun : public VpiDesignRun {
   }
 };
 
-// §37.26 with §37.17 detail 3: a packed struct var has a member variable per
-// field, as an unpacked one does -- vpiPacked is a property of the struct var,
-// not a limit on its members -- each a child of the struct var holding its
-// field's bits. None was made for a packed struct.
 TEST_F(StructuresOfARun, APackedStructVarHasAMemberPerField) {
   Run("module top; struct packed {logic a; logic [1:0] b;} s = 3'b110;\n"
       "endmodule\n");
@@ -286,8 +223,6 @@ TEST_F(StructuresOfARun, APackedStructVarHasAMemberPerField) {
   EXPECT_EQ(IntOf(By("top.s.a")), 1);
 }
 
-// §37.26: a net of a structure type is a struct net, and one of a union type
-// a union net. Both reported vpiNet.
 TEST_F(StructuresOfARun, AStructOrUnionNetHasItsOwnKind) {
   Run("module top;\n"
       "  typedef struct packed {logic a; logic b;} pair_t;\n"
@@ -299,8 +234,6 @@ TEST_F(StructuresOfARun, AStructOrUnionNetHasItsOwnKind) {
   EXPECT_EQ(vpi_get(vpiType, By("top.u")), vpiUnionNet);
 }
 
-// §37.26: a struct net has a member net per field, its vpiParent the struct
-// net and its value that field's bits of the net's.
 TEST_F(StructuresOfARun, AStructNetHasAMemberNetPerField) {
   Run("module top;\n"
       "  typedef struct packed {logic a; logic b;} pair_t;\n"
@@ -316,9 +249,6 @@ TEST_F(StructuresOfARun, AStructNetHasAMemberNetPerField) {
   EXPECT_EQ(IntOf(By("top.n.b")), 0);
 }
 
-// §37.26: no aggregate has no members; a child whose vpiParent is another
-// object is none of this aggregate's; a struct var's child that is no
-// variable, and a struct net's that is no net or is a net bit, are none.
 TEST(StructuresAndUnionsModel, OnlyChildrenOfTheMemberKindAreMembers) {
   EXPECT_TRUE(VpiStructUnionMembers(nullptr).empty());
   VpiObject other;
@@ -345,11 +275,8 @@ TEST(StructuresAndUnionsModel, OnlyChildrenOfTheMemberKindAreMembers) {
   EXPECT_TRUE(VpiStructUnionMembers(&net).empty());
 }
 
-// A design whose unions are declared tagged, soft or neither.
 class UnionFlagsOfARun : public VpiDesignRun {};
 
-// §37.26 (figure): a union var and a union net report through vpiTagged and
-// vpiSoft whether their union was declared tagged or soft (#7101).
 TEST_F(UnionFlagsOfARun, AUnionReportsWhetherItIsTaggedOrSoft) {
   Run("module top;\n"
       "  typedef union tagged { int a; bit b; } tu_t;\n"

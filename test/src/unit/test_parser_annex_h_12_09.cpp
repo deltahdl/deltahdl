@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §H.12.9, the SystemVerilog side of Example 7: a typedef struct MyType, an
-// import f1 taking an input open array of MyType and an output one, a
-// source and a target of ten MyType each, and a call of f1 with the two.
 class ExampleSevenParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -31,8 +28,6 @@ TEST_F(ExampleSevenParsing, TheSystemVerilogSideParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The import's two formals are open arrays of MyType, one unsized unpacked
-// dimension each, the first an input and the second an output.
 TEST_F(ExampleSevenParsing, TheFormalsAreAnInputAndAnOutputOpenArray) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =

@@ -104,7 +104,6 @@ TEST(TimingControlSyntaxParsing, DelayControlMissingRParen) {
       "module m;\n"
       "  initial #(5 + 3 a = 1;\n"
       "endmodule\n");
-  // §9.4.1 owns the delay_control parenthesis; A.6.5 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got identifier", 2, "9.4.1"));
 }
@@ -114,7 +113,6 @@ TEST(TimingControlSyntaxParsing, EventControlMissingRParen) {
       "module m;\n"
       "  initial @(posedge clk a = 1;\n"
       "endmodule\n");
-  // §9.4.2 owns the event_control parenthesis; A.6.5 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got identifier", 2, "9.4.2"));
 }
@@ -124,7 +122,6 @@ TEST(TimingControlSyntaxParsing, WaitOrderMissingLParen) {
       "module m;\n"
       "  initial wait_order a, b;\n"
       "endmodule\n");
-  // §15.5.4 owns wait_order; A.6.5 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got identifier", 2, "15.5.4"));
 }
@@ -134,7 +131,6 @@ TEST(TimingControlSyntaxParsing, WaitOrderMissingRParen) {
       "module m;\n"
       "  initial wait_order(a, b ;\n"
       "endmodule\n");
-  // §15.5.4 owns wait_order; A.6.5 only states its BNF.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "15.5.4"));
 }
 
@@ -175,8 +171,6 @@ TEST(TimingControlSyntaxParsing, CycleDelayMissingSemicolon) {
       "    ##5\n"
       "  end\n"
       "endmodule\n");
-  // A cycle_delay takes a statement_or_null after it, so `end` is taken as the
-  // statement and reaches ParsePrimaryExpr, whose report is filed under §11.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
@@ -187,7 +181,6 @@ TEST(TimingControlSyntaxParsing, CycleDelayMissingRParen) {
       "    ##(5 ;\n"
       "  end\n"
       "endmodule\n");
-  // §14.11 owns the cycle_delay parenthesis; A.6.5 only states its BNF.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "14.11"));
 }
 
@@ -321,11 +314,6 @@ TEST(JumpStatementSyntaxParsing, ReturnStatementBnf) {
   EXPECT_EQ(stmt->expr, nullptr);
 }
 
-// The `[ expression ]` alternative of the A.6.5 jump_statement
-// production. The clause 12.8 rule that a value-returning function must
-// supply that expression is covered by
-// JumpStatementSyntaxParsing.ReturnValueFromNonVoidFunction in
-// test_parser_subclause_12_08.cpp.
 TEST(JumpStatementSyntaxParsing, ReturnWithExpressionBnf) {
   auto r = Parse(
       "module m;\n"
@@ -348,8 +336,6 @@ TEST(JumpStatementSyntaxParsing, ReturnMissingSemicolonBnf) {
       "    return 42\n"
       "  endfunction\n"
       "endmodule\n");
-  // §12.8 owns the jump statements; A.6.5 only states their BNF. `endfunction`
-  // stands where the ';' was wanted.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endfunction'", 4, "12.8"));
 }
@@ -359,7 +345,6 @@ TEST(JumpStatementSyntaxParsing, BreakMissingSemicolonBnf) {
       "module m;\n"
       "  initial forever begin break end\n"
       "endmodule\n");
-  // §12.8 owns the jump statements; A.6.5 only states their BNF.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 2, "12.8"));
 }
 
@@ -368,7 +353,6 @@ TEST(JumpStatementSyntaxParsing, ContinueMissingSemicolonBnf) {
       "module m;\n"
       "  initial forever begin continue end\n"
       "endmodule\n");
-  // §12.8 owns the jump statements; A.6.5 only states their BNF.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 2, "12.8"));
 }
 
@@ -423,7 +407,6 @@ TEST(WaitStatementSyntaxParsing, WaitMissingLParenErrors) {
       "    wait done) a = 1;\n"
       "  end\n"
       "endmodule\n");
-  // §9.4.3 owns the wait condition parenthesis; A.6.5 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got identifier", 3, "9.4.3"));
 }
@@ -435,8 +418,6 @@ TEST(WaitStatementSyntaxParsing, WaitForkMissingSemicolonErrors) {
       "    wait fork\n"
       "  end\n"
       "endmodule\n");
-  // §9.6.1 owns wait fork; A.6.5 only states its BNF. `end` stands where the
-  // ';' was wanted.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "9.6.1"));
 }
 
@@ -473,9 +454,6 @@ TEST(TimingControlSyntaxParsing, ParenthesizedEventExprNested) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kPosedge);
 }
 
-// event_trigger ::= ->> [ delay_or_event_control ]
-// hierarchical_event_identifier ; delay_or_event_control covers delay_control |
-// event_control | repeat ( expression ) event_control.
 TEST(EventTriggerSyntaxParsing, NonblockingWithEventControlClockingEvent) {
   auto r = Parse(
       "module m;\n"
@@ -530,15 +508,10 @@ TEST(EventTriggerSyntaxParsing, NonblockingRepeatEventControlMissingAt) {
       "module m;\n"
       "  initial ->> repeat (3) ev;\n"
       "endmodule\n");
-  // §15.5.1 owns the ->> event trigger; A.6.5 only states its BNF. The repeat
-  // form of an event control demands the '@' this source leaves out.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '@', got identifier", 2, "15.5.1"));
 }
 
-// event_trigger ::= ->> [ delay_or_event_control ] ...
-// delay_or_event_control admits a delay_control (# delay_value) alternative,
-// distinct from the event_control / repeat forms exercised above.
 TEST(EventTriggerSyntaxParsing, NonblockingWithDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -556,8 +529,6 @@ TEST(EventTriggerSyntaxParsing, NonblockingWithDelayControl) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-// event_trigger ::= ->> [ delay_or_event_control ] ...
-// The delay_or_event_control is optional; the bare ->> form omits it entirely.
 TEST(EventTriggerSyntaxParsing, NonblockingWithoutDelayOrEventControl) {
   auto r = Parse(
       "module m;\n"
@@ -576,7 +547,6 @@ TEST(EventTriggerSyntaxParsing, NonblockingWithoutDelayOrEventControl) {
   EXPECT_NE(stmt->expr, nullptr);
 }
 
-// event_trigger ::= -> hierarchical_event_identifier nonrange_select ;
 TEST(EventTriggerSyntaxParsing, BlockingEventTrigger) {
   auto r = Parse(
       "module m;\n"
@@ -604,9 +574,6 @@ TEST(EventTriggerSyntaxParsing, BlockingEventTriggerHierarchical) {
   EXPECT_EQ(stmt->kind, StmtKind::kEventTrigger);
 }
 
-// event_trigger ::= -> hierarchical_event_identifier nonrange_select ;
-// The nonrange_select permits a bit/element select on the event identifier,
-// e.g. triggering one element of an event array.
 TEST(EventTriggerSyntaxParsing, BlockingEventTriggerWithSelect) {
   auto r = Parse(
       "module m;\n"
@@ -623,9 +590,6 @@ TEST(EventTriggerSyntaxParsing, BlockingEventTriggerWithSelect) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSelect);
 }
 
-// disable_statement ::= disable hierarchical_task_identifier ;
-//                    |  disable hierarchical_block_identifier ;
-//                    |  disable fork ;
 TEST(DisableStatementSyntaxParsing, DisableHierarchicalIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -674,13 +638,10 @@ TEST(DisableStatementSyntaxParsing, DisableMissingSemicolon) {
       "module m;\n"
       "  initial disable foo\n"
       "endmodule\n");
-  // §9.6.2 owns the disable statement; A.6.5 only states its BNF. `endmodule`
-  // stands where the ';' was wanted.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "9.6.2"));
 }
 
-// event_expression ::= [ edge_identifier ] expression [ iff expression ]
 TEST(TimingControlSyntaxParsing, EventExprWithIff) {
   auto r = Parse(
       "module m;\n"
@@ -714,7 +675,6 @@ TEST(TimingControlSyntaxParsing, EventExprPlainSignalIff) {
   EXPECT_NE(stmt->events[0].iff_condition, nullptr);
 }
 
-// clocking_event ::= @ ps_identifier | @ hierarchical_identifier
 TEST(TimingControlSyntaxParsing, EventControlBareIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -731,8 +691,6 @@ TEST(TimingControlSyntaxParsing, EventControlBareIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
-// event_expression ::= event_expression or event_expression
-//                   |  event_expression , event_expression
 TEST(TimingControlSyntaxParsing, EventExprCommaSeparated) {
   auto r = Parse(
       "module m;\n"
@@ -763,9 +721,6 @@ TEST(TimingControlSyntaxParsing, EventExprOrSeparated) {
   ASSERT_EQ(stmt->events.size(), 2u);
 }
 
-// event_expression ::= [ edge_identifier ] expression [ iff expression ]
-// The edge_identifier has three forms; posedge/negedge are exercised above,
-// this covers the remaining `edge` (any-transition) form.
 TEST(TimingControlSyntaxParsing, EventExprEdgeKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -782,12 +737,6 @@ TEST(TimingControlSyntaxParsing, EventExprEdgeKeyword) {
   EXPECT_EQ(stmt->events[0].edge, Edge::kEdge);
 }
 
-// delay_or_event_control ::= repeat ( expression ) event_control
-// observed via intra-assignment timing prefix (already covered for ->>
-// above; here we observe the analogous form in an assignment statement).
-// procedural_timing_control_statement ::= procedural_timing_control
-//                                         statement_or_null
-// where procedural_timing_control includes cycle_delay (## ...).
 TEST(TimingControlSyntaxParsing, CycleDelayBeforeStatement) {
   auto r = Parse(
       "module m;\n"
@@ -803,8 +752,6 @@ TEST(TimingControlSyntaxParsing, CycleDelayBeforeStatement) {
   EXPECT_NE(stmt->body, nullptr);
 }
 
-// clocking_event ::= @ ps_identifier | @ hierarchical_identifier
-//                  | @ ( event_expression )
 TEST(TimingControlSyntaxParsing, EventControlHierarchicalIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -821,14 +768,6 @@ TEST(TimingControlSyntaxParsing, EventControlHierarchicalIdentifier) {
   EXPECT_NE(stmt->events[0].signal, nullptr);
 }
 
-// A.6.5 writes `wait_order ( hierarchical_identifier { ,
-// hierarchical_identifier } ) action_block`, so an operand that is an
-// expression rather than a name is outside the grammar. It parsed with no
-// report because ParseWaitOrderStmt read each operand with ParseExpr, which
-// accepts every expression Annex A writes.
-//
-// The other operand is a bare name that is legal, so the source differs from a
-// legal one in the one operand the report has to be about.
 TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsAnExpressionIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -841,11 +780,6 @@ TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsAnExpressionIsRejected) {
       "15.5.4"));
 }
 
-// The same rule reached by the operand the reading behind #3310 turned up. A
-// function_subroutine_call is the one that reaches an elaborator walk over
-// expressions: ForEachChildExpr hands Stmt::wait_order_events to every walker
-// converted onto it, and the reason no case covers a call there is that A.6.5
-// admits none.
 TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsACallIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -858,11 +792,6 @@ TEST(TimingControlSyntaxParsing, WaitOrderOperandThatIsACallIsRejected) {
       "15.5.4"));
 }
 
-// A.6.5's operand is a hierarchical_identifier and not an identifier, and A.9.3
-// writes one as `[ $root . ] { identifier constant_bit_select . } identifier`.
-// A dotted name is therefore legal, and a check demanding a bare name would
-// reject a source nothing reported before. The seven cases above all write bare
-// identifiers, so none of them holds this shut.
 TEST(TimingControlSyntaxParsing, WaitOrderOperandMayBeADottedName) {
   auto r = Parse(
       "module m;\n"

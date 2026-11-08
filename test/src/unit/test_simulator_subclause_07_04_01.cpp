@@ -23,8 +23,6 @@ TEST(PackedArraySimulation, MultiDimPackedArrayAsSingleVector) {
   EXPECT_EQ(v, 0xABCDu);
 }
 
-// §7.4.5: a slice of a packed array selects contiguous elements, so `x[1:1]`
-// of `logic [1:0][7:0] x` is the byte element 1, not bit 1.
 TEST(PackedArraySimulation, MultiDimPackedArrayPartSelect) {
   auto v = RunAndGet(
       "module t;\n"
@@ -54,9 +52,6 @@ TEST(PackedArraySimulation, PackedArrayBitSelect) {
 }
 
 TEST(PackedArraySimulation, PartSelectIsUnsigned) {
-  // When a part-select extracts the high bits of a signed packed array,
-  // the result must be treated as unsigned. Widening it back to a wider
-  // signed receiver must zero-extend (not sign-extend) the top bit.
   auto v = RunAndGet(
       "module t;\n"
       "  logic signed [7:0] x;\n"
@@ -71,8 +66,6 @@ TEST(PackedArraySimulation, PartSelectIsUnsigned) {
 }
 
 TEST(PackedArraySimulation, SignedPackedArrayWidensWithSignExtension) {
-  // A packed array declared signed shall behave as a signed vector when
-  // assigned to a wider signed receiver, so the MSB sign-extends.
   auto v = RunAndGet(
       "module t;\n"
       "  logic signed [7:0] x;\n"
@@ -87,9 +80,6 @@ TEST(PackedArraySimulation, SignedPackedArrayWidensWithSignExtension) {
 }
 
 TEST(PackedArraySimulation, IntCanBeSelectedAsPackedArray) {
-  // A predefined-width integer type (here, int with predefined width 32)
-  // matches and can be selected from as if it were a packed array with a
-  // single [n-1:0] dimension.
   auto v = RunAndGet(
       "module t;\n"
       "  int x;\n"
@@ -104,10 +94,6 @@ TEST(PackedArraySimulation, IntCanBeSelectedAsPackedArray) {
 }
 
 TEST(PackedArraySimulation, ElementOfPackedArrayIsUnsigned) {
-  // An individual element of a packed array (here, the high [7:0] slice
-  // of a multi-dim packed array) is unsigned by default, so widening it
-  // to a wider signed receiver must zero-extend the top bit instead of
-  // sign-extending it.
   auto v = RunAndGet(
       "module t;\n"
       "  logic [1:0][7:0] x;\n"
@@ -123,9 +109,6 @@ TEST(PackedArraySimulation, ElementOfPackedArrayIsUnsigned) {
 }
 
 TEST(PackedArraySimulation, ByteCanBeSelectedAsPackedArray) {
-  // Corroborates that the predefined-width-as-packed-vector rule is not
-  // unique to int: a byte (predefined width 8) can also be part-selected
-  // as though it were a packed [7:0] type.
   auto v = RunAndGet(
       "module t;\n"
       "  byte x;\n"
@@ -139,11 +122,6 @@ TEST(PackedArraySimulation, ByteCanBeSelectedAsPackedArray) {
   EXPECT_EQ(v, 0xAu);
 }
 
-// §7.4.1: an element of a packed array is signed when its type is a named type
-// declared signed, so widening one sign-extends and it compares below zero.
-// Only an element of that type is: `z[1]` of `s8_t [1:0][1:0] z` is a packed
-// array of two s8_t and stays unsigned, while `z[1][0]` is an s8_t. The rule
-// holds for a one-bit named type too, whose element a bit-select reads.
 TEST(PackedArraySimulation, ElementOfSignedNamedTypeIsSigned) {
   SimFixture f;
   std::string out = RunCapture(
@@ -176,11 +154,6 @@ TEST(PackedArraySimulation, ElementOfSignedNamedTypeIsSigned) {
   EXPECT_EQ(out, "ff80 ff80 00008080 ffff 1\nff80 0180 1\n");
 }
 
-// §7.4.1 with A.2.2.1: packed dimensions written after an enumeration's body
-// make a packed array of the enumeration, each element as wide as its base
-// type, the 2-bit `bit [1:0]` or the 32-bit default int, and an index selects
-// one element; they are not the base type's dimension, which they used to
-// replace (#7312).
 TEST(PackedArraySimulation, EnumWithDimsAfterItsBodyIsAnArrayOfIt) {
   SimFixture f;
   std::string out = RunCapture(
@@ -200,10 +173,6 @@ TEST(PackedArraySimulation, EnumWithDimsAfterItsBodyIsAnArrayOfIt) {
   EXPECT_EQ(out, "8 24 2 1\n64 1 0 7\n");
 }
 
-// §7.4.1: a packed structure or union with packed dimensions after its body is
-// a packed array of it, as wide as its members make one element times the
-// elements, written plainly, through a typedef, or as a member, and an index
-// selects one whole element (#7313).
 TEST(PackedArraySimulation, AggregateWithDimsAfterItsBodyIsAnArrayOfIt) {
   SimFixture f;
   std::string out = RunCapture(
@@ -225,10 +194,6 @@ TEST(PackedArraySimulation, AggregateWithDimsAfterItsBodyIsAnArrayOfIt) {
   EXPECT_EQ(out, "64 00000000abcd0000 abcd\n24 11\n");
 }
 
-// §7.4.1 with §7.4.4: an enumeration with packed dimensions after its body,
-// declared inside a procedural block through a typedef or inline, is a packed
-// array of it, so an index selects one whole enumeration; a block's plain
-// enumeration with a base range is still indexed by bit (#7318).
 TEST(PackedArraySimulation, BlockEnumArrayIsIndexedByElement) {
   SimFixture f;
   std::string out = RunCapture(

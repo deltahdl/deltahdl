@@ -8,9 +8,6 @@
 using namespace delta;
 namespace {
 
-// 12.7.6: without a timing control in its body, a forever loop would spin in
-// zero time, so the repeated statement here waits on a delay. The A.6.8 file
-// carries the plain assignment body.
 TEST(LoopSyntaxParsing, ForeverLoopWithTimingControlledBody) {
   auto r = Parse(
       "module m;\n"
@@ -63,9 +60,6 @@ TEST(LoopSyntaxParsing, ErrorForeverMissingBody) {
       "    forever\n"
       "  end\n"
       "endmodule\n");
-  // §12.7.6 gives forever no report of its own for a missing body: the parser
-  // asks for the statement and the `end` on line 4 is read as an expression,
-  // so the report is the §11.2 one.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 

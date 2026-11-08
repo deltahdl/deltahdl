@@ -1,12 +1,3 @@
-// §6.20.2 Value parameters — the runtime value a parameter carries.
-//
-// A parameter's value is fixed during elaboration, but whether it survives to
-// run time as the type it was declared with is a property of the lowering, so
-// these tests read the value back out of a running module rather than
-// inspecting the elaborated parameter. A real parameter is the case that
-// distinguishes the two: an integer-only representation resolves it to
-// something, or fails to resolve it at all, and either way the fraction is gone
-// before any process can read it.
 #include <gtest/gtest.h>
 
 #include <string>
@@ -19,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.20.2: a parameter declared with a real type takes a real value, so a
-// fractional default must read back whole. A value truncated to an integer
-// would display 2, and one that failed to resolve would leave the name
-// undeclared and display 0.
 TEST(ValueParameterSim, RealParameterKeepsItsFraction) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -33,10 +20,6 @@ TEST(ValueParameterSim, RealParameterKeepsItsFraction) {
             "2.5\n");
 }
 
-// The localparam form of the same rule. §6.20.4 makes a localparam a parameter
-// that cannot be overridden, not a different kind of value, so its real-ness is
-// carried the same way -- and it is the form a nested expression is most likely
-// to name.
 TEST(ValueParameterSim, RealLocalparamKeepsItsFraction) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -47,10 +30,6 @@ TEST(ValueParameterSim, RealLocalparamKeepsItsFraction) {
             "0.125\n");
 }
 
-// §6.20.2 covers a value parameter wherever it is written, and a parameter port
-// is the other place it can be written. The two positions are elaborated by
-// different code, so a real value carried in one of them says nothing about the
-// other, and this is the port half.
 TEST(ValueParameterSim, RealParameterPortKeepsItsFraction) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t #(parameter real R = 1.5);\n"
@@ -60,10 +39,6 @@ TEST(ValueParameterSim, RealParameterPortKeepsItsFraction) {
             "1.5\n");
 }
 
-// A real parameter whose default happens to have no fraction is still a real,
-// so it divides as one. Reading the default as the integer it can also be
-// spelled as would make this 0 -- which is why the real fold is tried before
-// the integer fold rather than after it.
 TEST(ValueParameterSim, RealParameterWithoutAFractionIsStillReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -74,9 +49,6 @@ TEST(ValueParameterSim, RealParameterWithoutAFractionIsStillReal) {
             "0.5\n");
 }
 
-// The guard that carrying a real value did not disturb the integer path: an
-// integer-typed parameter set from a real constant is still converted per
-// §6.12.1 (round to nearest, ties away from zero), so 2.5 becomes 3.
 TEST(ValueParameterSim, IntegerParameterFromRealConstantStillRounds) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -87,11 +59,6 @@ TEST(ValueParameterSim, IntegerParameterFromRealConstantStillRounds) {
             "3\n");
 }
 
-// §6.20.2 (printed page 126): a parameter with a range specification has the
-// range of its declaration, so a 96-bit localparam holds all 96 bits of its
-// value. The three words are read back through part-selects, each a different
-// value, so a value cut to 64 bits (hi reads 0) and one whose literal was lost
-// whole (every word reads 0) are both told from the right one.
 TEST(ValueParameterSim, WideLocalparamKeepsEveryWordOfItsValue) {
   SimFixture f;
   auto* hi = RunAndFindVar(
@@ -116,8 +83,6 @@ TEST(ValueParameterSim, WideLocalparamKeepsEveryWordOfItsValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2 with §11.4.10: the same parameter as an operand, shifted by a whole
-// word, so the high word is what the expression reads, not a part-select.
 TEST(ValueParameterSim, WideParameterOperandCarriesItsHighWord) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -132,9 +97,6 @@ TEST(ValueParameterSim, WideParameterOperandCarriesItsHighWord) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2 (printed 126): a localparam set from another parameter takes that
-// parameter's whole value, shifted here so the word read is not the one a
-// copy of the low word alone would hold.
 TEST(ValueParameterSim, WideLocalparamSetFromAWideParameterKeepsEveryWord) {
   SimFixture f;
   auto* hi = RunAndFindVar(
@@ -150,10 +112,6 @@ TEST(ValueParameterSim, WideLocalparamSetFromAWideParameterKeepsEveryWord) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.2 with §6.20.2 (printed 126): an instance's parameter value
-// assignment does not change the declared range, so a 96-bit literal given to
-// the instance reaches the instance whole. The override is folded on a path of
-// its own, so the declaration test above says nothing about it.
 TEST(ValueParameterSim, WideParameterOverriddenAtTheInstanceKeepsEveryWord) {
   SimFixture f;
   auto* hi = RunAndFindVar(
@@ -176,9 +134,6 @@ TEST(ValueParameterSim, WideParameterOverriddenAtTheInstanceKeepsEveryWord) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.2: the override's expression is written in the instantiating module,
-// so a parent's own 96-bit parameter handed down by name is read there, where
-// it has storage, and not in the instance, which declares no K.
 TEST(ValueParameterSim, WideParameterOverrideNamingTheParentsParameter) {
   SimFixture f;
   auto* hi = RunAndFindVar(
@@ -196,18 +151,6 @@ TEST(ValueParameterSim, WideParameterOverrideNamingTheParentsParameter) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2 (printed pages 126-127): a parameter declared with neither a type
-// nor a range takes the type and range of its final value, so `parameter p1 =
-// 13'h7e` is a 13-bit logic vector, `newconst3 = 3'h4` a 3-bit one and
-// `newconst4 = 4`, whose value is unsized, at least 32 bits; a parameter
-// declared with a range, `[31:0] dec_const = 1'b1`, has its declaration's 32
-// whatever the value's size, and `signed [3:0]` its four. These are the
-// clause's own examples, read with $bits inside the module, and every
-// untyped parameter answered 32 while the lowering gave one 32 bits whenever
-// the declaration fixed no width. %h of p1 prints the four digits its 13 bits
-// need, not the eight of a 32-bit word, and the second line reads the values
-// through the same storage: $signed(4'b1100 + mux_selector) is -4 at the
-// operands' four bits, byte_mask is 7 from `byte_size - 1`.
 TEST(ValueParameterSim, UntypedParameterIsAsWideAsItsSizedLiteral) {
   SimFixture f;
   std::string printed = RunCapture(
@@ -237,13 +180,6 @@ TEST(ValueParameterSim, UntypedParameterIsAsWideAsItsSizedLiteral) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2 (printed pages 126-127): the final value is the one after every
-// override, so a parameter port declared `parameter P = 13'h7e` is 13 bits
-// wide in an instance that keeps the default and 5 bits wide in one that
-// overrides it with 5'd9 (§23.10.2, printed 766); a value's type includes its
-// sign, so `parameter N = -1` is a signed 32-bit vector that prints -1, and a
-// bare `signed` with no range, `parameter signed S = 4'sd7`, has the range of
-// its value, four bits, where the lowering read the implicit type's one bit.
 TEST(ValueParameterSim, UntypedParameterPortTakesTheWidthOfItsFinalValue) {
   SimFixture f;
   std::string printed = RunCapture(
@@ -265,17 +201,6 @@ TEST(ValueParameterSim, UntypedParameterPortTakesTheWidthOfItsFinalValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2 (printed pages 126-127): a parameter declared with neither type nor
-// range takes the type of its final value, and a real value makes it a real
-// parameter, so `parameter r = 5.7` -- the clause's own example, which its
-// comment calls a real parameter -- reads 5.7, and `average_delay = (r + f)
-// / 2`, real arithmetic on it with the integer f of 9, is the real 7.35,
-// which $rtoi truncates to 7. Both read 0 while a real fold was tried for a
-// declared real type alone and an untyped parameter's real literal folded
-// as no integer at all, and while a fold reading a real parameter's name
-// found the 0 its integer slot holds: `twice = r1 * 2` from the declared
-// `real r1 = 3.5e17` is 7.0e17, and the conversion of §6.12.1, which the
-// clause applies to parameters, rounds `int ri = r` to 6.
 TEST(ValueParameterSim, UntypedParameterWithARealValueIsReal) {
   SimFixture f;
   std::string printed = RunCapture(
@@ -295,11 +220,6 @@ TEST(ValueParameterSim, UntypedParameterWithARealValueIsReal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.1 (printed page 125) writes the same declarations in a parameter port
-// list, so an untyped port whose default is real arithmetic on an earlier
-// real port, `parameter b = a * 2` after `parameter real a = 1.5`, is the
-// real 3.0 in the instance, and an untyped port with a real literal default,
-// `parameter c = 0.25`, reads 0.25 in an instance that keeps the default.
 TEST(ValueParameterSim, UntypedParameterPortWithARealDefaultIsReal) {
   SimFixture f;
   std::string printed = RunCapture(
@@ -315,11 +235,6 @@ TEST(ValueParameterSim, UntypedParameterPortWithARealDefaultIsReal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2 gives a class value parameter declared `real` a real value, as it
-// does a module's (§8.25's own example declares `real D = 1.5`). The default,
-// a named override, twice each in a method, and the default read through a
-// typedef of a specialization are five different reals, so the value read at
-// every site has to be the specialization's own and keep its fraction.
 TEST(ValueParameterSim, RealClassParamKeepsItsFractionInEverySpecialization) {
   SimFixture f;
   EXPECT_EQ(
@@ -340,10 +255,6 @@ TEST(ValueParameterSim, RealClassParamKeepsItsFractionInEverySpecialization) {
       "1.5 2.25 3 4.5 1.5\n");
 }
 
-// §6.20.2 applies §6.12.1's conversion between real and integer values to
-// parameters, a class's included, so an int class parameter given 2.5 holds
-// 3 (round to nearest, ties away from zero) rather than being rejected or
-// truncated to 2.
 TEST(ValueParameterSim, IntegerClassParamFromRealConstantRounds) {
   SimFixture f;
   EXPECT_EQ(
@@ -358,11 +269,6 @@ TEST(ValueParameterSim, IntegerClassParamFromRealConstantRounds) {
       "3\n");
 }
 
-// §6.20.2 makes a value parameter a constant, and §7.4.1 lets a packed
-// dimension's bound be any constant expression, so a variable declared in a
-// named block with `[W-1:0]` is W bits wide there as it is at module scope.
-// All ones is the discriminating value: a variable sized at the one bit of its
-// base type reads 1, one at the 32-bit carrier 4294967295.
 TEST(ValueParameterSim, NamedBlockVariableSizedByParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -379,8 +285,6 @@ TEST(ValueParameterSim, NamedBlockVariableSizedByParameter) {
             "65535 4095 16\n");
 }
 
-// The same declaration in a subroutine body, static and automatic function and
-// a task, which a body's own declaration path sizes.
 TEST(ValueParameterSim, SubroutineLocalSizedByParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -404,10 +308,6 @@ TEST(ValueParameterSim, SubroutineLocalSizedByParameter) {
             "65535 65535 65535\n");
 }
 
-// A for-loop initialization declares its variable with the same data type, in
-// a process and in a function body alike. Starting at all ones, a 16-bit
-// counter wraps to 0 on its first increment, so the two values it takes sum to
-// 65535; the count bounds the loop whatever width the variable was given.
 TEST(ValueParameterSim, ForInitVariableSizedByParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -432,9 +332,6 @@ TEST(ValueParameterSim, ForInitVariableSizedByParameter) {
             "65535\n0\n65535\n");
 }
 
-// A parameter is a constant of the instance that declares it (§23.10), so two
-// instances given different widths declare their block variables at their own
-// widths rather than at one fold made for the module.
 TEST(ValueParameterSim, BlockVariableSizedByEachInstancesParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter W = 4, parameter D = 1);\n"
@@ -452,10 +349,6 @@ TEST(ValueParameterSim, BlockVariableSizedByEachInstancesParameter) {
             "255\n7\n");
 }
 
-// §6.20.2 with A.2.8: a parameter a procedural block, a task or a function
-// declares with no type and no range takes the type and range of its value,
-// as a module's does. Odd and even values tell the one bit an implicit type
-// would give apart from the 32 the value has: 3 would read 1 and 20 read 0.
 TEST(ValueParameterSimulation,
      BlockAndSubroutineParametersTakeTheirValuesType) {
   SimFixture f;
@@ -483,10 +376,6 @@ TEST(ValueParameterSimulation,
             "3 40 11\n9\n");
 }
 
-// §6.20.2 with §23.10: a block parameter written with neither type nor range
-// is real where its value is, and a signing keyword written alone sets the
-// signedness while the range is still the value's. One written with a type or
-// a range keeps it, the value converted to it.
 TEST(ValueParameterSimulation, BlockParameterTakesRealAndWrittenSigning) {
   SimFixture f;
   EXPECT_EQ(
@@ -506,11 +395,6 @@ TEST(ValueParameterSimulation, BlockParameterTakesRealAndWrittenSigning) {
       "1.500000 8 -16 4294967295 44 9\n");
 }
 
-// §6.20.2: a class parameter whose type is a typedef name holds its value at
-// that type, so `nib P = 12'hFFF` on `typedef bit [3:0] nib` is 15 when a
-// method reads it. Its storage was sized with no typedef but the class's type
-// parameters in reach, which left the name unsized and P at the
-// initializer's twelve bits, 4095.
 TEST(ValueParameterSimulation, ClassParameterOfATypedefTypeIsConverted) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef bit [3:0] nib;\n"
@@ -527,11 +411,6 @@ TEST(ValueParameterSimulation, ClassParameterOfATypedefTypeIsConverted) {
             "15\n");
 }
 
-// §6.20.2 with §6.19: a package parameter of a typedef type is converted to
-// it before an enumeration member names it, so `A = P` over `nib P = 12'hFFF`
-// is 15, and `B = W` over `nib [1:0] W`, whose dimensions multiply the
-// typedef's four bits (§7.4.4), is 255. The lowerer folded both uncut while
-// creating the package's enumeration constants.
 TEST(ValueParameterSimulation, PackageEnumMemberFromATypedefParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -547,9 +426,6 @@ TEST(ValueParameterSimulation, PackageEnumMemberFromATypedefParameter) {
             "15 255\n");
 }
 
-// §6.20.2 with §6.12.1: a class parameter whose typedef names a real type is
-// a real, so `r_t R = 2.5` keeps its fraction rather than being cut to the
-// bits of an integral type as wide as the real.
 TEST(ValueParameterSimulation, ClassParameterOfARealTypedefStaysReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef real r_t;\n"
@@ -566,11 +442,6 @@ TEST(ValueParameterSimulation, ClassParameterOfARealTypedefStaysReal) {
             "2.5\n");
 }
 
-// §6.20.2 with §8.23: a class nested in another may declare a typedef and a
-// parameter of it, which holds its value at that type, so `t P = 12'hFFF` on
-// `typedef bit [3:0] t` reads 15 through an `Outer::Inner` object's method.
-// The parameter was sized by a lookup of the typedef under `Inner` alone,
-// where the design records it under `Outer::Inner`, and kept 4095.
 TEST(ValueParameterSimulation, NestedClassParameterOfItsOwnTypedef) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class Outer;\n"
@@ -588,9 +459,6 @@ TEST(ValueParameterSimulation, NestedClassParameterOfItsOwnTypedef) {
             "15\n");
 }
 
-// §6.20.2 with §6.11.2: a parameter of a 2-state type is of that type, so
-// each x or z bit of its value is held as 0, whichever 2-state type it is;
-// the 4-state `logic` beside them keeps its x and z.
 TEST(ValueParameterSimulation, TwoStateModuleParameterTakesXAndZAsZero) {
   SimFixture f;
   EXPECT_EQ(
@@ -608,7 +476,6 @@ TEST(ValueParameterSimulation, TwoStateModuleParameterTakesXAndZAsZero) {
       "1000 0 01010110 0012 0 1x0z\n");
 }
 
-// The override of a 2-state parameter port is converted as its default is.
 TEST(ValueParameterSimulation, TwoStateParameterPortOverrideTakesXAndZAsZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter int W = 7);\n"
@@ -621,9 +488,6 @@ TEST(ValueParameterSimulation, TwoStateParameterPortOverrideTakesXAndZAsZero) {
             "10\n");
 }
 
-// §26.2: a package's parameter is converted to its declared type as a
-// module's is, a 2-state type written as a typedef the package declares
-// among them; the `logic` one keeps its x and z.
 TEST(ValueParameterSimulation, TwoStatePackageParameterTakesXAndZAsZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package pk;\n"
@@ -641,7 +505,6 @@ TEST(ValueParameterSimulation, TwoStatePackageParameterTakesXAndZAsZero) {
             "1000 0 0101 1x0z\n");
 }
 
-// §3.12.1: the compilation unit's parameters are stored as a package's are.
 TEST(ValueParameterSimulation, TwoStateCompilationUnitParameterTakesZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("parameter bit [3:0] CU = 4'bz1x1;\n"
@@ -653,9 +516,6 @@ TEST(ValueParameterSimulation, TwoStateCompilationUnitParameterTakesZero) {
             "0101 z1x1\n");
 }
 
-// §8.25: a class's parameter port, its body parameter and a port of a
-// typedef type are converted to their 2-state types, read through the class
-// scope and through an object; the `logic` body parameter keeps x and z.
 TEST(ValueParameterSimulation, TwoStateClassParameterTakesXAndZAsZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef bit [3:0] nib_t;\n"
@@ -675,9 +535,6 @@ TEST(ValueParameterSimulation, TwoStateClassParameterTakesXAndZAsZero) {
             "0 1001 00000101 1x0z 1001\n");
 }
 
-// §8.25.1: `C#(actual)::P` names the parameter of that specialization, whose
-// actual is converted to the declared type as an object's is: cut or
-// extended to the type's width, and x and z taken as 0 for a 2-state type.
 TEST(ValueParameterSimulation, SpecializationActualIsConvertedToItsType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C #(parameter int CI = 1, bit [3:0] CN = 3);\n"
@@ -691,8 +548,6 @@ TEST(ValueParameterSimulation, SpecializationActualIsConvertedToItsType) {
             "3 32 1110 0101\n");
 }
 
-// §6.20.2 holds for a parameter wherever it is written: an interface's and
-// a generate block's 2-state parameters are converted too.
 TEST(ValueParameterSimulation, TwoStateInterfaceAndGenerateParametersTakeZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc;\n"
@@ -709,7 +564,6 @@ TEST(ValueParameterSimulation, TwoStateInterfaceAndGenerateParametersTakeZero) {
             "00000003 1010\n");
 }
 
-// A program's 2-state parameter, the remaining place one is written.
 TEST(ValueParameterSimulation, TwoStateProgramParameterTakesXAndZAsZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program pg;\n"
@@ -723,8 +577,6 @@ TEST(ValueParameterSimulation, TwoStateProgramParameterTakesXAndZAsZero) {
             "00001111\n");
 }
 
-// §6.11.1: `time` is a 64-bit unsigned type, so a parameter of it is 64 bits,
-// -1 reads as 2**64-1 rather than -1, and a real is rounded (§6.12.1).
 TEST(ValueParameterSimulation, TimeParameterIsSixtyFourUnsignedBits) {
   SimFixture f;
   EXPECT_EQ(
@@ -739,9 +591,6 @@ TEST(ValueParameterSimulation, TimeParameterIsSixtyFourUnsignedBits) {
       "5 64 18446744073709551615 3 1\n");
 }
 
-// §6.12: a shortreal is single precision, so a shortreal parameter holds 32
-// bits and the binary32 nearest its value -- 0.1 reads 0.100000001490 and
-// 16777217 reads 16777216 -- while an integral value is made a real.
 TEST(ValueParameterSimulation, ShortrealParameterHoldsASinglePrecisionValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -756,7 +605,6 @@ TEST(ValueParameterSimulation, ShortrealParameterHoldsASinglePrecisionValue) {
             "1.5 32 0.100000001490 16777216.0 1.75\n");
 }
 
-// The parameter port form, its override converted to shortreal as well.
 TEST(ValueParameterSimulation,
      ShortrealParameterPortOverrideIsSinglePrecision) {
   SimFixture f;
@@ -770,7 +618,6 @@ TEST(ValueParameterSimulation,
             "0.100000001490 32\n");
 }
 
-// A package's, a class port's and a class body's shortreal parameters.
 TEST(ValueParameterSimulation, ShortrealPackageAndClassParameters) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package pk;\n"
@@ -788,8 +635,6 @@ TEST(ValueParameterSimulation, ShortrealPackageAndClassParameters) {
             "0.100000001490 32 0.100000001490 32 0.100000001490\n");
 }
 
-// §6.18: a typedef naming shortreal gives a parameter its type, in a module,
-// a package and a class alike.
 TEST(ValueParameterSimulation, ShortrealTypedefParameterIsSinglePrecision) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef shortreal sr_t;\n"
@@ -807,8 +652,6 @@ TEST(ValueParameterSimulation, ShortrealTypedefParameterIsSinglePrecision) {
             "0.100000001490 32 0.100000001490 32 0.100000001490\n");
 }
 
-// §6.12.1: a real-typed parameter given an integral value holds it as a real,
-// so it divides as one -- in a package and in a class's port and body.
 TEST(ValueParameterSimulation,
      RealPackageAndClassParametersOfAnIntegerAreReal) {
   SimFixture f;
@@ -828,8 +671,6 @@ TEST(ValueParameterSimulation,
       "3.5 3.5 3.5 3.5 3.5\n");
 }
 
-// §6.18: a module parameter of a typedef naming real is real, its fraction
-// kept, an integral default made a real and an integral override too.
 TEST(ValueParameterSimulation, RealTypedefModuleParameterIsReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef real r_t;\n"

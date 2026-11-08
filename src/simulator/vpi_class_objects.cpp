@@ -38,11 +38,6 @@ namespace delta {
 
 namespace {
 
-// §37.17 with §8.3: the kind of variable a property declared as `member` is,
-// a class var where its type names a class the run knows, a package's through
-// its scope by the "p::P" key the run holds it under (§26.3), and where it
-// declares unpacked dimensions, a named event array for an array of events
-// (§37.33 with §37.27) and an array var for any other.
 int PropertyVariableKind(const ClassMember& member, SimContext& ctx) {
   if (!member.unpacked_dims.empty()) {
     return member.data_type.kind == DataTypeKind::kEvent ? vpiNamedEventArray
@@ -58,10 +53,6 @@ int PropertyVariableKind(const ClassMember& member, SimContext& ctx) {
   return kNamesClass ? vpiClassVar : VpiDataTypeVariableKind(type.kind);
 }
 
-// §37.33 detail 7: the elements of the array of virtual interfaces `var`
-// stands as, each a virtual interface var of its own, named by an index of
-// each dimension the array declares, so that a vpiVirtualInterfaceVar
-// iteration of the class obj returns each separately.
 void MakeVifArrayElements(VpiObject* var, const VpiAttachBuild& build) {
   std::vector<std::string> names{std::string(var->name)};
   for (const std::vector<int>& dim : var->array_dim_indices) {
@@ -83,9 +74,6 @@ void MakeVifArrayElements(VpiObject* var, const VpiAttachBuild& build) {
   }
 }
 
-// §37.33 detail 5: the class typespec the variable `var` was declared with,
-// where it is a class var, as the property of its name the class defn `defn`
-// holds it; nothing where the class has no defn.
 void CopyDeclaredClassTypespec(VpiObject& var, const VpiObject* defn,
                                const VpiAttachBuild& build) {
   if (var.type != vpiClassVar || defn == nullptr) return;
@@ -100,11 +88,6 @@ void CopyDeclaredClassTypespec(VpiObject& var, const VpiObject* defn,
   }
 }
 
-// §37.33 detail 6 with §37.17 detail 24: the variable the property `member`
-// of the object `obj` stands as, under the class obj `holder`, automatic or
-// static as declared, with the indices of its fixed unpacked dimensions, the
-// visibility it was declared with and a copy of the value the object holds;
-// the variable is returned.
 VpiObject* MakePropertyVariable(VpiObject* holder, ClassObject& obj,
                                 const ClassMember& member, SimContext& ctx,
                                 const VpiAttachBuild& build) {
@@ -114,8 +97,6 @@ VpiObject* MakePropertyVariable(VpiObject* holder, ClassObject& obj,
   var->name = build.keep(std::string(member.name));
   var->parent = holder;
   var->automatic = !member.is_static;
-  // §37.3.7: a property other than a static one is part of the class object,
-  // in the dynamic memory the object was allocated in.
   var->alloc_scheme = VpiAllocSchemeFor(
       member.is_static ? VpiAllocKind::kOther : VpiAllocKind::kDynamic);
   if (member.is_local) {
@@ -142,8 +123,6 @@ VpiObject* MakePropertyVariable(VpiObject* holder, ClassObject& obj,
   return var;
 }
 
-// §8.13: the class `type` and those it extends, the base first. The bound
-// stops a chain of extensions that loops.
 std::vector<const ClassTypeInfo*> ClassChain(const ClassTypeInfo* type) {
   constexpr int kMaxDepth = 64;
   std::vector<const ClassTypeInfo*> chain;
@@ -154,12 +133,6 @@ std::vector<const ClassTypeInfo*> ClassChain(const ClassTypeInfo* type) {
   return chain;
 }
 
-// §37.32 with §37.31: the class defn of the class `type`, for an object
-// created in the instance `instance` names. A class a module declares has one
-// under each instance of the module, and the object's is the one under the
-// instance it was created in, found among the `objects` by that instance's
-// path; any other class has the one `by_decl` holds for its declaration, as
-// has a class of the first top.
 VpiObject* ClassDefnOf(
     const ClassTypeInfo* type, std::string_view instance,
     const VpiObjectMap& objects,
@@ -181,16 +154,11 @@ VpiObject* ClassDefnOf(
   return found == by_decl.end() ? nullptr : found->second;
 }
 
-// A class of a class obj's chain and the class defn it stands as, null for
-// none (§37.32).
 struct ChainClass {
   const ClassTypeInfo* type;
   VpiObject* defn;
 };
 
-// What a class obj's constraints are made with: the class obj `holder` of
-// the object `obj`, the classes `chain` names, base first, and where each
-// class's calls find their callees (`of`).
 struct ObjectConstraintSite {
   VpiObject* holder;
   ClassObject& obj;
@@ -198,11 +166,6 @@ struct ObjectConstraintSite {
   const VpiClassObjDefn& of;
 };
 
-// §37.33 with §37.34: a constraint per constraint block of the classes `at`
-// names, under its class obj, whose constraint_mode() state each reports
-// (§18.9). A name in one resolves through `names`, and a call in one stands
-// in the class obj, its callee found where the class declaring the block is
-// declared (§37.42, §8.13).
 void MakeObjectConstraints(const ObjectConstraintSite& at,
                            const VpiConstraintNames& names,
                            const VpiAttachBuild& build) {
@@ -224,10 +187,6 @@ void MakeObjectConstraints(const ObjectConstraintSite& at,
   }
 }
 
-// §37.33 detail 6 with §8.14: the methods the classes `chain` names declare,
-// as their class defns made them, under the class obj `holder`; a method a
-// class overrides is its override alone, the chain walked from the derived
-// class. A built-in method no declaration names has no method object.
 void RelateObjectMethods(VpiObject* holder,
                          const std::vector<ChainClass>& chain) {
   std::unordered_set<std::string_view> named;
@@ -242,9 +201,6 @@ void RelateObjectMethods(VpiObject* holder,
   }
 }
 
-// §37.33 detail 4 with §15.4.5: the kind of constant a message is, as the
-// kind of the value the mailbox placed says, a parameterized mailbox's among
-// them (§15.4.9): a literal's value carries no string mark of its own.
 int MessageConstType(const MailboxMessageType& type) {
   switch (type.value_kind) {
     case MailboxMessageType::Kind::kReal:
@@ -256,11 +212,6 @@ int MessageConstType(const MailboxMessageType& type) {
   }
 }
 
-// §37.32 detail 1: the typespec of the class obj `made` of an object of the
-// class `type`, whose class defn is `defn`: the class specialization it was
-// created as, whose typespec the defn holds where the run held the
-// specialization when the defn was made, and otherwise one made with `build`
-// for it, reaching the defn where there is one.
 VpiObject* ClassObjTypespec(const ClassTypeInfo& type, VpiObject* defn,
                             VpiObject* made, const VpiAttachBuild& build) {
   if (defn != nullptr) {
@@ -306,7 +257,6 @@ void VpiRecordPropertyDecl(VpiObject& var, const ClassMember& member) {
   }
   var.decl_facts.constant_variable =
       member.is_const || member.data_type.is_const;
-  // §37.29: a virtual interface property of a modport's type is a modport.
   var.is_modport = !member.data_type.modport_name.empty();
 }
 
@@ -335,8 +285,6 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
   if (obj.type == nullptr) return made;
   made->children.push_back(
       ClassObjTypespec(*obj.type, of.defn_of(*obj.type), made, build));
-  // §37.33 detail 8: the parameters the class typespec the object was created
-  // with gives values to, port list and body alike.
   const ClassTypespecInfo kTypespec = VpiClassTypespecOf(obj.type);
   for (std::size_t i = 0; i < kTypespec.params.size(); ++i) {
     VpiMakeObjectParameter(made, *obj.type->decl, kTypespec.params[i],
@@ -356,8 +304,6 @@ VpiObject* VpiMakeClassObject(ClassObject& obj, const VpiClassObjDefn& of,
       }
     }
   }
-  // A name in a constraint finds the object's variables first, then the
-  // instance's or package's the object was created in, keyed in `objects`.
   static const std::vector<std::string_view> kNoGenBlocks;
   std::string prefix(obj.instance);
   if (!prefix.empty() && prefix.back() == '.') prefix.pop_back();
@@ -390,8 +336,6 @@ void VpiRefreshSyncClassObject(
                                     : ctx.ContainedSemaphore(kHandle);
   if (sync == nullptr) return;
   obj.children.resize(1);
-  // §37.33 detail 4 with §15.4: a message is any singular expression, held as
-  // the value put() was handed.
   const size_t kMessages = mbx != nullptr ? mbx->messages.size() : 0;
   for (size_t index = 0; index < kMessages; ++index) {
     const Logic4Vec& held = mbx->messages[index].Get();
@@ -410,7 +354,6 @@ void VpiRefreshSyncClassObject(
     constant->parent = &obj;
     obj.children.push_back(constant);
   }
-  // §37.33 detail 3: a process waiting to get or put a message, or for a key.
   for (Process* proc : ctx.GetScheduler().Threads()) {
     if (proc->waiting_on_sync == sync) obj.children.push_back(thread_of(proc));
   }
@@ -424,8 +367,6 @@ void VpiRefreshWaitedOn(VpiObject& obj, SimContext& ctx,
     return;
   }
   if (obj.type != vpiNamedEvent || obj.var == nullptr) return;
-  // §37.27 detail 1: the thread of each process, static or dynamic, an event
-  // control holds waiting on the event now.
   std::erase_if(obj.children, [](const VpiObject* child) {
     return child->type == vpiThread;
   });
@@ -446,8 +387,6 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
   if (ClassObject* obj = sim_ctx_->GetClassObject(kHandle)) {
     return MadeClassObject(*obj);
   }
-  // §15.3 and §15.4: a semaphore or a mailbox is an object of a built-in class
-  // the run keeps by its identity, which its handle is.
   SemaphoreObject* sem = sim_ctx_->ContainedSemaphore(kHandle);
   const void* sync = sem != nullptr ? static_cast<const void*>(sem)
                                     : sim_ctx_->ContainedMailbox(kHandle);
@@ -463,11 +402,6 @@ VpiHandle VpiContext::ClassObjectOf(VpiObject& class_var) {
 }
 
 void VpiContext::NoteObjectReclaimed(ClassObject& obj) {
-  // §37.2.2 item 3 and §37.3.8: a class object the garbage collector reclaims
-  // releases the handles to it and to its automatic members, and cbReclaimObj
-  // and cbEndOfObject report the reclaim. An object no application asked for
-  // has no object of the model, and is made one only where a callback is there
-  // to be told of its end.
   if (sim_ctx_ == nullptr) return;
   if (!run_objects_.contains(&obj) &&
       !HasCallbackFor(callbacks_, cbReclaimObj) &&
@@ -478,17 +412,12 @@ void VpiContext::NoteObjectReclaimed(ClassObject& obj) {
 }
 
 VpiHandle VpiContext::MadeClassObject(ClassObject& obj) {
-  // §37.33 detail 1: an identifier may be reused once its object is
-  // reclaimed, so an object made for one that has since gone is made afresh.
   VpiObject*& made = run_objects_[&obj];
   if (made == nullptr || made->obj_id != static_cast<int64_t>(obj.handle)) {
-    // §37.42: the calls the object's constraints write, shaped once it is.
     std::vector<VpiDeferredCall> deferred;
     const VpiAttachBuild kBuild{[this] { return AllocObject(); },
                                 VpiPoolKeeper(name_pool_), sim_ctx_->GetArena(),
                                 &deferred};
-    // A class whose defn was not made finds its callees among the
-    // compilation unit's declarations alone.
     made = VpiMakeClassObject(
         obj,
         {[this, &obj](const ClassTypeInfo& cls) {

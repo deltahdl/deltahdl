@@ -16,13 +16,11 @@ namespace delta {
 
 namespace {
 
-// Every array of elements a handle names, by handle; handle 0 names none.
 std::vector<std::unique_ptr<QueueObject>>& Table() {
   static std::vector<std::unique_ptr<QueueObject>> table(1);
   return table;
 }
 
-// An empty array of the elements `field` declares.
 std::unique_ptr<QueueObject> EmptyOf(const StructFieldInfo& field) {
   auto queue = std::make_unique<QueueObject>();
   queue->elem_width = field.dyn_elem_width;

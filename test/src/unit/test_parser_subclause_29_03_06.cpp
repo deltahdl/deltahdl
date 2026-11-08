@@ -1,16 +1,3 @@
-// §29.3.6 "Summary of symbols" (Table 29-1) defines, for every UDP table
-// symbol, which fields of a row it may legally occupy. These parser-stage tests
-// drive real UDP source through the pipeline and observe the field-permission
-// diagnostics emitted from parser_udp.cpp:
-//   - ?  and b : permitted in input (and sequential current-state) fields, but
-//                not in the output field.
-//   - -        : permitted only in the output field of a sequential UDP.
-//   - edges /
-//     (vw)     : only permitted in the input field.
-//   - x        : permitted in the input, output, and current-state fields.
-//
-// The complementary symbol-matching semantics live in the simulator canonical
-// file for this subclause.
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -19,8 +6,6 @@
 using namespace delta;
 
 namespace {
-
-// ? and b iterate over level values but are barred from the output field.
 
 TEST(UdpSymbolFields, QuestionInOutputFieldRejected) {
   auto r = Parse(
@@ -69,8 +54,6 @@ TEST(UdpSymbolFields, BInInputFieldAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ? and b are also permitted in the current-state field of a sequential UDP.
-
 TEST(UdpSymbolFields, QuestionInSequentialCurrentStateAccepted) {
   auto r = Parse(
       "primitive p(output reg q, input a, input b);\n"
@@ -92,9 +75,6 @@ TEST(UdpSymbolFields, BInSequentialCurrentStateAccepted) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// - means "no change" and is permitted only in the output field of a
-// sequential UDP.
 
 TEST(UdpSymbolFields, DashInInputFieldRejected) {
   auto r = Parse(
@@ -141,9 +121,6 @@ TEST(UdpSymbolFields, DashInSequentialOutputAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Edge and (vw) transition symbols are only permitted in the input field; an
-// edge symbol in the current-state field is rejected.
-
 TEST(UdpSymbolFields, EdgeSymbolInCurrentStateRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a, input b);\n"
@@ -156,7 +133,6 @@ TEST(UdpSymbolFields, EdgeSymbolInCurrentStateRejected) {
       "29.3.6"));
 }
 
-// The accepting side: a (vw) transition symbol in an input field is permitted.
 TEST(UdpSymbolFields, TransitionSymbolInInputFieldAccepted) {
   auto r = Parse(
       "primitive p(output reg q, input clk, input d);\n"
@@ -167,8 +143,6 @@ TEST(UdpSymbolFields, TransitionSymbolInInputFieldAccepted) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// x is permitted in the input, output, and current-state fields.
 
 TEST(UdpSymbolFields, XInInputFieldAccepted) {
   auto r = Parse(
@@ -203,9 +177,6 @@ TEST(UdpSymbolFields, XInSequentialCurrentStateAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §29.3 Syntax 29-1 writes a parenthesised edge as two level symbols. Taken
-// from one token, `(011)` was read as its first two symbols. Taken from two,
-// `(0x1)`, whose `x1` is one identifier, was read as `(0x)`.
 TEST(UdpSymbolFields, ParenthesisedEdgeOfThreeSymbolsRejected) {
   auto r = Parse(
       "primitive p(output reg q, input clk, input d);\n"
@@ -220,8 +191,6 @@ TEST(UdpSymbolFields, ParenthesisedEdgeOfThreeSymbolsRejected) {
       r.diags, "an edge in parentheses is two level symbols", 4, "29.3"));
 }
 
-// The lexer hands an edge's two symbols over as one token or as two, as
-// `(x1)` and `(? 0)` here do, and either way the edge has its two.
 TEST(UdpSymbolFields, ParenthesisedEdgeInOneTokenOrTwoAccepted) {
   auto r = Parse(
       "primitive p(output reg q, input clk, input d);\n"
@@ -240,9 +209,6 @@ TEST(UdpSymbolFields, ParenthesisedEdgeInOneTokenOrTwoAccepted) {
   EXPECT_EQ(rows[1].paren_edges[0].second, '0');
 }
 
-// §29.3 Syntax 29-1 makes the current-state field a level symbol, and Table
-// 29-1 lists those. Only - and the edge symbols were refused there, so a digit
-// other than 0 and 1, or a letter, passed as a state.
 TEST(UdpSymbolFields, CurrentStateThatIsNoLevelSymbolRejected) {
   auto r = Parse(
       "primitive p(output reg q, input clk, input d);\n"

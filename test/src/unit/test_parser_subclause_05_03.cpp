@@ -117,9 +117,6 @@ TEST(LexicalConventionParsing, StatementSpanningManyLines) {
   EXPECT_EQ(assign_item->kind, ModuleItemKind::kContAssign);
 }
 
-// §5.3 makes white space the space, tab, newline, formfeed and end of file
-// alone, so a vertical tab between two tokens is a character outside every
-// token (§5.2), not a delimiter.
 TEST(LexicalConventionParsing, VerticalTabIsNoDelimiter) {
   auto r = Parse("module\vt;\nendmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "unexpected character 0x0B", 1, "5.2"));

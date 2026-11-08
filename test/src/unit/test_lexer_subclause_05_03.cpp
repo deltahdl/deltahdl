@@ -36,17 +36,11 @@ TEST(LexicalConventionLexing, FormfeedIsWhitespace) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// §5.3 and A.9.4 make white space the space, tab, newline, formfeed and end
-// of file alone, so a vertical tab separates nothing. No token begins with
-// one, and §5.2 has it reported as a character outside every token, named by
-// its value since it does not print.
 TEST(LexicalConventionLexing, VerticalTabIsNoWhitespace) {
   auto diags = LexDiagnostics("a\vb");
   EXPECT_TRUE(ReportedError(diags, "unexpected character 0x0B", 1, "5.2"));
 }
 
-// An escaped identifier runs to white space (§5.6.1), so a vertical tab, being
-// none, stands inside it as the non-printable character it is.
 TEST(LexicalConventionLexing, VerticalTabDoesNotEndAnEscapedIdentifier) {
   auto diags = LexDiagnostics("\\ab\vc ");
   EXPECT_TRUE(ReportedError(
@@ -54,8 +48,6 @@ TEST(LexicalConventionLexing, VerticalTabDoesNotEndAnEscapedIdentifier) {
       "5.6.1"));
 }
 
-// §5.7.1 lets white space stand between a based literal's base and its value,
-// and a vertical tab is none, so the value is missing where it stands.
 TEST(LexicalConventionLexing, VerticalTabDoesNotSeparateABaseFromItsValue) {
   auto diags = LexDiagnostics("4'h\v5 ");
   EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",

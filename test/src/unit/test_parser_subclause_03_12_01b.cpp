@@ -9,19 +9,11 @@ using namespace delta;
 
 namespace {
 
-// A source and the line of the report it should draw.
 struct Written {
   const char* src;
   uint32_t line;
 };
 
-// §3.12.1 (printed page 56): outside every design element a compilation unit
-// holds what a package may hold (§26.2), bind directives (§23.11) and the
-// design elements themselves. A procedure, an instance of a module, gate,
-// switch, pull source or primitive, a genvar, a concurrent assertion, a
-// defparam and an alias are items of a module and of none of these, so each
-// written there is reported where it starts, the primitive's instance beside
-// the primitive's own declaration, which the unit may hold.
 TEST(CompilationUnitItems, ModuleItemOutsideEveryDesignElement) {
   const Written kCases[] = {
       {"logic x;\n"
@@ -66,9 +58,6 @@ TEST(CompilationUnitItems, ModuleItemOutsideEveryDesignElement) {
   }
 }
 
-// The nearest allowed forms: each of those items inside a module, a module
-// instance bound into one from the unit, and a property declared in the unit,
-// which a concurrent assertion of a module then asserts.
 TEST(CompilationUnitItems, TheSameItemsInsideAModule) {
   EXPECT_TRUE(
       ParseOk("module sub #(parameter P = 1); endmodule\n"
@@ -95,8 +84,6 @@ TEST(CompilationUnitItems, TheSameItemsInsideAModule) {
               "bind top sub b();\n"));
 }
 
-// §3.12.1 with §26.6: a package export declaration is an item a package may
-// hold, so the unit may hold one, naming a package the unit imports.
 TEST(CompilationUnitItems, PackageExportInTheUnit) {
   EXPECT_TRUE(
       ParseOk("package p;\n"
@@ -107,12 +94,6 @@ TEST(CompilationUnitItems, PackageExportInTheUnit) {
               "module m; endmodule\n"));
 }
 
-// §3.12.1 (printed page 57): the compilation-unit scope has no name, so no
-// import declaration can name it, wherever the declaration stands: a module's
-// item or header, an interface's, program's, checker's or package's item, or
-// a declaration of a function or of a begin-end block. The report is
-// ParseImportItem's, under §26.3, whose package_import_item takes a
-// package_identifier where `$unit` stands.
 TEST(CompilationUnitImport, DollarUnitImportedInEachPlace) {
   const Written kCases[] = {
       {"module m;\n"
@@ -163,7 +144,6 @@ TEST(CompilationUnitImport, DollarUnitImportedInEachPlace) {
   }
 }
 
-// The nearest allowed form: a named package imported in each of those places.
 TEST(CompilationUnitImport, NamedPackageImportedInEachPlace) {
   EXPECT_TRUE(
       ParseOk("package p;\n"

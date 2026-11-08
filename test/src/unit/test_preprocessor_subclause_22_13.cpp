@@ -71,8 +71,6 @@ TEST(FileAndLineMacroPreprocessing, LineDirective_AffectsFileMacro) {
   EXPECT_NE(result.find("\"overridden.sv\""), std::string::npos);
 }
 
-// The same `line, with `__FILE__ inside the line rather than at its head,
-// where the inline expander rather than the directive path answers it.
 TEST(FileAndLineMacroPreprocessing, LineDirective_AffectsFileMacroInLine) {
   PreprocFixture f;
   auto result =
@@ -244,9 +242,6 @@ TEST(FileAndLineMacroPreprocessing, Include_LineRevertsWithLongInclude) {
   std::remove(tmp_dir.c_str());
 }
 
-// §22.12 makes the `line directive's string literal the file's new name, and
-// "" is a string literal, so after `line 5 "" 0 `__FILE__ (§22.13) gives "",
-// alone on a line and within one. It gave the path the tool opened.
 TEST(Preprocessor, FileAfterALineNamingTheEmptyNameIsEmpty) {
   PreprocFixture f;
   auto out = Preprocess(

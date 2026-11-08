@@ -12,11 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §23.11: a bound instance stands as though at the end of its target, seeing
-// what the target declares or imports: a name an explicit import brings in, and
-// a wildcard candidate the target has imported by reading it, are both seen,
-// while a candidate the target never reads is reported, since a bind cannot
-// import one itself.
 TEST(BindVisibility, ImportedNamesOfTheTargetAreSeen) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,10 +43,6 @@ TEST(BindVisibility, ImportedNamesOfTheTargetAreSeen) {
                              "23.11"));
 }
 
-// §23.11: a bind instantiation takes ordered connections as any instantiation
-// does, and one naming nothing in the target is reported by the port it
-// stands at; a connection past the bound module's last port has no port to
-// name.
 TEST(BindVisibility, AnOrderedConnectionIsReportedByItsPort) {
   ElabFixture f;
   ElaborateSrc(
@@ -74,11 +65,6 @@ TEST(BindVisibility, AnOrderedConnectionIsReportedByItsPort) {
                             "23.11"));
 }
 
-// §23.11: a bind instance's parameter reached by a hierarchical name is no
-// constant outside the instance, so a packed range reaching one, in the first
-// dimension or a later one, is reported; a range reaching an instance the
-// module wrote itself, a package's parameter, or a name no instance answers is
-// not this rule's.
 TEST(BindVisibility, ABoundInstancesParameterIsNoConstantOutsideIt) {
   ElabFixture f;
   ElaborateSrc(
@@ -110,8 +96,6 @@ TEST(BindVisibility, ABoundInstancesParameterIsNoConstantOutsideIt) {
   }
 }
 
-// How many children named `bound` the element `elem` of the design's top's
-// instance array holds.
 int BoundInElement(const RtlirDesign* design, std::string_view elem,
                    std::string_view bound) {
   int count = 0;
@@ -131,10 +115,6 @@ constexpr const char* kArrayOfLeaf =
     "  leaf u[0:1] ();\n"
     "endmodule\n";
 
-// §23.11 with §23.3.3.5: the second form binds into the one instance its
-// target names, so a target naming one element of an instance array binds
-// into that element alone, though the elements share one elaborated module
-// until then (#7557).
 TEST(BindDirective, ABindIntoOneArrayElementBindsThereAlone) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -145,7 +125,6 @@ TEST(BindDirective, ABindIntoOneArrayElementBindsThereAlone) {
   EXPECT_EQ(BoundInElement(design, "u[0]", "c1"), 0);
 }
 
-// An entry of a bind_target_instance_list names one instance as well.
 TEST(BindDirective, AnInstanceListEntryNamingOneArrayElementBindsThereAlone) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -156,8 +135,6 @@ TEST(BindDirective, AnInstanceListEntryNamingOneArrayElementBindsThereAlone) {
   EXPECT_EQ(BoundInElement(design, "u[0]", "c3"), 0);
 }
 
-// A target scope with no instance list binds into every instance of the
-// scope, each element of the array among them.
 TEST(BindDirective, AScopeBindReachesEveryArrayElement) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -168,8 +145,6 @@ TEST(BindDirective, AScopeBindReachesEveryArrayElement) {
   EXPECT_EQ(BoundInElement(design, "u[0]", "c4"), 1);
 }
 
-// A scope bind and a bind into one element together: the element that gets a
-// module of its own still holds the scope's instance once.
 TEST(BindDirective, AScopeBindAndAnElementBindTogether) {
   ElabFixture f;
   auto* design = ElaborateSrc(std::string(kArrayOfLeaf) +

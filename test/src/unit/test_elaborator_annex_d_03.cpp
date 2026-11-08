@@ -5,24 +5,12 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
-// Annex D.3: $getpattern.
-//
-// The function has one permitted placement: a continuous assignment whose
-// left-hand side concatenates scalar nets, called with a reference to an
-// element of a memory as its argument. The elaborator reports a call anywhere
-// else under D.3: in a procedural statement, inside an expression of a
-// continuous assignment's right-hand side, with a left-hand side that is no
-// concatenation or holds an element that is no scalar net, or with an argument
-// that names no memory element. The call in the placement the clause gives,
-// D.3's own example reduced, elaborates clean.
-
 namespace {
 
 constexpr const char* kLimit =
     "$getpattern may only be used in a continuous assignment statement whose "
     "left-hand side is a concatenation of scalar nets";
 
-// D.3's example, with three scalar inputs and two patterns.
 TEST(GetpatternPlacement, TheExamplesPlacementIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -36,7 +24,6 @@ TEST(GetpatternPlacement, TheExamplesPlacementIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A call in a procedural statement, D.1's parser test having written one so.
 TEST(GetpatternPlacement, ACallInAProceduralStatementIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,9 +39,6 @@ TEST(GetpatternPlacement, ACallInAProceduralStatementIsRejected) {
       "D.3"));
 }
 
-// A call under a loop's body, which the walk reaches through the statement's
-// child links, and under an operator, which it reaches through the
-// expression's.
 TEST(GetpatternPlacement, ACallNestedInAProceduralStatementIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -72,8 +56,6 @@ TEST(GetpatternPlacement, ACallNestedInAProceduralStatementIsRejected) {
       "D.3"));
 }
 
-// A call that is an operand of the right-hand side rather than the whole of
-// it.
 TEST(GetpatternPlacement, ACallInsideTheRightHandSideIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -90,7 +72,6 @@ TEST(GetpatternPlacement, ACallInsideTheRightHandSideIsRejected) {
                             4, "D.3"));
 }
 
-// A left-hand side that is a vector net rather than a concatenation.
 TEST(GetpatternPlacement, ALeftHandSideThatIsNoConcatenationIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,9 +87,6 @@ TEST(GetpatternPlacement, ALeftHandSideThatIsNoConcatenationIsRejected) {
       "D.3"));
 }
 
-// A concatenation holding a vector net and a variable: each element that is
-// no scalar net is reported where it stands, and the scalar net between them
-// is not.
 TEST(GetpatternPlacement, AnElementThatIsNoScalarNetIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -139,8 +117,6 @@ TEST(GetpatternPlacement, AnElementThatIsNoScalarNetIsRejected) {
                     7, "D.3"));
 }
 
-// An argument that is a variable with no unpacked dimension, a select of one,
-// and no argument at all: none is a memory element reference.
 TEST(GetpatternPlacement, AnArgumentNamingNoMemoryElementIsRejected) {
   ElabFixture f;
   ElaborateSrc(

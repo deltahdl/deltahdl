@@ -7,8 +7,6 @@
 
 using namespace delta;
 
-// Returns true when net `name` has settled to the known scalar value `expected`
-// (aval matches the low bit of expected, bval clear).
 inline bool SettledToKnown(SimFixture& f, std::string_view name,
                            uint64_t expected) {
   auto* v = f.ctx.FindVariable(name);
@@ -17,8 +15,6 @@ inline bool SettledToKnown(SimFixture& f, std::string_view name,
          (v->value.words[0].bval & 1u) == 0u;
 }
 
-// Returns true when net `name` has settled to high-impedance (aval clear,
-// bval set on the low bit).
 inline bool SettledToHighZ(SimFixture& f, std::string_view name) {
   auto* v = f.ctx.FindVariable(name);
   if (!v) return false;

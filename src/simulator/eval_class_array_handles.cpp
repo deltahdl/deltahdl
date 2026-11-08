@@ -24,22 +24,11 @@ namespace delta {
 
 namespace {
 
-// The key of the class the elements of the array property `ref` are handles
-// of, empty where they are values: the class the property's declared type
-// names as written in its declaring class (PropertyClassName), so that
-// §8.23's `Outer::Inner kids[2]` in another class and `Inner kids[2]` in
-// Outer both answer `Outer::Inner`. A property of a class type has
-// width_is_declared false and a 32-bit carrier for its width, so the type is
-// the one fact that tells a handle element from a value one. Asked by the
-// property record's bare type name, `Outer::Inner kids[2]` held plain
-// values: `x.kids[1] = new` constructed nothing and `x.kids[1].v` read 0.
 std::string_view ElementClassKey(const ClassArrayRef& ref, SimContext& ctx) {
   if (ref.static_owner != nullptr) return {};
   return PropertyClassName(ref.obj, ref.obj->type, ref.prop->name, ctx);
 }
 
-// `expr` as a single-index select, or null for an expression of any other
-// shape.
 const Expr* SingleIndexSelect(const Expr* expr) {
   if (expr == nullptr || expr->kind != ExprKind::kSelect ||
       expr->base == nullptr || expr->index == nullptr ||
@@ -49,8 +38,6 @@ const Expr* SingleIndexSelect(const Expr* expr) {
   return expr;
 }
 
-// `expr` as `<select>.name`, a member access that is no scope resolution on a
-// single-index select, answering the select; null for any other shape.
 const Expr* SelectOfMemberAccess(const Expr* expr) {
   if (expr == nullptr || expr->kind != ExprKind::kMemberAccess ||
       expr->is_scope_resolution || expr->rhs == nullptr ||
@@ -60,30 +47,7 @@ const Expr* SelectOfMemberAccess(const Expr* expr) {
   return SingleIndexSelect(expr->lhs);
 }
 
-// §8.4 with §7.4.2 (printed pages 153-154) and §7.5 (printed 157): the key
-// of the class the elements of the declared array `base` names are handles
-// of, empty where `base` is no bare or package-scoped name of a fixed-size or
-// dynamic array the run holds a shape for, or the array's declaration
-// recorded no class. The declaration records the element class under the
-// array's name as it does for a variable of a class type
-// (SetVariableClassType by Lowerer::LowerVar for a module's, ExecVarDeclImpl
-// for a block's, CreateFuncLocalVar for a subroutine body's), so the name is
-// what tells an array of handles from one of values, as HandleArrayOfSelect
-// (eval_assoc_class_handles.cpp) reads it for an associative array. A
-// queue's elements are told by the queue's own flag
-// (TryEvalQueueElementMember) and are not asked for here. §15.3 and §15.4:
-// the built-in semaphore and mailbox are classes an array may hold handles
-// of too, though no registered class answers their names
-// (BuiltinSyncKindOf); asked by the registry alone, `semaphore arr[2]` was
-// an array of values and `arr[1] = new(1)` constructed nothing.
 std::string_view DeclaredArrayElementClass(const Expr* base, SimContext& ctx) {
-  // §26.3: a package's array named through the package scope resolution
-  // operator, `p::a`, stands under "p.a" (ScopedOrBareTargetKey), the key its
-  // shape (CreatePackageArray) and its element class
-  // (RegisterPackageClassVariables) are entered under. Asked by a bare name
-  // alone, `p::objs[1].v = 5` was written under no declared class, its bare
-  // key alone, and a read through a handle declared of the class read the
-  // stale value its class-scoped key held.
   std::string_view key;
   if (base->kind == ExprKind::kIdentifier) {
     key = base->text;
@@ -98,16 +62,6 @@ std::string_view DeclaredArrayElementClass(const Expr* base, SimContext& ctx) {
   return holds_handles ? cls : std::string_view{};
 }
 
-// §8.4: `a[i] = new` where `a` is a declared array of handles: the element's
-// declared class is constructed and the handle written into the element as
-// any value is (TrySelectBlockingAssign: the element variable of a
-// fixed-size array, the queue-backed element of a dynamic one), an index
-// addressing no element writing nothing (§7.4.6). Before this the statement
-// had no path: TryClassNewAssign (statement_assign_object.cpp) takes a bare
-// name or `p::h` for its target and the constructors here served array
-// properties alone, so `arr[0] = new` on a module's or a block's `C arr[2]`
-// fell to the generic assignment, which reads `new` as a value and
-// constructed nothing.
 bool TryDeclaredArrayElementNew(const Expr* lhs, const Expr* rhs,
                                 SimContext& ctx, Arena& arena) {
   std::string_view cls = DeclaredArrayElementClass(lhs->base, ctx);
@@ -117,10 +71,6 @@ bool TryDeclaredArrayElementNew(const Expr* lhs, const Expr* rhs,
   return true;
 }
 
-// The property `field` of the object the element `sel` refers to, the element
-// read as any select of its array is -- an index addressing no element
-// answering the element type's default, which is the null handle -- and
-// false for a null handle.
 bool ReadElementObjectProperty(const Expr* sel, std::string_view field,
                                SimContext& ctx, Arena& arena, Logic4Vec& out) {
   ClassObject* obj = ctx.GetClassObject(EvalExpr(sel, ctx, arena).ToUint64());
@@ -129,10 +79,6 @@ bool ReadElementObjectProperty(const Expr* sel, std::string_view field,
   return true;
 }
 
-// §8.4/§7.4.2: `a[i].v` where `a` is a declared array of handles, the
-// property `v` of the object the element refers to. Before this the read had
-// no path: the member name EvalMemberAccess builds from the expression
-// flattens no select, so `arr[0].v` named no variable and read 0.
 bool TryEvalDeclaredArrayElementMember(const Expr* expr, SimContext& ctx,
                                        Arena& arena, Logic4Vec& out) {
   const Expr* sel = SelectOfMemberAccess(expr);
@@ -155,8 +101,6 @@ ClassObject* DeclaredArrayElementObject(const Expr* expr, SimContext& ctx,
 
 Logic4Vec ConstructElementObject(const Expr* rhs, std::string_view class_type,
                                  SimContext& ctx, Arena& arena) {
-  // §15.3.1 and §15.4.1: an element of a container of semaphores or mailboxes
-  // is given the built-in object `new` builds (NewContainedSyncObject).
   if (BuiltinSyncKindOf(class_type, ctx) != SyncKind::kNone) {
     return NewContainedSyncObject(rhs, class_type, ctx, arena);
   }
@@ -183,8 +127,6 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
   if (!ResolveClassArray(lhs->base, ctx, arena, ref)) return false;
   std::string_view class_key = ElementClassKey(ref, ctx);
   if (class_key.empty()) return false;
-  // §11.4.1: the index is evaluated once, before the constructor runs, which
-  // may write the array itself.
   Logic4Vec idx_val = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx_val)) return true;
   int64_t index = SelectBoundValue(idx_val);
@@ -192,8 +134,6 @@ bool TryClassArrayElementNewAssign(const Stmt* stmt, SimContext& ctx,
     return true;
   Logic4Vec handle = ConstructElementObject(rhs, class_key, ctx, arena);
   ref.obj->SetProperty(ClassArrayRefElementKey(ref, index), handle);
-  // §9.4.2: a change to an object's data member wakes a process waiting on
-  // the object, as every other write to an element of the property tells it.
   ctx.NotifyClassHandleWatchers(ref.obj->handle);
   return true;
 }
@@ -207,8 +147,6 @@ bool TryEvalClassArrayElementMember(const Expr* expr, SimContext& ctx,
       ElementClassKey(ref, ctx).empty()) {
     return false;
   }
-  // The element is read as any select of the property is (EvalSelect through
-  // TryClassArrayElementSelect).
   return ReadElementObjectProperty(sel, expr->rhs->text, ctx, arena, out);
 }
 
@@ -220,12 +158,6 @@ bool TryEvalElementObjectMember(const Expr* expr, SimContext& ctx, Arena& arena,
          TryEvalAssocElementMember(expr, ctx, arena, out);
 }
 
-// Whether the element `sel` selects is a handle: of a declared fixed-size or
-// dynamic array (DeclaredArrayElementClass), or of a queue flagged as holding
-// handles, declared or a property (FindQueueOfBase). `declared` receives the
-// class the element is declared of -- the array's, or the one a declared
-// queue's declaration recorded under its name -- and stays empty for a queue
-// property, whose element is then dispatched by its object's own class.
 static bool SelectsAHandleElement(const Expr* sel, SimContext& ctx,
                                   Arena& arena, std::string_view& declared) {
   declared = DeclaredArrayElementClass(sel->base, ctx);
@@ -244,9 +176,6 @@ bool ResolveElementObjectMethod(const Expr* access, SimContext& ctx,
   std::string_view declared;
   if (sel == nullptr || !SelectsAHandleElement(sel, ctx, arena, declared))
     return false;
-  // The element is read as any select of its container is, an index
-  // addressing no element answering the null handle, which resolves no
-  // method.
   ClassObject* obj = ctx.GetClassObject(EvalExpr(sel, ctx, arena).ToUint64());
   if (ResolveMethodByDeclaredClass(obj, declared, access->rhs->text, ctx,
                                    info)) {
@@ -262,8 +191,7 @@ bool TryEvalElementObjectMethodCall(const Expr* expr, SimContext& ctx,
                                     Arena& arena, Logic4Vec& out) {
   if (expr == nullptr || expr->kind != ExprKind::kCall) return false;
   InstanceMethodInfo info;
-  if (!ResolveElementObjectMethod(expr->lhs, ctx, arena, info,
-                                  /*report_null=*/true)) {
+  if (!ResolveElementObjectMethod(expr->lhs, ctx, arena, info, true)) {
     return false;
   }
   out = RunInstanceMethod(info, expr, ctx, arena);

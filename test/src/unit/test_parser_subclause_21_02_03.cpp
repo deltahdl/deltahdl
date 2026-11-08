@@ -37,8 +37,6 @@ TEST(IoSystemTaskParsing, MonitorSystemCall) {
   EXPECT_EQ(stmt->expr->callee, "$monitor");
 }
 
-// §21.2.3 (Syntax 21-3): the parenthesized argument list is optional, so a
-// bare $monitor with no arguments is a well-formed statement.
 TEST(IoSystemTaskParsing, MonitorCallWithoutArguments) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

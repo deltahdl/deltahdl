@@ -14,8 +14,6 @@
 namespace delta {
 
 SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
-  // §16.12.2: assert property and assume property evaluate a bare sequence
-  // weakly; the remaining assertion statements take the strong reading.
   if (stmt == AssertionKind::kAssert || stmt == AssertionKind::kAssume) {
     return SequencePropertyStrength::kWeak;
   }
@@ -23,22 +21,17 @@ SequencePropertyStrength DefaultSequencePropertyStrength(AssertionKind stmt) {
 }
 
 PropertyResult EvalStrongSequenceProperty(bool has_nonempty_match) {
-  // §16.12.2: the strong reading holds exactly when a nonempty match exists.
   return has_nonempty_match ? PropertyResult::kPass : PropertyResult::kFail;
 }
 
 PropertyResult EvalWeakSequenceProperty(
     bool finite_prefix_witnesses_inability) {
-  // §16.12.2: the weak reading holds unless some finite prefix has already
-  // ruled out any match.
   return finite_prefix_witnesses_inability ? PropertyResult::kFail
                                            : PropertyResult::kPass;
 }
 
 SequencePropertyStrength NegatePropertyStrength(
     SequencePropertyStrength inner) {
-  // §16.12.3: negation flips the strength — a weak underlying property becomes
-  // strong under `not`, and a strong one becomes weak.
   return inner == SequencePropertyStrength::kWeak
              ? SequencePropertyStrength::kStrong
              : SequencePropertyStrength::kWeak;
@@ -65,27 +58,18 @@ SampledValue SampleAutomaticVariable(uint64_t current_value) {
 }
 
 SampledValue SampleLocalVariable(uint64_t current_value) {
-  // §16.5.1 / §16.10: a local variable is sampled at its current value, not at
-  // its Preponed value, so its sampled value carries kCurrent just as an
-  // automatic variable's does.
   return SampledValue{current_value, SampleMode::kCurrent};
 }
 
 SampledValue SampleActiveFreeCheckerVariable(uint64_t current_value) {
-  // §16.5.1: an active free checker variable, like an automatic or local
-  // variable, is sampled at its current value.
   return SampledValue{current_value, SampleMode::kCurrent};
 }
 
 SampledValue SampleActiveFreeCheckerVarPastFuture(uint64_t postponed_value) {
-  // §16.5.1: a past/future value of an active free checker variable requested
-  // by a sampled value function is read from the Postponed region.
   return SampledValue{postponed_value, SampleMode::kPostponed};
 }
 
 SampledValue SampleAutomaticVarPastFuture(uint64_t current_value) {
-  // §16.5.1: a past/future value of an automatic variable requested by a
-  // sampled value function collapses to the automatic variable's current value.
   return SampledValue{current_value, SampleMode::kCurrent};
 }
 
@@ -109,8 +93,8 @@ SampledValue SampleProceduralAssertionArgument(uint64_t current_value) {
   return SampledValue{current_value, SampleMode::kCurrent};
 }
 
-SampledValue ProceduralArgumentValueAfterMature(
-    SampledValue captured, uint64_t /*later_underlying_value*/) {
+SampledValue ProceduralArgumentValueAfterMature(SampledValue captured,
+                                                uint64_t) {
   return captured;
 }
 
@@ -127,8 +111,7 @@ SampledValue SampleProceduralAssertionActionBlockArgument(
 
 bool ActionBlockMayModifyArgument() { return false; }
 
-uint64_t ReadProceduralConditionalGuard(uint64_t current_value,
-                                        uint64_t /*sampled_value*/) {
+uint64_t ReadProceduralConditionalGuard(uint64_t current_value, uint64_t) {
   return current_value;
 }
 
@@ -159,9 +142,6 @@ bool IsClockingBlockInputSamplingValid(ClockingInputSkew skew) {
 }
 
 bool InterpretAssertionExprAsBoolean(uint64_t aval, uint64_t bval) {
-  // §16.6: x and z bits make the expression false; an all-zero known value
-  // is also false. Otherwise the expression is true. The bval rail carries
-  // the unknown mask, so any non-zero bval forces a false interpretation.
   if (bval != 0) return false;
   return aval != 0;
 }
@@ -172,8 +152,6 @@ SampledArrayElement SampleArrayElementForAssertion(uint64_t element_value) {
 
 SampledArrayElement ArrayElementAfterArrayMutation(
     SampledArrayElement sampled) {
-  // §16.6: the sampled copy remains live for the duration of the assertion
-  // expression evaluation regardless of mutations to the source container.
   return sampled;
 }
 
@@ -200,14 +178,6 @@ bool DisableConditionAllowsMatchedMethod() { return false; }
 
 bool DisableConditionAllowsLocalVariableReference() { return false; }
 
-// A Logic4Vec carries a pointer to its words rather than the words themselves,
-// so assigning one shares storage with the value it was taken from: a later
-// write through that value -- a bit-select deposit above all, which edits the
-// words in place -- would show through what was meant to be a fixed sample.
-// Every value this store keeps therefore owns its words. The buffer is
-// allocated once per variable and reused, because Refill runs at the end of
-// every time slot and MakeLogic4Vec derives the word count from the width, so a
-// variable whose width has not changed needs no second allocation.
 static void CopySample(const Logic4Vec& src, Logic4Vec& dst, Arena& arena) {
   if (dst.words == nullptr || dst.width != src.width) {
     dst = MakeLogic4Vec(arena, src.width);
@@ -225,8 +195,6 @@ void AssertionSampleStore::Register(const Variable* var, Arena& arena) {
     return;
   Entry entry;
   CopySample(var->value, entry.default_value, arena);
-  // Before the first Refill the only value there is to read is the default one,
-  // and §16.5.1 gives a time-0 read that value anyway.
   CopySample(var->value, entry.preponed_value, arena);
   entries_.emplace(var, entry);
 }
@@ -260,8 +228,6 @@ const std::vector<Logic4Vec>* AssertionSampleStore::ReadQueueWithinProperty(
   if (!evaluating_property_) return nullptr;
   auto it = queue_entries_.find(queue);
   if (it == queue_entries_.end()) return nullptr;
-  // The same split as Read: the default sampled elements at time 0, and the
-  // Preponed ones in every later time slot.
   SampledValue decision = SampleStaticVariable(0, t, 0);
   return decision.mode == SampleMode::kDefault ? &it->second.default_elements
                                                : &it->second.preponed_elements;
@@ -269,16 +235,9 @@ const std::vector<Logic4Vec>* AssertionSampleStore::ReadQueueWithinProperty(
 
 const Logic4Vec* AssertionSampleStore::Read(const Variable* var,
                                             SimTime t) const {
-  // Where a snapshot is installed it holds every variable enrolled at its
-  // tick, the Preponed value being that tick's, and is read as of that tick.
   const auto& table = snapshot_ != nullptr ? snapshot_->entries : entries_;
   auto it = table.find(var);
   if (it == table.end()) return nullptr;
-  // SampleStaticVariable carries §16.5.1's split between time 0, which reads
-  // the default sampled value, and every later time slot, which reads the
-  // Preponed value. Only the mode it returns is used: SampledValue::value is a
-  // uint64_t and would drop the upper bits of a variable wider than 64, so the
-  // answer is the stored Logic4Vec that the mode names.
   SampledValue decision = SampleStaticVariable(0, StepTime(t), 0);
   return decision.mode == SampleMode::kDefault ? &it->second.default_value
                                                : &it->second.preponed_value;
@@ -321,9 +280,6 @@ void AssertionSampleStore::RecordTick(const SampleSite& site,
   }
   history.values.insert(history.values.begin(), copy);
   history.recorded_at = site.now;
-  // Only as many ticks as the site asks for are kept, plus this tick's own
-  // sample, so a `$past(x)` written once costs two values however long the
-  // run is.
   if (history.values.size() > depth + 1) history.values.resize(depth + 1);
 }
 

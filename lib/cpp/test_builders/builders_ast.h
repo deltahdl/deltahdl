@@ -12,9 +12,6 @@
 
 using namespace delta;
 
-// ---------------------------------------------------------------------------
-// Expression builders
-// ---------------------------------------------------------------------------
 inline Expr* MakeInt(Arena& arena, uint64_t val) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIntegerLiteral;
@@ -38,7 +35,6 @@ inline Expr* MakeBinary(Arena& arena, TokenKind op, Expr* lhs, Expr* rhs) {
   return e;
 }
 
-// A conditional expression: cond ? t : f.
 inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kTernary;
@@ -48,8 +44,6 @@ inline Expr* MakeTernary(Arena& arena, Expr* cond, Expr* t, Expr* f) {
   return e;
 }
 
-// An assignment written where an expression is expected, as in `(v = 3)`,
-// which carries a value of its own as well as writing one.
 inline Expr* MakeAssignExpr(Arena& arena, std::string_view name, uint64_t val) {
   return MakeBinary(arena, TokenKind::kEq, MakeId(arena, name),
                     MakeInt(arena, val));
@@ -111,9 +105,6 @@ inline Expr* MakeMethodCall(Arena& arena, std::string_view obj,
   return call;
 }
 
-// ---------------------------------------------------------------------------
-// Statement builders
-// ---------------------------------------------------------------------------
 inline Stmt* MakeAssign(Arena& arena, std::string_view lhs_name, Expr* rhs) {
   auto* s = arena.Create<Stmt>();
   s->kind = StmtKind::kBlockingAssign;

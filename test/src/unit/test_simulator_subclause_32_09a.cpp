@@ -1,18 +1,3 @@
-// The readers behind five of the seven operands §32.9 gives $sdf_annotate,
-// called directly rather than through a design: ParseSdf for sdf_file,
-// ParseSdfMtmKeyword for "mtm_spec", ParseSdfScaleType for "scale_type",
-// ParseSdfScaleFactors for "scale_factors" and WriteSdfAnnotationLog for what
-// "log_file" receives, together with ApplySdfScaling, which applies what
-// "scale_factors" and "scale_type" name to one delay value. All six are
-// declared in src/simulator/sdf_parser.h. Calling each directly is what makes a
-// failure here name the function that returned the wrong answer, rather than
-// the call that reached it.
-//
-// The calls are in test_simulator_subclause_32_09b.cpp, which writes
-// $sdf_annotate into a design's source and runs it. The two files were one
-// until #3157, which split them at 997 lines, 3 short of the maximum
-// assert-no-oversized-source-files enforces.
-
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -149,11 +134,6 @@ TEST(SdfScaling, ZeroFactorClampsScaledValueToZero) {
   EXPECT_EQ(out.max_val, 0u);
 }
 
-// §32.7 (printed pages 930-931): scaling keeps each member's sign, so a
-// negative INCREMENT value in a $sdf_annotate call's file, which is scaled
-// before it is annotated, still lowers what it is added to; a scale type taking
-// one member for all three takes that member's sign for all three. Scaled from
-// the magnitudes alone, every value came out positive.
 TEST(SdfScaling, ScalingKeepsEachMembersSign) {
   SdfDelayValue v;
   v.min_val = 1;
@@ -172,11 +152,6 @@ TEST(SdfScaling, ScalingKeepsEachMembersSign) {
   EXPECT_TRUE(typ.max_negative);
 }
 
-// §32.2 (printed page 924) with IEEE 1497: an SDF delay value is a real number,
-// so `(2.5)` and `(1.3)` are read whole -- the exact magnitude beside the
-// rounded one -- rather than stopping the lexer at the decimal point, and the
-// header's TIMESCALE, written with or without a space before its unit, is the
-// unit they are in.
 TEST(SdfRealValues, RealValuesAndTheTimescaleHeaderAreRead) {
   SdfFile file;
   ASSERT_TRUE(ParseSdf(R"(
@@ -201,8 +176,6 @@ TEST(SdfRealValues, RealValuesAndTheTimescaleHeaderAreRead) {
   EXPECT_DOUBLE_EQ(none.timescale_seconds, 0.0);
 }
 
-// Scaling reads the exact magnitude, so 2.5 in ns scaled into ps ticks is 2500
-// rather than the 3000 its rounded magnitude would give.
 TEST(SdfRealValues, ScalingReadsTheExactMagnitude) {
   SdfDelayValue v;
   v.min_val = v.typ_val = v.max_val = 3;
@@ -213,9 +186,6 @@ TEST(SdfRealValues, ScalingReadsTheExactMagnitude) {
   EXPECT_EQ(out.typ_val, 2500u);
 }
 
-// A PATHPULSEPERCENT entry (§32.7) carries percentages of the delay rather than
-// times, so the scale factors that multiply the file's timing values leave it
-// as written while they double the PATHPULSE limits beside it.
 TEST(SdfScaling, PulsePercentagesAreNotScaled) {
   SdfFile file;
   ASSERT_TRUE(ParseSdf(

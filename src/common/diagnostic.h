@@ -10,19 +10,10 @@
 
 namespace delta {
 
-// The subclause of IEEE 1800-2023 whose rule a report enforces. §1.5 organizes
-// the standard into clauses and puts subclauses within each clause to discuss
-// individual constructs and concepts, and it is a subclause that states the
-// rule a report enforces: "5.7.1", not "5". A type rather than a bare string so
-// that a report cannot be written without saying which of the three cases below
-// it is in.
 class Subclause {
  public:
   explicit constexpr Subclause(std::string_view text) : text_(text) {}
 
-  // The report enforces no rule of the standard. An internal limit and a file
-  // that cannot be opened are reports of this kind: they state a fact about
-  // the run rather than a breach of the standard.
   static constexpr Subclause None() { return Subclause(std::string_view()); }
 
   constexpr std::string_view Text() const { return text_; }
@@ -31,11 +22,6 @@ class Subclause {
   std::string_view text_;
 };
 
-// One value per entry point DiagEngine declares. A severity earns an
-// enumerator when a caller needs it, together with the entry point that
-// produces it: kWarning for DiagEngine::Warning, kError for
-// DiagEngine::Error, and the Diagnostics.EverySeverityHasAProducer test over
-// both.
 enum class DiagSeverity : uint8_t {
   kWarning,
   kError,
@@ -45,11 +31,6 @@ struct Diagnostic {
   DiagSeverity severity = DiagSeverity::kError;
   SourceLoc loc;
   std::string message;
-  // The subclause of IEEE 1800-2023 stating the rule this reports, written as
-  // the standard numbers it: "11.4.14", "16.12.17". Held as text because the
-  // numbering is not arithmetic and a subclause has as many components as the
-  // standard gives it. Empty when the report states no rule of the standard,
-  // as an internal limit does.
   std::string subclause;
 };
 
@@ -57,35 +38,14 @@ class DiagEngine {
  public:
   explicit DiagEngine(const SourceManager& src_mgr) : src_mgr_(src_mgr) {}
 
-  // The two reports, each naming the subclause of IEEE 1800-2023 the reported
-  // rule comes from. Give the subclause as the standard numbers it and without
-  // a section sign, Subclause("11.4.14") rather than Subclause("§11.4.14"): the
-  // sign is added when the diagnostic is written out. A caller that reads the
-  // record back then learns which rule was enforced without matching the
-  // wording of the message, so rewording a message costs nothing.
-  //
-  // The subclause is required and there is no form that omits it, so a report
-  // cannot say nothing about which rule it enforces by saying nothing. A
-  // report that enforces no rule of the standard says so with
-  // Subclause::None(), which is the only answer for a report that names no
-  // subclause.
   void Warning(SourceLoc loc, std::string msg, Subclause subclause);
   void Error(SourceLoc loc, std::string msg, Subclause subclause);
-  // An error that a later stage may come upon again: reported unless the same
-  // message already stands on the same line, as when a check the elaborator
-  // makes of the source is made again as the design runs.
   void ErrorOnce(SourceLoc loc, std::string msg, Subclause subclause);
 
-  // Each query of the record below counts as a read of it, which ReadCount and
-  // HasUnreadError report.
   bool HasErrors() const {
     NoteRead();
     return error_count_ > 0;
   }
-  // How many errors have been reported so far. A caller that runs one step of
-  // a longer job on a shared engine reads this before and after the step to
-  // learn whether that step failed, which HasErrors() cannot tell it once an
-  // earlier step has already reported something.
   uint32_t ErrorCount() const {
     NoteRead();
     return error_count_;
@@ -95,66 +55,34 @@ class DiagEngine {
     return warning_count_;
   }
 
-  // The diagnostics reported so far, in the order they were reported. A caller
-  // asserting that a run failed for one reason rather than another reads the
-  // message and the location here, which the counts above cannot distinguish:
-  // every cause of failure adds one to the same count.
   const std::vector<Diagnostic>& Diagnostics() const {
     NoteRead();
     return diags_;
   }
 
-  // How many times the record has been queried, through any of HasErrors,
-  // ErrorCount, WarningCount, Diagnostics, SuppressedErrorCount and
-  // LastSuppressedErrorLoc. A caller that hands the engine to another notes
-  // this at the handover and compares it later, to learn whether the other
-  // looked at what the engine recorded. Asking is not itself a read.
   uint32_t ReadCount() const { return read_count_; }
-  // Whether an error has been recorded that no query of the record has
-  // followed, so that nobody has looked at it. A query made before the error
-  // was reported does not read it. Asking is not itself a read.
   bool HasUnreadError() const { return has_unread_error_; }
 
-  // The source description a report's location is read against. A caller that
-  // has to name a file rather than format a report reads it here: §37.3.3's
-  // vpiFile hands a PLI application the source file an object came from, and a
-  // SourceLoc carries only the file_id this tool made up, which no application
-  // can resolve.
   const SourceManager& Sources() const { return src_mgr_; }
 
   void SetWarningsAsErrors(bool val) { warnings_as_errors_ = val; }
 
-  // Temporarily suppress every diagnostic (and its count) while a speculative
-  // parse runs, so a trial parse whose result is discarded never reports
-  // errors. Calls nest; diagnostics resume once the outermost suppression is
-  // released.
   void PushSuppress() { ++suppress_depth_; }
   void PopSuppress() { --suppress_depth_; }
-  // The errors suppressed so far, which a trial parse compares before and
-  // after to learn whether the text it read was well formed, the report
-  // itself being discarded.
   uint32_t SuppressedErrorCount() const {
     NoteRead();
     return suppressed_error_count_;
   }
-  // Where the last of them stood, which such a parse reads to learn where its
-  // text broke off once the count has said that it did.
   SourceLoc LastSuppressedErrorLoc() const {
     NoteRead();
     return last_suppressed_error_loc_;
   }
 
-  // Keeps every report in Diagnostics() and the counts without writing it out,
-  // for a caller that reads back where a trial parse reported -- which a
-  // suppressed report, never recorded, cannot answer -- on an engine of its
-  // own whose reports nobody is to see.
   void SetQuiet(bool val) { quiet_ = val; }
 
  private:
   void Emit(DiagSeverity sev, SourceLoc loc, std::string msg,
             Subclause subclause);
-  // A query reads every error recorded before it. The two members it sets are
-  // mutable because a query answers from a const engine.
   void NoteRead() const {
     ++read_count_;
     has_unread_error_ = false;

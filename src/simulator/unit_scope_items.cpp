@@ -19,15 +19,8 @@
 
 namespace delta {
 
-// §3.12.1 (printed page 56): the name a design of one unit's compilation-unit
-// frames are pushed with and its items keyed under, "$unit.name"; no package
-// can be named so, `$` starting no identifier.
 constexpr std::string_view kOneUnitScope = "$unit";
 
-// §3.12.1: kOneUnitScope for a class the compilation unit itself declares
-// (RtlirDesign::cu_class_decls), and an empty view for a package's or a
-// module's class, or with no design behind the class. In a design of several
-// units, the scope name of the unit declaring the class ("$unit#k").
 std::string_view UnitScopeOfClass(const RtlirDesign* design,
                                   const ClassDecl* cls, Arena& arena) {
   if (design == nullptr) return {};
@@ -47,9 +40,6 @@ std::string_view UnitScopeOfClass(const RtlirDesign* design,
   return found;
 }
 
-// The compilation unit's classes to lower: the first of each name, and in a
-// design of several units every unit's own, two units' classes of one name
-// being two classes (§3.12.1).
 std::vector<std::pair<std::string_view, std::string_view>>
 ScopeSameNamedUnitClasses(const RtlirDesign* design, Arena& arena) {
   std::unordered_map<std::string_view, int> units_declaring;
@@ -124,11 +114,6 @@ std::vector<const ClassDecl*> UnitClassesToLower(const RtlirDesign* design) {
   return classes;
 }
 
-// §3.12.1: in a design of several units, the instance under `prefix` reaches
-// its own unit's subroutines by their bare names: under the prefix, as its own
-// subroutines are registered, and under the bare names themselves for the
-// first top, whose names stand under no prefix. The module's own subroutines,
-// registered after this, take a name it shares over.
 void EnterInstanceUnit(const RtlirDesign* design, const RtlirModule* mod,
                        std::string_view prefix, SimContext& ctx, Arena& arena) {
   if (mod->unit_index < 0) return;

@@ -8,15 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §14.11: `##` delays execution by a number of clocking block events, so the
-// statement after it runs at a time the default clocking decides rather than at
-// the time the source reaches it. No hardware holds a process back that way.
-//
-// The module below is legal: a default clocking block governs it, which is what
-// §14.11 requires of a module using `##`, so the only thing wrong with it is
-// that it is not hardware. The report has to say so by name, because a design
-// carrying `##3` that lowered without a word would give a netlist in which `q`
-// never takes the value the source assigns it.
 TEST(CycleDelaySynthesis, CycleDelayIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

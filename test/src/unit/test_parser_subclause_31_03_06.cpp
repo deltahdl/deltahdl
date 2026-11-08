@@ -64,8 +64,6 @@ TEST(TimingCheckCommandParsing, RecremWithNotifierOnly) {
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-// Syntax 31-8 makes both timing_check_limit arguments mandatory: supplying only
-// one trips the $recrem two-limit requirement.
 TEST(TimingCheckCommandParsing, ErrorRecremMissingSecondLimit) {
   auto r = Parse(
       "module m;\n"
@@ -85,13 +83,9 @@ TEST(TimingCheckCommandParsing, ErrorRecremMissingBothLimits) {
       "  $recrem(posedge clk, rst);\n"
       "endspecify\n"
       "endmodule\n");
-  // With no limit at all the argument list stops matching at the separator, so
-  // the shared timing-check parser reports under §31.2 rather than §31.3.6.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
-// timing_check_limit ::= expression, so each limit slot accepts a full constant
-// expression rather than only a literal.
 TEST(TimingCheckCommandParsing, RecremConstantExpressionLimits) {
   auto r = Parse(
       "module m;\n"
@@ -105,11 +99,6 @@ TEST(TimingCheckCommandParsing, RecremConstantExpressionLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// timing_check_limit ::= expression also admits an identifier primary, not only
-// numeric literals and arithmetic over them: a specparam reference in each of
-// the two limit slots parses as that slot's limit expression. This is a
-// distinct parse input form from the arithmetic-literal limits above (an
-// identifier primary rather than a binary node over integer literals).
 TEST(TimingCheckCommandParsing, RecremSpecparamLimits) {
   auto r = Parse(
       "module m;\n"
@@ -125,9 +114,6 @@ TEST(TimingCheckCommandParsing, RecremSpecparamLimits) {
   ASSERT_GE(tc->limits.size(), 2u);
 }
 
-// Syntax 31-8 productions timestamp_condition ::= mintypmax_expression and
-// timecheck_condition ::= mintypmax_expression: when present, each is parsed
-// into its own slot following the optional notifier.
 TEST(TimingCheckCommandParsing, RecremConditionsArePresent) {
   auto r = Parse(
       "module m;\n"
@@ -143,9 +129,6 @@ TEST(TimingCheckCommandParsing, RecremConditionsArePresent) {
   EXPECT_NE(tc->timecheck_cond, nullptr);
 }
 
-// Syntax 31-8 productions delayed_reference and delayed_data each admit the
-// terminal_identifier [ constant_mintypmax_expression ] alternative; the
-// bracket select is captured alongside the terminal name.
 TEST(TimingCheckCommandParsing, RecremDelayedSignalsAcceptConstantSelect) {
   auto r = Parse(
       "module m;\n"
@@ -162,9 +145,6 @@ TEST(TimingCheckCommandParsing, RecremDelayedSignalsAcceptConstantSelect) {
   EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
-// The optional trailing arguments of Syntax 31-8 nest independently: a
-// timestamp_condition may be supplied while the following timecheck_condition
-// is omitted, so the argument list closes right after the timestamp slot.
 TEST(TimingCheckCommandParsing,
      RecremTimestampConditionWithoutTimecheckCondition) {
   auto r = Parse(
@@ -182,9 +162,6 @@ TEST(TimingCheckCommandParsing,
   EXPECT_TRUE(tc->delayed_data.empty());
 }
 
-// Likewise the innermost nesting: a delayed_reference may appear without a
-// trailing delayed_data, with the argument list closing after the delayed
-// reference terminal.
 TEST(TimingCheckCommandParsing, RecremDelayedReferenceWithoutDelayedData) {
   auto r = Parse(
       "module m;\n"

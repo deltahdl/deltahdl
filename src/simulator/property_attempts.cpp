@@ -31,8 +31,6 @@ namespace delta {
 
 namespace {
 
-// §16.12.14: marks the states of the abort `node` in the attempt under
-// `state`, in flight at the time step the condition became true at.
 void MarkAborted(NodeState& state, const PropertyExprNode* node) {
   if (state.abort_node == node) state.aborted = true;
   for (NodeState* operand : state.operands) MarkAborted(*operand, node);
@@ -40,9 +38,6 @@ void MarkAborted(NodeState& state, const PropertyExprNode* node) {
   for (NodeState* c : state.seconds) MarkAborted(*c, node);
 }
 
-// §16.12.14: an asynchronous abort's condition is checked at the
-// granularity of the simulation time step, so each variable it reads is
-// watched, and a change that makes it true marks the attempts in flight.
 void WatchAsynchronousAbort(const PropertyExprNode* node,
                             PropertyTreeState& state, SimContext& ctx,
                             Arena& arena) {
@@ -60,14 +55,8 @@ void WatchAsynchronousAbort(const PropertyExprNode* node,
   }
 }
 
-// §16.13.1: each operand of the flattened sequence given the number of its
-// clock among the property's, where the sequence names any or is evaluated
-// on a clock other than the leading, an operand naming none on the clock
-// flowing to the sequence, `inherited`.
 void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
                          int inherited) {
-  // §16.13.3: a named sequence declared with a clock is evaluated on it,
-  // which flows no further than the sequence.
   int own_clock = body.declared_clock.empty()
                       ? inherited
                       : ClockIndexOf(clocks, body.declared_clock);
@@ -81,10 +70,6 @@ void NumberOperandClocks(LinearSequence& body, PropertyClocks& clocks,
   }
 }
 
-// §16.13.2 and §16.13.3: the number of the clock the node is evaluated on,
-// its own where it names one, numbered where new, and otherwise the one
-// flowing to it from its parent, `inherited`; a sequence, an implication's
-// antecedent included, names its first operand's.
 int ClockOfNode(const PropertyExprNode* node, PropertyTreeState& state,
                 int inherited) {
   if (!node->clock.empty()) return ClockIndexOf(state.clocks, node->clock);
@@ -97,39 +82,26 @@ int ClockOfNode(const PropertyExprNode* node, PropertyTreeState& state,
   return inherited;
 }
 
-// What a collection of the tree's sequences reads and writes: the tree's
-// state, the context and arena the sequences are flattened in, and the
-// actuals of the instance the tree is the expansion of.
 struct Collection {
   PropertyTreeState& state;
   SimContext& ctx;
   Arena& arena;
   const ActualsByFormal& actuals;
-  // §16.13.7: the copies of the property's locals in force under the node,
-  // by the local's name, the sequences under it substituted with them.
   ActualsByFormal locals;
 };
 
-// §16.13.7: the copies of the locals made for `node`, where any were,
-// added to the copies in force above it.
 void AddLocalCopies(const PropertyExprNode* node, Collection& in) {
   for (const LocalCopy& copy : in.state.local_copies) {
     if (copy.node == node) in.locals[copy.name] = copy.reference;
   }
 }
 
-// The actuals a sequence under the node is substituted with: the
-// instance's and the local copies in force.
 ActualsByFormal SubstitutedActuals(const Collection& in) {
   ActualsByFormal all = in.actuals;
   for (const auto& [name, literal] : in.locals) all[name] = literal;
   return all;
 }
 
-// The sequences of the tree flattened, each node's once, with the actuals
-// substituted where the collection holds any, each operand numbered by its
-// clock, `inherited` the clock flowing to the node; answers false where a
-// sequence is not readable.
 bool CollectSequences(const PropertyExprNode* node, Collection& in,
                       int inherited) {
   PropertyTreeState& state = in.state;
@@ -168,9 +140,6 @@ bool CollectSequences(const PropertyExprNode* node, Collection& in,
 PropertyExprNode* SubstituteTree(const PropertyExprNode* node,
                                  const ActualsByFormal& actuals, Arena& arena);
 
-// §16.12.18: the tree the actual of a formal carries where `e` references
-// the formal and the actual is a sequence_expr or a property_expr
-// (ActualTree); nullptr for any other expression.
 const PropertyExprNode* ActualProperty(const Expr* e,
                                        const ActualsByFormal& actuals) {
   if (e == nullptr || e->kind != ExprKind::kIdentifier) return nullptr;
@@ -179,10 +148,6 @@ const PropertyExprNode* ActualProperty(const Expr* e,
   return ActualTree(it->second);
 }
 
-// §16.12.18: the sequences and properties passed as actuals to an instance
-// in the body read the formals as the body's expressions do, so the tree
-// each such argument carries is substituted too; the argument is the copy
-// the expression substitution made.
 void SubstituteActualProperties(Expr* instance, const ActualsByFormal& actuals,
                                 Arena& arena) {
   if (instance == nullptr || instance->kind != ExprKind::kCall ||
@@ -197,12 +162,6 @@ void SubstituteActualProperties(Expr* instance, const ActualsByFormal& actuals,
   }
 }
 
-// §F.4.1: a copy of the tree under `node` with the actuals substituted for
-// the formals in every expression it holds; a sequence is shared with the
-// original and substituted where it is flattened. §16.12.18: a boolean
-// operand that references a formal whose actual is a sequence_expr or a
-// property_expr stands for the actual, copied so that its nodes are the
-// expansion's own.
 PropertyExprNode* SubstituteTree(const PropertyExprNode* node,
                                  const ActualsByFormal& actuals, Arena& arena) {
   if (node->kind == PropertyExprNode::Kind::kBoolean) {
@@ -236,9 +195,6 @@ const LinearSequence& BodyOf(const PropertyTreeState& state,
   return state.sequences.front().body;
 }
 
-// The state of one attempt of the tree under `node`, its operators' operands
-// stood up with it and its sequences' attempts to be begun at the first
-// tick.
 NodeState* NewNodeState(const PropertyExprNode* node, PropertyTreeState& tree,
                         int inherited, Arena& arena) {
   auto* state = arena.Create<NodeState>();
@@ -252,14 +208,10 @@ NodeState* NewNodeState(const PropertyExprNode* node, PropertyTreeState& tree,
   return state;
 }
 
-// What one tick's steps read: the tree with its flattened sequences, the
-// context and the arena.
 struct StepContext {
   PropertyTreeState& tree;
   SimContext& ctx;
   Arena& arena;
-  // §16.13: the clocks that ticked at the time step, a bit per clock, on
-  // which each node advances where its own did.
   uint32_t ticked = ~0u;
 };
 
@@ -267,17 +219,9 @@ bool Ticked(const StepContext& sc, int clock) {
   return clock >= 32 || ((sc.ticked >> clock) & 1u) != 0;
 }
 
-// One tick of one attempt's node, `begin` where the tick is the one the
-// attempt begins at, answering the node's verdict so far.
 Tri Step(const PropertyExprNode* node, NodeState& state, StepContext& sc,
          bool begin);
 
-// §16.10: a variable standing for the local `decl` of the instance whose
-// expansion `state` holds, of the local's declared type and holding the
-// value it holds before any assignment, under a name of its own, which
-// `state` binds it to while the expansion steps (StepBoolean); the variable
-// and an identifier naming it, which the expansion reads in the local's
-// place.
 std::pair<Expr*, Variable*> NewExpansionLocal(SeqLocalDecl decl,
                                               NodeState& state,
                                               StepContext& sc) {
@@ -294,12 +238,6 @@ std::pair<Expr*, Variable*> NewExpansionLocal(SeqLocalDecl decl,
   return {reference, var};
 }
 
-// §16.12.19 by way of §16.8.2: a local variable formal argument of a named
-// property, whose direction is input alone, is a local variable of the
-// instance of the type the formal is declared with, a new copy of it
-// initialized from the actual when the attempt begins, so the variable holds
-// the actual's value at that tick, sampled as the property reads it and cast
-// as §16.8.1 has it, for the attempt where the actual is an expression.
 void CaptureLocalFormals(const ModuleItem* decl, ActualsByFormal& actuals,
                          NodeState& state, StepContext& sc) {
   for (size_t i = 0;
@@ -318,9 +256,6 @@ void CaptureLocalFormals(const ModuleItem* decl, ActualsByFormal& actuals,
   }
 }
 
-// §16.13.7: the expressions of one node of an expansion with the copies of
-// the locals in force substituted for the locals, in place, the node being
-// the expansion's own; a sequence is substituted where it is flattened.
 void SubstituteNodeLocals(PropertyExprNode* node, const ActualsByFormal& locals,
                           Arena& arena) {
   node->boolean = SubstituteFormals(node->boolean, locals, arena);
@@ -332,10 +267,6 @@ void SubstituteNodeLocals(PropertyExprNode* node, const ActualsByFormal& locals,
   }
 }
 
-// §16.13.7: a copy of each of the property's locals for `node`, one of the
-// expansion's nodes that names a clock or its root, the initialization of
-// each reading the copies of the locals declared before it; the identifiers
-// naming the copies by the locals' names.
 ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
                                const std::vector<SeqLocalDecl>& locals,
                                NodeState& state, StepContext& sc) {
@@ -349,8 +280,6 @@ ActualsByFormal NewLocalCopies(const PropertyExprNode* node,
   return copies;
 }
 
-// §16.13.2: whether the node names a clock of its own, `@(posedge clk1)`
-// before it or before the first operand of the sequence it holds.
 bool NamesAClock(const PropertyExprNode* node) {
   if (!node->clock.empty()) return true;
   if (node->sequence == nullptr) return false;
@@ -358,12 +287,6 @@ bool NamesAClock(const PropertyExprNode* node) {
   return !body.clocks.empty() && !body.clocks.front().empty();
 }
 
-// §16.13.7: a separate copy of each local of the property for each semantic
-// leading clock of the expansion, the clock a node names being one and the
-// clock flowing into the root another, each subtree reading the copy of the
-// nearest clock above it, and a copy's initialization performed at the
-// first tick of its clock at or after the attempt begins, which is where
-// its node begins.
 void PlaceLocalCopies(PropertyExprNode* node,
                       const std::vector<SeqLocalDecl>& locals,
                       const ActualsByFormal* in_force, NodeState& state,
@@ -379,11 +302,6 @@ void PlaceLocalCopies(PropertyExprNode* node,
   }
 }
 
-// §16.13.7: the initialization assignments of the copies made for `node`,
-// performed as the node begins, at the first tick of its clock at or after
-// the attempt began, each in the order the locals are declared and assigned
-// to the copy's variable as to the local (AssignWholeLocal); a copy
-// initialized lives on in its variable alone.
 void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
   std::vector<LocalCopy>& copies = sc.tree.local_copies;
   std::vector<LocalCopy> waiting;
@@ -400,13 +318,6 @@ void InitializeLocalCopies(const PropertyExprNode* node, StepContext& sc) {
   copies = std::move(waiting);
 }
 
-// §16.12.17: a boolean operand that instantiates a named property is, when
-// it begins, expanded to the property's body with the actuals substituted
-// for the formals, stood up as the operand's one operand and stepped from
-// the tick; an instance in that body, the property's own included, is
-// expanded in turn when it begins, after the positive advance in time
-// Restriction 3 requires of it. Answers false, the operand a boolean,
-// where it instantiates no property or the body is not readable.
 bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
                     StepContext& sc) {
   const ModuleItem* decl = InstantiatedProperty(node->boolean, sc.ctx);
@@ -415,9 +326,6 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   CaptureLocalFormals(decl, actuals, state, sc);
   PropertyExprNode* body =
       SubstituteTree(decl->prop_body_tree, actuals, sc.arena);
-  // §16.13.2: a property declared with a clock is evaluated on it, from its
-  // first tick at or after the instance begins, the actuals in the formals'
-  // places.
   if (body->clock.empty()) {
     body->clock = SubstituteClock(decl->prop_clock, actuals, sc.arena);
   }
@@ -427,10 +335,6 @@ bool ExpandInstance(const PropertyExprNode* node, NodeState& state,
   Collection collection{sc.tree, sc.ctx, sc.arena, actuals, {}};
   if (!CollectSequences(body, collection, state.clock)) return false;
   InstallClockWatchers(sc.tree.clocks, sc.ctx, sc.arena);
-  // §16.13.2: a clock the expansion brings has not ticked at this time
-  // step, which the step's mask, read before the clock was met, would say
-  // of every clock, so the mask is read again for the operands on it to
-  // begin at its first tick.
   sc.ticked = ClocksTicked(
       sc.tree.clocks, sc.ctx.AssertionSamples().StepTime(sc.ctx.CurrentTime()));
   sc.ctx.AssertionSamples().SetClockTicks(sc.ticked);
@@ -443,8 +347,6 @@ Tri StepBoolean(const PropertyExprNode* node, NodeState& state, StepContext& sc,
                 bool begin) {
   if (begin) ExpandInstance(node, state, sc);
   if (state.expansion != nullptr) {
-    // §16.10: the expansion reads and assigns the instance's locals by the
-    // names their variables stand under.
     sc.ctx.PushScope();
     for (const auto& [name, var] : state.locals) {
       sc.ctx.BindLocalVariable(name, var);
@@ -478,8 +380,6 @@ Tri StepJunction(const PropertyExprNode* node, NodeState& state,
   return Junction(node->kind == PropertyExprNode::Kind::kOr, verdicts);
 }
 
-// §16.12.6: the condition is read at the attempt's tick, and the branch it
-// selects is the property; the else absent is true.
 Tri StepIfElse(const PropertyExprNode* node, NodeState& state, StepContext& sc,
                bool begin) {
   if (begin) {
@@ -492,13 +392,6 @@ Tri StepIfElse(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.condition ? then_branch : else_branch;
 }
 
-// §16.12.16: the linear search over the items in order, the default item
-// ignored in it: the first item one of whose expressions matches the case
-// expression is selected and the search ends there; where every comparison
-// fails the default is selected, and the count of the items where there is
-// none. The clause compares as §12.5 does, every expression evaluated at
-// the length of the longest and extended by sign only where all are signed,
-// which F.3.4.3.5 writes as the case equality of specify(b) and specify(bi).
 size_t SelectCaseItem(const PropertyExprNode* node, StepContext& sc) {
   CaseLength length;
   IncludeInCaseLength(node->boolean, sc.ctx, length);
@@ -524,9 +417,6 @@ size_t SelectCaseItem(const PropertyExprNode* node, StepContext& sc) {
   return selected;
 }
 
-// §16.12.16: the item is selected at the attempt's tick and its property
-// alone is the case's, evaluated from that tick; with no item selected none
-// is evaluated and the case holds, vacuously.
 Tri StepCase(const PropertyExprNode* node, NodeState& state, StepContext& sc,
              bool begin) {
   if (begin) state.selected = SelectCaseItem(node, sc);
@@ -535,9 +425,6 @@ Tri StepCase(const PropertyExprNode* node, NodeState& state, StepContext& sc,
               sc, begin);
 }
 
-// §16.12.7: one tick of the antecedent's attempt while it can still match,
-// answering whether a consequent is to begin at this tick; a match of the
-// nonoverlapped form begins one at the next tick instead.
 bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
                     StepContext& sc, bool begin) {
   if (state.antecedent_done) return false;
@@ -545,8 +432,6 @@ bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
   if (begin) state.attempt = NewSequenceAttempt(body, sc.arena);
   SequenceStep step =
       StepSequenceAttempt(body, *state.attempt, begin, sc.ctx, sc.arena);
-  // §16.9.8: of a first_match antecedent's matches only those ending at the
-  // earliest tick count, so the attempt ends with its first match.
   if (step == SequenceStep::kFailed || step == SequenceStep::kMatchedLast ||
       (body.first_match && Matched(step))) {
     state.antecedent_done = true;
@@ -557,10 +442,6 @@ bool StepAntecedent(const PropertyExprNode* node, NodeState& state,
   return false;
 }
 
-// §16.13.2 and §16.13.3: the clock the consequent is evaluated on: its own
-// where it names one, else the clock flowing out of the antecedent's end,
-// which is the implication's where the antecedent names none outside
-// parentheses and instances.
 int ConsequentClock(const PropertyExprNode* node, const NodeState& state,
                     StepContext& sc) {
   int own = ClockOfNode(node->operands[0], sc.tree, -1);
@@ -572,11 +453,6 @@ int ConsequentClock(const PropertyExprNode* node, const NodeState& state,
   return state.clock;
 }
 
-// §16.12.7: the antecedent's attempt is stepped until it can match no more,
-// and at each tick it matches at a consequent attempt begins, at that tick
-// for `|->` and at the next for `|=>`; the implication is false as soon as
-// a consequent is, and true once the antecedent can match no more and every
-// consequent begun is true, no match of the antecedent making it true.
 Tri StepImplication(const PropertyExprNode* node, NodeState& state,
                     StepContext& sc, bool begin) {
   const PropertyExprNode* consequent = node->operands[0];
@@ -585,9 +461,6 @@ Tri StepImplication(const PropertyExprNode* node, NodeState& state,
   for (NodeState* c : state.consequents) {
     verdicts.push_back(Step(consequent, *c, sc, false));
   }
-  // §16.13.2: a consequent on a clock of its own begins at that clock's
-  // nearest tick after the antecedent's end, the coincident one for `|->`
-  // and the strictly subsequent one for `|=>`.
   int clock = ConsequentClock(node, state, sc);
   bool spawn_now = state.spawn_next && Ticked(sc, clock);
   if (spawn_now) state.spawn_next = false;
@@ -611,9 +484,6 @@ Tri StepImplication(const PropertyExprNode* node, NodeState& state,
   return Tri::kPending;
 }
 
-// §16.12.10: the operand begins at the tick the count of ticks after the
-// attempt's has passed, one where none was written, `nexttime [0]` at the
-// attempt's own tick; until then the property is not decided.
 Tri StepNexttime(const PropertyExprNode* node, NodeState& state,
                  StepContext& sc, bool begin) {
   if (begin) {
@@ -634,11 +504,6 @@ uint64_t EvalCount(const Expr* e, StepContext& sc, uint64_t absent) {
   return EvalExpr(e, sc.ctx, sc.arena).ToUint64();
 }
 
-// §16.12.11 and §16.12.13: an operand attempt begins at each tick of the
-// range; the always is false as soon as one is false and true once every
-// tick of a bounded range has begun one and all are true, and the
-// eventually true as soon as one is true and false once every tick of a
-// bounded range has begun one and all are false.
 Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
                bool begin) {
   const PropertyExprNode* operand = node->operands[0];
@@ -668,8 +533,6 @@ Tri StepAlways(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return state.remaining == 0 ? joined : Tri::kPending;
 }
 
-// One tick of an until: the operands' attempts of the ticks before step on,
-// a pair begins at this tick, and the ticks are decided in order.
 Tri StepUntil(const PropertyExprNode* node, NodeState& state, StepContext& sc) {
   std::vector<Tri> firsts;
   std::vector<Tri> seconds;
@@ -690,12 +553,6 @@ Tri StepUntil(const PropertyExprNode* node, NodeState& state, StepContext& sc) {
   return DecideUntil(node, state, firsts, seconds);
 }
 
-// §16.12.14: the abort condition is read at each tick of the attempt, and
-// for the asynchronous forms at each time step between as well, before the
-// operand is stepped, so that an abort at the step the operand's evaluation
-// ends at takes precedence and the outermost of nested aborts does; the
-// condition true makes an accept true and a reject false, and otherwise the
-// property is its operand.
 Tri StepAbort(const PropertyExprNode* node, NodeState& state, StepContext& sc,
               bool begin) {
   bool fired =
@@ -704,9 +561,6 @@ Tri StepAbort(const PropertyExprNode* node, NodeState& state, StepContext& sc,
   return Step(node->operands[0], *state.operands[0], sc, begin);
 }
 
-// §16.13: whether the node advances at a tick of a clock other than its
-// own: a sequence, whose operands may be on that clock, and the operators
-// whose operands may be and which count no ticks of their own.
 bool AdvancesOffItsClock(const PropertyExprNode* node, const NodeState& state) {
   switch (node->kind) {
     case PropertyExprNode::Kind::kSequence:
@@ -732,12 +586,6 @@ bool AdvancesOffItsClock(const PropertyExprNode* node, const NodeState& state) {
   return false;
 }
 
-// §16.13.2: whether the node advances at this tick: an operand on a clock
-// of its own begins at that clock's nearest tick, the one it was begun at
-// where the clock ticked there, `begin` set where that is this tick, and
-// advances at its clock's ticks, and at the others' only where an operand
-// of its own may be on them. §16.13.7: the copies of the locals made for
-// the node are initialized as it begins.
 bool AdvancesAtTick(const PropertyExprNode* node, NodeState& state,
                     StepContext& sc, bool& begin) {
   bool own_tick = Ticked(sc, state.clock);
@@ -816,8 +664,6 @@ PropertyTreeState* CreatePropertyTreeState(
     bool every_match, SimContext& ctx, Arena& arena) {
   auto* state = arena.Create<PropertyTreeState>();
   state->every_match = every_match;
-  // §17.3: a checker's assertion reads the event, sequence or property bound
-  // to a formal in the formal's place, as a property instance's body does.
   const ActualsByFormal kActuals =
       CheckerTreeActuals(ctx.ActiveInstancePrefix(), ctx);
   if (!kActuals.empty()) root = SubstituteTree(root, kActuals, arena);
@@ -828,9 +674,6 @@ PropertyTreeState* CreatePropertyTreeState(
   if (!CollectSequences(root, collection, 0)) return nullptr;
   RegisterInstanceBodyClocks(root, state->clocks, ctx, arena);
   InstallClockWatchers(state->clocks, ctx, arena);
-  // §16.14.5: the step the watchers are installed at is read as a tick of
-  // the leading clock, the one an attempt begins at, unless another of the
-  // property's clocks is what woke its process there (§16.13.1).
   Process* proc = ctx.CurrentProcess();
   if (proc != nullptr && WokenByAnotherClock(state->clocks, proc->woken_by)) {
     state->clocks.installed_at = PropertyClocks::kNever;
@@ -838,9 +681,6 @@ PropertyTreeState* CreatePropertyTreeState(
   return state;
 }
 
-// §16.14.3: whether the attempt under `root`, its tree one sequence that
-// matched at this tick, is kept in flight for the matches it can still
-// reach, a cover sequence counting each.
 static bool MatchesAgain(const PropertyTreeState& state,
                          const NodeState& root) {
   return state.every_match &&
@@ -848,10 +688,6 @@ static bool MatchesAgain(const PropertyTreeState& state,
          root.verdict == Tri::kTrue && root.matches_again;
 }
 
-// The attempts of one tick: the first `advanced`, already stepped at this
-// time step, are kept as they stand; the rest step, the last `beginning`
-// of them at their first tick, and each that is decided reaches its
-// verdict and leaves.
 static void StepAttempts(StepContext& sc, size_t beginning, size_t advanced,
                          PropertyTick& tick) {
   PropertyTreeState& state = sc.tree;
@@ -863,7 +699,6 @@ static void StepAttempts(StepContext& sc, size_t beginning, size_t advanced,
       continue;
     }
     bool first = i + beginning >= state.attempts.size();
-    // §16.14.6.1: the attempt reads the values its instance saved.
     samples.SetInstanceBindings(state.attempts[i]->bindings);
     samples.NoteAttemptStepped(state.attempts[i]->started);
     Tri verdict = Step(state.root, *state.attempts[i], sc, first);
@@ -885,16 +720,8 @@ PropertyTick AdvancePropertyTree(PropertyTreeState& state, bool disabled,
                                  const AttemptInstances& instances,
                                  SimContext& ctx, Arena& arena) {
   PropertyTick tick;
-  // §16.13: which clocks ticked at this time step; a second wake at one
-  // time step, by another of the clocks, advances nothing again. A step
-  // §16.9.4 defers stands in the time step of its own tick.
   SimTime now = ctx.AssertionSamples().StepTime(ctx.CurrentTime());
   if (state.clocks.multiclock && state.advanced_at == now) return tick;
-  // §16.14.6.3: a second pass of the Active region in one time step, after
-  // the Reactive region wrote what a procedure reads, may queue instances
-  // of a procedural assertion whose clock ticked earlier in the step; they
-  // begin at this tick, and the attempts already advanced at it advance no
-  // more.
   bool again = state.advanced_at == now;
   state.advanced_at = now;
   uint32_t ticked = ClocksTicked(state.clocks, now);

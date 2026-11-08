@@ -34,9 +34,6 @@ TEST(Coverage, MultipleGroupInstances) {
   EXPECT_EQ(db.FindGroup("cg2")->name, "cg2");
 }
 
-// §19.3: a covergroup with a clocking event samples at each occurrence of the
-// event. a is 1 at the posedges at 5 and 45 and 0 at 15, 25 and 35, and a_d1
-// follows it a cycle later, so every bin of both coverpoints is hit.
 TEST(CovergroupInstanceSim, ClockingEventSamplesEachEdge) {
   SimFixture f;
   EXPECT_EQ(
@@ -62,8 +59,6 @@ TEST(CovergroupInstanceSim, ClockingEventSamplesEachEdge) {
       "cov=100\n$finish at time 52\n");
 }
 
-// §19.3: a covergroup takes a function's tf_port_list, so a formal with a
-// default takes it when new gives no actual: [0:hi] is [0:5], holding 4.
 TEST(CovergroupInstanceSim, FormalDefaultUsedWithoutActual) {
   SimFixture f;
   EXPECT_EQ(
@@ -84,8 +79,6 @@ TEST(CovergroupInstanceSim, FormalDefaultUsedWithoutActual) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: a ref formal refers to the actual, so a coverpoint over it samples
-// va as it stands at the sample, 7, not the 0 it held at new().
 TEST(CovergroupInstanceSim, RefFormalSamplesActualAtEachSample) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -105,8 +98,6 @@ TEST(CovergroupInstanceSim, RefFormalSamplesActualAtEachSample) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: new on the covergroup type builds an instance wherever the
-// assignment stands, a procedural c = new among them.
 TEST(CovergroupInstanceSim, ProceduralNewBuildsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -122,8 +113,6 @@ TEST(CovergroupInstanceSim, ProceduralNewBuildsInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §26.3: a covergroup a package declares is a type its import makes
-// visible, so `pcg c = new;` builds an instance sampling the package's pv, 0.
 TEST(CovergroupInstanceSim, ImportedPackageCovergroupBuildsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -143,9 +132,6 @@ TEST(CovergroupInstanceSim, ImportedPackageCovergroupBuildsInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §26.3: a package-qualified covergroup type needs no import, and
-// an explicit import of the type's own name makes it visible past one naming
-// another item, so `p::pcg c` and `pcg d` each build an instance.
 TEST(CovergroupInstanceSim,
      PackageCovergroupByScopeOrNamedImportBuildsInstance) {
   SimFixture f;
@@ -169,8 +155,6 @@ TEST(CovergroupInstanceSim,
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: a block event `begin t` samples as the task starts, so v is still
-// the 0 it held before the call, not the 3 the task writes.
 TEST(CovergroupInstanceSim, BeginBlockEventSamplesAsTaskStarts) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -189,8 +173,6 @@ TEST(CovergroupInstanceSim, BeginBlockEventSamplesAsTaskStarts) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: the terms of a block event joined by `or` each sample: `end fn`
-// once the function has written 3, `begin blk` before the block writes 2.
 TEST(CovergroupInstanceSim, OrJoinedBlockEventsSampleFunctionEndAndBlockBegin) {
   SimFixture f;
   EXPECT_EQ(
@@ -212,8 +194,6 @@ TEST(CovergroupInstanceSim, OrJoinedBlockEventsSampleFunctionEndAndBlockBegin) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: a block event names the task of the instance the covergroup is in,
-// so only u1's instance samples when u1 runs its task.
 TEST(CovergroupInstanceSim, BlockEventSamplesOnlyTheInstanceRunningTheTask) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(bit GO = 0);\n"
@@ -235,8 +215,6 @@ TEST(CovergroupInstanceSim, BlockEventSamplesOnlyTheInstanceRunningTheTask) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: an instance built again by a second new is sampled once per block
-// event, so with at_least 2 one call of the task covers no bin.
 TEST(CovergroupInstanceSim, RebuiltInstanceSamplesOncePerBlockEvent) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -257,8 +235,6 @@ TEST(CovergroupInstanceSim, RebuiltInstanceSamplesOncePerBlockEvent) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: an end block event is not triggered when its block, task or named fork
-// is disabled, so only the second pass of blk, which ends normally, samples.
 TEST(CovergroupInstanceSim, DisabledBlockTaskOrForkTriggersNoEndEvent) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -283,8 +259,6 @@ TEST(CovergroupInstanceSim, DisabledBlockTaskOrForkTriggersNoEndEvent) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: a covergroup variable holds a handle, so a copy of it and a formal
-// it is passed to reach the instance the variable holds.
 TEST(CovergroupInstanceSim, CopiedHandleAndFormalReachTheInstance) {
   SimFixture f;
   EXPECT_EQ(
@@ -308,8 +282,6 @@ TEST(CovergroupInstanceSim, CopiedHandleAndFormalReachTheInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: each new builds a fresh instance, so a handle copied before the
-// variable is given a second instance still reaches the first.
 TEST(CovergroupInstanceSim, SecondNewLeavesTheCopiedInstance) {
   SimFixture f;
   EXPECT_EQ(
@@ -331,9 +303,6 @@ TEST(CovergroupInstanceSim, SecondNewLeavesTheCopiedInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §19.7.1: a covergroup whose strobe option is set samples in the
-// Postponed region of the slot its clocking event occurred in, so it sees the
-// v = 2 written after the edge, where the unstrobed one sees v = 1.
 TEST(CovergroupInstanceSim, StrobedCovergroupSamplesInPostponedRegion) {
   SimFixture f;
   EXPECT_EQ(
@@ -358,9 +327,6 @@ TEST(CovergroupInstanceSim, StrobedCovergroupSamplesInPostponedRegion) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §19.7.1: a strobed covergroup takes one sample per time slot
-// however often its clocking event occurs in it, the value v holds at the end
-// of the slot, while a procedural sample() call is taken at once.
 TEST(CovergroupInstanceSim, StrobedCovergroupSamplesOncePerTimeSlot) {
   SimFixture f;
   EXPECT_EQ(
@@ -385,8 +351,6 @@ TEST(CovergroupInstanceSim, StrobedCovergroupSamplesOncePerTimeSlot) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.4 with §19.7.1: an embedded covergroup's strobe option defers its
-// clocking-event samples to the Postponed region as well.
 TEST(CovergroupInstanceSim, StrobedEmbeddedCovergroupSamplesInPostponedRegion) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -410,8 +374,6 @@ TEST(CovergroupInstanceSim, StrobedEmbeddedCovergroupSamplesInPostponedRegion) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §7.4: an element of an unpacked array of a covergroup type holds
-// the instance a new assigned to it builds, apart from its sibling's.
 TEST(CovergroupInstanceSim, ArrayElementHoldsTheInstanceNewBuilds) {
   SimFixture f;
   EXPECT_EQ(
@@ -432,9 +394,6 @@ TEST(CovergroupInstanceSim, ArrayElementHoldsTheInstanceNewBuilds) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §8.3 and §26.3: a class property whose type is a covergroup the
-// module or a package declares holds the instance the constructor's new
-// builds.
 TEST(CovergroupInstanceSim, ClassPropertyHoldsTheInstanceNewBuilds) {
   SimFixture f;
   EXPECT_EQ(
@@ -465,8 +424,6 @@ TEST(CovergroupInstanceSim, ClassPropertyHoldsTheInstanceNewBuilds) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §8.9: a static class property of a covergroup type holds the
-// instance `K::s = new` builds.
 TEST(CovergroupInstanceSim, StaticPropertyHoldsTheInstanceNewBuilds) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -485,9 +442,6 @@ TEST(CovergroupInstanceSim, StaticPropertyHoldsTheInstanceNewBuilds) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §6.21 and §13.4: a variable of a covergroup type declared in an
-// automatic function, an automatic task or a procedural block holds the
-// instance its new initializer builds.
 TEST(CovergroupInstanceSim, AutomaticLocalHoldsTheInstanceNewBuilds) {
   SimFixture f;
   EXPECT_EQ(
@@ -518,8 +472,6 @@ TEST(CovergroupInstanceSim, AutomaticLocalHoldsTheInstanceNewBuilds) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3: a named fork that completes, as a block that is not disabled,
-// triggers its end block event once its join is satisfied.
 TEST(CovergroupInstanceSim, CompletedNamedForkTriggersItsEndEvent) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -539,9 +491,6 @@ TEST(CovergroupInstanceSim, CompletedNamedForkTriggersItsEndEvent) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §8.13: a property of a covergroup type a derived class inherits
-// receives the instance a new in the derived constructor builds, and a module
-// covergroup variable assigned a new in a method keeps its own.
 TEST(CovergroupInstanceSim, InheritedPropertyAndModuleVariableTakeNew) {
   SimFixture f;
   EXPECT_EQ(
@@ -567,10 +516,6 @@ TEST(CovergroupInstanceSim, InheritedPropertyAndModuleVariableTakeNew) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.3 with §8.7 and §26.3: a class property of a covergroup type a package
-// declares, given `new` by its declaration, holds an instance as one given
-// `new` in the constructor does, each counting the sample of 0 as 1 of 4
-// bins. The initialized one held none.
 TEST(CovergroupInstanceSim,
      APackageCovergroupPropertyInitializedByNewHasAnInstance) {
   SimFixture f;
@@ -598,11 +543,6 @@ TEST(CovergroupInstanceSim,
   EXPECT_EQ(out, "25.00 25.00\n");
 }
 
-// §19.3 with §3.12.1: a covergroup the compilation unit declares is a type
-// every scope below it sees, so a module variable, a class property given
-// `new` in the constructor and an automatic local of it each hold an instance
-// of their own, counting 1, 2 and 3 of the 4 values. Each held none, the type
-// found neither by the elaboration of the variable nor at the run.
 TEST(CovergroupInstanceSim, ACompilationUnitCovergroupTypeHasInstances) {
   SimFixture f;
   auto out = RunCapture(

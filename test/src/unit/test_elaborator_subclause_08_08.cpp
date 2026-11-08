@@ -68,8 +68,6 @@ TEST(TypedConstructorCallElaboration, TypedConstructorInDeclarationElaborates) {
              "endmodule\n"));
 }
 
-// §8.8: the specified type shall be assignment compatible with the target.
-// An unrelated class as the constructor scope is therefore an error.
 TEST(TypedConstructorCallElaboration, IncompatibleTypedConstructorRejected) {
   ElabFixture f;
   ElabOk(
@@ -85,8 +83,6 @@ TEST(TypedConstructorCallElaboration, IncompatibleTypedConstructorRejected) {
       "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
-// §8.8: the assignment-compatibility requirement holds regardless of whether
-// arguments are passed to the typed constructor call.
 TEST(TypedConstructorCallElaboration,
      IncompatibleTypedConstructorWithArgsRejected) {
   ElabFixture f;
@@ -105,9 +101,6 @@ TEST(TypedConstructorCallElaboration,
       "typed constructor call type is not assignment compatible", 7, "8.8"));
 }
 
-// §8.8: assignment compatibility is directional. A superclass type is not
-// compatible with a subclass target, so naming the base class in a typed
-// constructor call assigned to a derived handle is an error.
 TEST(TypedConstructorCallElaboration,
      BaseTypeConstructorToDerivedTargetRejected) {
   ElabFixture f;
@@ -124,10 +117,6 @@ TEST(TypedConstructorCallElaboration,
       "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
-// §8.8: the assignment-compatibility rule also governs a typed constructor call
-// initializing a module-scope declaration (`C c = U::new;` at module level,
-// outside any procedural block). An unrelated specified type is rejected there
-// just as in a procedural assignment or a block-local declaration.
 TEST(TypedConstructorCallElaboration, IncompatibleModuleLevelDeclInitRejected) {
   ElabFixture f;
   ElabOk(
@@ -142,10 +131,6 @@ TEST(TypedConstructorCallElaboration, IncompatibleModuleLevelDeclInitRejected) {
       "typed constructor call type is not assignment compatible", 4, "8.8"));
 }
 
-// §8.8: the assignment-compatibility rule applies to a typed constructor call
-// used as a declaration initializer, not only a procedural assignment. A
-// compatible derived type in a block-local `C c = D::new;` declaration
-// elaborates.
 TEST(TypedConstructorCallElaboration, BlockLocalDeclInitElaborates) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -157,9 +142,6 @@ TEST(TypedConstructorCallElaboration, BlockLocalDeclInitElaborates) {
              "endmodule\n"));
 }
 
-// §8.8: conversely, an unrelated (incompatible) type named in a typed
-// constructor call that initializes a block-local declaration is rejected --
-// the compatibility rule is enforced on the declaration-initializer form.
 TEST(TypedConstructorCallElaboration, IncompatibleBlockLocalDeclInitRejected) {
   ElabFixture f;
   ElabOk(
@@ -176,8 +158,6 @@ TEST(TypedConstructorCallElaboration, IncompatibleBlockLocalDeclInitRejected) {
       "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
-// §8.8: the directional nature of the rule also holds for a declaration
-// initializer -- a base type initializing a derived-typed local is rejected.
 TEST(TypedConstructorCallElaboration, BaseToDerivedBlockLocalDeclInitRejected) {
   ElabFixture f;
   ElabOk(
@@ -194,9 +174,6 @@ TEST(TypedConstructorCallElaboration, BaseToDerivedBlockLocalDeclInitRejected) {
       "typed constructor call type is not assignment compatible", 5, "8.8"));
 }
 
-// §8.8: a type several levels down the inheritance chain is still assignment
-// compatible with a base-class target, so the typed constructor call is
-// accepted across more than one extension step.
 TEST(TypedConstructorCallElaboration,
      MultiLevelDerivedTypedConstructorElaborates) {
   EXPECT_TRUE(

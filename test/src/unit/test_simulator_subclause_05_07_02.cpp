@@ -95,11 +95,6 @@ TEST(RealLiteralConstantSim, RealVariablePreservesValue) {
   EXPECT_DOUBLE_EQ(v, 3.14159265358979);
 }
 
-// §5.7.2: the IEEE 754 value of a real literal must survive regardless of the
-// syntactic position it is written in. The other value tests place the literal
-// on the right-hand side of a procedural assignment; this one drives it through
-// the distinct variable-declaration-initializer lowering path and reads the
-// resulting run-time value back.
 TEST(RealLiteralConstantSim, RealDeclarationInitializerValue) {
   auto v = RunAndGetReal("module t;\n  real r = 6.25;\nendmodule\n", "r");
   EXPECT_DOUBLE_EQ(v, 6.25);
@@ -124,10 +119,6 @@ TEST(RealLiteralConstantSim, IEEE754NegativeBitExact) {
   EXPECT_EQ(bits, expected);
 }
 
-// §5.7.2 (printed page 80): a cast converts a real literal to shortreal, so
-// `shortreal'(0.5)` is the single-precision 0.5, which equals the real 0.5.
-// The cast masked the double's bit pattern to 32 bits, an integer of no
-// relation to the value, and the comparison was false.
 TEST(RealLiteralConstantSim, ShortrealCastOfHalfEqualsTheRealHalf) {
   auto v = RunAndGet(
       "module t;\n"
@@ -138,8 +129,6 @@ TEST(RealLiteralConstantSim, ShortrealCastOfHalfEqualsTheRealHalf) {
   EXPECT_EQ(v, 1u);
 }
 
-// A shortreal initialized from the cast holds the single-precision value, so
-// `h + 2.0` is 2.5; it held 0.
 TEST(RealLiteralConstantSim, ShortrealFromCastAddsAsItsValue) {
   auto v = RunAndGetReal(
       "module t;\n"
@@ -151,9 +140,6 @@ TEST(RealLiteralConstantSim, ShortrealFromCastAddsAsItsValue) {
   EXPECT_DOUBLE_EQ(v, 2.5);
 }
 
-// 1.2 is not exact in single precision, so the sum is 3.7 to the precision a
-// float carries and not to a double's; the pattern read as an integer gave
-// 858993474.5.
 TEST(RealLiteralConstantSim,
      ShortrealFromCastOfInexactValueAddsToSinglePrecision) {
   auto v = RunAndGetReal(
@@ -167,9 +153,6 @@ TEST(RealLiteralConstantSim,
   EXPECT_NE(v, 3.7);
 }
 
-// §6.12 makes shortreal a C float, so the cast narrows: the single-precision
-// 0.1 widened back into a real is not the double 0.1, which discriminates a
-// cast that kept the double.
 TEST(RealLiteralConstantSim, ShortrealCastNarrowsToSinglePrecision) {
   auto v = RunAndGet(
       "module t;\n"
@@ -181,17 +164,11 @@ TEST(RealLiteralConstantSim, ShortrealCastNarrowsToSinglePrecision) {
   EXPECT_EQ(v, 0u);
 }
 
-// One real literal and the binary64 bit pattern nearest its decimal value.
 struct NearestBinary64 {
   const char* literal;
   uint64_t bits;
 };
 
-// §5.7.2 makes a real literal an IEEE 754 double, whose value is the binary64
-// nearest the decimal it writes, ties to even: a decimal no binary64 holds
-// exactly in each literal form, a value halfway between two (2**53 + 1), the
-// subnormal range on both sides of half the smallest subnormal, and a value
-// past the largest finite double, which rounds to infinity.
 static std::vector<NearestBinary64> NearestBinary64Cases() {
   return {{"0.1", 0x3FB999999999999AULL},
           {"0.1_0", 0x3FB999999999999AULL},
@@ -207,7 +184,6 @@ static std::vector<NearestBinary64> NearestBinary64Cases() {
           {"1e309", 0x7FF0000000000000ULL}};
 }
 
-// Each literal, assigned in a procedure, holds exactly its nearest binary64.
 TEST(RealLiteralConstantSim, ProceduralLiteralHoldsTheNearestBinary64) {
   for (const NearestBinary64& c : NearestBinary64Cases()) {
     std::string src = "module t;\n  real r;\n  initial r = ";
@@ -217,7 +193,6 @@ TEST(RealLiteralConstantSim, ProceduralLiteralHoldsTheNearestBinary64) {
   }
 }
 
-// The same in a declaration's initializer.
 TEST(RealLiteralConstantSim, DeclarationLiteralHoldsTheNearestBinary64) {
   for (const NearestBinary64& c : NearestBinary64Cases()) {
     std::string src = "module t;\n  real r = ";
@@ -227,8 +202,6 @@ TEST(RealLiteralConstantSim, DeclarationLiteralHoldsTheNearestBinary64) {
   }
 }
 
-// The same as a parameter's value, which the elaborator folds before the
-// variable reads it.
 TEST(RealLiteralConstantSim, ParameterLiteralHoldsTheNearestBinary64) {
   for (const NearestBinary64& c : NearestBinary64Cases()) {
     std::string src = "module t;\n  parameter real P = ";

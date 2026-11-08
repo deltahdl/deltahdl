@@ -53,8 +53,6 @@ TEST(EventTriggerElaborator, TriggerAndWaitElaborates) {
              "endmodule\n"));
 }
 
-// §15.5.1: a trigger makes a named event occur, so its target is an event,
-// which a variable of type int is not.
 TEST(EventTriggerElaborator, TriggerOfAnIntVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -68,7 +66,6 @@ TEST(EventTriggerElaborator, TriggerOfAnIntVariableIsReported) {
                             "15.5.1"));
 }
 
-// §15.5.1: a nonblocking trigger's target is an event as a blocking one's is.
 TEST(EventTriggerElaborator, NonblockingTriggerOfALogicVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,10 +79,6 @@ TEST(EventTriggerElaborator, NonblockingTriggerOfALogicVariableIsReported) {
                             "15.5.1"));
 }
 
-// §15.5.1: an event, an element of an array of events, an event of a typedef
-// of event, a class's event property, an event formal hiding a module variable
-// of its name, an event a block declares and one of the compilation unit's
-// scope are each a trigger's target.
 TEST(EventTriggerElaborator, TriggerOfEveryFormOfEventElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

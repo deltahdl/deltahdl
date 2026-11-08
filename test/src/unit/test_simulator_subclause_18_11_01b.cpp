@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.11.1: randomize(null) designates no random variables for the call, so
-// every member, the rand x and y included, is a state variable, and the
-// method checks whether x < v && y > w holds on the current values,
-// returning 1 where it does and 0 where it does not and drawing nothing
-// either way, as the design test/src/e2e/inline_constraint_checker.sv runs
-// it.
 TEST(InlineConstraintCheckerRun, NullChecksTheRelationOnTheCurrentValues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -39,9 +33,6 @@ TEST(InlineConstraintCheckerRun, NullChecksTheRelationOnTheCurrentValues) {
   EXPECT_EQ(out, "1 1 0 1\n");
 }
 
-// 18.11.1: a class without random variables turns randomize() into a checker
-// without any null argument, assigning nothing and returning 1 where every
-// constraint is satisfied and 0 otherwise.
 TEST(InlineConstraintCheckerRun, NoRandomVariablesMakesTheMethodAChecker) {
   SimFixture f;
   std::string out = RunCapture(

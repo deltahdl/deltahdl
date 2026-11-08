@@ -118,10 +118,6 @@ TEST(PliPreActiveSim, PreActiveReadWriteContrastWithPreponed) {
   EXPECT_EQ(active_sample, 55);
 }
 
-// Edge case for the guarantee that events are created before the Active region
-// is evaluated: an event created while inside Pre-Active that is itself
-// scheduled into Pre-Active for the current time slot must still be drained
-// within the same Pre-Active pass, ahead of any Active event.
 TEST(PliPreActiveSim, PreActiveCreatedPreActiveEventRunsBeforeActive) {
   Arena arena;
   Scheduler sched(arena);
@@ -147,9 +143,6 @@ TEST(PliPreActiveSim, PreActiveCreatedPreActiveEventRunsBeforeActive) {
   EXPECT_EQ(order[2], "active");
 }
 
-// Pre-Active is an unrestricted control point: writing values and creating
-// events from within it is explicitly permitted, unlike the read-only Preponed
-// and Postponed regions. The scheduler must not flag such activity as illegal.
 TEST(PliPreActiveSim, PreActiveWritesAndSchedulingAreNotFlaggedIllegal) {
   Arena arena;
   Scheduler sched(arena);
@@ -170,14 +163,6 @@ TEST(PliPreActiveSim, PreActiveWritesAndSchedulingAreNotFlaggedIllegal) {
   EXPECT_EQ(sched.IllegalPostponedScheduleCount(), 0u);
 }
 
-// §4.4.3.2's facet that values are written before the Active region's events
-// are evaluated, driven through the real VPI write path rather than the
-// synthetic NoteWriteAttempt shortcut used above. A vpi_put_value() issued from
-// a Pre-Active PLI callback flows through PutValueApplyWriteAndForce, so it
-// both takes effect (an Active-region read via vpi_get_value() sees the new
-// value, proving the write landed ahead of the Active region) and is left
-// un-flagged: unlike the read-only Preponed/Postponed/Pre-Observed regions, a
-// Pre-Active write records no illegal-write violation.
 TEST(PliPreActiveSim, VpiPutValueFromPreActiveTakesEffectAndIsNotFlagged) {
   Arena arena;
   Scheduler sched(arena);
@@ -219,16 +204,13 @@ namespace {
 
 std::vector<std::string>* g_next_sim_time_order = nullptr;
 
-int RecordNextSimTime(s_cb_data* /*data*/) {
+int RecordNextSimTime(s_cb_data*) {
   g_next_sim_time_order->push_back("next_sim_time");
   return 0;
 }
 
 }  // namespace
 
-// Table 4-1 places cbNextSimTime in the Pre-Active region, which §4.5 runs
-// after the slot's Preponed region; called ahead of the slot, a value the
-// callback wrote was seen by the Preponed sampling.
 TEST(PliPreActiveSim, NextSimTimeCallbackRunsAfterThePreponedRegion) {
   Arena arena;
   Scheduler sched(arena);

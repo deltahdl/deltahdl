@@ -1,11 +1,3 @@
-// Observing tests for the BNF productions of IEEE 1800-2023 Annex A.1.9
-// "Class items". Every production in this subclause is grammar that the parser
-// already realizes; these tests pin the parser actually applying each rule by
-// inspecting the resulting AST. The superscript markers in the LRM (e.g. on
-// parameter_declaration, method_prototype, class_constructor_arg_list and the
-// qualifier productions) point at clarification list elements in Annex A.10, a
-// separate subclause, so they are not A.1.9's own requirements.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -21,13 +13,10 @@ using namespace delta;
 
 namespace {
 
-// Helpers to locate a class / member produced by the parser.
 const ClassDecl* FirstClass(const ParseResult& r) {
   return r.cu->classes.empty() ? nullptr : r.cu->classes[0];
 }
 
-// --- class_item --------------------------------------------------------------
-// class_item's class_declaration alternative: a class nested inside a class.
 TEST(ClassItems, ClassItemNestedClassDeclaration) {
   auto r = Parse(
       "class Outer;\n"
@@ -43,7 +32,6 @@ TEST(ClassItems, ClassItemNestedClassDeclaration) {
   EXPECT_EQ(c->members[0]->nested_class->name, "Inner");
 }
 
-// class_item's covergroup_declaration alternative.
 TEST(ClassItems, ClassItemCovergroupDeclaration) {
   auto r = Parse(
       "class C;\n"
@@ -57,8 +45,6 @@ TEST(ClassItems, ClassItemCovergroupDeclaration) {
   EXPECT_EQ(c->members[0]->kind, ClassMemberKind::kCovergroup);
 }
 
-// class_item's parameter_declaration ';' and local_parameter_declaration ';'
-// alternatives both yield class properties named after the declared parameters.
 TEST(ClassItems, ClassItemParameterAndLocalParam) {
   auto r = Parse(
       "class C;\n"
@@ -73,8 +59,6 @@ TEST(ClassItems, ClassItemParameterAndLocalParam) {
   EXPECT_EQ(c->members[1]->name, "Q");
 }
 
-// class_item's empty ';' alternative: a stray semicolon is accepted and adds no
-// member to the class body.
 TEST(ClassItems, ClassItemEmptySemicolon) {
   auto r = Parse(
       "class C;\n"
@@ -89,9 +73,6 @@ TEST(ClassItems, ClassItemEmptySemicolon) {
   EXPECT_EQ(c->members[0]->name, "x");
 }
 
-// class_item's interface_class_declaration alternative, distinct from the
-// ordinary class_declaration alternative: an 'interface class' nested inside a
-// class yields a class-declaration member flagged as an interface class.
 TEST(ClassItems, ClassItemNestedInterfaceClassDeclaration) {
   auto r = Parse(
       "class Outer;\n"
@@ -107,8 +88,6 @@ TEST(ClassItems, ClassItemNestedInterfaceClassDeclaration) {
   EXPECT_TRUE(c->members[0]->nested_class->is_interface);
 }
 
-// Every class_item alternative permits a leading { attribute_instance }; the
-// parser accepts the attribute prefix and parses the member that follows.
 TEST(ClassItems, ClassItemWithAttributeInstance) {
   auto r = Parse(
       "class C;\n"
@@ -122,10 +101,6 @@ TEST(ClassItems, ClassItemWithAttributeInstance) {
   EXPECT_EQ(c->members[0]->name, "x");
 }
 
-// --- class_property ----------------------------------------------------------
-// class_property's second alternative:
-//   const {class_item_qualifier} data_type const_identifier [=
-//   constant_expression] ;
 TEST(ClassItems, ClassPropertyConstForm) {
   auto r = Parse(
       "class C;\n"
@@ -141,8 +116,6 @@ TEST(ClassItems, ClassPropertyConstForm) {
   EXPECT_NE(c->members[0]->init_expr, nullptr);
 }
 
-// class_property's const form leaves the '= constant_expression' initializer
-// optional: a const property declared without an initializer is accepted.
 TEST(ClassItems, ClassPropertyConstWithoutInitializer) {
   auto r = Parse(
       "class C;\n"
@@ -157,9 +130,6 @@ TEST(ClassItems, ClassPropertyConstWithoutInitializer) {
   EXPECT_EQ(c->members[0]->init_expr, nullptr);
 }
 
-// class_property is a data_declaration behind its qualifiers, and A.2.1.3
-// opens one with an optional `var`, after which footnote 14 of A.10 lets the
-// data type be implicit: packed dimensions alone, or a signing.
 TEST(ClassItems, ClassPropertyWrittenWithVar) {
   auto r = Parse(
       "class C;\n"
@@ -184,10 +154,6 @@ TEST(ClassItems, ClassPropertyWrittenWithVar) {
   EXPECT_TRUE(c->members[3]->data_type.is_signed);
 }
 
-// Footnote 14 of A.10 has a data_declaration name its data type unless `var`
-// is written, and a class property is one, so a property of implicit type
-// written without `var` -- nothing at all, a signing, `const` alone or packed
-// dimensions alone -- draws the report a module item does.
 TEST(ClassItems, ClassPropertyOfImplicitTypeWithoutVarIsReported) {
   auto r = Parse(
       "class C;\n"
@@ -204,7 +170,6 @@ TEST(ClassItems, ClassPropertyOfImplicitTypeWithoutVarIsReported) {
   }
 }
 
-// The same properties stand written with `var` or with their type named.
 TEST(ClassItems, ClassPropertyOfImplicitTypeWithVarStands) {
   auto r = Parse(
       "class C;\n"
@@ -215,10 +180,6 @@ TEST(ClassItems, ClassPropertyOfImplicitTypeWithVarStands) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A name followed by the property's name is a type the parse does not know
-// rather than an implicit type. It draws the property parse's own report at
-// the name after it, and no word of `var` where the type stands, at column 3;
-// the `h;` the parse resumes at is a property of implicit type of its own.
 TEST(ClassItems, ClassPropertyOfAnUnknownTypeNameDrawsNoVarReport) {
   auto r = Parse(
       "class C;\n"
@@ -230,9 +191,6 @@ TEST(ClassItems, ClassPropertyOfAnUnknownTypeNameDrawsNoVarReport) {
   }
 }
 
-// A.2.2.1 counts a type_reference among the data types, which a property, a
-// variable, writes after `var` (§6.23), held for the elaborator to resolve;
-// one written without it is reported as a module's variable is.
 TEST(ClassItems, ClassPropertyOfATypeReferenceAfterVarStands) {
   auto r = Parse(
       "class C;\n"
@@ -259,9 +217,6 @@ TEST(ClassItems, ClassPropertyOfATypeReferenceWithoutVarIsReported) {
                             3, "6.8"));
 }
 
-// --- property_qualifier ------------------------------------------------------
-// property_qualifier ::= random_qualifier | class_item_qualifier. Both branches
-// can prefix a single data_declaration property.
 TEST(ClassItems, PropertyQualifierRandAndStatic) {
   auto r = Parse(
       "class C;\n"
@@ -278,8 +233,6 @@ TEST(ClassItems, PropertyQualifierRandAndStatic) {
   EXPECT_TRUE(c->members[1]->is_static);
 }
 
-// --- random_qualifier --------------------------------------------------------
-// random_qualifier ::= rand | randc.
 TEST(ClassItems, RandomQualifierRandAndRandc) {
   auto r = Parse(
       "class C;\n"
@@ -296,8 +249,6 @@ TEST(ClassItems, RandomQualifierRandAndRandc) {
   EXPECT_FALSE(c->members[1]->is_rand);
 }
 
-// --- class_item_qualifier ----------------------------------------------------
-// class_item_qualifier ::= static | protected | local.
 TEST(ClassItems, ClassItemQualifierAccessModifiers) {
   auto r = Parse(
       "class C;\n"
@@ -312,8 +263,6 @@ TEST(ClassItems, ClassItemQualifierAccessModifiers) {
   EXPECT_TRUE(c->members[1]->is_local);
 }
 
-// --- class_method ------------------------------------------------------------
-// class_method's task_declaration and function_declaration alternatives.
 TEST(ClassItems, ClassMethodFunctionAndTask) {
   auto r = Parse(
       "class C;\n"
@@ -335,9 +284,6 @@ TEST(ClassItems, ClassMethodFunctionAndTask) {
   EXPECT_EQ(c->members[1]->method->name, "t");
 }
 
-// --- method_qualifier --------------------------------------------------------
-// method_qualifier ::= [pure] virtual | class_item_qualifier. The plain
-// 'virtual' branch (no 'pure') prefixes a complete method definition.
 TEST(ClassItems, MethodQualifierVirtual) {
   auto r = Parse(
       "class C;\n"
@@ -353,8 +299,6 @@ TEST(ClassItems, MethodQualifierVirtual) {
   EXPECT_EQ(c->members[0]->kind, ClassMemberKind::kMethod);
 }
 
-// method_qualifier's class_item_qualifier branch (distinct from the [pure]
-// virtual branch): an access qualifier may prefix a complete method definition.
 TEST(ClassItems, MethodQualifierAccessModifier) {
   auto r = Parse(
       "class C;\n"
@@ -369,8 +313,6 @@ TEST(ClassItems, MethodQualifierAccessModifier) {
   EXPECT_TRUE(c->members[0]->is_protected);
 }
 
-// class_method's 'pure virtual {class_item_qualifier} method_prototype ;'
-// alternative — also exercises method_prototype's function_prototype branch.
 TEST(ClassItems, ClassMethodPureVirtualPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -384,9 +326,6 @@ TEST(ClassItems, ClassMethodPureVirtualPrototype) {
   EXPECT_EQ(c->members[0]->kind, ClassMemberKind::kMethod);
 }
 
-// class_method's 'extern {method_qualifier} method_prototype ;' alternative —
-// covers both method_prototype branches (function_prototype and
-// task_prototype).
 TEST(ClassItems, ClassMethodExternPrototypes) {
   auto r = Parse(
       "class C;\n"
@@ -405,9 +344,6 @@ TEST(ClassItems, ClassMethodExternPrototypes) {
   EXPECT_EQ(c->members[1]->method->name, "t");
 }
 
-// --- class_constructor_declaration -------------------------------------------
-// class_constructor_declaration: 'function new (...) ; ... [super.new(...);]
-// ... endfunction'. The constructor's name is recognized as "new".
 TEST(ClassItems, ClassConstructorDeclaration) {
   auto r = Parse(
       "class C;\n"
@@ -424,8 +360,6 @@ TEST(ClassItems, ClassConstructorDeclaration) {
   EXPECT_EQ(c->members[0]->method->name, "new");
 }
 
-// class_constructor_declaration permits the super.new call to take the lone
-// 'default' keyword in place of an argument list.
 TEST(ClassItems, ConstructorSuperNewDefault) {
   auto r = Parse(
       "class C;\n"
@@ -441,8 +375,6 @@ TEST(ClassItems, ConstructorSuperNewDefault) {
   EXPECT_EQ(c->members[0]->method->name, "new");
 }
 
-// class_constructor_declaration permits the optional closing label, which the
-// grammar restricts to 'endfunction : new'.
 TEST(ClassItems, ConstructorEndLabel) {
   auto r = Parse(
       "class C;\n"
@@ -457,8 +389,6 @@ TEST(ClassItems, ConstructorEndLabel) {
   EXPECT_EQ(c->members[0]->method->name, "new");
 }
 
-// class_constructor_declaration's optional class_scope: an out-of-body
-// constructor definition 'function ClassName :: new (...) ; ... endfunction'.
 TEST(ClassItems, ClassConstructorClassScope) {
   auto r = Parse(
       "class C;\n"
@@ -467,8 +397,6 @@ TEST(ClassItems, ClassConstructorClassScope) {
       "function C::new(int x);\n"
       "endfunction\n");
   ASSERT_FALSE(r.has_errors);
-  // The out-of-body definition lands among the compilation-unit items, carrying
-  // both the qualifying class scope and the constructor name.
   const ModuleItem* def = nullptr;
   for (auto* it : r.cu->cu_items) {
     if (it->kind == ModuleItemKind::kFunctionDecl && it->name == "new") {
@@ -480,10 +408,6 @@ TEST(ClassItems, ClassConstructorClassScope) {
   EXPECT_EQ(def->method_class, "C");
 }
 
-// --- class_constructor_prototype ---------------------------------------------
-// class_method's 'extern {method_qualifier} class_constructor_prototype' form:
-//   class_constructor_prototype ::= function new [(
-//   [class_constructor_arg_list] )] ;
 TEST(ClassItems, ClassConstructorPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -498,11 +422,6 @@ TEST(ClassItems, ClassConstructorPrototype) {
   EXPECT_TRUE(c->members[0]->method->is_extern);
 }
 
-// --- class_constructor_arg_list / class_constructor_arg ----------------------
-// class_constructor_arg_list ::= class_constructor_arg { ,
-// class_constructor_arg } class_constructor_arg ::= tf_port_item | default The
-// constructor argument list accepts several ordinary port items together with
-// the 'default' keyword argument.
 TEST(ClassItems, ConstructorArgListWithDefaultArg) {
   auto r = Parse(
       "class C;\n"
@@ -520,9 +439,6 @@ TEST(ClassItems, ConstructorArgListWithDefaultArg) {
   EXPECT_EQ(c->members[0]->method->func_args[2].name, "b");
 }
 
-// --- interface_class_item / interface_class_method ---------------------------
-// interface_class_method ::= pure virtual method_prototype ; inside an
-// 'interface class' declaration.
 TEST(ClassItems, InterfaceClassMethod) {
   auto r = Parse(
       "interface class I;\n"
@@ -538,8 +454,6 @@ TEST(ClassItems, InterfaceClassMethod) {
   EXPECT_EQ(c->members[0]->method->name, "f");
 }
 
-// interface_class_method also covers method_prototype's task_prototype branch:
-// 'pure virtual task ... ;' inside an interface class.
 TEST(ClassItems, InterfaceClassMethodTaskPrototype) {
   auto r = Parse(
       "interface class I;\n"
@@ -555,8 +469,6 @@ TEST(ClassItems, InterfaceClassMethodTaskPrototype) {
   EXPECT_EQ(c->members[0]->method->name, "t");
 }
 
-// interface_class_item's type_declaration and parameter_declaration ';'
-// alternatives are accepted inside an interface class body.
 TEST(ClassItems, InterfaceClassItemTypeAndParameter) {
   auto r = Parse(
       "interface class I;\n"
@@ -572,9 +484,6 @@ TEST(ClassItems, InterfaceClassItemTypeAndParameter) {
   EXPECT_EQ(c->members[1]->name, "P");
 }
 
-// interface_class_item's local_parameter_declaration ';' and empty ';'
-// alternatives are accepted in an interface class body; the stray semicolon
-// contributes no member.
 TEST(ClassItems, InterfaceClassItemLocalParamAndEmpty) {
   auto r = Parse(
       "interface class I;\n"
@@ -589,9 +498,6 @@ TEST(ClassItems, InterfaceClassItemLocalParamAndEmpty) {
   EXPECT_EQ(c->members[0]->name, "X");
 }
 
-// --- class_constraint --------------------------------------------------------
-// class_constraint ::= constraint_prototype | constraint_declaration. A
-// constraint with a block body is a declaration; one without is a prototype.
 TEST(ClassItems, ClassConstraintDeclarationAndPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -608,18 +514,6 @@ TEST(ClassItems, ClassConstraintDeclarationAndPrototype) {
   EXPECT_TRUE(c->members[1]->is_constraint_prototype);
 }
 
-// --- the qualifiers each class_item admits -----------------------------------
-// A.1.9 gives each item its own: class_property `{ property_qualifier }` and
-// the const form's `const { class_item_qualifier }`; class_method
-// `{ method_qualifier }`, `[ pure ] virtual` and class_item_qualifier, with
-// `extern` before a prototype; class_constraint what A.1.10 gives a
-// constraint_prototype and a constraint_declaration, extern, pure and static;
-// a nested class_declaration its `[ virtual ]`; a type_declaration, being a
-// data_declaration, what a property takes; and a parameter declaration and a
-// covergroup_declaration none. The parser read every qualifier before it knew
-// the item and kept whatever it read, so each of the forms below was accepted
-// silently.
-
 TEST(ClassItems, MethodQualifierAdmitsNoRandomQualifierOrConst) {
   auto r = Parse(
       "class C;\n"
@@ -634,8 +528,6 @@ TEST(ClassItems, MethodQualifierAdmitsNoRandomQualifierOrConst) {
       r.diags, "'const' is no qualifier of a class method", 4, "A.1.9"));
 }
 
-// method_qualifier ::= [ pure ] virtual | class_item_qualifier: `pure` stands
-// before `virtual` and before nothing else.
 TEST(ClassItems, PureWithoutVirtualIsRejected) {
   auto r = Parse(
       "class C;\n"
@@ -661,8 +553,6 @@ TEST(ClassItems, PropertyQualifierAdmitsNoMethodQualifier) {
       r.diags, "'extern' is no qualifier of a class property", 4, "A.1.9"));
 }
 
-// The qualifiers a property does take are left as they were: a report on one
-// item is no report on the next.
 TEST(ClassItems, PropertyQualifiersEachAdmitted) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -732,10 +622,6 @@ TEST(ClassItems, TypeDeclarationAdmitsNoMethodQualifierOrConst) {
       r.diags, "'const' is no qualifier of a type declaration", 3, "A.1.9"));
 }
 
-// class_declaration ::= [ virtual ] class ...: the `virtual` of a nested class
-// is the declaration's, and the parser read it as a member qualifier and
-// dropped it, so the nested class was recorded as a concrete one. Every other
-// qualifier before a nested class is no part of its declaration.
 TEST(ClassItems, NestedVirtualClassKeepsItsVirtual) {
   auto r = Parse(
       "class C;\n"
@@ -756,9 +642,6 @@ TEST(ClassItems, NestedVirtualClassKeepsItsVirtual) {
   EXPECT_FALSE(c->members[1]->nested_class->is_virtual);
 }
 
-// --- the order of the qualifiers ---------------------------------------------
-// class_method's extern forms open with `extern`, before every method
-// qualifier, and no other form has one (#7575).
 TEST(ClassItems, ExternAfterAnotherQualifierIsError) {
   auto r = Parse(
       "class C;\n"
@@ -776,9 +659,6 @@ TEST(ClassItems, ExternAfterAnotherQualifierIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kMsg, 6, "A.1.9"));
 }
 
-// method_qualifier is `[ pure ] virtual`, so `pure` stands directly before
-// `virtual`, and the bodiless form `pure virtual { class_item_qualifier }
-// method_prototype ;` opens with the pair unless `extern` comes first (#7578).
 TEST(ClassItems, PureApartFromVirtualIsError) {
   auto r = Parse(
       "virtual class C;\n"
@@ -801,9 +681,6 @@ TEST(ClassItems, PureApartFromVirtualIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kOpens, 6, "A.1.9"));
 }
 
-// `{ method_qualifier } function_declaration` takes `pure virtual` after
-// another qualifier, so a method written that way with a body draws §8.21's
-// report on the body and none on the order.
 TEST(ClassItems, PureVirtualWithABodyIsNotReportedForItsOrder) {
   auto r = Parse(
       "virtual class C;\n"
@@ -816,9 +693,6 @@ TEST(ClassItems, PureVirtualWithABodyIsNotReportedForItsOrder) {
       r.diags, "a pure virtual method prototype opens with", 2, "A.1.9"));
 }
 
-// class_property's first form puts every property qualifier before the
-// data_declaration's own `const`, and its const form takes only class item
-// qualifiers after `const` (#7579).
 TEST(ClassItems, RandomQualifierAfterConstIsError) {
   auto r = Parse(
       "class C;\n"
@@ -834,10 +708,6 @@ TEST(ClassItems, RandomQualifierAfterConstIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kMsg, 5, "A.1.9"));
 }
 
-// interface_class_item: an interface_class_method is `pure virtual
-// method_prototype ;`, with no class_item_qualifier and no `extern`, and a
-// type_declaration there takes no qualifier at all. `static` on the method is
-// §8.10's to report (#7576).
 TEST(ClassItems, InterfaceClassItemQualifiersAreErrors) {
   auto r = Parse(
       "interface class I;\n"
@@ -877,7 +747,6 @@ TEST(ClassItems, InterfaceClassItemQualifiersAreErrors) {
   EXPECT_FALSE(ReportedError(r.diags, "is no qualifier", 10, "A.1.9"));
 }
 
-// The same items in a class that is no interface class take those qualifiers.
 TEST(ClassItems, OrdinaryClassItemsTakeTheseQualifiers) {
   EXPECT_TRUE(
       ParseOk("virtual class V;\n"
@@ -889,11 +758,6 @@ TEST(ClassItems, OrdinaryClassItemsTakeTheseQualifiers) {
               "endclass\n"));
 }
 
-// --- class_constructor_arg
-// ----------------------------------------------------- class_constructor_arg
-// ::= tf_port_item | default. The `default` argument is a class constructor's;
-// A.2.7's tf_port_item, the argument of every other task and function, has no
-// such form, and the parser recorded one in any list.
 TEST(ClassItems, DefaultArgumentOutsideConstructorIsRejected) {
   auto r = Parse(
       "class C;\n"

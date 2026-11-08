@@ -1,19 +1,3 @@
-// §3.14.2: the timeunit and timeprecision declarations, and what one of them
-// updates.
-//
-// §3.14.2.1 gives a design element one time unit and one time precision, and
-// §3.14.2.2 states where a declaration of either may stand and which scope it
-// belongs to. A single declaration can reach an enclosing module, the
-// compilation unit or an enclosing package, so what a parse of one has to
-// produce is not a value but an update applied to whichever of those three the
-// declaration was written in.
-//
-// This was the tail of src/parser/parser.cpp, which reached 975 lines against
-// the 1000 assert-no-oversized-source-files in .github/workflows/deltahdl.yml
-// fails at. Nothing here is reached from that file except through
-// Parser::ParseTimeunitDecl, and everything here reaches back into it only
-// through Parser members src/parser/parser.h declares.
-
 #include <string_view>
 
 #include "common/diagnostic.h"
@@ -28,24 +12,12 @@
 namespace delta {
 
 namespace {
-// The three SystemVerilog scopes (§3.14.2) whose timeunit/timeprecision a
-// single "timeunit"/"timeprecision" declaration can update: an enclosing
-// module, the compilation unit, and an enclosing package. Any subset may be
-// null.
 struct TimeScopeTargets {
   ModuleDecl* mod;
   CompilationUnit* cu;
   PackageDecl* pkg;
 };
 
-// The already-parsed "unit" part of a timeunit/timeprecision declaration
-// (§3.14.2): whether it is a timeunit (vs timeprecision) declaration, whether
-// the unit token was the literal 'step', the parsed unit value, and where the
-// declaration's leading keyword stands. The position is carried because
-// §3.14.2.2 requires a repeat to agree with the declaration made before it in
-// the same time scope and a report about a repeat has to stand at it; the
-// compilation-unit scope keeps it, since that scope outlives the parse that
-// wrote it.
 struct TimeunitDecl {
   bool is_unit;
   bool unit_is_step;
@@ -54,10 +26,6 @@ struct TimeunitDecl {
   SourceLoc loc;
 };
 
-// Apply a timeunit/timeprecision setting to a single scope (module, package, or
-// any type whose timeunit fields are named time_unit/time_prec). The
-// compilation-unit scope uses differently named fields and is handled
-// separately by ApplyCuTimeUnit.
 template <typename Scope>
 void ApplyScopeTimeUnit(Scope* scope, bool is_unit, TimeUnit tu, int mag) {
   if (!scope) return;
@@ -72,13 +40,6 @@ void ApplyScopeTimeUnit(Scope* scope, bool is_unit, TimeUnit tu, int mag) {
   }
 }
 
-// `loc` is stored beside whichever flag this sets, and is the position of the
-// declaration's leading timeunit/timeprecision keyword. A module or a package
-// keeps no such position because its scope is one file's, so a repeat that does
-// not match it is reported by ValidateTimeScopeAfterParse in
-// src/parser/parser_items.cpp while that file is still being parsed. The
-// compilation-unit scope spans a whole command line (§3.12.1 case a)), so its
-// position has to outlive the parse.
 void ApplyCuTimeUnit(CompilationUnit* cu, bool is_unit, TimeUnit tu, int mag,
                      SourceLoc loc) {
   if (!cu) return;
@@ -103,27 +64,15 @@ static void ApplyTimeUnit(const TimeScopeTargets& targets,
   ApplyScopeTimeUnit(targets.pkg, decl.is_unit, decl.tu, decl.mag);
 }
 
-// The precision named after the slash of "timeunit <unit> / <precision>"
-// (§3.14.2.2: the timeunit keyword can declare the time precision too, as an
-// optional second argument after a slash). `decl` is the
-// declaration the slash belongs to, read for its position alone: the precision
-// is declared by the same statement as the unit, so a report about it stands
-// where CheckCuTimeunitConsistency in src/parser/parser.cpp stands, at the
-// leading keyword rather than at the token after the slash.
 static void ApplyTimePrecision(const TimeScopeTargets& targets,
                                const TimeunitDecl& decl, TimeUnit prec,
                                int mag) {
-  ApplyScopeTimeUnit(targets.mod, /*is_unit=*/false, prec, mag);
-  ApplyCuTimeUnit(targets.cu, /*is_unit=*/false, prec, mag, decl.loc);
-  ApplyScopeTimeUnit(targets.pkg, /*is_unit=*/false, prec, mag);
+  ApplyScopeTimeUnit(targets.mod, false, prec, mag);
+  ApplyCuTimeUnit(targets.cu, false, prec, mag, decl.loc);
+  ApplyScopeTimeUnit(targets.pkg, false, prec, mag);
 }
 
 namespace {
-// Validate the precision side of a "timeunit <unit> / <precision>" declaration
-// (its token already consumed and known not to be 'step'), reporting a bad
-// literal or a precision coarser than the unit, then store it. The declaration
-// is a timeunit: ParseTimeunitDecl reports a slash after `timeprecision`
-// before reaching here.
 void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok,
                              const TimeunitDecl& decl,
                              const TimeScopeTargets& targets) {
@@ -149,19 +98,7 @@ void ParsePrecisionFromToken(DiagEngine& diag, Token prec_tok,
 void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
                                PackageDecl* pkg) {
   bool is_unit = Check(TokenKind::kKwTimeunit);
-  // The leading timeunit/timeprecision keyword, kept because it is where a
-  // report about this declaration stands: the caller in src/parser/parser.cpp
-  // that hands CheckCuTimeunitConsistency a position reads CurrentLoc() here,
-  // before this function is entered, so recording the same token is what makes
-  // the cross-file report of §3.14.2.2 land where the within-file one does.
   auto kw_tok = Consume();
-  // A.1.11 gives anonymous_program_item a closed set -- task, function, class,
-  // interface class, covergroup and class constructor declarations, and the
-  // null item -- and a timeunit or timeprecision declaration is none of them.
-  // It is refused here rather than in the filter over an anonymous program's
-  // items, because this parse path appends no ModuleItem at all and the filter
-  // never sees one. The message and the citation are the filter's, A.1.11's set
-  // being one rule however a source breaks it.
   if (in_anonymous_program_) {
     diag_.Error(kw_tok.loc,
                 "an anonymous program may contain only task, function, class, "
@@ -191,12 +128,6 @@ void Parser::ParseTimeunitDecl(ModuleDecl* mod, CompilationUnit* cu,
     ApplyTimeUnit(targets,
                   TimeunitDecl{is_unit, unit_is_step, tu, mag, kw_tok.loc});
   }
-  // A.1.2 gives the slash to `timeunit time_literal [ / time_literal ]` alone,
-  // and §3.14.2.2 says whose the second argument is: the timeunit keyword can
-  // declare the time precision too, as an optional second argument after a
-  // slash. After `timeprecision` the slash and the
-  // literal behind it are read so that the declaration still ends at its
-  // semicolon, and they set nothing.
   auto slash_loc = CurrentLoc();
   if (Match(TokenKind::kSlash)) {
     auto prec_tok = Consume();

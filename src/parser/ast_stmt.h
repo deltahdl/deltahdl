@@ -53,8 +53,6 @@ enum class StmtKind : uint8_t {
   kBlockItemDecl,
   kCycleDelay,
   kExpect,
-  // §17.3: a checker_instantiation standing in procedural code, a
-  // procedural checker instance; decl_item holds the instantiation.
   kCheckerInstantiation,
 };
 
@@ -74,24 +72,6 @@ struct EventExpr {
   bool is_sequence_event = false;
 };
 
-// §16.12: a property_expr built from the operands the evaluation reads --
-// a boolean, a sequence weak or strong (§16.12.2) -- under the operators
-// not (§16.12.3), or (§16.12.4), and (§16.12.5), if-else (§16.12.6),
-// implication (§16.12.7), implies and iff (§16.12.8), the last two over two
-// operands, nexttime (§16.12.10), `strong` where it is s_nexttime and its
-// tick count, one where none was written, in `boolean`, always
-// (§16.12.11), `strong` where it is s_always, over the range below,
-// eventually (§16.12.13) likewise, `strong` where it is s_eventually, the
-// aborts (§16.12.14) over one operand, and until (§16.12.12) over two
-// operands, `strong` where it is s_until or
-// s_until_with and `range_unbounded` where it is an overlapping form,
-// until_with or s_until_with. A boolean leaf
-// carries `boolean`, a sequence leaf
-// `sequence` and `strong`, an operator its operands, an if-else its
-// condition in `boolean` with the then and else properties as its operands,
-// the else absent where none was written, and an implication its antecedent
-// in `sequence`, `strong` where it is the nonoverlapped `|=>`, with the
-// consequent as its one operand.
 struct PropertyExprNode {
   enum class Kind : uint8_t {
     kBoolean,
@@ -115,34 +95,14 @@ struct PropertyExprNode {
   ModuleItem* sequence = nullptr;
   bool strong = false;
   std::vector<PropertyExprNode*> operands;
-  // §16.12.11: the range of ticks an always covers, from `range_min` to
-  // `range_max` after the attempt's tick, `range_unbounded` where the
-  // maximum is `$` or no range was written; the minimum null where none
-  // was written stands for 0.
   Expr* range_min = nullptr;
   Expr* range_max = nullptr;
   bool range_unbounded = false;
-  // §16.12.14: an abort over its one operand, its condition in `boolean`,
-  // `accept` where it is accept_on or sync_accept_on and `synchronous` where
-  // it is one of the sync_ forms, checked at the clock ticks alone.
   bool accept = false;
   bool synchronous = false;
-  // §16.12.9: a not standing for the followed-by `s #-# p`, `not (s |-> not
-  // p)`, or `s #=# p`, the implication beneath it strong; the operator the
-  // source wrote, which §37.52 reports.
   bool followed_by = false;
-  // §16.12.16: a case over the case expression in `boolean`, each operand
-  // the property of one property_case_item and the item's expressions at
-  // the same index here, the default's none.
   std::vector<std::vector<Expr*>> case_values;
-  // §16.13.2: the clocking event written before the operand, `@(posedge
-  // clk1) sig1`, on which it is evaluated from its nearest tick; empty for
-  // an operand on the clock flowing to it (§16.13.3).
   std::vector<EventExpr> clock;
-  // §16.12.2: for a sequence, whether strong(...) or weak(...) was written
-  // around it. One written plain takes the strength of the statement it is
-  // used in: strong in a cover property or an expect, weak in an assert
-  // property or an assume property.
   bool strength_written = false;
 };
 
@@ -170,21 +130,7 @@ enum class RsProdKind : uint8_t {
 struct RsProductionItem {
   std::string_view name;
   std::vector<Expr*> args;
-  // §18.17: where the identifier this item names stands, so a report about the
-  // name is made at the name. Nothing else on the path from a randsequence
-  // statement to a production identifier carries a location -- RsCaseItem,
-  // RsProd, RsRule and RsProduction hold none -- so every such report used to
-  // stand at the randsequence keyword, and a statement whose rules misspell two
-  // names produced two reports on one line with nothing to tell them apart.
-  //
-  // Parser::ParseRsProductionItem fills it from the identifier token it was
-  // already reading. An item that is default-constructed rather than parsed
-  // carries no name either, and CheckProductionItem in
-  // elaborator_validate_randsequence.cpp returns on that before reading this.
   SourceLoc loc;
-  // §18.17.7: the names of the arguments written `.name ( [ expression ] )`,
-  // which are the last arg_names.size() of args, as Expr::arg_names are a
-  // call's. A null argument is one the call left out.
   std::vector<std::string_view> arg_names;
 };
 
@@ -219,11 +165,6 @@ struct RsRule {
 
 struct RsProduction {
   std::string_view name;
-  // §18.17.7: a production may carry a data_type_or_void return type and a
-  // tf_port_list of formal arguments. has_return_type records that a
-  // data_type_or_void was written (including an explicit 'void'); return_type
-  // holds the parsed type so the value-passing engine can size the production's
-  // return value. ports holds the parsed formal arguments (empty when none).
   bool has_return_type = false;
   bool has_ports = false;
   DataType return_type;
@@ -274,42 +215,14 @@ struct Stmt {
   std::vector<std::string_view> foreach_vars;
 
   Expr* assert_expr = nullptr;
-  // §16.12: the disable condition of a concurrent assertion's property_spec,
-  // `disable iff ( expression )`, read live at each attempt; an attempt at
-  // which it is true is disabled, neither succeeding nor failing.
   Expr* assert_disable_iff = nullptr;
-  // §16.12.2: a sequential property, the sequence_expr of a concurrent
-  // assertion's property_spec read as a linear sequence body, and whether it
-  // is `strong(...)`, so that an attempt still in flight when the run ends
-  // fails; a weak one, written `weak(...)` or bare in an assert or assume,
-  // never fails that way, and a cover statement's is strong. `assert_expr`
-  // is unset where this is set.
   ModuleItem* assert_sequence = nullptr;
   bool assert_strong = false;
-  // §16.12.3: the property is `not` the boolean or sequence carried, so each
-  // attempt's result is the opposite of the underlying one, the strength of
-  // a sequence switched with it.
   bool assert_negated = false;
-  // §16.12.4 and §16.12.5: the property as a tree of the operands above
-  // under or and and, set where the property_spec holds either operator;
-  // the fields above then stand unset but for the placeholder.
   PropertyExprNode* assert_property = nullptr;
-  // §16.13: the leading clocking event the tree is evaluated on, which the
-  // elaborator copies from the assertion's sensitivity before adding the
-  // clocks the sequences name, so that the evaluation tells the ticks of
-  // that clock from the others'.
   std::vector<EventExpr> assert_clock;
-  // §16.16 (a) and §16.14.6: whether that clock was inferred, from the
-  // default clocking or the procedure, rather than written, which §37.50
-  // reports as vpiIsClockInferred.
   bool assert_clock_inferred = false;
-  // §16.16 (a) and §16.14.6: whether the clock inferred is the default
-  // clocking's rather than the procedure's, so that the default clocking block
-  // is the one clocking the assertion (§37.49).
   bool assert_clock_from_default_clocking = false;
-  // §16.12.1 and §37.50: the instance of a declared property the spec of a
-  // concurrent assertion embedded in procedural code is, kept by the
-  // elaborator where it substitutes the property's body; null for any other.
   const Expr* assert_instance = nullptr;
   Stmt* assert_pass_stmt = nullptr;
   Stmt* assert_fail_stmt = nullptr;
@@ -319,16 +232,7 @@ struct Stmt {
 
   bool is_procedural_concurrent = false;
 
-  // §16.5: the `property` keyword is what marks an assertion as concurrent
-  // rather than immediate. Set on the immediate-assert statement the parser
-  // synthesises for the clocked boolean form of `assert property (@(clk) e)`,
-  // which is the only thing that tells that body apart from an `assert (e)`
-  // written inside an always_ff: §16.5.1 samples the expressions of the first
-  // and leaves the second reading the values standing now.
   bool is_concurrent_clocked = false;
-  // §16.14.3: the statement is a cover sequence, whose results are attempts
-  // and matches, every match of an attempt counted, rather than a cover
-  // property's attempts and successes, at most one per attempt.
   bool cover_sequence = false;
 
   std::vector<Expr*> wait_order_events;
@@ -345,25 +249,12 @@ struct Stmt {
   bool var_is_automatic = false;
   bool var_is_static = false;
   bool var_is_const = false;
-  // A block parameter_declaration or local_parameter_declaration (A.2.8's
-  // block_item_declaration) read into this kVarDecl rather than a variable, so
-  // §6.21's lifetime rules on block variables pass it by.
   bool var_is_param = false;
 
   ModuleItem* decl_item = nullptr;
-  // §16.16 (d) with §17.3: the leading clock of this assertion of a checker
-  // was taken from the sequence or property actual one of the checker's
-  // formals is bound to, so its names stand in the scope instantiating the
-  // checker rather than in the checker.
   bool assert_clock_from_actual = false;
 };
 
-// The subroutine call an expression statement consists of, or nullptr where
-// the statement is not one: A.6.9's subroutine_call_statement is the call
-// itself or `void'(function_subroutine_call)`, which §13.4.1 has discard a
-// nonvoid function's result, so a void cast is seen through to the call it
-// wraps. §16.4 states its action-block rule over this statement, and its
-// readers look at the call rather than at the cast.
 inline const Expr* SubroutineCallOfStmt(const Stmt* stmt) {
   if (stmt == nullptr || stmt->kind != StmtKind::kExprStmt) return nullptr;
   const Expr* e = stmt->expr;

@@ -15,41 +15,18 @@ struct RtlirDesign;
 struct RtlirModule;
 struct VpiObject;
 
-// §25.9: the declaration of the interface a virtual interface var declared
-// with `type` in the module `mod`, or in no module for null, refers to an
-// instance of, found from where the var is written (VpiElementDeclFrom)
-// whether or not the design instantiates the interface, which tells a clocking
-// block the var names from any other member
-// (VpiVirtualInterfaceClockingBlock). A typedef name stands for the type at the
-// end of its chain (§6.18), whose interface the design records
-// (RtlirDesign::type_interfaces). Null for any other type, and for no type.
 const ModuleDecl* VpiVirtualInterfaceOf(const RtlirDesign& design,
                                         const DataType* type,
                                         const RtlirModule* mod);
 
-// §37.48 details 2 and 3: `vif.cb` written in an expression, where `holder`
-// is the virtual interface var `vif` and `written` the whole dotted name it
-// heads: a clocking block whose vpiPrefix is the var, where the interface the
-// var's declaration names declares a clocking block of that name; null for
-// any other member, and for a holder declared with no virtual interface type.
 VpiObject* VpiVirtualInterfaceClockingBlock(
     VpiObject* holder, std::string_view written,
     const std::function<VpiObject*()>& alloc, const VpiNameKeeper& keep);
 
-// §37.29: where `type` is vpiActual and `ref` a virtual interface var holding
-// a value in the run `ctx`, sets its actual to what it refers to now: the
-// interface instance the handle it holds names, found by its name through
-// `by_name`, and null while it holds none. Leaves any other object, or one with
-// no run or no value, as it is.
 void VpiRefreshVirtualInterfaceActual(
     int type, VpiObject& ref, SimContext* ctx,
     const std::function<VpiObject*(const std::string&)>& by_name);
 
-// §37.48 detail 3: where `type` is vpiActual and `ref` a clocking block a
-// virtual interface var prefixes, sets its actual to what it stands for now:
-// the block of its name the interface instance the var holds in the run `ctx`
-// declares, that instance found by its name through `by_name`, and null while
-// the var holds none. Leaves any other object, or one with no run, as it is.
 void VpiRefreshPrefixedClockingBlock(
     int type, VpiObject& ref, SimContext* ctx,
     const std::function<VpiObject*(const std::string&)>& by_name);

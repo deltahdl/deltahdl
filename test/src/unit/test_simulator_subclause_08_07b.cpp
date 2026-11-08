@@ -6,15 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.7's own example, with the values the clause says the properties hold once
-// an object of D is constructed: c1 is 1, c2 is 2 because the base constructor
-// assigns it after the base properties are initialized, d1 is 4, d2 is 2
-// because super.new has completed when the derived properties are initialized,
-// and d3 is 6. The clause leaves c3 undefined -- D passes d3 to super.new
-// before d3 is initialized -- so c3 is left out of the packed result. The
-// five values are packed as one integer so that one comparison holds the
-// whole example; a derived level initialized before its base constructor ran
-// would read d2 as 1.
 TEST(ClassConstructorSim, ClauseExamplePropertiesAfterConstruction) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int c1 = 1;\n"
@@ -46,14 +37,6 @@ TEST(ClassConstructorSim, ClauseExamplePropertiesAfterConstruction) {
             12426u);
 }
 
-// §8.7 and §8.15: the derived constructor's first statement, super.new(...),
-// is the one call of the base class constructor, made with those arguments.
-// The base here takes UVM's uvm_component::new shape, telling the root apart
-// by the name and null parent the root's constructor passes and counting every
-// construction that took the ordinary path. Running the base constructor once
-// with no arguments before the derived body and again from the statement left
-// the ordinary count at 1 beside the root flag; the one call with "__top__"
-// and null leaves it at 0.
 TEST(ClassConstructorSim, LeadingSuperNewIsTheOneBaseConstructorCall) {
   EXPECT_EQ(RunAndGet("class base;\n"
                       "  static int ordinary = 0;\n"
@@ -85,13 +68,6 @@ TEST(ClassConstructorSim, LeadingSuperNewIsTheOneBaseConstructorCall) {
             101u);
 }
 
-// §8.7: the base class constructor is called before the derived class's
-// properties are initialized, and the rest of the derived constructor body
-// runs after them. A derived property whose default reads what the base
-// constructor wrote sees that value, and the derived body then reads the
-// initialized property; with the base constructor called from the leading
-// super.new after the derived properties were initialized, d would have read
-// the base default of 1 and y been 1 instead of 9.
 TEST(ClassConstructorSim, DerivedBodyRunsAfterItsPropertiesAreInitialized) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int b = 1;\n"
@@ -119,11 +95,6 @@ TEST(ClassConstructorSim, DerivedBodyRunsAfterItsPropertiesAreInitialized) {
             99u);
 }
 
-// §8.7: an object constructed inside a constructor body is built the same
-// way, its own base constructor called once from its leading super.new, while
-// the outer construction is under way. The outer derived body constructs an
-// inner derived object after its own super.new; the inner base counts its
-// constructor runs, and each base run stores the argument it was given.
 TEST(ClassConstructorSim, ObjectConstructedInsideAConstructorBodyChainsOnce) {
   EXPECT_EQ(
       RunAndGet("class InnerBase;\n"
@@ -164,12 +135,6 @@ TEST(ClassConstructorSim, ObjectConstructedInsideAConstructorBodyChainsOnce) {
       513u);
 }
 
-// §8.15 has super.new be the first statement of the constructor, and A.2.8
-// puts a body's local declarations ahead of its statements, so a constructor
-// that declares a local before its `super.new("__top__", null)` still makes
-// that call its base constructor call -- uvm_root::new's shape, where the
-// base takes the root path only for that name. With the declaration counted
-// as the first statement the base ran with no arguments and no name.
 TEST(ClassConstructorSim, LocalDeclarationAheadOfLeadingSuperNew) {
   EXPECT_EQ(RunAndGet("class base;\n"
                       "  int is_root;\n"
@@ -200,11 +165,6 @@ TEST(ClassConstructorSim, LocalDeclarationAheadOfLeadingSuperNew) {
             73u);
 }
 
-// §8.7: a class-typed property with the declaration initializer `= new` holds
-// an object constructed when the enclosing object is, with that object's own
-// initializers run -- §8.12's example, `baseA a = new;` in B, where baseA's j
-// is 5. The result packs `b1.a.j` and `b1.i`; an initializer that constructed
-// nothing read j as 0, giving 1 where 51 is expected.
 TEST(ClassConstructorSim, ClassTypedPropertyNewInitializerConstructsItsObject) {
   EXPECT_EQ(RunAndGet("class baseA;\n"
                       "  int j = 5;\n"
@@ -225,12 +185,6 @@ TEST(ClassConstructorSim, ClassTypedPropertyNewInitializerConstructsItsObject) {
             51u);
 }
 
-// §8.7: the arguments of a property's `= new(...)` initializer are passed to
-// the constructor of the property's class, and that class's own property
-// initializers have run when its constructor body reads them: `new(7)` adds
-// 7 to the 5 baseA's j starts at. A construction that dropped the argument
-// would read 5, one that skipped the constructor body 5, and one that ran the
-// body before the initializers 7.
 TEST(ClassConstructorSim, ClassTypedPropertyNewInitializerBindsItsArguments) {
   EXPECT_EQ(RunAndGet("class baseA;\n"
                       "  int j = 5;\n"
@@ -253,12 +207,6 @@ TEST(ClassConstructorSim, ClassTypedPropertyNewInitializerBindsItsArguments) {
             12u);
 }
 
-// §8.12: a shallow copy `b2 = new b1` copies b1's handles and not the objects
-// they name, so the baseA that b1's property initializer constructed is the
-// one object behind both `b1.a` and `b2.a`: writing `b2.a.j = 50` is seen
-// through `b1.a.j`, the two handles compare equal, and b1's own `i` keeps 1
-// beside b2's 10. The result packs `b1.a.j`, `b1.i` and the comparison; an
-// initializer that constructed nothing left the write unseen, giving 11.
 TEST(ClassConstructorSim,
      ShallowCopySharesTheObjectAPropertyInitializerConstructed) {
   EXPECT_EQ(
@@ -284,12 +232,6 @@ TEST(ClassConstructorSim,
       5011u);
 }
 
-// §8.7 gives a constructor's arguments the conventions of any other subroutine
-// call, and §13.5 has the return copy an output formal into the call's
-// variable: after `a = new(ia)` with the constructor writing `oid = m_id`, the
-// caller's `ia` holds what the object's `id` holds. The counter starts at 3 so
-// an output formal never copied out, which leaves `ia` at 0, reads 3 rather
-// than 33.
 TEST(ClassConstructorSim, OutputFormalOfNewIsCopiedOutToTheCallersVariable) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  static local int m_id = 3;\n"
@@ -313,10 +255,6 @@ TEST(ClassConstructorSim, OutputFormalOfNewIsCopiedOutToTheCallersVariable) {
             33u);
 }
 
-// §8.7 and §13.5: each `new(...)` call copies the output formal into its own
-// actual, so two constructions leave `ia` at 0 and `ib` at 1, the values of
-// `a.id` and `b.id`; the four are packed as one integer, and a copy-out that
-// never happened leaves `ib` at 0, reading 1 rather than 101.
 TEST(ClassConstructorSim, OutputFormalOfNewIsCopiedOutOnEachConstruction) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  static local int m_id = 0;\n"
@@ -341,13 +279,6 @@ TEST(ClassConstructorSim, OutputFormalOfNewIsCopiedOutOnEachConstruction) {
             101u);
 }
 
-// §8.7 and §8.15: a subclass constructor passing its own output formal to
-// `super.new(oid)` receives the base constructor's value in that formal when
-// the base returns, and copies it out to the caller in turn when it returns
-// itself, so `ic` reads the 5 the base counter held; the subclass adds 100 to
-// what came back before it returns, telling a copy made at the base level from
-// one made at the outer level alone. A chain copying out at neither level
-// leaves `ic` at 0, reading 5 rather than 1055.
 TEST(ClassConstructorSim,
      OutputFormalOfNewIsCopiedOutThroughASubclassSuperNewCall) {
   EXPECT_EQ(RunAndGet("class Base;\n"
@@ -378,11 +309,6 @@ TEST(ClassConstructorSim,
             1055u);
 }
 
-// §8.17: a subclass constructor declared `new(default)` forwards the caller's
-// trailing actuals to the base constructor, so the base's output formal is
-// bound from the caller's `ic` and copied out to it when the base returns,
-// with the subclass's own scope still on the stack between them; the third
-// construction leaves `ic` at 2 beside `c.id`, reading 22 rather than 2.
 TEST(ClassConstructorSim,
      OutputFormalOfNewIsCopiedOutThroughASubclassDefaultArgument) {
   EXPECT_EQ(RunAndGet("class Base;\n"
@@ -414,9 +340,6 @@ TEST(ClassConstructorSim,
             22u);
 }
 
-// §8.7 with §23.6: `new` assigned to a handle named hierarchically, u.h in
-// instance u, constructs an object of the handle's class there. Taken by the
-// name's identifier alone, the target was missed and u.h stayed null.
 TEST(ClassConstructorSim, NewIntoAnInstancesHandleByItsPath) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class C; int v = 3; endclass\n"
@@ -434,8 +357,6 @@ TEST(ClassConstructorSim, NewIntoAnInstancesHandleByItsPath) {
             3u);
 }
 
-// The same for the handle a named block declares, given its object from
-// outside the block before the block runs, which then reads that object.
 TEST(ClassConstructorSim, NewIntoANamedBlocksHandleByItsPath) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  class C; int v = 6; endclass\n"
@@ -453,11 +374,6 @@ TEST(ClassConstructorSim, NewIntoANamedBlocksHandleByItsPath) {
             6u);
 }
 
-// §8.7 with §7.2: `new` assigned to a member of a structure declared with a
-// class type constructs an object of the member's class, passing the
-// constructor its argument, for a typedef's structure, a nested structure's
-// member and a structure written in the declaration (#7230). Before, the
-// statement found no class under the member's dotted name and made nothing.
 TEST(ClassConstructorSim, NewIntoAStructuresClassMember) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int v;\n"
@@ -485,8 +401,6 @@ TEST(ClassConstructorSim, NewIntoAStructuresClassMember) {
             357u);
 }
 
-// §8.7 with §7.2: a property is read straight through a structure's class
-// member, s.k.v and s.n.h.v, without first copying the handle to a variable.
 TEST(ClassConstructorSim, PropertyReadThroughAStructuresClassMember) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int v;\n"
@@ -507,9 +421,6 @@ TEST(ClassConstructorSim, PropertyReadThroughAStructuresClassMember) {
             35u);
 }
 
-// §8.4 with §7.2: a structure's class member never assigned is null, and the
-// result of reading a property through it is indeterminate, so the run is
-// asked only to go on past the read rather than follow the null handle.
 TEST(ClassConstructorSim, PropertyReadThroughANullStructureMemberLetsRunGoOn) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int v;\n"

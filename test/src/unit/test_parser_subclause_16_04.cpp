@@ -114,9 +114,6 @@ TEST(DeferredAssertionParsing, FinalAssertMissingExpressionRejected) {
       "module m;\n"
       "  initial assert final;\n"
       "endmodule\n");
-  // §16.3 owns the parenthesized asserted expression that a deferred assertion
-  // shares with the simple immediate form, so the missing '(' is reported
-  // there rather than under §16.4.
   EXPECT_TRUE(ReportedError(r.diags, "expected '(', got ';'", 2, "16.3"));
 }
 
@@ -125,9 +122,6 @@ TEST(DeferredAssertionParsing, Hash0PrecludesFinalKeyword) {
       "module m;\n"
       "  initial assert #0 final (1);\n"
       "endmodule\n");
-  // §16.4 admits #0 or final, never both, so after #0 the parser is already
-  // reading the asserted expression §16.3 owns and reports the `final` keyword
-  // standing where its '(' belongs.
   EXPECT_TRUE(ReportedError(r.diags, "expected '(', got 'final'", 2, "16.3"));
 }
 
@@ -192,12 +186,6 @@ TEST(DeferredAssertionParsing, ModuleLevelCoverNonZeroHashRejected) {
       r.diags, "deferred immediate assertion requires #0, got #4", 3, "16.4"));
 }
 
-// §16.3 Syntax 16-1 ends deferred_immediate_cover_statement in
-// `statement_or_null`, so the deferred cover written as a module item has no
-// fail statement either. This form is read by Parser::ParseCoverProperty rather
-// than by Parser::ParseImmediateCover, which is why the rule is asserted here
-// as well as in test/src/unit/test_parser_subclause_16_03.cpp. The else stands
-// on a line of its own so that the line the assertion names is the else.
 TEST(DeferredAssertionParsing, DeferredCoverModuleItemWithElseRejected) {
   auto r = Parse(
       "module m;\n"
@@ -208,9 +196,6 @@ TEST(DeferredAssertionParsing, DeferredCoverModuleItemWithElseRejected) {
   EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 4, "16.3"));
 }
 
-// The other side of the same tail: the pass statement §16.3 does permit is read
-// rather than refused. DeferredAssertionParsing.ModuleLevelHash0CoverParses
-// above writes no pass statement, so nothing else covers this path.
 TEST(DeferredAssertionParsing, ModuleLevelHash0CoverWithPassStatementParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

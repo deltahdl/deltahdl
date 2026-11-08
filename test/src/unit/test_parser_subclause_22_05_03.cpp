@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §22.5.3 puts no restriction on placement, so the directive is equally legal
-// inside a design element and the module still parses.
 TEST(UndefineAllParsing, UndefineAllInsideDesignElement) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define A 1\n"
@@ -17,8 +15,6 @@ TEST(UndefineAllParsing, UndefineAllInsideDesignElement) {
                               "endmodule\n"));
 }
 
-// C2: with no arguments to take, source text left on the directive's line is
-// handed to the parser as ordinary syntax rather than being consumed.
 TEST(UndefineAllParsing, UndefineAllTrailingTextParsesAsSource) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define A 1\n"
@@ -27,8 +23,6 @@ TEST(UndefineAllParsing, UndefineAllTrailingTextParsesAsSource) {
                               "endmodule\n"));
 }
 
-// Once the macros are gone the conditional falls through to its `else arm, and
-// what reaches the parser is the branch that arm supplies.
 TEST(UndefineAllParsing, UndefineAllLeavesElseBranchToParse) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`define A 1\n"

@@ -1,17 +1,3 @@
-// §A.2.10's property_spec, property_expr and sequence_expr, held to the spec
-// of a concurrent assertion statement wherever the evaluation's own parse,
-// Parser::TryParseSimpleConcurrentProperty, gives it up: a spec the grammar
-// admits is reported as one this tool does not evaluate (§16.14), and one it
-// does not admit is an error, reported at an operand of a kind its operator
-// does not take, or else at the furthest point no reading of it gets past.
-//
-// Each malformed spec below writes the point the report stands at on a line
-// of its own, so a reading that broke off sooner or got further reports on
-// another line. A spec that writes a construct well and then breaks puts the
-// break on the line after the construct; one that breaks inside a construct
-// breaks once more on a later line, so the evaluation's parse rejects it
-// whatever it makes of the construct.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -27,14 +13,11 @@ namespace {
 
 constexpr const char* kNotAdmitted = "is not one the grammar admits";
 
-// A spec and the line its report stands on, the spec's first line being
-// line 2.
 struct Malformed {
   const char* spec;
   uint32_t line;
 };
 
-// `statement` with `spec` in its parentheses, on line 2 of a module.
 ParseResult ParseSpec(const std::string& statement, const std::string& spec) {
   return Parse("module m;\n  " + statement + " (" + spec + ");\nendmodule\n");
 }
@@ -48,8 +31,6 @@ void ExpectNotAdmitted(const std::string& statement,
   }
 }
 
-// The constructs of the grammar, each written well and followed by a
-// break, so the report stands on the line after the construct.
 TEST(PropertySpecGrammar, AWellWrittenConstructIsReadPast) {
   ExpectNotAdmitted(
       "assert property",
@@ -84,8 +65,6 @@ TEST(PropertySpecGrammar, AWellWrittenConstructIsReadPast) {
       });
 }
 
-// A clocking event, a disable condition or a cycle delay, between operands
-// or before the first, broken where the line after the first starts.
 TEST(PropertySpecGrammar, ABrokenClockConditionOrDelayIsReportedWhereItBreaks) {
   ExpectNotAdmitted("assert property",
                     {
@@ -108,8 +87,6 @@ TEST(PropertySpecGrammar, ABrokenClockConditionOrDelayIsReportedWhereItBreaks) {
                     });
 }
 
-// An operator written before its operand, broken in what it reads before
-// the operand or in the operand.
 TEST(PropertySpecGrammar, ABrokenPrefixOperatorIsReportedWhereItBreaks) {
   ExpectNotAdmitted("assert property",
                     {
@@ -134,9 +111,6 @@ TEST(PropertySpecGrammar, ABrokenPrefixOperatorIsReportedWhereItBreaks) {
                     });
 }
 
-// An operand broken: a name or a group with nothing a chain reads after
-// it, a group, an instance or its actual arguments, a repetition or a
-// match item.
 TEST(PropertySpecGrammar, ABrokenOperandIsReportedWhereItBreaks) {
   ExpectNotAdmitted("assert property",
                     {
@@ -168,10 +142,6 @@ TEST(PropertySpecGrammar, ABrokenOperandIsReportedWhereItBreaks) {
                     });
 }
 
-// §16.14.3: a cover sequence statement's spec is a sequence_expr after its
-// clock and its disable condition, so a property operator, binary or
-// written before its operand, is no part of it; first_match and the
-// sequence operators are.
 TEST(PropertySpecGrammar, ACoverSequenceSpecAdmitsNoPropertyOperator) {
   ExpectNotAdmitted(
       "cover sequence",
@@ -182,11 +152,6 @@ TEST(PropertySpecGrammar, ACoverSequenceSpecAdmitsNoPropertyOperator) {
       });
 }
 
-// The grammar is held to the spec of every concurrent assertion statement
-// whose spec the evaluation's parse may give up: an assert in an always
-// procedure (§16.14.6), a cover sequence there, an expect statement
-// (§16.17), and a restrict property statement, which is not evaluated at
-// all (§16.14.4).
 TEST(PropertySpecGrammar, EveryStatementsSpecIsHeldToTheGrammar) {
   ExpectNotAdmitted("always @(posedge clk) assert property",
                     {{"a ##1\nb dist zz", 3}});
@@ -196,9 +161,6 @@ TEST(PropertySpecGrammar, EveryStatementsSpecIsHeldToTheGrammar) {
   ExpectNotAdmitted("restrict property", {{"a ##1\nb dist zz", 3}});
 }
 
-// §16.11's subroutine call attached to a sequence of one boolean is a spec
-// the grammar admits and the evaluation does not read, so each statement
-// reports it as not evaluated and none reports a grammar error.
 TEST(PropertySpecGrammar, AnAdmittedSpecIsReportedAsNotEvaluatedOnly) {
   const std::string kSpec = "@(posedge clk) (b, $display(\"m\"))";
   const std::vector<std::string> kStatements = {
@@ -217,10 +179,6 @@ TEST(PropertySpecGrammar, AnAdmittedSpecIsReportedAsNotEvaluatedOnly) {
   EXPECT_FALSE(procedural.has_errors);
 }
 
-// Table 16-3 groups a spec by precedence and associativity, and each
-// operator takes the kinds of operand §A.2.10 gives it: a property where only
-// a sequence stands, or a sequence where only an expression_or_dist does, is
-// reported at the operand, before a break written after it.
 constexpr const char* kPropertyForSequence =
     "a property stands where the grammar admits only a sequence";
 constexpr const char* kSequenceForBoolean =
@@ -234,9 +192,6 @@ void ExpectMisplaced(const char* message, const std::vector<Malformed>& cases) {
   }
 }
 
-// §16.12.7 and §16.12.9: an implication and a followed-by take a sequence on
-// their left; not binds tighter than either, so `not a #=# b` puts a property
-// there.
 TEST(PropertySpecGrammar, AnImplicationTakesASequenceOnItsLeft) {
   ExpectMisplaced(kPropertyForSequence,
                   {
@@ -245,7 +200,6 @@ TEST(PropertySpecGrammar, AnImplicationTakesASequenceOnItsLeft) {
                   });
 }
 
-// §16.12.2 and §16.9.8: strong, weak and first_match take a sequence.
 TEST(PropertySpecGrammar, StrongWeakAndFirstMatchTakeASequence) {
   ExpectMisplaced(kPropertyForSequence,
                   {
@@ -255,8 +209,6 @@ TEST(PropertySpecGrammar, StrongWeakAndFirstMatchTakeASequence) {
                   });
 }
 
-// §16.9: a cycle delay, intersect, within, a repetition and a sequence's
-// match items take sequences on either side.
 TEST(PropertySpecGrammar, ASequenceOperatorTakesSequences) {
   ExpectMisplaced(
       kPropertyForSequence,
@@ -271,8 +223,6 @@ TEST(PropertySpecGrammar, ASequenceOperatorTakesSequences) {
       });
 }
 
-// §16.9.9: throughout takes an expression_or_dist on its left, and a cycle
-// delay binds tighter, so `a ##1 b throughout c` puts a sequence there.
 TEST(PropertySpecGrammar, ThroughoutTakesAnExpressionOnItsLeft) {
   ExpectMisplaced(kSequenceForBoolean,
                   {
@@ -281,13 +231,6 @@ TEST(PropertySpecGrammar, ThroughoutTakesAnExpressionOnItsLeft) {
                   });
 }
 
-// Specs Table 16-3's grouping admits and a flat or a left-to-right reading
-// would not: the implications group to the right, not, nexttime and the and
-// or the or before an implication take only what binds tighter, with a
-// bracket after nexttime as well, always, s_always and accept_on run to the
-// end, and a cycle delay binds tighter than throughout. Each holds a
-// subroutine call beside an and or an or, which the evaluation does not read,
-// so the grammar is held to it.
 TEST(PropertySpecGrammar, AnOperandIsGroupedByPrecedence) {
   const std::vector<std::string> kSpecs = {
       "a |-> b |=> (c, $display(\"m\"))",

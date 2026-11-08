@@ -117,8 +117,6 @@ int64_t ConvertToPointType(uint64_t bits, const SampledCoverpoint& point) {
 
 namespace {
 
-// A function standing for a formal list of the covergroup, so that the
-// actuals of a call are bound to it as to a function's (§19.3, §19.8.1).
 const ModuleItem* FormalsFunction(std::string_view name,
                                   const std::vector<FunctionArg>& formals,
                                   Arena& arena) {
@@ -131,16 +129,12 @@ const ModuleItem* FormalsFunction(std::string_view name,
   return function;
 }
 
-// A call of no arguments, whose binding gives each formal its default.
 const Expr* EmptyCall(Arena& arena) {
   auto* call = arena.Create<Expr>();
   call->kind = ExprKind::kCall;
   return call;
 }
 
-// The property a bare name `e` reads of the running object where the object
-// holds no value of it yet and its declaration gives its width; null for any
-// other name, a local or formal shadowing it among them.
 const ClassTypeInfo::PropertyInfo* UnheldProperty(const Expr* e,
                                                   SimContext& ctx) {
   const ClassObject* self = ctx.CurrentThis();
@@ -153,8 +147,6 @@ const ClassTypeInfo::PropertyInfo* UnheldProperty(const Expr* e,
   return prop != nullptr && prop->width_is_declared ? prop : nullptr;
 }
 
-// §19.5: a coverpoint with a data type samples its expression as that type,
-// and one without as the self-determined type of the expression.
 void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
                   SimContext& ctx, Arena& arena) {
   if (decl.has_data_type) {
@@ -171,10 +163,6 @@ void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
   point.is_signed = v.is_signed;
   point.is_real = v.is_real;
   point.enum_type = EnumTypeOfExpr(decl.expr, ctx, arena);
-  // §19.4.1 with §8.7: a derived covergroup is built where its base's `new`
-  // is, in the base class's constructor, before the deriving class's
-  // properties are initialized; the value read for one of them is then no
-  // measure of its type, and the declaration's width is taken.
   if (const ClassTypeInfo::PropertyInfo* prop =
           UnheldProperty(decl.expr, ctx)) {
     point.width = prop->width;
@@ -182,8 +170,6 @@ void SetPointType(SampledCoverpoint& point, const CoverPointDecl& decl,
   }
 }
 
-// §19.5.3: whether the bits of a sampled value that the coverpoint's type
-// keeps hold an x or z.
 bool SampleHasUnknownBits(const Logic4Vec& v, const SampledCoverpoint& point) {
   if (v.is_real || !point.is_four_state) return false;
   uint32_t width = point.width == 0 ? v.width : std::min(point.width, v.width);
@@ -195,8 +181,6 @@ bool SampleHasUnknownBits(const Logic4Vec& v, const SampledCoverpoint& point) {
   return false;
 }
 
-// §19.3: the instance's formals, which the frame of its construction bound to
-// the actuals of new().
 void KeepFormals(CovergroupInstance& inst, SimContext& ctx) {
   for (const FunctionArg& formal : inst.decl->formals) {
     Variable* var = ctx.FindLocalVariable(formal.name);
@@ -204,9 +188,6 @@ void KeepFormals(CovergroupInstance& inst, SimContext& ctx) {
   }
 }
 
-// §19.7: the covergroup's option assignments are applied first, so that the
-// options which default the coverpoints' and crosses' (§19.7, Table 19-2)
-// are in place when those are built; the crosses follow every coverpoint.
 void BuildItems(CovergroupInstance& inst, SimContext& ctx, Arena& arena) {
   const CovergroupDecl& decl = *inst.decl;
   for (const CoverageSpecOrOption& item : decl.items) {
@@ -285,8 +266,6 @@ SampledValues ReadPoints(const CovergroupInstance& inst, SimContext& ctx,
   return values;
 }
 
-// §19.6.3: a sampled cross product an illegal_bins selection selects is a
-// run-time error, unless the cross's guard is false.
 void ReportIllegalCrossProducts(const CovergroupInstance& inst, SourceLoc loc,
                                 SimContext& ctx) {
   for (const SampledCross& sampled : inst.crosses) {
@@ -308,16 +287,10 @@ void ReportIllegalCrossProducts(const CovergroupInstance& inst, SourceLoc loc,
   }
 }
 
-// §19.8: samples the instance, reporting a value an illegal_bins holds
-// (§19.5.6) and a tuple an illegal_bins selection of a cross covers (§19.6.3)
-// as run-time errors at the call that sampled it. §19.8.1: the arguments of
-// the call are bound to the formals of `with function sample`.
 void SampleInstance(CovergroupInstance& inst, const Expr* call, SimContext& ctx,
                     Arena& arena) {
   if (!inst.group->collecting) return;
   CovergroupFrame frame(inst, ctx, arena, {{inst.sample_function, call}});
-  // §19.3 with §23.6: the expressions are read in the scope the instance was
-  // built in, however the call reached it; the actuals above in the caller's.
   GenBlockSubroutineScope scope{inst.inst_prefix, inst.gen_prefixes, {}};
   EnterCalleeInstance(ctx, {nullptr, inst.inst_prefix,
                             inst.built_by_process ? &scope : nullptr});
@@ -344,8 +317,6 @@ void SampleInstance(CovergroupInstance& inst, const Expr* call, SimContext& ctx,
   ReportIllegalCrossProducts(inst, call->range.start, ctx);
 }
 
-// Whether `e` is a name a variable is read by, an identifier or a dotted,
-// scoped (`K::s`) or selected path of them, whose evaluation calls nothing.
 bool IsNamePath(const Expr* e) {
   if (e->kind == ExprKind::kIdentifier) return true;
   if (e->kind == ExprKind::kMemberAccess) {
@@ -357,18 +328,12 @@ bool IsNamePath(const Expr* e) {
   return false;
 }
 
-// §19.3: the instance the variable `e` names holds a handle to, the variable
-// read by its own name, by a hierarchical one (§23.6), through a virtual
-// interface (§25.9) or as an element of an array; null where it holds none.
 CovergroupInstance* InstanceHeldBy(const Expr* e, SimContext& ctx,
                                    Arena& arena) {
   if (!IsNamePath(e)) return nullptr;
   return ctx.Covergroups().Held(EvalExpr(e, ctx, arena).ToUint64());
 }
 
-// The instance a receiver names: an embedded covergroup of the object whose
-// method is running, `h.cg`, the embedded covergroup `cg` of the object `h`
-// holds, or the instance a variable of a covergroup type holds a handle to.
 CovergroupInstance* InstanceNamed(const Expr* e, SimContext& ctx,
                                   Arena& arena) {
   CovergroupTable& table = ctx.Covergroups();
@@ -405,10 +370,6 @@ CovergroupTarget TargetNamed(const Expr* e, SimContext& ctx, Arena& arena) {
   return {};
 }
 
-// §19.3 with §19.7.1: a covergroup whose strobe option is set samples the
-// occurrences of its clocking event in a time slot once, in the slot's
-// Postponed region, its expressions read in the scope of the process that saw
-// the event.
 void StrobeSample(CovergroupInstance& inst, SimContext& ctx, Arena& arena) {
   if (inst.strobe_pending) return;
   inst.strobe_pending = true;
@@ -442,9 +403,6 @@ Logic4Vec RunGroupMethod(std::string_view method, CovergroupInstance& inst,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// §19.8, Table 19-5: start() and stop() called on a coverpoint or a cross
-// switch that item's collection alone, on where `start`. Answers true, the
-// call having been served.
 bool SwitchItemCollection(const CovergroupTarget& target, bool start) {
   bool& collecting =
       target.point != nullptr
@@ -454,9 +412,6 @@ bool SwitchItemCollection(const CovergroupTarget& target, bool start) {
   return true;
 }
 
-// §19.8: runs the method `call` names on `target`, the coverage methods on an
-// instance or one of its coverpoints or crosses and the others on an
-// instance; false for any other method of a coverpoint or cross.
 bool RunCovergroupMethod(const CovergroupTarget& target, const Expr* call,
                          SimContext& ctx, Arena& arena, Logic4Vec& out) {
   std::string_view method = call->lhs->rhs->text;
@@ -480,8 +435,6 @@ bool IsCovergroupMethod(std::string_view method) {
          method == "start" || method == "stop";
 }
 
-// §19.3 with §19.4: the process sampling an embedded covergroup at each
-// occurrence of its clocking event, as an always procedure would.
 SimCoroutine EmbeddedSamplingCoroutine(const Stmt* wait, SimContext& ctx,
                                        Arena& arena) {
   while (!ctx.StopRequested()) {
@@ -489,8 +442,6 @@ SimCoroutine EmbeddedSamplingCoroutine(const Stmt* wait, SimContext& ctx,
   }
 }
 
-// §19.3: the statement an embedded covergroup's sampling process repeats,
-// `@(clocking_event) name.sample();`.
 const Stmt* EmbeddedSamplingWait(const CovergroupDecl& decl, Arena& arena) {
   auto* access = arena.Create<Expr>();
   access->kind = ExprKind::kMemberAccess;
@@ -514,12 +465,6 @@ const Stmt* EmbeddedSamplingWait(const CovergroupDecl& decl, Arena& arena) {
   return wait;
 }
 
-// §19.3 with §19.4: an embedded covergroup with a clocking event is sampled
-// at each occurrence of the event for each object whose instance of it is
-// built, by a process of its own that waits on the event, `this` the object,
-// and calls sample() on the object's instance. The process stands in the
-// instance and generate blocks of the one building the instance, where the
-// event's names resolve.
 void StartEmbeddedSampling(const CovergroupInstance& inst, SimContext& ctx,
                            Arena& arena) {
   auto* p = arena.Create<Process>();
@@ -532,7 +477,6 @@ void StartEmbeddedSampling(const CovergroupInstance& inst, SimContext& ctx,
   }
   p->saved_this_stack = {inst.owner};
   p->saved_method_class_stack = {inst.owner->type};
-  // §8.29: the sampling process keeps the object it samples reachable.
   ctx.GetScheduler().NoteCarrier(p);
   p->rng_seed = ctx.DrawSeedForChild();
   p->coro = EmbeddedSamplingCoroutine(EmbeddedSamplingWait(*inst.decl, arena),
@@ -617,9 +561,6 @@ std::string CovergroupTable::EmbeddedKey(const ClassObject* owner,
 
 namespace {
 
-// The name a coverage item goes by, which a derived covergroup's item of the
-// same kind overrides by (§19.4.1): a coverpoint's (CoverpointName), a
-// cross's label, and an option's member, empty for an unlabelled cross.
 std::string ItemName(const CoverageSpecOrOption& item, size_t index) {
   if (item.kind == CoverageSpecKind::kCoverPoint)
     return CoverpointName(*item.cover_point, index);
@@ -628,11 +569,6 @@ std::string ItemName(const CoverageSpecOrOption& item, size_t index) {
   return {};
 }
 
-// §19.4.1: the covergroup the derived covergroup `derived` amounts to: the
-// argument list and coverage event of its base `base`, the base's items its
-// own do not override -- a coverpoint or labelled cross of the same name --
-// and its own items after them, so that an option it sets is set after, and
-// overrides, the base's.
 CovergroupDecl ComposeDerived(const CovergroupDecl& base,
                               const CovergroupDecl& derived) {
   CovergroupDecl out = base;
@@ -651,8 +587,6 @@ CovergroupDecl ComposeDerived(const CovergroupDecl& base,
   return out;
 }
 
-// The covergroup of the name of `embedded[i]` that a class further up the
-// chain embeds, the one a derived covergroup at `i` extends; null where none.
 const CovergroupDecl* NextOfName(
     const std::vector<std::pair<std::string_view, const CovergroupDecl*>>&
         embedded,
@@ -663,8 +597,6 @@ const CovergroupDecl* NextOfName(
   return nullptr;
 }
 
-// §19.4.1: the covergroup `derived` extending `base` amounts to, composed the
-// first time any class reaches the two and kept in `composed`.
 const CovergroupDecl* ComposedOnce(ComposedCovergroups& composed,
                                    const CovergroupDecl& base,
                                    const CovergroupDecl& derived) {
@@ -673,10 +605,6 @@ const CovergroupDecl* ComposedOnce(ComposedCovergroups& composed,
   return &it->second;
 }
 
-// §19.4: every covergroup `type` and the classes it derives from embed, the
-// most derived first. §19.4.1: one that extends the covergroup of its name
-// further up is composed with it (ComposeDerived), from the base down, the
-// composition kept in `composed` once for the two, whichever class reaches it.
 std::vector<std::pair<std::string_view, const CovergroupDecl*>>
 EmbeddedCovergroups(const ClassTypeInfo* type, ComposedCovergroups& composed) {
   std::vector<std::pair<std::string_view, const CovergroupDecl*>> embedded;

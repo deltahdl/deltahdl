@@ -23,9 +23,6 @@ namespace delta {
 
 namespace {
 
-// What a left-hand-side pattern's widths are read against: the module whose
-// names its items and the right-hand side name, the module's typedefs,
-// functions and unpacked arrays, and the scope a select's bounds fold in.
 struct LhsPatternCtx {
   const RtlirModule* mod;
   const TypedefMap& typedefs;
@@ -35,8 +32,6 @@ struct LhsPatternCtx {
   DiagEngine& diag;
 };
 
-// Whether `name` names a variable or net of `mod` with no unpacked dimension,
-// one whose select is a select of bits.
 bool IsUnpackedFree(std::string_view name, const RtlirModule* mod) {
   for (const auto& v : mod->variables)
     if (v.name == name) return v.unpacked_size == 0;
@@ -45,11 +40,6 @@ bool IsUnpackedFree(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-// §7.4: how many elements the variable `name` holds: 1 for one declaring no
-// unpacked array, each dimension's size multiplied out for a fixed-size
-// array, and 0 for a dynamic array, a queue or an associative array, whose
-// count is the run's to know, as for any array a dimension of which does not
-// fold.
 uint32_t ElementCount(std::string_view name, const LhsPatternCtx& ctx) {
   auto it = ctx.arrays.find(name);
   if (it == ctx.arrays.end()) return 1;
@@ -58,11 +48,6 @@ uint32_t ElementCount(std::string_view name, const LhsPatternCtx& ctx) {
   return std::accumulate(sizes.begin(), sizes.end(), 1U, std::multiplies<>());
 }
 
-// The bit count of a pattern's right-hand side: a name's declared width, every
-// element's for an unpacked array (§10.9 has `U'{a, b, c} = A` take the three
-// elements of `A`), the span of a constant select of a vector, a call's
-// declared return width, and otherwise what the operators give it. 0 where
-// none of these is known.
 uint32_t PatternRhsWidth(const Expr* rhs, const LhsPatternCtx& ctx) {
   if (rhs->kind == ExprKind::kIdentifier)
     return LookupLhsWidth(rhs, ctx.mod) * ElementCount(rhs->text, ctx);
@@ -78,8 +63,6 @@ uint32_t PatternRhsWidth(const Expr* rhs, const LhsPatternCtx& ctx) {
   return InferExprWidth(rhs, ctx.typedefs);
 }
 
-// §10.9 (printed page 261): each item of a typed pattern on the left-hand side
-// has the bit count of the member of the pattern's type it stands for.
 void CheckTypedLhsPatternItems(const Expr* cast, const LhsPatternCtx& ctx) {
   auto it = ctx.typedefs.find(cast->text);
   if (it == ctx.typedefs.end()) return;
@@ -97,11 +80,6 @@ void CheckTypedLhsPatternItems(const Expr* cast, const LhsPatternCtx& ctx) {
   }
 }
 
-// §10.9 (printed page 260): a positional assignment pattern on the left-hand
-// side of an assignment-like context holds the bits the right-hand side
-// supplies, and an untyped one takes its type from the other side, which an
-// untyped pattern there cannot give it. Fires on a bit count only when both
-// sides have one, so that unrelated diagnostics keep their primacy.
 void CheckLhsPattern(const Expr* lhs, const Expr* rhs,
                      const LhsPatternCtx& ctx) {
   const Expr* pat = lhs;
@@ -131,8 +109,6 @@ void CheckLhsPattern(const Expr* lhs, const Expr* rhs,
                  Subclause("10.9"));
 }
 
-// §10.9's rules reach an assignment wherever one is written: every statement
-// of a process or a subroutine, and a continuous assignment.
 void WalkStmtsForLhsPattern(const Stmt* s, const LhsPatternCtx& ctx) {
   if (!s) return;
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -156,9 +132,6 @@ void Elaborator::ValidateLhsPatternWidths(const ModuleDecl* decl,
     for (const Stmt* s : item->func_body_stmts) WalkStmtsForLhsPattern(s, kCtx);
     if (item->kind == ModuleItemKind::kContAssign)
       CheckLhsPattern(item->assign_lhs, item->assign_rhs, kCtx);
-    // Syntax 10-6: a typed pattern operand of an alias is the net_lvalue a
-    // continuous assignment's left-hand side is, its items standing for the
-    // members of its type as there.
     if (item->kind != ModuleItemKind::kAlias) continue;
     for (const Expr* net : item->alias_nets)
       if (net->kind == ExprKind::kCast) CheckTypedLhsPatternItems(net, kCtx);

@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §20.10.1 — when a $fatal elaboration severity task survives elaboration,
-// the simulator shall refuse to start. Lowering must not register variables
-// or processes from a blocked design.
 TEST(ElabSeverityTaskSim, FatalBlocksLowering) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,10 +28,6 @@ TEST(ElabSeverityTaskSim, FatalBlocksLowering) {
                             "20.10.1"));
 }
 
-// §20.10.1 — $error at elaboration lets elaboration run to completion but
-// shall still prevent simulation from starting. The design is produced, yet
-// lowering must refuse to register its variables and the initial-block
-// assignment must never take effect.
 TEST(ElabSeverityTaskSim, ErrorBlocksLowering) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -55,9 +48,6 @@ TEST(ElabSeverityTaskSim, ErrorBlocksLowering) {
                             "20.10.1"));
 }
 
-// §20.10.1 — $warning at elaboration shall not prevent simulation from
-// starting. Lowering must proceed and the initial-block assignment must
-// take effect.
 TEST(ElabSeverityTaskSim, WarningDoesNotBlockLowering) {
   SimFixture f;
   auto* design = ElaborateSrc(

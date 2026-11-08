@@ -29,10 +29,8 @@ namespace delta {
 
 namespace {
 
-// Whether a scope enclosing the one walked makes `name` visible at `use`.
 using OuterScopes = std::function<bool(std::string_view name, SourceLoc use)>;
 
-// Where one scope first declares each name it declares as data.
 using Declarations = std::unordered_map<std::string_view, SourceLoc>;
 
 bool DeclaresData(const ModuleItem& item) {
@@ -48,8 +46,6 @@ Declarations DataDeclarationsOf(const std::vector<ModuleItem*>& items) {
   return found;
 }
 
-// The name at the root of a procedural target: of each select, member access
-// and element of a concatenation written there.
 void CollectTargetRoots(const Expr* e, std::vector<const Expr*>& out) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kIdentifier) {
@@ -77,8 +73,6 @@ bool NamesATarget(StmtKind kind) {
   }
 }
 
-// The data a statement and the statements under it write, passing by the
-// names `locals` holds, which the statements declare themselves.
 void CollectTargets(const Stmt* s,
                     const std::unordered_set<std::string_view>& locals,
                     std::vector<const Expr*>& out) {
@@ -93,10 +87,6 @@ void CollectTargets(const Stmt* s,
                    [&](Stmt* const& sub) { CollectTargets(sub, locals, out); });
 }
 
-// The reads an item makes outside any statement: a data declaration's value,
-// a declaration's dimensions, a continuous assignment's expression, an always
-// construct's event control, and a generate construct's condition and case
-// item expressions.
 void CollectItemReads(const ModuleItem& item, std::vector<const Expr*>& out) {
   if (item.kind == ModuleItemKind::kContAssign)
     CollectBareIdents(item.assign_rhs, out);
@@ -119,8 +109,6 @@ void CollectItemReads(const ModuleItem& item, std::vector<const Expr*>& out) {
       CollectBareIdents(pattern, out);
 }
 
-// The reads and writes of a procedure's or a subroutine's statements, passing
-// by the formals `locals` starts with and the names the statements declare.
 void CollectBodyUses(const std::vector<Stmt*>& body,
                      std::unordered_set<std::string_view> locals,
                      std::vector<const Expr*>& out) {
@@ -131,9 +119,6 @@ void CollectBodyUses(const std::vector<Stmt*>& body,
   }
 }
 
-// The uses a task's or function's body makes, passing by the names
-// CollectSubroutineLocalNames finds it declares: its formals, a function's own
-// name, and the declarations of its body.
 void CollectSubroutineUses(const ModuleItem& subroutine,
                            std::vector<const Expr*>& out) {
   std::unordered_set<std::string_view> locals;
@@ -153,9 +138,6 @@ class UseBeforeDeclaration {
     scopes_.pop_back();
   }
 
-  // A class's properties are its data, read and written by its methods and
-  // by the other properties' initializers. A name a base class may declare is
-  // passed by, since the use may read the member the class inherits.
   void ClassBody(const ClassDecl& cls) {
     Declarations properties;
     std::vector<const Expr*> uses;
@@ -190,10 +172,6 @@ class UseBeforeDeclaration {
     for (const auto& case_item : item.gen_case_items) Scope(case_item.body);
   }
 
-  // Whether a class `cls` extends may declare a property `name`: one of its
-  // bases does, or a base is found nowhere in the unit, so what it declares is
-  // not known here. Elaborator::RunPreElaborationValidations has already
-  // dropped the extends clause closing any cycle, so the walk ends.
   bool MayInherit(const ClassDecl& cls, std::string_view name) const {
     for (const ClassDecl* derived = &cls; !derived->base_class.empty();) {
       const ClassDecl* base = FindBaseClass(derived, &unit_);
@@ -208,10 +186,6 @@ class UseBeforeDeclaration {
     return false;
   }
 
-  // A use stands above its declaration when every scope declaring the name
-  // declares it only below the use, and no enclosing scope supplies it. A
-  // module is walked once for each of its instances, so the report is made
-  // once.
   void Use(const Expr& use) {
     bool declared = false;
     for (const Declarations& scope : scopes_) {
@@ -241,8 +215,6 @@ static void ReportDataUsedAboveItsDeclaration(
   UseBeforeDeclaration(unit, outer, diag).Scope(items);
 }
 
-// Whether the compilation unit declares `name` above `use`, where a scope it
-// encloses reaches that declaration before one of its own further down.
 static bool UnitNamesAbove(const CompilationUnit& unit, std::string_view name,
                            SourceLoc use) {
   return std::ranges::any_of(unit.cu_items, [&](const ModuleItem* item) {
@@ -250,10 +222,6 @@ static bool UnitNamesAbove(const CompilationUnit& unit, std::string_view name,
   });
 }
 
-// Whether a wildcard import of the package `package_name` may make `name`
-// visible: the package declares an item of that name or exports anything, or
-// is none of the unit's, so what it supplies is not known here. The std
-// package, which every scope imports, holds the members §G.1 lists.
 static bool PackageMayProvide(const CompilationUnit& unit,
                               std::string_view package_name,
                               std::string_view name) {
@@ -267,8 +235,6 @@ static bool PackageMayProvide(const CompilationUnit& unit,
   });
 }
 
-// Whether an import among `items` may make `name` visible: one naming it, or a
-// wildcard import of a package that may supply it.
 static bool ImportReaches(const CompilationUnit& unit,
                           const std::vector<ModuleItem*>& items,
                           std::string_view name) {

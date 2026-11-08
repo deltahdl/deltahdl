@@ -18,61 +18,25 @@
 namespace delta {
 namespace {
 
-// §37.13 IO declaration: the VPI object model for an io decl (vpiIODecl), a
-// module/UDP/task/function port or argument declaration. These tests observe
-// the production helpers in vpi.cpp (and the VpiContext::Handle path they feed)
-// that apply the clause's four numbered "Details".
-//
-// The diagram's properties (vpiName/vpiScalar/vpiSigned/vpiSize/vpiVector) and
-// the structural reach from instance/UDP/task-func/module are served by the
-// generic Get/Handle machinery and carry no §37.13-specific rule of their own.
-// The four details that do - the vpiRef direction for by-ref (detail 1), the
-// vpiExpr target kind (detail 2), the undefined direction for an interface/
-// modport/virtual-interface io decl (detail 3), and the typespec-equal range
-// relations (detail 4) - are exercised below.
-
-// D2: the object kinds the vpiExpr relation of an io decl may draw to - the
-// named ref obj / interface tf decl / virtual interface var targets and the
-// nets and variables groupings. An unrelated kind is not an expr target.
 TEST(IoDeclModel, ExprTargetTypeClassification) {
   EXPECT_TRUE(VpiIsIoDeclExprType(vpiRefObj));
   EXPECT_TRUE(VpiIsIoDeclExprType(vpiInterfaceTfDecl));
   EXPECT_TRUE(VpiIsIoDeclExprType(vpiVirtualInterfaceVar));
   EXPECT_TRUE(VpiIsIoDeclExprType(kVpiNet));
-  EXPECT_TRUE(VpiIsIoDeclExprType(kVpiReg));  // a logic var
+  EXPECT_TRUE(VpiIsIoDeclExprType(kVpiReg));
 
   EXPECT_FALSE(VpiIsIoDeclExprType(vpiModule));
   EXPECT_FALSE(VpiIsIoDeclExprType(vpiExpr));
 }
 
-// D2: a by-reference io decl, or one that is an interface or a modport, has a
-// ref obj for its vpiExpr; a virtual-interface io decl has a virtual interface
-// var; any other io decl keeps its directly connected expression kind.
 TEST(IoDeclModel, ExprTargetKindFollowsPassingMode) {
-  // Passed by reference -> ref obj.
-  EXPECT_EQ(VpiIoDeclExprType(/*passed_by_reference=*/true,
-                              /*is_interface_or_modport=*/false,
-                              /*is_virtual_interface=*/false,
-                              /*default_expr_type=*/kVpiNet),
-            vpiRefObj);
-  // An interface or modport io decl -> ref obj, even when not by reference.
-  EXPECT_EQ(VpiIoDeclExprType(false, /*is_interface_or_modport=*/true, false,
-                              kVpiNet),
-            vpiRefObj);
-  // A virtual interface io decl -> virtual interface var; this wins over the
-  // by-reference/interface routing.
-  EXPECT_EQ(
-      VpiIoDeclExprType(true, true, /*is_virtual_interface=*/true, kVpiNet),
-      vpiVirtualInterfaceVar);
-  // An ordinary input port keeps its connected kind (here a net).
-  EXPECT_EQ(
-      VpiIoDeclExprType(false, false, false, /*default_expr_type=*/kVpiNet),
-      kVpiNet);
+  EXPECT_EQ(VpiIoDeclExprType(true, false, false, kVpiNet), vpiRefObj);
+  EXPECT_EQ(VpiIoDeclExprType(false, true, false, kVpiNet), vpiRefObj);
+  EXPECT_EQ(VpiIoDeclExprType(true, true, true, kVpiNet),
+            vpiVirtualInterfaceVar);
+  EXPECT_EQ(VpiIoDeclExprType(false, false, false, kVpiNet), kVpiNet);
 }
 
-// D2: traversing vpiExpr through the public handle path returns the io decl's
-// designated connection child, whose own type is an expr-target kind rather
-// than vpiExpr.
 TEST(IoDeclPublic, HandleExprReturnsConnectionChild) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -81,8 +45,6 @@ TEST(IoDeclPublic, HandleExprReturnsConnectionChild) {
   io_decl.type = vpiIODecl;
   VpiObject ref_obj;
   ref_obj.type = vpiRefObj;
-  // A typespec child precedes the connection but is not an expr target, so the
-  // traversal must skip past it to the ref obj.
   VpiObject typespec;
   typespec.type = vpiTypespec;
   io_decl.children.push_back(&typespec);
@@ -92,7 +54,6 @@ TEST(IoDeclPublic, HandleExprReturnsConnectionChild) {
   ASSERT_EQ(expr, &ref_obj);
   EXPECT_EQ(ctx.Get(vpiType, expr), vpiRefObj);
 
-  // An io decl with no expr-target child yields null.
   VpiObject bare;
   bare.type = vpiIODecl;
   bare.children.push_back(&typespec);
@@ -101,39 +62,18 @@ TEST(IoDeclPublic, HandleExprReturnsConnectionChild) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D1: a port or argument passed by reference reports vpiRef as its direction;
-// any other passing mode keeps its declared direction.
 TEST(IoDeclModel, ByReferenceReportsVpiRefDirection) {
-  EXPECT_EQ(
-      VpiIoDeclDirection(/*declared_direction=*/vpiInput,
-                         /*passed_by_reference=*/true,
-                         /*expr_is_ref_obj_to_interface_or_modport=*/false,
-                         /*expr_is_virtual_interface_var=*/false),
-      vpiRef);
-  // A plain input keeps its declared direction.
+  EXPECT_EQ(VpiIoDeclDirection(vpiInput, true, false, false), vpiRef);
   EXPECT_EQ(VpiIoDeclDirection(vpiInput, false, false, false), vpiInput);
   EXPECT_EQ(VpiIoDeclDirection(vpiOutput, false, false, false), vpiOutput);
   EXPECT_EQ(VpiIoDeclDirection(vpiInout, false, false, false), vpiInout);
 }
 
-// D3: the direction is undefined (vpiNoDirection) when vpiExpr is a ref obj
-// whose vpiActual is an interface or modport declaration, or when vpiExpr is a
-// virtual interface var. Detail 3 wins over the detail-1 by-reference routing.
 TEST(IoDeclModel, InterfaceModportAndVirtualInterfaceHaveNoDirection) {
-  EXPECT_EQ(VpiIoDeclDirection(vpiInput, /*passed_by_reference=*/true,
-                               /*expr_is_ref_obj_to_interface_or_modport=*/true,
-                               /*expr_is_virtual_interface_var=*/false),
-            vpiNoDirection);
-  EXPECT_EQ(
-      VpiIoDeclDirection(vpiInput, /*passed_by_reference=*/false,
-                         /*expr_is_ref_obj_to_interface_or_modport=*/false,
-                         /*expr_is_virtual_interface_var=*/true),
-      vpiNoDirection);
+  EXPECT_EQ(VpiIoDeclDirection(vpiInput, true, true, false), vpiNoDirection);
+  EXPECT_EQ(VpiIoDeclDirection(vpiInput, false, false, true), vpiNoDirection);
 }
 
-// D4: the io decl's range relations are the same as for its corresponding
-// typespec (§37.25): one range per declared dimension, leftmost to rightmost,
-// with a dynamic/queue/associative dimension contributing an empty range.
 TEST(IoDeclModel, RangesMatchCorrespondingTypespec) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims(2);
@@ -141,7 +81,7 @@ TEST(IoDeclModel, RangesMatchCorrespondingTypespec) {
   dims[0].left_expr = &l0;
   dims[0].right_expr = &r0;
   dims[0].size = 8;
-  dims[1].kind = VpiDimensionKind::kAssoc;  // becomes an empty range
+  dims[1].kind = VpiDimensionKind::kAssoc;
   dims[1].left_expr = &l1;
   dims[1].right_expr = &r1;
   dims[1].size = 0;
@@ -155,13 +95,10 @@ TEST(IoDeclModel, RangesMatchCorrespondingTypespec) {
     EXPECT_EQ(io_ranges[i].right_expr, ts_ranges[i].right_expr);
     EXPECT_EQ(io_ranges[i].size, ts_ranges[i].size);
   }
-  // The leftmost dimension is the real packed one, so its bounds surface.
   EXPECT_EQ(io_ranges[0].left_expr, &l0);
   EXPECT_TRUE(io_ranges[1].empty);
 }
 
-// D4: vpiLeftRange/vpiRightRange of an io decl are identical to the typespec's,
-// including the NULL both relations yield for an empty leftmost range.
 TEST(IoDeclModel, LeftRightRangeMatchTypespec) {
   VpiObject l0, r0;
   std::vector<VpiArrayDimension> packed(1);
@@ -174,22 +111,15 @@ TEST(IoDeclModel, LeftRightRangeMatchTypespec) {
   EXPECT_EQ(VpiIoDeclLeftRange(packed), &l0);
   EXPECT_EQ(VpiIoDeclRightRange(packed), &r0);
 
-  // A dynamic leftmost dimension is an empty range, so both relations are NULL,
-  // exactly as for the corresponding typespec.
   std::vector<VpiArrayDimension> dynamic(1);
   dynamic[0].kind = VpiDimensionKind::kDynamic;
   EXPECT_EQ(VpiIoDeclLeftRange(dynamic), nullptr);
   EXPECT_EQ(VpiIoDeclRightRange(dynamic), VpiTypespecRightRange(dynamic));
 }
 
-// D2 (guard/error): the vpiExpr traversal applies only to an io decl. A null
-// handle, or an object of any other kind, has no io decl vpiExpr target and so
-// yields null rather than diverting some unrelated object's first child.
 TEST(IoDeclModel, ExprTraversalAppliesOnlyToIoDecl) {
   EXPECT_EQ(VpiIoDeclExpr(nullptr), nullptr);
 
-  // A non-io-decl object that happens to carry a ref obj child is not subject
-  // to the io decl rule, so its vpiExpr target is not taken.
   VpiObject not_io_decl;
   not_io_decl.type = vpiModule;
   VpiObject ref_obj;
@@ -198,9 +128,6 @@ TEST(IoDeclModel, ExprTraversalAppliesOnlyToIoDecl) {
   EXPECT_EQ(VpiIoDeclExpr(&not_io_decl), nullptr);
 }
 
-// D4 (edge): a scalar io decl has no declared dimension, so its corresponding
-// typespec has none either - the range iteration is empty and both bound
-// relations are NULL, matching the typespec exactly.
 TEST(IoDeclModel, ScalarIoDeclHasNoRanges) {
   std::vector<VpiArrayDimension> none;
   EXPECT_TRUE(VpiIoDeclRanges(none).empty());
@@ -211,31 +138,24 @@ TEST(IoDeclModel, ScalarIoDeclHasNoRanges) {
   EXPECT_EQ(VpiIoDeclRightRange(none), VpiTypespecRightRange(none));
 }
 
-// A design whose interface, instantiated as top.i0, declares modports, run
-// with a PLI application registered.
 class ModportIoDeclsOfARun : public VpiDesignRun {
  protected:
-  // The object top.i0.`name`.
   static vpiHandle InInstance(const char* name) {
     std::string full = std::string("top.i0.") + name;
     return vpi_handle_by_name(full.data(), nullptr);
   }
 
-  // The io decl `port` of the modport `modport` of top.i0.
   static vpiHandle IoDecl(const char* modport, const char* port) {
     vpiHandle iface = vpi_handle_by_name(VpiText("top.i0"), nullptr);
     return Named(vpiIODecl, Named(vpiModport, iface, modport), port);
   }
 
-  // The design whose interface declares `items`.
   static std::string Design(const std::string& items) {
     return "interface ifc; " + items +
            " endinterface\nmodule top; ifc i0(); endmodule\n";
   }
 };
 
-// §37.13 detail 2 with §37.7: the io decl of a modport port naming a variable
-// of its interface reaches that variable through vpiExpr.
 TEST_F(ModportIoDeclsOfARun, ASimplePortReachesTheVariableItNames) {
   Run(Design("logic a, b; modport mp(input a, output b);"));
   vpiHandle b = InInstance("b");
@@ -244,7 +164,6 @@ TEST_F(ModportIoDeclsOfARun, ASimplePortReachesTheVariableItNames) {
             VpiObjectOf(b));
 }
 
-// ...and the io decl of one naming a net reaches that net.
 TEST_F(ModportIoDeclsOfARun, ASimplePortReachesTheNetItNames) {
   Run(Design("wire w; modport mp(input w);"));
   vpiHandle w = InInstance("w");
@@ -253,14 +172,12 @@ TEST_F(ModportIoDeclsOfARun, ASimplePortReachesTheNetItNames) {
             VpiObjectOf(w));
 }
 
-// §37.13 detail 2: the io decl of a ref port reaches a ref obj...
 TEST_F(ModportIoDeclsOfARun, ARefPortReachesARefObj) {
   Run(Design("logic a; modport mr(ref a);"));
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiExpr, IoDecl("mr", "a"))),
             vpiRefObj);
 }
 
-// ...whose vpiActual is the variable the port names.
 TEST_F(ModportIoDeclsOfARun, ARefPortsRefObjIsBoundToTheVariable) {
   Run(Design("logic a; modport mr(ref a);"));
   vpiHandle a = InInstance("a");
@@ -269,8 +186,6 @@ TEST_F(ModportIoDeclsOfARun, ARefPortsRefObjIsBoundToTheVariable) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, ref_obj)), VpiObjectOf(a));
 }
 
-// §37.13 with §25.5.4: the io decl of a .port_id(expr) port reaches the
-// expression it was written with...
 TEST_F(ModportIoDeclsOfARun, AnExpressionPortReachesItsExpression) {
   Run(Design("logic [7:0] r; modport mp(output .lo(r[3:0]));"));
   vpiHandle lo = vpi_handle(vpiExpr, IoDecl("mp", "lo"));
@@ -279,7 +194,6 @@ TEST_F(ModportIoDeclsOfARun, AnExpressionPortReachesItsExpression) {
             VpiObjectOf(InInstance("r")));
 }
 
-// ...and that of an empty .port_id() reaches none.
 TEST_F(ModportIoDeclsOfARun, AnEmptyExpressionPortReachesNone) {
   Run(Design("logic [7:0] r; modport mp(output .lo());"));
   vpiHandle lo = IoDecl("mp", "lo");
@@ -287,11 +201,8 @@ TEST_F(ModportIoDeclsOfARun, AnEmptyExpressionPortReachesNone) {
   EXPECT_EQ(vpi_handle(vpiExpr, lo), nullptr);
 }
 
-// A design run whose tasks, udp defns and modports are read back for their io
-// decls.
 class IoDeclsOfARun : public ModportIoDeclsOfARun {
  protected:
-  // The io decl `arg` of top's task or function `tf`.
   static vpiHandle ArgOf(const char* tf, const char* arg) {
     return Named(vpiIODecl, Named(vpiTaskFunc, By("top"), tf), arg);
   }
@@ -304,10 +215,6 @@ class IoDeclsOfARun : public ModportIoDeclsOfARun {
   }
 };
 
-// The figure with detail 4: an argument's io decl reports the size, signing,
-// shape and ranges of the variable it declares, its typespec being the
-// variable's; one passed by reference reaches it through a ref obj (detail 2)
-// and reports vpiRef (detail 1).
 TEST_F(IoDeclsOfARun, AnArgumentsIoDeclReportsTheVariableItDeclares) {
   Run("module top;\n"
       "  task automatic t(input logic signed [7:0] a, input logic b,\n"
@@ -340,8 +247,6 @@ TEST_F(IoDeclsOfARun, AnArgumentsIoDeclReportsTheVariableItDeclares) {
   EXPECT_EQ(vpi_get(vpiSize, r), 32);
 }
 
-// Detail 3: an argument's io decl whose vpiExpr is a virtual interface var
-// has no direction.
 TEST_F(IoDeclsOfARun, AVirtualInterfaceIoDeclHasNoDirection) {
   Run("interface inner; endinterface\n"
       "module top; inner n();\n"
@@ -350,8 +255,6 @@ TEST_F(IoDeclsOfARun, AVirtualInterfaceIoDeclHasNoDirection) {
   EXPECT_EQ(vpi_get(vpiDirection, ArgOf("t", "w")), vpiNoDirection);
 }
 
-// The figure: a udp defn reaches an io decl per port, its output and then
-// its inputs, each one bit and declaring no net of the defn's.
 TEST_F(IoDeclsOfARun, AUdpDefnReachesAnIoDeclPerPort) {
   Run("primitive my_and(o, a, b);\n"
       "  output o;\n"
@@ -376,10 +279,6 @@ TEST_F(IoDeclsOfARun, AUdpDefnReachesAnIoDeclPerPort) {
   EXPECT_EQ(vpi_handle(vpiExpr, o), nullptr);
 }
 
-// The figure with §37.7 and §37.8: a modport's io decl of a task it exports
-// reaches the interface's interface tf decl for it, and of one it imports
-// from the interface's own definitions an interface tf decl reaching that
-// definition, each of vpiExternAcc.
 TEST_F(IoDeclsOfARun, AModportsSubroutineIoDeclReachesAnInterfaceTfDecl) {
   Run("interface ifc; logic a;\n"
       "  extern task put();\n"

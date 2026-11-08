@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §40.4 writes the FSM pragmas as the text of a comment, so they reach the
-// lexer that records them only if the preprocessor hands each comment on with
-// its text. A parameter's enum-only pragma and a signal's state_vector pragma,
-// run through the preprocessor as every compiled source is, are both still
-// recorded from the preprocessed text (#5135).
 TEST(FsmPragmaPreprocessing, PragmasSurviveThePreprocessor) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -34,9 +29,6 @@ TEST(FsmPragmaPreprocessing, PragmasSurviveThePreprocessor) {
   EXPECT_EQ(pragmas[1].enum_name, "fsm_e");
 }
 
-// The pragma keeps its text on a line whose macro usages the preprocessor
-// expands: the bit range is substituted and the enum-only pragma behind it is
-// still recorded.
 TEST(FsmPragmaPreprocessing, PragmaSurvivesBesideAnExpandedMacro) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -53,8 +45,6 @@ TEST(FsmPragmaPreprocessing, PragmaSurvivesBesideAnExpandedMacro) {
   EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
 }
 
-// §40.4.7 lets the pragmas stand in a one-line comment as well, and that
-// comment's text reaches the lexer the same way.
 TEST(FsmPragmaPreprocessing, OneLineCommentPragmaSurvivesThePreprocessor) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -71,9 +61,6 @@ TEST(FsmPragmaPreprocessing, OneLineCommentPragmaSurvivesThePreprocessor) {
   EXPECT_EQ(pragmas[0].enum_name, "my_fsm");
 }
 
-// A macro usage whose argument list runs onto the next line is read with that
-// line joined to it (§22.5.1), and a pragma written on the line read ahead
-// keeps its text: the enum-only pragma behind the usage is still recorded.
 TEST(FsmPragmaPreprocessing, PragmaOnALineReadAheadForAUsageSurvives) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -91,9 +78,6 @@ TEST(FsmPragmaPreprocessing, PragmaOnALineReadAheadForAUsageSurvives) {
   EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
 }
 
-// A one-line comment ending a line of a usage that runs onto the next line
-// keeps its text, and the line joined after it is still read as source rather
-// than swallowed into the comment.
 TEST(FsmPragmaPreprocessing, OneLineCommentPragmaInAJoinedUsageSurvives) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -112,8 +96,6 @@ TEST(FsmPragmaPreprocessing, OneLineCommentPragmaInAJoinedUsageSurvives) {
   EXPECT_EQ(pragmas[0].enum_name, "my_fsm");
 }
 
-// The same holds for a one-line comment on a line read ahead, between the line
-// the usage opens on and the one it closes on.
 TEST(FsmPragmaPreprocessing, OneLineCommentPragmaOnALineReadAheadSurvives) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -132,9 +114,6 @@ TEST(FsmPragmaPreprocessing, OneLineCommentPragmaOnALineReadAheadSurvives) {
   EXPECT_EQ(pragmas[0].enum_name, "fsm_e");
 }
 
-// Each one-line comment of a usage that runs onto later lines keeps its text
-// and stays a comment of its own, so two pragmas written on two of its lines
-// are both recorded.
 TEST(FsmPragmaPreprocessing, OneLineCommentPragmasOnTwoLinesOfAUsageSurvive) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -155,10 +134,6 @@ TEST(FsmPragmaPreprocessing, OneLineCommentPragmasOnTwoLinesOfAUsageSurvive) {
   EXPECT_EQ(pragmas[1].enum_name, "fsm_e");
 }
 
-// A block comment the usage's last line opens and leaves open runs on past the
-// usage (A.9.2), so a one-line comment moved out of the usage is written ahead
-// of it rather than inside it: the pragma is recorded, and the block comment
-// still hides the directive on the line it runs onto.
 TEST(FsmPragmaPreprocessing, OneLineCommentPragmaBeforeAnOpenBlockComment) {
   PreprocFixture f;
   auto out = Preprocess(

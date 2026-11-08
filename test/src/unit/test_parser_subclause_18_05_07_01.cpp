@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.7.1: 'constraint_expression ::= ... | foreach ( array_id [
-// loop_variables ] ) constraint_set'. A foreach iterative constraint with a
-// single loop variable and a predicate over the indexed element is a
-// well-formed constraint expression and parses without error.
 TEST(ForeachIterativeConstraint, SingleLoopVariableAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -20,9 +16,6 @@ TEST(ForeachIterativeConstraint, SingleLoopVariableAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: 'loop_variables ::= [ index_variable_identifier ] { , [
-// index_variable_identifier ] }'. A list of several loop variables, one per
-// array dimension, is accepted.
 TEST(ForeachIterativeConstraint, MultipleLoopVariablesAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -32,8 +25,6 @@ TEST(ForeachIterativeConstraint, MultipleLoopVariablesAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: leaving a loop variable empty skips iteration over its dimension,
-// so a position in the loop_variables list may be left blank.
 TEST(ForeachIterativeConstraint, EmptyLoopVariableAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -43,8 +34,6 @@ TEST(ForeachIterativeConstraint, EmptyLoopVariableAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: a trailing run of commas may be omitted, so 'foreach (arr[j])' is a
-// shorthand for naming only the leading dimension.
 TEST(ForeachIterativeConstraint, TrailingCommasOmittedAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -54,7 +43,6 @@ TEST(ForeachIterativeConstraint, TrailingCommasOmittedAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: a loop variable named the same as the array it walks is an error.
 TEST(ForeachIterativeConstraint, LoopVariableNameClashRejected) {
   auto r = Parse(
       "class C;\n"
@@ -67,8 +55,6 @@ TEST(ForeachIterativeConstraint, LoopVariableNameClashRejected) {
                             3, "18.5.7.1"));
 }
 
-// 18.5.7.1: the loop-variable naming rule fires on the clashing variable even
-// when it is not the first one in a multi-dimensional list.
 TEST(ForeachIterativeConstraint, LaterLoopVariableNameClashRejected) {
   auto r = Parse(
       "class C;\n"
@@ -81,8 +67,6 @@ TEST(ForeachIterativeConstraint, LaterLoopVariableNameClashRejected) {
                             3, "18.5.7.1"));
 }
 
-// 18.5.7.1: a loop variable that merely resembles, but does not equal, the
-// array identifier is fine; only an exact match is an error.
 TEST(ForeachIterativeConstraint, DistinctLoopVariableAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -92,12 +76,6 @@ TEST(ForeachIterativeConstraint, DistinctLoopVariableAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: a foreach iterative constraint's constraint_set may itself contain
-// a predicate, such as an implication that guards an element relation against
-// an out-of-bounds index. This well-formed sorted-array constraint — whose body
-// references the array size and adjacent indexed elements — parses without
-// error, confirming the foreach header is recognized and the constraint_set
-// after it is scanned normally.
 TEST(ForeachIterativeConstraint, PredicatedForeachAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -107,11 +85,6 @@ TEST(ForeachIterativeConstraint, PredicatedForeachAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: a function call cannot stand in the foreach argument as an implicit
-// variable declaration (see 13.4.1); doing so is an error. The argument must be
-// a plain array identifier; a call standing in its place — 'f()[i]' rather than
-// 'arr[i]' — cannot serve as the implicit loop-variable declaration the header
-// introduces, and is rejected.
 TEST(ForeachIterativeConstraint, FunctionCallArrayIdentifierRejected) {
   auto r = Parse(
       "class C;\n"
@@ -124,10 +97,6 @@ TEST(ForeachIterativeConstraint, FunctionCallArrayIdentifierRejected) {
                             3, "18.5.7.1"));
 }
 
-// 18.5.7.1: the array being iterated may be named by a hierarchical reference,
-// and the loop-variable naming rule compares against that array's own
-// identifier (the trailing component of the reference). A loop variable that
-// matches the trailing array name is still an error.
 TEST(ForeachIterativeConstraint,
      HierarchicalArrayLoopVariableNameClashRejected) {
   auto r = Parse(
@@ -141,12 +110,6 @@ TEST(ForeachIterativeConstraint,
                             3, "18.5.7.1"));
 }
 
-// 18.5.7.1: the foreach argument is a ps_or_hierarchical_array_identifier, so
-// the iterated array may be named through a hierarchical reference such as
-// 'this.arr'. With a loop variable distinct from the array's trailing
-// identifier the header is well-formed; this is the accepting counterpart to
-// the hierarchical name-clash case above and confirms the hierarchical array
-// form is parsed as a valid foreach argument.
 TEST(ForeachIterativeConstraint, HierarchicalArrayReferenceAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -156,11 +119,6 @@ TEST(ForeachIterativeConstraint, HierarchicalArrayReferenceAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.7.1: the constraint_set following a foreach header need not be a single
-// relation — it may be a brace-enclosed group of several
-// constraint_expressions. Each per-element relation inside the braces is
-// scanned as part of the foreach body, and the whole iterative constraint
-// parses without error.
 TEST(ForeachIterativeConstraint, BracedConstraintSetAccepted) {
   auto r = Parse(
       "class C;\n"

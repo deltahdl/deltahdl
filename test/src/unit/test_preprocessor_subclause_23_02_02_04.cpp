@@ -7,9 +7,6 @@ using namespace delta;
 namespace {
 
 TEST(DefaultPortValueParsing, AnsiPortWithDefault) {
-  // §23.2.2.4 defines no preprocessor-stage rule for default port values; this
-  // is an integration check that a port default survives preprocessing and
-  // reaches the parser intact.
   auto r = ParseWithPreprocessor("module m(input logic a = 1'b0); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

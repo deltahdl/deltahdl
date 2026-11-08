@@ -25,8 +25,6 @@ TEST(ClassParsing, OutOfBlockMethod) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// A.1.6's interface_or_generate_item is the one body production that admits
-// an extern_tf_declaration, so the prototype is hosted in an interface.
 TEST(FunctionDeclParsing, FuncPrototypeExtern) {
   auto r = Parse(
       "interface ifc;\n"
@@ -73,9 +71,6 @@ TEST(FunctionDeclParsing, FuncBodyOutOfBlockConstructor) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// An out-of-block task body repeating the prototype's tf_port_list.
-// test_parser_annex_a_02_07.cpp covers the class_scope form that has no
-// parenthesized port list.
 TEST(TaskDeclParsing, TaskBodyClassScopeWithPortList) {
   auto r = Parse(
       "class C;\n"
@@ -249,14 +244,6 @@ TEST(OutOfBlockDeclParsing, RegularTaskNoMethodClass) {
   EXPECT_TRUE(found);
 }
 
-// §8.24 has an out-of-block method declaration access every declaration of the
-// class whose prototype it implements, its example resolving the `T` of
-// `function void C::f(T x)` to `C::T` (printed pages 202 and 203 of IEEE
-// 1800-2023). The parser decides whether an identifier opens a declaration
-// by the type names it knows where it stands, and the class's own names leave
-// at `endclass`, so the method's argument list and body have to be given them
-// back: before that, `pair_t p;` was read as an expression statement and
-// reported "expected ';', got identifier".
 TEST(OutOfBlockDeclParsing, BodyReadsTheClassTypedefAsAType) {
   auto r = Parse(
       "class C;\n"
@@ -318,10 +305,6 @@ TEST(OutOfBlockDeclParsing, TaskBodyReadsTheClassTypedefAsAType) {
   EXPECT_EQ(t->func_body_stmts[0]->var_decl_type.type_name, "pair_t");
 }
 
-// §23.9 makes the function its own scope, so the class's names given to the
-// method leave with it at `endfunction`: A.10.3 lets `data_type_or_implicit`
-// be empty, so the `localparam pair_t = 1` after it is a value parameter named
-// pair_t, which a leaked type name would read as a type and report at `=`.
 TEST(OutOfBlockDeclParsing, ClassTypedefLeavesWithTheMethod) {
   auto r = Parse(
       "class C;\n"

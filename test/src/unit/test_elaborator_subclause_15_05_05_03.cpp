@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §15.5.5.3: the equality, inequality, case-equality, and case-inequality
-// operators are the only comparison operators permitted on event variables,
-// and an event may be used as a Boolean test. These uses elaborate cleanly.
 TEST(EventComparisonElaborator, AllowedComparisonOperatorsAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -25,8 +22,6 @@ TEST(EventComparisonElaborator, AllowedComparisonOperatorsAccepted) {
              "endmodule\n"));
 }
 
-// §15.5.5.3: an event may be compared against the special value null with any
-// of the permitted equality operators, including the case-equality forms.
 TEST(EventComparisonElaborator, ComparisonAgainstNullAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -41,8 +36,6 @@ TEST(EventComparisonElaborator, ComparisonAgainstNullAccepted) {
              "endmodule\n"));
 }
 
-// §15.5.5.3: a relational operator is not among the permitted operators for an
-// event variable, so applying one is illegal.
 TEST(EventComparisonElaborator, RelationalOperatorRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -58,8 +51,6 @@ TEST(EventComparisonElaborator, RelationalOperatorRejected) {
                             4, "15.5.5.3"));
 }
 
-// §15.5.5.3: an arithmetic operator on an event operand is likewise illegal,
-// even when the other operand is not an event.
 TEST(EventComparisonElaborator, ArithmeticOperatorRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -75,8 +66,6 @@ TEST(EventComparisonElaborator, ArithmeticOperatorRejected) {
                             4, "15.5.5.3"));
 }
 
-// §15.5.5.3: a bitwise operator on an event operand is not a permitted
-// comparison and is rejected.
 TEST(EventComparisonElaborator, BitwiseOperatorRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,8 +81,6 @@ TEST(EventComparisonElaborator, BitwiseOperatorRejected) {
                             4, "15.5.5.3"));
 }
 
-// §15.5.5.3: a unary operator applied to an event operand is outside the set of
-// permitted operations and is rejected.
 TEST(EventComparisonElaborator, UnaryOperatorRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -109,8 +96,6 @@ TEST(EventComparisonElaborator, UnaryOperatorRejected) {
                             4, "15.5.5.3"));
 }
 
-// §15.5.5.3: a postfix increment/decrement on an event operand is likewise not
-// among the permitted operations and is rejected.
 TEST(EventComparisonElaborator, PostfixIncrementOperatorRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -126,9 +111,6 @@ TEST(EventComparisonElaborator, PostfixIncrementOperatorRejected) {
                             4, "15.5.5.3"));
 }
 
-// §15.5.5.3: a unary arithmetic operator reaches the same check as the unary
-// bitwise negation above, so the report has to name which of them was written.
-// Table 11-1 lists '-' and '~' as different operators under different names.
 TEST(EventComparisonElaborator, UnaryOperatorReportNamesTheOperator) {
   ElabFixture f;
   ElaborateSrc(
@@ -144,12 +126,6 @@ TEST(EventComparisonElaborator, UnaryOperatorReportNamesTheOperator) {
                             4, "15.5.5.3"));
 }
 
-// The property the three checks exist to be told apart by. All three stand at
-// the same line under the same subclause, so while they shared one sentence a
-// test written for any one of them was satisfied by the other two, and deleting
-// a check reported failures against tests covering the checks that remained.
-// One source draws all three at once, and the assertions are what say the
-// reports differ.
 TEST(EventComparisonElaborator, OperatorKindsReportDistinguishably) {
   ElabFixture f;
   ElaborateSrc(
@@ -175,26 +151,6 @@ TEST(EventComparisonElaborator, OperatorKindsReportDistinguishably) {
                             6, "15.5.5.3"));
 }
 
-// §15.5.5.3 admits only ==, !=, === and !== on an event variable and names no
-// statement the rule is suspended in. Elaborator::WalkStmtsForEventOps in
-// src/elaborator/elaborator_validate_datatype_ops.cpp had written out six of
-// the thirteen child-statement links Stmt declares, so the addition of
-// ArithmeticOperatorRejected above elaborated clean in any of the other seven.
-// The walk now takes its list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h, and each case below rewrites
-// that addition in one newly reached position.
-//
-// When these cases were written, IsDataTypeKeyword, then in
-// src/parser/parser_stmt.cpp and now in src/parser/parser_token_skips.h,
-// omitted TokenKind::kKwEvent, so an event variable could not be declared
-// inside a begin/end block, a fork arm or a subroutine body (#3322, since
-// closed). Every case below therefore declares the event as a module item and
-// writes only the offending operation in the new position, which is what the
-// rule is about.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, whose
-// statements the parser keeps in Stmt::fork_stmts.
 TEST(EventComparisonElaborator, ArithmeticOperatorInForkArmRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -212,10 +168,6 @@ TEST(EventComparisonElaborator, ArithmeticOperatorInForkArmRejected) {
                             5, "15.5.5.3"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// `variable_assignment ::= variable_lvalue = expression`, so an assignment
-// whose right-hand side adds two events stands in a for-loop header. The parser
-// keeps it in Stmt::for_inits.
 TEST(EventComparisonElaborator, ArithmeticOperatorInForInitializationRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -231,10 +183,6 @@ TEST(EventComparisonElaborator, ArithmeticOperatorInForInitializationRejected) {
                             4, "15.5.5.3"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
-// written with `=` carries an arbitrary expression. The parser keeps it in
-// Stmt::for_steps.
 TEST(EventComparisonElaborator, ArithmeticOperatorInForStepRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -250,10 +198,6 @@ TEST(EventComparisonElaborator, ArithmeticOperatorInForStepRejected) {
                             4, "15.5.5.3"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion (§16.3) holds a statement in
-// each arm, kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This
-// case and the next cover one arm each.
 TEST(EventComparisonElaborator,
      ArithmeticOperatorInAssertionPassStatementRejected) {
   ElabFixture f;
@@ -286,8 +230,6 @@ TEST(EventComparisonElaborator,
                             4, "15.5.5.3"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second of each Stmt::randcase_items pair.
 TEST(EventComparisonElaborator, ArithmeticOperatorInRandcaseItemRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -305,10 +247,6 @@ TEST(EventComparisonElaborator, ArithmeticOperatorInRandcaseItemRejected) {
                             5, "15.5.5.3"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block (§18.17) holds ordinary
-// procedural statements. The parser keeps them in RsProd::code_stmts, reached
-// through Stmt::rs_productions and through no other member of Stmt.
 TEST(EventComparisonElaborator,
      ArithmeticOperatorInRandsequenceCodeBlockRejected) {
   ElabFixture f;

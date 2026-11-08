@@ -10,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Returns the elaborated value of parameter `name` in module `mod`.
 int64_t ParamValue(RtlirDesign* design, std::string_view mod,
                    std::string_view name) {
   auto it = design->all_modules.find(mod);
@@ -23,10 +22,6 @@ int64_t ParamValue(RtlirDesign* design, std::string_view mod,
   return -1;
 }
 
-// §22.14: the pair of directives only selects which identifiers are reserved
-// words; it does not change the semantics of the language. The same design
-// text elaborates to the same parameter values whether or not it sits inside a
-// keyword region that names an older standard.
 TEST(KeywordVersionElaboration, KeywordRegionDoesNotChangeElaboratedValues) {
   const std::string kBody =
       "module t;\n"
@@ -53,9 +48,6 @@ TEST(KeywordVersionElaboration, KeywordRegionDoesNotChangeElaboratedValues) {
             ParamValue(without_region, "t", "DEPTH"));
 }
 
-// §22.14: the reserved word list a `begin_keywords selects applies to all the
-// source that follows it, so several design elements in one region are all
-// elaborated under that list. `logic` names a net in both modules here.
 TEST(KeywordVersionElaboration, OneRegionCoversSeveralDesignElements) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -72,8 +64,6 @@ TEST(KeywordVersionElaboration, OneRegionCoversSeveralDesignElements) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  // Both design elements elaborated, and in each one the word the 1364-2001
-  // list leaves unreserved really did come through as the net's name.
   for (std::string_view name : {"a", "b"}) {
     auto it = design->all_modules.find(name);
     ASSERT_NE(it, design->all_modules.end()) << name;
@@ -82,11 +72,6 @@ TEST(KeywordVersionElaboration, OneRegionCoversSeveralDesignElements) {
   }
 }
 
-// §22.14 states its placement rule against the design elements of §3.2, and a
-// region covers every kind of element that follows it, not just modules. A
-// package and an interface written in real §3.2 syntax elaborate alongside the
-// module inside one 1800-2005 region, and `until` — a word 1800-2005 has not
-// yet reserved — really did come through as the package parameter's name.
 TEST(KeywordVersionElaboration, RegionCoversNonModuleDesignElements) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -115,10 +100,6 @@ TEST(KeywordVersionElaboration, RegionCoversNonModuleDesignElements) {
   EXPECT_EQ(intf->second->nets[0].name, "global");
 }
 
-// §22.14: nested pairs are stacked. The inner region selects 1364-2001, where
-// `logic` is an ordinary identifier; the enclosing region selects 1800-2012,
-// where it is the type keyword. Both design elements elaborate, each under the
-// list that was in effect where it appears.
 TEST(KeywordVersionElaboration, NestedRegionsElaborateUnderOwnVersion) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

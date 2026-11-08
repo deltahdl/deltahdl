@@ -17,16 +17,8 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
-// What a clocking item names (§14.3, printed page 355), the value a cycle
-// delay may take (§14.11, printed page 361), and the declarations a nested
-// declaration sits in, which §14.12 (printed page 362) carries a default
-// clocking into.
-
 namespace delta {
 
-// Whether `scope`, or a declaration nested in it, holds `decl`; when it does,
-// the declarations from the one holding `decl` out to `scope` are appended to
-// `path`, innermost first.
 static bool FindEnclosing(const ModuleDecl* scope, const ModuleDecl* decl,
                           std::vector<const ModuleDecl*>& path) {
   for (const ModuleItem* item : scope->items) {
@@ -53,9 +45,6 @@ std::vector<const ModuleDecl*> EnclosingDecls(const CompilationUnit* unit,
   return path;
 }
 
-// Reports each cycle delay under `s` whose count folds to a negative constant,
-// on a `##` statement and on a synchronous drive alike, both of which keep the
-// count in Stmt::cycle_delay.
 static void ReportNegativeCycleDelays(const Stmt* s, const ScopeMap& scope,
                                       DiagEngine& diag) {
   if (s == nullptr) return;
@@ -85,8 +74,6 @@ void ValidateCycleDelayCounts(const ModuleDecl* decl, const ScopeMap& scope,
 
 namespace {
 
-// The clocking blocks among `items`, those of the generate blocks they hold
-// included.
 void CollectClockingBlocks(const std::vector<ModuleItem*>& items,
                            std::vector<const ModuleItem*>& out) {
   for (const ModuleItem* item : items) {
@@ -101,11 +88,6 @@ void CollectClockingBlocks(const std::vector<ModuleItem*>& items,
   }
 }
 
-// The names §6.21 (printed page 134) limits to procedural code when one is
-// the head of a select or of a member access: a dynamically sized array, a
-// queue or an associative array, whose elements are referenced only there; a
-// class variable, whose object's members are; and an automatic task or
-// function, whose variables are.
 struct ProceduralOnlyHeads {
   std::unordered_set<std::string_view> dynamic_arrays;
   const std::unordered_set<std::string_view>& class_vars;
@@ -117,7 +99,6 @@ bool IsIdentIn(const Expr* e, const std::unordered_set<std::string_view>& set) {
          set.contains(e->text);
 }
 
-// Whether `e` references a variable §6.21 limits to procedural code.
 bool DesignatesProceduralOnly(const Expr* e, const ProceduralOnlyHeads& heads) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kSelect &&
@@ -134,10 +115,6 @@ bool DesignatesProceduralOnly(const Expr* e, const ProceduralOnlyHeads& heads) {
   });
 }
 
-// The names a clocking item may name in `decl`: what `decl` declares, what
-// each declaration enclosing it declares (§23.4), and what the compilation
-// unit's scope and its packages declare (§3.12.1, §26.3). ScopeNameSet holds
-// more than any one scope declares, so it only ever leaves a name unreported.
 ScopeNameSet ClockingSignalScope(const CompilationUnit* unit,
                                  const ModuleDecl* decl) {
   ScopeNameSet names;
@@ -154,9 +131,6 @@ ScopeNameSet ClockingSignalScope(const CompilationUnit* unit,
   return names;
 }
 
-// §14.3 with §23.9: a clocking block's event is an event expression read in
-// the scope holding the block, so each bare identifier it names resolves to a
-// declaration visible there, `names`, or is reported.
 void ReportUndeclaredClockingEvent(const ModuleItem* block,
                                    const ScopeNameSet& names,
                                    DiagEngine& diag) {
@@ -176,9 +150,6 @@ void ReportUndeclaredClockingEvent(const ModuleItem* block,
 
 }  // namespace
 
-// §14.3 (printed page 355): a clocking item written without an expression
-// names a net or variable of the scope enclosing the clocking block, and no
-// clocking signal designates a variable §6.21 restricts to a procedural block.
 void Elaborator::ValidateClockingSignalTargets(const ModuleDecl* decl) {
   std::vector<const ModuleItem*> blocks;
   CollectClockingBlocks(decl->items, blocks);

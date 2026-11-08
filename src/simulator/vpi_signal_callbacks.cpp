@@ -13,7 +13,6 @@ namespace delta {
 
 namespace {
 
-// The signals a trap can record, numbered from 0.
 constexpr int kSignalSlots = 65;
 
 volatile std::sig_atomic_t g_raised[kSignalSlots] = {};
@@ -38,8 +37,6 @@ bool InRange(int signal) { return signal > 0 && signal < kSignalSlots; }
 }  // namespace delta
 
 extern "C" {
-// Installed by VpiTrapSignal alone, for a signal InRange holds, so the number
-// it is handed is one of the record's slots.
 static void RecordVpiSignal(int signal) {
   delta::g_raised[signal] = 1;
   delta::g_any_raised = 1;

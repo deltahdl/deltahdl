@@ -128,10 +128,6 @@ TEST(EventTriggerParser, NonblockingWithRepeatEventControl) {
   EXPECT_FALSE(stmt->events.empty());
 }
 
-// Syntax 15-1 target is `hierarchical_event_identifier nonrange_select`: the
-// blocking trigger admits a select on an element of a named-event array, not
-// just a bare identifier. The parsed target expression is a select node, not an
-// identifier.
 TEST(EventTriggerParser, BlockingTriggerArraySelect) {
   auto r = Parse(
       "module m;\n"
@@ -149,7 +145,6 @@ TEST(EventTriggerParser, BlockingTriggerArraySelect) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSelect);
 }
 
-// The nonblocking trigger accepts the same nonrange_select target form.
 TEST(EventTriggerParser, NonblockingTriggerArraySelect) {
   auto r = Parse(
       "module m;\n"
@@ -167,9 +162,6 @@ TEST(EventTriggerParser, NonblockingTriggerArraySelect) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSelect);
 }
 
-// The blocking trigger's target is a hierarchical_event_identifier, so a
-// dotted (member-access) name is a valid target position, not only a bare
-// identifier or an array select.
 TEST(EventTriggerParser, BlockingHierarchical) {
   auto r = Parse(
       "module m;\n"
@@ -184,9 +176,6 @@ TEST(EventTriggerParser, BlockingHierarchical) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kMemberAccess);
 }
 
-// The blocking form `-> hier_event_id nonrange_select ;` admits no
-// delay_or_event_control -- only the nonblocking ->> form does. A leading
-// delay on -> is therefore a syntax error.
 TEST(EventTriggerParser, BlockingTriggerRejectsDelay) {
   auto r = Parse(
       "module m;\n"
@@ -194,15 +183,9 @@ TEST(EventTriggerParser, BlockingTriggerRejectsDelay) {
       "  initial -> #5 ev;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §15.5.1 has no report of its own here: Parser::ParseEventTriggerStmt reads
-  // the target as an expression, and the '#' on line 3 opens none, so the
-  // report is the §11.2 one.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
-// §15.5.1 notes that an edge's state cannot be ascertained, i.e., a posedge
-// cannot be observed as a value: `if (posedge clk)` is illegal. A posedge is
-// not a primary expression, so the parser rejects it in an if condition.
 TEST(EventTriggerParser, PosedgeInIfConditionIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -210,8 +193,6 @@ TEST(EventTriggerParser, PosedgeInIfConditionIsRejected) {
       "  initial if (posedge clk) ;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // The rejection is §11.2's: `posedge` opens no primary expression, so the
-  // if condition never reaches a form §15.5.1 could speak about.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

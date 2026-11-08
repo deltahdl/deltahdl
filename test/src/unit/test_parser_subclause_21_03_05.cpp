@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.5 Syntax 21-8: all three file positioning functions -- $ftell(fd),
-// $fseek(fd, offset, operation), and $rewind(fd) -- in assignment and
-// statement positions.
 TEST(IoSystemTaskParsing, AllThreePositioningFunctionsParse) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -24,9 +21,6 @@ TEST(IoSystemTaskParsing, AllThreePositioningFunctionsParse) {
               "endmodule\n"));
 }
 
-// §21.3.5 Syntax 21-8: the positioning functions are functions, so each may
-// appear as an expression operand, and fd/offset/operation are ordinary
-// expressions rather than bare identifiers.
 TEST(IoSystemTaskParsing, PositioningFunctionsAsExpressionOperands) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -41,8 +35,6 @@ TEST(IoSystemTaskParsing, PositioningFunctionsAsExpressionOperands) {
               "endmodule\n"));
 }
 
-// §21.3.5 Syntax 21-8: a positioning function may also supply the initializer
-// of a variable declaration.
 TEST(IoSystemTaskParsing, PositioningFunctionAsDeclarationInitializer) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -54,16 +46,12 @@ TEST(IoSystemTaskParsing, PositioningFunctionAsDeclarationInitializer) {
               "endmodule\n"));
 }
 
-// Negative form: an unterminated $fseek call cannot parse.
 TEST(IoSystemTaskParsing, UnterminatedFseekRejected) {
   auto r = Parse(
       "module t;\n"
       "  integer fd, code;\n"
       "  initial code = $fseek(fd, 10, 0;\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a system function call's argument
-  // list, so Parser::ParseSystemCall files the report under it rather than
-  // under §21.3.5.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "13.5"));
 }
 

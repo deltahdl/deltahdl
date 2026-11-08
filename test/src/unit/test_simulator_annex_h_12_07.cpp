@@ -11,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §H.12.7: an array whose elements are of a type compatible with C has no
-// need of the canonical representation, which a packed array element does
-// need; a scalar bit or logic has its own functions and needs it neither.
 TEST(DpiOtherElementTypes, CCompatibleElementsNeedNoCanonicalRepresentation) {
   EXPECT_FALSE(
       DpiCanonicalRepresentationIsNeededForElement(DataTypeKind::kInt, 0));
@@ -29,9 +26,6 @@ TEST(DpiOtherElementTypes, CCompatibleElementsNeedNoCanonicalRepresentation) {
       DpiCanonicalRepresentationIsNeededForElement(DataTypeKind::kLogic, 64));
 }
 
-// §H.12.7: such elements are accessed through pointers, in two steps -- the
-// actual address of the element is computed first and then used to access
-// the element.
 TEST(DpiOtherElementTypes, TheAddressIsComputedFirstAndThenUsed) {
   const std::array<DpiPointerAccessStep, 2> kSteps = DpiPointerAccessSteps();
   EXPECT_EQ(kSteps[0], DpiPointerAccessStep::kComputeTheElementsAddress);
@@ -40,11 +34,6 @@ TEST(DpiOtherElementTypes, TheAddressIsComputedFirstAndThenUsed) {
             DpiElementAccessMethod::kGenericPointerWithCasting);
 }
 
-// The two steps over an open array `int a [2:1][-1:-2]` of C-compatible
-// ints laid out as C lays them out: svGetArrElemPtr2 computes the address
-// of an element by the actual's own indices, and the element is read and
-// written through that address with the int cast the user provides, no
-// canonical buffer in between.
 TEST(DpiOtherElementTypes, AnIntElementIsReachedThroughItsComputedAddress) {
   const SvOpenArrayDimRange kRanges[] = {{31, 0}, {2, 1}, {-1, -2}};
   int data[2][2] = {{10, 11}, {12, 13}};

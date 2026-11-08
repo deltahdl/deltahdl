@@ -15,8 +15,6 @@ using namespace delta;
 
 namespace {
 
-// Register a clocking block named `name` on signal `signal` with the given
-// clock `edge` and zero default input/output skews.
 void RegisterClockBlock(ClockingManager& cmgr, const char* name,
                         const char* signal, Edge edge) {
   ClockingBlock block;
@@ -28,8 +26,6 @@ void RegisterClockBlock(ClockingManager& cmgr, const char* name,
   cmgr.Register(block);
 }
 
-// Create an event variable named `var_name`, flag it as an event, and bind it
-// to the clocking block `block_name`.
 Variable* MakeBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
                          const char* var_name, const char* block_name) {
   auto* ev = f.ctx.CreateVariable(var_name, 1);
@@ -38,7 +34,6 @@ Variable* MakeBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
   return ev;
 }
 
-// Add a watcher to `ev` that sets *flag true when fired.
 void WatchFlag(Variable* ev, bool* flag) {
   ev->AddWatcher([flag]() {
     *flag = true;
@@ -46,8 +41,6 @@ void WatchFlag(Variable* ev, bool* flag) {
   });
 }
 
-// Add a watcher to `ev` that appends `label` to *order when fired, so the
-// firing can be ordered relative to events placed in other scheduler regions.
 void WatchOrder(Variable* ev, std::vector<std::string>* order,
                 const char* label) {
   ev->AddWatcher([order, label]() {
@@ -56,9 +49,6 @@ void WatchOrder(Variable* ev, std::vector<std::string>* order,
   });
 }
 
-// Standard single-block event setup: create clk (initial `clk_init`), register
-// a "cb" block on "clk" with the given edge, create+bind its "__cb_event", and
-// attach. Returns clk; fills *out_event with the bound event variable.
 Variable* SetupSingleBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
                                 Edge edge, uint64_t clk_init,
                                 Variable** out_event) {
@@ -70,9 +60,6 @@ Variable* SetupSingleBlockEvent(ClockingSimFixture& f, ClockingManager& cmgr,
   return clk;
 }
 
-// Parameters for SetupTwoBlockEvents: the two clock signals to register blocks
-// on (`sig1`/`sig2`) and the two flags (`fired1`/`fired2`) set when each event
-// fires.
 struct TwoBlockEventSpec {
   const char* sig1;
   const char* sig2;
@@ -80,9 +67,6 @@ struct TwoBlockEventSpec {
   bool* fired2;
 };
 
-// Wire two posedge blocks "cb1"/"cb2" (on signals `spec.sig1`/`spec.sig2`),
-// bind their "__cb1_event"/"__cb2_event" events, attach, and install watchers
-// that set *spec.fired1/*spec.fired2 true when the respective event fires.
 void SetupTwoBlockEvents(ClockingSimFixture& f, ClockingManager& cmgr,
                          const TwoBlockEventSpec& spec) {
   RegisterClockBlock(cmgr, "cb1", spec.sig1, Edge::kPosedge);
@@ -162,23 +146,12 @@ TEST(ClockingBlockEventSim, NegedgeBlockTriggersOnNegedge) {
   EXPECT_TRUE(triggered);
 }
 
-// §14.10: a clocking block triggers its named event upon its specified clocking
-// event. A block declared with the any-edge form (Edge::kEdge) takes either
-// transition as its clocking event, so both a rising and a falling edge trigger
-// the block event, unlike the posedge/negedge blocks that react to a single
-// direction.
 TEST(ClockingBlockEventSim, AnyEdgeBlockTriggersOnBothEdges) {
   ClockingSimFixture f;
   ClockingManager cmgr;
   Variable* cb_event = nullptr;
   auto* clk = SetupSingleBlockEvent(f, cmgr, Edge::kEdge, 0, &cb_event);
 
-  // A watcher answers whether it is finished: NotifyWatchers re-registers the
-  // ones that return false and drops the ones that return true. Counting two
-  // firings therefore needs a watcher that stays registered through the first,
-  // which is what separates this from the single-shot flags the tests above
-  // use. Returning true here would unregister it at the rising edge and cap the
-  // count at one whatever the block did on the falling edge.
   uint32_t fire_count = 0;
   cb_event->AddWatcher([&fire_count]() {
     ++fire_count;
@@ -212,14 +185,6 @@ TEST(ClockingBlockEventSim, MultipleBlocksTriggerIndependentEvents) {
   EXPECT_FALSE(ev2_fired);
 }
 
-// §14.10: the event *associated with the clocking block name* (the clocking
-// block event) shall be triggered in the Observed region. This test watches the
-// bound event variable itself (the object §14.10 names) and confirms its notify
-// lands in Observed by ordering it against competing Active- and NBA-region
-// events in the same time step. If the block-event notify were scheduled into
-// the active region set instead of Observed it would fire before the NBA event,
-// so the strict "block_event last" ordering discriminates the Observed
-// placement.
 TEST(ClockingBlockEventSim, NamedEventFiresInObservedRegionAfterActiveAndNBA) {
   ClockingSimFixture f;
   ClockingManager cmgr;
@@ -282,16 +247,6 @@ TEST(ClockingBlockEventSim, SharedClockBothBlocksFireEvents) {
   EXPECT_TRUE(ev2_fired);
 }
 
-// Drives `clk` to `value` at `time` the way an ordinary assignment does: the
-// value changes and its watchers are notified, and nothing writes
-// Variable::prev_value.
-//
-// SchedulePosedge in helpers_clocking.h writes that field before every toggle,
-// which stands in for an event control armed on the same clock. §14.10 makes
-// the clocking event the transition of the block's own clocking expression, so
-// it has to be detected whether or not anything else waits on that clock; these
-// cases drive the clock without the write so the block is left to detect the
-// transition on its own.
 void ScheduleClockValue(ClockingSimFixture& f, Variable* clk, uint64_t value,
                         uint64_t time) {
   auto* ev = f.scheduler.GetEventPool().Acquire();
@@ -302,11 +257,6 @@ void ScheduleClockValue(ClockingSimFixture& f, Variable* clk, uint64_t value,
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-// §14.10: the block's event fires on each posedge of its clocking expression
-// and on no other notification. The clock is driven low, high, low, high, and
-// nothing else waits on it. Reading the previous value from a field nobody
-// wrote leaves it at 0, which makes every notification look like a posedge, so
-// the count is what tells the two apart.
 TEST(ClockingEventSim, PosedgeBlockFiresOncePerPosedgeOnAnUnwatchedClock) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -327,10 +277,6 @@ TEST(ClockingEventSim, PosedgeBlockFiresOncePerPosedgeOnAnUnwatchedClock) {
   EXPECT_EQ(fired, 2);
 }
 
-// §14.10, the other edge: a negedge block fires when its clock falls. A
-// previous value read as 0 makes a negedge impossible, so a posedge case alone
-// cannot tell a working record from a missing one -- the two failures are
-// opposite.
 TEST(ClockingEventSim, NegedgeBlockFiresOnTheFallOfAnUnwatchedClock) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -350,17 +296,6 @@ TEST(ClockingEventSim, NegedgeBlockFiresOnTheFallOfAnUnwatchedClock) {
   EXPECT_EQ(fired, 1);
 }
 
-// §14.10: each time a clocking block's clocking event occurs, the block
-// triggers the event its name stands for, in the Observed region; that event is
-// the clocking block event. The cases above drive
-// ClockingManager::NotifyBlockEvent through a manager and an event variable the
-// test builds itself, which says nothing about whether a design's
-// `always @(cb)` attaches to anything. This one starts from source, on §14.10's
-// own example shape.
-//
-// The clock rises twice, at t=5 and t=15, so a process attached to the block's
-// event runs twice; one attached to nothing runs not at all and leaves hits at
-// its declared 0.
 TEST(ClockingBlockEventSim, ClockingBlockEventFromSourceTriggersOnTheEdge) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -384,10 +319,6 @@ TEST(ClockingBlockEventSim, ClockingBlockEventFromSourceTriggersOnTheEdge) {
   EXPECT_EQ(hits->value.ToUint64(), 2u);
 }
 
-// §14.10's event is the block's own, so a clock edge that is not the one the
-// block names triggers nothing. The declaration here is on `negedge clk` while
-// the run drives two rises and one fall, so a process that followed the raw
-// variable rather than the declared edge would reach a different count.
 TEST(ClockingBlockEventSim, ClockingBlockEventFollowsTheDeclaredEdge) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -411,11 +342,6 @@ TEST(ClockingBlockEventSim, ClockingBlockEventFollowsTheDeclaredEdge) {
   EXPECT_EQ(hits->value.ToUint64(), 1u);
 }
 
-// The root-cause guard under both cases above and under
-// SyncDriveSim.SynchronousDriveFromSourceDrivesTheSignal: a design carrying a
-// clocking block leaves the run with a ClockingManager holding it. Without
-// this, a fix that wires one construct and not the other leaves the unwired one
-// failing for a reason the two counts report identically.
 TEST(ClockingBlockEventSim, ClockingManagerIsInstalledForADesignWithABlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -435,16 +361,6 @@ TEST(ClockingBlockEventSim, ClockingManagerIsInstalledForADesignWithABlock) {
   EXPECT_NE(f.ctx.GetClockingManager()->Find("cb"), nullptr);
 }
 
-// §14.3 declares a clocking block within its module, so a block written in a
-// module that is instantiated belongs to the instance rather than to the
-// module: the clock it names, the signals it samples and the event it triggers
-// are all that instance's. The cases below declare the block one level down and
-// read the result back under the instance's own prefix.
-
-// §14.10's clocking block event, triggered by a block a child instance
-// declares. The clock rises twice, so the child's `always @(cb)` runs twice; a
-// block registered nowhere leaves that process attached to nothing and `hits`
-// at its declared 0.
 TEST(ClockingBlockEventSim, AChildInstancesBlockTriggersItsOwnEvent) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -471,11 +387,6 @@ TEST(ClockingBlockEventSim, AChildInstancesBlockTriggersItsOwnEvent) {
   EXPECT_EQ(hits->value.ToUint64(), 2u);
 }
 
-// §14.3 (printed pages 354-355) with §15.5: the clocking event may be a
-// named event, so `clocking cb @(e)` samples its inputs and fires its own
-// event at each trigger of e: at 4, reading the 2 standing before the step,
-// and at 9, reading the 3 written at 5. A named event makes no edge, the block
-// waited for one, and `@(cb)` never woke.
 TEST(ClockingBlockEventSim, NamedEventClocksTheBlock) {
   SimFixture f;
   std::string out = RunCapture(

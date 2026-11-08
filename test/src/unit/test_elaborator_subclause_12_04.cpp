@@ -110,10 +110,6 @@ TEST(ConditionalElaboration, NestedIfElseInInitial) {
              "endmodule\n"));
 }
 
-// §12.4 takes an if's condition as true when its value is known and nonzero,
-// and §13.4.3 gives a constant function the meaning it has at run time. The
-// condition's only set bit is bit 64, so the fold reads 1 only when the
-// evaluator looks above the low 64 bits.
 TEST(ConditionalElaboration, ConstantFunctionIfReadsBitsAbove63) {
   ElabFixture f;
   auto* design = ElaborateSrc(

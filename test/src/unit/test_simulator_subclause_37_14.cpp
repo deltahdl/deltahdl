@@ -22,15 +22,6 @@
 namespace delta {
 namespace {
 
-// §37.14 Ports: the VPI port object model. These tests observe the production
-// helpers and dispatch cases in vpi.cpp that apply the clause's numbered
-// "Details". The connection relations (vpiHighConn/vpiLowConn) are shared with
-// §37.15 Reference objects, and detail 5 ties an interface port's lowConn to a
-// ref obj, so those rules are exercised against ref obj handles here too.
-
-// A test fixture that installs the context the public C entry points dispatch
-// through, so vpi_get/vpi_get_str/vpi_handle/vpi_get_delays observe the same
-// rules a PLI application would.
 class PortContext : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -38,26 +29,15 @@ class PortContext : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// D1: a port's vpiPortType is one of vpiPort, vpiInterfacePort, or
-// vpiModportPort, and which one is decided by the formal, not the actual.
 TEST(PortModel, PortTypeValuesAndFormalDerivation) {
   EXPECT_TRUE(VpiIsValidPortType(vpiPort));
   EXPECT_TRUE(VpiIsValidPortType(vpiInterfacePort));
   EXPECT_TRUE(VpiIsValidPortType(vpiModportPort));
   EXPECT_FALSE(VpiIsValidPortType(vpiRefObj));
 
-  // The formal decides the type: a modport formal wins over an interface
-  // formal, an interface formal yields an interface port, and anything else is
-  // ordinary.
-  EXPECT_EQ(VpiPortTypeFromFormal(/*formal_is_interface=*/false,
-                                  /*formal_is_modport=*/false),
-            vpiPort);
-  EXPECT_EQ(VpiPortTypeFromFormal(/*formal_is_interface=*/true,
-                                  /*formal_is_modport=*/false),
-            vpiInterfacePort);
-  EXPECT_EQ(VpiPortTypeFromFormal(/*formal_is_interface=*/true,
-                                  /*formal_is_modport=*/true),
-            vpiModportPort);
+  EXPECT_EQ(VpiPortTypeFromFormal(false, false), vpiPort);
+  EXPECT_EQ(VpiPortTypeFromFormal(true, false), vpiInterfacePort);
+  EXPECT_EQ(VpiPortTypeFromFormal(true, true), vpiModportPort);
 }
 
 TEST_F(PortContext, PortTypeReportedThroughVpiGet) {
@@ -67,7 +47,6 @@ TEST_F(PortContext, PortTypeReportedThroughVpiGet) {
   EXPECT_EQ(vpi_get(vpiPortType, VpiHandleOf(&port)), vpiModportPort);
 }
 
-// D2: the delay routines are not applicable to an interface port.
 TEST(PortModel, DelaysNotApplicableToInterfacePort) {
   EXPECT_FALSE(VpiPortDelaysApplicable(vpiInterfacePort));
   EXPECT_TRUE(VpiPortDelaysApplicable(vpiPort));
@@ -82,17 +61,12 @@ TEST_F(PortContext, GetDelaysOnInterfacePortIsAnError) {
   s_vpi_delay delay = {};
   delay.no_of_delays = 1;
   vpi_get_delays(VpiHandleOf(&iface_port), &delay);
-  // The interface-port guard fires first; its message identifies the ground for
-  // the error, distinguishing it from the generic no-of-delays legality check.
   EXPECT_NE(ctx_.LastError().level, 0);
   ASSERT_NE(ctx_.LastError().message, nullptr);
   EXPECT_NE(std::string(ctx_.LastError().message).find("interface port"),
             std::string::npos);
 }
 
-// D3, D4, D10: vpiHighConn reaches the higher connection and vpiLowConn the
-// lower one; an unconnected instance gives a NULL highConn and a null port
-// gives a NULL lowConn.
 TEST_F(PortContext, HighConnAndLowConnReachDesignatedConnections) {
   VpiObject high, low;
   VpiObject port;
@@ -102,13 +76,11 @@ TEST_F(PortContext, HighConnAndLowConnReachDesignatedConnections) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, VpiHandleOf(&port))), &high);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, VpiHandleOf(&port))), &low);
 
-  // D10: an instance with no connection to the port -> NULL highConn.
   VpiObject unconnected;
   unconnected.type = vpiPort;
   unconnected.low_conn = &low;
   EXPECT_EQ(vpi_handle(vpiHighConn, VpiHandleOf(&unconnected)), nullptr);
 
-  // D10: a null port -> NULL lowConn, even if a stored pointer were present.
   VpiObject null_port;
   null_port.type = vpiPort;
   null_port.null_port = true;
@@ -117,7 +89,6 @@ TEST_F(PortContext, HighConnAndLowConnReachDesignatedConnections) {
   EXPECT_EQ(VpiLowConn(&null_port), nullptr);
 }
 
-// D5: the lowConn of a vpiInterfacePort shall always be a ref obj (§37.15).
 TEST(PortModel, InterfacePortLowConnIsRefObj) {
   VpiObject ref_obj;
   ref_obj.type = vpiRefObj;
@@ -128,17 +99,14 @@ TEST(PortModel, InterfacePortLowConnIsRefObj) {
   iface_port.low_conn = &ref_obj;
   EXPECT_TRUE(VpiPortLowConnSatisfiesInterfaceRule(&iface_port));
 
-  // An interface port whose lowConn is some other kind violates the rule.
   VpiObject net;
   net.type = vpiNet;
   iface_port.low_conn = &net;
   EXPECT_FALSE(VpiPortLowConnSatisfiesInterfaceRule(&iface_port));
 
-  // An interface port with no lowConn at all violates the rule.
   iface_port.low_conn = nullptr;
   EXPECT_FALSE(VpiPortLowConnSatisfiesInterfaceRule(&iface_port));
 
-  // The rule does not constrain a non-interface port.
   VpiObject ordinary;
   ordinary.type = vpiPort;
   ordinary.port_type = vpiPort;
@@ -146,8 +114,6 @@ TEST(PortModel, InterfacePortLowConnIsRefObj) {
   EXPECT_TRUE(VpiPortLowConnSatisfiesInterfaceRule(&ordinary));
 }
 
-// D6: vpiScalar/vpiVector report whether the port is 1 bit or more than 1 bit,
-// based on the port's own width and nothing about what is connected.
 TEST_F(PortContext, ScalarAndVectorFollowPortWidth) {
   EXPECT_TRUE(VpiPortScalar(1));
   EXPECT_FALSE(VpiPortScalar(8));
@@ -167,7 +133,6 @@ TEST_F(PortContext, ScalarAndVectorFollowPortWidth) {
   EXPECT_EQ(vpi_get(vpiVector, VpiHandleOf(&vector_port)), 1);
 }
 
-// D7: vpiPortIndex and vpiName apply to a whole port but not to a port bit.
 TEST_F(PortContext, PortIndexAndNameDoNotApplyToPortBit) {
   EXPECT_TRUE(VpiPortIndexAndNameApply(vpiPort));
   EXPECT_FALSE(VpiPortIndexAndNameApply(vpiPortBit));
@@ -180,14 +145,11 @@ TEST_F(PortContext, PortIndexAndNameDoNotApplyToPortBit) {
   EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&port_bit)), nullptr);
 }
 
-// D8: an explicitly named port returns its explicit name; failing that, an
-// inferred name if one exists; otherwise NULL.
 TEST_F(PortContext, ExplicitNameResolution) {
-  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/true, "exp", "inf"), "exp");
-  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/false, "exp", "inf"), "inf");
-  EXPECT_EQ(VpiPortName(/*explicitly_named=*/false, "", ""), nullptr);
-  // No explicit name written, but an inferred name exists.
-  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/false, "", "inf"), "inf");
+  EXPECT_STREQ(VpiPortName(true, "exp", "inf"), "exp");
+  EXPECT_STREQ(VpiPortName(false, "exp", "inf"), "inf");
+  EXPECT_EQ(VpiPortName(false, "", ""), nullptr);
+  EXPECT_STREQ(VpiPortName(false, "", "inf"), "inf");
 
   VpiObject named_port;
   named_port.type = vpiPort;
@@ -197,11 +159,7 @@ TEST_F(PortContext, ExplicitNameResolution) {
   EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&named_port)), "p");
 }
 
-// D8 (remaining arms, through the vpi_get_str dispatch path): a port that was
-// not explicitly named but still has a name returns that name, and a port with
-// no name at all returns NULL.
 TEST_F(PortContext, PortNameThroughVpiGetStrForInferredAndUnnamed) {
-  // Not explicitly named, but a name exists -> that name is returned.
   VpiObject inferred_port;
   inferred_port.type = vpiPort;
   inferred_port.name = "q";
@@ -209,14 +167,11 @@ TEST_F(PortContext, PortNameThroughVpiGetStrForInferredAndUnnamed) {
   EXPECT_EQ(vpi_get(vpiExplicitName, VpiHandleOf(&inferred_port)), 0);
   EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&inferred_port)), "q");
 
-  // No name at all -> NULL.
   VpiObject unnamed_port;
-  unnamed_port.type = vpiPort;  // name left empty
+  unnamed_port.type = vpiPort;
   EXPECT_EQ(vpi_get_str(vpiName, VpiHandleOf(&unnamed_port)), nullptr);
 }
 
-// D9: vpiPortIndex gives the port order; the first port has index zero. The
-// production CreatePort routine assigns indices in declaration order.
 TEST_F(PortContext, PortIndexGivesDeclarationOrder) {
   VpiObject parent;
   parent.type = vpiModule;
@@ -228,15 +183,14 @@ TEST_F(PortContext, PortIndexGivesDeclarationOrder) {
   EXPECT_EQ(vpi_get(vpiPortIndex, VpiHandleOf(third)), 2);
 }
 
-// D11: vpiSize for a null port is 0; any other port reports its bit width.
 TEST_F(PortContext, NullPortSizeIsZero) {
-  EXPECT_EQ(VpiPortSize(/*is_null_port=*/true, 8), 0);
-  EXPECT_EQ(VpiPortSize(/*is_null_port=*/false, 8), 8);
+  EXPECT_EQ(VpiPortSize(true, 8), 0);
+  EXPECT_EQ(VpiPortSize(false, 8), 8);
 
   VpiObject null_port;
   null_port.type = vpiPort;
   null_port.null_port = true;
-  null_port.size = 8;  // ignored for a null port
+  null_port.size = 8;
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&null_port)), 0);
 
   VpiObject sized_port;
@@ -245,15 +199,6 @@ TEST_F(PortContext, NullPortSizeIsZero) {
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&sized_port)), 8);
 }
 
-// -----------------------------------------------------------------------------
-// §37.14 draws a one-to-many relation from an instance to its ports, and every
-// case above builds the ports it then asks about. VpiContext::CreatePort could
-// make one and nothing under src/ called it, so a design's ports were not
-// objects at all: the whole of this model answered for ports a test had built
-// and for none a module declared.
-// -----------------------------------------------------------------------------
-
-// What the application found walking one instance's ports.
 int g_ports_seen = 0;
 std::string g_first_port_name;
 int g_first_port_index = -1;
@@ -304,8 +249,6 @@ void RegisterPortProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// A module declaring three ports of two widths and two directions,
-// instantiated so the application has an instance to walk from.
 void RunAModuleOfThreePorts(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m(input a, input [7:0] b, output c);\n"
@@ -338,8 +281,6 @@ TEST_F(PortModelInARun, AnInstanceReachesThePortsItDeclares) {
   RunAModuleOfThreePorts(f);
 
   EXPECT_EQ(g_ports_seen, 3);
-  // §37.14 detail 9: vpiPortIndex gives a port's place in the order, counting
-  // from zero, and detail 8 has a named port report the name it was given.
   EXPECT_EQ(g_first_port_name, "a");
   EXPECT_EQ(g_first_port_index, 0);
   EXPECT_EQ(g_first_port_direction, vpiInput);
@@ -351,18 +292,12 @@ TEST_F(PortModelInARun, ThePortsWidthDecidesScalarAndVector) {
   SimFixture f;
   RunAModuleOfThreePorts(f);
 
-  // §37.14 detail 6: vpiScalar and vpiVector tell whether the port itself is
-  // one bit wide or wider, and say nothing about what the port is connected to.
-  // Both ports here are connected to a net of their own width, so what
-  // separates them is the declaration.
   ASSERT_EQ(g_ports_seen, 3);
   EXPECT_EQ(g_wide_port_size, 8);
   EXPECT_EQ(g_wide_port_vector, 1);
   EXPECT_EQ(g_narrow_port_scalar, 1);
 }
 
-// The ports of a run: those an instantiation in a design connects, built from
-// the elaborated design rather than by hand (#4951).
 class PortsOfARun : public VpiDesignRun {
  protected:
   static vpiHandle PortOfU(const char* name) {
@@ -377,9 +312,6 @@ constexpr const char* kConnectedPorts =
     "module top; logic w, x; wire y; sub u(.a(w & x), .o(y), .n()); "
     "endmodule\n";
 
-// Details 3 and 4: a port's higher connection is the expression the
-// instantiation wrote for it, and its lower one the instance's own variable
-// or net of the port.
 TEST_F(PortsOfARun, APortReachesBothOfItsConnections) {
   Run(kConnectedPorts);
   vpiHandle a = PortOfU("a");
@@ -395,8 +327,6 @@ TEST_F(PortsOfARun, APortReachesBothOfItsConnections) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, o)), VpiObjectOf(By("top.u.o")));
 }
 
-// Detail 10: a port the instantiation leaves unconnected has no higher
-// connection, though its lower one is there.
 TEST_F(PortsOfARun, AnUnconnectedPortHasNoHigherConnection) {
   Run(kConnectedPorts);
   vpiHandle n = PortOfU("n");
@@ -405,8 +335,6 @@ TEST_F(PortsOfARun, AnUnconnectedPortHasNoHigherConnection) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiLowConn, n)), VpiObjectOf(By("top.u.n")));
 }
 
-// The instance of `sub` a scope holds, read off its definition name; null for
-// none.
 vpiHandle SubInstanceIn(vpiHandle scope) {
   vpiHandle it = scope == nullptr ? nullptr : vpi_iterate(vpiModule, scope);
   while (vpiHandle inst = it == nullptr ? nullptr : vpi_scan(it)) {
@@ -416,8 +344,6 @@ vpiHandle SubInstanceIn(vpiHandle scope) {
   return nullptr;
 }
 
-// A connection written in a generate block names the block's variable, which
-// shadows the module's of that name (§27.4, #5067).
 TEST_F(PortsOfARun, AConnectionInAGenerateBlockNamesItsVariable) {
   Run("module sub(input logic a); endmodule\n"
       "module top; logic v;\n"
@@ -434,25 +360,19 @@ TEST_F(PortsOfARun, AConnectionInAGenerateBlockNamesItsVariable) {
   EXPECT_STREQ(vpi_get_str(vpiName, high), "v");
 }
 
-// D5: the rule constrains an interface port, so asked of no port at all it has
-// nothing to reject.
 TEST(PortModel, NoPortSatisfiesTheInterfaceLowConnRule) {
   EXPECT_TRUE(VpiPortLowConnSatisfiesInterfaceRule(nullptr));
 }
 
-// D8: a port marked explicitly named whose explicit name is empty has none to
-// report, so its inferred name is returned instead.
 TEST(PortModel, AnEmptyExplicitNameFallsBackToTheInferredName) {
-  EXPECT_STREQ(VpiPortName(/*explicitly_named=*/true, "", "inf"), "inf");
-  EXPECT_EQ(VpiPortName(/*explicitly_named=*/true, "", ""), nullptr);
+  EXPECT_STREQ(VpiPortName(true, "", "inf"), "inf");
+  EXPECT_EQ(VpiPortName(true, "", ""), nullptr);
 }
 
 constexpr const char* kVectorPort =
     "module sub(input wire [3:0] a, input wire s); endmodule\n"
     "module top; wire [3:0] w; wire v; sub u(.a(w), .s(v)); endmodule\n";
 
-// §37.14 (figure): a vector port holds a port bit per bit, in the order of the
-// instance's own net, whose bits are their lowConns.
 TEST_F(PortsOfARun, AVectorPortHoldsAPortBitPerBit) {
   Run(kVectorPort);
   vpiHandle a = PortOfU("a");
@@ -466,7 +386,6 @@ TEST_F(PortsOfARun, AVectorPortHoldsAPortBitPerBit) {
             VpiObjectOf(vpi_handle_by_index(By("top.u.a"), 3)));
 }
 
-// §37.14 (figure): a scalar port has no bits to hold.
 TEST_F(PortsOfARun, AScalarPortHoldsNoPortBits) {
   Run(kVectorPort);
   vpiHandle s = PortOfU("s");
@@ -474,9 +393,6 @@ TEST_F(PortsOfARun, AScalarPortHoldsNoPortBits) {
   EXPECT_EQ(vpi_iterate(vpiBit, s), nullptr);
 }
 
-// §37.14 (figure): a port makes its port bits from the bits of its lowConn,
-// passing over any other child the lowConn holds; a port with no lowConn has
-// none.
 TEST(PortModel, PortBitsAreMadeFromTheLowConnsBits) {
   std::deque<VpiObject> made;
   std::deque<std::string> kept;
@@ -513,8 +429,6 @@ TEST(PortModel, PortBitsAreMadeFromTheLowConnsBits) {
   EXPECT_EQ(port.children[0]->direction, vpiInput);
 }
 
-// §37.14 (figure) with §37.17 detail 12: the variable an ANSI variable port
-// declares has a var bit per bit, so the port holds a port bit per bit of it.
 TEST_F(PortsOfARun, AVariablePortHoldsAPortBitPerBit) {
   Run("module sub(output logic [1:0] o); endmodule\n"
       "module top; wire [1:0] x; sub u(.o(x)); endmodule\n");
@@ -524,8 +438,6 @@ TEST_F(PortsOfARun, AVariablePortHoldsAPortBitPerBit) {
   EXPECT_EQ(KindsOf(vpiBit, o), std::vector<int>(2, vpiPortBit));
 }
 
-// §37.14 (figure): a port bit reaches the port it is a bit of through
-// vpiParent.
 TEST_F(PortContext, APortBitReachesItsPortThroughParent) {
   VpiObject port;
   port.type = vpiPort;
@@ -535,10 +447,6 @@ TEST_F(PortContext, APortBitReachesItsPortThroughParent) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, VpiHandleOf(&bit))), &port);
 }
 
-// Detail 1: a port's type follows its formal, an interface port for one of an
-// interface type, a modport port for one naming a modport too, and a port for
-// any other (#7045). An interface port reaches no typespec, no interface
-// typespec being built (#7120).
 TEST_F(PortsOfARun, APortsTypeFollowsItsFormal) {
   Run("interface bus; logic d; modport mp(input d); endinterface\n"
       "module sub(bus b, bus.mp m, input logic a); endmodule\n"
@@ -552,10 +460,6 @@ TEST_F(PortsOfARun, APortsTypeFollowsItsFormal) {
   EXPECT_EQ(vpi_handle(vpiTypespec, PortOfU("b")), nullptr);
 }
 
-// §37.14 (figure) with detail 8: a port written .name(expr) is explicitly
-// named, and one written as a bare name is not (#7046). The first, having no
-// declaration of its own, reaches the typespec of the type the declaration its
-// expression names wrote (#7344).
 TEST_F(PortsOfARun, APortWrittenWithItsOwnNameIsExplicitlyNamed) {
   Run("module sub(.q(c), .p(a), b); input c; input [3:0] a; input b;\n"
       "endmodule\n"
@@ -575,10 +479,6 @@ TEST_F(PortsOfARun, APortWrittenWithItsOwnNameIsExplicitlyNamed) {
   EXPECT_EQ(vpi_get(vpiSize, kRanges[0]), 4);
 }
 
-// §37.14 (figure) with §23.2.2.2: a port whose expression is a select, a
-// concatenation or the name of an object the module body declares reaches a
-// logic typespec of the expression's width, one of no range for a single bit
-// (#7345).
 TEST_F(PortsOfARun, APortWrittenAsAnExpressionReachesATypespecOfItsWidth) {
   Run("module sub(output .p(r[3:1]), output .q(r[0]), output .c({x, y}),\n"
       "           output .s(v));\n"
@@ -599,9 +499,6 @@ TEST_F(PortsOfARun, APortWrittenAsAnExpressionReachesATypespecOfItsWidth) {
   }
 }
 
-// §37.14 (figure): a port connected through a named list, .a(w) or .*, is
-// connected by name; one connected through an ordered list, or left
-// unconnected, is not (#7047).
 TEST_F(PortsOfARun, APortConnectedByNameSaysSo) {
   Run("module sub(input logic a, input logic b); endmodule\n"
       "module top; logic a, b;\n"
@@ -617,8 +514,6 @@ TEST_F(PortsOfARun, APortConnectedByNameSaysSo) {
   }
 }
 
-// §37.14 (figure) with §37.13 detail 1: a port passed by reference has the
-// direction vpiRef (#7049).
 TEST_F(PortsOfARun, ARefPortsDirectionIsRef) {
   Run("module sub(ref int r, input var int i); endmodule\n"
       "module top; int x, y; sub u(.r(x), .i(y)); endmodule\n");
@@ -630,16 +525,11 @@ TEST_F(PortsOfARun, ARefPortsDirectionIsRef) {
   EXPECT_EQ(vpi_get(vpiDirection, i), vpiInput);
 }
 
-// The kind of the typespec `port` reaches, 0 for none.
 int TypespecKindOf(vpiHandle port) {
   vpiHandle typespec = vpi_handle(vpiTypespec, port);
   return typespec == nullptr ? 0 : vpi_get(vpiType, typespec);
 }
 
-// §37.14 (figure): a port reaches the typespec of the type it was declared
-// with: a typedef's, the compilation unit's or its module's own, a keyword's,
-// the array typespec of its unpacked dimensions, and the one a type parameter
-// has in the instance, its packed dimensions evaluated there (#7048).
 TEST_F(PortsOfARun, APortReachesTheTypespecOfItsType) {
   Run("typedef logic [3:0] nib_t;\n"
       "module sub #(parameter W = 2, parameter type T = int)\n"
@@ -672,9 +562,6 @@ TEST_F(PortsOfARun, APortReachesTheTypespecOfItsType) {
   EXPECT_STREQ(vpi_get_str(vpiName, h), "six_t");
 }
 
-// §37.14 (figure) with §11.4.12 and §11.5.1: a port whose expression reads
-// only 2-state variables reaches a bit typespec, and one that reads a net or a
-// 4-state variable a logic one (#7346).
 TEST_F(PortsOfARun, APortOverTwoStateObjectsReachesABitTypespec) {
   Run("module sub(output .p({x, y}), output .q(n[1:0]), output .s(y[1]),\n"
       "           output .t({x, v}));\n"
@@ -693,9 +580,6 @@ TEST_F(PortsOfARun, APortOverTwoStateObjectsReachesABitTypespec) {
   }
 }
 
-// The figure with §23.4: a port of an instance of a module declared nested in
-// another's body reaches the typespec of the type that declaration wrote for
-// it (#8266).
 TEST_F(PortsOfARun, ANestedModulesPortReachesItsTypespec) {
   Run("module top; logic [2:0] w;\n"
       "  module inner(input logic [2:0] p); endmodule\n"

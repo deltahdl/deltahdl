@@ -48,12 +48,6 @@ TEST(CompilerDirectiveSynthesis, DirectivePersistsToSynthesizedModule) {
   EXPECT_NE(aig, nullptr);
 }
 
-// The second compilation unit gets its own Preprocessor, so `ONLY` is undefined
-// in it and the report is the §22.5.1 one for a text-macro usage naming an
-// undefined macro, at the line the usage stands on. The case used to accept
-// either no module or any error at all, which held whatever went wrong in the
-// second unit and would have held had the macro been defined and the module
-// rejected for some other reason.
 TEST(CompilerDirectiveSynthesis, MacroIsolatedBetweenCus) {
   {
     SynthFixture f1;

@@ -145,7 +145,6 @@ TEST(StatementLabelParsing, LabelAndBlockNameErrors) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  // The report stands at the `begin` the label precedes, on line 3.
   EXPECT_TRUE(ReportedError(
       r.diags, "cannot have both a statement label and a block name", 3,
       "9.3.5"));
@@ -260,8 +259,6 @@ TEST(StatementLabelParsing, StatementLabelOnWait) {
 }
 
 TEST(StatementLabelParsing, StatementLabelOnDelayControl) {
-  // A label may precede a delay-control statement, a procedural statement
-  // reached through a parse path distinct from the assignment forms.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -277,7 +274,6 @@ TEST(StatementLabelParsing, StatementLabelOnDelayControl) {
 }
 
 TEST(StatementLabelParsing, StatementLabelOnEventControl) {
-  // A label may precede an event-control statement.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -293,7 +289,6 @@ TEST(StatementLabelParsing, StatementLabelOnEventControl) {
 }
 
 TEST(StatementLabelParsing, StatementLabelOnEventTrigger) {
-  // A label may precede an event-trigger statement.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -350,10 +345,6 @@ TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledBeginIsError) {
       "      a = 1;\n"
       "    end : wrong\n"
       "endmodule\n");
-  // §9.3.4 owns the rule that a name after end must match the block name, and
-  // ParserStmtBlockHelpers::MatchEndBlockLabel files the report under it;
-  // §9.3.5 contributes only the equivalence that makes `blk` the block name
-  // here.
   EXPECT_TRUE(ReportedError(r.diags,
                             "end label 'wrong' does not match block name "
                             "'blk'",
@@ -369,7 +360,6 @@ TEST(StatementLabelParsing, MismatchedEndLabelOnLabeledForkIsError) {
       "    join : wrong\n"
       "  end\n"
       "endmodule\n");
-  // §9.3.4 owns the matching-name rule the report is filed under, as above.
   EXPECT_TRUE(ReportedError(
       r.diags, "end label 'wrong' does not match block name 'fg'", 5, "9.3.4"));
 }
@@ -383,15 +373,12 @@ TEST(StatementLabelParsing, LabelAndBlockNameOnForkIsError) {
       "    join\n"
       "  end\n"
       "endmodule\n");
-  // The report stands at the `fork` the label precedes, on line 3.
   EXPECT_TRUE(ReportedError(
       r.diags, "cannot have both a statement label and a block name", 3,
       "9.3.5"));
 }
 
 TEST(StatementLabelParsing, PrefixLabelMatchesEndLabelOnBegin) {
-  // A label before begin is equivalent to a block name, so a matching name
-  // may follow end without being treated as a label on an unnamed block.
   auto r = Parse(
       "module m;\n"
       "  initial\n"
@@ -408,7 +395,6 @@ TEST(StatementLabelParsing, PrefixLabelMatchesEndLabelOnBegin) {
 }
 
 TEST(StatementLabelParsing, PrefixLabelMatchesJoinLabelOnFork) {
-  // The same equivalence holds for fork ... join with a matching name.
   auto r = Parse(
       "module m;\n"
       "  initial\n"
@@ -425,10 +411,6 @@ TEST(StatementLabelParsing, PrefixLabelMatchesJoinLabelOnFork) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeEndIsError) {
-  // §9.3.5: no label may stand before end, join, join_any or join_none, since
-  // those keywords are not statements. The report names the keyword, so each of
-  // the four sources below fixes a different message. It stands at the label on
-  // line 4, not at the keyword.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -441,10 +423,6 @@ TEST(StatementLabelParsing, LabelBeforeEndIsError) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeEndReportsExactlyOneError) {
-  // The rejection leaves the `end` unconsumed, so the block closes on it and
-  // the module closes on `endmodule`. Parser::ParsePrimaryExpr used to consume
-  // that `end` as a failed expression, after which the module reported a second
-  // time; a count is what states the cascade is gone.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -459,7 +437,6 @@ TEST(StatementLabelParsing, LabelBeforeEndReportsExactlyOneError) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
-  // The same §9.3.5 sentence covers the three fork terminators.
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
@@ -472,12 +449,6 @@ TEST(StatementLabelParsing, LabelBeforeJoinIsError) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
-  // §9.3.5: a label may precede any procedural statement, meaning any statement
-  // other than a declaration that a begin-end block can hold. A data
-  // declaration is not one, so a label before it is rejected. This message
-  // differs from the keyword one above and from the "cannot have both a
-  // statement label and a block name" report the same subclause already
-  // carries, which is what keeps the three §9.3.5 rules apart.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -491,10 +462,6 @@ TEST(StatementLabelParsing, LabelBeforeDeclarationIsError) {
 
 TEST(StatementLabelParsing,
      LabelBeforeDeclarationReportsAtTheLabelNotTheDeclaration) {
-  // The label and the declaration stand on separate lines, so the asserted line
-  // can fail. ReportedError compares the line and not the column, and
-  // StatementLabelParsing.LabelBeforeDeclarationIsError puts both on line 3,
-  // where a report about the declaration would satisfy it just as well.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -508,9 +475,6 @@ TEST(StatementLabelParsing,
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationLeavesTheDeclarationParsed) {
-  // The label is dropped and what followed it is then read as the declaration
-  // it is, so the block holds `int x` rather than the expression statement the
-  // label used to turn it into.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -527,9 +491,6 @@ TEST(StatementLabelParsing, LabelBeforeDeclarationLeavesTheDeclarationParsed) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationInFunctionRejected) {
-  // A function body admits declarations as a begin-end block does, so §9.3.5
-  // reaches it through the same rejection. Parser::ParseFuncBody has its own
-  // statement loop, separate from the one in Parser::ParseBlockStmt.
   auto r = Parse(
       "module m;\n"
       "  function void f();\n"
@@ -542,7 +503,6 @@ TEST(StatementLabelParsing, LabelBeforeDeclarationInFunctionRejected) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeDeclarationInTaskRejected) {
-  // A task body has a third such loop, in Parser::ParseTaskDecl.
   auto r = Parse(
       "module m;\n"
       "  task t;\n"
@@ -555,7 +515,6 @@ TEST(StatementLabelParsing, LabelBeforeDeclarationInTaskRejected) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinAnyIsError) {
-  // join_any is the second fork terminator the sentence enumerates.
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"
@@ -569,7 +528,6 @@ TEST(StatementLabelParsing, LabelBeforeJoinAnyIsError) {
 }
 
 TEST(StatementLabelParsing, LabelBeforeJoinNoneIsError) {
-  // join_none is the third and last.
   auto r = Parse(
       "module m;\n"
       "  initial fork\n"

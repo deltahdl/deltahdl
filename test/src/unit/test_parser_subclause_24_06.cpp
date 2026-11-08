@@ -40,11 +40,6 @@ TEST(AnonymousProgramNameSpaceSharing,
             1u);
 }
 
-// §24.6 states that an anonymous program declares its items without
-// introducing a new scope. Beyond the members flattening into the surrounding
-// compilation-unit list, the parser must not record a program declaration for
-// the anonymous program itself: r.cu->programs holds only named programs and
-// stays empty here.
 TEST(AnonymousProgramNameSpaceSharing,
      CompilationUnitAnonymousProgramDeclaresNoProgramScope) {
   auto r = Parse(

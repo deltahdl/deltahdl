@@ -14,14 +14,11 @@
 
 namespace delta {
 
-// §16.12.14: the keywords of the four abort operators.
 static bool IsAbortToken(TokenKind k) {
   return k == TokenKind::kKwAcceptOn || k == TokenKind::kKwRejectOn ||
          k == TokenKind::kKwSyncAcceptOn || k == TokenKind::kKwSyncRejectOn;
 }
 
-// Whether the token opens an operand a keyword reads: if-else, a case, a
-// nexttime, an always, an eventually or an abort.
 static bool OpensKeywordTerm(TokenKind k) {
   return k == TokenKind::kKwIf || k == TokenKind::kKwCase ||
          k == TokenKind::kKwNexttime || k == TokenKind::kKwSNexttime ||
@@ -30,16 +27,10 @@ static bool OpensKeywordTerm(TokenKind k) {
          IsAbortToken(k);
 }
 
-// Whether a look-ahead over a spec has run out of tokens it may read: the end
-// of the file, or the endproperty of a declaration whose spec has no `;` after
-// it (A.2.10), which no property_spec holds.
 bool ParserPropertySpecHelpers::AtSpecScanEnd(Parser& p) {
   return p.Check(TokenKind::kEof) || p.Check(TokenKind::kKwEndproperty);
 }
 
-// Whether the tokens ahead, past any `not` and any opening parenthesis,
-// open an operand a keyword reads, so the spec is a property of operands
-// whether or not a junction joins them. The lexer is rewound.
 bool ParserPropertySpecHelpers::AheadOpensKeywordTerm(Parser& p) {
   auto saved = p.lexer_.SavePos();
   while (p.Check(TokenKind::kKwNot) || p.Check(TokenKind::kLParen)) {
@@ -50,11 +41,6 @@ bool ParserPropertySpecHelpers::AheadOpensKeywordTerm(Parser& p) {
   return opens;
 }
 
-// Whether the tokens ahead, to the closing parenthesis of the spec, the
-// semicolon ending a case item or the first `or` or `and` at the spec's
-// own depth, or the endproperty of a declaration whose spec has no `;`
-// after it, hold §16.9.2's repetition, `[*`, `[->`, `[=` or `[+`, which
-// makes the operand a sequence where no `##` does. The lexer is rewound.
 bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   auto scan = p.lexer_.SavePos();
   int depth = 0;
@@ -82,10 +68,6 @@ bool ParserPropertySpecHelpers::AheadHoldsRepetition(Parser& p) {
   return found;
 }
 
-// §16.9.6, §16.9.8, §16.9.9 and §16.9.10: whether the tokens ahead hold a
-// sequence operator no boolean has, intersect, within, throughout or
-// first_match, which makes the operand a sequence where no cycle delay or
-// repetition does.
 bool ParserPropertySpecHelpers::AheadHoldsSequenceOperator(Parser& p) {
   return p.Check(TokenKind::kKwFirstMatch) ||
          AheadHolds(p, TokenKind::kKwIntersect, true) ||
@@ -93,8 +75,6 @@ bool ParserPropertySpecHelpers::AheadHoldsSequenceOperator(Parser& p) {
          AheadHolds(p, TokenKind::kKwThroughout, true);
 }
 
-// The expression standing for a property_spec the assertion does not carry
-// as one: a skipped spec, or a sequential property carried as a sequence.
 Expr* ParserPropertySpecHelpers::PropertySpecPlaceholder(Arena& arena,
                                                          SourceLoc loc) {
   auto* expr = arena.Create<Expr>();
@@ -104,12 +84,6 @@ Expr* ParserPropertySpecHelpers::PropertySpecPlaceholder(Arena& arena,
   return expr;
 }
 
-// §16.12.2: the sequence_expr of a sequential property, bare or under
-// strong(...) or weak(...), read as a linear sequence body into a sequence
-// declaration of its own; `strong` says whether strong(...) was written and
-// `written` whether either operator was, and `term` that the sequence is one
-// operand of a property's or or and, read to the operator. Answers nullptr,
-// the lexer where it was, where the sequence is not one the monitor reads.
 ModuleItem* ParserPropertySpecHelpers::TryParseSequenceSpec(Parser& p,
                                                             bool& strong,
                                                             bool& written,
@@ -138,11 +112,6 @@ ModuleItem* ParserPropertySpecHelpers::TryParseSequenceSpec(Parser& p,
   return sequence;
 }
 
-// Whether the tokens ahead, to the closing parenthesis of the spec, the
-// semicolon ending a case item at the spec's own depth, the endproperty of a
-// declaration whose spec has no `;` after it (A.2.10) or, where
-// `to_junction` says so, the first `or` or `and` at that depth, hold a
-// token `wanted` at that depth or below.
 bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
                                            bool to_junction) {
   auto scan = p.lexer_.SavePos();
@@ -169,12 +138,6 @@ bool ParserPropertySpecHelpers::AheadHolds(Parser& p, TokenKind wanted,
   return found;
 }
 
-// Whether the spec holds an `or` or an `and` at its own depth, or an
-// implication, a followed-by, implies, iff or an until, which makes it a
-// property built of operands (§16.12.4, §16.12.5, §16.12.7 to §16.12.9,
-// §16.12.12) rather than one operand; a
-// sequence's own `or` and `and` read the same, which §16.12.2's strength rules
-// make the same property.
 bool ParserPropertySpecHelpers::BodyHasPropertyJunction(Parser& p) {
   return AheadHolds(p, TokenKind::kKwOr, false) ||
          AheadHolds(p, TokenKind::kKwAnd, false) ||
@@ -197,10 +160,6 @@ PropertyExprNode* ParserPropertySpecHelpers::NewPropertyNode(
   return node;
 }
 
-// At `(`: whether the parentheses hold a property with an operator of its
-// own joining its operands, or open with an operand a keyword reads or, as
-// §16.13.2's `(@(posedge clk1) sig1)` does, with a clocking event of its
-// own. The lexer is rewound.
 bool ParserPropertySpecHelpers::OpensPropertyGroup(Parser& p) {
   auto saved = p.lexer_.SavePos();
   p.Consume();
@@ -210,10 +169,6 @@ bool ParserPropertySpecHelpers::OpensPropertyGroup(Parser& p) {
   return kOpens;
 }
 
-// A parenthesised property OpensPropertyGroup finds, read as one operand;
-// `group` says the tokens were such a group, and the node is null where the
-// group failed to read. The lexer is left where it was where the parentheses
-// hold no such property.
 PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
     Parser& p, bool& group) {
   group = false;
@@ -225,23 +180,16 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParsePropertyGroup(
   return nullptr;
 }
 
-// §16.12.7: the expression parser joins an antecedent to a consequent under
-// `|->` and `|=>`, which only a sequence body's read stops at, so an actual
-// read as such an expression is a property_expr, to be read as one.
 static bool IsImplicationExpr(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kBinary &&
          (e->op == TokenKind::kPipeDashGt || e->op == TokenKind::kPipeEqGt);
 }
 
-// §9.4.2: whether `k` is an edge_identifier, which opens an event.
 static bool IsEdgeKeyword(TokenKind k) {
   return k == TokenKind::kKwPosedge || k == TokenKind::kKwNegedge ||
          k == TokenKind::kKwEdge;
 }
 
-// An actual that reads whole as an expression other than an implication,
-// ending at the `,` or `)` after it; null, the position put back, for any
-// other actual.
 Expr* ParserPropertySpecHelpers::ParseWholeExpressionActual(Parser& p) {
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
@@ -254,20 +202,6 @@ Expr* ParserPropertySpecHelpers::ParseWholeExpressionActual(Parser& p) {
   return nullptr;
 }
 
-// §16.12.18: one actual argument of a property instance: `$`, kept as an
-// identifier named `$`; an event expression opening with an edge keyword or
-// with a group of events, kept as ParseEventActual reads it for a formal of
-// type event; an expression running to the comma or parenthesis ending the
-// argument; or, where the tokens are not one, a sequence_expr or a
-// property_expr for a formal of type sequence or property, read as a property
-// and carried by an identifier standing in the argument's place. `plain` is
-// cleared where the argument is not an expression. Parentheses holding a `,`,
-// an `or` or an `iff` at their own level, which no expression holds there,
-// are a group of events where they list names only and end the argument,
-// `(a, b)`, kept with the sequence they read as too
-// (ParseListedNamesActual); otherwise a sequence's group with its match items
-// or its `or`, a property's group, or else, their events needing no edge
-// keyword (§9.4.2), a group of events (footnote 36 to Syntax 9-4).
 Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
                                                         bool& plain) {
   SourceLoc loc = p.CurrentLoc();
@@ -309,13 +243,6 @@ Expr* ParserPropertySpecHelpers::ParsePropertyActualArg(Parser& p,
   return holder;
 }
 
-// §16.8.1 (a): an actual that reads whole as a sequence_expr, ending at the
-// `,` or `)` after it, is one sequence, its `and` and `or` those of §16.9.5
-// and §16.9.7 rather than a property's, which §16.12.2 makes the same where
-// the formal is of type property; null, the position put back, for any
-// other actual. An actual opening with its clocking event is left to the
-// property's reading, which keeps that event as the actual's own clock
-// (§16.13.6).
 PropertyExprNode* ParserPropertySpecHelpers::ParseWholeSequenceActual(
     Parser& p) {
   if (p.Check(TokenKind::kAt)) return nullptr;
@@ -333,13 +260,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParseWholeSequenceActual(
   return nullptr;
 }
 
-// §16.8 and §16.12: a formal's default actual argument, read as an actual
-// argument is, ending at the ',' or ')' after it; null, with the position put
-// back, where it is not one, so the port list scan reads its tokens as it
-// would have. A default opening with an edge keyword can be nothing but an
-// event expression, so where it is not one, §9.4.2's syntax is reported.
-// §16.14.7's inferred functions are null too, left to the scan, which checks
-// and records them apart.
 Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
   Token head = p.CurrentToken();
   if (head.text == "$inferred_clock" || head.text == "$inferred_disable") {
@@ -364,11 +284,6 @@ Expr* ParserPropertySpecHelpers::ParseFormalDefault(Parser& p) {
   return nullptr;
 }
 
-// The `.formal(` opening an actual bound by name, where one is written,
-// the name recorded on `call`. `named` says on entry whether the actual
-// before was bound by name and on return whether this one is; the answer is
-// false where the actual is malformed, A.2.10's property_list_of_arguments
-// taking no positional actual after a named one.
 bool ParserPropertySpecHelpers::ParseNamedActualPrefix(Parser& p, Expr* call,
                                                        bool& named) {
   const bool kAfterNamed = named;
@@ -379,10 +294,6 @@ bool ParserPropertySpecHelpers::ParseNamedActualPrefix(Parser& p, Expr* call,
   return p.Match(TokenKind::kLParen);
 }
 
-// The `( actuals )` of a property instance into `call`, each actual bound
-// by position or, as `.formal(actual)`, by name; false where the list is
-// malformed, A.2.10's property_list_of_arguments taking no positional actual,
-// an empty one included, after a named one among the malformed.
 bool ParserPropertySpecHelpers::ParsePropertyActualList(Parser& p, Expr* call,
                                                         bool& plain) {
   if (!p.Match(TokenKind::kLParen)) return false;
@@ -400,20 +311,12 @@ bool ParserPropertySpecHelpers::ParsePropertyActualList(Parser& p, Expr* call,
   return p.Match(TokenKind::kRParen);
 }
 
-// §16.12.1 and §16.12.18: `name ( actuals )` where an actual is a
-// sequence_expr, a property_expr or an event expression, which no
-// expression holds, read as an instance of a named property. The lexer is
-// left where it was, and nullptr answered, where the tokens are not that,
-// an instance whose actuals are all expressions included, which reads as a
-// call does.
 Expr* ParserPropertySpecHelpers::TryParsePropertyInstance(Parser& p) {
   if (!p.Check(TokenKind::kIdentifier)) return nullptr;
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   Token name = p.Consume();
   std::string_view callee = name.text;
-  // §16.12 with §26.3: the name of a property or sequence declared in a
-  // package, written with the package's, `pk::pr`.
   if (p.Match(TokenKind::kColonColon)) {
     if (!p.Check(TokenKind::kIdentifier)) {
       p.diag_.PopSuppress();
@@ -438,9 +341,6 @@ Expr* ParserPropertySpecHelpers::TryParsePropertyInstance(Parser& p) {
   return nullptr;
 }
 
-// §16.12.6: `if ( expression_or_dist ) property_expr [ else property_expr
-// ]`, the if keyword consumed; Table 16-3 puts if-else below every other
-// operator, so each branch runs to the else or the end.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIfElse(Parser& p) {
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kIfElse);
   if (!p.Match(TokenKind::kLParen)) return nullptr;
@@ -459,10 +359,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIfElse(Parser& p) {
   return node;
 }
 
-// §16.12.16: one property_case_item, `expression_or_dist { ,
-// expression_or_dist } : property_expr ;` or `default [ : ] property_expr
-// ;`, its expressions and its property added to `node`, the default's
-// expressions none. Answers false where the item failed to read.
 bool ParserPropertySpecHelpers::ParsePropertyCaseItem(Parser& p,
                                                       PropertyExprNode& node) {
   std::vector<Expr*> values;
@@ -483,10 +379,6 @@ bool ParserPropertySpecHelpers::ParsePropertyCaseItem(Parser& p,
   return true;
 }
 
-// §16.12.16: `case ( expression_or_dist ) property_case_item {
-// property_case_item } endcase`, the case keyword consumed; Table 16-3
-// puts case beside if-else, below every other operator, so each item's
-// property runs to its semicolon.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyCase(Parser& p) {
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kCase);
   if (!p.Match(TokenKind::kLParen)) return nullptr;
@@ -502,13 +394,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyCase(Parser& p) {
   return node->operands.empty() ? nullptr : node;
 }
 
-// One operand of a property's or or and: `not` before an operand negates
-// it (§16.12.3); an if-else is read whole (§16.12.6); a parenthesised
-// property holding an or or and of its own is read as one; and otherwise
-// the operand is a sequence where it holds a cycle delay before the next
-// operator or stands under strong or weak, and a boolean else.
-// §16.12.10: `nexttime [ [ constant_expression ] ] property_expr` and the
-// strong s_nexttime, the operand bound as tightly as not's.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyNexttime(
     Parser& p, bool strong) {
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kNexttime);
@@ -525,11 +410,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyNexttime(
   return node;
 }
 
-// §16.12.11 and §16.12.13: `always [ [ range ] ] property_expr`, `s_always
-// [ range ] property_expr`, `eventually [ range ] property_expr` and
-// `s_eventually [ [ range ] ] property_expr`, the range `min:max` or
-// `min:$`, the operand any property as Table 16-3 puts both beside if-else,
-// below every other operator.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAlways(
     Parser& p, PropertyExprNode::Kind kind, bool strong) {
   auto* node = NewPropertyNode(p, kind);
@@ -555,10 +435,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAlways(
   return node;
 }
 
-// The operators that open an operand with a keyword: if-else, case, always
-// and eventually in their weak and strong forms, nexttime likewise and not;
-// `read` says the keyword was one of them, and the node is null where its
-// operand failed to read.
 PropertyExprNode* ParserPropertySpecHelpers::TryParseKeywordTerm(Parser& p,
                                                                  bool& read) {
   read = true;
@@ -590,9 +466,6 @@ PropertyExprNode* ParserPropertySpecHelpers::TryParseKeywordTerm(Parser& p,
   return nullptr;
 }
 
-// §16.12.14: `accept_on ( expression_or_dist ) property_expr`, reject_on
-// and the sync_ forms, the operand any property as Table 16-3 puts the
-// aborts beside if-else, below every other operator.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAbort(Parser& p) {
   TokenKind op = p.Consume().kind;
   auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kAbort);
@@ -611,12 +484,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAbort(Parser& p) {
   return node;
 }
 
-// §16.13.2: `@(event_list)` before an operand, the clock the operand is
-// evaluated on from its nearest tick; the operand it reads is the term
-// after it, a sequence with the clock on its operands where the term is
-// one. A.6.5's clocking_event also writes the clock as a name after `@`
-// with no parentheses, `@clk`, and §14.14 and §16.5.2 write `@$global_clock`
-// so.
 PropertyExprNode* ParserPropertySpecHelpers::ParseClockedTerm(Parser& p) {
   std::vector<EventExpr> clock;
   if (p.Match(TokenKind::kLParen)) {
@@ -639,8 +506,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   bool group = false;
   auto* inner = TryParsePropertyGroup(p, group);
   if (group) return inner;
-  // §16.12.18: an instance whose actuals hold a sequence or a property is
-  // read before the scans below, which its actuals would answer.
   if (Expr* instance = TryParsePropertyInstance(p)) {
     auto* node = NewPropertyNode(p, PropertyExprNode::Kind::kBoolean);
     node->boolean = instance;
@@ -659,9 +524,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyTerm(Parser& p) {
   return node->boolean != nullptr ? node : nullptr;
 }
 
-// §16.12.5 and Table 16-3: `and` binds tighter than `or`, both left
-// associative, so an `and` gathers its operands under one node and an
-// `or` gathers the conjunctions.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAnd(Parser& p) {
   auto* left = ParsePropertyTerm(p);
   if (left == nullptr || !p.Check(TokenKind::kKwAnd)) return left;
@@ -675,10 +537,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyAnd(Parser& p) {
   return node;
 }
 
-// §16.12.7 and §16.12.9: `sequence_expr |-> property_expr`, `|=>`, `#-#`
-// and `#=#`, the antecedent a sequence read to the operator and the
-// consequent any property, the operators right associative and, in Table
-// 16-3, above if-else alone; a spec without one is its implies.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
     Parser& p) {
   auto saved = p.lexer_.SavePos();
@@ -702,8 +560,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
     node->operands.push_back(consequent);
     return node;
   }
-  // §16.12.9: `s #-# p` is `not (s |-> not p)` and `s #=# p` is `not (s
-  // |=> not p)`, the followed-bys being the duals of the implications.
   auto* negated = NewPropertyNode(p, PropertyExprNode::Kind::kNot);
   negated->operands.push_back(consequent);
   node->operands.push_back(negated);
@@ -713,8 +569,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplication(
   return whole;
 }
 
-// §16.12.8 and Table 16-3: `iff` binds tighter than `implies` and looser
-// than `or`, both right associative, each over two operands.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIff(Parser& p) {
   auto* left = ParsePropertyOr(p);
   if (left == nullptr || !p.Match(TokenKind::kKwIff)) return left;
@@ -726,10 +580,6 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyIff(Parser& p) {
   return node;
 }
 
-// §16.12.8 and §16.12.12: `implies` and the four untils stand in one row of
-// Table 16-3, right associative, below iff; an until is strong where it is
-// s_until or s_until_with and overlapping where it is until_with or
-// s_until_with.
 PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyImplies(Parser& p) {
   auto* left = ParsePropertyIff(p);
   if (left == nullptr) return nullptr;
@@ -763,34 +613,16 @@ PropertyExprNode* ParserPropertySpecHelpers::ParsePropertyOr(Parser& p) {
   return node;
 }
 
-// §16.12.2: the body of the spec after its clock and disable condition: a
-// spec holding an or or an and at its own depth is a property of operands
-// read as a tree into `property`; one holding `##` and no property
-// operator is a sequential property, read as a sequence into `sequence`;
-// one holding neither a cycle delay nor an implication is a boolean, read
-// into `prop`. Answers false where the body is none of these.
 bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
                                                     SimpleSpecBody& body) {
-  // Table 16-3 has `not` bind tighter than `or` and `and`, so where the
-  // spec is a property of operands a leading `not` is the first operand's,
-  // read with the operands; a spec opening with an operand a keyword reads,
-  // after any nots and parentheses, is a property of operands as well, as
-  // is one opening with a clocking event, §16.14.1's `abc` writing its
-  // clock after its disable condition, where §A.2.10 has the property_expr
-  // begin.
   if (BodyHasPropertyJunction(p) || AheadOpensKeywordTerm(p) ||
       p.Check(TokenKind::kAt)) {
     body.property = ParsePropertyImplication(p);
     return body.property != nullptr;
   }
-  // §16.12.3: each `not` before the body negates it once more.
   while (p.Match(TokenKind::kKwNot)) body.negated = !body.negated;
-  // §16.12.18: an instance whose actuals hold a sequence or a property is
-  // read before the scan below, which its actuals would answer.
   body.prop = TryParsePropertyInstance(p);
   if (body.prop != nullptr) return true;
-  // §16.9.2: a repetition makes the spec a sequence where no cycle delay
-  // does, `a[*0:2]` as much as `a ##1 b`.
   if (!p.BodyHasTemporalOperator() && !AheadHoldsRepetition(p) &&
       !AheadHoldsSequenceOperator(p)) {
     body.prop = ParseExpressionOrDist(p);
@@ -801,11 +633,6 @@ bool ParserPropertySpecHelpers::ParseSimpleSpecBody(Parser& p,
   return body.sequence != nullptr;
 }
 
-// The statement carrying the property_spec read, for the process the
-// elaborator makes of the assertion: its clock is the item's sensitivity,
-// and a `not` before a property of operands negates the whole.
-// §16.13.1: whether the body, or an operand of its intersect, and or or,
-// names a clock of its own.
 static bool SequenceNamesClocks(const SeqLinearBody& body) {
   for (const auto& clock : body.clocks) {
     if (!clock.empty()) return true;
@@ -822,10 +649,6 @@ static bool SequenceNamesClocks(const SeqLinearBody& body) {
   return false;
 }
 
-// §16.12.2 and F.3.4.3.1: whether the sequence of `body` is read as strong
-// in a statement of `body_kind`: where strong(...) is written, and where no
-// sequence operator is and the statement is a cover or an expect, which read
-// a plain sequence as strong(...). A weak(...) stays weak in every statement.
 static bool SequenceReadsStrong(const SimpleSpecBody& body,
                                 StmtKind body_kind) {
   if (body.strength_written) return body.strong;
@@ -836,9 +659,6 @@ static bool SequenceReadsStrong(const SimpleSpecBody& body,
 Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
     Parser& p, ModuleItem* item, StmtKind body_kind,
     const SimpleSpecBody& read) {
-  // §16.13.1: a sequence whose operands name clocks of their own is
-  // evaluated as a tree of one operand, where the ticks of each clock are
-  // told apart.
   SimpleSpecBody body = read;
   if (body.property == nullptr && body.sequence != nullptr &&
       SequenceNamesClocks(body.sequence->seq_linear)) {
@@ -850,18 +670,12 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   auto* stmt = p.arena_.Create<Stmt>();
   stmt->kind = body_kind;
   stmt->range.start = item->loc;
-  // A sequential property or a property of operands stands under the
-  // placeholder a skipped spec does, so what reads the item's expression
-  // finds one; the evaluation reads the sequence or the tree.
   Expr* prop = body.prop != nullptr
                    ? body.prop
                    : PropertySpecPlaceholder(p.arena_, item->loc);
   item->assert_expr = prop;
   stmt->assert_expr = prop;
   stmt->assert_sequence = body.sequence;
-  // §16.12.2: a sequence_expr in an assert or assume is evaluated as weak
-  // unless written strong(...), and one in a cover or an expect as strong
-  // unless written weak(...).
   stmt->assert_strong = SequenceReadsStrong(body, body_kind);
   stmt->assert_negated = body.negated;
   PropertyExprNode* property = body.property;
@@ -872,15 +686,10 @@ Stmt* ParserPropertySpecHelpers::MakeSimplePropertyStmt(
   }
   stmt->assert_property = property;
   stmt->assert_disable_iff = body.disable_iff;
-  // §16.5: this statement carries a concurrent assertion's property, not
-  // an immediate assertion's expression, so the mark travels with it to
-  // the evaluation that §16.5.1 gives sampled values.
   stmt->is_concurrent_clocked = true;
   return stmt;
 }
 
-// The body as one tree: the tree read, or a node over the boolean or the
-// sequence with its strength, under a not where the body was negated.
 PropertyExprNode* ParserPropertySpecHelpers::TreeOfSpecBody(
     Parser& p, const SimpleSpecBody& body) {
   PropertyExprNode* tree = body.property;
@@ -899,29 +708,13 @@ PropertyExprNode* ParserPropertySpecHelpers::TreeOfSpecBody(
   return whole;
 }
 
-// §16.12 and §16.12.17: the body of a named property declaration,
-// trial-parsed as an assertion's property_spec is -- the local variables
-// declared ahead of it (§16.10), a clock where one is written, a disable
-// condition where one is, and the property -- and recorded in
-// prop_body_tree with the locals, the clock and the condition beside, so
-// that an instance of the property, in an assertion or in a property's
-// body, its own included, is evaluated as the body with the actuals
-// substituted. The clocked boolean form is captured as a tree too, a
-// boolean under a not where negated, for the instance whose actuals the
-// boolean substitution does not read (§16.12.18). Diagnostics are
-// suppressed and the lexer rewound, so the body scan re-reads the same
-// tokens; a body of any other shape leaves the tree null.
 void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
                                                         ModuleItem* item) {
   auto saved = p.lexer_.SavePos();
   p.diag_.PushSuppress();
   std::vector<EventExpr> clock;
-  // §16.10: the body's local variables are declared ahead of the property.
   std::vector<SeqLocalDecl> locals;
   bool ok = ParsePropertyLocalDecls(p, locals);
-  // §16.13.3: of two clocking events juxtaposed the second nullifies the
-  // first, so the last written is the body's; §16.13 writes the event as a
-  // parenthesized list or, `@clk`, as one identifier, a formal's among them.
   while (ok && p.Match(TokenKind::kAt)) {
     clock.clear();
     if (p.Match(TokenKind::kLParen)) {
@@ -934,7 +727,6 @@ void ParserPropertySpecHelpers::CapturePropertyTreeBody(Parser& p,
   SimpleSpecBody body;
   if (ok) ok = p.TryParseDisableIff(body.disable_iff);
   if (ok) ok = ParseSimpleSpecBody(p, body);
-  // A.2.10: the `;` after the spec is optional.
   if (ok) p.Match(TokenKind::kSemicolon);
   ok = ok && p.Check(TokenKind::kKwEndproperty);
   p.diag_.PopSuppress();

@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §35.5.6: an exported DPI subroutine may not declare a formal of a dynamic
-// array type. A function whose formal argument is a dynamic array (the unsized
-// "[]" form) cannot be exported for DPI.
 TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -19,8 +16,6 @@ TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgIsError) {
     endmodule
   )",
             f, "m");
-  // The report stands at the export declaration, line 4 of the literal above,
-  // whose first line is the newline that follows R"(.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "SystemVerilog function 'sv_take' has a dynamic "
                             "array formal argument and therefore cannot be "
@@ -28,10 +23,6 @@ TEST(DpiExportFormalType, ExportedFunctionWithDynamicArrayArgIsError) {
                             4, "35.5.6"));
 }
 
-// §35.5.6: the dynamic-array prohibition on exported subroutines applies to
-// tasks as well as functions, since both are DPI subroutines. §35.8 terms such
-// a subroutine an exported task, so the report names the word the declaration
-// used rather than calling it a function.
 TEST(DpiExportFormalType, ExportedTaskWithDynamicArrayArgSaysTask) {
   ElabFixture f;
   Elaborate(R"(
@@ -48,10 +39,6 @@ TEST(DpiExportFormalType, ExportedTaskWithDynamicArrayArgSaysTask) {
                             4, "35.5.6"));
 }
 
-// §35.5.6: the prohibition is specific to *dynamic* arrays. A fixed-size
-// unpacked array is a permitted construct for a DPI formal argument, so an
-// export carrying one is well-formed -- confirming the check keys on the
-// unsized dynamic-array form and not on unpacked dimensions in general.
 TEST(DpiExportFormalType, ExportedFunctionWithFixedUnpackedArrayArgIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -64,8 +51,6 @@ TEST(DpiExportFormalType, ExportedFunctionWithFixedUnpackedArrayArgIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.6: a plain scalar formal argument is among the permitted types and
-// carries no unpacked dimension, so it does not trip the dynamic-array rule.
 TEST(DpiExportFormalType, ExportedFunctionWithScalarArgIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -78,9 +63,6 @@ TEST(DpiExportFormalType, ExportedFunctionWithScalarArgIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.6: the prohibition applies to every formal argument, so a dynamic array
-// is rejected even when it is not the first argument and is preceded by
-// permitted ones.
 TEST(DpiExportFormalType,
      ExportedFunctionWithDynamicArrayArgAmongOthersIsError) {
   ElabFixture f;
@@ -98,9 +80,6 @@ TEST(DpiExportFormalType,
                             4, "35.5.6"));
 }
 
-// §35.5.6: the formals of an imported or exported subroutine may have only the
-// types the subclause lists. An event is not among them, so an export whose
-// subroutine takes one is rejected.
 TEST(DpiExportFormalType, ExportedFunctionWithEventArgIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -110,18 +89,12 @@ TEST(DpiExportFormalType, ExportedFunctionWithEventArgIsError) {
     endmodule
   )",
             f, "m");
-  // The report stands at the export declaration, line 4 of the literal above,
-  // whose first line is the newline that follows R"(.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "SystemVerilog function 'sv_notify' has a formal "
                             "argument 'ev' whose type is not permitted for DPI",
                             4, "35.5.6"));
 }
 
-// §35.5.6: the permitted set governs the formal arguments of every DPI
-// subroutine, tasks as well as functions. The report names the word the
-// declaration used, so a user who wrote a task is not sent looking for a
-// function they never declared.
 TEST(DpiExportFormalType, ExportedTaskWithEventArgSaysTask) {
   ElabFixture f;
   Elaborate(R"(
@@ -137,8 +110,6 @@ TEST(DpiExportFormalType, ExportedTaskWithEventArgSaysTask) {
                             4, "35.5.6"));
 }
 
-// §35.5.6 admits a union in its packed form only, so an exported subroutine
-// whose formal argument is an unpacked union is rejected.
 TEST(DpiExportFormalType, ExportedFunctionWithUnpackedUnionArgIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -156,9 +127,6 @@ TEST(DpiExportFormalType, ExportedFunctionWithUnpackedUnionArgIsError) {
                     4, "35.5.6"));
 }
 
-// §35.5.6: the packed form of a union is a permitted type, so the same export
-// stands once the union is declared packed -- confirming the check keys on the
-// packing and not on the union keyword.
 TEST(DpiExportFormalType, ExportedFunctionWithPackedUnionArgIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -173,11 +141,6 @@ TEST(DpiExportFormalType, ExportedFunctionWithPackedUnionArgIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.6 also permits types built from the supported ones by struct, union
-// (packed forms only), unpacked array and typedef, so a typedef is permitted
-// exactly where the type behind the name is. The export path follows the name
-// too: an event named through a typedef is the event §35.5.6 leaves out of its
-// permitted set.
 TEST(DpiExportFormalType, ExportedFunctionWithTypedefOfEventIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -188,17 +151,12 @@ TEST(DpiExportFormalType, ExportedFunctionWithTypedefOfEventIsError) {
     endmodule
   )",
             f, "m");
-  // The report stands at the export declaration, line 5 of the literal above,
-  // whose first line is the newline that follows R"(.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "SystemVerilog function 'sv_notify' has a formal "
                             "argument 'ev' whose type is not permitted for DPI",
                             5, "35.5.6"));
 }
 
-// §35.5.6 admits a typedef only as a construct built over the supported types,
-// so a name standing for an event names a type the permitted set leaves out and
-// the import is rejected exactly as the bare event would be.
 TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfEventIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -208,17 +166,12 @@ TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfEventIsError) {
     endmodule
   )",
             f, "m");
-  // The report stands at the import declaration, line 4 of the literal above,
-  // whose first line is the newline that follows R"(.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "formal argument 'ev' has type 'ev_t', which is "
                             "not permitted for a DPI imported subroutine",
                             4, "35.5.6"));
 }
 
-// §35.5.6 admits a union in its packed form only. Following the typedef name
-// reaches a union declared without `packed`, so the import is rejected and the
-// report names the type the argument was written with.
 TEST(DpiImportFormalTypedefType,
      ImportedFunctionWithTypedefOfUnpackedUnionIsError) {
   ElabFixture f;
@@ -237,10 +190,6 @@ TEST(DpiImportFormalTypedefType,
                             4, "35.5.6"));
 }
 
-// §35.5.6 lists `int` among the permitted types, and permits a typedef built
-// over a permitted type, so an import taking a name standing for `int` is
-// well-formed -- confirming the check follows the name rather than rejecting
-// every name it has to resolve.
 TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfIntIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -253,10 +202,6 @@ TEST(DpiImportFormalTypedefType, ImportedFunctionWithTypedefOfIntIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §26.3 makes a wildcard-imported package typedef nameable by its bare name, so
-// the name a formal argument is written with stands for the package's type and
-// §35.5.6 decides the argument on that type. The declaration is rejected here
-// exactly as one naming a module-local typedef of event is.
 TEST(DpiImportFormalTypedefType,
      ImportedFunctionWithWildcardImportedTypedefOfEventIsError) {
   ElabFixture f;
@@ -270,17 +215,12 @@ TEST(DpiImportFormalTypedefType,
     endmodule
   )",
             f, "m");
-  // The report stands at the import declaration, line 7 of the literal above,
-  // whose first line is the newline that follows R"(.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "formal argument 'ev' has type 'ev_t', which is "
                             "not permitted for a DPI imported subroutine",
                             7, "35.5.6"));
 }
 
-// §26.3's explicit import names one item, and reaches the type behind that name
-// by a different arm from the wildcard form. A rule following only the wildcard
-// arm would leave this declaration accepted, so the two are asserted apart.
 TEST(DpiImportFormalTypedefType,
      ImportedFunctionWithNamedImportedTypedefOfEventIsError) {
   ElabFixture f;
@@ -300,10 +240,6 @@ TEST(DpiImportFormalTypedefType,
                             7, "35.5.6"));
 }
 
-// §35.5.6 permits a typedef built over a permitted type, and an import
-// declaration changes nothing about which types those are. A package typedef of
-// `int` reached through a wildcard import is therefore accepted, which is what
-// separates following the name from rejecting every imported one.
 TEST(DpiImportFormalTypedefType,
      ImportedFunctionWithWildcardImportedTypedefOfIntIsOk) {
   ElabFixture f;
@@ -320,13 +256,6 @@ TEST(DpiImportFormalTypedefType,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.6 (printed page 979 of IEEE 1800-2023) lists the only types a
-// formal argument of an import or export subroutine may have, and among the
-// unpacked kinds it admits the unpacked array (with §35.5.6.1's open array
-// for imports); a queue (§7.10) and an associative array (§7.8) are not among
-// them and the foreign side has no representation of either. Both formals
-// were accepted: the check judged the formal's data type alone, and a `[$]`
-// or `[string]` dimension is written on the formal's unpacked dimensions.
 TEST(DpiImportFormalType, ImportedFunctionWithQueueFormalIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -361,9 +290,6 @@ TEST(DpiImportFormalType, ImportedFunctionWithAssociativeFormalIsError) {
                             3, "35.5.6"));
 }
 
-// §35.5.6 with §35.5.6.1: a sized unpacked dimension, one sized by a
-// parameter, and an open array are the permitted unpacked forms, and none is
-// reported.
 TEST(DpiImportFormalType, ImportedFunctionWithSizedAndOpenFormalsIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -377,13 +303,6 @@ TEST(DpiImportFormalType, ImportedFunctionWithSizedAndOpenFormalsIsOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §35.5.6 (printed page 979 of IEEE 1800-2023) names imports and exports
-// together when it lists the permitted formal argument types, and §35.7
-// (printed 982) holds an exported subroutine to the same restrictions; a queue
-// or an associative array is not among them. The export path looked for the
-// dynamic array's absent dimension alone and let a `[$]` or `[string]`
-// dimension through, and the type check read the data type, where `int`
-// is permitted.
 TEST(DpiExportFormalType, ExportedFunctionWithQueueFormalIsError) {
   ElabFixture f;
   Elaborate(R"(

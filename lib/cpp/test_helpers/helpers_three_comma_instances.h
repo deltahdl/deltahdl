@@ -8,8 +8,6 @@
 
 using namespace delta;
 
-// Parses a module body containing exactly three comma-separated instances and
-// verifies that the first three module items are named u0, u1, and u2 in order.
 inline void ExpectThreeCommaSeparatedInstances(const std::string& src) {
   auto r = Parse(src);
   ASSERT_NE(r.cu, nullptr);

@@ -13,18 +13,6 @@
 
 namespace delta {
 
-// The elaborated forms of the two primitives no continuous assignment can
-// stand for, a bidirectional pass switch (§28.8) and an instance of a
-// user-defined primitive (§29.8), which RtlirModule holds beside its
-// continuous assignments. Moved out of rtlir.h, which stood at the size the
-// assert-no-oversized-source-files job fails at.
-
-// §28.8: one bidirectional pass switch -- tran, rtran, or a tranif0, tranif1,
-// rtranif0 or rtranif1 -- between two bidirectional terminals, with the
-// control terminal and the turn-on and turn-off delays of the enabled forms.
-// Unlike every other gate it drives neither terminal from the other, so it is
-// no continuous assignment: the run joins the two nets it connects while it
-// conducts.
 struct RtlirBidirSwitch {
   GateKind kind = GateKind::kTran;
   Expr* terminal_a = nullptr;
@@ -34,38 +22,11 @@ struct RtlirBidirSwitch {
   Expr* turn_off_delay = nullptr;
 };
 
-// §29.8: one instance of a user-defined primitive, and what drives its output
-// terminal. A gate instance lowers to an RtlirContAssign carrying a synthesized
-// expression, and a primitive instance cannot, for two reasons. §29.3.4 defines
-// the output as a table lookup rather than an operator, and §29.5 gives a
-// sequential primitive a current state counted as equal to the current output
-// value and which an expression has nowhere to keep. So the instance carries
-// the declaration it names, and the simulator evaluates that declaration's
-// table against the input terminals, holding one UdpEvalState per instance for
-// the length of the run.
-//
-// The terminals are split the way §29.8 writes them -- "udp_instance ::= [
-// name_of_instance ] ( output_terminal , input_terminal { , input_terminal } )"
-// -- so `inputs` already stands in the order UdpEvalState indexes a table row
-// by, and nothing downstream has to work out which terminal is the output.
-//
-// Two delays and no third, because §29.8 allows two delays, since a UDP does
-// not support z. RtlirContAssign carries a third for the switches that need
-// one.
 struct RtlirUdpInst {
   const UdpDecl* decl = nullptr;
-  // §37.83: the instantiation it was elaborated from, which the attributes it
-  // is written with are kept under (RtlirModule::node_attrs).
   const ModuleItem* source_item = nullptr;
-  // §29.8: the instance name is optional, as for gates. Empty where the source
-  // wrote none, which is why it cannot be what identifies the instance.
   std::string_view name;
-  // §28.3.6 with §29.8: the index of the element of the instance array `name`
-  // this instance is, which its own name writes after the array's, u[0]; none
-  // for an instance written without a range.
   std::optional<int64_t> array_index;
-  // Where the primitive's name stands, which is the position a report about
-  // this instance carries.
   SourceLoc loc;
   Expr* output = nullptr;
   std::vector<Expr*> inputs;

@@ -18,11 +18,6 @@ namespace delta {
 
 namespace {
 
-// The function a class declares under `name`, whether or not it is static.
-// §6.6.7 admits a non-static one as far as being found, and rejects it by the
-// class-static rule rather than by not finding it, which is what lets the
-// report say what is wrong with the source rather than that the name is
-// missing.
 NettypeResolutionTarget ClassResolutionMethod(const ClassDecl* cls,
                                               std::string_view name) {
   for (const auto* m : cls->members) {
@@ -33,8 +28,6 @@ NettypeResolutionTarget ClassResolutionMethod(const ClassDecl* cls,
   return {nullptr, true, false, false};
 }
 
-// The function among `items`, a package's or the compilation unit's, declared
-// under `name`.
 const ModuleItem* FunctionAmong(const std::vector<ModuleItem*>& items,
                                 std::string_view name) {
   for (const auto* item : items) {
@@ -44,7 +37,6 @@ const ModuleItem* FunctionAmong(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// The package `unit` declares under `name`, or null.
 const PackageDecl* FindNettypeScopePackage(const CompilationUnit* unit,
                                            std::string_view name) {
   for (const auto* p : unit->packages) {
@@ -53,11 +45,6 @@ const PackageDecl* FindNettypeScopePackage(const CompilationUnit* unit,
   return nullptr;
 }
 
-// The class the scope of a resolution function names: a class by its own name,
-// or one a typedef names, which §6.6.7's own example does with `typedef
-// Base#(32) MyBaseT;` and `with MyBaseT::Ssum` (printed page 99). A chain of
-// typedefs is followed to the class; the hop limit keeps a cyclic typedef from
-// looping.
 const ClassDecl* NettypeScopeClass(std::string_view scope,
                                    const CompilationUnit* unit,
                                    const TypedefMap& typedefs) {
@@ -71,8 +58,6 @@ const ClassDecl* NettypeScopeClass(std::string_view scope,
   return nullptr;
 }
 
-// The class `$unit::name` names (§3.12.1): one the compilation unit declares,
-// or, where it declares none of the name, a typedef naming a class.
 const ClassDecl* UnitScopeClass(std::string_view name,
                                 const CompilationUnit* unit,
                                 const TypedefMap& typedefs) {
@@ -83,8 +68,6 @@ const ClassDecl* UnitScopeClass(std::string_view name,
   return NettypeScopeClass(name, unit, typedefs);
 }
 
-// The names of `scope`, outermost first, ending in the one declaring the
-// function.
 std::vector<std::string_view> ScopeNames(const DataType& scope) {
   std::vector<std::string_view> names(scope.outer_scope_names.begin(),
                                       scope.outer_scope_names.end());
@@ -93,8 +76,6 @@ std::vector<std::string_view> ScopeNames(const DataType& scope) {
   return names;
 }
 
-// `cls` followed down the classes nested in it (§8.23) that `names` writes
-// from `next` on, or null where one of them is not declared there.
 const ClassDecl* NestedClassAlong(const ClassDecl* cls,
                                   const std::vector<std::string_view>& names,
                                   size_t next) {
@@ -104,10 +85,6 @@ const ClassDecl* NestedClassAlong(const ClassDecl* cls,
   return cls;
 }
 
-// The class a scope of two names or more reaches. A.2.2.1's class_type opens
-// with a ps_class_identifier, so the first name is `$unit` or a package the
-// second class is declared in, or else is itself the class, and every name
-// after that is a class nested in the one before.
 const ClassDecl* NettypeScopeChainClass(
     const std::vector<std::string_view>& names, const CompilationUnit* unit,
     const TypedefMap& typedefs) {

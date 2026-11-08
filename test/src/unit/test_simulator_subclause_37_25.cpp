@@ -21,37 +21,16 @@
 namespace delta {
 namespace {
 
-// §37.25 Typespec: a typespec object describes a type specification. These
-// tests observe the production helpers in vpi.cpp that apply the clause's
-// numbered "Details" - what vpiName/vpiTypedefAlias report (detail 1), which
-// typespecs carry an index typespec (detail 2) and members (detail 3/4), what a
-// member's type and default value are (detail 3/7), how vpiElemTypespec unwinds
-// an array (detail 8), and how the figure's range relations route through
-// §37.22 (details 9 and 10). The figure attributes with no numbered Detail
-// (vpiTagged/vpiSoft/ vpiPacked/vpiVector/vpiArrayType/vpiRandType) belong to
-// §37.26 and §37.17.
-
-// §37.25: the typespec class groups every "... typespec" node of the figure; a
-// plain expression or variable object is not a typespec.
 TEST(Typespec, TypespecClassMembership) {
   EXPECT_TRUE(VpiIsTypespecType(vpiEnumTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiStructTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiArrayTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiPackedArrayTypespec));
-  // Detail 11: an unresolved type parameter acts as a typespec.
   EXPECT_TRUE(VpiIsTypespecType(vpiTypeParameter));
   EXPECT_FALSE(VpiIsTypespecType(vpiConstant));
   EXPECT_FALSE(VpiIsTypespecType(vpiStructVar));
 }
 
-// §37.25 figure: the class-membership rule admits every "... typespec" node the
-// figure draws, not just the aggregate kinds. The built-in scalar and integer
-// typespecs, the string/class/union kinds, the bit/logic kinds, and the
-// void/sequence/property/event/interface kinds are each distinct figure nodes
-// that a caller may hand to the classifier, so each must be recognized as a
-// typespec. (The Annex M spellings vpiIntegerTypespec, vpiRealTypespec,
-// vpiTimeTypespec, and vpiChandleTypespec share numeric values with kinds
-// already covered here.)
 TEST(Typespec, TypespecClassAdmitsEveryFigureNode) {
   const int kFigureNodes[] = {
       vpiLongIntTypespec,   vpiShortIntTypespec, vpiIntTypespec,
@@ -65,50 +44,32 @@ TEST(Typespec, TypespecClassAdmitsEveryFigureNode) {
   }
 }
 
-// D1: a typespec denoting a user-defined typedef reports that typedef's name.
 TEST(Typespec, NameOfUserDefinedTypedef) {
-  EXPECT_STREQ(VpiTypespecName(vpiEnumTypespec, /*denotes_user_typedef=*/true,
-                               "colors", nullptr),
+  EXPECT_STREQ(VpiTypespecName(vpiEnumTypespec, true, "colors", nullptr),
                "colors");
 }
 
-// D1: vpiName returns NULL for a SystemVerilog built-in type (no user typedef).
 TEST(Typespec, NameOfBuiltInTypeIsNull) {
-  EXPECT_EQ(VpiTypespecName(vpiIntTypespec, /*denotes_user_typedef=*/false,
-                            nullptr, nullptr),
-            nullptr);
+  EXPECT_EQ(VpiTypespecName(vpiIntTypespec, false, nullptr, nullptr), nullptr);
 }
 
-// D1: a class typespec reports the class name even though it is not a typedef.
 TEST(Typespec, NameOfClassTypespecIsClassName) {
-  EXPECT_STREQ(VpiTypespecName(vpiClassTypespec, /*denotes_user_typedef=*/false,
-                               nullptr, "my_class"),
+  EXPECT_STREQ(VpiTypespecName(vpiClassTypespec, false, nullptr, "my_class"),
                "my_class");
 }
 
-// D5: a typedef field defined inline rather than via a typedef declaration may
-// have the empty string for its name; that empty name is still reported (not
-// NULL, which is reserved for built-in types).
 TEST(Typespec, NameOfInlineFieldMayBeEmpty) {
-  const char* name = VpiTypespecName(
-      vpiStructTypespec, /*denotes_user_typedef=*/true, "", nullptr);
+  const char* name = VpiTypespecName(vpiStructTypespec, true, "", nullptr);
   ASSERT_NE(name, nullptr);
   EXPECT_STREQ(name, "");
 }
 
-// D1: a typespec whose typedef aliases another typedef hands back a handle to
-// the aliased typedef; the aliased typedef, not itself an alias, reports NULL.
-// This mirrors the colors -> primary_colors example.
 TEST(Typespec, TypedefAliasChain) {
   VpiObject primary_colors;
-  EXPECT_EQ(VpiTypespecTypedefAlias(/*is_alias=*/true, &primary_colors),
-            &primary_colors);
-  EXPECT_EQ(VpiTypespecTypedefAlias(/*is_alias=*/false, nullptr), nullptr);
+  EXPECT_EQ(VpiTypespecTypedefAlias(true, &primary_colors), &primary_colors);
+  EXPECT_EQ(VpiTypespecTypedefAlias(false, nullptr), nullptr);
 }
 
-// D1: vpiTypedefAlias is drawn on a typespec alone. A typespec reaches the
-// typedef its own aliases, and an object of another kind answers the
-// relation with nothing, whatever it holds (#5748).
 TEST(Typespec, OnlyATypespecReachesATypedefAlias) {
   VpiContext ctx;
   VpiObject aliased;
@@ -123,18 +84,14 @@ TEST(Typespec, OnlyATypespecReachesATypedefAlias) {
   EXPECT_EQ(ctx.Handle(vpiTypedefAlias, &net), nullptr);
 }
 
-// D6: a type defined as an alias of another type inherits the other type's
-// vpiType, so both the alias and the aliased typespec report the same type
-// code, observed through the existing vpi_get(vpiType). The alias of a time
-// typedef reports vpiTimeTypespec, not a distinct alias type.
 TEST(Typespec, AliasInheritsUnderlyingType) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
 
-  VpiObject aliased;  // the predefined "time" typespec
+  VpiObject aliased;
   aliased.type = vpiTimeTypespec;
-  VpiObject my_time;               // typedef time my_time;
-  my_time.type = vpiTimeTypespec;  // inherits the underlying type
+  VpiObject my_time;
+  my_time.type = vpiTimeTypespec;
 
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&my_time)), vpiTimeTypespec);
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&aliased)),
@@ -143,33 +100,21 @@ TEST(Typespec, AliasInheritsUnderlyingType) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D2: vpiIndexTypespec exists only on an associative-array typespec and gives
-// the key type.
 TEST(Typespec, IndexTypespecOnAssociativeArray) {
   VpiObject key;
-  EXPECT_EQ(VpiTypespecIndexTypespec(/*is_assoc_array_typespec=*/true,
-                                     /*wildcard_index=*/false, &key),
-            &key);
+  EXPECT_EQ(VpiTypespecIndexTypespec(true, false, &key), &key);
 }
 
-// D2: a wildcard index type has no index typespec.
 TEST(Typespec, IndexTypespecNullForWildcardIndex) {
   VpiObject key;
-  EXPECT_EQ(VpiTypespecIndexTypespec(/*is_assoc_array_typespec=*/true,
-                                     /*wildcard_index=*/true, &key),
-            nullptr);
+  EXPECT_EQ(VpiTypespecIndexTypespec(true, true, &key), nullptr);
 }
 
-// D2: a non-associative typespec carries no index typespec at all.
 TEST(Typespec, IndexTypespecNullForNonAssociativeTypespec) {
   VpiObject key;
-  EXPECT_EQ(VpiTypespecIndexTypespec(/*is_assoc_array_typespec=*/false,
-                                     /*wildcard_index=*/false, &key),
-            nullptr);
+  EXPECT_EQ(VpiTypespecIndexTypespec(false, false, &key), nullptr);
 }
 
-// D3: a struct typespec exposes its members through vpiTypespecMember; a union
-// typespec does likewise.
 TEST(Typespec, StructAndUnionExposeMembers) {
   VpiObject a;
   VpiObject b;
@@ -178,15 +123,12 @@ TEST(Typespec, StructAndUnionExposeMembers) {
   EXPECT_EQ(VpiTypespecMembers(vpiUnionTypespec, members).size(), 2u);
 }
 
-// D3: a typespec that is not a struct or union has no typespec members.
 TEST(Typespec, NonStructTypespecHasNoMembers) {
   VpiObject a;
   std::vector<VpiHandle> members = {&a};
   EXPECT_TRUE(VpiTypespecMembers(vpiEnumTypespec, members).empty());
 }
 
-// D3: the typespec relation of a member indicates the member's type - its
-// typespec child, distinct from any default-value expr child.
 TEST(Typespec, MemberTypespecIsTheTypespecChild) {
   VpiObject member;
   VpiObject member_type;
@@ -198,16 +140,12 @@ TEST(Typespec, MemberTypespecIsTheTypespecChild) {
   EXPECT_EQ(VpiTypespecChild(&member), &member_type);
 }
 
-// D4: vpiName of a typespec member is the member's own name, not the name of
-// the member's type.
 TEST(Typespec, MemberNameIsTheMembersOwnName) {
   VpiObject member;
   member.name = "a";
   EXPECT_STREQ(VpiTypespecMemberName(&member), "a");
 }
 
-// D7: the expr of a member is the member's explicit default value - its expr
-// child (an object of the §37.59 expr class).
 TEST(Typespec, MemberDefaultExprIsTheExprChild) {
   VpiObject member;
   VpiObject member_type;
@@ -219,7 +157,6 @@ TEST(Typespec, MemberDefaultExprIsTheExprChild) {
   EXPECT_EQ(VpiTypespecMemberDefaultExpr(&member), &default_value);
 }
 
-// D7: a member with no default value has no expr.
 TEST(Typespec, MemberWithoutDefaultHasNoExpr) {
   VpiObject member;
   VpiObject member_type;
@@ -229,44 +166,30 @@ TEST(Typespec, MemberWithoutDefaultHasNoExpr) {
   EXPECT_EQ(VpiTypespecMemberDefaultExpr(&member), nullptr);
 }
 
-// D3 edge: a member whose children include no typespec object (only, say, a
-// default-value expr) reports no member type rather than misreading the expr.
 TEST(Typespec, MemberTypespecNullWhenNoTypespecChild) {
   VpiObject member;
   VpiObject default_value;
-  default_value.type = vpiConstant;  // an expr, not a typespec
+  default_value.type = vpiConstant;
   member.children = {&default_value};
 
   EXPECT_EQ(VpiTypespecChild(&member), nullptr);
 }
 
-// D3/D4/D7 error condition: the member relations tolerate a null member handle,
-// reporting no type, no name, and no default expr rather than dereferencing it.
 TEST(Typespec, MemberRelationsNullHandleSafe) {
   EXPECT_EQ(VpiTypespecChild(nullptr), nullptr);
   EXPECT_EQ(VpiTypespecMemberName(nullptr), nullptr);
   EXPECT_EQ(VpiTypespecMemberDefaultExpr(nullptr), nullptr);
 }
 
-// D8: vpiElemTypespec unwinds one dimension at a time. While the typespec still
-// has a range it hands back the element typespec (the next unwinding level);
-// once no ranges remain it yields NULL. This walks the figure's arr example:
-// a 4x3 unpacked array typespec -> ... -> base struct typespec.
 TEST(Typespec, ElemTypespecUnwindsUntilNoRangesRemain) {
-  VpiObject after_first_unwind;  // 3-element unpacked array typespec
-  VpiObject base_struct;         // the non-array element, no ranges left
+  VpiObject after_first_unwind;
+  VpiObject base_struct;
 
-  // The outer typespec still has unpacked ranges, so unwinding yields the next
-  // level.
-  EXPECT_EQ(VpiTypespecElemTypespec(/*has_ranges=*/true, &after_first_unwind),
+  EXPECT_EQ(VpiTypespecElemTypespec(true, &after_first_unwind),
             &after_first_unwind);
-  // The base struct typespec has no ranges, so vpiElemTypespec is NULL.
-  EXPECT_EQ(VpiTypespecElemTypespec(/*has_ranges=*/false, &base_struct),
-            nullptr);
+  EXPECT_EQ(VpiTypespecElemTypespec(false, &base_struct), nullptr);
 }
 
-// D10: vpi_iterate(vpiRange, array_typespec) returns one range per declared
-// dimension, leftmost to rightmost.
 TEST(Typespec, RangeIterationYieldsOneRangePerDimension) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims =
@@ -278,8 +201,6 @@ TEST(Typespec, RangeIterationYieldsOneRangePerDimension) {
   EXPECT_EQ(VpiRangeRightRange(ranges[1]), &r1);
 }
 
-// D10: a dynamic, associative, or queue dimension of the typespec contributes
-// an empty range (§37.22).
 TEST(Typespec, RangeIterationGivesEmptyRangeForUnboundedDimension) {
   VpiObject l, r;
   std::vector<VpiArrayDimension> dims(1);
@@ -294,9 +215,6 @@ TEST(Typespec, RangeIterationGivesEmptyRangeForUnboundedDimension) {
   EXPECT_EQ(VpiRangeLeftRange(ranges[0]), nullptr);
 }
 
-// D9: vpiLeftRange/vpiRightRange of a typespec report the bounds of the
-// leftmost declared dimension (leftmost packed for a logic/bit/packed-array
-// typespec, leftmost unpacked for an array typespec).
 TEST(Typespec, LeftAndRightRangeUseLeftmostDimension) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims(2);
@@ -309,8 +227,6 @@ TEST(Typespec, LeftAndRightRangeUseLeftmostDimension) {
   EXPECT_EQ(VpiTypespecRightRange(dims), &r0);
 }
 
-// D9: when the leftmost unpacked dimension corresponds to an empty range, both
-// vpiLeftRange and vpiRightRange return NULL (§37.22).
 TEST(Typespec, LeftAndRightRangeNullForEmptyLeftmostDimension) {
   VpiObject l, r;
   std::vector<VpiArrayDimension> dims(1);
@@ -322,16 +238,12 @@ TEST(Typespec, LeftAndRightRangeNullForEmptyLeftmostDimension) {
   EXPECT_EQ(VpiTypespecRightRange(dims), nullptr);
 }
 
-// D9: a typespec with no declared dimension has neither a left nor a right
-// range.
 TEST(Typespec, LeftAndRightRangeNullWhenNoDimensions) {
   std::vector<VpiArrayDimension> dims;
   EXPECT_EQ(VpiTypespecLeftRange(dims), nullptr);
   EXPECT_EQ(VpiTypespecRightRange(dims), nullptr);
 }
 
-// D11: in a context where the type parameter is unresolved, the type parameter
-// itself acts as the typespec; once resolved, the resolved typespec stands in.
 TEST(Typespec, UnresolvedTypeParameterActsAsTypespec) {
   VpiObject type_parameter;
   type_parameter.type = vpiTypeParameter;
@@ -343,8 +255,6 @@ TEST(Typespec, UnresolvedTypeParameterActsAsTypespec) {
   EXPECT_EQ(VpiTypespecForTypeParameter(&type_parameter, &resolved), &resolved);
 }
 
-// §37.25 details 9 and 10: an implicit element range is no declared dimension
-// of the typespec, so the ranges and the leftmost range pass over it.
 TEST(TypespecModel, AnImplicitElementRangeIsNoDeclaredDimension) {
   VpiObject left;
   left.type = vpiConstant;
@@ -361,10 +271,6 @@ TEST(TypespecModel, AnImplicitElementRangeIsNoDeclaredDimension) {
   EXPECT_EQ(VpiTypespecLeftRange(kDims), &left);
 }
 
-// §37.25 with §37.17: attaching a design makes a typespec for each typedef an
-// instance's declaration writes. An enumeration the elaborated module records
-// no constants for is a typespec with none, and a variable of the typedef that
-// the run built no object for is passed over rather than related to it.
 TEST(TypespecModel, AttachToleratesAnEnumWithoutConstantsAndAnUnbuiltVariable) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
@@ -405,11 +311,8 @@ TEST(TypespecModel, AttachToleratesAnEnumWithoutConstantsAndAnUnbuiltVariable) {
   SetGlobalVpiContext(nullptr);
 }
 
-// A design run with a PLI application registered, its VPI model read back
-// once the run is over.
 class TypespecsOfARun : public VpiDesignRun {
  protected:
-  // The sizes of the ranges `typespec` iterates, leftmost first.
   static std::vector<int> RangeSizesOf(vpiHandle typespec) {
     std::vector<int> sizes;
     for (vpiHandle range : ObjectsOf(vpiRange, typespec)) {
@@ -418,7 +321,6 @@ class TypespecsOfARun : public VpiDesignRun {
     return sizes;
   }
 
-  // The value of the integer constant `bound`, -1 for none.
   static int ValueOf(vpiHandle bound) {
     if (bound == nullptr) return -1;
     s_vpi_value value{};
@@ -427,13 +329,11 @@ class TypespecsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The kind of what `relation` reaches from `ref`, 0 for nothing.
   static int KindReached(int relation, vpiHandle ref) {
     vpiHandle reached = vpi_handle(relation, ref);
     return reached == nullptr ? 0 : vpi_get(vpiType, reached);
   }
 
-  // The values of the enum consts `typespec` reaches, in declaration order.
   static std::vector<int> EnumConstValuesOf(vpiHandle typespec) {
     std::vector<int> values;
     for (vpiHandle constant : ObjectsOf(vpiEnumConst, typespec)) {
@@ -443,10 +343,6 @@ class TypespecsOfARun : public VpiDesignRun {
   }
 };
 
-// Detail 1: a typedef of another typedef is a typespec of the aliased one's
-// kind, reaching it through vpiTypedefAlias, whether the typedef it aliases
-// is the module's or the compilation unit's; a typedef of a type of its own
-// aliases none (#5748).
 TEST_F(TypespecsOfARun, ATypedefOfATypedefReachesItThroughTypedefAlias) {
   Run("typedef int word_t;\n"
       "module top; typedef logic [3:0] nib_t; typedef nib_t half_t;\n"
@@ -468,11 +364,6 @@ TEST_F(TypespecsOfARun, ATypedefOfATypedefReachesItThroughTypedefAlias) {
   EXPECT_STREQ(vpi_get_str(vpiName, word), "word_t");
 }
 
-// Detail 1: a module typedef aliasing a typedef a package declares, made
-// visible by an import (§26.3), is a typespec of the aliased one's kind that
-// reaches the package's typespec, past a wildcard import of a package
-// declaring no such typedef and an import of another of the package's
-// typedefs (#5751).
 TEST_F(TypespecsOfARun, ATypedefOfAnImportedTypedefReachesIt) {
   Run("package pk; typedef logic [3:0] nib_t; typedef int word_t;\n"
       "endpackage\n"
@@ -486,10 +377,6 @@ TEST_F(TypespecsOfARun, ATypedefOfAnImportedTypedefReachesIt) {
                                   Named(vpiTypedef, By("pk"), "nib_t")));
 }
 
-// §37.25: a typedef of realtime is a real typespec (§6.12), one of event an
-// event typespec and one of chandle a chandle typespec, each among the
-// module's typedefs; a property formal of the realtime one reaches it
-// (#5754).
 TEST_F(TypespecsOfARun, RealtimeEventAndChandleTypedefsAreTypespecs) {
   Run("module top; logic clk;\n"
       "  typedef realtime rt_t; typedef event ev_t; typedef chandle ch_t;\n"
@@ -507,12 +394,6 @@ TEST_F(TypespecsOfARun, RealtimeEventAndChandleTypedefsAreTypespecs) {
   EXPECT_STREQ(vpi_get_str(vpiName, v), "rt_t");
 }
 
-// Details 8 to 10: a bit or logic typespec ranges over its packed dimensions,
-// those of a typedef it is written over included, its leftmost one's bounds
-// being its vpiLeftRange and vpiRightRange, and is a vector; vpiElemTypespec
-// unwinds it a range at a time, to the typedef it is written over and then to
-// a bit typespec of no ranges and no name, which is no vector and unwinds to
-// nothing (#7094, #7095, #7096).
 TEST_F(TypespecsOfARun, ABitOrLogicTypespecRangesAndUnwinds) {
   Run("module top;\n"
       "  typedef bit [3:0] nib_t; typedef nib_t [1:0] byte_t;\n"
@@ -545,11 +426,6 @@ TEST_F(TypespecsOfARun, ABitOrLogicTypespecRangesAndUnwinds) {
   EXPECT_EQ(KindReached(vpiElemTypespec, b), vpiLogicTypespec);
 }
 
-// Detail 8's example: a packed array typespec of packed structs, one over it
-// ranging over both, an array typespec over that, and a variable's own
-// unpacked dimensions over the last making an unnamed array typespec of both
-// unpacked ones, each unwinding to the typedef it is written over and the
-// structure to nothing (#7083, #7084, #7096, #7099, #7310).
 TEST_F(TypespecsOfARun, DetailEightsArraysUnwindToTheirTypedefs) {
   Run("module top;\n"
       "  typedef struct packed { int i1; bit bvec; } [1:3] parrtype;\n"
@@ -588,11 +464,6 @@ TEST_F(TypespecsOfARun, DetailEightsArraysUnwindToTheirTypedefs) {
   EXPECT_EQ(vpi_handle(vpiElemTypespec, element), nullptr);
 }
 
-// Details 2, 9 and 10 with §7.5 to §7.10: an array typespec's vpiArrayType is
-// the kind of array its leftmost dimension makes, a dynamic, queue or
-// associative one being an empty range with no bounds; an associative one's
-// vpiIndexTypespec is its index type's typespec, a keyword's or a typedef's,
-// and none for the wildcard index or any other array (#7084, #7097).
 TEST_F(TypespecsOfARun, AnArraysKindAndIndexTypeAreItsLeftmostDimensions) {
   Run("module top; typedef int my_t;\n"
       "  typedef int aa_t [string]; typedef bit ab_t [my_t];\n"
@@ -620,11 +491,6 @@ TEST_F(TypespecsOfARun, AnArraysKindAndIndexTypeAreItsLeftmostDimensions) {
   EXPECT_EQ(KindReached(vpiElemTypespec, q), vpiIntTypespec);
 }
 
-// Details 3, 4 and 7 with §7.2 and §37.26: a struct or union typespec says
-// whether it is packed, tagged or soft, and each typespec member reaches the
-// typespec of its type, a typedef's where it names one, the default value it
-// was declared with through vpiExpr, and says through vpiRandType whether it
-// is rand or randc (#7090, #7091, #7092, #7093).
 TEST_F(TypespecsOfARun, AnAggregatesMembersReachTheirTypesAndDefaults) {
   Run("module top; typedef bit [3:0] nib_t;\n"
       "  typedef struct packed { logic [3:0] a; nib_t b; } ps_t;\n"
@@ -666,13 +532,6 @@ TEST_F(TypespecsOfARun, AnAggregatesMembersReachTheirTypesAndDefaults) {
   EXPECT_EQ(KindReached(vpiTypespec, d), vpiIntTypespec);
 }
 
-// Details 1 and 6 with §6.19 and §37.32: an enum typespec reaches its base
-// type's typespec, int's where it names none, through vpiBaseTypespec, which
-// no other typespec reaches; a typedef of an enum typedef is an enum typespec
-// with its constants and base; one of a predefined type aliases that type's
-// unnamed typespec; one of a package's type aliases the package's typedef;
-// and one of a class is a class typespec of its own name reaching the class
-// defn (#7082, #7088, #7089, #7098).
 TEST_F(TypespecsOfARun, EnumsAliasesAndClassesReachWhatTheyStandFor) {
   Run("package pk; typedef logic [1:0] t; endpackage\n"
       "module top;\n"
@@ -722,9 +581,6 @@ TEST_F(TypespecsOfARun, EnumsAliasesAndClassesReachWhatTheyStandFor) {
                                   Named(vpiClassDefn, top, "C")));
 }
 
-// Detail 5: a member whose type is a structure written in place reaches an
-// unnamed typespec of that structure, packed as it was declared, whose own
-// members reach their types in turn.
 TEST_F(TypespecsOfARun, AMemberWrittenAsAStructureReachesItsOwnTypespec) {
   Run("module top;\n"
       "  typedef struct { struct packed { bit [1:0] lo; logic hi; } inner;\n"
@@ -747,10 +603,6 @@ TEST_F(TypespecsOfARun, AMemberWrittenAsAStructureReachesItsOwnTypespec) {
             vpiIntTypespec);
 }
 
-// §37.25 detail 8 with §7.4.1: a typedef of an enumeration written with
-// packed dimensions after its body is a packed array typespec ranging over
-// them, whose element is an enum typespec over the base type the enumeration
-// was written with (#7312).
 TEST_F(TypespecsOfARun, AnEnumWithDimsAfterItsBodyIsAPackedArrayOfIt) {
   Run("module top;\n"
       "  typedef enum bit [1:0] {A, B} [3:0] e_t;\n"
@@ -766,9 +618,6 @@ TEST_F(TypespecsOfARun, AnEnumWithDimsAfterItsBodyIsAPackedArrayOfIt) {
             (std::vector<int>{2}));
 }
 
-// A typedef of a type the run draws no typespec for, a type parameter's,
-// written plain or with unpacked dimensions of its own, hangs nothing from its
-// scope, and the typedefs declared after it still reach theirs.
 TEST_F(TypespecsOfARun, ATypedefWithNoTypespecLeavesTheOthersInPlace) {
   Run("module top;\n"
       "  parameter type T = int;\n"
@@ -782,10 +631,6 @@ TEST_F(TypespecsOfARun, ATypedefWithNoTypespecLeavesTheOthersInPlace) {
   EXPECT_EQ(KindReached(vpiElemTypespec, tri), vpiBitTypespec);
 }
 
-// §6.18 with detail 1: a forward typedef, of a class, of a structure or bare,
-// draws no typespec of its own; the scope's typedefs are those that define
-// the types, and a variable of the class is related to no logic typespec named
-// after it (#7311).
 TEST_F(TypespecsOfARun, AForwardTypedefDrawsNoTypespecOfItsOwn) {
   Run("module top;\n"
       "  typedef class C; typedef T; typedef struct s_t;\n"
@@ -802,9 +647,6 @@ TEST_F(TypespecsOfARun, AForwardTypedefDrawsNoTypespecOfItsOwn) {
   EXPECT_NE(KindReached(vpiTypespec, h), vpiLogicTypespec);
 }
 
-// Detail 8: the enum typespec a typedef's dimensions unwind to is unnamed and
-// reaches the constants the typedef's enumeration declares, whether the
-// dimensions are unpacked or packed ones written after its body (#7314).
 TEST_F(TypespecsOfARun, AnEnumElementOfATypedefReachesItsConstants) {
   Run("module top;\n"
       "  typedef enum bit [2:0] {P, Q} ea_t [2];\n"
@@ -824,9 +666,6 @@ TEST_F(TypespecsOfARun, AnEnumElementOfATypedefReachesItsConstants) {
   EXPECT_EQ(vpi_get_str(vpiName, packed), nullptr);
 }
 
-// The figure with detail 3 and §7.3.2: a tagged union's void member reaches a
-// void typespec, and its other members the typespecs of their own types
-// (#7085).
 TEST_F(TypespecsOfARun, ATaggedUnionsVoidMemberReachesAVoidTypespec) {
   Run("module top;\n"
       "  typedef union tagged { void Invalid; int Valid; } vint;\n"
@@ -839,10 +678,6 @@ TEST_F(TypespecsOfARun, ATaggedUnionsVoidMemberReachesAVoidTypespec) {
             vpiIntTypespec);
 }
 
-// §37.31 with the figure: an enum typedef a class declares reaches its enum
-// consts with their values, whether the class is a module's, nested in
-// another (§8.23) or the compilation unit's, beside a typedef of another type
-// (#7343).
 TEST_F(TypespecsOfARun, AClassesEnumTypedefReachesItsConstants) {
   Run("class U; typedef enum {X = 4, Y} u_t; endclass\n"
       "module top;\n"
@@ -865,9 +700,6 @@ TEST_F(TypespecsOfARun, AClassesEnumTypedefReachesItsConstants) {
             (std::vector<int>{4, 5}));
 }
 
-// Detail 11 with §37.31: in a class defn, where its type parameters stay
-// unresolved, a property declared with one reaches the type parameter itself
-// as its typespec, and one declared with any other type does not (#7100).
 TEST_F(TypespecsOfARun, AClassPropertyOfATypeParameterReachesIt) {
   Run("package pk; typedef int t; endpackage\n"
       "module top;\n"
@@ -892,9 +724,6 @@ TEST_F(TypespecsOfARun, AClassPropertyOfATypeParameterReachesIt) {
             vpiTypeParameter);
 }
 
-// With §23.4: an instance of a module declared nested in another's body
-// declares the typedefs that declaration writes, as an instance of a module
-// declared at the top level does (#8266).
 TEST_F(TypespecsOfARun, ANestedModulesInstanceDeclaresItsTypedefs) {
   Run("module top;\n"
       "  module inner; typedef bit [3:0] nib_t; endmodule\n"

@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A module around the procedures given, as
-// test/src/e2e/procedural_assertion_arguments.sv is: clk rises at 5, 15, 25
-// and 35, foo holds the even bits of 0 to 10 and bar the bits 0 to 4, i and
-// n are static, act is 1 across the tick of 15, w is 1 from 30, and the run
-// ends at 40.
 std::string ArgumentsSource(const std::string& procedures) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -38,10 +33,6 @@ uint64_t Count(SimFixture& f, std::string_view name) {
   return var == nullptr ? 0 : var->value.ToUint64();
 }
 
-// §16.14.6.1: the clause's a1 reads the static i as sampled in the Preponed
-// region, 0 at the first tick and 10, its value after the loop, at every
-// tick after, so its ten instances a tick check foo[0] && bar[0] at the
-// first tick and foo[10] && bar[10] after.
 TEST(ProceduralAssertionArgumentsRun, AStaticVariableIsReadSampled) {
   SimFixture f;
   RunAndFindVar(ArgumentsSource("  always @(posedge clk)\n"
@@ -53,9 +44,6 @@ TEST(ProceduralAssertionArgumentsRun, AStaticVariableIsReadSampled) {
   EXPECT_EQ(Count(f, "fails"), 30u);
 }
 
-// §16.14.6.1: the clause's a2 saves const'(i) as the instance is queued, so
-// its instances check foo[0] to foo[9] against the sampled bar[i], and a3
-// saves both, checking foo[i] && bar[i] for each i.
 TEST(ProceduralAssertionArgumentsRun, AConstCastIsSavedAsTheInstanceIsQueued) {
   SimFixture f;
   RunAndFindVar(
@@ -77,9 +65,6 @@ TEST(ProceduralAssertionArgumentsRun, AConstCastIsSavedAsTheInstanceIsQueued) {
   EXPECT_EQ(Count(g, "fails"), 28u);
 }
 
-// §16.14.6.1: an automatic variable's immediate value is preserved as a
-// const cast's is, so the clause's a4, over the j a for statement declares,
-// checks foo[j] && bar[j] for each j as a3 does.
 TEST(ProceduralAssertionArgumentsRun, AnAutomaticVariableIsSavedLikewise) {
   SimFixture f;
   RunAndFindVar(ArgumentsSource("  always @(posedge clk)\n"
@@ -91,11 +76,6 @@ TEST(ProceduralAssertionArgumentsRun, AnAutomaticVariableIsSavedLikewise) {
   EXPECT_EQ(Count(f, "fails"), 28u);
 }
 
-// §16.14.6.1: a matured instance holding temporal expressions keeps the
-// values it saved for the whole of its evaluation, the procedure's later
-// execution affecting nothing of it: the clause's a7 is queued at 15 for k
-// of 0 and 1 while act is 1, the instance of 1 holds vacuously there and the
-// instance of 0 keeps its k while bar[0] is read at 25 and w at 35.
 TEST(ProceduralAssertionArgumentsRun, AMaturedInstanceKeepsItsSavedValues) {
   SimFixture f;
   RunAndFindVar(
@@ -116,9 +96,6 @@ TEST(ProceduralAssertionArgumentsRun, AMaturedInstanceKeepsItsSavedValues) {
   EXPECT_EQ(Count(f, "last"), 35u);
 }
 
-// §16.14.6.1: the same rules apply to the variables of the action block,
-// so the clause's a8 reports the const'(n) its instance saved, 1 and 3,
-// beside $sampled(n), 0 at the first tick and 4 after.
 TEST(ProceduralAssertionArgumentsRun, TheActionBlockReadsTheSavedValues) {
   SimFixture f;
   std::string out =
@@ -135,10 +112,6 @@ TEST(ProceduralAssertionArgumentsRun, TheActionBlockReadsTheSavedValues) {
             "$finish at time 40\n");
 }
 
-// §16.14.6.1: a conditional around the assertion reads the current values,
-// where the assertion's expressions read the sampled ones: the clause's a9
-// is queued at the tick en is assigned 1, and a10, under $sampled(en), one
-// tick later.
 TEST(ProceduralAssertionArgumentsRun, AConditionalReadsTheCurrentValue) {
   SimFixture f;
   std::string out = RunCapture(

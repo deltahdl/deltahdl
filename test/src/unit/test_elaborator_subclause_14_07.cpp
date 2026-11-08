@@ -16,8 +16,6 @@ TEST(ClockingScopeElab, ClockingInModuleElaborates) {
 }
 
 TEST(ClockingScopeElab, ClockingInProgramElaborates) {
-  // A top-level program (no enclosing module) is named as the explicit top so
-  // it is actually elaborated; §14.7 permits a clocking block in a program.
   ElabFixture f;
   ElaborateSrc(
       "program p(input clk);\n"
@@ -78,9 +76,6 @@ TEST(ClockingScopeElab, MultipleBlocksSameModuleElaborates) {
 }
 
 TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
-  // §14.7: a clocking block's scope is local to its enclosing module, so the
-  // same clocking block name can appear in a module and in a submodule it
-  // instantiates without the two colliding during elaboration.
   EXPECT_TRUE(
       ElabOk("module sub; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"
@@ -96,13 +91,6 @@ TEST(ClockingScopeElab, SameBlockNameAcrossInstantiatedScopesElaborates) {
 }
 
 TEST(ClockingScopeElab, PerInstanceCopyWhenModuleInstantiatedTwice) {
-  // §14.7: a clocking block is both a declaration and an instance of that
-  // declaration; one copy is created for each instance of the block containing
-  // the declaration (like an always procedure). Instantiating the same leaf
-  // module twice therefore yields an independent copy of its clocking block per
-  // instance, and elaboration succeeds without the two copies colliding. This
-  // exercises per-instance replication, distinct from name reuse across two
-  // different module scopes.
   EXPECT_TRUE(
       ElabOk("module leaf; logic clk;\n"
              "  logic data; clocking cb @(posedge clk);\n"

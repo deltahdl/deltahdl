@@ -6,13 +6,6 @@ using namespace delta;
 
 namespace {
 
-// These tests drive the constraint solver directly with a uniqueness group
-// (18.5.4) holding a randc member. The elaborator rejects such a group in
-// every source whose receiver class it can name, so the solver's own refusal
-// is reached from a hand-built solver state rather than from source.
-
-// A solver holding rand a and a b declared `b_qualifier`, both over 0..3,
-// under one block constraining {a, b} to be unique.
 ConstraintSolver UniqueSolver(RandQualifier b_qualifier) {
   ConstraintSolver solver(7);
   RandVariable a;
@@ -36,9 +29,6 @@ ConstraintSolver UniqueSolver(RandQualifier b_qualifier) {
   return solver;
 }
 
-// 18.5.4: a uniqueness group admits no randc variable, so a group naming one is
-// illegal and the solve fails; the same group with b rand solves, with a and b
-// distinct.
 TEST(ConstraintUniqueSolver, RandcMemberFailsTheSolve) {
   ConstraintSolver with_randc = UniqueSolver(RandQualifier::kRandc);
   EXPECT_FALSE(with_randc.Solve());

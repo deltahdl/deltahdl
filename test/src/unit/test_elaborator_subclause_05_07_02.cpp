@@ -11,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §5.7.2: the default type of a fixed-point real literal is `real`, an IEEE 754
-// double-precision (64-bit) value, rather than the 32-bit `shortreal`. The
-// elaborator's width inference therefore reports 64 bits for such a literal.
 TEST(RealLiteralElaboration, FixedPointDefaultsToRealWidth) {
   EvalFixture f;
   auto* e = ParseExprFrom("1.2", f);
@@ -22,8 +19,6 @@ TEST(RealLiteralElaboration, FixedPointDefaultsToRealWidth) {
   EXPECT_EQ(InferExprWidth(e, {}), 64u);
 }
 
-// §5.7.2: the exponent (scientific) form likewise defaults to `real`, not the
-// 32-bit `shortreal`.
 TEST(RealLiteralElaboration, ExponentFormDefaultsToRealWidth) {
   EvalFixture f;
   auto* e = ParseExprFrom("2.0e10", f);

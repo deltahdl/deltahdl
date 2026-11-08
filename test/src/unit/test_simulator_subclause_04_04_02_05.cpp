@@ -185,18 +185,6 @@ TEST(ObservedRegionSim, ObservedEventsAcrossMultipleTimeSlots) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// §4.4.2.5 D1: the Observed region is for evaluation of property expressions
-// when they are triggered. Rather than hand-schedule a bare event into the
-// Observed region, this drives the production assertion monitor: a property is
-// registered against a real signal, and the signal's change is triggered
-// through the same watcher mechanism edges use elsewhere in the simulator. The
-// monitor's response - scheduling the property's evaluation - is entirely
-// production code, and the evaluation is confirmed to run while the scheduler's
-// current region is Observed. The first trigger is the monitor's per-property
-// warm-up cycle (a vacuous pass that records no verdict); the post-timestep
-// tick the monitor installed advances its cycle count, so the second trigger is
-// the one whose property check actually runs, and it is that check which probes
-// the current region.
 TEST(ObservedRegionSim, TriggeredPropertyEvaluationRunsInObservedRegion) {
   SourceManager mgr;
   Arena arena;
@@ -220,30 +208,21 @@ TEST(ObservedRegionSim, TriggeredPropertyEvaluationRunsInObservedRegion) {
   monitor.AddProperty(prop);
   monitor.Attach(ctx, sched);
 
-  // First trigger: warm-up evaluation, no property check yet.
   sig->NotifyWatchers();
   sched.Run();
   EXPECT_EQ(eval_region, Region::kCOUNT);
 
-  // Second trigger: the property check runs and observes its home region.
   sig->NotifyWatchers();
   sched.Run();
   EXPECT_EQ(eval_region, Region::kObserved);
   EXPECT_EQ(monitor.PassCount(), 1u);
 }
 
-// Where and when a deferred report's own verdict action ran.
 struct ActionSlot {
   Region region = Region::kCOUNT;
   uint64_t time = UINT64_MAX;
 };
 
-// Queues one deferred assertion carrying the verdict `condition_val`, matures
-// it, and executes the matured reports from an Observed-region event at
-// `time`, returning the region and time that verdict's action observed.
-//
-// Only the arm the verdict selects carries the recorder, so a slot comes back
-// at all only if the engine ran the arm the verdict called for.
 ActionSlot RunDeferredVerdictAction(uint64_t condition_val, uint64_t time) {
   Arena arena;
   Scheduler sched(arena);
@@ -277,27 +256,12 @@ ActionSlot RunDeferredVerdictAction(uint64_t condition_val, uint64_t time) {
   return slot;
 }
 
-// §4.4.2.5 D2: during property evaluation, pass/fail code shall be scheduled in
-// the Reactive region of the current time slot. This observes the production
-// SVA engine path that realizes the rule: a matured deferred report is turned
-// into a scheduled action by ExecuteMaturedObservedInReactive. The call is made
-// from inside an Observed-region event running at a nonzero time, mirroring the
-// real flow where the pass/fail action is emitted while the property is being
-// evaluated. The action records where and when it runs, confirming the engine
-// homed it in the Reactive region and in the same (current) time slot.
 TEST(ObservedRegionSim, PassFailActionSchedulesIntoReactiveOfCurrentSlot) {
   ActionSlot slot = RunDeferredVerdictAction(1, 5);
   EXPECT_EQ(slot.region, Region::kReactive);
   EXPECT_EQ(slot.time, 5u);
 }
 
-// §4.4.2.5 D2, fail input form: the rule covers both verdict arms - a failing
-// property's fail code must also land in the Reactive region of the current
-// slot. A failed verdict (condition value zero) drives the engine's fail
-// branch, distinct from the pass branch above, yet the matured report is still
-// homed in the Reactive region at the current time. Exercising the fail arm
-// confirms the region/slot placement is a property of the deferral path, not of
-// which verdict arm runs.
 TEST(ObservedRegionSim, FailActionSchedulesIntoReactiveOfCurrentSlot) {
   ActionSlot slot = RunDeferredVerdictAction(0, 7);
   EXPECT_EQ(slot.region, Region::kReactive);

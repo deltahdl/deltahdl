@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.10: a constraint declared through a static prototype and a static
-// external block is one static constraint, so the block turned off through
-// one instance is off through another, and while it stands every draw of
-// either instance holds x above 0, as the design
-// test/src/e2e/static_constraint_blocks.sv runs it.
 TEST(StaticConstraintBlocksRun, AStaticExternalBlockIsSharedAcrossInstances) {
   SimFixture f;
   std::string out = RunCapture(
@@ -39,10 +34,6 @@ TEST(StaticConstraintBlocksRun, AStaticExternalBlockIsSharedAcrossInstances) {
   EXPECT_EQ(out, "32 0\n");
 }
 
-// 18.5.10: a static block turned off through one instance is off for every
-// instance's randomize(), so the other instance, whose draws all lay below
-// 10 while the static bound stood, reaches 10 or more in some of 64 draws
-// afterwards, while its own even, no static block, holds throughout.
 TEST(StaticConstraintBlocksRun, AStaticBlockOffFreesEveryInstance) {
   SimFixture f;
   std::string out = RunCapture(

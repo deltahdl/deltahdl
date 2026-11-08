@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.7: file_error_detect_function ::= $ferror ( fd , str )
-// The error-detection function takes a file descriptor and a string variable
-// that receives the error description.
 TEST(IoSystemTaskParsing, FerrorCallParses) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -23,8 +20,6 @@ TEST(IoSystemTaskParsing, FerrorCallParses) {
               "endmodule\n"));
 }
 
-// §21.3.7 Syntax 21-10: $ferror is a function, so it may appear as an
-// expression operand, and the str destination may be a string-typed variable.
 TEST(IoSystemTaskParsing, FerrorAsExpressionOperandWithStringDest) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -38,7 +33,6 @@ TEST(IoSystemTaskParsing, FerrorAsExpressionOperandWithStringDest) {
               "endmodule\n"));
 }
 
-// Negative form: an unterminated $ferror call cannot parse.
 TEST(IoSystemTaskParsing, UnterminatedFerrorRejected) {
   auto result = Parse(
       "module t;\n"
@@ -46,8 +40,6 @@ TEST(IoSystemTaskParsing, UnterminatedFerrorRejected) {
       "  reg [639:0] msg;\n"
       "  initial errno = $ferror(fd, msg;\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a subroutine call argument list;
-  // §21.3.7 states the $ferror argument list but reports nothing of its own.
   EXPECT_TRUE(ReportedError(result.diags, "expected ')', got ';'", 4, "13.5"));
 }
 

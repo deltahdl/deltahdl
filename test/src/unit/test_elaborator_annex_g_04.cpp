@@ -1,26 +1,3 @@
-// IEEE 1800-2023 Annex G.4 (Std package -- Mailbox).
-//
-// Section G.4 presents the prototype of the built-in `mailbox` class that the
-// std package provides; its semantics are owned by clause 15.4. The prototype
-// is:
-//
-//   class mailbox #(type T = dynamic_singular_type);
-//     function new(int bound = 0);
-//     function int num();
-//     task put( T message);
-//     function int try_put( T message);
-//     task get( ref T message );
-//     function int try_get( ref T message );
-//     task peek( ref T message );
-//     function int try_peek( ref T message );
-//   endclass
-//
-// These tests observe the elaborator providing that prototype out of the std
-// package: `mailbox` resolves as a built-in class without any user
-// `class mailbox` definition (Elaborator::RegisterCuScopeItems registers the
-// std-package class name), and each prototype method elaborates at the call
-// site, including the documented default new() argument omitted.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -36,7 +13,6 @@ using namespace delta;
 
 namespace {
 
-// The std package supplies the class name; no user declaration is required.
 TEST(MailboxStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +27,6 @@ TEST(MailboxStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
   EXPECT_EQ(mod->variables[0].class_type_name, "mailbox");
 }
 
-// new() with the bound argument omitted (prototype default 0).
 TEST(MailboxStdPackageElaborator, NewWithDefaultBound) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,8 +42,6 @@ TEST(MailboxStdPackageElaborator, NewWithDefaultBound) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// The full prototype surface: num / put / try_put / get / try_get / peek /
-// try_peek each elaborate at the call site.
 TEST(MailboxStdPackageElaborator, PrototypeMethodsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,8 +64,6 @@ TEST(MailboxStdPackageElaborator, PrototypeMethodsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// new() accepts an explicit bound, matching the `int bound` formal in the
-// prototype constructor.
 TEST(MailboxStdPackageElaborator, NewWithExplicitBound) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -107,8 +78,6 @@ TEST(MailboxStdPackageElaborator, NewWithExplicitBound) {
   EXPECT_EQ(mod->variables[0].class_type_name, "mailbox");
 }
 
-// The prototype's new() constructor also applies when the handle is built
-// procedurally after declaration, then driven through the prototype methods.
 TEST(MailboxStdPackageElaborator, DeferredConstructionAndUse) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,9 +95,6 @@ TEST(MailboxStdPackageElaborator, DeferredConstructionAndUse) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// num() and try_get() are `function int`: their value feeds an expression
-// context (here an if-condition), and the elaborator accepts the
-// value-returning prototype methods there.
 TEST(MailboxStdPackageElaborator, ValueReturningMethodsUsableInExpression) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -145,12 +111,6 @@ TEST(MailboxStdPackageElaborator, ValueReturningMethodsUsableInExpression) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §G.4: the prototype as src/elaborator/std_package.h writes it down -- the
-// constructor new with its defaulted int bound, num taking nothing and
-// returning int, the tasks put, get and peek and the int functions try_put,
-// try_get and try_peek, each over one formal T message, by reference for the
-// four that receive a message and by value for the two that send one -- over
-// the type parameter T defaulting to dynamic_singular_type.
 TEST(MailboxStdPackageElaborator, ThePrototypeIsWrittenDown) {
   const auto& prototype = MailboxPrototype();
   ASSERT_EQ(prototype.size(), 8u);
@@ -189,11 +149,6 @@ TEST(MailboxStdPackageElaborator, ThePrototypeIsWrittenDown) {
             std::nullopt);
 }
 
-// §G.4: a call on a mailbox handle, parameterized or not, is checked against
-// the prototype: a method it does not declare is rejected, as is put with no
-// message, num with an argument and try_get with no destination, each under
-// the subclause giving the prototype and at the call, while the prototype's
-// own calls beside them are accepted.
 TEST(MailboxStdPackageElaborator, CallsAreCheckedAgainstThePrototype) {
   ElabFixture f;
   ElabOk(
@@ -235,10 +190,6 @@ TEST(MailboxStdPackageElaborator, CallsAreCheckedAgainstThePrototype) {
   }
 }
 
-// §G.4 with §5.13: a call on a mailbox handle written as a statement without
-// its empty parentheses is the same call, so a method the prototype does not
-// declare and get with no destination are rejected under §G.4, while num and
-// the get_randstate every class has are accepted (#7723).
 TEST(MailboxStdPackageElaborator, CallsWithoutParenthesesAreChecked) {
   ElabFixture f;
   ElabOk(

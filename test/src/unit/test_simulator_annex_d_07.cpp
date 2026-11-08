@@ -14,10 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The path of a log file under the host's temporary directory, cleared of any
-// copy an earlier run left, so what a test reads back is what its own run
-// wrote. A test splices it into its source as the filename argument D.7 gives
-// $log.
 std::string FreshLogPath(const std::string& stem) {
   namespace fs = std::filesystem;
   fs::path path = fs::temp_directory_path() / ("deltahdl_annex_d_07_" + stem);
@@ -26,8 +22,6 @@ std::string FreshLogPath(const std::string& stem) {
   return path.string();
 }
 
-// Annex D.7: a log file mirrors all standard output, so logging is enabled to
-// begin with -- before any $log or $nolog has run.
 TEST(OptionalLogSim, LoggingEnabledByDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -39,7 +33,6 @@ TEST(OptionalLogSim, LoggingEnabledByDefault) {
   EXPECT_TRUE(f.ctx.LoggingEnabled());
 }
 
-// Annex D.7: the $nolog task disables output to the log file.
 TEST(OptionalLogSim, NologDisablesOutput) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -51,7 +44,6 @@ TEST(OptionalLogSim, NologDisablesOutput) {
   EXPECT_FALSE(f.ctx.LoggingEnabled());
 }
 
-// Annex D.7: the $log task reenables output that a preceding $nolog disabled.
 TEST(OptionalLogSim, LogReenablesOutput) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -66,8 +58,6 @@ TEST(OptionalLogSim, LogReenablesOutput) {
   EXPECT_TRUE(f.ctx.LoggingEnabled());
 }
 
-// Annex D.7: a filename argument to $log closes the current log file and
-// creates a new one, so the named file becomes the active log file.
 TEST(OptionalLogSim, LogFilenameOpensNewFile) {
   std::string path = FreshLogPath("opens.log");
   SimFixture f;
@@ -86,8 +76,6 @@ TEST(OptionalLogSim, LogFilenameOpensNewFile) {
   std::filesystem::remove(path, ec);
 }
 
-// Annex D.7: the filename form of $log also reenables output, just as the bare
-// form does, so output disabled by $nolog resumes to the newly named file.
 TEST(OptionalLogSim, LogFilenameReenablesOutput) {
   std::string path = FreshLogPath("reenables.log");
   SimFixture f;
@@ -108,8 +96,6 @@ TEST(OptionalLogSim, LogFilenameReenablesOutput) {
   std::filesystem::remove(path, ec);
 }
 
-// Annex D.7: each $log filename argument opens a fresh log file, so when
-// several are issued the file named most recently is the active one.
 TEST(OptionalLogSim, MostRecentLogFileWins) {
   std::string first = FreshLogPath("wins_first.log");
   std::string second = FreshLogPath("wins_second.log");
@@ -133,9 +119,6 @@ TEST(OptionalLogSim, MostRecentLogFileWins) {
   std::filesystem::remove(second, ec);
 }
 
-// Annex D.7: $nolog only disables output to the log file; it does not close or
-// rename the file. After a filename has been established, a $nolog leaves that
-// name in place while turning output off.
 TEST(OptionalLogSim, NologPreservesLogFile) {
   std::string path = FreshLogPath("preserved.log");
   SimFixture f;
@@ -156,9 +139,6 @@ TEST(OptionalLogSim, NologPreservesLogFile) {
   std::filesystem::remove(path, ec);
 }
 
-// Annex D.7: only the filename form of $log opens a new file. A bare $log
-// merely reenables output, so after a file has been named it keeps directing
-// output to that same file rather than replacing it.
 TEST(OptionalLogSim, BareLogPreservesLogFile) {
   std::string path = FreshLogPath("kept.log");
   SimFixture f;
@@ -180,8 +160,6 @@ TEST(OptionalLogSim, BareLogPreservesLogFile) {
   std::filesystem::remove(path, ec);
 }
 
-// Annex D.7: a bare $log with no argument names no file, so with no preceding
-// filename argument the active log file remains unset.
 TEST(OptionalLogSim, BareLogLeavesNoFilenameByDefault) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -194,13 +172,6 @@ TEST(OptionalLogSim, BareLogLeavesNoFilenameByDefault) {
   EXPECT_EQ(f.ctx.LogFile(), "");
 }
 
-// Annex D.7: the log file holds a copy of all the text printed to the standard
-// output. Naming a file with $log opens it, and the text $display and $write
-// then print to the standard output is copied there as printed -- the
-// formatted values, the newline $display appends and the absence of one after
-// $write -- while the standard output still receives it. Text put one
-// character at a time reaches the same copy, since the stream is the tool's
-// standard output however a caller writes to it.
 TEST(OptionalLogSim, LogFileHoldsACopyOfWhatIsPrintedToStandardOutput) {
   std::string path = FreshLogPath("copy.log");
   SimFixture f;
@@ -226,10 +197,6 @@ TEST(OptionalLogSim, LogFileHoldsACopyOfWhatIsPrintedToStandardOutput) {
   std::filesystem::remove(path, ec);
 }
 
-// Annex D.7: $nolog disables output to the log file and $log reenables it. The
-// text printed between the two is absent from the log file and present on the
-// standard output, which the tasks say nothing about, and the text printed
-// after the bare $log is copied again.
 TEST(OptionalLogSim, NologWithholdsTheCopyAndBareLogResumesIt) {
   std::string path = FreshLogPath("resume.log");
   SimFixture f;
@@ -253,10 +220,6 @@ TEST(OptionalLogSim, NologWithholdsTheCopyAndBareLogResumesIt) {
   std::filesystem::remove(path, ec);
 }
 
-// Annex D.7: a file name argument to $log closes the old log file, creates a
-// new one and directs output to it. The text printed before the second name
-// stays in the first file alone and the text printed after it goes to the
-// second file alone.
 TEST(OptionalLogSim, ANewFileNameClosesTheOldFileAndDirectsOutputToTheNew) {
   std::string first = FreshLogPath("first.log");
   std::string second = FreshLogPath("second.log");
@@ -282,11 +245,6 @@ TEST(OptionalLogSim, ANewFileNameClosesTheOldFileAndDirectsOutputToTheNew) {
   std::filesystem::remove(second, ec);
 }
 
-// Annex D.7: the copy is of all the text printed to the standard output, so
-// text a §21.3 file output task prints there -- $fdisplay to the STDOUT
-// descriptor of §21.3.1 and $fwrite to the multichannel descriptor whose bit 0
-// is the standard output -- is copied too, and text the same tasks print to a
-// file of their own is not.
 TEST(OptionalLogSim, FileOutputTasksPrintingToStandardOutputAreCopied) {
   std::string path = FreshLogPath("fileio.log");
   std::string other = FreshLogPath("other.txt");

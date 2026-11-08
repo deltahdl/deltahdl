@@ -41,7 +41,6 @@ void RegisterSpecifyBlockSpecparams(const ModuleItem* item, RtlirModule* mod,
     names.constants.insert(sp->param_name);
     RtlirVariable var;
     var.name = sp->param_name;
-    // §37.3.3: the specparam stands where the specify block wrote it.
     var.loc = sp->loc;
     DataType type;
     type.packed_dim_left = sp->param_packed_left;
@@ -58,48 +57,30 @@ namespace {
 
 using IfaceMap = std::unordered_map<std::string_view, const ModuleDecl*>;
 
-// §25.6: the outcome of resolving an interface-qualified specify terminal
-// (`iface_inst.sig`) against the module's interface ports and, if the port
-// selected a modport, the modport member that governs the signal. When a
-// modport restricts the signal, `dir` carries its direction so the path-
-// terminal check can enforce that a modport-input signal drives only a source
-// and a modport-output signal only a destination; `is_ref` flags a member
-// exposed through the modport as `ref`, which may never be a specify terminal.
 struct IfaceTerminal {
-  bool is_interface = false;  // qualifier names an interface port
-  bool is_ref = false;        // signal reaches the port via a ref modport
-  Direction dir = Direction::kNone;  // modport-restricted direction, else kNone
+  bool is_interface = false;
+  bool is_ref = false;
+  Direction dir = Direction::kNone;
 };
 
-// The role a terminal plays in a module path (§30.4.4): a source must be
-// connected to an input/inout port (and be a net), a destination to an
-// output/inout port. Groups the direction rule with the diagnostic wording so
-// the whole expectation travels as one entity.
 struct TerminalRole {
-  Direction allowed_dir;        // kInput for sources, kOutput for destinations
-  std::string_view role;        // diagnostic word ("source"/"destination")
-  std::string_view dir_phrase;  // diagnostic phrase for the allowed direction
-  bool require_net;             // sources must be nets, destinations need not
+  Direction allowed_dir;
+  std::string_view role;
+  std::string_view dir_phrase;
+  bool require_net;
 };
 
-// Builds the source/destination terminal-role expectations.
 TerminalRole SourceRole() {
-  return {Direction::kInput, "source", "input or inout", /*require_net=*/true};
+  return {Direction::kInput, "source", "input or inout", true};
 }
 TerminalRole DestRole() {
-  return {Direction::kOutput, "destination", "output or inout",
-          /*require_net=*/false};
+  return {Direction::kOutput, "destination", "output or inout", false};
 }
 
-// The signal scope of one module: its declared ports plus the net/var
-// declarations that are local signals (not ports).
-// The names a module's body declares: the nets and variables that are no port
-// (`local`), and the non-ANSI ports it declares again as variables, which
-// §23.2.2.1 lets make such a port a variable (`variable_ports`).
 struct ModuleSignals {
   SignalSet local;
   SignalSet variable_ports;
-  SignalSet local_nets;  // the members of `local` declared as nets
+  SignalSet local_nets;
 };
 
 struct SignalScope {
@@ -108,11 +89,6 @@ struct SignalScope {
   const IfaceMap& iface_map;
 };
 
-// §25.6: resolves an interface-qualified terminal. The qualifier must name one
-// of the module's interface ports; if it does not (an unrelated hierarchical
-// name, or a port that is not an interface), the terminal is left for the
-// caller to ignore. When the port selected a modport, the member matching the
-// signal supplies its restricted direction and ref-ness.
 IfaceTerminal ResolveIfaceTerminal(const SpecifyTerminal& t,
                                    const PortMap& port_map,
                                    const IfaceMap& iface_map) {
@@ -125,7 +101,7 @@ IfaceTerminal ResolveIfaceTerminal(const SpecifyTerminal& t,
   if (iit == iface_map.end()) return r;
   r.is_interface = true;
   std::string_view mp_name = p->data_type.modport_name;
-  if (mp_name.empty()) return r;  // no modport: default interface direction
+  if (mp_name.empty()) return r;
   for (const auto* mp : iit->second->modports) {
     if (!mp || mp->name != mp_name) continue;
     for (const auto& member : mp->ports) {
@@ -134,16 +110,11 @@ IfaceTerminal ResolveIfaceTerminal(const SpecifyTerminal& t,
       r.is_ref = member.direction == Direction::kRef;
       return r;
     }
-    break;  // modport found but the signal is not one of its members
+    break;
   }
   return r;
 }
 
-// §25.6: validates an interface-qualified terminal in a module-path role. A
-// signal reached through a `ref` modport member can never be a terminal; a
-// modport-restricted direction confines the signal to one path role (input to
-// a source, output to a destination), while an unrestricted signal (no modport,
-// or an inout member) may play either role.
 void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
                             SourceLoc loc, const TerminalRole& tr,
                             DiagEngine& diag) {
@@ -173,17 +144,9 @@ void CheckIfacePathTerminal(const IfaceTerminal& ift, const SpecifyTerminal& t,
   }
 }
 
-// Validates a path terminal that resolves to a declared port `p`: checks the
-// ref-port prohibition and direction compatibility, answering whether it
-// reported either.
 bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
                            SourceLoc loc, const TerminalRole& tr,
                            DiagEngine& diag) {
-  // §25.6 is where the bar on a ref port as a specify block terminal is
-  // written, and it states it once for both roles the block has: the same
-  // paragraph names the module paths and the timing checks together. §30.4.1 is
-  // the two module path restrictions, which name no ref port and are what the
-  // direction and net reports below enforce.
   if (p->direction == Direction::kRef) {
     diag.Error(loc,
                std::format("ref port '{}' cannot be used as a "
@@ -203,12 +166,6 @@ bool CheckPathTerminalPort(const PortDecl* p, const SpecifyTerminal& t,
   return false;
 }
 
-// §23.2.2.3 (printed page 735): an implicit data type declaration means a net
-// unless var is written, so a non-ANSI `input a;` is a net -- the standard's
-// own specify examples declare their ports that way -- unless the body declares
-// it again as a variable (§23.2.2.1) or it was written with `var`. Both styles
-// mark such a port a net, so the body's declaration is read before that mark,
-// which would otherwise hide `input a; reg a;` as a path source of no net.
 bool PortIsVariable(const PortDecl& p, const ModuleSignals& signals) {
   if (p.data_type.kind == DataTypeKind::kImplicit && !p.has_explicit_var) {
     return signals.variable_ports.contains(p.name);
@@ -216,10 +173,6 @@ bool PortIsVariable(const PortDecl& p, const ModuleSignals& signals) {
   return !p.data_type.is_net;
 }
 
-// Validates one terminal of a module path: it must name a port whose direction
-// permits the given role (kInput for path sources, kOutput for destinations;
-// inout is always allowed), it may not be a ref port, and a source must be a
-// net. `tr.role` is the word used in diagnostics ("source"/"destination").
 void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
                               const SignalScope& scope, const TerminalRole& tr,
                               DiagEngine& diag) {
@@ -248,7 +201,6 @@ void CheckSpecifyPathTerminal(const SpecifyTerminal& t, SourceLoc loc,
   }
 }
 
-// Builds the port-name lookup for a module's declared ports.
 PortMap BuildPortMap(const ModuleDecl* mod) {
   PortMap port_map;
   for (const auto& p : mod->ports) {
@@ -257,8 +209,6 @@ PortMap BuildPortMap(const ModuleDecl* mod) {
   return port_map;
 }
 
-// Collects the module's net and variable declarations: those that are no
-// port, and the variables declaring a port again.
 ModuleSignals BuildLocalSignals(const ModuleDecl* mod,
                                 const PortMap& port_map) {
   ModuleSignals signals;
@@ -280,13 +230,6 @@ ModuleSignals BuildLocalSignals(const ModuleDecl* mod,
   return signals;
 }
 
-// A timing-check terminal may not name a ref port. §25.6: an interface signal
-// reached through a ref modport member is equally barred; other interface
-// signals are valid timing-check terminals regardless of modport direction.
-// Nor may it name a net or variable of the module that is no port: Syntax 31-2
-// (§31.2, printed page 896) makes it a specify_terminal_descriptor, whose
-// input_identifier and output_identifier (A.7.3) are port identifiers or an
-// interface port's member.
 void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
                          const SignalScope& scope, DiagEngine& diag) {
   const PortMap& port_map = scope.port_map;
@@ -319,10 +262,6 @@ void CheckTimingTerminal(const SpecifyTerminal& t, SourceLoc loc,
   }
 }
 
-// §31.6 (printed page 915): the notifier is a variable declared in the module
-// invoking the timing check tasks, and Syntax 31-2 makes it a
-// variable_identifier, so a net of the module, or a port that is a net, is
-// refused as one.
 void CheckTimingCheckNotifier(const SpecifyItem* si, const SignalScope& scope,
                               DiagEngine& diag) {
   std::string_view n = si->timing_check.notifier;
@@ -338,7 +277,6 @@ void CheckTimingCheckNotifier(const SpecifyItem* si, const SignalScope& scope,
       Subclause("31.6"));
 }
 
-// Validates all source and destination terminals of one path declaration.
 void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
                             const ModuleSignals& signals,
                             const IfaceMap& iface_map, DiagEngine& diag) {
@@ -351,8 +289,6 @@ void CheckPathDeclTerminals(const SpecifyItem* si, const PortMap& port_map,
   }
 }
 
-// Validates the terminals of one specify item (path declaration or timing
-// check); other item kinds are ignored.
 void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
                                const ModuleSignals& signals,
                                const IfaceMap& iface_map, DiagEngine& diag) {
@@ -366,8 +302,6 @@ void CheckSpecifyItemTerminals(const SpecifyItem* si, const PortMap& port_map,
   }
 }
 
-// Pass: validate every path-source, path-destination, and timing-check terminal
-// against the module's port directions.
 void ValidatePathTerminals(const ModuleDecl* mod, const PortMap& port_map,
                            const ModuleSignals& signals,
                            const IfaceMap& iface_map, DiagEngine& diag) {
@@ -379,8 +313,6 @@ void ValidatePathTerminals(const ModuleDecl* mod, const PortMap& port_map,
   }
 }
 
-// Two path declarations have the same endpoints if their source and destination
-// terminal lists name the same ports (and interfaces) in the same order.
 bool SameEndpoints(const SpecifyPathDecl& a, const SpecifyPathDecl& b) {
   if (a.src_ports.size() != b.src_ports.size()) return false;
   if (a.dst_ports.size() != b.dst_ports.size()) return false;
@@ -397,10 +329,6 @@ bool SameEndpoints(const SpecifyPathDecl& a, const SpecifyPathDecl& b) {
   return true;
 }
 
-// The specify items of every specify block `mod` holds, in source order. A
-// module may write more than one specify block (A.1.4), and the paths they
-// declare are all the module's, so the rules of §30.4.4.3, §30.4.4.4 and
-// §30.7.4 that relate one declaration to another read them together.
 std::vector<SpecifyItem*> ModuleSpecifyItems(const ModuleDecl* mod) {
   std::vector<SpecifyItem*> items;
   for (auto* item : mod->items) {
@@ -411,15 +339,10 @@ std::vector<SpecifyItem*> ModuleSpecifyItems(const ModuleDecl* mod) {
   return items;
 }
 
-// §30.4.2: a simple module path is one with no edge identifier and no data
-// source expression, both of which make it an edge-sensitive path (§30.4.3).
 bool IsSimplePath(const SpecifyPathDecl& path) {
   return path.edge == SpecifyEdge::kNone && path.data_source == nullptr;
 }
 
-// Reports an ifnone path whose module path also has an unconditional simple
-// path (§30.4.4.4). An ifnone path no state-dependent path corresponds to is
-// legal, the clause treating it as an unconditional simple path of its own.
 void CheckIfnonePath(SpecifyItem* ifn,
                      const std::vector<SpecifyItem*>& unconditionals,
                      DiagEngine& diag) {
@@ -434,8 +357,6 @@ void CheckIfnonePath(SpecifyItem* ifn,
   }
 }
 
-// Pass: an ifnone path may not share its module path with an unconditional
-// simple path, whichever of the module's specify blocks declares each.
 void ValidateIfnonePaths(const ModuleDecl* mod, DiagEngine& diag) {
   std::vector<SpecifyItem*> ifnones;
   std::vector<SpecifyItem*> unconditionals;
@@ -450,8 +371,6 @@ void ValidateIfnonePaths(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* ifn : ifnones) CheckIfnonePath(ifn, unconditionals, diag);
 }
 
-// Classifies how a port is referenced: 0 = entire port, 1 = bit-select,
-// 2 = part-select (including indexed forms).
 int RefCategory(const SpecifyTerminal& t) {
   switch (t.range_kind) {
     case SpecifyRangeKind::kNone:
@@ -463,8 +382,6 @@ int RefCategory(const SpecifyTerminal& t) {
   }
 }
 
-// §30.4.4.3: two edge-sensitive paths to the same endpoints must reference
-// every port the same way.
 bool ConsistentRefs(const SpecifyPathDecl& a, const SpecifyPathDecl& b) {
   for (size_t i = 0; i < a.src_ports.size(); ++i) {
     if (RefCategory(a.src_ports[i]) != RefCategory(b.src_ports[i]))
@@ -477,8 +394,6 @@ bool ConsistentRefs(const SpecifyPathDecl& a, const SpecifyPathDecl& b) {
   return true;
 }
 
-// Collects the edge-sensitive path declarations of every specify block of
-// `mod`.
 std::vector<SpecifyItem*> CollectEdgePaths(const ModuleDecl* mod) {
   std::vector<SpecifyItem*> edge_paths;
   for (auto* si : ModuleSpecifyItems(mod)) {
@@ -489,8 +404,6 @@ std::vector<SpecifyItem*> CollectEdgePaths(const ModuleDecl* mod) {
   return edge_paths;
 }
 
-// Reports if `edge_paths[cur]` references its ports differently from any
-// preceding edge-sensitive path sharing the same endpoints (§30.4.4.3).
 void CheckEdgePathConsistency(const std::vector<SpecifyItem*>& edge_paths,
                               size_t cur, DiagEngine& diag) {
   for (size_t i = 0; i < cur; ++i) {
@@ -506,8 +419,6 @@ void CheckEdgePathConsistency(const std::vector<SpecifyItem*>& edge_paths,
   }
 }
 
-// Pass: enforce consistent port-reference forms across edge-sensitive paths to
-// the same module path (§30.4.4.3).
 void ValidateEdgePathConsistency(const ModuleDecl* mod, DiagEngine& diag) {
   std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(mod);
   for (size_t j = 0; j < edge_paths.size(); ++j) {
@@ -515,14 +426,8 @@ void ValidateEdgePathConsistency(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// §30.4.4.3: conservative structural equality for the constant and condition
-// expressions that distinguish edge-sensitive state-dependent paths. Forms not
-// recognized compare unequal, so a duplicate is reported only when two
-// declarations are provably identical -- never on a guess.
 bool SpecifyExprEqual(const Expr* a, const Expr* b);
 
-// Two selects denote the same reference when they select the same way from the
-// same base over the same bounds.
 bool SpecifySelectEqual(const Expr* a, const Expr* b) {
   return a->is_part_select_plus == b->is_part_select_plus &&
          a->is_part_select_minus == b->is_part_select_minus &&
@@ -531,8 +436,6 @@ bool SpecifySelectEqual(const Expr* a, const Expr* b) {
          SpecifyExprEqual(a->index_end, b->index_end);
 }
 
-// Two concatenations (or replications) are equal when their repeat counts match
-// and their element lists agree pairwise.
 bool SpecifyElementListEqual(const Expr* a, const Expr* b) {
   if (!SpecifyExprEqual(a->repeat_count, b->repeat_count)) return false;
   if (a->elements.size() != b->elements.size()) return false;
@@ -575,9 +478,6 @@ bool SpecifyExprEqual(const Expr* a, const Expr* b) {
   }
 }
 
-// §30.4.4.3: two edge-sensitive state-dependent path declarations denote the
-// same path when both terminals match by name and are referenced identically
-// -- entire port, or the same bit-/part-select expression.
 bool SameTerminal(const SpecifyTerminal& a, const SpecifyTerminal& b) {
   return a.name == b.name && a.interface_name == b.interface_name &&
          a.range_kind == b.range_kind &&
@@ -593,12 +493,6 @@ bool SameTerminals(const std::vector<SpecifyTerminal>& a,
   return true;
 }
 
-// §30.4.4.3: different delays may be assigned to the same edge-sensitive path
-// only when the edge, the condition, or both make each declaration unique.
-// Reports when `edge_paths[cur]` repeats an earlier state-dependent
-// declaration's edge and condition on the identical source and destination
-// terminals. Only paths that carry a condition are state-dependent, so an
-// unconditional edge path never triggers this rule.
 void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
                              size_t cur, DiagEngine& diag) {
   const SpecifyPathDecl& c = edge_paths[cur]->path;
@@ -618,8 +512,6 @@ void CheckEdgePathUniqueness(const std::vector<SpecifyItem*>& edge_paths,
   }
 }
 
-// Pass: enforce that edge-sensitive state-dependent paths sharing a module path
-// are distinguished by edge and/or condition (§30.4.4.3).
 void ValidateEdgePathUniqueness(const ModuleDecl* mod, DiagEngine& diag) {
   std::vector<SpecifyItem*> edge_paths = CollectEdgePaths(mod);
   for (size_t j = 0; j < edge_paths.size(); ++j) {
@@ -627,8 +519,6 @@ void ValidateEdgePathUniqueness(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// Computes the bit-width of a single path terminal, or 0 if it cannot be
-// determined statically.
 uint32_t TerminalWidth(const SpecifyTerminal& t, const PortMap& port_map) {
   if (t.range_kind == SpecifyRangeKind::kBitSelect) return 1;
   if (t.range_kind == SpecifyRangeKind::kPartSelect) {
@@ -651,8 +541,6 @@ uint32_t TerminalWidth(const SpecifyTerminal& t, const PortMap& port_map) {
   return EvalTypeWidth(it->second->data_type);
 }
 
-// Sums the widths of a terminal list; sets `known` false if any width is
-// unknown (and returns 0 in that case).
 uint32_t SumWidths(const std::vector<SpecifyTerminal>& ts,
                    const PortMap& port_map, bool& known) {
   uint32_t total = 0;
@@ -667,11 +555,6 @@ uint32_t SumWidths(const std::vector<SpecifyTerminal>& ts,
   return total;
 }
 
-// §30.4.3 (printed page 874): with a parallel connection, an edge-sensitive
-// path's destination is a scalar output or inout port or a bit-select of a
-// vector one. Its source may be any input or inout port, its edge read off the
-// least significant bit, so the source's width is not compared. A destination
-// whose port or width is unknown is left alone.
 void CheckEdgeParallelPathDestination(const SpecifyItem* si,
                                       const PortMap& port_map,
                                       DiagEngine& diag) {
@@ -692,9 +575,6 @@ void CheckEdgeParallelPathDestination(const SpecifyItem* si,
   }
 }
 
-// Checks that one simple parallel module path has equal source and destination
-// bit widths (§30.4.5), and an edge-sensitive one its destination (§30.4.3);
-// full paths and unknown widths are skipped.
 void CheckParallelPathWidth(const SpecifyItem* si, const PortMap& port_map,
                             DiagEngine& diag) {
   if (si->kind != SpecifyItemKind::kPathDecl) return;
@@ -715,7 +595,6 @@ void CheckParallelPathWidth(const SpecifyItem* si, const PortMap& port_map,
   }
 }
 
-// Pass: parallel module paths require equal source and destination bit widths.
 void ValidateParallelPathWidths(const ModuleDecl* mod, const PortMap& port_map,
                                 DiagEngine& diag) {
   for (auto* item : mod->items) {
@@ -726,11 +605,6 @@ void ValidateParallelPathWidths(const ModuleDecl* mod, const PortMap& port_map,
   }
 }
 
-// Reports every signal in `si->path_outputs` that names a module-path
-// destination in `path_dsts`, using `kw` as the declaration keyword.
-// §30.7.4.1 states the rule for a pulse style declaration and §30.7.4.2 the
-// same rule for a showcancelled declaration, so the caller passes the one its
-// keyword falls under.
 void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
                                const SignalSet& path_dsts, DiagEngine& diag,
                                Subclause subclause) {
@@ -747,8 +621,6 @@ void ReportPulseStyleConflicts(const SpecifyItem* si, const char* kw,
   }
 }
 
-// Updates the running set of module-path destinations from one specify item,
-// then checks any pulsestyle/showcancelled declaration against that set.
 void CheckPulseStyleItem(const SpecifyItem* si, SignalSet& path_dsts,
                          DiagEngine& diag) {
   if (si->kind == SpecifyItemKind::kPathDecl) {
@@ -767,9 +639,6 @@ void CheckPulseStyleItem(const SpecifyItem* si, SignalSet& path_dsts,
   }
 }
 
-// Pass: pulsestyle/showcancelled declarations may not name an output a module
-// path declaration has already reached, in its own specify block or an earlier
-// one of the module.
 void ValidatePulseStyleConflicts(const ModuleDecl* mod, DiagEngine& diag) {
   SignalSet path_dsts;
   for (auto* si : ModuleSpecifyItems(mod)) {
@@ -777,8 +646,6 @@ void ValidatePulseStyleConflicts(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// Verifies that every delay-expression operand of one path declaration names a
-// specparam; non-path items are ignored.
 void CheckItemDelayOperands(const SpecifyItem* si, const SignalSet& specparams,
                             DiagEngine& diag) {
   if (si->kind != SpecifyItemKind::kPathDecl) return;
@@ -788,7 +655,6 @@ void CheckItemDelayOperands(const SpecifyItem* si, const SignalSet& specparams,
   }
 }
 
-// Pass: every operand in a module-path delay expression must be a specparam.
 void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -799,8 +665,6 @@ void ValidateDelayOperands(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// Runs all specify-block validation passes for a single module/interface/
-// program, in their original order.
 void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
                               DiagEngine& diag) {
   PortMap port_map = BuildPortMap(mod);
@@ -815,8 +679,6 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
   ValidateDelayOperands(mod, diag);
   ValidateTimingCheckLimitOperands(mod, diag);
   ValidateTimingCheckFlags(mod, diag);
-  // Each check's own subclause states the limits it takes, so each pass names
-  // the subclause of the check it walks.
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kSetup,
                                       "$setup", Subclause("31.3.1"));
   ValidateTimingCheckLimitNonNegative(mod, diag, TimingCheckKind::kHold,
@@ -841,12 +703,6 @@ void ValidateOneSpecifyModule(const ModuleDecl* mod, const IfaceMap& iface_map,
 
 }  // namespace
 
-// Recursively verifies that every identifier operand in a specify-block
-// constant expression names a specparam declared in the same specify block.
-// `constant_expr` says which construct the expression belongs to, so the same
-// walker serves module-path delays (§30.5) and timing-check limits (§31.2),
-// both of which the LRM requires to be constant expressions that may include
-// specparams.
 void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
                     DiagEngine& diag, SpecifyConstantExpr constant_expr) {
   if (!e) return;
@@ -897,7 +753,6 @@ void CheckDelayExpr(const Expr* e, SourceLoc loc, const SignalSet& specparams,
   }
 }
 
-// Collects the names of all specparams declared in one specify block.
 SignalSet CollectSpecparams(const ModuleItem* item) {
   SignalSet specparams;
   for (auto* si : item->specify_items) {
@@ -920,9 +775,6 @@ SignalSet CollectSpecparamsInScope(const ModuleDecl* mod,
 }
 
 void Elaborator::ValidateSpecifyBlocks() {
-  // §25.6: interface signals used as specify terminals are governed by the
-  // interface (and any selected modport), so the validator needs to look up
-  // each interface port's definition by type name.
   IfaceMap iface_map;
   for (const auto* iface : unit_->interfaces) {
     if (iface && !iface->name.empty()) iface_map[iface->name] = iface;

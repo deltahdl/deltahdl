@@ -11,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §11.4.13: if no match is found the operator returns 1'b0. Driven through the
-// full pipeline so both the left-hand side and the value set come from real
-// literals: 4 is not a member of {3,5,7}.
 TEST(ExpressionSim, InsideValueNoMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -26,9 +23,6 @@ TEST(ExpressionSim, InsideValueNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §11.4.13: integral comparisons use wildcard equality, so an x or z bit in a
-// set value is a do-not-care in that position. `3'b1?1` matches 3'b101 because
-// the wildcard bit ignores val's middle bit.
 TEST(ExpressionSim, InsideWildcardRhsMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -45,8 +39,6 @@ TEST(ExpressionSim, InsideWildcardRhsMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.4.13: a match is found when the left-hand side lies inclusively within
-// the range, so both the low and the high bound are themselves matches.
 TEST(ExpressionSim, InsideRangeBoundaryInclusive) {
   SimFixture f;
   auto [x, y] = RunModuleTwoVars(f,
@@ -62,9 +54,6 @@ TEST(ExpressionSim, InsideRangeBoundaryInclusive) {
   EXPECT_EQ(y, 1u);
 }
 
-// §11.4.13 makes the left operand of `inside` a singular expression, and an
-// unpacked array is none, so `arr inside {q}` is illegal. It elaborated clean
-// and answered 1.
 TEST(InsideOperatorElaboration, UnpackedArrayLeftOperandIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -80,8 +69,6 @@ TEST(InsideOperatorElaboration, UnpackedArrayLeftOperandIsIllegal) {
                             "11.4.13"));
 }
 
-// An unpacked array in the set is where §11.4.13 puts one, each of its
-// elements a member, so it is not reported.
 TEST(InsideOperatorElaboration, UnpackedArrayInTheSetIsLegal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,10 +83,6 @@ TEST(InsideOperatorElaboration, UnpackedArrayInTheSetIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.13's left operand is singular, and neither a select leaving one of an
-// array's unpacked dimensions nor a member that is an unpacked array or an
-// unpacked structure or union is; an element, a scalar member and a member of
-// a packed or class type are.
 TEST(InsideElaboration, UnpackedSubArrayOrMemberLeftOperandReported) {
   ElabFixture f;
   ElaborateSrc(

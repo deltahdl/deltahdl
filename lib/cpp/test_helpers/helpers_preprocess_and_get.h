@@ -18,17 +18,12 @@
 
 using namespace delta;
 
-// Selects which preprocessor state (if any) is propagated onto the
-// CompilationUnit before elaboration.
 enum class CuPropagation : std::uint8_t {
   kNone,
   kDefaultNetType,
   kUnconnectedDrive
 };
 
-// Runs the full preprocess -> parse -> elaborate -> lower -> simulate pipeline
-// on an already-registered source file and returns the resulting value of
-// `var_name`. The source `fid` is preprocessed, then parsed and simulated.
 inline uint64_t RunPreprocessedSim(SimFixture& f, uint32_t fid,
                                    const char* var_name, Preprocessor& pp,
                                    CuPropagation prop = CuPropagation::kNone) {
@@ -56,8 +51,6 @@ inline uint64_t RunPreprocessedSim(SimFixture& f, uint32_t fid,
   return var->value.ToUint64();
 }
 
-// Convenience overload that builds a fresh SimFixture, registers `src` as the
-// top-level source, and simulates it.
 inline uint64_t PreprocessAndGet(const std::string& src, const char* var_name,
                                  CuPropagation prop = CuPropagation::kNone) {
   SimFixture f;
@@ -66,13 +59,6 @@ inline uint64_t PreprocessAndGet(const std::string& src, const char* var_name,
   return RunPreprocessedSim(f, fid, var_name, pp, prop);
 }
 
-// Runs `src` as deltahdl's driver does: preprocessed, parsed, given what the
-// preprocessor recorded in force at each design element's header -- its
-// `timescale among it -- and the compilation unit's last `timescale and finest
-// `timescale precision, as ApplyPreprocMetadata in src/main.cpp gives them,
-// then elaborated with its last module as the top, lowered and simulated.
-// Returns what the run wrote to stdout; a source that does not elaborate writes
-// nothing.
 inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Preprocessor pp(f.mgr, f.diag, {});
@@ -99,14 +85,6 @@ inline std::string PreprocessAndCapture(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
-// The same, for a §22.14 test: `body` is wrapped in a real `begin_keywords
-// region for `spec` and driven through the whole pipeline, and the value of
-// `var_name` at the end of the run is returned. Checking the diagnostics is
-// what keeps the result meaningful -- source the specifier's list admits has
-// to run clean, not merely produce a number after the front end recovered
-// from something it rejected -- and the unterminated-region report is asked
-// for because a region the directive left open is one of the things that
-// would make it dirty.
 inline uint64_t RunUnderKeywordVersion(const char* spec,
                                        const std::string& body,
                                        const char* var_name) {

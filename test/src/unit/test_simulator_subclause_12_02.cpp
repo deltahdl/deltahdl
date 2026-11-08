@@ -1,13 +1,3 @@
-// Tests for §12.2 "Overview" at the simulator, covering the half of its rule
-// that says what the eight constructs do: a procedural statement contained
-// within any of them runs. §12.2 names six that activate on their own --
-// initial, always, always_comb, always_latch, always_ff and final -- and two
-// that activate when called, task and function.
-//
-// Each test below writes one procedural assignment into one container and
-// reads the variable it wrote. The parser-stage file for this subclause covers
-// the other half, that a procedural statement outside all eight is rejected.
-
 #include <gtest/gtest.h>
 
 #include "helpers_scheduler.h"
@@ -16,7 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §12.2: `initial` activates automatically and runs the statement it contains.
 TEST(ProceduralStatementContainmentSim, InitialRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
@@ -27,9 +16,6 @@ TEST(ProceduralStatementContainmentSim, InitialRunsItsStatement) {
   EXPECT_EQ(val, 42u);
 }
 
-// §12.2: `always` activates automatically and repeats, so the statement it
-// contains runs each time the block does. Three delays elapse before the
-// finish, so the count reaches 3.
 TEST(ProceduralStatementContainmentSim, AlwaysRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
@@ -41,8 +27,6 @@ TEST(ProceduralStatementContainmentSim, AlwaysRunsItsStatement) {
   EXPECT_EQ(val, 3u);
 }
 
-// §12.2: `always_comb` activates automatically on a change of what its
-// statement reads.
 TEST(ProceduralStatementContainmentSim, AlwaysCombRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
@@ -54,10 +38,6 @@ TEST(ProceduralStatementContainmentSim, AlwaysCombRunsItsStatement) {
   EXPECT_EQ(val, 8u);
 }
 
-// §12.2: `always_latch` activates automatically in the same way, and the
-// statement it contains here is a selection statement rather than a bare
-// assignment. Only the latch writes `x`, since §9.2.2.2 rules that a variable
-// written by an always_latch shall be written by nothing else.
 TEST(ProceduralStatementContainmentSim, AlwaysLatchRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
@@ -70,8 +50,6 @@ TEST(ProceduralStatementContainmentSim, AlwaysLatchRunsItsStatement) {
   EXPECT_EQ(val, 5u);
 }
 
-// §12.2: `always_ff` activates on the edge its event control names, and runs
-// the nonblocking assignment it contains.
 TEST(ProceduralStatementContainmentSim, AlwaysFFRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
@@ -84,8 +62,6 @@ TEST(ProceduralStatementContainmentSim, AlwaysFFRunsItsStatement) {
   EXPECT_EQ(val, 9u);
 }
 
-// §12.2: `final` activates once, after the simulation the other blocks ran in
-// has ended, and runs the statement it contains then.
 TEST(ProceduralStatementContainmentSim, FinalRunsItsStatement) {
   auto val = RunAndGet(
       "module m;\n"
@@ -97,8 +73,6 @@ TEST(ProceduralStatementContainmentSim, FinalRunsItsStatement) {
   EXPECT_EQ(val, 99u);
 }
 
-// §12.2: a `task` activates when called, and the statement in its body runs
-// then rather than on its own.
 TEST(ProceduralStatementContainmentSim, TaskRunsItsStatementWhenCalled) {
   auto val = RunAndGet(
       "module m;\n"
@@ -112,9 +86,6 @@ TEST(ProceduralStatementContainmentSim, TaskRunsItsStatementWhenCalled) {
   EXPECT_EQ(val, 21u);
 }
 
-// §12.2: a `function` is the other construct that activates when called. Its
-// body holds a local declaration, an assignment and a jump statement, three of
-// the kinds §12.2 lists.
 TEST(ProceduralStatementContainmentSim, FunctionRunsItsStatementsWhenCalled) {
   auto val = RunAndGet(
       "module m;\n"

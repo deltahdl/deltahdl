@@ -22,33 +22,10 @@ namespace delta {
 void ValidateRefLifetime(const ModuleItem* func, DiagEngine& diag);
 void ValidateConstRefWriteProtection(const ModuleItem* func, DiagEngine& diag);
 
-// §9.3.2: a return inside a fork-join block is illegal and a compilation error.
-// The clause puts no condition on where inside the fork the return stands, so
-// every position a statement holds a statement in is one the rule reaches.
-// ForEachChildStmt in elaborator_validate_internal.h states those positions
-// once for the whole elaborator, which is why the list is not written out again
-// here.
-//
-// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
-// walked whole, and no conforming source puts a return in either: A.6.8 admits
-// only a list_of_variable_assignments or a for_variable_declaration in a
-// for_initialization, and only an operator_assignment, an inc_or_dec_expression
-// or a function_subroutine_call in a for_step, and a jump_statement is none of
-// those.
-//
-// `in_production_code_block` is §18.17.6's term. It is set at a randsequence
-// statement and stays set below one, through a fork-join written inside a
-// production code block as well: a return there aborts the production rather
-// than the enclosing subroutine, so the return §9.3.2 forbids is not what is
-// written there, however many process boundaries stand between.
 static void CheckNoReturnInFork(const Stmt* s, bool in_production_code_block,
                                 DiagEngine& diag) {
   if (!s) return;
   if (s->kind == StmtKind::kReturn) {
-    // §18.17.6: return ends the generation of the current production. A return
-    // in a randsequence production code block is therefore not the enclosing
-    // subroutine's return, and §9.3.2 is about the subroutine's return, so this
-    // clause has nothing to report about it.
     if (!in_production_code_block) {
       diag.Error(s->range.start,
                  "return statement is not allowed inside a fork-join block",
@@ -56,9 +33,6 @@ static void CheckNoReturnInFork(const Stmt* s, bool in_production_code_block,
     }
     return;
   }
-  // Stmt::rs_productions is the only member of Stmt a randsequence statement
-  // fills, and every statement it holds stands in one of the two rs_code_blocks
-  // A.6.12's rs_rule admits, so the term is set at the randsequence itself.
   bool in_production =
       in_production_code_block || s->kind == StmtKind::kRandsequence;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
@@ -121,18 +95,6 @@ static void CheckStmtExprsForRefArgs(
     CheckExprForRefArgs(we, ref_names, diag);
 }
 
-// §9.3.2 forbids a ref argument anywhere inside a fork-join_any or
-// fork-join_none block, and puts no condition on the position the use is
-// written in, so every position a statement holds a statement in is one the
-// rule reaches. ForEachChildStmt in elaborator_validate_internal.h states
-// those positions once for the whole elaborator, which is why the list is not
-// written out again here.
-//
-// The recursion passes false for is_fork_block_item because the flag answers
-// for a statement the fork holds directly. §9.3.2 excepts the initializers of
-// variables a block_item_declaration of the fork declares, and A.6.3 puts a
-// block_item_declaration among the fork's own items, so no statement nested
-// below one is that declaration.
 static void CheckStmtForRefArgs(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     bool is_fork_block_item, DiagEngine& diag) {
@@ -143,25 +105,6 @@ static void CheckStmtForRefArgs(
   });
 }
 
-// Finds the fork-join_any and fork-join_none blocks §9.3.2 governs. A.6.3
-// makes a par_block a statement, and the clause puts no condition on where the
-// fork stands, so every position a statement holds a statement in is one such
-// a fork can be written in. ForEachChildStmt in
-// elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
-//
-// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
-// walked whole, and no conforming source puts a fork in either: A.6.8 admits
-// only a list_of_variable_assignments or a for_variable_declaration in a
-// for_initialization, and only an operator_assignment, an
-// inc_or_dec_expression or a function_subroutine_call in a for_step, none of
-// which is a par_block.
-// `enclosed` says a fork-join_any or fork-join_none already handed this subtree
-// to CheckStmtForRefArgs, which covers the whole of it. §9.3.2 states one rule
-// about a ref argument used inside a fork-join_any or fork-join_none block, and
-// a use inside two of them is one use of it: without the term the outer fork
-// reported it and the inner fork reported it again, and three nested forks
-// reported it three times.
 static void CheckRefArgsInForkBlocks(
     const Stmt* s, const std::unordered_set<std::string_view>& ref_names,
     bool enclosed, DiagEngine& diag) {
@@ -180,10 +123,6 @@ static void CheckRefArgsInForkBlocks(
   });
 }
 
-// §13.4 rule (a) bars any statement containing `#` or `@`, and an assignment's
-// intra-assignment delay or event control, `a = #1 b` or `a <= @(e) b`, is
-// one the assignment contains (Stmt::delay, Stmt::events). Its intra-assignment
-// `##` is reported under §14.11 instead.
 static bool HasIntraAssignmentTiming(const Stmt* s) {
   if (s->kind != StmtKind::kBlockingAssign &&
       s->kind != StmtKind::kNonblockingAssign)
@@ -212,49 +151,18 @@ static void CheckFuncBodyVarDecl(const Stmt* s, std::string_view func_name,
                            func_name),
                Subclause("13.4.1"));
   }
-  // A static variable's initializer is deliberately not checked for
-  // constancy. §6.8 permits a run-time initial value outright: an initial value
-  // need not be a simple constant and may be a run-time expression, dynamic
-  // memory allocation included, and names calling $urandom as one of its own
-  // examples. §6.21 constrains only when that initialization runs, once at the
-  // beginning of simulation, and §13.4.2 covers storage and reentrancy, so
-  // neither narrows §6.8 for a static variable declared inside a subroutine.
 }
 
-// What §13.4 and §13.4.1 need to know about the function whose body is being
-// walked, and §18.17.6 about where in that body the statement being walked
-// stands.
 struct FunctionBodyScope {
-  // §13.4.1: a function declared void has no return value, so a return carrying
-  // one in such a function breaks the clause.
   bool is_void = false;
-  // §13.4.1 forbids declaring, inside a function's scope, another object named
-  // after the function. A declaration written in the body is compared against
-  // this name.
   std::string_view func_name;
-  // §13.4: no function may enable a task, whether or not the task holds a
-  // time-controlling statement. A statement is a task enable when the name it
-  // enables (EnabledSubroutineName) is one of these (ReachableTaskNames).
   const std::unordered_set<std::string>& task_names;
-  // §18.17.6: return ends the generation of the current production. Such a
-  // return is not the function's return, and §18.17.7 has it carry an
-  // expression -- a production returns a value through a return with an
-  // expression -- which is the shape §13.4.1's void-return report fires on. The
-  // term is what withholds that report.
   bool in_production_code_block = false;
-  // §9.3.2: whether a fork-join block already encloses the statement being
-  // walked. CheckNoReturnInFork covers a whole subtree from one entry, so
-  // entering it again at a nested fork states one breach twice.
   bool in_fork = false;
 };
 
 static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
                                   DiagEngine& diag) {
-  // §18.17.6 and §18.17.7: the expression a return carries in a randsequence
-  // production code block is the production's value and not a value returned
-  // from the function, so §13.4.1's rule about a void function is not what
-  // governs it. A return without a value in a nonvoid function is §12.8's
-  // report (elaborator_validate_jump_statements.cpp).
   if (s->kind == StmtKind::kReturn && s->expr && scope.is_void &&
       !scope.in_production_code_block) {
     diag.Error(s->range.start, "void function returns a value",
@@ -282,60 +190,27 @@ static void CheckFuncBodyStmtSelf(const Stmt* s, const FunctionBodyScope& scope,
                Subclause("10.6.1"));
   }
 
-  // §9.3.2 states one rule about a return inside a fork-join block, and a
-  // return inside two of them breaks it once. CheckNoReturnInFork descends
-  // every child-statement link, Stmt::fork_stmts among them, so the outermost
-  // fork already reaches everything below it and entering again at a nested one
-  // states the same breach a second time.
   if (s->kind == StmtKind::kFork && !scope.in_fork) {
     for (auto* sub : s->fork_stmts)
       CheckNoReturnInFork(sub, scope.in_production_code_block, diag);
   }
 }
 
-// §13.4 and §13.4.1 state the rules a function body is held to and put no
-// condition on where in the body the statement breaking one stands, so every
-// position a statement holds a statement in is one they reach. ForEachChildStmt
-// in elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
-//
-// Stmt::for_inits is walked because the shared list is walked whole, and no
-// conforming source makes any report above from it: A.6.8 admits only a
-// list_of_variable_assignments or a for_variable_declaration there, and
-// ParserStmtHelpers::ParseForLocalDeclInits in src/parser/parser_stmt.cpp
-// leaves a control variable declared local to the loop as an assignment with
-// its type in Stmt::for_init_types rather than as a StmtKind::kVarDecl.
-// Stmt::for_steps does make one: A.6.8 admits a function_subroutine_call there,
-// and a task enable is one.
 static void CheckFuncBodyStmt(const Stmt* s, const FunctionBodyScope& scope,
                               DiagEngine& diag) {
   if (!s) return;
   CheckFuncBodyStmtSelf(s, scope, diag);
 
-  // §13.4.4: inside a function, a fork-join_none may hold whatever statements a
-  // task may, which is the exception §13.4 points to at its opening. The
-  // statements under such a fork are answerable to §13.3 rather than to §13.4,
-  // so the walk stops here.
   if (s->kind == StmtKind::kFork && s->join_kind == TokenKind::kKwJoinNone)
     return;
 
   FunctionBodyScope inner = scope;
-  // Stmt::rs_productions is the only member of Stmt a randsequence statement
-  // fills, and every statement it holds stands in one of the two rs_code_blocks
-  // A.6.12's rs_rule admits, so §18.17.6's term is set at the randsequence
-  // itself.
   if (s->kind == StmtKind::kRandsequence) inner.in_production_code_block = true;
-  // §9.3.2: everything below this fork is already covered by the
-  // CheckNoReturnInFork entry made at it, so a nested fork makes no second
-  // entry.
   if (s->kind == StmtKind::kFork) inner.in_fork = true;
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { CheckFuncBodyStmt(sub, inner, diag); });
 }
 
-// §13.3.2: an automatic task variable is deallocated when the invocation ends,
-// so a reference to one must not outlive the call. Walk an expression tree
-// looking for any leaf identifier naming such a variable.
 static bool ExprRefsAutoVar(
     const Expr* e, const std::unordered_set<std::string_view>& auto_vars);
 
@@ -363,30 +238,6 @@ static bool ExprRefsAutoVar(
   return AnyChildExprRefsAutoVar(e, auto_vars);
 }
 
-// Which clause forbids the four uses below, and how a report names the
-// variable. §13.3.1 lets a static task declare a given local variable
-// automatic, and an automatic task declare one static, so a task-local variable
-// is deallocated when the task returns for either of two reasons, and the
-// clause that forbids these uses of it differs with the reason.
-//
-// A variable of an automatic task is what §13.3.2's four bullets are about:
-// they rest on the variables of an automatic task being freed when the task
-// invocation ends, which keeps them out of constructs that could still refer to
-// them afterwards, and reach nothing else.
-//
-// A variable a static task declares `automatic` is not one, and answers to
-// §6.21. Its first sentence forbids writing an automatic variable with a
-// nonblocking, continuous or procedural continuous assignment, which is the
-// nonblocking assignment and the procedural continuous assignment. Its last
-// sentence, confining references to automatic variables and to elements or
-// members of dynamic variables to procedural blocks, is what the other two
-// break: an intra-assignment event control defers its evaluation past the
-// statement, and $monitor keeps reading its arguments for the rest of the
-// simulation, so neither reference stays inside the block that declared the
-// variable.
-//
-// ValidateTaskBody is the only place that knows which task declared the
-// variables, so the rule travels from there rather than being fixed at a site.
 struct AutoVarRule {
   std::string_view variable;
   Subclause subclause;
@@ -396,22 +247,14 @@ constexpr AutoVarRule kAutomaticTaskVar{"automatic task variable",
                                         Subclause("13.3.2")};
 constexpr AutoVarRule kAutomaticVarInStaticScope{"automatic variable",
                                                  Subclause("6.21")};
-// §10.4.2 (printed page 253) states the nonblocking rule for every automatic
-// variable, and it is the clause a function body answers to, §13.4 naming no
-// rule of its own for one.
 constexpr AutoVarRule kAutomaticFunctionVar{"automatic variable",
                                             Subclause("10.4.2")};
 
-// What a nonblocking target's names are judged against: the class names that
-// tell a handle, and the typedefs a declared type is written through.
 struct HandleNames {
   const NameSet& class_names;
   const TypedefMap& typedefs;
 };
 
-// Whether a variable of `type` is a handle: a class or virtual interface
-// handle, whose members belong to the object or interface it refers to,
-// written as such or through typedefs.
 static bool IsHandleType(const DataType& type, const HandleNames& names) {
   const DataType* t = &type;
   while (t->kind == DataTypeKind::kNamed &&
@@ -424,9 +267,6 @@ static bool IsHandleType(const DataType& type, const HandleNames& names) {
          t->kind == DataTypeKind::kNamed;
 }
 
-// Whether `name`, written as the variable a nonblocking target writes into,
-// reaches an automatic variable. Written through a member of a handle it
-// writes the object the handle refers to instead, which outlives the call.
 static bool NbaNameIsAutomatic(std::string_view name, bool through_member,
                                const BodyDeclScopes& scopes,
                                const HandleNames& class_names) {
@@ -435,9 +275,6 @@ static bool NbaNameIsAutomatic(std::string_view name, bool through_member,
   return !through_member || !IsHandleType(*decl->type, class_names);
 }
 
-// §10.4.2 (printed page 253): a nonblocking assignment shall not write into an
-// automatic variable, whichever select, member or concatenation element of it
-// the target names, and §23.9 decides which declaration a name reaches.
 static bool NbaTargetWritesAutomatic(const Expr* e, bool through_member,
                                      const BodyDeclScopes& scopes,
                                      const HandleNames& class_names) {
@@ -456,19 +293,12 @@ static bool NbaTargetWritesAutomatic(const Expr* e, bool through_member,
          NbaNameIsAutomatic(e->text, through_member, scopes, class_names);
 }
 
-// How a body's nonblocking writes into automatic variables are judged and
-// reported: the rule that names them, the class names that tell a handle, and
-// where the reports go.
 struct NbaAutoReport {
   const AutoVarRule& rule;
   const HandleNames& class_names;
   DiagEngine& diag;
 };
 
-// Reports each nonblocking assignment of a body that writes an automatic
-// variable: a subroutine's, whose formals are in view throughout, or a
-// procedural block's, which has none. `default_auto` is the lifetime of a
-// variable the body declares without saying.
 static void CheckNbaAutomaticTargets(const std::vector<FunctionArg>& formals,
                                      const std::vector<Stmt*>& body,
                                      bool default_auto,
@@ -490,9 +320,6 @@ static void CheckNbaAutomaticTargets(const std::vector<FunctionArg>& formals,
   }
 }
 
-// An automatic task variable shall not appear in the intra-assignment event
-// control of a nonblocking assignment, since the event control can defer
-// evaluation past the variable's lifetime.
 static void CheckNbaEventControlForAutoVar(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     const AutoVarRule& rule, DiagEngine& diag) {
@@ -512,10 +339,6 @@ static void CheckNbaEventControlForAutoVar(
   }
 }
 
-// §13.3.2 (printed page 339): an automatic task variable may not be traced by
-// system tasks like $monitor and $dumpvars, whose tracing outlives the
-// invocation. $monitor's radix forms trace as it does, and so does $fmonitor in
-// each of its forms, which §21.3.2 makes work as $monitor does.
 static bool IsTracingSystemTask(std::string_view name) {
   if (name == "$dumpvars") return true;
   name.remove_prefix(name.starts_with("$f") ? 2 : 1);
@@ -543,9 +366,6 @@ static void CheckTaskBodyMonitorTrace(
 static void CheckTaskBodyContAssign(
     const Stmt* s, const std::unordered_set<std::string_view>& auto_vars,
     const AutoVarRule& rule, DiagEngine& diag) {
-  // §13.3.2 bars an automatic task variable from being the target of an
-  // assign or force and from being referenced by one, which keeps reading its
-  // right side after the task returns.
   if (s->kind == StmtKind::kForce || s->kind == StmtKind::kAssign) {
     auto name = ExprIdent(s->lhs);
     if ((!name.empty() && auto_vars.count(name) != 0) ||
@@ -564,35 +384,15 @@ static void CheckTaskBodyContAssign(
   }
 }
 
-// What §13.3 and the clause AutoVarRule selects need to know about the task
-// whose body is being walked, and §18.17.6 about where in that body the
-// statement being walked stands.
 struct TaskBodyScope {
-  // The variables the four uses are forbidden of: §13.3.2's variables of
-  // automatic tasks, or §6.21's automatic variables where a static task
-  // declared them, as CollectAutoVarNames collects them.
   const std::unordered_set<std::string_view>& auto_vars;
-  // Which of those two clauses forbids the use, and how its report names the
-  // variable. See AutoVarRule above.
   const AutoVarRule& rule;
-  // §18.17.6: return ends the generation of the current production. Such a
-  // return is not the task's return, and §18.17.7 has it carry an expression --
-  // a production returns a value through a return with an expression -- which
-  // is the shape §13.3's report fires on. The term is what withholds that
-  // report.
   bool in_production_code_block = false;
-  // §9.3.2: whether a fork-join block already encloses the statement being
-  // walked. CheckNoReturnInFork covers a whole subtree from one entry, so
-  // entering it again at a nested fork states one breach twice.
   bool in_fork = false;
 };
 
 static void CheckTaskBodyStmtSelf(const Stmt* s, const TaskBodyScope& scope,
                                   DiagEngine& diag) {
-  // §18.17.6 and §18.17.7: the expression a return carries in a randsequence
-  // production code block is the production's value and not a value returned
-  // from the task, so §13.3's rule that a task exits at endtask, or earlier
-  // through return, is not what governs it.
   if (s->kind == StmtKind::kReturn && s->expr &&
       !scope.in_production_code_block) {
     diag.Error(s->range.start, "task returns a value", Subclause("13.3"));
@@ -603,65 +403,23 @@ static void CheckTaskBodyStmtSelf(const Stmt* s, const TaskBodyScope& scope,
   CheckTaskBodyMonitorTrace(s, scope.auto_vars, scope.rule, diag);
   CheckTaskBodyContAssign(s, scope.auto_vars, scope.rule, diag);
 
-  // §9.3.2 states one rule about a return inside a fork-join block, and a
-  // return inside two of them breaks it once. CheckNoReturnInFork descends
-  // every child-statement link, Stmt::fork_stmts among them, so the outermost
-  // fork already reaches everything below it and entering again at a nested one
-  // states the same breach a second time.
   if (s->kind == StmtKind::kFork && !scope.in_fork) {
     for (auto* sub : s->fork_stmts)
       CheckNoReturnInFork(sub, scope.in_production_code_block, diag);
   }
 }
 
-// §13.3, §13.3.2, §6.21 and §10.6.1 each state a rule about a statement written
-// in a task body and put no condition on where in the body it stands, so every
-// position a statement holds a statement in is one they reach. ForEachChildStmt
-// in elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
-//
-// Stmt::for_inits is walked because the shared list is walked whole, and no
-// conforming source makes any report above from it: A.6.8 admits only a
-// list_of_variable_assignments or a for_variable_declaration there, and neither
-// is a return, a nonblocking assignment, a procedural continuous assignment or
-// a system task call. Stmt::for_steps does make one: A.6.8 admits a
-// function_subroutine_call there, and $monitor is one.
 static void CheckTaskBodyStmt(const Stmt* s, const TaskBodyScope& scope,
                               DiagEngine& diag) {
   if (!s) return;
   CheckTaskBodyStmtSelf(s, scope, diag);
   TaskBodyScope inner = scope;
-  // Stmt::rs_productions is the only member of Stmt a randsequence statement
-  // fills, and every statement it holds stands in one of the two rs_code_blocks
-  // A.6.12's rs_rule admits, so §18.17.6's term is set at the randsequence
-  // itself.
   if (s->kind == StmtKind::kRandsequence) inner.in_production_code_block = true;
-  // §9.3.2: everything below this fork is already covered by the
-  // CheckNoReturnInFork entry made at it, so a nested fork makes no second
-  // entry.
   if (s->kind == StmtKind::kFork) inner.in_fork = true;
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { CheckTaskBodyStmt(sub, inner, diag); });
 }
 
-// Collects the names §6.21 and §13.3.2 govern. §6.21 bars nonblocking,
-// continuous and procedural continuous assignments from writing an automatic
-// variable or an element of a dynamically sized array variable, and §13.3.2
-// rests on an automatic task's variables being freed when the task invocation
-// ends, so each turns on how a variable was declared and neither on where the
-// declaration stands. A.2.8 makes a data_declaration a block_item_declaration,
-// so a declaration this collects can be reached through every position a
-// statement holds a statement in. ForEachChildStmt in
-// elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
-//
-// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
-// walked whole, and neither ever holds a declaration this collects.
-// Parser::ParseAssignmentOrExprNoSemi in src/parser/parser_stmt.cpp builds
-// every statement in both, and it produces a blocking assignment, a nonblocking
-// assignment or an expression statement and never a StmtKind::kVarDecl; a
-// control variable declared local to the loop leaves its type in
-// Stmt::for_init_types and its name in the assignment.
 static void CollectAutoVarNames(const Stmt* s, bool task_is_auto,
                                 std::unordered_set<std::string_view>& out) {
   if (!s) return;
@@ -710,7 +468,7 @@ static void ValidateRefArgsInForkBlocks(const ModuleItem* item,
   }
   if (!ref_names.empty()) {
     for (auto* s : item->func_body_stmts)
-      CheckRefArgsInForkBlocks(s, ref_names, /*enclosed=*/false, diag);
+      CheckRefArgsInForkBlocks(s, ref_names, false, diag);
   }
 }
 
@@ -745,15 +503,11 @@ void Elaborator::ValidateFunctionBody(const ModuleItem* item,
 
   ValidateRefArgsInForkBlocks(item, diag_);
 
-  // §3.13 (f): a function or a task opens a block name space holding its
-  // formal arguments and the declarations and named blocks of its body, and
-  // each block nested in the body opens one of its own.
   std::unordered_set<std::string_view> formals;
   for (const auto& arg : item->func_args) formals.insert(arg.name);
   CheckBlockNameSpace(item->func_body_stmts, std::move(formals), diag_);
   for (auto* s : item->func_body_stmts) CheckNestedBlockNameSpaces(s, diag_);
 
-  // §8.6: every method of a class is automatic.
   bool is_auto = item->is_automatic || is_class_method;
   if (item->kind == ModuleItemKind::kTaskDecl) {
     ValidateTaskBody(item, is_auto, {class_names_, typedefs_}, diag_);
@@ -784,35 +538,11 @@ static void CheckAutoVarWritesInProc(
                  Subclause("6.21"));
     }
   }
-  // §6.21 forbids the procedural continuous assignment reported above by what
-  // it writes into rather than by where it is written, so every position a
-  // statement holds a statement in is one it can stand in. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
-  //
-  // Stmt::for_inits and Stmt::for_steps are walked because the shared list is
-  // walked whole, and no conforming source makes either report: A.6.8 admits
-  // only a list_of_variable_assignments or a for_variable_declaration in a
-  // for_initialization, and only an operator_assignment, an
-  // inc_or_dec_expression or a function_subroutine_call in a for_step, and none
-  // of those is a nonblocking assignment, a procedural continuous assignment or
-  // a force.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     CheckAutoVarWritesInProc(sub, auto_vars, diag);
   });
 }
 
-// §6.21 (printed pages 133 and 134): a variable of a static task, function or
-// procedural block is static by default, and a declaration of one that gives
-// an initialization value shall say `static`, stating that the initialization
-// runs once, or `automatic`, making it run on each entry to its block. The
-// clause's top_illegal example marks both `int svar2 = 2;` at the top of an
-// initial block and `int loop3 = 0;` in a loop body, so the rule reaches every
-// position a statement holds a declaration in. A block parameter is read into
-// the same kVarDecl and is not a variable, so it is passed by. §18.17 (printed
-// page 567) makes a randsequence statement an automatic scope and each of its
-// code blocks another, so nothing declared within one is static by default and
-// the walk stops there.
 static void ReportImplicitlyStaticInit(const Stmt* s, DiagEngine& diag) {
   if (s == nullptr || s->kind == StmtKind::kRandsequence) return;
   if (s->kind == StmtKind::kVarDecl && s->var_init != nullptr &&
@@ -828,12 +558,6 @@ static void ReportImplicitlyStaticInit(const Stmt* s, DiagEngine& diag) {
       s, [&](Stmt* const& sub) { ReportImplicitlyStaticInit(sub, diag); });
 }
 
-// §6.21: a module's procedural blocks are static unless the module is declared
-// `automatic`, and so are its tasks and functions unless the subroutine or the
-// module says automatic, a subroutine's own `static` outranking the module's.
-// §13.3.1 and §13.4.2 give a package's subroutines the same default from the
-// package, and make a class method automatic always, which an out-of-block
-// method definition standing among the scope's items is.
 static void ReportImplicitlyStaticInitsOfItem(const ModuleItem* item,
                                               bool scope_is_automatic,
                                               DiagEngine& diag) {
@@ -854,11 +578,6 @@ static void ValidateAutomaticVarRulesOfItems(
     const std::vector<ModuleItem*>& items, bool module_is_automatic,
     const HandleNames& class_names, DiagEngine& diag);
 
-// §27.3 (printed page 818): the procedural blocks and subroutines a generate
-// block brings into existence act as they would in a module, so §6.21's rules
-// reach them with the enclosing module's lifetime. A conditional generate's
-// else branch is a kGenerateIf of its own, reached through gen_else, and each
-// case generate arm holds its block in its own body.
 static void ValidateAutomaticVarRulesOfGenerate(const ModuleItem* item,
                                                 bool module_is_automatic,
                                                 const HandleNames& class_names,
@@ -908,10 +627,6 @@ void Elaborator::ValidateAutomaticVarProcWrites(const ModuleDecl* decl) {
                                    {class_names_, typedefs_}, diag_);
 }
 
-// §6.21's initializer rule over a package's tasks and functions, which §13.3.1
-// and §13.4.2 make static unless the subroutine or the package says automatic.
-// A process in a package is reported under §26.2 by
-// Elaborator::ValidatePackageItems, so only the subroutines are walked here.
 void ReportPackageSubroutineStaticInits(const PackageDecl* pkg,
                                         DiagEngine& diag) {
   for (const auto* item : pkg->items) {

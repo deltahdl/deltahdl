@@ -71,7 +71,6 @@ TEST(ClockingScopeParse, InInterface) {
 }
 
 TEST(ClockingScopeParse, InPackageRejected) {
-  // §14.7: a package body may not hold a clocking block.
   auto r = Parse(
       "package pkg;\n"
       "  clocking cb @(posedge clk);\n"
@@ -83,8 +82,6 @@ TEST(ClockingScopeParse, InPackageRejected) {
 }
 
 TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
-  // §14.7: the package prohibition applies to any clocking block, including
-  // one carrying the "default" qualifier.
   auto r = Parse(
       "package pkg;\n"
       "  default clocking cb @(posedge clk);\n"
@@ -95,19 +92,6 @@ TEST(ClockingScopeParse, DefaultClockingInPackageRejected) {
       r.diags, "a package body cannot hold a clocking block", 2, "14.7"));
 }
 
-// Two rules turn this source away and each is asserted, so neither can be
-// waived without a case noticing.
-//
-// A.1.11 closes anonymous_program_item to task, function, class, interface
-// class, covergroup and class constructor declarations plus the null item, and
-// no clocking_declaration is among them.
-//
-// §14.7's package prohibition reaches it too. §24.6 has an anonymous program
-// declare items without opening a scope of its own, its items sharing one name
-// space with the package or compilation-unit scope that holds them, so a
-// clocking block written in one is in the package's scope. The keyword
-// `program` naming the construct is what made the parser read it as a program
-// scope and hold this report back.
 TEST(ClockingScopeParse, InAnonymousProgramInPackageRejected) {
   auto r = Parse(
       "package pkg;\n"
@@ -126,11 +110,6 @@ TEST(ClockingScopeParse, InAnonymousProgramInPackageRejected) {
       r.diags, "a package body cannot hold a clocking block", 3, "14.7"));
 }
 
-// §14.7: no clocking block may be written in a function, a task or a package,
-// nor at the top of a compilation unit outside every declaration. A module
-// declaration precedes the clocking block so that the line the report names is
-// the `clocking` keyword rather than the first line of the source, which any
-// report standing at the start of the file would also name.
 TEST(ClockingScopeParse, AtCompilationUnitScopeRejected) {
   auto r = Parse(
       "module m;\n"
@@ -144,8 +123,6 @@ TEST(ClockingScopeParse, AtCompilationUnitScopeRejected) {
       "14.7"));
 }
 
-// §14.7 names the function among the scopes a clocking block cannot be
-// declared in.
 TEST(ClockingScopeParse, InFunctionRejected) {
   auto r = Parse(
       "module m;\n"
@@ -162,11 +139,6 @@ TEST(ClockingScopeParse, InFunctionRejected) {
       3, "14.7"));
 }
 
-// One mistake draws one report. Parser::RejectClockingDecl reads the
-// declaration through its `endclocking` and discards it, so the function body
-// resumes at `endfunction` and nothing is left for a second rule to reject.
-// Before this, the tokens were read as an expression and drew a §11.2 report
-// that a source failing any other way would draw just as readily.
 TEST(ClockingScopeParse, InFunctionReportsExactlyOneError) {
   auto r = Parse(
       "module m;\n"
@@ -183,8 +155,6 @@ TEST(ClockingScopeParse, InFunctionReportsExactlyOneError) {
   EXPECT_EQ(errors, 1U);
 }
 
-// §14.7 names the task alongside the function. Both reach the same rejection,
-// because a task body and a function body both hold statements.
 TEST(ClockingScopeParse, InTaskRejected) {
   auto r = Parse(
       "module m;\n"
@@ -201,9 +171,6 @@ TEST(ClockingScopeParse, InTaskRejected) {
       3, "14.7"));
 }
 
-// §14.7: no clocking block may contain another. The inner block stands
-// where a clocking_item belongs, and is rejected under the nesting rule rather
-// than read as a malformed clocking_item.
 TEST(ClockingScopeParse, NestedClockingRejected) {
   auto r = Parse(
       "module m;\n"
@@ -218,8 +185,6 @@ TEST(ClockingScopeParse, NestedClockingRejected) {
       "14.7"));
 }
 
-// §14.7: a clocking block belongs only in a module, an interface, a checker or
-// a program. A class is none of the four.
 TEST(ClockingScopeParse, InClassRejected) {
   auto r = Parse(
       "class c;\n"
@@ -231,9 +196,6 @@ TEST(ClockingScopeParse, InClassRejected) {
       r.diags, "a class body cannot hold a clocking block", 2, "14.7"));
 }
 
-// One mistake draws one report in a class body too: the class body resumes at
-// `endclass` rather than asking for a property name under §8.5 and then
-// rejecting each remaining token of the discarded declaration.
 TEST(ClockingScopeParse, InClassReportsExactlyOneError) {
   auto r = Parse(
       "class c;\n"
@@ -248,10 +210,6 @@ TEST(ClockingScopeParse, InClassReportsExactlyOneError) {
   EXPECT_EQ(errors, 1U);
 }
 
-// §14.7 makes a clocking block a declaration in one of four scopes, never a
-// procedural statement, so an initial block is not one of the places it may
-// stand. This is the third position that reaches the statement rejection,
-// beside the function and the task above.
 TEST(ClockingScopeParse, InProceduralBlockRejected) {
   auto r = Parse(
       "module m;\n"
@@ -268,11 +226,6 @@ TEST(ClockingScopeParse, InProceduralBlockRejected) {
       3, "14.7"));
 }
 
-// §14.7 permits a clocking block anywhere inside a module, and a generate block
-// is inside one, so none of the rejections above may reach it. The `global`
-// form is the one §14.14 bars from a generate block, and
-// GlobalClockingParse.GlobalClockingInGenerateBlockIsError in
-// test/src/unit/test_parser_subclause_14_14.cpp holds that separate rule.
 TEST(ClockingScopeParse, InGenerateBlockAccepted) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

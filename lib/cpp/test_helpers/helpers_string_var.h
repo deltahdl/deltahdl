@@ -14,14 +14,6 @@
 
 using namespace delta;
 
-// Decodes a packed Logic4Vec holding a SystemVerilog string (big-endian byte
-// order, low byte = last character) back into a std::string.
-//
-// Null bytes are dropped, because a SystemVerilog string never contains one:
-// §6.16 removes every "\0" as a string literal is assigned to a string
-// variable. A carrier is at least one byte wide, so the empty string is stored
-// as a single null byte, and keeping it would decode the empty string as a
-// one-character one. This is the same rule the simulator's own decoder applies.
 inline std::string VecToStr(const Logic4Vec& vec) {
   std::string result;
   uint32_t nbytes = vec.width / 8;
@@ -35,8 +27,6 @@ inline std::string VecToStr(const Logic4Vec& vec) {
   return result;
 }
 
-// Creates a string-typed variable named `name` holding `value`, registering it
-// as a string variable in the simulation context.
 inline Variable* MakeStringVar(SimFixture& f, std::string_view name,
                                std::string_view value) {
   uint32_t width = static_cast<uint32_t>(value.size()) * 8;
@@ -54,12 +44,6 @@ inline Variable* MakeStringVar(SimFixture& f, std::string_view name,
   return var;
 }
 
-// Elaborates and runs `src`, then checks the elements the queue `name` was
-// left holding, decoded as strings, against `expected` in order.
-//
-// A queue whose element type is string carries its text packed into each
-// element, so what a rule about building one produced is read as the sequence
-// of strings rather than as the packed vectors themselves.
 inline void RunAndExpectStringQueue(
     const char* src, std::string_view name,
     std::initializer_list<const char*> expected) {

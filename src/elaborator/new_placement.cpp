@@ -19,8 +19,6 @@ namespace delta {
 
 namespace {
 
-// What a variable's declaration says of its shape: the type written and the
-// unpacked dimensions after its name.
 struct DeclaredShape {
   const DataType* type;
   const std::vector<Expr*>* dims;
@@ -30,13 +28,10 @@ using DeclaredShapes = std::unordered_map<std::string_view, DeclaredShape>;
 
 }  // namespace
 
-// `new` and `C::new` alike; neither is an expression.
 static bool IsNew(const Expr* e) {
   return e->kind == ExprKind::kCall && e->text == "new";
 }
 
-// The first `new` written within `e`, `e` itself included. A call's arguments
-// are not searched: a `new` among them is the parser's to report.
 static const Expr* NewWithin(const Expr* e) {
   if (e == nullptr) return nullptr;
   if (IsNew(e)) return e;
@@ -56,17 +51,10 @@ static void ReportMisplacedNew(const Expr* where, DiagEngine& diag) {
              Subclause("7.5.1"));
 }
 
-// A right-hand side on which no `new` may stand at all.
 static void CheckNoNew(const Expr* rhs, DiagEngine& diag) {
   if (const Expr* found = NewWithin(rhs)) ReportMisplacedNew(found, diag);
 }
 
-// Whether a variable of `shape`, selected `depth` times, is something no `new`
-// constructs: an element that the declaration gives a fixed-size or
-// associative dimension, or one with no dimension left whose type is a
-// keyword. A dynamic dimension is the parser's null, and a queue's is sized by
-// `new []` as §7.10.5's bounded queues are; a named type may be a class or a
-// typedef of a dynamic array.
 static bool NewCannotConstruct(const DeclaredShape& shape, size_t depth) {
   if (depth < shape.dims->size()) {
     const Expr* dim = (*shape.dims)[depth];
@@ -75,9 +63,6 @@ static bool NewCannotConstruct(const DeclaredShape& shape, size_t depth) {
   return shape.type->kind != DataTypeKind::kNamed;
 }
 
-// A right-hand side that is a `new` as a whole is judged against the variable
-// the left-hand side names, when it names one this walk has seen declared; any
-// other `new` within it is an operand.
 static void CheckAssignedNew(const Expr* lhs, std::string_view declared,
                              const Expr* rhs, const DeclaredShapes& shapes,
                              DiagEngine& diag) {
@@ -112,9 +97,6 @@ static void CheckStmt(const Stmt* s, DeclaredShapes& shapes, DiagEngine& diag) {
       }
       break;
     case StmtKind::kBlockingAssign:
-      // Syntax 10-2 (printed page 252): only the expression form of a
-      // blocking assignment takes a delay or event control, and the forms that
-      // assign a dynamic_array_new or a class_new take none.
       if ((s->delay != nullptr || !s->events.empty()) &&
           NewWithin(s->rhs) == s->rhs) {
         diag.Error(s->range.start,
@@ -134,7 +116,6 @@ static void CheckStmt(const Stmt* s, DeclaredShapes& shapes, DiagEngine& diag) {
       s, [&shapes, &diag](Stmt* const& sub) { CheckStmt(sub, shapes, diag); });
 }
 
-// A subroutine's arguments are declarations its body's assignments may name.
 static void CheckSubroutine(const ModuleItem* item, DeclaredShapes shapes,
                             DiagEngine& diag) {
   for (const FunctionArg& arg : item->func_args) {

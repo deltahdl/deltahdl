@@ -41,8 +41,6 @@ TEST(ElaborationSeverityTaskElab, FatalValidFinishNumbers) {
     auto src = "module m; $fatal(" + std::to_string(fn) + "); endmodule\n";
     auto* design = Elaborate(src, f);
     ASSERT_NE(design, nullptr);
-    // The finish_number is valid: the one report is the $fatal's own
-    // (§20.10.1), and none stands on the argument (§20.10).
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "elaboration FATAL in scope 'm'", 1, "20.10.1"))
         << "finish_number " << fn;
@@ -60,8 +58,6 @@ TEST(ElaborationSeverityTaskElab, FatalInvalidFinishNumber) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // Syntax 20-11 in §20.10 writes finish_number ::= 0 | 1 | 2, and the report
-  // stands on the argument rather than on the $fatal call.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "finish_number must be 0, 1, or 2", 2, "20.10"));
 }
@@ -74,14 +70,10 @@ TEST(ElaborationSeverityTaskElab, FatalNoArgsIsValid) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The call is valid: what it reports is the $fatal's own report (§20.10.1).
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "elaboration FATAL in scope 'm'", 2, "20.10.1"));
 }
 
-// A.1.4 writes the first argument of a parenthesized $fatal as a
-// finish_number, 0, 1 or 2, so a message, a parameter or a negative number in
-// its place is reported (#7555).
 TEST(ElaborationSeverityTaskElab, FatalFirstArgumentIsAFinishNumber) {
   for (const char* call :
        {"$fatal(\"bad width\");", "$fatal(P, \"bad\");", "$fatal(-1);"}) {
@@ -110,8 +102,6 @@ TEST(ElaborationSeverityTaskElab, FatalWithAFinishNumberAndMessageIsValid) {
                              2, "A.1.4"));
 }
 
-// How many children named `bound` the instance `simple` of the design's top
-// holds in the iteration `index` of its innermost generate block.
 int BoundInIteration(const RtlirDesign* design, std::string_view simple,
                      int64_t index, std::string_view bound) {
   int count = 0;
@@ -136,10 +126,6 @@ constexpr const char* kBindTargets =
     "  end\n"
     "endmodule\n";
 
-// A.1.4's bind_target_instance ends in a constant_bit_select, and A.9.3 lets
-// each level of its hierarchical_identifier carry one, so a select names one
-// iteration of a loop generate block (#7553). One naming an element of an
-// instance array reaches every element, which share a module (#7557).
 TEST(BindDirectiveElab, ABindTargetSelectNamesOneInstance) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -161,8 +147,6 @@ TEST(BindDirectiveElab, AnInstanceListEntrySelectNamesOneInstance) {
   EXPECT_EQ(BoundInIteration(design, "v", 0, "c3"), 0);
 }
 
-// The select is a constant_bit_select, so a variable index is reported
-// (#7554), and a parameter is a constant that selects (#7553).
 TEST(BindDirectiveElab, ABindTargetSelectByAVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(

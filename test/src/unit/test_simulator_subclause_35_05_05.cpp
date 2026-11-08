@@ -17,23 +17,6 @@ using namespace delta;
 
 namespace {
 
-// §35.5.5 — Function result. An imported function's declaration must write out
-// its result type, a data type or void, and that type is limited to small
-// values: void, byte, shortint, int, longint, real, shortreal, chandle, string,
-// and scalar bit and logic.
-//
-// The declared type decides what the value a call site receives can hold, and
-// these cases ask that of the value a design is actually left with. EvalDpiCall
-// in src/simulator/eval_function_dpi.cpp builds it, and §35.2.2.1 rules that
-// how 4-state values, structures and arrays are represented and laid out
-// matters to the foreign side alone and not to SystemVerilog's meaning, so a
-// result the declared type admits has to arrive whatever the carrier between
-// the two sides looks like.
-
-// An import `sv_result()` declared with `kind` as its result type, whose
-// foreign body returns `value`. `result` is what the call site `sv_result()` is
-// left holding: the width the declared type gives it, and the aval/bval pair
-// carrying the value.
 struct ImportResultOfType {
   DpiRuntime dpi;
   SimFixture f;
@@ -53,25 +36,13 @@ struct ImportResultOfType {
   }
 };
 
-// §35.5.5 admits scalar bit and logic values as a result type, and a logic has
-// four values, so a body returning x gives the call site x. §35.2.2.1 leaves
-// the foreign side's representation to the interface, and sv_x is the spelling
-// svdpi.h gives x there; an x is aval 1 with bval 1 on this side, and a result
-// carried as one word per bit has nowhere to put the bval and gives the call
-// site 1.
 TEST(DpiFunctionResultInADesign, AScalarLogicResultCarriesAnUnknownBit) {
   ImportResultOfType run(DataTypeKind::kLogic, DpiArgValue::FromLogic(sv_x));
 
-  // The bval is what says the bit is unknown rather than one. The aval is
-  // asserted with it because x (1, 1) and z (0, 1) differ in nothing else.
   EXPECT_EQ(run.result.words[0].bval, 1U);
   EXPECT_EQ(run.result.words[0].aval, 1U);
 }
 
-// §35.5.5 admits longint as a result type, and a longint is 64 bits, so a body
-// returning 0x123456789ABCDEF0 gives the call site all of it. The low 32 bits
-// are 0x9ABCDEF0, which the whole value is not: a result assembled at a fixed
-// width of 32 keeps those and drops the rest.
 TEST(DpiFunctionResultInADesign, ALongintResultCarriesItsUpperWord) {
   ImportResultOfType run(DataTypeKind::kLongint,
                          DpiArgValue::FromLongint(0x123456789ABCDEF0LL));
@@ -80,11 +51,6 @@ TEST(DpiFunctionResultInADesign, ALongintResultCarriesItsUpperWord) {
   EXPECT_EQ(run.result.words[0].aval, 0x123456789ABCDEF0ULL);
 }
 
-// §35.5.5 admits int as a result type, and an int is 32 bits, so the width the
-// call site receives is the width the declaration names and not the widest a
-// result can travel in. The body returns 0x100000007, whose bit 32 the type
-// does not have, so a result built at 64 bits keeps that bit and reads
-// 0x100000007 rather than 7.
 TEST(DpiFunctionResultInADesign, AnIntResultIsThirtyTwoBitsWide) {
   ImportResultOfType run(DataTypeKind::kInt,
                          DpiArgValue::FromLongint(0x100000007LL));
@@ -93,12 +59,6 @@ TEST(DpiFunctionResultInADesign, AnIntResultIsThirtyTwoBitsWide) {
   EXPECT_EQ(run.result.words[0].aval, 7U);
 }
 
-// §35.5.5's list of permitted result types -- void, byte, shortint, int,
-// longint, real, shortreal, chandle and string, and scalar bit and logic -- is
-// what it calls small values, and every one of them is 64 bits or fewer. So a
-// result stays in one word however wide a formal may be: §35.5.6's packed
-// formals travel in Annex H.10.1.2's canonical array, and a carrier that put
-// every value there would give a byte result more words than a byte has.
 TEST(DpiFunctionResultInADesign, ANarrowResultStillOccupiesOneWord) {
   ImportResultOfType run(DataTypeKind::kByte, DpiArgValue::FromInt(0x5A));
 
@@ -107,16 +67,10 @@ TEST(DpiFunctionResultInADesign, ANarrowResultStillOccupiesOneWord) {
   EXPECT_EQ(run.result.words[0].aval, 0x5AU);
 }
 
-// The C functions the imports below are bound to.
 char NegativeByte() { return -100; }
 void WriteNegativeByte(char* b) { *b = -100; }
 unsigned int AllOnes() { return 0xFFFFFFFFU; }
 
-// §35.5.5 with §11.8.1: a call's value is signed or unsigned as its result
-// type is, so a byte result of -100 extends to -100 in an int, where read as
-// unsigned it would be 156; an output of a signed type likewise extends into
-// a wider actual as the assignment of it does; and an int unsigned result of
-// all ones is 4294967295 in a longint rather than -1.
 TEST(DpiFunctionResult, AResultAndAnOutputAreSignedAsTheirTypesAre) {
   SimFixture f;
   RunWithImportsBound(

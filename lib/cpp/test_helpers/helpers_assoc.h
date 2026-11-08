@@ -15,7 +15,6 @@
 
 using namespace delta;
 
-// Build a select expression  base_name[int_literal].
 inline Expr* MakeAssocSelect(Arena& arena, int64_t idx_val,
                              std::string_view base_name = "aa") {
   auto* sel = arena.Create<Expr>();
@@ -31,13 +30,6 @@ inline Expr* MakeAssocSelect(Arena& arena, int64_t idx_val,
   return sel;
 }
 
-// Elaborates and runs `src`, then checks the keys the string-indexed
-// associative array `name` holds against `expected`, in the order the array
-// stores them.
-//
-// A string-indexed array orders its keys lexicographically however the source
-// inserted them, so a test states the insertion order in the source and reads
-// the whole key sequence back as the verdict.
 inline void RunAndExpectStringKeys(
     const char* src, std::string_view name,
     std::initializer_list<const char*> expected) {

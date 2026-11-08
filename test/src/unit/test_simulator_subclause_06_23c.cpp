@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23 with §6.7.1 and §6.22.1: a net's name is an expression of the net's
-// data type, which a net declared with no data type takes as logic, so a type
-// reference to the net matches logic with the net's own packed range and
-// signing, and nothing else -- not bit, not another width, not the other
-// signing, and not the same bits ranged the other way round (§6.22.1 (f)).
 TEST(TypeOfValueCompareSim, NetMatchesItsImplicitLogicType) {
   const std::string kSrc =
       "module t;\n"
@@ -32,9 +27,6 @@ TEST(TypeOfValueCompareSim, NetMatchesItsImplicitLogicType) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b10101010u);
 }
 
-// §6.23 with §6.22.1: the same comparisons on variables of those types, and on
-// variables of predefined-width types, whose type matches the simple vector
-// of its width and signing (§6.22.1 (e)) and no other built-in type.
 TEST(TypeOfValueCompareSim, VariableMatchesItsDeclaredType) {
   const std::string kSrc =
       "module t;\n"
@@ -59,8 +51,6 @@ TEST(TypeOfValueCompareSim, VariableMatchesItsDeclaredType) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1010101011010u);
 }
 
-// §6.23 with §6.7.1: a net of every built-in net type declared with no data
-// type is of logic, so each matches logic and none matches bit.
 TEST(TypeOfValueCompareSim, NetOfEveryBuiltInNetTypeMatchesLogic) {
   const std::string kSrc =
       "module t;\n"
@@ -92,9 +82,6 @@ TEST(TypeOfValueCompareSim, NetOfEveryBuiltInNetTypeMatchesLogic) {
   EXPECT_EQ(RunAndGet(kSrc, "s"), 0u);
 }
 
-// §6.23 with §6.7.1: a net declared with a data type is of that type, integer
-// matching integer and the signed 32-bit logic vector (§6.22.1 (e)) but not
-// int, and a logic vector its own range but not the signed one.
 TEST(TypeOfValueCompareSim, NetMatchesTheDataTypeItsDeclarationWrites) {
   const std::string kSrc =
       "module t;\n"
@@ -111,9 +98,6 @@ TEST(TypeOfValueCompareSim, NetMatchesTheDataTypeItsDeclarationWrites) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b10110u);
 }
 
-// §6.23 with §6.6.7: a net of a user-defined nettype is of the nettype's data
-// type, written out or through a typedef, which §6.22.1 (b) makes match the
-// type it renames.
 TEST(TypeOfValueCompareSim, NetOfAUserNettypeMatchesTheNettypesDataType) {
   const std::string kSrc =
       "module t;\n"
@@ -132,9 +116,6 @@ TEST(TypeOfValueCompareSim, NetOfAUserNettypeMatchesTheNettypesDataType) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b10110u);
 }
 
-// §6.23: two type references to values compare by the values' types, so two
-// nets of one type are equal and two of different types are not, by == and
-// by != alike, and a net matches a variable of its type.
 TEST(TypeOfValueCompareSim, TwoValuesCompareByTheirTypes) {
   const std::string kSrc =
       "module t;\n"
@@ -151,9 +132,6 @@ TEST(TypeOfValueCompareSim, TwoValuesCompareByTheirTypes) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b101011u);
 }
 
-// §6.23 with §6.3.2: a drive strength or a charge strength is no part of a
-// net's data type, so a net declared with one matches the type of the same
-// net declared without.
 TEST(TypeOfValueCompareSim, StrengthIsNoPartOfANetsType) {
   const std::string kSrc =
       "module t;\n"
@@ -171,8 +149,6 @@ TEST(TypeOfValueCompareSim, StrengthIsNoPartOfANetsType) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1110u);
 }
 
-// §6.23 with §23.2.2.3: a net port is a net of the port's data type, logic
-// where the declaration writes none, with the range it writes.
 TEST(TypeOfValueCompareSim, NetPortMatchesItsDeclaredType) {
   const std::string kSrc =
       "module t(input wire [0:3] p, input [2:0] q);\n"
@@ -185,9 +161,6 @@ TEST(TypeOfValueCompareSim, NetPortMatchesItsDeclaredType) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1010u);
 }
 
-// §6.23 with §27.5: a net or variable a generate block declares is the one a
-// type reference in the block names, of the type the block declares it with,
-// even where the module declares another of the name.
 TEST(TypeOfValueCompareSim, ValueOfAGenerateBlockIsTypedInTheBlock) {
   const std::string kSrc =
       "module t;\n"
@@ -204,9 +177,6 @@ TEST(TypeOfValueCompareSim, ValueOfAGenerateBlockIsTypedInTheBlock) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b101u);
 }
 
-// §6.23: a comparison of type references in a continuous assignment's
-// right-hand side drives the value it stands for, for a net, a variable and
-// a typedef alike.
 TEST(TypeOfValueCompareSim, ComparisonInAContinuousAssignment) {
   const std::string kSrc =
       "module t;\n"
@@ -223,10 +193,6 @@ TEST(TypeOfValueCompareSim, ComparisonInAContinuousAssignment) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b101010u);
 }
 
-// §6.23 with §27.5: a comparison of type references is a constant expression,
-// so it selects a generate if's branch standing alone or as an operand of a
-// wider condition, and a generate case over a type reference to a net selects
-// the item whose type matches the net's.
 TEST(TypeOfValueCompareSim, ComparisonSelectsAGenerateBranch) {
   const std::string kSrc =
       "module t;\n"
@@ -254,9 +220,6 @@ TEST(TypeOfValueCompareSim, ComparisonSelectsAGenerateBranch) {
   EXPECT_EQ(RunAndGet(kSrc, "c"), 2u);
 }
 
-// §6.23 with §6.20.4: a comparison of type references is a constant
-// expression, so a localparam may be set from one, standing alone or as an
-// operand, and holds the value the comparison stands for.
 TEST(TypeOfValueCompareSim, ComparisonSetsAParameter) {
   const std::string kSrc =
       "module t;\n"
@@ -274,10 +237,6 @@ TEST(TypeOfValueCompareSim, ComparisonSetsAParameter) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b10110111u);
 }
 
-// §6.23 with §6.22.1 (f): a declaration whose type is a type reference to a
-// net or variable takes the value's declared type, its range as written: n's
-// [0:3] keeps 0 as its left bound, which a range rebuilt from the width as
-// [3:0] would not.
 TEST(TypeOfValueCompareSim, DeclarationTakesAValuesDeclaredRange) {
   const std::string kSrc =
       "module t;\n"

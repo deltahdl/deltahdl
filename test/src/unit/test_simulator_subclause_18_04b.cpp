@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The Vars of test/src/e2e/random_variables.sv, an object holding one
-// random variable per rule of the clause, around the statements of an
-// initial that holds it as vars, its Inner as held and the ints n and m.
 std::string Design(const std::string& body) {
   return "typedef enum bit [1:0] {A = 2'b00, B = 2'b11} ab_e;\n"
          "typedef struct packed {\n"
@@ -44,10 +41,6 @@ std::string Design(const std::string& body) {
          "endmodule\n";
 }
 
-// §18.4.2: a randc variable cycles through all the values of its declared
-// range in a random permutation, so each group of four randomizations of
-// the 2-bit c visits every value once; §18.4.1 has the 8-bit y stay within
-// 0 to 255 and every randomize() succeed.
 TEST(RandomVariableRun, ARandcVariableCyclesThroughItsRange) {
   SimFixture f;
   std::string out = RunCapture(
@@ -65,11 +58,6 @@ TEST(RandomVariableRun, ARandcVariableCyclesThroughItsRange) {
   EXPECT_EQ(out, "40 10\n");
 }
 
-// §18.4.1: a real random variable is uniformly distributed over the range
-// its constraints leave, here 0.0 to 2.0, which every randomization
-// respects; §18.3's enum rule holds e to A or B while the packed struct s,
-// treated as an integral type, has its enum member take 2'b01 or 2'b10 as
-// well over 40 draws.
 TEST(RandomVariableRun, RealsEnumsAndPackedStructsDrawAsTheClauseHasIt) {
   SimFixture f;
   std::string out =
@@ -84,10 +72,6 @@ TEST(RandomVariableRun, RealsEnumsAndPackedStructsDrawAsTheClauseHasIt) {
   EXPECT_EQ(out, "40 1\n");
 }
 
-// §18.4: an object handle declared rand has the object's variables and
-// constraints solved concurrently with the holder's, in.v under its own
-// range and w above it under the holder's global constraint, and the
-// handle itself is never modified.
 TEST(RandomVariableRun, ARandHandlesObjectIsSolvedWithTheHolder) {
   SimFixture f;
   std::string out =
@@ -102,8 +86,6 @@ TEST(RandomVariableRun, ARandHandlesObjectIsSolvedWithTheHolder) {
   EXPECT_EQ(out, "40 40\n");
 }
 
-// A class holding the one member `decl` and the constraint `constraint`,
-// randomized 8 times by an initial that counts the calls answering 1.
 std::string Lone(const std::string& decl, const std::string& constraint) {
   return "class Lone;\n" + decl + constraint +
          "endclass\n"
@@ -117,8 +99,6 @@ std::string Lone(const std::string& decl, const std::string& constraint) {
          "endmodule\n";
 }
 
-// §18.4.1: a rand real member alone, under its range constraint, is drawn
-// eight times over.
 TEST(RandomVariableRun, ALoneRealMemberIsDrawn) {
   SimFixture f;
   EXPECT_EQ(RunCapture(Lone("  rand real r;\n",
@@ -127,15 +107,11 @@ TEST(RandomVariableRun, ALoneRealMemberIsDrawn) {
             "8\n");
 }
 
-// §18.4.2: a randc member alone is drawn eight times over, two cycles of
-// its four values.
 TEST(RandomVariableRun, ALoneRandcMemberIsDrawn) {
   SimFixture f;
   EXPECT_EQ(RunCapture(Lone("  randc bit [1:0] c;\n", ""), f), "8\n");
 }
 
-// §18.4: a rand packed structure with an enum member, and a rand enum, are
-// drawn eight times over.
 TEST(RandomVariableRun, LoneEnumAndPackedStructMembersAreDrawn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef enum bit [1:0] {A = 2'b00, B = 2'b11} ab_e;\n"
@@ -147,8 +123,6 @@ TEST(RandomVariableRun, LoneEnumAndPackedStructMembersAreDrawn) {
             "8\n");
 }
 
-// §18.4: a rand object handle whose object carries a constraint, under a
-// global constraint of the holder's, is solved eight times over.
 TEST(RandomVariableRun, ALoneRandHandleIsSolvedWithTheHolder) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class Inner;\n"
@@ -163,8 +137,6 @@ TEST(RandomVariableRun, ALoneRandHandleIsSolvedWithTheHolder) {
             "8\n");
 }
 
-// The Inner of the design and a Lone holding a rand handle to it beside
-// `decl`, under the handle's global constraint and `constraint`.
 std::string WithHandle(const std::string& decl, const std::string& constraint) {
   return "class Inner;\n"
          "  rand int v;\n"
@@ -175,8 +147,6 @@ std::string WithHandle(const std::string& decl, const std::string& constraint) {
               "  constraint cw { w > in.v; }\n" + constraint);
 }
 
-// §18.4: a rand real beside a rand handle is solved with the handle's
-// object eight times over.
 TEST(RandomVariableRun, ARealBesideARandHandleIsDrawn) {
   SimFixture f;
   EXPECT_EQ(RunCapture(WithHandle("  rand real r;\n",
@@ -185,14 +155,11 @@ TEST(RandomVariableRun, ARealBesideARandHandleIsDrawn) {
             "8\n");
 }
 
-// §18.4: a randc beside a rand handle is drawn eight times over.
 TEST(RandomVariableRun, ARandcBesideARandHandleIsDrawn) {
   SimFixture f;
   EXPECT_EQ(RunCapture(WithHandle("  randc bit [1:0] c;\n", ""), f), "8\n");
 }
 
-// §18.4: a rand enum and a rand packed structure beside a rand handle are
-// drawn eight times over.
 TEST(RandomVariableRun, AnEnumAndAPackedStructBesideARandHandleAreDrawn) {
   SimFixture f;
   EXPECT_EQ(
@@ -205,7 +172,6 @@ TEST(RandomVariableRun, AnEnumAndAPackedStructBesideARandHandleAreDrawn) {
       "8\n");
 }
 
-// §18.4: a rand real beside a randc is drawn eight times over.
 TEST(RandomVariableRun, ARealBesideARandcIsDrawn) {
   SimFixture f;
   EXPECT_EQ(RunCapture(Lone("  rand real r;\n  randc bit [1:0] c;\n",
@@ -214,9 +180,6 @@ TEST(RandomVariableRun, ARealBesideARandcIsDrawn) {
             "8\n");
 }
 
-// §18.4: a rand packed structure is one integral random variable, and a
-// constraint on one of its members constrains that member's bits of it: hi
-// is held at A and lo drawn from 1 to 3, so the whole lies in A1 to A3.
 TEST(RandPackedStructRun, AConstraintOnAMemberConstrainsItsBits) {
   SimFixture f;
   std::string out = RunCapture(
@@ -242,9 +205,6 @@ TEST(RandPackedStructRun, AConstraintOnAMemberConstrainsItsBits) {
   EXPECT_EQ(out, "0 14\n");
 }
 
-// §18.4: the size of a rand queue may be constrained; the queue is resized at
-// its back to the size the constraint gives and every element randomized, so
-// five entries become three, each within the range its foreach gives.
 TEST(RandQueueRun, AConstrainedSizeResizesTheQueue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -267,8 +227,6 @@ TEST(RandQueueRun, AConstrainedSizeResizesTheQueue) {
   EXPECT_EQ(out, "1 3 0\n");
 }
 
-// §18.4: a rand queue whose size no constraint names keeps its size, and its
-// elements are randomized.
 TEST(RandQueueRun, AnUnconstrainedSizeIsKept) {
   SimFixture f;
   std::string out = RunCapture(
@@ -290,9 +248,6 @@ TEST(RandQueueRun, AnUnconstrainedSizeIsKept) {
   EXPECT_EQ(out, "1 4 0\n");
 }
 
-// §18.4: randomize() allocates no class object: grown by its size
-// constraint, a rand dynamic array of handles keeps the objects it held,
-// their contents randomized, and its elements added are null.
 TEST(RandQueueRun, AnArrayOfHandlesKeepsItsObjectsAndAddsNulls) {
   SimFixture f;
   std::string out = RunCapture(
@@ -324,9 +279,6 @@ TEST(RandQueueRun, AnArrayOfHandlesKeepsItsObjectsAndAddsNulls) {
   EXPECT_EQ(out, "1 4 1 1 1\n");
 }
 
-// §18.4: a rand unpacked structure has the members its typedef marks rand
-// solved with the object's other random variables, and the members it does
-// not mark keep their values: addr is drawn from 7 to 9, crc stays 77.
 TEST(RandPackedStructRun, ARandUnpackedStructRandomizesItsRandMembers) {
   SimFixture f;
   std::string out = RunCapture(
@@ -355,9 +307,6 @@ TEST(RandPackedStructRun, ARandUnpackedStructRandomizesItsRandMembers) {
   EXPECT_EQ(out, "0 77\n");
 }
 
-// §18.4: an associative array declared rand has every element randomized,
-// its size and its keys left as they are: the two entries written before the
-// call are drawn within the range the foreach over their keys gives.
 TEST(RandQueueRun, AnAssociativeArrayRandomizesItsElementsKeepingItsKeys) {
   SimFixture f;
   std::string out = RunCapture(
@@ -385,8 +334,6 @@ TEST(RandQueueRun, AnAssociativeArrayRandomizesItsElementsKeepingItsKeys) {
   EXPECT_EQ(out, "1 2 1 1 6 10\n");
 }
 
-// §18.4: with no constraint on its size, a rand dynamic array of handles
-// keeps its size and its objects, each randomized.
 TEST(RandQueueRun, AnArrayOfHandlesWithoutASizeConstraintKeepsItsSize) {
   SimFixture f;
   std::string out = RunCapture(
@@ -411,9 +358,6 @@ TEST(RandQueueRun, AnArrayOfHandlesWithoutASizeConstraintKeepsItsSize) {
   EXPECT_EQ(out, "1 2 1\n");
 }
 
-// §18.4: the structure may be of a type declared outside the class, and a
-// member it declares rand that is an array, which is no integral variable
-// of its bits, is left as it is.
 TEST(RandPackedStructRun, AModuleTypedefsRandMembersAreRandomized) {
   SimFixture f;
   std::string out = RunCapture(
@@ -441,9 +385,6 @@ TEST(RandPackedStructRun, AModuleTypedefsRandMembersAreRandomized) {
   EXPECT_EQ(out, "0 77\n");
 }
 
-// §18.4: a member a rand unpacked structure's type declares rand that is a
-// dynamic array has its elements randomized, as §18.4's packet example has
-// data, the foreach over it constraining each, its size kept.
 TEST(RandPackedStructRun, ARandDynamicMemberHasItsElementsRandomized) {
   SimFixture f;
   std::string out = RunCapture(
@@ -471,12 +412,6 @@ TEST(RandPackedStructRun, ARandDynamicMemberHasItsElementsRandomized) {
   EXPECT_EQ(out, "1 4 0 1\n");
 }
 
-// §18.4 with §7.8.4: the elements of a rand associative array are named by
-// their whole index, so two entries whose 80-bit indices differ only above
-// bit 63 are two random variables, each held to its own instance of the
-// foreach: the entry at 2**64 + 5 is drawn 2 and the one at 5 is drawn 1.
-// Named by the low 64 bits, they were one variable held to the relation
-// for the key 5.
 TEST(RandQueueRun, AnAssociativeArrayElementIsNamedByItsWholeIndex) {
   SimFixture f;
   std::string out = RunCapture(
@@ -498,10 +433,6 @@ TEST(RandQueueRun, AnAssociativeArrayElementIsNamedByItsWholeIndex) {
   EXPECT_EQ(out, "1 2 1 2\n");
 }
 
-// §18.4 with §18.8: a resize by randomize() keeps the rand_mode of each
-// element it retains and makes each element it adds active, so the element at
-// index 2, turned off, dropped by a shrink and added back by a regrow, is
-// active again, while the retained element 0 and the scalar b stay off.
 TEST(RandQueueRun, AnElementAddedBackByRandomizeIsActive) {
   SimFixture f;
   std::string out = RunCapture(
@@ -531,8 +462,6 @@ TEST(RandQueueRun, AnElementAddedBackByRandomizeIsActive) {
   EXPECT_EQ(out, "0 1 0\n");
 }
 
-// §18.4 with §18.8: a resize by new[] does the same, for a static rand array,
-// whose modes its class holds, as for one of the object's own.
 TEST(RandQueueRun, AnElementAddedBackByNewIsActive) {
   SimFixture f;
   std::string out = RunCapture(
@@ -560,8 +489,6 @@ TEST(RandQueueRun, AnElementAddedBackByNewIsActive) {
   EXPECT_EQ(out, "0 1 1\n");
 }
 
-// §18.4 with §18.5.13: a soft constraint that is kept constrains the size as a
-// hard one does, so the array of two elements is resized to the six it asks.
 TEST(RandQueueRun, AKeptSoftSizeConstraintResizesTheArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -581,9 +508,6 @@ TEST(RandQueueRun, AKeptSoftSizeConstraintResizesTheArray) {
   EXPECT_EQ(out, "6\n");
 }
 
-// §18.4 with §18.7: a size constraint of an inline block, hard or soft,
-// resizes the array as one of the class's own blocks does, and an inline
-// block naming no size leaves the array its size.
 TEST(RandQueueRun, AnInlineSizeConstraintResizesTheArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -605,10 +529,6 @@ TEST(RandQueueRun, AnInlineSizeConstraintResizesTheArray) {
   EXPECT_EQ(out, "4 5 5 3\n");
 }
 
-// §18.4 with §18.5.13.2: disable soft on an array's size discards the soft
-// size constraints of lower priority, and a size constrained by nothing else
-// leaves the array its size, two and three elements here; a soft size
-// constraint of higher priority, the inline block's, is kept and resizes it.
 TEST(RandQueueRun, DisableSoftOnTheSizeLeavesTheArrayItsSize) {
   SimFixture f;
   std::string out = RunCapture(

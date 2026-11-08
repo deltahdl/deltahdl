@@ -34,10 +34,6 @@ static std::optional<AlwaysKind> TokenToAlwaysKind(TokenKind tk) {
 
 namespace {
 
-// Mutable pointers into the time-scope fields of the module or package that
-// owns the timeunit/timeprecision declaration currently being parsed, plus a
-// snapshot of the prior state captured before parsing so the post-parse
-// validation can detect mismatches.
 struct TimeScopeRefs {
   bool active = false;
   bool* has_unit = nullptr;
@@ -55,8 +51,6 @@ struct TimeScopeRefs {
   int old_prec_mag = 0;
 };
 
-// Binds the time-scope pointers to whichever of the module/package owns the
-// declaration and snapshots the prior values for later mismatch checks.
 TimeScopeRefs CollectTimeScopeRefs(ModuleDecl* mod, PackageDecl* pkg) {
   TimeScopeRefs refs;
   bool validate_mod = mod && (mod->decl_kind == ModuleDeclKind::kModule ||
@@ -91,8 +85,6 @@ TimeScopeRefs CollectTimeScopeRefs(ModuleDecl* mod, PackageDecl* pkg) {
   return refs;
 }
 
-// Emits the §3.14.2 diagnostics comparing the just-parsed timeunit/
-// timeprecision against the snapshot captured in CollectTimeScopeRefs.
 void ValidateTimeScopeAfterParse(const TimeScopeRefs& refs, DiagEngine& diag,
                                  SourceLoc loc) {
   if (!refs.active) return;
@@ -116,8 +108,6 @@ void ValidateTimeScopeAfterParse(const TimeScopeRefs& refs, DiagEngine& diag,
                Subclause("3.14.2.2"));
 }
 
-// Builds the fixed (keyword-independent) part of an `interconnect` net's
-// data type; the optional signedness is filled in by the caller.
 DataType MakeInterconnectDataType() {
   DataType dtype;
   dtype.kind = DataTypeKind::kWire;
@@ -126,8 +116,6 @@ DataType MakeInterconnectDataType() {
   return dtype;
 }
 
-// Builds a named data type carrying an optional package/class scope name.
-// The caller fills in any parameterized type arguments after the `#`.
 DataType MakeScopedNamedType(std::string_view scope_name,
                              std::string_view type_name) {
   DataType dtype;
@@ -137,7 +125,6 @@ DataType MakeScopedNamedType(std::string_view scope_name,
   return dtype;
 }
 
-// Builds an unscoped named (type_identifier) data type.
 DataType MakeNamedType(std::string_view type_name) {
   DataType dtype;
   dtype.kind = DataTypeKind::kNamed;
@@ -145,17 +132,12 @@ DataType MakeNamedType(std::string_view type_name) {
   return dtype;
 }
 
-// Stamps the resolved package/class scope name onto each instantiation item
-// produced for a `scope :: module #(...) inst(...)` form.
 void StampInstScope(std::vector<ModuleItem*>& items, size_t start,
                     std::string_view scope_name) {
   for (size_t i = start; i < items.size(); ++i)
     items[i]->inst_scope = scope_name;
 }
 
-// Propagates a deferred-immediate / concurrent assertion item's optional
-// block_identifier label onto each item produced for it (§16.14), filling the
-// item name and its statement body label only where still unset.
 void ApplyAssertionLabel(std::vector<ModuleItem*>& items, size_t before,
                          std::string_view label) {
   if (label.empty()) return;
@@ -221,13 +203,6 @@ bool Parser::TryParseProcessBlock(std::vector<ModuleItem*>& items) {
   return false;
 }
 
-// True when a method qualifier stands on a subroutine declared outside a class
-// body. §13.3 Syntax 13-1 and §13.4 Syntax 13-2 admit no qualifier before
-// `task` or `function`, and A.1.9 gives `method_qualifier ::= [ pure ] virtual
-// | class_item_qualifier`, which reaches those two declarations only through
-// `class_method`. Peeks only, and restores the lexer position: a `virtual`
-// before an identifier or `interface` is the §25.9 virtual interface type and a
-// `virtual` before `class` is a virtual class, neither of which this claims.
 bool Parser::AtMisplacedMethodQualifier() {
   if (!Check(TokenKind::kKwPure) && !Check(TokenKind::kKwVirtual)) return false;
   auto saved = lexer_.SavePos();
@@ -239,11 +214,6 @@ bool Parser::AtMisplacedMethodQualifier() {
   return on_subroutine;
 }
 
-// Reports the qualifier and then reads the declaration it stands on, so the
-// enclosing body resumes after `endtask` or `endfunction` rather than rejecting
-// the rest of the declaration a second time. The subclause is the one owning
-// the declaration the qualifier was written on. A.1.9 gives `pure virtual` a
-// method_prototype rather than a body, so that spelling is read as a prototype.
 void Parser::RejectMisplacedMethodQualifier(std::vector<ModuleItem*>& items) {
   SourceLoc loc = CurrentLoc();
   bool is_prototype = Match(TokenKind::kKwPure);
@@ -284,9 +254,6 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   if (Check(TokenKind::kKwExtern)) {
     SourceLoc extern_loc = CurrentLoc();
     Consume();
-    // An extern declaration of a module, an interface or a program is kept as
-    // a nested declaration; the extern keyword only declares the ports here,
-    // it does not define the element.
     if (ModuleDecl* decl = TryParseNestedExternDecl(extern_loc)) {
       auto* item = arena_.Create<ModuleItem>();
       item->kind = ModuleItemKind::kNestedModuleDecl;
@@ -301,18 +268,6 @@ bool Parser::TryParseDeclKeywordItem(std::vector<ModuleItem*>& items) {
   return false;
 }
 
-// A.1.6's extern_tf_declaration, `extern method_prototype ;` or `extern
-// forkjoin task_prototype ;`, with the `extern` keyword already consumed and
-// its position in `extern_loc`. A.1.6 is the one place the declaration
-// stands: interface_or_generate_item admits it, and the bodies A.1.4, A.1.7,
-// A.1.8 and A.1.11 give a module, a program, a checker and a package do not,
-// while a class reads its own `extern` under A.1.9's class_method. §25.7 says
-// what the prototype is for: an interface declares a task or function extern
-// when a module defines it through a hierarchical name. So one written in any
-// body but an interface's is reported at the keyword. The prototype is still
-// read, so that the body resumes after its own ';'. An anonymous program is
-// left to FilterAnonymousProgramItems in parser.cpp, which reports every
-// prototype under A.1.11 and drops it.
 ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
   if (!InInterfaceBody() && !in_anonymous_program_) {
     diag_.Error(extern_loc,
@@ -333,15 +288,6 @@ ModuleItem* Parser::ParseExternTfDeclaration(SourceLoc extern_loc) {
   return item;
 }
 
-// Parses a timeunit/timeprecision declaration with its surrounding §3.14.2
-// snapshot/validate dance. A function of its own so its branch logic is
-// scored separately and does not inflate the dispatcher's complexity.
-//
-// §3.14.2.2 (printed page 60) gives a time scope to a module, program,
-// package, interface or compilation unit and to nothing inside one, and
-// A.4.2's generate_item reaches no timeunits_declaration. So one inside a
-// generate block or region is reported and read with no time scope to set,
-// leaving the enclosing element's unit and precision as they were.
 void Parser::ParseTimeunitItem() {
   if (InGenerateBlock() || in_generate_region_) {
     diag_.Error(CurrentLoc(),
@@ -359,14 +305,6 @@ void Parser::ParseTimeunitItem() {
   ValidateTimeScopeAfterParse(refs, diag_, loc);
 }
 
-// The first step of each pass of a body loop, the compilation unit's among
-// them. Unless a timeunit or timeprecision keyword stands, it records in
-// `has_read_item` that the body has read an item, for CollectTimeScopeRefs and
-// CaptureCuTimeunitState to read: §3.14.2.2 has the time scope's
-// timeunits_declaration precede every other item, and the null item, a
-// modport, a bind directive and an anonymous program are items that leave the
-// body's item list as it was. Answers whether the item is the null item, and
-// consumes it if so.
 bool Parser::NoteItemAndMatchNull(bool& has_read_item) {
   if (!Check(TokenKind::kKwTimeunit) && !Check(TokenKind::kKwTimeprecision)) {
     has_read_item = true;
@@ -374,17 +312,12 @@ bool Parser::NoteItemAndMatchNull(bool& has_read_item) {
   return Match(TokenKind::kSemicolon);
 }
 
-// Parses an `interconnect` net declaration (§6.6.8), including its optional
-// signedness and packed dimensions, into a var-decl list.
 void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
   Consume();
   DataType dtype = MakeInterconnectDataType();
   dtype.is_signed = Match(TokenKind::kKwSigned);
   if (!dtype.is_signed) Match(TokenKind::kKwUnsigned);
   ParsePackedDims(dtype);
-  // Syntax 10-1 gives an interconnect net `[ # delay_value ]`, one value
-  // written without parentheses, where other nets take a delay3. A
-  // parenthesized delay, of one value or of more, is the delay3 form.
   if (Check(TokenKind::kHash)) {
     auto saved = lexer_.SavePos();
     auto loc = CurrentLoc();
@@ -398,9 +331,6 @@ void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
                   Subclause("10.3"));
     }
   }
-  // A.2.1.3 and §6.7's Syntax 6-2 write one net_identifier and an optional
-  // second one after a comma, so a net after the second is reported where it
-  // stands and still read.
   const size_t kFirst = items.size();
   ParseVarDeclList(items, dtype);
   for (size_t i = kFirst + 2; i < items.size(); ++i) {
@@ -410,13 +340,6 @@ void Parser::ParseInterconnectItem(std::vector<ModuleItem*>& items) {
   }
 }
 
-// C.4.2 tells two forms of assignment apart by where they are placed: a
-// continuous assignment stands outside every procedure, and a procedural
-// continuous assignment inside one, and A.6.2 has deassign, force and
-// release in the procedural_continuous_assignment alone, a statement_item. One
-// of the three written where a module item stands is that statement outside
-// any procedure; it is reported as such at its keyword and read to its ';' so
-// that the items behind it are still read.
 void Parser::RejectProceduralContinuousAssignItem() {
   const Token& kw = CurrentToken();
   diag_.Error(kw.loc,
@@ -587,9 +510,6 @@ std::string_view Parser::TryParseAssertionItemLabel() {
     lexer_.RestorePos(saved);
     return {};
   }
-  // §16.14 Syntax 16-18: every concurrent_assertion_statement alternative —
-  // assert, assume, cover, and restrict — may head a concurrent_assertion_item
-  // and so carry the optional block_identifier name described in §16.14.
   if (!Check(TokenKind::kKwAssert) && !Check(TokenKind::kKwAssume) &&
       !Check(TokenKind::kKwCover) && !Check(TokenKind::kKwRestrict)) {
     lexer_.RestorePos(saved);
@@ -604,16 +524,10 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   if (!attrs.empty()) RejectAttributesBeforeItem(kAttrLoc);
   size_t before = items.size();
 
-  // §A.6.10 deferred_immediate_assertion_item permits an optional
-  // [ block_identifier : ] label, mirroring concurrent_assertion_item.
-  // Consume the label here so the dispatch below sees the bare keyword.
   auto assertion_label = TryParseAssertionItemLabel();
 
   if (TryRejectBodyPortDecl()) return;
 
-  // Each branch parses one module_or_generate_item form; the shared
-  // AttachAttrs is applied once after the dispatch. The data-declaration
-  // fallback attaches its own attributes, so it returns early.
   if (TryParseExternConstraintItem(items)) {
     return;
   }
@@ -649,13 +563,6 @@ void Parser::ParseModuleItem(std::vector<ModuleItem*>& items) {
   AttachAttrs(items, before, attrs);
 }
 
-// Looks past the current position (the candidate instance name of a scoped
-// `name :: id ...` form) to decide whether the tail is a hierarchical_instance
-// rather than a variable declarator. Per A.4.1.1, a module/interface/checker
-// instantiation is `[ #(params) ] instance_name [dims] ( port_list )`, so the
-// parenthesized port-connection list is mandatory; a bare declarator followed
-// by `;`, `=`, `,`, or `[` is a data_declaration of the scoped type. The lexer
-// position is restored before returning.
 bool Parser::LooksLikeScopedInstTail() {
   auto saved = lexer_.SavePos();
   if (Check(TokenKind::kHash)) {
@@ -664,7 +571,7 @@ bool Parser::LooksLikeScopedInstTail() {
   }
   bool has_name = CheckIdentifier();
   if (has_name) {
-    Consume();  // instance name
+    Consume();
     SkipBracketedDims();
   }
   bool is_inst = has_name && Check(TokenKind::kLParen);
@@ -672,49 +579,24 @@ bool Parser::LooksLikeScopedInstTail() {
   return is_inst;
 }
 
-// Parses a `name :: type_identifier ...` form (the `::` is consumed here) as
-// either a scoped module instantiation or a variable declaration of a
-// package/class-scoped type.
 void Parser::ParseScopedTypeOrInst(const Token& name_tok,
                                    std::vector<ModuleItem*>& items) {
-  Consume();  // ::
+  Consume();
   auto type_tok = ExpectIdentifier(Subclause("23.7.1"));
-  // The built-in package name `std` is reserved (it cannot hold modules), so
-  // `std :: type_identifier` is a built_in_data_type. A declarator that follows
-  // is a variable declaration of that scoped type rather than a scoped module
-  // instantiation.
   bool is_builtin_pkg = name_tok.text == "std";
   bool is_scoped_inst = !is_builtin_pkg && LooksLikeScopedInstTail();
   if (is_scoped_inst) {
-    // A.4.1.1's module_instantiation, A.4.1.2's interface_instantiation and
-    // A.4.1.3's program_instantiation name their cell by an identifier alone;
-    // only A.4.1.4's checker_instantiation names it by a ps_checker_identifier
-    // with a package scope, and a checker is what a program may instantiate.
     auto start = items.size();
     ParseModuleInstList(type_tok, &items);
     StampInstScope(items, start, name_tok.text);
     return;
   }
   DataType dtype = MakeScopedNamedType(name_tok.text, type_tok.text);
-  // Parses the trailing `# (...)` parameter assignments of a scoped named type
-  // (e.g. `pkg :: t #(...)`) onto the data type, if present.
   bool assignment_written = Check(TokenKind::kHash);
   if (assignment_written) {
     Consume();
     dtype.type_params = ParseTypeParamList();
   }
-  // A.2.2.1 with A.9.3: a class scope may itself be named through a package,
-  // `std::process::state` (§26.7 with §G.6), so each further `:: name` makes
-  // the name before it the scope, as ParseNamedType reads the same type in a
-  // procedure. Read one scope deep, the declaration expected its variable at
-  // the second `::`.
-  //
-  // §8.23 reaches the type through the whole chain, so the scope each step
-  // displaces is kept among the outer prefixes, and §8.25.1's parameter values
-  // written on the class stay with the type, `pkg::Inner#(4)::t`, as
-  // ParseNamedType keeps them. Dropped and cleared, the declaration reached
-  // the elaborator as an unspecialized `Inner::t`, which the compilation
-  // unit's own class Inner answered.
   while (Check(TokenKind::kColonColon)) {
     auto saved = lexer_.SavePos();
     Consume();
@@ -732,13 +614,10 @@ void Parser::ParseScopedTypeOrInst(const Token& name_tok,
       dtype.type_params = ParseTypeParamList();
     }
   }
-  // A.2.2.1: packed dimensions may follow the scoped type_identifier.
   ParsePackedDims(dtype);
   ParseVarDeclList(items, dtype);
 }
 
-// Builds the fallback bare-identifier variable declaration with optional
-// initializer when the name is neither a scope, known type, UDP, nor inst.
 void Parser::ParsePlainVarDecl(const Token& name_tok,
                                std::vector<ModuleItem*>& items) {
   auto* item = arena_.Create<ModuleItem>();
@@ -750,21 +629,6 @@ void Parser::ParsePlainVarDecl(const Token& name_tok,
   items.push_back(item);
 }
 
-// Whether the item beginning with an identifier this parser holds no
-// declaration for is a data declaration rather than an instantiation. A.4.1.1
-// gives `hierarchical_instance ::= name_of_instance ( [ list_of_port_
-// connections ] )`, and §23.3.2 repeats it in prose: every module instantiation
-// writes the parentheses, a module without ports included. So a declarator
-// reaching `;`, `=` or `,` -- or the end of its dimensions -- without a `(`
-// cannot be an instance, whatever the leading name turns out to name, and every
-// variable_decl_assignment A.2.4 admits has that shape.
-//
-// LooksLikeScopedInstTail answers this same question for the `pkg :: type_id`
-// form, and it is called rather than restated so that the bare and the scoped
-// form cannot come to disagree about which sources A.4.1.1 admits. The leading
-// CheckIdentifier is what holds `t;` and `t = 3;` out: those carry no
-// declarator at all, and ParsePlainVarDecl reads their one name as the variable
-// rather than as its type.
 bool Parser::LooksLikeUndeclaredTypeDecl() {
   return CheckIdentifier() && !LooksLikeScopedInstTail();
 }
@@ -778,9 +642,6 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
   }
   if (known_types_.count(name_tok.text) != 0) {
     DataType dtype = MakeNamedType(name_tok.text);
-    // Parse type parameters if present (e.g., C#(1, real) v2;). A nettype
-    // identifier instead takes a delay_control here (e.g. `mynet #5 x;`),
-    // which ParseVarDeclList handles, so skip type params for nettypes.
     if (Check(TokenKind::kHash) && known_nettypes_.count(name_tok.text) == 0) {
       Consume();
       dtype.type_params = ParseTypeParamList();
@@ -796,16 +657,6 @@ void Parser::ParseImplicitTypeOrInst(std::vector<ModuleItem*>& items) {
     ParseUdpInstList(name_tok, items);
     return;
   }
-  // A declarator with no port-connection list after it, which A.4.1.1 does not
-  // admit as a hierarchical_instance whatever the leading name turns out to be:
-  // the parentheses are not optional there. Reading the shape as an
-  // instantiation is what made a reference breaching §6.18 -- a user-defined
-  // data type is declared before any reference to its type_identifier -- come
-  // back as a missing port connection list under §23.3.2. Recording it as the
-  // data declaration it also spells lets the parse finish with the name kept,
-  // and Elaborator::ReportUndeclaredTypeName decides which of the two the
-  // source meant, because the module names the answer turns on are the
-  // elaborator's and not this parser's.
   if (LooksLikeUndeclaredTypeDecl()) {
     auto start = items.size();
     ParseVarDeclList(items, MakeNamedType(name_tok.text));

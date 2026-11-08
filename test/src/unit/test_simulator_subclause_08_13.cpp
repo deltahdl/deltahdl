@@ -96,11 +96,6 @@ TEST(InheritanceSimulation, IsAUnrelatedTypes) {
   EXPECT_FALSE(b->IsA(a));
 }
 
-// §8.13: once a subclass extends a base class, all of the base class's
-// properties and methods become part of the subclass. Built from real `extends`
-// source and driven through the full pipeline, an object of the derived class
-// both reads a property declared only in the base and calls a method declared
-// only in the base.
 TEST(InheritanceSimulation, DerivedInheritsBasePropertyAndMethod) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -127,10 +122,6 @@ TEST(InheritanceSimulation, DerivedInheritsBasePropertyAndMethod) {
   LowerRunAndCheck(f, design, {{"p", 42u}, {"m", 7u}});
 }
 
-// §8.13: the methods of the base class can be overridden to change their
-// definitions. A call on a derived-class handle to a name the derived class
-// redefines resolves to the derived definition (1 from the base would show no
-// override took effect).
 TEST(InheritanceSimulation, DerivedMethodOverridesBaseFullPipeline) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -166,9 +157,6 @@ TEST(InheritanceSimulation, MethodNotFoundReturnsNull) {
   EXPECT_EQ(obj->ResolveMethod("nonexistent"), nullptr);
 }
 
-// §8.13: inheritance carries over methods of every kind, not just functions. A
-// task declared only in the base is callable on a derived object and operates
-// on the inherited property.
 TEST(InheritanceSimulation, DerivedInheritsBaseTask) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -193,9 +181,6 @@ TEST(InheritanceSimulation, DerivedInheritsBaseTask) {
   LowerRunAndCheck(f, design, {{"out", 33u}});
 }
 
-// §8.13: a base task can also be overridden by the derived class; a call on a
-// derived handle runs the derived definition (1 would mean the base version
-// ran).
 TEST(InheritanceSimulation, DerivedOverridesBaseTask) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -223,12 +208,6 @@ TEST(InheritanceSimulation, DerivedOverridesBaseTask) {
   LowerRunAndCheck(f, design, {{"out", 2u}});
 }
 
-// §8.13 (printed pages 189-190) with §8.9 (printed 186): a derived class
-// inherits the base's properties, and a static property is one storage
-// shared by every object of its class, so `D::n` and `C::n` name C's one
-// storage. Written through D and read through both, 3 * 10 + 3; the write
-// found no slot in D's own static_properties and landed nowhere, and each
-// read 0.
 TEST(InheritanceSimulation, InheritedStaticWrittenThroughDerivedScope) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static int n;\n"
@@ -246,9 +225,6 @@ TEST(InheritanceSimulation, InheritedStaticWrittenThroughDerivedScope) {
             33u);
 }
 
-// §8.13 with §8.9: the same storage the other way about -- written through
-// the base's scope and read through the derived one, 5 where `D::n` read 0
-// from D's own static_properties, which hold D's declarations alone.
 TEST(InheritanceSimulation, InheritedStaticReadThroughDerivedScope) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static int n;\n"
@@ -266,11 +242,6 @@ TEST(InheritanceSimulation, InheritedStaticReadThroughDerivedScope) {
             5u);
 }
 
-// §8.13 with §8.10 (printed page 186): a static method of D names the
-// inherited static property bare, and both its write and its read are of
-// C's one storage: put(6) makes `C::n` 6 and get() reads it, 66; then
-// `C::n = 4` is what get() reads, 6604. The bare write landed nowhere and
-// the bare read gave 0, D's own static_properties holding no `n`.
 TEST(InheritanceSimulation, InheritedStaticNamedBareInDerivedStaticMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static int n;\n"
@@ -296,10 +267,6 @@ TEST(InheritanceSimulation, InheritedStaticNamedBareInDerivedStaticMethod) {
             6604u);
 }
 
-// §8.13 with §8.9: `d.n` through a D handle and `c.n` through a C handle
-// read and write the one storage, as `C::n` does: `d.n = 7` read back as 77
-// through c.n and C::n, then `c.n = 8` read back as 8 through d.n, 7708. The
-// write through d landed in the D object's own map, where only d.n saw it.
 TEST(InheritanceSimulation, InheritedStaticSharedThroughBothHandles) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static int n;\n"
@@ -323,12 +290,6 @@ TEST(InheritanceSimulation, InheritedStaticSharedThroughBothHandles) {
             7708u);
 }
 
-// §8.13 with §8.9 and §8.4 (printed pages 181-182): a static handle C
-// declares is reached as `D::m_inst`, and a member through it is the
-// object's: after `d.k = 4` and `D::m_inst = d`, `D::m_inst.k` and
-// `C::m_inst.k` both read 4, 44; `D::m_inst.k = 5` writes d's k, 4405.
-// Asked of D's own static_properties, the base named no static property,
-// so the read gave x and the write went nowhere.
 TEST(InheritanceSimulation, InheritedStaticHandleReachesItsObject) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int k = 9;\n"
@@ -352,9 +313,6 @@ TEST(InheritanceSimulation, InheritedStaticHandleReachesItsObject) {
             4405u);
 }
 
-// §8.13 with §8.9 and §26.3 (printed page 810): the same one storage for a
-// package's classes, written as `p::D::n` and read back through `p::C::n`
-// and `p::D::n`, 88 where each read 0.
 TEST(InheritanceSimulation, InheritedStaticThroughPackageQualifiedScope) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class C;\n"
@@ -374,10 +332,6 @@ TEST(InheritanceSimulation, InheritedStaticThroughPackageQualifiedScope) {
             88u);
 }
 
-// §8.13 with §26.3: `extends p::B` inherits the package's B, whose b is 3 and
-// whose get() doubles it, though the module declares a B of its own whose b
-// is 9 and which has no get(): 3 and 6 read as 36. Kept as a bare B, the
-// base was the module's.
 TEST(InheritanceSimulation, ABaseNamedThroughAPackageIsThePackagesClass) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class B;\n"
@@ -399,10 +353,6 @@ TEST(InheritanceSimulation, ABaseNamedThroughAPackageIsThePackagesClass) {
             36u);
 }
 
-// §8.13 with §8.9 and §8.7 (printed page 184): `D::m_inst = new` constructs
-// into the static handle C declares, so `C::m_inst.k` reads the new object's
-// 9 and `D::m_inst == null` reads 0, 90; declined for D's own
-// static_properties, the handle stayed null and the read gave x.
 TEST(InheritanceSimulation, InheritedStaticHandleConstructedThroughDerived) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int k = 9;\n"
@@ -421,11 +371,6 @@ TEST(InheritanceSimulation, InheritedStaticHandleConstructedThroughDerived) {
             90u);
 }
 
-// §8.13 with §8.10 and §8.6 (printed page 183): the bare `m_inst` of D's
-// instance method is the static handle C declares, so `m_inst.add(7)` runs
-// on the object `C::m_inst` holds and its k reads 16 through `C::m_inst.k`;
-// read from D's own static_properties, the bare name gave the null handle
-// and the call was reported.
 TEST(InheritanceSimulation, InheritedStaticHandleNamedBareInDerivedMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int k = 9;\n"
@@ -449,11 +394,6 @@ TEST(InheritanceSimulation, InheritedStaticHandleNamedBareInDerivedMethod) {
             16u);
 }
 
-// §8.13 (printed pages 189-190) with §8.10 (printed 186-187): a subclass
-// inherits the base's methods, static ones among them, and a static method
-// runs with no `this`, so a static method of D calling C's static function
-// bare calls C's, in class scope. D::quad(5) is twice(twice(5)), 20. Looked
-// up in D's own methods alone, the call ran nothing and yielded 0.
 TEST(InheritanceSimulation, InheritedStaticFunctionCalledBareInDerivedStatic) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static function int twice(int x);\n"
@@ -475,12 +415,6 @@ TEST(InheritanceSimulation, InheritedStaticFunctionCalledBareInDerivedStatic) {
             20u);
 }
 
-// §8.13 with §8.10 and §13.5.2 (printed page 348): the inherited static
-// function may be void and take a ref formal, as uvm_typed_callbacks'
-// m_get_q does for uvm_callbacks' get_first, and the write through the ref
-// reaches the caller's local: get_first's q holds the object m_get_q
-// constructed, whose size reads 3. The call ran nothing, q stayed null, and
-// the size call through it was reported.
 TEST(InheritanceSimulation,
      InheritedStaticVoidFunctionWritesDerivedCallersRef) {
   EXPECT_EQ(
@@ -510,11 +444,6 @@ TEST(InheritanceSimulation,
       3u);
 }
 
-// §8.13 has a derived class inherit its base's members, a typedef among them
-// (§8.23), so a structure typedef the derived class declares lays out a member
-// written `nib_t` by the base's 4-bit nib_t: S is 5 bits, and 9'h1F5 keeps its
-// low five, x reading 10 and y 1. Laid out by the compilation unit's 8-bit
-// nib_t, S was 9 bits and the line read 9 250 1.
 TEST(InheritedTypedefSim, AStructureMemberNamedByTheBaseTypedefTakesItsWidth) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef logic [7:0] nib_t;\n"
@@ -537,8 +466,6 @@ TEST(InheritedTypedefSim, AStructureMemberNamedByTheBaseTypedefTakesItsWidth) {
             "5 10 1\n");
 }
 
-// The same with no typedef of the name outside the classes, which left x
-// sized by no typedef at all: one bit, S two, and the line 2 0 1.
 TEST(InheritedTypedefSim,
      AStructureMemberNamedByTheBaseTypedefAloneTakesItsWidth) {
   SimFixture f;
@@ -561,10 +488,6 @@ TEST(InheritedTypedefSim,
             "5 10 1\n");
 }
 
-// Up a longer chain the nearest class declaring the name supplies it: Mid's
-// 4-bit nib_t hides Base's 2-bit one, and Base's tri_t, which Mid does not
-// redeclare, is reached through Mid, so S is 4 + 3 + 1 = 8 bits. Taking
-// Base's nib_t made it 6.
 TEST(InheritedTypedefSim, TheNearestBaseDeclaringTheNameSuppliesTheMember) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class Base;\n"

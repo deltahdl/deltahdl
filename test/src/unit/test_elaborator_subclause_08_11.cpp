@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// The report stands at the `initial` keyword rather than at the statement that
-// names 'this': Elaborator::ValidateThisInItem passes the module item's own
-// location.
 TEST(ThisElaboration, ThisInModuleInitialBlockError) {
   ElabFixture f;
   ElabOk(
@@ -45,12 +42,6 @@ TEST(ThisElaboration, ThisInModuleAlwaysBlockError) {
       "8.11"));
 }
 
-// §8.11 holds for every procedural block a module can contain, not just
-// `always`. Elaborator::ValidateThisInItem selects the item kinds it checks
-// with IsProceduralItemKind in src/parser/ast_module.h, which names
-// always_comb alongside always, always_ff, always_latch, initial and final.
-// The report stands at the `always_comb` keyword, the module item's own
-// location.
 TEST(ThisElaboration, ThisInModuleAlwaysCombBlockError) {
   ElabFixture f;
   ElabOk(
@@ -173,11 +164,6 @@ TEST(ThisElaboration, BareThisInClassMethodOk) {
              "endmodule\n"));
 }
 
-// §8.11 lists type(this) as a permitted form alongside non-static class
-// methods, constraints, inlined constraint methods, and covergroups embedded
-// in classes. Static method bodies otherwise forbid bare 'this', yet the
-// literal type(this) form may still appear there because §6.23 names it as
-// a way to obtain the enclosing class type without evaluating any expression.
 TEST(ThisElaboration, TypeOfThisInStaticMethodBodyAllowed) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -192,14 +178,6 @@ TEST(ThisElaboration, TypeOfThisInStaticMethodBodyAllowed) {
              "endmodule\n"));
 }
 
-// §8.11 — a static method is not tied to any instance, so a non-literal 'this'
-// (here `this.x`) inside a static method body is outside the permitted set and
-// an error is issued. This is the static-method rejection form, a different
-// enforcement path from the module-context rejections above:
-// CheckStaticMethodsForThisSuper in
-// src/elaborator/elaborator_validate_static_methods.cpp reports it under §8.10,
-// which is where the standard states that a static method has no 'this', and
-// the report stands at the `function` keyword.
 TEST(ThisElaboration, ThisInStaticMethodError) {
   ElabFixture f;
   ElabOk(
@@ -219,9 +197,6 @@ TEST(ThisElaboration, ThisInStaticMethodError) {
                             3, "8.10"));
 }
 
-// §8.11 also permits 'this' inside a covergroup embedded within a class.
-// The validator must not flag a reference to 'this' when the enclosing
-// context is a class-member covergroup.
 TEST(ThisElaboration, ThisInClassCovergroupOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -235,9 +210,6 @@ TEST(ThisElaboration, ThisInClassCovergroupOk) {
              "endmodule\n"));
 }
 
-// §8.11 also permits 'this' inside a class constraint block. The
-// validator must not flag such a reference when the enclosing context is
-// the body of a constraint declared on a class.
 TEST(ThisElaboration, ThisInClassConstraintBlockOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -249,10 +221,6 @@ TEST(ThisElaboration, ThisInClassConstraintBlockOk) {
              "endmodule\n"));
 }
 
-// The exception is restricted to the literal form type(this). A 'this' that
-// appears as part of a richer expression inside type(...) is still subject
-// to §8.11, and inside a static method body the rejection is the §8.10 one
-// CheckStaticMethodsForThisSuper emits, at the `function` keyword.
 TEST(ThisElaboration, ThisInsideMemberAccessInsideTypeOpRejected) {
   ElabFixture f;
   ElabOk(
@@ -273,9 +241,6 @@ TEST(ThisElaboration, ThisInsideMemberAccessInsideTypeOpRejected) {
                             2, "8.10"));
 }
 
-// §8.11 gives `this` no object outside a class's non-static methods, and a
-// subroutine a package or the compilation unit declares is no method of any
-// class, so `this` in one is reported as in a module's subroutine.
 TEST(ThisElaboration, ThisInAPackageOrUnitSubroutineIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -296,10 +261,6 @@ TEST(ThisElaboration, ThisInAPackageOrUnitSubroutineIsAnError) {
   }
 }
 
-// §8.11 gives `this` no object outside a class, and a continuous assignment
-// and a declaration's initializer belong to no method, so `this` or `super` in
-// either side of the one or in the other is reported at the module item, as in
-// a procedural block (#8079).
 TEST(ThisElaboration, ThisInAModuleItemsOwnExpressionIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -321,10 +282,6 @@ TEST(ThisElaboration, ThisInAModuleItemsOwnExpressionIsAnError) {
   }
 }
 
-// §8.11 reaches every expression a statement holds, not only an assignment's
-// two sides and a condition: a block variable's initializer, a loop's
-// condition and a delay each name `this` here, in a procedural block apiece,
-// and each block is reported at its keyword (#8080).
 TEST(ThisElaboration, ThisInAnyExpressionOfAStatementIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -346,8 +303,6 @@ TEST(ThisElaboration, ThisInAnyExpressionOfAStatementIsAnError) {
   }
 }
 
-// §8.11 reaches `this` wherever it stands within an expression, a
-// part-select's second bound and a replication's count among the rest (#8086).
 TEST(ThisElaboration, ThisInAnyOperandOfAnExpressionIsAnError) {
   ElabFixture f;
   ElabOk(

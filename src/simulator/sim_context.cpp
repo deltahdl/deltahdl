@@ -32,25 +32,14 @@
 
 namespace delta {
 
-// Defined here, where CoverageDB is a complete type, so the owning unique_ptr
-// member can be destroyed.
 SimContext::~SimContext() {
-  // The running process's park slot belongs to this run.
   g_park_slot = nullptr;
-  // §35.5.3: the C layer reaches this run's registry through a free function
-  // (DpiForeignRuntime), so a run that installed one takes it back out when it
-  // goes away rather than leaving a pointer to storage that no longer exists.
-  // Another run's installation is left alone: the last run to install is the
-  // one the foreign layer is talking to.
   if (dpi_runtime_ != nullptr && DpiForeignRuntime() == dpi_runtime_) {
     DpiSetForeignRuntime(nullptr);
   }
 }
 
 CoverageDB& SimContext::CoverageData() {
-  // §19.9: an externally injected database wins; otherwise create the run's own
-  // and reuse it on every later call so the coverage system tasks/functions all
-  // see the same live data.
   if (coverage_db_ != nullptr) return *coverage_db_;
   if (!owned_coverage_db_) owned_coverage_db_ = std::make_unique<CoverageDB>();
   return *owned_coverage_db_;
@@ -62,10 +51,6 @@ CovergroupTable& SimContext::Covergroups() {
 }
 
 ClockingManager& SimContext::AcquireClockingManager() {
-  // A manager installed from outside is the run's, the way an installed DPI
-  // registry is: §14's blocks, their events and their sampled values all have
-  // to be the one set, and making a second here would leave the design's blocks
-  // in one manager and the run's lookups in the other.
   if (clocking_mgr_ != nullptr) return *clocking_mgr_;
   if (owned_clocking_manager_ == nullptr) {
     owned_clocking_manager_ = std::make_unique<ClockingManager>();
@@ -83,9 +68,6 @@ SpecifyManager& SimContext::AcquireSpecifyManager() {
 }
 
 DpiRuntime& SimContext::AcquireDpiRuntime() {
-  // A registry installed from outside is the run's: §35 holds of whichever one
-  // the calls go through, and making a second here would leave a design's
-  // imports in one registry and its calls in the other.
   if (dpi_runtime_ != nullptr) {
     DpiSetForeignRuntime(dpi_runtime_);
     return *dpi_runtime_;
@@ -94,27 +76,18 @@ DpiRuntime& SimContext::AcquireDpiRuntime() {
     owned_dpi_runtime_ = std::make_unique<DpiRuntime>();
   }
   dpi_runtime_ = owned_dpi_runtime_.get();
-  // §35.5.3: the C layer has no handle to pass, so the registry a foreign
-  // routine's svGetScope and svSetScope reach is installed here, where the
-  // run's own registry is settled.
   DpiSetForeignRuntime(dpi_runtime_);
   return *owned_dpi_runtime_;
 }
 
 namespace {
 
-// The symbol tables consulted during a hierarchical name lookup: the map from
-// instance path to its module type, the flat variable table, and the names of
-// the design's top-level modules (§23.6).
 struct SymbolTables {
   const std::unordered_map<std::string, std::string>& instance_types;
   const std::unordered_map<std::string_view, Variable*>& variables;
   const std::unordered_set<std::string>& top_modules;
 };
 
-// A hierarchical name being resolved: the full dotted `name`, plus its split
-// into the leading instance segment (`head`) and the remainder (`rest`), and
-// the `prefix` of the current scope from which the upward walk begins.
 struct NameLookup {
   std::string_view name;
   std::string_view head;
@@ -122,8 +95,6 @@ struct NameLookup {
   const std::string& prefix;
 };
 
-// Shrinks `p` to the next-shorter dotted instance prefix (dropping the final
-// path segment, keeping the trailing dot), clearing it when no segment remains.
 void ShrinkInstancePrefix(std::string& p) {
   size_t last =
       (p.size() >= 2) ? p.find_last_of('.', p.size() - 2) : std::string::npos;
@@ -134,8 +105,6 @@ void ShrinkInstancePrefix(std::string& p) {
   }
 }
 
-// When the instance at `p` has type `head`, looks up `rest` under that prefix.
-// Returns the matching variable or nullptr.
 Variable* LookupRestUnderMatchingInstance(const std::string& p,
                                           std::string_view head,
                                           std::string_view rest,
@@ -151,9 +120,6 @@ Variable* LookupRestUnderMatchingInstance(const std::string& p,
   return (cit != tables.variables.end()) ? cit->second : nullptr;
 }
 
-// Walks progressively shorter instance prefixes searching for `name` (or its
-// rest under a matching instance head) in the variable table. Extracted from
-// FindVariable so the lookup body stays a single cohesive step.
 Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
                                    const SymbolTables& tables) {
   std::string p = lookup.prefix;
@@ -166,38 +132,15 @@ Variable* FindVariableByPrefixWalk(const NameLookup& lookup,
     auto cit = tables.variables.find(cand);
     if (cit != tables.variables.end()) return cit->second;
   }
-  // §23.6: a hierarchical name rooted at the top module (e.g. "top.sig") strips
-  // its leading segment against the top instance, which is keyed under the
-  // empty prefix. The walk above skips that iteration when it starts from an
-  // empty prefix (a top-level process or a test-time lookup), so try it
-  // explicitly.
   if (Variable* under_top = LookupRestUnderMatchingInstance(
           "", lookup.head, lookup.rest, tables)) {
     return under_top;
   }
-  // §23.6: the complete path to any object starts at a top-level module and
-  // may be used from a parallel hierarchy, so "m.a" written in the other
-  // top-level module n names m's `a`. Every top's declarations are keyed under
-  // the empty prefix, while the instance type under it records one top alone,
-  // so the others are answered by their names: the head names a top, and the
-  // rest is the key. §23.6 also lets the first node be the top of the
-  // hierarchy the path is used from, and an instance of the current scope
-  // called `m` is answered by the walk above or by the plain lookup ahead of
-  // it, so that instance stands ahead of a top of the same name.
   if (tables.top_modules.count(std::string(lookup.head)) == 0) return nullptr;
   auto top_it = tables.variables.find(lookup.rest);
   return (top_it != tables.variables.end()) ? top_it->second : nullptr;
 }
 
-// §23.8 with §23.9: a dotted name read inside named blocks, `inner.x` in
-// `outer` or `b.r` in `b`, has its first name looked for in the current scope
-// and then outward through the enclosing ones, a named block among them. A
-// named block's variable is keyed by the path of the named scopes in force
-// where it was declared, starting at the innermost subroutine
-// (BindNamedBlockVariable), so each run of the scopes in force ending at a
-// given depth, innermost depth first, is tried as the name's prefix: the run
-// that starts at a called task's own scope among them. Null for a name with no
-// dot or one no scope answers.
 Variable* FindUnderNamedScopes(
     const std::unordered_map<std::string_view, Variable*>& variables,
     const std::string& prefix, const std::vector<std::string_view>& scopes,
@@ -218,8 +161,6 @@ Variable* FindUnderNamedScopes(
   return nullptr;
 }
 
-// `name` declared in the running instance, keyed under its prefix, or else
-// reached through the named blocks in force (FindUnderNamedScopes).
 Variable* FindUnderInstanceOrNamedScopes(
     const std::unordered_map<std::string_view, Variable*>& variables,
     const std::string& prefix, const std::vector<std::string_view>& scopes,
@@ -233,17 +174,6 @@ Variable* FindUnderInstanceOrNamedScopes(
 
 }  // namespace
 
-// §27.4: resolves `name` against the generate block instances the running
-// process is in, if it is in any. `inst_prefix` is the process's
-// module-instance prefix, which the block prefixes sit inside. Returns nullptr
-// when there is no enclosing generate block or none of them declares such a
-// name, leaving the caller to carry on with the enclosing scopes.
-//
-// The blocks are tried innermost first because §23.9 takes a local declaration
-// first and otherwise searches outward until a declaration of the name turns up
-// or a module, interface, program or checker boundary stops the search, the
-// order
-// GenerateBlockKeys (sim_context_name_tables.cpp) spells the keys in.
 Variable* SimContext::FindInGenerateBlock(const std::string& inst_prefix,
                                           std::string_view name) {
   if (!current_process_) return nullptr;
@@ -304,19 +234,11 @@ void SimContext::SetLoweringInstancePrefix(std::string_view prefix) {
 }
 
 std::string SimContext::ActiveInstancePrefix() const {
-  // §32.4.3's rebuild stands in the instance that declared what is being
-  // rebuilt, which is neither of the two below.
   if (prefix_override_.active) return prefix_override_.prefix;
   return current_process_ ? current_process_->inst_prefix
                           : lowering_inst_prefix_;
 }
 
-// §3.12.1 (printed page 56): the scope name the declarations of the running
-// code's scope stand under where each unit has a scope of its own, and empty
-// for a design of one unit. A unit's or a package's subroutine runs in the
-// frame of the scope declaring it (EnterSubroutinePackage), whatever instance
-// enabled it, so its own unit's "$unit#k" or its own package's name; other
-// code stands in the unit of its instance's module.
 std::string SimContext::ActiveUnitScope() const {
   if (!units_.Separate()) return {};
   const Scope* frame = PackageFrame();
@@ -324,11 +246,6 @@ std::string SimContext::ActiveUnitScope() const {
   return UnitScopes::ScopeName(units_.UnitOf(ActiveInstancePrefix()));
 }
 
-// §26.3 with §13.4: a bare name read inside a package subroutine's body is
-// the package's own variable or one an import of the package brings in, held
-// under the "package.name" keys PackageFrameKeys lists
-// (sim_context_fileio.cpp); null outside any package frame or where no key
-// holds the name.
 Variable* SimContext::FindInPackageScope(std::string_view name) {
   for (const std::string& key : PackageFrameKeys(name)) {
     auto found = variables_.find(key);
@@ -337,11 +254,6 @@ Variable* SimContext::FindInPackageScope(std::string_view name) {
   return nullptr;
 }
 
-// §26.3 with §13.4, for a subroutine as FindInPackageScope for a variable: a
-// bare callee inside a package's frame is the package's own subroutine,
-// registered under "pkg::name" by RegisterPackageScopedSubroutines, or one an
-// import of the package brings in; null outside any package frame or where
-// no package holds the name.
 ModuleItem* SimContext::FindFunctionInPackageScope(std::string_view name) {
   const Scope* frame = PackageFrame();
   if (frame == nullptr) return nullptr;
@@ -354,16 +266,6 @@ ModuleItem* SimContext::FindFunctionInPackageScope(std::string_view name) {
 }
 
 Variable* SimContext::FindVariable(std::string_view name) {
-  // §23.6: the instance name $root names the top of the instantiated design
-  // and reaches it without ambiguity. A name written from there is absolute, so
-  // it is read straight out of variables_ and never joined to
-  // ActiveInstancePrefix(), which would make the top of the design relative to
-  // whichever instance is running. `$root` cannot spell a local or a prefixed
-  // name either, `$` starting no identifier, so this stands ahead of both
-  // lookups below.
-  //
-  // variables_ keys the first top's own declarations under no instance
-  // prefix and a later top's under its name (RootedStorageKey).
   constexpr std::string_view kRootPrefix = "$root.";
   if (name.substr(0, kRootPrefix.size()) == kRootPrefix) {
     auto it =
@@ -374,45 +276,19 @@ Variable* SimContext::FindVariable(std::string_view name) {
   auto* local = FindLocalVariable(name);
   if (local) return local;
   if (auto* in_package = FindInPackageScope(name)) return in_package;
-  // §3.12.1: a unit subroutine's path is read from the top of the design.
   if (Variable* from_root = FindUnitPathVariable(name)) return from_root;
   std::string prefix = ActiveInstancePrefix();
 
-  // §27.4: a generate block is a separate scope, and its declarations are
-  // stored under the block instance's prefix. The innermost scope is searched
-  // first, so a name that the block declares resolves to that declaration
-  // ahead of a like-named one in the enclosing module.
   if (auto* in_block = FindInGenerateBlock(prefix, name)) return in_block;
 
   if (auto* in_scope = FindUnderInstanceOrNamedScopes(
           variables_, prefix, ActiveNamedScopes(), name)) {
     return in_scope;
   }
-  // §23.4: a module declared inside the one instantiating it sees the outer
-  // module's name space and may use any name declared there, so the boundary
-  // §23.9 draws is not there and the search goes on in the instance holding it
-  // -- m1's K for the program nested in `m
-  // #(7) m1()` (§24.3) -- and outward through every nested declaration's
-  // instance. Reading the top's key instead answered for an instance at the
-  // top alone.
   if (auto* outer = FindInNestedDeclOuterScopes(variables_, prefix, name))
     return outer;
 
   auto dot = name.find('.');
-  // §23.9: the search climbs outward until a declaration of the name turns up
-  // or a module, interface, program or checker boundary stops it, and for a
-  // variable a module boundary stops it. The bare key is the enclosing scope's,
-  // so reading it from inside an instance is that forbidden step. It stays the
-  // answer in the three cases §23.9 does not forbid: with no instance prefix in
-  // force it is the ordinary lookup rather than an upward step; a dotted name
-  // is the §23.8 climb, which names the module it reaches; and a name a package
-  // import brought into scope is bound flat under its unqualified spelling
-  // rather than declared in an enclosing module at all, as is each element of
-  // an imported array (IsImportedName). A nested declaration's instance at the
-  // top reached the top's key through the §23.4 search above. §23.6's `$root`
-  // is a fourth, answered above rather than here: it names the top of the
-  // design outright rather than climbing to it, so no boundary stands between
-  // the reference and what it reaches.
   if (prefix.empty() || dot != std::string_view::npos || IsImportedName(name)) {
     auto it = variables_.find(name);
     if (it != variables_.end()) return it->second;
@@ -430,8 +306,6 @@ Variable* SimContext::CreateVariable(std::string_view name, uint32_t width) {
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4Vec(arena_, width);
 
-  // §6.8, Table 6-7: an uninitialized 4-state integral variable defaults to 'x,
-  // which FillWithX writes inside the width and nowhere above it.
   FillWithX(var->value);
   variables_[name] = var;
   return var;
@@ -443,8 +317,6 @@ void SimContext::AliasVariable(std::string_view alias_name,
   if (target) variables_[alias_name] = target;
 }
 
-// §15.5 with §13.5.1: the variable `target` itself, found by no name, which
-// an event output formal hands back to the caller's actual.
 void SimContext::AliasVariable(std::string_view alias_name, Variable* target) {
   if (target) variables_[alias_name] = target;
 }
@@ -465,9 +337,6 @@ void SimContext::NullifyEventVariable(std::string_view name) {
     var->is_null_event = true;
     return;
   }
-  // §6.18: nullifying one event handle must not disturb other handles that
-  // alias the same underlying event. If this name shares its Variable with
-  // another handle, rebind it to a fresh nulled event so the aliases diverge.
   int shared = 0;
   for (const auto& [key, value] : variables_) {
     if (value == var && ++shared > 1) break;
@@ -485,16 +354,8 @@ void SimContext::NullifyEventVariable(std::string_view name) {
 
 namespace {
 
-// §6.7.1: install a net's default value before it is driven. A user-defined
-// nettype keeps the variable's existing initialization; a trireg defaults to x
-// (it holds charge, unknown until driven); every other net defaults to z. The
-// bits of the last storage word above the net's width are left clear, as every
-// value a driver resolves to leaves them: set, they made the net's first
-// resolution to the z it already held a change of value, and §9.4.2's event
-// control on the net woke at time 0 on none.
 void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
   if (is_user_nettype) return;
-  // Canonical Convention A: x = (aval=1, bval=1) and z = (aval=0, bval=1).
   bool is_x = type == NetType::kTrireg;
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
     uint64_t mask = WordMaskWithinWidth(var->value.width, i);
@@ -503,8 +364,6 @@ void InitNetDefaultValue(Variable* var, NetType type, bool is_user_nettype) {
   }
 }
 
-// Populates a freshly created Net's fields from the CreateNet arguments
-// (§6.7.1: nettype, charge strength/decay, user-nettype flag, resolve func).
 void PopulateNetFields(Net* net, Variable* var, NetType type,
                        const NetSpec& spec) {
   net->type = type;
@@ -527,16 +386,6 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
   auto* net = arena_.Create<Net>();
   PopulateNetFields(net, var, type, spec);
   nets_[name] = net;
-  // §6.6.5: a tri0/tri1 net is equivalent to a wire carrying a continuous 0/1
-  // of pull strength, so it holds that value even with no driver connected --
-  // unlike an ordinary net, which stays z until driven. Resolve() with no
-  // drivers installs the pull default (value and strength); a later driver
-  // update re-resolves and can override it.
-  // §28.15.3: a supply0/supply1 net models a constant ground/power connection.
-  // Like tri0/tri1 above it holds its value (0/1) at supply strength with no
-  // driver connected, so resolve it at creation instead of leaving it z.
-  // §28.15.2: a trireg nothing drives is in the charge storage state, holding
-  // its initial x at its charge strength.
   if (type == NetType::kTri0 || type == NetType::kTri1 ||
       type == NetType::kSupply0 || type == NetType::kSupply1 ||
       type == NetType::kTrireg) {
@@ -546,29 +395,13 @@ Net* SimContext::CreateNet(std::string_view name, NetType type, uint32_t width,
 }
 
 void SimContext::SetCurrentProcess(Process* proc) {
-  // §38.36.1: a thread the run switches to after it first ran resumes
-  // execution here, which a cbEnterThread callback is called for once the
-  // thread is the one running, as it is where it was running already.
   const bool kResuming =
       proc != nullptr && !proc->stand_in && scheduler_.HasRunThread(proc);
   if (proc == current_process_) {
     if (kResuming) GetGlobalVpiContext().NoteThreadEntered(proc);
     return;
   }
-  // §37.44: a process reaching here is one the run has a thread for. This is
-  // the one place every process passes through, which is what makes the list
-  // the scheduler builds the run's threads rather than some of them. A stand-in
-  // for the caller of a deferred display (deferred_caller.h) is no thread.
   if (proc == nullptr || !proc->stand_in) scheduler_.NoteThreadSwitch(proc);
-  // §13.3.2: SetCurrentProcess is the thread-switch primitive -- every process
-  // resume is preceded by a call here. Hand the scope stack off between threads
-  // so automatic-task (and block) locals stay private to each activation: park
-  // the outgoing process's stack and bring in the incoming process's. Static
-  // storage is unaffected -- it lives in static_frames_, shared across
-  // activations of the same instance.
-  // §21.2.1.5: the named scopes travel with the process as its locals do.
-  // §8.11 and §8.15: the object and the class a suspended class task's body
-  // runs against travel with it too (Process::saved_this_stack).
   if (current_process_) {
     current_process_->saved_scope_stack = std::move(scope_stack_);
     current_process_->saved_named_scopes = std::move(active_scope_stack_);
@@ -587,30 +420,15 @@ void SimContext::SetCurrentProcess(Process* proc) {
     method_class_stack_.clear();
   }
   current_process_ = proc;
-  // §9.6.2: the wait the running process parks in is recorded on it, while
-  // the named scopes it stands in are the ones in active_scope_stack_.
   g_park_slot = proc != nullptr ? &proc->park : nullptr;
   if (proc != nullptr) proc->park.named_scopes = &active_scope_stack_;
   if (kResuming) GetGlobalVpiContext().NoteThreadEntered(proc);
 }
 
-// §9.3.2 with §8.6 and §13.3.2: a branch spawned inside a method runs on the
-// object and in the class the method runs on, and its statements are
-// statements of the enclosing scope, so they read and write its automatic
-// locals -- the loop variable a `for (int j ...)` declared, the `automatic int
-// k = j` the fork itself declared before spawning, a class task's local. The
-// stacks are the spawning process's, live here while it runs, and the branch
-// takes a copy of each as the state SetCurrentProcess installs when it first
-// resumes; a scope maps names to the variables themselves, so the copy holds
-// the same variables and a write on either side is seen on the other. Without
-// this the branch started with no object and no scope: every property and
-// local read 0 and a write reached nothing or a variable of the branch's own.
 void SimContext::CopyCarriedStacksTo(Process& child) const {
   child.saved_this_stack = this_stack_;
   child.saved_method_class_stack = method_class_stack_;
   child.saved_scope_stack = scope_stack_;
-  // §8.29: what a branch carries before it first runs keeps the objects it
-  // refers to reachable. A stand-in's stacks are its holder's to report.
   if (!child.stand_in) scheduler_.NoteCarrier(&child);
 }
 
@@ -702,11 +520,6 @@ void SimContext::RegisterProgramInitial(uint32_t program_block_id,
   }
 }
 
-// §24.3: an initial procedure of a program reaching its end is counted out,
-// and its descendant threads end with it. One that $exit already ended was
-// counted out by ExitProgramBlock and is no longer registered, so a coroutine
-// that ran on to its end after the $exit counts nothing out a second time,
-// which would take another program's initial for ended.
 void SimContext::OnProgramInitialComplete(Process* proc) {
   if (proc) {
     KillDescendants(proc);
@@ -750,11 +563,6 @@ void SimContext::RunFinalBlocks() {
 }
 
 std::mt19937& SimContext::ActiveRng() {
-  // §18.14.2 thread stability: when a thread is running, every randomization
-  // draw made from it must come from that thread's own generator so it stays
-  // independent of sibling execution order. The hierarchical seed is
-  // installed once, on first use, by drawing the next value from the parent's
-  // active stream (which is whatever generator the current process inherits).
   if (current_process_ != nullptr && !current_process_->is_static_init) {
     if (!current_process_->rng_initialized) {
       current_process_->rng.seed(current_process_->rng_seed);
@@ -762,11 +570,6 @@ std::mt19937& SimContext::ActiveRng() {
     }
     return current_process_->rng;
   }
-  // §18.14.1: with no thread running the draw is being made while the design
-  // is built, and it seeds a static process or a static-initializer object of
-  // the instance being built, from that instance's own initialization RNG --
-  // a static local's initializer among them, run under the stand-in naming
-  // its instance (Lowerer::InitializeStaticLocals).
   return InitializationRng(ActiveInstancePrefix(), default_seed_);
 }
 
@@ -798,9 +601,6 @@ void SimContext::AddPlusArg(std::string arg) {
   plus_args_.push_back(std::move(arg));
 }
 
-// The key of the instance `cand` names when read from the top of the design:
-// an instance's own key, the instance an interface port is connected to, or
-// the instance whose path through generate blocks `cand` spells.
 std::string SimContext::InstanceKeyOf(const std::string& cand) const {
   if (instance_types_.find(cand) != instance_types_.end()) return cand;
   if (std::string_view key = FindInterfacePortInstance(cand); !key.empty())
@@ -810,8 +610,6 @@ std::string SimContext::InstanceKeyOf(const std::string& cand) const {
 
 std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
   std::string prefix = ActiveInstancePrefix();
-  // Walk progressively shorter instance prefixes, mirroring FindVariable, so a
-  // bare instance name resolves to its full hierarchical scope.
   std::string p = prefix;
   for (;;) {
     std::string cand = p + std::string(ident);
@@ -825,8 +623,6 @@ std::string SimContext::ResolveInstanceScope(std::string_view ident) const {
       p = p.substr(0, last + 1);
     }
   }
-  // §23.6: a path headed by a top-level module's name is read from that top,
-  // whose own instances are keyed under no prefix.
   size_t dot = ident.find('.');
   if (dot != std::string_view::npos && IsTopModule(ident.substr(0, dot)))
     return InstanceKeyOf(std::string(ident.substr(dot + 1)));
@@ -837,12 +633,6 @@ void SimContext::RegisterArray(std::string_view name, const ArrayInfo& info) {
   array_infos_[name] = info;
 }
 
-// §18.17: a randsequence statement opens an automatic scope, so the
-// array §18.17.7 declares within one of its rules is described by the scope
-// and not by the design. The shape is copied into the arena because the frame
-// holds a pointer, and the arena outlives every scope: what ends with the
-// scope is the name standing for the array, which is the whole of the
-// declaration.
 void SimContext::RegisterLocalArray(std::string_view name,
                                     const ArrayInfo& info) {
   scope_stack_.back().arrays[name] = arena_.Create<ArrayInfo>(info);
@@ -861,8 +651,6 @@ void SimContext::RegisterStringVariable(std::string_view name) {
   if (auto* var = FindVariable(name)) var->is_string = true;
 }
 
-// Not const because FindVariable is not, the lookup walking scope frames it
-// hands out mutable variables from.
 bool SimContext::IsStringVariable(std::string_view name) {
   const auto* var = FindVariable(name);
   return var != nullptr && var->is_string;
@@ -872,26 +660,7 @@ ArrayInfo* SimContext::FindArrayInfo(std::string_view name) {
   return const_cast<ArrayInfo*>(std::as_const(*this).FindArrayInfo(name));
 }
 
-// §23.9: a local declaration is taken first, and failing one the search climbs
-// outward. An array a scope declares is therefore
-// what its name reads while that scope is on the stack, and a like-named array
-// RegisterArray recorded for the whole run is what the name reads again once
-// the scope is gone.
-//
-// The upward search from inside an instance reaches its own module first, and
-// CreateChildModuleVariables (lowerer_child.cpp) records an array that module
-// declares under the instance's prefix, so the prefixed name is what a bare
-// reference from within the instance denotes and is tried ahead of the bare
-// key, as FindQueue and FindVariable do; ScopedObjectKeys
-// (sim_context_fileio.cpp) orders the keys, a package frame's own ahead of
-// both. Asked by the bare key alone, an array declared in an instantiated
-// module was no array to any reader: an element select read a bit of the
-// carrier variable the lowerer creates under the name, foreach ran once per
-// bit of that carrier, and $size, %p and an aggregate copy saw no array at
-// all. The bare key stays the answer for an array of the enclosing scope, so
-// a name that resolved before still does.
 const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
-  // §23.6: a name written from $root is absolute, as FindVariable reads it.
   constexpr std::string_view kRootPrefix = "$root.";
   if (name.starts_with(kRootPrefix)) {
     auto it =
@@ -902,9 +671,6 @@ const ArrayInfo* SimContext::FindArrayInfo(std::string_view name) const {
        ++frame) {
     auto local = frame->arrays.find(name);
     if (local != frame->arrays.end()) return local->second;
-    // A frame declaring a variable of the name and no array under it hides
-    // an outer array of the name, as a nested with clause's iterator `item`
-    // hides the row the outer clause bound to `item` (§7.12.3).
     if (frame->vars.count(name) != 0) return nullptr;
   }
   for (const std::string& key : ScopedObjectKeys(name)) {

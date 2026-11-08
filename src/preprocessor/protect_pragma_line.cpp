@@ -23,9 +23,6 @@ bool IsIdentifierStart(char c) {
   return std::isalpha(static_cast<unsigned char>(c)) != 0 || c == '_';
 }
 
-// Consumes `word` from the front of `text` when it stands there as a whole
-// word. A longer name that merely starts with the same letters is a different
-// name, so it is left alone.
 bool ConsumeWord(std::string_view& text, std::string_view word) {
   if (text.substr(0, word.size()) != word) return false;
   std::string_view rest = text.substr(word.size());
@@ -34,8 +31,6 @@ bool ConsumeWord(std::string_view& text, std::string_view word) {
   return true;
 }
 
-// Advances past a parenthesized value, returning the index just after the
-// parenthesis that closes the one opening at `i`.
 size_t SkipParenGroup(std::string_view body, size_t i) {
   size_t depth = 0;
   while (i < body.size()) {
@@ -46,17 +41,6 @@ size_t SkipParenGroup(std::string_view body, size_t i) {
   return i;
 }
 
-// Advances past an escaped identifier, returning the index just after it.
-// §5.6.1 runs one from its backslash to the first whitespace character.
-//
-// §22.5.1 spells a pragma_keyword as a simple identifier, so a name written
-// this way names no expression of the list, whatever its letters read as.
-// Stepping over it whole is what keeps those letters from being scanned as a
-// keyword in their own right: the backslash is not one of the characters a
-// name may start with, so a walk that merely stepped over the backslash would
-// find a keyword standing where the directive grammar finds one token that is
-// no keyword at all, and the two readings of a source text would disagree
-// about which expressions it wrote.
 size_t SkipEscapedIdentifier(std::string_view body, size_t i) {
   ++i;
   while (i < body.size() &&
@@ -66,18 +50,11 @@ size_t SkipEscapedIdentifier(std::string_view body, size_t i) {
   return i;
 }
 
-// Where the pragma_value being read starts, once an '=' has opened one. A list
-// is walked from left to right, so at most one value is open at any point and
-// the name it belongs to is the one collected last.
 struct OpenValue {
   bool open;
   size_t start;
 };
 
-// Ends the value that has stood open since its '=': what lies between there
-// and `end` was written against the name collected last, without the
-// whitespace separating it from the punctuation on either side. A value with
-// no name to its left belongs to no expression of the list and is dropped.
 void CloseValue(std::string_view body, size_t end, OpenValue* value,
                 std::vector<ListedKeyword>* keywords) {
   if (!value->open) return;
@@ -87,9 +64,6 @@ void CloseValue(std::string_view body, size_t end, OpenValue* value,
       TrimTrailing(TrimLeading(body.substr(value->start, end - value->start)));
 }
 
-// Scans the identifier starting at `i`, collecting it when it names an
-// expression of the list rather than qualifying a value, and returns the index
-// just past it.
 size_t ScanKeyword(std::string_view body, size_t i, bool in_value,
                    std::vector<ListedKeyword>* keywords) {
   size_t start = i;
@@ -100,10 +74,6 @@ size_t ScanKeyword(std::string_view body, size_t i, bool in_value,
   return i;
 }
 
-// Records that a pragma_value was written against the name collected last,
-// which is the name an '=' reached at this level belongs to. A directive that
-// opens with an '=' has collected nothing yet, and an expression with no
-// keyword to the left of its '=' is not one of these.
 void MarkLastKeywordValued(std::vector<ListedKeyword>* keywords) {
   if (!keywords->empty()) keywords->back().has_value = true;
 }
@@ -184,9 +154,6 @@ std::vector<ListedKeyword> TopLevelKeywords(std::string_view body) {
       ++i;
     }
   }
-  // A value runs to the comma that ends its expression, or, for the last
-  // expression of the list, to the end of the list -- which a comment written
-  // after it brings forward to where the comment starts.
   CloseValue(body, i, &value, &keywords);
   return keywords;
 }
@@ -195,8 +162,6 @@ std::string_view KeywordValueOnLine(std::string_view line,
                                     std::string_view keyword) {
   std::string_view body;
   if (!ProtectPragmaLine(line, &body)) return {};
-  // §34.2 reads the list left to right, so a keyword written twice ends at the
-  // value written last.
   std::string_view value;
   for (const ListedKeyword& listed : TopLevelKeywords(body)) {
     if (listed.name == keyword && listed.has_value) value = listed.value;

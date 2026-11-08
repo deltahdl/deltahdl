@@ -8,10 +8,6 @@
 namespace delta {
 namespace {
 
-// FIPS 46-3 numbers the bits of a block from 1 at the left, so a table entry is
-// a position counted from the most significant bit of the value it selects
-// from. `width` is how many bits of `src` are significant, and the answer is
-// `count` bits wide with the first entry landing in its most significant bit.
 uint64_t Permute(uint64_t src, unsigned width, const uint8_t* table,
                  unsigned count) {
   uint64_t out = 0;
@@ -22,8 +18,6 @@ uint64_t Permute(uint64_t src, unsigned width, const uint8_t* table,
   return out;
 }
 
-// The initial permutation and its inverse, applied to the block on the way in
-// and on the way out.
 constexpr uint8_t kInitialPermutation[64] = {
     58, 50, 42, 34, 26, 18, 10, 2, 60, 52, 44, 36, 28, 20, 12, 4,
     62, 54, 46, 38, 30, 22, 14, 6, 64, 56, 48, 40, 32, 24, 16, 8,
@@ -36,9 +30,6 @@ constexpr uint8_t kFinalPermutation[64] = {
     36, 4, 44, 12, 52, 20, 60, 28, 35, 3, 43, 11, 51, 19, 59, 27,
     34, 2, 42, 10, 50, 18, 58, 26, 33, 1, 41, 9,  49, 17, 57, 25};
 
-// The expansion that takes the right half from 32 bits to the 48 the subkey is
-// combined with, and the permutation applied to what the substitution boxes
-// leave.
 constexpr uint8_t kExpansion[48] = {
     32, 1,  2,  3,  4,  5,  4,  5,  6,  7,  8,  9,  8,  9,  10, 11,
     12, 13, 12, 13, 14, 15, 16, 17, 16, 17, 18, 19, 20, 21, 20, 21,
@@ -48,9 +39,6 @@ constexpr uint8_t kRoundPermutation[32] = {
     16, 7, 20, 21, 29, 12, 28, 17, 1,  15, 23, 26, 5,  18, 31, 10,
     2,  8, 24, 14, 32, 27, 3,  9,  19, 13, 30, 6,  22, 11, 4,  25};
 
-// The two permuted choices of the key schedule. The first drops the parity bit
-// of every byte, leaving the 56 bits the algorithm uses; the second selects the
-// 48 bits of each round's subkey out of the rotated halves.
 constexpr uint8_t kPermutedChoiceOne[56] = {
     57, 49, 41, 33, 25, 17, 9,  1,  58, 50, 42, 34, 26, 18, 10, 2,  59, 51, 43,
     35, 27, 19, 11, 3,  60, 52, 44, 36, 63, 55, 47, 39, 31, 23, 15, 7,  62, 54,
@@ -61,12 +49,9 @@ constexpr uint8_t kPermutedChoiceTwo[48] = {
     26, 8,  16, 7,  27, 20, 13, 2,  41, 52, 31, 37, 47, 55, 30, 40,
     51, 45, 33, 48, 44, 49, 39, 56, 34, 53, 46, 42, 50, 36, 29, 32};
 
-// How far each round rotates the two halves of the key.
 constexpr uint8_t kKeyRotations[16] = {1, 1, 2, 2, 2, 2, 2, 2,
                                        1, 2, 2, 2, 2, 2, 2, 1};
 
-// The eight substitution boxes, each read as four rows of sixteen: the outer
-// two bits of a six-bit group select the row and the inner four the column.
 constexpr uint8_t kSubstitutionBoxes[8][64] = {
     {14, 4,  13, 1, 2,  15, 11, 8,  3,  10, 6,  12, 5,  9,  0, 7,
      0,  15, 7,  4, 14, 2,  13, 1,  10, 6,  12, 11, 9,  5,  3, 8,
@@ -101,7 +86,6 @@ constexpr uint8_t kSubstitutionBoxes[8][64] = {
      7,  11, 4,  1, 9,  12, 14, 2,  0,  6,  10, 13, 15, 3,  5,  8,
      2,  1,  14, 7, 4,  10, 8,  13, 15, 12, 9,  0,  3,  5,  6,  11}};
 
-// The sixteen subkeys, in the order encryption applies them.
 void KeySchedule(uint64_t key, uint64_t subkeys[16]) {
   uint64_t permuted = Permute(key, 64, kPermutedChoiceOne, 56);
   auto left = static_cast<uint32_t>((permuted >> 28) & 0x0FFFFFFFU);
@@ -115,8 +99,6 @@ void KeySchedule(uint64_t key, uint64_t subkeys[16]) {
   }
 }
 
-// The round function: the right half expanded to 48 bits, combined with the
-// subkey, put through the substitution boxes six bits at a time and permuted.
 uint32_t RoundFunction(uint32_t half, uint64_t subkey) {
   uint64_t expanded = Permute(half, 32, kExpansion, 48) ^ subkey;
   uint32_t substituted = 0;
@@ -130,9 +112,6 @@ uint32_t RoundFunction(uint32_t half, uint64_t subkey) {
   return static_cast<uint32_t>(Permute(substituted, 32, kRoundPermutation, 32));
 }
 
-// The sixteen rounds over one block, the subkeys applied in the order given.
-// FIPS 46-3 leaves the halves swapped after the last round, which is why the
-// preoutput is assembled right half first.
 uint64_t DesRounds(uint64_t block, const uint64_t subkeys[16], bool reversed) {
   uint64_t permuted = Permute(block, 64, kInitialPermutation, 64);
   auto left = static_cast<uint32_t>(permuted >> 32);
@@ -147,8 +126,6 @@ uint64_t DesRounds(uint64_t block, const uint64_t subkeys[16], bool reversed) {
   return Permute(preoutput, 64, kFinalPermutation, 64);
 }
 
-// Eight bytes read as one 64-bit value, the first byte holding bits 1 to 8,
-// and the inverse of that reading.
 uint64_t WordOfBytes(std::string_view bytes) {
   uint64_t value = 0;
   for (char c : bytes) {
@@ -173,8 +150,6 @@ std::string OneBlock(std::string_view block, std::string_view key,
   return BytesOfWord(DesRounds(WordOfBytes(block), subkeys, reversed));
 }
 
-// The two blocks combined byte by byte, which is what chains one block of CBC
-// to the one before it.
 std::string CombineBlocks(std::string_view left, std::string_view right) {
   std::string combined;
   combined.reserve(left.size());
@@ -188,11 +163,11 @@ std::string CombineBlocks(std::string_view left, std::string_view right) {
 }  // namespace
 
 std::string DesEncryptBlock(std::string_view block, std::string_view key) {
-  return OneBlock(block, key, /*reversed=*/false);
+  return OneBlock(block, key, false);
 }
 
 std::string DesDecryptBlock(std::string_view block, std::string_view key) {
-  return OneBlock(block, key, /*reversed=*/true);
+  return OneBlock(block, key, true);
 }
 
 std::string DesCbcEncrypt(std::string_view cleartext, std::string_view key,
@@ -228,8 +203,6 @@ bool DesCbcDecrypt(std::string_view ciphertext, std::string_view key,
     chain.assign(block);
   }
   auto pad = static_cast<size_t>(static_cast<uint8_t>(padded.back()));
-  // The ciphertext is at least one whole block, so a count no larger than a
-  // block is never larger than what it counts.
   if (pad == 0 || pad > kDesBlockBytes) return false;
   for (size_t n = 0; n < pad; ++n) {
     auto byte = static_cast<size_t>(

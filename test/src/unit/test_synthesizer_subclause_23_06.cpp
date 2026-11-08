@@ -25,23 +25,6 @@ TEST(HierarchicalNameSynthesis, ModuleInstanceHierarchyLowers) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The assertion names §23.6 because `c1.sig` is a hierarchical name rather
-// than a member of a packed structure. §23.6 defines the reference this source
-// writes: any named object or hierarchical name reference can be named uniquely
-// in full by joining, with periods, the names of the modules, module instances,
-// generate blocks, tasks, functions, assertion labels, named assertion action
-// blocks or named blocks that contain it. §23.7 is what tells the construct
-// from a member select: a hierarchical name's first component matches a scope
-// name, while a member select's first component matches a data object or an
-// interface port. `c1` is the instance name of the `child c1()` instantiation
-// and so matches a scope name, while `p` in a member select `p.hi` matches a
-// declared variable. Parser::ParseMemberAccessChain builds both constructs as
-// ExprKind::kMemberAccess, so SynthLower is what has to tell them apart before
-// it reports one. This case fails if SynthLower reports the §7.2.1
-// packed-structure message for a name whose first component is a child
-// instance. The case used to assert only that a graph came back and that no
-// error stood, which held while kMemberAccess fell through to constant zero:
-// `out` came out zero rather than 8'h2a, and nothing said so.
 TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentIsReported) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -62,13 +45,6 @@ TEST(HierarchicalNameSynthesis, HierarchicalNameReadInAssignmentIsReported) {
       "a hierarchical name has no lowering in the synthesizer", 8, "23.6"));
 }
 
-// The report comes from Elaborator::ValidateHierRefIntoChecker, at the
-// continuous assignment, before any graph is built. Naming its message is what
-// says the source was stopped by §23.6's rule that a hierarchical reference
-// into a checker shall not be permitted rather than by the report the case
-// above draws. Both reports carry §23.6, because a hierarchical name that
-// reaches SynthLower is reported under the subclause that defines it, so the
-// message is the only thing that tells the two apart.
 TEST(HierarchicalNameSynthesis, HierarchicalRefIntoCheckerRejectedBeforeSynth) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

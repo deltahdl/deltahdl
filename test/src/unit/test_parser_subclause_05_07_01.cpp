@@ -408,9 +408,6 @@ TEST(IntegerLiteralParsing, UnaryMinusOnBasedLiteral) {
   EXPECT_EQ(rhs->lhs->int_val, 6u);
 }
 
-// §5.7.1: a plus operator preceding the size of a based literal is a unary plus
-// operator applied to the literal (the based-literal counterpart of the unary
-// plus on a simple decimal).
 TEST(IntegerLiteralParsing, UnaryPlusOnBasedLiteral) {
   auto r = Parse("module m; logic [7:0] x; initial x = +8'd6; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -423,11 +420,6 @@ TEST(IntegerLiteralParsing, UnaryPlusOnBasedLiteral) {
   EXPECT_EQ(rhs->lhs->int_val, 6u);
 }
 
-// §5.7.1 sizes a based literal by its size constant, so the digits of a 96-bit
-// hexadecimal literal reach beyond the 64 bits Expr::int_val holds; int_val
-// holds the low 64 bits, which the elaborator folds. Each digit position
-// differs from the one 64 places above it, so a fold keeping the high bits or
-// leaving zero reads a different number.
 TEST(IntegerLiteralParsing, WideHexLiteralFoldsItsLowSixtyFourBits) {
   auto r = Parse(
       "module m;\n"
@@ -441,10 +433,6 @@ TEST(IntegerLiteralParsing, WideHexLiteralFoldsItsLowSixtyFourBits) {
   EXPECT_EQ(rhs->int_val, 0x89ABCDEF00112233u);
 }
 
-// A decimal literal's digits are folded in base 10 with the same wrap: 2^80 + 1
-// written out is 1208925819614629174706177, whose residue modulo 2^64 is 1. A
-// fold that gave up on overflow read 0, and one that stopped before the digit
-// taking the value past 64 bits would read the prefix 12089258196146291747.
 TEST(IntegerLiteralParsing, WideDecimalLiteralFoldsModuloTwoToTheSixtyFour) {
   auto r = Parse(
       "module m;\n"
@@ -458,9 +446,6 @@ TEST(IntegerLiteralParsing, WideDecimalLiteralFoldsModuloTwoToTheSixtyFour) {
   EXPECT_EQ(rhs->int_val, 1u);
 }
 
-// A 70-bit binary literal whose six digits above bit 63 are all ones and whose
-// low 64 bits set bit 63 and bit 0 alone: int_val is those low 64 bits, so the
-// six high digits fall away and bit 63 stays.
 TEST(IntegerLiteralParsing, WideBinaryLiteralFoldsItsLowSixtyFourBits) {
   auto r = Parse(
       "module m;\n"
@@ -475,14 +460,6 @@ TEST(IntegerLiteralParsing, WideBinaryLiteralFoldsItsLowSixtyFourBits) {
   EXPECT_EQ(rhs->int_val, 0x8000000000000001u);
 }
 
-// §5.7.1 (printed page 77) composes a based literal of up to three tokens, its
-// size, its base and its digits, and §5.4 makes a comment a token separator as
-// §5.3's white space is, so `8 /* c */ 'h11` is the one sized literal 8'h11.
-// The lexer reads the size and the base as one token across spaces and tabs
-// alone; across the comment the size was a decimal literal of its own and
-// `'h11` a second literal, which the parser reported as a stray token. The
-// digit in the comment discriminates a join that read the source between the
-// two tokens as part of the size.
 TEST(IntegerLiteralParsing, BlockCommentBetweenSizeAndBaseJoinsOneLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -497,9 +474,6 @@ TEST(IntegerLiteralParsing, BlockCommentBetweenSizeAndBaseJoinsOneLiteral) {
   EXPECT_EQ(rhs->int_val, 0x11u);
 }
 
-// §5.3 counts a newline as white space, so a size on one line and its base on
-// the next are the same three-token literal, here with a one-line comment
-// ending the first line.
 TEST(IntegerLiteralParsing, LineCommentBetweenSizeAndBaseJoinsOneLiteral) {
   auto r = Parse(
       "module m;\n"
@@ -515,12 +489,6 @@ TEST(IntegerLiteralParsing, LineCommentBetweenSizeAndBaseJoinsOneLiteral) {
   EXPECT_EQ(rhs->int_val, 3u);
 }
 
-// §5.7.1's Example 1 lists `4af` as illegal: a simple decimal number is a
-// sequence of the digits 0 through 9, and hexadecimal digits go behind a base
-// such as 'h. The lexer reads `4` as a decimal literal and `af` as the
-// identifier against it, the only thing the grammar makes of those characters,
-// so where an expression is expected the run is reported as the literal it was
-// written to be, under the subclause whose rule it breaks.
 TEST(IntegerLiteralParsing,
      DigitsAgainstLettersAreReportedAsOneMalformedLiteral) {
   auto r = Parse(
@@ -536,9 +504,6 @@ TEST(IntegerLiteralParsing,
       "5.7.1"));
 }
 
-// The letters are taken with the digits, so the statement is parsed in step:
-// no report of a token left over after the literal, which is what §12.3 had
-// said of the `af` it was handed.
 TEST(IntegerLiteralParsing, DigitsAgainstLettersLeaveNoLeftoverTokenReport) {
   auto r = Parse(
       "module top();\n"
@@ -550,9 +515,6 @@ TEST(IntegerLiteralParsing, DigitsAgainstLettersLeaveNoLeftoverTokenReport) {
   }
 }
 
-// With white space between them, `4` and `af` are the two tokens they look
-// like and no malformed literal was written: the statement is still wrong,
-// but as a token left over, not under §5.7.1.
 TEST(IntegerLiteralParsing,
      DigitsThenSpaceThenLettersAreReportedAsALeftoverToken) {
   auto r = Parse(
@@ -566,8 +528,6 @@ TEST(IntegerLiteralParsing,
       ReportedError(r.diags, "expected ';', got identifier", 3, "12.3"));
 }
 
-// The based forms the example points to, unsized and sized, are the legal
-// spellings of the same digits and draw nothing.
 TEST(IntegerLiteralParsing, HexDigitsBehindABaseDrawNoReport) {
   EXPECT_TRUE(
       ParseOk("module top(); logic [31:0] a; initial a = 'haf; endmodule\n"));

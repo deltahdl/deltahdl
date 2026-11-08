@@ -36,13 +36,10 @@ TEST(SeveritySystemTaskParsing, ErrorWithMessageParses) {
   EXPECT_TRUE(ParseOk("module m; initial $error(\"oops\"); endmodule\n"));
 }
 
-// Syntax 20-11: the parenthesized argument portion is optional for $warning,
-// so a bare call with no parentheses is a legal statement form.
 TEST(SeveritySystemTaskParsing, WarningNoArgsParses) {
   EXPECT_TRUE(ParseOk("module m; initial $warning; endmodule\n"));
 }
 
-// Syntax 20-11: likewise $info admits a bare no-argument form.
 TEST(SeveritySystemTaskParsing, InfoNoArgsParses) {
   EXPECT_TRUE(ParseOk("module m; initial $info; endmodule\n"));
 }

@@ -681,10 +681,6 @@ TEST(ConditionalEventIffSim, EdgeKeywordIffFalseSuppresses) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// Edge case for the truth rule: a guard that evaluates to an unknown value is
-// not true (per the if-condition semantics the iff qualifier references), so
-// the edge does not trigger the process. Here enable is never assigned and so
-// holds x at the clock edge, and the body must not run.
 TEST(ConditionalEventIffSim, IffConditionUnknownSuppresses) {
   SimFixture f;
   auto* var = RunAndFindVar(

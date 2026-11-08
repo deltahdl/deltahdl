@@ -1,40 +1,3 @@
-// Tests for IEEE 1800-2023 §33.6.1 "Default configuration from library map
-// file".
-//
-// The subclause states one rule and reads it out over the design of §33.6:
-// with no configuration in force, the libraries are searched in the order the
-// library map file declares them, so an instance binds the description held by
-// the first declared library that holds a cell of that name. In the §33.6
-// design that makes every instance of `adder` bind the aLib description --
-// rtlLib is declared first but holds no adder -- and every instance of `m`
-// bind the rtlLib description, including the m instances written inside the
-// aLib adder.
-//
-// The rule is applied at the elaborator stage. The search order reaches the
-// elaborator through Elaborator::SetLibraryDeclarationOrder
-// (src/elaborator/elaborator.cpp) and decides the binding in
-// Elaborator::FindModule and PickByLibraryOrder
-// (src/elaborator/elaborator_resolve.cpp); the order itself is what
-// LibraryMap::ResolveSearchOrder (src/parser/library_map.cpp) yields for an
-// invocation that named no order of its own.
-//
-// What the rule consumes comes from this pass's dependencies: the library
-// declarations and the order they are declared in are read from a real lib.map
-// (§33.3.1), and the library each cell lives in is the one the map's file path
-// specifications earned that cell's source file (§33.3.3). Every test below
-// therefore writes the map and the source files to disk, loads the map, parses
-// each file and tags it through the map, and elaborates the assembled unit. No
-// test states a library or a search order of its own.
-//
-// A primitive is a cell a library holds as much as a module is. An instance of
-// one keeps no record of the description it took, so which of two libraries
-// holding a primitive of the name supplied it cannot be read back. What can be
-// read back is whether the name reached a primitive at all: a name reaching a
-// module instead leaves a bound module instance where reaching the primitive
-// leaves none. The tests over that cell kind therefore put a primitive and a
-// design element of another kind in different libraries and read which one the
-// search arrived at.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -51,23 +14,12 @@ using namespace delta;
 
 namespace {
 
-// The library map of §33.6: rtlLib is declared first, aLib second, gateLib
-// last. Both the aLib and the gateLib specification cover adder.vg, and the
-// gateLib specification names that file outright while the aLib one only
-// matches it through a wildcard, which is what leaves the gate-level
-// descriptions in gateLib and the RTL ones in aLib. The declaration order and
-// the library each file lands in are therefore two separate things, and the
-// tests below turn one without turning the other.
 constexpr const char* kExampleMap =
     "library rtlLib top.v;\n"
     "library aLib adder.*;\n"
     "library gateLib\n"
     "    adder.vg;\n";
 
-// top.v: the cell topping the design instantiates the adder twice, so a rule
-// said to hold for every instance of a cell has more than one instance to hold
-// for. The file also describes a cell named m, which is the only description of
-// m that reaches rtlLib.
 constexpr const char* kTopFile =
     "module top;\n"
     "  adder a1();\n"
@@ -76,11 +28,6 @@ constexpr const char* kTopFile =
     "module m;\n"
     "endmodule\n";
 
-// adder.v and adder.vg: the RTL and the gate-level description of the same two
-// cells. One text stands for both files, so the descriptions differ in nothing
-// a test could have arranged except the library their file names earned them,
-// and the adder each file describes instantiates m twice -- the instances whose
-// binding §33.6.1 settles against the library holding their parent.
 constexpr const char* kAdderFile =
     "module adder;\n"
     "  m f1();\n"
@@ -89,22 +36,12 @@ constexpr const char* kAdderFile =
     "module m;\n"
     "endmodule\n";
 
-// The adder on its own, for a further file added to a library that already
-// holds a description of m. Two cells of one name in one library would be two
-// definitions of the same cell rather than the choice between libraries these
-// tests are about.
 constexpr const char* kAdderOnlyFile =
     "module adder;\n"
     "  m f1();\n"
     "  m f2();\n"
     "endmodule\n";
 
-// Writes the library map and the three source descriptions of §33.6, then
-// parses them with the gate-level file first and the topping file last. An
-// implementation binding the description it parsed first, rather than the one
-// the declaration order names, would answer gateLib for the adder, so the
-// parse order cannot be what produces the expected answer. Returns false when
-// the map does not load or a file does not parse.
 bool BuildExampleDesign(ScratchDir& tmp, LibraryDesign& d,
                         const std::string& map_text) {
   auto map_file = tmp.Write("lib.map", map_text);
@@ -116,9 +53,6 @@ bool BuildExampleDesign(ScratchDir& tmp, LibraryDesign& d,
          d.AddFile(top, kTopFile);
 }
 
-// A module and a primitive answering to one name, each written to a file of its
-// own so the map decides which library holds which. Both take the same two
-// terminals, so one instantiation reads as an instance of either.
 constexpr const char* kWidgetModuleFile =
     "module w(output y, input a);\n"
     "  assign y = ~a;\n"
@@ -134,22 +68,12 @@ constexpr const char* kWidgetTopFile =
     "  w u(y, a);\n"
     "endmodule\n";
 
-// One cell described in two files, for the tests that vary the kind of design
-// element the cell is made from. `base` names the pair of files -- base.v and
-// base.vg -- `cell` is the description written into each of them, and `top`
-// describes the cell instantiating it once.
 struct TwoFileCell {
   std::string base;
   std::string cell;
   std::string top;
 };
 
-// Writes a map sending base.v to aLib and base.vg to gateLib, with rtlLib
-// declared ahead of both and holding the topping file, then parses the
-// gate-level file before the RTL one. aLib is declared before gateLib and
-// rtlLib holds no cell of the name, so a search following the declaration order
-// answers aLib whatever kind of design element the cell is. Returns false when
-// the map does not load or a file does not parse.
 bool BuildTwoFileCellDesign(ScratchDir& tmp, LibraryDesign& d,
                             const TwoFileCell& c) {
   std::string map_text = "library rtlLib top.v;\n";
@@ -164,9 +88,6 @@ bool BuildTwoFileCellDesign(ScratchDir& tmp, LibraryDesign& d,
          d.AddFile(top, c.top);
 }
 
-// Elaborates `top_cell` with no configuration in force, under exactly the
-// search order the loaded map yields for an invocation that named no library
-// order of its own.
 RtlirDesign* ElaborateUnderMapOrder(LibraryDesign& d,
                                     std::string_view top_cell) {
   Elaborator elab(d.arena, d.diag, d.unit);
@@ -174,13 +95,6 @@ RtlirDesign* ElaborateUnderMapOrder(LibraryDesign& d,
   return elab.Elaborate(top_cell);
 }
 
-// The first half of the rule as §33.6.1 reads it out: no configuration is
-// elaborated, so the libraries are searched in declaration order, and every
-// instance of adder binds aLib.adder. rtlLib is declared ahead of aLib and is
-// searched first, but holds no cell named adder, so the search passes it by;
-// gateLib holds one and is searched after aLib, so it is passed over. Both
-// instances answer alike, which is what the rule's reach over every instance
-// claims.
 TEST(DefaultLibraryBinding, EveryAdderInstanceBindsFirstDeclaredLibraryWithIt) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -199,12 +113,6 @@ TEST(DefaultLibraryBinding, EveryAdderInstanceBindsFirstDeclaredLibraryWithIt) {
   EXPECT_EQ(a2->library, "aLib");
 }
 
-// The second half: every instance of m binds rtlLib.m, and the instances of m
-// that the design reaches are the ones written inside the adder the first half
-// left bound out of aLib. aLib holds a cell named m of its own -- adder.v
-// describes one -- and it is the library the parent came from, but the search
-// starts again from the head of the declaration order for the instance rather
-// than following the parent's library, so rtlLib answers.
 TEST(DefaultLibraryBinding, NestedMInstancesBindFirstDeclaredLibraryWithM) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -225,8 +133,6 @@ TEST(DefaultLibraryBinding, NestedMInstancesBindFirstDeclaredLibraryWithM) {
   EXPECT_EQ(f1->library, "rtlLib");
   EXPECT_EQ(f2->library, "rtlLib");
 
-  // The claim is about every instance of m, and the design reaches four of
-  // them: the second adder instance carries two more.
   auto* a2 = ChildBoundTo(top, "a2");
   ASSERT_NE(a2, nullptr);
   auto* g1 = ChildBoundTo(a2, "f1");
@@ -237,12 +143,6 @@ TEST(DefaultLibraryBinding, NestedMInstancesBindFirstDeclaredLibraryWithM) {
   EXPECT_EQ(g2->library, "rtlLib");
 }
 
-// What decides the binding is the order the map declares the libraries in, so
-// moving the gateLib declaration ahead of the aLib one moves the binding with
-// it. The two file path specifications are unchanged and each file still lands
-// in the library it landed in before -- the gate-level description is still the
-// gateLib one and the RTL description still the aLib one -- so the declaration
-// order is the only thing this map turned.
 TEST(DefaultLibraryBinding, DeclarationOrderAloneDecidesWhichAdderIsBound) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -260,13 +160,6 @@ TEST(DefaultLibraryBinding, DeclarationOrderAloneDecidesWhichAdderIsBound) {
   EXPECT_EQ(a1->library, "gateLib");
 }
 
-// The rule is the one that governs when no configuration settles the binding,
-// and what settles a binding is the configuration a design is elaborated from.
-// A configuration whose default clause names gateLib alone is written beside
-// the design and the design is then elaborated from its cell name rather than
-// from that configuration, so the search order is still the map's declaration
-// order: the adder binds the aLib description the configuration's own library
-// list would have excluded.
 TEST(DefaultLibraryBinding, DesignElaboratedFromACellNameUsesDeclarationOrder) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -288,14 +181,6 @@ TEST(DefaultLibraryBinding, DesignElaboratedFromACellNameUsesDeclarationOrder) {
   EXPECT_EQ(a1->library, "aLib");
 }
 
-// The rule is about searching the libraries, not about instantiation alone, so
-// it settles the cell that tops the design as well as the cells beneath it.
-// Two files describe a cell named top and the map sends them to two libraries;
-// the design is elaborated from that cell name with no configuration naming a
-// library for it, so the first declared library holding a top supplies it. The
-// map declares gateLib first here and the RTL file is parsed first, so neither
-// the file order nor a preference for an RTL description could produce the
-// answer.
 TEST(DefaultLibraryBinding, TopCellComesFromFirstDeclaredLibraryHoldingIt) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -316,11 +201,6 @@ TEST(DefaultLibraryBinding, TopCellComesFromFirstDeclaredLibraryHoldingIt) {
   EXPECT_EQ(top->library, "gateLib");
 }
 
-// A cell is a design element of any kind the language declares, so the search
-// order settles an interface instance on the same terms as a module instance.
-// Both libraries holding a bus are searched in the order the map declares them
-// and the file describing the aLib bus is parsed last, so the earlier
-// declaration is what carries the binding.
 TEST(DefaultLibraryBinding, InterfaceCellIsSearchedInDeclarationOrderToo) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -340,10 +220,6 @@ TEST(DefaultLibraryBinding, InterfaceCellIsSearchedInDeclarationOrderToo) {
   EXPECT_EQ(bound->library, "aLib");
 }
 
-// And for a program, the next kind of design element a library holds as a cell.
-// The two descriptions differ in nothing but the file name that earned each its
-// library, so the instance taking the aLib one can only come from aLib being
-// declared ahead of gateLib.
 TEST(DefaultLibraryBinding, ProgramCellIsSearchedInDeclarationOrderToo) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -363,7 +239,6 @@ TEST(DefaultLibraryBinding, ProgramCellIsSearchedInDeclarationOrderToo) {
   EXPECT_EQ(bound->library, "aLib");
 }
 
-// And for a checker, the remaining kind of design element the search reaches.
 TEST(DefaultLibraryBinding, CheckerCellIsSearchedInDeclarationOrderToo) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -383,12 +258,6 @@ TEST(DefaultLibraryBinding, CheckerCellIsSearchedInDeclarationOrderToo) {
   EXPECT_EQ(bound->library, "aLib");
 }
 
-// The libraries searched are the ones the map declares, so a description whose
-// file matched no file path specification takes no position in that order and
-// is reached only once every declared library has been passed over. The extra
-// file here describes an adder and is parsed before either mapped adder, so an
-// implementation searching the descriptions in the order it read them would
-// answer with the unmapped one.
 TEST(DefaultLibraryBinding, UndeclaredLibraryIsSearchedAfterTheDeclaredOnes) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -412,11 +281,6 @@ TEST(DefaultLibraryBinding, UndeclaredLibraryIsSearchedAfterTheDeclaredOnes) {
   EXPECT_EQ(a1->library, "aLib");
 }
 
-// A primitive is a cell, so it takes the name where its library is searched
-// first: the map puts the primitive in aLib and the module in gateLib, aLib is
-// declared ahead of gateLib, and the instantiation is taken as an instance of
-// the primitive -- which leaves the module uninstantiated, so the topping cell
-// holds no bound child at all.
 TEST(DefaultLibraryBinding, PrimitiveInAnEarlierLibraryTakesTheName) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -439,10 +303,6 @@ TEST(DefaultLibraryBinding, PrimitiveInAnEarlierLibraryTakesTheName) {
   EXPECT_TRUE(top->children.empty());
 }
 
-// And the other way round: with the module in aLib and the primitive in
-// gateLib, the search reaches the module first, so the instantiation is an
-// instance of it and binds the aLib description. A primitive of the name held
-// by a library searched later does not take the name from it.
 TEST(DefaultLibraryBinding, ModuleInAnEarlierLibraryKeepsTheNameFromPrimitive) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -467,14 +327,6 @@ TEST(DefaultLibraryBinding, ModuleInAnEarlierLibraryKeepsTheNameFromPrimitive) {
   EXPECT_EQ(bound->library, "aLib");
 }
 
-// Which primitive the other kinds are measured against is the one the search
-// reaches first, not the one that happened to be parsed first. Three libraries
-// hold a primitive named w and a fourth holds a module of that name, and the
-// module's library is searched before two of the three primitives but after the
-// first. The primitive parsed first is the one in the last-searched library, so
-// measuring against it would hand the name to the module; measuring against the
-// first-searched one leaves the name with the primitive, and the topping cell
-// holds no bound child.
 TEST(DefaultLibraryBinding, NearestPrimitiveIsWhatOtherKindsAreMeasuredBy) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -502,12 +354,6 @@ TEST(DefaultLibraryBinding, NearestPrimitiveIsWhatOtherKindsAreMeasuredBy) {
   EXPECT_TRUE(top->children.empty());
 }
 
-// The order a library takes is the one its first declaration gives it, so
-// naming a library again further down the map adds files to it without moving
-// it. rtlLib is declared first and named a second time after aLib, and the file
-// the second declaration adds describes an adder, so rtlLib now holds one. Its
-// first position is what makes that description answer where the same map
-// without the second declaration gave the aLib one.
 TEST(DefaultLibraryBinding, LibraryNamedTwiceKeepsItsFirstPosition) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -535,10 +381,6 @@ TEST(DefaultLibraryBinding, LibraryNamedTwiceKeepsItsFirstPosition) {
   EXPECT_EQ(a1->library, "rtlLib");
 }
 
-// The nearest input the rule has to turn away: an instance naming a cell that
-// no declared library holds. Searching every library in declaration order ends
-// with nothing found, so the instance is reported and left unbound rather than
-// filled in from some library the search never named.
 TEST(DefaultLibraryBinding, InstanceOfACellNoLibraryHoldsIsLeftUnbound) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -556,10 +398,6 @@ TEST(DefaultLibraryBinding, InstanceOfACellNoLibraryHoldsIsLeftUnbound) {
   EXPECT_EQ(top->children[0].resolved, nullptr);
 }
 
-// The same refusal at the design root, the other position the search settles.
-// Every declared library is searched for the named cell and none holds one, so
-// the elaboration reports the name and yields no design rather than topping it
-// with a cell out of some library the order never covered.
 TEST(DefaultLibraryBinding, RootCellNoLibraryHoldsYieldsNoDesign) {
   ScratchDir tmp;
   LibraryDesign d;
@@ -567,8 +405,6 @@ TEST(DefaultLibraryBinding, RootCellNoLibraryHoldsYieldsNoDesign) {
 
   auto* design = ElaborateUnderMapOrder(d, "subtractor");
   EXPECT_EQ(design, nullptr);
-  // The name was handed to the elaborator rather than written in a source
-  // description, so the report stands at no position and enforces no subclause.
   EXPECT_TRUE(ReportedError(d.diag.Diagnostics(),
                             "top module 'subtractor' not found", 0, ""));
 }

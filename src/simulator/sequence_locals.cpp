@@ -60,8 +60,6 @@ bool LocalIs4State(TokenKind type_kw) {
          type_kw == TokenKind::kKwInteger || type_kw == TokenKind::kKwTime;
 }
 
-// The keywords LocalWidth sizes wider than a bit, time aside, are the integer
-// atom types Table 6-8 makes signed; time is unsigned.
 bool LocalIsSigned(TokenKind type_kw) {
   return LocalWidth(type_kw) > 1 && type_kw != TokenKind::kKwTime;
 }
@@ -98,12 +96,8 @@ SeqLocalDecl LocalFormalDecl(const ModuleItem& decl, size_t index) {
     local.named_type.packed_dim_right = nullptr;
     local.named_type.extra_packed_dims.clear();
   } else {
-    // §6.11.3: a keyword type is signed as its keyword is by default, or as
-    // the signing written after it says, which the parsed type holds.
     local.signing =
         type.is_signed ? TokenKind::kKwSigned : TokenKind::kKwUnsigned;
-    // §6.11: the vector types are the keyword types packed dimensions follow,
-    // of which bit alone is 2-state.
     if (local.type_kw == TokenKind::kEof) {
       local.type_kw = type.kind == DataTypeKind::kBit ? TokenKind::kKwBit
                                                       : TokenKind::kKwLogic;
@@ -131,8 +125,6 @@ Variable* StandUpLocal(const SeqLocalDecl& decl, const Logic4Vec& value,
   var->value = value;
   DataType type = LocalDataType(decl);
   RecordDeclaredRange(type, var, ctx, ctx.GetArena());
-  // A type name written with dimensions after it stands for the element of
-  // an array of it, which RecordDeclaredRange shaped, not the whole local.
   if (type.kind == DataTypeKind::kNamed && decl.packed_dims.empty()) {
     var->local_layout = NamedLayout(type, ctx);
   }
@@ -169,10 +161,6 @@ void AssignMatchItem(const SeqMatchAssign& item, Logic4Vec rhs, Variable& local,
   }
 }
 
-// §16.10: the initialization assignments are performed in the order the
-// locals are declared, one's expression reading the locals declared before
-// it as assigned, so each is stood up in a scope of its own as its value is
-// found; a local without an initialization is unassigned.
 std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
                                      SimContext& ctx, Arena& arena) {
   std::vector<Logic4Vec> values;
@@ -189,12 +177,6 @@ std::vector<Logic4Vec> InitialLocals(const std::vector<SeqLocalDecl>& decls,
   return values;
 }
 
-// §16.11: a subroutine call attached to a sequence is executed at each end
-// point, in the Reactive region like an action block, and does not hold the
-// evaluation up; an argument passed by value reads the sampled value the
-// match was evaluated with, so each argument is evaluated here, the attempt's
-// locals in scope, and its value stands in for the expression while the call
-// runs.
 void ScheduleMatchCall(const Expr* call, SimContext& ctx, Arena& arena) {
   std::vector<std::pair<const Expr*, Logic4Vec>> snaps;
   for (const Expr* arg : call->args) {

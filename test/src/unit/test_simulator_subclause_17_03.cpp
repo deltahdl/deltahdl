@@ -12,27 +12,16 @@ using namespace delta;
 namespace {
 
 TEST(CheckerInstanceScheduling, ProceduralVersusStaticClassification) {
-  // §17.3: a checker instantiation in procedural code is a procedural checker
-  // instance; one outside procedural code is a static checker instance.
-  EXPECT_EQ(ClassifyCheckerInstance(/*instantiated_in_procedural_code=*/true),
-            CheckerInstanceKind::kProcedural);
-  EXPECT_EQ(ClassifyCheckerInstance(/*instantiated_in_procedural_code=*/false),
-            CheckerInstanceKind::kStatic);
+  EXPECT_EQ(ClassifyCheckerInstance(true), CheckerInstanceKind::kProcedural);
+  EXPECT_EQ(ClassifyCheckerInstance(false), CheckerInstanceKind::kStatic);
 }
 
 TEST(CheckerInstanceScheduling, OnlyStaticAssertionsAreExemptFromEveryStep) {
-  // §17.3: all contents other than static assertion statements exist during
-  // every time step; static assertion statements are the exception.
-  EXPECT_TRUE(CheckerContentExistsEveryTimeStep(
-      /*is_static_assertion_statement=*/false));
-  EXPECT_FALSE(CheckerContentExistsEveryTimeStep(
-      /*is_static_assertion_statement=*/true));
+  EXPECT_TRUE(CheckerContentExistsEveryTimeStep(false));
+  EXPECT_FALSE(CheckerContentExistsEveryTimeStep(true));
 }
 
 TEST(CheckerInstanceScheduling, StaticConcurrentAssertionTreatment) {
-  // §17.3: a static concurrent assertion is monitored directly in a static
-  // checker and queued (pending procedural assertion queue) in a procedural
-  // checker.
   EXPECT_EQ(TreatmentOfStaticConcurrentAssertion(CheckerInstanceKind::kStatic),
             StaticAssertionTreatment::kMonitoredDirectly);
   EXPECT_EQ(
@@ -41,9 +30,6 @@ TEST(CheckerInstanceScheduling, StaticConcurrentAssertionTreatment) {
 }
 
 TEST(CheckerInstanceScheduling, StaticDeferredAssertionTreatment) {
-  // §17.3: a static deferred assertion is monitored on expression change in a
-  // static checker and queued (pending deferred assertion report) in a
-  // procedural checker.
   EXPECT_EQ(TreatmentOfStaticDeferredAssertion(CheckerInstanceKind::kStatic),
             StaticAssertionTreatment::kMonitoredDirectly);
   EXPECT_EQ(
@@ -52,39 +38,22 @@ TEST(CheckerInstanceScheduling, StaticDeferredAssertionTreatment) {
 }
 
 TEST(CheckerInstanceScheduling, NestedStaticCheckerFollowsTopLevelAncestor) {
-  // §17.3: a static checker statically instantiated inside another checker has
-  // its static assertions follow the top-level ancestor's instance kind; an
-  // un-nested checker keeps its own kind.
-  EXPECT_EQ(EffectiveKindForStaticAssertions(
-                /*own_kind=*/CheckerInstanceKind::kStatic,
-                /*nested_inside_another_checker=*/true,
-                /*top_level_ancestor_kind=*/CheckerInstanceKind::kProcedural),
+  EXPECT_EQ(EffectiveKindForStaticAssertions(CheckerInstanceKind::kStatic, true,
+                                             CheckerInstanceKind::kProcedural),
             CheckerInstanceKind::kProcedural);
-  EXPECT_EQ(EffectiveKindForStaticAssertions(
-                /*own_kind=*/CheckerInstanceKind::kStatic,
-                /*nested_inside_another_checker=*/true,
-                /*top_level_ancestor_kind=*/CheckerInstanceKind::kStatic),
+  EXPECT_EQ(EffectiveKindForStaticAssertions(CheckerInstanceKind::kStatic, true,
+                                             CheckerInstanceKind::kStatic),
             CheckerInstanceKind::kStatic);
-  EXPECT_EQ(EffectiveKindForStaticAssertions(
-                /*own_kind=*/CheckerInstanceKind::kStatic,
-                /*nested_inside_another_checker=*/false,
-                /*top_level_ancestor_kind=*/CheckerInstanceKind::kProcedural),
-            CheckerInstanceKind::kStatic);
-  // Edge: when not nested, the instance's own kind is returned regardless of
-  // any ancestor kind, so a procedural own kind is preserved.
-  EXPECT_EQ(EffectiveKindForStaticAssertions(
-                /*own_kind=*/CheckerInstanceKind::kProcedural,
-                /*nested_inside_another_checker=*/false,
-                /*top_level_ancestor_kind=*/CheckerInstanceKind::kStatic),
-            CheckerInstanceKind::kProcedural);
+  EXPECT_EQ(
+      EffectiveKindForStaticAssertions(CheckerInstanceKind::kStatic, false,
+                                       CheckerInstanceKind::kProcedural),
+      CheckerInstanceKind::kStatic);
+  EXPECT_EQ(
+      EffectiveKindForStaticAssertions(CheckerInstanceKind::kProcedural, false,
+                                       CheckerInstanceKind::kStatic),
+      CheckerInstanceKind::kProcedural);
 }
 
-// §17.2 lets a checker be declared in a package, and §17.3's
-// ps_checker_identifier instantiates it by the package's name, `p::chk`, or
-// by a name an import made visible (§26.3), here past a package q whose
-// wildcard import and explicit import of another name hold no checker. Each
-// instance fails at 15 and 25 of the five posedges. Both were reported as
-// unknown modules.
 TEST(CheckerInstanceScheduling, ACheckerDeclaredInAPackageIsInstantiated) {
   SimFixture f;
   auto* c_pass = RunAndFindVar(
@@ -115,12 +84,6 @@ TEST(CheckerInstanceScheduling, ACheckerDeclaredInAPackageIsInstantiated) {
   EXPECT_EQ(f.ctx.FindVariable("c2.fail")->value.ToUint64(), 2u);
 }
 
-// §17.2 and §17.9: a checker formal whose actual, or default where the
-// instance binds none, is an elaboration-time constant is that constant in
-// the checker, so a conditional generate tests it (§27.5). c binds lvl to 1
-// and takes clevel's default cover_all, keeping the cover; d binds lvl by
-// name to 0 and e binds clevel to cover_none, dropping it. The condition was
-// reported not constant and every instance dropped the block.
 TEST(CheckerInstanceScheduling, AConstantFormalSelectsAGenerateBlock) {
   SimFixture f;
   auto* c_cov = RunAndFindVar(
@@ -146,11 +109,6 @@ TEST(CheckerInstanceScheduling, AConstantFormalSelectsAGenerateBlock) {
   EXPECT_EQ(f.ctx.FindVariable("e.cov")->value.ToUint64(), 0u);
 }
 
-// §17.2 and §17.3: a checker formal of type string carries its actual, or
-// its default where the instance binds none, into the checker body, an
-// action block among it, whole: c takes the fourteen-character default and
-// c2 the actual. The formal read as an empty string, having no width to be
-// connected at, and a default was cut to its last eight characters.
 TEST(CheckerInstanceScheduling, AStringFormalCarriesItsActualOrDefault) {
   SimFixture f;
   auto* len = RunAndFindVar(
@@ -176,11 +134,6 @@ TEST(CheckerInstanceScheduling, AStringFormalCarriesItsActualOrDefault) {
   EXPECT_EQ(f.ctx.FindVariable("c2.same")->value.ToUint64(), 1u);
 }
 
-// §17.2 and §17.3: an assertion clocked by a checker formal of type event
-// waits on its actual, a named event c's module triggers at every clock edge
-// and the clock signal itself for c2, so each is attempted at the ten edges
-// from 5 to 50 and fails at the four where a is low. Neither was attempted:
-// the formal, having no width, was never connected.
 TEST(CheckerInstanceScheduling, AnEventFormalClocksTheCheckersAssertion) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -204,12 +157,6 @@ TEST(CheckerInstanceScheduling, AnEventFormalClocksTheCheckersAssertion) {
   EXPECT_EQ(f.ctx.FindVariable("c2.fail")->value.ToUint64(), 4u);
 }
 
-// §17.3: a checker formal written as a cycle delay's bound takes its
-// actual, `##n` with n bound to 2 being `##2` and `##[1:m]` with m bound to
-// `$` being `##[1:$]`, in an or's operands and in a group nested in a chain
-// as well. a is high at the posedge at 5 alone and b from 25, so each
-// assertion holds there, and vacuously at the other four posedges. Each
-// bound was read as 1, failing at 15.
 TEST(CheckerInstanceScheduling, AFormalBoundsACycleDelay) {
   SimFixture f;
   auto* p1 = RunAndFindVar(
@@ -236,11 +183,6 @@ TEST(CheckerInstanceScheduling, AFormalBoundsACycleDelay) {
   EXPECT_EQ(f.ctx.FindVariable("c.p4")->value.ToUint64(), 5u);
 }
 
-// §17.3: the actual of a checker's event formal is an event expression, so
-// `@clk` in the checker waits on the edge the instance writes: c's posedge
-// clk at 5, 15, 25, 35 and 45, and c2's negedge clk, bound by name, at 10 to
-// 50. a is low from 17 to 22, over the negedge at 20 alone, so c holds at
-// all five and c2 fails once. Both were parse errors.
 TEST(CheckerInstanceScheduling, AnEdgeActualClocksTheCheckersAssertion) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -263,12 +205,6 @@ TEST(CheckerInstanceScheduling, AnEdgeActualClocksTheCheckersAssertion) {
   EXPECT_EQ(f.ctx.FindVariable("c2.fail")->value.ToUint64(), 1u);
 }
 
-// §17.2 and §17.3: the actual of a checker's sequence formal is a sequence
-// expression, so `s |-> b` in the checker is `a ##1 a |-> b`. a is high
-// throughout and b until 32, so the attempts from 5 and 15 end where b holds
-// and those from 25 and 35 where it does not; the attempt from 45 is still
-// open at 52. Read as `a` alone, the formal would pass three times. The
-// actual was a parse error.
 TEST(CheckerInstanceScheduling, ASequenceActualStandsForItsFormal) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -288,12 +224,6 @@ TEST(CheckerInstanceScheduling, ASequenceActualStandsForItsFormal) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
 }
 
-// §17.2 and §17.3: the actual of a checker's property formal is a property
-// expression, so `assert property (@(posedge clk) p)` with the actual
-// `a |-> b` asserts the implication at each posedge, its names those of the
-// module, not the checker's formal a, bound to !a. a is high throughout and b
-// until 32, so it holds at 5, 15 and 25 and fails at 35 and 45. The formal
-// read as a variable, failing at every posedge.
 TEST(CheckerInstanceScheduling, APropertyActualStandsForItsFormal) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -313,11 +243,6 @@ TEST(CheckerInstanceScheduling, APropertyActualStandsForItsFormal) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
 }
 
-// §17.3 with §16.5.1: the names a sequence actual reads are read sampled in
-// the checker's assertion, as in an assertion written where the actual is. y
-// is toggled by a nonblocking assignment at each posedge, so its sampled
-// value is 1, 0, 1, 0, 1 at the five posedges and the value it takes there
-// the opposite. The actual read the value y took.
 TEST(CheckerInstanceScheduling, ASequenceActualReadsSampledValues) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -338,11 +263,6 @@ TEST(CheckerInstanceScheduling, ASequenceActualReadsSampledValues) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
 }
 
-// §17.3 with §23.3: a property actual reads the names of the instance
-// writing it, in a call's arguments and a concatenation's elements too, so
-// each of two instances of m gives its checker its own b: u1's high, where
-// {a, b} holds two ones at the five posedges, and u2's low, where it holds
-// one.
 TEST(CheckerInstanceScheduling, APropertyActualReadsItsOwnInstance) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -368,16 +288,12 @@ TEST(CheckerInstanceScheduling, APropertyActualReadsItsOwnInstance) {
   EXPECT_EQ(f.ctx.FindVariable("u2.c.fail")->value.ToUint64(), 5u);
 }
 
-// The checker the procedural-instance cases share: one static concurrent
-// assertion of a on clk, counting its successes and failures.
 constexpr const char* kCountingChecker =
     "checker chk(logic a, logic clk);\n"
     "  int pass = 0, fail = 0;\n"
     "  a1: assert property (@(posedge clk) a) pass++; else fail++;\n"
     "endchecker\n";
 
-// The successes and failures `scope`'s counters hold once `module` has run
-// over `checker`.
 std::pair<uint64_t, uint64_t> CountsOver(const std::string& checker,
                                          const std::string& module,
                                          const std::string& scope) {
@@ -388,17 +304,11 @@ std::pair<uint64_t, uint64_t> CountsOver(const std::string& checker,
           f.ctx.FindVariable(scope + ".fail")->value.ToUint64()};
 }
 
-// The same over kCountingChecker.
 std::pair<uint64_t, uint64_t> CheckerCounts(const std::string& module,
                                             const std::string& scope) {
   return CountsOver(kCountingChecker, module, scope);
 }
 
-// §17.3: a checker instantiated under an if in an always procedure is a
-// procedural checker instance, its static concurrent assertion queued each
-// time the statement is reached: clk rises at 5 to 45, en is low from 22 to
-// 42, so the posedges at 25 and 35 queue nothing, and a, low from 12 to 32,
-// fails at 15 alone.
 TEST(ProceduralCheckerInstance, ItsAssertionIsQueuedWhenTheStatementIsReached) {
   EXPECT_EQ(CheckerCounts("module top;\n"
                           "  logic clk = 0, a = 1, en = 1;\n"
@@ -413,9 +323,6 @@ TEST(ProceduralCheckerInstance, ItsAssertionIsQueuedWhenTheStatementIsReached) {
             std::make_pair(2ull, 1ull));
 }
 
-// §17.3: reached once, after the posedge at 5 in an initial procedure, the
-// instance queues one evaluation, which the tick at 5 begins; the failures
-// a's low stretch would give later are never attempted.
 TEST(ProceduralCheckerInstance, ReachedOnceItIsEvaluatedOnce) {
   EXPECT_EQ(CheckerCounts("module top;\n"
                           "  logic clk = 0, a = 1;\n"
@@ -431,11 +338,6 @@ TEST(ProceduralCheckerInstance, ReachedOnceItIsEvaluatedOnce) {
             std::make_pair(1ull, 0ull));
 }
 
-// §17.3: a static instance of the same checker beside the procedural one is
-// monitored at every posedge, and two procedural instances in one procedure
-// keep their own queues: p1 and p2 are reached at every posedge but 25, s
-// and p1 see a, s failing at 15 and 25 and p1 at 15 alone, and p2 sees b,
-// low at 35 and 45.
 TEST(ProceduralCheckerInstance, EachInstanceKeepsItsOwnAssertion) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -463,10 +365,6 @@ TEST(ProceduralCheckerInstance, EachInstanceKeepsItsOwnAssertion) {
   EXPECT_EQ(value("p2.fail"), 2u);
 }
 
-// §17.3: everything in a procedural checker but its static assertions exists
-// at every time step, so its always_ff counts all five posedges while its
-// assertion, queued at the three where en is high, sees sum sampled at 0, 1
-// and 4.
 TEST(ProceduralCheckerInstance, ItsOtherContentsRunAtEveryStep) {
   SimFixture f;
   auto* sum = RunAndFindVar(
@@ -490,10 +388,6 @@ TEST(ProceduralCheckerInstance, ItsOtherContentsRunAtEveryStep) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 1u);
 }
 
-// §17.3 with §16.4.1: a static deferred assertion of a procedural checker is
-// added to the pending deferred assertion report each time the statement is
-// reached, at the posedges 5 to 35, its action calling the checker's own
-// functions: a != b holds at 5 and 25 and fails at 15 and 35.
 TEST(ProceduralCheckerInstance, ItsDeferredAssertionIsReportedWhenReached) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -517,8 +411,6 @@ TEST(ProceduralCheckerInstance, ItsDeferredAssertionIsReportedWhenReached) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 2u);
 }
 
-// §17.3: an interface's always procedure may instantiate a checker too: a
-// fails at 15 and 25 and holds at the other three posedges.
 TEST(ProceduralCheckerInstance, AnInterfacesProcedureInstantiatesOne) {
   EXPECT_EQ(CheckerCounts("interface ifc(input logic clk);\n"
                           "  logic a = 1;\n"
@@ -537,9 +429,6 @@ TEST(ProceduralCheckerInstance, AnInterfacesProcedureInstantiatesOne) {
             std::make_pair(3ull, 2ull));
 }
 
-// §17.3: a checker statically instantiated inside a procedural one has its
-// static assertions treated as procedural ones, queued when the top-level
-// ancestor's instantiation is reached, as in the first case.
 TEST(ProceduralCheckerInstance, ANestedStaticInstanceFollowsItsAncestor) {
   EXPECT_EQ(CheckerCounts("checker outer(logic a, logic clk);\n"
                           "  chk i(a, clk);\n"
@@ -557,9 +446,6 @@ TEST(ProceduralCheckerInstance, ANestedStaticInstanceFollowsItsAncestor) {
             std::make_pair(2ull, 1ull));
 }
 
-// §17.3 with §17.2: a procedural instance may name a checker a package
-// declares, found through the package scope as a static instance's is, and
-// behaves as the first case's does.
 TEST(ProceduralCheckerInstance, APackageCheckerIsInstantiatedInAProcedure) {
   SimFixture f;
   auto* pass = RunAndFindVar(
@@ -584,10 +470,6 @@ TEST(ProceduralCheckerInstance, APackageCheckerIsInstantiatedInAProcedure) {
   EXPECT_EQ(f.ctx.FindVariable("c.fail")->value.ToUint64(), 1u);
 }
 
-// §17.3 with §16.14.6.1: an actual reading the procedure's automatic v1 is
-// read with the value v1 had when the instance was reached, as the
-// check_loop example has it: each of the five posedges reaches `c` with v1
-// at 5, 10 and 20, and arr holds 1 at 5 and 20 alone.
 TEST(ProceduralCheckerInstance, AnAutomaticInTheActualIsSavedWhenQueued) {
   EXPECT_EQ(CheckerCounts("module top;\n"
                           "  logic clk = 0;\n"
@@ -610,10 +492,6 @@ TEST(ProceduralCheckerInstance, AnAutomaticInTheActualIsSavedWhenQueued) {
             std::make_pair(10ull, 5ull));
 }
 
-// §16.14.6.1 with §16.5.1: the static b beside the saved automatic k is
-// still read sampled at the tick: the procedure flips b before reaching the
-// instance, so the sampled 1, 0, 1, 0, 1 of the five posedges is judged
-// rather than the 0, 1, 0, 1, 0 standing when each is queued.
 TEST(ProceduralCheckerInstance, AStaticBesideTheSavedAutomaticIsSampled) {
   EXPECT_EQ(CheckerCounts("module top;\n"
                           "  logic clk = 0, b = 1;\n"
@@ -629,8 +507,6 @@ TEST(ProceduralCheckerInstance, AStaticBesideTheSavedAutomaticIsSampled) {
             std::make_pair(3ull, 2ull));
 }
 
-// A module reaching `inst` at each of the posedges 5 to 45 with the
-// automatic k at 0 to 4 in turn, where k[0] is 1 at 15 and 35 alone.
 std::string ReachedWithAnAutomatic(const std::string& inst) {
   return "module top;\n"
          "  logic clk = 0;\n"
@@ -647,9 +523,6 @@ std::string ReachedWithAnAutomatic(const std::string& inst) {
          "endmodule\n";
 }
 
-// §17.3 with §16.14.6.1: a sequence of the checker reads the saved k[0] at
-// every tick of an attempt: the attempts queued at 15 and 35 hold it at 1
-// through the next tick and succeed, those at 5, 25 and 45 fail at once.
 TEST(ProceduralCheckerInstance, ASequenceReadsTheSavedActualAtEachTick) {
   EXPECT_EQ(CountsOver("checker chk(logic a, logic clk);\n"
                        "  int pass = 0, fail = 0;\n"
@@ -660,8 +533,6 @@ TEST(ProceduralCheckerInstance, ASequenceReadsTheSavedActualAtEachTick) {
             std::make_pair(2ull, 3ull));
 }
 
-// §17.3 with §16.14.6.1: so does each operand of a property's or, the
-// formal substituted in both: the odd k satisfy the second operand at once.
 TEST(ProceduralCheckerInstance, EachOperandOfAnOrReadsTheSavedActual) {
   EXPECT_EQ(CountsOver("checker chk(logic a, logic clk);\n"
                        "  int pass = 0, fail = 0;\n"
@@ -672,8 +543,6 @@ TEST(ProceduralCheckerInstance, EachOperandOfAnOrReadsTheSavedActual) {
             std::make_pair(2ull, 3ull));
 }
 
-// §17.3: an event actual is substituted as a static instance's is, beside
-// the saved one, so the instance ticks on posedge clk and judges k[0].
 TEST(ProceduralCheckerInstance, AnEventActualBesideTheSavedOneClocksIt) {
   EXPECT_EQ(
       CountsOver("checker chk(logic a, event ev);\n"
@@ -684,9 +553,6 @@ TEST(ProceduralCheckerInstance, AnEventActualBesideTheSavedOneClocksIt) {
       std::make_pair(2ull, 3ull));
 }
 
-// §16.14.6.1: a const cast in the actual is saved as it stands when the
-// instance is queued, after the procedure flips b, so 0, 1, 0, 1, 0 is
-// judged where b's sampled value would give 1, 0, 1, 0, 1.
 TEST(ProceduralCheckerInstance, AConstCastInTheActualIsSavedWhenQueued) {
   EXPECT_EQ(CheckerCounts("module top;\n"
                           "  logic clk = 0, b = 1;\n"
@@ -701,12 +567,6 @@ TEST(ProceduralCheckerInstance, AConstCastInTheActualIsSavedWhenQueued) {
             std::make_pair(2ull, 3ull));
 }
 
-// §17.3: a checker's output formal is assigned to its actual in the Reactive
-// region. mutex's action block sets failure at the posedge at 1; res then
-// rises in the Reactive region, so the checker obs, whose procedures run
-// there as well, reads m_seen before the module's always procedure, waiting
-// in the Active region, sets it. Assigned in the Active region, res would let
-// the module's procedure run first.
 TEST(CheckerInstanceScheduling, AnOutputIsAssignedInTheReactiveRegion) {
   SimFixture f;
   auto* saw = RunAndFindVar(
@@ -735,11 +595,6 @@ TEST(CheckerInstanceScheduling, AnOutputIsAssignedInTheReactiveRegion) {
   EXPECT_EQ(saw->value.ToUint64(), 0u);
 }
 
-// §17.3 with §16.9.11: `triggered` applied to a checker's sequence formal
-// reads the end point of its actual, a named sequence of the instantiating
-// module or a sequence expression: s_two, a high at two posedges running,
-// first ends at 15, and the expression, b at a posedge, at 5. Each count is
-// of the posedges up to 52 where the end point is reached.
 TEST(CheckerInstanceScheduling, TriggeredOnASequenceFormalReadsItsActual) {
   SimFixture f;
   auto* hits = RunAndFindVar(

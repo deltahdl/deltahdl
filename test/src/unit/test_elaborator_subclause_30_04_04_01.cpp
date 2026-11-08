@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §30.4.4.1: the operands of a state-dependent path conditional expression may
-// be input/inout ports (or their selects), locally defined nets/variables, or
-// compile-time constants (specparams, literals). This bundles an input port, a
-// local net, and a specparam under the logical-AND operator -- all permitted --
-// so elaboration must accept it.
 TEST(OperatorElaboration, ModulePathOperandClassesElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -27,7 +22,6 @@ TEST(OperatorElaboration, ModulePathOperandClassesElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: a locally defined variable (not just a net) is an allowed operand.
 TEST(OperatorElaboration, LocalVariableOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,8 +36,6 @@ TEST(OperatorElaboration, LocalVariableOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: a part-select of an input port is an allowed operand (the
-// bit-select form is covered separately).
 TEST(OperatorElaboration, PartSelectOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -57,7 +49,6 @@ TEST(OperatorElaboration, PartSelectOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: an inout port is an allowed operand.
 TEST(OperatorElaboration, InoutPortOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,8 +62,6 @@ TEST(OperatorElaboration, InoutPortOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: a bit-select of an input port and a constant number are allowed
-// operands.
 TEST(OperatorElaboration, BitSelectAndConstantOperandsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,10 +75,6 @@ TEST(OperatorElaboration, BitSelectAndConstantOperandsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: reduction, bitwise, and conditional (?:) operators are
-// all valid in a conditional expression, so a combination of them elaborates.
-// This bundle exercises reduction AND (~&), reduction XOR (^), bitwise OR (|),
-// reduction AND (&), and the conditional operator (?:).
 TEST(OperatorElaboration, TableOperatorsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,9 +88,6 @@ TEST(OperatorElaboration, TableOperatorsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: bitwise negation (~) is a valid operator. Each Table
-// 30-1 operator is a distinct branch of the elaboration allow-set, so it is
-// exercised individually at the stage where the restriction applies.
 TEST(OperatorElaboration, BitwiseNegationOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -119,7 +101,6 @@ TEST(OperatorElaboration, BitwiseNegationOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: logical negation (!) is a valid operator.
 TEST(OperatorElaboration, LogicalNotOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -133,7 +114,6 @@ TEST(OperatorElaboration, LogicalNotOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: logical equality (==) is a valid operator.
 TEST(OperatorElaboration, LogicalEqualityOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -147,7 +127,6 @@ TEST(OperatorElaboration, LogicalEqualityOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: logical inequality (!=) is a valid operator.
 TEST(OperatorElaboration, LogicalInequalityOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -161,7 +140,6 @@ TEST(OperatorElaboration, LogicalInequalityOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: logical OR (||) is a valid operator.
 TEST(OperatorElaboration, LogicalOrOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -175,7 +153,6 @@ TEST(OperatorElaboration, LogicalOrOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: bitwise XNOR (^~) is a valid operator.
 TEST(OperatorElaboration, BitwiseXnorOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -189,8 +166,6 @@ TEST(OperatorElaboration, BitwiseXnorOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: the alternate XNOR spelling (~^) is also valid -- it
-// is a distinct token from ^~, so it takes its own branch of the allow-set.
 TEST(OperatorElaboration, BitwiseXnorAltOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -204,7 +179,6 @@ TEST(OperatorElaboration, BitwiseXnorAltOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: reduction NOR (~|) is a valid operator.
 TEST(OperatorElaboration, ReductionNorOperatorElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -218,8 +192,6 @@ TEST(OperatorElaboration, ReductionNorOperatorElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: a concatenation ({}) is a valid conditional-expression
-// element; the operand check descends into its members.
 TEST(OperatorElaboration, ConcatenationOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -233,8 +205,6 @@ TEST(OperatorElaboration, ConcatenationOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1, Table 30-1: a replication ({{}}) is a valid conditional-expression
-// element.
 TEST(OperatorElaboration, ReplicationOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -248,9 +218,6 @@ TEST(OperatorElaboration, ReplicationOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: an output port is not an allowed operand of a conditional
-// expression (only input and inout ports are). Using the destination output as
-// a condition operand must be rejected.
 TEST(OperatorElaboration, OutputPortOperandIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -266,9 +233,6 @@ TEST(OperatorElaboration, OutputPortOperandIsRejected) {
                             "30.4.4.1"));
 }
 
-// §30.4.4.1: the output-port prohibition applies to a select of an output port
-// too, not just the whole port -- the check descends into the bit-/part-select
-// to reach the underlying signal.
 TEST(OperatorElaboration, OutputPortBitSelectOperandIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -284,11 +248,6 @@ TEST(OperatorElaboration, OutputPortBitSelectOperandIsRejected) {
                             "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: an arithmetic operator is not among the valid
-// conditional-expression operators and must be rejected. Both operands (an
-// input port and a local net) are otherwise legal, so the sole error is the
-// '+' operator. The report names it as binary, which separates this case from
-// OperatorElaboration.UnaryArithmeticOperatorIsRejected below.
 TEST(OperatorElaboration, ArithmeticOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -307,8 +266,6 @@ TEST(OperatorElaboration, ArithmeticOperatorIsRejected) {
       4, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: relational operators are excluded. The source uses
-// greater-than, so the report names '>'.
 TEST(OperatorElaboration, RelationalOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -327,8 +284,6 @@ TEST(OperatorElaboration, RelationalOperatorIsRejected) {
       4, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: shift operators are excluded. The source uses the
-// logical left shift, so the report names '<<'.
 TEST(OperatorElaboration, ShiftOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -346,8 +301,6 @@ TEST(OperatorElaboration, ShiftOperatorIsRejected) {
       3, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: only logical equality (==) and inequality (!=) are
-// valid; case equality (===) is not.
 TEST(OperatorElaboration, CaseEqualityOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -366,8 +319,6 @@ TEST(OperatorElaboration, CaseEqualityOperatorIsRejected) {
       4, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: the power operator (**) is not a valid conditional-
-// expression operator and must be rejected.
 TEST(OperatorElaboration, PowerOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -385,12 +336,6 @@ TEST(OperatorElaboration, PowerOperatorIsRejected) {
       3, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: the restriction applies to unary operators too. A
-// unary arithmetic operator (unary +) is not in the table and must be rejected
-// -- this exercises the unary branch of the check, distinct from the binary
-// rejections above. The report says "unary", which is what keeps this case
-// from passing on the '+' source of
-// OperatorElaboration.ArithmeticOperatorIsRejected.
 TEST(OperatorElaboration, UnaryArithmeticOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -408,10 +353,6 @@ TEST(OperatorElaboration, UnaryArithmeticOperatorIsRejected) {
       3, "30.4.4.1"));
 }
 
-// §30.4.4.1: the operand and operator rules are enforced on the whole tree, not
-// just its root -- a disallowed operator nested beneath a permitted one is
-// still rejected. The root is logical OR, which Table 30-1 admits, so the one
-// report names the binary '-' beneath it.
 TEST(OperatorElaboration, NestedDisallowedOperatorIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -430,10 +371,6 @@ TEST(OperatorElaboration, NestedDisallowedOperatorIsRejected) {
       4, "30.4.4.1"));
 }
 
-// §30.4.4.1, Table 30-1: bitwise AND (&) is a valid operator, so a condition
-// built from it elaborates with no error at all. This case goes red if the
-// operator check starts reporting every operator once the report names the one
-// it read.
 TEST(OperatorElaboration, PermittedOperatorStillAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -447,10 +384,6 @@ TEST(OperatorElaboration, PermittedOperatorStillAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: the conditional expression governs a state-dependent path whether
-// the path is a simple path or an edge-sensitive path (§30.4.3). Built from a
-// real edge-sensitive path, a permitted operand (a local net) still elaborates
-// -- the operand rule applies at this syntactic position.
 TEST(OperatorElaboration, ConditionOnEdgeSensitivePathElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -465,9 +398,6 @@ TEST(OperatorElaboration, ConditionOnEdgeSensitivePathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1: the operand rule fires on the condition of an edge-sensitive path
-// too -- an output port used as an operand is rejected regardless of the path
-// form the condition guards (§30.4.3 syntactic position).
 TEST(OperatorElaboration, OutputOperandOnEdgeSensitivePathIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -483,11 +413,6 @@ TEST(OperatorElaboration, OutputOperandOnEdgeSensitivePathIsRejected) {
                             "30.4.4.1"));
 }
 
-// §30.4.4.1 (printed page 876): a condition's operands are input or inout
-// ports, variables or nets the module defines locally, and compile-time
-// constants, and their selects, so a hierarchical name reaching into the
-// instantiating module, `if (top.b)`, is none of them. The operator check ran
-// and the operand passed unexamined, so the design elaborated and ran.
 TEST(OperatorElaboration, HierarchicalNameOperandIsRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -509,9 +434,6 @@ TEST(OperatorElaboration, HierarchicalNameOperandIsRejected) {
                             4, "30.4.4.1"));
 }
 
-// A dotted name starting at the module's own interface port is the member of a
-// port, and §30.4.2 names such a signal as a path terminal besides, so it is
-// not refused as a hierarchical name.
 TEST(OperatorElaboration, InterfacePortMemberOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -529,9 +451,6 @@ TEST(OperatorElaboration, InterfacePortMemberOperandElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.1 lists the operators a condition may use in Table 30-1, and A.8.4's
-// module_path_primary the operands. Set membership is neither, though its
-// operands here are a legal input port and literals.
 TEST(OperatorElaboration, InsideExpressionIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -592,8 +511,6 @@ TEST(OperatorElaboration, AssignmentPatternIsRejected) {
                             3, "30.4.4.1"));
 }
 
-// A function call is a module_path_primary in A.8.4, so a condition built on
-// one stays legal while the forms above are refused.
 TEST(OperatorElaboration, FunctionCallOperandElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -15,11 +15,6 @@ namespace delta {
 
 namespace {
 
-// §7.8: whether the unpacked dimension `dim` is an index type, which makes
-// the declaration an associative array -- a keyword index type, the `*`
-// wildcard, or a name the scope's typedefs or classes declare. A name the
-// scope declares none of is a constant expression sizing the dimension
-// (§7.4.2), a parameter among them, and is no index type.
 bool IsAssocIndexDimension(const Expr* dim, const TypedefMap& typedefs,
                            const DpiClassNames& classes) {
   if (dim->kind != ExprKind::kIdentifier) return false;
@@ -71,10 +66,6 @@ void CheckImportFormalTypedefTypes(const ModuleItem* item,
   }
 }
 
-// §35.5.6: the name of the unpacked dimension kind that keeps `dim` from
-// being a formal argument of a DPI subroutine -- "queue" for `[$]` (§7.10)
-// and "associative" for an index type (§7.8) -- or empty for a sized
-// dimension, which the subclause's unpacked array permits.
 static std::string_view UnpermittedDimKind(const Expr* dim,
                                            const TypedefMap& typedefs,
                                            const DpiClassNames& classes) {

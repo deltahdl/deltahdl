@@ -22,7 +22,6 @@ namespace {
 
 using NameSet = std::unordered_set<std::string_view>;
 
-// The names of the items of `kind` the checker body declares.
 NameSet DeclaredNames(const ModuleDecl* decl, ModuleItemKind kind) {
   NameSet names;
   for (const auto* item : decl->items) {
@@ -31,8 +30,6 @@ NameSet DeclaredNames(const ModuleDecl* decl, ModuleItemKind kind) {
   return names;
 }
 
-// §17.6: a declaration in a checker procedure whose type names one of the
-// checker's covergroups, `automatic cg cg_1 = new();`, instantiates it there.
 void WalkForCovergroupInstances(const Stmt* s, const NameSet& covergroups,
                                 DiagEngine& diag) {
   if (s == nullptr) return;
@@ -50,8 +47,6 @@ void WalkForCovergroupInstances(const Stmt* s, const NameSet& covergroups,
   });
 }
 
-// The variable an assignment target writes, its selects and members
-// stripped.
 const Expr* TargetRoot(const Expr* e) {
   while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
     e = e->kind == ExprKind::kSelect ? e->base : e->lhs;
@@ -59,10 +54,6 @@ const Expr* TargetRoot(const Expr* e) {
   return e;
 }
 
-// §16.6: whether the function `fn` writes a variable other than its own
-// formals, its locals and its result, which is a side effect; and, through
-// `keeps_state`, whether it holds a value from one call to the next, a local
-// whose declaration initializes it once where the local is static.
 bool HasSideEffect(const ModuleItem* fn, bool& keeps_state) {
   NameSet own{fn->name};
   for (const FunctionArg& arg : fn->func_args) own.insert(arg.name);
@@ -87,9 +78,6 @@ bool HasSideEffect(const ModuleItem* fn, bool& keeps_state) {
   return writes;
 }
 
-// §17.8: each call in `e` of one of the functions `writers` names, which
-// write an argument back, or `impure` names, which keep state or have a side
-// effect.
 void ReportWritingCalls(const Expr* e, const NameSet& writers,
                         const NameSet& impure, DiagEngine& diag) {
   if (e == nullptr) return;
@@ -128,9 +116,6 @@ void WalkForWritingCalls(const Stmt* s, const NameSet& writers,
 
 }  // namespace
 
-// §16.6's kinds of argument, which §17.8 applies to a function called on a
-// checker variable's right-hand side; a formal written without a direction
-// takes the one before it, the first input (§13.3).
 bool HasArgumentWrittenBack(const ModuleItem* fn) {
   Direction dir = Direction::kInput;
   for (const FunctionArg& arg : fn->func_args) {
@@ -173,8 +158,6 @@ void ValidateCheckerAssignmentCalls(const ModuleDecl* decl, DiagEngine& diag) {
     if (HasArgumentWrittenBack(item)) writers.insert(item->name);
     if (FunctionIsImpure(item)) impure.insert(item->name);
   }
-  // A continuous assignment is left to §13.4, which bars such a function
-  // from one wherever it is written.
   for (const auto* item : decl->items) {
     if (IsProceduralItemKind(item->kind)) {
       WalkForWritingCalls(item->body, writers, impure, diag);

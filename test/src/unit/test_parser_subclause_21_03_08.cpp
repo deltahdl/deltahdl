@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.8 Syntax 21-11: the detection function in the assignment form shown
-// by the standard's example, amid the surrounding open/query/close calls.
 TEST(IoSystemTaskParsing, FeofAsAssignmentRhs) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -23,9 +21,6 @@ TEST(IoSystemTaskParsing, FeofAsAssignmentRhs) {
               "endmodule\n"));
 }
 
-// §21.3.8 Syntax 21-11: $feof is a function, so beyond the assignment form of
-// the standard's example it can sit directly in expression-operand position --
-// here guarding a loop and negated inside a condition.
 TEST(IoSystemTaskParsing, FeofAsExpressionOperand) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -39,8 +34,6 @@ TEST(IoSystemTaskParsing, FeofAsExpressionOperand) {
               "endmodule\n"));
 }
 
-// §21.3.8 Syntax 21-11: the detection function may also supply the
-// initializer of a variable declaration.
 TEST(IoSystemTaskParsing, FeofAsDeclarationInitializer) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -52,9 +45,6 @@ TEST(IoSystemTaskParsing, FeofAsDeclarationInitializer) {
               "endmodule\n"));
 }
 
-// §21.3.8 Syntax 21-11: the fd operand is an expression, not just a plain
-// identifier -- an array element or an arithmetic expression may supply the
-// descriptor.
 TEST(IoSystemTaskParsing, FeofFdArgumentMayBeExpression) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -67,8 +57,6 @@ TEST(IoSystemTaskParsing, FeofFdArgumentMayBeExpression) {
               "endmodule\n"));
 }
 
-// §21.3.8 Syntax 21-11: the fd operand may be the result of another function
-// call -- here the opening call itself supplies the descriptor directly.
 TEST(IoSystemTaskParsing, FeofFdFromFopenCallResult) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -77,15 +65,12 @@ TEST(IoSystemTaskParsing, FeofFdFromFopenCallResult) {
               "endmodule\n"));
 }
 
-// Negative form: an unterminated $feof call cannot parse.
 TEST(IoSystemTaskParsing, UnterminatedFeofRejected) {
   auto result = Parse(
       "module t;\n"
       "  integer fd, code;\n"
       "  initial code = $feof(fd;\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a subroutine call argument list;
-  // §21.3.8 states the $feof argument list but reports nothing of its own.
   EXPECT_TRUE(ReportedError(result.diags, "expected ')', got ';'", 3, "13.5"));
 }
 

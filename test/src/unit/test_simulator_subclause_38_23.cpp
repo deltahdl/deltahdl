@@ -47,10 +47,6 @@ TEST_F(VpiIterateSim, IterateModuleChildPorts) {
   EXPECT_EQ(count, 2);
 }
 
-// §38.23: the iterator walks every object of the given type that the reference
-// object is related to, so the regs of a run are reached by asking the scope
-// that holds them. §37.4.3 gives a NULL reference only to a relationship the
-// diagrams draw from a circle, and a scope's regs are drawn from the scope.
 TEST_F(VpiIterateSim, IterateRegsOfAScopeAfterAttach) {
   sim_ctx_.CreateVariable("m1.v1", 8);
   sim_ctx_.CreateVariable("m1.v2", 16);
@@ -73,8 +69,6 @@ TEST_F(VpiIterateSim, ScanNullIteratorReturnsNull) {
   EXPECT_EQ(vpi_scan(nullptr), nullptr);
 }
 
-// §38.23: the returned handle is an iterator whose own type is vpiIterator,
-// not the type of the objects being traversed.
 TEST_F(VpiIterateSim, IteratorHandleTypeIsIterator) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -84,8 +78,6 @@ TEST_F(VpiIterateSim, IteratorHandleTypeIsIterator) {
   EXPECT_EQ(vpi_get(vpiType, iter), vpiIterator);
 }
 
-// §38.23: vpi_handle(vpiUse, iterator) recovers the reference object the
-// iterator was created over.
 TEST_F(VpiIterateSim, HandleVpiUseReturnsReferenceObject) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -95,8 +87,6 @@ TEST_F(VpiIterateSim, HandleVpiUseReturnsReferenceObject) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUse, iter)), mod);
 }
 
-// §38.23: unless otherwise specified, iterating a protected object is an error,
-// so no iterator handle is produced.
 TEST_F(VpiIterateSim, IterateProtectedObjectReturnsNull) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -105,8 +95,6 @@ TEST_F(VpiIterateSim, IterateProtectedObjectReturnsNull) {
   EXPECT_EQ(vpi_iterate(vpiPort, VpiHandleOf(mod)), nullptr);
 }
 
-// §38.23: when no objects of the requested type are associated with the
-// reference handle, vpi_iterate() returns NULL.
 TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("p0", kVpiInput, mod);
@@ -114,19 +102,6 @@ TEST_F(VpiIterateSim, IterateNoMatchingObjectsReturnsNull) {
   EXPECT_EQ(vpi_iterate(vpiParameter, VpiHandleOf(mod)), nullptr);
 }
 
-// -----------------------------------------------------------------------------
-// §38.23's own worked example. The clause ends with an application that walks
-// a module's nets, printing each net the module declares and, for a vector, its
-// size -- built out of vpi_iterate(vpiNet, mod), vpi_scan, vpiName and vpiSize.
-//
-// Every case above hands vpi_iterate objects it made itself, which says what
-// the routine does with an object and nothing about a design having one. These
-// run the example against a design.
-// -----------------------------------------------------------------------------
-
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it, and vpi_get_str hands back one buffer
-// every call reuses (§38.11), so the names are copied as they are read.
 int g_nets_seen = 0;
 std::string g_first_net_name;
 std::string g_second_net_name;
@@ -162,8 +137,6 @@ void RegisterNetProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// A module declaring the example's two shapes of net -- a scalar and a vector
-// -- instantiated so the application has a module handle to iterate from.
 void RunAModuleOfTwoNets(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -193,9 +166,6 @@ TEST_F(VpiIterateInARun, TheIterationWalksEveryNetTheModuleDeclares) {
   SimFixture f;
   RunAModuleOfTwoNets(f);
 
-  // §38.23: vpi_iterate() is the routine for one-to-many relationships, and a
-  // module to its nets is one of them. Both of the module's nets are walked,
-  // and each answers to the name the source gave it.
   EXPECT_EQ(g_nets_seen, 2);
   EXPECT_TRUE(g_first_net_name == "w" || g_second_net_name == "w");
   EXPECT_TRUE(g_first_net_name == "bus" || g_second_net_name == "bus");
@@ -207,16 +177,9 @@ TEST_F(VpiIterateInARun, TheExamplesVectorNetReportsItsSize) {
   SimFixture f;
   RunAModuleOfTwoNets(f);
 
-  // The example displays the size of each vector net, read off each net the
-  // iteration handed back. The wider of the two is the eight-bit bus, which is
-  // a size only the net object the design built carries -- one made by hand
-  // carries whatever the case put in it.
   EXPECT_EQ(g_widest_net_size, 8);
 }
 
-// §38.23: a relation no special rule names walks the reference's children of
-// the asked type, whatever kind the reference is -- including the kinds whose
-// other relations do have rules of their own.
 TEST(VpiIterateRelations, AnUnnamedRelationWalksChildrenOfItsType) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -235,9 +198,6 @@ TEST(VpiIterateRelations, AnUnnamedRelationWalksChildrenOfItsType) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.17 detail 18 draws the vpiIndex iteration of an array element from a
-// variable; an element of a gate array is no variable, and the iteration
-// walks no index expressions of it.
 TEST(VpiIterateRelations, AGateArrayElementHasNoIndexIteration) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);

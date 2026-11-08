@@ -68,9 +68,6 @@ TEST(Elaboration, StringLiteralRelationalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.10: a string literal is a constant number, so it shall fold at
-// elaboration when it initializes a localparam. "AB" packs to the 16-bit
-// number 0x4142 (first character in the most-significant byte).
 TEST(Elaboration, StringLiteralConstantFoldsToPackedAscii) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -87,7 +84,6 @@ TEST(Elaboration, StringLiteralConstantFoldsToPackedAscii) {
   EXPECT_EQ(p.resolved_value, 0x4142);
 }
 
-// A single-character literal folds to the 8-bit ASCII code of that character.
 TEST(Elaboration, SingleCharStringLiteralConstantFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,9 +99,6 @@ TEST(Elaboration, SingleCharStringLiteralConstantFolds) {
   EXPECT_EQ(p.resolved_value, 65);
 }
 
-// §11.10: an operator manipulating a string literal operand behaves as though
-// the literal were a single numeric value, and that holds in a constant
-// expression evaluated at elaboration. "A" (65) + 1 folds to 66.
 TEST(Elaboration, StringLiteralOperandFoldsInConstantExpr) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -121,10 +114,6 @@ TEST(Elaboration, StringLiteralOperandFoldsInConstantExpr) {
   EXPECT_EQ(p.resolved_value, 66);
 }
 
-// A localparam folded from a string literal is itself a constant number that a
-// second constant expression can consume (11.2.1 constant forms). A = "A" is
-// 65, so B = A + 1 folds to 66, proving the folded value flows into the
-// constant-expression scope rather than being dropped as unresolved.
 TEST(Elaboration, StringLiteralParamConsumedAsConstant) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -142,9 +131,6 @@ TEST(Elaboration, StringLiteralParamConsumedAsConstant) {
   EXPECT_EQ(b.resolved_value, 66);
 }
 
-// The constant-number rule holds for the `parameter` form as well as the
-// `localparam` form; both take the parameter-resolution path. "AB" folds to the
-// packed 16-bit constant 0x4142.
 TEST(Elaboration, StringLiteralConstantFoldsOnParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -161,9 +147,6 @@ TEST(Elaboration, StringLiteralConstantFoldsOnParameter) {
   EXPECT_EQ(p.resolved_value, 0x4142);
 }
 
-// A literal written with §5.9 hex escapes folds at elaboration to the same
-// constant number as the plain-character form: "\x41\x42" packs to 0x4142,
-// exercising the constant-expression escape-decoding path.
 TEST(Elaboration, StringLiteralHexEscapeConstantFolds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -179,9 +162,6 @@ TEST(Elaboration, StringLiteralHexEscapeConstantFolds) {
   EXPECT_EQ(p.resolved_value, 0x4142);
 }
 
-// §11.10 makes a string literal one number of all its 8-bit characters, so two
-// literals differing only in their leading character fold unequal, and a
-// select reaches the leading character above bit 63.
 TEST(StringLiteralElaboration, LongStringLiteralKeepsItsLeadingCharacters) {
   EvalFixture f;
   EXPECT_EQ(

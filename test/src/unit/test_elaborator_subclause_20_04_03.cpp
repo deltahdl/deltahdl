@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 20-5 (§20.4.3) gives $timeformat either no argument list or all four
-// of units_number, precision_number, suffix_string and minimum_field_width, so
-// a call with one, two or three of them is an error, in a process or in a
-// subroutine.
 TEST(TimeformatElab, ACallWithFewerThanFourArgumentsIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -30,8 +26,6 @@ TEST(TimeformatElab, ACallWithFewerThanFourArgumentsIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 7, "20.4.3"));
 }
 
-// §20.4.3: Syntax 20-5 makes the parenthesized list optional as a whole, so a
-// call writing the parentheses with nothing between them is not the bare form.
 TEST(TimeformatElab, ACallWithAnEmptyArgumentListIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,9 +40,6 @@ TEST(TimeformatElab, ACallWithAnEmptyArgumentListIsRejected) {
       "'$timeformat' takes all four of its arguments or none", 3, "20.4.3"));
 }
 
-// §20.4.3: each of the four arguments inside Syntax 20-5's list is required,
-// so a call leaving a position empty, inside the list or at its end, is
-// rejected even though it spells four positions.
 TEST(TimeformatElab, ACallLeavingAnArgumentPositionEmptyIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,8 +55,6 @@ TEST(TimeformatElab, ACallLeavingAnArgumentPositionEmptyIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 4, "20.4.3"));
 }
 
-// §20.4.3: the bare call and the call with all four arguments are the two forms
-// Syntax 20-5 gives, and neither is reported.
 TEST(TimeformatElab, ABareCallAndAFullCallAreAccepted) {
   ElabFixture f;
   ElaborateSrc(

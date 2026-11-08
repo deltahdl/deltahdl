@@ -26,9 +26,6 @@ TEST(FormalSyntaxParsing, ChainedMemberAccess) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-// tagged_union_expression ::= tagged member_identifier [ primary ]. The
-// keyword introduces a kTagged node whose member identifier is the tag name
-// and whose optional primary is the member value.
 TEST(TaggedUnionExprParsing, TaggedWithMemberValue) {
   auto r = Parse("module m; initial x = tagged Valid (23 + 34); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -41,8 +38,6 @@ TEST(TaggedUnionExprParsing, TaggedWithMemberValue) {
   EXPECT_NE(rhs->lhs, nullptr);
 }
 
-// For a void member the member value primary is omitted, so the kTagged node
-// carries only the member identifier and no value subexpression.
 TEST(TaggedUnionExprParsing, TaggedVoidMemberOmitsValue) {
   auto r = Parse("module m; initial x = tagged Invalid; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -55,8 +50,6 @@ TEST(TaggedUnionExprParsing, TaggedVoidMemberOmitsValue) {
   EXPECT_EQ(rhs->lhs, nullptr);
 }
 
-// The optional-primary slot of the BNF accepts a bare literal: a kTagged node
-// with the literal attached as its value subexpression should result.
 TEST(TaggedUnionExprParsing, TaggedWithBareLiteralPrimary) {
   auto r = Parse("module m; initial x = tagged Valid 42; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -70,9 +63,6 @@ TEST(TaggedUnionExprParsing, TaggedWithBareLiteralPrimary) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// The optional-primary slot also accepts an assignment-pattern primary,
-// e.g. tagged Add '{...}, producing a kTagged node whose value subexpression
-// is the assignment pattern.
 TEST(TaggedUnionExprParsing, TaggedWithAssignmentPatternPrimary) {
   auto r = Parse("module m; initial x = tagged Add '{19, 4, 3}; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -86,13 +76,8 @@ TEST(TaggedUnionExprParsing, TaggedWithAssignmentPatternPrimary) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// The BNF requires a member identifier immediately after the tagged keyword;
-// supplying a primary with no member name (here a bare literal) is a syntax
-// error the parser must report.
 TEST(TaggedUnionExprParsing, TaggedWithoutMemberIdentifierRejected) {
   auto r = Parse("module m; initial x = tagged 42; endmodule\n");
-  // §7.3.2 owns the tagged union member name, so the missing identifier is
-  // reported there rather than under §11.9.
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got integer literal",
                             1, "7.3.2"));
 }

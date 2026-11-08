@@ -1,77 +1,3 @@
-// §34.5.9.2 Description, for the protect pragma keyword that settles the
-// writing every encoded value of a protected envelope is carried as. The syntax
-// block above it settles how the expression is spelled; this one settles what a
-// tool does with one, under the three headings the subclause writes its rules
-// under.
-//
-// ENCRYPTION INPUT. The expression settles how the content of a data_block, a
-// digest_block and a key_block is written, and that writing is what lets every
-// byte an encryption produces travel as text. An expression standing in the
-// input stream settles how the output is written. Three subkeywords carry the
-// parts of it:
-//
-//   enctype names the method the writing is calculated by. Table 34-2 sets four
-//   identifiers aside as string values of this name, each bound to a published
-//   algorithm: uuencode, standing for the historical algorithm of IEEE Std
-//   1003.1, and base64, standing for IETF RFC 2045, are required of every
-//   implementation; quoted-printable, standing for IETF RFC 2045, and raw,
-//   standing for the identity transformation that performs no writing at all
-//   and leaves the data free to hold characters that cannot be printed, are
-//   optional. An implementation offering an optional one offers it under that
-//   identifier rather than one of its own, and further identifiers, with the
-//   algorithms behind them, are the implementation's.
-//
-//   line_length is the most characters one line of a data_block may hold once
-//   the writing has been applied, the breaks being there so that ordinary text
-//   tools can handle what an encryption produced.
-//
-//   bytes is how much data the block held before any writing was applied to it
-//   and before any line was broken. An encrypting tool ignores it in its input.
-//
-// ENCRYPTION OUTPUT. The directive is written into each protected envelope, so
-// that the writing the encrypting tool used is stated rather than guessed at. A
-// tool may write the data under a scheme even where the input asked for none,
-// and states the expression that goes with what it did. It states, against the
-// bytes name, how much data each block it writes stands for. Every encoded
-// value of the envelope goes under that one scheme -- the data block, the
-// public key the data are under, the key that decrypts them, the digest block,
-// the key block and the public key the region's own keys are under -- and a
-// text wanting one of them written differently states a further expression
-// ahead of it.
-//
-// DECRYPTION INPUT. A tool reading an envelope takes two things from the
-// directive: the algorithm the characters were written by, and how much data
-// they stand for.
-//
-// All of it is preprocessor-stage. src/preprocessor/protect_encoding.cpp holds
-// Table 34-2 and reads a value into the three parts it is spelled with;
-// src/preprocessor/protect_encoding_codecs.cpp carries the four algorithms;
-// src/preprocessor/protect_region_lines.cpp is the encrypting half, which takes
-// the scheme a text asked for and reads the region's own encoded values under
-// it; src/preprocessor/protect_envelope_output.cpp writes the directive into
-// each envelope and states the count of each block, with
-// src/preprocessor/protect_digest_block.cpp and
-// src/preprocessor/protect_key_block.cpp doing the same for the blocks they
-// write; src/preprocessor/protect_processing_cipher.cpp applies the writing to
-// what the cipher produced; and
-// src/preprocessor/preprocessor_protect_values.cpp is where a reading takes the
-// algorithm and the count back out.
-//
-// The inputs are the real syntax of the constructs this rule consumes.
-// §34.5.1.1's and §34.5.2.1's words delimit every region handed to the
-// encrypting half, and §34.5.3.1's and §34.5.4.1's words delimit the envelopes
-// that half produces and the envelopes a reading is then handed -- an encoded
-// value has no standing outside one. §34.5.7's encrypt_agent stands in the
-// clear on each of those envelopes beside the expression under test, which is
-// what the output rule means by the writing the encrypting tool used. Beyond
-// the dependencies, §34.5.23's key_keyowner with §34.5.13's and §34.5.26's
-// public-key designations are how a region names a key by an encoded value,
-// §34.5.27's key_block and §34.5.14's key inside it are two more of the values
-// governed here, §34.5.22's digest_block asks for the second block an envelope
-// carries, and §34.5.15's data_block is where the region's own text ends up.
-// Every text below is written as directive syntax and driven through the
-// encrypting half, the preprocessor, or both in turn.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -89,18 +15,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// ENCRYPTION INPUT: the scheme a text names is the writing its block gets.
-// ---------------------------------------------------------------------------
-
-// A region naming one of the required identifiers, driven through the
-// encrypting half. The characters its envelope carries are read back by that
-// identifier's algorithm alone -- not by this tool's reading of the envelope,
-// which would prove only that the tool agrees with itself -- and the bytes
-// they give up are the bytes the region's cipher produced.
-//
-// This is the whole of the encryption-input rule in one input: a scheme was
-// named, and the block content really is what that scheme writes.
 TEST(ProtectEncodingEncryptionInput, TheSchemeARegionNamesWritesItsBlock) {
   std::string envelope = EnvelopeAround(NamesScheme(kBase64Enctype));
   ASSERT_TRUE(Holds(envelope, "enctype=\"base64\""));
@@ -112,13 +26,6 @@ TEST(ProtectEncodingEncryptionInput, TheSchemeARegionNamesWritesItsBlock) {
   EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
 }
 
-// The same block read by another of the tabulated algorithms. The identity
-// transformation reads anything, so it gives up bytes rather than refusing --
-// and those bytes are the characters rather than what the characters stand for,
-// so the cipher does not recognize them as a block it produced.
-//
-// Without this pairing the reading above would be met by a tool that wrote its
-// blocks one way whatever a text named, the scheme stated and used nowhere.
 TEST(ProtectEncodingEncryptionInput, TheBlockIsNotTheWritingOfAnotherScheme) {
   std::string envelope = EnvelopeAround(NamesScheme(kBase64Enctype));
   std::string block;
@@ -128,14 +35,6 @@ TEST(ProtectEncodingEncryptionInput, TheBlockIsNotTheWritingOfAnotherScheme) {
   EXPECT_FALSE(DecryptProtectedBlock(block, kEncodingExchangeKey, &recovered));
 }
 
-// The expression standing in the input stream ahead of the region rather than
-// inside it. The rule is about an expression present in the input, and §34.4
-// makes the scope of one lexical, so a scheme named before the design was ever
-// opened is the scheme that design's block is written under.
-//
-// The two positions are read by different parts of the encrypting half -- one
-// is carried into the region when it opens, the other is taken off a line the
-// region encloses -- so a tool passing the test above may still lose this one.
 TEST(ProtectEncodingEncryptionInput, ASchemeNamedAheadOfARegionWritesItsBlock) {
   std::string source(NamesScheme(kBase64Enctype));
   source.append(RegionHolding(""));
@@ -149,15 +48,6 @@ TEST(ProtectEncodingEncryptionInput, ASchemeNamedAheadOfARegionWritesItsBlock) {
   EXPECT_TRUE(Holds(recovered, kEncodingSealedDesign));
 }
 
-// The count written where the subclause says a count is ignored. The region
-// states one that no block of it could hold, alongside a scheme that is
-// honored, so the same expression carries a part that is acted on and a part
-// that is not.
-//
-// What the envelope states is the size of the block the tool wrote, and the
-// number the region asked for is nowhere in it. A tool taking the input's count
-// would publish a description of its own block that the block contradicts, and
-// the next reading of that envelope would refuse it.
 TEST(ProtectEncodingEncryptionInput, ACountWrittenInARegionReachesNoEnvelope) {
   std::string inside(
       StatesEncoding("(enctype=\"base64\", line_length=8, bytes=1)"));
@@ -168,14 +58,6 @@ TEST(ProtectEncodingEncryptionInput, ACountWrittenInARegionReachesNoEnvelope) {
   EXPECT_FALSE(Holds(envelope, TheCountOf(1)));
 }
 
-// The same disregarded count at the other position an expression can stand in:
-// ahead of the region rather than inside it. §34.4's lexical scope carries it
-// in as much as one written between the delimiters, so it reaches the
-// encrypting half by the path the scheme itself takes -- and is dropped there.
-//
-// The envelope is searched rather than the whole text: a directive outside a
-// region is carried across unchanged, so the source's own line is still in the
-// output and a reading of the text whole would take it for the tool's.
 TEST(ProtectEncodingEncryptionInput,
      ACountWrittenAheadOfARegionReachesNoEnvelope) {
   std::string source(StatesEncoding("(enctype=\"base64\", bytes=1)"));
@@ -188,16 +70,6 @@ TEST(ProtectEncodingEncryptionInput,
   EXPECT_FALSE(Holds(envelope, TheCountOf(1)));
 }
 
-// The pairing that says the ignoring belongs to the encryption input rather
-// than to the count itself: the same disagreeing count, written this time into
-// an envelope a reading is handed, is measured against the block standing after
-// it and the reading refuses that block.
-//
-// One number, two positions, two treatments. Without the pair, a tool that took
-// no notice of the count anywhere would pass the test above. The control for
-// this half is EveryEnvelopeStatesItsOwnWriting, which hands a reading the very
-// envelope this one alters and gets the design back without a word: what the
-// refusal turns on is the count written in, and nothing else about the text.
 TEST(ProtectEncodingEncryptionInput,
      TheSameCountIsActedOnWhenAnEnvelopeIsRead) {
   std::string list = "(enctype=\"";
@@ -213,14 +85,6 @@ TEST(ProtectEncodingEncryptionInput,
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
-// ---------------------------------------------------------------------------
-// Table 34-2: the identifiers, and the algorithms behind them.
-// ---------------------------------------------------------------------------
-
-// The table itself, row by row and in the order it lists them. Four identifiers
-// are set aside, spelled exactly as the table spells them, and each row also
-// records whether the standard requires the algorithm behind it of every
-// implementation.
 TEST(ProtectEncodingTable, TheTableSetsFourIdentifiersAside) {
   auto rows = ProtectEncodingAlgorithms();
   ASSERT_EQ(rows.size(), 4U);
@@ -230,11 +94,6 @@ TEST(ProtectEncodingTable, TheTableSetsFourIdentifiersAside) {
   EXPECT_EQ(rows[3].enctype, "raw");
 }
 
-// The table's third column, which is the whole reason the first one is worth
-// writing: each identifier stands for one published algorithm, named beside it.
-// Every row names one, and no two rows name the same one -- an identifier
-// sharing another's algorithm would be an identifier standing for nothing of
-// its own, and a text choosing between the two would be choosing nothing.
 TEST(ProtectEncodingTable, EachRowNamesAnAlgorithmOfItsOwn) {
   auto rows = ProtectEncodingAlgorithms();
   ASSERT_EQ(rows.size(), 4U);
@@ -246,15 +105,6 @@ TEST(ProtectEncodingTable, EachRowNamesAnAlgorithmOfItsOwn) {
   }
 }
 
-// The required/optional column, and what being required costs an
-// implementation: the two identifiers the table marks required name algorithms
-// this tool provides, and it provides the two optional ones as well -- which
-// the table permits and does not ask for.
-//
-// The negative alongside them is the identifier belonging to no row. The
-// subclause leaves further identifiers to the implementation, so this tool
-// defines one for the writing it performs where a text asked for nothing; it is
-// available without being one of the four the standard set aside.
 TEST(ProtectEncodingTable, TheRequiredIdentifiersAreProvidedAndSoAreTheRest) {
   EXPECT_TRUE(IsRequiredProtectEncodingAlgorithm(kUuencodeEnctype));
   EXPECT_TRUE(IsRequiredProtectEncodingAlgorithm(kBase64Enctype));
@@ -265,21 +115,12 @@ TEST(ProtectEncodingTable, TheRequiredIdentifiersAreProvidedAndSoAreTheRest) {
   EXPECT_TRUE(ProtectEncodingIsAvailable(kRawEnctype));
 }
 
-// The implementation's own identifier, which is what the last sentence of the
-// enctype paragraph leaves a tool free to define. It stands for a writing this
-// tool performs and for no row of the table, so a reading has it available
-// without the standard having said anything about it.
 TEST(ProtectEncodingTable, TheToolsOwnIdentifierIsNoneOfTheTabulatedFour) {
   EXPECT_FALSE(IsProtectEncodingAlgorithm(kBlockEnctype));
   EXPECT_TRUE(ProtectEncodingIsAvailable(kBlockEnctype));
   EXPECT_FALSE(ProtectEncodingIsAvailable(kUnprovidedEnctype));
 }
 
-// The first required identifier, driven through the encrypting half on a real
-// designation. The line beneath §34.5.26's keyword is the encoded value of a
-// key, so reading it means applying RFC 2045's algorithm to characters no part
-// of this tool wrote -- and the key it yields is the one the tool holds, so the
-// region is sealed and its keys travel in a key block.
 TEST(ProtectEncodingTable, TheRequiredBase64IdentifierReadsADesignation) {
   std::string sealed =
       SealedByDesignation(kBase64Enctype, kDesignationInBase64, kDesignatedKey);
@@ -287,11 +128,6 @@ TEST(ProtectEncodingTable, TheRequiredBase64IdentifierReadsADesignation) {
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
-// The second required identifier, on the same designation written by the
-// historical algorithm of IEEE Std 1003.1 instead: a count character at the
-// head of the line and the data six bits to a character after it. The value the
-// two algorithms carry is one value, so the key reached is the same key and the
-// region is sealed the same way.
 TEST(ProtectEncodingTable, TheRequiredUuencodeIdentifierReadsADesignation) {
   std::string sealed = SealedByDesignation(
       kUuencodeEnctype, kDesignationInUuencode, kDesignatedKey);
@@ -299,11 +135,6 @@ TEST(ProtectEncodingTable, TheRequiredUuencodeIdentifierReadsADesignation) {
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
-// The first optional identifier. An implementation offering it is required to
-// offer it under this spelling, so the observation is that this spelling
-// reaches RFC 2045's other algorithm: the escape in the middle of the line
-// stands for the space in the middle of the key, and nothing but that algorithm
-// turns the one into the other.
 TEST(ProtectEncodingTable,
      TheOptionalQuotedPrintableIdentifierReadsADesignation) {
   std::string sealed = SealedByDesignation(
@@ -312,17 +143,6 @@ TEST(ProtectEncodingTable,
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
-// The second optional identifier, and with it one line standing for two
-// different values under two identifiers -- which is what says an identifier is
-// consulted rather than assumed. The row for the identity transformation has no
-// writing performed, so the line is the value; the characters here are those of
-// the base64 designation, and declared that way they are instead the key name
-// those characters stand for.
-//
-// The tool holds its key under the characters themselves, so the reading that
-// performs no writing reaches it and the reading that performs RFC 2045's does
-// not. The first half is this row's plain positive as much as the contrast: a
-// designation read literally is what reaching that key means.
 TEST(ProtectEncodingTable, TheSameLineStandsForAnotherValueUnderRaw) {
   std::string as_written = SealedByDesignation(
       kRawEnctype, kDesignationInBase64, kDesignationInBase64);
@@ -332,10 +152,6 @@ TEST(ProtectEncodingTable, TheSameLineStandsForAnotherValueUnderRaw) {
   EXPECT_TRUE(Holds(as_base64, kEncodingSealedDesign));
 }
 
-// The rest of the raw row: the data such a block carries may hold characters
-// that cannot be printed. A designation carrying one reaches the key held under
-// it, the byte having travelled through the reading as data rather than as an
-// escape or an alphabet member.
 TEST(ProtectEncodingTable, ARawDesignationMayHoldAnUnprintableCharacter) {
   std::string sealed = SealedByDesignation(kRawEnctype, kUnprintableDesignation,
                                            kUnprintableDesignation);
@@ -343,12 +159,6 @@ TEST(ProtectEncodingTable, ARawDesignationMayHoldAnUnprintableCharacter) {
   EXPECT_TRUE(Holds(sealed, kKeyBlockLine));
 }
 
-// The negative the four rows are read against: an identifier no row names and
-// this implementation has not defined. It stands for no writing, so the line
-// beneath the keyword stands for nothing, the designation reaches no key, and
-// the region goes back exactly as it was written -- design and all.
-//
-// The input differs from the base64 test above in the identifier alone.
 TEST(ProtectEncodingTable, AnIdentifierNothingProvidesReadsNoDesignation) {
   std::string untouched = SealedByDesignation(
       kUnprovidedEnctype, kDesignationInBase64, kDesignatedKey);
@@ -356,9 +166,6 @@ TEST(ProtectEncodingTable, AnIdentifierNothingProvidesReadsNoDesignation) {
   EXPECT_FALSE(Holds(untouched, kKeyBlockLine));
 }
 
-// The same identifier asked to write and to read directly. It stands for no
-// writing, so there is nothing to produce and nothing a text can be the
-// writing of.
 TEST(ProtectEncodingTable, AnIdentifierNothingProvidesWritesAndReadsNothing) {
   ProtectEncoding unprovided;
   unprovided.enctype = std::string(kUnprovidedEnctype);
@@ -369,14 +176,6 @@ TEST(ProtectEncodingTable, AnIdentifierNothingProvidesWritesAndReadsNothing) {
   EXPECT_EQ(bytes, "untouched");
 }
 
-// ---------------------------------------------------------------------------
-// ENCRYPTION OUTPUT: what the envelope states about its own writing.
-// ---------------------------------------------------------------------------
-
-// A region asking for nothing at all. The tool writes the data under a scheme
-// anyway, which the subclause permits, and states the expression that goes with
-// what it did -- so an envelope always carries this directive and a reader
-// never has to guess.
 TEST(ProtectEncodingEncryptionOutput, EveryEnvelopeStatesItsOwnWriting) {
   std::string envelope = EnvelopeAround("");
   EXPECT_TRUE(Holds(envelope, kAnyEncoding));
@@ -389,14 +188,6 @@ TEST(ProtectEncodingEncryptionOutput, EveryEnvelopeStatesItsOwnWriting) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
-// The count the tool generates, against the block it describes. It is of the
-// data the block held before any writing was applied, so it is neither the
-// length of the region's text -- a block records more than the text -- nor the
-// number of characters the block was written as.
-//
-// Both comparisons are needed. Against the text alone a tool stating the
-// characters' length would pass; against the characters alone a tool stating
-// the text's length would.
 TEST(ProtectEncodingEncryptionOutput, TheCountIsOfTheDataAndNotOfTheWriting) {
   std::string envelope = EnvelopeAround("");
   EXPECT_TRUE(Holds(
@@ -407,17 +198,6 @@ TEST(ProtectEncodingEncryptionOutput, TheCountIsOfTheDataAndNotOfTheWriting) {
             EncodingDataBlockOf(envelope).size());
 }
 
-// An envelope carrying two blocks, the second being the digest §34.5.22 asks
-// for. The count belongs to one block rather than to the envelope, so the tool
-// writes an expression ahead of each of them and states each block's own size.
-//
-// Three directives go out: the one describing the envelope, which states the
-// writing without describing any block, and one ahead of each block. That is
-// also the shape a text needs to ask for one field to be written differently
-// from another, an expression standing ahead of each field.
-//
-// The request is the tool's to act on rather than a line of the design, so the
-// data block holds the design alone (§34.5.22.2).
 TEST(ProtectEncodingEncryptionOutput, EachBlockOfAnEnvelopeStatesItsOwnCount) {
   std::string envelope = EnvelopeAround(kDigestBlockLine);
   size_t held = ProtectedRegionBlockSize(kEncodingSealedDesign);
@@ -427,10 +207,6 @@ TEST(ProtectEncodingEncryptionOutput, EachBlockOfAnEnvelopeStatesItsOwnCount) {
   EXPECT_EQ(TimesWritten(envelope, TheCountOf(held)), 1U);
 }
 
-// The same envelope with a scheme named for it. Every encoded value it carries
-// is written under the one scheme, so all three expressions name it -- and the
-// digest, which is a block of its own written by a different part of the tool
-// from the data block, gives its bytes up to that scheme's algorithm.
 TEST(ProtectEncodingEncryptionOutput, EveryBlockIsWrittenUnderTheOneScheme) {
   std::string inside(kDigestBlockLine);
   inside.append(NamesScheme(kBase64Enctype));
@@ -442,14 +218,6 @@ TEST(ProtectEncodingEncryptionOutput, EveryBlockIsWrittenUnderTheOneScheme) {
   EXPECT_FALSE(digest.empty());
 }
 
-// The third of the six fields: the designation of the key the region's data are
-// under. The two schemes differ here on purpose -- this tool carries a block as
-// the value of one pragma expression and the historical algorithm writes
-// characters such a value cannot hold, so a region asking for it gets an
-// envelope under this tool's own writing. The designation goes out in that
-// writing, the value carried across being the key rather than the characters
-// that spelled it. A tool copying the line through would leave the envelope
-// declaring one writing and carrying a value in another.
 TEST(ProtectEncodingEncryptionOutput, TheDataKeyDesignationIsRewrittenAsWell) {
   std::string envelope = EnvelopeOf(
       RegionDesignatingTheDataKey(kUuencodeEnctype, kDesignationInUuencode));
@@ -464,10 +232,6 @@ TEST(ProtectEncodingEncryptionOutput, TheDataKeyDesignationIsRewrittenAsWell) {
   EXPECT_TRUE(Holds(envelope, TheCountOf(kDesignatedKey.size())));
 }
 
-// The fourth: the designation of the key the region's own keys are under. It
-// travels the same way and is observed the same way, and it is a separate path
-// through the tool -- this one is written beside the key blocks it selects,
-// where the one above is written beside the data.
 TEST(ProtectEncodingEncryptionOutput, TheKeyDesignationIsRewrittenAsWell) {
   std::string envelope = SealedByDesignation(
       kUuencodeEnctype, kDesignationInUuencode, kDesignatedKey);
@@ -479,15 +243,6 @@ TEST(ProtectEncodingEncryptionOutput, TheKeyDesignationIsRewrittenAsWell) {
   EXPECT_EQ(key, kDesignatedKey);
 }
 
-// The last two fields, reached one through the other. The block holding the
-// region's keys is written under the scheme the envelope declares, so its
-// characters give up bytes to that algorithm and those bytes open under the key
-// the designation selected; the key that block carries is written under the
-// same scheme again, so reading it out leaves the key that opens the data.
-//
-// Nothing here is taken on trust: the chain ends at the design, which comes out
-// of the data block only if all three values along the way were read out of the
-// writing the envelope named.
 TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   std::string envelope =
       SealedByDesignation(kBase64Enctype, kDesignationInBase64, kDesignatedKey);
@@ -507,11 +262,6 @@ TEST(ProtectEncodingEncryptionOutput, AKeyBlockAndTheKeyInItAreUnderTheScheme) {
   EXPECT_TRUE(Holds(design, kEncodingSealedDesign));
 }
 
-// The same envelope counted rather than opened. It carries several encoded
-// values where the envelopes above carry one or two, and an expression stands
-// ahead of every one of them stating that value's own size -- the arrangement a
-// text needs to write one field differently from the next. Exactly one
-// expression carries no count: the one describing the envelope, not a field.
 TEST(ProtectEncodingEncryptionOutput, AnExpressionStandsAheadOfEveryField) {
   std::string envelope =
       SealedByDesignation(kBase64Enctype, kDesignationInBase64, kDesignatedKey);
@@ -521,12 +271,6 @@ TEST(ProtectEncodingEncryptionOutput, AnExpressionStandsAheadOfEveryField) {
   EXPECT_EQ(expressions, counts + 1);
 }
 
-// A text writing two regions. The rule is about each protected block rather
-// than about the first one, so the directive goes into both -- and both designs
-// come back from a reading that was told nothing but the key.
-//
-// The halves are searched separately. A count over the whole text would be met
-// by a tool that described one envelope twice and the other not at all.
 TEST(ProtectEncodingEncryptionOutput, EachEnvelopeOfATextStatesItsWriting) {
   std::string text = EncryptEnvelopes(TwoRegions(), kEncodingExchangeKey);
   EXPECT_FALSE(Holds(text, kEncodingSealedDesign));
@@ -544,21 +288,6 @@ TEST(ProtectEncodingEncryptionOutput, EachEnvelopeOfATextStatesItsWriting) {
   EXPECT_TRUE(Holds(read, "module sealed_n"));
 }
 
-// What the writing is for: everything an encryption produced comes out as text.
-// The design sealed here holds a quotation mark and a byte that cannot be
-// printed, and the cipher turns the whole of it into arbitrary bytes besides --
-// and the block is still printable characters alone, none of them a quotation
-// mark.
-//
-// The block stands on one line of the envelope, which is what keeps a line
-// break out of it. EnvelopeBlockEncoding
-// (src/preprocessor/protect_envelope_output.h) writes the block under one of
-// the schemes ProtectEncodingFitsOneLine admits, and those write neither a line
-// break nor a quotation mark.
-//
-// The block is opened as well as inspected: a reading that had found only the
-// first few characters -- stopping at a line break inside them -- would
-// otherwise report those few as printable and pass.
 TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
   std::string region = "`pragma protect begin\n";
   region.append(kAwkwardDesign).append("`pragma protect end\n");
@@ -576,18 +305,6 @@ TEST(ProtectEncodingEncryptionOutput, TheBlockHoldsOnlyWhatASourceLineCarries) {
   EXPECT_TRUE(Holds(recovered, kAwkwardDesign));
 }
 
-// What the tool states is what the tool did, which is the point of stating it.
-// §34.5.9.2 defines the length as the most characters, counted after encoding,
-// that one line of the data_block may hold, so a region asking for one has its
-// block broken at it and the envelope states the length it broke at.
-//
-// The first line of the block is measured against the length asked for, and the
-// whole of the block is measured against it too: a writing that dropped the
-// length would have put every character on the announced line, which is far
-// longer. The envelope is then read back under the key, which is what says the
-// breaks belong to the writing rather than to the data -- §34.5.15.2 having the
-// block begin on that line and say nothing about where it ends, so the reading
-// takes every line of it.
 TEST(ProtectEncodingEncryptionOutput, AnEnvelopeStatesTheLengthItBrokeAt) {
   constexpr size_t kLengthAskedFor = 8;
   std::string list = "(enctype=\"base64\", line_length=";
@@ -604,11 +321,6 @@ TEST(ProtectEncodingEncryptionOutput, AnEnvelopeStatesTheLengthItBrokeAt) {
   EXPECT_TRUE(Holds(read, kEncodingSealedDesign));
 }
 
-// The other half of §34.5.9.2's separation: the length names the data_block and
-// the scheme names all three blocks, so the key block of the same envelope is
-// written on the one line §34.5.27.2 begins it on. A reader takes the length as
-// the clause defines it, against the data block, and would find no break where
-// it looked in a key block if it took it otherwise.
 TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheDataBlockAlone) {
   std::string list = "(enctype=\"base64\", line_length=8)";
   std::string envelope =
@@ -616,21 +328,11 @@ TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheDataBlockAlone) {
   ASSERT_TRUE(Holds(envelope, "line_length=8"));
   EXPECT_TRUE(Holds(EncodingDataBlockLinesOf(envelope), "\n"));
 
-  // §34.5.22.2 begins the digest on the line following its own keyword, and the
-  // length names the data_block, so the digest stands on that one line. It runs
-  // to some thirty characters under this scheme, so a length of eight applied
-  // here would have broken it into four.
   std::string digest = BlockLinesAfter(envelope, kDigestBlockLine);
   EXPECT_FALSE(digest.empty()) << envelope;
   EXPECT_FALSE(Holds(digest, "\n")) << envelope;
 }
 
-// The length itself, where the writing does break at it: the most characters
-// one line may hold once the algorithm has been applied. The descriptor is read
-// out of the value a directive writes rather than assembled by hand, so the
-// length under test is one a source text really stated. The breaks belong to
-// the writing rather than to the data, which is what they are for -- reading
-// the text back gives the bytes that went in.
 TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheWriting) {
   ProtectEncoding stated =
       ParseProtectEncoding("(enctype=\"base64\", line_length=8)");
@@ -649,8 +351,6 @@ TEST(ProtectEncodingEncryptionOutput, TheStatedLengthBreaksTheWriting) {
   EXPECT_EQ(recovered, kEncodingSealedDesign);
 }
 
-// A length the whole writing fits inside breaks nothing, so the text is the
-// one line the scheme wrote.
 TEST(ProtectEncodingEncryptionOutput, ALengthTheWritingFitsInBreaksNothing) {
   ProtectEncoding stated =
       ParseProtectEncoding("(enctype=\"base64\", line_length=1000)");
@@ -660,9 +360,6 @@ TEST(ProtectEncodingEncryptionOutput, ALengthTheWritingFitsInBreaksNothing) {
   EXPECT_FALSE(written.empty());
 }
 
-// A break written as a carriage return and a line feed, as a text written on
-// another system carries it, belongs to the writing as a bare line feed does,
-// so neither character is read as part of the value.
 TEST(ProtectEncodingDecryptionInput, ACarriageReturnInABreakIsNotData) {
   std::string bytes;
   ASSERT_TRUE(
@@ -670,8 +367,6 @@ TEST(ProtectEncodingDecryptionInput, ACarriageReturnInABreakIsNotData) {
   EXPECT_EQ(bytes, kDesignatedKey);
 }
 
-// The same of the tool's own scheme, which writes one run of characters and
-// takes every break back out of a block before reading it.
 TEST(ProtectEncodingDecryptionInput, ACarriageReturnInTheToolsSchemeIsNotData) {
   ProtectEncoding encoding;
   encoding.enctype = std::string(kBlockEnctype);
@@ -683,14 +378,6 @@ TEST(ProtectEncodingDecryptionInput, ACarriageReturnInTheToolsSchemeIsNotData) {
   EXPECT_EQ(bytes, kDesignatedKey);
 }
 
-// The negative of the length: the one row of the table with nothing for it to
-// bound. A length limits the characters a line holds once the writing has been
-// applied, and the identity transformation applies none -- the block is the
-// data -- so a break put in would be a byte the data never held.
-//
-// The value is longer than the length asked for, so a scheme that broke at it
-// would have broken this, and the descriptor differs from the accepted one
-// above in the identifier alone.
 TEST(ProtectEncodingEncryptionOutput, TheIdentityTransformationBreaksNoLine) {
   ProtectEncoding stated =
       ParseProtectEncoding("(enctype=\"raw\", line_length=8)");
@@ -701,13 +388,6 @@ TEST(ProtectEncodingEncryptionOutput, TheIdentityTransformationBreaksNoLine) {
             kEncodingSealedDesign);
 }
 
-// ---------------------------------------------------------------------------
-// DECRYPTION INPUT: the algorithm and the size a reading takes from it.
-// ---------------------------------------------------------------------------
-
-// The whole round trip under a named scheme. The envelope states the writing
-// its block was produced by, a reading holding the author's key takes the
-// algorithm from that statement, and the design comes back.
 TEST(ProtectEncodingDecryptionInput, TheStatedSchemeIsWhatOpensTheBlock) {
   std::string envelope = EnvelopeAround(NamesScheme(kBase64Enctype));
   PreprocFixture f;
@@ -716,17 +396,10 @@ TEST(ProtectEncodingDecryptionInput, TheStatedSchemeIsWhatOpensTheBlock) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
-// The same envelope with another tabulated algorithm declared immediately ahead
-// of its block. The identity transformation reads the characters as the data,
-// so the reading has bytes in hand and they are not the block's -- the key is
-// offered against something the cipher never produced, and the author is told
-// rather than left with an empty design.
 TEST(ProtectEncodingDecryptionInput, ABlockDeclaredWronglyDoesNotOpen) {
   PreprocFixture f;
   std::string src = EnvelopeReadUnder(NamesScheme(kRawEnctype));
   std::string read = Preprocess(src, f, HoldingTheKey());
-  // The characters are a writing the named scheme admits, so they are read and
-  // it is the bytes they stand for under it that no key opens.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "protect pragma data block cannot be decrypted with the key supplied",
@@ -734,12 +407,6 @@ TEST(ProtectEncodingDecryptionInput, ABlockDeclaredWronglyDoesNotOpen) {
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
-// The other way a reading can be stopped, and a different thing to be told: an
-// identifier standing for no writing at all. There is nothing to measure the
-// characters against, so the question of whether they came out of that writing
-// cannot even be asked.
-//
-// The input differs from the one above in the identifier alone.
 TEST(ProtectEncodingDecryptionInput, ABlockUnderAnUnprovidedSchemeIsNotRead) {
   std::string declared = NamesScheme(kUnprovidedEnctype);
   PreprocFixture f;
@@ -753,16 +420,6 @@ TEST(ProtectEncodingDecryptionInput, ABlockUnderAnUnprovidedSchemeIsNotRead) {
   EXPECT_FALSE(Holds(read, "module sealed_m"));
 }
 
-// The same directive as the test above, moved to the other end of the envelope:
-// on the line after the word that opens it, with everything the envelope says
-// about itself and everything its block says still standing after it. The block
-// opens, because what a field is read under is the last expression written
-// before that field rather than any expression the envelope holds.
-//
-// That is what lets a text write one field differently from the next: an
-// expression stands ahead of each, and each takes the one nearest above it. The
-// pair makes the point -- one directive, two positions, two outcomes -- since a
-// tool ignoring the keyword outright would pass here and fail above.
 TEST(ProtectEncodingDecryptionInput, AFieldIsReadUnderTheExpressionAboveIt) {
   PreprocFixture f;
   std::string read = Preprocess(EnvelopeOpeningWith(NamesScheme(kRawEnctype)),
@@ -771,12 +428,6 @@ TEST(ProtectEncodingDecryptionInput, AFieldIsReadUnderTheExpressionAboveIt) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
-// A digest block read back under the scheme its envelope declares. The digest
-// is a second encoded value, written by a different part of the tool and read
-// by a different part of the reading, and it has to come out of the same
-// writing as the data block for the check that follows to have anything to
-// compare -- so a reading that opens the design and reports nothing has read
-// both blocks under the one declared scheme.
 TEST(ProtectEncodingDecryptionInput, ADigestBlockIsReadUnderTheSameScheme) {
   std::string inside(kDigestBlockLine);
   inside.append(NamesScheme(kBase64Enctype));
@@ -788,26 +439,10 @@ TEST(ProtectEncodingDecryptionInput, ADigestBlockIsReadUnderTheSameScheme) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
-// The count an envelope states belongs to the one block written under it.
-// §34.5.9.2 defines it as the number of bytes in the original block of data,
-// which is a fact about that block and not about the scheme the envelope is
-// written in: the scheme stands over everything after it, and the count is
-// answered by the value it stands ahead of.
-//
-// The value inserted here is written in the envelope's own scheme and stands
-// after the block with no expression of its own between them, so it is read
-// under the very directive the block was read under -- the one carrying the
-// block's count. It is a designation of a key rather than a whole sealed
-// design, so it is nothing like that count in length, and a reading that held
-// the count over would turn it away for its size.
 TEST(ProtectEncodingDecryptionInput, TheCountIsSpentOnTheBlockItStandsAheadOf) {
   std::string envelope = EnvelopeAround("");
   size_t block = envelope.find(kEncodingBlockOpening);
   ASSERT_NE(block, std::string::npos);
-  // §34.5.15.2 puts the block on the line beneath its keyword, so the line the
-  // designation is written after is the one past the announcement rather than
-  // the announcement's own: written between the two it would be taken as the
-  // block, and the block as a key.
   size_t ends = envelope.find('\n', block + kEncodingBlockOpening.size());
   ASSERT_NE(ends, std::string::npos);
   std::string written(kDataPublicKeyLine);
@@ -821,8 +456,6 @@ TEST(ProtectEncodingDecryptionInput, TheCountIsSpentOnTheBlockItStandsAheadOf) {
   EXPECT_TRUE(Holds(read, "module sealed_m"));
 }
 
-// A raw data block of three lines, the second indented, under a count stated
-// with `bytes`.
 std::string IndentedRawBlockUnder(std::string_view bytes) {
   std::string src =
       "`pragma protect data_method=\"des-cbc\", begin_protected\n";
@@ -833,13 +466,6 @@ std::string IndentedRawBlockUnder(std::string_view bytes) {
   return src;
 }
 
-// §34.5.9.2 with Table 34-2 (printed pages 956-957): "raw" performs no
-// encoding, so the block is its text as written -- the indentation of its
-// second line and the break ending each line are bytes of it -- and
-// `ab`/`  cd`/`ef` is eleven. Read at that count the block reaches the cipher,
-// and it is the key that fails. Gathered with every line trimmed, the block
-// was read as eight bytes, so eleven drew the count error and §34.3.1's own
-// indented raw example could be read at no count its writer could state.
 TEST(ProtectEncodingDecryptionInput, ARawBlockIsItsTextAsWritten) {
   PreprocFixture f;
   std::string src = IndentedRawBlockUnder("11");
@@ -850,7 +476,6 @@ TEST(ProtectEncodingDecryptionInput, ARawBlockIsItsTextAsWritten) {
       "34.3.2"));
 }
 
-// The count the trimmed lines held is no count of the block written.
 TEST(ProtectEncodingDecryptionInput, ARawBlockIsNotReadAtItsTrimmedCount) {
   PreprocFixture f;
   std::string src = IndentedRawBlockUnder("8");

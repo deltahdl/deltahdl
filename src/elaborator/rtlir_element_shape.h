@@ -7,10 +7,6 @@
 
 namespace delta {
 
-// §7.8 (printed pages 162-163): the index type an associative dimension
-// declares, as RtlirVariable records its first dimension's: a string, a
-// wildcard, or an integral type of `width` bits, signed or not, where
-// `class_name` names a class index and `type_name` a typedef index.
 struct RtlirAssocIndex {
   bool is_string = false;
   bool is_wildcard = false;
@@ -20,46 +16,19 @@ struct RtlirAssocIndex {
   std::string_view type_name;
 };
 
-// §7.4.2: one fixed-size dimension of an array: how many elements it holds,
-// the lower of its bounds, and whether it was written from a higher left
-// bound down, `[2:0]`.
 struct RtlirFixedDim {
   uint32_t size = 0;
   int64_t lo = 0;
   bool descending = false;
 };
 
-// §7.4 with §7.5, §7.8 and §7.10 (printed pages 153, 157, 162 and 169): what
-// each element of a queue, dynamic array, associative array or fixed-size
-// array is where it is an array itself, beyond RtlirVariable's
-// elements_are_queues.
 struct RtlirElementShape {
-  // How many levels of queues each element's queue holds below it, one for
-  // `int arr[2][][]`, whose arr[0][0] is a queue too, and none for `int
-  // qq[$][$]`.
   uint32_t nested_queue_levels = 0;
-  // For a queue or dynamic array whose elements are fixed-size arrays, `int
-  // q[$][3]`, the number of elements each holds, each element being kept as
-  // a queue of exactly that many; 0 otherwise. `array_lo` is the lower of
-  // the dimension's bounds and `array_descending` says whether it was
-  // written from a higher left bound down, `[2:0]`, so that its leftmost
-  // element is the one of the higher index.
   uint32_t array_size = 0;
   int64_t array_lo = 0;
   bool array_descending = false;
-  // §7.4.4: where each such element is a multidimensional fixed-size array,
-  // `int q[$][2][3]`, its dimensions after the first, outermost first, each
-  // level of it kept as a queue of that many elements in turn; empty for an
-  // element of one dimension.
   std::vector<RtlirFixedDim> inner_array_dims;
-  // For an associative array whose element type is itself an associative
-  // array, `int m[string][int]`, the index its elements have; empty for any
-  // other variable.
   std::optional<RtlirAssocIndex> assoc_index;
-  // §7.4.4: whether the element type is a name whose typedef writes unpacked
-  // dimensions of its own, `mem_type` under `typedef bsix mem_type [0:3]`, so
-  // that an index past an element of the array is a further array dimension
-  // rather than a select within a packed object.
   bool type_is_unpacked_array = false;
 };
 

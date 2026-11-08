@@ -12,25 +12,9 @@ namespace delta {
 void Parser::AdoptTypeNames(const ScopeTypeNames& names) {
   known_types_.insert(names.types.begin(), names.types.end());
   known_nettypes_.insert(names.nettypes.begin(), names.nettypes.end());
-  // Empty for every caller but AdoptCompilationUnitScope, since A.1.2 admits
-  // udp_declaration only as a description and so neither ApplyImportedTypeNames
-  // nor AdoptBaseClassTypeNames has a primitive name to hand over.
   known_udps_.insert(names.udps.begin(), names.udps.end());
 }
 
-// Applies to what the parser reads as a type name §26.3's rule that an import
-// declaration lets the current scope see identifiers a package declares
-// without a qualifying package name. A wildcard item hands
-// over every type name the package declared; an explicit item hands over the
-// one it names, and only when that name is a type, because §26.3's own example
-// imports the enumeration type teeth_t without importing the literal FALSE.
-//
-// The names land in known_types_ and known_nettypes_, so the TypeNameScope of
-// the design element holding the import is what takes them away again at its
-// closing keyword, and that is what keeps the import from reaching the module
-// after it. A package declared later in the file is absent from package_types_
-// and hands over nothing, which §26.3 admits: a package is compiled before
-// any scope that imports it.
 void Parser::ApplyImportedTypeNames(const ImportItem& item) {
   auto it = package_types_.find(item.package_name);
   if (it == package_types_.end()) return;
@@ -77,20 +61,10 @@ ModuleItem* Parser::ParseImportItem() {
     item->import_item.item_name =
         Expect(TokenKind::kIdentifier, Subclause("26.3")).text;
   }
-  // Not on the `$unit` path above, which returns before reaching here: §26.3
-  // gives an import declaration a package_identifier, and that path has already
-  // reported the compilation unit standing where one belongs.
   ApplyImportedTypeNames(item->import_item);
   return item;
 }
 
-// A DPI import or export declaration is A.1.11's dpi_import_export, a
-// package_or_generate_item_declaration, which a module, an interface, a
-// program, a package and a generate block reach. A.1.8's
-// checker_or_generate_item_declaration does not list it, and §17.2's list of
-// what a checker body may contain names no DPI declaration, so one written in a
-// checker is reported at its keyword and still read, so that the body resumes
-// after it.
 void Parser::ParseImportDecl(std::vector<ModuleItem*>& items) {
   const auto kLoc = CurrentLoc();
   Expect(TokenKind::kKwImport, Subclause("26.3"));
@@ -122,11 +96,6 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     items.push_back(ParseDpiExport(loc));
     return;
   }
-  // §26.6 with A.1.11 and A.1.2: a package export declaration is an item of a
-  // package, and of the compilation unit, which takes package items; a
-  // module, interface, program or checker body holds none, a checker a
-  // package declares included, and the design element being read is what
-  // current_module_ holds.
   if (current_module_ != nullptr) {
     diag_.Error(loc,
                 "a package export declaration is allowed only in a package",
@@ -140,7 +109,6 @@ void Parser::ParseExportDecl(std::vector<ModuleItem*>& items) {
     Expect(TokenKind::kColonColon, Subclause("26.6"));
     Expect(TokenKind::kStar, Subclause("26.6"));
     item->import_item.is_wildcard = true;
-    // Syntax 26-4: `export *::*` stands alone, taking no list after it.
     items.push_back(item);
     Expect(TokenKind::kSemicolon, Subclause("26.6"));
     return;

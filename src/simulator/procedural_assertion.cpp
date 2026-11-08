@@ -26,10 +26,6 @@ namespace delta {
 
 namespace {
 
-// The concurrent assertions embedded in `s` that carry a leading clocking
-// event, those in the action block of another among them; not §16.17's
-// expect, which blocks the process on its property rather than queueing
-// an instance.
 void CollectQueuedAssertions(const Stmt* s, std::vector<const Stmt*>& out) {
   if (s == nullptr) return;
   if (s->is_procedural_concurrent && s->is_concurrent_clocked &&
@@ -40,9 +36,6 @@ void CollectQueuedAssertions(const Stmt* s, std::vector<const Stmt*>& out) {
       s, [&out](Stmt* const& sub) { CollectQueuedAssertions(sub, out); });
 }
 
-// One tick of the statement in the monitor's process, the current one,
-// beginning an attempt per instance given, the statement's reports naming
-// the scopes the procedure reached it in.
 void TickInstances(ProceduralAssertionState* state,
                    const AttemptInstances& instances, SimContext& ctx,
                    Arena& arena) {
@@ -52,10 +45,6 @@ void TickInstances(ProceduralAssertionState* state,
   PendingReportScope::Replace(ctx, saved);
 }
 
-// §16.14.6: the life of one statement's monitor: at every occurrence of the
-// leading clocking event, in the Observed region, the attempts in flight
-// advance and one begins per pending instance. A tick before the statement
-// was ever reached has nothing in flight and nothing to begin.
 SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
                               SimContext& ctx, Arena& arena) {
   for (;;) {
@@ -63,8 +52,6 @@ SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
     co_await RegionAwaiter{ctx, Region::kObserved};
     state->ticked_at = ctx.CurrentTime().ticks;
     if (!state->reached) continue;
-    // The instances matured in earlier steps and the ones pending in this,
-    // which mature in this Observed region, all begin an attempt.
     AttemptInstances instances = std::move(state->matured);
     state->matured.clear();
     instances.insert(instances.end(), state->pending.begin(),
@@ -74,10 +61,6 @@ SimCoroutine MonitorCoroutine(const Stmt* stmt, ProceduralAssertionState* state,
   }
 }
 
-// §16.14.6.1: the sites of `e` whose value the instance saves as it is
-// queued, a const cast's operand read as it stands and an automatic
-// variable, one the process keeps in a scope of its own, read likewise; a
-// static variable is left to §16.5.1's sampling at each tick.
 void BindSites(const Expr* e, InstanceBindings& out, SimContext& ctx,
                Arena& arena) {
   ForEachSubExpr(e, [&](const Expr* sub) {
@@ -91,8 +74,6 @@ void BindSites(const Expr* e, InstanceBindings& out, SimContext& ctx,
   });
 }
 
-// The sites of a sequence body: its operands and those of the bodies it
-// intersects, conjoins and alternates with.
 void BindSequenceSites(const SeqLinearBody& body, InstanceBindings& out,
                        SimContext& ctx, Arena& arena) {
   for (const Expr* operand : body.operands) BindSites(operand, out, ctx, arena);
@@ -107,7 +88,6 @@ void BindSequenceSites(const SeqLinearBody& body, InstanceBindings& out,
   }
 }
 
-// The sites of a property tree: each node's boolean and sequence.
 void BindTreeSites(const PropertyExprNode* node, InstanceBindings& out,
                    SimContext& ctx, Arena& arena) {
   if (node == nullptr) return;
@@ -120,9 +100,6 @@ void BindTreeSites(const PropertyExprNode* node, InstanceBindings& out,
   }
 }
 
-// §16.14.6.1: what one instance of `stmt` saves as it is queued: the sites
-// of its property, its disable condition and its action block, whose
-// variables the same rules apply to.
 const InstanceBindings* CaptureInstanceBindings(const Stmt* stmt,
                                                 SimContext& ctx, Arena& arena) {
   auto* bindings = arena.Create<InstanceBindings>();
@@ -138,14 +115,6 @@ const InstanceBindings* CaptureInstanceBindings(const Stmt* stmt,
   return bindings->values.empty() ? nullptr : bindings;
 }
 
-// §16.14.6: each pending instance matures in the Observed region of the
-// time step it was queued in, whether or not the step holds a tick of the
-// statement's clock; one maturing is scheduled per step per statement, the
-// first enqueue of the step scheduling it, and it moves what is pending by
-// then, what §16.14.6.2's flush points left, to the matured queue.
-// §16.14.6.3: where the clock ticked earlier in the step, the monitor
-// having run in an earlier pass of the Observed region, the instances
-// begin their attempts here and then, in the monitor's process.
 void ScheduleMaturing(ProceduralAssertionState* state, SimContext& ctx,
                       Arena& arena) {
   if (state->maturing_scheduled) return;
@@ -170,10 +139,6 @@ void ScheduleMaturing(ProceduralAssertionState* state, SimContext& ctx,
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime(), Region::kObserved, ev);
 }
 
-// The queue of the statement `stmt` and the monitor that evaluates it in
-// the instance `inst_prefix` names, marked as carrying a concurrent
-// assertion so that its wake at the clocking event lands in the Observed
-// region.
 ProceduralAssertionState* StartMonitor(const Stmt* stmt,
                                        std::string_view inst_prefix,
                                        SimContext& ctx, Arena& arena) {
@@ -188,7 +153,6 @@ ProceduralAssertionState* StartMonitor(const Stmt* stmt,
   return state;
 }
 
-// Places one pending instance, saving `bindings`, in the queue `state`.
 void PlaceInstance(ProceduralAssertionState* state,
                    const InstanceBindings* bindings, SimContext& ctx,
                    Arena& arena) {
@@ -207,8 +171,6 @@ void StartProceduralAssertionMonitors(Process* proc, const Stmt* body,
   std::vector<const Stmt*> statements;
   CollectQueuedAssertions(body, statements);
   for (const Stmt* stmt : statements) {
-    // The monitor stands in the procedure's instance and generate blocks, as
-    // the attempt of a static assertion stands in its process's.
     ProceduralAssertionState* state =
         StartMonitor(stmt, proc->inst_prefix, ctx, arena);
     proc->procedural_assertions[stmt] = state;
@@ -247,8 +209,6 @@ void EnqueueProceduralCheckerAssertion(
     Arena& arena) {
   ctx.CurrentProcess()->procedural_assertions.emplace(assertion.stmt,
                                                       assertion.state);
-  // §16.14.6.1: the actuals are read here, in the procedure reaching the
-  // instantiation, whose variables they name.
   auto* bindings = arena.Create<InstanceBindings>();
   for (const Expr* actual : assertion.saved_actuals) {
     BindSites(actual, *bindings, ctx, arena);

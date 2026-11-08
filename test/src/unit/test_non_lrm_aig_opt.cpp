@@ -67,9 +67,6 @@ TEST(AigOpt, BalanceReducesDepth) {
   EXPECT_NE(g.outputs[0], AigGraph::kConstTrue);
 }
 
-// Balancing ((a & b) & c) & d builds c & d and (a & b) & (c & d) beside the
-// chain it replaces, whose a & b & c and a & b & c & d stay allocated but no
-// output reaches: ten nodes allocated, eight described, as before the pass.
 TEST(AigOpt, BalanceLeavesTheReplacedChainUnreached) {
   AigGraph g;
   auto a = g.AddInput();

@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §25.5.4's example: modport A names r[3:0] P and the constant x Q, modport B
-// names r[7:4] P and 2 Q, so `i.P = i.Q` through A writes 1 to the low
-// nibble and through B writes 2 to the high one. Before the expression ports
-// were bound, both writes were lost and r stayed all x.
 TEST(ModportExpressionSim, WritesAndReadsThroughTheExpression) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface I;\n"
@@ -36,12 +32,6 @@ TEST(ModportExpressionSim, WritesAndReadsThroughTheExpression) {
             "r=00100001\n");
 }
 
-// §25.5.4: a nonblocking assignment is as much a write of a modport
-// expression port as a blocking one, so `i.P <= 4'd5` through modport A
-// updates r[3:0] and leaves the high nibble at 1. The update lands in the NBA
-// region, so a read of r in the same time step still sees 16. Before the
-// target was routed through the expression, the write was lost and r stayed
-// 16.
 TEST(ModportExpressionSim, NonblockingWriteReachesTheExpression) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface I;\n"

@@ -8,14 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A.2.10 with A.9.3 and §26.3: a package's property or sequence instance
-// standing alone as the spec runs as the same instance declared in the
-// module does. clk, the package's, rises at 5, 15, 25, 35 and 45 and a is 1,
-// so each assertion passes and each cover matches five times by 47: the
-// expect statement waits for the first tick at 5, and the display follows
-// it by 42. The named property r, whose body is the package instance, and
-// the instances called by name and with no list run the same, and the
-// expect statement passes once.
 TEST(PackageInstanceSpecRun, APackageInstanceAloneRunsAsTheModulesWould) {
   SimFixture f;
   std::string out = RunCapture(
@@ -52,10 +44,6 @@ TEST(PackageInstanceSpecRun, APackageInstanceAloneRunsAsTheModulesWould) {
   EXPECT_NE(out.find("5 5 5 5 5 5 5 5 5 1 \n"), std::string::npos) << out;
 }
 
-// The contrast: a package property whose clock is written on the
-// module's posedge clk and whose a is 0 at every tick fails, so the
-// instance alone is not merely accepted but evaluated, failing at 5, 15,
-// 25 and 35 before 42.
 TEST(PackageInstanceSpecRun, APackageInstanceAloneFailsWhereItsBodyDoes) {
   SimFixture f;
   std::string out = RunCapture(

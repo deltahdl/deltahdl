@@ -31,7 +31,7 @@ TEST(ConditionalAmbiguousCondition, ZConditionCombinesBranchesBitwise) {
   ternary->false_expr = MakeId(f.arena, "zf");
   auto result = EvalExpr(ternary, f.ctx, f.arena);
 
-  EXPECT_EQ(result.words[0].aval, 0b1110u);  // differing bits -> x = (1, 1)
+  EXPECT_EQ(result.words[0].aval, 0b1110u);
   EXPECT_EQ(result.words[0].bval, 0b0110u);
 }
 
@@ -422,10 +422,6 @@ TEST(TernaryOperatorSim, TernaryUnaryNotCondition) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §11.4.11 over dynamic arrays and queues: a known predicate assigns the
-// chosen array whole; an ambiguous one merges arrays of one element count
-// element by element, a differing element taking its type's default, and
-// gives arrays of different counts the empty array.
 TEST(ConditionalArraySim, DynamicArraysAndQueuesAreChosenOrMerged) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -446,9 +442,6 @@ TEST(ConditionalArraySim, DynamicArraysAndQueuesAreChosenOrMerged) {
             "2 1 0\n2 0\n1 4\n");
 }
 
-// §11.4.11 over associative arrays: a known predicate assigns the chosen one,
-// and an ambiguous one the shared contents where the two are equal and the
-// empty array, the default, where they are not.
 TEST(ConditionalArraySim, AssociativeArraysAreChosenOrEmptied) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

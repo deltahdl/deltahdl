@@ -86,11 +86,6 @@ TEST(PackageImportSim, WildcardImportResolvesValueReference) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 77u);
 }
 
-// Table 26-1 Row B, column 1: a local declaration shadows a wildcard import of
-// the same name. The direct reference resolves to the local object, while a
-// qualified reference still reaches the package member. The distinct values
-// prove the local and the package member are separate storage (the wildcard
-// import never aliased the name onto the package member).
 TEST(PackageImportSim, LocalDeclShadowsWildcardImportValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -114,10 +109,6 @@ TEST(PackageImportSim, LocalDeclShadowsWildcardImportValue) {
   EXPECT_EQ(f.ctx.FindVariable("qualified_ref")->value.ToUint64(), 10u);
 }
 
-// Table 26-1 Row B on an enumeration-constant operand, observed at run time: a
-// wildcard import makes a package enum's members directly visible, so an
-// unqualified reference to a member resolves to that member's value. Built from
-// real package + enum syntax and run end to end (enum member B == 9).
 TEST(PackageImportSim, WildcardImportedEnumMemberResolvesToValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -135,12 +126,6 @@ TEST(PackageImportSim, WildcardImportedEnumMemberResolvesToValue) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 9u);
 }
 
-// §26.2: a package's declarations are visible by their bare names throughout
-// the package, so a localparam initialized from an earlier parameter of the
-// package holds the computed value, read through the package scope resolution
-// operator and through a wildcard import alike. L is 17 doubled: 0 was what
-// an initializer evaluated outside the package's frame gave, and 17 would be
-// K read unscaled; M, initialized through `p::K`, stood at 34 already.
 TEST(PackageImportSim, DerivedPackageLocalparamReadsThroughScopeAndImport) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -165,13 +150,6 @@ TEST(PackageImportSim, DerivedPackageLocalparamReadsThroughScopeAndImport) {
                    {{"scoped", 34u}, {"imported", 34u}, {"viapkg", 34u}});
 }
 
-// §26.5's package p of Table 26-1, a `const` of the package's enumeration
-// type initialized to one of its literals, beside a localparam of the type:
-// §26.2 makes the literal visible by its bare name in the package, so each
-// holds TRUE, 1, through `p::` and through the wildcard import; `sum` reads
-// the literal in an expression, 3. Each read 0 while the initializers were
-// evaluated before the package's literals had storage; `e`, a literal
-// initializer, was 1 already.
 TEST(PackageImportSim, PackageConstAndLocalparamOfPackageEnumTypeHoldLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -206,12 +184,6 @@ TEST(PackageImportSim, PackageConstAndLocalparamOfPackageEnumTypeHoldLiteral) {
                     {"id", 1u}});
 }
 
-// §26.2 with §26.3: a package parameter initialized from a parameter another
-// package's import brings in -- `import base::K; parameter int KK = K;`, the
-// wildcard form with a function of the package standing between, and the
-// `base::K` form -- holds base's 21 when read through each package's scope;
-// the two bare forms were rejected as no constant expression before. §26.5
-// has d4's own K, 4, win over the wildcard's candidate.
 TEST(PackageImportSim, PackageParameterFromImportedPackageParameterReads) {
   SimFixture f;
   auto* design = ElaborateSrc(

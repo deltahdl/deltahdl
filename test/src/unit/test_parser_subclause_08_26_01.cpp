@@ -158,10 +158,6 @@ TEST(InterfaceClassSyntax, SingleExtendsNoAdditionalBases) {
   EXPECT_TRUE(r.cu->classes[0]->extends_interfaces.empty());
 }
 
-// interface_class_method ::= pure virtual method_prototype ; -- the method
-// prototype admits formal arguments (as in the LRM's own put(PUT_T a) example),
-// not only the no-argument prototypes the other cases exercise. Drive both a
-// function and a task prototype carrying formals through the real parser.
 TEST(InterfaceClassSyntax, PureVirtualMethodWithFormalArgs) {
   auto r = Parse(
       "interface class IC;\n"
@@ -183,9 +179,6 @@ TEST(InterfaceClassSyntax, PureVirtualMethodWithFormalArgs) {
   EXPECT_EQ(members[1]->method->func_args.size(), 2u);
 }
 
-// interface_class_declaration ::= ... extends interface_class_type
-// { , interface_class_type } -- a non-first base in the comma list may itself
-// carry a parameter value assignment #(...), just as the first base may.
 TEST(InterfaceClassSyntax, SecondExtendsBaseWithTypeParams) {
   auto r = Parse(
       "interface class IA; endclass\n"

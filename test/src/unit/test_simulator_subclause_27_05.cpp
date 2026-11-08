@@ -156,13 +156,6 @@ TEST(GenerateSimulation, GenerateCaseMultiplePatternsPerItem) {
 }
 
 TEST(GenerateSimulation, GenvarGatedConditionalDrivesValue) {
-  // §27.5 end-to-end over the §27.4 loop-generate dependency: a conditional
-  // generate nested in a loop generate is selected per iteration using the
-  // loop genvar as its constant. Only the i==2 iteration takes the (else-less)
-  // then-branch, so exactly one continuous assignment to the module-level
-  // result survives; the others select nothing. The input is built from real
-  // loop-generate syntax and driven through the full pipeline, and the selected
-  // block's assignment is observed by its simulated result.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t ();\n"
@@ -181,16 +174,6 @@ TEST(GenerateSimulation, GenvarGatedConditionalDrivesValue) {
 }
 
 TEST(GenerateSimulation, GenerateIfElseIfChainSelectsFinalElse) {
-  // §27.5 requires a conditional generate construct to select no more than one
-  // of a set of alternative generate blocks, by constant expressions evaluated
-  // during elaboration, and to instantiate the selected block into the model.
-  // Here no condition in the chain holds, so the final else is the selected
-  // alternative and its 64 is the only value driven onto the module-level
-  // variable the simulated run reads back. Elaborating the else arm's body
-  // without evaluating the nested condition instantiates the first else-if
-  // branch instead and yields 41, and never reaches the two alternatives past
-  // it, so each of the four constants is distinct and non-zero to name which
-  // alternative a wrong run selected.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t #(parameter SEL = 7) ();\n"
@@ -212,9 +195,6 @@ TEST(GenerateSimulation, GenerateIfElseIfChainSelectsFinalElse) {
   EXPECT_EQ(var->value.ToUint64(), 64u);
 }
 
-// §27.5 with §23.6: a named conditional generate block is a scope, and what it
-// declares is read from the module through the block's name. A 4-state value
-// carrying an x bit keeps it through a part-select of the path.
 TEST(ConditionalGenerateHierarchicalNameSim, BlockVariableIsReadWhole) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -230,8 +210,6 @@ TEST(ConditionalGenerateHierarchicalNameSim, BlockVariableIsReadWhole) {
             "lg 001x 1x hello\n");
 }
 
-// §27.5 with §23.6: a write from the module through the block's name lands in
-// the variable the block's own process reads by its simple name.
 TEST(ConditionalGenerateHierarchicalNameSim, WriteFromTheModuleReachesIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -245,10 +223,6 @@ TEST(ConditionalGenerateHierarchicalNameSim, WriteFromTheModuleReachesIt) {
             "wr 78\n");
 }
 
-// §27.5: the one block an if-else-if chain or a case generate selects is
-// instantiated under the name its alternatives share, and a localparam it
-// declares is read through that name. Each unselected alternative declares a
-// different value, so reading one of them gives a different answer.
 TEST(ConditionalGenerateHierarchicalNameSim, SelectedBlockLocalparamIsRead) {
   SimFixture f;
   EXPECT_EQ(
@@ -268,8 +242,6 @@ TEST(ConditionalGenerateHierarchicalNameSim, SelectedBlockLocalparamIsRead) {
       "sel 3 8\n");
 }
 
-// §23.6: a path is usable from any scope, the method of a class the module
-// declares among them.
 TEST(ConditionalGenerateHierarchicalNameSim, ClassMethodReadsThroughIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -289,8 +261,6 @@ TEST(ConditionalGenerateHierarchicalNameSim, ClassMethodReadsThroughIt) {
             "meth 33\n");
 }
 
-// §23.6: the path may start at a submodule instance and pass through a block
-// of that instance's module.
 TEST(ConditionalGenerateHierarchicalNameSim, SubmoduleBlockIsReached) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"
@@ -307,8 +277,6 @@ TEST(ConditionalGenerateHierarchicalNameSim, SubmoduleBlockIsReached) {
             "hi 29\n");
 }
 
-// §25.9 with §27.5: a virtual interface reaches what its interface instance
-// declares, a named generate block's variable among it.
 TEST(ConditionalGenerateHierarchicalNameSim, VirtualInterfaceReachesIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc;\n"
@@ -329,10 +297,6 @@ TEST(ConditionalGenerateHierarchicalNameSim, VirtualInterfaceReachesIt) {
             "vif 55 55\n");
 }
 
-// §27.5 with §23.3: an instance written in the generate block a conditional
-// generate construct selects is an ordinary instance of its module, so the
-// module's own variable is declared and its procedures run: n counts the five
-// rising edges of clk before 52.
 TEST(GenerateSimulation, ModuleInstanceInTheSelectedBlockRunsItsBody) {
   SimFixture f;
   std::string out = RunCapture(
@@ -352,9 +316,6 @@ TEST(GenerateSimulation, ModuleInstanceInTheSelectedBlockRunsItsBody) {
   EXPECT_EQ(out, "n=5\n");
 }
 
-// A concurrent assertion of a module instantiated in the selected block is
-// evaluated as one outside it is: a is sampled 1, 0, 0, 1 and 1 at the five
-// rising edges of clk, counted by the instance itself.
 TEST(GenerateSimulation,
      ModuleInstanceInTheSelectedBlockEvaluatesItsAssertion) {
   SimFixture f;
@@ -376,8 +337,6 @@ TEST(GenerateSimulation,
   EXPECT_EQ(out, "pass=3 fail=2\n");
 }
 
-// The same counts read from the module through the block and the instance,
-// `g.c.pass`, for a checker instantiated in the selected block.
 TEST(GenerateSimulation, CheckerInstanceInTheSelectedBlockEvaluatesIt) {
   SimFixture f;
   std::string out = RunCapture(
@@ -399,11 +358,6 @@ TEST(GenerateSimulation, CheckerInstanceInTheSelectedBlockEvaluatesIt) {
   EXPECT_EQ(out, "pass=3 fail=2\n");
 }
 
-// §27.5 folds a conditional generate's condition at elaboration, and §20.6.2
-// makes `$bits` of a type parameter a constant expression, so the wide block
-// is the one elaborated. The test fails on an elaborator that folds the
-// condition without the scope's typedefs, which warns that the condition is
-// not constant and elaborates neither block.
 TEST(GenerateSimulation, BitsOfATypeParameterGatesAGenerateIf) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top #(parameter type T = logic [15:0]);\n"
@@ -418,11 +372,6 @@ TEST(GenerateSimulation, BitsOfATypeParameterGatesAGenerateIf) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.11 lets a bind directive target an instance by its hierarchical path,
-// and §27.3 with §23.6 reaches an instance in a generate block through the
-// block's name, so `top.g.u` names the leaf in block g. The test fails on an
-// elaborator that walks the hierarchy by the flattened instance name `g_u`,
-// which never meets the path and refuses the target.
 TEST(GenerateSimulation, BindTargetsAnInstanceInsideAGenerateBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf(input logic [7:0] a);\n"
@@ -442,11 +391,6 @@ TEST(GenerateSimulation, BindTargetsAnInstanceInsideAGenerateBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §23.11 elaborates a bound instance as though it were written in its target,
-// and §27.5 instantiates the block its conditional generate selects, so the
-// block's initial runs in the bound instance. The test fails on an elaborator
-// that drains the queued generate constructs before applying the binds, which
-// never elaborates the bound module's block.
 TEST(GenerateSimulation, GenerateBlockOfABoundModuleRuns) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf;\n"
@@ -464,10 +408,6 @@ TEST(GenerateSimulation, GenerateBlockOfABoundModuleRuns) {
             "bnd gen\n");
 }
 
-// §27.5 makes each generate block a scope of its own, and §23.9 resolves a
-// name read in a block in that block first, so each block reads the K it
-// declares. The test fails on a simulator that stores every block's K under
-// one name, where both blocks read the last one lowered.
 TEST(GenerateSimulation, EachBlockReadsTheLocalparamItDeclares) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -484,9 +424,6 @@ TEST(GenerateSimulation, EachBlockReadsTheLocalparamItDeclares) {
             "two 3 4\n");
 }
 
-// A block's K hides the module's K inside the block only, and the module's is
-// still reached through its path. The test fails on a simulator whose block K
-// replaces the module's.
 TEST(GenerateSimulation, BlockLocalparamHidesTheModuleParameterInTheBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -500,10 +437,6 @@ TEST(GenerateSimulation, BlockLocalparamHidesTheModuleParameterInTheBlock) {
             "sh 9 1\n");
 }
 
-// §27.4 makes each loop iteration's block a scope, and the case-generate in it
-// selects a block c of its own, so the first iteration reads 7 and the second
-// 8. The test fails on a simulator that stores both selected blocks' K under
-// one name.
 TEST(GenerateSimulation, EachIterationReadsItsSelectedBlocksLocalparam) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -525,11 +458,6 @@ TEST(GenerateSimulation, EachIterationReadsItsSelectedBlocksLocalparam) {
             "cs5 7\ncs5 8\n");
 }
 
-// §27.4 lets a loop block hold an interface instance and a module instance
-// like any module item, and a name a block writes resolves in the block
-// first (§23.9), so each iteration's `cons c(i)` connects its own `i`
-// (§25.3). The test fails on an elaborator that knows no block's interface
-// instances, which refuses the connection under §23.3.3.4.
 TEST(GenerateSimulation, InterfaceInstanceInALoopBlockIsConnected) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc;\n"
@@ -550,7 +478,6 @@ TEST(GenerateSimulation, InterfaceInstanceInALoopBlockIsConnected) {
             "ifp 32\nifp 33\n");
 }
 
-// The same in a conditional block, through a modport of the block's instance.
 TEST(GenerateSimulation, InterfaceModportInAConditionalBlockIsConnected) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc;\n"
@@ -571,9 +498,6 @@ TEST(GenerateSimulation, InterfaceModportInAConditionalBlockIsConnected) {
             "mp 70\n");
 }
 
-// A connection inside a block naming the module's interface instance finds it
-// in the enclosing scope (§23.9). The test fails on an elaborator that
-// elaborates the block with none of the module's interface instances known.
 TEST(GenerateSimulation, ModuleInterfaceInstanceIsConnectedInsideABlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc;\n"

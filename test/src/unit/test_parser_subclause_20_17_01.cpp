@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 20-17: system_call ::= $system ( [ "terminal_command_line" ] ). With a
-// terminal command line present, $system parses as a system call whose callee
-// is $system and whose single argument is the command string.
 TEST(SystemCall, ParsesWithStringArgument) {
   auto r =
       Parse("module m; initial $system(\"mv design.v adder.v\"); endmodule");
@@ -28,8 +25,6 @@ TEST(SystemCall, ParsesWithStringArgument) {
   EXPECT_EQ(stmt->expr->args[0]->kind, ExprKind::kStringLiteral);
 }
 
-// Syntax 20-17: the terminal_command_line is optional, so $system parses with
-// an empty argument list as well.
 TEST(SystemCall, ParsesWithNoArgument) {
   auto r = Parse("module m; initial $system(); endmodule");
   ASSERT_NE(r.cu, nullptr);

@@ -21,8 +21,6 @@ namespace delta {
 
 namespace {
 
-// The clock the actual `operand` names brings, where `operand` is a formal's
-// bare name; empty otherwise.
 std::vector<EventExpr> BareFormalActualClock(const Expr* operand,
                                              const ActualsByFormal& actuals,
                                              const PropertyRegistry& registry,
@@ -33,9 +31,6 @@ std::vector<EventExpr> BareFormalActualClock(const Expr* operand,
   return ActualLeadingClock(found->second, registry, arena);
 }
 
-// The clock the actual of a formal brings where the chain `body` opens with
-// that formal under no clocking event of its own, `s ##1 a`; empty
-// otherwise.
 std::vector<EventExpr> OpeningFormalActualClock(
     const SeqLinearBody& body, const ActualsByFormal& actuals,
     const PropertyRegistry& registry, Arena& arena) {
@@ -50,8 +45,6 @@ std::vector<EventExpr> OpeningFormalActualClock(
 
 namespace {
 
-// §16.12.18: whether an actual argument of `instance` is a sequence_expr or
-// a property_expr read into a tree.
 bool InstanceHasTreeActual(const Expr* instance) {
   if (instance == nullptr || instance->kind != ExprKind::kCall) return false;
   for (const Expr* arg : instance->args) {
@@ -60,9 +53,6 @@ bool InstanceHasTreeActual(const Expr* instance) {
   return false;
 }
 
-// §16.8.1: whether the boolean of `decl`'s clocked boolean body is a formal
-// that `instance` binds to a list of names, `(a, f)`, which stands there as
-// the sequence the list reads as.
 bool BindsListToBoolean(const Expr* instance, const ModuleItem* decl) {
   const Expr* boolean = decl->prop_body_expr;
   if (boolean->kind != ExprKind::kIdentifier) return false;
@@ -79,11 +69,6 @@ bool TakesBooleanSubstitution(const Expr* instance, const ModuleItem* decl) {
          !BindsListToBoolean(instance, decl);
 }
 
-// §16.12.18 by way of §16.8.1: the clock of the instantiated property or
-// sequence with the actuals in the formals' places: the actual of a formal of
-// type event, an event expression, supplies its events, each with its edge,
-// its signal and its guard beside the clock's own (§9.4.2), and any other
-// actual the signal under the edge the clock wrote.
 std::vector<EventExpr> SubstituteClockEvents(
     const std::vector<EventExpr>& clock, const ActualsByFormal& actuals,
     Arena& arena) {
@@ -111,25 +96,16 @@ std::vector<EventExpr> SequenceInstanceClock(const ModuleItem* seq,
                                              Arena& arena) {
   ActualsByFormal actuals = BindActualsWithDefaults(
       seq->prop_formals, seq->prop_formal_defaults, instance);
-  // §16.16 (d) with §F.4.1: a sequence whose body is a formal alone is on
-  // the clock its actual opens with.
   if (seq->seq_clock.empty()) {
     std::vector<EventExpr> clock =
         OpeningFormalActualClock(seq->seq_linear, actuals, registry, arena);
     if (!clock.empty()) return clock;
-    // §16.16 (f) with §16.16.1: a body opening with an instance of a
-    // clocked sequence, `s2 ##1 b`, is on that sequence's clock.
     return SubstituteClockEvents(DeterminedSequenceClock(seq, registry),
                                  actuals, arena);
   }
   return SubstituteClockEvents(seq->seq_clock, actuals, arena);
 }
 
-// §16.16 (d): the leading clock an actual that is an instance of a named
-// sequence or property brings, `p2(a, b, c)` of a property declared with
-// `@($global_clock)`: the clock the declaration gives the instance, its
-// formals replaced by the instance's actuals; empty for an actual naming no
-// such declaration, or one declared with no clock.
 static std::vector<EventExpr> InstanceActualClock(
     const Expr* actual, const PropertyRegistry& registry, Arena& arena) {
   const ModuleItem* decl = registry.FindInstance(actual);
@@ -187,17 +163,12 @@ std::vector<EventExpr> FormalOpeningClock(const PropertyExprNode* body,
                                   arena);
 }
 
-// The declaration `operand` instantiates where it names one of `kind`, an
-// identifier or a call naming a sequence or a property.
 const ModuleItem* InstantiatedDecl(const Expr* operand, ModuleItemKind kind,
                                    const PropertyRegistry& registry) {
   const ModuleItem* decl = registry.FindInstance(operand);
   return decl != nullptr && decl->kind == kind ? decl : nullptr;
 }
 
-// §16.12.2 and §16.13.4: a sequence declaration of one operand, an instance
-// of the named sequence `instance` names, for the flattening to expand: a
-// bare name in a property is a sequence where the name is a sequence's.
 ModuleItem* SequenceInstanceBody(Expr* instance, Arena& arena) {
   auto* seq = arena.Create<ModuleItem>();
   seq->kind = ModuleItemKind::kSequenceDecl;
@@ -212,16 +183,6 @@ ModuleItem* SequenceInstanceBody(Expr* instance, Arena& arena) {
   return seq;
 }
 
-// §16.13.3 and §16.13.4: the clock flowing into a property declared with
-// none: the clocking event its body's property_expr opens with, after the
-// disable condition where §16.14.1's `abc` writes one, on the root where
-// the body is a `not` and on the first operand of the sequence the body
-// opens with where the body is a sequence or an implication, §16.14.2's
-// `abc` writing its clock before the antecedent, from which it flows to the
-// consequent; or else the clock of the sequence its body opens with, where
-// that sequence, the body itself or the antecedent of the implication it
-// is, is one instance of a sequence declared with a clock, `mult_s |=>
-// mult_s` being on mult_s's; empty otherwise.
 const std::vector<EventExpr>& FlowedBodyClock(
     const ModuleItem* decl, const PropertyRegistry& registry) {
   static const std::vector<EventExpr> kNone;
@@ -241,10 +202,6 @@ const std::vector<EventExpr>& FlowedBodyClock(
   return seq == nullptr ? kNone : seq->seq_clock;
 }
 
-// §16.13.4: a boolean operand of the tree that is the bare name of a named
-// sequence, or a call of one, which the parser read as a boolean since a
-// variable's name reads the same, is the sequence, a node the flattening
-// expands; the walk reaches the trees an instance's actuals carry too.
 void PromoteSequenceInstances(PropertyExprNode* node,
                               const PropertyRegistry& registry, Arena& arena) {
   if (node == nullptr) return;
@@ -268,9 +225,6 @@ void PromoteSequenceInstances(PropertyExprNode* node,
   }
 }
 
-// §16.14.7: the event expression of the inferred clock as an actual argument
-// of an event formal writes it, each event with its edge and its iff guard as
-// EventAsActual writes one, and the events joined by `or`.
 static Expr* ClockActual(const std::vector<EventExpr>& clock, Arena& arena) {
   Expr* actual = nullptr;
   for (const EventExpr& ev : clock) {
@@ -281,8 +235,6 @@ static Expr* ClockActual(const std::vector<EventExpr>& clock, Arena& arena) {
   return actual;
 }
 
-// §16.14.7: the disable condition $inferred_disable returns outside the
-// scope of any default disable iff declaration.
 static Expr* FalseLiteral(Arena& arena) {
   static constexpr std::string_view kZero = "1'b0";
   auto* literal = arena.Create<Expr>();
@@ -292,7 +244,6 @@ static Expr* FalseLiteral(Arena& arena) {
   return literal;
 }
 
-// Whether any formal of `decl` is defaulted to an inferred function.
 static bool HasInferredDefault(const ModuleItem* decl) {
   for (InferredDefault kind : decl->prop_formal_inferred) {
     if (kind != InferredDefault::kNone) return true;
@@ -300,8 +251,6 @@ static bool HasInferredDefault(const ModuleItem* decl) {
   return false;
 }
 
-// The actual the inferred function `kind` is replaced by at an instance, or
-// nullptr where it is neither function or no clock is inferred there.
 static Expr* InferredActual(InferredDefault kind,
                             const InferredAtInstance& inferred, Arena& arena) {
   if (kind == InferredDefault::kClock && !inferred.clock.empty()) {
@@ -313,8 +262,6 @@ static Expr* InferredActual(InferredDefault kind,
   return nullptr;
 }
 
-// The inferred function the default actual `e` calls, kNone where it calls
-// neither.
 static InferredDefault InferredDefaultCalled(const Expr* e) {
   if (e == nullptr || e->kind != ExprKind::kSystemCall) {
     return InferredDefault::kNone;
@@ -399,11 +346,6 @@ std::vector<EventExpr> DefaultClockingEvent(const RtlirModule* mod) {
   return mod->inherited_default_clock;
 }
 
-// §16.12 with §26.3: an instance written by its package-qualified name,
-// `pk::pq` or `pk::pr(a, clk)`, which the parser left the scope resolution
-// it reads as since a package's variable reads the same, is made, once its
-// declaration is found, the instance named by the key the registry holds it
-// under, as the instance of a declaration in the scope is.
 void NameInstanceByKey(ModuleItem* item, Arena& arena) {
   Expr* instance = item->assert_expr;
   if (instance == nullptr) return;

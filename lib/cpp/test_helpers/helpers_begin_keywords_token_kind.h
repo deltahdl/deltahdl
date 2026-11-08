@@ -12,9 +12,6 @@
 
 using namespace delta;
 
-// Preprocesses a single token wrapped in a `begin_keywords/`end_keywords
-// block for the given keyword version, lexes the preprocessed output, locates
-// the token by its text, and asserts that it lexes with the expected kind.
 inline void ExpectBeginKeywordsTokenKind(const std::string& version,
                                          const std::string& token_text,
                                          TokenKind expected_kind) {

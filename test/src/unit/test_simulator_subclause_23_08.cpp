@@ -96,12 +96,6 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceAcrossTwoLevels) {
 
 TEST(UpwardNameReferenceSimulation,
      InstanceScopeNameResolvesDownwardFromParent) {
-  // A scope_name.item_name reference whose leading scope_name is a sibling
-  // instance resolves by first stepping up to the reference's enclosing
-  // scope, locating the named instance there, and then resolving the item
-  // downward from that instance. Here probe reads sib.v, where sib is a peer
-  // instance sharing the enclosing module mid; the value must be drawn from
-  // that sibling instance rather than from probe's own scope.
   SimFixture f;
   auto* r = RunAndFindVar(
       "module sub;\n"
@@ -128,14 +122,6 @@ TEST(UpwardNameReferenceSimulation,
 }
 
 TEST(UpwardNameReferenceSimulation, UpwardReferenceByEnclosingInstanceName) {
-  // §23.8: a variable in an enclosing module can be referenced when that
-  // module's instance name is known, not only when its module type name is
-  // used. Here leaf reads m1.v, where m1 is the instance name of the enclosing
-  // mid instance (leaf lives inside m1). The leading scope_name m1 is not found
-  // in leaf's own scope, so the search climbs to the enclosing scopes until it
-  // reaches top, where the instance m1 exists, and the item v is then resolved
-  // downward from that instance -- distinct from a sibling-instance reference,
-  // whose scope_name is found already in the immediate parent.
   SimFixture f;
   auto* r = RunAndFindVar(
       "module leaf;\n"
@@ -159,11 +145,6 @@ TEST(UpwardNameReferenceSimulation, UpwardReferenceByEnclosingInstanceName) {
 }
 
 TEST(UpwardNameReferenceSimulation, UpwardNetReferenceReadsDrivenValue) {
-  // Syntax 23-8 admits net_identifier as an item_name of an upward reference.
-  // Here child reads parent.n, a net in the enclosing module driven by a
-  // continuous assignment. The upward-resolution walk must reach the net's
-  // driven value just as it does for a variable, so the read observes the
-  // settled 0xA5 rather than the net's default.
   SimFixture f;
   auto* r = RunAndFindVar(
       "module child;\n"
@@ -184,10 +165,6 @@ TEST(UpwardNameReferenceSimulation, UpwardNetReferenceReadsDrivenValue) {
 }
 
 TEST(UpwardNameReferenceSimulation, UpwardParameterReferenceReadsValue) {
-  // Syntax 23-8 admits parameter_identifier as an item_name. child reads
-  // parent.P, a parameter of the enclosing module referenced by that module's
-  // type name; the upward reference must resolve to the parameter's value (8),
-  // observed end-to-end rather than merely elaborating without error.
   SimFixture f;
   auto* r = RunAndFindVar(
       "module child;\n"
@@ -207,10 +184,6 @@ TEST(UpwardNameReferenceSimulation, UpwardParameterReferenceReadsValue) {
 }
 
 TEST(UpwardNameReferenceSimulation, UpwardPortReferenceReadsDrivenValue) {
-  // Syntax 23-8 admits port_identifier as an item_name. child reads parent.p,
-  // an input port of the enclosing parent instance that an outer module drives
-  // with 0x3C. The upward reference resolves through the enclosing instance to
-  // the port's driven value.
   SimFixture f;
   auto* r = RunAndFindVar(
       "module child;\n"
@@ -233,10 +206,6 @@ TEST(UpwardNameReferenceSimulation, UpwardPortReferenceReadsDrivenValue) {
 }
 
 TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
-  // The upward search visits enclosing module scopes only; it must not reach
-  // sideways into a sibling instance. Here child's reference parent.v resolves
-  // to the enclosing module parent's own variable (88), even though a sibling
-  // instance other_inst also declares a variable named v (5).
   SimFixture f;
   auto* r = RunAndFindVar(
       "module other;\n"
@@ -261,10 +230,6 @@ TEST(UpwardNameReferenceSimulation, UpwardSearchUsesEnclosingModuleNotSibling) {
   EXPECT_EQ(r->value.ToUint64(), 88u);
 }
 
-// §23.8: a function of a module above the caller is called through that
-// module's definition name, and the call runs in the nearest enclosing
-// instance of it, reading that instance's own variables: each leaf adds its
-// own mid's g, two levels up through an inner instance.
 TEST(UpwardNameReferenceSimulation,
      CallThroughAnEnclosingModulesNameRunsInTheNearestInstance) {
   SimFixture f;
@@ -295,11 +260,6 @@ TEST(UpwardNameReferenceSimulation,
   EXPECT_EQ(second->value.ToUint64(), 12u);
 }
 
-// §23.8 with §23.9: a dotted name read inside named blocks has its first name
-// looked for in the current scope and then outward through the enclosing
-// ones, so `inner.x` written in `outer` after `inner` ran reaches inner's x,
-// and `b.r` written inside `b` itself, in a task called from a named block of
-// its caller, reaches b's own r, as `tk.b.r` does.
 TEST(UpwardNameReferenceSimulation, DottedNameHeadedByAnEnclosingNamedBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

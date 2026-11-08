@@ -137,8 +137,6 @@ TEST(ModuleInstantiationElaboration, InstanceArrayElaborates) {
   EXPECT_FALSE(design->top_modules[0]->children.empty());
 }
 
-// §23.3.2.2: a module with no ports declares no name a named connection may
-// give, so connecting one is an error.
 TEST(ModuleInstantiationElaboration, PortConnectionsToPortlessModuleFail) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -168,14 +166,6 @@ TEST(ModuleInstantiationElaboration, EmptyParensOnPortlessModuleElaborates) {
   EXPECT_NE(design->top_modules[0]->children[0].resolved, nullptr);
 }
 
-// §23.3.2 gives module_instantiation a parenthesized list_of_port_connections,
-// which A.4.1.1's hierarchical_instance makes no part of optional, so `child
-// u0;` is not one however few ports child has. The report is the elaborator's
-// rather than the parser's because the two identifiers and semicolon are also
-// what a data declaration of an undeclared type spells, and the module names
-// that tell the two apart are the elaborator's. Which is why this case is here
-// rather than in test/src/unit/test_parser_subclause_23_03_02.cpp, where it
-// stood while the parser answered it.
 TEST(ModuleInstantiationElaboration, PortlessInstanceWithoutParensIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,11 +180,6 @@ TEST(ModuleInstantiationElaboration, PortlessInstanceWithoutParensIsReported) {
                             3, "23.3.2"));
 }
 
-// §23.3.2 (A.4.1.1): a port connection of a module instance is an expression,
-// so an event expression, a sequence or a property, which only a checker's
-// actual may be (§17.3), is reported where it is bound, by position or by
-// name. The parser reads any of the three, not knowing what the instance
-// names.
 TEST(ModuleInstantiationElaboration, ModulePortTakesNoSequenceOrEventActual) {
   ElabFixture f;
   ElaborateSrc(

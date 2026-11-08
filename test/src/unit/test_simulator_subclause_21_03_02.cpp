@@ -14,18 +14,6 @@
 using namespace delta;
 namespace {
 
-// These tests are about §21.3.2's file output tasks -- which of them terminate
-// with a newline, how a multichannel descriptor fans out, when a strobe or
-// monitor is cancelled -- and not about how a value is rendered. They therefore
-// write %0d rather than %d.
-//
-// The distinction is not cosmetic. §21.2.1.2 sizes %d automatically, to the
-// widest value the expression can hold, padding with leading spaces: its table
-// gives `%d` on `32'd10` as `:        10:`. Only `%0d` yields the minimum
-// width, with no leading spaces or zeros. Asserting an unpadded string against
-// %d makes each of these tests depend on the width deltahdl assigns the
-// expression, which is a separate question from the one being asked here.
-
 static std::string ReadAll(const std::string& path) {
   std::ifstream ifs(path);
   std::stringstream ss;
@@ -33,9 +21,6 @@ static std::string ReadAll(const std::string& path) {
   return ss.str();
 }
 
-// Drives a whole module through parse -> elaborate -> lower -> run so the
-// file-output task under test receives a descriptor produced by a real $fopen
-// (its §21.3.1 dependency), not a hand-built descriptor value.
 static void RunFullSource(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
@@ -66,7 +51,6 @@ TEST(IoSystemTaskTest, FdisplayToFile) {
   std::remove(tmp_path.c_str());
 }
 
-// §21.3.2: $fdisplay terminates with a newline; $fwrite does not.
 TEST(IoSystemTaskTest, FwriteSuppressesNewline) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fwrite.txt";
@@ -88,7 +72,6 @@ TEST(IoSystemTaskTest, FwriteSuppressesNewline) {
   std::remove(path.c_str());
 }
 
-// §21.3.2: the b/h/o suffix supplies the radix when no format string is given.
 TEST(IoSystemTaskTest, FwriteRadixSuffixes) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_radix.txt";
@@ -114,13 +97,11 @@ TEST(IoSystemTaskTest, FwriteRadixSuffixes) {
 
   std::string contents = ReadAll(path);
   EXPECT_NE(contents.find("ab"), std::string::npos);
-  EXPECT_NE(contents.find("10"), std::string::npos);   // 8 in octal
-  EXPECT_NE(contents.find("101"), std::string::npos);  // 5 in binary
+  EXPECT_NE(contents.find("10"), std::string::npos);
+  EXPECT_NE(contents.find("101"), std::string::npos);
   std::remove(path.c_str());
 }
 
-// §21.3.2: $fstrobe writes to the file using the descriptor for control,
-// just like $strobe but routed through the file descriptor.
 TEST(IoSystemTaskTest, FstrobeWritesToFile) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fstrobe.txt";
@@ -135,7 +116,6 @@ TEST(IoSystemTaskTest, FstrobeWritesToFile) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "s=%0d"),
                         MakeInt(f.arena, 42)}),
            f.ctx, f.arena);
-  // §21.2.2: a strobe writes at the end of the time step.
   f.scheduler.Run();
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
@@ -144,9 +124,6 @@ TEST(IoSystemTaskTest, FstrobeWritesToFile) {
   std::remove(path.c_str());
 }
 
-// §21.3.2: $fmonitor writes to the file under control of the descriptor; any
-// number of $fmonitor tasks can be set up simultaneously active (we exercise
-// two file targets in succession without one cancelling the other).
 TEST(IoSystemTaskTest, FmonitorWritesToFile) {
   SimFixture f;
   std::string path_a = "/tmp/deltahdl_test_fmon_a.txt";
@@ -173,7 +150,6 @@ TEST(IoSystemTaskTest, FmonitorWritesToFile) {
                        {MakeInt(f.arena, fdb), MkStr(f.arena, "b=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
-  // §21.2.3: each monitor writes its list at the end of the time step.
   f.scheduler.Run();
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fda)}), f.ctx,
@@ -187,9 +163,6 @@ TEST(IoSystemTaskTest, FmonitorWritesToFile) {
   std::remove(path_b.c_str());
 }
 
-// §21.3.2: $fstrobe and $fmonitor are controlled by the descriptor argument,
-// so they must accept an mcd just as $fdisplay does and fan out to every
-// channel selected by its set bits.
 TEST(IoSystemTaskTest, FstrobeAndFmonitorAcceptMcd) {
   SimFixture f;
   std::string path_a = "/tmp/deltahdl_test_strobe_mcd_a.txt";
@@ -224,12 +197,6 @@ TEST(IoSystemTaskTest, FstrobeAndFmonitorAcceptMcd) {
   std::remove(path_b.c_str());
 }
 
-// §21.3.2: every b/h/o suffix variant of $fdisplay, $fstrobe, and $fmonitor
-// must dispatch through the same suffix-aware path as $fwrite*, producing the
-// expected radix when no format string is given. Per §21.2.1.2 a non-decimal
-// radix without an explicit %0 field width always shows leading zeros padded to
-// the operand's bit width; the unsized integer literal arguments here are
-// 32-bit (§5.7.1), so hex pads to 8 digits, octal to 11, and binary to 32.
 TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
   SimFixture f;
   struct Case {
@@ -259,7 +226,6 @@ TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
     EvalExpr(MakeSysCall(f.arena, c.task,
                          {MakeInt(f.arena, fd), MakeInt(f.arena, c.value)}),
              f.ctx, f.arena);
-    // §21.2.3: a monitor's first write comes at the end of the time step.
     f.scheduler.Run();
     EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
              f.arena);
@@ -268,8 +234,6 @@ TEST(IoSystemTaskTest, DisplayStrobeMonitorRadixSuffixesAllDispatch) {
   }
 }
 
-// §21.3.2: a multichannel descriptor with no channel bits set selects no
-// files; the file-output task must complete without writing anywhere.
 TEST(IoSystemTaskTest, FdisplayMcdWithNoChannelsBitsWritesNothing) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_empty_mcd.txt";
@@ -279,9 +243,6 @@ TEST(IoSystemTaskTest, FdisplayMcdWithNoChannelsBitsWritesNothing) {
                f.ctx, f.arena)
           .ToUint64();
 
-  // mcd with no bits set selects nothing — even though the underlying file
-  // was opened, no write is directed to it because the descriptor argument
-  // selects no channels.
   EvalExpr(MakeSysCall(f.arena, "$fdisplay",
                        {MakeInt(f.arena, 0u), MkStr(f.arena, "ghost=%0d"),
                         MakeInt(f.arena, 1)}),
@@ -293,9 +254,6 @@ TEST(IoSystemTaskTest, FdisplayMcdWithNoChannelsBitsWritesNothing) {
   std::remove(path.c_str());
 }
 
-// §21.3.2: $fclose is the means by which an active $fstrobe or $fmonitor task
-// is cancelled. After the descriptor is closed, follow-up tasks naming that
-// descriptor must not produce additional output.
 TEST(IoSystemTaskTest, FcloseCancelsActiveStrobeAndMonitor) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_cancel_strobe_monitor.txt";
@@ -314,7 +272,6 @@ TEST(IoSystemTaskTest, FcloseCancelsActiveStrobeAndMonitor) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "m=%0d"),
                         MakeInt(f.arena, 2)}),
            f.ctx, f.arena);
-  // §21.2.3: the monitor writes its list at the end of the time step.
   f.scheduler.Run();
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
@@ -332,8 +289,6 @@ TEST(IoSystemTaskTest, FcloseCancelsActiveStrobeAndMonitor) {
   std::remove(path.c_str());
 }
 
-// §21.3.2: an mcd selects every file whose channel bit is set; a single
-// $fdisplay through that mcd writes to all selected files.
 TEST(IoSystemTaskTest, FdisplayMcdFansOut) {
   SimFixture f;
   std::string path_a = "/tmp/deltahdl_test_mcd_a.txt";
@@ -363,14 +318,6 @@ TEST(IoSystemTaskTest, FdisplayMcdFansOut) {
   std::remove(path_b.c_str());
 }
 
-// ---------------------------------------------------------------------------
-// §21.3.2 end-to-end: the file-output task's first argument is the mcd/fd its
-// §21.3.1 dependency ($fopen) produces from real source. Each test drives the
-// full parse/elaborate/lower/run pipeline and reads back what the run wrote.
-// ---------------------------------------------------------------------------
-
-// §21.3.2: $fdisplay directs its formatted output to the file named by the fd
-// first argument and appends a newline, as its $display counterpart does.
 TEST(IoSystemTaskTest, FdisplayThroughFdFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_fdisplay_fd.txt";
@@ -391,8 +338,6 @@ TEST(IoSystemTaskTest, FdisplayThroughFdFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2: $fwrite writes the same formatted text to the fd but, like $write,
-// suppresses the trailing newline.
 TEST(IoSystemTaskTest, FwriteThroughFdFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_fwrite_fd.txt";
@@ -413,8 +358,6 @@ TEST(IoSystemTaskTest, FwriteThroughFdFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2: the first argument may equally be a multichannel descriptor; the
-// output is directed to the channel the mcd selects.
 TEST(IoSystemTaskTest, FdisplayThroughMcdFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_fdisplay_mcd.txt";
@@ -435,8 +378,6 @@ TEST(IoSystemTaskTest, FdisplayThroughMcdFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2: $fstrobe writes to the file under control of its descriptor, the
-// file counterpart of $strobe.
 TEST(IoSystemTaskTest, FstrobeThroughFdFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_fstrobe_fd.txt";
@@ -457,8 +398,6 @@ TEST(IoSystemTaskTest, FstrobeThroughFdFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2: $fmonitor writes to the file under control of its descriptor, the
-// file counterpart of $monitor.
 TEST(IoSystemTaskTest, FmonitorThroughFdFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_fmonitor_fd.txt";
@@ -479,9 +418,6 @@ TEST(IoSystemTaskTest, FmonitorThroughFdFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2: two mcds bitwise-OR'd together form a descriptor that directs a
-// single file-output task to every selected channel. The mcds and their OR are
-// all produced by real source expressions.
 TEST(IoSystemTaskTest, McdFanoutViaBitwiseOrFromSource) {
   SimFixture f;
   const std::string kPathA = "/tmp/deltahdl_e2e_fanout_a.txt";
@@ -510,11 +446,6 @@ TEST(IoSystemTaskTest, McdFanoutViaBitwiseOrFromSource) {
   std::remove(kPathB.c_str());
 }
 
-// §21.3.2: $fclose is the means by which an active $fstrobe/$fmonitor task is
-// cancelled; a task naming the descriptor after it is closed produces no more
-// output. Driven end-to-end from source. The monitor writes its list at the
-// end of the time step it was set up in (§21.2.3), so the close comes a step
-// later.
 TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_cancel_fmonitor.txt";
@@ -536,12 +467,6 @@ TEST(IoSystemTaskTest, FcloseCancelsFmonitorFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.2 (printed page 667): $fmonitor works as $monitor does (§21.2.3),
-// writing its list when called and again at the end of each time step in which
-// an argument changed, and any number of $fmonitor tasks may be active at once:
-// two on one descriptor each write on the change, a third set up later writes
-// beside them, and an $fclose cancels all three (§21.3.1) before a later change
-// could write again.
 TEST(IoSystemTaskTest, FmonitorsWriteOnEveryChangeUntilClosed) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fmon_changes.txt";
@@ -573,11 +498,6 @@ TEST(IoSystemTaskTest, FmonitorsWriteOnEveryChangeUntilClosed) {
   std::remove(path.c_str());
 }
 
-// §21.3.2 with §21.2.1.5: a write made at the end of a later time step still
-// reads the list in the instance the $fmonitor was written in, and its %m
-// names that instance, whichever process ran last. §21.3.1: a multichannel
-// monitor is cancelled with the channel it writes, which a later $fopen hands
-// to another file that the monitor then leaves alone.
 TEST(IoSystemTaskTest, FmonitorKeepsItsScopeAndItsChannels) {
   SimFixture f;
   std::string sub_path = "/tmp/deltahdl_test_fmon_sub.txt";
@@ -619,11 +539,6 @@ TEST(IoSystemTaskTest, FmonitorKeepsItsScopeAndItsChannels) {
   std::remove(reuse_path.c_str());
 }
 
-// §21.3.2 with §21.2.2 (printed page 664): $fstrobe writes its arguments at
-// the end of the time step, after every blocking assignment of the step has
-// landed, so v = 2 made after the call is what the file holds; the $fwrite
-// either side of it is written at once. An $fclose in the same step cancels
-// a strobe (§21.3.1).
 TEST(IoSystemTaskTest, FstrobeWritesAtTheEndOfTheTimeStep) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fstrobe_end.txt";
@@ -661,11 +576,6 @@ TEST(IoSystemTaskTest, FstrobeWritesAtTheEndOfTheTimeStep) {
   std::remove(cancelled.c_str());
 }
 
-// §21.3.2 (printed page 667): the file output tasks take the same kinds of
-// argument as the tasks they are built on once the descriptor is taken off --
-// every argument written in order, a literal after an expression included, an
-// expression under the task's radix where no template takes it, an omitted
-// argument as a space, and %p formatting an aggregate.
 TEST(IoSystemTaskTest, FileTasksTakeTheDisplayArgumentList) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_file_arg_list.txt";
@@ -700,10 +610,6 @@ TEST(IoSystemTaskTest, FileTasksTakeTheDisplayArgumentList) {
   std::remove(path.c_str());
 }
 
-// §21.3.2 with §26.2 and §26.3 (printed pages 808-811): a descriptor held in
-// a package variable is one storage location, so the one a package function's
-// $fopen assigned is the one the importing module writes through, by its bare
-// name and as fio::fd, from forked processes at different times.
 TEST(IoSystemTaskTest, DescriptorInAPackageVariableOpenedByAPackageFunction) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_package_fd.txt";
@@ -741,12 +647,6 @@ TEST(IoSystemTaskTest, DescriptorInAPackageVariableOpenedByAPackageFunction) {
   std::remove(path.c_str());
 }
 
-// §21.3.2 with §21.2.2 and §8.6: $fstrobe and $fmonitor called in a class
-// method write their lists at the end of the step as the method sees them --
-// the object's property bare and as this.v, a static property, and for the
-// strobe the method's local, which §13.3.2 bars from a monitor. The monitor
-// writes to the module's descriptor for the same reason: the task's argument
-// is automatic as well. Each wrote 0.
 TEST(IoSystemTaskTest, FstrobeAndFmonitorInAClassMethodReadTheMethodsObject) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fstrobe_method.txt";
@@ -783,10 +683,6 @@ TEST(IoSystemTaskTest, FstrobeAndFmonitorInAClassMethodReadTheMethodsObject) {
   std::remove(path.c_str());
 }
 
-// §21.3.2 with §21.2.3 and §8.5: $fmonitor works "just like" $monitor, so a
-// class property read through a handle is followed too -- written again when
-// its value changes, not when a write leaves it as it was, and no more once
-// $fclose has cancelled the monitor.
 TEST(IoSystemTaskTest, FmonitorOfAPropertyThroughAHandleFollowsItsWrites) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fmonitor_property.txt";

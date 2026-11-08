@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -71,15 +70,6 @@ TEST(NamedPortSimulation, EmptyNamedOutputNotDriven) {
 }
 
 TEST(NamedPortSimulation, ExplicitEmptyNamedInputDiscardsDefaultAtRuntime) {
-  // §23.3.2.2: an input port that carries a default value but is given an
-  // explicit empty named connection ".a()" is left unconnected, and its default
-  // is deliberately NOT substituted -- the opposite of merely omitting the port
-  // from the list (OmittedInputUsesDefaultValueAtRuntime), which does fall back
-  // to the default. Here b's default of 5 must be discarded, so the child's
-  // unconnected input propagates an unknown value rather than 15; observing the
-  // result as not-known is the runtime counterpart to the elaborator's
-  // binding-level check that the connection is 'z, confirming the default was
-  // not driven into the simulated logic.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b = 8'd5,\n"
@@ -96,11 +86,6 @@ TEST(NamedPortSimulation, ExplicitEmptyNamedInputDiscardsDefaultAtRuntime) {
 }
 
 TEST(NamedPortSimulation, OmittedInputUsesDefaultValueAtRuntime) {
-  // §23.3.2.2: an input port left out of a named connection list falls back to
-  // its declared default. b is omitted here, so the child evaluates a + b using
-  // b's default of 5; the parent observing 10 + 5 confirms the default was both
-  // substituted during elaboration and actually drove the simulated logic --
-  // the runtime counterpart to the elaborator's binding-level observation.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b = 8'd5,\n"
@@ -116,14 +101,6 @@ TEST(NamedPortSimulation, OmittedInputUsesDefaultValueAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §23.3.2.2 (printed page 743): a named connection `.dout(d3)` connects the
-// port to the parent's `d3` and to nothing else, and §23.9 (printed page 761)
-// keeps the child's bare `dout` inside the child, so a parent net that shares
-// the port's name plays no part: the child's value reaches d3 and the parent's
-// own `dout`, which nothing drives, reads z. An `output logic` port is a
-// variable rather than a net under the child's prefix, and the child's
-// `assign dout` found no net there, stepped out to the parent's like-named one
-// and drove it, leaving d3 x.
 TEST(PortConnectionSim, OutputVariablePortDrivesOnlyTheConnectedNet) {
   SimFixture f;
   auto out = RunCapture(
@@ -139,9 +116,6 @@ TEST(PortConnectionSim, OutputVariablePortDrivesOnlyTheConnectedNet) {
   EXPECT_EQ(out, "dout zzzz d3 1001\n");
 }
 
-// The same for an output net port, and for a parent net that shares the port's
-// name and is connected to it by name, `.y(y)`: the child's value reaches the
-// connected net whichever name it has.
 TEST(PortConnectionSim, OutputNetPortDrivesOnlyTheConnectedNet) {
   SimFixture f;
   auto out = RunCapture(

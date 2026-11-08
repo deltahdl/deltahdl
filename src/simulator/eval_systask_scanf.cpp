@@ -1,4 +1,3 @@
-
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -24,8 +23,6 @@
 
 namespace delta {
 
-// §21.3.4.3: integer conversion codes are case-insensitive (%d or %D, etc.).
-// Returns the numeric base, or 0 for a code not treated as an integer field.
 static int SpecToBase(char spec) {
   char c =
       (spec >= 'A' && spec <= 'Z') ? static_cast<char>(spec - 'A' + 'a') : spec;
@@ -36,18 +33,11 @@ static int SpecToBase(char spec) {
   return 0;
 }
 
-// §21.3.4.3: leading white space ahead of an input field is ignored. This is
-// the same set $fscanf recognizes (blanks, tabs, newlines, formfeeds, and the
-// related vertical tab and carriage return).
 static bool IsScanSpace(char c) {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
          c == '\v';
 }
 
-// §21.3.4.3: a four-state value with any unknown bit (x or z) cannot be read as
-// ASCII text. Only a non-literal argument can carry such bits. An unpacked
-// byte array is lowered to per-element variables, so it is decoded per element
-// rather than evaluated as one packed value.
 static bool ScanArgHasUnknownBits(const Expr* arg, SimContext& ctx,
                                   Arena& arena) {
   if (!arg || arg->kind == ExprKind::kStringLiteral) return false;
@@ -62,8 +52,6 @@ static bool ScanArgHasUnknownBits(const Expr* arg, SimContext& ctx,
   return false;
 }
 
-// §21.3.4.3: pack a matched string/character field into a destination, placing
-// the leftmost character in the most significant byte.
 Logic4Vec ScanStringToVec(Arena& arena, const std::string& str,
                           uint32_t width) {
   auto vec = MakeLogic4VecVal(arena, width, 0);
@@ -79,8 +67,6 @@ Logic4Vec ScanStringToVec(Arena& arena, const std::string& str,
   return vec;
 }
 
-// §21.3.4.3: store a converted real value (its IEEE-754 bit pattern) into a
-// real destination.
 void StoreRealField(Variable* var, Arena& arena, double d) {
   if (!var) return;
   uint64_t bits = 0;
@@ -89,66 +75,36 @@ void StoreRealField(Variable* var, Arena& arena, double d) {
   auto vec = MakeLogic4VecVal(arena, width, bits);
   vec.is_real = true;
   var->value = vec;
-  // §9.4.2: an implicit event with no edge is detected on any change in the
-  // expression's value, and the clause names no writer whose change is
-  // exempt -- a scanned field is a write to a user variable, and
-  // Variable::NotifyWatchers is the only route by which a process parked on
-  // that variable resumes. Every store below owes the same.
   var->NotifyWatchers();
 }
 
-// Outcome of handling one §21.3.4.3 conversion specifier. `kStop` ends the
-// scan with no further bookkeeping; `kMatched` means a field converted (the
-// caller advances the match/arg counters unless the field was suppressed);
-// `kSkipped` means the specifier consumed input but produces no assigned field
-// (the %% literal match), so the caller only continues.
 enum class ScanFieldResult : std::uint8_t { kStop, kMatched, kSkipped };
 
-// State carried across the per-specifier handlers. `pos` is the current read
-// offset into the input; the helpers advance it in place.
 namespace {
 struct ScanCursor {
   const std::string& input;
   size_t& pos;
 };
 
-// §21.3.4.3 (c): the input one conversion reads -- the cursor into the scan
-// input and the optional maximum field width that caps how many characters the
-// conversion may consume (non-positive when the specification wrote none).
 struct ScanInputField {
   const ScanCursor& cur;
   int width;
 };
 
-// §21.3.4.3 (c) maximum-field-width clamp: the field ends at `pos+width` when a
-// positive width still leaves room inside the input, otherwise at end of input.
 size_t ScanUpperLimit(const ScanCursor& cur, int width) {
   if (width > 0 && cur.pos + static_cast<size_t>(width) < cur.input.size())
     return cur.pos + static_cast<size_t>(width);
   return cur.input.size();
 }
 
-// The destination of one conversion. Beyond the plain variable, §21.3.4.3
-// admits a string-typed destination (variable-width, holds exactly the matched
-// characters) and, for %s, an unpacked array of byte whose elements each take
-// one character. `name` backs the per-element writes of the byte-array form.
 struct ScanDest {
   Variable* var = nullptr;
   bool is_string = false;
   const ArrayInfo* byte_array = nullptr;
   std::string_view name;
-  // §21.3.4.3 with §8.5: a destination no variable of the run's tables
-  // answers -- a class property through a handle or bare in a method, an
-  // element, a field -- is scanned into a stand-in `var` holding its value,
-  // which is then assigned to this expression as `x = ...` would be.
   const Expr* assign_back = nullptr;
 };
 
-// §21.3.4.3: store a matched character run into the destination. A string
-// destination resizes to the exact run; a packed destination takes the
-// leftmost character in its most significant byte; an unpacked byte array
-// takes one character per element from its left bound, clearing elements
-// beyond the run and dropping characters beyond the array.
 void StoreScannedChars(const ScanDest& dst, const std::string& s,
                        SimContext& ctx, Arena& arena) {
   if (dst.byte_array != nullptr) {
@@ -176,8 +132,6 @@ void StoreScannedChars(const ScanDest& dst, const std::string& s,
   dst.var->NotifyWatchers();
 }
 
-// §21.3.4.3: the character conversion does not skip leading white space; it
-// copies `width` (default 1) raw characters into the destination.
 ScanFieldResult ScanCharField(ScanCursor cur, int width, const ScanDest& dst,
                               SimContext& ctx, Arena& arena) {
   int cnt = width > 0 ? width : 1;
@@ -195,8 +149,6 @@ ScanFieldResult ScanCharField(ScanCursor cur, int width, const ScanDest& dst,
   return ScanFieldResult::kMatched;
 }
 
-// §21.3.4.3: %s gathers a run of non-white-space characters (bounded by the
-// field width) into the destination.
 ScanFieldResult ScanStringField(ScanCursor cur, int width, const ScanDest& dst,
                                 SimContext& ctx, Arena& arena) {
   size_t limit = ScanUpperLimit(cur, width);
@@ -208,15 +160,9 @@ ScanFieldResult ScanStringField(ScanCursor cur, int width, const ScanDest& dst,
   return ScanFieldResult::kMatched;
 }
 
-// §21.3.4.3, Table 21-7: %t matches a floating-point number that is then
-// scaled and rounded according to the $timeformat configuration (§20.4.3):
-// the matched value is in $timeformat units, rounded to the configured number
-// of fractional digits, and expressed in the current scope's time unit.
 double ScaleScannedTime(double d, SimContext& ctx) {
   const TimeFormatSpec& tf = ctx.GetTimeFormat();
   double p = std::pow(10.0, tf.precision_number);
-  // Round half up in the decimal sense; the epsilon absorbs binary
-  // representation error so a decimal .5 boundary does not round down.
   double scaled = d * p;
   d = std::floor(scaled + 0.5 + std::fabs(scaled) * 1e-12) / p;
   const TimeScale& ts = ActiveInstanceTimeScale(ctx);
@@ -225,11 +171,6 @@ double ScaleScannedTime(double d, SimContext& ctx) {
   return d;
 }
 
-// §21.3.4.3: the real conversions (%f/%e/%g/%t) parse a floating-point token
-// with strtod and store its IEEE-754 bit pattern. Overflow saturates to +Inf
-// (or -Inf), which strtod yields directly, discharging the rule that a real
-// destination too small for the converted input receives an infinity. %t
-// additionally rescales the token under $timeformat.
 ScanFieldResult ScanRealField(const ScanInputField& field, bool is_time,
                               Variable* var, SimContext& ctx, Arena& arena) {
   const ScanCursor& cur = field.cur;
@@ -245,7 +186,6 @@ ScanFieldResult ScanRealField(const ScanInputField& field, bool is_time,
   return ScanFieldResult::kMatched;
 }
 
-// Reads a native-endian 32-bit word from the input.
 uint32_t ScanRead32(const ScanCursor& cur, size_t at) {
   uint32_t x = 0;
   for (int b = 0; b < 4; ++b)
@@ -254,26 +194,19 @@ uint32_t ScanRead32(const ScanCursor& cur, size_t at) {
   return x;
 }
 
-// Mask selecting the bits of a 32-bit chunk that fall inside `width` starting
-// at bit offset `off`.
 uint32_t ScanChunkMask(uint32_t width, uint32_t off) {
   if (off + 32 <= width) return ~uint32_t{0};
   if (off >= width) return 0;
   return (uint32_t{1} << (width - off)) - 1;
 }
 
-// §21.3.4.3, Table 21-7: %u transfers unformatted 2-value binary data --
-// enough to fill the destination -- as native-endian 32-bit chunks, the chunk
-// holding the LSB first, mirroring the layout a matching $fwrite("%u", data)
-// emits. The bytes are 2-value, so the stored value carries no x or z.
 ScanFieldResult ScanRawBinaryField(ScanCursor cur, Variable* var,
                                    Arena& arena) {
   uint32_t w = var ? var->value.width : 32;
   uint32_t nchunks = (w + 31) / 32;
   if (nchunks == 0) nchunks = 1;
   size_t need = static_cast<size_t>(nchunks) * 4;
-  if (cur.pos + need > cur.input.size())
-    return ScanFieldResult::kStop;  // too little data to fill target
+  if (cur.pos + need > cur.input.size()) return ScanFieldResult::kStop;
   auto vec = MakeLogic4VecVal(arena, w, 0);
   for (uint32_t k = 0; k < nchunks; ++k) {
     uint32_t off = k * 32;
@@ -290,18 +223,13 @@ ScanFieldResult ScanRawBinaryField(ScanCursor cur, Variable* var,
   return ScanFieldResult::kMatched;
 }
 
-// §21.3.4.3, Table 21-7: %z transfers unformatted 4-value binary data as
-// (aval, bval) 32-bit pairs in the s_vpi_vecval layout, LSB chunk first, each
-// word native-endian -- the same layout $fwrite("%z", data) emits -- so x and
-// z survive the round trip.
 ScanFieldResult ScanFourStateField(ScanCursor cur, Variable* var,
                                    Arena& arena) {
   uint32_t w = var ? var->value.width : 32;
   uint32_t nchunks = (w + 31) / 32;
   if (nchunks == 0) nchunks = 1;
   size_t need = static_cast<size_t>(nchunks) * 8;
-  if (cur.pos + need > cur.input.size())
-    return ScanFieldResult::kStop;  // too little data to fill target
+  if (cur.pos + need > cur.input.size()) return ScanFieldResult::kStop;
   auto vec = MakeLogic4VecVal(arena, w, 0);
   for (uint32_t k = 0; k < nchunks; ++k) {
     uint32_t off = k * 32;
@@ -323,17 +251,6 @@ ScanFieldResult ScanFourStateField(ScanCursor cur, Variable* var,
   return ScanFieldResult::kMatched;
 }
 
-// §21.3.4.3, Table 21-7: %v matches a net signal strength as the
-// three-character sequence of §21.2.1.4 (two strength letters and a logic
-// value, e.g. "St1" or "HiZ"). The logic value -- the third character -- is
-// converted to its 4-value equivalent and assigned; the strength letters are
-// consumed but carry no storable information for a variable.
-// Table 21-3 logic values whose 4-value equivalent is x. X is the unknown value
-// itself. L stands for a 0 or a high impedance and H for a 1 or a high
-// impedance, so each names two of the four values without saying which of
-// them holds, and x is the value an integral variable has for that.
-// Both cases are taken, as they are for the other letters of the format, though
-// FormatStrength writes these two only in upper case.
 bool IsScanStrengthUnknownValue(char c) {
   return c == 'x' || c == 'X' || c == 'l' || c == 'L' || c == 'h' || c == 'H';
 }
@@ -352,7 +269,7 @@ ScanFieldResult ScanStrengthField(ScanCursor cur, Variable* var, Arena& arena) {
   } else if (vc == 'z' || vc == 'Z') {
     b = true;
   } else if (vc != '0') {
-    return ScanFieldResult::kStop;  // not a §21.2.1.4 logic value
+    return ScanFieldResult::kStop;
   }
   cur.pos += 3;
   if (var) {
@@ -365,7 +282,6 @@ ScanFieldResult ScanStrengthField(ScanCursor cur, Variable* var, Arena& arena) {
   return ScanFieldResult::kMatched;
 }
 
-// Value of `c` as a digit of `base`, or -1 when it is not one.
 int ScanDigitValue(char c, int base) {
   if (c >= '0' && c <= '9') {
     int v = c - '0';
@@ -378,22 +294,16 @@ int ScanDigitValue(char c, int base) {
   return -1;
 }
 
-// Table 21-7 unknown / high-impedance digit characters; ? is an alternative
-// spelling of z.
 bool ScanIsXZDigit(char c) {
   return c == 'x' || c == 'X' || c == 'z' || c == 'Z' || c == '?';
 }
 
-// One matched digit of a binary/octal/hex field: its value and 4-state kind.
 struct ScanDigit {
   int val = 0;
   bool is_x = false;
   bool is_z = false;
 };
 
-// Write one scanned digit's bit group into the destination value, starting at
-// bit `base`. An x digit sets both planes and a z digit only the b plane; bits
-// beyond the destination width are dropped.
 void WriteScannedDigitBits(const ScanDigit& d, uint32_t base,
                            uint32_t bits_per_digit, Logic4Vec& vec) {
   for (uint32_t b = 0; b < bits_per_digit; ++b) {
@@ -406,9 +316,6 @@ void WriteScannedDigitBits(const ScanDigit& d, uint32_t base,
   }
 }
 
-// Packs base-2/8/16 digits (most significant first) into a 4-state value of
-// the destination's width. Digits beyond the width are dropped from the top,
-// discharging the rule that a too-small destination takes the LSBs.
 void StoreScannedDigits(Variable* var, const std::vector<ScanDigit>& digits,
                         uint32_t bits_per_digit, Arena& arena) {
   if (!var) return;
@@ -423,8 +330,6 @@ void StoreScannedDigits(Variable* var, const std::vector<ScanDigit>& digits,
   var->NotifyWatchers();
 }
 
-// Fills every bit of the destination with x or with z, the reading of a
-// decimal field that is a single value from the set x, X, z, Z, ?.
 void StoreAllXZ(Variable* var, bool is_x, Arena& arena) {
   if (!var) return;
   uint32_t w = var->value.width;
@@ -437,12 +342,6 @@ void StoreAllXZ(Variable* var, bool is_x, Arena& arena) {
   var->NotifyWatchers();
 }
 
-// §21.3.4.3, Table 21-7: a decimal field is an optionally signed digit string
-// (underscores permitted after the first digit), or a single x/z/? standing
-// for a wholly unknown or high-impedance value.
-// Read the digit string of a decimal field into `mag`, advancing `p` past it.
-// Underscores are permitted after the first digit. False when no digit was
-// read.
 bool ScanDecimalDigits(const ScanCursor& cur, size_t limit, size_t& p,
                        uint64_t& mag) {
   bool any = false;
@@ -476,8 +375,7 @@ ScanFieldResult ScanDecimalField(ScanCursor cur, int width, Variable* var,
     return ScanFieldResult::kMatched;
   }
   uint64_t mag = 0;
-  if (!ScanDecimalDigits(cur, limit, p, mag))
-    return ScanFieldResult::kStop;  // sign alone converts nothing
+  if (!ScanDecimalDigits(cur, limit, p, mag)) return ScanFieldResult::kStop;
   cur.pos = p;
   if (var) {
     uint64_t v = neg ? (0 - mag) : mag;
@@ -487,9 +385,6 @@ ScanFieldResult ScanDecimalField(ScanCursor cur, int width, Variable* var,
   return ScanFieldResult::kMatched;
 }
 
-// §21.3.4.3, Table 21-7: a binary, octal, or hexadecimal field is a sequence
-// of base digits, x, z (or ?), and underscores; each digit -- including an x
-// or z digit -- contributes its bit group to the 4-state result.
 ScanFieldResult ScanIntegerField(ScanCursor cur, int base, int width,
                                  Variable* var, Arena& arena) {
   if (base == 10) return ScanDecimalField(cur, width, var, arena);
@@ -522,10 +417,6 @@ ScanFieldResult ScanIntegerField(ScanCursor cur, int base, int width,
   return ScanFieldResult::kMatched;
 }
 
-// Result of parsing one §21.3.4.3 (c) conversion specifier starting just after
-// the '%'. `stop` requests ending the scan (the specifier ran off the end of
-// the format string). On success `code` is the conversion letter and `fi` has
-// been advanced to point at that letter.
 struct ScanSpec {
   bool stop = false;
   bool suppress = false;
@@ -533,9 +424,6 @@ struct ScanSpec {
   char code = '\0';
 };
 
-// §21.3.4.3 (c): parse the optional assignment-suppression character and the
-// optional maximum field width, then the conversion code. `fi` enters pointing
-// at the character following '%' and exits pointing at the conversion letter.
 ScanSpec ParseScanSpec(const std::string& fmt, size_t& fi) {
   ScanSpec spec;
   if (fmt[fi] == '*') {
@@ -557,27 +445,16 @@ ScanSpec ParseScanSpec(const std::string& fmt, size_t& fi) {
   return spec;
 }
 
-// Destination-argument list and binding state for one §21.3.4.3 scan. `dest`
-// holds the `ndest` unevaluated destination expressions; `ai` is the index of
-// the next destination to fill and `matched` counts assigned (non-suppressed)
-// fields as they convert.
 struct ScanArgs {
   Expr* const* dest;
   size_t ndest;
   SimContext& ctx;
-  // Where the call was written, carried from the ScanRequest for the same
-  // reason it is carried there.
   SourceLoc loc;
   size_t ai = 0;
   uint32_t matched = 0;
-  // §21.3.8: whether the scan attempted to read at or past the end of the
-  // input (reported to the caller through ScanRequest::hit_end).
   bool hit_end = false;
 };
 
-// §21.3.4.3 with §8.5: a stand-in for the destination `a`, holding the value
-// it holds so a conversion fits the field to its width, and a string where it
-// names a string property.
 ScanDest StandInScanDest(const Expr* a, ScanArgs& args) {
   ScanDest d;
   Logic4Vec held = EvalExpr(a, args.ctx, args.ctx.GetArena());
@@ -588,11 +465,6 @@ ScanDest StandInScanDest(const Expr* a, ScanArgs& args) {
   return d;
 }
 
-// §21.3.4.3: resolve the destination that the next field assigns to. All
-// members stay null when the field is suppressed, the arguments are exhausted,
-// or the destination expression is not a plain identifier. A name that does
-// not resolve to a variable may name an unpacked byte array (lowered to one
-// element variable per index), which %s may fill.
 ScanDest ResolveScanDest(ScanArgs& args, bool suppress) {
   ScanDest d;
   if (suppress || args.ai >= args.ndest) return d;
@@ -600,9 +472,6 @@ ScanDest ResolveScanDest(ScanArgs& args, bool suppress) {
   if (a == nullptr) return d;
   if (a->kind != ExprKind::kIdentifier) return StandInScanDest(a, args);
   d.name = a->text;
-  // An unpacked array is checked first: its lowering keeps per-element
-  // variables (and possibly a placeholder under the bare name), so the bare
-  // name must never be written as if it were the whole aggregate.
   const ArrayInfo* ai = args.ctx.FindArrayInfo(a->text);
   if (ai != nullptr) {
     if (!ai->is_dynamic && !ai->is_queue &&
@@ -617,8 +486,6 @@ ScanDest ResolveScanDest(ScanArgs& args, bool suppress) {
   return d;
 }
 
-// §21.3.4.3: a matched field scanned into a stand-in is assigned to the
-// destination it stands for.
 void AssignScanStandIn(const ScanDest& dst, SimContext& ctx, Arena& arena) {
   if (dst.assign_back == nullptr || dst.var == nullptr) return;
   Logic4Vec value = dst.var->value;
@@ -626,25 +493,17 @@ void AssignScanStandIn(const ScanDest& dst, SimContext& ctx, Arena& arena) {
   PerformBlockingAssign(dst.assign_back, value, ctx, arena);
 }
 
-// §21.3.4.3: the integer format specifiers (h, d, o, b, c, u, and z) shall not
-// be used with any unpacked aggregate data type.
 bool IsIntegerClassCode(char lc) {
   return lc == 'h' || lc == 'x' || lc == 'd' || lc == 'o' || lc == 'b' ||
          lc == 'c' || lc == 'u' || lc == 'z';
 }
 
-// §21.3.4.3 (a): white space in the control string skips a run of input white
-// space. §21.3.8: the skip stops only at a non-white-space character or the end
-// of the input, so running off the end touches end-of-file.
 void SkipScanInputSpace(const ScanCursor& cur, ScanArgs& args) {
   while (cur.pos < cur.input.size() && IsScanSpace(cur.input[cur.pos]))
     ++cur.pos;
   if (cur.pos >= cur.input.size()) args.hit_end = true;
 }
 
-// §21.3.4.3 (b): an ordinary character must match the next input character.
-// §21.3.8: attempting the match with the input exhausted touches end-of-file;
-// a mismatch against an available character does not. False stops the scan.
 bool MatchScanLiteralChar(const ScanCursor& cur, char fc, ScanArgs& args) {
   if (cur.pos >= cur.input.size()) {
     args.hit_end = true;
@@ -655,10 +514,6 @@ bool MatchScanLiteralChar(const ScanCursor& cur, char fc, ScanArgs& args) {
   return true;
 }
 
-// §21.3.4.3: dispatch a single conversion (other than the %% literal, which the
-// caller handles) to the matching field handler. Leading white space is skipped
-// for every code except %c and %m (which reads no input at all). Returns kStop
-// on an unsupported conversion code.
 ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
                                   const ScanDest& dst, const ScanArgs& args,
                                   Arena& arena) {
@@ -666,18 +521,14 @@ ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
   const ScanCursor& cur = field.cur;
   int width = field.width;
   if (lc == 'c') {
-    // §21.3.4.3: the character conversion does not skip leading white space.
     return ScanCharField(cur, width, dst, ctx, arena);
   }
   if (lc == 'm') {
-    // §21.3.4.3, Table 21-7: %m assigns the current hierarchical path
-    // (§21.2.1.5) as a string and reads nothing from the input.
     StoreScannedChars(dst,
                       FormatDisplay("%m", {}, {.ctx = &ctx, .loc = args.loc}),
                       ctx, arena);
     return ScanFieldResult::kMatched;
   }
-  // §21.3.4.3: every remaining conversion ignores leading white space.
   while (cur.pos < cur.input.size() && IsScanSpace(cur.input[cur.pos]))
     ++cur.pos;
 
@@ -688,20 +539,10 @@ ScanFieldResult DispatchScanField(char lc, const ScanInputField& field,
   if (lc == 'z') return ScanFourStateField(cur, dst.var, arena);
   if (lc == 'v') return ScanStrengthField(cur, dst.var, arena);
   int base = SpecToBase(lc);
-  if (base == 0) return ScanFieldResult::kStop;  // unsupported conversion code
+  if (base == 0) return ScanFieldResult::kStop;
   return ScanIntegerField(cur, base, width, dst.var, arena);
 }
 
-// §21.3.4.3 (c): handle one conversion specifier beginning at the '%' that `fi`
-// currently points at. Advances `fi` past the specifier, mutates the cursor and
-// `args` binding state, and returns false when the scan must stop (malformed
-// specifier, %% mismatch, or a field that failed to convert).
-
-// §21.3.4.3 (printed page 671): the integer format specifiers, %u and %z among
-// them, shall not read into any unpacked aggregate -- an unpacked array of any
-// kind or an unpacked struct or union; only %s may fill an unpacked array of
-// byte. True rejects the misuse, after reporting it, so the scan ends without
-// assigning.
 bool RejectAggregateScanDest(char lc, const ScanSpec& spec, ScanArgs& args) {
   if (!IsIntegerClassCode(lc) || spec.suppress || args.ai >= args.ndest)
     return false;
@@ -716,20 +557,11 @@ bool RejectAggregateScanDest(char lc, const ScanSpec& spec, ScanArgs& args) {
   return true;
 }
 
-// What one conversion did to the input: where it started reading, and whether
-// it matched, stopped, or was suppressed.
 struct ScanOutcome {
   size_t start_pos;
   ScanFieldResult result;
 };
 
-// §21.3.8: note when this conversion ran against the end of the input. The
-// delimiter-terminated conversions must look one character past their field, so
-// ending at (or failing for lack of input at) the last byte touches
-// end-of-file. The exact-count reads never look past what they take: %c touches
-// the end only when it delivers fewer characters than requested, %u/%z only
-// when too little data remained to fill the target, and %m reads nothing at
-// all.
 void NoteScanEndOfInput(char lc, const ScanSpec& spec,
                         const ScanInputField& field, const ScanOutcome& done,
                         ScanArgs& args) {
@@ -777,15 +609,6 @@ bool HandleScanSpecifier(const std::string& fmt, size_t& fi,
 }
 }  // namespace
 
-// §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
-// `input`, assigning converted fields to the destination arguments; returns the
-// count of assigned items and reports the consumed input length.
-// §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
-// `input`, assigning converted fields to the destination arguments; returns the
-// count of assigned items and reports the consumed input length.
-// §21.3.4.3 scan engine shared in spirit with $fscanf. Interprets `fmt` against
-// `input`, assigning converted fields to the destination arguments; returns the
-// count of assigned items and reports the consumed input length.
 uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   const std::string& input = req.input;
   const std::string& fmt = req.fmt;
@@ -796,20 +619,16 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   for (size_t fi = 0; fi < fmt.size(); ++fi) {
     char fc = fmt[fi];
 
-    // §21.3.4.3 (a): white space in the control string skips a run of input
-    // white space.
     if (IsScanSpace(fc)) {
       SkipScanInputSpace(cur, args);
       continue;
     }
 
-    // §21.3.4.3 (b): an ordinary character must match the next input character.
     if (fc != '%') {
       if (!MatchScanLiteralChar(cur, fc, args)) break;
       continue;
     }
 
-    // §21.3.4.3 (c): a conversion specifier; stop the scan if it fails.
     if (!HandleScanSpecifier(fmt, fi, cur, args, arena)) break;
   }
 
@@ -818,16 +637,6 @@ uint32_t RunScanf(const ScanRequest& req, SimContext& ctx, Arena& arena) {
   return args.matched;
 }
 
-// §21.3.4.3: decode the str argument of $sscanf into the text to scan. The
-// argument may be a string literal, a string or integral expression (decoded
-// from its packed bytes, most significant first, dropping the all-zero high
-// padding), or an unpacked array of byte read from its left bound. Null
-// characters inside the text shall be considered white space for $sscanf, so
-// each surviving NUL becomes a blank rather than vanishing (which would fuse
-// the tokens on either side of it).
-// An unpacked array of byte, read from its left bound. False when `name` does
-// not denote one. A NUL element becomes a blank, since a null character is
-// white space for $sscanf.
 static bool ReadByteArrayText(std::string_view name, SimContext& ctx,
                               std::string& out) {
   const ArrayInfo* ai = ctx.FindArrayInfo(name);
@@ -845,9 +654,6 @@ static bool ReadByteArrayText(std::string_view name, SimContext& ctx,
   return true;
 }
 
-// The packed bytes of a value, most significant first, with the all-zero high
-// padding dropped. Each surviving NUL becomes a blank rather than vanishing,
-// which would fuse the tokens on either side of it.
 static std::string PackedBytesToScanText(const Logic4Vec& val) {
   uint32_t nbytes = val.width / 8;
   std::string result;
@@ -858,7 +664,7 @@ static std::string PackedBytesToScanText(const Logic4Vec& val) {
     uint32_t bit = (byte_idx * 8) % 64;
     if (word >= val.nwords) continue;
     auto ch = static_cast<char>((val.words[word].aval >> bit) & 0xFF);
-    if (!started && ch == 0) continue;  // leading NUL padding, not content
+    if (!started && ch == 0) continue;
     started = true;
     result += ch != 0 ? ch : ' ';
   }
@@ -878,16 +684,12 @@ static std::string DecodeSscanfInput(const Expr* arg, SimContext& ctx,
 Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
 
-  // §21.3.4.3: when the str argument or the format string carries an unknown
-  // bit (x or z), $sscanf reports EOF (-1).
   if (ScanArgHasUnknownBits(expr->args[0], ctx, arena) ||
       ScanArgHasUnknownBits(expr->args[1], ctx, arena)) {
     return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   }
 
   std::string input = DecodeSscanfInput(expr->args[0], ctx, arena);
-  // §21.3.4.3: the format can be an expression -- a string literal, a string
-  // data type, or an integral data type whose content is the control string.
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
 
   size_t consumed = 0;
@@ -899,8 +701,6 @@ Logic4Vec EvalSscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
                   expr->range.start};
   uint32_t matched = RunScanf(req, ctx, arena);
 
-  // §21.3.4.3: zero signals a matching failure against present input, while EOF
-  // (-1) is returned when the input is exhausted before any field converts.
   if (matched == 0) {
     size_t p = consumed;
     while (p < input.size() && IsScanSpace(input[p])) ++p;

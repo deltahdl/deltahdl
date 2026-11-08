@@ -1,14 +1,5 @@
 #pragma once
 
-// §13.3 with §23.6: a subroutine enabled by hierarchical name into another
-// module instance, `u1.tk(3)` with `sub u1();`, runs in that instance. §13.3.2
-// keeps the static storage of a static task in one instance apart from the
-// same task's in another, so the body's static frame, the bare names it reads
-// and §21.2.1.5's %m all resolve in the instance the declaration belongs to,
-// not in the instance that wrote the enable; and a task may suspend on a
-// timing control while it runs there (§13.3), so the instance is carried by
-// the enabling process rather than by the context every process shares.
-
 #include <string>
 #include <string_view>
 
@@ -22,88 +13,28 @@ struct ModuleItem;
 struct Stmt;
 struct Variable;
 
-// The declaration a call names and the instance its body runs in.
-// `inst_prefix` ends in a `.` and is empty for the top of the design, as
-// Process::inst_prefix is; it is the calling instance's for a bare name.
-// `gen_block` is the generate block instance's scope for a subroutine one
-// declares, reached by the instance's hierarchical name, `blk[1].triple`
-// (§27.4 with §23.6), and null for every other target, a bare call from
-// inside the block among them, which runs where the caller stands.
 struct SubroutineTarget {
   ModuleItem* func = nullptr;
   std::string inst_prefix;
   const GenBlockSubroutineScope* gen_block = nullptr;
 };
 
-// §26.3: whether `call` names a subroutine through the package scope
-// resolution operator, `pk::f(x)`, which parses as a call with no callee text
-// and the scoped name as its base. Defined in eval_function_hier.cpp.
 bool IsPackageScopedCall(const Expr* call);
 
-// §23.6: the key a dotted path of identifiers is read by, each instance select
-// in it evaluated where the path is read, so `g[k].v` while k holds 1 is read
-// as "g[1].v", as is `g[1 - i].v` in the instance of a loop generate block
-// whose implicit localparam i is 0 (§27.4). Empty for any other shape, and for
-// a select holding an x or z bit, which selects no instance. Defined in
-// eval_function_hier.cpp.
 std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
                                       Arena& arena);
 
-// The module subroutine `call` names: a bare identifier or a call with a
-// bare callee, one through the package scope resolution operator (§26.3), or
-// a call whose callee is a dotted path of identifiers, `u1.tk` or `x.u1.tk`,
-// resolved relative to the calling instance ahead of the top of the design
-// (§23.6 lets the first node be the top of the hierarchy the path is used
-// from), or headed by a top-level module's name, `m.t1` from the parallel
-// top n (§23.6's complete path), a name in the path followed by an instance
-// select, `blk[1].triple` into a loop generate block's instance or `u[2].tk`
-// into an instance array's (§23.6). `func` is null where no registered
-// declaration answers.
 SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
                                       Arena& arena);
 
-// §25.7.4: the fork-join a call of an interface's extern forkjoin task runs:
-// an enable of each definition the modules connected to the instance export,
-// by the defining instance's path, all at once, the call returning when every
-// one has; with no definition, an empty fork, the call having been reported
-// as the run-time error the clause makes it. Null for a call of any other
-// subroutine, which runs as before. Built once for a call with definitions.
-// Defined in eval_function_hier.cpp.
 const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx, Arena& arena);
 
-// Puts the running process in the instance `target` names, and in the
-// generate block instance where the target has one, keeping what it stood
-// in, and LeaveCalleeInstance puts that back. Every enter is matched by one
-// leave, in reverse, so the two nest with the calls. Neither does anything
-// while no process runs, which is where a declaration initializer is
-// evaluated and where a unit test sets a call up by hand.
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target);
 void LeaveCalleeInstance(SimContext& ctx);
 
-// §13.4.2 with §8.10: enters `owner` as the one the static frames of the
-// method about to run are kept under -- the package or compilation unit
-// declaring its class (ClassTypeInfo::package), whose one declaration every
-// calling instance shares, and empty for a module's class, whose frames are
-// the calling instance's -- and LeaveStaticFrameOwner leaves it. They nest
-// with EnterCalleeInstance and LeaveCalleeInstance, which enter a package's
-// or unit's subroutine's owner on the same stack (Process::frame_owners).
 void EnterStaticFrameOwner(SimContext& ctx, std::string_view owner);
 void LeaveStaticFrameOwner(SimContext& ctx);
 
-// §6.21 with §13.4.2: a variable a subroutine body declares static has one
-// copy for that subroutine, kept between calls, and §8.25 (printed page 204 of
-// IEEE 1800-2023) makes each specialization of a parameterized class a type of
-// its own -- consistent, the clause says, with C++ templated classes, whose
-// function-local statics are per instantiation. A method's static locals are
-// therefore the declaring level's own: the level of the running method's
-// class, a specialization included, whose methods hold `func`, its frame
-// named "Class::method" and kept under the level's package or unit
-// (ClassTypeInfo::package, empty for a module's class). Keyed by the bare
-// name, every class's `get()` declaring `static this_type m_inst` --
-// uvm_object_registry#(T,Tname)::get and uvm_registry_common::get among them
-// -- shared one variable, and the first registry asked answered for every
-// other, and so did two classes' tasks of one name. A subroutine no running
-// class declares keeps its name and has no owner.
 struct BodyStaticFrame {
   std::string_view name;
   std::string_view owner;
@@ -112,8 +43,6 @@ struct BodyStaticFrame {
 BodyStaticFrame StaticFrameOfBody(const ModuleItem* func, SimContext& ctx,
                                   Arena& arena);
 
-// The frame StaticFrameOfBody gives a function's body, its owner entered for
-// as long as the scope lasts (EnterStaticFrameOwner).
 class StaticLocalFrameScope {
  public:
   StaticLocalFrameScope(const ModuleItem* func, SimContext& ctx, Arena& arena);
@@ -128,25 +57,11 @@ class StaticLocalFrameScope {
   bool entered_ = false;
 };
 
-// §27.4: declares the implicit localparam of each loop generate block the
-// target's block instance is in as a local of the innermost scope, the
-// subroutine's own frame, at the value the loop index had for the instance,
-// so the body reads `g` as the block's own processes do; nothing for a
-// target of no generate block. Called after the frame is pushed.
 void BindGenBlockConsts(const SubroutineTarget& target, SimContext& ctx,
                         Arena& arena);
 
-// The instance the running process stood in before the innermost
-// EnterCalleeInstance, and the instance an evaluation stands in where none is
-// in force: the one a call's actuals are read in (§13.5) and its output
-// arguments written back to (§13.5.2), with the process itself standing in
-// the callee's for the static frame key (§13.3.2).
 std::string CallerInstancePrefix(SimContext& ctx);
 
-// The three steps of a call that stand in one instance while the process
-// stands in the other, each scoped over a step that never suspends: the
-// actuals bound (§13.5) and the output arguments written back (§13.5.2) in
-// the caller's instance, and a function's body run in the callee's (§13.4).
 void BindActualsInCaller(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena);
 void WritebackInCaller(const ModuleItem* func, const Expr* expr,
@@ -154,13 +69,6 @@ void WritebackInCaller(const ModuleItem* func, const Expr* expr,
 void ExecFunctionBodyInCallee(const SubroutineTarget& target, const Expr* call,
                               Variable* ret_var, SimContext& ctx, Arena& arena);
 
-// §23.7 (printed pages 757-758): a dotted name whose first component names a
-// function, `f.x` or `p::f.x`, is the static variable `x` of that function.
-// `member` is the member access, its left side the function as a call would
-// name it (FindSubroutineTarget) and its right the variable. Answers the
-// variable the function's calls read, creating it in the function's static
-// frame from its declaration where no call has yet, or null where the left
-// side names no function or the function declares no static `x`.
 Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
                               Arena& arena);
 

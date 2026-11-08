@@ -36,8 +36,6 @@ TEST(ExtendsVsImplementsParsing, ImplementsMultipleInterfaces) {
   EXPECT_EQ(cls->implements_types[2].name, "IFace3");
 }
 
-// A.2.2.1 with §26.3: an interface class implemented or extended through a
-// package scope keeps the package beside its name, and a bare one keeps none.
 TEST(ExtendsVsImplementsParsing, ScopedInterfaceClassesKeepTheirPackage) {
   auto r = Parse(
       "class C implements p::I, J;\n"

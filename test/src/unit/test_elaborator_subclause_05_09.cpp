@@ -45,10 +45,6 @@ TEST(LexicalConventionElaboration, EmptyStringElaborates) {
              "endmodule\n"));
 }
 
-// §5.9: a string literal used as an operand is an unsigned integral constant of
-// one 8-bit value per character or escape, so "a\0" is 16 bits, 'h6100. Only a
-// string variable drops \0 (§6.16). The parameter fold dropped it, giving P
-// 'h0061 and Q 8 bits.
 TEST(LexicalConventionElaboration,
      StringLiteralFoldedAsAnIntegerKeepsZeroBytes) {
   SimFixture f;

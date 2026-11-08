@@ -26,8 +26,6 @@ const ModuleDecl* FindInterface(std::string_view name,
   return nullptr;
 }
 
-// The names `e` reads without a hierarchical path: every identifier but the
-// member a `.` or `::` selects.
 void CollectFreeNames(const Expr* e,
                       std::unordered_set<std::string_view>& out) {
   if (e == nullptr) return;
@@ -48,8 +46,6 @@ void CollectFreeNames(const Expr* e,
   for (const Expr* el : e->elements) CollectFreeNames(el, out);
 }
 
-// The member of instance `inst` that stands for each of `names`, for a
-// substitution to put in their places.
 ActualsByFormal InstanceMembers(
     const std::unordered_set<std::string_view>& names, std::string_view inst,
     SourceLoc loc, Arena& arena) {
@@ -60,8 +56,6 @@ ActualsByFormal InstanceMembers(
   return members;
 }
 
-// A copy of the property tree under `node` whose nodes and sequences are the
-// copy's own, so that its expressions can be replaced.
 PropertyExprNode* CopyTree(const PropertyExprNode* node, Arena& arena) {
   auto* copy = arena.Create<PropertyExprNode>(*node);
   if (node->sequence != nullptr) {
@@ -73,9 +67,6 @@ PropertyExprNode* CopyTree(const PropertyExprNode* node, Arena& arena) {
   return copy;
 }
 
-// §16.12 with §23.6: the tree of `decl`'s body as instance `inst` of its
-// interface sees it, each name it reads that is neither a formal nor a
-// local made the member of `inst` that the path reaches.
 PropertyExprNode* InstanceTree(const ModuleItem* decl, std::string_view inst,
                                Arena& arena) {
   PropertyExprNode* tree = CopyTree(decl->prop_body_tree, arena);
@@ -93,9 +84,6 @@ PropertyExprNode* InstanceTree(const ModuleItem* decl, std::string_view inst,
   return tree;
 }
 
-// `decl` as instance `inst` of its interface sees it: named "inst.name",
-// with each name its body reads, a formal aside, made the member of `inst`
-// that §23.6 reaches by the path.
 ModuleItem* InstanceCopy(const ModuleItem* decl, std::string_view inst,
                          Arena& arena) {
   std::unordered_set<std::string_view> names;
@@ -114,9 +102,6 @@ ModuleItem* InstanceCopy(const ModuleItem* decl, std::string_view inst,
       SubstituteFormals(decl->prop_body_expr, members, arena);
   copy->prop_disable_iff =
       SubstituteFormals(decl->prop_disable_iff, members, arena);
-  // A body the parser reads as the clocked boolean form is evaluated as the
-  // boolean alone; one it reads as a tree alone, a temporal one, is the tree
-  // with the instance's names in it.
   copy->prop_body_tree = decl->prop_body_expr != nullptr
                              ? nullptr
                              : InstanceTree(decl, inst, arena);
@@ -127,9 +112,6 @@ ModuleItem* InstanceCopy(const ModuleItem* decl, std::string_view inst,
   return copy;
 }
 
-// §16.8 with §23.6: `decl`, a sequence of the interface, as instance `inst`
-// sees it: named "inst.name", with each name its body and its clock read, a
-// formal or a local aside, made the member of `inst` the path reaches.
 ModuleItem* InstanceSequence(const ModuleItem* decl, std::string_view inst,
                              Arena& arena) {
   auto* copy = arena.Create<ModuleItem>(*decl);
@@ -155,10 +137,6 @@ ModuleItem* InstanceSequence(const ModuleItem* decl, std::string_view inst,
   return copy;
 }
 
-// The properties of the interface `ifc` as its instance `inst` sees them, each
-// registered, and each whose body is a tree also appended to
-// `run.properties`; and its sequences likewise, each registered and appended
-// to `run.sequences`.
 void RegisterInstanceCopies(const ModuleDecl* ifc, std::string_view inst,
                             PropertyRegistry& registry, Arena& arena,
                             RunDeclarations run) {

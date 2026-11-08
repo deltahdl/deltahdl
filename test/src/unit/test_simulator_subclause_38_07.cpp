@@ -11,9 +11,6 @@
 namespace delta {
 namespace {
 
-// §38.7: vpi_get64() reads the value of a 64-bit integer object property (one
-// whose type is PLI_INT64). Querying a protected object is an error, and on any
-// error the routine returns vpiUndefined.
 class VpiGet64Sim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -22,25 +19,17 @@ class VpiGet64Sim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.7: a 64-bit integer property is returned at full PLI_INT64 width. A class
-// object's identifier (§37.33) is genuinely 64-bit; an identifier larger than
-// what fits in PLI_INT32 comes back intact, whereas vpi_get() must narrow the
-// same value and so reports something different.
 TEST_F(VpiGet64Sim, ReturnsSixtyFourBitPropertyAtFullWidth) {
   VpiObject class_obj;
   class_obj.type = vpiClassObj;
-  class_obj.obj_id = static_cast<int64_t>(0x1'0000'0002);  // > INT32_MAX
+  class_obj.obj_id = static_cast<int64_t>(0x1'0000'0002);
 
   EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&class_obj)),
             static_cast<PLI_INT64>(0x1'0000'0002));
-  // The 32-bit reader cannot carry the full value, so the 64-bit path is what
-  // preserves it.
   EXPECT_NE(static_cast<PLI_INT64>(vpi_get(vpiObjId, VpiHandleOf(&class_obj))),
             vpi_get64(vpiObjId, VpiHandleOf(&class_obj)));
 }
 
-// §38.7: querying a protected object is an error, and on an error vpi_get64()
-// returns vpiUndefined.
 TEST_F(VpiGet64Sim, ProtectedObjectQueryReturnsVpiUndefined) {
   VpiObject locked;
   locked.type = vpiClassObj;
@@ -49,18 +38,11 @@ TEST_F(VpiGet64Sim, ProtectedObjectQueryReturnsVpiUndefined) {
 
   EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&locked)), vpiUndefined);
 
-  // The refused query is recorded as an error.
   s_vpi_error_info info = {};
   EXPECT_NE(vpi_chk_error(&info), 0);
   EXPECT_NE(info.level, 0);
 }
 
-// §38.7: vpi_get64() on a protected object is an error unless a rule says
-// otherwise. The exceptions are the ones §37.3.6 and §37.59 specify for reading
-// a protected object at all - vpiType and vpiIsProtected, permitted for every
-// object, and vpiSize on a protected expression - so the 64-bit reader lets
-// those through as the 32-bit one does rather than refusing every property
-// alike.
 TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   VpiObject locked;
   locked.type = vpiClassObj;
@@ -69,7 +51,6 @@ TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   EXPECT_EQ(vpi_get64(vpiType, VpiHandleOf(&locked)), vpiClassObj);
   EXPECT_EQ(vpi_get64(vpiIsProtected, VpiHandleOf(&locked)), 1);
 
-  // §37.59 detail 8: a protected expression still reports its size.
   VpiObject locked_expr;
   locked_expr.type = vpiOperation;
   locked_expr.is_protected = true;
@@ -78,17 +59,11 @@ TEST_F(VpiGet64Sim, TheProtectedRuleKeepsTheExceptionsSpecifiedElsewhere) {
   EXPECT_EQ(vpi_get64(vpiSize, VpiHandleOf(&locked_expr)), 16);
 }
 
-// §38.6: asked for vpiTimeUnit or vpiTimePrecision with a NULL object, the
-// routine answers with the simulation time unit, and §38.9 answers a null
-// handle asked for the save/restart id with the run's. Those say something
-// about the run rather than about an object, so the width of the reader asking
-// does not change them - vpi_get64() answered 0 for both where vpi_get()
-// answered the run's.
 TEST_F(VpiGet64Sim, ANullHandleReadsTheSameRunWideAnswersVpiGetReads) {
   VpiHandle module = vpi_ctx_.CreateModule("t", "t");
   module->time_precision = -9;
 
-  ASSERT_EQ(vpi_get(vpiTimePrecision, nullptr), -9);  // the run's, not zero
+  ASSERT_EQ(vpi_get(vpiTimePrecision, nullptr), -9);
   EXPECT_EQ(vpi_get64(vpiTimePrecision, nullptr), -9);
   EXPECT_EQ(vpi_get64(vpiTimeUnit, nullptr), vpi_get(vpiTimeUnit, nullptr));
 
@@ -96,12 +71,9 @@ TEST_F(VpiGet64Sim, ANullHandleReadsTheSameRunWideAnswersVpiGetReads) {
   EXPECT_EQ(vpi_get64(vpiSaveRestartID, nullptr),
             vpi_get(vpiSaveRestartID, nullptr));
 
-  // A property a null handle says nothing about is undefined for it (§38.6).
   EXPECT_EQ(vpi_get64(vpiObjId, nullptr), vpiUndefined);
 }
 
-// §37.59 detail 8 lets vpiSize through only for a protected expression, so a
-// protected object of any other kind refuses it like every other property.
 TEST_F(VpiGet64Sim, AProtectedNonExpressionRefusesItsSize) {
   VpiObject locked;
   locked.type = vpiClassObj;

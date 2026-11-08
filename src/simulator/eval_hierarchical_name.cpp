@@ -1,10 +1,3 @@
-// §23.6: the flattened name a hierarchical reference is read by. A dotted
-// name, `s.y` or `$root.t.s.y`, is spelled out from its parts, and the
-// `$root.<top>.` a rooted one starts with is dropped, since the run keys what
-// the top declares by its bare name and what an instance declares by its path
-// below the top. Split out of eval_expr.cpp, which EvalMemberAccess still
-// reads the name through, when that file reached the 950-line limit.
-
 #include <string>
 #include <string_view>
 #include <utility>
@@ -28,8 +21,6 @@ static void BuildMemberName(const Expr* expr, std::string& out) {
     out += expr->text;
     return;
   }
-  // §23.6: an element of an array of instances, `arr[1]`, is named by the
-  // instance name and its index, as the elaborator names the element.
   if (expr->kind == ExprKind::kSelect && expr->base != nullptr &&
       expr->index != nullptr && expr->index_end == nullptr &&
       expr->index->kind == ExprKind::kIntegerLiteral) {
@@ -62,14 +53,6 @@ std::string HierarchicalReferenceName(const Expr* expr) {
   return StripRootPrefix(name);
 }
 
-// §23.3.1 (printed page 740): $root stands at the root of the instance tree,
-// and it tells a rooted path apart from a local one, which otherwise wins, so
-// a name headed by it is read from there and never from
-// the instance that runs it: in instance A, `B.v` is A's own B while
-// `$root.A_top.B.v` is the B beside A. The name is kept whole, top included,
-// for FindVariable and FindNet to answer from the top of the design alone
-// (SimContext::RootedStorageKey), a later top's declarations being keyed under
-// its name. Empty for a name $root does not head.
 std::string RootedReferenceKey(const std::string& name) {
   constexpr std::string_view kPrefix = "$root.";
   if (!std::string_view(name).starts_with(kPrefix)) return {};
@@ -93,8 +76,6 @@ Net* FindHierarchicalNet(const Expr* expr, SimContext& ctx) {
 }
 
 std::string_view ArrayRootKey(const Expr* base, Arena& arena) {
-  // A name $root heads keeps the head, for the array and its elements to be
-  // read from the top of the design (SimContext::FindArrayInfo).
   if (base != nullptr &&
       (base->kind == ExprKind::kIdentifier ||
        (base->kind == ExprKind::kMemberAccess && !base->is_scope_resolution))) {

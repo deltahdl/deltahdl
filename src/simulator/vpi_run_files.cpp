@@ -13,8 +13,6 @@ namespace delta {
 
 namespace {
 
-// The file open on the one channel `channel` of the run's table, null for
-// none.
 FILE* ChannelFile(SimContext& run, PLI_UINT32 channel) {
   return run.FileTables().mcd_channels[std::countr_zero(channel)];
 }
@@ -22,9 +20,6 @@ FILE* ChannelFile(SimContext& run, PLI_UINT32 channel) {
 }  // namespace
 
 PLI_UINT32 VpiRunMcdOpen(SimContext& run, const std::string& name) {
-  // §38.27: a file already open on a channel, through vpi_mcd_open() or the
-  // design's $fopen, is handed back on that channel; one opened as an fd is
-  // no multichannel descriptor and is opened on a channel of its own.
   for (const auto& [descriptor, opened] : run.FileTables().names) {
     if ((descriptor & SimContext::kFdMsb) == 0 && opened == name) {
       return descriptor;
@@ -35,7 +30,6 @@ PLI_UINT32 VpiRunMcdOpen(SimContext& run, const std::string& name) {
 
 PLI_UINT32 VpiRunMcdClose(SimContext& run, PLI_UINT32 mcd) {
   if ((mcd & SimContext::kFdMsb) != 0) {
-    // §38.24 with §21.3.1: the standard streams are not closed.
     const bool kOpen =
         mcd != SimContext::kStdinFd && mcd != SimContext::kStdoutFd &&
         mcd != SimContext::kStderrFd && run.GetFileHandle(mcd) != nullptr;
@@ -43,8 +37,6 @@ PLI_UINT32 VpiRunMcdClose(SimContext& run, PLI_UINT32 mcd) {
     run.CloseFile(mcd);
     return 0;
   }
-  // §38.24: channel 1 is the tool's own and is not closed, and a channel
-  // with no file open has nothing to close; both are reported back.
   PLI_UINT32 unclosed = mcd & 1u;
   for (int bit = 1; bit < 31; ++bit) {
     const PLI_UINT32 kChannel = PLI_UINT32{1} << bit;

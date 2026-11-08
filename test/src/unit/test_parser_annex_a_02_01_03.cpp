@@ -42,8 +42,6 @@ TEST(TypeDeclParsing, DataDeclVarPrefix) {
 }
 
 TEST(TypeDeclParsing, DataDeclConstVarPrefix) {
-  // data_declaration admits [const] and [var] together; the type that follows
-  // `var` is threaded through the const-var branch and the const flag survives.
   auto r = Parse("module m; const var logic x = 1'b1; endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -207,7 +205,6 @@ TEST(TypeDeclParsing, NetDeclInterconnectWithDelay) {
   EXPECT_TRUE(item->data_type.is_interconnect);
 }
 
-// A.2.1.3 gives an interconnect declaration a second net after a comma.
 TEST(TypeDeclParsing, NetDeclInterconnectMultipleNetIdentifiers) {
   auto r = Parse("module m; interconnect a, b; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -301,11 +298,6 @@ TEST(TypeDeclParsing, TypedefStructType) {
   EXPECT_EQ(item->name, "pair_t");
 }
 
-// The five ForwardType* cases below cover the alternatives of the
-// forward_type nonterminal in the A.2.1.3 type_declaration production
-// (forward_type ::= enum | struct | union | class | interface class).
-// test_parser_subclause_06_18.cpp carries the matching prose cases for the
-// forward typedef forms listed in 6.18.
 TEST(TypeDeclParsing, ForwardTypeEnum) {
   auto r = Parse("module m; typedef enum color_t; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -476,30 +468,24 @@ TEST(TypeDeclParsing, NetDeclInterconnectWithPackedDim) {
 
 TEST(TypeDeclParsing, ErrorTypedefMissingSemicolon) {
   auto r = Parse("module m; typedef int my_t endmodule");
-  // §6.18 owns type_declaration, so its terminator is demanded there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.18"));
 }
 
 TEST(TypeDeclParsing, ErrorImportMissingSemicolon) {
   auto r = Parse("module m; import pkg::foo endmodule");
-  // §26.3 owns package_import_declaration, so its terminator is demanded
-  // there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "26.3"));
 }
 
 TEST(TypeDeclParsing, ErrorGenvarMissingSemicolon) {
   auto r = Parse("module m; genvar i endmodule");
-  // §27.4 owns genvar_declaration, so its terminator is demanded there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "27.4"));
 }
 
 TEST(TypeDeclParsing, ErrorNetDeclMissingSemicolon) {
   auto r = Parse("module m; wire w endmodule");
-  // §6.7 states the net declaration, so the declarator list a net type heads
-  // takes its terminator's report from there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.7"));
 }
@@ -508,22 +494,17 @@ TEST(TypeDeclParsing, ErrorExportMissingSemicolon) {
   auto r = Parse(
       "package pkg; endpackage\n"
       "package q; export pkg::* endpackage");
-  // §26.6 owns package_export_declaration, so its terminator is demanded
-  // there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endpackage'", 2, "26.6"));
 }
 
 TEST(TypeDeclParsing, ErrorNettypeMissingSemicolon) {
   auto r = Parse("module m; nettype real foo endmodule");
-  // §6.6.7 owns nettype_declaration, so its terminator is demanded there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.6.7"));
 }
 
 TEST(TypeDeclParsing, ErrorNettypeWithoutDataType) {
-  // nettype_declaration alt-1 makes the data_type mandatory; a lone
-  // `nettype name;` with no data type must be rejected.
   auto r = Parse("module m; nettype foo; endmodule");
   EXPECT_TRUE(ReportedError(
       r.diags, "nettype declaration requires an explicit data type", 1,
@@ -572,7 +553,6 @@ TEST(TypeDeclParsing, ErrorImportInsideClassScope) {
 
 TEST(TypeDeclParsing, ErrorChargeStrengthOnNonTriregNet) {
   auto r = Parse("module m; wire (small) bus; endmodule");
-  // §6.3.2.1 states the charge strength rule, so the report is filed there.
   EXPECT_TRUE(ReportedError(r.diags,
                             "charge strength can only be used with trireg nets",
                             1, "6.3.2.1"));
@@ -607,11 +587,6 @@ TEST(TypeDeclParsing, ForwardTypedefWithoutKeyword) {
   EXPECT_EQ(item->name, "incomplete_t");
 }
 
-// A.2.1.3 opens a data_declaration with `const`, then `var`, then a lifetime,
-// each optional, and §6.8's Syntax 6-3 repeats the order. Outside a class,
-// whose class_property puts qualifiers of its own in front, a qualifier
-// written after one that follows it in that order, or written twice, is
-// reported where it stands (#7589).
 TEST(TypeDeclParsing, DataDeclQualifiersOutOfOrderAreErrors) {
   auto r = Parse(
       "module m;\n"
@@ -631,9 +606,6 @@ TEST(TypeDeclParsing, DataDeclQualifiersOutOfOrderAreErrors) {
   }
 }
 
-// Written in A.2.1.3's order, the qualifiers parse at module level and in a
-// block alike, a lifetime after `const` or `var` included, and a class
-// property keeps its leading `static` (#7589).
 TEST(TypeDeclParsing, DataDeclQualifiersInOrderParse) {
   auto r = Parse(
       "module m;\n"
@@ -653,9 +625,6 @@ TEST(TypeDeclParsing, DataDeclQualifiersInOrderParse) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.2.1.3 and §6.7's Syntax 6-2 give an interconnect declaration one net and
-// at most one more, so each net after the second is reported where it stands,
-// and the declaration is still read (#7590).
 TEST(TypeDeclParsing, InterconnectDeclThirdNetIsError) {
   auto r = Parse(
       "module m;\n"
@@ -672,13 +641,6 @@ TEST(TypeDeclParsing, InterconnectDeclThirdNetIsError) {
   EXPECT_EQ(r.cu->modules[0]->items.size(), 6u);
 }
 
-// A.2.1.3 writes a nettype's resolution function after an optional
-// package_scope or class_scope, and A.2.2.1 makes a class_scope a class_type:
-// a class name with an optional parameter_value_assignment, itself named
-// through a package or $unit, followed by the names of the classes nested in
-// it. The scope is kept as the class_type or package it names, its last name
-// the one declaring the function, and a specialization's parameter values are
-// kept with it (#7592).
 TEST(TypeDeclParsing, NettypeWithClauseReadsAClassScopeChain) {
   auto r = Parse(
       "module m;\n"
@@ -715,9 +677,6 @@ TEST(TypeDeclParsing, NettypeWithClauseReadsAClassScopeChain) {
   EXPECT_EQ(n4.type_params.size(), 2u);
 }
 
-// A.2.2.1's package_scope is a package name or `$unit`, each followed by `::`,
-// so `with $unit::f` names the compilation unit's function f, and a with clause
-// writing no scope keeps none.
 TEST(TypeDeclParsing, NettypeWithClauseReadsAUnitOrPackageScope) {
   auto r = Parse(
       "module m;\n"
@@ -740,9 +699,6 @@ TEST(TypeDeclParsing, NettypeWithClauseReadsAUnitOrPackageScope) {
   EXPECT_EQ(items[2]->nettype_resolve_func, "fn");
 }
 
-// `$unit` opens a package_scope and is never the function itself, so a with
-// clause ending at `$unit`, or at `$unit::`, is missing the function's name,
-// as one naming nothing at all is.
 TEST(TypeDeclParsing, NettypeWithClauseOfUnitAloneIsError) {
   auto r = Parse(
       "module m;\n"
@@ -757,11 +713,6 @@ TEST(TypeDeclParsing, NettypeWithClauseOfUnitAloneIsError) {
       ReportedError(r.diags, "expected identifier, got ';'", 4, "6.6.7"));
 }
 
-// A.2.2.1 lets a data_type open with a package_scope, and A.2.1.3's second
-// nettype form names its source nettype through one, so a nettype may take a
-// type a package declares and may rename a package's nettype. Neither package
-// name is a type the parser knows, and each declaration is still read whole,
-// its scope kept (#7593).
 TEST(TypeDeclParsing, NettypeOfAPackageScopedTypeOrNettype) {
   auto r = Parse(
       "package P;\n"
@@ -784,11 +735,6 @@ TEST(TypeDeclParsing, NettypeOfAPackageScopedTypeOrNettype) {
   EXPECT_EQ(items[1]->typedef_type.type_name, "nt");
 }
 
-// A.2.1.3 lets const, var and a lifetime open a data_declaration, and A.2.2.1
-// lets its data type be named through a package scope, which no qualifier
-// rules out. Outside procedural code every qualified form was read as an
-// implicit type: P taken for the variable's name after `var`, and the
-// declaration reported as wanting `var` after `const` or `static` (#7603).
 TEST(TypeDeclParsing, AQualifiedDataDeclarationTakesAPackageScopedType) {
   auto r = Parse(
       "package P;\n"
@@ -817,9 +763,6 @@ TEST(TypeDeclParsing, AQualifiedDataDeclarationTakesAPackageScopedType) {
   EXPECT_TRUE(items[3]->data_type.is_const);
 }
 
-// §6.8 reports `automatic` on a data declaration outside procedural code, and
-// the declaration it opens still takes its package-scoped type, so the report
-// that an implicit type wants `var` is not filed beside it.
 TEST(TypeDeclParsing, AnAutomaticPackageScopedDeclarationReportsTheLifetime) {
   auto r = Parse(
       "package P;\n"
@@ -843,9 +786,6 @@ TEST(TypeDeclParsing, AnAutomaticPackageScopedDeclarationReportsTheLifetime) {
   EXPECT_EQ(items[0]->data_type.scope_name, "P");
 }
 
-// A.2.1.3's type_declaration and nettype_declaration each take a data_type,
-// which A.2.2.1 lets be a type_reference (§6.23), held for the elaborator to
-// resolve.
 TEST(TypeDeclParsing, TypedefAndNettypeOfATypeReference) {
   auto r = Parse(
       "module m;\n"

@@ -57,10 +57,6 @@ TEST(GateElaboration, HighzBothStrengthsRejected) {
                             "28.3.2"));
 }
 
-// §28.3.2 names both (highz0, highz1) and (highz1, highz0) as invalid. Since
-// the strength0/strength1 specifications may appear in either order, exercise
-// the reversed (strength1-first) form to confirm the illegal-pair rule fires
-// regardless of the order the keywords are written.
 TEST(GateElaboration, HighzBothStrengthsRejectedReversedOrder) {
   ElabFixture f;
   Elaborate(
@@ -69,9 +65,6 @@ TEST(GateElaboration, HighzBothStrengthsRejectedReversedOrder) {
       "  and (highz1, highz0) g1(y, a, b);\n"
       "endmodule\n",
       f);
-  // The report is worded for the strength0-first spelling, and one report
-  // covers both orders: the parser records highz1 and highz0 as the same pair
-  // of strength values whichever order they were written in.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "drive strength (highz0, highz1) is illegal", 3,
                             "28.3.2"));

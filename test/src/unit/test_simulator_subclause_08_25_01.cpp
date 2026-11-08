@@ -45,10 +45,6 @@ TEST(ParameterizedScopeResolutionSim, TwoSpecializationsReturnDifferentValues) {
 
 TEST(ParameterizedScopeResolutionSim,
      SpecificSpecializationValueAccessUsesOverride) {
-  // §8.25.1: the explicit specialization form may denote a specific parameter,
-  // so reading `C#(3)::p` yields the value of p in the C#(3) specialization --
-  // 3 -- not the class's default of 1. Two different specializations of the
-  // same value parameter therefore read back as their two override values.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class C #(parameter int p = 1);\n"
@@ -66,11 +62,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      OutOfBlockMethodTakesValueFromCallSiteSpecialization) {
-  // §8.25.1: an out-of-block method definition of a parameterized class implies
-  // no specialization of its own; the class parameter it reads is supplied by
-  // the specialization named at the call site. The same out-of-block method
-  // called through two specializations therefore returns the two parameter
-  // values -- the default 1 for C#() and the override 5 for C#(5).
   SimFixture f;
   auto* design = ElaborateSrc(
       "class C #(parameter int p = 1);\n"
@@ -92,11 +83,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      ScopeResolvedParamInMethodTracksActiveSpecialization) {
-  // §8.25.1: inside the class the unadorned `C::p` names the class parameter,
-  // and when the method runs under a specialization it reads that
-  // specialization's value -- exactly as the bare name p does. With p read
-  // twice (once bare, once as C::p) the result is 2*p: 2 for the default
-  // specialization and 10 for C#(5).
   SimFixture f;
   auto* design = ElaborateSrc(
       "virtual class C #(parameter int p = 1);\n"
@@ -116,9 +102,6 @@ TEST(ParameterizedScopeResolutionSim,
 }
 
 TEST(ParameterizedScopeResolutionSim, SpecializationArgumentFromLocalparam) {
-  // §8.25.1: the explicit specialization's argument is a constant expression,
-  // which may be a localparam and not only a literal. `C#(K)::p` reads p in the
-  // specialization selected by the localparam K, so the result is K's value.
   EXPECT_EQ(RunAndGet("class C #(parameter int p = 1);\n"
                       "endclass\n"
                       "module t;\n"
@@ -132,9 +115,6 @@ TEST(ParameterizedScopeResolutionSim, SpecializationArgumentFromLocalparam) {
 
 TEST(ParameterizedScopeResolutionSim,
      SpecializationArgumentFromModuleParameter) {
-  // §8.25.1: the specialization argument may also be a module parameter, built
-  // and resolved through a different declaration path than a literal or a
-  // localparam. `C#(W)::p` selects the specialization named by W and reads p.
   EXPECT_EQ(RunAndGet("class C #(parameter int p = 1);\n"
                       "endclass\n"
                       "module t #(parameter int W = 9);\n"
@@ -147,10 +127,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      SpecializationLeavesLocalParameterUnchanged) {
-  // §8.25.1: a specialization overrides the class's value parameters (the
-  // parameter port p), but a parameter declared in the class body (q) is not a
-  // specialization argument and keeps its declared value. Reading both under
-  // C#(3) gives the override 3 for p and the unchanged 5 for q.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class C #(parameter int p = 1);\n"
@@ -168,9 +144,6 @@ TEST(ParameterizedScopeResolutionSim,
 }
 
 TEST(ParameterizedScopeResolutionSim, NamedSpecializationOverrideResolves) {
-  // §8.25.1: the specialization prefix may name its argument (.p(3)) instead of
-  // supplying it positionally; `C#(.p(3))::p` still denotes p in that
-  // specialization, so the result is 3.
   EXPECT_EQ(RunAndGet("class C #(parameter int p = 1);\n"
                       "endclass\n"
                       "module t;\n"
@@ -183,11 +156,6 @@ TEST(ParameterizedScopeResolutionSim, NamedSpecializationOverrideResolves) {
 
 TEST(ParameterizedScopeResolutionSim,
      DefaultScopeAccessFoldsAsConstantExpression) {
-  // §8.25.1: the scope resolution operator accesses a parameter, which is a
-  // constant expression, so `C#()::p` may appear where a constant is required.
-  // Using it to initialize a localparam forces the access to fold at
-  // elaboration; the folded localparam then reads back as the parameter's
-  // default (3) at run time -- a different code path than a procedural read.
   EXPECT_EQ(RunAndGet("class C #(parameter int p = 3);\n"
                       "endclass\n"
                       "module t;\n"
@@ -201,11 +169,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      SpecificSpecializationFoldsInConstantExpression) {
-  // §8.25.1: the explicit specialization form denotes a specific parameter even
-  // in a constant-expression position. Using C#(4)::p to initialize a
-  // localparam forces the elaborator to fold the access; it must yield the
-  // C#(4) specialization's value (4), not the class default (1), and the folded
-  // localparam reads back as 4 at run time.
   EXPECT_EQ(RunAndGet("class C #(parameter int p = 1);\n"
                       "endclass\n"
                       "module t;\n"
@@ -219,11 +182,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      UnadornedScopeInsideClassSelectsParameterOverLocal) {
-  // §8.25.1: within the parameterized class the unadorned name as a scope
-  // resolution prefix names a member -- here the parameter p -- and does not
-  // denote the default specialization. It disambiguates the parameter from a
-  // local variable of the same name, so `C::p` reads the parameter value 1,
-  // not the shadowing local's 99.
   EXPECT_EQ(RunAndGet("class C #(parameter int p = 1);\n"
                       "  static function int g();\n"
                       "    int p = 99;\n"
@@ -238,13 +196,6 @@ TEST(ParameterizedScopeResolutionSim,
             1u);
 }
 
-// §8.25.1 (printed pages 205-206 of IEEE 1800-2023): the unadorned name
-// of a parameterized class denotes its default specialization other than as the
-// prefix of the class scope resolution operator, so `typedef C T;` makes T
-// that specialization and `T::p` is `C#()::p`. The simulator knew a class by
-// its declared name alone, so the typedef name resolved to no class and the
-// read answered 0 while `C#()::p` beside it read 1. A class-body parameter is
-// reached the same way.
 TEST(ParameterizedScopeResolutionSim,
      ScopeResolutionThroughATypedefOfTheDefaultSpecialization) {
   EXPECT_EQ(RunAndGet("class C #(int p = 1);\n"
@@ -259,8 +210,6 @@ TEST(ParameterizedScopeResolutionSim,
             151u);
 }
 
-// §6.18 with §8.9: a typedef of a class with no parameters names the class as
-// well, so a static property is reached through it.
 TEST(ParameterizedScopeResolutionSim,
      StaticPropertyThroughATypedefOfAPlainClass) {
   EXPECT_EQ(RunAndGet("class K;\n"
@@ -275,15 +224,6 @@ TEST(ParameterizedScopeResolutionSim,
             36u);
 }
 
-// §8.25 binds a class's type parameter throughout the class body per
-// specialization (printed page 204 of IEEE 1800-2023), and §8.25.1 has
-// the explicit specialization form as the prefix of the class scope resolution
-// operator outside the class (printed 205), so §20.6.2's `$bits(T)` (printed
-// 629) in a static method called as `Box#(byte)::bits()` is 8 whether the
-// package class is reached through an import or through `p::`, and 16 for
-// `p::Box#(shortint)::bits()`. No object runs a static method, so the actual
-// was read off none: the value-parameter bind made a 1-bit local of the type
-// name and every specialization answered 1.
 TEST(ParameterizedScopeResolutionSim,
      BitsOfATypeParameterInAStaticMethodOfASpecialization) {
   EXPECT_EQ(RunAndGet("package p;\n"
@@ -303,10 +243,6 @@ TEST(ParameterizedScopeResolutionSim,
             8u * 10000u + 8u * 100u + 16u);
 }
 
-// §8.25.1: `Box#()` is the default specialization, whose type parameter is
-// the default the class declares -- byte here rather than int, so that the
-// 8 the default gives is told from the 32 a class parameter's slot answered
-// for the name -- and `Box#(shortint)` beside it reads its own 16.
 TEST(ParameterizedScopeResolutionSim,
      BitsOfATypeParameterInAStaticMethodOfTheDefaultSpecialization) {
   EXPECT_EQ(RunAndGet("class Box #(type T = byte);\n"
@@ -322,11 +258,6 @@ TEST(ParameterizedScopeResolutionSim,
             8u * 100u + 16u);
 }
 
-// §8.25 lets any type be the actual, so `Box#(logic [11:0])` -- a keyword
-// type under a packed dimension, which the parse spells as a select on the
-// name -- binds T to a 12-bit type, `Box#(int unsigned)` -- a type the parse
-// reads as a type, since an expression cannot spell the signing -- to a
-// 32-bit one, and `Box#(.T(word_t))` to the 20-bit typedef it names.
 TEST(ParameterizedScopeResolutionSim,
      BitsOfARangedTypedefOrNamedTypeActualInAStaticMethod) {
   EXPECT_EQ(RunAndGet("class Box #(type T = int);\n"
@@ -344,11 +275,6 @@ TEST(ParameterizedScopeResolutionSim,
             12u * 10000u + 32u * 100u + 20u);
 }
 
-// §8.25 with §13.3: a static task named through a specialization runs as a
-// coroutine, so its `#1` suspends the process, and the type the call bound
-// is still in force when the body resumes: `Box#(shortint)::show(out)` writes
-// 16 through its output formal where the default's `Box#()::show(out)`
-// writes 32, and the sum tells the two calls apart from a 1 or a 32 twice.
 TEST(ParameterizedScopeResolutionSim,
      BitsOfATypeParameterInAStaticTaskOfASpecialization) {
   EXPECT_EQ(RunAndGet("class Box #(type T = int);\n"
@@ -368,13 +294,6 @@ TEST(ParameterizedScopeResolutionSim,
             16u * 100u + 32u);
 }
 
-// §8.25.1 (printed page 205) with §26.3 (printed 808): the explicit
-// specialization of a package's class reached through `p::` prefixes the
-// class scope resolution operator as the bare name does, so a static task
-// enabled as the statement `p::Box#(byte)::show(a)` runs with T bound to
-// byte, 8 through its output formal after the `#1`, `p::Box#(shortint)` 16
-// and `p::Box#()` the default's 32. The task statement bound the actuals of
-// a bare `Box#(...)` alone, so the package-qualified forms answered 32 each.
 TEST(ParameterizedScopeResolutionSim,
      BitsOfATypeParameterInAStaticTaskOfAPackageClassSpecialization) {
   EXPECT_EQ(RunAndGet("package p;\n"
@@ -397,13 +316,6 @@ TEST(ParameterizedScopeResolutionSim,
             8u * 10000u + 16u * 100u + 32u);
 }
 
-// §8.25.1 with §8.10 (printed pages 186-187): a static method called
-// through a specialization's scope, `C#(5)::outer()`, runs in the class's
-// scope, so a bare `helper()` inside it is the class's own static method,
-// as it is under `C::outer()`. outer reads helper() + N, twice N plus N, 15
-// under #(5). The specialization call bound N and pushed no class, so the
-// bare call was looked up in the caller's class, ran nothing and read 0,
-// and outer answered 5.
 TEST(ParameterizedScopeResolutionSim,
      BareStaticCallInsideAStaticMethodOfASpecialization) {
   EXPECT_EQ(RunAndGet("class C #(int N = 1);\n"
@@ -424,12 +336,6 @@ TEST(ParameterizedScopeResolutionSim,
             15u);
 }
 
-// §8.25.1 with §8.13: and the bare call may name a static method the base
-// declares, uvm_typed_callbacks#(T)'s m_get_q called from
-// uvm_callbacks#(T,CB)::get_first, which uvm_callback_iter#(T,CB)::first
-// reaches as `uvm_callbacks#(T,CB)::get_first(m_i, m_obj)`: the ref formal
-// writes get_first's q, whose size reads 3. Under the caller's class the
-// call ran nothing, q stayed null and its size call was reported.
 TEST(ParameterizedScopeResolutionSim,
      BareInheritedStaticCallInsideAStaticMethodOfASpecialization) {
   EXPECT_EQ(RunAndGet("class Q;\n"
@@ -465,11 +371,6 @@ TEST(ParameterizedScopeResolutionSim,
 }
 
 TEST(ParameterizedScopeResolutionSim, StaticPropertyReadsItsSpecialization) {
-  // §8.25.1 with §8.25: the explicit specialization form names one
-  // specialization, and each specialization has its own set of static member
-  // variables, so `vector#(1)::count` and `vector#(4)::count` read two
-  // counters. Two `vector #(1)` objects and one `vector #(4)` object leave 2
-  // and 1; one counter shared by the declaration leaves 3 for both.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class vector #(int size = 1);\n"
@@ -491,11 +392,6 @@ TEST(ParameterizedScopeResolutionSim, StaticPropertyReadsItsSpecialization) {
 
 TEST(ParameterizedScopeResolutionSim,
      StaticInitializerRunsForTheScopeNamedSpecialization) {
-  // §8.25.1 with §8.9: a specialization the source names only through the
-  // scope form, never declaring a variable of it, still has its own copy of
-  // each static property, and that copy takes its initializer with the
-  // specialization's own parameters bound. The two widths discriminate from
-  // each other and from the 0 the declaration's shared copy holds.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class V #(int size = 1);\n"
@@ -514,11 +410,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      StaticMethodCallRunsAgainstItsSpecialization) {
-  // §8.25.1 with §8.25: `counter#(1)::get()` names one specialization, and a
-  // static method reached through that scope reads the static member variables
-  // §8.25 gives it. Two `counter #(1)` objects and one `counter #(4)` object
-  // leave 2 and 1; the one map the class declaration holds leaves 3 for both
-  // calls.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class counter #(int size = 1);\n"
@@ -541,14 +432,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      UnadornedScopeInsideClassReadsItsSpecializationStaticProperty) {
-  // §8.25.1: inside the parameterized class, the unadorned name as a scope
-  // resolution prefix refers to the members of the class in hand rather than
-  // to the default specialization, and §8.25 gives each specialization its own
-  // set of static member variables, so `counter::count` inside get() is the
-  // count of whichever specialization the call is running under. Two
-  // `counter #(1)` objects and one `counter #(4)` object leave 2 and 1; the
-  // declaration's own map, which no constructor writes now that a variable's
-  // actuals point it at a specialization, leaves 0 for both calls.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class counter #(int size = 1);\n"
@@ -571,14 +454,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      TypeActualsOfAScopeNameTheSpecializationTheirTypesGive) {
-  // §8.25.1: the explicit `#(...)` of a scope form names one specialization,
-  // and §8.25 makes two sets of parameters the same only where each type
-  // parameter's two types match, each specialization having its own set of
-  // static member variables. C#(byte):: and C#(shortint):: therefore name two
-  // specializations with an n each, and C#(byte):: names the very one a
-  // variable declared `C #(byte)` holds. Keyed without the types they spell,
-  // the two scopes share one n and read 2 twice, and the declared object's
-  // specialization, keyed by its type, reads an n no scope wrote, 0.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class C #(type T = int);\n"
@@ -603,15 +478,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      TypeParameterOfTheRunningClassInAScopeListIsItsActual) {
-  // §8.25: a type parameter used in a type resolves to a type only after
-  // elaboration, so `Box#(T)::` written in a method of `Reg #(type T)` names
-  // Box specialized by whatever the running specialization of Reg binds T to
-  // -- UVM's `uvm_typeid#(CB)::get()` inside uvm_callbacks#(T,CB) -- and not
-  // a class named T. A static method reached through Reg#(byte):: and an
-  // instance method of a Reg #(shortint) object discriminate: keyed by the
-  // name T, the two calls reach one Box whose T is nothing, and read one width
-  // twice; resolved through the running specialization, they read byte's 8
-  // and shortint's 16.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class Box #(type T = int);\n"
@@ -635,14 +501,6 @@ TEST(ParameterizedScopeResolutionSim,
 
 TEST(ParameterizedScopeResolutionSim,
      DefaultSpecializationsTypedefNamesTheSpecializationOfItsDefault) {
-  // §8.25.1: inside the default specialization, a class-scope typedef writing
-  // the class's type parameter, `typedef R #(T) rsrc_t;` in `Own #(type T =
-  // int)`, names R #(int), the default standing for T -- UVM's `typedef
-  // uvm_resource #(T) rsrc_t;` in uvm_resource_db_implementation_t, whose
-  // default T is uvm_object. `rsrc_t::id` in Own #(int) therefore reads
-  // R #(int)'s 7, as `R#(T)::id` does and as Own #(byte) reads R #(byte)'s 9.
-  // Bound when the class had no actuals, T stood for its own name and
-  // rsrc_t named an R of its own, whose id read 0.
   SimFixture f;
   auto* design = ElaborateSrc(
       "class R #(type T = int);\n"
@@ -667,12 +525,6 @@ TEST(ParameterizedScopeResolutionSim,
   LowerRunAndCheck(f, design, {{"a", 7u}, {"c", 9u}});
 }
 
-// §8.25.1 (printed page 205) with §8.25 (printed page 204) and §8.10 (printed
-// pages 186-187): a static task named through a specialization runs in that
-// specialization's scope, so the static property it reads bare is the
-// specialization's own copy, initialized from its own value parameter:
-// `C#(4)::t(a)` writes 4 and `C#(7)::t(b)` 7. Run under the class declaration,
-// whose copy no specialization's actual initializes, each wrote 0.
 TEST(ParameterizedScopeResolutionSim,
      StaticTaskOfASpecializationReadsItsOwnStaticProperty) {
   EXPECT_EQ(RunAndGet("class C #(int N = 1);\n"
@@ -691,11 +543,6 @@ TEST(ParameterizedScopeResolutionSim,
             4u * 100u + 7u);
 }
 
-// §8.25.1 (printed page 205) with §8.9 (printed 186): the class used with no
-// actuals, `P#()`, or with its defaults, `P #(3)`, is the default
-// specialization, whose value parameter holds the declaration's default, so
-// a static initializer naming it reads 3 -- through the scope form, a handle
-// and a method alike. Run with no parameter bound, every read was 0.
 TEST(ParameterizedScopeResolutionSim,
      DefaultSpecializationStaticInitializerReadsTheDefault) {
   EXPECT_EQ(RunAndGet("class P #(int N = 3);\n"

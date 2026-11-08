@@ -27,7 +27,6 @@ void CollectNameSpaceLabels(const Stmt* s, std::vector<BlockLabel>& out) {
                    [&](Stmt* const& sub) { CollectNameSpaceLabels(sub, out); });
 }
 
-// §16.14: the five concurrent assertion statements a module item can be.
 static bool IsConcurrentAssertionItem(ModuleItemKind kind) {
   static constexpr ModuleItemKind kKinds[] = {
       ModuleItemKind::kAssertProperty, ModuleItemKind::kAssumeProperty,
@@ -49,9 +48,6 @@ void CollectAssertionNameSpaceLabels(const std::vector<ModuleItem*>& items,
   }
 }
 
-// The user-defined type a block's typedef declares, or empty for any other
-// block item declaration and for §6.18's forward typedef, which announces the
-// type its later definition declares.
 static std::string_view BlockTypedefName(const Stmt* s) {
   const ModuleItem* item = s->decl_item;
   if (item->kind != ModuleItemKind::kTypedef ||
@@ -63,9 +59,6 @@ static std::string_view BlockTypedefName(const Stmt* s) {
 void CheckBlockNameSpace(const std::vector<Stmt*>& stmts,
                          std::unordered_set<std::string_view> names,
                          DiagEngine& diag) {
-  // §23.9 states the rule the closing sentence of §3.13 gives every name
-  // space, that an identifier declares one item in a scope, and names the
-  // constructs that are scopes, so the report is filed under it.
   auto declare = [&](std::string_view name, SourceLoc loc) {
     if (name.empty() || names.insert(name).second) return;
     diag.Error(loc, std::format("redeclaration of '{}'", name),
@@ -88,15 +81,8 @@ void CheckBlockNameSpace(const std::vector<Stmt*>& stmts,
 
 void CheckNestedBlockNameSpaces(const Stmt* s, DiagEngine& diag) {
   if (s == nullptr) return;
-  // A declaration written directly inside a fork lands in Stmt::fork_stmts on
-  // a node whose kind is StmtKind::kFork, so that list is the fork-join
-  // block's own name space.
   if (s->kind == StmtKind::kBlock) CheckBlockNameSpace(s->stmts, {}, diag);
   if (s->kind == StmtKind::kFork) CheckBlockNameSpace(s->fork_stmts, {}, diag);
-  // §3.13 puts no condition on where a block stands, so every position a
-  // statement holds a statement in is one a block may stand in.
-  // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { CheckNestedBlockNameSpaces(sub, diag); });
 }

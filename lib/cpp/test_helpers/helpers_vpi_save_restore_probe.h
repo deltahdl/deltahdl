@@ -14,15 +14,6 @@
 
 using namespace delta;
 
-// Shared probe routines and fixture for the vpi_get_data()/vpi_put_data()
-// save/restart tests (§38.9 and §38.31). vpi_get_data() (and the write tests'
-// read-back) are only legal from an application routine running for a
-// save/restart reason. These probe routines stand in for such an application
-// routine: the simulator invokes them from DispatchCallbacks (which sets the
-// active callback reason), and they call the routine and record what it
-// returned.
-
-// A single vpi_get_data() call.
 struct SingleRead {
   int id = 0;
   int request = 0;
@@ -36,7 +27,6 @@ inline int ReadOnceCb(s_cb_data* cb) {
   return 0;
 }
 
-// Two successive vpi_get_data() calls for the same id.
 struct DoubleRead {
   int id = 0;
   int req1 = 0;
@@ -54,15 +44,11 @@ inline int ReadTwiceCb(s_cb_data* cb) {
   return 0;
 }
 
-// Fixture that installs a VpiContext as the active global context and can
-// register a callback for a reason and deliver it. The dispatch sets the active
-// callback reason for the duration of the routine.
 class VpiSaveRestoreSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Register `cb_rtn` for `reason`, carrying `probe`, then deliver it.
   void DispatchWith(int reason, int (*cb_rtn)(s_cb_data*), void* probe) {
     s_cb_data reg = {};
     reg.reason = reason;

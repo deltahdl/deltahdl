@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §5.11 — an array literal whose element count matches the array dimension
-// elaborates.
 TEST(ArrayLiteralElaboration, MatchingElementCountElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -17,12 +15,6 @@ TEST(ArrayLiteralElaboration, MatchingElementCountElaborates) {
              "endmodule\n"));
 }
 
-// §5.11 — braces nest once per dimension, which C does not require. What
-// rejects the flat list is the §10.9.1 element count: the outer dimension [1:2]
-// takes two elements and the flat list offers six. §5.11 states no report of
-// its own, opening instead by making an array literal an array assignment
-// pattern or pattern expression with constant member expressions (§10.9.1), so
-// §10.9.1 is where the rule the report enforces is stated.
 TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -36,8 +28,6 @@ TEST(ArrayLiteralElaboration, FlatLiteralForMultiDimRejected) {
       "10.9.1"));
 }
 
-// §5.11 — an array literal whose element count does not match the dimension is
-// rejected, under the same §10.9.1 rule.
 TEST(ArrayLiteralElaboration, WrongElementCountRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -51,8 +41,6 @@ TEST(ArrayLiteralElaboration, WrongElementCountRejected) {
       "10.9.1"));
 }
 
-// §5.11 — a replication operator sets values within one dimension; the inner
-// brace pair is removed, so the replicated value fills the dimension.
 TEST(ArrayLiteralElaboration, ReplicationFillsDimension) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -61,7 +49,6 @@ TEST(ArrayLiteralElaboration, ReplicationFillsDimension) {
              "endmodule\n"));
 }
 
-// §5.11 — an array literal's type may be explicitly indicated with a prefix.
 TEST(ArrayLiteralElaboration, TypePrefixedArrayLiteralElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -70,8 +57,6 @@ TEST(ArrayLiteralElaboration, TypePrefixedArrayLiteralElaborates) {
              "endmodule\n"));
 }
 
-// §5.11 — an array literal's type may instead be indicated implicitly by an
-// assignment-like context (see §10.8).
 TEST(ArrayLiteralElaboration, AssignmentContextProvidesType) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -80,8 +65,6 @@ TEST(ArrayLiteralElaboration, AssignmentContextProvidesType) {
              "endmodule\n"));
 }
 
-// §5.11 — an array literal can use an index as a key together with a default
-// key value.
 TEST(ArrayLiteralElaboration, IndexKeyWithDefaultElaborates) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -90,10 +73,6 @@ TEST(ArrayLiteralElaboration, IndexKeyWithDefaultElaborates) {
              "endmodule\n"));
 }
 
-// §5.11 has a replication operate within one dimension, so the elements it
-// supplies, its multiplier times its items, are counted against that dimension
-// under the §10.9.1 rule as any positional list is. Two elements for three were
-// let through, every replication excused from the count.
 TEST(ArrayLiteralElaboration, ReplicationSupplyingTooFewElementsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -107,8 +86,6 @@ TEST(ArrayLiteralElaboration, ReplicationSupplyingTooFewElementsRejected) {
       "10.9.1"));
 }
 
-// §5.11's own example: three copies of two items fill a dimension of six,
-// which a count of the multiplier alone would reject.
 TEST(ArrayLiteralElaboration,
      ReplicationOfSeveralItemsFillingDimensionAccepted) {
   EXPECT_TRUE(
@@ -117,8 +94,6 @@ TEST(ArrayLiteralElaboration,
              "endmodule\n"));
 }
 
-// A multiplier naming a parameter supplies as many elements as its value, so a
-// replication of three under a parameter of 3 fills a dimension of three.
 TEST(ArrayLiteralElaboration, ReplicationByParameterFillingDimensionAccepted) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -127,8 +102,6 @@ TEST(ArrayLiteralElaboration, ReplicationByParameterFillingDimensionAccepted) {
              "endmodule\n"));
 }
 
-// The element count holds for a pattern in a procedural assignment as for one
-// at a module-level declaration, which alone was checked.
 TEST(ArrayLiteralElaboration, WrongElementCountInProceduralAssignmentRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -143,8 +116,6 @@ TEST(ArrayLiteralElaboration, WrongElementCountInProceduralAssignmentRejected) {
       "10.9.1"));
 }
 
-// The element count holds for an array whose dimension comes from its typedef,
-// which the declaration takes before its pattern is checked.
 TEST(ArrayLiteralElaboration, WrongElementCountForTypedefArrayRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -159,10 +130,6 @@ TEST(ArrayLiteralElaboration, WrongElementCountForTypedefArrayRejected) {
       "10.9.1"));
 }
 
-// §5.11 has an array literal take its type from a prefix or from an
-// assignment-like context, §10.8 lists those contexts and allows no other, and
-// §10.9 gives a pattern without a prefix no type of its own. A system task's
-// argument and an operator's operand are no such context. Both were accepted.
 TEST(ArrayLiteralElaboration,
      UntypedPatternOutsideAssignmentLikeContextRejected) {
   ElabFixture f;
@@ -182,10 +149,6 @@ TEST(ArrayLiteralElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kMessage, 5, "10.9"));
 }
 
-// The assignment-like contexts of §10.8 type a pattern written without a
-// prefix: a continuous and a procedural assignment, a typed parameter, a
-// subroutine argument, a return, the parenthesized and conditional forms of a
-// right-hand value, a nondefault pattern item, and a static cast.
 TEST(ArrayLiteralElaboration,
      UntypedPatternInEachAssignmentLikeContextAccepted) {
   EXPECT_TRUE(

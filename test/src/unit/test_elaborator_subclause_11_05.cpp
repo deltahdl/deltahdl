@@ -108,10 +108,6 @@ TEST(OperandElaboration, BitSelectOfNetElaborates) {
              "endmodule\n"));
 }
 
-// §11.5 para 2 lists a packed structure among the base types that admit a
-// bit-select operand. Elaboration must accept selecting a bit of a packed
-// struct rather than rejecting it as a bit-select of a scalar: a packed
-// aggregate is excluded from the scalar-select check, unlike a plain `logic b`.
 TEST(OperandElaboration, PackedStructBitSelectOperandElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -121,8 +117,6 @@ TEST(OperandElaboration, PackedStructBitSelectOperandElaborates) {
              "endmodule\n"));
 }
 
-// §11.5 para 2 likewise lists a packed structure as a base type for a
-// part-select operand.
 TEST(OperandElaboration, PackedStructPartSelectOperandElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -132,10 +126,6 @@ TEST(OperandElaboration, PackedStructPartSelectOperandElaborates) {
              "endmodule\n"));
 }
 
-// §11.5 para 2 lists a packed array among the base types that admit bit-select
-// and part-select operands. A packed-array variable is registered on the
-// packed-array path (not the scalar path), so selecting from it must elaborate;
-// §7.4.1 supplies the multi-dimensional packed declaration.
 TEST(OperandElaboration, PackedArraySelectOperandElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -146,9 +136,6 @@ TEST(OperandElaboration, PackedArraySelectOperandElaborates) {
              "endmodule\n"));
 }
 
-// §11.5 para 2 lists a parameter among the base types that admit bit-select and
-// part-select operands (a parameter is a constant operand, §11.2.1). Both forms
-// over a vector parameter must elaborate cleanly.
 TEST(OperandElaboration, ParameterBitAndPartSelectOperandElaborates) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

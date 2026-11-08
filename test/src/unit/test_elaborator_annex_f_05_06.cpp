@@ -18,30 +18,16 @@
 
 using namespace delta;
 
-// §F.5.6 is the heading whose title gives the three notions of satisfaction
-// it heads their common scope: satisfaction with local variables, each notion
-// the §F.5.3 one with the understanding that the underlying properties may
-// carry local variables, and each a relation over a word and a local variable
-// context where §F.5.3's is over the word alone. The cases check which
-// properties of the §F.5.6 model involve a local variable, that the
-// retraction of §F.5.3's embedding is defined on exactly the rest and inverts
-// it there, that on that fragment the context is inert -- the §F.5.6 relations
-// agree with §F.5.3's under the empty context and under one binding a name --
-// and that outside it §F.5.6 gives a verdict where §F.5.3 has no property.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto Bs(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// a ##1 (1, v = e): a sequence that samples a local.
 std::shared_ptr<const SequenceExpr> Sampling() {
   return SeqConcat(Bs("a"), SeqLocalVarSampling("v"));
 }
 
-// A §F.5.6 property in the fragment without local variables, spanning every
-// operator the two models share.
 std::shared_ptr<const LvProperty> Clean() {
   return LvUntil(LvNexttime(LvParen(LvStrong(Bs("a")))),
                  LvAcceptOn(BoolAtom("x"),
@@ -50,8 +36,6 @@ std::shared_ptr<const LvProperty> Clean() {
                                              LvStrong(Bs("c")))))));
 }
 
-// Two optional operands agree when both are absent or both are present and
-// equal.
 template <typename T, typename Equal>
 bool SameOperand(const std::shared_ptr<const T>& lhs,
                  const std::shared_ptr<const T>& rhs, Equal equal) {
@@ -61,7 +45,6 @@ bool SameOperand(const std::shared_ptr<const T>& lhs,
   return equal(*lhs, *rhs);
 }
 
-// Structural equality of two §F.5.6 properties, operator for operator.
 bool LvEqual(const LvProperty& lhs, const LvProperty& rhs) {
   return lhs.kind == rhs.kind && lhs.local_var_type == rhs.local_var_type &&
          lhs.local_var_name == rhs.local_var_name &&
@@ -71,9 +54,6 @@ bool LvEqual(const LvProperty& lhs, const LvProperty& rhs) {
          SameOperand(lhs.rhs, rhs.rhs, LvEqual);
 }
 
-// §F.5.6: a property of the §F.5.6 model involves a local variable through
-// its own declaration form, at any depth, or through a sequence operand that
-// does; the operators shared with §F.5.3 involve none by themselves.
 TEST(SatisfactionWithLocalVariables,
      APropertyInvolvesALocalByItsDeclarationOrItsSequences) {
   EXPECT_FALSE(LvPropertyInvolvesLocalVariables(*Clean()));
@@ -89,8 +69,6 @@ TEST(SatisfactionWithLocalVariables,
       *LvOr(LvStrong(Bs("a")), LvWeak(SeqLocalVarDecl("int", "v", Bs("a"))))));
 }
 
-// §F.5.6: a top-level property involves a local variable through its own
-// declaration form or through its property, under a guard or a parenthesis.
 TEST(SatisfactionWithLocalVariables,
      ATopLevelPropertyInvolvesALocalByItsDeclarationOrItsProperty) {
   EXPECT_FALSE(LvTopLevelPropertyInvolvesLocalVariables(
@@ -103,11 +81,6 @@ TEST(SatisfactionWithLocalVariables,
       *LvTopProperty(LvLocalVarDecl("int", "v", LvStrong(Bs("a"))))));
 }
 
-// §F.5.6: the retraction of §F.5.3's embedding is defined on the fragment
-// without local variables alone, keeps the shape there, and inverts the
-// embedding both ways: a §F.5.6 property in the fragment embeds back to
-// itself through its retraction, and a §F.5.3 property retracts back to a
-// property whose embedding is what it embedded to.
 TEST(SatisfactionWithLocalVariables, TheRetractionInvertsTheEmbedding) {
   EXPECT_EQ(AsPropertyWithoutLocalVariables(*LvStrong(Sampling())), nullptr);
   EXPECT_EQ(AsPropertyWithoutLocalVariables(
@@ -155,8 +128,6 @@ TEST(SatisfactionWithLocalVariables, TheRetractionInvertsTheEmbedding) {
                       *AsPropertyWithLocalVariables(*original)));
 }
 
-// The words and contexts the agreement cases range over: a context binding no
-// name, and one binding v, a name no property of the fragment mentions.
 std::vector<Word> Words() {
   return {Word{},
           Word{A({"a"})},
@@ -179,11 +150,6 @@ std::vector<std::shared_ptr<const LvProperty>> Fragment() {
           LvAcceptOn(BoolAtom("x"), LvStrong(SeqConcat(Bs("a"), Bs("b"))))};
 }
 
-// §F.5.6: on the fragment without local variables the context is inert, since
-// only the local variable forms read or write it, so the neutral satisfaction
-// of §F.5.6.1 and the non-vacuity of §F.5.6.3 agree with §F.5.3.1 and §F.5.3.3
-// on the retraction under the empty context and under one binding v alike,
-// with both verdicts occurring for each relation.
 TEST(SatisfactionWithLocalVariables, TheContextIsInertOnTheFragment) {
   std::set<bool> neutral;
   std::set<bool> vacuity;
@@ -205,9 +171,6 @@ TEST(SatisfactionWithLocalVariables, TheContextIsInertOnTheFragment) {
   EXPECT_EQ(vacuity.size(), 2U);
 }
 
-// §F.5.6: likewise for the top-level relations, pass, disabled and fail,
-// under a disable iff guard whose condition some words carry, and through a
-// parenthesis; the disabled verdict occurs both ways.
 TEST(SatisfactionWithLocalVariables, TheTopLevelVerdictsAreInertToTheContext) {
   std::set<bool> disabled;
   for (const auto& lv : Fragment()) {
@@ -231,12 +194,6 @@ TEST(SatisfactionWithLocalVariables, TheTopLevelVerdictsAreInertToTheContext) {
   EXPECT_EQ(disabled.size(), 2U);
 }
 
-// §F.5.6: outside the fragment the notions are §F.5.6's alone. ( int v ;
-// strong( a ##1 (1, v = e) ) ) declares a local and samples it, which §F.5.3
-// has no property for, and §F.5.6.1 gives it a verdict: it holds on [a][b],
-// the sampling matching the second letter, and not on [x]; and the same
-// sequence under §F.5.3.2's context-free tight satisfaction, which does not
-// reach the local variable forms, matches no word.
 TEST(SatisfactionWithLocalVariables, OutsideTheFragmentTheNotionsAreItsOwn) {
   auto decl = LvLocalVarDecl("int", "v", LvStrong(Sampling()));
   EXPECT_EQ(AsPropertyWithoutLocalVariables(*decl), nullptr);

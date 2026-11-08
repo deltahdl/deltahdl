@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 20-16: a PLA modeling system task parses as a system call whose callee
-// is the full $array_type$logic$format name and whose three arguments are the
-// memory identifier, the input terms, and the output terms.
 TEST(PlaSystemTask, ParsesAsSystemCallWithThreeArguments) {
   auto r = Parse(
       "module m; initial $async$and$array(mem, {a1, a2}, {b1, b2}); endmodule");
@@ -26,8 +23,6 @@ TEST(PlaSystemTask, ParsesAsSystemCallWithThreeArguments) {
   ASSERT_EQ(stmt->expr->args.size(), 3u);
 }
 
-// Syntax 20-16: memory_identifier is a plain identifier and the input/output
-// terms may be single expressions rather than concatenations.
 TEST(PlaSystemTask, ParsesSingleTermArguments) {
   auto r = Parse("module m; initial $sync$or$plane(mem, ai, bo); endmodule");
   ASSERT_NE(r.cu, nullptr);

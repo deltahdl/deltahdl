@@ -32,10 +32,6 @@ namespace delta {
 
 namespace {
 
-// 18.3: fold an enum's named-constant list into the concrete integer values it
-// defines, applying the same source-order auto-increment rule the type
-// declaration uses: a member with an explicit value resets the running counter,
-// and each subsequent unspecified member is one greater than the last.
 void FoldEnumMemberValues(const std::vector<EnumMember>& members,
                           std::vector<int64_t>& out) {
   int64_t next = 0;
@@ -46,15 +42,6 @@ void FoldEnumMemberValues(const std::vector<EnumMember>& members,
   }
 }
 
-// 18.3: the solver draws an active random enum variable's value from that
-// enum's named constants alone, never from values outside them, even ones that
-// would cast cleanly to the enum type. Resolve the member's enum type to its
-// named constants and record them as the solver domain; a non-enum member is
-// left unrestricted. The enum type may be written inline on the declaration
-// (`rand enum {...} x;`) or named through a typedef declared on the class or an
-// ancestor (`rand col_e x;` as in the 18.3 MyBus example's atype), and a
-// package- or module-scope enum typedef is found through the enum registry, so
-// all three forms are resolved here.
 void PopulateEnumDomain(const ClassMember* m, const ClassTypeInfo* level,
                         SimContext& ctx, RandVariable& var) {
   const DataType& dt = m->data_type;
@@ -82,14 +69,6 @@ void PopulateEnumDomain(const ClassMember* m, const ClassTypeInfo* level,
   }
 }
 
-// 6.11.3: whether a data member's declared type is signed. The parser has
-// already folded the clause's defaults into DataType::is_signed -- byte,
-// shortint, int, integer and longint signed, time, bit, reg and logic unsigned,
-// either overridable with the `signed` and `unsigned` keywords -- so a type
-// written on the declaration answers directly. A type named through a typedef
-// carries nothing of its own, so the typedef is resolved on the class or an
-// ancestor the same way an enum type is; a name that resolves nowhere is left
-// unsigned, which is the wider of the two ranges and the previous behaviour.
 bool DeclaredSignedness(const ClassMember* m, const ClassTypeInfo* level) {
   const DataType& dt = m->data_type;
   if (dt.kind != DataTypeKind::kNamed) return dt.is_signed;
@@ -106,8 +85,6 @@ bool DeclaredSignedness(const ClassMember* m, const ClassTypeInfo* level) {
 
 }  // namespace
 
-// 18.4: build a solver variable for one rand/randc data member. The default
-// integral domain is later tightened by the relational constraints.
 RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
                          SimContext& ctx) {
   RandInfo info;
@@ -118,37 +95,12 @@ RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
   info.var.qualifier =
       m->is_randc ? RandQualifier::kRandc : RandQualifier::kRand;
   uint32_t width = EvalTypeWidth(m->data_type);
-  // §18.4: a member of a named type, a packed structure's typedef among them,
-  // is as wide as that type, one integral variable of its bits.
   if (width == 0 && m->data_type.kind == DataTypeKind::kNamed)
     width = ctx.FindTypeWidth(m->data_type.type_name);
   info.var.width = width == 0 ? 32 : width;
-  // 18.3: confine an enum-typed random variable to its named-constant set.
   PopulateEnumDomain(m, level, ctx, info.var);
-  // 18.4.1: a rand variable is uniformly distributed over the range its
-  // declared type admits -- the clause reads 'rand bit [7:0]' as an 8-bit
-  // unsigned integer to be assigned a value in the range 0 to 255. Bind the
-  // solver domain to that width rather than leaving it on the generic 16-bit
-  // default; later constraint folding narrows it further. The bound matters to
-  // every rand variable, cyclic or not, because the solver evaluates the
-  // constraints against the value it drew and only the write-back truncates to
-  // the member. A wider domain therefore compares a narrow variable as a number
-  // it cannot hold: a relation its declared range satisfies routinely becomes
-  // near-unsatisfiable, and the solve exhausts its attempts instead of
-  // returning one of the legal combinations. 18.4.2 needs the same bound for a
-  // second reason -- a randc permutation drawn over a wider range and then
-  // truncated repeats values within a cycle, destroying the no-repeat property
-  // over the declared range it is meant to permute.
-  //
-  // 6.11.3 supplies the other half of the range. An integer type is signed or
-  // unsigned, and a signed one admits negatives, so binding the domain to the
-  // width alone leaves the whole negative half of a `rand int` unreachable and
-  // every constraint requiring a negative value unsatisfiable.
   info.var.is_signed = DeclaredSignedness(m, level);
   info.var.BindDomainToDeclaredRange();
-  // 18.4.1: a real random variable is drawn uniformly over its range, which
-  // the relational constraints narrow; unconstrained it spans what an int
-  // does, a range with no bound being no range to draw from.
   if (m->data_type.kind == DataTypeKind::kReal ||
       m->data_type.kind == DataTypeKind::kShortreal ||
       m->data_type.kind == DataTypeKind::kRealtime) {
@@ -161,10 +113,6 @@ RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
 
 namespace {
 
-// §18.5.7.1: one random variable per leaf element of an array member of
-// several unpacked dimensions, from the dimension `dim` onward under the key
-// `key`, each named by its declared index in every dimension, `m[1][2]`, as
-// the object holds the element.
 void AddRandLeaves(const RandInfo& info,
                    const ClassTypeInfo::PropertyInfo& array, size_t dim,
                    const std::string& key, std::vector<RandInfo>& out) {
@@ -182,17 +130,8 @@ void AddRandLeaves(const RandInfo& info,
   }
 }
 
-// 18.4: the random variables of one rand/randc data member. 18.5.7: a member
-// declared as an array is one random variable per element, each named as its
-// element's key and drawn over the element type's range, so that an
-// iterative constraint can bind any one of them; one declared as a dynamic
-// array has its elements added by AddDynamicArrayVariables, their count
-// being the object's rather than the class's.
 void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
                    SimContext& ctx, std::vector<RandInfo>& out) {
-  // §18.4: a queue's variables are added by AddDynamicArrayVariables, their
-  // count being the object's, as are an associative array's, and a
-  // structure's by AddRandStructMembers.
   if (IsQueuePropertyDecl(m, level, ctx) ||
       IsAssocPropertyDecl(m, level, ctx) ||
       AddRandStructMembers(m, level, ctx, out)) {
@@ -219,29 +158,6 @@ void AddRandMember(const ClassMember* m, const ClassTypeInfo* level,
   }
 }
 
-// 18.5: true when any operand of `e` names one of the random variables being
-// solved. A relation whose other side is such an expression relates two random
-// variables to each other, so neither side is a constant the first can be
-// bounded against.
-//
-// A qualified name is taken whole rather than walked into, because its final
-// identifier is not a random variable of the object being solved even when it
-// spells one: 18.7.1's `local::x` names the calling scope's x alongside the
-// object's own rand x, and `obj.x` or `pkg::x` name someone else's. Descending
-// into those would read them as the rand variable whose name they share and
-// wrongly refuse to fold a relation that really is against a constant. `this.x`
-// is the one qualified form that does name the object's own member.
-// 18.5: a comparison of a rand variable against a constant. Fills `out` with
-// the typed solver constraint, folds the variable's domain, and returns true;
-// other relation shapes return false for the kCustom fallback.
-//
-// "Against a constant" is the whole of what this path can express: it reads the
-// other side once, before solving, and turns the result into a fixed bound. A
-// side that names another random variable has no value yet to read -- taking
-// its current one bounds the variable against a stale number and then lets the
-// solver draw that other variable independently of the bound, so the relation
-// is reported satisfied while the values committed violate it. Those relations
-// belong to the kCustom path, which re-evaluates them against trial values.
 bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                              RandomizeCtx& rc, ConstraintExpr& out,
                              bool fold = true) {
@@ -264,12 +180,6 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   }
   if (!var_side) return false;
   if (mirror) ComparisonKind(MirrorComparison(rel->op), kind);
-  // 6.11.3: the operand this relation is compared against carries its own
-  // signedness, and a signed one holding a negative number reads as a large
-  // positive if its bits are taken unsigned. That would relate the variable to
-  // the wrong number entirely -- `b < -100` would bound b above by 4294967195
-  // rather than by -101 -- so the bound is read as the type the operand was
-  // written in.
   ConstraintEvalScope scope(rc.obj, rc.ctx);
   auto cv = EvalExpr(const_side, rc.ctx, rc.arena);
   int64_t c = cv.is_signed ? SignExtend(cv.ToUint64(), cv.width)
@@ -278,21 +188,10 @@ bool TryComparisonConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.var_name = std::string(var_side->text);
   out.lo = c;
   out.ref_vars.push_back(out.var_name);
-  // 18.5.13: a soft relation must not tighten the variable's draw domain. If it
-  // did, a discarded soft preference would still constrain the variable,
-  // biasing the result and narrowing the values the hard constraints still
-  // allow.
   if (fold) FoldComparison(rands, var_side->text, kind, cv, c);
   return true;
 }
 
-// 18.5.10: locate the constraint block named `name` in the object's class
-// hierarchy, walking from the dynamic type up to its base classes so the
-// most-derived block of a given name wins (matching CollectConstraintBlocks).
-// A block qualified 'static' shares one active/inactive state across every
-// instance of its declaring class, so its state lives on the ClassTypeInfo
-// rather than the object; this returns that declaring type when the block is
-// static, and nullptr otherwise.
 static const ClassTypeInfo* StaticConstraintOwner(const ClassObject* obj,
                                                   std::string_view name) {
   for (const auto* lvl = obj ? obj->type : nullptr; lvl != nullptr;
@@ -308,11 +207,6 @@ static const ClassTypeInfo* StaticConstraintOwner(const ClassObject* obj,
 
 }  // namespace
 
-// Folds the comparison of the rand variable `name` against the constant
-// `cv`, `c` as an integer, into its domain: 18.4.1 has a real variable's
-// range be what its relational constraints leave of it, the bound read as
-// the real it compares against, and an integral variable's bounds narrow
-// as FoldBound has them.
 void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
                     ConstraintKind kind, const Logic4Vec& cv, int64_t c) {
   auto* ri = FindRand(rands, name);
@@ -325,7 +219,6 @@ void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
   FoldBound(*ri, kind, c);
 }
 
-// True when any expression in `list` references one of the random variables.
 bool AnyRefsRandVar(const std::vector<Expr*>& list,
                     std::vector<RandInfo>& rands) {
   for (const Expr* x : list) {
@@ -334,8 +227,6 @@ bool AnyRefsRandVar(const std::vector<Expr*>& list,
   return false;
 }
 
-// 18.5.7: whether `name` is a rand member declared as an array, whose
-// elements are the random variables; a select of it names one of them.
 static bool IsRandArray(std::string_view name, std::vector<RandInfo>& rands) {
   for (const auto& ri : rands) {
     if (ri.array_base == name) return true;
@@ -361,38 +252,6 @@ bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands) {
   return AnyRefsRandVar(e->args, rands) || AnyRefsRandVar(e->elements, rands);
 }
 
-// 18.6.1: randomize() gives valid values to every active random variable of an
-// object AND to the random objects it references, succeeding only when every
-// one is solved. Solve this object's own random variables subject to its active
-// constraints and write the results back, then recurse into each non-null rand
-// object-handle member so its own random members are randomized as well; the
-// overall result fails if any sub-object solve fails. The visited set breaks
-// handle cycles so a self- or mutually-referential object graph terminates. A
-// null random object handle references nothing to randomize and is skipped.
-//
-// 18.11: inline_random, when non-null, is the set of property names passed as
-// randomize()'s arguments. It names the complete active random set for the
-// duration of this one call: a named property is active (and a non-random
-// property so named is promoted to a random variable), while every other
-// variable becomes a state variable held at its current value. It governs only
-// the object named in the call, so it is passed as null on the recursive
-// descent into rand sub-objects below.
-//
-// 18.11.1: null_checker marks the special randomize(null) form, the inline
-// constraint checker. It rides on top of the same mechanism: inline_random is
-// an empty (but present) set, so every rand/randc variable is excluded from the
-// active set and held as a state variable, and no value is drawn for the call.
-// Because no class member is randomized, the rand object-handle members are not
-// recursed into either -- they too are state variables for this call.
-// 18.11: naming a property in the inline argument list can make any class
-// property random for the call, rand, randc or neither. A named property that
-// is not already among the rand/randc set is looked up and added as an active
-// random variable so it is solved and written back like any other.
-// It is added before the constraint blocks are gathered so a constraint
-// relating to it binds it as a random variable rather than a state constant.
-// The mechanism does not affect the cyclical mode, so the promoted variable is
-// built as a noncyclical rand (AddRandMember keys the qualifier off the
-// member's own randc declaration, which a non-random property does not have).
 static void PromoteInlineRandomVariables(
     ClassObject* obj, SimContext& ctx,
     const std::unordered_set<std::string>& inline_random,
@@ -405,18 +264,6 @@ static void PromoteInlineRandomVariables(
   }
 }
 
-// 18.7: the inline constraint block from a randomize() with {...} call is
-// applied along with the object's own constraints -- not in place of them. It
-// is translated into an additional, always-active constraint block using the
-// same machinery as an in-class block, so its relations (and
-// dist/soft/if-else forms) narrow this object's solve exactly like a class
-// constraint. A block preceded by a parenthesized identifier_list is restricted
-// -- only the listed names resolve as the object's random variables; every
-// other name resolves in the calling scope. Translating the block against a
-// rand set filtered to the listed names realizes exactly that: an unlisted name
-// is not found among the rand variables, so it is read from the caller as a
-// constant instead of being treated as one of the object's randoms. An
-// unrestricted block (no parentheses) sees the full rand set.
 static void AddInlineConstraintBlock(const InlineRandomizeCall& call,
                                      std::vector<RandInfo>& rands,
                                      RandomizeCtx& rc,
@@ -434,14 +281,6 @@ static void AddInlineConstraintBlock(const InlineRandomizeCall& call,
   AddConstraintMember(call.inline_block, listed_rands, rc, solver);
 }
 
-// 18.4.2: a randc variable repeats no value before its permutation runs out,
-// and that no-repeat property spans successive randomize() calls.
-// Because the solver is rebuilt for every call, hand it a persistent
-// permutation history to advance in place so the cycle continues across calls
-// instead of restarting each time. A nonstatic randc uses this object's own
-// per-member history; a static randc shares one history held on the (single,
-// per-class) type descriptor, so its cyclic state is static too -- a single
-// sequence advances no matter which instance is randomized.
 static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
   if (ri.var.qualifier != RandQualifier::kRandc) return;
   std::shared_ptr<std::unordered_set<int64_t>>* slot =
@@ -456,20 +295,6 @@ static void BindRandcHistory(ClassObject* obj, RandInfo& ri) {
   ri.var.shared_randc_domain = *domain;
 }
 
-// Hand each collected random variable to the solver, active or held.
-//
-// 18.11: randomize() called with an argument list randomizes exactly those
-// variables in this call and reads every other variable as state --
-// conceptually equivalent to rand_mode() calls that enable the named variables
-// and disable the rest. The inline list therefore fully governs the active set
-// here, overriding the persistent rand_mode() state for the duration of the
-// call. Without an argument list (18.8) the persistent per-object rand_mode()
-// flag governs.
-//
-// 18.8 / 18.11: a variable that is not active is not randomized; the solver
-// treats it as a state variable, holding its current value constant. That value
-// is seeded and the variable disabled, so the solve leaves it untouched while
-// still evaluating any constraint that relates to it.
 void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
                           const std::unordered_set<std::string>* inline_random,
                           ConstraintSolver& solver) {
@@ -479,7 +304,6 @@ void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
     bool active = inline_random != nullptr ? inline_random->count(ri.name) != 0
                                            : IsObjectRandActive(obj, ri.name);
     if (!active) {
-      // 18.6.3: a static variable holds its value in the class-wide cell.
       const auto& held = ri.is_static && ri.level != nullptr
                              ? ri.level->static_properties
                              : obj->properties;
@@ -492,9 +316,6 @@ void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
   }
 }
 
-// The keys the handles the rand object-handle member `name` of `obj` holds
-// are kept under: its own name, or, §18.4, those of the elements an array of
-// handles holds.
 static std::vector<std::string> HandleKeys(const ClassObject* obj,
                                            const std::string& name) {
   const auto* array = FindClassArrayProperty(obj->type, name);
@@ -508,8 +329,6 @@ static std::vector<std::string> HandleKeys(const ClassObject* obj,
   return keys;
 }
 
-// The object the handle `obj` holds under `key` refers to; null where it
-// holds none or a null handle.
 static ClassObject* HeldObject(const ClassObject* obj, const std::string& key,
                                SimContext& ctx) {
   auto it = obj->properties.find(key);
@@ -541,8 +360,6 @@ std::string InlineReceiverName(const Expr* call) {
 bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
                  SimContext& ctx, Arena& arena) {
   ClassObject* obj = part.obj;
-  // 18.6.3: seed from the object's own RNG so randomize() draws a fresh result
-  // each call while staying reproducible from the object's starting state.
   auto seed = static_cast<uint32_t>(ctx.ObjectRng(obj)());
   part.solver = std::make_unique<ConstraintSolver>(seed);
   ConstraintSolver& solver = *part.solver;
@@ -558,18 +375,12 @@ bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
   if (call.inline_random != nullptr)
     PromoteInlineRandomVariables(obj, ctx, *call.inline_random, rands);
   CollectConstraintBlocks(obj->type, rands, rc, solver);
-  // The inline block is applied only to the object named in the call, not to
-  // its rand sub-objects, which are solved without it.
   if (call.inline_block != nullptr)
     AddInlineConstraintBlock(call, rands, rc, solver);
   PrepareRandVariables(obj, rands, call.inline_random, solver);
   return solver.SolveWith({});
 }
 
-// 18.9 / Table 18-4: record a block's active (ON) or inactive (OFF) state for
-// this object, as set by a void-form constraint_mode() call.
-// 18.5.10: a static block's state is written to the class-wide map, so the
-// change takes effect for every instance of the declaring class.
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active) {
   if (const ClassTypeInfo* owner = StaticConstraintOwner(obj, name)) {
@@ -579,22 +390,14 @@ void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
   obj->constraint_active[std::string(name)] = active;
 }
 
-// 18.8 / Table 18-3: record a random variable's active (ON) or inactive (OFF)
-// state for this object, as set by a rand_mode() call.
-// 18.8: a call on an array member without an index affects all of its
-// elements, so the states its elements were given on their own are dropped
-// for the member's.
 std::unordered_map<std::string, bool>& RandModesOf(ClassObject* obj,
                                                    std::string_view name) {
-  // §18.8: a static variable's state is held by its declaring class.
   const ClassTypeInfo* owner = StaticRandOwner(obj, name);
   return owner != nullptr ? owner->static_rand_active : obj->rand_active;
 }
 
 void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
   auto& modes = RandModesOf(obj, name);
-  // 18.8: a call on an array, a subarray or a structure sets every element or
-  // member under it, so the states set on any of those before are dropped.
   std::erase_if(modes, [name](const auto& entry) {
     const std::string& key = entry.first;
     return key.size() > name.size() && key.starts_with(name) &&
@@ -603,14 +406,6 @@ void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active) {
   modes[std::string(name)] = active;
 }
 
-// 18.5.11: gather the identifiers a constraint relation names, partitioned by
-// whether the identifier appears in a function-call argument position. 'in_arg'
-// is true while descending through the argument subtrees of a call, so a name
-// used as (or inside) a function argument is added to 'arg_names' while every
-// named identifier is added to 'all_names'. Only the argument subtrees carry
-// the in-argument flag; the callee and receiver of a member call do not, so the
-// object handle of a qualified call is not mistaken for an argument. The caller
-// filters these against the object's random variables.
 void CollectConstraintArgRefs(const Expr* e, bool in_arg,
                               std::unordered_set<std::string>& all_names,
                               std::unordered_set<std::string>& arg_names) {
@@ -631,26 +426,17 @@ void CollectConstraintArgRefs(const Expr* e, bool in_arg,
   CollectConstraintArgRefs(e->with_expr, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->stream_range, in_arg, all_names, arg_names);
   CollectConstraintArgRefs(e->repeat_count, in_arg, all_names, arg_names);
-  // A call's arguments (and everything nested within them) are in-argument.
   for (const Expr* a : e->args)
     CollectConstraintArgRefs(a, call || in_arg, all_names, arg_names);
   for (const Expr* el : e->elements)
     CollectConstraintArgRefs(el, in_arg, all_names, arg_names);
 }
 
-// 18.4: a rand class-handle member names an object; randomize() solves that
-// object's own random members and shall never modify the handle itself. The
-// handle is therefore not built as a solver variable — doing so would draw an
-// integer and overwrite the handle on writeback. (The recursive solve of the
-// referenced object is a separate concern; the head-level obligation observed
-// here is simply that the handle value is left unchanged.)
 bool IsClassHandleMember(const ClassMember* m, SimContext& ctx) {
   return m->data_type.kind == DataTypeKind::kNamed &&
          ctx.FindClassType(m->data_type.type_name) != nullptr;
 }
 
-// 18.5: translate one captured constraint relation into a solver
-// ConstraintExpr.
 static ConstraintExpr TranslateUnguarded(const Expr* rel,
                                          std::vector<RandInfo>& rands,
                                          RandomizeCtx& rc, bool fold) {
@@ -663,10 +449,6 @@ static ConstraintExpr TranslateUnguarded(const Expr* rel,
   return MakeCustomConstraint(rel, rands, rc);
 }
 
-// 18.5.12: an implication's antecedent is its constraint guard, resolved
-// before the relation is imposed, however the relation itself is built.
-// 18.5.8: a relation reaching another object of a joint solve is built over
-// the variables of the tree the object reaches.
 ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold) {
   ConstraintExpr joint;
@@ -680,11 +462,6 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
   return ce;
 }
 
-// 18.11: locate a class property by name for the inline random control list,
-// walking the inheritance chain. Unlike CollectRandVariables this ignores the
-// rand/randc qualifier, because naming a property in the argument list may make
-// even a non-random property one of the object's random variables. Class-handle
-// members are excluded so the handle they hold is never overwritten.
 const ClassMember* FindNamedProperty(const ClassTypeInfo* type, SimContext& ctx,
                                      std::string_view name,
                                      const ClassTypeInfo** out_level) {
@@ -701,11 +478,6 @@ const ClassMember* FindNamedProperty(const ClassTypeInfo* type, SimContext& ctx,
   return nullptr;
 }
 
-// 18.11: the property name that a randomize() inline-control argument refers
-// to. Such an argument is a plain property reference -- a bare identifier, an
-// indexed element, or a member access -- never a computed expression (the
-// parser has already rejected those). Returns the referenced name, or an empty
-// view for a form that carries none.
 std::string_view InlineRandomArgName(const Expr* arg) {
   if (arg == nullptr) return {};
   switch (arg->kind) {
@@ -720,37 +492,19 @@ std::string_view InlineRandomArgName(const Expr* arg) {
   }
 }
 
-// 18.6.2: pre_randomize() is invoked by randomize() before any new random value
-// is computed, so it runs ahead of the constraints' translation too: a state
-// variable it writes is what they read. The method is resolved on the
-// object's actual (dynamic) class: because randomize() is virtual, an override
-// in the dynamic type is reached even through a base-class handle, so
-// pre_randomize() appears to behave virtually. A derived class that does not
-// itself declare pre_randomize() resolves to the inherited one, which is the
-// effect of automatically invoking super.pre_randomize().
 void InvokePreRandomize(ClassObject* obj, const Expr* expr, SimContext& ctx,
                         Arena& arena) {
   const ClassTypeInfo* owner = nullptr;
   if (ModuleItem* pre =
           obj->ResolveMethodForType("pre_randomize", obj->type, &owner)) {
-    // Run the body with its defining class as the enclosing scope so an
-    // unqualified member resolves to that level (§8.15) and a super call inside
-    // an override walks one level up, mirroring an ordinary method dispatch.
     ctx.PushMethodClass(owner);
     ExecInstanceMethodCall(pre, obj, expr, ctx, arena);
     ctx.PopMethodClass();
   }
 }
 
-// Resolve the concrete object from the handle. Works equally for a direct class
-// handle and an interface-class handle (8.26.9): the dynamic object found from
-// the handle is the implementing class instance either way.
 ClassObject* ResolveRandomizeTarget(SimContext& ctx,
                                     const MethodCallParts& parts) {
-  // 8.11: `this` names the object whose method is executing, so
-  // `this.randomize()` randomizes that object. It is not a variable, so the
-  // lookup below cannot reach it and the call would resolve to no target at
-  // all.
   if (parts.var_name == "this") {
     auto* self = ctx.CurrentThis();
     return (self != nullptr && self->type != nullptr) ? self : nullptr;
@@ -768,16 +522,12 @@ ClassObject* ResolveRandomizeTarget(SimContext& ctx,
 Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
                       const std::string& prefix, Arena& arena) {
   if (ri.var.is_real) {
-    // 18.4.1: the real drawn is written back as the real it is.
     return MakeRealVec(arena, solver.GetRealValue(prefix + ri.name),
                        ri.var.width == 32 ? 32 : 64);
   }
   int64_t v = solver.GetValue(prefix + ri.name);
   Logic4Vec lv =
       MakeLogic4VecVal(arena, ri.var.width, static_cast<uint64_t>(v));
-  // 6.11.3: the member's declared signedness belongs to the value stored in
-  // it, so a negative draw written into a signed member reads back as that
-  // negative number rather than as its unsigned bit pattern.
   lv.is_signed = ri.var.is_signed;
   return lv;
 }
@@ -793,7 +543,7 @@ TokenKind MirrorComparison(TokenKind op) {
     case TokenKind::kLt:
       return TokenKind::kGt;
     default:
-      return op;  // == and != are symmetric
+      return op;
   }
 }
 
@@ -804,9 +554,6 @@ RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name) {
   return nullptr;
 }
 
-// 18.4: gather every rand/randc data member visible on the object, walking the
-// inheritance chain so inherited random variables are included. Class-handle
-// members are skipped so the handle they hold is never overwritten.
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out) {
   for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
@@ -819,9 +566,6 @@ void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
   }
 }
 
-// 18.5: the comparison operators a relation can fold into a domain bound or a
-// typed solver constraint. Returns the solver kind for the var-on-left form;
-// callers mirror the operator for the var-on-right form before calling.
 bool ComparisonKind(TokenKind op, ConstraintKind& out) {
   switch (op) {
     case TokenKind::kGtEq:
@@ -847,17 +591,6 @@ bool ComparisonKind(TokenKind op, ConstraintKind& out) {
   }
 }
 
-// 18.5/18.5.13: tighten a relation 'var <op> constant' into the variable's draw
-// domain so the 500-attempt generate-and-test solver reliably hits it.
-//
-// 6.11.3: which of the two bounds a constant is, and which of it and the
-// standing bound is the tighter, is decided in the order the variable's
-// declared type reads them (DomainMin/DomainMax). A constant in the top half of
-// an unsigned 64-bit range is a negative int64_t, so ordered as a signed number
-// it looks like a bound below the bottom of the range and tightens the wrong
-// end of it. The step to the neighbouring value of a strict relation is taken
-// in wrapping unsigned arithmetic for the same reason: at the top of the range
-// there is no next number for a signed int64_t to hold.
 void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c) {
   switch (kind) {
     case ConstraintKind::kGreaterEqual:
@@ -898,10 +631,6 @@ void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c) {
   }
 }
 
-// 18.9: report whether a constraint block is active on this object. Every block
-// is active when the object is created, so an absent entry means active.
-// 18.5.10: for a static block the state is the class-wide one shared by all
-// instances, kept on the declaring type rather than on this object.
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name) {
   if (const ClassTypeInfo* owner = StaticConstraintOwner(obj, name)) {
     auto it = owner->static_constraint_active.find(std::string(name));

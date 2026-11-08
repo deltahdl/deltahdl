@@ -1,17 +1,3 @@
-// Tests for the §23.9 scope rules as they reach a subroutine no module holds:
-// one declared in the compilation-unit scope (§3.12.1) and one declared in a
-// package (Clause 26). §23.9 lists a task and a function among the elements
-// that define a scope and searches an identifier referenced without a
-// hierarchical path upward from the scope it stands in, and neither of these
-// bodies stands in a module -- so the walk that resolves a module's
-// subroutines never reached them, and a read of a name nothing declares was
-// accepted there. Every case here writes the read in one of the two bodies and
-// says whether §23.9 finds a declaration for it.
-//
-// The cases over a module's subroutines and procedural blocks are in
-// test_elaborator_subclause_23_09a.cpp, and those over generate blocks in
-// test_elaborator_subclause_23_09b.cpp.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -21,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §23.9 with §3.12.1: a function at compilation-unit scope reading a name
-// declared nowhere. Line 3 is the read; the module beside it declares nothing
-// of the name either, so the module is not what answers. The read stands on an
-// assignment's right side; the other positions a statement reads in are
-// test_elaborator_subclause_23_09d.cpp's.
 TEST(UnitScopeSubroutineReads, UndeclaredNameInAUnitFunctionIsReported) {
   ElabFixture f;
   ElabOk(
@@ -42,9 +23,6 @@ TEST(UnitScopeSubroutineReads, UndeclaredNameInAUnitFunctionIsReported) {
                             3, "23.9"));
 }
 
-// The same read inside a randsequence production code block of the function,
-// the shape of sv-tests' §18.17 `_fail` files: the code block is a statement
-// of the body, reached through the same walk. Line 5 is the code block.
 TEST(UnitScopeSubroutineReads,
      UndeclaredNameInAUnitFunctionsProductionCodeBlockIsReported) {
   ElabFixture f;
@@ -65,8 +43,6 @@ TEST(UnitScopeSubroutineReads,
                             5, "23.9"));
 }
 
-// §23.9 with Clause 26: a function declared in a package reading a name
-// declared nowhere, on line 4.
 TEST(UnitScopeSubroutineReads, UndeclaredNameInAPackageFunctionIsReported) {
   ElabFixture f;
   ElabOk(
@@ -85,14 +61,6 @@ TEST(UnitScopeSubroutineReads, UndeclaredNameInAPackageFunctionIsReported) {
                             4, "23.9"));
 }
 
-// The control for the compilation-unit body: each name it reads is one §23.9
-// lets it reach -- a variable and a parameter of the compilation unit, a
-// member of an enumeration declared there (§6.19 makes it a constant of the
-// scope), a name a package the unit imports provides (§26.3), and a name an
-// import written in the body itself provides. The names are distinct so that
-// a predicate missing any one of them is what fails this case, and the read
-// stands on an assignment's right side, the position the collector reads, so
-// that the case is not satisfied by a read never collected.
 TEST(UnitScopeSubroutineReads, AUnitFunctionReadingReachableNamesIsClean) {
   EXPECT_TRUE(
       ElabOk("package q;\n"
@@ -115,9 +83,6 @@ TEST(UnitScopeSubroutineReads, AUnitFunctionReadingReachableNamesIsClean) {
              "endmodule\n"));
 }
 
-// The control for the package body: its own variable and parameter, a member
-// of an enumeration it declares, and a name another package provides through
-// an import written in the package (§26.3).
 TEST(UnitScopeSubroutineReads, APackageFunctionReadingReachableNamesIsClean) {
   EXPECT_TRUE(
       ElabOk("package q;\n"
@@ -138,9 +103,6 @@ TEST(UnitScopeSubroutineReads, APackageFunctionReadingReachableNamesIsClean) {
              "endmodule\n"));
 }
 
-// The body's own names are not the compilation unit's to declare: a formal and
-// a local of the function answer their reads, as they do in a module's
-// function (CollectSubroutineLocalNames).
 TEST(UnitScopeSubroutineReads, AUnitFunctionReadingItsOwnNamesIsClean) {
   EXPECT_TRUE(
       ElabOk("function int f(int formal);\n"

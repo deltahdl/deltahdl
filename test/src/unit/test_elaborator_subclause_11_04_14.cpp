@@ -52,8 +52,6 @@ TEST(StreamingOperatorElaboration, StreamingNestedInStreaming) {
 }
 
 TEST(StreamingOperatorElaboration, RealTargetForStreamingSourceRejected) {
-  // §11.4.14: a streaming_concatenation source requires a bit-stream-type
-  // target; a real variable is not a bit-stream type and shall be rejected.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -71,7 +69,6 @@ TEST(StreamingOperatorElaboration, RealTargetForStreamingSourceRejected) {
 }
 
 TEST(StreamingOperatorElaboration, EventTargetForStreamingSourceRejected) {
-  // §11.4.14: event variables are likewise not bit-stream types.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -89,9 +86,6 @@ TEST(StreamingOperatorElaboration, EventTargetForStreamingSourceRejected) {
 }
 
 TEST(StreamingOperatorElaboration, StreamingAsArithOperandRejected) {
-  // §11.4.14: a streaming_concatenation appearing as a sub-operand of an
-  // expression (here, the right operand of `+`) without a prior bit-stream
-  // cast is illegal.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -109,9 +103,6 @@ TEST(StreamingOperatorElaboration, StreamingAsArithOperandRejected) {
 }
 
 TEST(StreamingOperatorElaboration, StreamingAsAssignmentTarget) {
-  // §11.4.14: a streaming_concatenation is a legal target of an assignment (the
-  // unpack position). Elaboration shall accept it — the context walk marks the
-  // left-hand side of an assignment as a valid streaming context.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -125,10 +116,6 @@ TEST(StreamingOperatorElaboration, StreamingAsAssignmentTarget) {
 }
 
 TEST(StreamingOperatorElaboration, ChandleTargetForStreamingSourceRejected) {
-  // §11.4.14: the target of a streaming_concatenation source must be a
-  // bit-stream data object (or another streaming_concatenation). A chandle is
-  // not a bit-stream type, so it is rejected — a distinct non-bit-stream type
-  // from the real/event cases above.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -145,11 +132,6 @@ TEST(StreamingOperatorElaboration, ChandleTargetForStreamingSourceRejected) {
       4, "11.4.14"));
 }
 
-// §11.4.14: a streaming concatenation re-orders the bits of its stream
-// expressions without adding or dropping any, so it is as wide as those
-// operands together -- eight bits for two four-bit literals. The slice size
-// decides the order the bits leave in rather than how many there are, so it
-// does not enter the sum.
 TEST(StreamingOperatorElaboration,
      StreamingConcatWidthIsTheSumOfItsOperandWidths) {
   TypedefMap typedefs;
@@ -169,24 +151,6 @@ TEST(StreamingOperatorElaboration,
   EXPECT_EQ(InferExprWidth(&stream, typedefs), 8u);
 }
 
-// §11.4.14 confines a streaming concatenation to an assignment or a bit-stream
-// cast and names no statement it is allowed to stand in, so every position a
-// statement holds a statement in is one the report reaches.
-// ElaboratorOperationRules::WalkStmtsForStreamingContext in
-// src/elaborator/elaborator_validate_operations_streaming.cpp had written out
-// six of the thirteen child-statement links Stmt declares and now takes the
-// list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The seven cases below stand in
-// the seven positions it was missing, each of which elaborated clean beforehand
-// with the concatenation left in an operand position nothing objected to. Each
-// writes the concatenation as the right operand of `+`, the form
-// StreamingAsArithOperandRejected above establishes as illegal in an
-// initial-block statement.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
-// holds statements the way a begin-end block does. The parser keeps them in
-// Stmt::fork_stmts rather than in Stmt::stmts.
 TEST(StreamingOperatorElaboration,
      StreamingAsArithOperandInAForkStatementRejected) {
   ElabFixture f;
@@ -206,8 +170,6 @@ TEST(StreamingOperatorElaboration,
       5, "11.4.14"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
-// the loop header holds assignments of its own, kept in Stmt::for_inits.
 TEST(StreamingOperatorElaboration,
      StreamingAsArithOperandInAForInitializerRejected) {
   ElabFixture f;
@@ -228,9 +190,6 @@ TEST(StreamingOperatorElaboration,
       6, "11.4.14"));
 }
 
-// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
-// at the other end of the loop header, kept in Stmt::for_steps. The initializer
-// here assigns a constant, so the report can only be about the step.
 TEST(StreamingOperatorElaboration, StreamingAsArithOperandInAForStepRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -250,10 +209,6 @@ TEST(StreamingOperatorElaboration, StreamingAsArithOperandInAForStepRejected) {
       6, "11.4.14"));
 }
 
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
 TEST(StreamingOperatorElaboration,
      StreamingAsArithOperandInAnAssertionPassStatementRejected) {
   ElabFixture f;
@@ -272,8 +227,6 @@ TEST(StreamingOperatorElaboration,
       5, "11.4.14"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(StreamingOperatorElaboration,
      StreamingAsArithOperandInAnAssertionFailStatementRejected) {
   ElabFixture f;
@@ -292,10 +245,6 @@ TEST(StreamingOperatorElaboration,
       5, "11.4.14"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §11.4.14
-// judges where the concatenation is written rather than whether it runs, so the
-// report stands whether the weighted draw would select the item or not.
 TEST(StreamingOperatorElaboration,
      StreamingAsArithOperandInARandcaseItemRejected) {
   ElabFixture f;
@@ -313,10 +262,6 @@ TEST(StreamingOperatorElaboration,
       4, "11.4.14"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(StreamingOperatorElaboration,
      StreamingAsArithOperandInARandsequenceCodeBlockRejected) {
   ElabFixture f;
@@ -338,9 +283,6 @@ TEST(StreamingOperatorElaboration,
       6, "11.4.14"));
 }
 
-// §11.4.14 bars a streaming concatenation as an operand of an expression
-// without a cast wherever it is written, so a declaration's initializer and a
-// subroutine's statements are held to it as a procedure's are.
 TEST(StreamingConcatElaboration,
      OperandUseInInitializersAndSubroutinesReported) {
   ElabFixture f;
@@ -364,8 +306,6 @@ TEST(StreamingConcatElaboration,
   }
 }
 
-// An initializer and a return value are each the source of an assignment, so
-// a streaming concatenation standing as the whole of one is legal there.
 TEST(StreamingConcatElaboration, StreamAsInitializerOrReturnValueAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -380,10 +320,6 @@ TEST(StreamingConcatElaboration, StreamAsInitializerOrReturnValueAccepted) {
              "endmodule\n"));
 }
 
-// A.8.3 counts `( operator_assignment )` among an expression's forms, so an
-// assignment written within an expression is an assignment still, and its
-// target and its source are where §11.4.14 lets a streaming concatenation
-// stand.
 TEST(StreamingConcatElaboration, StreamAssignedWithinAnExpressionAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -395,9 +331,6 @@ TEST(StreamingConcatElaboration, StreamAssignedWithinAnExpressionAccepted) {
              "endmodule\n"));
 }
 
-// A.10 footnote 52 lets no assignment operator but `=` and `<=` take a
-// streaming target, so a compound operator within an expression applies its
-// operator to the concatenation, which then stands as an operand.
 TEST(StreamingConcatElaboration,
      StreamCompoundAssignedWithinAnExpressionReported) {
   ElabFixture f;
@@ -414,9 +347,6 @@ TEST(StreamingConcatElaboration,
       3, "11.4.14"));
 }
 
-// A loop's condition, a case item, an event control and a delay are neither an
-// assignment nor a bit-stream cast, so §11.4.14 bars a streaming concatenation
-// from each of them as from any operand position.
 TEST(StreamingConcatElaboration, StreamInAStatementsOtherExpressionsReported) {
   ElabFixture f;
   ElaborateSrc(

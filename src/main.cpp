@@ -1,9 +1,4 @@
 #include <pthread.h>
-// glibc declares pthread_t and pthread_attr_t in <bits/pthreadtypes.h>, which
-// <pthread.h> reaches through <sys/types.h>; misc-include-cleaner asks for the
-// header that declares a name and names no public one for these two, so the
-// declaring header is included where it exists. Apple's SDK declares them in
-// <pthread.h>'s own tree and has no such file.
 #if __has_include(<bits/pthreadtypes.h>)
 #include <bits/pthreadtypes.h>
 #endif
@@ -64,9 +59,6 @@ namespace {
 
 using delta::PreprocResult;
 
-// The compilation units a run elaborates: the one every file makes up, or,
-// where each file is a unit of its own (§3.12.1), every unit beside the merged
-// view of them that the run's other steps read (compilation_unit_set.h).
 struct ParsedUnits {
   delta::CompilationUnit* cu = nullptr;
   std::vector<delta::CompilationUnit*> separate;
@@ -149,29 +141,11 @@ void PrintHelp() {
             << "  --dump-aig           Print AIG to stdout\n";
 }
 
-// --vcd is not one of the VCD system tasks §21.7.1 creates a dump file with,
-// so it opens the same dump those tasks open -- SimContext::OpenVcdDump writes
-// the header, the definitions and the per-timestep recording either way. What
-// differs is that no $dumpvars is coming to start this one (§21.7.1.3): the
-// option asks for the whole design dumped from time 0, so the recording is not
-// held back.
-//
-// The option runs before the scheduler does, so its writer is the one in place
-// when a source that also calls the VCD tasks reaches its first $dumpfile.
-// That call finds the dump already open and adds nothing; the file named on
-// the command line is the one written.
 void SetupVcd(delta::SimContext& ctx, const std::string& top,
               const std::string& vcd_file) {
   ctx.Vcd().SetDumpFileName(vcd_file);
-  // Reproduce the $dumpfile call that would have named this output in the
-  // $version section (§21.7.2.3).
   ctx.Vcd().SetDumpFileLiteral("\"" + vcd_file + "\"");
-  // §21.7.1: the option stands in for the tasks that create the 4-state file,
-  // so that is the type it opens. §21.7.3.1 gives $dumpports a file of its own,
-  // so a source calling it afterwards writes its extended dump beside this one
-  // rather than into it.
-  ctx.OpenVcdDump(top, /*wait_for_dumpvars=*/false,
-                  delta::VcdFileType::kFourState);
+  ctx.OpenVcdDump(top, false, delta::VcdFileType::kFourState);
 }
 
 void DumpAst(const delta::CompilationUnit* cu) {
@@ -197,12 +171,6 @@ void DumpIr(const delta::RtlirDesign* design) {
   }
 }
 
-// §33.3.1 (printed pages 935-936): the library mapping is read from a
-// predefined file before any source description is, and a tool lets an
-// invocation name library map files of its own, which are then read in the
-// order they were named. The predefined file is lib.map in the working
-// directory, read where the command line names no map file of its own. False
-// where a map file could not be read or parsed.
 bool LoadLibraryMaps(const delta::CliOptions& opts,
                      delta::SourceManager& src_mgr,
                      delta::LibraryMap& lib_map) {
@@ -216,15 +184,11 @@ bool LoadLibraryMaps(const delta::CliOptions& opts,
     std::vector<std::string> errors;
     bool loaded = lib_map.LoadMapFile(map_file, &errors);
     for (const auto& err : errors) std::cerr << "error: " << err << "\n";
-    // LibraryMap::LoadMapFile returns false on every path that records an
-    // error, so `loaded` alone says whether the file was read.
     if (!loaded) return false;
   }
   return true;
 }
 
-// The command-line source file whose text holds line `line` of the
-// preprocessed source.
 std::string_view SourceFileHoldingLine(const PreprocResult& pp, uint32_t line) {
   std::string_view path;
   for (const auto& [first_line, file] : pp.file_first_lines) {
@@ -234,12 +198,6 @@ std::string_view SourceFileHoldingLine(const PreprocResult& pp, uint32_t line) {
   return path;
 }
 
-// §33.3.1 (printed page 936): a file that no library's file_path_spec matches
-// is compiled into the default library, work, and a file that does match
-// compiles into the library
-// whose specification claims it, so every design element carries the library
-// of the command-line file it was written in. A file several libraries claim
-// equally belongs to none of them, which §33.3.1.1 makes an error.
 bool TagDesignElementLibraries(delta::CompilationUnit& cu,
                                const PreprocResult& pp,
                                const delta::LibraryMap& lib_map,
@@ -280,22 +238,16 @@ bool TagDesignElementLibraries(delta::CompilationUnit& cu,
   return ok;
 }
 
-// §33.3.1, Syntax 33-2: a config a library map file declares is a config of
-// the design as much as one a source file declares.
 void AddMapConfigs(delta::CompilationUnit& cu,
                    const delta::LibraryMap& lib_map) {
   for (auto* cfg : lib_map.DeclaredConfigs()) cu.configs.push_back(cfg);
 }
 
-// The top-level cell a run from source descriptions is rooted at: the last
-// --top names, or none where it names none.
 std::string_view SourceTopModule(const delta::CliOptions& opts) {
   if (opts.top_modules.empty()) return {};
   return opts.top_modules.back();
 }
 
-// The top-level instance a dump named on the command line is rooted at: the
-// one --top names, else the first the design roots.
 std::string DumpTopModule(const delta::CliOptions& opts,
                           const delta::RtlirDesign* design) {
   if (std::string_view top = SourceTopModule(opts); !top.empty()) {
@@ -305,11 +257,6 @@ std::string DumpTopModule(const delta::CliOptions& opts,
   return std::string(design->top_modules.front()->name);
 }
 
-// §33.8.1: installs the library search order this invocation is to use, which
-// the -L arguments override the library map's declaration order with. Those
-// arguments carry library names and nothing else, so an argument that is not a
-// library name names no library the map could define and the run stops instead
-// of searching an order that was never asked for. Returns false in that case.
 bool InstallLibrarySearchOrder(const delta::CliOptions& opts,
                                const delta::LibraryMap& lib_map,
                                delta::Elaborator& elaborator) {
@@ -324,11 +271,6 @@ bool InstallLibrarySearchOrder(const delta::CliOptions& opts,
   return true;
 }
 
-// What ElaborateDesign answers. A run that stopped on an error it reported has
-// failed, whatever the source declares. A run that did not, and still has no
-// design, came from a source that declares nothing -- a file of compiler
-// directives, of comments alone or of no bytes at all, which Annex A.1.2 makes
-// valid source text -- and has nothing to run.
 struct Elaboration {
   const delta::RtlirDesign* design = nullptr;
   bool failed = false;
@@ -338,10 +280,6 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
                             const delta::LibraryMap& lib_map,
                             const ParsedUnits& units, delta::DiagEngine& diag,
                             delta::Arena& arena) {
-  // §11.11's three values are chosen among while a constant expression is
-  // folded, and elaboration is where that folding happens, so the guard is
-  // constructed here rather than in main: ElaborateDesign is the whole of the
-  // elaboration, and both RunSimulation and RunSynthesis reach it through here.
   delta::DelayModeGuard mintypmax_guard(opts.mintypmax);
 
   std::optional<delta::Elaborator> built;
@@ -356,17 +294,6 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
   if (!InstallLibrarySearchOrder(opts, lib_map, elaborator)) {
     return {.failed = true};
   }
-  // §33.5.4: a configuration whose source description was named on the command
-  // line settles the design, so the top-level cell named here is what a command
-  // line that put no configuration in force is elaborated from.
-  //
-  // §23.3.1 (printed page 740): a top-level module is one the source text
-  // holds that no module instantiation statement names, so with no --top the
-  // design is rooted at every such module, which ElaborateCommandLine collects
-  // for an empty name. The last module in the source was taken for the top
-  // instead, and a design whose top came before the modules it instantiates --
-  // the standard's own §23.5 example, `module top` followed by `module m (.*)`
-  // and `module a (.*)` -- elaborated one of those alone and ran nothing.
   const auto* design = delta::ElaborateCommandLine(
       elaborator, *units.cu, SourceTopModule(opts), opts.config, diag);
   if (diag.HasErrors()) return {.failed = true};
@@ -375,12 +302,6 @@ Elaboration ElaborateDesign(const delta::CliOptions& opts,
   return {.design = design};
 }
 
-// --synth lowers the design's first top-level module. A design with none, which
-// is what a source declaring nothing or only packages, types or classes
-// elaborates to, leaves nothing to lower, and the run says so rather than
-// failing without a word. A run ElaborateDesign stopped on an error it
-// reported adds nothing to that report. This is a limit of what synthesis can
-// produce, not a rule of IEEE 1800-2023, so the report cites no subclause.
 int RunSynthesis(const delta::CliOptions& opts,
                  const delta::LibraryMap& lib_map, const ParsedUnits& units,
                  delta::DiagEngine& diag, delta::Arena& arena) {
@@ -413,15 +334,6 @@ int RunSynthesis(const delta::CliOptions& opts,
   return 0;
 }
 
-// --lint-only, "Parse and elaborate only": the design is elaborated as it is
-// ahead of a simulation, so every rule the elaborator enforces is applied and
-// reported, and nothing is run. The status is 1 on any report, including one
-// ElaborateDesign writes on its own, such as an -L entry that is not a library
-// name. A source that declares nothing, which is what a file of compiler
-// directives, of comments alone or of no bytes at all is, has nothing to
-// elaborate and nothing to report, and passes. Until this the option returned 0
-// as soon as the source had parsed, so a source only the elaborator could
-// reject was reported clean.
 int RunLint(const delta::CliOptions& opts, const delta::LibraryMap& lib_map,
             const ParsedUnits& units, delta::DiagEngine& diag,
             delta::Arena& arena) {
@@ -430,8 +342,6 @@ int RunLint(const delta::CliOptions& opts, const delta::LibraryMap& lib_map,
   return 0;
 }
 
-// Runs an elaborated design to its end: lowered into a simulation context,
-// scheduled, and its final blocks and coverage results reported.
 int SimulateDesign(const delta::CliOptions& opts,
                    const delta::RtlirDesign* design, delta::DiagEngine& diag,
                    delta::Arena& arena) {
@@ -439,65 +349,30 @@ int SimulateDesign(const delta::CliOptions& opts,
 
   delta::Scheduler scheduler(arena);
   delta::SimContext sim_ctx(scheduler, arena, diag, opts.seed);
-  // §38.30 and §38.27: a PLI application's text reaches the run's standard
-  // output, in order with the design's own, for as long as the run lasts.
   delta::GetGlobalVpiContext().ConnectOutputChannel(&sim_ctx.Log().Out());
-  // §11.11: the run selects the same member of a min:typ:max expression that
-  // ElaborateDesign folded parameters at, which EvalMinTypMax in
-  // src/simulator/evaluation.cpp reads back through SimContext::GetDelayMode.
-  // It is set before the design is lowered so that a delay evaluated during
-  // lowering sees it.
   sim_ctx.SetDelayMode(opts.mintypmax);
-  // §21.6: the plusargs $test$plusargs and $value$plusargs search.
   for (const auto& plus_arg : opts.plus_args) sim_ctx.AddPlusArg(plus_arg);
-  // §31.9.4: the two timing check invocation options are in force before the
-  // design's checks are registered at lowering, which builds each under them.
   sim_ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(
       {opts.negative_timing_checks, opts.no_timing_checks});
-  // §30.7.2, §30.7.4.1 and §30.7.4.2: the pulse control invocation options are
-  // in force before lowering registers the design's module paths, each of which
-  // derives its pulse limits from the percentages as it is registered.
   delta::ApplyPulseControlOptions(opts, sim_ctx.AcquireSpecifyManager());
-  // §40.3.2.4 and §40.3.2.5: a coverage database $coverage_save names is a
-  // file in the directory the run starts in, where a later run's
-  // $coverage_merge finds it.
   sim_ctx.GetCoverageControlState().SetDatabaseDirectory(".");
   delta::Lowerer lowerer(sim_ctx, arena, diag);
   lowerer.Lower(design);
-  // §35.4: the imports lowering registered are bound to the global symbols
-  // their linkage names name, before any process can call one.
   delta::BindDesignDpiImports(sim_ctx);
 
   if (!opts.vcd_file.empty()) SetupVcd(sim_ctx, top, opts.vcd_file);
 
   scheduler.Run();
   scheduler.EndSimulation();
-  // §16.3 and §16.14.3: the results of coverage for the immediate and the
-  // concurrent cover statements are reported at the end of simulation, once
-  // the final blocks that could still evaluate one have run.
   delta::ReportImmediateCoverResults(sim_ctx.ImmediateCovers(), std::cout);
   delta::ReportConcurrentCoverResults(sim_ctx.ConcurrentCovers(), std::cout);
-  // §19.7: the cross bins a cross's cross_num_print_missing asks the coverage
-  // report to list, once the final blocks have sampled.
   sim_ctx.CoverageData().ReportMissingCrossBins(std::cout);
-  // §19.9: the coverage database is saved at the end of the run to the file
-  // $set_coverage_db_name named, once the final blocks have sampled.
   sim_ctx.CoverageData().SaveNamedCoverageDb();
-  // §21.7.3.6.1: close the dump by recording the final simulation time, which
-  // an extended VCD file ends with. This covers a dump the source's own VCD
-  // tasks opened as well as one --vcd asked for, and does nothing when the run
-  // opened none.
   sim_ctx.CloseVcdDump();
   delta::GetGlobalVpiContext().ConnectOutputChannel(nullptr);
-  // §20.10: a $fatal or an $error the run called is an error of the run.
   return diag.HasErrors() || sim_ctx.HasRuntimeErrors() ? 1 : 0;
 }
 
-// A source that declares nothing, which is what a file of compiler directives,
-// of comments alone or of no bytes at all is, is valid source text under Annex
-// A.1.2 and elaborates to no design: there is nothing to run, and the run
-// passes, as one of a package alone does. A run ElaborateDesign stopped on an
-// error it reported fails, whatever the source declares.
 int RunSimulation(const delta::CliOptions& opts,
                   const delta::LibraryMap& lib_map, const ParsedUnits& units,
                   delta::DiagEngine& diag, delta::Arena& arena) {
@@ -507,8 +382,6 @@ int RunSimulation(const delta::CliOptions& opts,
   return SimulateDesign(opts, design, diag, arena);
 }
 
-// The run to carry across the thread boundary below, and the status it
-// answers.
 struct SimulationJob {
   const std::function<int()>& run;
   int status = 1;
@@ -520,21 +393,6 @@ void* RunSimulationJob(void* arg) {
   return nullptr;
 }
 
-// §13.3 has a task enable other tasks with no limit on how many are enabled,
-// and §13.4 lets a function call functions and itself, so a design's call
-// chain is as deep as it writes it; the interpreter spends a native frame on
-// every statement and call along it, and UVM's `run_test` stands ninety-odd
-// frames deep before its root object exists, which outran the 8 MiB a main
-// thread has on macOS and segfaulted. The simulation therefore runs on a
-// thread of its own with a stack of 1 GiB, address space reserved and paged
-// in only as far as the run goes, the main thread waiting for its status; a
-// system that refuses the thread gets the run on the main thread as before.
-//
-// The attributes are set up unchecked. POSIX lets pthread_attr_init fail only
-// for want of memory, which glibc and macOS never report, and
-// pthread_attr_setstacksize only for a size below PTHREAD_STACK_MIN or, on
-// macOS, one that is not a multiple of the page size; the constant 1 GiB is
-// neither, so neither call has a failure this run could take.
 int RunOnDeepStack(const std::function<int()>& run) {
   SimulationJob job{run};
   constexpr std::size_t kStackBytes = std::size_t{1} << 30;
@@ -551,23 +409,9 @@ int RunOnDeepStack(const std::function<int()>& run) {
 
 }  // namespace
 
-// §34.3.1's encrypting mode over the sources named on the command line: each
-// text's encryption envelopes come back decryption envelopes, and everything
-// outside them comes back as it was written. The produced text goes to standard
-// output, one source after another, which is what lets an author redirect it
-// into the file they mean to ship.
-//
-// The engine the run already holds is handed to the encryptor, so the four
-// conditions §34.5.1, §34.5.15 and §34.5.27 make an error in an input file are
-// printed and decide the status. The transformation reads each text to its end
-// whatever it found, so a breach costs the report rather than the text, and the
-// text is still written; the status is what says it was not clean.
 int RunEnvelopeEncryption(const delta::CliOptions& opts,
                           delta::SourceManager& src_mgr,
                           delta::DiagEngine& diag) {
-  // §34.4 lets the scope of the protect directives cross file boundaries, so
-  // one encryptor reads every source in turn, and the source manager holds each
-  // text for as long as a region left open in it may still refer to it.
   delta::EnvelopeEncryptor encryptor(opts.protect.exchange_key,
                                      opts.protect.keys, &diag);
   for (const auto& path : opts.source_files) {
@@ -580,15 +424,6 @@ int RunEnvelopeEncryption(const delta::CliOptions& opts,
   return diag.HasErrors() ? 1 : 0;
 }
 
-// §33.5.4's binding invocation: the tool that binds a design from precompiled
-// libraries is told only the lib.cell of each top-level cell, or the
-// configuration to use, or both, and under that strategy the configuration is
-// precompiled as well.
-//
-// So the cells come from the libraries --load-lib names and from nowhere else,
-// and what roots the design is either --config or the top-level cells --top
-// names. A configuration is looked for among the precompiled cells for the same
-// reason every other cell is: this invocation reads no source description.
 int RunSeparateCompilationBind(const delta::CliOptions& opts,
                                delta::SourceManager& src_mgr,
                                delta::DiagEngine& diag) {
@@ -597,10 +432,6 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   for (const auto& path : opts.precompiled_libs) {
     if (!binder.LoadLibrary(path)) return 1;
   }
-  // §33.8.1: -L names the libraries an instantiated cell is searched in and
-  // their order, on this invocation as on one that reads source descriptions,
-  // and an argument that is no library name is refused here as it is there.
-  // A bind reads no library map, so the order is the -L names alone.
   std::vector<std::string> errors;
   auto order =
       delta::LibraryMap().ResolveSearchOrder(opts.lib_search_order, &errors);
@@ -612,8 +443,6 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   if (!opts.config.empty()) {
     design = binder.BindConfig(opts.config);
   } else if (!opts.top_modules.empty()) {
-    // §33.5.3 (printed page 944): the binding tool is told the top-level
-    // module or modules of the design, so every cell --top names roots it.
     design = binder.Bind(std::vector<std::string_view>(opts.top_modules.begin(),
                                                        opts.top_modules.end()));
   } else {
@@ -622,13 +451,7 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
   }
   if (design == nullptr || diag.HasErrors()) return 1;
   if (opts.dump_ir) DumpIr(design);
-  // The bound design is the design of this invocation, so it is run as one
-  // elaborated from source descriptions is: --lint-only and --parse-only stop
-  // short of the run, and anything else simulates it.
   if (opts.lint_only || opts.parse_only) return 0;
-  // §34.5.29.2: the runtime licences the precompiled models state are asked
-  // before they are executed, which here is now, and the exit functions they
-  // name are called as `licenses` goes, once the simulation is over.
   delta::ProtectLicenseLibraries licenses;
   if (!delta::PrecompiledRuntimeLicensesGranted(opts.precompiled_libs, licenses,
                                                 diag)) {
@@ -638,14 +461,6 @@ int RunSeparateCompilationBind(const delta::CliOptions& opts,
       [&] { return SimulateDesign(opts, design, diag, arena); });
 }
 
-// The invocations that finish without elaborating a design out of the source
-// descriptions named on the command line, each selected by an option of its
-// own: §34.3.1's encrypting mode, §33.5.3's precompile into a library, and
-// §33.5.4's bind from precompiled libraries. Returns true when one of them ran,
-// leaving its status in `status`, which is meaningless otherwise.
-//
-// They are asked about together so that main states once that an invocation is
-// either one of these or an ordinary elaboration, rather than once per mode.
 bool RanStandaloneMode(const delta::CliOptions& opts,
                        delta::SourceManager& src_mgr, delta::DiagEngine& diag,
                        int& status) {
@@ -666,17 +481,6 @@ bool RanStandaloneMode(const delta::CliOptions& opts,
 
 namespace {
 
-// §38.17: vpi_get_vlog_info() reports how many invocation options there were
-// and what each one was, as argc and argv, entry zero being the tool's name.
-// Nothing told the run what they were, so every invocation reported an empty
-// command line. Recording it before anything else runs means the answer is
-// there for whatever asks, including a PLI application loaded early.
-//
-// C lets a process start with argc of zero, argv[0] then being the null pointer
-// that ends the list. No platform deltahdl runs on starts one that way -- Linux
-// gives such a process an empty argv[0] -- but a command line with no entry
-// zero is still answered with the tool's own name there, by padding the words
-// to one rather than by reading argv[0].
 void RecordInvocationCommandLine(int argc, char* argv[]) {
   std::vector<std::string> words(argv, argv + argc);
   words.resize(std::max<std::size_t>(words.size(), 1), "deltahdl");
@@ -686,13 +490,6 @@ void RecordInvocationCommandLine(int argc, char* argv[]) {
 
 }  // namespace
 
-// §J.4.1: the bootstrap file -sv_liblist names has a syntax of its own -- the
-// first line holds #!SV_LIBRARIES, each later line one entry or a comment --
-// and a file that departs from it is reported at the line that does, before
-// anything the file lists would be loaded. ParseForeignCodeBootstrap opens
-// every description it gives with "line N: ", so the number is read from there
-// unchecked for the position of the report, and the text after it is what is
-// reported. False where any file is at fault.
 bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
                                  delta::SourceManager& src_mgr,
                                  delta::DiagEngine& diag,
@@ -713,9 +510,6 @@ bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
     delta::ForeignCodeBootstrap file =
         delta::ParseForeignCodeBootstrap(content);
     if (file.Ok()) {
-      // §J.4: the bootstrap file's entries are processed ahead of the -sv_lib
-      // switches, each resolved against the root in force when the switch
-      // naming the file was (§J.4.2 c).
       for (auto& entry :
            delta::ForeignCodeResolveBootstrapEntries(file, liblist.root)) {
         libraries.push_back(std::move(entry));
@@ -735,11 +529,6 @@ bool BootstrapFilesAreWellFormed(const delta::CliOptions& opts,
   return ok;
 }
 
-// Annex J.4: the object code the command line specifies, settled before the
-// design is read -- each bootstrap file well formed, then each library it or
-// an -sv_lib switch names loaded, in the order the annex processes them -- so
-// that the symbols the libraries define are there to bind the design's
-// imports to.
 bool ForeignCodeIsLoaded(const delta::CliOptions& opts,
                          delta::SourceManager& src_mgr,
                          delta::DiagEngine& diag) {
@@ -750,16 +539,6 @@ bool ForeignCodeIsLoaded(const delta::CliOptions& opts,
                                          diag);
 }
 
-// What the run does with a parsed compilation unit, chosen by the options
-// that name a stage: --dump-ast prints the tree and goes on; --parse-only,
-// "Parse only", ends the run here, after the parse's own reports have already
-// returned 1, with the status --lint-only gave before it elaborated, so a
-// source only the elaborator rejects passes, which is what a file meant to
-// test the preprocessor or the parser alone asks for; --lint-only elaborates
-// and stops; --synth synthesizes; and with none of them the design is
-// simulated. Synthesis and simulation both evaluate the model, which §34.5.29.2
-// NOTE 1 counts as executing it, so each begins only once `licensed` has
-// answered that every runtime licence the model states is granted.
 int RunParsedUnit(const delta::CliOptions& opts,
                   const delta::LibraryMap& lib_map, const ParsedUnits& units,
                   delta::DiagEngine& diag,
@@ -784,10 +563,6 @@ int RunParsedUnit(const delta::CliOptions& opts,
       [&] { return RunSimulation(opts, lib_map, units, diag, elab_arena); });
 }
 
-// §3.12.1 (printed page 56): --compilation-unit-per-file reads each source file
-// as a compilation unit of its own and runs the units together, the merged
-// view of them standing where the one parsed unit stands otherwise. Each unit's
-// design elements take the libraries of the files that unit was read from.
 int RunSeparateUnits(const delta::CliOptions& opts,
                      const delta::LibraryMap& lib_map,
                      delta::SourceManager& src_mgr, delta::DiagEngine& diag,
@@ -811,11 +586,6 @@ int RunSeparateUnits(const delta::CliOptions& opts,
   });
 }
 
-// --version and --help are answered with no design read, and so is an
-// invocation that names nothing to read, whose help ends in a failing status.
-// §33.5.4: a bind from precompiled libraries is told the top-level cells, the
-// configuration, or both, and is given no source description, so --load-lib
-// stands in for a source file.
 bool AnsweredWithoutADesign(const delta::CliOptions& opts, int& status) {
   if (opts.show_version) {
     PrintVersion();
@@ -834,23 +604,12 @@ bool AnsweredWithoutADesign(const delta::CliOptions& opts, int& status) {
 int main(int argc, char* argv[]) {
   RecordInvocationCommandLine(argc, argv);
 
-  // §38.37.2: the routines placed in the vlog_startup_routines[] array are how
-  // an application registers its system task and system function callbacks,
-  // and does whatever else it needs, as soon as the simulator starts, so the
-  // array the tool supplies is walked here, before the run decides what it
-  // is doing with its arguments. A system task a PLI application registers from
-  // one of these routines is then registered ahead of the compilation that
-  // resolves references to it.
   delta::InvokeVlogStartupRoutines(vlog_startup_routines);
 
   delta::CliOptions opts;
   if (!delta::ParseArgs(argc, argv, opts)) {
     return 1;
   }
-  // §36.12.2.2: the default VPI compatibility mode --vpi-compat-mode selects
-  // governs every application not bound to a mode at compile time, so it is
-  // set once, before the design is compiled or run and any callback an
-  // application registered above is called.
   if (opts.vpi_compat_mode != 0)
     delta::GetGlobalVpiContext().SetDefaultCompatibilityMode(
         opts.vpi_compat_mode);
@@ -871,9 +630,6 @@ int main(int argc, char* argv[]) {
   delta::LibraryMap lib_map;
   if (!LoadLibraryMaps(opts, src_mgr, lib_map)) return 1;
 
-  // §34.5.28.2 and §34.5.29.2: the libraries a protected model's licences are
-  // asked through, whose exit functions are called as this object goes, when
-  // main returns.
   delta::ProtectLicenseLibraries licenses;
   if (opts.compilation_unit_per_file) {
     return RunSeparateUnits(opts, lib_map, src_mgr, diag, licenses);

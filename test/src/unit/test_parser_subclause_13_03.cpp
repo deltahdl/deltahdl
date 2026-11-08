@@ -57,8 +57,6 @@ TEST(TaskDeclParsing, TfPortItemVarWithDirection) {
   EXPECT_EQ(item->func_args[0].name, "x");
 }
 
-// The prototype stands in an interface, A.1.6's extern_tf_declaration being
-// an interface_or_generate_item and no item of a module body.
 TEST(TaskDeclParsing, TfPortItemNoNameInPrototype) {
   auto r = Parse(
       "interface ifc;\n"
@@ -169,9 +167,6 @@ TEST(TaskAndFunctionParsing, OldStyleTaskMultipleInputs) {
   }
 }
 
-// A.2.7's tf_port_declaration takes a data_type_or_implicit, so a task port
-// declared in the body may carry a packed range alone, shared by every name
-// the declaration lists.
 TEST(TaskAndFunctionParsing, OldStyleTaskPortsWithAPackedRangeAlone) {
   auto r = Parse(
       "module m;\n"
@@ -287,9 +282,6 @@ TEST(TaskDeclParsing, TaskBodyNewStyleMultipleDirections) {
                            Direction::kInout, Direction::kRef});
 }
 
-// End label on the task_body_declaration alternative whose tf_port_list is
-// present but empty. test_parser_annex_a_02_07.cpp covers the form that has no
-// parenthesized port list at all.
 TEST(TaskDeclParsing, TaskBodyWithEndLabelEmptyPortList) {
   auto r = Parse(
       "module m;\n"
@@ -301,8 +293,6 @@ TEST(TaskDeclParsing, TaskBodyWithEndLabelEmptyPortList) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "my_task");
 }
 
-// Two tf_port_declarations of the same direction both become task arguments.
-// test_parser_annex_a_02_07.cpp covers the mixed-direction form.
 TEST(TaskDeclParsing, TaskBodyOldStyleTwoInputPorts) {
   auto r = Parse(
       "module m;\n"
@@ -503,8 +493,6 @@ TEST(TaskAndFunctionParsing, FormalArgRequiresIdentifierInFunctionBody) {
       r.diags, "tf_port_item shall include a port_identifier", 2, "13.3"));
 }
 
-// Each prototype stands in an interface, A.1.6's extern_tf_declaration being
-// an interface_or_generate_item and no item of a module body.
 TEST(TaskAndFunctionParsing, FormalArgIdentifierOptionalInPrototype) {
   EXPECT_TRUE(
       ParseOk("interface ifc;\n"
@@ -564,13 +552,6 @@ TEST(TaskAndFunctionParsing,
   EXPECT_FALSE(item->func_args[1].is_ref_static);
 }
 
-// §13.3 Syntax 13-1 gives `task_declaration ::= task [
-// dynamic_override_specifiers ] [ lifetime ] task_body_declaration`, so nothing
-// may precede `task`. A.1.9 puts `virtual` in `method_qualifier`, which reaches
-// a task_declaration only through `class_method`, and §8.20 states the same in
-// prose: a class method may carry the keyword virtual. Where the qualifier does
-// belong is VirtualMethodParsing.VirtualTaskExtendsSpecifier in
-// test/src/unit/test_parser_subclause_08_20.cpp, which declares one in a class.
 TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
   auto r = Parse(
       "module m;\n"
@@ -581,11 +562,6 @@ TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeRejected) {
                             "13.3"));
 }
 
-// One mistake draws one report. Parser::RejectMisplacedMethodQualifier consumes
-// the qualifier and lets Parser::ParseTaskDecl read the declaration, so the
-// module body resumes at `endmodule` rather than rejecting the remaining tokens
-// again. Before this the tokens reached Parser::ParseDataType, which read the
-// `virtual` as the head of a §25.9 virtual interface type.
 TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeReportsExactlyOneError) {
   auto r = Parse(
       "module m;\n"
@@ -599,10 +575,6 @@ TEST(TaskAndFunctionParsing, VirtualTaskAtModuleScopeReportsExactlyOneError) {
   EXPECT_EQ(errors, 1U);
 }
 
-// A.1.9 gives `method_qualifier ::= [ pure ] virtual | class_item_qualifier`,
-// so `pure virtual` breaks the same §13.3 rule. A.1.9 pairs that spelling with
-// a method_prototype rather than a task_body_declaration, so this source ends
-// the declaration at its `;` and writes no `endtask`.
 TEST(TaskAndFunctionParsing, PureVirtualTaskAtModuleScopeRejected) {
   auto r = Parse(
       "module m;\n"
@@ -629,11 +601,6 @@ TEST(TaskAndFunctionParsing, FunctionFormalArgDataTypeInherited) {
   EXPECT_EQ(item->func_args[1].data_type.packed_dim_left->int_val, 3u);
 }
 
-// §13.3 (printed page 336): implicit_data_type is signing and packed
-// dimensions alone, and a formal with no explicit data type is `logic`, so
-// `input [7:0] a` is recorded as logic with the dimension it was written
-// with, and the untyped `b` after it inherits that same type (printed page
-// 337). Left at the implicit kind, the simulator's bind sized neither.
 TEST(TaskAndFunctionParsing, FormalWithAPackedDimensionAloneIsLogic) {
   auto r = Parse(
       "module m;\n"
@@ -653,9 +620,6 @@ TEST(TaskAndFunctionParsing, FormalWithAPackedDimensionAloneIsLogic) {
   }
 }
 
-// A.2.7 opens a task body without a port list with tf_item_declarations, each
-// a port declaration or a block item declaration, in either order, so a port
-// may follow a body variable: t takes the formals a and b and declares n.
 TEST(TaskAndFunctionParsing, OldStyleTaskPortAfterABodyDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -678,8 +642,6 @@ TEST(TaskAndFunctionParsing, OldStyleTaskPortAfterABodyDeclaration) {
   EXPECT_EQ(tk->func_body_stmts[0]->var_name, "n");
 }
 
-// The declarations end at the body's first statement, so a port declared
-// after one is reported.
 TEST(TaskAndFunctionParsing, OldStyleTaskPortAfterAStatementIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -695,9 +657,6 @@ TEST(TaskAndFunctionParsing, OldStyleTaskPortAfterAStatementIsReported) {
       5, "13.3"));
 }
 
-// After a port list in parentheses A.2.7 gives a task body block item
-// declarations alone, so a port declared there is reported, an empty `()`
-// being a port list too.
 TEST(TaskAndFunctionParsing, PortInTheBodyOfATaskWithAPortListIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -716,10 +675,6 @@ TEST(TaskAndFunctionParsing, PortInTheBodyOfATaskWithAPortListIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, msg, 7, "13.3"));
 }
 
-// §13.3's mytask2 declares its formals by direction alone and gives them their
-// types with data declarations of the same names later in the body: x is an
-// int and y a logic [3:0], and neither declaration stays in the body as a
-// variable of its own.
 TEST(TaskAndFunctionParsing, BodyDeclarationTypesADirectionOnlyFormal) {
   auto r = Parse(
       "module m;\n"

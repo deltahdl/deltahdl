@@ -135,9 +135,6 @@ TEST(ExternModuleParsing, ExternAndSameNameDefinition) {
   EXPECT_FALSE(r.cu->modules[1]->is_extern);
 }
 
-// §23.5: an extern module declaration can appear at any level of the
-// instantiation hierarchy, including nested inside a module body. The parser
-// stores it as a nested module declaration flagged is_extern.
 TEST(ExternModuleParsing, NestedExternModuleDecl) {
   auto r = Parse(
       "module top;\n"
@@ -162,9 +159,6 @@ TEST(ExternModuleParsing, NestedExternModuleDecl) {
 
 TEST(ExternModuleParsing, ErrorMissingSemicolon) {
   auto r = Parse("extern module m(input a)\n");
-  // The header terminator is shared with module_ansi_header, so
-  // Parser::ParseParamsPortsAndSemicolon in src/parser/parser_port.cpp files
-  // it under §23.2.1 rather than §23.5.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "23.2.1"));
 }
 

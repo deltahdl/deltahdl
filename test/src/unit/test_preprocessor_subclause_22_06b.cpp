@@ -11,8 +11,6 @@
 
 using namespace delta;
 
-// The substituted text keeps the blanks around each directive it once held, so
-// the expected text is compared with every white-space character removed.
 static std::string WithoutWhitespace(std::string text) {
   text.erase(std::remove_if(text.begin(), text.end(),
                             [](unsigned char c) { return std::isspace(c); }),
@@ -20,14 +18,6 @@ static std::string WithoutWhitespace(std::string text) {
   return text;
 }
 
-// §22.6 lets the conditional compilation directives stand anywhere in the
-// source description (printed page 712), and §22.5.1 has a compiler directive
-// written in a macro's text take effect when the macro is used (printed page
-// 710), so an `ifdef or `ifndef inside a macro body is evaluated at each usage
-// against the defines in force there. The preprocessor once copied the
-// directive text through into the output, where the lexer reported the
-// backtick under §5.2. UVM's m_uvm_field_op_begin macro is the shape of the
-// first group of cases.
 TEST(Preprocessor, ConditionalInFunctionMacroBodyAtLineHeadTakesIfndef) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -104,8 +94,6 @@ TEST(Preprocessor, ConditionalInObjectMacroBodyMidLineTakesElse) {
   EXPECT_EQ(result.find('`'), std::string::npos);
 }
 
-// A body that opens with the conditional is text to evaluate, not a directive
-// line to hand to the directive reader, when the usage heads a line.
 TEST(Preprocessor, ConditionalOpeningObjectMacroBodyAtLineHead) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -121,8 +109,6 @@ TEST(Preprocessor, ConditionalOpeningObjectMacroBodyAtLineHead) {
   EXPECT_EQ(result.find('`'), std::string::npos);
 }
 
-// The UVM shape proper: the macro holding the conditional is used inside
-// another macro's body, so the conditional is met while that body is expanded.
 TEST(Preprocessor, ConditionalInMacroBodyUsedByOuterMacro) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -138,8 +124,6 @@ TEST(Preprocessor, ConditionalInMacroBodyUsedByOuterMacro) {
   EXPECT_EQ(result.find('`'), std::string::npos);
 }
 
-// The condition is read against the defines in force at the usage, not at the
-// definition: a macro defined after the body is written still selects.
 TEST(Preprocessor, ConditionalInMacroBodySeesDefineAfterDefinition) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -154,10 +138,6 @@ TEST(Preprocessor, ConditionalInMacroBodySeesDefineAfterDefinition) {
   EXPECT_EQ(result.find('`'), std::string::npos);
 }
 
-// §22.6 resolves the expression by §11.8's rules, so `&&` is false when its
-// left operand is, whatever the right one is. Only the right one is defined
-// here, which is the operand order IfdefExprAndFalse in the file beside this
-// one does not take.
 TEST(Preprocessor, IfdefExprAndWithOnlyTheRightOperandDefined) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -167,9 +147,6 @@ TEST(Preprocessor, IfdefExprAndWithOnlyTheRightOperandDefined) {
   EXPECT_EQ(result.find("both_defined"), std::string::npos);
 }
 
-// A parenthesized operand is an ifdef_macro_expression of its own, and an
-// operator may follow it: the parenthesis closes the inner expression without
-// ending the outer one.
 TEST(Preprocessor, IfdefExprParenthesizedOperandFollowedByAnOperator) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -180,9 +157,6 @@ TEST(Preprocessor, IfdefExprParenthesizedOperandFollowedByAnOperator) {
   EXPECT_NE(result.find("both_defined"), std::string::npos);
 }
 
-// §22.6 compiles a nested block only where the enclosing one is compiled, so
-// an `elsif whose condition holds still compiles nothing inside an outer
-// `ifdef whose condition does not, and the outer `else is compiled instead.
 TEST(Preprocessor, ElsifInsideAnUncompiledBlockCompilesNothing) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -202,11 +176,6 @@ TEST(Preprocessor, ElsifInsideAnUncompiledBlockCompilesNothing) {
   EXPECT_NE(result.find("outer_else"), std::string::npos);
 }
 
-// §22.6 hides a directive inside a comment, and only there: the text after the
-// comment closes is source text again. In a compiled block a directive there
-// takes effect; in a skipped block an `endif there closes the block, and other
-// text there is read only for a comment it opens, which then hides the
-// `endif on its line.
 TEST(Preprocessor, DirectiveAfterABlockCommentCloses) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -233,8 +202,6 @@ TEST(Preprocessor, DirectiveAfterABlockCommentCloses) {
   EXPECT_NE(result.find("after_closed"), std::string::npos);
 }
 
-// Within one line, a usage of a macro whose name only begins with endif is a
-// usage, not the `endif closing the conditional around it.
 TEST(Preprocessor, InlineConditionalHoldingAMacroNamedLikeEndif) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -247,9 +214,6 @@ TEST(Preprocessor, InlineConditionalHoldingAMacroNamedLikeEndif) {
   EXPECT_NE(result.find('y'), std::string::npos);
 }
 
-// An `ifdef after other text on a line whose `endif is on a later line is no
-// conditional within the line, so its block runs over the lines up to that
-// `endif and is dropped with them when its condition fails.
 TEST(Preprocessor, MidLineIfdefClosedOnALaterLine) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -265,10 +229,6 @@ TEST(Preprocessor, MidLineIfdefClosedOnALaterLine) {
   EXPECT_NE(result.find("after"), std::string::npos);
 }
 
-// Conditionals nest within one line as they do across lines: an inner
-// `ifndef, and an inner `ifdef with an `else of its own, each select their
-// own group inside the outer one, and a doubly parenthesized condition is the
-// expression inside it.
 TEST(Preprocessor, NestedInlineConditionals) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -283,11 +243,6 @@ TEST(Preprocessor, NestedInlineConditionals) {
   EXPECT_EQ(result.find(" b "), std::string::npos);
   EXPECT_NE(result.find("paren_a"), std::string::npos);
 }
-// §22.6 resolves an ifdef expression by §11.8's rules, and the text beneath
-// Table 11-2 in §11.3.2 has `->` associate right to left. With nothing
-// defined, `A -> B -> C` is `A -> (B -> C)`, `0 -> 1`, which is 1 and keeps
-// the block; folded left to right it was `(A -> B) -> C`, `1 -> 0`, and the
-// block was skipped.
 TEST(Preprocessor, IfdefExprImplicationChainAssociatesRightToLeft) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -298,9 +253,6 @@ TEST(Preprocessor, IfdefExprImplicationChainAssociatesRightToLeft) {
   EXPECT_NE(result.find("chain_kept"), std::string::npos);
 }
 
-// Table 11-2 puts `->` and `<->` on one row, one precedence level, so
-// `A -> B <-> C` is `A -> (B <-> C)`, `0 -> 1`, which is 1. With `<->` a level
-// below `->` it was `(A -> B) <-> C`, `1 <-> 0`, and the block was skipped.
 TEST(Preprocessor, IfdefExprImplicationAndEquivalenceShareALevel) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -311,9 +263,6 @@ TEST(Preprocessor, IfdefExprImplicationAndEquivalenceShareALevel) {
   EXPECT_NE(result.find("mixed_kept"), std::string::npos);
 }
 
-// A control on the cases above: with A defined, `A -> B -> C` is
-// `1 -> (0 -> 0)`, `1 -> 1`, and keeps its block, while `A -> B` is `1 -> 0`
-// and skips its own, so reading every chain as true does not pass.
 TEST(Preprocessor, IfdefExprImplicationWithATrueLeftSideTakesItsRightSide) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -330,9 +279,6 @@ TEST(Preprocessor, IfdefExprImplicationWithATrueLeftSideTakesItsRightSide) {
   EXPECT_EQ(result.find("only_a"), std::string::npos);
 }
 
-// §22.6 (Syntax 22-5): `elsif, `else and `endif are parts of a conditional
-// that an `ifdef or `ifndef opens, so none stands on its own; each is
-// reported at its line. Each was accepted without a word.
 TEST(Preprocessor, EndifWithoutIfdef) {
   PreprocFixture f;
   Preprocess("`endif\n", f);
@@ -357,8 +303,6 @@ TEST(Preprocessor, ElsifWithoutIfdef) {
                             1, "22.6"));
 }
 
-// §22.6 (Syntax 22-5) closes every conditional with `endif, so one the source
-// leaves open is reported at the `ifdef that opened it.
 TEST(Preprocessor, IfdefWithoutEndif) {
   PreprocFixture f;
   Preprocess("text\n`ifdef SOMETHING\ntext\n", f);
@@ -367,9 +311,6 @@ TEST(Preprocessor, IfdefWithoutEndif) {
                             "22.6"));
 }
 
-// §22.6 (Syntax 22-5): `ifdef, `ifndef and `elsif each take an ifdef_condition,
-// a macro name or a parenthesized expression, which cannot be empty. A bare
-// `ifdef silently compiled its block out and a bare `ifndef silently in.
 TEST(Preprocessor, ConditionalMissingItsConditionIsReported) {
   PreprocFixture f;
   Preprocess(
@@ -387,9 +328,6 @@ TEST(Preprocessor, ConditionalMissingItsConditionIsReported) {
                             "`elsif is missing its condition", 4, "22.6"));
 }
 
-// §22.6 (Syntax 22-5) gives a conditional at most one `else group, so a
-// second is reported, whether the conditional stands on lines of its own or
-// within one line. The text after the second was silently dropped.
 TEST(Preprocessor, SecondElseIsReported) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -412,9 +350,6 @@ TEST(Preprocessor, SecondElseIsReported) {
                             "22.6"));
 }
 
-// §22.6 (Syntax 22-5): an ifdef_condition is a macro name or a parenthesized
-// ifdef_macro_expression, so a negation outside parentheses, `ifdef !A, is
-// neither and is reported. It was evaluated as `ifdef (!A).
 TEST(Preprocessor, NegationOutsideParenthesesIsNoIfdefCondition) {
   PreprocFixture f;
   Preprocess(
@@ -427,10 +362,6 @@ TEST(Preprocessor, NegationOutsideParenthesesIsNoIfdefCondition) {
                             "22.6"));
 }
 
-// §22.6 (Syntax 22-5) builds an ifdef_macro_expression of names, `!`,
-// parentheses and &&, ||, -> and <->, so a character that begins an operator
-// but completes none, an operand left out and a parenthesis never closed are
-// each reported. Each silently selected or skipped its block.
 TEST(Preprocessor, MalformedIfdefExpressionIsReported) {
   for (const char* condition :
        {"(A & B)", "(A | B)", "(A - B)", "(A <- B)", "(A &&)", "()", "(A"}) {
@@ -444,8 +375,6 @@ TEST(Preprocessor, MalformedIfdefExpressionIsReported) {
   }
 }
 
-// A well-formed expression, nested parentheses and text after the closing one
-// on the same line among it, is read as before, with no report.
 TEST(Preprocessor, WellFormedIfdefExpressionIsAccepted) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -455,8 +384,6 @@ TEST(Preprocessor, WellFormedIfdefExpressionIsAccepted) {
   EXPECT_NE(out.find("kept"), std::string::npos) << out;
 }
 
-// Within one line, a parenthesis never closed leaves no condition to read, and
-// is reported under §22.6. Its backticks reached the lexer instead.
 TEST(Preprocessor, UnclosedInlineIfdefExpressionIsReported) {
   PreprocFixture f;
   Preprocess("wire w = 1 `ifdef (A a `endif ;\n", f);
@@ -465,10 +392,6 @@ TEST(Preprocessor, UnclosedInlineIfdefExpressionIsReported) {
                             1, "22.6"));
 }
 
-// §22.6 (printed page 714): a block of text a conditional directive ignores
-// still follows the lexical conventions of Clause 5, and §5.9 keeps a string
-// literal on its line unless a backslash continues it, so one left open at the
-// end of an ignored line is reported.
 TEST(Preprocessor, UnterminatedStringInAnIgnoredBlockIsReported) {
   PreprocFixture f;
   Preprocess(
@@ -480,10 +403,6 @@ TEST(Preprocessor, UnterminatedStringInAnIgnoredBlockIsReported) {
                             2, "22.6"));
 }
 
-// §22.6: an ignored block holding only well-formed tokens draws no report,
-// however little they would parse, and neither does a string that a backslash
-// continues onto the next ignored line, one with an escaped quote in it, or a
-// triple-quoted string spanning two lines.
 TEST(Preprocessor, WellFormedIgnoredBlockIsNotReported) {
   PreprocFixture f;
   Preprocess(

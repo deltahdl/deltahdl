@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §H.10.3, the SystemVerilog side of Example 3: a typedef of a struct
-// triple mixing C types and packed arrays -- an int a, a bit [6:1][1:8] b
-// [65:2] and an int c -- an import f1 taking a triple, an export of
-// exported_sv_func, and that function taking an int and an output logic
-// [63:0].
 class ExampleThreeParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -35,8 +30,6 @@ TEST_F(ExampleThreeParsing, TheSystemVerilogSideParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The triple's troublesome member b: a bit array with two packed dimensions
-// and one unpacked dimension, between the two int members.
 TEST_F(ExampleThreeParsing, TheTripleMixesIntsWithAPackedUnpackedBitArray) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* triple =
@@ -57,8 +50,6 @@ TEST_F(ExampleThreeParsing, TheTripleMixesIntsWithAPackedUnpackedBitArray) {
   EXPECT_EQ(members[2].type_kind, DataTypeKind::kInt);
 }
 
-// The import f1 takes the triple as an input under its type's name, and the
-// exported function takes an int input and the 64-bit logic output.
 TEST_F(ExampleThreeParsing, TheImportTakesATripleAndTheExportALogicOutput) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =

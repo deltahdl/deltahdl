@@ -26,7 +26,6 @@ bool SameBits(const Logic4Vec& a, const Logic4Vec& b) {
   return true;
 }
 
-// Whether `cur` differs from the value `last` holds, recording it if so.
 bool TookNewValue(const Logic4Vec& cur, Logic4Snapshot& last) {
   if (SameBits(cur, last.Get())) return false;
   last.Capture(cur);
@@ -44,8 +43,6 @@ void WatchStaticProperty(const ClassTypeInfo* cls, std::string_view member,
   });
 }
 
-// The object is held by its handle, as an event control's watcher holds it,
-// since the collector of §8.4 may sweep it while the monitor still lives.
 void WatchObjectProperty(uint64_t handle, std::string_view member,
                          SimContext& ctx,
                          const std::function<bool()>& changed) {
@@ -60,7 +57,6 @@ void WatchObjectProperty(uint64_t handle, std::string_view member,
   });
 }
 
-// Arms on the property `e` names, answering whether it names one.
 bool WatchNamedProperty(const Expr* e, SimContext& ctx,
                         const std::function<bool()>& changed) {
   if (e->kind != ExprKind::kIdentifier && e->kind != ExprKind::kMemberAccess)

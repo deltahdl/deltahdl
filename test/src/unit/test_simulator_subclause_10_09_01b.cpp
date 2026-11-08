@@ -11,12 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9.1 assigns an array assignment pattern to an unpacked array element by
-// element, §7.5 gives a dynamic array assigned whole the size of what is
-// assigned, and §8.5 lets a dynamic array be a class property. So a pattern
-// assigned to one, through a handle or by its bare name in a method, stores
-// each item, and a shorter pattern shortens it. The pattern wrote nothing:
-// the elements stayed 0 and the size 3.
 TEST(ArrayLiteralSim, APatternFillsADynamicArrayProperty) {
   const char* src =
       "module t;\n"
@@ -46,9 +40,6 @@ TEST(ArrayLiteralSim, APatternFillsADynamicArrayProperty) {
   EXPECT_EQ(RunAndGet(src, "shorter"), 2u);
 }
 
-// §10.9.1's replication `'{3{7, 8}}` gives the items it repeats as many times
-// as it says, so a dynamic array property it is assigned to holds six
-// elements alternating 7 and 8, from an empty one.
 TEST(ArrayLiteralSim, AReplicationSizesADynamicArrayProperty) {
   const char* src =
       "module t;\n"
@@ -66,11 +57,6 @@ TEST(ArrayLiteralSim, AReplicationSizesADynamicArrayProperty) {
   EXPECT_EQ(RunAndGet(src, "e5"), 8u);
 }
 
-// §10.9.1 with §7.5 and §8.7: a dynamic array property declared with an
-// assignment pattern initializer holds, in each object new constructs, as
-// many elements as the pattern's items and each item in its element; a
-// replication counts its items as many times as it says. The object's arrays
-// were empty.
 TEST(ArrayLiteralSim, APatternInitializesADynamicArrayProperty) {
   const char* src =
       "module t;\n"
@@ -90,11 +76,6 @@ TEST(ArrayLiteralSim, APatternInitializesADynamicArrayProperty) {
   EXPECT_EQ(RunAndGet(src, "r1"), 5u);
 }
 
-// §10.9.1 with §7.4.4: a select of a multidimensional array's leading
-// dimensions is an unpacked array, which an assignment pattern fills element
-// by element: positionally, by `default`, and with nested patterns into the
-// subarray of a three-dimensional array, `m3[1]`, and into one of its
-// subarrays, `m3[0][1]`. The elements stayed 0.
 TEST(ArrayLiteralSim, APatternFillsASubarraySelect) {
   SimFixture f;
   auto out = RunCapture(
@@ -115,12 +96,6 @@ TEST(ArrayLiteralSim, APatternFillsASubarraySelect) {
             "4}}}\n");
 }
 
-// §10.9.1 with §8.5 and §8.7: a class property may be a multidimensional
-// array, which a nested pattern fills one subarray per outer item, through a
-// handle, by its bare name in a method and as the initializer of an instance
-// or a static property, and which `'{default: 9}` fills at every element. The
-// pattern stored nothing through a handle or in a method, and as an initializer
-// gave every element the last item, 6.
 TEST(ArrayLiteralSim, ANestedPatternFillsAMultidimensionalArrayProperty) {
   SimFixture f;
   auto out = RunCapture(
@@ -150,10 +125,6 @@ TEST(ArrayLiteralSim, ANestedPatternFillsAMultidimensionalArrayProperty) {
   EXPECT_EQ(out, "1 2 4 6\n3 5 1 6\n9 9 3 2\n");
 }
 
-// §10.9.1 with §7.4.4 and §8.5: a select of a multidimensional class
-// property's leading dimension, `s.g[1]` through a handle or `g[0]` bare in a
-// method, is a subarray, which a pattern fills element by element. The pattern
-// stored nothing.
 TEST(ArrayLiteralSim, APatternFillsASubarrayOfAClassProperty) {
   SimFixture f;
   auto out = RunCapture(
@@ -174,12 +145,6 @@ TEST(ArrayLiteralSim, APatternFillsASubarrayOfAClassProperty) {
   EXPECT_EQ(out, "4 5 6 7 8 9\n");
 }
 
-// §10.9.1 with §11.4.12.1: a pattern whose one item is a concatenation
-// replication, `'{ {2{8'h12}} }`, lists one value, 16'h1212, and not the
-// replication form `'{2{8'h12}}`, whose items fill a whole dimension. So a
-// declaration's one-element array holds 1212, and the inner pattern of a
-// two-dimensional one fills its one element with 3434; read as the
-// replication form, each held its item alone, 0012 and 0034.
 TEST(ArrayLiteralSim, AConcatenationReplicationItemInitializesOneElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -192,8 +157,6 @@ TEST(ArrayLiteralSim, AConcatenationReplicationItemInitializesOneElement) {
   EXPECT_EQ(out, "1212 3434 5678\n");
 }
 
-// §10.9.1 with §11.4.12.1: the same patterns assigned in a procedure give
-// the same one value per element.
 TEST(ArrayLiteralSim, AConcatenationReplicationItemAssignsOneElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -210,9 +173,6 @@ TEST(ArrayLiteralSim, AConcatenationReplicationItemAssignsOneElement) {
   EXPECT_EQ(out, "1212 3434 5678\n");
 }
 
-// §10.9.1 with §7.5: a dynamic array assigned a pattern of one concatenation
-// replication item takes one element, not the two the replication form
-// `'{2{8'h12}}` would give it.
 TEST(ArrayLiteralSim, AConcatenationReplicationItemSizesADynamicArrayToOne) {
   SimFixture f;
   auto out = RunCapture(
@@ -229,10 +189,6 @@ TEST(ArrayLiteralSim, AConcatenationReplicationItemSizesADynamicArrayToOne) {
   EXPECT_EQ(out, "1 1212\n");
 }
 
-// §11.4.5 with §10.9.1: an array compared with a pattern of one
-// concatenation replication item is compared with that one value, so the
-// one-element array holding 1212 equals it. An operand of == is no
-// assignment-like context (§10.8), so the pattern names its type.
 TEST(ArrayLiteralSim, AnArrayEqualsAConcatenationReplicationItem) {
   SimFixture f;
   auto out = RunCapture(
@@ -245,10 +201,6 @@ TEST(ArrayLiteralSim, AnArrayEqualsAConcatenationReplicationItem) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §10.9.2 with §10.9.1: in the pattern for a structure's unpacked array
-// member, a concatenation replication item gives one element, so
-// `'{ {2{8'h12}}, 16'h3456 }` fills the two elements of `v[2]`; read as
-// three items, it matched no element count.
 TEST(ArrayLiteralSim, AConcatenationReplicationItemFillsOneMemberElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -264,9 +216,6 @@ TEST(ArrayLiteralSim, AConcatenationReplicationItemFillsOneMemberElement) {
   EXPECT_EQ(out, "5 1212 3456\n");
 }
 
-// §10.9.1: when more than one type key matches an element, the last one gives
-// its value, in an assignment and in a declaration's initializer alike. The
-// first was taken.
 TEST(ArrayLiteralSim, TheLastOfTwoMatchingTypeKeysGivesTheValue) {
   const char* src =
       "module t;\n"
@@ -279,11 +228,6 @@ TEST(ArrayLiteralSim, TheLastOfTwoMatchingTypeKeysGivesTheValue) {
   EXPECT_EQ(RunAndGet(src, "d1"), 7u);
 }
 
-// §10.9.1: a default falling on an element that is a structure is applied to
-// it member by member, unless the value's own type is that structure, which
-// the element is then assigned whole; by an assignment and by a declaration's
-// initializer alike. The value was resized to the element's width, giving
-// 16'h0001 where each member is 1.
 TEST(ArrayLiteralSim, ADefaultFillsAStructureElementMemberByMember) {
   const char* src =
       "typedef struct packed { byte a, b; } s_t;\n"
@@ -303,10 +247,6 @@ TEST(ArrayLiteralSim, ADefaultFillsAStructureElementMemberByMember) {
   EXPECT_EQ(RunAndGet(src, "c1"), 0x1234u);
 }
 
-// §10.9.1 with Syntax 10-5: a type key may be a typedef name, which sets each
-// element of a matching type -- an array declared with the typedef or with the
-// type it names -- in an assignment and a declaration's initializer alike. The
-// name was evaluated as an index, so at most one element took the value.
 TEST(ArrayLiteralSim, ATypedefKeySetsTheElementsOfItsType) {
   const char* src =
       "typedef logic [7:0] byte_t;\n"
@@ -327,11 +267,6 @@ TEST(ArrayLiteralSim, ATypedefKeySetsTheElementsOfItsType) {
   EXPECT_EQ(RunAndGet(src, "l1"), 7u);
 }
 
-// §10.9.1 with §6.22.1: a type key sets the elements whose type matches its
-// own. The one-bit `logic` matches no `logic [7:0]` element; `int` matches a
-// `bit signed [31:0]` element, of its state, signing and range, and no
-// `bit [31:0]` one, which is unsigned. Matched by kind, `logic:` set the
-// vector and `int:` neither bit vector.
 TEST(ArrayLiteralSim, ATypeKeyMatchesAnElementOfItsFullType) {
   const char* src =
       "module t;\n"
@@ -350,10 +285,6 @@ TEST(ArrayLiteralSim, ATypeKeyMatchesAnElementOfItsFullType) {
   EXPECT_EQ(RunAndGet(src, "u1"), 0u);
 }
 
-// §10.9.1 with §6.22.1: two vector types match only over the same packed
-// bounds, so a `logic [7:0]` typedef key sets no `logic [8:1]` element, eight
-// bits wide as it is, in an assignment, a declaration's initializer or a
-// multidimensional array's; the default gives each 0.
 TEST(ArrayLiteralSim, ATypeKeyMatchesOnlyAnElementOfItsPackedBounds) {
   const char* src =
       "typedef logic [7:0] byte_t;\n"
@@ -374,10 +305,6 @@ TEST(ArrayLiteralSim, ATypeKeyMatchesOnlyAnElementOfItsPackedBounds) {
   EXPECT_EQ(RunAndGet(src, "k11"), 1u);
 }
 
-// §10.9.1: a type key that matches no element of an array of structures is
-// applied to each element's members by §10.9.2's rules, in an assignment and
-// a declaration's initializer alike. It was asked of the elements alone, so
-// the members kept no value.
 TEST(ArrayLiteralSim, ATypeKeyReachesTheMembersOfStructureElements) {
   const char* src =
       "typedef struct packed { int x, y; } s_t;\n"
@@ -395,9 +322,6 @@ TEST(ArrayLiteralSim, ATypeKeyReachesTheMembersOfStructureElements) {
   EXPECT_EQ(RunAndGet(src, "iy0"), 4u);
 }
 
-// §10.9.1 with §6.22.1: an array a block declares takes a type key by its
-// element type as a module's does -- an int element by int's signing and
-// range, and an element written with a typedef by the typedef's.
 TEST(ArrayLiteralSim, ABlockArrayTakesATypeKeyOfItsElementType) {
   const char* src =
       "typedef logic [7:0] byte_t;\n"
@@ -415,13 +339,6 @@ TEST(ArrayLiteralSim, ABlockArrayTakesATypeKeyOfItsElementType) {
   EXPECT_EQ(RunAndGet(src, "b0"), 9u);
 }
 
-// §10.9.1: an item standing at a dimension of a multidimensional array other
-// than its last is assigned to that dimension's subarray, so an item of the
-// subarray's unpacked array type -- a typed pattern, keyed or positional, or a
-// variable of that type -- gives the subarray its elements in order, whether it
-// is positional, index-keyed or the default. A default key's value is no
-// assignment-like context (§10.8), so a pattern there names its type. Each row
-// read one scalar instead, the same value at all three leaves.
 TEST(ArrayLiteralSim, AnUnpackedArrayItemFillsItsSubarrayElementForElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -447,10 +364,6 @@ TEST(ArrayLiteralSim, AnUnpackedArrayItemFillsItsSubarrayElementForElement) {
             "'{'{1, 2, 3}, '{7, 8, 9}} '{'{1, 2, 3}, '{5, 5, 5}}\n");
 }
 
-// §10.9.1 with §7.4.4, §7.4.5 and §7.6: a slice, a select of another array's
-// leading dimension and a queue are unpacked arrays too, so each fills the
-// subarray it stands for, its elements paired with the subarray's by their
-// left-to-right position: `e [1:0][2:0]` takes 7 at e[1][2] from g[0][0].
 TEST(ArrayLiteralSim, ASliceASubarraySelectAndAQueueFillTheirSubarrays) {
   SimFixture f;
   auto out = RunCapture(
@@ -478,9 +391,6 @@ TEST(ArrayLiteralSim, ASliceASubarraySelectAndAQueueFillTheirSubarrays) {
             "7 9 10\n");
 }
 
-// §10.9.1: an item of a non-aggregate type is applied recursively to every
-// element of the subarray it stands for, and a select of one element of an
-// array is such an item, not an array.
 TEST(ArrayLiteralSim, AnElementSelectItemFillsEveryLeafOfItsSubarray) {
   SimFixture f;
   auto out = RunCapture(
@@ -497,9 +407,6 @@ TEST(ArrayLiteralSim, AnElementSelectItemFillsEveryLeafOfItsSubarray) {
   EXPECT_EQ(out, "'{'{2, 2, 2}, '{2, 2, 2}}\n");
 }
 
-// §10.9.1 with §7.6: a queue standing for a subarray is assigned to it as one
-// unpacked array to another, which needs as many elements as the subarray
-// holds, and a queue's size is only known as the assignment runs.
 TEST(ArrayLiteralSim, AQueueItemOfTheWrongSizeIsARuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -521,13 +428,6 @@ TEST(ArrayLiteralSim, AQueueItemOfTheWrongSizeIsARuntimeError) {
       "array size mismatch in assignment to fixed-size array", 6, "7.6"));
 }
 
-// §10.9.1: a declaration's initializer follows the array's dimensions as an
-// assignment does, so an item of the subarray's unpacked array type standing
-// at the first dimension -- a typed pattern, keyed or positional, or a
-// variable of that type -- gives the subarray its elements in order. A default
-// key's value is no assignment-like context (§10.8), so a pattern there names
-// its type. Each row read one scalar instead, the same value at all three
-// leaves.
 TEST(ArrayLiteralSim, ADeclarationsUnpackedArrayItemFillsItsSubarray) {
   SimFixture f;
   auto out = RunCapture(
@@ -549,10 +449,6 @@ TEST(ArrayLiteralSim, ADeclarationsUnpackedArrayItemFillsItsSubarray) {
             "'{'{1, 2, 3}, '{7, 8, 9}} '{'{1, 2, 3}, '{5, 5, 5}}\n");
 }
 
-// §10.9.1 with §7.4.4 and §7.6: in a declaration's initializer too, a slice
-// and a select of another array's leading dimension fill the subarray they
-// stand for by left-to-right position, which in `e [1:0][2:0]` puts g[0][0]'s
-// 7 at e[1][2]; an element select is no array and reaches every leaf.
 TEST(ArrayLiteralSim, ADeclarationsSliceAndSubarraySelectFillTheirSubarrays) {
   SimFixture f;
   auto out = RunCapture(
@@ -575,10 +471,6 @@ TEST(ArrayLiteralSim, ADeclarationsSliceAndSubarraySelectFillTheirSubarrays) {
             "7 9 10\n");
 }
 
-// §10.9.1 with §7.6: a queue standing for a subarray in a declaration's
-// initializer is assigned to it as one unpacked array to another, which needs
-// as many elements as the subarray holds; a queue's size is only known as the
-// initializer is evaluated.
 TEST(ArrayLiteralSim, ADeclarationsQueueItemOfTheWrongSizeIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -595,12 +487,6 @@ TEST(ArrayLiteralSim, ADeclarationsQueueItemOfTheWrongSizeIsAnError) {
       "array size mismatch in assignment to fixed-size array", 3, "7.6"));
 }
 
-// §10.9.1 assigns each item of a declaration's array pattern to its element
-// by the element type's assignment rules, and §6.12 with §6.12.1 makes that a
-// conversion to the element's real format: single precision for a shortreal,
-// and an integer item converted by its value. The shortreal elements held
-// the low 32 bits of each item's double, 0.0 for both 1.0 and 2.5 (#7489),
-// and an integer item kept its integer bits in a real or shortreal element.
 TEST(ArrayLiteralSim, ADeclarationsPatternGivesRealElementsTheirValues) {
   SimFixture f;
   auto out = RunCapture(
@@ -622,9 +508,6 @@ TEST(ArrayLiteralSim, ADeclarationsPatternGivesRealElementsTheirValues) {
             "1.0 2.5 3.0 -2.0\n");
 }
 
-// §10.9.1 with §7.4.4: the leaves of a multidimensional shortreal array take
-// the single-precision values of the items that reach them, as a
-// one-dimensional array's elements do.
 TEST(ArrayLiteralSim, ADeclarationsPatternGivesShortrealLeavesTheirValues) {
   SimFixture f;
   auto out = RunCapture(

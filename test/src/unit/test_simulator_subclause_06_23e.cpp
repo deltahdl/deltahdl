@@ -14,20 +14,11 @@ using namespace delta;
 
 namespace {
 
-// §6.23 (printed page 138): a type reference to an expression stands for the
-// expression's self-determined type, the expression left unevaluated, and two
-// type references compared with ==, !=, === or !== give whether the two types
-// match (§6.22.1). Each comparison below holds against the type its operand
-// has by §11.6.1's widths, §11.8.1's signing, §11.3.1's real operands and
-// §11.3.4's 2- and 4-state operands, or fails against the type nearest it.
 struct Comparison {
   const char* text;
   bool holds;
 };
 
-// The subroutines declared outside the module that the calls compared read:
-// a package's function and DPI import, and the compilation unit's; and a
-// package's class.
 constexpr const char* kOutsideTheModule =
     "package pk;\n"
     "  function automatic shortint pf(); return 0; endfunction\n"
@@ -42,7 +33,6 @@ constexpr const char* kOutsideTheModule =
     "function automatic byte uf(); return 0; endfunction\n"
     "import \"DPI-C\" function real ud();\n";
 
-// The operands every comparison reads.
 constexpr const char* kOperands =
     "  import pk::pf;\n"
     "  import \"DPI-C\" function shortreal md(input int n);\n"
@@ -113,9 +103,6 @@ constexpr const char* kOperands =
     "  PC #(8, int) p8i;\n"
     "  PC pd;\n";
 
-// §11.6.1 with §11.8.1: an arithmetic operator is as wide as its wider
-// operand, signed where both are and 4-state where either is; a unary minus
-// is its operand's type.
 constexpr std::array kArithmetic = {
     Comparison{"type(a + b) == type(bit [7:0])", true},
     Comparison{"type(a + b) == type(byte)", false},
@@ -129,8 +116,6 @@ constexpr std::array kArithmetic = {
     Comparison{"type(a + b) != type(a + c)", true},
 };
 
-// §11.6.1: a bitwise operator sizes as an arithmetic one does, and a shift is
-// its left operand's type, 4-state where either operand is.
 constexpr std::array kBitwiseAndShift = {
     Comparison{"type(a & b) == type(bit [7:0])", true},
     Comparison{"type(a & c) == type(bit [7:0])", false},
@@ -140,8 +125,6 @@ constexpr std::array kBitwiseAndShift = {
     Comparison{"type(a >>> c) == type(byte)", false},
 };
 
-// §11.6.1 with §11.8.1: a relational, equality, logical, reduction or
-// set membership operator is one unsigned bit.
 constexpr std::array kOneBitResults = {
     Comparison{"type(a < b) == type(bit)", true},
     Comparison{"type(a < b) == type(logic)", false},
@@ -155,9 +138,6 @@ constexpr std::array kOneBitResults = {
     Comparison{"type(c inside {a}) == type(bit)", false},
 };
 
-// §11.5.1 with §11.8.1 and §7.4.1: a bit-select is one bit and a part-select
-// as many bits as it names, unsigned and of the vector's state; an element of
-// a packed array is the array's element type.
 constexpr std::array kSelects = {
     Comparison{"type(v[3]) == type(logic)", true},
     Comparison{"type(v[3]) == type(bit)", false},
@@ -171,8 +151,6 @@ constexpr std::array kSelects = {
     Comparison{"type(pk[2:1]) == type(logic [15:0])", true},
 };
 
-// §7.2 and §7.4.2: a member of a structure is the type it was declared with,
-// and an element of an unpacked array the array's element type.
 constexpr std::array kMembersAndElements = {
     Comparison{"type(p.g) == type(logic [2:0])", true},
     Comparison{"type(p.g) == type(bit [2:0])", false},
@@ -184,10 +162,6 @@ constexpr std::array kMembersAndElements = {
     Comparison{"type(arr[1][2]) == type(bit)", true},
 };
 
-// §11.4.12 and §11.4.12.1: a concatenation is unsigned and as wide as its
-// operands together, a replication its count of copies of them; §11.4.11: a
-// conditional is as wide as its wider result, signed where both are and
-// 4-state where its condition or a result is.
 constexpr std::array kConcatenationsAndConditionals = {
     Comparison{"type({a, b}) == type(bit [15:0])", true},
     Comparison{"type({a, b}) == type(shortint)", false},
@@ -200,9 +174,6 @@ constexpr std::array kConcatenationsAndConditionals = {
     Comparison{"type(c[0] ? a : b) == type(logic [7:0])", true},
 };
 
-// §6.24.1: a cast is the type it names, a signing cast its operand with the
-// signing it names, and a size cast its operand's signing and state at the
-// size it names.
 constexpr std::array kCasts = {
     Comparison{"type(byte'(b)) == type(byte)", true},
     Comparison{"type(byte'(b)) == type(bit [7:0])", false},
@@ -216,8 +187,6 @@ constexpr std::array kCasts = {
     Comparison{"type(type(c)'(b)) == type(logic [3:0])", true},
 };
 
-// §11.4.2 and §11.3.6: an increment, a decrement and an assignment are the
-// type of the variable they would change, with none of them carried out.
 constexpr std::array kIncrementsAndAssignments = {
     Comparison{"type(i++) == type(int)", true},
     Comparison{"type(i++) == type(integer)", false},
@@ -227,10 +196,6 @@ constexpr std::array kIncrementsAndAssignments = {
     Comparison{"type((x = b)) == type(logic [5:0])", true},
 };
 
-// A system function is the type its clause gives its result: an integer for
-// $bits (§20.6.2) and $clog2 (§20.8.1), an int for $countones (§20.9), a bit
-// for $isunknown (§20.9) and a real for $itor (§20.5); $signed and $unsigned
-// (§11.7) are their argument with the signing each names.
 constexpr std::array kSystemFunctions = {
     Comparison{"type($bits(x)) == type(integer)", true},
     Comparison{"type($bits(x)) == type(int)", false},
@@ -243,11 +208,6 @@ constexpr std::array kSystemFunctions = {
     Comparison{"type($itor(i)) == type(real)", true},
 };
 
-// §5.7.1: an integer literal is as wide as its size, or 32 bits unsized,
-// signed where it is decimal or carries the s designator, and 4-state; an
-// unbased unsized literal is one bit where it is self-determined. §5.7.2 and
-// §5.8: a real or time literal is real. §5.9: a string literal is an unsigned
-// integral value of eight bits a character.
 constexpr std::array kLiterals = {
     Comparison{"type(4'b1010) == type(logic [3:0])", true},
     Comparison{"type(4'b1010) == type(bit [3:0])", false},
@@ -263,8 +223,6 @@ constexpr std::array kLiterals = {
     Comparison{"type(\"ab\") == type(logic [7:0])", false},
 };
 
-// §11.3.1: an operator with a real operand is real, and one with a shortreal
-// operand and no real one is shortreal.
 constexpr std::array kRealOperands = {
     Comparison{"type(rl * 2) == type(real)", true},
     Comparison{"type(srl + b) == type(shortreal)", true},
@@ -274,8 +232,6 @@ constexpr std::array kRealOperands = {
     Comparison{"type(flag ? rl : a) == type(real)", true},
 };
 
-// §6.20.2 and §6.19.3: a parameter is the type it was declared with, and an
-// enumeration's named constant is of the enumeration's type.
 constexpr std::array kParametersAndConstants = {
     Comparison{"type(P) == type(byte)", true},
     Comparison{"type(P) == type(bit [7:0])", false},
@@ -284,9 +240,6 @@ constexpr std::array kParametersAndConstants = {
     Comparison{"type(E1) == type(int)", false},
 };
 
-// §6.19.5: first, last, next and prev give the enumeration's type, num an int
-// and name a string, called on a variable or a named constant, and with or
-// without the parentheses §5.13 lets a call with no arguments leave out.
 constexpr std::array kEnumerationMethods = {
     Comparison{"type(en.first()) == type(e_t)", true},
     Comparison{"type(en.first()) == type(int)", false},
@@ -299,9 +252,6 @@ constexpr std::array kEnumerationMethods = {
     Comparison{"type(en.name()) == type(int)", false},
 };
 
-// §6.16.1 to §6.16.10: len, compare and icompare give an int, getc a byte,
-// toupper, tolower and substr a string, atoi, atohex, atooct and atobin an
-// integer, and atoreal a real, a method of a method's result included.
 constexpr std::array kStringMethods = {
     Comparison{"type(str.len()) == type(int)", true},
     Comparison{"type(str.len) == type(integer)", false},
@@ -320,9 +270,6 @@ constexpr std::array kStringMethods = {
     Comparison{"type(str.tolower().len()) == type(int)", true},
 };
 
-// §7.5.2, §7.10.2.1 and §7.9.1 to §7.9.7: size gives an int, as do an
-// associative array's num, exists, first, last, next and prev; §7.10.2.4 and
-// §7.10.2.5: pop_front and pop_back give the queue's element type.
 constexpr std::array kArrayMethods = {
     Comparison{"type(dyn.size()) == type(int)", true},
     Comparison{"type(dyn.size) == type(integer)", false},
@@ -340,10 +287,6 @@ constexpr std::array kArrayMethods = {
     Comparison{"type(bq.pop_back()) == type(int)", false},
 };
 
-// §7.12.3: a reduction method gives the array's element type, or, with a with
-// clause, the type of its expression, the iterator named item or named by the
-// method's argument; §7.12.4: the iterator's index method gives an int, or an
-// associative array's index type.
 constexpr std::array kReductionMethods = {
     Comparison{"type(ia.sum()) == type(shortint)", true},
     Comparison{"type(ia.sum()) == type(int)", false},
@@ -363,10 +306,6 @@ constexpr std::array kReductionMethods = {
     Comparison{"type(ab.sum with (item.index)) == type(logic [3:0])", false},
 };
 
-// §26.3: a package's function gives its return type, called through the
-// package or imported, as do a function the compilation unit declares
-// (§3.12.1) and an imported DPI function (§35.5.4), whether the module, a
-// package or the compilation unit imports it.
 constexpr std::array kSubroutineCalls = {
     Comparison{"type(pk::pf()) == type(shortint)", true},
     Comparison{"type(pk::pf()) == type(int)", false},
@@ -379,12 +318,6 @@ constexpr std::array kSubroutineCalls = {
     Comparison{"type(ud()) == type(real)", true},
 };
 
-// §6.22.1(f) with §7.4.2: two unpacked array types match where they are the
-// same kind of array with matching element types, matching index types where
-// associative, and the same bounds where fixed in size, `[2]` being `[0:1]`.
-// An element of a multidimensional array is an array of the dimensions left,
-// and a typedef renaming an array typedef, or writing dimensions on one, adds
-// none of its own to those it names, or puts its own outside them (§7.4.4).
 constexpr std::array kUnpackedArrays = {
     Comparison{"type(u) == type(u)", true},
     Comparison{"type(u) == type(un)", true},
@@ -409,10 +342,6 @@ constexpr std::array kUnpackedArrays = {
     Comparison{"type(ai) == type(aas_t)", false},
 };
 
-// §7.12.1: an array locator method gives a queue: of the array's element type
-// for find, find_first, find_last, min, max and unique, and of int for
-// find_index, find_first_index, find_last_index and unique_index, or of the
-// index type where the array is associative.
 constexpr std::array kArrayLocators = {
     Comparison{"type(arr.find with (item > 1)) == type(b6q_t)", true},
     Comparison{"type(arr.find with (item > 1)) == type(bit [5:0])", false},
@@ -434,11 +363,6 @@ constexpr std::array kArrayLocators = {
     Comparison{"type(ai.find_index with (item > 1)) == type(iq_t)", false},
 };
 
-// §6.22.1 with §8.4 and §8.25: a class handle is of its class, which matches
-// itself, a typedef of it and no other class, a class it extends included;
-// a specialization of a parameterized class matches another only where each
-// parameter takes the same value or type, a default given or left out alike,
-// and the unadorned name is the default specialization.
 constexpr std::array kClassHandles = {
     Comparison{"type(h) == type(C)", true},
     Comparison{"type(h) == type(D)", false},
@@ -458,10 +382,6 @@ constexpr std::array kClassHandles = {
     Comparison{"type(pd) == type(p8)", false},
 };
 
-// §8.5, §8.6, §8.10 and §8.13: a property read through a handle is of the
-// type it is declared with, under the handle's specialization, and a method
-// called through a handle or a class scope gives its return type, a member
-// the class inherits included.
 constexpr std::array kClassMembers = {
     Comparison{"type(h.x) == type(byte)", true},
     Comparison{"type(h.x) == type(bit [7:0])", false},
@@ -492,8 +412,6 @@ constexpr std::array kClassMembers = {
 struct ComparisonGroup {
   const char* name;
   std::span<const Comparison> comparisons;
-  // §11.3.6 (printed page 275): an assignment operator stands only in an
-  // expression within a procedural statement, a type reference's included.
   bool procedural_only = false;
 };
 
@@ -523,9 +441,6 @@ constexpr std::array kGroups = {
     ComparisonGroup{"class members", kClassMembers},
 };
 
-// Where §6.23 lets a comparison of type references stand: a procedural if's
-// condition, a continuous assignment's right-hand side, a generate if's
-// condition (§27.5) and a localparam's value (§6.20.4).
 enum class Place : std::uint8_t {
   kProceduralIf,
   kContinuousAssignment,
@@ -533,8 +448,6 @@ enum class Place : std::uint8_t {
   kParam
 };
 
-// A module declaring the operands and writing each comparison of `group` at
-// `place`, the k-th setting the bit of r k places below its most significant.
 std::string ModuleComparing(std::span<const Comparison> group, Place place) {
   const size_t kCount = group.size();
   std::string src = std::format("{}module t;\n{}  bit [{}:0] r;\n",
@@ -573,8 +486,6 @@ std::string ModuleComparing(std::span<const Comparison> group, Place place) {
   return src + "endmodule\n";
 }
 
-// The value r takes where each comparison of `group` gives what the standard
-// says it gives.
 uint64_t ExpectedBits(std::span<const Comparison> group) {
   uint64_t bits = 0;
   for (const Comparison& comparison : group) {
@@ -608,9 +519,6 @@ TEST(TypeOfExpressionCompareSim, ComparisonSetsAParameter) {
   ExpectEveryGroupAt(Place::kParam);
 }
 
-// §6.23: the expression a type reference names is not evaluated, so neither
-// the increment nor the operator assignment a comparison names changes the
-// variable it would write.
 TEST(TypeOfExpressionCompareSim, ComparedExpressionIsNotEvaluated) {
   const std::string kSrc =
       "module t;\n"
@@ -624,8 +532,6 @@ TEST(TypeOfExpressionCompareSim, ComparedExpressionIsNotEvaluated) {
   EXPECT_EQ(RunAndGet(kSrc, "x"), 1u);
 }
 
-// §6.23 with §7.10.2.4: nor is a method call, so the queue a comparison would
-// pop from keeps both its elements.
 TEST(TypeOfExpressionCompareSim, ComparedMethodCallIsNotEvaluated) {
   const std::string kSrc =
       "module t;\n"
@@ -641,9 +547,6 @@ TEST(TypeOfExpressionCompareSim, ComparedMethodCallIsNotEvaluated) {
   EXPECT_EQ(RunAndGet(kSrc, "n"), 2u);
 }
 
-// §6.23 with §27.5: a name in the expression is the value the generate block
-// the comparison stands in declares, where the module declares another of the
-// name.
 TEST(TypeOfExpressionCompareSim, OperandOfAGenerateBlockIsTypedInTheBlock) {
   const std::string kSrc =
       "module t;\n"
@@ -659,10 +562,6 @@ TEST(TypeOfExpressionCompareSim, OperandOfAGenerateBlockIsTypedInTheBlock) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b110u);
 }
 
-// §6.23: a declaration whose type is a type reference to an expression takes
-// the expression's self-determined type: 2-state where every operand is, so x
-// assigned to it reads as 0, signed where every operand is, as wide as §11.6.1
-// makes it, and real where an operand is.
 TEST(TypeOfExpressionDeclarationSim, DeclarationTakesTheSelfDeterminedType) {
   const std::string kSrc =
       "module t;\n"
@@ -691,11 +590,6 @@ TEST(TypeOfExpressionDeclarationSim, DeclarationTakesTheSelfDeterminedType) {
   EXPECT_EQ(RunAndGetReal(kSrc, "g"), 1.25);
 }
 
-// §6.23: a declaration written with a type reference to a call takes the type
-// the call gives: a string's len an int, 2-state and 32 bits wide (§6.16.1); a
-// queue's pop_front its signed byte element (§7.10.2.4); an enumeration's next
-// the enumeration, 3 bits wide (§6.19.5.3); a package's function its shortint
-// (§26.3); and an imported DPI function its real (§35.5.4).
 TEST(TypeOfExpressionDeclarationSim, DeclarationTakesACallsType) {
   const std::string kSrc =
       "package pk;\n"
@@ -725,19 +619,6 @@ TEST(TypeOfExpressionDeclarationSim, DeclarationTakesACallsType) {
   EXPECT_EQ(RunAndGetReal(kSrc, "h"), 1.25);
 }
 
-// §6.23 with §7.4.4: a declaration written with a type reference to an
-// unpacked array is an array of the same kind, element and bounds, and the
-// dimensions the declaration writes after its name stand outside those. Each
-// operand below is declared with, and its probe run, in a module, a
-// procedural block, a function and a generate block; written with `[3]`
-// after the name, the declaration is three of the operand's array, the first
-// of which is as large as an array of the operand's type starts, empty where
-// that is variable in size. `element_size` reads the size of that first
-// array: $size(d, 2) where it is fixed-size (§20.7), and $size(d[0]) where it
-// is variable in size (§20.7.1). It is null for a fixed array of associative
-// arrays, whose element no array query yet describes (#9020).
-// `variable_size` marks an operand whose array is variable in size, which a
-// procedure does not yet build as the element of a fixed array (#9019).
 struct DeclaredArray {
   const char* operand;
   const char* probe;
@@ -768,9 +649,6 @@ constexpr std::array kDeclaredArrays = {
                   "$size(d[0])", true},
 };
 
-// Where a declaration may stand: a module's items, a procedural block, a
-// function and a generate block, `{0}` the declaration and `{1}` the probe,
-// and whether that is among a procedure's statements.
 struct DeclarationPlace {
   const char* text;
   bool in_procedure;
@@ -786,8 +664,6 @@ constexpr std::array kDeclarationPlaces = {
                      false},
 };
 
-// A module declaring the operands and an int n, with `declaration` and
-// `probe` written at `place`, the text of one of kDeclarationPlaces.
 std::string ModuleDeclaring(std::string_view place,
                             const std::string& declaration,
                             const std::string& probe) {
@@ -796,10 +672,6 @@ std::string ModuleDeclaring(std::string_view place,
       std::vformat(place, std::make_format_args(declaration, probe)));
 }
 
-// Whether `array`, declared with `[3]` after the name at `place`, is a shape
-// the simulator builds and answers the element query of: not a fixed array of
-// associative arrays (#9020), nor, in a procedure, a fixed array of
-// variable-size arrays (#9019).
 bool ProbesOwnDimension(const DeclarationPlace& place,
                         const DeclaredArray& array) {
   return array.element_size != nullptr &&
@@ -824,13 +696,6 @@ TEST(TypeOfExpressionDeclarationSim, DeclarationTakesAnUnpackedArrayType) {
   }
 }
 
-// §6.23 with §8.4, §8.5 and §8.6: a declaration written with a type reference
-// to a class handle holds a handle of the class, which `new` makes an object
-// of; one to a property read through a handle is of the property's type,
-// under the handle's specialization, its unpacked dimensions included; and
-// one to a method's call, through a handle or a class scope, is of the
-// method's return type. Each is declared, and its probe run, in a module, a
-// procedural block, a function and a generate block.
 struct DeclaredClassValue {
   const char* operand;
   const char* probe;

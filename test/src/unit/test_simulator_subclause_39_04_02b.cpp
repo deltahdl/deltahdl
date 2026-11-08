@@ -16,8 +16,6 @@
 namespace delta {
 namespace {
 
-// Two instances of one module, each with a labelled and an unnamed concurrent
-// assertion.
 constexpr const char* kTwoInstances =
     "module m(input logic clk, input logic a);\n"
     "  a1: assert property (@(posedge clk) a);\n"
@@ -30,10 +28,6 @@ constexpr const char* kTwoInstances =
     "  initial $arm;\n"
     "endmodule\n";
 
-// §39.3.1 with §39.4.2 and §39.5.2: an assertion handle is the handle of one
-// instance of one assertion, so a callback placed on top.u1.a1 is not called
-// by a control of top.u2.a1, and a control of one instance's a1 leaves the
-// other's enabled (#7500).
 TEST_F(AssertionRun, SameNamedAssertionsOfTwoInstancesAreApart) {
   AssertionArmer() = [] {
     ASSERT_NE(WatchAssertion("top.u1.a1", cbAssertionDisable), nullptr);
@@ -52,10 +46,6 @@ TEST_F(AssertionRun, SameNamedAssertionsOfTwoInstancesAreApart) {
   EXPECT_TRUE(api_.AssertionEnabled("top.u2.a1"));
 }
 
-// §39.3.1: an unnamed assertion is reached by iteration though not by name,
-// and its handle is as much an assertion handle as a named one's: a callback
-// can be placed on it, a control acts on it and calls that callback, and the
-// unnamed assertion of the other instance is another assertion (#7500).
 TEST_F(AssertionRun, AnUnnamedAssertionTakesCallbacksAndControls) {
   AssertionArmer() = [] {
     vpiHandle own = UnnamedAssertOf("top.u1");
@@ -74,8 +64,6 @@ TEST_F(AssertionRun, AnUnnamedAssertionTakesCallbacksAndControls) {
   EXPECT_EQ(CallsOf(cbAssertionDisable).size(), 1u);
 }
 
-// The cb_time and attempt start time of each call recorded for `reason`, and
-// whether each had attempt information, in order.
 struct Timing {
   uint64_t cb_time = 0;
   uint64_t attempt_start = 0;
@@ -91,17 +79,12 @@ std::vector<Timing> TimingsOf(const std::vector<AssertionCall>& calls) {
   return timings;
 }
 
-// Places a callback for each of `reasons` on the assertion `full_name`.
 void WatchFor(const char* full_name, std::initializer_list<int> reasons) {
   for (int reason : reasons) {
     ASSERT_NE(WatchAssertion(full_name, reason), nullptr);
   }
 }
 
-// §39.4.2: an attempt of a running concurrent assertion starts at each tick
-// of its clock, and each reaches success, vacuous success or failure at the
-// tick its verdict is decided; each callback gets the attempt's start time,
-// and its cb_time is the time of the event (#7490, #7491, #7492, #7493).
 TEST_F(AssertionRun, AConcurrentAssertionsAttemptsReachTheirCallbacks) {
   AssertionArmer() = [] {
     WatchFor("top.a1", {cbAssertionStart, cbAssertionSuccess,
@@ -133,9 +116,6 @@ TEST_F(AssertionRun, AConcurrentAssertionsAttemptsReachTheirCallbacks) {
             (std::vector<Timing>{{40, 30}}));
 }
 
-// §39.4.2: a sequence property's attempt succeeds where its sequence
-// matches and fails where it can no longer match, and an attempt still in
-// flight when the run ends of a strong one fails then (#7490, #7491, #7493).
 TEST_F(AssertionRun, ASequencePropertysAttemptsReachTheirCallbacks) {
   AssertionArmer() = [] {
     WatchFor("top.s1",
@@ -165,12 +145,8 @@ TEST_F(AssertionRun, ASequencePropertysAttemptsReachTheirCallbacks) {
   EXPECT_EQ(CallsOf(cbAssertionFailure)[1].attempt_start, 30u);
 }
 
-// §39.4.2: an immediate assertion's attempt starts each time the statement
-// executes and succeeds or fails there and then (#7490, #7491, #7493).
 TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
   AssertionArmer() = [] {
-    // §39.3.1: the assertion stands inside a procedure and is found by its
-    // full name, which the named begin its label opens shares (§9.3.5).
     vpiHandle i1 = vpi_handle_by_name(VpiText("top.i1"), nullptr);
     ASSERT_NE(i1, nullptr);
     EXPECT_EQ(vpi_get(vpiType, i1), vpiImmediateAssert);
@@ -203,11 +179,6 @@ TEST_F(AssertionRun, AnImmediateAssertionsAttemptsReachTheirCallbacks) {
             (std::vector<Timing>{{6, 6}}));
 }
 
-// §39.4.2: an attempt reaches the disabled state where its disable iff
-// condition is true at a tick it is in flight at, and an attempt that starts
-// while the condition is true reaches it at once, neither succeeding nor
-// failing, whether the property is an implication, a boolean or a sequence
-// (#7494).
 TEST_F(AssertionRun, ADisabledAttemptReachesTheDisabledEvaluationCallback) {
   AssertionArmer() = [] {
     WatchFor("top.a1", {cbAssertionDisabledEvaluation, cbAssertionSuccess,
@@ -244,16 +215,12 @@ TEST_F(AssertionRun, ADisabledAttemptReachesTheDisabledEvaluationCallback) {
   EXPECT_TRUE(CallsOf(cbAssertionFailure).empty());
 }
 
-// The source text `expr` decompiles to, empty for a null handle.
 std::string Written(vpiHandle expr) {
   const char* text =
       expr != nullptr ? vpi_get_str(vpiDecompile, expr) : nullptr;
   return text != nullptr ? text : "";
 }
 
-// What a failure or a step callback's attempt information details: the text
-// of the failExpr, or of each expression the step matched with the states it
-// went from and to.
 struct Detail {
   std::vector<std::string> exprs;
   int from = -1;
@@ -266,9 +233,8 @@ std::vector<Detail>& Details() {
   return details;
 }
 
-PLI_INT32 RecordDetail(PLI_INT32 reason, p_vpi_time /*cb_time*/,
-                       vpiHandle /*assertion*/, p_vpi_attempt_info info,
-                       PLI_BYTE8* /*user_data*/) {
+PLI_INT32 RecordDetail(PLI_INT32 reason, p_vpi_time, vpiHandle,
+                       p_vpi_attempt_info info, PLI_BYTE8*) {
   Detail detail;
   if (reason == cbAssertionFailure) {
     detail.exprs.push_back(Written(info->detail.failExpr));
@@ -284,7 +250,6 @@ PLI_INT32 RecordDetail(PLI_INT32 reason, p_vpi_time /*cb_time*/,
   return 0;
 }
 
-// Places RecordDetail on the assertion `full_name` for each of `reasons`.
 void WatchDetail(const char* full_name, std::initializer_list<int> reasons) {
   vpiHandle assertion = vpi_handle_by_name(VpiText(full_name), nullptr);
   for (int reason : reasons) {
@@ -294,10 +259,6 @@ void WatchDetail(const char* full_name, std::initializer_list<int> reasons) {
   }
 }
 
-// §39.4.2: a failure callback's failExpr and a step callback's matched
-// expressions are handles to the assertion's own expressions, which
-// decompile to what the source wrote, and the step carries the states it
-// went from and to (#7496, #7497).
 TEST_F(AssertionRun, AttemptDetailNamesTheAssertionsExpressions) {
   Details().clear();
   AssertionArmer() = [this] {
@@ -321,7 +282,6 @@ TEST_F(AssertionRun, AttemptDetailNamesTheAssertionsExpressions) {
             (std::vector<Detail>{{{"b"}, -1, -1}, {{"a", "b"}, 0, 2}}));
 }
 
-// The texts of the details recorded, sorted.
 std::vector<std::string> SortedTexts() {
   std::vector<std::string> texts;
   for (const Detail& detail : Details()) {
@@ -331,9 +291,6 @@ std::vector<std::string> SortedTexts() {
   return texts;
 }
 
-// §39.4.2: a run's failure callback names the expression the attempt failed
-// at: the consequent of an implication, the operand of a sequence it ended
-// at, and a Boolean property's own expression (#7496).
 TEST_F(AssertionRun, ARunsFailureNamesTheExpressionTheAttemptFailedAt) {
   Details().clear();
   AssertionArmer() = [] {
@@ -357,8 +314,6 @@ TEST_F(AssertionRun, ARunsFailureNamesTheExpressionTheAttemptFailedAt) {
   EXPECT_EQ(SortedTexts(), (std::vector<std::string>{"b", "b", "b", "b", "c"}));
 }
 
-// Enables stepping, by clock steps, for the attempt of the assertion
-// `full_name` that begins at `start`.
 void EnableStepAt(const char* full_name, uint32_t start) {
   s_vpi_time time = {vpiSimTime, 0, start, 0.0};
   EXPECT_EQ(vpi_control(vpiAssertionEnableStep,
@@ -367,7 +322,6 @@ void EnableStepAt(const char* full_name, uint32_t start) {
             1);
 }
 
-// Four clock edges, at 5, 15, 25 and 35, the design calling $arm first.
 constexpr const char* kFourEdges =
     "  initial begin\n"
     "    $arm;\n"
@@ -381,10 +335,6 @@ constexpr const char* kFourEdges =
     "  end\n"
     "endmodule\n";
 
-// §39.5.2 with §39.4.2: the attempt stepping was enabled for before it began
-// calls the step callback at each clock tick it advances at, with the
-// operand it matched there, from the origin through states of its own to
-// the accepting state; the attempts before and after it call none (#7495).
 TEST_F(AssertionRun, AStepEnabledAttemptCallsItsStepCallbackEachTick) {
   Details().clear();
   AssertionArmer() = [] {
@@ -401,8 +351,6 @@ TEST_F(AssertionRun, AStepEnabledAttemptCallsItsStepCallbackEachTick) {
             (std::vector<Detail>{{{"a"}, 0, 2}, {{"b"}, 2, 3}, {{"c"}, 3, 1}}));
 }
 
-// §39.4.2: a failing step carries the expression it failed at, last, and
-// is the attempt's last step (#7495).
 TEST_F(AssertionRun, AStepEnabledAttemptsFailingStepEndsWithItsFailure) {
   Details().clear();
   AssertionArmer() = [] {

@@ -25,9 +25,6 @@ TEST(AssertionSemanticsParsing, Intersect) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.6: an intersect of two booleans holds no cycle delay, and is a
-// sequence all the same, so a spec that is one is read as the sequential
-// property it is, its second operand the first's intersect.
 TEST(AssertionSemanticsParsing, AnIntersectOfBooleansIsASequentialProperty) {
   auto r = Parse(
       "module m;\n"

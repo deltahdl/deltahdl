@@ -31,10 +31,6 @@ PreprocConfig PreprocConfigFor(const CliOptions& opts,
   PreprocConfig config;
   config.include_dirs = opts.include_dirs;
   config.defines = opts.defines;
-  // §34.3 (printed page 949): a tool processing source text decrypts the
-  // decryption envelopes it meets with the key the user supplies, so the keys
-  // given on the command line are the ones a reading run opens them with, as
-  // an --encrypt run seals them under the same two.
   config.protect_key = opts.protect.exchange_key;
   config.protect_keys = opts.protect.keys;
   config.ask_license = std::move(ask_license);
@@ -54,9 +50,6 @@ std::optional<std::string> ReadSource(const std::string& path) {
 
 namespace {
 
-// One source description as the preprocessor gave it back: the text, the
-// origin of each of its lines, and the directive state recorded while it was
-// read.
 struct PreprocessedSource {
   std::string path;
   std::string text;
@@ -64,17 +57,11 @@ struct PreprocessedSource {
   PrecompiledDirectives directives;
 };
 
-// The entries `all` gained since it held `before`.
 template <typename T>
 std::vector<T> Since(const std::vector<T>& all, size_t before) {
   return {all.begin() + static_cast<std::ptrdiff_t>(before), all.end()};
 }
 
-// §34.5.32: a viewport of an envelope a file's reading closed, restated
-// against `origins`, the origin of each line of the text the reading produced:
-// the line its pragma expression stood on, and the first and last lines that
-// came out of its envelope. A pragma expression that left no line of its own
-// stands at the envelope's first line.
 PrecompiledViewport RecordedViewport(
     const EnvelopeViewport& viewport,
     const std::vector<OutputLineOrigin>& origins,
@@ -97,10 +84,6 @@ PrecompiledViewport RecordedViewport(
   return kept;
 }
 
-// Preprocesses the file at `path` with `preproc`, which carries macros and
-// directive state from the files before it as an ordinary compile's does, and
-// keeps the parts of the preprocessor's records this file added, its runtime
-// licences among them.
 std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
                                                 Preprocessor& preproc,
                                                 SourceManager& src_mgr) {
@@ -118,23 +101,16 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
   out.line_origins = Since(preproc.LineOrigins(), origins);
   out.directives.modules = Since(preproc.ModuleDirectivesList(), modules);
   out.directives.cell_modules = Since(preproc.CellModuleNames(), cells);
-  // §34.5.29.2 asks each runtime licence before the model is executed, which
-  // the bind that reads this record does, so the licences go with the text.
   for (const ProtectRuntimeLicense& met :
        Since(preproc.RuntimeLicenses(), licenses)) {
     out.directives.runtime_licenses.push_back(met.license);
   }
-  // §37.3.6 has the objects of code a decryption envelope contained protected
-  // in the run that executes it, so the lines that came out of one go too.
   for (std::size_t i = 0; i < out.line_origins.size(); ++i) {
     const OutputLineOrigin& origin = out.line_origins[i];
     if (src_mgr.IsProtected(SourceLoc{origin.file_id, origin.line, 1})) {
       out.directives.protected_lines.push_back(static_cast<uint32_t>(i + 1));
     }
   }
-  // §34.5.32.2's containment check and the access each viewport asks belong to
-  // the run that binds the record, so the viewports go with the text, their
-  // envelopes restated as its lines.
   for (const EnvelopeViewport& viewport :
        Since(src_mgr.Viewports(), viewports)) {
     out.directives.viewports.push_back(
@@ -143,9 +119,6 @@ std::optional<PreprocessedSource> PreprocessOne(const std::string& path,
   return out;
 }
 
-// Parses `source` once, its reports going to `diag` at the file and line each
-// came from, as an ordinary compile's parse reports them. Answers whether it
-// parsed without error.
 bool ParsesWithReports(const PreprocessedSource& source, SourceManager& src_mgr,
                        DiagEngine& diag) {
   uint32_t errors = diag.ErrorCount();
@@ -159,18 +132,12 @@ bool ParsesWithReports(const PreprocessedSource& source, SourceManager& src_mgr,
   return diag.ErrorCount() == errors;
 }
 
-// §33.3.1 (printed page 937): one compiler invocation that maps two modules of
-// one name into one library warns of it. The last is the one the library
-// keeps (PrecompiledLibrary::Load); a cell written by an earlier invocation
-// is recompiled rather than duplicated, and draws none.
 void WarnRecompiledInThisInvocation(const PreprocessedSource& source,
                                     const CliOptions& opts,
                                     std::unordered_set<std::string>& written,
                                     DiagEngine& diag) {
   for (const auto& name : PrecompiledLibrary::CellNames(source.text)) {
     if (written.insert(name).second) continue;
-    // Joined rather than std::format'ed: main shall throw nothing, and
-    // std::format is declared to throw format_error.
     diag.Warning(SourceLoc::None(),
                  "'" + name + "' is compiled into library '" +
                      opts.precompile_library +
@@ -184,16 +151,10 @@ void WarnRecompiledInThisInvocation(const PreprocessedSource& source,
 
 int RunPrecompile(const CliOptions& opts, SourceManager& src_mgr,
                   DiagEngine& diag) {
-  // Both options are required together. A library name with nowhere to write
-  // it leaves nothing that persists, and a file with no library name holds
-  // cells belonging to no library, which §33.5.3 has a bind select from.
   if (opts.precompile_library.empty() || opts.precompile_output.empty()) {
     std::cerr << "--precompile-into and --precompile-out are used together\n";
     return 1;
   }
-  // §34.5.28.2: a model a precompiled source carries in an envelope is
-  // decrypted only where its decrypt_license is granted, and the exit functions
-  // those licences name are called as this object goes, before the run ends.
   ProtectLicenseLibraries licenses;
   Preprocessor preproc(src_mgr, diag, PreprocConfigFor(opts, licenses.Asker()));
   std::vector<PreprocessedSource> sources;
@@ -203,7 +164,6 @@ int RunPrecompile(const CliOptions& opts, SourceManager& src_mgr,
     if (!source) return 1;
     sources.push_back(std::move(*source));
   }
-  // A `begin_keywords region may span source file boundaries (§22.14).
   preproc.ReportUnterminatedKeywordRegions();
   if (diag.HasErrors()) return 1;
 

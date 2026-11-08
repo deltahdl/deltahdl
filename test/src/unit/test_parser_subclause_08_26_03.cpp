@@ -45,10 +45,6 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionOnInterfaceClassParam) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// §8.26.3 parse case: a class scope prefix may carry a parameter value
-// assignment ahead of ::, so IntfA#(bit)::T2 is accepted as a data type by the
-// grammar alone. The elaborator file for this subclause carries the matching
-// claim that the typedef then resolves against that specialization.
 TEST(InterfaceClassTypeAccess,
      ScopeResolutionOnInterfaceClassSpecializationParses) {
   auto r = Parse(

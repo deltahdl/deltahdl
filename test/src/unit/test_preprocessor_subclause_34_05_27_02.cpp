@@ -1,45 +1,3 @@
-// §34.5.27.2 key_block, Description, on what a block carries and who may open
-// it.
-//
-// The subclause states four things. One is a condition on an encrypting tool's
-// input -- a block found outside a previously generated envelope is an error,
-// and inside one it is ignored -- and the file named for §34.5.27 covers that
-// and says so. That file also covers the error a region draws by changing its
-// data decryption pragma expressions between two of its blocks. The other two
-// are what this file is for.
-//
-//   ENCRYPTION OUTPUT: the tool forms a buffer from the expressions that open
-//   the region's data, encrypts it, encodes it under the encoding pragma
-//   expression in effect, and writes the result as the block's contents. Where
-//   several blocks stand in one envelope they are alternative decryption keys
-//   for it rather than several envelopes.
-//
-//   DECRYPTION INPUT: the block is read in the encoded form, the encoding is
-//   reversed, the block is decrypted, and the resulting text is parsed for the
-//   keys the data block needs.
-//
-// The initialization vector never arises. §34.5.27.2 has the vector prepended
-// to the encrypted key wherever the cipher a region's keys are under is a CBC
-// algorithm requiring one, and the cipher this implementation has is a keyed
-// stream named as its own rather than as one the standard reserves. There is
-// nothing to prepend and nothing to strip, and a case below states it: the
-// decoded block is the buffer and nothing standing ahead of it.
-//
-// Which spelling of the keyword announces the block is §34.5.27.1's and is
-// stated in test_preprocessor_subclause_34_05_27_01.cpp.
-//
-// A block this reader cannot open costs it no report, and the last case below
-// is what holds the reading to that. §34.5.24.2 has an encrypting tool seal a
-// region's keys under the algorithm the key_method expression names, has that
-// identifier unchanged in the output file, and has a reader decrypt a key block
-// under the algorithm the identifier names. This implementation has one cipher,
-// so #3278 settled the first two by refusing a region that named any other:
-// ReportUnprovidedKeyMethod in src/preprocessor/protect_processing.cpp makes
-// that report where the region closes. The third is left saying nothing,
-// because §34.5.27.2's alternatives are what a block under some other cipher
-// arrives as, and a reader that reported one would report every envelope
-// written for two readers.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -60,9 +18,6 @@ using namespace delta;
 
 namespace {
 
-// Two entities, each holding one key. A region designating both is written a
-// block for each, and §34.5.27 makes those two alternative ways into one
-// envelope rather than two envelopes.
 constexpr std::string_view kFirstEntity = "meridian-trust";
 constexpr std::string_view kSecondEntity = "cerulean-vault";
 constexpr std::string_view kFirstKeyName = "wrapping-2026";
@@ -70,9 +25,6 @@ constexpr std::string_view kSecondKeyName = "wrapping-2027";
 constexpr std::string_view kFirstKey = "meridian-trust-wrapping-key";
 constexpr std::string_view kSecondKey = "cerulean-vault-wrapping-key";
 
-// The name a region gives the key its data are under. A name with no key held
-// for it is what sends the region to key blocks rather than to a key of its
-// author's.
 constexpr std::string_view kDataKeyName = "design-2027";
 
 constexpr std::string_view kEncodingSealedDesign =
@@ -85,10 +37,6 @@ std::string Writes(std::string_view keyword, std::string_view value) {
   return text;
 }
 
-// One designation of a key block's key: the entity, the name of the key the
-// data are under, and the name picking the block's own key out of that entity's
-// list. The data name is written with each designation because §34.5.27 holds
-// the blocks of one envelope to agreeing about the data.
 std::string Designates(std::string_view entity, std::string_view key_name) {
   std::string text = Writes("key_keyowner", entity);
   text.append(Writes("data_keyname", kDataKeyName));
@@ -115,7 +63,6 @@ ProtectKeyList OnlyTheSecondEntitysKey() {
   return keys;
 }
 
-// A region designating `described`, sealing the design behind key blocks.
 std::string Region(const std::string& described) {
   std::string text = "`pragma protect begin\n";
   text.append(described).append(kEncodingSealedDesign);
@@ -123,8 +70,6 @@ std::string Region(const std::string& described) {
   return text;
 }
 
-// The envelope this tool writes for a region designating both entities,
-// checked on the way out to be one carrying a block for each.
 std::string EnvelopeWithTwoBlocks() {
   std::string envelope =
       EncryptEnvelopes(Region(Designates(kFirstEntity, kFirstKeyName) +
@@ -135,7 +80,6 @@ std::string EnvelopeWithTwoBlocks() {
   return envelope;
 }
 
-// The envelope for a region designating one entity.
 std::string EnvelopeWithOneBlock() {
   std::string envelope =
       EncryptEnvelopes(Region(Designates(kFirstEntity, kFirstKeyName)), {},
@@ -145,8 +89,6 @@ std::string EnvelopeWithOneBlock() {
   return envelope;
 }
 
-// The characters the first key block of `envelope` was written as, which is
-// the line beneath the keyword announcing it.
 std::string BlockLineOf(const std::string& envelope) {
   size_t at = envelope.find(kKeyBlockLine);
   EXPECT_NE(at, std::string::npos) << envelope;
@@ -154,8 +96,6 @@ std::string BlockLineOf(const std::string& envelope) {
   return envelope.substr(from, envelope.find('\n', from) - from);
 }
 
-// That block read the way §34.5.27.2 has a reader read it: out of the coding
-// scheme it was written in, then out of the key it was encrypted under.
 std::string RecoveredBufferOf(const std::string& envelope,
                               std::string_view key) {
   std::string block;
@@ -167,25 +107,12 @@ std::string RecoveredBufferOf(const std::string& envelope,
   return buffer;
 }
 
-// -- What the block carries --------------------------------------------------
-
-// §34.5.27.2: the buffer is formed from the expressions that open the region's
-// data. What a reader is here for is the key, and the cipher it belongs to
-// stands beside it: neither opens the data block without the other.
 TEST(ProtectKeyBlockDescription, TheBufferCarriesWhatOpensTheDataBlock) {
   std::string buffer = RecoveredBufferOf(EnvelopeWithOneBlock(), kFirstKey);
   EXPECT_TRUE(Holds(buffer, "`pragma protect data_method=")) << buffer;
   EXPECT_TRUE(Holds(buffer, "`pragma protect data_decrypt_key\n")) << buffer;
 }
 
-// §34.5.27.2 names data_keyname among the expressions the buffer is formed
-// from, and §34.5.12.2 sends that name into the key_block wherever a digital
-// envelope is used, so the name is inside the block and not beside it. Issue
-// #3268 is the defect: it was written in the clear as well.
-//
-// The entity whose key opens the block stays outside. §34.5.23.2 states no
-// exception for it, and a reader that had to open the block to learn whose key
-// opens it would have no way in at all.
 TEST(ProtectKeyBlockDescription, TheDataNameIsInsideAndTheBlocksEntityOutside) {
   std::string envelope = EnvelopeWithOneBlock();
   std::string buffer = RecoveredBufferOf(envelope, kFirstKey);
@@ -195,25 +122,11 @@ TEST(ProtectKeyBlockDescription, TheDataNameIsInsideAndTheBlocksEntityOutside) {
       << envelope;
 }
 
-// §34.5.27.2 has the encrypted region encoded under the encoding pragma
-// expression in effect, so the characters beneath the keyword are the buffer
-// written in that scheme and nothing else: read out of the scheme and out of
-// the key, what is left is the buffer whole.
-//
-// That is also where the initialization vector would have been. §34.5.27.2
-// prepends one to the encrypted key wherever the cipher is a CBC algorithm
-// requiring it, and the cipher here requires none, so nothing stands ahead of
-// the buffer.
 TEST(ProtectKeyBlockDescription, TheBlockIsTheBufferAndNothingAheadOfIt) {
   std::string buffer = RecoveredBufferOf(EnvelopeWithOneBlock(), kFirstKey);
   EXPECT_TRUE(buffer.rfind("`pragma protect data_method=", 0) == 0) << buffer;
 }
 
-// -- Alternative ways into one envelope --------------------------------------
-
-// §34.5.27.2: several blocks in one envelope are alternative decryption keys
-// for it rather than several envelopes. A reader holding either entity's key
-// opens the block written for it and reaches the same design.
 TEST(ProtectKeyBlockDescription, AReaderOpeningEitherBlockReachesTheDesign) {
   std::string envelope = EnvelopeWithTwoBlocks();
   ReadSource first(envelope, ReadSource::KeysConfig(OnlyTheFirstEntitysKey()));
@@ -223,10 +136,6 @@ TEST(ProtectKeyBlockDescription, AReaderOpeningEitherBlockReachesTheDesign) {
   EXPECT_TRUE(Holds(second.text, kEncodingSealedDesign)) << second.text;
 }
 
-// The two blocks encode the same data decryption key data, which is what makes
-// them ways into one envelope rather than two: the design each reader reaches
-// is the same design, and the block the other reader could not open cost
-// neither of them anything.
 TEST(ProtectKeyBlockDescription, TwoBlocksAreWaysIntoOneEnvelope) {
   std::string envelope = EnvelopeWithTwoBlocks();
   ReadSource first(envelope, ReadSource::KeysConfig(OnlyTheFirstEntitysKey()));
@@ -237,9 +146,6 @@ TEST(ProtectKeyBlockDescription, TwoBlocksAreWaysIntoOneEnvelope) {
   EXPECT_FALSE(second.diag.HasErrors()) << second.text;
 }
 
-// A reader holding neither entity's key opens neither block, and §34.5.27 has
-// that cost nothing to say: a block written for somebody else is not a breach.
-// What the reading is left without is the design.
 TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
   ReadSource run(EnvelopeWithTwoBlocks(),
                  ReadSource::KeysConfig(ProtectKeyList()));
@@ -250,20 +156,6 @@ TEST(ProtectKeyBlockDescription, AReaderHoldingNeitherKeyOpensNeitherBlock) {
       "34.3.2"));
 }
 
-// The reader between those two: it holds the second entity's key and not the
-// first's, so the first block it reaches is one it cannot open and the second
-// is one it can. §34.5.27.2 makes the two alternatives rather than obligations,
-// so what the reading owes this reader is the design and not one word about the
-// block it passed over. Preprocessor::TakeKeyBlockValue
-// (src/preprocessor/preprocessor_protect_values.cpp) consumes that line and
-// says nothing, which is where a block under a cipher this implementation does
-// not provide is left as well.
-//
-// Nothing reported is the claim rather than no error reported, a warning about
-// the passed-over block being as much a report about it as an error would be.
-// A report added to the reading half for §34.5.24.2 would land here: #3278
-// settled that subclause on the encrypting half alone, and this case is what
-// goes red if the settlement moves.
 TEST(ProtectKeyBlockDescription, TheBlockThisReaderCannotOpenCostsItNoReport) {
   ReadSource run(EnvelopeWithTwoBlocks(),
                  ReadSource::KeysConfig(OnlyTheSecondEntitysKey()));
@@ -271,13 +163,6 @@ TEST(ProtectKeyBlockDescription, TheBlockThisReaderCannotOpenCostsItNoReport) {
   EXPECT_TRUE(run.diag.Diagnostics().empty()) << run.text;
 }
 
-// §34.5.27.2 has the block read in its encoded form and §34.5.27.1's keyword
-// begins it on the line beneath, neither saying where it ends. So a key block
-// another tool wrote over several lines -- which §34.5.9.2's line-oriented
-// schemes produce by construction -- is one this reader has to take, and the
-// entity's key still comes out of it. The envelope is this tool's own with the
-// block broken across three lines by hand, so it differs from one that opens in
-// the breaks alone.
 TEST(ProtectKeyBlockDescription, AKeyBlockStandingOnSeveralLinesIsReadWhole) {
   std::string envelope = EnvelopeWithOneBlock();
   std::string broken = WithBlockBrokenIntoLines(envelope, kKeyBlockLine, 3);
@@ -288,15 +173,6 @@ TEST(ProtectKeyBlockDescription, AKeyBlockStandingOnSeveralLinesIsReadWhole) {
   EXPECT_TRUE(run.diag.Diagnostics().empty()) << run.text;
 }
 
-// -- What the recovered text is read as --------------------------------------
-
-// §34.5.27.2: the resulting text is parsed to determine the keys the data block
-// needs. What it recovers to is protect pragma directives, so the reading is
-// the one every directive of the source goes through, and what it puts in
-// effect is what the data block is then opened with.
-//
-// The block's own text is not text of the design: it holds keys rather than
-// lines, so none of it comes back out.
 TEST(ProtectKeyBlockDescription, TheRecoveredTextIsReadAsDirectivesNotDesign) {
   std::string envelope = EnvelopeWithOneBlock();
   ReadSource run(envelope, ReadSource::KeysConfig(OnlyTheFirstEntitysKey()));

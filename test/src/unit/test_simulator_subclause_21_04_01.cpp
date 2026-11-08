@@ -1,19 +1,3 @@
-// §21.4.1 Reading packed data — the $readmemb / $readmemh destinations this
-// subclause adds on top of the §21.4 fixed unpacked array: unpacked arrays of
-// packed data (each packed element handled as its vector equivalent), dynamic
-// arrays and queues (whose current size is fixed for the load), and
-// associative arrays (integral index only; loading an address creates the
-// element, and an enumerated index is addressed by its members' numeric
-// values).
-//
-// Every rule here is a runtime rule whose behavior depends on how the
-// destination is produced: the element's packed shape (§7.4), a queue's
-// declaration or push_back population (§7.10), a dynamic array's new[]
-// sizing (§7.5), and an associative array's index type (§7.8, §6.19). These
-// tests therefore declare each destination with its real syntax and drive the
-// module through the full pipeline (parse -> elaborate -> lower -> run),
-// reading the loaded elements back with $display — rather than hand-building
-// container objects in an isolated evaluator.
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -27,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Writes `data` to a scratch file tagged by `tag` and returns its path. The
-// path contains no characters that need escaping inside a SystemVerilog
-// string literal, so it can be embedded directly in the source under test.
 std::string WriteData(const std::string& tag, const std::string& data) {
   std::string path = "/tmp/deltahdl_t210401_" + tag + ".mem";
   std::ofstream ofs(path);
@@ -38,13 +19,6 @@ std::string WriteData(const std::string& tag, const std::string& data) {
   return path;
 }
 
-// ---------------------------------------------------------------------------
-// Unpacked arrays of packed data: each packed element is handled as its
-// vector equivalent, and the normal §21.4 operation is performed on it.
-// ---------------------------------------------------------------------------
-
-// §21.4.1: a packed-vector element wider than one file digit takes a whole
-// multi-digit number as one word; nothing is split across elements.
 TEST(ReadmemPackedDataSim, PackedVectorElementsLoadAsWholeWords) {
   SimFixture f;
   std::string path = WriteData("vec", "ABCD\n1234\n");
@@ -63,8 +37,6 @@ TEST(ReadmemPackedDataSim, PackedVectorElementsLoadAsWholeWords) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: an element of a packed structure type is treated as the vector
-// equivalent of the structure, so one file number fills the whole element.
 TEST(ReadmemPackedDataSim, PackedStructElementsLoadAsVectorEquivalent) {
   SimFixture f;
   std::string path = WriteData("pstruct", "ABCD\n1234\n");
@@ -84,8 +56,6 @@ TEST(ReadmemPackedDataSim, PackedStructElementsLoadAsVectorEquivalent) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: a multidimensional packed element ([1:0][7:0]) is likewise one flat
-// vector; the file number lands whole in the element, not per packed subword.
 TEST(ReadmemPackedDataSim, MultiDimPackedElementsLoadAsFlatVectors) {
   SimFixture f;
   std::string path = WriteData("mdpacked", "ABCD\n1234\n");
@@ -104,8 +74,6 @@ TEST(ReadmemPackedDataSim, MultiDimPackedElementsLoadAsFlatVectors) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: a packed element wider than 64 bits still loads as one vector; the
-// high words of the multi-word value survive intact.
 TEST(ReadmemPackedDataSim, WidePackedElementLoadsAllWords) {
   SimFixture f;
   std::string path = WriteData("wide", "0123456789ABCDEF0123\n");
@@ -124,14 +92,6 @@ TEST(ReadmemPackedDataSim, WidePackedElementLoadsAllWords) {
   std::remove(path.c_str());
 }
 
-// ---------------------------------------------------------------------------
-// Dynamic arrays and queues: the current size of the array is fixed for the
-// load, and the array shall not be resized.
-// ---------------------------------------------------------------------------
-
-// §21.4.1 (shall): a queue populated by push_back keeps its current size; a
-// file holding more words than the queue has elements fills the existing
-// elements and the surplus is dropped rather than appended.
 TEST(ReadmemQueueDynSim, QueueSizeFixedSurplusWordsDropped) {
   SimFixture f;
   std::string path = WriteData("q_over", "0A\n14\n1E\n2A\n");
@@ -151,9 +111,6 @@ TEST(ReadmemQueueDynSim, QueueSizeFixedSurplusWordsDropped) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: a queue declared with an assignment-pattern initializer loads into
-// its existing elements; when the file is shorter than the queue, the tail
-// elements keep their initializer values and the size does not change.
 TEST(ReadmemQueueDynSim, QueueDeclInitTailUntouchedByShortFile) {
   SimFixture f;
   std::string path = WriteData("q_short", "11 22\n");
@@ -172,8 +129,6 @@ TEST(ReadmemQueueDynSim, QueueDeclInitTailUntouchedByShortFile) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: $readmemb loads a queue the same way, reading each number in
-// binary; the destination container kind does not change the file grammar.
 TEST(ReadmemQueueDynSim, ReadmembLoadsQueueInBinary) {
   SimFixture f;
   std::string path = WriteData("q_bin", "1010\n0110\n");
@@ -193,8 +148,6 @@ TEST(ReadmemQueueDynSim, ReadmembLoadsQueueInBinary) {
   std::remove(path.c_str());
 }
 
-// §21.4.1 (shall): a dynamic array sized by a procedural new[] keeps that size
-// through the load; a longer file does not grow it.
 TEST(ReadmemQueueDynSim, DynamicArrayNewSizeIsFixed) {
   SimFixture f;
   std::string path = WriteData("dyn_new", "0A\n14\n1E\n2A\n");
@@ -214,9 +167,6 @@ TEST(ReadmemQueueDynSim, DynamicArrayNewSizeIsFixed) {
   std::remove(path.c_str());
 }
 
-// §21.4.1 (shall): the fixed-size rule also holds when the dynamic array is
-// sized by a declaration initializer (= new[2]); the surplus file words are
-// dropped and the size stays 2.
 TEST(ReadmemQueueDynSim, DynamicArrayDeclInitNotResized) {
   SimFixture f;
   std::string path = WriteData("dyn_init", "11 22 33\n");
@@ -235,9 +185,6 @@ TEST(ReadmemQueueDynSim, DynamicArrayDeclInitNotResized) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: a dynamic array sized by an assignment-pattern initializer keeps
-// that size; a file shorter than the array fills the leading elements and the
-// tail keeps its initializer value.
 TEST(ReadmemQueueDynSim, DynamicArrayPatternInitTailUntouched) {
   SimFixture f;
   std::string path = WriteData("dyn_pat", "11 22\n");
@@ -256,8 +203,6 @@ TEST(ReadmemQueueDynSim, DynamicArrayPatternInitTailUntouched) {
   std::remove(path.c_str());
 }
 
-// §21.4.1 (shall): an @-address at or past the current size does not make
-// room — the deposits are dropped, and the array keeps its size and contents.
 TEST(ReadmemQueueDynSim, AddressPastCurrentSizeDoesNotGrowArray) {
   SimFixture f;
   std::string path = WriteData("dyn_past", "@4 AA BB\n");
@@ -278,13 +223,6 @@ TEST(ReadmemQueueDynSim, AddressPastCurrentSizeDoesNotGrowArray) {
   std::remove(path.c_str());
 }
 
-// ---------------------------------------------------------------------------
-// Associative arrays: the index shall be integral; loading an address creates
-// the element of that index when it does not already exist.
-// ---------------------------------------------------------------------------
-
-// §21.4.1: each @-address in the file names an integral key, and depositing a
-// word there creates the element; unaddressed keys are not created.
 TEST(ReadmemAssocSim, FileAddressesCreateElements) {
   SimFixture f;
   std::string path = WriteData("aa_addr", "@5 AB\n@10 CD\n");
@@ -300,13 +238,10 @@ TEST(ReadmemAssocSim, FileAddressesCreateElements) {
           "  end\n"
           "endmodule\n",
       f);
-  // @-addresses are hexadecimal, so @10 is key 16; key 6 was never loaded.
   EXPECT_EQ(out, "2 ab cd 1 0\n");
   std::remove(path.c_str());
 }
 
-// §21.4.1: with no address in the file the load starts at the default index 0
-// and creates successive elements as the cursor advances.
 TEST(ReadmemAssocSim, SequentialWordsCreateConsecutiveElements) {
   SimFixture f;
   std::string path = WriteData("aa_seq", "11 22 33\n");
@@ -325,9 +260,6 @@ TEST(ReadmemAssocSim, SequentialWordsCreateConsecutiveElements) {
   std::remove(path.c_str());
 }
 
-// §21.4.1 / §21.4: a start_addr task argument (here supplied through an
-// elaboration-time parameter) fixes the first created key; loading then
-// advances upward, creating keys start, start+1, ...
 TEST(ReadmemAssocSim, StartAddrParameterSetsFirstCreatedKey) {
   SimFixture f;
   std::string path = WriteData("aa_start", "11 22 33\n");
@@ -347,8 +279,6 @@ TEST(ReadmemAssocSim, StartAddrParameterSetsFirstCreatedKey) {
   std::remove(path.c_str());
 }
 
-// §21.4.1 / §21.4: when start exceeds finish the created keys descend from the
-// start address, following the load direction the task arguments fix.
 TEST(ReadmemAssocSim, DescendingKeysWhenStartExceedsFinish) {
   SimFixture f;
   std::string path = WriteData("aa_desc", "11 22 33\n");
@@ -367,9 +297,6 @@ TEST(ReadmemAssocSim, DescendingKeysWhenStartExceedsFinish) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: an element is created only when its index does not already exist —
-// loading an existing key overwrites that element in place, and the cursor
-// then advances to create genuinely new keys.
 TEST(ReadmemAssocSim, ExistingElementOverwrittenNewKeysCreated) {
   SimFixture f;
   std::string path = WriteData("aa_upd", "@7 22 33\n@3 44\n");
@@ -385,13 +312,10 @@ TEST(ReadmemAssocSim, ExistingElementOverwrittenNewKeysCreated) {
           "  end\n"
           "endmodule\n",
       f);
-  // Key 7 pre-existed (overwritten 11 -> 22); keys 8 and 3 are created.
   EXPECT_EQ(out, "3 22 33 44\n");
   std::remove(path.c_str());
 }
 
-// §21.4.1: the wildcard index [*] admits any integral key, so it satisfies
-// the integral-index requirement and loads like an int-indexed array.
 TEST(ReadmemAssocSim, WildcardIndexLoadsAsIntegral) {
   SimFixture f;
   std::string path = WriteData("aa_wild", "11 22 33\n");
@@ -410,9 +334,6 @@ TEST(ReadmemAssocSim, WildcardIndexLoadsAsIntegral) {
   std::remove(path.c_str());
 }
 
-// §21.4.1 (shall): the index of a loaded associative array must be of an
-// integral type. A string-keyed array has no numeric address form, so the
-// load is rejected with an error and the array stays empty.
 TEST(ReadmemAssocSim, StringIndexRejectedArrayUntouched) {
   SimFixture f;
   std::string path = WriteData("aa_str", "@1 AA\n");
@@ -427,9 +348,6 @@ TEST(ReadmemAssocSim, StringIndexRejectedArrayUntouched) {
           "  end\n"
           "endmodule\n",
       f);
-  // The task name is part of the substring because EvalWritemem in
-  // src/simulator/eval_systask_writemem.cpp words its own report the same way
-  // from "$writemem" onwards.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "$readmemh: associative array index must be of an integral type", 4,
@@ -438,14 +356,6 @@ TEST(ReadmemAssocSim, StringIndexRejectedArrayUntouched) {
   std::remove(path.c_str());
 }
 
-// ---------------------------------------------------------------------------
-// Enumerated index types: address entries in the pattern file are numeric and
-// correspond to the numeric values of the enumeration's elements (see 6.19).
-// ---------------------------------------------------------------------------
-
-// §21.4.1: with explicitly valued enum members, an @-address selects the
-// member whose numeric value it equals; reading back through the member name
-// finds the loaded word.
 TEST(ReadmemAssocSim, EnumIndexAddressedByMemberValues) {
   SimFixture f;
   std::string path = WriteData("aa_enum", "@2 41\n@5 42\n");
@@ -465,8 +375,6 @@ TEST(ReadmemAssocSim, EnumIndexAddressedByMemberValues) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: with default-valued enum members (0, 1, 2, ...) a sequential file
-// creates elements at the members' numeric values in declaration order.
 TEST(ReadmemAssocSim, EnumIndexSequentialUsesDefaultValues) {
   SimFixture f;
   std::string path = WriteData("aa_enumseq", "11 22 33\n");
@@ -486,8 +394,6 @@ TEST(ReadmemAssocSim, EnumIndexSequentialUsesDefaultValues) {
   std::remove(path.c_str());
 }
 
-// §21.4.1: when loading associative arrays, indices shall be of integral
-// types, so a string-indexed array cannot be loaded. The report names §21.4.1.
 TEST(ReadmemAssocSim, StringIndexRejectionNames21_4_1) {
   SimFixture f;
   std::string path = WriteData("aa_sub", "@2 BB\n");

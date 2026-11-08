@@ -38,15 +38,6 @@ TEST(PackageImportInHeaderSim, WildcardConstantFromHeaderImport) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 7u);
 }
 
-// §26.4 (printed page 812 of IEEE 1800-2023) has a header import make a
-// package's names visible in the port list, its own example typing `input
-// instruction_t a` through `import A::instruction_t`, and §7.2.1 makes a member
-// of a packed structure a window of the variable's bits, `a.opcode` the top
-// eight of thirty-two. The port's storage was created with no layout, so
-// `a.opcode` read a one-bit 0 after the parent wrote the connected variable's
-// members. 165 and 0x123456 are read back through the member, the part-select
-// of the same bits and the second member: a one-bit port answers 0 or 1 to
-// each, and a port sized without a layout answers 165 to the part-select alone.
 TEST(PackageImportInHeaderSim, WildcardImportedStructPortReadsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -84,12 +75,6 @@ TEST(PackageImportInHeaderSim, WildcardImportedStructPortReadsItsMembers) {
   EXPECT_EQ(im->value.ToUint64(), 0x123456u);
 }
 
-// The top's own port list, through the explicit form of §26.4's example with
-// its parameter port list: a member write to the output port lands in the
-// member's bits and the whole port reads the two members side by side. The
-// members are `bit`, so the port is 2-state and reads 0xA5123456 whole rather
-// than an x-filled value: a port written through a one-bit variable would hold
-// 1 and a port with no layout 0.
 TEST(PackageImportInHeaderSim, NamedImportedStructPortOfTheTopHoldsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(

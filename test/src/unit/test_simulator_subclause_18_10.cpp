@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A Channel whose constraints are modified through the four ways of the
-// clause: an if-else and an implication predicated on a state fast, a cap
-// block to be turned off, an order relating top to a base to be held, and
-// a dist whose weights are the state variables w_one and w_two.
 const char* const kChannel =
     "class Channel;\n"
     "  rand bit [7:0] len;\n"
@@ -27,10 +23,6 @@ const char* const kChannel =
     "endclass\n"
     "module t;\n";
 
-// 18.10: implication and if-else constraints are predicated on a state
-// variable, so changing fast between calls changes what randomize() solves:
-// with it set len lies in (3, 16) on every draw, with it clear at or above
-// 16, as the design test/src/e2e/dynamic_constraint_modification.sv runs it.
 TEST(DynamicConstraintModificationRun, AStateVariablePredicatesTheBlocks) {
   SimFixture f;
   std::string out =
@@ -55,11 +47,6 @@ TEST(DynamicConstraintModificationRun, AStateVariablePredicatesTheBlocks) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// 18.10: a block made inactive through constraint_mode() is ignored by
-// randomize() and a variable made inactive through rand_mode() is a state
-// variable to the solver: with cap off len reaches 200 in some of 64 draws
-// and with it back on in none, and base held at 1000 leaves top drawn in
-// (1000, 1008) on every call.
 TEST(DynamicConstraintModificationRun, TheModeCallsChangeWhatIsSolved) {
   SimFixture f;
   std::string out = RunCapture(
@@ -90,10 +77,6 @@ TEST(DynamicConstraintModificationRun, TheModeCallsChangeWhatIsSolved) {
   EXPECT_EQ(out, "1 0 32\n");
 }
 
-// 18.10: the weights of a dist can be changed, moving the probability of
-// each value: read from state variables at each call, 9:1 draws more ones
-// than twos over 64 calls and 1:9 more twos than ones, every draw one of
-// the two.
 TEST(DynamicConstraintModificationRun, ChangedWeightsMoveTheDistribution) {
   SimFixture f;
   std::string out = RunCapture(

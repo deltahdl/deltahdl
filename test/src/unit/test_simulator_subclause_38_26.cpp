@@ -27,13 +27,9 @@ class VpiMcdNameSim : public ::testing::Test {
   SimContext sim_ctx_{scheduler_, arena_, diag_};
   VpiContext vpi_ctx_;
 
-  // mcd channel 32 is the MSB, which marks an fd returned from $fopen.
   static constexpr PLI_UINT32 kMsbChannel = 0x80000000u;
 };
 
-// §38.26: vpi_mcd_name() shall return the name of the file represented by a
-// single-channel descriptor. A file opened with vpi_mcd_open() is named back by
-// the descriptor that open returned.
 TEST_F(VpiMcdNameSim, ReturnsNameOfFileNamedByDescriptor) {
   char name[] = "trace.log";
   PLI_UINT32 mcd = vpi_mcd_open(name);
@@ -44,11 +40,8 @@ TEST_F(VpiMcdNameSim, ReturnsNameOfFileNamedByDescriptor) {
   EXPECT_STREQ(reported, "trace.log");
 }
 
-// §38.26: the routine can get the name of a file opened by $fopen, whose
-// descriptor lives in the shared namespace. Such a descriptor could be an fd
-// with its MSB set; the name is still reported.
 TEST_F(VpiMcdNameSim, ReportsNameOfFopenFileIncludingFdWithMsbSet) {
-  PLI_UINT32 fd = kMsbChannel | 0x5u;  // an fd from $fopen has its MSB set
+  PLI_UINT32 fd = kMsbChannel | 0x5u;
   vpi_ctx_.RegisterFopenMcdFile("from_fopen.log", fd);
 
   PLI_BYTE8* reported = vpi_mcd_name(fd);
@@ -56,22 +49,13 @@ TEST_F(VpiMcdNameSim, ReportsNameOfFopenFileIncludingFdWithMsbSet) {
   EXPECT_STREQ(reported, "from_fopen.log");
 }
 
-// §38.26: on error the routine shall return NULL. A descriptor of 0 and a
-// descriptor that names no open file both take the error return.
 TEST_F(VpiMcdNameSim, ReturnsNullOnError) {
   EXPECT_EQ(vpi_mcd_name(0u), nullptr);
 
-  // A channel that was never opened names nothing.
   EXPECT_EQ(vpi_mcd_name(0x00000008u), nullptr);
 }
 
-// §38.26: the routine shall overwrite the returned value on subsequent calls -
-// it hands back one reused buffer, so a pointer from an earlier call no longer
-// reads as the file it first named once a later call has run. A caller that
-// needs to retain the string must copy it.
 TEST_F(VpiMcdNameSim, OverwritesReturnedValueOnSubsequentCalls) {
-  // Equal-length names so the reused buffer keeps the same allocation and the
-  // earlier pointer stays valid to observe the overwrite.
   char a[] = "alpha.log";
   char b[] = "bravo.log";
   PLI_UINT32 mcd_a = vpi_mcd_open(a);
@@ -81,25 +65,16 @@ TEST_F(VpiMcdNameSim, OverwritesReturnedValueOnSubsequentCalls) {
 
   PLI_BYTE8* first = vpi_mcd_name(mcd_a);
   ASSERT_NE(first, nullptr);
-  // The application copies the string it wants to keep, as the clause advises.
   std::string retained(first);
   EXPECT_EQ(retained, "alpha.log");
 
   PLI_BYTE8* second = vpi_mcd_name(mcd_b);
   ASSERT_NE(second, nullptr);
-  // Same reused buffer, and reading the first pointer now shows the later name:
-  // the returned value was overwritten in place.
   EXPECT_EQ(second, first);
   EXPECT_STREQ(first, "bravo.log");
-  // The earlier copy is unaffected, demonstrating why a caller must copy.
   EXPECT_EQ(retained, "alpha.log");
 }
 
-// §38.26 returns the name of the file a descriptor cd naming one channel stands
-// for. A descriptor naming several channels names several files, so there is no
-// one name to return and the routine takes its error return. Both of the files
-// named are open and each answers on its own descriptor, so the null is the
-// rule at work rather than the files being absent.
 TEST_F(VpiMcdNameSim, AMultiChannelDescriptorNamesNoOneFile) {
   char first[] = "first.log";
   char second[] = "second.log";
@@ -113,10 +88,8 @@ TEST_F(VpiMcdNameSim, AMultiChannelDescriptorNamesNoOneFile) {
   EXPECT_EQ(vpi_mcd_name(mcd_first | mcd_second), nullptr);
 }
 
-// The names vpi_mcd_name gave the fd and the mcd the design's $fopen opened.
 std::string fd_name;
 std::string mcd_name;
-// Whether vpi_mcd_name named anything for a channel of the run with no file.
 bool unopened_named = true;
 
 class NameOfAFopenedFile : public RunFilesRun {
@@ -125,19 +98,17 @@ class NameOfAFopenedFile : public RunFilesRun {
     const char* name = vpi_mcd_name(cd);
     return name == nullptr ? "" : name;
   }
-  static PLI_INT32 NameBoth(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 NameBoth(PLI_BYTE8*) {
     fd_name = NameOf(DescriptorIn("top.fd"));
     mcd_name = NameOf(DescriptorIn("top.mcd"));
     return 0;
   }
-  static PLI_INT32 NameUnopened(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 NameUnopened(PLI_BYTE8*) {
     unopened_named = vpi_mcd_name(PLI_UINT32{1} << 20) != nullptr;
     return 0;
   }
 };
 
-// §38.26 with §21.3.1: vpi_mcd_name names the file of an fd or an mcd the
-// design's $fopen returned (#7466).
 TEST_F(NameOfAFopenedFile, BothFormsAreNamed) {
   RegisterTask("$name_both", &NameBoth);
   Run("module top; integer fd, mcd;\n"
@@ -151,8 +122,6 @@ TEST_F(NameOfAFopenedFile, BothFormsAreNamed) {
   EXPECT_EQ(mcd_name, "named_mcd.txt");
 }
 
-// §38.26: in a run, a channel with no file open names none, which the routine
-// reports as an error by returning NULL.
 TEST_F(NameOfAFopenedFile, AChannelWithNoFileIsNamedNothing) {
   RegisterTask("$name_unopened", &NameUnopened);
   Run("module top; initial $name_unopened; endmodule\n");

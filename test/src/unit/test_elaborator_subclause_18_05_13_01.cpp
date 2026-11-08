@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.13.1: a soft constraint applies to random variables alone. A soft
-// preference on an ordinary rand variable is within that rule and elaborates.
 TEST(SoftConstraintVariable, SoftOnRandVariableAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -18,8 +16,6 @@ TEST(SoftConstraintVariable, SoftOnRandVariableAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.13.1: a randc variable cannot be the subject of a soft constraint.
-// Preferring a value for a randc member is therefore an error.
 TEST(SoftConstraintVariable, SoftOnRandcVariableRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -36,9 +32,6 @@ TEST(SoftConstraintVariable, SoftOnRandcVariableRejected) {
       "18.5.13.1"));
 }
 
-// 18.5.13.1: the prohibition holds however the randc variable is named within
-// the soft expression — here inside a set-membership preference rather than a
-// plain equality.
 TEST(SoftConstraintVariable, SoftOnRandcInSetMembershipRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -54,10 +47,6 @@ TEST(SoftConstraintVariable, SoftOnRandcInSetMembershipRejected) {
       "18.5.13.1"));
 }
 
-// 18.5.13.1: the soft operand is an expression_or_dist, so the preference can
-// be a distribution rather than a comparison. A soft distribution over an
-// ordinary rand variable is within the rule and elaborates — confirming the
-// randc check does not spuriously reject the dist operand form.
 TEST(SoftConstraintVariable, SoftDistOnRandVariableAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -67,10 +56,6 @@ TEST(SoftConstraintVariable, SoftDistOnRandVariableAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.13.1: the prohibition holds for the dist operand form as well — a soft
-// distribution names the variable it distributes, so a soft dist over a randc
-// variable is still an error, just as a soft equality or set membership over
-// one is.
 TEST(SoftConstraintVariable, SoftDistOnRandcVariableRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -86,10 +71,6 @@ TEST(SoftConstraintVariable, SoftDistOnRandcVariableRejected) {
       "18.5.13.1"));
 }
 
-// 18.5.13.1: the restriction applies only to soft constraints. A randc variable
-// is free to appear in an ordinary (hard) constraint, so a class whose only
-// soft constraint is on a rand variable elaborates even though it references a
-// randc member in a hard constraint.
 TEST(SoftConstraintVariable, RandcInHardConstraintNotFlagged) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -100,11 +81,6 @@ TEST(SoftConstraintVariable, RandcInHardConstraintNotFlagged) {
              "module m; endmodule\n"));
 }
 
-// 18.5.13.1: the restriction is confined to the soft constraint's own
-// expression. A hard constraint that follows a soft constraint in the same
-// block may freely reference a randc variable; the soft scan ends at the soft
-// expression's ';', so the randc named only in the later hard constraint is not
-// flagged and the class elaborates.
 TEST(SoftConstraintVariable, RandcInHardConstraintAfterSoftNotFlagged) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -115,10 +91,6 @@ TEST(SoftConstraintVariable, RandcInHardConstraintAfterSoftNotFlagged) {
              "module m; endmodule\n"));
 }
 
-// 18.5.13.1: the prohibition is enforced across every soft constraint in the
-// block, not just the first. With two soft constraints — one on a rand variable
-// and a later one on a randc variable — the randc soft constraint is still
-// rejected.
 TEST(SoftConstraintVariable, RandcInLaterSoftConstraintRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -135,9 +107,6 @@ TEST(SoftConstraintVariable, RandcInLaterSoftConstraintRejected) {
       "18.5.13.1"));
 }
 
-// 18.5.13.1: the soft variable is resolved against the class and its base
-// chain, so a soft constraint on a randc variable inherited from a superclass
-// is likewise rejected.
 TEST(SoftConstraintVariable, SoftOnInheritedRandcRejected) {
   ElabFixture f;
   EXPECT_FALSE(

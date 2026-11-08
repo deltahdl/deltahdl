@@ -9,18 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.4 owns Syntax 31-6, the $removal_timing_check production:
-//   $removal ( reference_event , data_event , timing_check_limit
-//             [ , [ notifier ] ] ) ;
-// The shared timing-check parser (ParseTimingCheckKind / ParseTimingCheck /
-// ParseTimingCheckTrailingArgs) carries it. The terminals are positional, so
-// the first argument (the reference_event) lands in ref_terminal and the
-// second (the data_event) in data_terminal -- the natural order shared with
-// $hold (§31.3.2). The timecheck/timestamp role assignment of Table 31-4 is
-// applied later by the simulator. The optional trailing notifier
-// (notifier ::= variable_identifier) is the same notifier whose
-// violation-response semantics §31.6 defines.
-
 TEST(TimingCheckCommandParsing, RemovalWithNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -52,15 +40,10 @@ TEST(TimingCheckCommandParsing, RemovalAsSpecifyItem) {
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->timing_check.data_terminal.name, "clk");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
-  // The optional notifier is omitted here, so nothing is recorded for it.
   EXPECT_TRUE(si->timing_check.notifier.empty());
 }
 
 TEST(TimingCheckCommandParsing, RemovalAcceptsTrailingCommaWithoutNotifier) {
-  // Syntax 31-6's optional [ , [ notifier ] ] also permits the separating
-  // comma to appear with the notifier itself omitted; the parser accepts this
-  // and records no notifier (the trailing-comma break branch of the
-  // trailing-arg loop, distinct from the no-comma and comma+notifier forms).
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -90,11 +73,6 @@ TEST(TimingCheckCommandParsing, RemovalLimitIsExpression) {
 }
 
 TEST(TimingCheckCommandParsing, RemovalPlainReferenceEvent) {
-  // reference_event ::= timing_check_event, whose leading
-  // edge_control_specifier is optional. A plain (unedged) reference terminal is
-  // a distinct input form from the posedge/negedge references of the other
-  // tests: it parses and records no edge on the reference, with the terminals
-  // still landing positionally (reference first, data second).
   auto sp = ParseSpecifySingle(
       "module m(input rst, clk);\n"
       "  specify\n"
@@ -118,8 +96,6 @@ TEST(TimingCheckCommandParsing, ErrorRemovalMissingLimit) {
       "  $removal(posedge rst, posedge clk);\n"
       "endspecify\n"
       "endmodule\n");
-  // The shared timing-check parser files the missing separator under §31.2, the
-  // system_timing_check production, rather than under §31.3.4.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 

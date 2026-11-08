@@ -1,12 +1,3 @@
-// §22.11 `pragma -- the rule that a pragma leaves the meaning of the source
-// text unchanged, observed at the far end of the pipeline.
-//
-// The directive is consumed in src/preprocessor/preprocessor.cpp. These tests
-// build real SystemVerilog with unrecognized pragmas interleaved among the
-// declarations and statements, run the full preprocess -> parse -> elaborate ->
-// lower -> simulate pipeline, and check the simulated values are the ones the
-// pragma-free source produces.
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -15,8 +6,6 @@
 
 namespace {
 
-// Pragmas placed before the module, inside it, between statements, and after
-// endmodule must not change what the design computes.
 TEST(PragmaSimulation, InterleavedPragmasDoNotChangeResult) {
   auto with = PreprocessAndGet(
       "`pragma unknown_outer\n"
@@ -46,9 +35,6 @@ TEST(PragmaSimulation, InterleavedPragmasDoNotChangeResult) {
   EXPECT_EQ(with, without);
 }
 
-// The directive's own text is not source text: identifiers inside a pragma
-// that happen to spell SystemVerilog keywords reach neither the lexer nor the
-// elaborator, so the module still ends where endmodule says it does.
 TEST(PragmaSimulation, PragmaTextIsNotInterpretedAsSource) {
   auto result = PreprocessAndGet(
       "module t;\n"
@@ -60,8 +46,6 @@ TEST(PragmaSimulation, PragmaTextIsNotInterpretedAsSource) {
   EXPECT_EQ(result, 123u);
 }
 
-// A pragma standing between a parameter and the expression that reads it does
-// not disturb the value the simulation ends up with.
 TEST(PragmaSimulation, PragmaBetweenParameterAndUse) {
   auto result = PreprocessAndGet(
       "module t;\n"
@@ -74,8 +58,6 @@ TEST(PragmaSimulation, PragmaBetweenParameterAndUse) {
   EXPECT_EQ(result, 42u);
 }
 
-// The `celldefine region and the `default_nettype setting that the later
-// stages consume survive a pragma written in the middle of them.
 TEST(PragmaSimulation, PragmaDoesNotDisturbNeighbouringDirectiveState) {
   auto result = PreprocessAndGet(
       "`default_nettype none\n"
@@ -88,10 +70,6 @@ TEST(PragmaSimulation, PragmaDoesNotDisturbNeighbouringDirectiveState) {
   EXPECT_EQ(result, 55u);
 }
 
-// End-to-end over the conditional compilation the pragma rule depends on: a
-// pragma in the branch that is compiled in is consumed normally, while a
-// malformed one in the branch that is compiled away is never even examined.
-// Both facts have to hold for the run to reach the expected value cleanly.
 TEST(PragmaSimulation, PragmasInConditionalBranchesDrivenEndToEnd) {
   SimFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -112,8 +90,6 @@ TEST(PragmaSimulation, PragmasInConditionalBranchesDrivenEndToEnd) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A subroutine body is another syntactic position; a pragma between its
-// statements must not change what the function returns.
 TEST(PragmaSimulation, PragmaInsideFunctionBodyDoesNotChangeResult) {
   auto result = PreprocessAndGet(
       "module t;\n"
@@ -128,8 +104,6 @@ TEST(PragmaSimulation, PragmaInsideFunctionBodyDoesNotChangeResult) {
   EXPECT_EQ(result, 42u);
 }
 
-// A pragma supplied by a text macro expansion is still consumed as a directive
-// rather than reaching the simulation.
 TEST(PragmaSimulation, MacroSuppliedPragmaExpressionsConsumed) {
   auto result = PreprocessAndGet(
       "`define PRAGMA_ARGS style = onehot, depth = 3\n"

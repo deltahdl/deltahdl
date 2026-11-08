@@ -7,29 +7,21 @@
 
 namespace delta {
 
-// The token tests and skips the parser's translation units share, kept out of
-// parser.h because they are free functions over the lexer rather than parts of
-// the Parser.
-
 inline bool IsPortDirection(TokenKind tk) {
   return tk == TokenKind::kKwInput || tk == TokenKind::kKwOutput ||
          tk == TokenKind::kKwInout || tk == TokenKind::kKwRef;
 }
 
-// The system task names of A.1.4's elaboration_severity_system_task.
 inline bool IsElabSeverityTask(TokenKind kind, std::string_view text) {
   return kind == TokenKind::kSystemIdentifier &&
          (text == "$fatal" || text == "$error" || text == "$warning" ||
           text == "$info");
 }
 
-// True for the two keywords that head a §3.14.2 time-scope declaration.
 inline bool IsTimeunitKeyword(TokenKind kind) {
   return kind == TokenKind::kKwTimeunit || kind == TokenKind::kKwTimeprecision;
 }
 
-// Reads past the ';' that ends the construct at the current position, or to
-// the end of input where there is none, for a construct reported whole.
 inline void SkipToSemicolon(Lexer& lexer) {
   while (!lexer.Peek().Is(TokenKind::kSemicolon) &&
          !lexer.Peek().Is(TokenKind::kEof)) {
@@ -48,9 +40,6 @@ inline void SkipBraceBlock(Lexer& lexer) {
   if (lexer.Peek().Is(TokenKind::kRBrace)) lexer.Next();
 }
 
-// The keywords that open a data_type of A.2.2.1 by themselves, which is what
-// parser_stmt.cpp's for-initialization and parser_block_item_decl.cpp's block
-// item predicate both ask of a token before reading a declaration.
 inline bool IsDataTypeKeyword(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwLogic:
@@ -67,14 +56,6 @@ inline bool IsDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwTime:
     case TokenKind::kKwString:
     case TokenKind::kKwChandle:
-    // A.2.2.1 gives data_type the bare alternative `event`, so an event
-    // declaration is a data_declaration and A.2.8's block_item_declaration
-    // carries it wherever A.6.3's seq_block and par_block and A.2.6's and
-    // A.2.7's subroutine bodies put one. Without it the line was read as an
-    // expression statement, the event was never declared, and every later
-    // reference to the name resolved to whatever else it happened to mean --
-    // which is how §15.5's synchronization between two arms of a fork is
-    // written.
     case TokenKind::kKwEvent:
       return true;
     default:
@@ -82,9 +63,6 @@ inline bool IsDataTypeKeyword(TokenKind tk) {
   }
 }
 
-// The assignment_operator alternatives of A.6.2 other than `=`, which
-// parser_stmt.cpp reads as an operator and parser_block_item_decl.cpp reads as
-// the sign that a leading name is a statement.
 inline bool IsCompoundAssignOp(TokenKind kind) {
   switch (kind) {
     case TokenKind::kPlusEq:
@@ -105,13 +83,6 @@ inline bool IsCompoundAssignOp(TokenKind kind) {
   }
 }
 
-// Whether `next` was written directly against `first`, with no white space,
-// comment or anything else between them. A token's text is a view into the
-// lexer's source, so the test is whether `next` begins where `first` ends.
-// This is how a digit run and the letters after it, which the lexer hands on
-// as a literal and an identifier, are told from the same two tokens written
-// apart: §5.6 forbids the run as an identifier and §5.7.1 as a literal, and
-// with white space between them each token is what it looks like.
 inline bool TokenFollowsDirectly(const Token& first, const Token& next) {
   return next.text.data() == first.text.data() + first.text.size();
 }

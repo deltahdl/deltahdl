@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "elaborator/elaborator.h"
@@ -20,10 +18,6 @@ TEST(TopLevelModules, EmptySourceTopNotFoundReturnsNull) {
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate("top");
   EXPECT_EQ(design, nullptr);
-  // The top-module-not-found report in
-  // Elaborator::Elaborate(std::string_view) in src/elaborator/elaborator.cpp
-  // states a fact about the run rather than a rule a construct breaks, so it
-  // carries SourceLoc::None() (line 0) and Subclause::None() (empty).
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "top module 'top' not found", 0, ""));
 }
@@ -57,9 +51,6 @@ TEST(TopLevelModules, NonexistentTopIsError) {
       "module b; endmodule\n",
       f, "nonexistent");
   EXPECT_EQ(design, nullptr);
-  // As above: the top-module-not-found report in
-  // Elaborator::Elaborate(std::string_view) in src/elaborator/elaborator.cpp
-  // stands at SourceLoc::None() under Subclause::None().
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "top module 'nonexistent' not found", 0, ""));
 }
@@ -70,16 +61,12 @@ bool HasTopNamed(const RtlirDesign* design, std::string_view name) {
   return false;
 }
 
-// §23.3.1: with no explicit top named, every module that does not appear in any
-// module instantiation statement is implicitly instantiated once as a top-level
-// module. Two mutually independent modules therefore both become tops. This is
-// the auto-top path (§23.3.1) that a named-top elaboration bypasses.
 TEST(TopLevelModules, AutoTopRootsEveryUninstantiatedModule) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
       "module a; endmodule\n"
       "module b; endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
@@ -87,11 +74,6 @@ TEST(TopLevelModules, AutoTopRootsEveryUninstantiatedModule) {
   EXPECT_TRUE(HasTopNamed(design, "b"));
 }
 
-// §23.3.1: a design shall contain at least one top-level module. When every
-// declared module is instantiated by another -- here `a` and `b` instantiate
-// each other, so neither is a root -- the auto-top path finds no top-level
-// module and the elaborator reports the malformed design rather than silently
-// yielding an empty one.
 TEST(TopLevelModules, DesignWithNoTopLevelModuleIsError) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -101,22 +83,13 @@ TEST(TopLevelModules, DesignWithNoTopLevelModuleIsError) {
       "module b;\n"
       "  a a1();\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   EXPECT_EQ(design, nullptr);
-  // The no-top-level-module report in Elaborator::Elaborate(std::string_view)
-  // in src/elaborator/elaborator.cpp stands at SourceLoc::None() (line 0),
-  // which NoTopLevelModuleReportStandsAtNoPosition below fixes as correct.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "design contains no top-level module", 0,
                             "23.3.1"));
 }
 
-// The §23.3.1 report above states a fact about the run rather than a breach a
-// construct commits: what it reports is that no module roots the hierarchy, so
-// there is nothing written in the source description for it to stand at. It
-// carries SourceLoc::None(), which SourceLoc::IsValid rejects, and this case
-// fixes that as correct so a later change giving every report a position cannot
-// make this one point at an arbitrary line to satisfy a gate.
 TEST(TopLevelModules, NoTopLevelModuleReportStandsAtNoPosition) {
   ElabFixture f;
   ElaborateWithPreprocessor(
@@ -126,15 +99,12 @@ TEST(TopLevelModules, NoTopLevelModuleReportStandsAtNoPosition) {
       "module b;\n"
       "  a a1();\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "design contains no top-level module", 0,
                             "23.3.1"));
 }
 
-// §23.3.1: a module that appears in a module instantiation statement does not
-// become a top-level module. Only `top` is rooted; the instantiated `child` is
-// excluded from the auto-top set.
 TEST(TopLevelModules, AutoTopExcludesNormallyInstantiatedChild) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -142,7 +112,7 @@ TEST(TopLevelModules, AutoTopExcludesNormallyInstantiatedChild) {
       "module top;\n"
       "  child c1();\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -150,14 +120,6 @@ TEST(TopLevelModules, AutoTopExcludesNormallyInstantiatedChild) {
   EXPECT_FALSE(HasTopNamed(design, "child"));
 }
 
-// §23.3.1 (interweave with §27.3/§3.12): the top-level exclusion applies even
-// when the sole instantiation sits in a generate block that is not itself
-// instantiated. `child`'s only instantiation is inside a generate-if whose
-// constant condition is false (§27.3: generate schemes are evaluated during
-// elaboration, §3.12), so that block produces zero instances -- yet the textual
-// appearance still disqualifies `child` from being a top-level module. Only
-// `wrapper` is rooted. Removing the generate-body descent in the instantiation
-// collector would wrongly promote `child` to a second top.
 TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateIf) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -167,7 +129,7 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateIf) {
       "    child c1();\n"
       "  end\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -175,11 +137,6 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateIf) {
   EXPECT_FALSE(HasTopNamed(design, "child"));
 }
 
-// §23.3.1 (interweave with §27.3): the disqualifying instantiation may live in
-// the else arm of a generate-if. The selected arm here contains no
-// instantiation, so `child` is never elaborated into the hierarchy, but its
-// textual appearance in the unselected else block still keeps it out of the
-// auto-top set. Exercises the gen_else branch of the instantiation collector.
 TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateElse) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -191,7 +148,7 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateElse) {
       "    child c1();\n"
       "  end\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -199,12 +156,6 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateElse) {
   EXPECT_FALSE(HasTopNamed(design, "child"));
 }
 
-// §23.3.1 (interweave with §27.3): the disqualifying instantiation may live in
-// a case-generate item that the constant selector does not choose. `SEL`
-// selects the default arm, so the `0:` arm holding `child` is never
-// instantiated, yet its textual appearance still excludes `child` from the
-// auto-top set. Exercises the gen_case_items branch of the instantiation
-// collector.
 TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateCase) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -220,7 +171,7 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateCase) {
       "    end\n"
       "  endcase\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);
@@ -228,11 +179,6 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateCase) {
   EXPECT_FALSE(HasTopNamed(design, "child"));
 }
 
-// §23.3.1 (interweave with §27.3): the disqualifying instantiation may sit in a
-// loop-generate body, a distinct syntactic position from the conditional forms.
-// `child`'s only instantiation is the loop body, so its textual appearance
-// keeps it out of the auto-top set even though the loop instantiates it under
-// `wrapper`. Exercises the loop-generate gen_body descent of the collector.
 TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateFor) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -243,7 +189,7 @@ TEST(TopLevelModules, AutoTopExcludesModuleInstantiatedOnlyInGenerateFor) {
       "    child c1();\n"
       "  end\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 1u);

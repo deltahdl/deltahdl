@@ -264,9 +264,6 @@ TEST(ModuleParametersAndPorts, AnsiPortMultipleUnpackedDims) {
   EXPECT_GE(r.cu->modules[0]->ports[0].unpacked_dims.size(), 2u);
 }
 
-// --- parameter_port_list (prod 1) ---
-
-// A leading #( ... ) introduces a parameter_port_list ahead of the port list.
 TEST(ModuleParametersAndPorts, ParameterPortList) {
   auto r = Parse(
       "module m #(parameter int W = 8) (input logic a);\n"
@@ -282,7 +279,6 @@ TEST(ModuleParametersAndPorts, ParameterPortList) {
   EXPECT_EQ(mod->ports[0].name, "a");
 }
 
-// The #( ) alternative carries an empty parameter_port_list.
 TEST(ModuleParametersAndPorts, ParameterPortListEmpty) {
   auto r = Parse("module m #() (); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -292,9 +288,6 @@ TEST(ModuleParametersAndPorts, ParameterPortListEmpty) {
   EXPECT_TRUE(mod->params.empty());
 }
 
-// The first alternative of parameter_port_list leads with a
-// list_of_param_assignments: a bare "name = value" with no `parameter` keyword
-// and an implicit data type, distinct from the data_type-prefixed form.
 TEST(ModuleParametersAndPorts, ParameterPortListLeadingParamAssignment) {
   auto r = Parse("module m #(W = 8) (); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -304,17 +297,12 @@ TEST(ModuleParametersAndPorts, ParameterPortListLeadingParamAssignment) {
   ASSERT_EQ(mod->params.size(), 1u);
   EXPECT_EQ(mod->params[0].first, "W");
   EXPECT_NE(mod->params[0].second, nullptr);
-  // Implicit type: no `parameter`/`localparam` keyword and no explicit data
-  // type.
   ASSERT_EQ(mod->param_types.size(), 1u);
   EXPECT_EQ(mod->param_types[0].kind, DataTypeKind::kImplicit);
   EXPECT_EQ(mod->localparam_port_names.count("W"), 0u);
   EXPECT_EQ(mod->type_param_names.count("W"), 0u);
 }
 
-// --- parameter_port_declaration (prod 2) ---
-
-// local_parameter_declaration alternative inside a parameter_port_list.
 TEST(ModuleParametersAndPorts, ParameterPortDeclLocalparam) {
   auto r = Parse("module m #(parameter P = 1, localparam Q = 2) (); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -327,7 +315,6 @@ TEST(ModuleParametersAndPorts, ParameterPortDeclLocalparam) {
   EXPECT_EQ(mod->localparam_port_names.count("P"), 0u);
 }
 
-// type_parameter_declaration alternative inside a parameter_port_list.
 TEST(ModuleParametersAndPorts, ParameterPortDeclTypeParameter) {
   auto r = Parse("module m #(parameter type T = int) (); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -336,7 +323,6 @@ TEST(ModuleParametersAndPorts, ParameterPortDeclTypeParameter) {
   EXPECT_EQ(mod->type_param_names.count("T"), 1u);
 }
 
-// data_type list_of_param_assignments alternative (no parameter keyword).
 TEST(ModuleParametersAndPorts, ParameterPortDeclDataType) {
   auto r = Parse("module m #(int W = 8) (); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -348,11 +334,6 @@ TEST(ModuleParametersAndPorts, ParameterPortDeclDataType) {
   EXPECT_EQ(mod->param_types[0].kind, DataTypeKind::kInt);
 }
 
-// --- list_of_ports / port / port_expression / port_reference (prods 3,6,7,8)
-// ---
-
-// A non-ANSI list_of_ports is a parenthesized comma list of bare
-// port_reference port identifiers.
 TEST(ModuleParametersAndPorts, NonAnsiListOfPorts) {
   auto r = Parse("module m (a, b, c); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -365,7 +346,6 @@ TEST(ModuleParametersAndPorts, NonAnsiListOfPorts) {
   EXPECT_EQ(mod->ports[2].name, "c");
 }
 
-// port_reference allows a constant_select on the port identifier.
 TEST(ModuleParametersAndPorts, PortReferenceWithSelect) {
   auto r = Parse("module m (a[0], b); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -378,9 +358,6 @@ TEST(ModuleParametersAndPorts, PortReferenceWithSelect) {
   EXPECT_EQ(mod->ports[0].port_expr->kind, ExprKind::kSelect);
 }
 
-// A.1.3: a port_reference's constant_select writes its part-select as a
-// constant_part_select_range, whose constant_indexed_range is the +: and -:
-// forms, each held as an indexed select with its width in index_end (#7552).
 TEST(ModuleParametersAndPorts, PortReferenceWithIndexedPartSelects) {
   auto r = Parse("module m (c[1+:3], d[2-:2]); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -400,7 +377,6 @@ TEST(ModuleParametersAndPorts, PortReferenceWithIndexedPartSelects) {
   ASSERT_NE(minus->index_end, nullptr);
 }
 
-// port_expression may be a braced concatenation of port_references.
 TEST(ModuleParametersAndPorts, PortExpressionConcatenation) {
   auto r = Parse("module m ({a, b}, c); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -411,8 +387,6 @@ TEST(ModuleParametersAndPorts, PortExpressionConcatenation) {
   EXPECT_NE(mod->ports[0].port_expr, nullptr);
 }
 
-// port's explicit ". port_identifier ( port_expression )" form names the
-// external port and binds it to an internal expression.
 TEST(ModuleParametersAndPorts, PortExplicitlyNamed) {
   auto r = Parse("module m (.x(a), .y(b)); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -425,10 +399,6 @@ TEST(ModuleParametersAndPorts, PortExplicitlyNamed) {
   EXPECT_NE(mod->ports[0].port_expr, nullptr);
 }
 
-// --- port_declaration (prod 5) ---
-
-// In the non-ANSI style, directions are supplied by body port_declarations
-// that bind back to the names listed in the header.
 TEST(ModuleParametersAndPorts, NonAnsiPortDeclarations) {
   auto r = Parse(
       "module m (a, b, c);\n"
@@ -446,7 +416,6 @@ TEST(ModuleParametersAndPorts, NonAnsiPortDeclarations) {
   EXPECT_EQ(mod->ports[2].direction, Direction::kInout);
 }
 
-// A non-ANSI body port_declaration may be preceded by attribute_instances.
 TEST(ModuleParametersAndPorts, NonAnsiPortDeclarationsWithAttributes) {
   auto r = Parse(
       "module m (a, b);\n"
@@ -462,9 +431,6 @@ TEST(ModuleParametersAndPorts, NonAnsiPortDeclarationsWithAttributes) {
   EXPECT_EQ(mod->ports[1].direction, Direction::kOutput);
 }
 
-// --- interface_port_header (prod 12, interface-keyword form) ---
-
-// The generic "interface [ . modport_identifier ]" port header form.
 TEST(ModuleParametersAndPorts, GenericInterfacePortHeader) {
   auto r = Parse("module m (interface.master bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -475,9 +441,6 @@ TEST(ModuleParametersAndPorts, GenericInterfacePortHeader) {
   EXPECT_EQ(mod->ports[0].name, "bus");
 }
 
-// --- ansi_port_declaration (prod 13, explicit ".port(expr)" form) ---
-
-// The "[ port_direction ] . port_identifier ( [ expression ] )" ANSI form.
 TEST(ModuleParametersAndPorts, AnsiExplicitlyNamedPort) {
   auto r = Parse("module m (input .x(a)); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -490,9 +453,6 @@ TEST(ModuleParametersAndPorts, AnsiExplicitlyNamedPort) {
   EXPECT_NE(mod->ports[0].port_expr, nullptr);
 }
 
-// --- edge cases ---
-
-// ansi_port_declaration permits a trailing "= constant_expression" default.
 TEST(ModuleParametersAndPorts, AnsiPortDefaultValue) {
   auto r = Parse("module m(input int x = 5); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -502,8 +462,6 @@ TEST(ModuleParametersAndPorts, AnsiPortDefaultValue) {
   EXPECT_NE(mod->ports[0].default_value, nullptr);
 }
 
-// A port may be empty: a "port" is an optional port_expression, so an omitted
-// entry in a non-ANSI list_of_ports is a legal unconnected position.
 TEST(ModuleParametersAndPorts, NonAnsiEmptyPort) {
   auto r = Parse("module m (a, , b); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -517,8 +475,6 @@ TEST(ModuleParametersAndPorts, NonAnsiEmptyPort) {
   EXPECT_EQ(mod->ports[2].name, "b");
 }
 
-// port_reference's constant_select may be a part-select range, not just an
-// index.
 TEST(ModuleParametersAndPorts, PortReferenceRangeSelect) {
   auto r = Parse("module m (a[3:0]); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -530,7 +486,6 @@ TEST(ModuleParametersAndPorts, PortReferenceRangeSelect) {
   EXPECT_NE(mod->ports[0].port_expr->index_end, nullptr);
 }
 
-// The generic interface port header may omit the ". modport_identifier" part.
 TEST(ModuleParametersAndPorts, GenericInterfacePortNoModport) {
   auto r = Parse("module m (interface bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -542,8 +497,6 @@ TEST(ModuleParametersAndPorts, GenericInterfacePortNoModport) {
   EXPECT_TRUE(mod->ports[0].data_type.modport_name.empty());
 }
 
-// Each ansi_port_declaration in a list_of_port_declarations may be preceded by
-// attribute_instances.
 TEST(ModuleParametersAndPorts, AnsiPortsWithAttributes) {
   auto r = Parse(
       "module m((* keep *) input logic a,\n"
@@ -559,46 +512,31 @@ TEST(ModuleParametersAndPorts, AnsiPortsWithAttributes) {
   EXPECT_EQ(mod->ports[1].name, "b");
 }
 
-// --- error conditions ---
-
-// parameter_port_list requires the closing ")".
 TEST(ModuleParametersAndPorts, ParameterPortListMissingCloseParen) {
   auto r = Parse("module m #(parameter int W = 8 ; endmodule");
-  // §23.2.3 owns the parameter_port_list, so the closing ')' it wants is
-  // reported there rather than under §23.2.1 with the header as a whole.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "23.2.3"));
 }
 
-// list_of_port_declarations requires the closing ")".
 TEST(ModuleParametersAndPorts, PortListMissingCloseParen) {
   auto r = Parse("module m (input logic a ; endmodule");
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 1, "23.2.2.2"));
 }
 
-// A non-ANSI body port_declaration must be terminated by ";".
 TEST(ModuleParametersAndPorts, NonAnsiPortDeclMissingSemicolon) {
   auto r = Parse(
       "module m (a);\n"
       "  input a\n"
       "endmodule\n");
-  // `endmodule` is the token standing where the ';' was wanted on line 3.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.2.2.1"));
 }
 
-// The explicit-named ANSI port form requires "(" after the port identifier.
 TEST(ModuleParametersAndPorts, AnsiExplicitlyNamedPortMissingParen) {
   auto r = Parse("module m (input .x a); endmodule");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got identifier", 1, "23.2.2.2"));
 }
 
-// --- additional input forms ---
-
-// ansi_port_declaration's "= constant_expression" default is a constant
-// expression; besides a literal it may be a reference to a parameter. The
-// parameter is produced from real parameter_port_list syntax, and the default
-// takes the identifier-reference parse path rather than the literal path.
 TEST(ModuleParametersAndPorts, AnsiPortDefaultValueParameter) {
   auto r = Parse(
       "module m #(parameter int D = 5)(input int x = D);\n"
@@ -614,8 +552,6 @@ TEST(ModuleParametersAndPorts, AnsiPortDefaultValueParameter) {
   EXPECT_EQ(mod->ports[0].default_value->text, "D");
 }
 
-// port's ". port_identifier ( [ port_expression ] )" form has an optional
-// port_expression, so an empty ".name()" is a legal unconnected explicit port.
 TEST(ModuleParametersAndPorts, PortExplicitlyNamedEmpty) {
   auto r = Parse("module m (.x()); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -628,9 +564,6 @@ TEST(ModuleParametersAndPorts, PortExplicitlyNamedEmpty) {
   EXPECT_EQ(mod->ports[0].port_expr, nullptr);
 }
 
-// interface_port_header's "interface_identifier [ . modport_identifier ]"
-// alternative with the ". modport_identifier" part omitted: a plain named
-// interface-type port.
 TEST(ModuleParametersAndPorts, NamedInterfacePortNoModport) {
   auto r = Parse("module m (bus_if bus); endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -643,8 +576,6 @@ TEST(ModuleParametersAndPorts, NamedInterfacePortNoModport) {
   EXPECT_TRUE(mod->ports[0].data_type.modport_name.empty());
 }
 
-// port_declaration's ref_declaration alternative: a non-ANSI body port
-// declaration may carry the "ref" direction, binding it to a header name.
 TEST(ModuleParametersAndPorts, NonAnsiRefPortDeclaration) {
   auto r = Parse(
       "module m (r);\n"

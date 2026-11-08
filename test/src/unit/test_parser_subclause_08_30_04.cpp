@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.30.4: the void clear() method is a legal standalone statement call. The
-// referent value and any following statement do not change what the parser
-// accepts, so a single accepting form covers the parse of the clear() call.
 TEST(ClassParsing, WeakRefClearCallParses) {
   EXPECT_TRUE(
       ParseOk("class obj;\n"

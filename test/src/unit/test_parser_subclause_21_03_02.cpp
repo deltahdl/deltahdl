@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 21-5: file_output_tasks accept either an mcd or an fd as the first
-// argument, and file_output_task_name enumerates all sixteen
-// $fdisplay/$fwrite/$fstrobe/$fmonitor variants.
-
 TEST(IoSystemTaskParsing, FdisplayFwrite) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -49,7 +45,6 @@ TEST(IoSystemTaskParsing, FstrobeAndFmonitor) {
 }
 
 TEST(IoSystemTaskParsing, FileOutputTaskAcceptsMcd) {
-  // Syntax 21-5 lets the first argument be a multichannel descriptor.
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer mcd, val;\n"
@@ -65,8 +60,6 @@ TEST(IoSystemTaskParsing, FileOutputTaskAcceptsMcd) {
 }
 
 TEST(IoSystemTaskParsing, FileOutputTaskNoExtraArguments) {
-  // The argument list is optional after the descriptor; a bare descriptor
-  // argument is legal under Syntax 21-5.
   EXPECT_TRUE(
       ParseOk("module t;\n"
               "  integer fd;\n"

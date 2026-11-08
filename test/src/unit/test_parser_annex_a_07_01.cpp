@@ -27,8 +27,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleAndShowcancelledTogether) {
   EXPECT_FALSE(spec->specify_items[1]->is_noshowcancelled);
 }
 
-// specify_block ::= specify { specify_item } endspecify
-// Zero-repetition of { specify_item }: an empty specify block must parse.
 TEST(SpecifyBlockDeclParsing, EmptySpecifyBlock) {
   auto r = Parse(
       "module m;\n"
@@ -42,8 +40,6 @@ TEST(SpecifyBlockDeclParsing, EmptySpecifyBlock) {
   EXPECT_TRUE(spec->specify_items.empty());
 }
 
-// pulsestyle_declaration ::= pulsestyle_onevent list_of_path_outputs ; | ...
-// Complements the ondetect alternative covered above.
 TEST(SpecifyBlockDeclParsing, PulsestyleOnevent) {
   auto r = Parse(
       "module m;\n"
@@ -60,8 +56,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleOnevent) {
   EXPECT_FALSE(spec->specify_items[0]->is_ondetect);
 }
 
-// showcancelled_declaration ::= ... | noshowcancelled list_of_path_outputs ;
-// Complements the showcancelled alternative covered above.
 TEST(SpecifyBlockDeclParsing, NoshowcancelledDecl) {
   auto r = Parse(
       "module m;\n"
@@ -78,8 +72,6 @@ TEST(SpecifyBlockDeclParsing, NoshowcancelledDecl) {
   EXPECT_TRUE(spec->specify_items[0]->is_noshowcancelled);
 }
 
-// specify_item ::= specparam_declaration | ...
-// The specify_item dispatch routes a specparam declaration to a specparam item.
 TEST(SpecifyBlockDeclParsing, SpecparamAsSpecifyItem) {
   auto r = Parse(
       "module m;\n"
@@ -95,8 +87,6 @@ TEST(SpecifyBlockDeclParsing, SpecparamAsSpecifyItem) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kSpecparam);
 }
 
-// specify_item ::= ... | path_declaration | ...
-// The specify_item dispatch routes a path declaration to a path-decl item.
 TEST(SpecifyBlockDeclParsing, PathDeclarationAsSpecifyItem) {
   auto r = Parse(
       "module m;\n"
@@ -112,9 +102,6 @@ TEST(SpecifyBlockDeclParsing, PathDeclarationAsSpecifyItem) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPathDecl);
 }
 
-// specify_item ::= ... | system_timing_check
-// The specify_item dispatch routes a system timing check to a timing-check
-// item.
 TEST(SpecifyBlockDeclParsing, SystemTimingCheckAsSpecifyItem) {
   auto r = Parse(
       "module m;\n"
@@ -130,12 +117,6 @@ TEST(SpecifyBlockDeclParsing, SystemTimingCheckAsSpecifyItem) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kTimingCheck);
 }
 
-// pulsestyle_declaration ::= pulsestyle_ondetect list_of_path_outputs ;
-// The list is A.7.3's: each entry a specify_output_terminal_descriptor,
-// `output_identifier [ [ constant_range_expression ] ]`, whose
-// output_identifier is a port_identifier, `interface_identifier .
-// port_identifier`, or the escaped spelling of either. A bit-select, a
-// part-select, an escaped name and an interface port are each one output.
 TEST(SpecifyBlockDeclParsing, PulsestyleListOfPathOutputsTakesDescriptors) {
   auto r = Parse(
       "module m;\n"
@@ -159,8 +140,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleListOfPathOutputsTakesDescriptors) {
   EXPECT_EQ(outs[3].name, "p");
 }
 
-// showcancelled_declaration ::= noshowcancelled list_of_path_outputs ;
-// The same list, read the same way.
 TEST(SpecifyBlockDeclParsing, ShowcancelledListOfPathOutputsTakesDescriptors) {
   auto r = Parse(
       "module m;\n"
@@ -182,9 +161,6 @@ TEST(SpecifyBlockDeclParsing, ShowcancelledListOfPathOutputsTakesDescriptors) {
   EXPECT_EQ(outs[1].range_kind, SpecifyRangeKind::kNone);
 }
 
-// list_of_path_outputs lists its descriptors with commas alone; a brace group
-// is no specify terminal in a pulse style declaration any more than in a path,
-// and is reported under A.7.3 at its '{'.
 TEST(SpecifyBlockDeclParsing, PulsestyleBraceListRejected) {
   auto r = Parse(
       "module m;\n"
@@ -198,9 +174,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleBraceListRejected) {
                             3, "A.7.3"));
 }
 
-// pulsestyle_declaration ::= pulsestyle_onevent list_of_path_outputs ; | ...
-// The trailing ';' is a required terminal of the production: dropping it is an
-// error. The item is still produced, so the parser reached the ';' check.
 TEST(SpecifyBlockDeclParsing, PulsestyleDeclMissingSemicolonRejected) {
   auto r = Parse(
       "module m;\n"
@@ -209,8 +182,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleDeclMissingSemicolonRejected) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §30.7.4.1 owns pulsestyle_declaration, and endspecify stands where its ';'
-  // must be.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.1"));
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
@@ -219,8 +190,6 @@ TEST(SpecifyBlockDeclParsing, PulsestyleDeclMissingSemicolonRejected) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kPulsestyle);
 }
 
-// showcancelled_declaration ::= showcancelled list_of_path_outputs ; | ...
-// The trailing ';' terminal is required; omitting it is an error.
 TEST(SpecifyBlockDeclParsing, ShowcancelledDeclMissingSemicolonRejected) {
   auto r = Parse(
       "module m;\n"
@@ -229,8 +198,6 @@ TEST(SpecifyBlockDeclParsing, ShowcancelledDeclMissingSemicolonRejected) {
       "  endspecify\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §30.7.4.2 owns showcancelled_declaration; endspecify stands where its ';'
-  // must be.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.2"));
   auto* spec = FindSpecifyBlock(r.cu->modules[0]->items);
@@ -239,16 +206,11 @@ TEST(SpecifyBlockDeclParsing, ShowcancelledDeclMissingSemicolonRejected) {
   EXPECT_EQ(spec->specify_items[0]->kind, SpecifyItemKind::kShowcancelled);
 }
 
-// specify_block ::= specify { specify_item } endspecify
-// The closing endspecify keyword is a required terminal; a block left open
-// (here at end of input) is an error.
 TEST(SpecifyBlockDeclParsing, SpecifyBlockMissingEndspecifyRejected) {
   auto r = Parse(
       "module m;\n"
       "  specify\n");
   ASSERT_NE(r.cu, nullptr);
-  // The source ends after line 2, so end of input stands on line 3 where
-  // §30.3 requires endspecify.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endspecify', got EOF", 3, "30.3"));
 }

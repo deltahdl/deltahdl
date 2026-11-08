@@ -9,15 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.5: every positioning rule operates on a descriptor whose behavior is
-// decided by how it was produced -- the type argument of the §21.3.1 $fopen
-// that created it -- so these tests build the descriptor from real $fopen
-// source syntax, drive the whole pipeline, and observe the positioning
-// functions' results through $display.
-
-// §21.3.5: $ftell returns the offset from the beginning of the file of the
-// byte the next operation on the descriptor will read or write -- zero on a
-// freshly opened file, and the count of characters consumed after reads.
 TEST(FilePositioning, FtellReportsPositionOfNextByte) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_ftell.txt";
@@ -43,9 +34,6 @@ TEST(FilePositioning, FtellReportsPositionOfNextByte) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $ftell equally reports the position of the next byte to be
-// WRITTEN -- on a write-type descriptor it advances with each output
-// operation.
 TEST(FilePositioning, FtellReportsPositionOfNextByteToWrite) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_ftell_write.txt";
@@ -69,8 +57,6 @@ TEST(FilePositioning, FtellReportsPositionOfNextByteToWrite) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: a value obtained from $ftell can be handed back to a subsequent
-// $fseek to reposition the file to that same point.
 TEST(FilePositioning, FtellValueRepositionsThroughFseek) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_ftell_seek.txt";
@@ -98,8 +84,6 @@ TEST(FilePositioning, FtellValueRepositionsThroughFseek) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: operation value 0 sets the position to exactly offset bytes from
-// the beginning of the file.
 TEST(FilePositioning, FseekFromBeginning) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek0.txt";
@@ -122,8 +106,6 @@ TEST(FilePositioning, FseekFromBeginning) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: operation value 1 sets the position to the current location plus
-// the offset.
 TEST(FilePositioning, FseekFromCurrentPosition) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek1.txt";
@@ -148,9 +130,6 @@ TEST(FilePositioning, FseekFromCurrentPosition) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: operation value 2 sets the position to EOF plus the offset; the
-// offset is a signed distance, so a negative value seeks backward from the
-// end of the file.
 TEST(FilePositioning, FseekFromEndWithNegativeOffset) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek2.txt";
@@ -173,9 +152,6 @@ TEST(FilePositioning, FseekFromEndWithNegativeOffset) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: offset and operation are ordinary expressions -- here a parameter
-// and a localparam constant supply them, and the offset arrives through a
-// variable as well.
 TEST(FilePositioning, FseekArgumentsFromConstantsAndVariables) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek_forms.txt";
@@ -203,9 +179,6 @@ TEST(FilePositioning, FseekArgumentsFromConstantsAndVariables) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $fseek changes the position of the next input OR output operation;
-// on a read-update ("r+") descriptor a reposition followed by a write
-// overwrites the byte at that spot in place.
 TEST(FilePositioning, FseekOnReadUpdateDescriptorRepositionsWrite) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_rplus.txt";
@@ -238,8 +211,6 @@ TEST(FilePositioning, FseekOnReadUpdateDescriptorRepositionsWrite) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $rewind is equivalent to $fseek(fd, 0, 0) -- it reports 0 and the
-// next read starts over at the first byte.
 TEST(FilePositioning, RewindEquivalentToFseekZeroZero) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_rewind.txt";
@@ -264,9 +235,6 @@ TEST(FilePositioning, RewindEquivalentToFseekZeroZero) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: a repositioning error sets the returned code to -1 -- both for a
-// descriptor that cannot be repositioned and for an operation value outside
-// 0, 1, and 2 -- while a successful reposition returns 0.
 TEST(FilePositioning, FseekReturnsZeroOnSuccessMinusOneOnError) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek_code.txt";
@@ -291,7 +259,6 @@ TEST(FilePositioning, FseekReturnsZeroOnSuccessMinusOneOnError) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $rewind reports -1 when the reposition fails.
 TEST(FilePositioning, RewindReturnsMinusOneOnInvalidDescriptor) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -306,9 +273,6 @@ TEST(FilePositioning, RewindReturnsMinusOneOnInvalidDescriptor) {
   EXPECT_NE(out.find("r=-1"), std::string::npos) << out;
 }
 
-// §21.3.5: when an error occurs, $ftell returns EOF (-1), and the application
-// can call the §21.3.7 $ferror function to determine the cause of the most
-// recent error.
 TEST(FilePositioning, PositioningErrorCauseReportedThroughFerror) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -325,8 +289,6 @@ TEST(FilePositioning, PositioningErrorCauseReportedThroughFerror) {
   EXPECT_NE(out.find("p=-1 nz=1 has_msg=1"), std::string::npos) << out;
 }
 
-// §21.3.5: repositioning with $fseek shall cancel a pending $ungetc
-// push-back -- the next read resumes from the file, not the pushed character.
 TEST(FilePositioning, FseekCancelsUngetcPushback) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek_ungetc.txt";
@@ -351,8 +313,6 @@ TEST(FilePositioning, FseekCancelsUngetcPushback) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: repositioning with $rewind shall likewise cancel a pending $ungetc
-// push-back.
 TEST(FilePositioning, RewindCancelsUngetcPushback) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_rewind_ungetc.txt";
@@ -377,10 +337,6 @@ TEST(FilePositioning, RewindCancelsUngetcPushback) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5 cancels the push back of any descriptor a $fseek repositions, one
-// opened "w" among them, where §21.3.4.1 still lets $ungetc push a character
-// for the next $fgetc: after the seek that $fgetc finds nothing pushed and a
-// file it cannot read, and answers EOF.
 TEST(FilePositioning, FseekCancelsAWriteOnlyFdsPushBack) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_seek_ungetc_w.txt";
@@ -403,8 +359,6 @@ TEST(FilePositioning, FseekCancelsAWriteOnlyFdsPushBack) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: $rewind repositions as $fseek(fd, 0, 0) does, so it too cancels
-// the push back of a descriptor opened "w".
 TEST(FilePositioning, RewindCancelsAWriteOnlyFdsPushBack) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_rewind_ungetc_w.txt";
@@ -427,9 +381,6 @@ TEST(FilePositioning, RewindCancelsAWriteOnlyFdsPushBack) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: the position indicator may be set beyond the end of the existing
-// data, but $fseek by itself does not extend the size of the file -- seeking
-// back to EOF afterward still finds the original six bytes.
 TEST(FilePositioning, FseekBeyondEndDoesNotExtendFile) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_past_eof.txt";
@@ -454,8 +405,6 @@ TEST(FilePositioning, FseekBeyondEndDoesNotExtendFile) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: when data are written at a point beyond the existing end of the
-// file, reads of the gap between the old end and that point return zero.
 TEST(FilePositioning, GapLeftBySeekPastEndReadsAsZero) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_gap.txt";
@@ -487,9 +436,6 @@ TEST(FilePositioning, GapLeftBySeekPastEndReadsAsZero) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: on a file opened for append, $fseek may move the pointer, but
-// written output disregards it -- everything lands at the end of the file and
-// the pointer is then repositioned to the end of that output.
 TEST(FilePositioning, AppendOutputIgnoresSeekAndLandsAtEnd) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_append.txt";
@@ -522,8 +468,6 @@ TEST(FilePositioning, AppendOutputIgnoresSeekAndLandsAtEnd) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.5: the append-update type ("a+") shows the same behavior -- output
-// written after a reposition still lands at the end of the file.
 TEST(FilePositioning, AppendUpdateOutputAlsoLandsAtEnd) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2135_append_plus.txt";

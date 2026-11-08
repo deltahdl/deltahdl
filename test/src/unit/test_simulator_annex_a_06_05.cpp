@@ -161,10 +161,6 @@ TEST(TimingControlSimulation, TwoProcessesSynchronizeViaDelay) {
   LowerRunAndCheck(f, design, {{"x", 2u}, {"y", 2u}});
 }
 
-// event_control ::= clocking_event ; clocking_event ::= @ ( event_expression )
-// with an edge_identifier. A process suspended on @(posedge clk) resumes only
-// when the driven net (§A.8.3 expression over a real signal) rises, at which
-// point it captures y.
 TEST(TimingControlSimulation, EventControlPosedgeResumesProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -185,9 +181,6 @@ TEST(TimingControlSimulation, EventControlPosedgeResumesProcess) {
   LowerRunAndCheck(f, design, {{"x", 9u}, {"clk", 1u}, {"y", 9u}});
 }
 
-// wait_statement ::= wait ( expression ) statement_or_null
-// A process blocks until the condition expression (built over a real variable)
-// becomes true, then runs its body.
 TEST(TimingControlSimulation, WaitConditionResumesProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -207,9 +200,6 @@ TEST(TimingControlSimulation, WaitConditionResumesProcess) {
   LowerRunAndCheck(f, design, {{"x", 7u}, {"go", 1u}});
 }
 
-// event_trigger ::= -> hierarchical_event_identifier ... ; combined with
-// event_control on a named event. Built from a real `event` declaration
-// (§6.17): triggering -> e wakes the process waiting on @(e).
 TEST(TimingControlSimulation, NamedEventTriggerResumesWaiter) {
   SimFixture f;
   auto* design = ElaborateSrc(

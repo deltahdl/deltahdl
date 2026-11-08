@@ -233,9 +233,6 @@ TEST(EventControlParsing, MemberAccessInEventExpression) {
       ExprKind::kMemberAccess);
 }
 
-// §9.4 Syntax 9-4 gives a clocking_event without parentheses, `@` and a name,
-// so an always procedure opens with one as readily as with `@(e)`: the name
-// becomes the procedure's sensitivity and the statement after it its body.
 TEST(EventControlParsing, AlwaysAtBareEventName) {
   auto r = Parse(
       "module m;\n"
@@ -286,9 +283,6 @@ TEST(EventControlParsing, AlwaysFFAtBareClockName) {
   EXPECT_EQ(item->sensitivity[0].signal->text, "clk");
 }
 
-// The name after a bare `@` is a name and no more: the `->` that follows it
-// opens the event trigger the control guards, and is not §11.4.7's
-// implication joining `e` to `f`.
 TEST(EventControlParsing, BareEventNameStopsBeforeTrigger) {
   auto r = Parse(
       "module m;\n"
@@ -307,8 +301,6 @@ TEST(EventControlParsing, BareEventNameStopsBeforeTrigger) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kEventTrigger);
 }
 
-// Nor is a `++` after the name its postfix increment: it is the prefix
-// increment the controlled statement opens with.
 TEST(EventControlParsing, BareEventNameStopsBeforePrefixIncrement) {
   auto r = Parse(
       "module m;\n"
@@ -327,9 +319,6 @@ TEST(EventControlParsing, BareEventNameStopsBeforePrefixIncrement) {
   EXPECT_EQ(stmt->body->kind, StmtKind::kExprStmt);
 }
 
-// A hierarchical_identifier may open with `$root.`, which the lexer gives as
-// a system identifier rather than a name; the bare event name takes it as the
-// first part of the path all the same.
 TEST(EventControlParsing, BareEventNameFromRoot) {
   auto r = Parse(
       "module m;\n"

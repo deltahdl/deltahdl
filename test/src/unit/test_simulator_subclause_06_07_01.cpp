@@ -11,13 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §6.7.1 default net initialization, observed through the real simulator: a
-// design is elaborated, lowered, and run, then the resolved net value is read
-// back from the SimContext.
-
-// 4-state value of bit 0, encoded as (bval << 1) | aval. Canonical Convention
-// A: x = (aval=1, bval=1), z = (aval=0, bval=1).
-//   0 -> 0, 1 -> 1, z -> 2, x -> 3
 uint8_t Bit0(const Variable& v) {
   uint8_t a = v.value.words[0].aval & 1;
   uint8_t b = v.value.words[0].bval & 1;
@@ -28,7 +21,6 @@ constexpr uint8_t kVal1 = 1;
 constexpr uint8_t kValZ = 2;
 constexpr uint8_t kValX = 3;
 
-// §6.7.1: the default initialization value for a net shall be z.
 TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
   LowerFixture f;
   auto* var = RunAndFindVar("module t; wire w; endmodule\n", f, "w");
@@ -36,8 +28,6 @@ TEST(NetDefaultValue, UndrivenWireDefaultsToZ) {
   EXPECT_EQ(Bit0(*var), kValZ);
 }
 
-// §6.7.1: the default-z rule applies to every non-trireg net type, not just
-// `wire`. An undriven `tri` net comes up z as well.
 TEST(NetDefaultValue, UndrivenTriDefaultsToZ) {
   LowerFixture f;
   auto* var = RunAndFindVar("module t; tri w; endmodule\n", f, "w");
@@ -45,7 +35,6 @@ TEST(NetDefaultValue, UndrivenTriDefaultsToZ) {
   EXPECT_EQ(Bit0(*var), kValZ);
 }
 
-// §6.7.1: nets with drivers shall assume the output value of their drivers.
 TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
   LowerFixture f;
   auto* var =
@@ -54,8 +43,6 @@ TEST(NetDefaultValue, DrivenNetAssumesDriverValue) {
   EXPECT_EQ(Bit0(*var), kVal1);
 }
 
-// §6.7.1: the default applies to every bit of a vector net, not just bit 0.
-// All four bits of an undriven vector wire come up z (aval=0, bval=1 per bit).
 TEST(NetDefaultValue, UndrivenVectorWireAllBitsZ) {
   LowerFixture f;
   auto* var = RunAndFindVar("module t; wire [3:0] w; endmodule\n", f, "w");
@@ -64,7 +51,6 @@ TEST(NetDefaultValue, UndrivenVectorWireAllBitsZ) {
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
-// §6.7.1: the trireg net is an exception and shall default to x.
 TEST(NetDefaultValue, UndrivenTriregDefaultsToX) {
   LowerFixture f;
   auto* var = RunAndFindVar("module t; trireg r; endmodule\n", f, "r");
@@ -72,8 +58,6 @@ TEST(NetDefaultValue, UndrivenTriregDefaultsToX) {
   EXPECT_EQ(Bit0(*var), kValX);
 }
 
-// §6.7.1: the trireg x default also applies across every bit of a vector trireg
-// (x is aval=1, bval=1 per bit).
 TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   LowerFixture f;
   auto* var = RunAndFindVar("module t; trireg [3:0] r; endmodule\n", f, "r");
@@ -82,12 +66,6 @@ TEST(NetDefaultValue, UndrivenVectorTriregAllBitsX) {
   EXPECT_EQ(var->value.words[0].bval & 0xF, 0xFu);
 }
 
-// §6.7.1: a net declaration names its net type first and may go on to name a
-// data type, and the net type still decides how the net resolves (§6.6.3,
-// §6.6.5): undriven tri0 logic and tri1 logic [3:0] nets read 0 and 1111, and
-// a wand logic net driven 1 and 0 reads their wired AND, 0. The net type
-// keyword was dropped for the data type, so all three were wires reading z,
-// zzzz and x.
 TEST(NetDefaultValue, NetTypeKeywordBeforeADataTypeDecidesResolution) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -103,17 +81,6 @@ TEST(NetDefaultValue, NetTypeKeywordBeforeADataTypeDecidesResolution) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.7.1 (printed page 103 of IEEE 1800-2023) admits a packed structure
-// as a net's data type, `wire addressT w1` reaching a type through a typedef
-// name in its own example, and §7.2.1 (printed 147) makes a member of a packed
-// structure a window of the vector, `w.opcode` the top eight bits of
-// thirty-two. A net declared in a module body carried no layout, so the member
-// selects read 0 after `assign w = instr` had driven every bit. 165 is read
-// back through the member and through the part-select of the same bits, and
-// 0x123456 through the second member: a net with no layout answers 165 to the
-// part-select alone and 0 to both members, and a net laid out over the wrong
-// bits answers something other than 165 and 0x123456 to them. $bits still
-// reports the net's whole width.
 TEST(StructNetLayout, TypedefStructWireReadsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -151,13 +118,6 @@ TEST(StructNetLayout, TypedefStructWireReadsItsMembers) {
   EXPECT_EQ(nbits->value.ToUint64(), 32u);
 }
 
-// The same net declared in a child instance, its type a package's typedef
-// made visible by a wildcard import (§26.3): the instance's net is laid out
-// under its instance-prefixed name, the one its member selects are resolved
-// by, so the child reads 60 and 0xABCDEF back through the members of the
-// 0x3CABCDEF the parent drives in. A layout recorded for the top's nets alone,
-// or looked up by the bare name from inside the instance, leaves the child
-// reading 0 for both members while the part-select still reads 60.
 TEST(StructNetLayout, ChildInstanceStructWireReadsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -194,12 +154,6 @@ TEST(StructNetLayout, ChildInstanceStructWireReadsItsMembers) {
   EXPECT_EQ(low24->value.ToUint64(), 0xABCDEFu);
 }
 
-// §6.7.1's own example writes the structure in the declaration, `wire struct
-// packed {logic ecc; logic [7:0] data;} memsig`, naming no typedef at all.
-// The nine-bit net is driven with ecc set and data 0x5A, and each member reads
-// its own window: 1 and 90. A net with no layout reads 0 for both, and a
-// layout with the members in the wrong order reads 0 for ecc and 0xAD for
-// data.
 TEST(StructNetLayout, AnonymousPackedStructWireReadsItsMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(

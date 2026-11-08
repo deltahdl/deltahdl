@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 20-4: the parens block is optional, so a bare $printtimescale is
-// parsed as an expression statement wrapping an argument-less system call.
 TEST(PrinttimescaleSysTask, BareInvocationParsesAsArglessSystemCall) {
   auto r = Parse("module m; initial $printtimescale; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -24,8 +22,6 @@ TEST(PrinttimescaleSysTask, BareInvocationParsesAsArglessSystemCall) {
   EXPECT_TRUE(stmt->expr->args.empty());
 }
 
-// Syntax 20-4: the optional argument is a hierarchical identifier naming the
-// design element whose timescale is reported.
 TEST(PrinttimescaleSysTask, HierarchicalArgumentParses) {
   auto r = Parse("module m; initial $printtimescale(top.dut); endmodule");
   ASSERT_NE(r.cu, nullptr);

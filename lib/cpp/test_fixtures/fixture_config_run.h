@@ -15,29 +15,11 @@
 
 using namespace delta;
 
-// A mapped multi-file design assembled from source files, carrying the
-// simulator state a run of it needs.
-//
-// §33.2 has a configuration name the source description that represents each
-// instance, so what a configuration bound is read by running the design rather
-// than by inspecting it, and the scheduler and the context the lowered
-// hierarchy runs in travel with the unit they were built from.
 struct BoundDesign : LibraryDesign {
   Scheduler scheduler{arena};
   SimContext ctx{scheduler, arena, diag};
 };
 
-// Parses `config_text` into `design`, elaborates the configuration `name`
-// names, lowers the bound hierarchy into the design's simulator context and
-// runs it, returning whatever the run wrote to stdout. An empty string comes
-// back where the configuration was not parsed, was not found, or did not
-// elaborate, so a caller asserting on the text also rules out a run that never
-// happened.
-//
-// The search order the loaded map yields is installed before elaboration,
-// which is what leaves the configuration's clauses something to override: a
-// test could otherwise not tell a clause being obeyed from a map order that
-// happened to agree with it.
 inline std::string RunConfiguredDesign(ScratchDir& tmp, BoundDesign& design,
                                        const std::string& config_text,
                                        std::string_view name) {
@@ -57,10 +39,6 @@ inline std::string RunConfiguredDesign(ScratchDir& tmp, BoundDesign& design,
   return captured.str();
 }
 
-// Whether `line` appears somewhere in `out`. Instances of one design report at
-// the same simulation time and in no order clause 33 fixes, so a claim about
-// one of them is read as the presence of its own line rather than as the whole
-// transcript.
 inline bool ReportsLine(const std::string& out, const std::string& line) {
   return out.find(line) != std::string::npos;
 }

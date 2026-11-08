@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A class C holding the members `decls` under the constraint block `c`,
-// randomized `draws` times by an initial that counts the draws for which
-// `holds` is true, as the design test/src/e2e/uniqueness_constraints.sv
-// does, and displays the count.
 std::string Design(const std::string& decls, const std::string& constraint,
                    int draws, const std::string& holds) {
   return "class C;\n" + decls + "  constraint c { " + constraint +
@@ -34,9 +30,6 @@ std::string Design(const std::string& decls, const std::string& constraint,
          "endmodule\n";
 }
 
-// 18.5.4: the clause's example on singular variables: with excluded held to
-// 5 by another constraint, no member of the group beside it takes 5, so b
-// and c drawn from 4 to 6 split 4 and 6 between them on every draw.
 TEST(UniquenessConstraintsRun, TheExcludedValueLeavesTheOtherMembers) {
   SimFixture f;
   std::string out = RunCapture(
@@ -50,10 +43,6 @@ TEST(UniquenessConstraintsRun, TheExcludedValueLeavesTheOtherMembers) {
   EXPECT_EQ(out, "64\n");
 }
 
-// 18.5.4: a singular member may be of real type, and the group holds no two
-// members at the same value, so two reals each drawn from 1.0 and 2.0 are
-// never alike. The solver compared the integral draws of a group only, so
-// two real members drawn alike passed as distinct.
 TEST(UniquenessConstraintsRun, RealMembersNeverDrawAlike) {
   SimFixture f;
   std::string out = RunCapture(
@@ -66,10 +55,6 @@ TEST(UniquenessConstraintsRun, RealMembersNeverDrawAlike) {
   EXPECT_EQ(out, "64\n");
 }
 
-// 18.5.4: a group of fewer than two members has no effect and causes no
-// contradiction, so randomize() succeeds beside a relation fixing the one
-// member and the member takes the fixed value rather than keeping the 0 a
-// failed randomize() would leave it.
 TEST(UniquenessConstraintsRun, AGroupOfOneMemberHasNoEffect) {
   SimFixture f;
   std::string out = RunCapture(
@@ -78,9 +63,6 @@ TEST(UniquenessConstraintsRun, AGroupOfOneMemberHasNoEffect) {
   EXPECT_EQ(out, "32\n");
 }
 
-// §18.5.4: a slice of an unpacked array in a unique group adds each element
-// it selects, so b, a[2] and a[3] take pairwise distinct values; with a[2]
-// held at 1 and b at 1 forcing a[3] to 0, a draw sharing a value is refused.
 TEST(UniqueConstraintRun, ASliceContributesEachElementItSelects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -105,10 +87,6 @@ TEST(UniqueConstraintRun, ASliceContributesEachElementItSelects) {
   EXPECT_EQ(out, "0\n");
 }
 
-// §18.5.4: a whole unpacked array in a unique group adds every element, and a
-// slice written high index first selects the same elements as one written
-// low first: the four elements of a, two bits each, take all four values,
-// and c[3] and c[2] differ.
 TEST(UniqueConstraintRun, AWholeArrayAndAReversedSliceAddTheirElements) {
   SimFixture f;
   std::string out = RunCapture(

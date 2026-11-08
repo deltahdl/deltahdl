@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §11.9 takes a tagged expression's type from its context, which shall be a
-// tagged union: an int, a module's or a block's, has no member to name.
 TEST(ExpressionElaboration, TaggedExpressionAssignedToIntReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -65,9 +63,6 @@ TEST(ExpressionElaboration, TaggedUnionMemberAccessElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// When the LHS variable is a tagged union typedef, the tag name in a tagged
-// expression must be one of the declared members; otherwise the elaborator
-// rejects the assignment.
 TEST(ExpressionElaboration, TaggedUnionUnknownMemberRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,9 +80,6 @@ TEST(ExpressionElaboration, TaggedUnionUnknownMemberRejected) {
                             "11.9"));
 }
 
-// §11.9: the member-name rule also governs a declaration initializer, whose
-// tagged expression type is known from the declared variable. A tag that is a
-// declared member is accepted.
 TEST(ExpressionElaboration, TaggedUnionInitializerKnownMemberAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -100,8 +92,6 @@ TEST(ExpressionElaboration, TaggedUnionInitializerKnownMemberAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same rule rejects a declaration initializer whose tag is not a member of
-// the declared tagged union type.
 TEST(ExpressionElaboration, TaggedUnionInitializerUnknownMemberRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -138,9 +128,6 @@ TEST(ExpressionElaboration, NestedTaggedUnionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.9 knows a tagged expression's type wherever its context gives one: a
-// cast's type, either arm of a conditional, a continuous assignment's target,
-// the return type of a function and the formal an argument binds to.
 TEST(ExpressionElaboration, TaggedMemberNameCheckedInEveryContext) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,9 +153,6 @@ TEST(ExpressionElaboration, TaggedMemberNameCheckedInEveryContext) {
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
-// §11.9: the member's value shall have the member's type, which a literal
-// does not give an unpacked structure; an assignment pattern does. A void
-// member takes no value at all.
 TEST(ExpressionElaboration, TaggedMemberValueCheckedAgainstMemberType) {
   ElabFixture f;
   ElaborateSrc(
@@ -193,9 +177,6 @@ TEST(ExpressionElaboration, TaggedMemberValueCheckedAgainstMemberType) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A member written with an inline structure type gives its value that type,
-// and a member that is itself a tagged union gives a tagged value its context.
-// A union written inline in the declaration is named by no typedef.
 TEST(ExpressionElaboration, InlineAndNestedTaggedUnionTypesChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -227,8 +208,6 @@ TEST(ExpressionElaboration, InlineAndNestedTaggedUnionTypesChecked) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// An untagged union is no tagged union, so its members are not named by
-// `tagged` either (§7.3.2).
 TEST(ExpressionElaboration, TaggedExpressionAssignedToUntaggedUnionReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -244,12 +223,6 @@ TEST(ExpressionElaboration, TaggedExpressionAssignedToUntaggedUnionReported) {
                             4, "11.9"));
 }
 
-// A context whose type the elaborator does not know here -- an element or a
-// select of a variable, an array, a port, a class, a cast to
-// a type no typedef names, and the formal of a method or of the compilation
-// unit's function, which the module's own `f` does not declare -- gives a
-// tagged expression nothing to be checked against, so none of these draws a
-// §11.9 report.
 TEST(ExpressionElaboration, TaggedExpressionInUnknownContextNotJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -276,10 +249,6 @@ TEST(ExpressionElaboration, TaggedExpressionInUnknownContextNotJudged) {
   }
 }
 
-// §11.9 makes the value after the member name of the member's type, which an
-// unpacked structure of another typedef is not, nor a structure given to an
-// int member; a variable of the member's own structure type, and an int
-// variable given to an int member, are.
 TEST(ExpressionElaboration, TaggedMemberVariableValueCheckedAgainstMemberType) {
   ElabFixture f;
   ElaborateSrc(

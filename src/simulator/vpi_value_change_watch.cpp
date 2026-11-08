@@ -17,20 +17,13 @@ namespace delta {
 
 namespace {
 
-// §38.36.1: whether a `reason` registration placed on `obj` is still live
-// among `callbacks`.
 bool IsPlacedOn(const std::vector<s_cb_data>& callbacks, int reason,
                 const VpiObject* obj) {
-  // `obj` is the object watched, never null, so a registration with no object
-  // matches none.
   return std::ranges::any_of(callbacks, [reason, obj](const s_cb_data& cb) {
     return cb.reason == reason && VpiObjectOf(cb.obj) == obj;
   });
 }
 
-// The aval and bval words of the bits `obj` stands for: its variable's, or,
-// for a bit or a select of one, those of its parent's it spans, up to the
-// variable's last bit.
 std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
   const Logic4Vec& whole = obj.var->value;
   std::vector<uint64_t> bits;
@@ -53,16 +46,10 @@ std::vector<uint64_t> ObjectBits(const VpiObject& obj) {
 
 }  // namespace
 
-// The strength the net `obj` reads, or none for an object without one.
 NetStrength StrengthOf(const VpiObject& obj) {
   return obj.net != nullptr ? obj.net->resolved_strength : NetStrength{};
 }
 
-// §38.36.1: what `obj` holds now against the bits `held` and the strength
-// `strength` last seen, both brought up to date, and, where `call_back`, its
-// cbValueChange callbacks called for a change of value or, a change of
-// strength alone being a change to a vpiStrengthVal callback and to no other,
-// of strength.
 void NoteValueChange(VpiContext& vpi, VpiObject* obj,
                      std::vector<uint64_t>& held, NetStrength& strength,
                      bool call_back) {
@@ -80,12 +67,7 @@ void NoteValueChange(VpiContext& vpi, VpiObject* obj,
   }
 }
 
-// §38.36.1 with §37.17 detail 14: watch the storage of `obj` and, as it is
-// written, call back the cbSizeChange registrations placed on it where its
-// size changed, then the cbValueChange ones where its value did, a write of
-// what it holds being no change, until none of either is left.
 void WatchObjectChanges(VpiContext& vpi, VpiObject* obj) {
-  // Its one caller, vpi_register_cb, passes a registration's object only.
   if (obj->var == nullptr || obj->value_change_watched) return;
   obj->value_change_watched = true;
   obj->var->AddWatcher([&vpi, obj, held = ObjectBits(*obj),

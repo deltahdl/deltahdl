@@ -30,12 +30,6 @@ TEST(DefparamEarlyNameResolution, AmbiguityWithNamedGenerateBlockIsError) {
                     6, "23.10.4.2"));
 }
 
-// Same early-resolution hazard, but the like-named generate block is introduced
-// by a conditional case-generate item label rather than an if-generate block
-// (§27.5 admits both forms). The leading component of the defparam path (m)
-// again names both this local block and a top-level module, so the target the
-// name binds to before the block is elaborated differs from the one it would
-// bind to afterward -- the §23.10.4.2 error must still fire.
 TEST(DefparamEarlyNameResolution, AmbiguityWithCaseGenerateBlockIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,11 +76,6 @@ TEST(DefparamEarlyNameResolution, RenamedGenerateBlockRemovesAmbiguity) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The early-resolution hazard only exists when the defparam's leading name also
-// names an outer scope (here, a top-level module). A generate block whose name
-// merely matches the leading path component, with no like-named outer scope, is
-// an ordinary unresolved target -- not an early/late divergence -- so it must
-// not raise the §23.10.4.2 error.
 TEST(DefparamEarlyNameResolution,
      BlockNameWithoutMatchingTopScopeIsNotAmbiguous) {
   ElabFixture f;

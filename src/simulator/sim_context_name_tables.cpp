@@ -1,19 +1,3 @@
-// The bodies of the tables src/simulator/sim_context_name_tables.h declares:
-// the functions, let declarations and sequence declarations a module
-// registers, the real, string and chandle variables, the unbounded
-// parameters, the enumeration and structure types with the type each variable
-// was declared of, the width recorded for a named type, the type of each
-// module instance, the §26.3 imported names, the §23.4 nested declaration
-// scopes and the §25.9 virtual interface handles. Each records one entry or
-// answers one lookup.
-//
-// ResolveStructFieldPath stands here too, with the structure types it reads.
-// src/simulator/sim_context_types.h declares it and eval_expr.cpp,
-// assoc_element.cpp and statement_assign.cpp call it to turn a dotted member
-// path into the bit offset, width and type of the field it names.
-//
-// The rest of the context is in src/simulator/sim_context.h.
-
 #include "simulator/sim_context_name_tables.h"
 
 #include <cstddef>

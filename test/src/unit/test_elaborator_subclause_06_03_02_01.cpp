@@ -1,7 +1,3 @@
-// Tests for §6.3.2.1 "Charge strength", which confines the charge strength
-// specification to trireg nets, names small, medium and large as its keywords,
-// and makes medium the default charge strength of a trireg net.
-
 #include <gtest/gtest.h>
 
 #include "common/types.h"
@@ -32,15 +28,8 @@ TEST(ChargeStrengthElaboration, TriregDefaultChargeStrengthMedium) {
   EXPECT_TRUE(found);
 }
 
-// §6.3.2.1 keeps the charge strength specification to trireg nets, so `small`
-// on a wire is rejected under §6.3.2.1 and not under §10.3, whose footnote 16
-// to Syntax 10-1 only annotates the net_declaration production with the same
-// restriction. Parser::ParseNetStrength raises the report where it reads the
-// specification, and ElaborateSrc leaves it in the fixture's engine.
 TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
   ElabFixture f;
-  // The charge-strength rule is reported while parsing, so this case reaches
-  // its subject through a source that does not parse.
   ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  wire (small) w;\n"
@@ -51,11 +40,6 @@ TEST(ChargeStrengthElaboration, SmallOnNonTriregIsIllegal) {
                             2, "6.3.2.1"));
 }
 
-// An explicit `medium` charge strength on a trireg is carried to the net as
-// Strength::kMedium through the parser->elaborator override path (charge code
-// 2), which is a different production path than the default-retention path that
-// the no-strength trireg tests exercise. This completes the small/medium/large
-// value-mapping trio at the elaboration stage.
 TEST(ChargeStrengthElaboration, TriregExplicitMediumPreservesMedium) {
   ElabFixture f;
   auto* design = Elaborate(

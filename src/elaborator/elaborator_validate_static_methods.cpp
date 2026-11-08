@@ -1,13 +1,3 @@
-// §8.10 "Static methods" and §8.11 "This", the two rules deciding what a
-// method may name when it has no object handle. §8.10 bars a static method
-// from accessing a non-static member or the special `this` handle, and §8.11
-// bars `this` outside a non-static class method altogether. Both are answered
-// by searching a body for a name, so both need the same two searches and the
-// collection of the names that shadow a member; the rest of the class rules
-// are in elaborator_validate_class_members.cpp, which the 1000-line cap in
-// .github/workflows/deltahdl.yml separated this file from. No symbol crosses
-// the cut.
-
 #include <cstddef>
 #include <string_view>
 #include <unordered_set>
@@ -35,11 +25,6 @@ static bool IsLiteralTypeOfThis(const Expr* e) {
 
 static bool ExprRefsThisOrSuper(const Expr* e) {
   if (!e) return false;
-  // §8.11 lists type(this) as a permitted form alongside non-static class
-  // methods, constraints, and covergroups. The cross-reference in §6.23
-  // names it as a way to obtain the enclosing class type without evaluating
-  // any expression, so the literal form may appear even where a bare 'this'
-  // would otherwise be flagged.
   if (IsLiteralTypeOfThis(e)) return false;
   if (e->kind == ExprKind::kIdentifier &&
       (e->text == "this" || e->text == "super"))
@@ -47,26 +32,6 @@ static bool ExprRefsThisOrSuper(const Expr* e) {
   return AnyExprChild(e, ExprRefsThisOrSuper);
 }
 
-// §8.10 makes an access to the special this handle inside a static method's
-// body illegal and names no statement of that body where the handle is
-// permitted, so this descends every link ForEachChildStmt in
-// elaborator_validate_internal.h names and names no link itself. It wrote out
-// six of the thirteen, so `fork this.x = 1; join` and
-// `assert (1) else this.x = 1;` in a static method each named `this` where
-// nothing looked.
-//
-// That is the list StmtRefsNonStaticMember below already reads, and the two
-// halves of §8.10's one sentence -- the non-static member and the `this` handle
-// -- now hold over the same body rather than over two different subsets of it.
-//
-// The rule names no expression of a statement where the handle is permitted
-// either, so each statement's own expressions are the positions
-// ForEachChildExpr names: a declaration's initializer, a loop's condition and
-// a delay as well as an assignment's two sides and a condition.
-//
-// Neither ForEachChildExpr nor ForEachChildStmt gives the visitor a way to
-// stop, so the first hit is kept in `found` and each visit runs only while
-// `found` is false.
 static bool StmtRefsThisOrSuper(const Stmt* s) {
   if (!s) return false;
   bool found = false;
@@ -80,13 +45,6 @@ static bool StmtRefsThisOrSuper(const Stmt* s) {
   return found;
 }
 
-// §12.7.1 makes a control variable declared in a for header local to the loop,
-// so such a name is not the class member it spells. The parser builds no
-// StmtKind::kVarDecl for one: parser_stmt.cpp puts `for (int i = 0; ...)` into
-// Stmt::for_inits as an assignment and its type into the matching
-// Stmt::for_init_types entry (src/parser/ast_stmt.h). An entry whose type is
-// DataTypeKind::kImplicit was written `for (i = 0; ...)`, which assigns a
-// variable declared elsewhere and declares nothing, so it contributes no name.
 static void CollectForHeaderNames(const Stmt* s,
                                   std::unordered_set<std::string_view>& out) {
   for (size_t k = 0; k < s->for_inits.size() && k < s->for_init_types.size();
@@ -99,24 +57,6 @@ static void CollectForHeaderNames(const Stmt* s,
   }
 }
 
-// The names `s` brings into scope for its own expressions and its child
-// statements. §6.21 says of a declaration in a block that such variables are
-// visible to the block and every block nested below it, so a declaration
-// reaches this from one level down and no further: an immediate child that is a
-// declaration, whatever the for header declares, and a foreach's index
-// variables. A declaration deeper than that belongs to a scope `s` is outside
-// of, and StmtRefsNonStaticMember collects it when it gets there.
-//
-// Stmt::for_steps holds no name to collect: A.6.8 admits in it an
-// operator_assignment, an inc_or_dec_expression or a call and nothing else.
-//
-// The result is empty for almost every statement, which is what lets the
-// caller copy the enclosing set only where a scope is really opened.
-//
-// Declared in elaborator_validate_classes_internal.h: the §8.23 walk over a
-// nested class's methods in elaborator_validate_class_nesting.cpp subtracts the
-// same names for the same reason, and one list of what a statement declares is
-// what keeps the two rules from disagreeing about a scope.
 std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
   std::unordered_set<std::string_view> declared;
   CollectForHeaderNames(s, declared);
@@ -131,34 +71,6 @@ std::unordered_set<std::string_view> NamesDeclaredUnder(const Stmt* s) {
   return declared;
 }
 
-// Whether `e` or any expression nested inside it names one of `non_static`,
-// discounting the names `locals` holds. §8.10 makes the access illegal inside a
-// static method's body and names no position in that body where it is
-// permitted, so this reaches every child link AnyExprChild in
-// elaborator_validate_internal.h names.
-//
-// This wrote its own list of ten of those thirteen links, and the three it left
-// out are positions a property name is written in: `k = a[3:i];` puts one in
-// Expr::index_end, `k = {i{1'b0}};` in Expr::repeat_count and `a = '{i: 1};` in
-// Expr::pattern_keys. AnyExprChild answers a question about a subtree and stops
-// at the first child that answers it, which is what this search wants, so it is
-// used here rather than ForEachExprChild beside it.
-//
-// §8.10 (printed page 186 of IEEE 1800-2023) denies a static method the
-// non-static members of an object it holds no handle to, and §8.4 (printed
-// 181-182) reads a member through any handle a variable holds -- `p.fileID` in
-// §8.9's example on the same page as §8.10 -- which a static method may hold as
-// any subroutine may: in a static property, a local, a formal, a call's result
-// or an element of an array of handles. A `.` access is therefore qualified by
-// whatever its left side names, and only that side is searched, as
-// FirstEnclosingPropRef in elaborator_validate_class_nesting.cpp searches it
-// under §8.23. The one base that is no such handle is `this` (and `super`,
-// §8.15), the object the static method does not have, so a member behind either
-// is the bare access still.
-//
-// This searched the member name of every `.` access as if it stood bare, so
-// `return m_inst.k;` through a static property of the class and `return c.k;`
-// through a local handle were each reported as the access §8.10 bars.
 static bool IsAccessThroughAHandle(const Expr* e) {
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution) {
     return false;
@@ -168,14 +80,6 @@ static bool IsAccessThroughAHandle(const Expr* e) {
          (base->text != "this" && base->text != "super");
 }
 
-// §8.23 (printed page 200) has the class scope resolution operator name a
-// member of the class its left side stands for, so the right side of a `::`
-// is that class's member and not this one's, and only the left side is
-// searched, as the left side of a `.` is. Searched against this class's
-// non-static names, the right side reported every static method that reached
-// another class's member by a name this class also declares -- `type_id::get()`
-// in UVM's uvm_object_param_utils, where uvm_pool has a non-static `get` of
-// its own (#4352). Whether the left side names this class itself is not asked.
 static bool IsAccessThroughAClassScope(const Expr* e) {
   return e->kind == ExprKind::kMemberAccess && e->is_scope_resolution;
 }
@@ -198,15 +102,6 @@ static bool ExprRefsNonStaticMember(
   });
 }
 
-// `locals` are the names in scope where `s` stands. §8.10 bars an access to a
-// non-static member, and a name in scope is not the member it spells, so the
-// search subtracts them.
-//
-// The set grows on the way down and never on the way up, which is what §6.21
-// asks for: a declaration is visible to its own block and to the blocks nested
-// below it, and to nothing outside. A set gathered over the whole body instead
-// would let a declaration in one block exempt the member of that name from the
-// rule in every other.
 static bool StmtRefsNonStaticMember(
     const Stmt* s, const std::unordered_set<std::string_view>& non_static,
     const std::unordered_set<std::string_view>& locals) {
@@ -220,22 +115,6 @@ static bool StmtRefsNonStaticMember(
   const std::unordered_set<std::string_view>& scope =
       declared.empty() ? locals : widened;
 
-  // §8.10 makes the access illegal inside a static method's body and names no
-  // position in that body where it is permitted, so this search reads every
-  // expression position ForEachChildExpr names and descends every statement
-  // ForEachChildStmt names, both in elaborator_validate_internal.h.
-  //
-  // This read Stmt::lhs, Stmt::rhs, Stmt::expr and Stmt::condition and no other
-  // expression position, and the twelve it left out are positions a property
-  // name is written in: `int k = i;` puts one in Stmt::var_init, `for (int k =
-  // 0; k < i; k = k + 1) ;` in Stmt::for_cond -- which is the one that reads as
-  // an oversight, since a `for` keeps its condition there and not in
-  // Stmt::condition -- `#(i) k = 1;` in Stmt::delay, `assert (i);` in
-  // Stmt::assert_expr, and a case-item pattern, a randcase weight and an
-  // unpacked dimension each hold one too.
-  //
-  // Neither list gives the visitor a way to stop, so the first hit is kept in
-  // `found` and each walk runs only while `found` is false.
   bool found = false;
   ForEachChildExpr(s, [&](Expr* const& e) {
     if (found) return;
@@ -249,11 +128,6 @@ static bool StmtRefsNonStaticMember(
   return found;
 }
 
-// §8.10 makes an access to a non-static member, or to the special this handle,
-// inside a static method's body an illegal compile-time error. Reports the
-// first offending statement in each static method body. §8.11 states the
-// separate rule about where the 'this' keyword may be used at all, which
-// Elaborator::ValidateThisInItem reports below.
 static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
                                            DiagEngine& diag) {
   for (const auto* m : cls->members) {
@@ -272,8 +146,6 @@ static void CheckStaticMethodsForThisSuper(const ClassDecl* cls,
   }
 }
 
-// §8.10: collects the names of all non-static properties and (non-'new')
-// methods of the class — the members a static method is forbidden to access.
 static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
     const ClassDecl* cls) {
   std::unordered_set<std::string_view> non_static;
@@ -289,20 +161,6 @@ static std::unordered_set<std::string_view> CollectNonStaticMemberNames(
   return non_static;
 }
 
-// §8.10: the names in scope for the whole of a static method body, which are
-// what shadows a class member there. Its arguments, its own result name where
-// it is a function, and the declarations written at the top level of the body:
-// ModuleItem::func_body_stmts holds those as siblings of the statements that
-// see them rather than under a block statement, so nothing else would collect
-// them.
-//
-// A declaration deeper in the body is not here. §6.21 makes it visible to its
-// own block and the blocks below it and to nothing else, and
-// StmtRefsNonStaticMember adds it to the set as it descends into that block.
-//
-// Declared in elaborator_validate_classes_internal.h, since the same names
-// shadow the enclosing class's properties in a nested class's method under
-// §8.23, which elaborator_validate_class_nesting.cpp checks.
 std::unordered_set<std::string_view> CollectMethodLocalNames(
     const ModuleItem* method) {
   std::unordered_set<std::string_view> locals;
@@ -320,21 +178,6 @@ std::unordered_set<std::string_view> CollectMethodLocalNames(
   return locals;
 }
 
-// §8.10 states a rule about a class declaration, and the declaration is one
-// wherever the module being validated stands, so a class is read once per
-// design: Elaborator::ValidateModuleConstraints runs ValidateStaticMethodBodies
-// for every module it elaborates, and a class the compilation unit or a package
-// holds is in view from each of them. Without the set, a design of two modules
-// reported the compilation unit's one offending method twice, and a package's
-// would have been reported once per module.
-//
-// §8.23 (printed 200-201) lets a class declare a class inside itself, named
-// from outside as `Outer::Inner`, and §8.10 holds over the nested class's
-// static methods as over any class's. The walk read the direct class items of
-// the unit, a module and a package, so `class Outer; class Inner; int k;
-// static function int f(); return k; endfunction endclass endclass` was never
-// reported in any of the three scopes; the nested classes are read here, as
-// ApplyAutoToClassMethods reads them, and the set guards each once.
 void ElaboratorClassRules::ValidateNestedClassStaticMethods(
     const ClassDecl* cls) {
   for (const auto* m : cls->members) {
@@ -371,8 +214,6 @@ void ElaboratorClassRules::ValidateOneClassStaticMethods(const ClassDecl* cls) {
   }
 }
 
-// The classes `items` declares directly, as a module's or a package's item
-// list holds them.
 void ElaboratorClassRules::ValidateStaticMethodsAmong(
     const std::vector<ModuleItem*>& items) {
   for (const auto* item : items) {
@@ -382,27 +223,6 @@ void ElaboratorClassRules::ValidateStaticMethodsAmong(
   }
 }
 
-// §26.2 (printed page 808 of IEEE 1800-2023) makes a class declaration
-// written in a package an item of that package, and §8.10 (printed 186) holds
-// over it as it holds over a class at the top of a file or inside a module.
-// This walked the compilation unit's classes and the module's own, so `package
-// p; class C; int k; static function int f(); return k; endfunction endclass
-// endpackage` was never reported while the same class at compilation-unit scope
-// was, whether or not a module imported the package.
-//
-// §24.3 (printed 775) admits a class declaration among a program's items
-// through module_or_generate_item_declaration, and §25.3 (printed 781) among
-// an interface's through interface_or_generate_item. Each of the two is
-// elaborated -- and so handed here as `decl` -- only when something
-// instantiates it or, for a program, when it is a top, so `program p; class C;
-// int k; static function int f(); return k; endfunction endclass endprogram`
-// beside a module named as the top, and the same class in an interface nothing
-// instantiates, was in no walk at all. The unit's programs and interfaces are
-// walked as its packages are, and the set in ValidateOneClassStaticMethods
-// keeps an instantiated one from a second report. A checker is not walked:
-// §17.2 (printed 503-504) names no class declaration among a checker's items,
-// and the parser reports one under A.1.8 (RejectInCheckerBody in
-// parser_items.cpp), so no checker reaches elaboration holding a class.
 void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   for (const auto* cls : unit_->classes) {
     ValidateOneClassStaticMethods(cls);
@@ -419,9 +239,6 @@ void ElaboratorClassRules::ValidateStaticMethodBodies(const ModuleDecl* decl) {
   }
 }
 
-// The expressions a module item writes outside any statement: a continuous
-// assignment's two sides and a declaration's initializer, which no method
-// holds any more than a procedural block does.
 static bool ItemExprRefsThisOrSuper(const ModuleItem* item) {
   return ExprRefsThisOrSuper(item->init_expr) ||
          ExprRefsThisOrSuper(item->assign_lhs) ||
@@ -441,12 +258,6 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   bool is_func_or_task = item->kind == ModuleItemKind::kFunctionDecl ||
                          item->kind == ModuleItemKind::kTaskDecl;
   if (!is_func_or_task || item->func_body_stmts.empty()) return;
-  // §8.24 (printed page 202): an out-of-block body, `function Rect::new(...)`,
-  // is the method its class declared `extern`, and §23.2.4 (printed page 739)
-  // admits the class and the body among a module's items as well as at
-  // compilation-unit scope. `this` in it names the object, so it is checked
-  // as the class's method, a static one's through MethodBody, not as a
-  // subroutine of the module.
   if (!item->method_class.empty()) return;
   for (const auto* s : item->func_body_stmts) {
     if (StmtRefsThisOrSuper(s)) {
@@ -459,9 +270,6 @@ void ElaboratorClassRules::ValidateThisInItem(const ModuleItem* item) {
   }
 }
 
-// §8.11 holds over a subroutine a package or the compilation unit declares as
-// over a module's, and these scopes are read once, where a module's items are
-// read with each module elaborated.
 void ElaboratorClassRules::ValidateThisOutsideModules() {
   for (const auto* item : unit_->cu_items) ValidateThisInItem(item);
   for (const auto* pkg : unit_->packages) {

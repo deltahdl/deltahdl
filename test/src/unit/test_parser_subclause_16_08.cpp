@@ -50,9 +50,6 @@ TEST(SequenceDeclarationParsing, SequenceDecl) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclCapturesFormalNames) {
-  // §16.8 sequence_port_list: each formal_port_identifier must be recoverable
-  // from the parsed declaration so later stages can bind actuals and check
-  // typed-vs-untyped rules.
   auto r = Parse(
       "module m;\n"
       "  sequence s(x, y, untyped z);\n"
@@ -73,8 +70,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclCapturesFormalNames) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclWithDefaultActualParses) {
-  // §16.8: a default actual argument may be specified for a formal argument
-  // in the optional associated declaration assignment.
   auto r = Parse(
       "module m;\n"
       "  sequence s(x, y = 1'b1);\n"
@@ -86,7 +81,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclWithDefaultActualParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclWithTrailingLabelParses) {
-  // §16.8 sequence_declaration: `endsequence [ : sequence_identifier ]`.
   auto r = Parse(
       "module m;\n"
       "  sequence s;\n"
@@ -105,9 +99,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclWithTrailingLabelParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceTypedFormalParses) {
-  // §16.8 Syntax 16-5, sequence_formal_type ::= data_type_or_implicit
-  // | sequence | untyped. The `sequence` alternative (a formal that is itself
-  // a sequence) must parse and its formal_port_identifier must be captured.
   auto r = Parse(
       "module m;\n"
       "  sequence s(sequence x);\n"
@@ -129,10 +120,6 @@ TEST(SequenceDeclarationParsing, SequenceTypedFormalParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclEndLabelMismatchIsError) {
-  // §16.8 sequence_declaration: `endsequence [ : sequence_identifier ]`. When
-  // the trailing label is present it must match the declared sequence name;
-  // a mismatched label is rejected. This is the negative of the accepting
-  // SequenceDeclWithTrailingLabelParses case.
   auto r = Parse(
       "module m;\n"
       "  sequence s;\n"
@@ -140,15 +127,11 @@ TEST(SequenceDeclarationParsing, SequenceDeclEndLabelMismatchIsError) {
       "  endsequence : wrong\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §9.3.4 owns the end-label rule for every named block, so the mismatch is
-  // reported there rather than under §16.8.
   EXPECT_TRUE(ReportedError(r.diags, "end label 'wrong' does not match 's'", 4,
                             "9.3.4"));
 }
 
 TEST(SequenceDeclarationParsing, DollarAsSequenceActualParses) {
-  // §16.8: the terminal `$` may appear as an actual argument in a sequence
-  // instance (here as the upper bound of a cycle_delay_const_range).
   auto r = Parse(
       "module m;\n"
       "  sequence delay_to(max);\n"
@@ -163,8 +146,6 @@ TEST(SequenceDeclarationParsing, DollarAsSequenceActualParses) {
 }
 
 TEST(SequenceDeclarationParsing, NamedArgumentBindingParses) {
-  // §16.8: actuals may be bound to formals by name using the
-  // `.formal_port_identifier(actual)` form.
   auto r = Parse(
       "module m;\n"
       "  sequence base(x, y);\n"
@@ -179,9 +160,6 @@ TEST(SequenceDeclarationParsing, NamedArgumentBindingParses) {
 }
 
 TEST(SequenceDeclarationParsing, TypedFormalArgumentsParse) {
-  // §16.8: a formal argument may be typed by specifying its type prior to
-  // the formal_port_identifier; the type carries through to subsequent
-  // identifiers until a new type appears.
   auto r = Parse(
       "module m;\n"
       "  sequence s(bit x, y, int z);\n"
@@ -193,7 +171,6 @@ TEST(SequenceDeclarationParsing, TypedFormalArgumentsParse) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclaredInPackageParses) {
-  // §16.8 scope list: a named sequence may be declared in a package.
   auto r = Parse(
       "package p;\n"
       "  sequence s;\n"
@@ -213,7 +190,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInPackageParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclaredInInterfaceParses) {
-  // §16.8 scope list: a named sequence may be declared in an interface.
   auto r = Parse(
       "interface ifc;\n"
       "  sequence s;\n"
@@ -233,11 +209,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInInterfaceParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceBodyLocalVariableDeclIsCaptured) {
-  // §16.8 Syntax 16-5: a sequence_declaration admits an optional run of
-  // assertion_variable_declarations between the header and the sequence_expr
-  // ({ assertion_variable_declaration } sequence_expr). The parser harvests
-  // each declared local name so later stages can bind it; observe that a
-  // body-local variable is recorded on the declaration.
   auto r = Parse(
       "module m;\n"
       "  sequence s;\n"
@@ -263,9 +234,6 @@ TEST(SequenceDeclarationParsing, SequenceBodyLocalVariableDeclIsCaptured) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclaredInProgramParses) {
-  // §16.8 scope list: a named sequence may be declared in a program. The
-  // program body reaches the sequence parser through ParseModuleItem, a
-  // distinct container from a module or package.
   auto r = Parse(
       "program p;\n"
       "  sequence s;\n"
@@ -285,8 +253,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInProgramParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclaredInCompilationUnitScopeParses) {
-  // §16.8 scope list: a named sequence may be declared in compilation-unit
-  // scope, i.e. outside any design element. It lands in the unit's cu_items.
   auto r = Parse(
       "sequence s;\n"
       "  @(posedge clk) a ##1 b;\n"
@@ -303,7 +269,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInCompilationUnitScopeParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclaredInCheckerParses) {
-  // §16.8 scope list: a named sequence may be declared in a checker.
   auto r = Parse(
       "checker chk;\n"
       "  sequence s;\n"
@@ -323,9 +288,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInCheckerParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclaredInGenerateBlockParses) {
-  // §16.8 scope list: a named sequence may be declared in a generate block.
-  // Here the sequence lives inside a generate-for block's body, a scope
-  // distinct from a bare module item.
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -353,8 +315,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclaredInGenerateBlockParses) {
 }
 
 TEST(SequenceDeclarationParsing, SequenceDeclCapturesInstanceRefs) {
-  // §16.8 cyclic-dependency check needs to know which named sequences a
-  // declaration instantiates inside its body.
   auto r = Parse(
       "module m;\n"
       "  sequence inner;\n"
@@ -379,10 +339,6 @@ TEST(SequenceDeclarationParsing, SequenceDeclCapturesInstanceRefs) {
   EXPECT_TRUE(refs_inner);
 }
 
-// §16.8 writes a sequence declaration's header as `sequence sequence_identifier
-// [ ( list_of_formals ) ] ;`, so the ';' closes the header before the body
-// begins. A header left without one is rejected at the token standing where the
-// ';' belongs, and the report names §16.8 rather than the token it wanted.
 TEST(SequenceDeclaration, MalformedSequenceHeaderNames16_8) {
   auto r = Parse(
       "module m;\n"
@@ -393,12 +349,6 @@ TEST(SequenceDeclaration, MalformedSequenceHeaderNames16_8) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 3, "16.8"));
 }
 
-// §16.8: a formal of a sequence declaration may declare a default actual
-// argument, which an instance that omits the formal takes, so the parser keeps
-// the expression beside the formal: an identifier, a literal, and a sequence
-// expression, where a formal with none, and one whose default is §16.14.7's
-// $inferred_clock, `untyped` so that the shortint before it does not carry to
-// it, which is carried by prop_formal_inferred instead, keep none.
 TEST(SequenceDeclaration, AFormalsDefaultActualIsRecorded) {
   auto r = Parse(
       "module m;\n"
@@ -424,11 +374,6 @@ TEST(SequenceDeclaration, AFormalsDefaultActualIsRecorded) {
   EXPECT_NE(item->prop_formal_defaults[4]->property_actual, nullptr);
 }
 
-// §16.8 with §9.4.2: an event formal's default may be any event expression,
-// one with an `iff` guard among them, which is recorded as the guard over the
-// edge and its signal. The scan reads past it to the formal that follows,
-// `untyped` so that the event type does not carry to it, which is harvested
-// as the port list's second formal with its own default, and raises nothing.
 TEST(SequenceDeclaration, AGuardedEventDefaultIsRecorded) {
   auto r = Parse(
       "module m;\n"
@@ -459,9 +404,6 @@ TEST(SequenceDeclaration, AGuardedEventDefaultIsRecorded) {
   EXPECT_EQ(item->prop_formal_defaults[1]->text, "a");
 }
 
-// §16.8 with §9.4.2: an event formal's default joining events with `or` is
-// recorded as the `or` of the two, the second written with no edge keyword
-// kept as its signal alone.
 TEST(SequenceDeclaration, AnOrEventDefaultIsRecorded) {
   auto r = Parse(
       "module m;\n"
@@ -486,10 +428,6 @@ TEST(SequenceDeclaration, AnOrEventDefaultIsRecorded) {
   EXPECT_EQ(either->rhs->text, "rst");
 }
 
-// §16.8 with §9.4.2: a default opening with an edge keyword can be nothing
-// but an event expression, so one stopping short of an event, an edge keyword
-// with no signal after it or an `or` with no event after it, is reported
-// where it opens, and no default is recorded for the formal.
 TEST(SequenceDeclaration, AnEventDefaultStoppingShortIsReported) {
   for (const char* dflt :
        {"posedge", "negedge", "posedge clk or", "edge clk or"}) {
@@ -515,9 +453,6 @@ TEST(SequenceDeclaration, AnEventDefaultStoppingShortIsReported) {
   }
 }
 
-// §16.8 with §16.6: a formal's type is one an assertion expression may
-// reference, which chandle is not, in a sequence's port list and, by §16.12's
-// sequence_formal_type, in a property's (#5739).
 TEST(SequenceDeclaration, AChandleFormalIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -532,11 +467,6 @@ TEST(SequenceDeclaration, AChandleFormalIsReported) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 4, "16.8"));
 }
 
-// §16.8 with Annex A.2.2.1: a formal's data type may be a type a package or a
-// parameterized class declares, written with its scope, so the identifier
-// after the type is the formal, in a sequence's port list and, by §16.12's
-// sequence_formal_type, in a property's; the formal after them carries the
-// class-scoped type (#7304).
 TEST(SequenceDeclaration, AFormalOfAScopedTypeIsNamedAfterItself) {
   auto r = Parse(
       "package pk; typedef logic [1:0] t; endpackage\n"
@@ -568,11 +498,6 @@ TEST(SequenceDeclaration, AFormalOfAScopedTypeIsNamedAfterItself) {
   }
 }
 
-// §16.8 with Annex A.2.2.1: a formal's data type may be a user-defined type
-// with packed dimensions, so the identifier after the dimension is the formal,
-// in a sequence's port list and in a property's, while a dimension after a
-// formal's own name is an unpacked dimension of that formal, which carries
-// the type before it (#7305).
 TEST(SequenceDeclaration, AFormalOfANamedTypeWithPackedDimsIsNamedAfterItself) {
   auto r = Parse(
       "module m;\n"
@@ -599,8 +524,6 @@ TEST(SequenceDeclaration, AFormalOfANamedTypeWithPackedDimsIsNamedAfterItself) {
   }
 }
 
-// §16.8: a port list the source ends inside, within a formal's packed
-// dimension, is rejected where the ';' closing the header belongs.
 TEST(SequenceDeclaration, APortListEndingInsideAFormalsTypeIsReported) {
   auto r = Parse(
       "module m;\n"

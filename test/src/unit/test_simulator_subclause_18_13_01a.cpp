@@ -10,21 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §18.13.1: every $urandom claim below is a runtime rule realized by the
-// simulator's PRNG evaluation (EvalPrngCall / SimContext::Urandom32 /
-// SeedUrandom). Each test builds the call from real source in one of the
-// syntactic positions the LRM example uses -- a bit-select target, a
-// concatenation element, a masked operand, a seeded/plain call -- and drives it
-// through parse -> elaborate -> lower -> run, observing the committed variable
-// value rather than a hand-built call node.
-
-// The function returns a fresh 32-bit random number, and that number is
-// unsigned. A single 32-bit draw assigned to a 64-bit target must ZERO-extend
-// (upper 32 bits stay 0); a signed result would sign-extend and set them once
-// any draw has its top bit set. Accumulating the OR of 64 deterministic draws
-// (default seed 0 => a fixed sequence) makes at least one top-bit-set draw a
-// certainty, so upper == 0 pins down both the 32-bit width and the unsigned
-// result through the assignment's own extension path.
 TEST(SysTask, UrandomIs32BitUnsignedResult) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -47,15 +32,10 @@ TEST(SysTask, UrandomIs32BitUnsignedResult) {
   auto* acc = f.ctx.FindVariable("acc");
   ASSERT_NE(acc, nullptr);
   uint64_t v = acc->value.ToUint64();
-  // Unsigned + 32-bit: nothing bled above bit 31 across every draw.
   EXPECT_EQ(v >> 32, 0u);
-  // The draws actually populated the low 32 bits (not a stuck-at-zero source).
   EXPECT_NE(v & 0xFFFFFFFFu, 0u);
 }
 
-// One seed always yields one sequence of random numbers. Re-seeding with the
-// same value restarts the identical sequence, so two seeded draws with the same
-// seed match.
 TEST(SysTask, UrandomSameSeedReplaysSequence) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,7 +59,6 @@ TEST(SysTask, UrandomSameSeedReplaysSequence) {
   EXPECT_EQ(a->value.ToUint64(), b->value.ToUint64());
 }
 
-// The seed selects the sequence: two distinct seeds diverge.
 TEST(SysTask, UrandomDistinctSeedsDiverge) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -103,8 +82,6 @@ TEST(SysTask, UrandomDistinctSeedsDiverge) {
   EXPECT_NE(p->value.ToUint64(), q->value.ToUint64());
 }
 
-// A fresh 32-bit random number on every call: the generator advances per call,
-// so a seeded draw followed by an unseeded draw yields two different numbers.
 TEST(SysTask, UrandomAdvancesEachCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -128,9 +105,6 @@ TEST(SysTask, UrandomAdvancesEachCall) {
   EXPECT_NE(x->value.ToUint64(), y->value.ToUint64());
 }
 
-// The RNG is deterministic, running through one random sequence on every
-// execution of the program. Two independent runs of the same source, each from
-// a fresh unseeded context, draw the identical first value.
 TEST(SysTask, UrandomDeterministicAcrossRuns) {
   const char* src =
       "module t;\n"
@@ -157,10 +131,6 @@ TEST(SysTask, UrandomDeterministicAcrossRuns) {
   EXPECT_EQ(x1->value.ToUint64(), x2->value.ToUint64());
 }
 
-// Any integral expression may serve as the seed. The sequence is keyed by the
-// seed VALUE, not the syntactic form: a literal, a localparam constant, a
-// runtime variable, and a constant expression that all evaluate to 7 produce
-// the same first draw.
 TEST(SysTask, UrandomSeedFormsWithEqualValueMatch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -198,10 +168,6 @@ TEST(SysTask, UrandomSeedFormsWithEqualValueMatch) {
   EXPECT_EQ(d->value.ToUint64(), va);
 }
 
-// Any integral expression may serve as the seed. A module parameter is a
-// distinct constant path from a localparam or a bare literal, yet it keys the
-// sequence by its value: seeding with a parameter that defaults to 100 replays
-// the same first draw as seeding with the literal 100.
 TEST(SysTask, UrandomParameterSeedMatchesLiteral) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -225,9 +191,6 @@ TEST(SysTask, UrandomParameterSeedMatchesLiteral) {
   EXPECT_EQ(p->value.ToUint64(), l->value.ToUint64());
 }
 
-// The seed argument has type int (32 bits): a wider integral seed expression is
-// reduced to its low 32 bits, so a 64-bit seed whose low word is 7 keys the
-// same sequence as the literal 7.
 TEST(SysTask, UrandomWideSeedReducesToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -251,10 +214,6 @@ TEST(SysTask, UrandomWideSeedReducesToInt) {
   EXPECT_EQ(narrow->value.ToUint64(), wide->value.ToUint64());
 }
 
-// LRM example form: a bit-select target -- addr[32:1] = $urandom(254). The
-// seeded 32-bit draw lands only in the selected low 32 bits of a bit [64:1]
-// vector; the untouched upper half stays 0, and the whole result is
-// deterministic across runs because the draw is seeded.
 TEST(SysTask, UrandomIntoBitSelectTarget) {
   const char* src =
       "module t;\n"
@@ -266,13 +225,9 @@ TEST(SysTask, UrandomIntoBitSelectTarget) {
       "endmodule\n";
 
   uint64_t v = RunTwiceForSameValue(src, "addr");
-  // Only the low 32 bits were written; the upper half is untouched zero.
   EXPECT_EQ(v >> 32, 0u);
 }
 
-// LRM example form: a concatenation of two draws -- addr = {$urandom,
-// $urandom} -- builds a 64-bit value from two independent 32-bit draws. The
-// result is deterministic across runs (unseeded default sequence).
 TEST(SysTask, UrandomConcatenationBuildsWideValue) {
   const char* src =
       "module t;\n"
@@ -281,14 +236,10 @@ TEST(SysTask, UrandomConcatenationBuildsWideValue) {
       "endmodule\n";
 
   uint64_t v = RunTwiceForSameValue(src, "addr");
-  // Both 32-bit halves were populated by the two draws.
   EXPECT_NE(v >> 32, 0u);
   EXPECT_NE(v & 0xFFFFFFFFu, 0u);
 }
 
-// LRM example form: masking a draw to a narrow field -- number = $urandom & 15
-// -- yields a value confined to 4 bits. Declared as bit [3:0], the committed
-// result never exceeds 15, and the seeded draw replays across runs.
 TEST(SysTask, UrandomMaskedToFourBits) {
   const char* src =
       "module t;\n"

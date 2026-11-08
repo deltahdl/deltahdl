@@ -25,9 +25,6 @@ TEST(DefparamSimulation, OverriddenParameterVisibleAtRuntime) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // observed is declared in child, instantiated as u, so its runtime storage is
-  // u.observed; query the hierarchical name (the scheduler leaves no current
-  // process installed once it goes idle, so a bare name resolves in top scope).
   auto* var = f.ctx.FindVariable("u.observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 42u);
@@ -50,21 +47,11 @@ TEST(DefparamSimulation, LastDefparamVisibleAtRuntime) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // observed lives in child instance u; query u.observed (no current process is
-  // installed once the scheduler is idle, so a bare name resolves in top
-  // scope).
   auto* var = f.ctx.FindVariable("u.observed");
   ASSERT_NE(var, nullptr);
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// A defparam over a string parameter declared as a module item, which is the
-// one shape where Elaborator::ElaborateParamDecl has already recorded the
-// declaration's own characters in RtlirParamDecl::resolved_string by the time
-// the defparam replaces resolved_value. Lowerer::LowerParams reads
-// resolved_string for a string parameter, so a lowering that read it here
-// would run the design with "abc" -- the value the defparam overrode -- and
-// report nothing.
 TEST(DefparamSimulation, OverriddenStringParameterVisibleAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,10 +72,6 @@ TEST(DefparamSimulation, OverriddenStringParameterVisibleAtRuntime) {
   EXPECT_EQ(Logic4VecToString(var->value), "xyz");
 }
 
-// Ten characters is past what EvalDefparamOverride's int64_t can carry, so this
-// case separates the recording of the override's own characters from the §11.10
-// packed fold beside it. The three-character case above passes on the packed
-// value alone and says nothing about a longer one.
 TEST(DefparamSimulation, OverriddenStringParameterLongerThanEightCharacters) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,11 +92,6 @@ TEST(DefparamSimulation, OverriddenStringParameterLongerThanEightCharacters) {
   EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
 }
 
-// §23.10.1: a defparam's right-hand side is a constant expression, and §11.2.1
-// makes a parameter one. The name is written in the module holding the defparam
-// statement, so that module's parameters are what supplies the characters.
-// Before this the fold failed, ReplaceStringParamValue cleared is_string_value,
-// and the lowering fell back to the packed number.
 TEST(DefparamSimulation, ADefparamNamingAnotherParameterKeepsEveryCharacter) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -135,11 +113,6 @@ TEST(DefparamSimulation, ADefparamNamingAnotherParameterKeepsEveryCharacter) {
   EXPECT_EQ(Logic4VecToString(var->value), "John Smith");
 }
 
-// §23.10 (printed page 764), the clause's own example: the defparam of f1.A
-// with 3.1415 converts the floating-point 3.1415 to the fixed-point 3, and the
-// defparam of f1.B with 3.1415 replaces B's 3'h2 with the floating-point
-// 3.1415. Folded as an integer, each right-hand side was reported as not
-// constant and both read 0.0.
 TEST(DefparamSimulation, RealRightHandSideTakesTheParametersTypeOrItsOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m1;\n"
@@ -161,10 +134,6 @@ TEST(DefparamSimulation, RealRightHandSideTakesTheParametersTypeOrItsOwn) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1 with §23.6: a defparam may select one instance of an array of
-// instances, u[1] or w[0], and changes the parameter in that instance alone.
-// The elements shared one elaborated module, so the step was never matched (a
-// "target not found" warning), and matched it would have changed u[0] too.
 TEST(DefparamSimulation, AnInstanceSelectReachesThatElementAlone) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -187,11 +156,6 @@ TEST(DefparamSimulation, AnInstanceSelectReachesThatElementAlone) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.10.1 with §23.10.2: a parameter a named block declares is redefined by a
-// defparam naming it through the block, u.blk.Q, in that instance alone: u
-// reads 6 and v keeps its declared 3. The path reached no parameter, the
-// block's being a statement of the body rather than one of the module's, and
-// was reported as finding no target.
 TEST(DefparamSimulation, ANamedBlocksParameterTakesTheDefparamInItsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -211,10 +175,6 @@ TEST(DefparamSimulation, ANamedBlocksParameterTakesTheDefparamInItsInstance) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.10.2 lets a defparam redefine a parameter declared in a task or a
-// function as well as in a named block, and a named block nested in another
-// is reached through both, from the instance or from the top (§23.8):
-// u.t.blk.Q, u.f.fb.R and top.u.a.b.S each take their defparam's value.
 TEST(DefparamSimulation, SubroutineAndNestedBlockParametersTakeDefparams) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -253,10 +213,6 @@ TEST(DefparamSimulation, SubroutineAndNestedBlockParametersTakeDefparams) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.10.1: the value a block parameter's defparam gives is folded where the
-// statement stands, so `W + 1` reads top's W; a parameter a task declares
-// directly takes one through the task, u.t.R; and of two defparams naming the
-// same parameter the later is the one kept.
 TEST(DefparamSimulation, BlockParameterDefparamsFoldReplaceAndReachTasks) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -282,11 +238,6 @@ TEST(DefparamSimulation, BlockParameterDefparamsFoldReplaceAndReachTasks) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1 with §27.4: the element u[1] a defparam changes is given a module
-// of its own with the generate constructs still to be elaborated in it, so
-// its loop generates two blocks while u[0]'s generates one, and the array of
-// leaf instances the element holds is copied once, its elements sharing the
-// copy as they shared the original.
 TEST(DefparamSimulation, AnElementsGenerateLoopFollowsItsOwnDefparam) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf;\n"
@@ -310,10 +261,6 @@ TEST(DefparamSimulation, AnElementsGenerateLoopFollowsItsOwnDefparam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1 with §23.10.2: a real or a string parameter a named block
-// declares takes the value its defparam writes, and a fork named inside the
-// block is a further step of the path, u.blk.fk.F; the block's variable, its
-// other parameter and a labelled assignment are passed over.
 TEST(DefparamSimulation, RealStringAndForkBlockParametersTakeDefparams) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -341,9 +288,6 @@ TEST(DefparamSimulation, RealStringAndForkBlockParametersTakeDefparams) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.10.1 with §27.4: two generate blocks each holding an instance named u
-// are told apart by the block a defparam names, g2.u.P, so g1.u keeps its
-// declared value.
 TEST(DefparamSimulation, ADefparamPicksTheGenerateBlockItNames) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -364,9 +308,6 @@ TEST(DefparamSimulation, ADefparamPicksTheGenerateBlockItNames) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1 with §27.4: where the design's only defparam stands in a generate
-// block of the module an array's elements share, each element given a module
-// of its own keeps that defparam, so both elements' leaves read 4.
 TEST(DefparamSimulation, AnIsolatedElementKeepsItsGenerateBlocksDefparam) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf;\n"
@@ -388,11 +329,6 @@ TEST(DefparamSimulation, AnIsolatedElementKeepsItsGenerateBlocksDefparam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1: a defparam gives the parameter its value for the whole instance,
-// so a declaration the parameter sizes is as wide as the new value makes it:
-// all-ones in the variable data is fff, read inside the instance and through a
-// hierarchical name, and the net w is 12 bits as well. The parameter took the
-// value, but both declarations kept the width the default gave them, ff and 8.
 TEST(DefparamSimulation, ADefparamResizesADeclarationItsParameterSizes) {
   SimFixture f;
   EXPECT_EQ(
@@ -413,8 +349,6 @@ TEST(DefparamSimulation, ADefparamResizesADeclarationItsParameterSizes) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same holds for an interface instance, whose declarations a defparam
-// sizes as a module's.
 TEST(DefparamSimulation, ADefparamResizesAnInterfacesDeclaration) {
   SimFixture f;
   EXPECT_EQ(
@@ -432,10 +366,6 @@ TEST(DefparamSimulation, ADefparamResizesAnInterfacesDeclaration) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1 with §27.4: a declaration a loop generate block makes from the
-// parameter and the block's own index is resized from both, 5 and 10 for W of
-// 5, while a net the defparam'd parameter does not size, and one a conditional
-// block declares, read the widths they have: 1 and 5.
 TEST(DefparamSimulation, ADefparamResizesGenerateBlockDeclarations) {
   SimFixture f;
   EXPECT_EQ(
@@ -460,11 +390,6 @@ TEST(DefparamSimulation, ADefparamResizesGenerateBlockDeclarations) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.1 with §7.4.2: an unpacked dimension the parameter sizes takes its
-// size from the value the defparam gives: x[N] holds four elements, x[3] among
-// them, y[N:1] runs from 4 down to 1, and z[2][N] is four wide in its second
-// dimension. Each kept the size the default of 2 gave it: 2, 2 and 2, x[3]
-// reading no element, and y running from 2.
 TEST(DefparamSimulation, ADefparamResizesAnUnpackedDimension) {
   SimFixture f;
   EXPECT_EQ(RunCapture(

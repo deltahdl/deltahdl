@@ -1,9 +1,3 @@
-// The modport declarations of IEEE 1800-2023 §25.5, read inside an interface
-// body: the modport's ports with their directions, and the import and export
-// of tasks and functions through it. Moved here from parser_class.cpp, which
-// the A.1.9 reports on a class item's qualifiers took past the limit
-// assert-no-oversized-source-files enforces.
-
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -18,14 +12,6 @@
 
 namespace delta {
 
-// A.2.7 writes task_prototype and function_prototype with
-// `[ dynamic_override_specifiers ]` after the keyword, so a modport_tf_port's
-// method_prototype may carry one, and the specifiers are read so that the
-// name that follows them is found; A.10's footnote 25 admits the
-// dynamic_override_specifiers on a method declaration only within the scope
-// of a class that is not an interface class, and a modport is no class, so one
-// read here is reported at the prototype. The parser reported the prototype
-// as a missing identifier at the ':'.
 void Parser::ParseModportPrototypeSpecifiers(ModuleItem* item) {
   ParseDynamicOverrideSpecifiers(item);
   ReportMisplacedOverrideSpecifiers(*item, diag_);
@@ -52,8 +38,6 @@ ModportPort Parser::ParseModportTfPort(bool is_import) {
     Consume();
     ParseModportPrototypeSpecifiers(item);
     item->data_type = ParseFunctionReturnType();
-    // A.2.9's method_prototype is A.2.6's function_prototype, whose
-    // data_type_or_void takes no implicit result type.
     if (IsImplicitResultType(item->data_type)) {
       diag_.Error(item->loc,
                   "a modport's function prototype writes its result type out, "
@@ -100,17 +84,6 @@ static Direction TokenToDirection(TokenKind tk) {
   }
 }
 
-// One entry of A.2.9's modport_item, either a modport_ports_declaration
-// opening with its port_direction, import_export or `clocking`, or a port
-// continuing the declaration before it. An entry that opens with none of the
-// three where no declaration is open to continue -- the first entry of the
-// item, or the one after a modport_clocking_declaration, which is `clocking
-// clocking_identifier` and continues with nothing -- is reported under A.2.9
-// and read as a simple port of no direction, so that the item's list is read
-// to its ')'. Attribute instances open a modport_ports_declaration, and
-// neither a modport_simple_port nor a modport_tf_port takes any, so those
-// written before a port continuing the open declaration are reported under
-// A.2.9 where they stand, and the port is read as the declaration's next.
 void Parser::ParseModportPortEntry(ModportDecl* mp, ModportScan& scan) {
   using Opened = ModportScan::Opened;
   const SourceLoc kAttrLoc = CurrentLoc();
@@ -166,9 +139,6 @@ void Parser::ParseModportItem(ModportDecl* mp) {
     ParseModportPortEntry(mp, scan);
     if (!Check(TokenKind::kRParen))
       Expect(TokenKind::kComma, Subclause("25.5"));
-    // Missing ')': a token that is neither a port nor a comma (e.g. the
-    // terminating ';') leaves the cursor unmoved. Stop so the caller's
-    // Expect(kRParen) reports the error instead of spinning.
     if (lexer_.SavePos().pos == before) break;
   }
 }
@@ -181,9 +151,6 @@ void Parser::ParseModportDecl(std::vector<ModportDecl*>& out) {
     mp->name = Expect(TokenKind::kIdentifier, Subclause("25.5")).text;
     Expect(TokenKind::kLParen, Subclause("25.5"));
     ParseModportItem(mp);
-    // A.2.9's modport_item is `modport_identifier ( modport_ports_declaration
-    // { , modport_ports_declaration } )`: one declaration at least, and an
-    // item written with none is reported where its first was due.
     if (mp->ports.empty()) {
       diag_.Error(CurrentLoc(),
                   "a modport item has at least one modport_ports_declaration",

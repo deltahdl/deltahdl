@@ -19,22 +19,6 @@
 
 using namespace delta;
 
-// The SystemVerilog side of a specify-block test, built from real source
-// rather than hand-assembled. A module is parsed, elaborated, lowered and run,
-// and the specify items it declared are registered onto a SpecifyManager
-// through the production builders -- which is what makes the manager's
-// contents a consequence of the syntax the subclause is about.
-//
-// The specify runtime is not wired into RTLIR, so registration is a step of
-// its own. It is one call per specify item kind, because what an item means
-// differs by subclause: a test registers the kinds the rule it covers is
-// about and leaves the manager empty of everything else.
-
-// Parses, elaborates, lowers and runs `src`, returning the compilation unit so
-// a caller can walk the declarations it holds. Returns nullptr when the source
-// declares no module, or when elaboration fails or reports a diagnostic. The
-// fixture is caller-owned, so the arena holding the declarations outlives the
-// call and the context keeps whatever the run left in it.
 inline CompilationUnit* RunModuleSource(const std::string& src, SimFixture& f) {
   auto fid = f.mgr.AddFile("<test>", src);
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
@@ -48,8 +32,6 @@ inline CompilationUnit* RunModuleSource(const std::string& src, SimFixture& f) {
   return cu;
 }
 
-// The same for a module whose whole content is one specify block, which is
-// what a test about a specify item alone needs.
 inline CompilationUnit* RunSpecifyBlockSource(const std::string& specify_body,
                                               SimFixture& f) {
   return RunModuleSource(
@@ -57,8 +39,6 @@ inline CompilationUnit* RunSpecifyBlockSource(const std::string& specify_body,
       f);
 }
 
-// The pulsestyle_onevent and pulsestyle_ondetect declarations of Syntax 30-8,
-// each selecting the style for every path output it names.
 inline void RegisterPulseStyles(const ModuleDecl& mod, SpecifyManager& mgr) {
   for (auto* item : mod.items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -74,8 +54,6 @@ inline void RegisterPulseStyles(const ModuleDecl& mod, SpecifyManager& mgr) {
   }
 }
 
-// The showcancelled and noshowcancelled declarations of Syntax 30-9, each
-// selecting the mode for every path output it names.
 inline void RegisterShowCancelled(const ModuleDecl& mod, SpecifyManager& mgr) {
   for (auto* item : mod.items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -92,11 +70,6 @@ inline void RegisterShowCancelled(const ModuleDecl& mod, SpecifyManager& mgr) {
   }
 }
 
-// The PATHPULSE$ specparams of §30.7.1, collected across the module and then
-// resolved onto the manager in one call. Resolving is what applies them, and
-// it happens after the whole set is known because a more specific PATHPULSE$
-// overrides a less specific one, so a caller registers the path delays these
-// limit before calling this.
 inline void RegisterPathPulseSpecparams(const ModuleDecl& mod, SimFixture& f,
                                         SpecifyManager& mgr) {
   std::vector<PulseControlSpecparam> specs;
@@ -120,8 +93,6 @@ inline void RegisterPathPulseSpecparams(const ModuleDecl& mod, SimFixture& f,
   mgr.ResolvePulseControlSpecparams(specs);
 }
 
-// The timing check declarations of §31.2, registered through the builder that
-// applies the invocation options in force.
 inline void RegisterTimingChecks(const ModuleDecl& mod, SimFixture& f,
                                  SpecifyManager& mgr) {
   for (auto* item : mod.items) {
@@ -133,9 +104,6 @@ inline void RegisterTimingChecks(const ModuleDecl& mod, SimFixture& f,
   }
 }
 
-// The first module path declaration `mod` holds, or nullptr when it declares
-// none. A test whose subject is one path's delay names it this way rather
-// than walking the module itself.
 inline const SpecifyPathDecl* FirstPathDeclIn(const ModuleDecl& mod) {
   for (auto* item : mod.items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -146,11 +114,6 @@ inline const SpecifyPathDecl* FirstPathDeclIn(const ModuleDecl& mod) {
   return nullptr;
 }
 
-// The module path assignments of §30.4, each built into a PathDelay by the
-// production builder. `default_pulse_limits` starts the path's pulse limits
-// out equal to its delay, which is the §30.7 default and the prebackannotation
-// state a PATHPULSE$ specparam or an SDF pulse limit replaces; a test whose
-// subject is the delay alone leaves it off.
 inline void RegisterPathDelays(const ModuleDecl& mod, SimFixture& f,
                                SpecifyManager& mgr,
                                bool default_pulse_limits = false) {
@@ -165,9 +128,6 @@ inline void RegisterPathDelays(const ModuleDecl& mod, SimFixture& f,
   }
 }
 
-// The §6.20.5 specparam declarations that carry an ordinary named value, which
-// is every specparam but PATHPULSE$ -- that one names a pulse limit rather
-// than a timing value, and RegisterPathPulseSpecparams carries it.
 inline void RegisterSpecparamValues(const ModuleDecl& mod, SimFixture& f,
                                     SpecifyManager& mgr) {
   for (auto* item : mod.items) {
@@ -185,9 +145,6 @@ inline void RegisterSpecparamValues(const ModuleDecl& mod, SimFixture& f,
   }
 }
 
-// The gate instantiations that drive a module output, which is where a
-// primitive's own delay lives -- an SDF construct may annotate one, so a test
-// about that needs the drivers the gates produce.
 inline void RegisterPrimitiveDrivers(const ModuleDecl& mod, SimFixture& f,
                                      SpecifyManager& mgr) {
   for (auto* item : mod.items) {

@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A disable fork standing after a statement the synthesizer does lower is
-// still reported, and at its own line rather than at the block's.
 TEST(DisableForkSynthesis, RejectDisableForkInAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -29,8 +27,6 @@ TEST(DisableForkSynthesis, RejectDisableForkInAlwaysComb) {
                             "9.6.3"));
 }
 
-// The report stands wherever the disable fork stands, so a sequential
-// procedure gets it as a combinational one does.
 TEST(DisableForkSynthesis, RejectDisableForkInAlwaysFF) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -50,9 +46,6 @@ TEST(DisableForkSynthesis, RejectDisableForkInAlwaysFF) {
                             "9.6.3"));
 }
 
-// §9.6.3: a disable fork statement terminates every descendant subprocess of
-// the calling process, which is a different construct from the disable
-// statement of §9.6.2. The report names it and stands at the `disable`.
 TEST(DisableForkSynthesis, DisableForkIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

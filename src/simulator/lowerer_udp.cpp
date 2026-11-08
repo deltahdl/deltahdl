@@ -1,20 +1,3 @@
-// §29.8: lowering a user-defined primitive instance into the process that
-// drives its output terminal.
-//
-// A module instantiates a UDP just as it instantiates a gate (see §28.3), and a
-// gate reaches the simulator as a driver on the net its
-// output terminal names, so a primitive does too. What it drives is what the
-// state table §29.3.4 defines says, and UdpEvalState in
-// src/simulator/udp_eval.h is what answers that table. This file is the join
-// between the two: it reads the instance's input terminals into the positional
-// vector that evaluator takes, applies the delay2 §29.8 admits, and commits the
-// result to the output terminal with the drive strengths the instance carries.
-//
-// The process is created here and started by ScheduleProcess, which
-// src/simulator/lowerer.h declares and src/simulator/lowerer.cpp defines. That
-// is how §10.3's continuous assignments are started too, which is what §29.8's
-// likening of a UDP instance to a gate instance comes to at run time.
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -45,11 +28,6 @@
 
 namespace delta {
 
-// The strength one half of a drive_strength names, from the code the parser
-// records on the instance. §28.11 gives the four driving strengths supply,
-// strong, pull and weak, and a drive_strength may also name highz; code 4 is
-// strong and so is code 0, which is what the parser leaves where the source
-// wrote no drive_strength at all.
 static Strength UdpDriveStrength(uint8_t code) {
   switch (code) {
     case 1:
@@ -65,13 +43,6 @@ static Strength UdpDriveStrength(uint8_t code) {
   }
 }
 
-// The one bit a primitive drives, in the 4-state encoding a net holds:
-// (aval, bval) is (0,0) for 0, (1,0) for 1, (1,1) for x and (0,1) for z.
-// UdpEvalState answers '0', '1' or 'x' and never 'z', because §29.3.4 leaves
-// the z state out of UDPs altogether and
-// §29.3.5 treats a z passed to an input terminal the same as an x. So z reaches
-// the net only through a highz drive strength, which §28.11 makes a driver that
-// is off for the value it names.
 static Logic4Vec UdpDrivenBit(char out, DriverStrength ds, Arena& arena) {
   bool off = (out == '0' && ds.s0 == Strength::kHighz) ||
              (out == '1' && ds.s1 == Strength::kHighz);
@@ -85,28 +56,11 @@ static Logic4Vec UdpDrivenBit(char out, DriverStrength ds, Arena& arena) {
   return MakeAllX(arena, 1);
 }
 
-// The value one input terminal contributes to the state table, as the character
-// UdpEvalState matches a row against. §29.3.1 requires every UDP port to be a
-// scalar and forbids vector ports, so a terminal is one bit:
-// the expression is evaluated in a one-bit context and its least significant
-// bit is what the table sees. Logic4Vec::ToString spells a vector most
-// significant bit first, so that bit is the last character of the spelling.
 static char UdpInputChar(const Expr* terminal, SimContext& ctx, Arena& arena) {
   std::string bits = EvalExpr(terminal, ctx, arena, 1).ToString();
   return bits.empty() ? 'x' : bits.back();
 }
 
-// The value a sequential primitive's output holds when simulation begins, as
-// the character UdpEvalState seeds its state with. A.5.2 writes the header's
-// initial value as `output reg port_identifier = constant_expression`, and the
-// parser keeps that expression on UdpDecl::initial_expr because `~1'b0` is not
-// a bit it can read off the spelling; it is evaluated here, in the one-bit
-// context the reg gives it, the same way an input terminal is. §29.3.4 leaves
-// the z state out of what a UDP considers, so a z the expression evaluates to
-// seeds x, as §29.3.5 gives a z input. Where the
-// header wrote no expression the bit is the one the parser read, off a literal
-// or off §29.3.3's initial statement, whose right-hand side A.5.3 closes over
-// literals.
 static char UdpInitialOutput(const UdpDecl& decl, SimContext& ctx,
                              Arena& arena) {
   if (decl.initial_expr == nullptr) return decl.initial_value;
@@ -114,14 +68,6 @@ static char UdpInitialOutput(const UdpDecl& decl, SimContext& ctx,
   return bit == 'z' ? 'x' : bit;
 }
 
-// The input terminals of one instance, in the order the state table indexes
-// them. §29.3.4 orders the input fields of each state table row as the UDP
-// definition header's port list orders the ports, and §29.8 connects the
-// terminals in the order the UDP definition gives, so position i of this vector
-// is position i of every row. §29.3.5 (printed page 863): a z reaching a UDP
-// input is handled exactly as an x, so a z is read as the x it is taken for,
-// and an input moving between the two makes no transition: an undriven net left
-// at z from the start leaves a sequential primitive's initial state standing.
 static std::vector<char> ReadUdpInputs(const RtlirUdpInst& inst,
                                        SimContext& ctx, Arena& arena) {
   std::vector<char> inputs;
@@ -133,18 +79,6 @@ static std::vector<char> ReadUdpInputs(const RtlirUdpInst& inst,
   return inputs;
 }
 
-// The driver a primitive instance holds on the net its output terminal names.
-// §29.8 instantiates a UDP just as a gate is, so the instance is
-// one driver of that net and §28.11's resolution decides what the net settles
-// at. The slot is appended by the first commit and overwritten by every later
-// one, which is what `first` distinguishes; `strength` is the instance's
-// drive_strength, which is fixed for the run.
-//
-// §28.3.6 lets a terminal be a bit-select, so a select of a net is a driver of
-// that net at the one bit `bit` counts from its least significant end, and
-// `partial` says so. §29.8 gives the instance a gate's delays, so the driver
-// also holds the value last committed, the change still pending, and a count
-// that tells a pending change from one a later evaluation superseded.
 struct UdpOutputDriver {
   Net* net = nullptr;
   DriverStrength strength;
@@ -155,11 +89,7 @@ struct UdpOutputDriver {
   char committed = 0;
   char pending = 0;
   uint64_t generation = 0;
-  // The instance's evaluator, kept beside the driver rather than in the
-  // process's frame so that a VPI put (§38.34) can set its state.
   UdpEvalState* state = nullptr;
-  // The prefix of the instance the primitive is instantiated in, which a
-  // vpi_put_delays (§38.32) files new delays for its output below.
   std::string inst_prefix;
 };
 
@@ -174,10 +104,6 @@ static UdpOutputDriver MakeUdpOutputDriver(const RtlirUdpInst& inst,
   return drv;
 }
 
-// A bit-select of a net, which every element of an instance array drives
-// (§28.3.6), is a driver of that net at the selected bit. Its index may read a
-// generate block's genvar (§27.4), so the bit is found by the instance's own
-// process, which has the block's values installed.
 static void FindUdpSelectOutput(const Expr* output, UdpOutputDriver* drv,
                                 SimContext& ctx) {
   if (output->kind != ExprKind::kSelect) return;
@@ -195,18 +121,11 @@ static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
   drv->committed = out;
   Logic4Vec val = UdpDrivenBit(out, drv->strength, arena);
   if (drv->partial) {
-    // The selected bit, and high impedance on every other bit of the net,
-    // which drives nothing there.
     Logic4Vec whole = MakeAllHighZ(arena, drv->net->resolved->value.width);
     DepositBitField(whole, drv->bit, val, 1);
     val = whole;
   }
   if (drv->net == nullptr) {
-    // A terminal that is not a whole net -- a select, which §29.8 admits by
-    // connecting UDP terminals under the gate rules of §28.3.6 -- has no driver
-    // slot of its own, so it is written through the
-    // procedural lvalue writer, which decomposes the lvalue and notifies each
-    // affected variable's watchers (§11.4.1).
     PerformBlockingAssign(terminal, val, ctx, arena);
     return;
   }
@@ -219,15 +138,9 @@ static void CommitUdpOutput(const Expr* terminal, UdpOutputDriver* drv,
     drv->net->drivers[drv->idx] = val;
     drv->net->driver_strengths[drv->idx] = drv->strength;
   }
-  // §28.16.2.1: the scheduler is passed so Resolve can arm a trireg's charge
-  // decay process where this update leaves the net with only high-impedance
-  // drivers.
   drv->net->Resolve(arena, &ctx.GetScheduler());
 }
 
-// §37.35 detail 2 with §38.34: a value put to a sequential primitive through
-// VPI is its state, which §29.5 makes its output, from now: the output
-// terminal takes it with no delay, overtaking a change still pending.
 static void PutUdpState(const Expr* terminal, UdpOutputDriver* drv, char bit,
                         SimContext& ctx, Arena& arena) {
   drv->state->SetOutput(bit);
@@ -236,9 +149,6 @@ static void PutUdpState(const Expr* terminal, UdpOutputDriver* drv, char bit,
   CommitUdpOutput(terminal, drv, bit, ctx, arena);
 }
 
-// §38.32: the rise and fall delays a vpi_put_delays gave the instance `inst`,
-// driving through `drv`, filed with the driver of its output terminal, which
-// replace its own; null where none was put.
 static const PrimitiveDriver* PutUdpDelays(const RtlirUdpInst& inst,
                                            const UdpOutputDriver& drv,
                                            SimContext& ctx) {
@@ -251,13 +161,6 @@ static const PrimitiveDriver* PutUdpDelays(const RtlirUdpInst& inst,
   return specify->FindAnnotatedPrimitiveDriver(drv.inst_prefix, output->text);
 }
 
-// How long a transition to `out` waits before it reaches the output terminal.
-// §29.8 admits a delay2 on a primitive instance and allows no more than two
-// delays, a UDP having no z to turn off to, so this is the one-bit
-// case of Table 28-9 in §28.16 with the third, turn-off delay of that table
-// absent: a transition to 1 waits the rise delay, one to 0 the fall delay, and
-// one to x the lesser of the two. Where the source wrote a single delay, §28.16
-// applies that one value to every propagation delay of the gate or net.
 static uint64_t SelectUdpDelay(const RtlirUdpInst& inst,
                                const UdpOutputDriver& drv, char out,
                                SimContext& ctx, Arena& arena) {
@@ -277,22 +180,6 @@ static uint64_t SelectUdpDelay(const RtlirUdpInst& inst,
   return std::min(rise, fall);
 }
 
-// Puts `out` on the output terminal, after the delay §28.16 selects for it.
-//
-// A delay is served by a scheduled update event rather than by suspending the
-// process, so that the process stays on its watch of the input terminals for
-// the whole of the delay. §29.6 triggers a change of the output on a transition
-// of an input, and a primitive whose delay is longer than the interval between
-// two such transitions has to see both; a process parked on the delay would see
-// only the first, because the watch is re-armed after the delay elapses and a
-// transition in between reaches nothing.
-//
-// §29.8 gives the instance a gate's delays, so a change computed later
-// supersedes one still pending, as §10.3.3 has a delayed assignment's do: an
-// evaluation giving the value already on its way leaves it there, one giving
-// another replaces it, and one giving back the value standing leaves none.
-// Scheduled and never withdrawn, an earlier change could land after a later
-// one when the two waited different delays.
 static void DriveUdpOutput(const RtlirUdpInst& inst, UdpOutputDriver* drv,
                            char out, SimContext& ctx, Arena& arena) {
   if (drv->pending == out) return;
@@ -308,27 +195,17 @@ static void DriveUdpOutput(const RtlirUdpInst& inst, UdpOutputDriver* drv,
   uint64_t gen = drv->generation;
   const Expr* terminal = inst.output;
   auto* event = ctx.GetScheduler().GetEventPool().Acquire();
-  // §4.4: putting a new value on a net is an update event.
   event->kind = EventKind::kUpdate;
   event->callback = [terminal, drv, out, gen, &ctx, &arena]() {
     if (drv->generation != gen) return;
     drv->pending = 0;
     CommitUdpOutput(terminal, drv, out, ctx, arena);
   };
-  // §24.3.1: an instance written in a program drives in the Reactive region,
-  // which is the region the process this runs in was given.
   Region region = ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
   ctx.GetScheduler().ScheduleEvent(ctx.CurrentTime() + SimTime{ticks}, region,
                                    event);
 }
 
-// Runs the state table once for every input terminal that moved since the
-// previous snapshot, and answers the output the last of those runs left. §29.6
-// lets a table entry give a transition for one input at most, so a row is
-// matched against one transition: two terminals moving between one evaluation
-// and the next are two runs of the table rather than one, taken in terminal
-// order. Where no terminal moved there is no transition to trigger a change of
-// the output (§29.6), so the output stands.
 static char EvaluateSequentialUdp(UdpEvalState& state,
                                   const std::vector<char>& prev,
                                   const std::vector<char>& now) {
@@ -342,14 +219,6 @@ static char EvaluateSequentialUdp(UdpEvalState& state,
   return state.GetOutput();
 }
 
-// The output the primitive shows for the values now on its input terminals.
-//
-// A sequential primitive is matched against the transitions that brought its
-// terminals here, because §29.6 has particular input transitions trigger the
-// output's changes, which turns its state table into a transition table, and
-// because §29.5 has the current state field hold the internal state the
-// previous run left. A combinational primitive has
-// no current state field, so §29.4's form matches the input levels alone.
 static char UdpPassOutput(UdpEvalState& state, bool is_sequential,
                           const std::vector<char>& prev,
                           const std::vector<char>& now) {
@@ -357,20 +226,11 @@ static char UdpPassOutput(UdpEvalState& state, bool is_sequential,
   return state.Evaluate(now);
 }
 
-// `inst` is held by pointer rather than copied because this coroutine outlives
-// the call that creates it: it first runs when the scheduler resumes it. The
-// RtlirUdpInst is a member of the RtlirModule the RtlirDesign holds, and
-// RunSimulation in src/main.cpp keeps that design alive across
-// Scheduler::Run(), which is the lifetime the Expr pointers of a lowered
-// process already rely on.
 static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
                                          UdpOutputDriver* drv, SimContext& ctx,
                                          Arena& arena) {
   if (inst->decl == nullptr || inst->output == nullptr) co_return;
 
-  // The change-watchers and SimContext key by std::string_view, so the strings
-  // backing read_vars must outlive every co_await below. The owning set is kept
-  // in the coroutine frame for that reason, as MakeContAssignCoroutine's is.
   std::unordered_set<std::string> read_strs;
   for (const Expr* terminal : inst->inputs) {
     CollectExprReads(terminal, read_strs);
@@ -378,31 +238,13 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
   std::vector<std::string_view> read_vars(read_strs.begin(), read_strs.end());
   DropUnwatchableNames(ctx, read_vars);
 
-  // One evaluator for the life of the instance. §29.5 makes the current state
-  // of a sequential primitive the current output value, so a UdpEvalState built
-  // per evaluation would match every row against the initial value §29.7 gives
-  // rather than against the state the previous evaluation left.
   UdpEvalState& state = *drv->state;
   FindUdpSelectOutput(inst->output, drv, ctx);
 
-  // §29.7: that value is the state table's current state as simulation
-  // begins, and a delay on the instance does not put off assigning it to the
-  // output. So a sequential primitive drives what its initial statement gave
-  // before any table is consulted, whatever delay the instance carries. A
-  // combinational primitive has no such value, since §29.3.2 forbids a reg
-  // declaration in a combinational UDP and §29.3.3's initial
-  // statement assigns to that reg.
-  // LowerUdpInst has already driven it where the terminal is a whole net.
   if (inst->decl->is_sequential && drv->first) {
     CommitUdpOutput(inst->output, drv, state.GetOutput(), ctx, arena);
   }
 
-  // The terminals are taken to have stood at x before the run began, which is
-  // the value §6.8 gives an unassigned 4-state variable and the value §29.3.5
-  // gives an input terminal left at z. So the first evaluation sees the
-  // transitions that brought the terminals to the values they now hold, rather
-  // than seeing no transition at all -- which is what a level-sensitive
-  // sequential primitive needs to leave its initial state at time zero.
   std::vector<char> prev_inputs(inst->inputs.size(), 'x');
   while (true) {
     std::vector<char> inputs = ReadUdpInputs(*inst, ctx, arena);
@@ -410,18 +252,12 @@ static SimCoroutine MakeUdpInstCoroutine(const RtlirUdpInst* inst,
         UdpPassOutput(state, inst->decl->is_sequential, prev_inputs, inputs);
     DriveUdpOutput(*inst, drv, out, ctx, arena);
     prev_inputs = std::move(inputs);
-    // An instance whose terminals read no name can never see a transition, so
-    // §29.6 leaves nothing that could change its output again.
     if (read_vars.empty()) break;
     co_await AnyChangeAwaiter{ctx, read_vars};
     if (ctx.StopRequested()) break;
   }
 }
 
-// §37.35 detail 2: files the setter of the state of the sequential instance
-// `inst`, driving through `drv`, under its flat name below `inst_prefix`, the
-// name its udp object carries, for a VPI put to reach it: an element of an
-// instance array's being the array's with its index after it, u[0] (§28.3.6).
 static void RegisterUdpStateSetter(const RtlirUdpInst& inst,
                                    UdpOutputDriver* drv,
                                    const std::string& inst_prefix,
@@ -437,10 +273,6 @@ static void RegisterUdpStateSetter(const RtlirUdpInst& inst,
 
 void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   auto* p = arena_.Create<Process>();
-  // §29.8 instantiates a UDP just as a gate is, and a gate drives
-  // its output net continuously rather than as a procedure §9.2 declares. That
-  // is what ProcessKind::kContAssign says, and it is what makes this process an
-  // invalid target for the process control of §9.7.
   p->kind = ProcessKind::kContAssign;
   p->id = next_id_++;
   p->home_region = from_program
@@ -451,19 +283,12 @@ void Lowerer::LowerUdpInst(const RtlirUdpInst& inst, bool from_program) {
   p->gen_prefixes.assign(inst.gen_block_prefixes.begin(),
                          inst.gen_block_prefixes.end());
   InstallGenBlockConsts(inst.gen_block_consts, p);
-  // The driver lives in the arena rather than in the coroutine frame because a
-  // delayed commit is a scheduler event that runs after the coroutine has moved
-  // on to its next evaluation.
   UdpOutputDriver* drv = nullptr;
   if (inst.decl != nullptr && inst.output != nullptr) {
     drv = arena_.Create<UdpOutputDriver>(MakeUdpOutputDriver(inst, ctx_));
     drv->inst_prefix = inst_prefix_;
     const char kInitial = UdpInitialOutput(*inst.decl, ctx_, arena_);
     drv->state = arena_.Create<UdpEvalState>(*inst.decl, kInitial);
-    // §29.7 (printed page 867): under `initial q = 1'b1` the output q holds 1
-    // as simulation begins, so a sequential
-    // primitive driving a whole net drives it before time 0, and a procedure
-    // reading the net at time 0 sees it whichever process runs first.
     if (inst.decl->is_sequential && drv->net != nullptr) {
       CommitUdpOutput(inst.output, drv, kInitial, ctx_, arena_);
     }

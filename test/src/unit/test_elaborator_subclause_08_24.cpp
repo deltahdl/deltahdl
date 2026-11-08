@@ -44,13 +44,6 @@ TEST(OutOfBlockDeclElaboration, UnknownClassError) {
                             "8.24"));
 }
 
-// §8.24: an out-of-block declaration ties a method body back to a prototype
-// the class body declared extern, and the out-of-block declaration has to match
-// that prototype exactly. A body naming a method the class never declared
-// extern has no prototype to match. The subclause on the report is what tells
-// this rejection from §8.23's rule about what the class scope resolution
-// operator may name, which the same `C::foo` breaches when C is not a class at
-// all.
 TEST(OutOfBlockDeclElaboration, NoMatchingPrototypeNames8_24) {
   ElabFixture f;
   ElabOk(
@@ -209,9 +202,6 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgCountError) {
       "module m;\n"
       "endmodule\n",
       f);
-  // The name is part of the claim: one comparison serves both this rule and
-  // §25.7's for an interface hierarchical body, and only naming 'C::foo' here
-  // fails a change that gave the class caller the interface's spelling.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "out-of-block declaration for 'C::foo' has 2 "
                             "argument(s) but the prototype has 1",
@@ -283,8 +273,6 @@ TEST(OutOfBlockDeclElaboration, MismatchedArgDirectionError) {
                             4, "8.24"));
 }
 
-// §8.24: matching the prototype exactly includes the method kind; a task body
-// for a function prototype (or vice versa) is an error.
 TEST(OutOfBlockDeclElaboration, MismatchedMethodKindError) {
   ElabFixture f;
   ElabOk(
@@ -302,8 +290,6 @@ TEST(OutOfBlockDeclElaboration, MismatchedMethodKindError) {
                             4, "8.24"));
 }
 
-// §8.24: a default argument value specified in the prototype may be omitted in
-// the out-of-block declaration.
 TEST(OutOfBlockDeclElaboration, DefaultArgOmittedInBodyOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -316,8 +302,6 @@ TEST(OutOfBlockDeclElaboration, DefaultArgOmittedInBodyOk) {
              "endmodule\n"));
 }
 
-// §8.24: a default argument value repeated in the out-of-block declaration must
-// be syntactically identical to the prototype's.
 TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedIdenticalOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -330,8 +314,6 @@ TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedIdenticalOk) {
              "endmodule\n"));
 }
 
-// §8.24: a differing default argument value in the out-of-block declaration is
-// an error.
 TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedMismatchError) {
   ElabFixture f;
   ElabOk(
@@ -349,8 +331,6 @@ TEST(OutOfBlockDeclElaboration, DefaultArgRepeatedMismatchError) {
                             "8.24"));
 }
 
-// §8.24: a default argument value in the out-of-block declaration with none in
-// the prototype is an error.
 TEST(OutOfBlockDeclElaboration, DefaultArgOnlyInBodyError) {
   ElabFixture f;
   ElabOk(
@@ -368,8 +348,6 @@ TEST(OutOfBlockDeclElaboration, DefaultArgOnlyInBodyError) {
                             "8.24"));
 }
 
-// §8.24: the repeated default value comparison is structural, so an identical
-// compound expression on both sides is accepted.
 TEST(OutOfBlockDeclElaboration, DefaultArgCompoundExprIdenticalOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -382,8 +360,6 @@ TEST(OutOfBlockDeclElaboration, DefaultArgCompoundExprIdenticalOk) {
              "endmodule\n"));
 }
 
-// §8.24: identity is syntactic rather than value-based, so two defaults that
-// evaluate to the same number but are written differently do not match.
 TEST(OutOfBlockDeclElaboration, DefaultArgSameValueDifferentSyntaxError) {
   ElabFixture f;
   ElabOk(
@@ -401,7 +377,6 @@ TEST(OutOfBlockDeclElaboration, DefaultArgSameValueDifferentSyntaxError) {
                             "8.24"));
 }
 
-// §8.24 places an out-of-block declaration after the declaration of its class.
 TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
   ElabFixture f;
   ElabOk(
@@ -419,10 +394,6 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockBeforeClassError) {
                             "8.24"));
 }
 
-// §8.24 (printed page 202) and §23.2.4 (printed page 739): a class among a
-// module's items has its out-of-block bodies among the same items, and `this`
-// in the body of a non-static method names the object, so §8.11's rule for a
-// subroutine outside a class does not reach it.
 TEST(OutOfBlockDeclElaboration, ThisInModuleOutOfBlockMethodIsAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -436,9 +407,6 @@ TEST(OutOfBlockDeclElaboration, ThisInModuleOutOfBlockMethodIsAccepted) {
              "endmodule\n"));
 }
 
-// §8.10 (printed pages 186-187) makes access to the special this handle inside
-// a static method's body illegal, and an out-of-block body is that method's
-// body wherever it stands. Neither scope reported it.
 TEST(OutOfBlockDeclElaboration, ThisInModuleStaticOutOfBlockMethodIsError) {
   ElabFixture f;
   ElabOk(
@@ -473,12 +441,6 @@ TEST(OutOfBlockDeclElaboration, ThisInUnitStaticOutOfBlockMethodIsError) {
                             "shall not be used in a static method", 5, "8.10"));
 }
 
-// §8.24: an out-of-block declaration is its extern prototype's body, so the
-// rules Clause 8 lays on a method's body hold over it as over a body written
-// in the class: §8.10's on a static method (no non-static member, no `this`),
-// §8.15's on `super` in a class extending nothing, §8.17's on super.new()
-// opening the constructor and §8.19's on a global constant, wherever the
-// declaration stands.
 TEST(OutOfBlockDeclElaboration, AnOutOfBlockBodyIsHeldToTheMethodRules) {
   ElabFixture f;
   ElabOk(
@@ -518,9 +480,6 @@ TEST(OutOfBlockDeclElaboration, AnOutOfBlockBodyIsHeldToTheMethodRules) {
       "8.10"));
 }
 
-// §8.24 holds an out-of-block declaration standing in a package or a module
-// to its prototype, to one definition per extern method and to following its
-// class, as it holds one at compilation-unit scope.
 TEST(OutOfBlockDeclElaboration, OutOfBlockDeclarationsInEveryScopeAreChecked) {
   ElabFixture f;
   ElabOk(
@@ -552,9 +511,6 @@ TEST(OutOfBlockDeclElaboration, OutOfBlockDeclarationsInEveryScopeAreChecked) {
                             11, "8.24"));
 }
 
-// §8.24 has an out-of-block declaration stand in the scope of its class's
-// declaration, so one at compilation-unit scope finds no class a module
-// declares.
 TEST(OutOfBlockDeclElaboration, AModulesClassHasNoUnitOutOfBlockDeclaration) {
   ElabFixture f;
   ElabOk(
@@ -568,13 +524,6 @@ TEST(OutOfBlockDeclElaboration, AModulesClassHasNoUnitOutOfBlockDeclaration) {
                             "8.24"));
 }
 
-// §8.24: the prototype resolves a type name where it stands, seeing only the
-// class's types declared before it, while the out-of-block header sees them
-// all. A name the class declares only after the prototype resolves to two
-// declarations, which is reported, whether written bare or behind the class's
-// own scope, and whether the class declares it as a typedef or as a nested
-// class; a type declared before the prototype, and a type behind another
-// scope, resolve alike in both.
 TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
   ElabFixture f;
   ElabOk(
@@ -612,8 +561,6 @@ TEST(OutOfBlockDeclElaboration, ATypeNameResolvingDifferentlyIsReported) {
   EXPECT_TRUE(ReportedError(diags, kMessage[2], 18, "8.24"));
 }
 
-// §8.24 holds an out-of-block declaration to its prototype exactly, and an
-// argument's name is none of the three things it may differ in.
 TEST(OutOfBlockDeclElaboration, ArgumentNamesMatchThePrototype) {
   ElabFixture f;
   ElabOk(

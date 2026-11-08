@@ -14,7 +14,6 @@ using namespace delta;
 
 namespace {
 
-// Evaluates a system-task call while capturing everything it writes to stdout.
 std::string EvalCapture(Expr* expr, SimFixture& f) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
@@ -23,7 +22,6 @@ std::string EvalCapture(Expr* expr, SimFixture& f) {
   return captured.str();
 }
 
-// §20.2: $finish ends the run; the call requests that the scheduler halt.
 TEST(SimControlSim, FinishRequestsStop) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$finish", {});
@@ -31,7 +29,6 @@ TEST(SimControlSim, FinishRequestsStop) {
   EXPECT_TRUE(f.ctx.StopRequested());
 }
 
-// §20.2: $stop suspends the run; like $finish it halts the scheduler loop.
 TEST(SimControlSim, StopRequestsStop) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 1)});
@@ -39,8 +36,6 @@ TEST(SimControlSim, StopRequestsStop) {
   EXPECT_TRUE(f.ctx.StopRequested());
 }
 
-// §20.2 / Table 20-1: with no argument the diagnostic level defaults to 1, so
-// $finish reports the simulation time and the controlling task.
 TEST(SimControlSim, FinishDefaultLevelReportsTimeAndLocation) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$finish", {});
@@ -49,7 +44,6 @@ TEST(SimControlSim, FinishDefaultLevelReportsTimeAndLocation) {
   EXPECT_NE(out.find("time"), std::string::npos);
 }
 
-// §20.2 / Table 20-1, level 0: prints nothing.
 TEST(SimControlSim, FinishLevelZeroPrintsNothing) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 0)});
@@ -57,8 +51,6 @@ TEST(SimControlSim, FinishLevelZeroPrintsNothing) {
   EXPECT_TRUE(out.empty());
 }
 
-// §20.2 / Table 20-1, level 1: prints simulation time and location, but no
-// resource-usage statistics.
 TEST(SimControlSim, StopLevelOneReportsTimeWithoutStats) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 1)});
@@ -67,8 +59,6 @@ TEST(SimControlSim, StopLevelOneReportsTimeWithoutStats) {
   EXPECT_EQ(out.find("statistics"), std::string::npos);
 }
 
-// §20.2 / Table 20-1: the default-level-1 rule is stated for both control
-// tasks, so $stop with no argument likewise reports the simulation time.
 TEST(SimControlSim, StopDefaultLevelReportsTime) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$stop", {});
@@ -77,7 +67,6 @@ TEST(SimControlSim, StopDefaultLevelReportsTime) {
   EXPECT_NE(out.find("time"), std::string::npos);
 }
 
-// §20.2 / Table 20-1, level 0 applies equally to $stop: nothing is printed.
 TEST(SimControlSim, StopLevelZeroPrintsNothing) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 0)});
@@ -85,8 +74,6 @@ TEST(SimControlSim, StopLevelZeroPrintsNothing) {
   EXPECT_TRUE(out.empty());
 }
 
-// §20.2 / Table 20-1, level 2: adds the memory and CPU-time statistics line on
-// top of the level-1 information.
 TEST(SimControlSim, FinishLevelTwoAddsStatistics) {
   SysTaskFixture f;
   auto* level_two = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 2)});
@@ -97,13 +84,9 @@ TEST(SimControlSim, FinishLevelTwoAddsStatistics) {
   SysTaskFixture g;
   auto* level_one = MkSysCall(g.arena, "$finish", {MkInt(g.arena, 1)});
   std::string out_one = EvalCapture(level_one, g);
-  // Level 2 is strictly more verbose than level 1.
   EXPECT_GT(out_two.size(), out_one.size());
 }
 
-// §20.2 / Table 20-1, level 1: the time-and-location rule is stated for both
-// control tasks, so $finish at level 1 likewise reports the simulation time
-// without the level-2 resource-usage statistics.
 TEST(SimControlSim, FinishLevelOneReportsTimeWithoutStats) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 1)});
@@ -112,8 +95,6 @@ TEST(SimControlSim, FinishLevelOneReportsTimeWithoutStats) {
   EXPECT_EQ(out.find("statistics"), std::string::npos);
 }
 
-// §20.2 / Table 20-1, level 2 applies equally to $stop: on top of the level-1
-// time and location it emits the memory and CPU-time statistics line.
 TEST(SimControlSim, StopLevelTwoAddsStatistics) {
   SysTaskFixture f;
   auto* level_two = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 2)});
@@ -124,12 +105,9 @@ TEST(SimControlSim, StopLevelTwoAddsStatistics) {
   SysTaskFixture g;
   auto* level_one = MkSysCall(g.arena, "$stop", {MkInt(g.arena, 1)});
   std::string out_one = EvalCapture(level_one, g);
-  // Level 2 carries strictly more detail than level 1.
   EXPECT_GT(out_two.size(), out_one.size());
 }
 
-// §20.2: the control action is independent of the diagnostic level. Even at
-// level 0, where nothing is printed, $finish still requests that the run halt.
 TEST(SimControlSim, FinishLevelZeroStillRequestsStop) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$finish", {MkInt(f.arena, 0)});
@@ -137,8 +115,6 @@ TEST(SimControlSim, FinishLevelZeroStillRequestsStop) {
   EXPECT_TRUE(f.ctx.StopRequested());
 }
 
-// §20.2: likewise $stop suspends the run at level 0; the silent diagnostic does
-// not suppress the halt request.
 TEST(SimControlSim, StopLevelZeroStillRequestsStop) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$stop", {MkInt(f.arena, 0)});
@@ -146,12 +122,6 @@ TEST(SimControlSim, StopLevelZeroStillRequestsStop) {
   EXPECT_TRUE(f.ctx.StopRequested());
 }
 
-// §20.2: the diagnostic-level argument is an expression, not only a literal. A
-// localparam is a constant expression that resolves during elaboration and
-// takes a different path from a literal operand, so this drives the level from
-// a localparam end to end -- real source, elaboration, and the run -- rather
-// than hand-building the argument node. A value of 2 selects the level-2
-// diagnostic, so the memory/CPU statistics line appears and the run halts.
 TEST(SimControlSim, FinishLevelFromLocalparamSelectsStatistics) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -169,12 +139,6 @@ TEST(SimControlSim, FinishLevelFromLocalparamSelectsStatistics) {
   EXPECT_NE(captured.str().find("statistics"), std::string::npos);
 }
 
-// §20.2: $finish makes the simulator exit and hand control back to the host
-// operating system. A $finish reached from a randsequence production code block
-// ends the run there, so the production standing after it in the rule is never
-// generated and the variable its code block writes is left as the run found it.
-// §18.17.6 gives a randsequence a meaning for break and for return and none for
-// $finish, so nothing in the generation of `main` absorbs the request to halt.
 TEST(SimControlSim, FinishInARandsequenceProductionCodeBlockEndsGeneration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -195,22 +159,14 @@ TEST(SimControlSim, FinishInARandsequenceProductionCodeBlockEndsGeneration) {
   LowerAndRun(design, f);
   std::cout.rdbuf(old_buf);
   EXPECT_TRUE(f.ctx.StopRequested());
-  // `first` generated, so the run did reach the $finish.
   auto* before = f.ctx.FindVariable("before_finish");
   ASSERT_NE(before, nullptr);
   EXPECT_EQ(before->value.ToUint64(), 37u);
-  // `second` stands after `first` in the rule, so it never generated.
   auto* after = f.ctx.FindVariable("after_finish");
   ASSERT_NE(after, nullptr);
   EXPECT_EQ(after->value.ToUint64(), 0u);
 }
 
-// §20.2 has $finish end the run where it is called, and §9.2.3 has no event
-// still scheduled then execute after the final procedures, so what the time
-// step of the $finish had queued behind it is dropped rather than drained. A
-// nonblocking assignment made in that step is one such event: its update
-// belongs to the NBA region, which comes after the Active region the $finish
-// ran in. The one made a step earlier has had its NBA region and lands.
 TEST(SimControlSim, FinishLeavesItsStepsNonblockingAssignmentUnapplied) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -227,10 +183,6 @@ TEST(SimControlSim, FinishLeavesItsStepsNonblockingAssignmentUnapplied) {
   EXPECT_EQ(n->value.ToUint64(), 3u);
 }
 
-// §20.2 with §21.2.2: $strobe prints once every event of the current time has
-// occurred, just before time advances, and a run ended by $finish in that
-// step never gets there, while a $display ahead of the $finish prints where it
-// is called and a $strobe a step earlier prints at the end of its own step.
 TEST(SimControlSim, FinishLeavesItsStepsStrobeUnprinted) {
   SimFixture f;
   std::string out = RunCapture(
@@ -246,11 +198,6 @@ TEST(SimControlSim, FinishLeavesItsStepsStrobeUnprinted) {
   EXPECT_EQ(out, "early\nshown\n");
 }
 
-// §20.2 with §16.4.1: a failing deferred assertion queues its action as a
-// pending report, which for `assert #0` matures in the Observed region and
-// for `assert final` in the Postponed region of the step. The pair failing in
-// the step of the $finish is never reached by either region, so neither
-// action runs; the pair failing a step earlier matures as usual, once each.
 TEST(SimControlSim, FinishLeavesItsStepsDeferredReportsUnmatured) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -278,8 +225,6 @@ TEST(SimControlSim, FinishLeavesItsStepsDeferredReportsUnmatured) {
   EXPECT_EQ(final_fails->value.ToUint64(), 1u);
 }
 
-// §20.2: no statement of the calling process runs after $finish, inside an
-// instance class task enabled through a handle as in a sequential block.
 TEST(SimControlSim, FinishInAClassTaskEndsTheTask) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"
@@ -297,7 +242,6 @@ TEST(SimControlSim, FinishInAClassTaskEndsTheTask) {
             "before\n");
 }
 
-// §20.2: the same inside a module task, after a delay.
 TEST(SimControlSim, FinishInAModuleTaskEndsTheTask) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

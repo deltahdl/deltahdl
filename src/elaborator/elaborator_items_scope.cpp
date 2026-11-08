@@ -19,12 +19,6 @@ namespace delta {
 
 ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
   ScopeMap scope = BuildParamScope(mod, gen_prefix_scopes_);
-  // §27.4 gives each instance of a loop generate block an implicit localparam
-  // named after the genvar, holding that instance's value, which may stand
-  // wherever a parameter may: a localparam's value, a declared dimension, an
-  // instance's parameter override. gen_prefix_scopes_ places this fold in the
-  // blocks being elaborated, so their genvar values are entered beside their
-  // parameters, outermost first so that an inner loop's genvar wins.
   for (const auto& [name, value] : gen_loop_consts_)
     BindDeclaredConstant(scope, name, value);
   return scope;
@@ -33,33 +27,15 @@ ScopeMap Elaborator::BuildParamScope(const RtlirModule* mod) const {
 ScopeMap Elaborator::BuildParamScope(
     const RtlirModule* mod, const std::vector<std::string_view>& scopes) const {
   ScopeMap scope = cu_param_scope_;
-  // §3.12.1: an explicit $unit:: prefix names the compilation-unit-scope
-  // declaration and exists precisely so a same-named module-local declaration
-  // cannot shadow it. Expose each compilation-unit-scope parameter a second
-  // time under a "$unit::"-qualified key, which the local-parameter overlay
-  // below never overwrites, so a $unit:: reference keeps resolving to the
-  // outermost value.
   for (const auto& [name, val] : cu_param_scope_) {
     if (name.find('.') != std::string_view::npos) continue;
     auto* key = arena_.Create<std::string>("$unit::" + std::string(name));
     scope[*key] = val;
   }
-  // §6.19 declares an enumeration's members as constants of the scope the
-  // enumeration is written in, and A.8.4 lists an enum identifier among the
-  // constant primaries, so `localparam X = RED | GREEN;` is a constant
-  // expression wherever RED and GREEN are members of an enumeration the module
-  // declares, or that a wildcard import brought in (§26.3). The module's
-  // enumerations are held in mod->enum_types, already folded, from
-  // Elaborator::ElaborateTypedef, EmitBareEnumMembers and
-  // RegisterImportedEnumLiterals.
   for (const auto& entry : mod->enum_types) {
     for (const auto& member : entry.second)
       BindDeclaredConstant(scope, member.name, member.value);
   }
-  // §23.9 makes a generate block a new scope, so a parameter one declares is
-  // read only by an expression written in that block or in one nested inside
-  // it. Entering it under its bare name for every expression in the module
-  // would fold it into expressions that cannot name it at all.
   for (const auto& [name, value] : mod->constant_formals)
     BindDeclaredConstant(scope, name, value);
   for (const auto& p : mod->params) {
@@ -74,9 +50,6 @@ bool Elaborator::RefersToUnboundedParam(const RtlirModule* mod,
                                         std::string_view name) const {
   for (const auto& p : mod->params) {
     if (!p.is_unbounded || p.name != name) continue;
-    // §23.9: an unbounded parameter a generate block declares is not what a
-    // reference outside that block names, so it must not make the parameter
-    // that reference initialises unbounded in its turn.
     if (ParamVisibleFromScopes(p.gen_block_prefix, gen_prefix_scopes_)) {
       return true;
     }
@@ -88,9 +61,6 @@ namespace {
 
 bool ExprContainsDollarSubexpr(const Expr* e);
 
-// Returns true if any of the fixed scalar child-expression pointers of `e`
-// contains a self-contained `$` subexpression. Factored out of the recursive
-// walk so the driver stays below the cognitive-complexity threshold.
 bool AnyScalarChildContainsDollar(const Expr* e) {
   const Expr* const kChildren[] = {
       e->lhs,        e->rhs,          e->condition,   e->true_expr,
@@ -119,18 +89,10 @@ bool Elaborator::ContainsDollarSubexpr(const Expr* e) const {
   return ExprContainsDollarSubexpr(e);
 }
 
-// var_types_ records every explicit net and variable declaration and
-// net_names_ the implicit nets beside the explicit ones, so the two together
-// answer for every net or variable the module has declared so far.
 bool Elaborator::DeclaresNetOrVariable(std::string_view name) const {
   return var_types_.count(name) != 0 || net_names_.count(name) != 0;
 }
 
-// §3.12.1 (printed page 56): a name neither the module nor a module enclosing
-// it (§23.4) declares, as a variable, a port, a parameter or any other item,
-// reaches the part of the compilation-unit scope written before the reference
-// at `loc`, so it names the net the unit declares there, which every rule
-// asking whether an assignment's target is a net counts among the module's.
 bool Elaborator::NamesNet(std::string_view name, SourceLoc loc) const {
   if (net_names_.count(name) != 0) return true;
   if (var_types_.count(name) != 0) return false;
@@ -140,8 +102,6 @@ bool Elaborator::NamesNet(std::string_view name, SourceLoc loc) const {
   return UnitNetBefore(unit_, name, loc) != nullptr;
 }
 
-// The module's nets with the unit's a reference at `loc` reaches (NamesNet),
-// for the checks that ask a set rather than one name.
 std::unordered_set<std::string_view> Elaborator::NetNamesAt(
     SourceLoc loc) const {
   std::unordered_set<std::string_view> names = net_names_;

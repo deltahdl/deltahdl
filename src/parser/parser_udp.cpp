@@ -51,9 +51,6 @@ void Parser::ValidateUdpHeader(UdpDecl* udp) {
   }
 }
 
-// §29.3.4 (printed page 863) makes it an error for two rows to give one
-// combination of inputs, edges counted, two different outputs. Reported once
-// per table, at the later row of the first pair found.
 void Parser::ValidateUdpTable(UdpDecl* udp) {
   for (size_t j = 1; j < udp->table.size(); ++j) {
     for (size_t i = 0; i < j; ++i) {
@@ -99,20 +96,11 @@ static bool IsValidUdpInitialLiteral(std::string_view text) {
   return false;
 }
 
-// The bit a literal IsValidUdpInitialLiteral accepts gives the output: its
-// last character, an upper-case X read as x.
 static char UdpInitialLiteralBit(std::string_view text) {
   char last = text.back();
   return last == 'X' ? 'x' : last;
 }
 
-// A.5.2: the one bit a 1-bit reg keeps of an integer literal written as its
-// initial value, which is the literal's least significant bit under §10.7's
-// truncation of an assignment to a narrower variable, or 'x' where that bit is
-// unknown. The low bit of every base's value is the low bit of its last digit,
-// so the literal's int_val answers it, and an x, z or ? as that last digit is
-// the one spelling that leaves the bit unknown. 'x' for an expression that is
-// not a literal: that bit is the run's to evaluate from UdpDecl::initial_expr.
 static char UdpLiteralInitialBit(const Expr* expr) {
   if (expr == nullptr || expr->kind != ExprKind::kIntegerLiteral) return 'x';
   if (!expr->text.empty()) {
@@ -125,13 +113,6 @@ static char UdpLiteralInitialBit(const Expr* expr) {
   return (expr->int_val & 1) != 0 ? '1' : '0';
 }
 
-// A.5.2 gives `[ = constant_expression ]` to `output reg port_identifier`
-// alone; the `output port_identifier` alternative carries none. Reads the `=`
-// the current token stands at and the expression after it, and returns the
-// expression where the output was declared reg. After an output declared
-// without reg the `=` is reported and the expression read past all the same,
-// so the declaration is otherwise taken as written and the header's port count
-// still agrees with the table below; nullptr is returned then.
 Expr* Parser::ParseUdpOutputInitialValue(bool declares_reg) {
   auto eq_tok = Consume();
   Expr* value = ParseExpr();
@@ -142,10 +123,6 @@ Expr* Parser::ParseUdpOutputInitialValue(bool declares_reg) {
   return nullptr;
 }
 
-// §3.13 (g): a primitive opens a port name space, in which each port is
-// declared once. Reports the declaration of `name` at `loc` where the
-// primitive has already declared an input of that name, or, where
-// `output_too`, its output; a second output is §29.3.1's report instead.
 static void ReportUdpPortRedeclared(DiagEngine& diag, const UdpDecl& udp,
                                     std::string_view name, SourceLoc loc,
                                     bool output_too) {
@@ -157,10 +134,6 @@ static void ReportUdpPortRedeclared(DiagEngine& diag, const UdpDecl& udp,
 }
 
 void Parser::ParseUdpOutputDecl(UdpDecl* udp) {
-  // Read into its own flag rather than off udp->is_sequential, which a
-  // `reg q;` declared above this line has already set: A.5.2 puts the initial
-  // value on the `output reg` form and not on an `output` that a separate
-  // udp_reg_declaration makes sequential.
   bool declares_reg = Match(TokenKind::kKwReg);
   if (declares_reg) udp->is_sequential = true;
   RejectUdpPortDimension();
@@ -199,13 +172,6 @@ void ValidatePendingUdpRegs(DiagEngine& diag, const UdpDecl* udp,
 }
 }  // namespace
 
-// A.5.2 writes an initial value on udp_output_declaration's `output reg
-// port_identifier [ = constant_expression ]` alone: udp_input_declaration is
-// `input list_of_udp_port_identifiers` and udp_reg_declaration `reg
-// variable_identifier`, and §29.4 gives the other place a sequential UDP's
-// initial value stands, the initial statement. One written on either
-// declaration is reported at its '=' and read past, so that the declaration
-// ends at its own terminator.
 void Parser::RejectUdpInitialValueOn(const char* declaration) {
   if (!Check(TokenKind::kEq)) return;
   diag_.Error(CurrentLoc(),
@@ -217,10 +183,6 @@ void Parser::RejectUdpInitialValueOn(const char* declaration) {
   ParseExpr();
 }
 
-// A.5.2's udp_input_declaration, `input list_of_udp_port_identifiers`, the
-// `input` keyword consumed, read to its ';'. A.2.3 writes the list
-// `port_identifier { , port_identifier }`, and A.9.3 spells the identifier
-// `simple_identifier | escaped_identifier`.
 void Parser::ParseUdpInputDecl(UdpDecl* udp) {
   do {
     RejectUdpPortDimension();
@@ -319,14 +281,6 @@ static void ValidateUdpRowInputTransitions(DiagEngine& diag,
   ValidateUdpRowNoDashInput(diag, row, row_loc);
 }
 
-// `row_is_sequential` says whether the row was written as A.5.3's
-// `sequential_entry`, which is what decides where its fields are. Table 29-1
-// permits `-` only in the output field of a sequential UDP, and a current-state
-// field exists only in that form, so a row read as the other form has neither
-// rule to answer.
-// §29.3 Syntax 29-1 makes a sequential row's current-state field a
-// level_symbol, so - and the edge symbols are refused there, and so is any
-// other character but z, which UdpRowContainsZ reports for every field.
 static void ValidateUdpRowCurrentState(DiagEngine& diag, char cs,
                                        SourceLoc row_loc) {
   if (cs == '-') {
@@ -373,11 +327,6 @@ static void ValidateUdpRowStateAndOutput(DiagEngine& diag,
   }
 }
 
-// §29.3.4 (printed page 863) with Syntax 29-1 (printed page 861): a
-// combinational row gives the output for one set of input levels, its inputs a
-// level_input_list, while a sequential row may also let a single input change
-// -- so an edge indicator, `(01)` or r, f, p, n or *, stands in a row written
-// as a sequential entry alone.
 static bool UdpRowHasEdge(const UdpTableRow& row) {
   for (char c : row.inputs) {
     if (UdpInputIsEdge(c)) return true;
@@ -401,12 +350,6 @@ static void ValidateUdpTableRow(DiagEngine& diag, bool row_is_sequential,
   ValidateUdpRowStateAndOutput(diag, row_is_sequential, row, row_loc);
 }
 
-// §29.3.2 requires a UDP's two statements about its own form to agree: a
-// sequential UDP declares its output port reg, and a combinational one declares
-// no reg. `udp->is_sequential` carries the first statement, the presence of a
-// reg; `row_is_sequential` carries the second, the form the table entry was
-// written in. Reports once per UDP, at the first row that disagrees, since one
-// missing or surplus reg is one mistake however many rows stand under it.
 static void ValidateUdpRowAgainstRegDecl(DiagEngine& diag, const UdpDecl* udp,
                                          bool row_is_sequential,
                                          SourceLoc row_loc,
@@ -420,20 +363,6 @@ static void ValidateUdpRowAgainstRegDecl(DiagEngine& diag, const UdpDecl* udp,
              Subclause("29.3.2"));
 }
 
-// §29.3.4 reads a row's input fields off the header's port list by position:
-// the fields stand for the inputs in the order the UDP definition header lists
-// them, one field to each input, with one more for the output. A row carrying
-// some other number of fields therefore names no combination of this UDP's
-// inputs at all. UdpRowMatchesLevels (src/simulator/udp_eval.cpp) answers no
-// match for such a row whatever the inputs are, so the primitive runs as
-// though the row had not been written, giving x for any combination no other
-// row lists, as §29.3.4 has it. Reports once per UDP, at the first row that
-// disagrees, since one port list read wrong is one mistake however many rows
-// stand under it.
-//
-// Says nothing where the header declared no inputs: ValidateUdpHeader has
-// already reported that, every row would disagree with a port list that is not
-// there, and the count this would name is the one already being reported.
 static void ValidateUdpRowWidth(DiagEngine& diag, const UdpDecl* udp,
                                 const UdpTableRow& row, SourceLoc row_loc,
                                 bool& already_reported) {
@@ -448,15 +377,6 @@ static void ValidateUdpRowWidth(DiagEngine& diag, const UdpDecl* udp,
       Subclause("29.3.4"));
 }
 
-// The symbols one token of a UDP input list stands for. A.5.3 writes
-// level_input_list `level_symbol { level_symbol }` and edge_input_list
-// `{ level_symbol } edge_indicator { level_symbol }` over single characters
-// with no separator between them, so a run the lexer read as one token --
-// `01` as a number, `x1` or `bx` as an identifier -- is every character of it,
-// and a symbol outside level_symbol `0 | 1 | x | X | ? | b | B` and
-// edge_symbol `r | R | f | F | p | P | n | N | *` is reported at the token and
-// kept, so that the row's width still answers to the header. A `z` is left to
-// §29.3.5's own report.
 void Parser::AppendUdpInputSymbols(UdpTableRow& row, const Token& tok) {
   if (tok.kind == TokenKind::kStar || tok.kind == TokenKind::kMinus ||
       tok.kind == TokenKind::kQuestion || tok.text.empty()) {
@@ -474,9 +394,6 @@ void Parser::AppendUdpInputSymbols(UdpTableRow& row, const Token& tok) {
   }
 }
 
-// One symbol of a UDP entry's current_state or next_state field, which A.5.3
-// writes as a single level_symbol or output_symbol; a token of more than one
-// character there is reported and its first character taken.
 char Parser::ParseUdpFieldSymbol() {
   Token tok = Consume();
   if (tok.text.size() > 1) {
@@ -487,11 +404,6 @@ char Parser::ParseUdpFieldSymbol() {
   return UdpCharFromToken(tok);
 }
 
-// §29.3 Syntax 29-1 writes a parenthesised edge `( level_symbol level_symbol
-// )`. The lexer hands the two over as one token, as `01` or `x1`, or as two, as
-// `?` and `0`, so every symbol up to the `)` is gathered and the edge is
-// refused unless there are two. Taking the first two of a token, `(011)` was
-// read as `(01)`.
 void Parser::ParseUdpParenEdge(UdpTableRow& row) {
   SourceLoc loc = Consume().loc;
   std::string symbols;
@@ -529,13 +441,6 @@ void Parser::ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
     }
   }
   Expect(TokenKind::kColon, Subclause("29.3.4"));
-  // A.5.3 tells the two entry forms apart by how many fields follow that colon:
-  // `combinational_entry ::= level_input_list : output_symbol ;` writes one,
-  // and `sequential_entry ::= seq_input_list : current_state : next_state ;`
-  // writes two. Read the count off the row rather than off udp->is_sequential,
-  // which records only how the output port was declared. The two are separate
-  // statements about the same UDP, and comparing them is what
-  // ValidateUdpRowAgainstRegDecl below does.
   char first_field = ParseUdpFieldSymbol();
   bool row_is_sequential = Match(TokenKind::kColon);
   if (row_is_sequential) {
@@ -568,11 +473,6 @@ void Parser::ParseUdpTable(UdpDecl* udp) {
   Expect(TokenKind::kKwEndtable, Subclause("29.3.4"));
 }
 
-// §29.3.1 and §29.3.2: the non-ANSI header lists the ports and the
-// declarations after it declare them, so the list and the declarations name
-// one set of ports, each once. Reports a name listed twice or never declared,
-// where the list writes it, and a declared input the list leaves out, at the
-// list's first name.
 static void MatchUdpNonAnsiPortList(DiagEngine& diag, const UdpDecl* udp,
                                     const Token& first,
                                     const std::vector<Token>& inputs) {
@@ -611,10 +511,6 @@ static void MatchUdpNonAnsiPortList(DiagEngine& diag, const UdpDecl* udp,
   }
 }
 
-// Validates that the non-ANSI port list's first port matches the declared
-// output, then reorders udp->input_names to follow the order in which the
-// inputs appeared in the parenthesized port list (only when every port-list
-// input maps to a declared input).
 static void ReconcileUdpNonAnsiPortList(DiagEngine& diag, UdpDecl* udp,
                                         const Token& first,
                                         const std::vector<Token>& inputs) {
@@ -644,10 +540,6 @@ static void ReconcileUdpNonAnsiPortList(DiagEngine& diag, UdpDecl* udp,
 }
 
 namespace {
-// The illegal syntactic forms scanned at the head of a UDP initial statement
-// (IEEE 1800 §29.6): a leading begin keyword and a leading # delay control,
-// each with the source position captured at the matching point in the token
-// stream so a diagnostic can be emitted later.
 struct UdpInitialHeaderScan {
   bool saw_begin = false;
   SourceLoc begin_loc;
@@ -656,9 +548,6 @@ struct UdpInitialHeaderScan {
 };
 }  // namespace
 
-// Emits the diagnostics for a UDP initial statement header (the begin/delay
-// form errors and the output-target mismatch) given the positions captured at
-// the matching points in the token stream. Pure-diagnostic; no parsing.
 static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
                                      const UdpInitialHeaderScan& scan,
                                      const Token& id_tok) {
@@ -678,32 +567,11 @@ static void ValidateUdpInitialHeader(DiagEngine& diag, const UdpDecl* udp,
   }
 }
 
-// Says whether the parenthesized port list is A.5.2's
-// `udp_declaration_port_list` rather than its `udp_port_list`. The two lists
-// differ in what they hold and not in what order they hold it: the first holds
-// `udp_output_declaration` and `udp_input_declaration` entries, each introduced
-// by a direction keyword, and the second holds bare port identifiers. Choosing
-// on the keyword rather than on `output` alone is what lets §29.3.1's rule that
-// the output port lead the port list be reported against a list that declares
-// its ports in the wrong order, rather than the leading
-// `input` being reported as a port identifier gone missing. `inout` counts
-// because §29.3.1 permits no such port on a UDP at all, so a list holding one
-// is a declaration list with an illegal entry and never a list of names. `reg`
-// does not: A.5.2 gives it no place at the head of an entry, only inside
-// `udp_reg_declaration`, which is a `udp_port_declaration` written in the body.
 bool Parser::UdpPortListIsDeclarations() {
   return Check(TokenKind::kKwOutput) || Check(TokenKind::kKwInput) ||
          Check(TokenKind::kKwInout);
 }
 
-// Parses A.5.2's `udp_declaration_port_list` through the closing parenthesis
-// and the semicolon after it, reporting §29.3.1's two rules over the entries as
-// they were written: a UDP has one output port and no more, and that port
-// comes first in the port list. Both header forms answer them in the same
-// words, the second in ReconcileUdpNonAnsiPortList.
-// Reads one entry of A.5.2's `udp_declaration_port_list` without placing it, so
-// that what the entry declared is available to §29.3.1's rules before the
-// UdpDecl is written to.
 UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
   UdpAnsiPortEntry entry;
   ParseAttributes();
@@ -716,8 +584,6 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
   } else {
     entry.keyword_omitted = !Match(TokenKind::kKwInput);
   }
-  // A.5.2 writes the optional `reg` and the optional initial value into
-  // `udp_output_declaration` alone, so neither is read on an input entry.
   entry.declares_reg = entry.is_output && Match(TokenKind::kKwReg);
   RejectUdpPortDimension();
   entry.name = ExpectIdentifier(Subclause("29.3.1")).text;
@@ -729,10 +595,6 @@ UdpAnsiPortEntry Parser::ParseUdpAnsiPortEntry() {
   return entry;
 }
 
-// Places one entry of A.5.2's `udp_declaration_port_list` on `udp`, reporting
-// §29.3.1's limit of one output port to a UDP where a second output
-// declaration arrives. Returns whether the entry was taken as
-// the output port, which is not the same as whether it declared one.
 static bool PlaceUdpAnsiPortEntry(DiagEngine& diag, UdpDecl* udp,
                                   const UdpAnsiPortEntry& entry) {
   ReportUdpPortRedeclared(diag, *udp, entry.name, entry.loc, true);
@@ -740,9 +602,6 @@ static bool PlaceUdpAnsiPortEntry(DiagEngine& diag, UdpDecl* udp,
   if (is_output && !udp->output_name.empty()) {
     diag.Error(entry.loc, "UDP shall have exactly one output port",
                Subclause("29.3.1"));
-    // Take the surplus declaration's port as an input rather than dropping it.
-    // It is a port the user wrote, and a header short one port disagrees with
-    // the table below it for a second report about one mistake.
     is_output = false;
   }
   if (!is_output) {
@@ -766,9 +625,6 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
   bool after_output = false;
   do {
     UdpAnsiPortEntry entry = ParseUdpAnsiPortEntry();
-    // §29.3 Syntax 29-1 opens each udp_input_declaration with input, and only
-    // the names after the first in its list go without it, so a bare name
-    // straight after the output declaration continues no input declaration.
     if (entry.keyword_omitted && after_output) {
       diag_.Error(
           entry.loc,
@@ -777,9 +633,6 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
     }
     after_output = entry.is_output;
     bool is_output = PlaceUdpAnsiPortEntry(diag_, udp, entry);
-    // An inout entry is not a port §29.3.1 admits, and RejectUdpInoutPort has
-    // already said so, so it is not what the output's position is measured
-    // against.
     if (!have_first_port && !entry.is_inout) {
       have_first_port = true;
       first_port_is_output = is_output;
@@ -787,10 +640,6 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
     }
   } while (Match(TokenKind::kComma));
 
-  // Held back until the whole list is read, and reported only where an output
-  // was declared somewhere in it, so a list declaring none draws
-  // ValidateUdpHeader's report about the missing output and not a second one
-  // about where it should have stood.
   if (have_first_port && !first_port_is_output && !udp->output_name.empty()) {
     diag_.Error(
         first_port_loc,
@@ -802,8 +651,6 @@ void Parser::ParseUdpAnsiHeader(UdpDecl* udp) {
   Expect(TokenKind::kSemicolon, Subclause("29.3.1"));
 }
 
-// Parses the non-ANSI header (a bare port-name list) followed by the separate
-// port declarations, then reconciles the port-list order against them.
 void Parser::ParseUdpNonAnsiHeader(UdpDecl* udp) {
   auto first_tok = ExpectIdentifier(Subclause("29.3.1"));
   std::vector<Token> port_list_inputs;
@@ -816,8 +663,6 @@ void Parser::ParseUdpNonAnsiHeader(UdpDecl* udp) {
   ReconcileUdpNonAnsiPortList(diag_, udp, first_tok, port_list_inputs);
 }
 
-// Parses the optional UDP initial statement (initial out = literal;),
-// validating its restricted form along the way.
 void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   udp->has_initial = true;
 
@@ -830,8 +675,6 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   ValidateUdpInitialHeader(diag_, udp, scan, id_tok);
   Expect(TokenKind::kEq, Subclause("29.3.3"));
 
-  // §29.3.3: one single-bit literal and nothing after it, so a right-hand side
-  // opening with one and going on is refused with the rest read past.
   auto rhs_tok = CurrentToken();
   if (!Check(TokenKind::kSemicolon)) Consume();
   bool one_literal =
@@ -847,10 +690,6 @@ void Parser::ParseUdpInitialStatement(UdpDecl* udp) {
   Expect(TokenKind::kSemicolon, Subclause("29.3.3"));
 }
 
-// A.5.2's udp_port_list is port identifiers alone, with no attribute_instance
-// before any of them. Those read ahead of the header's first port, where they
-// would have opened a udp_declaration_port_list entry, are reported at the
-// first of them once the list proves to be names.
 static void RejectAttributesBeforeUdpPortList(
     DiagEngine& diag, const std::vector<Attribute>& attrs) {
   if (attrs.empty()) return;
@@ -882,10 +721,6 @@ UdpDecl* Parser::ParseUdpDecl() {
   }
 
   if (Check(TokenKind::kKwInitial)) {
-    // A.5.3 writes `[ udp_initial_statement ]` into sequential_body alone,
-    // combinational_body opening with `table`; §29.4 has the statement set
-    // the value a sequential UDP's output starts from, and a combinational
-    // UDP's output has no state to initialize.
     if (!udp->is_sequential) {
       diag_.Error(CurrentLoc(),
                   "a UDP initial statement stands in a sequential body; a "
@@ -918,10 +753,6 @@ UdpDecl* Parser::ParseExternUdpDecl() {
     ParseUdpAnsiHeader(udp);
   } else {
     RejectAttributesBeforeUdpPortList(diag_, attrs);
-    // A.5.1 gives `extern udp_nonansi_declaration` no `udp_port_declaration`
-    // and no `udp_body`, so A.5.2's `udp_port_list` is the whole prototype: its
-    // first name is the output port and the rest are inputs, and no separate
-    // declarations exist to reconcile that order against.
     udp->output_name = ExpectIdentifier(Subclause("29.3.1")).text;
     while (Match(TokenKind::kComma)) {
       udp->input_names.push_back(ExpectIdentifier(Subclause("29.3.1")).text);

@@ -335,15 +335,6 @@ TEST(PostponedRegionSim, MonitorIsScheduledIntoPostponedRegion) {
 }
 
 TEST(PostponedRegionSim, StrobeSamplesFinalSettledValueOfTimeSlot) {
-  // §4.4.2.9: $strobe events are scheduled in the Postponed region, which the
-  // stratified scheduler reaches only after the NBA region has applied every
-  // nonblocking update of the current time slot and once no new value changes
-  // remain. Deferring the whole task to Postponed therefore makes $strobe print
-  // the *settled* value of the slot. An immediate $display in the same initial
-  // block reads the value before the nonblocking update takes effect, so the
-  // two tasks observe different values of one variable -- a direct, value-level
-  // observation that $strobe was scheduled into Postponed rather than executed
-  // in place. The nonblocking assignment supplies the pre/post differential.
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
 
@@ -371,14 +362,6 @@ TEST(PostponedRegionSim, StrobeSamplesFinalSettledValueOfTimeSlot) {
 }
 
 TEST(PostponedRegionSim, MonitorSamplesFinalSettledValueOfTimeSlot) {
-  // §4.4.2.9: $monitor, like $strobe, posts its display into the Postponed
-  // region, which is reached only after every nonblocking update of the slot
-  // has settled and no further value change may occur. A $monitor armed on a
-  // variable that takes a nonblocking update in the same time slot therefore
-  // reports the settled post-update value, never the transient value present
-  // when the monitor was armed. The nonblocking assignment supplies the
-  // pre/post differential that makes the Postponed sampling observable: an
-  // in-place display at arm time would have shown the pre-update value.
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
 

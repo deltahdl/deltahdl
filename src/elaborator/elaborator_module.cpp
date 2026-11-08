@@ -32,12 +32,6 @@
 
 namespace delta {
 
-// §23.2.2.3: an explicitly named port (.name(expr)) takes the self-determined
-// data type of its connection expression. Resolve the expression's width
-// against the module's already-elaborated variables and nets. Returns 0 when
-// the width cannot be determined here, leaving the port's default untouched.
-// The declared width of the variable or net named `name` in `mod`, or 0 when
-// the module declares no such signal.
 static uint32_t NamedSignalWidth(std::string_view name,
                                  const RtlirModule* mod) {
   for (const auto& v : mod->variables)
@@ -47,11 +41,6 @@ static uint32_t NamedSignalWidth(std::string_view name,
   return 0;
 }
 
-// A bit-select of a vector yields a single bit. A part-select's width is
-// self-determined from the select bounds alone: an indexed part-select (+:/-:)
-// is as wide as its constant width operand, and a ranged select spans the
-// inclusive distance between its two constant bounds. The LRM example
-// `.P1(r[3:0])` connects to a 4-bit slice regardless of r's width.
 static uint32_t ExplicitPortSelectWidth(const Expr* expr,
                                         const ScopeMap& scope) {
   if (expr->index_end == nullptr) return 1;
@@ -85,9 +74,6 @@ static uint32_t ExplicitPortExprWidth(const Expr* expr, const RtlirModule* mod,
   }
 }
 
-// The self-determined signedness of an explicit port expression: a simple
-// reference adopts the referenced object's signedness; composite expressions
-// such as concatenations are unsigned.
 static bool ExplicitPortExprSigned(const Expr* expr, const RtlirModule* mod) {
   if (!expr || expr->kind != ExprKind::kIdentifier) return false;
   for (const auto& v : mod->variables)
@@ -97,10 +83,6 @@ static bool ExplicitPortExprSigned(const Expr* expr, const RtlirModule* mod) {
   return false;
 }
 
-// §11.4.12 and §11.5.1: whether an explicit port expression is 4-state. A
-// select is of the object it selects from, and a concatenation is 4-state
-// where any of its operands is; a name is of the variable it names, and a net
-// or anything else the module declares no variable for is taken as 4-state.
 static bool ExplicitPortExprIs4state(const Expr* expr, const RtlirModule* mod) {
   while (expr->kind == ExprKind::kSelect) expr = expr->base;
   if (expr->kind == ExprKind::kConcatenation) {
@@ -114,17 +96,6 @@ static bool ExplicitPortExprIs4state(const Expr* expr, const RtlirModule* mod) {
   return true;
 }
 
-// §23.2.2.3: apply the self-determined type of each explicitly named port's
-// connection expression to the resolved port. The referenced declarations live
-// in the module body, so this runs after the items have been elaborated.
-//
-// §23.2.2.2 (printed page 734): an ANSI style port declaration may be
-// explicitly named, putting array and structure elements, concatenations of
-// elements and assignment patterns of elements the module declares on the port
-// list. The port stands for its expression, so the expression is recorded on it
-// for the connection to be joined to (LowerPortBindings); without it
-// `output .P1(r[3:0])` was storage of its own that nothing inside the module
-// reached.
 static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod,
                                      const ScopeMap& scope) {
   for (const auto& src : decl->ports) {
@@ -144,8 +115,6 @@ static void ResolveExplicitPortTypes(const ModuleDecl* decl, RtlirModule* mod,
   }
 }
 
-// §6.20: report every value parameter that ends up with neither a default
-// expression nor an instantiation override.
 static void ReportParamsMissingValue(const ModuleDecl* decl,
                                      const RtlirModule* mod, DiagEngine& diag) {
   for (const auto& pd : mod->params) {
@@ -160,8 +129,6 @@ static void ReportParamsMissingValue(const ModuleDecl* decl,
   }
 }
 
-// Whether the declaration is an interface's, and for one, the modports it
-// wrote (§25.5), which §37.7 gives each of its instances.
 static void InitInterfaceHeader(RtlirModule* mod, const ModuleDecl* decl) {
   mod->is_interface = (decl->decl_kind == ModuleDeclKind::kInterface);
   if (mod->is_interface) {
@@ -169,9 +136,6 @@ static void InitInterfaceHeader(RtlirModule* mod, const ModuleDecl* decl) {
   }
 }
 
-// Initialize the standalone (non-port, non-item) header fields of a freshly
-// created RtlirModule from its declaration. `unit_params` are the parameters of
-// the compilation unit that declares it.
 static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
                                   const CompilationUnit* unit,
                                   const ScopeMap& unit_params,
@@ -186,9 +150,6 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->is_checker = (decl->decl_kind == ModuleDeclKind::kChecker);
   mod->is_automatic = decl->is_automatic;
   mod->decl = decl;
-  // Annex E: each of its directives applies to the modules that follow it,
-  // so the values recorded at this module's header stand ahead of the unit's
-  // last.
   if (decl->has_module_directives) {
     mod->default_decay_time = decl->default_decay_time;
     mod->default_decay_time_infinite = decl->default_decay_time_infinite;
@@ -206,17 +167,11 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
     mod->has_default_trireg_strength = unit->has_default_trireg_strength;
     mod->delay_mode = unit->delay_mode_directive;
   }
-  // §22.8 and §22.9 bind a module to the directives in force at its
-  // definition, as Annex E does above.
   mod->default_nettype =
       decl->has_net_directives ? decl->default_nettype : unit->default_nettype;
   mod->unconnected_drive = decl->has_net_directives ? decl->unconnected_drive
                                                     : unit->unconnected_drive;
-  // §5.12: the attributes written before the declaration stand in the
-  // compilation unit, so their values fold against its parameters.
   mod->attrs = ResolveAttributes(decl->attrs, diag, unit_params);
-  // §20.4.1: the time unit and precision $timeunit and $timeprecision report
-  // for the element.
   mod->timescale = ModuleTimescale(decl, *unit);
 
   RtlirImport std_import;
@@ -225,9 +180,6 @@ static void InitRtlirModuleHeader(RtlirModule* mod, const ModuleDecl* decl,
   mod->imports.push_back(std_import);
 }
 
-// Clears every per-module bookkeeping table before a module's items are
-// elaborated. Lives beside ItemElaborationStateSaver (whose field set mirrors
-// it exactly) so the two stay in sync.
 void Elaborator::ResetItemElaborationState() {
   forward_typedef_kinds_.clear();
   declared_names_.clear();
@@ -279,12 +231,6 @@ void Elaborator::ResetItemElaborationState() {
   inference_funcs_ = InferenceFuncs{};
 }
 
-// Holds a snapshot of the per-module item-elaboration state. The constructor
-// moves the state out of the elaborator (resetting it for the nested module
-// about to be elaborated); Restore moves it back. The field set mirrors
-// Elaborator::ResetItemElaborationState exactly, apart from the two named at
-// the end of it; decltype is used so the field types track the members without
-// naming the elaborator's private nested types.
 struct ItemElaborationStateSaver {
   decltype(Elaborator::forward_typedef_kinds_) forward_typedef_kinds;
   decltype(Elaborator::declared_names_) declared_names;
@@ -332,42 +278,10 @@ struct ItemElaborationStateSaver {
   decltype(Elaborator::task_names_) task_names;
   decltype(Elaborator::let_names_) let_names;
   decltype(Elaborator::sequence_names_) sequence_names;
-  // §16.12: the registry of the module's own property and sequence
-  // declarations, which an instance an item makes rebuilds for the module it
-  // instantiates, so the items after the instance read their own module's
-  // declarations only because it is put back.
   decltype(Elaborator::property_registry_) property_registry;
   decltype(Elaborator::func_decls_) func_decls;
   decltype(Elaborator::inference_funcs_) inference_funcs;
 
-  // §26.3 and §6.18: a name an import or a typedef declaration introduces
-  // belongs to the scope it was written in, so what a module adds to typedefs_
-  // and cu_param_scope_ is taken back out before the next module is elaborated.
-  // Without this, `module a; import q::*; endmodule module b; word_t y;
-  // endmodule` sizes b's y from a's import, and a typedef declared in a is
-  // equally visible in b.
-  //
-  // §3.13 (e) puts a typedef in the name space of the module or interface
-  // declaring it, so the unpacked dimensions td_array_dims_ records for an
-  // array typedef are taken back out with it. Left in, an interface's
-  // `typedef int t [2]` gave two elements to every declaration a module
-  // elaborated after it wrote with its own `t` of no unpacked dimensions.
-  //
-  // These three are the exception to the field set above: they are copied and
-  // put back rather than moved out and cleared, because they also hold the
-  // compilation unit's own declarations. Elaborator::RegisterCuScopeItems fills
-  // them with $unit's typedefs, their dimensions and parameters and with every
-  // package's typedefs and parameters under their qualified keys before any
-  // module is elaborated, and §3.12.1 makes those visible to every design
-  // element in the unit. Clearing them would take those away from the module
-  // about to be elaborated, so the copy keeps them and drops only what that
-  // module added.
-  // Elaborator::ResetItemElaborationState therefore does not name them.
-  //
-  // A module elaborated as a child instance still starts from its parent's
-  // entry, which is what a lexically nested module (§23.4) requires and a
-  // separately instantiated one does not; that is a different question from the
-  // one settled here, which is what one module leaves behind for the next.
   struct ScopeMaps {
     decltype(Elaborator::typedefs_) typedefs;
     decltype(Elaborator::cu_param_scope_) cu_param_scope;
@@ -381,7 +295,6 @@ struct ItemElaborationStateSaver {
     e.ResetItemElaborationState();
   }
 
-  // The names, types and shapes of the module's objects and what drives them.
   void TakeObjectState(Elaborator& e) {
     forward_typedef_kinds = std::move(e.forward_typedef_kinds_);
     declared_names = std::move(e.declared_names_);
@@ -413,8 +326,6 @@ struct ItemElaborationStateSaver {
     alias_bit_pairs = std::move(e.alias_bit_pairs_);
   }
 
-  // The module's ports, the instances it makes, and the subroutines, lets,
-  // sequences and properties it declares.
   void TakePortAndDeclarationState(Elaborator& e) {
     non_ansi_complete_ports = std::move(e.non_ansi_complete_ports_);
     non_ansi_partial_ports = std::move(e.non_ansi_partial_ports_);
@@ -439,12 +350,6 @@ struct ItemElaborationStateSaver {
     inference_funcs = std::move(e.inference_funcs_);
   }
 
-  // Hands this module's typedefs, their dimensions and the compilation-unit
-  // parameters back. What the module added is kept in the design-wide unions,
-  // which a pass running after every module reads, before the maps the next
-  // module reads are taken back to what they were. insert_or_assign and not
-  // insert: two modules may declare one name, and the design-wide tables named
-  // the last one before any of this existed.
   void RestoreScopeMaps(Elaborator& e) {
     for (const auto& [name, dtype] : e.typedefs_)
       e.all_typedefs_.insert_or_assign(name, dtype);
@@ -519,14 +424,6 @@ struct ItemElaborationStateSaver {
   }
 };
 
-// §23.9/§24.3: the enclosing-scope chain follows lexical nesting, not the
-// instance tree. A lexically nested declaration (set up by the nested-decl
-// elaboration site, which records the enclosing scope in `pending`) extends
-// the caller's chain by one entry; any other call (a separately-instantiated
-// child, a bind, or the top cell) starts from an empty chain so the prior
-// caller's scope does not leak in. Answers the caller's chain, put back once
-// the cell is done. Moved out of ElaborateModule, which c70321083's guard took
-// past readability-function-size's statement threshold.
 static std::vector<std::unordered_set<std::string_view>>
 EnterEnclosingScopeChain(
     std::vector<std::unordered_set<std::string_view>>& chain,
@@ -542,12 +439,6 @@ EnterEnclosingScopeChain(
   return saved;
 }
 
-// §14.14: this cell's own global clocking declaration `own_gclk` joins the
-// chain of its ancestors' rather than replacing it, so back() is the
-// declaration closest to the point of reference -- rule a) before rule b) --
-// and the answer is the event a $global_clock reference in the cell resolves
-// to, null where the chain is empty. The caller pops its own entry once the
-// cell is done.
 template <class Scopes>
 static const std::vector<EventExpr>* EnterGlobalClockingChain(
     Scopes& scopes, const std::vector<EventExpr>* own_gclk,
@@ -561,45 +452,20 @@ static const std::vector<EventExpr>* EnterGlobalClockingChain(
 
 RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
                                          const ParamList& params) {
-  // §3.12.1: the design element is elaborated in the compilation-unit scope
-  // of the unit that declared it, before anything here reads that scope.
   UnitScopeTables::Switch unit_scope(*this, decl);
   auto* mod = arena_.Create<RtlirModule>();
   if (!units_.views.empty()) mod->unit_index = static_cast<int>(units_.current);
   InitRtlirModuleHeader(mod, decl, unit_, cu_param_scope_, diag_);
   mod->config = active_config_;
 
-  // The per-module item-elaboration state (the members reset by
-  // ResetItemElaborationState) is accumulated as this module's items are
-  // elaborated and is read by the deferred post-item validations. Elaborating a
-  // child instance recurses back into ElaborateModule, which resets and
-  // repopulates those members for the child; without restoring them the
-  // parent's validations would run against the child's leftover state -- for
-  // example a child's continuous assign to a port named like a parent signal
-  // would be misread as a multiple-driver conflict (§23.3.3). Snapshot the
-  // state here and restore it before returning so each ElaborateModule call is
-  // transparent to its caller. (nested_module_decls_ already had a narrower
-  // per-call save at the instance site; this generalizes it to the full set.)
   ItemElaborationStateSaver saved_item_state(*this);
-  // §23.9 (printed page 761) with §27.4 (printed 820): this module's
-  // declarations stand in its own scope, so the generate block prefixes,
-  // path and loop bindings of the scope instantiating it are taken out for
-  // its items and put back after; see ElaboratorData::GenerateScopeSaver.
   GenerateScopeSaver saved_generate_scope(*this);
 
   std::vector<std::unordered_set<std::string_view>> saved_enclosing =
       EnterEnclosingScopeChain(enclosing_scope_names_, pending_enclosing_scope_,
                                has_pending_enclosing_scope_);
-  // §16.15: the default disable iff a nested declaration inherits from the
-  // scope it is declared in, taken here so that the instances this cell
-  // contains, other than its own nested declarations, inherit none.
-  // §23.4: likewise the declarations the enclosing scopes nest.
   TakeNestedDeclInheritance();
 
-  // While this cell is elaborated it is the parent of any instances it
-  // contains; record its library so child binding can fall back to it
-  // (§33.4.1.5) or inherit it for a library-less use clause (§33.4.1.6). The
-  // previous value is restored before returning.
   std::string saved_library =
       std::exchange(current_library_, std::string(decl->library));
 
@@ -609,9 +475,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   RegisterImportedEnumLiterals(decl, mod, enum_ctx);
   RegisterCuEnumLiterals(decl, mod, enum_ctx);
 
-  // The type references of the parameter ports and the ports read the
-  // declaration's own values (Elaborator::ResolveTypeRef), so it is in force
-  // from the parameter ports on, not the instantiating module's.
   module_decl_path_.push_back(decl);
   ElaborateParamPortList(decl, params, mod);
   if (decl->decl_kind == ModuleDeclKind::kChecker) {
@@ -623,16 +486,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
         std::exchange(pending_checker_tree_actuals_, {});
   }
 
-  // §23.10 (printed page 763) with §6.20.1 (printed 125): a module declared
-  // with no parameter port list declares its value parameters among its
-  // items, and the instantiation's assignments override them there. They are
-  // installed for the items below, with the instantiating module's parameters
-  // -- registered from the item loop this instantiation is an item of, until
-  // ElaborateItems registers this module's own -- as the scope their
-  // expressions stand in. A module with a parameter port list has its body
-  // parameters as localparams, which no assignment reaches, so none are
-  // installed for it. ElaborateParamPortList alone read the assignments
-  // before, so `c #(.P(5)) u()` over `module c; parameter P = 1;` kept 1.
   const InstanceParamAssignments kBodyAssignments{
       params, RegisteredModuleScope(), RegisteredModule()};
   BodyParamAssignmentsGuard body_assignments_guard(
@@ -645,12 +498,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   CheckGenerateConstructs(decl);
   AssignGenerateBlockNames(decl);
 
-  // §14.14 (rule b): a $global_clock reference resolves against the effective
-  // global clocking found by searching up the instance hierarchy. Extend the
-  // in-scope flag with this cell's own declaration before its items -- and the
-  // child instances among them -- are elaborated, so a reference in a module
-  // that does not itself declare a global clocking still resolves against an
-  // ancestor's. Restored below so the flag reflects the parent's chain again.
   bool saved_global_clocking_in_scope = std::exchange(
       global_clocking_in_scope_,
       global_clocking_in_scope_ || ModuleDeclaresGlobalClocking(decl));
@@ -674,13 +521,6 @@ RtlirModule* Elaborator::ElaborateModule(const ModuleDecl* decl,
   global_clocking_in_scope_ = saved_global_clocking_in_scope;
   current_library_ = std::move(saved_library);
   enclosing_scope_names_ = std::move(saved_enclosing);
-  // declared_names_ holds this module's complete set of declared names at this
-  // point, and the Restore below takes it back to what the caller had. The
-  // generate constructs this module queued are elaborated after that, by
-  // Elaborator::ProcessPendingGenerate, and §23.9 judges what they declare
-  // against the scope they were written in, so keep the set here for them.
-  // The type tables are taken rather than copied, since the Restore below
-  // overwrites every one of them.
   module_scope_names_[mod] = {declared_names_,
                               net_names_,
                               cont_assign_targets_,

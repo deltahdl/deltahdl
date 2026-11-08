@@ -16,61 +16,29 @@
 using namespace delta;
 
 namespace {
-// The first included list at this stage: all 102 of Table 22-1 stay reserved,
-// so none of them can occupy the identifier slot of a declaration. Sweeping the
-// table whole is what makes the inclusion, rather than a handful of its
-// entries, the thing being checked.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005ReservesEveryVerilog1995Keyword) {
   ExpectKeywordTableIsReservedAtParse("1800-2005",
                                       kVerilog1995KeywordSweepAtParse);
 }
 
-// The second included list, with the leg that makes it an inclusion. Each of
-// Table 22-2's twenty-one entries is rejected here and accepted under
-// "1364-1995", where it is not yet a keyword -- so the rejection is this
-// version's list doing its work rather than an unrelated parse failure.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005ReservesEveryVerilog2001Keyword) {
   ExpectKeywordTableIsReservedAtParse("1800-2005",
                                       kVerilog2001AddedKeywordSweep);
 }
 
-// The third included list. Its one word cannot name a variable here, names one
-// under both lists the version it comes from is built on, and still opens the
-// net declaration it exists for -- inclusion is about the keyword role
-// surviving, not only about the identifier slot closing.
 TEST(CompilerDirectiveParsing, SystemVerilog2005ReservesTheVerilog2005Word) {
   ExpectKeywordTableIsReservedAtParse("1800-2005",
                                       kVerilog2005AddedKeywordSweep);
   ExpectUwireStillOpensNetDeclarations("1800-2005");
 }
 
-// Table 22-4 swept whole in an identifier slot, with the leg that makes each
-// entry an addition. The word cannot name a variable here, and under
-// "1364-2005" -- the union of everything this version includes -- the very same
-// declaration is built and read back off the tree. Any word for which both legs
-// hold is reserved by this version_specifier and by nothing it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2005ReservesEveryWordItAdds) {
   ExpectKeywordTableIsReservedAtParse("1800-2005",
                                       kSystemVerilog2005AddedKeywordSweep);
 }
 
-// The identifier positions a variable declaration does not reach, for the three
-// lists this version *includes*. Being on this version's list has to stop a
-// word from naming anything at all, not just from naming a variable, so one
-// word from each included table is put in turn where a design element, a port,
-// an instance, a task, and a named block take their names -- five productions,
-// each reached by its own path. Every one is rejected. The accepting
-// counterpart is the test below, which runs the same five positions with words
-// this version leaves free, so the rejections here cannot be blamed on the
-// positions themselves.
-//
-// Table 22-4 is deliberately absent from the word list. Its position axis is
-// carried by AddedWordsNameEntitiesUnderIncludedLists, which runs these same
-// five templates plus three more against three added words and asserts this
-// same rejection -- so listing an added word here would be a strictly weaker
-// copy of what that test already does.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005ReservedWordsFillNoIdentifierPosition) {
   ExpectWordsFillNoIdentifierPosition(
@@ -78,34 +46,16 @@ TEST(CompilerDirectiveParsing,
       {"design element", "port", "instance", "task", "named block"});
 }
 
-// The same five positions filled by words the four tables do not list, which is
-// the accepting side of the bound this version's list sets. Each names its
-// entity and the source parses, so the rejections above belong to the reserved
-// word list rather than to anything about the positions. Three of the five are
-// read back off the tree so the words are observed naming things.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005UnlistedWordsFillEveryIdentifierPosition) {
   ExpectUnlistedWordsNameEveryEntity("1800-2005", {"checker", "let"});
 }
 
-// The other side of the addition across the positions an identifier can occupy.
-// The sweep above closes the variable-declaration slot for every added word and
-// the test above that closes five further positions, but neither shows the
-// words free in those positions under the lists this version includes -- the
-// accepting leg there is carried by words a *later* standard reserves, which
-// says nothing about Table 22-4. So the added words are put in each of eight
-// positions under "1364-2005", the union of everything this version includes,
-// where they are still ordinary identifiers. Three of the eight -- a function
-// name, a gate instance name, and a genvar -- are reached by no other test
-// here. Each case is paired with the same source under this version, which
-// reserves the word and so admits none of them.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedWordsNameEntitiesUnderIncludedLists) {
   ExpectWordsNameEntitiesUnder("1364-2005", "1800-2005",
                                {"logic", "int", "bit"});
 
-  // Two of those positions read back, so the accepting legs are observed naming
-  // things rather than merely parsing.
   auto named_module =
       ParseWithPreprocessor(In2005("module logic;\nendmodule\n"));
   ASSERT_NE(named_module.cu, nullptr);
@@ -122,11 +72,6 @@ TEST(CompilerDirectiveParsing,
   EXPECT_EQ(gate->gate_inst_name, "int");
 }
 
-// The declaration forms the type test below does not reach. A declaration may
-// carry its own initializer, and a port may be declared either in the header or
-// in the separate style where the header lists only names and the body supplies
-// direction and type. Each is a production of its own, and a word this version
-// adds has to type the object in every one of them.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedTypeWordsTypeEveryDeclarationForm) {
   auto with_initializer =
@@ -144,8 +89,6 @@ TEST(CompilerDirectiveParsing,
       if (item->kind != ModuleItemKind::kVarDecl || item->name != name)
         continue;
       found = true;
-      // The declaration brings its own value rather than leaning on a separate
-      // procedural assignment, which is what makes this a form of its own.
       EXPECT_NE(item->init_expr, nullptr) << name;
     }
     EXPECT_TRUE(found) << name;
@@ -184,23 +127,6 @@ TEST(CompilerDirectiveParsing,
   }
   EXPECT_TRUE(typed_in_body);
 
-  // None of the three forms means under the union of everything this version
-  // includes what it means here, where the words introduce nothing. What each
-  // reads as depends on what follows the ordinary identifier that heads it, so
-  // the three are shown one at a time.
-  //
-  // The first is not rejected at all. A.4.1.1 gives `hierarchical_instance ::=
-  // name_of_instance ( [ list_of_port_connections ] )` and §23.3.2 repeats it
-  // in prose -- every module instantiation needs the parentheses, even of a
-  // module with no ports -- so `int counted = 21;` cannot be an instantiation,
-  // and A.2.4 admits it as a variable_decl_assignment carrying its own
-  // initializer. So Parser::ParseImplicitTypeOrInst builds a data declaration
-  // whose type_identifier is the undeclared name `int`, and §6.18 -- a
-  // user-defined data type is declared before any reference to its
-  // type_identifier -- is what refuses it, at elaboration, which no parse
-  // reaches. The tree is what says the words carried no keyword meaning: the
-  // declared name is `counted` and `int` is a type nothing declared, where
-  // under "1800-2005" above `int` is the type and nothing is undeclared.
   auto initialized =
       ParseWithPreprocessor(In2005("module m;\n  int counted = 21;\n"
                                    "endmodule\n"));
@@ -215,15 +141,10 @@ TEST(CompilerDirectiveParsing,
     EXPECT_EQ(item->data_type.kind, DataTypeKind::kNamed);
     EXPECT_EQ(item->data_type.type_name, "int");
     EXPECT_TRUE(item->type_name_undeclared_at_parse);
-    // The initializer is what makes this a declaration form of its own, so it
-    // survives the reading that leaves the type undeclared.
     EXPECT_NE(item->init_expr, nullptr);
   }
   EXPECT_TRUE(named_by_an_undeclared_type);
 
-  // §23.2.2.2 owns the second: `logic` is read as the first port's own name
-  // and `[7:0]` as its unpacked dimension, which leaves `a` where
-  // Parser::ParsePortList wants the closing parenthesis.
   auto ansi = ParseWithPreprocessor(
       In2005("module ch (input logic [7:0] a, output int y);\n"
              "  assign y = a;\n"
@@ -231,9 +152,6 @@ TEST(CompilerDirectiveParsing,
   EXPECT_TRUE(ReportedError(ansi.diags, "expected ')', got identifier",
                             LineInRegion(1), "23.2.2.2"));
 
-  // §6.8 owns the third: a packed dimension is where the declaration was meant
-  // to end, so Parser::ParsePlainVarDecl in src/parser/parser_items.cpp
-  // demands the semicolon.
   auto in_body =
       ParseWithPreprocessor(In2005("module ch (a, y);\n"
                                    "  input  [7:0] a;\n"
@@ -244,12 +162,6 @@ TEST(CompilerDirectiveParsing,
                             LineInRegion(4), "6.8"));
 }
 
-// The keyword roles the additions exist for, starting with the data types.
-// Reserving a word is only half of what the version_specifier buys; the other
-// half is that the word now introduces something, and each of these opens a
-// declaration whose type is read back off the tree. Under "1364-2005", where
-// none of them is reserved, the same source is not a set of declarations at
-// all.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedTypeWordsOpenDeclarations) {
   const std::string kSrc =
@@ -295,19 +207,11 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(found) << d.name;
   }
 
-  // §6.8 owns the report: with `logic` an ordinary identifier the first
-  // declaration reads as a variable of an implicit type, and its packed
-  // dimension is where Parser::ParsePlainVarDecl expected the semicolon.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '['",
                             LineInRegion(2), "6.8"));
 }
 
-// The aggregate and user-defined type words, which reach the parser by a path
-// of their own: `typedef` introduces a name for a type, `enum`, `struct`,
-// `union` and `packed` build the types it names, and `type` appears as a
-// parameter kind. The declared names are read back, and the same source under
-// the union of everything this version includes is rejected.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedAggregateWordsOpenDeclarations) {
   const std::string kSrc =
@@ -342,22 +246,11 @@ TEST(CompilerDirectiveParsing,
     EXPECT_TRUE(found) << name;
   }
 
-  // §6.8 owns the report: with `typedef` and `logic` both ordinary identifiers
-  // the first line is a data declaration and not an instantiation, because
-  // A.4.1.1 requires the parenthesized list_of_port_connections and no `(`
-  // follows the declarator. `typedef` is read as the type_identifier, `logic`
-  // as the declarator and `[7:0]` as the variable_dimension A.2.4 lets a
-  // declarator carry, which leaves the declared name `byte_t` standing where
-  // Parser::ParseVarDeclList wants the semicolon that ends the
-  // list_of_variable_decl_assignments.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected ';', got identifier",
                             LineInRegion(2), "6.8"));
 }
 
-// The words that open a process. Each of the three inferred always forms and
-// the final block is a module item of its own kind, so the tree says outright
-// which word opened which -- something no identifier-slot rejection could show.
 TEST(CompilerDirectiveParsing, SystemVerilog2005AddedProcessWordsOpenBlocks) {
   const std::string kSrc =
       "module m (input logic clk, input logic d, output logic q);\n"
@@ -379,14 +272,7 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005AddedProcessWordsOpenBlocks) {
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kAlwaysLatchBlock), nullptr);
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kFinalBlock), nullptr);
 
-  // The header survives, because "input logic clk" reads as a port of a
-  // user-defined type; the body declaration is read the same way, as a variable
-  // whose type_identifier is spelled logic. §6.18 refuses it at elaboration,
-  // since no such type is declared. Finding the declaration under that reading
-  // is what says the word carried no keyword meaning under this list.
   auto before = ParseWithPreprocessor(In2005(kSrc));
-  // always_comb leaves a declarator after it, but each of the other three words
-  // is followed by text no declarator begins with, and is reported there.
   EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '@'",
                             LineInRegion(5), "6.8"));
   EXPECT_TRUE(ReportedError(before.diags, "expected ';', got 'if'",
@@ -404,10 +290,6 @@ TEST(CompilerDirectiveParsing, SystemVerilog2005AddedProcessWordsOpenBlocks) {
   EXPECT_TRUE(read_as_a_named_type);
 }
 
-// The words that open a statement rather than a declaration or a process. The
-// loop-control and return statements, the do-while and foreach loops, and the
-// case qualifiers are all reached through a procedural block, which is a path
-// of its own. The statement kinds are read back off the initial block's body.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedStatementWordsOpenStatements) {
   const std::string kSrc =
@@ -455,17 +337,6 @@ TEST(CompilerDirectiveParsing,
   ASSERT_NE(fn, nullptr);
   EXPECT_EQ(fn->name, "twice");
 
-  // §6.8 owns the report, and it stands at the fourth declaration rather than
-  // the first. `int arr [0:3];` is not an instantiation, because A.4.1.1 gives
-  // `hierarchical_instance ::= name_of_instance ( [ list_of_port_connections ]
-  // )` and no `(` follows the dimension; A.2.4 admits it as a
-  // variable_decl_assignment whose variable_dimension is `[0:3]`, of a type
-  // named by the undeclared `int`, which is the reading the tree is checked
-  // for below. §6.18 refuses that reference at elaboration, which no parse
-  // reaches. `logic [1:0] sel;` is refused here, because what follows the
-  // leading name is a packed dimension and not a declarator:
-  // Parser::ParsePlainVarDecl reads `logic` as the variable itself and wants
-  // the semicolon that ends the declaration where the dimension opens.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   ASSERT_NE(before.cu, nullptr);
   ASSERT_EQ(before.cu->modules.size(), 1u);
@@ -483,11 +354,6 @@ TEST(CompilerDirectiveParsing,
                             LineInRegion(5), "6.8"));
 }
 
-// The words that open a design element, which is the outermost syntactic
-// position any of the additions reaches. An interface with a modport, a package
-// with a constant that is then imported, a program, and a class hierarchy each
-// land in their own list on the compilation unit, so what opened them is read
-// back rather than inferred from the source parsing.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedDesignElementWordsOpenElements) {
   const std::string kSrc =
@@ -532,18 +398,11 @@ TEST(CompilerDirectiveParsing,
       FindItemByKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl),
       nullptr);
 
-  // §3.12.1 owns the report: with `package` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and
-  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));
 }
 
-// The verification vocabulary, which is the part of Table 22-4 with no Verilog
-// ancestor at all: an immediate assertion, a named property and sequence, a
-// cover statement, a covergroup with a coverpoint and its bins, a clocking
-// block, and the fork-join variants. Each lands as its own module item.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005AddedVerificationWordsOpenConstructs) {
   const std::string kSrc =
@@ -587,56 +446,27 @@ TEST(CompilerDirectiveParsing,
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kClockingBlock), nullptr);
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kCovergroupDecl, "cg"));
 
-  // §6.8 owns the report. The header survives, because "input logic clk" reads
-  // as a port of a user-defined type; the first body declaration does not,
-  // because its packed dimension is where Parser::ParsePlainVarDecl expected
-  // the semicolon.
   auto before = ParseWithPreprocessor(In2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected ';', got '['",
                             LineInRegion(2), "6.8"));
 }
 
-// Table 22-1 in its keyword role under this version: inclusion is not only
-// about what a word may no longer name. The gate primitives build structure,
-// the resolved net types and drive strengths are written out, and the
-// procedural statements build control flow -- all under a region opened for
-// this version_specifier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005IncludedVerilog1995WordsStillWork) {
   ExpectVerilog1995ConstructsParse("1800-2005");
 }
 
-// Including Table 22-2 means including the ten words a configuration is written
-// with, which is the sharpest thing that list contributes: seven of them appear
-// here and the declaration is built. Under "1364-1995", the first of the three
-// lists this version includes, none of the words is reserved and the construct
-// cannot be written -- so the configuration exists here because of the second
-// inclusion and not by default.
 TEST(CompilerDirectiveParsing, SystemVerilog2005IncludesTheConfigurationWords) {
   ExpectConfigurationWordsParse("1800-2005");
 }
 
-// The rest of Table 22-2 in its keyword role. `localparam` declares a constant,
-// `genvar`/`generate`/`endgenerate` build a loop generate construct,
-// `automatic` qualifies a subroutine, `signed` and `unsigned` qualify
-// declarations, and the four pulse-control words are specify items -- each the
-// construct its word exists to open, all still available under this version.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005IncludedVerilog2001WordsStillWork) {
   ExpectVerilog2001ConstructsParse("1800-2005");
 }
 
-// The negative the four tables imply, at the stage where it shows: a word none
-// of them lists is an ordinary identifier under this version, so it names
-// things freely and opens nothing. Both halves are here -- the same word naming
-// a declaration and failing to be a data type -- because either one alone would
-// leave the other unchecked.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2005LeavesUnlistedWordsAsIdentifiers) {
-  // None of these opens a design element, so putting one at the head of a line
-  // leaves the region machinery -- which tracks design elements by a line's
-  // first word, without regard to the list in force -- out of the picture, and
-  // the only thing that can reject the source is the word not being a type.
   const char* const kUnlisted[] = {"until", "let", "global", "nettype", "soft"};
   for (const char* word : kUnlisted) {
     auto r = ParseWithPreprocessor(InSv2005(VarDecl(word)));
@@ -649,9 +479,6 @@ TEST(CompilerDirectiveParsing,
 
     std::string as_type =
         std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n";
-    // §6.8 owns the report: the word is an ordinary identifier here, so
-    // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
-    // the packed dimension is where it expected the declaration to end.
     auto typed = ParseWithPreprocessor(InSv2005(as_type));
     EXPECT_TRUE(ReportedError(typed.diags, "expected ';', got '['",
                               LineInRegion(2), "6.8"))

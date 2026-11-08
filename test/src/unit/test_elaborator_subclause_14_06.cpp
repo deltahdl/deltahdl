@@ -42,8 +42,6 @@ TEST(SignalMultiBlockElab, SharedClockBlocksElaborate) {
              "endmodule\n"));
 }
 
-// §14.6 lists inouts among the directions a signal may take across several
-// clocking blocks; the same inout signal in two blocks elaborates cleanly.
 TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
       ElabOk("module m; logic clk;\n"
@@ -56,8 +54,6 @@ TEST(SignalMultiBlockElab, InoutSignalInTwoBlocksElaborates) {
              "endmodule\n"));
 }
 
-// §14.6 lists outputs among the directions a signal may take across several
-// clocking blocks; the same output signal in two blocks elaborates cleanly.
 TEST(SignalMultiBlockElab, SameOutputSignalInTwoBlocksElaborates) {
   EXPECT_TRUE(
       ElabOk("module m; logic clk;\n"

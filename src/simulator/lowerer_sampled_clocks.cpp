@@ -17,19 +17,11 @@ namespace delta {
 
 namespace {
 
-// §16.9.3's four value change functions.
 bool IsValueChangeFunction(std::string_view name) {
   return name == "$rose" || name == "$fell" || name == "$stable" ||
          name == "$changed";
 }
 
-// §16.9.3 (printed pages 415 and 417): a value change function given a
-// clocking event of its own compares the sampled value of its argument now
-// with the one at the most recent strictly prior time step in which that
-// event occurred, whatever clock or procedure the call stands in. This
-// process records that sample at every tick of the event, as the call site's
-// history, which the call reads (EvalPastOrValueChange in
-// eval_systask_verif.cpp) and does not write.
 SimCoroutine MakeSampledClockMonitor(const Expr* site, SimContext& ctx,
                                      Arena& arena) {
   while (!ctx.StopRequested()) {

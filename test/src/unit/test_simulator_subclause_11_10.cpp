@@ -76,9 +76,6 @@ TEST(StringLiteralExpressionsSim, StringLiteralShiftLeft) {
   EXPECT_EQ(val.ToUint64(), 0x82u);
 }
 
-// A multi-character literal taking part in an operation is handled as one
-// numeric value formed from all of its ASCII bytes, not byte-by-byte: "AB"
-// is the 16-bit number 0x4142, so adding one yields 0x4143.
 TEST(StringLiteralExpressionsSim, MultiCharStringLiteralActsAsSingleNumber) {
   SimFixture f;
   auto* expr = ParseExprFrom("\"AB\" + 16'd1", f);
@@ -87,9 +84,6 @@ TEST(StringLiteralExpressionsSim, MultiCharStringLiteralActsAsSingleNumber) {
   EXPECT_EQ(val.ToUint64(), 0x4143u);
 }
 
-// Left zero-padding of an oversized target must extend past a single 64-bit
-// word: a 16-bit literal stored into an 80-bit vector keeps its bytes in the
-// low word and leaves the entire upper word as padding zeros.
 TEST(StringLiteralExpressionsSim, WideVectorPaddingSpansMultipleWords) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -105,10 +99,6 @@ TEST(StringLiteralExpressionsSim, WideVectorPaddingSpansMultipleWords) {
   EXPECT_EQ(var->value.words[1].aval, 0ULL);
 }
 
-// §11.10 with a literal built from §5.9's escape-sequence syntax: each escape
-// contributes one 8-bit ASCII byte to the packed constant number, exactly like
-// a plain character. "\t!" is the two bytes 0x09 (tab) and 0x21 ('!'), packed
-// first-character-high into a 16-bit value 0x0921.
 TEST(StringLiteralExpressionsSim,
      StringLiteralEscapeSequencesArePackedAsAscii) {
   SimFixture f;
@@ -122,10 +112,6 @@ TEST(StringLiteralExpressionsSim,
   EXPECT_EQ(var->value.ToUint64(), 0x0921ULL);
 }
 
-// §11.10 defines left zero-padding only for a target larger than the literal;
-// when the target is narrower, the assignment truncates (the §10.7 rule the
-// clause defers to) rather than padding. "AB" is the 16-bit number 0x4142;
-// stored into an 8-bit vector it keeps the low byte 0x42 ('B').
 TEST(StringLiteralExpressionsSim, StringLiteralTruncatedIntoNarrowVector) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -138,9 +124,6 @@ TEST(StringLiteralExpressionsSim, StringLiteralTruncatedIntoNarrowVector) {
   EXPECT_EQ(var->value.ToUint64(), 0x42ULL);
 }
 
-// A string literal is a constant number in a continuous-assignment context too,
-// not only a procedural one: driving a net with "A" places the ASCII code 0x41
-// on the net.
 TEST(StringLiteralExpressionsSim, StringLiteralInContinuousAssignment) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -153,12 +136,6 @@ TEST(StringLiteralExpressionsSim, StringLiteralInContinuousAssignment) {
   EXPECT_EQ(var->value.ToUint64(), 0x41ULL);
 }
 
-// §11.10's worked example: a 14-character vector is loaded with an 11-character
-// literal (left zero-padded, claim 4 + ASCII packing, claim 1), then the stored
-// value is manipulated by the concatenation operator (claim 2) as a single
-// numeric value (claim 3). Appending "!!!" (0x212121) and reassigning into the
-// same 112-bit vector drops the three padding bytes off the top, leaving
-// exactly the byte sequence the clause reports: 48656c6c6f20776f726c64212121.
 TEST(StringLiteralExpressionsSim, HeadExampleConcatenateAndStore) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -177,10 +154,6 @@ TEST(StringLiteralExpressionsSim, HeadExampleConcatenateAndStore) {
   EXPECT_EQ(var->value.words[1].aval, 0x48656c6c6f20ULL);
 }
 
-// §11.10: left zero-padding of an oversized target is consistent with the
-// padding applied when a nonstring unsigned value is assigned. The string
-// literal "Hi" and the plain unsigned number 16'h4869 carry the same bits, so
-// storing each into an identical 32-bit vector must yield identical contents.
 TEST(StringLiteralExpressionsSim, PaddingConsistentWithNonstringUnsigned) {
   SimFixture f;
   auto* design = ElaborateSrc(

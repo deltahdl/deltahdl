@@ -11,10 +11,6 @@ using namespace delta;
 
 namespace {
 
-// A.10 item 2: only a variable output port may be initialized, and only an
-// input port may be given a default value. A variable output port with
-// `= constant_expression` is the initialized port the item permits; an output
-// net with one is the port it forbids initializing.
 TEST(BnfClarificationElaboration, VariableOutputPortInitializerOk) {
   ElabFixture f;
   EXPECT_TRUE(ElabOk(
@@ -95,12 +91,6 @@ TEST(BnfClarificationElaboration, DollarInQueueSelectOk) {
              "endmodule\n"));
 }
 
-// §A.10 item 8: it shall be illegal to use the final_specifier when declaring
-// a pure virtual method. A.2.6 places the dynamic_override_specifiers of a
-// function_prototype directly after the `function` keyword, so `:final` is
-// written there; the specifier trailing the port list, which this case used to
-// hand over, is no production at all and was rejected by the parser before the
-// pure virtual rule was ever reached.
 TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,8 +104,6 @@ TEST(BnfClarificationElaboration, FinalOnPureVirtualError) {
       "':final' shall not be specified on a pure virtual method", 2, "8.20"));
 }
 
-// §A.10 item 4: when the bind target is an interface, the bound instance must
-// be an interface or checker instantiation, not a module instantiation.
 TEST(BnfClarificationElaboration, BindCheckerIntoInterfaceOk) {
   EXPECT_TRUE(
       ElabOk("checker chk; endchecker\n"
@@ -142,8 +130,6 @@ TEST(BnfClarificationElaboration, BindModuleIntoInterfaceError) {
                             6, "23.11"));
 }
 
-// §A.10 item 11: a dynamic_override_specifier may not be used on a static
-// constraint.
 TEST(BnfClarificationElaboration, DynamicOverrideOnStaticConstraintError) {
   ElabFixture f;
   ElabOk(
@@ -160,8 +146,6 @@ TEST(BnfClarificationElaboration, DynamicOverrideOnStaticConstraintError) {
       "18.5.10"));
 }
 
-// §A.10 item 25: a dynamic_override_specifier is legal only on a method
-// declared inside a (non-interface) class; on a free subroutine it is illegal.
 TEST(BnfClarificationElaboration, DynamicOverrideOutsideClassError) {
   ElabFixture f;
   ElaborateSrc(
@@ -177,8 +161,6 @@ TEST(BnfClarificationElaboration, DynamicOverrideOutsideClassError) {
       2, "13.4"));
 }
 
-// §A.10 item 41: every argument of a constant_function_call must itself be a
-// constant expression.
 TEST(BnfClarificationElaboration, ConstantFunctionCallConstantArgOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -202,8 +184,6 @@ TEST(BnfClarificationElaboration, ConstantFunctionCallNonConstantArgError) {
                     4, "13.4.3"));
 }
 
-// §A.10 item 16: when the vectored or scalared keyword is used there must be at
-// least one packed dimension.
 TEST(BnfClarificationElaboration, VectoredWithPackedDimensionOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -224,8 +204,6 @@ TEST(BnfClarificationElaboration, VectoredWithoutPackedDimensionError) {
                             2, "6.9.2"));
 }
 
-// §A.10 item 19: a named type used as an enum base type must denote an
-// integer_atom_type or integer_vector_type.
 TEST(BnfClarificationElaboration, EnumIntegerBaseTypeOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -248,7 +226,6 @@ TEST(BnfClarificationElaboration, EnumRealBaseTypeError) {
                             3, "6.19"));
 }
 
-// §A.10 item 20: a void member is legal only within a tagged union.
 TEST(BnfClarificationElaboration, VoidMemberInTaggedUnionOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -268,8 +245,6 @@ TEST(BnfClarificationElaboration, VoidMemberInUntaggedUnionError) {
                             "7.2"));
 }
 
-// §A.10 item 21: an expression used as the argument of a type_reference must
-// not contain hierarchical references or references to dynamic-object elements.
 TEST(BnfClarificationElaboration, TypeRefArgHierarchicalRefError) {
   ElabFixture f;
   ElabOk(
@@ -302,8 +277,6 @@ TEST(BnfClarificationElaboration, TypeRefArgDynamicElementError) {
                             3, "6.23"));
 }
 
-// §A.10 item 46: `this` may only appear within a class scope (or out-of-block
-// method); using it in a module procedural context is illegal.
 TEST(BnfClarificationElaboration, ThisInClassMethodOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -331,8 +304,6 @@ TEST(BnfClarificationElaboration, ThisInModuleInitialError) {
       "8.11"));
 }
 
-// §A.10 item 43: in a scope randomize_call (one that is not a method on a
-// class object), `null` is not a legal argument.
 TEST(BnfClarificationElaboration, ScopeRandomizeNullArgumentError) {
   ElabFixture f;
   ElaborateSrc(
@@ -345,8 +316,6 @@ TEST(BnfClarificationElaboration, ScopeRandomizeNullArgumentError) {
       "'null' is not a legal argument to a scope randomize call", 2, "A.8.2"));
 }
 
-// §A.10 item 43: a scope randomize_call may not carry a parenthesized
-// identifier_list after `with`.
 TEST(BnfClarificationElaboration, ScopeRandomizeParenIdentifierListError) {
   ElabFixture f;
   ElaborateSrc(
@@ -360,8 +329,6 @@ TEST(BnfClarificationElaboration, ScopeRandomizeParenIdentifierListError) {
                             2, "A.8.2"));
 }
 
-// §A.10 item 43 edge: the restriction is specific to scope randomize; a class
-// object's randomize method may take the parenthesized identifier list.
 TEST(BnfClarificationElaboration, MethodRandomizeParenIdentifierListOk) {
   ElabFixture f;
   ElaborateSrc(
@@ -376,9 +343,6 @@ TEST(BnfClarificationElaboration, MethodRandomizeParenIdentifierListOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §A.10 item 45: a type_reference primary may only be used with the equality,
-// inequality, and case equality/inequality operators. Applying any other
-// operator to it is illegal.
 TEST(BnfClarificationElaboration, TypeRefWithArithmeticOperatorError) {
   ElabFixture f;
   ElaborateSrc(
@@ -395,8 +359,6 @@ TEST(BnfClarificationElaboration, TypeRefWithArithmeticOperatorError) {
                             4, "6.23"));
 }
 
-// §A.10 item 45: an equality comparison between type references remains legal
-// and must not be rejected by the operator restriction.
 TEST(BnfClarificationElaboration, TypeRefEqualityComparisonOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -406,11 +368,6 @@ TEST(BnfClarificationElaboration, TypeRefEqualityComparisonOk) {
              "endmodule\n"));
 }
 
-// A.10 footnote 47 makes the `$` primary legal only in a select of a queue
-// variable, where it stands for the last element (§7.10.1). One in the select
-// of a fixed array, a vector or a dynamic array, or in a slice of one, is
-// reported; one in a queue's select, in the select of a variable declared with
-// a queue typedef, and in a value range is not (#8078).
 TEST(BnfClarificationElaboration, DollarInTheSelectOfANonQueueError) {
   ElabFixture f;
   ElaborateSrc(
@@ -446,10 +403,6 @@ TEST(BnfClarificationElaboration, DollarInTheSelectOfANonQueueError) {
   }
 }
 
-// A.10 footnote 45 admits a type reference to no operator but the four
-// equality operators, and `inside` is §11.4.13's set membership operator, so a
-// type reference as its left operand or as an item of its range list is
-// reported, once for each `inside` (#8082).
 TEST(BnfClarificationElaboration, TypeRefAsAnInsideOperandError) {
   ElabFixture f;
   ElaborateSrc(
@@ -472,10 +425,6 @@ TEST(BnfClarificationElaboration, TypeRefAsAnInsideOperandError) {
   }
 }
 
-// A.10 footnote 45 holds wherever a type reference stands, so one under any
-// other operator is reported in a localparam's value, a declaration's
-// initializer, a function's body and a block variable's initializer as in a
-// procedural assignment (#8083).
 TEST(BnfClarificationElaboration, TypeRefOperatorAnywhereError) {
   ElabFixture f;
   ElaborateSrc(

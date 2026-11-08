@@ -100,9 +100,6 @@ TEST(StreamingOperatorParsing, StreamingSliceSizeSimpleType) {
 }
 
 TEST(StreamingOperatorParsing, StreamExpressionWithArrayRange) {
-  // §11.4.14 BNF: stream_expression ::= expression [ with [
-  // array_range_expression ] ]. Exercises a `with` clause carrying a colon
-  // range on the stream element.
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] arr[0:3];\n"
@@ -119,7 +116,6 @@ TEST(StreamingOperatorParsing, StreamExpressionWithArrayRange) {
 }
 
 TEST(StreamingOperatorParsing, StreamExpressionWithPlusColonRange) {
-  // §11.4.14 BNF: array_range_expression covers the `+:` form.
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] arr[0:3];\n"
@@ -138,7 +134,6 @@ TEST(StreamingOperatorParsing, StreamExpressionWithPlusColonRange) {
 }
 
 TEST(StreamingOperatorParsing, StreamExpressionWithMinusColonRange) {
-  // §11.4.14 BNF: array_range_expression covers the `-:` form.
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] arr[0:3];\n"
@@ -157,8 +152,6 @@ TEST(StreamingOperatorParsing, StreamExpressionWithMinusColonRange) {
 }
 
 TEST(StreamingOperatorParsing, StreamExpressionWithBareIndex) {
-  // §11.4.14 BNF: array_range_expression admits a single expression with no
-  // colon — the degenerate one-element range form.
   auto r = Parse(
       "module t;\n"
       "  logic [7:0] arr[0:3];\n"
@@ -178,12 +171,6 @@ TEST(StreamingOperatorParsing, StreamExpressionWithBareIndex) {
   EXPECT_EQ(with->index_end, nullptr);
 }
 
-// §11.4.14 encloses the stream_concatenation of a streaming operator in braces
-// of its own, inside the braces of the concatenation holding it. A stream left
-// open is rejected at the token standing where its '}' belongs, and the report
-// names §11.4.14 rather than the token it wanted. It comes before the enclosing
-// concatenation's own report, because the stream is the innermost construct the
-// source ran out of.
 TEST(StreamingConcatenation, MalformedStreamNames11_4_14) {
   auto r = Parse(
       "module m;\n"

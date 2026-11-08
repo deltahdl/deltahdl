@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §5.7.2: real numbers may be written in decimal (fixed-point) notation, with a
-// digit present on each side of the decimal point. Such a form lexes as a
-// single real literal token.
 TEST(RealLiteralLexing, DecimalNotationIsRealLiteral) {
   auto r = LexOne("14.72 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
@@ -23,8 +20,6 @@ TEST(RealLiteralLexing, LeadingZeroDecimalIsRealLiteral) {
   EXPECT_EQ(r.token.text, "0.1");
 }
 
-// §5.7.2: real numbers may also be written in scientific notation, including
-// the exponent-only form (e.g. 39e8 = 39 x 10^8).
 TEST(RealLiteralLexing, ExponentOnlyIsRealLiteral) {
   auto r = LexOne("39e8 ");
   EXPECT_EQ(r.token.kind, TokenKind::kRealLiteral);
@@ -37,14 +32,6 @@ TEST(RealLiteralLexing, FixedPointWithExponentIsRealLiteral) {
   EXPECT_EQ(r.token.text, "1.30e-2");
 }
 
-// §5.7.2 has a real number written with a decimal point carry a digit on each
-// side of the point, and lists the four forms below as invalid for lacking
-// one. The lexer reads each as the one real literal it was written to be, so
-// that the statement holding it is parsed in step, and reports the spelling
-// under §5.7.2 naming the side that has no digit. The tests are one per form
-// so that a failure names the form.
-
-// No digit before the point.
 TEST(RealLiteralLexing, NoLeadingDigitIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics(".12 "),
@@ -55,7 +42,6 @@ TEST(RealLiteralLexing, NoLeadingDigitIsReported) {
   EXPECT_EQ(tokens[0].text, ".12");
 }
 
-// No digit after the point.
 TEST(RealLiteralLexing, NoTrailingDigitIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics("9. "),
@@ -66,8 +52,6 @@ TEST(RealLiteralLexing, NoTrailingDigitIsReported) {
   EXPECT_EQ(tokens[0].text, "9.");
 }
 
-// A point with an exponent but no fractional digit is still missing the digit
-// after the point; the exponent is read with the literal.
 TEST(RealLiteralLexing, PointBeforeExponentIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics("4.E3 "),
@@ -78,7 +62,6 @@ TEST(RealLiteralLexing, PointBeforeExponentIsReported) {
   EXPECT_EQ(tokens[0].text, "4.E3");
 }
 
-// Missing the digit before the point, even with an exponent.
 TEST(RealLiteralLexing, NoLeadingDigitWithExponentIsReported) {
   EXPECT_TRUE(ReportedError(
       LexDiagnostics(".2e-7 "),
@@ -90,19 +73,12 @@ TEST(RealLiteralLexing, NoLeadingDigitWithExponentIsReported) {
   EXPECT_EQ(tokens[0].text, ".2e-7");
 }
 
-// The legal spellings of §5.7.2's own list, with a digit on each side of the
-// point or no point at all, draw nothing: the report is for the point that
-// lacks a digit, not for the point or the exponent as such.
 TEST(RealLiteralLexing, DigitsOnBothSidesOfThePointDrawNoReport) {
   EXPECT_TRUE(LexDiagnostics("0.1 ").empty());
   EXPECT_TRUE(LexDiagnostics("1.2E12 ").empty());
   EXPECT_TRUE(LexDiagnostics("29E-2 ").empty());
 }
 
-// Underscores may stand among the digits of an exponent, and among those
-// after a point with no digit before it, and the literal is read whole either
-// way: `1e1_0` is one real literal, and `.1_2` one literal reported for its
-// missing digit rather than a literal and an identifier.
 TEST(RealLiteralLexing, UnderscoresAmongExponentAndFractionDigits) {
   auto exponent = Lex("1e1_0");
   ASSERT_EQ(exponent.size(), 2u);

@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.16: each branch is taken with a chance equal to its share of the summed
-// weights, so 8000 draws of the clause's weights of 3, 1 and 4 take the
-// branches near 3/8, 1/8 and 1/2 of the time, and every draw takes one branch,
-// as the design test/src/e2e/randcase_statement.sv runs it.
 TEST(RandcaseRun, TheClausesWeightsSelectTheBranchesInProportion) {
   SimFixture f;
   std::string out = RunCapture(
@@ -42,9 +38,6 @@ TEST(RandcaseRun, TheClausesWeightsSelectTheBranchesInProportion) {
   EXPECT_EQ(out, "1 1 1 1\n");
 }
 
-// 18.16: a branch of zero weight is not taken, and no branch is taken when
-// every weight is zero, as the design test/src/e2e/randcase_statement.sv runs
-// it.
 TEST(RandcaseRun, AZeroWeightIsNotTakenAndAllZeroTakesNone) {
   SimFixture f;
   std::string out = RunCapture(
@@ -74,12 +67,6 @@ TEST(RandcaseRun, AZeroWeightIsNotTakenAndAllZeroTakesNone) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// 18.16: the weights are arbitrary expressions of self-determined precision,
-// each evaluated at most once and added as unsigned values, so with a = 1
-// and b = 1 the clause's 12'h800 branch takes most of 1000 draws and the
-// a - b branch none, with a = 8'hFF and b = 1 the a + b branch, 0 in 8 bits,
-// none, and two weights calling a function call it twice, as the design
-// test/src/e2e/randcase_statement.sv runs it.
 TEST(RandcaseRun, WeightsAreSelfDeterminedExpressionsEvaluatedOnce) {
   SimFixture f;
   std::string out = RunCapture(
@@ -130,10 +117,6 @@ TEST(RandcaseRun, WeightsAreSelfDeterminedExpressionsEvaluatedOnce) {
   EXPECT_EQ(out, "1 1 1 2\n");
 }
 
-// 18.16: randcase is thread stable, its random numbers coming from
-// $urandom_range(), so a forked thread seeded with 3 selects the same eight
-// branches beside a thread that draws a hundred, as the design
-// test/src/e2e/randcase_statement.sv runs it.
 TEST(RandcaseRun, ASeededThreadSelectsTheSameBranchesBesideABusyOne) {
   SimFixture f;
   std::string out = RunCapture(
@@ -176,14 +159,6 @@ TEST(RandcaseRun, ASeededThreadSelectsTheSameBranchesBesideABusyOne) {
   EXPECT_EQ(out, "1\n");
 }
 
-// 18.16 with 13.4: a randcase is a statement a function body may hold, and
-// it selects a branch there as it does in a process, weighing each item with
-// an expression evaluated in the function's own frame. The weights are the
-// function's argument y read twice, y - y and y + y, so with y = 6 the first
-// branch weighs 0 and is never taken and the second weighs 12 and always is:
-// the function returns 10, and not the 0 a body that stepped over the
-// statement returns nor the 5 a weight that could not read y would allow.
-// This is the shape of sv-tests' 18.16--random-weighted-case-randcase_2.sv.
 TEST(RandcaseRun, ARandcaseInAFunctionBodyWeighsWithTheFunctionsArguments) {
   SimFixture f;
   std::string out = RunCapture(

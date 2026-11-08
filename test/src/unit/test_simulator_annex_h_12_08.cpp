@@ -13,21 +13,11 @@ using namespace delta;
 
 namespace {
 
-// §H.12.8, the C side of Example 6, compiled against this svdpi.h as the
-// example writes it -- under the names this tree's naming rules give C++
-// code, F1 for f1, and without the const the example puts on the handle
-// parameter, which those rules read as a constant: a struct MyType
-// compatible with C, and f1 taking the two-dimensional open array by
-// handle, reading the bounds of each of its
-// two unpacked dimensions with svLow and svHigh, and visiting every element
-// by its own indices through the address svGetArrElemPtr2 computes, reading
-// it into a MyType and writing a MyType back.
 struct MyType {
   int i;
   int j;
 };
 
-// What f1 saw: the bounds it read and the elements it visited.
 int g_lo1 = 0;
 int g_hi1 = 0;
 int g_lo2 = 0;
@@ -51,8 +41,6 @@ void F1(svOpenArrayHandle h) {
   for (i = lo1; i <= hi1; i++) {
     for (j = lo2; j <= hi2; j++) {
       my_value = *static_cast<MyType*>(svGetArrElemPtr2(h, i, j));
-      // Something interesting: the element records the indices it was
-      // visited by, so that what f1 wrote back says which element it was.
       my_value.i = i;
       my_value.j = j;
       ++g_visited;
@@ -61,8 +49,6 @@ void F1(svOpenArrayHandle h) {
   }
 }
 
-// An open array of MyType laid out as C lays it out, over the ranges the
-// example declares, with room for the larger of its two actuals.
 struct OpenArrayOfMyType {
   std::vector<MyType> data;
   SvOpenArrayDimRange ranges[3];
@@ -86,8 +72,6 @@ struct OpenArrayOfMyType {
   svOpenArrayHandle Handle() { return &desc; }
 };
 
-// §H.12.8: f1's C prototype takes the open array by handle whatever the
-// element type, const svOpenArrayHandle.
 TEST(DpiTwoDimensionalOpenArray, TheOpenArrayFormalIsAHandle) {
   DpiArg formal;
   formal.name = "i";
@@ -97,9 +81,6 @@ TEST(DpiTwoDimensionalOpenArray, TheOpenArrayFormalIsAHandle) {
   EXPECT_EQ(DpiCTypeOfFormal(formal, true), "const svOpenArrayHandle");
 }
 
-// f1(a_10x5): the bounds read are those of [11:20][6:2], every one of the
-// 50 elements is visited by its own indices, and the element at [11][6]
-// holds what f1 wrote for those indices.
 TEST(DpiTwoDimensionalOpenArray, F1VisitsEveryElementOfA10x5ByItsOwnIndices) {
   OpenArrayOfMyType a_10x5(11, 20, 6, 2);
   F1(a_10x5.Handle());
@@ -114,8 +95,6 @@ TEST(DpiTwoDimensionalOpenArray, F1VisitsEveryElementOfA10x5ByItsOwnIndices) {
   EXPECT_EQ(corner->j, 6);
 }
 
-// f1(a_64x8): the same C code over [64:1][-1:-8], 512 elements visited, the
-// element at [1][-8] holding what f1 wrote for those indices.
 TEST(DpiTwoDimensionalOpenArray, TheSameF1VisitsA64x8OverItsNegativeRange) {
   OpenArrayOfMyType a_64x8(64, 1, -1, -8);
   F1(a_64x8.Handle());

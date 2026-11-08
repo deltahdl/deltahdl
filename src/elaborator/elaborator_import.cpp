@@ -20,48 +20,23 @@
 namespace delta {
 namespace {
 
-// §26.4: the scopes an import registers a package item into. The typedef table
-// and the set naming which of its entries stand for an unpacked aggregate are
-// filled by the same declaration and travel together, the parameter scope is
-// another part of what one import writes, and the class-name sets are the
-// last: a package class the import makes visible is a class type in the
-// importing scope (§26.3), which is what makes `B h;` declare a handle and
-// lets `h = d` take a subclass handle (§8.13).
 struct ImportScope {
   TypedefMap& typedefs;
   std::unordered_set<std::string_view>& aggregate_typedefs;
   ScopeMap& cu_param_scope;
   std::unordered_set<std::string_view>& class_names;
   std::unordered_set<std::string_view>& parameterized_classes;
-  // §13.4.3: the functions the constant-expression folder may call, which an
-  // imported package function joins under its bare name.
   std::unordered_map<std::string_view, const ModuleItem*>& func_decls;
-  // §6.6.7: the nettypes of the importing scope, which an imported package
-  // nettype joins under its bare name.
   NettypeTables nettypes;
-  // Where an imported typedef's type is made (PackageTypedefType).
   Arena& arena;
 };
 
-// §26.3 with §6.6.7: an imported package nettype is that nettype under its bare
-// name. RegisterPackageNettypes (src/elaborator/nettype_registration.cpp)
-// recorded the nettype under its "P::nt" key, and CopyNettype enters it under
-// `name` as well. A net declared with the name is then a net of the package's
-// nettype: it resolves through the package's function and, under §6.22.6,
-// matches the package's nettype, being that nettype.
 void RegisterImportedNettype(std::string_view pkg, std::string_view nettype,
                              std::string_view name, const ImportScope& scope) {
   CopyNettype(std::string(pkg) + "::" + std::string(nettype), name,
               scope.typedefs, scope.nettypes);
 }
 
-// An imported package parameter, entered in the compilation-unit parameter
-// scope under `name`. RegisterPackageParams in elaborator_resolve.cpp folded
-// the value where the declaration stands, against the package's own earlier
-// parameters and the members of its enumerations (§6.19, §6.20.1), and
-// recorded it under the "package.name" key. This scope holds none of those bare
-// names, so the recorded value is read back rather than folded again; an
-// initializer registration could not fold is folded here as before.
 void RegisterImportedParam(const ModuleItem* pi, const PackageDecl& pkg,
                            std::string_view name, const ImportScope& scope) {
   std::string qualified = std::string(pkg.name) + "." + std::string(pi->name);
@@ -82,11 +57,6 @@ void RegisterImportedParam(const ModuleItem* pi, const PackageDecl& pkg,
       TwoStateReading(pi->init_expr, kType, scope.cu_param_scope, *val));
 }
 
-// Register a single imported package item into a module's elaboration scopes:
-// typedefs become available by name, const parameters are entered into the
-// compilation-unit parameter scope, and classes into the class-name sets as
-// RecordClassDecl enters a module's own (§8.25 for the parameterized ones).
-// Shared by the wildcard and named-import branches of ApplyImport.
 void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
                         std::string_view name, ImportScope scope) {
   if (pi->kind == ModuleItemKind::kClassDecl && pi->class_decl) {
@@ -100,18 +70,13 @@ void RegisterImportItem(const ModuleItem* pi, const PackageDecl& pkg,
   } else if (pi->kind == ModuleItemKind::kNettypeDecl) {
     RegisterImportedNettype(pkg.name, pi->name, name, scope);
   } else if (pi->kind == ModuleItemKind::kTypedef) {
-    // §23.9: the type the package declared, as the package records it.
     scope.typedefs[name] = PackageTypedefType(*pi, pkg, scope.arena);
-    // §6.18: an import is what gives a package's typedef its bare name in this
-    // scope, and the name stands for whatever the package declared -- an
-    // aggregate when the declaration carried unpacked dimensions.
     if (!pi->unpacked_dims.empty()) scope.aggregate_typedefs.insert(name);
   } else if (pi->kind == ModuleItemKind::kParamDecl && pi->init_expr) {
     RegisterImportedParam(pi, pkg, name, scope);
   }
 }
 
-// Locate a package declaration by name within the compilation unit, or nullptr.
 const PackageDecl* FindPackageByName(const CompilationUnit* unit,
                                      std::string_view pkg_name) {
   for (const auto* p : unit->packages) {
@@ -120,14 +85,12 @@ const PackageDecl* FindPackageByName(const CompilationUnit* unit,
   return nullptr;
 }
 
-// Register every named item of a wildcard-imported package.
 void RegisterWildcardImport(const PackageDecl* pkg, ImportScope scope) {
   for (const auto* pi : pkg->items) {
     if (!pi->name.empty()) RegisterImportItem(pi, *pkg, pi->name, scope);
   }
 }
 
-// Register a single named item of an explicitly-named package import.
 void RegisterNamedImport(const PackageDecl* pkg, std::string_view target,
                          ImportScope scope) {
   for (const auto* pi : pkg->items) {
@@ -138,8 +101,6 @@ void RegisterNamedImport(const PackageDecl* pkg, std::string_view target,
   }
 }
 
-// Apply one package import directive, resolving the named package and
-// registering either all of its items (wildcard) or a single named item.
 void ApplyImport(const ImportItem& import_item, const CompilationUnit* unit,
                  ImportScope scope) {
   const PackageDecl* pkg = FindPackageByName(unit, import_item.package_name);
@@ -153,17 +114,6 @@ void ApplyImport(const ImportItem& import_item, const CompilationUnit* unit,
 
 }  // namespace
 
-// §3.12.1 makes the compilation-unit scope the one a module's upward search
-// (§23.9) ends in, and §26.3 has an import make a package's names visible in
-// the scope it is written in; so an import written outside every module, as the
-// uvm-tagged sv-tests files write `import uvm_pkg::*;` above their module, is
-// in force in each module of the unit. Each module takes the unit's imports as
-// it takes its own header imports, ahead of them so that a module's own
-// declarations and imports shadow the unit's (§23.9), and each is recorded on
-// the RTLIR module as a header import is, which is what the lowering reads.
-// §3.12.1 (printed page 56) has a reference search only the part of the unit
-// written before it, imports included, so an import written after the module
-// is not in force in it.
 void Elaborator::ApplyCompilationUnitImports(const ModuleDecl* decl,
                                              RtlirModule* mod) {
   for (const auto* item : UnitItemsBefore(unit_, decl->range.start)) {
@@ -183,10 +133,6 @@ void Elaborator::ApplyCompilationUnitImports(const ModuleDecl* decl,
   }
 }
 
-// §26.4: an import written in the module header precedes every declaration in
-// the module, ports included, so these are applied before ports and before the
-// item walk. A body import is applied by ApplyBodyImport below instead, as the
-// walk reaches it.
 void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kImportDecl) continue;
@@ -203,16 +149,6 @@ void Elaborator::ApplyHeaderImports(const ModuleDecl* decl) {
   }
 }
 
-// §26.3: a wildcard import earlier in a scope makes an identifier potentially
-// locally visible from there on, and an explicit import makes one locally
-// visible only before the point in question. Both rules are about the import's
-// position in the scope, which is why this registers one import as the item
-// walk in Elaborator::ElaborateItems reaches it rather than hoisting every body
-// import ahead of the walk: a declaration written above the import does not see
-// the package, and one written below it does.
-//
-// A header import is already registered by ApplyHeaderImports before the walk
-// starts and is skipped here.
 void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
   if (import_item.is_header) return;
   ApplyImport(import_item, unit_,
@@ -224,9 +160,6 @@ void Elaborator::ApplyBodyImport(const ImportItem& import_item) {
                func_decls_,
                {nettype_names_, nettype_resolve_funcs_, nettype_canonical_},
                arena_});
-  // §9.2.2.2.1: a function the import brings in is one an always_comb below it
-  // may call, and the table the inference reads was filled ahead of the walk
-  // (ElaborateItems).
   inference_funcs_.funcs.insert(func_decls_.begin(), func_decls_.end());
 }
 

@@ -8,15 +8,6 @@
 using namespace delta;
 namespace {
 
-// IEEE 1800-2023 §9.4.2.2 — the parser recognizes the implicit event control
-// @* and its parenthesized spelling @(*) and marks the construct as the star
-// form (is_star_sensitivity on a module-level always item, is_star_event on a
-// procedural event-control statement). The statement that follows the control
-// is parsed by the ordinary statement grammar and is not part of this rule, so
-// these tests cover only the distinct syntactic forms of @* itself: bare vs.
-// parenthesized, in a module always vs. in a procedural statement, and the
-// nested inner @* of LRM Example 4.
-
 TEST(ImplicitEventParsing, AtStarAlwaysSimple) {
   auto r = Parse(
       "module m;\n"
@@ -84,9 +75,6 @@ TEST(ImplicitEventParsing, AtStarParenStmtLevel) {
 }
 
 TEST(ImplicitEventParsing, NestedAtStarParsesAsEventControl) {
-  // LRM Example 4: an inner @* inside an @* always body parses as its own
-  // event-control statement (is_star_event). Also exercises @* preceding a
-  // begin/end block.
   auto r = Parse(
       "module m;\n"
       "  reg a, b, c, d, x;\n"

@@ -25,10 +25,6 @@ bool IsCoverpointOrCross(TokenKind k) {
   return k == TokenKind::kKwCoverpoint || k == TokenKind::kKwCross;
 }
 
-// §19.7, Table 19-2: whether an instance coverage option named `member` may
-// NOT be specified at the cross level when `cross` holds, at the coverpoint
-// level otherwise. Only the options the table forbids at a lower
-// level are listed; every other member is left alone.
 bool InstanceOptionForbiddenAtItemLevel(std::string_view member, bool cross) {
   if (member == "name" || member == "per_instance" ||
       member == "get_inst_coverage") {
@@ -41,11 +37,6 @@ bool InstanceOptionForbiddenAtItemLevel(std::string_view member, bool cross) {
   return member == "auto_bin_max" || member == "detect_overlap";
 }
 
-// §19.7.1, Table 19-4: whether a type coverage option named `member` may NOT
-// be specified at the cross level when `cross` holds, at the coverpoint level
-// otherwise. strobe, merge_instances and distribute_first belong to the
-// covergroup level alone, real_interval to the covergroup and coverpoint
-// levels; weight, goal and comment are allowed at every level.
 bool TypeOptionForbiddenAtItemLevel(std::string_view member, bool cross) {
   if (member == "strobe" || member == "merge_instances" ||
       member == "distribute_first") {
@@ -59,8 +50,6 @@ bool IsLiteralOne(const Expr* e) {
          e->int_val == 1;
 }
 
-// §19.5.2: a transition of length 0, a trans_set of one covergroup_value_range
-// with no repetition, or with a consecutive repetition of exactly 1.
 bool IsLengthZeroTransition(const TransSet& set) {
   if (set.steps.size() != 1 || set.steps[0].items.size() != 1) return false;
   const TransRangeList& step = set.steps[0];
@@ -70,8 +59,6 @@ bool IsLengthZeroTransition(const TransSet& set) {
          (step.repeat_hi == nullptr || IsLiteralOne(step.repeat_hi));
 }
 
-// §19.5.2: a goto or nonconsecutive repetition matches sequences of no fixed
-// length.
 bool HasUnboundedStep(const TransSet& set) {
   for (const TransRangeList& step : set.steps) {
     if (step.repetition == TransRepetition::kGoto ||
@@ -82,9 +69,6 @@ bool HasUnboundedStep(const TransSet& set) {
   return false;
 }
 
-// §19.5.5, §19.5.6: an ignore_bins or an illegal_bins `bins` cannot specify a
-// transition of unbounded or undetermined length; each one it holds is
-// reported.
 void ReportUnboundedExcludingTransitions(const BinsOrOptions& bins,
                                          DiagEngine& diag) {
   bool ignore = bins.keyword == BinsKeyword::kIgnoreBins;
@@ -98,10 +82,6 @@ void ReportUnboundedExcludingTransitions(const BinsOrOptions& bins,
   }
 }
 
-// A.6.5: whether `e` is the name an unparenthesized clocking event writes
-// after its '@': an identifier, a package-scoped one, or a hierarchical one.
-// `prefix` marks an `e` standing before a '.' or '::', the one place A.9.3's
-// hierarchical_identifier lets a bit-select stand.
 bool IsClockingEventName(const Expr* e, bool prefix) {
   if (e->kind == ExprKind::kIdentifier) return true;
   if (e->kind == ExprKind::kMemberAccess) {
@@ -135,11 +115,6 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kKwCovergroup, Subclause("19.3"));
 
   if (Check(TokenKind::kKwExtends)) {
-    // §19.4.1 embedded covergroup inheritance: the derived covergroup is
-    // written `covergroup extends base ;` with no fresh name of its own. The
-    // covergroup_identifier that follows `extends` names the base covergroup,
-    // and the derived covergroup takes that same name so every reference to it
-    // resolves to the derived instance.
     Consume();
     auto base = Expect(TokenKind::kIdentifier, Subclause("19.4.1"));
     item->name = base.text;
@@ -168,15 +143,6 @@ void Parser::ParseCovergroupDecl(std::vector<ModuleItem*>& items) {
   items.push_back(item);
 }
 
-// Reports a port list or a coverage event written on a derived covergroup.
-// A.2.11 gives covergroup_declaration two alternatives, and the second,
-// `covergroup extends covergroup_identifier ;`, ends at the semicolon: the
-// optional `( tf_port_list )` and `coverage_event` belong to the first
-// alternative alone. §19.4.1 (printed page 581) says why the derived one needs
-// neither: it takes over the base's argument list, when the base has one, and
-// must sample on the base's coverage event, when the base names one. The token
-// is left where it stands, so the shared tail of Parser::ParseCovergroupDecl
-// consumes it and one report covers the whole declaration.
 void Parser::RejectDerivedCovergroupTail() {
   if (Check(TokenKind::kLParen) || Check(TokenKind::kAt) ||
       Check(TokenKind::kAtAt) || Check(TokenKind::kKwWith)) {
@@ -187,14 +153,6 @@ void Parser::RejectDerivedCovergroupTail() {
   }
 }
 
-// Reports an `extends` written after a covergroup has named itself. A.2.11's
-// first alternative names the covergroup and carries no `extends`, and its
-// second carries `extends` and names nothing of its own; no alternative does
-// both, so a name followed by `extends` is a production the grammar does not
-// have. The base is read and discarded rather than recorded, because §19.4.1
-// (printed page 580) names the derived covergroup after the
-// covergroup_identifier the `extends` gives, and says nothing about what a
-// fresh name would mean.
 void Parser::RejectNamedCovergroupExtends() {
   if (!Check(TokenKind::kKwExtends)) return;
   diag_.Error(CurrentLoc(),
@@ -206,10 +164,6 @@ void Parser::RejectNamedCovergroupExtends() {
   ExpectIdentifier(Subclause("19.4.1"));
 }
 
-// Reads a `( tf_port_list )` of a covergroup or of its sample method into
-// `args`, reporting `output_message` under `subclause` at each formal written
-// with the `output` or `inout` direction, which neither list admits (§19.3,
-// §19.8.1).
 void Parser::ParseCoverageFormalList(std::vector<FunctionArg>& args,
                                      std::string_view output_message,
                                      Subclause subclause) {
@@ -235,9 +189,6 @@ void Parser::ParseCovergroupFormals(CovergroupBodyState& state) {
   }
 }
 
-// A.2.11 coverage_event: a clocking_event, which A.6.5 writes `@ ( event
-// expression )` or `@` followed by a name; `with function sample ( ... )`; or
-// `@@ ( block_event_expression )`.
 void Parser::ParseCoverageEvent(CovergroupBodyState& state) {
   CoverageEvent& event = state.cg->event;
   if (Match(TokenKind::kAt)) {
@@ -268,9 +219,6 @@ void Parser::ParseCoverageEvent(CovergroupBodyState& state) {
   }
 }
 
-// §19.8.1: `with function sample ( tf_port_list )`. A sample formal shall not
-// designate an output direction, and shares the covergroup's argument scope,
-// so it may not reuse a covergroup formal's name.
 void Parser::ParseSampleFunctionEvent(CovergroupBodyState& state) {
   Expect(TokenKind::kKwFunction, Subclause("19.8.1"));
   auto sample_id = ExpectIdentifier(Subclause("19.8.1"));
@@ -311,15 +259,6 @@ void Parser::ParseBlockEventExpression(std::vector<BlockEventTerm>& terms) {
   } while (Match(TokenKind::kKwOr));
 }
 
-// Reads A.2.11's hierarchical_btf_identifier, a hierarchical_tf_identifier, a
-// hierarchical_block_identifier or `[ hierarchical_identifier . | class_scope
-// ] method_identifier`, where A.9.3 spells hierarchical_identifier `[ $root .
-// ] { identifier constant_bit_select . } identifier` and A.8.4 spells
-// class_scope `class_type ::`. §19.3 (printed page 577) has the name denote a
-// block that carries a name, a task, a function or a method of a class. The
-// three forms share their first identifier and differ in what separates the
-// identifiers after it, so the separators are read as they come, and each
-// identifier is recorded in `path`.
 void Parser::ParseHierarchicalBtfIdentifier(
     std::vector<std::string_view>& path) {
   if (Check(TokenKind::kSystemIdentifier) && CurrentToken().text == "$root") {
@@ -342,12 +281,6 @@ void Parser::ParseHierarchicalBtfIdentifier(
   }
 }
 
-// A.2.11's coverage_spec_or_option opens both of its alternatives with
-// `{ attribute_instance }`, and cover_point's label may be preceded by a
-// data_type_or_implicit, so both are read before the item is told apart by
-// its first token. An identifier followed by ':' is the label itself, and is
-// asked about first because a name a typedef has declared can label a
-// coverpoint as well as type one.
 void Parser::ParseCovergroupItem(CovergroupBodyState& state) {
   ParseAttributes();
   if (IsOptionKeyword(CurrentToken())) {
@@ -374,9 +307,6 @@ void Parser::ParseCovergroupItem(CovergroupBodyState& state) {
   RejectCovergroupItem();
 }
 
-// §19.5/§19.6: a `label : coverpoint`/`label : cross` item, positioned on the
-// label. A label that does not introduce either is reported where the
-// keyword was due.
 void Parser::ParseLabelledCoverageSpec(CovergroupBodyState& state,
                                        const DataType* data_type) {
   Token label = Consume();
@@ -397,9 +327,6 @@ void Parser::ParseLabelledCoverageSpec(CovergroupBodyState& state,
   RejectCovergroupItem();
 }
 
-// A.2.11 makes each item of a covergroup a coverage_spec_or_option, a
-// cover_point, a cover_cross or a coverage_option; anything else is reported
-// where it stands and read past up to its ';'.
 void Parser::RejectCovergroupItem() {
   diag_.Error(CurrentLoc(),
               "a covergroup item is a coverpoint, a cross or a coverage "
@@ -412,13 +339,6 @@ void Parser::RejectCovergroupItem() {
   Match(TokenKind::kSemicolon);
 }
 
-// A.2.11 writes a coverage_option as `option . member_identifier = expression`
-// or `type_option . member_identifier = constant_expression`, and §19.7 has
-// an option take effect by that assignment alone: a member named with no
-// value, or a keyword with no member, sets nothing. Positioned on the `option`
-// or `type_option` keyword. Returns whether the member was read, whether or
-// not the '=' follows, so a caller keying on the member still keys on it; a
-// break in the form is reported where the form breaks.
 bool Parser::ParseCoverageOption(CoverageOption& option) {
   Token keyword = Consume();
   option.is_type_option = keyword.text == "type_option";
@@ -447,9 +367,6 @@ bool Parser::ParseCoverageOption(CoverageOption& option) {
   return true;
 }
 
-// §19.7.1: a type option is set with a constant expression, and a covergroup
-// formal is bound only when an instance is built, so a type option naming
-// one is reported at the formal.
 void Parser::RejectFormalInTypeOption(const CoverageOption& option,
                                       const CovergroupBodyState& state) {
   if (!option.is_type_option) return;
@@ -462,10 +379,6 @@ void Parser::RejectFormalInTypeOption(const CoverageOption& option,
               Subclause("19.7.1"));
 }
 
-// §19.7: a covergroup-level coverage-option assignment. Assigning the same
-// option twice in the same covergroup definition is an error, so each
-// assignment is keyed by its `option`/`type_option` keyword joined with the
-// member name and a repeat is flagged.
 void Parser::ParseCovergroupOption(CovergroupBodyState& state) {
   CoverageSpecOrOption item;
   item.kind = CoverageSpecKind::kOption;
@@ -492,10 +405,6 @@ void Parser::ParseCovergroupOption(CovergroupBodyState& state) {
   Match(TokenKind::kSemicolon);
 }
 
-// §19.7, Table 19-2: an instance coverage option set inside a coverpoint or
-// cross body, or §19.7.1, Table 19-4: a type option set there. A member that
-// may not be specified at this syntactic level is rejected; a `type_option` is
-// held to §19.7.1's constant value.
 bool Parser::ParseItemLevelOption(CoverageOption& option,
                                   const CovergroupBodyState& state,
                                   CovItemLevel level) {
@@ -518,9 +427,6 @@ bool Parser::ParseItemLevelOption(CoverageOption& option,
   return option.value != nullptr;
 }
 
-// §19.5: a coverpoint's name -- its label, or the variable an unlabelled one
-// covers -- and a cross's label share the covergroup's scope, so a name taken
-// a second time is reported where it is written.
 void Parser::TakeCoverageName(CovergroupBodyState& state, std::string_view name,
                               SourceLoc loc) {
   if (name.empty() || state.names.insert(name).second) return;
@@ -531,9 +437,6 @@ void Parser::TakeCoverageName(CovergroupBodyState& state, std::string_view name,
               Subclause("19.5"));
 }
 
-// True where the identifier the parse stands on is followed by ':', the shape
-// of a cover_point_identifier or cross_identifier label rather than of a type
-// name before one.
 bool Parser::IdentifierOpensCoverageLabel() {
   auto saved = lexer_.SavePos();
   Consume();
@@ -542,8 +445,6 @@ bool Parser::IdentifierOpensCoverageLabel() {
   return labelled;
 }
 
-// True where the identifier the parse stands on is followed by `with`, the
-// shape of A.2.11's `cover_point_identifier with ( ... )` bins value.
 bool Parser::IdentifierOpensCoverPointWith() {
   auto saved = lexer_.SavePos();
   Consume();
@@ -552,21 +453,12 @@ bool Parser::IdentifierOpensCoverPointWith() {
   return with;
 }
 
-// Reads the data_type_or_implicit before a cover_point's label. A.2.2.1 gives
-// it as a data_type or an implicit_data_type, `[ signing ] { packed_dimension
-// }`; ParseDataType reads the first and a leading signing, and a bare packed
-// dimension is what it leaves standing.
 DataType Parser::ParseCoverpointDataType() {
   DataType dtype = ParseDataType();
   if (Check(TokenKind::kLBracket)) ParsePackedDims(dtype);
   return dtype;
 }
 
-// True when the '{' the parser is on opens the coverpoint's bins_or_empty
-// rather than a concatenation: A.8.1's concatenation is `{ expression { ,
-// expression } }` and no expression opens with '}', a bins_keyword,
-// `wildcard`, `option`, `type_option` or an attribute_instance, which are the
-// tokens A.2.11's bins_or_options may open with.
 bool Parser::BraceOpensCoverpointBody() {
   auto saved = lexer_.SavePos();
   Consume();
@@ -578,10 +470,6 @@ bool Parser::BraceOpensCoverpointBody() {
   return is_body;
 }
 
-// Reads the expression A.2.11's cover_point puts after the `coverpoint`
-// keyword. §19.3 (printed page 577) lets a coverage point cover either a
-// variable or an expression, so a coverpoint written with nothing to cover is
-// reported where its expression was due.
 Expr* Parser::ParseCoverpointHead() {
   if (Check(TokenKind::kSemicolon) || Check(TokenKind::kKwIff) ||
       Check(TokenKind::kKwEndgroup) || AtEnd() ||
@@ -594,11 +482,6 @@ Expr* Parser::ParseCoverpointHead() {
   return ParseExpr();
 }
 
-// Reads the `[ iff ( expression ) ]` that A.2.11 puts after a cover_point's
-// expression, after a cover_cross's list_of_cross_items and after a bin: the
-// guard's expression is parenthesized in each, and one written bare is
-// reported at the token where its '(' was due and read on to where the item's
-// body or terminator resumes.
 Expr* Parser::ParseCoverageIffGuard() {
   if (!Match(TokenKind::kKwIff)) return nullptr;
   if (Match(TokenKind::kLParen)) {
@@ -614,8 +497,6 @@ Expr* Parser::ParseCoverageIffGuard() {
   return ParseExpr();
 }
 
-// A.2.11 cover_point, positioned on the `coverpoint` keyword: the expression,
-// its guard, and bins_or_empty.
 void Parser::ParseCoverPoint(CovergroupBodyState& state, std::string_view label,
                              SourceLoc label_loc, const DataType* data_type) {
   auto* cp = arena_.Create<CoverPointDecl>();
@@ -651,13 +532,9 @@ void Parser::ParseCoverPoint(CovergroupBodyState& state, std::string_view label,
     BinsOrOptions bins;
     if (ParseBinsOrOptions(bins, state)) cp->bins.push_back(bins);
   }
-  // A.2.11's bins_or_empty ends at its '}', so a ';' after it is left for the
-  // covergroup's item loop, which reports it as no coverage_spec_or_option.
   Expect(TokenKind::kRBrace, Subclause("A.2.11"));
 }
 
-// True where the token the parse stands on opens an item of a coverpoint or
-// cross body, so a missing ';' before it costs no more than its report.
 bool Parser::OpensCoverageBodyItem() {
   const Token& t = CurrentToken();
   return t.Is(TokenKind::kRBrace) || IsBinsKeyword(t.kind) ||
@@ -665,9 +542,6 @@ bool Parser::OpensCoverageBodyItem() {
          t.Is(TokenKind::kKwFunction) || IsOptionKeyword(t);
 }
 
-// Reads past the rest of a malformed coverpoint or cross body item: up to and
-// including the `;` that ends it at its own nesting, or up to the `}` that
-// closes the body.
 void Parser::SkipCoverageItemTail() {
   int depth = 0;
   while (!AtEnd() && !Check(TokenKind::kKwEndgroup)) {
@@ -688,7 +562,6 @@ void Parser::SkipCoverageItemTail() {
   }
 }
 
-// §19.3: each item of a coverpoint or cross body ends with ';'.
 void Parser::ExpectCoverageItemEnd() {
   if (Match(TokenKind::kSemicolon)) return;
   diag_.Error(CurrentLoc(), "missing ';' in covergroup item",
@@ -696,20 +569,12 @@ void Parser::ExpectCoverageItemEnd() {
   if (!OpensCoverageBodyItem()) SkipCoverageItemTail();
 }
 
-// The ')' closing a parenthesized part of a bins item: a trans_set, a `with`
-// filter or a `binsof` operand.
 void Parser::ExpectCoverageCloseParen() {
   if (Match(TokenKind::kRParen)) return;
   diag_.Error(CurrentLoc(), "missing ')' in covergroup item",
               Subclause("19.3"));
 }
 
-// A.2.11 bins_or_options, positioned on its first token: a coverage_option,
-// or `[ wildcard ] bins_keyword name [ [ [ size ] ] ] = value [ iff ( ... ) ]`.
-// `wildcard` is written on the value and transition forms alone; a trans_list
-// follows `[ ]` alone, §19.5.2 (printed page 592) naming its bins
-// "binname[transition]" for the transitions the list holds; `default
-// sequence` carries no subscript. Returns whether a whole item was read.
 bool Parser::ParseBinsOrOptions(BinsOrOptions& bins,
                                 CovergroupBodyState& state) {
   bins.loc = CurrentLoc();
@@ -764,7 +629,6 @@ bool Parser::ParseBinsOrOptions(BinsOrOptions& bins,
   return true;
 }
 
-// The value of a coverpoint's bins item, after its '='.
 void Parser::ParseBinsValue(BinsOrOptions& bins) {
   if (Match(TokenKind::kKwDefault)) {
     bins.kind = BinsOrOptionsKind::kDefault;
@@ -814,9 +678,6 @@ void Parser::ParseBinsValue(BinsOrOptions& bins) {
   bins.set_expr = ParseExpr();
 }
 
-// §19.5.2: a transition of length 0 is illegal, and the `[ ]` form, one bin
-// per transition, cannot hold a transition of unbounded length; §19.5.5 and
-// §19.5.6: nor can an ignore_bins or an illegal_bins.
 void Parser::CheckTransitionBins(const BinsOrOptions& bins) {
   for (const TransSet& set : bins.transitions) {
     if (IsLengthZeroTransition(set)) {

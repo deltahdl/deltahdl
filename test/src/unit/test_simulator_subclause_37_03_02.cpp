@@ -14,15 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.3.2 (Object type properties) states that every object carries a vpiType
-// property that is not drawn in the data model diagrams: vpi_get(vpiType, ...)
-// returns the integer constant for the object's type, and vpi_get_str(vpiType,
-// ...) returns the spelling of that type constant (a name derived, per §37.3,
-// from the object name in the diagram). The clause also notes that some objects
-// expose extra type properties shown in the diagrams (e.g. vpiOpType), reached
-// the same way through vpi_get. These tests drive the production routines
-// through the public C entry points, exactly as a PLI program would, by
-// installing a private context as the global one.
 class VpiObjectTypeProperty : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -31,8 +22,6 @@ class VpiObjectTypeProperty : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim: all objects have a vpiType property, and vpi_get(vpiType, handle)
-// returns the integer constant that represents the object's type.
 TEST_F(VpiObjectTypeProperty, GetTypeReturnsTheObjectTypeConstant) {
   VpiObject net;
   net.type = vpiNet;
@@ -43,9 +32,6 @@ TEST_F(VpiObjectTypeProperty, GetTypeReturnsTheObjectTypeConstant) {
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(&mod)), vpiModule);
 }
 
-// Claim: vpi_get_str(vpiType, handle) returns a pointer to a string holding the
-// name of the type constant - the identifier the type is known by in the data
-// model diagram.
 TEST_F(VpiObjectTypeProperty, GetStrTypeReturnsTheTypeConstantName) {
   VpiObject net;
   net.type = vpiNet;
@@ -60,19 +46,12 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeReturnsTheTypeConstantName) {
   EXPECT_EQ(std::string(mod_name), "vpiModule");
 }
 
-// Edge of the vpiType string rule: a value neither Annex K nor Annex M defines
-// as an object type has no type constant to name, so the string accessor
-// reports no name (a null pointer) rather than inventing one - the same null
-// the routine yields for any property it cannot supply.
 TEST_F(VpiObjectTypeProperty, GetStrTypeYieldsNoNameForAnUndefinedType) {
   VpiObject odd;
-  odd.type = 9999;  // no object type of either annex
+  odd.type = 9999;
   EXPECT_EQ(vpi_get_str(vpiType, VpiHandleOf(&odd)), nullptr);
 }
 
-// The string form names every object type the annexes define, each by its
-// own constant's spelling: the first and last of Annex K's list, kinds of
-// Annex M's, and its last.
 std::string TypeNameOf(int type) {
   VpiObject obj;
   obj.type = type;
@@ -104,17 +83,10 @@ TEST_F(VpiObjectTypeProperty, GetStrTypeNamesTheLastAnnexMType) {
   EXPECT_EQ(TypeNameOf(vpiLetExpr), "vpiLetExpr");
 }
 
-// §37.17 detail 19: a var bit may be named vpiRegBit, the spelling of the
-// shared value Annex K defines.
 TEST_F(VpiObjectTypeProperty, GetStrTypeNamesAVarBitByItsAnnexKSpelling) {
   EXPECT_EQ(TypeNameOf(vpiVarBit), "vpiRegBit");
 }
 
-// Claim: some objects expose additional type properties shown in the data model
-// diagrams (vpiOpType among those the clause lists), and
-// vpi_get(<type_property>, handle) likewise returns an integer constant
-// representing that extra type. An operation reports its operator kind through
-// vpiOpType.
 TEST_F(VpiObjectTypeProperty, GetReturnsAnAdditionalTypePropertyConstant) {
   VpiObject op;
   op.type = vpiOperation;
@@ -123,11 +95,6 @@ TEST_F(VpiObjectTypeProperty, GetReturnsAnAdditionalTypePropertyConstant) {
   EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&op)), vpiAddOp);
 }
 
-// Claim D, second input form: vpiPrimType is another of the additional type
-// properties the clause names. vpi_get(vpiPrimType, handle) returns the integer
-// constant for the primitive kind the object carries, reached through a
-// distinct production path from vpiOpType. The value tracks the stored kind, so
-// a sequential primitive and a combinational one report their own constants.
 TEST_F(VpiObjectTypeProperty, GetReturnsThePrimTypeAdditionalProperty) {
   VpiObject seq;
   seq.type = vpiPrimitive;
@@ -140,9 +107,6 @@ TEST_F(VpiObjectTypeProperty, GetReturnsThePrimTypeAdditionalProperty) {
   EXPECT_EQ(vpi_get(vpiPrimType, VpiHandleOf(&comb)), vpiCombPrim);
 }
 
-// Claim D, third input form: vpiDelayType is likewise one of the additional
-// type properties. vpi_get(vpiDelayType, handle) returns the integer constant
-// for the delay kind the object carries, through yet another production path.
 TEST_F(VpiObjectTypeProperty, GetReturnsTheDelayTypeAdditionalProperty) {
   VpiObject mod_path;
   mod_path.type = vpiModPath;
@@ -156,11 +120,6 @@ TEST_F(VpiObjectTypeProperty, GetReturnsTheDelayTypeAdditionalProperty) {
             vpiInterModPathDelay);
 }
 
-// Claim: the constant names of the types returned for the additional type
-// properties can be accessed using vpi_get_str(). Alongside the integer form,
-// vpi_get_str(vpiOpType, handle) hands back the spelling of the operator
-// constant the operation reports - the name of the very value vpi_get()
-// returns, so the two forms stay in step.
 TEST_F(VpiObjectTypeProperty, GetStrReturnsAnAdditionalTypePropertyName) {
   VpiObject add;
   add.type = vpiOperation;
@@ -170,8 +129,6 @@ TEST_F(VpiObjectTypeProperty, GetStrReturnsAnAdditionalTypePropertyName) {
   ASSERT_NE(add_name, nullptr);
   EXPECT_EQ(std::string(add_name), "vpiAddOp");
 
-  // A different operator value names its own constant, confirming the string
-  // form tracks the reported integer rather than a fixed spelling.
   VpiObject shift;
   shift.type = vpiOperation;
   shift.op_type = vpiLShiftOp;
@@ -180,25 +137,16 @@ TEST_F(VpiObjectTypeProperty, GetStrReturnsAnAdditionalTypePropertyName) {
   EXPECT_EQ(std::string(shift_name), "vpiLShiftOp");
 }
 
-// Edge of the additional-type-property string rule: vpi_get_str names the type
-// only for the values the simulator models. An operation whose op-type value
-// falls outside the modelled operator set still reports its integer faithfully,
-// while the string accessor has no constant name to hand back (null) rather
-// than inventing one.
 TEST_F(VpiObjectTypeProperty,
        GetStrAdditionalTypeYieldsNoNameForUnmodelledValue) {
   VpiObject op;
   op.type = vpiOperation;
-  op.op_type = 0;  // no operator constant carries value 0
+  op.op_type = 0;
 
   EXPECT_EQ(vpi_get(vpiOpType, VpiHandleOf(&op)), 0);
   EXPECT_EQ(vpi_get_str(vpiOpType, VpiHandleOf(&op)), nullptr);
 }
 
-// §37.3.2: the operator constants are Annex K's and those Annex M adds, and
-// vpi_get_str(vpiOpType) names each one, from the first of all, vpiMinusOp, to
-// the last, vpiInsideOp, a cast and a wildcard equality among them. The Annex
-// M constants had no name.
 TEST_F(VpiObjectTypeProperty, GetStrNamesTheOperatorsAnnexMAdds) {
   const struct {
     int op_type;
@@ -218,10 +166,6 @@ TEST_F(VpiObjectTypeProperty, GetStrNamesTheOperatorsAnnexMAdds) {
   }
 }
 
-// §37.3.2: vpiPrimType, vpiDelayType and vpiTchkType are additional type
-// properties too, and vpi_get_str names the constant each reports, from the
-// first to the last of its set in Annex K; a value outside its set has no
-// name. None of the three had a name.
 TEST_F(VpiObjectTypeProperty, GetStrNamesThePrimitiveDelayAndCheckTypes) {
   VpiObject prim;
   prim.type = vpiPrimitive;
@@ -259,9 +203,6 @@ TEST_F(VpiObjectTypeProperty, GetStrNamesThePrimitiveDelayAndCheckTypes) {
   }
 }
 
-// §37.3.2 with §23.3.3.7.1: an interconnect net whose ports connect it to no
-// net keeps its interconnect type -- a port of its instance it stands for with
-// no higher connection, and a port of an instance it holds with no lower one.
 TEST_F(VpiObjectTypeProperty, AnUnresolvedInterconnectNetStaysInterconnect) {
   VpiObject module;
   module.type = vpiModule;
@@ -285,10 +226,6 @@ TEST_F(VpiObjectTypeProperty, AnUnresolvedInterconnectNetStaysInterconnect) {
   EXPECT_EQ(std::string(name), "vpiInterconnect");
 }
 
-// §37.3.2 with §23.3.3.7.1: an interconnect net that a port of an instance it
-// holds joins to a wand net takes the wand type. The search passes the
-// module's own port joining another net, a child of the instance that is no
-// port, and a port of the instance joining another net.
 TEST_F(VpiObjectTypeProperty, AnInterconnectNetTakesItsInstancePortsNetType) {
   VpiObject module;
   module.type = vpiModule;
@@ -320,11 +257,6 @@ TEST_F(VpiObjectTypeProperty, AnInterconnectNetTakesItsInstancePortsNetType) {
   EXPECT_EQ(vpi_get(vpiResolvedNetType, VpiHandleOf(&net)), vpiWand);
 }
 
-// §37.3.2 with §23.3.3.7.1: the merged net is of the first type its nets
-// bring. An instance port joining the interconnect net to a net standing for
-// no net, or to a net of no type, brings none and is passed over, as is an
-// interconnect net whose net has no type, which still passes the merge on to
-// the wand net it is joined to.
 TEST_F(VpiObjectTypeProperty, AnInterconnectNetPassesOverNetsOfNoType) {
   VpiObject module;
   module.type = vpiModule;
@@ -353,8 +285,6 @@ TEST_F(VpiObjectTypeProperty, AnInterconnectNetPassesOverNetsOfNoType) {
   VpiObject leaf;
   leaf.type = vpiModule;
   leaf.children = {&leaf_port};
-  // The port that joins inner_ic to the net, seen from inside, leads back to
-  // a net the merge already holds.
   VpiObject back;
   back.type = vpiPort;
   back.high_conn = &net;
@@ -383,9 +313,6 @@ TEST_F(VpiObjectTypeProperty, AnInterconnectNetPassesOverNetsOfNoType) {
   EXPECT_EQ(vpi_get(vpiResolvedNetType, VpiHandleOf(&net)), vpiWand);
 }
 
-// §37.16: vpiNetType is the kind of net an object stands for. A net object
-// standing for no net has none to report, in either form; a net of no type is
-// vpiNone, and an interconnect net vpiInterconnect.
 TEST_F(VpiObjectTypeProperty, ANetTypeComesFromTheNetAnObjectStandsFor) {
   VpiObject bare;
   bare.type = vpiNet;
@@ -412,7 +339,6 @@ TEST_F(VpiObjectTypeProperty, ANetTypeComesFromTheNetAnObjectStandsFor) {
 
 class ResolvedNetTypesOfARun : public VpiDesignRun {
  protected:
-  // The resolved net type of `net`, in the integer and the string form.
   static std::string Resolved(vpiHandle net) {
     const char* name = vpi_get_str(vpiResolvedNetType, net);
     return std::to_string(vpi_get(vpiResolvedNetType, net)) + " " +
@@ -420,11 +346,6 @@ class ResolvedNetTypesOfARun : public VpiDesignRun {
   }
 };
 
-// §37.3.2 with §23.3.3.7.1: vpiResolvedNetType is a net's type once the nets a
-// port joins are resolved. A wand net, which no port joins to another type,
-// keeps its own; an interconnect port's net takes the type of the wor net the
-// instantiation connects to it, and an interconnect net connected to a wor
-// port of an instance takes that port's net's type. Neither form answered.
 TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesTheTypeItIsConnectedTo) {
   Run("module leaf(interconnect p); endmodule\n"
       "module sink(inout wor q); endmodule\n"
@@ -441,9 +362,6 @@ TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesTheTypeItIsConnectedTo) {
   EXPECT_EQ(Resolved(vpi_handle(vpiLowConn, port)), kWor);
 }
 
-// §37.16 with §23.3.3.7.1 and Table 23-1: an interconnect net that its module
-// connects to a wire port and a wand port is merged into a wand, the type the
-// elaborator gave its net, whichever port is connected first.
 TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesItsMergedNetsType) {
   Run("module dut1(inout wire w); endmodule\n"
       "module dut2(inout wand w); endmodule\n"
@@ -451,9 +369,6 @@ TEST_F(ResolvedNetTypesOfARun, AnInterconnectNetTakesItsMergedNetsType) {
   EXPECT_EQ(Resolved(By("top.c")), std::to_string(vpiWand) + " vpiWand");
 }
 
-// §37.16 with §23.3.3.7.1 and Table 23-1: an interconnect chain that reaches
-// a wire port and a wand port through an interconnect port is one net, merged
-// into a wand, which both of its interconnect nets resolve to (#7392).
 TEST_F(ResolvedNetTypesOfARun, AnInterconnectChainTakesItsMergedNetsType) {
   Run("module dut1(inout wire w); endmodule\n"
       "module dut2(inout wand w); endmodule\n"

@@ -10,20 +10,8 @@ using namespace delta;
 
 namespace {
 
-// §18.17 states that a randsequence statement opens an automatic scope holding
-// all of its production identifiers, so the set a production identifier
-// resolves against is exactly the productions its own randsequence statement
-// declares. These are the two reports
-// src/elaborator/elaborator_validate_randsequence.cpp makes of a name outside
-// that set, one for an rs_production_item and one for the optional top-level
-// name the statement's parentheses carry, each a literal fragment of the
-// std::format string at its emission site.
 constexpr std::string_view kItemNamesNoProduction =
     "randsequence production item names";
-// §23.9's report of a read that names no declaration the reference can reach,
-// made by ReportProcUnresolved in src/elaborator/elaborator_scope_rules.cpp. A
-// randsequence code block reads the names §18.17.7 declares, so the cases below
-// turn on whether this report is made rather than on the two above it.
 constexpr std::string_view kUnresolvedIdentifier =
     "reference to unresolved identifier";
 
@@ -31,15 +19,6 @@ constexpr std::string_view kTopNameNamesNoProduction =
     "as its top-level production, which is not one of the productions it "
     "declares";
 
-// The module, initial block and randsequence statement every case here hands
-// the elaborator: `top` is the name written inside the parentheses and `rules`
-// is the production list between it and endsequence. Written once so that each
-// case varies only the name that fails to resolve and the position the resolver
-// reaches it in, and so that seven near-identical bodies do not stand in the
-// file for the copy-paste detector to find.
-//
-// `rules` supplies its own indentation and its own trailing newline, so the
-// randsequence keyword stands on line 3 of every source built here.
 std::string RandsequenceOver(std::string_view top, std::string_view rules) {
   return "module m;\n"
          "  initial begin\n"
@@ -50,16 +29,6 @@ std::string RandsequenceOver(std::string_view top, std::string_view rules) {
          "endmodule\n";
 }
 
-// Elaborates the randsequence RandsequenceOver builds and asserts the
-// elaborator reported `message` on the line holding `anchor`.
-//
-// The anchor is passed rather than fixed because the report stands at the
-// offending name now: RsProductionItem carries the location of the identifier
-// it names, so a case whose name is written on the rule line is reported there
-// and not at the randsequence keyword. Every case below therefore anchors on
-// its own rule, and only the one about the name in the parentheses anchors on
-// the keyword. Naming the line by a string it holds rather than by a number
-// keeps the cases from counting the lines RandsequenceOver writes around them.
 void ExpectReportedOverRandsequence(std::string_view top,
                                     std::string_view rules,
                                     std::string_view message,
@@ -71,11 +40,6 @@ void ExpectReportedOverRandsequence(std::string_view top,
                             LineHolding(src, anchor), "18.17"));
 }
 
-// §18.17 makes every production identifier local to the randsequence statement
-// that declares it, so a production item naming a production the statement
-// never declared names nothing at all. `second` is that name here and `first`
-// beside it resolves, so the source differs from a legal one in the one name
-// the report has to be about.
 TEST(RandsequenceProductionNames, ItemNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main",
                                  "      main : first second;\n"
@@ -83,22 +47,12 @@ TEST(RandsequenceProductionNames, ItemNamingNoDeclaredProductionIsRejected) {
                                  kItemNamesNoProduction, "main : first second");
 }
 
-// §18.17 states that the randsequence keyword may take, inside the parentheses,
-// an optional production name naming the top-level production, so that name has
-// to designate one of the statement's productions. `mian` designates nothing
-// over a statement declaring `main`, and it reaches the resolver as
-// Stmt::rs_top_production rather than as an rs_production_item, which is a
-// position a check written over production items alone never visits.
 TEST(RandsequenceProductionNames,
      TopLevelNameDesignatingNoProductionIsRejected) {
   ExpectReportedOverRandsequence("mian", "      main : { ; };\n",
                                  kTopNameNamesNoProduction, "randsequence(");
 }
 
-// §18.17.2's rs_if_else names a production for the true branch, which the
-// resolver reaches through the branch rather than through the rs_prod's own
-// item. `missing` is declared nowhere; `other` beside it is declared, so the
-// only thing wrong with this source is the name the report has to be about.
 TEST(RandsequenceProductionNames,
      IfBranchNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main",
@@ -108,10 +62,6 @@ TEST(RandsequenceProductionNames,
                                  "if (1) missing else other");
 }
 
-// §18.17.2's rs_if_else names a second production for the else branch, which
-// the syntax and RsProd hold apart from the true branch, so a resolver reaching
-// one branch does not thereby reach the other. This source is the case above
-// with the two names exchanged.
 TEST(RandsequenceProductionNames,
      ElseBranchNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main",
@@ -121,19 +71,11 @@ TEST(RandsequenceProductionNames,
                                  "if (1) other else missing");
 }
 
-// §18.17.4's rs_repeat names the production it repeats, which the resolver
-// reaches through the repeat rather than through the rs_prod's own item. The
-// count is 2 rather than 1 or 0 so that nothing about the repetition makes the
-// name reachable or unreachable by accident.
 TEST(RandsequenceProductionNames, RepeatNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main", "      main : repeat(2) missing;\n",
                                  kItemNamesNoProduction, "repeat(2) missing");
 }
 
-// §18.17.3's rs_case names a production in each of its arms, which the resolver
-// reaches through the arm. `missing` names the arm the case expression selects
-// and `other`, declared, names the default arm, so the two arms differ in
-// exactly the name the report has to be about.
 TEST(RandsequenceProductionNames, CaseArmNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence(
       "main",
@@ -142,10 +84,6 @@ TEST(RandsequenceProductionNames, CaseArmNamingNoDeclaredProductionIsRejected) {
       kItemNamesNoProduction, "0: missing; default: other");
 }
 
-// §18.17.5's rand join names the productions it interleaves in a list of its
-// own, RsRule::rand_join_items, rather than through an rs_prod, so a resolver
-// walking the rs_prods alone reaches none of them. `other` beside `missing`
-// resolves, so the source differs from a legal one in one name.
 TEST(RandsequenceProductionNames,
      RandJoinNamingNoDeclaredProductionIsRejected) {
   ExpectReportedOverRandsequence("main",
@@ -155,13 +93,6 @@ TEST(RandsequenceProductionNames,
                                  "rand join missing other");
 }
 
-// The control the seven cases above rest on: a randsequence every one of whose
-// names resolves is reported nowhere. Every position they breach one at a time
-// is written here resolving -- the top-level name `main`, the two branches of
-// the if, the production the repeat repeats, the productions of both case arms,
-// the two the rand join interleaves, and the plain production item `leaf`.
-// Without this case, a resolver reporting every name whatever it resolved to
-// would satisfy all seven.
 TEST(RandsequenceProductionNames, EveryNameResolvingIsReportedNowhere) {
   ElabFixture f;
   std::string src =
@@ -179,11 +110,6 @@ TEST(RandsequenceProductionNames, EveryNameResolvingIsReportedNowhere) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The claim the seven cases above rest on, stated on its own: the report stands
-// at the offending name and not at the statement. The randsequence keyword is
-// three lines above the rule that breaks, and `first` on the rule before it
-// resolves, so a report made at the statement or at the first rule reads a
-// different line from this one.
 TEST(RandsequenceProductionNames, ReportStandsOnTheLineOfTheOffendingItem) {
   ElabFixture f;
   std::string src = RandsequenceOver("main",
@@ -195,11 +121,6 @@ TEST(RandsequenceProductionNames, ReportStandsOnTheLineOfTheOffendingItem) {
                             LineHolding(src, "spare : second"), "18.17"));
 }
 
-// Two rules naming two different undeclared productions are reported on their
-// own lines. One report cannot show that the location follows the item rather
-// than the statement: a location fixed at the randsequence keyword satisfies a
-// case that asserts one report on one line, and satisfies it twice over when
-// two reports land on that same line with nothing to tell them apart.
 TEST(RandsequenceProductionNames, TwoBadNamesAreReportedOnTwoLines) {
   ElabFixture f;
   std::string src = RandsequenceOver("main",
@@ -213,12 +134,6 @@ TEST(RandsequenceProductionNames, TwoBadNamesAreReportedOnTwoLines) {
                             LineHolding(src, "spare : missing_two"), "18.17"));
 }
 
-// §18.17 names no enclosing declaration the rule is suspended in, and a class
-// method is where a verification environment puts its code -- but the walk that
-// applied the rule reached a module's procedural blocks and its module-level
-// subroutines and no class, so whether a source was checked depended on where
-// it was written. The same randsequence in a module's initial block is reported
-// today, which is why these cases put it where it was not.
 TEST(RandsequenceScope, UndeclaredProductionInAClassMethodIsReported) {
   ElabFixture f;
   std::string src =
@@ -234,9 +149,6 @@ TEST(RandsequenceScope, UndeclaredProductionInAClassMethodIsReported) {
                             LineHolding(src, "main : missing"), "18.17"));
 }
 
-// A package is skipped for a different reason from a class: a package is not
-// elaborated through ElaborateItems at all, so the pass the checks run in never
-// sees one. One case cannot stand for both.
 TEST(RandsequenceScope, UndeclaredProductionInAPackageSubroutineIsReported) {
   ElabFixture f;
   std::string src =
@@ -252,9 +164,6 @@ TEST(RandsequenceScope, UndeclaredProductionInAPackageSubroutineIsReported) {
                             LineHolding(src, "main : missing"), "18.17"));
 }
 
-// A class declared inside a module, which reaches the walk by its scope's item
-// list rather than by the compilation unit's, so the two routes to a class are
-// both shown to arrive.
 TEST(RandsequenceScope, UndeclaredProductionInAClassInsideAModuleIsReported) {
   ElabFixture f;
   std::string src =
@@ -272,10 +181,6 @@ TEST(RandsequenceScope, UndeclaredProductionInAClassInsideAModuleIsReported) {
                             LineHolding(src, "main : missing"), "18.17"));
 }
 
-// The module a §18.17.7 case hands the elaborator. Separate from
-// RandsequenceOver above because these cases read a value out of a production
-// into a variable, which the name-resolution cases have no use for and so do
-// not declare.
 std::string RandsequenceReadingInto(std::string_view rules) {
   return "module m;\n"
          "  int r;\n"
@@ -287,11 +192,6 @@ std::string RandsequenceReadingInto(std::string_view rules) {
          "endmodule\n";
 }
 
-// §18.17.7: a rule implicitly declares a variable for each of its productions
-// that returns a value, and the code blocks of the production that set off the
-// generation may read it. So `a` in the code block below is a name the standard
-// declares, and §23.9's report of a reference to an unresolved identifier is
-// for a name nothing declares.
 TEST(RandsequenceProductionNames, ReturnValueReadInACodeBlockResolves) {
   ElabFixture f;
   std::string src = RandsequenceReadingInto(
@@ -302,11 +202,6 @@ TEST(RandsequenceProductionNames, ReturnValueReadInACodeBlockResolves) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.7: a production's scope takes in all its rules and code blocks, so
-// arguments passed to the production can be used anywhere in it. A formal
-// argument is therefore a declaration its own code blocks may read, reached by
-// a different field of RsProduction from the implicit return variable above and
-// so stated separately.
 TEST(RandsequenceProductionNames, FormalArgumentReadInACodeBlockResolves) {
   ElabFixture f;
   std::string src = RandsequenceReadingInto(
@@ -317,15 +212,6 @@ TEST(RandsequenceProductionNames, FormalArgumentReadInACodeBlockResolves) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.7 declares an implicit variable for each production of the rule that
-// returns a value, and a production given no return type is void. A void
-// production therefore declares nothing, and a read of its name is a read of an
-// undeclared name.
-//
-// This is what keeps the two cases above from being satisfied by declaring
-// every production name: `a` is written exactly as it is there and differs only
-// in returning nothing, so a collection that ignored the return type would
-// leave this source elaborating clean.
 TEST(RandsequenceProductionNames, VoidProductionNameReadIsUnresolved) {
   ElabFixture f;
   std::string src = RandsequenceReadingInto(
@@ -336,9 +222,6 @@ TEST(RandsequenceProductionNames, VoidProductionNameReadIsUnresolved) {
                             LineHolding(src, "r = a"), "23.9"));
 }
 
-// §18.17.7: a return in a production that returns a value shall specify an
-// expression, so `return;` in the code block of the int production num is
-// reported, at the return.
 TEST(RandsequenceProductionReturns,
      AReturnWithNoValueInAnIntProductionIsReported) {
   ElabFixture f;
@@ -358,10 +241,6 @@ TEST(RandsequenceProductionReturns,
                             5, "18.17.7"));
 }
 
-// §18.17.7: a production given no return type, or void, returns no value, so
-// `return;` there merely ends it (§18.17.6); and a return carrying a value in
-// the int production num, or in its weight code block, is what the clause
-// asks for. The source elaborates.
 TEST(RandsequenceProductionReturns,
      ValueLessReturnsInVoidProductionsElaborate) {
   EXPECT_TRUE(
@@ -377,10 +256,6 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
-// §18.17.7: a return in a production that returns a value gives an expression
-// of the production's type, as one in a nonvoid function does. num returns an
-// int, and the class handle c its code block declares is not
-// assignment-compatible with int, so its return is reported, at the return.
 TEST(RandsequenceProductionReturns,
      AClassHandleReturnedFromAnIntProductionIsReported) {
   ElabFixture f;
@@ -402,9 +277,6 @@ TEST(RandsequenceProductionReturns,
                             6, "18.17.7"));
 }
 
-// §18.17.7 with §8.13: mk returns a handle of class C, which an integer is not
-// assignment-compatible with, so the return of 5 in mk's weight code block is
-// reported, at the return.
 TEST(RandsequenceProductionReturns,
      AnIntegerReturnedFromAClassProductionIsReported) {
   ElabFixture f;
@@ -427,10 +299,6 @@ TEST(RandsequenceProductionReturns,
                             7, "18.17.7"));
 }
 
-// §18.17.7: the int formal v of num is an int, the handle d of class D, which
-// extends C, fits the production mk returning C (§8.13), and the string s that
-// the code block of name declares fits that string production. The source
-// elaborates.
 TEST(RandsequenceProductionReturns, ReturnsOfTheProductionsTypeElaborate) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -447,9 +315,6 @@ TEST(RandsequenceProductionReturns, ReturnsOfTheProductionsTypeElaborate) {
              "endmodule\n"));
 }
 
-// §23.9 makes a begin-end block nested in a code block a scope of its own, so
-// the class handle it declares hides mk's int port, and the return gives the
-// handle, which the class production takes.
 TEST(RandsequenceProductionReturns,
      AReturnReadsTheVariableANestedBlockDeclaresOverAPort) {
   EXPECT_TRUE(
@@ -464,8 +329,6 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
-// The nested block's int hides mk's class port, so the return gives an int,
-// which the class production does not take.
 TEST(RandsequenceProductionReturns,
      AnIntANestedBlockDeclaresOverAClassPortIsReported) {
   ElabFixture f;
@@ -487,8 +350,6 @@ TEST(RandsequenceProductionReturns,
                             6, "18.17.7"));
 }
 
-// §12.7.1 makes a variable a for loop's initialization declares local to the
-// loop, so the class handle it declares hides mk's int port.
 TEST(RandsequenceProductionReturns,
      AReturnReadsTheVariableAForLoopDeclaresOverAPort) {
   EXPECT_TRUE(
@@ -504,7 +365,6 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
-// The for loop's int hides mk's class port, so the return gives an int.
 TEST(RandsequenceProductionReturns,
      AnIntAForLoopDeclaresOverAClassPortIsReported) {
   ElabFixture f;
@@ -527,9 +387,6 @@ TEST(RandsequenceProductionReturns,
                             6, "18.17.7"));
 }
 
-// §12.7.3 makes a foreach loop variable local to the loop and, over a
-// fixed-size dimension, an int, so it hides mk's class port and the return
-// gives an int.
 TEST(RandsequenceProductionReturns,
      AnIntForeachVariableOverAClassPortIsReported) {
   ElabFixture f;
@@ -552,9 +409,6 @@ TEST(RandsequenceProductionReturns,
                             6, "18.17.7"));
 }
 
-// Over an associative dimension a foreach loop variable has the index type,
-// here a byte, which the int production takes; it hides mk's class port all
-// the same.
 TEST(RandsequenceProductionReturns,
      AForeachVariableOverAnAssociativeDimensionHidesAPort) {
   EXPECT_TRUE(
@@ -570,9 +424,6 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
-// §23.9: a name a code block does not declare is searched for outward, here
-// reaching the int the initial block declares around the randsequence, which
-// the class production mk does not take.
 TEST(RandsequenceProductionReturns,
      AVariableOfTheBlockAroundTheRandsequenceIsChecked) {
   ElabFixture f;
@@ -595,8 +446,6 @@ TEST(RandsequenceProductionReturns,
                             7, "18.17.7"));
 }
 
-// The outward search goes on past the procedural block to the module's own
-// variables.
 TEST(RandsequenceProductionReturns, AVariableOfTheModuleIsChecked) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -618,8 +467,6 @@ TEST(RandsequenceProductionReturns, AVariableOfTheModuleIsChecked) {
                             7, "18.17.7"));
 }
 
-// A formal argument of the task the randsequence stands in is one of the names
-// around its code blocks.
 TEST(RandsequenceProductionReturns, AFormalOfTheEnclosingTaskIsChecked) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -640,8 +487,6 @@ TEST(RandsequenceProductionReturns, AFormalOfTheEnclosingTaskIsChecked) {
                             6, "18.17.7"));
 }
 
-// §8.4: in a method, a property of its class is one of the names around the
-// randsequence.
 TEST(RandsequenceProductionReturns, APropertyOfTheMethodsClassIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -663,8 +508,6 @@ TEST(RandsequenceProductionReturns, APropertyOfTheMethodsClassIsChecked) {
                             7, "18.17.7"));
 }
 
-// §23.9 makes a fork-join block a scope, so the int it declares hides the
-// class handle of the initial block, and the int production takes it.
 TEST(RandsequenceProductionReturns, AForkDeclarationHidesTheNameAroundIt) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -682,9 +525,6 @@ TEST(RandsequenceProductionReturns, AForkDeclarationHidesTheNameAroundIt) {
              "endmodule\n"));
 }
 
-// A randsequence written in a code block reads the names of that code block
-// first: its int hides the class handle of the initial block, and the int
-// production of the inner randsequence takes it.
 TEST(RandsequenceProductionReturns,
      AnInnerRandsequenceReadsTheCodeBlockAroundIt) {
   EXPECT_TRUE(
@@ -704,9 +544,6 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
-// §18.17.7 gives a rule's code block an implicit variable for each production
-// it generates that returns a value, so `op.len()` calls a string method on
-// the variable op and heads no hierarchical name for §23.8 to resolve.
 TEST(RandsequenceProductionReturns,
      AMethodOfAnImplicitVariableIsNoHierarchicalName) {
   EXPECT_TRUE(
@@ -720,8 +557,6 @@ TEST(RandsequenceProductionReturns,
              "endmodule\n"));
 }
 
-// A production with no return type declares no implicit variable, so `p.len()`
-// in a code block still heads a hierarchical name, and p resolves to nothing.
 TEST(RandsequenceProductionReturns,
      AVoidProductionsNameHeadsAHierarchicalName) {
   ElabFixture f;

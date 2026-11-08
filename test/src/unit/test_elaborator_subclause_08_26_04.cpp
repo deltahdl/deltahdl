@@ -127,12 +127,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
                             "8.26.4"));
 }
 
-// §8.1 lets a class be declared wherever a data declaration may appear, so the
-// three below write theirs inside a module. Every other case in this file
-// declares at compilation-unit scope, which is the convenient placement and the
-// one that cannot tell a rule enforced everywhere from a rule enforced at the
-// top of a file: a validator reading only the compilation unit's own classes
-// passes all of them and reaches none of these.
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassInsideAModuleImplementsTypeParamError) {
   ElabFixture f;
@@ -173,10 +167,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
                             3, "8.26.4"));
 }
 
-// The control the two above need: the same placement with the interface
-// declared ahead of the class that implements it is ordinary and stays legal,
-// so neither error can be passing because a class inside a module is rejected
-// out of hand.
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassInsideAModuleImplementsInterfaceDeclaredAheadOfItOk) {
   EXPECT_TRUE(
@@ -191,11 +181,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
              "endmodule\n"));
 }
 
-// §8.1 admits the same declaration inside a package, an interface and a
-// program, and a class may enclose a class in turn. Each of the four below
-// varies only the scope the classes are written in, because that placement is
-// the one thing a validator can be reached by or miss: the rule they all state
-// is the rule the module-scope case above states.
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassInsideAPackageImplementsTypeParamError) {
   ElabFixture f;
@@ -280,10 +265,6 @@ TEST(InterfaceClassTypeUsageRestrictions,
                             5, "8.26.4"));
 }
 
-// The control the four above need: the same nesting with an ordinary
-// `implements` of a named interface class stays legal, so none of them can be
-// passing because a class written outside the compilation unit, or inside
-// another class, is rejected out of hand.
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassNestedInAClassImplementsNamedInterfaceOk) {
   EXPECT_TRUE(
@@ -320,10 +301,6 @@ TEST(InterfaceClassTypeUsageRestrictions, ClassImplementsForwardTypedefError) {
                             2, "8.26.4"));
 }
 
-// The literal §8.26.4 example: the forward typedef is referenced through a
-// parameterized `#(...)` argument list (from §6.20.3) while the class is
-// declared ahead of the real interface declaration. The forward-typedef rule
-// must still fire when the reference carries type-parameter arguments.
 TEST(InterfaceClassTypeUsageRestrictions,
      ClassImplementsParameterizedForwardTypedefError) {
   ElabFixture f;

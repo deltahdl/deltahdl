@@ -6,14 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §18.13.5: set_randstate() installs the given value as an object's RNG
-// internal state. A state captured with get_randstate() and reinstalled
-// afterwards restores the generator to the exact stream position it was read
-// from, so the randomize() draws taken after the restore replay the draws that
-// followed the capture. Driven end-to-end: the state string is produced by real
-// get_randstate() source, round-tripped through a string variable, and consumed
-// by set_randstate(). `differ` proves the stream advances between draws, so
-// `same` is not a trivial coincidence.
 TEST(SetRandstateSimulation, RestoresCapturedObjectStream) {
   const char* src =
       "class C;\n"
@@ -48,11 +40,6 @@ TEST(SetRandstateSimulation, RestoresCapturedObjectStream) {
   EXPECT_EQ(RunAndGet(src, "differ"), 1u);
 }
 
-// §18.13.5: the state value captures generator state, not object identity, so
-// it is portable between objects. A state read from one object and installed
-// into a second (never itself drawn from) makes the second continue the first's
-// stream: their next draws agree. This also exercises installing a state into
-// an object whose stream has not yet been materialized.
 TEST(SetRandstateSimulation, TransfersStateBetweenObjects) {
   const char* src =
       "class C;\n"
@@ -77,11 +64,6 @@ TEST(SetRandstateSimulation, TransfersStateBetweenObjects) {
   EXPECT_EQ(RunAndGet(src, "same"), 1u);
 }
 
-// §18.13.5 via §9.7: the RNG associated with a process is set using the
-// set_randstate() method of the process. Capturing the current process's state,
-// drawing $urandom values (which draw from that process's stream), then
-// reinstalling the state rewinds the generator so the same values are drawn
-// again. `differ` confirms the stream advances so `same` is meaningful.
 TEST(SetRandstateSimulation, RestoresCapturedProcessStream) {
   const char* src =
       "module t;\n"

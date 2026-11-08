@@ -10,15 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.7: $ferror reports on the most recent file I/O operation, so what it
-// returns is decided entirely by how the descriptor was produced (the §21.3.1
-// $fopen type) and which operation ran last (a §21.3.4 read or a §21.3.5
-// reposition). These tests therefore build that history from real source
-// syntax, drive the whole pipeline, and observe $ferror through $display.
-
-// §21.3.7: when the most recent operation did not result in an error, the
-// value returned shall be zero and the str variable shall be cleared -- a
-// previously populated destination must not keep stale characters.
 TEST(IoErrorStatus, ReturnsZeroAndClearsStrWhenNoError) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_clear.txt";
@@ -43,9 +34,6 @@ TEST(IoErrorStatus, ReturnsZeroAndClearsStrWhenNoError) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.7: when the most recent operation failed -- here a §21.3.4 read
-// refused on a descriptor opened for writing -- $ferror returns a nonzero
-// error code and writes a textual description of the error into str.
 TEST(IoErrorStatus, ReportsRefusedReadWithDescription) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_refused.txt";
@@ -69,9 +57,6 @@ TEST(IoErrorStatus, ReportsRefusedReadWithDescription) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.7: a failed §21.3.5 reposition (an operation value outside 0..2) is
-// also an error of the most recent file I/O operation, reported by $ferror
-// with its own description.
 TEST(IoErrorStatus, ReportsInvalidSeekOperation) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_badop.txt";
@@ -96,8 +81,6 @@ TEST(IoErrorStatus, ReportsInvalidSeekOperation) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.7: the str destination may be a string-typed variable rather than a
-// packed array; the description is stored with its own length.
 TEST(IoErrorStatus, WritesDescriptionIntoStringTypedVariable) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_strvar.txt";
@@ -121,10 +104,6 @@ TEST(IoErrorStatus, WritesDescriptionIntoStringTypedVariable) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.7: the standard recommends at least 640 bits for a packed str
-// destination, but a narrower one is still an accepted destination -- the
-// description is coerced to the declared width, keeping its trailing
-// characters, rather than being dropped.
 TEST(IoErrorStatus, NarrowPackedDestinationReceivesTruncatedDescription) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_narrow.txt";
@@ -143,14 +122,11 @@ TEST(IoErrorStatus, NarrowPackedDestinationReceivesTruncatedDescription) {
           "  end\n"
           "endmodule\n",
       f);
-  // 128 bits hold sixteen characters: the tail of the full description.
   EXPECT_NE(out.find("nz=1"), std::string::npos) << out;
   EXPECT_NE(out.find("open for reading"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.7: clearing on success applies to a string-typed destination too -- a
-// stale value assigned earlier is emptied, not merely overwritten in part.
 TEST(IoErrorStatus, ClearsStringTypedDestinationWhenNoError) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_clear_str.txt";
@@ -175,9 +151,6 @@ TEST(IoErrorStatus, ClearsStringTypedDestinationWhenNoError) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.7: only the most recent operation counts -- a successful §21.3.5
-// reposition after a failed one leaves no error to report: the code returns
-// to zero and the str variable is cleared of the earlier description.
 TEST(IoErrorStatus, SuccessfulOperationSupersedesEarlierError) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2137_supersede.txt";
@@ -203,11 +176,6 @@ TEST(IoErrorStatus, SuccessfulOperationSupersedesEarlierError) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.1 (printed page 667) and §21.3.7 (printed page 675): a file that
-// cannot be opened gives a zero fd or mcd, and $ferror on that descriptor then
-// reports the failed open, the most recent operation on it, as a nonzero code
-// with a description; on a descriptor whose last operation succeeded it
-// answers 0 and clears the string.
 TEST(IoErrorStatus, FailedOpenIsReportedOnTheZeroDescriptor) {
   SimFixture f;
   std::string ok_path = "/tmp/deltahdl_t210307_ok.txt";

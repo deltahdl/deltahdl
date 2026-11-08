@@ -2,14 +2,6 @@
 
 #include "fixture_parser.h"
 
-// §A.9.4 white_space ::= space | tab | newline | formfeed | eof
-//
-// White space is a lexer-stage rule: it separates adjacent tokens and is
-// otherwise discarded. These tests observe that separation flowing downstream
-// into the parser — the same module parses into a valid AST no matter which
-// white_space alternative delimits its tokens, and the final `eof` closes the
-// token stream without a spurious trailing construct.
-
 namespace {
 
 TEST(WhiteSpaceParsing, SpaceDelimiterParses) {
@@ -30,7 +22,6 @@ TEST(WhiteSpaceParsing, FormfeedDelimiterParses) {
 }
 
 TEST(WhiteSpaceParsing, EmptyInputParsesEmptyCompilationUnit) {
-  // A source of only implicit eof yields a valid, empty compilation unit.
   auto result = Parse("");
   EXPECT_FALSE(result.has_errors);
   ASSERT_NE(result.cu, nullptr);

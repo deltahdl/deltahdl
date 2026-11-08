@@ -16,17 +16,12 @@ TEST(DefaultNettypeSimulation, WireModuleSimulatesCorrectly) {
   EXPECT_EQ(result, 42u);
 }
 
-// A module p0 passing its input i to its output o.
 static std::string PassThrough() {
   return "module p0(input logic i, output logic o);\n"
          "  assign o = i;\n"
          "endmodule\n";
 }
 
-// §22.8: `default_nettype governs the module definitions that follow it, so a
-// directive after the last module reaches back to none of them: t's implicit
-// nets und and w are tri1, und pulling p0's input to 1. The trailing
-// `default_nettype wire governed every module, and w read z.
 TEST(DefaultNettypeSimulation, ATrailingDirectiveLeavesTheModulesBeforeIt) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`default_nettype tri1\n" + PassThrough() +
@@ -39,10 +34,6 @@ TEST(DefaultNettypeSimulation, ATrailingDirectiveLeavesTheModulesBeforeIt) {
             "1\n");
 }
 
-// §22.8: `default_nettype wire in force at t gives t's undeclared und and w
-// implicit wires, which a `none` before p0 or after t does not forbid; und is
-// undriven, so w reads z. The trailing none governed t, and und and w were
-// reported as implicit nets it forbids.
 TEST(DefaultNettypeSimulation, NoneBeforeAndAfterLeavesAWireModuleItsNets) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`default_nettype none\n" + PassThrough() +
@@ -57,11 +48,6 @@ TEST(DefaultNettypeSimulation, NoneBeforeAndAfterLeavesAWireModuleItsNets) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §22.8: each of t0, t1 and t2 takes the `default_nettype before it, so its
-// implicit und is a tri0 reading 0, a tri1 reading 1 and an undriven wire
-// reading z, and each passes the value through p0 to its w. p0 comes before
-// every directive, so its input is a wire (§23.2.2.3) that pulls nothing. The
-// last directive, wire, governed all three, which read z z z.
 TEST(DefaultNettypeSimulation, EachModuleTakesTheDirectiveBeforeIt) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(PassThrough() +

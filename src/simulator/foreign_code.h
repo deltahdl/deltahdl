@@ -1,8 +1,3 @@
-// Annex J: the inclusion of foreign language code into a SystemVerilog
-// application. §J.1 has the annex describe common guidelines for that
-// inclusion, whose intention is to enable the redistribution of C binaries in
-// shared object form. This header states what the annex says; the switches
-// and files the guidelines define are what a simulator's driver reads.
 #ifndef DELTA_SIMULATOR_FOREIGN_CODE_H_
 #define DELTA_SIMULATOR_FOREIGN_CODE_H_
 
@@ -16,8 +11,6 @@
 
 namespace delta {
 
-// §J.1: what the guidelines of the annex are for -- the redistribution of C
-// binaries -- and the form they intend it in.
 enum class ForeignCodeRedistributionForm : uint8_t {
   kSharedObject,
   kSourceCode,
@@ -26,18 +19,8 @@ enum class ForeignCodeRedistributionForm : uint8_t {
 
 ForeignCodeRedistributionForm ForeignCodeIntendedRedistributionForm();
 
-// §J.1: the guidelines are common ones, for the inclusion of foreign language
-// code into any SystemVerilog application rather than into one simulator's.
 bool ForeignCodeGuidelinesAreCommonToApplications();
 
-// §J.2: foreign language code is functionality included into SystemVerilog
-// using the DPI, so the annex applies only to code included through that
-// interface, and code included through another, the VPI say, is outside the
-// standard's scope. Most such code is created from C or C++ source, but
-// nothing precludes object code from other languages, and the annex is
-// independent of the language used. The code is provided in general as
-// object code compiled for the platform, and every simulator shall support
-// including it in that form as the annex specifies.
 enum class ForeignCodeInterface : uint8_t { kDpi, kVpi };
 
 bool ForeignCodeAnnexApplies(ForeignCodeInterface included_through);
@@ -48,9 +31,6 @@ enum class ForeignCodeForm : uint8_t { kObjectCode, kSourceCode };
 ForeignCodeForm ForeignCodeProvidedForm();
 bool ForeignCodeObjectFormMustBeSupported();
 
-// §J.2: what the annex defines how to do -- specify the location of the
-// files within the filesystem, specify the files to be loaded, and provide
-// the object code, as a shared library or an archive.
 enum class ForeignCodeFacility : uint8_t {
   kSpecifyLocationOfFiles,
   kSpecifyFilesToLoad,
@@ -63,17 +43,6 @@ enum class ForeignCodeObjectPackaging : uint8_t { kSharedLibrary, kArchive };
 
 bool ForeignCodeObjectMayBePackagedAs(ForeignCodeObjectPackaging packaging);
 
-// §J.2: the annex requires multiple implementations, usually two, of the
-// facilities, users having different viewpoints: a vendor providing IP as
-// foreign code wants a self-contained integration a third party can still
-// make, often covered by a bootstrap file; a project team specifying a
-// common set of foreign code that changes with technology, cells and
-// back-annotation data is often covered by a set of tool switches; and a
-// user switching between selections or adding code is covered by tool
-// switches -- each of the three able to use the bootstrap file approach
-// too. The switch names the annex defines are recommendations, not
-// requirements of the language, naming being outside the standard and some
-// character configurations impossible in some shells.
 enum class ForeignCodeInclusionMethod : uint8_t {
   kBootstrapFile,
   kToolSwitches
@@ -87,45 +56,21 @@ ForeignCodeInclusionMethod ForeignCodeMethodOftenCovering(
 bool ForeignCodeUseCaseMayUseBootstrapFile(ForeignCodeUseCase use_case);
 bool ForeignCodeSwitchNamesAreRequirements();
 
-// §J.3: every path name the annex specifies is intended to be location
-// independent, which the switch -sv_root accomplishes: it receives a single
-// directory path name as its value, which is then prepended to any relative
-// path name specified. In the absence of the switch, or for relative file
-// names processed before any -sv_root specification, the user's current
-// working directory is the default. A locator resolves each path name as it
-// is processed, against the root in force at that moment.
 std::string_view ForeignCodeRootSwitch();
 
 class ForeignCodeLocator {
  public:
-  // The directory a -sv_root specification gave, replacing any earlier one.
   void SetRoot(std::string_view directory);
   bool HasRoot() const;
-  // The root relative path names are prepended with: the directory set, or
-  // the user's current working directory while none is.
   std::string Root() const;
-  // `path` as an absolute path name: itself where it is absolute already,
-  // and the root followed by it where it is relative.
   std::string Resolve(std::string_view path) const;
 
  private:
   std::string root_;
 };
 
-// §J.4.1: the syntax of the object code bootstrap file. Its first line
-// contains the string #!SV_LIBRARIES; an arbitrary number of entries follow,
-// one per line, each holding exactly one library location -- the path name
-// without extension of the object code file to be loaded, equivalent to the
-// value of -sv_lib -- surrounded by any number of blanks, at least one blank
-// preceding the entry in its line; and any number of comment lines, each
-// starting with # after any number of blanks and ending at a newline, can
-// be interspersed between the entries.
 std::string_view ForeignCodeBootstrapHeader();
 
-// The library locations a bootstrap file's text lists, in order, or a
-// description of the first line that departs from the syntax -- a first line
-// without the header, an entry no blank precedes, a line holding more than
-// one entry, or a line that is neither an entry nor a comment.
 struct ForeignCodeBootstrap {
   std::vector<std::string> libraries;
   std::string error;
@@ -134,20 +79,6 @@ struct ForeignCodeBootstrap {
 
 ForeignCodeBootstrap ParseForeignCodeBootstrap(std::string_view text);
 
-// §J.4: compiled object code is required where the user handles the
-// compilation and linking of the source code fully, so the object code
-// created only need be loaded to integrate the foreign language code, and
-// every SystemVerilog application shall support integrating foreign code in
-// object code form. Compiled object code is specified by one of two
-// methods: a) an entry in a bootstrap file (§J.4.1), whose location one
-// instance of the switch -sv_liblist pathname gives; b) one instance of the
-// switch -sv_lib pathname_without_extension, the file named without its
-// platform-specific extension, which the application appends. Either switch
-// can be used multiple times, to define multiple bootstrap files or
-// multiple libraries. Both methods shall be provided and made available
-// concurrently, so that any mixture of them is permitted, and every location
-// can be an absolute or a relative path name, -sv_root of §J.3 prefixing the
-// relative ones.
 enum class ForeignCodeSpecificationMethod : uint8_t {
   kBootstrapFileEntry,
   kLibSwitch,
@@ -160,18 +91,6 @@ bool ForeignCodeSwitchMayRepeat(std::string_view switch_name);
 bool ForeignCodeMethodsAreAvailableConcurrently();
 bool ForeignCodeMethodsMayBeMixed();
 
-// §J.4: the conditions on the object code. It shall be provided as a shared
-// library having the extension the platform gives such a library, which the
-// application identifies -- the note has .so on Solaris and .sl on HP-UX --
-// and which the application appends to the path name a specification gives
-// without it. The provider of the code resolves the external references the
-// objects hold, avoids interference with other software, and selects the
-// software version where two versions of one library are referenced, the
-// same problems arising from dependencies on the run-time environment such
-// as C++ global objects. The application need only load the object code
-// within a shared library that SystemVerilog code or registration functions
-// reference, since loading further functions the library holds can
-// interfere with other parts.
 std::string_view ForeignCodeSharedLibraryExtension();
 std::string ForeignCodeSharedLibraryFileName(
     std::string_view pathname_without_extension);
@@ -195,72 +114,33 @@ enum class ForeignCodeLoadScope : uint8_t {
 
 ForeignCodeLoadScope ForeignCodeLoadRequired();
 
-// §J.4: the order all compiled object code is loaded in -- first the content
-// of the bootstrap file, processed from its first line, then the set of
-// -sv_lib switches in order of their occurrence -- and any library is loaded
-// only once. Among multiple occurrences of the same file, whether by the
-// same path name or identified as identical, by comparing inodes where links
-// refer to one file say, that order identifies the precedence of loading: a
-// file the bootstrap file located overrides the same file -sv_lib specified.
 struct ForeignCodeLibrary {
-  // The path name without extension, resolved as §J.3 has it.
   std::string path;
   ForeignCodeSpecificationMethod method =
       ForeignCodeSpecificationMethod::kBootstrapFileEntry;
 };
 
-// Whether two path names without extension name the same file: the same
-// path name, or two names of one file on the filesystem.
 bool ForeignCodeIsSameFile(std::string_view a, std::string_view b);
 
-// The libraries to load in order, each once, from the bootstrap files'
-// entries in order and then the -sv_lib values in order of occurrence.
 std::vector<ForeignCodeLibrary> ForeignCodeLoadOrder(
     const std::vector<std::string>& bootstrap_entries,
     const std::vector<std::string>& lib_switch_values);
 
-// §J.4.2: the examples of the annex. Example a) has a bootstrap file and a
-// list of -sv_lib switches naming the same libraries under one -sv_root load
-// the same files, the two methods being equivalent; example b) has -sv_lib
-// values resolve against the working directory before any -sv_root and
-// against the root in force after each; and example c) has the entries of a
-// bootstrap file resolve against the root in force when the -sv_liblist
-// switch naming the file was processed, an absolute entry left as it is, so
-// that a later -sv_root moves the entries of a later bootstrap file only. A
-// specification therefore keeps, with each bootstrap file's location, the
-// root its entries resolve against.
 struct ForeignCodeLibList {
-  // The bootstrap file's location, resolved as §J.3 has it.
   std::string path;
-  // The root in force when the switch naming the file was processed: the
-  // directory -sv_root gave, or the working directory while none had.
   std::string root;
 };
 
-// The entries of a bootstrap file, each resolved as §J.3 has it against
-// `root`, the root in force when the -sv_liblist switch naming the file was
-// processed, the working directory where `root` is empty.
 std::vector<std::string> ForeignCodeResolveBootstrapEntries(
     const ForeignCodeBootstrap& file, std::string_view root);
 
-// The file names the libraries of a load order are loaded from, in order,
-// the platform's extension appended to each path name.
 std::vector<std::string> ForeignCodeLibraryFileNames(
     const std::vector<ForeignCodeLibrary>& order);
 
-// §J.2 and §J.4: loads into the simulator the object code the specification
-// names -- the bootstrap files' entries, then the -sv_lib values -- in the
-// order ForeignCodeLoadOrder gives, each library once, as a shared library
-// whose symbols are made global and kept for the rest of the run (see
-// LoadSharedLibrary). A location naming no file once the platform's extension
-// is appended, and a file the loader cannot load, are each reported under
-// §J.4 against the location as it was written, the second with the loader's
-// own account, and the run is not to proceed past either. False where any
-// library was not loaded.
 bool ForeignCodeLoadLibraries(const std::vector<std::string>& bootstrap_entries,
                               const std::vector<std::string>& lib_switch_values,
                               DiagEngine& diag);
 
 }  // namespace delta
 
-#endif  // DELTA_SIMULATOR_FOREIGN_CODE_H_
+#endif

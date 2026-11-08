@@ -62,10 +62,6 @@ TEST(GenerateBlockContent, SpecifyBlockAllowedAtModuleScope) {
               "endmodule\n"));
 }
 
-// §27.2 speaks of generate blocks, and a bare generate region is none, but
-// A.4.2 fills the region with generate_items, which reach no specify_block;
-// §27.3's region makes no semantic difference to the module, which grants no
-// item the grammar leaves out.
 TEST(GenerateBlockContent, SpecifyBlockRejectedInBareGenerateRegion) {
   auto r = Parse(
       "module m(input a, output b);\n"
@@ -176,8 +172,6 @@ TEST(GenerateBlockContent, PortDeclarationRejectedInNestedGenerate) {
 }
 
 TEST(GenerateBlockContent, PortDeclarationRejectedWithRefDirection) {
-  // The prohibition covers every port direction the parser recognizes, ref
-  // included, not just input/output/inout.
   auto r = Parse(
       "module m;\n"
       "  if (1) begin\n"

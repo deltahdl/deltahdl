@@ -63,10 +63,6 @@ TEST(ProceduralContinuousSchedulingSim,
   EXPECT_EQ(q->value.ToUint64(), 24u);
 }
 
-// Claim 1 input form: a source element of the expression may be a net (driven
-// by a continuous assignment, §4.9.1) rather than a variable. Net changes reach
-// the process through a different scheduling path than variable writes, so the
-// procedural continuous assignment must stay sensitive to them as well.
 TEST(ProceduralContinuousSchedulingSim, ForceSensitiveToNetSourceElement) {
   SimFixture f;
   auto* q = RunAndFindVar(
@@ -87,9 +83,6 @@ TEST(ProceduralContinuousSchedulingSim, ForceSensitiveToNetSourceElement) {
   EXPECT_TRUE(q->is_forced);
 }
 
-// Claim 1 input form: the source-element form (a net driven by a continuous
-// assignment) also applies to the `assign` procedural continuous assignment,
-// not only to `force`. Net changes must re-propagate through the assign.
 TEST(ProceduralContinuousSchedulingSim, AssignSensitiveToNetSourceElement) {
   SimFixture f;
   auto* q = RunAndFindVar(
@@ -110,9 +103,6 @@ TEST(ProceduralContinuousSchedulingSim, AssignSensitiveToNetSourceElement) {
   EXPECT_TRUE(q->is_forced);
 }
 
-// Claim 1 input form: `force` may determine a NET target (not only a variable).
-// The forced net stays sensitive to its source, so a later source change
-// reaches the net's resolved value.
 TEST(ProceduralContinuousSchedulingSim, ForceTargetsNetSensitiveToSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -174,8 +164,6 @@ TEST(ProceduralContinuousSchedulingSim,
   EXPECT_TRUE(c->is_forced);
 }
 
-// Claim 1 edge case: the process stays sensitive to the source, so the target
-// tracks every subsequent source change, not just the first one.
 TEST(ProceduralContinuousSchedulingSim,
      AssignStaysSensitiveAcrossRepeatedChanges) {
   SimFixture f;
@@ -195,8 +183,6 @@ TEST(ProceduralContinuousSchedulingSim,
   EXPECT_TRUE(c->is_forced);
 }
 
-// Claim 2 followed by claim 1: after deassign deactivates the assign, a fresh
-// procedural continuous assignment re-establishes a source-sensitive process.
 TEST(ProceduralContinuousSchedulingSim, AssignReactivatesAfterDeassign) {
   SimFixture f;
   auto* c = RunAndFindVar(

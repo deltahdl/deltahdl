@@ -10,15 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.20.2 (printed page 126): a parameter with a range specification has the
-// range of its declaration, and §7.4.1 (printed 153) makes a packed array of
-// two dimensions as many bits as the two ranges multiply to, so `logic
-// [HI:1][3:0] V` under `localparam int HI = 8` is 32 bits. The declared type
-// was sized without the earlier parameters in scope, which left HI unfolded
-// and the width at the vector atom's one bit, and 8ecbbc294 read the span of
-// the first range's recorded bounds over that, 8, so `$bits(V)` answered 8
-// and a read of V was cut to its low byte, 0xEF. Sized with the parameters
-// in scope, $bits(V) is 32 and V reads whole.
 TEST(DeclaredWidth, SecondPackedDimensionUnderAParameterBoundMultiplies) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -38,11 +29,6 @@ TEST(DeclaredWidth, SecondPackedDimensionUnderAParameterBoundMultiplies) {
   EXPECT_EQ(v->decl_width, 32u);
 }
 
-// The single range written in terms of the earlier parameter, `logic
-// [HI-1:0] W`, is eight bits from the declaration itself now rather than
-// from the bounds recorded beside it: W reads 255 through another parameter
-// and $bits(W) answers 8, and decl_width, which ConvertOverrideValue in
-// src/elaborator/elaborator_module.cpp cuts an override to, holds the 8.
 TEST(DeclaredWidth, RangeBoundWrittenAsAParameterFoldsIntoDeclWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -62,12 +48,6 @@ TEST(DeclaredWidth, RangeBoundWrittenAsAParameterFoldsIntoDeclWidth) {
   EXPECT_EQ(w->decl_width, 8u);
 }
 
-// §6.20.2 with §6.18 (printed page 118): a parameter declared with a typedef
-// name is of the type the name stands for, and that type's own range may be
-// written in terms of an earlier parameter. The declared type was sized
-// without the scope's typedefs, which gave a named type no width at all, so
-// `$bits(T)` over `typedef logic [HI:1] vec_t; localparam vec_t T` folded to
-// nothing; sized with them and HI in scope it is 8, and T reads 0xA5.
 TEST(DeclaredWidth, TypedefNamedTypeUnderAParameterBoundIsSized) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -85,13 +65,6 @@ TEST(DeclaredWidth, TypedefNamedTypeUnderAParameterBoundIsSized) {
   EXPECT_EQ(ParamValue(design, "TR"), 0xA5);
 }
 
-// §6.20.2 (printed page 126) with §23.10.1 (printed 765): a defparam's value
-// is converted to the range of the parameter it names, `logic [TOP:0] P`
-// under `parameter int TOP = 15` being 16 bits, so `defparam u.P = 16'hABCD`
-// gives P every bit of the literal and Q, made over after it, reads 0xABCD.
-// ConvertOverrideValue cut the value to decl_width, which the body
-// declaration's fold without TOP in scope left at 1, so P became 1 and Q
-// with it.
 TEST(DeclaredWidth, DefparamValueIsCutToTheRangeWrittenAsAParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -113,11 +86,6 @@ TEST(DeclaredWidth, DefparamValueIsCutToTheRangeWrittenAsAParameter) {
   EXPECT_EQ(q->resolved_value, 0xABCD);
 }
 
-// §6.20.2 (printed page 126) gives a parameter declared `real` a real value,
-// and §8.25 declares `real D = 1.5` in a class parameter port list in its own
-// example. Each case fails on a registration that folds a class value
-// parameter as an integer alone and reports the value when that fold fails,
-// which is what rejected every real default and every real override.
 TEST(ValueParameters, RealClassParamDefaultIsAccepted) {
   EXPECT_TRUE(
       ElabOk("class Mem #(int size = 4, real D = 1.5);\n"
@@ -136,8 +104,6 @@ TEST(ValueParameters, RealClassParamDefaultOfAModuleScopedClassIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.20.2's first rule: a parameter declared with neither type nor range takes
-// the type of its final value, and a real expression makes the parameter real.
 TEST(ValueParameters, UntypedClassParamWithARealDefaultIsAccepted) {
   EXPECT_TRUE(
       ElabOk("class C #(D = 1.5);\n"
@@ -147,9 +113,6 @@ TEST(ValueParameters, UntypedClassParamWithARealDefaultIsAccepted) {
              "endmodule\n"));
 }
 
-// §23.10.2 makes an override a constant expression, which 2.25 is, and §8.25
-// applies that rule to a specialization of a class whether it is written in a
-// declaration or in an extends clause.
 TEST(ValueParameters, RealClassParamOverrideInADeclarationIsAccepted) {
   EXPECT_TRUE(
       ElabOk("class Mem #(real D = 1.5);\n"
@@ -169,9 +132,6 @@ TEST(ValueParameters, RealClassParamOverrideInAnExtendsClauseIsAccepted) {
              "endmodule\n"));
 }
 
-// A real default is still a constant_param_expression, so one that reads a
-// variable is reported as an integer one is. This fails on a repair that
-// accepts every default of a real parameter. The `r` stands on line 3.
 TEST(ValueParameters, NonConstantRealClassParamDefaultIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -186,9 +146,6 @@ TEST(ValueParameters, NonConstantRealClassParamDefaultIsRejected) {
       "class parameter 'D' value is not a constant expression", 3, "6.20.2"));
 }
 
-// §6.20.2's real parameter is a constant as an integral one is, so it is a
-// legal override in an extends clause. That clause's check folds the module's
-// parameters as integers, and read the real `R` as a name it could not fold.
 TEST(ValueParameters, RealModuleParamAsAnExtendsOverrideIsAccepted) {
   EXPECT_TRUE(
       ElabOk("class Mem #(real D = 1.5);\n"
@@ -200,10 +157,6 @@ TEST(ValueParameters, RealModuleParamAsAnExtendsOverrideIsAccepted) {
              "endmodule\n"));
 }
 
-// §6.20.2 (printed pages 126-127): a package parameter declared `bit [3:0]`
-// holds 24 converted to four unsigned bits, 8, and a constant expression
-// reading it through `p::P` reads 8. The fold cut the value to four bits but
-// read them with the sign of the unsized literal (§5.7.1), which made it -8.
 TEST(TypedParameterSign, PackageParameterOfAnUnsignedTypeReadsUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -219,9 +172,6 @@ TEST(TypedParameterSign, PackageParameterOfAnUnsignedTypeReadsUnsigned) {
   EXPECT_EQ(ParamValue(design, "Q"), 8);
 }
 
-// §6.20.2: a parameter with a range and no type is unsigned whatever its
-// value, so a compilation-unit `parameter [3:0] R = 24` is 8, read the same
-// through a module's localparam.
 TEST(TypedParameterSign, CompilationUnitParameterWithARangeReadsUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -235,9 +185,6 @@ TEST(TypedParameterSign, CompilationUnitParameterWithARangeReadsUnsigned) {
   EXPECT_EQ(ParamValue(design, "Q"), 8);
 }
 
-// §6.20.2: a parameter of a signed type is signed, so `byte B = 8'd200` holds
-// the eight bits of 200 read signed, -56, though the sized literal is
-// unsigned. The fold read them with the literal's sign, 200.
 TEST(TypedParameterSign, PackageParameterOfASignedTypeReadsSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -253,9 +200,6 @@ TEST(TypedParameterSign, PackageParameterOfASignedTypeReadsSigned) {
   EXPECT_EQ(ParamValue(design, "Q"), -56);
 }
 
-// §6.20.2 with §8.25: a class parameter's default is converted to its declared
-// type as any parameter's is, so `bit [3:0] P = 24` read through `C#()::P`
-// is 8 and not the -8 the signed literal's sign made of the cut bits.
 TEST(TypedParameterSign, ClassParameterOfAnUnsignedTypeReadsUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -270,9 +214,6 @@ TEST(TypedParameterSign, ClassParameterOfAnUnsignedTypeReadsUnsigned) {
   EXPECT_EQ(ParamValue(design, "Q"), 8);
 }
 
-// §6.20.2: a parameter whose type is a typedef name has that type, so a
-// package's `nib P = 12'hFFF` on `typedef bit [3:0] nib` holds four bits, 15.
-// The fold resolved no typedef name and left the value uncut, 4095.
 TEST(TypedefParameterType, PackageParameterIsCutToTheTypedefWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -289,7 +230,6 @@ TEST(TypedefParameterType, PackageParameterIsCutToTheTypedefWidth) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// The same for a compilation-unit parameter of a compilation-unit typedef.
 TEST(TypedefParameterType, CompilationUnitParameterIsCutToTheTypedefWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -304,8 +244,6 @@ TEST(TypedefParameterType, CompilationUnitParameterIsCutToTheTypedefWidth) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// §6.20.2 with §8.25: a class parameter's default is converted to its typedef
-// type, so `nib P = 12'hFFF` read through `C#()::P` is 15.
 TEST(TypedefParameterType, ClassParameterIsCutToTheTypedefWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -321,9 +259,6 @@ TEST(TypedefParameterType, ClassParameterIsCutToTheTypedefWidth) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// §6.20.2: a typedef of a signed type gives the parameter that sign, so
-// `sb B = 8'd200` on `typedef byte sb` is the eight bits of 200 read signed,
-// -56, though the sized literal is unsigned.
 TEST(TypedefParameterType, PackageParameterOfASignedTypedefReadsSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -340,10 +275,6 @@ TEST(TypedefParameterType, PackageParameterOfASignedTypedefReadsSigned) {
   EXPECT_EQ(ParamValue(design, "Q"), -56);
 }
 
-// §7.4.4 with §7.4.1: packed dimensions written on a typedef name multiply its
-// width, and the packed array is unsigned unless declared signed, so `sb [1:0]`
-// on `typedef byte sb` is sixteen unsigned bits: 20'hFFFFF is cut to 65535,
-// and `'1` fills all sixteen.
 TEST(TypedefParameterType, DimensionsOnASignedTypedefMakeAnUnsignedArray) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -363,9 +294,6 @@ TEST(TypedefParameterType, DimensionsOnASignedTypedefMakeAnUnsignedArray) {
   EXPECT_EQ(ParamValue(design, "QF"), 65535);
 }
 
-// §6.20.1 with §6.20.2: a package typedef's range may name an earlier
-// parameter of the package, so `t` on `typedef bit [N-1:0] t` under
-// `parameter int N = 4` is four bits and `t P = 12'hFFF` is 15.
 TEST(TypedefParameterType, TypedefRangeNamingAPackageParameterSizesTheCut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -383,10 +311,6 @@ TEST(TypedefParameterType, TypedefRangeNamingAPackageParameterSizesTheCut) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// §6.20.2 with §8.23: a class body's parameter may take a typedef the class
-// declares, so `t P = 12'hFFF` on the class's `typedef bit [3:0] t` is 15
-// through `C::P`. The class's typedef was recorded only as `C::t` and looked
-// up as the bare `t`, so the value was left uncut, 4095.
 TEST(TypedefParameterType, ClassBodyParameterOfTheClassTypedefIsCut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -404,10 +328,6 @@ TEST(TypedefParameterType, ClassBodyParameterOfTheClassTypedefIsCut) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// The same read through a specialization, `D#()::P`, which folds the body
-// parameters again under the specialization's values; and the class's `t`
-// is taken over a compilation-unit typedef of the same name, a byte, under
-// which the bits of 12'hFFF would read -1.
 TEST(TypedefParameterType, SpecializationReadsTheClassTypedefOverTheUnits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -425,9 +345,6 @@ TEST(TypedefParameterType, SpecializationReadsTheClassTypedefOverTheUnits) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// The same for a class declared inside a module (§8.26), whose typedefs were
-// keyed only after its parameters had been folded: `logic [C::P-1:0] v` after
-// the class is fifteen bits wide, where the uncut 4095 made it 4095.
 TEST(TypedefParameterType, ModuleClassParameterOfTheClassTypedefIsCut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -446,9 +363,6 @@ TEST(TypedefParameterType, ModuleClassParameterOfTheClassTypedefIsCut) {
   EXPECT_EQ(v->width, 15u);
 }
 
-// The same for a class nested in another (§8.23), whose typedefs are keyed
-// under the full path, `Outer::Inner::t`: P read as `Outer::Inner::P` is 15
-// and not the 4095 a lookup under `Inner::t` alone left it.
 TEST(TypedefParameterType, NestedClassParameterOfItsOwnTypedefIsCut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -467,8 +381,6 @@ TEST(TypedefParameterType, NestedClassParameterOfItsOwnTypedefIsCut) {
   EXPECT_EQ(ParamValue(design, "Q"), 15);
 }
 
-// §6.20.2 with §6.11.1: a parameter of type `time` is of that type, 64 bits
-// and unsigned.
 TEST(TypedParameterSign, TimeParameterIsSixtyFourUnsignedBits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -486,9 +398,6 @@ TEST(TypedParameterSign, TimeParameterIsSixtyFourUnsignedBits) {
   EXPECT_FALSE(t->decl_is_signed);
 }
 
-// §6.20.2 with §6.18: a parameter declared with a typedef naming shortreal
-// or real is of that real type, so 2.75 is held as a real; folded as the
-// integer the name was taken for, it was 3.
 TEST(TypedefParameterType, ParameterOfARealTypedefIsReal) {
   ElabFixture f;
   auto* design = ElaborateSrc(

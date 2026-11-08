@@ -106,12 +106,6 @@ Logic4Vec StringToLogic4Vec(Arena& arena, std::string_view str) {
   return vec;
 }
 
-// One string method call: the string it is called on, as text, and where
-// that string lives -- `var` for a string variable of the run's tables,
-// `target` for a class property resolved to its storage (§8.5, §8.9), or
-// `element` for an element of an array of strings (§7.4, §7.5, §7.8, §7.10),
-// which the six methods that write their object store through; a method that
-// answers a value reads `str` alone and all three may be null.
 struct StringMethodArgs {
   Variable* var;
   const FieldTarget* target;
@@ -122,11 +116,6 @@ struct StringMethodArgs {
   const Expr* element = nullptr;
 };
 
-// §6.16.2 and §6.16.11 through §6.16.15: the text a mutating method leaves
-// in its object, stored where the object lives. A property takes it as an
-// assignment to the property does (WriteResolvedField), and an array element
-// as an assignment to the element does (PerformBlockingAssign), whole, since
-// §6.16 gives a string no declared width to truncate to.
 static void StoreString(const StringMethodArgs& a, std::string_view text) {
   if (a.var != nullptr) {
     a.var->value = StringToLogic4Vec(a.arena, text);
@@ -165,11 +154,6 @@ static Logic4Vec StringGetc(const std::string& str, const Expr* call_expr,
   return MakeLogic4VecVal(arena, 8, static_cast<unsigned char>(str[idx]));
 }
 
-// §6.16.4, §6.16.5 and §6.16.8 declare toupper, tolower and substr with a
-// string result, and the value answered carries the kind so that a method
-// called on it, `s.toupper().substr(0, 2)`, reads it as text
-// (TryEvalCallResultMethodCall); StringToLogic4Vec alone leaves the words a
-// packed number.
 static Logic4Vec StringResult(std::string_view str, Arena& arena) {
   Logic4Vec out = StringToLogic4Vec(arena, str);
   out.is_string = true;
@@ -194,9 +178,6 @@ static std::string EvalArgAsString(const Expr* arg, SimContext& ctx,
   return Logic4VecToString(val);
 }
 
-// §6.16.6 and §6.16.7: compare() and icompare() return an `int`, which §6.11
-// makes signed, so a string ordering first reads negative wherever the result
-// is used. Built unsigned, `s.compare("abd") < 0` never held.
 static Logic4Vec CompareResult(int cmp, Arena& arena) {
   Logic4Vec out = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(cmp));
   out.is_signed = true;
@@ -256,11 +237,6 @@ static Logic4Vec StringAtoBase(const std::string& str, int base, Arena& arena) {
 }
 
 static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
-  // The scan conforms to real-constant syntax (§5.7.2), which permits an
-  // underscore between digits purely as a spacing separator. strtod would stop
-  // at such an underscore, so first drop the underscores that fall between two
-  // digits; any other underscore is left in place and still terminates the
-  // scan, since it does not conform to the real-constant syntax.
   std::string cleaned;
   cleaned.reserve(str.size());
   for (size_t i = 0; i < str.size(); ++i) {
@@ -276,10 +252,6 @@ static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
   const char* start = cleaned.c_str();
   char* end = nullptr;
   double d = std::strtod(start, &end);
-  // The conversion only recognizes real constants, and the result is zero when
-  // no digits were scanned. strtod additionally accepts digit-free spellings
-  // such as "inf"/"nan"; these are not real constants, so force the result to
-  // zero unless the scanned prefix actually contained a decimal digit.
   bool found_digit = false;
   for (const char* p = start; p < end; ++p) {
     if (*p >= '0' && *p <= '9') {
@@ -290,18 +262,11 @@ static Logic4Vec StringAtoreal(const std::string& str, Arena& arena) {
   if (!found_digit) d = 0.0;
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
-  // atoreal yields a real value; flag the result so assignments and expression
-  // operands treat the 64 bits as an IEEE double rather than an integer.
   auto result = MakeLogic4VecVal(arena, 64, bits);
   result.is_real = true;
   return result;
 }
 
-// §6.16.11 to §6.16.14: the argument of itoa(), hextoa(), octtoa() and
-// bintoa() is an `integer`, so it is converted to that type's 32 bits first,
-// and itoa() reads them signed (§6.11): `s.itoa(-7)` stores "-7" and
-// `s.itoa(64'h1_0000_0005)` stores "5". Read as the argument's whole bits,
-// unsigned, they stored "4294967289" and "4294967301".
 static void StringXtoa(const StringMethodArgs& a, int base) {
   if (a.call_expr->args.empty()) return;
   uint64_t val =
@@ -396,9 +361,6 @@ static bool DispatchReturningMethod(std::string_view method,
 
 static bool DispatchMutatingMethod(std::string_view method,
                                    const StringMethodArgs& a, Logic4Vec& out) {
-  // The six names are StringMethodWritesItsObject's, so that the elaborator's
-  // §6.20 refusal of one of these calls on a constant and the write carried out
-  // here can never be about different sets of methods.
   if (!StringMethodWritesItsObject(method)) return false;
   if (method == "putc") {
     StringPutc(a);
@@ -433,9 +395,6 @@ static bool DispatchMutatingMethod(std::string_view method,
   return false;
 }
 
-// §26.3: the key a package's variable named through the package scope
-// resolution operator, `P::ps`, is held under, "P.ps", the one the lowerer
-// creates it with (InitPackageDataVariables); empty for any other expression.
 static std::string PackageScopedKey(const Expr* scoped) {
   if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
       !scoped->is_scope_resolution || scoped->lhs == nullptr ||
@@ -446,16 +405,6 @@ static std::string PackageScopedKey(const Expr* scoped) {
   return std::string(scoped->lhs->text) + "." + std::string(scoped->rhs->text);
 }
 
-// §26.3: a package's string variable named through the package scope
-// resolution operator, `P::ps.len()`, is a method call whose receiver is the
-// scoped name rather than an identifier, which ExtractMethodCallParts reads
-// alone; the variable is held under the "P.ps" key the lowerer creates it
-// with (InitPackageDataVariables), so the receiver is that key. §3.12.1
-// (printed page 56): `$unit::s.len()` is likewise the unit's string under
-// "$unit.s" past a module's own s, the identifier carrying the prefix the
-// parser keeps (DeclaredKindsKey); read as a bare identifier by
-// ExtractMethodCallParts, the module's s answered. Answers the key and the
-// method for those shapes, and false for any other.
 static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
                                            std::string_view& method) {
   const Expr* access = expr->lhs;
@@ -476,14 +425,6 @@ static bool ExtractScopedStringMethodParts(const Expr* expr, std::string& key,
   return true;
 }
 
-// §7.4 with §8.5: what the nearest declaration of the property `name` on the
-// class chain from `type` writes of its shape: whether an unpacked dimension
-// -- fixed-size, dynamic, queue or associative -- on itself or on the typedef
-// its type names (PropertyNamedTypedef), which makes it an array rather than
-// one value, and, §6.18, whether that typedef's type is string, the array's
-// element type where the typedef writes a dimension, `typedef string sq_t[$]`
-// for a property `sq_t tq`, and the property's own where it writes none,
-// `typedef string str_t` for `str_t u`, whose own type is the typedef's name.
 struct PropertyShape {
   bool is_array = false;
   bool typedef_holds_strings = false;
@@ -509,11 +450,6 @@ static PropertyShape PropertyShapeOf(const ClassTypeInfo* type,
   return {};
 }
 
-// §7.4, §7.5 and §7.10 with §8.5: a property declared as an array of
-// strings, `string inst[2]`, is no string itself, and a select of it,
-// `h.inst[1] = "ab"`, writes an element rather than a character. Taken for a
-// string, that write set character 1 of the property's empty text, which
-// changed nothing, and the element read back empty.
 bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
                       SimContext& ctx, bool elements) {
   const ClassTypeInfo::PropertyInfo* prop =
@@ -524,10 +460,6 @@ bool PropertyIsString(const ClassTypeInfo* type, std::string_view name,
          shape.is_array == elements;
 }
 
-// Whether `e` is a name or a chain of member selects down from one, `h` or
-// `d.c`: reading it runs no subroutine, so it can be evaluated to find the
-// object it denotes and evaluated again by whichever dispatcher takes the call
-// when it denotes no string.
 static bool IsNamePath(const Expr* e) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier) return true;
@@ -536,10 +468,6 @@ static bool IsNamePath(const Expr* e) {
          IsNamePath(e->lhs);
 }
 
-// §6.16 with §8.10 and §8.11: the class scope a bare name inside a method
-// resolves against -- the class whose static property it names, the running
-// method's class, or the object's own -- as EvalIdentifierClassScope
-// (evaluation.cpp) resolves it; nullptr outside every method.
 static const ClassTypeInfo* BareNameClassScope(std::string_view name,
                                                SimContext& ctx) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
@@ -551,10 +479,6 @@ static const ClassTypeInfo* BareNameClassScope(std::string_view name,
   return self != nullptr ? self->type : nullptr;
 }
 
-// The text of a string property named bare inside a method of its class
-// (§8.6, §8.10). A variable of the name is what the identifier denotes
-// instead (§23.9), and a string one is TryEvalStringMethodCall's own case;
-// `this` names no property.
 static bool ReadBareStringProperty(const Expr* name, SimContext& ctx,
                                    Arena& arena, std::string& str) {
   if (name->text == "this" || NameDenotesVariable(name->text, ctx))
@@ -565,8 +489,6 @@ static bool ReadBareStringProperty(const Expr* name, SimContext& ctx,
   return true;
 }
 
-// The text of a static string property named through the class scope
-// resolution operator, `C::name` (§8.9).
 static bool ReadScopedStringProperty(const Expr* access, SimContext& ctx,
                                      Arena& arena, std::string& str) {
   if (access->lhs->kind != ExprKind::kIdentifier) return false;
@@ -578,9 +500,6 @@ static bool ReadScopedStringProperty(const Expr* access, SimContext& ctx,
   return true;
 }
 
-// The text of a string property reached through a handle or a chain of them,
-// `h.s`, `this.s` or `d.c.s` (§8.3, §8.11); the handle side is a name path,
-// so reading it to find the object runs nothing.
 static bool ReadHandleStringProperty(const Expr* access, SimContext& ctx,
                                      Arena& arena, std::string& str) {
   if (!IsNamePath(access->lhs)) return false;
@@ -592,21 +511,6 @@ static bool ReadHandleStringProperty(const Expr* access, SimContext& ctx,
   return true;
 }
 
-// §6.16 declares the string methods on the string type, so a method is called
-// on any expression of that type, and the receivers of this file's other two
-// readers -- a string variable of the run's tables, a package's under its
-// scoped key -- are two of them. The text of the others, when the declaration
-// behind the receiver wrote the string type: a class property named bare
-// inside a method of the class, a static property named bare in a static
-// method or as `C::name`, or a property reached through a handle or a chain
-// of them. The declaration is asked because the value read is not: a literal
-// stored into the property is a packed value (§5.9) that carries no kind.
-// An element of a declared array of strings is one more (SelectsStringElement).
-// Answers false for any other receiver, a call's result among them, which
-// TryEvalCallResultMethodCall reads by the kind the call's value carries.
-// §7.7: whether `name` is a fixed-size array formal of the running call. Such
-// a formal has no variable of its own name, only its element variables local
-// to the call (BindFixedArrayArg in eval_function_args_array.cpp).
 static bool NamesArrayFormal(std::string_view name, SimContext& ctx) {
   const ArrayInfo* info = ctx.FindArrayInfo(name);
   return info != nullptr &&
@@ -614,8 +518,6 @@ static bool NamesArrayFormal(std::string_view name, SimContext& ctx) {
                                std::to_string(info->lo) + "]") != nullptr;
 }
 
-// Whether the declared array held under `name` -- a queue, an associative, a
-// dynamic or a fixed-size one -- says by its declaration that it holds strings.
 static bool DeclaredArrayHoldsStrings(std::string_view name, SimContext& ctx) {
   const ArrayInfo* info = ctx.FindArrayInfo(name);
   if (info == nullptr)
@@ -628,22 +530,10 @@ static bool DeclaredArrayHoldsStrings(std::string_view name, SimContext& ctx) {
                               std::to_string(info->lo) + "]");
 }
 
-// §6.16 with §7.4, §7.5 and §7.10: whether `receiver` selects one element of
-// an array of strings -- a queue, a dynamic or a fixed one, declared or a
-// class property, `h.names[0]` -- whose declaration, and not the value read,
-// says that it holds strings. A fixed-size array formal, `a[4]` of `string
-// a[4:1]` (§7.7), is one too: its name was taken for no variable's, so
-// `a[4].len()` read an empty string. So is a package's array named through
-// the package scope (§26.3), `p::pq[0]`, held under the key `p.pq` as a
-// scoped string variable is (PackageScopedKey).
 static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
                                         FieldTarget& target,
                                         bool elements = false);
 
-// §6.16 with §7.4.4: whether `receiver`, `m[1][0]`, selects one leaf of a
-// declared multidimensional array of strings: a select for every one of its
-// unpacked dimensions down from its name, no fewer, which would name a
-// subarray, and no more, which would name a character.
 static bool SelectsMultiDimStringLeaf(const Expr* receiver, SimContext& ctx) {
   size_t selects = 0;
   const Expr* root = receiver;
@@ -673,18 +563,13 @@ static bool SelectsStringElement(const Expr* receiver, SimContext& ctx) {
     return DeclaredArrayHoldsStrings(base->text, ctx);
   }
   if (SelectsMultiDimStringLeaf(receiver, ctx)) return true;
-  // §7.2 with §6.16: `m.v[1]`, an element of a structure's array member, is a
-  // string where the member is an array of strings.
   if (const StructFieldInfo* member = ResolveStructArrayMember(base, ctx))
     return member->type_kind == DataTypeKind::kString;
   FieldTarget target;
-  if (ResolveStringPropertyTarget(base, ctx, target, /*elements=*/true))
-    return true;
+  if (ResolveStringPropertyTarget(base, ctx, target, true)) return true;
   return DeclaredArrayHoldsStrings(PackageScopedKey(base), ctx);
 }
 
-// §7.2 with §6.16: whether `receiver`, `p.s`, names a string member of the
-// structure a variable holds, which is a string variable of its own.
 static bool SelectsStringMember(const Expr* receiver, SimContext& ctx) {
   FieldTarget target = ResolveFieldTarget(receiver, ctx);
   return target.kind == FieldTarget::Kind::kBits &&
@@ -714,9 +599,6 @@ static bool ReadStringReceiver(const Expr* receiver, SimContext& ctx,
   return ReadHandleStringProperty(receiver, ctx, arena, str);
 }
 
-// The class type whose declaration of `target.field` says what the storage
-// holds: the declared class scoping a property write (§8.15), else the
-// object's own, and the declaring class of a static property.
 static const ClassTypeInfo* TargetClassType(const FieldTarget& target) {
   if (target.kind == FieldTarget::Kind::kStatic) return target.type;
   if (target.kind != FieldTarget::Kind::kProperty || target.obj == nullptr)
@@ -724,15 +606,6 @@ static const ClassTypeInfo* TargetClassType(const FieldTarget& target) {
   return target.type != nullptr ? target.type : target.obj->type;
 }
 
-// §6.16.2 and §6.16.11 through §6.16.15, with §6.16's indexed character
-// assignment: the storage a string that is no variable of the run's tables is
-// written in -- a class property named bare inside a method of the class or
-// through `this` (§8.11), a static property named bare in a static method or
-// as `C::name` (§8.9, §8.10), or a property reached through a handle or a
-// chain of them (§8.3) -- resolved as an assignment to the property resolves
-// it (ResolveBarePropertyTarget, ResolveFieldTarget), when the declaration
-// wrote the string type. A bare name a variable denotes (§23.9) is that
-// variable's, which the callers serve first, and is not resolved here.
 static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
                                         FieldTarget& target, bool elements) {
   if (receiver->kind == ExprKind::kIdentifier) {
@@ -746,7 +619,6 @@ static bool ResolveStringPropertyTarget(const Expr* receiver, SimContext& ctx,
   return PropertyIsString(TargetClassType(target), target.field, ctx, elements);
 }
 
-// The text the resolved string property holds.
 static std::string StringPropertyText(const FieldTarget& target, Arena& arena) {
   if (target.kind == FieldTarget::Kind::kStatic)
     return Logic4VecToString(*target.slot);
@@ -765,14 +637,6 @@ bool TryEvalStringMethodOnValue(const Logic4Vec& value, const Expr* call_expr,
   return DispatchReturningMethod(method, args, out);
 }
 
-// The string methods on a receiver that is no string variable of the run's
-// tables: a value-answering one reads the receiver ReadStringReceiver reads,
-// and one that writes its object writes the array element
-// SelectsStringElement accepts or the property storage
-// ResolveStringPropertyTarget resolves. The name is asked first so that a
-// receiver is evaluated for a string method alone: a call of a class's own
-// method on a chain of handles is left to the dispatcher that runs it, its
-// receiver read once, there.
 static bool TryEvalStringMethodOnReceiver(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
   const Expr* access = expr->lhs;
@@ -818,10 +682,6 @@ bool TryWriteStringPropertyChar(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   FieldTarget target;
   if (!ResolveStringPropertyTarget(lhs->base, ctx, target)) return false;
-  // §6.16 (printed page 113): the index addresses one character, and an
-  // index out of range or a null character written leaves the string as it
-  // is, the rules StringWriteByte applies to a variable; an unknown index
-  // addresses no character at all.
   Logic4Vec idx = EvalExpr(lhs->index, ctx, arena);
   if (HasUnknownBits(idx)) return true;
   std::string text = StringPropertyText(target, arena);
@@ -843,10 +703,6 @@ bool TryEvalStringMethodCall(const Expr* expr, SimContext& ctx, Arena& arena,
     return TryEvalStringMethodOnReceiver(expr, ctx, arena, out);
   }
 
-  // §23.9 with §8.6: a bare name inside a method that the class scope declares
-  // is the property, not a like-named string of the enclosing module, which
-  // NameDenotesVariable tells apart as EvalIdentifier does; asked of the
-  // tables alone, `s.len()` in a method read the module's s.
   if (!ctx.IsStringVariable(parts.var_name) ||
       !NameDenotesVariable(parts.var_name, ctx)) {
     return TryEvalStringMethodOnReceiver(expr, ctx, arena, out);

@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §H.12.8, the SystemVerilog side of Example 6: a typedef struct MyType, an
-// import f1 taking a two-dimensional unsized unpacked array of MyType, two
-// arrays of MyType of different sizes and ranges -- a_10x5 [11:20][6:2] and
-// a_64x8 [64:1][-1:-8] -- and a call of f1 with each.
 class ExampleSixParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -34,8 +30,6 @@ TEST_F(ExampleSixParsing, TheSystemVerilogSideParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The import's one formal is a MyType with two unpacked dimensions, both
-// unsized -- the open array.
 TEST_F(ExampleSixParsing, TheFormalIsATwoDimensionalUnsizedUnpackedArray) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =
@@ -50,8 +44,6 @@ TEST_F(ExampleSixParsing, TheFormalIsATwoDimensionalUnsizedUnpackedArray) {
   EXPECT_EQ(f1->func_args[0].unpacked_dims[1], nullptr);
 }
 
-// The two actuals are declared with sized ranges of their own, two
-// dimensions each.
 TEST_F(ExampleSixParsing, TheActualsHaveSizedRangesOfTheirOwn) {
   ASSERT_NE(r_.cu, nullptr);
   int arrays = 0;

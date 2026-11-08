@@ -11,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Table 22-2 split the way this subclause splits it. The `kind` column is what
-// the word lexes as under "1364-2001"; under this version the ten dropped ones
-// lex as ordinary identifiers instead and the eleven kept ones do not change.
 struct Verilog2001KeywordEntry {
   const char* word;
   TokenKind kind_under_2001;
@@ -59,9 +56,6 @@ TEST(KeywordVersionPreprocessing, NoconfigRegionEmitsItsOwnVersionMarker) {
             KeywordVersion::kVer13642001Noconfig);
 }
 
-// The marker this version emits is its own, distinct from the one the version
-// it is defined in terms of emits. The exception can only reach the lexer if
-// the two regions are told apart here first.
 TEST(KeywordVersionPreprocessing, NoconfigMarkerDiffersFromVerilog2001) {
   auto marker_for = [](const char* version) {
     PreprocFixture f;
@@ -78,11 +72,6 @@ TEST(KeywordVersionPreprocessing, NoconfigMarkerDiffersFromVerilog2001) {
   EXPECT_NE(marker_for("1364-2001-noconfig"), marker_for("1364-2001"));
 }
 
-// The whole of Table 22-2, driven through a real `begin_keywords region and
-// read back as tokens: the ten this subclause names come out of the region as
-// ordinary identifiers, and the other eleven still come out as the keywords
-// "1364-2001" made them. Sweeping the table rather than sampling it is what
-// makes the exception, and not two convenient words, the thing observed.
 TEST(KeywordVersionPreprocessing, NoconfigDropsExactlyTheTenNamedWords) {
   for (const auto& entry : kVerilog2001AddedKeywordEntries) {
     ExpectBeginKeywordsTokenKind("1364-2001-noconfig", entry.word,
@@ -92,9 +81,6 @@ TEST(KeywordVersionPreprocessing, NoconfigDropsExactlyTheTenNamedWords) {
   }
 }
 
-// The same sweep against the version this one is defined from, which is what
-// makes each of the ten an *exception* rather than a word that was never
-// reserved: under "1364-2001" every entry of the table lexes as its keyword.
 TEST(KeywordVersionPreprocessing, Verilog2001KeepsItsAdditionsReserved) {
   for (const auto& entry : kVerilog2001AddedKeywordEntries) {
     ExpectBeginKeywordsTokenKind("1364-2001", entry.word,
@@ -102,8 +88,6 @@ TEST(KeywordVersionPreprocessing, Verilog2001KeepsItsAdditionsReserved) {
   }
 }
 
-// The inherited list is untouched by the exception, so words Table 22-1 names
-// still arrive at the lexer as keywords inside a region of this version.
 TEST(KeywordVersionPreprocessing, NoconfigKeepsInheritedKeywords) {
   ExpectBeginKeywordsTokenKind("1364-2001-noconfig", "module",
                                TokenKind::kKwModule);
@@ -114,8 +98,6 @@ TEST(KeywordVersionPreprocessing, NoconfigKeepsInheritedKeywords) {
                                TokenKind::kKwAlways);
 }
 
-// The bound from above: this version reserves no more than "1364-2001" does,
-// so a word a later list introduces reaches the lexer as an identifier.
 TEST(KeywordVersionPreprocessing, NoconfigLexesLaterWordsAsIdentifiers) {
   ExpectBeginKeywordsTokenKind("1364-2001-noconfig", "uwire",
                                TokenKind::kIdentifier);

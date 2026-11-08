@@ -81,9 +81,6 @@ TEST(LexicalConventionPreprocessor, TabsAndFormfeedsAsWhitespace) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §5.2 makes a source file a stream of lexical tokens and lists the seven kinds
-// there are; kKeywordMarker, the byte 0x01, begins none of them, so a source
-// holding one is rejected at the character it stands on.
 TEST(LexicalConventionPreprocessor, KeywordMarkerByteInSourceTextIsReported) {
   PreprocFixture f;
   Preprocess(
@@ -96,11 +93,6 @@ TEST(LexicalConventionPreprocessor, KeywordMarkerByteInSourceTextIsReported) {
                             "5.2"));
 }
 
-// What that report protects. The Preprocessor writes kKeywordMarker itself to
-// introduce a keyword-version change, and Lexer reads the byte after every
-// marker it finds as a KeywordVersion, so a 0x01 the user wrote that survived
-// into the output would set the reserved word list to whatever byte followed
-// it instead of being diagnosed.
 TEST(LexicalConventionPreprocessor,
      KeywordMarkerByteIsBlankedFromPreprocessedText) {
   PreprocFixture f;
@@ -115,11 +107,6 @@ TEST(LexicalConventionPreprocessor,
                             "5.2"));
 }
 
-// A value given for a macro on the command line is text of the same kind, and
-// §5.2 lists no token a 0x01 byte begins wherever it stands. The value never
-// passes through the scan the source text above meets, so the report is the
-// only thing that says the byte was read at all. A command-line define stands
-// on no line of any file, which is the line 0 below.
 TEST(LexicalConventionPreprocessor,
      KeywordMarkerByteInCommandLineDefineValueIsReported) {
   PreprocFixture f;
@@ -137,9 +124,6 @@ TEST(LexicalConventionPreprocessor,
       0, "5.2"));
 }
 
-// What that report protects, in the text the macro's expansion writes. The
-// source expands `WIDTH, so the value reaches the output rather than sitting in
-// the macro table where no assertion about the output could fail.
 TEST(LexicalConventionPreprocessor,
      KeywordMarkerByteIsBlankedFromExpandedCommandLineDefine) {
   PreprocFixture f;
@@ -158,8 +142,6 @@ TEST(LexicalConventionPreprocessor,
       0, "5.2"));
 }
 
-// Lexes `src` and returns the kind of the first token whose spelling is
-// `word`, or kError when the token never appears.
 TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -171,15 +153,6 @@ TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
   return TokenKind::kError;
 }
 
-// The consequence a surviving marker has, which neither assertion above shows:
-// Lexer::ConsumeKeywordMarker reads the byte after a marker as a
-// KeywordVersion, so a value carrying a marker and a version byte would select
-// a reserved word list for every token the expansion precedes. §22.14 gives
-// `begin_keywords as the only thing that selects one. `logic` separates the two
-// lists that byte would choose between: §22.14.6 reserves it from IEEE Std
-// 1800-2005 and the IEEE Std 1364-1995 list of §22.14.2 omits it, so it lexes
-// as an identifier when the value took effect and as its keyword when it did
-// not.
 TEST(LexicalConventionPreprocessor,
      CommandLineDefineValueCannotSelectTheReservedWordList) {
   PreprocFixture f;
@@ -200,9 +173,6 @@ TEST(LexicalConventionPreprocessor,
       0, "5.2"));
 }
 
-// §5.2 counts a comment among the lexical tokens, so a block comment in macro
-// text keeps apart the text on either side of it, as it does outside a macro.
-// Deleted outright, it ran `a` and `b` together into one identifier `ab`.
 TEST(LexicalTokenPreprocessor, BlockCommentInMacroTextSeparatesTokens) {
   PreprocFixture f;
   auto out = Preprocess(

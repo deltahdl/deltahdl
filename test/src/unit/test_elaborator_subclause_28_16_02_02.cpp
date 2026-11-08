@@ -48,9 +48,6 @@ TEST(ChargeDecaySpecElaboration, SingleDelayDoesNotPopulateDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2.2's charge decay time is a net delay value, i.e. a constant
-// expression (11.2.1). A parameter used as the third delay resolves in the
-// module's parameter scope and flows to decay_ticks, not just a bare literal.
 TEST(ChargeDecaySpecElaboration, ParameterThirdDelayResolvesToDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,7 +69,6 @@ TEST(ChargeDecaySpecElaboration, ParameterThirdDelayResolvesToDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// A localparam is likewise a valid constant form for the charge decay time.
 TEST(ChargeDecaySpecElaboration, LocalparamThirdDelayResolvesToDecayTicks) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,26 +110,6 @@ TEST(ChargeDecaySpecElaboration, TwoDelaysDoNotPopulateDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2.2 rules that a trireg net declaration's third delay is its charge
-// decay time, and §28.16.2 admits §28.16.1's three-valued form into that slot,
-// a trireg taking up to three delays as any net does. §28.16.1 in turn has each
-// delay's minimum, typical and maximum written as expressions between colons,
-// so `#(1, 2, 3:4:5)` writes a charge decay time of 3, 4 or 5.
-//
-// 4 is the one this asserts, because 4 is the member elaboration can reach.
-// §11.11 orders the three as minimum, then typical, then maximum, and the
-// typical member is what a design elaborates with: the delay mode that would
-// name a different member is DelayMode in src/simulator/sim_context_types.h,
-// which only SimContext::SetDelayMode writes and which nothing in production
-// calls. #3264 covers that, and until it is settled a case asserting 3 or 5 has
-// no way to ask for them.
-//
-// The rise and fall delays are 1 and 2 so that a decay time read off the wrong
-// position of the declaration answers 1 or 2 rather than one of the members,
-// and a fold that gives up on the triple answers 0 -- which
-// ChargeDecaySpecElaboration.SingleDelayDoesNotPopulateDecayTicks above asserts
-// of a declaration carrying no third delay at all, so the triple would state
-// the opposite of what it says.
 TEST(ChargeDecaySpecElaboration, ThirdDelayTripleTakesTheTypicalMember) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -148,18 +124,6 @@ TEST(ChargeDecaySpecElaboration, ThirdDelayTripleTakesTheTypicalMember) {
   EXPECT_EQ(cap->decay_ticks, 4u);
 }
 
-// A third delay that does not fold is warned about rather than stood down to a
-// decay time of zero. Zero is the value §28.16.2 leaves a declaration writing
-// no third delay with, and §28.16.2.1 arms no charge decay process at it, so
-// substituting it for a fold that failed makes the declaration say the opposite
-// of what it wrote.
-//
-// The report is a warning and not an error because A.2.2.3 writes delay3 over
-// mintypmax_expression rather than constant_mintypmax_expression, so a third
-// delay naming a variable is not thereby illegal -- the rise and fall delays of
-// the same declaration reach the run as expressions. What the source loses is
-// the charge decay time, which §28.16.2.1 needs before the drivers turn off,
-// and the warning is what says so.
 TEST(ChargeDecaySpecElaboration,
      ThirdDelayThatDoesNotFoldIsWarnedAboutRatherThanZeroed) {
   ElabFixture f;
@@ -176,16 +140,6 @@ TEST(ChargeDecaySpecElaboration,
                               "28.16.2.2"));
 }
 
-// §28.16.2.1 makes the charge decay a process that ends when the charge decay
-// time has passed and the trireg net goes from 1 or 0 to x, so a decay time of
-// zero is that transition happening at once. §28.16.2.2 gives the *absence* of
-// a third delay the meaning of never decaying. The two states shared one
-// representation -- a decay_ticks of zero -- so a declaration writing zero got
-// the opposite of what it asked for.
-//
-// The elaborated nets are asserted to differ in the field that now tells them
-// apart, which is where the distinction is made; the two run-time cases are in
-// test/src/unit/test_simulator_subclause_28_16_02.cpp.
 TEST(ChargeDecaySpecElaboration, ZeroDecayTimeIsRecordedAsDecaying) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -207,10 +161,6 @@ TEST(ChargeDecaySpecElaboration, ZeroDecayTimeIsRecordedAsDecaying) {
   EXPECT_TRUE(found);
 }
 
-// The other half of the same distinction, which the case above cannot state on
-// its own: a declaration with no third delay records the same zero count and
-// does not decay. SingleDelayDoesNotPopulateDecayTicks asserts the count and is
-// what let the two states share a representation.
 TEST(ChargeDecaySpecElaboration, AbsentThirdDelayIsRecordedAsNotDecaying) {
   ElabFixture f;
   auto* design = ElaborateSrc(

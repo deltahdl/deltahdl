@@ -51,11 +51,6 @@ TEST(MultipleTaskExports,
   EXPECT_TRUE(ElabOk(src));
 }
 
-// §25.7.4 accepts the forkjoin exemption regardless of how the modport names
-// the exported task. Here the modport uses the full-prototype export form
-// (`export task Read(...)`) rather than the bare identifier, exercising the
-// dependency (§25.5/§25.7) prototype syntax the duplicate-export check
-// consumes.
 TEST(MultipleTaskExports,
      ExternForkjoinTaskExportedViaFullPrototypeModportElaborates) {
   EXPECT_TRUE(
@@ -95,17 +90,12 @@ TEST(MultipleTaskExports, DuplicateNonForkjoinTaskExportFromTwoModulesIsError) {
       "  memMod mem2(sb_intf.target);\n"
       "endmodule\n",
       f);
-  // The report stands at the first of the two exporting definitions, which for
-  // two instances of one module is memMod's single body on line 7.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "task 'Read' exported by more than one module "
                             "connected to interface instance 'sb_intf'",
                             7, "25.7.4"));
 }
 
-// §25.7.4's general rule is stated over several modules — not only repeated
-// instances of one module type. Two DISTINCT module types exporting the same
-// non-forkjoin task into one interface instance is likewise an error.
 TEST(MultipleTaskExports, DifferentModuleTypesDuplicateTaskExportIsError) {
   ElabFixture f;
   ElabOk(
@@ -129,8 +119,6 @@ TEST(MultipleTaskExports, DifferentModuleTypesDuplicateTaskExportIsError) {
       "  altMod alt(sb_intf.target);\n"
       "endmodule\n",
       f);
-  // The export sites are collected in instantiation order, so the first is
-  // memMod's body on line 7 rather than altMod's on line 11.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "task 'Read' exported by more than one module "
                             "connected to interface instance 'sb_intf'",
@@ -181,9 +169,6 @@ TEST(MultipleTaskExports, DuplicateFunctionExportFromTwoModulesIsError) {
                             7, "25.7.4"));
 }
 
-// Positive control witnessing that the duplicate-function negative above fires
-// on the second export, not on function export being unsupported: a single
-// module exporting the function elaborates.
 TEST(MultipleTaskExports, SingleModuleExportOfFunctionElaborates) {
   EXPECT_TRUE(
       ElabOk("interface simple_bus (input logic clk);\n"
@@ -203,8 +188,6 @@ TEST(MultipleTaskExports, SingleModuleExportOfFunctionElaborates) {
              "endmodule\n"));
 }
 
-// The no-forkjoin-escape for functions also holds across distinct module
-// types: two different modules exporting the same function is an error.
 TEST(MultipleTaskExports, DifferentModuleTypesDuplicateFunctionExportIsError) {
   ElabFixture f;
   ElabOk(
@@ -230,8 +213,6 @@ TEST(MultipleTaskExports, DifferentModuleTypesDuplicateFunctionExportIsError) {
       "  altMod alt(sb_intf.target);\n"
       "endmodule\n",
       f);
-  // memMod is instantiated first, so its definition on line 7 is the site the
-  // report stands at.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "function 'compute' exported by more than one "
                             "module connected to interface instance 'sb_intf'",

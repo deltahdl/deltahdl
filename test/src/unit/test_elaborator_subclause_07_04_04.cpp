@@ -29,9 +29,6 @@ TEST(MultidimensionalArrayValidation, TwoDimUnpackedElaborates) {
 }
 
 TEST(MultidimensionalArrayValidation, PackedDimsViaTypedefStaging) {
-  // §7.4.4: multiple packed dimensions may be assembled in stages through a
-  // typedef. The packed range carried by the typedef supplies the element
-  // width, while the unpacked range at the use site sizes the array.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -52,11 +49,6 @@ TEST(MultidimensionalArrayValidation, PackedDimsViaTypedefStaging) {
 }
 
 TEST(MultidimensionalArrayValidation, PackedDimsViaTypedefStagingCombineWidth) {
-  // §7.4.4: multiple packed dimensions may be assembled in stages with a
-  // typedef. A packed range placed before the name at the use site of the
-  // typedef stacks on top of the typedef's own packed range, so v5 declared as
-  // `bsix [1:10] v5` (bsix == bit [1:5]) is a single 50-bit packed value, not a
-  // 10-element unpacked array of 5-bit words.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -73,17 +65,10 @@ TEST(MultidimensionalArrayValidation, PackedDimsViaTypedefStagingCombineWidth) {
   }
   ASSERT_NE(v5, nullptr);
   EXPECT_EQ(v5->width, 50u);
-  // The staged dimension is packed, not unpacked: v5 is a single scalar packed
-  // word rather than an array of elements.
   EXPECT_EQ(v5->unpacked_size, 0u);
 }
 
 TEST(MultidimensionalArrayValidation, MultiPackedDimWidthParameterBounds) {
-  // §7.4.4: the two packed dimensions of an array of arrays combine into the
-  // element width. Each dimension bound is a constant expression; when a
-  // parameter supplies the bound it is resolved through the parameter scope
-  // (a different width-evaluation path than a plain literal), and both packed
-  // ranges must still multiply into the element width (4 * 8 == 32 here).
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -105,11 +90,6 @@ TEST(MultidimensionalArrayValidation, MultiPackedDimWidthParameterBounds) {
 
 TEST(MultidimensionalArrayValidation,
      PackedDimsViaTypedefStagingParameterWidth) {
-  // §7.4.4: the packed dimension staged onto a typedef at its use site is a
-  // constant expression. A parameter as that bound resolves through the
-  // parameter scope, exercising the scope-aware branch of the staging-width
-  // rule rather than the literal branch, yet must still combine to 50 bits
-  // (10 elements of the typedef's own 5-bit packed range).
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -131,9 +111,6 @@ TEST(MultidimensionalArrayValidation,
 
 TEST(MultidimensionalArrayValidation,
      PackedDimsViaTypedefStagingLocalparamWidth) {
-  // §7.4.4: a localparam bound on the staged packed dimension is likewise a
-  // constant expression and combines identically to a literal or parameter
-  // bound, giving the full 50-bit width.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -164,10 +141,6 @@ TEST(MultidimensionalArrayValidation, CommaSeparatedSharePackedDims) {
   EXPECT_EQ(mod->variables[0].width, mod->variables[1].width);
 }
 
-// §7.4.4 with §6.20.2: packed dimensions written on a typedef name multiply
-// the width the name stands for, so a package parameter of `nib [1:0]` on a
-// `typedef bit [3:0] nib` is eight bits and holds all of 8'hFF, 255. The fold
-// cut the value to the two bits the outer range counts alone, 3.
 TEST(StagedPackedDimensions, PackageParameterOfATypedefWithDimensionsIsNotCut) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -184,7 +157,6 @@ TEST(StagedPackedDimensions, PackageParameterOfATypedefWithDimensionsIsNotCut) {
   EXPECT_EQ(ParamValue(design, "Q"), 255);
 }
 
-// The same for a class parameter's default, read through `C#()::P`.
 TEST(StagedPackedDimensions, ClassParameterOfATypedefWithDimensionsIsNotCut) {
   ElabFixture f;
   auto* design = ElaborateSrc(

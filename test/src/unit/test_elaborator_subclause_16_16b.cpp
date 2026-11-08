@@ -10,10 +10,6 @@ namespace {
 const char* const kNoClockReport =
     "concurrent assertion has no leading clocking event";
 
-// §16.16 (f): with no default clocking, the clause's c1 covers a sequence
-// declared with no clock and its a6 asserts a property with none, so
-// neither has an explicit, inferred or default leading clocking event and
-// each is illegal.
 TEST(ClockResolutionElaboration, NoClockAnywhereIsIllegal) {
   ElabFixture f;
   Elaborate(
@@ -32,10 +28,6 @@ TEST(ClockResolutionElaboration, NoClockAnywhereIsIllegal) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 9, "16.16"));
 }
 
-// §16.16 (f): the clause's c3 covers s3, an instance of a sequence declared
-// with negedge clk, from which a unique leading clocking event is
-// determined, so it is legal; its c4 covers s3 ##1 b, whose maximal
-// property is no instance, so it is not.
 TEST(ClockResolutionElaboration, AnInstanceDeterminesTheClockAndMoreDoesNot) {
   ElabFixture f;
   Elaborate(
@@ -54,10 +46,6 @@ TEST(ClockResolutionElaboration, AnInstanceDeterminesTheClockAndMoreDoesNot) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 9, "16.16"));
 }
 
-// §16.16 (c): a contextually inferred clocking event is the leading
-// clocking event of the assertion it applies to, which a multiclocked
-// property may not take: the clause's a3 asserts $fell(c) |=> q2, q2
-// clocked by posedge clk, in an always at negedge clk.
 TEST(ClockResolutionElaboration,
      AMulticlockedPropertyMayNotTakeAnInferredClock) {
   ElabFixture f;
@@ -87,9 +75,6 @@ TEST(ClockResolutionElaboration,
                             12, "16.16"));
 }
 
-// §16.16 (a) and (b): under a default clocking an unclocked spec, an
-// instance of an unclocked property and an instance of a property declared
-// in the clocking block, named through the block, are all legal.
 TEST(ClockResolutionElaboration, TheDefaultAndTheBlockClockTheRest) {
   ElabFixture f;
   Elaborate(
@@ -111,11 +96,6 @@ TEST(ClockResolutionElaboration, TheDefaultAndTheBlockClockTheRest) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-// §16.16 (f) and §16.9.5: a sequence declared with posedge clk over a
-// parenthesised `and` of two concatenations, the composite ending at the
-// later end point, followed by `##0 e`, a shape the linear monitor does not
-// read, still determines a unique leading clocking event, so an assertion
-// whose maximal property is an instance of it is legal.
 TEST(ClockResolutionElaboration,
      AnInstanceOfAConjunctionThenZeroDelayDeterminesTheClock) {
   ElabFixture f;
@@ -131,8 +111,6 @@ TEST(ClockResolutionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.16 (f) and §16.7: the same with each concatenation over a
-// cycle_delay_range, `##[1:6]` and `##[1:9]`.
 TEST(ClockResolutionElaboration,
      AnInstanceOfARangedConjunctionThenZeroDelayDeterminesTheClock) {
   ElabFixture f;
@@ -148,9 +126,6 @@ TEST(ClockResolutionElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.16 (f): the same body declared with no clocking event, under no
-// default clocking, determines none, so the assertion instantiating it is
-// reported.
 TEST(ClockResolutionElaboration,
      AnInstanceOfAnUnclockedConjunctionThenZeroDelayIsIllegal) {
   ElabFixture f;
@@ -165,10 +140,6 @@ TEST(ClockResolutionElaboration,
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 5, "16.16"));
 }
 
-// §16.16 (b)(3): a property declared outside a clocking block and
-// instantiated in one of its declarations is singly clocked on the block's
-// event: q5's negedge clk is not cb's posedge clk, while q6, written with no
-// clock, takes the block's.
 TEST(ClockResolutionElaboration,
      AnOutsideInstanceInAClockingBlockTakesItsClock) {
   ElabFixture f;
@@ -201,9 +172,6 @@ TEST(ClockResolutionElaboration,
                              13, "16.16"));
 }
 
-// §16.16 (b)(3): so is an outside sequence on another signal's edge, s9, and
-// an outside property clocked twice, q11, while q10, on the block's own
-// event, is legal.
 TEST(ClockResolutionElaboration, AnOutsideInstanceOnAnotherClockIsReported) {
   const char* const kReport =
       "is not clocked on the block's clocking event alone";

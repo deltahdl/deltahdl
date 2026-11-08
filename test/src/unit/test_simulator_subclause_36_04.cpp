@@ -14,19 +14,6 @@
 namespace delta {
 namespace {
 
-// §36.4 — User-defined system task and system function arguments. A
-// user-defined system task or system function written in a source file may take
-// arguments that the PLI applications tied to it can use, the clause's own
-// example being `$get_vector("test_vector.pat", input_bus);` with two of them.
-// Those arguments are the task/function arguments, and the rule about them is
-// how they reach the application: a called PLI application is not handed them,
-// and reads and writes them instead through PLI routines provided for the
-// purpose.
-//
-// Both halves are observable from a calltf. The application's own parameter
-// carries the user_data its registration gave it and never an argument list,
-// and §37.42's vpiArgument iteration over the call handle
-// vpi_handle(vpiSysTfCall, NULL) returns is what reaches the arguments.
 class SystfCallArguments : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -35,19 +22,12 @@ class SystfCallArguments : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// What the application below found, left at file scope because a calltf is a
-// plain C function with nowhere else to put it.
 int g_args_seen = 0;
 uint64_t g_second_arg = 0;
 const char* g_user_data_seen = nullptr;
-// The user_data every registration below carries. An array rather than a string
-// literal because s_vpi_systf_data::user_data is a void* and the application is
-// handed it back unchanged.
 char g_user_data[] = "vector-reader";
 bool g_user_data_was_read = false;
 
-// Walks the call's arguments the way §36.4 says an application has to: through
-// the PLI routines, off the call handle, rather than out of its own parameter.
 PLI_INT32 ReadArgsCalltf(PLI_BYTE8* user_data) {
   g_user_data_seen = user_data;
   g_user_data_was_read = true;
@@ -69,14 +49,11 @@ PLI_INT32 ReadArgsCalltf(PLI_BYTE8* user_data) {
   return 0;
 }
 
-// Writes through the second argument, the write to a task/function argument
-// that §36.4 names.
 PLI_INT32 WriteArgCalltf(PLI_BYTE8*) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   if (call == nullptr) return 0;
   vpiHandle args = vpi_iterate(vpiArgument, call);
   if (args == nullptr) return 0;
-  // The first argument is the file name; the second is the variable to write.
   if (vpi_scan(args) == nullptr) return 0;
   vpiHandle arg = vpi_scan(args);
   if (arg == nullptr) return 0;
@@ -87,9 +64,6 @@ PLI_INT32 WriteArgCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// Registers $get_vector under `calltf` and runs the clause's own call site,
-// with `input_bus` holding `bus`. Returns the value the variable holds once the
-// run is over, so a case that wrote through an argument can read it back.
 uint64_t RunGetVector(PLI_INT32 (*calltf)(PLI_BYTE8*), uint64_t bus,
                       SimFixture& f) {
   s_vpi_systf_data task = {};
@@ -113,9 +87,6 @@ uint64_t RunGetVector(PLI_INT32 (*calltf)(PLI_BYTE8*), uint64_t bus,
   return var == nullptr ? 0 : var->value.ToUint64();
 }
 
-// §36.4: the call site's arguments reach the application. The clause's example
-// writes two, so the iteration returns two -- a call object carrying none would
-// return zero and read as a task called with no arguments at all.
 TEST_F(SystfCallArguments, BothArgumentsOfTheCallSiteAreReachable) {
   g_args_seen = 0;
   SimFixture f;
@@ -124,10 +95,6 @@ TEST_F(SystfCallArguments, BothArgumentsOfTheCallSiteAreReachable) {
   EXPECT_EQ(g_args_seen, 2);
 }
 
-// §36.4: the routines let the PLI applications read the task/function
-// arguments. The second argument is `input_bus`, which the design set to 8'h5A
-// before the call, so that is what the application reads back through
-// vpi_get_value.
 TEST_F(SystfCallArguments, AnArgumentsValueIsReadThroughTheRoutines) {
   g_second_arg = 0;
   SimFixture f;
@@ -136,18 +103,11 @@ TEST_F(SystfCallArguments, AnArgumentsValueIsReadThroughTheRoutines) {
   EXPECT_EQ(g_second_arg, 0x5Au);
 }
 
-// §36.4: and let them write to the task/function arguments. The application
-// puts 8'h2D through the second argument, so the variable the call site named
-// holds it once the run is over rather than the 8'h5A it went in with.
 TEST_F(SystfCallArguments, AnArgumentIsWrittenThroughTheRoutines) {
   SimFixture f;
   EXPECT_EQ(RunGetVector(WriteArgCalltf, 0x5A, f), 0x2Du);
 }
 
-// §36.4: the PLI application is not handed the task/function arguments. The one
-// parameter a calltf takes is the user_data its registration carried, which is
-// what it is handed here -- not the first argument of the call, and not a list
-// of them.
 TEST_F(SystfCallArguments, TheApplicationsParameterIsItsOwnUserData) {
   g_user_data_seen = nullptr;
   g_user_data_was_read = false;
@@ -158,8 +118,6 @@ TEST_F(SystfCallArguments, TheApplicationsParameterIsItsOwnUserData) {
   EXPECT_STREQ(g_user_data_seen, "vector-reader");
 }
 
-// What $kinds found of each argument: its type, its constant type or operator,
-// and its value.
 struct ArgumentSeen {
   int type;
   int kind;
@@ -185,11 +143,6 @@ PLI_INT32 KindsCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §36.4 with §37.42 and §37.58: each argument the call site wrote reaches the
-// application as what it is -- an unbased unsized literal an integer constant,
-// a real literal a real constant, an omitted argument an operation of the null
-// operator (§37.42 detail 8) -- and a member of a structure, through a name or
-// through an element of an array, as an expression holding the member's value.
 TEST_F(SystfCallArguments, EachArgumentKindReachesTheApplication) {
   KindsSeen().clear();
   s_vpi_systf_data task = {};
@@ -226,10 +179,6 @@ PLI_INT32 AllOnesCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §36.8.1 with §38.37.1: a sizetf answering with no bits describes no value,
-// so a sized system function returns the default 32 bits: all ones written
-// through the call reads back as 32 ones, zero-extended into a 64-bit
-// variable.
 TEST_F(SystfCallArguments, ASizetfOfNoBitsLeavesTheDefaultWidth) {
   s_vpi_systf_data func = {};
   func.type = vpiSysFunc;
@@ -253,9 +202,6 @@ PLI_INT32 CountCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §36.4 with §37.42 detail 3: a call written in a package function and one
-// written in a task of an instance reached by a hierarchical call each reach
-// the application with a call object, whichever instance the call runs from.
 TEST_F(SystfCallArguments, ACallWrittenOutsideTheRunningInstanceIsReached) {
   g_elsewhere_calls = 0;
   s_vpi_systf_data task = {};

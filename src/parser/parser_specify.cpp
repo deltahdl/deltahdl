@@ -30,20 +30,12 @@ ModuleItem* Parser::ParseSpecifyBlock() {
   while (!Check(TokenKind::kKwEndspecify) && !AtEnd()) {
     auto before = lexer_.SavePos().pos;
     ParseSpecifyItem(item->specify_items);
-    // Missing endspecify: the enclosing endmodule reaches here and
-    // ParseSpecifyItem's recovery consumes nothing. Stop and let the Expect
-    // below report the missing endspecify rather than spinning.
     if (lexer_.SavePos().pos == before) break;
   }
   Expect(TokenKind::kKwEndspecify, Subclause("30.3"));
   return item;
 }
 
-// A.2.4 and Syntax 30-7 (printed page 887) parenthesize a PATHPULSE$
-// specparam's limits; §30.7.1's example `PATHPULSE$ = 3;` is informative
-// (§1.10), so a bare limit is reported and read as the one limit that serves
-// as both. Answers the reject limit, and sets `error_limit` where one is
-// written.
 Expr* Parser::ParsePathpulseLimits(Expr*& error_limit) {
   if (!Check(TokenKind::kLParen)) {
     diag_.Error(CurrentLoc(),
@@ -93,8 +85,6 @@ void Parser::ParseSpecparamDecl(std::vector<ModuleItem*>& items) {
 }
 
 void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
-  // Recover from a malformed specify item by skipping tokens up to (and
-  // including) the terminating semicolon, without crossing the block end.
   auto skip_to_item_end = [&]() {
     while (!AtEnd() && !Check(TokenKind::kSemicolon) &&
            !Check(TokenKind::kKwEndspecify) &&
@@ -121,7 +111,6 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     return;
   }
 
-  // A system identifier is either a timing check or an erroneous system task.
   if (Check(TokenKind::kSystemIdentifier) &&
       IsTimingCheckName(CurrentToken().text)) {
     items.push_back(ParseTimingCheck());
@@ -134,7 +123,6 @@ void Parser::ParseSpecifyItem(std::vector<SpecifyItem*>& items) {
     return;
   }
 
-  // An 'if'/'ifnone' module path declaration.
   if (Check(TokenKind::kKwIfnone)) {
     items.push_back(ParseIfnonePathDecl());
     return;
@@ -164,8 +152,6 @@ static bool IsZorX(char c) {
 
 static bool IsZeroOrOne(char c) { return c == '0' || c == '1'; }
 
-// Two-character edge descriptors are either (z|x, 0|1) or two distinct binary
-// values (e.g. "01", "10").
 static bool IsTwoCharEdgeDescriptor(std::string_view text) {
   if (text.size() != 2) return false;
   if (IsZorX(text[0]) && IsZeroOrOne(text[1])) return true;
@@ -194,10 +180,6 @@ static void CheckEdgeDescriptorCount(DiagEngine& diag, SourceLoc list_loc,
   }
 }
 
-// The zero_or_one and z_or_x halves of an edge_descriptor such as `0x` lex as
-// two separate tokens, so they arrive split apart. Syntax 31-15 forbids
-// embedded spaces within an edge_descriptor: the two halves shall be
-// immediately adjacent in the source.
 void Parser::ParseSplitEdgeDescriptor(
     char first, SourceLoc tok_loc,
     std::vector<std::pair<char, char>>& descriptors) {
@@ -260,13 +242,6 @@ SpecifyEdge Parser::ParseSpecifyEdge(
   return SpecifyEdge::kNone;
 }
 
-// A.7.3's specify_input_terminal_descriptor and
-// specify_output_terminal_descriptor, which A.7.5.3's timing_check_event and
-// A.7.2's path descriptions share: an input_identifier or output_identifier,
-// each a port_identifier or `interface_identifier . port_identifier`, with an
-// optional `[ constant_range_expression ]`. Every identifier here is A.9.3's
-// `simple_identifier | escaped_identifier`, so each is read by
-// Parser::ExpectIdentifier, which takes either.
 SpecifyTerminal Parser::ParseSpecifyTerminal() {
   SpecifyTerminal term;
   term.name = ExpectIdentifier(Subclause("30.4")).text;
@@ -296,14 +271,6 @@ SpecifyTerminal Parser::ParseSpecifyTerminal() {
   return term;
 }
 
-// A.7.3: list_of_path_inputs ::= specify_input_terminal_descriptor { ,
-// specify_input_terminal_descriptor }, and list_of_path_outputs likewise; a
-// descriptor is an identifier with an optional range, so there is no brace
-// around either list. A.8.1's module_path_concatenation does take braces, but
-// it is a module_path_primary (A.8.4) and stands only in the
-// module_path_expression a state-dependent path's `if` tests, never in a
-// terminal list. A brace group here is reported at its '{' and skipped whole,
-// so that the operator and the other list are still read.
 void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   if (Check(TokenKind::kLBrace)) {
     diag_.Error(CurrentLoc(),
@@ -320,10 +287,6 @@ void Parser::ParsePathPorts(std::vector<SpecifyTerminal>& ports) {
   }
 }
 
-// A.7.4's list_of_path_delay_expressions: one constant_mintypmax_expression
-// (A.8.3) or a comma-separated list of them. The count the list may have is
-// the caller's to check, once it knows which alternative of path_delay_value
-// held the list.
 void Parser::ParsePathDelayList(std::vector<Expr*>& delays) {
   delays.push_back(ParseMinTypMaxExpr());
   while (Match(TokenKind::kComma)) {
@@ -331,16 +294,6 @@ void Parser::ParsePathDelayList(std::vector<Expr*>& delays) {
   }
 }
 
-// Reads A.7.4's `( list_of_path_delay_expressions )` alternative of
-// path_delay_value, answering whether that is what stood at the '('. The bare
-// alternative can open with a '(' too, since a constant_mintypmax_expression
-// can, as in `(1) + 2` and `(2) * 3, (4) + 1`; the two are told apart by what
-// follows the ')' that answers the '(': the ';' that ends the path declaration
-// for the parenthesized list, an operator or a ',' for an expression the
-// parentheses opened. A list read cleanly to its ')' with no ';' behind it is
-// given back to the bare reading from the '(' on. A list that drew a report is
-// kept as the parenthesized alternative, so that its report stands once and a
-// ')' it lacks is reported here rather than as the expression's.
 bool Parser::TryParseParenthesizedPathDelays(std::vector<Expr*>& delays) {
   if (!Check(TokenKind::kLParen)) return false;
   auto saved = lexer_.SavePos();
@@ -362,11 +315,6 @@ bool Parser::TryParseParenthesizedPathDelays(std::vector<Expr*>& delays) {
   return true;
 }
 
-// A.7.4's path_delay_value: a list_of_path_delay_expressions bare or in
-// parentheses, §30.5 putting at least one delay value on the right-hand side,
-// with parentheses around them allowed but not required. The list holds
-// one, two, three, six or twelve values, and no other count, whichever
-// alternative holds it.
 void Parser::ParsePathDelays(std::vector<Expr*>& delays) {
   auto loc = CurrentLoc();
   if (!TryParseParenthesizedPathDelays(delays)) {
@@ -392,9 +340,6 @@ SpecifyPolarity Parser::ParseSpecifyPolarity() {
   return SpecifyPolarity::kNone;
 }
 
-// Every parallel ('=>') form — plain, edge-sensitive, or with a data-source
-// expression — is described with a single input and a single output terminal
-// descriptor. Only the full ('*>') forms accept terminal lists.
 static void CheckParallelPathTerminalCount(DiagEngine& diag, SourceLoc loc,
                                            const SpecifyPathDecl& path) {
   if (path.path_kind == SpecifyPathKind::kParallel &&
@@ -406,18 +351,12 @@ static void CheckParallelPathTerminalCount(DiagEngine& diag, SourceLoc loc,
   }
 }
 
-// Maps a leading '+='/'-=' token to the polarity of a polarity-prefixed
-// '+=>'/'-=>' parallel-path operator, or kNone when it is not a candidate.
 static SpecifyPolarity PolarityPrefixOf(TokenKind kind) {
   if (kind == TokenKind::kPlusEq) return SpecifyPolarity::kPositive;
   if (kind == TokenKind::kMinusEq) return SpecifyPolarity::kNegative;
   return SpecifyPolarity::kNone;
 }
 
-// Consume the polarity-prefixed '+=>'/'-=>' spelling, whose polarity is lexed
-// as a single '+='/'-=' token followed by '>'. Returns true (recording the
-// polarity and parallel kind) only on a complete match; a partial match
-// restores the saved position so the plain operators are reconsidered.
 bool Parser::ParsePolarityPrefixedParallelPath(SpecifyItem* item) {
   SpecifyPolarity prefix = PolarityPrefixOf(CurrentToken().kind);
   if (item->path.polarity != SpecifyPolarity::kNone ||
@@ -435,13 +374,6 @@ bool Parser::ParsePolarityPrefixedParallelPath(SpecifyItem* item) {
   return false;
 }
 
-// Consume the path operator that separates source and destination terminals.
-// §30.4.2 gives a simple path two forms, `source *> destination` and
-// `source => destination`, and A.7.2 admits no other token in that place.
-// Anything else is reported where the operator was due; a token that could
-// not open the destination is consumed so that the destination after it is
-// still read, while an identifier or the closing ')' is left to be read as
-// what it is.
 void Parser::ParseSpecifyPathOperator(SpecifyItem* item) {
   if (ParsePolarityPrefixedParallelPath(item)) return;
   if (Match(TokenKind::kEqGt)) {
@@ -458,13 +390,6 @@ void Parser::ParseSpecifyPathOperator(SpecifyItem* item) {
   if (!Check(TokenKind::kIdentifier) && !Check(TokenKind::kRParen)) Consume();
 }
 
-// Parse the destination terminal descriptor, which is parenthesized only when
-// it carries a destination polarity and data-source expression. §30.4.3: the
-// output polarity operator sits between the output terminal and the
-// data-source ':' separator. When written with no space it abuts the colon, so
-// '+:' / '-:' lex as a single token and the polarity and separator are
-// recovered from it; a space (e.g. 'q + : d') instead leaves a plain polarity
-// token followed by ':'.
 void Parser::ParseSpecifyPathDestination(SpecifyItem* item) {
   bool parenthesized = Match(TokenKind::kLParen);
   ParsePathPorts(item->path.dst_ports);
@@ -525,12 +450,6 @@ SpecifyItem* Parser::ParseIfnonePathDecl() {
   return item;
 }
 
-// A.7.1: `pulsestyle_declaration ::= pulsestyle_onevent list_of_path_outputs
-// ; | pulsestyle_ondetect list_of_path_outputs ;`. The list is A.7.3's, the
-// same one a full path's destination side is, so Parser::ParsePathPorts reads
-// it: each output a specify_output_terminal_descriptor with its optional
-// range, its `interface_identifier . port_identifier` form and its escaped
-// spelling.
 SpecifyItem* Parser::ParsePulsestyleDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kPulsestyle;
@@ -546,9 +465,6 @@ SpecifyItem* Parser::ParsePulsestyleDecl() {
   return item;
 }
 
-// A.7.1: `showcancelled_declaration ::= showcancelled list_of_path_outputs ;
-// | noshowcancelled list_of_path_outputs ;`, its list read as the pulse style
-// declaration's is.
 SpecifyItem* Parser::ParseShowcancelledDecl() {
   auto* item = arena_.Create<SpecifyItem>();
   item->kind = SpecifyItemKind::kShowcancelled;
@@ -564,8 +480,6 @@ SpecifyItem* Parser::ParseShowcancelledDecl() {
   return item;
 }
 
-// Decode the input/output terminal names embedded in a "PATHPULSE$in$out"
-// specparam name and mark the item as a PATHPULSE specparam.
 static void DecodePathpulseName(SpecifyItem& sp) {
   sp.is_pathpulse = true;
   constexpr std::string_view kPrefix = "PATHPULSE$";
@@ -580,16 +494,6 @@ static void DecodePathpulseName(SpecifyItem& sp) {
   sp.pathpulse_output = rest.substr(sep + 1);
 }
 
-// §30.7.1 (printed page 887): a PATHPULSE$ specparam's module path terminals
-// follow the rules for the inputs and outputs of a module path, except that
-// neither may select a bit or a part of a vector. Syntax 30-7 spells the name
-// out of two terminal descriptors,
-// each admitting a range, so `PATHPULSE$a[0]$y` is that syntax with a select
-// the restriction forbids. The name reads up to the select as one identifier,
-// and what follows it up to the `=` -- the select and whatever terminal comes
-// after -- is taken as part of the name the rule refuses rather than left to
-// be read as four unrelated parse errors. True where the select was there,
-// the specparam then declaring nothing.
 bool Parser::RefusePathpulseTerminalSelect() {
   if (!Check(TokenKind::kLBracket)) return false;
   diag_.Error(CurrentLoc(),
@@ -616,10 +520,6 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     Expect(TokenKind::kRBracket, Subclause("6.20.5"));
   }
 
-  // A lone reject limit leaves pathpulse_error null, which is how §30.7.1's
-  // rule that it is the error limit too reaches ApplyPulseControlOverride in
-  // src/simulator/specify_pulse.cpp: a cleared has_error there is the
-  // instruction to use the reject limit for both.
   auto parse_pathpulse_value = [&](SpecifyItem* sp) {
     DecodePathpulseName(*sp);
     sp->pathpulse_reject = ParsePathpulseLimits(sp->pathpulse_error);
@@ -630,11 +530,6 @@ void Parser::ParseSpecparamInSpecify(std::vector<SpecifyItem*>& items) {
     auto* sp = arena_.Create<SpecifyItem>();
     sp->kind = SpecifyItemKind::kSpecparam;
     sp->loc = kw_loc;
-    // A.2.1.1 writes one `specparam_declaration` and §6.20.5 admits it in a
-    // specify block or in the module body, so the range the declaration carries
-    // reaches the item here as it does in ParseSpecparamDecl above. Parsed and
-    // dropped, a specparam written inside a specify block was the one
-    // declaration of the two whose declared range said nothing.
     sp->param_packed_left = packed_left;
     sp->param_packed_right = packed_right;
     sp->param_name = Expect(TokenKind::kIdentifier, Subclause("6.20.5")).text;

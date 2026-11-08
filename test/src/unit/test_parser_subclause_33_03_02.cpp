@@ -94,11 +94,6 @@ TEST(LibraryMapInclude, MissingIncludeIsReported) {
   EXPECT_FALSE(errors.empty());
 }
 
-// A relative include path is resolved against the map file that physically
-// contains it, at every level of nesting -- not against the root map's
-// directory. Here the second-level map lives in a subdirectory and pulls in a
-// sibling by a bare relative name; that name only resolves if anchoring tracks
-// the immediate containing file.
 TEST(LibraryMapInclude, NestedRelativeIncludeAnchorsToImmediateContainingFile) {
   ScratchDir tmp;
   auto sub_dir = tmp.dir / "sub";
@@ -111,11 +106,6 @@ TEST(LibraryMapInclude, NestedRelativeIncludeAnchorsToImmediateContainingFile) {
   EXPECT_EQ(m.LibraryForFile((sub_dir / "x.dv").string()), "deep");
 }
 
-// A lib.map's permitted content is limited to library specifications, include
-// statements, and standard SystemVerilog comment syntax. Here line and block
-// comments are interleaved with a library declaration and an include; the
-// loader must consume them via the ordinary lexer and still resolve both the
-// local and the included library, confirming comments are an accepted form.
 TEST(LibraryMapInclude, StandardCommentSyntaxIsAcceptedInMapFile) {
   ScratchDir tmp;
   tmp.Write("sub.map",
@@ -133,11 +123,6 @@ TEST(LibraryMapInclude, StandardCommentSyntaxIsAcceptedInMapFile) {
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "y.sv").string()), "subLib");
 }
 
-// The permitted content of a lib.map is limited to library specifications,
-// include statements, and comments. A construct outside that set -- here an
-// ordinary module declaration -- is therefore not accepted and the load fails
-// with a diagnostic, confirming the restriction to those statements is enforced
-// rather than silently tolerated.
 TEST(LibraryMapInclude, NonPermittedConstructInMapFileIsRejected) {
   ScratchDir tmp;
   auto top = tmp.Write("top.map", "module m; endmodule\n");
@@ -147,8 +132,6 @@ TEST(LibraryMapInclude, NonPermittedConstructInMapFileIsRejected) {
   EXPECT_FALSE(errors.empty());
 }
 
-// An absolute include path is honored as given; the containing-file anchoring
-// rule applies only to relative paths.
 TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
   ScratchDir tmp;
   auto away_dir = tmp.dir / "elsewhere";
@@ -160,9 +143,6 @@ TEST(LibraryMapInclude, AbsoluteIncludePathIsHonoredAsGiven) {
   EXPECT_EQ(m.LibraryForFile((away_dir / "x.av").string()), "absLib");
 }
 
-// §33.3.2: an include stands for the included file's text at its own place,
-// so the library it declares falls between the two the including file
-// declares around it in the declaration order §33.6.1 searches.
 TEST(LibraryMapInclude, IncludedDeclarationsTakeTheIncludesPlaceInTheOrder) {
   ScratchDir tmp;
   tmp.Write("gates.map", "library gateLib gates/*.v;\n");
@@ -176,9 +156,6 @@ TEST(LibraryMapInclude, IncludedDeclarationsTakeTheIncludesPlaceInTheOrder) {
   EXPECT_EQ(m.LibraryDeclarationOrder(), kExpected);
 }
 
-// §33.3.2 and §33.8.3: an include's path is a file_path_spec, which may be
-// written between double quotes and then names the file its bare spelling
-// names.
 TEST(LibraryMapInclude, QuotedIncludePathNamesTheFileItsBareSpellingNames) {
   ScratchDir tmp;
   fs::create_directories(tmp.dir / "sub");
@@ -189,9 +166,6 @@ TEST(LibraryMapInclude, QuotedIncludePathNamesTheFileItsBareSpellingNames) {
   EXPECT_EQ(m.LibraryForFile((tmp.dir / "sub" / "x.sv").string()), "subLib");
 }
 
-// Syntax 33-2: a map file's library_text admits a config declaration, and the
-// config is kept for elaboration in the library the map file itself maps to:
-// work, where no declaration claims the map file.
 TEST(LibraryMapInclude, ConfigDeclaredInAMapFileIsKept) {
   ScratchDir tmp;
   auto top = tmp.Write("lib.map",

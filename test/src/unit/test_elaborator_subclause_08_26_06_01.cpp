@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -65,10 +63,6 @@ TEST(InterfaceClassMethodConflict, InterfaceExtendsMultipleWithSameMethodOk) {
              "endmodule\n"));
 }
 
-// The report for two interfaces disagreeing over one method name stands at the
-// class that names them both, not at either interface: it is that class whose
-// method set cannot be built. Every case below that pits two interfaces against
-// each other therefore names the line of the implementing or extending class.
 TEST(InterfaceClassMethodConflict, IncompatibleReturnTypesError) {
   ElabFixture f;
   ElabOk(
@@ -153,12 +147,6 @@ TEST(InterfaceClassMethodConflict,
                             "8.26.6.1"));
 }
 
-// Nothing here pits two interfaces against each other: IA contributes the only
-// interface prototype for f, and C's own f matches it. What C breaks is the
-// signature of the pure virtual f it inherits from Base, so the report is
-// §8.20's rule about a virtual method override and it stands at C's f rather
-// than at C. §8.26.6.1's own rule about a name a class inherits from a base
-// class and an interface class alike goes unreported.
 TEST(InterfaceClassMethodConflict, ImplConflictsWithInheritedBaseMethodError) {
   ElabFixture f;
   ElabOk(
@@ -201,10 +189,6 @@ TEST(InterfaceClassMethodConflict, VirtualClassPrototypeResolvesConflict) {
              "endmodule\n"));
 }
 
-// Claim A: the single resolving "implementation" need not be declared in the
-// implementing class itself; a concrete virtual method inherited from a base
-// class can simultaneously satisfy the same-named pure virtuals of every
-// implemented interface.
 TEST(InterfaceClassMethodConflict, InheritedConcreteMethodResolvesConflict) {
   EXPECT_TRUE(
       ElabOk("interface class IA;\n"
@@ -224,16 +208,6 @@ TEST(InterfaceClassMethodConflict, InheritedConcreteMethodResolvesConflict) {
              "endmodule\n"));
 }
 
-// Claim B: even when the two implemented interfaces agree on a compatible
-// same-named prototype (so there is no interface-vs-interface conflict), the
-// single resolving method must itself be a valid virtual method override of
-// that prototype. Here the interfaces both declare `bit f()`, but the class's
-// implementation returns `int`, so it is not a valid override and an error is
-// required. This isolates the impl-signature check from the
-// interface-vs-interface conflict check.
-// The report stands at C's own f, not at C, which is what separates this case
-// from the interface-versus-interface ones: the two interfaces agree, and it is
-// the implementing method that does not match them.
 TEST(InterfaceClassMethodConflict, ImplMustValidlyOverrideAgreeingInterfaces) {
   ElabFixture f;
   ElabOk(
@@ -256,9 +230,6 @@ TEST(InterfaceClassMethodConflict, ImplMustValidlyOverrideAgreeingInterfaces) {
                             8, "8.26.6.1"));
 }
 
-// Claim A (cannot be resolved): the conflicting interface prototypes differ
-// only in argument direction, so no single method can be a valid simultaneous
-// implementation of both, and an error is required.
 TEST(InterfaceClassMethodConflict, IncompatibleArgDirectionError) {
   ElabFixture f;
   ElabOk(
@@ -280,10 +251,6 @@ TEST(InterfaceClassMethodConflict, IncompatibleArgDirectionError) {
                             "8.26.6.1"));
 }
 
-// §8.1 lets a class be declared inside a module, and the conflict rule has to
-// reach it there. The interface classes below are named from a class in the
-// same module, so a lookup confined to the compilation unit's own classes finds
-// neither and the conflict goes unreported.
 TEST(InterfaceClassMethodNameConflicts, ConflictInsideAModuleIsReported) {
   ElabFixture f;
   ElabOk(
@@ -305,8 +272,6 @@ TEST(InterfaceClassMethodNameConflicts, ConflictInsideAModuleIsReported) {
                             "8.26.6.1"));
 }
 
-// The control: the same two interfaces agreeing on the prototype conflict over
-// nothing, so the class implementing both is ordinary and stays legal.
 TEST(InterfaceClassMethodNameConflicts, AgreeingPrototypesInsideAModuleAreOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -323,11 +288,6 @@ TEST(InterfaceClassMethodNameConflicts, AgreeingPrototypesInsideAModuleAreOk) {
              "endmodule\n"));
 }
 
-// A name two modules both declare is a name this lookup must not answer for:
-// resolving it to whichever module came first would hold a class against an
-// interface the source never named. The class below implements an interface
-// declared in its own module, and the same name stands in another module with a
-// prototype it does not satisfy -- which must not be what it is judged by.
 TEST(InterfaceClassMethodNameConflicts,
      ANameTwoModulesDeclareIsNotResolvedAcrossThem) {
   EXPECT_TRUE(
@@ -347,13 +307,6 @@ TEST(InterfaceClassMethodNameConflicts,
              "endmodule\n"));
 }
 
-// A conflict between two specializations of one parameterized interface class
-// is §8.26.6.3's, the rule that makes them two types (see
-// InterfaceClassDiamond.DifferentSpecializationsMethodConflictError in
-// test_elaborator_subclause_08_26_06_03.cpp). The interfaces below are
-// specializations too, but of two different interface classes, so no diamond
-// was ever in question and the conflict keeps §8.26.6.1: the citation turns on
-// the interface class named, not on the presence of arguments.
 TEST(InterfaceClassMethodConflict, UnrelatedSpecializationsConflictError) {
   ElabFixture f;
   ElabOk(

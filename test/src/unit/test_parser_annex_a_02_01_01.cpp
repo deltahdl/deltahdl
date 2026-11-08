@@ -72,16 +72,12 @@ TEST(ParameterDeclParsing, ParameterExpressionDefault) {
 
 TEST(ParameterDeclParsing, ErrorParameterMissingSemicolon) {
   auto r = Parse("module m; parameter int X = 5 endmodule");
-  // 'endmodule' stands where the ';' belongs; §6.20.1 and the line carry the
-  // rest.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.20.1"));
 }
 
 TEST(ParameterDeclParsing, ErrorLocalparamMissingSemicolon) {
   auto r = Parse("module m; localparam int Y = 10 endmodule");
-  // A localparam declaration runs through the same list terminator as a
-  // parameter one, so §6.20.1 is where its missing ';' is filed.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "6.20.1"));
 }
@@ -165,8 +161,6 @@ TEST(ParameterDeclParsing, ErrorSpecparamMissingSemicolon) {
       "    specparam tpd = 1.5\n"
       "  endspecify\n"
       "endmodule");
-  // §6.20.5 owns specparam_declaration, so its list terminator is demanded
-  // there, and 'endspecify' is what stands in its place.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "6.20.5"));
 }
@@ -215,10 +209,6 @@ TEST(ParameterDeclParsing, SpecparamListOfAssignments) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.2.1.1's parameter declarations take a data_type_or_implicit, which
-// A.2.2.1 lets be a type_reference (§6.23): `type` followed by `(` opens one,
-// declaring a value parameter of that type, where `type` followed by a name
-// declares a type parameter.
 TEST(ParameterDeclParsing, ValueParametersOfATypeReference) {
   auto r = Parse(
       "module m #(parameter int W = 4, parameter type(W) V = -3);\n"

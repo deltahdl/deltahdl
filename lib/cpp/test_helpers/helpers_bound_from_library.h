@@ -16,13 +16,6 @@
 
 using namespace delta;
 
-// `sources` written to files in `tmp`, in order, and compiled by one
-// invocation into library "ip" there (§33.5.3), one record per file, decrypting
-// their envelopes under the exchange key `key`; and the design rooted at `t`
-// bound from that library by `binder`, as another invocation binds it
-// (§33.5.4), reading the compiled form and never the sources. A cell a later
-// file declares again replaces the one an earlier file wrote (§33.3.1). Null
-// where the compile or the bind fails.
 inline RtlirDesign* BoundFromALibrary(const ScratchDir& tmp,
                                       const std::vector<std::string>& sources,
                                       std::string_view key,

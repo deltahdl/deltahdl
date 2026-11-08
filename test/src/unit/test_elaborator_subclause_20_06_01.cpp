@@ -32,9 +32,6 @@ TEST(SubroutineCallExprElaboration, TypenameRejectsHierarchicalRef) {
                     6, "20.6.1"));
 }
 
-// The elaboration-time-constant restriction applies in a localparam
-// initializer just as in a parameter one: a hierarchical reference argument is
-// rejected. Covers the localparam declaration form of the constant context.
 TEST(SubroutineCallExprElaboration,
      TypenameRejectsHierarchicalRefInLocalparam) {
   ElabFixture f;
@@ -127,8 +124,6 @@ TEST(SubroutineCallExprElaboration, TypenameAcceptsScalarBitSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.6.1: $typename of a built-in data type folds in a constant expression to
-// the type's keyword, whatever the type.
 TEST(TypenameConstEval, ABuiltinTypeFoldsToItsKeyword) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalString(ParseExprFrom("$typename(int)", f)), "int");
@@ -136,10 +131,6 @@ TEST(TypenameConstEval, ABuiltinTypeFoldsToItsKeyword) {
   EXPECT_EQ(ConstEvalString(ParseExprFrom("$typename(string)", f)), "string");
 }
 
-// §20.6.1: a name that declares nothing, an operation on literals alone and a
-// call of another function are not folded as a type name; nor, with no module
-// being elaborated, an anonymous aggregate, which is named after the module
-// (step c), a range bounded by a name, nor an operand naming no variable.
 TEST(TypenameConstEval, OtherArgumentsAreNotFolded) {
   EvalFixture f;
   EXPECT_FALSE(ConstEvalString(ParseExprFrom("$typename(w)", f)).has_value());
@@ -157,16 +148,11 @@ TEST(TypenameConstEval, OtherArgumentsAreNotFolded) {
       ConstEvalString(ParseExprFrom("$typename(w[0])", f)).has_value());
 }
 
-// The characters the string parameter `name` of module `top` folded to.
 std::string_view FoldedChars(RtlirDesign* design, std::string_view name) {
   const RtlirParamDecl* pd = FindParam(design, "top", name);
   return pd == nullptr ? "<no parameter>" : pd->resolved_string;
 }
 
-// §20.6.1, step b: a data_type no expression spells reaches the fold as a type
-// node, and a signing other than its type's default stays in the name; an
-// anonymous aggregate is named by the system after the module (step c), an
-// enumeration with each constant's value (step e) (#8067).
 TEST(TypenameConstEval, ATypeNodeFoldsToItsName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -184,9 +170,6 @@ TEST(TypenameConstEval, ATypeNodeFoldsToItsName) {
   EXPECT_EQ(FoldedChars(design, "D"), "enum{X=2'd0,Y=2'd3}top.e$type");
 }
 
-// §20.6.1, step g: a keyword type with a packed range, which the parser reads
-// as a select over the keyword, folds to the keyword and its bounds as
-// unsized decimals, a parameter in a bound standing for its value (#8068).
 TEST(TypenameConstEval, ARangedKeywordFoldsWithItsBounds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -201,9 +184,6 @@ TEST(TypenameConstEval, ARangedKeywordFoldsWithItsBounds) {
   EXPECT_EQ(FoldedChars(design, "B"), "logic[7:0]");
 }
 
-// §20.6.1, step a: a typedef name folds to the type it names, and one naming
-// a structure keeps the name, behind the module declaring it (step f)
-// (#8069).
 TEST(TypenameConstEval, ATypedefNameFoldsToTheTypeItNames) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -219,12 +199,6 @@ TEST(TypenameConstEval, ATypedefNameFoldsToTheTypeItNames) {
   EXPECT_EQ(FoldedChars(design, "B"), "struct{bit A;bit B;}top.AB_t");
 }
 
-// §20.6.1: an expression folds to its self-determined type: a variable to the
-// type it was declared with, an unpacked array's dimensions after the "$"
-// standing for its name (step d), an element to the element type with the
-// dimensions after the first, a bit-select, an indexed part-select and a sum
-// to the vectors §11.6.1 and §11.8.1 make them, and an operation with a real
-// operand to `real` (#8070).
 TEST(TypenameConstEval, AnExpressionFoldsToItsSelfDeterminedType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -258,9 +232,6 @@ TEST(TypenameConstEval, AnExpressionFoldsToItsSelfDeterminedType) {
   EXPECT_EQ(FoldedChars(design, "I"), "bit");
 }
 
-// §20.6.1 with §7.4.1 and §11.5.1: the fold sizes a select of a packed array
-// by the elements of its outermost dimension, `p[1]` one 8-bit element and
-// `p[2:1]` two, as the run does.
 TEST(TypenameConstEval, ASelectOfAPackedArrayFoldsToItsElementsWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -278,9 +249,6 @@ TEST(TypenameConstEval, ASelectOfAPackedArrayFoldsToItsElementsWidth) {
   EXPECT_EQ(FoldedChars(design, "C"), "logic[7:0]");
 }
 
-// §20.6.1 with §7.4.4 and §7.4.1: a declaration naming a typedef that carries
-// the packed dimensions has them as its own, so the fold counts a select of
-// it in elements of the typedef's outermost dimension.
 TEST(TypenameConstEval, ASelectOfATypedefsPackedArrayFoldsToItsElementsWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -299,12 +267,6 @@ TEST(TypenameConstEval, ASelectOfATypedefsPackedArrayFoldsToItsElementsWidth) {
   EXPECT_EQ(FoldedChars(design, "C"), "logic[7:0]");
 }
 
-// What the fold cannot resolve from the module's declarations it leaves to
-// the run rather than fold to a wrong name: a class type and a package's
-// type, which the module's typedef table does not hold, an enumeration
-// constant, whose storage records no declared type, an operand that is real,
-// a string or an unpacked array, here a slice of one, a select of an element
-// of a multidimensional array, and a type reference to an expression.
 TEST(TypenameConstEval, WhatTheModuleCannotResolveIsLeftUnfolded) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -31,8 +31,6 @@ static const Expr* NamedTypeParamOverride(const ModuleItem* item,
   return nullptr;
 }
 
-// A positional override maps to the index of `pname` among the overridable
-// (non-localparam) parameters, mirroring ResolvePositionalInstParams.
 static const Expr* PositionalTypeParamOverride(const ModuleItem* item,
                                                const ModuleDecl* child_decl,
                                                std::string_view pname) {
@@ -47,9 +45,6 @@ static const Expr* PositionalTypeParamOverride(const ModuleItem* item,
   return nullptr;
 }
 
-// Locate the instantiation override expression for the type parameter `pname`,
-// honoring both the named (.T(x)) and positional (#(x, ...)) forms (the two are
-// never mixed -- the parser rejects that).
 static const Expr* FindTypeParamOverrideExpr(const ModuleItem* item,
                                              const ModuleDecl* child_decl,
                                              std::string_view pname) {
@@ -58,9 +53,6 @@ static const Expr* FindTypeParamOverrideExpr(const ModuleItem* item,
   return NamedTypeParamOverride(item, pname);
 }
 
-// §33.4.3 with Syntax 33-4: a use clause's named_parameter_assignment may name
-// a type parameter, its value a data type. The configuration's assignment for
-// `pname`, or nullptr.
 static const Expr* ConfigTypeParamOverride(const TypeParamAssignments& from,
                                            std::string_view pname) {
   for (const auto& [name, expr] : from.config) {
@@ -69,22 +61,12 @@ static const Expr* ConfigTypeParamOverride(const TypeParamAssignments& from,
   return nullptr;
 }
 
-// §23.10.2/§6.20.3: the type the child's type parameter at index `i` takes for
-// this instantiation -- the instance parameter value assignment when one names
-// a type, otherwise the type the declaration defaulted to. Returns nothing,
-// having reported, when the assignment names no type, and when there is neither
-// an assignment nor a default (§6.20.1). Reporting an assignment that names no
-// type is what keeps it apart from an absent one: falling back to the default
-// there would elaborate the child against a type the source did not write, and
-// the mismatch would surface as a wrong width rather than as a report.
 static std::optional<DataType> ResolveChildTypeParam(
     const TypeParamAssignments& from, const ModuleDecl* child_decl, size_t i,
     const CompilationUnit* unit, DiagEngine& diag) {
   const ModuleItem* item = from.item;
   std::string_view pname = child_decl->params[i].first;
   const Expr* ov = ConfigTypeParamOverride(from, pname);
-  // §33.4.3: `.T()` returns the parameter to its default, setting aside the
-  // instantiation's assignment as `#()` does for every parameter.
   const bool kConfigReset =
       from.config_reset_all ||
       std::ranges::find(from.config_reset, pname) != from.config_reset.end();
@@ -113,15 +95,6 @@ static std::optional<DataType> ResolveChildTypeParam(
   return std::nullopt;
 }
 
-// §23.10.2: a parameter value assignment is written in the instantiating
-// module, so a type name it gives, a typedef or type parameter of that module,
-// stands for the type the name has there and not for a child's declaration of
-// the same name. `typedefs` still holds the instantiating module's names, and
-// the name is replaced by the type it stands for among them. Published as the
-// name, `child #(bus_t)` into a child whose own type parameter is bus_t made
-// bus_t stand for itself, and sizing it recursed without end. A name carrying
-// packed dimensions written on it, and one scoped to a class or package, keep
-// their form; the hop limit keeps a cyclic typedef from looping.
 static DataType InInstantiatingScope(DataType dt, const TypedefMap& typedefs) {
   for (int hops = 0; hops < 8 && dt.kind == DataTypeKind::kNamed &&
                      dt.scope_name.empty() && dt.packed_dim_left == nullptr;
@@ -133,16 +106,6 @@ static DataType InInstantiatingScope(DataType dt, const TypedefMap& typedefs) {
   return dt;
 }
 
-// §6.20.3/§23.10: resolve each of the child's type parameters to a concrete
-// type and publish it in `typedefs` so the child's dependent declarations
-// elaborate against the chosen type. Every type is resolved before any is
-// published, so each override reads the instantiating module's names. A type
-// parameter whose type ResolveChildTypeParam could not settle publishes
-// nothing, so the child's declarations that depend on it are left unresolved
-// rather than bound to a type the instantiation did not ask for. Returns the
-// prior entries so the caller can restore the shared map after the child is
-// elaborated, and each type as it was written before InInstantiatingScope
-// replaced a typedef name in it, for §37.28 detail 2.
 AppliedTypeParams ApplyChildTypeParams(const TypeParamAssignments& from,
                                        const ModuleDecl* child_decl,
                                        TypedefMap& typedefs,

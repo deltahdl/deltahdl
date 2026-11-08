@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Integration robustness: in expression context the :: prefix builds a member
-// access whose lhs/rhs are the prefix and member identifiers — the shape the
-// elaborator inspects when applying §23.7.1.
 TEST(ScopeResolutionPrefixParsing, ExpressionPrefixTreeStructure) {
   auto r = Parse(
       "module t;\n"
@@ -28,9 +25,6 @@ TEST(ScopeResolutionPrefixParsing, ExpressionPrefixTreeStructure) {
   EXPECT_EQ(rhs->rhs->text, "val");
 }
 
-// Integration robustness: in type context the :: prefix populates scope_name
-// and type_name on the DataType — the fields the elaborator resolves per
-// §23.7.1.
 TEST(ScopeResolutionPrefixParsing, TypePrefixPopulatesScopeName) {
   auto r = Parse(
       "module t;\n"

@@ -50,8 +50,6 @@ bool Parser::IsAtClassDecl() {
   auto saved = lexer_.SavePos();
   const bool kVirtual = Check(TokenKind::kKwVirtual);
   Consume();
-  // A.1.2 writes no `virtual interface class`; it is read as a class all the
-  // same, so that Parser::ParseClassDecl reports the `virtual`.
   if (kVirtual) Match(TokenKind::kKwInterface);
   bool result = Check(TokenKind::kKwClass);
   lexer_.RestorePos(saved);
@@ -72,15 +70,6 @@ void Parser::ParseExtendsArgList(ClassDecl* decl) {
 
 namespace {
 
-// Record one base, `ref`, named in a class's extends/implements clause onto
-// decl. The first non-implements base becomes the class's primary base_class
-// (and carries its type parameters into base_class_type_params when
-// has_type_params is set); every other entry is collected as an implemented
-// interface or an additional extended interface. has_type_params distinguishes
-// 'base #(...)' from a bare 'base' so the no-parameter case leaves
-// base_class_type_params untouched. Each keeps the scope written before its
-// name's last '::'. Returns whether this base was the primary base, so the
-// caller can route its following '(...)' argument list correctly.
 bool RecordClassExtendsBase(ClassDecl* decl, InterfaceRef ref,
                             bool is_implements, bool has_type_params) {
   bool is_first_base = !is_implements && decl->base_class.empty();
@@ -104,8 +93,6 @@ bool RecordClassExtendsBase(ClassDecl* decl, InterfaceRef ref,
 void ParserClassHeaderHelpers::ParseHeadKeywords(Parser& p, ClassDecl* decl) {
   decl->is_virtual = p.Match(TokenKind::kKwVirtual);
   decl->is_interface = p.Match(TokenKind::kKwInterface);
-  // A.1.2's interface_class_declaration writes neither `virtual` before it nor
-  // a final_specifier after `class`; both are reported and passed over.
   if (decl->is_virtual && decl->is_interface) {
     p.diag_.Error(decl->range.start,
                   "an interface class is not declared virtual",
@@ -122,8 +109,6 @@ void ParserClassHeaderHelpers::ParseHeadKeywords(Parser& p, ClassDecl* decl) {
     p.Expect(TokenKind::kKwFinal, Subclause("8.13"));
     decl->is_final = true;
   }
-  // Syntax 8-1 gives a class no lifetime, so one written here is reported and
-  // passed over, and the class name after it is still read.
   if (p.Check(TokenKind::kKwAutomatic) || p.Check(TokenKind::kKwStatic)) {
     p.diag_.Error(p.CurrentLoc(),
                   std::format("a class declaration takes no lifetime; '{}' "
@@ -152,8 +137,6 @@ void ParserClassHeaderHelpers::ParseBaseType(Parser& p, ClassDecl* decl,
   RecordClassExtendsBase(decl, {name, std::move(tparams), scope}, is_implements,
                          kHasTypeParams);
   if (!p.Check(TokenKind::kLParen)) return;
-  // A.1.2: an interface class type, implemented or extended, takes no
-  // arguments; the list is still read so the header ends where it should.
   if (is_implements || decl->is_interface) {
     p.diag_.Error(p.CurrentLoc(),
                   std::format("an interface class type in an {} clause "
@@ -170,15 +153,11 @@ void ParserClassHeaderHelpers::ParseBaseType(Parser& p, ClassDecl* decl,
 }
 
 void Parser::ParseClassExtendsClause(ClassDecl* decl, bool is_implements) {
-  // §8.13 states the extends clause and §8.26.2 the implements clause, so which
-  // rule a malformed base name breaches depends on which clause is being read.
   Subclause subclause(is_implements ? "8.26.2" : "8.13");
   ParserClassHeaderHelpers::ParseBaseType(*this, decl, is_implements,
                                           subclause);
   for (SourceLoc comma = CurrentLoc(); Match(TokenKind::kComma);
        comma = CurrentLoc()) {
-    // A.1.2: a class extends one class type, and only an interface class
-    // extends a list of them.
     if (!is_implements && !decl->is_interface) {
       diag_.Error(comma,
                   "a class extends one class type; only an interface class "

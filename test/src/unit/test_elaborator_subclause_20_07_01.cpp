@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §20.7.1: querying an inner variable-sized dimension is an error.
-//
-// For `int a[3][][5]`, dimension 1 is the fixed [3], dimension 2 is the dynamic
-// [], and dimension 3 is the fixed [5]. Because each element of dimension 1 can
-// hold a differently sized dynamic array, $size(a, 2) has no single answer and
-// is an error, while the fixed dimensions 1 and 3 are fine. This mirrors the
-// example in the LRM.
-
 TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionIsError) {
   ElabFixture f;
   Elaborate(
@@ -54,8 +46,6 @@ TEST(ArrayQueryVariableDim, SizeOfFixedInnerDimensionIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The restriction is on n > 1: the slowest-varying dimension may be queried
-// even when it is itself variable-sized (a plain queue is dimension 1).
 TEST(ArrayQueryVariableDim, SizeOfQueueFirstDimensionIsLegal) {
   ElabFixture f;
   Elaborate(
@@ -68,7 +58,6 @@ TEST(ArrayQueryVariableDim, SizeOfQueueFirstDimensionIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A queue nested under a fixed dimension is a variable-sized dimension 2.
 TEST(ArrayQueryVariableDim, SizeOfQueueInnerDimensionIsError) {
   ElabFixture f;
   Elaborate(
@@ -84,8 +73,6 @@ TEST(ArrayQueryVariableDim, SizeOfQueueInnerDimensionIsError) {
                             4, "20.7.1"));
 }
 
-// A wildcard associative array nested under a fixed dimension is likewise a
-// variable-sized dimension 2, so querying it is an error.
 TEST(ArrayQueryVariableDim, SizeOfWildcardAssocInnerDimensionIsError) {
   ElabFixture f;
   Elaborate(
@@ -101,11 +88,6 @@ TEST(ArrayQueryVariableDim, SizeOfWildcardAssocInnerDimensionIsError) {
                             4, "20.7.1"));
 }
 
-// The LRM example only shows $size, but the restriction applies to every
-// per-dimension query function ($left, $right, $low, $high, $increment, $size),
-// which all route through the same recognizer. One non-$size function stands in
-// for the whole set: $left rejecting an inner dynamic dimension confirms the
-// rule is not tied to $size.
 TEST(ArrayQueryVariableDim, LeftOfDynamicInnerDimensionIsError) {
   ElabFixture f;
   Elaborate(
@@ -121,10 +103,6 @@ TEST(ArrayQueryVariableDim, LeftOfDynamicInnerDimensionIsError) {
                             4, "20.7.1"));
 }
 
-// The restriction fires wherever the query appears, not only in a procedural
-// assignment. A variable declaration initializer is a distinct elaboration walk
-// path (the initializer expression rather than a statement body); a variable
-// initialized with $size on an inner dynamic dimension is rejected there too.
 TEST(ArrayQueryVariableDim, InnerVariableDimInDeclInitializerIsError) {
   ElabFixture f;
   Elaborate(
@@ -139,9 +117,6 @@ TEST(ArrayQueryVariableDim, InnerVariableDimInDeclInitializerIsError) {
                             3, "20.7.1"));
 }
 
-// Control for the initializer-position case above: querying a fixed dimension
-// from the same declaration-initializer position is legal, confirming the error
-// there comes from the variable-sized rule and not from the initializer syntax.
 TEST(ArrayQueryVariableDim, FixedDimInDeclInitializerIsLegal) {
   ElabFixture f;
   Elaborate(
@@ -153,11 +128,6 @@ TEST(ArrayQueryVariableDim, FixedDimInDeclInitializerIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The restriction is on a bare array variable. When the first argument resolves
-// an outer dimension by indexing (here a[2], a single dynamic array), the query
-// targets a well-defined object and is legal even at a dimension that is
-// variable-sized for the parent array. This mirrors the $size(a[2], 1) case in
-// the LRM example.
 TEST(ArrayQueryVariableDim, IndexedElementQueryIsLegal) {
   ElabFixture f;
   Elaborate(
@@ -170,10 +140,6 @@ TEST(ArrayQueryVariableDim, IndexedElementQueryIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.7 states the dimension argument is a constant expression, so the query
-// index may be a parameter rather than a literal. Folding it must still surface
-// the §20.7.1 error when it names an inner variable-sized dimension. Here the
-// parameter value 2 selects the dynamic dimension of a[3][][5].
 TEST(ArrayQueryVariableDim, ParameterDimensionIndexIsError) {
   ElabFixture f;
   Elaborate(
@@ -190,9 +156,6 @@ TEST(ArrayQueryVariableDim, ParameterDimensionIndexIsError) {
                             5, "20.7.1"));
 }
 
-// A localparam-valued dimension index that selects a fixed dimension is legal,
-// confirming the folded index is compared against the real dimension list and
-// not merely rejected for being non-literal.
 TEST(ArrayQueryVariableDim, LocalparamDimensionIndexAtFixedDimIsLegal) {
   ElabFixture f;
   Elaborate(
@@ -206,8 +169,6 @@ TEST(ArrayQueryVariableDim, LocalparamDimensionIndexAtFixedDimIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.7.1: the restriction does not touch $dimensions, which takes no dimension
-// argument and so is well-defined even when an inner dimension is variable.
 TEST(ArrayQueryVariableDim, DimensionsIsUnaffected) {
   ElabFixture f;
   Elaborate(
@@ -220,8 +181,6 @@ TEST(ArrayQueryVariableDim, DimensionsIsUnaffected) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.7.1: the restriction also does not touch $unpacked_dimensions, which
-// likewise takes no dimension argument.
 TEST(ArrayQueryVariableDim, UnpackedDimensionsIsUnaffected) {
   ElabFixture f;
   Elaborate(
@@ -234,12 +193,6 @@ TEST(ArrayQueryVariableDim, UnpackedDimensionsIsUnaffected) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.7.1: each element of the first dimension of `int a[3][][5]` holds a
-// dynamic array of its own size, so a query of dimension 2 has no single
-// answer and is an error. The subclause on the report is what tells this
-// rejection from §20.7's own rules about the query functions, which the same
-// call satisfies: it names a query function that exists and a dimension the
-// array has.
 TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionNames20_7_1) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -255,25 +208,6 @@ TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionNames20_7_1) {
                             4, "20.7.1"));
 }
 
-// §20.7.1 says that when a §20.7 query function is called as (v, n) on an array
-// variable v with n above 1, the dimension n names must not be a variable-sized
-// one, and names no position the call may stand in. Each of the five cases
-// below writes the call in one such position, and each is a position
-// CheckArrayQueryOnVarDimStmt in src/elaborator/elaborator_validate_queries.cpp
-// reached only once it took its list of nested statements from ForEachChildStmt
-// in src/elaborator/elaborator_validate_internal.h. Every one of them
-// elaborated clean beforehand, with an inner variable-sized dimension left
-// queried.
-//
-// Each case names a different query function, and the three forms §20.7 counts
-// as variable-sized -- the dynamic array, the queue and the wildcard
-// associative array -- are spread across them.
-
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and a §20.7 query
-// function returns a value, so a call stands as the right-hand side of the
-// operator_assignment the loop step is written as. The parser keeps that
-// statement in Stmt::for_steps.
 TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionInAForStepIsError) {
   ElabFixture f;
   Elaborate(
@@ -291,9 +225,6 @@ TEST(ArrayQueryVariableDim, SizeOfDynamicInnerDimensionInAForStepIsError) {
                             5, "20.7.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// The parser keeps the pass arm in Stmt::assert_pass_stmt.
 TEST(ArrayQueryVariableDim,
      LowOfDynamicInnerDimensionInAnAssertionPassStatementIsError) {
   ElabFixture f;
@@ -311,9 +242,6 @@ TEST(ArrayQueryVariableDim,
                             5, "20.7.1"));
 }
 
-// §16.3's else arm of the same action block, kept in Stmt::assert_fail_stmt.
-// The inner dimension here is a queue, the second of the three variable-sized
-// forms.
 TEST(ArrayQueryVariableDim,
      HighOfQueueInnerDimensionInAnAssertionFailStatementIsError) {
   ElabFixture f;
@@ -331,10 +259,6 @@ TEST(ArrayQueryVariableDim,
                             5, "20.7.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The inner
-// dimension here is a wildcard associative array, the third variable-sized
-// form.
 TEST(ArrayQueryVariableDim,
      IncrementOfWildcardAssocInnerDimensionInARandcaseItemIsError) {
   ElabFixture f;
@@ -351,10 +275,6 @@ TEST(ArrayQueryVariableDim,
                             4, "20.7.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(ArrayQueryVariableDim,
      RightOfDynamicInnerDimensionInARandsequenceCodeBlockIsError) {
   ElabFixture f;

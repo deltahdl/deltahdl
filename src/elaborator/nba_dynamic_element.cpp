@@ -18,10 +18,6 @@ namespace delta {
 
 namespace {
 
-// How far a nonblocking target's path has reached: the type of the object it
-// names, the unpacked dimensions of that object, how many of them the selects
-// so far have indexed, and whether one of those selects indexed a dynamically
-// sized dimension.
 struct PathShape {
   const DataType* type = nullptr;
   const std::vector<Expr*>* dims = nullptr;
@@ -38,14 +34,6 @@ const ClassMember* FindClassProperty(const ClassDecl* cls,
   return nullptr;
 }
 
-// §10.4.2 (printed page 253): a nonblocking assignment shall not write an
-// element of a dynamically sized array variable -- a dynamic array, a queue or
-// an associative array -- and writing a member of such an element writes the
-// element. Which object a target names is decided by §23.9's scopes and then
-// by the types its selects and member accesses pass through, so an element of
-// a dynamically sized structure member, of a class property reached through a
-// handle, or of an inner dimension of an array is one, and an element of a
-// block's fixed-size array named like a module queue is not.
 class NbaDynamicElementWalk {
  public:
   NbaDynamicElementWalk(const NbaDynamicTables& tables,
@@ -70,8 +58,6 @@ class NbaDynamicElementWalk {
   }
 
  private:
-  // The unpacked dimensions an object declared with `type` and `own` has: its
-  // own, or, where it wrote none, those of the typedef it was declared with.
   const std::vector<Expr*>* DimsOf(const DataType* type,
                                    const std::vector<Expr*>* own) const {
     if (!own->empty()) return own;
@@ -96,8 +82,6 @@ class NbaDynamicElementWalk {
     return ShapeOf(it->second.type, it->second.dims);
   }
 
-  // The member `member` of an object of `type`: a class's property, which a
-  // handle reaches, or a structure's or union's member.
   std::optional<PathShape> ResolveMember(const DataType* type,
                                          std::string_view member) const {
     if (type == nullptr) return std::nullopt;
@@ -155,8 +139,6 @@ class NbaDynamicElementWalk {
   DiagEngine& diag_;
 };
 
-// The procedural bodies `item` holds: a process's statement, and a task's or
-// function's statements with its formals in view.
 void CheckItemBodies(const ModuleItem* item, NbaDynamicElementWalk& walk) {
   if (item->body != nullptr) walk.CheckBody({}, {item->body});
   walk.CheckBody(item->func_args, item->func_body_stmts);

@@ -1,23 +1,3 @@
-// IEEE 1800-2023 Annex G.7 (Std package -- Weak reference).
-//
-// Section G.7 presents the prototype of the built-in `weak_reference` class
-// that the std package provides; its semantics are owned by clause 8.30. The
-// prototype is:
-//
-//   class weak_reference #(type class T);
-//     function new(T referent);
-//     function T get();
-//     function void clear();
-//     static function longint get_id(T obj);
-//   endclass
-//
-// These tests observe the elaborator providing that prototype out of the std
-// package: `weak_reference` resolves as a built-in class without any user
-// `class weak_reference` definition (Elaborator::RegisterCuScopeItems registers
-// the std-package class name), the `#(type class T)` parameter is held to a
-// class type, and the prototype's constructor, instance methods, and static
-// get_id() elaborate at their call sites.
-
 #include <gtest/gtest.h>
 
 #include "elaborator/std_package.h"
@@ -28,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The std package supplies the class name; no user declaration is required for
-// a parameterized weak_reference over a user class.
 TEST(WeakReferenceStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
@@ -42,16 +20,7 @@ TEST(WeakReferenceStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
              "endmodule\n"));
 }
 
-// The prototype restricts the parameter to a class type (`type class T`): a
-// built-in integer argument is rejected at elaboration.
 TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
-  // A weak_reference declared inside a procedural block is a kVarDecl
-  // statement, so ValidateLocalWeakRefDecls in
-  // src/elaborator/elaborator_scope_rules.cpp answers for it and reports at the
-  // declaration statement. The same rule reaches a class member and a
-  // subroutine argument through different walks, and all four sites cite
-  // §8.30.1, which is the subclause carrying the sentence they enforce. This
-  // site cited §8.30 until #3058.
   ElabFixture f;
   ElabOk(
       "module m;\n"
@@ -65,9 +34,6 @@ TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNonClassType) {
       "weak_reference needs a class type as its type parameter", 3, "8.30.1"));
 }
 
-// Edge of the same `type class T` restriction: a named type that is not a class
-// (here an enum typedef) is rejected too -- the class-type requirement is not
-// satisfied merely by the argument being a named user type.
 TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNamedNonClassType) {
   ElabFixture f;
   ElabOk(
@@ -83,8 +49,6 @@ TEST(WeakReferenceStdPackageElaborator, TypeParameterRejectsNamedNonClassType) {
       "weak_reference needs a class type as its type parameter", 4, "8.30.1"));
 }
 
-// The prototype constructor new(T referent), get(), and clear() elaborate at
-// their call sites.
 TEST(WeakReferenceStdPackageElaborator, PrototypeInstanceMethodsElaborate) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
@@ -103,9 +67,6 @@ TEST(WeakReferenceStdPackageElaborator, PrototypeInstanceMethodsElaborate) {
              "endmodule\n"));
 }
 
-// The prototype's static get_id(T obj), reached through the parameterized class
-// scope-resolution operator, elaborates and its longint result is usable in an
-// expression.
 TEST(WeakReferenceStdPackageElaborator, StaticGetIdElaborates) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
@@ -121,8 +82,6 @@ TEST(WeakReferenceStdPackageElaborator, StaticGetIdElaborates) {
              "endmodule\n"));
 }
 
-// The built-in type resolves as a subroutine formal port type, and a prototype
-// method (clear) elaborates on the formal at the callee site.
 TEST(WeakReferenceStdPackageElaborator, WeakReferenceAsSubroutineFormalType) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
@@ -135,11 +94,6 @@ TEST(WeakReferenceStdPackageElaborator, WeakReferenceAsSubroutineFormalType) {
              "endmodule\n"));
 }
 
-// §G.7: the prototype as src/elaborator/std_package.h writes it down -- the
-// constructor new over one formal T referent with no default, get returning
-// T and taking nothing, clear void and taking nothing, and the static
-// get_id returning longint over T obj -- over a type parameter T restricted
-// to a class type and given no default.
 TEST(WeakReferenceStdPackageElaborator, ThePrototypeIsWrittenDown) {
   const auto& prototype = WeakReferencePrototype();
   ASSERT_EQ(prototype.size(), 4u);
@@ -174,12 +128,6 @@ TEST(WeakReferenceStdPackageElaborator, ThePrototypeIsWrittenDown) {
   EXPECT_TRUE(kT.class_only);
 }
 
-// §G.7: a construction and a call on a weak_reference handle are checked
-// against the prototype: new with no referent, get with an argument and a
-// method the prototype does not declare are each rejected under §G.7 at the
-// call, whether the handle is a module variable or one a procedural block
-// declares with its construction, while new with a referent, get and clear
-// beside them are accepted.
 TEST(WeakReferenceStdPackageElaborator,
      ConstructionsAndCallsAreCheckedAgainstThePrototype) {
   ElabFixture f;

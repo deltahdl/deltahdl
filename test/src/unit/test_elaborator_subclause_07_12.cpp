@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.5, §7.9, §7.10.2 and §7.12: an array has §7.12's manipulation methods and
-// the methods its kind lists, and no others. A member select written on an
-// array as though it held a handle names no method either.
 TEST(ArrayMethodValidation, NameNoMethodOfTheArraysKindIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -52,11 +49,6 @@ TEST(ArrayMethodValidation, NameNoMethodOfTheArraysKindIsRejected) {
   }
 }
 
-// The same of an array reached through members: a structure's member, s.q,
-// and a property of the class a variable holds a handle of, h.q. The methods
-// of each kind are still accepted there, and so is §18.8's rand_mode on an
-// array property declared rand, which gives it no other method. A structure
-// variable is no object, so a member declared rand gains no rand_mode.
 TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -104,9 +96,6 @@ TEST(ArrayMethodValidation, AMemberArraysNameOfNoMethodIsRejected) {
   }
 }
 
-// §7.8: a member whose index type is a name the scope declares, a typedef or a
-// class, is an associative array, and takes that kind's methods, num among
-// them, which no fixed-size array has.
 TEST(ArrayMethodValidation, AMembersNamedIndexTypeMakesItAssociative) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,11 +116,6 @@ TEST(ArrayMethodValidation, AMembersNamedIndexTypeMakesItAssociative) {
   }
 }
 
-// §8.25 with §7.8: a type parameter of the class declaring a property stands
-// for a type in the property's dimension too, so `int m[T]` is an associative
-// array and takes num(), reached through a specialization or through a class
-// extending one. A value parameter in that place sizes a fixed-size array,
-// which has no num().
 TEST(ArrayMethodValidation, AClassTypeParameterDimensionMakesItAssociative) {
   ElabFixture f;
   ElaborateSrc(
@@ -156,11 +140,6 @@ TEST(ArrayMethodValidation, AClassTypeParameterDimensionMakesItAssociative) {
   }
 }
 
-// §7.8 with §8.13: a typedef the declaring class writes is a type in its
-// property's dimension as well, whichever of the class's typedefs it is, and a
-// subclass inherits it with the base's other members, so `int m[K]` and the
-// subclass's `int d[K]` are associative arrays taking num(). A fixed-size
-// property beside them keeps its report.
 TEST(ArrayMethodValidation, AClassTypedefDimensionMakesItAssociative) {
   ElabFixture f;
   ElaborateSrc(
@@ -186,10 +165,6 @@ TEST(ArrayMethodValidation, AClassTypedefDimensionMakesItAssociative) {
   }
 }
 
-// What that rule passes over: a receiver it cannot trace to one member of a
-// variable -- a member of a member, a package's array, an element of an
-// array, an instance's array -- and a member that is no array, each written
-// with a method of its own kind, so nothing is reported.
 TEST(ArrayMethodValidation, ReceiversNotOneMemberOfAVariablePassClean) {
   ElabFixture f;
   ElaborateSrc(
@@ -215,9 +190,6 @@ TEST(ArrayMethodValidation, ReceiversNotOneMemberOfAVariablePassClean) {
   }
 }
 
-// §7.12, §7.12.1 and §7.12.5: an iterator argument without a with clause, a
-// find locator without one and map without one are each reported as the
-// design is elaborated, whether or not the call ever runs.
 TEST(ArrayMethodValidation, MissingWithClauseReportedAtElaboration) {
   ElabFixture f;
   ElaborateSrc(

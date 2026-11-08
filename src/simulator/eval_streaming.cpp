@@ -23,10 +23,6 @@
 
 namespace delta {
 
-// §11.4.14.2: a slice_size is a simple type, whose bit count it is, or a
-// constant integral expression, which shall be positive. A name the run holds
-// a value for -- a parameter -- is the second, read for its value; any other
-// name is a type, a typedef's among them, sized as a cast's is.
 uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx, Arena& arena) {
   if (!size_expr) return 1;
   if (size_expr->kind == ExprKind::kIdentifier &&
@@ -44,31 +40,17 @@ uint32_t StreamSliceSize(const Expr* size_expr, SimContext& ctx, Arena& arena) {
   return static_cast<uint32_t>(val);
 }
 
-// §11.4.14.1 appends each stream_expression to the right-hand end of the
-// generic stream, and §11.4.14 has a stream of 4-state data carry every x and
-// z. The parts are placed from the last written upward, so `bit_pos` is the
-// bit the next part's low end lands on and the placed part is `bit_pos` wider.
-// DepositBitField moves both planes and every word: a part wider than 64 bits
-// -- a 96-bit structure member, a 128-bit literal -- was once moved through a
-// 64-bit carrier in two 64-bit takes, the second shifted by 64, which the
-// hardware wraps to a shift by 0, so the part's second word landed OR'd over
-// its first and the destination's second word read the low bits of that.
 static void AppendStreamPart(Logic4Vec& stream, uint32_t& bit_pos,
                              const Logic4Vec& part) {
   DepositBitField(stream, bit_pos, part, part.width);
   bit_pos += part.width;
 }
 
-// §11.4.14.1: the stream being assembled from an unpacked array's elements --
-// the per-element values in traversal order and the running total width.
 struct StreamPartsSink {
   std::vector<Logic4Vec>& parts;
   uint32_t& total_width;
 };
 
-// Append one array element's value to the stream. An element with no
-// materialized variable contributes an all-x value of the element width, so the
-// stream keeps its shape.
 static void AppendElementValue(const std::string& elem_name,
                                uint32_t elem_width, SimContext& ctx,
                                StreamPartsSink& sink) {
@@ -81,11 +63,6 @@ static void AppendElementValue(const std::string& elem_name,
   sink.total_width += sink.parts.back().width;
 }
 
-// §11.4.14.1 / §12.7.3: a multidimensional fixed unpacked array is streamed in
-// the order a foreach loop with a single index variable would traverse it, i.e.
-// row-major with the outermost dimension varying slowest. Each leaf element is
-// a per-index variable materialized at declaration (arr[i0][i1]...); recurse
-// through the dimensions building that name and append each leaf's value.
 static void ExpandMultiDimArrayLeaves(const std::string& prefix,
                                       const ArrayInfo* info, size_t dim,
                                       SimContext& ctx, StreamPartsSink& sink) {
@@ -106,15 +83,10 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
   StreamPartsSink sink{parts, total_width};
-  // A multidimensional array records every dimension in dim_sizes; its elements
-  // live under fully-indexed leaf names, so walk all dimensions in turn rather
-  // than the outermost only.
   if (info->dim_sizes.size() >= 2) {
     ExpandMultiDimArrayLeaves(std::string(name), info, 0, ctx, sink);
     return;
   }
-  // §11.4.14.1: the elements are streamed in the left-to-right order the
-  // declaration writes, so `up [3:0]` streams up[3] first.
   for (uint32_t i = 0; i < info->size; ++i) {
     uint32_t idx =
         info->is_descending ? info->lo + info->size - 1 - i : info->lo + i;
@@ -123,29 +95,17 @@ static void ExpandArrayElements(std::string_view name, SimContext& ctx,
   }
 }
 
-// StreamSliceRange (half-open [start, start + count) `with` window) is declared
-// in statement_assign_internal.h and shared with ResolveWithRange.
-
 static void ExpandArrayElementsSliced(std::string_view name, SimContext& ctx,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width,
                                       StreamSliceRange range) {
   auto* info = ctx.FindArrayInfo(name);
   if (!info) return;
-  // §7.4.5: a `with` range may reach past the array, and a read of an unpacked
-  // array of any kind at an invalid index returns what Table 7-1 lists -- 'x
-  // for a 4-state integral element type, '0 for a 2-state one. A zero-filled
-  // vector is the 2-state answer given for both, which turns an entry that does
-  // not exist into a known zero and loses the distinction the stream is
-  // supposed to carry.
   auto nonexistent = [&] {
     return info->is_4state
                ? MakeAllX(ctx.GetArena(), info->elem_width)
                : MakeLogic4VecVal(ctx.GetArena(), info->elem_width, 0);
   };
-  // §11.4.14.4 has the range behave as a slice and §11.4.14.1 streams an
-  // array as its foreach traverses it, from the left bound, so a descending
-  // array's range runs from its highest index down.
   uint32_t start = range.start;
   for (uint32_t i = 0; i < range.count; ++i) {
     const uint32_t kOffset =
@@ -178,8 +138,6 @@ static void ExpandQueueElementsSliced(QueueObject* queue,
                                       StreamSliceRange range) {
   uint32_t start = range.start;
   for (uint32_t i = 0; i < range.count; ++i) {
-    // §11.4.14.4 with Table 7-1: an item past the queue's end reads as a
-    // nonexistent entry does, x for a 4-state element.
     if (start + i < queue->elements.size()) {
       parts.push_back(queue->elements[start + i]);
     } else {
@@ -205,13 +163,6 @@ static void ExpandAssocArrayElements(AssocArrayObject* aa,
   }
 }
 
-// §11.4.14.1: a struct is streamed by applying the procedure to each member in
-// declaration order, and §11.4.14 packs 4-state data into a 4-state stream, so
-// a member is taken as the window of the struct's storage at its own offset
-// and width -- both the value and the unknown plane, however many words it
-// spans. Read through ToUint64 the member came from the storage's first word
-// alone with x and z flattened to 0, so a member wider than 64 bits, or one
-// above bit 63, streamed truncated and an x bit streamed as a known 0.
 static void ExpandStructFields(Variable* var, const StructTypeInfo* sinfo,
                                std::vector<Logic4Vec>& parts,
                                uint32_t& total_width, Arena& arena) {
@@ -221,9 +172,6 @@ static void ExpandStructFields(Variable* var, const StructTypeInfo* sinfo,
   }
 }
 
-// §11.4.14.1: an untagged union is streamed by applying the procedure to its
-// first-declared member alone, taken as a window of the union's storage the
-// same way as a struct member.
 static void ExpandUnionFirstMember(Variable* var, const StructTypeInfo* sinfo,
                                    std::vector<Logic4Vec>& parts,
                                    uint32_t& total_width, Arena& arena) {
@@ -237,8 +185,6 @@ static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
                                   std::vector<Logic4Vec>& parts,
                                   uint32_t& total_width);
 
-// The elements an array member holds from the left, a dynamic one's count
-// read off the object; an element it holds no value for streams as zeros.
 static void ExpandClassArrayMember(const ClassObject* obj,
                                    const ClassTypeInfo::PropertyInfo& prop,
                                    std::vector<Logic4Vec>& parts,
@@ -255,9 +201,6 @@ static void ExpandClassArrayMember(const ClassObject* obj,
   }
 }
 
-// One data member of `obj`, streamed by the procedure §11.4.14.1 applies to
-// the whole: a queue's elements, an array's, a handle's object's members.
-// A queue or array member's elements; false for a member of any other kind.
 static bool TryExpandClassCollectionMember(
     const ClassObject* obj, const ClassTypeInfo::PropertyInfo& prop,
     std::vector<Logic4Vec>& parts, uint32_t& total_width, Arena& arena) {
@@ -293,11 +236,6 @@ static void ExpandClassMember(ClassObject* obj,
   total_width += it->second.width;
 }
 
-// §11.4.14.1 streams a non-null class handle by streaming each of its object's
-// data members in declaration order, the procedure applied to each in turn: a
-// queue member gives its elements, an array member (§7.4.2, §7.5) the
-// elements it holds from the left, a handle member its own object's members
-// and nothing where it is null, and any other member its value.
 static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
                                   std::vector<Logic4Vec>& parts,
                                   uint32_t& total_width) {
@@ -312,10 +250,6 @@ static void ExpandClassProperties(ClassObject* obj, SimContext& ctx,
   }
 }
 
-// Streaming-concatenation expansion sink (IEEE 1800 §11.4.14): the evaluation
-// environment (ctx + arena) together with the growing concatenation result
-// (the element parts and their accumulated bit width) that each aggregate
-// expansion appends to.
 struct StreamExpandSink {
   SimContext& ctx;
   Arena& arena;
@@ -323,8 +257,6 @@ struct StreamExpandSink {
   uint32_t& total_width;
 };
 
-// Expands an unpacked-array identifier into its constituent element parts,
-// honoring an optional `with` slice range.
 static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
                                  StreamExpandSink& sink) {
   if (elem->stream_range) {
@@ -338,8 +270,6 @@ static void ExpandArrayAggregate(const Expr* elem, const ArrayInfo* ainfo,
   }
 }
 
-// Expands a queue identifier into its constituent element parts, honoring an
-// optional `with` slice range.
 static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
                                  StreamExpandSink& sink) {
   if (elem->stream_range) {
@@ -353,17 +283,11 @@ static void ExpandQueueAggregate(const Expr* elem, QueueObject* queue,
   }
 }
 
-// Expands a struct/union variable identifier into its constituent field parts.
-// Returns true if the named struct variable existed and was expanded.
 static bool TryExpandStructAggregate(const Expr* elem,
                                      const StructTypeInfo* sinfo,
                                      StreamExpandSink& sink) {
   auto* var = sink.ctx.FindVariable(elem->text);
   if (!var) return false;
-  // §11.4.14.1 casts a bit-stream operand to a packed array of bits and
-  // appends it whole, which a packed structure or union -- a soft one too,
-  // whose members keep their own widths -- is; only an unpacked untagged
-  // union goes through its first member.
   if (sinfo->is_packed || sinfo->is_soft) {
     sink.parts.push_back(var->value);
     sink.total_width += var->value.width;
@@ -378,9 +302,6 @@ static bool TryExpandStructAggregate(const Expr* elem,
   return true;
 }
 
-// Expands a class-handle variable identifier into its non-static property
-// parts. Returns true if the named class variable existed (a null handle
-// contributes zero parts but is still considered handled).
 static bool TryExpandClassAggregate(const Expr* elem, SimContext& ctx,
                                     std::vector<Logic4Vec>& parts,
                                     uint32_t& total_width) {
@@ -398,21 +319,11 @@ static bool TryExpandClassAggregate(const Expr* elem, SimContext& ctx,
   return false;
 }
 
-// Tries to expand an unpacked aggregate identifier (array/queue/assoc/struct/
-// class) into its constituent parts. Returns true if the identifier named such
-// an aggregate (and was handled, possibly contributing zero parts); false if
-// the element should be evaluated as an ordinary expression by the caller.
 static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
                                       Arena& arena,
                                       std::vector<Logic4Vec>& parts,
                                       uint32_t& total_width) {
   StreamExpandSink sink{ctx, arena, parts, total_width};
-  // §11.4.14.1: a dynamic array is an unpacked array whose elements are
-  // streamed in turn, but its live elements are held in the backing
-  // QueueObject, not in per-index leaf variables (the fixed-shape ArrayInfo it
-  // registers carries no element count). Skip the fixed-array path for a
-  // dynamic array so it falls through to the queue expansion below, which reads
-  // the real elements.
   if (auto* ainfo = ctx.FindArrayInfo(elem->text);
       ainfo && !ainfo->is_dynamic) {
     ExpandArrayAggregate(elem, ainfo, sink);
@@ -429,10 +340,6 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
     return true;
   }
 
-  // §23.9: the operand resolves within the running instance, so its layout is
-  // asked for by the key that instance's storage was created under; asked by
-  // the bare name, a union of an instantiated module found no layout and was
-  // streamed whole rather than as its first-declared member.
   if (const StructTypeInfo* sinfo = StructLayoutOfName(elem->text, ctx)) {
     if (TryExpandStructAggregate(elem, sinfo, sink)) {
       return true;
@@ -449,14 +356,6 @@ static bool TryExpandAggregateElement(const Expr* elem, SimContext& ctx,
   return false;
 }
 
-// §11.4.14.2: the `<<` reorder slices the stream into blocks of slice_size
-// bits from the right-most bit, reverses the order of the blocks and keeps the
-// order of the bits within each; the last (left-most) block holds whatever bits
-// remain and is neither padded nor truncated, so it is as wide as those bits
-// and lands at bit 0 with nothing above it. Each block is moved whole through
-// ExtractBitField and DepositBitField: a block of more than 64 bits -- a
-// `{<< 96 {...}}`, or a slice_size naming a wide type -- went through the same
-// 64-bit carrier AppendStreamPart describes and came out mangled the same way.
 static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
                                      uint32_t total_width, uint32_t slice_size,
                                      Arena& arena) {
@@ -475,9 +374,6 @@ static Logic4Vec StreamReorderSlices(const Logic4Vec& concat,
   return result;
 }
 
-// §11.4.14.1 with §8.5: an array property of an object through a handle,
-// `p.payload`, streams its elements as a declared array does; evaluated as a
-// value it contributed one element.
 static bool TryExpandPropertyArray(const Expr* elem, SimContext& ctx,
                                    Arena& arena, std::vector<Logic4Vec>& parts,
                                    uint32_t& total_width) {
@@ -504,8 +400,6 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
     parts.push_back(EvalExpr(elem, ctx, arena));
     total_width += parts.back().width;
   }
-  // §11.4.14: a stream of no bits stays one, so a dynamically sized target is
-  // resized to no elements.
   if (total_width == 0) return MakeLogic4Vec(arena, 0);
 
   auto concat = MakeLogic4Vec(arena, total_width);
@@ -520,8 +414,6 @@ Logic4Vec EvalStreamingConcat(const Expr* expr, SimContext& ctx, Arena& arena) {
   return StreamReorderSlices(concat, total_width, ss, arena);
 }
 
-// Assembles collected element parts into one packed vector, placing the first
-// part in the most-significant bits (the layout {>>{expression}} produces).
 static Logic4Vec AssembleBitStreamParts(const std::vector<Logic4Vec>& parts,
                                         uint32_t total_width, Arena& arena) {
   if (total_width == 0) return MakeLogic4Vec(arena, 1);
@@ -533,19 +425,6 @@ static Logic4Vec AssembleBitStreamParts(const std::vector<Logic4Vec>& parts,
   return packed;
 }
 
-// §20.9: the expression argument to $countbits (and the related $countones,
-// $onehot, $onehot0, and $isunknown) shall be of a bit-stream type, and for the
-// purpose of computing the result it is treated as a vector of equal size
-// assigned from {>>{expression}} (see §11.4.14). Pack an aggregate operand into
-// that vector: a queue and a dynamic array both keep their live elements in a
-// QueueObject (a dynamic array also registers a fixed-shape ArrayInfo whose
-// element variables are never materialized), so pack those straight from the
-// backing store; a fixed unpacked array, associative array, or packed/unpacked
-// struct is expanded through the shared streaming-concat machinery. A plain
-// vector operand has no aggregate to expand and is returned by ordinary
-// evaluation. Bit order is irrelevant to the callers, which only count matching
-// bits, but element 0 is kept in the most-significant bits for consistency with
-// {>>{expression}}.
 Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg && arg->kind == ExprKind::kIdentifier) {
     if (auto* q = ctx.FindQueue(arg->text)) {
@@ -560,9 +439,6 @@ Logic4Vec PackBitStreamOperand(const Expr* arg, SimContext& ctx, Arena& arena) {
       return AssembleBitStreamParts(parts, total_width, arena);
     }
   }
-  // §8.5: an array property, bare in a method or `h.a` through a handle, is
-  // streamed element by element as a declared array is, so `$isunknown(c.lda)`
-  // sees the x an element holds.
   if (std::vector<Logic4Vec> parts;
       PropertyArrayElements(arg, ctx, arena, parts)) {
     uint32_t total_width = 0;
@@ -585,12 +461,6 @@ Logic4Vec EvalAssignmentPattern(const Expr* expr, SimContext& ctx,
   return AssembleConcatParts(parts, total_width, arena);
 }
 
-// §12.6.2: `e matches p` as an expression, 1 where the pattern matches and 0
-// where it does not, never x or z (MatchPattern). A constant pattern is
-// compared as MatchesClauseValueMatch compares it. The identifiers the pattern
-// binds are read only by a predicate that holds them, which
-// EvalMatchesPredicate evaluates in a scope of its own, so here they are
-// dropped.
 Logic4Vec EvalMatches(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::vector<PatternBinding> bindings;
   PatternMatchEnv env{TokenKind::kKwCase, MatchesClauseValueMatch, ctx, arena,

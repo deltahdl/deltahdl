@@ -354,9 +354,6 @@ TEST(SignedUnsignedArithmetic,
   EXPECT_FALSE(uresult.is_signed);
 }
 
-// §11.4.3.1: real operands use a floating-point representation, so a difference
-// that is both negative and fractional is preserved exactly rather than being
-// truncated or losing its sign.
 TEST(SignedUnsignedArithmetic, RealArithmeticPreservesNegativeFraction) {
   SimFixture f;
   MakeRealVar(f, "rc", 2.0);
@@ -368,9 +365,6 @@ TEST(SignedUnsignedArithmetic, RealArithmeticPreservesNegativeFraction) {
   EXPECT_DOUBLE_EQ(ToDouble(result), -5.5);
 }
 
-// §11.4.3.1: converting a signed value into an unsigned target keeps the bit
-// pattern; only the interpretation changes. Signed -1 stored into an unsigned
-// int retains its all-ones bits and reads back as an unsigned quantity.
 TEST(SignedUnsignedArithmetic, EndToEndSignedToUnsignedConversionKeepsBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -389,9 +383,6 @@ TEST(SignedUnsignedArithmetic, EndToEndSignedToUnsignedConversionKeepsBits) {
   EXPECT_FALSE(var->is_signed);
 }
 
-// §11.4.3.1: the reverse conversion likewise preserves the stored bits. An
-// all-ones unsigned value placed into a signed int keeps its bit pattern while
-// the destination's signed interpretation now applies.
 TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -410,13 +401,6 @@ TEST(SignedUnsignedArithmetic, EndToEndUnsignedToSignedConversionKeepsBits) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// §11.4.3.1: the operand data types govern the arithmetic, and the target then
-// reinterprets the result. A signed int divided by a signed (unsized decimal)
-// literal is a signed, two's-complement division yielding a negative quotient;
-// assigning that quotient to an unsigned vector keeps the bit pattern, so the
-// destination reads the wrapped large positive value. This is the LRM's
-// "U = intS / 3" row (result 65532), not covered by a signed-into-signed or an
-// all-unsigned division elsewhere in this file.
 TEST(SignedUnsignedArithmetic, SignedDivisionQuotientIntoUnsignedTargetWraps) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -434,12 +418,6 @@ TEST(SignedUnsignedArithmetic, SignedDivisionQuotientIntoUnsignedTargetWraps) {
   EXPECT_FALSE(var->is_signed);
 }
 
-// §11.4.3.1 / Table 11-7: an unsigned variable operand forces the whole
-// division to be evaluated as an unsigned operation even when the other operand
-// is a signed literal. The pattern 16'hFFF4 would be -12 if it were signed, but
-// as an unsigned value it is 65524, so the quotient is a large positive number
-// that survives unchanged into a signed target. This is the LRM's
-// "intS = U / 3" row (result 21841); a signed interpretation would give -4.
 TEST(SignedUnsignedArithmetic, UnsignedVariableDivisionEvaluatedUnsigned) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -457,13 +435,6 @@ TEST(SignedUnsignedArithmetic, UnsignedVariableDivisionEvaluatedUnsigned) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// §11.4.3.1 / Table 11-7: a real variable is interpreted with a floating-point
-// representation, so dividing two real operands keeps the fractional part
-// rather than truncating toward zero the way integer division would. Driven
-// from a real declaration through the full pipeline, 15.0/2.0 yields 7.5; an
-// integer division of the same magnitudes would give 7. This complements the
-// synthetic real-arithmetic checks with an end-to-end observation built from
-// real source syntax.
 TEST(SignedUnsignedArithmetic, RealDivisionKeepsFractionEndToEnd) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -480,12 +451,6 @@ TEST(SignedUnsignedArithmetic, RealDivisionKeepsFractionEndToEnd) {
   EXPECT_DOUBLE_EQ(VecToDouble(var->value), 7.5);
 }
 
-// §11.4.3.1 / Table 11-7 (signed net row): a signed net operand is interpreted
-// as a signed, two's-complement value by an arithmetic operator, just like a
-// signed variable. The net is built from real `wire signed` syntax, driven by a
-// continuous assignment, and divided by a signed literal; both operands are
-// signed so the division is signed and -12/3 yields -4. Were the net treated as
-// unsigned, 0xF4 would be 244 and the quotient would be 81.
 TEST(SignedUnsignedArithmetic, SignedNetOperandUsesSignedArithmetic) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -504,11 +469,6 @@ TEST(SignedUnsignedArithmetic, SignedNetOperandUsesSignedArithmetic) {
   EXPECT_TRUE(var->is_signed);
 }
 
-// §11.4.3.1 / Table 11-7 (unsigned net row): an unsigned net operand forces the
-// operator to interpret the whole expression as unsigned even when the other
-// operand is a signed literal. The net is built from real `wire` syntax and
-// driven by a continuous assignment; 0xF0 is 240 unsigned, so 240/2 yields 120.
-// Were the net treated as signed, 0xF0 would be -16 and the quotient -8.
 TEST(SignedUnsignedArithmetic, UnsignedNetOperandUsesUnsignedArithmetic) {
   SimFixture f;
   auto* var = RunAndFindVar(

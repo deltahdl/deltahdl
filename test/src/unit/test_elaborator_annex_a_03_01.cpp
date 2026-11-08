@@ -78,14 +78,6 @@ TEST(GateElaboration, NInputThreeInputsProducesBinaryChain) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kBinary);
 }
 
-// A.3.1 gate_instantiation: a buf instance elaborates into a continuous
-// assignment driving its output from its input. The driving expression is not
-// the bare input, because Table 28-4 gives buf the mapping 0->0, 1->1, x->x and
-// z->x: buf is a non-tristate driver, so a high-impedance input emerges as
-// unknown rather than passing through. Handing the identifier straight to the
-// output would propagate the z. A complement already folds z to x, so the
-// value-preserving form of that fold is a pair of them -- which is what tells
-// buf's assignment apart from the single complement not gets below.
 TEST(GateElaboration, BufGateProducesContAssign) {
   ElabFixture f;
   auto* rhs = ElaborateNInputGateRhs(

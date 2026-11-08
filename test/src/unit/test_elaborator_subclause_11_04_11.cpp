@@ -298,12 +298,6 @@ TEST(ConditionalElaboration, TernaryWithOneNullBranchElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.11: the conditional operator is usable inside a constant expression,
-// where its branch selection is resolved by the elaborator's constant-eval
-// path (a different code path from the runtime evaluator). The condition here
-// is a real parameter and the whole expression initializes a localparam, so the
-// constant-expression path is reached the way a design reaches it — not by
-// stubbing a scope map. A true parameter selects the first branch.
 TEST(ConstEval, ParameterConditionSelectsFirstBranchInConstExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -324,7 +318,6 @@ TEST(ConstEval, ParameterConditionSelectsFirstBranchInConstExpr) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §11.4.11 constant-expression path, false parameter condition selects second.
 TEST(ConstEval, ParameterConditionSelectsSecondBranchInConstExpr) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -345,8 +338,6 @@ TEST(ConstEval, ParameterConditionSelectsSecondBranchInConstExpr) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// §11.4.11 constant-expression path with the branch operands themselves being
-// parameters: the selected operand's symbol is resolved by constant-eval.
 TEST(ConstEval, ParameterOperandsInConstantTernary) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -368,10 +359,6 @@ TEST(ConstEval, ParameterOperandsInConstantTernary) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §11.4.11 lets a conditional take two class handles only where one is
-// assignment compatible with the other or both derive from a common base
-// class, and otherwise asks its operands to be of equivalent types, which two
-// unpacked structures of different typedefs are not.
 TEST(ConditionalOperatorElaboration, UnrelatedOperandTypesReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -413,7 +400,6 @@ TEST(ConditionalOperatorElaboration, UnrelatedOperandTypesReported) {
                             "the operands of a conditional operator shall be "
                             "of equivalent types",
                             16, "11.4.11"));
-  // An unpacked structure beside an int is no pair of equivalent types either.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "the operands of a conditional operator shall be "
                             "of equivalent types",
@@ -425,10 +411,6 @@ TEST(ConditionalOperatorElaboration, UnrelatedOperandTypesReported) {
   }
 }
 
-// §11.4.11 asks two operands that are neither integral, real nor class
-// handles to be of equivalent types (§6.22.2): unpacked arrays of different
-// sizes are not, nor is an unpacked structure or array beside an integral
-// value, on either side; arrays of one shape and element type are.
 TEST(ConditionalOperatorElaboration,
      AggregateOperandsOfDifferentTypesReported) {
   ElabFixture f;

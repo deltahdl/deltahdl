@@ -75,10 +75,6 @@ TEST(ParameterDeclElaboration, LocalparamResolvesAsLocal) {
   ExpectLocalparamDepth32ResolvesAsLocal(f);
 }
 
-// A.2.1.1's parameter declarations take a data_type_or_implicit, which
-// A.2.2.1 lets be a type_reference (§6.23): V is of W's type and P of x's,
-// each four bits, so 5'h1F converts to 15 in both, where an untyped parameter
-// would hold 31.
 TEST(ParameterDeclElaboration, ValueParametersOfATypeReferenceTakeTheType) {
   ElabFixture f;
   auto* design = Elaborate(

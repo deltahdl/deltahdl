@@ -19,25 +19,6 @@
 namespace delta {
 namespace {
 
-// §37.45 Delay terminals: the object model diagram for a delay device and its
-// two delay terminals. A delay device reaches its input delay term through
-// vpiInTerm and its output delay term through vpiOutTerm; both terms are delay
-// term objects. The delay device and each delay term carry the vpiDelayType
-// integer property, and a delay device is enclosed by a module. The subclause's
-// two numbered Details fix the run-time ordering of value changes on the
-// terminals relative to the device's delay (the input term changes before the
-// delay, the output term not until after it); those are event-scheduling
-// semantics with no VPI query to observe, so they carry no production hook
-// here. The terminal value (vpi_get_value) is the generic value machinery.
-// The cross-edges the figure draws from a terminal - vpiDriver to §37.46's
-// `net drivers` class and vpiLoad to its `net loads` class - are this clause's
-// own, because which class they reach is what the figure says about them; they
-// are exercised below. These tests observe the production code that applies the
-// delay-device relations, the cross-edges, and the property through the public
-// vpi_handle / vpi_iterate / vpi_get dispatch.
-
-// The fixture installs a context so the public entry points run their real
-// dispatch over the test objects.
 class DelayTerminals : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -45,9 +26,6 @@ class DelayTerminals : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// vpiInTerm / vpiOutTerm: a delay device reaches its input delay term and its
-// output delay term. Both are delay term objects, whose own type differs from
-// the relation enum, so the relations resolve to the device's designated terms.
 TEST_F(DelayTerminals, InAndOutTermsAreReached) {
   VpiObject in_term;
   in_term.type = vpiDelayTerm;
@@ -66,25 +44,18 @@ TEST_F(DelayTerminals, InAndOutTermsAreReached) {
   EXPECT_EQ(reached_in, &in_term);
   EXPECT_EQ(reached_out, &out_term);
 
-  // The handles returned for the terminals have the delay term type.
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_in)), vpiDelayTerm);
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_out)), vpiDelayTerm);
 }
 
-// vpiInTerm / vpiOutTerm (edge): a delay device that has no designated terminal
-// reports a null handle rather than reaching a stray object.
 TEST_F(DelayTerminals, TermRelationsAreNullWhenAbsent) {
   VpiObject device;
   device.type = vpiDelayDevice;
-  // in_term and out_term left null.
 
   EXPECT_EQ(vpi_handle(vpiInTerm, VpiHandleOf(&device)), nullptr);
   EXPECT_EQ(vpi_handle(vpiOutTerm, VpiHandleOf(&device)), nullptr);
 }
 
-// vpiInTerm / vpiOutTerm (scope): the terminal relations are specific to a
-// delay device. On an object that is not a delay device, asking for them does
-// not reach a stray delay term, even when one is present as a child.
 TEST_F(DelayTerminals, TermRelationsApplyOnlyToDelayDevices) {
   VpiObject stray_term;
   stray_term.type = vpiDelayTerm;
@@ -92,15 +63,13 @@ TEST_F(DelayTerminals, TermRelationsApplyOnlyToDelayDevices) {
   VpiObject not_a_device;
   not_a_device.type = vpiModule;
   not_a_device.children = {&stray_term};
-  not_a_device.in_term = &stray_term;   // ignored: object is not a delay device
-  not_a_device.out_term = &stray_term;  // ignored: object is not a delay device
+  not_a_device.in_term = &stray_term;
+  not_a_device.out_term = &stray_term;
 
   EXPECT_EQ(vpi_handle(vpiInTerm, VpiHandleOf(&not_a_device)), nullptr);
   EXPECT_EQ(vpi_handle(vpiOutTerm, VpiHandleOf(&not_a_device)), nullptr);
 }
 
-// vpiDelayType: a delay device and a delay term both report their delay-type
-// code through vpi_get(vpiDelayType); an object that is neither reports zero.
 TEST_F(DelayTerminals, DelayTypeIsReported) {
   VpiObject device;
   device.type = vpiDelayDevice;
@@ -117,9 +86,6 @@ TEST_F(DelayTerminals, DelayTypeIsReported) {
   EXPECT_EQ(vpi_get(vpiDelayType, VpiHandleOf(&other)), 0);
 }
 
-// module -- delay device: a delay device is enclosed by a module, reached
-// through the generic parent walk. A delay device with no module parent reports
-// none.
 TEST_F(DelayTerminals, ModuleRelationReachesEnclosingModule) {
   VpiObject module_scope;
   module_scope.type = vpiModule;
@@ -135,19 +101,12 @@ TEST_F(DelayTerminals, ModuleRelationReachesEnclosingModule) {
   EXPECT_EQ(vpi_handle(vpiModule, VpiHandleOf(&orphan)), nullptr);
 }
 
-// The figure's vpiDriver edge, drawn from a delay terminal to the `net drivers`
-// class. §37.46 is where that class is drawn, and its members are a port, a
-// force, a delay terminal, a continuous assignment or a primitive terminal - a
-// different set from §37.21's variable drivers. A delay terminal was named by
-// neither reference kind of the net arms, so the relation fell to the variable
-// arm and gathered the kinds that drive a variable, which a delay terminal
-// connects to none of.
 TEST_F(DelayTerminals, DriverFromATerminalReachesTheNetDriverKinds) {
   VpiObject prim_term;
-  prim_term.type = vpiPrimTerm;  // a net driver, not a variable driver
+  prim_term.type = vpiPrimTerm;
   prim_term.direction = vpiOutput;
   VpiObject assign_stmt;
-  assign_stmt.type = vpiAssignStmt;  // a variable driver, not a net driver
+  assign_stmt.type = vpiAssignStmt;
 
   VpiObject in_term;
   in_term.type = vpiDelayTerm;
@@ -159,14 +118,11 @@ TEST_F(DelayTerminals, DriverFromATerminalReachesTheNetDriverKinds) {
   EXPECT_EQ(vpi_scan(itr), nullptr);
 }
 
-// The same for the figure's vpiLoad edge from the output terminal, drawn to the
-// `net loads` class.
 TEST_F(DelayTerminals, LoadFromATerminalReachesTheNetLoadKinds) {
   VpiObject assign_stmt;
-  assign_stmt.type = vpiAssignStmt;  // a net load
+  assign_stmt.type = vpiAssignStmt;
   VpiObject port;
-  port.type = vpiPort;  // a net driver; §37.46 detail 1 keeps a bare one off
-                        // the load side
+  port.type = vpiPort;
 
   VpiObject out_term;
   out_term.type = vpiDelayTerm;
@@ -178,9 +134,6 @@ TEST_F(DelayTerminals, LoadFromATerminalReachesTheNetLoadKinds) {
   EXPECT_EQ(vpi_scan(itr), nullptr);
 }
 
-// Details 1 and 2: an input term reads the net it is placed on as it stands
-// where no module path transition runs there, and a net the run holds no net
-// for has none running (#7852).
 TEST_F(DelayTerminals, AnInputTermOnANetWithNoRunNetReadsTheNet) {
   Arena arena;
   Variable storage;
@@ -202,8 +155,6 @@ TEST_F(DelayTerminals, AnInputTermOnANetWithNoRunNetReadsTheNet) {
   EXPECT_EQ(value.value.integer, 1);
 }
 
-// The delay device of vpiDelayType `kind` whose input term is among the loads
-// of the net `name` names, null for none.
 vpiHandle DeviceOfKindOnNet(const char* name, int kind) {
   vpiHandle net = vpi_handle_by_name(VpiText(name), nullptr);
   vpiHandle it = net == nullptr ? nullptr : vpi_iterate(vpiLoad, net);
@@ -216,7 +167,6 @@ vpiHandle DeviceOfKindOnNet(const char* name, int kind) {
   return nullptr;
 }
 
-// The scalar value the delay term `relation` reaches from `device` reads.
 int TermScalar(vpiHandle device, int relation) {
   s_vpi_value value = {};
   value.format = vpiScalarVal;
@@ -224,13 +174,11 @@ int TermScalar(vpiHandle device, int relation) {
   return value.value.scalar;
 }
 
-// What the two terms of the device on the net a $peek names read while the
-// delay is still running.
 int g_in_term_mid_delay = -1;
 int g_out_term_mid_delay = -1;
 const char* g_peeked_net = nullptr;
 
-PLI_INT32 PeekDelayTermsCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PeekDelayTermsCalltf(PLI_BYTE8*) {
   vpiHandle device = DeviceOfKindOnNet(g_peeked_net, vpiModPathDelay);
   if (device == nullptr) return 0;
   g_in_term_mid_delay = TermScalar(device, vpiInTerm);
@@ -249,14 +197,8 @@ void RegisterPeek(const char* net) {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// The delay devices of a run: the one a module path a specify block declares
-// places on the net its output terminal names (#7168), the values its terms
-// read (#7363), and those an annotated SDF entry (#7361) and a delay put on an
-// intermodule path (#7362) or on a port (#7365) place.
 class DelayDevicesOfARun : public VpiDesignRun {
  protected:
-  // A cell whose buffer drives y, with a delay of 3 on the path from a to y,
-  // instantiated as top.u.
   void RunACellWithAPath() {
     Run("module m(input a, output y);\n"
         "  buf g(y, a);\n"
@@ -265,7 +207,6 @@ class DelayDevicesOfARun : public VpiDesignRun {
         "module top; wire p, q; m u(p, q); endmodule\n");
   }
 
-  // The delay terms among the objects of `type` that `ref` reaches.
   static std::vector<vpiHandle> TermsOf(int type, vpiHandle ref) {
     std::vector<vpiHandle> terms = ObjectsOf(type, ref);
     std::erase_if(
@@ -273,16 +214,12 @@ class DelayDevicesOfARun : public VpiDesignRun {
     return terms;
   }
 
-  // Whether `objects` holds the object `h` stands for.
   static bool HoldsObject(const std::vector<vpiHandle>& objects, vpiHandle h) {
     return std::ranges::any_of(
         objects, [h](vpiHandle o) { return VpiObjectOf(o) == VpiObjectOf(h); });
   }
 };
 
-// The input term is among the output net's loads, and it reaches a device of
-// vpiDelayType vpiModPathDelay standing in the cell's instance, whose input
-// term it is and whose output term is among the same net's drivers.
 TEST_F(DelayDevicesOfARun, AModulePathPlacesADeviceOnItsOutputNet) {
   RunACellWithAPath();
   vpiHandle y = By("top.u.y");
@@ -306,9 +243,6 @@ TEST_F(DelayDevicesOfARun, AModulePathPlacesADeviceOnItsOutputNet) {
             VpiObjectOf(kDriverTerms[0]));
 }
 
-// The input term's drivers are the net's own, the buffer's output terminal
-// among them, and the output term's loads leave out the input term: neither
-// term reaches the other device term standing beside it.
 TEST_F(DelayDevicesOfARun, ATermReachesTheNetsDriversOrLoadsLessItsDevice) {
   RunACellWithAPath();
   vpiHandle y = By("top.u.y");
@@ -326,8 +260,6 @@ TEST_F(DelayDevicesOfARun, ATermReachesTheNetsDriversOrLoadsLessItsDevice) {
   EXPECT_FALSE(HoldsObject(ObjectsOf(vpiLoad, out_term), in_term));
 }
 
-// §37.5 draws no vpiDelayDevice relation from a module, so the cell's
-// instance iterates none even though a device stands in it.
 TEST_F(DelayDevicesOfARun, AModuleIteratesNoDelayDevice) {
   RunACellWithAPath();
   vpiHandle u = By("top.u");
@@ -335,8 +267,6 @@ TEST_F(DelayDevicesOfARun, AModuleIteratesNoDelayDevice) {
   EXPECT_EQ(vpi_iterate(vpiDelayDevice, u), nullptr);
 }
 
-// A cell whose specify block declares no path carries no delay, so its output
-// net holds no delay term on either side.
 TEST_F(DelayDevicesOfARun, NoPathPlacesNoDevice) {
   Run("module m(input a, output y); buf g(y, a); endmodule\n"
       "module top; wire p, q; m u(p, q); endmodule\n");
@@ -346,9 +276,6 @@ TEST_F(DelayDevicesOfARun, NoPathPlacesNoDevice) {
   EXPECT_TRUE(TermsOf(vpiDriver, y).empty());
 }
 
-// §30.4.1 lets a module path end on a variable, which is no net for a device
-// to sit on: the cell still holds its path, and the net its output port drives
-// above holds no delay term on either side.
 TEST_F(DelayDevicesOfARun, APathIntoAVariablePlacesNoDevice) {
   Run("module m(input a, output reg y);\n"
       "  always @(a) y = a;\n"
@@ -364,10 +291,6 @@ TEST_F(DelayDevicesOfARun, APathIntoAVariablePlacesNoDevice) {
   EXPECT_TRUE(TermsOf(vpiDriver, q).empty());
 }
 
-// An intermodule path given a delay with vpi_put_delays places a device of
-// vpiDelayType vpiInterModPathDelay on the net its two ports share, in the
-// module holding that net; before the put the net holds no delay term, and a
-// second put leaves the one device standing (#7362).
 TEST_F(DelayDevicesOfARun, APutOnAnIntermodulePathPlacesADevice) {
   Run("module drv(output o); assign o = 1'b1; endmodule\n"
       "module rcv(input i); endmodule\n"
@@ -405,12 +328,6 @@ TEST_F(DelayDevicesOfARun, APutOnAnIntermodulePathPlacesADevice) {
   EXPECT_EQ(TermsOf(vpiDriver, w).size(), 1u);
 }
 
-// An input port given a delay with vpi_put_delays places a device of
-// vpiDelayType vpiMIPDelay on the net its lower connection names inside the
-// instance, in that instance; before the put the net holds no delay term, and
-// a second put leaves the one device standing. The net above holds none of its
-// own: its vpiLoad reaches the term through the port, as §37.16 has it, and
-// only its vpiLocalLoad keeps to the net itself (#7365).
 TEST_F(DelayDevicesOfARun, APutOnAnInputPortPlacesADevice) {
   Run("module rcv(input i); endmodule\n"
       "module top; wire w; rcv r(w); endmodule\n");
@@ -444,8 +361,6 @@ TEST_F(DelayDevicesOfARun, APutOnAnInputPortPlacesADevice) {
   EXPECT_TRUE(TermsOf(vpiLocalLoad, By("top.w")).empty());
 }
 
-// An input port whose lower connection is a variable has no net for a device
-// to sit on, so a put of its delay places none, inside the instance or above.
 TEST_F(DelayDevicesOfARun, APutOnAPortIntoAVariablePlacesNoDevice) {
   Run("module rcv(input var logic i); endmodule\n"
       "module top; logic w; rcv r(w); endmodule\n");
@@ -461,10 +376,6 @@ TEST_F(DelayDevicesOfARun, APutOnAPortIntoAVariablePlacesNoDevice) {
   EXPECT_EQ(DeviceOfKindOnNet("top.w", vpiMIPDelay), nullptr);
 }
 
-// Details 1 and 2 for a path into an instance's output port, whose delay the
-// run applies where the port drives the net above: a rise reaching the cell's
-// y at 10 is on the input term at 11, while the output term, past the delay
-// of 3, has not yet risen; once the run is over both have (#7363).
 TEST_F(DelayDevicesOfARun, TheInputTermChangesBeforeTheDelayAndTheOutputAfter) {
   RegisterPeek("top.u.y");
   Run("module m(input a, output y); timeunit 1ns; timeprecision 1ns;\n"
@@ -483,9 +394,6 @@ TEST_F(DelayDevicesOfARun, TheInputTermChangesBeforeTheDelayAndTheOutputAfter) {
   EXPECT_EQ(TermScalar(device, vpiOutTerm), vpi1);
 }
 
-// The same for a path into a top module's own output, whose delay the run
-// applies to the net itself: the input term reads the value the transition
-// is still carrying across the delay, the output term the net (#7363).
 TEST_F(DelayDevicesOfARun, ATopModulesOutputTermReadsItsOwnNet) {
   RegisterPeek("top.y");
   Run("module top(input a, output y); timeunit 1ns; timeprecision 1ns;\n"
@@ -501,9 +409,6 @@ TEST_F(DelayDevicesOfARun, ATopModulesOutputTermReadsItsOwnNet) {
   EXPECT_EQ(TermScalar(device, vpiOutTerm), vpi1);
 }
 
-// An SDF file whose one cell, the top module, annotates an INTERCONNECT from
-// u1's output port o to u2's input port i with a delay of 10, and a PORT delay
-// of 5 on u2's i, written where $sdf_annotate opens it (§32.9).
 std::string WriteInterconnectAndPortSdf() {
   const std::string kPath = "/tmp/delta_c37_45_devices.sdf";
   std::ofstream out(kPath, std::ios::trunc);
@@ -512,16 +417,11 @@ std::string WriteInterconnectAndPortSdf() {
   return kPath;
 }
 
-// The full name of the module the delay device `device` reaches.
 std::string ModuleOf(vpiHandle device) {
   vpiHandle module = vpi_handle(vpiModule, device);
   return module == nullptr ? "" : vpi_get_str(vpiFullName, module);
 }
 
-// An annotated INTERCONNECT places an intermodule path delay device on the net
-// its two ports share, in the top module holding it, and an annotated PORT a
-// module input port delay device on the net u2's port i connects inside u2
-// (#7361).
 TEST_F(DelayDevicesOfARun, AnAnnotatedInterconnectAndPortPlaceDevices) {
   Run("module drv(output o); assign o = 1'b1; endmodule\n"
       "module rcv(input i); endmodule\n"
@@ -538,8 +438,6 @@ TEST_F(DelayDevicesOfARun, AnAnnotatedInterconnectAndPortPlaceDevices) {
   EXPECT_EQ(ModuleOf(port_device), "top.u2");
 }
 
-// The same design with no $sdf_annotate call holds no delay on either net, so
-// neither holds a device.
 TEST_F(DelayDevicesOfARun, AnUnannotatedDesignHoldsNoSdfDevice) {
   Run("module drv(output o); assign o = 1'b1; endmodule\n"
       "module rcv(input i); endmodule\n"

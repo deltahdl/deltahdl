@@ -14,10 +14,6 @@
 
 namespace delta {
 
-// One delivery of a simulation-event callback as its routine saw it: the
-// reason, the name and type of the object in its obj field, whether it was
-// given a value, the value's format and integer, the time it was given and
-// the simulation time it ran at, and its index.
 struct EventDelivery {
   int reason = 0;
   std::string obj;
@@ -36,7 +32,6 @@ inline std::vector<EventDelivery>& EventDeliveries() {
   return deliveries;
 }
 
-// What `$arm` does when the design calls it.
 inline std::function<void()>& Armer() {
   static std::function<void()> armer;
   return armer;
@@ -62,8 +57,6 @@ inline PLI_INT32 RecordEventDelivery(p_cb_data cb) {
   return 0;
 }
 
-// Places a `reason` callback on `obj`, asking for the time as vpiSimTime
-// and the value in `format`, vpiIntVal unless named.
 inline vpiHandle PlaceEventCallback(int reason, vpiHandle obj,
                                     int format = vpiIntVal) {
   static s_vpi_time time;
@@ -80,8 +73,6 @@ inline vpiHandle PlaceEventCallback(int reason, vpiHandle obj,
   return vpi_register_cb(&data);
 }
 
-// A run whose design calls `$arm`, which places the case's callbacks once
-// the model exists, its deliveries recorded.
 class EventCallbacksOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -98,7 +89,6 @@ class EventCallbacksOfARun : public VpiDesignRun {
   }
 };
 
-// The deliveries recorded for `reason`, in order.
 inline std::vector<EventDelivery> DeliveriesOf(int reason) {
   std::vector<EventDelivery> of;
   for (const EventDelivery& d : EventDeliveries()) {

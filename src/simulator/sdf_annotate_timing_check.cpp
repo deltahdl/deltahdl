@@ -1,8 +1,3 @@
-// §32.4.2's TIMINGCHECK constructs: Table 32-2's mapping of each SDF timing
-// check onto the SystemVerilog checks it annotates, and the hand-over of one
-// entry to the SpecifyManager. AnnotateSdfCellEntry
-// (simulator/sdf_annotate.cpp) is the caller.
-
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -19,8 +14,6 @@ namespace delta {
 
 namespace {
 
-// Mirrors the `push` lambda in ExpandSdfTimingCheckTargets: appends a new
-// annotation seeded from the timing check and returns a reference to it.
 SdfTcAnnotation& PushSdfTcAnnotation(std::vector<SdfTcAnnotation>& targets,
                                      const SdfTimingCheck& tc,
                                      TimingCheckKind kind) {
@@ -39,16 +32,11 @@ SdfTcAnnotation& PushSdfTcAnnotation(std::vector<SdfTcAnnotation>& targets,
   return targets.back();
 }
 
-// One value of an SDF timing check: what it selects, and whether the file
-// wrote it at all rather than as empty parentheses.
 struct SdfTcValue {
   int64_t value = 0;
   bool written = true;
 };
 
-// §32.5: a field the entry wrote a value for takes it; one it wrote as empty
-// parentheses is held at what the check already carries, so the field is left
-// unset.
 template <typename F>
 void SetFromSdf(bool& set, F& field, SdfTcValue v) {
   if (!v.written) return;
@@ -194,8 +182,6 @@ static std::vector<SdfTcAnnotation> ExpandSdfTimingCheckTargets(
 
 namespace {
 
-// The SDF keyword a check came in under, so a warning about it names the same
-// construct the file's author wrote.
 std::string_view SdfCheckTypeName(SdfCheckType type) {
   switch (type) {
     case SdfCheckType::kSetup:
@@ -226,24 +212,10 @@ std::string_view SdfCheckTypeName(SdfCheckType type) {
 
 }  // namespace
 
-// §32.4.2 Table 32-2: hand one TIMINGCHECK entry to the manager, which updates
-// whichever declared checks it matches.
-//
-// §31.2 puts a system timing check inside a specify block and §30.3 puts that
-// block inside a module declaration, so two instances of one cell declare
-// checks naming identically spelled signals. `inst_prefix` is what
-// SdfCellPrefixInRegion made of the cell's CELLINSTANCE, and it travels beside
-// the annotation rather than on it because SdfTcAnnotation
-// (simulator/specify_sdf.h) has no field for it, as with AnnotateSdfDeviceEntry
-// above. It is what holds the constraint to the checks of the one instance the
-// entry names.
 void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
                                  std::string_view inst_prefix,
                                  SpecifyManager& mgr, SdfMtm mtm,
                                  SdfAnnotationResult& result) {
-  // §32.3: an SCOND or CCOND conditions the check in a way no declared check's
-  // condition can be matched against, so the entry is data the annotator
-  // cannot place.
   if (!tc.trailing_construct.empty()) {
     result.warnings.push_back("SDF annotator: unable to annotate " +
                               std::string(SdfCheckTypeName(tc.check_type)) +
@@ -252,19 +224,12 @@ void AnnotateSdfTimingCheckEntry(const SdfTimingCheck& tc,
                               tc.trailing_construct);
     return;
   }
-  // An SDF check offers several candidate annotations so it can update
-  // whichever form the specify block happens to declare; landing any one of
-  // them means the constraint was placed.
   bool placed = false;
   for (const auto& target : ExpandSdfTimingCheckTargets(tc, mtm)) {
     if (mgr.AnnotateSdfTimingCheck(target, inst_prefix, result.warnings)) {
       placed = true;
     }
   }
-  // §32.3: a constraint the design declares no check for is data the annotator
-  // understood but could not put anywhere, so it warns rather than dropping the
-  // value in silence. Timing checks are the only category that can fail this
-  // way -- delays and specparams that match nothing are simply recorded.
   if (placed) return;
   result.warnings.push_back("SDF annotator: unable to annotate " +
                             std::string(SdfCheckTypeName(tc.check_type)) +

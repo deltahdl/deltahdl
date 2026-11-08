@@ -31,16 +31,8 @@ namespace delta {
 
 namespace {
 
-// A cross product, as a tuple of indices into the bins of the crossed
-// coverpoints, in the order the cross lists them (§19.6).
 using Tuple = std::vector<size_t>;
 
-// What a select_expression of a cross reads (§19.6.1): the instance, the
-// index into its points of each coverpoint the cross crosses, the cross
-// items as written, the cross's products, the values of each `intersect` the
-// expression holds, and the products each `with` (§19.6.1.2) and
-// cross_set_expression (§19.6.1.4) selects, each read once; and the cross's
-// name, which a report about one of them gives.
 struct CrossSelector {
   const CovergroupInstance& inst;
   std::vector<size_t> points;
@@ -52,15 +44,8 @@ struct CrossSelector {
   std::string_view cross_name;
 };
 
-// §19.6.1.2: the most value tuples one `with` is evaluated for, over all the
-// bin tuples it is applied to. Each is one evaluation of the expression when
-// the instance is built, so a `with` over wide coverpoints, two int ones
-// spanning 2^64, is reported rather than run.
 constexpr uint64_t kMaxWithValueTuples = uint64_t{1} << 20;
 
-// §19.6: the coverpoint `name` of the instance, by index into its points; a
-// variable the cross names that no coverpoint does is given an implicit
-// coverpoint, as though `coverpoint name;` had been written.
 size_t CrossedPoint(CovergroupInstance& inst, std::string_view name,
                     size_t index, SimContext& ctx, Arena& arena) {
   for (size_t i = 0; i < inst.points.size(); ++i) {
@@ -75,8 +60,6 @@ size_t CrossedPoint(CovergroupInstance& inst, std::string_view name,
   return inst.points.size() - 1;
 }
 
-// Reads the values of every `intersect` in a select_expression, a `$` bound
-// standing for the end of the values of the coverpoint it names.
 void ReadIntersects(const SelectExpression* select, CrossSelector& selector,
                     SimContext& ctx, Arena& arena) {
   if (select == nullptr) return;
@@ -99,8 +82,6 @@ bool InValues(int64_t v, const std::vector<CoverValueRange>& values) {
       values, [&](const CoverValueRange& r) { return r.lo <= v && v <= r.hi; });
 }
 
-// §19.6.1: whether a coverpoint bin's values intersect `values`; a transition
-// bin's values are the last of each of its transitions.
 bool BinIntersects(const CoverBin& bin,
                    const std::vector<CoverValueRange>& values) {
   for (int64_t v : CoverageDB::BinsofBinValues(bin)) {
@@ -113,8 +94,6 @@ bool BinIntersects(const CoverBin& bin,
   });
 }
 
-// §19.6.1: whether the bin `bin` of a coverpoint is the one, or one of the
-// array of bins, that `binsof ( cover_point . bin )` names.
 bool BinNamed(const CoverBin& bin, std::string_view name) {
   return bin.name == name ||
          (bin.name.starts_with(name) && bin.name.size() > name.size() &&
@@ -136,7 +115,6 @@ bool SelectsBinsOf(const SelectExpression& select, const Tuple& tuple,
   return false;
 }
 
-// §19.6.1: whether a select_expression selects the cross product `tuple`.
 bool Selects(const SelectExpression& select, const Tuple& tuple,
              const CrossSelector& selector) {
   switch (select.kind) {
@@ -163,9 +141,6 @@ bool Selects(const SelectExpression& select, const Tuple& tuple,
   return false;
 }
 
-// §19.6.1.2 and §19.6.1.4: how many value tuples of a bin tuple a selection
-// requires, the `matches` count, every one of them for `matches $`, or one
-// where no `matches` is written.
 struct MatchPolicy {
   bool all = false;
   uint64_t count = 1;
@@ -175,8 +150,6 @@ struct MatchPolicy {
   }
 };
 
-// A `matches` count is positive; a covergroup formal giving it 0 or less is a
-// run-time error, and the selection selects no bin tuple.
 std::optional<MatchPolicy> ReadPolicy(const SelectExpression& select,
                                       const CrossSelector& selector,
                                       SimContext& ctx, Arena& arena) {
@@ -192,9 +165,6 @@ std::optional<MatchPolicy> ReadPolicy(const SelectExpression& select,
   return std::nullopt;
 }
 
-// The values of each coverpoint bin of the bin tuple `tuple`, as sorted
-// disjoint spans; a transition bin's values are the last of each of its
-// transitions.
 std::vector<std::vector<CoverValueRange>> TupleSpans(
     const Tuple& tuple, const CrossSelector& selector) {
   std::vector<std::vector<CoverValueRange>> spans;
@@ -208,14 +178,12 @@ std::vector<std::vector<CoverValueRange>> TupleSpans(
   return spans;
 }
 
-// How many value tuples a bin tuple of these spans holds, saturating.
 uint64_t ValueTupleCount(
     const std::vector<std::vector<CoverValueRange>>& spans) {
   uint64_t total = 1;
   for (const auto& point_spans : spans) {
     uint64_t values = 0;
     for (const CoverValueRange& r : point_spans) {
-      // A span over every int64_t holds 2^64 values, which reads as 0 here.
       uint64_t size =
           static_cast<uint64_t>(r.hi) - static_cast<uint64_t>(r.lo) + 1;
       values =
@@ -227,9 +195,6 @@ uint64_t ValueTupleCount(
   return total;
 }
 
-// §19.6.1.2: evaluates a with_covergroup_expression for the value tuples of
-// a bin tuple, each cross item bound to its value as its coverpoint's type
-// holds it, until the policy is settled either way.
 class WithEvaluation {
  public:
   WithEvaluation(const Expr* expr, MatchPolicy policy,
@@ -255,8 +220,6 @@ class WithEvaluation {
   }
 
  private:
-  // Binds the values of the spans from the point `i` on, evaluating the
-  // expression for each value tuple; false once the outcome is settled.
   bool Visit(const std::vector<std::vector<CoverValueRange>>& spans, size_t i) {
     if (i == spans.size()) return Evaluate();
     for (const CoverValueRange& r : spans[i]) {
@@ -286,8 +249,6 @@ class WithEvaluation {
   uint64_t evaluated_ = 0;
 };
 
-// §19.6.1.2: the bin tuples the subordinate select_expression selects for
-// which enough value tuples make the with_covergroup_expression true.
 std::set<Tuple> WithSelections(const SelectExpression& select,
                                const CrossSelector& selector, SimContext& ctx,
                                Arena& arena) {
@@ -325,9 +286,6 @@ std::set<Tuple> WithSelections(const SelectExpression& select,
   return chosen;
 }
 
-// §19.6.1.3: the value tuple a CrossValType element holds, each member read
-// as its coverpoint's type holds it. The members are laid out as a structure's
-// are, the first in the most significant bits.
 std::vector<int64_t> ElementValueTuple(const Logic4Vec& element,
                                        const CrossSelector& selector,
                                        Arena& arena) {
@@ -345,10 +303,6 @@ std::vector<int64_t> ElementValueTuple(const Logic4Vec& element,
   return values;
 }
 
-// §19.6.1.4: the value tuples a cross_set_expression yields, each value as
-// its coverpoint's type holds it: those an array literal of one array literal
-// per tuple lists, and otherwise the elements of the CrossQueueType the
-// expression evaluates to, a call of a function returning one among them.
 std::set<std::vector<int64_t>> CrossSetValueTuples(
     const Expr* e, const CrossSelector& selector, SimContext& ctx,
     Arena& arena) {
@@ -386,8 +340,6 @@ std::set<std::vector<int64_t>> CrossSetValueTuples(
   return tuples;
 }
 
-// §19.6.1.4: the bin tuples holding enough of the value tuples a
-// cross_set_expression lists.
 std::set<Tuple> CrossSetSelections(const SelectExpression& select,
                                    const CrossSelector& selector,
                                    SimContext& ctx, Arena& arena) {
@@ -411,8 +363,6 @@ std::set<Tuple> CrossSetSelections(const SelectExpression& select,
   return chosen;
 }
 
-// Reads the products each `with` and cross_set_expression of a
-// select_expression selects, those it is built on first.
 void ReadComputedSelections(const SelectExpression* select,
                             CrossSelector& selector, SimContext& ctx,
                             Arena& arena) {
@@ -427,9 +377,6 @@ void ReadComputedSelections(const SelectExpression* select,
   }
 }
 
-// A cross's bins_selection items read as the products each selects: the
-// `bins` (§19.6.1), and the products ignore_bins (§19.6.2) and illegal_bins
-// (§19.6.3) take out of every bin of the cross.
 struct CrossSelections {
   std::vector<CrossBin> user_bins;
   std::vector<const Expr*> user_guards;
@@ -466,11 +413,6 @@ CrossSelections ReadSelections(const CoverCrossDecl& decl,
   return selections;
 }
 
-// The cross's bins: each user-defined bin with the products ignore_bins and
-// illegal_bins take out removed, a bin left with none taking no part
-// (§19.11.2); then an automatic bin for every other product that no
-// user-defined bin selects, or none at all where cross_retain_auto_bins is
-// false and the cross defines a bin of its own (§19.6.1, Table 19-1).
 void AddCrossBins(const CovergroupInstance& inst, CrossCover& cross,
                   const std::vector<Tuple>& products,
                   CrossSelections& selections, SampledCross& sampled) {
@@ -503,7 +445,6 @@ void AddCrossBins(const CovergroupInstance& inst, CrossCover& cross,
   }
 }
 
-// A decimal literal of `value`, a bound of a member's packed dimension.
 Expr* DecimalLiteral(uint32_t value, Arena& arena) {
   std::string text = std::to_string(value);
   auto* literal = arena.Create<Expr>();
@@ -513,9 +454,6 @@ Expr* DecimalLiteral(uint32_t value, Arena& arena) {
   return literal;
 }
 
-// §19.6.1.3: CrossValType, a structure of one member per coverpoint the
-// cross crosses, in the order it lists them, each named as the coverpoint is
-// and of its type's width, signedness and number of states.
 DataType CrossValType(const CrossSelector& selector, Arena& arena) {
   DataType type;
   type.kind = DataTypeKind::kStruct;
@@ -534,11 +472,6 @@ DataType CrossValType(const CrossSelector& selector, Arena& arena) {
   return type;
 }
 
-// §19.6.1.3 with §13.4.1: a function the cross body declares returning
-// CrossQueueType, an unbounded queue of CrossValType, has an implicit variable
-// of that queue, as a function returning a typedef of a queue has
-// (ModuleItem::return_array_dims). The cross's coverpoints have the same
-// types in every instance, so the first instance built shapes it.
 void ShapeCrossQueueReturns(const CoverCrossDecl& decl,
                             const CrossSelector& selector, Arena& arena) {
   for (const CrossBodyItem& item : decl.body) {
@@ -557,7 +490,6 @@ void ShapeCrossQueueReturns(const CoverCrossDecl& decl,
   }
 }
 
-// The functions a cross body declares (A.2.11 cross_body_item).
 std::vector<ModuleItem*> CrossFunctions(const CoverCrossDecl& decl) {
   std::vector<ModuleItem*> functions;
   functions.reserve(decl.body.size());
@@ -568,7 +500,6 @@ std::vector<ModuleItem*> CrossFunctions(const CoverCrossDecl& decl) {
   return functions;
 }
 
-// §19.7: the instance options the cross's definition sets.
 std::vector<std::string_view> OwnCrossOptions(const CoverCrossDecl& decl) {
   std::vector<std::string_view> own;
   for (const CrossBodyItem& item : decl.body) {
@@ -616,8 +547,6 @@ void BuildCross(CovergroupInstance& inst, const CoverCrossDecl& decl,
                          {},
                          {},
                          added->name};
-  // §19.6.1.4: a call in a select expression names the functions the cross
-  // body declares ahead of every other.
   ShapeCrossQueueReturns(decl, selector, arena);
   ctx.PushFunctionScope(CrossFunctions(decl));
   for (const CrossBodyItem& item : decl.body) {

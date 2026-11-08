@@ -9,15 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §13.3.2 reaches a variable of an automatic task and nothing else. Its four
-// bullets rest on the variables of an automatic task being freed when the task
-// invocation ends, which keeps them out of constructs that could still refer to
-// them afterwards, so every rejection case below declares its task
-// `task automatic`. A variable a static task declares `automatic` is a
-// different declaration, because §13.3.1 lets a static task declare a given
-// local variable automatic, and an automatic task declare one static. That
-// variable answers to §6.21, and
-// test/src/unit/test_elaborator_subclause_06_21.cpp covers it.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -120,8 +111,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNestedNonblockingError) {
                             5, "13.3.2"));
 }
 
-// §13.3.2: an automatic task variable shall not be referenced by a force
-// procedural continuous assignment.
 TEST(TaskBodyElaboration, AutoTaskLocalInForceError) {
   ElabFixture f;
   ElaborateSrc(
@@ -138,8 +127,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInForceError) {
       "13.3.2"));
 }
 
-// §13.3.2: an automatic task variable shall not be the target of a procedural
-// continuous assignment.
 TEST(TaskBodyElaboration, AutoTaskLocalInProceduralAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -156,7 +143,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInProceduralAssignError) {
       "13.3.2"));
 }
 
-// §13.3.2: a static-task local may legally be forced; it is not deallocated.
 TEST(TaskBodyElaboration, StaticTaskLocalInForceOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -171,8 +157,6 @@ TEST(TaskBodyElaboration, StaticTaskLocalInForceOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: an automatic task variable shall not appear in the intra-assignment
-// event control of a nonblocking assignment.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingEventControlError) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,8 +174,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingEventControlError) {
                     5, "13.3.2"));
 }
 
-// §13.3.2: an automatic task variable shall not appear in the repeat count of a
-// nonblocking-assignment intra-assignment event control.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingRepeatEventError) {
   ElabFixture f;
   ElaborateSrc(
@@ -209,8 +191,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingRepeatEventError) {
                     5, "13.3.2"));
 }
 
-// §13.3.2: reading an automatic task variable on the RHS of a nonblocking
-// assignment to a non-automatic target is legal; the value is sampled at once.
 TEST(TaskBodyElaboration, AutoTaskLocalOnNonblockingRhsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -226,7 +206,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalOnNonblockingRhsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: an automatic task variable shall not be traced with $monitor.
 TEST(TaskBodyElaboration, AutoTaskLocalInMonitorError) {
   ElabFixture f;
   ElaborateSrc(
@@ -242,9 +221,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorError) {
                             "13.3.2"));
 }
 
-// §13.3.2: the radix forms of $monitor trace as it does, and so does $fmonitor
-// in each of its forms (§21.3.2), so an automatic task variable is refused in
-// each list. Only $monitor itself was refused.
 TEST(TaskBodyElaboration, AutoTaskLocalInMonitorFormsError) {
   for (const char* task :
        {"$monitorh(x)", "$fmonitor(1, x)", "$fmonitorb(1, \"%b\", x)"}) {
@@ -265,8 +241,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorFormsError) {
   }
 }
 
-// §13.3.2: $strobe displays its list once, at the end of the step it is called
-// in, and traces nothing, so an automatic task variable may be in it.
 TEST(TaskBodyElaboration, AutoTaskLocalInStrobeAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -282,7 +256,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInStrobeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: an automatic task variable shall not be traced with $dumpvars.
 TEST(TaskBodyElaboration, AutoTaskLocalInDumpvarsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -298,8 +271,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInDumpvarsError) {
                             "13.3.2"));
 }
 
-// §13.3.2: a one-shot display of an automatic task variable is not continuous
-// tracing and remains legal.
 TEST(TaskBodyElaboration, AutoTaskLocalInDisplayOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -314,9 +285,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInDisplayOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: the prohibition on automatic task variables in an intra-assignment
-// event control covers the iff guard of an event expression, not just the bare
-// event signal.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingEventIffError) {
   ElabFixture f;
   ElaborateSrc(
@@ -334,8 +302,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingEventIffError) {
                     5, "13.3.2"));
 }
 
-// §13.3.2: an intra-assignment event control that names only non-automatic
-// objects is legal; the restriction is scoped to automatic task variables.
 TEST(TaskBodyElaboration, NonblockingEventControlModuleVarsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -351,8 +317,6 @@ TEST(TaskBodyElaboration, NonblockingEventControlModuleVarsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: the tracing prohibition reaches an automatic task variable buried in
-// a larger argument expression, not only one passed directly.
 TEST(TaskBodyElaboration, AutoTaskLocalInMonitorSubexpressionError) {
   ElabFixture f;
   ElaborateSrc(
@@ -368,9 +332,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorSubexpressionError) {
                             "13.3.2"));
 }
 
-// §13.3.2: assigning a bit-select of an automatic task variable with a
-// nonblocking assignment writes part of that variable's storage and is
-// therefore also prohibited, not just a whole-variable target.
 TEST(TaskBodyElaboration, AutoTaskLocalBitSelectInNonblockingError) {
   ElabFixture f;
   ElaborateSrc(
@@ -386,8 +347,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalBitSelectInNonblockingError) {
                             4, "13.3.2"));
 }
 
-// §13.3.2: a part-select of an automatic task variable is likewise an illegal
-// nonblocking-assignment target.
 TEST(TaskBodyElaboration, AutoTaskLocalPartSelectInNonblockingError) {
   ElabFixture f;
   ElaborateSrc(
@@ -403,8 +362,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalPartSelectInNonblockingError) {
                             4, "13.3.2"));
 }
 
-// §13.3.2: a bit-select of a non-automatic (module) target remains a legal
-// nonblocking-assignment target inside an automatic task.
 TEST(TaskBodyElaboration, ModuleVarBitSelectInNonblockingOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -420,8 +377,6 @@ TEST(TaskBodyElaboration, ModuleVarBitSelectInNonblockingOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.3.2: tracing a non-automatic object with $monitor is legal even when an
-// automatic local is in scope but not referenced by the call.
 TEST(TaskBodyElaboration, MonitorOfModuleVarOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -437,23 +392,6 @@ TEST(TaskBodyElaboration, MonitorOfModuleVarOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The three cases below cover the positions CheckTaskBodyStmt in
-// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
-// now that it takes its child-statement links from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. It had written out seven of
-// the thirteen links Stmt declares, so §13.3.2's four bullets went unenforced
-// for a use written in Stmt::for_steps or Stmt::rs_productions. The other
-// newly reached links -- Stmt::assert_pass_stmt, Stmt::assert_fail_stmt and
-// Stmt::randcase_items -- are covered by the §13.3 cases in
-// test/src/unit/test_elaborator_subclause_13_03.cpp, and Stmt::for_inits by
-// neither: A.6.8 admits only a list_of_variable_assignments or a
-// for_variable_declaration there, and none of the four bullets is about one.
-
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds the nonblocking
-// assignment §13.3.2's first bullet forbids. The parser keeps its statements in
-// RsProd::code_stmts, reached through Stmt::rs_productions and through no other
-// member of Stmt.
 TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingInARandsequenceCodeBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -471,10 +409,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInNonblockingInARandsequenceCodeBlock) {
                             5, "13.3.2"));
 }
 
-// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
-// rs_code_block ] ]` puts a second code block after the weight, kept in
-// RsRule::weight_code rather than in RsProd::code_stmts, so it is a second
-// statement position under Stmt::rs_productions and gets its own case.
 TEST(TaskBodyElaboration,
      AutoTaskLocalInNonblockingInARandsequenceWeightCodeBlock) {
   ElabFixture f;
@@ -494,10 +428,6 @@ TEST(TaskBodyElaboration,
                             5, "13.3.2"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and a system task call is
-// a function_subroutine_call, so §13.3.2's fourth bullet -- no tracing by
-// system tasks like $monitor and $dumpvars -- reaches a for step.
 TEST(TaskBodyElaboration, AutoTaskLocalInMonitorInAForStepError) {
   ElabFixture f;
   ElaborateSrc(
@@ -514,8 +444,6 @@ TEST(TaskBodyElaboration, AutoTaskLocalInMonitorInAForStepError) {
                             "13.3.2"));
 }
 
-// The same where the variable is read on the right side: a procedural
-// continuous assignment keeps reading it after the task returns (#6428).
 TEST(TaskBodyElaboration, AutoTaskVarReadByForceOrAssignError) {
   ElabFixture f;
   ElaborateSrc(

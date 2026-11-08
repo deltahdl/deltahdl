@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -16,7 +14,6 @@ TEST(BufNotParsing, SingleTerminalRejected) {
       "module m;\n"
       "  buf b1(out);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.5 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -70,8 +67,6 @@ TEST(BufNotParsing, ThreeValueDelayRejected) {
       "module m;\n"
       "  buf #(1, 2, 3) b1(o, i);\n"
       "endmodule\n");
-  // §28.3.3 owns the count of delay values a gate type admits; §28.5 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }

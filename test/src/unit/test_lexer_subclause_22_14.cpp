@@ -87,44 +87,23 @@ TEST(KeywordVersionLexing, MarkerAtInputStart) {
   EXPECT_TRUE(found_module);
 }
 
-// §22.14: when no `begin_keywords directive is in effect (no version marker
-// precedes the source), the lexer applies the implementation's default reserved
-// keyword set. This implementation's default is IEEE 1800-2023, so a word that
-// is reserved there lexes as a keyword with no marker present at all.
 TEST(KeywordVersionLexing, NoDirectiveUsesDefaultKeywordSet) {
   auto tokens = Lex("logic");
   ASSERT_GE(tokens.size(), 1u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwLogic);
 }
 
-// Syntax 22-10 lists the version_specifier alternatives exhaustively. Strings
-// that are close to one of them but not equal to it are not alternatives of
-// that production, so they must not resolve to a version; `begin_keywords
-// reports such a specifier as an error precisely because this returns nothing.
 TEST(KeywordVersionLexing, ParseKeywordVersionRejectsNearMisses) {
   const char* const kRejected[] = {
-      "",                    // no specifier text at all
-      "bogus",               // unrelated word
-      "1800-2020",           // a year the production does not list
-      "1364-2000",           // ditto, on the 1364 side
-      "1800",                // standard number with no year
-      "2023",                // year with no standard number
-      "1800-2023-noconfig",  // the noconfig suffix belongs to 1364-2001 only
-      "1364-2005-noconfig",
-      "1800_2023",
-      "IEEE1800-2023",
-      " 1800-2023",
-      "1800-2023 ",
+      "",          "bogus",         "1800-2020",          "1364-2000",
+      "1800",      "2023",          "1800-2023-noconfig", "1364-2005-noconfig",
+      "1800_2023", "IEEE1800-2023", " 1800-2023",         "1800-2023 ",
   };
   for (const char* spec : kRejected) {
     EXPECT_FALSE(ParseKeywordVersion(spec).has_value()) << spec;
   }
 }
 
-// §22.14: the selected reserved word list stays in effect for all the source
-// that follows, not merely for the next token. Under the 1364-1995 list every
-// later-standard reserved word downstream of the marker is still an ordinary
-// identifier, several tokens and several lines further on.
 TEST(KeywordVersionLexing, MarkerAppliesToAllFollowingTokens) {
   std::string input;
   input += kKeywordMarker;

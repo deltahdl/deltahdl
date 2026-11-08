@@ -70,12 +70,6 @@ TEST(LoopStatementElaboration, ForCommaSeparatedTypedInitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.1 states that declaring the control variables in the for_initialization
-// wraps the loop in an implicit begin-end block, and that the block is a new
-// hierarchical scope to which the variables are local. The elaborator keeps
-// that rule by never admitting the name outside the loop, so the reference
-// after the loop is left with no declaration at all and is reported under
-// §23.9, which states the scope rules that decide where a name is visible.
 TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
   ElabFixture f;
   ElaborateSrc(
@@ -91,9 +85,6 @@ TEST(LoopStatementElaboration, ForTypedInitNotVisibleAfterLoop) {
                             5, "23.9"));
 }
 
-// A for-loop whose initialization does not declare its control variable
-// creates no implicit block, so the outer variable stays in scope after the
-// loop and may still be referenced.
 TEST(LoopStatementElaboration, UntypedForInitVarVisibleAfterLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -110,9 +101,6 @@ TEST(LoopStatementElaboration, UntypedForInitVarVisibleAfterLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.1's implicit block ends with the loop for a read as it does for an
-// assignment, so the loop's `i` named in a display after the loop resolves to
-// nothing, and §23.9 reports it.
 TEST(LoopStatementElaboration, ForTypedInitNotReadableAfterLoop) {
   ElabFixture f;
   ElaborateSrc(
@@ -128,8 +116,6 @@ TEST(LoopStatementElaboration, ForTypedInitNotReadableAfterLoop) {
                             "23.9"));
 }
 
-// The same boundary holds in a function body, whose reads are checked by a
-// walk of their own.
 TEST(LoopStatementElaboration, ForTypedInitNotReadableAfterLoopInFunction) {
   ElabFixture f;
   ElaborateSrc(
@@ -147,9 +133,6 @@ TEST(LoopStatementElaboration, ForTypedInitNotReadableAfterLoopInFunction) {
                             "23.9"));
 }
 
-// Inside the loop the declared variables are in scope: in the condition, in
-// the step, in the body, and in a later initializer of the same
-// initialization.
 TEST(LoopStatementElaboration, ForTypedInitReadableInsideLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -165,8 +148,6 @@ TEST(LoopStatementElaboration, ForTypedInitReadableInsideLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An initialization that assigns a module variable declares nothing, so that
-// variable is still read after the loop.
 TEST(LoopStatementElaboration, UntypedForInitVarReadableAfterLoop) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -183,10 +164,6 @@ TEST(LoopStatementElaboration, UntypedForInitVarReadableAfterLoop) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.1 wraps a for loop that declares its control variable in an implicit
-// begin-end block, so the loop's i hides the function's own i and leaves it
-// as it was, and §13.4.3 gives a constant function the meaning it has at run
-// time. The fold reads the outer i's 7, not the 3 the loop ends with.
 TEST(LoopStatementElaboration, ConstantFunctionForVariableHidesOuterOne) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -207,9 +184,6 @@ TEST(LoopStatementElaboration, ConstantFunctionForVariableHidesOuterOne) {
   EXPECT_EQ(p->resolved_value, 7);
 }
 
-// §12.7.1 makes a variable the for loop's initialization declares a local of
-// the loop's implicit block, visible in its condition, step and body, so a
-// method call through it names that local and no hierarchical name (#6417).
 TEST(LoopStatementElaboration, MethodCallThroughForLoopVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,8 +204,6 @@ TEST(LoopStatementElaboration, MethodCallThroughForLoopVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// After the loop the variable is gone, and the name heads a hierarchical name
-// that resolves to nothing.
 TEST(LoopStatementElaboration, MethodCallThroughForLoopVariableAfterTheLoop) {
   ElabFixture f;
   ElaborateSrc(

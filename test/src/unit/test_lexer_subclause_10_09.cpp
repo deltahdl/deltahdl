@@ -69,14 +69,6 @@ TEST(AssignmentPatternLex, EmptyAssignmentPatternTokens) {
   EXPECT_EQ(tokens[1].kind, TokenKind::kRBrace);
 }
 
-// Lexing "' {1, 2}" yields TokenKind::kApostropheLBrace as its first token.
-// A.6.7.1 writes assignment_pattern ::= ' { expression { , expression } }, so
-// the apostrophe and the { are two separate grammar terminals. §5.3 rules that
-// white space is ignored except where it separates lexical tokens, so a space
-// standing between those two terminals is legal. The two terminals still lex as
-// one TokenKind::kApostropheLBrace token, which
-// AssignmentPatternLex.ApostropheBraceDistinctFromConcatBrace above keeps
-// distinct from TokenKind::kLBrace.
 TEST(AssignmentPatternLex,
      WhiteSpaceBetweenApostropheAndLBraceLexesApostropheLBrace) {
   auto tokens = Lex("' {1, 2}");

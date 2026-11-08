@@ -171,9 +171,6 @@ TEST(Preprocessor, DefaultNettype_Supply1Invalid) {
                             1, "22.8"));
 }
 
-// §22.8: `default_nettype governs the module definitions that follow it, so
-// the preprocessor records at each header the value in force there: a reads
-// tri1, b tri0 and c wire, whatever a later directive sets.
 TEST(Preprocessor, DefaultNettype_RecordedAtEachHeader) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

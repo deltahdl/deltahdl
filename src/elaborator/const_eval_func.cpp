@@ -28,36 +28,20 @@ namespace delta {
 
 static std::optional<ConstVal> ConstEvalSysCallFull(const Expr* expr,
                                                     const ScopeMap& scope) {
-  // §11.7: `$signed` and `$unsigned` evaluate the input expression and return a
-  // one-dimensional packed array of its width and value, with the signedness
-  // the function names. The width carries over unchanged and only the
-  // signedness is set, so the number that width and signedness now make of the
-  // operand's bits is what the call is worth: `$unsigned(-4'sd4)` is the four
-  // bits 1100 read unsigned, which is 12, and `$signed(4'b1100)` is those same
-  // bits read signed, which is -4.
   if (expr->callee == "$signed" || expr->callee == "$unsigned") {
     if (expr->args.empty()) return std::nullopt;
     auto arg = ConstEvalFull(expr->args[0], scope);
     if (!arg) return std::nullopt;
     return CastConstVal(*arg, arg->width, expr->callee == "$signed");
   }
-  // §20.6.1: $typename answers a string, and §11.10 makes a string the packed
-  // number of its characters, as it makes a string literal.
   if (expr->callee == "$typename") return ConstEvalStringLiteral(expr);
   auto val = EvalConstSysCall(expr, scope);
   if (!val) return std::nullopt;
   return ConstVal{*val, 32, true};
 }
 
-// §11.5.1: the module whose parameter declarations the folder may consult for
-// the range they were declared with, installed by the elaborator via
-// ParamRangeRegistryGuard. Null unless a guard is live.
 static const RtlirModule* g_param_range_module = nullptr;
 
-// §23.9: the generate block prefixes in force where the expression being folded
-// stands, outermost first. Installed by RegisteredGenScopeGuard and cleared
-// whenever a module is installed, because a module is entered at its own level
-// and an expression among its own items stands in no generate block.
 static std::vector<std::string_view> g_param_range_prefixes;
 
 ParamRangeRegistryGuard::ParamRangeRegistryGuard(const RtlirModule* mod)
@@ -92,9 +76,6 @@ std::optional<PackedRange> RegisteredParamRange(std::string_view name) {
   if (!g_param_range_module) return std::nullopt;
   for (const auto& pd : g_param_range_module->params) {
     if (pd.name != name) continue;
-    // §23.9 puts a parameter a generate block declares in a scope of its own,
-    // so a select written outside that block is not addressing it however the
-    // names agree. RegisteredGenPrefixes() is where the select stands.
     if (!ParamVisibleFromScopes(pd.gen_block_prefix, RegisteredGenPrefixes()))
       continue;
     if (!pd.has_decl_range_bounds) return std::nullopt;
@@ -113,18 +94,10 @@ std::optional<std::string> ScopedNameKey(const Expr* expr) {
 
 static std::optional<ConstVal> ConstEvalMemberAccessFull(
     const Expr* expr, const ScopeMap& scope) {
-  // §8.25.1 makes the override the value of `C#(args)::name`, so an override
-  // that was written decides the answer whether or not it folded. Only an
-  // absent one falls through to the class default below.
   if (SpecializationArg arg = ConstEvalSpecializedClassParam(expr, scope);
       arg.supplied)
     return arg.value;
-  // §5.13 makes the empty parentheses optional, so `c.num` parses as a member
-  // access rather than a call and is folded here as well as from the kCall arm
-  // of ConstEvalFull.
   if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope)) return builtin;
-  // §8.23: a chain of scope resolutions, `Outer::Inner::N`, is read under
-  // the key its class's registration records for the full path.
   if (auto key = ScopedNameKey(expr)) {
     auto it = scope.find(*key);
     if (it == scope.end()) return std::nullopt;
@@ -134,21 +107,9 @@ static std::optional<ConstVal> ConstEvalMemberAccessFull(
   return std::nullopt;
 }
 
-// §13.4.3 constant-function-call evaluation ---------------------------------
-//
-// A constant function is a normal function evaluated at elaboration time so
-// that e.g. `localparam addr_width = clogb2(ram_depth)` folds to an integer.
-// The registry below is the set of user function declarations visible to the
-// design element whose parameters are currently being resolved; it is null
-// unless a ConstFuncRegistryGuard is live.
 static const std::unordered_map<std::string_view, const ModuleItem*>*
     g_const_func_registry = nullptr;
 
-// Bounds against pathological or (mutually) recursive constant functions:
-// depth caps recursion, and each active call carries an iteration budget for
-// its loops. Exhausting either simply abandons the fold (returns nullopt),
-// leaving the parameter unresolved exactly as before this feature existed —
-// never an error and never a wrong value.
 static constexpr int kMaxConstFuncDepth = 64;
 static constexpr int64_t kMaxConstFuncIterations = 10'000'000;
 static int g_const_func_depth = 0;
@@ -168,9 +129,6 @@ RegisteredConstFuncs() {
   return g_const_func_registry;
 }
 
-// §11.11: the min:typ:max member the folder selects. It is the typical value
-// unless a DelayModeGuard installed another, which is what src/main.cpp does
-// for the whole of an elaboration.
 static DiagEngine* g_severity_diag = nullptr;
 static Arena* g_severity_arena = nullptr;
 
@@ -195,7 +153,6 @@ DelayModeGuard::~DelayModeGuard() { g_delay_mode = prev_; }
 
 DelayMode ActiveDelayMode() { return g_delay_mode; }
 
-// Control-flow outcome of interpreting one constant-function statement.
 enum class ConstFuncFlow : std::uint8_t {
   kNormal,
   kReturn,
@@ -208,15 +165,11 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
                                        std::string_view result_name,
                                        int64_t& iter_budget);
 
-// §6.12.1: the integer a real converts to, rounded with a half away from zero;
-// none for a value that is no number.
 static std::optional<int64_t> RoundConstReal(double value) {
   if (!std::isfinite(value)) return std::nullopt;
   return std::llround(value);
 }
 
-// The integer `e` folds to against `scope`: a real expression rounded
-// (HasRealOperand, §6.12.1), and any other folded as an integer.
 static std::optional<int64_t> FoldIntegral(const Expr* e,
                                            const ScopeMap& scope) {
   if (auto rounded = FoldRealValueAsInteger(e, scope)) return rounded;
@@ -225,10 +178,6 @@ static std::optional<int64_t> FoldIntegral(const Expr* e,
   return v->value;
 }
 
-// Stores the value of `rhs` into the local `name`, as an assignment converts
-// it (§6.12.1): a real local (ConstFuncRealFrame) takes the real `rhs` is, an
-// integral one the value rounded where `rhs` is real (HasRealOperand) and the
-// integer it folds to otherwise. False where `rhs` does not fold.
 static bool StoreConstFuncLocal(std::string_view name, const Expr* rhs,
                                 ScopeMap& locals) {
   if (ConstFuncRealLocal(name)) {
@@ -244,9 +193,6 @@ static bool StoreConstFuncLocal(std::string_view name, const Expr* rhs,
   return true;
 }
 
-// A constant function may only assign to a simple (unindexed) local — its
-// arguments, body-declared variables, or the implicit result variable named
-// after the function. Anything else abandons the fold.
 static bool ConstFuncAssign(const Expr* lhs, const Expr* rhs,
                             ScopeMap& locals) {
   if (!lhs || lhs->kind != ExprKind::kIdentifier || lhs->text.empty())
@@ -265,10 +211,6 @@ static ConstFuncFlow ExecConstFuncStmts(const std::vector<Stmt*>& stmts,
   return ConstFuncFlow::kNormal;
 }
 
-// §13.4.3: body-local variables initialize as they would for normal
-// simulation. Model that as a fresh binding, seeded from the initializer when
-// one is present and 0 otherwise; one declared real is a real local
-// (ConstFuncRealFrame) starting at 0.0 (§6.8, Table 6-7).
 static ConstFuncFlow ExecConstFuncVarDecl(const Stmt* s, ScopeMap& locals) {
   if (s->var_name.empty()) return ConstFuncFlow::kNormal;
   locals[s->var_name] = 0;
@@ -307,24 +249,14 @@ static ConstFuncFlow ExecConstFuncIf(const Stmt* s, ScopeMap& locals,
   return ExecConstFuncStmt(s->else_branch, locals, result_name, iter_budget);
 }
 
-// Fold a loop's continuation condition. An absent expression is the always-true
-// condition of `for (;;)`; nullopt means the expression did not fold, which
-// abandons the enclosing loop.
 static std::optional<bool> ConstFuncLoopCond(const Expr* cond,
                                              const ScopeMap& locals) {
   if (!cond) return true;
   return ConstFuncTruth(cond, locals);
 }
 
-// What one pass over a loop body asks the enclosing loop to do next.
-enum class ConstFuncLoopStep : std::uint8_t {
-  kIterate,   // run the next iteration
-  kStop,      // the body broke out of the loop
-  kPropagate  // the body returned or abandoned the fold; `out` carries which
-};
+enum class ConstFuncLoopStep : std::uint8_t { kIterate, kStop, kPropagate };
 
-// Run one iteration of a loop body, charging it against the shared iteration
-// budget so a loop whose condition never folds false cannot hang elaboration.
 static ConstFuncLoopStep ExecConstFuncLoopBody(const Stmt* body,
                                                ScopeMap& locals,
                                                std::string_view result_name,
@@ -366,13 +298,6 @@ static ConstFuncFlow ExecConstFuncForLoop(const Stmt* s, ScopeMap& locals,
   return ConstFuncFlow::kNormal;
 }
 
-// §12.7.1: a for loop that declares its control variables stands in an
-// implicit begin-end block, so each declared variable hides any local of the
-// same name for the loop's duration and the local is as it was once the loop
-// ends. A loop that returns or abandons the fold leaves nothing to restore.
-// §12.7.1 with §6.12: a loop variable declared real is a real local for the
-// loop's run, and one of any other type no real local whatever the name was
-// outside the loop (ConstFuncRealFrame).
 static void BindLoopVarType(std::string_view name, const DataType& type) {
   if (IsConstFuncRealType(type)) {
     SetConstFuncRealLocal(name, 0.0);
@@ -381,7 +306,6 @@ static void BindLoopVarType(std::string_view name, const DataType& type) {
   }
 }
 
-// The real binding `real` the name `name` had outside a loop, handed back.
 static void RestoreRealBinding(std::string_view name,
                                std::optional<double> real) {
   if (real) {
@@ -466,23 +390,16 @@ static ConstFuncFlow ExecConstFuncReturn(const Stmt* s, ScopeMap& locals,
   return ConstFuncFlow::kReturn;
 }
 
-// §20.10.1: whether `name` is one of the elaboration severity tasks.
 static bool IsElabSeverityTask(std::string_view name) {
   return name == "$fatal" || name == "$error" || name == "$warning" ||
          name == "$info";
 }
 
-// §13.4.3: system task calls in a constant function are ignored but for the
-// elaboration severity tasks of §20.10.1, reported while a
-// ConstFuncSeverityGuard stands (ReportConstFuncSeverity).
 static void ExecConstFuncSystemTask(const Expr* call, const ScopeMap& locals) {
   if (g_severity_diag == nullptr || !IsElabSeverityTask(call->callee)) return;
   ReportConstFuncSeverity(call, locals, *g_severity_diag, *g_severity_arena);
 }
 
-// Other bare expression statements: see ExecConstFuncExprStmt. Other bare
-// expression statements — a pre/post increment on a local, say — are
-// interpreted for their side effect; anything else abandons the fold.
 static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
   const Expr* e = s->expr;
   if (!e) return ConstFuncFlow::kNormal;
@@ -495,7 +412,6 @@ static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
   bool is_step =
       e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus;
   if (is_unary && is_step && e->lhs && e->lhs->kind == ExprKind::kIdentifier) {
-    // §11.4.2: `++` and `--` on a real add and subtract 1.0.
     if (auto real = ConstFuncRealLocal(e->lhs->text)) {
       double next = e->op == TokenKind::kPlusPlus ? *real + 1.0 : *real - 1.0;
       SetConstFuncRealLocal(e->lhs->text, next);
@@ -511,8 +427,6 @@ static ConstFuncFlow ExecConstFuncExprStmt(const Stmt* s, ScopeMap& locals) {
   return ConstFuncFlow::kAbort;
 }
 
-// §13.4.3 excludes no case statement from a constant function: the arm it
-// selects (ConstFuncCaseArm) runs as the statement would.
 static ConstFuncFlow ExecConstFuncCase(const Stmt* s, ScopeMap& locals,
                                        std::string_view result_name,
                                        int64_t& iter_budget) {
@@ -560,16 +474,6 @@ static ConstFuncFlow ExecConstFuncStmt(const Stmt* s, ScopeMap& locals,
   }
 }
 
-// §13.4.3: fold a call to a user-defined constant function. Returns nullopt
-// (leaving the surrounding constant expression unresolved) whenever the callee
-// is not a registered user function, an argument is not itself constant, or the
-// body uses a construct the elaboration-time interpreter does not model.
-// Bind each formal argument to the constant value of the matching actual,
-// falling back to the formal's default when the call supplies fewer actuals.
-// False means some actual did not fold, which abandons the whole call.
-// A formal declared real takes the real its actual is (§6.12), held in
-// `reals` until the callee's frame (ConstFuncRealFrame) exists, as the actual
-// is evaluated in the caller's.
 using RealBindings = std::vector<std::pair<std::string_view, double>>;
 
 static bool BindConstFuncArg(const FunctionArg& fa, const Expr* arg_expr,
@@ -601,9 +505,6 @@ static bool BindConstFuncArgs(const ModuleItem* func, const Expr* expr,
   return true;
 }
 
-// Interpret the body statements in order, stopping at the first `return`.
-// False means the body used a construct the interpreter does not model or ran
-// out of its iteration budget.
 static bool RunConstFuncBody(const ModuleItem* func, ScopeMap& locals) {
   int64_t iter_budget = kMaxConstFuncIterations;
   for (auto* s : func->func_body_stmts) {
@@ -614,10 +515,6 @@ static bool RunConstFuncBody(const ModuleItem* func, ScopeMap& locals) {
   return true;
 }
 
-// §26.3: the key a call is registered under -- the bare callee, or for a
-// call written through the package scope resolution operator, `pk::f(...)`,
-// which the parser keeps as a call with no callee text and the scoped name as
-// its base, the "pk::f" the package's functions are registered under.
 static std::string ConstCallKey(const Expr* expr) {
   if (!expr->callee.empty()) return std::string(expr->callee);
   const Expr* scoped = expr->lhs;
@@ -641,8 +538,6 @@ const ModuleItem* RegisteredConstFunc(const Expr* call) {
   return it->second;
 }
 
-// What a constant function call returns: the integer its result variable
-// holds, and the real it holds where the function returns a real (§6.12).
 struct ConstCallResult {
   int64_t value;
   std::optional<double> real;
@@ -658,9 +553,6 @@ static std::optional<ConstCallResult> RunConstFuncCall(const Expr* expr,
     ~DepthGuard() { --g_const_func_depth; }
   } depth_guard;
 
-  // The body sees the caller's parameter scope (a constant function may
-  // reference module/package/$unit parameters, §13.4.3), overlaid with the
-  // argument bindings and the implicit result variable.
   ScopeMap locals = scope;
   RealBindings reals;
   if (!BindConstFuncArgs(func, expr, scope, locals, reals)) return std::nullopt;
@@ -677,7 +569,6 @@ static std::optional<ConstCallResult> RunConstFuncCall(const Expr* expr,
   return ConstCallResult{rit->second, ConstFuncRealLocal(func->name)};
 }
 
-// §6.12.1: a real result read as an integer is rounded.
 static std::optional<ConstVal> ConstEvalUserCall(const Expr* expr,
                                                  const ScopeMap& scope) {
   auto result = RunConstFuncCall(expr, scope);
@@ -695,11 +586,6 @@ std::optional<double> ConstEvalUserCallReal(const Expr* call,
   return result->real.value_or(static_cast<double>(result->value));
 }
 
-// §3.12.1: a $unit:: prefix forces resolution to the compilation-unit scope,
-// bypassing any same-named local that would otherwise shadow it. Those values
-// are aliased under a "$unit::"-qualified key by BuildParamScope, so a match
-// there is the outermost declaration and a miss must not silently fall back to
-// the shadowing local.
 static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
                                                        const ScopeMap& scope) {
   if (expr->scope_prefix == "$unit") {
@@ -711,19 +597,11 @@ static std::optional<ConstVal> ConstEvalIdentifierFull(const Expr* expr,
   }
   auto it = scope.find(expr->text);
   if (it == scope.end()) return std::nullopt;
-  // §6.20.2: a name standing for a parameter of the registered module has the
-  // parameter's declared width and signedness; any other name -- a constant
-  // function's local, a package or class constant under its qualified key --
-  // is read as the 32-bit signed integer it always was.
   if (auto param = RegisteredParamValue(expr->text, it->second)) return param;
   return ConstVal{FindTwoStateReading(scope, expr->text).value_or(it->second),
                   32, true};
 }
 
-// §11.11 orders the three values minimum, then typical, then maximum, which
-// Parser::ParseMinTypMaxExpr in src/parser/expr_parser_patterns.cpp and
-// Parser::ParseParenExpr in src/parser/expr_parser_aux.cpp both record as
-// Expr::lhs, Expr::condition and Expr::rhs in that order.
 const Expr* SelectMinTypMaxMember(const Expr* expr) {
   switch (ActiveDelayMode()) {
     case DelayMode::kMin:
@@ -736,11 +614,6 @@ const Expr* SelectMinTypMaxMember(const Expr* expr) {
   return expr->condition;
 }
 
-// The value of `expr` itself, before ReadInContext converts it to `ctx`. The
-// operator expressions and the conditional hand the context down to their
-// context-determined operands, and an unbased unsized literal is as wide as
-// the context (§5.7.1); every other form is self-determined in itself, and
-// its parts are.
 static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
                                              const ScopeMap& scope,
                                              FoldContext ctx) {
@@ -772,25 +645,11 @@ static std::optional<ConstVal> ConstEvalNode(const Expr* expr,
     case ExprKind::kMemberAccess:
       return ConstEvalMemberAccessFull(expr, scope);
     case ExprKind::kMinTypMax:
-      // §11.11 admits three colon-separated expressions anywhere an expression
-      // may stand, for the minimum, typical and maximum values in that order,
-      // so a constant expression can be written as one. Which of the three
-      // folds is what ActiveDelayMode answers, and EvalMinTypMax in
-      // src/simulator/evaluation.cpp selects by that same setting, so a
-      // parameter folded at elaboration and a delay waited out during the run
-      // cannot disagree. The member stands where the form stands, so the
-      // context reaches it.
       return ConstEvalFull(SelectMinTypMaxMember(expr), scope, ctx);
     case ExprKind::kCall: {
-      // §11.2.1: a constant built-in method call (§5.13) is evaluated at
-      // elaboration time. It is tried first because a built-in method is not a
-      // user function and would never be found in the §13.4.3 registry below.
       if (auto builtin = ConstEvalBuiltinMethodFull(expr, scope))
         return builtin;
-      // §11.12 with A.8.4: a call of a let is a constant_let_expression.
       if (auto let = ConstEvalLetCall(expr, scope, ctx)) return let;
-      // §13.4.3: a call to a user-defined constant function folds at
-      // elaboration time.
       return ConstEvalUserCall(expr, scope);
     }
     default:
@@ -803,9 +662,6 @@ std::optional<ConstVal> ConstEvalFull(const Expr* expr, const ScopeMap& scope,
   if (!expr) return std::nullopt;
   auto value = ConstEvalNode(expr, scope, ctx);
   if (!value) return std::nullopt;
-  // §11.8.2 (printed page 303): an operand the propagation reaches is
-  // converted to the propagated size and type, extended from its sign only
-  // where that type is signed.
   return ReadInContext(*value, ctx);
 }
 
@@ -829,10 +685,6 @@ struct StaticPrefixResult {
   bool is_static;
 };
 
-// How a folded index is spelled: as the integer it is, which the §9.2.2
-// checks compare, or by its 32 bits, the name the simulator holds an element
-// under (ArrayElementKey in src/simulator/lowerer_var.cpp), so `p[-1]` of
-// `p [-1:0]` is "p[4294967295]".
 enum class PrefixIndexSpelling : uint8_t { kValue, kStorage };
 
 struct StaticPrefixSpec {
@@ -865,10 +717,6 @@ static StaticPrefixResult BuildSelectPrefix(const Expr* expr,
   if (!base.is_static) return {base.text, false};
   auto idx = ConstEvalInt(expr->index, spec.scope);
   if (!idx) return {base.text, false};
-  // §11.5.3: a part-select whose bounds are constant stays in the prefix
-  // whole, spelled with the addresses it covers, lower first -- `v[4:7]` for
-  // `v[7:4]` and `v[4 -: 4]` alike -- so that two prefixes of one base are
-  // compared by the bits they reach and not by their first address alone.
   if (spec.spelling == PrefixIndexSpelling::kValue && expr->index_end) {
     auto end = ConstEvalInt(expr->index_end, spec.scope);
     if (!end) return {base.text, false};

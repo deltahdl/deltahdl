@@ -23,20 +23,6 @@ enum class ClassMemberKind : uint8_t {
   kCovergroup,
 };
 
-// 18.5.7.1: a foreach iterative constraint as seen in a constraint block body.
-// array_name is the (trailing) identifier of the iterated array; loop_var_count
-// is the number of loop variables given, counted up to the last nonempty slot
-// so a trailing run of omittable commas does not inflate it. loc points at the
-// foreach for diagnostics. The parser records these from the constraint body so
-// the elaborator — which can resolve the array's declaration and therefore its
-// dimensionality — can enforce that the loop-variable count does not exceed the
-// array's number of dimensions.
-// 18.5.7: the simulator instances the constraint_set the header governs once
-// per element of the array, so loop_vars carries the loop variable of each
-// slot up to the last named one, an omitted slot as an empty name, and body the
-// relations of that constraint_set -- the relations of a braced set, or the
-// one relation of an unbraced one -- left empty where the set holds a form the
-// capture does not read as a relation.
 struct ConstraintForeachRef {
   std::string_view array_name;
   int loop_var_count = 0;
@@ -45,70 +31,28 @@ struct ConstraintForeachRef {
   SourceLoc loc;
 };
 
-// 18.5.9: one constraint_primary appearing in a solve...before list. 'name' is
-// the trailing (leaf) identifier of the reference. is_simple marks a bare local
-// identifier — no class_scope/implicit_class_handle qualifier and no trailing
-// '()' array-method call (such as size()). The elaborator only applies the
-// solve...before variable restrictions (must be rand, not randc, integral or
-// real) to simple entries it can resolve to a class property; a qualified or
-// array-method primary is left alone, since array.size() is expressly allowed
-// as an ordering variable.
 struct ConstraintSolveBeforeEntry {
   std::string_view name;
   bool is_simple = true;
-  // 18.5.8: the handles a primary written as a member reached through
-  // handles alone, `left.v`, passes through, in order; empty for any other
-  // form.
   std::vector<std::string_view> handles;
 };
 
-// 18.5.9: a 'solve solve_before_list before solve_before_list ;' ordering
-// constraint as seen in a constraint block body. 'before' holds the variables
-// to be solved first; 'after' holds those solved afterward. loc points at the
-// solve keyword for diagnostics. The parser records these so the elaborator can
-// enforce the variable-ordering restrictions and reject circular dependencies.
 struct ConstraintSolveBeforeRef {
   std::vector<ConstraintSolveBeforeEntry> before;
   std::vector<ConstraintSolveBeforeEntry> after;
   SourceLoc loc;
 };
 
-// 18.5.11: a function call appearing in a constraint block body. 'callee' is
-// the leaf identifier named immediately before the '(' (the function name); loc
-// points at that name for diagnostics. Only an unqualified call is recorded —
-// one not preceded by a '.' or '::' member/scope qualifier — so the elaborator
-// resolves it against the enclosing class hierarchy and applies the
-// restrictions on functions used in constraints (no output/inout/non-const-ref
-// arguments).
 struct ConstraintFunctionCallRef {
   std::string_view callee;
   SourceLoc loc;
 };
 
-// 18.5.13.1: a bare local variable named within a soft constraint expression.
-// 'name' is the identifier and 'loc' points at it for diagnostics. The parser
-// records only simple local references — an identifier that is neither the leaf
-// of a '.'/'::' qualified reference nor a function call — so the elaborator can
-// resolve each against the class and reject a soft constraint specified on a
-// randc variable, which the clause forbids.
 struct ConstraintSoftVarRef {
   std::string_view name;
   SourceLoc loc;
 };
 
-// 18.5.3: one dist_item of a captured distribution set. A plain item weights
-// the single 'value'; is_range weights the inclusive range [lo:hi]; is_default
-// marks the 'default :/ weight' item that stands for every domain value not
-// named by another item. 'weight' is the dist_weight expression, left null when
-// omitted (an absent weight means 1). per_element records that a range used the
-// ':=' operator — the weight is applied to each element of the range — as
-// opposed to
-// ':/' (or a single value), which applies the weight to the item as a whole; a
-// range with no explicit weight defaults to ':= 1', hence per_element.
-// 11.4.13: a value_range may also be written about a centre, '[lo +/- tol]' or
-// '[lo +%- tol]', the clause's [VALUE_NOM +%- 1.0] in a distribution: 'lo'
-// then holds the centre, 'tolerance' the tolerance, and tolerance_relative
-// records the percentage form, with 'hi' left null.
 struct ConstraintDistItem {
   Expr* value = nullptr;
   Expr* lo = nullptr;
@@ -121,48 +65,29 @@ struct ConstraintDistItem {
   bool is_default = false;
 };
 
-// 18.5.3: a captured 'expression dist { dist_list }' constraint. 'target' is
-// the left-hand expression whose value the distribution weights; 'items' holds
-// the dist_list in source order. The parser records these so the simulator can
-// build a weighted-value solver constraint for a runtime randomize() call.
 struct ConstraintDistRef {
   Expr* target = nullptr;
   std::vector<ConstraintDistItem> items;
 };
 
-// §18.5 (A.1.10): what one item of a constraint block is. A
-// constraint_block_item is a solve-before ordering or a constraint_expression,
-// and a constraint_expression one of the other six.
 enum class ConstraintItemKind : uint8_t {
-  kExpression,   // [ soft ] expression_or_dist ;
-  kUnique,       // uniqueness_constraint ;
-  kImplication,  // expression -> constraint_set
-  kIfElse,       // if ( expression ) constraint_set [ else constraint_set ]
-  kForeach,      // foreach ( array [ loop_variables ] ) constraint_set
-  kDisableSoft,  // disable soft constraint_primary ;
-  kSolveBefore,  // solve solve_before_list before solve_before_list ;
+  kExpression,
+  kUnique,
+  kImplication,
+  kIfElse,
+  kForeach,
+  kDisableSoft,
+  kSolveBefore,
 };
 
-// §18.5: one item of a constraint block as the source wrote it, so that the
-// block can be written back in order (§37.59's vpiDecompile of a randomize()
-// call with an inline block, §18.7). `expr` is the expression of an
-// expression_or_dist, the antecedent of an implication, the condition of an
-// if-else, the array a foreach iterates or the primary a disable soft names.
-// `body` is the constraint_set an implication, an if-else or a foreach governs,
-// and `else_body` the one after an else.
 struct ConstraintItem {
   ConstraintItemKind kind = ConstraintItemKind::kExpression;
-  // §18.5.13: the expression_or_dist is written `soft`.
   bool soft = false;
   Expr* expr = nullptr;
-  // §18.5.3: the dist_list of an expression_or_dist written with one.
   bool has_dist = false;
   std::vector<ConstraintDistItem> dist;
-  // §18.5.4: the range_list of a uniqueness constraint; §18.5.9: the
-  // solve_before_list before `before`, with `after` the one after it.
   std::vector<Expr*> exprs;
   std::vector<Expr*> after;
-  // §18.5.7.1: the loop variables of a foreach, empty where one is skipped.
   std::vector<std::string_view> loop_vars;
   std::vector<ConstraintItem*> body;
   bool has_else = false;
@@ -172,7 +97,7 @@ struct ConstraintItem {
 struct ClassMember {
   ClassMemberKind kind = ClassMemberKind::kProperty;
   SourceLoc loc;
-  std::vector<Attribute> attrs;  // §5.12: those written before it.
+  std::vector<Attribute> attrs;
 
   bool is_static = false;
   bool is_virtual = false;
@@ -182,97 +107,39 @@ struct ClassMember {
   bool is_randc = false;
   bool is_const = false;
   bool is_pure_virtual = false;
-  // A.1.9 fixes where three of the qualifiers stand, and these record how
-  // Parser::ParseClassQualifiers found them: `extern` read after another
-  // qualifier; `pure` not directly followed by `virtual`; `pure` read after
-  // another qualifier with no `extern` first; and `rand` or `randc` read after
-  // `const`. Which of them is a defect depends on the item that follows.
   bool extern_follows_qualifier = false;
   bool pure_apart_from_virtual = false;
   bool pure_follows_qualifier = false;
   bool random_follows_const = false;
-  // §6.20/§8.25: this member is a parameter or localparam declaration (carried
-  // with kind kProperty). Distinguished from a data property so that, e.g.,
-  // §8.26 interface-class validation does not flag a parameter as a data
-  // member.
   bool is_param = false;
 
   bool is_constraint_initial = false;
   bool is_constraint_extends = false;
   bool is_constraint_final = false;
 
-  // 18.5.1: a constraint declared without a body is a constraint prototype that
-  // is completed by an external constraint block. The explicit prototype form
-  // uses the 'extern' keyword; the implicit form omits it.
   bool is_constraint_prototype = false;
   bool is_constraint_extern = false;
 
-  // 18.5.7.1: the foreach iterative constraints found in this constraint
-  // block's body (empty for non-constraint members).
   std::vector<ConstraintForeachRef> constraint_foreach_refs;
 
-  // 18.5.9: the solve...before ordering constraints found in this constraint
-  // block's body (empty for non-constraint members).
   std::vector<ConstraintSolveBeforeRef> constraint_solve_before_refs;
 
-  // 18.5.11: the function calls found in this constraint block's body (empty
-  // for non-constraint members), recorded so the elaborator can resolve each
-  // callee and apply the restrictions on functions used in constraints.
   std::vector<ConstraintFunctionCallRef> constraint_function_call_refs;
 
-  // 18.5.13.1: the bare local variables named within soft constraint
-  // expressions in this constraint block's body (empty for non-constraint
-  // members), recorded so the elaborator can reject a soft constraint specified
-  // on a randc variable.
   std::vector<ConstraintSoftVarRef> constraint_soft_refs;
 
-  // 18.5: the top-level constraint relation expressions of this constraint
-  // block, in source order (empty for non-constraint members). The parser
-  // captures these so the simulator can translate them into the constraint
-  // solver's inputs for a runtime randomize() call.
   std::vector<Expr*> constraint_exprs;
 
-  // 18.5.3: the 'expression dist { dist_list }' distributions found in this
-  // constraint block's body (empty for non-constraint members). The parser
-  // captures each so the simulator can build a weighted-value distribution
-  // constraint for the solver.
   std::vector<ConstraintDistRef> constraint_dist_refs;
 
-  // 18.5.13.2: the random variable named by each 'disable soft
-  // constraint_primary ;' directive in this block's body, in source order
-  // (empty for non-constraint members). The directive discards the
-  // lower-priority soft constraints that reference the given variable; the
-  // parser records only a simple variable reference (a lone identifier), which
-  // is the variable the simulator draws, and the simulator lowers each into a
-  // kDisableSoft solver directive placed in declaration order among the block's
-  // soft constraints.
   std::vector<ConstraintSoftVarRef> constraint_disable_soft_refs;
 
-  // 18.5.13: the inner relation of each 'soft' constraint in this block's body,
-  // in source order (empty for non-constraint members). A soft constraint is an
-  // expression_or_dist preceded by 'soft'; its inner relation is captured apart
-  // from constraint_exprs so the simulator builds it as a discardable (soft)
-  // solver constraint rather than a hard one. Without this the relation would
-  // be dropped and the soft preference lost entirely.
   std::vector<Expr*> constraint_soft_exprs;
 
-  // 18.5.13: the 'soft'-prefixed distributions of this block's body, i.e. the
-  // dist alternative of the soft operand's expression_or_dist. Captured apart
-  // from constraint_dist_refs (which are hard) so the simulator builds each as
-  // a discardable soft distribution rather than a hard one.
   std::vector<ConstraintDistRef> constraint_soft_dist_refs;
 
-  // 18.5.4: the uniqueness constraints ("unique { range_list }") found in this
-  // block's body (empty for non-constraint members). Each entry holds one
-  // constraint's range_list member expressions in source order. The parser
-  // captures each group so the simulator can build a kUnique solver constraint
-  // for a runtime randomize() call and the elaborator can check the restricted
-  // range_list member forms this subclause requires.
   std::vector<std::vector<Expr*>> constraint_unique_refs;
 
-  // §18.5: the items of this constraint block in source order, and whether the
-  // parser read every one of them; a block with an item it could not read
-  // keeps none, so nothing reads a partial block as the whole.
   std::vector<ConstraintItem*> constraint_items;
   bool constraint_items_parsed = false;
 
@@ -286,33 +153,25 @@ struct ClassMember {
 
   ClassDecl* nested_class = nullptr;
 
-  // §19.4.1: when this member is a derived covergroup declared with the
-  // embedded inheritance form `covergroup extends base ;`, the
-  // covergroup_identifier of the base covergroup. Empty otherwise.
   std::string_view covergroup_extends_base;
 
-  // kCovergroup: the embedded covergroup's declaration as A.2.11 gives it
-  // (ast_covergroup.h), which §19.4 reads in the scope of the class.
   CovergroupDecl* covergroup = nullptr;
 };
 
 struct InterfaceRef {
   std::string_view name;
   std::vector<DataType> type_params;
-  // A.2.2.1: the identifier written before the last `::` of the name, a
-  // package (§26.3) or an enclosing class; empty for a bare name.
   std::string_view scope;
 };
 
 struct ClassDecl {
   std::string_view name;
   SourceRange range;
-  std::vector<Attribute> attrs;  // §5.12: those written before it.
+  std::vector<Attribute> attrs;
   bool is_virtual = false;
   bool is_final = false;
   bool is_interface = false;
   std::string_view base_class;
-  // §8.13 with A.2.2.1: as InterfaceRef::scope, for base_class.
   std::string_view base_class_scope;
   std::vector<DataType> base_class_type_params;
   std::vector<Expr*> extends_args;
@@ -321,18 +180,7 @@ struct ClassDecl {
   std::vector<InterfaceRef> implements_types;
   std::vector<ClassMember*> members;
   std::vector<std::pair<std::string_view, Expr*>> params;
-  // The data type of each entry of params, in the same order: a value
-  // parameter's declared type, and a type parameter's default type (kImplicit
-  // when it has none). §8.25.1 defines the default specialization C#() as the
-  // one with an empty override list, so its arguments are these defaults, and a
-  // type parameter records its default nowhere else -- params holds an Expr*,
-  // and a default type is not an expression. ModuleDecl::param_types is the
-  // same list for a module's parameter_port_list.
   std::vector<DataType> param_types;
-  // A.2.1.1's param_assignment gives a parameter port { variable_dimension }:
-  // the unpacked dimensions each value parameter of the header declared with
-  // any was written with, by name, as ModuleDecl::param_port_unpacked_dims
-  // keeps a module's.
   std::unordered_map<std::string_view, std::vector<Expr*>>
       param_port_unpacked_dims;
   std::unordered_set<std::string_view> type_param_names;

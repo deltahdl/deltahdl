@@ -124,8 +124,6 @@ TEST(AlwaysFFElaboration, PosedgeClockNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A negedge-triggered clock is just as sequential as a posedge one, so the
-// not-sequential warning must stay silent for the negedge branch too.
 TEST(AlwaysFFElaboration, NegedgeClockNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -148,8 +146,6 @@ TEST(AlwaysFFElaboration, MultiDriverTwoAlwaysFFErrors) {
       "  always_ff @(posedge clk) q <= b;\n"
       "endmodule\n",
       f);
-  // CheckMultiProcDriver reports the second of the two processes, under
-  // §9.2.2.2 rather than §9.2.2.4.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'q' driven by multiple "
                             "always_comb/always_latch/always_ff processes",
@@ -165,8 +161,6 @@ TEST(AlwaysFFElaboration, MultiDriverFFAndContAssignErrors) {
       "  assign q = d;\n"
       "endmodule\n",
       f);
-  // A continuous driver overlapping an always_ff target is reported by
-  // CheckContAssignConflict under §10.3.2, at the always_ff keyword.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'q' driven by always_ff and continuous "
                             "assignment",
@@ -182,8 +176,6 @@ TEST(AlwaysFFElaboration, MultiDriverFFAndCombErrors) {
       "  always_comb q = d;\n"
       "endmodule\n",
       f);
-  // CheckMultiProcDriver reports the second of the two processes, under
-  // §9.2.2.2 rather than §9.2.2.4.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'q' driven by multiple "
                             "always_comb/always_latch/always_ff processes",
@@ -245,8 +237,6 @@ TEST(AlwaysFFElaboration, MultiDriverFFAndLatchErrors) {
       "  always_latch if (en) q = d;\n"
       "endmodule\n",
       f);
-  // CheckMultiProcDriver reports the second of the two processes, under
-  // §9.2.2.2 rather than §9.2.2.4.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'q' driven by multiple "
                             "always_comb/always_latch/always_ff processes",
@@ -265,21 +255,12 @@ TEST(AlwaysFFElaboration, MultiDriverViaFunctionCallErrors) {
       "  always_comb q = 0;\n"
       "endmodule\n",
       f);
-  // CheckMultiProcDriver reports the second of the two processes, under
-  // §9.2.2.2 rather than §9.2.2.4.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'q' driven by multiple "
                             "always_comb/always_latch/always_ff processes",
                             7, "9.2.2.2"));
 }
 
-// The §9.2.2.4 example event control is the richest accepting form of the
-// exactly-one-event-control rule: a single @(...) whose event expression
-// combines an edge-with-iff guard and a second edge via `or` (the §9.4.2
-// event_expression machinery). Two events under one event control is still a
-// single event control, so it must elaborate cleanly, keep both events in the
-// sensitivity list, and -- being edge-triggered -- raise no not-sequential
-// warning. The iff guard on the first event must survive.
 TEST(AlwaysFFElaboration, EdgeIffOrEventControlAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -323,9 +304,6 @@ TEST(AlwaysFFElaboration, WaitForkInAlwaysFFErrors) {
                             3, "9.2.2.4"));
 }
 
-// §9.2.2.4: the report that rejects an always_ff without an event control
-// names the subclause stating the rule, so a caller learns which rule was
-// enforced without matching the wording of the message.
 TEST(AlwaysFFElaboration, MissingEventControlNames9_2_2_4) {
   ElabFixture f;
   ElaborateSrc(
@@ -339,21 +317,6 @@ TEST(AlwaysFFElaboration, MissingEventControlNames9_2_2_4) {
                             "9.2.2.4"));
 }
 
-// §9.2.2.4: an always_ff holds exactly one event control and no blocking timing
-// control. A cycle delay is a blocking timing control: §14.11 lists cycle_delay
-// under procedural_timing_control and has ## wait for the named number of
-// clocking block events.
-//
-// The case names 9.2.2.4 rather than 9.2.2.2.2 because a different sentence
-// forbids a blocking statement in each procedure -- §9.2.2.2.2's for
-// always_comb, this one for always_ff -- and one elaborator predicate answers
-// for both, so a case reading only the message would pass whichever subclause
-// the report cited. The line is the always_ff keyword's, which is where
-// ValidateAlwaysFFProcess reports, and not the ## statement's.
-//
-// The run reports a second error the case does not name: §14.11 also rules
-// that a ## with no default clocking in the module is an error, and this
-// module declares no clocking block.
 TEST(AlwaysFFElaboration, CycleDelayInAlwaysFFErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -370,10 +333,6 @@ TEST(AlwaysFFElaboration, CycleDelayInAlwaysFFErrors) {
                             3, "9.2.2.4"));
 }
 
-// §9.2.2.4 puts the variables an always_ff assigns under always_comb's rule
-// that no other process assign them, so q, also written by an initial
-// procedure, is reported under §9.2.2.4; r, which only the always_ff writes, is
-// not.
 TEST(AlwaysFFElaboration, ATargetAnotherProcessWritesIsReported) {
   ElabFixture f;
   ElaborateSrc(

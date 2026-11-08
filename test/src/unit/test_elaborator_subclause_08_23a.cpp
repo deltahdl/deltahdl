@@ -135,15 +135,6 @@ TEST(ClassScopeResolutionElaboration, NestedClassAsTypeOk) {
              "endmodule\n"));
 }
 
-// §8.23: while a type parameter may resolve to a class type, use of the class
-// scope resolution operator to select something through such a prefix is
-// restricted to typedef declarations, the type operator, and type parameter
-// assignments. A type parameter prefixing '::' in an expression is outside the
-// permitted contexts and must be reported. §6.20.3 states the type parameter
-// case in its own words, so this leg is reported under that subclause and must
-// stay there: extending the check to the other two prefix kinds §8.23 names,
-// the incomplete forward type and the interface-based typedef, must not move
-// the type parameter report to §8.23.
 TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
   ElabFixture f;
   ElaborateSrc(
@@ -162,13 +153,6 @@ TEST(ClassScopeResolutionElaboration, TypeParamScopePrefixRestricted) {
       "6.20.3"));
 }
 
-// §8.23: the same restriction holds when the type parameter comes from the
-// parameter port list and the '::' prefix appears inside a procedural always
-// block (here on the right side of a nonblocking assignment), confirming the
-// restriction is enforced across these contexts rather than only in an initial
-// block with a body-declared type parameter. §6.20.3 states the type parameter
-// case in its own words, so this leg is reported under that subclause and must
-// stay there when the check grows the two prefix kinds §8.23 adds.
 TEST(ClassScopeResolutionElaboration,
      PortTypeParamScopePrefixInAlwaysBlockIsError) {
   ElabFixture f;
@@ -185,11 +169,6 @@ TEST(ClassScopeResolutionElaboration,
       "6.20.3"));
 }
 
-// §8.23: an incomplete forward type is one of the three prefix kinds whose use
-// with the class scope resolution operator is confined to a typedef
-// declaration, the type operator, and a type parameter assignment. A forward
-// type no definition in the scope completes is incomplete, so prefixing '::'
-// with it in an expression is outside all three and is reported under §8.23.
 TEST(ClassScopeResolutionElaboration, IncompleteForwardTypePrefixIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -206,10 +185,6 @@ TEST(ClassScopeResolutionElaboration, IncompleteForwardTypePrefixIsError) {
                     4, "8.23"));
 }
 
-// §8.23: a type defined by an interface-based typedef, the §6.18 form that
-// names a type through an interface port, is the third restricted prefix kind.
-// Selecting through it in an expression is none of the three permitted
-// contexts and is reported under §8.23.
 TEST(ClassScopeResolutionElaboration, InterfaceBasedTypedefPrefixIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -227,12 +202,6 @@ TEST(ClassScopeResolutionElaboration, InterfaceBasedTypedefPrefixIsError) {
       "type 'my_data_t' defined by an interface-based typedef", 7, "8.23"));
 }
 
-// §8.23 restricts an *incomplete* forward type, and §6.18 lets the definition
-// that completes one appear before or after the forward declaration. A forward
-// type a class in the scope resolves is therefore an ordinary class type name,
-// and prefixing '::' with it in an expression stays legal. This guards the
-// §8.23 check against rejecting the forward-declaration pattern §6.18 makes
-// legal in either order.
 TEST(ClassScopeResolutionElaboration, ResolvedForwardTypePrefixOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -245,10 +214,6 @@ TEST(ClassScopeResolutionElaboration, ResolvedForwardTypePrefixOk) {
              "endmodule\n"));
 }
 
-// §8.23: a typedef declaration is the first of the three contexts in which a
-// restricted prefix may precede the class scope resolution operator, so
-// selecting a type out of a forward-declared class inside a typedef
-// elaborates.
 TEST(ClassScopeResolutionElaboration, ForwardTypePrefixInTypedefDeclOk) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -260,13 +225,6 @@ TEST(ClassScopeResolutionElaboration, ForwardTypePrefixInTypedefDeclOk) {
              "endmodule\n"));
 }
 
-// §8.23: a type parameter assignment is the third context in which a restricted
-// prefix may precede the class scope resolution operator. §6.20.3 writes that
-// context as `localparam type C_t = C::T;` in the example it states the rule
-// with, so selecting a type out of a forward-declared class as the default of a
-// type parameter elaborates. The default is parsed into `typedef_type` rather
-// than into an expression, which is why the expression walk that reports the
-// restriction never reaches it.
 TEST(ClassScopeResolutionElaboration,
      ForwardTypePrefixInTypeParamAssignmentOk) {
   EXPECT_TRUE(
@@ -279,11 +237,6 @@ TEST(ClassScopeResolutionElaboration,
              "endmodule\n"));
 }
 
-// §6.18: a forward-declared name completed by something other than a class
-// cannot carry a scope-resolution prefix at all, whichever context the prefix
-// stands in. That report belongs to §6.18 and is the neighbour of the §8.23
-// check: a typedef declaration is a permitted §8.23 context, so the source
-// below must still be rejected, and by §6.18.
 TEST(ClassScopeResolutionElaboration, NonClassForwardPrefixInTypedefIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -297,8 +250,6 @@ TEST(ClassScopeResolutionElaboration, NonClassForwardPrefixInTypedefIsError) {
                             "6.18"));
 }
 
-// §8.23: an ordinary class type name remains a valid scope resolution prefix in
-// an expression; the restriction applies only to a type parameter prefix.
 TEST(ClassScopeResolutionElaboration, ClassNamePrefixInExpressionOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -312,9 +263,6 @@ TEST(ClassScopeResolutionElaboration, ClassNamePrefixInExpressionOk) {
              "endmodule\n"));
 }
 
-// §8.23: a class-scoped parameter is a constant expression. Referencing it via
-// `Class::PARAM` in a constant context must fold to the parameter's value at
-// elaboration, not merely elaborate without error. Cfg::WIDTH resolves to 8.
 TEST(ClassScopeResolutionElaboration, ClassParameterFoldsAsConstant) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -332,8 +280,6 @@ TEST(ClassScopeResolutionElaboration, ClassParameterFoldsAsConstant) {
   EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, 8);
 }
 
-// §8.23: a class-scoped local parameter is likewise a constant expression
-// reachable through `::`. Cfg::DEPTH resolves to 16.
 TEST(ClassScopeResolutionElaboration, ClassLocalparamFoldsAsConstant) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -351,18 +297,6 @@ TEST(ClassScopeResolutionElaboration, ClassLocalparamFoldsAsConstant) {
   EXPECT_EQ(design->top_modules[0]->params[0].resolved_value, 16);
 }
 
-// §8.23: an incomplete forward type may prefix the class scope resolution
-// operator only within a typedef declaration, the type operator, or a type
-// parameter assignment, and a data object declaration is none of the three, so
-// `C::T x;` is rejected under §8.23. IncompleteForwardTypePrefixIsError above
-// covers the same prefix where an expression carries it; here the prefix
-// reaches the elaborator through DataType::scope_name on the declared type
-// instead. No class completes `C`, because §6.18 makes a forward type a
-// complete type once a definition resolves it and ResolvedForwardTypePrefixOk
-// above pins that a resolved prefix stays legal: a completing class would
-// leave nothing incomplete for this report to name. The §6.18 reports the
-// unresolved name also provokes are separated from this one by the message and
-// the subclause asserted here rather than by the source.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInDataDeclIsError) {
   ElabFixture f;
@@ -379,14 +313,6 @@ TEST(ClassScopeResolutionElaboration,
                     3, "8.23"));
 }
 
-// §8.23: a type defined by an interface-based typedef, the §6.18 form naming a
-// type through an interface port, may prefix the class scope resolution
-// operator only within a typedef declaration, the type operator, or a type
-// parameter assignment. A data object declaration is none of the three, so the
-// declaration of `x` is rejected under §8.23.
-// InterfaceBasedTypedefPrefixIsError above asserts the same report where an
-// expression carries the prefix, and uses the same interface and typedef this
-// case declares.
 TEST(ClassScopeResolutionElaboration,
      InterfaceBasedTypedefPrefixInDataDeclIsError) {
   ElabFixture f;
@@ -404,14 +330,6 @@ TEST(ClassScopeResolutionElaboration,
       "type 'my_data_t' defined by an interface-based typedef", 6, "8.23"));
 }
 
-// §6.20.3 gives `class P#(type C); C::T x;` as its worked illegal example
-// (IEEE 1800-2023 PDF page 129, printed 128), marking the property
-// declaration illegal because C is an incomplete type. The prefix is a type
-// parameter and a class property declaration is none of the three contexts
-// §8.23 permits, so the report names §6.20.3, the subclause that states the
-// type parameter case in its own words. The prefix stands on a class member
-// rather than on a module item, which is what separates this case from the
-// module-scope form.
 TEST(ClassScopeResolutionElaboration, TypeParamPrefixInClassPropertyIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -427,12 +345,6 @@ TEST(ClassScopeResolutionElaboration, TypeParamPrefixInClassPropertyIsError) {
       "6.20.3"));
 }
 
-// §6.20.3 marks the other half of that same example legal: `localparam type
-// C_t = C::T;` reaches `C::T` by a type parameter assignment, which §8.23
-// permits, and `C_t y;` then declares the property through an ordinary type
-// name carrying no prefix. Both must elaborate, so a check that rejected every
-// class property whose type is written with a scope prefix is caught here
-// rather than passing on TypeParamPrefixInClassPropertyIsError alone.
 TEST(ClassScopeResolutionElaboration,
      ClassPropertyThroughTypeParamAssignmentOk) {
   EXPECT_TRUE(
@@ -444,14 +356,6 @@ TEST(ClassScopeResolutionElaboration,
              "endmodule\n"));
 }
 
-// §6.18: a forward-declared name completed by something other than a class
-// cannot carry a scope-resolution prefix, and a type parameter assignment is a
-// context §8.23 permits the prefix in, so the permission does not save this
-// source. `pkt_fwd` is completed by `byte`, so the prefix does not resolve to a
-// class and the assignment is rejected under §6.18.
-// NonClassForwardPrefixInTypedefIsError above asserts the same rule for the
-// `typedef` spelling of the same rejection, and the two differ only in the
-// construct the prefix is written on.
 TEST(ClassScopeResolutionElaboration,
      NonClassForwardPrefixInTypeParamAssignmentIsError) {
   ElabFixture f;
@@ -468,19 +372,6 @@ TEST(ClassScopeResolutionElaboration,
       "6.18"));
 }
 
-// §8.23 (printed page 200): since classes and other scopes may share
-// identifiers, the class scope resolution operator picks out one member,
-// parameter or local parameter of one class, which the clause writes out as
-// `b.print( Base::bin, bin );  // Base::bin and bin are different`. The two
-// my_type declarations below therefore have to differ in width, or the case
-// passes whether the prefix was read or dropped: 32 is the int inside Cfg, and
-// the module's byte would answer 8.
-//
-// The widths are read back rather than elaboration being asserted to succeed,
-// because nothing reports a named type that resolved to nothing. EvalTypeWidth
-// at src/elaborator/type_eval.cpp answers 0 for an unresolved
-// DataTypeKind::kNamed and the run carries on, so ScopeResolutionTypedefOk
-// above holds however the lookup went.
 TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesFromTheNamedClass) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -499,10 +390,6 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesFromTheNamedClass) {
   EXPECT_EQ(x->width, 32u);
 }
 
-// The same declaration with no unqualified my_type anywhere, which is
-// ScopeResolutionTypedefOk's source read back. It separates a prefix that
-// resolves from one that finds nothing: 32 is Cfg's int, and a lookup that
-// missed would leave x at the 0 an unresolved kNamed evaluates to.
 TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesWithNoUnqualifiedName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -520,22 +407,6 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefSizesWithNoUnqualifiedName) {
   EXPECT_EQ(x->width, 32u);
 }
 
-// The seven cases below cover the child-statement links of Stmt that
-// WalkStmtsForRestrictedScopePrefix in
-// src/elaborator/elaborator_validate_classes.cpp reaches for the first time now
-// that it takes its list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. It had written out six of the
-// thirteen, so a restricted prefix standing in any of the other seven reached
-// CheckRestrictedScopePrefixExpr through no link and was left unreported. Each
-// case writes the prefix kind IncompleteForwardTypePrefixIsError above uses,
-// because the three contexts §8.23 permits are parsed as data types and never
-// as expressions, which puts a prefix reached from a statement outside the
-// permitted set wherever that statement stands. The report is at the prefix
-// itself, the `C` of `C::val`.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
-// holds the expression like any other statement position.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInForkArmIsError) {
   ElabFixture f;
@@ -555,10 +426,6 @@ TEST(ClassScopeResolutionElaboration,
                     5, "8.23"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
-// the right-hand side of a header assignment is an ordinary expression. The
-// loop's control variable is declared above the loop, which leaves the header
-// as the only place the prefix is written.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInForInitializationIsError) {
   ElabFixture f;
@@ -577,9 +444,6 @@ TEST(ClassScopeResolutionElaboration,
                     5, "8.23"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, so a for step carries an
-// expression the same way.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInForStepIsError) {
   ElabFixture f;
@@ -598,10 +462,6 @@ TEST(ClassScopeResolutionElaboration,
                     5, "8.23"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// Which arm runs is settled when the design runs, and §8.23 restricts where the
-// prefix may be written.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInAssertionPassStmtIsError) {
   ElabFixture f;
@@ -636,10 +496,6 @@ TEST(ClassScopeResolutionElaboration,
                     4, "8.23"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. The item is reported whether the weighted draw would select it or
-// not.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInRandcaseItemIsError) {
   ElabFixture f;
@@ -661,11 +517,6 @@ TEST(ClassScopeResolutionElaboration,
                     6, "8.23"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp
-// puts them in RsProd::code_stmts, which Stmt::rs_productions reaches and no
-// other member of Stmt does.
 TEST(ClassScopeResolutionElaboration,
      IncompleteForwardTypePrefixInRandsequenceCodeBlockIsError) {
   ElabFixture f;
@@ -687,19 +538,6 @@ TEST(ClassScopeResolutionElaboration,
                     6, "8.23"));
 }
 
-// §8.23: a type declared inside a class scope is public and reachable from
-// outside the class, and nothing in the clause makes where the class itself
-// stands part of the rule. ScopedTypedefSizesWithNoUnqualifiedName above is
-// this source with `class Cfg` written above the module instead, and that is
-// the one arrangement the typedef map covered: RegisterClassTypedefs in
-// src/elaborator/elaborator_resolve.cpp walks CompilationUnit::classes, which
-// the parser fills from a top-of-file class alone, so no "Cfg::my_type" key was
-// ever recorded for a class written inside a module.
-//
-// The module declares an unqualified my_type of a different width for the
-// reason ScopedTypedefSizesFromTheNamedClass gives: 32 is the class's int, 8
-// would be a fallback to the module's byte, and 0 is what an unresolved kNamed
-// evaluates to. Only one of the three is the prefix being read.
 TEST(ClassScopeResolutionElaboration,
      ScopedTypedefFromAModuleLocalClassSizesTheVariable) {
   ElabFixture f;
@@ -719,16 +557,6 @@ TEST(ClassScopeResolutionElaboration,
   EXPECT_EQ(x->width, 32u);
 }
 
-// The signedness of the same declaration, which is a second case because
-// Elaborator::ElaborateVarDecl asks IsSignedType and EvalTypeWidth separately,
-// at src/elaborator/elaborator_decls_var.cpp:760 and :763. A width fix that
-// left IsSignedType reading the unresolved DataType would size the variable at
-// 8 and still read it unsigned, which is what printed 4294967295 for
-// test/src/e2e/decl_class_scope.sv.
-//
-// §6.11 Table 6-8 gives `byte` as an 8-bit signed integer, so both values below
-// come from the typedef rather than from the declaration, which writes no
-// signing and no dimension of its own.
 TEST(ClassScopeResolutionElaboration,
      ScopedTypedefFromAModuleLocalClassSignsTheVariable) {
   ElabFixture f;
@@ -748,11 +576,6 @@ TEST(ClassScopeResolutionElaboration,
   EXPECT_TRUE(x->is_signed);
 }
 
-// A net reaches EvalTypeWidth and IsSignedType from
-// Elaborator::ElaborateNetDecl rather than from ElaborateVarDecl, so it is a
-// path of its own and not a restatement of the two above. §6.7.1 requires a
-// net's data type to be 4-state, which is why the typedef is `logic [7:0]` and
-// not the `byte` beside it.
 TEST(ClassScopeResolutionElaboration,
      ScopedTypedefFromAModuleLocalClassSizesTheNet) {
   ElabFixture f;
@@ -771,11 +594,6 @@ TEST(ClassScopeResolutionElaboration,
   EXPECT_EQ(w->width, 8u);
 }
 
-// §8.23: a type name in use has to resolve to a type once elaboration is done.
-// A prefix naming a visible class that declares no such type resolves to
-// nothing, and what that produced was a zero-bit unsigned object and silence --
-// which is how test/src/e2e/decl_class_scope.sv ran all the way to printing a 0
-// with nothing said about why.
 TEST(ClassScopeResolutionElaboration, ScopedTypedefNamingNoSuchTypeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -791,13 +609,6 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefNamingNoSuchTypeIsError) {
                             "8.23"));
 }
 
-// §8.23 gives a nested class no implicit handle to an object of the class it
-// is declared in: it reaches the enclosing class's static properties and
-// methods, parameters and local parameters by their bare names, and a
-// non-static property only through a handle of the enclosing class. The
-// subclause writes this very shape, `outerProp = 0;` in a method of `Inner`
-// nested in `Outer`, as its illegal line, and deltahdl said nothing about it
-// and ran the module (#3781). The report stands at the write's line.
 TEST(ClassScopeResolutionElaboration,
      NestedClassUnqualifiedWriteToOuterNonStaticPropertyIsError) {
   ElabFixture f;
@@ -819,10 +630,6 @@ TEST(ClassScopeResolutionElaboration,
                             5, "8.23"));
 }
 
-// §8.23 bars the access, not the write alone: a read of the property from
-// the nested class's method has no object to read it from either. The read
-// stands on the right of a return, a position a walk over assignment targets
-// alone never reaches.
 TEST(ClassScopeResolutionElaboration,
      NestedClassUnqualifiedReadOfOuterNonStaticPropertyIsError) {
   ElabFixture f;
@@ -844,10 +651,6 @@ TEST(ClassScopeResolutionElaboration,
                             5, "8.23"));
 }
 
-// §8.23 gives the nested class lexically scoped, unqualified access to the
-// static properties of the enclosing class, the `outerStaticProp = 0;` its
-// example marks legal, so a check that took every enclosing property for an
-// object's would report what the subclause permits.
 TEST(ClassScopeResolutionElaboration,
      NestedClassReadsOuterStaticPropertyUnqualified) {
   ElabFixture f;
@@ -868,10 +671,6 @@ TEST(ClassScopeResolutionElaboration,
   EXPECT_EQ(FindDiag(f, "outerStaticProp"), nullptr);
 }
 
-// A property the nested class declares itself under the enclosing class's
-// name is the one a bare name in its methods resolves to (§8.11 resolves an
-// unqualified name in a method against the object's own class first), so the
-// write is to the nested class's own object and §8.23 has nothing to report.
 TEST(ClassScopeResolutionElaboration,
      NestedClassOwnPropertyShadowsOuterNonStaticProperty) {
   ElabFixture f;
@@ -892,11 +691,6 @@ TEST(ClassScopeResolutionElaboration,
   EXPECT_EQ(FindDiag(f, "outerProp"), nullptr);
 }
 
-// A formal of the method and a variable declared in its body each spell the
-// enclosing class's property name without naming it: §13.3 and §13.4 make a
-// formal a local of the subroutine, and §6.21 makes a block's declaration
-// visible to that block and the ones below it, so neither reference is the
-// property and neither is reported.
 TEST(ClassScopeResolutionElaboration,
      NestedClassFormalAndLocalShadowOuterNonStaticProperty) {
   ElabFixture f;

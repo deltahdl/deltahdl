@@ -5,8 +5,6 @@
 
 namespace {
 
-// Syntax 23-5 "more" case: a module with many different module items
-// elaborates.
 TEST(ModuleContents, MixedItemsElaborate) {
   EXPECT_TRUE(
       ElabOk("module m (input logic clk, output logic [7:0] q);\n"
@@ -19,7 +17,6 @@ TEST(ModuleContents, MixedItemsElaborate) {
              "endmodule\n"));
 }
 
-// Syntax 23-5 "zero" case: an empty module body elaborates to no items.
 TEST(ModuleItemsElaboration, EmptyModuleElaborates) {
   ElabFixture f;
   auto* design = Elaborate("module m; endmodule\n", f);
@@ -30,7 +27,6 @@ TEST(ModuleItemsElaboration, EmptyModuleElaborates) {
   EXPECT_TRUE(design->top_modules[0]->children.empty());
 }
 
-// continuous_assign lowers to an assign.
 TEST(ModuleItemsElaboration, ContinuousAssignElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -44,7 +40,6 @@ TEST(ModuleItemsElaboration, ContinuousAssignElaborates) {
   EXPECT_FALSE(design->top_modules[0]->assigns.empty());
 }
 
-// initial_construct lowers to an initial process.
 TEST(ModuleItemsElaboration, InitialBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -59,7 +54,6 @@ TEST(ModuleItemsElaboration, InitialBlockElaborates) {
             RtlirProcessKind::kInitial);
 }
 
-// final_construct lowers to a final process.
 TEST(ModuleItemsElaboration, FinalBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -74,8 +68,6 @@ TEST(ModuleItemsElaboration, FinalBlockElaborates) {
             RtlirProcessKind::kFinal);
 }
 
-// always_construct lowers to a process. The always_keyword kind is a §9.2
-// distinction, so a single observer covers §23.2.4.
 TEST(ModuleItemsElaboration, AlwaysCombProcessKind) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -90,7 +82,6 @@ TEST(ModuleItemsElaboration, AlwaysCombProcessKind) {
             RtlirProcessKind::kAlwaysComb);
 }
 
-// module_instantiation lowers to a child instance.
 TEST(ModuleItemsElaboration, ModuleInstantiationElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -106,7 +97,6 @@ TEST(ModuleItemsElaboration, ModuleInstantiationElaborates) {
   EXPECT_EQ(design->top_modules[0]->children[0].inst_name, "u1");
 }
 
-// conditional_generate_construct elaborates.
 TEST(ModuleItemsElaboration, ConditionalGenerateElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -120,7 +110,6 @@ TEST(ModuleItemsElaboration, ConditionalGenerateElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// loop_generate_construct elaborates.
 TEST(ModuleItemsElaboration, LoopGenerateElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -135,7 +124,6 @@ TEST(ModuleItemsElaboration, LoopGenerateElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// generate_region elaborates.
 TEST(ModuleItemsElaboration, GenerateRegionElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -149,7 +137,6 @@ TEST(ModuleItemsElaboration, GenerateRegionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// net_alias elaborates to an alias. Alias arity is a §10.11 detail.
 TEST(ModuleItemsElaboration, NetAliasElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -163,7 +150,6 @@ TEST(ModuleItemsElaboration, NetAliasElaborates) {
   EXPECT_FALSE(design->top_modules[0]->aliases.empty());
 }
 
-// gate_instantiation elaborates.
 TEST(ModuleItemsElaboration, GateInstantiationElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -176,7 +162,6 @@ TEST(ModuleItemsElaboration, GateInstantiationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// specparam_declaration elaborates.
 TEST(ModuleItemsElaboration, SpecparamElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -188,7 +173,6 @@ TEST(ModuleItemsElaboration, SpecparamElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// specify_block elaborates.
 TEST(ModuleItemsElaboration, SpecifyBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -203,7 +187,6 @@ TEST(ModuleItemsElaboration, SpecifyBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// clocking_declaration elaborates.
 TEST(ModuleItemsElaboration, ClockingBlockElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -217,7 +200,6 @@ TEST(ModuleItemsElaboration, ClockingBlockElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An elaboration system task module item elaborates.
 TEST(ModuleItemsElaboration, ElabSystemTaskElaborates) {
   ElabFixture f;
   auto* design = Elaborate(

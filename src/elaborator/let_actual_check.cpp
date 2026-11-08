@@ -33,26 +33,17 @@
 namespace delta {
 namespace {
 
-// Whether `t` is a value an integral or a real type gives: an integer type, an
-// enum, a real, or a structure or union, which ActualFitsFormal is asked of
-// only packed or soft (Judge takes an unpacked one by assignment or bit-stream
-// cast) and which §6.11.1 then makes integral.
 bool IsIntegralOrRealLike(const DataType& t) {
   return t.kind == DataTypeKind::kStruct || t.kind == DataTypeKind::kUnion ||
          IsIntegralType(t.kind) || IsRealType(t.kind);
 }
 
-// §6.24.3: the built-in kinds of a bit-stream type, a string or an integral
-// type.
 bool IsBitStreamKind(DataTypeKind kind) {
   return kind == DataTypeKind::kString || IsIntegralType(kind);
 }
 
 bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs);
 
-// A member of an unpacked structure as IsBitStreamType asks of it: its inline
-// aggregate or enum, its built-in kind, or the type its name resolves to. A
-// name resolving to no type, a class's, is taken as one.
 bool IsBitStreamMember(const StructMember& m, const TypedefMap& typedefs) {
   if (m.nested_type != nullptr)
     return IsBitStreamType(*m.nested_type, typedefs);
@@ -63,12 +54,6 @@ bool IsBitStreamMember(const StructMember& m, const TypedefMap& typedefs) {
   return end == nullptr || IsBitStreamType(*end, typedefs);
 }
 
-// §6.24.3: whether `t` is a bit-stream type -- an integral, packed or string
-// type, or an unpacked structure whose members all are -- which an explicit
-// cast converts to or from a string (§6.16) or another bit-stream type. An
-// unpacked array of one is too, so an array's element type is what this is
-// asked of. The clause's list names no unpacked union, so none is one, nor a
-// structure holding one.
 bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs) {
   if (t.kind != DataTypeKind::kStruct && t.kind != DataTypeKind::kUnion)
     return IsBitStreamKind(t.kind);
@@ -79,10 +64,6 @@ bool IsBitStreamType(const DataType& t, const TypedefMap& typedefs) {
   });
 }
 
-// §6.22.4 as §11.12 asks it of an actual and its typed formal, both followed
-// through their typedefs. A string is cast compatible with another bit-stream
-// type (§6.16, §6.24.3) and with no real, chandle or event, for which no cast
-// is defined (§6.22.5).
 bool ActualFitsFormal(const DataType& actual, const DataType& formal,
                       const TypedefMap& typedefs) {
   if (actual.kind == DataTypeKind::kString)
@@ -93,46 +74,31 @@ bool ActualFitsFormal(const DataType& actual, const DataType& formal,
          (IsIntegralOrRealLike(actual) && IsIntegralOrRealLike(formal));
 }
 
-// One unpacked dimension of a side, with the frame the names its bounds are
-// written with are looked up in.
 struct SideDim {
   const Expr* dim;
   const NameFrame* scope;
 };
 
-// A type with the frame of the scope it is written in, where the names it is
-// written with are looked up.
 struct TypeAt {
   const DataType* type;
   const NameFrame* scope;
 };
 
-// One side of a call, the variable an actual names or the formal it binds,
-// its type followed through the declarations of the names on the way: the
-// type the chain ends in, the class that is where the chain names one, and
-// the unpacked dimensions, slowest varying first -- the declaration's own,
-// then each typedef's in turn (§7.4.5).
 struct ResolvedSide {
   const DataType* end = nullptr;
   const ClassDecl* cls = nullptr;
   std::vector<SideDim> dims;
 };
 
-// What a route to cast compatibility shows of one pair: that the actual fits,
-// that it does not, or neither, where a size or a type is not known before the
-// design runs.
 enum class Verdict : std::uint8_t { kFits, kFails, kUnknown };
 
 enum class DimKind : std::uint8_t { kFixed, kDynamic, kAssociative };
 
-// An unpacked dimension's kind, and for a fixed-size one its element count
-// where it folds.
 struct DimShape {
   DimKind kind = DimKind::kFixed;
   std::optional<uint32_t> count;
 };
 
-// Fails where either fails, else is not known where either is not.
 Verdict Both(Verdict a, Verdict b) {
   if (a == Verdict::kFails || b == Verdict::kFails) return Verdict::kFails;
   if (a == Verdict::kUnknown || b == Verdict::kUnknown)
@@ -142,9 +108,6 @@ Verdict Both(Verdict a, Verdict b) {
 
 Verdict FitsWhen(bool fits) { return fits ? Verdict::kFits : Verdict::kFails; }
 
-// §6.7.1: a net declared with no data type, whose type the parser leaves of
-// its net type's kind, `wire [7:0] v`, is of the implicit type logic, with the
-// range and signing the declaration writes.
 const DataType* WithImplicitNetType(const DataType& type, Arena& arena) {
   if (!IsNetTypeKind(type.kind)) return &type;
   auto* logic = arena.Create<DataType>(type);
@@ -152,9 +115,6 @@ const DataType* WithImplicitNetType(const DataType& type, Arena& arena) {
   return logic;
 }
 
-// Whether `cls`, or a class it derives from, declares a local or protected
-// member (§8.18), which an object of the class holds whether or not it is
-// seen.
 bool DeclaresHiddenMember(const ClassDecl* cls, const CompilationUnit* unit) {
   for (; cls != nullptr; cls = FindBaseClass(cls, unit)) {
     for (const ClassMember* m : cls->members) {
@@ -175,10 +135,6 @@ void AddDims(ResolvedSide& side, const std::vector<Expr*>* dims,
   for (const Expr* dim : *dims) side.dims.push_back({dim, scope});
 }
 
-// §7.6: the slowest-varying dimensions of an actual and a formal under
-// assignment. An associative array takes only another (§7.9.9), whose index
-// types this does not compare; a dynamic or queue formal takes any number of
-// elements; a fixed-size formal takes as many as it has.
 Verdict SlowestDimensionsAssign(const DimShape& actual,
                                 const DimShape& formal) {
   if (actual.kind == DimKind::kAssociative ||
@@ -190,8 +146,6 @@ Verdict SlowestDimensionsAssign(const DimShape& actual,
   return FitsWhen(*actual.count == *formal.count);
 }
 
-// §7.6 with §6.22.2: a faster-varying dimension of the two is equivalent, of
-// one fixed size.
 Verdict FasterDimensionsMatch(const DimShape& actual, const DimShape& formal) {
   if (actual.kind != DimKind::kFixed || formal.kind != DimKind::kFixed ||
       !actual.count || !formal.count)
@@ -199,18 +153,12 @@ Verdict FasterDimensionsMatch(const DimShape& actual, const DimShape& formal) {
   return FitsWhen(*actual.count == *formal.count);
 }
 
-// A formal, with the type it takes (LetFormalTypes) and the frame of the
-// scope declaring its let.
 struct BoundFormal {
   const FunctionArg& arg;
   const DataType* type;
   const NameFrame& scope;
 };
 
-// The walk of one scope's items for the calls of lets they write, each judged
-// by §11.12's rule 2. `unit` is the compilation unit's frame, which `$unit::`
-// names, and `parameter_frame` the frame whose parameters the context's
-// parameter values are: a dimension folds only from names it declares.
 class LetActualWalk {
  public:
   LetActualWalk(const LetActualContext& ctx, const PackageFrames& packages,
@@ -227,8 +175,6 @@ class LetActualWalk {
     for (const ModuleItem* item : items) CheckItem(item, frame);
   }
 
-  // The implicit nets the items of the scope of `frame` declare (§6.10),
-  // where the design element assumes any.
   void DeclareImplicit(NameFrame& frame,
                        const std::vector<ModuleItem*>& items) const {
     if (ctx_.implicit_nets) DeclareImplicitNets(frame, items);
@@ -259,8 +205,6 @@ class LetActualWalk {
     CheckBody(item->func_body_stmts, frame);
   }
 
-  // §27.3: each generate block is a scope of its own within the one around
-  // it, and a loop's block declares its genvar as a localparam (§27.4).
   void CheckGenerate(const ModuleItem* item, const NameFrame& frame) const {
     if (item->kind == ModuleItemKind::kGenerateCase) {
       for (const GenerateCaseItem& choice : item->gen_case_items)
@@ -283,9 +227,6 @@ class LetActualWalk {
     CheckItems(items, block);
   }
 
-  // A subroutine's formals and its own name, its result's variable (§13.4.1),
-  // are its body's. An out-of-block body is its class's method (§8.24), whose
-  // properties this walk does not hold, so it is left alone.
   void CheckSubroutine(const ModuleItem* item, const NameFrame& frame) const {
     if (!item->method_class.empty()) return;
     NameFrame formals(&frame);
@@ -305,8 +246,6 @@ class LetActualWalk {
     for (const Stmt* s : present) CheckStmt(s, body);
   }
 
-  // A let's defaults are its declaration's (§11.12), judged where it is
-  // declared, and its body sees its formals.
   void CheckLet(const ModuleItem* let, const NameFrame& frame) const {
     const std::vector<const DataType*> kTypes = LetFormalTypes(let->func_args);
     for (size_t i = 0; i < kTypes.size(); ++i) {
@@ -318,10 +257,6 @@ class LetActualWalk {
     CheckExpr(let->init_expr, body);
   }
 
-  // A begin-end keeps its declarations among its statements and a fork among
-  // its fork statements (Parser::ParseBlockVarDecls), each seen by every
-  // statement the block holds, and a for or a foreach loop declares its
-  // variables for its own header and body.
   void CheckStmt(const Stmt* s, const NameFrame& frame) const {
     if (s == nullptr) return;
     if (IsBlockLet(s)) {
@@ -354,10 +289,6 @@ class LetActualWalk {
     }
   }
 
-  // What a call's name reaches: `p::f` the `f` the package `p` declares, where
-  // no class or typedef the scope sees is named `p` (§8.23); `$unit::f` the
-  // compilation unit's own (§3.12.1); a bare name what the scopes around the
-  // call bind it to. A hierarchical name reaches none (§11.12).
   const NameBinding* Callee(const Expr& callee, const NameFrame& frame) const {
     if (callee.kind == ExprKind::kIdentifier) return Named(callee, frame);
     if (callee.kind != ExprKind::kMemberAccess || !callee.is_scope_resolution ||
@@ -370,17 +301,12 @@ class LetActualWalk {
     return FindOwnName(packages_.Find(callee.lhs->text), callee.rhs->text);
   }
 
-  // What an identifier, bare or behind `$unit::`, names at `frame`.
   const NameBinding* Named(const Expr& id, const NameFrame& frame) const {
     if (id.scope_prefix == "$unit") return FindOwnName(&unit_, id.text);
     if (!id.scope_prefix.empty()) return nullptr;
     return FindName(frame, id.text);
   }
 
-  // §11.12, rule 2: an actual naming a variable is judged by the variable's
-  // declared type against the type its formal takes (LetFormalTypes), each
-  // read in the scope declaring it. An untyped formal, whose type is null,
-  // takes any actual, and an event formal's actual is an event expression.
   void CheckActual(const Expr* actual, const BoundFormal& formal,
                    const NameFrame& call_scope) const {
     if (formal.type == nullptr || formal.type->kind == DataTypeKind::kEvent ||
@@ -402,11 +328,6 @@ class LetActualWalk {
         Subclause("11.12"));
   }
 
-  // `type`, declared with the unpacked dimensions `dims` in the scope of
-  // `scope`, followed through each typedef name to the type the chain ends
-  // in, each name looked up in the scope declaring the typedef before it, or
-  // to the class it names. Nothing where a name is not known or a type
-  // reference is not resolved.
   std::optional<ResolvedSide> Resolve(const DataType& type,
                                       const std::vector<Expr*>* dims,
                                       const NameFrame& scope) const {
@@ -432,21 +353,12 @@ class LetActualWalk {
     return std::nullopt;
   }
 
-  // The class a chain's name `type` reaches: the one its binding `named`
-  // declares, or, where it reaches no declaration, the one
-  // ClassOfDeclaredType finds by the name as written, a class nested in a
-  // class or a package's (§8.23, §26.3). Null where it reaches none.
   const ClassDecl* ClassReached(const DataType& type,
                                 const NameBinding* named) const {
     if (named != nullptr) return named->cls;
     return ClassOfDeclaredType(type, {}, ctx_.unit);
   }
 
-  // Where a chain goes from a name, written as `at` holds it, that names no
-  // class: into the type the typedef its binding `named` declares, with the
-  // typedef's unpacked dimensions, or, where it reaches no declaration, into
-  // the type a specialization gives it (Specialized). Nothing where it
-  // reaches neither, or a declaration of no type.
   std::optional<TypeAt> NextInChain(ResolvedSide& side, const TypeAt& at,
                                     const NameBinding* named) const {
     if (named == nullptr) return Specialized(side, at);
@@ -456,13 +368,6 @@ class LetActualWalk {
     return TypeAt{type, named->scope};
   }
 
-  // §8.25.1: a type behind a class with parameters, `P#()::t` or `P#(4)::t`,
-  // which no frame of the class follows, is the typedef of that
-  // specialization, with its dimensions and the specialization's values
-  // folded in (SpecializeClassScopedType). A type it gives that is still a
-  // name is looked up where it was written: at `at`, for a type an argument
-  // of the specialization gives a type parameter, else in the class, among
-  // what it declares and inherits within the scope declaring it.
   std::optional<TypeAt> Specialized(ResolvedSide& side,
                                     const TypeAt& at) const {
     const std::optional<SpecializedClassType> kSpecialized =
@@ -478,11 +383,6 @@ class LetActualWalk {
     return TypeAt{type, written};
   }
 
-  // §6.22.4: an actual fits where it is assignment compatible with the formal
-  // or an explicit cast is defined between them. Classes go by their
-  // hierarchy; two other types neither of them an unpacked array, structure or
-  // union by ActualFitsFormal; and any other pair by assignment (§7.6) or by a
-  // bit-stream cast (§6.24.3).
   Verdict Judge(const ResolvedSide& actual, const ResolvedSide& formal) const {
     if (actual.cls != nullptr || formal.cls != nullptr)
       return ClassesFit(actual, formal);
@@ -497,14 +397,6 @@ class LetActualWalk {
                                         : kAssigned;
   }
 
-  // §6.24.3 makes a class illegal as a bit-stream cast's destination, so a
-  // formal holding class handles takes an actual by assignment alone: a lone
-  // handle by its hierarchy -- §8.12 passes one up it and §8.16 down it by
-  // $cast, so two classes fit where they are one or one derives from the
-  // other (IsClassDeclDerivedFrom, which follows interface classes too) --
-  // and an array by §7.6, its elements of the formal's own class, which
-  // §6.22.2 makes equivalent to itself alone. Handles for a formal holding
-  // none are HandlesAsBitStream's.
   Verdict ClassesFit(const ResolvedSide& actual,
                      const ResolvedSide& formal) const {
     if (formal.cls == nullptr) return HandlesAsBitStream(actual, formal);
@@ -518,15 +410,6 @@ class LetActualWalk {
     return DimensionsAssign(actual, formal);
   }
 
-  // §6.24.3: class handles convert by a bit-stream cast to a bit-stream type
-  // other than an associative array, unless their class, or one it derives
-  // from, declares a local or protected member. A non-null handle gives the
-  // members of the object it refers to, which may be of a class derived from
-  // its own, and a null one gives nothing (§11.4.14.1), so how many bits
-  // handles give is not known before the design runs. §6.22.5 has a handle
-  // type incompatible with every type but a class's; were that to decide
-  // here, §6.24.3's rule on a source's local and protected members would
-  // have nothing to apply to.
   Verdict HandlesAsBitStream(const ResolvedSide& actual,
                              const ResolvedSide& formal) const {
     const bool kAssociative =
@@ -538,20 +421,12 @@ class LetActualWalk {
     return Verdict::kUnknown;
   }
 
-  // §7.6: an unpacked array is assignment compatible with another of as many
-  // unpacked dimensions whose element types are equivalent (§6.22.2), the
-  // faster-varying dimensions included, and, where the formal is fixed size,
-  // of as many elements. An unpacked structure or union is with a type
-  // equivalent to it alone, which no integral or real rule widens.
   Verdict AssignmentRoute(const ResolvedSide& actual,
                           const ResolvedSide& formal) const {
     if (!TypesEquivalent(*actual.end, *formal.end)) return Verdict::kFails;
     return DimensionsAssign(actual, formal);
   }
 
-  // §7.6: the unpacked dimensions of two sides whose element types are
-  // equivalent assign where they are as many, each faster-varying one of the
-  // other's size, and the slowest as SlowestDimensionsAssign has it.
   Verdict DimensionsAssign(const ResolvedSide& actual,
                            const ResolvedSide& formal) const {
     if (actual.dims.size() != formal.dims.size()) return Verdict::kFails;
@@ -564,8 +439,6 @@ class LetActualWalk {
     return verdict;
   }
 
-  // §6.24.3: a bit-stream cast converts between two bit-stream types, never to
-  // an associative array, and between two fixed-size ones only of one size.
   Verdict BitStreamRoute(const ResolvedSide& actual,
                          const ResolvedSide& formal) const {
     if (!formal.dims.empty() &&
@@ -581,9 +454,6 @@ class LetActualWalk {
     return FitsWhen(*kActualBits == *kFormalBits);
   }
 
-  // The number of bits a fixed-size side holds; nothing for a side of a
-  // dynamically sized type, a string being a dynamic array of bytes to a
-  // bit-stream cast (§6.24.3), or of a size not known here.
   std::optional<uint64_t> BitSize(const ResolvedSide& side) const {
     if (side.end->kind == DataTypeKind::kString) return std::nullopt;
     const uint32_t kWidth = BitStreamTypeWidth(*side.end, ctx_.shapes.typedefs);
@@ -605,10 +475,6 @@ class LetActualWalk {
     return {DimKind::kFixed, FoldedCount(dim)};
   }
 
-  // A fixed-size dimension's element count, folded from the context's
-  // parameter values where every name its bounds are written with is one the
-  // parameter frame declares, so that no name of a scope within it or around
-  // it is read as the parameter of the same name.
   std::optional<uint32_t> FoldedCount(const SideDim& dim) const {
     bool folds = true;
     auto check = [&](const Expr* e) {
@@ -653,9 +519,6 @@ void CheckLetActualsOfUnitAndPackages(const LetActualContext& ctx) {
   ClassFrames classes(kPackages, unit);
   const LetActualWalk kUnitWalk(ctx, kPackages, classes, unit, unit);
   kUnitWalk.CheckItems(ctx.unit->cu_items, unit);
-  // A package's parameters are held under keys of their package's, not under
-  // the bare names its dimensions are written with, so a package's
-  // dimensions fold from literals alone.
   const ScopeMap kNoParameters;
   const LetActualContext kPackageCtx{ctx.unit, ctx.shapes, kNoParameters,
                                      ctx.diag, ctx.arena,  false};

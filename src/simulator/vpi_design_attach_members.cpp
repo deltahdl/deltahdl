@@ -54,7 +54,6 @@ int VpiDataTypeVariableKind(DataTypeKind kind) {
       return vpiStructVar;
     case DataTypeKind::kUnion:
       return vpiUnionVar;
-    // §6.12 makes realtime a synonym for real.
     case DataTypeKind::kReal:
     case DataTypeKind::kRealtime:
       return vpiRealVar;
@@ -66,7 +65,6 @@ int VpiDataTypeVariableKind(DataTypeKind kind) {
       return vpiChandleVar;
     case DataTypeKind::kEnum:
       return vpiEnumVar;
-    // §37.27 and §37.29.
     case DataTypeKind::kEvent:
       return vpiNamedEvent;
     case DataTypeKind::kVirtualInterface:
@@ -78,9 +76,6 @@ int VpiDataTypeVariableKind(DataTypeKind kind) {
 
 namespace {
 
-// §8.3, §9.7, §15.3 and §15.4: whether `name` names a class a scope sees:
-// one of `classes`, those the scope declares, one the compilation unit
-// declares, or one of the built-in classes.
 bool NamesClass(const RtlirDesign& design,
                 const std::vector<ClassDecl*>& classes, std::string_view name) {
   static constexpr std::string_view kBuiltIn[] = {"process", "semaphore",
@@ -95,9 +90,6 @@ bool NamesClass(const RtlirDesign& design,
          std::ranges::any_of(kBuiltIn, kIsNamed);
 }
 
-// §6.18 with §8.3: the object kind of a variable of a type that is a class
-// where `names_class`, and otherwise the one the typedef the design records
-// under `key` stands for, a class where its chain of names ends in one.
 int NamedTypeKind(const RtlirDesign& design, bool names_class,
                   std::string_view key) {
   if (names_class || design.type_targets.contains(key)) return vpiClassVar;
@@ -147,10 +139,6 @@ int VpiScopedTypeVariableKind(const RtlirDesign& design,
 
 namespace {
 
-// What the members of one instance are made from: its design and module, the
-// objects keyed under its name `prefix`, and what a run builds with. The
-// members of a sequence's or property's local stand in no instance's
-// storage, and their site has neither a design nor a module.
 struct MemberSite {
   const RtlirDesign* design;
   const RtlirModule* mod;
@@ -160,10 +148,6 @@ struct MemberSite {
   const VpiAttachBuild& build;
 };
 
-// §6.18: the kind of a variable of the type the name `name` stands for, as
-// the module at `site` sees it, a class among its names; at a site of no
-// module, a local's, the kind the run's type table records for it, as
-// DeclaredTypeKind gives the local its own.
 int NamedFieldKind(const MemberSite& site, std::string_view name) {
   if (site.mod == nullptr) {
     return VpiDataTypeVariableKind(site.ctx.FindTypeKind(name));
@@ -171,18 +155,10 @@ int NamedFieldKind(const MemberSite& site, std::string_view name) {
   return VpiNamedTypeVariableKind(*site.design, *site.mod, name);
 }
 
-// §37.26: the member of `holder` the field `field` lays out: its vpiParent is
-// the struct or union var or net, it is named after the field, its kind is a
-// net for a net's member and otherwise the one a variable of the field's type
-// has (§37.17), and its value is the field's bits of the holder's value, a
-// copy that a read refreshes and a write is copied back from, read as a real
-// where the field is one.
 VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
                       const MemberSite& site) {
   const VpiAttachBuild& build = site.build;
   VpiObject* member = build.alloc();
-  // §37.16 detail 31: a member of a struct or union net is a net, a struct or
-  // union net itself where its field is a structure or union.
   const bool kOfNet =
       holder->type == vpiStructNet || holder->type == vpiUnionNet;
   if (kOfNet && field.nested != nullptr) {
@@ -199,10 +175,6 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   member->name = build.keep(std::string(field.name));
   member->full_name = holder->full_name + "." + std::string(field.name);
   member->decl_signed = field.is_signed;
-  // §37.17 detail 20: a member is a scalar or a vector as a variable of its
-  // field's type is, a bit or logic field wider than one bit having a packed
-  // dimension; one declared as an unpacked array answers as its element
-  // (MakeMemberElements).
   VpiScalarVectorQuery shape;
   shape.var_type = member->type;
   shape.has_packed_dimension = field.width > 1;
@@ -213,9 +185,6 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   storage->value.is_signed = field.is_signed;
   storage->value.is_real =
       member->type == vpiRealVar || member->type == vpiShortRealVar;
-  // §7.2.1 and §7.3.1: the copy of a structure or union member is 2-state
-  // where none of the member's own members is 4-state, as a variable of the
-  // member's type is.
   if (field.nested != nullptr) {
     storage->is_4state = HasFourStateMember(*field.nested);
   }
@@ -227,12 +196,6 @@ VpiObject* MakeMember(VpiObject* holder, const StructFieldInfo& field,
   return member;
 }
 
-// §37.17 detail 12 with §7.4.1: the dimensions the bits of `member`, of the
-// field `field`, are indexed by: a bit or logic member's packed ones, the
-// outermost as the layout records it over its elements' own [n-1:0], and a
-// packed structure's or union's implicit [n-1:0] (§7.2.1). None for a net's
-// member, a member of one bit, an unpacked array or dynamic member, or one of
-// any other type.
 std::optional<PackedDims> MemberBitDims(const VpiObject& member,
                                         const StructFieldInfo& field) {
   const bool kVector = member.type == kVpiReg || member.type == vpiBitVar;
@@ -246,16 +209,10 @@ std::optional<PackedDims> MemberBitDims(const VpiObject& member,
     return PackedDims{PackedRange{field.packed_left, field.packed_right},
                       PackedRange::Implicit(field.packed_elem_width)};
   }
-  // §7.4.1: a member of one packed dimension indexes its bits as its
-  // declaration does, `reg [0:7] b`'s b[7] being its least significant bit.
   if (kVector && field.decl_range) return PackedDims{*field.decl_range};
   return PackedDims{PackedRange::Implicit(field.width)};
 }
 
-// What the elements of a member declared with unpacked dimensions are made
-// of: its dimensions, outermost first, the kind and width of one element, the
-// number of elements, the outermost structure whose storage the elements read
-// their bits of, at the member's offset there, and what a run builds with.
 struct MemberArrayShape {
   std::vector<PackedRange> dims;
   int element_type = 0;
@@ -266,14 +223,6 @@ struct MemberArrayShape {
   const VpiAttachBuild* build = nullptr;
 };
 
-// §37.17 details 2, 18 and 26: the members of `level`, the array var or
-// subarray of the member `shape` describes at dimension `depth`: one per
-// index, left index first, carrying its index and those `outer` that select
-// `level`, innermost first. At the last dimension each is a variable of the
-// member's type holding its bits of the outermost structure, where the layout
-// puts the element written first in the most significant ones; at every other
-// it is a subarray, an array var of its own. `position` counts the elements
-// made so far.
 void MakeMemberLevel(VpiObject* level, const MemberArrayShape& shape,
                      std::size_t depth, const std::vector<int64_t>& outer,
                      uint32_t& position) {
@@ -326,9 +275,6 @@ void MakeMemberLevel(VpiObject* level, const MemberArrayShape& shape,
   }
 }
 
-// §37.17 details 2, 18 and 26: the member `array` of the field `field`,
-// declared with the unpacked dimensions `dims`, made the array var it is,
-// with its subarrays and elements (MakeMemberLevel).
 void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
                         std::vector<PackedRange> dims,
                         const VpiAttachBuild& build) {
@@ -342,8 +288,6 @@ void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
   shape.root = array->member_of;
   shape.offset = array->member_offset;
   shape.build = &build;
-  // §37.17 detail 20: an array var answers vpiScalar and vpiVector as its
-  // element does.
   VpiScalarVectorQuery element;
   element.var_type = shape.element_type;
   element.has_packed_dimension = shape.element_width > 1;
@@ -357,9 +301,6 @@ void MakeMemberElements(VpiObject* array, const StructFieldInfo& field,
   MakeMemberLevel(array, shape, 0, {}, position);
 }
 
-// §7.4.2: the unpacked dimensions the member of the field `field` writes,
-// each evaluated in the scope `ctx` has set; none where it writes none or
-// where one is not a fixed range or size.
 std::vector<PackedRange> MemberUnpackedDims(const StructFieldInfo& field,
                                             SimContext& ctx) {
   std::vector<PackedRange> dims;
@@ -372,11 +313,6 @@ std::vector<PackedRange> MemberUnpackedDims(const StructFieldInfo& field,
   return dims;
 }
 
-// The member per field of the layout `info` gives `holder`. §37.17 detail 28's
-// example names `str1.inner1.j1`: a member of a structure or union type has a
-// member per field of its own, each read from and written back to the storage
-// of the outermost structure, at its offset there, as each member's bits are
-// (detail 12).
 void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
                  const MemberSite& site) {
   for (const StructFieldInfo& field : info.fields) {
@@ -397,10 +333,6 @@ void MakeMembers(VpiObject* holder, const StructTypeInfo& info,
   }
 }
 
-// §37.17 detail 26: an element of an array of structures or unions is a
-// struct or union var of its own, `spa[9][12]`, with a member per field of
-// the array's layout, each reached through the element. The leaves of the
-// array the elements pass made are those elements.
 void MakeElementMembers(VpiObject* array, const StructTypeInfo& info,
                         const MemberSite& site) {
   for (VpiObject* element : array->children) {
@@ -415,12 +347,6 @@ void MakeElementMembers(VpiObject* array, const StructTypeInfo& info,
   }
 }
 
-// §37.17 details 3, 17 and 26: a struct or union var, packed or not, has a
-// member variable per field, the struct as its vpiParent and the field's value
-// as its own. The run keeps the whole struct as one variable, and no member
-// object was made, so vpiMember reached nothing and no name reached a field; a
-// packed one was passed over after that, though §37.26 makes vpiPacked only a
-// property of the struct var.
 void AttachVariableMembers(const MemberSite& site) {
   for (const RtlirVariable& var : site.mod->variables) {
     const std::string kKey = VpiFlatName(site.prefix, var.name);
@@ -436,24 +362,14 @@ void AttachVariableMembers(const MemberSite& site) {
   }
 }
 
-// §37.26: a net of a structure or union type is a struct net or a union net,
-// with a member net per field. Every net of the run is an object
-// (VpiContext::Attach), and the run registers the layout of each one of an
-// aggregate type under the same key (RegisterAggregateLayout); each reported
-// vpiNet and held no member.
 void AttachNetMembers(const MemberSite& site) {
   for (const RtlirNet& net : site.mod->nets) {
     const std::string kKey = VpiFlatName(site.prefix, net.name);
     const StructTypeInfo* info = site.ctx.GetVariableStructType(kKey);
-    // §37.16 detail 1: a packed array net of a structure written in place has
-    // the whole array's layout under its name, but its members belong to its
-    // subelements (AttachPackedArrayMembers).
     if (info == nullptr || VpiNetObjectKind(net) == vpiPackedArrayNet) continue;
     VpiObject* holder = FindObjectForFlatName(site.objects, kKey);
     holder->type = info->is_union ? vpiUnionNet : vpiStructNet;
-    // §37.16 detail 24: whether it is packed, which decides its vpiSize.
     holder->packed = info->is_packed;
-    // §37.26: whether the union was declared tagged or soft.
     if (info->is_union && net.dtype != nullptr) {
       holder->tagged = net.dtype->is_tagged;
       holder->soft = net.dtype->is_soft;
@@ -462,11 +378,6 @@ void AttachNetMembers(const MemberSite& site) {
   }
 }
 
-// §7.2.1: the layout of one element of a packed array of the structure or
-// union `written` writes in place, which no typedef registers. It is built
-// from the fields written as RegisterAggregateLayout builds a declaration's,
-// as wide as the type without the array's packed dimensions, under a key
-// naming the written type, which stands at one address for the run.
 const StructTypeInfo* InlineElementLayout(const DataType& written,
                                           SimContext& ctx) {
   DataType element = written;
@@ -480,11 +391,6 @@ const StructTypeInfo* InlineElementLayout(const DataType& written,
   return ctx.FindStructType(*key);
 }
 
-// §37.16 detail 32 and §37.18 detail 3 with §6.18: the layout of the struct
-// or union each subelement of a packed array declared with the type `written`
-// holds past its last packed dimension: that of a structure or union written
-// in place, or of the typedef it names, which the design's layouts key by its
-// package or class where one is written (§26.3); null for an enum.
 const StructTypeInfo* PackedArrayElementLayout(const DataType* written,
                                                SimContext& ctx) {
   if (written == nullptr) return nullptr;
@@ -497,10 +403,6 @@ const StructTypeInfo* PackedArrayElementLayout(const DataType* written,
                             "::" + std::string(written->type_name));
 }
 
-// The members under `holder` that MakeMembers rooted at the net subelement
-// `sub`, rooted instead at the packed array net `top` holding the run's
-// storage, at the subelement's offset in it. A var subelement is rooted at
-// its packed array var already, and so are the members made under it.
 void RootMembersAt(VpiObject& holder, const VpiObject& sub, VpiObject& top) {
   for (VpiObject* member : holder.children) {
     if (member->member_of != &sub) continue;
@@ -510,10 +412,6 @@ void RootMembersAt(VpiObject& holder, const VpiObject& sub, VpiObject& top) {
   }
 }
 
-// §37.16 detail 32, §37.18 detail 3 and §37.26: each struct or union
-// subelement under `holder`, the packed array `top` or a subelement of it,
-// given a member per field of `info`, each holding its field's bits of the
-// subelement's share of `top`.
 void MakeSubelementMembers(VpiObject& holder, VpiObject& top,
                            const StructTypeInfo& info, const MemberSite& site) {
   for (VpiObject* sub : holder.children) {
@@ -528,8 +426,6 @@ void MakeSubelementMembers(VpiObject& holder, VpiObject& top,
   }
 }
 
-// The members of the subelements of the packed array `top`, if it is one,
-// declared with the type `written`.
 void MakePackedArrayMembers(VpiObject* top, const DataType* written,
                             const MemberSite& site) {
   if (top == nullptr ||
@@ -570,12 +466,8 @@ void AttachPackedArrayMembers(const RtlirDesign* design,
 }
 
 int VpiNetObjectKind(const RtlirNet& net) {
-  // §37.24 (figure): a generic interconnect is an interconnect net, which has
-  // no data type of its own, whatever net a port connection merged it into.
   if (VpiNetIsInterconnect(net)) return vpiInterconnectNet;
   switch (net.data_kind) {
-    // §37.16 detail 1: a packed struct, union or enum net with a packed
-    // dimension of its own is a packed array net.
     case DataTypeKind::kStruct:
       return net.has_declared_packed_dim ? vpiPackedArrayNet : vpiStructNet;
     case DataTypeKind::kUnion:
@@ -586,9 +478,6 @@ int VpiNetObjectKind(const RtlirNet& net) {
       return vpiIntegerNet;
     case DataTypeKind::kTime:
       return vpiTimeNet;
-    // §6.7.1 keeps a 2-state or real type off a built-in net type, so these
-    // arise through a user-defined nettype (§6.6.7), the figure's user
-    // defined net.
     case DataTypeKind::kBit:
       return vpiBitNet;
     case DataTypeKind::kByte:
@@ -611,10 +500,6 @@ int VpiNetObjectKind(const RtlirNet& net) {
 
 void RecordNetObjectKinds(const RtlirDesign* design,
                           const VpiObjectMap& objects) {
-  // §37.16 (figure): a net is drawn as the kind its data type makes it. The run
-  // made every net a logic net, and only a struct or union net with a layout
-  // of its own was told otherwise (AttachNetMembers), so no design had an enum
-  // net, an integer net or a packed array net.
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         for (const RtlirNet& net : VpiDeclaredNets(*mod)) {

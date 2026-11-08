@@ -37,80 +37,40 @@ class DiagEngine;
 struct ContTargetLeaf;
 struct Expr;
 
-// The elaborator: it reads the compilation unit the parser produced and builds
-// the RtlirDesign the simulator runs. Two groups of rules that turn on nothing
-// elaboration resolves stand in the classes it derives from, one header each:
-// ElaboratorClassRules in src/elaborator/elaborator_validate_classes.h holds
-// the Clause 8 rules on a class declaration, and ElaboratorOperationRules in
-// src/elaborator/elaborator_validate_operations.h, which that one derives
-// from, holds the Clause 11 rules on an expression.
 class Elaborator : public ElaboratorClassRules {
  public:
-  // §23.10.2: a module instance parameter value assignment gives particular
-  // instances values for parameters the module's definition specifies, and this
-  // is what one override is worth between the fold that reads it and the
-  // RtlirParamDecl that receives it.
-  //
-  // The value is carried twice because one form of it cannot express the other.
-  // `value` is the §11.10 packed number, which is what every integral parameter
-  // reads and what ConvertOverrideValue coerces to the declared width.
-  // `value_expr` is the expression that number was folded from, which is what a
-  // parameter declared string needs: §6.16 gives such a parameter a value of
-  // arbitrary length, and an int64_t holds eight characters of one. Keeping the
-  // expression rather than a second folded form lets RecordStringParamValue
-  // recover the characters with the ConstEvalString it already calls for a
-  // declaration's own initializer, so both ends of the override path spell a
-  // string value the same way.
   struct ParamOverride {
     std::string_view name;
     int64_t value = 0;
     const Expr* value_expr = nullptr;
-    std::optional<double> real{};  // §23.10: a real override, value rounded
+    std::optional<double> real{};
   };
 
   using ParamList = std::vector<ParamOverride>;
 
   Elaborator(Arena& arena, DiagEngine& diag, CompilationUnit* unit);
-  // §3.12.1: `units`, at least one, each file a unit of its own, together.
   Elaborator(Arena& arena, DiagEngine& diag,
              const std::vector<CompilationUnit*>& units);
 
   RtlirDesign* Elaborate(std::string_view top_module_name);
 
-  // Elaborates the design rooted at each of the named modules, in the order
-  // named. A caller that already knows which modules are the design's tops
-  // says so with this form: the hierarchy is rooted at those modules and at no
-  // others, where the empty-name form above instead takes every module no
-  // instance names for a top (§23.3.1). A name repeated in the list roots one
-  // hierarchy rather than two. Naming no module at all elaborates nothing and
-  // is reported, since the caller meant to name some.
   RtlirDesign* Elaborate(const std::vector<std::string_view>& top_names);
 
   RtlirDesign* Elaborate(const ConfigDecl* cfg);
 
   void SetLibraryDeclarationOrder(std::vector<std::string> order);
 
-  // Sets how many times a loop generate scheme may iterate before elaboration
-  // stops and reports. §27.4 states no such bound, so this is a budget: raise
-  // it for a design that legitimately generates more instances than
-  // kDefaultMaxGenerateIterations admits, and lower it to cap what elaborating
-  // a suspect source costs. A value of zero or less reports on the first
-  // iteration, which is not a use this has.
   void SetMaxGenerateIterations(int64_t max_iterations);
 
  private:
-  friend struct ItemElaborationStateSaver;  // per-module state save/restore
-  friend struct UnitScopeTables;            // unit_scope_switch.h
+  friend struct ItemElaborationStateSaver;
+  friend struct UnitScopeTables;
 
   void RunPreElaborationValidations();
 
   RtlirDesign* ElaborateTops(const std::vector<ModuleDecl*>& top_decls);
-  // Elaborates each top-level module declaration into `design`; returns false
-  // (after reporting) if any top fails to elaborate.
   bool ElaborateTopModules(const std::vector<ModuleDecl*>& top_decls,
                            RtlirDesign* design);
-  // §23.10.4 / §27: runs the defparam-application and pending-generate
-  // expansion fixpoint over every top in `design` until no generates remain.
   void ResolveDefparamsAndGenerates(RtlirDesign* design);
 
   void ValidateNameSpaces();
@@ -131,15 +91,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateConfigParamOverrides();
 
-  // §33.4: the three kinds of binding a config's rules record before its tops
-  // are elaborated -- per-instance parameter overrides, cell-clause use and
-  // liblist selections, and per-instance plain use bindings.
   void CollectConfigInstanceParamOverrides(const ConfigDecl* cfg);
   void CollectConfigCellClauseOverrides(const ConfigDecl* cfg);
   void CollectConfigInstanceBindOverrides(const ConfigDecl* cfg);
   void CollectConfigRuleTables(const ConfigDecl* cfg);
   void CollectCellUseOverride(const ConfigDecl* cfg, const ConfigRule* rule);
-  const ConfigDecl* DelegatedConfigFor(std::string_view cell) const;  // §33.4.2
+  const ConfigDecl* DelegatedConfigFor(std::string_view cell) const;
   void EnterDelegatedConfig(const ConfigDecl* inner);
   void LeaveDelegatedConfig();
 
@@ -158,7 +115,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateHierRefToImportedName(const ModuleDecl* decl,
                                      const RtlirModule* mod);
 
-  // §26.3: the three places an import is applied from, in reaching order.
   void ApplyCompilationUnitImports(const ModuleDecl* decl, RtlirModule* mod);
   void ApplyHeaderImports(const ModuleDecl* decl);
   void ApplyBodyImport(const ImportItem& import_item);
@@ -172,64 +128,33 @@ class Elaborator : public ElaboratorClassRules {
   void ResolveExternModules();
 
   ModuleDecl* FindModule(std::string_view name) const;
-  // FindModule's library-list search, before any cell clause's use expansion.
   ModuleDecl* SearchModule(std::string_view name) const;
-  // §33.2.2, §33.4.1.1: `cell` from `library` alone (the configuration's where
-  // the design statement wrote none), or any where empty; else null.
   ModuleDecl* FindDesignCell(std::string_view library,
                              std::string_view cell) const;
 
-  // Applies a cell selection clause's use expansion to a cell being resolved
-  // (§33.4.1.4, §33.4.1.6). Returns nullopt when no clause applies (resolution
-  // should continue normally); a present value (possibly nullptr) is the bound
-  // cell, where nullptr means the named target does not exist.
   std::optional<ModuleDecl*> ResolveCellUseOverride(
       std::string_view name, const ModuleDecl* found) const;
 
-  // Applies an instance selection clause's plain use expansion to the instance
-  // currently being resolved (§33.4.1.6). The exact instance at the named path
-  // is bound to the specified library.cell, independent of the instance's
-  // declared cell name; an omitted library is inherited from the parent cell.
-  // Returns nullopt when no clause applies; a present value (possibly nullptr)
-  // is the bound cell, where nullptr means the named target does not exist.
   std::optional<ModuleDecl*> ResolveInstanceBindOverride() const;
 
   ModuleDecl* FindModuleInScope(std::string_view name) const;
 
-  // §6.18: reports a declaration the parser recorded as two bare identifiers
-  // and a semicolon whose first name it had not yet seen declared as a type.
-  // The shape is a data declaration whose type_identifier breaches the rule
-  // that a user-defined data type be declared before any reference to it, and a
-  // module instantiation missing its port connection list both, and which of
-  // the two it is turns on whether the name is a module, which the parser does
-  // not know and this does.
   void ReportUndeclaredTypeName(const ModuleItem* item);
   RtlirModule* ElaborateModule(const ModuleDecl* decl, const ParamList& params);
 
-  // §6.20.2: resolves each parameter of `decl`'s parameter port list against
-  // `params`, the overrides the instantiation supplied, and appends the result
-  // to mod->params, each against a scope rebuilt from the parameters already
-  // appended, so one parameter port may be written in terms of an earlier one.
   void ElaborateParamPortList(const ModuleDecl* decl, const ParamList& params,
                               RtlirModule* mod);
 
   void ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateItem(ModuleItem* item, RtlirModule* mod);
-  // Two-level dispatch for ElaborateItem: each handles a cohesive subset of
-  // module-item kinds and returns true when it consumed `item->kind`.
   bool ElaborateDeclItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod);
   bool ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod);
-  // §16.14.6, §17.3: a procedure's process, its assertions and checkers first.
   void AddProcedure(ModuleItem* item, RtlirModule* mod, RtlirProcessKind kind);
-  // §9.2.2.2.1: enters in inference_funcs_ the functions `body` calls by a
-  // scoped name.
   void AddInferenceCallees(const Stmt* body);
   void ResolveStaticAssertionClock(ModuleItem* item,
                                    const std::vector<EventExpr>& default_clock);
-  // Third-level dispatch for the §16 assertion/sequence/property/clocking
-  // module items; returns true for those kinds and is a no-op (true) otherwise.
   bool ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod);
@@ -238,19 +163,10 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateAssertPropertyItem(ModuleItem* item, RtlirModule* mod);
   void ElaborateParamDecl(ModuleItem* item, RtlirModule* mod);
   void ElaborateNetDecl(ModuleItem* item, RtlirModule* mod);
-  // §6.6.7: elaborates a declaration whose named data type is a user-defined
-  // nettype as the net it declares, answering true when it was one. A nettype
-  // name reaches ElaborateVarDecl because the parser reads `mynet w;` as a
-  // variable declaration of a named type, and it is here rather than there to
-  // keep that function inside the statement count clang-tidy holds it to.
   bool ElaborateUserNettypeNet(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateVarDecl(ModuleItem* item, RtlirModule* mod);
   std::string_view ResolveVarDeclTypeRefs(ModuleItem* item, RtlirModule* mod);
-  // §23.2.2.1: a non-ANSI port declared with no net or variable type takes the
-  // kind of its body declaration (a variable where `net_type` is kNone), and
-  // `signed` on either makes both signed. Returns the declaration's
-  // signedness, `decl_signed` where `name` is no such port.
   bool ReconcilePartialPort(std::string_view name, bool decl_signed,
                             NetType net_type, RtlirModule* mod);
   void SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,
@@ -290,56 +206,34 @@ class Elaborator : public ElaboratorClassRules {
 
   void ElaborateNettypeDecl(ModuleItem* item, RtlirModule* mod);
   void RegisterNettypeResolutionAndCanonical(const ModuleItem* item);
-  // §6.6.7: a named resolution function shall return the nettype's data type
-  // and take a single input argument that is a dynamic array of that type.
   void CheckNettypeResolutionFunction(const ModuleItem* item);
 
   void ElaborateItems(const ModuleDecl* decl, RtlirModule* mod);
   void ElaborateItemsInOrder(const ModuleDecl* decl, RtlirModule* mod);
 
-  // §23.4: a nested design element with no ports and no un-defaulted parameter
-  // port is implicitly instantiated once inside its enclosing element, unless
-  // the source instantiated it explicitly.
   void InstantiateImplicitNestedModules(
       const std::vector<std::pair<std::string_view, ModuleDecl*>>& nested,
       RtlirModule* mod);
-  // Clears every per-module bookkeeping table before a module's items are
-  // elaborated, and runs the post-item legality validations for `decl`/`mod`.
   void ResetItemElaborationState();
   void RunPostItemValidations(const ModuleDecl* decl, RtlirModule* mod);
 
   void ElaborateModuleInst(ModuleItem* item, RtlirModule* mod);
-  // The child of an instance, under its parameter and type overrides.
   void ElaborateChildInstance(RtlirModuleInst& inst, const ModuleItem* item,
                               ModuleDecl* child_decl, RtlirModule* mod,
                               const ScopeMap& parent_scope);
-  // The three checks on an instance's port connections once they are bound.
   void CheckInstancePorts(RtlirModuleInst& inst, const ModuleItem* item,
                           RtlirModule* mod);
 
-  // Reports a gate or user-defined primitive instance whose terminals are the
-  // wrong width, or whose driven terminals A.8.5's net_lvalue does not admit.
   void CheckPrimitiveTerminals(const ModuleItem* item, const RtlirModule* mod);
 
-  // §29.8: records on `mod` every instance of a user-defined primitive that one
-  // instantiation writes, so that the primitive drives the nets its output
-  // terminals name. An instantiation written with the optional range §29.8
-  // admits is one instance per array element.
   void ElaborateUdpInst(ModuleItem* item, RtlirModule* mod);
 
-  // §29.8: appends the one instance of a user-defined primitive that the
-  // terminal list currently held on `item` describes, the element `index` of
-  // the instance array `item` declares where it writes a range (§28.3.6).
   void ElaborateOneUdpInst(const ModuleItem* item, RtlirModule* mod,
                            std::optional<int64_t> index);
 
   UdpDecl* FindUdpByName(std::string_view name) const;
   UdpDecl* FindUdpForInstance(const ModuleItem* item);
 
-  // §33.4.1.4/§33.4.1.6: applies a cell selection clause's use expansion to a
-  // primitive being resolved. Returns nullopt when no clause applies (the
-  // library search should run); a present value (possibly nullptr) is the bound
-  // primitive, where nullptr means the named target does not exist.
   std::optional<UdpDecl*> ResolveUdpUseOverride(std::string_view name) const;
 
   void ReclassifyForwardUdpInstances(const ModuleDecl* decl);
@@ -350,39 +244,25 @@ class Elaborator : public ElaboratorClassRules {
   void BindPorts(RtlirModuleInst& inst, const ModuleItem* item,
                  RtlirModule* parent_mod, const ModuleDecl* child_decl);
 
-  // Binds the explicit port connection at `index`; returns false to stop the
-  // loop (too many ordered connections for the instantiated module).
   bool BindExplicitPort(const PortBindScope& scope, size_t index);
-  // Declares an implicit net (named form) or diagnoses an undeclared signal.
   void PrepareExplicitConnNet(const PortBindScope& scope,
                               const ExplicitPortBind& bind);
-  // Resolves the targeted child port, fills the binding direction/width, and
-  // runs named-connection net-type checks. Returns false to stop the loop.
   bool ResolveExplicitTarget(const PortBindScope& scope, size_t index,
                              ExplicitPortBind& bind);
-  // Connection-legality checks: assignment compatibility, replication,
-  // assignment-pattern, and multiple-driver rules.
   void CheckExplicitConnLegality(const PortBindScope& scope,
                                  const ExplicitPortBind& bind);
-  // §23.3.3.2: records every variable an output or inout port connection
-  // drives, so a second output driving the same variable is rejected.
   void RecordOutputPortDrivenVariables(const Expr* conn_expr, SourceLoc loc);
-  // Synthesizes the default, pull or highZ connection of an unconnected input.
   void SynthesizeExplicitDefault(const PortBindScope& scope,
                                  ExplicitPortBind& bind);
-  // §25.5 header-vs-connection modport consistency for an interface port.
   void CheckPortModportConsistency(const PortBindScope& scope,
                                    const RtlirPortBinding& binding,
                                    const Expr* conn_expr,
                                    const RtlirPort* child_port);
-  // §23.3.2.2 wildcard `.*` completion: binds each not-yet-connected port.
   void BindWildcardPorts(const PortBindScope& scope);
   void BindOneWildcardPort(const PortBindScope& scope, const RtlirPort& port);
-  // Wildcard completion when a same-named signal is declared in the scope.
   void BindWildcardDeclaredPort(const PortBindScope& scope,
                                 const RtlirPort& port,
                                 RtlirPortBinding& binding);
-  // Trailing unconnected-input completion when no wildcard appears.
   void BindTrailingInputPorts(const PortBindScope& scope);
 
   void CheckPortCoercion(const RtlirModuleInst& inst, SourceLoc loc);
@@ -406,27 +286,14 @@ class Elaborator : public ElaboratorClassRules {
                                   const std::vector<uint32_t>& inst_dim_sizes,
                                   uint32_t total_instances);
 
-  // §23.9: the resolved parameters of `mod` as a scope, holding those a
-  // reference standing in the generate blocks `scopes` can see -- the prefixes
-  // in force at that reference, outermost first, empty for a reference among
-  // the module's own items. A parameter one generate block declares is not
-  // visible at module level or in a sibling block, so passing the wrong list
-  // folds a constant expression against a declaration it cannot name.
   ScopeMap BuildParamScope(const RtlirModule* mod,
                            const std::vector<std::string_view>& scopes) const;
 
-  // The same for a reference standing where this elaboration is, which is what
-  // every site inside the module being elaborated wants.
   ScopeMap BuildParamScope(const RtlirModule* mod) const;
 
-  // §6.20.7: returns true if `name` matches an already-elaborated parameter of
-  // `mod` that was assigned $ (an unbounded parameter).
   bool RefersToUnboundedParam(const RtlirModule* mod,
                               std::string_view name) const;
 
-  // §6.20.7: returns true if a literal $ appears anywhere inside `e`. Used to
-  // reject parameter values where $ is combined with operators or selects
-  // instead of standing alone as the entire (self-contained) expression.
   bool ContainsDollarSubexpr(const Expr* e) const;
 
   void ElaborateGenerateIf(ModuleItem* item, RtlirModule* mod,
@@ -435,15 +302,6 @@ class Elaborator : public ElaboratorClassRules {
   void ElaborateGenerateCase(ModuleItem* item, RtlirModule* mod,
                              const ScopeMap& scope);
 
-  // §27.5: one generate block of a conditional generate construct, of which the
-  // construct selects at most one and this elaborates. The then-branch, each
-  // case item and the final else are the same entity written three ways, and
-  // ModuleItem and GenerateCaseItem spell its name under different member
-  // names, so the four call sites assemble one of these rather than the node.
-  //
-  // `name_is_generated` says §27.6 assigned `name` rather than the source
-  // writing it, which §23.6 makes the difference between a block a
-  // hierarchical name can reach into and one it cannot.
   struct ConditionalGenerateBlock {
     std::string_view name;
     bool name_is_generated = false;
@@ -455,8 +313,6 @@ class Elaborator : public ElaboratorClassRules {
                                          RtlirModule* mod,
                                          const ScopeMap& scope);
 
-  // §27.4: a loop generate construct's genvar once its header has been checked
-  // -- the genvar name and the constant value its control variable starts at.
   struct GenerateForOpening {
     std::string_view genvar_name;
     int64_t init_value;
@@ -471,8 +327,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void ElaborateGenerateBlockItem(ModuleItem* item, RtlirModule* mod);
 
-  // §26.3: records an import written among a generate block's items as the
-  // block's own, a candidate for the items after it alone.
   void ElaborateGenerateBlockImport(ModuleItem* item, RtlirModule* mod);
 
   void ElaborateGenerateItems(const std::vector<ModuleItem*>& items,
@@ -482,11 +336,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void CheckGenerateConstructs(const ModuleDecl* decl);
 
-  // Every defparam statement belonging to `mod`: the ones ModuleDecl::items
-  // holds directly, then the ones each generate block instance elaborated into
-  // `mod` contributed. ApplyDefparams and ReportUnresolvedDefparams both read
-  // this one list, so the keys they build out of it agree and a statement one
-  // applied is not one the other reports as having reached nothing.
   std::vector<DefparamSite> CollectDefparamSites(RtlirModule* mod,
                                                  const ModuleDecl* decl) const;
 
@@ -497,10 +346,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void ApplyDefparamsRecursively(RtlirModule* mod);
 
-  // §23.8: the root and remaining steps of a defparam's name read upward from
-  // a top-level module, and the module the parameter it reaches is declared
-  // in. Starts as the writer's own module and the whole path, which is what a
-  // name resolved within the writer's hierarchy keeps.
   struct DefparamTopRooted {
     RtlirModule* root;
     HierPath steps;
@@ -520,13 +365,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void ProcessPendingGenerate(const PendingGenerate& pg);
 
-  // Resolves a §23.6 hierarchical path, already read into steps, against the
-  // instances elaborated under `root`. `writer` is the generate block instance
-  // the defparam statement stands in, and the path starts there: §23.10.1
-  // rules that a defparam in or under a generate block instance may not change
-  // a parameter outside that hierarchy, and a path that reaches outside is one
-  // no sequence of steps from `writer` arrives at, so the rule holds by
-  // construction rather than by a check that could be skipped.
   RtlirParamDecl* ResolveDefparamSteps(RtlirModule* root, const HierPath& path,
                                        const HierPath& writer,
                                        RtlirModule** out_mod = nullptr);
@@ -535,17 +373,12 @@ class Elaborator : public ElaboratorClassRules {
   void RefoldChildOverrides(RtlirModule* mod, const ScopeMap& mod_scope);
   bool MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                               RtlirModule* mod);
-  // Whether an explicit or implicit net or variable of the module declares it.
   bool DeclaresNetOrVariable(std::string_view name) const;
   bool NamesNet(std::string_view name, SourceLoc loc) const;
   std::unordered_set<std::string_view> NetNamesAt(SourceLoc loc) const;
-  // §3.13 (e) and (g): enters `name`, which a declaration other than a net or
-  // a variable declares at `loc`, in the module name space.
   void DeclareInModuleNameSpace(std::string_view name, SourceLoc loc);
 
   std::string_view ScopedName(std::string_view base);
-  // The generate prefix currently in force, arena-persisted so it outlives the
-  // mutable member it is copied from. Empty outside any generate construct.
   std::string_view InternedGenPrefix();
   std::string_view ResolveTypeRef(DataType& dt, SourceLoc loc,
                                   const RtlirModule* mod);
@@ -571,12 +404,8 @@ class Elaborator : public ElaboratorClassRules {
 
   void WalkStmtsForVirtualInterfaceOps(const Stmt* s);
 
-  // §15.5: the operators an event takes, and the operands that are events.
   void ValidateEventOps(const ModuleDecl* decl);
 
-  // Annex D.3: $getpattern stands as the whole right-hand side of a
-  // continuous assignment to a concatenation of scalar nets, with a memory
-  // element as its argument, and nowhere else.
   void ValidateGetpatternUses(const ModuleDecl* decl);
   void ValidateGetpatternContAssign(const ModuleItem* item,
                                     const RtlirModule* mod);
@@ -588,8 +417,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void WalkStmtsForVirtualInterfaceClocking(const Stmt* s);
 
-  // Public so the free recursive walker in elaborator_validate_interface.cpp
-  // can drive it over a statement tree.
  public:
   void ValidateArrayOfVifInitStmt(const Stmt* s);
 
@@ -654,19 +481,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateMixedAssignments();
 
-  // §23.3.3.2: a variable declared as an input port is already driven by the
-  // implied continuous assignment from its port connection, so an additional
-  // continuous or procedural assignment to it inside the module is illegal.
   void ValidateInputPortAssignments(const ModuleDecl* decl);
 
-  // §12.6 to §12.6.3: the static rules of every pattern a module's bodies
-  // write, read against the declarations in scope where it stands.
   void ValidatePatterns(const ModuleDecl* decl);
 
   void ValidateProceduralNetAssign();
   void ValidateDynamicArrayNba(const ModuleDecl* decl);
-  // §6.18/§7.4.4: gives a declaration written inside a procedure the unpacked
-  // dimensions its typedef carries, which the module-scope path already adopts.
   void AdoptProceduralTypedefDims(const ModuleDecl* decl);
   void AdoptTypedefDimsInStmt(Stmt* s);
   void ValidateArrayQueryOnDynamicType(const ModuleDecl* decl);
@@ -682,26 +502,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateElabSystemTask(const ModuleItem* item, const RtlirModule* mod);
 
-  // §11.12: resolves each let formal's type reference (§6.23) in `mod`, null
-  // at unit scope, and requires each type be `event` or one §16.6 allows.
   void ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod);
 
-  // §35.5.2: pure-only restrictions on imported subroutines.
   void ValidateDpiImport(const ModuleItem* item);
 
-  // §35.5.4: duplicate import-name detection per declaration scope and
-  // type-signature consistency across all declarations that share a single
-  // linkage name (c_identifier, defaulting to the SystemVerilog name).
   void ValidateDpiDeclarations();
 
-  // §35.4: per-scope uniqueness for export declarations and global agreement
-  // on the DPI version string across every declaration that shares a single
-  // linkage identifier.
-  //
-  // Both walk each module declaration, each package body and the
-  // compilation-unit items, because A.1.11 makes a DPI import or export a
-  // package_item and each of the three is one scope for the rules stated over
-  // declarations in one scope.
   void ValidateDpiGlobalNameSpace();
 
   void ValidateTypenameAsElabConstant(const Expr* init);
@@ -724,8 +530,6 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateFinalTaskEnables(const ModuleDecl* decl);
 
-  // §13's and §10.4.2's rules over one task or function body; a class's
-  // method, `is_class_method`, is automatic whatever it declares (§8.6).
   void ValidateFunctionBody(const ModuleItem* item,
                             bool is_class_method = false);
 
@@ -733,25 +537,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateAutomaticVarProcWrites(const ModuleDecl* decl);
 
-  // §12.8 — break/continue must be inside a loop and may not target a loop
-  // outside their enclosing fork-join; return must be inside a subroutine and
-  // a value-returning function shall return an expression.
   void ValidateJumpStatements(const ModuleDecl* decl);
 
-  // §12.7.3 — foreach loop variables may not outnumber the array's
-  // dimensions, are read-only, and may not reuse the array's identifier.
   void ValidateForeachLoops(const ModuleDecl* decl);
 
-  // §18.17 — a production identifier is local to the scope its randsequence
-  // statement creates, so every one the statement writes shall name one of
-  // that statement's own productions.
   void ValidateRandsequenceProductionNames(const ModuleDecl* decl);
 
-  // §12.8, §12.7.3 and §18.17 are stated of a statement and name no enclosing
-  // declaration they are suspended in, so each of the three checks above is
-  // written over an item list rather than over a module. The entry points above
-  // pass a module's items; ValidatePerDeclarationRulesInUnitScopes below passes
-  // the item lists a module does not hold.
   void CheckJumpStatementsIn(const std::vector<ModuleItem*>& items);
   void CheckForeachLoopsIn(const std::vector<ModuleItem*>& items);
   void CheckForeachLoopsInClass(const ClassDecl* cls);
@@ -759,56 +550,31 @@ class Elaborator : public ElaboratorClassRules {
   void CheckPatternsInClass(const ClassDecl* cls);
   void CheckRandsequenceNamesIn(const std::vector<ModuleItem*>& items);
 
-  // §3.12.1 puts a declaration outside every design element in the
-  // compilation-unit scope and Clause 26 puts one in a package, and neither is
-  // elaborated through ElaborateItems -- so RunPostItemValidations, where the
-  // three checks above run, never sees either. This runs them over the item
-  // lists that are nobody's module: the compilation unit's, each package's, and
-  // the methods of each class declared outside every design element.
   void ValidatePerDeclarationRulesInUnitScopes();
 
   void ValidateConstantFunctionCalls(const ModuleDecl* decl);
   void ValidateTaskCallsInExpressions(const ModuleDecl* decl);
-  // §13.3: the names a call written in the module names a task by -- the
-  // module's own tasks and DPI task imports (task_names_), the compilation
-  // unit's tasks no function of the module hides (§23.9), and each package's
-  // tasks under the "pk::t" a call through the package scope resolution
-  // operator names (§26.3) -- as EnabledSubroutineName spells them.
   std::unordered_set<std::string> ReachableTaskNames() const;
-  // §7.7: a dynamic array or queue may not be passed to a DPI import formal
-  // that is an open array (unsized) with an output direction.
   void ValidateDpiOpenArrayArgs(const ModuleDecl* decl);
   void WalkStmtsForDpiArgs(const Stmt* s);
   void WalkExprForDpiCalls(const Expr* e);
   void CheckDpiOpenArrayCall(const Expr* call);
 
-  // §13.4.4
   void ValidateBackgroundFuncCallContext(const ModuleDecl* decl);
 
   void ValidateSubroutineCallArgs(const ModuleDecl* decl);
   void ValidateRefArgActuals(const ModuleDecl* decl);
   void ResetPendingElaboration();
 
-  // §A.8.2 footnote 43 and §G.5: the forms a scope randomize_call may not
-  // take -- a null argument, a parenthesized identifier list after with, and
-  // an argument that is no variable identifier.
   void ValidateScopeRandomizeCalls(const ModuleDecl* decl);
 
-  // §15.4.9: the compile-time type check a parameterized mailbox applies to the
-  // arguments of its put/get/peek (and try_ variants) methods.
   void ValidateParameterizedMailboxCalls(const ModuleDecl* decl);
 
-  // §G.3: a call on a handle of a std class whose prototype
-  // src/elaborator/std_package.h writes down names a method the prototype
-  // declares and passes at least its formals without a default, at most all.
   void ValidateStdClassMethodCalls(const ModuleDecl* decl);
 
   void ValidateArrayArgTypes(const ModuleDecl* decl);
 
   void TrackEnumVariable(const ModuleItem* item);
-  // Declares the named constants of an enumeration written directly in a data
-  // declaration rather than in a typedef (§6.19, Syntax 6-5), giving each the
-  // value it takes so a read of the name finds it.
   void EmitBareEnumMembers(const ModuleItem* item, RtlirModule* mod);
 
   void ValidateEnumAssignments(const ModuleDecl* decl);
@@ -819,21 +585,12 @@ class Elaborator : public ElaboratorClassRules {
 
   void WalkStmtsForConstAssign(const Stmt* s);
 
-  // §6.20: reports a procedural write whose left-hand side reaches a constant,
-  // naming the constant it reaches. `loc` is where the assignment stands, since
-  // that is what somebody whose source was rejected has to find.
   void ReportConstAssignTarget(const Expr* lhs, SourceLoc loc);
 
-  // §6.20: the same report for a call statement that writes its object, which
-  // §6.16 gives six of the string methods. A call is not an assignment and no
-  // lvalue walk reaches it, so it is asked about separately and answered the
-  // same way, the object being what ReportConstAssignTarget is handed.
   void ReportConstMutatingMethodCall(const Expr* call, SourceLoc loc);
 
   void CheckEnumAssignStmt(const Stmt* s);
 
-  // §6.19.3: strong typing also applies when an actual argument is bound to an
-  // enum-typed formal of a called subroutine.
   void WalkExprForEnumCalls(const Expr* e);
   void CheckEnumCallArguments(const Expr* call);
 
@@ -846,16 +603,9 @@ class Elaborator : public ElaboratorClassRules {
 
   void ValidateClockingBlock(ModuleItem* item, const RtlirModule* mod);
 
-  // §16.10: a formal-argument name of a sequence/property declaration cannot
-  // also be declared as a body-scope local variable in an
-  // assertion_variable_declaration. Diagnoses the redeclaration on `item`.
   void ValidateNoFormalShadowedByBodyLocal(ModuleItem* item);
 
-  // §16.12.17 / §F.7: enforce the four restrictions on recursive property
-  // declarations against `item` (a property declaration).
   void ValidateRecursiveProperty(const ModuleItem* item);
-  // §16.12.17 Restriction 4 / §F.7 RESTRICTION 4: the actual-argument rule on
-  // recursive instances appearing in the body of `item`.
   void ValidateRecursivePropertyArguments(const ModuleItem* item);
 
   void ValidateClockvarAccess(const ModuleDecl* decl);
@@ -864,15 +614,9 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateDuplicateDefaultClocking(const ModuleDecl* decl);
   void ValidateDefaultClockingReference(const ModuleDecl* decl);
   void ValidateDuplicateGlobalClocking(const ModuleDecl* decl);
-  // §16.15: more than one default disable iff declaration within the same
-  // module, interface, or program declaration shall be an error.
   void ValidateDuplicateDefaultDisableIff(const ModuleDecl* decl);
   void ValidateGlobalClockReference(const ModuleDecl* decl);
-  // §16.9.4: the global clocking sampled value functions ($past_gclk, …,
-  // $changing_gclk) require a global clocking to be defined in scope.
   void ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl);
-  // §16.9.4: the global clocking future sampled value functions may appear only
-  // in a property or sequence expression, not in procedural code.
   void ValidateFutureGclkPlacement(const ModuleDecl* decl);
   void ValidateContAssignToClockvar(const ModuleDecl* decl);
   void WalkStmtsForClockvarAccess(const Stmt* s);
@@ -881,27 +625,17 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateClockingSignalTargets(const ModuleDecl* decl);
   bool ExprTargetsWritableClockvar(const Expr* e) const;
 
-  // §14.16.2: true when `name` is a plain variable associated with an output
-  // (or inout) clockvar -- the underlying signal driven by a clocking-block
-  // output -- which no external driver may write.
   bool IsOutputClockvarSignal(std::string_view name) const;
-  // §14.16.2: it is illegal to drive a variable associated with an output
-  // clockvar from a primitive (gate) output terminal.
   void ValidatePrimitiveDriveToClockvar(const ModuleDecl* decl);
 
   void ValidateScopeRules(const ModuleDecl* decl);
 
-  // §5.6/§6.5: flags an unresolved bare identifier read on a cont-assign RHS.
   void ValidateUnresolvedReferences(const ModuleDecl* decl,
                                     const RtlirModule* mod);
   bool IsDeclaredNameForRhs(std::string_view name) const;
-  // Whether `name` is in a module-level name set, or in an enclosing scope's.
   bool IsNameInModuleScope(std::string_view name) const;
   bool IsNameInEnclosingScope(std::string_view name) const;
 
-  // §23.9/§24.3: snapshot of the names declared in the scope currently being
-  // elaborated, captured when descending into a lexically-nested declaration so
-  // the nested scope can resolve enclosing-scope identifiers.
   std::unordered_set<std::string_view> CaptureCurrentScopeNames() const;
 
   void ValidateHierRefIntoChecker(const ModuleDecl* decl);
@@ -922,8 +656,6 @@ class Elaborator : public ElaboratorClassRules {
   void ValidateProgramWideSpaceAccessInPackageAndCuScopes();
 
   void ApplyBindDirectives(const std::vector<RtlirModule*>& tops);
-  // §23.11: what the walk over the elaborated hierarchy carries; defined in
-  // elaborator_bind.cpp.
   struct BindWalkCtx;
   void WalkForBind(RtlirModule* mod, const std::string& hier_path,
                    bool under_bind, BindWalkCtx& ctx);
@@ -933,10 +665,6 @@ class Elaborator : public ElaboratorClassRules {
   void WalkForExportConflicts(RtlirModule* mod,
                               std::unordered_set<RtlirModule*>& visited);
 
-  // Applies the configuration's parameter overrides for `item`'s cell and then
-  // for the instance being elaborated on top of the instantiation's, recording
-  // which parameters the configuration fixed. Config overrides win over the
-  // instantiation's values; an empty one restores the default (§33.4.3).
   void ApplyConfigParamOverrides(const ModuleItem* item,
                                  const ModuleDecl* child_decl,
                                  ParamList& child_params,

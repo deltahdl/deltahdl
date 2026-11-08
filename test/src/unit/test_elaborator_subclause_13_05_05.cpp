@@ -204,15 +204,9 @@ TEST(SubroutineCallElaborationSyntax,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The message a call of a nonvoid function leaving its parentheses off is
-// reported with, up to the function's name.
 constexpr std::string_view kNonvoidOmitted =
     "cannot omit parentheses in call to nonvoid function '";
 
-// §27.1: a generate block's items are the module's like any other, so a call
-// in any block of a conditional, case or loop generate construct, of a
-// function the module declares or one the block itself does, keeps its
-// parentheses as a call at the module's top level does.
 TEST(OptionalArgumentListElaboration, ACallInAGenerateBlockIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -244,10 +238,6 @@ TEST(OptionalArgumentListElaboration, ACallInAGenerateBlockIsJudged) {
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
-// In a method a name alone calls a method of the class or of a class it
-// extends first (§8.13), which may leave its parentheses off; any other name
-// calls the module's subroutine, whose call keeps them. A class nested in
-// another sees the module's subroutines too (§8.23).
 TEST(OptionalArgumentListElaboration, ACallInAMethodOfAModulesClassIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -269,10 +259,6 @@ TEST(OptionalArgumentListElaboration, ACallInAMethodOfAModulesClassIsJudged) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A class extending its type parameter declares names no one knows before the
-// class is specialized, any of which a name alone may call, so a method's call
-// by a name alone is not judged: here the default's method `f` is what it
-// calls.
 TEST(OptionalArgumentListElaboration, ACallInAClassOfAnUnknownBaseIsLeft) {
   ElabFixture f;
   ElaborateSrc(
@@ -290,9 +276,6 @@ TEST(OptionalArgumentListElaboration, ACallInAClassOfAnUnknownBaseIsLeft) {
                              std::string(kNonvoidOmitted) + "f'", 7, "13.5.5"));
 }
 
-// A class a package or the compilation unit declares calls the package's or
-// the unit's subroutines by a name alone, and such a call keeps its
-// parentheses as one in a module does.
 TEST(OptionalArgumentListElaboration, ACallInAMethodOfAUnitOrPackageClass) {
   ElabFixture f;
   ElaborateSrc(

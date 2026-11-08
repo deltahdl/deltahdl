@@ -35,10 +35,6 @@ TEST(SvaEngine, PropertyNot) {
             PropertyResult::kFail);
 }
 
-// §16.12.8: `property_expr1 implies property_expr2` holds if, and only if, the
-// antecedent fails to hold or the consequent holds. The antecedent holding with
-// a holding consequent passes; a holding antecedent with a failing consequent
-// fails; a failing antecedent holds vacuously regardless of the consequent.
 TEST(SvaEngine, PropertyImplies) {
   EXPECT_EQ(EvalPropertyImplies(PropertyResult::kPass, PropertyResult::kPass),
             PropertyResult::kPass);
@@ -50,9 +46,6 @@ TEST(SvaEngine, PropertyImplies) {
             PropertyResult::kPass);
 }
 
-// §16.12.8: `property_expr1 iff property_expr2` holds if, and only if, the two
-// operands' verdicts agree — both hold or both fail to hold; disagreement
-// fails in either direction.
 TEST(SvaEngine, PropertyIff) {
   EXPECT_EQ(EvalPropertyIff(PropertyResult::kPass, PropertyResult::kPass),
             PropertyResult::kPass);
@@ -64,11 +57,6 @@ TEST(SvaEngine, PropertyIff) {
             PropertyResult::kFail);
 }
 
-// §16.12.8: a vacuous pass counts as the operand holding, so it behaves like an
-// ordinary pass on either side of implies and iff. The implies consequent is a
-// distinct, asymmetric operand: a consequent that holds vacuously (as an inner
-// vacuously passing property_expr does) still makes the implication hold, both
-// when the antecedent holds and when it fails to hold.
 TEST(SvaEngine, ImpliesIffTreatVacuousPassAsHolding) {
   EXPECT_EQ(
       EvalPropertyImplies(PropertyResult::kVacuousPass, PropertyResult::kFail),
@@ -93,12 +81,6 @@ TEST(SvaEngine, ImpliesIffTreatVacuousPassAsHolding) {
       PropertyResult::kFail);
 }
 
-// --- Live cases: implies and iff over real source ---
-
-// The module the cases share: clk rises at 5, 15, 25 and 35, tick n at
-// 10n - 5, the tick counter counting through; a is high at ticks 1 and 3, b
-// at 2 and 3 and c at 2 and 3. `items` declare the assertions, counting in
-// `passes` and `fails`.
 std::string ImpliesSource(const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -116,8 +98,6 @@ std::string ImpliesSource(const std::string& items) {
          "endmodule\n";
 }
 
-// §16.12.8: `a implies b` is true if and only if a is false or b true:
-// false at 1 alone.
 TEST(ImpliesIffProperty, ImpliesHoldsWhereTheFirstIsFalseOrTheSecondTrue) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -129,8 +109,6 @@ TEST(ImpliesIffProperty, ImpliesHoldsWhereTheFirstIsFalseOrTheSecondTrue) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
 }
 
-// §16.12.8: `a iff b` is true if and only if both are false or both true:
-// true at 3 and 4, false at 1 and 2.
 TEST(ImpliesIffProperty, IffHoldsWhereBothAreAlike) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -142,9 +120,6 @@ TEST(ImpliesIffProperty, IffHoldsWhereBothAreAlike) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 2u);
 }
 
-// Table 16-3: `iff` binds tighter than `implies`, so `a iff b implies c` is
-// (a iff b) implies c: false at 4 alone, where a iff b holds with c low;
-// a iff (b implies c) would be false at 2 and 4.
 TEST(ImpliesIffProperty, IffBindsTighterThanImplies) {
   SimFixture f;
   auto* passes = RunAndFindVar(
@@ -156,11 +131,6 @@ TEST(ImpliesIffProperty, IffBindsTighterThanImplies) {
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
 }
 
-// §16.12.8: an operand may be a sequence: `(a ##1 b) implies c` is false
-// at 2 for the attempt from 1, whose sequence matches there with c low at 1,
-// true at 2 for the attempt from 2, whose sequence cannot match, true at 3
-// for the attempt from 3 through c, its sequence still in flight, and true
-// at 4 for the attempt from 4.
 TEST(ImpliesIffProperty, ASequenceOperandIsDecidedWhereItMatchesOrCannot) {
   SimFixture f;
   auto* passes = RunAndFindVar(

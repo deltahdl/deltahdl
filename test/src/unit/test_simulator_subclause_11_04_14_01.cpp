@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §11.4.14.1 packs each stream_expression, left to right, onto the right end of
-// the generic stream. Every test below drives a real streaming concatenation
-// through the full pipeline (parse, elaborate, lower, run) and reads the packed
-// result from a language-level variable, so it observes the production pack
-// procedure (eval_streaming.cpp) rather than a hand-assembled intermediate.
-
 TEST(StreamExpressionConcat, StreamingMultipleElements) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -77,10 +71,6 @@ TEST(StreamExpressionConcat, PackSingleElementPreservesValue) {
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
 
-// §11.4.14.1: an operand that is itself a streaming_concatenation is cast to a
-// packed array of bit and appended to the right end of the generic stream. The
-// inner {>> {a}} contributes a's 8 bits ahead of b, so a lands at the most
-// significant end.
 TEST(StreamExpressionConcat, NestedStreamingConcatAsElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -98,10 +88,6 @@ TEST(StreamExpressionConcat, NestedStreamingConcatAsElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-// §11.4.14.1: the bit-stream produced by an inner streaming_concatenation is
-// appended as-is. The inner {<< 8 {x}} reverses x's two bytes (0xABCD ->
-// 0xCDAB), and the outer >> concatenation then packs that byte-swapped stream
-// unchanged.
 TEST(StreamExpressionConcat, NestedStreamingConcatBitStreamCast) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -117,10 +103,6 @@ TEST(StreamExpressionConcat, NestedStreamingConcatBitStreamCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
-// §11.4.14.1: an unpacked array operand is expanded by applying the procedure
-// to each element in foreach-traversal order (§12.7.3), i.e. ascending index.
-// arr[0] streams first and lands at the most significant end; any other order
-// would change the packed value.
 TEST(StreamExpressionConcat, UnpackedArrayStreamedInForeachOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -139,8 +121,6 @@ TEST(StreamExpressionConcat, UnpackedArrayStreamedInForeachOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
-// §11.4.14.1: foreach traversal starts at the array's declared low bound, not
-// at zero. For arr[3:4] the element at index 3 streams first.
 TEST(StreamExpressionConcat, UnpackedArrayNonZeroLowBound) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -158,10 +138,6 @@ TEST(StreamExpressionConcat, UnpackedArrayNonZeroLowBound) {
   EXPECT_EQ(var->value.ToUint64(), 0xAABBu);
 }
 
-// §11.4.14.1: because the procedure is applied element by element, an unwritten
-// 4-state element contributes its own x bits to the stream rather than being
-// merged away. arr[1] is never assigned, so the middle byte of the packed
-// stream is unknown while the assigned bytes survive around it.
 TEST(StreamExpressionConcat, UnpackedArrayUnwrittenElementKeepsX) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -177,16 +153,11 @@ TEST(StreamExpressionConcat, UnpackedArrayUnwrittenElementKeepsX) {
       f, "dst");
   ASSERT_NE(var, nullptr);
   EXPECT_FALSE(var->value.IsKnown());
-  // The assigned elements keep their known values on either side of the
-  // unknown middle byte, which is fully x.
   EXPECT_EQ((var->value.words[0].aval >> 16) & 0xFFu, 0x11u);
   EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0x33u);
   EXPECT_EQ((var->value.words[0].bval >> 8) & 0xFFu, 0xFFu);
 }
 
-// §11.4.14.1: an aggregate operand is expanded in place and a following scalar
-// is appended to the right of the expanded elements. arr[0], arr[1] occupy the
-// high bytes and the trailing scalar lands at the least significant end.
 TEST(StreamExpressionConcat, ArrayThenScalarAppendsToRight) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -206,11 +177,6 @@ TEST(StreamExpressionConcat, ArrayThenScalarAppendsToRight) {
   EXPECT_EQ(var->value.ToUint64(), 0xAABBCCu);
 }
 
-// §11.4.14.1: a multidimensional fixed unpacked array is still one unpacked
-// array, streamed in the order a foreach with a single index variable traverses
-// it -- row-major, outermost dimension first. Element [0][0] streams first
-// (most significant end) and [1][2] last; any other traversal would reorder the
-// bytes.
 TEST(StreamExpressionConcat, MultiDimUnpackedArrayStreamedRowMajor) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -232,9 +198,6 @@ TEST(StreamExpressionConcat, MultiDimUnpackedArrayStreamedRowMajor) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233445566ull);
 }
 
-// §11.4.14.1: a queue is an unpacked array, so the procedure is applied to each
-// element in foreach-traversal order (ascending index). The element at index 0
-// lands at the most significant end of the generic stream.
 TEST(StreamExpressionConcat, QueueStreamedInForeachOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -248,11 +211,6 @@ TEST(StreamExpressionConcat, QueueStreamedInForeachOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
-// §11.4.14.1: a dynamic array is one of the unpacked-array forms streamed
-// element by element in foreach-traversal order. Its live elements are held in
-// the backing store rather than in per-index leaf variables, so this exercises
-// the branch that packs from that store; the element at index 0 lands at the
-// most significant end.
 TEST(StreamExpressionConcat, DynamicArrayStreamedInForeachOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -266,9 +224,6 @@ TEST(StreamExpressionConcat, DynamicArrayStreamedInForeachOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
-// §11.4.14.1: an associative array is streamed in index-sorted order. Entries
-// are written out of key order to prove the stream follows ascending index, not
-// insertion order: key 0 lands at the most significant end.
 TEST(StreamExpressionConcat, AssocArrayStreamedInIndexSortedOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -287,10 +242,6 @@ TEST(StreamExpressionConcat, AssocArrayStreamedInIndexSortedOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
-// §11.4.14.1: index-sorted order applies to a string-keyed associative array
-// too, where the ordering is lexicographic over the keys. Entries are written
-// out of key order to prove the stream follows sorted key order, not insertion
-// order: key "a" streams first and lands at the most significant end.
 TEST(StreamExpressionConcat, AssocArrayStringKeyStreamedInKeySortedOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -309,9 +260,6 @@ TEST(StreamExpressionConcat, AssocArrayStringKeyStreamedInKeySortedOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
-// §11.4.14.1: a struct is streamed by applying the procedure to each member in
-// declaration order. The first-declared member 'a' streams first, ending at the
-// most significant end; were the order reversed the result would be 0xCDAB.
 TEST(StreamExpressionConcat, StructMembersStreamedInDeclarationOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -329,11 +277,6 @@ TEST(StreamExpressionConcat, StructMembersStreamedInDeclarationOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDu);
 }
 
-// §11.4.14.1: an untagged union is streamed by applying the procedure to its
-// first-declared member only. Both members are 8 bits and overlap the same
-// storage; streaming only the first yields an 8-bit stream, which lands
-// left-aligned in the 16-bit target as 0xAB00. Streaming both members would
-// instead pack 16 bits (0xABAB).
 TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -350,9 +293,6 @@ TEST(StreamExpressionConcat, UntaggedUnionStreamsFirstMemberOnly) {
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
 
-// §11.4.14.1: a null class handle is skipped (not streamed). The handle h is
-// left null and contributes nothing, so the generic stream carries only the
-// trailing scalar's 8 bits, landing left-aligned in the 16-bit target.
 TEST(StreamExpressionConcat, NullClassHandleSkipped) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -373,11 +313,6 @@ TEST(StreamExpressionConcat, NullClassHandleSkipped) {
   EXPECT_EQ(var->value.ToUint64(), 0xCD00u);
 }
 
-// §11.4.14.1: a non-null class handle is streamed by applying the procedure to
-// each data member of the referenced object in declaration order, with an
-// extended class streaming its base-class members before its own. Base members
-// b0, b1 precede derived member d, so b0 lands at the most significant end and
-// d at the least; any other ordering would change the packed value.
 TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -404,12 +339,6 @@ TEST(StreamExpressionConcat, NonNullClassHandleStreamsBaseFirstInDeclOrder) {
   EXPECT_EQ(var->value.ToUint64(), 0x112233u);
 }
 
-// §11.4.14.1: an untagged union streams its first-declared member alone, and
-// that holds for a union declared in an instantiated module, whose layout
-// stands under "m.u" (§23.9). The first member is 8 bits and the union's
-// storage 16, so the 8-bit stream lands left-aligned in the 16-bit target as
-// 0xAB00. Looked up by the bare name, no layout was found and the whole
-// storage streamed instead: 16 bits, filling the target as 0x00AB.
 TEST(StreamExpressionConcat, ChildInstanceUnionStreamsFirstMemberOnly) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -429,14 +358,6 @@ TEST(StreamExpressionConcat, ChildInstanceUnionStreamsFirstMemberOnly) {
   EXPECT_EQ(var->value.ToUint64(), 0xAB00u);
 }
 
-// §11.4.14.1: a struct streams member by member in declaration order, and
-// §11.4.14 packs 4-state data bit for bit, so a 96-bit member contributes all
-// 96 of its bits. big sits at bits [103:8] of the packed struct and low8 at
-// [7:0]; streamed big then low8, the 104-bit stream is big:low8 and fills the
-// 104-bit target exactly: word 0 holds 0xABCDEF0F1E2D3CA5 and word 1 the top
-// 40 bits, 0x0123456789. Taken through a 64-bit integer the member came from
-// the struct's first word alone, so word 1 read 0 while word 0 was unchanged;
-// it is word 1 that separates the two.
 TEST(StreamExpressionConcat, WideStructMemberStreamsEveryWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -458,11 +379,6 @@ TEST(StreamExpressionConcat, WideStructMemberStreamsEveryWord) {
   EXPECT_EQ(var->value.words[1].aval, 0x0123456789u);
 }
 
-// §11.4.14.1: an untagged union streams its first-declared member, and that
-// member is taken whole when it is wider than 64 bits. w is 96 bits at offset
-// 0 of the union's storage; the stream is w alone, filling the 96-bit target
-// with word 0 = 0x765432100F0FA5A5 and word 1 = 0xFEDCBA98. Taken through a
-// 64-bit integer, word 1 read 0.
 TEST(StreamExpressionConcat, WideUnionFirstMemberStreamsEveryWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -483,11 +399,6 @@ TEST(StreamExpressionConcat, WideUnionFirstMemberStreamsEveryWord) {
   EXPECT_EQ(var->value.words[1].aval, 0xFEDCBA98u);
 }
 
-// §11.4.14: packing 4-state data yields a 4-state stream, so a struct member's
-// x bits stream as x. hi is 1010_xxxx and lo 0x5A; streamed hi then lo, the
-// 16-bit target carries x in bits [11:8] (bval 0x0F00) with the known nibble
-// 0xA above them and 0x5A below. Taken through a 64-bit integer the member's
-// x bits were flattened to a known 0, the target reading a fully known 0xA05A.
 TEST(StreamExpressionConcat, StructMemberXBitsStreamAsX) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -508,10 +419,6 @@ TEST(StreamExpressionConcat, StructMemberXBitsStreamAsX) {
   EXPECT_EQ(var->value.words[0].aval & 0xFFu, 0x5Au);
 }
 
-// §11.4.14.1 streams an unpacked array's elements in the left-to-right order
-// its declaration writes, so `logic [10:0] up [3:0]` streams up[3] first:
-// `{>>{up}}` is 44'h24715bc48ab and unpacking `up` into four vectors gives them
-// 123 456 789 0ab. Streamed from the low index up, both came out reversed.
 TEST(StreamingConcatSim, AnUnpackedArrayStreamsLeftToRight) {
   SimFixture f;
   std::string out = RunCapture(
@@ -529,12 +436,6 @@ TEST(StreamingConcatSim, AnUnpackedArrayStreamsLeftToRight) {
   EXPECT_EQ(out, "24715bc48ab 123 456 789 0ab\n");
 }
 
-// §7.10 gives each element of a queue the queue's element type and §10.10
-// assigns each item of an unpacked array concatenation to one element, so a
-// byte queue set from `{1, 2, 3}`, by its initializer or in a procedure, is a
-// 24-bit stream, and a twelve-element one unpacks into three ints. Kept at the
-// items' own 32 bits, the pack was refused as wider than its target and the
-// unpack read the first three items as whole ints.
 TEST(StreamingConcatSim, AByteQueueFromAConcatenationStreamsItsBytes) {
   SimFixture f;
   std::string out = RunCapture(
@@ -553,10 +454,6 @@ TEST(StreamingConcatSim, AByteQueueFromAConcatenationStreamsItsBytes) {
   EXPECT_EQ(out, "010203 010203 0c0b0a09 08070605 04030201\n");
 }
 
-// §11.4.14.1 streams a non-null handle as its object's data members in
-// declaration order, base members first: a queue, a dynamic or fixed array
-// member its elements, a handle member its object's members and nothing when
-// null. A packed union, soft or not, is streamed whole.
 TEST(StreamingConcatSim, ClassMembersAndPackedUnionsStreamAsTheClauseSays) {
   SimFixture f;
   EXPECT_EQ(

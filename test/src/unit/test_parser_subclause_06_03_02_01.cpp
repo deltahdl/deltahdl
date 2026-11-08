@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -75,17 +73,11 @@ TEST(DataTypeParsing, TriregChargeStrengthMedium) {
   EXPECT_EQ(item->name, "m");
 }
 
-// Only small/medium/large name a charge strength. A drive-strength keyword
-// such as weak is not in the charge-strength set, so the parser declines to
-// consume the parenthesized group and the declaration fails.
 TEST(DataTypeParsing, DriveStrengthKeywordIsNotChargeStrength) {
   auto r = Parse(
       "module t;\n"
       "  trireg (weak) c;\n"
       "endmodule\n");
-  // §6.7 owns the net declaration list, and that is where the declaration
-  // fails: ParseChargeStrength puts the position back on the '(' it could not
-  // read as small, medium or large, so no §6.3.2.1 report is written here.
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got '('", 2, "6.7"));
 }
 
@@ -102,9 +94,6 @@ TEST(DataTypeParsing, ChargeStrengthKeywordOnWireFails) {
 constexpr const char* kChargeStrengthRule =
     "charge strength can only be used with trireg nets";
 
-// §6.3.2.1 keeps a charge strength to trireg nets, so every other built-in net
-// type is reported with each of the three sizes, while the trireg declared the
-// same way beside it parses clean.
 TEST(DataTypeParsing, ChargeStrengthOnEveryOtherNetTypeIsReported) {
   for (const char* net_type : {"tri", "wand", "wor", "triand", "trior", "tri0",
                                "tri1", "uwire", "supply0", "supply1"}) {
@@ -125,8 +114,6 @@ TEST(DataTypeParsing, ChargeStrengthOnATriregOfEachSizeIsAccepted) {
   }
 }
 
-// A vector, a data type and a list of declarators after the strength leave the
-// net type what decides the rule.
 TEST(DataTypeParsing, ChargeStrengthOnAVectorOrListOfOtherNetsIsReported) {
   auto vec = Parse(
       "module t;\n"
@@ -151,9 +138,6 @@ std::ptrdiff_t ErrorsIn(const std::vector<Diagnostic>& diags) {
   });
 }
 
-// A net of a user-defined nettype is no trireg either, so its charge strength
-// is reported under §6.3.2.1, once, where the declarator would otherwise stop
-// at the parenthesis.
 TEST(DataTypeParsing, ChargeStrengthOnANettypeNetIsReported) {
   auto r = Parse(
       "module t;\n"
@@ -164,9 +148,6 @@ TEST(DataTypeParsing, ChargeStrengthOnANettypeNetIsReported) {
   EXPECT_EQ(ErrorsIn(r.diags), 1);
 }
 
-// Syntax 6-2 in §6.7 gives a nettype's net a delay and no strength, so a drive
-// strength there is reported once under §6.7, with or without an assignment,
-// while the same net with its delay alone parses clean.
 TEST(DataTypeParsing, DriveStrengthOnANettypeNetIsReported) {
   for (const char* decl :
        {"nt (strong0, weak1) n = 2'b01;", "nt (pull1, highz0) n;"}) {
@@ -185,9 +166,6 @@ TEST(DataTypeParsing, DriveStrengthOnANettypeNetIsReported) {
   }
 }
 
-// A net type keyword keeps its drive strength, with nothing reported, so the
-// report above belongs to the nettype and not to every strength the
-// declaration list reads.
 TEST(DataTypeParsing, DriveStrengthOnANetTypeKeywordIsAccepted) {
   auto r = Parse(
       "module t;\n"
@@ -200,8 +178,6 @@ TEST(DataTypeParsing, DriveStrengthOnANetTypeKeywordIsAccepted) {
   EXPECT_NE(item->drive_strength1, 0);
 }
 
-// The rule holds wherever a net may be declared: in an interface, a program, a
-// generate block of either kind, a nested module and the compilation unit.
 TEST(DataTypeParsing, ChargeStrengthOnAWireIsReportedInEveryPlace) {
   struct Place {
     const char* open;

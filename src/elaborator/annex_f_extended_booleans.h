@@ -13,65 +13,27 @@
 
 namespace delta {
 
-// §F.6.1 defines two extended Boolean expressions -- the sequence-instance
-// methods .triggered and .matched -- whose value at a point w^j of a word is
-// fixed by the §F.5.5 tight-satisfaction-with-local-variables relation applied
-// to subwords ending (or starting) at j. Here T(V) denotes an instance of a
-// clocked or unclocked sequence T to which the local variables V are passed as
-// actual arguments; V is modelled as the set of those names. The relations are
-// nondeterministic in the output context, so each is exposed both as the set of
-// output contexts L_1 it yields and as a four-way predicate.
-
-// §F.6.1 evaluates an instance T(V) of a sequence T -- passed the actual
-// arguments V -- at a single point w^j of a word w. These four data are the
-// fixed subject of both extended-Boolean relations; bundling them as one query
-// keeps the relation entry points to the (query, context) shape the §F.6.1
-// rules use. `word`, `sequence`, and `actuals` are non-owning references; a
-// query is a transient value that does not outlive them.
 struct ExtendedBooleanQuery {
-  const Word& word;              // the word w
-  std::size_t j;                 // the point w^j (requires 0 <= j < |w|)
-  const SequenceExpr& sequence;  // the sequence T
-  const std::set<std::string>& actuals;  // the actual-argument set V
+  const Word& word;
+  std::size_t j;
+  const SequenceExpr& sequence;
+  const std::set<std::string>& actuals;
 };
 
-// §F.6.1: the output contexts L_1 such that w^j, L_0, L_1 |= T(V).triggered.
-// triggered holds at j iff some start point 0 <= i <= j lets the subword
-// w^{i,j} tightly satisfy T from the empty context, producing an inner context
-// L; the result keeps the names of L_0 that the call does not overwrite -- the
-// domain D = dom(L_0) - (dom(L) & V) -- and adds the names of L that flow back
-// through the actual arguments, L|_V.
 std::vector<LocalContext> TriggeredOutputs(const ExtendedBooleanQuery& query,
                                            const LocalContext& input);
 
-// §F.6.1: the four-way relation w^j, L_0, L_1 |= T(V).triggered as a predicate,
-// true when the given output context is among those TriggeredOutputs yields.
 bool TriggeredSatisfies(const ExtendedBooleanQuery& query,
                         const LocalContext& input, const LocalContext& output);
 
-// §F.6.1: the output contexts L_1 such that w^j, L_0, L_1 |=
-// @(c)(T(V).matched). matched holds at j with destination clock c iff T(V) is
-// triggered at some strictly earlier point i (0 <= i < j) with the same output
-// context, and the clock c ticks exactly once between i and j -- the subword
-// w^{i+1,j} tightly satisfies the goto repetition c[->1] from empty contexts.
 std::vector<LocalContext> MatchedOutputs(
     const ExtendedBooleanQuery& query,
     const std::shared_ptr<const BooleanExpr>& clock, const LocalContext& input);
 
-// §F.6.1: the four-way relation w^j, L_0, L_1 |= @(c)(T(V).matched) as a
-// predicate, true when the given output context is among those MatchedOutputs
-// yields.
 bool MatchedSatisfies(const ExtendedBooleanQuery& query,
                       const std::shared_ptr<const BooleanExpr>& clock,
                       const LocalContext& input, const LocalContext& output);
 
-// §F.6.1 under §F.6: T(V).triggered and @(c)(T(V).matched) as the extended
-// expressions §F.6 has them be, a meaning at a point read from the whole
-// word, true at j iff the relation yields some output context from the empty
-// input context and undefined past the word, so that WordWithExtendedAtom of
-// §F.6 can read either into a word for the preceding subclauses to decide. T
-// may be clocked or unclocked, as the subclause has it; a clocked T is
-// decided through its §F.5.1.1 rewrite, as §F.5.5 decides it.
 ExtendedExpression TriggeredExpression(
     std::shared_ptr<const SequenceExpr> sequence,
     std::set<std::string> actuals);

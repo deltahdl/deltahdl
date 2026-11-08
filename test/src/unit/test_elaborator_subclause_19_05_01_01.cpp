@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.1.1: a `with` expression filters the values of a bin, and is not
-// allowed for the bins of a real coverpoint, whether it follows a range list
-// or the coverpoint's own name. An integral coverpoint's bin may take one.
 TEST(RealCoverpointBinWith, WithOnRealCoverpointBinIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -34,8 +31,6 @@ TEST(RealCoverpointBinWith, WithOnRealCoverpointBinIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5.1.1: only the coverpoint holding a bin may be named in place of its
-// range list, so naming another coverpoint of the covergroup is an error.
 TEST(CoverpointBinWith, NamingAnotherCoverpointIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -58,9 +53,6 @@ TEST(CoverpointBinWith, NamingAnotherCoverpointIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// Footnote 31 of Syntax 19-2 with §19.5.1.1: a bin's `with` expression is
-// assignment compatible with an integral type, which a string and a class
-// handle are not; a comparison over `item` is.
 TEST(CoverpointBinWith, WithExpressionNotIntegralIsError) {
   ElabFixture f;
   ElaborateSrc(

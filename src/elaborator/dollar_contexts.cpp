@@ -38,7 +38,6 @@ static void Report(const Expr* param, const QueueContextScan& scan) {
                   Subclause("6.20.7"));
 }
 
-// Reports every `$` parameter written anywhere inside `e`.
 static void ReportUnboundedParamsIn(const Expr* e,
                                     const QueueContextScan& scan) {
   if (e == nullptr) return;
@@ -47,9 +46,6 @@ static void ReportUnboundedParamsIn(const Expr* e,
       e, [&scan](const Expr* child) { ReportUnboundedParamsIn(child, scan); });
 }
 
-// A queue dimension's bound is a queue context, and so is a dimension written
-// as a `$` parameter alone, which stands for `[$]`. A fixed dimension written
-// in terms of one is not a queue's, and §6.20.7's other contexts decide it.
 static void CheckDims(const std::vector<Expr*>& dims,
                       const QueueContextScan& scan) {
   for (const Expr* dim : dims) {
@@ -61,10 +57,6 @@ static void CheckDims(const std::vector<Expr*>& dims,
   }
 }
 
-// §7.10: an index or a slice of a queue is a queue select, the one context
-// where `$` itself may carry operators, and the one a `$` parameter may not
-// enter. A value range of `inside` is a select with no base, and selects
-// nothing.
 static void CheckExpr(const Expr* e, const QueueContextScan& scan) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kSelect && e->base != nullptr &&
@@ -109,8 +101,6 @@ static void ReportDollar(const Expr* e, DiagEngine& diag) {
 
 namespace {
 
-// What the `$` operand check reads: the module's variables known to be no
-// queue, and the engine its reports go to.
 struct DollarScan {
   const std::unordered_set<std::string_view>& non_queues;
   DiagEngine& diag;
@@ -118,10 +108,6 @@ struct DollarScan {
 
 }  // namespace
 
-// The module's variables that are no queue whatever their type names: one
-// whose declaration writes an unpacked dimension first that is not `[$]`, and
-// one written with none whose type is neither a typedef name nor a type
-// reference, either of which can stand for a queue (§7.10).
 static std::unordered_set<std::string_view> NonQueueNames(
     const ModuleDecl* decl) {
   std::unordered_set<std::string_view> names;
@@ -136,8 +122,6 @@ static std::unordered_set<std::string_view> NonQueueNames(
   return names;
 }
 
-// Whether `select` selects from one of the module's variables that is no
-// queue, named alone. A value range of `inside` is a select with no base.
 static bool SelectsANonQueue(const Expr* select, const DollarScan& scan) {
   const Expr* base = select->base;
   return base != nullptr && base->kind == ExprKind::kIdentifier &&
@@ -152,9 +136,6 @@ static void CheckDollarOperand(const Expr* e, const DollarScan& scan) {
   }
   if (e->kind == ExprKind::kSelect) {
     CheckDollarOperand(e->base, scan);
-    // A.10 footnote 47: the `$` primary stands for the last element of a
-    // queue, in its select alone, so one in the select of a variable that is
-    // no queue is an operand like any other.
     if (SelectsANonQueue(e, scan)) {
       CheckDollarOperand(e->index, scan);
       CheckDollarOperand(e->index_end, scan);
@@ -179,9 +160,6 @@ void CheckDollarOperands(const ModuleDecl* decl, DiagEngine& diag) {
   const std::unordered_set<std::string_view> kNonQueues = NonQueueNames(decl);
   const DollarScan kScan{kNonQueues, diag};
   for (const ModuleItem* item : decl->items) {
-    // A parameter's value is a context the subclause lists, and a sequence's
-    // or property's body holds cycle delay ranges, so a declaration's
-    // initializer is read for a variable or a net alone.
     if (item->kind == ModuleItemKind::kVarDecl ||
         item->kind == ModuleItemKind::kNetDecl) {
       CheckDollarOperand(item->init_expr, kScan);

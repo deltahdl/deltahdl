@@ -150,9 +150,6 @@ TEST(ModportDeclarationParsing, DotNotationModportName) {
   EXPECT_EQ(mp->name, "target");
 }
 
-// modport_simple_port's dotted form makes the connecting expression optional:
-// `. port_identifier ( [ expression ] )`. Exercise the empty-parentheses branch
-// where no expression is supplied, leaving the recorded expr null.
 TEST(ModportDeclarationParsing, DotNotationEmptyExpression) {
   auto r = Parse(
       "interface bus;\n"
@@ -267,10 +264,6 @@ TEST(ModportDeclarationParsing, AllPortKindsMixed) {
               "endinterface\n"));
 }
 
-// modport_tf_port's method_prototype alternative also covers the function form
-// (the task form is exercised above). This reaches the function-prototype
-// branch of the tf-port parser, recording an imported method prototype on the
-// port.
 TEST(ModportDeclarationParsing, ImportFunctionMethodPrototype) {
   auto r = Parse(
       "interface bus;\n"
@@ -336,7 +329,6 @@ TEST(ModportDeclarationParsing, MissingModportName) {
       "interface ifc;\n"
       "  modport (input a);\n"
       "endinterface\n");
-  // §25.5 owns the modport declaration; A.2.9 states the production alone.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got '('", 2, "25.5"));
 }
@@ -347,7 +339,6 @@ TEST(ModportDeclarationParsing, MissingOpenParen) {
       "  logic a;\n"
       "  modport mp input a);\n"
       "endinterface\n");
-  // §25.5 owns the modport declaration. `input` stands where the '(' belongs.
   EXPECT_TRUE(ReportedError(r.diags, "expected '(', got 'input'", 3, "25.5"));
 }
 
@@ -357,7 +348,6 @@ TEST(ModportDeclarationParsing, MissingCloseParen) {
       "  logic a;\n"
       "  modport mp(input a;\n"
       "endinterface\n");
-  // §25.5 owns the modport declaration; A.2.9 states the production alone.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "25.5"));
 }
 
@@ -367,15 +357,10 @@ TEST(ModportDeclarationParsing, MissingSemicolon) {
       "  logic a;\n"
       "  modport mp(input a)\n"
       "endinterface\n");
-  // §25.5 owns the modport declaration. The token standing where the ';'
-  // should be is `endinterface`.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endinterface'", 4, "25.5"));
 }
 
-// modport_item ::= modport_identifier ( modport_ports_declaration
-//   { , modport_ports_declaration } )
-// One declaration at least; an item written with none was accepted silently.
 TEST(ModportDeclarationParsing, EmptyModportItemIsRejected) {
   auto r = Parse(
       "interface bus;\n"
@@ -389,9 +374,6 @@ TEST(ModportDeclarationParsing, EmptyModportItemIsRejected) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->name, "empty");
 }
 
-// modport_ports_declaration opens with a port_direction, import_export or
-// `clocking`; a first entry that is a bare port has no declaration to stand
-// in, and was read as a port of no direction with nothing said.
 TEST(ModportDeclarationParsing, PortWithoutDeclarationIsRejected) {
   auto r = Parse(
       "interface bus;\n"
@@ -408,9 +390,6 @@ TEST(ModportDeclarationParsing, PortWithoutDeclarationIsRejected) {
   EXPECT_EQ(mp->ports[1].direction, Direction::kOutput);
 }
 
-// modport_clocking_declaration ::= clocking clocking_identifier -- one
-// identifier, so the entry after it opens a declaration of its own; a bare
-// port there was read as a port of the direction last named.
 TEST(ModportDeclarationParsing, PortAfterClockingDeclarationIsRejected) {
   auto r = Parse(
       "interface bus(input logic clk);\n"
@@ -429,12 +408,6 @@ TEST(ModportDeclarationParsing, PortAfterClockingDeclarationIsRejected) {
   EXPECT_EQ(mp->ports[2].direction, Direction::kNone);
 }
 
-// modport_tf_port ::= method_prototype | tf_identifier, and A.2.7 writes both
-// prototypes with `[ dynamic_override_specifiers ]` after the keyword, which
-// A.10's footnote 25 allows them only on a method declaration in a class scope
-// that is not an interface class. A prototype carrying one was reported as a
-// missing identifier at the ':'; it is now read to its name and reported for
-// the specifier.
 TEST(ModportDeclarationParsing, PrototypeWithOverrideSpecifierIsRejected) {
   auto r = Parse(
       "interface bus;\n"
@@ -458,10 +431,6 @@ TEST(ModportDeclarationParsing, PrototypeWithOverrideSpecifierIsRejected) {
   EXPECT_EQ(mp->ports[1].name, "f");
 }
 
-// A modport_tf_port's method_prototype is A.2.6's function_prototype, whose
-// data_type_or_void takes no implicit result type: no bare signing, no bare
-// packed dimensions and not nothing at all. Each prototype is still read to
-// its name.
 TEST(ModportDeclarationParsing, PrototypeWithImplicitResultTypeIsRejected) {
   auto r = Parse(
       "interface bus;\n"
@@ -484,8 +453,6 @@ TEST(ModportDeclarationParsing, PrototypeWithImplicitResultTypeIsRejected) {
   EXPECT_TRUE(mp->ports[2].is_export);
 }
 
-// A data_type_or_void is `void` or any data type: a keyword type with its
-// packed dimensions, a typedef's name, and a type reference (A.2.2.1).
 TEST(ModportDeclarationParsing, PrototypesWritingTheirResultTypeAreAccepted) {
   auto r = Parse(
       "interface bus;\n"
@@ -498,12 +465,6 @@ TEST(ModportDeclarationParsing, PrototypesWritingTheirResultTypeAreAccepted) {
   EXPECT_EQ(r.cu->interfaces[0]->modports[0]->ports.size(), 4u);
 }
 
-// Attribute instances open a modport_ports_declaration, and neither a
-// modport_simple_port nor a modport_tf_port continuing one takes any, so the
-// attributes before `b` and `g` fit no production while those before
-// `input a` and `import f` do. Each continuing port is still read as its
-// declaration's next. An attributed port that opens nothing where nothing is
-// open draws the report on the declaration it fails to open, and no second.
 TEST(ModportDeclarationParsing, AttributeBeforeAContinuingPortIsRejected) {
   auto r = Parse(
       "interface bus;\n"

@@ -56,8 +56,6 @@ TEST(LoopSyntaxSimulation, ForPreIncrementStep) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// loop_statement ::= repeat ( expression ) statement_or_null — the body runs a
-// fixed number of times.
 TEST(LoopSyntaxSimulation, RepeatLoop) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -73,8 +71,6 @@ TEST(LoopSyntaxSimulation, RepeatLoop) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// loop_statement ::= while ( expression ) statement_or_null — the body runs
-// while the condition holds.
 TEST(LoopSyntaxSimulation, WhileLoop) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -90,8 +86,6 @@ TEST(LoopSyntaxSimulation, WhileLoop) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// loop_statement ::= do statement_or_null while ( expression ) ; — the body
-// always runs at least once, even when the condition is initially false.
 TEST(LoopSyntaxSimulation, DoWhileRunsAtLeastOnce) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -107,7 +101,6 @@ TEST(LoopSyntaxSimulation, DoWhileRunsAtLeastOnce) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// loop_statement ::= forever statement_or_null — runs until a break leaves it.
 TEST(LoopSyntaxSimulation, ForeverWithBreak) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -126,9 +119,6 @@ TEST(LoopSyntaxSimulation, ForeverWithBreak) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// loop_statement ::= foreach ( ps_or_hierarchical_array_identifier
-//                               [ loop_variables ] ) statement — the body runs
-// once per element of the array.
 TEST(LoopSyntaxSimulation, ForeachIteratesEachElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -145,8 +135,6 @@ TEST(LoopSyntaxSimulation, ForeachIteratesEachElement) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// for_initialization with a comma list and for_step with a comma list both run:
-// two control variables advance in opposite directions until they meet.
 TEST(LoopSyntaxSimulation, ForMultipleInitsAndSteps) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -165,9 +153,6 @@ TEST(LoopSyntaxSimulation, ForMultipleInitsAndSteps) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// A.6.8's for_variable_declaration may take a type_reference after `var`
-// (§6.23): i is x's int, so it counts -2 and -1 up to 0 and s ends at -3,
-// where a one-bit i, never below 0, would leave s at 0.
 TEST(LoopSyntaxSimulation, ForVariableOfATypeReference) {
   SimFixture f;
   auto* var = RunAndFindVar(

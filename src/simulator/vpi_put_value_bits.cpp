@@ -22,15 +22,12 @@ namespace delta {
 
 namespace {
 
-// Bit `k` of `words`, its a and b bits set as `a` and `b` say; x is (1,1) and
-// z (0,1), the encoding Figure 38-8 gives.
 void SetBit(std::vector<Logic4Word>& words, uint32_t k, bool a, bool b) {
   const uint64_t kMask = uint64_t{1} << (k % 64);
   if (a) words[k / 64].aval |= kMask;
   if (b) words[k / 64].bval |= kMask;
 }
 
-// The two's complement of the value `words` hold, in place.
 void Negate(std::vector<Logic4Word>& words) {
   uint64_t carry = 1;
   for (Logic4Word& word : words) {
@@ -39,8 +36,6 @@ void Negate(std::vector<Logic4Word>& words) {
   }
 }
 
-// `pattern` in the low 64 bits, and above it every bit `negative` says the
-// sign extends into.
 void FillPattern(std::vector<Logic4Word>& words, uint64_t pattern,
                  bool negative) {
   words[0].aval = pattern;
@@ -49,25 +44,17 @@ void FillPattern(std::vector<Logic4Word>& words, uint64_t pattern,
   }
 }
 
-// §6.12.1: `real` converted to an integral value, rounded to the nearest
-// integer, ties away from zero.
 void FillRounded(std::vector<Logic4Word>& words, double real) {
   const int64_t kRounded = std::llround(real);
   FillPattern(words, static_cast<uint64_t>(kRounded), kRounded < 0);
 }
 
-// The value of the digit `c`, lowercase, in base 16 or below; -1 for a
-// character that is no digit.
 int DigitValue(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;
   return -1;
 }
 
-// §38.15, Table 38-3 (vpiBinStrVal, vpiOctStrVal and vpiHexStrVal rows): the
-// digits of `text` from the rightmost up, each `bits` bits of the value, an x
-// or z digit of either case unknown in every bit it stands for; false where a
-// character is no digit of the base.
 bool DigitBits(std::string_view text, uint32_t bits, uint32_t width,
                std::vector<Logic4Word>& words) {
   uint32_t k = 0;
@@ -85,7 +72,6 @@ bool DigitBits(std::string_view text, uint32_t bits, uint32_t width,
   return true;
 }
 
-// `words` times ten, plus `digit`, carried across every word.
 void MultiplyAddTen(std::vector<Logic4Word>& words, uint64_t digit) {
   uint64_t carry = digit;
   for (Logic4Word& word : words) {
@@ -96,9 +82,6 @@ void MultiplyAddTen(std::vector<Logic4Word>& words, uint64_t digit) {
   }
 }
 
-// §38.15, Table 38-3 (vpiDecStrVal row): the number `text` writes in decimal,
-// a leading minus sign making it negative in two's complement; false where a
-// character is no decimal digit.
 bool DecimalBits(std::string_view text, std::vector<Logic4Word>& words) {
   const bool kNegative = text.starts_with('-');
   if (kNegative) text.remove_prefix(1);
@@ -111,8 +94,6 @@ bool DecimalBits(std::string_view text, std::vector<Logic4Word>& words) {
   return true;
 }
 
-// §38.15, Table 38-3 (vpiStringVal row): each eight bits of the value one
-// character of `text`, the last character the least significant.
 void StringBits(std::string_view text, uint32_t width,
                 std::vector<Logic4Word>& words) {
   uint32_t k = 0;
@@ -124,8 +105,6 @@ void StringBits(std::string_view text, uint32_t width,
   }
 }
 
-// §38.15 (Figure 38-8): the aval/bval words of a vpiVectorVal value, 32 bits
-// of the value in each element of `vector`, the first the least significant.
 void VectorBits(const s_vpi_vecval* vector, uint32_t width,
                 std::vector<Logic4Word>& words) {
   for (uint32_t k = 0; k < width; ++k) {
@@ -135,15 +114,11 @@ void VectorBits(const s_vpi_vecval* vector, uint32_t width,
   }
 }
 
-// The value of a vpiScalarVal or vpiStrengthVal's logic, `scalar`, in bit 0.
 void ScalarBit(int scalar, std::vector<Logic4Word>& words) {
   SetBit(words, 0, scalar == kVpi1 || scalar == kVpiX,
          scalar == kVpiX || scalar == kVpiZ);
 }
 
-// The value of `value`, of a format whose text a string member holds, in
-// `words`; false where that member is null or its text no number of the
-// format.
 bool TextBits(const s_vpi_value& value, uint32_t width,
               std::vector<Logic4Word>& words) {
   if (value.value.str == nullptr) return false;
@@ -163,8 +138,6 @@ bool TextBits(const s_vpi_value& value, uint32_t width,
   }
 }
 
-// The value of `value`, of a format a pointer member other than the string
-// holds, in `words`; false where that pointer is null.
 bool PointedBits(const s_vpi_value& value, uint32_t width,
                  std::vector<Logic4Word>& words) {
   switch (value.format) {
@@ -186,10 +159,6 @@ bool PointedBits(const s_vpi_value& value, uint32_t width,
   }
 }
 
-// §38.34: take out of the event queue the delayed puts pending on `target`
-// that a put taking place at `at` under `mode` removes: every one for
-// vpiInertialDelay, those later than it for vpiTransportDelay, and none for
-// vpiPureTransportDelay.
 void RemovePendingPuts(VpiObject& target, int mode, uint64_t at) {
   if (mode == vpiPureTransportDelay) return;
   for (VpiObject* event : target.scheduled_puts) {
@@ -279,9 +248,6 @@ void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
   obj.scheduled_puts.push_back(&event);
   Event* queued = scheduler.GetEventPool().Acquire();
   queued->superseded = event.put_superseded;
-  // The scheduler runs a superseded event's callback as well, so a put that a
-  // cancel or a later put removed checks for that itself, before it reads the
-  // vpiSchedEvent a cancel frees.
   queued->callback = [target = &obj, sched = &event, bits = std::move(bits),
                       kWidth, removed = event.put_superseded]() {
     if (*removed) return;

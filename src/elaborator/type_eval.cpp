@@ -58,9 +58,6 @@ bool TypeKeyMatchesKind(std::string_view key, DataTypeKind kind) {
 }
 
 namespace {
-// §7.2.1: the bit width contributed by a member's packed dimensions — the
-// leading [l:r] times every trailing dimension. Returns 1 when the member has
-// no packed dimension, and 0 when any bound is not a foldable constant.
 uint32_t PackedDimProduct(const StructMember& m) {
   if (!m.packed_dim_left || !m.packed_dim_right) return 1;
   auto left = ConstEvalInt(m.packed_dim_left);
@@ -78,11 +75,7 @@ uint32_t PackedDimProduct(const StructMember& m) {
 }  // namespace
 
 uint32_t EvalStructMemberWidth(const StructMember& m) {
-  // §7.2.1: an inline aggregate (struct/union) or enum member's width comes
-  // from its full type, which already folds in its own packed dimensions and
-  // (for aggregates) the widths of its nested members.
   if (m.nested_type) return EvalTypeWidth(*m.nested_type);
-  // A member declared through a typedef the elaborator resolved.
   if (m.resolved_width > 0) return m.resolved_width;
 
   if (m.packed_dim_left && m.packed_dim_right) {
@@ -90,14 +83,6 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
     if (w > 0) return w;
   }
 
-  // Table 6-8 fixes a width for each integer data type that has one, and
-  // §6.11.1 calls those the simple bit vector types of predefined width. The
-  // cases below are that table, and after it §6.12's real types: a real is a C
-  // double, a shortreal a C float, and realtime is real (printed page 110), so
-  // a member of one of those holds 64 or 32 bits. Only bit, logic and reg are
-  // left out, because Table 6-8 gives them a user-defined vector size instead
-  // -- a member declared with no packed dimension is the one-bit vector, which
-  // is what the default answers.
   switch (m.type_kind) {
     case DataTypeKind::kByte:
       return 8;
@@ -121,8 +106,6 @@ uint32_t EvalStructMemberWidth(const StructMember& m) {
   }
 }
 
-// One unpacked dimension's bounds, left first: `[l:r]` as written, and the
-// size form `[n]` as [0:n-1] (§7.4.2). False where a bound does not fold.
 static bool UnpackedDimBounds(const Expr* dim, int64_t* left, int64_t* right) {
   if (dim == nullptr) return false;
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
@@ -166,7 +149,6 @@ static uint32_t TagBitWidth(uint32_t num_members) {
 uint32_t EvalStructMemberWidth(const StructMember& m,
                                const TypedefMap& typedefs) {
   if (m.nested_type) return EvalTypeWidth(*m.nested_type, typedefs);
-  // §7.4.4: dimensions written on a typedef name stack on the typedef's own.
   uint32_t w = PackedDimProduct(m);
   const DataType* named = MemberNamedType(m, typedefs);
   if (named != nullptr)
@@ -252,9 +234,6 @@ static uint32_t EvalRangeWidth(const Expr* left_expr, const Expr* right_expr,
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// §7.4.1: how many enumerations the packed dimensions written after an
-// enumeration's body make a packed array of, their bounds folded under
-// `scope` where one is given.
 static uint32_t EnumArrayCount(const DataType& dtype, const ScopeMap* scope) {
   uint32_t count = 1;
   for (const auto& [left, right] : dtype.enum_array_dims) {
@@ -264,19 +243,12 @@ static uint32_t EnumArrayCount(const DataType& dtype, const ScopeMap* scope) {
   return count;
 }
 
-// The enumeration a packed array of enumerations is an array of.
 DataType EnumArrayElement(const DataType& dtype) {
   DataType element = dtype;
   element.enum_array_dims.clear();
   return element;
 }
 
-// §6.19: an enumeration is as wide as its base type, int where it names none.
-// A keyword base sizes it here, an integer atom by its own width and a scalar
-// integer vector as one bit; a base written with a packed dimension is sized
-// from that dimension before this is reached, and taken as int here where the
-// dimension names a parameter no scope is at hand to fold. A typedef name for
-// the base is still taken as int (issue #11449).
 static uint32_t EnumBaseWidth(const DataType& dtype) {
   if (dtype.packed_dim_left != nullptr ||
       dtype.enum_base_kind == DataTypeKind::kImplicit ||
@@ -289,16 +261,6 @@ static uint32_t EnumBaseWidth(const DataType& dtype) {
 }
 
 uint32_t EvalTypeWidth(const DataType& dtype) {
-  // §7.4.4: packed dimensions may also be built up in stages through typedef,
-  // and its example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits: a
-  // packed dimension written where a typedef name is used is a dimension *of*
-  // that name and multiplies the width the name stands for. This overload has
-  // no typedef map to resolve the name with, so it cannot answer, and answering
-  // from the range alone discarded the name entirely -- `nib [1:0] x` on a
-  // `typedef bit [3:0] nib` came out 2 bits, the width of the index rather than
-  // of what is indexed. 0 is what a name already answers here without a
-  // dimension, what every caller's fallback is written to handle, and what lets
-  // a typedef-aware caller take over.
   if (dtype.kind == DataTypeKind::kNamed) return 0;
   if (!dtype.enum_array_dims.empty()) {
     return EvalTypeWidth(EnumArrayElement(dtype)) *
@@ -310,8 +272,6 @@ uint32_t EvalTypeWidth(const DataType& dtype) {
     for (const auto& [left, right] : dtype.extra_packed_dims) {
       w *= EvalRangeWidth(left, right);
     }
-    // §7.4.1: the dimensions of a packed structure or union are those of an
-    // array of it, each element as wide as its members make it.
     if (dtype.kind == DataTypeKind::kStruct ||
         dtype.kind == DataTypeKind::kUnion) {
       return w * EvalStructOrUnionWidth(dtype);
@@ -425,9 +385,6 @@ DataType TypeNameToDataType(std::string_view name) {
   return dt;
 }
 
-// §7.4.1: the total element count of a data type's packed dimensions -- the
-// leading range times each further one. Zero when the type declares no packed
-// dimension, or when a bound does not fold.
 uint32_t PackedDimProduct(const DataType& dtype) {
   if (!dtype.packed_dim_left || !dtype.packed_dim_right) return 0;
   uint32_t w = EvalRangeWidth(dtype.packed_dim_left, dtype.packed_dim_right);
@@ -451,10 +408,6 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs) {
   const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) {
     uint32_t base = EvalTypeWidth(*resolved, typedefs);
-    // §7.4.4: packed dimensions written where a typedef is used stack on top of
-    // the packed dimensions the typedef itself carries. The element count of
-    // the use-site range(s) multiplies the typedef's own width, so a staged
-    // declaration such as `bsix [1:10] v5` (bsix == bit [1:5]) is 50 bits wide.
     uint32_t outer = PackedDimProduct(dtype);
     return outer > 0 ? base * outer : base;
   }
@@ -471,8 +424,6 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
   const auto* resolved = FindNamedType(dtype, typedefs);
   if (resolved) {
     uint32_t base = EvalTypeWidth(*resolved, typedefs, scope);
-    // §7.4.4: use-site packed dimensions stack on top of the typedef's own
-    // packed dimensions (see the 2-arg overload for the staging rule).
     uint32_t outer = PackedDimProduct(dtype, scope);
     return outer > 0 ? base * outer : base;
   }
@@ -481,9 +432,6 @@ uint32_t EvalTypeWidth(const DataType& dtype, const TypedefMap& typedefs,
            EnumArrayCount(dtype, &scope);
   }
   uint32_t w = PackedDimProduct(dtype, scope);
-  // Mirror the 2-arg overload: a struct/union sizes from its members (using
-  // typedefs), an element of its packed dimensions where it has any. §6.20:
-  // a member's own dimensions may name the parameters `scope` holds too.
   if (dtype.kind == DataTypeKind::kStruct ||
       dtype.kind == DataTypeKind::kUnion) {
     return (w > 0 ? w : 1) * FoldedMembersWidth(dtype, typedefs, scope);
@@ -503,10 +451,6 @@ static bool Is4stateEnum(const DataType& dtype, const TypedefMap& typedefs) {
   return false;
 }
 
-// §7.2.1 (printed page 147): a member is as 4-state as its own type, which for
-// a member written through a typedef name, or as a nested aggregate or
-// enumeration, is the type the name or the nesting stands for. Judged by the
-// kind written alone, `nib_t a` under `typedef logic [3:0] nib_t` was 2-state.
 static bool Is4stateMember(const StructMember& m, const TypedefMap& typedefs) {
   if (m.nested_type != nullptr) return Is4stateType(*m.nested_type, typedefs);
   DataType own;
@@ -549,11 +493,6 @@ bool Is4stateType(const DataType& dtype, const TypedefMap& typedefs) {
   return false;
 }
 
-// §6.19 (printed page 119): an enumeration's values are of its base type,
-// which is `int` when the declaration names none, so the enumeration is signed
-// when that base is. A typedef base answers through the table it is declared
-// in; a keyword base carries its signing on the enumeration itself, written or
-// implied by the keyword; no base at all is the signed `int`.
 static bool IsSignedEnum(const DataType& dtype, const TypedefMap& typedefs) {
   if (!dtype.enum_base_name.empty()) {
     auto it = typedefs.find(dtype.enum_base_name);
@@ -783,15 +722,6 @@ static uint32_t InferReplicateWidth(const Expr* expr,
   return count ? static_cast<uint32_t>(*count) * inner : inner;
 }
 
-// §11.4.14 builds a streaming concatenation out of the stream expressions the
-// parser records in Expr::elements, and re-orders their bits without adding or
-// dropping any, so the result is as wide as those operands together. The slice
-// size in Expr::lhs does not enter the sum, §11.4.14 having it decide the order
-// the bits leave in rather than how many there are. An operand of unknown width
-// makes the whole stream unknown: InferExprWidth answers 0 for "not known", and
-// a total that dropped such a term would be a width short by that operand
-// instead of an absent one. An empty Expr::elements answers 0 as well, there
-// being no operand to measure.
 static uint32_t InferStreamingConcatWidth(const Expr* expr,
                                           const TypedefMap& typedefs) {
   if (expr->elements.empty()) return 0;
@@ -816,16 +746,6 @@ static uint32_t InferCastWidth(const Expr* expr, const TypedefMap& typedefs) {
   return InferExprWidth(expr->lhs, typedefs);
 }
 
-// §11.7: `$signed` and `$unsigned` evaluate the input expression and return a
-// one-dimensional packed array of its width and value, with the signedness the
-// function names. A signing conversion is therefore as wide as its operand, so
-// `$signed(4'b1100)` is four bits and not thirty-two. Every other system
-// function returns a 32-bit integer, which makes the 32 below their own width
-// rather than a fallback these two escape. The 32 stands for a signing
-// conversion as well when the operand's width is unknown: InferExprWidth
-// answers 0 for ExprKind::kIdentifier, whose declared width it does not read,
-// and returning that 0 would take a width away from callers that read one
-// today.
 static uint32_t InferSystemCallWidth(const Expr* expr,
                                      const TypedefMap& typedefs) {
   if (expr->callee == "$signed" || expr->callee == "$unsigned") {
@@ -881,15 +801,6 @@ uint32_t InferExprWidth(const Expr* expr, const TypedefMap& typedefs) {
     case ExprKind::kInside:
     case ExprKind::kTagged:
       return 0;
-    // §11.11 lets the min:typ:max form stand wherever an expression may, so the
-    // form stands as an operand and an operand is sized. What it is worth is
-    // the member the run selects -- Example 1 reads `(a:b:c) + (d:e:f)` member
-    // by member, its minimum a+d, its typical b+e and its maximum c+f -- so
-    // what it is worth and how wide it is are the same member's, and the width
-    // follows the fold rather than composing the three. §11.11 requires no
-    // relation between them, so they may differ in width and the selected one
-    // decides; a width of 0 sized the form as nothing wherever a context read
-    // it, and a concatenation holding one contributed no bits for it.
     case ExprKind::kMinTypMax:
       return InferExprWidth(SelectMinTypMaxMember(expr), typedefs);
   }

@@ -1,20 +1,3 @@
-// IEEE 1800-2023 §40.3.2.4 "$coverage_merge" and §40.3.2.5 "$coverage_save":
-// the file a named coverage database is kept in, so that a database one run
-// saves is there for a later run to merge. §40.3.2.5 leaves both the format and
-// the mapping of a name to files to the tool; deltahdl keeps one text file per
-// name, at the name's path under the state's database directory.
-//
-// The file opens with a header line, then names each instance of the design
-// that saved it with its definition, which is how a merge tells a database of
-// this design from one of another (§40.3.2.4), then the coverage types the
-// database holds and the covered-item count each instance stood at:
-//
-//   deltahdl-coverage-database 1
-//   instance top top
-//   instance top.u1 leaf
-//   type 21
-//   covered top 21 2
-
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>

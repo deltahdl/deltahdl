@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// The source the cases share: clk rises at 5, 15, 25, ...; the stimulus is
-// what `drive` writes between the ticks; and a process counts the ticks at
-// which the named sequence `rule`, declared as `decls` has it, reaches its end
-// point, keeping the last such time.
 std::string LocalSource(const std::string& decls, const std::string& drive) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -38,10 +34,6 @@ std::string LocalSource(const std::string& decls, const std::string& drive) {
          "endmodule\n";
 }
 
-// §16.10 as §16.8.2 rests on it: a local variable the body declares is
-// assigned by a match item where its operand holds and read by a later
-// operand of the same attempt. v1 takes data's 5 at the tick at 15, and the
-// sequence ends where do1 reads 5 two ticks later, not where it reads 6.
 TEST(LocalVariableFormals, BodyLocalAssignedByAMatchItemIsReadLater) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -59,10 +51,6 @@ TEST(LocalVariableFormals, BodyLocalAssignedByAMatchItemIsReadLater) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 35u);
 }
 
-// §16.8.2: a new copy of each local variable is created at the beginning of
-// each attempt, so two attempts in flight hold their own: c holds at the ticks
-// at 15 and 25 with data at 5 and then 6, and each attempt ends two ticks on
-// where do1 reads its own capture, at 35 and at 45.
 TEST(LocalVariableFormals, EachAttemptHoldsItsOwnCopy) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -81,11 +69,6 @@ TEST(LocalVariableFormals, EachAttemptHoldsItsOwnCopy) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
-// §16.8.2: a local variable formal argument of direction input is
-// initialized from its actual at the beginning of each attempt of the
-// instance, before the instance's first operand is evaluated, and keeps that
-// value: sub(data) holds data's 5 from the tick at 15 through the tick at 25
-// though data reads 6 there, so the sequence ends where do1 reads 5.
 TEST(LocalVariableFormals, InputLocalFormalIsInitializedFromTheActual) {
   SimFixture f;
   auto* hits = RunAndFindVar(LocalSource("  sequence sub(local input int lv);\n"
@@ -104,14 +87,6 @@ TEST(LocalVariableFormals, InputLocalFormalIsInitializedFromTheActual) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
-// §16.8.2 with §16.10: a local variable formal argument is a local variable
-// of the instance of the type it is declared with, so each formal here holds
-// data's 165 as that type does: lv, lb and lt all eight bits, a packed
-// vector's, a bit vector's and byte_t's; lr resolving a select against its
-// [8:1], lr[1] the rightmost bit; ls as the signed -91; and lu as an
-// unsigned byte, 165. The sequence ends at 25, where do1 reads 165. Sized by
-// the type keyword alone, the first four would hold one bit and lu a signed
-// byte, and it would never end.
 TEST(LocalVariableFormals, ALocalFormalTakesItsDeclaredType) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -139,11 +114,6 @@ TEST(LocalVariableFormals, ALocalFormalTakesItsDeclaredType) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
-// §16.8.2's example, its repetition left out: sub_seq2's inout lv is
-// initialized from seq2's v1, incremented by data_in where !a holds, and
-// assigned back to v1 when the instance matches, so seq2's last operand reads
-// v1 as 8, the 5 captured from data plus the 3 of data_in, where do1 reads 8
-// at the tick at 55. Assigned back nowhere, v1 would still read 5 there.
 TEST(LocalVariableFormals, InoutLocalFormalIsAssignedBackAtTheMatch) {
   SimFixture f;
   auto* hits = RunAndFindVar(

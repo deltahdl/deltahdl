@@ -171,12 +171,6 @@ TEST(SignedExprSim, SystemTfCallSigned) {
   EXPECT_EQ(var->value.ToUint64(), 200u);
 }
 
-// §11.7: `regB = $unsigned(-4'sd4);` gives `8'b00001100`. This is the line of
-// the clause's example that separates a correct conversion from one that
-// widens its operand: `-4'sd4` is four bits wide, so the eight-bit target is
-// filled by zero-extending the unsigned value the conversion produced. An
-// implementation that let the operand's signedness survive would sign-extend
-// instead and leave `8'b11111100`.
 TEST(SignedExprSim, UnsignedOfNegativeSizedSignedLiteral) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -189,10 +183,6 @@ TEST(SignedExprSim, UnsignedOfNegativeSizedSignedLiteral) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
 }
 
-// §11.7 in a constant expression: a parameter's value is folded at elaboration
-// rather than evaluated at run time, and the conversion has to mean the same
-// thing in both. The four bits 1100 read unsigned are 12, so the parameter is
-// `8'b00001100` as the procedural assignment above is.
 TEST(SignedExprSim, UnsignedOfNegativeSizedSignedLiteralAsParameter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -206,9 +196,6 @@ TEST(SignedExprSim, UnsignedOfNegativeSizedSignedLiteralAsParameter) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
 }
 
-// §11.7: the same for `$signed`, whose result is the operand's bits read as a
-// signed number. The four bits 1100 read signed are -4, which fills an
-// eight-bit target as `8'b11111100`.
 TEST(SignedExprSim, SignedOfFourBitVectorAsParameter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -222,10 +209,6 @@ TEST(SignedExprSim, SignedOfFourBitVectorAsParameter) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// §11.7: `$unsigned(-4)` in a constant expression. `-4` is thirty-two bits
-// wide, so the eight-bit parameter keeps its low byte, `8'b11111100`. Read
-// beside the four-bit case above, this pair says the answer follows the
-// operand's width rather than the sign of the number written.
 TEST(SignedExprSim, UnsignedOfNegativeFourAsParameter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -239,9 +222,6 @@ TEST(SignedExprSim, UnsignedOfNegativeFourAsParameter) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// §11.7: the operand is any expression, and its width is whatever that
-// expression is worth. A concatenation is four bits here, so `$signed` reads
-// those four bits as -4 and the target is filled by sign-extending them.
 TEST(SignedExprSim, SignedOfConcatenationKeepsConcatenationWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -259,9 +239,6 @@ TEST(SignedExprSim, SignedOfConcatenationKeepsConcatenationWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// §11.7: a part-select is as wide as the range it names, so `$signed` on the
-// low four bits of an eight-bit value reads four bits and not eight. Reading
-// eight would make the result 8'b10101100 rather than -4.
 TEST(SignedExprSim, SignedOfPartSelectKeepsSelectedWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -278,18 +255,6 @@ TEST(SignedExprSim, SignedOfPartSelectKeepsSelectedWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// §11.7: the value `$signed` returns is signed and the value `$unsigned`
-// returns is unsigned, so an assignment that stores such a value has to keep
-// that signedness whatever the width of the variable it is stored in. The
-// three tests below read `var->value.is_signed`, the flag on the vector the
-// run stored, and never a flag off an evaluated expression. EvalIdentifier in
-// src/simulator/evaluation.cpp writes `val.is_signed = var->is_signed` on
-// every read of a variable, so an expression naming the variable reports the
-// signedness of the declaration and says nothing about what was stored.
-
-// The eight-bit variable is resized by ResizeNarrowKnown in
-// src/simulator/statement_assign.cpp, the path ResizeToWidth takes for a value
-// with no x or z that fits in 64 bits.
 TEST(SignedExprSim, StoredValueOfNarrowSignedVariableIsSigned) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -302,11 +267,6 @@ TEST(SignedExprSim, StoredValueOfNarrowSignedVariableIsSigned) {
   EXPECT_TRUE(var->value.is_signed);
 }
 
-// The ninety-six-bit variable is resized by the other path of ResizeToWidth,
-// the one that builds its result with MakeLogic4Vec. Neither this test nor the
-// narrow one above states the rule alone. Together they say the two paths
-// answer alike, so the one assignment does not store the signed value
-// $signed returns as signed in a wide variable and as unsigned in a narrow one.
 TEST(SignedExprSim, StoredValueOfWideSignedVariableIsSigned) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -319,9 +279,6 @@ TEST(SignedExprSim, StoredValueOfWideSignedVariableIsSigned) {
   EXPECT_TRUE(var->value.is_signed);
 }
 
-// §11.7: `$unsigned` returns an unsigned value, so the stored flag is false.
-// This is the test that fails if the two paths of ResizeToWidth are made to
-// agree by setting the flag on every value they store.
 TEST(SignedExprSim, StoredValueOfUnsignedVariableIsUnsigned) {
   SimFixture f;
   auto* var = RunAndFindVar(

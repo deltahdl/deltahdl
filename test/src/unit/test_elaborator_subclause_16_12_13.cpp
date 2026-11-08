@@ -8,29 +8,18 @@ using namespace delta;
 
 namespace {
 
-// §16.12.13: a weak `eventually` with a bounded range is well-formed.
 TEST(EventuallyRange, WeakEventuallyAllowsBoundedRange) {
-  EXPECT_TRUE(
-      IsEventuallyRangeWellFormed(MakeEventuallyBound(5), /*strong=*/false));
+  EXPECT_TRUE(IsEventuallyRangeWellFormed(MakeEventuallyBound(5), false));
 }
 
-// §16.12.13: a weak eventually needs a finite range, so a `$` upper
-// bound is rejected for `eventually` (the `eventually [2:$]` form is illegal).
 TEST(EventuallyRange, WeakEventuallyRejectsUnboundedMaximum) {
-  EXPECT_FALSE(
-      IsEventuallyRangeWellFormed(MakeEventuallyDollar(), /*strong=*/false));
+  EXPECT_FALSE(IsEventuallyRangeWellFormed(MakeEventuallyDollar(), false));
 }
 
-// §16.12.13: the range for a strong eventually may be unbounded, so a `$` upper
-// bound is accepted for `s_eventually` even though the same bound is illegal
-// for the weak form.
 TEST(EventuallyRange, StrongEventuallyAllowsUnboundedMaximum) {
-  EXPECT_TRUE(
-      IsEventuallyRangeWellFormed(MakeEventuallyDollar(), /*strong=*/true));
+  EXPECT_TRUE(IsEventuallyRangeWellFormed(MakeEventuallyDollar(), true));
 }
 
-// §16.12.13: the bounds of a ranged eventually written as parameters are
-// non-negative: [NEG:HI] has the minimum -1, while [0:HI] is legal.
 TEST(EventuallyRangeElaboration, ANegativeParameterBoundIsReported) {
   const char* const kReport =
       "eventually range bounds shall be non-negative integer constant "

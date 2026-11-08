@@ -5,15 +5,10 @@
 
 namespace {
 
-// A.3.3 makes a gate's output and inout terminals a net_lvalue, as A.5.4 does
-// a user-defined primitive instance's output terminal, and A.8.5 writes the
-// selects under the net's name as a constant_select.
 const char* const kNonConstant =
     "a primitive's output or inout terminal selects with an expression that "
     "is not constant";
 
-// An index naming a variable is no constant expression, at a gate's output, a
-// switch's inout and a UDP instance's output alike (#7978).
 TEST(PrimitiveTerminalElaboration, ADrivenTerminalSelectByAVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -34,9 +29,6 @@ TEST(PrimitiveTerminalElaboration, ADrivenTerminalSelectByAVariableIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNonConstant, 10, "A.8.5"));
 }
 
-// A parameter, a localparam and the genvar of the loop generate block the
-// instance stands in are constant expressions, and a net or a variable named
-// whole, which §6.5 lets a primitive drive, selects with nothing.
 TEST(PrimitiveTerminalElaboration, ConstantSelectsAndWholeNamesAreNotReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -61,10 +53,6 @@ TEST(PrimitiveTerminalElaboration, ConstantSelectsAndWholeNamesAreNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.8.5 names a net in a net_lvalue through ps_or_hierarchical_net_identifier,
-// and §6.20 makes a parameter a constant that nothing drives, whether it is
-// named whole or selected, and whether the module or a generate block declares
-// it (#7981).
 TEST(PrimitiveTerminalElaboration, AParameterAsADrivenTerminalIsReported) {
   ElabFixture f;
   ElaborateSrc(

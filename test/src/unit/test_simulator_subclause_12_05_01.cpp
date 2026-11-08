@@ -17,10 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a case statement whose single non-default item matches the selector via
-// a pattern variable holding a don't-care (z) bit, returning the result value.
-// Shared by the casex and casez "Z in item treated as don't-care" tests, which
-// differ only in case_kind.
 uint64_t RunZInItemDontCare(StmtFixture& f, TokenKind case_kind) {
   auto* result_var = f.ctx.CreateVariable("czit", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -32,7 +28,7 @@ uint64_t RunZInItemDontCare(StmtFixture& f, TokenKind case_kind) {
 
   auto* pat_var = f.ctx.CreateVariable("pat_z", 4);
   pat_var->value = MakeLogic4Vec(f.arena, 4);
-  pat_var->value.words[0].aval = 0x02;  // bit0 = z = (aval=0, bval=1)
+  pat_var->value.words[0].aval = 0x02;
   pat_var->value.words[0].bval = 0x01;
 
   CaseItem item1;
@@ -49,11 +45,6 @@ uint64_t RunZInItemDontCare(StmtFixture& f, TokenKind case_kind) {
   return result_var->value.ToUint64();
 }
 
-// Runs a case statement where an earlier item (a pattern variable 8'b0000010z,
-// whose z bit is a don't-care under casex and casez alike, §12.5.1) and a
-// later literal item both match the selector 5, verifying first-match-wins
-// behavior. Shared by the casex and casez "first match wins" tests, which
-// differ in case_kind alone.
 uint64_t RunFirstMatchWins(StmtFixture& f, TokenKind case_kind) {
   auto* result_var = f.ctx.CreateVariable("cfm", 32);
   result_var->value = MakeLogic4VecVal(f.arena, 32, 0);
@@ -177,13 +168,6 @@ TEST(CasexStatementSim, CasexXInSelectorTreatedAsDontCare) {
       f, "x");
   ASSERT_NE(var, nullptr);
 
-  // §12.5.1: for casex, x (and z) bits in either the case_expression or a
-  // case_item are do-not-cares and drop out of the comparison. Here the
-  // selector r ^ 8'b0x0x0x0x = 8'b0x1x0x1x carries x in every odd bit, and
-  // item 8'b001100xx carries x in its two low bits. Skipping all of those, the
-  // surviving known bits (bit7=0, bit5=1, bit3=0) equal item1, so it matches
-  // and x = 1. A non-zero result here would mean the x bits were still being
-  // compared instead of ignored.
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
@@ -268,12 +252,6 @@ TEST(CasexStatementSim, CasexQuestionMarkDontCare) {
 
 TEST(CasexStatementSim, CasexZInSelectorIsDontCare) {
   SimFixture f;
-  // §12.5.1: casex treats BOTH x and z as do-not-cares. This exercises the z
-  // operand type (from a real z literal, not a ? and not an x): sel = 4'bz1z0
-  // carries z in bits 3 and 1. Under casex those bits drop out, so the known
-  // bits (bit2=1, bit0=0) match item 4'b0100 -> y = 10. Contrast the casez
-  // x-selector case, which does NOT match, and the casex x-selector case: here
-  // it is z (not x) that casex is ignoring, proving casex covers z as well.
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
@@ -347,7 +325,7 @@ TEST(CasezStatementSim, CasezWithZInSelector) {
 
   auto* sel_var = f.ctx.CreateVariable("sel_z", 8);
   sel_var->value = MakeLogic4Vec(f.arena, 8);
-  sel_var->value.words[0].aval = 0x02;  // bit0 = z = (aval=0, bval=1)
+  sel_var->value.words[0].aval = 0x02;
   sel_var->value.words[0].bval = 0x01;
 
   auto* stmt = f.arena.Create<Stmt>();
@@ -428,21 +406,11 @@ TEST(CasezStatementSim, CasezZInSelectorIsDontCare) {
       f, "x");
   ASSERT_NE(var, nullptr);
 
-  // §12.5.1: z in the case_expression is a do-not-care for casez, so bits 3 and
-  // 1 of sel=4'bz1z0 drop out and the surviving known bits (bit2=1, bit0=0)
-  // match the first item 4'b0100 -> x = 10. (z-in-selector IS a don't-care, per
-  // the test name; expecting the default 99 would mean z were significant.)
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(CasezStatementSim, CasezXInSelectorStaysSignificant) {
   SimFixture f;
-  // §12.5.1: casez treats only z (and ?) as do-not-care; x is a real value.
-  // sel = 4'bx1x0 differs from the z-selector case (4'bz1z0 matched 4'b0100)
-  // ONLY in that bits 3 and 1 are x instead of z. Because x is NOT dropped
-  // under casez, those bits are compared as ordinary values, no item's known
-  // bits can match an x, and control falls through to the default -> x = 99.
-  // A result of 10 here would mean x had been mistaken for a don't-care.
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
@@ -463,13 +431,6 @@ TEST(CasezStatementSim, CasezXInSelectorStaysSignificant) {
 
 TEST(CasezStatementSim, CasezXInItemStaysSignificant) {
   SimFixture f;
-  // §12.5.1 (negative, item side): under casez an x bit is a real value, not a
-  // do-not-care, wherever it sits. Here the x lives in a case_item (4'b1x1x)
-  // rather than the selector. sel = 4'b1010: the item's known bits (bit3=1,
-  // bit1=1) agree, but bits 2 and 0 hold x, which casez compares as ordinary
-  // values against sel's 0s -> no match, so control falls to default -> x = 99.
-  // The companion CasezDontCareInItem test uses z in the same positions and
-  // DOES match, isolating the x-vs-z difference at the item.
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
@@ -487,12 +448,6 @@ TEST(CasezStatementSim, CasezXInItemStaysSignificant) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.5.1 (printed page 322): an x bit under casez compares as a plain case
-// compares it, so it matches an x and nothing else -- an x of the selector
-// does not match the item's 1 in the same position, nor an x of the item the
-// selector's 1, while the x-for-x item does. The comparison read the value
-// half of each bit alone, which an x shares with a 1, so both mismatches
-// selected their item.
 TEST(CasezStatementSim, CasezXOverAOneStaysSignificant) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -536,14 +491,6 @@ TEST(CasezStatementSim, CasezDontCareInPatternOnly) {
 
 TEST(CasezStatementSim, CasezDontCareInItem) {
   SimFixture f;
-  // §12.5.1: a do-not-care in a case_item drops out just as one in the
-  // case_expression does. This drives the item-side rule from an explicit z
-  // literal (4'b1z1z), a distinct source form from the ? spelling exercised by
-  // CasezDontCareInPatternOnly. sel = 4'b1010: bits 2 and 0 of the item are z
-  // and are not considered, and the surviving bits (bit3=1, bit1=1) equal sel,
-  // so the first item matches -> x = 10. Pairs with
-  // CasezXInItemStaysSignificant (same positions, x instead of z) to show z is
-  // dropped where x is not.
   auto* var = RunAndFindVar(
       "module t;\n"
       "  logic [3:0] sel;\n"
@@ -586,8 +533,6 @@ TEST(CasezStatementSim, CasezFirstMatchWins) {
   EXPECT_EQ(RunFirstMatchWins(f, TokenKind::kKwCasez), 10u);
 }
 
-// §12.5.1 keeps §12.5's lengths and signedness: every expression is signed,
-// so s sign-extends to 8'hFF and matches.
 TEST(CasezStatementSim, AllSignedExpressionsSignExtend) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -601,7 +546,6 @@ TEST(CasezStatementSim, AllSignedExpressionsSignExtend) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-// The same for casex.
 TEST(CasexStatementSim, AllSignedExpressionsSignExtend) {
   SimFixture f;
   auto* v = RunAndFindVar(

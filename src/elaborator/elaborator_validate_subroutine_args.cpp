@@ -24,14 +24,6 @@ namespace delta {
 
 static bool IsValidOutputArg(const Expr* e) {
   if (!e) return false;
-  // §13.5: an output/inout actual is restricted to an expression that is valid
-  // on the left-hand side of a procedural assignment (§10.4). A concatenation
-  // is such an lvalue only when every element is itself a valid lvalue, so a
-  // concatenation containing a non-assignable element (e.g. a literal) is
-  // rejected just like a bare literal actual would be.
-  // §10.8 (printed page 260) counts the actual of an output or inout argument
-  // among the assignment-like contexts, so §10.9 lets a positional pattern of
-  // lvalues stand there as the side being assigned.
   if (e->kind == ExprKind::kConcatenation ||
       (e->kind == ExprKind::kAssignmentPattern && e->pattern_keys.empty())) {
     if (e->elements.empty()) return false;
@@ -105,9 +97,6 @@ static int ResolveCallArgIndex(const Expr* expr, size_t i,
 static std::string_view RefActualNetName(
     const Expr* e, const std::unordered_set<std::string_view>& nets);
 
-// §13.5 with §10.4: the net an output or inout actual names -- whole, through
-// a select, or as an element of a concatenation or positional pattern -- or
-// empty for none.
 static std::string_view OutputActualNetName(
     const Expr* e, const std::unordered_set<std::string_view>& nets) {
   if (e->kind != ExprKind::kConcatenation &&
@@ -161,10 +150,6 @@ static std::string_view RefActualNetName(
   return {};
 }
 
-// §13.5.2: a ref argument refers to a variable, so its actual names one --
-// whole, through a select or as a member -- and §10.8 excludes passing to a ref
-// argument from the assignment-like contexts, which leaves an untyped pattern
-// there no type to take. A net is no variable either.
 static void CheckRefArgs(const Expr* expr, const ModuleItem* func,
                          size_t positional_count,
                          const std::unordered_set<std::string_view>& net_names,
@@ -224,11 +209,6 @@ static void CheckVoidCallInExpr(
   if (!expr) return;
   if (expr->kind == ExprKind::kCall && !expr->callee.empty()) {
     auto it = func_decls.find(expr->callee);
-    // §35.5.5 lets an imported function declare `void` for its result, and
-    // §35.5 makes its usage that of a native function, so §13.4.1's rule about
-    // a void function used as an operand reaches an import as well. An
-    // imported task is excluded here rather than by its result type, which
-    // §35.5.4 leaves unwritten for one.
     if (it != func_decls.end() &&
         (it->second->kind == ModuleItemKind::kFunctionDecl ||
          (it->second->kind == ModuleItemKind::kDpiImport &&
@@ -320,12 +300,6 @@ static void CheckEventExprSingular(
                  Subclause("9.4.2"));
     }
   }
-  // §9.4.2: an aggregate may appear in an event expression as long as the
-  // expression reduces to a singular value. A member select such as `s.a`
-  // yields a singular result, so the aggregate object on the left of the `.`
-  // need not itself be singular — do not flag it. (Element selects like
-  // `arr[0]` carry their operand in the base/index fields, which are already
-  // not walked here.)
   if (expr->kind != ExprKind::kMemberAccess) {
     CheckEventExprSingular(expr->lhs, non_singular_vars, non_singular_funcs,
                            diag);
@@ -344,23 +318,12 @@ static void CheckEventExprSingular(
     CheckEventExprSingular(e, non_singular_vars, non_singular_funcs, diag);
 }
 
-// §9.4.2 holds every event expression to a singular value and puts no
-// condition on where the statement carrying the event control stands; A.6.4
-// makes a procedural_timing_control_statement a statement_item, and the
-// clause's own example writes three event controls inside a fork-join. Every
-// position a statement holds a statement in is therefore one this check is owed
-// at, and ForEachChildStmt in elaborator_validate_internal.h states those
-// positions once for the whole elaborator. It hands the visitor the field
-// itself, so a walk that only reads the tree takes a `Stmt* const&`.
 static void WalkStmtForEventSingular(
     const Stmt* s,
     const std::unordered_set<std::string_view>& non_singular_vars,
     const std::unordered_set<std::string_view>& non_singular_funcs,
     DiagEngine& diag) {
   if (!s) return;
-  // An event control's events, and the intra-assignment event control a
-  // blocking or nonblocking assignment carries (§9.4.5), `x = @(e) y;`; no
-  // other statement holds any.
   for (const auto& ev : s->events) {
     CheckEventExprSingular(ev.signal, non_singular_vars, non_singular_funcs,
                            diag);
@@ -416,10 +379,6 @@ static void WalkExprForCallArgs(
     WalkExprForCallArgs(e, func_decls, net_names, diag);
 }
 
-// The name a call statement whose expression is `e` calls with its
-// parentheses left off, as the walk's map keys it: a name alone or a
-// package-scoped name, `p::g`, written as the statement or within its void
-// cast (A.6.9). Empty for any other statement.
 static std::string ParenOmittedCallName(const Expr* e) {
   if (e->kind == ExprKind::kCast) e = e->lhs;
   if (e->kind == ExprKind::kIdentifier) return std::string(e->text);
@@ -427,9 +386,6 @@ static std::string ParenOmittedCallName(const Expr* e) {
   return std::format("{}::{}", e->lhs->text, e->rhs->text);
 }
 
-// §13.5.5 with A.8.2's footnote 42: a call statement whose expression `e`
-// calls the subroutine `name` with its parentheses left off; check that the
-// omission is legal here.
 static void CheckParenOmittedCall(
     const Expr* e, std::string_view name,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -437,10 +393,6 @@ static void CheckParenOmittedCall(
   auto it = func_decls.find(name);
   if (it == func_decls.end()) return;
   const auto* func = it->second;
-  // §35.5: an imported function is used much as a native SystemVerilog function
-  // is, so §13.5.5 decides an imported subroutine's paren-omitted call by what
-  // §35.5.4 declared it as. A task is a task by its keyword, and a function is
-  // void by the result type §35.5.5 required it to state.
   bool is_import = func->kind == ModuleItemKind::kDpiImport;
   bool is_task = func->kind == ModuleItemKind::kTaskDecl ||
                  (is_import && func->dpi_is_task);
@@ -455,8 +407,6 @@ static void CheckParenOmittedCall(
                Subclause("13.5.5"));
     return;
   }
-  // §13.5.5: parentheses may be omitted only when the subroutine has
-  // no formal arguments, or when every formal has a default value.
   bool all_have_defaults = true;
   for (const auto& arg : func->func_args) {
     if (!arg.default_value) {
@@ -473,15 +423,9 @@ static void CheckParenOmittedCall(
   }
 }
 
-// §13.4.1: what a statement calling a nonvoid function may do about the
-// result it discards.
 constexpr std::string_view kCastToVoid = "cast to void to silence this warning";
 
 bool ReturnsAValue(const ModuleItem* subroutine) {
-  // §35.5 makes an imported function's usage that of a native one, so §13.4.1's
-  // warning about a discarded result covers a call to one. An imported task is
-  // excluded by its keyword: §35.5.4 writes no result type for one, so its
-  // result type would otherwise read as a non-void type here.
   return (subroutine->kind == ModuleItemKind::kFunctionDecl ||
           (subroutine->kind == ModuleItemKind::kDpiImport &&
            !subroutine->dpi_is_task)) &&
@@ -497,9 +441,6 @@ void WarnDiscardedReturn(SourceLoc loc, std::string_view callee,
                Subclause("13.4.1"));
 }
 
-// §13.4.1: an expression-statement call discards its result; warn if it is a
-// nonvoid function (a void'(...) cast wraps the call in a kCast and so does not
-// reach this check). Also checks the argument expressions for void operands.
 static void CheckDiscardedCallStmt(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -511,10 +452,6 @@ static void CheckDiscardedCallStmt(
   WarnDiscardedReturn(s->expr->range.start, s->expr->callee, kCastToVoid, diag);
 }
 
-// §13.4.1: a statement calling one of the standard's system functions
-// discards its result as one calling a nonvoid function does. A statement
-// calling $cast, $system or $stacktrace calls the task, which
-// IsStandardSystemFunction leaves out.
 static void CheckDiscardedSystemCallStmt(const Stmt* s, DiagEngine& diag) {
   if (s->expr == nullptr || s->kind != StmtKind::kExprStmt ||
       s->expr->kind != ExprKind::kSystemCall ||
@@ -524,8 +461,6 @@ static void CheckDiscardedSystemCallStmt(const Stmt* s, DiagEngine& diag) {
   WarnDiscardedReturn(s->expr->range.start, s->expr->callee, kCastToVoid, diag);
 }
 
-// §9.4.2: an event expression cannot call functions with out/inout/ref
-// arguments, cannot call tasks, and must yield singular values.
 static void CheckEventControlCalls(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -546,14 +481,6 @@ static void WalkStmtForCallArgs(
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
     const std::unordered_set<std::string_view>& net_names, DiagEngine& diag);
 
-// Recurse into every substatement and sub-expression of `s`. A.6.4 makes a
-// subroutine_call_statement a statement_item and none of §13.5, §13.5.2,
-// §13.5.3, §13.5.4, §13.5.5, §13.4.1, §13.4 or §9.4.2 conditions its rule on
-// where the call stands, so every position a statement holds a statement in is
-// one these reports are owed at; §13.4.4 settles the fork arms, a fork-join
-// inside a function holding any statement legal within a task. ForEachChildStmt
-// in elaborator_validate_internal.h states those positions once for the whole
-// elaborator, which is why the list is not written out again here.
 static void WalkChildStmtsForCallArgs(
     const Stmt* s,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -594,9 +521,6 @@ static void WalkStmtForCallArgs(
     CheckCallNoOutInoutRefInExpr(s->rhs, func_decls, diag,
                                  "a procedural continuous assignment");
   }
-  // §9.4.2 and §13.4: the events of an event control, and of the
-  // intra-assignment event control a blocking or nonblocking assignment
-  // carries (§9.4.5), `a = @(f(y)) b;`, are event expressions alike.
   if (!s->events.empty()) CheckEventControlCalls(s, func_decls, diag);
   WalkChildStmtsForCallArgs(s, func_decls, net_names, diag);
 }
@@ -608,18 +532,11 @@ static std::unordered_map<std::string_view, const ModuleItem*> BuildAllDecls(
       func_decls;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kTaskDecl) all_decls[item->name] = item;
-    // §35.5: an imported function is used much as a native SystemVerilog
-    // function is, so the §13.5 checks over a call's actuals apply to a
-    // subroutine §35.5.4 declared as an import. Its formal list is in the same
-    // ModuleItem::func_args field, and each check below reads the declaration's
-    // kind where the rule turns on it.
     if (item->kind == ModuleItemKind::kDpiImport) all_decls[item->name] = item;
   }
   return all_decls;
 }
 
-// Collects names of variables whose declared type is non-singular (an unpacked
-// array or unpacked struct/union).
 static std::unordered_set<std::string_view> CollectNonSingularVars(
     const ModuleDecl* decl) {
   std::unordered_set<std::string_view> non_singular_vars;
@@ -635,8 +552,6 @@ static std::unordered_set<std::string_view> CollectNonSingularVars(
   return non_singular_vars;
 }
 
-// Collects names of functions whose return type is non-singular (an unpacked
-// struct/union), drawn from `decl` and the elaborator's known functions.
 static std::unordered_set<std::string_view> CollectNonSingularFuncs(
     const ModuleDecl* decl,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
@@ -654,24 +569,15 @@ static std::unordered_set<std::string_view> CollectNonSingularFuncs(
   return non_singular_funcs;
 }
 
-// The set of per-module lookup tables consulted while validating subroutine
-// calls and event expressions (§9.4.2, §13.4.x, §13.5.5). These travel together
-// as one validation context: the map of callable subroutines, the net names
-// (for ref-arg legality), and the sets of non-singular variables/functions
-// (for event-expression singular-value checks), plus the diagnostic sink.
 struct SubroutineCallContext {
   const std::unordered_map<std::string_view, const ModuleItem*>& all_decls;
   const std::unordered_set<std::string_view>& net_names;
   const std::unordered_set<std::string_view>& non_singular_vars;
   const std::unordered_set<std::string_view>& non_singular_funcs;
   DiagEngine& diag;
-  // The classes of the unit, whose members a method's name alone calls first.
   const SoleClassIndex& classes;
 };
 
-// Validates one sensitivity-list event expression (the `signal` and
-// `iff_condition` of a single entry): call legality, no task calls, and
-// singular-value requirements.
 static void ValidateSensitivityEntry(const Expr* signal,
                                      const Expr* iff_condition,
                                      const SubroutineCallContext& ctx) {
@@ -689,8 +595,6 @@ static void ValidateSensitivityEntry(const Expr* signal,
                          ctx.non_singular_funcs, ctx.diag);
 }
 
-// Validates the event expressions in a procedural block's body and sensitivity
-// list: call legality, no task calls, and singular-value requirements.
 static void ValidateProcBlockEvents(const ModuleItem* item,
                                     const SubroutineCallContext& ctx) {
   WalkStmtForCallArgs(item->body, ctx.all_decls, ctx.net_names, ctx.diag);
@@ -703,7 +607,6 @@ static void ValidateProcBlockEvents(const ModuleItem* item,
   }
 }
 
-// Validates the subroutine-call rules in a function or task body.
 static void ValidateSubroutineBodyCallArgs(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
@@ -713,7 +616,6 @@ static void ValidateSubroutineBodyCallArgs(
   }
 }
 
-// Validates the subroutine-call rules in a continuous assignment's RHS.
 static void ValidateContAssignCallArgs(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, const ModuleItem*>& all_decls,
@@ -727,7 +629,6 @@ static void ValidateContAssignCallArgs(
 static void ValidateCallArgsInItem(const ModuleItem* item,
                                    const SubroutineCallContext& ctx);
 
-// The context `ctx` with the subroutines `decls` in place of its own.
 static SubroutineCallContext WithDecls(
     const SubroutineCallContext& ctx,
     const std::unordered_map<std::string_view, const ModuleItem*>& decls) {
@@ -736,8 +637,6 @@ static SubroutineCallContext WithDecls(
       ctx.diag, ctx.classes};
 }
 
-// Keys each task and function the items `items` declare in `decls` by its
-// name.
 static void AddSubroutines(
     const std::vector<ModuleItem*>& items,
     std::unordered_map<std::string_view, const ModuleItem*>& decls) {
@@ -749,8 +648,6 @@ static void AddSubroutines(
   }
 }
 
-// §27.1 with §23.9: the items `items` of one generate block, walked as the
-// module's are, the tasks and functions the block declares callable within it.
 static void ValidateCallArgsInBlock(const std::vector<ModuleItem*>& items,
                                     const SubroutineCallContext& ctx) {
   std::unordered_map<std::string_view, const ModuleItem*> decls = ctx.all_decls;
@@ -759,9 +656,6 @@ static void ValidateCallArgsInBlock(const std::vector<ModuleItem*>& items,
   for (const ModuleItem* item : items) ValidateCallArgsInItem(item, kInner);
 }
 
-// §27.4 and §27.5: each block of the generate construct `construct`: a loop's
-// one block, each block of a conditional construct and of the else chain after
-// it, and each case item's block.
 static void ValidateCallArgsInGenerate(const ModuleItem& construct,
                                        const SubroutineCallContext& ctx) {
   for (const ModuleItem* branch = &construct; branch != nullptr;
@@ -773,13 +667,6 @@ static void ValidateCallArgsInGenerate(const ModuleItem& construct,
   }
 }
 
-// §8.13: each method body the class `cls` writes, and those of the classes
-// nested in it (§8.23), walked with every name the class or a class it extends
-// declares taken out of the scope's subroutines. A name alone calls that
-// member first, and a method may leave its parentheses off (footnote 42 of
-// A.8.2). Where the names are not known in full, a class extending its type
-// parameter or a class no scope declares, any name may be a member's, so the
-// methods are left alone.
 static void ValidateCallArgsInClass(const ClassDecl& cls,
                                     const SubroutineCallContext& ctx) {
   std::unordered_set<std::string_view> members;
@@ -798,8 +685,6 @@ static void ValidateCallArgsInClass(const ClassDecl& cls,
   }
 }
 
-// Validates the subroutine-call rules in one item, a generate construct's
-// blocks and a class's methods among them.
 static void ValidateCallArgsInItem(const ModuleItem* item,
                                    const SubroutineCallContext& ctx) {
   if (IsProceduralItemKind(item->kind)) {
@@ -822,7 +707,6 @@ static void ValidateCallArgsInItem(const ModuleItem* item,
   if (item->kind == ModuleItemKind::kContAssign) {
     ValidateContAssignCallArgs(item, ctx.all_decls, ctx.diag);
   }
-  // §13.4: a declaration's initializer stands in no procedural statement.
   CheckCallNoOutInoutRefInExpr(item->init_expr, ctx.all_decls, ctx.diag,
                                "a declaration's initializer");
 }
@@ -830,9 +714,6 @@ static void ValidateCallArgsInItem(const ModuleItem* item,
 void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
   std::unordered_map<std::string_view, const ModuleItem*> all_decls =
       BuildAllDecls(decl, func_decls_);
-  // A call scoped by a package, `p::g;`, leaves its parentheses off by the
-  // same rule as one by a name alone, so each subroutine of a package is
-  // keyed by its scoped name as well.
   for (const PackageDecl* package : unit_->packages) {
     for (const ModuleItem* item : package->items) {
       if (item->kind != ModuleItemKind::kFunctionDecl &&
@@ -865,8 +746,6 @@ void Elaborator::ValidateSubroutineCallArgs(const ModuleDecl* decl) {
 void ValidateUnitClassCallArgs(const CompilationUnit& unit, DiagEngine& diag) {
   const SoleClassIndex kClasses(unit);
   const std::unordered_set<std::string_view> kNone;
-  // A package's classes see its subroutines, and the unit's classes the
-  // unit's; a package sees nothing the unit declares (§26.3).
   auto walk_site = [&](const std::vector<ModuleItem*>& items,
                        const std::vector<ClassDecl*>& classes) {
     std::unordered_map<std::string_view, const ModuleItem*> decls;

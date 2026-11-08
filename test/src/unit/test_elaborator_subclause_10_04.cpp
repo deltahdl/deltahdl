@@ -13,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §10.4: the left-hand side of a procedural assignment shall be a variable.
-// Positive anchor — a variable LHS is accepted, confirming the net-target check
-// does not reject legitimate variable targets.
 TEST(ProceduralAssignmentElaboration, VariableLhsIsAccepted) {
   SimFixture f;
   ElaborateSrc(
@@ -29,14 +26,6 @@ TEST(ProceduralAssignmentElaboration, VariableLhsIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.4 requires that the left-hand side of a procedural assignment be a
-// variable, and admits four forms for it: a singular variable (§6.4), an
-// aggregate variable (Clause 7), a bit-select, part-select or slice of a packed
-// array, and a slice of an unpacked array. A net is none of the four, so the
-// report cites §10.4. §6.5 says that a net cannot be procedurally assigned, but
-// says it as what follows for a net from the requirement §10.4 places on the
-// assignment, so it is not the citation however the check is written -- this
-// one reads the module's net names, which is a mechanism and not the rule.
 TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -52,11 +41,6 @@ TEST(ProceduralAssignmentElaboration, ProceduralAssignToNetIsError) {
                             4, "10.4"));
 }
 
-// §10.4 (printed page 251) with §11.4.14.3 (printed page 292): a streaming
-// concatenation written as a procedural assignment's target unpacks the stream
-// into variables, so a net among its stream expressions, or among a nested
-// one's, is reported as a net written directly is, and the variable beside it
-// is not.
 TEST(ProceduralAssignmentElaboration, NetInStreamingTargetIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -124,9 +108,6 @@ TEST(ProceduralAssignmentElaboration, ConcatenationContainingNetIsError) {
                             5, "10.4"));
 }
 
-// §10.4 with §23.2.2.1 (printed pages 731 and 732): a non-ANSI port declared
-// with no net or variable type, which the body never declares again, is a net,
-// so a procedural assignment to it is reported as one to a declared net is.
 TEST(ProceduralAssignmentElaboration, AssignToUndeclaredNonAnsiPortIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -142,8 +123,6 @@ TEST(ProceduralAssignmentElaboration, AssignToUndeclaredNonAnsiPortIsError) {
                             4, "10.4"));
 }
 
-// §23.2.2.1: the body declaring that port again as a variable makes it one, and
-// a variable takes the procedural assignment.
 TEST(ProceduralAssignmentElaboration, AssignToNonAnsiPortDeclaredAVariable) {
   SimFixture f;
   ElaborateSrc(
@@ -158,8 +137,6 @@ TEST(ProceduralAssignmentElaboration, AssignToNonAnsiPortDeclaredAVariable) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.4 holds wherever the procedural assignment stands: in a task, in a
-// function and in a process of a generate block.
 TEST(ProceduralAssignmentElaboration, NetTargetInSubroutineOrGenerateIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -177,9 +154,6 @@ TEST(ProceduralAssignmentElaboration, NetTargetInSubroutineOrGenerateIsError) {
   }
 }
 
-// §23.9: a block's own variable, a subroutine's formal and a loop's variable
-// are what an assignment within their scope names, even where a module net
-// has the same name.
 TEST(ProceduralAssignmentElaboration, LocalNameShadowingNetIsAccepted) {
   SimFixture f;
   ElaborateSrc(
@@ -194,9 +168,6 @@ TEST(ProceduralAssignmentElaboration, LocalNameShadowingNetIsAccepted) {
             nullptr);
 }
 
-// Syntax 10-2 (printed page 252): only the expression form of a blocking
-// assignment takes an intra-assignment delay or event control, and the forms
-// that assign a dynamic array's or a class's new take none.
 TEST(ProceduralAssignmentElaboration, TimingControlOnAssignmentOfNewIsError) {
   SimFixture f;
   ElaborateSrc(
@@ -220,10 +191,6 @@ TEST(ProceduralAssignmentElaboration, TimingControlOnAssignmentOfNewIsError) {
                              6, "10.4"));
 }
 
-// §6.19 makes the names an enumeration declares named constants, and Syntax
-// 10-2 writes the target of a blocking or nonblocking assignment as a
-// variable_lvalue, which a constant is not. An assignment to one is reported,
-// whole or as an element of a concatenation, and the variable `q` is not.
 TEST(ProceduralAssignmentElaboration,
      AssignmentOfAnEnumerationConstantIsError) {
   SimFixture f;
@@ -251,9 +218,6 @@ TEST(ProceduralAssignmentElaboration,
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "of constant", 8, "10.4"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a task or a
-// function declared inside one assigns no net procedurally, and assigns a
-// variable.
 TEST(ProceduralAssignmentElaboration,
      NetTargetInSubroutineInsideGenerateBlocksIsRejected) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(

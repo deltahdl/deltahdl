@@ -10,8 +10,6 @@
 namespace delta {
 
 bool SequenceInvolvesLocalVariables(const SequenceExpr& sequence) {
-  // §F.3.2: the two local variable forms of R; every other form only carries
-  // operands that may hold one.
   switch (sequence.kind) {
     case SequenceExpr::Kind::kLocalVarDecl:
     case SequenceExpr::Kind::kLocalVarSampling:
@@ -34,8 +32,6 @@ bool SequenceInvolvesLocalVariables(const SequenceExpr& sequence) {
 }
 
 bool PropertyInvolvesLocalVariables(const PropertyExpr& property) {
-  // §F.3.2 P: no form of its own declares or samples a local variable, so the
-  // question passes to the sequence operand and the sub-properties.
   return (property.sequence &&
           SequenceInvolvesLocalVariables(*property.sequence)) ||
          (property.lhs && PropertyInvolvesLocalVariables(*property.lhs)) ||
@@ -48,7 +44,6 @@ bool TopLevelPropertyInvolvesLocalVariables(const TopLevelProperty& top) {
 }
 
 bool ClockedPropertyInvolvesLocalVariables(const ClockedProperty& property) {
-  // §F.3.2 Q: as for P, only the sequence operands can hold one.
   return (property.sequence &&
           SequenceInvolvesLocalVariables(*property.sequence)) ||
          (property.lhs &&
@@ -65,8 +60,6 @@ bool ClockedTopLevelPropertyInvolvesLocalVariables(
 }
 
 bool AssertionInvolvesLocalVariables(const AssertionStatement& assertion) {
-  // §F.3.2 A: the clock c is a Boolean and holds no local variable, so only
-  // the top-level body can.
   switch (assertion.form) {
     case AssertionStatement::Form::kExplicitClock:
       return assertion.top &&
@@ -82,8 +75,6 @@ bool AssertionInvolvesLocalVariables(const AssertionStatement& assertion) {
 namespace {
 
 LvProperty::Kind LvKindOf(PropertyExpr::Kind kind) {
-  // The §F.5.6.1 model repeats the §F.5.3.1 forms one for one and adds the
-  // declaration, which no §F.5.3 property has.
   switch (kind) {
     case PropertyExpr::Kind::kStrong:
       return LvProperty::Kind::kStrong;

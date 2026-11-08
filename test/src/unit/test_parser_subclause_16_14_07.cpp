@@ -48,9 +48,6 @@ TEST(AssertionParsing, InferredDisableInProperty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.14.7: $inferred_clock shall only be used as the default value for a
-// formal argument that is untyped or of type event. An `event`-typed formal is
-// one of the two permitted forms, so its $inferred_clock default is accepted.
 TEST(AssertionParsing, InferredClockDefaultOnEventFormalIsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -63,8 +60,6 @@ TEST(AssertionParsing, InferredClockDefaultOnEventFormalIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.14.7 (negative): a data-typed formal is neither untyped nor of type
-// event, so defaulting it to $inferred_clock is illegal and shall be rejected.
 TEST(AssertionParsing, InferredClockDefaultOnTypedFormalIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -80,9 +75,6 @@ TEST(AssertionParsing, InferredClockDefaultOnTypedFormalIsRejected) {
                             3, "16.14.7"));
 }
 
-// §16.14.7 (negative): a formal declared with the `property` type keyword is
-// neither untyped nor of type event, so a $inferred_clock default on it is
-// rejected. Exercises the property-type branch of the placement check.
 TEST(AssertionParsing, InferredClockDefaultOnPropertyFormalIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -98,9 +90,6 @@ TEST(AssertionParsing, InferredClockDefaultOnPropertyFormalIsRejected) {
                             3, "16.14.7"));
 }
 
-// §16.14.7 (negative): a formal declared with the `sequence` type keyword is
-// likewise neither untyped nor of type event, so a $inferred_clock default on
-// it is rejected. Exercises the sequence-type branch of the placement check.
 TEST(AssertionParsing, InferredClockDefaultOnSequenceFormalIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -116,9 +105,6 @@ TEST(AssertionParsing, InferredClockDefaultOnSequenceFormalIsRejected) {
                             3, "16.14.7"));
 }
 
-// §16.14.7: the untyped/event-formal restriction on a $inferred_clock default
-// applies in a sequence declaration too. An untyped sequence formal is a
-// permitted form, so its $inferred_clock default is accepted.
 TEST(AssertionParsing, InferredClockDefaultOnUntypedSequenceFormalIsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -131,9 +117,6 @@ TEST(AssertionParsing, InferredClockDefaultOnUntypedSequenceFormalIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.14.7 (negative): a data-typed sequence formal is neither untyped nor of
-// type event, so defaulting it to $inferred_clock is rejected — the same rule
-// as for a property formal, observed at the sequence port scanner.
 TEST(AssertionParsing, InferredClockDefaultOnTypedSequenceFormalIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -149,10 +132,6 @@ TEST(AssertionParsing, InferredClockDefaultOnTypedSequenceFormalIsRejected) {
                             3, "16.14.7"));
 }
 
-// §16.14.7 (negative): an inferred clocking or disable function shall be used
-// only as the ENTIRE default value expression of a formal. Combining
-// $inferred_disable into a larger expression is illegal — observed at the
-// property port scanner.
 TEST(AssertionParsing, InferredFunctionAsPartialDefaultInPropertyIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -168,9 +147,6 @@ TEST(AssertionParsing, InferredFunctionAsPartialDefaultInPropertyIsRejected) {
                             3, "16.14.7"));
 }
 
-// §16.14.7 (negative): the same entire-default restriction holds for a sequence
-// formal — a $inferred_clock call followed by more of the default expression is
-// rejected at the sequence port scanner.
 TEST(AssertionParsing, InferredFunctionAsPartialDefaultInSequenceIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -199,10 +175,6 @@ TEST(AssertionParsing, InferredClockAndDisableTogether) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.14.7 with §16.8: a formal that writes no type takes the data type of the
-// formal before it, so `e` after `shortint d` is a shortint, and a
-// $inferred_clock default on it is rejected in a sequence's port list as in a
-// property's.
 TEST(AssertionParsing, InferredClockDefaultOnACarriedDataTypeIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -217,8 +189,6 @@ TEST(AssertionParsing, InferredClockDefaultOnACarriedDataTypeIsRejected) {
                             2, "16.14.7"));
 }
 
-// `untyped` and `event` end the carried type, so a $inferred_clock default on
-// a formal after either stands, the data type before them notwithstanding.
 TEST(AssertionParsing, InferredClockDefaultAfterUntypedOrEventIsAccepted) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -229,9 +199,6 @@ TEST(AssertionParsing, InferredClockDefaultAfterUntypedOrEventIsAccepted) {
               "endmodule\n"));
 }
 
-// §16.14.7: a formal of a user-defined type has a data type, so a
-// $inferred_clock default on it is rejected in a property's port list, the
-// `event` formal before it notwithstanding (#7308).
 TEST(AssertionParsing, InferredClockDefaultOnAUserDefinedTypeIsRejected) {
   auto r = Parse(
       "module m;\n"

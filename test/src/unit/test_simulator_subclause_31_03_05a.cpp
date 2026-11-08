@@ -10,13 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.5 ($recovery) defines the violation window relative to the reference
-// (timestamp) event: begin = timestamp time, end = timestamp time + limit, with
-// a violation when begin <= timecheck time < end -- only the end of the window
-// is excluded from the violation region. CheckRecoveryViolation carries this;
-// the window is byte-identical to $hold (§31.3.2). A zero limit collapses the
-// window so no transition can violate it.
-
 TimingCheckEntry MakeRecovery(uint64_t limit) {
   TimingCheckEntry tc;
   tc.kind = TimingCheckKind::kRecovery;

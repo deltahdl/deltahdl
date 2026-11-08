@@ -8,7 +8,6 @@
 using namespace delta;
 namespace {
 
-// Syntax 23-5: "zero" case — a module definition may contain no module items.
 TEST(ModuleItemsParsing, EmptyModuleBody) {
   auto r = Parse("module m; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -17,8 +16,6 @@ TEST(ModuleItemsParsing, EmptyModuleBody) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-// Syntax 23-5: "more" case — a module definition may contain many module items
-// of several different alternatives at once.
 TEST(ModuleItemsParsing, AllModuleItemAlternatives) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -45,7 +42,6 @@ TEST(ModuleItemsParsing, AllModuleItemAlternatives) {
   EXPECT_GE(r.cu->modules[0]->items.size(), 10u);
 }
 
-// module_common_item alternative: continuous_assign.
 TEST(ModuleItemsParsing, ContinuousAssign) {
   auto r = Parse(
       "module m;\n"
@@ -58,7 +54,6 @@ TEST(ModuleItemsParsing, ContinuousAssign) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kContAssign));
 }
 
-// module_common_item alternative: initial_construct.
 TEST(ModuleItemsParsing, InitialConstruct) {
   auto r = Parse(
       "module m;\n"
@@ -70,7 +65,6 @@ TEST(ModuleItemsParsing, InitialConstruct) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kInitialBlock));
 }
 
-// module_common_item alternative: final_construct.
 TEST(ModuleItemsParsing, FinalConstruct) {
   auto r = Parse(
       "module m;\n"
@@ -82,9 +76,6 @@ TEST(ModuleItemsParsing, FinalConstruct) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kFinalBlock));
 }
 
-// module_common_item alternative: always_construct. The four always_keyword
-// kinds are a §9.2 distinction; §23.2.4 only requires always_construct to be a
-// module item, so a single observer suffices here.
 TEST(ModuleItemsParsing, AlwaysConstructPlain) {
   auto r = Parse(
       "module m;\n"
@@ -95,7 +86,6 @@ TEST(ModuleItemsParsing, AlwaysConstructPlain) {
   EXPECT_TRUE(HasAlwaysOfKind(r.cu->modules[0]->items, AlwaysKind::kAlways));
 }
 
-// module_common_item alternative: loop_generate_construct.
 TEST(ModuleItemsParsing, LoopGenerateConstruct) {
   auto r = Parse(
       "module m;\n"
@@ -110,8 +100,6 @@ TEST(ModuleItemsParsing, LoopGenerateConstruct) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateFor));
 }
 
-// module_common_item alternative: conditional_generate_construct. The if vs
-// case forms are a §27.5 distinction, so one observer covers §23.2.4.
 TEST(ModuleItemsParsing, ConditionalGenerateIf) {
   auto r = Parse(
       "module m;\n"
@@ -125,8 +113,6 @@ TEST(ModuleItemsParsing, ConditionalGenerateIf) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGenerateIf));
 }
 
-// module_or_generate_item alternative: parameter_override (BNF-6). The number
-// of defparam assignments is a list_of_defparam_assignments (A.2.4) detail.
 TEST(ModuleItemsParsing, ParameterOverride) {
   auto r = Parse(
       "module m;\n"
@@ -138,7 +124,6 @@ TEST(ModuleItemsParsing, ParameterOverride) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kDefparam));
 }
 
-// module_or_generate_item alternative: gate_instantiation.
 TEST(ModuleItemsParsing, GateInstantiation) {
   auto r = Parse(
       "module m;\n"
@@ -150,7 +135,6 @@ TEST(ModuleItemsParsing, GateInstantiation) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kGateInst));
 }
 
-// module_or_generate_item alternative: udp_instantiation.
 TEST(ModuleItemsParsing, UdpInstantiation) {
   auto r = Parse(
       "primitive my_udp(output y, input a, b);\n"
@@ -169,7 +153,6 @@ TEST(ModuleItemsParsing, UdpInstantiation) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kUdpInst));
 }
 
-// module_or_generate_item alternative: module_instantiation.
 TEST(ModuleItemsParsing, ModuleInstantiation) {
   auto r = Parse(
       "module m;\n"
@@ -181,8 +164,6 @@ TEST(ModuleItemsParsing, ModuleInstantiation) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
-// module_common_item alternative: interface_instantiation. A distinct Syntax
-// 23-5 alternative even though the parser shares the instantiation AST kind.
 TEST(ModuleItemsParsing, InterfaceInstantiation) {
   auto r = Parse(
       "module m;\n"
@@ -194,7 +175,6 @@ TEST(ModuleItemsParsing, InterfaceInstantiation) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
-// module_common_item alternative: program_instantiation.
 TEST(ModuleItemsParsing, ProgramInstantiationInModule) {
   auto r = Parse(
       "program prg;\n"
@@ -209,8 +189,6 @@ TEST(ModuleItemsParsing, ProgramInstantiationInModule) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kModuleInst));
 }
 
-// module_common_item alternative: assertion_item. The assert/assume/cover/
-// restrict forms are a §16.14.6 distinction, so one observer covers §23.2.4.
 TEST(ModuleItemsParsing, AssertionItem) {
   auto r = Parse(
       "module m;\n"
@@ -222,8 +200,6 @@ TEST(ModuleItemsParsing, AssertionItem) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAssertProperty));
 }
 
-// module_common_item alternative: bind_directive. Recorded on the enclosing
-// module rather than its item list.
 TEST(ModuleItemsParsing, BindDirectiveAsModuleItem) {
   auto r = Parse(
       "module m;\n"
@@ -235,8 +211,6 @@ TEST(ModuleItemsParsing, BindDirectiveAsModuleItem) {
   EXPECT_EQ(r.cu->modules[0]->bind_directives.size(), 1u);
 }
 
-// module_common_item alternative: net_alias. The number of aliased nets is a
-// §10.11 detail, not a §23.2.4 distinction.
 TEST(ModuleItemsParsing, NetAlias) {
   auto r = Parse(
       "module m;\n"
@@ -248,8 +222,6 @@ TEST(ModuleItemsParsing, NetAlias) {
   EXPECT_TRUE(HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kAlias));
 }
 
-// module_or_generate_item_declaration alternative:
-// package_or_generate_item_declaration (here a class declaration).
 TEST(ModuleItemsParsing, ClassInsideModule) {
   auto r = Parse(
       "module m;\n"
@@ -264,7 +236,6 @@ TEST(ModuleItemsParsing, ClassInsideModule) {
   EXPECT_EQ(cls->name, "inner_cls");
 }
 
-// module_or_generate_item_declaration alternative: genvar_declaration.
 TEST(ModuleItemsParsing, GenvarDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -274,7 +245,6 @@ TEST(ModuleItemsParsing, GenvarDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// module_or_generate_item_declaration alternative: clocking_declaration.
 TEST(ModuleItemsParsing, ClockingDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -287,7 +257,6 @@ TEST(ModuleItemsParsing, ClockingDeclaration) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kClockingBlock));
 }
 
-// module_or_generate_item_declaration alternative: default clocking ... ;
 TEST(ModuleItemsParsing, DefaultClocking) {
   auto r = Parse(
       "module m;\n"
@@ -299,7 +268,6 @@ TEST(ModuleItemsParsing, DefaultClocking) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// module_or_generate_item_declaration alternative: default disable iff ... ;
 TEST(ModuleItemsParsing, DefaultDisableIff) {
   auto r = Parse(
       "module m;\n"
@@ -311,7 +279,6 @@ TEST(ModuleItemsParsing, DefaultDisableIff) {
                             ModuleItemKind::kDefaultDisableIff));
 }
 
-// non_port_module_item alternative: generate_region.
 TEST(ModuleItemsParsing, GenerateRegion) {
   auto r = Parse(
       "module m;\n"
@@ -323,7 +290,6 @@ TEST(ModuleItemsParsing, GenerateRegion) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// non_port_module_item alternative: specify_block.
 TEST(ModuleItemsParsing, SpecifyBlock) {
   auto r = Parse(
       "module m(input a, output y);\n"
@@ -337,7 +303,6 @@ TEST(ModuleItemsParsing, SpecifyBlock) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecifyBlock));
 }
 
-// non_port_module_item alternative: specparam_declaration.
 TEST(ModuleItemsParsing, SpecparamDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -349,7 +314,6 @@ TEST(ModuleItemsParsing, SpecparamDeclaration) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kSpecparam));
 }
 
-// non_port_module_item alternative: module_declaration (nested module).
 TEST(ModuleItemsParsing, NestedModuleDeclaration) {
   auto r = Parse(
       "module outer;\n"
@@ -366,7 +330,6 @@ TEST(ModuleItemsParsing, NestedModuleDeclaration) {
   EXPECT_EQ(item->nested_module_decl->name, "inner");
 }
 
-// non_port_module_item alternative: interface_declaration (nested interface).
 TEST(ModuleItemsParsing, NestedInterfaceDeclaration) {
   auto r = Parse(
       "module outer;\n"
@@ -382,7 +345,6 @@ TEST(ModuleItemsParsing, NestedInterfaceDeclaration) {
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kInterface);
 }
 
-// non_port_module_item alternative: program_declaration (nested program).
 TEST(ModuleItemsParsing, NestedProgramDeclaration) {
   auto r = Parse(
       "module outer;\n"
@@ -398,7 +360,6 @@ TEST(ModuleItemsParsing, NestedProgramDeclaration) {
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kProgram);
 }
 
-// module_item alternative: port_declaration ; (non-ANSI port declaration item).
 TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
   auto r = Parse(
       "module m(a, b, y);\n"
@@ -409,7 +370,6 @@ TEST(ModuleItemsParsing, PortDeclAsModuleItem) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Syntax 23-5 attribute_instance prefix on a module_or_generate_item.
 TEST(ModuleItemsParsing, ItemWithAttributes) {
   auto r = Parse(
       "module m;\n"
@@ -419,8 +379,6 @@ TEST(ModuleItemsParsing, ItemWithAttributes) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// An elaboration system task accepted as a module item. The particular
-// severity ($fatal/$error/$warning/$info) is a §20.11 distinction.
 TEST(ModuleItemsParsing, ElabFatalTask) {
   auto r = Parse(
       "module m;\n"
@@ -432,8 +390,6 @@ TEST(ModuleItemsParsing, ElabFatalTask) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
-// non_port_module_item alternative: timeunits_declaration. timeunit, time-
-// precision, and the combined form are a §3.14.2 distinction.
 TEST(ModuleItemsParsing, TimeunitAsModuleItem) {
   auto r = Parse(
       "module m;\n"
@@ -444,8 +400,6 @@ TEST(ModuleItemsParsing, TimeunitAsModuleItem) {
   EXPECT_TRUE(r.cu->modules[0]->has_timeunit);
 }
 
-// Footnote 3: a later timeunits_declaration is legal when it repeats and
-// matches a prior declaration in the same time scope.
 TEST(ModuleItemsParsing, TimeunitRepeatMatches) {
   auto r = Parse(
       "module m;\n"
@@ -457,24 +411,18 @@ TEST(ModuleItemsParsing, TimeunitRepeatMatches) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Footnote 3: a later timeunits_declaration with no prior declaration to repeat
-// is illegal.
 TEST(ModuleItemsParsing, ErrorTimeunitNoPriorDeclaration) {
   auto r = Parse(
       "module m;\n"
       "  wire w;\n"
       "  timeunit 1ns;\n"
       "endmodule\n");
-  // §3.14.2.2 states the time scope rule, so the report is filed there rather
-  // than under §23.2.4.
   EXPECT_TRUE(ReportedError(r.diags,
                             "timeunit as a later item requires a matching "
                             "prior declaration in the same time scope",
                             3, "3.14.2.2"));
 }
 
-// Footnote 3: a repeated timeunits_declaration that does not match the prior
-// one is illegal.
 TEST(ModuleItemsParsing, ErrorTimeunitMismatch) {
   auto r = Parse(
       "module m;\n"
@@ -486,62 +434,44 @@ TEST(ModuleItemsParsing, ErrorTimeunitMismatch) {
       r.diags, "timeunit does not match prior declaration", 4, "3.14.2.2"));
 }
 
-// parameter_override is terminated by ';' (BNF-6).
 TEST(ModuleItemsParsing, ErrorDefparamMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
       "  defparam u.W = 16\n"
       "endmodule\n");
-  // §23.10.1 owns the parameter override, and the report stands on the
-  // `endmodule` that follows the unterminated one, on line 3.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.10.1"));
 }
 
-// A generate_region must be closed with endgenerate.
 TEST(ModuleItemsParsing, ErrorUnclosedGenerateRegion) {
   auto r = Parse(
       "module m;\n"
       "  generate\n"
       "    wire w;\n"
       "endmodule\n");
-  // §27.3 owns the generate region and expects its `endgenerate`. The region
-  // stops at the `endmodule` that closes the module holding it and leaves that
-  // keyword for §23.2, so the report stands on line 4.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate', got 'endmodule'",
                             4, "27.3"));
 }
 
-// A net_alias module item is terminated by ';'.
 TEST(ModuleItemsParsing, ErrorNetAliasMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
       "  wire w1, w2;\n"
       "  alias w1 = w2\n"
       "endmodule\n");
-  // §10.11 owns the net alias, and the report stands on the `endmodule` that
-  // follows the unterminated one, on line 4.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "10.11"));
 }
 
-// A timeunits_declaration module item is terminated by ';'.
 TEST(ModuleItemsParsing, ErrorTimeunitMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
       "  timeunit 1ns\n"
       "endmodule\n");
-  // §3.14.2.2 owns the timeunits declaration, and the report stands on the
-  // `endmodule` that follows the unterminated one, on line 3.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "3.14.2.2"));
 }
 
-// module_item ::= port_declaration ; | non_port_module_item — the rejecting
-// leg. A construct in module-body position that begins none of the Syntax 23-5
-// alternatives (here a bare integer literal, which is neither a port
-// declaration nor any non_port_module_item) is not a module item and is
-// rejected.
 TEST(ModuleItemsParsing, ErrorNonModuleItemInBody) {
   auto r = Parse(
       "module m;\n"

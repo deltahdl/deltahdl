@@ -92,16 +92,6 @@ bool GlobOne(std::string_view pat, std::string_view name) {
   return pi == pat.size();
 }
 
-// A file path specification is written in whatever notation names a path on
-// the host filesystem, and a path written between double quotes is one such
-// notation: there the quotes delimit the path rather than belong to it, and a
-// name carrying a space is why the notation exists. Peeling a surrounding pair
-// off before the specification is read makes the quoted and the bare spelling
-// of one path name that same path.
-//
-// A quote that is not matched by one at the other end is left where it is,
-// since a file name is free to carry a quote of its own; only the surrounding
-// pair is notation.
 std::string_view UnquoteSpec(std::string_view spec) {
   if (spec.size() < 2 || spec.front() != '"' || spec.back() != '"') {
     return spec;
@@ -129,8 +119,6 @@ SpecKind ClassifySpec(std::string_view raw_spec) {
   return has_wild ? SpecKind::kWildcardFilename : SpecKind::kExplicitFilename;
 }
 
-// The characters an identifier is built from: a letter or an underscore opens
-// one, and digits and dollar signs may follow.
 bool IsNameStart(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
@@ -190,11 +178,6 @@ bool ReadFileContent(const std::filesystem::path& canon, std::string& content,
   return true;
 }
 
-// Parses one map file, registering it in `external` when a caller supplied one
-// and in a manager private to this parse when it did not. A position taken off
-// the parse means something only to the manager the file was registered in, so
-// a caller that reports a library declaration passes the manager its reports
-// resolve against and gets positions it can use.
 CompilationUnit* ParseLibraryMapContent(const std::filesystem::path& canon,
                                         std::string content, Arena& arena,
                                         SourceManager* external,
@@ -216,9 +199,6 @@ CompilationUnit* ParseLibraryMapContent(const std::filesystem::path& canon,
   return cu;
 }
 
-// §33.3.2: an include statement names its map file with a file_path_spec, the
-// production a library declaration names its files with, so a quoted path
-// names the file its bare spelling does.
 std::filesystem::path ResolveIncludePath(std::string_view file_path,
                                          const std::filesystem::path& canon) {
   std::filesystem::path inc_path{std::string{UnquoteSpec(file_path)}};
@@ -228,18 +208,11 @@ std::filesystem::path ResolveIncludePath(std::string_view file_path,
   return inc_path;
 }
 
-// Whether a resolved specification's segment holds a wildcard, after which the
-// segments name no one directory a path could be resolved through.
 bool IsWildSegment(std::string_view seg) {
   return seg.find_first_of("*?") != std::string_view::npos ||
          seg.find("...") != std::string_view::npos;
 }
 
-// §33.3.3 compares a source file's name against an absolute specification,
-// and ComparedSourcePath resolves the source's symbolic links before it does.
-// The directories an absolute specification names before its first wildcard
-// are resolved the same way, so a specification naming a directory through a
-// link and a source named through it spell that directory alike.
 std::string ResolveFixedDirectories(const std::string& resolved) {
   bool absolute = false;
   auto segs = SplitSegments(resolved, absolute);
@@ -301,11 +274,6 @@ void LibraryMap::ResolvePositionsAgainst(SourceManager& mgr) { mgr_ = &mgr; }
 
 void LibraryMap::AddDeclaration(const LibraryDecl& decl,
                                 std::string_view base_dir) {
-  // The position of a declaration is kept only where this map parses into the
-  // manager its caller reports through. A file identifier issued by any other
-  // manager names a different file there, so a report standing at such a
-  // position would name the wrong file and the wrong line, which is worse than
-  // standing at no position at all.
   SourceLoc loc = mgr_ == nullptr ? SourceLoc::None() : decl.range.start;
   for (auto path : decl.file_paths) {
     entries_.push_back({std::string(decl.name), std::string(base_dir),
@@ -313,11 +281,6 @@ void LibraryMap::AddDeclaration(const LibraryDecl& decl,
   }
 }
 
-// §33.3.1 resolves a map's relative specification against the directory of
-// the map file, which LoadMapFileImpl takes through fs::weakly_canonical, so an
-// absolute source path is taken the same way before the two are compared: a
-// file named through a symbolic link to that directory is the file the
-// specification names. A relative path is compared as written.
 static std::string ComparedSourcePath(std::string_view path) {
   namespace fs = std::filesystem;
   fs::path written{std::string(path)};
@@ -336,8 +299,6 @@ std::vector<const LibraryMap::Entry*> LibraryMap::EntriesClaiming(
   for (const auto& e : entries_) {
     if (!PathMatches(e.spec, e.base_dir, kCompared)) continue;
     SpecKind kind = ClassifySpec(e.spec);
-    // A more specific specification settles the claim on its own, so the
-    // specifications claiming the file less specifically drop out.
     if (claimants.empty() || static_cast<int>(kind) < static_cast<int>(best)) {
       best = kind;
       claimants.clear();
@@ -352,9 +313,6 @@ std::vector<const LibraryMap::Entry*> LibraryMap::EntriesClaiming(
 std::vector<std::string_view> LibraryMap::LibrariesForFile(
     std::string_view path) const {
   std::vector<std::string_view> libraries;
-  // One library claiming a file through two of its own specifications is named
-  // once: the ambiguity this answers is between libraries, and a library is
-  // not ambiguous with itself.
   for (const Entry* e : EntriesClaiming(path)) {
     if (std::find(libraries.begin(), libraries.end(), e->library) ==
         libraries.end()) {
@@ -382,8 +340,6 @@ void LibraryMap::WriteCell(std::string_view library, std::string_view name,
   std::string key = CellKey(library, name);
   auto it = cells_.find(key);
   if (it != cells_.end()) {
-    // Two modules of the same name written to one library in a single
-    // invocation are almost certainly a mistake rather than a recompile.
     if (is_module && it->second.is_module &&
         it->second.from_current_invocation) {
       diag.Warning(loc,
@@ -392,7 +348,6 @@ void LibraryMap::WriteCell(std::string_view library, std::string_view name,
                        "' more than once in this invocation",
                    Subclause("33.3.1.1"));
     }
-    // The last cell encountered wins.
     it->second = LibraryCell{std::string(library), std::string(name), is_module,
                              loc, true};
     return;
@@ -444,19 +399,9 @@ std::vector<std::string> LibraryMap::ResolveSearchOrder(
       }
       continue;
     }
-    // A name given twice ranks its library once: the earlier position is the
-    // one a search reaches, so the later mention says nothing further.
     if (seen.insert(name).second) order.push_back(name);
   }
 
-  // An override says where the libraries it names belong; it says nothing
-  // about how the rest rank among themselves, and what this map declares is
-  // the default answer to exactly that. So every library the override passed
-  // over follows the ones it named, keeping the position its declaration gave
-  // it. Leaving them out instead would leave them tied, and a tie between two
-  // libraries holding a cell of one name is settled by whichever description
-  // was read first -- which is to say by the order the sources were handed
-  // over, an order no library map and no command line ever stated.
   for (auto name : LibraryDeclarationOrder()) {
     if (seen.insert(name).second) order.emplace_back(name);
   }
@@ -494,8 +439,6 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   std::string content;
   if (!ReadFileContent(canon, content, errors)) return false;
 
-  // The configs a map file declares are kept for elaboration, so the parse
-  // they point into, and the text it points into, outlive this call.
   auto arena = std::make_shared<Arena>();
   if (mgr_ == nullptr && own_mgr_ == nullptr) {
     own_mgr_ = std::make_shared<SourceManager>();
@@ -513,9 +456,6 @@ bool LibraryMap::LoadMapFileImpl(const std::filesystem::path& map_file,
   return kOk;
 }
 
-// §33.3.2: an include statement stands for the whole of the map file it
-// names, at the place it is written, so its declarations take that place in
-// the declaration order (§33.6.1) among the including file's own.
 bool LibraryMap::LoadDescriptionsInOrder(
     const CompilationUnit& cu, const std::filesystem::path& canon,
     std::vector<std::filesystem::path>& stack,
@@ -531,8 +471,6 @@ bool LibraryMap::LoadDescriptionsInOrder(
            kBefore(cu.libraries[lib]->range.start, inc->loc)) {
       AddDeclaration(*cu.libraries[lib++], kBaseDir);
     }
-    // An include with no path is a parse error, which ended the load
-    // before this.
     if (!LoadMapFileImpl(ResolveIncludePath(inc->file_path, canon), stack,
                          errors)) {
       ok = false;

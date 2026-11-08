@@ -51,11 +51,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerWithDelay) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// The ->> operator defers the trigger to the nonblocking assignment region of
-// the current time step. A process that registers its wait in the active region
-// *after* the ->> statement (same time step) is therefore still unblocked,
-// since the deferred trigger fires only once the active region has drained. An
-// active-region (immediate) trigger would be lost here, leaving result == 0.
 TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -75,12 +70,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerDefersToNbaRegion) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §15.5.1: a named event triggered via -> behaves like a one shot -- the
-// trigger state itself is not observable, only its effect on processes already
-// waiting. Here the -> fires before any process is blocked on ev, so it is
-// lost; the subsequent @(ev) in the same process then blocks forever and the
-// assignment past it never runs. Contrast NonblockingTriggerDefersToNbaRegion,
-// where ->> reaches a same-time-step waiter registered after the statement.
 TEST(EventTriggerSimulator, BlockingTriggerIsOneShotAndLost) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -100,11 +89,6 @@ TEST(EventTriggerSimulator, BlockingTriggerIsOneShotAndLost) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §15.5.1: the trigger target is a hierarchical_event_identifier, so a blocking
-// -> may name an event inside a child instance through a dotted path. The child
-// process waits on its own event; triggering it from the parent as `s.ev`
-// resolves to that same instance-qualified event and unblocks the waiter
-// (result becomes 9). Built from real hierarchical syntax, full pipeline.
 TEST(EventTriggerSimulator, BlockingTriggerHierarchicalTarget) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -129,9 +113,6 @@ TEST(EventTriggerSimulator, BlockingTriggerHierarchicalTarget) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// The nonblocking ->> form likewise accepts a hierarchical target: the deferred
-// NBA-region update event fires the child instance's event, unblocking its
-// waiter (result becomes 9).
 TEST(EventTriggerSimulator, NonblockingTriggerHierarchicalTarget) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -156,13 +137,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerHierarchicalTarget) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// §15.5.1 states that ->> creates a *nonblocking assign* update event that
-// fires in the nonblocking assignment region -- the same region a §10.4.2
-// nonblocking procedural assignment (<=) uses. Built from real <= syntax: the
-// assignment `x <= 5` and the `->> ev` trigger both land in that region this
-// time step, so the process unblocked by ev observes the already-committed
-// nonblocking write (result == 5). An active-region trigger firing before the
-// NBA update would leave result == 0.
 TEST(EventTriggerSimulator, NonblockingTriggerCoexistsWithNonblockingAssign) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -210,9 +184,6 @@ TEST(EventTriggerSimulator, TriggerUnblocksMultipleWaiters) {
   EXPECT_EQ(b, 22u);
 }
 
-// ->> with an event control creates its update event when the event control
-// occurs (here, a posedge), not when the statement executes. The waiter is
-// unblocked once the posedge arrives.
 TEST(EventTriggerSimulator, NonblockingTriggerWaitsForEventControl) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -237,10 +208,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerWaitsForEventControl) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// The update event is gated on the event control: if the event control never
-// occurs, the named event is never triggered and a waiter stays blocked. This
-// distinguishes the deferred behavior from an immediate trigger, which would
-// have fired the already-registered waiter and left result == 55.
 TEST(EventTriggerSimulator, NonblockingTriggerGatedOnEventControl) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -264,9 +231,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerGatedOnEventControl) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// The repeat-event form waits for the event control the given number of times
-// before creating the update event. After a single posedge (sampled into mid)
-// the event has not yet fired; only the second posedge triggers it.
 TEST(EventTriggerSimulator, NonblockingTriggerRepeatEventControl) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -304,12 +268,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerRepeatEventControl) {
   EXPECT_EQ(result->value.ToUint64(), 55u);
 }
 
-// §15.5.1 and §15.5.2 with §13.5.1: an event passed to an input formal is
-// passed as its handle, so `-> ev` in the task triggers the caller's `done`,
-// waking the wait on it at 1, and `@ev` in another task waits on the
-// caller's `e`, woken by the trigger at 2: 1 and 2, read as 12. Bound as a
-// copy, neither the trigger nor the wait reached the caller's event, and
-// neither time was written.
 TEST(NamedEventSim, EventPassedToAnInputFormalIsTheCallersEvent) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -333,10 +291,6 @@ TEST(NamedEventSim, EventPassedToAnInputFormalIsTheCallersEvent) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §15.5.1 with §23.6 and §27.4: an event a loop generate block declares is
-// triggered and waited on by the path through the instance, `g[1].e`, so the
-// wait is woken by the trigger at 2. The trigger named no event through the
-// select, and the wait was never woken.
 TEST(NamedEventSim, LoopGenerateEventTriggeredByItsPath) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -355,11 +309,6 @@ TEST(NamedEventSim, LoopGenerateEventTriggeredByItsPath) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §15.5.1 and §15.5.2 with §7.4 and §7.8: an element of an array of events is
-// a named event of its own, so the wait on arr[1] is woken by the trigger of
-// arr[1] at 2 and not by that of arr[0] at 1, and the wait on m["k"] of an
-// associative array of events by the trigger of m["k"] at 4: 2 and 4, read as
-// 24. Resolved by no name, the triggers reached nothing and neither wait woke.
 TEST(NamedEventSim, EventArrayElementsAreEventsOfTheirOwn) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -384,10 +333,6 @@ TEST(NamedEventSim, EventArrayElementsAreEventsOfTheirOwn) {
   EXPECT_EQ(var->value.ToUint64(), 24u);
 }
 
-// §15.5.1: changing the index of a named event array in an event control
-// expression makes no event occur. Each waiter's index moves while it waits
-// -- by a blocking write, by either index of a two-dimensional array, and by a
-// nonblocking write -- and no element is ever triggered, so none of them runs.
 TEST(NamedEventSim, ChangingAnEventArrayIndexMakesNoEventOccur) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -406,9 +351,6 @@ TEST(NamedEventSim, ChangingAnEventArrayIndexMakesNoEventOccur) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §15.5.1: the nearest allowed form beside the one above -- the element the
-// index names is triggered, at 2 in the one-dimensional array and at 3 in the
-// two-dimensional one, and each waiter runs: 2 and 3, read as 23.
 TEST(NamedEventSim, TriggeringTheIndexedEventArrayElementWakesTheWaiter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -426,11 +368,6 @@ TEST(NamedEventSim, TriggeringTheIndexedEventArrayElementWakesTheWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 23u);
 }
 
-// §15.5 with §7.4: a leaf of a multidimensional array of events is a named
-// event of its own. A blocking trigger with variable indices wakes an event
-// control on the same leaf at 1, another with constant indices wakes a wait on
-// the triggered state of its leaf at 2, and the leaf beside it, never
-// triggered, wakes nothing: 1 and 2, read as 12.
 TEST(NamedEventSim, MultidimensionalEventArrayLeavesAreEvents) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -448,12 +385,6 @@ TEST(NamedEventSim, MultidimensionalEventArrayLeavesAreEvents) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §15.5.1: the target of ->> is an event identifier with a nonrange select,
-// so a nonblocking trigger fires an element of an array of events as it fires
-// a declared event. Each waiter below wakes at 2 on the update event of its
-// own element -- a variable index into one dimension, constant indices into
-// two, a string key of an associative array and a position of a queue of
-// events -- and each adds its weight once: 1 + 10 + 100 + 1000.
 TEST(EventTriggerSimulator, NonblockingTriggerFiresAnEventArrayElement) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -482,9 +413,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerFiresAnEventArrayElement) {
   EXPECT_EQ(var->value.ToUint64(), 1111u);
 }
 
-// §15.5.1 with §15.5.3: the update event of ->> on an element of an array of
-// events gives the element its triggered state, so a wait on it begun in the
-// same time step, before the nonblocking assignment region, resumes at 3.
 TEST(EventTriggerSimulator,
      NonblockingTriggerOfAnElementSetsItsTriggeredState) {
   LowerFixture f;
@@ -501,8 +429,6 @@ TEST(EventTriggerSimulator,
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §15.5.1: a class event property named through a handle is a target of ->>
-// as of ->, and its waiter resumes at 4 on the update event.
 TEST(EventTriggerSimulator, NonblockingTriggerFiresAClassEventProperty) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -521,9 +447,6 @@ TEST(EventTriggerSimulator, NonblockingTriggerFiresAClassEventProperty) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §15.5.1 with §9.4.2.3: an update event of ->> that a waiter's iff refuses
-// leaves the waiter blocked on the event, and the next one, at 2 with the
-// condition true, wakes it, as a trigger by -> would.
 TEST(EventTriggerSimulator, NonblockingTriggerKeepsAWaiterItsIffRefuses) {
   LowerFixture f;
   auto* var = RunAndFindVar(

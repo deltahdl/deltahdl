@@ -12,7 +12,6 @@
 
 namespace delta {
 
-// Whether `a` stands before `b` in the one text a parse reads.
 static bool Before(SourceLoc a, SourceLoc b) {
   return std::tie(a.line, a.column) < std::tie(b.line, b.column);
 }

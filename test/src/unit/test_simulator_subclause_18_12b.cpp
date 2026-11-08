@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.12: the scope randomize function assigns random values to the
-// variables its arguments name in the current scope, addr and data of
-// module scope and rd_wr local to the function in the clause's gen_stim,
-// and returns 1 where it sets all of them: over 32 calls every call
-// succeeds, addr and data move and both values of rd_wr are seen, as the
-// design test/src/e2e/scope_randomize.sv runs it.
 TEST(ScopeRandomizeRun, TheClausesGenStimSetsEveryNamedVariable) {
   SimFixture f;
   std::string out = RunCapture(
@@ -47,10 +41,6 @@ TEST(ScopeRandomizeRun, TheClausesGenStimSetsEveryNamedVariable) {
   EXPECT_EQ(out, "32 1 1 1\n");
 }
 
-// 18.12: called with no argument, the scope randomize changes no variable
-// and checks its constraints, every expression of its constraint_block
-// evaluated: 1 with a < b true on the current values and 0 with it false,
-// a and b untouched either way.
 TEST(ScopeRandomizeRun, NoArgumentEvaluatesTheBlockOnTheCurrentValues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -70,9 +60,6 @@ TEST(ScopeRandomizeRun, NoArgumentEvaluatesTheBlockOnTheCurrentValues) {
   EXPECT_EQ(out, "1 0 1\n");
 }
 
-// 18.12: the scope randomize returns 0 where it cannot set a random
-// variable to a valid value: an 8-bit a required above 300 has no such
-// value, so the call returns 0 and a keeps its value.
 TEST(ScopeRandomizeRun, AnUnsatisfiableBlockReturnsZeroAndHoldsTheValue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -89,10 +76,6 @@ TEST(ScopeRandomizeRun, AnUnsatisfiableBlockReturnsZeroAndHoldsTheValue) {
   EXPECT_EQ(out, "0 3\n");
 }
 
-// 18.12 with A.8.2: the scope randomize's argument list is optional, so
-// std::randomize written with only its with clause is the call with no
-// argument, the same check of its constraints on the current values, and
-// std::randomize alone checks none and returns 1 (#8151).
 TEST(ScopeRandomizeRun, NoArgumentListBeforeTheClauseIsTheSameCheck) {
   SimFixture f;
   std::string out = RunCapture(
@@ -113,10 +96,6 @@ TEST(ScopeRandomizeRun, NoArgumentListBeforeTheClauseIsTheSameCheck) {
   EXPECT_EQ(out, "1 0 1 1\n");
 }
 
-// 18.12 with A.8.2: outside any class method a bare randomize, written with
-// neither the std:: prefix nor its argument list, is the scope randomize
-// called with no argument, in an initial block as in a module's function: it
-// leaves a untouched and returns 1 each time.
 TEST(ScopeRandomizeRun, ABareRandomizeOutsideAClassIsTheNoArgumentCall) {
   SimFixture f;
   std::string out = RunCapture(

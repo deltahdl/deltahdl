@@ -14,13 +14,11 @@
 namespace delta {
 namespace {
 
-// What `$put` does each time the design calls it.
 std::function<void()>& Putter() {
   static std::function<void()> putter;
   return putter;
 }
 
-// A run whose design calls `$put`, which makes the case's puts.
 class PutsOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -35,7 +33,6 @@ class PutsOfARun : public VpiDesignRun {
     ASSERT_NE(vpi_register_systf(&data), nullptr);
   }
 
-  // The integer value `name` holds once the run is over.
   static int IntOf(const char* name) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -44,8 +41,6 @@ class PutsOfARun : public VpiDesignRun {
   }
 };
 
-// Puts `value` into the object `name` names with `flags`, after `delay` for
-// a delay mode; answers the event handle the put returns.
 vpiHandle PutInt(const char* name, int value, int flags, uint32_t delay = 0) {
   s_vpi_value val = {};
   val.format = vpiIntVal;
@@ -57,8 +52,6 @@ vpiHandle PutInt(const char* name, int value, int flags, uint32_t delay = 0) {
                        flags);
 }
 
-// §38.34 with §9.4.2: a value put with vpiNoDelay is an update of the object,
-// which resumes an event control waiting on it (#5112).
 TEST_F(PutsOfARun, APutWakesAnEventControlOnItsObject) {
   Putter() = [] { PutInt("top.v", 5, vpiNoDelay); };
   Run("module top; int v, seen;\n"
@@ -68,8 +61,6 @@ TEST_F(PutsOfARun, APutWakesAnEventControlOnItsObject) {
   EXPECT_EQ(IntOf("top.seen"), 5);
 }
 
-// §38.34 with §37.33 and §9.4.3: a value put into a class object's property
-// resumes a class task waiting on a condition over it (#5113).
 TEST_F(PutsOfARun, APutIntoAClassPropertyWakesATaskWaitingOnIt) {
   Putter() = [] {
     vpiHandle obj =
@@ -99,9 +90,6 @@ constexpr const char* kDelayedPut =
     "  initial begin #1 $put; #2 v_at3 = v; #2 v_at5 = v; end\n"
     "endmodule\n";
 
-// §38.34: a put with vpiInertialDelay sets the object once its delay has
-// passed, not at once: 6 put at time 1 with a delay of 3 is 0 at time 3 and
-// 6 at time 5 (#5114).
 TEST_F(PutsOfARun, AnInertialPutTakesEffectAfterItsDelay) {
   Putter() = [] { PutInt("top.v", 6, vpiInertialDelay, 3); };
   Run(kDelayedPut);
@@ -109,8 +97,6 @@ TEST_F(PutsOfARun, AnInertialPutTakesEffectAfterItsDelay) {
   EXPECT_EQ(IntOf("top.v_at5"), 6);
 }
 
-// §38.34: an event a delayed put scheduled and vpiCancelEvent then cancelled
-// is taken out of the event queue and never takes place (#5115).
 TEST_F(PutsOfARun, ACancelledPutNeverTakesEffect) {
   Putter() = [] {
     vpiHandle event = PutInt("top.v", 7, vpiTransportDelay | vpiReturnEvent, 2);
@@ -125,9 +111,6 @@ int& ReleasedValue() {
   return released;
 }
 
-// §38.34 with §10.6.2: vpiReleaseFlag releases a net vpiForceFlag forced, the
-// net taking at once the value its driver gives, which value_p reports
-// (#5116).
 TEST_F(PutsOfARun, AReleasedNetTakesItsDriversValue) {
   ReleasedValue() = -1;
   Putter() = [] {
@@ -155,8 +138,6 @@ constexpr const char* kTwoPutsOneEarlier =
     "  initial begin #1 $put; #2 v_at3 = v; #2 v_at5 = v; #2 v_at7 = v; end\n"
     "endmodule\n";
 
-// §38.34: vpiPureTransportDelay removes no event, so a put of 7 after 1
-// leaves the put of 6 after 3 that came first: 7 at time 3, 6 at time 5.
 TEST_F(PutsOfARun, APureTransportPutKeepsTheEventsBeforeIt) {
   Putter() = [] {
     PutInt("top.v", 6, vpiPureTransportDelay, 3);
@@ -167,8 +148,6 @@ TEST_F(PutsOfARun, APureTransportPutKeepsTheEventsBeforeIt) {
   EXPECT_EQ(IntOf("top.v_at5"), 6);
 }
 
-// §38.34: vpiInertialDelay removes every event pending on the object, so the
-// put of 6 after 3 never takes place once a put of 7 after 1 follows it.
 TEST_F(PutsOfARun, AnInertialPutRemovesTheEventsPendingOnItsObject) {
   Putter() = [] {
     PutInt("top.v", 6, vpiInertialDelay, 3);
@@ -179,9 +158,6 @@ TEST_F(PutsOfARun, AnInertialPutRemovesTheEventsPendingOnItsObject) {
   EXPECT_EQ(IntOf("top.v_at5"), 7);
 }
 
-// §38.34: vpiTransportDelay removes the events later than its own and keeps
-// the earlier ones: of 6 at time 2 and 8 at time 6, a put of 7 at time 4
-// keeps the first and removes the second.
 TEST_F(PutsOfARun, ATransportPutRemovesOnlyTheLaterEvents) {
   Putter() = [] {
     PutInt("top.v", 6, vpiTransportDelay, 1);
@@ -194,8 +170,6 @@ TEST_F(PutsOfARun, ATransportPutRemovesOnlyTheLaterEvents) {
   EXPECT_EQ(IntOf("top.v_at7"), 7);
 }
 
-// §38.34: an event that has already taken place is no event a later put
-// removes, and the later put takes effect in its turn.
 TEST_F(PutsOfARun, APutAfterAnEarlierOneTookPlaceTakesEffect) {
   Putter() = [] {
     static int calls = 0;
@@ -208,8 +182,6 @@ TEST_F(PutsOfARun, APutAfterAnEarlierOneTookPlaceTakesEffect) {
   EXPECT_EQ(IntOf("top.v_at5"), 7);
 }
 
-// §38.34 with Table 38-3: a delayed put whose value is no number of its
-// format schedules nothing, and the object keeps its value.
 TEST_F(PutsOfARun, ADelayedPutOfAnUndecodableValueSchedulesNothing) {
   Putter() = [] {
     s_vpi_value val = {};
@@ -225,9 +197,6 @@ TEST_F(PutsOfARun, ADelayedPutOfAnUndecodableValueSchedulesNothing) {
   EXPECT_EQ(IntOf("top.v_at3"), 0);
 }
 
-// §38.34 with §15.5.1: a put to a named event triggers it as `->` does,
-// resuming the process waiting on it, and leaves it triggered for the rest of
-// the time step (§15.5.3) (#7473).
 TEST_F(PutsOfARun, APutToANamedEventTriggersIt) {
   Putter() = [] {
     vpi_put_value(vpi_handle_by_name(VpiText("top.ev"), nullptr), nullptr,
@@ -241,9 +210,6 @@ TEST_F(PutsOfARun, APutToANamedEventTriggersIt) {
   EXPECT_EQ(IntOf("top.fired"), 1);
 }
 
-// §38.34 with §6.6.7: a subelement of a user-defined nettype's net takes no
-// value of its own, so a put to one is refused and the net left as it was,
-// while a put to the whole net stands (#7475).
 TEST_F(PutsOfARun, APutToAPartOfANettypeNetIsRefused) {
   Run("module top;\n"
       "  nettype logic [7:4] n4;\n"
@@ -273,9 +239,6 @@ TEST_F(PutsOfARun, APutToAPartOfANettypeNetIsRefused) {
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
-// §38.34 with §6.12: a real variable takes a real put to it as that real and
-// an integer put to it as the real number the integer is, in its own
-// precision, neither rounded nor left as integer bits.
 TEST_F(PutsOfARun, ARealVariableHoldsTheRealOrIntegerPut) {
   Run("module top; real r; shortreal s; initial $noop; endmodule\n");
   s_vpi_value half = {};
@@ -294,8 +257,6 @@ TEST_F(PutsOfARun, ARealVariableHoldsTheRealOrIntegerPut) {
   EXPECT_DOUBLE_EQ(read.value.real, -3.0);
 }
 
-// §38.34 with §6.12: a real member of an unpacked structure holds a real put
-// to it as that real too, its storage being what says it holds a real (#7852).
 TEST_F(PutsOfARun, ARealMemberOfAStructureHoldsTheRealPut) {
   Run("module top; struct { real r; int i; } s; initial $noop; endmodule\n");
   s_vpi_value half = {};
@@ -308,7 +269,6 @@ TEST_F(PutsOfARun, ARealMemberOfAStructureHoldsTheRealPut) {
   EXPECT_DOUBLE_EQ(read.value.real, 2.5);
 }
 
-// The real `top.r` holds once `put` is put to it.
 double RealAfterPut(s_vpi_value put) {
   vpi_put_value(vpi_handle_by_name(VpiText("top.r"), nullptr), &put, nullptr,
                 vpiNoDelay);
@@ -318,10 +278,6 @@ double RealAfterPut(s_vpi_value put) {
   return read.value.real;
 }
 
-// §38.34 with §38.15: a real variable takes a value put in a string, scalar
-// or vector format as the integer the value gives, its x and z bits as 0, the
-// inverse of reading a real in such a format as its rounded integer, and a
-// value that decodes to nothing leaves it as it was (#8170).
 TEST_F(PutsOfARun, ARealVariableTakesAnIntegralFormatAsItsInteger) {
   Run("module top; real r; initial $noop; endmodule\n");
   s_vpi_value dec = {};
@@ -341,8 +297,6 @@ TEST_F(PutsOfARun, ARealVariableTakesAnIntegralFormatAsItsInteger) {
   EXPECT_DOUBLE_EQ(RealAfterPut(nothing), 1.0);
 }
 
-// §38.34 with §38.15: a negative real read as a vector, its rounded integer's
-// 64 bits, is put back from that vector as itself (#8170).
 TEST_F(PutsOfARun, ARealReadAsAVectorIsPutBackAsItself) {
   Run("module top; real r; initial $noop; endmodule\n");
   s_vpi_value minus = {};
@@ -363,11 +317,8 @@ TEST_F(PutsOfARun, ARealReadAsAVectorIsPutBackAsItself) {
   EXPECT_DOUBLE_EQ(RealAfterPut(back), -4.0);
 }
 
-// What the vpiStringVal put to the `$half_of_five` call recorded.
 int string_put_error = 0;
 
-// A run whose design calls `$half_of_five`, a vpiRealFunc whose calltf first
-// puts a string to its call and then the real 2.5.
 class RealFunctionOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -394,8 +345,6 @@ class RealFunctionOfARun : public VpiDesignRun {
   }
 };
 
-// §38.34 with §38.37.1: a vpiRealFunc returns the real its calltf puts, and
-// refuses a vpiStringVal put as a real object does (#7474).
 TEST_F(RealFunctionOfARun, ItReturnsTheRealPutAndRefusesAString) {
   Run("module top; real r; initial r = $half_of_five; endmodule\n");
   s_vpi_value value = {};
@@ -405,7 +354,6 @@ TEST_F(RealFunctionOfARun, ItReturnsTheRealPutAndRefusesAString) {
   EXPECT_NE(string_put_error, 0);
 }
 
-// The string value of `obj`.
 std::string StringOf(vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiStringVal;
@@ -413,7 +361,6 @@ std::string StringOf(vpiHandle obj) {
   return value.value.str == nullptr ? "" : value.value.str;
 }
 
-// The integer value of `obj`.
 int IntValueOf(vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -421,9 +368,6 @@ int IntValueOf(vpiHandle obj) {
   return value.value.integer;
 }
 
-// Expects `put` to `target` to be refused as a put to an object of a kind
-// §38.34 does not list: no event handle answered, an error recorded, and the
-// message naming the kinds it does list.
 void ExpectPutTargetRefused(vpiHandle target, s_vpi_value put) {
   EXPECT_EQ(vpi_put_value(target, &put, nullptr, vpiNoDelay), nullptr);
   s_vpi_error_info info = {};
@@ -434,10 +378,6 @@ void ExpectPutTargetRefused(vpiHandle target, s_vpi_value put) {
                "function call, a sequential UDP or a scheduled event");
 }
 
-// §38.34: vpi_put_value applies to nets, variables, variable selects, named
-// events, system function calls, sequential UDPs and scheduled events alone,
-// so a put to a parameter, a specparam or a UDP table entry is refused with
-// an error and leaves the object as it was (#8172).
 TEST_F(PutsOfARun, APutToAParameterSpecparamOrTableEntryIsRefused) {
   Run("primitive inv(output o, input i);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
@@ -462,10 +402,6 @@ TEST_F(PutsOfARun, APutToAParameterSpecparamOrTableEntryIsRefused) {
   EXPECT_EQ(StringOf(kRows[0]), "0 : 1");
 }
 
-// §38.34 with §37.19, §37.58 and §37.59: the variable selects vpi_put_value
-// applies to are var selects. A bit select, a part select and an indexed part
-// select are expressions holding no storage of their own, so a put to one is
-// refused with an error and leaves the bits it selects as they were.
 TEST_F(PutsOfARun, APutToABitSelectOrAPartSelectIsRefused) {
   Run("module top; integer n = 5; logic [7:0] r = 8'hA5; logic [2:0] i = 1;\n"
       "  wire b; wire [3:0] p, q;\n"

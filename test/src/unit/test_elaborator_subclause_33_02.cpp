@@ -5,10 +5,6 @@
 
 namespace {
 
-// §33.2.1 (printed page 935): where a config shares its name with a module or
-// primitive, the optional :config extension is what names the config, so a
-// config and a module of one name are two cells of one library, told apart by
-// the suffix, and neither is defined twice.
 TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesName) {
   ElabFixture f;
   ElabOk(
@@ -20,7 +16,6 @@ TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same with the config written first.
 TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesNameWrittenFirst) {
   ElabFixture f;
   ElabOk(
@@ -32,9 +27,6 @@ TEST(ConfigDesignElementNameSpace, ConfigSharesAModulesNameWrittenFirst) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Two configs of one name collide: §33.2 puts a config in the SystemVerilog
-// name space, and no suffix tells two configs apart, so the second reuses a
-// name already used there.
 TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
   ElabFixture f;
   ElabOk(
@@ -46,8 +38,6 @@ TEST(ConfigDesignElementNameSpace, DuplicateConfigNames) {
       "  design work.m;\n"
       "endconfig\n",
       f);
-  // The second `config dup` is the later insertion, so the report stands at its
-  // `config` keyword on line 5.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "duplicate definition of 'dup'", 5, "33.2"));
 }
@@ -60,10 +50,6 @@ TEST(ConfigDesignElementNameSpace, DistinctConfigAndModuleOk) {
              "endconfig\n"));
 }
 
-// §33.2: a config is a design element, like a module, living in the
-// SystemVerilog name space, and the :config extension §33.2.1 provides tells a
-// config apart from a module or primitive only, so an interface of the config's
-// name collides, and the report carries §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -77,7 +63,6 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithInterface) {
                             "duplicate definition of 'bar'", 3, "33.2"));
 }
 
-// The program form of the same collision, reported under the same §33.2.
 TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
   ElabFixture f;
   ElaborateSrc(
@@ -91,8 +76,6 @@ TEST(ConfigDesignElementNameSpace, ConfigCollidesWithProgram) {
                             "duplicate definition of 'baz'", 3, "33.2"));
 }
 
-// §33.2.1 names the primitive beside the module as the design element a
-// config may share a name with.
 TEST(ConfigDesignElementNameSpace, ConfigSharesAPrimitivesName) {
   ElabFixture f;
   ElaborateSrc(
@@ -107,11 +90,6 @@ TEST(ConfigDesignElementNameSpace, ConfigSharesAPrimitivesName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.2: a design description starts at a top-level module and the source
-// descriptions for the module definitions of its subinstances are located,
-// recursively, until every instance in the design is mapped to a source
-// description. The recursive descent walks top -> child -> grandchild and
-// every instance binds to the module definition that supplies its source.
 TEST(ConfigInstanceSourceMapping, EveryInstanceMappedToSourceDescription) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -122,7 +100,6 @@ TEST(ConfigInstanceSourceMapping, EveryInstanceMappedToSourceDescription) {
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
 
-  // Each subinstance located the source description of its module definition.
   ASSERT_EQ(design->top_modules.size(), 1u);
   auto* top = design->top_modules.front();
   ASSERT_EQ(top->children.size(), 1u);
@@ -132,17 +109,11 @@ TEST(ConfigInstanceSourceMapping, EveryInstanceMappedToSourceDescription) {
   auto* leaf = mid->children.front().resolved;
   ASSERT_NE(leaf, nullptr);
 
-  // Every module definition reached by the walk is mapped in the design.
   EXPECT_TRUE(design->all_modules.contains("top"));
   EXPECT_TRUE(design->all_modules.contains("mid"));
   EXPECT_TRUE(design->all_modules.contains("leaf"));
 }
 
-// §33.2: when a subinstance has no source description to be located, the
-// instance cannot be mapped and elaboration reports the failure. §33.2
-// describes that walk and states no prohibition of its own, so the report is
-// the one for an instantiation naming no module definition and carries
-// §23.3.2, where module_instantiation and its module_identifier are defined.
 TEST(ConfigInstanceSourceMapping, UnlocatableSubinstanceIsError) {
   ElabFixture f;
   ElaborateSrc("module top; missing u_missing(); endmodule\n", f, "top");
@@ -150,10 +121,6 @@ TEST(ConfigInstanceSourceMapping, UnlocatableSubinstanceIsError) {
                             "23.3.2"));
 }
 
-// §33.2: the descent continues into each located definition's own
-// subinstances, so a definition that cannot be located deeper in the
-// hierarchy still leaves an instance unmapped and is reported, by the same
-// report and under the same §23.3.2.
 TEST(ConfigInstanceSourceMapping, UnlocatableNestedSubinstanceIsError) {
   ElabFixture f;
   ElaborateSrc(

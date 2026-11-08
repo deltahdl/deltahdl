@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -71,9 +69,6 @@ TEST(InterfaceSubroutines, HierarchicalTaskBodyElaborates) {
              "endmodule\n"));
 }
 
-// §25.7: a subroutine defined for an interface using a hierarchical name shall
-// also be declared as extern in that interface. A hierarchical body with no
-// matching extern prototype is an elaboration error.
 TEST(InterfaceSubroutines, HierarchicalTaskBodyWithoutExternPrototypeIsError) {
   ElabFixture f;
   ElabOk(
@@ -90,8 +85,6 @@ TEST(InterfaceSubroutines, HierarchicalTaskBodyWithoutExternPrototypeIsError) {
                             3, "25.7"));
 }
 
-// §25.7: the number of arguments in a prototype shall match the number in the
-// subroutine declaration. The hierarchical body here supplies an extra formal.
 TEST(InterfaceSubroutines, HierarchicalBodyArgumentCountMismatchIsError) {
   ElabFixture f;
   ElabOk(
@@ -109,8 +102,6 @@ TEST(InterfaceSubroutines, HierarchicalBodyArgumentCountMismatchIsError) {
                             4, "25.7"));
 }
 
-// §25.7: the types of the arguments in a prototype shall match those in the
-// subroutine declaration. Here the body widens the argument type.
 TEST(InterfaceSubroutines, HierarchicalBodyArgumentTypeMismatchIsError) {
   ElabFixture f;
   ElabOk(
@@ -128,8 +119,6 @@ TEST(InterfaceSubroutines, HierarchicalBodyArgumentTypeMismatchIsError) {
                             4, "25.7"));
 }
 
-// §25.7: argument directions named by a prototype shall match the subroutine
-// declaration. Here the body flips the direction from input to output.
 TEST(InterfaceSubroutines, HierarchicalBodyArgumentDirectionMismatchIsError) {
   ElabFixture f;
   ElabOk(
@@ -147,9 +136,6 @@ TEST(InterfaceSubroutines, HierarchicalBodyArgumentDirectionMismatchIsError) {
                             4, "25.7"));
 }
 
-// §25.7: a function prototype specifies the return value as well as the
-// arguments, so the hierarchical body's return type shall match the prototype.
-// Here the prototype returns int but the body returns bit.
 TEST(InterfaceSubroutines, HierarchicalFunctionBodyReturnTypeMismatchIsError) {
   ElabFixture f;
   ElabOk(
@@ -168,9 +154,6 @@ TEST(InterfaceSubroutines, HierarchicalFunctionBodyReturnTypeMismatchIsError) {
                             4, "25.7"));
 }
 
-// §25.7: a prototype is either a function prototype or a task prototype, so the
-// hierarchical body shall agree in kind with its prototype. Here the interface
-// declares an extern task but the body is written as a function.
 TEST(InterfaceSubroutines, HierarchicalBodyKindMismatchIsError) {
   ElabFixture f;
   ElabOk(
@@ -189,8 +172,6 @@ TEST(InterfaceSubroutines, HierarchicalBodyKindMismatchIsError) {
                             4, "25.7"));
 }
 
-// §25.7: when a modport exports a subroutine via a full prototype, a connected
-// module that supplies a matching definition elaborates without error.
 TEST(ModportDeclarationElaboration,
      ExportPrototypeMatchingDefinitionElaborates) {
   EXPECT_TRUE(
@@ -209,9 +190,6 @@ TEST(ModportDeclarationElaboration,
              "endmodule\n"));
 }
 
-// §25.7: a module's definition of an exported subroutine must match the
-// modport's exported prototype exactly; here the argument width differs, which
-// is an elaboration error.
 TEST(ModportDeclarationElaboration,
      ExportPrototypeMismatchedDefinitionIsError) {
   ElabFixture f;
@@ -230,10 +208,6 @@ TEST(ModportDeclarationElaboration,
       "  memMod mem(sb_intf.target);\n"
       "endmodule\n",
       f);
-  // One report covers every way a definition can fail to match an exported
-  // prototype, so the message names the subroutine and the defining module
-  // rather than the part of the signature that differs; the line is the
-  // definition's.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "definition of exported subroutine 'Read' in "
                             "module 'memMod' does not match the prototype "
@@ -241,8 +215,6 @@ TEST(ModportDeclarationElaboration,
                             6, "25.7"));
 }
 
-// §25.7: matching includes the return value for an exported function prototype;
-// a definition whose return type agrees elaborates cleanly.
 TEST(ModportDeclarationElaboration,
      ExportFunctionPrototypeMatchingReturnElaborates) {
   EXPECT_TRUE(
@@ -262,8 +234,6 @@ TEST(ModportDeclarationElaboration,
              "endmodule\n"));
 }
 
-// §25.7: an exported function whose definition returns a different type than
-// the modport prototype does not match, which is an elaboration error.
 TEST(ModportDeclarationElaboration,
      ExportFunctionPrototypeReturnMismatchIsError) {
   ElabFixture f;
@@ -290,10 +260,6 @@ TEST(ModportDeclarationElaboration,
                             6, "25.7"));
 }
 
-// §25.7: if a module is connected to a modport that contains an exported
-// subroutine and the module does not define that subroutine, an elaboration
-// error shall occur. Here memMod binds the exporting `target` modport but
-// supplies no out-of-block body for the exported task.
 TEST(ModportDeclarationElaboration,
      ExportPrototypeUndefinedInConnectedModuleIsError) {
   ElabFixture f;
@@ -310,8 +276,6 @@ TEST(ModportDeclarationElaboration,
       "  memMod mem(sb_intf.target);\n"
       "endmodule\n",
       f);
-  // The missing definition is reported where the export was written, which for
-  // a full prototype is the `task` keyword on line 3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "module 'memMod' is connected to modport 'target' "
                             "of interface instance 'sb_intf', which exports "
@@ -320,9 +284,6 @@ TEST(ModportDeclarationElaboration,
                             3, "25.7"));
 }
 
-// §25.7: the same requirement holds when the modport names the exported
-// subroutine with a bare identifier rather than a full prototype. The
-// connected module must still define it, so its absence is an error.
 TEST(ModportDeclarationElaboration,
      ExportBareIdentifierUndefinedInConnectedModuleIsError) {
   ElabFixture f;
@@ -338,8 +299,6 @@ TEST(ModportDeclarationElaboration,
       "  memMod mem(sb_intf.target);\n"
       "endmodule\n",
       f);
-  // A bare identifier export carries no prototype to stand at, so the report
-  // stands at the modport declaration on line 2.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "module 'memMod' is connected to modport 'target' "
                             "of interface instance 'sb_intf', which exports "
@@ -348,10 +307,6 @@ TEST(ModportDeclarationElaboration,
                             2, "25.7"));
 }
 
-// §25.7: the missing-definition error is specific to the exported subroutine
-// the module was connected to. When the connected module does define the
-// exported task with an out-of-block body, elaboration succeeds — this guards
-// the negative tests above against reporting an error unconditionally.
 TEST(ModportDeclarationElaboration,
      ExportBareIdentifierDefinedInConnectedModuleElaborates) {
   EXPECT_TRUE(
@@ -369,9 +324,6 @@ TEST(ModportDeclarationElaboration,
              "endmodule\n"));
 }
 
-// §25.7: exact matching of an exported prototype covers the argument count.
-// Here the module's definition adds an extra formal beyond the modport
-// prototype, which is an elaboration error.
 TEST(ModportDeclarationElaboration,
      ExportPrototypeArgumentCountMismatchIsError) {
   ElabFixture f;
@@ -397,9 +349,6 @@ TEST(ModportDeclarationElaboration,
                             6, "25.7"));
 }
 
-// §25.7: exact matching of an exported prototype covers argument directions.
-// Here the module flips the argument from input to output, which does not match
-// the modport prototype and is an elaboration error.
 TEST(ModportDeclarationElaboration,
      ExportPrototypeArgumentDirectionMismatchIsError) {
   ElabFixture f;
@@ -425,9 +374,6 @@ TEST(ModportDeclarationElaboration,
                             6, "25.7"));
 }
 
-// §25.7: exact matching also fixes the subroutine kind. Here the modport
-// exports a task prototype but the module defines a function of the same name,
-// so the kinds disagree and elaboration fails.
 TEST(ModportDeclarationElaboration, ExportPrototypeKindMismatchIsError) {
   ElabFixture f;
   ElabOk(
@@ -453,9 +399,6 @@ TEST(ModportDeclarationElaboration, ExportPrototypeKindMismatchIsError) {
                             6, "25.7"));
 }
 
-// §25.7: a function defined for an interface by a hierarchical name whose
-// signature agrees with the interface's extern function prototype elaborates
-// cleanly — the positive function counterpart of the task body accepted above.
 TEST(InterfaceSubroutines, HierarchicalFunctionBodyElaborates) {
   EXPECT_TRUE(
       ElabOk("interface ifc;\n"
@@ -468,11 +411,6 @@ TEST(InterfaceSubroutines, HierarchicalFunctionBodyElaborates) {
              "endmodule\n"));
 }
 
-// §25.7: a subroutine a module supplies for an interface through a hierarchical
-// name shall also be announced by the interface — declared extern in it or
-// exported by one of its modports. Here memMod defines a.Read for a connected
-// interface that neither externs Read nor exports it from any modport, which is
-// an elaboration error.
 TEST(ModportDeclarationElaboration,
      HierarchicalModuleBodyNotAnnouncedByInterfaceIsError) {
   ElabFixture f;
@@ -498,9 +436,6 @@ TEST(ModportDeclarationElaboration,
                             5, "25.7"));
 }
 
-// §25.7: the same hierarchical definition is legal once the interface announces
-// the subroutine with an extern declaration — the positive control isolating
-// the rule above (the only change is adding the extern prototype).
 TEST(ModportDeclarationElaboration,
      HierarchicalModuleBodyAnnouncedByExternElaborates) {
   EXPECT_TRUE(
@@ -519,10 +454,6 @@ TEST(ModportDeclarationElaboration,
              "endmodule\n"));
 }
 
-// §25.7: the number and types of a prototype's arguments shall match the
-// subroutine's declaration, and a formal name it gives shall be the
-// declaration's. mp's prototype of f has two arguments where the interface
-// declares one, and mq's names its second formal z where g's is b.
 TEST(ModportImportPrototype, MismatchWithTheDeclarationIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -543,10 +474,6 @@ TEST(ModportImportPrototype, MismatchWithTheDeclarationIsRefused) {
                             5, "25.7"));
 }
 
-// A prototype matching the declaration is accepted, and one that leaves a
-// formal unnamed agrees with whatever name the declaration gives it. A full
-// prototype of a subroutine the interface does not define, one a module
-// defines, has no declaration here to match.
 TEST(ModportImportPrototype, MatchingPrototypesAreAccepted) {
   EXPECT_TRUE(
       ElabOk("interface sb;\n"
@@ -559,9 +486,6 @@ TEST(ModportImportPrototype, MatchingPrototypesAreAccepted) {
              "module m; endmodule\n"));
 }
 
-// §25.7: importing a subroutine from another module needs a full prototype.
-// The interface defines no Read, its extern prototype being no definition, so
-// `import Read` imports the one memMod defines and is refused.
 TEST(ModportImportPrototype, IdentifierImportFromAnotherModuleIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -586,10 +510,6 @@ TEST(ModportImportPrototype, IdentifierImportFromAnotherModuleIsRefused) {
                             4, "25.7"));
 }
 
-// §25.7: a call binding an argument by name, or leaving one to its default,
-// needs a full prototype in the modport; `import f` alone is none, so each
-// such call through it is refused, while one writing every argument in order
-// is not. An argument left empty, `p.f(, 2)`, is left to its default too.
 TEST(ModportImportPrototype, IdentifierImportCallsNeedingAPrototypeAreRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -625,9 +545,6 @@ TEST(ModportImportPrototype, IdentifierImportCallsNeedingAPrototypeAreRefused) {
                              9, "25.7"));
 }
 
-// §25.7: a default a call needs shall be given in the prototype. mp's
-// prototype gives b none, so `p.f(1)` leaving b out is refused, though the
-// interface's declaration of f gives b one.
 TEST(ModportImportPrototype, ArgumentThePrototypeGivesNoDefaultIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -645,10 +562,6 @@ TEST(ModportImportPrototype, ArgumentThePrototypeGivesNoDefaultIsRefused) {
                             5, "25.7"));
 }
 
-// A call through a modport port of a subroutine the modport does not import
-// is no import call, and is refused only for reaching what the modport does
-// not list (§25.5); a call through no port, `new` or a class method's, is no
-// call through a modport at all.
 TEST(ModportImportPrototype, OtherCallsAreNoImportCalls) {
   ElabFixture f;
   ElaborateSrc(

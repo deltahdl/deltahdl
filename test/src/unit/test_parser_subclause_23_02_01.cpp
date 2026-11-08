@@ -74,9 +74,6 @@ TEST(ModuleDefinition, ModuleWithParamsPortsAndBody) {
       "endmodule\n"));
 }
 
-// The `.*` port list of §23.2.1 parsed straight from the lexer; the same
-// header run through the preprocessor first is covered by
-// test_preprocessor_subclause_23_02_01.cpp.
 TEST(ModuleHeaderDefinition, ModuleWildcardPorts) {
   auto r = Parse("module m(.*); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -212,31 +209,24 @@ TEST(ModuleParametersAndPorts, MixedParamPortDecls) {
 
 TEST(ModuleParametersAndPorts, ErrorMissingPortListClose) {
   auto r = Parse("module m(input logic a endmodule");
-  // §23.2.2.2 owns the ANSI list_of_port_declarations this list is one of, and
-  // its closing parenthesis is expected there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got 'endmodule'", 1, "23.2.2.2"));
 }
 
 TEST(ModuleParametersAndPorts, ErrorMissingParamListClose) {
   auto r = Parse("module m #(parameter int W endmodule");
-  // §23.2.3 owns the parameter_port_list, so its closing parenthesis is
-  // expected there rather than under §23.2.1.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got 'endmodule'", 1, "23.2.3"));
 }
 
 TEST(ModuleParametersAndPorts, ErrorTrailingCommaInPortList) {
   auto r = Parse("module m(input a,); endmodule");
-  // The comma starts another ansi_port_declaration, and §23.2.2.2 expects the
-  // port identifier the closing parenthesis stands in place of.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 1, "23.2.2.2"));
 }
 
 TEST(ModuleParametersAndPorts, ErrorTrailingCommaInParamList) {
   auto r = Parse("module m #(parameter int A,)(); endmodule");
-  // The comma starts another param_assignment, whose identifier §6.20.2 owns.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 1, "6.20.2"));
 }
@@ -266,8 +256,6 @@ TEST(ModuleHeaderDefinition, TimeunitOnly) {
 
 TEST(ModuleHeaderDefinition, EndLabelMismatchIsError) {
   auto r = Parse("module m; endmodule : wrong\n");
-  // §9.3.4 states the block-name matching rule the end label breaks, and the
-  // report is filed there rather than under §23.2.1.
   EXPECT_TRUE(ReportedError(r.diags, "end label 'wrong' does not match 'm'", 1,
                             "9.3.4"));
 }
@@ -400,9 +388,6 @@ TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterHeader) {
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.2.1"));
 }
 
-// Syntax 23-1 footnote: a package import in the header must be followed by a
-// parameter port list or a port declaration list (or both). A header whose
-// import is followed only by the terminating semicolon is rejected.
 TEST(ModuleHeaderDefinition, ErrorHeaderImportWithoutParamOrPortList) {
   auto r = Parse("module m import pkg::*; ; endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags,
@@ -411,36 +396,21 @@ TEST(ModuleHeaderDefinition, ErrorHeaderImportWithoutParamOrPortList) {
                             1, "23.2.1"));
 }
 
-// The companion well-formed case: the same header import followed by a port
-// declaration list is accepted.
 TEST(ModuleHeaderDefinition, HeaderImportFollowedByPortListOk) {
   EXPECT_TRUE(ParseOk("module m import pkg::*; (input logic a); endmodule\n"));
 }
 
-// Syntax 23-1 footnote lists two things that may follow a header import: a
-// parameter port list OR a port declaration list. The parameter-port-list-only
-// form (a header import followed by `#(...)` and then the terminating
-// semicolon, with no port declaration list at all) is equally well-formed and
-// must be accepted, distinct from the port-list form above.
 TEST(ModuleHeaderDefinition, HeaderImportFollowedByParamListOnlyOk) {
   EXPECT_TRUE(
       ParseOk("module m import pkg::*; #(parameter int N = 1); endmodule\n"));
 }
 
-// §23.2.1: the header is completed by the semicolon that follows the closing
-// parenthesis of the port list. A port list that closes but is not followed by
-// that semicolon is rejected, distinct from a header that has no port list.
 TEST(ModuleHeaderDefinition, ErrorMissingSemicolonAfterPortList) {
   auto r = Parse("module m(input logic a) endmodule\n");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 1, "23.2.1"));
 }
 
-// The semicolon this header is missing is stated by §23.2.1, and the semicolon
-// a procedural statement is missing is stated by §12.3. Both rejections write
-// `expected ';'`, so before the subclause reached the record the two were one
-// report, and a reader could not tell a broken module header from a broken
-// statement. This case pins the header's rule; the statement's is §12.3.
 TEST(ModuleHeaderDefinition, MissingSemicolonNames23_2_1) {
   auto r = Parse("module m(input logic a) endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 1, "23.2.1"));

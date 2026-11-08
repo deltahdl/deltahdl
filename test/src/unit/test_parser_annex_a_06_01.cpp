@@ -71,9 +71,6 @@ TEST(ContinuousAssignSyntaxParsing,
   EXPECT_NE(cas[1]->assign_delay, nullptr);
 }
 
-// continuous_assign's [ drive_strength ] and [ delay3 ] are independent
-// optionals; exercise the strength-present / delay-absent quadrant so the
-// drive_strength is observed applied on its own, not only bundled with a delay.
 TEST(ContinuousAssignSyntaxParsing, DriveStrengthWithoutDelay) {
   auto r = Parse(
       "module m;\n"
@@ -290,7 +287,6 @@ TEST(NetAliasSyntaxParsing, AliasSingleNetIsRejected) {
       "  wire a;\n"
       "  alias a;\n"
       "endmodule\n");
-  // §10.11 owns net_alias; A.6.1 only states the production.
   EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 3, "10.11"));
 }
 
@@ -300,7 +296,6 @@ TEST(NetAliasSyntaxParsing, AliasMissingSemicolonIsRejected) {
       "  wire a, b;\n"
       "  alias a = b\n"
       "endmodule\n");
-  // §10.11 owns net_alias; A.6.1 only states the production.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "10.11"));
 }
@@ -311,7 +306,6 @@ TEST(ContinuousAssignSyntaxParsing, AssignMissingSemicolonIsRejected) {
       "  wire a, b;\n"
       "  assign a = b\n"
       "endmodule\n");
-  // §10.3 owns continuous_assign; A.6.1 only states the production.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 4, "10.3"));
 }
@@ -322,7 +316,6 @@ TEST(ContinuousAssignSyntaxParsing, NetAssignmentMissingEqualsIsRejected) {
       "  wire a, b;\n"
       "  assign a b;\n"
       "endmodule\n");
-  // §10.3 owns continuous_assign; A.6.1 only states the production.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '=', got identifier", 3, "10.3"));
 }
@@ -333,8 +326,6 @@ TEST(ContinuousAssignSyntaxParsing, NetAssignmentMissingRhsIsRejected) {
       "  wire a;\n"
       "  assign a = ;\n"
       "endmodule\n");
-  // The missing right-hand side is caught in the expression parser, which
-  // files its report under §11.2 rather than under the §10.3 assignment.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

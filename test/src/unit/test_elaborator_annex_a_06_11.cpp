@@ -215,8 +215,6 @@ TEST(DefaultClockingElab, ReferenceFormElaborates) {
 }
 
 TEST(DefaultClockingElab, DefaultClockingInInterfaceElaborates) {
-  // Top-level interface (no module): name it as the explicit top so it is
-  // elaborated rather than skipped by ElabOk's module default.
   ElabFixture f;
   ElaborateSrc(
       "interface my_if (input clk);\n"

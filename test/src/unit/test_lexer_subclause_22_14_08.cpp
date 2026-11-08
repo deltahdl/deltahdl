@@ -14,10 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The spelling of the version_specifier is what selects this list, so the
-// string has to resolve to its own version and to nothing else. Its two nearest
-// neighbours are the SystemVerilog standards on either side of it, each
-// differing from it only in the year.
 TEST(SystemVerilog2012KeywordList, SpecifierResolvesToItsOwnVersion) {
   auto parsed = ParseKeywordVersion("1800-2012");
   ASSERT_TRUE(parsed.has_value());
@@ -35,9 +31,6 @@ TEST(SystemVerilog2012KeywordList, SpecifierResolvesToItsOwnVersion) {
   EXPECT_NE(*parsed, *next_standard);
 }
 
-// The negative for that spelling. A version_specifier is a fixed string, so a
-// word differing from it by a separator, by surrounding space, or by its year
-// or standard number is not this one and names no list at all.
 TEST(SystemVerilog2012KeywordList, SpecifierMisspellingsAreNotRecognized) {
   const char* const kNotThisSpecifier[] = {
       "1800-2012 ", " 1800-2012", "1800_2012", "18002012", "1800-2013",
@@ -49,11 +42,6 @@ TEST(SystemVerilog2012KeywordList, SpecifierMisspellingsAreNotRecognized) {
   }
 }
 
-// The first included list, swept whole rather than sampled. Each word is read
-// under both versions from the same lookup, so "1364-1995" is the baseline the
-// inclusion is measured against instead of an assumption, and the keyword each
-// word resolves to has to be the same one -- being reserved for a different
-// meaning would not be inclusion.
 TEST(SystemVerilog2012KeywordList, IncludesEveryVerilog1995Keyword) {
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
   for (const char* word : kVerilog1995Keywords) {
@@ -70,12 +58,6 @@ TEST(SystemVerilog2012KeywordList, IncludesEveryVerilog1995Keyword) {
   }
 }
 
-// The second included list, swept the same way. Taking in every earlier version
-// takes in two lists published for the same standard -- one with the
-// configuration words and one without -- and this test settles which of them
-// governs: all twenty-one entries are reserved here, and the ten the
-// configuration-free list drops are called out on their own, since they are the
-// only entries on which the two disagree.
 TEST(SystemVerilog2012KeywordList, IncludesEveryVerilog2001Keyword) {
   EXPECT_EQ(std::size(kVerilog2001AddedKeywords), 21u);
   for (const char* word : kVerilog2001AddedKeywords) {
@@ -101,10 +83,6 @@ TEST(SystemVerilog2012KeywordList, IncludesEveryVerilog2001Keyword) {
   }
 }
 
-// The third included list, which holds one word. It is reserved here with the
-// meaning it has under the list it comes from, and it is not reserved by either
-// of the two lists that one is itself built on -- so its being a keyword here
-// can only have come from the third inclusion.
 TEST(SystemVerilog2012KeywordList, IncludesTheVerilog2005Keyword) {
   ASSERT_EQ(std::size(kVerilog2005AddedKeywords), 1u);
   const char* word = kVerilog2005AddedKeywords[0];
@@ -123,11 +101,6 @@ TEST(SystemVerilog2012KeywordList, IncludesTheVerilog2005Keyword) {
   EXPECT_FALSE(LookupKeyword(word, KeywordVersion::kVer13642001).has_value());
 }
 
-// The fourth included list, swept whole. Its entries are reserved here with the
-// meaning they carry under the list they come from, and each is an ordinary
-// identifier under "1364-2005" -- the union of the three lists that one is
-// itself built on -- so their being keywords here traces to the fourth
-// inclusion and to nothing earlier.
 TEST(SystemVerilog2012KeywordList, IncludesEverySystemVerilog2005Keyword) {
   EXPECT_EQ(std::size(kSystemVerilog2005AddedKeywords), 97u);
   for (const char* word : kSystemVerilog2005AddedKeywords) {
@@ -147,11 +120,6 @@ TEST(SystemVerilog2012KeywordList, IncludesEverySystemVerilog2005Keyword) {
   }
 }
 
-// The fifth included list, and the last one before this version's own. Its
-// entries are reserved here with the meaning they carry under the list they
-// come from, and each is an ordinary identifier under "1800-2005" -- the union
-// of the four lists that one is itself built on -- so their being keywords here
-// traces to the fifth inclusion.
 TEST(SystemVerilog2012KeywordList, IncludesEverySystemVerilog2009Keyword) {
   EXPECT_EQ(std::size(kSystemVerilog2009AddedKeywords), 23u);
   for (const char* word : kSystemVerilog2009AddedKeywords) {
@@ -171,12 +139,6 @@ TEST(SystemVerilog2012KeywordList, IncludesEverySystemVerilog2009Keyword) {
   }
 }
 
-// Table 22-6 and what makes its entries *additions* rather than inheritances:
-// each is reserved here and is an ordinary identifier under the last of the
-// five lists this version includes, which is the union of all five. The sweep
-// over those five lists is the other half of the claim -- across every word
-// they hold, being reserved here but not under "1800-2009" happens for none of
-// them, so Table 22-6 accounts for the whole difference between the two lists.
 TEST(SystemVerilog2012KeywordList,
      AddedWordsAreTheWholeDifferenceFromIncludedLists) {
   EXPECT_EQ(std::size(kSystemVerilog2012AddedKeywords), 4u);
@@ -196,8 +158,6 @@ TEST(SystemVerilog2012KeywordList,
     ASSERT_TRUE(here.has_value())
         << word.text << " is one of the words this version adds";
     if (!here.has_value()) continue;
-    // Naming the keyword outright is what makes this an addition claim rather
-    // than the weaker "something other than an identifier".
     EXPECT_EQ(*here, word.kind) << word.text;
     EXPECT_FALSE(
         LookupKeyword(word.text, KeywordVersion::kVer18002009).has_value())
@@ -220,9 +180,6 @@ TEST(SystemVerilog2012KeywordList,
       << "the included lists contribute nothing this version reserves anew";
 }
 
-// The six tables put together are the list, so their sizes add up to it and
-// none of them repeats a word another already holds. Without this the sweeps
-// above could each pass while between them covering only part of the list.
 TEST(SystemVerilog2012KeywordList, TheListIsTheSixTablesTogether) {
   ExpectTablesPartitionTheList(
       {kVerilog1995KeywordSweep, kVerilog2001AddedKeywordSweep,
@@ -232,18 +189,6 @@ TEST(SystemVerilog2012KeywordList, TheListIsTheSixTablesTogether) {
       248);
 }
 
-// The list bounds what is reserved from above as well as from below: naming
-// five included tables plus one of its own says nothing outside them is a
-// reserved word here.
-//
-// Every earlier version in this ladder can be bounded from above by pointing at
-// the words the *next* one introduces. This version cannot -- it is the last
-// one that introduces any -- so what is checked instead is that words shaped
-// like its own additions, and like the additions of the lists it includes, are
-// not on it. Each near-miss below differs from a real entry by a prefix, a
-// suffix, or a separator, which is exactly what a table membership test that
-// matched loosely would let through; that the entries themselves are reserved
-// is what the sweeps above establish.
 TEST(SystemVerilog2012KeywordList, WordsOutsideTheSixTablesAreNotReserved) {
   const char* const kNotWords[] = {
       "implement",     "implemented",    "implements_",   "interconnects",

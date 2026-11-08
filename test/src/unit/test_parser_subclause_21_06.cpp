@@ -1,10 +1,3 @@
-// §21.6 Command line input — parse acceptance for the two plusarg query
-// functions. Both names carry an embedded '$' ($test$plusargs /
-// $value$plusargs); the calls are expressions, so they must parse in every
-// expression position: if-conditions, negations, assignment right-hand
-// sides, argument positions, and inside task bodies. The first argument may
-// be a string literal or a variable; $value$plusargs takes a second,
-// destination-variable argument.
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -35,8 +28,6 @@ TEST(PlusargsParsing, ValuePlusargsCall) {
               "endmodule\n"));
 }
 
-// §21.6: the search string may be supplied through a variable rather than a
-// literal, for both functions.
 TEST(PlusargsParsing, VariablePatternArguments) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -49,8 +40,6 @@ TEST(PlusargsParsing, VariablePatternArguments) {
               "endmodule\n"));
 }
 
-// The calls are ordinary expressions: assignment right-hand side and
-// system-task argument positions parse.
 TEST(PlusargsParsing, CallInAssignmentAndArgumentPositions) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -62,7 +51,6 @@ TEST(PlusargsParsing, CallInAssignmentAndArgumentPositions) {
               "endmodule\n"));
 }
 
-// Negated-call form used by the LRM's default-value idiom.
 TEST(PlusargsParsing, NegatedValuePlusargsCondition) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -74,7 +62,6 @@ TEST(PlusargsParsing, NegatedValuePlusargsCondition) {
               "endmodule\n"));
 }
 
-// The calls parse inside a task body as well as in an initial process.
 TEST(PlusargsParsing, CallInsideTaskBody) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -86,7 +73,6 @@ TEST(PlusargsParsing, CallInsideTaskBody) {
               "endmodule\n"));
 }
 
-// Negative: an unterminated call is a syntax error.
 TEST(PlusargsParsing, UnterminatedTestPlusargsRejected) {
   auto result = Parse(
       "module t;\n"
@@ -94,8 +80,6 @@ TEST(PlusargsParsing, UnterminatedTestPlusargsRejected) {
       "    if ($test$plusargs(\"VERBOSE\") $display(\"v\");\n"
       "  end\n"
       "endmodule\n");
-  // §12.4 owns the parentheses around a conditional statement's condition, and
-  // that is what the missing ')' after the $test$plusargs call breaks first.
   EXPECT_TRUE(ReportedError(result.diags, "expected ')', got system identifier",
                             3, "12.4"));
 }

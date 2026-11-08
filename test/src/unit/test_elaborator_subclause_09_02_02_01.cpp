@@ -33,8 +33,6 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithSensitivityNoWarning) {
 }
 
 TEST(GeneralPurposeAlwaysElaboration, AlwaysWithStarSensitivityNoWarning) {
-  // A general purpose always whose implicit @(*) supplies a sensitivity is
-  // not flagged as a potential zero-delay loop: the trigger lets time advance.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -104,11 +102,6 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithEventControlInBodyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.1 warns about an always procedure with nothing in it to let simulation
-// time advance. A cycle delay is such a control: §14.11 has it hold the process
-// for as many clocking block events as it counts, so the process yields and the
-// loop is not a zero-delay one. The module carries the default clocking §14.11
-// requires of a module using `##`, so nothing else in it is wrong.
 TEST(GeneralPurposeAlwaysElaboration, AlwaysWithCycleDelayInBodyNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -141,10 +134,6 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysWithWaitInBodyNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §9.2.2.1 warns about an always procedure with no control for simulation time
-// to advance. Annex P's glossary makes a task enable a blocking statement, the
-// task possibly holding one, without the caller looking into its body, so an
-// always that enables a task has such a control and draws no warning.
 TEST(GeneralPurposeAlwaysElaboration, AlwaysEnablingATaskNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -160,9 +149,6 @@ TEST(GeneralPurposeAlwaysElaboration, AlwaysEnablingATaskNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A function call is no blocking statement, §13.4 keeping every
-// time-controlling statement out of a function, so an always whose body only
-// calls one still has nothing to let time advance.
 TEST(GeneralPurposeAlwaysElaboration, AlwaysCallingOnlyAFunctionWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(

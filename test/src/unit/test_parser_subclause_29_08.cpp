@@ -11,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Collect every UDP instance parsed inside the first module of a unit.
 std::vector<ModuleItem*> FindUdpInstances(ParseResult& r) {
   std::vector<ModuleItem*> out;
   for (auto* item : r.cu->modules[0]->items) {
@@ -28,11 +27,6 @@ const char* udp_def =
     "  endtable\n"
     "endprimitive\n";
 
-// §29.8 BNF udp_instantiation lists drive_strength and delay2 as optional
-// prefixes, followed by a udp_instance carrying its terminal list. This
-// observes one declaration that supplies every optional component at once and
-// checks each lands on the parsed instance: the strength pair, both rise/fall
-// delays (delay2), the instance name, and the output/input terminal list.
 TEST(UdpInstantiation, ParsesAllInstantiationComponents) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -43,19 +37,16 @@ TEST(UdpInstantiation, ParsesAllInstantiationComponents) {
   ASSERT_EQ(insts.size(), 1u);
   auto* u = insts[0];
   EXPECT_EQ(u->inst_module, "my_udp");
-  EXPECT_EQ(u->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(u->drive_strength1, 4u);  // strong1
+  EXPECT_EQ(u->drive_strength0, 4u);
+  EXPECT_EQ(u->drive_strength1, 4u);
   ASSERT_NE(u->gate_delay, nullptr);
   EXPECT_EQ(u->gate_delay->int_val, 2u);
   ASSERT_NE(u->gate_delay_fall, nullptr);
   EXPECT_EQ(u->gate_delay_fall->int_val, 3u);
   EXPECT_EQ(u->gate_inst_name, "u1");
-  ASSERT_EQ(u->gate_terminals.size(), 3u);  // output_terminal + 2 inputs
+  ASSERT_EQ(u->gate_terminals.size(), 3u);
 }
 
-// §29.8 states a UDP instance name is optional, just as for gates. The
-// udp_instance BNF brackets name_of_instance accordingly. This observes the
-// nameless form parsing into an anonymous instance with its terminals intact.
 TEST(UdpInstantiation, OptionalInstanceName) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -68,9 +59,6 @@ TEST(UdpInstantiation, OptionalInstanceName) {
   EXPECT_EQ(insts[0]->gate_terminals.size(), 3u);
 }
 
-// §29.8 permits an optional range for an array of UDP instances; the
-// name_of_instance BNF carries an unpacked_dimension for this. This observes
-// the range component being accepted and recorded on the instance.
 TEST(UdpInstantiation, ArrayOfInstances) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -84,9 +72,6 @@ TEST(UdpInstantiation, ArrayOfInstances) {
   EXPECT_NE(insts[0]->inst_range_right, nullptr);
 }
 
-// §29.8 BNF udp_instantiation allows a comma-separated list of udp_instance
-// items under one declaration. This observes the list repetition producing
-// multiple instances of the same UDP from a single statement.
 TEST(UdpInstantiation, MultipleInstancesInOneStatement) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -99,10 +84,6 @@ TEST(UdpInstantiation, MultipleInstancesInOneStatement) {
   EXPECT_EQ(insts[1]->gate_inst_name, "u2");
 }
 
-// §29.8 BNF udp_instantiation places the optional drive_strength and delay2
-// ahead of the whole comma-separated instance list, so a strength/delay written
-// once applies to every instance in the declaration. This observes that the
-// pair parsed once is propagated onto both instances of the list.
 TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
   auto r =
       Parse(std::string(udp_def) +
@@ -113,8 +94,8 @@ TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
   auto insts = FindUdpInstances(r);
   ASSERT_EQ(insts.size(), 2u);
   for (auto* u : insts) {
-    EXPECT_EQ(u->drive_strength0, 4u);  // strong0
-    EXPECT_EQ(u->drive_strength1, 2u);  // weak1
+    EXPECT_EQ(u->drive_strength0, 4u);
+    EXPECT_EQ(u->drive_strength1, 2u);
     ASSERT_NE(u->gate_delay, nullptr);
     EXPECT_EQ(u->gate_delay->int_val, 2u);
     ASSERT_NE(u->gate_delay_fall, nullptr);
@@ -122,9 +103,6 @@ TEST(UdpInstantiation, SharedStrengthAndDelayAcrossInstances) {
   }
 }
 
-// §29.8's delay2 permits a single delay as well as a rise/fall pair. This
-// observes the lower-bound input form: one delay parses into the rise slot with
-// no fall delay recorded, still under the two-delay ceiling.
 TEST(UdpInstantiation, SingleDelayForm) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -138,10 +116,6 @@ TEST(UdpInstantiation, SingleDelayForm) {
   EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
 }
 
-// §29.8's own example writes the delay as a single parameter reference
-// (d_edge_ff #p3 d_inst (...)), not a literal. This observes that constant-form
-// of the delay2 input: a parameter name parses into the rise-delay slot as an
-// identifier expression, distinct from the literal forms above.
 TEST(UdpInstantiation, ParameterValuedDelay) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -157,9 +131,6 @@ TEST(UdpInstantiation, ParameterValuedDelay) {
   EXPECT_EQ(insts[0]->gate_delay_fall, nullptr);
 }
 
-// §29.8 limits UDP instances to two delays because z is not supported, so the
-// delay specification is delay2 rather than the gate-style delay3. A third
-// delay must be rejected.
 TEST(UdpInstantiation, RejectsThreeDelays) {
   auto r = Parse(std::string(udp_def) +
                  "module top;\n"
@@ -169,11 +140,6 @@ TEST(UdpInstantiation, RejectsThreeDelays) {
       r.diags, "UDP instantiation shall have at most two delays", 8, "29.8"));
 }
 
-// §29.3 lets a UDP be declared anywhere, so the parser meets my_udp here before
-// its declaration and does not yet know it for a primitive. A delay written
-// with no parentheses is no module's parameter assignment, which always writes
-// them, so the item is a UDP instance whatever the name turns out to be. It was
-// read as a module instance and failed at the `5`.
 TEST(UdpInstantiation, UdpDeclaredLaterTakesADelayWithoutParentheses) {
   auto r = Parse(
       "module top;\n"
@@ -188,8 +154,6 @@ TEST(UdpInstantiation, UdpDeclaredLaterTakesADelayWithoutParentheses) {
   EXPECT_EQ(insts[0]->gate_inst_name, "u1");
 }
 
-// A drive strength stands where a module instance names its instance, so it
-// too is a UDP instance's whatever the name. It failed to parse at the `(`.
 TEST(UdpInstantiation, UdpDeclaredLaterTakesADriveStrength) {
   auto r = Parse(
       "module top;\n"
@@ -199,13 +163,10 @@ TEST(UdpInstantiation, UdpDeclaredLaterTakesADriveStrength) {
   EXPECT_FALSE(r.has_errors);
   auto insts = FindUdpInstances(r);
   ASSERT_EQ(insts.size(), 1u);
-  EXPECT_EQ(insts[0]->drive_strength0, 4u);  // strong0
-  EXPECT_EQ(insts[0]->drive_strength1, 2u);  // weak1
+  EXPECT_EQ(insts[0]->drive_strength0, 4u);
+  EXPECT_EQ(insts[0]->drive_strength1, 2u);
 }
 
-// §29.8 makes the instance name optional, and a module instance always names
-// its instance, so `my_udp (` is a UDP instance with no name. It failed to
-// parse, read as a variable declaration.
 TEST(UdpInstantiation, UdpDeclaredLaterTakesAnUnnamedInstance) {
   auto r = Parse(
       "module top;\n"

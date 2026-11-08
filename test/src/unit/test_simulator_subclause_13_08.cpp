@@ -453,11 +453,6 @@ TEST(ParameterizedSubroutineSim, ParamControlsVariableWidth) {
   LowerRunAndCheck(f, design, {{"r4", 15u}, {"r8", 255u}});
 }
 
-// §13.8: the specialization value that parameterizes the subroutine is a
-// constant expression. Every other test supplies it as a literal; here it is
-// produced by a module `parameter` declaration, which reaches the call site
-// through a different resolution path. The bound value must still flow into the
-// static method body and drive the computed result.
 TEST(ParameterizedSubroutineSim, SpecializationArgFromModuleParameter) {
   SimFixture f;
   auto* var = RunAndFind(
@@ -474,9 +469,6 @@ TEST(ParameterizedSubroutineSim, SpecializationArgFromModuleParameter) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §13.8: same constant-expression specialization value, this time produced by a
-// `localparam`. A localparam is resolved independently of a module parameter,
-// so it exercises a distinct path for delivering the value into the subroutine.
 TEST(ParameterizedSubroutineSim, SpecializationArgFromLocalparam) {
   SimFixture f;
   auto* var = RunAndFind(

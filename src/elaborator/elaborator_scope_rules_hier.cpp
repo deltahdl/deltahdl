@@ -53,11 +53,6 @@ void CollectMemberAccess(const Expr* e, std::vector<const Expr*>& out) {
   for (const auto* el : e->elements) CollectMemberAccess(el, out);
 }
 
-// Collects every member access the statement `s` writes in its own
-// expressions, leaving out the statements it holds. The two loops read
-// expressions rather than statements: a case item's patterns and a randcase
-// item's weight are the only expressions Stmt holds outside its own scalar
-// fields, and ForEachChildStmt reaches neither because neither is a statement.
 void CollectOwnMemberAccess(const Stmt* s, std::vector<const Expr*>& out) {
   CollectMemberAccess(s->condition, out);
   CollectMemberAccess(s->lhs, out);
@@ -73,17 +68,6 @@ void CollectOwnMemberAccess(const Stmt* s, std::vector<const Expr*>& out) {
   for (const auto& rc : s->randcase_items) CollectMemberAccess(rc.first, out);
 }
 
-// Collects every member access written anywhere in `s` and its nested
-// statements. §23.6 says a hierarchical name may be written wherever the object
-// it names is referenced, and §26.3 bars a hierarchical reference into an
-// importing scope with no condition on where that reference stands, so every
-// position a statement holds a statement in is a position both rules reach.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions
-// once for the whole elaborator, which is why the list is not written out again
-// here. The visitor takes `Stmt* const&` because `s` is a `const Stmt*`, which
-// is how ForEachChildStmt lets a walk that only reads the tree share its list
-// with the walks that rewrite it.
 void CollectMemberAccessInStmt(const Stmt* s, std::vector<const Expr*>& out) {
   if (!s) return;
   CollectOwnMemberAccess(s, out);
@@ -166,9 +150,6 @@ void CheckHierRefImportedMemberAccess(
   if (!ma->rhs || ma->rhs->kind != ExprKind::kIdentifier) return;
   auto it = inst_type.find(ma->lhs->text);
   if (it == inst_type.end()) return;
-  // §26.3 (printed pages 810, 812): a name the child declares is its own, a
-  // wildcard import supplying nothing for it, so the reference reaches that
-  // declaration and no imported one.
   if (ModuleDeclaresMember(it->second, ma->rhs->text)) return;
   if (ImportedIntoModule(unit, it->second, ma->rhs->text)) {
     diag.Error(
@@ -190,7 +171,6 @@ CollectResolvedChildren(const RtlirModule* mod) {
   return inst_type;
 }
 
-// True when any element of `range` projects (via `proj`) to `name`.
 template <typename Range, typename Proj>
 bool RangeHasName(const Range& range, Proj proj, std::string_view name) {
   for (const auto& e : range) {
@@ -210,21 +190,10 @@ bool EnumTypesDeclare(const RtlirModule* m, std::string_view name) {
   return false;
 }
 
-// True when `name` is declared at the top level of module `m` and so may be the
-// target of a hierarchical reference `inst.name`. Covers every flat namespace
-// an instance member access can reach.
 bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
   auto ptr_name = [](const auto* d) {
     return d ? d->name : std::string_view{};
   };
-  // §23.6 forms a hierarchical name by joining the names of the modules, module
-  // instances, generate blocks and so on that contain the item, so a parameter
-  // a generate block of `m` declares is named through that block and not by
-  // `inst.name`. This is asked of the parameters and of nothing else in the
-  // chain below because RtlirNet::name and RtlirVariable::name carry the prefix
-  // Elaborator::ScopedName added, so a block's net is already stored under a
-  // name no bare identifier matches, while RtlirParamDecl::name is bare
-  // whatever scope declared it.
   auto declares_module_level_param = [&] {
     for (const auto& p : m->params) {
       if (p.name != name) continue;
@@ -252,21 +221,10 @@ bool ModuleDeclaresMember(const RtlirModule* m, std::string_view name) {
          RangeHasName(
              m->children, [](const RtlirModuleInst& c) { return c.inst_name; },
              name) ||
-         // §14.3 with §23.6 (printed page 354 and 741): a clocking block is a
-         // named item of the module declaring it, so `u.cb` names u's block
-         // and `u.cb.d` its clockvar. Asked of no clocking block, the name
-         // was reported undeclared in the module that declares it.
          RangeHasName(m->clocking_blocks, ptr_name, name) ||
          EnumTypesDeclare(m, name);
 }
 
-// Gate for the undeclared-member check: only a plain module whose top-level
-// namespace is fully enumerable by ModuleDeclaresMember may be checked.
-// Interfaces and programs expose modports/clocking-block members; a generate
-// construct introduces named scopes; and a procedural block can declare named
-// blocks (`begin : label`) reachable hierarchically — none of which appear in
-// the flat RtlirModule lists. For any of those the check is suppressed so it
-// never produces a false positive.
 bool ChildDeclAllowsMemberCheck(const ModuleDecl* child) {
   if (!child) return false;
   if (child->decl_kind != ModuleDeclKind::kModule) return false;
@@ -299,12 +257,6 @@ CollectInstanceArrayBounds(const ModuleDecl* decl) {
   return arrayed;
 }
 
-// §23.6 with Syntax 23-7: the instance select after `name`, the name of an
-// instance array or a loop generate block, in the select `select`, is one
-// constant expression naming one instance or one block. A range in its place,
-// or a select that is no constant expression in `scope`, is reported; true
-// when either is. The parser holds the second bound or the width of each of
-// `[a:b]`, `[a+:w]` and `[a-:w]` in index_end.
 bool ReportInstanceSelectForm(DiagEngine& diag, std::string_view name,
                               const Expr* select, const ConstantScope& scope) {
   if (select->index_end != nullptr) {
@@ -323,9 +275,6 @@ bool ReportInstanceSelectForm(DiagEngine& diag, std::string_view name,
   return true;
 }
 
-// The names of the blocks of the module's loop generate constructs, one of
-// whose blocks a hierarchical name selects with an instance select (§23.6,
-// §27.4). A block §27.6 named takes no hierarchical name at all.
 std::unordered_set<std::string_view> NamedLoopGenerateBlocks(
     const ModuleDecl* decl) {
   std::unordered_set<std::string_view> names;
@@ -338,9 +287,6 @@ std::unordered_set<std::string_view> NamedLoopGenerateBlocks(
   return names;
 }
 
-// §23.6: the select standing on the name of a loop generate block in the
-// hierarchical name `ma`, as in `blk[i].w`, is an instance select as an
-// instance array's is.
 void CheckHierRefLoopBlockSelect(
     DiagEngine& diag, const std::unordered_set<std::string_view>& loops,
     const Expr* ma, const ConstantScope& scope) {
@@ -368,12 +314,6 @@ void CheckHierRefInstanceArrayAccess(
                Subclause("23.6"));
     return;
   }
-  // §23.6: the instance select is a constant expression, so it may be any of
-  // the constant forms of 11.2.1 -- a literal, but equally a parameter or
-  // localparam. Evaluate it against the enclosing module's parameter scope so a
-  // parameter-valued select is range-checked, not just a bare literal. A range
-  // or a select that is no constant has been reported, and has no one index
-  // to check.
   if (ReportInstanceSelectForm(diag, name, ma->lhs, scope)) return;
   auto idx = ConstEvalInt(select_index, scope.fold);
   if (!idx) return;
@@ -386,11 +326,6 @@ void CheckHierRefInstanceArrayAccess(
   }
 }
 
-// §23.6: the instance selects of the hierarchical names a module's procedures
-// hold, each judged against the constants in force where it is written. A
-// parameter a block declares is a constant of the statements after it in the
-// block (§6.20), so it is entered as the walk passes its declaration and
-// leaves when the walk leaves the block.
 struct InstanceSelectWalk {
   DiagEngine& diag;
   const std::unordered_map<std::string_view, InstanceArrayBounds>& arrayed;
@@ -417,11 +352,6 @@ struct InstanceSelectWalk {
 
 }  // namespace
 
-// §23.6: a hierarchical reference `inst.name` into a resolved child of a plain
-// module (see ChildDeclAllowsMemberCheck) is unresolved when the child does not
-// declare `name` and no bind directive gives it one of that name. The
-// imported-name case is reported by the imported-member check above, so it is
-// skipped here to avoid a duplicate diagnostic.
 void Elaborator::CheckHierRefUndeclaredMember(
     const std::unordered_map<std::string_view, const RtlirModule*>& inst_type,
     const Expr* ma) {
@@ -432,9 +362,6 @@ void Elaborator::CheckHierRefUndeclaredMember(
   if (!ChildDeclAllowsMemberCheck(FindModule(it->second->name))) return;
   if (ModuleDeclaresMember(it->second, ma->rhs->text)) return;
   if (ImportedIntoModule(unit_, it->second, ma->rhs->text)) return;
-  // §23.11: a bound instance stands at the end of its target scope, so `s1.c`
-  // names the instance a bind directive puts in s1, which the directives have
-  // not yet inserted while this module is checked.
   if (BindIntroducesName(unit_, it->second->name, ma->lhs->text, ma->rhs->text))
     return;
   diag_.Error(
@@ -458,10 +385,6 @@ UnitHierHeadNames::UnitHierHeadNames(const CompilationUnit* unit)
   }
 }
 
-// A genblk<n> name §27.6 gives an unnamed generate block is not among
-// scope_names_, being no name a hierarchical name may use, and
-// Elaborator::ValidateUnresolvedReferences has every scope of the unit named
-// before this is built so that each such name is marked as §27.6's.
 bool UnitHierHeadNames::Admits(std::string_view name) const {
   return declared_.Declares(name) || scope_names_.Contains(name);
 }
@@ -505,12 +428,6 @@ void ScopeNameSet::AddItem(const ModuleItem* item) {
   for (const Stmt* s : item->func_body_stmts) AddStmt(s);
 }
 
-// What the item itself declares. §6.19 declares an enumeration's members in
-// the scope its type is written in. §6.10 declares an implicit net for an
-// undeclared identifier written as a continuous assignment's target or in a
-// port expression of an instance or a gate, so every identifier written there
-// is taken as one: it is a name the scope declares whether or not something
-// else declares it first.
 void ScopeNameSet::AddItemOwnNames(const ModuleItem* item) {
   if (!item->name_is_generated) Insert(item->name);
   for (std::string_view name : {item->inst_name, item->gate_inst_name}) {
@@ -546,8 +463,6 @@ void ScopeNameSet::AddImplicitNets(const Expr* e) {
 void ScopeNameSet::AddStmt(const Stmt* s) {
   if (s == nullptr) return;
   for (std::string_view name : {s->label, s->var_name}) Insert(name);
-  // §12.7.3: a foreach loop declares its loop variables, and a key of a
-  // class-keyed associative array is a handle a member is selected through.
   for (std::string_view name : s->foreach_vars) Insert(name);
   if (s->decl_item != nullptr) AddItem(s->decl_item);
   ForEachChildStmt(s, [&](Stmt* const& sub) { AddStmt(sub); });
@@ -555,18 +470,10 @@ void ScopeNameSet::AddStmt(const Stmt* s) {
 
 namespace {
 
-// The names a module's named generate blocks declare, by block name. The
-// alternatives of one conditional construct may share a name (§27.5), and
-// only one of them is instantiated, so a name holds what any of them declares.
 using GenerateBlockScopes = std::unordered_map<std::string_view, ScopeNameSet>;
 
 void AddConstructBlocks(const ModuleItem* item, GenerateBlockScopes& blocks);
 
-// One block of a conditional construct. §27.5 makes a block that holds only a
-// conditional construct, written without begin-end, belong to the outer
-// construct, so the nested construct's blocks are named in this scope. A
-// block §27.6 named is left out: §23.6 lets no path written outside it reach
-// in by that name.
 void AddConditionalBlock(std::string_view name, bool name_is_generated,
                          const std::vector<ModuleItem*>& body,
                          bool has_begin_end, GenerateBlockScopes& blocks) {
@@ -579,7 +486,6 @@ void AddConditionalBlock(std::string_view name, bool name_is_generated,
   for (const ModuleItem* sub : body) names.AddItem(sub);
 }
 
-// The blocks of an if-generate and of every else-if after it.
 void AddIfBlocks(const ModuleItem* item, GenerateBlockScopes& blocks) {
   AddConditionalBlock(item->name, item->name_is_generated, item->gen_body,
                       item->gen_body_has_begin_end, blocks);
@@ -593,8 +499,6 @@ void AddIfBlocks(const ModuleItem* item, GenerateBlockScopes& blocks) {
                       other->gen_body_has_begin_end, blocks);
 }
 
-// §27.4 gives each block of a loop an implicit localparam named after the
-// genvar, so the genvar is a name the block declares.
 void AddLoopBlock(const ModuleItem* item, GenerateBlockScopes& blocks) {
   if (item->name.empty() || item->name_is_generated) return;
   ScopeNameSet& names = blocks[item->name];
@@ -626,8 +530,6 @@ void AddConstructBlocks(const ModuleItem* item, GenerateBlockScopes& blocks) {
   }
 }
 
-// A block name the module also gives something else, or a procedure declares
-// as a local, may be what a reference names, so such a block is not checked.
 void DropShadowedBlocks(const ModuleDecl* decl, GenerateBlockScopes& blocks) {
   for (const PortDecl& port : decl->ports) blocks.erase(port.name);
   std::unordered_set<std::string_view> locals;
@@ -682,8 +584,6 @@ namespace {
 void AddGeneratedBlockNames(const ModuleItem* item,
                             std::unordered_set<std::string_view>& out);
 
-// One block of a conditional construct, or the blocks of the construct
-// directly nested in it, which §27.5 makes the outer construct's own.
 void AddGeneratedBlockName(std::string_view name, bool name_is_generated,
                            const std::vector<ModuleItem*>& body,
                            bool has_begin_end,
@@ -695,9 +595,6 @@ void AddGeneratedBlockName(std::string_view name, bool name_is_generated,
   if (name_is_generated) out.insert(name);
 }
 
-// The genblk<n> names §27.6 gave the blocks of `item` that stand in the scope
-// `item` is written in. A plain else is held in gen_else as a kGenerateIf of
-// its own, so following gen_else reaches it as it reaches an else-if.
 void AddGeneratedBlockNames(const ModuleItem* item,
                             std::unordered_set<std::string_view>& out) {
   if (!IsConditionalGenerateConstruct(item->kind)) {
@@ -734,8 +631,6 @@ void ReportUnnamedGenerateBlockReaches(const ModuleDecl* decl,
     std::string_view block;
     const Expr* select_index = nullptr;
     if (!DecodeInstanceArrayBase(ma, block, select_index)) continue;
-    // A path may start at the design element's own name, as top.genblk1.a
-    // does, and the block it reaches is then the name after it.
     if (block == decl->name) block = ma->rhs->text;
     if (!generated.contains(block)) continue;
     diag.Error(ma->range.start,
@@ -749,10 +644,6 @@ void ReportUnnamedGenerateBlockReaches(const ModuleDecl* decl,
 
 namespace {
 
-// The leftmost name of the hierarchical name `e` heads, through its member
-// selects and the bit-selects of an instance array, or null where it is no
-// hierarchical name a scope has to answer: a `pkg::` or class scope
-// resolution, a `$root.` or `$unit::` prefix, `this` or `super`, or a call.
 const Expr* HierHead(const Expr* e) {
   while (e != nullptr) {
     if (e->kind == ExprKind::kMemberAccess) {
@@ -772,7 +663,6 @@ const Expr* HierHead(const Expr* e) {
 
 using NameSet = std::unordered_set<std::string_view>;
 
-// `base` widened by `names`, built in `storage` where there are any.
 const NameSet* Widened(const NameSet* base, const NameSet& names,
                        NameSet& storage) {
   if (names.empty()) return base;
@@ -781,9 +671,6 @@ const NameSet* Widened(const NameSet* base, const NameSet& names,
   return &storage;
 }
 
-// §20.4.1: the argument of $timeunit or $timeprecision `call` is a
-// hierarchical identifier naming a design element, so a lone name there, `p`
-// for a package or a top module's own name, heads one as a dotted path does.
 void CollectDesignElementHeads(const Expr* call,
                                std::vector<const Expr*>& out) {
   for (const Expr* arg : call->args) {
@@ -792,14 +679,6 @@ void CollectDesignElementHeads(const Expr* call,
   }
 }
 
-// The heads of the hierarchical names `e` holds, but for those `bound` names:
-// a variable in scope where the name stands, which the name then reaches
-// through rather than heads a hierarchical name of (§12.6, §12.7.1). §12.6.3
-// puts what a conditional expression's predicate binds in scope in its
-// second operand and not its third, and §12.6.2 what a `&&&` clause binds in
-// the clauses after it. A `with` clause is left alone: an array method's
-// reads its iterator, `item` unless it names another, which no scope
-// declares (§7.12).
 void CollectHierHeads(const Expr* e, const NameSet& bound,
                       std::vector<const Expr*>& out) {
   if (e == nullptr) return;
@@ -836,12 +715,6 @@ void CollectHierHeads(const Expr* e, const NameSet& bound,
   for (const Expr* child : e->elements) CollectHierHeads(child, bound, out);
 }
 
-// The same over the statement `s`, with `bound` the variables in scope where
-// it stands. §12.7.1 adds those a for loop's initialization declares for the
-// loop's own header and body, §12.6.1 and §12.6.2 those a pattern binds for
-// the statement it guards (ForEachChildStmtWithBindings), and §18.17.7 those
-// a randsequence declares for its code blocks: `op.len()` there calls a method
-// of the implicit variable op.
 void CollectStmtHierHeads(const Stmt* s, const NameSet& bound,
                           std::vector<const Expr*>& out) {
   if (s == nullptr) return;

@@ -1,12 +1,3 @@
-// §8.19's rules on constant class properties. A global constant, one declared
-// with an initial value, is assigned nowhere but its declaration; an instance
-// constant, declared without one, is assigned only in its class's constructor,
-// once there, and is never declared static. The rules are on the property, so
-// they hold for a class declared in any scope, in the classes that inherit the
-// property, and for a write reaching it by any name: `k`, `this.k` and `C::k`
-// inside the class, `h.k` and `C::k` in a module's procedures and subroutines
-// and in the methods of any other class.
-
 #include <format>
 #include <string_view>
 #include <unordered_map>
@@ -30,10 +21,6 @@ namespace delta {
 
 namespace {
 
-// The const properties a class's methods reach by name, split into §8.19's
-// forms: the global constants it declares or inherits, the instance constants
-// it declares, which its constructor may assign, and the instance constants it
-// inherits, which only a base's constructor may assign.
 struct ConstClassProps {
   const ClassDecl* cls = nullptr;
   std::unordered_set<std::string_view> global_consts;
@@ -41,7 +28,6 @@ struct ConstClassProps {
   std::unordered_set<std::string_view> inherited_instance_consts;
 };
 
-// A handle's name and the name of the class it is declared with (§8.4).
 using HandleTypes = std::unordered_map<std::string_view, std::string_view>;
 
 }  // namespace
@@ -65,9 +51,6 @@ static void ReportConstPropertyWrite(std::string_view name, bool is_global,
   }
 }
 
-// The name of the property of `cls` that an assignment target written inside
-// cls denotes: the bare `k`, `this.k` (§8.11) or `C::k` with C the class
-// itself (§8.23). An empty view for any other target.
 static std::string_view OwnPropertyTargetName(const Expr* lhs,
                                               const ClassDecl* cls) {
   if (!lhs) return {};
@@ -99,10 +82,6 @@ static void WalkStmtsForConstClassProp(const Stmt* s,
       ReportConstPropertyWrite(name, false, s->range.start, diag);
     }
   }
-  // §8.19 conditions neither rule on the statement the assignment is written
-  // in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names: a write from a fork arm, a randcase
-  // item or an immediate assertion's action block is a write all the same.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForConstClassProp(sub, props, in_constructor, diag);
   });
@@ -129,8 +108,6 @@ static const ClassDecl* BaseOf(const ClassDecl* cls,
   return FindBaseClass(cls, unit);
 }
 
-// Adds the const properties `base` declares to `props`, leaving out a name
-// `seen` already holds: a property a nearer class declares hides it (§8.13).
 static void AddBaseConstProperties(const ClassDecl* base,
                                    std::unordered_set<std::string_view>& seen,
                                    ConstClassProps& props) {
@@ -143,9 +120,6 @@ static void AddBaseConstProperties(const ClassDecl* base,
   }
 }
 
-// §8.13: a derived class has its bases' properties, so its methods reach a
-// base's constant by name unless a nearer class declares a property of that
-// name, which then hides it.
 static void CollectInheritedConstProperties(ConstClassProps& props,
                                             const CompilationUnit* unit) {
   std::unordered_set<std::string_view> seen;
@@ -159,11 +133,6 @@ static void CollectInheritedConstProperties(ConstClassProps& props,
   }
 }
 
-// §8.19: an instance constant may be assigned in the constructor, but the
-// assignment can only be done once. Two unconditional writes at the top level
-// of new() are an unambiguous double assignment. Only top-level statements are
-// counted so a value chosen across the branches of an if/else (a single
-// dynamic write) is not mistaken for two writes.
 static void CheckInstanceConstSingleAssign(const ModuleItem* ctor,
                                            const ConstClassProps& props,
                                            DiagEngine& diag) {
@@ -182,7 +151,6 @@ static void CheckInstanceConstSingleAssign(const ModuleItem* ctor,
   }
 }
 
-// Whether `items` declares a class named `name` directly.
 static bool ClassDeclaredAmong(std::string_view name,
                                const std::vector<ModuleItem*>& items) {
   for (const auto* item : items) {
@@ -194,10 +162,6 @@ static bool ClassDeclaredAmong(std::string_view name,
   return false;
 }
 
-// §8.10: check one class method for writes to a const class property. A class
-// subroutine body is stored in func_body_stmts, not the single `body` statement
-// used by module procedural blocks, so each statement is walked. Only the
-// constructor may write an instance const, and only once.
 static void CheckConstClassPropsInMethod(const ModuleItem* method,
                                          const ConstClassProps& props,
                                          DiagEngine& diag) {
@@ -208,7 +172,6 @@ static void CheckConstClassPropsInMethod(const ModuleItem* method,
   if (is_ctor) CheckInstanceConstSingleAssign(method, props, diag);
 }
 
-// The property `name` declares in `cls` or in a class it extends (§8.13).
 static const ClassMember* FindPropertyInHierarchy(const ClassDecl* cls,
                                                   std::string_view name,
                                                   const CompilationUnit* unit) {
@@ -222,10 +185,6 @@ static const ClassMember* FindPropertyInHierarchy(const ClassDecl* cls,
   return nullptr;
 }
 
-// The const class property an assignment target names through a handle or a
-// class: `h.k`, with h a handle `handles` gives the class of (§8.4), or `C::k`
-// through the class scope resolution operator (§8.23). Null for any other
-// target and for a property that is not const.
 static const ClassMember* ConstPropertyOfQualifiedTarget(
     const Expr* lhs, const HandleTypes& handles, const CompilationUnit* unit) {
   if (!lhs || lhs->kind != ExprKind::kMemberAccess || !lhs->lhs || !lhs->rhs)
@@ -245,7 +204,6 @@ static const ClassMember* ConstPropertyOfQualifiedTarget(
   return (m != nullptr && m->is_const) ? m : nullptr;
 }
 
-// Records `name` as a handle when `type` names a class the unit declares.
 static void RecordHandle(std::string_view name, const DataType& type,
                          const CompilationUnit* unit, HandleTypes& handles) {
   if (type.kind == DataTypeKind::kNamed &&
@@ -254,11 +212,6 @@ static void RecordHandle(std::string_view name, const DataType& type,
   }
 }
 
-// Walks statements for writes to a const class property through a handle or a
-// class scope. A handle declared in a block is recorded as the walk reaches its
-// declaration, which precedes every use of it. Inside a method of `own`, the
-// targets naming own's properties -- `this.k`, `own::k` -- are left to
-// WalkStmtsForConstClassProp, which knows which constructor may write them.
 static void WalkStmtsForQualifiedConstWrites(const Stmt* s,
                                              const ClassDecl* own,
                                              HandleTypes& handles,
@@ -282,8 +235,6 @@ static void WalkStmtsForQualifiedConstWrites(const Stmt* s,
   });
 }
 
-// A subroutine body's handles are those of its scope, `handles`, and its own
-// formals and locals: a class method's or a module task's or function's.
 static void WalkSubroutineForQualifiedConstWrites(const ModuleItem* sub,
                                                   const ClassDecl* own,
                                                   HandleTypes handles,
@@ -297,9 +248,6 @@ static void WalkSubroutineForQualifiedConstWrites(const ModuleItem* sub,
   }
 }
 
-// §8.1 lets a class be declared wherever a data declaration may appear, so
-// this walks AllClassDecls: the classes of every module, interface, program,
-// checker and package, and the classes nested in them, besides the unit's own.
 void ElaboratorClassRules::ValidateConstClassProperties() {
   for (const auto* cls : AllClassDecls(unit_)) {
     ConstClassProps props;
@@ -327,9 +275,6 @@ void ElaboratorClassRules::ValidateConstPropertyWritesFromOutside(
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kFunctionDecl ||
         item->kind == ModuleItemKind::kTaskDecl) {
-      // §8.24: an out-of-block declaration of a class the module declares is
-      // that class's method, which ValidateConstClassProperties reads through
-      // MethodBody, not a subroutine standing outside the class.
       if (!item->method_class.empty() &&
           ClassDeclaredAmong(item->method_class, decl->items)) {
         continue;

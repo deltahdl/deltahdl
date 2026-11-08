@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// These tests observe the elaborator rule of 18.5.3 that governs a real-valued
-// range within a distribution: such a range shall use the :/ operator and shall
-// specify a weight. The rule is type-directed, so it lives at the elaborator
-// stage, which alone knows that the distributed variable is real; the parser
-// accepts the syntax regardless. Each program is built from real class source
-// so the check runs over the elaborated distribution, not a hand-built state.
-
-// 18.5.3: a real-valued range that uses :/ with a weight is well formed and
-// elaborates.
 TEST(RealDistRange, DivideOperatorWithWeightAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -25,9 +16,6 @@ TEST(RealDistRange, DivideOperatorWithWeightAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.3: a real-valued range cannot take the := operator (which spreads a
-// weight per element — meaningful only for an integral range), so a := range on
-// a real variable is rejected.
 TEST(RealDistRange, AssignOperatorRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -37,16 +25,12 @@ TEST(RealDistRange, AssignOperatorRejected) {
              "endclass\n"
              "module m; endmodule\n",
              f));
-  // The report stands at the range's low bound (1.0), which is on the same
-  // line 3 as the constraint that carries it.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "a real-valued range in a dist constraint requires "
                             "the :/ operator and an explicit weight",
                             3, "18.5.3"));
 }
 
-// 18.5.3: a real-valued range needs an explicit weight; a bare range (which
-// defaults to := 1) omits the required weight and is rejected.
 TEST(RealDistRange, MissingWeightRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -62,8 +46,6 @@ TEST(RealDistRange, MissingWeightRejected) {
                             3, "18.5.3"));
 }
 
-// 18.5.3: the rule is confined to real-valued ranges. An integral range may use
-// the := operator, so the same shape on an integral variable elaborates.
 TEST(RealDistRange, IntegralRangeWithAssignAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -73,9 +55,6 @@ TEST(RealDistRange, IntegralRangeWithAssignAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.3: the distributed variable may be an inherited real property; the
-// target is resolved through the base-class chain, so a := range on it is still
-// rejected.
 TEST(RealDistRange, InheritedRealTargetChecked) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -87,18 +66,12 @@ TEST(RealDistRange, InheritedRealTargetChecked) {
              "endclass\n"
              "module m; endmodule\n",
              f));
-  // Line 5 is the constraint in D, so the line also says the report was raised
-  // for D's dist and not for anything B declares.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "a real-valued range in a dist constraint requires "
                             "the :/ operator and an explicit weight",
                             5, "18.5.3"));
 }
 
-// 18.5.3: a randc variable cannot be the subject of a dist. The qualifier and
-// the distribution are both declarations, so the class is rejected as declared,
-// before any randomize() call; the report stands at the distributed variable,
-// on line 3 with the constraint.
 TEST(DistOnRandc, RandcTargetRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -114,8 +87,6 @@ TEST(DistOnRandc, RandcTargetRejected) {
       "18.5.3"));
 }
 
-// 18.5.3: the limitation is on the randc qualifier, not on dist itself; the
-// same distribution over a rand variable elaborates.
 TEST(DistOnRandc, RandTargetAccepted) {
   EXPECT_TRUE(
       ElabOk("class a;\n"
@@ -125,9 +96,6 @@ TEST(DistOnRandc, RandTargetAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.3: the distributed variable may be an inherited randc property; the
-// target is resolved through the base-class chain, so the derived class's
-// dist over it is rejected, on line 5 where that dist stands.
 TEST(DistOnRandc, InheritedRandcTargetRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -145,10 +113,6 @@ TEST(DistOnRandc, InheritedRandcTargetRejected) {
       "18.5.3"));
 }
 
-// 18.5.3: the limitation holds wherever the class is declared. §8.1 lets a
-// class be declared inside a module, and such a class is not in the compilation
-// unit's own class list, so the report on line 4 says the check walks the
-// module's classes as well.
 TEST(DistOnRandc, ModuleScopedClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -165,8 +129,6 @@ TEST(DistOnRandc, ModuleScopedClassRejected) {
       "18.5.3"));
 }
 
-// 18.5.3: the same for a class declared inside a package, which the parser
-// records as a package item rather than a compilation-unit class.
 TEST(DistOnRandc, PackageScopedClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -184,9 +146,6 @@ TEST(DistOnRandc, PackageScopedClassRejected) {
       "18.5.3"));
 }
 
-// 18.5.3: the same for a class nested in another class's body (§8.23), which
-// the parser keeps as a member of the outer class rather than in any scope's
-// list; the report on line 4 is the inner class's dist.
 TEST(DistOnRandc, NestedClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(

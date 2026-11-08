@@ -19,8 +19,6 @@ namespace delta {
 
 namespace {
 
-// The spelling of a clock, its events' edges and signals, the leading
-// clock's for an operand under no clock of its own.
 std::string ClockName(const std::vector<EventExpr>& clock,
                       const std::vector<EventExpr>& leading) {
   const std::vector<EventExpr>& named = clock.empty() ? leading : clock;
@@ -34,8 +32,6 @@ std::string ClockName(const std::vector<EventExpr>& clock,
   return name;
 }
 
-// What the rules are applied under: the leading clock, where to report, the
-// declarations and the diagnostics.
 struct MulticlockCheck {
   const std::vector<EventExpr>& leading;
   SourceLoc loc;
@@ -48,8 +44,6 @@ const std::vector<EventExpr>& ClockAt(const SeqLinearBody& body, size_t i) {
   return i < body.clocks.size() ? body.clocks[i] : kNone;
 }
 
-// §16.13.1: the operator joining the operand at `i` to the one before it:
-// ##1, ##0 or any other delay.
 MulticlockJoin JoinAt(const SeqLinearBody& body, size_t i) {
   const SeqCycleDelay& delay = body.delays[i];
   if (delay.min != delay.max) return MulticlockJoin::kOther;
@@ -58,9 +52,6 @@ MulticlockJoin JoinAt(const SeqLinearBody& body, size_t i) {
   return MulticlockJoin::kOther;
 }
 
-// §16.13.1: whether the maximal singly clocked subsequence of the operands
-// from `first` to `last` admits an empty match, read off the chain cut from
-// the body with no delay before its first operand.
 bool SegmentAdmitsEmpty(const SeqLinearBody& body, size_t first, size_t last,
                         const PropertyRegistry& registry) {
   SeqLinearBody segment;
@@ -77,9 +68,6 @@ bool SegmentAdmitsEmpty(const SeqLinearBody& body, size_t first, size_t last,
   return AdmitsAnyEmptyMatch(ClassifyBodyMatches(segment, registry));
 }
 
-// §16.13.1: the maximal singly clocked subsequences of one chain, each with
-// the clock over it, the operator joining it to the one before and whether
-// it admits an empty match.
 std::vector<MulticlockSubsequence> SubsequencesOf(
     const SeqLinearBody& body, const std::vector<EventExpr>& leading,
     const PropertyRegistry& registry) {
@@ -101,7 +89,6 @@ std::vector<MulticlockSubsequence> SubsequencesOf(
   return out;
 }
 
-// Whether any operand of the chain is on a clock other than the leading.
 bool NamesAnotherClock(const SeqLinearBody& body,
                        const std::vector<EventExpr>& leading) {
   for (const auto& clock : body.clocks) {
@@ -114,7 +101,6 @@ bool NamesAnotherClock(const SeqLinearBody& body,
 
 void ValidateBody(const SeqLinearBody& body, const MulticlockCheck& check);
 
-// §16.13.1: an operand of `op` on a clock other than the leading one.
 void ReportOperandClock(const char* op, const MulticlockCheck& check) {
   check.diag.Error(
       check.loc,
@@ -125,9 +111,6 @@ void ReportOperandClock(const char* op, const MulticlockCheck& check) {
       Subclause("16.13.1"));
 }
 
-// §16.13.1: differently clocked operands are combined by ##1 and ##0 alone,
-// so an operand of `op` on a clock of its own is reported, and each
-// operand's chain is checked on its own.
 void ValidateOperands(const std::vector<SeqLinearBody>& operands,
                       const char* op, const MulticlockCheck& check) {
   for (const SeqLinearBody& operand : operands) {
@@ -138,8 +121,6 @@ void ValidateOperands(const std::vector<SeqLinearBody>& operands,
   }
 }
 
-// §16.9.1: the operator the chain of `body` is the first operand of, the
-// one binding tightest among those written after it; nullptr where none is.
 const char* FirstOperandOf(const SeqLinearBody& body) {
   if (body.within) return "within";
   if (!body.intersects.empty()) return "intersect";
@@ -148,10 +129,6 @@ const char* FirstOperandOf(const SeqLinearBody& body) {
   return nullptr;
 }
 
-// Annex F.3.2 with F.2: whether a chain of `body` writes a clocking event
-// other than the one named `in_force`, in an operand, in an operand of its
-// intersects, conjuncts and alternatives or in a group read into a sequence
-// of its own, a clock equal to the one in force being redundant.
 bool WritesClockOtherThan(const SeqLinearBody& body,
                           const std::string& in_force) {
   for (const auto& clock : body.clocks) {
@@ -175,9 +152,6 @@ bool WritesClockOtherThan(const SeqLinearBody& body,
          any_writes(body.alternatives);
 }
 
-// The sequence a repeated operand stands for: a group read into a sequence
-// of its own, or the named sequence an instance instantiates; nullptr for a
-// Boolean operand.
 const ModuleItem* RepeatedSequence(const Expr* operand,
                                    const PropertyRegistry& registry) {
   const PropertyExprNode* tree = operand->property_actual;
@@ -191,11 +165,6 @@ const ModuleItem* RepeatedSequence(const Expr* operand,
   return decl;
 }
 
-// Annex F.3.2: a repetition has no clocked form, so the sequence a repeated
-// operand stands for may write no clocking event but one F.2 eliminates as
-// redundant, equal to the clock in force where the operand stands. Where no
-// clock is known to be in force there, the leading clock being inherited
-// from an instance not yet seen, the operand is left alone.
 void ValidateRepeatedOperands(const SeqLinearBody& body,
                               const MulticlockCheck& check) {
   for (size_t i = 0; i < body.operands.size(); ++i) {

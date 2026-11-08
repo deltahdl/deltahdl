@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.6: the clause's SimpleSum, three 8-bit random variables under z == x +
-// y, randomized through the built-in randomize(): the call returns 1 and
-// sets the three to values satisfying the constraint at their width on
-// every one of 32 draws, and the values differ across the draws, as the
-// design test/src/e2e/randomization_methods.sv runs it.
 TEST(RandomizationMethodsRun, TheBuiltInRandomizeSetsTheSimpleSum) {
   SimFixture f;
   std::string out = RunCapture(
@@ -38,11 +33,6 @@ TEST(RandomizationMethodsRun, TheBuiltInRandomizeSetsTheSimpleSum) {
   EXPECT_EQ(out, "32 32 1\n");
 }
 
-// 18.6.1: a state variable's value can leave even a simple-looking constraint
-// with no solution. With floor at 256 no 8-bit z lies at or above it, so
-// randomize() returns 0 rather than drawing the bound the range was collapsed
-// onto, which the declared range excludes; 18.6.3: z retains its previous
-// value, pre_randomize() ran and post_randomize() did not.
 TEST(RandomizationMethodsRun, AStateVariableCanMakeTheConstraintsInfeasible) {
   SimFixture f;
   std::string out = RunCapture(

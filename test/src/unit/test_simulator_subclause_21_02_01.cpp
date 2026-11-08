@@ -7,7 +7,6 @@ using namespace delta;
 
 namespace {
 
-// N1: $display appends a trailing newline to its output.
 TEST(IoDisplayWriteSim, DisplayAppendsNewline) {
   SimFixture f;
   std::string out = RunCapture(
@@ -18,7 +17,6 @@ TEST(IoDisplayWriteSim, DisplayAppendsNewline) {
   EXPECT_EQ(out, "hi\n");
 }
 
-// N1: $write emits the same text but without a trailing newline.
 TEST(IoDisplayWriteSim, WriteOmitsNewline) {
   SimFixture f;
   std::string out = RunCapture(
@@ -29,7 +27,6 @@ TEST(IoDisplayWriteSim, WriteOmitsNewline) {
   EXPECT_EQ(out, "hi");
 }
 
-// N6: $display invoked with no arguments prints just a newline.
 TEST(IoDisplayWriteSim, DisplayNoArgsPrintsNewline) {
   SimFixture f;
   std::string out = RunCapture(
@@ -40,7 +37,6 @@ TEST(IoDisplayWriteSim, DisplayNoArgsPrintsNewline) {
   EXPECT_EQ(out, "\n");
 }
 
-// N6: $write invoked with no arguments prints nothing at all.
 TEST(IoDisplayWriteSim, WriteNoArgsPrintsNothing) {
   SimFixture f;
   std::string out = RunCapture(
@@ -51,8 +47,6 @@ TEST(IoDisplayWriteSim, WriteNoArgsPrintsNothing) {
   EXPECT_EQ(out, "");
 }
 
-// N5: a trailing empty argument (a comma with nothing after it) renders as a
-// single space.
 TEST(IoDisplayWriteSim, TrailingEmptyArgIsSpace) {
   SimFixture f;
   std::string out = RunCapture(
@@ -63,7 +57,6 @@ TEST(IoDisplayWriteSim, TrailingEmptyArgIsSpace) {
   EXPECT_EQ(out, "a ");
 }
 
-// N5: a leading empty argument renders as a single space (and must not crash).
 TEST(IoDisplayWriteSim, LeadingEmptyArgIsSpace) {
   SimFixture f;
   std::string out = RunCapture(
@@ -74,8 +67,6 @@ TEST(IoDisplayWriteSim, LeadingEmptyArgIsSpace) {
   EXPECT_EQ(out, " d");
 }
 
-// N5: an empty argument between two literals renders as one space; this is the
-// LRM's worked example reproduced for $write.
 TEST(IoDisplayWriteSim, DoubledCommaIsSpace) {
   SimFixture f;
   std::string out = RunCapture(
@@ -86,8 +77,6 @@ TEST(IoDisplayWriteSim, DoubledCommaIsSpace) {
   EXPECT_EQ(out, "b c");
 }
 
-// N5: a single comma between the parentheses is two empty arguments, so it
-// renders as two spaces.
 TEST(IoDisplayWriteSim, SingleCommaIsTwoSpaces) {
   SimFixture f;
   std::string out = RunCapture(
@@ -98,10 +87,6 @@ TEST(IoDisplayWriteSim, SingleCommaIsTwoSpaces) {
   EXPECT_EQ(out, "  ");
 }
 
-// N5: the commas that delimit an empty argument may carry surrounding white
-// space. That white space belongs to no argument, so a padded comma still
-// denotes exactly one empty argument and emits exactly one space -- here the
-// single gap between "x" and "y" rather than several.
 TEST(IoDisplayWriteSim, WhitespacePaddedEmptyArgIsSingleSpace) {
   SimFixture f;
   std::string out = RunCapture(
@@ -112,9 +97,6 @@ TEST(IoDisplayWriteSim, WhitespacePaddedEmptyArgIsSingleSpace) {
   EXPECT_EQ(out, "x y");
 }
 
-// N2: arguments are rendered in the order they appear in the argument list.
-// Two adjacent string literals exercise ordering without invoking any format
-// specifier: the first literal must precede the second in the output.
 TEST(IoDisplayWriteSim, ArgumentsRenderInListOrder) {
   SimFixture f;
   std::string out = RunCapture(
@@ -125,8 +107,6 @@ TEST(IoDisplayWriteSim, ArgumentsRenderInListOrder) {
   EXPECT_EQ(out, "foobar");
 }
 
-// N4c: a doubled percent sign in a string literal is rendered as one literal
-// percent sign and consumes no expression argument.
 TEST(IoDisplayWriteSim, DoubledPercentRendersOnePercent) {
   SimFixture f;
   std::string out = RunCapture(
@@ -137,8 +117,6 @@ TEST(IoDisplayWriteSim, DoubledPercentRendersOnePercent) {
   EXPECT_EQ(out, "50% done");
 }
 
-// N6 edge: a no-argument $display written with empty parentheses still prints
-// just a newline, identically to the parenthesis-free form.
 TEST(IoDisplayWriteSim, DisplayEmptyParensPrintsNewline) {
   SimFixture f;
   std::string out = RunCapture(
@@ -149,8 +127,6 @@ TEST(IoDisplayWriteSim, DisplayEmptyParensPrintsNewline) {
   EXPECT_EQ(out, "\n");
 }
 
-// N6 edge: a no-argument $write written with empty parentheses prints nothing,
-// just as the parenthesis-free form does.
 TEST(IoDisplayWriteSim, WriteEmptyParensPrintsNothing) {
   SimFixture f;
   std::string out = RunCapture(
@@ -161,8 +137,6 @@ TEST(IoDisplayWriteSim, WriteEmptyParensPrintsNothing) {
   EXPECT_EQ(out, "");
 }
 
-// N1/B2: a radix-suffixed display task ($displayh here) is part of the display
-// family, so it terminates its output with a newline.
 TEST(IoDisplayWriteSim, DisplayRadixVariantAppendsNewline) {
   SimFixture f;
   std::string out = RunCapture(
@@ -173,8 +147,6 @@ TEST(IoDisplayWriteSim, DisplayRadixVariantAppendsNewline) {
   EXPECT_EQ(out, "hi\n");
 }
 
-// N1/B2: a radix-suffixed write task ($writeb here) is part of the write
-// family, so it emits its output with no trailing newline.
 TEST(IoDisplayWriteSim, WriteRadixVariantOmitsNewline) {
   SimFixture f;
   std::string out = RunCapture(
@@ -185,10 +157,6 @@ TEST(IoDisplayWriteSim, WriteRadixVariantOmitsNewline) {
   EXPECT_EQ(out, "hi");
 }
 
-// N4b: %m is one of the three specifiers (with %l and %%) that do not draw a
-// corresponding expression argument from the list. Invoked with no expression
-// argument at all, the call still succeeds and the specifier is consumed --
-// nothing of the literal "%m" survives into the output.
 TEST(IoDisplayWriteSim, HierarchicalSpecifierConsumesNoArgument) {
   SimFixture f;
   std::string out = RunCapture(
@@ -200,8 +168,6 @@ TEST(IoDisplayWriteSim, HierarchicalSpecifierConsumesNoArgument) {
   EXPECT_EQ(out.find('%'), std::string::npos);
 }
 
-// N4b: %l likewise needs no corresponding expression argument; supplied with an
-// empty argument list it is still substituted rather than echoed literally.
 TEST(IoDisplayWriteSim, LibrarySpecifierConsumesNoArgument) {
   SimFixture f;
   std::string out = RunCapture(
@@ -213,9 +179,6 @@ TEST(IoDisplayWriteSim, LibrarySpecifierConsumesNoArgument) {
   EXPECT_EQ(out.find('%'), std::string::npos);
 }
 
-// N3a: a '\' escape inside a string-literal argument is interpreted per
-// Table 5-1 of 5.9.1. The tab escape must render as an actual tab byte, not the
-// literal letter 't' -- so the decoder is more than a bare "\n handler".
 TEST(IoDisplayWriteSim, TabEscapeRendersTab) {
   SimFixture f;
   std::string out = RunCapture(
@@ -226,8 +189,6 @@ TEST(IoDisplayWriteSim, TabEscapeRendersTab) {
   EXPECT_EQ(out, "a\tb");
 }
 
-// N3a: an octal '\ddd' escape (from 5.9.1's Table 5-1) selects the byte with
-// that octal code. \123 is octal 0123 == 'S'.
 TEST(IoDisplayWriteSim, OctalEscapeRendersByte) {
   SimFixture f;
   std::string out = RunCapture(
@@ -238,7 +199,6 @@ TEST(IoDisplayWriteSim, OctalEscapeRendersByte) {
   EXPECT_EQ(out, "S");
 }
 
-// N3a: a hex '\xhh' escape selects the byte with that hex code. \x41 == 'A'.
 TEST(IoDisplayWriteSim, HexEscapeRendersByte) {
   SimFixture f;
   std::string out = RunCapture(
@@ -249,9 +209,6 @@ TEST(IoDisplayWriteSim, HexEscapeRendersByte) {
   EXPECT_EQ(out, "A");
 }
 
-// N3a: an octal escape that resolves to '%' (octal 045) must reach the output
-// as a literal percent sign -- the byte is decoded as literal text and is not
-// re-interpreted as the start of a format specification.
 TEST(IoDisplayWriteSim, OctalEscapedPercentIsLiteral) {
   SimFixture f;
   std::string out = RunCapture(
@@ -262,9 +219,6 @@ TEST(IoDisplayWriteSim, OctalEscapedPercentIsLiteral) {
   EXPECT_EQ(out, "%d");
 }
 
-// N3a/N4c: the worked example from 21.2.1, combining the '\' escape (backslash,
-// tab, newline, escaped quote and octal \123 == 'S') with the '%%' literal
-// percent. $display terminates the whole thing with a trailing newline.
 TEST(IoDisplayWriteSim, CombinedBackslashAndPercentEscapes) {
   SimFixture f;
   std::string out = RunCapture(
@@ -275,9 +229,6 @@ TEST(IoDisplayWriteSim, CombinedBackslashAndPercentEscapes) {
   EXPECT_EQ(out, "\\\t\\\n\"%S\n");
 }
 
-// N1/B2: $displayb is a display-family name; like every $display* task it
-// terminates its output with a newline. Its radix suffix affects only the
-// default radix of unformatted expression arguments, never the newline.
 TEST(IoDisplayWriteSim, DisplaybAppendsNewline) {
   SimFixture f;
   std::string out =
@@ -285,7 +236,6 @@ TEST(IoDisplayWriteSim, DisplaybAppendsNewline) {
   EXPECT_EQ(out, "hi\n");
 }
 
-// N1/B2: $displayo is likewise a display-family name and appends a newline.
 TEST(IoDisplayWriteSim, DisplayoAppendsNewline) {
   SimFixture f;
   std::string out =
@@ -293,7 +243,6 @@ TEST(IoDisplayWriteSim, DisplayoAppendsNewline) {
   EXPECT_EQ(out, "hi\n");
 }
 
-// N1/B2: $writeo is a write-family name and emits no trailing newline.
 TEST(IoDisplayWriteSim, WriteoOmitsNewline) {
   SimFixture f;
   std::string out =
@@ -301,8 +250,6 @@ TEST(IoDisplayWriteSim, WriteoOmitsNewline) {
   EXPECT_EQ(out, "hi");
 }
 
-// N1/B2: $writeh completes the eight-name enumeration at the runtime stage; as
-// a write-family name it too omits the trailing newline.
 TEST(IoDisplayWriteSim, WritehOmitsNewline) {
   SimFixture f;
   std::string out =
@@ -310,14 +257,6 @@ TEST(IoDisplayWriteSim, WritehOmitsNewline) {
   EXPECT_EQ(out, "hi");
 }
 
-// §21.2.1 with §21.2.1.1 (printed pages 654-656): every argument prints in
-// order. A literal holding no specifier is text and the expression after it
-// prints in the task's default radix; an expression beyond the template's
-// specifiers prints on its own in that radix; an empty argument is a space.
-// §21.2.1.2 (printed page 659) sizes each such value by the largest value its
-// type holds, so the 4-bit v takes two columns in decimal and each 32-bit
-// literal eleven. The value after a specifier-free literal and every value
-// past the template's last specifier were dropped.
 TEST(IoDisplayWriteSim, ArgumentsBeyondATemplatesSpecifiersPrintInOrder) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -341,11 +280,6 @@ TEST(IoDisplayWriteSim, ArgumentsBeyondATemplatesSpecifiersPrintInOrder) {
             "v=1          2          3\n");
 }
 
-// §21.2.1.1 with §21.2.1.2: a string literal after a template is the value of
-// the template's pending %s, padded on the left to the field width and never
-// truncated, as a string variable is -- in $display, $swrite and $sformat
-// alike. The literal was printed after the template as a template of its own,
-// `::a`.
 TEST(IoDisplayWriteSim, StringLiteralIsThePendingPercentSValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -365,10 +299,6 @@ TEST(IoDisplayWriteSim, StringLiteralIsThePendingPercentSValue) {
             ":  a:\n:abcdef:\n:a:\n:   xy:\n:  a:\n:  a:\n");
 }
 
-// §21.2.1 (printed page 655) with §21.2.1.1: an expression argument follows a
-// string literal for each of its format specifications but %m, %l and %%, so
-// a literal with two conversions and one argument after it is reported, as
-// §21.3.3 has $sformat report a shortfall, and the run goes on.
 TEST(IoDisplayWriteSim, LiteralWithMoreConversionsThanArgumentsIsReported) {
   SimFixture f;
   std::string out = RunCapture(
@@ -386,8 +316,6 @@ TEST(IoDisplayWriteSim, LiteralWithMoreConversionsThanArgumentsIsReported) {
   EXPECT_NE(out.find("next"), std::string::npos);
 }
 
-// §21.2.1: %m, %l and %% take no argument, so a literal whose one other
-// conversion has its argument draws no report.
 TEST(IoDisplayWriteSim, ConversionsTakingNoArgumentAreNotCounted) {
   SimFixture f;
   RunCapture(

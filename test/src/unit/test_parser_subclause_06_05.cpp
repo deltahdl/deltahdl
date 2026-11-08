@@ -99,10 +99,6 @@ TEST(DataTypeParsing, NetAndVarSameWidthVectors) {
   EXPECT_EQ(items[1]->data_type.packed_dim_left->int_val, 31u);
 }
 
-// §6.5: an assignment in a variable's declaration is a variable initialization,
-// not an implicit continuous assignment. It must parse as a single var-decl
-// item carrying the initializer expression, with no separate continuous-assign
-// item produced.
 TEST(DataTypeParsing, VarDeclAssignmentIsInitializerNotContAssign) {
   auto r = Parse(
       "module t;\n"

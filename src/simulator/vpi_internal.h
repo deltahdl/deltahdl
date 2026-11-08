@@ -9,205 +9,87 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// Internal helpers shared between the vpi.cpp translation units. These are file
-// scoped helpers that were promoted from anonymous/static linkage so that the
-// definition in one translation unit can be reused by another. They are not
-// part of the public VPI surface declared in vpi_user.h.
 namespace delta {
 
 class Scheduler;
 
-// Annex K types the text members of its structures, s_vpi_error_info's message
-// and s_vpi_value's str among them, as PLI_BYTE8 *, a char * with no const, as
-// the C of the interface writes a pointer to text the callee does not modify.
-// What the simulator stores in them is a string literal or a std::string's
-// buffer, and nothing writes through the member, so the const is removed here,
-// in one place, rather than at each site that stores text.
 inline PLI_BYTE8* VpiText(const char* text) {
   return const_cast<PLI_BYTE8*>(text);
 }
 
-// §38.3: the representative of the underlying simulation object `obj`
-// denotes, reached by following its same_object_as chain. A bounded walk
-// guards against an accidental cycle; the chains the simulator builds are short
-// (a handle aliases at most one representative).
 VpiObject* VpiResolveSameObject(VpiObject* obj);
 
-// Defined in vpi_helpers_statements.cpp, used by vpi_callbacks.cpp.
 bool VpiIsScopeBodyStmtType(int type);
 
-// §37.60 with §37.42 and §37.59: whether `obj` stands as an atomic statement,
-// or as a statement a scope body or a statement's body holds. A function call
-// is drawn both in the tf call class of atomic stmt and in expr, and is the
-// one where it was written as a statement and the other everywhere else.
-// Defined in vpi_helpers_statements.cpp, used by the scans that tell a
-// statement's body from its condition.
 bool VpiIsAtomicStmtObject(VpiHandle obj);
 bool VpiIsScopeBodyStmtObject(VpiHandle obj);
 
-// §37.12: the kinds the scope class groups, which vpiInternalScope reaches,
-// and whether an object of one of them is a scope (details 1 and 2). Defined
-// in vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
 bool VpiIsInternalScopeType(int type);
 bool VpiIsScopeObject(VpiHandle obj);
 
-// §39.3.1 step b and §37.12: an iteration whose objects stand deeper than the
-// reference's children - an instance's assertions, the scopes a scope holds
-// (those inside a statement that is no scope among them), and the statements
-// a block holds - collected into `iter`; false for any other. Defined in
-// vpi_helpers_scopes.cpp, used by vpi_iterate.cpp.
 bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter);
 
-// §37.12 detail 1: the scope named `name` nested in `parent` through a
-// statement that is no scope, such as an unnamed begin declaring nothing, or
-// through an unnamed one, such as a for loop declaring its variables, either
-// of which adds no level to the names of the scopes inside it; null for none.
-// Defined in vpi_helpers_scopes.cpp, used by vpi_design_walk.h.
 VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name);
 
-// §37.12/§37.63: a statement's vpiScope, the nearest scope around it. Defined
-// in vpi_helpers_scopes.cpp, used by vpi_handle.cpp.
 bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out);
-// §37.17 (figure) with §37.12 details 2 and 3: a variable's vpiScope, the
-// nearest object around it that is a scope.
 bool TryResolveVariableScopeRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// §37.63/§37.66/§37.67/§37.70: the kinds that reach a body statement through
-// the object model's untagged arrow to `stmt`. Defined in
-// vpi_helpers_statements.cpp, used by vpi_handle.cpp.
 bool VpiIsBodyStmtOwnerType(int type);
 
-// §37.73: the else action of an expect statement - the second of the two
-// statements it carries. Defined in vpi_helpers_statements.cpp, used by
-// vpi_handle.cpp.
 VpiHandle VpiExpectElseStmt(VpiHandle expect);
 
-// §37.74: the first of the initialization or increment statements a for
-// statement's header writes, which the diagram's single arrow reaches. Defined
-// in vpi_helpers_loops.cpp, used by vpi_handle.cpp.
 VpiHandle VpiForHeaderStmt(int type, VpiHandle for_stmt);
 
-// §37.74: every one of them, which the diagram's double arrow walks. Defined in
-// vpi_helpers_loops.cpp, used by vpi_iterate.cpp.
 void VpiCollectForHeaderStmts(int type, VpiHandle for_stmt, VpiHandle iter);
 
-// §37.42: the arguments a tf call was written with, which the vpiArgument
-// iteration walks. Defined in vpi_helpers_statements.cpp, used by
-// vpi_iterate.cpp.
 void VpiCollectTfCallArguments(VpiHandle call, VpiHandle iter);
 
-// §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74/§37.75: the body statement
-// the object model draws an untagged arrow to `stmt` for, §37.74's two single
-// arrows to a for statement's header, and the process a statement runs in;
-// §37.42: the user systf a system task or function call is a call of; §37.50
-// and §37.52: a concurrent assertion's clock, property and actions and a
-// property spec's disable condition and property expression. Defined in
-// vpi_handle_statements.cpp, used by vpi_handle.cpp.
 bool TryResolveProcessAndStmtRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// §37.40 (figure): a timing check's ref and data terms and the notifier it
-// toggles, and a tchk term's expression and `&&&` condition; §37.39 (figure):
-// a module path's condition and a path term's expression. Defined in
-// vpi_handle_timing.cpp, used by vpi_handle.cpp.
 bool TryResolveSpecifyRelation(int type, VpiHandle ref, VpiHandle& out);
 
-// §37.80 (figure): whether an object is one of the kinds the callback diagram
-// draws a single arrow from to `callback`. Defined in vpi_callbacks.cpp, used
-// by vpi_handle.cpp.
 bool VpiIsCallbackHostType(int type);
 
-// §37.80 (figure) + detail 2: the callback objects an iteration reaches - those
-// registered on `ref`, or, with no reference object, those no object the
-// diagram draws that arrow from reaches. Defined in vpi_callbacks.cpp, used by
-// vpi_iterate.cpp.
 void VpiCollectCallbackObjects(VpiHandle ref,
                                const std::vector<VpiHandle>& cb_handles,
                                const std::vector<s_cb_data>& callbacks,
                                VpiHandle iter);
 
-// Defined in vpi_helpers_statements.cpp, used by vpi_iterate.cpp.
 bool VpiIsVirtualInterfaceArray(VpiHandle obj);
 
-// §39.3.1 step b: the assertions of one instance - every assertion written
-// anywhere in its body, and none of those belonging to an instance nested
-// inside it. Defined in vpi_helpers_instance.cpp, used by vpi_iterate.cpp.
 void VpiCollectInstanceAssertions(VpiHandle scope, VpiHandle iter);
 
-// Defined in vpi_systf.cpp, used by vpi_helpers_statements.cpp,
-// vpi_handle.cpp, and vpi_value.cpp.
 bool VpiObjectIsPrimitive(int type);
 
-// §36.12.3: the message an application running under `mode` is given where the
-// objects an iteration reached include a construct that mode's standard has no
-// notion of, and null where they do not. Defined in vpi_compatibility.cpp,
-// called from VpiContext::Iterate, which records it as the §38.2 error.
 const char* VpiCompatibilityUnsupportedConstruct(
     int mode, const std::vector<VpiObject*>& objects);
 
-// §36.12.2.2: the iteration a compatibility mode gives an application - the
-// current one, with the objects that mode's applications do not expect dropped.
-// Defined in vpi_compatibility.cpp, used by vpi.cpp for the run-wide default
-// and by the compile-based variants for the mode compiled into them.
 VpiHandle VpiIterateInCompatibilityMode(int type, VpiHandle ref, int mode);
 
-// §36.12.2.2 with §36.12.1 Table 36-10 rows 1 through 4: the property a
-// compatibility mode gives an application - the current one, with the object
-// type and vpiArray property of an IEEE 1364 mode's memories and arrays of
-// integer, time and real variables answered as that version answered them.
-// Defined in vpi_compatibility.cpp, used by vpi.cpp for the run-wide default
-// and by the compile-based variants for the mode compiled into them.
 int VpiGetInCompatibilityMode(int property, VpiHandle obj, int mode);
 
-// §38.34 with Table 38-3 of §38.15: the `width` bits the value `value` gives,
-// decoded from whichever format it is in, in `words`; false for a format that
-// gives none (vpiObjTypeVal, a misc value) or a value whose text or pointer
-// gives no bits. Defined in vpi_put_value_bits.cpp, used by vpi_value.cpp.
 bool VpiPutValueBits(const s_vpi_value& value, uint32_t width,
                      std::vector<Logic4Word>& words);
 
-// §38.34: the number of bits a put to `obj` writes: those of its variable, or
-// those a bit or select of one spans. Defined in vpi_put_value_bits.cpp.
 uint32_t VpiPutWidth(const VpiObject& obj);
 
-// §38.34: write `bits`, `width` of them, to the bits `obj` stands for.
-// Defined in vpi_put_value_bits.cpp.
 void VpiWriteDecodedBits(VpiObject& obj, const std::vector<Logic4Word>& bits,
                          uint32_t width);
 
-// §38.34: schedule the put of `value` to `obj` at the time `event` carries as
-// its event time, under the delay mode `mode`, as an event that writes it and
-// notifies the object's watchers when it takes place, `event` becoming the
-// vpiSchedEvent standing for it; the events already pending on `obj` that the
-// mode removes are removed first. Defined in vpi_put_value_bits.cpp.
 void VpiSchedulePut(VpiObject& obj, const s_vpi_value& value, int mode,
                     Scheduler& scheduler, VpiObject& event);
 
-// §38.34 with §38.13: the delay `time` gives, in ticks of the simulation time
-// unit `sim_unit`, a vpiScaledRealTime one read in the time unit of `obj`.
-// Defined in vpi_put_value_bits.cpp.
 uint64_t VpiPutDelayTicks(const VpiObject& obj, const s_vpi_time& time,
                           int sim_unit);
 
-// §38.13 with §3.14.2: the time unit a vpiScaledRealTime time of `obj` is
-// read in -- that of the instance, an instance itself or the one enclosing it,
-// whose design element declares the object; the simulation time unit
-// `sim_unit` for an object no instance encloses. Defined in
-// vpi_put_value_bits.cpp.
 int VpiObjectTimeUnit(const VpiObject& obj, int sim_unit);
 
-// Defined in vpi_systf.cpp, used by vpi_design_attach.cpp.
 std::vector<std::string_view> VpiNamePathComponents(
     std::string_view name,
     const std::unordered_set<std::string_view>& whole_names);
 
-// §38.21 with §37.10 detail 5 and §37.17 detail 25: the components
-// vpi_handle_by_name() walks, those of VpiNamePathComponents with each split
-// at every `::`, so a package member `pkg::P` is the package and its member
-// and a static member `C::m` the class defn and the member. Defined in
-// vpi_systf.cpp.
 std::vector<std::string_view> VpiHandleNameComponents(std::string_view name);
 
-// Whether any `reason` registration is still live among `callbacks`.
 bool HasCallbackFor(const std::vector<s_cb_data>& callbacks, int reason);
 
 }  // namespace delta

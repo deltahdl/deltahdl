@@ -74,18 +74,6 @@ TEST(ClassAssignRenameParsing, ShallowCopyInDeclaration) {
               "endmodule\n"));
 }
 
-// A.2.4's `new expression` takes any expression as the copy source, and
-// footnote 23 on class_new asks only that its value be an object handle.
-// §8.11 (printed page 187) makes `this` one: a predefined object handle to the
-// object the enclosing subroutine was invoked on. A non-static class method is
-// one of the five contexts that clause admits `this` in, so this source is
-// legal and copies the object the method was invoked on.
-//
-// The case fails on a run that reads the copy source only when it begins with
-// an identifier. `this` is then left standing where the statement terminator
-// belongs, and the §12.3 report that draws says the source is missing a
-// semicolon -- which, written, would make it `p2 = new;` followed by a bare
-// `this`, so the copy asked for is silently not the copy given.
 TEST(ClassAssignRenameParsing, ShallowCopyFromThisAccepted) {
   EXPECT_TRUE(
       ParseOk("class C;\n"
@@ -98,14 +86,6 @@ TEST(ClassAssignRenameParsing, ShallowCopyFromThisAccepted) {
               "endclass\n"));
 }
 
-// Reads the copy source back off the `new` expression, because acceptance alone
-// does not say `this` was taken as one. A run that consumed the keyword and
-// discarded it would report nothing and pass
-// ClassAssignRenameParsing.ShallowCopyFromThisAccepted, and the design would
-// get `p2 = new;` -- a fresh object where a copy was written.
-// Parser::ParseMemberAccessChain in src/parser/expr_parser.cpp gives a bare
-// `this` an ExprKind::kIdentifier node whose text is "this", which is what the
-// copy source has to be.
 TEST(ClassAssignRenameParsing, ShallowCopyFromThisStoresCopySource) {
   auto r = Parse(
       "class C;\n"
@@ -152,13 +132,6 @@ TEST(ClassAssignRenameParsing, DeepChainedMemberAccess) {
               "endmodule\n"));
 }
 
-// §8.12 (printed page 188): a typed constructor call (§8.8) may not make a
-// shallow copy. A.2.4 gives class_new the alternatives
-// `[ class_scope ] new [ ( list_of_arguments ) ]` and `new expression`, so the
-// copy source belongs to the alternative carrying no class scope. The plain
-// `c2 = new c1;` form is accepted by
-// ClassAssignRenameParsing.ShallowCopyNewIdentifier, which isolates the `C::`
-// prefix as the difference.
 TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyRejected) {
   auto r = Parse(
       "class C;\n"
@@ -176,13 +149,6 @@ TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyRejected) {
       "8.12"));
 }
 
-// §8.12 bans the typed constructor call for every shallow copy, not only for
-// one whose source is an identifier, so widening what `new` takes as a copy
-// source has to widen what a class scope over it is reported for. The case
-// fails on a run that admits `this` after a bare `new` and not after `C::new`:
-// the class scope is then silently accepted, which is what
-// ClassAssignRenameParsing.TypedConstructorShallowCopyRejected states it must
-// not be for the identifier form.
 TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyFromThisRejected) {
   auto r = Parse(
       "class C;\n"
@@ -200,9 +166,6 @@ TEST(ClassAssignRenameParsing, TypedConstructorShallowCopyFromThisRejected) {
 
 TEST(ClassAssignRenameParsing,
      TypedConstructorShallowCopyReportsExactlyOneError) {
-  // Parser::MakeMemberAccess consumes the copy source, so the statement still
-  // finds its semicolon. `c1` used to stand where the terminator belongs and
-  // Parser::ParseAssignmentOrExprStmt reported it a second time under §12.3.
   auto r = Parse(
       "class C;\n"
       "  int x;\n"
@@ -223,11 +186,6 @@ TEST(ClassAssignRenameParsing,
 
 TEST(ClassAssignRenameParsing,
      TypedConstructorShallowCopyInDeclarationRejected) {
-  // A declaration initializer reaches the expression parser from
-  // Parser::ParseBlockVarDecls rather than from
-  // Parser::ParseAssignmentOrExprStmt, so the assignment form above does not
-  // answer for it. ClassAssignRenameParsing.ShallowCopyInDeclaration accepts
-  // the same declaration written without the class scope.
   auto r = Parse(
       "class C;\n"
       "endclass\n"
@@ -243,10 +201,6 @@ TEST(ClassAssignRenameParsing,
 }
 
 TEST(ClassAssignRenameParsing, TypedConstructorCallWithArgumentAccepted) {
-  // §8.8 (printed page 186): a typed constructor call may take arguments where
-  // they fit, as an ordinary constructor does. Without this case the §8.12
-  // report above is satisfied by refusing every class-scoped `new`, since the
-  // copy source is the only thing that makes one illegal.
   EXPECT_TRUE(
       ParseOk("class C;\n"
               "  int x;\n"

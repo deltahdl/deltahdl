@@ -11,8 +11,6 @@ namespace delta {
 
 void VpiNoteSelectIndexes(VpiObject* select, const Expr* expr,
                           const std::function<VpiObject*()>& alloc) {
-  // A select written with no base, as an inside set's range `[2:3]` is,
-  // ends the walk as one written over a name does.
   for (const Expr* at = expr; at != nullptr && at->kind == ExprKind::kSelect;
        at = at->base) {
     for (const Expr* index : {at->index, at->index_end}) {

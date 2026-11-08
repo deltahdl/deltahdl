@@ -17,9 +17,6 @@ UdpEvalState::UdpEvalState(const UdpDecl& decl, char initial_output)
   output_ = (decl_.is_sequential && decl_.has_initial) ? initial_output : 'x';
 }
 
-// §29.3 Syntax 29-1 writes every table symbol in both cases, and Table 29-1
-// gives the upper-case forms the meanings of the lower-case ones, so a symbol
-// is read in its lower-case form wherever it is matched.
 static char Lowered(char symbol) {
   return static_cast<char>(std::tolower(static_cast<unsigned char>(symbol)));
 }

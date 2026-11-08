@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's Packet, its new(seed) seeding the object's RNG with
-// this.srandom(seed) and, when asked, randomizing the object there too.
 const char* const kPacket =
     "  class Packet;\n"
     "    rand bit [15:0] header;\n"
@@ -19,13 +17,6 @@ const char* const kPacket =
     "    endfunction\n"
     "  endclass\n";
 
-// 18.15: an object's RNG can be seeded in a class method, and is used by its
-// randomize() alone, so two Packets whose new() seeds them with 200 draw the
-// same four values though created at different points of the thread, and a
-// $urandom and a $random before each draw change nothing; and srandom() in
-// new() sets the seed before any member is randomized, so a Packet that
-// randomizes itself inside new() holds the first draw of one that does not,
-// as the design test/src/e2e/manually_seeding_randomize.sv runs it.
 TEST(ManuallySeedingRandomizeRun, SeedingInNewSelectsTheDrawsOfEveryPacket) {
   SimFixture f;
   std::string out = RunCapture(
@@ -60,12 +51,6 @@ TEST(ManuallySeedingRandomizeRun, SeedingInNewSelectsTheDrawsOfEveryPacket) {
   EXPECT_EQ(out, "4 4 1\n");
 }
 
-// 18.15: an object's RNG can be seeded from outside the class with srandom(),
-// so a Packet re-seeded with 300 draws the four values of one created with
-// 300; and an object is seeded at creation with the next value of the
-// creating thread's RNG, so a Plain object without a seeding constructor
-// draws as one seeded by hand with that value, as the design
-// test/src/e2e/manually_seeding_randomize.sv runs it.
 TEST(ManuallySeedingRandomizeRun,
      ExternalAndHierarchicalSeedingSelectTheDraws) {
   SimFixture f;

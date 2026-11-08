@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 6.19.4: wherever an enumeration element appears in arithmetic, it stands for
-// the number its declaration gave it. The canonical
-// example declares Colors {red..black}; blue has value 2, so blue*3 is 6 and
-// yellow(3) + green(1) is 4.
 TEST(EnumNumericalExpr, ElementValueUsedInArithmetic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,10 +32,6 @@ TEST(EnumNumericalExpr, ElementValueUsedInArithmetic) {
   EXPECT_EQ(b->value.ToUint64(), 4u);
 }
 
-// 6.19.4: an operand of enum type takes part in an expression as a value of
-// its enum's base type (int by default), with no explicit cast. Two enum
-// operands of distinct
-// enum types may therefore be combined arithmetically into an integral result.
 TEST(EnumNumericalExpr, CrossEnumOperandsAutocastToInt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -61,15 +53,9 @@ TEST(EnumNumericalExpr, CrossEnumOperandsAutocastToInt) {
   LowerAndRun(design, f);
   auto* i = f.ctx.FindVariable("I");
   ASSERT_NE(i, nullptr);
-  // Blue == 2, Th == 3 -> 2 + 3 == 5.
   EXPECT_EQ(i->value.ToUint64(), 5u);
 }
 
-// 6.19.4: casting to an enum type only reshapes the value into the base type;
-// nothing confirms that the result is one of the members, so the stray value
-// survives the cast at run time. Su belongs to Week (value 6); casting it into
-// the three-member Colors enum leaves Colors variable C holding 6, not a
-// clamped or rejected value.
 TEST(EnumNumericalExpr, OutOfRangeCastPreservesValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -89,14 +75,9 @@ TEST(EnumNumericalExpr, OutOfRangeCastPreservesValue) {
   LowerAndRun(design, f);
   auto* r = f.ctx.FindVariable("r");
   ASSERT_NE(r, nullptr);
-  // Su == 6; the cast does not validate membership, so C keeps 6.
   EXPECT_EQ(r->value.ToUint64(), 6u);
 }
 
-// 6.19.4: an enum element used in an expression auto-casts to the enum's base
-// type, which may be declared explicitly rather than defaulting to int. Here
-// the base is bit [3:0] with gold == 5, so gold * 2 evaluates to 10 using the
-// member's numerical value.
 TEST(EnumNumericalExpr, ExplicitBaseTypeElementValueInArithmetic) {
   SimFixture f;
   auto* design = ElaborateSrc(

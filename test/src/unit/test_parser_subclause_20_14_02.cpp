@@ -68,7 +68,6 @@ TEST(DistributionFunctionParsing, DistChiSquare) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-// §20.14.2 Syntax 20-15: $dist_t ( seed , degree_of_freedom ).
 TEST(DistributionFunctionParsing, DistT) {
   auto r = Parse(
       "module m;\n"
@@ -81,8 +80,6 @@ TEST(DistributionFunctionParsing, DistT) {
   EXPECT_EQ(stmt->kind, StmtKind::kBlockingAssign);
 }
 
-// §20.14.2 Syntax 20-15: $dist_erlang ( seed , k_stage , mean ) — the only
-// distribution with three arguments after the seed.
 TEST(DistributionFunctionParsing, DistErlang) {
   auto r = Parse(
       "module m;\n"

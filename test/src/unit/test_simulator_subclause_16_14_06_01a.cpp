@@ -129,18 +129,11 @@ TEST(ProceduralAssertionArgs, SnapshotCapturesBoundaryValuesExactly) {
   EXPECT_EQ(hi.mode, SampleMode::kCurrent);
 }
 
-// §16.14.6.1 (examples a2/a3): a `const'(i)` cast argument — the const-cast
-// construct supplied by dependency §16.5.1 — is captured at its current value
-// when the evaluation attempt is queued, and that captured value is what the
-// evaluation reads after the instance matures, regardless of later changes to
-// the underlying variable. This exercises the const-expression input form of
-// the argument-capture rule directly, rather than through the generic sampler.
 TEST(ProceduralAssertionArgs,
      ConstCastArgumentIsSnapshotAsCurrentAndSurvivesMature) {
   PendingProceduralAssertion p;
   p.instance_name = "a3";
   p.kind = AssertionKind::kAssert;
-  // foo[const'(i)] with i currently 4.
   p.sampled_args.push_back(SampleConstCastExpression(4));
   ASSERT_EQ(p.sampled_args.front().mode, SampleMode::kCurrent);
 
@@ -153,23 +146,16 @@ TEST(ProceduralAssertionArgs,
   EXPECT_EQ(stored.value, 4u);
   EXPECT_EQ(stored.mode, SampleMode::kCurrent);
 
-  // i races ahead to its loop-final value; the queued const value is
-  // unaffected.
   SampledValue post = ProceduralArgumentValueAfterMature(stored, 10);
   EXPECT_EQ(post.value, 4u);
   EXPECT_EQ(post.mode, SampleMode::kCurrent);
 }
 
-// §16.14.6.1 (example a4): a bare automatic-variable argument has its immediate
-// value preserved at queue time exactly as a const-cast argument does, so the
-// automatic input form of the capture rule yields the same current-value
-// snapshot that survives maturation.
 TEST(ProceduralAssertionArgs,
      AutomaticVariableArgumentIsSnapshotAsCurrentAndSurvivesMature) {
   PendingProceduralAssertion p;
   p.instance_name = "a4";
   p.kind = AssertionKind::kAssert;
-  // foo[i] where i is declared in the for statement, so it is automatic.
   p.sampled_args.push_back(SampleAutomaticVariable(6));
   ASSERT_EQ(p.sampled_args.front().mode, SampleMode::kCurrent);
 
@@ -186,20 +172,13 @@ TEST(ProceduralAssertionArgs,
   EXPECT_EQ(post.mode, SampleMode::kCurrent);
 }
 
-// §16.14.6.1 (example a2): within a single queued instance the two argument
-// forms keep their distinct capture modes. In `foo[const'(i)] && bar[i]` with i
-// a static loop variable, the const-cast argument is captured at its current
-// value (0..9) while the bare static argument is sampled in the Preponed region
-// (its settled loop-final value 10). Both live in the same instance's argument
-// list and must not be conflated.
 TEST(ProceduralAssertionArgs,
      MixedConstCastAndStaticArgsRetainDistinctCaptureModes) {
   PendingProceduralAssertion p;
   p.instance_name = "a2";
   p.kind = AssertionKind::kAssert;
-  p.sampled_args.push_back(SampleConstCastExpression(3));  // foo[const'(i)]
-  p.sampled_args.push_back(SampleStaticVariable(
-      /*preponed_value=*/10, SimTime{1}, /*type_default=*/0));  // bar[i]
+  p.sampled_args.push_back(SampleConstCastExpression(3));
+  p.sampled_args.push_back(SampleStaticVariable(10, SimTime{1}, 0));
 
   ProceduralAssertionQueue q;
   q.Enqueue(p);

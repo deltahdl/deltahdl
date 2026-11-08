@@ -34,9 +34,6 @@ namespace delta {
 
 namespace {
 
-// §25.9: returns the constant parameter-override values of a module instance
-// when every override evaluates to a constant, or nullopt if the instance has
-// no overrides or any override is non-constant.
 std::optional<std::vector<int64_t>> TryConstEvalInstParams(
     const ModuleItem* item, const ScopeMap& scope) {
   if (item->inst_params.empty()) return std::nullopt;
@@ -44,10 +41,6 @@ std::optional<std::vector<int64_t>> TryConstEvalInstParams(
   for (const auto& param : item->inst_params) {
     const Expr* pexpr = param.second;
     if (pexpr == nullptr) return std::nullopt;
-    // §25.9 / §11.2.1: an instance parameter override may be any constant
-    // expression, including a parameter of the enclosing module, so evaluate it
-    // in that module's parameter scope so the recorded value can be matched
-    // against a virtual interface's own override.
     auto v = ConstEvalInt(pexpr, scope);
     if (!v) return std::nullopt;
     values.push_back(*v);
@@ -55,9 +48,6 @@ std::optional<std::vector<int64_t>> TryConstEvalInstParams(
   return values;
 }
 
-// §17.2/§17.7/§25.9 and A.1.6: the kind of the enclosing scope that governs
-// which nested items and instances are legal. `kind_word` is the diagnostic
-// noun ("program", "checker" or "interface") used when any flag is set.
 struct ParentScopeKind {
   bool is_program;
   bool is_checker;
@@ -65,9 +55,6 @@ struct ParentScopeKind {
   std::string_view kind_word;
 };
 
-// §25.9: the per-module lookup tables that record each instance's resolved kind
-// (interface/checker/program) so later passes can validate references against
-// the instantiated kind. Holds references to the elaborator member tables.
 struct InstClassTables {
   std::unordered_map<std::string_view, std::string_view>& interface_inst_types;
   std::unordered_map<std::string_view, std::vector<int64_t>>&
@@ -76,9 +63,6 @@ struct InstClassTables {
   std::unordered_set<std::string_view>& program_inst_names;
 };
 
-// §25.9: records a module-instance whose resolved child is an interface,
-// checker, or program into the corresponding lookup table so later passes can
-// validate references against the instantiated kind.
 void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
                                InstClassTables& tables, const ScopeMap& scope) {
   if (child->decl_kind == ModuleDeclKind::kInterface) {
@@ -95,11 +79,6 @@ void ClassifyInstantiatedChild(const ModuleItem* item, const ModuleDecl* child,
   }
 }
 
-// Emits the parent-scope legality diagnostics for a module-instance item whose
-// resolved child is `child`: an interface may not instantiate a module, a
-// program may instantiate no module, interface or program (§24.3), reported as
-// the parser reports one whose cell it has seen declared, and a checker may
-// instantiate only checkers (§17.2).
 void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
                                 const ModuleDecl* child,
                                 const ParentScopeKind& parent,
@@ -127,9 +106,6 @@ void CheckModuleInstParentRules(const ModuleItem* item, const ModuleDecl* decl,
   }
 }
 
-// §23.4/§25.9: the rules that govern a design element declared inside another.
-// A port-less nested program is implicitly instantiated, so its name is
-// recorded; a module may not be declared inside an interface.
 void CheckNestedDeclItemRules(
     const ModuleItem* item, const ModuleDecl* decl,
     std::unordered_set<std::string_view>& program_inst_names,
@@ -151,11 +127,6 @@ void CheckNestedDeclItemRules(
   }
 }
 
-// §24.3: a program instantiates no user-defined primitive. Nor does an
-// interface or a checker, whose items, a generate block's among them, never
-// reach the udp_instantiation only A.1.4's module items do: A.1.6's
-// interface_or_generate_item and A.1.8's checker_or_generate_item, which
-// reaches no instantiation but a checker's.
 void CheckUdpInstParentRule(const ModuleItem* item, const ModuleDecl* decl,
                             const ParentScopeKind& parent, DiagEngine& diag) {
   const char* subclause = "24.3";
@@ -185,8 +156,6 @@ void CheckProgramCheckerItemRules(
   CheckNestedDeclItemRules(item, decl, program_inst_names, diag);
 }
 
-// Returns true if a child instance named `name` already exists on the module,
-// i.e. the nested module was explicitly instantiated by the source.
 bool ModuleExplicitlyInstantiated(const RtlirModule* mod,
                                   std::string_view name) {
   for (const auto& child : mod->children) {
@@ -195,9 +164,6 @@ bool ModuleExplicitlyInstantiated(const RtlirModule* mod,
   return false;
 }
 
-// Indexes the nested module/interface/program declarations of `decl` by name
-// and rejects a virtual-interface variable declared directly inside an
-// interface body.
 void CollectNestedModulesAndCheckVif(
     const ModuleDecl* decl,
     std::unordered_map<std::string_view, ModuleDecl*>& nested_module_decls,
@@ -205,10 +171,6 @@ void CollectNestedModulesAndCheckVif(
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl && !item->nested_module_decl->is_extern) {
-      // §23.5: an extern module declaration only declares the ports; it never
-      // defines an instantiable module. Keep it out of the nested-module table
-      // so it is not elaborated or instantiated as a real module and does not
-      // shadow the actual nested definition of the same name.
       nested_module_decls[item->nested_module_decl->name] =
           item->nested_module_decl;
     }
@@ -222,13 +184,6 @@ void CollectNestedModulesAndCheckVif(
   }
 }
 
-// Records task names and indexes function declarations by name.
-//
-// §35.5: an imported function is used much as a native SystemVerilog function
-// is, so a subroutine §35.5.4 declared with the `task` keyword is a task of
-// this scope and is recorded as one. §13.4's rule that a function shall not
-// enable a task reads this set, and §35.5.1.1's note that an imported task can
-// consume time is why that rule has to reach one.
 void RecordTaskFuncNames(
     const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
     std::unordered_map<std::string_view, const ModuleItem*>& func_decls) {
@@ -245,12 +200,6 @@ void RecordTaskFuncNames(
   }
 }
 
-// §13.4.3 with §26.3: a constant function declared in a package is called
-// through the package scope resolution operator, `pk::twice(6)`, so every
-// package's functions are registered under that key in the table the folder
-// reads; an out-of-block class method (§8.24) is the class's and is left out.
-// The key is arena-owned, as the table holds views. An import registers the
-// bare name (RegisterImportItem in elaborator_import.cpp).
 static void RecordPackageFuncNames(
     const CompilationUnit* unit,
     std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -268,15 +217,6 @@ static void RecordPackageFuncNames(
   }
 }
 
-// §6.21/§13.3.1: a task/function with no explicit lifetime inherits the
-// enclosing scope's lifetime (automatic if the scope is automatic, otherwise
-// static). An out-of-block method body (§8.24), the item whose `method_class`
-// names its class, is left alone: §8.6 makes every method of a class automatic
-// and forbids a class method a static lifetime, so the scope's default is not
-// its to inherit. The simulator reads ModuleItem::is_static_method for §8.10's
-// qualifier; before the two flags were split, marking a body here made an
-// instance method of a package class run in class scope without `this`, its
-// properties unreachable.
 static void DefaultSubroutineLifetime(ModuleItem* item,
                                       bool scope_is_automatic) {
   if ((item->kind != ModuleItemKind::kFunctionDecl &&
@@ -291,8 +231,6 @@ static void DefaultSubroutineLifetime(ModuleItem* item,
   }
 }
 
-// A generate block is no scope of a lifetime of its own (§27), so a subroutine
-// it declares, in every branch and arm, takes the enclosing design element's.
 void DefaultSubroutineLifetimes(const std::vector<ModuleItem*>& items,
                                 bool scope_is_automatic) {
   for (auto* item : items) {
@@ -311,7 +249,6 @@ void DefaultTaskFuncLifetimes(const ModuleDecl* decl) {
   DefaultSubroutineLifetimes(decl->items, decl->is_automatic);
 }
 
-// Collects the names of the automatic-lifetime tasks and functions.
 void CollectAutoTaskFuncNames(
     const ModuleDecl* decl,
     std::unordered_set<std::string_view>& auto_task_func_names) {
@@ -324,9 +261,6 @@ void CollectAutoTaskFuncNames(
   }
 }
 
-// Records task and function declaration names, defaults their lifetime from the
-// enclosing decl (§6.21), and collects the automatic ones. Mutates the three
-// member tables passed by reference.
 void ClassifyTaskFuncDecls(
     const ModuleDecl* decl, std::unordered_set<std::string_view>& task_names,
     std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -336,21 +270,12 @@ void ClassifyTaskFuncDecls(
   CollectAutoTaskFuncNames(decl, auto_task_func_names);
 }
 
-// §23.2/§25.9: the enclosing design element an item is classified within --
-// what kind of scope it is, the parameter scope an instance's overrides fold
-// in, and where a violation is reported.
 struct ItemScopeContext {
   const ParentScopeKind& parent_scope;
   const ScopeMap& scope;
   DiagEngine& diag;
 };
 
-// §3.4 (printed page 51) with §27: a generate block is part of the design
-// element it is written in, so an instance in one -- in the body, the else
-// body or a case arm of the generate construct `item`, at any depth -- is held
-// to the placement rules of §25.3, §17.2 and §24.3 that the element's own
-// items are. A user-defined primitive declared after the element is still
-// read as a module instance there, so `is_udp` names one by its name.
 template <typename FindChild, typename IsUdp>
 void CheckGeneratePlacement(const ModuleItem* item, const ModuleDecl* decl,
                             const ItemScopeContext& item_scope,
@@ -379,8 +304,6 @@ void CheckGeneratePlacement(const ModuleItem* item, const ModuleDecl* decl,
   }
 }
 
-// §17.2/§17.7/§25.9: applies instance-classification and parent-scope legality
-// rules to every item of `decl`; `find_child` resolves an instance's target.
 template <typename FindChild, typename IsUdp>
 void ClassifyAndCheckItems(const ModuleDecl* decl,
                            const ItemScopeContext& item_scope,
@@ -404,12 +327,6 @@ void ClassifyAndCheckItems(const ModuleDecl* decl,
   }
 }
 
-// §16.16 (b): every sequence and property declaration within a clocking
-// block is treated as though the block's clocking event had been written
-// as its leading clocking event, and an assertion instantiates it by the
-// name of the block and its own, `posedge_clk.q4`, which is the name the
-// registry keys it under, once, the declaration being shared by every
-// instance of the module.
 void RegisterClockingBlockDecls(const ModuleItem* block,
                                 PropertyRegistry& registry, Arena& arena) {
   for (ModuleItem* decl : block->clocking_decls) {
@@ -430,8 +347,6 @@ void RegisterClockingBlockDecls(const ModuleItem* block,
   }
 }
 
-// §16.12/§F.4.1: registers every property/sequence decl of `decl` into
-// `registry` so a property may be referenced before its declaration.
 void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry,
                            Arena& arena) {
   registry = PropertyRegistry();
@@ -446,8 +361,6 @@ void BuildPropertyRegistry(const ModuleDecl* decl, PropertyRegistry& registry,
   }
 }
 
-// §26.3: whether the scope whose items are `items` imports `name` from `pkg`,
-// by a wildcard import of the package or by an import of the name.
 bool ImportsName(const std::vector<ModuleItem*>& items, std::string_view pkg,
                  std::string_view name) {
   for (const ModuleItem* item : items) {
@@ -459,18 +372,10 @@ bool ImportsName(const std::vector<ModuleItem*>& items, std::string_view pkg,
   return false;
 }
 
-// §16.8 and §16.12 with §26.3: the named sequences and properties the
-// compilation unit declares are reached by their names, and those declared in
-// a package are reached from the module through the package scope,
-// "pk::name", and by their bare names where the module or the compilation
-// unit imports them; the module's own declarations, registered first, keep
-// their names.
 void RegisterPackageAssertionDecls(const ModuleDecl* decl,
                                    const CompilationUnit* unit,
                                    PropertyRegistry& registry, Arena& arena) {
   if (unit == nullptr) return;
-  // §3.12.1: what the compilation unit declares outside every design element
-  // is visible throughout it, a property or sequence among them.
   for (const ModuleItem* item : unit->cu_items) registry.Register(item);
   for (const PackageDecl* pkg : unit->packages) {
     for (const ModuleItem* item : pkg->items) {
@@ -490,8 +395,6 @@ void RegisterPackageAssertionDecls(const ModuleDecl* decl,
   }
 }
 
-// True if port-less nested module `nested_decl` (named `name`) is an implicit-
-// instantiation candidate: not an interface and not explicitly instantiated.
 bool IsImplicitNestedInstantiationCandidate(std::string_view name,
                                             const ModuleDecl* nested_decl,
                                             const RtlirModule* mod) {
@@ -503,11 +406,6 @@ bool IsImplicitNestedInstantiationCandidate(std::string_view name,
 
 }  // namespace
 
-// §13.3.1: subroutines declared in a package take their default lifetime from
-// the package. Packages are not elaborated through ElaborateItems (they are not
-// modules), so their task/function default lifetimes are resolved here, and
-// those of the compilation unit's subroutines too, which no lifetime keyword
-// can make automatic and so are static (§6.21).
 void Elaborator::DefaultPackageTaskFuncLifetimes() {
   for (auto* pkg : unit_->packages) {
     DefaultSubroutineLifetimes(pkg->items, pkg->is_automatic);
@@ -519,8 +417,6 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
                                         RtlirModule* mod) {
   CheckAlwaysCombMultiDriver(decl, mod);
   CheckAggregateElementDrivers(decl, mod);
-  // §6.23: the module whose names ValidateTypeRefArgs types a type
-  // reference's operand by, among the checks ValidateModuleConstraints runs.
   type_ref_mod_ = mod;
   ValidateModuleConstraints(decl, mod);
   ValidateValueParams(decl, mod);
@@ -559,8 +455,6 @@ void Elaborator::RunPostItemValidations(const ModuleDecl* decl,
   ValidateHierRefToImportedName(decl, mod);
   ValidateUnresolvedReferences(decl, mod);
   ValidateHierRefInstanceArray(decl, mod);
-  // A.8.6: a parameter port's value is an ordinary expression, joining no
-  // operands under a property operator.
   for (const auto& param : decl->params) {
     ReportImplicationOperators(param.second, diag_);
   }
@@ -579,8 +473,6 @@ void Elaborator::InstantiateImplicitNestedModules(
     inst.module_name = name;
     inst.inst_name = name;
     inst.simple_inst_name = name;
-    // §23.4: this instance exists because the module was declared here, so the
-    // enclosing scope's names are visible inside it.
     inst.is_nested_decl = true;
     ParamList empty_params;
 
@@ -589,11 +481,6 @@ void Elaborator::InstantiateImplicitNestedModules(
     current_inst_path_.append(name.data(), name.size());
     std::string saved_config_path = std::exchange(
         config_inst_path_, HierInstancePath(config_inst_path_, {}, name));
-    // §23.9/§24.3: a nested module/program/interface resolves names declared in
-    // this enclosing scope, so hand its visible names to ElaborateModule. The
-    // instance is implied at the end of the items, but §6.10 counts a name as
-    // declared previously by the text above the nested declaration, so the
-    // snapshot ElaborateItems took there is what BeginNestedDeclScope prefers.
     BeginNestedDeclScope(nested_decl, CaptureCurrentScopeNames());
     nested_default_disable_iff_ = mod->default_disable_iff;
     nested_default_clock_ = DefaultClockingEvent(mod);
@@ -605,26 +492,13 @@ void Elaborator::InstantiateImplicitNestedModules(
   }
 }
 
-// The items of `decl` in source order, each seeing only the names declared
-// above it, then the delayed signals its timing checks imply.
 void Elaborator::ElaborateItemsInOrder(const ModuleDecl* decl,
                                        RtlirModule* mod) {
-  // §6.10 with §23.4: a reference inside a nested declaration sees an outer
-  // name only if it was declared previously, above the declaration's text. An
-  // instance written above its declaration is elaborated before the loop
-  // below reaches the declaration, so the names the text declares above each
-  // nested declaration are read first, for BeginNestedDeclScope to join with
-  // the names declared so far at such an instance.
   RecordNestedDeclNamesAbove(decl->items);
-  // §3.13 (e): an interface's modports are in its module name space too; they
-  // are held apart from its items, so they enter it before the items do.
   for (const auto* modport : decl->modports) {
     DeclareInModuleNameSpace(modport->name, modport->loc);
   }
   for (auto* item : decl->items) {
-    // The same rule for an instance written or implied below: this scope's
-    // names are recorded as they stand when the loop reaches the declaration,
-    // for BeginNestedDeclScope to hand on when the instance is elaborated.
     if (item->kind == ModuleItemKind::kNestedModuleDecl &&
         item->nested_module_decl != nullptr) {
       nested_decl_scope_names_[item->nested_module_decl] =
@@ -635,20 +509,11 @@ void Elaborator::ElaborateItemsInOrder(const ModuleDecl* decl,
   for (auto* item : TimingCheckDelayedSignalItems(decl, arena_)) {
     ElaborateItem(item, mod);
   }
-  // §37.83: the attributes of the operators an interface's modports' port
-  // expressions are written with, once the parameters they fold against are.
   RecordModportAttributes(*mod, diag_, [&] { return BuildParamScope(mod); });
 }
 
 void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
   ReclassifyForwardUdpInstances(decl);
-  // §23.2.2.1: do NOT reset the per-module item-elaboration state here.
-  // ElaborateModule already reset it via the ItemElaborationStateSaver before
-  // ElaboratePorts ran, and ElaboratePorts populated the ANSI/non-ANSI
-  // port-name tables (complete/partial/signed ports) that the body net and
-  // variable declarations below reconcile against. Re-running the reset would
-  // wipe those tables before reconciliation, silently dropping the
-  // redeclaration, range-mismatch, and signedness checks.
   CollectNestedModulesAndCheckVif(decl, nested_module_decls_, diag_);
   const bool kParentIsProgram = decl->decl_kind == ModuleDeclKind::kProgram;
   const bool kParentIsChecker = decl->decl_kind == ModuleDeclKind::kChecker;
@@ -671,7 +536,7 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       [&](std::string_view name) { return FindModuleInScope(name); },
       interface_inst_types_, arena_);
 
-  for (const auto& [pname, pval] : decl->params) {  // §6.20: params are consts.
+  for (const auto& [pname, pval] : decl->params) {
     const_names_.insert(pname);
   }
 
@@ -688,64 +553,29 @@ void Elaborator::ElaborateItems(const ModuleDecl* decl, RtlirModule* mod) {
       decl, unit_, property_registry_, arena_,
       {mod->property_decls, mod->sequence_decls});
   PromoteSequenceInstancesInProperties(decl, property_registry_, arena_);
-  // §16.15: the default disable iff of this scope, wherever it stands among
-  // the items, or the enclosing declaration's where this is a nested
-  // declaration without one, which the concurrent assertions of the scope
-  // without a disable iff clause of their own take.
   mod->default_disable_iff = DeclaredDefaultDisableIff(decl->items);
   if (mod->default_disable_iff == nullptr) {
     mod->default_disable_iff = inherited_default_disable_iff_;
   }
   mod->inherited_default_clock = inherited_default_clock_;
 
-  // §13.4.3: make this scope's functions available to the constant-expression
-  // folder so a parameter/localparam initialized from a constant function call
-  // (e.g. `localparam addr_width = clogb2(ram_depth)`) is evaluated at
-  // elaboration time while its declaration item is elaborated below.
   ConstFuncRegistryGuard const_func_guard(&func_decls_);
 
-  // §8.25.1: also expose the parameterized-class declarations so a constant
-  // expression that reads a specific specialization's parameter through the
-  // scope resolution operator (e.g. `localparam W = C#(3)::p`) folds to that
-  // specialization's value rather than the class default.
   std::unordered_map<std::string_view, const ClassDecl*> param_class_registry =
       BuildParamClassRegistry(unit_);
   ParamClassRegistryGuard param_class_guard(&param_class_registry);
 
-  // §11.5.1: expose this module's parameter declarations so a bit-select or
-  // part-select written on one of them (e.g. `localparam Q = P[8:5]`) is
-  // resolved against the range P was declared with. The module is consulted at
-  // each fold rather than copied, so a parameter declared earlier in this item
-  // list is visible to a select written later in it.
   ParamRangeRegistryGuard param_range_guard(mod);
-  // §20.6.2 with §6.18: expose this scope's typedefs so `$bits(my_t)` written
-  // in a parameter's value is sized by the type the name stands for, and the
-  // names among them that stand for an unpacked aggregate, which have no
-  // single width and are left to the run. The table is consulted at each fold
-  // as the module is, so a typedef declared earlier in this item list is
-  // visible to a call written later in it.
   TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
                                      &type_ref_compare_);
-  // §23.9: this runs while the module is being elaborated, so a UDP instance
-  // written in a generate block reads that block's parameters as well as the
-  // module's, and gen_prefix_scopes_ is already where the instance stands.
   RegisteredGenScopeGuard gen_scope_guard(gen_prefix_scopes_);
 
   ElaborateItemsInOrder(decl, mod);
 
-  // §6.18: a class method's or a module subroutine's formal may name a
-  // typedef the module forward-declares above it and defines below it, so
-  // every class and every function and task of the module is resolved again
-  // against the complete table (elaborator_items_formals.cpp).
   ResolveModuleClassFormalTypes(mod->class_decls, typedefs_, arena_);
   ResolveModuleSubroutineFormalTypes(decl->items, typedefs_, arena_);
 
   InstantiateImplicitNestedModules(local_nested_modules, mod);
-
-  // §28.16: a net delay is a property of the net, so it reaches the drivers
-  // only once every item is elaborated -- §10.3.2 lets the continuous
-  // assignment that drives a net stand before the declaration that gives it its
-  // delay, and a gate instance driving it may stand there too.
 
   RunPostItemValidations(decl, mod);
 }

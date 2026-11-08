@@ -1,21 +1,3 @@
-// Canonical coverage for Annex A §A.2.5 "Declaration ranges".
-//
-// §A.2.5 owns six pure-syntax productions, all parser-stage:
-//   unpacked_dimension   ::= [ constant_range ] | [ constant_expression ]
-//   packed_dimension     ::= [ constant_range ] | unsized_dimension
-//   associative_dimension::= [ data_type ] | [ * ]
-//   variable_dimension   ::= unsized_dimension | unpacked_dimension
-//                          | associative_dimension | queue_dimension
-//   queue_dimension      ::= [ $ [ : constant_expression ] ]
-//   unsized_dimension    ::= [ ]
-//
-// The packed_dimension range alternative is carried by ParsePackedDims; the
-// entire variable_dimension family (and thus the unpacked/associative/queue/
-// unsized productions) is carried by ParseUnpackedDims in parser_types.cpp.
-// Every dimension is built from a real declaration so the consumed dependency
-// constructs (constant_range/constant_expression from §A.8.3, data_type from
-// §A.2.2.1) are produced by genuine source syntax.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -31,7 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Returns the first module item with the given declared name, or null.
 const ModuleItem* FindItem(const ParseResult& r, std::string_view name) {
   if (r.cu == nullptr || r.cu->modules.empty()) return nullptr;
   for (const auto* item : r.cu->modules[0]->items) {
@@ -39,8 +20,6 @@ const ModuleItem* FindItem(const ParseResult& r, std::string_view name) {
   }
   return nullptr;
 }
-
-// --- unpacked_dimension ::= [ constant_range ] -----------------------------
 
 TEST(DeclarationRangeParsing, UnpackedDimensionConstantRange) {
   auto r = Parse("module m; logic a [3:0]; endmodule\n");
@@ -50,12 +29,9 @@ TEST(DeclarationRangeParsing, UnpackedDimensionConstantRange) {
   ASSERT_NE(a, nullptr);
   ASSERT_EQ(a->unpacked_dims.size(), 1u);
   ASSERT_NE(a->unpacked_dims[0], nullptr);
-  // constant_range parses to a colon-joined pair.
   EXPECT_EQ(a->unpacked_dims[0]->kind, ExprKind::kBinary);
   EXPECT_EQ(a->unpacked_dims[0]->op, TokenKind::kColon);
 }
-
-// --- unpacked_dimension ::= [ constant_expression ] (size form) ------------
 
 TEST(DeclarationRangeParsing, UnpackedDimensionConstantExpressionSize) {
   auto r = Parse("module m; logic a [4]; endmodule\n");
@@ -65,12 +41,9 @@ TEST(DeclarationRangeParsing, UnpackedDimensionConstantExpressionSize) {
   ASSERT_NE(a, nullptr);
   ASSERT_EQ(a->unpacked_dims.size(), 1u);
   ASSERT_NE(a->unpacked_dims[0], nullptr);
-  // A single constant_expression, not a range.
   EXPECT_EQ(a->unpacked_dims[0]->kind, ExprKind::kIntegerLiteral);
   EXPECT_NE(a->unpacked_dims[0]->op, TokenKind::kColon);
 }
-
-// --- packed_dimension ::= [ constant_range ] -------------------------------
 
 TEST(DeclarationRangeParsing, PackedDimensionConstantRange) {
   auto r = Parse("module m; logic [7:0] a; endmodule\n");
@@ -83,7 +56,6 @@ TEST(DeclarationRangeParsing, PackedDimensionConstantRange) {
   EXPECT_TRUE(a->data_type.extra_packed_dims.empty());
 }
 
-// Repeated packed_dimension (the { packed_dimension } closure in data_type).
 TEST(DeclarationRangeParsing, PackedDimensionMultiple) {
   auto r = Parse("module m; logic [7:0][3:0] a; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -97,8 +69,6 @@ TEST(DeclarationRangeParsing, PackedDimensionMultiple) {
   EXPECT_NE(a->data_type.extra_packed_dims[0].second, nullptr);
 }
 
-// --- associative_dimension ::= [ * ] ---------------------------------------
-
 TEST(DeclarationRangeParsing, AssociativeDimensionWildcard) {
   auto r = Parse("module m; int a [*]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -110,8 +80,6 @@ TEST(DeclarationRangeParsing, AssociativeDimensionWildcard) {
   EXPECT_EQ(a->unpacked_dims[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(a->unpacked_dims[0]->text, "*");
 }
-
-// --- associative_dimension ::= [ data_type ] -------------------------------
 
 TEST(DeclarationRangeParsing, AssociativeDimensionIntegerIndex) {
   auto r = Parse("module m; int a [int]; endmodule\n");
@@ -125,8 +93,6 @@ TEST(DeclarationRangeParsing, AssociativeDimensionIntegerIndex) {
   EXPECT_EQ(a->unpacked_dims[0]->text, "int");
 }
 
-// --- queue_dimension ::= [ $ ] (unbounded) ---------------------------------
-
 TEST(DeclarationRangeParsing, QueueDimensionUnbounded) {
   auto r = Parse("module m; int a [$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -137,11 +103,8 @@ TEST(DeclarationRangeParsing, QueueDimensionUnbounded) {
   ASSERT_NE(a->unpacked_dims[0], nullptr);
   EXPECT_EQ(a->unpacked_dims[0]->kind, ExprKind::kIdentifier);
   EXPECT_EQ(a->unpacked_dims[0]->text, "$");
-  // The optional [ : constant_expression ] bound is omitted.
   EXPECT_EQ(a->unpacked_dims[0]->rhs, nullptr);
 }
-
-// --- queue_dimension ::= [ $ : constant_expression ] (bounded) -------------
 
 TEST(DeclarationRangeParsing, QueueDimensionBoundedLiteral) {
   auto r = Parse("module m; int a [$:16]; endmodule\n");
@@ -156,8 +119,6 @@ TEST(DeclarationRangeParsing, QueueDimensionBoundedLiteral) {
   EXPECT_EQ(a->unpacked_dims[0]->rhs->kind, ExprKind::kIntegerLiteral);
 }
 
-// --- unsized_dimension ::= [ ] ---------------------------------------------
-
 TEST(DeclarationRangeParsing, UnsizedDimension) {
   auto r = Parse("module m; int a []; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -165,15 +126,10 @@ TEST(DeclarationRangeParsing, UnsizedDimension) {
   const auto* a = FindItem(r, "a");
   ASSERT_NE(a, nullptr);
   ASSERT_EQ(a->unpacked_dims.size(), 1u);
-  // An empty dimension is recorded as a null entry.
   EXPECT_EQ(a->unpacked_dims[0], nullptr);
 }
 
-// --- variable_dimension dispatch across its four alternatives --------------
-
 TEST(DeclarationRangeParsing, VariableDimensionMixedAlternatives) {
-  // One declaration with an unpacked size dim, an associative-wildcard dim,
-  // and a queue dim, exercising the dispatch in ParseUnpackedDims.
   auto r = Parse("module m; int a [4][*][$]; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -188,23 +144,11 @@ TEST(DeclarationRangeParsing, VariableDimensionMixedAlternatives) {
   EXPECT_EQ(a->unpacked_dims[2]->text, "$");
 }
 
-// --- Negative: queue_dimension colon requires a constant_expression --------
-
 TEST(DeclarationRangeParsing, QueueDimensionColonWithoutBoundRejected) {
-  // queue_dimension ::= [ $ [ : constant_expression ] ]: when the colon is
-  // present, the bound expression is mandatory.
   auto r = Parse("module m; int a [$:]; endmodule\n");
-  // §11.2 owns the report for a primary that is not an expression; §7.10 states
-  // the queue dimension whose bound is missing.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
-// --- Negative: associative_dimension's index is a data_type ---------------
-
-// A.2.5 writes associative_dimension as `[ data_type ]`, and A.2.2.1's net_type
-// is no form of data_type, so `[wire]` and `[supply0]` are each reported on
-// their own line. A keyword data_type, packed dimensions and all, is read with
-// no report. Both net keywords were taken as index types.
 TEST(DeclarationRangeParsing, NetTypeIndexIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -224,12 +168,6 @@ TEST(DeclarationRangeParsing, NetTypeIndexIsReported) {
   }
 }
 
-// A.2.5 writes associative_dimension's index as a data_type, so an
-// enumeration, a packed structure and a packed union declared in the brackets,
-// a type reference and a parameterized class are each an index type. Each is
-// read with no report into a type reference, the data_type it holds kept for
-// all but `type(k)`, which the elaborator resolves. The enumeration, the
-// structure, the union and the class each drew a parse error.
 TEST(DeclarationRangeParsing, DataTypeIndexFormsAreRead) {
   auto r = Parse(
       "class P #(int N = 1); endclass\n"

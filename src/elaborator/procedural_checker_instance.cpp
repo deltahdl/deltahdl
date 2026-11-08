@@ -18,9 +18,6 @@ namespace delta {
 
 namespace {
 
-// §12.7.1 and §12.7.3: the variables the loop `s` declares for its body, a
-// foreach loop's loop variables and each control variable a for loop's
-// initialization gives a data type.
 void AppendLoopLocals(const Stmt& s, std::vector<std::string_view>& locals) {
   locals.insert(locals.end(), s.foreach_vars.begin(), s.foreach_vars.end());
   for (size_t i = 0; i < s.for_inits.size() && i < s.for_init_types.size();
@@ -33,10 +30,6 @@ void AppendLoopLocals(const Stmt& s, std::vector<std::string_view>& locals) {
   }
 }
 
-// §17.3: no checker instance may stand inside a fork-join, fork-join_any or
-// fork-join_none block, so one a fork statement encloses, `in_fork`, is
-// reported and left out. `locals` are the variables the enclosing blocks
-// and loops declare before `s`.
 void CollectCheckerInstantiations(
     Stmt* s, bool in_fork, std::vector<std::string_view> locals,
     std::vector<CheckerInstantiationInProcedure>& out, DiagEngine& diag) {
@@ -53,7 +46,6 @@ void CollectCheckerInstantiations(
   AppendLoopLocals(*s, locals);
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     CollectCheckerInstantiations(sub, sub_in_fork, locals, out, diag);
-    // A block's variable declaration is visible to the statements after it.
     if (sub != nullptr && sub->kind == StmtKind::kVarDecl) {
       locals.push_back(sub->var_name);
     }

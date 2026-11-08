@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A.1.6's extern_tf_declaration is an interface_or_generate_item and no item
-// of a module body, so each prototype here stands in an interface.
-
 TEST(FunctionDeclParsing, FuncPrototypeExternVoid) {
   auto r = Parse(
       "interface m;\n"

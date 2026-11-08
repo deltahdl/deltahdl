@@ -22,11 +22,6 @@ namespace delta {
 
 namespace {
 
-// One packed array net or var whose subelements are being made: the object
-// itself, which §37.16 detail 31 and §37.18 detail 3 make the vpiParent of
-// every one of them, the packed dimensions it declares, the kind of a
-// subelement while dimensions remain and the kind past the last of them, and
-// the model to build in.
 struct PackedArrayShape {
   VpiObject* top;
   const PackedDims& dims;
@@ -35,26 +30,16 @@ struct PackedArrayShape {
   const VpiAttachBuild& build;
 };
 
-// The kind of net a packed array net of `kind` holds past its last packed
-// dimension: a packed struct, union or enum net (§37.16 detail 1).
 int LeafNetKindOf(DataTypeKind kind) {
   if (kind == DataTypeKind::kStruct) return vpiStructNet;
   return kind == DataTypeKind::kUnion ? vpiUnionNet : vpiEnumNet;
 }
 
-// The kind of variable the packed array var `var` holds past its last packed
-// dimension: a struct, union or enum var (§37.18 detail 1), the struct or
-// union its type resolves to where it names no enum.
 int LeafVarKindOf(const RtlirVariable& var) {
   if (!var.enum_type_name.empty()) return vpiEnumVar;
   return var.dtype->kind == DataTypeKind::kUnion ? vpiUnionVar : vpiStructVar;
 }
 
-// The run's bits of the subelement `sub`, `offset` bits above the least
-// significant end of the packed array. A net's subelement reads them out of
-// the net's storage directly. A var's holds a copy of them kept in step with
-// the variable's (VpiRefreshElementCopy), as a member does, and is a vector
-// (§37.18 detail 1).
 void GiveSubelementBits(VpiObject& sub, const VpiObject& holder, int64_t offset,
                         const PackedArrayShape& shape) {
   if (shape.array_kind == vpiPackedArrayNet) {
@@ -70,13 +55,6 @@ void GiveSubelementBits(VpiObject& sub, const VpiObject& holder, int64_t offset,
   sub.decl_vector = true;
 }
 
-// §37.16 detail 32 and §37.18 detail 3: the subelements of `holder`, which
-// stands for the packed dimensions of `shape` from `depth` on and sits
-// `offset` bits above the least significant end of the packed array, one per
-// index of the dimension at `depth`, the leftmost first and most significant:
-// a packed array while dimensions remain and past the last one of the leaf
-// kind. Each is named by its index, carries it for vpiIndex, and has the whole
-// packed array as its vpiParent (§37.16 detail 31, §37.17 detail 26).
 void MakeSubelements(VpiObject* holder, std::size_t depth, int64_t offset,
                      const PackedArrayShape& shape) {
   if (depth == shape.dims.size()) return;
@@ -115,8 +93,6 @@ bool VpiVariableIsPackedArray(const RtlirVariable& var) {
     return false;
   }
   if (!var.enum_type_name.empty()) return true;
-  // The elaborator carries a resolved type for every declaration that writes a
-  // packed dimension.
   return var.dtype->kind == DataTypeKind::kStruct ||
          var.dtype->kind == DataTypeKind::kUnion;
 }
@@ -128,7 +104,6 @@ void AttachPackedArrayElements(const RtlirDesign* design,
       design, objects,
       [&](const RtlirNet& net, VpiObject& obj, const std::string& prefix) {
         if (VpiNetObjectKind(net) != vpiPackedArrayNet) return;
-        // The dimensions are evaluated in the instance declaring the net.
         InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
                                      prefix.empty() ? "" : prefix + ".");
         const PackedDims kDims = WrittenPackedDims(net.dtype, ctx);

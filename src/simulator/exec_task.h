@@ -16,10 +16,6 @@ struct ExecTask {
     StmtResult result = StmtResult::kDone;
     std::coroutine_handle<> continuation;
 
-    // §9.6.2: every wait a statement's coroutine suspends in goes through
-    // ParkedAwait below, so that a process another process disables can be
-    // taken out of the wait it stands in (ParkSlot). A nested statement's
-    // task is awaited as it is.
     ExecTask& await_transform(ExecTask& task) noexcept { return task; }
     ExecTask&& await_transform(ExecTask&& task) noexcept {
       return std::move(task);
@@ -96,12 +92,6 @@ struct ExecTask {
     return handle_.promise().result;
   }
 
-  // Runs the task from a caller that is no coroutine and so cannot co_await
-  // it: a function body, whose statements §13.4.4 keeps free of every time
-  // control, so nothing under the task suspends and the one resumption
-  // carries it to its end. The result is the one await_resume would hand a
-  // coroutine. For a task with a frame to run, which is every task a
-  // coroutine function returns; a task Immediate() built has none.
   StmtResult RunToCompletion() noexcept {
     handle_.resume();
     return handle_.promise().result;
@@ -120,16 +110,10 @@ struct ExecTask {
   bool is_immediate_ = false;
 };
 
-// Whether a parked wait's wake may still go through: closed once the wait is
-// abandoned, by a disable of the scope it stands in, so that its own wake,
-// arriving later, resumes nothing.
 struct WakeGate {
   bool open = true;
 };
 
-// A one-shot coroutine a parked wait is woken through in place of the frame
-// that waits: resumed by the wait's wake, it resumes that frame if the gate
-// is still open, then ends and frees itself.
 struct WakeRelay {
   struct promise_type {
     WakeRelay get_return_object() noexcept {
@@ -146,8 +130,6 @@ struct WakeRelay {
 
 inline WakeRelay RelayWake(std::coroutine_handle<> target,
                            std::shared_ptr<WakeGate> gate) {
-  // The relay's frame holds the gate until the wake comes, however long the
-  // wait it stands for has been abandoned by then.
   std::shared_ptr<WakeGate> held = std::move(gate);
   if (held->open) {
     held->open = false;
@@ -156,13 +138,6 @@ inline WakeRelay RelayWake(std::coroutine_handle<> target,
   co_return;
 }
 
-// §9.6.2: where a process is parked, for a disable from another process to
-// take it out: the frame of the statement waiting and the gate its wake goes
-// through. Kept only while the process stands in a named block, a labeled
-// statement or a task -- `named_scopes`, the running process's list, not
-// empty -- since those are all a disable can name; a wait elsewhere is left
-// to wake as it always has. Each process owns one (Process::park), and
-// SimContext::SetCurrentProcess points g_park_slot at the running process's.
 struct ParkSlot {
   std::coroutine_handle<ExecTask::promise_type> frame;
   std::shared_ptr<WakeGate> gate;

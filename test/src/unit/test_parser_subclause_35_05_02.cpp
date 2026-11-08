@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §35.5.2's restrictions on pure imports cannot be enforced unless the
-// parser surfaces the pure marker on the import. This test observes the
-// parser-stage precondition of that enforcement chain: a pure DPI import
-// is recognized as such, recorded with dpi_is_pure set, and distinguished
-// from context / task forms.
 TEST(PureDpiImportParsing, ParserMarksPureFlagOnImport) {
   auto r = Parse(
       "module m;\n"

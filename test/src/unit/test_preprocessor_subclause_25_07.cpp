@@ -7,12 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §25.7: a function prototype in an interface names a function defined
-// elsewhere. The prototype stands in an interface because A.1.6's
-// extern_tf_declaration is an interface_or_generate_item and no item of a
-// module body, and it reaches the parser through a macro so that the case
-// observes the preprocessed text rather than repeating the parser's own case
-// in test_parser_subclause_25_07.cpp.
 TEST(SourceText, ExternFunctionPrototypeInInterface) {
   auto r = ParseWithPreprocessor(
       "`define PROTO(name) extern function int name(input int a, int b);\n"

@@ -19,16 +19,8 @@
 #include "parser/ast_stmt.h"
 #include "parser/ast_type.h"
 
-// §6.20.3: the check that a type parameter prefixing the class scope
-// resolution operator resolves to a class, made with the type each instance
-// binds the parameter to.
-
 namespace delta {
 
-// Whether `type` is a class or a name the scope does not resolve, following a
-// typedef or type parameter naming another by a bare name to the type it ends
-// at. Only a type that ends at something other than a name is known to be no
-// class.
 static bool MayBeClass(const DataType& type,
                        const TypeParamPrefixScope& scope) {
   const DataType* cur = &type;
@@ -68,9 +60,6 @@ void ReportTypeParamPrefixNotAClass(std::string_view prefix, SourceLoc loc,
 
 namespace {
 
-// A type name a scope declares among its own items, in the order written: a
-// type parameter or a typedef, with the type it stands for. A later one of
-// the same name hides an earlier.
 struct LocalTypeName {
   std::string_view name;
   const DataType* bound;
@@ -79,12 +68,6 @@ struct LocalTypeName {
 
 using LocalTypeNames = std::vector<LocalTypeName>;
 
-// What a walk over a scope's items reports against: the instance's scope for
-// a prefix the items do not declare themselves, none in a package or the
-// compilation unit, whose type parameters are all their own. A type operator
-// naming the instance's parameter is judged against it only where
-// `outer_type_refs`: in a checker the instance declares, which is elaborated
-// as an instance of its own that does not see the parameter.
 struct PrefixWalk {
   const TypeParamPrefixScope* outer;
   DiagEngine& diag;
@@ -99,9 +82,6 @@ const LocalTypeName* FindLocal(const LocalTypeNames& locals,
   return nullptr;
 }
 
-// Whether the type `local` stands for, followed through the scope's own names
-// bound by a bare name, ends at a type that is no class. A name the scope
-// does not declare may be a class, and is not known to be none.
 bool BoundToNoClass(const LocalTypeName& local, const LocalTypeNames& locals) {
   const DataType* cur = local.bound;
   for (int depth = 0; depth < 32; ++depth) {
@@ -115,8 +95,6 @@ bool BoundToNoClass(const LocalTypeName& local, const LocalTypeNames& locals) {
   return false;
 }
 
-// Judges `prefix`, written at `loc`: by the scope's own declaration of the
-// name where it has one, and otherwise, where `outer_too`, by the instance's.
 void JudgePrefix(std::string_view prefix, SourceLoc loc,
                  const LocalTypeNames& locals, const PrefixWalk& walk,
                  bool outer_too) {
@@ -130,8 +108,6 @@ void JudgePrefix(std::string_view prefix, SourceLoc loc,
     ReportTypeParamPrefixNotAClass(prefix, loc, *walk.outer, walk.diag);
 }
 
-// The prefix of a type operator's argument written as one name scoped by
-// another, `type(T::inner)`; empty for any other argument.
 std::string_view TypeRefPrefix(const DataType& type) {
   const Expr* ref = type.type_ref_expr;
   if (ref == nullptr || ref->kind != ExprKind::kMemberAccess ||
@@ -141,20 +117,14 @@ std::string_view TypeRefPrefix(const DataType& type) {
   return ref->lhs->text;
 }
 
-// The type operator `type` writes. An instance's own type parameter is judged
-// where the reference is resolved (ReportTypeRefPrefixNotAClass), so outside a
-// checker only the scope's own names are judged here.
 void JudgeTypeRef(const DataType& type, SourceLoc loc,
                   const LocalTypeNames& locals, const PrefixWalk& walk) {
   JudgePrefix(TypeRefPrefix(type), loc, locals, walk, walk.outer_type_refs);
 }
 
-// A typedef or a type parameter `item` declares, judged and then entered among
-// the scope's names, which the items after it see.
 void DeclareTypeName(const ModuleItem& item, bool is_param,
                      LocalTypeNames& locals, const PrefixWalk& walk) {
-  JudgePrefix(item.typedef_type.scope_name, item.loc, locals, walk,
-              /*outer_too=*/true);
+  JudgePrefix(item.typedef_type.scope_name, item.loc, locals, walk, true);
   JudgeTypeRef(item.typedef_type, item.loc, locals, walk);
   locals.push_back({item.name, &item.typedef_type, is_param});
 }
@@ -165,17 +135,15 @@ bool DeclaresTypeParam(const ModuleItem& item) {
          item.typedef_type.kind != DataTypeKind::kImplicit;
 }
 
-// The statement `s` and those under it, a block's items declaring names its
-// later statements and nested blocks see; a nested block's names end with it.
 void WalkStmt(Stmt* s, LocalTypeNames& locals, const PrefixWalk& walk) {
   if (s == nullptr) return;
   const ModuleItem* item = s->decl_item;
   if (s->kind == StmtKind::kBlockItemDecl && item != nullptr &&
       item->kind == ModuleItemKind::kTypedef) {
-    DeclareTypeName(*item, /*is_param=*/false, locals, walk);
+    DeclareTypeName(*item, false, locals, walk);
   } else if (s->kind == StmtKind::kVarDecl && s->var_is_param &&
              item != nullptr && DeclaresTypeParam(*item)) {
-    DeclareTypeName(*item, /*is_param=*/true, locals, walk);
+    DeclareTypeName(*item, true, locals, walk);
   } else if (s->kind == StmtKind::kVarDecl) {
     JudgeTypeRef(s->var_decl_type, s->range.start, locals, walk);
   }
@@ -196,15 +164,14 @@ bool DeclaresChecker(const ModuleItem& item) {
          item.nested_module_decl->decl_kind == ModuleDeclKind::kChecker;
 }
 
-// A package's, the compilation unit's or a checker's items, in order.
 void WalkScopeItems(const std::vector<ModuleItem*>& items,
                     const PrefixWalk& walk) {
   LocalTypeNames locals;
   for (const ModuleItem* item : items) {
     if (item->kind == ModuleItemKind::kTypedef) {
-      DeclareTypeName(*item, /*is_param=*/false, locals, walk);
+      DeclareTypeName(*item, false, locals, walk);
     } else if (DeclaresTypeParam(*item)) {
-      DeclareTypeName(*item, /*is_param=*/true, locals, walk);
+      DeclareTypeName(*item, true, locals, walk);
     } else if (item->kind == ModuleItemKind::kVarDecl) {
       JudgeTypeRef(item->data_type, item->loc, locals, walk);
     } else if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -222,8 +189,7 @@ void ReportItemPrefixesNotAClass(const ModuleItem& item,
                                  const TypeParamPrefixScope& scope,
                                  DiagEngine& diag) {
   if (DeclaresChecker(item)) {
-    WalkScopeItems(item.nested_module_decl->items,
-                   {&scope, diag, /*outer_type_refs=*/true});
+    WalkScopeItems(item.nested_module_decl->items, {&scope, diag, true});
     return;
   }
   WalkProcedure(item, {}, {&scope, diag});
@@ -256,9 +222,6 @@ const DataType* TypeRefThroughBoundPrefix(std::string_view prefix,
   return FindNamedType(written, typedefs);
 }
 
-// The type `cls` binds its type parameter at index `i`, named `name`, to under
-// the actuals `written` gives: the one named for it, else the one at its
-// position, else the class's default. Null where none is given.
 static const DataType* BoundActual(const ClassDecl& cls, size_t i,
                                    std::string_view name,
                                    const DataType& written) {
@@ -272,8 +235,6 @@ static const DataType* BoundActual(const ClassDecl& cls, size_t i,
   return nullptr;
 }
 
-// Whether the body of `cls` selects a type through its type parameter
-// `name`, in a typedef or a body `localparam type` (carried as a typedef).
 static bool BodySelectsThrough(const ClassDecl& cls, std::string_view name) {
   return std::ranges::any_of(cls.members, [&](const ClassMember* m) {
     return m->kind == ClassMemberKind::kTypedef && m->typedef_item != nullptr &&

@@ -26,16 +26,6 @@ void SetLocalWords(Logic4Vec& value, int64_t v) {
 
 namespace {
 
-// The local a trial binds the random variable `n` to, made on the first
-// trial of the randomize() call and kept on `rc` for the rest: a real
-// variable's (18.4.1) 64 bits wide, an integral one's in the signedness the
-// solver's variable of the name is declared with, since 6.11.3 has the value
-// read as the type declares it, so that an int element drawn negative
-// compares below one drawn positive (18.5.7.1), which the value taken as 32
-// unsigned bits does not, and no narrower than the 32 bits of an int, the
-// width the operands of a relation over it take (11.6.1), so that a sum of
-// two 4-bit variables compared against an int is the sum and not its low
-// four bits.
 Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
   auto it = rc.trial_locals.find(n);
   if (it != rc.trial_locals.end()) {
@@ -52,20 +42,12 @@ Variable* TrialLocal(const std::string& n, bool real, RandomizeCtx& rc) {
   return local;
 }
 
-// Evaluates `e` with each name in `names` bound to its value in `vals`, a
-// rand variable as a local so the expression reads the trial value. A real
-// variable's (18.4.1) draw the solver keeps among its real values, so its
-// local is the real drawn there and an expression over it reads the real
-// (18.5.5); an integral variable `vals` lacks, not yet drawn while another
-// variable's values are enumerated, reads 0, and its local stays integral
-// for the trials after.
 Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
                     RandomizeCtx& rc,
                     const std::unordered_map<std::string, int64_t>& vals) {
   rc.ctx.PushScope();
   for (const auto& n : names) {
     auto it = vals.find(n);
-    // Every name bound is one of the solve's random variables.
     bool real = rc.solver != nullptr &&
                 rc.solver->FindVariable(rc.solver_prefix + n)->is_real;
     Variable* local = TrialLocal(n, real, rc);
@@ -85,18 +67,10 @@ Logic4Vec EvalBound(const Expr* e, const std::vector<std::string>& names,
   return value;
 }
 
-// 18.8: whether the random variable `name` is active, so that the solver
-// writes it; a scope randomize (18.12) has no object and every variable of
-// it is active.
 bool RandIsActive(const RandomizeCtx& rc, std::string_view name) {
   return rc.obj == nullptr || IsObjectRandActive(rc.obj, name);
 }
 
-// The side of the comparison `rel` that is a bare random variable the other
-// side does not reference, so that the other side derives it, filling `cmp`
-// with the comparison as read from that side; nullptr where neither side
-// is, or the relation is no comparison, or an inequality, which bounds
-// nothing.
 const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
                         RandomizeCtx& rc, ConstraintKind& cmp) {
   if (rel->kind != ExprKind::kBinary || rel->lhs == nullptr ||
@@ -106,8 +80,6 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
   }
   for (const Expr* side : {rel->lhs, rel->rhs}) {
     const Expr* other = side == rel->lhs ? rel->rhs : rel->lhs;
-    // 18.8: an inactive variable is a state variable the solver never
-    // writes, so it derives nothing; the other side may derive from it.
     if (side->kind == ExprKind::kIdentifier &&
         FindRand(rands, side->text) != nullptr &&
         RandIsActive(rc, side->text) && !RefsNamedRandVar(other, side->text)) {
@@ -118,10 +90,6 @@ const Expr* DerivedSide(const Expr* rel, std::vector<RandInfo>& rands,
   return nullptr;
 }
 
-// The bare random variable `side` is a sum or difference with, x + q, q +
-// x, x - q or q - x, x active and the operand q free of it, filling `term`
-// with q and `subtrahend` with whether x is taken away from it; nullptr
-// where `side` is no such form.
 const Expr* AddendOf(const Expr* side, std::vector<RandInfo>& rands,
                      RandomizeCtx& rc, const Expr*& term, bool& subtrahend) {
   if (side->kind != ExprKind::kBinary || side->lhs == nullptr ||
@@ -131,8 +99,6 @@ const Expr* AddendOf(const Expr* side, std::vector<RandInfo>& rands,
   }
   for (const Expr* x : {side->lhs, side->rhs}) {
     const Expr* q = x == side->lhs ? side->rhs : side->lhs;
-    // 18.8: an inactive variable is a state variable the solver never
-    // writes, so it derives nothing.
     if (x->kind != ExprKind::kIdentifier ||
         FindRand(rands, x->text) == nullptr || !RandIsActive(rc, x->text) ||
         RefsNamedRandVar(q, x->text)) {
@@ -145,11 +111,6 @@ const Expr* AddendOf(const Expr* side, std::vector<RandInfo>& rands,
   return nullptr;
 }
 
-// 18.5.12: the side of the comparison `rel` that is a sum or difference
-// with a bare random variable the other operand and the other side are free
-// of, the clause's x+y == 10 read as deriving x; nullptr where neither side
-// is, or the relation is no comparison, or an inequality, which bounds
-// nothing. Fills `term` and `subtrahend` as AddendOf does.
 const Expr* AddendSide(const Expr* rel, std::vector<RandInfo>& rands,
                        RandomizeCtx& rc, const Expr*& term, bool& subtrahend) {
   ConstraintKind cmp = ConstraintKind::kEqual;
@@ -180,11 +141,6 @@ int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc) {
 
 namespace {
 
-// 18.5.12: sets `ce` to derive the random variable of the addend side of
-// `rel`, the clause's x+y == 10 deriving x as 10 - y: x + q and q + x
-// compared against the other side derive x from the other side less q, x -
-// q from the other side plus q, and q - x from q less the other side, under
-// the comparison as read from x. Answers false where `rel` has no such side.
 bool DeriveAddend(const Expr* rel, std::vector<RandInfo>& rands,
                   const std::vector<std::string>& names, RandomizeCtx& rc,
                   ConstraintExpr& ce) {
@@ -255,9 +211,6 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
   for (const auto& ri : rands) names.push_back(ri.name);
   ConstraintExpr ce;
   ce.kind = ConstraintKind::kCustom;
-  // 18.5.7: a relation naming an array member whole -- a reduction method
-  // over it, or a select of it the expansion left as written -- references
-  // each of its elements.
   for (const auto& ri : rands) {
     if (RefsNamedRandVar(rel, ri.name) ||
         (!ri.array_base.empty() && RefsNamedRandVar(rel, ri.array_base))) {
@@ -268,10 +221,6 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
                 &rc](const std::unordered_map<std::string, int64_t>& vals) {
     return EvalCustomRelation(rel, names, rc, vals);
   };
-  // 18.3: `x == expression` over the other random variables, the clause's
-  // data == 1 << n, derives x from them once they are drawn; 18.5.7.1: `x >
-  // expression`, the clause's A[k+1] > A[k], derives the bound x is drawn
-  // above.
   ConstraintKind cmp = ConstraintKind::kEqual;
   if (const Expr* derived = DerivedSide(rel, rands, rc, cmp)) {
     const Expr* other = derived == rel->lhs ? rel->rhs : rel->lhs;
@@ -287,7 +236,6 @@ ConstraintExpr MakeCustomConstraint(const Expr* rel,
     }
     return ce;
   }
-  // 18.5.12: the clause's x+y == 10 derives x from y as well.
   DeriveAddend(rel, rands, names, rc, ce);
   return ce;
 }

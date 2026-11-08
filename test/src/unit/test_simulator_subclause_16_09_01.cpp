@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// The source the cases share: clk rises at 5, 15, 25, ...; a is high for the
-// tick at 15, b for the tick at 25, c for the tick at 45 and d for the tick
-// at 55, unless `drive` says otherwise; and a process counts the ticks at
-// which the named sequence `rule`, whose body is `body`, reaches its end
-// point, keeping the last such time.
 std::string PrecedenceSource(const std::string& body,
                              const std::string& drive = "") {
   return "module t;\n"
@@ -49,10 +44,6 @@ std::string PrecedenceSource(const std::string& body,
          "endmodule\n";
 }
 
-// §16.9.1, Table 16-1: `##` binds tighter than `or`, so `a ##1 b or c ##1 d`
-// is `(a ##1 b) or (c ##1 d)` and ends where either concatenation does, at 25
-// and at 55. Read as `a ##1 (b or c) ##1 d` it would need d at 35, low then,
-// and end at 55 alone; `or` alone ends at each tick either operand holds at.
 TEST(SequenceOperatorPrecedence, ConcatenationBindsTighterThanOr) {
   SimFixture f;
   auto* hits = RunAndFindVar(PrecedenceSource("a ##1 b or c ##1 d"), f, "hits");
@@ -66,10 +57,6 @@ TEST(SequenceOperatorPrecedence, ConcatenationBindsTighterThanOr) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
-// §16.9.1: `##` binds tighter than `and`, so `a ##1 b and c` is `(a ##1 b)
-// and c`, both operands matched from the tick at 15 where a and c hold and
-// the whole ending at the later end point, 25 where b holds; read as `a ##1
-// (b and c)` it would need c at 25, low then, and never end.
 TEST(SequenceOperatorPrecedence, ConcatenationBindsTighterThanAnd) {
   SimFixture f;
   auto* hits = RunAndFindVar(PrecedenceSource("a ##1 b and c",
@@ -82,9 +69,6 @@ TEST(SequenceOperatorPrecedence, ConcatenationBindsTighterThanAnd) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 25u);
 }
 
-// §16.9.1: `and` binds tighter than `or`, so `a and c or d` is `(a and c) or
-// d`, ending at 15 where a and c both hold and at 25 and 45 where d holds;
-// read as `a and (c or d)` it would need a beside d and end at 15 alone.
 TEST(SequenceOperatorPrecedence, AndBindsTighterThanOr) {
   SimFixture f;
   auto* hits = RunAndFindVar(PrecedenceSource("a and c or d",

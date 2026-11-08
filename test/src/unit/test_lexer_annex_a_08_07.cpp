@@ -386,11 +386,6 @@ TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValue) {
       "5.7.1"));
 }
 
-// A.8.7 writes `unbased_unsigned_literal ::= '0 | '1 | 'x | 'X | 'z | 'Z`, six
-// terminals whole, so no white space stands inside one and `' 1` is no
-// literal. Lexer::LexApostrophe leaves the apostrophe to Lexer::LexOperator,
-// which reports it. The case fails if the lexer accepts `' 1` as a literal, or
-// rejects it under some other rule than the §5.2 unexpected character.
 TEST(NumberTokenLexing, WhitespaceAfterApostropheNotUnbasedUnsized) {
   auto diags = LexDiagnostics("' 1 ");
   EXPECT_TRUE(ReportedError(diags, "unexpected character '''", 1, "5.2"));
@@ -403,12 +398,6 @@ TEST(NumberTokenLexing, ErrorUnderscoreLeadingDigitValueHex) {
       "5.7.1"));
 }
 
-// A.8.7 gives `decimal_number` the alternative `[ size ] decimal_base
-// unsigned_number`, and its other three alternatives require an
-// unsigned_number, an x_digit or a z_digit just as squarely, so no
-// decimal_number is written without a value. `8'd;` is that source. `8'd-6`
-// does carry a value and breaches the separate §5.7.1 sentence about a sign
-// between the base format and the number, so it cannot stand for this rule.
 TEST(NumberTokenLexing, ErrorDecimalNoValueDigits) {
   auto diags = LexDiagnostics("8'd;");
   EXPECT_TRUE(ReportedError(diags, "missing value digits after base specifier",
@@ -434,12 +423,6 @@ TEST(NumberTokenLexing, BinaryValueWithQuestion) {
   EXPECT_EQ(r.token.kind, TokenKind::kIntLiteral);
 }
 
-// A.8.7 derives a fixed_point_number as an unsigned_number, a point and an
-// unsigned_number, so a point with a digit on one side only, the four invalid
-// forms §5.7.2 lists, is derived by no production. The lexer reads each as the
-// one real literal it was written to be and reports it under §5.7.2, rather
-// than handing the parser a point or an integer that the grammar would then
-// reject for a reason of its own.
 TEST(NumberTokenLexing, RealLeadingDotIsOneReportedRealToken) {
   auto tokens = Lex(".12 ");
   ASSERT_GE(tokens.size(), 1u);
@@ -500,12 +483,6 @@ TEST(NumberTokenLexing, RealFracExpNoSign) {
   EXPECT_EQ(r.token.text, "1.5e10");
 }
 
-// A.8.7 lists `'0`, `'1`, `'x`, `'X`, `'z` and `'Z` and nothing else, so `'?`
-// is no unbased unsigned literal even though §5.7.1 admits ? as a value digit
-// after a base specifier. Lexer::LexApostrophe leaves the apostrophe to
-// Lexer::LexOperator, which reports it. The case fails if the lexer accepts
-// `'?` as a literal, or rejects it under some other rule than the §5.2
-// unexpected character.
 TEST(NumberTokenLexing, ApostropheQuestionNotUnbasedUnsized) {
   auto diags = LexDiagnostics("'? ");
   EXPECT_TRUE(ReportedError(diags, "unexpected character '''", 1, "5.2"));

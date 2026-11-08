@@ -5,20 +5,8 @@
 
 using namespace delta;
 
-// §29.3.3 Sequential UDP initial statement.
-//
-// The clause text defines the *syntax* of the sequential UDP initial
-// statement: it begins with the `initial` keyword and the following statement
-// shall be an assignment of a single-bit literal value to the output port. The
-// statement records the value the output takes when simulation begins; the
-// simulation-start mechanics themselves belong to §29.7 (Sequential UDP
-// initialization), so this clause is observed entirely at the parser stage in
-// src/parser/parser_toplevel.cpp (ParseUdpDecl).
-
 namespace {
 
-// S2 + value capture: the statement begins with `initial`, and the parser
-// captures the single-bit literal the output assumes at simulation start.
 TEST(UdpSequentialInitial, InitialKeywordIntroducesAssignment) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -36,8 +24,6 @@ TEST(UdpSequentialInitial, InitialKeywordIntroducesAssignment) {
   EXPECT_EQ(udp->initial_value, '1');
 }
 
-// init_val bare-literal form: 0 and 1 are accepted single-bit literals, a
-// distinct grammar branch from the sized 1'b? forms.
 TEST(UdpSequentialInitial, BareZeroAndOneAreSingleBitLiterals) {
   auto r0 = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -62,10 +48,6 @@ TEST(UdpSequentialInitial, BareZeroAndOneAreSingleBitLiterals) {
   EXPECT_EQ(r1.cu->udps[0]->initial_value, '1');
 }
 
-// S3 facet, the value being a single-bit literal: the value may be the unknown
-// state x. §29.2 gives the output three states (0, 1, x), so the initial
-// statement must admit an x-valued single-bit literal, distinct from the 0/1
-// forms.
 TEST(UdpSequentialInitial, UnknownSingleBitLiteralIsAccepted) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -81,9 +63,6 @@ TEST(UdpSequentialInitial, UnknownSingleBitLiteralIsAccepted) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// S3 facet, the value being a single-bit literal: the capital base letter and
-// capital value digit form the same single-bit literal, a distinct lexical
-// branch that the parser accepts and folds to the same captured value.
 TEST(UdpSequentialInitial, CapitalBaseAndDigitSingleBitLiteral) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -98,9 +77,6 @@ TEST(UdpSequentialInitial, CapitalBaseAndDigitSingleBitLiteral) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '1');
 }
 
-// S3 facet, the value being a single-bit literal: the sized form carrying value
-// 0. This exercises the sized-base branch with a 0 digit, distinct from the
-// bare `0` literal branch and from the sized value-1 form.
 TEST(UdpSequentialInitial, SizedZeroSingleBitLiteral) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -115,9 +91,6 @@ TEST(UdpSequentialInitial, SizedZeroSingleBitLiteral) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, '0');
 }
 
-// S3 facet, the value being a single-bit literal: an upper-case X value digit
-// denotes the same unknown state as lower-case x. This exercises the
-// value-capture path that folds the upper-case digit down to the canonical 'x'.
 TEST(UdpSequentialInitial, UpperCaseUnknownDigitFoldsToX) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -132,8 +105,6 @@ TEST(UdpSequentialInitial, UpperCaseUnknownDigitFoldsToX) {
   EXPECT_EQ(r.cu->udps[0]->initial_value, 'x');
 }
 
-// S3 facet "literal": the value must be a literal, so a named reference on the
-// right-hand side (not one of the accepted literal forms) is rejected.
 TEST(UdpSequentialInitial, NonLiteralValueIsRejected) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -148,8 +119,6 @@ TEST(UdpSequentialInitial, NonLiteralValueIsRejected) {
       "29.3.3"));
 }
 
-// S3 facet, the assignment being to the output port: the assignment target must
-// be the output port, not an input.
 TEST(UdpSequentialInitial, AssignmentMustTargetOutputPort) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -163,8 +132,6 @@ TEST(UdpSequentialInitial, AssignmentMustTargetOutputPort) {
       "29.3.3"));
 }
 
-// S3 facet, the value being a single-bit literal: a multi-bit literal is
-// rejected.
 TEST(UdpSequentialInitial, MultiBitLiteralIsRejected) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -179,8 +146,6 @@ TEST(UdpSequentialInitial, MultiBitLiteralIsRejected) {
       "29.3.3"));
 }
 
-// S3 facet, the statement being an assignment: a procedural block is not a
-// plain assignment and is rejected.
 TEST(UdpSequentialInitial, BlockStatementIsRejected) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -194,9 +159,6 @@ TEST(UdpSequentialInitial, BlockStatementIsRejected) {
       2, "29.3.3"));
 }
 
-// §29.3.3: the initial statement assigns one single-bit literal. Only the
-// right-hand side's first token was checked, so a literal followed by more of
-// an expression passed, its value taken from its last token.
 TEST(UdpSequentialInitial, ExpressionOpeningWithALiteralIsRejected) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"

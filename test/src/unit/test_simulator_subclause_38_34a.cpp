@@ -32,8 +32,6 @@ class VpiPutValueSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.34: vpiNoDelay sets the object to the passed value immediately. With no
-// vpiReturnEvent bit and no delay, the return value is NULL.
 TEST_F(VpiPutValueSim, PutValueNoDelay) {
   auto* var = sim_ctx_.CreateVariable("d", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -50,7 +48,6 @@ TEST_F(VpiPutValueSim, PutValueNoDelay) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §38.34: a put with vpiInertialDelay applies the value to the object.
 TEST_F(VpiPutValueSim, PutValueInertialDelay) {
   auto* var = sim_ctx_.CreateVariable("di", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -68,7 +65,6 @@ TEST_F(VpiPutValueSim, PutValueInertialDelay) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §38.34: a value supplied in vpiRealVal format is accepted.
 TEST_F(VpiPutValueSim, PutValueRealFormat) {
   auto* var = sim_ctx_.CreateVariable("rf", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -82,8 +78,6 @@ TEST_F(VpiPutValueSim, PutValueRealFormat) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §38.34: a value supplied in vpiScalarVal format is accepted on a one-bit
-// object.
 TEST_F(VpiPutValueSim, PutValueScalarFormat) {
   auto* var = sim_ctx_.CreateVariable("sf", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -98,9 +92,6 @@ TEST_F(VpiPutValueSim, PutValueScalarFormat) {
   EXPECT_EQ(var->value.words[0].bval & 1, 0u);
 }
 
-// §38.34: when vpiReturnEvent is set together with a delay that schedules an
-// event, the routine returns a handle of type vpiSchedEvent for that event, and
-// the event reports itself as scheduled.
 TEST_F(VpiPutValueSim, ReturnEventWithDelayReturnsSchedEventHandle) {
   auto* var = sim_ctx_.CreateVariable("re", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -120,8 +111,6 @@ TEST_F(VpiPutValueSim, ReturnEventWithDelayReturnsSchedEventHandle) {
   EXPECT_EQ(vpi_get(vpiScheduled, ev), 1);
 }
 
-// §38.34: vpiReturnEvent with no delay (vpiNoDelay) schedules nothing, so the
-// return value is NULL.
 TEST_F(VpiPutValueSim, ReturnEventWithoutDelayReturnsNull) {
   auto* var = sim_ctx_.CreateVariable("rn", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -135,9 +124,6 @@ TEST_F(VpiPutValueSim, ReturnEventWithoutDelayReturnsNull) {
   EXPECT_EQ(ev, nullptr);
 }
 
-// §38.34: even when a delay schedules an event, the return value is NULL unless
-// the vpiReturnEvent bit mask was requested. Here a delayed put without the
-// mask returns NULL.
 TEST_F(VpiPutValueSim, DelayWithoutReturnEventReturnsNull) {
   auto* var = sim_ctx_.CreateVariable("dn", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -154,9 +140,6 @@ TEST_F(VpiPutValueSim, DelayWithoutReturnEventReturnsNull) {
   EXPECT_EQ(ev, nullptr);
 }
 
-// §38.34 (input form): vpiPureTransportDelay is a named delay mode of its own
-// (transport delay that removes no events); a put using it applies the value to
-// an ordinary object just like the other scheduled delay modes.
 TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
   auto* var = sim_ctx_.CreateVariable("dp", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -174,11 +157,6 @@ TEST_F(VpiPutValueSim, PutValuePureTransportDelay) {
   EXPECT_EQ(var->value.ToUint64(), 55u);
 }
 
-// §38.34 (input form): vpiTransportDelay is the third named scheduled delay
-// mode (modified transport delay); like the other scheduled modes it applies
-// the passed value to an ordinary object. The companion
-// DelayWithoutReturnEventReturnsNull already checks its NULL return; this
-// checks the value is actually written.
 TEST_F(VpiPutValueSim, PutValueTransportDelay) {
   auto* var = sim_ctx_.CreateVariable("dt", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -196,11 +174,6 @@ TEST_F(VpiPutValueSim, PutValueTransportDelay) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §38.34: putting a value to a vpiNet with one of the delay modes overrides the
-// net's resolved value. The override holds until a driver changes value, at
-// which point the net is reevaluated by the normal resolution algorithm. Here
-// the put overrides the resolved value, then a fresh driver plus a resolution
-// pass replaces it - the override is no longer in effect.
 TEST_F(VpiPutValueSim, NetPutOverridesResolvedValueUntilDriverChanges) {
   Net* net = sim_ctx_.CreateNet("nw", NetType::kWire, 32);
   ASSERT_NE(net, nullptr);
@@ -213,19 +186,13 @@ TEST_F(VpiPutValueSim, NetPutOverridesResolvedValueUntilDriverChanges) {
   val.format = vpiIntVal;
   val.value.integer = 123;
   vpi_put_value(VpiHandleOf(h), &val, nullptr, vpiNoDelay);
-  // The supplied value overrides the resolved value of the net.
   EXPECT_EQ(net->resolved->value.ToUint64(), 123u);
 
-  // A driver changes value and the net is reevaluated: normal resolution wins
-  // and the override no longer stands.
   net->drivers.push_back(MakeLogic4VecVal(arena_, 32, 5));
   net->Resolve(arena_);
   EXPECT_EQ(net->resolved->value.ToUint64(), 5u);
 }
 
-// §38.34: a scheduled event is cancelled by calling the routine with the
-// vpiSchedEvent handle and vpiCancelEvent; afterwards vpi_get(vpiScheduled)
-// reports it is no longer in the queue. value_p and time_p are not needed.
 TEST_F(VpiPutValueSim, CancelEventClearsScheduled) {
   auto* var = sim_ctx_.CreateVariable("ce", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -248,8 +215,6 @@ TEST_F(VpiPutValueSim, CancelEventClearsScheduled) {
   EXPECT_EQ(vpi_get(vpiScheduled, ev), 0);
 }
 
-// §38.34: it shall not be an error to cancel an event that has already occurred
-// - cancelling a handle that is no longer scheduled simply does nothing.
 TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
   auto* var = sim_ctx_.CreateVariable("co", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -266,8 +231,6 @@ TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
       vpi_put_value(h, &val, &time, vpiInertialDelay | vpiReturnEvent);
   ASSERT_NE(ev, nullptr);
 
-  // Cancel once (the event leaves the queue), then cancel again: still no
-  // error.
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
   s_vpi_error_info info = {};
   vpi_put_value(ev, nullptr, nullptr, vpiCancelEvent);
@@ -275,9 +238,6 @@ TEST_F(VpiPutValueSim, CancelAlreadyOccurredIsNotError) {
   EXPECT_EQ(vpi_get(vpiScheduled, ev), 0);
 }
 
-// §38.34: vpiForceFlag forces the passed value onto the object - the same
-// operation as a procedural force (10.6.2) - so the object holds the value and
-// is marked forced.
 TEST_F(VpiPutValueSim, ForceFlagForcesValue) {
   auto* var = sim_ctx_.CreateVariable("ff", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -294,8 +254,6 @@ TEST_F(VpiPutValueSim, ForceFlagForcesValue) {
   EXPECT_EQ(var->forced_value.ToUint64(), 42u);
 }
 
-// §38.34: vpiReleaseFlag releases a forced value (the procedural release of
-// 10.6.2) and updates value_p with the object's value after the release.
 TEST_F(VpiPutValueSim, ReleaseFlagReleasesAndUpdatesValue) {
   auto* var = sim_ctx_.CreateVariable("rl", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -316,8 +274,6 @@ TEST_F(VpiPutValueSim, ReleaseFlagReleasesAndUpdatesValue) {
   EXPECT_EQ(out.value.integer, 9);
 }
 
-// §38.34: putting to a vpiNamedEvent object toggles (triggers) the named event,
-// and value_p may be NULL because the event needs no value.
 TEST_F(VpiPutValueSim, NamedEventToggleAcceptsNullValue) {
   auto* var = sim_ctx_.CreateVariable("ne", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -333,8 +289,6 @@ TEST_F(VpiPutValueSim, NamedEventToggleAcceptsNullValue) {
   EXPECT_EQ(var->triggered_ticks, scheduler_.CurrentTime().ticks);
 }
 
-// §38.34: it is illegal to put a value in vpiStringVal format to a real object;
-// the put is rejected and recorded as an error.
 TEST_F(VpiPutValueSim, StringFormatToRealIsIllegal) {
   auto* var = sim_ctx_.CreateVariable("sr", 64);
   var->value = MakeLogic4VecVal(arena_, 64, 0);
@@ -351,8 +305,6 @@ TEST_F(VpiPutValueSim, StringFormatToRealIsIllegal) {
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// §38.34: it is illegal to put a value in vpiStrengthVal format to a vector
-// object (one wider than a single bit).
 TEST_F(VpiPutValueSim, StrengthFormatToVectorIsIllegal) {
   auto* var = sim_ctx_.CreateVariable("sv", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -367,8 +319,6 @@ TEST_F(VpiPutValueSim, StrengthFormatToVectorIsIllegal) {
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// §38.34 (edge): the vpiStrengthVal restriction is scoped to vector objects, so
-// supplying that format for a one-bit object is not flagged as an error.
 TEST_F(VpiPutValueSim, StrengthFormatToScalarIsNotIllegal) {
   auto* var = sim_ctx_.CreateVariable("ss", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -383,8 +333,6 @@ TEST_F(VpiPutValueSim, StrengthFormatToScalarIsNotIllegal) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// §38.34 (edge): the vpiStringVal restriction is scoped to real objects, so
-// supplying that format for an ordinary (non-real) object is not flagged.
 TEST_F(VpiPutValueSim, StringFormatToNonRealIsNotIllegal) {
   auto* var = sim_ctx_.CreateVariable("sn", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0);
@@ -400,8 +348,6 @@ TEST_F(VpiPutValueSim, StringFormatToNonRealIsNotIllegal) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// §38.34 (edge): vpiCancelEvent acts only on a vpiSchedEvent handle. Asking to
-// cancel through an ordinary object handle leaves it alone and raises no error.
 TEST_F(VpiPutValueSim, CancelOnNonSchedEventHandleIsNoError) {
   auto* var = sim_ctx_.CreateVariable("cn", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 7);
@@ -418,8 +364,6 @@ TEST_F(VpiPutValueSim, CancelOnNonSchedEventHandleIsNoError) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §38.34: a put to a sequential UDP with a scheduled delay mode (here
-// vpiTransportDelay) is an error - such an object accepts only vpiNoDelay.
 TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
   auto* var = sim_ctx_.CreateVariable("up", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -440,14 +384,9 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsDelayMode) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  // The rejected put left the object unchanged.
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
 
-// §38.34 (input form): the sequential-UDP delay restriction covers every
-// scheduled delay mode, not just vpiTransportDelay. Putting with
-// vpiPureTransportDelay - another of the delay modes the clause names - is
-// likewise an error, and the UDP is left unchanged.
 TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
   auto* var = sim_ctx_.CreateVariable("uq", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -471,10 +410,6 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsPureTransportDelay) {
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
 
-// §38.34 (input form): the sequential-UDP restriction rejects vpiInertialDelay
-// as well - it is the last of the three scheduled delay modes, and none of them
-// is allowed on a sequential UDP, which accepts only vpiNoDelay. The put is an
-// error and the object is left unchanged.
 TEST_F(VpiPutValueSim, SequentialUdpRejectsInertialDelay) {
   auto* var = sim_ctx_.CreateVariable("ui", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -498,8 +433,6 @@ TEST_F(VpiPutValueSim, SequentialUdpRejectsInertialDelay) {
   EXPECT_EQ(var->value.words[0].aval & 1, 0u);
 }
 
-// §38.34: the same sequential UDP accepts a value when the required vpiNoDelay
-// flag is used, applying it with no error.
 TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
   auto* var = sim_ctx_.CreateVariable("ua", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -520,11 +453,8 @@ TEST_F(VpiPutValueSim, SequentialUdpAcceptsNoDelay) {
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 
-// §38.34 with Table 38-3: a value in any format the table lists is decoded
-// into every word of the object it is put to (#5101).
 class VpiPutValueFormats : public VpiPutValueSim {
  protected:
-  // The variable `name`, `width` bits wide and 0, after `value` is put to it.
   const Logic4Vec& PutTo(const char* name, uint32_t width, s_vpi_value value) {
     auto* var = sim_ctx_.CreateVariable(name, width);
     var->value = MakeLogic4VecVal(arena_, width, 0);
@@ -568,7 +498,7 @@ TEST_F(VpiPutValueFormats, ANegativeDecimalStringIsTwosComplement) {
 TEST_F(VpiPutValueFormats, ADecimalStringReachesPastTheFirstWord) {
   s_vpi_value val = {};
   val.format = vpiDecStrVal;
-  val.value.str = VpiText("18446744073709551621");  // 2^64 + 5
+  val.value.str = VpiText("18446744073709551621");
   const Logic4Vec& v = PutTo("dw", 72, val);
   ASSERT_EQ(v.nwords, 2u);
   EXPECT_EQ(v.words[0].aval, 5u);
@@ -616,9 +546,6 @@ TEST_F(VpiPutValueFormats, ANegativeIntegerFillsAWideObject) {
   EXPECT_EQ(v.words[1].aval, 0xFFFFFFFFu);
 }
 
-// §38.34: with a null handle there is nothing to write, and a put of no
-// value to a variable, which needs one, writes nothing; neither hands back a
-// handle.
 TEST_F(VpiPutValueSim, ANullHandleOrValueWritesNothing) {
   auto* var = sim_ctx_.CreateVariable("nh", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 3);
@@ -634,9 +561,6 @@ TEST_F(VpiPutValueSim, ANullHandleOrValueWritesNothing) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §38.34: outside a run, with no scheduler to note it in, a put to a net
-// with no storage of its own and a put triggering a named event write
-// nothing and stamp no trigger time.
 TEST_F(VpiPutValueSim, APutWithNoSchedulerNotesNothing) {
   Net bare;
   vpiHandle net = VpiHandleOf(vpi_ctx_.CreateNetObj("bare", &bare, 8));
@@ -654,8 +578,6 @@ TEST_F(VpiPutValueSim, APutWithNoSchedulerNotesNothing) {
   EXPECT_EQ(event->triggered_ticks, UINT64_MAX);
 }
 
-// §38.34: with a scheduler to note it in but no run to resume processes in, a
-// put to a named event stamps the event's trigger time and nothing more.
 TEST_F(VpiPutValueSim, AnEventPutWithNoRunStampsItsTriggerTime) {
   Variable event;
   event.is_event = true;
@@ -668,11 +590,6 @@ TEST_F(VpiPutValueSim, AnEventPutWithNoRunStampsItsTriggerTime) {
   EXPECT_EQ(event.triggered_ticks, scheduler_.CurrentTime().ticks);
 }
 
-// §38.34: a delay mode takes its delay from time_p, a delay being present
-// when the time is nonzero in its high word, its low word or its real value,
-// and absent when no time is given or the time is zero throughout, the write
-// then made at once. A present
-// delay with vpiReturnEvent hands back the scheduled event's handle.
 TEST_F(VpiPutValueSim, ADelayIsPresentWhereAnyPartOfTheTimeIsNonzero) {
   auto* var = sim_ctx_.CreateVariable("dl", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0);
@@ -699,8 +616,6 @@ TEST_F(VpiPutValueSim, ADelayIsPresentWhereAnyPartOfTheTimeIsNonzero) {
   EXPECT_EQ(vpi_put_value(h, &val, &zero, kFlags), nullptr);
 }
 
-// §38.36.2 with §4.4.2.9: a cbReadOnlySynch routine writes no value, but a
-// cancel writes none, so a cancel made then is no error.
 TEST_F(VpiPutValueSim, ACancelFromAReadOnlySynchCallbackIsNoError) {
   auto* var = sim_ctx_.CreateVariable("cn", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 1);
@@ -714,8 +629,6 @@ TEST_F(VpiPutValueSim, ACancelFromAReadOnlySynchCallbackIsNoError) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// §38.34: vpiReleaseFlag outside a run, with no net solver to hand the release
-// to, clears the forced state the force set.
 TEST_F(VpiPutValueSim, ReleaseOutsideARunClearsTheForce) {
   auto* var = sim_ctx_.CreateVariable("rr0", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0);

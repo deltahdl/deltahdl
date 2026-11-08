@@ -25,10 +25,6 @@ SpecifyItem* FindPathpulseInSpecify(ModuleDecl* mod) {
   return nullptr;
 }
 
-// Every specparam item the specify block of `mod` declares, in declaration
-// order. §30.7.1's worked example writes its three PATHPULSE$ specparams as one
-// comma-separated declaration, so a case about that declaration has to read the
-// whole list rather than the first item FindPathpulseInSpecify answers with.
 std::vector<SpecifyItem*> CollectSpecparamsInSpecify(ModuleDecl* mod) {
   std::vector<SpecifyItem*> out;
   auto* spec = FindSpecifyBlock(mod->items);
@@ -39,8 +35,6 @@ std::vector<SpecifyItem*> CollectSpecparamsInSpecify(ModuleDecl* mod) {
   return out;
 }
 
-// Syntax 30-7 first alternative (PATHPULSE$ = ( reject )): a lone reject limit
-// produces a module-wide pathpulse specparam with no error limit.
 TEST(PulseControlSpecparamParsing, PathpulseRejectOnlyExtraction) {
   auto r = Parse(
       "module m;\n"
@@ -59,9 +53,6 @@ TEST(PulseControlSpecparamParsing, PathpulseRejectOnlyExtraction) {
   EXPECT_EQ(item->pathpulse_error, nullptr);
 }
 
-// Syntax 30-7 second alternative
-// (PATHPULSE$ input $ output = ( ... )): the input and output terminal
-// descriptors are captured for a path-specific specparam.
 TEST(PulseControlSpecparamParsing, PathpulseExtractsInputOutputTerminals) {
   auto r = Parse(
       "module m;\n"
@@ -80,8 +71,6 @@ TEST(PulseControlSpecparamParsing, PathpulseExtractsInputOutputTerminals) {
   EXPECT_NE(item->pathpulse_error, nullptr);
 }
 
-// limit_value ::= constant_mintypmax_expression: each limit may be a full
-// min:typ:max triple.
 TEST(PulseControlSpecparamParsing, PathpulseMintypmaxExpressionPreserved) {
   auto r = Parse(
       "module m;\n"
@@ -99,10 +88,6 @@ TEST(PulseControlSpecparamParsing, PathpulseMintypmaxExpressionPreserved) {
   EXPECT_EQ(item->pathpulse_error->kind, ExprKind::kMinTypMax);
 }
 
-// limit_value ::= constant_mintypmax_expression: a limit need not be a bare
-// literal. A constant expression built from an identifier operand (e.g. a
-// specparam per 11.2.1) and an operator is accepted and preserved as the
-// reject-limit expression.
 TEST(PulseControlSpecparamParsing, PathpulseConstantExpressionLimit) {
   auto r = Parse(
       "module m;\n"
@@ -120,8 +105,6 @@ TEST(PulseControlSpecparamParsing, PathpulseConstantExpressionLimit) {
   EXPECT_EQ(item->pathpulse_error, nullptr);
 }
 
-// The PATHPULSE$ specparam form is also accepted in a module-level specparam
-// declaration, exercising the separate specparam-declaration parse path.
 TEST(PulseControlSpecparamParsing, PulseControlSpecparamModuleLevel) {
   auto r = Parse(
       "module m;\n"
@@ -131,20 +114,12 @@ TEST(PulseControlSpecparamParsing, PulseControlSpecparamModuleLevel) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Errors a run reported, however many there were.
 size_t ErrorCount(const std::vector<Diagnostic>& diags) {
   return static_cast<size_t>(std::count_if(
       diags.begin(), diags.end(),
       [](const Diagnostic& d) { return d.severity == DiagSeverity::kError; }));
 }
 
-// §30.7.1 (printed page 887): a PATHPULSE$ specparam's terminals follow the
-// rules for module path inputs and outputs, except that neither may select a
-// bit or a part of a vector. Syntax 30-7 builds the name out of two terminal
-// descriptors, each admitting a range, so `PATHPULSE$a[0]$b` is that syntax
-// with the select the restriction forbids, and it is reported under it, once,
-// at the select. Read as an identifier ended by the bracket, it drew four parse
-// errors under §6.20.5, §11.2 and §30.3, none naming the rule.
 TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -159,8 +134,6 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBeBitOrPartSelect) {
   EXPECT_EQ(ErrorCount(r.diags), 1U);
 }
 
-// The part-select form, and a select on the output terminal, each reported the
-// same way; the specparam after them still parses.
 TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -181,17 +154,6 @@ TEST(PulseControlSpecparamParsing, TerminalCannotBePartSelect) {
   EXPECT_EQ(ErrorCount(r.diags), 2U);
 }
 
-// §30.7.1's own worked example, printed on page 888 and reproduced here
-// verbatim -- the blank line, the `(2,9)` written without a space, and the
-// final `PATHPULSE$ = 3;` written with no parentheses. Syntax 30-7 and A.2.4
-// both parenthesize the limit list, and §1.10 makes the example informative,
-// so that last limit is reported, on line 10 alone, and still read as the
-// reject limit that serves as both. It was accepted.
-//
-// The delays 12, 10 and 4 and the limits 2, 9 and 3 are the example's own
-// numbers, and no two of them coincide, so a value read off the wrong
-// declaration is caught. The 0 in `(0,4)` is the exception: nothing here
-// asserts on it, because an unset limit and a limit of 0 read the same.
 TEST(PulseControlSpecparamParsing,
      StandardExampleUnparenthesizedLimitIsReported) {
   auto r = Parse(
@@ -217,17 +179,10 @@ TEST(PulseControlSpecparamParsing,
   EXPECT_TRUE(specparams[0]->is_pathpulse);
   EXPECT_TRUE(specparams[1]->is_pathpulse);
   EXPECT_TRUE(specparams[2]->is_pathpulse);
-  // The unparenthesized limit is a reject limit alone. §30.7.1: a reject limit
-  // given alone serves as the error limit too, which the null error limit is
-  // what carries.
   EXPECT_NE(specparams[2]->pathpulse_reject, nullptr);
   EXPECT_EQ(specparams[2]->pathpulse_error, nullptr);
 }
 
-// Syntax 30-7 gives both alternatives the same parenthesized limit list, so a
-// path-specific limit written without the parentheses is reported as the
-// nonpath-specific one is, and still read: 3 is the one limit written in this
-// source, so no other value can stand in for it.
 TEST(PulseControlSpecparamParsing, PathSpecificBareLimitIsReported) {
   auto r = Parse(
       "module m;\n"

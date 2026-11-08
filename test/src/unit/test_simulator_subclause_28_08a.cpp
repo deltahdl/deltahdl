@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §28.8 (printed page 840): both bidirectional terminals always carry signals
-// into and out of the device, in either direction, so a tran carries whichever
-// side is driven to the other, and neither side once nothing drives either.
 TEST(BidirSwitchRun, TranConductsInBothDirections) {
   SimFixture f;
   auto out = RunCapture(
@@ -36,11 +33,6 @@ TEST(BidirSwitchRun, TranConductsInBothDirections) {
             "a=z b=z\n");
 }
 
-// §28.8: a tranif1 conducts while its control is 1 and a tranif0 while it is
-// 0, each blocking otherwise; with the control x, §4.9.5 (printed page 71) has
-// the network solved for every combination of these transistors fully
-// conducting or not, and a node with no single logic level across all of them
-// -- 1 when on, z when off -- is x.
 TEST(BidirSwitchRun, TranifFollowsItsControl) {
   SimFixture f;
   auto out = RunCapture(
@@ -65,8 +57,6 @@ TEST(BidirSwitchRun, TranifFollowsItsControl) {
             "b1=x b0=x\n");
 }
 
-// §28.8: the control input is a 4-state net, a 4-state variable or a 2-state
-// variable. A bit control turns the switch on and off as a logic one does.
 TEST(BidirSwitchRun, TranifControlMayBeATwoStateVariable) {
   SimFixture f;
   auto out = RunCapture(
@@ -87,10 +77,6 @@ TEST(BidirSwitchRun, TranifControlMayBeATwoStateVariable) {
             "b=z\n");
 }
 
-// §28.8: the first delay is the control input's turn-on delay and the second
-// its turn-off delay, with no delay through the terminals themselves: a tranif1
-// #(3, 5) turned on at 0, off at 4 and on again at 10 passes its driven side at
-// 3, stops at 9 and passes again at 13.
 TEST(BidirSwitchRun, TranifTurnsOnAndOffAfterItsDelays) {
   SimFixture f;
   auto out = RunCapture(
@@ -113,9 +99,6 @@ TEST(BidirSwitchRun, TranifTurnsOnAndOffAfterItsDelays) {
             "t=13 b=1\n");
 }
 
-// §28.13 and §28.14 (printed page 855): a tran, tranif0 or tranif1 passes a
-// signal's strength but for supply, which it reduces to strong, and an rtran
-// or rtranif1 reduces it by Table 28-8 -- strong to pull, pull to weak.
 TEST(BidirSwitchRun, SwitchesPassOrReduceStrength) {
   SimFixture f;
   auto out = RunCapture(
@@ -137,11 +120,6 @@ TEST(BidirSwitchRun, SwitchesPassOrReduceStrength) {
   EXPECT_EQ(out, "a=1 St1 b=1 Pu1 c=0 We0 d=1 St1\n");
 }
 
-// §28.8: switches in series join every net along them, a resistive one
-// reducing the strength at each crossing, and the nets a tran joins resolve
-// their drivers together (§28.12.1), the pull 1 overcoming the weak 0 on both
-// sides; a tran inside an instance joins the nets its ports are connected
-// to.
 TEST(BidirSwitchRun, SwitchesChainAndResolveTheirNetsTogether) {
   SimFixture f;
   auto out = RunCapture(
@@ -167,9 +145,6 @@ TEST(BidirSwitchRun, SwitchesChainAndResolveTheirNetsTogether) {
   EXPECT_EQ(out, "c=St1 f=We1 g=Pu1 h=Pu1 n=St0\n");
 }
 
-// §28.8: tran, tranif1 and tranif0 devices may be connected to nets of
-// user-defined net types as well, and such a switch passes the value while it
-// conducts.
 TEST(BidirSwitchRun, TranifJoinsNetsOfAUserDefinedNetType) {
   SimFixture f;
   auto out = RunCapture(
@@ -185,11 +160,6 @@ TEST(BidirSwitchRun, TranifJoinsNetsOfAUserDefinedNetType) {
   EXPECT_EQ(out, "b=1\n");
 }
 
-// §28.8 admits a bit-select of a vector net as a bidirectional terminal, the
-// only form a resistive switch's terminal takes besides a scalar net, and the
-// switch conducts between that one bit and its other terminal in both
-// directions. Lowered only for a terminal naming a whole net, every switch
-// below was dropped and both scalars read z.
 TEST(BidirSwitchRun, ABitSelectTerminalConducts) {
   SimFixture f;
   auto out = RunCapture(
@@ -217,8 +187,6 @@ TEST(BidirSwitchRun, ABitSelectTerminalConducts) {
             "z01z\n");
 }
 
-// The two terminals of one switch may be two bits of the same vector net, and
-// the switch carries the value driven on either bit to the other.
 TEST(BidirSwitchRun, ASwitchJoiningTwoBitsOfOneNetConducts) {
   SimFixture f;
   auto out = RunCapture(
@@ -232,11 +200,6 @@ TEST(BidirSwitchRun, ASwitchJoiningTwoBitsOfOneNetConducts) {
   EXPECT_EQ(out, "1z1\n");
 }
 
-// Switches that conduct join their terminals into one network, and a chain of
-// them carries a signal from end to end whether or not a terminal along it is
-// a bit-select: u's strong 1 and v[1]'s strong 0 meet across the four switches
-// below in one network, every net of which carries both. Followed one step
-// from the member alone, a link joining bits stopped the chain at s.
 TEST(BidirSwitchRun, AChainThroughBitSelectTerminalsIsOneNetwork) {
   SimFixture f;
   auto out = RunCapture(
@@ -255,8 +218,6 @@ TEST(BidirSwitchRun, AChainThroughBitSelectTerminalsIsOneNetwork) {
   EXPECT_EQ(out, "xx x x\n");
 }
 
-// The one-bit chain alone: u's 1 crosses two switches to reach v[0], and v[1],
-// which no switch joins, stays undriven.
 TEST(BidirSwitchRun, ASignalCrossesASwitchChainToABitSelectTerminal) {
   SimFixture f;
   auto out = RunCapture(

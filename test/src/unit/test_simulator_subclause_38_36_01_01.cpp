@@ -20,17 +20,6 @@
 namespace delta {
 namespace {
 
-// §38.36.1.1 governs cbStmt callbacks placed on individual statements. It
-// states one registration-time prohibition (a cbStmt callback may not be placed
-// on a statement in a protected portion of the code), one repetition rule
-// (multiple identical registrations produce multiple callbacks), and the fixed
-// contents of the s_cb_data structure delivered to the routine (value always
-// NULL, index always 0, and a NULL time pointer when registered with
-// vpiSuppressTime). These tests observe vpi_register_cb()/DispatchCallbacks()
-// applying those rules.
-
-// Recorder for the contents of the s_cb_data structure the simulator hands to a
-// cbStmt routine, so a test can observe the dispatch-time field guarantees.
 int g_stmt_calls = 0;
 s_vpi_value* g_stmt_value = reinterpret_cast<s_vpi_value*>(1);
 int g_stmt_index = -1;
@@ -61,8 +50,6 @@ class VpiStmtCallback : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Advance the simulation clock to `t` by draining a no-op event scheduled
-  // there; after Run() the scheduler's current time is that slot.
   void AdvanceTo(uint64_t t) {
     auto* ev = scheduler_.GetEventPool().Acquire();
     ev->callback = []() {};
@@ -70,9 +57,6 @@ class VpiStmtCallback : public ::testing::Test {
     scheduler_.Run();
   }
 
-  // Build a handle that stands for a statement (here a named-begin block, one
-  // of the cbStmt-eligible objects). `protect` marks it as residing in a
-  // protected portion of the code.
   vpiHandle MakeStatementHandle(const char* name, bool protect) {
     sim_ctx_.CreateVariable(name, 1);
     vpi_ctx_.Attach(sim_ctx_);
@@ -92,11 +76,8 @@ class VpiStmtCallback : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.36.1.1: placing a cbStmt callback on a statement that resides in a
-// protected portion of the code is not allowed; vpi_register_cb() returns NULL
-// and records an error.
 TEST_F(VpiStmtCallback, ProtectedStatementRejected) {
-  vpiHandle stmt = MakeStatementHandle("p", /*protect=*/true);
+  vpiHandle stmt = MakeStatementHandle("p", true);
   ASSERT_NE(stmt, nullptr);
 
   s_cb_data cb = {};
@@ -108,11 +89,8 @@ TEST_F(VpiStmtCallback, ProtectedStatementRejected) {
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// §38.36.1.1: the prohibition is specific to protected code. A cbStmt callback
-// on an ordinary, unprotected statement is a legal registration and yields a
-// callback handle.
 TEST_F(VpiStmtCallback, UnprotectedStatementAccepted) {
-  vpiHandle stmt = MakeStatementHandle("u", /*protect=*/false);
+  vpiHandle stmt = MakeStatementHandle("u", false);
   ASSERT_NE(stmt, nullptr);
 
   s_cb_data cb = {};
@@ -121,12 +99,8 @@ TEST_F(VpiStmtCallback, UnprotectedStatementAccepted) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// §38.36.1.1: the protected-code prohibition is specific to the cbStmt reason.
-// A callback for another reason (here cbValueChange) placed on the same
-// protected handle is outside this rule, so the cbStmt guard does not reject
-// it.
 TEST_F(VpiStmtCallback, ProtectedHandleRejectionIsSpecificToStmtReason) {
-  vpiHandle stmt = MakeStatementHandle("s", /*protect=*/true);
+  vpiHandle stmt = MakeStatementHandle("s", true);
   ASSERT_NE(stmt, nullptr);
 
   s_cb_data cb = {};
@@ -135,15 +109,12 @@ TEST_F(VpiStmtCallback, ProtectedHandleRejectionIsSpecificToStmtReason) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// §38.36.1.1: multiple calls to vpi_register_cb() with the same data shall
-// result in multiple callbacks. Registering the identical cbStmt data twice and
-// dispatching the reason once invokes the routine twice.
 TEST_F(VpiStmtCallback,
        MultipleIdenticalRegistrationsProduceMultipleCallbacks) {
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
-  cb.obj = MakeStatementHandle("m", /*protect=*/false);
+  cb.obj = MakeStatementHandle("m", false);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -152,15 +123,12 @@ TEST_F(VpiStmtCallback,
   EXPECT_EQ(g_stmt_calls, 2);
 }
 
-// §38.36.1.1: in the s_cb_data delivered to a cbStmt routine the value field is
-// always NULL and the index field is always 0, regardless of what was supplied
-// at registration.
 TEST_F(VpiStmtCallback, DispatchedDataHasNullValueAndZeroIndex) {
   s_vpi_value supplied_value = {};
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
-  cb.obj = MakeStatementHandle("v", /*protect=*/false);
+  cb.obj = MakeStatementHandle("v", false);
   cb.value = &supplied_value;
   cb.index = 5;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
@@ -172,16 +140,13 @@ TEST_F(VpiStmtCallback, DispatchedDataHasNullValueAndZeroIndex) {
   EXPECT_EQ(g_stmt_index, 0);
 }
 
-// §38.36.1.1: when a cbStmt callback was registered with a vpiSuppressTime time
-// type, no time is passed to the routine - the time pointer in the delivered
-// s_cb_data is set to NULL.
 TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
   s_vpi_time t = {};
   t.type = vpiSuppressTime;
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
-  cb.obj = MakeStatementHandle("n", /*protect=*/false);
+  cb.obj = MakeStatementHandle("n", false);
   cb.time = &t;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -191,25 +156,16 @@ TEST_F(VpiStmtCallback, SuppressTimeNullsDispatchedTimePointer) {
   EXPECT_EQ(g_stmt_time, nullptr);
 }
 
-// §38.36.1.1: the NULL-time rule is specific to vpiSuppressTime. When a real
-// time type (here vpiSimTime) is requested, the routine receives a time pointer
-// rather than NULL, and what it points at holds the current simulation time in
-// the type the vpi_register_cb() call asked for. At registration only the type
-// is read, so the low word the application left in its own structure says
-// nothing about when the statement ran: the time the routine reads is the one
-// the simulation had reached as the statement was about to execute. The
-// structure it reads is the dispatch's own, the registration's being left as
-// the application wrote it.
 TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
   AdvanceTo(37);
 
   s_vpi_time t = {};
   t.type = vpiSimTime;
-  t.low = 5;  // not a time of anything: at registration only the type is used
+  t.low = 5;
   s_cb_data cb = {};
   cb.reason = cbStmt;
   cb.cb_rtn = &RecordStmtCb;
-  cb.obj = MakeStatementHandle("c", /*protect=*/false);
+  cb.obj = MakeStatementHandle("c", false);
   cb.time = &t;
   ASSERT_NE(vpi_register_cb(&cb), nullptr);
 
@@ -224,7 +180,6 @@ TEST_F(VpiStmtCallback, DispatchedTimeCarriesTheCurrentSimulationTime) {
   EXPECT_EQ(t.low, 5u);
 }
 
-// The vpiType of the statement each cbStmt delivery named, in order.
 std::vector<int>& StmtsCalledBack() {
   static std::vector<int> kinds;
   return kinds;
@@ -235,7 +190,7 @@ PLI_INT32 RecordStmt(p_cb_data cb) {
   return 0;
 }
 
-PLI_INT32 PlaceModuleWideCbStmt(p_cb_data /*cb*/) {
+PLI_INT32 PlaceModuleWideCbStmt(p_cb_data) {
   s_cb_data data = {};
   data.reason = cbStmt;
   data.cb_rtn = &RecordStmt;
@@ -246,10 +201,6 @@ PLI_INT32 PlaceModuleWideCbStmt(p_cb_data /*cb*/) {
 
 class StmtCallbacksOfARun : public VpiDesignRun {};
 
-// §38.36.1.1 with Table 38-6 and §38.36.1.3: a cbStmt placed on a module is
-// called just before each statement in it executes, with obj that statement:
-// a begin block once before its statements, each assignment, and a delay
-// control when it is reached, before the statement it delays (#5119).
 TEST_F(StmtCallbacksOfARun, ACbStmtIsCalledBeforeEachStatementOfItsModule) {
   StmtsCalledBack().clear();
   s_cb_data data = {};
@@ -264,9 +215,6 @@ TEST_F(StmtCallbacksOfARun, ACbStmtIsCalledBeforeEachStatementOfItsModule) {
                               vpiDelayControl, vpiAssignment}));
 }
 
-// §38.36.1.1: a declaration among a block's statements is no behavioral
-// statement, and the model holds no object for it, so a cbStmt placed on the
-// module is called for the block and the assignments around it alone.
 TEST_F(StmtCallbacksOfARun, ACbStmtPassesOverADeclarationInABlock) {
   StmtsCalledBack().clear();
   s_cb_data data = {};

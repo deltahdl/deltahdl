@@ -10,10 +10,6 @@
 
 using namespace delta;
 
-// Parses `src`, expects a clean parse, then locates the unpacked variable
-// declaration named `var_name` and asserts its single unpacked dimension is an
-// identifier expression whose text equals `expected_index_text` (the
-// associative-array index type name).
 inline void ExpectAssocArrayIdentifierIndexDim(
     const std::string& src, const std::string& var_name,
     const std::string& expected_index_text) {

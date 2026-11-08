@@ -14,27 +14,22 @@
 #include "simulator/eval_systask_internal.h"
 #include "simulator/net.h"
 #include "simulator/sim_context.h"
-#include "simulator/vpi_coverage.h"
-#include "simulator/vpi_coverage_items.h"
-#include "simulator/vpi_globals.h"
-#include "simulator/vpi_internal.h"
-#include "simulator/vpi_model_helpers1.h"
-#include "simulator/vpi_user.h"
-// §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_control_requests.h"
+#include "simulator/vpi_coverage.h"
+#include "simulator/vpi_coverage_items.h"
 #include "simulator/vpi_data_structs.h"
+#include "simulator/vpi_globals.h"
+#include "simulator/vpi_internal.h"
+#include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
-// §38.4: run `task`, a built-in task vpi_control() requested, on return of
-// the application routine that requested it: at once where no routine is
-// running, as when a test calls vpi_control() directly.
 static void OnRoutineReturn(VpiControlRequests& control,
                             std::function<void()> task) {
   if (control.routines_running > 0) {
@@ -44,8 +39,6 @@ static void OnRoutineReturn(VpiControlRequests& control,
   task();
 }
 
-// §20.2: end the run `sim`, where there is one, as $finish (`finish`) or
-// $stop ends it, with the diagnostic message `level` gives.
 static void EndRunAsRequested(SimContext* sim, bool finish, int level) {
   if (sim == nullptr) return;
   EmitFinishDiagnostic(*sim, finish ? "$finish" : "$stop", level, sim->Out());
@@ -60,10 +53,6 @@ void VpiContext::LeaveApplicationRoutine() {
 }
 
 int VpiContext::Control(int operation, int arg0, VpiHandle scope) {
-  // §38.4: vpiFinish/vpiStop request the matching built-in task on return of
-  // the application routine and carry its diagnostic message level (see 20.2).
-  // §20.2: the run ends as $finish ends it, at that level; it is suspended as
-  // $stop suspends it, which a run with no interactive phase ends.
   if (operation == kVpiFinish || operation == kVpiStop) {
     const bool kFinish = operation == kVpiFinish;
     (kFinish ? control_.finish_requested : control_.stop_requested) = true;
@@ -73,33 +62,22 @@ int VpiContext::Control(int operation, int arg0, VpiHandle scope) {
     });
     return 1;
   }
-  // §38.4: vpiSetInteractiveScope immediately retargets the tool's interactive
-  // scope to the supplied handle, which names an object of the vpiScope class
-  // (§37.12); with no such object there is no scope to change to.
   if (operation == kVpiSetInteractiveScope) {
     if (scope == nullptr || !VpiIsScopeObject(scope)) return 0;
     NoteInteractiveScope(scope);
     return 1;
   }
-  // §38.4: any other operation fails. vpiReset is among them: it asks for
-  // $reset, which this implementation is without, as Annex D.1 allows.
   return 0;
 }
 
 void VpiContext::NoteInteractiveScope(VpiHandle scope) {
   control_.interactive_scope = scope;
-  // §38.4: the scope the tool's interactive tasks name objects from, which
-  // $scope sets too (D.11).
   if (sim_ctx_ != nullptr) sim_ctx_->SetInteractiveScope(scope->full_name);
-  // §38.36.3: a change of the interactive scope is what a
-  // cbInteractiveScopeChange callback is called for, obj the new scope.
   DispatchCallbacks(kCbInteractiveScopeChange, scope);
 }
 
 namespace {
 
-// §40.5.3: map a Start/Stop/Reset/Check coverage-control operation onto the
-// matching CoverageControl request.
 CoverageControl CoverageControlForOperation(int operation) {
   switch (operation) {
     case vpiCoverageStart:
@@ -126,16 +104,6 @@ std::string CoverageScopeName(const VpiObject* scope_handle) {
   return std::string(scope_handle->name);
 }
 
-// §40.5.1's coverage type properties name the same four coverage types §40.3.1
-// names with its `SV_COV_* macros, and §40.5.3 has the VPI operations carry the
-// semantics of the system functions that take those macros. One coverage of one
-// type, then, whichever door it is reached through - so a property arriving
-// through VPI is put into the terms the coverage state is keyed in before it
-// reaches the state. Untranslated, a database saved by $coverage_save under
-// `SV_COV_ASSERTION held nothing a vpi_control(vpiCoverageMerge,
-// vpiAssertCoverage, ...) could find, and a database saved through VPI was as
-// invisible to $coverage_merge, each reporting `SV_COV_NOCOV over coverage the
-// other had just recorded.
 std::optional<int> CoverageTypeForVpiProperty(int property) {
   switch (property) {
     case vpiAssertCoverage:
@@ -151,25 +119,7 @@ std::optional<int> CoverageTypeForVpiProperty(int property) {
   }
 }
 
-// §40.5.3: statement, toggle, and FSM coverage are not individually
-// controllable, so the Start/Stop/Reset/Check actions act on the scope the
-// handle names as a whole rather than on any per-statement, per-signal, or
-// per-FSM object. The return is the §40.3.1 status value the equivalent system
-// function produces, so the detailed outcome -- and the collection-state change
-// it reflects -- is observable to the caller.
 CoverageControlState& VpiContext::GetCoverageControlState() {
-  // §40.2 defines SystemVerilog's one coverage API, of which §40.5's routines
-  // are the VPI extension rather than a second one, and §40.5.3 gives its
-  // controls the meaning $coverage_control() has. So
-  // what a PLI application starts, stops, resets or reads is the coverage of
-  // the run it is loaded into: the state the SimContext keeps, which the
-  // language's own access functions of §40.3.2 answer out of. Two stores would
-  // have meant a design whose $coverage_get reported nothing of what a PLI
-  // application had been collecting, and the reverse.
-  //
-  // A context with no run attached - a PLI application reaching the routines
-  // before a design is there, and a test that stands a VpiContext up alone -
-  // has this context's own state to work in instead.
   if (sim_ctx_ != nullptr) return sim_ctx_->GetCoverageControlState();
   return coverage_control_;
 }
@@ -182,10 +132,6 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
     case vpiCoverageStop:
     case vpiCoverageReset:
     case vpiCoverageCheck: {
-      // §40.5.3: Start/Stop/Reset/Check with $coverage_control()'s semantics
-      // (§40.3.2.1), the type put in §40.3.1's terms. Statement, toggle and
-      // FSM coverage are not individually controllable, so they act on the
-      // instance whole; an assertion handle controls that one assertion.
       CoverageControl control = CoverageControlForOperation(operation);
       if (scope_handle != nullptr && VpiIsAssertionType(scope_handle->type)) {
         return VpiControlAssertionCoverage(
@@ -198,21 +144,14 @@ int VpiContext::ControlCoverage(int operation, int coverage_type,
           scope));
     }
     case vpiCoverageSave:
-      // §40.5.3: save the current coverage of the requested type to the named
-      // coverage database, per $coverage_save() (§40.3.2.5). The type is the
-      // one §40.3.1 names, so the entry is one $coverage_merge can load.
       return static_cast<int>(GetCoverageControlState().CoverageSave(
           CoverageTypeForVpiProperty(coverage_type).value_or(coverage_type),
           name));
     case vpiCoverageMerge:
-      // §40.5.3: merge coverage of the requested type from the named coverage
-      // database into the simulation, per $coverage_merge() (§40.3.2.4), and
-      // in the same terms, so a database $coverage_save wrote is found here.
       return static_cast<int>(GetCoverageControlState().CoverageMerge(
           CoverageTypeForVpiProperty(coverage_type).value_or(coverage_type),
           name));
     default:
-      // Not a coverage control operation: nothing to apply.
       return 0;
   }
 }
@@ -225,8 +164,6 @@ bool VpiContext::ChkError(s_vpi_error_info* info) {
 
 void VpiContext::SetInvocationArguments(
     const std::string& tool_name, const std::vector<std::string>& options) {
-  // §38.17: entry zero of the command line is the tool's own name; the
-  // invocation options follow it in order.
   invocation_args_.clear();
   invocation_args_.reserve(options.size() + 1);
   invocation_args_.push_back(tool_name);
@@ -235,20 +172,10 @@ void VpiContext::SetInvocationArguments(
 
 namespace {
 
-// §38.17: the option this tool passes a file of options with. The driver reads
-// it in src/driver/cli_options.cpp, and the clause says what
-// vpi_get_vlog_info() reports of such a file: the vendor's option string,
-// followed by a pointer to a NULL-terminated array of character pointers.
 constexpr std::string_view kVpiVendorOptionsFileFlag = "-f";
 
-// The driver caps how deep options files may nest; this walk caps it the same
-// way, so a file that names its way back to itself ends here too.
 constexpr int kVpiMaxOptionsFileDepth = 16;
 
-// §38.17: one array of pointers the report holds - the command line itself, or
-// the parsed contents of an options file. An entry is either a word, given as
-// its index in the string pool, or the pointer to a nested array, given as that
-// array's index.
 struct VpiArgvEntry {
   size_t word = 0;
   int nested_array = -1;
@@ -258,9 +185,6 @@ struct VpiArgvArray {
   size_t offset = 0;
 };
 
-// §38.17: the words an options file holds, parsed the way the tool parses them
-// - whitespace-separated, a word beginning with # commenting out the rest of
-// its line.
 std::vector<std::string> VpiOptionsFileWords(const std::string& path) {
   std::vector<std::string> words;
   std::ifstream ifs(path);
@@ -277,9 +201,6 @@ std::vector<std::string> VpiOptionsFileWords(const std::string& path) {
   return words;
 }
 
-// §38.17: lay one list of words into an array of the report, pooling each word
-// and opening a nested array wherever the vendor option names a file. Returns
-// the index of the array it built.
 int VpiBuildArgvArray(const std::vector<std::string>& words, int depth,
                       std::vector<std::string>* pool,
                       std::vector<VpiArgvArray>* arrays) {
@@ -293,24 +214,17 @@ int VpiBuildArgvArray(const std::vector<std::string>& words, int depth,
                             i + 1 < words.size() &&
                             depth < kVpiMaxOptionsFileDepth;
     if (!kNamesFile) continue;
-    // §38.17: entry zero holds the file's name, and each later entry points to
-    // a NULL-terminated string holding one of the file's options.
     std::vector<std::string> nested = {words[i + 1]};
     for (std::string& word : VpiOptionsFileWords(words[i + 1])) {
       nested.push_back(std::move(word));
     }
     int child = VpiBuildArgvArray(nested, depth + 1, pool, arrays);
     (*arrays)[static_cast<size_t>(self)].entries.push_back({0, child});
-    ++i;  // the file name is the nested array's entry zero, not an entry here
+    ++i;
   }
   return self;
 }
 
-// §38.17: give every array a place in the report and fill in the words. The
-// command line comes first and its entries are argc; each array after it ends
-// in the NULL the clause requires, so it is one longer than its entries. The
-// pointer a vendor file option is followed by is left for VpiLinkArgvArrays,
-// which needs every array's place before it can name one.
 void VpiPlaceArgvArrays(std::vector<std::string>& pool,
                         std::vector<VpiArgvArray>* arrays,
                         std::vector<PLI_BYTE8*>* argv) {
@@ -329,9 +243,6 @@ void VpiPlaceArgvArrays(std::vector<std::string>& pool,
   }
 }
 
-// §38.17: the vendor's option string is followed by a pointer to a
-// NULL-terminated array of character pointers - the pointer is written
-// here, once the array it reaches has a place of its own in the report.
 void VpiLinkArgvArrays(const std::vector<VpiArgvArray>& arrays,
                        std::vector<PLI_BYTE8*>* argv) {
   for (const VpiArgvArray& array : arrays) {
@@ -351,18 +262,8 @@ void VpiLinkArgvArrays(const std::vector<VpiArgvArray>& arrays,
 }  // namespace
 
 bool VpiContext::GetVlogInfo(s_vpi_vlog_info* info) {
-  // §38.17: a null result structure cannot receive the information, so the
-  // routine fails.
   if (!info) return false;
 
-  // §38.17: rebuild the report. The command line is the first array and its
-  // length is argc, entry zero being the tool name - both guaranteed by how
-  // invocation_args_ was populated. Wherever it names an options file, the
-  // entry after the vendor option holds a pointer to that file's own array
-  // rather than the file name as a string, and those arrays are laid out after
-  // the command line's entries. Nothing built them: a named file was reported
-  // as the plain word it was written as, so what the tool had actually read out
-  // of it was in the report nowhere.
   invocation_file_args_.clear();
   std::vector<VpiArgvArray> arrays;
   VpiBuildArgvArray(invocation_args_, 0, &invocation_file_args_, &arrays);
@@ -378,17 +279,10 @@ bool VpiContext::GetVlogInfo(s_vpi_vlog_info* info) {
 
 namespace {
 
-// §38.22: a request for an intermodule path names the output-port and
-// input-port reference objects the path runs between. Those two ports shall be
-// of the same size; they may, however, sit at different levels of the
-// hierarchy, which is deliberately left unconstrained. A size mismatch cannot
-// describe a valid intermodule path, so it is rejected by the caller, which is
-// also where a missing reference has already been answered.
 bool InterModPathSizeMismatch(int type, VpiHandle ref1, VpiHandle ref2) {
   return type == vpiInterModPath && ref1->size != ref2->size;
 }
 
-// Whether `obj` is one of the objects `ref` reaches.
 bool IsChildOf(VpiHandle ref, const VpiObject* obj) {
   for (auto* child : ref->children) {
     if (child == obj) return true;
@@ -396,13 +290,6 @@ bool IsChildOf(VpiHandle ref, const VpiObject* obj) {
   return false;
 }
 
-// §38.22 Synopsis: the routine answers a handle to the object of a many-to-one
-// relationship. The one object is the one of kind `type` that every reference
-// object reaches: an object only one of them reaches stands in a relationship
-// with that one alone, which is the one-to-one relationship vpi_handle() is
-// for. §37.37 detail 1 is this rule read for an intermodule path, which
-// vpi_handle_multi(vpiInterModPath, port1, port2) reaches, and whose one object
-// is the path running between the two named ports.
 VpiObject* ObjectSharedBy(VpiHandle ref1, VpiHandle ref2, int type) {
   if (!ref1 || !ref2) return nullptr;
   for (auto* child : ref1->children) {
@@ -415,12 +302,6 @@ VpiObject* ObjectSharedBy(VpiHandle ref1, VpiHandle ref2, int type) {
 
 }  // namespace
 
-// §38.22 Returns: a vpiHandle to an object. What comes back is the
-// object of the many-to-one relationship rather than anything holding it, which
-// is what the Related routines row separates this routine from its neighbours
-// by: vpi_iterate() and vpi_scan() walk a one-to-many relationship and
-// vpi_handle() answers a one-to-one one. So an application that reaches an
-// intermodule path this way holds the path itself and can put delays on it.
 VpiHandle VpiContext::HandleMulti(int type, VpiHandle ref1, VpiHandle ref2) {
   if (!ref1 || !ref2) return nullptr;
 
@@ -444,40 +325,20 @@ VpiObject* VpiResolveSameObject(VpiObject* obj) {
 }
 
 VpiHandle VpiContext::CreateHandleFor(VpiHandle object) {
-  // §37.2.1: a null object denotes nothing, so there is no handle to create.
   if (object == nullptr) return nullptr;
 
-  // Resolve through any existing alias chain to the representative of the
-  // underlying object so the new handle points straight at it. The fresh handle
-  // is a distinct object (a different pointer than the one passed in), which
-  // the standard allows, as it lets two handles to one object be distinct.
   VpiObject* rep = VpiResolveSameObject(object);
 
-  // §37.2.4: a tool makes a handle to an object only while the object exists.
-  // Past that lifetime there is no object for a
-  // handle to refer to, so none is made; a handle handed back here would be
-  // invalid from the moment it was created, and §37.2.4 forbids a program both
-  // from referring through it and from releasing it.
   if (!rep->object_exists) return nullptr;
 
   auto* handle = AllocObject();
   handle->type = rep->type;
 
-  // §37.2.1: the new handle and the original both refer to the same object, so
-  // they are equivalent. Recording that this handle denotes `rep` lets
-  // vpi_compare_objects() resolve the two to a common representative and report
-  // them equal despite their pointers differing.
   handle->same_object_as = rep;
   return handle;
 }
 
 void VpiContext::ReleaseHandle(VpiHandle handle) {
-  // §37.2.2: vpi_release_handle() causes the tool to release a handle. Marking
-  // the handle released is all that is needed: the underlying object is not
-  // touched, so a distinct handle to the same object - held perhaps by another
-  // VPI program - is unaffected and can still refer to that object. A handle
-  // the tool handed out more than once stays live until every hand-out is
-  // released (HandOut in vpi.cpp). A null handle names nothing.
   if (!handle) return;
   if (handle->handles_held > 1) {
     --handle->handles_held;
@@ -488,26 +349,13 @@ void VpiContext::ReleaseHandle(VpiHandle handle) {
 }
 
 PLI_INT32 VpiContext::ReleaseHandleStatus(VpiHandle handle) {
-  // §38.38: vpi_release_handle() shall free the memory a VPI routine allocated
-  // for a handle. It shall not be called on an invalid handle: a null,
-  // already-released, or no-longer-existing handle names no live memory to
-  // free, so the call fails and returns 0.
   if (!HandleValid(handle)) return 0;
 
-  // §38.38: an iterator object (from vpi_iterate(), §38.21) carries storage
-  // that vpi_scan() reclaims only once a traversal reaches its end. When a
-  // program breaks out of an iteration loop before that, vpi_release_handle()
-  // frees the iterator's memory. An iterator is allocated standalone - it is
-  // not one of the tracked objects - so its storage is returned here directly,
-  // the same way vpi_scan() disposes of an exhausted one.
   if (handle->type == vpiIterator) {
     delete handle;
     return 1;
   }
 
-  // §38.38: for any other handle, freeing it is the §37.2.2 release operation -
-  // the handle stops being a live handle to its object while the object itself
-  // is left in place. The routine succeeds, returning 1.
   ReleaseHandle(handle);
   return 1;
 }
@@ -517,30 +365,13 @@ bool VpiContext::HandleReleased(VpiHandle handle) const {
 }
 
 bool VpiContext::HandleValid(VpiHandle handle) const {
-  // §37.2.4: validity runs from a handle's creation until one of the events
-  // that ends it. A null handle names no object and so is never valid. A
-  // released handle (§37.2.2) is no longer a live handle to its object, and a
-  // handle whose object has ceased to exist (§38.3) no longer refers to a live
-  // object; both are invalid. Tool termination, the remaining terminating
-  // event, disposes of the context and every handle with it, so a handle that
-  // is still queryable here has not hit that case. What is left is a valid
-  // handle: non-null, unreleased, and naming an object that still exists.
   if (!handle) return false;
   if (handle->released) return false;
 
-  // Existence is a property of the object, while release is a property of the
-  // handle. A handle made by CreateHandleFor() is a record of its own that
-  // aliases the representative, so its own object_exists flag says nothing
-  // about the object it denotes: the chain has to be resolved first, or an
-  // alias to an object that has ceased to exist answers that it is still valid.
   return VpiResolveSameObject(handle)->object_exists;
 }
 
 bool VpiContext::HandleSurvivesRestart(VpiHandle handle) const {
-  // §37.2.2 (restart): a restart releases every handle except those naming a
-  // cbStartOfRestart or cbEndOfRestart callback. A surviving handle is
-  // therefore a callback handle whose registered reason is one of the two
-  // restart reasons.
   if (!handle || handle->type != kVpiCallback) return false;
   if (handle->index < 0 ||
       handle->index >= static_cast<int>(callbacks_.size())) {
@@ -551,21 +382,11 @@ bool VpiContext::HandleSurvivesRestart(VpiHandle handle) const {
 }
 
 void VpiContext::ReleaseHandlesForRestart() {
-  // §37.2.2 (restart): release all handles except the restart-callback handles.
-  // Every allocated handle is visited; the two surviving kinds are left live.
   for (VpiObject* handle : all_objects_) {
     if (!HandleSurvivesRestart(handle)) handle->released = true;
   }
 }
 
-// §37.2.2: release a handle along with the handles to every callback placed on
-// the object it names. A callback handle records, in `index`, the slot of the
-// callback whose `obj` is the watched object; any such handle is released too.
-//
-// §37.2.3: which callbacks those are is settled by §38.3's comparison rather
-// than by a C "==" of the handles, since a callback is placed on an object and
-// the application may have registered it through a handle other than the one
-// being released.
 void VpiContext::ReleaseHandleWithCallbacks(VpiObject* object) {
   if (!object) return;
   object->released = true;
@@ -577,16 +398,9 @@ void VpiContext::ReleaseHandleWithCallbacks(VpiObject* object) {
   }
 }
 
-// §37.2.2: release a handle, every subelement reachable through its children,
-// and the callbacks placed on any of them. Shared by the frame/thread-free and
-// class-reclaim rules; the two differ only in which children they descend into.
 void VpiContext::ReleaseHandleSubtree(VpiObject* root) {
   if (!root) return;
   ReleaseHandleWithCallbacks(root);
-  // §37.44: a thread a fork spawned is a thread of its own, which its own end
-  // releases, rather than an object belonging to the one that spawned it.
-  // §37.33 detail 5: the class defn a class var's class typespec reaches is
-  // the class's, which lives on with the design (§37.31).
   for (VpiObject* child : root->children) {
     if (child->type != vpiThread && child->type != vpiClassDefn) {
       ReleaseHandleSubtree(child);
@@ -595,35 +409,19 @@ void VpiContext::ReleaseHandleSubtree(VpiObject* root) {
 }
 
 void VpiContext::ReleaseFrameOrThreadObject(VpiHandle root) {
-  // §37.3.8: callbacks can follow a transient object through its life, and a
-  // frame and a thread are two of the kinds it names. The end of one is where
-  // cbEndOfFrame and cbEndOfThread are delivered, while the object is still a
-  // live handle the routine can read.
   if (root == nullptr) return;
   if (root->type == vpiFrame) DispatchCallbacks(cbEndOfFrame, root);
   if (root->type == vpiThread) DispatchCallbacks(cbEndOfThread, root);
 
-  // §37.2.2 (frame/thread free): release the freed object, all of its
-  // subelements, and the callbacks placed on any of them.
   ReleaseHandleSubtree(root);
 }
 
 void VpiContext::ReleaseClassObject(VpiHandle class_object) {
-  // §37.2.2 (class reclaim): release the class object and the callbacks on it,
-  // then release each automatic data member together with all of its
-  // subelements. Non-automatic (static) data members are left live - they are
-  // not reclaimed with the class object.
   if (!class_object) return;
-  // §37.3.8: reclaiming the memory of a class object is the end of that
-  // object's life, and the subclause gives it two of the callbacks it lists -
-  // cbReclaimObj for the reclaim itself and cbEndOfObject for the object
-  // ceasing to exist, delivered while it is still a live handle.
   DispatchCallbacks(cbReclaimObj, class_object);
   DispatchCallbacks(cbEndOfObject, class_object);
 
   ReleaseHandleWithCallbacks(class_object);
-  // §37.33 detail 6: a method the class obj reaches is its class defn's, no
-  // data member of the object, and lives on with the class.
   for (VpiObject* member : class_object->children) {
     if (member->automatic && !VpiIsClassMethodType(member->type)) {
       ReleaseHandleSubtree(member);
@@ -632,10 +430,6 @@ void VpiContext::ReleaseClassObject(VpiHandle class_object) {
 }
 
 bool VpiContext::SetDefaultCompatibilityMode(int mode) {
-  // §36.12.2.2: only one default mode is selectable for a given simulation run.
-  // Once a mode has been selected, refuse any request that would change it so
-  // the run keeps a single, consistent default; a request for the mode already
-  // in force is consistent and is accepted.
   if (default_compat_mode_selected_ && mode != default_compat_mode_) {
     return false;
   }
@@ -646,10 +440,6 @@ bool VpiContext::SetDefaultCompatibilityMode(int mode) {
 
 int VpiContext::EffectiveCompatibilityMode(bool uses_mechanism1,
                                            int mechanism1_mode) const {
-  // §36.12.2.2: the run-wide default determines the compatibility-mode VPI
-  // behavior for every application not using the compile-based scheme. An
-  // application that does use Mechanism 1 is governed by the mode compiled into
-  // it, so the default does not apply to it.
   if (uses_mechanism1) {
     return mechanism1_mode;
   }
@@ -691,10 +481,6 @@ VpiHandle VpiContext::CreateParameter(std::string_view name, int int_value) {
 }
 
 VpiHandle VpiContext::CreateAssertion(std::string_view name, int type) {
-  // §37.49: an assertion is registered under one of the assertion-class kinds
-  // so a null-referenced iteration over the assertion class (the circle
-  // relation) can reach it. An unnamed assertion is not entered in the by-name
-  // map.
   auto* obj = AllocObject();
   obj->type = type;
   obj->name = name;
@@ -725,8 +511,6 @@ VpiHandle VpiContext::CreateRegArray(
   obj->array_dim_indices = dim_indices;
   obj->size = static_cast<int>(elements.size());
   for (size_t i = 0; i < elements.size(); ++i) {
-    // §38.35: each element is reachable as a vpiReg over its variable, keyed by
-    // its flat ordinal so vpi_put_value_array() can locate it.
     auto* child = AllocObject();
     child->type = kVpiReg;
     child->var = elements[i];
@@ -765,8 +549,6 @@ bool IsOneShotPliCallback(int reason) {
 static VpiContext* g_vpi_context = nullptr;
 
 VpiContext& GetGlobalVpiContext() {
-  // Function-local static: the default context is constructed lazily on first
-  // use (catchable) rather than during static init before main.
   static VpiContext default_context;
   if (g_vpi_context) return *g_vpi_context;
   return default_context;
@@ -776,13 +558,6 @@ void SetGlobalVpiContext(VpiContext* ctx) { g_vpi_context = ctx; }
 
 void InvokeVlogStartupRoutines(VlogStartupRoutine* routines) {
   if (!routines) return;
-  // §36.10.2: the routines in the vlog_startup_routines[] array execute in the
-  // startup phase, when very little VPI functionality is available. Establish
-  // that phase for the duration of the walk so the function-availability
-  // restriction is in force while the routines register their system
-  // tasks/functions and callbacks, then restore the prior phase afterwards. The
-  // array-walking itself is unchanged (that is §36.9.1's mechanism); this only
-  // narrows the available functionality for its duration.
   VpiContext& ctx = GetGlobalVpiContext();
   VpiToolPhase prior = ctx.ToolPhase();
   ctx.SetToolPhase(VpiToolPhase::kStartup);
@@ -793,17 +568,10 @@ void InvokeVlogStartupRoutines(VlogStartupRoutine* routines) {
 }
 
 bool VpiPhaseRestrictsFunctionality(VpiToolPhase phase) {
-  // §36.10.2: only the full phase (cbEndOfCompile onward) makes all
-  // functionality available; the startup phase and the sizetf phase that
-  // follows it - which permits no access beyond the startup phase - both
-  // restrict it.
   return phase != VpiToolPhase::kFull;
 }
 
 bool VpiContext::RoutineIsUnavailableNow(VpiRoutine routine) {
-  // §36.10.2 restricts by phase and then by routine: the two registration
-  // routines are available throughout, and everything else waits for the full
-  // phase.
   if (!VpiPhaseRestrictsFunctionality(tool_phase_)) return false;
   if (VpiRoutineAvailableInStartup(routine)) return false;
   last_error_.state = kVpiPLI;
@@ -815,15 +583,11 @@ bool VpiContext::RoutineIsUnavailableNow(VpiRoutine routine) {
 }
 
 bool VpiRoutineAvailableInStartup(VpiRoutine routine) {
-  // §36.10.2: only the two registration routines may be called while the
-  // vlog_startup_routines[] array executes.
   return routine == VpiRoutine::kRegisterSystf ||
          routine == VpiRoutine::kRegisterCb;
 }
 
 bool VpiStartupCallbackReasonAllowed(int reason) {
-  // §36.10.2: the only reasons vpi_register_cb() may be registered for while
-  // VPI functionality is restricted.
   switch (reason) {
     case kCbEndOfCompile:
     case kCbStartOfSimulation:
@@ -838,8 +602,6 @@ bool VpiStartupCallbackReasonAllowed(int reason) {
 }
 
 bool VpiIsSimulationTimeCallbackReason(int reason) {
-  // §38.36.2: the seven time-related callback reasons. Their placement is
-  // constrained through the s_cb_data time structure (see RegisterCb).
   switch (reason) {
     case kCbAtStartOfSimTime:
     case kCbNBASynch:
@@ -855,10 +617,6 @@ bool VpiIsSimulationTimeCallbackReason(int reason) {
 }
 
 bool VpiSystfNameIsValid(const char* tfname) {
-  // §38.37.1: the name shall begin with a dollar sign and shall be followed by
-  // one or more characters legal in a SystemVerilog simple identifier. A null
-  // pointer, an empty string, or a bare "$" with nothing after it fails the
-  // requirement of at least one such character.
   if (tfname == nullptr || tfname[0] != '$' || tfname[1] == '\0') return false;
   for (const char* p = tfname + 1; *p != '\0'; ++p) {
     char c = *p;
@@ -870,40 +628,26 @@ bool VpiSystfNameIsValid(const char* tfname) {
 }
 
 int VpiSystfReturnType(const s_vpi_systf_data& data) {
-  // §38.37.1: sysfunctype shall only be used when type is set to vpiSysFunc, so
-  // it names a return-value kind only for a system function; a system task has
-  // no return-value kind.
   if (data.type != kVpiSysFunc) return 0;
   return data.sysfunctype;
 }
 
 bool VpiSystfCallbackFiresAtBuild(VpiSystfCallback callback) {
-  // §38.37.1: callbacks to compiletf and sizetf occur when the simulation data
-  // structure is compiled or built; callbacks to calltf occur each time the
-  // system task or function is invoked during simulation execution.
   return callback == VpiSystfCallback::kCompiletf ||
          callback == VpiSystfCallback::kSizetf;
 }
 
 int VpiSystfInvoke(PLI_INT32 (*routine)(PLI_BYTE8*), PLI_BYTE8* user_data) {
-  // §38.37.1: the only argument passed to a compiletf/sizetf/calltf routine is
-  // the user_data field, typed as PLI_BYTE8 * (char *). One or more of the
-  // routine fields may be null when not needed, so a null pointer is skipped.
   if (routine == nullptr) return 0;
   return routine(user_data);
 }
 
 bool VpiSystfSizetfIsCalled(const s_vpi_systf_data& data) {
-  // §38.37.1: the sizetf application shall only be called if the type is
-  // vpiSysFunc and the sysfunctype is vpiSizedFunc or vpiSizedSignedFunc.
   return data.type == kVpiSysFunc && (data.sysfunctype == kVpiSizedFunc ||
                                       data.sysfunctype == kVpiSizedSignedFunc);
 }
 
 int VpiContext::SystfResultSizeBits(const s_vpi_systf_data& data) {
-  // The registration this record is, if it is one of ours. Compared by address
-  // rather than by content: two registrations may carry identical fields, and
-  // §36.8.1 counts sizetf calls per registration.
   for (size_t i = 0; i < systfs_.size(); ++i) {
     if (&systfs_[i] != &data) continue;
     auto it = systf_result_bits_.find(i);
@@ -916,13 +660,9 @@ int VpiContext::SystfResultSizeBits(const s_vpi_systf_data& data) {
 }
 
 int VpiSystfResultSizeBits(const s_vpi_systf_data& data) {
-  // §38.37.1: a sized system function takes its width from the sizetf
-  // application when one is provided; with no sizetf it returns 32 bits.
   if (VpiSystfSizetfIsCalled(data) && data.sizetf != nullptr) {
     return VpiSystfInvoke(data.sizetf, data.user_data);
   }
-  // §38.37.1 with Annex K.2, §6.11 and §6.12: a vpiTimeFunc returns time and
-  // a vpiRealFunc real, each 64 bits.
   if (data.type == kVpiSysFunc &&
       (data.sysfunctype == vpiTimeFunc || data.sysfunctype == vpiRealFunc)) {
     return 64;

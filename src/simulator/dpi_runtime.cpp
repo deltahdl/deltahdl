@@ -17,12 +17,6 @@
 
 namespace delta {
 
-// §35.9 disable-protocol state for the current execution thread. A foreign
-// routine queries its disabled state with no handle, so the state is naturally
-// thread-local, mirroring how the C-ABI scope (g_current_scope) is held. The
-// acknowledgement flag records whether svAckDisabledState() was called during
-// the current disable episode; it is cleared whenever the disabled state is
-// left so each episode starts unacknowledged.
 namespace {
 thread_local bool g_disabled_state = false;
 thread_local bool g_disable_acked = false;
@@ -32,8 +26,6 @@ bool DpiCurrentDisabledState() { return g_disabled_state; }
 
 void DpiSetCurrentDisabledState(bool disabled) {
   g_disabled_state = disabled;
-  // The acknowledgement is per disable episode: leaving the disabled state ends
-  // the episode, so a subsequent one starts unacknowledged.
   if (!disabled) g_disable_acked = false;
 }
 
@@ -83,10 +75,6 @@ bool DpiSvdpiSrcIsNeededForExportCall(
 
 namespace {
 
-// Read any numeric DPI argument value as an integer. Real values round to the
-// nearest integer, matching the way SystemVerilog assignments convert a real
-// expression to an integral target — §35.6.1 requires the temporary/actual
-// assignments to follow general SystemVerilog assignment and coercion rules.
 int64_t NumericToInt(const DpiArgValue& v) {
   switch (v.type) {
     case DataTypeKind::kReal:
@@ -101,10 +89,6 @@ int64_t NumericToInt(const DpiArgValue& v) {
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
       return v.AsLogic();
-    // §35.2.2.1: an `integer` crosses as the aval/bval pair, so its numeric
-    // value is the aval half. A bit the bval marks unknown reads as whatever
-    // the aval says, which is the projection any coercion to a two-state type
-    // has to make and the one the standard leaves to the implementation.
     case DataTypeKind::kInteger:
       return static_cast<int32_t>(v.AsLogicVec().aval);
     default:
@@ -112,8 +96,6 @@ int64_t NumericToInt(const DpiArgValue& v) {
   }
 }
 
-// Read any numeric DPI argument value as a real, used when coercing toward a
-// floating-point formal or actual.
 double NumericToReal(const DpiArgValue& v) {
   switch (v.type) {
     case DataTypeKind::kReal:
@@ -135,23 +117,12 @@ double NumericToReal(const DpiArgValue& v) {
   }
 }
 
-// §35.6.2: equality of two same-typed actual-argument values. After an
-// imported function returns, the copy-back leaves an output/inout actual with
-// its own declared type, so the value before the call and the value after it
-// share a type; this compares them so a value-change event is propagated only
-// when the call genuinely changed the actual, matching SystemVerilog
-// value-change semantics where an assignment of an unchanged value is inert.
 bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
   if (a.type != b.type) return false;
-  // §H.7.3: an unpacked array is the same value when every element is.
   if (a.IsArray() || b.IsArray()) {
     return std::equal(a.elements.begin(), a.elements.end(), b.elements.begin(),
                       b.elements.end(), SameArgValue);
   }
-  // Annex H.10.1.2: a value carried in the canonical array is compared word by
-  // word over the whole of it. Falling through to the union below would read a
-  // member nothing wrote and call two different wide values the same, so an
-  // output formal §35.5.6 admits at 128 bits would raise no §35.6.2 event.
   if (a.IsWideVec() || b.IsWideVec()) {
     return a.VecWidth() == b.VecWidth() &&
            std::equal(a.AsLogicVecWords().begin(), a.AsLogicVecWords().end(),
@@ -161,9 +132,6 @@ bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
                       });
   }
   switch (a.type) {
-    // §35.2.2.1: two four-state values are the same value when both halves
-    // agree. Comparing the aval alone would call an actual left at x equal to
-    // one the call set to 1, and raise no §35.6.2 event for the change.
     case DataTypeKind::kInteger:
       return a.AsLogicVec().aval == b.AsLogicVec().aval &&
              a.AsLogicVec().bval == b.AsLogicVec().bval;
@@ -190,17 +158,7 @@ bool SameArgValue(const DpiArgValue& a, const DpiArgValue& b) {
 
 }  // namespace
 
-// §35.6.1: when a coercion is needed, the value crosses the interface through a
-// temporary that is created with the appropriate coercion. This realizes that
-// temporary: it returns `v` converted to `target`, following SystemVerilog
-// assignment/coercion rules. When the value already has the target type no
-// conversion is needed and it is returned unchanged.
 DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
-  // §35.6.1 has the value cross through a temporary of the formal's own type,
-  // and a value carried in the canonical array was already built at the width
-  // that formal's declaration gave it. There is nothing to convert, and every
-  // conversion below reads the union, so a wide value put through one would
-  // come back as its low word alone.
   if (v.IsWideVec()) return v;
   if (v.type == target) return v;
   switch (target) {
@@ -226,11 +184,6 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
       r.type = target;
       return r;
     }
-    // §35.2.2.1: coercing toward `integer` yields the four-state pair. A value
-    // that already is one arrives here only when the types differ, so the pair
-    // is built from the numeric reading and carries no unknown bit; an
-    // `integer` actual passed to an `integer` formal is returned untouched by
-    // the identity check above, x and z bits included.
     case DataTypeKind::kInteger:
       return DpiArgValue::FromLogicVec(
           SvLogicVecVal{static_cast<uint32_t>(NumericToInt(v)), 0});
@@ -247,15 +200,12 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
       return r;
     }
     case DataTypeKind::kString:
-      // No numeric/string coercion is defined across the interface here; a
-      // string actual is carried through unchanged toward a string formal and
-      // any other source yields the empty string.
       return v.type == DataTypeKind::kString ? v : DpiArgValue::FromString("");
     case DataTypeKind::kChandle:
       return v.type == DataTypeKind::kChandle
                  ? v
                  : DpiArgValue::FromChandle(nullptr);
-    default: {  // kInt, kInteger, and any other integral formal
+    default: {
       DpiArgValue r =
           DpiArgValue::FromInt(static_cast<int32_t>(NumericToInt(v)));
       r.type = target;
@@ -265,8 +215,6 @@ DpiArgValue CoerceArgValue(const DpiArgValue& v, DataTypeKind target) {
 }
 
 void DpiRuntime::RegisterImport(DpiRtFunction func) {
-  // §35.4: the declaration also resolves to a symbol in the global name space,
-  // under its linkage name rather than its SystemVerilog name.
   import_global_index_.emplace(DpiGlobalName(func), imports_.size());
   import_index_[func.sv_name] = imports_.size();
   imports_.push_back(std::move(func));
@@ -297,11 +245,6 @@ uint32_t DpiRuntime::ImportCount() const {
 }
 
 namespace {
-// §35.5.3: the key one export instance is held under -- the instantiated scope
-// declaring it and its SystemVerilog name together, since as many instances of
-// a name exist as there are scopes exporting it. The separator is a character
-// no SystemVerilog name contains, so no pair of scope and name can spell the
-// key another pair spells.
 std::string ExportInstanceKey(std::string_view sv_name,
                               std::string_view scope_name) {
   std::string key(scope_name);
@@ -312,21 +255,11 @@ std::string ExportInstanceKey(std::string_view sv_name,
 }  // namespace
 
 void DpiRuntime::RegisterExport(DpiRtExport exp) {
-  // §35.7: exported SystemVerilog functions are always context functions.
-  // Normalize the flag here so any caller that fails to set it (or sets it
-  // false) still gets a context export.
   exp.is_context = true;
-  // §35.5.3: an export declared in several instantiated scopes exists as
-  // several instances once elaboration is done, one per scope. Holding this one
-  // under its scope as well as under its name leaves an instance registered
-  // earlier reachable when a second instance takes the name index. An export
-  // registered with no scope names no instance and is reachable by name alone.
   if (!exp.scope_name.empty()) {
     export_scope_index_[ExportInstanceKey(exp.sv_name, exp.scope_name)] =
         exports_.size();
   }
-  // §35.4: the declaration also defines a symbol in the global name space,
-  // under its linkage name rather than its SystemVerilog name.
   export_global_index_.emplace(DpiGlobalName(exp), exports_.size());
   export_index_[exp.sv_name] = exports_.size();
   exports_.push_back(std::move(exp));
@@ -362,11 +295,6 @@ DpiArgValue DpiRuntime::CallImport(std::string_view sv_name,
 
 namespace {
 
-// The value `arg` presents, written so that two values read the same here
-// exactly when they agree in both type and value. Each branch reads the union
-// member the argument's type wrote, so a value never stands in for a
-// differently typed one that happens to share a representation; an array's
-// elements and a wide value's words (§H.7.3, §H.10.1.2) are read whole.
 void AppendArgKey(std::string& key, const DpiArgValue& arg) {
   key += std::to_string(static_cast<int>(arg.type));
   key += ':';
@@ -418,9 +346,6 @@ void AppendArgKey(std::string& key, const DpiArgValue& arg) {
   }
 }
 
-// §35.5.2 replaces a pure function's call with the value previously computed
-// for the same values of the input arguments, and this key is what decides
-// which values are the same ones.
 std::string PureCallArgKey(std::string_view sv_name,
                            const std::vector<DpiArgValue>& args) {
   std::string key(sv_name);
@@ -442,10 +367,6 @@ bool DpiRuntime::ImportCallIsRemovable(std::string_view sv_name) const {
 DpiArgValue DpiRuntime::CallImportReusingPureResult(
     std::string_view sv_name, const std::vector<DpiArgValue>& args) {
   const auto* func = FindImport(sv_name);
-  // §35.5.1.3: an import declared with neither special property can perform
-  // side effects, so its call is made every time it is written whatever an
-  // earlier call returned. §35.5.2 licenses the reuse for a pure function
-  // alone.
   if (func == nullptr || !func->is_pure) return CallImport(sv_name, args);
 
   std::string key = PureCallArgKey(sv_name, args);
@@ -459,9 +380,6 @@ DpiArgValue DpiRuntime::CallImportReusingPureResult(
 
 DpiArgValue DpiRuntime::UndeterminedOutputValue(DataTypeKind type,
                                                 uint32_t width) {
-  // §35.5.1.2: the initial value of an output argument is undetermined and
-  // implementation dependent. We pick a deterministic per-type zero so the
-  // callee observes a value that is independent of the caller's actual.
   if (width > DpiInlineValueBits(type)) {
     return DpiArgValue::FromLogicVecWords(
         std::vector<SvLogicVecVal>(DpiCanonicalWordCount(width),
@@ -497,24 +415,14 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
   const auto* func = FindImport(sv_name);
   if (!func) return DpiArgValue::FromInt(0);
 
-  // The vector the foreign function operates on. Input and inout arguments are
-  // seeded with the caller's actual value, so the foreign function can read an
-  // inout argument's initial value. An output argument is seeded with an
-  // undetermined value instead of the actual, because the foreign function
-  // shall not assume anything about an output argument's initial value.
   std::vector<DpiArgValue> callee = actuals;
   for (size_t i = 0; i < func->args.size() && i < callee.size(); ++i) {
     if (func->args[i].direction == Direction::kOutput) {
-      // An open array's shape is the actual's (§35.6.1.1), whatever it holds.
       DpiArgValue seeded =
           UndeterminedOutputValue(func->args[i].type, func->args[i].width);
       seeded.ranges = callee[i].ranges;
       callee[i] = std::move(seeded);
     } else {
-      // §35.6.1: input and inout formals are passed copy-in through a temporary
-      // initialized with the actual coerced to the formal's type. When the
-      // actual already matches the formal type CoerceArgValue is a no-op, so
-      // the §35.5.1.2 same-type behavior is preserved.
       callee[i] = CoerceArgValue(callee[i], func->args[i].type);
     }
   }
@@ -526,26 +434,13 @@ DpiArgValue DpiRuntime::CallImportWithArgs(
     result = func->impl(callee);
   }
 
-  // §35.9: when a disable is in effect, the values of an imported subroutine's
-  // output and inout parameters are undefined, as is its return value. A
-  // SystemVerilog simulator is not obligated to propagate anything the foreign
-  // code wrote back to the calling SystemVerilog code. This implementation
-  // exercises that latitude: the actuals are left untouched and an undetermined
-  // result of the return type is yielded, so no disabled-call value leaks out.
   if (DpiCurrentDisabledState()) {
     return UndeterminedOutputValue(func->return_type);
   }
 
-  // Copy back only output and inout arguments: the value the foreign function
-  // wrote to them is visible outside the call. Input arguments are passed by
-  // value, so any modification the foreign function made to its copy is
-  // discarded here and the caller's actual is left unchanged.
   for (size_t i = 0; i < func->args.size() && i < actuals.size(); ++i) {
     Direction dir = func->args[i].direction;
     if (dir == Direction::kOutput || dir == Direction::kInout) {
-      // §35.6.1: copy-out assigns the temporary's value back to the actual with
-      // the appropriate conversion — coerce the foreign-written value to the
-      // actual argument's own type. A matching type makes this a no-op.
       actuals[i] = CoerceArgValue(callee[i], actuals[i].type);
     }
   }
@@ -558,23 +453,10 @@ DpiArgValue DpiRuntime::CallImportDetectingChanges(
   const auto* func = FindImport(sv_name);
   if (!func) return DpiArgValue::FromInt(0);
 
-  // §35.6.2: snapshot the actuals before the call so that, once control
-  // returns, the simulator can tell which output/inout actuals the call
-  // changed. Nothing is detected or propagated yet — that happens only after
-  // the imported function has returned.
   std::vector<DpiArgValue> before = actuals;
 
-  // The copy-back of output/inout values into the actuals is the
-  // §35.5.1.2/§35.6.1 responsibility of CallImportWithArgs and finishes before
-  // any value-change event below is raised.
   DpiArgValue result = CallImportWithArgs(sv_name, actuals);
 
-  // §35.6.2: now that control has returned, handle the value changes. Propagate
-  // each as if the actual were assigned the formal immediately after the
-  // return. Only output and inout actuals can change. Walk the arguments in
-  // declaration order so that, with more than one argument, the assignments and
-  // their value-change events follow the order general SystemVerilog rules
-  // impose. An actual whose value the call did not alter raises no event.
   for (size_t i = 0; i < func->args.size() && i < actuals.size(); ++i) {
     Direction dir = func->args[i].direction;
     if (dir != Direction::kOutput && dir != Direction::kInout) continue;
@@ -586,27 +468,14 @@ DpiArgValue DpiRuntime::CallImportDetectingChanges(
 
 void DpiRuntime::EnterContextImportCall(std::string_view sv_name,
                                         DpiScope decl_scope, bool is_task) {
-  // §35.9: the disabled state is a per-thread property of an in-progress
-  // disable episode. Opening a fresh top-level import chain means no disable is
-  // active, so clear the thread-local state; otherwise a disable left set by an
-  // earlier chain (thread-local, not held per DpiRuntime) would leak into this
-  // call.
   if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
-  // §35.5.3: the chain's context is the import declaration's instantiated
-  // scope when SystemVerilog calls a context import.
   PushScope(std::move(decl_scope));
   call_chain_.push_back({sv_name, true, is_task});
 }
 
 void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
                                            bool is_task) {
-  // See EnterContextImportCall: a fresh top-level chain starts with no active
-  // disable episode (§35.9).
   if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
-  // §35.5.3: the frame remembers the scope it was entered under so that leaving
-  // it restores that scope. A noncontext import call is not instrumented and
-  // affects only its actual arguments, so a scope set while it ran belongs to
-  // it and not to whatever runs after it returns.
   bool from_stack =
       !scope_stack_.empty() && current_scope_ == scope_stack_.back();
   call_chain_.push_back({sv_name, false, is_task, current_scope_, from_stack});
@@ -615,14 +484,7 @@ void DpiRuntime::EnterNoncontextImportCall(std::string_view sv_name,
 void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
                                          DpiScope decl_scope) {
   const auto* func = FindImport(sv_name);
-  // §H.2: the declaration says whether the import is a task or a function; a
-  // name without one is a function.
   const bool kIsTask = func != nullptr && func->is_task;
-  // §35.5.1.3: a subroutine declared pure and a subroutine declared with
-  // neither special property are both barred from reading or writing any
-  // SystemVerilog data object other than their actual arguments, so neither
-  // opens a context frame. An import this runtime holds no declaration for has
-  // declared nothing, which is the same case as declaring neither.
   if (func == nullptr || func->is_pure || !func->is_context) {
     EnterNoncontextImportCall(sv_name, kIsTask);
     return;
@@ -632,13 +494,6 @@ void DpiRuntime::EnterDeclaredImportCall(std::string_view sv_name,
 
 void DpiRuntime::LeaveImportCall() {
   if (call_chain_.empty()) return;
-  // §35.9 item c): before a disable ends an imported function, the function
-  // acknowledges the disable through svAckDisabledState(). This frame popping
-  // is that return, and the acknowledgement is thread state the function has
-  // either set or not, so the check §35.9 requires of a simulator is made here
-  // rather than left to whatever drives the call. Item b) is checked by
-  // VerifyImportReturnUnderDisable instead, because the int an imported task
-  // returns is not something a frame carries.
   if (!call_chain_.back().is_task) {
     VerifyImportFunctionReturnUnderDisable(call_chain_.back().sv_name);
   }
@@ -646,25 +501,11 @@ void DpiRuntime::LeaveImportCall() {
   const DpiScope* entry_scope = call_chain_.back().entry_scope;
   bool entry_scope_from_stack = call_chain_.back().entry_scope_from_stack;
   call_chain_.pop_back();
-  // §35.9: an imported subroutine is in the disabled state while some disable
-  // statement in the design is aimed at it or at one of its parents. Popping
-  // the last frame ends the chain the disable was propagating through, so no
-  // imported subroutine is in the disabled state after it and the episode is
-  // over. Leaving the flag set would have svIsDisabledState() report 1 to
-  // foreign code running outside any import call, and would have the next
-  // call's output and inout arguments dropped under a §35.9 licence to drop
-  // them that applies only while a disable is in effect.
   if (call_chain_.empty()) DpiSetCurrentDisabledState(false);
   if (had_context) {
-    // The context frame pushed the import declaration's instantiated scope on
-    // entry, and popping it discards whatever svSetScope named while the call
-    // ran.
     PopScope();
     return;
   }
-  // §35.5.3: only the actual arguments can be affected by the call of an import
-  // not specified as context, so the scope this frame was entered under is the
-  // scope its caller resumes in.
   if (entry_scope_from_stack) {
     current_scope_ = scope_stack_.empty() ? nullptr : scope_stack_.back();
     return;
@@ -678,22 +519,15 @@ uint32_t DpiRuntime::ImportCallDepth() const {
 
 bool DpiRuntime::ChainRootIsContext() const {
   if (call_chain_.empty()) return false;
-  // §35.5.3: context property attaches to the *root* of the import chain,
-  // never transitively promoted to subsequent inner calls.
   return call_chain_.front().is_context;
 }
 
 bool DpiRuntime::InCallChain() const {
-  // §H.9: a chain is open from the import frame it starts at; an export call
-  // that has pushed a start the chain has not yet reached stands in
-  // SystemVerilog code, in no chain.
   const size_t kStart = chain_starts_.empty() ? 0 : chain_starts_.back();
   return call_chain_.size() > kStart;
 }
 
 uint32_t DpiRuntime::OpenCallChainCount() const {
-  // §H.9: the first chain, and one more for each export call whose
-  // SystemVerilog code has called an import again.
   if (call_chain_.empty()) return 0;
   uint32_t open = 1;
   for (size_t start : chain_starts_) {
@@ -703,8 +537,6 @@ uint32_t DpiRuntime::OpenCallChainCount() const {
 }
 
 bool DpiRuntime::InContextCallChain() const {
-  // §H.9 with §35.5.3: the chain is a context chain where its innermost import
-  // is context, the property never being promoted to an inner call.
   return InCallChain() && call_chain_.back().is_context;
 }
 
@@ -718,18 +550,9 @@ bool DpiRuntime::IsImportCallOptimizationBarrier(
 int DpiRuntime::ReturnFromExportUnderDisable(DpiDisableTarget target) {
   switch (target) {
     case DpiDisableTarget::kAncestor:
-      // §35.9 item a): the exported task returns because a disable targets a
-      // parent. The disable is still propagating, so the calling import enters
-      // the disabled state and the task returns 1.
       DpiSetCurrentDisabledState(true);
       return 1;
     case DpiDisableTarget::kExportItself:
-      // §35.9: when the exported task is itself the disable target, the disable
-      // stops there — its parent import is not considered disabled, the task
-      // returns 0, and svIsDisabledState() reports 0.
-      //
-      // §35.9 item a): a task that does not return due to a disable likewise
-      // clears the disabled state and returns 0, so kNone shares this body.
     case DpiDisableTarget::kNone:
     default:
       DpiSetCurrentDisabledState(false);
@@ -740,16 +563,10 @@ int DpiRuntime::ReturnFromExportUnderDisable(DpiDisableTarget target) {
 void* DpiRuntime::PackedArgRef(std::string_view sv_name,
                                void* actual_data) const {
   const auto* func = FindImport(sv_name);
-  // Annex H.14: the SV3.1a semantics are the deprecated ones, so every import
-  // this runtime holds no declaration for is passed its packed data in the
-  // canonical representation, as is one whose declaration did not ask for the
-  // other.
   if (func == nullptr ||
       func->packed_arg_passing != DpiPackedArgPassing::kSv31aReference) {
     return nullptr;
   }
-  // The actual is handed over as it stands. §H.14 lets an implementation pass
-  // such data without converting or marshalling it into the canonical form.
   return actual_data;
 }
 
@@ -757,22 +574,16 @@ bool DpiRuntime::IsDisabledState() const { return DpiCurrentDisabledState(); }
 
 bool DpiRuntime::CheckImportedSubroutineDisableReturn(
     bool is_task, int task_return_value) const {
-  // §35.9: the verification only applies to a subroutine returning while a
-  // disable is in effect. With no disable there is nothing to check.
   if (!DpiCurrentDisabledState()) return true;
   if (is_task) {
-    // item b): once a disable ends an imported task, it gives back 1.
     return task_return_value == 1;
   }
-  // item c): before a disable ends an imported function, the function
-  // acknowledges the disable through svAckDisabledState().
   return DpiCurrentDisableAcknowledged();
 }
 
 bool DpiRuntime::VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
                                                     int task_return_value) {
-  if (CheckImportedSubroutineDisableReturn(/*is_task=*/true,
-                                           task_return_value)) {
+  if (CheckImportedSubroutineDisableReturn(true, task_return_value)) {
     return true;
   }
   IssueDisableProtocolFatalError(
@@ -785,8 +596,7 @@ bool DpiRuntime::VerifyImportTaskReturnUnderDisable(std::string_view sv_name,
 
 bool DpiRuntime::VerifyImportFunctionReturnUnderDisable(
     std::string_view sv_name) {
-  if (CheckImportedSubroutineDisableReturn(/*is_task=*/false,
-                                           /*task_return_value=*/0)) {
+  if (CheckImportedSubroutineDisableReturn(false, 0)) {
     return true;
   }
   IssueDisableProtocolFatalError(
@@ -797,8 +607,6 @@ bool DpiRuntime::VerifyImportFunctionReturnUnderDisable(
 }
 
 bool DpiRuntime::VerifyImportReturnUnderDisable(int task_return_value) {
-  // §35.9: the protocol governs an imported subroutine that returns while a
-  // disable is in effect. With no import call open there is no such return.
   if (call_chain_.empty()) return true;
   std::string_view sv_name = call_chain_.back().sv_name;
   if (call_chain_.back().is_task) {
@@ -808,16 +616,9 @@ bool DpiRuntime::VerifyImportReturnUnderDisable(int task_return_value) {
 }
 
 void DpiRuntime::IssueDisableProtocolFatalError(const std::string& message) {
-  // §35.9: breaking any item of the disable protocol is a fatal simulation
-  // error. The first violation is the error that ends the run, so it
-  // is the one recorded and reported; a later violation is reached only because
-  // this runtime cannot halt the caller itself, and adds nothing.
   if (disable_protocol_fatal_) return;
   disable_protocol_fatal_ = true;
   disable_protocol_fatal_message_ = message;
-  // FATAL is the severity word §20.10's $fatal prints and std::cerr is the
-  // stream it prints on, so a disable-protocol violation reads like any other
-  // fatal simulation error.
   std::cerr << "FATAL: " << message << "\n";
 }
 

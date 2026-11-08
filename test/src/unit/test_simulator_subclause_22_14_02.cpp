@@ -11,11 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Wraps `body` in a real `begin_keywords "1364-1995" region and runs the whole
-// pipeline over it — preprocess, parse, elaborate, lower, simulate — returning
-// the final value of `var_name`. The diagnostic check is what keeps the result
-// meaningful: source the Table 22-1 list admits has to run clean, not merely
-// produce a number after the front end recovered from something it rejected.
 uint64_t Run1995(const std::string& body, const char* var_name) {
   SimFixture f;
   auto fid = f.mgr.AddFile(
@@ -27,13 +22,6 @@ uint64_t Run1995(const std::string& body, const char* var_name) {
   return value;
 }
 
-// Words Table 22-1 omits are ordinary identifiers under this list, and they
-// carry values at runtime like any other name: this one writes to one, reads
-// another back as an operand, and spreads the rest across a hierarchy — the
-// child module's name, its two port names, a parameter, a task, and the
-// instance name are all words later standards reserve. The value the child
-// computes has to reach the parent for the run to produce this result, so
-// every one of those names had to resolve.
 TEST(Verilog1995KeywordSimulation, FreedWordsRunAcrossAHierarchy) {
   auto result = Run1995(
       "module bit (input wire [7:0] logic, output wire [7:0] byte);\n"
@@ -55,9 +43,6 @@ TEST(Verilog1995KeywordSimulation, FreedWordsRunAcrossAHierarchy) {
   EXPECT_EQ(result, 43u);
 }
 
-// The membership side at runtime: the gate primitives and net types Table 22-1
-// lists still build working structure under this list, and their values reach
-// a variable the run leaves behind.
 TEST(Verilog1995KeywordSimulation, ReservedGateAndNetKeywordsDriveValues) {
   auto result = Run1995(
       "module m;\n"
@@ -76,13 +61,9 @@ TEST(Verilog1995KeywordSimulation, ReservedGateAndNetKeywordsDriveValues) {
       "  end\n"
       "endmodule\n",
       "result");
-  // and(1,1) = 1, nor(1,1) = 0, wand of two 1s = 1.
   EXPECT_EQ(result, 5u);
 }
 
-// The procedural keywords of Table 22-1 driving real control flow: a loop, a
-// count-controlled repeat, a while, and a casez arm all have to be understood
-// as keywords for the arithmetic to come out at this value.
 TEST(Verilog1995KeywordSimulation, ReservedProceduralKeywordsRun) {
   auto result = Run1995(
       "module m;\n"
@@ -109,11 +90,6 @@ TEST(Verilog1995KeywordSimulation, ReservedProceduralKeywordsRun) {
   EXPECT_EQ(result, 33u);
 }
 
-// Table 22-1's event-control and branching words doing their job at runtime:
-// an `always` procedure sensitive to a `posedge`/`negedge` list joined by
-// `or`, and an `if`/`else` pair choosing between them. The count the run
-// leaves behind is reachable only if the sensitivity list and both branches
-// were understood as keywords.
 TEST(Verilog1995KeywordSimulation, ReservedEventControlAndBranchRun) {
   auto result = Run1995(
       "module m;\n"
@@ -135,13 +111,9 @@ TEST(Verilog1995KeywordSimulation, ReservedEventControlAndBranchRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // The negedge on rst loads 40, then three posedges each add one.
   EXPECT_EQ(result, 43u);
 }
 
-// `wait`, `forever`, and `disable` are Table 22-1 words whose whole meaning is
-// a runtime one: the loop has to block until the flag is set, spin, and then be
-// torn down by name. Only a run can observe that.
 TEST(Verilog1995KeywordSimulation, WaitForeverAndDisableRun) {
   auto result = Run1995(
       "module m;\n"
@@ -165,9 +137,6 @@ TEST(Verilog1995KeywordSimulation, WaitForeverAndDisableRun) {
   EXPECT_EQ(result, 43u);
 }
 
-// A `function` called for its value and a `defparam` overriding a parameter
-// across the hierarchy — two more Table 22-1 words whose effect shows up only
-// in what the run computes.
 TEST(Verilog1995KeywordSimulation, FunctionAndDefparamRun) {
   auto result = Run1995(
       "module sub (output wire [7:0] o);\n"
@@ -189,11 +158,6 @@ TEST(Verilog1995KeywordSimulation, FunctionAndDefparamRun) {
   EXPECT_EQ(result, 43u);
 }
 
-// An `event` declared under this list, triggered with `->`, and waited on by
-// an `always` procedure. The keyword, the trigger operator, and the event
-// control all have to line up for the waiting process to resume, and the name
-// carrying the event is a word a later standard reserved — so the run observes
-// both sides of the rule at once.
 TEST(Verilog1995KeywordSimulation, FreedWordNamesAnEventDrivingAProcess) {
   auto result = Run1995(
       "module m;\n"
@@ -209,11 +173,6 @@ TEST(Verilog1995KeywordSimulation, FreedWordNamesAnEventDrivingAProcess) {
   EXPECT_EQ(result, 43u);
 }
 
-// The same arithmetic reached two ways: with the operand written as a literal
-// and with it declared as a constant using the Table 22-1 `parameter` keyword.
-// The two take different paths to a value, and under this list both have to
-// arrive at it — the second also showing `parameter` still declares a constant
-// whose name may be a word a later standard reserved.
 TEST(Verilog1995KeywordSimulation, LiteralAndParameterConstantsAgree) {
   auto from_literal = Run1995(
       "module m;\n"
@@ -242,9 +201,6 @@ TEST(Verilog1995KeywordSimulation, LiteralAndParameterConstantsAgree) {
   EXPECT_EQ(from_freed_name, 43u);
 }
 
-// `force`/`release` and the `assign`/`deassign` procedural pair are Table 22-1
-// words whose whole effect is a runtime one, so this is the only stage where
-// they can be observed doing their job under this list.
 TEST(Verilog1995KeywordSimulation, ForceAndReleaseRun) {
   auto result = Run1995(
       "module m;\n"

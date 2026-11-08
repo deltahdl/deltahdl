@@ -13,22 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.27 named events: the VPI object model for a named event and a named event
-// array. The diagram's properties (vpiName/vpiFullName,
-// vpiArray/vpiArrayMember, vpiAutomatic, vpiAllocScheme), its
-// typespec/value/parent edges, and access by index are owned by the generic
-// machinery and the cited dependency subclauses (§37.3.7 lifetime and memory
-// allocation, §37.25 typespecs, §38.19/§38.20 access by index, §38.34 value).
-// The three relations that carry §37.27's own normative details are exercised
-// here through the public iterate/scan API:
-//   detail 1 - vpiWaitingProcesses reaches the threads of the waiting
-//   processes; detail 2 - vpiIndex on a named event reaches its array indices,
-//   innermost
-//              first, and is NULL when the named event is not an array element;
-//   detail 3 - vpiRange on a named event array walks the unpacked range
-//              declarations from leftmost to rightmost.
-
-// Walk an iterator to completion, collecting every object it yields in order.
 std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   std::vector<VpiHandle> objects;
   if (!iterator) return objects;
@@ -36,9 +20,6 @@ std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   return objects;
 }
 
-// Detail 1: vpiWaitingProcesses on a named event returns all the waiting
-// processes identified by their threads, skipping unrelated children, even
-// though the relation is named for the processes and not for the thread type.
 TEST(NamedEventModel, WaitingProcessesIterationReachesWaitingThreads) {
   VpiContext ctx;
 
@@ -60,9 +41,6 @@ TEST(NamedEventModel, WaitingProcessesIterationReachesWaitingThreads) {
   EXPECT_EQ(waiting[1], &dynamic_proc);
 }
 
-// Detail 2: vpiIndex on a named event that is an array element returns its
-// index expressions, beginning with the index for the named event and working
-// outward.
 TEST(NamedEventModel, IndexIterationReachesArrayIndicesOutward) {
   VpiContext ctx;
 
@@ -82,8 +60,6 @@ TEST(NamedEventModel, IndexIterationReachesArrayIndicesOutward) {
   EXPECT_EQ(indices[1], &outer_index);
 }
 
-// Detail 2: a named event that is not part of an array has no indices, so
-// iterating vpiIndex returns NULL.
 TEST(NamedEventModel, IndexIterationIsNullWhenNotAnArrayElement) {
   VpiContext ctx;
 
@@ -92,8 +68,6 @@ TEST(NamedEventModel, IndexIterationIsNullWhenNotAnArrayElement) {
   EXPECT_EQ(ctx.Iterate(vpiIndex, &standalone), nullptr);
 }
 
-// Detail 3: vpiRange on a named event array walks the unpacked range
-// declarations from the leftmost range through to the rightmost.
 TEST(NamedEventModel, RangeIterationWalksUnpackedRangesLeftToRight) {
   VpiContext ctx;
 
@@ -112,10 +86,6 @@ TEST(NamedEventModel, RangeIterationWalksUnpackedRangesLeftToRight) {
   EXPECT_EQ(ranges[1], &rightmost);
 }
 
-// Details 1 and 2 select distinct targets: when a named event carries both a
-// waiting thread and an array index, vpiWaitingProcesses reaches only the
-// thread and vpiIndex reaches only the index expression - the two special
-// relations do not cross-contaminate.
 TEST(NamedEventModel, WaitingAndIndexRelationsSelectDistinctTargets) {
   VpiContext ctx;
 
@@ -138,25 +108,11 @@ TEST(NamedEventModel, WaitingAndIndexRelationsSelectDistinctTargets) {
   EXPECT_EQ(indices[0], &index);
 }
 
-// -----------------------------------------------------------------------------
-// The two typespec edges. §37.27 draws a named event to its event typespec and
-// a named event array to its array typespec, both to the `typespec` class
-// §37.25 fills with the concrete typespec kinds. §37.4.1 makes that enclosure a
-// grouping rather than an object, so vpiTypespec is the group's name; matching
-// it against an object's own type, which is what the generic traversal does,
-// reached the typespec of no named event any design declares.
-// -----------------------------------------------------------------------------
-
-// Class membership: the kinds the enclosure holds are the concrete typespecs
-// §37.25 draws inside it, which is what the edge has to reach. An object of
-// some other kind is not one of them.
 TEST(NamedEventModel, TheTypespecClassGroupsTheConcreteTypespecKinds) {
   EXPECT_TRUE(VpiIsTypespecType(vpiEventTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiArrayTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiStructTypespec));
   EXPECT_TRUE(VpiIsTypespecType(vpiTypeParameter));
-  // The chandle, integer, time and real typespecs are kinds of their own,
-  // whose values no other typespec kind shares (#5746).
   for (int kind : {vpiChandleTypespec, vpiIntegerTypespec, vpiTimeTypespec,
                    vpiRealTypespec}) {
     EXPECT_TRUE(VpiIsTypespecType(kind));
@@ -166,9 +122,6 @@ TEST(NamedEventModel, TheTypespecClassGroupsTheConcreteTypespecKinds) {
   EXPECT_FALSE(VpiIsTypespecType(vpiThread));
 }
 
-// §37.27 (figure, named event --vpiTypespec--> event typespec): a named event
-// reaches the event typespec drawn on it. A waiting thread hanging off the same
-// event, which the diagram reaches by an edge of its own, is not it.
 TEST(NamedEventModel, ANamedEventReachesItsEventTypespec) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -188,9 +141,6 @@ TEST(NamedEventModel, ANamedEventReachesItsEventTypespec) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.27 (figure, named event array --vpiTypespec--> array typespec): the array
-// reaches the array typespec drawn on it, by the same edge and the same class.
-// A range declaration, which detail 3 reaches by its own iteration, is not it.
 TEST(NamedEventModel, ANamedEventArrayReachesItsArrayTypespec) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -210,8 +160,6 @@ TEST(NamedEventModel, ANamedEventArrayReachesItsArrayTypespec) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.27 (figure): a named event declared with no typespec reaches none, rather
-// than some other object hanging off it.
 TEST(NamedEventModel, ANamedEventWithNoTypespecReachesNone) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -228,10 +176,8 @@ TEST(NamedEventModel, ANamedEventWithNoTypespecReachesNone) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.27 against a design read and run whole.
 class NamedEventsOfARun : public VpiDesignRun {
  protected:
-  // The type of what `relation` reaches from `ref`, 0 for nothing.
   static int KindOf(int relation, vpiHandle ref) {
     vpiHandle reached = ref == nullptr ? nullptr : vpi_handle(relation, ref);
     return reached == nullptr ? 0 : vpi_get(vpiType, reached);
@@ -249,8 +195,6 @@ constexpr const char* kEvents =
     "  initial begin #1 -> f; end\n"
     "endmodule\n";
 
-// §37.27 (figure): a named event reaches an event typespec, and a named event
-// array an array typespec whose elements are of that type (#7102, #7105).
 TEST_F(NamedEventsOfARun, AnEventAndAnEventArrayReachTheirTypespecs) {
   Run(kEvents);
   EXPECT_EQ(KindOf(vpiTypespec, By("top.e")), vpiEventTypespec);
@@ -260,9 +204,6 @@ TEST_F(NamedEventsOfARun, AnEventAndAnEventArrayReachTheirTypespecs) {
   EXPECT_EQ(KindOf(vpiElemTypespec, array), vpiEventTypespec);
 }
 
-// §37.27 (figure): an element of a named event array is a named event, which
-// vpi_handle_by_index reaches and which reaches the array through vpiParent
-// (#7103, #7104).
 TEST_F(NamedEventsOfARun, AnEventArraysElementsAreNamedEvents) {
   Run(kEvents);
   vpiHandle array = By("top.ea");
@@ -274,10 +215,6 @@ TEST_F(NamedEventsOfARun, AnEventArraysElementsAreNamedEvents) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiParent, element)), VpiObjectOf(array));
 }
 
-// §37.27 detail 1: vpiWaitingProcesses reaches the thread of each process an
-// event control holds waiting on the event, one waiting on it among others
-// included, and none that has since been woken: `@(e or f)` and `@f` resume
-// when f is triggered, and `@e` and `@(g or e)` wait on (#7106).
 TEST_F(NamedEventsOfARun, AnEventReachesTheThreadsWaitingOnIt) {
   Run(kEvents);
   EXPECT_EQ(ObjectsOf(vpiWaitingProcesses, By("top.e")).size(), 2U);

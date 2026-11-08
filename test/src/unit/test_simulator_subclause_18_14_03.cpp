@@ -8,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The two classes of the clause's example, each with one rand integer.
 const char* const kClasses =
     "  class C1;\n"
     "    rand integer x;\n"
@@ -17,10 +16,6 @@ const char* const kClasses =
     "    rand integer y;\n"
     "  endclass\n";
 
-// 18.14.3: an object's randomize() calls do not depend on calls to the other
-// randomize functions, so the clause's example run again with a $random, a
-// $urandom and a std::randomize() between its two calls returns the same c1.x
-// and c2.y, as the design test/src/e2e/object_stability.sv runs it.
 TEST(ObjectStabilityRun, OtherRandomizeFunctionsBetweenTheCallsChangeNothing) {
   SimFixture f;
   std::string out = RunCapture(std::string("module t;\n") + kClasses +
@@ -53,11 +48,6 @@ TEST(ObjectStabilityRun, OtherRandomizeFunctionsBetweenTheCallsChangeNothing) {
   EXPECT_EQ(out, "2\n");
 }
 
-// 18.14.3: c1.x and c2.y do not depend on each other, since every instance
-// draws from its own random source with its own seed, so c1.x is the same after
-// five more calls on c2, two instances seeded with 3 draw the same four values,
-// and c1 seeded with 3 again replays its four, as the design
-// test/src/e2e/object_stability.sv runs it.
 TEST(ObjectStabilityRun, EachInstanceIsItsOwnSourceSeededIndependently) {
   SimFixture f;
   std::string out = RunCapture(
@@ -97,10 +87,6 @@ TEST(ObjectStabilityRun, EachInstanceIsItsOwnSourceSeededIndependently) {
   EXPECT_EQ(out, "1 4 4\n");
 }
 
-// 18.14.3: an instance gets its random seed from the thread that creates it, so
-// an instance seeded by hand with the value the thread would have drawn next
-// draws what the one created there drew, as the design
-// test/src/e2e/object_stability.sv runs it.
 TEST(ObjectStabilityRun, TheSeedIsTakenFromTheParentThreadAtCreation) {
   SimFixture f;
   std::string out = RunCapture(std::string("module t;\n") + kClasses +

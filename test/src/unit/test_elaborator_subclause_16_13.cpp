@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §16.13: the process of an assertion whose sequence names a clock of its
-// own wakes on that clock beside the leading one, and the statement keeps
-// the leading clock alone, on which every attempt begins.
 TEST(MulticlockElaboration, TheProcessWakesOnEveryClockTheSequenceNames) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,11 +32,6 @@ TEST(MulticlockElaboration, TheProcessWakesOnEveryClockTheSequenceNames) {
   EXPECT_EQ(p->body->assert_clock[0].signal->text, "clk0");
 }
 
-// §16.13.4: a property whose body is the bare name of a named sequence,
-// which the parser read as a boolean since a variable's name reads the
-// same, is the sequence: the elaborator makes the body a sequence operand
-// instantiating it, and the assertion's process wakes on the clocks the
-// sequence names.
 TEST(MulticlockElaboration, ABareSequenceNameInAPropertyBodyIsTheSequence) {
   ElabFixture f;
   auto* design = ElaborateSrc(

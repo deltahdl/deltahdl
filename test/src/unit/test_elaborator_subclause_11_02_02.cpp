@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -56,12 +54,6 @@ TEST(AggregateExpr, StructPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2 requires two aggregate operands of a comparison operator to have
-// equivalent types in the §6.22.2 sense, and §6.22.2 is where equivalence is
-// defined. The report names §6.22.2 because that is the definition the check
-// applies, and because test/src/unit/test_elaborator_subclause_06_22_02.cpp and
-// test/src/unit/test_elaborator_subclause_06_04.cpp already read this same
-// message as §6.22.2's.
 TEST(AggregateExpr, NonEquivalentTypeComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -108,11 +100,6 @@ TEST(AggregateExpr, StructCopiedInAssignment) {
 
 TEST(AggregateExpr, StructPassedThroughPort) {
   ElabFixture f;
-  // The struct type is declared at compilation-unit scope so it is visible
-  // both where inner's ANSI port list names it and where m instantiates inner;
-  // the aggregate s then flows through the port (§11.2.2 ¶2). The port is
-  // declared `var`: §23.2.2.3 makes an input whose port kind is omitted a net,
-  // and §6.7.1 gives no net a structure of 2-state int members.
   auto* design = ElaborateSrc(
       "typedef struct { int a; int b; } pair_t;\n"
       "module inner(input var pair_t p);\n"
@@ -126,8 +113,6 @@ TEST(AggregateExpr, StructPassedThroughPort) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Inequality is the other comparison operator §11.2.2 admits, and it is held to
-// the same equivalence definition in §6.22.2.
 TEST(AggregateExpr, NonEquivalentTypeInequalityError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -204,9 +189,6 @@ TEST(AggregateExpr, ArrayPassedToFunction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Two unpacked arrays of differing size are not of equivalent type under
-// §6.22.2, so comparing them breaks the requirement §11.2.2 places on aggregate
-// comparison operands.
 TEST(AggregateExpr, NonEquivalentArrayTypeComparisonError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -239,8 +221,6 @@ TEST(AggregateExpr, EquivalentTypeComparisonInContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The requirement holds wherever the comparison is written; a continuous
-// assignment is checked against the same §6.22.2 equivalence.
 TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -259,7 +239,6 @@ TEST(AggregateExpr, NonEquivalentTypeComparisonInContAssign) {
                             "6.22.2"));
 }
 
-// Array inequality, held to §6.22.2 equivalence like array equality.
 TEST(AggregateExpr, NonEquivalentArrayTypeInequalityError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -280,8 +259,6 @@ TEST(AggregateExpr, NonEquivalentArrayTypeInequalityError) {
 
 TEST(AggregateExpr, ArrayPassedThroughPort) {
   ElabFixture f;
-  // Unpacked-array type shared at compilation-unit scope so inner's ANSI port
-  // list can name it; the aggregate s then flows through the port (§11.2.2 ¶2).
   auto* design = ElaborateSrc(
       "typedef logic [7:0] arr_t [0:3];\n"
       "module inner(input arr_t a);\n"
@@ -309,10 +286,6 @@ TEST(AggregateExpr, ArrayConstructorAsAggregate) {
 }
 
 TEST(AggregateExpr, EquivalentArraySliceComparison) {
-  // §11.2.2 ¶1 names a multi-element slice of an unpacked array as an
-  // aggregate expression; two slices drawn from the same array type are of
-  // equivalent type (§6.22.2), so comparing them is legal and elaborates
-  // without a non-equivalent-aggregate error.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -326,14 +299,6 @@ TEST(AggregateExpr, EquivalentArraySliceComparison) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.2.2 counts a slice of several elements of an unpacked array as an
-// aggregate expression, so slices of non-equivalent array types are
-// non-equivalent operands and the report names the §6.22.2 definition they
-// fail.
-// §6.22.2 makes two unpacked fixed-size arrays equivalent when their element
-// types are equivalent and they have the same shape, whatever typedefs they
-// were declared through: two four-element slices of logic [7:0] arrays are,
-// though the arrays are of different typedefs and sizes.
 TEST(AggregateExpr, EqualShapedSlicesOfDifferentTypedefsCompare) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -350,9 +315,6 @@ TEST(AggregateExpr, EqualShapedSlicesOfDifferentTypedefsCompare) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Arrays of different sizes, or different element types, are not equivalent,
-// declared through a typedef or not, and a slice of a different length is not
-// equivalent to the whole array.
 TEST(AggregateExpr, NonEquivalentArrayComparisonsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -383,9 +345,6 @@ TEST(AggregateExpr, NonEquivalentArrayComparisonsReported) {
 }
 
 TEST(AggregateExpr, EquivalentArraySliceInequality) {
-  // The inequality operator is the other comparison form §11.2.2 ¶2 admits;
-  // two slices of the same array type are equivalent (§6.22.2), so an
-  // inequality between them elaborates cleanly like the equality case.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -400,10 +359,6 @@ TEST(AggregateExpr, EquivalentArraySliceInequality) {
 }
 
 TEST(AggregateExpr, NonEquivalentArraySliceInequalityError) {
-  // Negative form: an inequality between slices of non-equivalent array types
-  // is rejected just as the equality comparison is, under the same §6.22.2
-  // definition of equivalent type that §11.2.2 requires the operands to meet.
-  // Slices of four and five elements are not of one shape.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

@@ -68,13 +68,6 @@ TEST(LoopGenerateParsing, GenvarDeclaredInsideGenerateRegion) {
 }
 
 TEST(LoopGenerateParsing, ForBodySingleItemRecordsNoBeginEnd) {
-  // A.4.2 ends loop_generate_construct with a generate_block, which is either a
-  // single generate_item or a begin-end block, and gen_body_has_begin_end says
-  // which was written here as it does for a conditional generate construct.
-  // §27.5, printed page 825, rules that direct nesting has no bearing at all on
-  // loop generate constructs, so the field is recorded in this position without
-  // that rule bearing on it: a loop generate block is a scope whether or not
-  // begin and end were written.
   auto r = Parse(
       "module m;\n"
       "  genvar i;\n"
@@ -91,13 +84,6 @@ TEST(LoopGenerateParsing, ForBodySingleItemRecordsNoBeginEnd) {
   EXPECT_FALSE(loop->gen_body_has_begin_end);
 }
 
-// A.4.2 gives genvar_iteration three forms -- an assignment_operator on the
-// genvar, and ++ or -- before or after it -- and §27.4 says the same in prose:
-// the initialization and the iteration assignments of the loop generate scheme
-// both assign the one genvar. A `~i` in the third header position names the
-// genvar and assigns to nothing: inc_or_dec_operator is ++ or -- and nothing
-// else, so the form is reported by the parser, where every position that
-// reaches the elaborator has one of the three.
 TEST(LoopGenerateParsing, StepThatIsANonIncrementUnaryIsRejected) {
   auto r = Parse(
       "module top();\n"
@@ -112,11 +98,6 @@ TEST(LoopGenerateParsing, StepThatIsANonIncrementUnaryIsRejected) {
                             4, "A.4.2"));
 }
 
-// A.4.2 gives genvar_initialization ::= [ genvar ] genvar_identifier =
-// constant_expression, and §27.4 requires the loop index to be declared by a
-// genvar declaration, which the keyword written here is. The parser records
-// the name the keyword declares on the initialization, and nothing for a loop
-// whose index is declared elsewhere, so the elaborator can tell the two apart.
 TEST(LoopGenerateParsing, InlineGenvarIsRecordedOnTheInitialization) {
   auto r = Parse(
       "module m;\n"

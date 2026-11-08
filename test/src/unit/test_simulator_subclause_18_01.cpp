@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The Bus of §18.3, with its random addr and data and its word_align
-// constraint, around the statements of an initial.
 std::string Design(const std::string& body) {
   return "class Bus;\n"
          "  rand bit [15:0] addr;\n"
@@ -28,10 +26,6 @@ std::string Design(const std::string& body) {
          "endmodule\n";
 }
 
-// §18.1: the clause's random variables, constraint blocks and
-// randomization methods, which the overview names first: randomize()
-// answers 1 and leaves addr's two low-order bits 0 under word_align, and
-// its with clause adds addr == 8 to the constraints.
 TEST(ConstrainedRandomOverview, VariablesConstraintsAndMethods) {
   SimFixture f;
   std::string out =
@@ -43,10 +37,6 @@ TEST(ConstrainedRandomOverview, VariablesConstraintsAndMethods) {
   EXPECT_EQ(out, "1 0\n1\n");
 }
 
-// §18.1: disabling randomization and controlling constraints:
-// data.rand_mode(0) keeps data at the 99 written before the next
-// randomize(), and word_align.constraint_mode(0) lets an in-line addr == 3
-// be solved where the block would have refused it.
 TEST(ConstrainedRandomOverview, DisablingRandomizationAndConstraints) {
   SimFixture f;
   std::string out =
@@ -61,11 +51,6 @@ TEST(ConstrainedRandomOverview, DisablingRandomizationAndConstraints) {
   EXPECT_EQ(out, "99\n1\n");
 }
 
-// §18.1: scope variable randomization, seeding, the random weighted case
-// and random sequence generation: std::randomize(v) holds v to the range
-// its with clause gives, two objects seeded alike through srandom draw the
-// same addr, a randcase whose second branch weighs 0 takes the first, and
-// a randsequence runs its productions in order.
 TEST(ConstrainedRandomOverview, ScopeSeedingRandcaseAndRandsequence) {
   SimFixture f;
   std::string out = RunCapture(

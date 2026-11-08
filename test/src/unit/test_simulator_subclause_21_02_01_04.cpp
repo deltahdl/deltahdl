@@ -17,8 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a NetStrength from the drive-0 and drive-1 strength ranges so a test
-// can describe exactly the strength state §21.2.1.4 renders.
 NetStrength MakeNS(Strength s0_hi, Strength s0_lo, Strength s1_hi,
                    Strength s1_lo) {
   NetStrength ns;
@@ -29,8 +27,6 @@ NetStrength MakeNS(Strength s0_hi, Strength s0_lo, Strength s1_hi,
   return ns;
 }
 
-// Runs a single-module source through elaboration and simulation while
-// capturing stdout, so a %v rendering produced by $display can be inspected.
 std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
@@ -40,19 +36,12 @@ std::string CaptureDisplayOutput(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
-// Runs a source that displays one net with %v and asserts the expected
-// three-character strength rendering appears in the output, so cases that
-// differ only in the drive strengths of their source share one body.
 void ExpectPercentVOutput(const std::string& src, const std::string& expected) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(src, f);
   EXPECT_NE(out.find(expected), std::string::npos);
 }
 
-// Runs a source declaring one net as `decl` and passing `operand` to %v, and
-// asserts the run reported §21.2.1.4's "shall" against it at the line of the
-// call, naming the operand shape as `shape`, so the cases differ only in the
-// declaration and the operand they name.
 void ExpectPercentVReported(const std::string& decl, const std::string& operand,
                             const std::string& shape) {
   SimFixture f;
@@ -68,100 +57,64 @@ void ExpectPercentVReported(const std::string& decl, const std::string& operand,
       LineHolding(kSrc, "$display"), "21.2.1.4"));
 }
 
-// The vector and one-bit-vector cases, which name the whole net.
 void ExpectPercentVOperandReported(const std::string& decl) {
   ExpectPercentVReported(decl, "w", "a net declared with a range");
 }
 
-// Runs a source and asserts it reported nothing at all, for the operand forms
-// §21.2.1.4 admits.
 void ExpectPercentVNotReported(const std::string& src) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(src, f);
   EXPECT_TRUE(f.diag.Diagnostics().empty()) << out;
 }
 
-// Table 21-5: a strong drive of a logic 1 renders with the St mnemonic and the
-// 1 logic-value character.
 TEST(StrengthFormat, StrongDriveOneIsSt1) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
                                   Strength::kStrong, Strength::kStrong)),
             "St1");
 }
 
-// Table 21-5: a pull drive of a logic 0 renders as Pu0.
 TEST(StrengthFormat, PullDriveZeroIsPu0) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kPull,
                                   Strength::kHighz, Strength::kHighz)),
             "Pu0");
 }
 
-// §21.2.1.4: the high-impedance strength cannot carry a known logic value; the
-// only logic value allowed at this level is Z, so a fully undriven net renders
-// as HiZ.
 TEST(StrengthFormat, UndrivenNetIsHiZ) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
                                   Strength::kHighz, Strength::kHighz)),
             "HiZ");
 }
 
-// Table 21-5: a 0-valued charge stored on a medium capacitor renders as Me0.
 TEST(StrengthFormat, MediumCapacitorZeroIsMe0) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kMedium, Strength::kMedium,
                                   Strength::kHighz, Strength::kHighz)),
             "Me0");
 }
 
-// §21.2.1.4: an unknown value is shown with a mnemonic when its 0 and 1
-// strength components share one level. §28.12.2 says which level each component
-// is, reading the 35X of Figure 28-9 as a first digit for the result's highest
-// strength0 level and a second for its highest strength1 level. The two sides
-// here are ranges, which is the shape §28.12.2 gives an equal-strength
-// conflict: the result carries both signals' strength levels and every weaker
-// level, drawn in Figure 28-5 as reaching down through high impedance on both
-// sides. Their highest levels are both strong, so the rendering is StX.
-// Collapsing the two sides to points instead would make the two components
-// sharing a level and neither side having a range one condition for this input,
-// and the case could not tell the clause's rule from that narrower one.
 TEST(StrengthFormat, StrongUnknownSameLevelIsStX) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kHighz,
                                   Strength::kStrong, Strength::kHighz)),
             "StX");
 }
 
-// §21.2.1.4 / Table 21-5: a value that is ambiguously a pull-driven 1 or high
-// impedance is the H logic value, and L/H always use a mnemonic -> PuH.
 TEST(StrengthFormat, PullOneOrHighZIsPuH) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
                                   Strength::kPull, Strength::kHighz)),
             "PuH");
 }
 
-// §21.2.1.4 / Table 21-5: an unknown value whose 0 and 1 components are at
-// different strength levels prints the two levels as decimal digits in 0-then-1
-// order, followed by X -- a strong (6) 0 and a pull (5) 1 give 65X.
 TEST(StrengthFormat, UnknownDifferentLevelsIs65X) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kStrong,
                                   Strength::kPull, Strength::kPull)),
             "65X");
 }
 
-// §21.2.1.4: for an unknown value at differing levels the two digits are the
-// 0-side level then the 1-side level, in that order -- not sorted by magnitude.
-// Here the 0 side is the weaker pull (5) and the 1 side the stronger strong
-// (6), so the rendering must read 56X; a magnitude-sorted implementation would
-// wrongly emit 65X. This complements the descending 65X case to pin the order.
 TEST(StrengthFormat, UnknownDifferentLevelsKeepsZeroThenOneOrder) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kPull,
                                   Strength::kStrong, Strength::kStrong)),
             "56X");
 }
 
-// §21.2.1.4 builds the unknown rendering out of the 0 and 1 strength components
-// alone, and §28.12.2 makes each of those the highest level of its side, so
-// neither the mnemonic nor the digit form carries a lower bound. Two values
-// whose highest levels agree therefore render alike however far down their
-// ranges reach; these two differ only in s1_lo.
 TEST(StrengthFormat, UnknownRenderingIgnoresTheLowerBounds) {
   const std::string kCollapsed =
       FormatStrength(MakeNS(Strength::kStrong, Strength::kStrong,
@@ -173,59 +126,36 @@ TEST(StrengthFormat, UnknownRenderingIgnoresTheLowerBounds) {
   EXPECT_EQ(kOneSideRanged, "StX");
 }
 
-// §28.12.2, Figure 28-11: a 651 signal (a 1 ranging from strong down to pull)
-// and a 530 signal (a 0 ranging from pull down to weak) combine to 56X. Both
-// sides of that result are genuine ranges, and the standard still spells it
-// with exactly two digits -- the highest strength0 level, pull (5), then the
-// highest strength1 level, strong (6). There is no four-digit form in which the
-// two lower bounds could appear.
 TEST(StrengthFormat, UnknownWithBothSidesRangedPrintsTheTwoHighestLevels) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kWeak,
                                   Strength::kStrong, Strength::kPull)),
             "56X");
 }
 
-// §28.12.2, Figure 28-9: a pull H combined with a weak L is 35X, over the range
-// Figure 28-10 draws from We0 (3) through high impedance up to Pu1 (5). Both
-// lower bounds are at high impedance here and the digits still apply, because
-// the two highest levels differ. Together with StrongUnknownSameLevelIsStX,
-// whose lower bounds are equally low but whose highest levels agree, this fixes
-// the choice between the mnemonic and the digits on the highest levels alone.
 TEST(StrengthFormat, UnknownFromCombinedAmbiguousStrengthsIs35X) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kWeak, Strength::kHighz,
                                   Strength::kPull, Strength::kHighz)),
             "35X");
 }
 
-// §21.2.1.4 / Table 21-5: a logic 0 driven across a range of strengths prints
-// the maximum then minimum level as decimal digits -- pull (5) down to medium
-// (2) gives 520.
 TEST(StrengthFormat, ZeroAcrossRangeIs520) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kPull, Strength::kMedium,
                                   Strength::kHighz, Strength::kHighz)),
             "520");
 }
 
-// §21.2.1.4: a logic 1 driven across a range of strengths likewise prints the
-// maximum then minimum level -- strong (6) down to pull (5) gives 651.
 TEST(StrengthFormat, OneAcrossRangeIsDigitsThenValue) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
                                   Strength::kStrong, Strength::kPull)),
             "651");
 }
 
-// Table 21-3: the L logic value stands for a 0 or a high impedance. A 0 side
-// whose strength reaches down to highz is ambiguous between driving 0 and
-// floating, and L always uses a mnemonic for the strength level -> StL.
 TEST(StrengthFormat, ZeroOrHighZIsMnemonicL) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kStrong, Strength::kHighz,
                                   Strength::kHighz, Strength::kHighz)),
             "StL");
 }
 
-// Table 21-4: every strength-level mnemonic is reachable. Su (supply, 7), La
-// (large capacitor, 4), We (weak, 3), and Sm (small, 1) complete the set
-// alongside St/Pu/Me/Hi exercised above.
 TEST(StrengthFormat, AllStrengthLevelMnemonicsAreReachable) {
   EXPECT_EQ(FormatStrength(MakeNS(Strength::kHighz, Strength::kHighz,
                                   Strength::kSupply, Strength::kSupply)),
@@ -241,9 +171,6 @@ TEST(StrengthFormat, AllStrengthLevelMnemonicsAreReachable) {
             "Sm0");
 }
 
-// §21.2.1.4: for each %v in a string literal, a corresponding scalar reference
-// follows in the argument list. The dispatcher must therefore consume one
-// argument per %v and substitute that argument's strength rendering in order.
 TEST(StrengthFormat, PercentVConsumesOneArgumentEach) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 1, 1),
@@ -253,8 +180,6 @@ TEST(StrengthFormat, PercentVConsumesOneArgumentEach) {
   EXPECT_EQ(out, "a=St1 b=Pu0");
 }
 
-// Table 21-1 gives every specifier in both cases ("%v or %V"); the uppercase
-// form must route to the same strength substitution as the lowercase one.
 TEST(StrengthFormat, PercentVUppercaseMatchesLowercase) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 1, 0)};
@@ -263,9 +188,6 @@ TEST(StrengthFormat, PercentVUppercaseMatchesLowercase) {
             FormatDisplay("%v", vals, {.v_fmts = &v_fmts, .loc = {}}));
 }
 
-// End-to-end: a wire driven to a known logic 1 by a continuous assignment
-// resolves to a strong drive, and FormatStrength renders that resolved net
-// strength as St1.
 TEST(StrengthFormat, ResolvedNetStrengthRendersStrongDriveOne) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -281,7 +203,6 @@ TEST(StrengthFormat, ResolvedNetStrengthRendersStrongDriveOne) {
   EXPECT_EQ(FormatStrength(net->resolved_strength), "St1");
 }
 
-// End-to-end: the same net driven to a known logic 0 renders as St0.
 TEST(StrengthFormat, ResolvedNetStrengthRendersStrongDriveZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -297,8 +218,6 @@ TEST(StrengthFormat, ResolvedNetStrengthRendersStrongDriveZero) {
   EXPECT_EQ(FormatStrength(net->resolved_strength), "St0");
 }
 
-// End-to-end through the display path: $display("%v", net) prints the scalar
-// net's three-character strength rendering.
 TEST(StrengthFormat, DisplayPercentVPrintsNetStrength) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -311,33 +230,22 @@ TEST(StrengthFormat, DisplayPercentVPrintsNetStrength) {
   EXPECT_NE(out.find("St1"), std::string::npos);
 }
 
-// §21.2.1.4: each %v consumes exactly one argument from the list. Edge case --
-// even when no strength rendering is available for that argument, the %v still
-// consumes its slot, so a following specifier binds to the next argument. Here
-// the %v eats the first value (5, which is therefore never printed) and the %d
-// binds to the second, proving the per-%v argument advance.
 TEST(StrengthFormat, PercentVConsumesItsArgumentWithoutAStrengthString) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 8, 5),
                               MakeLogic4VecVal(arena, 8, 9)};
   std::vector<std::string> v_fmts{""};
   auto out = FormatDisplay("%v=%d", vals, {.v_fmts = &v_fmts, .loc = {}});
-  // The 5 was consumed by the %v (which had no strength string), so it never
-  // prints; the %d therefore binds to the second argument, 9.
   EXPECT_EQ(out.find('5'), std::string::npos);
   EXPECT_NE(out.find('9'), std::string::npos);
 }
 
-// Error/edge case: a %v with no corresponding argument supplied must neither
-// crash nor leave a stray percent sign -- it simply renders nothing.
 TEST(StrengthFormat, PercentVWithoutArgumentEmitsNothing) {
   std::vector<Logic4Vec> vals;
   auto out = FormatDisplay("%v", vals);
   EXPECT_TRUE(out.empty());
 }
 
-// End-to-end edge case: an undriven scalar net has no driver, so its resolved
-// strength stays at the high-impedance level, which §21.2.1.4 reports as HiZ.
 TEST(StrengthFormat, UndrivenWireDisplaysAsHiZ) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -349,15 +257,6 @@ TEST(StrengthFormat, UndrivenWireDisplaysAsHiZ) {
   EXPECT_NE(out.find("HiZ"), std::string::npos);
 }
 
-// End-to-end: §21.2.1.4 says the first two characters may be a Table 21-4
-// mnemonic, and that the charge storage strengths (small/medium/large
-// capacitor) are the ones associated with the trireg net. The strong-drive and
-// HiZ end-to-end cases above never exercise a charge-storage strength; this one
-// does, driven entirely from real trireg source. A large-size trireg is driven
-// to a 1 through a §28 conditional continuous assignment, then the driver is
-// released to high impedance so the trireg enters its charge storage state
-// holding the 1 at large capacitor strength. Displaying it with %v must render
-// the La mnemonic (large capacitor, level 4) with the held 1 logic value: La1.
 TEST(StrengthFormat, DisplayPercentVOnTriregShowsChargeStorageMnemonic) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -366,9 +265,9 @@ TEST(StrengthFormat, DisplayPercentVOnTriregShowsChargeStorageMnemonic) {
       "  trireg (large) cap;\n"
       "  assign cap = en ? 1'b1 : 1'bz;\n"
       "  initial begin\n"
-      "    en = 1'b1;\n"  // drive cap to a strong 1
+      "    en = 1'b1;\n"
       "    #1;\n"
-      "    en = 1'b0;\n"  // release the driver -> capacitive (charge) state
+      "    en = 1'b0;\n"
       "    #1;\n"
       "    $display(\"%v\", cap);\n"
       "  end\n"
@@ -377,12 +276,6 @@ TEST(StrengthFormat, DisplayPercentVOnTriregShowsChargeStorageMnemonic) {
   EXPECT_NE(out.find("La1"), std::string::npos);
 }
 
-// End-to-end: §21.2.1.4 names four driving strengths (supply, strong, pull,
-// weak), and the pull mnemonic Pu (Table 21-4, level 5) must be reachable from
-// a real driving source. A strength-specified continuous assignment (§28.12.2)
-// that drives a 1 at pull strength resolves the net to that strength, and %v
-// renders it as Pu1 -- the Pu mnemonic with the driven 1 logic value. Only the
-// strong drive was covered end-to-end above; this pins the pull driving level.
 TEST(StrengthFormat, DisplayPercentVOnPullDrivenNetShowsPu1) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -395,11 +288,6 @@ TEST(StrengthFormat, DisplayPercentVOnPullDrivenNetShowsPu1) {
   EXPECT_NE(out.find("Pu1"), std::string::npos);
 }
 
-// End-to-end: the weak driving strength We (Table 21-4, level 3) reached from a
-// real strength-specified continuous assignment (§28.12.2) driving a 0. The
-// third character is the driven 0 logic value, so the rendering is We0. This
-// also exercises the Claim-5 path from a side without a range to a mnemonic for
-// a 0 value at a non-strong driving level.
 TEST(StrengthFormat, DisplayPercentVOnWeakDrivenNetShowsWe0) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -412,11 +300,6 @@ TEST(StrengthFormat, DisplayPercentVOnWeakDrivenNetShowsWe0) {
   EXPECT_NE(out.find("We0"), std::string::npos);
 }
 
-// End-to-end: the supply driving strength Su (Table 21-4, level 7, the highest)
-// reached from a real strength-specified continuous assignment (§28.12.2)
-// driving a 1. Renders as Su1. Together with the strong (St1/St0), pull (Pu1),
-// and weak (We0) cases, this covers all four driving strengths of §21.2.1.4
-// end-to-end from continuous-assignment sources.
 TEST(StrengthFormat, DisplayPercentVOnSupplyDrivenNetShowsSu1) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -429,13 +312,6 @@ TEST(StrengthFormat, DisplayPercentVOnSupplyDrivenNetShowsSu1) {
   EXPECT_NE(out.find("Su1"), std::string::npos);
 }
 
-// End-to-end: §28.12.2, Figure 28-4 combines a weak 1 with a weak 0 and names
-// the result WeX, Figure 28-5 drawing its range from We0 through high impedance
-// up to We1. Two weak continuous assignments of opposite value are exactly that
-// combination, and §21.2.1.4 gives it a mnemonic because both strength
-// components -- the highest level of each side, per §28.12.2 -- are weak. The
-// lower bounds lie at high impedance and reach no part of the rendering, so the
-// weak conflict prints WeX rather than the digits of its range.
 TEST(StrengthFormat, DisplayPercentVOnWeakConflictShowsWeX) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -447,13 +323,6 @@ TEST(StrengthFormat, DisplayPercentVOnWeakConflictShowsWeX) {
       "WeX");
 }
 
-// End-to-end: the ordinary conflict. Two continuous assignments of opposite
-// value at the default drive put strong0 and strong1 on the wire, so both
-// strength components are at the strong level and §21.2.1.4 gives the result
-// the St mnemonic: StX. §28.12.2 adds every weaker strength level to that
-// result, so both lower bounds sit at high impedance, and the digit form is
-// still not what the clause asks for. Table 21-5 reads StX as an unknown value
-// driven at strong strength.
 TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -465,15 +334,6 @@ TEST(StrengthFormat, DisplayPercentVOnStrongConflictShowsStX) {
       "StX");
 }
 
-// End-to-end: a driver whose own value is x. §28.12.2 gives a signal of value x
-// strength levels drawn from both the strength1 and the strength0 halves of the
-// strength scale, so a strong driver of 1'bx puts strong on both sides -- the
-// value is unknown, the strength is not. §21.2.1.4 renders that with a
-// mnemonic, its 0 and 1 strength components sharing one level: StX.
-//
-// This is a different source from the equal-and-opposite conflict above, which
-// arrives at x by combining two known values. A net driven x by one driver
-// reported HiZ, which says nothing is driving it.
 TEST(StrengthFormat, DisplayPercentVOnStrongDrivenUnknownShowsStX) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -484,10 +344,6 @@ TEST(StrengthFormat, DisplayPercentVOnStrongDrivenUnknownShowsStX) {
       "StX");
 }
 
-// The level reported is the driver's own, not a constant strong: the same
-// unknown value driven under (pull0, pull1) renders PuX. Without this case, a
-// mapping that filled both sides at strong whatever the driver specified would
-// satisfy the case above.
 TEST(StrengthFormat, DisplayPercentVOnPullDrivenUnknownShowsPuX) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -498,10 +354,6 @@ TEST(StrengthFormat, DisplayPercentVOnPullDrivenUnknownShowsPuX) {
       "PuX");
 }
 
-// End-to-end: the small-capacitor charge storage strength Sm (Table 21-4, level
-// 1). A small-size trireg (§28.11) driven to 0 then released to high impedance
-// holds that 0 at small charge strength, which %v renders as Sm0 -- completing
-// the charge-storage strengths alongside the medium and large cases.
 TEST(StrengthFormat, DisplayPercentVOnSmallTriregShowsSm0) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -510,9 +362,9 @@ TEST(StrengthFormat, DisplayPercentVOnSmallTriregShowsSm0) {
       "  trireg (small) cap;\n"
       "  assign cap = en ? 1'b0 : 1'bz;\n"
       "  initial begin\n"
-      "    en = 1'b1;\n"  // drive cap to 0
+      "    en = 1'b1;\n"
       "    #1;\n"
-      "    en = 1'b0;\n"  // release -> capacitive state holding 0
+      "    en = 1'b0;\n"
       "    #1;\n"
       "    $display(\"%v\", cap);\n"
       "  end\n"
@@ -521,9 +373,6 @@ TEST(StrengthFormat, DisplayPercentVOnSmallTriregShowsSm0) {
   EXPECT_NE(out.find("Sm0"), std::string::npos);
 }
 
-// End-to-end: the medium-capacitor charge storage strength Me (Table 21-4,
-// level 2), reached from a medium-size trireg (§28.11) holding a 1 in its
-// charge storage state -> Me1.
 TEST(StrengthFormat, DisplayPercentVOnMediumTriregShowsMe1) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -532,9 +381,9 @@ TEST(StrengthFormat, DisplayPercentVOnMediumTriregShowsMe1) {
       "  trireg (medium) cap;\n"
       "  assign cap = en ? 1'b1 : 1'bz;\n"
       "  initial begin\n"
-      "    en = 1'b1;\n"  // drive cap to 1
+      "    en = 1'b1;\n"
       "    #1;\n"
-      "    en = 1'b0;\n"  // release -> capacitive state holding 1
+      "    en = 1'b0;\n"
       "    #1;\n"
       "    $display(\"%v\", cap);\n"
       "  end\n"
@@ -543,10 +392,6 @@ TEST(StrengthFormat, DisplayPercentVOnMediumTriregShowsMe1) {
   EXPECT_NE(out.find("Me1"), std::string::npos);
 }
 
-// End-to-end edge case: %v targets scalar nets. An operand that names a
-// variable rather than a net has no strength model, so the production lookup
-// finds no net and the specifier renders nothing between the surrounding
-// literal text.
 TEST(StrengthFormat, NonNetOperandToPercentVRendersEmpty) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -561,25 +406,14 @@ TEST(StrengthFormat, NonNetOperandToPercentVRendersEmpty) {
   EXPECT_NE(out.find("[]"), std::string::npos);
 }
 
-// §21.2.1.4 admits a scalar reference alone, which follows the string literal
-// in the argument list. A four-bit net is a vector (§6.9), and one
-// three-character group cannot stand for its four bits, so the operand is
-// reported rather than rendered.
 TEST(StrengthFormat, VectorNetOperandToPercentVIsReported) {
   ExpectPercentVOperandReported("wire [3:0] w;");
 }
 
-// The one-bit vector, settled explicitly rather than by accident: §6.9 makes an
-// object a scalar by its being declared with no range specification, so
-// `wire [0:0] w` is a vector however wide it is, and %v does not admit it. A
-// check written on the width alone would accept this.
 TEST(StrengthFormat, SingleBitVectorNetOperandToPercentVIsReported) {
   ExpectPercentVOperandReported("wire [0:0] w;");
 }
 
-// The check does not reject what the clause admits: a net declared with no
-// range is the scalar reference §21.2.1.4 asks for, and a run passing one to %v
-// reports nothing at all.
 TEST(StrengthFormat, ScalarNetOperandToPercentVIsNotReported) {
   ExpectPercentVNotReported(
       "module m;\n"
@@ -589,11 +423,6 @@ TEST(StrengthFormat, ScalarNetOperandToPercentVIsNotReported) {
       "endmodule\n");
 }
 
-// The rule §21.2.1.4 states is on the %v specification and not on the argument
-// on its own. A display task builds every rendering a template might draw on
-// for each argument it takes, %v's among them, so a vector net displayed with
-// %h reaches the strength renderer as well -- and it must pass through
-// unreported, because no %v consumed it.
 TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
   SimFixture f;
   std::string out = CaptureDisplayOutput(
@@ -606,14 +435,6 @@ TEST(StrengthFormat, VectorNetUnderAnIntegerSpecifierIsNotReported) {
   EXPECT_TRUE(f.diag.Diagnostics().empty()) << out;
 }
 
-// §21.2.1.4 asks a %v for a matching scalar reference, and §11.5.1 has a
-// bit-select name the one bit of vector acc that the operand index addresses.
-// One bit of a net is the scalar whose strength the clause reports, so a
-// bit-select of a vector net is the operand form that asks about it, and the
-// three characters for the bit named are what it renders. The net as a whole
-// drives both sides here -- bit 0 a 1 and the rest a 0, at the (strong1,
-// strong0) §10.3.4 defaults a continuous assignment to -- so a rendering taken
-// from the net rather than the bit would be the unknown value's StX instead.
 TEST(StrengthFormat, BitSelectOfVectorNetRendersThatBitsStrength) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -624,14 +445,6 @@ TEST(StrengthFormat, BitSelectOfVectorNetRendersThatBitsStrength) {
       "[St1]");
 }
 
-// The bit is read rather than the net. §6.6.5 makes a tri0 net carry a
-// continuous 0 of pull strength wherever nothing else drives it, so a driver
-// leaving bit 1 at z puts the two bits of this net at different strength levels
-// and different values: bit 0 is the assignment's strong 1 and bit 1 the net's
-// own pull 0. The net reports one strength for both, and §21.2.1.4 renders a 0
-// side and a 1 side at unequal levels as their two decimal digits -- 56X here
-// -- so a renderer answering with the net's own strength gives that one
-// rendering twice and neither of the two below.
 TEST(StrengthFormat, BitSelectReadsTheStrengthOfTheBitItNames) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -642,10 +455,6 @@ TEST(StrengthFormat, BitSelectReadsTheStrengthOfTheBitItNames) {
       "[St1][Pu0]");
 }
 
-// §11.5.1: the declaration helps decide which bit an address reaches. The
-// declaration here ascends, so index 1 is the most significant bit of the two
-// and index 2 the least; the value 2'b01 therefore drives a 0 at index 1. An
-// index read as a storage offset instead would answer with the other bit.
 TEST(StrengthFormat, BitSelectResolvesItsIndexAgainstTheDeclaredRange) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -656,10 +465,6 @@ TEST(StrengthFormat, BitSelectResolvesItsIndexAgainstTheDeclaredRange) {
       "[St0][St1]");
 }
 
-// §11.5.1 gives an out-of-bounds bit-select the value x: vect[addr] with addr
-// out of bounds returns x. Such an operand names no bit of the net, so there is
-// no scalar whose strength could be reported and nothing is rendered for it --
-// the same empty rendering an operand naming no net at all gets.
 TEST(StrengthFormat, OutOfRangeBitSelectOfNetRendersNothing) {
   ExpectPercentVOutput(
       "module m;\n"
@@ -670,9 +475,6 @@ TEST(StrengthFormat, OutOfRangeBitSelectOfNetRendersNothing) {
       "[]");
 }
 
-// An out-of-range index is still the scalar reference §21.2.1.4 asks for -- a
-// bit-select is one whether or not the bit it addresses exists -- so the run
-// reports nothing, which is what separates this from the vector operand above.
 TEST(StrengthFormat, OutOfRangeBitSelectOfNetIsNotReported) {
   ExpectPercentVNotReported(
       "module m;\n"
@@ -682,9 +484,6 @@ TEST(StrengthFormat, OutOfRangeBitSelectOfNetIsNotReported) {
       "endmodule\n");
 }
 
-// The admitted form reports nothing: a bit-select of a vector net is the scalar
-// reference the clause asks for, so the check that rejects the vector itself
-// must let a select of one bit of it through.
 TEST(StrengthFormat, BitSelectOfVectorNetOperandIsNotReported) {
   ExpectPercentVNotReported(
       "module m;\n"
@@ -694,29 +493,16 @@ TEST(StrengthFormat, BitSelectOfVectorNetOperandIsNotReported) {
       "endmodule\n");
 }
 
-// A part-select is no more a scalar reference than the vector it selects from:
-// §11.5.1 has it address a range of bits, and one three-character group stands
-// for one scalar. It is reported as the shape it is rather than as the vector,
-// since a writer given a whole net is told to select a bit and a writer given a
-// part-select has already selected one too many.
 TEST(StrengthFormat, PartSelectOfNetOperandToPercentVIsReported) {
   ExpectPercentVReported("wire [3:0] w;", "w[1:0]",
                          "a select naming more than one bit of a net");
 }
 
-// §7.4.1: a single index of a packed multidimensional array addresses one
-// element rather than one bit, so `w[0]` of a `[1:0][7:0]` net names eight bits
-// and is reported for the same reason a part-select is. A check written on the
-// select's syntax alone would take this for the bit-select it looks like.
 TEST(StrengthFormat, PackedElementSelectOfNetOperandToPercentVIsReported) {
   ExpectPercentVReported("wire [1:0][7:0] w;", "w[0]",
                          "a select naming more than one bit of a net");
 }
 
-// §21.2.1.4 with §23.6: a net named hierarchically is the net declared in the
-// instance the name reaches, so %v reports the strength its drivers give it
-// there -- the `and` inside `sub` drives `s.y` strong, the `nor (weak1, weak0)`
-// drives `s.z` weak -- as the same net named from inside `sub` would.
 TEST(StrengthFormat, NetOfASubmoduleNamedHierarchically) {
   SimFixture f;
   auto out = RunCapture(
@@ -734,10 +520,6 @@ TEST(StrengthFormat, NetOfASubmoduleNamedHierarchically) {
   EXPECT_EQ(out, "y=1 St1 z=0 We0\n");
 }
 
-// §21.2.1.4 with §23.6 and §25.3.2: gates in a module drive the nets of an
-// interface instance through the interface port connected to it, so the nets
-// named from the top through the instance, `b.y` and `b.z`, carry the
-// strengths those gates drive.
 TEST(StrengthFormat, NetOfAnInterfaceInstanceDrivenThroughItsPort) {
   SimFixture f;
   auto out = RunCapture(
@@ -758,9 +540,6 @@ TEST(StrengthFormat, NetOfAnInterfaceInstanceDrivenThroughItsPort) {
   EXPECT_EQ(out, "y=1 St1 z=0 We0\n");
 }
 
-// §25.3.2: an interface port named `p` connected to an instance named `i` is
-// that instance, so a gate driving `p.y` inside the module drives `i.y`, and
-// %v reports the same strength through either name.
 TEST(StrengthFormat, InterfaceNetNamedThroughThePortAndTheInstance) {
   SimFixture f;
   auto out = RunCapture(

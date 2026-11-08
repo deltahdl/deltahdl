@@ -20,8 +20,6 @@ TEST(IfnoneConditionElaboration, ParallelPathElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.4: an ifnone path between the same terminals as a state-dependent
-// path is that path's default delay, and the pair elaborates cleanly.
 TEST(IfnoneConditionElaboration, MatchingCompanionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -36,10 +34,6 @@ TEST(IfnoneConditionElaboration, MatchingCompanionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// C2 (bullet 2): a corresponding state-dependent path may be edge-sensitive as
-// well as simple. Here the ifnone path's only counterpart is an edge-sensitive
-// state-dependent path (§30.4.3 syntax) between the same source and
-// destination, and the design elaborates cleanly.
 TEST(IfnoneConditionElaboration, MatchingEdgeSensitiveCompanionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -54,10 +48,6 @@ TEST(IfnoneConditionElaboration, MatchingEdgeSensitiveCompanionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.4 treats an ifnone path that no state-dependent path corresponds to
-// as an unconditional simple path, so it is legal. The conditional path here
-// runs from another source, which does not make it correspond, and the check
-// once rejected the ifnone for it.
 TEST(IfnoneConditionElaboration, IfnoneFromAnotherSourceElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,9 +62,6 @@ TEST(IfnoneConditionElaboration, IfnoneFromAnotherSourceElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same rule with the destination differing: the conditional path to y does
-// not correspond to the ifnone path to z, which stands as an unconditional
-// path of its own.
 TEST(IfnoneConditionElaboration, IfnoneToAnotherDestinationElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -105,8 +92,6 @@ TEST(IfnoneConditionElaboration, ErrorCoexistsWithUnconditional) {
       "30.4.4.4"));
 }
 
-// A full-connection ifnone with two source terminals (§30.4.2, §30.4.5) beside
-// the state-dependent path between the same terminal lists elaborates cleanly.
 TEST(IfnoneConditionElaboration, MatchingFullConnectionCompanionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -121,12 +106,6 @@ TEST(IfnoneConditionElaboration, MatchingFullConnectionCompanionElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Claim E (bullet 4) forbids specifying both an ifnone and an unconditional
-// path only for the SAME module path. An unconditional path with a different
-// source and destination is a distinct module path, so it may coexist with the
-// ifnone without error. This observes that the conflict check is scoped by
-// endpoints, the accept boundary of the rule whose reject side is
-// ErrorCoexistsWith- Unconditional.
 TEST(IfnoneConditionElaboration, UnrelatedUnconditionalCoexists) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -141,9 +120,6 @@ TEST(IfnoneConditionElaboration, UnrelatedUnconditionalCoexists) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.4.4 forbids an ifnone path beside an unconditional *simple* path of the
-// same module path. An edge-sensitive path is no simple path, so an
-// unconditional one may stand beside the ifnone.
 TEST(IfnoneConditionElaboration, UnconditionalEdgeSensitivePathCoexists) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -158,9 +134,6 @@ TEST(IfnoneConditionElaboration, UnconditionalEdgeSensitivePathCoexists) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A module's specify blocks all declare its module paths, so the ifnone and
-// the unconditional path conflict when they sit in two blocks as when they
-// share one.
 TEST(IfnoneConditionElaboration, ConflictAcrossSpecifyBlocksIsReported) {
   ElabFixture f;
   ElaborateSrc(

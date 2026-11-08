@@ -25,7 +25,6 @@ namespace delta {
 
 namespace {
 
-// The identifiers a reference reads, a dotted name (§23.7) by its first name.
 void WalkExprIdents(Expr* e, std::vector<Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kIdentifier) {
@@ -65,13 +64,6 @@ void WalkStmtScalarIdents(const Stmt* s, std::vector<Expr*>& out) {
   for (auto* e : s->wait_order_events) WalkExprIdents(e, out);
 }
 
-// The expressions a case item and a randcase item hold beside their bodies:
-// A.6.7 gives a case item its case_item_expressions and §18.16 gives a randcase
-// item its weight expression. Neither is a statement, so ForEachChildStmt does
-// not reach either and both are read here. The two bodies are left to the
-// descent in WalkStmtIdents below, which ForEachChildStmt reaches through
-// CaseItem::body and through the second member of a randcase item, so that no
-// statement is walked twice.
 void WalkStmtCaseIdents(const Stmt* s, std::vector<Expr*>& out) {
   for (const auto& ci : s->case_items) {
     for (auto* p : ci.patterns) WalkExprIdents(p, out);
@@ -79,12 +71,6 @@ void WalkStmtCaseIdents(const Stmt* s, std::vector<Expr*>& out) {
   for (const auto& rc : s->randcase_items) WalkExprIdents(rc.first, out);
 }
 
-// §26.3 makes a name a wildcard-imported package supplies directly visible to
-// a reference written anywhere in the importing scope, so every position a
-// statement holds a statement in is a position one of these reads stands in.
-// ForEachChildStmt in elaborator_validate_internal.h states those positions
-// once for the whole elaborator, which is why the list is not written out again
-// here.
 void WalkStmtIdents(const Stmt* s, std::vector<Expr*>& out) {
   if (!s) return;
   WalkStmtScalarIdents(s, out);
@@ -96,11 +82,6 @@ using OuterBoundRefs =
     std::unordered_map<std::string_view,
                        std::vector<std::pair<Expr*, std::string_view>>>;
 
-// §26.3 (printed page 810): what settling a module-level reference that no
-// import written before it resolved takes: the packages the module's body
-// imports by wildcard anywhere, and whether the module declares the name,
-// whether the compilation unit declares it as data before the module, and
-// whether anything else the module reaches declares it.
 struct LateImportCheck {
   const std::vector<std::string_view>& wildcards;
   std::function<bool(std::string_view)> module_declares;
@@ -108,12 +89,6 @@ struct LateImportCheck {
   std::function<bool(std::string_view)> declared;
 };
 
-// Mutable state shared across the import-rule checking helpers below: one
-// scope's locally visible identifiers, its explicit imports and the packages
-// its wildcard imports name, with the names those have been made to supply.
-// Holds references to the Elaborator members for the module's scope and to
-// per-call locals for a generate block's, so the phases can be expressed as
-// free functions.
 struct ImportRuleCtx {
   DiagEngine& diag;
   const CompilationUnit* unit;
@@ -123,15 +98,8 @@ struct ImportRuleCtx {
   std::vector<std::string_view>& wildcard_packages;
   std::unordered_map<std::string_view, SourceLoc>& wildcard_claimed;
   std::unordered_set<std::string_view>& seen_decls;
-  // §23.7 with §26.3: the references standing in this scope, or in one inside
-  // it, that an outer scope's wildcard import bound, by the name each reads,
-  // with the package declaring what it bound.
   OuterBoundRefs& outer_bound;
-  // §26.3: the next outer lexical scope a reference this scope does not
-  // resolve is searched in, or null for the module's own scope, where the
-  // search ends.
   ImportRuleCtx* outer;
-  // The module's own scope's LateImportCheck; null for a generate block's.
   const LateImportCheck* late = nullptr;
 };
 
@@ -147,25 +115,12 @@ void TrackImportRuleDecl(ImportRuleCtx& ctx, std::string_view name,
                    Subclause("26.3"));
   }
   ctx.seen_decls.insert(name);
-  // §23.7 with §26.3: a reference an outer scope's wildcard import bound
-  // stays bound to the package's declaration when this scope declares the
-  // name after it, so it is read through that package.
   auto bound = ctx.outer_bound.find(name);
   if (bound == ctx.outer_bound.end()) return;
   for (auto& [ref, origin] : bound->second) ref->scope_prefix = origin;
   ctx.outer_bound.erase(bound);
 }
 
-// §26.3 makes it illegal for the wildcard imports of more than one package to
-// define the same potentially locally visible identifier that a reference
-// matches (printed page 810), and §26.6 makes an import of a declaration
-// reached through an export an import of the original declaration, so that
-// reaching one declaration by several exported paths is no conflict (printed
-// 815): the clause's own `import p2::*; import p4::*; int y = x;` reads p1's x
-// through both. The wildcard-imported packages supplying `name` are therefore
-// counted by the package declaring it, a second supplier of the same
-// declaration adding nothing. Answers whether the scope's wildcard imports
-// settled the reference, by a claim or by the conflict.
 bool ClaimWildcardCandidate(ImportRuleCtx& ctx, const Expr* e) {
   auto name = e->text;
   std::vector<std::string_view> providers;
@@ -191,12 +146,6 @@ bool ClaimWildcardCandidate(ImportRuleCtx& ctx, const Expr* e) {
   return true;
 }
 
-// The declaration an explicit import of `pkg_name::name` imports, named by
-// the package declaring it: §26.6 makes an import of a declaration reached
-// through an export an import of the original declaration (printed page 815),
-// so the origin is the source's own declaration or the one an export of the
-// source hands on. The source itself stands in where it provides no such
-// name, the import of a name its package lacks being the import's own report.
 std::string_view ExplicitImportOrigin(ImportRuleCtx& ctx,
                                       std::string_view pkg_name,
                                       std::string_view name) {
@@ -205,9 +154,6 @@ std::string_view ExplicitImportOrigin(ImportRuleCtx& ctx,
   return origin.empty() ? pkg_name : origin;
 }
 
-// The package declaring the identifier a reference bound through the scope's
-// wildcard imports. ClaimWildcardCandidate claims a name only where one
-// declaration supplies it, so the first supplier's origin is the claim's.
 std::string_view WildcardClaimOrigin(ImportRuleCtx& ctx,
                                      std::string_view name) {
   for (auto pkg : ctx.wildcard_packages) {
@@ -218,8 +164,6 @@ std::string_view WildcardClaimOrigin(ImportRuleCtx& ctx,
   return {};
 }
 
-// The first of the wildcard-imported packages `packages` that provides
-// `name`; empty where none does.
 std::string_view WildcardOriginAmong(
     ImportRuleCtx& ctx, const std::vector<std::string_view>& packages,
     std::string_view name) {
@@ -231,12 +175,6 @@ std::string_view WildcardOriginAmong(
   return {};
 }
 
-// §23.7 (printed pages 757-758) with §26.3: a reference `binder`'s wildcard
-// import bound from the scope `from` inside it is noted on every scope from
-// `from` out to `binder`, any of which may declare the name after the
-// reference. The clause's dotted name 2 has `s2.x` in a generate block bind
-// the structure p::s2 the module imports, the instance s2 the block declares
-// after it not yet being visible.
 void NoteOuterBinding(ImportRuleCtx& from, ImportRuleCtx& binder, Expr* e) {
   std::string_view origin = WildcardClaimOrigin(binder, e->text);
   for (ImportRuleCtx* scope = &from; scope != &binder; scope = scope->outer) {
@@ -244,21 +182,6 @@ void NoteOuterBinding(ImportRuleCtx& from, ImportRuleCtx& binder, Expr* e) {
   }
 }
 
-// §26.3's search for a reference (printed page 810): the current scope's
-// locally visible identifiers, then the candidates the wildcard imports
-// written before the reference in that scope supply, and, where neither
-// matches, the next outer lexical scope the same way, a candidate found there
-// imported into that outer scope. The clause's Example 2 (printed 811) has
-// `initial x = 1;` in a generate block of a module importing p bind p::x
-// through the module's scope, the block's own `import p2::*` standing after
-// the reference.
-// §26.3 (printed page 810): a module-level reference no scope resolved, where
-// a wildcard import written after it in the module would supply the name. The
-// import does not reach back to it, so the search ends in the compilation
-// unit: the reference reads the unit's data of the name, recorded on it as
-// `$unit::` records it (§3.12.1), and with no declaration of the name to reach
-// it is reported. A name the module, or anything else it reaches, declares is
-// left to the checks of its own.
 void SettleReferenceBeforeImport(ImportRuleCtx& module, Expr* e) {
   const LateImportCheck& late = *module.late;
   std::string_view name = e->text;
@@ -294,14 +217,6 @@ void ProcessImportRuleRef(ImportRuleCtx& ctx, Expr* e) {
   SettleReferenceBeforeImport(*module, e);
 }
 
-// §26.3 makes an explicit import illegal where the identifier is explicitly
-// imported from another package, an import of the same identifier from the
-// same package allowed (printed page 810), and §26.6 makes importing one
-// declaration by several exported paths no conflict (printed 815-816): the
-// clause's p2 and p4 both hand on p1's x, so `import p2::x; import p4::x;`
-// imports one declaration twice. The two imports are therefore compared by
-// the declaration each reaches rather than by the package each names.
-// Answers whether an earlier explicit import settled this one.
 bool CheckAgainstEarlierExplicitImport(ImportRuleCtx& ctx,
                                        const ModuleItem* item,
                                        std::string_view pkg_name) {
@@ -321,15 +236,6 @@ bool CheckAgainstEarlierExplicitImport(ImportRuleCtx& ctx,
   return true;
 }
 
-// Table 26-1 of §26.5, row `import p::c;`, column for a scope holding a
-// wildcard import of c (printed page 814): the explicit import makes every
-// earlier reference to c illegal. §26.3 states the other three import-legality
-// rules this file enforces but not this one, and the worked example closing
-// §26.5 (`import q::*; wire a = c; import p::c;`) is this rule alone. The
-// reference bound the wildcard-imported declaration, and the explicit import
-// would bind the name to another; where it names that same declaration,
-// reached through an export, §26.6 has the two imports agree (printed 816)
-// and nothing is rebound. Answers whether the explicit import was reported.
 bool ReportExplicitImportAfterWildcardClaim(ImportRuleCtx& ctx,
                                             const ModuleItem* item,
                                             std::string_view pkg_name) {
@@ -347,11 +253,6 @@ bool ReportExplicitImportAfterWildcardClaim(ImportRuleCtx& ctx,
   return true;
 }
 
-// §26.3 (printed page 809) with §26.6 (printed 815): an explicit import
-// imports the declaration the package makes visible under the name, its own
-// or one an export hands on, and std's are Annex G's (§26.7); a name the
-// package neither declares nor exports is no candidate for import, what it
-// imports without exporting included. Answers whether the import was reported.
 bool ReportImportOfNoCandidate(ImportRuleCtx& ctx, const ModuleItem* item,
                                std::string_view pkg_name) {
   auto name = item->import_item.item_name;
@@ -389,9 +290,6 @@ void HandleExplicitImport(ImportRuleCtx& ctx, const ModuleItem* item,
   ctx.seen_decls.insert(name);
 }
 
-// §26.3 (printed page 808): the compilation of a package precedes that of the
-// scopes importing it, so an import written ahead of the package it names has
-// no package yet to import from. Answers whether the import was reported.
 bool ReportImportBeforePackage(ImportRuleCtx& ctx, const ModuleItem* item,
                                std::string_view pkg_name) {
   for (const auto* pkg : ctx.unit->packages) {
@@ -438,16 +336,6 @@ void ProcessImportRuleRefs(ImportRuleCtx& ctx, const std::vector<Expr*>& refs) {
 
 void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item);
 
-// §27.5 and §27.4 make a generate block a scope of its own, nested in the
-// scope its construct is written in, and §26.3 has an import written among
-// the block's items make its names candidates for the block's references
-// after it alone: a reference in the block is searched in the block first,
-// its declarations and then those candidates, and only then outward. The
-// block's scope starts empty rather than pre-seeded as the module's is, so a
-// reference before the block's own import is the enclosing scope's to
-// resolve, as Example 2 has it. §27.4's loop generate block declares the
-// genvar as an implicit localparam of every block instance, so `genvar` is
-// among the block's own names.
 void HandleGenerateBlockImportRules(ImportRuleCtx& outer,
                                     const std::vector<ModuleItem*>& items,
                                     std::string_view genvar) {
@@ -465,13 +353,6 @@ void HandleGenerateBlockImportRules(ImportRuleCtx& outer,
   for (const auto* item : items) HandleImportRuleItem(ctx, item);
 }
 
-// §26.3 (printed pages 809-810) with A.2.8: a task or function body is a scope
-// of its own, its formals, its result and its declarations its locally visible
-// names, and an import among its block item declarations makes names
-// candidates for the body's references after it alone. The body is walked as
-// a scope nested in the one the subroutine stands in, in source order: a local
-// variable is a declaration once its initializer has been read, and a let, a
-// typedef or an import is the item it carries.
 void HandleSubroutineImportRules(ImportRuleCtx& outer, const ModuleItem* item) {
   TrackImportRuleDecl(outer, item->name, item->loc);
   std::unordered_map<std::string_view, std::pair<std::string_view, SourceLoc>>
@@ -499,9 +380,6 @@ void HandleSubroutineImportRules(ImportRuleCtx& outer, const ModuleItem* item) {
   }
 }
 
-// The genvar a loop generate construct is written over (§27.4), whether
-// declared in the loop's own initialization or before it, or empty for a
-// conditional construct.
 std::string_view GenerateLoopVariable(const ModuleItem* item) {
   const Stmt* init = item->gen_init;
   if (init == nullptr) return {};
@@ -512,12 +390,6 @@ std::string_view GenerateLoopVariable(const ModuleItem* item) {
   return {};
 }
 
-// Walks every generate block of the construct as a scope nested in `ctx`. An
-// else branch is itself a conditional construct (Parser::ParseGenerateIf
-// makes a plain else one with no condition), so it is handled as one item; a
-// case construct holds its blocks in its items. Every alternative is walked,
-// the check running before the construct's condition is evaluated, and each is
-// a scope of its own so none reaches another's declarations.
 void HandleGenerateImportRules(ImportRuleCtx& ctx, const ModuleItem* item) {
   TrackImportRuleDecl(ctx, item->name, item->loc);
   HandleGenerateBlockImportRules(ctx, item->gen_body,
@@ -570,8 +442,6 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
       break;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
-      // §8.24: an out-of-block method body reads its class's members, which
-      // no scope here holds, and is the class's to check.
       if (item->method_class.empty()) {
         HandleSubroutineImportRules(ctx, item);
       } else {
@@ -579,21 +449,7 @@ void HandleImportRuleItem(ImportRuleCtx& ctx, const ModuleItem* item) {
       }
       break;
     default:
-      // §26.5 module m example: a net/variable/parameter declaration with an
-      // initializer (e.g. `wire a = c;`) references names in that initializer.
-      // Such a reference forces a wildcard import to claim the name just like a
-      // procedural or continuous-assignment reference does, so a later
-      // declaration or explicit import of the same name then conflicts. Track
-      // the declared name first (so a self-referential initializer sees the
-      // local decl), then process the initializer's references.
       TrackImportRuleDecl(ctx, item->name, item->loc);
-      // §6.19: an enum declaration also introduces its member names into the
-      // enclosing scope, so those names participate in import-collision
-      // detection just like the enum type name. Register members from both a
-      // typedef enum and a bare enum data declaration, mirroring how a
-      // package's enum members are treated as wildcard-import candidates, and
-      // from an enumeration written as the type of a structure or union member
-      // of either (§7.2), which §23.9 makes no scope of its own.
       auto track_literals = [&](std::string_view, const DataType& type) {
         for (const auto& em : type.enum_members)
           TrackImportRuleDecl(ctx, em.name, item->loc);
@@ -632,10 +488,6 @@ void Elaborator::ValidatePackageImportRules(const ModuleDecl* decl) {
   SeedImportRuleSeenDecls(decl, seen_decls);
   OuterBoundRefs outer_bound;
 
-  // §26.3 (printed page 810): a wildcard import makes its names candidates for
-  // the references after it alone, so the scope's packages are gathered as the
-  // walk below reaches each import; every one the body writes is kept apart
-  // for a reference written ahead of the import that supplies it.
   std::vector<std::string_view> body_wildcards;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kImportDecl &&

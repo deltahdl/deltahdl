@@ -178,7 +178,6 @@ TEST(CaseInsideItemParsing, RejectsCasezWithInside) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // §12.5 owns the case statement; A.6.7 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
@@ -404,7 +403,6 @@ TEST(CaseInsideItemParsing, RejectsCasexWithInside) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // §12.5 owns the case statement; A.6.7 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "'inside' is only valid with 'case'", 3, "12.5"));
 }
@@ -418,7 +416,6 @@ TEST(CaseInsideItemParsing, RejectsInsideCombinedWithMatches) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // §12.5 owns the case statement; A.6.7 only states its BNF.
   EXPECT_TRUE(ReportedError(
       r.diags, "'matches' and 'inside' cannot be used together", 3, "12.5"));
 }
@@ -460,8 +457,6 @@ TEST(CasePatternItemParsing, DefaultOnlyItem) {
 }
 
 TEST(RandcaseItemParsing, RejectsDefaultLabel) {
-  // randcase_item ::= expression : statement_or_null
-  // — BNF has no default-form alternative, unlike case_item.
   auto r = Parse(
       "module t;\n"
       "  initial begin\n"
@@ -470,13 +465,9 @@ TEST(RandcaseItemParsing, RejectsDefaultLabel) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // A randcase_item begins with a weight expression, so `default` reaches
-  // ParsePrimaryExpr, whose report is filed under §11.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 4, "11.2"));
 }
 
-// A.6.7 writes `randcase randcase_item { randcase_item } endcase`, so a
-// randcase holds at least one item before its endcase.
 TEST(CaseStatementParsing, ARandcaseWithNoItemIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -487,10 +478,6 @@ TEST(CaseStatementParsing, ARandcaseWithNoItemIsReported) {
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
-// A.6.7 writes a pattern-matching case item as a pattern and at most one `&&&`
-// filter, an expression, which holds neither another `&&&` nor a `matches`
-// (A.8.6). Each is reported; one filter alone is not. A `matches` in
-// parentheses is reported once, as one outside a predicate.
 TEST(CaseStatementParsing, ACaseItemFilterIsOneExpression) {
   auto r = Parse(
       "module m;\n"
@@ -516,8 +503,6 @@ TEST(CaseStatementParsing, ACaseItemFilterIsOneExpression) {
   EXPECT_EQ(r.diags.size(), 3u);
 }
 
-// Nor does `matches` follow a case item's pattern, before its filter or not:
-// A.6.7.1 ends no pattern with it, and A.8.6 makes it no binary operator.
 TEST(CaseStatementParsing, ACaseItemPatternIsNotFollowedByMatches) {
   auto r = Parse(
       "module m;\n"

@@ -1,14 +1,3 @@
-// Tests for the §23.9 scope rules as they reach a name read in a method of a
-// class. §23.9 resolves a name read in a task or function upward through the
-// scopes that enclose it: the method's own formals and declarations, its class
-// with the classes it extends (§8.13) and the class's parameters, and the
-// scope that declares the class with what it imports. A name none of them
-// declares is unresolved there as in a module's own subroutine.
-//
-// The reads in a module's statements are in
-// test_elaborator_subclause_23_09a.cpp to 23_09d, and those of assertions in
-// 23_09e.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -23,8 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §23.9: a name a class method reads that nothing declares, on the right of
-// an assignment or in a condition, is unresolved.
 TEST(ClassMethodScopeRules, ReadOfUndeclaredNameIsUnresolved) {
   ElabFixture f;
   ElaborateSrc(
@@ -47,12 +34,6 @@ TEST(ClassMethodScopeRules, ReadOfUndeclaredNameIsUnresolved) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §23.9 with §8.13 and §26.3: a class method reads its formals and locals,
-// its class's properties, parameters, type parameters and enumeration
-// members, those of the class it extends, and the names of the module that
-// declares the class, its ports, parameters and type parameters and the package
-// it imports among them; an enumeration member written `S[2]` gives S0 and S1
-// (§6.19.2), and a nested class's method reads its outer class's parameter.
 TEST(ClassMethodScopeRules, ReadsOfNamesItsScopesDeclareResolve) {
   ElabFixture f;
   ElaborateSrc(
@@ -96,10 +77,6 @@ TEST(ClassMethodScopeRules, ReadsOfNamesItsScopesDeclareResolve) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §23.9 with §18.6.1 and A.8.2: every class has the built-in method
-// randomize, which no class declares, and its call may be written without its
-// argument list, so a method's bare `randomize` reads that method and is no
-// unresolved name, where a name beside it that nothing declares still is.
 TEST(ClassMethodScopeRules, ABareRandomizeReadsTheBuiltInMethod) {
   ElabFixture f;
   ElaborateSrc(

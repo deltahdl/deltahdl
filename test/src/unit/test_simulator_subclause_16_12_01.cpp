@@ -5,26 +5,10 @@
 #include "fixture_simulator.h"
 #include "simulator/variable.h"
 
-// §16.12.1: an instance of a named property can be used as a property_spec, and
-// the assertion then means what the property's body means in that place. Each
-// case here asserts an instance of a property whose body is the clocked boolean
-// form and drives the design so the boolean holds at some ticks and not at
-// others, then reads the pass and fail counts the action block kept. §16.14.1
-// runs the pass statement when the property is true and the fail statement
-// when it is false, so the two counts together say at which ticks the property
-// was evaluated and what it evaluated to.
-
 using namespace delta;
 
 namespace {
 
-// Three posedges of clk, with req and en changed between the edges so every
-// region of a tick sees the same values: req is 0 at the first tick, 1 with en
-// 0 at the second, and 1 with en 1 at the third. The property holds at the
-// first and third and fails at the second, so the counts are 2 and 1. An
-// implementation that evaluated the instance at no tick leaves both at 0, and
-// one that evaluated it as an always-true or always-false property gives 3 and
-// 0 or 0 and 3.
 TEST(PropertyInstanceSim, InstanceAsSpecIsEvaluatedAsItsBody) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -42,14 +26,14 @@ TEST(PropertyInstanceSim, InstanceAsSpecIsEvaluatedAsItsBody) {
       "  else\n"
       "    fails = fails + 1;\n"
       "  initial begin\n"
-      "    #5 clk = 1;\n"  // tick 1: req 0, en 1 -> holds
+      "    #5 clk = 1;\n"
       "    #5 clk = 0;\n"
       "    req = 1'b1;\n"
       "    en = 1'b0;\n"
-      "    #5 clk = 1;\n"  // tick 2: req 1, en 0 -> fails
+      "    #5 clk = 1;\n"
       "    #5 clk = 0;\n"
       "    en = 1'b1;\n"
-      "    #5 clk = 1;\n"  // tick 3: req 1, en 1 -> holds
+      "    #5 clk = 1;\n"
       "    #5 clk = 0;\n"
       "  end\n"
       "endmodule\n",
@@ -65,13 +49,6 @@ TEST(PropertyInstanceSim, InstanceAsSpecIsEvaluatedAsItsBody) {
   EXPECT_EQ(fails->value.ToUint64(), 1u);
 }
 
-// §16.12.1 makes the substitution on the property's body, and a module's
-// property declarations are the same in every instance of the module, so an
-// assertion in a module instantiated twice is evaluated in both instances. The
-// two instances are driven differently: two ticks with the property holding in
-// the first, and two with it failing in the second, so the counts tell the
-// instances apart and a substitution made for the first instance only leaves
-// the second's counts at 0.
 TEST(PropertyInstanceSim, InstanceIsEvaluatedInEveryModuleInstance) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -113,12 +90,6 @@ TEST(PropertyInstanceSim, InstanceIsEvaluatedInEveryModuleInstance) {
   EXPECT_EQ(fail_fails->value.ToUint64(), 2u);
 }
 
-// §16.12.1: an instance of a named property stands as a property_spec, the
-// property's body with the actuals substituted, and each instance is an
-// assertion of its own. Two instances of p_low over sig, high at ticks 2 and
-// 3 of four, and over other, high at 4, count two and one failures apart,
-// and an instance of p_guarded, whose body carries a disable iff, is legal
-// as a property_spec and is disabled at the tick rst is high, 2.
 TEST(PropertyInstantiationSim, EachInstanceIsAnAssertionOfItsOwn) {
   SimFixture f;
   auto* sig_fail = RunAndFindVar(

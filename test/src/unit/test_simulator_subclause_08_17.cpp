@@ -130,11 +130,6 @@ TEST(ChainedConstructorSimulation, PropertyDefaultsInitializedDuringChaining) {
             75u);
 }
 
-// §8.17: the 'default' keyword in the extends specifier expands to the
-// superclass constructor's argument list, so a subclass with no explicit
-// constructor forwards the new() call's actuals straight to the base
-// constructor. Observed end-to-end: the value passed to new() reaches the base
-// property.
 TEST(ChainedConstructorSimulation, ExtendsDefaultForwardsToBaseConstructor) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int bx;\n"
@@ -153,11 +148,6 @@ TEST(ChainedConstructorSimulation, ExtendsDefaultForwardsToBaseConstructor) {
             55u);
 }
 
-// §8.17: 'default' in a subclass constructor's own argument list expands to the
-// superclass constructor's arguments, and passing 'default' as the sole
-// argument to an explicit super.new() forwards them. The subclass's own
-// argument (size) binds from the leading actual; the trailing actual expands
-// through 'default' to the base constructor.
 TEST(ChainedConstructorSimulation, SuperNewDefaultForwardsExpandedArgs) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int bx;\n"
@@ -181,9 +171,6 @@ TEST(ChainedConstructorSimulation, SuperNewDefaultForwardsExpandedArgs) {
             742u);
 }
 
-// §8.17: when a subclass constructor uses 'default' but provides no explicit
-// super.new() call, the compiler inserts super.new(default) automatically, so
-// the trailing actual still reaches the base constructor.
 TEST(ChainedConstructorSimulation,
      ImplicitSuperNewDefaultForwardsExpandedArgs) {
   EXPECT_EQ(RunAndGet("class Base;\n"
@@ -207,9 +194,6 @@ TEST(ChainedConstructorSimulation,
             399u);
 }
 
-// §8.17: a subclass whose extends specifier uses 'default' and that also
-// defines its own constructor (repeating 'default') forwards the trailing
-// actual to the base while binding its own leading argument locally.
 TEST(ChainedConstructorSimulation, ExtendsDefaultWithUserConstructorForwards) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int bx;\n"
@@ -232,9 +216,6 @@ TEST(ChainedConstructorSimulation, ExtendsDefaultWithUserConstructorForwards) {
             488u);
 }
 
-// §8.17: 'default' expands to the superclass constructor's argument list in the
-// same declaration order. With a two-argument base constructor, the trailing
-// actuals must reach the base arguments positionally (a before b), not swapped.
 TEST(ChainedConstructorSimulation, DefaultForwardsMultipleArgsInOrder) {
   EXPECT_EQ(
       RunAndGet("class Base;\n"
@@ -260,10 +241,6 @@ TEST(ChainedConstructorSimulation, DefaultForwardsMultipleArgsInOrder) {
       170u);
 }
 
-// §8.17: 'default' expands to the superclass constructor's argument list with
-// the same DEFAULT VALUES. Here the subclass supplies only the first base
-// argument; the second base argument is omitted, so its declared default (30)
-// must be applied through the expansion. Observed via the base sum property.
 TEST(ChainedConstructorSimulation, ExtendsDefaultAppliesBaseArgDefault) {
   EXPECT_EQ(
       RunAndGet("class Base;\n"
@@ -283,10 +260,6 @@ TEST(ChainedConstructorSimulation, ExtendsDefaultAppliesBaseArgDefault) {
       37u);
 }
 
-// §8.17: when the arguments are given in the extends specifier, the compiler
-// inserts the super.new() call automatically. Observed end-to-end: the literal
-// argument in 'extends Base(5)' reaches the base constructor at run time even
-// though the subclass declares no constructor.
 TEST(ChainedConstructorSimulation, ExtendsArgsForwardToBaseConstructor) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int bx;\n"
@@ -305,10 +278,6 @@ TEST(ChainedConstructorSimulation, ExtendsArgsForwardToBaseConstructor) {
             5u);
 }
 
-// §8.17: the 'default' keyword may appear before the subclass's own added
-// arguments (the LRM class-C form: new(default, ...)). The leading actuals then
-// expand to the base constructor while the trailing actual binds the subclass's
-// own argument.
 TEST(ChainedConstructorSimulation, DefaultBeforeOwnArgForwards) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  int bx;\n"
@@ -332,13 +301,6 @@ TEST(ChainedConstructorSimulation, DefaultBeforeOwnArgForwards) {
             1020u);
 }
 
-// §8.17: the first action of a subclass's new() is to invoke the superclass
-// constructor, once, and the general approach is the explicit super.new(5) at
-// the head of the subclass constructor, the clause's own example. The base
-// counts its constructor runs and keeps the argument the first run was given:
-// a construction that ran the base constructor with no arguments before the
-// subclass body and then again from the statement counted 2 with a first
-// argument of 0; the one call counts 1 with 5.
 TEST(ChainedConstructorSimulation, SuperNewWithArgsRunsTheBaseConstructorOnce) {
   EXPECT_EQ(
       RunAndGet("class Base;\n"
@@ -368,11 +330,6 @@ TEST(ChainedConstructorSimulation, SuperNewWithArgsRunsTheBaseConstructorOnce) {
       155u);
 }
 
-// §8.17 and §8.15: super.new(...) passes the subclass constructor's own
-// formals to the superclass constructor, so the actuals are evaluated with
-// those formals bound, and the superclass constructor sees them the one time
-// it runs. Three levels chain this way, each handing its argument up one
-// level, and each base level counts its runs.
 TEST(ChainedConstructorSimulation, SuperNewFormalsReachEachLevelOnce) {
   EXPECT_EQ(RunAndGet("class A;\n"
                       "  static int a_runs = 0;\n"

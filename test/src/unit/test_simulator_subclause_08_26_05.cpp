@@ -100,10 +100,6 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eAssignImplToInterfaceVar) {
             1u);
 }
 
-// §8.26.5: the object-to-interface handle assignment is also legal when written
-// as a declaration initializer (the LRM example form), not only as a procedural
-// assignment. Drive it through the full pipeline and confirm the interface
-// handle ends up referring to the constructed object rather than staying null.
 TEST(InterfaceClassCastingAndRefAssignment,
      E2eAssignImplToInterfaceVarDeclInit) {
   EXPECT_EQ(RunAndGet("interface class IC;\n"
@@ -186,11 +182,6 @@ TEST(InterfaceClassCastingAndRefAssignment, E2eCastObjectToInterfaceSucceeds) {
             1u);
 }
 
-// §8.26.2 with §26.3: a class implementing `p::I` is one of the package's
-// interface class, though the module declares an I of its own, so the cast
-// from a handle of its base class succeeds and the call through it reads 4:
-// 14. Kept as a bare I, the class implemented the module's and the cast
-// failed.
 TEST(InterfaceClassCastingAndRefAssignment,
      ACastReachesTheInterfaceClassNamedThroughAPackage) {
   EXPECT_EQ(RunAndGet("package p;\n"
@@ -256,11 +247,6 @@ TEST(InterfaceClassCastingAndRefAssignment, InterfaceClassNewReportsError) {
       "  end\n"
       "endmodule\n",
       f);
-  // The §8.26.5 report on `ic = new` comes from the elaborator, from
-  // CheckNewOnUnconstructibleHandle in
-  // src/elaborator/elaborator_validate_class_handles.cpp, so it stands whether
-  // or not Elaborate went on to return a design. One assertion therefore
-  // covers what the two branches on `design` each claimed.
   if (design) LowerAndRun(design, f);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot construct object of interface class 'IC'",
@@ -330,10 +316,6 @@ TEST(InterfaceClassCastingAndRefAssignment,
             1u);
 }
 
-// A dynamic cast between interface class variables is only legal when the
-// concrete object actually held by the source can satisfy the destination
-// interface. Here the held object implements IA but not IB, so casting the
-// IA-typed handle into an IB-typed handle must fail and report 0.
 TEST(InterfaceClassCastingAndRefAssignment,
      E2eCastBetweenInterfaceVarsFailsWhenNotImplemented) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
@@ -361,9 +343,6 @@ TEST(InterfaceClassCastingAndRefAssignment,
             0u);
 }
 
-// Casting an object handle to an interface class type is only legal when the
-// actual object implements that interface. Class C does not implement IC, so
-// the cast must fail and report 0 rather than succeed.
 TEST(InterfaceClassCastingAndRefAssignment,
      E2eCastObjectToUnimplementedInterfaceFails) {
   EXPECT_EQ(RunAndGet("interface class IC;\n"
@@ -384,8 +363,6 @@ TEST(InterfaceClassCastingAndRefAssignment,
             0u);
 }
 
-// §8.26.5: like an abstract class, an object of an interface class type shall
-// not be constructed, and the report that rejects it names §8.26.5.
 TEST(InterfaceClassCastingAndRefAssignment, ConstructionRejectionNames8_26_5) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -398,9 +375,6 @@ TEST(InterfaceClassCastingAndRefAssignment, ConstructionRejectionNames8_26_5) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The elaborator rejects the same construction in the same words, and its
-  // site is one of the ones still to be read against the standard, so the
-  // search starts after the reports elaboration left behind.
   size_t after_elaboration = f.diag.Diagnostics().size();
   LowerAndRun(design, f);
   std::vector<Diagnostic> after(

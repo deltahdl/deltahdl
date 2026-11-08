@@ -19,8 +19,6 @@ TEST(EnumerationElaboration, EnumSizedLiteralMismatch_Error) {
       "  } myenum;\n"
       "endmodule\n",
       f);
-  // Both named constants are 4 bits wide against a 3-bit base, so the report
-  // stands twice; the first is on the line of Global's value.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "enum literal width 4 does not match base type "
                             "width 3",
@@ -224,11 +222,6 @@ TEST(EnumerationElaboration, EnumIntegerWithXAssignmentPermitted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19: one enumeration declaration declares its set of named constants once,
-// and the clause's own `enum {red, yellow, green} light1, light2;` gives that
-// one set to both declarators. The names are not redeclared by the second name
-// in the list, so this is legal where two separate declarations of red would
-// not be (see EnumMemberNameReusedInSameScope_Error).
 TEST(EnumerationElaboration, EnumSharedByTwoDeclaratorsDeclaresItsNamesOnce) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -248,8 +241,6 @@ TEST(EnumerationElaboration, EnumMemberNameReusedInSameScope_Error) {
       "  enum bit [3:0] {bronze=4'h3, silver, gold=4'h5} medal3;\n"
       "endmodule\n",
       f);
-  // medal2 declares the three names, so the clash is reported against medal3
-  // on line 3, once per name; the assertion names the first of the three.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "enum member name 'bronze' is already declared in "
                             "this scope",
@@ -334,8 +325,6 @@ TEST(EnumerationElaboration, EnumVectorTypedefBaseWithPackedDimAllowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19: an enum named-constant value is an elaboration-time constant
-// expression (§6.20) and may reference a localparam, not only a parameter.
 TEST(EnumerationElaboration, EnumLocalparamInitializer_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -348,16 +337,6 @@ TEST(EnumerationElaboration, EnumLocalparamInitializer_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.19 (printed page 119) has an enumerated type declare its literals as
-// named constants, and printed 120 makes two enumerations naming one literal
-// illegal in one scope, so the literals stand in the scope holding the enum;
-// §7.2's Syntax 7-1 (printed 146) gives a structure member any data_type, the
-// enum form among them, and §23.9's list of the elements that define a scope
-// (printed 761) names no structure, so IDLE and BUSY are constants of p, read
-// through §26.3's package scope resolution operator into a localparam. K folds
-// to 1 * 10 + 0 = 10; a package that recorded neither constant left K
-// unresolved, the "p.BUSY" fold of RegisterPackageParams reading the members
-// of an enumeration written at the top of a typedef alone.
 TEST(EnumerationElaboration,
      StructMemberEnumLiteralOfAPackageFoldsIntoALocalparam) {
   ElabFixture f;
@@ -377,12 +356,6 @@ TEST(EnumerationElaboration,
   EXPECT_EQ(param->resolved_value, 10);
 }
 
-// The same clauses for a module's own typedef: the member's enumeration
-// declares A and B in the module, and each enumeration numbers its literals
-// from 0 on its own (printed 120), so the second member's C is 0 again and
-// D 1, not a continuation of the first. K folds to 1 * 100 + 0 * 10 + 1 =
-// 101; before, ElaborateTypedef declared the constants of a typedef naming
-// the enum form alone, and `B` was reported an unresolved identifier.
 TEST(EnumerationElaboration,
      StructMemberEnumLiteralOfAModuleFoldsIntoALocalparam) {
   ElabFixture f;
@@ -400,12 +373,6 @@ TEST(EnumerationElaboration,
   EXPECT_EQ(param->resolved_value, 101);
 }
 
-// §7.2 (printed 146) gives struct_union_member to a union as to a structure,
-// and a member's value may be written (printed 120): a union member's
-// enumeration with `HI = 5` declares LO as 4 in the module, so K folds to
-// 5 * 10 + 4 = 54, and a data declaration of the union type declares the
-// constants a second time no more than `light1, light2` does. An enumeration
-// written on a union's member declared nothing before.
 TEST(EnumerationElaboration, UnionMemberEnumLiteralFoldsIntoALocalparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -423,17 +390,6 @@ TEST(EnumerationElaboration, UnionMemberEnumLiteralFoldsIntoALocalparam) {
   EXPECT_EQ(param->resolved_value, 54);
 }
 
-// §3.12.1 (printed page 56) has the compilation-unit scope hold any item a
-// package holds, a data declaration among them, and searches the portion of
-// it written before a reference once the module's own scope is exhausted;
-// §6.19 (printed 119) has an enumerated type declare its literals as
-// constants of the scope holding it, Syntax 6-5 making the enum form a
-// data_type, so a unit-scope `enum {X, Y} v;` declares X and Y for the
-// modules of the unit with no typedef, and L folds to 1 * 10 + 0 = 10.
-// Before, the parser admitted no enum head to a unit-scope data declaration
-// (IsCuScopeDataTypeKeyword), reporting "expected top-level declaration",
-// and RegisterCuEnumLiterals gave the module the backing variables of a
-// typedef's enumeration alone.
 TEST(EnumerationElaboration, UnitScopeBareEnumLiteralFoldsIntoALocalparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -450,12 +406,6 @@ TEST(EnumerationElaboration, UnitScopeBareEnumLiteralFoldsIntoALocalparam) {
   EXPECT_EQ(param->resolved_value, 10);
 }
 
-// §6.19 (printed page 119): an enumeration's named constants are of its base
-// type, `int` when the declaration names none, so the backing variable of a
-// member carries the base type's signedness: signed for `int`, written or
-// defaulted, unsigned for `logic [3:0]`, and for a typedef base whatever the
-// typedef names. The value -6 of `C = -8'sd6` is what an unsigned 32-bit
-// variable would print as 4294967290.
 TEST(EnumerationElaboration, MemberOfAnIntBaseEnumIsSigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -510,12 +460,6 @@ TEST(EnumerationElaboration, MemberOfATypedefIntBaseEnumIsSigned) {
   EXPECT_TRUE(m->is_signed);
 }
 
-// §6.19 declares an enumeration's members in the scope the enumeration is
-// written in, and A.2.8 lets a begin-end block declare a typedef among its
-// items, so the members of `typedef enum {p, q} e_t;` in an initial block are
-// constants of that block, which the statements after it read; §23.9 finds
-// them there. A `name[N]` member declares name0 through nameN-1 (§6.19.2),
-// and a task body's typedef declares its members in the task.
 TEST(EnumerationElaboration, MembersOfABlockTypedefEnumResolveInTheBlock) {
   ElabFixture f;
   ElaborateSrc(
@@ -538,8 +482,6 @@ TEST(EnumerationElaboration, MembersOfABlockTypedefEnumResolveInTheBlock) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A `name[N]` member's written name is no constant of the block, so a read
-// of it is still unresolved there.
 TEST(EnumerationElaboration, WrittenNameOfARangedBlockEnumMemberIsUnresolved) {
   ElabFixture f;
   ElaborateSrc(
@@ -556,9 +498,6 @@ TEST(EnumerationElaboration, WrittenNameOfARangedBlockEnumMemberIsUnresolved) {
                             "23.9"));
 }
 
-// §6.19: a member of a 4-state enumeration assigned x keeps that value, so
-// its constant is a 4-state variable given the value as written, while a
-// member assigned a number is given the folded number.
 TEST(EnumerationElaboration, XMemberOfA4StateEnumIsGivenItsValueAsWritten) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -579,11 +518,6 @@ TEST(EnumerationElaboration, XMemberOfA4StateEnumIsGivenItsValueAsWritten) {
   EXPECT_EQ(s1->init_expr->int_val, 1u);
 }
 
-// §6.19 with §6.18: a typedef writing an enumeration and unpacked dimensions,
-// typedef enum {A, B} ea_t [2], declares A and B itself, so a variable of it
-// is an array of that enumeration and declares neither constant again; nor
-// does a variable of a structure array type whose member's enumeration the
-// typedef wrote.
 TEST(EnumerationElaboration, ArrayTypedefVariableRedeclaresNoConstant) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -605,10 +539,6 @@ TEST(EnumerationElaboration, ArrayTypedefVariableRedeclaresNoConstant) {
   EXPECT_EQ(e->enum_type_name, "ea_t");
 }
 
-// §6.19 with §7.4.1: the constants of an enumeration written with packed
-// dimensions after its body are as wide as its base type, not as the packed
-// array of it the dimensions make, whether a declaration or a typedef writes
-// it (#7315).
 TEST(EnumerationElaboration, ConstantsOfAnEnumArrayAreAsWideAsItsBase) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -634,8 +564,6 @@ TEST(EnumerationElaboration, ConstantsOfAnEnumArrayAreAsWideAsItsBase) {
   EXPECT_EQ(v->width, 8u);
 }
 
-// §6.19: a constant's value is judged against the base type's range, which
-// the packed dimensions written after the body do not widen (#7315).
 TEST(EnumerationElaboration, AnEnumArraysConstantOutsideItsBaseIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -649,9 +577,6 @@ TEST(EnumerationElaboration, AnEnumArraysConstantOutsideItsBaseIsReported) {
                             2, "6.19"));
 }
 
-// §6.19: an enumeration array whose base is 64 bits wide gives its constants
-// the whole unsigned 64-bit range, and a literal written at the base's width
-// matches it rather than the 128 bits of the array.
 TEST(EnumerationElaboration, AnEnumArrayOfA64BitBaseTakesItsWholeRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(

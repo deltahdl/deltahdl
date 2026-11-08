@@ -1,9 +1,3 @@
-// §3.12.1 (printed page 56 of IEEE 1800-2023) with §6.7 (printed 102): the
-// nets the compilation-unit scope declares, each given the storage of a net of
-// its declared net type and width ahead of every module, under the
-// "$unit.name" key the unit's variables stand under, to which each module that
-// does not declare the name is bound (AliasUnitDataItems).
-
 #include <string>
 #include <string_view>
 
@@ -20,10 +14,6 @@
 
 namespace delta {
 
-// The record of the net `item` declares, as Elaborator::ElaborateNetDecl
-// builds a module's: the net type its keyword wrote, its width and
-// signedness, and the declared type where a packed dimension addresses its
-// bits over the range as written.
 static RtlirNet UnitNetRecord(const ModuleItem& item, SimContext& ctx) {
   RtlirNet net;
   net.name = item.name;

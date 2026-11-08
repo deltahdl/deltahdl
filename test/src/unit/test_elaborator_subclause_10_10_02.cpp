@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -43,13 +41,6 @@ TEST(UnpackedArrayConcatElaboration, QueueTargetDisambiguatesOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.2: the disambiguation is what decides whether braces are an unpacked
-// array concatenation at all. The chandle target makes that decision observable
-// at elaboration: because the target is an unpacked array, {c1, c2} is
-// unambiguously an unpacked array concatenation (§10.10), so each operand is a
-// whole chandle element and the scalar "a chandle takes only another chandle or
-// null" rule does not apply. Elaboration therefore accepts it. This observes
-// the rule actually being applied, not merely that some target is accepted.
 TEST(UnpackedArrayConcatElaboration, ChandleArrayTargetDisambiguatedAsConcat) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -63,17 +54,6 @@ TEST(UnpackedArrayConcatElaboration, ChandleArrayTargetDisambiguatedAsConcat) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.2, negative form: with the identical right-hand side but a scalar
-// (non-array) chandle target, the braces are NOT disambiguated to an unpacked
-// array concatenation, so the ordinary scalar chandle-assignment rule stays in
-// force and rejects {c1, c2}. The same expression accepted in the array case
-// above is an error here purely because the target is not an unpacked array,
-// which is exactly the distinction §10.10.2 draws. §10.10.2 states only where
-// the braces are routed -- braces in an assignment-like context with an
-// unpacked array target are an unpacked array concatenation, and otherwise a
-// vector or string concatenation -- and prohibits nothing itself, so the report
-// names the rule that does reject the source: §6.14's, that a chandle admits
-// only assignment from another chandle.
 TEST(UnpackedArrayConcatElaboration, ScalarChandleTargetKeepsScalarRule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -89,10 +69,6 @@ TEST(UnpackedArrayConcatElaboration, ScalarChandleTargetKeepsScalarRule) {
       "chandle can only be assigned from another chandle or null", 4, "6.14"));
 }
 
-// §10.10.2 (printed page 265) reads braces whose target is an unpacked array
-// as an unpacked array concatenation whatever names the target: an element of
-// a multidimensional array and a structure's array member are such arrays,
-// and a whole element of a one-dimensional array is not.
 TEST(UnpackedArrayConcatElaboration, ElementArrayAndArrayMemberTargets) {
   ElabFixture f;
   ElaborateSrc(

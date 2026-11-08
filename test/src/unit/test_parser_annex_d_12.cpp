@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Annex D.12: $showscopes may appear with no argument, parsing as an ordinary
-// system task call.
 TEST(OptionalSystemTaskParserParsing, ShowScopesNoArgument) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +14,6 @@ TEST(OptionalSystemTaskParserParsing, ShowScopesNoArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.12: $showscopes accepts an optional integer argument in parentheses.
 TEST(OptionalSystemTaskParserParsing, ShowScopesIntegerArgument) {
   auto r = Parse(
       "module m;\n"

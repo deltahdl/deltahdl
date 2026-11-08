@@ -23,9 +23,6 @@ static void SkipSpaces(std::string_view& s) {
   }
 }
 
-// The parenthesized condition `name` opens with, up to the parenthesis that
-// closes it, the block of text standing after it; the whole of `name` where no
-// parenthesis closes it, which EvalIfdefExpr reports.
 static std::string_view ParenthesizedSpan(std::string_view name) {
   int depth = 0;
   for (size_t i = 0; i < name.size(); ++i) {
@@ -44,9 +41,6 @@ bool Preprocessor::EvalIfdefCondition(std::string_view name,
     return false;
   }
   if (name[0] == '(') return EvalIfdefExpr(ParenthesizedSpan(name), loc);
-  // A condition that opens with no parenthesis is a text_macro_identifier,
-  // simple or escaped (§5.6.1, an escaped one running to white space); a
-  // negation is an ifdef_macro_expression, which stands only in parentheses.
   size_t len = name[0] == '\\'
                    ? std::min(name.find_first_of(" \t\f\r\n"), name.size())
                    : 0;
@@ -61,10 +55,6 @@ bool Preprocessor::EvalIfdefCondition(std::string_view name,
   return macros_.IsDefined(name.substr(0, len));
 }
 
-// §22.6 (Syntax 22-5) builds an ifdef_macro_expression of names, `!`,
-// parentheses and `&&`, `||`, `->` and `<->`, so one with an operand missing,
-// a parenthesis left open or text the grammar does not read, `&` alone, is
-// reported rather than read as far as it goes.
 bool Preprocessor::EvalIfdefExpr(std::string_view expr, SourceLoc loc) {
   auto e = Trim(expr);
   ifdef_expr_malformed_ = false;
@@ -79,11 +69,6 @@ bool Preprocessor::EvalIfdefExpr(std::string_view expr, SourceLoc loc) {
   return result;
 }
 
-// §22.6 resolves an ifdef expression by §11.8's rules, and Table 11-2 in
-// §11.3.2 puts `->` and `<->` on one precedence level, associating right to
-// left: `A -> B -> C` is `A -> (B -> C)` and `A -> B <-> C` is
-// `A -> (B <-> C)`. Each operator therefore takes the whole of the level to
-// its right, which this reaches by recursing into itself.
 bool Preprocessor::EvalIfdefEquiv(std::string_view& expr) {
   bool lhs = EvalIfdefOr(expr);
   SkipSpaces(expr);
@@ -160,13 +145,6 @@ std::string Preprocessor::ExpandMacro(const MacroDef& macro,
     if (arg.empty() && macro.param_defaults[i] != "\x01") {
       resolved.emplace_back(macro.param_defaults[i]);
     } else {
-      // §22.5.1: an actual argument is macro-expanded before being substituted
-      // for the formal argument. Splitting happens first, on the raw text, so
-      // the argument count and default selection are decided before expansion
-      // (an argument expanding to empty, e.g. `EMPTY, is a provided-but-empty
-      // argument, not an omitted one). Expanding here -- before the caller
-      // pushes this macro onto the expansion stack -- also means an argument
-      // that calls the same macro is not mistaken for a recursive expansion.
       resolved.emplace_back(ExpandInlineMacros(arg, loc.file_id, loc.line));
     }
   }
@@ -184,14 +162,6 @@ size_t EndOfEscapedIdentifier(std::string_view text, size_t i) {
   return i;
 }
 
-// Tracks the matched pairs §22.5.1 lists -- parentheses, square brackets,
-// braces, double quotes, triple quotes and an escaped identifier -- so that a
-// comma or right parenthesis inside one of them is not read as an argument
-// separator or the end of the list. Read consumes what stands at text[i] -- a
-// delimiter, one item of a string, or a whole escaped identifier -- and returns
-// the index of the next character to read; `inside` reports whether text[i]
-// stood inside a string, a triple-quoted string or an escaped identifier, where
-// a comma or parenthesis is text rather than punctuation.
 struct DelimiterTracker {
   int paren_depth = 0;
   int bracket_depth = 0;
@@ -199,10 +169,6 @@ struct DelimiterTracker {
   bool in_string = false;
   bool in_triple = false;
 
-  // One item of an open string, or the quote that closes it. A '"' that a
-  // backslash precedes is 5.9's escape sequence inside a quoted_string and
-  // closes nothing; a lone '"' inside a triple_quoted_string is an item of it
-  // (A.8.8), and only a `"""` closes it.
   size_t ReadStringItem(std::string_view text, size_t i) {
     if (in_triple) {
       if (!AtTripleQuote(text, i)) return i + 1;
@@ -250,15 +216,10 @@ struct DelimiterTracker {
   }
 };
 
-// Records one formal parameter token ("name" or "name = default") into params
-// and defaults; a missing default is stored as the "\x01" sentinel, an empty
-// one (name =) as the empty string.
 static void AppendMacroParam(std::string_view token,
                              std::vector<std::string>& params,
                              std::vector<std::string>& defaults) {
   auto trimmed = Preprocessor::Trim(token);
-  // The formal argument name is a simple_identifier (22.5.1), so the first '='
-  // is always the boundary between the name and its default text.
   auto eq = trimmed.find('=');
   if (eq != std::string_view::npos) {
     params.emplace_back(Preprocessor::Trim(trimmed.substr(0, eq)));
@@ -276,8 +237,6 @@ std::vector<std::string> Preprocessor::ParseMacroParams(
   size_t start = 0;
   size_t i = 0;
   while (i < param_list.size()) {
-    // §22.5.1: a default may contain a comma inside a matched pair or an
-    // escaped identifier; such commas do not separate formal parameters.
     bool inside = false;
     size_t next = tracker.Read(param_list, i, inside);
     if (!inside && param_list[i] == ',' && tracker.AtTopLevel()) {
@@ -296,20 +255,12 @@ size_t Preprocessor::FindMacroParamListClose(std::string_view text) {
   while (i < text.size()) {
     bool inside = false;
     size_t next = tracker.Read(text, i, inside);
-    // The list's own '(' is the sole reason paren_depth is nonzero; the first
-    // ')' that returns every delimiter to top level (and is not inside a
-    // string or an escaped identifier) closes the parameter list.
     if (!inside && text[i] == ')' && tracker.AtTopLevel()) return i;
     i = next;
   }
   return std::string_view::npos;
 }
 
-// The actual argument list opening at the first '(' of `text`, parentheses
-// included, or empty when the list is not closed within `text`. Every caller
-// has checked that the '(' is there. §22.5.1 lists the matched pairs a right
-// parenthesis is protected inside, so the ')' that closes the list is the
-// first one standing at top level of every pair.
 std::string_view Preprocessor::ExtractBalancedArgs(std::string_view text) {
   auto open = text.find('(');
   DelimiterTracker tracker;
@@ -332,8 +283,6 @@ std::vector<std::string_view> Preprocessor::SplitMacroArgs(
   size_t start = 0;
   size_t i = 0;
   while (i < args_text.size()) {
-    // §22.5.1: a comma inside a matched pair or an escaped identifier (5.6.1)
-    // is part of the argument, not a separator.
     bool inside = false;
     size_t next = tracker.Read(args_text, i, inside);
     if (!inside && args_text[i] == ',' && tracker.AtTopLevel()) {
@@ -359,9 +308,6 @@ static void SubstituteToken(std::string_view token,
   result.append(token);
 }
 
-// Handles the macro-quote escape sequences (`\`", `", and ``) at body[i],
-// appending their literal expansion to result. Returns the number of source
-// characters consumed, or 0 if no macro-quote begins at body[i].
 static size_t AppendMacroQuote(std::string_view body, size_t i,
                                std::string& result) {
   std::string_view at = body.substr(i);
@@ -377,11 +323,6 @@ static size_t AppendMacroQuote(std::string_view body, size_t i,
   return 0;
 }
 
-// §22.5.1: macro and argument substitution shall not occur within string
-// literals. Copies one literal character (honoring escapes) at body[i] into
-// result, clearing in_string at the closing quote. Returns chars consumed.
-// HandleDefine refuses a body whose string is left open, so a backslash inside
-// one always has the character it escapes after it.
 static size_t CopyStringChar(std::string_view body, size_t i, bool& in_string,
                              std::string& result) {
   if (body[i] == '\\') {
@@ -406,8 +347,6 @@ std::string Preprocessor::SubstituteParams(
       i += CopyStringChar(body, i, in_string, result);
       continue;
     }
-    // The `" macro-quote does not start a suppression region: its contents are
-    // meant to be substituted, unlike a plain " string literal.
     if (size_t consumed = AppendMacroQuote(body, i, result)) {
       i += consumed;
       continue;

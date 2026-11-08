@@ -9,11 +9,6 @@
 
 using namespace delta;
 
-// Lexes a replication-style assignment pattern of the form '{ N { inner } } and
-// asserts the canonical six leading token kinds it produces:
-//   kApostropheLBrace IntLiteral LBrace IntLiteral RBrace RBrace
-// `src` must be a source whose first six tokens follow that shape (e.g.
-// "'{3{4}}" or "'{4{8'hAB}}").
 inline void ExpectReplicationPatternTokens(const std::string& src) {
   auto tokens = Lex(src);
   ASSERT_GE(tokens.size(), 6u);

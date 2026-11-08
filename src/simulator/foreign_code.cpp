@@ -40,8 +40,7 @@ std::array<ForeignCodeFacility, 3> ForeignCodeFacilitiesDefined() {
           ForeignCodeFacility::kProvideObjectCode};
 }
 
-bool ForeignCodeObjectMayBePackagedAs(
-    ForeignCodeObjectPackaging /*packaging*/) {
+bool ForeignCodeObjectMayBePackagedAs(ForeignCodeObjectPackaging) {
   return true;
 }
 
@@ -54,9 +53,7 @@ ForeignCodeInclusionMethod ForeignCodeMethodOftenCovering(
              : ForeignCodeInclusionMethod::kToolSwitches;
 }
 
-bool ForeignCodeUseCaseMayUseBootstrapFile(ForeignCodeUseCase /*use_case*/) {
-  return true;
-}
+bool ForeignCodeUseCaseMayUseBootstrapFile(ForeignCodeUseCase) { return true; }
 
 bool ForeignCodeSwitchNamesAreRequirements() { return false; }
 
@@ -66,9 +63,6 @@ namespace {
 
 bool IsBlank(char c) { return c == ' ' || c == '\t' || c == '\r'; }
 
-// The entry a line holds, or an error where the line is not one entry
-// preceded by a blank; a line of blanks alone is neither an entry nor a
-// comment, and so an error too.
 std::string ParseBootstrapEntry(std::string_view line, std::size_t line_no,
                                 std::string* error) {
   if (line.empty() || !IsBlank(line.front())) {
@@ -96,7 +90,6 @@ std::string ParseBootstrapEntry(std::string_view line, std::size_t line_no,
   return std::string(line.substr(begin, end - begin));
 }
 
-// The line starting at `pos`, without its newline; `pos` moves past it.
 std::string_view NextLine(std::string_view text, std::size_t* pos) {
   const std::size_t kNewline = text.find('\n', *pos);
   const std::size_t kEnd =
@@ -106,7 +99,6 @@ std::string_view NextLine(std::string_view text, std::size_t* pos) {
   return line;
 }
 
-// §J.4.1 c): a comment line starts with # after any number of blanks.
 bool IsCommentLine(std::string_view line) {
   std::size_t first = 0;
   while (first < line.size() && IsBlank(line[first])) ++first;
@@ -128,7 +120,6 @@ ForeignCodeBootstrap ParseForeignCodeBootstrap(std::string_view text) {
     const std::string_view kLine = NextLine(text, &pos);
     ++line_no;
     if (line_no == 1) {
-      // §J.4.1 a): the first line contains the header string.
       if (kLine.find(ForeignCodeBootstrapHeader()) == std::string_view::npos) {
         file.error = MissingHeaderError();
         return file;
@@ -136,7 +127,6 @@ ForeignCodeBootstrap ParseForeignCodeBootstrap(std::string_view text) {
       continue;
     }
     if (IsCommentLine(kLine)) continue;
-    // §J.4.1 b): otherwise the line holds one entry.
     std::string entry = ParseBootstrapEntry(kLine, line_no, &file.error);
     if (!file.Ok()) return file;
     file.libraries.push_back(entry);
@@ -225,8 +215,6 @@ bool ForeignCodeIsSameFile(std::string_view a, std::string_view b) {
 
 namespace {
 
-// Appends `path` under `method` unless a library already in the order is the
-// same file, an earlier occurrence taking precedence over a later one.
 void LoadOnce(std::string_view path, ForeignCodeSpecificationMethod method,
               std::vector<ForeignCodeLibrary>* order) {
   for (const ForeignCodeLibrary& loaded : *order) {
@@ -275,15 +263,12 @@ std::vector<std::string> ForeignCodeLibraryFileNames(
 
 namespace {
 
-// How the report of a library names the method that specified it.
 std::string_view NamedBy(ForeignCodeSpecificationMethod method) {
   return method == ForeignCodeSpecificationMethod::kBootstrapFileEntry
              ? "a bootstrap entry"
              : "-sv_lib";
 }
 
-// Loads one library of a load order, reporting it under §J.4 where its file is
-// not there or does not load. False where it was not loaded.
 bool LoadForeignLibrary(const ForeignCodeLibrary& library, DiagEngine& diag) {
   const std::string kFile = ForeignCodeSharedLibraryFileName(library.path);
   const std::string kLocation = "object code file '" + library.path +
@@ -304,11 +289,6 @@ bool LoadForeignLibrary(const ForeignCodeLibrary& library, DiagEngine& diag) {
                Subclause("J.4"));
     return false;
   }
-  // §36.9.1 with §38.37.2: a VPI application names in its own
-  // vlog_startup_routines[] the routines the simulator calls just after it is
-  // invoked, which for a library loaded here is now, ahead of reading the
-  // design. The array is looked up through this library's handle, apart from
-  // the tool's array of the same name, which main walks itself.
   auto* routines = static_cast<VlogStartupRoutine*>(
       SharedLibrarySymbol(load.handle, "vlog_startup_routines"));
   if (routines != nullptr && routines != vlog_startup_routines) {

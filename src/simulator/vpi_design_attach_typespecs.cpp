@@ -42,38 +42,21 @@ namespace delta {
 
 namespace {
 
-// The typespecs one scope declares, by typedef name.
 using TypespecsByName = std::unordered_map<std::string_view, VpiObject*>;
 
-// The declaration each instance was elaborated from, by its object.
 using InstanceDefinitions =
     std::unordered_map<const VpiObject*, const ModuleDecl*>;
 
-// What making typespecs reads across the whole design: the model to build in,
-// the run whose scope a dimension is evaluated in, the shapes of the
-// typespecs made so far, which a type written over one of them unwinds
-// through (§37.25 detail 8), the class defns a class type names (§37.32), and
-// the objects an expression a member's default value writes names.
 struct DesignTypespecs {
   const VpiAttachBuild& build;
   SimContext& ctx;
   VpiTypespecShapes& shapes;
   const VpiClassDefnObjects& classes;
   const VpiObjectMap& objects;
-  // §37.30: the compilation unit, and the declarations of the instances,
-  // whose interfaces an interface typespec's parameter values are assigned
-  // to.
   const CompilationUnit& unit;
   const InstanceDefinitions& definitions;
 };
 
-// What making one scope's typespecs reads: the scope object they hang from,
-// the key its class defns and its expressions are found under, an instance's
-// path, a package's name or "$unit", the enumerations the run resolved under
-// each typedef name, and, for a typedef of the scope to alias, the typespecs
-// answered beyond it, the compilation unit's by name and the packages' as
-// pkg::name, and the scope's imports, through which a package's are visible
-// (§26.3).
 struct ScopeTypespecs {
   VpiObject* scope;
   const std::string& prefix;
@@ -84,13 +67,10 @@ struct ScopeTypespecs {
   const DesignTypespecs& design;
 };
 
-// Hangs `child` from `holder` where one was made.
 void HangIfMade(VpiObject* holder, VpiObject* child) {
   if (child != nullptr) holder->children.push_back(child);
 }
 
-// §37.25: an enum const of `typespec`, named after the member and holding its
-// value.
 void MakeEnumConst(VpiObject* typespec, const RtlirEnumMember& member,
                    const VpiAttachBuild& build) {
   VpiObject* constant = build.alloc();
@@ -105,9 +85,6 @@ void MakeEnumConst(VpiObject* typespec, const RtlirEnumMember& member,
   typespec->children.push_back(constant);
 }
 
-// §7.2: the type a member of a structure or union was declared with: the
-// whole of an aggregate or enumeration written in place, and otherwise the
-// keyword or name with the packed dimensions it was written with.
 DataType MemberType(const StructMember& member) {
   if (member.nested_type != nullptr) return *member.nested_type;
   DataType type;
@@ -121,9 +98,6 @@ DataType MemberType(const StructMember& member) {
   return type;
 }
 
-// §37.25 detail 8: the type `type`'s dimensions are written over, the type
-// without its packed dimensions; for an enumeration, without those written
-// after its body, the one in its base type staying with it.
 DataType ElementOf(const DataType& type) {
   DataType element = type;
   element.enum_array_dims.clear();
@@ -135,8 +109,6 @@ DataType ElementOf(const DataType& type) {
   return element;
 }
 
-// §23.4: the interface `name` a type written within `scope` names, found from
-// the declaration of the instance holding `scope` (VpiElementDeclFrom).
 const ModuleDecl& InterfaceNamedFrom(const VpiObject* scope,
                                      const DesignTypespecs& design,
                                      std::string_view name) {
@@ -146,35 +118,21 @@ const ModuleDecl& InterfaceNamedFrom(const VpiObject* scope,
                             design.unit, name);
 }
 
-// The typespec a named type finds, and whether it is one a typedef declares,
-// which a typedef of it aliases (§37.25 detail 1), rather than a class
-// typespec of the class it names.
 struct NamedTypespec {
   VpiObject* typespec = nullptr;
   bool declared = false;
 };
 
-// Makes the typespecs of the types written in one scope, the scope's typedefs
-// made before the one being made, `made`, among those a name finds.
 class TypespecMaker {
  public:
   TypespecMaker(const ScopeTypespecs& at, const TypespecsByName& made)
       : at_(at), made_(made), build_(at.design.build) {}
 
-  // §37.25: the typespec of `type` written with the unpacked dimensions
-  // `unpacked`, named `name`, an empty one for a type no typedef declares,
-  // and hung from `parent`: where nothing is written over a named type, its
-  // typespec, or an alias of it reaching it through vpiTypedefAlias for a
-  // typedef (detail 1); where dimensions are, the typespec they make over the
-  // type's (detail 8); and otherwise one of the type's own kind. Null for a
-  // type it draws no typespec for.
   VpiObject* Of(const DataType& type, const std::vector<Expr*>& unpacked,
                 std::string_view name, VpiObject* parent) {
     return Shaped(type, DimsOf(type, unpacked), name, parent);
   }
 
-  // As Of, with the dimensions written over `type` already drawn as `dims`,
-  // outermost first.
   VpiObject* Shaped(const DataType& type,
                     const std::vector<VpiTypespecDim>& dims,
                     std::string_view name, VpiObject* parent) {
@@ -198,10 +156,6 @@ class TypespecMaker {
     return typespec;
   }
 
-  // §37.25 detail 10: the dimensions of a type written with the unpacked
-  // dimensions `unpacked` over the packed ones of `type`, outermost first; an
-  // enumeration's packed dimensions are those written after its body (§7.4.1),
-  // the one written in its base type being the base type's.
   std::vector<VpiTypespecDim> DimsOf(const DataType& type,
                                      const std::vector<Expr*>& unpacked) {
     std::vector<VpiTypespecDim> dims;
@@ -221,8 +175,6 @@ class TypespecMaker {
   }
 
  private:
-  // A typespec named `name`, hung from `parent`, of a kind its maker sets;
-  // one of no name reports none through vpiName (§37.25 detail 1).
   VpiObject* Alloc(std::string_view name, VpiObject* parent) const {
     VpiObject* typespec = build_.alloc();
     typespec->name =
@@ -231,8 +183,6 @@ class TypespecMaker {
     return typespec;
   }
 
-  // §7.4: an unpacked dimension, the kind of array it makes (§37.17 detail
-  // 21) and, for an associative one, the typespec of its index type.
   VpiTypespecDim UnpackedDim(const Expr* dim) {
     VpiTypespecDim made = VpiUnpackedTypespecDim(dim, at_.design.ctx);
     if (made.array_type == vpiAssocArray) {
@@ -241,9 +191,6 @@ class TypespecMaker {
     return made;
   }
 
-  // §37.25 detail 2 with §7.8: the typespec of the index type an associative
-  // dimension writes as `written`, a keyword's own or the one the name finds;
-  // none for the wildcard.
   VpiObject* IndexTypespec(std::string_view written) {
     if (std::optional<DataTypeKind> kind = VpiAssocIndexKeywordKind(written)) {
       DataType type;
@@ -256,13 +203,6 @@ class TypespecMaker {
     return Named(named, std::string_view{}, nullptr).typespec;
   }
 
-  // §37.25 detail 1 and §26.3: the typespec the typedef a named type names
-  // declares: one written through its package, pk::t, among the packages',
-  // and otherwise one of the scope's before it, the compilation unit's or a
-  // package's an import makes visible. Where no typedef is so named, §37.32:
-  // a class typespec named `name`, or after the class where that is empty,
-  // hung from `parent` and reaching the class defn the name finds; none where
-  // it finds none.
   NamedTypespec Named(const DataType& type, std::string_view name,
                       VpiObject* parent) const {
     const std::string kWritten =
@@ -286,12 +226,6 @@ class TypespecMaker {
     return {typespec, false};
   }
 
-  // §37.25: a typespec of the kind `type` is, with nothing written over it,
-  // named `name` and hung from `parent`: an enumeration's with its constants,
-  // those of the typedef `typedef_name`, and its base type's typespec, a
-  // structure's or union's with its members, and a predefined type's named by
-  // a typedef standing as an alias of that type's own (detail 6). A named type
-  // goes through Named, so every kind reaching here draws a typespec.
   VpiObject* Own(const DataType& type, std::string_view name, VpiObject* parent,
                  std::string_view typedef_name) {
     const int kKind = VpiTypespecKind(type.kind);
@@ -310,12 +244,6 @@ class TypespecMaker {
     return typespec;
   }
 
-  // §37.25: an enum typespec's constants, those the run resolved under the
-  // name of the typedef `typedef_name` that writes the enumeration, itself or
-  // as the element of its dimensions (detail 8), and its base type's
-  // typespec, which vpiBaseTypespec reaches: the one its base names, its
-  // keyword's with the packed dimensions it was written with, or int's where
-  // it names none (§6.19).
   void FillEnum(VpiObject* typespec, const DataType& type,
                 std::string_view typedef_name) {
     if (at_.enums != nullptr) {
@@ -337,11 +265,6 @@ class TypespecMaker {
     typespec->inner_typespec = Of(base, {}, std::string_view{}, typespec);
   }
 
-  // §37.30: an interface typespec of the interface the virtual interface type
-  // `type` names, reporting its name through vpiDefName (detail 1) and
-  // reaching a param assign per parameter value `type` writes (detail 3); for
-  // a type naming a modport, the modport's typespec, reporting the modport's
-  // name and reaching such an interface typespec through vpiParent (detail 2).
   void FillInterface(VpiObject* typespec, const DataType& type) {
     VpiObject* of_interface = typespec;
     if (!type.modport_name.empty()) {
@@ -360,10 +283,6 @@ class TypespecMaker {
     }
   }
 
-  // §37.30 detail 3: the param assign of `typespec` the value or type `actual`
-  // gives the parameter it names, or else `ordered`, the one at its place:
-  // reaching through vpiLhs a parameter of that name and through vpiRhs the
-  // expression a value writes or the typespec of a type.
   void MakeInterfaceParamAssign(VpiObject* typespec, const DataType& actual,
                                 std::string_view ordered) {
     VpiObject* assign = build_.alloc();
@@ -384,8 +303,6 @@ class TypespecMaker {
     typespec->children.push_back(assign);
   }
 
-  // §37.25 and §37.26: a struct or union typespec's vpiPacked, vpiTagged and
-  // vpiSoft, and a typespec member per member, in declaration order.
   void FillAggregate(VpiObject* typespec, const DataType& type) {
     typespec->packed = type.is_packed;
     typespec->tagged = type.is_tagged;
@@ -395,10 +312,6 @@ class TypespecMaker {
     }
   }
 
-  // §37.25 details 3, 4 and 7: a typespec member of `typespec`, named after
-  // the member, reaching the typespec of the member's type, the default
-  // value it was declared with through vpiExpr, and saying through
-  // vpiRandType whether it is rand or randc.
   void MakeTypespecMember(VpiObject* typespec, const StructMember& member) {
     VpiObject* typespec_member = build_.alloc();
     typespec_member->type = vpiTypespecMember;
@@ -424,16 +337,10 @@ class TypespecMaker {
   const VpiAttachBuild& build_;
 };
 
-// §37.25 and §37.26: the typespecs of the typedefs among `items`, each named
-// after its typedef and hung from `at.scope`, which reaches it through
-// vpiTypedef; none for a type it draws no typespec for here.
 TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
                               const ScopeTypespecs& at) {
   TypespecsByName made;
   for (const ModuleItem* item : items) {
-    // §6.18: a forward typedef, whose type is left implicit, names a type the
-    // class or the typedef resolving it defines, and draws no typespec of its
-    // own.
     if (item->kind != ModuleItemKind::kTypedef ||
         item->typedef_type.kind == DataTypeKind::kImplicit) {
       continue;
@@ -448,18 +355,10 @@ TypespecsByName MakeTypespecs(const std::vector<ModuleItem*>& items,
   return made;
 }
 
-// One instance of `mod` at `prefix`: its object and the module, interface or
-// program declaration it was elaborated from.
 using InstanceDeclVisit =
     std::function<void(const RtlirModule& mod, const std::string& prefix,
                        VpiObject* instance, const ModuleDecl& decl)>;
 
-// Visits each instance of the design whose module was elaborated from a
-// declaration, recording that declaration under the instance's object in
-// `definitions` first, `ctx`'s instance prefix set to the instance's own so
-// that the dimensions its declarations write evaluate there. An instance a
-// generate block below another instance holds is found once it has moved under
-// the block's gen scope as well (WalkInstanceObjects).
 void WalkInstanceDecls(const RtlirDesign* design, const VpiObjectMap& objects,
                        SimContext& ctx, InstanceDefinitions& definitions,
                        const InstanceDeclVisit& visit) {
@@ -475,9 +374,6 @@ void WalkInstanceDecls(const RtlirDesign* design, const VpiObjectMap& objects,
                       });
 }
 
-// §37.17: the typespec of the typedef a variable declared with the type
-// `written` was declared with, its own scope's or else the compilation unit's;
-// null where its type names no typedef either declares.
 VpiObject* DeclaredTypespec(const DataType* written,
                             const TypespecsByName& local,
                             const TypespecsByName& unit) {
@@ -491,22 +387,12 @@ VpiObject* DeclaredTypespec(const DataType* written,
   return nullptr;
 }
 
-// Where the variables of one instance find their typespecs: the typedefs of
-// its module and of the compilation unit, by name, the instance's objects,
-// keyed under `at.prefix` in `objects`, and what makes a typespec of the
-// dimensions a variable writes over its typedef.
 struct InstanceTypespecs {
   const TypespecsByName& local;
   const TypespecsByName& unit;
   const VpiObjectMap& objects;
   const ScopeTypespecs& at;
 
-  // §37.17: relates the variable `name` of the instance, declared with the
-  // type `written` and the unpacked dimensions `dims`, to the typespec of the
-  // typedef that type names, if any, or, where it writes unpacked dimensions
-  // of its own, to an unnamed array typespec of them over that one (§37.25
-  // detail 8). A variable of a type no name stands for, `int x`, relates to a
-  // typespec of its own kind, which §37.25 detail 1 leaves unnamed.
   void Relate(std::string_view name, const DataType* written,
               const std::vector<Expr*>* dims) const {
     VpiObject* typespec = DeclaredTypespec(written, local, unit);
@@ -514,9 +400,6 @@ struct InstanceTypespecs {
         FindObjectForFlatName(objects, VpiFlatName(at.prefix, name));
     if (obj == nullptr || written == nullptr) return;
     TypespecMaker maker(at, local);
-    // §37.27: a named event and an event array reach theirs as a variable
-    // does, and §37.16 a net, of the packed dimensions written over a typedef
-    // too; an interconnect has no data type of its own (§6.6.8).
     const bool kNet =
         VpiIsNetsType(obj->type) && !VpiIsInterconnectSubelementType(obj->type);
     const bool kTyped = kNet || VpiIsVariablesType(obj->type) ||
@@ -534,10 +417,6 @@ struct InstanceTypespecs {
   }
 };
 
-// §37.17 and §37.16 (figure): relates each variable and each net of an
-// instance of `mod` to its typespec, those its ports declare among them
-// (VpiDeclaredVariables, VpiDeclaredNets), which relate to the type the port's
-// declaration wrote.
 void RelateVariableTypespecs(const RtlirModule& mod,
                              const InstanceTypespecs& at) {
   for (const RtlirVariable& var : VpiDeclaredVariables(mod)) {
@@ -548,13 +427,6 @@ void RelateVariableTypespecs(const RtlirModule& mod,
   }
 }
 
-// §37.14 (figure) with §23.2.2.1 and §23.2.2.2: the typespec of `port`, of
-// the module `decl` declares, written as an expression, made by `maker` and
-// hung from the port's object `object`. Where the expression is the name of an
-// object a body port declaration declares, it is the type that declaration
-// wrote; otherwise a vector of the expression's width and signedness, bit
-// where the port's type is bit and logic otherwise (§11.5.1, §11.4.12), one of
-// no range for a single bit.
 VpiObject* ExprPortTypespec(const RtlirPort& port, const ModuleDecl& decl,
                             TypespecMaker& maker, VpiObject* object) {
   if (port.port_expr->kind == ExprKind::kIdentifier) {
@@ -575,13 +447,6 @@ VpiObject* ExprPortTypespec(const RtlirPort& port, const ModuleDecl& decl,
   return maker.Shaped(vector, dims, std::string_view{}, object);
 }
 
-// §37.14 (figure): relates each port of `at.scope`, an instance of `mod`, the
-// module `decl` declares, to the typespec of the type its declaration wrote
-// with the unpacked dimensions it wrote, found among the typedefs the instance
-// declares, a type parameter's name standing for the type it has there, and
-// those beyond it `at` holds; and a port written as an expression to the
-// typespec ExprPortTypespec makes for it. A port of an interface has no
-// declaration of its own to read a type from.
 void RelatePortTypespecs(const RtlirModule& mod, const ModuleDecl& decl,
                          const ScopeTypespecs& at) {
   TypespecsByName local;
@@ -614,10 +479,6 @@ void RelatePortTypespecs(const RtlirModule& mod, const ModuleDecl& decl,
   }
 }
 
-// §37.10 detail 1: a package is an instance too, whose typedefs are its
-// typespecs, answered in `answered` under the package's name and "::" for a
-// scope that imports them (§26.3) to reach, and answered by typedef name for
-// the package's own classes to find.
 TypespecsByName AnswerPackageTypespecs(const PackageDecl& pkg,
                                        const VpiObjectMap& objects,
                                        const DesignTypespecs& design,
@@ -635,24 +496,16 @@ TypespecsByName AnswerPackageTypespecs(const PackageDecl& pkg,
   return kPackage;
 }
 
-// The typespecs each gen scope declares, by the gen scope.
 using GenScopeTypespecs = std::unordered_map<const VpiObject*, TypespecsByName>;
 
-// §37.32 detail 3 with §27.4: for a class a generate block instance declares,
-// the prefix of the module instance its names resolve in, and the typedefs
-// among which its extends clause finds the types it names.
 struct BlockClassTypedefs {
   std::string prefix;
   TypespecsByName typedefs;
 };
 
-// Those of each such class, by the key its class defn is found under.
 using ClassTypedefs =
     std::map<VpiClassDefnObjects::key_type, BlockClassTypedefs>;
 
-// §37.85 detail 5: the typedefs a generate block instance of `mod`, whose
-// instance object is `instance`, declares are typespecs of the instance's gen
-// scope, which AttachGenScopes made; returned by that gen scope.
 GenScopeTypespecs MakeGenBlockTypespecs(const RtlirModule& mod,
                                         VpiObject* instance,
                                         const std::string& prefix,
@@ -669,9 +522,6 @@ GenScopeTypespecs MakeGenBlockTypespecs(const RtlirModule& mod,
   return made;
 }
 
-// §37.32 detail 3 with §27.4: the typedefs a name written in the generate
-// block instance `path` names below `instance` finds: its block's and its
-// enclosing blocks', the innermost first, among `gen`, then `local`'s.
 TypespecsByName GenBlockTypedefs(VpiObject* instance, const HierPath& path,
                                  const TypespecsByName& local,
                                  const GenScopeTypespecs& gen) {
@@ -687,9 +537,6 @@ TypespecsByName GenBlockTypedefs(VpiObject* instance, const HierPath& path,
   return found;
 }
 
-// §37.32 detail 3: the typedefs the extends clause of the class defn found
-// under `key` finds the types it names among: `in_blocks`' for a generate
-// block's class, else `declaring`'s for its package or instance, else `none`.
 const TypespecsByName& ExtendsTypedefs(
     const VpiClassDefnObjects::key_type& key, const ClassTypedefs& in_blocks,
     const std::unordered_map<std::string, TypespecsByName>& declaring,
@@ -700,8 +547,6 @@ const TypespecsByName& ExtendsTypedefs(
   return kDeclaring == declaring.end() ? none : kDeclaring->second;
 }
 
-// §8.23: the name the run registers the class of `defn` under, a nested
-// class's through the classes holding it, as "Outer::Inner".
 std::string RunClassName(const VpiObject* defn) {
   std::string name(defn->name);
   for (const VpiObject* at = defn->parent; at->type == vpiClassDefn;
@@ -711,9 +556,6 @@ std::string RunClassName(const VpiObject* defn) {
   return name;
 }
 
-// §6.19 with §8.23: the members of each enumeration a typedef among
-// `typedefs` of the class of `defn` writes, under the typedef's name, as the
-// run resolved them under "Class::name" when it lowered the class.
 std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> ClassEnums(
     const std::vector<ModuleItem*>& typedefs, const VpiObject* defn,
     const SimContext& ctx) {
@@ -734,15 +576,6 @@ std::unordered_map<std::string_view, std::vector<RtlirEnumMember>> ClassEnums(
   return enums;
 }
 
-// §37.31: the typedefs the class `decl` declares are typespecs its class defn
-// `defn` reaches through vpiTypedef, full-named through the class as its
-// methods are (§37.41 detail 5), an enumeration's with its constants, and
-// found under `prefix`, the key of the scope declaring the class. A body's
-// `localparam type`, which the parser carries as a typedef, is a parameter of
-// the class (detail 7) instead.
-// The variable the property `name` of the class `defn` stands for stands as,
-// among the defn's children, where MakeMembers made one of a variables kind or
-// a named event or array of them for every property no parameter declares.
 VpiObject& PropertyObject(const VpiObject& defn, std::string_view name) {
   return **std::ranges::find_if(defn.children, [name](const VpiObject* child) {
     const bool kVariable = VpiIsVariablesType(child->type) ||
@@ -752,18 +585,12 @@ VpiObject& PropertyObject(const VpiObject& defn, std::string_view name) {
   });
 }
 
-// Whether `obj` reaches a typespec already.
 bool ReachesATypespec(const VpiObject& obj) {
   return std::ranges::any_of(obj.children, [](const VpiObject* child) {
     return VpiIsTypespecType(child->type);
   });
 }
 
-// §37.32 detail 3: gives the param assigns of the typespec the extends clause
-// of `decl` writes, its class defn being `at.scope`, the typespecs of the
-// types it assigns as names. The clause, written before the class's body,
-// finds those names among `declaring`, the typedefs of the scope declaring
-// the class, not among the class's own.
 void AssignExtendsNamedTypes(const ClassDecl& decl, const ScopeTypespecs& at,
                              const TypespecsByName& declaring) {
   const VpiObject& defn = *at.scope;
@@ -803,10 +630,6 @@ void MakeClassTypespecs(const ClassDecl& decl, VpiObject* defn,
   for (const auto& [name, typespec] : kMade) {
     typespec->full_name = defn->full_name + "::" + std::string(name);
   }
-  // §37.31 with §37.17: each property reaches the typespec of the type it was
-  // declared with, a typedef of the class's among them, where nothing has
-  // related it to one; one of a class type or a type parameter of the class
-  // was related to its own as the defn was made.
   TypespecMaker maker(kAt, kMade);
   for (const ClassMember* member : decl.members) {
     if (member->kind != ClassMemberKind::kProperty || member->is_param) {
@@ -851,11 +674,6 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
                              const VpiClassDefnObjects& classes,
                              SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.25, §37.26 and §37.85 detail 5: each typedef a scope declares is a
-  // typespec named after it, an enum's with its constants and a struct's or
-  // union's with its members; and §37.17 relates a variable declared with one
-  // to it. No typespec of any kind was made, so vpiTypedef reached none and a
-  // variable's vpiTypespec was null.
   if (design->compilation_unit == nullptr) return {};
   const CompilationUnit& unit = *design->compilation_unit;
   VpiTypespecShapes shapes(build);
@@ -866,9 +684,6 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
   const std::vector<RtlirImport> kNoImports;
   const std::string kUnitPrefix("$unit");
   InstancePrefixOverride unprefixed(ctx.InstancePrefixOverride(), "");
-  // §3.12.1: each compilation unit's typedefs are typespecs of its own scope,
-  // one of each file's where each file is a unit, and a variable a module
-  // declares with one finds it among those of every unit.
   TypespecsByName unit_typedefs;
   for (const VpiUnitScope& at : VpiUnitScopes(*design, objects)) {
     const TypespecsByName kOwn = MakeTypespecs(
@@ -877,8 +692,6 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
     unit_typedefs.insert(kOwn.begin(), kOwn.end());
   }
   VpiObjectMap answered(unit_typedefs.begin(), unit_typedefs.end());
-  // The typedefs of each package and instance, by the key the class defns it
-  // declares are found under, and those of each generate block's class.
   std::unordered_map<std::string, TypespecsByName> declaring;
   ClassTypedefs in_blocks;
   for (const PackageDecl* pkg : design->packages) {
@@ -917,8 +730,6 @@ VpiObjectMap AttachTypespecs(const RtlirDesign* design,
 void AttachPortTypespecs(const RtlirDesign* design, const VpiObjectMap& objects,
                          const VpiCallObjects& calls, SimContext& ctx,
                          const VpiAttachBuild& build) {
-  // §37.14 (figure): a port reaches the typespec of its type through
-  // vpiTypespec, which reached nothing for every port.
   VpiTypespecShapes shapes(build);
   InstanceDefinitions definitions;
   const DesignTypespecs kDesign{build,      ctx,

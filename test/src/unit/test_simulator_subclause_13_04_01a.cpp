@@ -203,9 +203,6 @@ TEST(FunctionReturnSim, VoidFunctionBareReturnExitsEarly) {
   EXPECT_EQ(val, 10u);
 }
 
-// §12.8 (printed page 334) requires a return in a function that returns a value
-// to carry an expression, so the bare return is reported; the call still
-// answers what the function's implicit variable holds when it returns.
 TEST(FunctionReturnSim, BareReturnUsesImplicitVar) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -273,10 +270,6 @@ TEST(FunctionReturnSim, SystemFunctionAsImplicitVariableInExpression) {
   EXPECT_EQ(var->value.ToUint64(), 43u);
 }
 
-// §13.4.1: unless otherwise specified, all nonvoid function calls -- including
-// built-in methods -- may be used as an implicit variable within an expression.
-// Here the built-in queue method size() is a nonvoid call embedded in an
-// arithmetic expression, and the whole expression evaluates end to end.
 TEST(FunctionReturnSim, BuiltinMethodCallAsImplicitVariableInExpression) {
   uint64_t r = RunAndGet(
       "module t;\n"
@@ -292,12 +285,6 @@ TEST(FunctionReturnSim, BuiltinMethodCallAsImplicitVariableInExpression) {
   EXPECT_EQ(r, 7u);
 }
 
-// §13.4.1: the internal variable the function implicitly declares takes the
-// type of the function's return value, so a `return` of a wider expression is
-// an assignment to that variable rather than a replacement of it, and the
-// caller sees the declared eight bits. The value returned here needs nine to
-// survive whole, so a result that kept the expression's own width would read
-// 0x134.
 TEST(FunctionReturnSim, ReturnValueTakesTheDeclaredWidthOfTheFunction) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -315,12 +302,6 @@ TEST(FunctionReturnSim, ReturnValueTakesTheDeclaredWidthOfTheFunction) {
   EXPECT_EQ(var->value.ToUint64(), 0x34u);
 }
 
-// §13.4.1 x §10.7: the same assignment widens a narrower expression, and §10.7
-// extends it by the expression's own signedness rather than the variable's. A
-// comparison yields one unsigned bit, so an `int` function returning one hands
-// the caller 1 -- sign-extending that bit to the declared thirty-two would give
-// -1, which is what an assignment carrying the variable's signedness into the
-// extension produces.
 TEST(FunctionReturnSim, ReturnOfUnsignedBitZeroExtendsIntoSignedReturnType) {
   uint64_t r = RunAndGet(
       "module t;\n"
@@ -336,12 +317,6 @@ TEST(FunctionReturnSim, ReturnOfUnsignedBitZeroExtendsIntoSignedReturnType) {
   EXPECT_EQ(r, 1u);
 }
 
-// §13.4.1: the function definition implicitly declares a variable with the same
-// type as the function return value, and Syntax 6-4 makes a type_identifier a
-// data_type like any other, so a function declared to return `nib` returns the
-// four bits `nib` names. Returning 8'hFF through it gives 15; a return type the
-// simulator cannot size falls back to 32 bits and would give 255. A typedef of
-// exactly 32 bits would make the two answers coincide and prove nothing.
 TEST(FunctionReturnSim, TypedefReturnTypeSizesTheImplicitVariable) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -360,10 +335,6 @@ TEST(FunctionReturnSim, TypedefReturnTypeSizesTheImplicitVariable) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// §13.4.1 again, on a typedef wider than the 32-bit fallback rather than
-// narrower: the fallback is not merely imprecise but too small, and every bit
-// above the first word is lost. 40'hAA_AAAA_AAAA truncated to 32 bits reads
-// 0xAAAAAAAA, so the high byte is what the case turns on.
 TEST(FunctionReturnSim, TypedefReturnTypeWiderThanTheFallbackKeepsItsHighBits) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -382,33 +353,6 @@ TEST(FunctionReturnSim, TypedefReturnTypeWiderThanTheFallbackKeepsItsHighBits) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAAAAAAAAAull);
 }
 
-// §13.4.1's implicitly declared variable is one storage element, and §6.8 makes
-// every other declaration one of its own: a variable stands for a data storage
-// element and keeps its value from one assignment to the next. A statement in a
-// function body that only reads `x` therefore cannot change what `x` stores,
-// whatever it does to its own target.
-//
-// A subroutine body runs on its own statement executor -- a void function
-// called with parentheses is declined by SetupTaskCall and reaches
-// ExecFunctionBody, so `take()` lands in ExecFuncIdentifierAssign rather than
-// in the executor an initial block uses. That executor stored the evaluated
-// right-hand value straight into the target, and a Logic4Vec copies its `words`
-// pointer rather than the words: with the resize declining to build anything at
-// equal widths, `y` was left naming `x`'s storage. The line after the store
-// coerces a 2-state target in place -- §6.11.2: any x or z bits become zeros --
-// and the coercion travelled back through that alias to clear the unknowns of
-// `x`, in the statement that only read it.
-//
-// The eight bits on each side are load-bearing. Unequal widths make the
-// assignment resize, which builds the value in a fresh store and hides the
-// sharing; matching widths are what let the read value reach the target
-// unresized.
-//
-// The assertions read words[0] because ToUint64 projects aval & ~bval: an x bit
-// already reads 0 there, so `x` answers 0xC1 through it whether its unknowns
-// survived or not. 8'b1100xx01 is stored as aval 0xCD with bval 0x0C, an x bit
-// being aval 1 with bval 1; clearing those unknowns gives aval 0xC1 with bval
-// 0x00, which is what `y` alone is entitled to hold.
 TEST(FunctionReturnSim, TwoStateLocalCopyLeavesTheSourceUnknownsIntact) {
   SimFixture f;
   auto* read_var = RunAndFindVar(
@@ -433,24 +377,6 @@ TEST(FunctionReturnSim, TwoStateLocalCopyLeavesTheSourceUnknownsIntact) {
   EXPECT_EQ(written_var->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// The contrast, and the reason the case above is written as a function. §13.4
-// and §13.3 give a task and a function the same procedural body, but the two
-// calls are routed apart: a task called with parentheses is claimed by
-// SetupTaskCall, and ExecInlineTaskCall then walks its body through ExecStmt,
-// so `q = p` written in a task is executed by the ordinary blocking-assignment
-// path -- the one that takes its own copy of the right-hand words before any
-// store can see them. Only the void function above is declined by SetupTaskCall
-// and reaches the subroutine-body executor.
-//
-// So this case states the boundary of the claim rather than one more way to
-// break it: it holds on either side of the fix the function case asks for, and
-// what it discriminates against is a task body rerouted onto the
-// subroutine-body executor, which would carry that executor's in-place coercion
-// back into `p`.
-//
-// 8'b0110x1x0 is stored as aval 0x6E with bval 0x0A, and the 2-state copy of it
-// is aval 0x64 with bval 0x00 -- a different pattern from the function case, so
-// the two state their claim on different bits.
 TEST(FunctionReturnSim, TaskBodyCopyRunsOnTheOrdinaryStatementExecutor) {
   SimFixture f;
   auto* source = RunAndFindVar(
@@ -475,27 +401,6 @@ TEST(FunctionReturnSim, TaskBodyCopyRunsOnTheOrdinaryStatementExecutor) {
   EXPECT_EQ(target->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// The same §6.8 independence of storage elements, reached through a write that
-// lands after the copy rather than inside it, and with no 2-state coercion
-// anywhere in it. §7.2.1 makes a packed struct one vector, so assigning one of
-// its members deposits into a window of the whole struct's storage, writing
-// through the words the struct already holds. A target left naming its source's
-// storage therefore takes every later member write to the target back to the
-// source, which records an assignment it never received.
-//
-// Both statements sit in the function body, so the copy and the deposit are
-// both executed by the subroutine-body executor. A packed struct lays its first
-// member at the high bits, so `a.hi = 8'h5A; a.lo = 8'hC3;` stores 16'h5AC3,
-// `hi` occupying bits [15:8] and `lo` bits [7:0]. `b = a` must give `b` its own
-// 16'h5AC3, and depositing 8'h00 over `b.lo` then clears bits [7:0] of `b`
-// alone: `b` reads 16'h5A00 and `a` is still 16'h5AC3. Shared storage answers
-// 16'h5A00 for both, `a` having lost the 8'hC3 it was assigned and never
-// overwrote.
-//
-// Every bit involved is known, so ToUint64 reports the stored value exactly and
-// its projection hides nothing here. The two structs are sixteen bits each,
-// which is again what keeps the copy from resizing into a fresh store and so
-// from hiding the sharing.
 TEST(FunctionReturnSim, MemberDepositAfterABodyCopyLeavesTheSourceIntact) {
   SimFixture f;
   auto* origin = RunAndFindVar(
@@ -521,37 +426,6 @@ TEST(FunctionReturnSim, MemberDepositAfterABodyCopyLeavesTheSourceIntact) {
   EXPECT_EQ(duplicate->value.ToUint64(), 0x5A00u);
 }
 
-// §13.4.1 makes the value a `return` hands back an assignment to the function's
-// implicitly declared internal variable, and §6.8 makes that variable a storage
-// element of its own: a variable stands for a data storage element and keeps
-// its value from one assignment to the next. A statement spelled
-// `return pattern;` therefore only reads `pattern`, and nothing the declared
-// return type does to the result may reach back into what was read.
-//
-// The two forms §13.4.1 offers are executed apart, which is why the claim has
-// to be made twice. The assignment form `f = expr;` is an ordinary blocking
-// assignment in the body and reaches ExecFuncBlockingAssign, which takes its
-// own copy of the right-hand words. The `return expr;` form is ExecFuncReturn,
-// which stored what EvalExpr answered: a bare identifier is answered with the
-// source variable's own Logic4Vec, a Logic4Vec copies its `words` pointer
-// rather than the words, and ResizeToWidth hands a value already at the
-// declared width straight back. So a `bit [7:0]` function's implicit variable
-// was left naming `pattern`'s storage, and §6.11.2's conversion of the result
-// -- any x or z bits become zeros -- is an in-place write that travelled
-// through the alias and cleared the unknowns of `pattern`, in the statement
-// that only read it.
-//
-// The eight bits on each side are load-bearing. A return type wider or narrower
-// than the returned variable makes ResizeToWidth build the result in a fresh
-// store, which hides the sharing completely; matching widths are what let the
-// read value reach the implicit variable unresized.
-//
-// ToUint64 cannot see this. It projects aval & ~bval, so a bit that is already
-// unknown reads as 0 through it and clearing that bit changes nothing it
-// reports; the assertions read words[0] directly. 8'b1x01101x is stored as aval
-// 0xDB with bval 0x41, an x digit being aval 1 with bval 1, and the correctly
-// coerced result is aval 0x9A with bval 0x00 -- which is what `result` alone is
-// entitled to hold.
 TEST(FunctionReturnSim, ReturnIntoATwoStateResultKeepsTheReadVariableUnknown) {
   SimFixture f;
   auto* source = RunAndFindVar(
@@ -576,29 +450,6 @@ TEST(FunctionReturnSim, ReturnIntoATwoStateResultKeepsTheReadVariableUnknown) {
   EXPECT_EQ(returned->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// The same §13.4.1 return, made worse by where the returned object lives. The
-// §13.4 argument-direction table gives an inout formal a copy in at the start
-// of the call and a copy out at the end, so the formal is not private to the
-// body the way a local is: whatever it holds when the body finishes is what
-// WritebackOutputArgs assigns to the caller's actual. A `return io;` that left
-// the implicit variable naming `io`'s storage therefore carried §6.11.2's
-// conversion into the formal, and the copy-out then carried the cleared value
-// out to `held` -- a variable the caller never assigned after `8'bx11001x1`,
-// and one the function only ever read.
-//
-// That is what separates this from a body-local corruption: §13.4.1's
-// conversion of a function result reaches out of the subroutine entirely. The
-// inout direction is what makes it observable, because the copy-out is the
-// route by which the formal's damaged value becomes the caller's; a plain input
-// formal is discarded when the call returns and takes the damage with it.
-//
-// Widths match at eight bits throughout -- actual, formal and return type --
-// for the reason the case above gives: any mismatch resizes and hides it.
-//
-// 8'bx11001x1 is stored as aval 0xE7 with bval 0x82, and the 2-state result of
-// it is aval 0x65 with bval 0x00. `held` must still read 0xE7/0x82 after the
-// call: it is passed in, read, and passed back unchanged. A different bit
-// pattern from the case above, so the two state their claim on different bits.
 TEST(FunctionReturnSim, ReturnOfAnInoutFormalLeavesTheCallersActualIntact) {
   SimFixture f;
   auto* actual = RunAndFindVar(
@@ -624,27 +475,6 @@ TEST(FunctionReturnSim, ReturnOfAnInoutFormalLeavesTheCallersActualIntact) {
   EXPECT_EQ(taken_out->value.words[0].bval & 0xFFu, 0x00u);
 }
 
-// The other form §13.4.1 names, stated as the boundary of the two cases above
-// rather than as a third way to break them: the function returns whatever that
-// internal variable holds, and the subclause reaches that variable either by a
-// `return` or by an assignment to the function's own name. The name-assign form
-// is a blocking assignment in the body, so it is ExecFuncBlockingAssign that
-// executes it, and that executor already copies the right-hand words before any
-// store can keep them. This case therefore holds on both sides of the fix the
-// two above ask for; it is not discriminating for the aliased `return`, and
-// what it does discriminate against is the name-assign form being rerouted onto
-// a path that stores the read variable's own words.
-//
-// It is worth writing because the target here is §13.4.1's implicit variable
-// itself, whose 2-state-ness comes from the declared return type rather than
-// from a declaration in the body, and §6.11.2 has to convert it: a `bit [11:0]`
-// function must hand back a value with no unknowns in it while `stored` keeps
-// every unknown it was assigned.
-//
-// Twelve bits this time, matched across the variable and the return type, so
-// the copy has no resize to hide behind. 12'b1010x0111x01 is stored as aval
-// 0xABD with bval 0x084, and the converted result is aval 0xA39 with bval
-// 0x000.
 TEST(FunctionReturnSim, FunctionNameAssignOfAVariableCoercesOnlyTheResult) {
   SimFixture f;
   auto* kept = RunAndFindVar(
@@ -669,14 +499,6 @@ TEST(FunctionReturnSim, FunctionNameAssignOfAVariableCoercesOnlyTheResult) {
   EXPECT_EQ(handed_back->value.words[0].bval & 0xFFFu, 0x000u);
 }
 
-// §13.4.1 (printed page 342): a function's return may be a structure, and a
-// hierarchical name inside the function that begins with the function's name
-// is a member of the return value; §7.2 makes `s.a` that member of the
-// structure variable. The implicit variable was created with the return
-// type's width alone and no layout was recorded for its name, so `mk.a = 3`
-// resolved to no member window and the body handed back the zeros the
-// variable was created with (#3809). 3 and 4 combine to 34; the defect reads
-// 0, and a member written at the wrong offset reads 30, 4 or 40.
 TEST(FunctionReturnSim,
      MemberWritesThroughTheFunctionNameFillAnUnpackedStruct) {
   SimFixture f;
@@ -700,9 +522,6 @@ TEST(FunctionReturnSim,
   EXPECT_EQ(got->value.ToUint64(), 34u);
 }
 
-// The same rule over a packed structure (§7.2.1): the implicit variable is one
-// vector the members are windows of, and a write through the function's name
-// lands in the member's window. 34 as above; 0 on the defect.
 TEST(FunctionReturnSim, MemberWritesThroughTheFunctionNameFillAPackedStruct) {
   SimFixture f;
   auto* got = RunAndFindVar(
@@ -725,11 +544,6 @@ TEST(FunctionReturnSim, MemberWritesThroughTheFunctionNameFillAPackedStruct) {
   EXPECT_EQ(got->value.ToUint64(), 34u);
 }
 
-// §13.4.1 (printed page 342) has the two forms meet: a member written through
-// the function's name is read back through it, and an explicit `return mk`
-// then hands the whole implicit variable out. 5 and 5 + 2 combine to 57; the
-// defect returns a `mk` whose members are zeros, reading 0, and a `mk.a` read
-// that finds no member gives `mk.b` 2 and the sum 2 or 52.
 TEST(FunctionReturnSim, ReturnOfTheFunctionNameCarriesItsWrittenMembers) {
   SimFixture f;
   auto* got = RunAndFindVar(
@@ -753,12 +567,6 @@ TEST(FunctionReturnSim, ReturnOfTheFunctionNameCarriesItsWrittenMembers) {
   EXPECT_EQ(got->value.ToUint64(), 57u);
 }
 
-// §13.4.1 (printed pages 342-343): a nonvoid function call may be used as an
-// implicit variable of the return type within an expression, so a method
-// applies to a call returning a queue as to a queue variable, and §7.10.2.1
-// (printed 170) makes size() the number of its elements. The implicit
-// variable was one element wide and carried no elements, so the method read
-// 0 of a queue of three (#3807).
 TEST(FunctionReturnSim, SizeOfAQueueACallReturned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -777,9 +585,6 @@ TEST(FunctionReturnSim, SizeOfAQueueACallReturned) {
   EXPECT_EQ(v, 3u);
 }
 
-// The same implicit variable indexed (§7.10.1, printed 170): `fq()[1]` is the
-// element at position 1, 20. The defect read the vector the call handed back
-// as a packed one and bit-selected it, answering the index itself, 1.
 TEST(FunctionReturnSim, IndexOfAQueueACallReturned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -798,10 +603,6 @@ TEST(FunctionReturnSim, IndexOfAQueueACallReturned) {
   EXPECT_EQ(v, 20u);
 }
 
-// A dynamic array returned (§7.5): §7.5.2 (printed 159) makes size() its
-// current size and §7.4.5 (printed 155) an index its element, so two elements
-// with 7 at position 1 combine to 27. The defect gave 0 for the size and 1,
-// the index, for the element, combining to 1.
 TEST(FunctionReturnSim, SizeAndIndexOfADynamicArrayACallReturned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -819,10 +620,6 @@ TEST(FunctionReturnSim, SizeAndIndexOfADynamicArrayACallReturned) {
   EXPECT_EQ(v, 27u);
 }
 
-// A fixed-size unpacked array returned, indexed at the call (§7.4.5, printed
-// 155): positions 1 and 2 of '{10, 20, 30} combine to 2030. The defect read
-// the index bits, 1 and 0, combining to 100; elements taken in the wrong
-// order read 2010.
 TEST(FunctionReturnSim, IndexOfAFixedArrayACallReturned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -841,9 +638,6 @@ TEST(FunctionReturnSim, IndexOfAFixedArrayACallReturned) {
   EXPECT_EQ(v, 2030u);
 }
 
-// A structure returned, its members selected on the call (§13.4.1 with §7.2,
-// printed 146): 3 and 4 combine to 34. The defect resolved `mk().a` to no
-// member and read 0; a member read at the other's window reads 43 or 44.
 TEST(FunctionReturnSim, MemberOfAnUnpackedStructACallReturned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -859,8 +653,6 @@ TEST(FunctionReturnSim, MemberOfAnUnpackedStructACallReturned) {
   EXPECT_EQ(v, 34u);
 }
 
-// The same over a packed structure (§7.2.1), whose members are windows of the
-// one vector the call hands back. 34 as above; 0 on the defect.
 TEST(FunctionReturnSim, MemberOfAPackedStructACallReturned) {
   auto v = RunAndGet(
       "module t;\n"

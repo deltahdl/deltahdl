@@ -1,6 +1,3 @@
-// §11.4.11 for a conditional whose operands are queues, dynamic arrays or
-// associative arrays assigned whole, which a value of one vector cannot carry.
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -26,16 +23,10 @@ namespace delta {
 
 namespace {
 
-// Whether `a` and `b` are logically equal (§11.4.5): every bit known and the
-// same.
 bool LogicallyEqual(const Logic4Vec& a, const Logic4Vec& b) {
   return !HasUnknownBits(a) && !HasUnknownBits(b) && a.SameValueAs(b);
 }
 
-// §11.4.11: under an ambiguous predicate, arrays holding as many elements are
-// combined element by element -- an element both hold alike kept, any other
-// given its type's Table 7-1 default -- and arrays holding different counts
-// give the result type's default, an empty array.
 void AssignMergedQueues(QueueObject* dst, const QueueObject& a,
                         const QueueObject& b, Arena& arena) {
   std::vector<Logic4Vec> merged;
@@ -51,8 +42,6 @@ void AssignMergedQueues(QueueObject* dst, const QueueObject& a,
   ++dst->generation;
 }
 
-// Whether two associative arrays hold the same keys with logically equal
-// values.
 bool SameAssocContents(const AssocArrayObject& a, const AssocArrayObject& b) {
   auto same = [](const auto& x, const auto& y) {
     if (x.size() != y.size()) return false;
@@ -66,8 +55,6 @@ bool SameAssocContents(const AssocArrayObject& a, const AssocArrayObject& b) {
   return same(a.int_data, b.int_data) && same(a.str_data, b.str_data);
 }
 
-// The queues or dynamic arrays the conditional `rhs` names, merged into
-// `queue`; false where either names none.
 bool MergeQueueOperands(QueueObject* queue, const Expr* rhs, SimContext& ctx,
                         Arena& arena) {
   const QueueObject* a = ctx.FindQueue(rhs->true_expr->text);
@@ -77,9 +64,6 @@ bool MergeQueueOperands(QueueObject* queue, const Expr* rhs, SimContext& ctx,
   return true;
 }
 
-// The associative arrays the conditional `rhs` names: their shared contents
-// where they are equal, and nothing where they are not, stored in `assoc`;
-// false where either names none.
 bool MergeAssocOperands(AssocArrayObject* assoc, const Expr* rhs,
                         SimContext& ctx) {
   const AssocArrayObject* a = ctx.FindAssocArray(rhs->true_expr->text);
@@ -91,10 +75,6 @@ bool MergeAssocOperands(AssocArrayObject* assoc, const Expr* rhs,
   return true;
 }
 
-// §11.4.11 with Table 7-1: the element an unknown predicate yields from the two
-// arms' elements `t` and `e` -- the value both hold where they match, and the
-// element type's default, x for a four-state type and 0 for a two-state one,
-// where they do not.
 Logic4Vec MergedConditionalElement(const Logic4Vec& t, const Logic4Vec& e,
                                    const ArrayInfo& dst, Arena& arena) {
   Logic4Vec a = ResizeToWidth(t, dst.elem_width, arena);
@@ -108,7 +88,6 @@ Logic4Vec MergedConditionalElement(const Logic4Vec& t, const Logic4Vec& e,
                        : MakeLogic4VecVal(arena, dst.elem_width, 0);
 }
 
-// Whether the known predicate `cond` holds: any bit of it set.
 bool KnownPredicateHolds(const Logic4Vec& cond) {
   for (uint32_t w = 0; w < cond.nwords; ++w) {
     if (cond.words[w].aval != 0) return true;
@@ -116,9 +95,6 @@ bool KnownPredicateHolds(const Logic4Vec& cond) {
   return false;
 }
 
-// Writes each element of the array `dst_name` describes by `dst` the element
-// MergedConditionalElement makes of the elements of the conditional `cond`'s
-// two arms at the same position, left to right.
 void WriteMergedConditionalArray(std::string_view dst_name,
                                  const ArrayInfo& dst, const Expr* cond,
                                  SimContext& ctx, Arena& arena) {
@@ -144,11 +120,6 @@ void WriteMergedConditionalArray(std::string_view dst_name,
 
 }  // namespace
 
-// §11.4.11 with §7.5, §7.8 and §7.10: a known predicate assigns the chosen
-// array whole, as an assignment of it alone would; an ambiguous one assigns
-// queues and dynamic arrays merged element by element, and an associative
-// array -- left out of that merge -- the shared contents where the two are
-// equal and the empty array, its Table 7-1 default, where they are not.
 bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
                                     Arena& arena) {
   const Expr* rhs = stmt->rhs;
@@ -175,10 +146,6 @@ bool TryConditionalCollectionAssign(const Stmt* stmt, SimContext& ctx,
   return kMerged;
 }
 
-// §11.4.11: `r = c ? a : b` over fixed-size unpacked arrays. A known predicate
-// copies the array it selects whole; an unknown one merges the two arms
-// element by element (WriteMergedConditionalArray). Evaluated as a value, the
-// conditional read each arm's name as one element, and nothing reached `r`.
 bool TryConditionalArrayAssign(const Stmt* stmt, SimContext& ctx,
                                Arena& arena) {
   const Expr* rhs = stmt->rhs;

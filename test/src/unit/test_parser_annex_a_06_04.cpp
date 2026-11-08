@@ -62,12 +62,6 @@ TEST(StatementOrNullSyntaxParsing, NullStmtWithMultipleAttributeInstances) {
   EXPECT_EQ(body->stmts[0]->attrs[1].name, "b");
 }
 
-// statement_or_null's null form is attribute instances and a semicolon, with
-// no label, and the label belongs to a statement, whose statement_item is
-// never a bare semicolon. A label before `;` is therefore reported wherever a
-// statement is read: in a block, as an if branch and in a function body,
-// with or without attribute instances after it. The null statement it stood
-// before is still read, so nothing after it is reported.
 TEST(StatementOrNullSyntaxParsing, LabelOnNullStmtIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -114,8 +108,6 @@ TEST(StatementSyntaxParsing, StmtLabelAndBlockNameClashErrors) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  // §9.3.5 owns the label-and-block-name rule; A.6.4 only states the
-  // statement production that allows the leading label.
   EXPECT_TRUE(ReportedError(
       r.diags, "cannot have both a statement label and a block name", 3,
       "9.3.5"));
@@ -530,9 +522,6 @@ TEST(FunctionStatementOrNullSyntaxParsing, MultipleAttrInstancesOnNullInFunc) {
   EXPECT_EQ(null_stmt->attrs[1].name, "b");
 }
 
-// A.6.4: a statement_item holds an expression only as a subroutine call or an
-// increment or decrement, so an operator expression, a negation or a
-// conditional followed by `;` is no statement (#7718).
 TEST(StatementItemSyntaxParsing, AnExpressionThatIsNoCallIsNoStatement) {
   auto r = Parse(
       "module m;\n"
@@ -551,9 +540,6 @@ TEST(StatementItemSyntaxParsing, AnExpressionThatIsNoCallIsNoStatement) {
   EXPECT_TRUE(ReportedError(r.diags, kMessage, 6, "A.6.4"));
 }
 
-// A.6.4 with A.6.9: an increment or decrement, a call written with or without
-// its argument list, through a name or a member select, a void-cast call and
-// a call carrying a `with` clause are each a statement.
 TEST(StatementItemSyntaxParsing, CallsIncrementsAndDecrementsAreStatements) {
   auto r = Parse(
       "module m;\n"

@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's leaf and heap node classes, a leaf holding a byte v and a
-// heap node extending it with a rand left and right subtree under heapcond,
-// as the design test/src/e2e/global_constraints.sv declares them.
 const char* const kHeapClasses =
     "class Leaf;\n"
     "  rand bit [7:0] v;\n"
@@ -25,12 +22,6 @@ const char* const kHeapClasses =
     "  endfunction\n"
     "endclass\n";
 
-// 18.5.8: the objects randomized as a whole are found recursively, so a heap
-// node whose left subtree is a heap node in turn is solved with it, the
-// inner node's own heapcond holding at once with the outer's on every one of
-// 32 draws, which a solve that stopped at the outer node's leaves, leaving
-// the inner node's subtrees where they stood at 0 against a v drawn above
-// them, would fail on the inner node's right leaf.
 TEST(GlobalConstraintsRun, AHeapNodeUnderAHeapNodeIsSolvedWithIt) {
   SimFixture f;
   std::string out = RunCapture(
@@ -54,10 +45,6 @@ TEST(GlobalConstraintsRun, AHeapNodeUnderAHeapNodeIsSolvedWithIt) {
   EXPECT_EQ(out, "32\n");
 }
 
-// 18.5.8: the random variables of a rand object member are randomized along
-// with the containing object's, so over 32 draws of a heap node the leaves'
-// values vary as the node's does, while both global constraints hold on
-// every draw; leaves left as they were constructed would hold 0 throughout.
 TEST(GlobalConstraintsRun, TheLeavesAreDrawnWithTheNode) {
   SimFixture f;
   std::string out =
@@ -79,9 +66,6 @@ TEST(GlobalConstraintsRun, TheLeavesAreDrawnWithTheNode) {
   EXPECT_EQ(out, "32 1\n");
 }
 
-// §18.5.8 with §18.4: the objects a rand array of handles holds are random
-// object members as a scalar handle's object is, so a Grid holding both
-// solves all three Cells with it, each drawn into its own range.
 TEST(GlobalConstraintsRun, TheObjectsOfAnArrayOfHandlesAreSolvedWithTheTree) {
   SimFixture f;
   std::string out = RunCapture(
@@ -109,9 +93,6 @@ TEST(GlobalConstraintsRun, TheObjectsOfAnArrayOfHandlesAreSolvedWithTheTree) {
   EXPECT_EQ(out, "1 1 1 1\n");
 }
 
-// §18.5.8 with §18.4 and §18.5.7.1: an object solved together with its
-// random object members keeps its rand dynamic array, sized by its size
-// constraint and its elements drawn under its foreach constraint.
 TEST(GlobalConstraintsRun, ATreesDynamicArrayIsSizedAndDrawn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -136,10 +117,6 @@ TEST(GlobalConstraintsRun, ATreesDynamicArrayIsSizedAndDrawn) {
   EXPECT_EQ(out, "1 3 1\n");
 }
 
-// §18.5.8 with §18.5.3 and §18.5.4: an object solved together with its
-// random object members keeps its dist and uniqueness constraints, so on
-// every one of 16 calls d takes the only value of nonzero weight and u and
-// v differ.
 TEST(GlobalConstraintsRun, ATreesDistAndUniquenessConstraintsHold) {
   SimFixture f;
   std::string out = RunCapture(
@@ -168,8 +145,6 @@ TEST(GlobalConstraintsRun, ATreesDistAndUniquenessConstraintsHold) {
   EXPECT_EQ(out, "16\n");
 }
 
-// Runs 4 calls of `call` on an A holding a rand x and a rand B whose body is
-// `body`, and displays how many returned 1 with `check` holding.
 std::string RunMemberOfATree(const std::string& body, const std::string& call,
                              const std::string& check) {
   SimFixture f;
@@ -198,10 +173,6 @@ std::string RunMemberOfATree(const std::string& body, const std::string& call,
                     f);
 }
 
-// §18.5.8 with §18.4, §18.5.7.1 and §18.5.7.2: a random object member solved
-// with its container keeps its rand dynamic array, sized, its elements drawn
-// under foreach and summed under a reduction, while the container's inline
-// constraint applies with them.
 TEST(GlobalConstraintsRun, AMembersDynamicArrayHoldsInTheTree) {
   EXPECT_EQ(RunMemberOfATree(
                 "  rand bit [7:0] e[];\n"
@@ -213,9 +184,6 @@ TEST(GlobalConstraintsRun, AMembersDynamicArrayHoldsInTheTree) {
             "4\n");
 }
 
-// §18.5.8 with §18.5.13: a random object member solved with its container
-// keeps its soft constraint, discarded where its implication forbids it,
-// and the equality deriving w from t.
 TEST(GlobalConstraintsRun, AMembersSoftConstraintHoldsInTheTree) {
   EXPECT_EQ(RunMemberOfATree("  rand bit s;\n"
                              "  rand bit [3:0] t, w;\n"
@@ -226,9 +194,6 @@ TEST(GlobalConstraintsRun, AMembersSoftConstraintHoldsInTheTree) {
             "4\n");
 }
 
-// §18.5.8 with §18.5.9 and §18.5.11: a random object member solved with its
-// container keeps its solve...before ordering and the priority a function
-// of a random variable gives its argument.
 TEST(GlobalConstraintsRun, AMembersOrderingsHoldInTheTree) {
   EXPECT_EQ(
       RunMemberOfATree(
@@ -243,9 +208,6 @@ TEST(GlobalConstraintsRun, AMembersOrderingsHoldInTheTree) {
       "4\n");
 }
 
-// §18.5.8 with §18.5.4, §18.5.6 and §18.5.12: a random object member solved
-// with its container keeps its uniqueness constraint, its if-else and its
-// implication guarded by state.
 TEST(GlobalConstraintsRun, AMembersUniquenessAndGuardsHoldInTheTree) {
   EXPECT_EQ(RunMemberOfATree("  rand bit s;\n"
                              "  rand bit [1:0] m, n;\n"
@@ -260,10 +222,6 @@ TEST(GlobalConstraintsRun, AMembersUniquenessAndGuardsHoldInTheTree) {
             "4\n");
 }
 
-// §18.5.8 with §18.5.7.1: a foreach constraint of an object two levels into
-// the tree whose relations reach the object under its handle l ties each
-// element to the l.v the call draws, on every one of 4 calls, rather than
-// to the l.v held before it.
 TEST(GlobalConstraintsRun, AForeachReachingAnotherObjectHoldsInTheTree) {
   SimFixture f;
   std::string out = RunCapture(
@@ -294,9 +252,6 @@ TEST(GlobalConstraintsRun, AForeachReachingAnotherObjectHoldsInTheTree) {
   EXPECT_EQ(out, "4\n");
 }
 
-// §18.5.8 with §18.5.3: a dist whose target is the random variable of the
-// object under the handle left weights that variable, so on every one of 4
-// calls left.v takes the only value of nonzero weight.
 TEST(GlobalConstraintsRun, ADistOnAnotherObjectsVariableHoldsInTheTree) {
   SimFixture f;
   std::string out = RunCapture(
@@ -321,10 +276,6 @@ TEST(GlobalConstraintsRun, ADistOnAnotherObjectsVariableHoldsInTheTree) {
   EXPECT_EQ(out, "4\n");
 }
 
-// §18.5.8 with §18.5.4: a uniqueness constraint naming the random variable
-// of the object under the handle left among its members keeps it apart from
-// the others, so on every one of 4 calls the four 2-bit members are
-// pairwise distinct.
 TEST(GlobalConstraintsRun,
      AUniquenessOverAnotherObjectsVariableHoldsInTheTree) {
   SimFixture f;
@@ -353,11 +304,6 @@ TEST(GlobalConstraintsRun,
   EXPECT_EQ(out, "4\n");
 }
 
-// §18.5.8 with §18.5.9: solve left.s before d has the random variable of the
-// object under the handle left chosen first, 0 or 1 with equal probability,
-// so over 32 calls it is set near half the time, which a 4-bit d drawn with
-// it, the implication leaving s set in one of 17 legal combinations, would
-// leave near 2; and d is zero on every call with it set.
 TEST(GlobalConstraintsRun, AnOrderingOverAnotherObjectsVariableHoldsInTheTree) {
   SimFixture f;
   std::string out = RunCapture(
@@ -387,11 +333,6 @@ TEST(GlobalConstraintsRun, AnOrderingOverAnotherObjectsVariableHoldsInTheTree) {
   EXPECT_EQ(out, "1 0\n");
 }
 
-// §18.5.8 with §18.5.6: an implication whose antecedent reaches the object
-// under the handle left imposes its consequent as a relation of its own, so
-// with left.s ordered first and set near half the time, a 32-bit d is drawn
-// as 0 on every call with it set, which a d tried at random against the
-// whole implication would never be.
 TEST(GlobalConstraintsRun,
      AnImplicationReachingAnotherObjectImposesItsConsequent) {
   SimFixture f;
@@ -422,10 +363,6 @@ TEST(GlobalConstraintsRun,
   EXPECT_EQ(out, "1 0\n");
 }
 
-// §18.5.8 with §7.4.6: a relation over the random variable of an object an
-// element of a rand array of handles holds, arr[1].y, ties x to the arr[1].y
-// the call draws, on every one of 4 calls, rather than to the one held
-// before it.
 TEST(GlobalConstraintsRun, ARelationOverAnElementsObjectHoldsInTheTree) {
   SimFixture f;
   std::string out = RunCapture(

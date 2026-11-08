@@ -11,13 +11,6 @@ using namespace delta;
 
 namespace {
 
-// 18.6.2: pre_randomize() and post_randomize() exist in every class without
-// being declared.
-// A class that does not override them has built-in versions whose processing
-// is empty, so randomization proceeds and produces a value exactly as if they
-// were absent. The solver models a method left unoverridden as having no
-// pre/post hook registered; with neither hook set, Solve() still randomizes
-// successfully and the default built-ins contribute no processing of their own.
 TEST(PrePostRandomize, DefaultBuiltinsAreNoOpsWhenNotOverridden) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -26,22 +19,14 @@ TEST(PrePostRandomize, DefaultBuiltinsAreNoOpsWhenNotOverridden) {
   v.max_val = 100;
   solver.AddVariable(v);
 
-  // No SetPreRandomize/SetPostRandomize: the default built-in methods apply.
   ASSERT_TRUE(solver.Solve());
 
-  // The random variable was still computed and assigned a value in range.
   ASSERT_EQ(solver.GetValues().size(), 1u);
   const int64_t kX = solver.GetValues().at("x");
   EXPECT_GE(kX, 0);
   EXPECT_LE(kX, 100);
 }
 
-// 18.6.2: one randomize() call runs pre_randomize() before it computes values
-// and post_randomize() after. Beyond the compute boundary, this fixes both the
-// relative order of the two methods and their cardinality: across one Solve()
-// each hook fires exactly once, with pre_randomize() strictly preceding
-// post_randomize(). Recording an ordered log from the solver's pre/post hook
-// sites observes that sequence directly.
 TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
   ConstraintSolver solver(42);
   RandVariable v;
@@ -56,20 +41,10 @@ TEST(PrePostRandomize, PreThenPostInvokedExactlyOnceInOrder) {
 
   ASSERT_TRUE(solver.Solve());
 
-  // pre fired once, then post fired once — no extra or missing invocations.
   const std::vector<std::string> kExpected = {"pre", "post"};
   EXPECT_EQ(events, kExpected);
 }
 
-// 18.6.2: randomize() runs pre_randomize() before computing any new random
-// value and post_randomize() only once the new values are both computed AND
-// assigned. Observed through the real randomize() path from source: a user
-// pre_randomize() records the random member as it stands before the solve (its
-// default 0), while a user post_randomize() records the same member after the
-// solve, when the newly drawn value has already been written back onto the
-// object (42). Seeing 0 at pre and 42 at post fixes both the pre-before-compute
-// order and the timing of post_randomize after the values are computed and
-// assigned.
 TEST(PrePostRandomizeFromSource, PreObservesDefaultPostObservesAssignedValue) {
   const char* src =
       "class C;\n"
@@ -96,13 +71,6 @@ TEST(PrePostRandomizeFromSource, PreObservesDefaultPostObservesAssignedValue) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: pre_randomize() and post_randomize() are not declared virtual, yet
-// the virtual randomize() calls them, so in effect they dispatch like virtual
-// methods. Randomizing through a base-class handle bound to a derived object
-// dispatches post_randomize() to the derived override, not the base version:
-// the derived post_randomize() stamps the tag with its own marker (2), so
-// reading tag == 2 confirms the dynamic-type dispatch. Input form: the call
-// resolved through a base-class handle.
 TEST(PrePostRandomizeFromSource, PostRandomizeAppearsVirtualThroughBaseHandle) {
   const char* src =
       "class Base;\n"
@@ -133,13 +101,6 @@ TEST(PrePostRandomizeFromSource, PostRandomizeAppearsVirtualThroughBaseHandle) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: when a derived class does not itself define pre_randomize(), the
-// pre_randomize() invoked by randomize() automatically reaches the inherited
-// (super) implementation. A derived object whose class declares no
-// pre_randomize() is randomized; the base-class pre_randomize() still runs and
-// leaves its marker (7) on the object, alongside the derived-only and inherited
-// random variables both being solved. Input form: a derived class with no user
-// pre_randomize() override.
 TEST(PrePostRandomizeFromSource, InheritedPreRandomizeRunsForDerivedObject) {
   const char* src =
       "class Base;\n"
@@ -167,13 +128,6 @@ TEST(PrePostRandomizeFromSource, InheritedPreRandomizeRunsForDerivedObject) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: randomize() runs post_randomize() on the object AND on each of its
-// random object members. An outer object holds a rand class-handle member; a
-// single randomize() on the outer object drives the inner object's
-// post_randomize(), which reads the inner random member after it has been
-// solved and assigned (9) — so the inner post_randomize() both ran and saw the
-// new value. Input form: a rand class-handle member (a random sub-object) with
-// its own post_randomize().
 TEST(PrePostRandomizeFromSource, PostRandomizeRunsOnRandObjectMember) {
   const char* src =
       "class Inner;\n"
@@ -204,13 +158,6 @@ TEST(PrePostRandomizeFromSource, PostRandomizeRunsOnRandObjectMember) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: randomize() runs pre_randomize() on the object AND on each of its
-// random object members — the companion of the post_randomize()-on-member rule.
-// A single randomize() on the outer object drives the inner (rand class-handle)
-// member's pre_randomize(), which stamps its own marker (5); reading it back
-// through the outer object's handle confirms the inner pre_randomize() ran as
-// part of the enclosing call. Input form: a rand class-handle member (a random
-// sub-object) with its own pre_randomize().
 TEST(PrePostRandomizeFromSource, PreRandomizeRunsOnRandObjectMember) {
   const char* src =
       "class Inner;\n"
@@ -241,14 +188,6 @@ TEST(PrePostRandomizeFromSource, PreRandomizeRunsOnRandObjectMember) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: an override of pre_randomize() or post_randomize() keeps the base's
-// processing step only by calling the base-class method itself; when it does
-// (through super), both the base and the derived processing run. A derived
-// post_randomize() that first calls super.post_randomize() causes the base
-// post_randomize() to leave its marker (base_ran) as well as the derived one
-// (deriv_ran). Contrast the appears-virtual test above, where an override that
-// does NOT call super leaves the base step skipped — together the two fix both
-// halves of the rule. Input form: a derived override that chains to super.
 TEST(PrePostRandomizeFromSource, OverrideChainsToBaseThroughSuper) {
   const char* src =
       "class Base;\n"
@@ -278,15 +217,6 @@ TEST(PrePostRandomizeFromSource, OverrideChainsToBaseThroughSuper) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: the companion of the inherited-pre_randomize rule for post_randomize.
-// When a derived class defines no post_randomize() of its own, the
-// post_randomize() invoked by randomize() automatically reaches the inherited
-// (super) implementation. A derived object whose class declares no
-// post_randomize() is randomized; the base-class post_randomize() still runs
-// and, because it fires after the write-back, records the derived object's
-// just-assigned random member (3), while the derived-only variable is solved to
-// 4. Input form: a derived class with no user post_randomize() override
-// (post-invocation path, distinct from the pre-hook path).
 TEST(PrePostRandomizeFromSource, InheritedPostRandomizeRunsForDerivedObject) {
   const char* src =
       "class Base;\n"
@@ -313,13 +243,6 @@ TEST(PrePostRandomizeFromSource, InheritedPostRandomizeRunsForDerivedObject) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: pre_randomize() is not declared virtual, yet dispatches like a
-// virtual method since the virtual randomize() calls it — the companion of the
-// post_randomize apparent-virtual rule. Randomizing through a base-class handle
-// bound to a derived object dispatches pre_randomize() to the derived override
-// (marker 2), not the base version (marker 1), so reading tag == 2 confirms
-// dynamic-type dispatch on the pre-hook path. Input form: the call resolved
-// through a base-class handle (pre-hook path).
 TEST(PrePostRandomizeFromSource, PreRandomizeAppearsVirtualThroughBaseHandle) {
   const char* src =
       "class Base;\n"
@@ -350,13 +273,6 @@ TEST(PrePostRandomizeFromSource, PreRandomizeAppearsVirtualThroughBaseHandle) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.6.2: the super-chaining rule applied to pre_randomize() — the companion of
-// the post_randomize super-chain test. A derived pre_randomize() that first
-// calls super.pre_randomize() keeps the base's pre-randomization step: the base
-// pre_randomize() leaves its marker (base_ran) as well as the derived one
-// (deriv_ran). Contrast the pre appears-virtual test above, whose override does
-// NOT call super and leaves the base step skipped. Input form: a derived
-// pre_randomize() override that chains to super (pre-hook path).
 TEST(PrePostRandomizeFromSource, PreOverrideChainsToBaseThroughSuper) {
   const char* src =
       "class Base;\n"

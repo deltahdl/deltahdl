@@ -15,23 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.9 Program: the VPI object model for a program block. The diagram's
-// property and structural edges - the default clocking block
-// (vpiDefaultClocking), the default disable iff expr/distribution
-// (vpiDefaultDisableIff), the instance array the program belongs to, and the
-// one-to-many vpiInstance edges to the program's cont assigns, clocking blocks,
-// interfaces, interface arrays, and processes - are walked by the generic
-// object-model machinery (vpi_handle / vpi_iterate) and carry no rule of their
-// own here.
-//
-// The single numbered Detail carries this clause's own normative rule, observed
-// below through the public vpi_handle dispatch:
-//   D1 - vpiIndex from a program reaches the index expression that locates it
-//        within an instance array, or NULL when the program is not an element
-//        of an instance array.
-
-// The fixture installs a context so the public vpi_handle entry point runs its
-// real Handle dispatch.
 class Program : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -40,8 +23,6 @@ class Program : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D1: vpiIndex from a program that is an element of an instance array reaches
-// the index expression that locates it within the array.
 TEST_F(Program, IndexTransitionReachesArrayIndex) {
   VpiObject index_expr;
   index_expr.type = vpiConstant;
@@ -55,9 +36,6 @@ TEST_F(Program, IndexTransitionReachesArrayIndex) {
             &index_expr);
 }
 
-// D1: for a program that is not part of an instance array, the vpiIndex
-// transition returns NULL - even when an expr is hanging off the object, the
-// transition is meaningful only for an array element.
 TEST_F(Program, IndexTransitionIsNullWhenNotAnArrayElement) {
   VpiObject stray_expr;
   stray_expr.type = vpiConstant;
@@ -65,25 +43,12 @@ TEST_F(Program, IndexTransitionIsNullWhenNotAnArrayElement) {
   VpiObject standalone;
   standalone.type = vpiProgram;
   standalone.array_member = false;
-  standalone.index_expr = &stray_expr;  // present but must not be reported
+  standalone.index_expr = &stray_expr;
   standalone.children.push_back(&stray_expr);
 
   EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
 }
 
-// -----------------------------------------------------------------------------
-// The program's edge to its procedures. §37.9 draws it to `process`, which
-// §37.63 draws as a class definition - bold italic letters in a dotted
-// enclosure - holding the initial, final and always object definitions. §37.4.1
-// makes such an enclosure a grouping rather than an object, so vpiProcess is
-// the group's name; matching it against an object's own type, which is what the
-// generic traversal does, reached no procedure of any program or module.
-// -----------------------------------------------------------------------------
-
-// Class membership: the kinds the enclosure holds are the initial, the final
-// and the always procedure. The class constant itself is not one of them, and
-// §37.63 detail 1's specialized always forms are vpiAlwaysType values rather
-// than kinds beside them.
 TEST_F(Program, TheProcessClassGroupsTheThreeProcedureKinds) {
   EXPECT_TRUE(VpiIsProcessType(vpiInitial));
   EXPECT_TRUE(VpiIsProcessType(vpiFinal));
@@ -93,10 +58,6 @@ TEST_F(Program, TheProcessClassGroupsTheThreeProcedureKinds) {
   EXPECT_FALSE(VpiIsProcessType(vpiContAssign));
 }
 
-// §37.9 (figure, program ==> process): a program's procedures are what the edge
-// drawn to the class reaches, so the iteration hands back the initial, the
-// final and the always block the program declares. A continuous assignment,
-// which the diagram reaches by an edge of its own, is not one of them.
 TEST_F(Program, AProgramIteratesTheProceduresItDeclares) {
   VpiObject initial;
   initial.type = vpiInitial;
@@ -119,9 +80,6 @@ TEST_F(Program, AProgramIteratesTheProceduresItDeclares) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// §37.63 detail 1: an always procedure is one object kind whatever form it was
-// written in, its form read off vpiAlwaysType. All four forms are reached by
-// the one edge, and each still reports the form it was written as.
 TEST_F(Program, EveryAlwaysFormIsReachedByTheOneEdge) {
   VpiObject comb;
   comb.type = vpiAlways;
@@ -144,8 +102,6 @@ TEST_F(Program, EveryAlwaysFormIsReachedByTheOneEdge) {
   EXPECT_EQ(vpi_get(vpiAlwaysType, VpiHandleOf(&latch)), vpiAlwaysLatch);
 }
 
-// §37.9 (figure): a program that declares no procedure reaches none, which
-// §38.23 reports as no iterator rather than an empty one.
 TEST_F(Program, AProgramOfNoProceduresIteratesToNone) {
   VpiObject assign;
   assign.type = vpiContAssign;
@@ -157,30 +113,24 @@ TEST_F(Program, AProgramOfNoProceduresIteratesToNone) {
   EXPECT_EQ(vpi_iterate(vpiProcess, VpiHandleOf(&program)), nullptr);
 }
 
-// A design run with a PLI application registered, its VPI model read back
-// once the run is over.
 class ProgramsOfARun : public VpiDesignRun {};
 
 constexpr const char* kProgramInstance =
     "program prog; int v; endprogram\n"
     "module top; prog p0(); endmodule\n";
 
-// §37.9: a program instance is a program, reached from the instance that
-// holds it through vpiProgram...
 TEST_F(ProgramsOfARun, AProgramInstanceIsReachedAsAProgram) {
   Run(kProgramInstance);
   EXPECT_EQ(NamesOf(vpiProgram, vpi_handle_by_name(VpiText("top"), nullptr)),
             (std::vector<std::string>{"p0"}));
 }
 
-// ...of type vpiProgram...
 TEST_F(ProgramsOfARun, AProgramInstanceIsOfTypeProgram) {
   Run(kProgramInstance);
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_name(VpiText("top.p0"), nullptr)),
             vpiProgram);
 }
 
-// ...whose definition is the program it instantiates.
 TEST_F(ProgramsOfARun, AProgramInstancesDefinitionIsItsProgram) {
   Run(kProgramInstance);
   EXPECT_STREQ(

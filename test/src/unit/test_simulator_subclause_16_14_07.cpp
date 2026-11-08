@@ -8,15 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A module around the items given, as
-// test/src/e2e/inferred_clocking_functions.sv is: clk1 rises at 5, 15, ...
-// and falls at 10, 20, ..., clk2 rises at 13 and 33, the default clocking
-// is negedge clk1 and the default disable iff is rst1, a and b are 1
-// throughout, c is 1 from 12 to 28, rst1 from 36 to 42, and the run ends
-// at 48; the clause's p_triggers defaults its clock and its disable
-// condition to the inferred functions. The attempts still in flight at the
-// end hold in the final processes, which the fixture's run does not reach
-// and the e2e design shows.
 std::string InferredSource(const std::string& items) {
   return "module t;\n"
          "  logic a = 1, b = 1, c = 0, rst1 = 0, clk1 = 0, clk2 = 0;\n"
@@ -46,11 +37,6 @@ std::string InferredSource(const std::string& items) {
          "endmodule\n";
 }
 
-// §16.14.7: in the clause's a1 the clock is inferred from the default
-// clocking, negedge clk1, and the disable condition from the default
-// disable iff, rst1, so a1 reports as the assertion it is logically
-// equivalent to: passing at 20, failing at 30, its attempt of 30 dropped
-// and its attempt of 40 disabled while rst1 is 1.
 TEST(InferredClockingFunctionsRun,
      TheDefaultClockingAndDisableStandInForTheDefaults) {
   SimFixture f;
@@ -71,9 +57,6 @@ TEST(InferredClockingFunctionsRun,
             "$finish at time 48\n");
 }
 
-// §16.14.7: in the clause's a2 the event expression posedge clk1 is passed
-// to the formal clk and 1'b0 to rst, so neither inferred function is used
-// and a2 reports as its equivalent on posedge clk1 disabled by nothing.
 TEST(InferredClockingFunctionsRun, AnActualSuppliedStandsInsteadOfTheDefault) {
   SimFixture f;
   std::string out = RunCapture(
@@ -95,10 +78,6 @@ TEST(InferredClockingFunctionsRun, AnActualSuppliedStandsInsteadOfTheDefault) {
             "$finish at time 48\n");
 }
 
-// §16.14.7: in the clause's a3 the clocking event is inferred from the
-// event control of the always procedure, posedge clk2, reset being
-// referenced within it, and the disable condition from the default disable
-// iff, so a3 reports as its equivalent on posedge clk2, failing at 33.
 TEST(InferredClockingFunctionsRun,
      TheProceduresInferredClockStandsInForTheDefault) {
   SimFixture f;
@@ -123,9 +102,6 @@ TEST(InferredClockingFunctionsRun,
             "$finish at time 48\n");
 }
 
-// §16.14.7: outside the scope of any default disable iff declaration,
-// $inferred_disable returns 1'b0, so the instance is disabled by nothing
-// and rst1 rising at 36 drops no attempt: the attempt of 30 fails at 40.
 TEST(InferredClockingFunctionsRun, OutsideAnyDefaultDisableTheDefaultIsFalse) {
   SimFixture f;
   std::string src = InferredSource(
@@ -141,12 +117,6 @@ TEST(InferredClockingFunctionsRun, OutsideAnyDefaultDisableTheDefaultIsFalse) {
             "$finish at time 48\n");
 }
 
-// A module whose default clocking is `@(event)`: clk rises at 5, 15, ..., 95
-// and falls at 10, 20, ..., 90 by 98; en is true from 42, so at the six rises
-// of 45 to 95 and the five falls of 50 to 90; and a is 1 throughout. c1 counts
-// the attempts of a sequence clocked on an event formal defaulted to
-// $inferred_clock, and c2 those of a statement clocked by the default clocking
-// itself.
 std::string RunInferredClockCase(const std::string& event) {
   SimFixture f;
   return RunCapture(
@@ -168,24 +138,17 @@ std::string RunInferredClockCase(const std::string& event) {
       f);
 }
 
-// §16.14.7 with §9.4.2: $inferred_clock stands for the whole event expression
-// of the inferred clock, its iff guard included, so the sequence is attempted
-// at the six rises at which en holds, as the default clocking itself is.
 TEST(InferredClockingFunctionsRun, AGuardedInferredClockKeepsItsGuard) {
   EXPECT_NE(RunInferredClockCase("posedge clk iff en").find("c1=6 c2=6\n"),
             std::string::npos);
 }
 
-// §16.14.7 with §9.4.2: an inferred clock joining events with `or` stands in
-// whole, so the sequence is attempted at the ten rises and the nine falls.
 TEST(InferredClockingFunctionsRun, AnOrJoinedInferredClockKeepsEachEvent) {
   EXPECT_NE(
       RunInferredClockCase("posedge clk or negedge clk").find("c1=19 c2=19\n"),
       std::string::npos);
 }
 
-// §16.14.7 with §9.4.2: an inferred clock naming no edge, guarded, stands in
-// as any change of clk at which en holds, the six rises and five falls.
 TEST(InferredClockingFunctionsRun, AnEdgelessGuardedInferredClockStandsIn) {
   EXPECT_NE(RunInferredClockCase("clk iff en").find("c1=11 c2=11\n"),
             std::string::npos);

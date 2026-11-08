@@ -10,9 +10,6 @@
 namespace delta {
 
 void ElaboratorClassRules::RunPreElaborationClassValidations() {
-  // §8.24: first, so that each extern prototype is linked to the out-of-block
-  // declaration defining it before any rule below reads a method's body
-  // through MethodBody.
   ValidateOutOfBlockDeclarations();
 
   ValidateFinalClassExtension();
@@ -61,17 +58,12 @@ void ElaboratorClassRules::RunPreElaborationClassValidations() {
 
   ValidateInterfaceClassRules();
 
-  // Clause 18: the class constraint rules are checked as one unit, against the
-  // compilation unit and its typedef table.
   ClassConstraintValidator constraints(unit_, typedefs_, diag_);
 
   constraints.ValidateRandomVariableTypes();
 
   constraints.ValidateConstraintBlockNames();
 
-  // 18.5.1: complete each prototype with its external block's body before the
-  // checks on a constraint's contents, so those checks reach the block, and so
-  // randomization applies it.
   constraints.CompleteExternalConstraints();
 
   constraints.ValidateForeachConstraintDims();

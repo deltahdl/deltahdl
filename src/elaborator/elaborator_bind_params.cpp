@@ -18,9 +18,6 @@ namespace delta {
 
 namespace {
 
-// §23.11: whether the dotted name `e`, read from `mod`, passes through an
-// instance a bind put there: its leading names are instances one below the
-// other, and one of them was bound.
 bool DottedNameCrossesBind(const Expr* e, const RtlirModule* mod) {
   std::vector<std::string_view> steps;
   const Expr* head = e;
@@ -41,7 +38,6 @@ bool DottedNameCrossesBind(const Expr* e, const RtlirModule* mod) {
   return false;
 }
 
-// §23.11: whether some dotted name within `e` crosses a bind (above).
 bool ExprCrossesBind(const Expr* e, const RtlirModule* mod) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kMemberAccess) return DottedNameCrossesBind(e, mod);
@@ -52,10 +48,6 @@ bool ExprCrossesBind(const Expr* e, const RtlirModule* mod) {
   return found;
 }
 
-// The packed range a declaration in a module's body writes, the constant
-// expressions there a hierarchical name can reach a bind instance's parameter
-// from; a parameter's value is held to §6.20.2's rule against any hierarchical
-// reference already.
 std::vector<const Expr*> ItemConstantExprs(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kVarDecl &&
       item->kind != ModuleItemKind::kNetDecl) {
@@ -70,8 +62,6 @@ std::vector<const Expr*> ItemConstantExprs(const ModuleItem* item) {
   return exprs;
 }
 
-// §23.11: the packed ranges of the declaration `decl` gives module `mod` that
-// reach a bind instance's parameter, each reported at its declaration.
 void ReportBindParamsInModule(const ModuleDecl* decl, const RtlirModule* mod,
                               DiagEngine& diag) {
   for (const ModuleItem* item : decl->items) {

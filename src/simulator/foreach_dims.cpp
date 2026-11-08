@@ -38,16 +38,11 @@ static ForeachDim DimOfRange(std::string_view var, const PackedRange& range) {
           static_cast<uint64_t>(range.HighIndex() - range.LowIndex()) + 1};
 }
 
-// An unpacked dimension as ArrayInfo and a property record it: its address
-// extent from `lo` and whether it was declared descending.
 static ForeachDim DimOfExtent(int64_t lo, uint64_t size, bool descending) {
   int64_t high = lo + static_cast<int64_t>(size) - 1;
   return {{}, descending ? high : lo, descending, size};
 }
 
-// The unpacked dimensions `info` records, outermost first, and the key of the
-// element standing at every one's low index, `name[lo]` or `name[lo][lo]`,
-// whose packed type every element shares.
 static void AppendUnpackedDims(const ArrayInfo& info,
                                std::vector<ForeachDim>& dims,
                                std::string& elem_key) {
@@ -63,8 +58,6 @@ static void AppendUnpackedDims(const ArrayInfo& info,
   }
 }
 
-// The packed dimensions of `v`, outermost first, as RecordPackedRange recorded
-// them; an `int` or a scalar is the one [width-1:0] it is addressed as.
 static void AppendPackedDims(const Variable& v, std::vector<ForeachDim>& dims) {
   dims.push_back(DimOfRange({}, v.DeclaredRange()));
   if (!v.has_packed_range) return;
@@ -72,7 +65,6 @@ static void AppendPackedDims(const Variable& v, std::vector<ForeachDim>& dims) {
     dims.push_back(DimOfRange({}, range));
 }
 
-// Keeps the dimensions `stmt` names a loop variable for, each given its name.
 static std::vector<ForeachDim> NamedDims(const Stmt* stmt,
                                          const std::vector<ForeachDim>& all) {
   std::vector<ForeachDim> named;
@@ -88,9 +80,6 @@ uint32_t ForeachArraySize(std::string_view name, SimContext& ctx) {
   if (const ArrayInfo* info = ctx.FindArrayInfo(name)) return info->size;
   const Variable* var = ctx.FindVariable(name);
   if (var == nullptr) return 0;
-  // §12.7.3: a string is treated as a dynamic array of bytes, so the loop runs
-  // once per character. The value packs eight bits per character, so the
-  // character count is the bit width divided by eight.
   if (ctx.IsStringVariable(name)) return var->value.width / 8;
   return var->value.width;
 }
@@ -146,9 +135,8 @@ std::vector<Variable*> CreateForeachDimVars(const std::vector<ForeachDim>& dims,
                                             SimContext& ctx) {
   std::vector<Variable*> vars;
   vars.reserve(dims.size());
-  // §12.7.3: a loop variable over a fixed-size or dynamic array is an int.
   for (const auto& d : dims) {
-    vars.push_back(ctx.CreateLocalVariable(d.var, 32, /*is_signed=*/true));
+    vars.push_back(ctx.CreateLocalVariable(d.var, 32, true));
   }
   return vars;
 }
@@ -179,8 +167,7 @@ ForeachElementDim ForeachElementDimOf(const Stmt* stmt,
     if (q == nullptr || !q->elements_are_queues) return dim;
     dim.queue = q;
   }
-  dim.var =
-      ctx.CreateLocalVariable(stmt->foreach_vars[1], 32, /*is_signed=*/true);
+  dim.var = ctx.CreateLocalVariable(stmt->foreach_vars[1], 32, true);
   return dim;
 }
 

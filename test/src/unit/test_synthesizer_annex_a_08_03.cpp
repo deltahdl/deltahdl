@@ -140,18 +140,6 @@ TEST(ExpressionSynthesis, NestedConditionalExpressionLowers) {
   ASSERT_NE(aig, nullptr);
 }
 
-// A.8.3 lists `++` among the incrementor operators, and §11.4.2 rules that it
-// behaves as a blocking assignment, so `++tmp` has to leave the incremented
-// bits in the netlist. `ASSERT_NE(aig, nullptr)` and `EXPECT_FALSE(HasErrors)`
-// both hold over a graph in which the increment never happened, so the sweep is
-// what states the increment took place: it drives every value of `a` through
-// the netlist and reads what `y` carries. The width is four bits because at
-// width one an increment and a decrement build the same netlist, and the block
-// writes `y` itself rather than through `assign y = tmp;` because `Lower`
-// lowers `mod->assigns` before `mod->processes` and a continuous assignment
-// would read the bits `tmp` held before the block ran. `++tmp` is the prefix
-// spelling, which `ParsePrefixExpr` builds as an `ExprKind::kUnary` rather than
-// the `ExprKind::kPostfixUnary` that `tmp++` builds.
 TEST(ExpressionSynthesis, IncDecCrossLinkInsideAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

@@ -15,25 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.3.4 Delays and values: nets, primitives, module paths, timing checks, and
-// continuous assignments can carry a delay written within the SystemVerilog
-// source. The vpiDelay relation reaches the expression standing for that source
-// delay. Two normative "shall" rules constrain the form of that expression:
-//   - Claim S1: the expression shall be one that evaluates to a constant when a
-//     single delay is specified, or an operation when more than one delay is
-//     specified.
-//   - Claim S2: in the multiple-delay case the operation's vpiOpType shall be
-//     vpiListOp.
-// The rest of the subclause (the vpi_get_delays/vpi_put_delays/vpi_get_value/
-// vpi_put_value routines and their structures, the actual delays the tool uses)
-// is descriptive of, or a pointer to, Clause 38, which owns those rules. These
-// tests observe the production helpers in vpi.cpp - and the VpiContext::Handle
-// dispatch they feed - that apply the vpiDelay access and the S1/S2 form rules.
-
-// D2 grouping: the object kinds whose delays are written in the source and are
-// therefore reachable through vpiDelay - a net, a primitive (and its gate,
-// switch, and udp forms), a module path, a timing check, and a continuous
-// assignment. An unrelated object kind carries no source delay.
 TEST(SourceDelayModel, DelayCarryingTypeClassification) {
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiNet));
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiPrimitive));
@@ -43,61 +24,46 @@ TEST(SourceDelayModel, DelayCarryingTypeClassification) {
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiModPath));
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiTchk));
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiContAssign));
-  // A module, by contrast, carries no source-written delay reached this way.
   EXPECT_FALSE(VpiObjectCarriesSourceDelay(vpiModule));
 }
 
-// D2 + S1 (single delay): vpiDelay of a delay-carrying object reaches its
-// designated source-delay expression. With one delay specified, that expression
-// is a single constant-valued expression.
 TEST(SourceDelayModel, SingleDelayReachesConstantExpression) {
   VpiObject net;
   net.type = vpiNet;
-  VpiObject
-      delay;  // one delay specified -> an expression evaluating to a const
+  VpiObject delay;
   delay.type = vpiConstant;
   net.delay_expr = &delay;
 
   EXPECT_EQ(VpiSourceDelayExpr(&net), &delay);
-  // A single constant-valued delay is not the multiple-delay list operation.
   EXPECT_FALSE(VpiSourceDelayExprIsListOp(VpiSourceDelayExpr(&net)));
 }
 
-// D2 (edges): a null handle, an object that is not a delay-carrying kind, and a
-// delay-carrying object with no source delay all reach no delay expression.
 TEST(SourceDelayModel, NoDelayExpressionReachesNull) {
   EXPECT_EQ(VpiSourceDelayExpr(nullptr), nullptr);
 
   VpiObject delay;
   delay.type = vpiConstant;
 
-  // The delay is carried by the wrong object kind: a module is not reachable.
   VpiObject module;
   module.type = vpiModule;
   module.delay_expr = &delay;
   EXPECT_EQ(VpiSourceDelayExpr(&module), nullptr);
 
-  // A delay-carrying kind with no source delay reaches nothing.
   VpiObject net;
   net.type = vpiNet;
   EXPECT_EQ(VpiSourceDelayExpr(&net), nullptr);
 }
 
-// S1 + S2 (multiple delays): when more than one delay is specified the vpiDelay
-// expression shall be an operation whose vpiOpType is vpiListOp.
 TEST(SourceDelayModel, MultipleDelaysAreListOperation) {
   VpiObject list_op;
   list_op.type = vpiOperation;
   list_op.op_type = vpiListOp;
   EXPECT_TRUE(VpiSourceDelayExprIsListOp(&list_op));
 
-  // A single constant-valued delay (the one-delay form) is not the list op.
   VpiObject constant;
   constant.type = vpiConstant;
   EXPECT_FALSE(VpiSourceDelayExprIsListOp(&constant));
 
-  // A different operation type does not satisfy the rule, and neither does a
-  // null handle.
   VpiObject other_op;
   other_op.type = vpiOperation;
   other_op.op_type = vpiConcatOp;
@@ -105,9 +71,6 @@ TEST(SourceDelayModel, MultipleDelaysAreListOperation) {
   EXPECT_FALSE(VpiSourceDelayExprIsListOp(nullptr));
 }
 
-// D2 + S1 (public path, single delay): traversing vpiDelay through the public
-// handle dispatch returns the source-delay expression, and for one delay it is
-// the constant-valued expression rather than a list operation.
 TEST(SourceDelayPublic, HandleDelayReturnsSingleConstantExpression) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -126,8 +89,6 @@ TEST(SourceDelayPublic, HandleDelayReturnsSingleConstantExpression) {
   SetGlobalVpiContext(nullptr);
 }
 
-// S1 + S2 (public path, multiple delays): traversing vpiDelay returns the list
-// operation, and the object it returns satisfies the type/op-type rule.
 TEST(SourceDelayPublic, HandleDelayReturnsListOperationForMultipleDelays) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -148,9 +109,6 @@ TEST(SourceDelayPublic, HandleDelayReturnsListOperationForMultipleDelays) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D2 (public path edge): vpiDelay is diverted only for the delay-carrying
-// object kinds; an object that does not carry a source delay is not diverted,
-// so the public path reaches nothing.
 TEST(SourceDelayPublic, HandleDelayNotDivertedForNonDelayObject) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -166,8 +124,6 @@ TEST(SourceDelayPublic, HandleDelayNotDivertedForNonDelayObject) {
   SetGlobalVpiContext(nullptr);
 }
 
-// What the application found, against a design. A calltf is a plain C function
-// with no return path to the case that provoked it.
 int g_one_delay_type = 0;
 int g_two_delay_type = 0;
 int g_two_delay_op_type = 0;
@@ -203,11 +159,6 @@ void RegisterSourceDelayProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// Claims S1 and S2, against a design. A net declared with one delay reaches a
-// constant expression through vpiDelay, and a net declared with two reaches an
-// operation whose vpiOpType is vpiListOp, over the two delays as its operands.
-// VpiObject::delay_expr is what the relation is read from and no pass of the
-// attach wrote it, so both reached nothing at all whatever the source declared.
 TEST(SourceDelayDesign, ANetsDeclaredDelaysAreReachedThroughVpiDelay) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
@@ -237,12 +188,6 @@ TEST(SourceDelayDesign, ANetsDeclaredDelaysAreReachedThroughVpiDelay) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.3.4 against a design: each kind of object whose source writes delays,
-// beside the net, reaches them through vpiDelay -- a primitive (gate and
-// udp), a continuous assignment, a module path and a timing check. One delay
-// is a constant of the value written, several an operation of vpiOpType
-// vpiListOp over constants in the order written. Only the net's had been
-// built, so the four answered null whatever the source wrote.
 class SourceDelaysOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -269,9 +214,6 @@ class SourceDelaysOfARun : public VpiDesignRun {
         "module top; reg a, b; wire o, y; m m1(a, b, o, y); endmodule\n");
   }
 
-  // The values vpiDelay reaches from `obj`: one constant's, or each operand's
-  // of a vpiListOp operation in order; -1 for a delay of any other shape, and
-  // none for no delay.
   static std::vector<int> DelaysOf(vpiHandle obj) {
     vpiHandle delay = vpi_handle(vpiDelay, obj);
     if (delay == nullptr) return {};
@@ -293,8 +235,6 @@ class SourceDelaysOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The objects of `type` the instance m1 reaches, in the order it reaches
-  // them.
   static std::vector<vpiHandle> AllOf(int type) {
     std::vector<vpiHandle> found;
     vpiHandle it = vpi_iterate(type, By("top.m1"));
@@ -304,7 +244,6 @@ class SourceDelaysOfARun : public VpiDesignRun {
   }
 };
 
-// #6967: a gate's and a udp's instantiation delays.
 TEST_F(SourceDelaysOfARun, APrimitivesWrittenDelaysAreReached) {
   EXPECT_EQ(DelaysOf(Named(vpiPrimitive, By("top.m1"), "g")),
             (std::vector<int>{2, 3}));
@@ -314,8 +253,6 @@ TEST_F(SourceDelaysOfARun, APrimitivesWrittenDelaysAreReached) {
             (std::vector<int>{14, 15}));
 }
 
-// #7232: a continuous assignment's delays, its turn-off delay among them where
-// it writes one.
 TEST_F(SourceDelaysOfARun, AContinuousAssignmentsWrittenDelaysAreReached) {
   std::vector<std::vector<int>> delays;
   for (vpiHandle assign : AllOf(vpiContAssign)) {
@@ -325,7 +262,6 @@ TEST_F(SourceDelaysOfARun, AContinuousAssignmentsWrittenDelaysAreReached) {
   EXPECT_EQ(delays, (std::vector<std::vector<int>>{{5}, {6, 7}, {16, 17, 18}}));
 }
 
-// #7233: a module path's delays, as the path declaration wrote them.
 TEST_F(SourceDelaysOfARun, AModulePathsWrittenDelaysAreReached) {
   std::vector<std::vector<int>> delays;
   for (vpiHandle path : AllOf(vpiModPath)) delays.push_back(DelaysOf(path));
@@ -333,7 +269,6 @@ TEST_F(SourceDelaysOfARun, AModulePathsWrittenDelaysAreReached) {
   EXPECT_EQ(delays, (std::vector<std::vector<int>>{{8, 9}, {10}}));
 }
 
-// #7234: a timing check's limits.
 TEST_F(SourceDelaysOfARun, ATimingChecksWrittenLimitsAreReached) {
   std::vector<std::vector<int>> delays;
   for (vpiHandle check : AllOf(vpiTchk)) delays.push_back(DelaysOf(check));

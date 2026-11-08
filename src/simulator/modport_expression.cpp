@@ -15,8 +15,6 @@
 
 namespace delta {
 
-// The modport expression port `expr` names, `i.P` with i an interface port
-// of the running instance, or null.
 static const ModportExpressionPort* PortNamedBy(const Expr* expr,
                                                 SimContext& ctx) {
   if (expr == nullptr || !ctx.HasModportExpressions() ||
@@ -58,8 +56,6 @@ bool TryModportExpressionAssign(const Stmt* stmt, SimContext& ctx,
                                    ctx, arena);
 }
 
-// The statement `stmt` with the expression `port` stands for as its target in
-// place of the port, built once per statement and port.
 static const Stmt* NonblockingOfExpression(const Stmt* stmt,
                                            const ModportExpressionPort* port,
                                            SimContext& ctx, Arena& arena) {

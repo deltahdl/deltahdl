@@ -71,9 +71,6 @@ TEST(RandsequenceSim, ProductionSequenceOrder) {
 }
 
 TEST(RandsequenceSim, NamedTopProductionDesignatesEntry) {
-  // 18.17: the optional production name after the randsequence keyword
-  // designates the top-level production. It need not be the first production;
-  // here the entry is the second one declared, so only its code block runs.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -92,9 +89,6 @@ TEST(RandsequenceSim, NamedTopProductionDesignatesEntry) {
 }
 
 TEST(RandsequenceSim, AlternativeProductionListsChosenAtRandom) {
-  // 18.17: the generator picks at random among production lists set apart by
-  // '|'. Running the block many times must exercise both alternatives while
-  // keeping every selection a valid one (total preserved).
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -144,10 +138,6 @@ TEST(RandsequenceSim, NoProductionNameUsesFirst) {
 }
 
 TEST(RandsequenceSim, NonterminalDecomposesToTerminals) {
-  // 18.17: a nonterminal is decomposed into its constituent productions, which
-  // are themselves decomposed until only terminals (code blocks) remain. Here
-  // 'group' expands to two further nonterminals; the digits accumulated into x
-  // record that the terminal code blocks ran in fully-decomposed order.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -169,10 +159,6 @@ TEST(RandsequenceSim, NonterminalDecomposesToTerminals) {
 }
 
 TEST(RandsequenceSim, ChosenProductionListStreamsItemsInOrder) {
-  // 18.17: a production list holding several items streams them in sequence,
-  // and lists separated by '|' are alternative choices. Whichever alternative
-  // the generator picks, its items must run left-to-right, so x ends as one of
-  // the two ordered outcomes and never an interleaving of the two lists.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -195,11 +181,6 @@ TEST(RandsequenceSim, ChosenProductionListStreamsItemsInOrder) {
 }
 
 TEST(RandsequenceSim, SequencedCodeBlockTerminalsRunInOrder) {
-  // 18.17: a production list streams its items in sequence. Here the items are
-  // anonymous code-block terminals rather than named nonterminals, so the two
-  // blocks execute directly and in written order. The first multiplies-and-adds
-  // 1, the second 2, so x reads 12 -- proving terminal code blocks in a list
-  // are generated left-to-right just like production references.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -217,14 +198,6 @@ TEST(RandsequenceSim, SequencedCodeBlockTerminalsRunInOrder) {
 }
 
 TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
-  // 18.17: a randsequence statement opens an automatic scope of its own, and
-  // its production names belong to that scope alone. Two sibling randsequence
-  // statements may therefore each declare a production named 'main' with no
-  // collision, and each statement must resolve 'main' to the production
-  // declared within itself -- not to the other statement's like-named
-  // production. The first block records the digit 1 and the second records the
-  // digit 2, so a scope-local resolution yields 12; a shared/leaked production
-  // identifier would instead run one of the two bodies twice (11 or 22).
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -245,10 +218,6 @@ TEST(RandsequenceSim, ProductionIdentifiersAreLocalToRandsequenceScope) {
 }
 
 TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
-  // 18.17: a production code block opens an automatic scope with no name, so a
-  // variable it declares starts fresh on every execution. Production 'p' runs
-  // twice; were its local 'y' persistent the accumulator would reach 1+2=3, but
-  // automatic lifetime makes each run observe y == 1, so acc sums to 2.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -266,20 +235,6 @@ TEST(RandsequenceSim, CodeBlockLocalsAreAutomaticPerInvocation) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §18.17: every code block in the randsequence block opens an anonymous
-// automatic scope. CodeBlockLocalsAreAutomaticPerInvocation above covers the
-// block written as a production of its own, which ExecRsProdCodeBlock pushes a
-// scope for. This is the other place Syntax 18-14 puts a code block:
-// `rs_rule ::= rs_production_list [ := rs_weight_specification [ rs_code_block
-// ] ]`, the block a rule carries after its weight. That one ran in the
-// enclosing production's scope, so its declaration outlived it and was still
-// standing when the same rule was selected again.
-//
-// Production a is selected twice and its block increments a local. Automatic
-// lifetime makes each run observe y == 1, so the block contributes 1 + 1; a
-// declaration that survived would contribute 1 + 2. p adds 10 each time it
-// generates, so the total tells the two apart as 22 against 23 and also says
-// the rule really was activated twice rather than once.
 TEST(RandsequenceSim, WeightCodeBlockLocalsAreAutomaticPerActivation) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -299,17 +254,6 @@ TEST(RandsequenceSim, WeightCodeBlockLocalsAreAutomaticPerActivation) {
   EXPECT_EQ(var->value.ToUint64(), 22u);
 }
 
-// The same rule for the trailing block of a production named as a rand join
-// operand, which is a second execution path: §18.17.5's interleaving runs each
-// operand production's selected rule through a helper of its own rather than
-// through the one the case above exercises. §18.17 puts no condition on where
-// a code block stands, so both want the scope.
-//
-// m is generated twice and each generation interleaves p and q, so p's trailing
-// block runs twice and s generates four times. Automatic lifetime gives
-// 40 + 1 + 1; a surviving declaration gives 40 + 1 + 2. The interleaving order
-// §18.17.5 leaves unspecified does not reach the total, every contribution
-// being a sum.
 TEST(RandsequenceSim, RandJoinOperandWeightCodeBlockLocalsAreAutomatic) {
   SimFixture f;
   auto* var = RunAndFindVar(

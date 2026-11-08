@@ -29,8 +29,6 @@ TEST(IoSystemTaskParsing, DumpvarsMultipleScopes) {
               "endmodule\n"));
 }
 
-// The module/variable list is optional, so a level count with no scope list
-// is still a well-formed call.
 TEST(IoSystemTaskParsing, DumpvarsLevelsWithoutScopeList) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

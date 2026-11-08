@@ -8,28 +8,6 @@
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
-// Annex H.12.4 - Access to actual representation.
-//
-// H.12.4 defines the DPI C-layer functions that hand back the actual address of
-// an open array or of its individual elements. Its normative requirements are:
-//
-//   C1 - svGetArrElemPtr/1/2/3 return the address of an individual element, and
-//        such per-element access shall always be supported;
-//   C2 - if the SystemVerilog array layout differs from the C layout, the
-//   address
-//        and size of the array as a whole shall be undefined (0); svGetArrayPtr
-//        returns a null pointer and svSizeOfArray returns 0;
-//   C3 - the element functions shall return a null pointer when the element's
-//        representation differs from that of an individual value of the same
-//        type (modeled here by a zero element stride), and likewise for an
-//        out-of-range index, a null handle, or a mismatched index count.
-//
-// These tests build an svOpenArrayHandle backed by a real SvOpenArrayDesc
-// buffer and observe the svdpi.cpp functions applying those rules. The
-// descriptor's dimension 0 describes the single packed part (H.12.2) and
-// dimensions above 0 the unpacked part; elem_size records the per-element byte
-// stride of the actual representation.
-
 using namespace delta;
 
 namespace {
@@ -45,8 +23,6 @@ svOpenArrayHandle MakeHandle(void* data, const SvOpenArrayDimRange* ranges,
   return desc;
 }
 
-// C1: each unpacked index resolves to the element's own slot in storage. The
-// handle models: bit [7:0] arr [0:3], one canonical word per element.
 TEST(ActualRepresentation, ElementAddress1D) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
@@ -58,10 +34,6 @@ TEST(ActualRepresentation, ElementAddress1D) {
     EXPECT_EQ(svGetArrElemPtr1(h, i), static_cast<void*>(&data[i]));
 }
 
-// C1: indexing follows the actual argument's original SystemVerilog range. For
-// a descending unpacked range [3:1], the left bound (index 3) occupies position
-// 0 and positions advance toward the right bound, so index 1 lands two slots
-// in.
 TEST(ActualRepresentation, ElementAddressDescendingRange) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {3, 1}};
   svBitVecVal data[3] = {0, 0, 0};
@@ -74,9 +46,6 @@ TEST(ActualRepresentation, ElementAddressDescendingRange) {
   EXPECT_EQ(svGetArrElemPtr1(h, 1), static_cast<void*>(&data[2]));
 }
 
-// C1: a multi-word packed element widens the stride between elements. The
-// handle models bit [39:0] arr [0:2]: two canonical words (8 bytes) per
-// element.
 TEST(ActualRepresentation, ElementAddressMultiWordStride) {
   const SvOpenArrayDimRange kRanges[] = {{39, 0}, {0, 2}};
   svBitVecVal data[6] = {0, 0, 0, 0, 0, 0};
@@ -90,8 +59,6 @@ TEST(ActualRepresentation, ElementAddressMultiWordStride) {
   EXPECT_EQ(svGetArrElemPtr1(h, 2), static_cast<void*>(base + 2 * kStride));
 }
 
-// C1: two and three unpacked indices select an element row-major over the
-// unpacked dimensions. Handle: bit [7:0] arr [0:1][0:2] (then [0:1] added).
 TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
   {
     const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 1}, {0, 2}};
@@ -99,7 +66,6 @@ TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
     SvOpenArrayDesc desc;
     svOpenArrayHandle h =
         MakeHandle(data, kRanges, 3, sizeof(svBitVecVal), &desc);
-    // Row-major: linear = i*3 + j.
     EXPECT_EQ(svGetArrElemPtr2(h, 0, 0), static_cast<void*>(&data[0]));
     EXPECT_EQ(svGetArrElemPtr2(h, 0, 2), static_cast<void*>(&data[2]));
     EXPECT_EQ(svGetArrElemPtr2(h, 1, 0), static_cast<void*>(&data[3]));
@@ -112,7 +78,6 @@ TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
     SvOpenArrayDesc desc;
     svOpenArrayHandle h =
         MakeHandle(data, kRanges, 4, sizeof(svBitVecVal), &desc);
-    // Row-major: linear = ((i*2)+j)*2 + k.
     EXPECT_EQ(svGetArrElemPtr3(h, 0, 0, 0), static_cast<void*>(&data[0]));
     EXPECT_EQ(svGetArrElemPtr3(h, 0, 1, 1), static_cast<void*>(&data[3]));
     EXPECT_EQ(svGetArrElemPtr3(h, 1, 0, 1), static_cast<void*>(&data[5]));
@@ -120,8 +85,6 @@ TEST(ActualRepresentation, ElementAddress2DAnd3DRowMajor) {
   }
 }
 
-// C1: the general variadic entry point gathers one index per unpacked dimension
-// and resolves to the same address as the specialized functions.
 TEST(ActualRepresentation, VariadicMatchesSpecialized) {
   const SvOpenArrayDimRange kRanges1[] = {{7, 0}, {0, 3}};
   svBitVecVal data1[4] = {0, 0, 0, 0};
@@ -141,8 +104,6 @@ TEST(ActualRepresentation, VariadicMatchesSpecialized) {
       EXPECT_EQ(svGetArrElemPtr(h2, i, j), svGetArrElemPtr2(h2, i, j));
 }
 
-// C2: the whole-array address and size are undefined because the simulator's
-// canonical storage layout differs from the C layout; they are pinned to 0.
 TEST(ActualRepresentation, WholeArrayAddressAndSizeUndefined) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
@@ -154,7 +115,6 @@ TEST(ActualRepresentation, WholeArrayAddressAndSizeUndefined) {
   EXPECT_EQ(svSizeOfArray(h), 0);
 }
 
-// C3: an index outside the element's original range yields a null pointer.
 TEST(ActualRepresentation, OutOfRangeIndexReturnsNull) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
@@ -166,7 +126,6 @@ TEST(ActualRepresentation, OutOfRangeIndexReturnsNull) {
   EXPECT_EQ(svGetArrElemPtr1(h, 4), nullptr);
 }
 
-// C3: a null handle and a mismatched index count both yield a null pointer.
 TEST(ActualRepresentation, NullHandleAndWrongIndexCountReturnNull) {
   EXPECT_EQ(svGetArrElemPtr1(nullptr, 0), nullptr);
 
@@ -176,45 +135,29 @@ TEST(ActualRepresentation, NullHandleAndWrongIndexCountReturnNull) {
   svOpenArrayHandle h =
       MakeHandle(data, kRanges, 2, sizeof(svBitVecVal), &desc);
 
-  // The array has one unpacked dimension, so two indices is a mismatch.
   EXPECT_EQ(svGetArrElemPtr2(h, 0, 0), nullptr);
 }
 
-// C3: a zero element stride marks an element representation that differs from
-// an individual value of the same type, so element access returns a null
-// pointer.
 TEST(ActualRepresentation, RepresentationDiffersReturnsNull) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   svBitVecVal data[4] = {0, 0, 0, 0};
   SvOpenArrayDesc desc;
-  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, /*elem_size=*/0, &desc);
+  svOpenArrayHandle h = MakeHandle(data, kRanges, 2, 0, &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
   EXPECT_EQ(svGetArrElemPtr(h, 0), nullptr);
 }
 
-// C1/C3: a handle whose backing storage pointer is null has no element to
-// address, so element access returns a null pointer even when the handle and
-// index are otherwise valid. This is the listing's "null pointer" case,
-// distinct from passing a null handle.
 TEST(ActualRepresentation, NullArrayPointerReturnsNull) {
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {0, 3}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h =
-      MakeHandle(/*data=*/nullptr, kRanges, 2, sizeof(svBitVecVal), &desc);
+      MakeHandle(nullptr, kRanges, 2, sizeof(svBitVecVal), &desc);
 
   EXPECT_EQ(svGetArrElemPtr1(h, 0), nullptr);
   EXPECT_EQ(svGetArrElemPtr(h, 0), nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// The clause's prose, modeled in dpi_c_type.h beside the functions above.
-// ---------------------------------------------------------------------------
-
-// §H.12.3: the access method depends on the element's type -- a packed
-// array by copying through the canonical representation, a scalar bit or
-// logic directly, and any other type, an int compatible with C or a
-// structure, through a generic pointer with the user's casting.
 TEST(DpiActualRepresentationModel, TheAccessMethodFollowsTheElementsType) {
   EXPECT_EQ(DpiElementAccessMethodOf(DataTypeKind::kBit, 8),
             DpiElementAccessMethod::kCopyingToOrFromCanonical);
@@ -230,10 +173,6 @@ TEST(DpiActualRepresentationModel, TheAccessMethodFollowsTheElementsType) {
             DpiElementAccessMethod::kGenericPointerWithCasting);
 }
 
-// §H.12.3: a scalar or packed array is accessible through a pointer only
-// where the implementation supports it for the array in question; and the
-// indexing functions are specialized for one, two and three indices, the
-// variable argument list form serving any count.
 TEST(DpiActualRepresentationModel,
      PointerAccessIsPerArrayAndIndexingIsSpecializedToThree) {
   EXPECT_TRUE(DpiScalarOrPackedElementIsAccessibleByPointer(true));
@@ -245,9 +184,6 @@ TEST(DpiActualRepresentationModel,
   EXPECT_FALSE(DpiIndexingFunctionIsSpecializedFor(0));
 }
 
-// §H.12.4: the whole array is accessible only where the actual's layout is
-// the C layout, its address and size being 0 otherwise, while an element's
-// address is always supported; every function hands back a generic void*.
 TEST(DpiActualRepresentationModel, TheWholeArrayNeedsTheCLayoutAnElementNever) {
   EXPECT_TRUE(DpiWholeArrayIsAccessible(true));
   EXPECT_FALSE(DpiWholeArrayIsAccessible(false));
@@ -258,10 +194,6 @@ TEST(DpiActualRepresentationModel, TheWholeArrayNeedsTheCLayoutAnElementNever) {
       (std::is_same<decltype(svGetArrElemPtr1(nullptr, 0)), void*>::value));
 }
 
-// §H.12.4: an element's pointer is meaningful only where the element is
-// represented as an individual value of the same type would be, which this
-// simulator's canonical storage of a packed element satisfies and a
-// compacted representation, marked by a zero stride, does not.
 TEST(DpiActualRepresentationModel,
      AnElementPointerNeedsTheIndividualValuesRepresentation) {
   EXPECT_TRUE(DpiElementPointerIsMeaningful(true));

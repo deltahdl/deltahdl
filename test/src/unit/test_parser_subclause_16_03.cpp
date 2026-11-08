@@ -135,11 +135,6 @@ TEST(ImmediateAssertionStatementParsing, AssertInsideAlwaysComb) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.3 Syntax 16-1 ends simple_immediate_cover_statement in
-// `statement_or_null` where the assert and assume forms end in `action_block`,
-// and `action_block` is the only production carrying `else`. The else stands on
-// a line of its own so that the line the assertion names is the else and not
-// the cover above it.
 TEST(ImmediateAssertionStatementParsing, CoverWithElseClauseRejected) {
   auto r = Parse(
       "module m;\n"
@@ -149,10 +144,6 @@ TEST(ImmediateAssertionStatementParsing, CoverWithElseClauseRejected) {
   EXPECT_TRUE(ReportedError(r.diags, "cover has no fail statement", 3, "16.3"));
 }
 
-// One mistake draws one report. The parser reads the else and the statement
-// behind it, so nothing is left for the module body to reject a second time
-// under §23.2.4. That the pass statement §16.3 does permit is still read is
-// ImmediateAssertionStatementParsing.CoverPassActionOnly above.
 TEST(ImmediateAssertionStatementParsing, CoverWithElseReportsExactlyOneError) {
   auto r = Parse(
       "module m;\n"
@@ -172,8 +163,6 @@ TEST(ImmediateAssertionStatementParsing, AssertMissingExpressionRejected) {
       "module m;\n"
       "  initial assert();\n"
       "endmodule\n");
-  // §11.2 owns the report: the empty parentheses fail as a missing expression,
-  // and §16.3's own report is the ')' the parser wants after it.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -182,14 +171,9 @@ TEST(ImmediateAssertionStatementParsing, AssumeMissingExpressionRejected) {
       "module m;\n"
       "  initial assume();\n"
       "endmodule\n");
-  // §11.2 owns the report: the empty parentheses fail as a missing expression,
-  // and §16.3's own report is the ')' the parser wants after it.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// §16.3: the fail statement is any legal procedural statement, so it can signal
-// a failure to another part of the testbench -- here an event trigger. The
-// action block's else arm accepts a `-> ev` statement.
 TEST(ImmediateAssertionStatementParsing, AssertFailActionEventTrigger) {
   auto r = Parse(
       "module m;\n"
@@ -206,8 +190,6 @@ TEST(ImmediateAssertionStatementParsing, AssertFailActionEventTrigger) {
   EXPECT_EQ(stmt->assert_fail_stmt->kind, StmtKind::kEventTrigger);
 }
 
-// §16.3: the asserted expression is an ordinary (nontemporal) expression, so a
-// function call is an admitted operand form for the condition.
 TEST(ImmediateAssertionStatementParsing, AssertConditionFunctionCall) {
   auto r = Parse(
       "module m;\n"
@@ -222,11 +204,6 @@ TEST(ImmediateAssertionStatementParsing, AssertConditionFunctionCall) {
   EXPECT_EQ(stmt->assert_expr->kind, ExprKind::kCall);
 }
 
-// §16.3, Syntax 16-2: `simple_immediate_assert_statement ::= assert (
-// expression ) action_block`, so the asserted expression is parenthesized. The
-// report reads `expected '(', got identifier`, a sentence the concurrent
-// assertion of §16.14 and the deferred assertion of §16.4 would write in the
-// same words; the subclause is what separates the three.
 TEST(ImmediateAssertionStatementParsing, MalformedAssertedExprNames16_3) {
   auto r = Parse(
       "module m;\n"

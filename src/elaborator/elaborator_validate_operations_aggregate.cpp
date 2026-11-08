@@ -26,8 +26,6 @@
 
 namespace delta {
 
-// The type `dtype` stands for at the end of its chain of typedefs, or null
-// where a name on the way stands for nothing the table holds.
 static const DataType* EndOfTypedefChain(const DataType& dtype,
                                          const TypedefMap& typedefs) {
   const DataType* d = &dtype;
@@ -58,18 +56,12 @@ std::unordered_set<std::string_view> UnpackedStructVars(
 
 namespace {
 
-// The type tables a declaration is classified against: the typedefs, those of
-// them naming an unpacked array (§6.18), and the classes.
 struct DeclarationTypes {
   const TypedefMap& typedefs;
   const std::unordered_set<std::string_view>& aggregate_typedefs;
   const std::unordered_set<std::string_view>& class_names;
 };
 
-// §7.4.6: what a name stands for to the unpacked-array checks, as the module
-// or the innermost block declaring it declares it -- an unpacked array of
-// `unpacked_dims` dimensions, associative or not, or a variable of an integral
-// type. A name that is neither is another kind of variable.
 struct DeclaredName {
   uint32_t unpacked_dims = 0;
   bool is_assoc = false;
@@ -78,22 +70,13 @@ struct DeclaredName {
 
 using DeclaredNames = std::unordered_map<std::string_view, DeclaredName>;
 
-// The names an aggregate-operand check tells apart: the unpacked structures
-// and unions with their types, and every name in scope (DeclaredNames), the
-// module's arrays of every kind among them.
 struct AggregateOperandNames {
   const std::unordered_set<std::string_view>& structs;
-  // The type each of `structs` is declared with, at the end of its typedef
-  // chain.
   const std::unordered_map<std::string_view, const DataType*>& struct_types;
   const DeclaredNames& declared;
   const DeclarationTypes& types;
 };
 
-// §6.11.1: whether a variable or net of `dtype` is integral -- of an integer
-// type, an enum, a packed structure or union, or a net type's implicit logic
-// (§6.7.1), directly or through typedef names, none of which names an unpacked
-// array. An interconnect net (§6.6.8) has no data type.
 bool IsIntegralDeclaredType(const DataType& dtype, const DeclarationTypes& t) {
   if (dtype.is_interconnect) return false;
   if (IsNetTypeKind(dtype.kind)) return true;
@@ -109,9 +92,6 @@ bool IsIntegralDeclaredType(const DataType& dtype, const DeclarationTypes& t) {
   return IsIntegralType(d->kind);
 }
 
-// §7.8: an unpacked dimension whose index is a data type or `*` declares an
-// associative array. The integral index types §7.8.4 lists, `string` (§7.8.2)
-// and a class (§7.8.3) are named directly; a typedef names any other.
 bool IsAssocDimension(const Expr* dim, const DeclarationTypes& t) {
   if (dim == nullptr || dim->kind != ExprKind::kIdentifier) return false;
   std::string_view s = dim->text;
@@ -121,8 +101,6 @@ bool IsAssocDimension(const Expr* dim, const DeclarationTypes& t) {
          t.typedefs.count(s) != 0 || t.class_names.count(s) != 0;
 }
 
-// The module's names: its arrays, as VarArrayInfo describes them, and its
-// variables and nets of an integral type.
 DeclaredNames ModuleDeclaredNames(
     const ModuleDecl* decl,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -141,7 +119,6 @@ DeclaredNames ModuleDeclaredNames(
   return names;
 }
 
-// One variable a block declares, which hides any outer one of its name.
 struct BlockDeclaration {
   std::string_view name;
   const DataType& type;
@@ -159,11 +136,6 @@ void DeclareBlockName(const BlockDeclaration& d, const DeclarationTypes& t,
   names[d.name] = name;
 }
 
-// A.2.8's block_item_declaration and A.6.8's for_variable_declaration: each
-// variable a begin-end block or a fork declares, as a kVarDecl statement, or a
-// for loop's initialization declares, as an assignment whose for_init_types
-// entry is a type, which the statements under it see in place of the enclosing
-// scope's name of the same spelling.
 template <typename Visit>
 void ForEachBlockDeclaration(const Stmt* s, Visit visit) {
   for (const auto* list : {&s->stmts, &s->fork_stmts}) {
@@ -184,11 +156,6 @@ void ForEachBlockDeclaration(const Stmt* s, Visit visit) {
   }
 }
 
-// §11.3's Table 11-1: the operators whose operands are integral or real
-// alone -- arithmetic, bitwise, logical, relational, shift, implication and
-// equivalence, reduction and increment -- which an unpacked structure or union
-// is not. The equality and case equality operators, `?:`, the assignments and
-// `matches` (§12.6) take one, and are left out.
 bool TakesIntegralOrRealOperands(TokenKind op) {
   switch (op) {
     case TokenKind::kPlus:
@@ -231,9 +198,6 @@ bool NamesIn(const Expr* e, const std::unordered_set<std::string_view>& set) {
          set.count(e->text) != 0;
 }
 
-// §7.4.6: the unpacked array `e` is as a whole, or null where it is none -- a
-// name standing for one, a slice of one, or a select of one indexing fewer of
-// its unpacked dimensions than it declares, `m[1]` of `int m[2][3]`.
 const DeclaredName* UnpackedArrayOperand(const Expr* e,
                                          const DeclaredNames& declared) {
   uint32_t selects = 0;
@@ -250,17 +214,12 @@ const DeclaredName* UnpackedArrayOperand(const Expr* e,
   return whole ? &it->second : nullptr;
 }
 
-// §11.4.5 and §11.4.6: the equality, case equality and wildcard equality
-// operators, each giving a 1-bit result.
 bool IsEqualityOperator(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq ||
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// §7.4.6: whether `e` is plainly an integral value -- a number, a variable of
-// an integral type, or the result of an operator that gives an integral value:
-// one that takes integral operands, or an equality.
 bool IsIntegralOperand(const Expr* e, const DeclaredNames& declared) {
   switch (e->kind) {
     case ExprKind::kIntegerLiteral:
@@ -280,9 +239,6 @@ bool IsIntegralOperand(const Expr* e, const DeclaredNames& declared) {
   }
 }
 
-// §7.4.6: an unpacked array, an associative one among them, is compared only
-// with another array, so an equality whose one operand is an unpacked array
-// and whose other is an integral value is an error, reported at the array.
 void CheckUnpackedArrayComparison(const Expr* e, const AggregateOperandNames& n,
                                   DiagEngine& diag) {
   if (e->lhs == nullptr || e->rhs == nullptr) return;
@@ -298,11 +254,6 @@ void CheckUnpackedArrayComparison(const Expr* e, const AggregateOperandNames& n,
   }
 }
 
-// §7.4.6: an unpacked array is compared only with another array
-// (CheckUnpackedArrayComparison), and is not treated as an integer by an
-// operator TakesIntegralOrRealOperands lists. An associative array, which
-// §7.4.6 lets be read, written and compared as a whole, is to be selected down
-// to an element first.
 void CheckUnpackedArrayOperand(const Expr* e, const AggregateOperandNames& n,
                                DiagEngine& diag) {
   bool binary = e->kind == ExprKind::kBinary;
@@ -326,10 +277,6 @@ void CheckUnpackedArrayOperand(const Expr* e, const AggregateOperandNames& n,
   }
 }
 
-// §11.4.13 with §7.2: whether `e` selects, of one of the module's unpacked
-// structures or unions, a member that is no singular value -- one declared with
-// an unpacked dimension, or one of an unpacked structure or union type,
-// written in place or through a typedef.
 bool IsUnpackedMemberOperand(const Expr* e, const AggregateOperandNames& n) {
   if (e->kind != ExprKind::kMemberAccess || !NamesIn(e->lhs, n.structs))
     return false;
@@ -343,18 +290,11 @@ bool IsUnpackedMemberOperand(const Expr* e, const AggregateOperandNames& n) {
           : MemberNamedType(*member, n.types.typedefs));
 }
 
-// Whether `e` names an unpacked aggregate: an unpacked structure or union
-// variable, or an unpacked array or a select leaving one of its dimensions.
 bool NamesUnpackedAggregate(const Expr* e, const AggregateOperandNames& n) {
   return NamesIn(e, n.structs) ||
          UnpackedArrayOperand(e, n.declared) != nullptr;
 }
 
-// §11.4.11 (printed page 286): a conditional whose operands are neither
-// integral, real nor class handles takes two of equivalent types (§6.22.2),
-// which two unpacked structures declared through different typedefs are not,
-// nor an unpacked aggregate and an integral value. Two arrays are compared by
-// shape where their declarations are known (ReportNonEquivalentArrayOperands).
 void CheckConditionalStructOperands(const Expr* e,
                                     const AggregateOperandNames& n,
                                     DiagEngine& diag) {
@@ -377,12 +317,6 @@ void CheckConditionalStructOperands(const Expr* e,
              Subclause("11.4.11"));
 }
 
-// §11.4.13 makes the left operand of `inside` singular, which neither an
-// unpacked array -- a name standing for one, or a select leaving one of its
-// unpacked dimensions -- nor an unpacked structure, nor such a member of one
-// is; §11.3's Table 11-1 keeps an
-// unpacked structure or union out of the operators TakesIntegralOrRealOperands
-// lists, and §7.4.6 an unpacked array (CheckUnpackedArrayOperand).
 void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
                                DiagEngine& diag) {
   CheckUnpackedArrayOperand(e, n, diag);
@@ -408,13 +342,6 @@ void CheckAggregateOperandNode(const Expr* e, const AggregateOperandNames& n,
   }
 }
 
-// §10.9 gives an assignment pattern written without a type prefix no type of
-// its own, §10.8 lists the assignment-like contexts that lend it one and allows
-// no other, and §5.10 and §5.11 require a structure or array literal to have a
-// type. An operator's operand and a system task's or function's argument are
-// no such context, so a pattern there is reported. The right operand of
-// `matches` and the left of a case item's `&&&` are §12.6 patterns, which share
-// the spelling.
 void ReportUntypedPattern(const Expr* operand, DiagEngine& diag) {
   if (operand == nullptr || operand->kind != ExprKind::kAssignmentPattern)
     return;
@@ -433,9 +360,6 @@ void CheckUntypedPatternOperand(const Expr* e, DiagEngine& diag) {
     operands = {e->lhs, e->rhs};
   } else if (e->kind == ExprKind::kSystemCall ||
              e->kind == ExprKind::kConcatenation) {
-    // §10.10.1 (printed page 265) asks a self-determined type of each item of
-    // an unpacked array concatenation, and §11.4.12 of each operand of a
-    // vector concatenation, which an untyped pattern does not have.
     const std::vector<Expr*>& list =
         e->kind == ExprKind::kSystemCall ? e->args : e->elements;
     operands.assign(list.begin(), list.end());
@@ -460,12 +384,9 @@ void WalkExprForAggregateOperands(const Expr* e, const AggregateOperandNames& n,
 void WalkStmtForAggregateOperands(const Stmt* s, const AggregateOperandNames& n,
                                   DiagEngine& diag);
 
-// §11.3 and §11.4.13 name no statement their rules are suspended in, so every
-// position ForEachChildExpr and ForEachChildStmt name is walked.
 void WalkStmtChildrenForAggregateOperands(const Stmt* s,
                                           const AggregateOperandNames& n,
                                           DiagEngine& diag) {
-  // A statement's condition is no assignment-like context either (§10.8).
   ReportUntypedPattern(s->condition, diag);
   ForEachChildExpr(
       s, [&](Expr* const& e) { WalkExprForAggregateOperands(e, n, diag); });
@@ -473,8 +394,6 @@ void WalkStmtChildrenForAggregateOperands(const Stmt* s,
       s, [&](Stmt* const& sub) { WalkStmtForAggregateOperands(sub, n, diag); });
 }
 
-// A statement that declares variables (ForEachBlockDeclaration) opens a scope,
-// whose names the statements under it see in place of the enclosing ones.
 void WalkStmtForAggregateOperands(const Stmt* s, const AggregateOperandNames& n,
                                   DiagEngine& diag) {
   if (s == nullptr) return;
@@ -516,9 +435,6 @@ void ElaboratorOperationRules::ValidateAggregateOperands(
 
 namespace {
 
-// §7.4.6: the number of elements a slice of an unpacked array selects, from
-// its two constant bounds or the width of an indexed form; empty where those do
-// not fold.
 std::optional<int64_t> SliceLength(const Expr* slice) {
   if (slice->is_part_select_plus || slice->is_part_select_minus)
     return ConstEvalInt(slice->index_end);
@@ -529,9 +445,6 @@ std::optional<int64_t> SliceLength(const Expr* slice) {
   });
 }
 
-// What §6.22.2 compares of an unpacked array operand: its declaration's
-// record, which carries the element type and the kind of array, and the size
-// of each unpacked dimension, the first being a slice's own length.
 struct ArrayOperandShape {
   const ElaboratorData::VarArrayInfo* info;
   std::vector<std::optional<uint32_t>> dims;
@@ -560,11 +473,6 @@ ElementTypeInfo ElementOf(const ElaboratorData::VarArrayInfo& info) {
 
 }  // namespace
 
-// §6.22.2 (printed page 133): two unpacked fixed-size arrays are equivalent
-// when their element types are and they have the same shape, the same number
-// of elements in each unpacked dimension; dynamic arrays, queues and
-// associative arrays when they are the same kind of array, an associative one
-// with an equivalent index type, and their element types are equivalent.
 std::optional<bool> ElaboratorOperationRules::ArrayOperandsEquivalent(
     const Expr* lhs, const Expr* rhs) const {
   auto l = ArrayOperandShapeOf(lhs, var_array_info_);

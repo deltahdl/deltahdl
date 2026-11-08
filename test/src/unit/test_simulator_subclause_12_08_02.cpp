@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// continue jumps to the end of the loop (12.8), skipping the rest of the
-// while body on one iteration. The 12.8 file covers a continue taken on
-// every odd iteration and the 12.7.4 file makes the matching claim about
-// the while-loop construct.
 TEST(LoopStatementSim, ContinueJumpsToEndOfWhileBody) {
   SimFixture f;
   auto* count = RunAndFindVar(

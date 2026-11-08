@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -246,10 +245,6 @@ TEST(SingleSourceNetsElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.6 with §23.3.3.7: a design that calls $sdf_annotate keeps an inout
-// port's net and its connection's net apart, so that an interconnect delay
-// (§32.4.4) can sit between them; with a uwire on either side, those two
-// unmerged nets draw the warning, reported at the connection.
 TEST(SingleSourceNetsElaboration, UwireInoutKeptApartForSdfAnnotateWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -270,8 +265,6 @@ TEST(SingleSourceNetsElaboration, UwireInoutKeptApartForSdfAnnotateWarns) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// The uwire may be on the outside alone: the port is a wire and the
-// connection a uwire, and the two nets are still kept apart.
 TEST(SingleSourceNetsElaboration,
      ExternalUwireOnAnInoutKeptApartForSdfAnnotateWarns) {
   ElabFixture f;
@@ -291,7 +284,6 @@ TEST(SingleSourceNetsElaboration,
       5, "23.3.3.6"));
 }
 
-// Without the call the two nets are merged into one, and nothing is warned.
 TEST(SingleSourceNetsElaboration, UwireInoutMergedWithoutSdfAnnotateNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -307,9 +299,6 @@ TEST(SingleSourceNetsElaboration, UwireInoutMergedWithoutSdfAnnotateNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// The call decides for the whole design, so one in a module elaborated after
-// the instance still keeps that instance's nets apart: m's c comes before t's
-// $sdf_annotate.
 TEST(SingleSourceNetsElaboration, ACallElaboratedLaterStillDrawsTheWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -334,8 +323,6 @@ TEST(SingleSourceNetsElaboration, ACallElaboratedLaterStillDrawsTheWarning) {
       5, "23.3.3.6"));
 }
 
-// Only an inout's nets are kept apart: an input port joining two nets is
-// merged whether or not the design calls $sdf_annotate.
 TEST(SingleSourceNetsElaboration, UwireInputInADesignThatAnnotatesNoWarning) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -352,8 +339,6 @@ TEST(SingleSourceNetsElaboration, UwireInputInADesignThatAnnotatesNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.1: an input port the module drives is coerced to inout, and its
-// nets are then kept apart as any inout's are, so the uwire warning follows.
 TEST(SingleSourceNetsElaboration, ACoercedUwireInputKeptApartWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -164,21 +164,6 @@ TEST(DisableStatementElaboration, DisableOuterTaskFromInsideFunctionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.6.2 bars a disable statement that names a function and puts no condition
-// on where that statement stands, so every position a statement holds a
-// statement in is a position the report is made at. CheckDisableTargets in
-// src/elaborator/elaborator_validate_matches.cpp had written out eight of the
-// thirteen child-statement links Stmt declares, and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The cases
-// below cover one newly reached position each. Stmt::for_inits and
-// Stmt::for_steps are the two remaining ones and get no case: A.6.8 admits only
-// a variable assignment or a declaration there, so a disable statement cannot
-// be written in either.
-
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(DisableStatementElaboration,
      DisableFunctionInAnAssertionPassStatementIsReported) {
   ElabFixture f;
@@ -213,10 +198,6 @@ TEST(DisableStatementElaboration,
       "a function cannot be the target of a disable statement", 6, "9.6.2"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(DisableStatementElaboration,
      DisableFunctionInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -237,10 +218,6 @@ TEST(DisableStatementElaboration,
       "a function cannot be the target of a disable statement", 7, "9.6.2"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(DisableStatementElaboration,
      DisableFunctionInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;

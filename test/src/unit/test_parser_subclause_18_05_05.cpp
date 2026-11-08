@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.5: constraint_expression includes the implication form
-// "expression -> constraint_set". A single-statement consequent parses as a
-// valid constraint expression inside a constraint block.
 TEST(ConstraintImplicationParsing, SingleStatementConsequentAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -19,8 +16,6 @@ TEST(ConstraintImplicationParsing, SingleStatementConsequentAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.5: the constraint_set on the right of "->" may be an unnamed constraint
-// set, i.e. a brace-enclosed group of constraint expressions.
 TEST(ConstraintImplicationParsing, BracedConstraintSetConsequentAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -32,9 +27,6 @@ TEST(ConstraintImplicationParsing, BracedConstraintSetConsequentAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.5: the left side of an implication can be any expression of integral or
-// real type. A real-typed antecedent (a comparison of a rand real member) is a
-// valid implication antecedent and parses without error.
 TEST(ConstraintImplicationParsing, RealTypedAntecedentAccepted) {
   auto r = Parse(
       "class C;\n"

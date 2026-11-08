@@ -23,8 +23,6 @@ TEST(SourceText, ClassCovergroupDecl) {
   EXPECT_EQ(members[0]->name, "cg");
 }
 
-// §19.4: a class can have more than one covergroup. Both embedded covergroups
-// are recognized as distinct class members, each named by its identifier.
 TEST(SourceText, MultipleCovergroupsInClass) {
   auto r = Parse(
       "class MC;\n"
@@ -49,10 +47,6 @@ TEST(SourceText, MultipleCovergroupsInClass) {
   EXPECT_EQ(cg_names[1], "cv2");
 }
 
-// §19.4: arguments can be passed in to an embedded covergroup. A covergroup
-// declared with a formal-argument list (as in the C1 example, where the
-// argument later initializes a coverage option) is still recognized as a
-// covergroup class member named by its identifier.
 TEST(SourceText, ParameterizedCovergroupInClass) {
   auto r = Parse(
       "class C1;\n"

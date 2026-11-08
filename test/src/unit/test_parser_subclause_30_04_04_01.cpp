@@ -226,9 +226,6 @@ TEST(OperatorParsing, ModulePathTernary) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §30.4.4.1 allows a conditional expression to combine any number of operands
-// and operators. A multi-operator chain exercises the precedence-climbing infix
-// loop, distinct from the single-operator and ternary forms above.
 TEST(OperatorParsing, ConditionChainsMultipleOperators) {
   auto r = Parse(
       "module m(input a, input b, input c, output y);\n"

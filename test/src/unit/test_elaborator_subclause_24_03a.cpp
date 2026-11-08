@@ -162,11 +162,6 @@ TEST(ProgramConstruct, ReferencingProgramSignalFromOutsideIsError) {
                             6, "24.3"));
 }
 
-// §24.3: nets declared in a program are program signals, exactly as program
-// variables are, so a hierarchical reference to a program net from outside the
-// program is an error too. The sibling test above uses a program variable; this
-// covers the net input form, read through a continuous assignment in the
-// enclosing module.
 TEST(ProgramConstruct, ReferencingProgramNetFromOutsideIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -178,8 +173,6 @@ TEST(ProgramConstruct, ReferencingProgramNetFromOutsideIsError) {
       "  assign w = p.pnet;\n"
       "endmodule\n",
       f, "top");
-  // The continuous-assign branch reports at the item's own location, which is
-  // the `assign` keyword on line 6.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "hierarchical reference to program signal from "
                             "outside the program is not permitted",
@@ -198,10 +191,6 @@ TEST(ProgramConstruct, ImplicitlyInstantiatedNestedProgramReusesDeclName) {
   ASSERT_NE(design, nullptr);
   ASSERT_FALSE(design->top_modules.empty());
   const auto* top = design->top_modules[0];
-  // §24.3: a portless nested program that is not explicitly instantiated is
-  // implicitly instantiated exactly once, and the implicit instance reuses the
-  // declaration name. Counting the matching children observes the "once" part
-  // of the rule, not just that some instance exists.
   int instances = 0;
   for (const auto& child : top->children) {
     if (child.module_name == "p") {
@@ -245,25 +234,10 @@ TEST(ProgramConstruct, AnonymousProgramHierRefToProgramIsError) {
                             6, "24.3"));
 }
 
-// §24.3 closes its account of hierarchical references by barring an anonymous
-// program from referring hierarchically to another program's scope, and puts no
-// condition on where the anonymous program itself stands. §24.6 says where it
-// may stand -- inside a package (Clause 26) or a compilation-unit scope
-// (§3.12.1) -- and A.1.11 makes anonymous_program a package_item, so the two
-// placements are one rule. AnonymousProgramHierRefToProgramIsError above writes
-// the reference at compilation-unit scope; the two cases below write the same
-// reference in a package, whose items Parser::TryParsePackageBodyItem puts into
-// PackageDecl::items rather than into CompilationUnit::cu_items.
 constexpr std::string_view kProgramSignalFromOutside =
     "hierarchical reference to program signal from outside the program is not "
     "permitted";
 
-// A package whose anonymous program holds `subroutine`, which writes the signal
-// of the named program `prog` declared above the package. A named program is
-// required: with no name in CompilationUnit::programs the check has no program
-// to match a reference against and answers nothing. `subroutine` is three lines
-// -- its header, the assignment, and its end keyword -- so the assignment is
-// line 7 of the source whichever subroutine kind is passed.
 void ExpectPackageAnonymousProgramHierRefRejected(
     const std::string& subroutine) {
   ElabFixture f;
@@ -281,11 +255,6 @@ void ExpectPackageAnonymousProgramHierRefRejected(
                             "24.3"));
 }
 
-// A.1.11 gives `anonymous_program_item ::= task_declaration |
-// function_declaration | class_declaration | interface_class_declaration |
-// covergroup_declaration | class_constructor_declaration | ;`, so a task is one
-// of the things a package's anonymous program declares, and its statements are
-// held in ModuleItem::func_body_stmts.
 TEST(ProgramConstruct, PackageAnonymousProgramTaskHierRefToProgramIsError) {
   ExpectPackageAnonymousProgramHierRefRejected(
       "    task t;\n"
@@ -293,9 +262,6 @@ TEST(ProgramConstruct, PackageAnonymousProgramTaskHierRefToProgramIsError) {
       "    endtask\n");
 }
 
-// The same reference written in a function, which A.1.11 admits beside the
-// task. The two reach the walk as different values of ModuleItem::kind, so a
-// check narrowed to one kind reports the case above and not this one.
 TEST(ProgramConstruct, PackageAnonymousProgramFunctionHierRefToProgramIsError) {
   ExpectPackageAnonymousProgramHierRefRejected(
       "    function void f();\n"
@@ -303,11 +269,6 @@ TEST(ProgramConstruct, PackageAnonymousProgramFunctionHierRefToProgramIsError) {
       "    endfunction\n");
 }
 
-// §24.3 bars an anonymous program from containing a hierarchical reference to
-// another program scope and bars nothing else about it, so what the report
-// selects is the reference and not the placement. The task below stands in the
-// same package anonymous program as the two cases above, beside the same named
-// program, and assigns a variable it declared itself.
 TEST(ProgramConstruct, PackageAnonymousProgramWithoutHierRefElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -327,20 +288,6 @@ TEST(ProgramConstruct, PackageAnonymousProgramWithoutHierRefElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.3 rules that referencing a program signal from outside every program
-// block is an error, and puts no condition on where the reference is written,
-// so every position a statement holds a statement in is one the report reaches.
-// WalkStmtsForProgramRef in src/elaborator/elaborator_validate_hier_refs.cpp
-// had written out nine of the thirteen child-statement links Stmt declares and
-// now takes the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The four cases below stand in
-// the four positions it was missing, each of which elaborated clean beforehand
-// with the reference into the program left unreported.
-
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
 TEST(ProgramConstruct, ProgramSignalRefInAnAssertionPassStatementIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -359,8 +306,6 @@ TEST(ProgramConstruct, ProgramSignalRefInAnAssertionPassStatementIsError) {
                             7, "24.3"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(ProgramConstruct, ProgramSignalRefInAnAssertionFailStatementIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -379,10 +324,6 @@ TEST(ProgramConstruct, ProgramSignalRefInAnAssertionFailStatementIsError) {
                             7, "24.3"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §24.3
-// judges the name rather than what runs, so the report stands whether the
-// weighted draw would select the item or not.
 TEST(ProgramConstruct, ProgramSignalRefInARandcaseItemIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -400,10 +341,6 @@ TEST(ProgramConstruct, ProgramSignalRefInARandcaseItemIsError) {
                             6, "24.3"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(ProgramConstruct, ProgramSignalRefInARandsequenceCodeBlockIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -425,17 +362,6 @@ TEST(ProgramConstruct, ProgramSignalRefInARandsequenceCodeBlockIsError) {
                             8, "24.3"));
 }
 
-// §24.3: an anonymous program may not refer hierarchically to another program's
-// scope, and the clause puts no condition on where in the anonymous program the
-// reference stands. A.1.11 admits a class_declaration as an
-// anonymous_program_item, so a method of such a class is in the anonymous
-// program and the reference it makes is one the clause reaches.
-//
-// The walk read an anonymous program's task and function bodies and never the
-// methods of a class it declares, so this legal placement of an illegal
-// reference went unreported. It is the opposite direction from §24.6's rule --
-// a reference out of an anonymous program rather than into one -- and each rule
-// walks the classes its own side reaches.
 TEST(ProgramConstruct, ProgramSignalRefFromAnAnonymousProgramClassIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -457,16 +383,6 @@ TEST(ProgramConstruct, ProgramSignalRefFromAnAnonymousProgramClassIsError) {
                             7, "24.3"));
 }
 
-// §24.3 bars a reference to a program signal, which the clause defines as a net
-// or variable a program's scope declares. §23.9 decides which declaration a
-// reference reaches -- a local declaration is the one used -- and a begin-end
-// block is one of the scopes it lists, so a block-local `p` is what `p.a` names
-// and the nested program `p` is not reached at all.
-//
-// The rule resolved nothing: it matched the leftmost component of a member
-// access against the set of program instance names, so this legal source was
-// refused. The local carries the program's name deliberately; one named
-// anything else cannot fail.
 TEST(ProgramConstruct,
      ABlockLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   ElabFixture f;
@@ -487,11 +403,6 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The true positive beside the case above: the same block with the shadowing
-// declaration taken out, so `p.a` reaches the nested program and §24.3's first
-// sentence applies. A fix that silenced the rule wherever a member access
-// appeared would pass the case above and fail this one, which is what makes the
-// two a pair rather than one acceptance.
 TEST(ProgramConstruct, AProgramSignalRefWithNoShadowingDeclarationIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -511,12 +422,6 @@ TEST(ProgramConstruct, AProgramSignalRefWithNoShadowingDeclarationIsReported) {
                             7, "24.3"));
 }
 
-// §24.3's third sentence -- barring an anonymous program from referring
-// hierarchically to another program's scope -- is read over a different set:
-// the named programs of the compilation unit rather than the program instances
-// of one module. It matched identifier text the same way, and §23.9 shadows it
-// the same way: a function is a scope, so a declaration at the head of its body
-// is what `ps.sampled` names.
 TEST(ProgramConstruct,
      AnAnonymousProgramSubroutineLocalOfAProgramNameIsNotAHierRef) {
   ElabFixture f;
@@ -540,9 +445,6 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A formal argument shadows the same way §23.9 makes a body-head declaration
-// shadow, and reaches the body by a route no statement walk sees, so it is
-// erased where the subroutine is read rather than where its statements are.
 TEST(ProgramConstruct,
      AnAnonymousProgramSubroutineFormalOfAProgramNameIsNotAHierRef) {
   ElabFixture f;
@@ -565,9 +467,6 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The true positive beside the two above, in the same subroutine with nothing
-// of the name declared in between, so `ps.sampled` reaches the program `ps` and
-// the anonymous program does contain the reference §24.3's third sentence bars.
 TEST(ProgramConstruct,
      AnAnonymousProgramHierRefWithNoShadowingDeclarationIsReported) {
   ElabFixture f;
@@ -589,13 +488,6 @@ TEST(ProgramConstruct,
                             7, "24.3"));
 }
 
-// §24.3 rules that referencing a program signal from outside every program
-// block is an error, and names no position the reference may stand in, and
-// §23.9 makes a task a scope within the module rather than outside it. So a
-// module task body is one of the places outside the program that the sentence
-// reaches. The rule read a continuous assignment and the body of a procedural
-// block and nothing else, and a task's statements are in neither, so this
-// source elaborated clean.
 TEST(ProgramConstruct, AProgramSignalRefInAModuleTaskBodyIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -615,10 +507,6 @@ TEST(ProgramConstruct, AProgramSignalRefInAModuleTaskBodyIsReported) {
                             7, "24.3"));
 }
 
-// A function beside the task above. The two item kinds are separate
-// ModuleItemKind values reaching the walk through one branch, so a fix keyed on
-// the task alone would leave the function unreported; the pair is what says the
-// branch reads both.
 TEST(ProgramConstruct, AProgramSignalRefInAModuleFunctionBodyIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -639,12 +527,6 @@ TEST(ProgramConstruct, AProgramSignalRefInAModuleFunctionBodyIsReported) {
                             7, "24.3"));
 }
 
-// The acceptance beside the task case: §23.9 makes the task a scope of its own,
-// so a declaration at the head of its body is what `p.a` selects from and the
-// nested program is not reached. The walk added for the task body is
-// WalkSubroutineBodyForProgramRef, which erases such a declaration before
-// reading the body; one that walked the body with the module's set unnarrowed
-// would pass the two cases above and fail this one.
 TEST(ProgramConstruct,
      ASubroutineLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   ElabFixture f;
@@ -665,10 +547,6 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A formal argument shadows the same way, and reaches the body by a route
-// neither the statement walk nor the body-head loop above sees: it is in
-// func_args rather than in func_body_stmts. The two acceptances therefore stand
-// for the two erases WalkSubroutineBodyForProgramRef makes.
 TEST(ProgramConstruct, AFormalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -688,12 +566,6 @@ TEST(ProgramConstruct, AFormalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.3 rules that referencing a program signal from outside every program
-// block is an error, and names no position the reference may stand in. A class
-// declared in the module is outside every program block, so a method of it is
-// reached exactly as a task of the module is -- and a class is where a
-// verification environment puts its code. The rule read the module's items and
-// no class among them, so this source elaborated clean.
 TEST(ProgramConstruct, AProgramSignalRefInAModuleClassMethodIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -715,12 +587,6 @@ TEST(ProgramConstruct, AProgramSignalRefInAModuleClassMethodIsReported) {
                             8, "24.3"));
 }
 
-// The acceptance beside it: a method is a subroutine, so §23.9 makes it a scope
-// of its own and a declaration at the head of its body is what `p.a` selects
-// from. The class route reads the method through
-// WalkSubroutineBodyForProgramRef, which erases that declaration; one that
-// walked a method's statements with the module's set unnarrowed would pass the
-// case above and fail this one.
 TEST(ProgramConstruct,
      AMethodLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   ElabFixture f;
@@ -743,12 +609,6 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.9 makes a class nested in a class a scope within the enclosing one, so a
-// method of it stands exactly where a method of the outer class stands: inside
-// the module and outside every program block, which is what §24.3's first
-// sentence reaches. ClassMember carries a nested class in nested_class rather
-// than in the class_decl of a method, so the class arm followed methods alone
-// and stopped at the outer class.
 TEST(ProgramConstruct, AProgramSignalRefInANestedClassMethodIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -772,10 +632,6 @@ TEST(ProgramConstruct, AProgramSignalRefInANestedClassMethodIsReported) {
                             9, "24.3"));
 }
 
-// The acceptance beside it: the nested class is reached through the same
-// subroutine helper as any other method, so a declaration at the head of the
-// body still shadows. A recursion that walked a nested method's statements with
-// the module set unnarrowed would pass the case above and fail this one.
 TEST(ProgramConstruct,
      ANestedClassMethodLocalOfAProgramInstanceNameIsNotAProgramSignalRef) {
   ElabFixture f;
@@ -800,10 +656,6 @@ TEST(ProgramConstruct,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.3: a program may hold no instance of a module, an interface or another
-// program. The parser reports an instance of a cell it has seen declared; a
-// cell declared after the program is an identifier the parser can tell nothing
-// from, and the elaborator, which knows every declaration, is what reports it.
 TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
   ProgramElabFixture f;
   ElaborateSource(
@@ -817,12 +669,6 @@ TEST(ProgramConstruct, ModuleDeclaredAfterProgramInstantiatingItIsError) {
                             "24.3"));
 }
 
-// §24.3 has a top-level program that is not explicitly instantiated
-// implicitly instantiated once, under its declaration name (printed page 776
-// of IEEE 1800-2023), as §23.3.1 has an uninstantiated module.
-// CollectAutoTopModules in src/elaborator/elaborator.cpp rooted the modules
-// alone, so a program standing alone in the source, or beside a module, was
-// elaborated by no run.
 TEST(ProgramConstruct, AnUninstantiatedProgramIsATopLevelProgram) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -837,9 +683,6 @@ TEST(ProgramConstruct, AnUninstantiatedProgramIsATopLevelProgram) {
   EXPECT_TRUE(design->top_modules[0]->is_program);
 }
 
-// ElaborateSource with no top name, rather than the fixture's ElaborateSrc,
-// which names the last module as the top when none is given and so roots
-// that module alone.
 TEST(ProgramConstruct, AnUninstantiatedProgramBesideAModuleIsATopToo) {
   ProgramElabFixture f;
   auto* design = ElaborateSource(
@@ -856,7 +699,6 @@ TEST(ProgramConstruct, AnUninstantiatedProgramBesideAModuleIsATopToo) {
   EXPECT_EQ(design->top_modules[1]->name, "p");
 }
 
-// A program a module instantiates is that module's instance and no top.
 TEST(ProgramConstruct, AnInstantiatedProgramIsNoTopLevelProgram) {
   ProgramElabFixture f;
   auto* design = ElaborateSource(
@@ -872,9 +714,6 @@ TEST(ProgramConstruct, AnInstantiatedProgramIsNoTopLevelProgram) {
   EXPECT_EQ(design->top_modules[0]->name, "t");
 }
 
-// Syntax 24-1's extern program header is a prototype as §23.5 describes: the
-// program p defines comes after it with no duplicate definition, and its `.*`
-// takes the prototype's port.
 TEST(ProgramConstruct, ExternProgramPrototypeIsNoDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -896,8 +735,6 @@ TEST(ProgramConstruct, ExternProgramPrototypeIsNoDefinition) {
   EXPECT_EQ(prog->ports[0].direction, Direction::kInput);
 }
 
-// Nor is an uninstantiated extern program header a top-level program beside
-// the program it declares.
 TEST(ProgramConstruct, ExternProgramPrototypeIsNoTopLevelProgram) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -913,7 +750,6 @@ TEST(ProgramConstruct, ExternProgramPrototypeIsNoTopLevelProgram) {
   EXPECT_EQ(design->top_modules[0]->variables[0].name, "b");
 }
 
-// The definition is held to the prototype's header as a module is (§23.5).
 TEST(ProgramConstruct, ExternProgramPortCountMismatchIsReported) {
   ElabFixture f;
   ElaborateSrc(

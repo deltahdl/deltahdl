@@ -17,11 +17,6 @@
 
 namespace delta {
 
-// One call of an assertion callback (§39.4.2) or an assertion system callback
-// (§39.4.1) as its routine saw it: the reason, the full name of the assertion
-// it was handed, empty for a system callback, its cb_time, whether it was
-// given attempt information and the attempt's start time there, and the
-// simulation time it ran at.
 struct AssertionCall {
   int reason = 0;
   std::string assertion;
@@ -37,7 +32,6 @@ inline std::vector<AssertionCall>& AssertionCalls() {
   return calls;
 }
 
-// What `$arm` does when the design calls it.
 inline std::function<void()>& AssertionArmer() {
   static std::function<void()> armer;
   return armer;
@@ -56,8 +50,7 @@ inline uint64_t AssertionNow() {
 
 inline PLI_INT32 RecordAssertionCall(PLI_INT32 reason, p_vpi_time cb_time,
                                      vpiHandle assertion,
-                                     p_vpi_attempt_info info,
-                                     PLI_BYTE8* /*user_data*/) {
+                                     p_vpi_attempt_info info, PLI_BYTE8*) {
   AssertionCall call;
   call.reason = reason;
   const char* name =
@@ -80,14 +73,12 @@ inline PLI_INT32 RecordAssertionSystemCall(p_cb_data data) {
   return 0;
 }
 
-// Places a `reason` callback on the assertion `full_name` names.
 inline vpiHandle WatchAssertion(const char* full_name, int reason) {
   return vpi_register_assertion_cb(
       vpi_handle_by_name(VpiText(full_name), nullptr), reason,
       &RecordAssertionCall, nullptr);
 }
 
-// Places a `reason` assertion system callback.
 inline vpiHandle WatchAssertionSystem(int reason) {
   s_cb_data data = {};
   data.reason = reason;
@@ -95,15 +86,12 @@ inline vpiHandle WatchAssertionSystem(int reason) {
   return vpi_register_cb(&data);
 }
 
-// Has the design's calls of `$arm` take `steps` in turn, one a call, and the
-// calls after the last do nothing.
 inline void ArmInTurn(std::vector<std::function<void()>> steps) {
   AssertionArmer() = [steps = std::move(steps), next = size_t{0}]() mutable {
     if (next < steps.size()) steps[next++]();
   };
 }
 
-// The value of the integer variable `full_name`.
 inline int IntOf(const char* full_name) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -111,9 +99,6 @@ inline int IntOf(const char* full_name) {
   return value.value.integer;
 }
 
-// The assert of `instance` that has no name, null for none. An instance's
-// assertion iteration also reaches the unnamed property inst its spec holds
-// (§37.49), which is not an assert.
 inline vpiHandle UnnamedAssertOf(const char* instance) {
   vpiHandle it =
       vpi_iterate(vpiAssertion, vpi_handle_by_name(VpiText(instance), nullptr));
@@ -126,9 +111,6 @@ inline vpiHandle UnnamedAssertOf(const char* instance) {
   return nullptr;
 }
 
-// A run of a design whose assertions an application watches through the
-// assertion API of its own case, the design calling `$arm` to place the
-// case's callbacks once the model exists.
 class AssertionRun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -151,7 +133,6 @@ class AssertionRun : public VpiDesignRun {
   }
 
  public:
-  // The calls recorded for `reason`, in order.
   static std::vector<AssertionCall> CallsOf(int reason) {
     std::vector<AssertionCall> of;
     for (const AssertionCall& call : AssertionCalls()) {

@@ -27,16 +27,11 @@ namespace delta {
 
 namespace {
 
-// A method member, with the class declaring it.
 struct OwnedMethod {
   const ClassMember* member = nullptr;
   const ClassDecl* owner = nullptr;
 };
 
-// What the types of an override and of the method it overrides are read in
-// (§8.20): the class declaring each, the design's typedefs and classes, and,
-// for a specialization of the overriding class (§8.25), the types it gives
-// that class's type parameters; none for the generic declaration.
 struct OverrideTypeContext {
   const ClassDecl* base;
   const ClassDecl* derived;
@@ -47,9 +42,6 @@ struct OverrideTypeContext {
 
 }  // namespace
 
-// Walks the base-class chain of `cls` (excluding `cls` itself) and returns the
-// first method named `method_name` for which `accept` holds, with the class
-// declaring it, or nothing.
 static OwnedMethod FindBaseMethod(
     const ClassDecl* cls, std::string_view method_name,
     const CompilationUnit* unit,
@@ -84,9 +76,6 @@ static const ClassMember* FindBaseFinalMethod(const ClassDecl* cls,
       .member;
 }
 
-// §6.18 with §6.22.1: the type `type`, written in the class `cls`, stands for,
-// a typedef name followed to the type it names: one `cls` declares, then one
-// the design's typedef table holds, so a name matches the type it stands for.
 static DataType ResolvedType(const DataType& type, const ClassDecl& cls,
                              const TypedefMap& typedefs) {
   DataType resolved = type;
@@ -103,18 +92,11 @@ static DataType ResolvedType(const DataType& type, const ClassDecl& cls,
   return resolved;
 }
 
-// Whether `type` names one of the type parameters of `cls`, whose type only a
-// specialization of the class gives (§8.25).
 static bool NamesTypeParameter(const DataType& type, const ClassDecl& cls) {
   return type.kind == DataTypeKind::kNamed && type.scope_name.empty() &&
          cls.type_param_names.contains(type.type_name);
 }
 
-// §8.20: whether the override's type `over` fails to match the overridden
-// method's `base`: a matching type (§6.22.1), or, for a return type
-// (`is_return`), a class derived from the base's. False where either names a
-// type parameter of its class the context gives no type to, which only a
-// specialization of the class settles (§8.25).
 static bool OverrideTypeMismatch(const DataType& base, const DataType& over,
                                  bool is_return,
                                  const OverrideTypeContext& ctx) {
@@ -196,8 +178,6 @@ const DataType* SpecializationArgument(const std::vector<DataType>& args,
   return !kNamed && index < args.size() ? &args[index] : nullptr;
 }
 
-// The type each type parameter of `cls` takes in the specialization `type`:
-// the argument it writes for the parameter, or the parameter's default.
 static std::unordered_map<std::string_view, DataType> SpecializationBindings(
     const ClassDecl& cls, const DataType& type) {
   std::unordered_map<std::string_view, DataType> bound;
@@ -243,11 +223,6 @@ void ReportSpecializationOverrideMismatches(const DataType& type, SourceLoc loc,
 void ElaboratorClassRules::ValidateOneMethodOverride(const ClassDecl* cls,
                                                      const ClassMember* m) {
   auto* method = m->method;
-  // §8.20's rule that `:initial` and `:extends` are mutually exclusive is
-  // reported by Parser::ParseDynamicOverrideSpecifiers, which consumes the
-  // second specifier without recording it. No source can therefore set both
-  // ModuleItem::is_method_initial and ModuleItem::is_method_extends, so this
-  // function does not test for the pair.
   const OwnedMethod kBaseVirtual =
       FindBaseVirtualMethod(cls, method->name, unit_);
   const ClassMember* base_virtual = kBaseVirtual.member;
@@ -264,8 +239,6 @@ void ElaboratorClassRules::ValidateOneMethodOverride(const ClassDecl* cls,
                 Subclause("8.20"));
   }
 
-  // §8.20: an override's qualifiers are the prototype's; `virtual` alone may
-  // be left off, so the encapsulation qualifiers of §8.18 are what remain.
   if (base_virtual && (base_virtual->is_local != m->is_local ||
                        base_virtual->is_protected != m->is_protected)) {
     diag_.Error(method->loc,
@@ -297,13 +270,6 @@ void ElaboratorClassRules::ValidateVirtualMethodOverrides() {
   }
 }
 
-// §8.21 with §8.20 (printed page 197 of IEEE 1800-2023): a method that
-// overrides a pure virtual one is its implementation whether or not it is
-// declared `virtual`, since a method identified as virtual stays virtual in
-// every subclass that overrides it and the keyword there is optional. Only a
-// member that is not itself pure takes the name off the list; kept on it for
-// want of the keyword, `function int area(); ... endfunction` in a subclass
-// of Shape reported Shape's pure area() as unimplemented.
 static void CollectPureVirtualMethods(
     const ClassDecl* cls, const CompilationUnit* unit,
     std::vector<std::string_view>& pure_names) {
@@ -324,9 +290,6 @@ static void CollectPureVirtualMethods(
 
 void ElaboratorClassRules::ValidateAbstractClassUnimplemented(
     const ClassDecl* cls) {
-  // §8.26: an interface class inherits pure virtual methods from the interfaces
-  // it extends; it does not implement them. Only a non-virtual, non-interface
-  // class is required to provide implementations.
   if (cls->is_virtual || cls->is_interface) return;
   std::vector<std::string_view> unimpl;
   CollectPureVirtualMethods(cls, unit_, unimpl);
@@ -363,8 +326,6 @@ void ElaboratorClassRules::ValidateAbstractClassRules() {
   }
 }
 
-// Checks the kind/legality of a single interface-class member, mirroring the
-// original dispatch chain (override specifiers + the disallowed member kinds).
 static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
                                           const ClassMember* m,
                                           DiagEngine& diag) {
@@ -383,13 +344,6 @@ static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
                            cls->name),
                Subclause("8.26"));
   } else if (m->kind == ClassMemberKind::kProperty && !m->is_param) {
-    // §8.26 (printed page 206): an interface class may contain pure virtual
-    // methods, type declarations, and parameter declarations; a
-    // parameter/localparam (carried as kProperty with is_param) is not a data
-    // member. Syntax 8-3 (printed 208) gives interface_class_item no
-    // class_property alternative, so a `const` or a `static` property is a
-    // data member like any other; exempting `const` here accepted
-    // `const int x = 1;`.
     diag.Error(cls->range.start,
                std::format("interface class '{}' shall not contain "
                            "data members",
@@ -416,8 +370,6 @@ static void CheckInterfaceClassMemberKind(const ClassDecl* cls,
   }
 }
 
-// Verifies that any default argument values on an interface-class method are
-// constant expressions.
 static void CheckInterfaceClassMethodArgDefaults(const ClassMember* m,
                                                  const ScopeMap& param_scope,
                                                  DiagEngine& diag) {
@@ -434,20 +386,7 @@ static void CheckInterfaceClassMethodArgDefaults(const ClassMember* m,
 }
 
 void ElaboratorClassRules::ValidateInterfaceClassMembers(const ClassDecl* cls) {
-  // §8.26.8: a method-argument default is evaluated in the scope that contains
-  // the subroutine declaration -- the interface class body. A value parameter
-  // or local parameter of the class is a constant visible there by its bare
-  // name, so layer the class's own parameters over the compilation-unit
-  // parameter scope before checking defaults; otherwise a default naming such a
-  // parameter would be wrongly rejected as non-constant.
   ScopeMap method_scope = cu_param_scope_;
-  // A parameter whose value is not a constant expression contributes nothing.
-  // Substituting zero for it made a method-argument default naming that
-  // parameter fold, so §8.26.8 read as satisfied by a default whose value the
-  // source never wrote and the elaborator could not compute.
-  // RegisterClassParams in elaborator_class_params.cpp reports the parameter
-  // itself under §6.20.2, so the breach is named once, at the value that caused
-  // it.
   auto add_param = [&](std::string_view pname, const Expr* pexpr) {
     if (pname.empty() || method_scope.count(pname)) return;
     if (auto val = ConstEvalInt(pexpr, method_scope))
@@ -467,10 +406,6 @@ void ElaboratorClassRules::ValidateInterfaceClassMembers(const ClassDecl* cls) {
   }
 }
 
-// §8.26.4's two questions are about the scope the class was written in rather
-// than about the design: a forward typedef declared in one module says nothing
-// about a class in another, and the order two declarations were written in only
-// means anything among declarations that share a scope.
 static bool IsForwardTypedefOnly(std::string_view name,
                                  const ClassDecl* before_cls,
                                  const ClassScope& scope) {
@@ -500,15 +435,9 @@ static bool IsDeclaredBefore(std::string_view name, const ClassDecl* before_cls,
 
 namespace {
 
-// §8.26: how one interface-inheritance relationship is phrased in diagnostics
-// (verb/noun = extend/extended or implement/implemented; self_label names the
-// owning class). The three move together as one relationship.
 struct InheritanceWording {
   std::string_view verb, noun, self_label;
 };
-// Shared per-name validation for a base/extended/implemented interface name.
-// Returns true when a diagnostic was emitted that should stop further checks on
-// this name (mirrors the original `continue`/early-out control flow).
 bool ValidateInheritedInterfaceName(const ClassDecl* cls, std::string_view name,
                                     const ClassScope& scope, DiagEngine& diag,
                                     const InheritanceWording& wording) {
@@ -585,14 +514,6 @@ void ElaboratorClassRules::ValidateInterfaceClassInheritance(
   }
 }
 
-// §8.13 has a class's superclasses run from the class it extends back to an
-// original base class. A chain of extends clauses that returns to a class it
-// passed through has no such base, so the class closing the cycle is reported
-// and its extends clause is dropped from the tree. A walk from a class off the
-// cycle stops where it meets the cycle, which the walk from a class on it
-// reports and breaks. A base is looked up as FindBaseClass looks it up and,
-// where that finds none, as SoleClassIndex does, which reaches a nested class
-// too, so a cycle either lookup would follow is broken.
 void ElaboratorClassRules::BreakClassInheritanceCycles() {
   const SoleClassIndex kClasses(*unit_);
   for (const ClassDecl* cls : AllClassDecls(unit_)) {

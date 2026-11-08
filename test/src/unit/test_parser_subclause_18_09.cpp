@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// 18.9: the void form object[.constraint_identifier].constraint_mode(on_off)
-// takes a single bit argument.
 TEST(ConstraintModeCall, VoidFormParses) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -19,8 +17,6 @@ TEST(ConstraintModeCall, VoidFormParses) {
               "endfunction\n"));
 }
 
-// 18.9: the nonvoid form is called without an argument to query the current
-// active state of the named constraint.
 TEST(ConstraintModeCall, NonvoidQueryFormParses) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"
@@ -32,8 +28,6 @@ TEST(ConstraintModeCall, NonvoidQueryFormParses) {
               "endfunction\n"));
 }
 
-// 18.9: the void form with no constraint named acts on every constraint of the
-// object.
 TEST(ConstraintModeCall, UnnamedVoidFormParses) {
   EXPECT_TRUE(
       ParseOk("class Packet;\n"

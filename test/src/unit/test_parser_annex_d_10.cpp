@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Annex D.10: $scale is a system function whose single argument is a
-// hierarchical name. It parses as an ordinary system call with that name as its
-// lone argument.
 TEST(OptionalScaleParser, ScaleParsesAsSystemCall) {
   auto r = Parse(
       "module m;\n"
@@ -25,9 +22,6 @@ TEST(OptionalScaleParser, ScaleParsesAsSystemCall) {
   EXPECT_EQ(call->args[0]->kind, ExprKind::kMemberAccess);
 }
 
-// Annex D.10 (edge case): a hierarchical name may be a single, unqualified
-// identifier. The argument then parses as a plain identifier rather than a
-// member-access chain, but $scale still parses as an ordinary system call.
 TEST(OptionalScaleParser, ScaleAcceptsSimpleName) {
   auto r = Parse(
       "module m;\n"

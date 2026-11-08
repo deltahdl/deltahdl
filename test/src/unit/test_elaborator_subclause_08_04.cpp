@@ -107,11 +107,6 @@ TEST(ClassObjectElaboration, ClassHandleArithmeticError) {
                             6, "8.4"));
 }
 
-// §8.4 lists every operator valid on an object handle -- equality, case
-// equality, the conditional operator, and assignment of a compatible handle or
-// of null -- and Table 8-1 records arithmetic on a handle as not allowed. The
-// subclause on the report is what tells this rejection from an ordinary type
-// mismatch in the same assignment, which is §10.8's rule and not §8.4's.
 TEST(ClassObjectElaboration, ArithmeticOnAnObjectHandleNames8_4) {
   ElabFixture f;
   ElaborateSrc(
@@ -242,10 +237,6 @@ TEST(ClassObjectElaboration, ClassHandleBitSelectError) {
                             "8.4"));
 }
 
-// The subclause asserted is the one the emission site passes, and
-// Elaborator::ValidateClassHandleContAssign in
-// src/elaborator/elaborator_validate_class_handles.cpp passes §10.3, where a
-// continuous assignment's driver is defined, rather than §8.4.
 TEST(ClassObjectElaboration, ClassHandleContAssignError) {
   ElabFixture f;
   ElaborateSrc(
@@ -341,11 +332,6 @@ TEST(ClassObjectElaboration, ClassHandleCompareCompatibleOk) {
              "endmodule\n"));
 }
 
-// §8.4 allows == and != on two handles; which pairs of handles they may be
-// applied to is §11.4.5's requirement that one operand be assignment compatible
-// with the other. That is the subclause the site in
-// src/elaborator/elaborator_validate_class_handles.cpp passes for two unrelated
-// classes, so it is the one asserted here.
 TEST(ClassObjectElaboration, ClassHandleCompareIncompatibleError) {
   ElabFixture f;
   ElaborateSrc(
@@ -394,10 +380,6 @@ TEST(ClassObjectElaboration, ClassHandleAssignIncompatibleError) {
       "8.4"));
 }
 
-// Table 8-1 lists casting of a SystemVerilog object handle as "Limited" (in
-// contrast to the unrestricted casting of a C pointer). One consequence of that
-// limit is that a handle cannot be reinterpreted as an unrelated non-class
-// value: casting it to a plain integral type is rejected.
 TEST(ClassObjectElaboration, ClassHandleCastToNonClassTypeError) {
   ElabFixture f;
   ElaborateSrc(
@@ -416,9 +398,6 @@ TEST(ClassObjectElaboration, ClassHandleCastToNonClassTypeError) {
                             6, "8.4"));
 }
 
-// The dual of the previous check: the limited casting of Table 8-1 also forbids
-// producing a class handle out of an ordinary (non-class, non-null) value, so
-// casting an integer literal to a class type is rejected.
 TEST(ClassObjectElaboration, NonClassValueCastToClassTypeError) {
   ElabFixture f;
   ElaborateSrc(
@@ -450,21 +429,6 @@ TEST(ClassObjectElaboration, ClassHandleAssignParentToChildError) {
       "8.4"));
 }
 
-// The eight cases below write one §8.4 breach -- `r = a + 1;`, which Table 8-1
-// records as not allowed on an object handle -- into each statement link
-// Elaborator::WalkStmtsForClassHandleOps in
-// src/elaborator/elaborator_validate_class_handles.cpp did not read before
-// #3319. That walk wrote out six of the thirteen links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h names, so the same arithmetic
-// one level down, in a fork arm or a randcase item, elaborated clean.
-//
-// The report stands at the offending expression rather than at the enclosing
-// method, because CheckClassHandleBinary anchors it at Expr::range.start, so
-// each case names the line its own arithmetic is written on.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword`, whose
-// statements the parser puts in Stmt::fork_stmts.
 TEST(ClassObjectElaboration, ArithmeticOnAHandleInAForkArmIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -484,8 +448,6 @@ TEST(ClassObjectElaboration, ArithmeticOnAHandleInAForkArmIsReported) {
                             7, "8.4"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
-// whose right-hand side is an ordinary expression and so may name a handle.
 TEST(ClassObjectElaboration,
      ArithmeticOnAHandleInAForInitializationIsReported) {
   ElabFixture f;
@@ -504,9 +466,6 @@ TEST(ClassObjectElaboration,
                             6, "8.4"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
-// takes the same expression on its right.
 TEST(ClassObjectElaboration, ArithmeticOnAHandleInAForStepIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -524,10 +483,6 @@ TEST(ClassObjectElaboration, ArithmeticOnAHandleInAForStepIsReported) {
                             6, "8.4"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// one below it cover one arm each.
 TEST(ClassObjectElaboration,
      ArithmeticOnAHandleInAnAssertionPassStmtIsReported) {
   ElabFixture f;
@@ -564,10 +519,6 @@ TEST(ClassObjectElaboration,
                             6, "8.4"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §8.4 is a rule about the source, so it holds whether the weighted draw
-// would select the item or not.
 TEST(ClassObjectElaboration, ArithmeticOnAHandleInARandcaseItemIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -587,10 +538,6 @@ TEST(ClassObjectElaboration, ArithmeticOnAHandleInARandcaseItemIsReported) {
                             7, "8.4"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
-// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
-// other member of Stmt.
 TEST(ClassObjectElaboration,
      ArithmeticOnAHandleInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -611,12 +558,6 @@ TEST(ClassObjectElaboration,
                             7, "8.4"));
 }
 
-// A.6.12's `rs_rule ::= rs_production_list [ := weight_specification [
-// rs_code_block ] ]` puts a second code block after the weight, which the
-// parser keeps in RsRule::weight_code rather than in RsProd::code_stmts. It is
-// a second statement position under Stmt::rs_productions, so it takes its own
-// case: the production `alt` holds a null statement, which leaves the weight
-// block as the only place the arithmetic stands.
 TEST(ClassObjectElaboration,
      ArithmeticOnAHandleInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;
@@ -638,10 +579,6 @@ TEST(ClassObjectElaboration,
                             7, "8.4"));
 }
 
-// §7.8 and §7.4.6: `C m[string]` declares an associative array whose elements
-// are handles, and `m["a"]` selects an element, so the member `m["a"].v` is
-// no §8.4 bit-select of a handle. ValidateVarDeclTypes took every variable of
-// a class type for one handle, and the element select was reported.
 TEST(ClassObjectElaboration, ElementSelectOfAnArrayOfHandlesIsNoBitSelect) {
   ElabFixture f;
   ElaborateSrc(
@@ -660,14 +597,6 @@ TEST(ClassObjectElaboration, ElementSelectOfAnArrayOfHandlesIsNoBitSelect) {
                              "8.4"));
 }
 
-// §7.4.2 (printed pages 153-154): a fixed-size unpacked array is declared by
-// the dimension after the name, so a block's `C arr[2]` and a dynamic `C d[]`
-// (§7.5) are arrays whose elements are handles, and `arr[1]` and `d[0]` are
-// elements, not §8.4's (printed 181) bit-select of a handle. The module-scope
-// declaration read its unpacked dimensions (ValidateVarDeclTypes), but
-// WalkStmtsForClassHandleOps took every block item declaration of a class
-// type for one handle, so the write `arr[1] = new` and the read `arr[1].v`
-// were both reported.
 TEST(ClassObjectElaboration,
      ElementSelectOfABlockDeclaredArrayOfHandlesIsNoBitSelect) {
   ElabFixture f;
@@ -689,9 +618,6 @@ TEST(ClassObjectElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A block-declared handle with no unpacked dimension is one handle, and a
-// select of it stays §8.4's bit-select; the array exemption reads the
-// dimensions, not the block position.
 TEST(ClassObjectElaboration, BitSelectOfABlockDeclaredHandleIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -709,11 +635,6 @@ TEST(ClassObjectElaboration, BitSelectOfABlockDeclaredHandleIsReported) {
                             "8.4"));
 }
 
-// §8.4's rules on what a handle admits hold wherever the expression stands: in
-// a module's task or function, through a formal argument, and in a class
-// method, through a property of the class, as in a procedural block. An array
-// of handles is no handle, so a select of it is an element, and a function
-// returning a handle names a handle variable, so assigning one to it is legal.
 TEST(ClassObjectElaboration,
      HandleOperationsAreCheckedInSubroutinesAndMethods) {
   ElabFixture f;
@@ -743,11 +664,6 @@ TEST(ClassObjectElaboration,
       ReportedError(f.diag.Diagnostics(), "class object handle", 12, "8.4"));
 }
 
-// §8.4's rules are about the handle value, whatever expression yields it: a
-// property of a class type selected from a handle, an element of an array of
-// handles and a function's result are each handles, while a property, element
-// or result of any other type, a structure's member and a package's variable
-// are not.
 TEST(ClassObjectElaboration, AHandleYieldedByAnExpressionIsAHandle) {
   ElabFixture f;
   ElabOk(
@@ -788,10 +704,6 @@ TEST(ClassObjectElaboration, AHandleYieldedByAnExpressionIsAHandle) {
   }
 }
 
-// §11.3.6 with §8.4: an assignment written in parentheses stands within an
-// expression, and one of a compatible handle, another of the target's class,
-// of a class extending it, or null, writes a handle of the target's class,
-// which a method is called through or compared like any other.
 TEST(ClassObjectElaboration, AParenthesizedHandleAssignmentIsAHandle) {
   EXPECT_TRUE(
       ElabOk("class C; task run(); endtask endclass\n"
@@ -806,9 +718,6 @@ TEST(ClassObjectElaboration, AParenthesizedHandleAssignmentIsAHandle) {
              "endmodule\n"));
 }
 
-// §11.3.6 with §8.4 and §7.4: a parenthesized assignment of a handle to an
-// element of an array of handles, or to a structure member holding one, is
-// written as the assignment statement is.
 TEST(ClassObjectElaboration, AParenthesizedAssignmentToAHandleElement) {
   EXPECT_TRUE(
       ElabOk("class C; endclass\n"
@@ -822,8 +731,6 @@ TEST(ClassObjectElaboration, AParenthesizedAssignmentToAHandleElement) {
              "endmodule\n"));
 }
 
-// §8.4: a parenthesized assignment of a handle of an unrelated class is no
-// assignment of a compatible handle.
 TEST(ClassObjectElaboration, AParenthesizedIncompatibleHandleAssignment) {
   ElabFixture f;
   ElaborateSrc(
@@ -840,7 +747,6 @@ TEST(ClassObjectElaboration, AParenthesizedIncompatibleHandleAssignment) {
       "8.4"));
 }
 
-// §8.4: a parenthesized assignment writes no integral value into a handle.
 TEST(ClassObjectElaboration, AParenthesizedIntegralAssignmentToAHandle) {
   ElabFixture f;
   ElaborateSrc(
@@ -855,7 +761,6 @@ TEST(ClassObjectElaboration, AParenthesizedIntegralAssignmentToAHandle) {
       "cannot assign non-class value to class object handle", 4, "8.4"));
 }
 
-// §8.4: a parenthesized assignment writes no handle into an integral variable.
 TEST(ClassObjectElaboration, AParenthesizedHandleAssignmentToAnInt) {
   ElabFixture f;
   ElaborateSrc(
@@ -870,8 +775,6 @@ TEST(ClassObjectElaboration, AParenthesizedHandleAssignmentToAnInt) {
       "cannot assign class object handle to a non-class variable", 4, "8.4"));
 }
 
-// §8.4: a compound assignment written in parentheses is an arithmetic
-// operator on the handle, which no handle admits.
 TEST(ClassObjectElaboration, AParenthesizedCompoundAssignmentToAHandle) {
   ElabFixture f;
   ElaborateSrc(
@@ -886,9 +789,6 @@ TEST(ClassObjectElaboration, AParenthesizedCompoundAssignmentToAHandle) {
                             4, "8.4"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a class
-// handle is kept out of a continuous assignment inside one, and a comparison
-// of it with null stays allowed there.
 TEST(ClassObjectElaboration,
      ClassHandleInContAssignInsideGenerateBlocksIsRejected) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(

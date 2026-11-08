@@ -64,9 +64,6 @@ TEST_F(VpiGetStringSim, GetStrReturnsNullForNullHandle) {
   EXPECT_EQ(vpi_get_str(vpiName, nullptr), nullptr);
 }
 
-// §38.11: the result is placed in a single temporary buffer that every call
-// reuses, so a pointer handed back by an earlier call is overwritten - and
-// reflects the new value - once a later call runs.
 TEST_F(VpiGetStringSim, ResultBufferIsReusedByEveryCall) {
   vpi_ctx_.CreateModule("aaa", "lib.aaa");
   vpi_ctx_.CreateModule("bbb", "lib.bbb");
@@ -83,18 +80,13 @@ TEST_F(VpiGetStringSim, ResultBufferIsReusedByEveryCall) {
   ASSERT_NE(second, nullptr);
   EXPECT_STREQ(second, "bbb");
 
-  // Both results come from the one shared buffer, so the earlier pointer now
-  // reads the later call's value.
   EXPECT_EQ(first, second);
   EXPECT_STREQ(first, "bbb");
 }
 
-// §38.11: a different buffer backs strings returned through the s_vpi_value
-// structure, so retrieving a value string does not disturb a string previously
-// handed back by vpi_get_str().
 TEST_F(VpiGetStringSim, ValueStringUsesADifferentBufferFromGetStr) {
   auto* var = sim_ctx_.CreateVariable("v", 16);
-  var->value = MakeLogic4VecVal(arena_, 16, 0x4869);  // encodes "Hi"
+  var->value = MakeLogic4VecVal(arena_, 16, 0x4869);
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("v"), nullptr);
@@ -109,15 +101,11 @@ TEST_F(VpiGetStringSim, ValueStringUsesADifferentBufferFromGetStr) {
   vpi_get_value(h, &val);
   ASSERT_NE(val.value.str, nullptr);
 
-  // The value string occupies separate storage, so the earlier vpi_get_str()
-  // pointer is untouched and the two pointers differ.
   EXPECT_NE(static_cast<const void*>(val.value.str),
             static_cast<const void*>(name));
   EXPECT_STREQ(name, "v");
 }
 
-// §38.11: unless otherwise specified, calling vpi_get_str() for a protected
-// object is an error - it yields no string and records an error.
 TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -130,27 +118,6 @@ TEST_F(VpiGetStringSim, ProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
-// -----------------------------------------------------------------------------
-// §38.11's own example:
-//
-//   vpiHandle mod = vpi_handle_by_name("top.mod1",NULL);
-//   vpi_printf ("Module top.mod1 is an instance of %s\n",
-//      vpi_get_str(vpiDefName, mod));
-//
-// What the sentence around it asks of the routine is that vpiDefName say what
-// the instance is an instance of. The instance's own name is vpiName and
-// answers a different question, and a module reporting that here said that
-// mod1 is an instance of mod1.
-//
-// The cases above build their module objects with VpiContext::CreateModule,
-// where the two names are the one string the case passed, so the difference
-// between them could not show. These run a design, where an instance and the
-// module it instantiates are named apart by construction.
-// -----------------------------------------------------------------------------
-
-// What the application read. §38.11 is the reason each is copied at once: the
-// routine returns its string in one temporary buffer that every call reuses, so
-// a string needed past the next call has to be copied elsewhere first.
 std::string g_instance_name;
 std::string g_definition_name;
 
@@ -199,15 +166,10 @@ TEST_F(VpiGetStringInARun, AnInstanceReportsWhatItIsAnInstanceOf) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // The instance is named m1 and is an instance of m. Two strings, from one
-  // object, through one routine -- which is the example, and which a module
-  // reporting its own name for both cannot produce.
   EXPECT_EQ(g_instance_name, "m1");
   EXPECT_EQ(g_definition_name, "m");
 }
 
-// §38.11: vpiDefName names what an object is an instance or definition of; a
-// net is neither, so it has no definition name and the query answers null.
 TEST_F(VpiGetStringSim, ANetHasNoDefinitionName) {
   VpiObject net;
   net.type = vpiNet;

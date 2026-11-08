@@ -26,17 +26,8 @@ namespace delta {
 
 namespace {
 
-// §16.8 lets instances nest, and a cyclic dependency among named sequences is
-// an error the elaborator reports; the flattening stops descending here so a
-// cycle it is handed all the same ends the instance rather than the run.
 constexpr int kMaxInstanceDepth = 16;
 
-// §16.10 over the match items of one operand: the right-hand sides and the
-// targets read the actuals as the operands do, and an assigned local named
-// after a formal -- a local variable formal argument, whose flattened name
-// the actual is -- is renamed with it. So is a local of a named property, or
-// a local variable formal argument of one, which the name of the attempt's
-// variable for it stands for (§16.13.7, §16.12.19).
 std::vector<SeqMatchAssign> SubstituteMatchItems(
     const std::vector<SeqMatchAssign>& items, const ActualsByFormal& actuals,
     Arena& arena) {
@@ -58,8 +49,6 @@ std::vector<SeqMatchAssign> SubstituteMatchItems(
   return out;
 }
 
-// An identifier expression naming `name`, arena-owned, for a local of an
-// instantiated body renamed into the flattened sequence.
 Expr* LocalNameExpr(std::string_view name, Arena& arena) {
   auto* e = arena.Create<Expr>();
   e->kind = ExprKind::kIdentifier;
@@ -73,7 +62,6 @@ std::string_view RenamedLocal(std::string_view name, int instance,
   return {arena.AllocString(renamed.data(), renamed.size()), renamed.size()};
 }
 
-// Whether `expr` reads a name one of `names` holds, a formal's.
 template <typename Names>
 bool NamesAny(const Expr* expr, const Names& names) {
   bool named = false;
@@ -86,9 +74,6 @@ bool NamesAny(const Expr* expr, const Names& names) {
   return named;
 }
 
-// Whether every name `expr` reads is a variable of the scope, a parameter
-// among them, rather than a formal of an enclosing property the expansion
-// of an instance has yet to bind.
 bool NamesOnlyVariables(const Expr* expr, SimContext& ctx) {
   bool declared = true;
   ForEachSubExpr(expr, [&](const Expr* e) {
@@ -100,13 +85,6 @@ bool NamesOnlyVariables(const Expr* expr, SimContext& ctx) {
   return declared;
 }
 
-// The value a delay bound or a repetition count written as an expression takes
-// once the actuals an instance binds stand for the formals it names: `$` for
-// no upper bound, or the elaboration-time constant §16.8 requires of it,
-// evaluated here as a parameter or a literal is. A bound naming no formal the
-// actuals bind is left for an enclosing scope's to settle, a checker's formal
-// among them (§17.3), and one that answers no known value leaves the bound as
-// it was, which is the parser's default of 1.
 void ResolveDelayBound(uint32_t& bound, Expr*& expr,
                        const ActualsByFormal& actuals, SimContext& ctx,
                        Arena& arena) {
@@ -127,8 +105,6 @@ void ResolveDelayBound(uint32_t& bound, Expr*& expr,
   bound = static_cast<uint32_t>(value.ToUint64());
 }
 
-// §16.7 and §16.9.2: a delay's bounds and a repetition's count, each settled
-// as above.
 template <typename Bounds>
 Bounds ResolveBounds(Bounds bounds, const ActualsByFormal& actuals,
                      SimContext& ctx, Arena& arena) {
@@ -137,8 +113,6 @@ Bounds ResolveBounds(Bounds bounds, const ActualsByFormal& actuals,
   return bounds;
 }
 
-// §16.7: `##a` before an instance whose body opens with `##b` is a delay of
-// a + b to the body's first operand, unbounded where either is.
 SeqCycleDelay AddDelays(const SeqCycleDelay& before,
                         const SeqCycleDelay& lead) {
   SeqCycleDelay sum;
@@ -151,8 +125,6 @@ SeqCycleDelay AddDelays(const SeqCycleDelay& before,
 
 }  // namespace
 
-// The parser keeps the named actuals after the positional ones with their
-// names beside.
 ActualsByFormal BindInstanceActuals(const ModuleItem* decl,
                                     const Expr* instance, Arena& arena) {
   ActualsByFormal actuals = BindActualsWithDefaults(
@@ -182,8 +154,6 @@ std::vector<EventExpr> SubstituteClock(const std::vector<EventExpr>& clock,
         AppendActualEvents(copy, it->second, arena, out);
         continue;
       }
-      // A signal under an edge is watched as the object it names, so the cast
-      // §16.8.1 (c) put on the actual of a typed formal is looked through.
       if (it != actuals.end() && it->second != nullptr &&
           it->second->kind == ExprKind::kCast) {
         copy.signal = it->second->lhs;
@@ -210,10 +180,6 @@ const ModuleItem* InstantiatedSequence(const Expr* operand, SimContext& ctx) {
 bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
              LinearSequence& out, int depth);
 
-// An operand of the sequence being flattened that instantiates a named
-// sequence: the declaration instantiated, the instance as written, the delay
-// written before it, its repetition, its clock and, §16.10, the match items
-// of the group it was written in, performed at each match of the instance.
 struct InstanceOperand {
   const ModuleItem* inner;
   const Expr* instance;
@@ -223,8 +189,6 @@ struct InstanceOperand {
   std::vector<SeqMatchAssign> items;
 };
 
-// §16.13.1: the clock of the operand just appended to `out`, kept parallel
-// to the operands once any operand names one.
 void PushOperandClock(LinearSequence& out,
                       const std::vector<EventExpr>& clock) {
   if (clock.empty() && out.operand_clocks.empty()) return;
@@ -240,10 +204,6 @@ const std::vector<EventExpr>& BodyOperandClock(const SeqLinearBody& body,
   return pos < body.clocks.size() ? body.clocks[pos] : kNone;
 }
 
-// §16.9.2: consecutive repetition of an instance by an exact count, unrolled
-// as the parser unrolls a group's, the operands from `first` on appended
-// again `count - 1` times with the copy's first operand a tick after the
-// last. Any other consecutive count is iterated whole (IteratesWhole).
 bool UnrollInstanceRepetition(LinearSequence& out, size_t first,
                               const SeqRepetition& rep) {
   if (rep.kind == SeqRepetition::Kind::kNone) return true;
@@ -266,9 +226,6 @@ bool UnrollInstanceRepetition(LinearSequence& out, size_t first,
   return true;
 }
 
-// §16.8.2: the local variable formal arguments of `decl`, each with its
-// direction, in the order of the formals. The directions the port scan keeps
-// stand in the order of the local formals alone.
 struct LocalFormal {
   size_t index;
   Direction direction;
@@ -290,29 +247,18 @@ std::vector<LocalFormal> LocalFormalsOf(const ModuleItem* decl) {
   return out;
 }
 
-// §16.8.2 and §16.10: every local of the instantiated body -- the ones it
-// declares and its local variable formal arguments -- becomes a local of the
-// flattened sequence under a name of its own, `name@N` for the Nth instance,
-// and the body's references to it are renamed through the actuals map. A
-// local formal's actual is set aside before the renaming overwrites its entry,
-// since the initialization and the assignment back are written over it.
 struct LocalBinding {
   std::string_view renamed;
   Expr* actual;
   Direction direction;
 };
 
-// Where the locals of one instance are renamed into: the number the instance
-// takes in the flattened sequence, that sequence, and the arena the new names
-// live in.
 struct Renaming {
   int instance;
   LinearSequence& out;
   Arena& arena;
 };
 
-// One local variable formal argument of `inner` renamed into the flattened
-// sequence, its actual recorded before the renaming replaces it in `actuals`.
 LocalBinding RenameLocalFormal(const ModuleItem* inner, const LocalFormal& lf,
                                ActualsByFormal& actuals, Renaming& renaming) {
   std::string_view name = inner->prop_formals[lf.index];
@@ -346,13 +292,6 @@ std::vector<LocalBinding> RenameInstanceLocals(const ModuleItem* inner,
   return formals;
 }
 
-// §16.8.2: the assignments an instance owes for its local variable formal
-// arguments, written as match items: the initialization of an input or inout
-// one from its actual before the instance's first operand, and the assignment
-// of an inout or output one back to the actual's local variable at the
-// instance's last operand. The actual of an inout or output formal is a
-// reference to a local variable, which the cast §16.8.1 put on it is looked
-// through to name.
 void AddLocalFormalAssignments(const std::vector<LocalBinding>& formals,
                                std::vector<SeqMatchAssign>& at_first,
                                std::vector<SeqMatchAssign>& at_last,
@@ -380,10 +319,6 @@ void AddLocalFormalAssignments(const std::vector<LocalBinding>& formals,
   }
 }
 
-// §16.13.1 and §16.13.3: the clock the operand at `j` of an instantiated
-// body is evaluated on: the one it names, else the one the declaration is
-// declared with, its formals replaced by the actuals, else the one flowing
-// into the instance.
 std::vector<EventExpr> InstanceOperandClock(const LinearSequence& body,
                                             size_t j, const InstanceOperand& op,
                                             const ActualsByFormal& actuals,
@@ -396,9 +331,6 @@ std::vector<EventExpr> InstanceOperandClock(const LinearSequence& body,
   return op.clock;
 }
 
-// §16.12.18: the declaration holding the sequence_expr an operand was
-// substituted with, where the operand referenced a formal whose actual is
-// one (ActualTree); nullptr for any other operand.
 const ModuleItem* SequenceActual(const Expr* operand) {
   if (operand == nullptr) return nullptr;
   const PropertyExprNode* tree = ActualTree(operand);
@@ -408,10 +340,6 @@ const ModuleItem* SequenceActual(const Expr* operand) {
   return tree->sequence;
 }
 
-// §16.8.1 (a): the sequence an operand of an instantiated body stands for
-// once a formal of type sequence in it is replaced by its actual: a named
-// sequence the actual names or instantiates, or the sequence_expr the parser
-// read it into (SequenceActual); nullptr for any other operand.
 const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
   if (ActualTree(operand) == nullptr) return InstantiatedSequence(operand, ctx);
   return SequenceActual(operand);
@@ -420,8 +348,6 @@ const ModuleItem* SequenceActualOf(const Expr* operand, SimContext& ctx) {
 bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth);
 
-// One operand of a body with the actuals in the formals' places: the
-// operand, the delay before it, its match items and its repetition.
 struct SubstitutedOperand {
   Expr* operand;
   SeqCycleDelay delay;
@@ -430,9 +356,6 @@ struct SubstitutedOperand {
   std::vector<EventExpr> clock;
 };
 
-// §16.7: a clocked boolean actual standing as an operand, `@(posedge clk)
-// a`, is a sequence of one operand read on the clock it writes, so the
-// boolean takes the operand's place and its clock the operand's clock.
 void ReadClockedBooleanActual(Expr*& operand, std::vector<EventExpr>& clock) {
   const PropertyExprNode* tree =
       operand != nullptr ? ActualTree(operand) : nullptr;
@@ -444,7 +367,6 @@ void ReadClockedBooleanActual(Expr*& operand, std::vector<EventExpr>& clock) {
   clock = tree->clock;
 }
 
-// The substituted operand appended to `out` as it stands.
 void AppendOperand(SubstitutedOperand sub, LinearSequence& out) {
   out.operands.push_back(sub.operand);
   out.delays.push_back(sub.delay);
@@ -453,10 +375,6 @@ void AppendOperand(SubstitutedOperand sub, LinearSequence& out) {
   PushOperandClock(out, sub.clock);
 }
 
-// §16.10: the match items of the group an instance was written in, performed
-// at each match of the instance: on the last operand its body became, or,
-// where that operand repeats and would perform them at each repetition, on a
-// 1 fused to its end on its clock, as the parser's AttachGroupItems has them.
 void AttachInstanceItems(LinearSequence& out,
                          const std::vector<SeqMatchAssign>& items,
                          Arena& arena) {
@@ -476,15 +394,12 @@ void AttachInstanceItems(LinearSequence& out,
   last.insert(last.end(), items.begin(), items.end());
 }
 
-// The sequence standing as `operand`, flattened, kept under it in `out`.
 void AddNested(LinearSequence& out, const Expr* operand,
                LinearSequence nested) {
   out.nested.emplace_back(
       operand, std::make_shared<const LinearSequence>(std::move(nested)));
 }
 
-// §16.8 and §16.13.3: an instantiated body's own clock, its formals replaced
-// by the actuals, is the clock of an outer sequence that has none.
 void AdoptInstanceClock(const LinearSequence& body,
                         const ActualsByFormal& actuals, Arena& arena,
                         LinearSequence& out) {
@@ -493,9 +408,6 @@ void AdoptInstanceClock(const LinearSequence& body,
   }
 }
 
-// One instance being expanded: the instance, the flattened body of the
-// sequence it instantiates, its actuals bound to that sequence's formals, and
-// what the expansion runs in, the depth of the instance among them.
 struct Expansion {
   const InstanceOperand& op;
   const LinearSequence& body;
@@ -505,11 +417,6 @@ struct Expansion {
   int depth;
 };
 
-// The operand at `j` of the flattened body of the instance `x.op`, appended
-// to `out` with the actuals substituted: its delay, the one written before
-// the instance added to the first operand's, its clock and its match items,
-// or, §16.8.1 (a), where it is a formal of type sequence, the sequence bound
-// to it expanded in its place with those.
 bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
   const LinearSequence& body = x.body;
   const InstanceOperand& op = x.op;
@@ -521,15 +428,10 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
   if (j == 0) delay = AddDelays(op.before, delay);
   SeqRepetition repetition =
       ResolveBounds(body.repetitions[j], actuals, ctx, arena);
-  // §16.13.1 and §16.13.3: an operand of the instantiated body is evaluated
-  // on the clock it names, else on the declaration's own, else on the one
-  // flowing into the instance.
   std::vector<EventExpr> clock =
       InstanceOperandClock(body, j, op, actuals, arena);
   std::vector<SeqMatchAssign> items =
       SubstituteMatchItems(body.match_items[j], actuals, arena);
-  // A nested sequence of the body stays under its operand, the actuals
-  // substituted in it in turn.
   if (const LinearSequence* nested = NestedOperand(body, j)) {
     AddNested(out, body.operands[j],
               SubstituteLinearSequence(*nested, actuals, ctx, arena));
@@ -546,11 +448,6 @@ bool AppendInstanceOperand(const Expansion& x, size_t j, LinearSequence& out) {
   return true;
 }
 
-// §16.8 and §16.9.5 to §16.9.7: the instantiated body, its actuals in the
-// formals' places, appended whole as one nested operand under the delay and
-// the clock written before the instance, the body's clock taken where the
-// outer sequence has none, and repeated by an exact count as an instance
-// spliced into the chain is, or carrying any other consecutive repetition.
 bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
                          SimContext& ctx, Arena& arena, LinearSequence& out) {
   ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
@@ -564,32 +461,20 @@ bool AppendNestedOperand(const InstanceOperand& op, const LinearSequence& body,
   return kept || UnrollInstanceRepetition(out, first, op.repetition);
 }
 
-// Appends the instantiated body's flattened operands with the actuals
-// substituted, its clock taken where the outer sequence has none, and the
-// §16.8.2 assignments of its local variable formal arguments: the
-// initialization from the actual before the first operand, and the assignment
-// back to the actual's local at the last operand's match.
 bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
                     LinearSequence& out, int depth) {
   LinearSequence body;
   if (!Flatten(op.inner, ctx, arena, body, depth + 1)) return false;
-  // A sequence with `intersect`, `and` or `or` operands of its own does not
-  // splice into one chain, so it stands in it whole, as does one repeated by
-  // a count its spliced operands could not be copied by (§16.9.2).
   if (!body.alternatives.empty() || !body.conjuncts.empty() ||
       !body.intersects.empty() || op.repetition.IteratesWhole()) {
     return AppendNestedOperand(op, body, ctx, arena, out);
   }
   ActualsByFormal actuals = BindInstanceActuals(op.inner, op.instance, arena);
-  // The operands already flattened number the instance, each instance adding
-  // at least one, so the locals of two instances of one sequence differ.
   Renaming renaming{static_cast<int>(out.operands.size()) + 1, out, arena};
   std::vector<LocalBinding> formals =
       RenameInstanceLocals(op.inner, body, actuals, renaming);
   AdoptInstanceClock(body, actuals, arena, out);
   size_t first = out.operands.size();
-  // Where each operand of the body begins and ends among the flattened ones,
-  // a formal of type sequence expanding to the operands of its actual.
   std::vector<size_t> begins;
   std::vector<size_t> ends;
   Expansion expansion{op, body, actuals, ctx, arena, depth};
@@ -598,8 +483,6 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
     if (!AppendInstanceOperand(expansion, j, out)) return false;
     ends.push_back(out.operands.size() - 1);
   }
-  // §16.9.9: a throughout of the instantiated body spans the operands its
-  // operands became, its condition over the actuals.
   for (SeqThroughout guard : body.throughouts) {
     guard.cond = SubstituteFormals(guard.cond, actuals, arena);
     guard.first = begins[guard.first];
@@ -616,8 +499,6 @@ bool ExpandInstance(const InstanceOperand& op, SimContext& ctx, Arena& arena,
 bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
                   LinearSequence& out, int depth);
 
-// One `intersect` operand with its intersects, each flattened as a chain of
-// its own; an instance in any that names the clock gives it to the whole.
 bool FlattenIntersection(const SeqLinearBody& body, SimContext& ctx,
                          Arena& arena, LinearSequence& out, int depth) {
   if (!FlattenChain(body, ctx, arena, out, depth)) return false;
@@ -631,8 +512,6 @@ bool FlattenIntersection(const SeqLinearBody& body, SimContext& ctx,
   return true;
 }
 
-// One `and` operand with its conjuncts, each flattened as an intersection of
-// its own; an instance in any that names the clock gives it to the whole.
 bool FlattenConjunction(const SeqLinearBody& body, SimContext& ctx,
                         Arena& arena, LinearSequence& out, int depth) {
   if (!FlattenIntersection(body, ctx, arena, out, depth)) return false;
@@ -646,8 +525,6 @@ bool FlattenConjunction(const SeqLinearBody& body, SimContext& ctx,
   return true;
 }
 
-// §16.9.8: the match items written on a `first_match` are the operand's own,
-// so they are executed at the end of each `or` operand's chain.
 void AttachFirstMatchItems(const SeqLinearBody& body, LinearSequence& out) {
   if (body.first_match_items.empty()) return;
   for (const SeqMatchAssign& item : body.first_match_items) {
@@ -658,10 +535,6 @@ void AttachFirstMatchItems(const SeqLinearBody& body, LinearSequence& out) {
   }
 }
 
-// Whether the body is one instance of a named sequence, written with no
-// arguments, delay, repetition, match items or operator of its own: such a
-// body stands for the instantiated sequence whole, `or` operands and all,
-// where an instance among other operands splices into one chain.
 const ModuleItem* BareInstance(const SeqLinearBody& body, SimContext& ctx) {
   if (body.operands.size() != 1 || !body.alternatives.empty() ||
       !body.conjuncts.empty() || !body.intersects.empty()) {
@@ -675,9 +548,6 @@ const ModuleItem* BareInstance(const SeqLinearBody& body, SimContext& ctx) {
   return InstantiatedSequence(operand, ctx);
 }
 
-// A body that is one bare instance stands for the instantiated sequence
-// whole, under the body's own clock where it has one, the instantiated
-// sequence's otherwise.
 bool FlattenBareInstance(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                          LinearSequence& out, int depth) {
   const ModuleItem* inner = BareInstance(seq->seq_linear, ctx);
@@ -704,7 +574,6 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
   out.clock_out = body.clock_out;
   out.first_match = body.first_match;
   if (!FlattenConjunction(body, ctx, arena, out, depth)) return false;
-  // §16.9.7: each `or` operand is flattened on its own.
   for (const SeqLinearBody& alt : body.alternatives) {
     LinearSequence flat;
     flat.clock = out.clock;
@@ -716,20 +585,14 @@ bool Flatten(const ModuleItem* seq, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// One chain of a body: its operands, an instance among them expanded, with
-// the chain's locals.
 bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
                   LinearSequence& out, int depth) {
   out.locals = body.locals;
-  // Where each of the body's operands begins and ends among the flattened
-  // ones, an instance among them expanding to several.
   std::vector<size_t> begins;
   std::vector<size_t> ends;
   for (size_t i = 0; i < body.operands.size(); ++i) {
     Expr* operand = body.operands[i];
     const SeqCycleDelay& before = body.delays[i];
-    // A group the parser read into a sequence of its own is expanded as an
-    // instance of it is.
     const ModuleItem* inner = SequenceActualOf(operand, ctx);
     begins.push_back(out.operands.size());
     if (inner == nullptr) {
@@ -745,7 +608,6 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
     }
     ends.push_back(out.operands.size() - 1);
   }
-  // §16.9.9: a throughout spans the flattened operands its operands became.
   for (SeqThroughout guard : body.throughouts) {
     guard.first = begins[guard.first];
     guard.last = ends[guard.last];
@@ -758,9 +620,6 @@ bool FlattenChain(const SeqLinearBody& body, SimContext& ctx, Arena& arena,
 
 namespace {
 
-// Each bound of a delay and of a repetition count of `seq` and of the
-// sequences under it, handed to `fn` with the expression it is written as,
-// null where it is a literal or settled.
 void ForEachBound(LinearSequence& seq,
                   const std::function<void(uint32_t&, Expr*&)>& fn) {
   for (SeqCycleDelay& delay : seq.delays) {
@@ -787,20 +646,12 @@ bool FlattenLinearSequence(const ModuleItem* seq, SimContext& ctx, Arena& arena,
                            LinearSequence& out) {
   out = LinearSequence{};
   if (!Flatten(seq, ctx, arena, out, 0)) return false;
-  // §17.3: a bound naming a formal of the checker the sequence stands in
-  // takes that formal's actual, `##n` with n bound to 2 being `##2` and
-  // `##[1:n]` with n bound to `$` being `##[1:$]`, as a sequence formal's
-  // bound takes its actual (§16.8).
   if (const ActualsByFormal* checker =
           ctx.CheckerActuals(ctx.ActiveInstancePrefix())) {
     ForEachBound(out, [&](uint32_t& bound, Expr*& expr) {
       ResolveDelayBound(bound, expr, *checker, ctx, arena);
     });
   }
-  // §16.7 and §16.9.2: a bound left an expression after that is an
-  // elaboration-time constant of the scope the sequence is declared in, a
-  // parameter `##P` or `a[*N]` among them, and is evaluated there; one naming
-  // a formal of the sequence itself is the instance's to settle.
   ForEachBound(out, [&](uint32_t& bound, Expr*& expr) {
     if (expr == nullptr || NamesAny(expr, seq->prop_formals) ||
         !NamesOnlyVariables(expr, ctx)) {
@@ -847,10 +698,6 @@ SubstitutedOperand SubstituteOperand(const LinearSequence& body, size_t j,
           OperandClock(body, j)};
 }
 
-// The substituted operand appended to `out`, or, where it references a
-// formal whose actual is a sequence_expr, that sequence's flattened
-// operands, the delay before the operand added to the first's and the
-// operand's match items carried by the last.
 void AppendSubstitutedOperand(SubstitutedOperand sub, SimContext& ctx,
                               Arena& arena, LinearSequence& out) {
   size_t first = out.operands.size();
@@ -888,15 +735,11 @@ LinearSequence SubstituteLinearSequence(const LinearSequence& body,
   out.operand_clock_index.clear();
   out.throughouts.clear();
   out.nested.clear();
-  // Where each of the body's operands begins and ends among the substituted
-  // ones, a sequence actual among them expanding to several.
   std::vector<size_t> begins;
   std::vector<size_t> ends;
   for (size_t j = 0; j < body.operands.size(); ++j) {
     begins.push_back(out.operands.size());
     SubstitutedOperand sub = SubstituteOperand(body, j, actuals, ctx, arena);
-    // A nested sequence stays under its operand, the actuals substituted in
-    // it in turn.
     if (const LinearSequence* nested = NestedOperand(body, j)) {
       sub.operand = body.operands[j];
       AddNested(out, sub.operand,

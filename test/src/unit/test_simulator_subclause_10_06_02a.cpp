@@ -122,10 +122,6 @@ TEST(ForceReleaseSim, ReleaseVariableHoldsValue) {
   EXPECT_EQ(x->value.ToUint64(), 50u);
 }
 
-// §10.6.2: once a variable with no continuous assignment or active assign
-// procedural continuous assignment is released, it keeps the forced value only
-// until the next procedural assignment, which then takes effect normally. The
-// released variable therefore resumes accepting ordinary blocking assignments.
 TEST(ForceReleaseSim, ReleaseThenProceduralAssignResumes) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -203,8 +199,6 @@ TEST(ForceReleaseSim, ReleaseReestablishesAssign) {
       "endmodule\n",
       f, "x");
   ASSERT_NE(x, nullptr);
-  // §10.6.1: the assign put back in force holds the variable again, against
-  // every procedural assignment, though no force does.
   EXPECT_TRUE(x->is_forced);
   EXPECT_FALSE(x->force_active);
   EXPECT_EQ(x->value.ToUint64(), 10u);
@@ -273,9 +267,6 @@ TEST(ForceReleaseSim, ReleaseOnNetUsesDriverValue) {
   EXPECT_EQ(w->value.ToUint64(), 55u);
 }
 
-// A force on a net overrides every kind of driver until the net is released,
-// not just continuous assignments. Here a primitive AND gate drives w to 1,
-// yet the force holds w at 0 while it is in effect.
 TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -297,9 +288,6 @@ TEST(ForceReleaseSim, ForceOverridesGateOutputDriver) {
   EXPECT_EQ(w->value.ToUint64(), 0u);
 }
 
-// Releasing a net makes it take the value its drivers determine right away.
-// After release the AND gate (1 & 1) drives w back to 1, displacing the
-// forced 0.
 TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -323,10 +311,6 @@ TEST(ForceReleaseSim, ReleaseNetReturnsToGateOutputValue) {
   EXPECT_EQ(w->value.ToUint64(), 1u);
 }
 
-// §10.6.2 names module outputs among the drivers a force overrides, alongside
-// gate outputs and continuous assignments. Here child instance u drives w to 10
-// through its output port; the force pins w to 99 while in effect, and after
-// the release w immediately returns to the value its port driver determines.
 TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -350,16 +334,6 @@ TEST(ForceReleaseSim, ForceOverridesModuleOutputDriver) {
   EXPECT_EQ(w->value.ToUint64(), 10u);
 }
 
-// §10.6.2: a force on a net overrides every driver of it -- gate outputs,
-// module outputs and continuous assignments -- until a release is executed on
-// the net. Overridden drivers are not driving, so the strength the net reports
-// is the force's and not theirs. §10.6 gives force no drive_strength syntax, so
-// the strength is the (strong1, strong0) §10.3.4 defaults to, which §21.2.1.4
-// renders St1.
-//
-// A pull1 continuous assignment is what the force overrides here: driver and
-// force disagree about the level while agreeing about the value, so a net
-// reporting Pu1 is reporting the driver it is not carrying.
 TEST(ForceReleaseSim,
      ForcedNetReportsTheForcesStrengthNotTheDriversItOverrode) {
   SimFixture f;
@@ -377,10 +351,6 @@ TEST(ForceReleaseSim,
   EXPECT_EQ(out.find("Pu1"), std::string::npos) << out;
 }
 
-// §10.6.2: the force is the net's source from the moment it executes, so a net
-// forced before anything drove it carries a strength too. Reporting the
-// strength only when a driver update happens to re-resolve the net leaves this
-// one at high impedance while it carries a value.
 TEST(ForceReleaseSim, NetForcedWithNoDriverStillReportsAStrength) {
   SimFixture f;
   std::string out = RunCapture(
@@ -396,9 +366,6 @@ TEST(ForceReleaseSim, NetForcedWithNoDriverStillReportsAStrength) {
   EXPECT_EQ(out.find("HiZ"), std::string::npos) << out;
 }
 
-// §10.6.2: on release, the net at once takes the value its drivers determine --
-// and the strength with it, the drivers being what drives again. Without this
-// case, reporting the force's strength for good satisfies the two above.
 TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
   SimFixture f;
   std::string out = RunCapture(
@@ -415,21 +382,6 @@ TEST(ForceReleaseSim, ReleasedNetReportsItsDriversStrengthAgain) {
   EXPECT_NE(out.find("Pu1"), std::string::npos) << out;
 }
 
-// §10.6.2: the left-hand side may reference a singular variable, a net, a
-// constant bit-select or constant part-select of a vector net, or a
-// concatenation of those. A concatenation of two whole variables is one of the
-// forms that sentence names, so the force takes effect on both of its elements;
-// §11.4.12 -- a concatenation is a packed vector of bits -- is what says how
-// one right-hand value reaches two targets, each element taking the bits its
-// own width claims with the leftmost taking the most significant ones. With
-// `logic [7:0] a, b;` and 16'h1234 that is 8'h12 for a and 8'h34 for b.
-//
-// The wrong answer was that nothing happened at all, and silently: the force
-// executor resolved its one target through ResolveLhsVariable, which answers
-// null for a concatenation, and returned kDone having marked nothing, written
-// nothing and reported nothing. Both elements start at sentinels no expected
-// value can be, so a force that writes nothing cannot pass for one that wrote
-// the right answer.
 TEST(ForceReleaseSim, ForceOfAConcatenationGivesEachElementItsSlice) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -451,17 +403,6 @@ TEST(ForceReleaseSim, ForceOfAConcatenationGivesEachElementItsSlice) {
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §10.6.2: a force on a variable overrides a procedural assignment to it until
-// a release is executed on that variable. That override is what makes the
-// statement above a force rather than a one-off write of a slice, and it is
-// carried by the is_forced flag the existing writers consult, so this case says
-// the flag the concatenation arm sets is the one they already read. Without it,
-// an arm that deposited each slice and marked nothing would satisfy the case
-// above.
-//
-// The wrong answer was silence in both halves: the force marked neither element
-// and the later `a = 8'd7;` therefore landed, leaving a at 7 rather than at the
-// slice the force gave it.
 TEST(ForceReleaseSim, ForceOfAConcatenationOverridesALaterElementAssign) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -483,19 +424,6 @@ TEST(ForceReleaseSim, ForceOfAConcatenationOverridesALaterElementAssign) {
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §10.6.2 bounds the override by the release -- once released, a variable
-// keeps its current value until the next procedural assignment to it executes
-// -- and the release names the same concatenation the force did, so it has to
-// reach every element the force marked. This is the companion the file writes
-// for every other form (ReleaseVariableHoldsValue,
-// ReleaseThenProceduralAssignResumes), and it is what keeps the concatenation
-// arm from installing a force no release can lift.
-//
-// The wrong answer was that neither statement did anything: release resolved
-// its target through the same ResolveLhsVariable and returned having cleared
-// nothing. The assignments after the release are what read the flag back --
-// each element takes its ordinary procedural assignment again, which a still
-// forced element would decline.
 TEST(ForceReleaseSim, ReleaseOfAConcatenationLiftsTheForceOnEachElement) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -520,24 +448,6 @@ TEST(ForceReleaseSim, ReleaseOfAConcatenationLiftsTheForceOnEachElement) {
   EXPECT_EQ(b->value.ToUint64(), 9u);
 }
 
-// §10.6.2 admits a constant bit-select of a vector net among the elements a
-// force's concatenation may mix, and the elaborator case
-// ForceConcatWithNetBitSelectElaborates accepts exactly
-// `force {w, bus[3]} = 2'b11;` on `wire w; wire [7:0] bus;`, so the simulator
-// owes that spelling an answer. The element's window is the point: bus[3]
-// claims one bit of the right-hand value and one bit of bus, and the seven bits
-// of bus its select does not name keep the value its driver gave them, the way
-// §11.4.1's distribution leaves the rest of a select element's variable
-// standing. Driving bus with 8'h55 makes bit 3 the only zero among a
-// distinctive pattern, so 8'h5D is reachable only by writing that one bit.
-//
-// The wrong answer was that nothing happened: neither element was written, w
-// stayed at the 0 its driver gave it and bus stayed at 8'h55. A whole-target
-// write is the other wrong answer this case names -- it would put the 2-bit
-// right-hand value over all of bus.
-//
-// bus is left marked forced in its entirety, which is #3512 and not this case's
-// claim; nothing here reads bus's flag or writes its other bits.
 TEST(ForceReleaseSim, ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -560,22 +470,6 @@ TEST(ForceReleaseSim, ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames) {
   EXPECT_EQ(bus->value.ToUint64(), 0x5Du);
 }
 
-// §10.6.2: releasing a variable that a continuous assignment drives, or that
-// has an active assign procedural continuous assignment, reestablishes that
-// assignment and schedules a reevaluation in the continuous assignment's
-// scheduling region. That is ReleaseReestablishesAssign reached through a
-// concatenation, and it is the case the reestablishment path can fail on its
-// own: the release writes the assign's right-hand value again, long after the
-// force looked correct, so an element carrying no window of its own quietly
-// takes the whole 16-bit value there. The value the reestablished assign leaves
-// is the same distribution the assign itself made -- 8'h12 for a and 8'h34 for
-// b -- and an a reading 8'h34 is the whole value truncated into it rather than
-// its slice.
-//
-// The wrong answer today is that all three statements are no-ops and a and b
-// stand at their sentinels. What the flag reads after a reestablished assign is
-// ReleaseReestablishesAssign's subject, not this one's, so nothing here asserts
-// on it.
 TEST(ForceReleaseSim, ReleaseOfAConcatenationReestablishesTheAssignPerElement) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -597,36 +491,6 @@ TEST(ForceReleaseSim, ReleaseOfAConcatenationReestablishesTheAssignPerElement) {
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §11.5.1's report for a select written with a zero width is owed by every
-// writer that reaches such a select, and §10.6.1 and §10.6.2 send `assign`,
-// `force`, `release` and `deassign` over a concatenation target through a walk
-// of their own: WalkConcatLhsElements in statement_assign_decl.cpp, which
-// carried the same `if (w == 0) continue;` arm the blocking unpacker carried
-// and the same silence with it. The blocking assignment's reading of the rule
-// is ConcatenationSim.LhsConcatZeroWidthPartSelectElementNames11_5_1 in
-// test_simulator_subclause_11_04_12.cpp; this is the force's, and the two are
-// separate functions in separate files, so either can be corrected while the
-// other stays silent.
-//
-// The select is on a net because §10.6.2 admits a constant bit-select or
-// part-select of a vector net, or a concatenation of such things, and nothing
-// wider: CheckForceLhsOperand rejects a bit-select or part-select of a
-// variable in a force lvalue outright, which is why `bus` is a wire here as it
-// is in ForceOfAConcatenationWritesOnlyTheNetBitItsSelectNames above.
-//
-// The width is a variable because a folded constant zero never reaches the
-// simulator at all -- CheckIndexedPartSelectWidthNode rejects it during
-// elaboration -- and that leaves the elaborator reporting the variable width as
-// the non-constant expression it is, "indexed part-select width must be a
-// constant expression", at this same line 10 and under this same §11.5.1. The
-// line and the subclause therefore separate nothing, and the message is what
-// names the report this case is about.
-//
-// The values say the force landed rather than the statement being dropped
-// whole. The zero-width element claims none of the right-hand value, so `w` is
-// the whole of a one-bit concatenation and takes the 1 of 2'b01 against the 0
-// its own continuous assignment drives, and `bus`, which the walk passes over,
-// keeps the 8'h55 its driver gave it.
 TEST(ForceReleaseSim, ForceOfAConcatenationZeroWidthPartSelectNames11_5_1) {
   SimFixture f;
   auto* w = RunAndFindVar(
@@ -654,24 +518,6 @@ TEST(ForceReleaseSim, ForceOfAConcatenationZeroWidthPartSelectNames11_5_1) {
   EXPECT_EQ(bus->value.ToUint64(), 0x55u);
 }
 
-// §10.6.1: releasing a variable with an active assign procedural continuous
-// assignment reestablishes that assignment, and the assignment being
-// reestablished is `assign {a, b} = 16'h1234`. What that assignment gives `a`
-// is §11.4.12's packed vector of bits' high half, 8'h12, however the release
-// that reestablishes it is written.
-//
-// This release names `a` where the assign named the concatenation, and that is
-// the whole of the case: the variable recorded the right-hand expression and
-// not the window it was installed with, so the release recomputed a window from
-// its own target -- the whole of `a`, which takes the whole of the value -- and
-// reestablished all sixteen bits of 16'h1234 on the eight-bit `a`. The sibling
-// case above releases the same concatenation the assign named, where the
-// recomputed window happens to match and nothing separates the two.
-//
-// `a` reading 16'h1234 is that whole value and `a` reading 8'h34 would be it
-// truncated into eight bits, so the assertion tells the slice from both wrong
-// answers; `b` is asserted with it because the release named neither `b` nor
-// anything of it.
 TEST(ForceReleaseSim, ReleaseOfOneElementReestablishesThatElementsSlice) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -693,18 +539,6 @@ TEST(ForceReleaseSim, ReleaseOfOneElementReestablishesThatElementsSlice) {
   EXPECT_EQ(b->value.ToUint64(), 0x34u);
 }
 
-// §10.6.1 has the reestablished assignment go on being an assignment: it
-// reestablishes that assignment and schedules a reevaluation, so a later change
-// of the right-hand side reaches the released element again, through the same
-// window. Each element carries its own, and releasing one says nothing about
-// the other -- `b` was never named by the force or the release and its half of
-// the assign stands untouched throughout.
-//
-// The source is a variable rather than a literal for exactly that: with a
-// constant right-hand side the reestablishment is a single write and nothing
-// after it can tell a window that was recorded from one that was recomputed.
-// After src becomes 16'hABCD the two elements must read 8'hAB and 8'hCD; a
-// reestablishment through the whole value leaves `a` holding all sixteen bits.
 TEST(ForceReleaseSim, ReleaseOfOneElementLeavesTheOtherElementsAssignIntact) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -727,17 +561,6 @@ TEST(ForceReleaseSim, ReleaseOfOneElementLeavesTheOtherElementsAssignIntact) {
   EXPECT_EQ(b->value.ToUint64(), 0xCDu);
 }
 
-// §10.6.2 names a constant bit-select of a vector net among the things a force
-// may hold, and the force holds what was named: bit 3 of `bus`, with the rest
-// of the net still driven by `assign bus = 8'h55;`. That is
-// ForceOnNetOverridesContinuousDriver with the target indexed, and it is the
-// arm no case reached.
-//
-// 8'h55 is 0101_0101, whose bit 3 is clear, so the three answers are all
-// different: 8'h5D is the window written and the rest driven, 8'h01 is the
-// one-bit right-hand value copied over the whole net -- a Logic4Vec carries its
-// own width, so the assignment replaced the net's eight bits with one -- and
-// 8'h55 is a force that landed nowhere.
 TEST(ForceReleaseSim, ForceOfANetBitSelectWritesOnlyThatBit) {
   SimFixture f;
   auto* bus = RunAndFindVar(
@@ -756,11 +579,6 @@ TEST(ForceReleaseSim, ForceOfANetBitSelectWritesOnlyThatBit) {
   EXPECT_EQ(bus->value.ToUint64(), 0x5Du);
 }
 
-// A constant part-select of a vector net is the other form the same sentence
-// names, and it is a second window resolution rather than the same one: the
-// bit-select arm of §11.5.1's resolution answers a width of one and returns
-// before the part-select arm is reached, so a fix that handed the force a bit
-// index alone passes the case above and fails this one.
 TEST(ForceReleaseSim, ForceOfANetPartSelectWritesOnlyThoseBits) {
   SimFixture f;
   auto* bus = RunAndFindVar(
@@ -778,12 +596,6 @@ TEST(ForceReleaseSim, ForceOfANetPartSelectWritesOnlyThoseBits) {
   EXPECT_EQ(bus->value.ToUint64(), 0xF5u);
 }
 
-// The driver half of the same sentence: §10.6.2 overrides every driver of the
-// net that was named, so the drivers of every other bit go on reaching it. The
-// value at force time could be right while every later driver update is dropped
-// -- the flag is one flag on the whole variable and the net resolver returned
-// on it before looking at a driver -- so the source changes after the force and
-// the net must follow it everywhere but bit 3.
 TEST(ForceReleaseSim, ForceOfANetBitSelectLeavesTheOtherBitsDriven) {
   SimFixture f;
   auto* bus = RunAndFindVar(
@@ -804,10 +616,6 @@ TEST(ForceReleaseSim, ForceOfANetBitSelectLeavesTheOtherBitsDriven) {
   EXPECT_EQ(bus->value.ToUint64(), 0xADu);
 }
 
-// §10.6.2: on release, the net at once takes the value its drivers determine,
-// which is ReleaseOnNetUsesDriverValue with the target indexed. The release
-// resolved its net only for a bare identifier, so the flag cleared and the net
-// kept the forced bit until some driver happened to notify.
 TEST(ForceReleaseSim, ReleaseOfANetBitSelectRestoresThatBitsDriver) {
   SimFixture f;
   auto* bus = RunAndFindVar(
@@ -830,10 +638,6 @@ TEST(ForceReleaseSim, ReleaseOfANetBitSelectRestoresThatBitsDriver) {
   EXPECT_EQ(bus->value.ToUint64(), 0xA5u);
 }
 
-// Table D.1's net_is_forced is per bit, $countdrivers taking a bit-select of a
-// vector net as its argument, and it is the one place the flag is visible from
-// source. A fix that lands the value in the right bits while still marking the
-// whole net reads 1 here for bit 7.
 TEST(ForceReleaseSim, CountDriversReportsANetBitSelectForceOnlyOnThatBit) {
   SimFixture f;
   auto* f3 = RunAndFindVar(
@@ -857,20 +661,6 @@ TEST(ForceReleaseSim, CountDriversReportsANetBitSelectForceOnlyOnThatBit) {
   EXPECT_EQ(f7->value.ToUint64(), 0u);
 }
 
-// §10.6.2 admits a concatenation of those forms as a force target and §11.4.12
-// divides such a target among its elements, so an element that is `out[1]` on a
-// `logic [7:0] out [0:3]` takes the high eight bits of 16'hABCD. §7.4.2 makes
-// that name a whole element of the array rather than bits of a packed object,
-// and the element has storage of its own -- the variable every read of `out[1]`
-// resolves to.
-//
-// The walk resolved it by following the select down to `out`, which is the
-// one-element-wide carrier the lowerer registers under the array's own name and
-// which no read consults, and then windowed the index against that carrier: the
-// force settled bit 1 of a variable nothing reads and `out[1]` kept 8'h11. The
-// other element is asserted with it because the two share one right-hand value
-// and a repair that gave the array element the whole 16 bits would still leave
-// `b` correct.
 TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
   SimFixture f;
   auto* b = RunAndFindVar(
@@ -892,10 +682,6 @@ TEST(ForceReleaseSim, ForceOverAConcatenationWritesAnUnpackedArrayElement) {
   EXPECT_EQ(b->value.ToUint64(), 0xCDu);
 }
 
-// §10.6.2 ends the force on the element it was placed on, which is the element
-// variable rather than the array's carrier: `release {out[1], b};` clears the
-// flag there, and §10.6.2 leaves a released variable holding what it held, no
-// driver and no assign standing to give it anything else.
 TEST(ForceReleaseSim, ReleaseOverAConcatenationEndsAnArrayElementsForce) {
   SimFixture f;
   auto* b = RunAndFindVar(

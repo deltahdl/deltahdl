@@ -10,8 +10,6 @@
 namespace delta {
 
 bool LvPropertyInvolvesLocalVariables(const LvProperty& property) {
-  // §F.5.6: the declaration form is the property's own; the sequence operand
-  // may carry the forms of §F.3.2; the sub-properties are searched in turn.
   if (property.kind == LvProperty::Kind::kLocalVarDecl) {
     return true;
   }
@@ -32,8 +30,6 @@ bool LvTopLevelPropertyInvolvesLocalVariables(const LvTopLevelProperty& top) {
 
 namespace {
 
-// The §F.5.3.1 form a §F.5.6.1 form retracts to, or none for the declaration,
-// which no §F.5.3 property has.
 std::optional<PropertyExpr::Kind> KindOf(LvProperty::Kind kind) {
   switch (kind) {
     case LvProperty::Kind::kStrong:
@@ -80,8 +76,6 @@ std::optional<TopLevelProperty::Kind> TopKindOf(LvTopLevelProperty::Kind kind) {
 
 std::shared_ptr<const PropertyExpr> AsPropertyWithoutLocalVariables(
     const LvProperty& property) {
-  // §F.5.6: outside the fragment without local variables there is nothing to
-  // retract to; inside it, the shape is kept operator for operator.
   const std::optional<PropertyExpr::Kind> kKind = KindOf(property.kind);
   if (!kKind || LvPropertyInvolvesLocalVariables(property)) {
     return nullptr;

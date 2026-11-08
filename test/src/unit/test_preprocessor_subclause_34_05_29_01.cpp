@@ -14,13 +14,6 @@
 
 using namespace delta;
 
-// Exercises the syntax of the `runtime_license` protect pragma keyword
-// (§34.5.29.1). The syntax block defines the keyword expression as a
-// parenthesized subkeyword list: `runtime_license = ( library = <string> ,
-// entry = <string> , feature = <string> [ , exit = <string> ]
-// [ , match = <number> ] )`. Protect pragmas are processed at the preprocessor
-// stage, where the generic `pragma` handler recognizes the keyword expression
-// and consumes the directive line, including the entire parenthesized value.
 struct ProtectRuntimeLicenseSyntaxTest : ::testing::Test {
  protected:
   std::string Preprocess(const std::string& src) {
@@ -36,9 +29,6 @@ struct ProtectRuntimeLicenseSyntaxTest : ::testing::Test {
 
 namespace {
 
-// The fully populated keyword expression, carrying both optional subkeywords
-// (`exit` and `match`) alongside the three required ones, is accepted and the
-// directive line is stripped, including every subkeyword and value.
 TEST_F(ProtectRuntimeLicenseSyntaxTest, PragmaProtectRuntimeLicenseConsumed) {
   auto result = Preprocess(
       "`pragma protect runtime_license = ( library = \"liblic.so\" , entry = "
@@ -49,9 +39,6 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest, PragmaProtectRuntimeLicenseConsumed) {
   EXPECT_EQ(result.find("liblic.so"), std::string::npos);
 }
 
-// Only the runtime_license directive line is removed; neighboring source text
-// survives, confirming it is the runtime_license keyword expression line that
-// the pragma path consumes.
 TEST_F(ProtectRuntimeLicenseSyntaxTest,
        RuntimeLicenseDirectiveStrippedSurroundingTextKept) {
   auto result = Preprocess(
@@ -66,9 +53,6 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest,
   EXPECT_NE(result.find("endmodule"), std::string::npos);
 }
 
-// The two optional subkeywords are independent in the grammar
-// (`[ , exit ] [ , match ]`): a form that omits `exit` but supplies `match` is
-// a valid keyword expression and is consumed in full.
 TEST_F(ProtectRuntimeLicenseSyntaxTest,
        RuntimeLicenseMatchWithoutExitConsumed) {
   auto result = Preprocess(
@@ -79,10 +63,6 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest,
   EXPECT_EQ(result.find("match"), std::string::npos);
 }
 
-// The mirror image of the previous case: with the optionals independent, a form
-// that supplies `exit` but omits `match` is also a valid keyword expression and
-// is consumed in full. Together with the both/required-only/match-only forms
-// this exhausts the four combinations of the two optional subkeywords.
 TEST_F(ProtectRuntimeLicenseSyntaxTest,
        RuntimeLicenseExitWithoutMatchConsumed) {
   auto result = Preprocess(
@@ -93,64 +73,27 @@ TEST_F(ProtectRuntimeLicenseSyntaxTest,
   EXPECT_EQ(result.find("release"), std::string::npos);
 }
 
-// The four cases above observe the directive line going away, which any
-// directive the pragma handler consumes does. What §34.5.29.1 defines is the
-// spelling, and its value is a list rather than a string: five names inside one
-// pair of parentheses, three required and two optional.
-//
-//   runtime_license = ( library = <string> , entry = <string> ,
-//       feature = <string> [ , exit = <string> ] [ , match = <number> ] )
-//
-// So the questions are the ones a list raises: whether the value is kept whole,
-// where it may stand among other expressions, and which near misses the reading
-// turns away, and then what the reading makes of the characters it kept.
-// ParseProtectLicense (src/preprocessor/protect_license.h) separates the five
-// names, and Preprocessor::ApplyLicense
-// (src/preprocessor/preprocessor_protect_license.cpp) reports a value written
-// in any other spelling than this one. What is done with the names is the
-// Description's: §34.5.29.2 has them asked before the model is executed
-// (test_preprocessor_subclause_34_05_29_02.cpp).
-//
-// §34.5.28.1 spells its keyword the same way, and
-// test_preprocessor_subclause_34_05_28_01.cpp asks the same questions of it.
-// The two are separate subclauses defining separate keywords, so each is stated
-// where it is defined.
-
-// The value in the shape the syntax line writes it: the three required names
-// with strings against them, and `after` standing where the two optional names
-// go, comma and all, with the parenthesis that closes the list left here.
 std::string LicenseList(std::string_view after) {
   std::string list = "(library=\"liblic.so\", entry=\"checkout\", ";
   list.append("feature=\"simulate\"").append(after).append(")");
   return list;
 }
 
-// The directive this subclause defines, carrying `list` as the pragma_value
-// written against the keyword. The list is passed in whole, parentheses and
-// all, because which characters stand there is the thing being observed.
 std::string StatesLicense(std::string_view list) {
   std::string directive = "`pragma protect runtime_license=";
   directive.append(list).append("\n");
   return directive;
 }
 
-// The value in effect for the keyword once `src` has been read.
 ProtectKeywordValue LicenseAfter(const std::string& src) {
   return ReadKeywordScope(src).ValueOf("runtime_license");
 }
 
-// §34.5.29.1 writes the value as a list, and §22.5.1 makes a parenthesized
-// pragma_value a list of further expressions. What stands in effect afterwards
-// is that list as the text wrote it, parentheses and all: the names inside are
-// expressions of the value rather than expressions of the directive.
 TEST(ProtectRuntimeLicenseSyntax, TheValueIsTheListTheSubclauseSpells) {
   EXPECT_EQ(LicenseAfter(StatesLicense(LicenseList(""))).value,
             LicenseList(""));
 }
 
-// The two optional names in each of the ways the brackets admit. The syntax
-// line writes them as separately optional, so a text may write both, neither,
-// or either one alone, and each is one value.
 TEST(ProtectRuntimeLicenseSyntax, EitherOptionalNameMayStandAlone) {
   EXPECT_EQ(
       LicenseAfter(StatesLicense(LicenseList(", exit=\"release\""))).value,
@@ -163,11 +106,6 @@ TEST(ProtectRuntimeLicenseSyntax, EitherOptionalNameMayStandAlone) {
       LicenseList(", exit=\"release\", match=1"));
 }
 
-// §22.11 writes a directive's expressions as a comma-separated list, and this
-// value holds commas of its own. The comma ending the value stands outside the
-// parentheses and the ones inside belong to the list, so a reading that
-// confused them would take the expression after this one for a further name of
-// the licence.
 TEST(ProtectRuntimeLicenseSyntax, TheCommasInsideTheListAreTheValuesOwn) {
   std::string src = "`pragma protect runtime_license=";
   src.append(LicenseList(", match=1")).append(", author=\"acme\"\n");
@@ -176,9 +114,6 @@ TEST(ProtectRuntimeLicenseSyntax, TheCommasInsideTheListAreTheValuesOwn) {
   EXPECT_EQ(run.ValueOf("author").value, "acme");
 }
 
-// The same directive with the licence written last, the mirror of the case
-// above: the expression before it ends where its own comma does and the list
-// that follows is one value.
 TEST(ProtectRuntimeLicenseSyntax, TheListReadsTheSameWrittenLast) {
   std::string src = "`pragma protect author=\"acme\", runtime_license=";
   src.append(LicenseList("")).append("\n");
@@ -186,10 +121,6 @@ TEST(ProtectRuntimeLicenseSyntax, TheListReadsTheSameWrittenLast) {
             LicenseList(""));
 }
 
-// §34.5.29.1 writes a list against the keyword, and a single string is not one.
-// A string names no library to load, so there is no entry function in one for
-// a feature to be asked about, and the expression states no licence for a tool
-// to be held to.
 TEST(ProtectRuntimeLicenseSyntax, AStringAgainstTheKeywordIsNotTheList) {
   PreprocFixture f;
   Preprocess("`pragma protect runtime_license=\"liblic.so\"\n", f);
@@ -201,9 +132,6 @@ TEST(ProtectRuntimeLicenseSyntax, AStringAgainstTheKeywordIsNotTheList) {
                     1, "34.5.29.1"));
 }
 
-// The parenthesized spelling written empty. That spelling holds a list of
-// further expressions rather than an optional one, so an empty pair of
-// parentheses is no pragma_value at all.
 TEST(ProtectRuntimeLicenseSyntax, AnEmptyListIsNoValue) {
   PreprocFixture f;
   Preprocess("`pragma protect runtime_license=()\n", f);
@@ -212,10 +140,6 @@ TEST(ProtectRuntimeLicenseSyntax, AnEmptyListIsNoValue) {
                             "22.11"));
 }
 
-// The '=' written with nothing after it. The spelling this keyword is defined
-// with has a value on the right of it, so a directive that wrote the one
-// without the other wrote neither of the two spellings §22.5.1 gives a pragma
-// expression.
 TEST(ProtectRuntimeLicenseSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
   PreprocFixture f;
   Preprocess("`pragma protect runtime_license =\n", f);
@@ -224,9 +148,6 @@ TEST(ProtectRuntimeLicenseSyntax, AnEqualsWithNoValueAfterItIsNoExpression) {
                             "22.11"));
 }
 
-// A list opened and never closed. This is the closest input to the defined
-// spelling the reading has to turn away: everything the syntax line writes is
-// on the line, and the one character missing is the one that ends the list.
 TEST(ProtectRuntimeLicenseSyntax, AListLeftUnclosedIsNoValue) {
   PreprocFixture f;
   Preprocess("`pragma protect runtime_license=(library=\"liblic.so\"\n", f);
@@ -235,29 +156,11 @@ TEST(ProtectRuntimeLicenseSyntax, AListLeftUnclosedIsNoValue) {
                             "22.11"));
 }
 
-// §34.5.29.1 spells one name, and a name that merely opens with those
-// characters is a different one. A text writing the longer one has written a
-// keyword §34.4 does not tabulate, so nothing is put in effect for the one it
-// resembles.
 TEST(ProtectRuntimeLicenseSyntax, ANameMerelyOpeningWithTheKeywordIsNotIt) {
   EXPECT_TRUE(LicenseAfter("`pragma protect runtime_licenses=(library=\"l\")\n")
                   .defaulted);
 }
 
-// §34.5.29.1 defines the keyword with a list, so `runtime_license` is absent
-// from kStringValuedKeywords in src/preprocessor/protect_keywords.cpp. That
-// array names the keywords §34.5 defines as `keyword = <string>`, and
-// ProtectKeywordScope::Apply records nothing for one of them written with a
-// parenthesized value, §22.5.1 making such a value a list of further
-// expressions rather than one written thing. #3269 named this keyword among the
-// ones to put in that array, and the syntax line is why it is not there: a list
-// is the only value the keyword is ever written with, so a membership would
-// refuse every spelling the subclause defines. This case is what turns that
-// addition red, a keyword in the array leaving the value empty where the whole
-// list stands now.
-//
-// The value is written out here rather than built by LicenseList, so all five
-// names §34.5.29.1 spells stand in the case defending them.
 TEST(ProtectRuntimeLicenseSyntax, EveryNameOfTheListSurvivesTheKeywordArray) {
   constexpr std::string_view kSpelledOut =
       "(library=\"libgrant.so\", entry=\"acquire\", feature=\"execute\", "
@@ -266,15 +169,6 @@ TEST(ProtectRuntimeLicenseSyntax, EveryNameOfTheListSurvivesTheKeywordArray) {
   EXPECT_FALSE(LicenseAfter(StatesLicense(kSpelledOut)).defaulted);
 }
 
-// -- What the names inside the list are read as ------------------------------
-
-// §34.5.29.1 writes five names inside the parentheses, and this is all five
-// read back out. ParseProtectLicense (src/preprocessor/protect_license.h) is
-// what separates them from the text around them.
-//
-// The number is 7 rather than 0 because 0 is what ProtectLicense::match holds
-// where nothing wrote one, so a reading that never took the value would answer
-// this case correctly.
 TEST(ProtectRuntimeLicenseSyntax, TheFiveNamesAreReadOutOfTheList) {
   ProtectLicense license =
       ParseProtectLicense(LicenseList(", exit=\"revoke\", match=7"));
@@ -288,11 +182,6 @@ TEST(ProtectRuntimeLicenseSyntax, TheFiveNamesAreReadOutOfTheList) {
   EXPECT_EQ(license.match, 7U);
 }
 
-// The names are expressions of a list rather than positions in one, so each is
-// read for itself. §22.5.1 spells the value as a list of pragma expressions,
-// which name what they carry. The order here is the reverse of the syntax
-// line's, which is what a reading taking the first string for the library
-// would fail.
 TEST(ProtectRuntimeLicenseSyntax,
      TheNamesAreReadForThemselvesWhateverTheOrder) {
   ProtectLicense license = ParseProtectLicense(
@@ -304,12 +193,6 @@ TEST(ProtectRuntimeLicenseSyntax,
   EXPECT_EQ(license.feature, "simulate");
 }
 
-// The two optional names left out. No default is stated for either of them:
-// not in the Syntax subclause, not in the Description beside it, and not in
-// Table 34-1. So the absence is recorded as an absence rather than filled in,
-// and what the Description makes of a licence writing no match value -- it is
-// held to 0, the value the NOTE has a forged library return to avoid the
-// check -- is read in its own file.
 TEST(ProtectRuntimeLicenseSyntax,
      TheOptionalNamesAreAbsentWhereTheTextOmitsThem) {
   ProtectLicense license = ParseProtectLicense(LicenseList(""));
@@ -318,13 +201,6 @@ TEST(ProtectRuntimeLicenseSyntax,
   EXPECT_FALSE(license.has_match);
 }
 
-// Each of the three names the syntax line writes outside the brackets, left out
-// in turn. The Description spends all three in the one sentence that carries
-// the check out -- the tool loads the library, calls the entry function in it,
-// and passes that function the feature string -- so a list short of any one of
-// them asks for nothing that can be carried out. Taking them one at a time is
-// what tells a reading that requires all three from one that requires only the
-// first.
 TEST(ProtectRuntimeLicenseSyntax, AListShortOfARequiredNameStatesNoLicence) {
   EXPECT_FALSE(
       ParseProtectLicense("(entry=\"checkout\", feature=\"simulate\")").stated);
@@ -336,29 +212,18 @@ TEST(ProtectRuntimeLicenseSyntax, AListShortOfARequiredNameStatesNoLicence) {
           .stated);
 }
 
-// §34.5.29.1 writes a <string> against each of the three, and §22.5.1 spells a
-// string with the quotation marks around it. A bare word is one of the other
-// three spellings a pragma_value has, so a list writing one names no library
-// however much the characters read like a file name.
 TEST(ProtectRuntimeLicenseSyntax, ALibraryWrittenAsABareWordNamesNoLibrary) {
   EXPECT_FALSE(ParseProtectLicense("(library=liblic.so, entry=\"checkout\", "
                                    "feature=\"simulate\")")
                    .stated);
 }
 
-// §34.5.29.1 writes a <number> against match, so a value written as a string
-// states none. The licence still stands, match being optional, and what it
-// states is a licence with no number to compare against rather than one whose
-// number is whatever the string reads like.
 TEST(ProtectRuntimeLicenseSyntax, AMatchWrittenAsAStringStatesNoNumber) {
   ProtectLicense license = ParseProtectLicense(LicenseList(", match=\"7\""));
   ASSERT_TRUE(license.stated);
   EXPECT_FALSE(license.has_match);
 }
 
-// The same list met as a directive rather than handed to the reading, so that
-// what the preprocessor does with it is what is observed. §34.5.29.1 is what
-// the report cites, the spelling being what the list failed.
 TEST(ProtectRuntimeLicenseSyntax, AListShortOfARequiredNameIsReported) {
   PreprocFixture f;
   Preprocess(

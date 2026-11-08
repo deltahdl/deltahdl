@@ -37,7 +37,6 @@ namespace delta {
 
 namespace {
 
-// Reports a call of `name`, a variable or a net, written at `loc`.
 void ReportDataCall(std::string_view name, SourceLoc loc, DiagEngine& diag) {
   diag.Error(loc,
              std::format("'{}' names a variable or a net, and a call names a "
@@ -46,16 +45,11 @@ void ReportDataCall(std::string_view name, SourceLoc loc, DiagEngine& diag) {
              Subclause("A.8.2"));
 }
 
-// Reports a call of `name` written at `loc` where the scope sees the name as
-// a variable or a net.
 void ReportIfData(std::string_view name, SourceLoc loc, const DataScope& scope,
                   DiagEngine& diag) {
   if (scope.Names(name)) ReportDataCall(name, loc, diag);
 }
 
-// The plain name the call `expr` calls, null where `expr` is no call by a
-// plain name. A constructor call is none: its `lhs` is the object a shallow
-// copy copies, `new src` (§8.12).
 const Expr* NamedCallee(const Expr& expr) {
   const bool kNamed = expr.kind == ExprKind::kCall && expr.lhs != nullptr &&
                       expr.text != "new" &&
@@ -63,11 +57,6 @@ const Expr* NamedCallee(const Expr& expr) {
   return kNamed ? expr.lhs : nullptr;
 }
 
-// A.6.9: the expression whose call the call statement whose expression is `e`
-// makes: within a void cast, the one cast a statement holds (A.6.4), a name or
-// a member select alone, judged as the same written as a statement is; `e`
-// otherwise, a call with its argument list in a cast being the expression
-// walk's.
 const Expr* StatementCallExpr(const Expr* e) {
   if (e->kind == ExprKind::kCast && (e->lhs->kind == ExprKind::kIdentifier ||
                                      e->lhs->kind == ExprKind::kMemberAccess)) {
@@ -76,13 +65,6 @@ const Expr* StatementCallExpr(const Expr* e) {
   return e;
 }
 
-// A.6.9: a call statement, `x;` or `x(...);`, whose name the scope declares
-// as no task or function: a variable or a net (A.8.2), or anything else the
-// module declares or imports as data, such as a parameter, a let or a
-// sequence. A call with an argument list naming nothing the scope, the
-// compilation unit or a module enclosing an instance of the module sees
-// (§23.8) is an undeclared identifier (§23.9); a bare one is the scope rules'
-// report.
 void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
                          DiagEngine& diag) {
   const Expr* e = StatementCallExpr(stmt.expr);
@@ -91,7 +73,6 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
   if (callee == nullptr) return;
   const std::string_view kName = callee->text;
   if (scope.Names(kName)) {
-    // A call with an argument list naming data is the expression walk's.
     if (kBare) ReportIfData(kName, stmt.range.start, scope, diag);
     return;
   }
@@ -110,19 +91,11 @@ void ReportStatementCall(const Stmt& stmt, const DataScope& scope,
              Subclause("23.9"));
 }
 
-// The interface a value declared with `type` refers to an instance of, where
-// it is a virtual interface (§25.9); empty for any other type.
 std::string_view VifInterface(const DataType& type) {
   return type.kind == DataTypeKind::kVirtualInterface ? type.type_name
                                                       : std::string_view();
 }
 
-// The type the variable `root` names is declared with, as written in the
-// scope or the scope within it declaring it, with the unpacked dimensions
-// written after its name, or the type of the property a member access `root`
-// names of the class a handle holds (HeldPropertyType); no type where `root`
-// names no variable, or one whose type is a type parameter, typedef or class
-// the scope declares for itself alone.
 SitedType DeclaredType(const Expr& root, const DataScope& scope) {
   if (root.kind == ExprKind::kMemberAccess) {
     return HeldPropertyType(root, scope);
@@ -134,9 +107,6 @@ SitedType DeclaredType(const Expr& root, const DataScope& scope) {
   return {var->type, scope.SiteOf(*var), var->dims};
 }
 
-// §8.4: the property of the class a variable of the scope holds a handle of
-// that the member access `access`, h.vif, names; null for any other
-// expression and for a name the class declares no property under.
 const ClassMember* HandleProperty(const Expr& access, const DataScope& scope) {
   if (access.kind != ExprKind::kMemberAccess || access.is_scope_resolution ||
       access.lhs->kind != ExprKind::kIdentifier) {
@@ -156,9 +126,6 @@ const ClassMember* HandleProperty(const Expr& access, const DataScope& scope) {
   return found;
 }
 
-// The variable the root `root` of a prefix names: the innermost declaration
-// of a plain name, v, or a property of the class whose method writes the
-// prefix, reached through `this`, this.vif (§8.11); null for anything else.
 const DeclaredVar* RootVar(const Expr& root, const DataScope& scope) {
   if (root.kind == ExprKind::kIdentifier) return scope.Declared(root.text);
   const bool kThis =
@@ -167,12 +134,6 @@ const DeclaredVar* RootVar(const Expr& root, const DataScope& scope) {
   return kThis ? scope.Property(root.rhs->text) : nullptr;
 }
 
-// §25.9: the interface the virtual interface `prefix` names refers to an
-// instance of: a variable of the module or of a block around the call, v, a
-// property of the class whose method writes the call, vif or this.vif, or a
-// property of the class a variable holds a handle of, h.vif, or an element of
-// an array of any of them, one select per unpacked dimension (§7.4), va[0] or
-// h.vifs[0]; empty for anything else.
 std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
   std::size_t selects = 0;
   const Expr& root = SelectRoot(prefix, selects);
@@ -185,9 +146,6 @@ std::string_view VifOf(const Expr& prefix, const DataScope& scope) {
              : std::string_view();
 }
 
-// §8.11: the property of the class whose method writes `root` that `root`
-// names, vif where no local variable of the method hides it, or this.vif;
-// null for anything else.
 const DeclaredVar* OwnProperty(const Expr& root, const DataScope& scope) {
   if (root.kind != ExprKind::kIdentifier) return RootVar(root, scope);
   const DeclaredVar* property = scope.Property(root.text);
@@ -195,9 +153,6 @@ const DeclaredVar* OwnProperty(const Expr& root, const DataScope& scope) {
                                                                       : nullptr;
 }
 
-// The declaration of the class property `root` names: one of the class whose
-// method writes it, vif or this.vif, or one of the class a variable holds a
-// handle of, h.vif; one with no type for anything else.
 DeclaredVar SelectedProperty(const Expr& root, const DataScope& scope) {
   if (const DeclaredVar* own = OwnProperty(root, scope)) return *own;
   const ClassMember* held = HandleProperty(root, scope);
@@ -206,10 +161,6 @@ DeclaredVar SelectedProperty(const Expr& root, const DataScope& scope) {
              : DeclaredVar{&held->data_type, held->unpacked_dims.size()};
 }
 
-// §8.5 and §8.6: a member access `access`, h.m, applied to a handle of a class
-// that, with the classes it extends or implements, declares nothing `m`
-// names; reported under `rule`, §8.6 where the access is what a call calls and
-// §8.5 otherwise.
 void ReportUndeclaredMember(const Expr& access, std::string_view rule,
                             const DataScope& scope, DiagEngine& diag) {
   const ClassDecl* cls = HandleClass(*access.lhs, scope);
@@ -224,10 +175,6 @@ void ReportUndeclaredMember(const Expr& access, std::string_view rule,
              Subclause(rule));
 }
 
-// §25.9 with §7.4: a select `select` into a class property that is a virtual
-// interface, past the property's unpacked dimensions, vif[0], this.vif[0] or
-// h.vif[0], which selects into a virtual interface; reported once, at the
-// first select past them.
 void ReportPropertyVifSelect(const Expr& select, const DataScope& scope,
                              DiagEngine& diag) {
   std::size_t selects = 0;
@@ -242,8 +189,6 @@ void ReportPropertyVifSelect(const Expr& select, const DataScope& scope,
              Subclause("25.9"));
 }
 
-// §25.9: a call `call` through a virtual interface, v.t(), naming no task or
-// function the interface declares.
 void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
   const Expr& callee = *call.lhs;
   if (callee.kind != ExprKind::kMemberAccess || callee.is_scope_resolution) {
@@ -260,12 +205,6 @@ void ReportVifCall(const Expr& call, const DataScope& scope, DiagEngine& diag) {
              Subclause("25.9"));
 }
 
-// Each call by a plain name `expr` holds, itself included, each call through a
-// virtual interface, each select into a class property that is one, and each
-// member access naming nothing its class, its string or enumeration type or
-// the operator result it is applied to has, `rule` being the subclause one
-// `expr` itself makes on a class is reported under. A scope resolution, C::m or
-// p::m, selects from no value.
 void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
                     std::string_view rule = "8.5") {
   if (expr == nullptr) return;
@@ -293,10 +232,6 @@ void CheckExprCalls(const Expr* expr, const DataScope& scope, DiagEngine& diag,
   });
 }
 
-// The calls `stmt` and the statements it holds make by a plain name: a bare
-// call statement, `x;`, and each call an expression of theirs holds, with the
-// variables a block declares in scope over the statements the block holds,
-// their types named at the block's site.
 void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
   if (stmt == nullptr) return;
   const std::size_t kOuter = scope.blocks.size();
@@ -325,10 +260,6 @@ void CheckStmtCalls(const Stmt* stmt, DataScope& scope, DiagEngine& diag) {
   scope.local_sites.Restore(kOuterSites);
 }
 
-// §13.3: each call the body of the task or function `item` writes, the
-// subroutine's formal arguments and the variables its body declares in scope
-// over its statements as a block's are (§23.9), the body's types named at the
-// body's site.
 void CheckSubroutineCalls(const ModuleItem& item, DataScope& scope,
                           DiagEngine& diag) {
   const std::size_t kOuter = scope.blocks.size();
@@ -354,11 +285,6 @@ void CheckSubroutineCalls(const ModuleItem& item, DataScope& scope,
   scope.local_sites.Restore(kOuterSites);
 }
 
-// §6.19.3: each named constant the enumeration `type` writes, as a value of
-// `scope` of that enumeration; a member a range names, R[2], declares the
-// numbered constants §6.19.2 gives it, R0 and R1, and not its own name, its
-// bounds being numbers, which fold with no scope. A variable of the
-// constant's name keeps its own declaration.
 void DeclareEnumConstants(const DataType& type, DataScope& scope) {
   for (const EnumMember& member : type.enum_members) {
     if (member.range_start == nullptr) {
@@ -372,11 +298,6 @@ void DeclareEnumConstants(const DataType& type, DataScope& scope) {
   }
 }
 
-// The declaration of each variable the module `decl` declares, as a variable
-// of `scope`: each of its ports (§23.2.2), each object an explicitly named
-// port of it stands for (§23.2.2.1), and each variable its items declare, a
-// body declaration of a port's name giving the port its type; and each named
-// constant of an enumeration a port or an item writes.
 void DeclareModuleVars(const ModuleDecl& decl, DataScope& scope) {
   for (const auto* ports : {&decl.ports, &decl.port_expr_objects}) {
     for (const PortDecl& port : *ports) {
@@ -395,9 +316,6 @@ void DeclareModuleVars(const ModuleDecl& decl, DataScope& scope) {
   }
 }
 
-// §3.12.1: each variable and net the compilation unit `unit` declares, as data
-// of `scope`, but for a name the module declares as something else, which
-// hides it (§23.9).
 void DeclareUnitData(const CompilationUnit& unit, DataScope& scope) {
   for (const ModuleItem* item : unit.cu_items) {
     const bool kData = item->kind == ModuleItemKind::kVarDecl ||
@@ -409,8 +327,6 @@ void DeclareUnitData(const CompilationUnit& unit, DataScope& scope) {
   }
 }
 
-// The names the items of module `decl` declare, each in the set of `scope`
-// its kind puts it in: data, subroutines and the rest, which no call names.
 void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
                         DataScope& scope) {
   DeclareModuleVars(decl, scope);
@@ -428,17 +344,10 @@ void DeclareModuleItems(const ModuleDecl& decl, const CompilationUnit& unit,
       AddImportedData(unit, item->import_item, scope.uncallable);
     }
   }
-  // A name a DPI export gives a function the module also declares stays
-  // callable whichever item the walk met first.
   for (std::string_view name : subroutines) scope.uncallable.erase(name);
-  // §18.12: a scope randomize call may be written without its std:: prefix.
   subroutines.insert("randomize");
 }
 
-// §8.13: the properties the class `cls` declares and those it inherits, as
-// the properties of `scope`, a derived class's shadowing a base's of its name.
-// Each base is looked up from the scope's site; no class is its own ancestor
-// (§8.13), so the walk ends at a class that extends none.
 void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
   const TypeSite kSite = scope.Site();
   for (const ClassDecl* walked = &cls; walked != nullptr;
@@ -453,9 +362,6 @@ void DeclareClassProperties(const ClassDecl& cls, DataScope& scope) {
   }
 }
 
-// The scope a method of the class `cls`, declared in the scope `site` sees,
-// is walked in: the site's, its variables among them (§23.9), with the
-// class's properties hiding those of their names.
 DataScope ClassScope(const ClassDecl& cls, const DataScope& site) {
   DataScope scope{site.visible, site.unit, site.items};
   scope.site = site.site;
@@ -468,8 +374,6 @@ DataScope ClassScope(const ClassDecl& cls, const DataScope& site) {
   return scope;
 }
 
-// §8.3: each call the methods of the class `cls`, declared in the scope
-// `site`, write, and those of each class nested in it (§8.23).
 void CheckClassCalls(const ClassDecl& cls, const DataScope& site,
                      DiagEngine& diag) {
   DataScope scope = ClassScope(cls, site);
@@ -483,11 +387,6 @@ void CheckClassCalls(const ClassDecl& cls, const DataScope& site,
   }
 }
 
-// Each call the classes the scope `site` declares write in their methods,
-// `classes` among them where the site's items do not hold its classes, and
-// each a method defined out of its class's body there writes (§8.24), in the
-// scope of the class the site sees under the name the method is written
-// behind.
 void CheckSiteClasses(const DataScope& site,
                       const std::vector<ClassDecl*>& classes,
                       DiagEngine& diag) {
@@ -509,18 +408,11 @@ void CheckSiteClasses(const DataScope& site,
   }
 }
 
-// The names the calls attached to a sequence are judged by besides the
-// scope's: the local variables the sequence reads, data whatever the scope
-// sees, and the formal arguments of the declaration holding it, which stand
-// for their actuals (§16.8.1) whatever the scope sees.
 struct AttachedNames {
   std::unordered_set<std::string_view> locals;
   std::unordered_set<std::string_view> formals;
 };
 
-// §16.11 with A.8.2: each of the match items `items` that calls, by a plain
-// name, one of `names.locals` or a variable or a net the scope sees, a
-// formal among `names.formals` aside.
 void CheckAttachedItems(const std::vector<SeqMatchAssign>& items,
                         const AttachedNames& names, const DataScope& scope,
                         DiagEngine& diag) {
@@ -536,8 +428,6 @@ void CheckAttachedItems(const std::vector<SeqMatchAssign>& items,
   }
 }
 
-// The calls attached to the sequence `body` and to each body nested in it,
-// first_match's among them.
 void CheckAttachedCalls(const SeqLinearBody& body, const AttachedNames& names,
                         const DataScope& scope, DiagEngine& diag) {
   ForEachBody(body, [&](const SeqLinearBody& nested) {
@@ -548,7 +438,6 @@ void CheckAttachedCalls(const SeqLinearBody& body, const AttachedNames& names,
   });
 }
 
-// The calls attached to each sequence of the property tree under `node`.
 void CheckTreeAttachedCalls(const PropertyExprNode* node,
                             const AttachedNames& names, const DataScope& scope,
                             DiagEngine& diag) {
@@ -559,9 +448,6 @@ void CheckTreeAttachedCalls(const PropertyExprNode* node,
   });
 }
 
-// The calls attached to the sequences of the sequence or property
-// declaration `decl`, judged by the locals its sequences and its property
-// declare and by its formals.
 void CheckDeclarationCalls(const ModuleItem& decl, const DataScope& scope,
                            DiagEngine& diag) {
   AttachedNames names;
@@ -577,8 +463,6 @@ void CheckDeclarationCalls(const ModuleItem& decl, const DataScope& scope,
   CheckTreeAttachedCalls(decl.prop_body_tree, names, scope, diag);
 }
 
-// The calls attached to the sequences of the concurrent assertion statement
-// `stmt`, whose sequences declare no locals and bind no formals.
 void CheckAssertionCalls(const Stmt& stmt, const DataScope& scope,
                          DiagEngine& diag) {
   const AttachedNames kNone;
@@ -591,10 +475,6 @@ void CheckAssertionCalls(const Stmt& stmt, const DataScope& scope,
 void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
                     DiagEngine& diag);
 
-// §27: each call the generate block whose items are `items` writes, the
-// variables and nets it declares in scope over its items as a block's are,
-// their types named at the block's site (§27.5), and the tasks and functions
-// it declares callable there (§23.9).
 void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
                              DataScope& scope, DiagEngine& diag) {
   const std::size_t kOuter = scope.blocks.size();
@@ -618,9 +498,6 @@ void CheckGenerateBlockCalls(const std::vector<ModuleItem*>& items,
   scope.local_sites.Restore(kOuterSites);
 }
 
-// §27.4 and §27.5: each call the blocks of the generate construct `construct`
-// write: a loop's one block, each block of a conditional construct and of the
-// else chain after it, and each case item's block.
 void CheckGenerateCalls(const ModuleItem& construct, DataScope& scope,
                         DiagEngine& diag) {
   for (const ModuleItem* branch = &construct; branch != nullptr;
@@ -632,11 +509,6 @@ void CheckGenerateCalls(const ModuleItem& construct, DataScope& scope,
   }
 }
 
-// Each call the items `items` of a module or of a generate block write: in
-// their procedures, in the tasks and functions they declare, a method defined
-// out of its class's body (§8.24) excepted, in the generate constructs among
-// them, and attached to the sequences their sequence and property
-// declarations write.
 void CheckItemCalls(const std::vector<ModuleItem*>& items, DataScope& scope,
                     DiagEngine& diag) {
   for (const ModuleItem* item : items) {
@@ -668,8 +540,6 @@ void ReportCallsOfDataNames(
   DeclareModuleItems(decl, unit, scope);
   DeclareUnitData(unit, scope);
   CheckItemCalls(decl.items, scope, diag);
-  // §16.11: the calls attached to the sequences of its concurrent assertion
-  // statements, at module level and in its procedures.
   ForEachConcurrentAssertion(&decl, [&](const Stmt* stmt) {
     CheckAssertionCalls(*stmt, scope, diag);
   });

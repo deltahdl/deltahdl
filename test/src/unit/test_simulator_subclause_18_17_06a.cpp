@@ -9,14 +9,6 @@ using namespace delta;
 
 namespace {
 
-// 18.17.6 governs aborting productions with break and return. It owns no
-// grammar of its own; break and return are ordinary procedural statements
-// (12.8 for break) appearing inside randsequence code blocks. The rules are
-// purely about how each statement unwinds sequence generation, so the whole
-// subclause lives at the simulator stage (stmt_exec.cpp randsequence engine).
-
-// break forces a jump out of the randsequence block; statements written after
-// the randsequence still execute (execution continues at the next statement).
 TEST(RandsequenceSim, BreakResumesExecutionAfterRandsequence) {
   SimFixture f;
   auto [x, y] = RunModuleTwoVars(f,
@@ -35,13 +27,10 @@ TEST(RandsequenceSim, BreakResumesExecutionAfterRandsequence) {
                                  "  end\n"
                                  "endmodule\n",
                                  "x", "y");
-  EXPECT_EQ(x, 1u);  // b never generated
-  EXPECT_EQ(y, 5u);  // statement after randsequence ran
+  EXPECT_EQ(x, 1u);
+  EXPECT_EQ(y, 5u);
 }
 
-// With no enclosing loop, break unwinds immediately: statements written after
-// the break in the same production code block are not executed, and the
-// production that would follow is never generated.
 TEST(RandsequenceSim, BreakSkipsRemainingStatementsInSameCodeBlock) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -57,13 +46,9 @@ TEST(RandsequenceSim, BreakSkipsRemainingStatementsInSameCodeBlock) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // x=1 runs; break exits the block so x=7 never runs and b never generates.
   EXPECT_EQ(x, 1u);
 }
 
-// Per 12.8, a break inside a loop statement terminates only the smallest
-// enclosing loop, not the randsequence. After the loop ends normally, the
-// subsequent production is still generated.
 TEST(RandsequenceSim, BreakInsideLoopTerminatesLoopNotRandsequence) {
   SimFixture f;
   auto [x, y] =
@@ -85,17 +70,12 @@ TEST(RandsequenceSim, BreakInsideLoopTerminatesLoopNotRandsequence) {
                        "  end\n"
                        "endmodule\n",
                        "x", "y");
-  EXPECT_EQ(x, 2u);  // loop broke at i==3, last write i==2
-  EXPECT_EQ(y, 7u);  // production b still generated
+  EXPECT_EQ(x, 2u);
+  EXPECT_EQ(y, 7u);
 }
 
-// return aborts the current production: the remaining production items of the
-// rule containing the return are skipped, but generation continues with the
-// next production in the enclosing rule.
 TEST(RandsequenceSim, ReturnAbortsCurrentProductionAndContinuesNext) {
   SimFixture f;
-  // main : p q r. q is "sub { return; } tail": the return aborts q, so tail is
-  // never generated, but r (the production following q in main) still is.
   uint64_t trace = RunModule(f,
                              "module t;\n"
                              "  int trace;\n"
@@ -112,17 +92,11 @@ TEST(RandsequenceSim, ReturnAbortsCurrentProductionAndContinuesNext) {
                              "  end\n"
                              "endmodule\n",
                              "trace");
-  // p=1, q runs sub=2 then return (tail's 8 skipped), then r=3 -> 123.
   EXPECT_EQ(trace, 123u);
 }
 
-// return is absorbed at the production it aborts; it does not unwind the whole
-// randsequence. A production that always returns can be reached from several
-// parents, and each time generation simply moves on to the next production.
 TEST(RandsequenceSim, ReturnContinuesWithNextProductionEachInvocation) {
   SimFixture f;
-  // bb aborts itself on every generation; cc must still follow it both times bb
-  // is reached (once inside p1, once inside p2).
   uint64_t trace = RunModule(f,
                              "module t;\n"
                              "  int trace;\n"
@@ -139,22 +113,9 @@ TEST(RandsequenceSim, ReturnContinuesWithNextProductionEachInvocation) {
                              "  end\n"
                              "endmodule\n",
                              "trace");
-  // p1: aa=1, bb aborts (9 skipped), cc=3 -> 13; p2 repeats -> 1313.
   EXPECT_EQ(trace, 1313u);
 }
 
-// break may stand in any code block, not only a production code block. A rule's
-// weight-specification code block (`:= weight { ... }`) is a distinct syntactic
-// code-block position; a break there must still terminate the whole
-// randsequence, so no production standing after the rule that holds it is
-// generated.
-//
-// §18.17.7 fixes when that block runs relative to the rule's own production
-// list: a code block can retrieve only the return values of productions already
-// generated, those to its left, and a block written after the weight has the
-// whole production list to its left. The clause's own LIST example reads ITEM,
-// a value-returning production of the same rule, in the block after `:= 8`. So
-// a's list generates p first and the block runs after it.
 TEST(RandsequenceSim, BreakInWeightSpecCodeBlockTerminatesRandsequence) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -171,23 +132,9 @@ TEST(RandsequenceSim, BreakInWeightSpecCodeBlockTerminatesRandsequence) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // p generates first (x=5), then a's weight-spec block adds 1 and breaks,
-  // unwinding the whole randsequence so b never adds its 9: x == 6. Each block
-  // accumulates rather than assigning so that the case observes the order as
-  // well as the abort -- an assigning block reads 1 whichever ran first, and a
-  // break that aborted only production a would read 15.
   EXPECT_EQ(x, 6u);
 }
 
-// return in a weight-specification code block aborts only the current
-// production and generation continues with the next production, exactly as
-// return does from a production code block. Confirms the abort scope is the
-// same across code-block positions.
-//
-// §18.17.7 puts that block after the rule's production list, as the case above
-// quotes, so the list has already generated when the return runs and the return
-// skips nothing of it. What the case pins is the abort scope: the randsequence
-// carries on with the production following the aborted one.
 TEST(RandsequenceSim, ReturnInWeightSpecCodeBlockAbortsCurrentProductionOnly) {
   SimFixture f;
   uint64_t trace = RunModule(f,
@@ -205,17 +152,9 @@ TEST(RandsequenceSim, ReturnInWeightSpecCodeBlockAbortsCurrentProductionOnly) {
                              "  end\n"
                              "endmodule\n",
                              "trace");
-  // a's list generates p (trace 5), then a's weight block appends 1 (51) and
-  // returns, ending production a; b still follows -> 51*10+9 = 519. A break
-  // there would have unwound the randsequence and left 51.
   EXPECT_EQ(trace, 519u);
 }
 
-// 18.17.6: the break terminates the randsequence block and nothing wider. The
-// randsequence statement itself finishes normally, so a loop enclosing it runs
-// its remaining iterations instead of being terminated in its turn. A break
-// that leaked out of the randsequence would satisfy 12.8 against this for loop
-// and stop it after one pass.
 TEST(RandsequenceSim, BreakDoesNotTerminateLoopEnclosingRandsequence) {
   SimFixture f;
   auto [x, y] = RunModuleTwoVars(f,
@@ -236,13 +175,10 @@ TEST(RandsequenceSim, BreakDoesNotTerminateLoopEnclosingRandsequence) {
                                  "  end\n"
                                  "endmodule\n",
                                  "x", "y");
-  EXPECT_EQ(x, 6u);   // three passes of a, and b never generated
-  EXPECT_EQ(y, 15u);  // the loop body finished all three iterations
+  EXPECT_EQ(x, 6u);
+  EXPECT_EQ(y, 15u);
 }
 
-// 18.17.6: a break in a production code block leaves the randsequence block,
-// not the subroutine holding it. The statements written after the randsequence
-// in the task body still run, and the caller resumes where the call left off.
 TEST(RandsequenceSim, BreakInTaskDoesNotReturnFromTask) {
   SimFixture f;
   auto [x, y] = RunModuleTwoVars(f,
@@ -265,14 +201,10 @@ TEST(RandsequenceSim, BreakInTaskDoesNotReturnFromTask) {
                                  "  end\n"
                                  "endmodule\n",
                                  "x", "y");
-  EXPECT_EQ(x, 3u);   // b never generated
-  EXPECT_EQ(y, 24u);  // the task ran on past the randsequence, then the caller
+  EXPECT_EQ(x, 3u);
+  EXPECT_EQ(y, 24u);
 }
 
-// 18.17.6: a return in a production code block aborts that production and
-// nothing wider, so inside a task it is not the task's return. Generation
-// continues with the next production, and the task body continues after the
-// randsequence.
 TEST(RandsequenceSim, ReturnInTaskDoesNotReturnFromTask) {
   SimFixture f;
   auto [x, y] =
@@ -296,15 +228,10 @@ TEST(RandsequenceSim, ReturnInTaskDoesNotReturnFromTask) {
                        "  end\n"
                        "endmodule\n",
                        "x", "y");
-  EXPECT_EQ(x, 33u);  // a aborted before 500, then b still generated
-  EXPECT_EQ(y, 24u);  // the task ran on past the randsequence, then the caller
+  EXPECT_EQ(x, 33u);
+  EXPECT_EQ(y, 24u);
 }
 
-// 18.17.6: break may stand in any code block, which includes the weight code
-// block of a rule reached as a rand join operand (18.17.5). Expanding an
-// operand runs that rule's weight code, so the break fires there, before any
-// interleaving, and terminates the whole randsequence: the other operand and
-// the production written after the rand join are never generated.
 TEST(RandsequenceSim, BreakInRandJoinWeightCodeTerminatesRandsequence) {
   SimFixture f;
   auto [x, y] = RunModuleTwoVars(f,
@@ -328,27 +255,10 @@ TEST(RandsequenceSim, BreakInRandJoinWeightCodeTerminatesRandsequence) {
                                  "  end\n"
                                  "endmodule\n",
                                  "x", "y");
-  // s1's code block runs once s1 has generated, so p (900) contributes and the
-  // break then leaves tail (50) ungenerated: x == 903.
-  //
-  // s2 writes z rather than x so that the expectation does not depend on the
-  // draw. §18.17.5 leaves the interleaving unspecified, so s2's step may run
-  // before s1's or not at all -- the break ends the randsequence either way --
-  // and a sibling contributing to x would read 903 or 910 by chance.
   EXPECT_EQ(x, 903u);
-  EXPECT_EQ(y, 6u);  // execution resumed after the randsequence
+  EXPECT_EQ(y, 6u);
 }
 
-// §18.17.6: return aborts the current production and nothing more. An operand
-// rule's code block runs once that operand has generated, so the production the
-// return aborts has already finished and there is nothing left to drop: the
-// interleaving carries on and the production written after the rand join still
-// generates.
-//
-// That is the same absorption ExecRsProduction performs at the end of an
-// ordinary production, which is the point. The block used to run at expansion
-// time, before any of the operand's own steps, so the same rule text dropped a
-// production here and dropped nothing as an ordinary production.
 TEST(RandsequenceSim, ReturnInRandJoinWeightCodeIsAbsorbedOnceItHasGenerated) {
   SimFixture f;
   uint64_t x = RunModule(f,
@@ -367,12 +277,6 @@ TEST(RandsequenceSim, ReturnInRandJoinWeightCodeIsAbsorbedOnceItHasGenerated) {
                          "  end\n"
                          "endmodule\n",
                          "x");
-  // p (900) generates, s1's block adds 2 and returns, and the return is
-  // absorbed because s1 has finished; s2 (4) is still interleaved and tail (30)
-  // still follows the join. A break there would have left 902 and ended the
-  // randsequence, and a return that unwound the whole join would have left 902
-  // too without tail. Every one of the four contributes whatever order the
-  // draw gives, so the total does not depend on it.
   EXPECT_EQ(x, 936u);
 }
 

@@ -15,10 +15,6 @@ using namespace delta;
 
 namespace {
 
-// §35.8: it is never legal to call an exported task from within an imported
-// function. When the innermost import in the call chain is a function (the
-// frame's is_task is false) and the export it tries to invoke names a task,
-// the runtime rejects the call with kFunctionCallsTask, regardless of context.
 TEST(DpiExportedTask, ImportedFunctionCallingExportedTaskIsRejected) {
   DpiRuntime rt;
   DpiRtExport task_export;
@@ -29,7 +25,6 @@ TEST(DpiExportedTask, ImportedFunctionCallingExportedTaskIsRejected) {
 
   DpiScope sc;
   sc.name = "top";
-  // A context *function* import opens the chain (is_task defaults to false).
   rt.EnterContextImportCall("ctx_func_import", sc);
 
   DpiArgValue result;
@@ -37,9 +32,6 @@ TEST(DpiExportedTask, ImportedFunctionCallingExportedTaskIsRejected) {
   EXPECT_EQ(status, DpiExportCallStatus::kFunctionCallsTask);
 }
 
-// §35.8: an imported *task* may call an exported task, provided it is declared
-// context (§35.5.3). The function/task check must not reject a task caller, so
-// a context task import reaches the export and the call is permitted.
 TEST(DpiExportedTask, ImportedContextTaskCallingExportedTaskIsAllowed) {
   DpiRuntime rt;
   DpiRtExport task_export;
@@ -55,8 +47,7 @@ TEST(DpiExportedTask, ImportedContextTaskCallingExportedTaskIsAllowed) {
 
   DpiScope sc;
   sc.name = "top";
-  // A context task import (is_task = true) opens the chain.
-  rt.EnterContextImportCall("ctx_task_import", sc, /*is_task=*/true);
+  rt.EnterContextImportCall("ctx_task_import", sc, true);
 
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_task", {}, &result);
@@ -64,9 +55,6 @@ TEST(DpiExportedTask, ImportedContextTaskCallingExportedTaskIsAllowed) {
   EXPECT_TRUE(ran);
 }
 
-// §35.8: the prohibition is specific to exported *tasks*. An imported function
-// calling an exported *function* is unaffected by the §35.8 check and proceeds
-// under the ordinary §35.5.3 rules.
 TEST(DpiExportedTask, ImportedFunctionCallingExportedFunctionIsAllowed) {
   DpiRuntime rt;
   DpiRtExport func_export;
@@ -84,9 +72,6 @@ TEST(DpiExportedTask, ImportedFunctionCallingExportedFunctionIsAllowed) {
   EXPECT_EQ(status, DpiExportCallStatus::kOk);
 }
 
-// §35.8: the prohibition is independent of the chain's context property. Even a
-// noncontext function import calling an exported task is rejected by the §35.8
-// check, which runs ahead of the §35.5.3 noncontext check.
 TEST(DpiExportedTask,
      NoncontextFunctionCallingExportedTaskIsRejectedByTaskRule) {
   DpiRuntime rt;
@@ -103,10 +88,6 @@ TEST(DpiExportedTask,
   EXPECT_EQ(status, DpiExportCallStatus::kFunctionCallsTask);
 }
 
-// §35.8: the prohibition is determined by the *immediate* caller of the export,
-// i.e. the innermost import in the call chain — not the chain's root. A chain
-// rooted at a task import but whose innermost frame is a function still cannot
-// invoke an exported task.
 TEST(DpiExportedTask, InnermostFunctionFrameInChainRootedAtTaskIsRejected) {
   DpiRuntime rt;
   DpiRtExport task_export;
@@ -117,19 +98,14 @@ TEST(DpiExportedTask, InnermostFunctionFrameInChainRootedAtTaskIsRejected) {
 
   DpiScope sc;
   sc.name = "top";
-  // Root frame is a task, but the innermost frame — the one actually issuing
-  // the export call — is a function.
-  rt.EnterContextImportCall("task_root", sc, /*is_task=*/true);
-  rt.EnterContextImportCall("func_inner", sc, /*is_task=*/false);
+  rt.EnterContextImportCall("task_root", sc, true);
+  rt.EnterContextImportCall("func_inner", sc, false);
 
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_task", {}, &result);
   EXPECT_EQ(status, DpiExportCallStatus::kFunctionCallsTask);
 }
 
-// §35.8: conversely, when the innermost frame is a task the task rule does not
-// fire even if an outer frame is a function. A context task issuing the call
-// reaches the exported task, so it runs.
 TEST(DpiExportedTask, InnermostTaskFrameInChainRootedAtFunctionIsAllowed) {
   DpiRuntime rt;
   DpiRtExport task_export;
@@ -145,10 +121,8 @@ TEST(DpiExportedTask, InnermostTaskFrameInChainRootedAtFunctionIsAllowed) {
 
   DpiScope sc;
   sc.name = "top";
-  // Root frame is a function, but the innermost frame issuing the call is a
-  // context task.
-  rt.EnterContextImportCall("func_root", sc, /*is_task=*/false);
-  rt.EnterContextImportCall("task_inner", sc, /*is_task=*/true);
+  rt.EnterContextImportCall("func_root", sc, false);
+  rt.EnterContextImportCall("task_inner", sc, true);
 
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_task", {}, &result);
@@ -156,10 +130,6 @@ TEST(DpiExportedTask, InnermostTaskFrameInChainRootedAtFunctionIsAllowed) {
   EXPECT_TRUE(ran);
 }
 
-// §35.8: a SystemVerilog task has no return type, and an exported task returns
-// an int telling whether a disable is in force on the thread running it. With
-// no disable active the call yields 0, whatever the registered body handed back
-// — the body's value stands for no result the clause gives a task.
 TEST(DpiExportedTask, AnExportedTaskYieldsZeroWithNoDisableActive) {
   DpiSetCurrentDisabledState(false);
   DpiRuntime rt;
@@ -174,7 +144,7 @@ TEST(DpiExportedTask, AnExportedTaskYieldsZeroWithNoDisableActive) {
 
   DpiScope sc;
   sc.name = "top";
-  rt.EnterContextImportCall("ctx_task_import", sc, /*is_task=*/true);
+  rt.EnterContextImportCall("ctx_task_import", sc, true);
 
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_task", {}, &result);
@@ -182,9 +152,6 @@ TEST(DpiExportedTask, AnExportedTaskYieldsZeroWithNoDisableActive) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-// §35.8: and 1 where a disable is active on the thread when the exported task
-// returns. §35.9 has the exported task's return set that state, which
-// ReturnFromExportUnderDisable does, so the body below returns through it.
 TEST(DpiExportedTask, AnExportedTaskYieldsOneWhenADisableIsActiveOnReturn) {
   DpiSetCurrentDisabledState(false);
   DpiRuntime rt;
@@ -200,7 +167,7 @@ TEST(DpiExportedTask, AnExportedTaskYieldsOneWhenADisableIsActiveOnReturn) {
 
   DpiScope sc;
   sc.name = "top";
-  rt.EnterContextImportCall("ctx_task_import", sc, /*is_task=*/true);
+  rt.EnterContextImportCall("ctx_task_import", sc, true);
 
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_task", {}, &result);
@@ -209,9 +176,6 @@ TEST(DpiExportedTask, AnExportedTaskYieldsOneWhenADisableIsActiveOnReturn) {
   DpiSetCurrentDisabledState(false);
 }
 
-// §35.8 gives the int result to exported tasks alone. An exported function has
-// a return value type of its own, so its call yields what its body returned and
-// the substitution above does not reach it.
 TEST(DpiExportedTask, AnExportedFunctionYieldsWhatItsBodyReturned) {
   DpiSetCurrentDisabledState(false);
   DpiRuntime rt;
@@ -233,11 +197,6 @@ TEST(DpiExportedTask, AnExportedFunctionYieldsWhatItsBodyReturned) {
   EXPECT_EQ(result.AsInt(), 77);
 }
 
-// §35.8: an imported task may call an exported task only when the import is
-// declared context. The permitted case is covered above; this is the other
-// half, where the task import is noncontext and the call is refused. The
-// refusal is the §35.5.3 one, since the context property is what §35.8 defers
-// to.
 TEST(DpiExportedTask, NoncontextTaskImportCallingExportedTaskIsRejected) {
   DpiSetCurrentDisabledState(false);
   DpiRuntime rt;
@@ -252,7 +211,7 @@ TEST(DpiExportedTask, NoncontextTaskImportCallingExportedTaskIsRejected) {
   };
   rt.RegisterExport(task_export);
 
-  rt.EnterNoncontextImportCall("plain_task_import", /*is_task=*/true);
+  rt.EnterNoncontextImportCall("plain_task_import", true);
 
   DpiArgValue result;
   auto status = rt.CallExportFromImport("sv_task", {}, &result);
@@ -260,8 +219,6 @@ TEST(DpiExportedTask, NoncontextTaskImportCallingExportedTaskIsRejected) {
   EXPECT_FALSE(ran);
 }
 
-// The exported task named `name` as C code in a loaded library reaches it: by
-// its linkage name among the process's global symbols.
 using ExportedTask = int (*)(int);
 using ExportedTaskNoArgs = int (*)();
 
@@ -273,9 +230,6 @@ ExportedTaskNoArgs TaskWithNoArgsNamed(const char* name) {
   return reinterpret_cast<ExportedTaskNoArgs>(dlsym(RTLD_DEFAULT, name));
 }
 
-// The imported tasks of the designs below: each calls an exported task that
-// consumes time, once or twice, the last recording what §35.9 has a disable
-// tell it.
 int WaitTwice(int n) {
   ExportedTask sv_wait = TaskNamed("sv_wait");
   if (sv_wait == nullptr) return 0;
@@ -308,15 +262,11 @@ int RunUntilDisabled() {
   return g_disabled_state;
 }
 
-// The value the design's variable `name` holds once the run is over, all ones
-// where the run holds no such variable.
 uint64_t VariableValue(SimFixture& f, std::string_view name) {
   auto* var = f.ctx.FindVariable(name);
   return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
 }
 
-// §35.8 with §35.5.1.5: an imported task may call an exported task that
-// consumes time, and the process that enabled the import resumes once it has.
 TEST(DpiExportedTaskFromC, AnExportedTaskConsumesTimeForTheEnablingProcess) {
   SimFixture f;
   RunWithImportsBound(
@@ -334,8 +284,6 @@ TEST(DpiExportedTaskFromC, AnExportedTaskConsumesTimeForTheEnablingProcess) {
   EXPECT_EQ(VariableValue(f, "t1"), 14U);
 }
 
-// §35.2.1: an imported task is enabled in statement context, a native task's
-// body among them, and each enable consumes the exported task's time.
 TEST(DpiExportedTaskFromC, AnImportedTaskEnabledFromANativeTask) {
   SimFixture f;
   RunWithImportsBound(
@@ -359,8 +307,6 @@ TEST(DpiExportedTaskFromC, AnImportedTaskEnabledFromANativeTask) {
   EXPECT_EQ(VariableValue(f, "nb"), 2U);
 }
 
-// §35.8 with §9.3.2: imported tasks enabled in join_none branches each consume
-// the exported task's time on their own.
 TEST(DpiExportedTaskFromC, ImportedTasksInJoinNoneBranchesRunApart) {
   SimFixture f;
   RunWithImportsBound(
@@ -385,9 +331,6 @@ TEST(DpiExportedTaskFromC, ImportedTasksInJoinNoneBranchesRunApart) {
   EXPECT_EQ(VariableValue(f, "n1"), 2U);
 }
 
-// §35.9: a disable reaching the process while it waits in an exported task
-// returns 1 from that task to the C code, which sees the disabled state and
-// acknowledges it, and the disabled block ends.
 TEST(DpiExportedTaskFromC, ADisableReturnsOneFromTheExportedTask) {
   g_disabled_return = -1;
   g_disabled_state = -1;

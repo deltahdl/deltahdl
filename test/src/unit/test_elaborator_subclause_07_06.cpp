@@ -44,10 +44,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignTypeMismatch) {
                             4, "7.6"));
 }
 
-// §7.6: element types of source and target shall be equivalent. Two packed
-// vector elements of the same 4-state kind but different widths are not
-// equivalent, so the array assignment is rejected (a width-based negative,
-// distinct from the signedness/state mismatch above).
 TEST(ArrayAssignmentValidation, ElementWidthMismatchRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -168,9 +164,6 @@ TEST(ArrayAssignmentValidation, FasterVaryingDimSizeMatchAccepted) {
              "endmodule\n"));
 }
 
-// §7.6: only the slowest-varying dimension gets the weaker (kind-flexible)
-// treatment; a faster-varying fixed dimension must still be equivalent even
-// when the leftmost dimension is dynamic (and therefore run-time sized).
 TEST(ArrayAssignmentValidation, FasterVaryingDimMismatchDynamicOuterRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -210,9 +203,6 @@ TEST(ArrayAssignmentValidation, PackedToUnpackedWithoutCastRejected) {
                             4, "7.6"));
 }
 
-// §7.9.9 is the rule that catches this, not §7.6: an associative array and a
-// non-associative one are rejected on their kinds before the §7.6 shape and
-// element checks are reached, so the report names §7.9.9.
 TEST(ArrayAssignmentValidation, AssocToFixedArrayAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -228,7 +218,6 @@ TEST(ArrayAssignmentValidation, AssocToFixedArrayAssignRejected) {
                             4, "7.9.9"));
 }
 
-// §7.9.9 again, with the associative array on the left-hand side.
 TEST(ArrayAssignmentValidation, FixedArrayToAssocAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -244,7 +233,6 @@ TEST(ArrayAssignmentValidation, FixedArrayToAssocAssignRejected) {
                             4, "7.9.9"));
 }
 
-// §7.9.9 again, with a dynamic array as the non-associative operand.
 TEST(ArrayAssignmentValidation, AssocToDynamicArrayAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -260,8 +248,6 @@ TEST(ArrayAssignmentValidation, AssocToDynamicArrayAssignRejected) {
                             4, "7.9.9"));
 }
 
-// §7.9.9 again, with the associative array on the left-hand side and a dynamic
-// array on the right.
 TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -277,13 +263,6 @@ TEST(ArrayAssignmentValidation, DynamicArrayToAssocAssignRejected) {
                             4, "7.9.9"));
 }
 
-// §7.6 states the shape and element-type compatibility an array assignment
-// requires and conditions the rule on the two operands, not on the statement
-// the assignment is written in. Elaborator::WalkStmtsForArrayAssign wrote out
-// six of the thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states, so each source below
-// elaborated clean while the same `a = b;` one level up was reported. The seven
-// cases write it in the seven links the walk did not read.
 TEST(ArrayAssignmentValidation, ArrayAssignInForkArmRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -302,9 +281,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignInForkArmRejected) {
                             5, "7.6"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so an
-// array-to-array assignment is a conforming for-loop initialization.
 TEST(ArrayAssignmentValidation, ArrayAssignInForInitRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -320,8 +296,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignInForInitRejected) {
                             4, "7.6"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment | ...`, and the
-// assignment operator of an operator_assignment may be `=`.
 TEST(ArrayAssignmentValidation, ArrayAssignInForStepRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -337,9 +311,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignInForStepRejected) {
                             4, "7.6"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, which is two statement links rather than one:
-// Stmt::assert_pass_stmt here and Stmt::assert_fail_stmt below.
 TEST(ArrayAssignmentValidation, ArrayAssignInAssertPassRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -368,9 +339,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignInAssertFailRejected) {
                             3, "7.6"));
 }
 
-// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`, and
-// the parser puts that statement in the second of each Stmt::randcase_items
-// pair.
 TEST(ArrayAssignmentValidation, ArrayAssignInRandcaseItemRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -389,9 +357,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignInRandcaseItemRejected) {
                             5, "7.6"));
 }
 
-// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
-// statement_or_null } }`, so a production code block holds procedural
-// statements like any other block.
 TEST(ArrayAssignmentValidation, ArrayAssignInRandsequenceCodeBlockRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -410,9 +375,6 @@ TEST(ArrayAssignmentValidation, ArrayAssignInRandsequenceCodeBlockRejected) {
                             5, "7.6"));
 }
 
-// §7.6 with §6.22.2: the element types of an array assignment are equivalent
-// only when they match, for an enumeration or a class, never because two of
-// them have the same width. A typedef renaming an enumeration matches it.
 TEST(ArrayAssignmentValidation, EnumAndClassElementTypesComparedByIdentity) {
   ElabFixture f;
   ElaborateSrc(
@@ -444,11 +406,6 @@ TEST(ArrayAssignmentValidation, EnumAndClassElementTypesComparedByIdentity) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 15u) << d.message;
 }
 
-// §7.6: a subarray, an element of an array that is itself an array, and a
-// slice are assignment compatible with another array only when their element
-// types are equivalent and, the target being fixed-size or a slice, the counts
-// agree. A slice whose bounds or width are not literals, or a subarray whose
-// dimensions are not all of a fixed size, is not judged here.
 TEST(ArrayAssignmentValidation, SlicesAndSubarraysAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -496,9 +453,6 @@ TEST(ArrayAssignmentValidation, SlicesAndSubarraysAreJudged) {
   }
 }
 
-// §7.6: a declaration assignment is an assignment to the variable declared,
-// so an array initialized from another array is judged as an assignment of
-// the same right-hand side would be.
 TEST(ArrayAssignmentValidation, DeclarationInitializersAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -520,10 +474,6 @@ TEST(ArrayAssignmentValidation, DeclarationInitializersAreJudged) {
   for (const auto& d : diags) EXPECT_NE(d.loc.line, 6u) << d.message;
 }
 
-// §7.6 holds for an array a procedural block or a subroutine declares as for
-// one among the module's items: in its declaration's initializer, in an
-// assignment, and with a subroutine's arguments among the arrays. A block's
-// declaration hides a module array of the same name.
 TEST(ArrayAssignmentValidation, ArraysOfBlocksAndSubroutinesAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -568,9 +518,6 @@ TEST(ArrayAssignmentValidation, ArraysOfBlocksAndSubroutinesAreJudged) {
   }
 }
 
-// §7.6 with §6.22.2: an enumeration is equivalent only to a type matching it,
-// so an array of int and an array of an enumeration are not assignment
-// compatible in either direction, however wide the enumeration's base is.
 TEST(ArrayAssignmentValidation, IntAndEnumElementsAreNotEquivalent) {
   ElabFixture f;
   ElaborateSrc(

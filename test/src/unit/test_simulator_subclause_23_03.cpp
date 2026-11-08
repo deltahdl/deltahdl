@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §23.3 (printed page 740): each instance of a module holds its own copy of
-// what the module declares, and §23.6 reaches it from outside by hierarchical
-// name. The child's unpacked array elements were stored but a name through the
-// instance, `u.b[2]`, found no array: the element select took its array only
-// from a bare or package-scoped name.
 TEST(ModuleInstanceStorage, ChildArrayElementsAreReachedByHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child;\n"
@@ -30,11 +25,6 @@ TEST(ModuleInstanceStorage, ChildArrayElementsAreReachedByHierarchicalName) {
             "8 5\n9\n");
 }
 
-// A class the instantiated module declares is that module's type (§8): its
-// handles construct objects, its methods read the module's items by
-// hierarchical name, and the parent reaches the handle's members through the
-// instance. The class was registered for a top-level module only, so in an
-// instance every read through the handle gave 0.
 TEST(ModuleInstanceStorage, ClassDeclaredInAnInstantiatedModuleIsItsType) {
   SimFixture f;
   EXPECT_EQ(

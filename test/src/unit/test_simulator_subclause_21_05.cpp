@@ -1,14 +1,3 @@
-// §21.5 Writing memory array data to a file — $writememb / $writememh dump a
-// memory array's contents to a file the matching $readmemb / $readmemh can
-// load back, and an existing file is overwritten (no append mode).
-//
-// Every rule here depends on how its input is produced: the memory operand is
-// an unpacked array declared per §7.4.3, and the observable is the dumped file
-// (or that file reloaded through §21.4's read tasks). These tests therefore
-// declare real memories in module source and drive each call through the full
-// pipeline (parse -> elaborate -> lower -> run), then inspect the file on disk
-// or the round-tripped values — never hand-registering array state on a bare
-// simulation context.
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -23,9 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §21.5: $writememh dumps the memory's words to a file $readmemh can load
-// back: the round trip through a second array reproduces every word, and the
-// file itself holds one hexadecimal word per line in address order.
 TEST(WritememSim, WritememhDumpReloadsThroughReadmemh) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_rt_h.mem";
@@ -51,9 +37,6 @@ TEST(WritememSim, WritememhDumpReloadsThroughReadmemh) {
   std::remove(path.c_str());
 }
 
-// §21.5: $writememb writes the words in binary — the radix its companion
-// $readmemb expects ("respectively"). A word carrying an x bit is dumped with
-// per-bit fidelity only the binary form can express, and reloads intact.
 TEST(WritememSim, WritemembDumpReloadsThroughReadmemb) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_rt_b.mem";
@@ -79,9 +62,6 @@ TEST(WritememSim, WritemembDumpReloadsThroughReadmemb) {
   std::remove(path.c_str());
 }
 
-// §21.5: a 4-state memory may hold fully-unknown or high-impedance words; the
-// hexadecimal dump renders them as x / z digits $readmemh accepts, so the
-// round trip preserves them.
 TEST(WritememSim, WritememhPreservesUnknownAndHighZWords) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_xz.mem";
@@ -105,7 +85,6 @@ TEST(WritememSim, WritememhPreservesUnknownAndHighZWords) {
   std::remove(path.c_str());
 }
 
-// §21.5: words wider than a machine word dump and reload without truncation.
 TEST(WritememSim, WideWordRoundTrip) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_wide.mem";
@@ -130,9 +109,6 @@ TEST(WritememSim, WideWordRoundTrip) {
   std::remove(path.c_str());
 }
 
-// §21.5: the file layout does not depend on the declaration's direction — a
-// descending unpacked range still dumps its words from the low address upward,
-// and the reload lands each word back at its original address.
 TEST(WritememSim, DescendingDeclarationRoundTrip) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_desc.mem";
@@ -158,9 +134,6 @@ TEST(WritememSim, DescendingDeclarationRoundTrip) {
   std::remove(path.c_str());
 }
 
-// §21.5: when the named file already exists at the time of the call it is
-// overwritten — there is no append mode. A file pre-created by the host with
-// unrelated contents holds only the dump afterward.
 TEST(WritememSim, OverwritesPreexistingHostFile) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_host.mem";
@@ -183,8 +156,6 @@ TEST(WritememSim, OverwritesPreexistingHostFile) {
   std::remove(path.c_str());
 }
 
-// §21.5: a second dump to the same filename within one run likewise replaces
-// the file: none of the first (longer) dump's words survive.
 TEST(WritememSim, SecondDumpReplacesFirstWithinRun) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_replace.mem";
@@ -209,8 +180,6 @@ TEST(WritememSim, SecondDumpReplacesFirstWithinRun) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13): start_addr and finish_addr bound the words written,
-// and a finish below the start dumps them in descending address order.
 TEST(WritememSim, StartAndFinishBoundAndOrderTheDump) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_range.mem";
@@ -230,9 +199,6 @@ TEST(WritememSim, StartAndFinishBoundAndOrderTheDump) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13): the production nests finish_addr inside start_addr, so
-// the three-argument form is legal on its own; the dump then runs from
-// start_addr through the end of the memory.
 TEST(WritememSim, StartWithoutFinishRunsToArrayEnd) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_start.mem";
@@ -252,9 +218,6 @@ TEST(WritememSim, StartWithoutFinishRunsToArrayEnd) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §7.4.2: a bound may be negative, and every word of the memory
-// is dumped, here a one-dimensional memory whose bounds straddle zero. The walk
-// from its low address reached an address past the last element's name.
 TEST(WritememSim, AOneDimensionalMemoryStraddlingZeroIsDumpedWhole) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_neg_one.mem";
@@ -273,11 +236,6 @@ TEST(WritememSim, AOneDimensionalMemoryStraddlingZeroIsDumpedWhole) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §7.4.2 and §21.4.3: a multidimensional memory with a negative
-// bound is dumped in row-major order and reloaded through $readmemh word for
-// word, and a block's own such array holds what is written to it. Its leaves
-// were named apart from the indices every select and both tasks name, so the
-// writes were lost and the dump empty.
 TEST(WritememSim, AMultidimensionalMemoryWithANegativeBoundIsDumpedWhole) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_neg_multi.mem";
@@ -306,8 +264,6 @@ TEST(WritememSim, AMultidimensionalMemoryWithANegativeBoundIsDumpedWhole) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13): the address operands are ordinary expressions — here a
-// parameter and a localparam supply the bounds.
 TEST(WritememSim, AddressBoundsFromParameterAndLocalparam) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_param.mem";
@@ -329,8 +285,6 @@ TEST(WritememSim, AddressBoundsFromParameterAndLocalparam) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13): the bounds may equally be a runtime variable and an
-// arithmetic expression over it.
 TEST(WritememSim, AddressBoundsFromVariableAndExpression) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_varexpr.mem";
@@ -352,9 +306,6 @@ TEST(WritememSim, AddressBoundsFromVariableAndExpression) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13): the filename operand need not be a literal — a
-// string-typed variable holding the path names the same file, exactly as on
-// the §21.4 read side.
 TEST(WritememSim, FilenameFromStringVariable) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_strfn.mem";
@@ -375,8 +326,6 @@ TEST(WritememSim, FilenameFromStringVariable) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13): the third filename form — an integral value whose
-// packed bytes spell the path — names the same file as the literal would.
 TEST(WritememSim, FilenameFromIntegralValue) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_intfn.mem";
@@ -397,8 +346,6 @@ TEST(WritememSim, FilenameFromIntegralValue) {
   std::remove(path.c_str());
 }
 
-// Negative form: a filename that cannot be opened (its directory does not
-// exist) produces no dump, and the run continues past the failed call.
 TEST(WritememSim, UnopenablePathLeavesRunAlive) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_no_such_dir/out.mem";
@@ -418,9 +365,6 @@ TEST(WritememSim, UnopenablePathLeavesRunAlive) {
   EXPECT_FALSE(std::ifstream(path).good());
 }
 
-// §21.5: the second operand must name a memory array; a plain literal in the
-// memory_name position is reported under 21.5 and dumps nothing -- no file is
-// created -- and the run continues.
 TEST(WritememSim, NonMemoryNameOperandWritesNothing) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_notmem.mem";
@@ -442,10 +386,6 @@ TEST(WritememSim, NonMemoryNameOperandWritesNothing) {
                             3, "21.5"));
 }
 
-// §21.5 with §8.5: the memory is any unpacked array, a class object's array
-// property included. Named bare inside the object's own methods, it is loaded
-// by $readmemh and dumped by $writememh, and the dump loads back into another
-// object's property named through a handle.
 TEST(WritememSim, ArrayPropertyNamedInAMethodIsDumped) {
   SimFixture f;
   std::string in_path = "/tmp/deltahdl_t2105_prop_in.mem";
@@ -482,8 +422,6 @@ TEST(WritememSim, ArrayPropertyNamedInAMethodIsDumped) {
   std::remove(out_path.c_str());
 }
 
-// §21.5 with §23.6: the memory dumped may be an instance's array named through
-// a hierarchical reference.
 TEST(WritememSim, HierarchicallyNamedArrayIsDumped) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_hier.mem";
@@ -505,9 +443,6 @@ TEST(WritememSim, HierarchicallyNamedArrayIsDumped) {
   std::remove(path.c_str());
 }
 
-// §21.5 (Syntax 21-13) with §7.10: a queue is dumped through the same address
-// window as a fixed array, so a finish below the start writes its elements
-// from the start index down.
 TEST(WritememSim, QueueWindowDescendsWhenFinishIsBelowStart) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_q_desc.mem";
@@ -526,9 +461,6 @@ TEST(WritememSim, QueueWindowDescendsWhenFinishIsBelowStart) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §7.10: a window reaching past both ends of a queue writes the
-// elements the queue holds and nothing for the indices it does not; a
-// longint start of -1 puts the window's first address below index 0.
 TEST(WritememSim, QueueWindowPastBothEndsWritesOnlyTheElements) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_q_wide.mem";
@@ -548,8 +480,6 @@ TEST(WritememSim, QueueWindowPastBothEndsWritesOnlyTheElements) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §7.10: an empty queue has no words, so its dump is a file with
-// nothing in it -- created, as every $writemem call creates its file.
 TEST(WritememSim, EmptyQueueDumpsAnEmptyFile) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_q_empty.mem";
@@ -567,10 +497,6 @@ TEST(WritememSim, EmptyQueueDumpsAnEmptyFile) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §21.4.3: start_addr and finish_addr address the highest
-// dimension of a multidimensional array. A window from 3 down to 0 over
-// m[1:2][0:1] skips the addresses outside 1..2 and writes the two rows in
-// descending order, each row's words from its low index up.
 TEST(WritememSim, MultiDimWindowDescendsAndSkipsAddressesOutsideIt) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_md_win.mem";
@@ -590,8 +516,6 @@ TEST(WritememSim, MultiDimWindowDescendsAndSkipsAddressesOutsideIt) {
   std::remove(path.c_str());
 }
 
-// §21.5: a window reaching below and above a fixed array's bounds writes the
-// words at the addresses the array has and none for the others.
 TEST(WritememSim, ArrayWindowPastBothBoundsWritesOnlyTheWords) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_arr_wide.mem";
@@ -610,9 +534,6 @@ TEST(WritememSim, ArrayWindowPastBothBoundsWritesOnlyTheWords) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §8.5: a class's array property is dumped through the same
-// window, so a window from 3 down to 0 over data[1:2] writes the property's
-// two words in descending order and nothing for the addresses beyond them.
 TEST(WritememSim, ArrayPropertyWindowDescendsAndSkipsAddressesOutsideIt) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_prop_win.mem";
@@ -635,8 +556,6 @@ TEST(WritememSim, ArrayPropertyWindowDescendsAndSkipsAddressesOutsideIt) {
   std::remove(path.c_str());
 }
 
-// §21.5 with §7.5 and §8.5: a dynamic array property not yet sized by new[]
-// has no words, so its dump is an empty file.
 TEST(WritememSim, UnsizedDynamicArrayPropertyDumpsAnEmptyFile) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_prop_empty.mem";
@@ -660,9 +579,6 @@ TEST(WritememSim, UnsizedDynamicArrayPropertyDumpsAnEmptyFile) {
   std::remove(path.c_str());
 }
 
-// Negative form for $writememb: a path that cannot be opened writes nothing,
-// the warning names $writememb, the task the source called, and the run
-// continues past the call.
 TEST(WritememSim, UnopenablePathWarningNamesWritememb) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_no_such_dir/out_b.mem";
@@ -686,9 +602,6 @@ TEST(WritememSim, UnopenablePathWarningNamesWritememb) {
   EXPECT_FALSE(std::ifstream(path).good());
 }
 
-// §21.5 (Syntax 21-13): both tasks require a filename and a memory_name. A
-// call giving only the filename is reported under 21.5 at the call, naming
-// the task the source wrote, and the run continues past it.
 TEST(WritememSim, ACallShortOfAMemoryNameIsReportedUnderEachTaskName) {
   SimFixture f;
   std::string out = RunCapture(
@@ -711,8 +624,6 @@ TEST(WritememSim, ACallShortOfAMemoryNameIsReportedUnderEachTaskName) {
                             4, "21.5"));
 }
 
-// §21.5 with §26.3: a package's memory array, named through the package that
-// declares it, is dumped like a module's.
 TEST(WritememSim, PackageQualifiedArrayIsDumped) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_pkg.mem";
@@ -733,9 +644,6 @@ TEST(WritememSim, PackageQualifiedArrayIsDumped) {
   std::remove(path.c_str());
 }
 
-// §21.5: a plain variable is not a memory array, so naming one as the
-// memory_name is reported under 21.5 at the operand, and a file already at
-// the path keeps the contents it had.
 TEST(WritememSim, PlainVariableMemoryNameIsReportedAndFileKept) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t2105_plain.mem";

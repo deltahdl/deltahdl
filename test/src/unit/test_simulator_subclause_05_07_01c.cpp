@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §5.7.1 has an underscore after a number's first character ignored, so a
-// number ending in one reads as the same number without it, sized or not and
-// whatever its base.
 TEST(IntegerLiteralSim, TrailingUnderscoreIsIgnored) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [31:0] x;\n"
@@ -34,7 +31,6 @@ TEST(IntegerLiteralSim, TrailingUnderscoreIsIgnored) {
             2u);
 }
 
-// Two or more underscores in a row are ignored as one is.
 TEST(IntegerLiteralSim, DoubledUnderscoresAreIgnored) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [31:0] x;\n"
@@ -56,9 +52,6 @@ TEST(IntegerLiteralSim, DoubledUnderscoresAreIgnored) {
             31u);
 }
 
-// The size is a number too, so an underscore in it is ignored and the size it
-// gives takes effect: sixteen bits, which keep the low sixteen of a wider
-// value.
 TEST(IntegerLiteralSim, UnderscoreInTheSizeLeavesTheSize) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int x;\n"
@@ -74,8 +67,6 @@ TEST(IntegerLiteralSim, UnderscoreInTheSizeLeavesTheSize) {
             0xFFFFu);
 }
 
-// The same holds in each digit run of a real literal, which §5.7.2's syntax
-// builds from the same unsigned number, and of a time literal (§5.8).
 TEST(IntegerLiteralSim, UnderscoresInARealOrTimeLiteralAreIgnored) {
   EXPECT_DOUBLE_EQ(RunAndGetReal("module t;\n"
                                  "  real r;\n"
@@ -97,16 +88,11 @@ TEST(IntegerLiteralSim, UnderscoresInARealOrTimeLiteralAreIgnored) {
                    10.0);
 }
 
-// One unbased unsized literal and the bits §5.7.1 has it set in a four-bit
-// target, printed by %b.
 struct UnbasedUnsizedForm {
   const char* literal;
   const char* bits;
 };
 
-// The design that writes `literal` as a four-bit variable's operand, as a
-// parameter's value and as an input port's connection, and prints all three
-// with %b once the port's value has reached the net it drives.
 std::string UnbasedUnsizedDesign(const char* literal) {
   std::string src =
       "module s(input logic [3:0] i, output logic [3:0] o);\n"
@@ -123,9 +109,6 @@ std::string UnbasedUnsizedDesign(const char* literal) {
   return src;
 }
 
-// Each of the six forms, written against its apostrophe, sets every bit of its
-// target to its own bit value: as an operand, as a parameter's value and as a
-// port's connection.
 TEST(IntegerLiteralSim, EachUnbasedUnsizedFormFillsItsTarget) {
   for (const UnbasedUnsizedForm& c :
        {UnbasedUnsizedForm{"'0", "0000"}, UnbasedUnsizedForm{"'1", "1111"},

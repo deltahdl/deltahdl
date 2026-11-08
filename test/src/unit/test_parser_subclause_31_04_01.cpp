@@ -68,8 +68,6 @@ TEST(TimingCheckCommandParsing, SkewRejectsTrailingArgument) {
       "  $skew(posedge clk, data, 5, ntfr, extra);\n"
       "endspecify\n"
       "endmodule\n");
-  // $skew takes no argument past the notifier, so the argument list has to
-  // close there; the shared timing-check parser reports under §31.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 3, "31.2"));
 }
 
@@ -90,9 +88,6 @@ TEST(TimingCheckCommandParsing, SkewWithoutEdgeControls) {
   EXPECT_EQ(tc->data_terminal.name, "clk2");
 }
 
-// Syntax 31-9 spells the trailing argument as [ , [ notifier ] ]: the comma
-// may appear with the notifier itself omitted. A bare trailing comma must
-// parse cleanly and leave the notifier empty.
 TEST(TimingCheckCommandParsing, SkewAcceptsTrailingCommaWithoutNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -115,8 +110,6 @@ TEST(TimingCheckCommandParsing, SkewMissingLimitIsError) {
       "  $skew(posedge clk, d);\n"
       "endspecify\n"
       "endmodule\n");
-  // The shared timing-check parser files the missing separator under §31.2, the
-  // system_timing_check production, rather than under §31.4.1.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 
@@ -127,8 +120,6 @@ TEST(TimingCheckCommandParsing, SkewEmptyArgListIsError) {
       "  $skew();\n"
       "endspecify\n"
       "endmodule\n");
-  // The reference_event's specify_terminal_descriptor is missing, and the
-  // shared terminal parser files that under §30.4.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }

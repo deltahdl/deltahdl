@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §24.3.2: a program's ports are objects of the program scope, and a program
-// can only be placed within a design scope. A program instantiated inside a
-// module is therefore a child of that design scope and elaborates to a program
-// scope.
 TEST(ProgramPortElab, ProgramInstanceInModuleResolvesToProgramScope) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -31,9 +27,6 @@ TEST(ProgramPortElab, ProgramInstanceInModuleResolvesToProgramScope) {
   EXPECT_TRUE(top->children[0].resolved->is_program);
 }
 
-// §24.3.2: program ports always attach to design objects, which include both
-// nets and variables. Variable case: the program's ports bind to the design
-// module's variables.
 TEST(ProgramPortElab, ProgramPortBindingsTargetDesignSignals) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -66,8 +59,6 @@ TEST(ProgramPortElab, ProgramPortBindingsTargetDesignSignals) {
   EXPECT_TRUE(saw_in);
 }
 
-// §24.3.2: program ports always attach to design objects, which include both
-// nets and variables. Net case: a program port binds to a design net (wire).
 TEST(ProgramPortElab, ProgramOutputPortConnectsToDesignWire) {
   ElabFixture f;
   auto* design = Elaborate(

@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §H.10.2, the SystemVerilog side of Example 2: a typedef of a struct pair
-// of two ints, an import f1 taking an int, a pair and an output logic
-// [63:0], an export of exported_sv_func, and that function taking an int and
-// an output unpacked array of eight ints.
 class ExampleTwoParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -33,8 +29,6 @@ TEST_F(ExampleTwoParsing, TheSystemVerilogSideParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The import f1: three formals, the int input, the pair input under the name
-// of its type, and the 64-bit logic output.
 TEST_F(ExampleTwoParsing, TheImportTakesAnIntAPairAndAWideLogicOutput) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =
@@ -56,8 +50,6 @@ TEST_F(ExampleTwoParsing, TheImportTakesAnIntAPairAndAWideLogicOutput) {
   EXPECT_NE(f1->func_args[2].data_type.packed_dim_right, nullptr);
 }
 
-// The export names exported_sv_func, and the function it exports takes the
-// int input and the output unpacked array of ints o [0:7].
 TEST_F(ExampleTwoParsing, TheExportedFunctionTakesAnUnpackedOutputArray) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* exp =

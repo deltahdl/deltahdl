@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -14,8 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §10.10 (printed page 264): `{}` is only an unpacked array concatenation, so
-// it is assigned to an unpacked array and to nothing else.
 TEST(UnpackedArrayConcatElaboration, EmptyConcatToVectorIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -76,11 +72,6 @@ TEST(UnpackedArrayConcatElaboration, ArrayItemExpansion) {
   EXPECT_EQ(c3->value.ToUint64(), 40u);
 }
 
-// §10.10: a `{...}` concatenation initializing an unpacked/dynamic/queue array
-// *declaration* is an unpacked array concatenation, where unsized integer
-// literals are legal (unlike a packed §11.4.12 concatenation). The declaration-
-// initializer path is distinct from the procedural-assignment path above, and
-// previously applied the packed unsized-constant check, rejecting these.
 TEST(UnpackedArrayConcatElaboration, DynamicArrayDeclInitUnsizedLiterals) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,9 +105,6 @@ TEST(UnpackedArrayConcatElaboration, FixedArrayDeclInitUnsizedLiterals) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Negative guard: a `{...}` initializing a plain packed vector (not an array)
-// is a genuine §11.4.12 packed concatenation, where unsized constants remain
-// illegal. The declaration-initializer exception must not swallow this.
 TEST(UnpackedArrayConcatElaboration, PackedVectorDeclInitUnsizedStillErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -169,11 +157,6 @@ TEST(UnpackedArrayConcatElaboration, DynamicArrayTargetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10 allows an unpacked array concatenation only as the source expression
-// of an assignment-like context. A fixed-size unpacked target is one of the
-// three legal slowest-varying dimensions (fixed-size, queue, dynamic). Mixing
-// array and scalar items in the source — the LRM's `{A, 4, 5, A, 6}` shape —
-// must elaborate cleanly.
 TEST(UnpackedArrayConcatElaboration, MixedItemsForFixedSizeTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -187,9 +170,6 @@ TEST(UnpackedArrayConcatElaboration, MixedItemsForFixedSizeTarget) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Items in an unpacked array concatenation must have a self-determined type,
-// and a brace expression nested inside the outer concatenation that holds
-// unpacked arrays is an unpacked array concatenation, which has none.
 TEST(UnpackedArrayConcatElaboration, NestedBraceItemRejected) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -200,17 +180,12 @@ TEST(UnpackedArrayConcatElaboration, NestedBraceItemRejected) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The report is the §10.10.3 nesting prohibition, which is where the
-  // self-determined-type requirement this case is about is written down.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "nested concatenation in unpacked array "
                             "concatenation is not self-determined",
                             4, "10.10.3"));
 }
 
-// The literal `null` is only a legal item when the target's element type is
-// event, class, interface class, chandle, or virtual interface. An int array
-// target does not qualify, so a null item is rejected.
 TEST(UnpackedArrayConcatElaboration, NullItemRejectedForIntElementType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -226,9 +201,6 @@ TEST(UnpackedArrayConcatElaboration, NullItemRejectedForIntElementType) {
                             3, "10.10"));
 }
 
-// A chandle array's element type is explicitly listed by the rule as allowing
-// null items, so an unpacked concatenation containing null shall elaborate
-// without errors.
 TEST(UnpackedArrayConcatElaboration, NullItemAllowedForChandleElementType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -241,11 +213,6 @@ TEST(UnpackedArrayConcatElaboration, NullItemAllowedForChandleElementType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The rule also lists class (and interface class) as element types for which a
-// null item is legal — a distinct acceptance branch from chandle, since a class
-// handle reaches the check as a named element type rather than a built-in
-// chandle. A queue of class handles initialized from a concatenation of null
-// items shall therefore elaborate cleanly.
 TEST(UnpackedArrayConcatElaboration, NullItemAllowedForClassElementType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -260,11 +227,6 @@ TEST(UnpackedArrayConcatElaboration, NullItemAllowedForClassElementType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// `event` is the third element type the rule admits for a null item, and it
-// reaches the check through yet another branch (a built-in event element type,
-// neither chandle nor a named class). A queue of events initialized from a
-// concatenation of null items shall elaborate without errors, completing the
-// per-element-type coverage of the accept side of the rule.
 TEST(UnpackedArrayConcatElaboration, NullItemAllowedForEventElementType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -277,21 +239,6 @@ TEST(UnpackedArrayConcatElaboration, NullItemAllowedForEventElementType) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10 admits `null` as an item of an unpacked array concatenation only where
-// the target's element type has a null value, and says nothing about the
-// statement the assignment is written in.
-//
-// ElaboratorOperationRules::WalkStmtsForArrayConcatNesting in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `q = {1, null, 3}` on a queue of ints in one of the seven positions
-// it did not read, where the item reached CheckNullItemInArrayConcatAssign not
-// at all.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(UnpackedArrayConcatElaboration,
      NullItemInArrayConcatInAForkArmNames10_10) {
   ElabFixture f;
@@ -310,10 +257,6 @@ TEST(UnpackedArrayConcatElaboration,
                             "10.10"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(UnpackedArrayConcatElaboration,
      NullItemInArrayConcatInAnAssertionPassStatementNames10_10) {
   ElabFixture f;
@@ -344,10 +287,6 @@ TEST(UnpackedArrayConcatElaboration,
                             "10.10"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(UnpackedArrayConcatElaboration,
      NullItemInArrayConcatInARandcaseItemNames10_10) {
   ElabFixture f;
@@ -362,10 +301,6 @@ TEST(UnpackedArrayConcatElaboration,
                             "10.10"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(UnpackedArrayConcatElaboration,
      NullItemInArrayConcatInARandsequenceCodeBlockNames10_10) {
   ElabFixture f;
@@ -384,14 +319,6 @@ TEST(UnpackedArrayConcatElaboration,
                             "10.10"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(UnpackedArrayConcatElaboration,
      NullItemInArrayConcatInAForLoopInitializationNames10_10) {
   ElabFixture f;
@@ -422,22 +349,6 @@ TEST(UnpackedArrayConcatElaboration,
                             "10.10"));
 }
 
-// §10.10 requires the target of an unpacked array concatenation to be an array
-// whose slowest-varying dimension is unpacked fixed-size, queue or dynamic, and
-// makes a target of any other type, an associative array included, illegal. It
-// names no statement the assignment is allowed to stand in unjudged.
-// WalkStmtsForAssocConcatTarget in
-// src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The seven
-// cases below are UnpackedArrayConcatElaboration.AssociativeArrayTargetError
-// above rewritten in the seven positions the walk was missing, each of which
-// elaborated clean beforehand with the associative-array target unreported.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
-// holds statements the way a begin-end block does. The parser keeps them in
-// Stmt::fork_stmts rather than in Stmt::stmts.
 TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetInForkArmError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -455,10 +366,6 @@ TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetInForkArmError) {
                             4, "10.10"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so the
-// assignment §10.10 judges stands in a for-loop header. The parser keeps those
-// assignments in Stmt::for_inits.
 TEST(UnpackedArrayConcatElaboration,
      AssociativeArrayTargetInForInitializerError) {
   ElabFixture f;
@@ -478,10 +385,6 @@ TEST(UnpackedArrayConcatElaboration,
                             5, "10.10"));
 }
 
-// A.6.8's `for_step_assignment ::= operator_assignment | ...` is the same rule
-// at the other end of the loop header, kept in Stmt::for_steps. The
-// initializer here assigns an integer, so the report can only be about the
-// step.
 TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetInForStepError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -500,10 +403,6 @@ TEST(UnpackedArrayConcatElaboration, AssociativeArrayTargetInForStepError) {
                             5, "10.10"));
 }
 
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
 TEST(UnpackedArrayConcatElaboration,
      AssociativeArrayTargetInAssertionPassStatementError) {
   ElabFixture f;
@@ -521,8 +420,6 @@ TEST(UnpackedArrayConcatElaboration,
                             4, "10.10"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(UnpackedArrayConcatElaboration,
      AssociativeArrayTargetInAssertionFailStatementError) {
   ElabFixture f;
@@ -540,10 +437,6 @@ TEST(UnpackedArrayConcatElaboration,
                             4, "10.10"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §10.10
-// judges the assignment as written rather than what runs, so the report stands
-// whether the weighted draw would select the item or not.
 TEST(UnpackedArrayConcatElaboration,
      AssociativeArrayTargetInRandcaseItemError) {
   ElabFixture f;
@@ -560,10 +453,6 @@ TEST(UnpackedArrayConcatElaboration,
                             3, "10.10"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(UnpackedArrayConcatElaboration,
      AssociativeArrayTargetInRandsequenceCodeBlockError) {
   ElabFixture f;
@@ -584,10 +473,6 @@ TEST(UnpackedArrayConcatElaboration,
                             5, "10.10"));
 }
 
-// §10.10 with §7.10: a `{...}` assigned to a queue a begin-end block declares
-// is an unpacked array concatenation, whose items may be unsized, as one
-// assigned to a module's queue is. The elaborator knew a module's arrays alone
-// and reported each item under §11.4.12.
 TEST(UnpackedArrayConcatElaboration, BlockLocalQueueTargetAdmitsUnsizedItems) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -621,8 +506,6 @@ TEST(UnpackedArrayConcatElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A block's queue hides a module's scalar of its name within the block, and
-// the module's queue is the target again once the block is left.
 TEST(UnpackedArrayConcatElaboration, BlockLocalQueueHidesModuleScalar) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -639,8 +522,6 @@ TEST(UnpackedArrayConcatElaboration, BlockLocalQueueHidesModuleScalar) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// And a block's scalar hides a module's queue: `{1, 2}` assigned to it is a
-// vector concatenation, where §11.4.12 bars an unsized constant.
 TEST(UnpackedArrayConcatElaboration, BlockLocalScalarHidesModuleQueueError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -659,9 +540,6 @@ TEST(UnpackedArrayConcatElaboration, BlockLocalScalarHidesModuleQueueError) {
                             5, "11.4.12"));
 }
 
-// §10.10 (printed page 264): an associative array is no target of an unpacked
-// array concatenation, whether a declaration initializes it with one at module
-// level or in a block; a dynamic array and a queue are.
 TEST(UnpackedArrayConcatElaboration, AssocDeclInitializedByConcatIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -683,9 +561,6 @@ TEST(UnpackedArrayConcatElaboration, AssocDeclInitializedByConcatIsError) {
                              4, "10.10"));
 }
 
-// §10.10 (printed page 265): an item is assignment compatible with the
-// target's elements, or `null` where they have a null value, in an assignment
-// and in a declaration's initializer alike; a class handle is no int.
 TEST(UnpackedArrayConcatElaboration, IncompatibleItemIsError) {
   ElabFixture f;
   ElaborateSrc(

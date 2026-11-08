@@ -1,13 +1,3 @@
-// §12.6 "Pattern matching conditional statements" -- the static rules of a
-// pattern, wherever a case statement, an if statement or a conditional
-// expression writes one (§12.6.1 to §12.6.3). Every rule reads the
-// declarations in scope where the pattern stands: the type of the value it is
-// matched with, which a tagged or a structure pattern is checked against, and
-// the variables and parameters a constant expression pattern may name. So the
-// walk carries those declarations inward, from a module's or a package's items
-// through a class's properties, a subroutine's formals and each block's own
-// declarations, a nearer one hiding a farther one of the same name.
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -34,16 +24,11 @@ namespace delta {
 
 namespace {
 
-// A parameter as a constant expression pattern naming it is read: the type it
-// was declared with and the value it was given.
 struct PatternParam {
   const DataType* type;
   const Expr* value;
 };
 
-// The names in scope where a pattern stands. A variable's declared type is
-// null where the declaration writes unpacked dimensions, a type no pattern
-// rule here reads.
 struct PatternNames {
   std::unordered_map<std::string_view, const DataType*> vars;
   std::unordered_map<std::string_view, PatternParam> params;
@@ -64,9 +49,6 @@ struct PatternCtx {
   DiagEngine& diag;
 };
 
-// The type a pattern is matched against, as far as the rules read it: its
-// kind after every typedef name is followed, and the declaration holding a
-// structure's or a union's members. kImplicit where the type is not known.
 struct MatchedType {
   DataTypeKind kind = DataTypeKind::kImplicit;
   const DataType* decl = nullptr;
@@ -93,8 +75,6 @@ const StructMember* FindMember(const DataType& aggregate,
   return nullptr;
 }
 
-// The type of the value V an expression gives, where the rules read it: a
-// variable named whole, or a member selected from a structure or a union.
 MatchedType MatchedTypeOfValue(const Expr* e, const PatternNames& names,
                                const PatternCtx& ctx) {
   if (e->kind == ExprKind::kIdentifier) {
@@ -112,9 +92,6 @@ MatchedType MatchedTypeOfValue(const Expr* e, const PatternNames& names,
 void CheckPatternAgainst(const Expr* p, const MatchedType& target,
                          const PatternCtx& ctx);
 
-// §12.6: a tagged pattern is matched with a tagged union value, names one of
-// its members, and, for a void member, omits the member pattern; the member
-// pattern of any other member is matched with that member's value.
 void CheckTaggedPattern(const Expr* p, const MatchedType& target,
                         const PatternCtx& ctx) {
   if (target.kind == DataTypeKind::kImplicit) return;
@@ -146,10 +123,6 @@ void CheckTaggedPattern(const Expr* p, const MatchedType& target,
   }
 }
 
-// §12.6: a structure pattern is matched with a structure value, its member
-// names are members of the structure, and only such a pattern may leave
-// members out, so a positional one gives one element per member. Each element
-// is matched with its member's value.
 void CheckStructurePattern(const Expr* p, const MatchedType& target,
                            const PatternCtx& ctx) {
   if (target.kind == DataTypeKind::kImplicit) return;
@@ -199,7 +172,6 @@ void CheckPatternAgainst(const Expr* p, const MatchedType& target,
   }
 }
 
-// The kinds of value a constant expression pattern can be read to have.
 enum class ConstantKind : uint8_t { kUnknown, kIntegral, kReal, kString };
 
 ConstantKind KindOfConstant(const Expr* e, const PatternNames& names,
@@ -211,9 +183,6 @@ ConstantKind KindOfType(DataTypeKind k) {
   return IsIntegralType(k) ? ConstantKind::kIntegral : ConstantKind::kUnknown;
 }
 
-// A parameter's kind is its declared type's, or, for a parameter declared
-// with neither type nor range, its value's (§6.20.2). `depth` bounds the
-// chain of parameters a value names.
 ConstantKind KindOfParam(std::string_view name, const PatternNames& names,
                          const PatternCtx& ctx, int depth) {
   auto it = names.params.find(name);
@@ -228,8 +197,6 @@ ConstantKind KindOfParam(std::string_view name, const PatternNames& names,
                           : KindOfConstant(value, names, ctx, depth - 1);
 }
 
-// §11.4.3 with §11.8.1: an arithmetic operation with a real operand is real,
-// and one of two integral operands integral.
 ConstantKind KindOfArithmetic(const Expr* e, const PatternNames& names,
                               const PatternCtx& ctx, int depth) {
   static constexpr TokenKind kArithmetic[] = {
@@ -248,9 +215,6 @@ ConstantKind KindOfArithmetic(const Expr* e, const PatternNames& names,
              : ConstantKind::kUnknown;
 }
 
-// The kind of value constant expression `e` has, where it is plain from the
-// source: a literal's, a parameter's, or an arithmetic operation's. §5.9 makes
-// a string literal in an expression an unsigned integer constant.
 ConstantKind KindOfConstant(const Expr* e, const PatternNames& names,
                             const PatternCtx& ctx, int depth) {
   switch (e->kind) {
@@ -269,12 +233,8 @@ ConstantKind KindOfConstant(const Expr* e, const PatternNames& names,
   }
 }
 
-// How many parameters deep a parameter's value is followed for its kind.
 constexpr int kParamDepth = 8;
 
-// Hands `visit` each constant expression of pattern `p` (Syntax 12-4): what is
-// neither a pattern identifier, the wildcard, a tagged pattern nor a
-// structure pattern, all of which are descended.
 template <typename Visit>
 void ForEachConstantPattern(const Expr* p, Visit visit) {
   if (p == nullptr) return;
@@ -288,8 +248,6 @@ void ForEachConstantPattern(const Expr* p, Visit visit) {
   }
 }
 
-// A `pattern &&& filter_expression` (§12.6.1) holds the pattern on its left;
-// the filter on its right is an ordinary expression.
 const Expr* WithoutFilter(const Expr* pat) {
   if (pat->kind == ExprKind::kBinary && pat->op == TokenKind::kAmpAmpAmp) {
     return pat->lhs;
@@ -297,11 +255,6 @@ const Expr* WithoutFilter(const Expr* pat) {
   return pat;
 }
 
-// §12.6: a name bound by a pattern identifier (the `. variable_identifier`
-// binding form) can appear at only one place in a pattern. Reports the second
-// and later use of any repeated name among the bindings ForEachPatternBinding
-// (elaborator_validate_internal.h) hands over, which is the one walk of
-// Syntax 12-4's nesting forms the §23.9 scope rule reads the same names off.
 void CheckPatternBindingsUnique(const Expr* pat, DiagEngine& diag) {
   std::unordered_set<std::string_view> seen;
   ForEachPatternBinding(pat, [&](const Expr* binding) {
@@ -316,8 +269,6 @@ void CheckPatternBindingsUnique(const Expr* pat, DiagEngine& diag) {
   });
 }
 
-// §12.6: V and the pattern have the same type, so a string value matched with
-// an integral constant expression pattern is a static type error.
 void CheckStringValueAgainstConstant(const Expr* p, const Expr* value,
                                      const PatternNames& names,
                                      const PatternCtx& ctx) {
@@ -330,9 +281,6 @@ void CheckStringValueAgainstConstant(const Expr* p, const Expr* value,
   }
 }
 
-// §12.6's rules of one pattern `pat`, matched with the value `value` gives:
-// each pattern identifier binds once, each constant expression pattern is an
-// integral constant expression, and the pattern has the value's type.
 void CheckPattern(const Expr* pat, const Expr* value, const PatternNames& names,
                   const PatternCtx& ctx) {
   CheckPatternBindingsUnique(pat, ctx.diag);
@@ -355,8 +303,6 @@ void CheckPattern(const Expr* pat, const Expr* value, const PatternNames& names,
   CheckPatternAgainst(p, MatchedTypeOfValue(value, names, ctx), ctx);
 }
 
-// Whether `value` is of a real type, which an integral constant pattern
-// cannot share (§12.6.1, §12.6.2).
 bool IsRealValue(const Expr* value, const PatternNames& names,
                  const PatternCtx& ctx) {
   return IsRealType(MatchedTypeOfValue(value, names, ctx).kind);
@@ -368,9 +314,6 @@ bool IsIntegralConstantPattern(const Expr* pat, const PatternNames& names,
          ConstantKind::kIntegral;
 }
 
-// §12.6.1: the tested expression of a pattern-matching case statement has
-// the type of the pattern in each item, so a real one paired with an integral
-// constant pattern is a static type error, reported once per item.
 void CheckCaseMatches(const Stmt* s, const PatternNames& names,
                       const PatternCtx& ctx) {
   bool real = IsRealValue(s->condition, names, ctx);
@@ -390,9 +333,6 @@ void CheckCaseMatches(const Stmt* s, const PatternNames& names,
   }
 }
 
-// §12.6.2: in each `e matches p` clause of an if statement's predicate, e and
-// p have the same type, so a real e paired with an integral constant pattern
-// is a static type error. The clauses are joined by `&&&`.
 void CheckIfPredicate(const Expr* pred, const PatternNames& names,
                       const PatternCtx& ctx) {
   if (pred->kind != ExprKind::kBinary) return;
@@ -409,9 +349,6 @@ void CheckIfPredicate(const Expr* pred, const PatternNames& names,
   }
 }
 
-// Every `e matches p` clause expression `e` holds, wherever in it one stands:
-// an if statement's predicate, a conditional expression's (§12.6.3), or any
-// other expression.
 void CheckMatchesOperators(const Expr* e, const PatternNames& names,
                            const PatternCtx& ctx) {
   if (e == nullptr) return;
@@ -425,8 +362,6 @@ void CheckMatchesOperators(const Expr* e, const PatternNames& names,
 void CheckPatternsInStmt(const Stmt* s, const PatternNames& names,
                          const PatternCtx& ctx);
 
-// §6.21 -- a block's statements in order, each declaration putting its name
-// in `names` from there on.
 void CheckPatternsInBlockStmts(const std::vector<Stmt*>& subs,
                                PatternNames& names, const PatternCtx& ctx) {
   for (const Stmt* sub : subs) {
@@ -438,10 +373,6 @@ void CheckPatternsInBlockStmts(const std::vector<Stmt*>& subs,
   }
 }
 
-// Every pattern statement `s` and the statements below it write. The
-// expressions are taken from ForEachChildExpr and the statements from
-// ForEachChildStmt in elaborator_validate_internal.h rather than listed again
-// here: §12.6 holds of a pattern wherever it is written.
 void CheckPatternsInStmt(const Stmt* s, const PatternNames& names,
                          const PatternCtx& ctx) {
   if (s == nullptr) return;
@@ -462,8 +393,6 @@ void CheckPatternsInStmt(const Stmt* s, const PatternNames& names,
       s, [&](Stmt* const& sub) { CheckPatternsInStmt(sub, names, ctx); });
 }
 
-// A subroutine's body, with its formals and then its body's declarations in
-// scope over `names`.
 void CheckPatternsInSubroutine(const ModuleItem* item,
                                const PatternNames& names,
                                const PatternCtx& ctx) {
@@ -474,16 +403,11 @@ void CheckPatternsInSubroutine(const ModuleItem* item,
   CheckPatternsInBlockStmts(item->func_body_stmts, inner, ctx);
 }
 
-// A class's typedefs may hide the names of the scope around it, which are what
-// PatternCtx::typedefs holds, so a method's types are read through no typedef
-// table.
 const TypedefMap& NoTypedefs() {
   static const TypedefMap kNone;
   return kNone;
 }
 
-// §8.10 -- a class's methods, with its properties and parameters in scope
-// over `names`. A nested class (§8.23) is walked the same way inside it.
 void CheckPatternsInClassBody(const ClassDecl* cls, const PatternNames& names,
                               const PatternCtx& outer) {
   PatternCtx ctx{NoTypedefs(), outer.diag};
@@ -505,7 +429,6 @@ void CheckPatternsInClassBody(const ClassDecl* cls, const PatternNames& names,
   }
 }
 
-// The variable, net or parameter `item` declares, put in `names`.
 void AddItemName(const ModuleItem* item, PatternNames& names) {
   if (item->kind == ModuleItemKind::kVarDecl ||
       item->kind == ModuleItemKind::kNetDecl) {
@@ -521,8 +444,6 @@ void AddItemNames(const std::vector<ModuleItem*>& items, PatternNames& names) {
   }
 }
 
-// The bodies `item` owns: a class's methods, a procedural block's statement
-// and a subroutine's.
 void CheckPatternsInItem(const ModuleItem* item, const PatternNames& names,
                          const PatternCtx& ctx) {
   if (item->kind == ModuleItemKind::kClassDecl) {
@@ -531,7 +452,6 @@ void CheckPatternsInItem(const ModuleItem* item, const PatternNames& names,
     CheckPatternsInStmt(item->body, names, ctx);
   } else if (item->kind == ModuleItemKind::kFunctionDecl ||
              item->kind == ModuleItemKind::kTaskDecl) {
-    // A method defined out of its class reads its names in the class too.
     CheckPatternsInSubroutine(
         item, names,
         item->method_class.empty() ? ctx : PatternCtx{NoTypedefs(), ctx.diag});

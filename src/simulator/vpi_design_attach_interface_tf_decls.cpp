@@ -18,8 +18,6 @@
 namespace delta {
 namespace {
 
-// The interface instance whose interface tf decls are made, with the prefix
-// the lowerer keys its subroutines under, "i." for the instance "i".
 struct TfDeclScope {
   VpiObject* iface;
   std::string key_prefix;
@@ -28,15 +26,10 @@ struct TfDeclScope {
   const VpiAttachBuild& build;
 };
 
-// The task or function `made` holds for the definition of `name` that the
-// instance `where` runs in gives through one of its interface ports, `task
-// a.Read` (§25.7.3); null where `where` names no instance or it gives none.
 VpiObject* DefinitionAt(const TfDeclScope& scope,
                         const GenBlockSubroutineScope* where,
                         std::string_view name) {
   if (where == nullptr) return nullptr;
-  // The lowerer's prefix ends in a `.`, which the instance path `made` is
-  // keyed by does not.
   const std::string_view kPrefix = where->inst_prefix;
   const std::string_view kInstance =
       kPrefix.substr(0, kPrefix.find_last_of('.'));
@@ -59,10 +52,6 @@ void MakeTfDecl(const TfDeclScope& scope, std::string_view name, int access,
   scope.iface->children.push_back(decl);
 }
 
-// §25.7.4 with §37.8 detail 1: a decl per definition the connected modules
-// give the extern forkjoin task `name`, and one reaching none where they give
-// none. Lowering the instance declared the task under the instance's key
-// (RegisterInstanceSubroutines), so the run holds a list for it.
 void MakeForkjoinDecls(const TfDeclScope& scope, std::string_view name) {
   const std::vector<std::string_view>& defs =
       *scope.ctx.FindForkjoinTask(scope.key_prefix + std::string(name));
@@ -77,16 +66,12 @@ void MakeForkjoinDecls(const TfDeclScope& scope, std::string_view name) {
   }
 }
 
-// §25.7.3: the one module that exports `name` to the instance gives its
-// definition, which a call through the instance runs in that module.
 void MakeExternDecl(const TfDeclScope& scope, std::string_view name) {
   const GenBlockSubroutineScope* where = scope.ctx.FindGenBlockSubroutineScope(
       scope.key_prefix + std::string(name));
   MakeTfDecl(scope, name, vpiExternAcc, DefinitionAt(scope, where, name));
 }
 
-// §25.7: the interface declares a subroutine a module defines by `extern` or
-// by `export` in a modport, and may do both for the same one.
 void MakeInterfaceTfDecls(const TfDeclScope& scope, const RtlirModule& ifc) {
   std::vector<std::string_view> declared;
   for (const ModuleItem* proto : ifc.function_decls) {
@@ -110,12 +95,6 @@ void MakeInterfaceTfDecls(const TfDeclScope& scope, const RtlirModule& ifc) {
   }
 }
 
-// §37.13 with §37.8 and §25.7: the interface tf decl an io decl `io_decl` of a
-// modport reaches for the subroutine `name` it imports or exports -- the one
-// the interface has for a subroutine a module defines, and otherwise, for an
-// import of one the interface `ifc` defines itself, a declaration of its own
-// whose definition is elsewhere than the modport, the interface body's, and
-// which so has vpiExternAcc.
 VpiObject* ModportTfDecl(const TfDeclScope& scope, const RtlirModule& ifc,
                          VpiObject* io_decl, std::string_view name) {
   for (VpiObject* child : scope.iface->children) {
@@ -136,9 +115,6 @@ VpiObject* ModportTfDecl(const TfDeclScope& scope, const RtlirModule& ifc,
   return decl;
 }
 
-// §37.7 with §37.13: an io decl per task or function each modport of the
-// interface `ifc` imports or exports (§25.7), its vpiExpr the interface tf
-// decl of the subroutine.
 void MakeModportTfIoDecls(const TfDeclScope& scope, const RtlirModule& ifc) {
   for (const ModportDecl* modport_decl : ifc.modports) {
     VpiObject* modport = *std::ranges::find_if(
@@ -167,8 +143,6 @@ void AttachInterfaceTfDecls(const RtlirDesign* design,
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix, VpiObject* iface) {
-        // The design's tops are its uninstantiated modules and programs
-        // (§23.3.1, §24.3), so every interface stands under an instance path.
         if (!mod->is_interface) return;
         const TfDeclScope kScope{iface, prefix + ".", made, ctx, build};
         MakeInterfaceTfDecls(kScope, *mod);

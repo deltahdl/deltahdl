@@ -10,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a module whose case_expression is a side-effecting function `sel_fn`
-// (bumping `cnt` and returning `sel_ret`), selected by a `qualifier`-case over
-// three literal items. Shared by the unique and unique0 "evaluated exactly
-// once" tests, which differ only in the qualifier and the selector return.
 std::string ExactlyOnceSrc(const char* qualifier, const char* sel_ret) {
   return std::string(
              "module t;\n"
@@ -39,10 +35,6 @@ std::string ExactlyOnceSrc(const char* qualifier, const char* sel_ret) {
          "endmodule\n";
 }
 
-// §12.5.3 (N4): in unique-case and unique0-case, the case_expression is
-// evaluated exactly once before any case_item_expression. We observe this by
-// using a side-effecting function as the case_expression and checking that
-// its counter is incremented exactly one time over the whole case statement.
 TEST(CaseQualifierSim, UniqueCaseExpressionEvaluatedExactlyOnce) {
   SimFixture f;
   EXPECT_EQ(RunModule(f, ExactlyOnceSrc("unique", "8'd1").c_str(), "cnt"), 1u);
@@ -51,10 +43,6 @@ TEST(CaseQualifierSim, UniqueCaseExpressionEvaluatedExactlyOnce) {
   EXPECT_EQ(x->value.ToUint64(), 11u);
 }
 
-// §12.5.3 (N4 ordering): the case_expression is evaluated BEFORE any
-// case_item_expression. A side-effecting function in the case_expression and
-// another in a case_item record their invocation order via a shared sequence
-// counter; the case_expression's stamp must be strictly less than the item's.
 TEST(CaseQualifierSim, UniqueCaseExprEvaluatedBeforeItemExpr) {
   SimFixture f;
   auto [case_seq, item_seq] = RunModuleTwoVars(
@@ -86,10 +74,6 @@ TEST(CaseQualifierSim, UniqueCaseExprEvaluatedBeforeItemExpr) {
   EXPECT_GT(item_seq, case_seq);
 }
 
-// §12.5.3 (N4 for unique0): in unique0-case, the case_expression is also
-// evaluated exactly once. Mirrors UniqueCaseExpressionEvaluatedExactlyOnce
-// but for the unique0 qualifier, which the LRM explicitly groups with unique
-// for this rule.
 TEST(CaseQualifierSim, Unique0CaseExpressionEvaluatedExactlyOnce) {
   SimFixture f;
   EXPECT_EQ(RunModule(f, ExactlyOnceSrc("unique0", "8'd2").c_str(), "cnt"), 1u);
@@ -98,10 +82,6 @@ TEST(CaseQualifierSim, Unique0CaseExpressionEvaluatedExactlyOnce) {
   EXPECT_EQ(x->value.ToUint64(), 22u);
 }
 
-// §12.5.3 (N6/N7 for unique0): the overlap rule applies to both unique-case
-// and unique0-case. With two items matching the case_expression the
-// implementation issues a violation report and runs only the first matching
-// item's body, even when the qualifier is unique0.
 TEST(CaseQualifierSim, Unique0OverlapRunsOnlyFirstMatch) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -120,8 +100,6 @@ TEST(CaseQualifierSim, Unique0OverlapRunsOnlyFirstMatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3 (N7): on a uniqueness violation the implementation executes the
-// statement of the FIRST matching case_item; no other matching item runs.
 TEST(CaseQualifierSim, UniqueOverlapRunsOnlyFirstMatch) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -140,12 +118,6 @@ TEST(CaseQualifierSim, UniqueOverlapRunsOnlyFirstMatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3 (N2/N3): priority-case acts on the first match only and, unlike
-// unique/unique0, does NOT assert that the case_items are non-overlapping. Both
-// casez items here match the selector (an overlap), yet priority runs only the
-// earliest matching body and issues no uniqueness violation. Asserting zero
-// warnings observes that the priority path skips the overlap check that the
-// unique path performs.
 TEST(CaseQualifierSim, PriorityFirstMatchRunsExactlyOneBody) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -164,9 +136,6 @@ TEST(CaseQualifierSim, PriorityFirstMatchRunsExactlyOneBody) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3 (N9): when a single case_item holds multiple case_item_expressions,
-// even if more than one matches the case_expression, this is NOT a uniqueness
-// violation. The item runs once with no violation report.
 TEST(CaseQualifierSim, UniqueSingleItemMultiplePatternsIsNotViolation) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -185,11 +154,6 @@ TEST(CaseQualifierSim, UniqueSingleItemMultiplePatternsIsNotViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3 (N9 for unique0): the rule that several matching expressions within
-// one item are no uniqueness violation covers unique0-case as well as
-// unique-case.
-// Both casez patterns in the single item match the selector, yet unique0 runs
-// the item once with no violation report.
 TEST(CaseQualifierSim, Unique0SingleItemMultiplePatternsIsNotViolation) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -208,7 +172,6 @@ TEST(CaseQualifierSim, Unique0SingleItemMultiplePatternsIsNotViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3 (N13): unique0 with no matching item shall NOT issue a violation.
 TEST(CaseQualifierSim, Unique0NoMatchProducesNoViolation) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -227,7 +190,6 @@ TEST(CaseQualifierSim, Unique0NoMatchProducesNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3 (N10): priority-case with no matching item shall issue a violation.
 TEST(CaseQualifierSim, PriorityNoMatchIssuesViolation) {
   SimFixture f;
   RunModuleNoVar(f,
@@ -244,7 +206,6 @@ TEST(CaseQualifierSim, PriorityNoMatchIssuesViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3 (N10): unique-case with no matching item shall issue a violation.
 TEST(CaseQualifierSim, UniqueNoMatchIssuesViolation) {
   SimFixture f;
   RunModuleNoVar(f,
@@ -261,11 +222,6 @@ TEST(CaseQualifierSim, UniqueNoMatchIssuesViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3 (N10, variable-selector input form): the LRM's own example models the
-// case_expression as a variable (bit [2:0] a) and lists a multi-expression item
-// (0,1). Driving the variable to a value no item covers (5) leaves no matching
-// case_item, so unique-case issues a violation. This exercises the no-match
-// rule on a runtime variable selector rather than a folded constant literal.
 TEST(CaseQualifierSim, UniqueVariableSelectorNoMatchIssuesViolation) {
   SimFixture f;
   RunModuleNoVar(f,
@@ -285,11 +241,6 @@ TEST(CaseQualifierSim, UniqueVariableSelectorNoMatchIssuesViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.5.3 (N9, variable-selector accepting path): companion to the reject case
-// above. Driving the same variable selector to 1 matches the multi-expression
-// item (0,1); the item runs exactly once with no violation, since a single item
-// covering the value is a clean unique match regardless of how many of its
-// expressions would match.
 TEST(CaseQualifierSim, UniqueVariableSelectorMatchesMultiExprItem) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,
@@ -311,8 +262,6 @@ TEST(CaseQualifierSim, UniqueVariableSelectorMatchesMultiExprItem) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.5.3 (N6/N7): a unique-case with a default-only fallback still suppresses
-// the no-match violation when execution falls through to default.
 TEST(CaseQualifierSim, UniqueNoMatchWithDefaultSilent) {
   SimFixture f;
   EXPECT_EQ(RunModule(f,

@@ -11,17 +11,11 @@ using namespace delta;
 
 namespace {
 
-// The identifiers this version_specifier drops from the list "1364-2001"
-// reserves. These ten are the whole of what distinguishes it from that
-// version.
 constexpr const char* kExcluded[] = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",
 };
 
-// The remainder of Table 22-2 -- the additions of "1364-2001" that this
-// version_specifier keeps reserved. Together with kExcluded this is the whole
-// table, which is what makes the pair a partition rather than two samples.
 constexpr const char* kKept[] = {
     "automatic",
     "endgenerate",
@@ -43,26 +37,18 @@ bool IsExcluded(const std::string& word) {
   return false;
 }
 
-// The spelling of the version_specifier itself is what selects this list, so
-// the string has to resolve to its own version and not to anything else.
 TEST(NoconfigKeywordList, SpecifierResolvesToItsOwnVersion) {
   auto parsed = ParseKeywordVersion("1364-2001-noconfig");
   ASSERT_TRUE(parsed.has_value());
   if (!parsed.has_value()) return;
   EXPECT_EQ(*parsed, KeywordVersion::kVer13642001Noconfig);
 
-  // The version it is defined in terms of is a different one; if the two
-  // collapsed onto the same value the exception below could not be observed
-  // at all.
   auto plain = ParseKeywordVersion("1364-2001");
   ASSERT_TRUE(plain.has_value());
   if (!plain.has_value()) return;
   EXPECT_NE(*parsed, *plain);
 }
 
-// The negative for that spelling. A version_specifier is a fixed string, so a
-// word differing from it by case, by a missing separator, or by standing on
-// its own is not this one and is not recognized at all.
 TEST(NoconfigKeywordList, SpecifierMisspellingsAreNotRecognized) {
   const char* const kNotThisSpecifier[] = {
       "1364-2001-NOCONFIG",  "1364-2001-Noconfig",
@@ -77,12 +63,6 @@ TEST(NoconfigKeywordList, SpecifierMisspellingsAreNotRecognized) {
   }
 }
 
-// The subclause in the exact shape it is written: this version behaves as
-// "1364-2001" does, except that ten identifiers drop off the list. Sweeping
-// both tables and comparing the two versions word for word is what makes the
-// claim -- rather than a sample of it -- the thing being checked. Every word
-// either resolves to the same keyword under both, or is one of the ten and
-// resolves under "1364-2001" alone.
 TEST(NoconfigKeywordList, MatchesVerilog2001ExceptForTheExcludedTen) {
   size_t excluded_seen = 0;
   size_t kept_seen = 0;
@@ -92,8 +72,6 @@ TEST(NoconfigKeywordList, MatchesVerilog2001ExceptForTheExcludedTen) {
     auto under_noconfig =
         LookupKeyword(word, KeywordVersion::kVer13642001Noconfig);
 
-    // Both legs are read from the same lookup, so the "1364-2001" side is the
-    // baseline the exception is measured against rather than an assumption.
     ASSERT_TRUE(under_2001.has_value())
         << word << " is reserved by the version this one is defined from";
 
@@ -118,24 +96,17 @@ TEST(NoconfigKeywordList, MatchesVerilog2001ExceptForTheExcludedTen) {
   EXPECT_EQ(kept_seen, std::size(kVerilog1995Keywords) + std::size(kKept));
 }
 
-// The two halves of Table 22-2 partition it: ten dropped and eleven kept makes
-// the twenty-one entries "1364-2001" adds. Without this the sweep above could
-// pass while silently covering only part of the table.
 TEST(NoconfigKeywordList, SplitsVerilog2001AdditionsIntoTenAndEleven) {
   EXPECT_EQ(std::size(kExcluded), 10u);
   EXPECT_EQ(std::size(kKept), 11u);
   EXPECT_EQ(std::size(kExcluded) + std::size(kKept), 21u);
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
 
-  // The two groups are disjoint, so no word is counted on both sides.
   for (const char* word : kKept) {
     EXPECT_FALSE(IsExcluded(word)) << word;
   }
 }
 
-// The whole inherited list, not a sample of it: the exception this subclause
-// names reaches Table 22-2 only, so every one of Table 22-1's entries has to
-// survive into this version untouched.
 TEST(NoconfigKeywordList, KeepsAllVerilog1995Keywords) {
   for (const char* kw : kVerilog1995Keywords) {
     EXPECT_TRUE(
@@ -144,10 +115,6 @@ TEST(NoconfigKeywordList, KeepsAllVerilog1995Keywords) {
   }
 }
 
-// Behaving as "1364-2001" does bounds the list from above as well as below:
-// words later versions introduce are no more reserved here than they are
-// there. `uwire` is the sharpest case, being the sole addition of the very
-// next version.
 TEST(NoconfigKeywordList, LaterVersionKeywordsAreNotRecognized) {
   const char* const kLater[] = {
       "uwire",   "logic",       "interface", "bit",        "byte",

@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.2: a trans_list orders transitions of integral values, and transition
-// bins of real values are not allowed, whatever the bins keyword. An integral
-// coverpoint's transition bins stay legal.
 TEST(RealCoverpointTransitionBin, TransitionBinOfRealCoverpointIsError) {
   ElabFixture f;
   ElaborateSrc(

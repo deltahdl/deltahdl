@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A Leaf counting its calls, and a Base holding a rand Leaf whose methods
-// record the step they ran at, the x they saw and how often they ran.
 const char* const kHooked =
     "class Leaf;\n"
     "  rand bit [7:0] v;\n"
@@ -46,11 +44,6 @@ const char* const kHooked =
     "  endfunction\n"
     "endclass\n";
 
-// 18.6.2: randomize() works in three steps: pre_randomize() on the object and
-// each enabled random object member, then the new values, then post_randomize()
-// on those same objects: pre runs at step 1 seeing x as it was, post at step 2
-// seeing the new x below 100, and the Leaf's methods run once each, as the
-// design test/src/e2e/pre_post_randomize.sv runs it.
 TEST(PrePostRandomizeRun, PreRunsBeforeTheValuesAndPostAfterOnTheTree) {
   SimFixture f;
   std::string out = RunCapture(
@@ -72,10 +65,6 @@ TEST(PrePostRandomizeRun, PreRunsBeforeTheValuesAndPostAfterOnTheTree) {
   EXPECT_EQ(out, "1 1 200 2 1 1 1\n");
 }
 
-// 18.6.2: a derived class that overrides the methods has to call the base's, or
-// the base's steps are skipped: a Skips not calling super runs its own methods
-// alone, and through a Base handle as well, the methods behaving as virtual
-// under the virtual randomize(); a Chains calling super runs both.
 TEST(PrePostRandomizeRun, AnOverrideRunsTheBasesStepsThroughSuperAlone) {
   SimFixture f;
   std::string out =
@@ -117,12 +106,6 @@ TEST(PrePostRandomizeRun, AnOverrideRunsTheBasesStepsThroughSuperAlone) {
   EXPECT_EQ(out, "1 1 2 0 0 4\n");
 }
 
-// 18.6.2: post_randomize() runs after the new values are assigned, and
-// nothing of randomize() runs after it, so a value it writes to a random
-// variable is the value the caller reads -- the method is a hook that can
-// change the result, not a notification of it. The constraint keeps the
-// solver's own value above 100, so a 5 read back is post_randomize()'s and
-// not a draw.
 TEST(PrePostRandomizeRun, AValuePostRandomizeAssignsIsWhatTheCallerReads) {
   SimFixture f;
   std::string out = RunCapture(
@@ -144,9 +127,6 @@ TEST(PrePostRandomizeRun, AValuePostRandomizeAssignsIsWhatTheCallerReads) {
   EXPECT_EQ(out, "1 5\n");
 }
 
-// §18.6.2: pre_randomize() is invoked before the new random values are
-// computed, so the state variable it writes is what the constraints read in
-// that call: each call moves lo to the next hundred, and x follows it.
 TEST(PrePostRandomizeRun, AStateWrittenByPreRandomizeIsWhatTheCallReads) {
   SimFixture f;
   std::string out = RunCapture(
@@ -172,10 +152,6 @@ TEST(PrePostRandomizeRun, AStateWrittenByPreRandomizeIsWhatTheCallReads) {
   EXPECT_EQ(out, "0 5\n");
 }
 
-// §18.6.2: randomize() computes and assigns the new values of the object and
-// of its random object members before it calls post_randomize() on any of
-// them, the restricted with (x) form included, so the Root's
-// post_randomize() reads the Leaf's y as drawn above 10, not the 0 it held.
 TEST(PrePostRandomizeRun, PostRandomizeReadsTheMembersNewValues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -202,10 +178,6 @@ TEST(PrePostRandomizeRun, PostRandomizeReadsTheMembersNewValues) {
   EXPECT_EQ(out, "1 1\n");
 }
 
-// §18.6.2 with §18.5.8: the random object members are the ones the object
-// holds once its pre_randomize() has run, so an Item the Holder's
-// pre_randomize() allocates on each call is solved with the Holder, its y
-// equal to x, and its post_randomize() reads that y.
 TEST(PrePostRandomizeRun, AMemberPreRandomizeAllocatesIsSolvedWithTheObject) {
   SimFixture f;
   std::string out = RunCapture(

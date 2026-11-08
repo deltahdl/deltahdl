@@ -12,12 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §19.7: per_instance and get_inst_coverage can be set only in the covergroup
-// definition, and auto_bin_max, detect_overlap and cross_retain_auto_bins only
-// in the covergroup or coverpoint definition; a procedural write to one of
-// them through an instance, at the covergroup's level or a coverpoint's, is an
-// error. The other instance options can be assigned after instantiation, and a
-// struct member that happens to be named `option` is no covergroup's.
 TEST(CoverageOptionWrites, DefinitionOnlyOptionWrittenProcedurallyIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,10 +58,6 @@ TEST(CoverageOptionWrites, DefinitionOnlyOptionWrittenProcedurallyIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
-// §19.7, Table 19-1, and §19.7.1, Table 19-3: a weight is a non-negative
-// integral value, so a constant negative weight is an error at the covergroup
-// and coverpoint levels, as an instance or a type option; a weight of 0 is
-// legal.
 TEST(CoverageOptionWeight, ConstantNegativeWeightIsError) {
   ElabFixture f;
   ElaborateSrc(

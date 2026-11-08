@@ -2,17 +2,6 @@
 
 #include "helpers_preprocess_and_get.h"
 
-// §22.10 (C5) states that `celldefine and `endcelldefine may appear anywhere
-// in the source description. "Anywhere" includes positions the other Clause 22
-// state directives reject -- inside a design element, and inside a procedural
-// block -- so the runtime consequence of the rule is that the surrounding
-// design is untouched: it still elaborates, still lowers, and still computes
-// the same values it would compute with the directives removed.
-//
-// The tag the directives apply is a compile-time property of a module; it does
-// not reach the simulator, so what is checked here is that placing the
-// directives in each permitted position leaves behaviour alone.
-
 TEST(CelldefineSimulation, CellModuleRunsUnchanged) {
   auto result = PreprocessAndGet(
       "`celldefine\n"
@@ -37,10 +26,6 @@ TEST(CelldefineSimulation, DirectivesInsideModuleBodyRunUnchanged) {
   EXPECT_EQ(result, 17u);
 }
 
-// C6: `resetall carries the effect of an `endcelldefine. The directive it
-// depends on is written here in its real §22.3 form and driven through the
-// whole pipeline, so what is checked is that ending a cell region this way
-// leaves the modules on both sides of it running normally.
 TEST(CelldefineSimulation, ResetallBetweenModulesRunsUnchanged) {
   auto result = PreprocessAndGet(
       "`celldefine\n"

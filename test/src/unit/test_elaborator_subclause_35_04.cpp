@@ -7,14 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §35.4: DPI imports and exports share a global linkage name space distinct
-// from the compilation-unit scope. The rules tested here govern how that name
-// space is policed across modules and across the import/export boundary.
-
-// §35.4: one scope may not hold two export declarations of the same
-// c_identifier. The linkage identifier defaults to the SystemVerilog subroutine
-// name when no c_identifier is given, so two export declarations of the same
-// function in one scope collide under that defaulted name.
 TEST(DpiGlobalNameElab, DuplicateDefaultExportLinkageInSameScopeIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -30,12 +22,6 @@ TEST(DpiGlobalNameElab, DuplicateDefaultExportLinkageInSameScopeIsError) {
                             4, "35.4"));
 }
 
-// §35.4: export declarations may share a c_identifier, written or defaulted,
-// when they stand in different scopes — exporting the same name from two
-// distinct modules is OK, provided the routines have equivalent type
-// signatures. §35.7 additionally requires each export to occur in the scope
-// where the function is defined, so both functions are defined here (with
-// matching signatures).
 TEST(DpiGlobalNameElab, SameExportLinkageAcrossDifferentScopesIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -54,9 +40,6 @@ TEST(DpiGlobalNameElab, SameExportLinkageAcrossDifferentScopesIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.4: every declaration sharing one linkage identifier must agree on the
-// DPI version string ("DPI-C" vs the deprecated "DPI"). A mix across an
-// import and an export is rejected.
 TEST(DpiGlobalNameElab, ImportExportSameLinkageDifferentVersionStringIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -74,10 +57,6 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageDifferentVersionStringIsError) {
                             6, "35.4"));
 }
 
-// §35.4: when two exports across distinct scopes share one linkage name,
-// the SystemVerilog routines they refer to must have equivalent type
-// signatures. Two functions whose return types disagree fail that
-// requirement and the elaborator rejects the pair.
 TEST(DpiGlobalNameElab,
      ExportsSharingLinkageWithMismatchedFunctionSignaturesIsError) {
   ElabFixture f;
@@ -100,10 +79,6 @@ TEST(DpiGlobalNameElab,
                             10, "35.4"));
 }
 
-// §35.4: cross-scope exports sharing a linkage name with equivalent
-// signatures are permitted. Two tasks with matching argument shapes meet
-// the equivalence rule and the elaborator accepts the pair. Tasks also
-// exercise the function-vs-task half of the signature equivalence check.
 TEST(DpiGlobalNameElab, ExportsSharingLinkageWithMatchingTaskSignaturesIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -122,10 +97,6 @@ TEST(DpiGlobalNameElab, ExportsSharingLinkageWithMatchingTaskSignaturesIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.4: matching version strings on import + export sharing a c_identifier
-// is the well-formed case. The elaborator must accept it. Per §35.7 the
-// exported function is defined in its scope, with a signature equivalent to the
-// import sharing the linkage name.
 TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -142,10 +113,6 @@ TEST(DpiGlobalNameElab, ImportExportSameLinkageSameVersionStringIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.4's rules hold in every scope a DPI declaration can be written in. A.1.11
-// makes dpi_import_export a package_or_generate_item_declaration and so a
-// package_item, and §26.2 makes packages explicitly named scopes, so a package
-// body is one scope for the same-scope rule exactly as a module declaration is.
 TEST(DpiGlobalNameElab, DuplicateExportLinkageInOnePackageIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -167,10 +134,6 @@ TEST(DpiGlobalNameElab, DuplicateExportLinkageInOnePackageIsError) {
                             8, "35.4"));
 }
 
-// §35.4: export declarations may share a c_identifier when they stand in
-// different scopes and their type signatures are equivalent. A package and a
-// module are two scopes, so one export in each under one linkage name is the
-// permitted case and not the forbidden one.
 TEST(DpiGlobalNameElab, PackageAndModuleExportsOfOneLinkageAreDifferentScopes) {
   ElabFixture f;
   Elaborate(R"(
@@ -189,10 +152,6 @@ TEST(DpiGlobalNameElab, PackageAndModuleExportsOfOneLinkageAreDifferentScopes) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.4: every declaration of one c_identifier must use the same DPI version
-// string syntax. The rule is stated over declarations rather than over modules,
-// so a package declaration is compared against the module declarations sharing
-// its linkage name rather than validated on its own.
 TEST(DpiGlobalNameElab, APackageDeclarationJoinsTheVersionStringAgreement) {
   ElabFixture f;
   Elaborate(R"(
@@ -210,10 +169,6 @@ TEST(DpiGlobalNameElab, APackageDeclarationJoinsTheVersionStringAgreement) {
                             6, "35.4"));
 }
 
-// §35.4: §3.12.1 gives the compilation-unit scope every declaration outside any
-// other scope and lets it hold any item a package may, so a DPI declaration
-// written outside every module and package is in a scope of its own and is held
-// to the same rules.
 TEST(DpiGlobalNameElab,
      ACompilationUnitDeclarationJoinsTheVersionStringAgreement) {
   ElabFixture f;
@@ -230,13 +185,6 @@ TEST(DpiGlobalNameElab,
                             2, "35.4"));
 }
 
-// §27.6 makes a generate block a scope, so §35.4's rule about one scope reads
-// the generate block as that scope for a declaration written in one. The parser
-// holds a generate block's items in ModuleItem::gen_body on the item enclosing
-// them, which was in none of the lists the DPI walk collected, so a declaration
-// written there was held to none of §35.4's, §35.5.4's or §35.7's rules. The
-// same pair written directly in the module body is reported today, which is why
-// this case puts it in the block.
 TEST(DpiGlobalNameElab, DuplicateExportLinkageInAGenerateBlockIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -258,10 +206,6 @@ TEST(DpiGlobalNameElab, DuplicateExportLinkageInAGenerateBlockIsError) {
                             9, "35.4"));
 }
 
-// A generate block is a scope of its own, so the same linkage name in the
-// module body and in a block inside it is two scopes and no collision. Without
-// this, a fix that folded a generate block's items into the enclosing scope
-// would satisfy the case above and report a source §35.4 admits.
 TEST(DpiGlobalNameElab, ExportLinkageInAGenerateBlockIsItsOwnScope) {
   ElabFixture f;
   Elaborate(R"(
@@ -280,8 +224,6 @@ TEST(DpiGlobalNameElab, ExportLinkageInAGenerateBlockIsItsOwnScope) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §35.4 holds exports sharing a linkage name to equivalent signatures, and two
-// functions whose formals differ only in signing have different ones.
 TEST(DpiGlobalNameElab, ExportsDifferingOnlyInSigningAreError) {
   ElabFixture f;
   Elaborate(R"(
@@ -303,8 +245,6 @@ TEST(DpiGlobalNameElab, ExportsDifferingOnlyInSigningAreError) {
                             10, "35.4"));
 }
 
-// The same through a typedef: a formal written as a name standing for `int`
-// is the `int` the other export's formal is written as.
 TEST(DpiGlobalNameElab, ExportsWithATypedefOfTheSameTypeAgree) {
   ElabFixture f;
   Elaborate(R"(

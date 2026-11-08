@@ -127,17 +127,6 @@ TEST(SvaEngine, FlushClearsQueue) {
   EXPECT_EQ(f.engine.DeferredQueueSize(), 0u);
 }
 
-// Every deferred action below is a single subroutine call, because §16.4
-// requires each pass or fail statement present in a deferred assertion's
-// action_block to be a single subroutine call -- an assignment is not one. An
-// observed (#0) action calls a void function that writes the variable under
-// test, which is legal because §16.4 schedules that call in the Reactive
-// region. A final action cannot use that vehicle: §16.4 requires its subroutine
-// to be one that is legal to call in the Postponed region, and §4.4.2.9 says of
-// that region that no net or variable may be written there, so the final test
-// reports through a severity system task instead and observes it with
-// LastSeverity().
-
 TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -155,14 +144,6 @@ TEST(AssertionStatementSim, ObservedDeferredActionFiresAfterFollowingStmt) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// The final form of the test above. Its claim is unchanged -- the pass action
-// runs after the statement that follows the assertion -- but it is read off the
-// severity rather than a variable, and the subroutine is a user task rather
-// than a system task, which §16.4 lists first among the permitted forms. The
-// task's body only reports, so it is one that is legal to call in the Postponed
-// region. The inline $error runs in the Active region where the process reaches
-// it and the deferred report runs later in the Postponed region, so the last
-// message is the deferred one; run inline, "inline" would be last.
 TEST(AssertionStatementSim, FinalDeferredActionFiresAfterFollowingStmt) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -250,12 +231,6 @@ TEST(AssertionStatementSim, DeferredCallArgEvaluatedAtScheduleTime) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §16.4: an actual argument passed to a deferred assertion action subroutine is
-// fully evaluated -- including any function call in the argument expression --
-// at the instant the deferred assertion's expression is evaluated, not when the
-// deferred call later runs. The argument is dbl(s); although s is overwritten
-// after the assertion is processed, the captured value reflects dbl of the
-// value s held at processing time.
 TEST(AssertionStatementSim, DeferredFunctionCallArgEvaluatedAtScheduleTime) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -275,7 +250,7 @@ TEST(AssertionStatementSim, DeferredFunctionCallArgEvaluatedAtScheduleTime) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  EXPECT_EQ(var->value.ToUint64(), 10u);  // dbl(5), captured at processing time
+  EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
 TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
@@ -295,12 +270,6 @@ TEST(AssertionStatementSim, ObservedDeferredAssumeActionDeferred) {
   EXPECT_EQ(var->value.ToUint64(), 88u);
 }
 
-// §16.4 has each by-value actual evaluated at the instant the deferred
-// assertion's expression is, so one statement processed three times in a time
-// step queues three reports, each carrying the actual of its own pass: the
-// loop counter as 0, 1 and 2, folded into 12. A snapshot store keyed by the
-// argument expression alone kept only the last pass's 2 for the first report,
-// then read the counter live at its final 3 for the other two, folding to 233.
 TEST(AssertionStatementSim, EachDeferredReportCarriesItsOwnByValueActual) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -318,12 +287,6 @@ TEST(AssertionStatementSim, EachDeferredReportCarriesItsOwnByValueActual) {
   EXPECT_EQ(var->value.ToUint64(), 12u);
 }
 
-// §16.4 and §8.6: a deferred assertion in a class method is queued when the
-// method runs, and its action block, run later in the Reactive region, calls
-// the methods of the object the method was called on and reaches its
-// properties. c.chk(-1) fails and c.chk(2) passes, so ff and pp each run once,
-// and so does the else branch's `this.n++`; the module function's assertion
-// beside them fails once.
 TEST(DeferredAssertionSim, AClassMethodsDeferredActionRunsOnItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -354,8 +317,6 @@ TEST(DeferredAssertionSim, AClassMethodsDeferredActionRunsOnItsObject) {
   EXPECT_EQ(out, "f=1 p=1 n=1 fs=1\n");
 }
 
-// The same called from an always procedure, which resumes at each change of
-// trig: val is -1 at the first and 2 at the second.
 TEST(DeferredAssertionSim, AClassMethodsDeferredActionFromAnAlwaysProcedure) {
   SimFixture f;
   std::string out = RunCapture(
@@ -382,10 +343,6 @@ TEST(DeferredAssertionSim, AClassMethodsDeferredActionFromAnAlwaysProcedure) {
   EXPECT_EQ(out, "f=1 p=1\n");
 }
 
-// §16.4: a deferred assertion's pass statement is a single subroutine call,
-// and a blocking assignment in its place is reported. §16.4.1 defers the call
-// a pass or failure names, and an assignment names none, so the run performs
-// nothing for it and goes on: x keeps its 0 while the procedure sets done.
 TEST(DeferredAssertionSim, APassStatementThatIsNoCallIsReportedAndNotRun) {
   SimFixture f;
   auto* x = RunAndFindVar(

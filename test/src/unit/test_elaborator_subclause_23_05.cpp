@@ -73,10 +73,6 @@ TEST(ExternModuleElaboration, WildcardPortsWithParametersFromExtern) {
   ASSERT_EQ(top->ports.size(), 2u);
 }
 
-// §23.5: `.*` places the extern declaration's parameters on the module. A type
-// parameter follows a different code path than a value parameter (its default
-// type is carried in a parallel array), so exercise it as a distinct input form
-// and observe that the type parameter itself is placed on the module.
 TEST(ExternModuleElaboration, WildcardImportsTypeParameterFromExtern) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -118,12 +114,6 @@ TEST(ExternModuleElaboration, WildcardModuleInstantiatedFromParent) {
   EXPECT_EQ(child->ports.size(), 2u);
 }
 
-// §23.5: an extern module declaration can appear at any level of the
-// instantiation hierarchy and only declares ports. A nested extern declaration
-// must not be elaborated as an instantiable module nor shadow the actual nested
-// definition of the same name. The extern is declared after the real module so
-// that keeping it out of the nested-module table is observable: were it
-// applied, the empty extern would displace the real body and drop the assign.
 TEST(ExternModuleElaboration, NestedExternDoesNotShadowDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -146,11 +136,6 @@ TEST(ExternModuleElaboration, NestedExternDoesNotShadowDefinition) {
   EXPECT_FALSE(child->assigns.empty());
 }
 
-// §23.5: the LRM's own example for the `.*` module header uses a NON-ANSI
-// extern declaration (port names only); the module body then supplies the
-// directions via non-ANSI port declarations. Placing the extern's ports on the
-// module and letting the body declarations give their directions shall yield
-// the same module as writing the names in the header directly.
 TEST(ExternModuleElaboration, WildcardHeaderNonAnsiExternBodyDirections) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -291,8 +276,6 @@ TEST(ExternModuleElaboration, PortSignednessMismatchErrors) {
       "  assign b = a[0];\n"
       "endmodule\n",
       f, "m");
-  // §23.5 requires equivalent port types, and signedness is part of the type,
-  // so a signedness difference is reported as the type mismatch it is.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "module 'm' port 'a' type does not match extern declaration", 2, "23.5"));
@@ -329,10 +312,6 @@ TEST(ExternModuleElaboration, MatchingTypeParamNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.5: the extern declaration and the module match in parameter types, so
-// a value parameter declared int in the one and logic [3:0] in the other is
-// reported; written with the same type in both, or with no type in one of
-// them, where the parameter takes its value's type (§6.20.2), it is not.
 TEST(ExternModuleElaboration, ValueParamTypeMismatchErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -356,10 +335,6 @@ TEST(ExternModuleElaboration, ValueParamTypeMismatchErrors) {
       ReportedError(f.diag.Diagnostics(), "module 'b' parameter", 5, "23.5"));
 }
 
-// §23.5: a localparam of the extern declaration's parameter port list stays
-// local on the `.*` module that takes the header, so an instance's parameter
-// value assignment naming it is refused, as §23.10.2.2 refuses one naming a
-// localparam port of a module that declares the list itself.
 TEST(ExternModuleElaboration, WildcardKeepsExternLocalparamPortLocal) {
   ElabFixture f;
   ElaborateSrc(

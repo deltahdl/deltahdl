@@ -93,9 +93,6 @@ TEST(OperatorParsing, PrecedenceLogicalBelowEquality) {
 }
 
 TEST(OperatorParsing, PrecedenceLogicalBelowRelational) {
-  // 11.4.7 states the logical operators bind lower than the relational
-  // operators, so each unparenthesized relational comparison forms an operand
-  // of `&&` rather than the other way around.
   auto r = Parse("module m; initial x = a < b && c > d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -144,9 +141,6 @@ TEST(OperatorParsing, EquivalenceRightAssociative) {
 }
 
 TEST(OperatorParsing, ImplicationBelowConditional) {
-  // Implication has lower precedence than the conditional operator, so the
-  // conditional expression binds tighter and becomes the right-hand operand
-  // of `->`.
   auto r = Parse("module m; initial x = a -> b ? c : d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -158,9 +152,6 @@ TEST(OperatorParsing, ImplicationBelowConditional) {
 }
 
 TEST(OperatorParsing, EquivalenceBelowConditional) {
-  // Equivalence shares implication's precedence and is likewise lower than the
-  // conditional operator, so the conditional expression forms the right-hand
-  // operand of `<->`.
   auto r = Parse("module m; initial x = a <-> b ? c : d; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

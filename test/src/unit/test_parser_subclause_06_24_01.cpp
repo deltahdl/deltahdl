@@ -147,12 +147,6 @@ TEST(CastOperatorParsing, IntCastAstFields) {
   ASSERT_NE(rhs->lhs, nullptr);
 }
 
-// A.8.4 writes the cast production as `cast ::= casting_type ' ( expression )`,
-// where the apostrophe and the `(` are separate terminals of the grammar. §5.3
-// rules that white space is ignored except where it separates lexical tokens,
-// and a space between two terminals separates nothing that was not already
-// separate. `int ' (x)` is therefore the same cast as `int'(x)` and parses to
-// an ExprKind::kCast node.
 TEST(CastOperatorParsing, IntCastWithWhitespaceAroundApostrophe) {
   auto r = Parse(
       "module t;\n"
@@ -209,9 +203,6 @@ TEST(CastOperatorParsing, SizeCastParameter) {
               "endmodule\n"));
 }
 
-// 6.24.1: a size cast's constant-expression casting type may be a localparam,
-// a distinct constant form of 11.2.1 from a parameter or a bare literal. It
-// parses as a cast just as the parameter form does.
 TEST(CastOperatorParsing, SizeCastLocalparam) {
   auto r = Parse(
       "module m;\n"
@@ -336,10 +327,6 @@ TEST(CastOperatorParsing, UnsignedCastParses) {
   EXPECT_EQ(rhs->kind, ExprKind::kCast);
 }
 
-// A.8.4 lists a cast among the primaries and A.8.6 makes a primary the root
-// of a method call, so `Cols'(2).name()` is the call of name() on the cast:
-// a call whose callee is a member select on a kCast node. Read as an
-// expression ending at the cast's ')', the '.' was reported unexpected.
 TEST(CastOperatorParsing, MethodCallOnAValueCastPrimary) {
   auto r = Parse(
       "module t;\n"
@@ -361,9 +348,6 @@ TEST(CastOperatorParsing, MethodCallOnAValueCastPrimary) {
   EXPECT_EQ(stmt->rhs->lhs->rhs->text, "name");
 }
 
-// The same tail after a cast to a keyword type, `string'(v).len()` (§6.16),
-// and a member select with no argument list after a cast, `Cols'(2).name`
-// (§6.19.5.7).
 TEST(CastOperatorParsing, MethodTailOnAKeywordCastAndWithoutArguments) {
   auto r = Parse(
       "module t;\n"

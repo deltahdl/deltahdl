@@ -23,12 +23,6 @@ TEST(AssignmentDelaySim, SingleDelayDefersAssignment) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
 }
 
-// §10.3.3: the delay on a continuous assignment is a constant expression, which
-// may be a parameter (§6.20) rather than a literal. The delay is not folded at
-// elaboration; it is resolved at run time from the parameter's value -- a
-// different evaluation path than a literal -- and still defers the assignment
-// by that many time units. Built from real parameter-declaration source and
-// driven through the full pipeline.
 TEST(AssignmentDelaySim, ParameterValuedDelayDefersAssignment) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -43,10 +37,6 @@ TEST(AssignmentDelaySim, ParameterValuedDelayDefersAssignment) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
 }
 
-// §10.3.3: the same deferral holds when the delay's constant expression is a
-// localparam (§6.20.2). A localparam reaches the simulator through a distinct
-// declaration path than a module parameter but likewise resolves to the delay
-// value that governs the assignment.
 TEST(AssignmentDelaySim, LocalparamValuedDelayDefersAssignment) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -179,9 +169,6 @@ TEST(AssignmentDelaySim, VectorNonzeroToZeroUsesFall) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
 }
 
-// §10.3.3: whether the right-hand side went from nonzero to zero is a
-// question about every bit of it, so a vector wider than one word whose only
-// set bit lies above the first word is nonzero, and clearing it falls.
 TEST(AssignmentDelaySim, WideVectorNonzeroAboveTheFirstWordToZeroUsesFall) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -218,8 +205,6 @@ TEST(AssignmentDelaySim, VectorTransitionToZUsesTurnoff) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // The vector drives all-z, so the turn-off (third) delay of 8 governs the
-  // assignment rather than the rise (20) or fall (5) delay: 50 + 8 == 58.
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 58u);
 }
 
@@ -237,9 +222,6 @@ TEST(AssignmentDelaySim, NetDeclSingleDelayApplied) {
 
 TEST(AssignmentDelaySim, VectorNetDeclDelayWholeVector) {
   SimFixture f;
-  // A.2.1.3 net_declaration: the packed range is part of data_type_or_implicit,
-  // and delay3 follows it -- the legal order is `wire [7:0] #5 w`, not
-  // `wire #5 [7:0] w`.
   auto* var = RunAndFindVar(
       "module t;\n"
       "  wire [7:0] #5 w = 8'hAB;\n"
@@ -250,12 +232,6 @@ TEST(AssignmentDelaySim, VectorNetDeclDelayWholeVector) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
 }
 
-// §10.3.3: when a continuous assignment carrying multiple delays is part of a
-// vector net's declaration, the delay is selected for the whole vector -- the
-// rising and falling delays are not applied to the individual bits. Built from
-// real net-declaration syntax (§10.3.1) so the assignment genuinely lives in
-// the declaration: a whole-vector transition from nonzero to zero picks the
-// fall delay (5), landing the update at t=55 rather than the rise delay's t=70.
 TEST(AssignmentDelaySim, VectorNetDeclMultiDelayUsesFallForNonzeroToZero) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -273,23 +249,6 @@ TEST(AssignmentDelaySim, VectorNetDeclMultiDelayUsesFallForNonzeroToZero) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 55u);
 }
 
-// §10.3.3 decides which delay governs a vector net once for the assignment
-// rather than once per bit: each of its three rules -- nonzero to zero picks
-// the falling delay, a transition to z picks the turn-off delay, and every
-// other case picks the rising delay -- reads the right-hand side whole. So a
-// vector whose two bits move in opposite directions is neither a transition to
-// zero nor one to z, and the rising delay carries both: bit 0 falling and bit 1
-// rising settle together at the rising delay rather than each at its own.
-//
-// The delay here is a net delay, §10.3.3's `wire #10 wireA;` form: the
-// declaration assigns nothing and a separate continuous assignment drives it,
-// so the net's own transition waits the net's delays (Net::delay in
-// src/simulator/net.h). The case below it is the other form, and the two
-// agree -- which is what #3372 asked to be settled.
-//
-// The rise delay is 2 and the fall delay 4, and the source changes at 50, so
-// the whole vector settles at 52. A reading that gave each bit its own delay
-// would settle bit 0 at 54, and the run would end there.
 TEST(AssignmentDelaySim, ANetDelaySettlesAVectorWholeWhenItsBitsDisagree) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -308,14 +267,6 @@ TEST(AssignmentDelaySim, ANetDelaySettlesAVectorWholeWhenItsBitsDisagree) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 52u);
 }
 
-// The same two bits under the other form, which is the one §10.3.3 restricts by
-// name: a continuous assignment written in a vector net's declaration does not
-// apply its rise and fall delays bit by bit. The delay is part of the
-// continuous assignment here rather than a net delay, and the vector still
-// settles whole at 52.
-//
-// Without this case beside the one above, the clause's contrast is stated on
-// one side only, which is the gap #3372 records.
 TEST(AssignmentDelaySim, ADeclarationAssignmentSettlesTheSameVectorWhole) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -333,13 +284,6 @@ TEST(AssignmentDelaySim, ADeclarationAssignmentSettlesTheSameVectorWhole) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 52u);
 }
 
-// The first of §10.3.3's three rules under a net delay, which is what says the
-// rule read above is the clause's rather than a rising delay applied to
-// everything: both bits fall together, the right-hand side goes from nonzero to
-// zero, and the falling delay of 4 carries it to 54.
-//
-// VectorNetDeclMultiDelayUsesFallForNonzeroToZero above asks the same of the
-// declaration-assignment form.
 TEST(AssignmentDelaySim, ANetDelayUsesTheFallingDelayForNonzeroToZero) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -358,13 +302,6 @@ TEST(AssignmentDelaySim, ANetDelayUsesTheFallingDelayForNonzeroToZero) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 54u);
 }
 
-// §10.3.3: a continuous assignment to a net of a user-defined nettype admits
-// only a single delay, and that one delay governs the assignment for any value
-// change (there is no rise/fall/turn-off split, unlike a scalar or vector net).
-// Built from real §6.7.2 nettype syntax and driven through the full pipeline:
-// the delayed driver is committed by the production continuous-assignment delay
-// path (SelectContAssignDelay returns the sole delay when no fall delay exists)
-// and lands on the resolved net value only after the delay elapses.
 TEST(AssignmentDelaySim, SingleDelayAppliedToNettypeNet) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -382,8 +319,6 @@ TEST(AssignmentDelaySim, SingleDelayAppliedToNettypeNet) {
   ASSERT_NE(net, nullptr);
   ASSERT_TRUE(net->is_user_nettype);
   ASSERT_NE(net->resolved, nullptr);
-  // The value change is deferred by the single delay: it is present only at
-  // t=10, confirming the one delay was applied to the nettype net.
   EXPECT_EQ(net->resolved->value.ToUint64(), 1u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 10u);
 }
@@ -422,11 +357,6 @@ TEST(AssignmentDelaySim, InertialReturnToCurrentValueSchedulesNoEvent) {
       "endmodule\n",
       f, "y");
   ASSERT_NE(var, nullptr);
-  // y settles to 0 early, then the operand pulses high at t20 (scheduling a
-  // y=1 event for t30) and returns to 0 at t25 before that event fires. Since
-  // the re-evaluated right-hand side again equals the current left-hand side
-  // value, the pending event is dropped and none is rescheduled, so the run
-  // stops at t25 rather than advancing to the cancelled event time of 35.
   EXPECT_EQ(var->value.ToUint64(), 0u);
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 25u);
 }
@@ -452,21 +382,6 @@ TEST(AssignmentDelaySim, InertialDelayNoIntermediateGlitch) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §10.3.3: a continuous assignment's delay is the time from a right-hand
-// operand's change to the assignment of the left-hand side, and §28.16 measures
-// a net delay from a change on any of the net's drivers to the moment the net's
-// value is updated and passed on. Both operands of `a & b` change in one time
-// step here, which every other delayed case in this file avoids by driving a
-// one-operand or constant right-hand side, so this is the first case where the
-// assignment has more than one operand change to react to at once. It fails
-// when the second operand's change costs the assignment its delay and puts the
-// new value on y at t=9 rather than t=15: y_mid, sampled at t=11, then reads
-// 8'h38 instead of the 8'hC0 y still holds.
-//
-// §4.7 leaves the order of active events within one region free, so neither
-// sample stands at the change instant (t=9) or at the expiry instant (t=15).
-// t=11 is strictly inside the delay and t=18 strictly after it, and no other
-// event of this design stands at either time.
 TEST(AssignmentDelaySim, TwoOperandsChangingInOneStepStillWaitTheDelay) {
   SimFixture f;
   auto* y_mid = RunAndFindVar(
@@ -491,37 +406,10 @@ TEST(AssignmentDelaySim, TwoOperandsChangingInOneStepStillWaitTheDelay) {
   ASSERT_NE(y_mid, nullptr);
   auto* y_late = f.ctx.FindVariable("y_late");
   ASSERT_NE(y_late, nullptr);
-  // t=11: the operands changed at t=9 and the delay has not run out, so y still
-  // carries 8'hF0 & 8'hCC.
   EXPECT_EQ(y_mid->value.ToUint64(), 0xC0u);
-  // t=18: the delay ran out at t=15, so y carries 8'h3C & 8'h7A.
   EXPECT_EQ(y_late->value.ToUint64(), 0x38u);
 }
 
-// §10.3.3 again, with three operands changing in one time step rather than two.
-// A second operand change is enough to strand one sibling of the assignment's
-// change-watch; a third strands two, and the second stranded sibling drives the
-// assignment through another evaluate-and-commit cycle. The extra commits carry
-// the same right-hand side value (§10.3.2 evaluates the whole right-hand side,
-// and all three operands already hold their new values when any of them is
-// reacted to), so what separates one commit from several is when the new value
-// reaches y and not what it is. This test therefore observes "committed once"
-// as: y carries its old value at both samples strictly inside the delay, the
-// new value at the sample strictly after it, and its value changes exactly once
-// across that window -- an extra commit lands at the change instant t=9 and is
-// read by the t=11 and t=14 samples, and a commit of any third value is read as
-// a second change. A repeat commit of the identical value at the identical time
-// is not observable through this fixture, and is not claimed.
-//
-// `changes` counts value changes of y, and §9.4.2 `@(y)` fires on a change
-// rather than on every drive, so the difference between the count sampled at
-// t=14 and the count sampled at t=25 is the number of new values y took over
-// the delay window: one.
-//
-// §4.7 leaves the order of active events within one region free, so no sample
-// stands at t=9 (the operand change), at t=15 (the expiry) or at t=6 (where y
-// first settles). t=11 and t=14 are strictly inside the delay; t=18 and t=25
-// are strictly after it.
 TEST(AssignmentDelaySim, ThreeOperandsChangingInOneStepCommitOnce) {
   SimFixture f;
   auto* y_early = RunAndFindVar(
@@ -565,34 +453,12 @@ TEST(AssignmentDelaySim, ThreeOperandsChangingInOneStepCommitOnce) {
   ASSERT_NE(changes_mid, nullptr);
   auto* changes_late = f.ctx.FindVariable("changes_late");
   ASSERT_NE(changes_late, nullptr);
-  // t=11 and t=14: the operands changed at t=9 and the delay has not run out,
-  // so y still carries 8'hF0 & 8'hCC & 8'hAA at both.
   EXPECT_EQ(y_early->value.ToUint64(), 0x80u);
   EXPECT_EQ(y_mid->value.ToUint64(), 0x80u);
-  // t=18: the delay ran out at t=15, so y carries 8'h6E & 8'h7C & 8'hE7.
   EXPECT_EQ(y_late->value.ToUint64(), 0x64u);
-  // Between t=14 and t=25 y took exactly one new value, at t=15.
   EXPECT_EQ(changes_late->value.ToUint64() - changes_mid->value.ToUint64(), 1u);
 }
 
-// §10.3.3 chooses between an assignment's two delays from the transition the
-// assignment makes, and §11.5.1 says which bits that transition is over: a
-// partially out-of-range part-select writes only the bits that lie in range,
-// and those bits take the value's bits at and above the select's own low ones.
-// `a[1 -: 4]` is `a[1:-2]`, so a[1] takes src[3] and a[0] takes src[2]: 4'b0011
-// lands 2'b00 on a pair already holding 2'b11, which is a transition to zero
-// and takes "the second delay", the fall delay of 3.
-//
-// The comparison was between the whole four-bit value as written and the two
-// in-range bits it lands on -- not the same bits, and not even the same width.
-// 4'b0011 is nonzero, so the zero test failed and the rise delay of 2 was
-// taken. The value is chosen for exactly that: its whole is nonzero while the
-// bits it lands are zero, which is the only shape that separates the two
-// readings.
-//
-// The settle time is the assertion because it is what the delay decides. The
-// first drive at t=0 leaves a[1:0] at 2'b11 and the change at t=20 is the one
-// under test, so the run ends at 23 for the fall and 22 for the rise.
 TEST(AssignmentDelaySim, SelectOffTheLowEndFallsOnTheBitsThatLand) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -611,19 +477,6 @@ TEST(AssignmentDelaySim, SelectOffTheLowEndFallsOnTheBitsThatLand) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 23u);
 }
 
-// §10.3.3 has two transition tables and the width of what is driven says which
-// applies: one bit takes the scalar table, where a z-to-0 transition is a fall.
-// `b[0 -: 2]` is `b[0:-1]`, whose one in-range bit is b[0], and it takes the
-// value's bit 1 -- the 0 of 2'b01 -- against an undriven `tri`, which is z. So
-// the drive is a z-to-0 transition of a single bit and the fall delay of 3 is
-// what §10.3.3 gives it.
-//
-// The declared select is two bits wide, and that width was what chose the
-// table, so the vector arm ran instead: it reads a fall only from a value that
-// is entirely zero, and the unprojected 2'b01 is not, so the rise delay of 2
-// was taken. Both halves of the correction are needed here -- the bits compared
-// and the width they are compared at -- which is what makes this case distinct
-// from the one above, where the width is two either way.
 TEST(AssignmentDelaySim, OneBitDrivenWindowTakesTheScalarTransitionTable) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -639,10 +492,6 @@ TEST(AssignmentDelaySim, OneBitDrivenWindowTakesTheScalarTransitionTable) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 3u);
 }
 
-// §10.3.3: a net delay delays every driver's change to the net, an instance's
-// output port among the drivers. The driver an output port connection makes
-// is created as the instance is lowered, after the net delays were given out,
-// and x followed the port at once.
 TEST(AssignmentDelaySim, ANetDelayDelaysAnOutputPortDriver) {
   const char* src =
       "module c(output logic o);\n"
@@ -658,9 +507,6 @@ TEST(AssignmentDelaySim, ANetDelayDelaysAnOutputPortDriver) {
   EXPECT_EQ(RunAndGet(src, "r12"), 1u);
 }
 
-// §10.3.3: a net delay delays every value change any other statement applies
-// to the net, so a driver of one bit of a vector net settles at the driver's
-// change plus the net's delay: a at 1, w[0] at 11.
 TEST(AssignmentDelaySim, NetDelayAppliesToDriverOfSelect) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -676,11 +522,6 @@ TEST(AssignmentDelaySim, NetDelayAppliesToDriverOfSelect) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 11u);
 }
 
-// §10.3.3: an assignment to a concatenation is one assignment, so the whole
-// right-hand side's transition picks its delay and every element settles after
-// it. 8'h01 to 8'h10 is no transition to zero, so the rise delay carries it,
-// though the low element alone falls from 1 to 0; settled element by element,
-// the low element and the scalar q took the fall delay and lagged.
 TEST(AssignmentDelaySim, ConcatenationTargetSettlesTogether) {
   const char* src =
       "module t;\n"

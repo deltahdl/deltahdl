@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.12.1 has find, find_first, find_last, min, max and unique return a queue
-// of the array's element type, so over an array of an enumeration a queue of
-// that enumeration, which a queue of the enumeration takes without a cast.
 TEST(Elaboration, EnumArrayLocatorResultAssignedToEnumQueueAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -30,9 +27,6 @@ TEST(Elaboration, EnumArrayLocatorResultAssignedToEnumQueueAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The element locators of an array of int return a queue of int, and the index
-// locators a queue of int whatever the elements are; neither is a value of the
-// enumeration, so each needs the cast.
 TEST(Elaboration, IntQueueFromLocatorAssignedToEnumQueueIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -55,10 +49,6 @@ TEST(Elaboration, IntQueueFromLocatorAssignedToEnumQueueIsReported) {
                             "6.19.3"));
 }
 
-// §7.12.1 has an index locator over an associative array return a queue of the
-// index type, so over one indexed by an enumeration a queue of that
-// enumeration, at module scope or in a block; over an array indexed by int, or
-// over any other kind of array, a queue of int, which needs the cast.
 TEST(Elaboration, EnumKeyedIndexLocatorResultAssignedToEnumQueue) {
   ElabFixture f;
   ElaborateSrc(

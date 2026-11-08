@@ -326,12 +326,6 @@ TEST(KeywordListLexing, KeywordTextIsPreserved) {
   }
 }
 
-// The other half of "the list is exactly this long". The token kinds the
-// reserved words map to occupy one unbroken run of the token enumeration, and
-// Table B.1's words land inside it and nowhere else. A run of exactly as many
-// values as the annex prints words, entered by that many distinct kinds (the
-// test above), leaves no kind over for a word the annex does not list -- which
-// is the direction a fixed count of table entries cannot establish on its own.
 TEST(KeywordListLexing, ReservedKeywordsFillTheWholeKeywordTokenKindRange) {
   constexpr auto kFirstKeywordKind = static_cast<int>(TokenKind::kKwModule);
   constexpr auto kLastKeywordKind = static_cast<int>(TokenKind::kKwXor);
@@ -355,9 +349,6 @@ TEST(KeywordListLexing, NoDuplicateTokenKinds) {
   EXPECT_EQ(seen.size(), kReservedKeywordCount);
 }
 
-// Boundary of the reservation rule: only the exact lowercase spellings in
-// Table B.1 are reserved. A differently-cased spelling must fall through to an
-// ordinary identifier, both at the keyword-lookup layer and through the lexer.
 TEST(KeywordListLexing, KeywordsAreCaseSensitive) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string upper(kReservedKeywords[i].text);
@@ -375,8 +366,6 @@ TEST(KeywordListLexing, KeywordsAreCaseSensitive) {
   }
 }
 
-// Reservation matches a complete token, not a leading substring. A keyword
-// immediately followed by identifier characters is one ordinary identifier.
 TEST(KeywordListLexing, KeywordWithIdentifierSuffixIsIdentifier) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string extended = std::string(kReservedKeywords[i].text) + "_x";
@@ -391,8 +380,6 @@ TEST(KeywordListLexing, KeywordWithIdentifierSuffixIsIdentifier) {
   }
 }
 
-// An underscore prefix yields a valid identifier whose spelling is not the
-// reserved keyword, so it must not be treated as one.
 TEST(KeywordListLexing, KeywordWithLeadingUnderscoreIsIdentifier) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string prefixed = "_" + std::string(kReservedKeywords[i].text);
@@ -405,9 +392,6 @@ TEST(KeywordListLexing, KeywordWithLeadingUnderscoreIsIdentifier) {
   }
 }
 
-// Several listed words end in a digit, so a trailing digit is the near miss
-// most likely to be mistaken for one of them. No entry is another entry with a
-// '9' appended, which makes that suffix a spelling the table cannot contain.
 TEST(KeywordListLexing, KeywordWithTrailingDigitIsIdentifier) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string suffixed = std::string(kReservedKeywords[i].text) + "9";
@@ -422,9 +406,6 @@ TEST(KeywordListLexing, KeywordWithTrailingDigitIsIdentifier) {
   }
 }
 
-// A name may carry a '$' after its first character, so a listed word with one
-// appended is a legal identifier whose spelling is not the reserved word. That
-// is the near miss a scan keyed on letters and underscores alone would fumble.
 TEST(KeywordListLexing, KeywordWithTrailingDollarIsIdentifier) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string suffixed = std::string(kReservedKeywords[i].text) + "$";
@@ -439,9 +420,6 @@ TEST(KeywordListLexing, KeywordWithTrailingDollarIsIdentifier) {
   }
 }
 
-// Reservation is a property of the spelling alone, not of what surrounds it.
-// Whitespace never separates the word from its neighbours here, so a scan that
-// only recognized whitespace-delimited words would miss every one of these.
 TEST(KeywordListLexing, KeywordIsReservedWhenAdjacentToPunctuation) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string src = "(" + std::string(kReservedKeywords[i].text) + ")";
@@ -455,8 +433,6 @@ TEST(KeywordListLexing, KeywordIsReservedWhenAdjacentToPunctuation) {
   }
 }
 
-// A comment carries no token of its own, so the word that follows one begins a
-// fresh scan and is reserved exactly as it would be at the start of a line.
 TEST(KeywordListLexing, KeywordIsReservedImmediatelyAfterAComment) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string block = "/*c*/" + std::string(kReservedKeywords[i].text);
@@ -473,10 +449,6 @@ TEST(KeywordListLexing, KeywordIsReservedImmediatelyAfterAComment) {
   }
 }
 
-// The escape form is the boundary of the reservation: the very same letters,
-// introduced by a backslash, are a user-chosen name again rather than the
-// reserved word. The name the escape carries is the spelling without the
-// backslash, which is what makes this the closest rejecting input there is.
 TEST(KeywordListLexing, EscapedFormOfAKeywordIsAnIdentifier) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string escaped = "\\" + std::string(kReservedKeywords[i].text) + " ";
@@ -489,8 +461,6 @@ TEST(KeywordListLexing, EscapedFormOfAKeywordIsAnIdentifier) {
   }
 }
 
-// Inside a string literal there is no identifier scan at all, so a listed word
-// there is character data and yields one literal token.
 TEST(KeywordListLexing, KeywordInsideAStringLiteralIsNotReserved) {
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
     std::string quoted = "\"" + std::string(kReservedKeywords[i].text) + "\"";
@@ -501,53 +471,26 @@ TEST(KeywordListLexing, KeywordInsideAStringLiteralIsNotReserved) {
   }
 }
 
-// The reservation covers the table and stops there. These are names a reader
-// could plausibly expect to be reserved -- built-in class and method names the
-// language defines elsewhere, vocabulary from other hardware description
-// languages, and plural or near-miss spellings of listed words -- and every one
-// of them has to come back an ordinary identifier.
 TEST(KeywordListLexing, WordsOffTheReservedKeywordListAreNotReserved) {
   const char* const kNotReserved[] = {
-      // Names the language defines without reserving them.
-      "randomize",
-      "srandom",
-      "mailbox",
-      "semaphore",
-      "process",
-      "std",
-      "option",
-      "sample",
-      "size",
-      "delete",
-      "exists",
-      "num",
-      "get_randstate",
-      // Reserved words of other hardware description languages.
-      "variable",
-      "signal",
-      "entity",
-      "architecture",
-      "component",
-      "downto",
-      // Near misses of listed words.
-      "wired",
-      "logics",
-      "nettypes",
-      "endmodules",
-      "always_seq",
-      "interfaces",
-      "s_until_without",
-      "join_all",
-      "unique1",
-      "weak2",
-      "tri2",
-      "assertion",
-      // General-purpose vocabulary that is not on the list.
-      "bool",
-      "boolean",
-      "true",
-      "false",
-      "byte_enable",
+      "randomize",     "srandom",
+      "mailbox",       "semaphore",
+      "process",       "std",
+      "option",        "sample",
+      "size",          "delete",
+      "exists",        "num",
+      "get_randstate", "variable",
+      "signal",        "entity",
+      "architecture",  "component",
+      "downto",        "wired",
+      "logics",        "nettypes",
+      "endmodules",    "always_seq",
+      "interfaces",    "s_until_without",
+      "join_all",      "unique1",
+      "weak2",         "tri2",
+      "assertion",     "bool",
+      "boolean",       "true",
+      "false",         "byte_enable",
       "state",
   };
   for (const char* word : kNotReserved) {
@@ -561,8 +504,6 @@ TEST(KeywordListLexing, WordsOffTheReservedKeywordListAreNotReserved) {
   }
 }
 
-// Every word above is genuinely absent from the list this file checks, so the
-// negative sweep cannot be quietly asserting something about a listed word.
 TEST(KeywordListLexing,
      TheNonReservedVocabularyIsDisjointFromTheReservedKeywords) {
   const char* const kNotReserved[] = {
@@ -578,9 +519,6 @@ TEST(KeywordListLexing,
   }
 }
 
-// The reservation applies to the language as a whole, not to one word at a
-// time: the entire list run together as a single stream comes back as that
-// many keyword tokens, in order, with nothing merged and nothing dropped.
 TEST(KeywordListLexing, WholeListLexesAsThatManyKeywordsInOrder) {
   std::string all;
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {

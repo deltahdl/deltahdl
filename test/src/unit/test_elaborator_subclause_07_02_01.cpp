@@ -189,9 +189,6 @@ TEST(PackedStructValidation, NestedPackedStruct_Allowed) {
              "endmodule\n"));
 }
 
-// §7.2.1: a packed data type is legal as a packed-struct member. A packed union
-// is a packed data type, so it is accepted alongside the integral members
-// (distinct admitted form from the nested packed struct case above).
 TEST(PackedStructValidation, PackedStructPackedUnionMember_Allowed) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -248,12 +245,6 @@ TEST(PackedStructTyping, AnyFourStateMember_StructIsFourState) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §7.2.1: a packed structure admits only packed data types and the integer data
-// types of Table 6-8. A real member is neither. The subclause on the report is
-// what tells this rejection from the rules §7.2 carries over the same
-// declaration -- the void-member rule and the random-qualifier rule -- which
-// are reported under 7.2 rather than 7.2.1. This case reaches the elaborator
-// through the preprocessor, which the ElaborateSrc case above does not.
 TEST(PackedStructValidation, PackedStructRealMemberNames7_2_1) {
   ElabFixture f;
   ElabOk(
@@ -267,11 +258,6 @@ TEST(PackedStructValidation, PackedStructRealMemberNames7_2_1) {
                             2, "7.2.1"));
 }
 
-// §7.2.1: a member is as 4-state as the type it is written with, so a 4-state
-// type reached through a typedef name, a nested packed structure or an
-// enumeration's base makes the whole structure 4-state, and a 2-state one
-// reached the same ways leaves it 2-state. The first member of an unpacked
-// union decides that union the same way.
 TEST(PackedStructTyping, NamedNestedAndEnumMembersDecideTheState) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -304,11 +290,6 @@ TEST(PackedStructTyping, NamedNestedAndEnumMembersDecideTheState) {
   EXPECT_TRUE(is_4state("union4"));
 }
 
-// §7.2.1: a member of a packed structure is judged by the type it is written
-// with, whether that is reached through a typedef name or written in place,
-// and an unpacked structure is no packed type. A packed structure, union or
-// enumeration member is one; a structure nested in an unpacked one is judged
-// by its own packing.
 TEST(PackedStructValidation, MemberTypesAreJudgedThroughNamesAndNesting) {
   ElabFixture f;
   ElaborateSrc(

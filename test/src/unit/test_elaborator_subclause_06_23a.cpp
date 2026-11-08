@@ -236,9 +236,6 @@ TEST(TypeOperatorSim, TypeOpParameterTypeDefault) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §6.23 with §6.19.3: type(c) is c's enumeration, so the variable it declares
-// takes the enumeration's own constant BLUE, whose value is 2, as c would; an
-// integer assigned to it without a cast is refused.
 TEST(TypeOperatorSim, TypeOpEnumType) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -258,8 +255,6 @@ TEST(TypeOperatorSim, TypeOpEnumType) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §6.23 with §6.19.3: a variable a type reference to an enumeration variable
-// declares is of the enumeration, so the integer 2 assigned to it needs a cast.
 TEST(TypeOperatorSim, AVariableOfAnEnumerationVariablesTypeIsStrict) {
   SimFixture f;
   ElaborateSrc(
@@ -517,11 +512,6 @@ TEST(TypeOperatorSim, TypeOpBitTypeUnsigned) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// §6.23 — the type operator applied to an expression yields that expression's
-// self-determined type. Here the operand's type is produced by a user-defined
-// typedef (§6.18) built from real source syntax: `bus_t` names a 24-bit logic
-// vector, so `type(x)` derives a 24-bit unsigned type for the dependent
-// declaration. Driven through the full pipeline and observed at runtime.
 TEST(TypeOperatorSim, TypeOpTypedefVectorType) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -541,10 +531,6 @@ TEST(TypeOperatorSim, TypeOpTypedefVectorType) {
   EXPECT_EQ(var->value.ToUint64(), 0xABCDEFu);
 }
 
-// §6.23 has a type reference to a data type stand for that type. The parse
-// reads `int`, a typedef name and a type parameter's name as identifiers, and
-// none names a variable or a net here, so each is resolved as the type it
-// spells.
 TEST(TypeOperatorSim, TypeOfADataTypeOrATypedefIsThatType) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -575,12 +561,6 @@ TEST(TypeOperatorSim, TypeOfADataTypeOrATypedefIsThatType) {
   EXPECT_EQ(g->value.ToUint64(), 0x2Au);
 }
 
-// A type reference to a parameter stands for the parameter's type: the type
-// it was declared with, `int` for P, or, declared with no type, the logic
-// vector of its declared range or of its final value (§6.20.2): 12 bits for
-// Q, 8 for U and 4 for the parameter port V. An expression over a parameter
-// takes the parameter's width and signing, as one over a variable takes the
-// variable's.
 TEST(TypeOperatorSim, TypeOfAParameterIsTheParametersType) {
   SimFixture f;
   auto* b = RunAndFindVar(
@@ -625,9 +605,6 @@ TEST(TypeOperatorSim, TypeOfAParameterIsTheParametersType) {
   EXPECT_EQ(w->value.ToUint64(), 0xFu);
 }
 
-// §6.19.3 makes a typedef's enumeration a data type its named constants are
-// of, and §6.23 has a type reference to one of them stand for that type, so
-// `type(A)` declares v of e_t: four bits, holding B's 4'h4 whole.
 TEST(TypeOperatorSim, TypeOfANamedEnumerationsConstantIsTheEnumeration) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -642,10 +619,6 @@ TEST(TypeOperatorSim, TypeOfANamedEnumerationsConstantIsTheEnumeration) {
   EXPECT_EQ(v->value.ToUint64(), 4u);
 }
 
-// A constant of an enumeration written as a variable's type, with no typedef
-// to name it, stands for that enumeration all the same (§6.19.3): z is of w's
-// type, 32 bits signed as `int`, the default base type (§6.19), makes it, and
-// holds Y.
 TEST(TypeOperatorSim, TypeOfAnAnonymousEnumerationsConstantIsTheEnumeration) {
   SimFixture f;
   auto* z = RunAndFindVar(
@@ -661,9 +634,6 @@ TEST(TypeOperatorSim, TypeOfAnAnonymousEnumerationsConstantIsTheEnumeration) {
   EXPECT_EQ(z->value.ToUint64(), 1u);
 }
 
-// §6.19.3 checks an assignment to a variable of an enumerated type strictly,
-// and a variable a type reference to one of the enumeration's constants
-// declares is of that type: Y stands, and the integer 5 needs a cast.
 TEST(TypeOperatorSim, AVariableOfAnAnonymousEnumerationsConstantsTypeIsStrict) {
   SimFixture f;
   ElaborateSrc(
@@ -682,9 +652,6 @@ TEST(TypeOperatorSim, AVariableOfAnAnonymousEnumerationsConstantsTypeIsStrict) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §6.19 with §7.2 declares the constants of an enumeration written as a
-// structure member's type in the scope holding the structure, so P is the
-// module's, and type(P) stands for the member's two-bit enumeration.
 TEST(TypeOperatorSim, TypeOfAMemberEnumerationsConstantIsTheEnumeration) {
   SimFixture f;
   auto* z = RunAndFindVar(
@@ -699,13 +666,6 @@ TEST(TypeOperatorSim, TypeOfAMemberEnumerationsConstantIsTheEnumeration) {
   EXPECT_EQ(z->value.ToUint64(), 1u);
 }
 
-// §26.3 makes a package's declarations visible in a module that imports them,
-// by name or by a wildcard, and reachable through the package's scope; §3.12.1
-// makes the compilation unit's declarations before the module visible in it.
-// A type reference to any of these values stands for the value's type: pv's
-// six bits, W's `int` both imported and written p::W, g's three bits, QV's
-// ten through q's explicit import, and for the untyped U and R the eight bits
-// of U's value and R's declared [3:0] (§6.20.2).
 TEST(TypeOperatorSim, TypeOfAValueOfAPackageOrTheUnitIsItsType) {
   SimFixture f;
   auto* a = RunAndFindVar(
@@ -768,8 +728,6 @@ TEST(TypeOperatorSim, TypeOfAValueOfAPackageOrTheUnitIsItsType) {
   EXPECT_EQ(h->value.ToUint64(), 0xFu);
 }
 
-// §6.23 with §26.3 and §7.2 — a member of a structure variable a package
-// declares, `pkg::v.f`, names no scope, so it is no hierarchical reference.
 TEST(TypeOperatorElab, PackageStructureMemberInTypeArgAccepted) {
   EXPECT_TRUE(
       ElabOk("package pkg;\n"

@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// A source whose hierarchical name `path`, written at `line`, ends in a name
-// only the compilation-unit scope declares.
 struct UnitReachedByPath {
   const char* src;
   const char* path;
@@ -20,12 +18,6 @@ struct UnitReachedByPath {
   uint32_t line;
 };
 
-// §3.12.1 (printed page 57): no hierarchical reference reaches an identifier
-// the compilation-unit scope declares. A path from $root, a path headed by a
-// top-level instance's name or by the name of a module above the reference
-// (§23.8), each written in a module's procedural block, continuous assignment
-// or function, in a program, or in a task or function of the unit, ends at an
-// instance that declares no `g` of its own, and so names nothing.
 TEST(UnitScopeHierarchicalNames, PathEndingAtAUnitName) {
   const UnitReachedByPath kCases[] = {
       {"int g;\n"
@@ -103,10 +95,6 @@ TEST(UnitScopeHierarchicalNames, PathEndingAtAUnitName) {
   }
 }
 
-// The nearest allowed forms: each path ending at an instance that declares a
-// `g` of its own, which is what the path reaches whatever the unit declares,
-// and a name headed by a variable of the referencing module, which is read
-// from that variable rather than from the top-level instance of its name.
 TEST(UnitScopeHierarchicalNames, PathEndingAtAnInstancesOwnName) {
   EXPECT_TRUE(
       ElabOk("int g;\n"
@@ -141,11 +129,6 @@ TEST(UnitScopeHierarchicalNames, PathEndingAtAnInstancesOwnName) {
              "endmodule\n"));
 }
 
-// §23.3.1: with no top named, every module no other one instantiates is a
-// top-level instance, and a path headed by its name is read from it wherever
-// the path is written. Ending at a name only the unit declares, the path names
-// nothing; ending at the other module's own g, or headed by a variable of the
-// referencing module named like the other module, it is read as written.
 TEST(UnitScopeHierarchicalNames, PathHeadedByAnotherTopLevelInstance) {
   ElabFixture f;
   ElaborateWithPreprocessor(
@@ -156,7 +139,7 @@ TEST(UnitScopeHierarchicalNames, PathHeadedByAnotherTopLevelInstance) {
       "  int y;\n"
       "  initial y = other.g;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "hierarchical name 'other.g' is unresolved: 'g' "
                             "is declared in the compilation-unit scope",
@@ -178,12 +161,11 @@ TEST(UnitScopeHierarchicalNames, PathHeadedByAnotherTopLevelInstance) {
                           "  initial y = other.g;\n"
                           "endmodule\n"}) {
     ElabFixture ok;
-    ElaborateWithPreprocessor(src, ok, "", /*auto_top=*/true);
+    ElaborateWithPreprocessor(src, ok, "", true);
     EXPECT_FALSE(ok.has_errors) << src;
   }
 }
 
-// A module instantiated twice writes its path once, and it is reported once.
 TEST(UnitScopeHierarchicalNames, PathInAModuleInstantiatedTwiceReportedOnce) {
   ElabFixture f;
   EXPECT_FALSE(

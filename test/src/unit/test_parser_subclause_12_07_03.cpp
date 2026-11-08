@@ -215,9 +215,6 @@ TEST(LoopSyntaxParsing, ErrorForeachMissingCloseBracket) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ')'", 3, "12.7.3"));
 }
 
-// §12.7.3 — the implicit block a foreach creates is unnamed by default but can
-// be named by prefixing the statement with a label; the label attaches to the
-// foreach statement itself.
 TEST(LoopSyntaxParsing, ForeachCanBeNamedByLabel) {
   auto r = Parse(
       "module m;\n"
@@ -233,9 +230,6 @@ TEST(LoopSyntaxParsing, ForeachCanBeNamedByLabel) {
   EXPECT_EQ(stmt->label, "myloop");
 }
 
-// §12.7.3 — a loop-variable slot implicitly declares an index variable, so it
-// admits only an identifier; a function call in that position (its closest
-// rejected form) is not a valid implicit declaration and is an error.
 TEST(LoopSyntaxParsing, ErrorForeachFunctionCallAsLoopVar) {
   auto r = Parse(
       "module m;\n"
@@ -243,16 +237,9 @@ TEST(LoopSyntaxParsing, ErrorForeachFunctionCallAsLoopVar) {
       "    foreach (arr[f()]) x = 0;\n"
       "  end\n"
       "endmodule\n");
-  // Parser::ParseForeachVars takes `f` as the loop variable and stops, so the
-  // call's '(' is what stands where §12.7.3 requires the ']'.
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got '('", 3, "12.7.3"));
 }
 
-// §12.7.3 brackets the loop variables of a foreach, so a loop-variable list
-// left unclosed is rejected at the token standing where the ']' belongs. The
-// report names §12.7.3 rather than the token it wanted, which is what separates
-// it from ErrorForeachMissingCloseBracket above: that case reads the same
-// source and asks only whether it was rejected.
 TEST(ForeachStmt, MalformedLoopVariableListNames12_7_3) {
   auto r = Parse(
       "module m;\n"
@@ -261,15 +248,6 @@ TEST(ForeachStmt, MalformedLoopVariableListNames12_7_3) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ']'", 2, "12.7.3"));
 }
 
-// Covers Parser::ParseForeachArrayId in src/parser/parser_stmt_loop.cpp, which
-// builds the ExprKind::kMemberAccess a dotted foreach array name becomes. It
-// assigned no range.start before this commit, so a report standing at the array
-// name printed "<unknown location>" instead of a file, line and column. §12.7.3
-// writes the array as `ps_or_hierarchical_array_identifier`, a name whose
-// leading identifier opens it, so the node begins at `obj`, at column 20 of
-// line
-// 2. Parser::MakeMemberAccess in src/parser/expr_parser.cpp takes the same
-// position for a dotted name written in an expression.
 TEST(LoopSyntaxParsing, ForeachArrayNameStartsAtItsRoot) {
   auto r = Parse(
       "module m;\n"
@@ -285,13 +263,6 @@ TEST(LoopSyntaxParsing, ForeachArrayNameStartsAtItsRoot) {
   EXPECT_EQ(stmt->expr->range.start.column, 20u);
 }
 
-// A.9.3's hierarchical_identifier is `{ identifier constant_bit_select . }
-// identifier` (printed page 1214 of IEEE 1800-2023), so the array a
-// foreach names may select an element before each `.`:
-// `successors[s].m_predecessors` is one hierarchical_array_identifier and
-// `[pred]` alone is the loop_variables list. The parser took the first bracket
-// after the name for the loop variables and asked for `)` at the `.`, reporting
-// under §12.7.3.
 TEST(LoopSyntaxParsing, ForeachArrayMayBeAMemberOfASelectedElement) {
   auto r = Parse(
       "module m;\n"

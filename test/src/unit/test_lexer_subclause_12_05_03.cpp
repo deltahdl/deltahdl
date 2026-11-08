@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5.3 (N1): the lexer recognizes the three case-qualifier keywords that
-// may precede `case`, `casez`, or `casex`.
-
 TEST(CaseQualifierLexing, PriorityKeyword) {
   auto r = LexOne("priority");
   EXPECT_EQ(r.token.kind, TokenKind::kKwPriority);

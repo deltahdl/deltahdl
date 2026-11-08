@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §16.10: a name that is already a formal argument of a sequence declaration
-// cannot be redeclared as a body-scope local variable in an
-// assertion_variable_declaration. The elaborator must flag the redeclaration.
 TEST(LocalVariableElaboration, FormalArgumentRedeclaredInSequenceBodyIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -28,8 +25,6 @@ TEST(LocalVariableElaboration, FormalArgumentRedeclaredInSequenceBodyIsError) {
                             "16.10"));
 }
 
-// §16.10: the same rule applies to a property declaration — a formal that is
-// reintroduced as a body-scope local variable is illegal.
 TEST(LocalVariableElaboration, FormalArgumentRedeclaredInPropertyBodyIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,10 +41,6 @@ TEST(LocalVariableElaboration, FormalArgumentRedeclaredInPropertyBodyIsError) {
                             "16.10"));
 }
 
-// §16.10: a local variable formal argument (declared with the `local` keyword,
-// see §16.8.2) is itself a "local variable"; redeclaring its name as a
-// body-scope assertion_variable_declaration in the same sequence is the same
-// illegality as for a plain formal. The elaborator must flag the collision.
 TEST(LocalVariableElaboration, LocalFormalArgumentRedeclaredInBodyIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -66,9 +57,6 @@ TEST(LocalVariableElaboration, LocalFormalArgumentRedeclaredInBodyIsError) {
                             "16.10"));
 }
 
-// §16.10: a body-scope local variable whose name does not collide with any
-// formal argument is legal, even when the declaration appears alongside
-// formal arguments on the port list.
 TEST(LocalVariableElaboration, FreshBodyLocalAlongsideFormalElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -83,10 +71,6 @@ TEST(LocalVariableElaboration, FreshBodyLocalAlongsideFormalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.10: the local variables declared in a sequence are not visible where the
-// sequence is instantiated. The clause's own example: `seq1` instantiates
-// `sub_seq1` and then reads `v1`, which only `sub_seq1` declares, so the read
-// resolves to nothing and names the local it cannot reach.
 TEST(LocalVariableElaboration, InstantiatedSequencesLocalIsNotVisible) {
   ElabFixture f;
   ElaborateSrc(
@@ -109,10 +93,6 @@ TEST(LocalVariableElaboration, InstantiatedSequencesLocalIsNotVisible) {
                             10, "16.10"));
 }
 
-// §16.10 names the local only where the reading text instantiates the
-// declaration holding it. Here the assertion instantiates `s2` alone, so its
-// read of `v`, which only `s1` declares, is an unresolved name (§23.9) and
-// not an invisible local.
 TEST(LocalVariableElaboration, LocalOfASequenceNotInstantiatedIsUnresolved) {
   ElabFixture f;
   ElaborateSrc(
@@ -129,9 +109,6 @@ TEST(LocalVariableElaboration, LocalOfASequenceNotInstantiatedIsUnresolved) {
       ReportedError(f.diag.Diagnostics(), "is a local variable", 4, "16.10"));
 }
 
-// §16.10: a local variable is referenced only where an assignment reaches
-// it: x++ reads x before any; y does not flow out of the or whose b operand
-// leaves it unassigned; and the initialization of v reads u, which has none.
 TEST(LocalVariableFlow, AReferenceToAnUnassignedLocalIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -168,8 +145,6 @@ TEST(LocalVariableFlow, AReferenceToAnUnassignedLocalIsReported) {
   EXPECT_FALSE(reported("w", 17));
 }
 
-// §16.10: a local passed to an instance triggered is applied to is an entire
-// actual, never part of one: v1 + 1 is not, v1 is.
 TEST(LocalVariableFlow, ALocalInsideAnActualOfTriggeredIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -205,9 +180,6 @@ TEST(LocalVariableFlow, ALocalInsideAnActualOfTriggeredIsReported) {
                             17, "16.13.5"));
 }
 
-// §16.10: where triggered is applied to an instance and a local is the entire
-// actual of a formal, the sequence does not reference the formal before it
-// assigns it, as sub does lv.
 TEST(LocalVariableFlow, TriggeredOnASequenceReadingTheFormalFirstIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -237,8 +209,6 @@ TEST(LocalVariableFlow, TriggeredOnASequenceReadingTheFormalFirstIsReported) {
                             13, "16.13.5"));
 }
 
-// §16.10: a local variable assignment is not attached to a sequence that
-// admits an empty match: b[*0:1] admits one, while a ##1 b[*0:1] does not.
 TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchingSequenceIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -262,11 +232,6 @@ TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchingSequenceIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.10"));
 }
 
-// §16.10 with §16.9.9: a throughout's condition holds at every tick of the
-// sequence it governs, so reads x before (b, x = 1) assigns it; y, assigned
-// before the throughout, may be read there. That throughout is parenthesized,
-// since Table 16-1 binds ## tighter, which would make the sequence before it
-// its condition.
 TEST(LocalVariableFlow,
      AThroughoutConditionReadingAnUnassignedLocalIsReported) {
   ElabFixture f;
@@ -291,9 +256,6 @@ TEST(LocalVariableFlow,
                              "16.10"));
 }
 
-// §16.10 with §16.9.7: the rule holds where the assignment is written inside
-// a group that `or` makes a sequence of its own: b[*0:1] admits an empty
-// match there as in a chain, while a ##1 b[*0:1] does not.
 TEST(LocalVariableFlow, AnAssignmentOnAnEmptyMatchInsideAnOrGroupIsReported) {
   ElabFixture f;
   ElaborateSrc(

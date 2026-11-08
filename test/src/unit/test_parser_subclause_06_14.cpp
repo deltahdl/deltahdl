@@ -126,13 +126,6 @@ TEST(ChandleDataType, ChandleChandleEquality) {
               "endmodule\n"));
 }
 
-// §6.14 (printed page 111) makes chandle a data type, declared as
-// `chandle name;`, and A.2.2.1 (printed page 1182) lists it among data_type's
-// bare keyword alternatives, so a block item opening with it is a
-// data_declaration wherever A.2.8 places one: the locals of a function or
-// task body and the head of a seq_block. IsDataTypeKeyword left the keyword
-// out, so the parser read such a line as an expression statement and reported
-// "expected expression" under §11.2.
 TEST(ChandleDataType, ChandleQueueFirstLocalOfFunction) {
   auto r = Parse(
       "module m;\n"

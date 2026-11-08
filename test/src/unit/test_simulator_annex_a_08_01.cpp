@@ -91,10 +91,6 @@ TEST(ConcatenationSim, ConstantMultipleConcatenationSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xFFFFu);
 }
 
-// End-to-end observation that a concatenation operand may be a full §A.8.3
-// expression, not just a leaf literal or identifier. The single element is a
-// runtime sum; the concatenation forwards its self-determined value, which the
-// assignment truncates into the 8-bit target.
 TEST(ConcatenationSim, ConcatenationOfExpressionSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -111,11 +107,6 @@ TEST(ConcatenationSim, ConcatenationOfExpressionSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x35u);
 }
 
-// End-to-end observation of streaming_concatenation carrying a slice_size drawn
-// from the §A.2.2.1 simple_type 'byte'. The left-stream operator reorders the
-// stream in byte-sized slices, so the two source bytes 0xAB,0xCD are emitted
-// swapped as 0xCDAB — the slice width (8) is resolved from the type name and
-// drives the reordering.
 TEST(ConcatenationSim, StreamingConcatByteSliceSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -133,9 +124,6 @@ TEST(ConcatenationSim, StreamingConcatByteSliceSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDABu);
 }
 
-// slice_size's constant_expression alternative is any constant expression, an
-// operator over a parameter among them: W*2 is 8, so the left-stream operator
-// reverses the word's four bytes.
 TEST(ConcatenationSim, StreamingConcatOperatorSliceSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -149,10 +137,6 @@ TEST(ConcatenationSim, StreamingConcatOperatorSliceSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x44332211u);
 }
 
-// constant_multiple_concatenation's replication count is a constant_expression.
-// ConstantMultipleConcatenationSimulates covers a literal count; here the count
-// is a parameter, the other constant form, folded when the dependent parameter
-// is elaborated.
 TEST(ConcatenationSim, MultipleConcatenationParameterCountSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(

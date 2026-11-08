@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "helpers_scheduler.h"
@@ -82,10 +80,6 @@ TEST(InterfaceClassMethodConflict, InterfaceExtendsConflictResolvesAtRuntime) {
             7u);
 }
 
-// Claim A (runtime): the conflict is resolved by a single pure virtual
-// prototype re-declared in an intervening abstract virtual class, with the
-// concrete implementation supplied by the derived class. Dispatching through
-// the derived handle must reach that derived implementation.
 TEST(InterfaceClassMethodConflict, VirtualClassPrototypeResolvedMethodCalled) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
                       "  pure virtual function int f();\n"
@@ -112,10 +106,6 @@ TEST(InterfaceClassMethodConflict, VirtualClassPrototypeResolvedMethodCalled) {
             55u);
 }
 
-// Claim A (runtime): the single resolving method is not declared in the
-// implementing class at all but inherited as a concrete method from a base
-// class; that inherited method must be the one dispatched when the derived
-// object's method is called.
 TEST(InterfaceClassMethodConflict, InheritedConcreteMethodResolvesAtRuntime) {
   EXPECT_EQ(RunAndGet("interface class IA;\n"
                       "  pure virtual function int f();\n"

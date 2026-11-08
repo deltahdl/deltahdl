@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.7: the clause's C1 and C2. In doit's f.randomize() with block x is
-// the member of C1, hiding both the member of C2 and the argument, y is the
-// member of C2 and z the argument: with the member y at 10 and z at 5 every
-// one of 32 draws leaves f.x from 10 below 15, whatever the argument x, as
-// the design test/src/e2e/inline_constraints.sv runs it.
 TEST(InlineConstraintsRun, TheBlockResolvesInTheObjectThenTheCallersScope) {
   SimFixture f;
   std::string out = RunCapture(
@@ -44,10 +39,6 @@ TEST(InlineConstraintsRun, TheBlockResolvesInTheObjectThenTheCallersScope) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// 18.7: the clause's restricted block, obj.randomize() with (x) { x < y; }
-// in a function F(C obj, integer y): only x resolves into obj, so y is the
-// argument though obj declares a y, and over 32 draws obj.x lies below the
-// argument 20 on every one.
 TEST(InlineConstraintsRun, ARestrictedBlockResolvesOnlyTheListedNames) {
   SimFixture f;
   std::string out = RunCapture(
@@ -73,10 +64,6 @@ TEST(InlineConstraintsRun, ARestrictedBlockResolvesOnlyTheListedNames) {
   EXPECT_EQ(out, "32 32\n");
 }
 
-// §18.7 with §18.5.7.1: a foreach in an inline block may iterate an array of
-// the scope containing the call, which no property of the object names; its
-// elements are state, so none of the banned 1 to 3 is drawn and the other
-// relation of the block still holds.
 TEST(InlineConstraintsRun, AForeachIteratesAnArrayOfTheCallersScope) {
   SimFixture f;
   std::string out = RunCapture(
@@ -102,8 +89,6 @@ TEST(InlineConstraintsRun, AForeachIteratesAnArrayOfTheCallersScope) {
   EXPECT_EQ(out, "0 49\n");
 }
 
-// §18.7 with §18.5.7.1: a foreach in an inline block may iterate a queue of
-// the scope containing the call too, its elements read as state.
 TEST(InlineConstraintsRun, AForeachIteratesAQueueOfTheCallersScope) {
   SimFixture f;
   std::string out = RunCapture(
@@ -127,9 +112,6 @@ TEST(InlineConstraintsRun, AForeachIteratesAQueueOfTheCallersScope) {
   EXPECT_EQ(out, "0\n");
 }
 
-// §18.7 with §18.5.7.1: a foreach in an inline block naming a loop variable
-// per dimension of a multidimensional array of the calling scope iterates
-// every element, as state: none of the four banned values is drawn.
 TEST(InlineConstraintsRun, AForeachIteratesAMultidimensionalCallersArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -154,10 +136,6 @@ TEST(InlineConstraintsRun, AForeachIteratesAMultidimensionalCallersArray) {
   EXPECT_EQ(out, "0\n");
 }
 
-// 18.7: a dotted name of the block resolves downwards starting in the class
-// of the object being randomized before the scope containing the call, so
-// h.v reads the C's handle h, whose v is 9, though the module declares an
-// h whose v is 2: on every one of 4 calls the C's x is 9.
 TEST(InlineConstraintsRun, ADottedNameResolvesItsHeadInTheObjectFirst) {
   SimFixture f;
   std::string out = RunCapture(
@@ -184,11 +162,6 @@ TEST(InlineConstraintsRun, ADottedNameResolvesItsHeadInTheObjectFirst) {
   EXPECT_EQ(out, "4\n");
 }
 
-// 18.7: in a restricted block only the listed names resolve into the class
-// of the object being randomized, so with x alone listed the head of h.v
-// resolves in the scope containing the call, the module's h whose v is 2,
-// though the C declares an h whose v is 9: on every one of 4 calls the C's
-// x is 2.
 TEST(InlineConstraintsRun, ARestrictedBlocksUnlistedHeadResolvesInTheCaller) {
   SimFixture f;
   std::string out = RunCapture(
@@ -216,9 +189,6 @@ TEST(InlineConstraintsRun, ARestrictedBlocksUnlistedHeadResolvesInTheCaller) {
   EXPECT_EQ(out, "4\n");
 }
 
-// 18.7 with A.8.2: an object's randomize written with only its with clause
-// is the call randomize() with that clause: x is drawn under x == 7 and the
-// call returns 1 (#8151).
 TEST(InlineConstraintsRun, ACallWithNoArgumentListTakesItsClause) {
   SimFixture f;
   std::string out = RunCapture(

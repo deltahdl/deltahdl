@@ -20,9 +20,6 @@ using namespace delta;
 
 namespace {
 
-// Registers a void function `add_ten(ref r) { r = r + 10; }` and creates a
-// caller variable `x` initialized to `x_init`, returning that variable. Shared
-// by the PassByRef tests that exercise the same add_ten setup.
 Variable* SetupAddTenFunc(FuncFixture& f, uint64_t x_init) {
   auto* x_var = f.ctx.CreateVariable("x", 32);
   x_var->value = MakeLogic4VecVal(f.arena, 32, x_init);
@@ -59,11 +56,6 @@ TEST(PassByRef, PassByRefReadsCaller) {
   auto* func = f.arena.Create<ModuleItem>();
   func->kind = ModuleItemKind::kFunctionDecl;
   func->name = "read_ref";
-  // §13.4: a function whose return type is left implicit returns a `logic`
-  // scalar, and §13.4.1's internal variable then truncates the returned
-  // expression to that one bit. This fixture is about how an argument reaches
-  // the body, not about an implicit return type, so it declares one wide
-  // enough to carry the value the call is checked for.
   func->return_type.kind = DataTypeKind::kInt;
   func->func_args = {
       {Direction::kRef, false, false, false, {}, "r", nullptr, {}}};
@@ -226,12 +218,6 @@ TEST(QueueRef, SurvivesInsert) {
   EXPECT_EQ(q->elements[3].ToUint64(), 30u);
 }
 
-// §7.10.3: delete() removes every element, so the reference is outdated, and
-// the two elements pushed afterwards are new ones. The name of this test used
-// to say it covered a whole-queue assignment, which it never did -- Rule B is
-// covered in test_simulator_subclause_07_10_03.cpp. What it does state is that
-// an identity a delete discarded is not handed back out to a later push, which
-// would make an outdated reference write over an element pushed after it.
 TEST(QueueRef, OutdatedByDeleteAllNotReclaimedByLaterPush) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20, 30});
@@ -351,13 +337,6 @@ TEST(PassByRef, SwapViaRef) {
       {Direction::kRef, false, false, false, {}, "x", nullptr, {}},
       {Direction::kRef, false, false, false, {}, "y", nullptr, {}},
   };
-  // §13.4: a variable used in a function body must be declared; there is no
-  // implicit creation for procedural locals. Declare the temporary explicitly.
-  // The declaration carries a type because §10.7 truncates what is assigned to
-  // the width the type declares, and a DataType left as it is built is
-  // DataTypeKind::kImplicit, which §6.10 makes a scalar: the swap would carry
-  // one bit of each value through the temporary and hand back 0 for 10. `int`
-  // is the width the two variables above are created at.
   auto* tmp_decl = f.arena.Create<Stmt>();
   tmp_decl->kind = StmtKind::kVarDecl;
   tmp_decl->var_name = "tmp";
@@ -497,15 +476,6 @@ TEST(QueueRef, QueueRefOutOfBoundsFallsBackToValue) {
   EXPECT_EQ(q->elements[2].ToUint64(), 30u);
 }
 
-// §13.5.2 makes a ref argument the caller's own object rather than a copy, so
-// the copy-out a queue element ref needs -- an element being a bare vector
-// rather than a Variable to alias -- is a write to the caller's queue, and
-// §9.4.2 has it announce itself: a change to an object data member, an
-// aggregate element, or the size of a dynamically sized array a method or
-// function references makes the event expression be reevaluated. The watchers
-// are on the variable the queue was declared under. 99 against 20 is the
-// discriminating pair: 20 is what a run that notified on push_back and not on
-// the writeback leaves standing.
 TEST(QueueRef, RefElementWritebackWakesAnAlwaysCombReadingTheElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -526,11 +496,6 @@ TEST(QueueRef, RefElementWritebackWakesAnAlwaysCombReadingTheElement) {
   EXPECT_EQ(v, 99u);
 }
 
-// The other awaiter route onto the same notification -- the compound watcher an
-// event control arms rather than the inferred sensitivity list's -- so a fix
-// serving one could leave the other. The second push and the writeback are the
-// two changes to q[1] after the control armed, and a run that notified only on
-// the push counts one of them.
 TEST(QueueRef, RefElementWritebackWakesAnEventControlOnThatElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -552,10 +517,6 @@ TEST(QueueRef, RefElementWritebackWakesAnEventControlOnThatElement) {
   EXPECT_EQ(v, 2u);
 }
 
-// WritebackAssocRefs rather than WritebackQueueRefs, a separate function whose
-// notification is separate. The ref call is the only write in the design, so no
-// statement-path element writer is involved and the case stands on the
-// writeback alone.
 TEST(PassByRef, AssocRefElementWritebackWakesAnAlwaysCombReadingTheElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -574,10 +535,6 @@ TEST(PassByRef, AssocRefElementWritebackWakesAnAlwaysCombReadingTheElement) {
   EXPECT_EQ(v, 99u);
 }
 
-// The guard rather than a reproduction: a ref bound to a whole variable is
-// aliased rather than copied out, and the body's own write is what notifies.
-// It passes today, and it is what says the notification for the element case
-// was added beside that one rather than moved onto its path.
 TEST(PassByRef, RefWholeVariableWriteWakesAnAlwaysCombReadingIt) {
   auto v = RunAndGet(
       "module t;\n"
@@ -596,13 +553,6 @@ TEST(PassByRef, RefWholeVariableWriteWakesAnAlwaysCombReadingIt) {
   EXPECT_EQ(v, 99u);
 }
 
-// §13.5.2: an argument passed by reference is not copied into the subroutine's
-// area; the subroutine gets a reference to the original instead, matched on
-// equivalent data types, and §6.18 makes a name standing for the element type
-// equivalent to it. The gate that decides whether the reference is formed asked
-// a width that a typedef name answers 0 for, so the bind was declined and the
-// argument fell to the by-value bind: the write reached a copy and the element
-// stood still, which is the discriminating reading.
 TEST(QueueRef, TypedefRefFormalBindsToTheQueueElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -622,7 +572,6 @@ TEST(QueueRef, TypedefRefFormalBindsToTheQueueElement) {
   EXPECT_EQ(v, 6u);
 }
 
-// The associative element, bound by a function of its own beside it.
 TEST(PassByRef, TypedefRefFormalBindsToTheAssocElement) {
   auto v = RunAndGet(
       "module t;\n"
@@ -642,10 +591,6 @@ TEST(PassByRef, TypedefRefFormalBindsToTheAssocElement) {
   EXPECT_EQ(v, 6u);
 }
 
-// The guard on the gate still being one: a name standing for a type that is not
-// the element's is not equivalent to it, so no reference is formed and the
-// element stands. Without this the repair could read as "bind whatever was
-// asked for".
 TEST(QueueRef, RefFormalOfANonEquivalentTypedefDoesNotBind) {
   auto v = RunAndGet(
       "module t;\n"
@@ -666,10 +611,6 @@ TEST(QueueRef, RefFormalOfANonEquivalentTypedefDoesNotBind) {
   EXPECT_EQ(v, 5u);
 }
 
-// §13.5.2: an output argument is copied to its actual when the subroutine
-// returns, the actual being the caller's variable however it is spelled: a
-// task whose formal and actual share the name met, and a function whose
-// formal and actual share the name n, each write the caller's variable.
 TEST(ArgumentPassingSim, OutputActualSpelledLikeTheFormalIsWritten) {
   auto val = RunAndGet(
       "module t;\n"
@@ -693,11 +634,6 @@ TEST(ArgumentPassingSim, OutputActualSpelledLikeTheFormalIsWritten) {
   EXPECT_EQ(val, 310u);
 }
 
-// §13.5.2 has a ref formal refer to the caller's own variable rather than a
-// copy, and §8.2 lets an object be declared as a ref argument, the handle being
-// what is passed. So `r = new` through `ref C r` of a class method replaces
-// the object the caller's handle names, and `r.v = x` writes that object: the
-// caller reads 62 from its own handle, which held null before the call.
 TEST(PassByRef, ClassTypedRefFormalOfAMethodReplacesTheCallersObject) {
   auto val = RunAndGet(
       "class C; int v; endclass\n"
@@ -719,11 +655,6 @@ TEST(PassByRef, ClassTypedRefFormalOfAMethodReplacesTheCallersObject) {
   EXPECT_EQ(val, 62u);
 }
 
-// §13.5.2: two ref formals side by side, one a class handle and one an int,
-// each alias the caller's variable. The handle is null on entry, so the
-// method constructs into the caller's variable, calls a method on the object
-// through the formal and counts in the int; the caller reads 40 from its own
-// handle and 3 from its counter, packed as 4003.
 TEST(PassByRef, ClassTypedRefFormalBesideAnIntRefFormalBothAliasTheCaller) {
   auto val = RunAndGet(
       "class C; int v;\n"
@@ -747,12 +678,6 @@ TEST(PassByRef, ClassTypedRefFormalBesideAnIntRefFormalBothAliasTheCaller) {
   EXPECT_EQ(val, 4003u);
 }
 
-// §13.5.2 outside a class: an automatic module-level task (the clause bars
-// ref on a static-lifetime subroutine) with a class-typed ref formal
-// aliases the caller's handle the same way. The task first points the formal
-// at another object the caller holds, writes through it, then constructs a
-// fresh one; the caller's variable ends on the fresh object (v 7) and the
-// other object carries the write made while the formal named it (v 5).
 TEST(PassByRef, ClassTypedRefFormalOfAModuleTaskRebindsTheCallersHandle) {
   auto val = RunAndGet(
       "class C; int v; endclass\n"
@@ -773,14 +698,6 @@ TEST(PassByRef, ClassTypedRefFormalOfAModuleTaskRebindsTheCallersHandle) {
   EXPECT_EQ(val, 75u);
 }
 
-// §13.5.2 (printed page 348): an argument passed by reference is not copied
-// into the subroutine area; the subroutine reaches the original through a
-// reference, and the clause's own example passes a fixed-size unpacked array
-// so. The task scales every element through the formal, and the caller reads
-// 5, 10 and 15 from its own array, packed as 51015. 10203 is what the run
-// left standing when the formal aliased the whole-array placeholder the
-// lowerer declares under the array's name: `a[i]` then bit-selected a scalar
-// and the caller's elements were never written.
 TEST(PassByRef, RefFormalOfAFixedArrayScalesTheCallersElements) {
   auto val = RunAndGet(
       "module t;\n"
@@ -798,12 +715,6 @@ TEST(PassByRef, RefFormalOfAFixedArrayScalesTheCallersElements) {
   EXPECT_EQ(val, 51015u);
 }
 
-// §13.5.2 (printed page 349): the caller and the subroutine share one
-// representation of a ref argument, so a queue method run on the formal grows
-// the caller's queue. After push_front(3) and push_back(7) on a queue holding
-// 42 the caller reads three elements 3, 42, 7, packed with the size as
-// 334207. A formal bound to anything but the caller's QueueObject leaves the
-// queue at its one element: size 1 and 42 in front, 520000.
 TEST(PassByRef, RefFormalOfAQueueGrowsTheCallersQueue) {
   auto val = RunAndGet(
       "module t;\n"
@@ -821,10 +732,6 @@ TEST(PassByRef, RefFormalOfAQueueGrowsTheCallersQueue) {
   EXPECT_EQ(val, 334207u);
 }
 
-// §13.5.2 (printed page 349), for an associative array: the entries the task
-// writes through the formal are the caller's, so the caller's array holds two
-// entries and reads 100 under "x", packed as 2100. An array the formal did not
-// reach stays empty and reads 0 for both.
 TEST(PassByRef, RefFormalOfAnAssocArrayFillsTheCallersArray) {
   auto val = RunAndGet(
       "module t;\n"
@@ -842,11 +749,6 @@ TEST(PassByRef, RefFormalOfAnAssocArrayFillsTheCallersArray) {
   EXPECT_EQ(val, 2100u);
 }
 
-// §13.5.2 (printed page 349): a variable is a legal ref actual whatever its
-// type, and an unpacked structure passed so is written member by member in
-// the caller's storage. The caller reads 8 and 9 from its own members, packed
-// as 89; a formal that reached the variable without its layout resolved `x.a`
-// to no member at all and left both at 0.
 TEST(PassByRef, RefFormalOfAnUnpackedStructWritesTheCallersMembers) {
   auto val = RunAndGet(
       "module t;\n"
@@ -863,12 +765,6 @@ TEST(PassByRef, RefFormalOfAnUnpackedStructWritesTheCallersMembers) {
   EXPECT_EQ(val, 89u);
 }
 
-// §13.5.2 (printed page 350): a const ref formal is passed by reference and
-// read only, so the callee reads the caller's elements themselves, indexed
-// and through foreach. one(data) reads 20 from element 1 and total(data) sums
-// 10, 20, 5 and 25 to 60, packed as 2060. Bound to the scalar placeholder the
-// formal read bit 1 of an 8-bit variable and summed its 8 bits, nowhere near
-// the elements.
 TEST(PassByRef, ConstRefFormalOfAFixedArrayReadsTheCallersElements) {
   auto val = RunAndGet(
       "module t;\n"
@@ -888,11 +784,6 @@ TEST(PassByRef, ConstRefFormalOfAFixedArrayReadsTheCallersElements) {
   EXPECT_EQ(val, 2060u);
 }
 
-// §13.5.2 (printed page 349) lists an element of an unpacked array among what
-// may be passed by reference, beside a variable. The task adds through the
-// formal; the plain variable reads 12 and the element 45, packed as 1245.
-// 1240 is what stood when the element actual fell to the by-value bind, the
-// plain variable written in place and the element's copy thrown away.
 TEST(PassByRef, RefFormalBoundToAFixedArrayElementWritesTheElement) {
   auto val = RunAndGet(
       "module t;\n"
@@ -910,12 +801,6 @@ TEST(PassByRef, RefFormalBoundToAFixedArrayElementWritesTheElement) {
   EXPECT_EQ(val, 1245u);
 }
 
-// §13.5.2 (printed page 349) lists a class property and a member of an
-// unpacked structure as well. Neither is a variable of its own, so the write
-// through the formal reaches the caller as the copy-out a queue element's
-// takes: the member reads 25 and the property 65 after the calls, with the
-// untouched member beside them at 1, packed as 12565. 10560 is the
-// by-value bind's answer, the member at 5 and the property at 60.
 TEST(PassByRef, RefFormalBoundToAStructMemberOrAClassPropertyWritesIt) {
   auto val = RunAndGet(
       "module t;\n"

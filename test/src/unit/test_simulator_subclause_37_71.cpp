@@ -13,29 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.71 If, if-else: the object model diagram draws a dotted enclosure holding
-// a plain if statement and an if-else statement. From the enclosure it draws a
-// vpiCondition edge to a controlling condition expression and an unlabeled edge
-// to a body statement - the then-branch the condition selects, whose relation
-// §37.4.3 names by putting "vpi" in front of the target enclosure's words - and
-// from the if-else alone a vpiElseStmt edge to a second body statement. Both
-// kinds carry an int vpiQualifier property (the unique/priority qualifier
-// flags). The clause has no numbered Details and no 'shall' sentences.
-//
-// §37.4.1 makes a dotted enclosure a class that groups other objects and
-// classes rather than a kind of its own, so both branches carry the kind a
-// statement of a design carries - a begin, an assignment, another if - and
-// neither carries vpiStmt, which is the class's name. Read the other way, as a
-// child whose own type is the relation tag, the then-branch of every
-// conditional was reached by nothing and the else-branch, which is found by
-// counting statement children, was never reached either because the count never
-// got past the first. These tests observe the production path for each edge:
-// the condition through VpiIfConditionExpr, the then-branch through the body
-// resolver the process, loop, wait and forever kinds share, and the
-// else-branch through VpiIfElseStmt, all reached by their public dispatch.
-
-// The fixture installs a context so the public vpi_handle / vpi_get entry
-// points run their real dispatch over the test objects.
 class IfIfElse : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -43,14 +20,12 @@ class IfIfElse : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// vpiCondition edge: a plain if statement reaches its condition expression
-// through the public vpi_handle(vpiCondition, ...) dispatch path.
 TEST_F(IfIfElse, IfStatementReachesConditionThroughVpiCondition) {
   VpiObject condition;
-  condition.type = vpiOperation;  // an expression kind
+  condition.type = vpiOperation;
 
   VpiObject then_body;
-  then_body.type = vpiBegin;  // a kind the `stmt` class groups
+  then_body.type = vpiBegin;
 
   VpiObject if_stmt;
   if_stmt.type = vpiIf;
@@ -60,11 +35,9 @@ TEST_F(IfIfElse, IfStatementReachesConditionThroughVpiCondition) {
             &condition);
 }
 
-// vpiCondition edge: an if-else statement reaches its condition the same way -
-// the edge is drawn from the enclosure, so it serves both conditional kinds.
 TEST_F(IfIfElse, IfElseStatementReachesConditionThroughVpiCondition) {
   VpiObject condition;
-  condition.type = vpiRefObj;  // another expression kind
+  condition.type = vpiRefObj;
 
   VpiObject then_body;
   then_body.type = vpiBegin;
@@ -80,12 +53,9 @@ TEST_F(IfIfElse, IfElseStatementReachesConditionThroughVpiCondition) {
             &condition);
 }
 
-// vpiCondition edge: the condition is found even when a body statement precedes
-// it in the child list. The scan skips the body and returns the first
-// expression child.
 TEST_F(IfIfElse, ConditionFoundWhenItFollowsABodyChild) {
   VpiObject then_body;
-  then_body.type = vpiBegin;  // a statement, not an expression, listed first
+  then_body.type = vpiBegin;
 
   VpiObject condition;
   condition.type = vpiOperation;
@@ -98,10 +68,6 @@ TEST_F(IfIfElse, ConditionFoundWhenItFollowsABodyChild) {
             &condition);
 }
 
-// vpiCondition edge is scoped to the conditional statements: asking some other
-// statement kind for vpiCondition does not pick up an expression child through
-// this path. A repeat control (§37.69 draws its own edges) with an expression
-// child yields no condition from the if/if-else dispatch.
 TEST_F(IfIfElse, VpiConditionIsScopedToConditionalStatements) {
   VpiObject expr;
   expr.type = vpiOperation;
@@ -113,11 +79,6 @@ TEST_F(IfIfElse, VpiConditionIsScopedToConditionalStatements) {
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&other)), nullptr);
 }
 
-// vpiCondition edge, no-condition edge case: a conditional statement that
-// carries only body statements (no expression child) yields no condition. This
-// reaches the dedicated VpiIfConditionExpr scan - distinct from the scoped test
-// above, which is rejected at the type gate before the scan runs - and observes
-// the scan completing over the children without finding an expression.
 TEST_F(IfIfElse, ConditionIsNullWhenNoExpressionChild) {
   VpiObject then_body;
   then_body.type = vpiBegin;
@@ -131,10 +92,6 @@ TEST_F(IfIfElse, ConditionIsNullWhenNoExpressionChild) {
   EXPECT_EQ(vpi_handle(vpiCondition, VpiHandleOf(&if_stmt)), nullptr);
 }
 
-// Then-branch edge (the enclosure's unlabeled arrow to `stmt`): an if-else
-// statement reaches the branch the condition selects through
-// vpi_handle(vpiStmt, ...) - the first statement child, told from the
-// else-branch by position.
 TEST_F(IfIfElse, ThenBodyReachedByTheKindTheStmtClassGroups) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -153,9 +110,6 @@ TEST_F(IfIfElse, ThenBodyReachedByTheKindTheStmtClassGroups) {
             &then_body);
 }
 
-// Then-branch edge: the arrow is drawn from the enclosure, so a plain if
-// reaches its branch by it too, and it reaches one whatever kind the branch is
-// written as - a lone statement, a block, or a nested conditional.
 TEST_F(IfIfElse, PlainIfReachesEachKindAThenBranchCarries) {
   for (int body_kind :
        {vpiAssignment, vpiNamedBegin, vpiFork, vpiIf, vpiNullStmt}) {
@@ -175,9 +129,6 @@ TEST_F(IfIfElse, PlainIfReachesEachKindAThenBranchCarries) {
   }
 }
 
-// vpiElseStmt edge: an if-else statement reaches its else-branch - the second
-// statement child - through the public vpi_handle(vpiElseStmt, ...) dispatch,
-// distinct from the then-branch the unlabeled arrow reaches.
 TEST_F(IfIfElse, IfElseStatementReachesElseBranchThroughVpiElseStmt) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -198,10 +149,6 @@ TEST_F(IfIfElse, IfElseStatementReachesElseBranchThroughVpiElseStmt) {
             &else_body);
 }
 
-// vpiElseStmt edge: an else-branch written as a nested if - the else-if chain
-// of 12.4 - is the second statement child like any other, and the two branches
-// are told apart by position rather than by kind even where both carry the same
-// one.
 TEST_F(IfIfElse, ElseBranchWrittenAsANestedConditionalIsTheSecondStatement) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -222,9 +169,6 @@ TEST_F(IfIfElse, ElseBranchWrittenAsANestedConditionalIsTheSecondStatement) {
             &else_body);
 }
 
-// vpiElseStmt is drawn only from the if-else: a plain if reports no else branch
-// even when it carries a second statement child, because the relation is gated
-// on the if-else kind.
 TEST_F(IfIfElse, PlainIfReportsNoElseStatement) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -242,9 +186,6 @@ TEST_F(IfIfElse, PlainIfReportsNoElseStatement) {
   EXPECT_EQ(vpi_handle(vpiElseStmt, VpiHandleOf(&if_stmt)), nullptr);
 }
 
-// vpiElseStmt edge: an if-else carrying only a then branch reports no else
-// branch, so the one statement it holds is not handed back for both edges, and
-// a null handle reports none either.
 TEST_F(IfIfElse, ElseStatementIsNullWhenNoElseBranch) {
   VpiObject condition;
   condition.type = vpiOperation;
@@ -260,10 +201,6 @@ TEST_F(IfIfElse, ElseStatementIsNullWhenNoElseBranch) {
   EXPECT_EQ(VpiIfElseStmt(nullptr), nullptr);
 }
 
-// Property (-> qualifier int: vpiQualifier): an if or if-else statement reports
-// its qualifier flags (a bitwise OR of the unique/priority/etc. qualifiers,
-// vpiNoQualifier when none) as an int property through the public vpi_get
-// dispatch.
 TEST_F(IfIfElse, ConditionalStatementReportsQualifier) {
   VpiObject if_stmt;
   if_stmt.type = vpiIf;
@@ -275,17 +212,13 @@ TEST_F(IfIfElse, ConditionalStatementReportsQualifier) {
   if_else.qualifier = vpiPriorityQualifier;
   EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&if_else)), vpiPriorityQualifier);
 
-  // An if statement written with no qualifier reports the "none" sentinel.
   VpiObject plain_if;
   plain_if.type = vpiIf;
   EXPECT_EQ(vpi_get(vpiQualifier, VpiHandleOf(&plain_if)), vpiNoQualifier);
 }
 
-// The if statements of a run: those a design's procedures write, built from
-// the elaborated design rather than by hand (#5004).
 class IfStatementsOfARun : public VpiDesignRun {
  protected:
-  // The statements the procedures of `top` run, in order.
   static std::vector<vpiHandle> Bodies() {
     std::vector<vpiHandle> bodies;
     vpiHandle it = vpi_iterate(vpiProcess, By("top"));
@@ -296,8 +229,6 @@ class IfStatementsOfARun : public VpiDesignRun {
   }
 };
 
-// An if reaches its condition, written as a name here, and the statement it
-// guards, and no else statement; it carries no qualifier.
 TEST_F(IfStatementsOfARun, AnIfIsAnObjectOfTheRun) {
   Run("module top; int a, b; initial if (a) b = 1; endmodule\n");
   const std::vector<vpiHandle> kBodies = Bodies();
@@ -314,8 +245,6 @@ TEST_F(IfStatementsOfARun, AnIfIsAnObjectOfTheRun) {
   EXPECT_EQ(vpi_handle(vpiElseStmt, branch), nullptr);
 }
 
-// An if-else reaches the two statements it chooses between, an else if being
-// an if of its own; a unique or priority keyword is its qualifier.
 TEST_F(IfStatementsOfARun, AnIfElseReachesBothBranches) {
   Run("module top; int a, b;\n"
       "  initial unique if (a == 1) b = 1; else b = 2;\n"
@@ -342,9 +271,6 @@ TEST_F(IfStatementsOfARun, AnIfElseReachesBothBranches) {
   EXPECT_EQ(vpi_get(vpiType, nested), vpiIf);
 }
 
-// An if-else reaches its else branch through vpiElseStmt whatever its then
-// branch stands as, one that stands as no object, as `i++` may, among them:
-// the branches are told apart by which each is, not by how many came before.
 TEST_F(IfStatementsOfARun, AnElseBranchIsReachedWhateverTheThenBranchIs) {
   Run("module top; int c, i, j;\n"
       "  initial if (c) i++; else j = 1;\n"
@@ -361,9 +287,6 @@ TEST_F(IfStatementsOfARun, AnElseBranchIsReachedWhateverTheThenBranchIs) {
   EXPECT_NE(VpiObjectOf(vpi_handle(vpiStmt, branch)), VpiObjectOf(otherwise));
 }
 
-// Annex M gives vpiQualifier no unique0 bit; §12.4.2 makes a unique0-if
-// assert the same absence of overlap a unique-if does, so an if or if-else
-// written with unique0 reports the unique qualifier, and no other bit (#5063).
 TEST_F(IfStatementsOfARun, AUnique0IfReportsTheUniqueQualifier) {
   Run("module top; int a, b;\n"
       "  initial unique0 if (a) b = 1;\n"
@@ -379,7 +302,6 @@ TEST_F(IfStatementsOfARun, AUnique0IfReportsTheUniqueQualifier) {
   EXPECT_EQ(vpi_get(vpiQualifier, kBodies[1]), vpiUniqueQualifier);
 }
 
-// §37.71: no if statement has no condition.
 TEST(IfModel, NoObjectHasNoCondition) {
   EXPECT_EQ(VpiIfConditionExpr(nullptr), nullptr);
 }

@@ -35,18 +35,12 @@ namespace delta {
 
 namespace {
 
-// §37.12 detail 6: the vpiJoinType of a fork closed by `keyword`.
 int JoinTypeOf(TokenKind keyword) {
   if (keyword == TokenKind::kKwJoinAny) return vpiJoinAny;
   if (keyword == TokenKind::kKwJoinNone) return vpiJoinNone;
   return vpiJoin;
 }
 
-// §37.12: the kind of block `stmt` is, 0 where it is none: a named begin or
-// fork where it has a label, and a begin or fork where it has none. Detail 1
-// makes the first always a scope and the second one only where it directly
-// declares a block item; a block that is no scope is a statement all the same
-// (§37.60), standing between the statements it holds and the scope around it.
 int BlockKind(const Stmt& stmt) {
   if (stmt.kind != StmtKind::kBlock && stmt.kind != StmtKind::kFork) return 0;
   bool is_fork = stmt.kind == StmtKind::kFork;
@@ -54,10 +48,6 @@ int BlockKind(const Stmt& stmt) {
   return is_fork ? vpiFork : vpiBegin;
 }
 
-// §37.60: the object an atomic statement of `type` stands as, hung from the
-// block or statement it is written in, whose nearest scope is what its
-// vpiScope reads (§37.12 with §37.63) and below which §38.36.1.3 reads a
-// module's statements off, its label its vpiName.
 VpiObject* MakeAtomicStatement(const Stmt& stmt, int type,
                                const BlockParent& parent,
                                const BodyWalk& walk) {
@@ -72,21 +62,12 @@ VpiObject* MakeAtomicStatement(const Stmt& stmt, int type,
   return obj;
 }
 
-// §37.17: the object kind of a variable a block declares, as a module's of its
-// type is. An unpacked array of events is a named event array (§37.27), and
-// one of any other element one array var (§37.17 detail 1).
 int BlockVariableKind(const Stmt& decl, const BodyWalk& walk) {
   const int kKind = TypeVariableKind(decl.var_decl_type, walk);
   if (decl.var_unpacked_dims.empty()) return kKind;
   return kKind == vpiNamedEvent ? vpiNamedEventArray : vpiRegArray;
 }
 
-// §37.12: the key the run makes the storage of the variable `name` the block
-// `stmt` declares under, as BindNamedBlockVariable (stmt_exec_control.cpp)
-// enters it when the block runs: the instance's prefix, the generate block
-// instance the procedure stands in, and the named blocks from the outermost
-// in; empty where no named block encloses the variable, which the run keys
-// under no such path.
 std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
                                 const BlockParent& parent,
                                 const BodyWalk& walk) {
@@ -98,8 +79,6 @@ std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
     }
   }
   if (scopes.empty()) return {};
-  // A body walked with no generate block names around it, such as that of a
-  // task or function the instance declares, carries no prefixes at all.
   const std::string kGen =
       walk.gen_prefixes == nullptr || walk.gen_prefixes->empty()
           ? ""
@@ -107,8 +86,6 @@ std::string BlockVariableRunKey(std::string_view name, const Stmt& stmt,
   return VpiFlatName(walk.prefix, kGen + scopes + std::string(name));
 }
 
-// §6.21: whether `scope` stands in a task or function declared automatic, in
-// which a variable a block declares with no lifetime of its own is automatic.
 bool InAutomaticSubroutine(const VpiObject* scope) {
   for (; scope != nullptr; scope = scope->parent) {
     if (VpiIsTaskFuncType(scope->type)) return scope->automatic;
@@ -116,11 +93,6 @@ bool InAutomaticSubroutine(const VpiObject* scope) {
   return false;
 }
 
-// §37.12 (figure): the variables a block declares hang from it, each named
-// under the block's path and keyed as the run keys its storage, and automatic
-// where it is declared so or declared with no lifetime in an automatic task or
-// function (§6.21), which §37.43 details 2 and 3 read. A block parameter is a
-// block item declaration but no variable.
 void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
                         const std::string& path, const BlockParent& parent,
                         const BodyWalk& walk) {
@@ -138,10 +110,6 @@ void MakeBlockVariables(VpiObject* block, const Stmt& stmt,
   }
 }
 
-// §15.5.1 with §23.6: the name a trigger names its event by as written, an
-// identifier or a hierarchical name of identifiers joined by periods, `m.e`;
-// empty for a target written through anything else, such as a select of an
-// array of events, which names no one declaration of the design.
 std::string EventTriggerTargetName(const Stmt& stmt) {
   std::vector<std::string_view> names;
   if (!ChainNames(*stmt.expr, names)) return {};
@@ -152,12 +120,6 @@ std::string EventTriggerTargetName(const Stmt& stmt) {
   return joined;
 }
 
-// §23.9 with §23.8: the named event object `name`, written by a statement
-// standing in `parent`, resolves to: one a block around the statement
-// declares, the innermost first, or else one found below the instance or, by
-// an upward name, below an instance enclosing it, the nearest first. Null where
-// the name reaches no object the design built, such as a class's event
-// property, which each object of the class holds for itself.
 VpiObject* TriggeredEvent(const std::string& name, const BlockParent& parent,
                           const BodyWalk& walk) {
   const BlockParent* where = nullptr;
@@ -174,16 +136,10 @@ VpiObject* TriggeredEvent(const std::string& name, const BlockParent& parent,
   }
 }
 
-// §37.62: the event statement a trigger stands as.
 VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
                               const BodyWalk& walk) {
   VpiObject* obj = MakeAtomicStatement(stmt, vpiEventStmt, parent, walk);
-  // §9.7.2: "->" is the blocking event trigger and "->>" the nonblocking one,
-  // which is the whole of what the property distinguishes.
   obj->blocking = stmt.kind == StmtKind::kEventTrigger;
-  // The figure's single arrow, which the generic one-to-one traversal walks by
-  // the kind of the child: the named event object the design already carries
-  // for the declaration, not a second one standing for the same event.
   const std::string kTarget = EventTriggerTargetName(stmt);
   if (kTarget.empty()) return obj;
   VpiObject* event = TriggeredEvent(kTarget, parent, walk);
@@ -191,12 +147,6 @@ VpiObject* MakeEventStatement(const Stmt& stmt, const BlockParent& parent,
   return obj;
 }
 
-// §37.42: the arguments `expr`, standing in `parent`, was written with, in
-// order, each the expression object the instance's names resolve it to
-// (§37.58, §37.59), an empty position being detail 8's empty argument and the
-// special value null, which the parser reads as a name, its null constant. An
-// expression of a kind the model builds no object for is passed over, and
-// recorded as a written argument of none.
 void MakeCallArguments(VpiObject* call, const Expr& expr,
                        const BlockParent& parent, const BodyWalk& walk) {
   if (expr.kind != ExprKind::kCall && expr.kind != ExprKind::kSystemCall) {
@@ -221,23 +171,15 @@ void MakeCallArguments(VpiObject* call, const Expr& expr,
   }
 }
 
-// §7.12.1: the array locator methods, whose calls §37.42 detail 1 has
-// vpiWith reach the with expression of.
 constexpr std::array<std::string_view, 10> kLocatorMethods = {
     "find",      "find_index",      "find_first", "find_first_index",
     "find_last", "find_last_index", "min",        "max",
     "unique",    "unique_index"};
 
-// §18.7 with §37.34: the constraint the inline constraint block `block` of
-// the call `call` of randomize stands as, a constraint §37.31 detail 3 calls
-// inline. A name in it finds the properties of the class `defn` of the
-// randomized object, and of those it extends, ahead of the declarations of
-// the scope the call stands in.
 VpiObject* InlineConstraint(const ClassMember& block, VpiObject* call,
                             const VpiObject* defn, const BlockParent& parent,
                             const BodyWalk& walk) {
   static const GenBlockPrefixes kNoGenBlocks;
-  // §37.42: a call the block makes stands where the call of randomize does.
   const VpiCallStand kStand{parent.scope, &walk.mod};
   VpiObject* constraint = VpiMakeConstraint(
       block, call,
@@ -250,11 +192,6 @@ VpiObject* InlineConstraint(const ClassMember& block, VpiObject* call,
   return constraint;
 }
 
-// §37.42 detail 1: what a call `expr` of a randomize method or an array
-// locator method is written with, hung from `call`'s vpiWith: the inline
-// constraint block of a call of randomize (§18.7), a constraint §37.31 detail 3
-// calls inline, or the with expression of a locator method's call. Any other
-// call, with clause or not, has no vpiWith.
 void MakeWithClause(VpiObject* call, std::string_view method, const Expr& expr,
                     const BlockParent& parent, const BodyWalk& walk) {
   call->tf_with_method =
@@ -262,8 +199,6 @@ void MakeWithClause(VpiObject* call, std::string_view method, const Expr& expr,
       (method == "randomize" ||
        std::ranges::find(kLocatorMethods, method) != kLocatorMethods.end());
   if (!call->tf_with_method) return;
-  // §18.7: the identifier list of a restricted block, randomize() with (a)
-  // {...}, is kept as a with expression too, so the block is looked for first.
   if (expr.inline_constraint != nullptr) {
     call->tf_with = InlineConstraint(
         *expr.inline_constraint, call,
@@ -275,31 +210,15 @@ void MakeWithClause(VpiObject* call, std::string_view method, const Expr& expr,
   }
 }
 
-// §37.42: give `call` what the shape `shape` of the call `called`, standing
-// in `parent`, says it is: its kind, its name, what a method is applied to
-// (detail 2), the subroutine it calls, whether that is user-defined, the
-// systf of a registered system task or function, its arguments and its with
-// clause (detail 1). The call is recorded under the call written and the
-// instance writing it, whether a statement or an expression writes it: as the
-// call a run's invocation of a registered system task or function stands as
-// (detail 3), and as what the frame of a subroutine it enters was activated
-// from (§37.43 detail 6).
 void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
               const BlockParent& parent, const BodyWalk& walk) {
   call->type = shape.type;
-  // §37.60 detail 1: a call written as a statement is named by its label,
-  // which MakeAtomicStatement gave it, or not at all; only a call within an
-  // expression is named after what it calls. The callee is reached through
-  // vpiTask or vpiFunction either way.
   if (!call->written_as_stmt) {
     call->name = walk.build.keep(std::string(shape.name));
   }
   call->tf_prefix = shape.prefix;
   call->prefix_members = shape.prefix_members;
   call->tf_decl = shape.called;
-  // A function call's vpiFuncType is the kind of value its function returns
-  // (§37.41), and a system function call's the one its registration gives
-  // (§38.37.1).
   call->func_type =
       shape.called != nullptr ? shape.called->func_type : shape.sysfunctype;
   call->user_defined = shape.user_defined;
@@ -309,14 +228,6 @@ void FillCall(VpiObject* call, const CallShape& shape, const Expr& called,
   walk.calls.sites[{&called, walk.prefix}] = call;
 }
 
-// §37.42 with §37.60: the call statement `stmt` stands as, null for a
-// statement that calls nothing the walk resolves. It is marked as written as
-// a statement, which tells a function call standing as one from a function
-// call standing as an expression, and leaves it named by its label alone
-// (§37.60 detail 1). A system task or function call decompiles to the call
-// written (detail 9). A function call written in a void cast, void'(f());
-// (§13.4.1), is the call it wraps: the parser records that statement as the
-// cast, the one cast a statement can be.
 VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
                              const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt) return nullptr;
@@ -333,10 +244,6 @@ VpiObject* MakeCallStatement(const Stmt& stmt, const BlockParent& parent,
   return call;
 }
 
-// §9.3.5: whether the label on `stmt` creates a named begin around it. A label
-// on a begin or fork is the block's name, and one on a foreach loop, or on a
-// for loop declaring its variables, names the block the loop creates; on any
-// other statement it creates a named begin-end block of its own.
 bool LabelCreatesNamedBegin(const Stmt& stmt) {
   if (stmt.label.empty() || stmt.kind == StmtKind::kBlock ||
       stmt.kind == StmtKind::kFork || stmt.kind == StmtKind::kForeach) {
@@ -346,9 +253,6 @@ bool LabelCreatesNamedBegin(const Stmt& stmt) {
          stmt.for_init_types.front().kind == DataTypeKind::kImplicit;
 }
 
-// A block or scope object of `kind` hung from the block, statement or scope
-// around it, named `label` under the path the scope extends, which `path` is
-// set to; an unnamed block leaves the path as it was.
 VpiObject* MakeScopeObject(int kind, std::string_view label,
                            const BlockParent& parent, const BodyWalk& walk,
                            std::string& path) {
@@ -369,14 +273,12 @@ VpiObject* MakeScopeObject(int kind, std::string_view label,
 VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
                     const BodyWalk& walk);
 
-// The statements `stmt` holds, each walked for the objects it writes.
 void WalkSubStmts(const Stmt& stmt, const BlockParent& parent,
                   const BodyWalk& walk) {
   ForEachChildStmt(&stmt,
                    [&](const Stmt* sub) { WalkStmt(sub, parent, walk); });
 }
 
-// What a statement at `parent` builds with, while `parent` and `walk` live.
 VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
   return {walk.build,
           [site = CallSiteOf(parent, walk), &walk](const Expr* expr) {
@@ -395,9 +297,6 @@ VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
             return VpiCallSiteAssignedExpression(
                 {expr, target}, walk.objects, site, walk.calls.ctx, walk.build);
           },
-          // §16.8 and §16.12 with §26.3: a sequence or a property a scope
-          // around the statement declares, or else one a package declares,
-          // which its path or an import makes visible.
           [&parent, &walk](int type, std::string_view package,
                            std::string_view name) {
             return VpiAssertionDeclNamed({parent.scope, type, package, name},
@@ -405,19 +304,11 @@ VpiStmtBuild StmtBuildAt(const BlockParent& parent, const BodyWalk& walk) {
           }};
 }
 
-// The object a statement the builder of vpi_design_attach_statements.cpp
-// knows stands as, with the expressions it writes and the statements it holds,
-// each hung from it; null for a statement of another kind.
 VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
                          const BodyWalk& walk) {
   const int kKind = VpiBuiltStmtKind(stmt);
   if (kKind == 0) return nullptr;
   VpiObject* obj = MakeAtomicStatement(stmt, kKind, parent, walk);
-  // §37.49: an assertion reports where its text stands, and §39.3.1: one
-  // that is labelled is named in the hierarchy of the scope it is written in,
-  // the path its named blocks extend. Its label also opens a named begin
-  // around it (§9.3.5, WalkStmt), whose path already ends in the label: that
-  // begin's name is the assertion's own and adds no level of its own.
   if (VpiIsAssertionType(kKind)) {
     VpiRecordAssertionLocation(obj, stmt.range, walk.calls.ctx);
     const bool kInOwnLabel = parent.block == nullptr &&
@@ -433,8 +324,6 @@ VpiObject* MakeBuiltStmt(const Stmt& stmt, const BlockParent& parent,
   return obj;
 }
 
-// §37.12: the object a block stands as, nested in the scope or statement around
-// it, with the variables it declares and the statements it holds.
 VpiObject* MakeBlock(const Stmt& stmt, int kind, const BlockParent& parent,
                      const BodyWalk& walk) {
   std::string path;
@@ -449,10 +338,6 @@ VpiObject* MakeBlock(const Stmt& stmt, int kind, const BlockParent& parent,
   return block;
 }
 
-// §11.4.2 with §37.64: an increment or decrement written as a statement is the
-// blocking assignment its operator behaves as, reporting that operator through
-// vpiOpType (detail 1), the variable it steps on its left and no right side,
-// none being written. Null for a statement of any other kind.
 VpiObject* MakeIncDecStatement(const Stmt& stmt, const BlockParent& parent,
                                const BodyWalk& walk) {
   if (stmt.kind != StmtKind::kExprStmt || stmt.expr == nullptr) return nullptr;
@@ -466,9 +351,6 @@ VpiObject* MakeIncDecStatement(const Stmt& stmt, const BlockParent& parent,
   return obj;
 }
 
-// The object `stmt` itself stands as, made with the objects it holds; null for
-// a statement of a kind the run builds no object for, whose contents are
-// walked all the same.
 VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
                           const BodyWalk& walk) {
   if (VpiObject* step = MakeIncDecStatement(stmt, parent, walk)) return step;
@@ -488,8 +370,6 @@ VpiObject* WalkStmtItself(const Stmt& stmt, const BlockParent& parent,
   return nullptr;
 }
 
-// §37.83: `obj`, the object the statement `stmt` itself stands as, given the
-// attributes the statement is written with; none where it stands as none.
 VpiObject* WithStmtAttributes(VpiObject* obj, const Stmt& stmt,
                               const BodyWalk& walk) {
   if (obj != nullptr) {
@@ -499,8 +379,6 @@ VpiObject* WithStmtAttributes(VpiObject* obj, const Stmt& stmt,
   return obj;
 }
 
-// The object `stmt` stands as: the named begin its label creates around it
-// (§9.3.5), holding what the statement itself stands as, or that object alone.
 VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
                     const BodyWalk& walk) {
   if (stmt == nullptr) return nullptr;
@@ -516,12 +394,6 @@ VpiObject* WalkStmt(const Stmt* stmt, const BlockParent& parent,
   return begin;
 }
 
-// §37.63 with §37.65: the statement a procedure runs. The parser lifts the
-// event control an always or always_ff procedure opens with into the
-// procedure's sensitivity, keeping the statement it guards as the body, so
-// that control is built here from the events, @* writing none, guarding the
-// body; an always_comb or always_latch procedure's sensitivity is inferred
-// (§9.2.2.2, §9.2.2.3) rather than written, and so stands for no control.
 VpiObject* WalkProcessBody(const RtlirProcess& proc, const BlockParent& parent,
                            const BodyWalk& walk) {
   const bool kAlways = proc.kind == RtlirProcessKind::kAlways ||
@@ -537,8 +409,6 @@ VpiObject* WalkProcessBody(const RtlirProcess& proc, const BlockParent& parent,
   return MakeBuiltStmt(control, parent, walk);
 }
 
-// §37.63 detail 1: the always type of a procedure of `kind`, the keyword that
-// opened it, 0 for an initial or final procedure, which has none.
 int AlwaysTypeOf(RtlirProcessKind kind) {
   if (kind == RtlirProcessKind::kInitial || kind == RtlirProcessKind::kFinal) {
     return 0;
@@ -548,8 +418,6 @@ int AlwaysTypeOf(RtlirProcessKind kind) {
   return kind == RtlirProcessKind::kAlwaysLatch ? vpiAlwaysLatch : vpiAlways;
 }
 
-// §37.63: the object a procedure stands as, one of the three kinds the
-// `process` class groups, with detail 1's always type for an always procedure.
 VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
                        const VpiAttachBuild& build) {
   VpiObject* process = build.alloc();
@@ -562,10 +430,6 @@ VpiObject* MakeProcess(const RtlirProcess& proc, VpiObject* scope,
   return process;
 }
 
-// `make` called for each entry of `items`, an item `instance` writes, with
-// the generate block instance writing it and what a statement written there
-// builds the objects it reaches with, a name resolving in that block first
-// (§27.4).
 template <typename Scoped, typename Make>
 void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
                        const std::vector<Scoped>& items, const Make& make) {
@@ -578,15 +442,10 @@ void AttachScopedItems(VpiObject* instance, const BodyWalk& instance_walk,
   }
 }
 
-// What builds the declaration of a property or a sequence, VpiMakePropertyDecl
-// or VpiMakeSequenceDecl.
 using DeclMaker = VpiObject* (*)(const RtlirAssertionItemDecl&,
                                  const VpiPropertyDeclSite&,
                                  const VpiStmtBuild&);
 
-// §37.12 with §37.83: the declaration `make` builds for `declared` in
-// `scope`, walked with `instance_walk`, carrying the attributes it is written
-// with.
 VpiObject* MakeAttributedDecl(DeclMaker make,
                               const RtlirAssertionItemDecl& declared,
                               VpiObject* scope, const VpiStmtBuild& with,
@@ -602,13 +461,10 @@ VpiObject* MakeAttributedDecl(DeclMaker make,
   return made;
 }
 
-// Whether `declared` is a sequence's declaration rather than a property's.
 bool IsSequenceDecl(const RtlirAssertionItemDecl& declared) {
   return declared.item->kind == ModuleItemKind::kSequenceDecl;
 }
 
-// §11.12 with §37.57: the let decl the let `item` stands as in `scope`, its
-// body built with its formals' names found first, walked with `walk`.
 void AttachLetDecl(const ModuleItem& item, VpiObject* scope,
                    const BodyWalk& walk) {
   VpiObject* made = VpiMakeLetDecl(item, scope, walk.build);
@@ -617,10 +473,6 @@ void AttachLetDecl(const ModuleItem& item, VpiObject* scope,
   VpiFillLetDecl(made, item, StmtBuildAt(kParent, walk));
 }
 
-// §11.12 with §37.12: each let the instance declares is a let decl of it, and
-// each one a generate block instance declares one of that instance's gen
-// scope (§37.85), whose names its body resolves through first (§27.4). A
-// covergroup, which its module holds among its lets, is none.
 void AttachInstanceLetDecls(VpiObject* instance, const BodyWalk& walk) {
   std::unordered_set<const ModuleItem*> in_blocks;
   for (const RtlirGenBlockLet& let : walk.mod.gen_block_lets) {
@@ -638,10 +490,6 @@ void AttachInstanceLetDecls(VpiObject* instance, const BodyWalk& walk) {
   }
 }
 
-// The sequences and properties one instance declares, each in the generate
-// block instance writing it, walked with `instance_walk`: every one declared
-// before any body is built, a body instantiating sequences and properties
-// declared after it (§16.8, §16.12).
 void AttachInstanceAssertionItemDecls(VpiObject* instance,
                                       const BodyWalk& instance_walk) {
   const auto& declared = instance_walk.mod.assertion_item_decls;
@@ -654,7 +502,6 @@ void AttachInstanceAssertionItemDecls(VpiObject* instance,
             IsSequenceDecl(item) ? VpiMakeSequenceDecl : VpiMakePropertyDecl,
             item, scope, with, instance_walk));
       });
-  // §16.8 and §16.12: a body's names find the declaration's formals first.
   for (size_t i = 0; i < declared.size(); ++i) {
     VpiObject* scope = VpiGenScopeOf(instance, declared[i].gen_block_path);
     BodyWalk walk = instance_walk;
@@ -668,11 +515,6 @@ void AttachInstanceAssertionItemDecls(VpiObject* instance,
   }
 }
 
-// The assertions one instance writes as items, each in the generate block
-// instance writing it, and the procedures it declares with the objects their
-// bodies hold, walked with `instance_walk`, whose process each procedure's
-// own replaces. An assertion the elaborator carries as a process is no
-// procedure the source wrote, a concurrent one being the item's (§37.50).
 void AttachInstanceProcedures(VpiObject* instance,
                               const BodyWalk& instance_walk) {
   AttachScopedItems(
@@ -681,7 +523,6 @@ void AttachInstanceProcedures(VpiObject* instance,
                        const VpiStmtBuild& with) {
         VpiObject* made = VpiMakeItemAssertion(assertion, scope,
                                                instance_walk.calls.ctx, with);
-        // §37.83: the attributes the assertion is written with.
         if (made != nullptr) {
           VpiAttachAttributes(
               made, VpiNodeAttributes(&instance_walk.mod, assertion.item),
@@ -689,31 +530,22 @@ void AttachInstanceProcedures(VpiObject* instance,
         }
       });
   for (const RtlirProcess& proc : instance_walk.mod.processes) {
-    // A process stands in the generate block instance its path names.
     VpiObject* scope = VpiGenScopeOf(instance, proc.gen_block_path);
     BodyWalk walk = instance_walk;
     walk.gen_prefixes = &proc.gen_block_prefixes;
     const BlockParent kParent{scope, scope->full_name};
     if (!proc.is_static_assertion) {
       walk.process = MakeProcess(proc, scope, instance_walk.build);
-      // §37.3.3: where the procedure was written.
       VpiRecordWrittenLocation(walk.process, proc.loc, instance_walk.calls.ctx);
-      // §37.83: the attributes the procedure is written with.
       VpiAttachAttributes(walk.process, proc.attrs, false,
                           instance_walk.calls.ctx, instance_walk.build);
       walk.process->body = WalkProcessBody(proc, kParent, walk);
     } else if (proc.body->is_deferred) {
-      // §16.4.3: a deferred assertion item is the statement it runs (§37.55).
       MakeBuiltStmt(*proc.body, kParent, walk);
     }
   }
 }
 
-// §37.12 detail 5 with §37.41: the statements the body of `item`, the task
-// or function `tf` stands for, holds: its one statement, an unnamed begin
-// holding them where it holds more than one, and none where it holds none. A
-// declaration the body writes is a variable of the task or function itself
-// (§13.3, §13.4), no statement of it.
 void WalkSubroutineBody(const ModuleItem& item, VpiObject* tf,
                         const BodyWalk& walk) {
   std::vector<Stmt*> statements;
@@ -733,10 +565,6 @@ void WalkSubroutineBody(const ModuleItem& item, VpiObject* tf,
   MakeBlock(*begin, vpiBegin, kParent, walk);
 }
 
-// §37.12 detail 5: the body of each task and function the instance declares,
-// the ones made under the instance's prefix, and each one a generate block
-// instance declares, made under the block's full name, whose names resolve in
-// the block first (§27.4).
 void AttachInstanceSubroutineBodies(VpiObject* instance, const BodyWalk& walk) {
   for (const auto& [key, tf] : walk.calls.subroutines) {
     if (key.second == walk.prefix) WalkSubroutineBody(*key.first, tf, walk);
@@ -751,10 +579,6 @@ void AttachInstanceSubroutineBodies(VpiObject* instance, const BodyWalk& walk) {
   }
 }
 
-// §37.12 detail 5 with §26.2 and §3.12.1: the body of each task and function a
-// package declares, standing in no module, and each compilation unit's,
-// standing in a module of that unit (RtlirModule::unit_index) the arena keeps,
-// as a call held for later outlives the walk; their names resolve there.
 void AttachPackageSubroutineBodies(const RtlirDesign& design,
                                    const VpiObjectMap& objects,
                                    const VpiCallBuild& calls,
@@ -777,8 +601,6 @@ void AttachPackageSubroutineBodies(const RtlirDesign& design,
     in_unit->unit_index = at.index;
     const BodyWalk kUnitWalk{design, *in_unit, objects, kUnit, calls, build};
     for (const ModuleItem* item : at.unit->cu_items) {
-      // A DPI import has no body. §8.24: a method body written outside its
-      // class is no task of the unit, and its class defn's method walks it.
       if (item->kind == ModuleItemKind::kDpiImport) continue;
       const auto kMade = calls.subroutines.find({item, kUnit});
       if (kMade != calls.subroutines.end()) {
@@ -788,8 +610,6 @@ void AttachPackageSubroutineBodies(const RtlirDesign& design,
   }
 }
 
-// The task or function the class defn `defn` holds for the method `method`,
-// which MakeMethod made one of for each method the class declares.
 VpiObject* MethodObject(const VpiObject& defn, const ModuleItem& method) {
   return *std::ranges::find_if(
       defn.children, [&method](const VpiObject* child) {
@@ -797,10 +617,6 @@ VpiObject* MethodObject(const VpiObject& defn, const ModuleItem& method) {
       });
 }
 
-// §37.12 detail 5 with §37.31: the body of each method of each class defn,
-// the one an out-of-block declaration writes for an `extern` method (§8.24),
-// its names resolving in the class first (§8.4) and then in the module or the
-// package declaring it, which the class defn is keyed under.
 void AttachClassMethodBodies(const RtlirDesign& design,
                              const VpiObjectMap& objects,
                              const VpiCallBuild& calls,
@@ -834,11 +650,7 @@ bool ShapeExprCall(const Expr& call, VpiObject* made, const BlockParent& parent,
                    const BodyWalk& walk) {
   CallShape shape = CallShapeOf(call, parent, walk);
   if (shape.type == 0) return false;
-  // §36.5: a system call within an expression yields a value, so it is a
-  // function call whatever its name.
   if (call.kind == ExprKind::kSystemCall) shape.type = vpiSysFuncCall;
-  // §37.42: the call stands in the scope its expression is written in, which
-  // vpiScope reaches, as a call statement's does.
   made->parent = parent.scope;
   FillCall(made, shape, call, parent, walk);
   return true;
@@ -877,7 +689,6 @@ bool ChainNames(const Expr& expr, std::vector<std::string_view>& names) {
   if (expr.kind != ExprKind::kMemberAccess || expr.is_scope_resolution) {
     return false;
   }
-  // The right-hand side of a member access is always the member's name.
   if (!ChainNames(*expr.lhs, names)) return false;
   names.push_back(expr.rhs->text);
   return true;
@@ -888,11 +699,7 @@ void VpiShapeDeferredCalls(const RtlirDesign* design,
                            std::vector<VpiDeferredCall>& deferred,
                            const VpiCallBuild& calls,
                            const VpiAttachBuild& build) {
-  // A call standing in a package or a class no module declares finds its
-  // callee among the compilation unit's and the packages' declarations alone.
   static const RtlirModule kNoModule{};
-  // Shaping a call builds its arguments, which may hold a call of their own
-  // held here in turn, so each is taken by its place and moved out.
   for (std::size_t index = 0; index < deferred.size(); ++index) {
     VpiDeferredCall held = std::move(deferred[index]);
     BodyWalk walk{
@@ -910,20 +717,9 @@ void VpiShapeDeferredCalls(const RtlirDesign* design,
 
 void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                       const VpiCallBuild& calls, const VpiAttachBuild& build) {
-  // §37.63: each procedure an instance declares is a process of it, reaching
-  // the statement it runs; §37.12: each begin or fork is a block of the
-  // instance whose procedure writes it, and detail 1 makes a named one, and an
-  // unnamed one declaring a block item, a scope; §37.62: each event trigger
-  // is an event statement, §37.42: each call of a task, a method task or a
-  // system task a call statement, and each statement VpiBuiltStmtKind names
-  // an object of its kind, each hung from the block or statement it stands in.
   if (design->top_modules.empty() || design->top_modules.front() == nullptr) {
     return;
   }
-  // The first top carries the empty prefix and is keyed under its own name.
-  // §37.51 and §37.53: every instance's sequences, and then its properties,
-  // are built ahead of every assertion, which may instantiate one through an
-  // instance below its own (§23.6).
   const std::string kFirstTop(design->top_modules.front()->name);
   const auto kWalk = [&](void (*attach)(VpiObject*, const BodyWalk&)) {
     WalkInstancePaths(
@@ -933,15 +729,12 @@ void AttachProcedures(const RtlirDesign* design, const VpiObjectMap& objects,
                  BodyWalk{*design, *mod, objects, prefix, calls, build});
         });
   };
-  // §11.12: a let is declared ahead of every expression naming it.
   kWalk(AttachInstanceLetDecls);
   kWalk(AttachInstanceAssertionItemDecls);
   kWalk(AttachInstanceProcedures);
   kWalk(AttachInstanceSubroutineBodies);
   AttachPackageSubroutineBodies(*design, objects, calls, build);
   AttachClassMethodBodies(*design, objects, calls, build);
-  // §37.77: a disable may name a block written after it or in an instance
-  // below its own, so what it names is resolved once every body is walked.
   VpiResolveDisableTargets(calls.stmts);
 }
 

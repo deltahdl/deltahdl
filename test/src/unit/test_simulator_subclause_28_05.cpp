@@ -11,13 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Every buf/not truth-table row and every delay-selection rule of §28.5 is
-// observed below by driving the full elaboration + simulation pipeline, so the
-// rule is seen as produced by production code (the lowered continuous
-// assignment plus the scheduler).
-
-// Low bit of the resolved 4-state value of a 1-bit net after simulation.
-// aval/bval encode: 0 -> (0,0), 1 -> (1,0), x -> (1,1), z -> (0,1).
 struct ResolvedBit {
   uint64_t aval;
   uint64_t bval;
@@ -69,9 +62,6 @@ TEST(BufNotSimulation, ProductionBufDrivesUnknownForUnknownInput) {
   EXPECT_EQ(b.bval, 1u);
 }
 
-// Table 28-4 maps a high-impedance input of buf to an unknown output: a buf is
-// not a pass-through of z, it drives x. The lowered buffer produces x for the z
-// input through production evaluation.
 TEST(BufNotSimulation, ProductionBufDrivesUnknownForHighImpedanceInput) {
   SimFixture f;
   auto* design = ElaborateBufNot(f, "  buf g(y, a);\n  initial a = 1'bz;\n");
@@ -112,8 +102,6 @@ TEST(BufNotSimulation, ProductionNotDrivesUnknownForUnknownInput) {
   EXPECT_EQ(b.bval, 1u);
 }
 
-// Table 28-4 maps a high-impedance input of not to an unknown output; the
-// lowered inverter produces x for the z input through production evaluation.
 TEST(BufNotSimulation, ProductionNotDrivesUnknownForHighImpedanceInput) {
   SimFixture f;
   auto* design = ElaborateBufNot(f, "  not g(y, a);\n  initial a = 1'bz;\n");
@@ -124,11 +112,6 @@ TEST(BufNotSimulation, ProductionNotDrivesUnknownForHighImpedanceInput) {
   EXPECT_EQ(b.bval, 1u);
 }
 
-// End-to-end over the instance-array syntax of §28.3.6: a buf array distributes
-// one scalar buffer per bit, so each element applies the buf truth table to its
-// own input bit. Driving a = 2'b10 yields y = 2'b10 (the high bit buffers 1,
-// the low bit buffers 0), observed through the full elaborate + simulate
-// pipeline.
 TEST(BufNotSimulation, ProductionBufInstanceArrayBuffersPerBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -149,9 +132,6 @@ TEST(BufNotSimulation, ProductionBufInstanceArrayBuffersPerBit) {
   EXPECT_EQ(w.bval & 0x3u, 0x0u);
 }
 
-// Two delays: the first slot governs a rising output. A buf whose input rises
-// at t=3 drives its output high one rise-delay (4) later, so the last
-// scheduled activity is at t=7.
 TEST(BufNotSimulation, ProductionBufRisingOutputUsesFirstDelaySlot) {
   SimFixture f;
   auto* design = ElaborateBufNot(
@@ -162,9 +142,6 @@ TEST(BufNotSimulation, ProductionBufRisingOutputUsesFirstDelaySlot) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
 }
 
-// Two delays: the second slot governs a falling output. A not whose input
-// rises at t=3 drives its output low one fall-delay (9) later, so the last
-// scheduled activity is at t=12 -- distinct from the rise case above.
 TEST(BufNotSimulation, ProductionNotFallingOutputUsesSecondDelaySlot) {
   SimFixture f;
   auto* design = ElaborateBufNot(
@@ -175,13 +152,6 @@ TEST(BufNotSimulation, ProductionNotFallingOutputUsesSecondDelaySlot) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 12u);
 }
 
-// Two delays: an output transition to x uses the smaller of the two delays,
-// regardless of which slot holds it. The output, x until its first transition
-// (§28.16), has fallen to 0 by t=8 under either ordering. Both orderings then
-// settle the x output at t=13 (input edge at t=10 plus the smaller delay 3),
-// which distinguishes the min from either fixed slot: an "always rise" bug
-// would give t=18 for #(8,3), and an "always fall" bug would give t=18 for
-// #(3,8).
 TEST(BufNotSimulation, ProductionTransitionToXUsesSmallerDelaySmallerFall) {
   SimFixture f;
   auto* design = ElaborateBufNot(
@@ -208,11 +178,6 @@ TEST(BufNotSimulation, ProductionTransitionToXUsesSmallerDelaySmallerRise) {
   EXPECT_EQ(b.bval, 1u);
 }
 
-// The two-delay rise/fall selection must hold when the delays are supplied by a
-// constant expression rather than an integer literal. Here both delays come
-// from localparams; elaboration resolves the constant expressions and the
-// scheduler still routes a falling not output through the second (fall) slot,
-// so the input edge at t=3 settles the output one fall-delay (9) later at t=12.
 TEST(BufNotSimulation, ProductionLocalparamTwoDelaysSelectFallSlot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -230,10 +195,6 @@ TEST(BufNotSimulation, ProductionLocalparamTwoDelaysSelectFallSlot) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 12u);
 }
 
-// The same rule with the delays supplied by module parameters (their default
-// values), which take the parameter-resolution path rather than the literal
-// path. A rising buf output uses the first (rise) slot: input rises at t=3, so
-// the output settles one rise-delay (4) later at t=7.
 TEST(BufNotSimulation, ProductionParameterTwoDelaysSelectRiseSlot) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -249,9 +210,6 @@ TEST(BufNotSimulation, ProductionParameterTwoDelaysSelectRiseSlot) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 7u);
 }
 
-// One delay specifies both the rise and the fall delay. With only a single
-// value, a falling not output is delayed by that same value (no distinct
-// second slot exists), so the input edge at t=3 settles the output at t=8.
 TEST(BufNotSimulation, ProductionSingleDelayAppliesToFallingOutput) {
   SimFixture f;
   auto* design = ElaborateBufNot(
@@ -261,11 +219,6 @@ TEST(BufNotSimulation, ProductionSingleDelayAppliesToFallingOutput) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 8u);
 }
 
-// The other half of a lone delay covering both rise and fall: the same single
-// value also governs a rising output. A buf whose input rises at t=3 drives its
-// output high one delay (5) later, settling at t=8 -- the same value the
-// falling case above uses, confirming a lone delay is applied in both
-// directions.
 TEST(BufNotSimulation, ProductionSingleDelayAppliesToRisingOutput) {
   SimFixture f;
   auto* design = ElaborateBufNot(
@@ -278,9 +231,6 @@ TEST(BufNotSimulation, ProductionSingleDelayAppliesToRisingOutput) {
   EXPECT_EQ(b.bval, 0u);
 }
 
-// No delay specification: there is no propagation delay through the gate, so an
-// input edge at t=3 produces the output change in the same time step. The last
-// scheduled activity stays at t=3 rather than being pushed past it.
 TEST(BufNotSimulation, ProductionNoDelaySpecHasZeroPropagationDelay) {
   SimFixture f;
   auto* design = ElaborateBufNot(

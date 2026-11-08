@@ -25,21 +25,17 @@ namespace delta {
 
 namespace {
 
-// The bits of word `w` of a value `width` bits wide that are bits of it.
 uint64_t WordMask(uint32_t width, std::size_t w) {
   const uint64_t kBits = width - (w * 64);
   return kBits >= 64 ? ~uint64_t{0} : (uint64_t{1} << kBits) - 1;
 }
 
-// §40.3.2.1 `SV_COV_RESET: a signal reset has seen neither value on any bit
-// and toggled none, its current value standing as where it is now.
 void ClearToggles(ToggleSignal& signal) {
   std::ranges::fill(signal.seen0, 0);
   std::ranges::fill(signal.seen1, 0);
   std::ranges::fill(signal.toggles, 0);
 }
 
-// The bits of `signal` that have held both values.
 std::int64_t BothValues(const ToggleSignal& signal) {
   std::int64_t both = 0;
   for (std::size_t w = 0; w < signal.seen0.size(); ++w) {
@@ -48,10 +44,6 @@ std::int64_t BothValues(const ToggleSignal& signal) {
   return both;
 }
 
-// One look at the bits of `signal` for its instance: each known bit has held
-// the value it holds now, and one that held the other known value at the last
-// look has toggled; while the instance collects, that is counted, and a bit
-// that now has held both is covered. An x or a z holds neither value.
 void Observe(ToggleSignal& signal) {
   CoverageControlState& cov = *signal.coverage;
   CoverageInstanceItems<ToggleSignal>& inst = *signal.instance;
@@ -82,8 +74,6 @@ void Observe(ToggleSignal& signal) {
   cov.SetCoveredItems(inst.scope, kCoverageTypeToggle, inst.covered);
 }
 
-// Whether `var` holds bits that toggle between 0 and 1: no real, string,
-// event, class handle or virtual interface does.
 bool HasToggleBits(const Variable* var, SimContext& ctx) {
   if (var == nullptr || var->is_real || var->is_string || var->is_event ||
       var->is_virtual_interface || var->value.width == 0) {
@@ -94,16 +84,11 @@ bool HasToggleBits(const Variable* var, SimContext& ctx) {
          ctx.FindClassType(type->type_name) == nullptr;
 }
 
-// The storage of the signal `name` of the instance keyed `prefix`; null where
-// it has none to count, an unpacked aggregate's elements being kept apart.
 Variable* SignalNamed(const std::string& prefix, std::string_view name,
                       SimContext& ctx) {
-  // A net's storage is registered under its name as a variable's is.
   return ctx.FindVariable(VpiFlatName(prefix, name));
 }
 
-// The signals of the instance of `mod` keyed `prefix` that hold toggling
-// bits, each once: its ports' and the nets and variables its body declares.
 std::vector<Variable*> InstanceSignals(const RtlirModule& mod,
                                        const std::string& prefix,
                                        SimContext& ctx) {
@@ -125,8 +110,6 @@ std::vector<Variable*> InstanceSignals(const RtlirModule& mod,
   return signals;
 }
 
-// The record of `var`'s bits for the instance `inst`, chained right after the
-// first one another instance keeps of the same variable.
 ToggleSignal& AddSignal(Variable* var,
                         CoverageInstanceItems<ToggleSignal>& inst,
                         CoverageControlState& cov) {
@@ -172,7 +155,6 @@ void AttachToggleCoverage(const RtlirDesign* design, SimContext& ctx) {
       bits += var->value.width;
     }
     ArmCoverageInstance(inst, kCoverageTypeToggle, bits, cov);
-    // The value each holds as collection starts is one it has held.
     for (ToggleSignal* signal : inst.items) {
       for (std::size_t w = 0; w < signal->last.size(); ++w) {
         signal->last[w].bval = ~uint64_t{0};

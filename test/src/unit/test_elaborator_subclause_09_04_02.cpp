@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <initializer_list>
@@ -135,9 +133,6 @@ TEST(EventControlElaboration, UnpackedArrayEventExpressionRejected) {
                     3, "9.4.2"));
 }
 
-// §9.4.2 holds an event expression to a singular value wherever it is
-// written, the intra-assignment event control of a blocking or a nonblocking
-// assignment (§9.4.5) included; a singular one there stays legal.
 TEST(EventControlElaboration, IntraAssignmentEventMustBeSingular) {
   ElabFixture f;
   ElaborateSrc(
@@ -184,10 +179,6 @@ TEST(EventControlElaboration, PackedStructEventExpressionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.4.2: an aggregate object may appear in an event expression when the
-// expression reduces to a singular value. Selecting a singular member of an
-// otherwise non-singular unpacked struct is accepted (contrast @(s), which is
-// rejected because the whole struct is non-singular).
 TEST(EventControlElaboration, UnpackedStructMemberEventExpressionAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,21 +221,6 @@ TEST(EventControlElaboration,
       5, "9.4.2"));
 }
 
-// §9.4.2 holds every event expression to a singular value and puts no
-// condition on where the statement the event control precedes stands. A.6.4
-// makes a procedural_timing_control_statement a statement_item, so an event
-// control may be written in every position a statement holds a statement in,
-// and the clause's own example writes three of them inside a fork-join.
-// WalkStmtForEventSingular in
-// src/elaborator/elaborator_validate_subroutine_args.cpp had written out eight
-// of the thirteen child-statement links Stmt declares, and now takes the list
-// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The
-// cases below cover one newly reached position each.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, whose
-// statements the parser keeps in Stmt::fork_stmts. §9.4.2's own example puts
-// its event controls in exactly this position.
 TEST(EventControlElaboration, NonSingularEventExpressionInForkArmRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -260,10 +236,6 @@ TEST(EventControlElaboration, NonSingularEventExpressionInForkArmRejected) {
       "event expression references non-singular variable 'arr'", 4, "9.4.2"));
 }
 
-// A.6.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(EventControlElaboration,
      NonSingularEventExpressionInAssertionPassStatementRejected) {
   ElabFixture f;
@@ -292,8 +264,6 @@ TEST(EventControlElaboration,
       "event expression references non-singular variable 'arr'", 3, "9.4.2"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
-// Stmt::randcase_items.
 TEST(EventControlElaboration,
      NonSingularEventExpressionInRandcaseItemRejected) {
   ElabFixture f;
@@ -310,10 +280,6 @@ TEST(EventControlElaboration,
       "event expression references non-singular variable 'arr'", 4, "9.4.2"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. The parser keeps them in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(EventControlElaboration,
      NonSingularEventExpressionInRandsequenceCodeBlockRejected) {
   ElabFixture f;
@@ -332,10 +298,6 @@ TEST(EventControlElaboration,
       "event expression references non-singular variable 'arr'", 5, "9.4.2"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(EventControlElaboration,
      NonSingularEventExpressionInRandsequenceWeightCodeBlockRejected) {
   ElabFixture f;

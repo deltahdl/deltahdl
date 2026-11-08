@@ -100,8 +100,6 @@ TEST(SpecparamElaboration, SpecparamOutsideSpecifyCreatesVariable) {
   EXPECT_TRUE(found);
 }
 
-// A specify parameter is a constant, so the report is the one §6.20 states for
-// an assignment to any constant rather than a specparam-specific one.
 TEST(SpecparamElaboration, AssignmentToSpecparamIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -173,11 +171,6 @@ TEST(SpecparamElaboration, SpecparamRangeWidthFromDeclaration) {
 }
 
 TEST(SpecparamElaboration, SpecparamNoRangeDefaultsToFinalValueWidth) {
-  // §6.20.5: a specify parameter declared with no range specification takes the
-  // range of its final value. An unsized integer constant is 32 bits wide, so
-  // the elaborated specparam variable is 32 bits. This is the no-range
-  // counterpart to SpecparamRangeWidthFromDeclaration, where an explicit [7:0]
-  // range instead fixes the width at 8.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -198,10 +191,6 @@ TEST(SpecparamElaboration, SpecparamNoRangeDefaultsToFinalValueWidth) {
 }
 
 TEST(SpecparamElaboration, SpecparamNoRangeTakesSizedLiteralWidth) {
-  // §6.20.5: with no range specification, a specparam takes the range of its
-  // final value. A sized integer literal fixes that width, so a 4-bit literal
-  // yields a 4-bit variable — distinct from the 32-bit default an unsized
-  // literal produces (SpecparamNoRangeDefaultsToFinalValueWidth).
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -243,11 +232,6 @@ TEST(SpecparamElaboration, SpecparamAssignedFromParameterSucceeds) {
 }
 
 TEST(SpecparamElaboration, SpecparamAssignedFromLocalparamSucceeds) {
-  // §6.20.5 / Table 6-11: a specify parameter may be assigned a constant
-  // expression built from parameter constants. A localparam (§6.20.4) is such a
-  // constant, and it is a distinct constant-expression input form from an
-  // ordinary parameter, so the specparam initializer is exercised over a real
-  // localparam declaration driven through parse + elaborate.
   ElabFixture f;
   auto* design = Elaborate(
       "module m;\n"
@@ -268,14 +252,6 @@ TEST(SpecparamElaboration, SpecparamAssignedFromLocalparamSucceeds) {
   EXPECT_TRUE(found);
 }
 
-// The seven cases below reach a specparam through a child link of Expr other
-// than lhs and rhs. §6.20.5 forbids a parameter or localparam assigned a
-// constant expression that includes a specify parameter, and forbids a
-// specparam in the range specification of a declaration, whatever expression
-// form the reference is written in. Each case names the link it covers, so a
-// walk that stops following one of them fails exactly that case.
-
-// Covers Expr::condition.
 TEST(SpecparamElaboration, SpecparamInAParameterConditionalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -289,7 +265,6 @@ TEST(SpecparamElaboration, SpecparamInAParameterConditionalIsError) {
                             "6.20.5"));
 }
 
-// Covers Expr::args.
 TEST(SpecparamElaboration, SpecparamInAParameterCallArgumentIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -304,7 +279,6 @@ TEST(SpecparamElaboration, SpecparamInAParameterCallArgumentIsError) {
                             "6.20.5"));
 }
 
-// Covers Expr::elements.
 TEST(SpecparamElaboration, SpecparamInAParameterConcatenationIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -318,7 +292,6 @@ TEST(SpecparamElaboration, SpecparamInAParameterConcatenationIsError) {
                             "6.20.5"));
 }
 
-// Covers Expr::repeat_count.
 TEST(SpecparamElaboration, SpecparamAsAParameterReplicationCountIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -332,9 +305,6 @@ TEST(SpecparamElaboration, SpecparamAsAParameterReplicationCountIsError) {
                             "6.20.5"));
 }
 
-// Covers Expr::index, and Expr::base with it. `arr` is declared [63:0] so that
-// bit 50 is within it and Elaborator::ValidatePartSelectBounds has nothing to
-// report, leaving §6.20.5 the only rule the source breaks.
 TEST(SpecparamElaboration, SpecparamAsAParameterIndexIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -349,10 +319,6 @@ TEST(SpecparamElaboration, SpecparamAsAParameterIndexIsError) {
                             "6.20.5"));
 }
 
-// Covers Expr::args reached from a declaration range, which is the second of
-// the two §6.20.5 rules and the other caller of the walk, so the message and
-// the location are those of CheckSpecparamInRange rather than of
-// Elaborator::ValidateSpecparamInParams.
 TEST(SpecparamElaboration, SpecparamInADeclarationRangeCallIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -368,9 +334,6 @@ TEST(SpecparamElaboration, SpecparamInADeclarationRangeCallIsError) {
                             4, "6.20.5"));
 }
 
-// An ordinary parameter in the conditional the first case above rejects. What
-// §6.20.5 forbids is a specify parameter, so a walk that reports every
-// identifier it reaches through a newly followed link fails here.
 TEST(SpecparamElaboration, ParameterInAConditionalStillSucceeds) {
   ElabFixture f;
   auto* design = Elaborate(

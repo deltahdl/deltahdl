@@ -1,9 +1,3 @@
-// §11.5.1 Vector bit-select and part-select addressing, folded as constant
-// expressions: a part-select of any width, the indexed forms, and a select
-// that reaches outside its vector, which a folded constant cannot answer
-// because it holds no x (the run-time read is in
-// test/src/unit/test_simulator_subclause_11_05_01e.cpp).
-
 #include <gtest/gtest.h>
 
 #include <optional>
@@ -17,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// A part-select of 64 bits or more folds from every word of its vector.
 TEST(ConstantSelectFold, PartSelectOfSixtyFourBitsOrMoreFolds) {
   EvalFixture f;
   EXPECT_EQ(
@@ -27,8 +20,6 @@ TEST(ConstantSelectFold, PartSelectOfSixtyFourBitsOrMoreFolds) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{8'h5A, 64'h3}[71:0]", f)), 3);
 }
 
-// §11.5.1 has an out-of-bounds address read as x for a 4-state vector, which a
-// folded constant does not hold, so such a select folds to nothing.
 TEST(ConstantSelectFold, SelectOutsideTheVectorDoesNotFold) {
   EvalFixture f;
   for (const char* text :
@@ -38,8 +29,6 @@ TEST(ConstantSelectFold, SelectOutsideTheVectorDoesNotFold) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("{8'hA5}[3:0]", f)), 5);
 }
 
-// A parameter takes the folded part-select of a 128-bit parameter's low 64
-// bits, and the indexed forms select `width` bits up or down from their base.
 TEST(ConstantSelectFold, ParameterSelectsFoldThroughTheDeclaredRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(

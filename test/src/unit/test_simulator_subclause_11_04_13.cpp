@@ -28,9 +28,6 @@ static Expr* MakeRange(Arena& arena, Expr* lo, Expr* hi,
 
 namespace {
 
-// §11.4.13: the set is scanned until a match is found and the operator returns
-// 1'b1. Driven through the full pipeline so the left-hand side and the set
-// members come from real literals: 5 is a member of {3,5,7}.
 TEST(ExpressionSim, InsideValueMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -43,8 +40,6 @@ TEST(ExpressionSim, InsideValueMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §11.4.13: values in the set may be repeated; a match against any occurrence
-// still yields 1'b1.
 TEST(EvalOp, InsideRepeatedValuesMatch) {
   SimFixture f;
   auto* inside = f.arena.Create<Expr>();
@@ -57,8 +52,6 @@ TEST(EvalOp, InsideRepeatedValuesMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §11.4.13: value ranges in the set may overlap; membership in either range is
-// enough for a match.
 TEST(EvalOp, InsideOverlappingRangesMatch) {
   SimFixture f;
   auto* inside = f.arena.Create<Expr>();
@@ -72,12 +65,6 @@ TEST(EvalOp, InsideOverlappingRangesMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §11.4.13: the result is the OR reduction of the per-member comparisons, so a
-// definite match anywhere in the set produces 1'b1 even when another member's
-// comparison is ambiguous (x). Here `om` has an x bit that makes the first
-// comparison ambiguous, and the [4:4] range, which takes `<=` and `>=`
-// (§11.4.4), is ambiguous for it too; the member 4'b1000 differs from it in a
-// known bit, a definite mismatch, and 4'b0?00 is a definite match.
 TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -90,12 +77,6 @@ TEST(EvalOpXZ, InsideOrReductionMatchOverridesAmbiguous) {
             "1 x 0\n");
 }
 
-// §11.4.13: the marquee do-not-care example driven through the full pipeline.
-// With `3'bz11 inside {3'b1?1, 3'b011}` the z bit on the left-hand side is NOT
-// treated as a do-not-care (unlike the `?` wildcard on the set side), so every
-// comparison is ambiguous and none matches; the result is a definite x, the OR
-// reduction of the per-member comparisons. A definite 0/1 would clear bval, so
-// observing bval set proves the x result rather than a match or a miss.
 TEST(ExpressionSim, InsideResultXWhenLhsHasZ) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -108,9 +89,6 @@ TEST(ExpressionSim, InsideResultXWhenLhsHasZ) {
   EXPECT_NE(var->value.words[0].bval & 1u, 0u);
 }
 
-// §11.4.13: absolute-tolerance range [A +/- B] designates [A-B : A+B]. Driven
-// end to end so the `+/-` token, not a hand-built AST, produces the bounds:
-// [7 +/- 5] = [2:12]; 10 is inside (match), 20 is outside (miss).
 TEST(ExpressionSim, InsideAbsoluteToleranceFullPipeline) {
   SimFixture f;
   auto [hit, miss] =
@@ -127,10 +105,6 @@ TEST(ExpressionSim, InsideAbsoluteToleranceFullPipeline) {
   EXPECT_EQ(miss, 0u);
 }
 
-// §11.4.13: relative-tolerance range [A +%- B] designates a tolerance of
-// A*B/100 with truncation (not rounding) on the real-to-integral conversion.
-// [7 +%- 25] has tolerance trunc(1.75) = 1, so the range is [6:8]: 6 matches
-// (truncation kept the low bound reachable) while 5 misses.
 TEST(ExpressionSim, InsideRelativeToleranceTruncatesFullPipeline) {
   SimFixture f;
   auto [hit, miss] =
@@ -147,13 +121,6 @@ TEST(ExpressionSim, InsideRelativeToleranceTruncatesFullPipeline) {
   EXPECT_EQ(miss, 0u);
 }
 
-// §11.4.13: a $ bound denotes the lowest or highest value of the left-hand
-// side's type. Driven end to end so the `$` token resolves against the operand
-// width: [100:$] resolves the upper bound to 255 for an 8-bit value (250 is a
-// match), while [$:100] resolves the lower bound to 0 (150 exceeds 100, a miss)
-// — proving the open bound is the type extreme, not an unbounded range. The
-// miss also covers an in-order, non-empty range whose value lies above the
-// high bound.
 TEST(ExpressionSim, InsideDollarBoundsFullPipeline) {
   SimFixture f;
   auto [hi, lo] = RunModuleTwoVars(f,
@@ -169,9 +136,6 @@ TEST(ExpressionSim, InsideDollarBoundsFullPipeline) {
   EXPECT_EQ(lo, 0u);
 }
 
-// §11.4.13: when the bound left of the colon exceeds the bound to its right the
-// range is empty and contains no values, so the membership test is a miss even
-// for a value that lies numerically between the two bounds.
 TEST(ExpressionSim, InsideInvertedRangeEmptyFullPipeline) {
   SimFixture f;
   uint64_t r = RunModule(f,
@@ -183,12 +147,6 @@ TEST(ExpressionSim, InsideInvertedRangeEmptyFullPipeline) {
   EXPECT_EQ(r, 0u);
 }
 
-// §11.4.13: a set member naming an unpacked array is traversed down to its
-// singular elements, so {5, arr} with arr = '{10,20,30} behaves like
-// {5,10,20,30}. Builds `ex inside {1, 2, q}` for a 32-bit `ex` holding `ex_val`
-// and returns the evaluated match result; q is '{3,4,5}. The queue exercises
-// the dynamically-sized-array descent branch (a distinct container from the
-// fixed-array case below).
 static uint64_t EvalInsideQueueMember(SimFixture& f, uint64_t ex_val) {
   MakeQueue(f, "q", {3, 4, 5});
   auto* var = f.ctx.CreateVariable("ex", 32);
@@ -212,10 +170,6 @@ TEST(EvalOp, InsideQueueMemberNoMatch) {
   EXPECT_EQ(EvalInsideQueueMember(f, 9), 0u);
 }
 
-// §11.4.13: the same descent for a fixed-size unpacked array, driven through
-// the full pipeline from a real array declaration + assignment-pattern
-// initializer (rather than a stubbed ArrayInfo): arr holds {10,20,30}, so 20
-// matches by descent while 7 misses — the constant 5 alone supplies neither.
 TEST(ExpressionSim, InsideUnpackedArrayMemberDescendsFullPipeline) {
   SimFixture f;
   auto [hit, miss] =
@@ -233,12 +187,6 @@ TEST(ExpressionSim, InsideUnpackedArrayMemberDescendsFullPipeline) {
   EXPECT_EQ(miss, 0u);
 }
 
-// §11.4.13: descent into an unpacked-array set member continues until a
-// singular value is reached, so a MULTIDIMENSIONAL array contributes each of
-// its leaf elements. Built from a real 2-D array whose leaves are populated by
-// compound-select procedural writes (§7.4.2) and driven end to end: grid holds
-// {{10,20},{30,40}}, so 30 (a leaf, reachable only by descending both
-// dimensions) matches while 7 misses. The constant 5 supplies neither.
 TEST(ExpressionSim, InsideMultiDimArrayMemberDescendsFullPipeline) {
   SimFixture f;
   auto [hit, miss] =
@@ -258,10 +206,6 @@ TEST(ExpressionSim, InsideMultiDimArrayMemberDescendsFullPipeline) {
   EXPECT_EQ(miss, 0u);
 }
 
-// §11.4.13: the left-hand side and the set members may all be runtime
-// variables (the operator's headline form, `a inside {b, c}`), so the members'
-// values come from variable reads rather than literals. With a=5, b=3, c=5 the
-// value 5 matches the second member.
 TEST(ExpressionSim, InsideValueMembersFromVariables) {
   SimFixture f;
   uint64_t r = RunModule(f,
@@ -277,9 +221,6 @@ TEST(ExpressionSim, InsideValueMembersFromVariables) {
   EXPECT_EQ(r, 1u);
 }
 
-// §11.4.13: a set member is an expression, so its value may be supplied by a
-// parameter constant rather than a literal (a distinct constant-evaluation
-// path). `8'd5 inside {P}` with P = 8'd5 matches.
 TEST(ExpressionSim, InsideValueMemberFromParameter) {
   SimFixture f;
   uint64_t r = RunModule(f,
@@ -292,8 +233,6 @@ TEST(ExpressionSim, InsideValueMemberFromParameter) {
   EXPECT_EQ(r, 1u);
 }
 
-// §11.4.13: the same, with the set member supplied by a localparam constant
-// (a separate constant form from a module parameter).
 TEST(ExpressionSim, InsideValueMemberFromLocalparam) {
   SimFixture f;
   uint64_t r = RunModule(f,
@@ -306,10 +245,6 @@ TEST(ExpressionSim, InsideValueMemberFromLocalparam) {
   EXPECT_EQ(r, 1u);
 }
 
-// §11.4.13: a range's low and high bounds are expressions and may be supplied
-// by parameter constants. [LO:HI] = [5:10]: 7 is inside (match), 20 is outside
-// (miss), exercising the relational membership test over parameter-valued
-// bounds.
 TEST(ExpressionSim, InsideRangeBoundsFromParameters) {
   SimFixture f;
   auto [hit, miss] = RunModuleTwoVars(f,
@@ -327,7 +262,6 @@ TEST(ExpressionSim, InsideRangeBoundsFromParameters) {
   EXPECT_EQ(miss, 0u);
 }
 
-// §11.4.13: range bounds supplied by localparam constants take the same path.
 TEST(ExpressionSim, InsideRangeBoundsFromLocalparams) {
   SimFixture f;
   auto [hit, miss] = RunModuleTwoVars(f,
@@ -345,8 +279,6 @@ TEST(ExpressionSim, InsideRangeBoundsFromLocalparams) {
   EXPECT_EQ(miss, 0u);
 }
 
-// §11.4.13: the left-hand side is any singular expression, including one whose
-// value is a parameter constant. `P inside {3,5,7}` with P = 8'd5 matches.
 TEST(ExpressionSim, InsideLhsFromParameter) {
   SimFixture f;
   uint64_t r = RunModule(f,
@@ -359,11 +291,6 @@ TEST(ExpressionSim, InsideLhsFromParameter) {
   EXPECT_EQ(r, 1u);
 }
 
-// §11.4.13 has an unpacked array in the set contribute each of its elements
-// as a member, and an associative array is one (§7.8): `3 inside {m}` with
-// m["a"] = 3 is 1 and `4 inside {m}` 0. The array's indices are no members,
-// so `5 inside {mi}` with mi[5] = 7 is 0. The associative array contributed
-// nothing, and every such test answered 0.
 TEST(InsideOperatorSim, AnAssociativeArrayInTheSetContributesItsValues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -379,11 +306,6 @@ TEST(InsideOperatorSim, AnAssociativeArrayInTheSetContributesItsValues) {
   EXPECT_EQ(out, "1 0 1 0\n");
 }
 
-// §11.4.13 compares an integral member by ==? and a nonintegral one by ==, and
-// a range by <= and >=, each on the operands' own types: a signed range holds
-// a negative value, a real is compared as a real, two signed operands of
-// unequal widths are brought to one by sign, and every word takes part. A
-// string range is ordered as strings are.
 TEST(InsideOperatorSim, MembersAndRangesCompareOnTheOperandsTypes) {
   SimFixture f;
   EXPECT_EQ(
@@ -402,9 +324,6 @@ TEST(InsideOperatorSim, MembersAndRangesCompareOnTheOperandsTypes) {
       "1 1 1 0 1 0\n");
 }
 
-// §11.4.13: `$` is the lowest or highest value of the left operand's type,
-// a signed int's being -2**31 and 2**31-1, an unsigned one's 0 and all ones,
-// and a real's the extremes of a real.
 TEST(InsideOperatorSim, DollarBoundIsTheLeftOperandsTypeExtreme) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -420,9 +339,6 @@ TEST(InsideOperatorSim, DollarBoundIsTheLeftOperandsTypeExtreme) {
             "1 0 0 1 1\n");
 }
 
-// §11.4.13: a tolerance range is of A's type with its bounds ordered, a real A
-// keeping its fraction and an integral one truncating the tolerance: 25% of
-// 7.0 is [5.25:8.75], 7.0 +/- 1.5 is [5.5:8.5], and 25% of -7 is [-8:-6].
 TEST(InsideOperatorSim, ToleranceRangeTakesTheTypeOfItsCentre) {
   SimFixture f;
   EXPECT_EQ(

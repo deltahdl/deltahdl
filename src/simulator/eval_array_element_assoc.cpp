@@ -16,20 +16,12 @@ namespace delta {
 
 namespace {
 
-// The entries of an associative array under one kind of key, `data`, and the
-// array each element that is an associative array holds under the same key,
-// `assocs`.
 template <typename Key>
 struct KeyedAssocs {
   std::map<Key, Logic4Vec>& data;
   std::map<Key, AssocArrayObject*>& assocs;
 };
 
-// The array under `key` of `outer`, whose entries under that kind of key are
-// `entries`. A key the entries lack is allocated where `allocate` says so,
-// the array a deleted entry left under it dropped so the new element starts
-// empty (§7.8.7); read alone, it answers a fresh empty array and allocates
-// nothing.
 template <typename Key>
 AssocArrayObject* ElementAssoc(AssocArrayObject* outer,
                                KeyedAssocs<Key> entries, const Key& key,

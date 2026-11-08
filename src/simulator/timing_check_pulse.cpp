@@ -1,31 +1,3 @@
-// §31.4.4's $width, §31.4.5's $period and §31.4.6's $nochange, evaluated
-// against a running design. ArmPulseWindow, declared in
-// simulator/timing_check_pulse.h, is handed an entry of one of those three
-// kinds by WatchTimingChecks (src/simulator/timing_check_driver.cpp); it finds
-// the variables the entry names and arms the watchers that measure the check.
-//
-// The three belong together because the reference signal bounds the window at
-// both ends. §31.4.4 takes the data event to be the reference signal's opposite
-// edge and §31.4.5 takes it to be the reference signal's same edge again, so
-// each names one signal and measures between two edges of it, and the state a
-// watcher carries is the time of the previous matching edge. §31.4.6 names a
-// data signal as well, and takes the leading edge of the reference event for
-// the beginning of its window and the trailing edge for the end, so a watcher
-// there carries both reference times and reports a data transition that fell
-// between them.
-//
-// The three predicates below -- WidthPulseViolated, PeriodViolated and
-// NochangeWindowViolated -- restate the arithmetic of
-// SpecifyManager::CheckWidthViolation, SpecifyManager::CheckPeriodViolation and
-// SpecifyManager::CheckNochangeViolation
-// (src/simulator/specify_timing_violation.cpp) from the clauses those members
-// read, rather than calling them. Each of those members selects a check by the
-// spelling of its signals -- `check.ref_signal != ref`, with no comparison of
-// TimingCheckEntry::inst_prefix -- so with one check registered per module
-// instance a single call answers for every instance of the cell, and answers
-// true when any of them is violated. A watcher already knows which entry it was
-// armed for, so it evaluates that entry and no other.
-
 #include "simulator/timing_check_pulse.h"
 
 #include <cstddef>
@@ -48,35 +20,10 @@
 namespace delta {
 namespace {
 
-// §31.9.4: the invocation option that switches every timing check off, read
-// through SpecifyManager::GetTimingCheckInvocationOptions. It is read at each
-// event rather than when the watcher is armed, because
-// SpecifyManager::SetTimingCheckInvocationOptions can be called after
-// WatchTimingChecks has run and the option then has to reach a check already
-// armed. SpecifyManager::CheckSetupholdViolation reads the same option to
-// return false, which is the behavior restated here.
 bool AllTimingChecksOff(const ArmedCheck& armed) {
   return armed.mgr->GetTimingCheckInvocationOptions().all_timing_checks_off;
 }
 
-// The edge §31.4.4 derives its data event with: the reference signal's edge in
-// the other direction.
-//
-// An edge_control_specifier written in §31.5's general form is inverted
-// edge_descriptor by edge_descriptor, the two characters of each one reversed,
-// so edge[01] gives edge[10], edge[0x] gives edge[x0] and edge[x1] gives
-// edge[1x]. §31.4.4 does not define the opposite of an arbitrary
-// edge_control_specifier, so that is the generalization chosen here rather than
-// a rule the clause states. §31.5 makes posedge the shorthand for edge[01, 0x,
-// x1] and negedge the shorthand for edge[10, x0, 1x], and reversing every
-// edge_descriptor of the first list yields exactly the second, so reversing
-// each edge_descriptor is the reading of the opposite edge that agrees with the
-// two shorthands §31.4.4 and §31.4.6 were written over.
-//
-// Where no edge_descriptor list was written, posedge and negedge are each
-// other's opposite. Every other SpecifyEdge is returned unchanged.
-// SpecifyEdge::kNone and a SpecifyEdge::kEdge carrying no edge_descriptor list
-// therefore match every transition in both of the watchers a check arms.
 TimingCheckEdge OppositeEdge(const TimingCheckEdge& edge) {
   if (!edge.descriptors.empty()) {
     TimingCheckEdge opposite;
@@ -97,35 +44,14 @@ TimingCheckEdge OppositeEdge(const TimingCheckEdge& edge) {
   return edge;
 }
 
-// §31.4.4: a violation is a pulse, timecheck time less timestamp time, wider
-// than the threshold and narrower than the limit. Both end points are excluded,
-// so a pulse exactly as wide as the limit satisfies the check -- the clause
-// asks for a width of at least the limit -- and a pulse no wider than the
-// threshold is passed over, the clause reporting nothing for a glitch below
-// the threshold. A check declared without the optional threshold
-// argument carries the zero §31.4.4 makes its default, which excludes nothing
-// but a pulse of no width at all.
 bool WidthPulseViolated(const TimingCheckEntry& check, uint64_t elapsed) {
   return elapsed > check.threshold && elapsed < check.limit;
 }
 
-// §31.4.5: a violation is timecheck time less timestamp time falling below the
-// limit, the two times being consecutive edges of one signal in the same
-// direction, since §31.4.5 takes the data event to be the reference signal's
-// same edge again. A zero limit
-// therefore issues no violation, no elapsed time being below it.
 bool PeriodViolated(const TimingCheckEntry& check, uint64_t elapsed) {
   return elapsed < check.limit;
 }
 
-// One §31.4.4 or §31.4.5 check between the two edges of its signal it measures:
-// which entry it is, the signal under the instance prefix the check was
-// registered with, and when the edge that opens the window last arrived.
-//
-// The entry is held as a position in SpecifyManager::GetTimingChecks rather
-// than as a pointer to it or a copy of it, which is what ArmedCheck
-// (src/simulator/timing_check_driver_internal.h) is for: an entry's limit can
-// change during the run and the vector holding it can move.
 struct PulseWindow {
   ArmedCheck armed;
   std::string signal;
@@ -133,11 +59,6 @@ struct PulseWindow {
   uint64_t timestamp_ticks = 0;
 };
 
-// Reports the violation a $width or a $period check just measured, naming the
-// one signal it watches and the two numbers §31.4.4 and §31.4.5 compare: the
-// time that elapsed between the two edges, and the limit the check requires it
-// to reach. The signal is named under the instance prefix the check was
-// registered with, so a reader can tell two instances of one cell apart.
 void ReportPulseViolation(const TimingCheckEntry& check,
                           const std::string& signal, uint64_t elapsed,
                           SimContext& ctx) {
@@ -156,16 +77,6 @@ void ReportPulseViolation(const TimingCheckEntry& check,
       "31.4.5", check.loc, ctx);
 }
 
-// The edge that closes a $width or a $period window has arrived at
-// `timecheck_ticks`. Reports a violation when the time since the edge that
-// opened the window falls short of what the check requires.
-//
-// Nothing is reported before an opening edge has been seen, there being no
-// window to measure yet, and nothing is reported for a closing edge at or
-// before the opening one. §31.4.4 notes that the two cannot fall at one
-// simulation time, since opposite transitions trigger them, and
-// SpecifyManager::CheckWidthViolation and SpecifyManager::CheckPeriodViolation
-// both skip a check whose data time is not past its reference time.
 void EvaluatePulseWindow(const PulseWindow& window, uint64_t timecheck_ticks,
                          SimContext& ctx) {
   if (!window.has_timestamp) return;
@@ -181,25 +92,6 @@ void EvaluatePulseWindow(const PulseWindow& window, uint64_t timecheck_ticks,
   NoteViolation(check, ctx);
 }
 
-// Arms the two watchers a §31.4.4 check needs on the one signal it names: the
-// reference edge opens the pulse and the opposite edge closes it.
-//
-// The closing watcher clears the opening time it measured against, so one
-// opening edge is measured once. §31.5 makes a transition to x a negedge as
-// readily as a transition to 0, so a signal going 1 to x to 0 offers two
-// closing edges for one pulse, and without the clear the second would be
-// measured against the same opening edge and reported again.
-//
-// The closing watcher is armed before the opening one. That decides nothing for
-// the posedge and negedge a $width is written with, no transition matching
-// both, and nothing for an edge_control_specifier written in §31.5's general
-// form, whose opposite OppositeEdge names edge_descriptor by edge_descriptor.
-// It matters for the two edges OppositeEdge returns unchanged: a
-// SpecifyEdge::kEdge carrying no edge_descriptor list, and the
-// SpecifyEdge::kNone of a timing_check_event written without an
-// edge_control_specifier. Both watchers match every transition for those two,
-// so arming the closing one first gives such a check the interval since the
-// previous transition rather than an interval of zero.
 void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
                     SimContext& ctx) {
   const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
@@ -210,14 +102,6 @@ void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
   auto window = std::make_shared<PulseWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->signal = std::move(signal);
-  // §31.7: a transition whose `&&&` condition does not hold is not an
-  // occurrence of the check, so both watchers go through WatchConditionedEdge
-  // (src/simulator/timing_check_driver_internal.h) rather than WatchEdge. A
-  // $width names one signal and one timing_check_event -- §31.4.4 takes the
-  // data event to be the reference signal's opposite edge rather than one
-  // written for it -- so there is a single condition to read
-  // whichever edge arrived, and both events set ConditionedEvent::is_data_event
-  // false to read TimingCheckEntry::ref_condition_expr.
   ConditionedEvent ref_event{window->armed, false};
   WatchConditionedEdge(var, OppositeEdge(opening_edge), ref_event, ctx,
                        {[window, &ctx]() {
@@ -234,10 +118,6 @@ void ArmWidthWindow(const SpecifyManager& mgr, std::size_t index,
                         nullptr});
 }
 
-// Arms the one watcher a §31.4.5 check needs. §31.4.5 derives the data event as
-// the reference signal with the same edge, so every matching edge both closes
-// the period that began at the previous one and opens the next; the opening
-// time is replaced whether or not the period just measured was violated.
 void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
                      SimContext& ctx) {
   const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
@@ -248,14 +128,6 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
   auto window = std::make_shared<PulseWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->signal = std::move(signal);
-  // §31.7: a transition whose `&&&` condition does not hold is not an
-  // occurrence of the check, so the watcher goes through WatchConditionedEdge
-  // (src/simulator/timing_check_driver_internal.h) rather than WatchEdge. A
-  // $period names one signal and one timing_check_event -- §31.4.5 derives the
-  // data event as the reference signal with the same edge rather than taking
-  // one written for it -- so there is a single condition to read whichever edge
-  // arrived, and ConditionedEvent::is_data_event is false to read
-  // TimingCheckEntry::ref_condition_expr.
   WatchConditionedEdge(var, std::move(edge),
                        ConditionedEvent{window->armed, false}, ctx,
                        {[window, &ctx]() {
@@ -267,24 +139,6 @@ void ArmPeriodWindow(const SpecifyManager& mgr, std::size_t index,
                         nullptr});
 }
 
-// One §31.4.6 check: which entry it is, the two signals it names under the
-// instance prefix the check was registered with, the two reference edges that
-// bound the window, and the data transitions seen while the window was still
-// open.
-//
-// §31.4.6 puts the end of the window end_edge_offset after the trailing
-// reference edge, so a data transition inside an open window can only be
-// answered once that end is known to lie past it. With a positive
-// end_edge_offset it does from the start -- the trailing edge is still to come,
-// at the transition's time or later -- and the transition is answered when it
-// happens. With a zero offset the trailing edge may yet come in the same time
-// step, which would leave the transition on the excluded end point, so it is
-// held in `pending` and answered at the Inactive region of its time step if the
-// window is still open then. A negative end_edge_offset shortens the region and
-// can leave the transition outside it, so it is held and answered at the
-// trailing edge, the first moment both end points are known. Any data event
-// inside the window is a violation, so each transition is its own violation and
-// toggles the notifier at its own time.
 struct NochangeWindow {
   ArmedCheck armed;
   std::string ref_signal;
@@ -296,17 +150,6 @@ struct NochangeWindow {
   std::vector<uint64_t> pending;
 };
 
-// §31.4.6: the window opens start_edge_offset before the leading reference edge
-// and closes end_edge_offset after the trailing one, and a data event strictly
-// between those two ends is a violation. The end points are not included,
-// which is what makes the clause's own example -- `$nochange(posedge clk, data,
-// 0, 0)` -- report nothing when the posedge and the data transition happen at
-// the same simulation time.
-//
-// Both offsets are signed and both are subtracted from or added to the edge
-// they move: a positive start_edge_offset starts the region earlier and a
-// positive end_edge_offset ends it later, each extending the region, and a
-// negative one shrinks it from that end.
 bool NochangeWindowViolated(const TimingCheckEntry& check,
                             uint64_t leading_ticks, uint64_t trailing_ticks,
                             uint64_t data_ticks) {
@@ -316,8 +159,6 @@ bool NochangeWindowViolated(const TimingCheckEntry& check,
   return begin < data && data < end;
 }
 
-// Reports a data transition of a §31.4.6 check that fell inside its window,
-// and toggles the notifier (§31.6).
 void ReportNochangeViolation(const NochangeWindow& window, SimContext& ctx) {
   if (AllTimingChecksOff(window.armed)) return;
   const TimingCheckEntry& check = window.armed.Entry();
@@ -329,9 +170,6 @@ void ReportNochangeViolation(const NochangeWindow& window, SimContext& ctx) {
   NoteViolation(check, ctx);
 }
 
-// A data transition of a §31.4.6 check at `data_ticks`, both reference edges of
-// the window being known. Reports the violation when the transition fell inside
-// the window.
 void EvaluateNochangeData(const NochangeWindow& window, uint64_t data_ticks,
                           SimContext& ctx) {
   if (NochangeWindowViolated(window.armed.Entry(), window.leading_ticks,
@@ -340,18 +178,11 @@ void EvaluateNochangeData(const NochangeWindow& window, uint64_t data_ticks,
   }
 }
 
-// The trailing reference edge of a §31.4.6 check has arrived at
-// `trailing_ticks`, which closes the window and settles its end point. Every
-// data transition held while the window was open is answered now.
 void CloseNochangeWindow(NochangeWindow& window, uint64_t trailing_ticks,
                          SimContext& ctx) {
   if (!window.has_leading) return;
   window.has_trailing = true;
   window.trailing_ticks = trailing_ticks;
-  // The held transitions are moved out before any is answered. §31.6 has a
-  // violation write the notifier through Variable::NotifyWatchers, and a
-  // watcher run from there reaches RecordNochangeData below, which appends to
-  // the vector this loop would otherwise be walking.
   std::vector<uint64_t> held = std::move(window.pending);
   window.pending.clear();
   for (uint64_t data_ticks : held) {
@@ -359,18 +190,6 @@ void CloseNochangeWindow(NochangeWindow& window, uint64_t trailing_ticks,
   }
 }
 
-// Drops the data transitions held for a window beginning `start_edge_offset`
-// before `reference_ticks`. §31.4.6 opens the window start_edge_offset before
-// the leading reference edge and reports a violation only for a data event
-// after that beginning, so a transition at or
-// before that beginning falls outside and is discarded.
-//
-// It is called from two places for two reasons. At a leading reference edge it
-// keeps the transitions that edge's own window can hold, which is what lets a
-// transition standing before the edge be reported at all. Between windows it
-// bounds what is held: a window still to come opens at some later leading edge
-// L and begins at L - start_edge_offset, so a transition at or before
-// `now - start_edge_offset` can fall in none of them.
 void DropTransitionsBefore(NochangeWindow& window, uint64_t reference_ticks) {
   const TimingCheckEntry& check = window.armed.Entry();
   const int64_t kBegin =
@@ -382,10 +201,6 @@ void DropTransitionsBefore(NochangeWindow& window, uint64_t reference_ticks) {
   window.pending = std::move(kept);
 }
 
-// Answers the transitions held at `now` in a window still open at the Inactive
-// region of their time step: its trailing reference edge has not come in the
-// Active region they were made in, so the end of a window with a zero
-// end_edge_offset lies past them.
 void SettleOpenNochangeWindow(NochangeWindow& window, uint64_t now,
                               SimContext& ctx) {
   if (!window.has_leading || window.has_trailing) return;
@@ -400,12 +215,6 @@ void SettleOpenNochangeWindow(NochangeWindow& window, uint64_t now,
   }
 }
 
-// A data transition inside a §31.4.6 window whose leading reference edge has
-// come and whose trailing edge has not. Answers it now where the window's end
-// is already known to lie past it, or has it answered at the Inactive region
-// of this time step where the end offset is zero, and answers whether it was
-// taken care of. A transition at or before the window's beginning, or under a
-// negative end_edge_offset, is left for RecordNochangeData to hold.
 bool AnswerInOpenWindow(const std::shared_ptr<NochangeWindow>& shared,
                         uint64_t data_ticks, SimContext& ctx) {
   NochangeWindow& window = *shared;
@@ -427,22 +236,6 @@ bool AnswerInOpenWindow(const std::shared_ptr<NochangeWindow>& shared,
   return true;
 }
 
-// A data transition of a §31.4.6 check at `data_ticks`.
-//
-// It is measured against the window standing closed, if one is, because
-// §31.4.6's end_edge_offset can extend that window past its trailing reference
-// edge and a transition after the edge is still inside it while the extension
-// lasts.
-//
-// It is held either way, because the next leading reference edge may open a
-// window that reaches back past it: §31.4.6 begins a window start_edge_offset
-// before the leading reference edge, so a positive offset puts the
-// beginning before the edge that opens it. Issue #3424 was that such a
-// transition was dropped, first by an early return while no leading edge had
-// been seen and then by the leading edge clearing everything held, which made
-// the interval a positive offset adds one no violation could be reported in.
-// One transition standing inside two windows violates both, which is why the
-// hold is not conditional on the immediate measurement having found nothing.
 void RecordNochangeData(const std::shared_ptr<NochangeWindow>& shared,
                         uint64_t data_ticks, SimContext& ctx) {
   NochangeWindow& window = *shared;
@@ -453,27 +246,12 @@ void RecordNochangeData(const std::shared_ptr<NochangeWindow>& shared,
       AnswerInOpenWindow(shared, data_ticks, ctx)) {
     return;
   }
-  // Nothing held is dropped while a window stands open, every transition in it
-  // being one that window's trailing reference edge has still to measure. The
-  // bound applies between windows, where what is held can only serve one still
-  // to come. It is taken before the transition is added, since a check whose
-  // start_edge_offset is zero has a bound of the current time and would
-  // otherwise discard what it has just been handed.
   if (!window.has_leading || window.has_trailing) {
     DropTransitionsBefore(window, data_ticks);
   }
   window.pending.push_back(data_ticks);
 }
 
-// Arms the three watchers a §31.4.6 check needs. §31.4.6 says so outright: a
-// $nochange, unlike the other checks, involves three transitions -- the leading
-// reference edge, the trailing one, and the data transition measured against
-// them.
-//
-// The leading edge is the one the check was written with, which §31.4.6
-// restricts to posedge or negedge, and the trailing edge is its opposite. A
-// leading edge starts a fresh window and discards any data transition held for
-// the one before it, which never closed.
 void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
                        SimContext& ctx) {
   const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
@@ -489,17 +267,6 @@ void ArmNochangeWindow(const SpecifyManager& mgr, std::size_t index,
   window->armed = ArmedCheck{&mgr, index};
   window->ref_signal = std::move(ref_signal);
   window->data_signal = std::move(data_signal);
-  // §31.7: a transition whose `&&&` condition does not hold is not an
-  // occurrence of the check, so all three watchers go through
-  // WatchConditionedEdge (src/simulator/timing_check_driver_internal.h) rather
-  // than WatchEdge. The leading edge and the trailing edge are both edges of
-  // the reference event -- §31.4.6 derives the trailing one as the opposite of
-  // the edge the reference event was written with -- so both watchers on
-  // ref_var read TimingCheckEntry::ref_condition_expr with
-  // ConditionedEvent::is_data_event false. A $nochange is the one check here
-  // whose data event is written rather than derived, so the watcher on
-  // data_var reads its own TimingCheckEntry::data_condition_expr with
-  // is_data_event true.
   ConditionedEvent ref_event{window->armed, false};
   ConditionedEvent data_event{window->armed, true};
   WatchConditionedEdge(ref_var, std::move(leading_edge), ref_event, ctx,

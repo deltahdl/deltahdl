@@ -1,27 +1,3 @@
-// §30.7's pulse filtering, applied to the driver of a module path output.
-//
-// The delay itself is only half of what a module path does. §30.7 opens by
-// treating two scheduled transitions in a row that lie nearer in time than the
-// module path delay as a pulse, and then says that the reject and
-// error limits belonging to the delay forming the pulse's trailing edge decide
-// whether it reaches the output, reaches it as x, or does not appear at all.
-// Figure 30-5 is the worked case: with `(A => Y) = 7, 9;` a pulse of width 4 on
-// A leaves a pulse of width 2 at Y, which is less than the rise delay's reject
-// limit of 7, so nothing appears on Y.
-//
-// The pulse is detected the same way §28's inertial delay detects one: the
-// driver is re-evaluated while a transition is still pending, and the value it
-// now wants is the value already on the output. What §30.7 adds is that this is
-// not automatically a cancellation. It is one of three outcomes, and the limits
-// say which.
-//
-// A fourth stands beside those three. §30.7.4.2's negative pulse is what
-// unequal delays make when the two schedules cross, and it has no width for a
-// limit to be measured against; the showcancelled mode decides it instead.
-//
-// The selection of the delay and the limits is in
-// src/simulator/module_path_delay.cpp; this file spends them.
-
 #include <cstdint>
 
 #include "common/types.h"
@@ -42,14 +18,6 @@ static uint64_t TicksUntil(uint64_t target, const SimContext& ctx) {
   return target > now ? target - now : 0;
 }
 
-// What one transition of the path output costs and what governs a pulse ending
-// on it. §30.6 settles the module path delay against the delay the driver
-// already carried by taking the larger of the two, which is what
-// SelectEffectivePathDelay answers. The limits come from the module path even
-// where the distributed delay is the larger, because §30.6 speaks about the
-// delay alone and §30.7.3 annotates the limits onto the module path transition
-// delay; a driver no module path reaches keeps its own delay and no limits,
-// which leaves it on §28's inertial route.
 struct ModulePathTransitionDelay {
   uint64_t ticks = 0;
   uint64_t reject_limit = 0;
@@ -60,10 +28,6 @@ static ModulePathTransitionDelay ResolveTransitionDelay(
     const ModulePathDrive& drive, const Logic4Vec& from, const Logic4Vec& to) {
   ModulePathDelay mp = SelectModulePathDelay(drive, from, to);
   if (!mp.found) return {drive.distributed_ticks, 0, 0};
-  // §30.6 (printed page 885): at the port the delay the instance's own logic
-  // took is already spent, so the path delay runs from its source's transition
-  // and only what is left of it is waited out -- none where the logic took
-  // longer, the greater of the two delays being the logic's then.
   uint64_t delay = mp.delay;
   if (drive.at_port) {
     const uint64_t kSpent = drive.ctx.CurrentTime().ticks - mp.source_ticks;
@@ -73,28 +37,10 @@ static ModulePathTransitionDelay ResolveTransitionDelay(
           mp.reject_limit, mp.error_limit};
 }
 
-// §30.7.4.2's negative pulse: the two schedules cross, so there is no pulse of
-// any width to measure. `target` is when the later of the two was scheduled for
-// and `trailing` the earlier; `settled` is the value the output already holds
-// and returns to.
-//
-// Without showcancelled the answer is that the leading edge is dropped, and
-// where the pulse starts and ends at one state the output never moves and
-// shows no sign a schedule existed, which is a return that drives nothing. With
-// it, the leading edge is scheduled into x and the trailing edge out of it --
-// the two edges
-// being the output's own, in time order, so the x begins at the earlier
-// schedule and the output leaves it at the later. Figure 30-7 is the case:
-// `(in => out) = (4, 6);` with `in` falling at 10 and rising at 11 schedules
-// `out` low at 16 and high at 15, and showcancelled shows x across 15 to 16 --
-// or from 11, the moment of detection, under on-detect.
 static ExecTask DriveCancelledPulse(const ModulePathDrive& drive,
                                     const Logic4Vec& settled, SimTime target,
                                     uint64_t trailing, bool* committed) {
   SimContext& ctx = drive.ctx;
-  // `trailing` is what ScheduleNegativePulse calls the scheduled leading time.
-  // The two names agree: its parameter means the edge that comes first at the
-  // output, and for a negative pulse that is the schedule computed last.
   NegativePulseSchedule neg =
       ScheduleNegativePulse(drive.mgr.ResolveShowCancelled(drive.output),
                             drive.mgr.ResolvePulseStyle(drive.output),
@@ -112,14 +58,6 @@ static ExecTask DriveCancelledPulse(const ModulePathDrive& drive,
   co_return StmtResult::kDone;
 }
 
-// Carries out §30.7's answer for one pulse. `leading` is the value the pending
-// transition would have placed on the output and `settled` the value already
-// there, which the driver has now returned to; `target` is when the leading
-// edge was scheduled for, so the pulse runs from `target` to the trailing
-// edge.
-//
-// A negative pulse has no width to measure and is handed to
-// DriveCancelledPulse above before the measurement is reached.
 static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
                                       const Logic4Vec& leading,
                                       const Logic4Vec& settled, SimTime target,
@@ -133,8 +71,6 @@ static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
     co_return StmtResult::kDone;
   }
 
-  // Past that test the trailing edge is no earlier than the leading one, so the
-  // width is their difference and never a clamp of one.
   uint64_t width = trailing - target.ticks;
 
   PulseClassification cls =
@@ -142,13 +78,6 @@ static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
   if (cls == PulseClassification::kReject) co_return StmtResult::kDone;
 
   if (cls == PulseClassification::kForceX) {
-    // §30.7.4.1: on-event leaves the x transition at the time the leading edge
-    // was already scheduled for, on-detect advances it to now, the moment the
-    // pulse was detected. The style is asked for by the instance-qualified
-    // output name, which is what RegisterPulseStyles in
-    // src/simulator/specify_register.cpp filed the declaration under, so a
-    // pulsestyle declared in one instance of a cell does not answer for
-    // another.
     uint64_t x_at =
         FilteredPulseLeadingXTime(drive.mgr.ResolvePulseStyle(drive.output),
                                   ctx.CurrentTime().ticks, target.ticks);
@@ -170,10 +99,6 @@ static ExecTask FilterModulePathPulse(const ModulePathDrive& drive,
 
 namespace {
 
-// §37.45 details 1 and 2: the destination net's record of the value a
-// transition is carrying across its delay, held from the transition's start,
-// moved with each new value the driver wants, and cleared when it ends, so the
-// input delay term on the net reads it ahead of the net.
 class PendingPathValue {
  public:
   PendingPathValue(Net* net, const Logic4Vec& v) : net_(net) { Hold(v); }
@@ -210,11 +135,6 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
 
     auto next = EvalExpr(drive.rhs, ctx, drive.arena, drive.width);
     if (next.SameValueAs(val)) {
-      // §30.5.3 (printed page 885): a source moving in the very step the
-      // transition was scheduled in transitioned simultaneously with the one
-      // that scheduled it -- where A and B last moved together, the clause
-      // takes the smaller of their two rise delays -- so the delay is selected
-      // again among them.
       if (ctx.CurrentTime().ticks == scheduled.ticks) {
         lead = ResolveTransitionDelay(drive, old_val, val);
         target = scheduled + SimTime{lead.ticks};
@@ -222,8 +142,6 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
       continue;
     }
     if (!next.SameValueAs(old_val)) {
-      // The driver wants a different value than the one pending, so the pending
-      // transition is dropped and the new one takes its own delay.
       val = next;
       kPending.Hold(val);
       lead = ResolveTransitionDelay(drive, old_val, val);
@@ -231,10 +149,6 @@ ExecTask RunModulePathTransition(const ModulePathDrive& drive,
       continue;
     }
 
-    // The driver has returned to the value already on the output before the
-    // pending transition fired, which is §30.7's pulse. `val` becomes that
-    // settled value so the caller's own commit, which runs whatever this
-    // returns, places nothing new on the output.
     Logic4Vec leading = val;
     val = next;
     co_await FilterModulePathPulse(drive, leading, old_val, target, committed);

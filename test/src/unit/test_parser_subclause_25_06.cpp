@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §25.6: an interface signal is named with its interface instance qualifier and
-// is available as a specify terminal. The parser splits the qualified terminal
-// into interface name and signal name. The same terminal parse serves source,
-// destination, and timing-check positions, so one observer covers the rule.
 TEST(SpecifyInterfaceTerminalParsing,
      InterfaceSignalSplitsIntoInterfaceAndName) {
   auto r = Parse(
@@ -28,9 +24,6 @@ TEST(SpecifyInterfaceTerminalParsing,
   EXPECT_EQ(si->path.src_ports[0].name, "sig");
 }
 
-// §25.6: an interface signal is equally available as a module path
-// destination. The destination is a distinct syntactic position, so observe the
-// qualifier split there too.
 TEST(SpecifyInterfaceTerminalParsing,
      InterfaceSignalSplitsInDestinationPosition) {
   auto r = Parse(
@@ -48,8 +41,6 @@ TEST(SpecifyInterfaceTerminalParsing,
   EXPECT_EQ(si->path.dst_ports[0].name, "sig");
 }
 
-// §25.6: an interface signal is equally available as a timing-check terminal,
-// another distinct syntactic position for the qualified terminal.
 TEST(SpecifyInterfaceTerminalParsing,
      InterfaceSignalSplitsInTimingCheckPosition) {
   auto r = Parse(
@@ -62,8 +53,6 @@ TEST(SpecifyInterfaceTerminalParsing,
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  // Syntax 31-3 writes the data_event first, so the interface signal here is
-  // the $setup data event.
   EXPECT_EQ(tc->data_terminal.interface_name, "intf");
   EXPECT_EQ(tc->data_terminal.name, "data");
 }

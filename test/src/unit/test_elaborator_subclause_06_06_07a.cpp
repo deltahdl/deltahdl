@@ -16,8 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §6.6.7: a net declared with a user-defined nettype takes on that nettype --
-// the elaborated net is marked as a user nettype and records the nettype name.
 TEST(NettypeElaboration, NetCarriesNettypeIdentity) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -38,8 +36,6 @@ TEST(NettypeElaboration, NetCarriesNettypeIdentity) {
   EXPECT_EQ(net->nettype_name, "my_net");
 }
 
-// §6.6.7: a net declared with a nettype also takes on the nettype's associated
-// resolution function.
 TEST(NettypeElaboration, NetCarriesResolutionFunction) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -60,8 +56,6 @@ TEST(NettypeElaboration, NetCarriesResolutionFunction) {
   EXPECT_EQ(net->resolve_func, "my_resolve");
 }
 
-// §6.6.7: the second declaration form names another nettype for an existing
-// one; a net of the alias resolves to the source nettype's resolution function.
 TEST(NettypeElaboration, AliasNetInheritsResolutionFunction) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -83,10 +77,6 @@ TEST(NettypeElaboration, AliasNetInheritsResolutionFunction) {
   EXPECT_EQ(net->resolve_func, "my_resolve");
 }
 
-// §6.6.7 resolution-function signature constraints, exercised through the
-// production validator. This signature breaks no requirement §6.6.7 states.
-// Each case below moves one field away from it, so the rule
-// ValidateNettypeResolutionFunction returns is the rule that field carries.
 static NettypeResolutionSig ConformingSig() {
   NettypeResolutionSig sig;
   sig.return_type_matches_nettype = true;
@@ -100,10 +90,6 @@ static NettypeResolutionSig ConformingSig() {
   return sig;
 }
 
-// §6.6.7: the resolution function of a user-defined nettype over data type T
-// returns T and takes one input argument, a dynamic array of T elements. The
-// case fails when ValidateNettypeResolutionFunction answers anything but
-// kReturnType for a signature whose only fault is the return type.
 TEST(NettypeElaboration, ResolutionFunctionWrongReturnTypeRejected) {
   auto sig = ConformingSig();
   sig.return_type_matches_nettype = false;
@@ -111,10 +97,6 @@ TEST(NettypeElaboration, ResolutionFunctionWrongReturnTypeRejected) {
             NettypeResolutionRule::kReturnType);
 }
 
-// §6.6.7: a resolution function is automatic, or keeps no state, and has no
-// side effects. The case fails when ValidateNettypeResolutionFunction answers
-// anything but kAutomaticLifetime for a signature whose only fault is the
-// lifetime.
 TEST(NettypeElaboration, ResolutionFunctionNonAutomaticRejected) {
   auto sig = ConformingSig();
   sig.is_automatic = false;
@@ -122,10 +104,6 @@ TEST(NettypeElaboration, ResolutionFunctionNonAutomaticRejected) {
             NettypeResolutionRule::kAutomaticLifetime);
 }
 
-// §6.6.7: a class function method may serve as a resolution function only if it
-// is static, since the call happens with no class object involved. The case
-// fails when ValidateNettypeResolutionFunction answers anything but
-// kClassStaticMethod for a class method that is not static.
 TEST(NettypeElaboration, ResolutionFunctionNonStaticClassMethodRejected) {
   auto sig = ConformingSig();
   sig.is_class_method = true;
@@ -134,10 +112,6 @@ TEST(NettypeElaboration, ResolutionFunctionNonStaticClassMethodRejected) {
             NettypeResolutionRule::kClassStaticMethod);
 }
 
-// §6.6.7 admits the class method that is static, a class function method
-// serving as a resolution function only when static. The case fails when
-// ValidateNettypeResolutionFunction names any rule broken by a static class
-// method conforming in every other field.
 TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
   auto sig = ConformingSig();
   sig.is_class_method = true;
@@ -146,15 +120,6 @@ TEST(NettypeElaboration, ResolutionFunctionStaticClassMethodAccepted) {
             NettypeResolutionRule::kConforming);
 }
 
-// §6.6.7: a class function method may serve as a resolution function only if it
-// is static, since the call happens with no class object involved. The case
-// fails unless the run reports "shall be a static class method" at line 7, the
-// `nettype` declaration, under §6.6.7. Driven from source through parse +
-// elaborate, where ResolutionFunctionNonStaticClassMethodRejected above hands
-// ValidateNettypeResolutionFunction the two flags directly: this one asserts
-// that `with C::res` reaches the class method the source named, and `res`
-// breaks no other requirement §6.6.7 states, so the class-static rule is the
-// one left to report.
 TEST(NettypeElaboration, NonStaticClassMethodResolutionFunctionIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -173,11 +138,6 @@ TEST(NettypeElaboration, NonStaticClassMethodResolutionFunctionIsRejected) {
                             7, "6.6.7"));
 }
 
-// §6.6.7 admits the class method that is static, so the same source with
-// `static` on `res` breaks nothing the clause states. The case fails when the
-// run reports any error, and it is what stops
-// NonStaticClassMethodResolutionFunctionIsRejected from passing on a source the
-// elaborator would reject whether `res` were static or not.
 TEST(NettypeElaboration, StaticClassMethodResolutionFunctionIsAccepted) {
   ElabFixture f;
   Elaborate(
@@ -193,11 +153,6 @@ TEST(NettypeElaboration, StaticClassMethodResolutionFunctionIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7's Syntax 6-1 writes the with clause as `with [ package_scope |
-// class_scope ] tf_identifier`, so a qualifier that names neither a package nor
-// a class names no resolution function at all. The case fails unless the run
-// reports "names unknown package or class 'Nope'" at line 2, the `nettype`
-// declaration, under §6.6.7.
 TEST(NettypeElaboration,
      ResolutionFunctionScopeNamingNeitherPackageNorClassRejected) {
   ElabFixture f;
@@ -212,10 +167,6 @@ TEST(NettypeElaboration,
                             2, "6.6.7"));
 }
 
-// §6.6.7: a qualifier reaching a class that declares no function of that name
-// is a different mistake from a qualifier reaching nothing, and draws its own
-// report. The case fails unless the run reports "'C::missing' ... does not
-// exist" at line 7, the `nettype` declaration, under §6.6.7.
 TEST(NettypeElaboration, ClassResolutionFunctionMissingFromItsClassRejected) {
   ElabFixture f;
   Elaborate(
@@ -234,13 +185,6 @@ TEST(NettypeElaboration, ClassResolutionFunctionMissingFromItsClassRejected) {
                             7, "6.6.7"));
 }
 
-// §6.6.7: a net of a nettype declared `with C::res` resolves through the class
-// method the with clause named, and not through a module-level function that
-// happens to share the bare name `res`. Both functions here conform to §6.6.7,
-// so nothing but the qualifier distinguishes them, and the case fails unless
-// the elaborated net's resolution function is 'C::res'. It is what the net
-// carries into the simulator, so binding the wrong one costs a wrong
-// simulation rather than a missing report.
 TEST(NettypeElaboration,
      QualifiedResolutionFunctionDoesNotBindAnUnrelatedPlainFunction) {
   ElabFixture f;
@@ -265,9 +209,6 @@ TEST(NettypeElaboration,
   EXPECT_EQ(net->resolve_func, "C::res");
 }
 
-// §6.6.7 data-type restriction: a real (or shortreal) type is one of the
-// permitted nettype data types, so a nettype declared over it elaborates
-// cleanly. Driven from real source through parse + elaborate.
 TEST(NettypeElaboration, RealDataTypeAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -279,8 +220,6 @@ TEST(NettypeElaboration, RealDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 data-type restriction: an unpacked struct is a legal fixed-size
-// aggregate nettype data type, so it is accepted.
 TEST(NettypeElaboration, StructDataTypeAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -293,8 +232,6 @@ TEST(NettypeElaboration, StructDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 data-type restriction (negative form): a string is not among the
-// permitted nettype data types, so declaring a nettype over it is an error.
 TEST(NettypeElaboration, StringDataTypeRejected) {
   ElabFixture f;
   Elaborate(
@@ -308,8 +245,6 @@ TEST(NettypeElaboration, StringDataTypeRejected) {
                             2, "6.6.7"));
 }
 
-// §6.6.7 data-type restriction (negative form): a chandle is not a legal
-// nettype data type.
 TEST(NettypeElaboration, ChandleDataTypeRejected) {
   ElabFixture f;
   Elaborate(
@@ -323,8 +258,6 @@ TEST(NettypeElaboration, ChandleDataTypeRejected) {
                             2, "6.6.7"));
 }
 
-// §6.6.7 data-type restriction (negative form): an event is not a legal
-// nettype data type.
 TEST(NettypeElaboration, EventDataTypeRejected) {
   ElabFixture f;
   Elaborate(
@@ -338,10 +271,6 @@ TEST(NettypeElaboration, EventDataTypeRejected) {
                             2, "6.6.7"));
 }
 
-// §6.6.7 resolution-function signature: a function with exactly one dynamic
-// array input argument conforms, so a nettype naming it elaborates cleanly.
-// Built from real source (the function and nettype declarations) and driven
-// through parse + elaborate so the wired check observes it.
 TEST(NettypeElaboration, ConformingResolutionFunctionAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -357,10 +286,6 @@ TEST(NettypeElaboration, ConformingResolutionFunctionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 requires exactly one input argument, and Tsum here takes two. The case
-// fails unless the run reports "shall take a single input argument" at line 6,
-// the `nettype` declaration, under §6.6.7. No other §6.6.7 report ends there:
-// the argument-direction report continues "and this one is not declared input".
 TEST(NettypeElaboration, ResolutionFunctionArgumentCountNamesItsOwnRule) {
   ElabFixture f;
   Elaborate(
@@ -376,10 +301,6 @@ TEST(NettypeElaboration, ResolutionFunctionArgumentCountNamesItsOwnRule) {
                             "shall take a single input argument", 6, "6.6.7"));
 }
 
-// §6.6.7 requires a resolution function for a nettype with data type T to
-// return T, and Tsum here returns U. The case fails unless the run reports
-// "shall have a return type of 'T'" at line 8, the `nettype` declaration, under
-// §6.6.7.
 TEST(NettypeElaboration, ResolutionFunctionReturnTypeNamesItsOwnRule) {
   ElabFixture f;
   Elaborate(
@@ -397,10 +318,6 @@ TEST(NettypeElaboration, ResolutionFunctionReturnTypeNamesItsOwnRule) {
                             "shall have a return type of 'T'", 8, "6.6.7"));
 }
 
-// §6.6.7 requires the argument to be a dynamic array of T elements, and
-// `input T driver[4]` is a fixed-size array. The case fails unless the run
-// reports "a dynamic array rather than a fixed-size array" at line 6, the
-// `nettype` declaration, under §6.6.7.
 TEST(NettypeElaboration,
      ResolutionFunctionDynamicArrayArgumentNamesItsOwnRule) {
   ElabFixture f;
@@ -418,10 +335,6 @@ TEST(NettypeElaboration,
                             "6.6.7"));
 }
 
-// §6.6.7 admits exactly one input argument, so an `output` argument breaks the
-// clause even though the count is right. The case fails unless the run reports
-// "and this one is not declared input" at line 6, the `nettype` declaration,
-// under §6.6.7.
 TEST(NettypeElaboration, ResolutionFunctionOutputArgumentRejected) {
   ElabFixture f;
   Elaborate(
@@ -437,10 +350,6 @@ TEST(NettypeElaboration, ResolutionFunctionOutputArgumentRejected) {
                             "and this one is not declared input", 6, "6.6.7"));
 }
 
-// §6.6.7 admits exactly one input argument, so a `ref` argument breaks the
-// clause as an `output` one does. The case fails unless the run reports "and
-// this one is not declared input" at line 6, the `nettype` declaration, under
-// §6.6.7.
 TEST(NettypeElaboration, ResolutionFunctionRefArgumentRejected) {
   ElabFixture f;
   Elaborate(
@@ -456,10 +365,6 @@ TEST(NettypeElaboration, ResolutionFunctionRefArgumentRejected) {
                             "and this one is not declared input", 6, "6.6.7"));
 }
 
-// §6.6.7 requires the argument to be a dynamic array of T elements, and Tsum
-// here takes a dynamic array of U against a nettype whose data type is T. The
-// case fails unless the run reports "dynamic array argument whose elements are
-// of type 'T'" at line 8, the `nettype` declaration, under §6.6.7.
 TEST(NettypeElaboration,
      ResolutionFunctionArgumentElementTypeMismatchRejected) {
   ElabFixture f;
@@ -479,10 +384,6 @@ TEST(NettypeElaboration,
       "dynamic array argument whose elements are of type 'T'", 8, "6.6.7"));
 }
 
-// §6.6.7's own example declares `function automatic T Tsum (input T driver[]);`
-// beside a nettype whose data type is T, which breaks none of the clause's
-// requirements. The case fails when the elaborator reports any §6.6.7 rule
-// against a signature that breaks none of them.
 TEST(NettypeElaboration, ConformingResolutionFunctionStillAccepted) {
   ElabFixture f;
   Elaborate(
@@ -497,8 +398,6 @@ TEST(NettypeElaboration, ConformingResolutionFunctionStillAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 data-type restriction: a 2-state integral type (here a packed bit
-// vector) is a permitted nettype data type, so it elaborates without error.
 TEST(NettypeElaboration, TwoStateIntegralDataTypeAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -510,8 +409,6 @@ TEST(NettypeElaboration, TwoStateIntegralDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 data-type restriction: shortreal (the other floating-point form
-// alongside real) is a permitted nettype data type.
 TEST(NettypeElaboration, ShortrealDataTypeAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -523,9 +420,6 @@ TEST(NettypeElaboration, ShortrealDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7 data-type restriction: a fixed-size unpacked array is a permitted
-// nettype data type. The array type is built from a real typedef (§6.18) and
-// driven through parse + elaborate, exercising the named-type acceptance path.
 TEST(NettypeElaboration, FixedUnpackedArrayDataTypeAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -538,10 +432,6 @@ TEST(NettypeElaboration, FixedUnpackedArrayDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.6.7's own example scopes a resolution function by a typedef of a class
-// specialization, `typedef Base#(32) MyBaseT;` and `with MyBaseT::Ssum`, so
-// the typedef names the class whose static function resolves the net and no
-// scope is reported unknown.
 TEST(NettypeElaboration, ResolutionFunctionScopedByATypedefOfASpecialization) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -558,8 +448,6 @@ TEST(NettypeElaboration, ResolutionFunctionScopedByATypedefOfASpecialization) {
              "endmodule\n"));
 }
 
-// The typedef still has to lead to a class declaring the function: one naming
-// a class without it is reported as a missing function, not an unknown scope.
 TEST(NettypeElaboration, ResolutionFunctionMissingFromATypedefsClassReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -577,9 +465,6 @@ TEST(NettypeElaboration, ResolutionFunctionMissingFromATypedefsClassReported) {
                             6, "6.6.7"));
 }
 
-// §6.6.7 with §3.12.1: a nettype declaration is a net declaration, which a
-// compilation unit may hold as a package may (A.1.2, A.1.11, A.2.1.3), and
-// the modules after it declare nets of its type.
 constexpr const char* kCompilationUnitNettype =
     "nettype logic mynet;\n"
     "module top; mynet n; endmodule\n";
@@ -603,11 +488,6 @@ TEST(NettypeElaboration, ANetOfACompilationUnitNettypeCarriesIt) {
   EXPECT_EQ(net->nettype_name, "mynet");
 }
 
-// §6.6.7 with §6.18: a nettype or typedef name stands for the type it was
-// declared with, so a chain of names is followed to the packed vector type at
-// its end, whose range a net of the first name takes. A name the table does
-// not hold, a name for an enumeration or for a type with no packed dimension,
-// and a chain with no end stand for none.
 TEST(NettypeElaboration, NamedPackedVectorTypeFollowsAChainOfNames) {
   Arena arena;
   Expr left;
@@ -652,11 +532,6 @@ TEST(NettypeElaboration, NamedPackedVectorTypeFollowsAChainOfNames) {
   EXPECT_EQ(NamedPackedVectorType(to_a, kTable, arena), nullptr);
 }
 
-// --- The data type a nettype resolves to (§6.6.7 items a to d) ---
-// The rule judges a type, so a typedef name is judged as what it stands for, an
-// array by whether it is fixed-size and by its element, and an unpacked
-// structure member by member.
-
 void ExpectIllegalNettypeDataType(const std::string& body) {
   ElabFixture f;
   const std::string kSrc =
@@ -691,14 +566,10 @@ TEST(NettypeElaboration, UnpackedStructWithAStringMemberDataTypeRejected) {
       "  typedef struct { real r; string s; } bad_t;\n");
 }
 
-// Item d asks of each element that it be fixed-size, so a member that is a
-// queue makes the structure illegal even though its element type is real.
 TEST(NettypeElaboration, UnpackedStructWithAQueueMemberDataTypeRejected) {
   ExpectIllegalNettypeDataType("  typedef struct { real r[$]; } bad_t;\n");
 }
 
-// void and a virtual interface name no value at all, and neither is among
-// items a to d.
 TEST(NettypeElaboration, VoidDataTypeRejected) {
   ElabFixture f;
   Elaborate(
@@ -726,7 +597,6 @@ TEST(NettypeElaboration, VirtualInterfaceDataTypeRejected) {
                             3, "6.6.7"));
 }
 
-// A class named directly is a data type too, and no more a legal one.
 TEST(NettypeElaboration, ClassDataTypeRejected) {
   ElabFixture f;
   Elaborate(
@@ -741,9 +611,6 @@ TEST(NettypeElaboration, ClassDataTypeRejected) {
                             3, "6.6.7"));
 }
 
-// The counterpart: a fixed-size array of an unpacked structure whose members
-// are real and 2-state integral is item d applied twice over, and an alias of
-// the nettype names a nettype rather than a data type.
 TEST(NettypeElaboration, FixedArrayOfARealAndTwoStateStructDataTypeAccepted) {
   ElabFixture f;
   Elaborate(
@@ -758,8 +625,6 @@ TEST(NettypeElaboration, FixedArrayOfARealAndTwoStateStructDataTypeAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Elaborates a module declaring `decls` and then a nettype `n` of `type`, and
-// answers whether it elaborated with no report.
 bool NettypeAccepted(const std::string& decls, const std::string& type) {
   ElabFixture f;
   Elaborate("module m;\n" + decls + "  nettype " + type + " n;\nendmodule\n",
@@ -767,8 +632,6 @@ bool NettypeAccepted(const std::string& decls, const std::string& type) {
   return !f.has_errors;
 }
 
-// Items a and b: a packed structure or union is integral, whether its members
-// are 4-state or 2-state, written inline or through a typedef.
 TEST(NettypeElaboration, PackedStructureAndUnionDataTypesAccepted) {
   EXPECT_TRUE(NettypeAccepted("", "struct packed { logic [3:0] a; logic b; }"));
   EXPECT_TRUE(NettypeAccepted("", "struct packed { bit [3:0] a; bit b; }"));
@@ -779,8 +642,6 @@ TEST(NettypeElaboration, PackedStructureAndUnionDataTypesAccepted) {
       "  typedef union packed { bit [3:0] a; bit [3:0] b; } u2_t;\n", "u2_t"));
 }
 
-// Items a and b take every integral type: a multidimensional packed array, an
-// enumeration, and the predefined integer types.
 TEST(NettypeElaboration, IntegralDataTypesAccepted) {
   EXPECT_TRUE(NettypeAccepted("", "logic [1:0][3:0]"));
   EXPECT_TRUE(NettypeAccepted("  typedef enum { A, B } e_t;\n", "e_t"));
@@ -791,9 +652,6 @@ TEST(NettypeElaboration, IntegralDataTypesAccepted) {
   }
 }
 
-// Item d: an unpacked union is legal as an unpacked structure is, each member
-// having a legal type, and an unpacked array may have several fixed-size
-// dimensions.
 TEST(NettypeElaboration, UnpackedUnionAndMultidimensionalArrayAccepted) {
   EXPECT_TRUE(NettypeAccepted(
       "  typedef union { real r; bit [63:0] b; } ru_t;\n", "ru_t"));
@@ -802,8 +660,6 @@ TEST(NettypeElaboration, UnpackedUnionAndMultidimensionalArrayAccepted) {
   EXPECT_TRUE(NettypeAccepted("  typedef real r4_t [0:3];\n", "r4_t"));
 }
 
-// Item d asks for a fixed-size array, which an associative array is not,
-// whatever its index type.
 TEST(NettypeElaboration, AssociativeArrayDataTypeRejected) {
   ExpectIllegalNettypeDataType("  typedef real bad_t[string];\n");
   ExpectIllegalNettypeDataType("  typedef real bad_t[int];\n");
@@ -812,8 +668,6 @@ TEST(NettypeElaboration, AssociativeArrayDataTypeRejected) {
       "  typedef real fix_t[2];\n  typedef fix_t bad_t[int];\n");
 }
 
-// An unpacked union is judged member by member, as a structure is, and an
-// array element by element.
 TEST(NettypeElaboration, UnpackedUnionWithAnIllegalMemberRejected) {
   ExpectIllegalNettypeDataType(
       "  typedef union { real r; string s; } bad_t;\n");
@@ -823,8 +677,6 @@ TEST(NettypeElaboration, UnpackedUnionWithAnIllegalMemberRejected) {
   ExpectIllegalNettypeDataType("  typedef event bad_t [2];\n");
 }
 
-// Item d applies at every level of nesting: a dynamic array two structures
-// down makes the outer structure illegal, and a fixed one there does not.
 TEST(NettypeElaboration, NestedDynamicArrayMemberRejected) {
   ExpectIllegalNettypeDataType(
       "  typedef struct { struct { int d[]; } inner; } bad_t;\n");
@@ -835,8 +687,6 @@ TEST(NettypeElaboration, NestedDynamicArrayMemberRejected) {
       "  typedef struct { struct { int d[2]; } inner; } ok_t;\n", "ok_t"));
 }
 
-// A class of the std package, by its bare name or through the package, and a
-// covergroup are types none of items a to d names.
 TEST(NettypeElaboration, BuiltInClassAndCovergroupDataTypesRejected) {
   for (const char* type :
        {"mailbox", "semaphore", "std::semaphore", "std::mailbox"}) {
@@ -866,8 +716,6 @@ TEST(NettypeElaboration, BuiltInClassAndCovergroupDataTypesRejected) {
                             3, "6.6.7"));
 }
 
-// A type parameter is judged as the type it stands for: its default where
-// nothing assigns it, and the type an instance gives it.
 TEST(NettypeElaboration, TypeParameterDataTypeJudgedAsItsType) {
   ElabFixture f;
   Elaborate(

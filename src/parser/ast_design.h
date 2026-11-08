@@ -17,24 +17,12 @@ namespace delta {
 
 struct ClassMember;
 
-// One identifier of a bind target and the constant_bit_select written after
-// it. A.9.3 spells hierarchical_identifier as `[ $root . ] { identifier
-// constant_bit_select . } identifier` and A.1.4 puts one more
-// constant_bit_select after the bind_target_instance's last identifier, so
-// every identifier of the target may carry selects; constant_bit_select is
-// `{ [ constant_expression ] }`, zero or more of them.
 struct BindTargetSegment {
   std::string_view name;
   std::vector<Expr*> selects;
 };
 
-// A bind_target_instance (A.1.4), `hierarchical_identifier
-// constant_bit_select`. The first form's bind_target_scope is read into the
-// same shape, as one segment without selects.
 struct BindTargetInstance {
-  // The identifiers joined by '.', with the selects and any `$root .` prefix
-  // left out: the elaborator matches an instance's hierarchical path against
-  // it, and a module or interface name is one segment of it.
   std::string_view path;
   bool from_root = false;
   std::vector<BindTargetSegment> segments;
@@ -45,9 +33,6 @@ struct BindDirective {
   std::vector<BindTargetInstance> target_instances;
   ModuleItem* instantiation = nullptr;
   SourceLoc loc;
-  // Written in a generate block, where §27.5 instantiates it only if the
-  // block is selected; such a directive also stands as a kBindDirective item
-  // of the block.
   bool in_generate_block = false;
 };
 
@@ -57,10 +42,6 @@ enum class ConfigRuleKind : uint8_t {
   kCell,
 };
 
-// One config_rule_statement (§33.4.1): the clause kind, what it selects, and
-// where the clause begins. A report about the clause carries that position, so
-// a configuration holding several default, instance or cell clauses says which
-// of them the report is about.
 struct ConfigRule {
   ConfigRuleKind kind = ConfigRuleKind::kDefault;
   SourceLoc loc;
@@ -72,27 +53,15 @@ struct ConfigRule {
   std::string_view use_cell;
   bool use_config = false;
   std::vector<std::pair<std::string_view, Expr*>> use_params;
-  // Set when the use clause carries an empty override list "#()", which resets
-  // every parameter of the bound cell to its module default (§33.4.3). This is
-  // distinct from a use clause with no override list at all, where use_params
-  // is likewise empty but no reset is intended.
   bool use_param_reset_all = false;
 };
 
-// One cell a design statement names (§33.4.1.1): a cell_identifier, the
-// library_identifier qualifying it where the statement wrote one, and where
-// the cell_identifier stands. A report about the cell carries that position,
-// so a configuration whose design statement names several cells says which of
-// them the report is about.
 struct ConfigDesignCell {
   std::string_view library;
   std::string_view cell;
   SourceLoc loc;
 };
 
-// §33.4.3: a localparam a config declares, for the values its overrides pass.
-// `data_type` is the type it was declared with, implicit where none was
-// written, and `is_type` marks a `localparam type`, which carries no value.
 struct ConfigLocalparam {
   std::string_view name;
   Expr* init_expr = nullptr;
@@ -110,53 +79,24 @@ struct ConfigDecl {
   std::string_view library;
 };
 
-// 18.5.1: an external constraint block completes a constraint prototype using
-// the class scope resolution operator (constraint ClassName::name { ... }). The
-// block is declared outside the class, so its placement and pairing with a
-// prototype are validated during elaboration.
 struct ExternalConstraintBlock {
   std::string_view class_name;
   std::string_view constraint_name;
   SourceLoc loc;
-  // 18.5.2: dynamic override specifiers carried on the external constraint
-  // block; they must match those on the completing prototype.
   bool is_initial = false;
   bool is_extends = false;
   bool is_final = false;
-  // 18.5.10: whether the external constraint block was qualified 'static'. The
-  // 'static' qualification must match the completing prototype's, or be absent
-  // on both.
   bool is_static = false;
-  // 18.5.1: the external block's body, scanned into a constraint member exactly
-  // as an in-class block is, with every list that scan fills: relations, soft
-  // relations, distributions, uniqueness groups, foreach and solve-before
-  // constraints, disable soft directives and function calls. Elaboration
-  // carries all of it onto the prototype the block completes, which then
-  // constrains randomization like an in-class block; a prototype left without
-  // a block behaves as an empty constraint (equivalent to the constant 1).
   ClassMember* body = nullptr;
-  // 18.5.1 with A.1.11: the item list of the scope that declares the block, a
-  // package, module, interface, program or generate block, or null for a
-  // block at compilation-unit scope. The block shares this scope with the
-  // class it completes, so the class is looked up among these items.
   const std::vector<ModuleItem*>* scope_items = nullptr;
 };
 
-// §5.8: a time literal and the time scope it is written in, which gives it
-// the time unit it is scaled to (§3.14.2.3): `module`, the innermost module,
-// interface, program or checker around it, where there is one, else
-// `package`, the package around it; with neither it stands in the
-// compilation-unit scope.
 struct TimeLiteralSite {
   Expr* literal = nullptr;
   const ModuleDecl* module = nullptr;
   const PackageDecl* package = nullptr;
 };
 
-// §3.12 (printed page 55): an identifier written before a scope resolution
-// operator and after none, the package or class a scoped name starts from, and
-// where it stands. A package's compilation is to precede every reference to
-// it, so a prefix naming a package declared after it is reported.
 struct ScopePrefix {
   std::string_view name;
   SourceLoc loc;
@@ -175,11 +115,7 @@ struct CompilationUnit {
   std::vector<IncludeStmt*> lib_includes;
   std::vector<BindDirective*> bind_directives;
   std::vector<ModuleItem*> cu_items;
-  // §16.13.6: the names `triggered` or `matched` is applied to anywhere in the
-  // unit, a named sequence's among them, by the last name of the path.
   std::unordered_set<std::string_view> triggered_names;
-  // §5.6.1: the escaped identifiers in the unit that hold a period, as
-  // Lexer::DottedEscapedNames records them.
   std::unordered_set<std::string_view> dotted_escaped_names;
   std::vector<ExternalConstraintBlock> external_constraints;
   NetType default_nettype = NetType::kWire;
@@ -188,9 +124,6 @@ struct CompilationUnit {
   uint64_t default_decay_time = 0;
   double default_decay_time_real = 0.0;
   bool default_decay_time_infinite = true;
-  // E.2: whether the decay time was written as a real constant, whose exact
-  // value default_decay_time_real holds for the elaborator to round at the
-  // governed module's time precision (§3.14.1).
   bool default_decay_time_is_real = false;
 
   uint32_t default_trireg_strength = 0;
@@ -202,74 +135,26 @@ struct CompilationUnit {
   TimeUnit cu_time_prec = TimeUnit::kNs;
   int cu_time_unit_magnitude = 1;
   int cu_time_prec_magnitude = 1;
-  // Where each of the two was declared, written by ApplyCuTimeUnit in
-  // src/parser/parser_timeunit.cpp at the same moment as the flag above it and
-  // holding the position of the declaration's leading timeunit/timeprecision
-  // keyword. §3.14.2.2 rules that a repeat has to agree with the declaration
-  // made before it in the same time scope, so a report about a repeat that
-  // does not match stands at the repeat. Within one file
-  // CheckCuTimeunitConsistency in src/parser/parser.cpp is handed that position
-  // by its caller, because it runs while the declaration is being parsed.
-  // Across two files of one command line -- §3.12.1 case a) -- the two
-  // declarations first meet in AppendCompilationUnitDeclarations below, by
-  // which time both parses are over, so the position has to travel with the
-  // value it belongs to. Each is meaningful only under its flag: a unit that
-  // declared nothing leaves the default SourceLoc here, which is what
-  // SourceLoc::None() in src/common/source_loc.h returns, so a reader that
-  // ignores the flag reports at no position at all.
   bool has_cu_timeunit = false;
   SourceLoc cu_timeunit_loc;
   bool has_cu_timeprecision = false;
   SourceLoc cu_timeprecision_loc;
-  // Whether this file has read an item of the compilation-unit scope other
-  // than a timeunits_declaration, set by Parser::NoteItemAndMatchNull for
-  // CaptureCuTimeunitState in src/parser/parser.cpp. The null item, a bind
-  // directive and an anonymous program with an empty body leave the lists
-  // above as they were, though §3.14.2.2 counts each as an item the scope's
-  // timeunit and timeprecision declarations precede. The check it serves
-  // reads one file, so AppendCompilationUnitDeclarations does not carry it.
   bool has_read_cu_item = false;
 
-  // Every time literal the unit's source wrote, with its time scope. The
-  // parser can scale one only provisionally, by the element's own declared
-  // unit, because the `timescale before the element's header reaches it only
-  // after the parse (ApplyModuleDirectives); ScaleTimeLiterals in
-  // src/elaborator/time_literal_scale.cpp scales each again before
-  // elaboration, once every source of its unit is known.
   std::vector<TimeLiteralSite> time_literals;
 
   bool has_preproc_global_precision = false;
-  // The finest precision of every `timescale the preprocessor read, which
-  // §3.14.3 counts toward the global precision whether or not the directive
-  // stands before any design element's header. Meaningful only under
-  // has_preproc_global_precision.
   TimeUnit preproc_global_precision = TimeUnit::kNs;
   int preproc_global_precision_magnitude = 1;
 
-  // Whether the unit holds nothing an elaboration could take up: no module or
-  // program to root a design at, no package or class whose items want
-  // validating, and no compilation-unit item (§3.12.1). A source of compiler
-  // directives and comments alone is such a unit, and Elaborator::Elaborate
-  // answers it with no design and no report; a run that asks only whether the
-  // source is clean -- deltahdl's --lint-only -- reads this to tell that answer
-  // from a design that could not be built.
   bool DeclaresNothing() const {
     return modules.empty() && programs.empty() && packages.empty() &&
            cu_items.empty() && classes.empty();
   }
 
-  // Each prefix the unit's source wrote, but for the package name of an import
-  // or export declaration, which §26.3's own check reads, and for a name the
-  // parser knew as a type where it stood, a class's scope being no package's.
   std::vector<ScopePrefix> scope_prefixes;
 };
 
-// §22.10: applies the cell-module tag. The preprocessor decides which modules
-// the `celldefine/`endcelldefine regions covered and hands the names over; this
-// is the step that puts the tag on the declarations the parser built. It lives
-// here rather than in the driver so that every path which preprocesses and then
-// parses -- the compiler, and anything else assembling a compilation unit --
-// tags cells the same way instead of repeating the match.
 inline void MarkCellModules(CompilationUnit* cu,
                             const std::vector<std::string>& cell_module_names) {
   for (auto* mod : cu->modules) {
@@ -282,11 +167,6 @@ inline void MarkCellModules(CompilationUnit* cu,
   }
 }
 
-// The directives the preprocessor recorded at the header of the design element
-// named `name`, a package's when `is_package` is set and a module's,
-// interface's or program's otherwise, or null when it recorded none there.
-// Packages have a name space of their own (§3.13), so a package and a module
-// may share a name and are told apart by kind.
 inline const ModuleDirectives* DirectivesAtHeader(
     std::string_view name, const std::vector<ModuleDirectives>& directives,
     bool is_package = false) {
@@ -296,12 +176,6 @@ inline const ModuleDirectives* DirectivesAtHeader(
   return nullptr;
 }
 
-// Annex E: puts on each module declaration the default decay time, charge
-// strength and delay mode the preprocessor recorded in force at its header,
-// so a module takes the directives that preceded it in the source rather than
-// the last ones of the compilation unit. Lives here beside MarkCellModules for
-// the same reason: every path that preprocesses and then parses applies it
-// alike.
 inline void ApplyModuleDirectives(
     CompilationUnit* cu, const std::vector<ModuleDirectives>& directives) {
   for (auto* mod : cu->modules) {
@@ -316,9 +190,6 @@ inline void ApplyModuleDirectives(
     mod->has_default_trireg_strength = d->has_strength;
     mod->delay_mode = d->delay_mode;
   }
-  // §22.7, §22.8 and §22.9: the `timescale, `default_nettype and
-  // `unconnected_drive in force at a design element's header are the ones it
-  // takes.
   for (const auto* list : {&cu->modules, &cu->interfaces, &cu->programs}) {
     for (auto* mod : *list) {
       const ModuleDirectives* d = DirectivesAtHeader(mod->name, directives);
@@ -330,7 +201,6 @@ inline void ApplyModuleDirectives(
       mod->unconnected_drive = d->unconnected_drive;
     }
   }
-  // §3.2 counts a package among the design elements the directive governs.
   for (auto* pkg : cu->packages) {
     const ModuleDirectives* d = DirectivesAtHeader(pkg->name, directives, true);
     if (d == nullptr) continue;
@@ -339,37 +209,6 @@ inline void ApplyModuleDirectives(
   }
 }
 
-// Every design element §3.2 defines, which is what §33.2.1 makes a cell.
-// Moving them from one compilation unit onto another is what makes a separately
-// parsed source description part of the unit a design is bound against, so
-// every path that assembles a unit out of more than one parse shares this step
-// rather than restating which element kinds a library holds. Nothing is copied:
-// the declarations stay in the arena that parsed them and the target gains
-// pointers to them.
-//
-// §33.2.1 defines a library as a named set of cells and a cell as a design
-// element in the sense of §3.2, and it then lists six kinds as examples: the
-// module, primitive, interface, program, package and configuration. The list
-// only illustrates, and the definition it points to is §3.2's, which names
-// seven: the module of
-// Clause 23, the program of Clause 24, the interface of Clause 25, the checker
-// of Clause 17, the package of Clause 26, the primitive of Clause 28 and the
-// configuration of Clause 33. Reading §33.2.1's examples as the whole
-// set is what left the checker out of this function.
-//
-// The lists CompilationUnit holds that are not moved are left behind on
-// purpose, for two different reasons. `classes`, `cu_items`, `bind_directives`
-// and `external_constraints` hold what a source declared outside every design
-// element, and §3.12.1 rules that no name declared in the compilation-unit
-// scope can be reached from outside that compilation unit, so they stay
-// with the unit that parsed them. That is the answer §3.12.1 case b) wants, so
-// a caller assembling one unit out of several source descriptions on one
-// command line -- case a) -- calls AppendCompilationUnitDeclarations below as
-// well. `libraries` and `lib_includes` stay because they are not a source
-// description's to contribute: §33.3.1 has the parser read the library map
-// file on its own before any source file the command line names, and
-// Syntax 33-2 gives library_declaration and
-// include_statement only in library_text.
 inline void AppendCellDeclarations(CompilationUnit& target,
                                    const CompilationUnit& src) {
   target.modules.insert(target.modules.end(), src.modules.begin(),
@@ -385,11 +224,8 @@ inline void AppendCellDeclarations(CompilationUnit& target,
                          src.packages.end());
   target.configs.insert(target.configs.end(), src.configs.begin(),
                         src.configs.end());
-  // §5.6.1: the escaped names holding a period that these declarations were
-  // written with, which the flat names of their objects are not split at.
   target.dotted_escaped_names.insert(src.dotted_escaped_names.begin(),
                                      src.dotted_escaped_names.end());
-  // §5.8: the time literals written inside these declarations go with them.
   for (const TimeLiteralSite& site : src.time_literals) {
     if (site.module != nullptr || site.package != nullptr) {
       target.time_literals.push_back(site);
@@ -397,58 +233,6 @@ inline void AppendCellDeclarations(CompilationUnit& target,
   }
 }
 
-// Everything a source description declared outside every design element, which
-// §3.12.1 puts in the compilation-unit scope, which, while no package itself,
-// may hold whatever a package may (§26.2) as well as bind constructs (§23.11).
-// The parser
-// leaves those in `cu_items`, `classes`, `bind_directives` and
-// `external_constraints`, and leaves the time unit and precision the scope
-// declared in `cu_time_unit`, `cu_time_prec`, their two magnitudes and the two
-// `has_` flags guarding them. This moves all of it onto `target`. The four
-// lists are not copied, exactly as in AppendCellDeclarations: the declarations
-// stay in the arena that parsed them.
-//
-// The time unit travels with the compilation-unit declarations rather than with
-// the cells because §3.14.2.2 is what puts it in this scope: a module,
-// program, package or interface definition, and a compilation-unit scope
-// likewise, each has no more than one time unit and one time precision.
-//
-// This exists beside AppendCellDeclarations because §3.12.1 states two use
-// models a tool has to offer and they want opposite answers about these four
-// lists and about the time unit. Case a) makes every file of one compilation
-// command line a single compilation unit, whose declarations each file then
-// sees under the ordinary visibility rules, so a caller merging a command line
-// calls both functions and the time unit one file declared is the merged unit's
-// too. Case b) makes each file a compilation unit of its own, whose
-// compilation-unit declarations no other file can see, so a caller reading a
-// separately compiled source description back calls AppendCellDeclarations
-// alone and this not at all, which is what leaves that file's time unit behind
-// with its declarations.
-//
-// A `target` that already declares a time unit keeps it, and the precision is
-// decided the same way and separately: the file that declared it first is the
-// one the merged unit reports, which is the rule MergeCompilationUnitScope in
-// src/parser/scope_type_names.h states for the names of the same scope.
-// §3.14.2.2 makes the choice unobservable in conforming source, because a
-// repeat has to agree with the declaration made before it in the same time
-// scope, and so gives the same answer whichever declaration is kept. A repeat
-// that does not match is an error, and CheckCuTimeunitConsistency in
-// src/parser/parser.cpp reports it within one file, by comparing the members
-// against a snapshot taken before the declaration was parsed. It cannot report
-// it across two, because each file is parsed by its own Parser into its own
-// CompilationUnit and so snapshots a unit holding no earlier file's
-// declaration. This function does not compare them either: it is inline in a
-// header and has no DiagEngine to report through, so a caller merging a
-// command line calls ReportCuTimescaleConflict in
-// src/parser/single_pass_compile.cpp first, while `target` still holds only
-// what the files before this one declared. Each half is taken only under
-// `src`'s own flag, so a file declaring nothing cannot put the struct default
-// over what an earlier file declared.
-//
-// The libraries the design elements were tagged with do not enter into it. A
-// compilation-unit declaration belongs to no library and is given no library
-// name to carry: LibraryMap::TagCompilationUnit in src/parser/library_map.cpp
-// tags the seven design element lists and none of these four.
 inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
                                               const CompilationUnit& src) {
   target.cu_items.insert(target.cu_items.end(), src.cu_items.begin(),
@@ -464,7 +248,6 @@ inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
   target.scope_prefixes.insert(target.scope_prefixes.end(),
                                src.scope_prefixes.begin(),
                                src.scope_prefixes.end());
-  // §5.8: and so do the time literals written outside every design element.
   for (const TimeLiteralSite& site : src.time_literals) {
     if (site.module == nullptr && site.package == nullptr) {
       target.time_literals.push_back(site);
@@ -474,9 +257,6 @@ inline void AppendCompilationUnitDeclarations(CompilationUnit& target,
     target.cu_time_unit = src.cu_time_unit;
     target.cu_time_unit_magnitude = src.cu_time_unit_magnitude;
     target.has_cu_timeunit = true;
-    // The position comes over with the value, so a third source description
-    // conflicting with this one is reported against the declaration the merged
-    // unit actually holds rather than against a position no file wrote.
     target.cu_timeunit_loc = src.cu_timeunit_loc;
   }
   if (src.has_cu_timeprecision && !target.has_cu_timeprecision) {

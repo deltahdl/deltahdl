@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §16.12.13: the ranged weak `eventually` carries a constant_range whose bounds
-// are non-negative integer constant expressions. A bounded non-negative range
-// is accepted and the property declaration parses cleanly.
 TEST(EventuallyRangeParsing, WeakRangedEventuallyWithBoundedRangeParses) {
   auto r = Parse(
       "module m;\n"
@@ -25,9 +22,6 @@ TEST(EventuallyRangeParsing, WeakRangedEventuallyWithBoundedRangeParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: a weak `eventually` needs a finite range, so a `$`
-// maximum is illegal — the `eventually [2:$]` form is the LRM's explicit
-// illegal example (p6).
 TEST(EventuallyRangeParsing, WeakUnboundedEventuallyDollarMaximumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -41,11 +35,6 @@ TEST(EventuallyRangeParsing, WeakUnboundedEventuallyDollarMaximumIsRejected) {
       "16.12.13"));
 }
 
-// §16.12.13: the range for a strong `s_eventually` may be unbounded, so a `$`
-// maximum is accepted even though the same bound is illegal for the weak form.
-// This is the legal p7 counterpart of the illegal weak p6 example, and it also
-// exercises the separate operator-group code path that consumes the
-// `s_eventually` keyword.
 TEST(EventuallyRangeParsing, StrongUnboundedEventuallyDollarMaximumParses) {
   auto r = Parse(
       "module m;\n"
@@ -59,7 +48,6 @@ TEST(EventuallyRangeParsing, StrongUnboundedEventuallyDollarMaximumParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: a bounded non-negative range is also legal for the strong form.
 TEST(EventuallyRangeParsing, StrongRangedEventuallyWithBoundedRangeParses) {
   auto r = Parse(
       "module m;\n"
@@ -73,9 +61,6 @@ TEST(EventuallyRangeParsing, StrongRangedEventuallyWithBoundedRangeParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: the non-ranged `s_eventually property_expr` is a distinct form
-// with no bracketed range, so it parses cleanly — the strong-eventually
-// operator path does not require a range and raises no spurious diagnostic.
 TEST(EventuallyRangeParsing, NonRangedStrongEventuallyParses) {
   auto r = Parse(
       "module m;\n"
@@ -89,8 +74,6 @@ TEST(EventuallyRangeParsing, NonRangedStrongEventuallyParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: a negative integer literal minimum violates the non-negative
-// integer constant expression requirement, so the weak ranged form is rejected.
 TEST(EventuallyRangeParsing, NegativeWeakEventuallyMinimumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -104,9 +87,6 @@ TEST(EventuallyRangeParsing, NegativeWeakEventuallyMinimumIsRejected) {
                             3, "16.12.13"));
 }
 
-// §16.12.13: the non-negative requirement applies to the maximum bound as well,
-// so a negative literal maximum in a weak `eventually` range is rejected. This
-// covers the maximum-operand position on the weak code path.
 TEST(EventuallyRangeParsing, NegativeWeakEventuallyMaximumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -120,9 +100,6 @@ TEST(EventuallyRangeParsing, NegativeWeakEventuallyMaximumIsRejected) {
                             3, "16.12.13"));
 }
 
-// §16.12.13: the non-negative requirement applies to the strong form's minimum
-// bound as well, and the strong operator takes its own keyword-consuming code
-// path, so a negative literal minimum in `s_eventually` is rejected.
 TEST(EventuallyRangeParsing, NegativeStrongEventuallyMinimumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -136,11 +113,6 @@ TEST(EventuallyRangeParsing, NegativeStrongEventuallyMinimumIsRejected) {
                             3, "16.12.13"));
 }
 
-// §16.12.13: the non-negative requirement also applies to the strong form's
-// maximum bound, so a negative literal maximum in `s_eventually` is rejected.
-// This is the strong-path counterpart of the weak maximum case above, covering
-// the maximum-operand position reached through the strong operator's own
-// keyword-consuming dispatch (the minimum-position case is checked above).
 TEST(EventuallyRangeParsing, NegativeStrongEventuallyMaximumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -154,9 +126,6 @@ TEST(EventuallyRangeParsing, NegativeStrongEventuallyMaximumIsRejected) {
                             3, "16.12.13"));
 }
 
-// §16.12.13: when both bounds are non-negative integer constant literals the
-// minimum shall not exceed the maximum, so an inverted weak range is rejected
-// at parse time.
 TEST(EventuallyRangeParsing, WeakLiteralMinimumGreaterThanMaximumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -169,8 +138,6 @@ TEST(EventuallyRangeParsing, WeakLiteralMinimumGreaterThanMaximumIsRejected) {
       "16.12.13"));
 }
 
-// §16.12.13: the same minimum-not-exceeding-maximum requirement applies to the
-// strong form, so an inverted `s_eventually` literal range is rejected.
 TEST(EventuallyRangeParsing, StrongLiteralMinimumGreaterThanMaximumIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -183,8 +150,6 @@ TEST(EventuallyRangeParsing, StrongLiteralMinimumGreaterThanMaximumIsRejected) {
       "16.12.13"));
 }
 
-// §16.12.13: the relation is less-than-or-equal, so equal literal bounds are a
-// legal single-tick range and parse cleanly.
 TEST(EventuallyRangeParsing, EqualLiteralBoundsParse) {
   auto r = Parse(
       "module m;\n"
@@ -198,11 +163,6 @@ TEST(EventuallyRangeParsing, EqualLiteralBoundsParse) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: a symbolic bound — here a module parameter (§11.2.1) — takes a
-// different code path than an integer literal. The literal-only parse check
-// leaves symbolic bounds for the later constant-folding stages, so a parameter
-// bound on the weak form parses without a parse-stage error rather than being
-// misreported.
 TEST(EventuallyRangeParsing, WeakSymbolicParameterBoundIsDeferred) {
   auto r = Parse(
       "module m;\n"
@@ -217,11 +177,6 @@ TEST(EventuallyRangeParsing, WeakSymbolicParameterBoundIsDeferred) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: a localparam is another non-negative integer constant expression
-// form admitted for a range bound (§11.2.1). Like a parameter it is a symbolic
-// reference rather than an integer literal, so the literal-only parse check
-// defers it and the weak `eventually` property parses without a parse-stage
-// error, built from a real localparam declaration.
 TEST(EventuallyRangeParsing, WeakLocalparamBoundIsDeferred) {
   auto r = Parse(
       "module m;\n"
@@ -236,9 +191,6 @@ TEST(EventuallyRangeParsing, WeakLocalparamBoundIsDeferred) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.13: the strong operator takes its own keyword-consuming code path, so
-// a symbolic (parameter) bound on `s_eventually` is likewise deferred rather
-// than misreported — the strong-form counterpart of the weak deferral above.
 TEST(EventuallyRangeParsing, StrongSymbolicParameterBoundIsDeferred) {
   auto r = Parse(
       "module m;\n"

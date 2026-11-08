@@ -21,12 +21,6 @@ namespace {
 
 using BinPair = std::pair<size_t, size_t>;
 
-// The pairs of bins two of `spans` share a value of, each pair once and the
-// lower index first, where each span comes with the index of its bin, `low`
-// gives a span's low end and `reaches(held, next)` whether a span reaches the
-// low end of one starting no lower. The spans are swept in order of their low
-// ends, each meeting the spans still open, so an array of single-value bins
-// costs no comparison of its own.
 template <typename Span, typename Low, typename Reaches>
 std::set<BinPair> SweepOverlaps(std::vector<std::pair<Span, size_t>> spans,
                                 Low low, Reaches reaches) {
@@ -46,10 +40,6 @@ std::set<BinPair> SweepOverlaps(std::vector<std::pair<Span, size_t>> spans,
   return pairs;
 }
 
-// §19.7, Table 19-1: the pairs of `bins`' bins of the `bins` keyword whose
-// range lists share a value: an integral coverpoint's values and ranges, or a
-// real coverpoint's intervals (§19.5.1), whose high end is in the interval
-// only where it is inclusive.
 std::set<BinPair> RangeListOverlaps(const std::deque<CoverBin>& bins) {
   std::vector<std::pair<CoverValueRange, size_t>> spans;
   std::vector<std::pair<RealInterval, size_t>> intervals;
@@ -77,9 +67,6 @@ std::set<BinPair> RangeListOverlaps(const std::deque<CoverBin>& bins) {
   return pairs;
 }
 
-// §19.7, Table 19-1: the pairs of `bins`' transition bins of the `bins`
-// keyword whose transition lists share a transition, each pair once and the
-// lower index first.
 std::set<BinPair> TransitionListOverlaps(const std::deque<CoverBin>& bins) {
   std::map<std::vector<int64_t>, std::set<size_t>> holders;
   for (size_t i = 0; i < bins.size(); ++i) {
@@ -96,9 +83,6 @@ std::set<BinPair> TransitionListOverlaps(const std::deque<CoverBin>& bins) {
   return pairs;
 }
 
-// §19.7, Table 19-1: the warning detect_overlap asks for, one per pair of
-// `cp`'s bins in `pairs`, at the definition of the later bin of the pair,
-// `origins` giving each bin's definition. `lists` names what overlaps.
 void WarnOfOverlaps(const CoverPoint& cp, const std::set<BinPair>& pairs,
                     std::string_view lists,
                     const std::vector<SourceLoc>& origins, DiagEngine& diag) {

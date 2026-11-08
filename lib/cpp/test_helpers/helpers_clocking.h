@@ -42,14 +42,9 @@ struct ClockingSetupParams {
   SimTime output_skew;
   const char* signal_name;
   ClockingDir signal_dir;
-  // Marks the signal's own skew as a written #0 rather than an unset default.
-  // §14.13 samples a #0 input in the Observed region and any other input in
-  // the Postponed region, so the distinction between "zero" and "not written"
-  // is what a sampling test turns on.
   bool explicit_zero_skew = false;
 };
 
-// Create a clocking block with one signal, register, and attach.
 template <typename Fixture>
 inline void SetupClockingBlock(Fixture& f, ClockingManager& cmgr,
                                const ClockingSetupParams& p) {
@@ -71,9 +66,6 @@ inline void SetupClockingBlock(Fixture& f, ClockingManager& cmgr,
   cmgr.Attach(f.ctx, f.scheduler);
 }
 
-// Full output-drive test: create clk + data_out, setup an output clocking block
-// with skew 5, schedule a drive of drive_val at t=10, run, and verify data_out
-// holds drive_val afterward.
 template <typename Fixture>
 inline void TestOutputSkewDrive(Fixture& f, ClockingManager& cmgr,
                                 uint64_t drive_val) {
@@ -100,8 +92,6 @@ inline void TestOutputSkewDrive(Fixture& f, ClockingManager& cmgr,
   EXPECT_EQ(data_out->value.ToUint64(), drive_val);
 }
 
-// Full negedge sampling test: create clk + data, setup clocking, schedule
-// negedge, run, verify sampled value.
 template <typename Fixture>
 inline void TestNegedgeSampling(Fixture& f, ClockingManager& cmgr) {
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -116,9 +106,6 @@ inline void TestNegedgeSampling(Fixture& f, ClockingManager& cmgr) {
   EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "neg_data"), 0xDDu);
 }
 
-// The clock and the one signal a sampling test starts from: `clk` holds
-// `clk_value` so an edge can be scheduled onto it, and the signal holds the
-// value the first clocking event is meant to sample.
 struct ClockAndSignal {
   Variable* clk;
   Variable* signal;
@@ -136,9 +123,6 @@ inline ClockAndSignal CreateClockAndSignal(Fixture& f, uint64_t clk_value,
   return {clk, signal};
 }
 
-// Schedules `var` taking `value` in the Active region at `time`, which is how
-// a test puts a signal change beside a clocking event without a process to
-// carry it.
 template <typename Fixture>
 inline void ScheduleValueChange(Fixture& f, Variable* var, uint64_t time,
                                 uint64_t value) {
@@ -149,12 +133,6 @@ inline void ScheduleValueChange(Fixture& f, Variable* var, uint64_t time,
   f.scheduler.ScheduleEvent(SimTime{time}, Region::kActive, ev);
 }
 
-// The value reading the clockvar `signal` of clocking block `block` yields.
-//
-// A clockvar is named by qualifying the block with the signal, so the read is
-// stated as that member access and put through the production evaluator --
-// which is what applies the sampling rule rather than returning whatever the
-// live variable currently holds.
 template <typename Fixture>
 inline uint64_t ReadClockvar(Fixture& f, const char* block,
                              const char* signal) {

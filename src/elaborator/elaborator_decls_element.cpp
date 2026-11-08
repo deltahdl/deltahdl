@@ -19,13 +19,6 @@
 
 namespace delta {
 
-// §7.4 with §7.5 and §7.10 (printed pages 153, 157 and 169): how many levels
-// of queues each element of the array `item` declares holds, counting the
-// element itself, 0 where the element is no queue -- its dimensions after the
-// first are each `[$]` or `[]`, `int aq[string][$]` or `int arr[2][][]`, or
-// its one dimension's element type names a typedef whose own unpacked
-// dimensions are, `q_t d[]` under `typedef int q_t[$];`, the typedef's
-// dimensions being part of the type it names (§6.18).
 static uint32_t ElementQueueLevels(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
@@ -38,8 +31,6 @@ static uint32_t ElementQueueLevels(
   return it == td_array_dims.end() ? 0 : QueueLevelsFrom(it->second, 0);
 }
 
-// §7.4.2: the extent of the fixed-size dimension `dim`, `[l:r]` or `[n]`;
-// empty where `dim` is no fixed-size dimension or a bound does not fold.
 static std::optional<RtlirFixedDim> FixedDimOf(const Expr* dim,
                                                const ScopeMap& scope) {
   if (dim == nullptr || IsQueueDim(dim)) return std::nullopt;
@@ -55,18 +46,6 @@ static std::optional<RtlirFixedDim> FixedDimOf(const Expr* dim,
   return RtlirFixedDim{static_cast<uint32_t>(*size), 0, false};
 }
 
-// §7.10, §7.5 and §7.8 with §7.4 (printed pages 169, 157, 162 and 153): where
-// each element of the queue, dynamic array or associative array `item`
-// declares is a fixed-size array, `int q[$][3]`, `int d[][1:3]`, `int
-// q[$][2][3]` or `int af[int][2]` (`first_is_assoc`), records into
-// `shape` how many elements it holds and its bounds, each such element being
-// kept as a queue of that many elements (RtlirElementShape::array_size), and
-// the dimensions of a multidimensional element after its first
-// (inner_array_dims). §7.4.5 lets a fixed-size array's element be such an
-// array in turn, `int a[3][][5]` (§20.7.1's own example), whose element a[i]
-// is a dynamic array of int [5]: there the shape recorded is that of the
-// element's elements, read from the dimensions after the dynamic one.
-// Nothing for any other declaration.
 static void RecordFixedElementArray(const ModuleItem* item,
                                     const ScopeMap& scope, bool first_is_assoc,
                                     RtlirElementShape& shape) {
@@ -90,11 +69,6 @@ static void RecordFixedElementArray(const ModuleItem* item,
   shape.inner_array_dims.assign(fixed.begin() + 1, fixed.end());
 }
 
-// §7.4 (printed pages 153-156): what the unpacked dimensions `item` declares
-// make of `var` -- each dimension's kind and extent (ComputeUnpackedDims), a
-// dynamic array's size from its initializer (InferDynArraySize), and whether
-// and how its elements are arrays themselves (ElementQueueLevels,
-// RecordFixedElementArray) -- the scope in `ctx` folding their bounds.
 void ElaborateUnpackedDims(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
@@ -107,8 +81,6 @@ void ElaborateUnpackedDims(
   var.element.nested_queue_levels = kQueueLevels > 0 ? kQueueLevels - 1 : 0;
   RecordFixedElementArray(item, ctx.scope, var.is_assoc, var.element);
   if (var.element.array_size > 0) var.elements_are_queues = true;
-  // §7.4.4: each level of a multidimensional element below its first is a
-  // queue of the next dimension's elements.
   if (!var.element.inner_array_dims.empty()) {
     var.element.nested_queue_levels =
         static_cast<uint32_t>(var.element.inner_array_dims.size());

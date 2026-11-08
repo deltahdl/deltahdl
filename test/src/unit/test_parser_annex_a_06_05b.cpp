@@ -13,12 +13,6 @@ using namespace delta;
 
 namespace {
 
-// A.6.5's delay_control is `#` and a delay_value, and A.2.2.3 gives
-// delay_value the form 1step, so a delay statement, an intra-assignment delay
-// after `=` and after `<=`, and a nonblocking trigger's delay each take
-// `#1step` as the one literal a gate's delay is read as. Read as `#1`, each
-// left `step` behind: the delay statement governed a call to a task named
-// step, and the others reported the stray name.
 TEST(TimingControlSyntaxParsing, OneStepIsADelayValueOfEveryDelayControl) {
   auto r = Parse(
       "module m;\n"
@@ -44,9 +38,6 @@ TEST(TimingControlSyntaxParsing, OneStepIsADelayValueOfEveryDelayControl) {
   EXPECT_EQ(body->stmts[0]->body->kind, StmtKind::kNull);
 }
 
-// 1step is a 1 and a step with nothing between them: written apart, by a space
-// or by a line break, they are a delay of 1 and the statement it governs, here
-// a call to a task named step.
 TEST(TimingControlSyntaxParsing, OneAndStepWrittenApartAreADelayAndACall) {
   auto r = Parse(
       "module m;\n"
@@ -70,11 +61,6 @@ TEST(TimingControlSyntaxParsing, OneAndStepWrittenApartAreADelayAndACall) {
   }
 }
 
-// A.6.5 writes a clocking_event without parentheses as `@` and a name, and
-// A.9.3's hierarchical_identifier lets a bit-select stand only before a
-// period, so an event control whose name ends in one or more selects is
-// reported. A select before a period, and a select inside parentheses, draw
-// no report.
 TEST(TimingControlSyntaxParsing, AnUnparenthesizedEventEndingInASelect) {
   auto r = Parse(
       "module m;\n"
@@ -97,12 +83,6 @@ TEST(TimingControlSyntaxParsing, AnUnparenthesizedEventEndingInASelect) {
   EXPECT_EQ(r.diags.size(), 3u);
 }
 
-// A.6.5's delay_or_event_control holds an event_control directly or after
-// `repeat ( expression )`, and an event_control is `@` and a name, `@*`,
-// `@(*)` or a parenthesized event expression. After an assignment operator
-// each form is read as an event control statement reads it, and after
-// `->> repeat ( expression )` as well. Only the parenthesized event expression
-// was read there, so the other forms drew a report that a '(' was missing.
 TEST(TimingControlSyntaxParsing, EveryEventControlFollowsAnAssignOrATrigger) {
   auto r = Parse(
       "module m;\n"
@@ -133,11 +113,6 @@ TEST(TimingControlSyntaxParsing, EveryEventControlFollowsAnAssignOrATrigger) {
   EXPECT_EQ(body->stmts[5]->events.size(), 1u);
 }
 
-// A.6.5 writes a wait_order operand as a hierarchical_identifier, which takes
-// bit-selects only before a period, and a bit-select is never a range. An
-// operand ending in a select, one with a part-select before its period and
-// one reached through the compilation unit's scope are reported; a bit-select
-// before a period and a `$root.` name are not.
 TEST(TimingControlSyntaxParsing, WaitOrderOperandSelectsStandBeforeAPeriod) {
   auto r = Parse(
       "module m;\n"
@@ -157,10 +132,6 @@ TEST(TimingControlSyntaxParsing, WaitOrderOperandSelectsStandBeforeAPeriod) {
   EXPECT_EQ(r.diags.size(), 3u);
 }
 
-// A.6.5 writes a disable statement's target as a hierarchical task or block
-// identifier, both A.9.3 hierarchical_identifiers, so an operation, a call, a
-// name ending in a select and a name reached through a package scope are
-// reported. A name, a dotted name and a bit-select before a period are not.
 TEST(TimingControlSyntaxParsing, ADisableTargetIsAHierarchicalName) {
   auto r = Parse(
       "module m;\n"
@@ -183,11 +154,6 @@ TEST(TimingControlSyntaxParsing, ADisableTargetIsAHierarchicalName) {
   EXPECT_EQ(r.diags.size(), 4u);
 }
 
-// A.6.5 writes an event trigger's operand as a hierarchical_event_identifier
-// and a nonrange_select, which A.8.4 builds of bit-selects and member selects
-// alone. An operation, a call, a part-select, an indexed part-select after
-// `->>` and a name reached through a package scope are reported. A name, an
-// element of an array of events, a member and a selected member are not.
 TEST(TimingControlSyntaxParsing, AnEventTriggerNamesAnEvent) {
   auto r = Parse(
       "module m;\n"

@@ -278,9 +278,6 @@ TEST(AssignmentLikeContextSim, StaticCastExtendsInAssignLikeContext) {
             0x000Au);
 }
 
-// §10.8 with §10.9: a positional pattern connected to an aggregate output port
-// receives the port's value item by item, its first item the most significant
-// member.
 TEST(AssignmentLikeContextSim, PatternOnOutputPortReceivesMembers) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -300,8 +297,6 @@ TEST(AssignmentLikeContextSim, PatternOnOutputPortReceivesMembers) {
   EXPECT_EQ(y->value.ToUint64(), 0x34u);
 }
 
-// §10.8 with §10.9: a positional pattern of variables passed to an output
-// argument of a structure type receives the argument's value member by member.
 TEST(AssignmentLikeContextSim, PatternOnOutputArgumentReceivesMembers) {
   SimFixture f;
   auto* x = RunAndFindVar(
@@ -319,10 +314,6 @@ TEST(AssignmentLikeContextSim, PatternOnOutputArgumentReceivesMembers) {
   EXPECT_EQ(y->value.ToUint64(), 2u);
 }
 
-// §10.8: an instance's override of a parameter declared with a structure type
-// is an assignment-like context, so a pattern there takes the parameter's type
-// and replaces its default, and an instance with no override keeps the
-// default's structure.
 TEST(AssignmentLikeContextSim, PatternOverridesStructureParameter) {
   SimFixture f;
   RunAndFindVar(

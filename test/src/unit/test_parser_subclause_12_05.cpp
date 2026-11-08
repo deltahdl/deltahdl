@@ -340,8 +340,6 @@ TEST(CaseSyntaxParsing, ConstExprCaseExpr) {
   EXPECT_NE(stmt->condition, nullptr);
 }
 
-// Syntax 12-3 writes every case form with at least one item, so a case
-// statement that reaches endcase with none is reported there.
 TEST(CaseSyntaxParsing, CaseWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -404,12 +402,6 @@ TEST(CaseSyntaxParsing, SingleDefaultItemAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §12.5 is what makes the `endcase` obligatory: Syntax 12-3 closes every
-// case_statement with it. This source runs out inside both a case statement
-// and the sequential block holding it, and each report names the keyword
-// Parser::Expect did not find rather than the rule that demanded it. The
-// subclause is what says which rule was read, and the case statement's report
-// comes first because it is the innermost construct the source ran out of.
 TEST(CaseSyntaxParsing, MissingEndcaseNames12_5) {
   auto r = Parse(
       "module m;\n"

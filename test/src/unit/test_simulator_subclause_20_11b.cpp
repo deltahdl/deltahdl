@@ -1,7 +1,3 @@
-// §20.11, Table 20-8: the VPI callbacks an assertion control task's call
-// raises. A call naming no scope or assertion raises the assertion system
-// callback of §39.4.1 its control_type selects; a call naming some raises the
-// assertion callbacks of §39.4.2 on each assertion it selects.
 #include <gtest/gtest.h>
 
 #include <initializer_list>
@@ -27,15 +23,13 @@ PLI_INT32 RecordSystemReason(s_cb_data* data) {
   return 0;
 }
 
-PLI_INT32 RecordAssertionReason(PLI_INT32 reason, s_vpi_time* /*cb_time*/,
-                                vpiHandle assertion,
-                                p_vpi_attempt_info /*info*/,
-                                PLI_BYTE8* /*user_data*/) {
+PLI_INT32 RecordAssertionReason(PLI_INT32 reason, s_vpi_time*,
+                                vpiHandle assertion, p_vpi_attempt_info,
+                                PLI_BYTE8*) {
   g_assertion_reasons.emplace_back(reason, vpi_get_str(vpiName, assertion));
   return 0;
 }
 
-// Places a callback for each of `reasons` on the assertion `name` of `top`.
 void PlaceOn(const char* name, std::initializer_list<int> reasons) {
   vpiHandle it =
       vpi_iterate(vpiAssertion, vpi_handle_by_name(VpiText("top"), nullptr));
@@ -49,9 +43,7 @@ void PlaceOn(const char* name, std::initializer_list<int> reasons) {
   }
 }
 
-// The calltf of $place, which places the callbacks the run is to raise once
-// the run has built the assertions they are placed on.
-PLI_INT32 PlaceCallbacks(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PlaceCallbacks(PLI_BYTE8*) {
   PlaceOn("a1", {cbAssertionDisable, cbAssertionReset});
   PlaceOn("a2", {cbAssertionDisable, cbAssertionReset});
   return 0;
@@ -73,10 +65,6 @@ class AssertControlCallbacks : public VpiDesignRun {
   AssertionApi api_;
 };
 
-// Table 20-8: $assertoff and $assertcontrol(5) applied to the whole design
-// raise cbAssertionSysOff and cbAssertionSysKill, and a control_type Table
-// 20-5 does not list raises nothing. The cbAssertionSysOn ahead of them is
-// the run's own, §39.4.1 starting the assertion system with the run.
 TEST_F(AssertControlCallbacks, AControlOfTheWholeDesignRaisesItsSystemReason) {
   for (int reason : {cbAssertionSysOff, cbAssertionSysKill, cbAssertionSysOn}) {
     s_cb_data cb = {};
@@ -96,9 +84,6 @@ TEST_F(AssertControlCallbacks, AControlOfTheWholeDesignRaisesItsSystemReason) {
                               cbAssertionSysKill}));
 }
 
-// Table 20-8: $assertoff naming a1 raises cbAssertionDisable on a1 alone, and
-// $assertkill naming a2 raises cbAssertionReset and then cbAssertionDisable on
-// a2 alone; no system callback is raised by either.
 TEST_F(AssertControlCallbacks, AControlNamingAssertionsRaisesTheirReasons) {
   s_vpi_systf_data place = {};
   place.type = vpiSysTask;

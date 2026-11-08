@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -92,8 +90,6 @@ TEST(NInputGateParsing, ThreeDelaysRejected) {
       "module m;\n"
       "  and #(1, 2, 3) g(y, a, b);\n"
       "endmodule\n");
-  // §28.3.3 owns the count of delay values a gate type admits; §28.4 has no
-  // report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "this gate type allows at most 2 delay values", 2, "28.3.3"));
 }
@@ -103,7 +99,6 @@ TEST(NInputGateParsing, SingleTerminalRejected) {
       "module m;\n"
       "  and (y);\n"
       "endmodule\n");
-  // §28.3 owns the terminal-count report; §28.4 has no report of its own here.
   EXPECT_TRUE(ReportedError(
       r.diags, "incorrect number of terminals for gate instance", 2, "28.3"));
 }
@@ -113,7 +108,6 @@ TEST(NInputGateParsing, OutputMustBeNetLvalue) {
       "module m;\n"
       "  and g(1, a, b);\n"
       "endmodule\n");
-  // §28.3 owns the net-lvalue report; §28.4 has no report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "output terminal must be a net lvalue", 2,
                             "28.3"));
 }

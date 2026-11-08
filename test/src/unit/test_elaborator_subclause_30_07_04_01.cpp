@@ -24,9 +24,6 @@ TEST(SpecifyBlockDeclElaboration, PulsestyleOnModulePathOutputIsError) {
                             4, "30.7.4.1"));
 }
 
-// The error is specific to a pulsestyle output that appears *after* the module
-// path declaration. A pulsestyle declaration that precedes the path on the same
-// output is legal, so order is what discriminates the rule.
 TEST(SpecifyBlockDeclElaboration, PulsestyleBeforeModulePathIsLegal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,10 +38,6 @@ TEST(SpecifyBlockDeclElaboration, PulsestyleBeforeModulePathIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The error rule applies to every output in a multi-output pulsestyle
-// declaration, not just the first one listed. Here the conflicting output (o,
-// already a module path destination) appears second in the list, so the per
-// output scan must still flag it.
 TEST(SpecifyBlockDeclElaboration,
      ConflictAmongMultiplePulsestyleOutputsIsError) {
   ElabFixture f;

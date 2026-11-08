@@ -1,63 +1,3 @@
-// §30.5.3's choice of a module path delay as a running simulation makes it: a
-// design carrying the subclause's own Example 1 is driven, and the time `y`
-// moved is read off what the run printed.
-//
-// §30.5.3 chooses in two steps. A simulator first finds which specify paths to
-// the output are active, those whose input changed most recently, and only then
-// picks among them, comparing each path's delay for the transition being
-// scheduled and taking the smallest. The first step is the one
-// test/src/unit/test_simulator_subclause_30_05_03a.cpp cannot make fail: that
-// file calls SelectPathDelay from src/simulator/specify_path_delay.h itself and
-// hands it the transition times as arguments, so it proves the arithmetic and
-// says nothing about whether anything computes those times from a run. Issue
-// #3385 is that gap. The delay was taken from every path reaching the output
-// rather than from the active ones, and no test could tell, because none drove
-// a design.
-//
-// Example 1 is the design under every case below:
-//
-//     (A => Y) = (6, 9);
-//     (B => Y) = (5, 11);
-//
-// and the clause's prose about it is what the four cases assert. When Y rises,
-// A having changed after B picks 6, B having changed after A picks 5, and A and
-// B having last changed together picks the smaller rise delay, B's 5; were Y to
-// fall instead, A's fall delay of 9 would be the one picked.
-//
-// The delays are the standard's own and no two quantities a case tells apart
-// share a value. 6 and 5 are the rise delays the first two cases tell apart;
-// they differ by a single time unit, so no sample taken on a whole tick
-// separates them, and the `always @(y)` below prints $time on every transition
-// of `y` for exactly that reason. 9 and 11 are the fall delays the fourth case
-// rests on, and 9 differs as well from the rise delay 6 that a selection
-// reading the wrong slot of Table 30-2 would hand the same transition. The
-// stimulus times 20, 40, 50 and 60 are spaced further apart than the largest
-// delay 11, so no two transitions of `y` are ever close enough for §30.7 to
-// deem them a pulse and filter one away.
-//
-// The expression driving `y` differs between the rise cases and the fall case,
-// and each is chosen so that the input that transitioned most recently is the
-// one that caused `y` to move. `a & b` rises when the later of the two inputs
-// rises, and `a | b` falls when the later of the two falls; under the other
-// operator the first input to move would carry `y` with it and the second could
-// not be the cause of anything.
-//
-// `armed` exists because `y` settles out of its initial high-impedance value
-// somewhere in the first eleven time units, at a moment the delays §30.5.2
-// derives for the x and z slots decide and no case here is about. It is raised
-// at t=40, after that settling and before every stimulus edge that matters, so
-// the run prints one line per transition a case is making a claim about.
-//
-// `a` and `b` are input ports and `y` an output port because §30.4.1 requires a
-// module path source to be a net connected to an input or inout port and a
-// destination to be connected to an output or inout port, and
-// CheckSpecifyPathTerminal in src/elaborator/elaborator_validate_specify.cpp
-// rejects a path terminal that is a declared local signal. An input port of a
-// top module has no driver, so `sa` and `sb` supply one through `assign a =
-// sa;`, which §23.3.3.3 admits onto a net input port and which costs a delta
-// cycle and no simulation time. Every time below is therefore the time `sa` or
-// `sb` was written.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -69,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// One case's variables over Example 1's design: the expression that drives `y`,
-// the statements the stimulus process runs after clearing `armed`, and the two
-// times `y` is sampled at. The samples straddle the transition the case asserts
-// and fall on no time any competing delay would place an edge at, so a sample
-// never reads a value in the same time slot it is being written.
 struct TwoUnconditionalPathsCase {
   std::string_view driver;
   std::string_view stimulus;
@@ -81,14 +16,6 @@ struct TwoUnconditionalPathsCase {
   int late;
 };
 
-// Example 1's two module paths over a driver of `y` the case chooses, with the
-// case's stimulus reaching `a` and `b` through `sa` and `sb`.
-//
-// The module is the only one in the source and so the one ElaborateSrc
-// elaborates, and it is a top module because only a top module's specify block
-// is registered, which issue #3383 records. Each sample line names the time it
-// was taken at, and each transition line names the time `y` moved, so a case
-// asserts on times rather than on an order of values.
 std::string TwoUnconditionalPathsSource(const TwoUnconditionalPathsCase& tc) {
   std::string early = std::to_string(tc.early);
   std::string late = std::to_string(tc.late);
@@ -116,13 +43,6 @@ std::string TwoUnconditionalPathsSource(const TwoUnconditionalPathsCase& tc) {
   return src;
 }
 
-// §30.5.3: with A the later of the two to change, the delay is 6. `b` rises at
-// t=20 and `a` at t=50, and `a & b` holds `y` at 0 until the second of the two
-// arrives, so the rise of `y` is caused by the input that transitioned most
-// recently. Only the path from `a` is active, and its rise delay of 6 places
-// `y` at 1 at t=56 -- not at the 55 that `b`'s rise delay of 5 would give,
-// which is a whole time unit away and so the difference the printed transition
-// time exists to state.
 TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputA) {
   SimFixture f;
   std::string out =
@@ -137,13 +57,6 @@ TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputA) {
   EXPECT_EQ(out, "s54=0\ny=1@56\ns58=1\n");
 }
 
-// §30.5.3: with B the later of the two to change, the delay is 5. The same
-// design and the same two transitions with their order exchanged -- `a` rises
-// at t=20 and `b` at t=50 -- so what differs between this case and the one
-// above is which input moved last and nothing else. The path from `b` is the
-// active one and its rise delay of 5 places `y` at 1 at t=55. The pair is what
-// says the delay follows the input that moved rather than sitting at either
-// value.
 TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputB) {
   SimFixture f;
   std::string out =
@@ -158,10 +71,6 @@ TEST(ActiveModulePathSelection, RiseTakesTheRiseDelayOfTheLaterInputB) {
   EXPECT_EQ(out, "s54=0\ny=1@55\ns58=1\n");
 }
 
-// §30.5.3: with A and B having last changed together, the smaller rise delay,
-// B's 5, is picked. Both inputs rise at t=50, which leaves both paths active,
-// so the comparison of the two rise delays is what settles the answer and `y`
-// reaches 1 at t=55.
 TEST(ActiveModulePathSelection, SimultaneousInputsRiseOnTheSmallerDelay) {
   SimFixture f;
   std::string out =
@@ -176,19 +85,6 @@ TEST(ActiveModulePathSelection, SimultaneousInputsRiseOnTheSmallerDelay) {
   EXPECT_EQ(out, "s54=0\ny=1@55\ns58=1\n");
 }
 
-// §30.5.3: were Y to fall instead, A's fall delay of 9 would be picked.
-//
-// Both inputs start at 1 and `a | b` holds `y` at 1 while either of them is
-// still 1, which is what lets `b` fall at t=50 without moving `y` at all: the
-// transition is recorded against `b` and nothing is scheduled for it. `a` then
-// falls at t=60, `y` follows it down, and `a` is the input that transitioned
-// most recently. That is the stimulus this case needs, because the standard's
-// sentence is about a fall taken from the path whose input moved last.
-//
-// The active path is `a`'s and the transition being scheduled is a 1 to 0, so
-// the delay is 9 and `y` reaches 0 at t=69. The two are selected independently:
-// 11 is the fall delay of the other path and 6 the rise delay of this one, and
-// neither places the edge at 69.
 TEST(ActiveModulePathSelection, FallTakesTheFallDelayOfTheLaterInputA) {
   SimFixture f;
   std::string out =
@@ -203,8 +99,6 @@ TEST(ActiveModulePathSelection, FallTakesTheFallDelayOfTheLaterInputA) {
   EXPECT_EQ(out, "s65=1\ny=0@69\ns73=0\n");
 }
 
-// A gate whose clk-to-q paths are `paths`, clk rising at 30 and falling at 60
-// with data held 1, printing each change of q from 20 on.
 std::string TwoPathGate(const std::string& paths) {
   return "module mygate(input clk, input data, output q);\n"
          "  assign q = clk & data;\n"
@@ -226,11 +120,6 @@ std::string TwoPathGate(const std::string& paths) {
          "endmodule\n";
 }
 
-// §30.5.3 (printed page 885): two unconditional paths declared between the
-// same terminals are both paths of the module and both active, so each
-// transition takes the smaller of their delays for it: the rise min(10, 20) and
-// the fall min(5, 6). The second declaration replaced the first, and q rose at
-// 50 and fell at 66.
 TEST(ActivePathSelectionRun, SameTerminalPathsAreBothKept) {
   SimFixture f;
   EXPECT_EQ(RunCapture(TwoPathGate("    (clk => q) = (10, 5);\n"
@@ -239,9 +128,6 @@ TEST(ActivePathSelectionRun, SameTerminalPathsAreBothKept) {
             "t=40 q=1\nt=65 q=0\n");
 }
 
-// The smaller rise and the smaller fall come from different declarations, so
-// neither path alone gives both: q rises with the first's 10 and falls with the
-// second's 5.
 TEST(ActivePathSelectionRun, EachTransitionTakesItsOwnSmallestDelay) {
   SimFixture f;
   EXPECT_EQ(RunCapture(TwoPathGate("    (clk => q) = (10, 6);\n"
@@ -250,11 +136,6 @@ TEST(ActivePathSelectionRun, EachTransitionTakesItsOwnSmallestDelay) {
             "t=40 q=1\nt=65 q=0\n");
 }
 
-// §30.5.3 (printed page 885): with A and B having last changed together, the
-// smaller of the two rise delays is picked, so a and b rising in one time step
-// raise y after min(6, 5) and falling in one after min(9, 11). The second
-// source's move, a step behind the first's in the same time, was never counted,
-// and y never rose at all.
 TEST(ActiveModulePathSelection,
      SimultaneousInputsInOneStepTakeTheSmallerDelay) {
   SimFixture f;

@@ -103,7 +103,6 @@ TEST(BlockNameParsing, MismatchedEndLabelBeginEndErrors) {
       "    $display(\"hello\");\n"
       "  end : blk_b\n"
       "endmodule\n");
-  // §9.3.4 owns the end-label rule; A.6.3 only states the block productions.
   EXPECT_TRUE(ReportedError(
       r.diags, "end label 'blk_b' does not match block name 'blk_a'", 4,
       "9.3.4"));
@@ -118,17 +117,12 @@ TEST(BlockNameParsing, MismatchedEndLabelForkJoinErrors) {
       "    join : blk_b\n"
       "  end\n"
       "endmodule\n");
-  // §9.3.4 owns the end-label rule; A.6.3 only states the block productions.
   EXPECT_TRUE(ReportedError(
       r.diags, "end label 'blk_b' does not match block name 'blk_a'", 5,
       "9.3.4"));
 }
 
 TEST(BlockNameParsing, EndLabelWithoutStartLabelErrors) {
-  // §9.3.4 (printed p.229): a name at the end that differs from the block's
-  // name at the beginning is an error. A block with no name at begin but a name
-  // after end has a name that differs from the absent one at the beginning, so
-  // an end label without a matching start label is illegal.
   auto r = Parse(
       "module m;\n"
       "  initial begin\n"
@@ -257,10 +251,6 @@ TEST(BlockStatementSyntaxParsing, UnterminatedSeqBlockErrors) {
       "  initial begin\n"
       "    a = 1;\n"
       "endmodule\n");
-  // A.6.3 closes seq_block with `end`, and §9.3.1 owns that delimiter, so
-  // Parser::ParseBlockStmt demands it at the `endmodule` where its statement
-  // loop stops. The `endmodule` was taken as a statement and drew §11.2's
-  // "expected expression" until that loop was given the stop set.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'end', got 'endmodule'", 4, "9.3.1"));
 }
@@ -273,10 +263,6 @@ TEST(BlockStatementSyntaxParsing, UnterminatedParBlockErrors) {
       "      a = 1;\n"
       "  end\n"
       "endmodule\n");
-  // §9.3.2 owns the join_keyword production, and Parser::ParseForkStmt demands
-  // it at the `end` on line 5, where its statement loop stops. That `end`
-  // closes the seq_block of §9.3.1 on line 2, so the fork reports it and leaves
-  // it rather than taking it for a statement.
   EXPECT_TRUE(ReportedError(
       r.diags, "expected join, join_any or join_none to close the parallel", 5,
       "9.3.2"));
@@ -289,10 +275,6 @@ TEST(BlockStatementSyntaxParsing, BeginWithJoinTerminatorErrors) {
       "    a = 1;\n"
       "  join\n"
       "endmodule\n");
-  // A seq_block ends only at `end`, and A.6.3 gives `join` to par_block, so
-  // Parser::ParseBlockStmt demands its own delimiter at the `join` where its
-  // statement loop stops. The `join` was taken as a statement and drew §11.2's
-  // "expected expression" until that loop was given the stop set.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'end', got 'join'", 4, "9.3.1"));
 }
 
@@ -305,12 +287,6 @@ TEST(BlockStatementSyntaxParsing, ForkWithEndTerminatorErrors) {
       "    end\n"
       "  end\n"
       "endmodule\n");
-  // The `end` on line 5 goes to the seq_block that opened on line 2, which is
-  // what leaves the `end` on line 6 with no block left to close. §23.2.4 owns
-  // the module body, so Parser::ParseTypedItemOrInst reports that second `end`
-  // there. This case claims that recovery; the §9.3.2 report this source also
-  // draws is named by BlockStatementSyntaxParsing.ParBlockMissingJoinRejected
-  // in test/src/unit/test_parser_annex_a_06_03b.cpp.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 6, "23.2.4"));
 }

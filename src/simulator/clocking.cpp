@@ -32,10 +32,6 @@ Region SynchronousDriveRegion() { return Region::kReNBA; }
 
 SimTime SynchronousDriveEffectiveTime(SimTime now, bool event_now,
                                       SimTime next_event_time, SimTime skew) {
-  // §14.16: a drive that runs coincident with its clocking event takes effect
-  // at that event; a drive that runs at any other time still performs its
-  // action as if it had run at the next clocking event. The driven signal then
-  // updates `skew` after that governing event.
   SimTime governing_event = event_now ? now : next_event_time;
   return governing_event + skew;
 }
@@ -50,7 +46,6 @@ Logic4Vec MakeClockvarNetDriverInit(Arena& arena, uint32_t width) {
   for (uint32_t i = 0; i < v.nwords; ++i) {
     uint32_t bits = remaining >= 64 ? 64 : remaining;
     uint64_t mask = (bits == 64) ? ~uint64_t{0} : ((uint64_t{1} << bits) - 1);
-    // 'z is encoded as aval = 0, bval = 1 per valid bit.
     v.words[i].aval = 0;
     v.words[i].bval = mask;
     remaining -= bits;
@@ -88,23 +83,10 @@ std::string ClockingSignalName(std::string_view inst_prefix,
   return std::string(inst_prefix) + std::string(signal_name);
 }
 
-// The path a clockvar's signal is spelled by: its `= expression` where the
-// declaration gives one, its own name otherwise.
 static std::string_view ClockvarPath(const ClockingSignal& sig) {
   return sig.target_path.empty() ? sig.signal_name : sig.target_path;
 }
 
-// The variable `path` names from the instance a clocking block was declared
-// in. A bare name is that instance's own signal, found under its prefix
-// (§23.9). §14.3 (printed page 354) with §23.6: a clocking event, and a
-// clockvar's `= expression`, may name the signal hierarchically,
-// `@(posedge top.clk)` and `output d = top.d`, which reaches nothing joined to
-// the prefix, so it is resolved as a reference written in that instance is,
-// SimContext::FindVariable walking the path from there, `$root` and a top
-// module's name at its head included. The joined name is a full one, read
-// from the root whatever process ran last: a clocking event processed in the
-// Observed region after a program wrote a signal ran with the program
-// current, and the bare name of a top module's signal reached nothing in it.
 static Variable* FindInBlockInstance(std::string_view inst_prefix,
                                      std::string_view path, SimContext& ctx) {
   {
@@ -135,9 +117,6 @@ std::string_view ClockingManager::DefaultClockingFor(
   const std::string kPrefix = ctx.ActiveInstancePrefix();
   auto it = scope_default_clocking_.find(kPrefix);
   if (it != scope_default_clocking_.end()) return it->second;
-  // §14.12 (printed page 362): a nested module, interface or checker that
-  // declares no default clocking takes the one of the scope it is declared
-  // in, so its instance's default is the nearest enclosing instance's.
   for (const std::string& scope : ctx.NestedDeclOuterScopes(kPrefix)) {
     it = scope_default_clocking_.find(scope);
     if (it != scope_default_clocking_.end()) return it->second;
@@ -148,8 +127,6 @@ std::string_view ClockingManager::DefaultClockingFor(
 const ClockingBlock* ClockingManager::FindInScope(std::string_view name,
                                                   const SimContext& ctx) const {
   const std::string kInstPrefix = ctx.ActiveInstancePrefix();
-  // §23.9 with §27.4: a process in a generate block reaches the block its own
-  // instance declares, registered under that instance's prefix, first.
   if (const Process* proc = ctx.CurrentProcess()) {
     for (const std::string& key :
          GenerateBlockKeys(kInstPrefix, proc->gen_prefixes, name)) {
@@ -158,9 +135,6 @@ const ClockingBlock* ClockingManager::FindInScope(std::string_view name,
   }
   if (const auto* block = Find(kInstPrefix + std::string(name))) return block;
   if (const auto* block = Find(name)) return block;
-  // §23.6: a path headed by a top-level module's name, `t.u.cb`, or `m.cb` of
-  // a top m, is read from that top, whose own blocks are keyed under no
-  // prefix.
   return Find(ctx.RootedStorageKey(name));
 }
 
@@ -182,29 +156,14 @@ SimTime ClockingManager::GetOutputSkew(std::string_view block_name,
   return block->default_output_skew;
 }
 
-// §14.10: whether the clock has just made the transition the block's clocking
-// event names. `prev` is what this block last saw the clock at, kept by the
-// watcher below rather than read from Variable::prev_value -- that field
-// belongs to the §9.4.2 event controls, which seed and resync it for their own
-// arming, so a clock no event control watches leaves it at its default and
-// every notification looks like a posedge.
 static bool CheckClockEdge(uint64_t prev, uint64_t cur, Edge edge) {
   if (edge == Edge::kPosedge) return prev == 0 && cur == 1;
   if (edge == Edge::kNegedge) return prev == 1 && cur == 0;
   return prev != cur;
 }
 
-// §14.10: what one block's clocking event is watched through -- the block whose
-// event it is, the clock variable its clocking expression names, the signals it
-// samples and the edge it waits for, and this block's record of what that clock
-// last stood at. Held together because the watcher hands all of it on when it
-// re-arms, and because §14.6 lets several blocks name one clock: each keeps its
-// own record, so one block's event cannot consume the transition for the rest.
 struct ClockWatch {
   std::string block_name;
-  // §23.9: the instance the block was declared in, which is what joins the bare
-  // signal names below to that instance's own variables. Empty for a block
-  // declared in a module elaborated as a top.
   std::string inst_prefix;
   Variable* clk_var = nullptr;
   std::vector<ClockingSignal> signals;
@@ -213,10 +172,6 @@ struct ClockWatch {
   const Expr* iff = nullptr;
 };
 
-// §14.3 with §9.4.2.3: whether the clocking event's `iff` qualifier lets this
-// edge through. §12.4 decides what true means, so any bit at 1 passes and a
-// zero, x or z condition does not. The condition names the block's instance's
-// variables, so it is evaluated from that instance.
 static bool ClockIffHolds(const ClockWatch& watch, SimContext& ctx) {
   if (watch.iff == nullptr) return true;
   InstancePrefixOverride in_block(ctx.InstancePrefixOverride(),
@@ -224,8 +179,6 @@ static bool ClockIffHolds(const ClockWatch& watch, SimContext& ctx) {
   return EvalExpr(watch.iff, ctx, ctx.GetArena()).IsTruthy();
 }
 
-// §14.5: `expr` read from the instance `inst_prefix` names, where a bare
-// name is that instance's own signal.
 static Logic4Vec EvalInBlockInstance(std::string_view inst_prefix,
                                      const Expr* expr, SimContext& ctx) {
   InstancePrefixOverride in_block(ctx.InstancePrefixOverride(), inst_prefix);
@@ -238,14 +191,6 @@ Logic4Vec ClockingManager::EvalClockvarExpr(const ClockingBlock& block,
   return EvalInBlockInstance(block.inst_prefix, sig.target_expr, ctx);
 }
 
-// §14.4 (printed page 356) with §14.3: the value input `sig` samples at this
-// clocking event. An edge skew samples at that edge preceding the event, which
-// the clock watcher recorded as it passed; a 1step skew samples the value at
-// the end of the previous time step (§14.13 places it at that step's
-// Postponed region); a numeric skew samples the signal that many time units
-// before the event; any other samples it now. A record not yet made is the
-// value the signal still holds. Sampled at the edge itself, `input #2 d` read
-// the value d took at the edge.
 static ClockingValue SampleOf(const ClockingManager* mgr,
                               const ClockWatch& watch,
                               const ClockingSignal& sig, const Variable& var,
@@ -265,9 +210,6 @@ static ClockingValue SampleOf(const ClockingManager* mgr,
   return recorded != nullptr ? *recorded : ClockingValue::Of(var.value);
 }
 
-// Whether input `sig` is sampled by the pass `only_zero_skew` names: an
-// explicit #0 input in the Observed region's pass, every other input in the
-// clock edge's.
 static bool SampledInThisPass(const ClockingSignal& sig, bool only_zero_skew) {
   if (sig.direction != ClockingDir::kInput &&
       sig.direction != ClockingDir::kInout) {
@@ -280,9 +222,6 @@ static void SampleBlockInputs(ClockingManager* mgr, const ClockWatch& watch,
                               SimContext& ctx, bool only_zero_skew) {
   for (const auto& sig : watch.signals) {
     if (!SampledInThisPass(sig, only_zero_skew)) continue;
-    // §14.5 (printed pages 357-358): a clockvar bound to an expression that
-    // is no name samples that expression, a concatenation or a slice, whole.
-    // With no variable of its name to read, it sampled nothing.
     if (sig.target_expr != nullptr) {
       mgr->SampleInputValue(watch.block_name, sig.signal_name,
                             ClockingValue::Of(EvalInBlockInstance(
@@ -299,8 +238,6 @@ static void SampleBlockInputs(ClockingManager* mgr, const ClockWatch& watch,
 static void RegisterClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                                  SimContext& ctx, Scheduler& sched);
 
-// Watch the clock for the next notification, reading the block back so a change
-// to what it samples is picked up. A block that is gone is not re-armed.
 static void RearmClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                               SimContext& ctx, Scheduler& sched) {
   const auto* blk = mgr->Find(watch.block_name);
@@ -312,17 +249,10 @@ static void RearmClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
                        ctx, sched);
 }
 
-// §14.13: when its clocking event is processed, a clocking block refreshes its
-// sampled values first and only then triggers its own block event. The
-// inputs carrying a skew are sampled here, and the explicit #0 ones in the
-// Observed region alongside the event itself, which §14.4 is what puts there.
 static void FireClockingEvent(ClockingManager* mgr, const ClockWatch& watch,
                               SimContext& ctx, Scheduler& sched) {
   SampleBlockInputs(mgr, watch, ctx, false);
   auto* ev = sched.GetEventPool().Acquire();
-  // The watch is captured by value because the callback runs in the Observed
-  // region, after this function and the caller that owns the watch have both
-  // returned.
   ev->callback = [mgr, watch, &ctx, &sched]() {
     SampleBlockInputs(mgr, watch, ctx, true);
     mgr->MarkBlockEventTime(watch.block_name, sched.CurrentTime());
@@ -332,9 +262,6 @@ static void FireClockingEvent(ClockingManager* mgr, const ClockWatch& watch,
   sched.ScheduleEvent(sched.CurrentTime(), Region::kObserved, ev);
 }
 
-// §14.3 (printed pages 355-356): each input whose skew is an edge of the
-// clock takes the value it holds as the clock makes that edge, which the
-// next clocking event samples.
 static void RecordEdgeSkewedInputs(ClockingManager* mgr,
                                    const ClockWatch& watch, uint64_t prev,
                                    uint64_t cur, SimContext& ctx) {
@@ -358,15 +285,9 @@ static void RegisterClockWatcher(ClockingManager* mgr, const ClockWatch& watch,
   clk_var->AddWatcher([mgr, watch, &ctx, &sched]() {
     uint64_t cur = watch.clk_var->value.ToUint64() & 1;
     RecordEdgeSkewedInputs(mgr, watch, *watch.last_clock, cur, ctx);
-    // §14.3 (printed pages 354-355) with §15.5: a named event is a clocking
-    // event of its own, `clocking cb @(e)`, and its trigger notifies the
-    // variable without changing a value, so each notification is one. Asked
-    // for an edge, it never fired.
     bool fired = (watch.clk_var->is_event ||
                   CheckClockEdge(*watch.last_clock, cur, watch.edge)) &&
                  ClockIffHolds(watch, ctx);
-    // Recorded whether or not the transition was the one this block waits for,
-    // because it is what the clock now stands at either way.
     *watch.last_clock = cur;
     if (fired) FireClockingEvent(mgr, watch, ctx, sched);
     RearmClockWatcher(mgr, watch, ctx, sched);
@@ -378,9 +299,6 @@ void ClockingManager::RecordStepValues(SimContext& ctx) {
   for (const auto& block : blocks_) {
     for (const auto& sig : block.signals) {
       if (sig.direction == ClockingDir::kOutput) continue;
-      // §23.9: what is recorded is the instance's own variable, so two
-      // instances of one module keep two records rather than overwriting each
-      // other's under the bare name the module declared.
       std::string name =
           ClockingSignalName(block.inst_prefix, ClockvarPath(sig));
       auto* var =
@@ -396,9 +314,6 @@ void ClockingManager::RecordStepValues(SimContext& ctx) {
   }
 }
 
-// Appends what a signal held at the end of the step at `now` and drops the
-// entries no skew of `reach` can reach back to, keeping the last one at or
-// before the cutoff, which is the value standing there.
 void ClockingManager::RecordHistory(
     std::vector<std::pair<SimTime, ClockingValue>>& history, SimTime now,
     ClockingValue value, SimTime reach) {
@@ -450,9 +365,6 @@ void ClockingManager::Attach(SimContext& ctx, Scheduler& sched) {
     auto* clk_var =
         FindInBlockInstance(block.inst_prefix, block.clock_signal, ctx);
     if (!clk_var) continue;
-    // §14.10: the block's event is the transition of its clocking expression,
-    // so the record starts at what the clock stands at now -- a clock already
-    // high when the block attaches has not made a posedge by being watched.
     auto last_clock = std::make_shared<uint64_t>(clk_var->value.ToUint64() & 1);
     RegisterClockWatcher(
         this,
@@ -462,8 +374,6 @@ void ClockingManager::Attach(SimContext& ctx, Scheduler& sched) {
         ctx, sched);
   }
   CreateSampleVariables(ctx);
-  // §14.13: a 1step input is the value of the signal at the Postponed region
-  // of the step before the clocking event, so it is recorded as each step ends.
   sched.AddPostTimestepCallback([this, &ctx]() { RecordStepValues(ctx); });
 }
 
@@ -487,10 +397,6 @@ void ClockingManager::SampleInput(std::string_view block_name,
   SampleInputValue(block_name, signal_name, ClockingValue::Known(value));
 }
 
-// §14.16 (printed page 368) with §10.7: `var` takes `held` as an assignment
-// to it does, at its own width -- a narrower value zero-extended, a wider one
-// truncated -- its unknown bits kept for a 4-state variable and cleared for a
-// 2-state one (§6.11.2). Answers whether any bit changed.
 static bool WriteDrivenValue(Variable* var, const ClockingValue& held) {
   bool changed = false;
   for (uint32_t i = 0; i < var->value.nwords; ++i) {
@@ -515,11 +421,6 @@ void ClockingManager::SampleInputValue(std::string_view block_name,
   Variable* held = it != sample_vars_.end() ? it->second : nullptr;
   bool changed = held != nullptr && WriteDrivenValue(held, value);
   sampled_values_[std::move(key)] = std::move(value);
-  // §14.15 (printed page 367): an event control on the clockvar is told of a
-  // change of the value it sampled, and of nothing else. It is told once the
-  // sample is stored, because a process it wakes runs at once and reads the
-  // clockvar: told first, `wait (s.sb.gnt == 1)` read the old sample and
-  // slept on.
   if (changed) held->NotifyWatchers();
 }
 
@@ -555,29 +456,15 @@ void ClockingManager::ScheduleOutputDrive(const ClockvarDrive& drive,
   if (block == nullptr) return;
   auto skew = GetOutputSkew(block_name, signal_name);
   auto now = sched.CurrentTime();
-  // §14.16: place the drive relative to its governing clocking event. When the
-  // clocking event is occurring in this time step the drive is coincident;
-  // otherwise it performs as if at the next clocking event. This model invokes
-  // the drive primitive at the event, so the next-event time falls back to the
-  // current time when no future event time is tracked.
   bool event_now = DidBlockEventOccurAt(block_name, now);
   auto drive_time = SynchronousDriveEffectiveTime(now, event_now, now, skew);
-  // §23.9: the signal a clockvar drives is the one the block's own instance
-  // declared, or the one its `= expression` names from there, so the drive is
-  // placed on that variable.
   const ClockingSignal* sig = FindSignal(*block, signal_name);
-  // §14.3 (printed pages 355-356): an output skewed by an edge of the clock is
-  // driven at that edge following the drive's clocking event.
   Variable* edge_clock =
       sig != nullptr && sig->drive_edge != Edge::kNone
           ? FindInBlockInstance(block->inst_prefix, block->clock_signal, ctx)
           : nullptr;
   DriveEdge when{edge_clock, sig != nullptr ? sig->drive_edge : Edge::kNone,
                  drive_time};
-  // §14.5 (printed pages 357-358): an output bound to an expression, `output
-  // nib = q[3:0]`, drives that expression, as an assignment to it from the
-  // block's instance writes the slice alone. With no variable of its name,
-  // the drive landed nowhere.
   if (target == nullptr && sig != nullptr) target = sig->target_expr;
   if (target != nullptr) {
     auto* ev = sched.GetEventPool().Acquire();
@@ -597,21 +484,11 @@ void ClockingManager::ScheduleOutputDrive(const ClockvarDrive& drive,
   if (var == nullptr) return;
   auto* ev = sched.GetEventPool().Acquire();
   ev->callback = [var, value]() {
-    // §14.16 (printed page 368): the drive assigns the signal in the Re-NBA
-    // region, and a change of a variable is the §9.4.2 event that a process
-    // waiting on it, `always @(d)`, is woken by. Written without the notice,
-    // the value landed and the process slept on.
     if (WriteDrivenValue(var, value)) var->NotifyWatchers();
   };
   ScheduleDriveEvent(when, ev, sched);
 }
 
-// §14.3 (printed pages 355-356): an output skewed by an edge of the clock is
-// driven at that edge following the drive's clocking event, so the update
-// waits for the clock to make it; taken for a zero skew, `output negedge q`
-// was driven at the posedge. §14.16: any other drive is scheduled in the
-// Re-NBA region of `drive_time`, a nonzero skew only shifting it into a future
-// time step.
 void ClockingManager::ScheduleDriveEvent(const DriveEdge& when, Event* ev,
                                          Scheduler& sched) {
   Variable* clk = when.clock;
@@ -635,12 +512,6 @@ void ClockingManager::ScheduleCycleDelayedDrive(const ClockvarDrive& drive,
                                                 Scheduler& sched) {
   std::string_view block_name = drive.block_name;
   uint32_t cycles = drive.cycles;
-  // The governing event is this step's where it has occurred, and an event of
-  // this step is then not one of the N; otherwise it is the next event, which
-  // the wait counts before the N. §14.16 (printed page 369): a drive with no
-  // cycle delay executed at any other time performs its drive action as if at
-  // that next event, so it too waits for it; placed at once, `#3 cb.v <= r`
-  // drove v at 3.
   SimTime start = sched.CurrentTime();
   bool event_now = DidBlockEventOccurAt(block_name, start);
   if (cycles == 0 && event_now) {
@@ -706,12 +577,6 @@ bool ClockingManager::ZeroCycleDelayProceeds(std::string_view block_name,
   return DidBlockEventOccurAt(block_name, now);
 }
 
-// §14.11: each wait on the block's events is told of this one. A wait resumes
-// its process at once, and the process may reach another cycle delay and
-// register a new wait before this returns, so the waits are taken out of the
-// table before any is called: iterated in place, the registration grew the
-// vector under the loop. The waits that go on waiting are put back ahead of
-// the ones registered meanwhile, which this event does not count.
 void ClockingManager::InvokeEdgeCallbacks(std::string_view block_name) {
   std::string key(block_name);
   auto it = edge_callbacks_.find(key);
@@ -738,8 +603,6 @@ const ClockingSignal* ClockingManager::FindSignal(
 Variable* ClockingManager::ResolveClockingMember(std::string_view block_name,
                                                  std::string_view signal_name,
                                                  SimContext& ctx) const {
-  // §23.9: `cb.data` spells the block by the bare name its module declared, so
-  // the running instance's own block is what it reaches.
   const auto* block = FindInScope(block_name, ctx);
   return block != nullptr ? ClockvarVariable(*block, signal_name, ctx)
                           : nullptr;
@@ -750,8 +613,6 @@ Variable* ClockingManager::ClockvarVariable(const ClockingBlock& block,
                                             SimContext& ctx) const {
   const auto* sig = FindSignal(block, signal_name);
   if (!sig) return nullptr;
-  // §14.15: an input clockvar stands for its sampled value, which its sample
-  // variable holds.
   auto held =
       sample_vars_.find({std::string(block.name), std::string(signal_name)});
   if (held != sample_vars_.end()) return held->second;
@@ -761,8 +622,6 @@ Variable* ClockingManager::ClockvarVariable(const ClockingBlock& block,
 const ClockingBlock* ClockingManager::FindByPath(std::string_view path,
                                                  const SimContext& ctx) const {
   if (const auto* block = FindInScope(path, ctx)) return block;
-  // A path headed by the top module's name, or by instances above the one
-  // registered, is registered under its tail.
   for (size_t dot = path.find('.'); dot != std::string_view::npos;
        dot = path.find('.', dot + 1)) {
     if (const auto* block = Find(path.substr(dot + 1))) return block;
@@ -799,13 +658,6 @@ const ClockingBlock* ResolveClockingBlockOf(const Expr* block_expr,
   return mgr->Find(path);
 }
 
-// §14.15 (printed page 367): an event control on an input clockvar, `@(cb.d)`
-// or `@(posedge cb.en)`, is synchronised to the clocking event, waking on a
-// change of the value the clockvar sampled. So each input clockvar is given a
-// variable holding that value, which SampleInputValue writes and notifies, and
-// which starts at what the signal holds when the block is armed. Bound to the
-// signal itself, the event control woke on a change between clocking events,
-// a pulse the block never sampled among them.
 void ClockingManager::CreateSampleVariables(SimContext& ctx) {
   for (const auto& block : blocks_) {
     for (const auto& sig : block.signals) {
@@ -821,8 +673,6 @@ void ClockingManager::CreateSampleVariables(SimContext& ctx) {
       } else {
         continue;
       }
-      // Created under the clockvar's full name, `b1.sb.gnt`, so a wait on a
-      // condition reading it finds it by name (ExecWait).
       auto* key = ctx.GetArena().Create<std::string>(
           SampleVariableName(block.name, sig.signal_name));
       auto* held = ctx.CreateVariable(*key, now.width);
@@ -836,19 +686,11 @@ void ClockingManager::CreateSampleVariables(SimContext& ctx) {
   }
 }
 
-// §14.13: reading a clockvar (cb.data) yields the value sampled at the clocking
-// block's most recent input event, not the signal's live value.
-// ResolveClockingMember confirms `base_name` names a clocking block carrying
-// signal `field_name` and yields the underlying variable for its width. Returns
-// true and fills `out` when the access resolved to a clockvar.
 static bool ReadClockvar(const ClockingBlock* block,
                          std::string_view field_name, SimContext& ctx,
                          Arena& arena, Logic4Vec& out) {
   auto* mgr = ctx.GetClockingManager();
   if (block == nullptr) return false;
-  // §14.5 (printed pages 357-358): a clockvar bound to an expression that is
-  // no name reads the whole value it sampled, at the expression's width; before
-  // its first clocking event it has sampled nothing and reads x.
   const ClockingSignal* sig = mgr->FindBlockSignal(*block, field_name);
   if (sig != nullptr && sig->target_expr != nullptr) {
     if (const ClockingValue* held =
@@ -862,9 +704,6 @@ static bool ReadClockvar(const ClockingBlock* block,
   }
   auto* sig_var = mgr->ClockvarVariable(*block, field_name, ctx);
   if (!sig_var) return false;
-  // §14.13 (printed page 366): what was sampled, whole -- every word and the
-  // unknown bits with them -- at the signal's width. Read back as 64 known
-  // bits, 4'b1x0z read as 1000 and a 96-bit input lost its top word.
   if (const ClockingValue* held = mgr->GetSampledVec(block->name, field_name)) {
     ClockingValue fitted = *held;
     fitted.width = sig_var->value.width;
@@ -880,9 +719,6 @@ bool TryClockvarMemberAccess(std::string_view base_name,
                              Arena& arena, Logic4Vec& out) {
   auto* mgr = ctx.GetClockingManager();
   if (!mgr) return false;
-  // §23.9: `cb.data` spells the block by the bare name the module declared, so
-  // the sampled value read back is the one belonging to the instance this
-  // expression is running in, which is what the block was registered under.
   return ReadClockvar(mgr->FindInScope(base_name, ctx), field_name, ctx, arena,
                       out);
 }
@@ -907,10 +743,6 @@ bool TryCheckerFormalClockvar(const Variable* formal, SimContext& ctx,
   return ReadClockvar(mgr->Find(bound->first), bound->second, ctx, arena, out);
 }
 
-// §25.5.5 and §25.9.1 with §14.13: a clockvar reached through a path to its
-// interface instance, `vif.sb.a` or a port's `b1.sb.a`, reads what that
-// block sampled (ResolveClockingBlockOf). Only a path spelling the block's
-// own registered name reached it, and one through a virtual interface read 0.
 bool TryClockvarPathRead(const Expr* expr, SimContext& ctx, Arena& arena,
                          Logic4Vec& out) {
   if (expr->lhs == nullptr || expr->lhs->kind != ExprKind::kMemberAccess ||

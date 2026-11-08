@@ -8,32 +8,8 @@
 
 using namespace delta;
 
-// §11.5.1 requires of a non-indexed part-select `vect[msb_expr:lsb_expr]` that
-// the first expression address a more significant bit than the second, and
-// states no condition on where the select stands. §11.5 makes a part-select an
-// operand, so the rule is owed wherever an expression can be written, which is
-// wherever a statement can be written. The four cases here each put one
-// reversed part-select in one statement position.
-//
-// Each of those four is a position Elaborator::ValidatePartSelectBounds reached
-// only once CheckPartSelectBoundsStmt in
-// src/elaborator/elaborator_validate_queries_dims.cpp took its list of nested
-// statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
-// clean beforehand, with a reversed part-select left unreported.
-//
-// Every vector below is declared [7:4] rather than [7:0] so that an index and
-// the storage offset it reaches are different numbers. On [7:0] the two
-// coincide, and a check that computed an offset where §11.5.1 requires an index
-// would answer such a case the same way the rule does, which
-// .claude/memories/discriminating-test-inputs.md bars.
-
 namespace {
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(SelectElaboration,
      ReversedPartSelectInAnAssertionPassStatementNames11_5_1) {
   ElabFixture f;
@@ -66,10 +42,6 @@ TEST(SelectElaboration,
                             "11.5.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §11.5.1's
-// ordering rule is a static one, so it holds whether the weighted draw would
-// select the item or not.
 TEST(SelectElaboration, ReversedPartSelectInARandcaseItemNames11_5_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -84,10 +56,6 @@ TEST(SelectElaboration, ReversedPartSelectInARandcaseItemNames11_5_1) {
                             "11.5.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(SelectElaboration, ReversedPartSelectInARandsequenceCodeBlockNames11_5_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,22 +74,6 @@ TEST(SelectElaboration, ReversedPartSelectInARandsequenceCodeBlockNames11_5_1) {
                             "11.5.1"));
 }
 
-// §11.4.12 bars a select of a concatenation as a net_lvalue, a variable_lvalue
-// or any equivalent use, the left-hand side of an assignment among them, and
-// states no condition on the statement the assignment stands in. The report
-// names §11.4.12 rather than this file's §11.5.1, because it is the
-// concatenation and not the bounds of the select that makes the lvalue illegal.
-//
-// ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `{a, b}[2] = 1'b1` in one of the seven positions it did not read,
-// every one of which elaborated clean beforehand.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(SelectElaboration, SelectOnConcatLvalueInAForkArmNames11_4_12) {
   ElabFixture f;
   ElaborateSrc(
@@ -139,10 +91,6 @@ TEST(SelectElaboration, SelectOnConcatLvalueInAForkArmNames11_4_12) {
                             "11.4.12"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(SelectElaboration,
      SelectOnConcatLvalueInAnAssertionPassStatementNames11_4_12) {
   ElabFixture f;
@@ -173,10 +121,6 @@ TEST(SelectElaboration,
                             "11.4.12"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(SelectElaboration, SelectOnConcatLvalueInARandcaseItemNames11_4_12) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,10 +134,6 @@ TEST(SelectElaboration, SelectOnConcatLvalueInARandcaseItemNames11_4_12) {
                             "11.4.12"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(SelectElaboration,
      SelectOnConcatLvalueInARandsequenceCodeBlockNames11_4_12) {
   ElabFixture f;
@@ -212,14 +152,6 @@ TEST(SelectElaboration,
                             "11.4.12"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(SelectElaboration,
      SelectOnConcatLvalueInAForLoopInitializationNames11_4_12) {
   ElabFixture f;
@@ -249,13 +181,6 @@ TEST(SelectElaboration, SelectOnConcatLvalueInAForLoopStepNames11_4_12) {
                             "11.4.12"));
 }
 
-// §11.5.1 bars a bit-select or part-select of a scalar alone, and §6.18 makes a
-// variable declared through a typedef the type the typedef names: `B y` under
-// `typedef logic [7:0] B` is an eight-bit vector, `T x` under
-// `typedef logic [1:0][3:0] T` a packed array, and `W w` under `typedef int W`
-// an integer atom. None of them is a scalar, so their selects elaborate. The
-// name was not followed to the type it stands for, and every one of them was
-// reported as a select of a scalar.
 TEST(SelectElaboration, SelectsOfTypedefDeclaredVectorsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -276,8 +201,6 @@ TEST(SelectElaboration, SelectsOfTypedefDeclaredVectorsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A typedef of a scalar type stands for a scalar, so a select of a variable
-// declared through it is still the illegal case.
 TEST(SelectElaboration, SelectOfATypedefDeclaredScalarIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -293,9 +216,6 @@ TEST(SelectElaboration, SelectOfATypedefDeclaredScalarIsIllegal) {
                             5, "11.5.1"));
 }
 
-// The declaration's range and the select's bounds may be written with
-// parameters, which fold as the literals they stand for, so a reversed
-// part-select is reported whichever of them is a parameter.
 TEST(PartSelectBoundsElaboration, ReversedPartSelectWithParametersReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -316,8 +236,6 @@ TEST(PartSelectBoundsElaboration, ReversedPartSelectWithParametersReported) {
   }
 }
 
-// A bound naming a variable a procedure declares -- a loop's or a block's -- or
-// a subroutine's formal is no constant expression.
 TEST(PartSelectBoundsElaboration, BoundNamingAProceduresVariableReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -341,10 +259,6 @@ TEST(PartSelectBoundsElaboration, BoundNamingAProceduresVariableReported) {
   }
 }
 
-// A.8.4 counts an enum_identifier and a constant_let_expression among a
-// constant expression's primaries, so a member of an enumeration a block
-// declares, and a block's let whose body is constant, bound a part-select
-// without a report; the block's variable `k` is still reported.
 TEST(PartSelectBoundsElaboration, BoundNamingABlocksConstantIsNotReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -372,10 +286,6 @@ TEST(PartSelectBoundsElaboration, BoundNamingABlocksConstantIsNotReported) {
                             9, "11.5.1"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a select of
-// a scalar and an indexed part-select of zero width are barred inside one. A
-// width the block's genvar or localparam gives is folded in the block
-// instance, and a name the block declares hides the module's.
 TEST(SelectElaboration, SelectsInsideGenerateBlocksAreChecked) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "logic s; wire y;", "assign y = s[0];"},

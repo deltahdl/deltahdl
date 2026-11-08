@@ -103,8 +103,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      CuScopeFunctionResolvesFromSiblingModuleInstances) {
   SimFixture f;
-  // The single compilation-unit function serves every bare reference; two
-  // independent instances each resolve and execute it.
   auto* design = ElaborateSrc(
       "function int cu_double(int a);\n"
       "  return a * 2;\n"
@@ -131,8 +129,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      CuScopeFunctionResolvesBareCallInsideAnotherCuFunction) {
   SimFixture f;
-  // The compilation-unit lookup also applies to a bare reference made from
-  // within a compilation-unit subroutine body, not only from module bodies.
   auto* v = RunAndFindVar(
       "function int cu_inner(int a);\n"
       "  return a + 1;\n"
@@ -152,9 +148,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      ForwardDefinedCompilationUnitFunctionResolvesAndExecutes) {
   SimFixture f;
-  // §23.8.1's compilation-unit lookup resolves a bare call to a function even
-  // when that function is defined textually after the calling module. The
-  // resolution is order-independent, so the call runs and yields the sum.
   auto* v = RunAndFindVar(
       "module m;\n"
       "  integer x;\n"
@@ -171,10 +164,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      ForwardDefinedCompilationUnitTaskResolvesAndExecutes) {
   SimFixture f;
-  // The compilation-unit lookup is order-independent for tasks as well as
-  // functions: a bare task call in the calling module resolves to a task whose
-  // definition appears later in the compilation unit, and the task runs and
-  // writes its output argument.
   auto* v = RunAndFindVar(
       "module m;\n"
       "  int x;\n"
@@ -191,10 +180,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
 TEST(TaskAndFunctionNameResolutionSimulation,
      CompilationUnitFunctionBodyCallsForwardDefinedCompilationUnitFunction) {
   SimFixture f;
-  // Mirrors LRM Example 1: a compilation-unit subroutine (caller) makes a bare
-  // reference to another compilation-unit function (f) that is defined later.
-  // The unit lookup resolves the forward reference from inside the subroutine
-  // body, so calling caller from a module returns f(10) + 100 == 111.
   auto* v = RunAndFindVar(
       "function int caller(int a);\n"
       "  return f(a) + 100;\n"
@@ -211,11 +196,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
   EXPECT_EQ(v->value.ToUint64(), 111u);
 }
 
-// §23.8.1 (printed pages 760-761): a subroutine name is looked up in the whole
-// compilation unit of the reference before the search steps up, so Example 1's
-// `x = f(1)` in the unit's task t is the unit's function f, and Example 2's
-// `f()` in generate block b is b's own f. With both examples in one design, t
-// enabled from inside b called b's void f and read 0.
 TEST(TaskAndFunctionNameResolutionSimulation,
      UnitTaskCallFromGenerateBlockReachesTheUnitFunction) {
   SimFixture f;
@@ -245,9 +225,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
             "top.b.f\n2\n");
 }
 
-// The same lookup from a top module that declares an f of its own: the
-// module's call reaches its f and the unit task's the unit's, rather than both
-// the one registered last under the bare name.
 TEST(TaskAndFunctionNameResolutionSimulation,
      UnitTaskCallReachesTheUnitFunctionAheadOfTheCallersOwn) {
   SimFixture f;
@@ -270,8 +247,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
             "101\n2\n");
 }
 
-// §23.8 with §23.9: a bare name the top calls is found in the top first, so
-// its own task runs, not the instance's of the same name below it.
 TEST(TaskAndFunctionNameResolutionSimulation,
      TopsBareCallRunsItsOwnTaskAheadOfAnInstancesOfTheSameName) {
   SimFixture f;
@@ -287,9 +262,6 @@ TEST(TaskAndFunctionNameResolutionSimulation,
             "top.t\n");
 }
 
-// §23.9 with §3.12.1: a bare name the top declares nothing by is looked for in
-// the compilation unit next, so the unit's function runs, not the one an
-// instance below the top declares.
 TEST(TaskAndFunctionNameResolutionSimulation,
      TopsBareCallRunsTheUnitsFunctionAheadOfAnInstancesOfTheSameName) {
   SimFixture f;

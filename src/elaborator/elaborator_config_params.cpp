@@ -1,6 +1,3 @@
-// §33.4.3's parameter overrides, applied to an instance as a configuration's
-// instance or cell clause writes them.
-
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -24,8 +21,6 @@ namespace delta {
 
 namespace {
 
-// Removes any existing override for `pname` from `child_params`, preserving the
-// relative order of the remaining entries.
 void DropParamOverride(Elaborator::ParamList& child_params,
                        std::string_view pname) {
   Elaborator::ParamList kept;
@@ -36,19 +31,6 @@ void DropParamOverride(Elaborator::ParamList& child_params,
   child_params.swap(kept);
 }
 
-// "#()" returns every parameter to its module default: discard the
-// instantiation's overrides and let the configuration own each one (§33.4.3).
-//
-// §33.4.3 (printed page 940) has the configuration's parameter override take
-// precedence over a defparam on the same parameter, and the parameters the
-// use clause returns to their defaults are every one the instance's
-// assignment could name (OverridableParamNames) -- a `parameter` among the
-// items of a module declared with no parameter port list among them
-// (§6.20.1, printed 125-126), which the cleared assignment list leaves to
-// its own value. The parameter port list's alone were locked before, so
-// `defparam top.u.P = 9` in top after `instance top.u use #()` on `module c;
-// parameter P = 2;` made P 9. A defparam on a type parameter is refused
-// before the lock is read (§6.20.3), so locking one changes nothing.
 void ResetAllConfigParams(const ModuleDecl* child_decl,
                           Elaborator::ParamList& child_params,
                           std::vector<std::string_view>& locked) {
@@ -67,9 +49,6 @@ void ResetAllConfigParams(const ModuleDecl* child_decl,
   locked.insert(locked.end(), kOwned.begin(), kOwned.end());
 }
 
-// Builds the scope used to evaluate configuration parameter-override
-// expressions: the instance's parent scope augmented with the configuration's
-// own localparams (§33.4.3).
 ScopeMap BuildConfigOverrideScope(const ScopeMap& parent_scope,
                                   const ScopeMap& config_localparam_scope) {
   ScopeMap scope = parent_scope;
@@ -79,8 +58,6 @@ ScopeMap BuildConfigOverrideScope(const ScopeMap& parent_scope,
   return scope;
 }
 
-// The dotted names a member-access chain is written with, outermost first, or
-// nothing where the chain is not a pure one.
 std::vector<std::string_view> MemberAccessNames(const Expr* e) {
   std::vector<std::string_view> names;
   while (e != nullptr && e->kind == ExprKind::kMemberAccess) {
@@ -93,10 +70,6 @@ std::vector<std::string_view> MemberAccessNames(const Expr* e) {
   return names;
 }
 
-// The parameter values of the instance `scope_path` names, read upward from
-// the configured instance's parent at `parent_path` as a bind statement's
-// names are (§33.4.3): the parent itself, or an instance above it whose path
-// is `scope_path` or ends in it. Null where none is.
 const ScopeMap* AncestorScopeNamed(
     std::string_view scope_path, std::string_view parent_path,
     const ScopeMap& parent_scope,
@@ -117,15 +90,6 @@ const ScopeMap* AncestorScopeNamed(
   return nullptr;
 }
 
-// §33.4.3 (printed page 940): parameter identifiers resolve starting in the
-// instance's parent scope and upward from it, so a hierarchical reference in a
-// configuration's override that names the configured instance's parent,
-// `top.WIDTH` for `instance top.a1`, or an instance above it, `top.WIDTH` for
-// `instance top.a1.b`, is that instance's parameter. It is folded here, where
-// those values are known: a scalar parameter becomes its value and a
-// parameter array its name in the parent's scope, which an index -- a literal
-// or a config localparam -- then selects in. A reference naming any other scope
-// is left as it was written.
 Expr* ResolveParentReference(
     Expr* e, std::string_view parent_path, const ScopeMap& parent_scope,
     const std::unordered_map<std::string, ScopeMap>& ancestors, Arena& arena) {
@@ -164,16 +128,6 @@ Expr* ResolveParentReference(
   return ident;
 }
 
-// Applies one configuration override's explicit per-parameter values onto
-// child_params, recording each touched parameter in `locked`. A present
-// expression sets a new value, a null one ("(.p())") leaves the parameter at
-// its module default; either way the configuration now owns the parameter
-// (§33.4.3). A value is taken as an instantiation's assignment of the same
-// parameter is (PushInstParamAssignment), so a real, an array, a structure or
-// a type reaches the instance as it would there; a type parameter of the
-// parameter port list is given its type by ApplyChildTypeParams instead.
-// Returns the parameters whose value gave nothing, which §33.4.3's constant
-// value leaves no way to apply.
 std::vector<std::string_view> ApplyConfigOverrideParams(
     const ModuleDecl* child_decl,
     const std::vector<std::pair<std::string_view, Expr*>>& override_params,
@@ -193,8 +147,6 @@ std::vector<std::string_view> ApplyConfigOverrideParams(
   return unresolved;
 }
 
-// §33.4.3: reports each override in `unapplied`, written at `loc`, whose value
-// gave no constant to apply to its parameter of `child_decl`.
 void ReportUnappliedOverrides(const std::vector<std::string_view>& unapplied,
                               const ModuleDecl* child_decl, SourceLoc loc,
                               DiagEngine& diag) {
@@ -218,8 +170,6 @@ void Elaborator::ApplyConfigParamOverrides(
     return;
   }
 
-  // Parameter identifiers resolve in the instance's parent scope, augmented
-  // with the configuration's own localparams (§33.4.3).
   ScopeMap scope =
       BuildConfigOverrideScope(parent_scope, config_localparam_scope_);
   std::string_view parent_path = config_inst_path_;
@@ -242,9 +192,6 @@ void Elaborator::ApplyConfigParamOverrides(
             child_params, scope, locked),
         child_decl, ov.loc, diag_);
   };
-  // §33.4.1.4: a cell clause's overrides reach every instance of the cell; an
-  // instance clause, the more specific selection (§33.4.1.6), is applied after
-  // it and so decides a parameter both name.
   for (const auto& ov : cell_param_overrides_) {
     if (ov.inst_path == item->inst_module) apply(ov);
   }

@@ -14,28 +14,10 @@
 
 using namespace delta;
 
-// §F.3.4.6 unfolds the two free checker variable assignments into assume
-// property statements: rand t u = e is initial assume property (@1 u === e),
-// and always_ff @c u <= e is always_ff assume property (@1 $future_gclk(u)
-// === (c ? e : u)), each evaluated under the enabling condition b of the
-// conditional statements the assignment is in the scope of. The Boolean each
-// compares is outside the §F.3.2 Boolean model, so the caller supplies it and
-// the cases stand it in by an atom. The cases check that each factory builds
-// the statement its identity names -- the role, the activation, the @1 clock
-// form and the weak reading of the bare Boolean -- that the caller's Boolean
-// is asked about the name and the clock given, that the enabling condition
-// given is the one the assumption is paired with, and that, under §F.5.3.1,
-// the rand form constrains the first letter alone where the always_ff form
-// constrains every letter, and an enabling condition absent at an activation
-// lets that letter go.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
-// The Boolean u === e stands in as the atom eq_<u>, and the Boolean
-// $future_gclk(u) === (c ? e : u) as the atom next_<u>_<c>, so a letter says
-// whether the comparison holds.
 std::shared_ptr<const BooleanExpr> Equality(const std::string& u) {
   return BoolAtom("eq_" + u);
 }
@@ -44,8 +26,6 @@ std::shared_ptr<const BooleanExpr> NextValue(
   return BoolAtom("next_" + u + "_" + c->atom);
 }
 
-// The two assignments as written in the scope of no conditional statement,
-// whose enabling condition is then the constant 1.
 EnabledAssertion Rand() {
   return FreeCheckerRandAssignment("u", Equality, BoolTrue());
 }
@@ -54,8 +34,6 @@ EnabledAssertion AlwaysFf() {
                                        BoolTrue());
 }
 
-// The body both statements share: @(1) weak(b) as a clocked top-level
-// property, which is what the unfolding wraps the caller's Boolean in.
 void ExpectBodyIsWeakAtGlobalClock(const AssertionStatement& statement,
                                    const std::string& atom) {
   ASSERT_EQ(statement.form, AssertionStatement::Form::kClockedTop);
@@ -73,8 +51,6 @@ void ExpectBodyIsWeakAtGlobalClock(const AssertionStatement& statement,
       *ClkClock(BoolTrue(), ClkStrong(SeqBoolean(BoolAtom(atom))))));
 }
 
-// rand t u = e is an initial assume property statement whose body is @1 over
-// the weak reading of u === e.
 TEST(DerivedFreeCheckerAssignments, RandAssignmentIsAnInitialAssume) {
   const AssertionStatement kStatement = Rand().statement;
   EXPECT_EQ(kStatement.activation, AssertionStatement::Activation::kInitial);
@@ -82,8 +58,6 @@ TEST(DerivedFreeCheckerAssignments, RandAssignmentIsAnInitialAssume) {
   ExpectBodyIsWeakAtGlobalClock(kStatement, "eq_u");
 }
 
-// always_ff @c u <= e is an always assume property statement whose body is
-// @1 over the weak reading of $future_gclk(u) === (c ? e : u).
 TEST(DerivedFreeCheckerAssignments, AlwaysFfAssignmentIsAnAlwaysAssume) {
   const AssertionStatement kStatement = AlwaysFf().statement;
   EXPECT_EQ(kStatement.activation, AssertionStatement::Activation::kAlways);
@@ -91,10 +65,6 @@ TEST(DerivedFreeCheckerAssignments, AlwaysFfAssignmentIsAnAlwaysAssume) {
   ExpectBodyIsWeakAtGlobalClock(kStatement, "next_u_c");
 }
 
-// The enabling condition given is the one the assumption is paired with: the
-// constant 1 for an assignment in the scope of no conditional statement, and
-// the resulting condition b of the conditional statements it is in the scope
-// of otherwise, for either form.
 TEST(DerivedFreeCheckerAssignments, TheEnablingConditionIsTheOneGiven) {
   auto one = BoolTrue();
   auto b = BoolAtom("b");
@@ -108,8 +78,6 @@ TEST(DerivedFreeCheckerAssignments, TheEnablingConditionIsTheOneGiven) {
       b);
 }
 
-// The caller's Boolean is asked about the name given, and for the always_ff
-// form about the clock given as well, once per statement.
 TEST(DerivedFreeCheckerAssignments, TheBooleanIsAskedAboutTheNameAndClock) {
   std::vector<std::string> names;
   std::vector<std::shared_ptr<const BooleanExpr>> clocks;
@@ -137,10 +105,6 @@ TEST(DerivedFreeCheckerAssignments, TheBooleanIsAskedAboutTheNameAndClock) {
   EXPECT_EQ(clocks[0], c);
 }
 
-// Under §F.5.3.1, the rand form is judged at the first letter alone, since
-// the global clock ticks on every letter and the initial form fires at the
-// first tick: it holds where eq_u is on the first letter whatever follows,
-// and fails where the first letter lacks it though a later one has it.
 TEST(DerivedFreeCheckerAssignments, TheRandFormConstrainsTheFirstLetter) {
   const AssertionStatement kStatement = Rand().statement;
   EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{A({"eq_u"}), A({"x"})},
@@ -153,9 +117,6 @@ TEST(DerivedFreeCheckerAssignments, TheRandFormConstrainsTheFirstLetter) {
       NeutrallySatisfiesAssertion(Word{A({"x"})}, *BoolTrue(), kStatement));
 }
 
-// Under §F.5.3.1, the always_ff form is judged at every letter: it holds
-// where next_u_c is on each letter and fails where any letter lacks it, so a
-// word the rand form of the same atom accepts is one it rejects.
 TEST(DerivedFreeCheckerAssignments, TheAlwaysFfFormConstrainsEveryLetter) {
   const AssertionStatement kStatement = AlwaysFf().statement;
   EXPECT_TRUE(NeutrallySatisfiesAssertion(
@@ -174,12 +135,6 @@ TEST(DerivedFreeCheckerAssignments, TheAlwaysFfFormConstrainsEveryLetter) {
                                           *BoolTrue(), kRandOfSameAtom));
 }
 
-// Under §F.5.3.1, the enabling condition gates each activation: with the
-// assignment in the scope of a conditional whose resulting condition is b,
-// the always_ff form lets a letter without the comparison go where b is
-// absent there and still rejects it where b is present, which the constant 1
-// would reject either way, and the rand form lets a first letter without the
-// equality go where b is absent there and rejects it where b is present.
 TEST(DerivedFreeCheckerAssignments, TheEnablingConditionGatesEachActivation) {
   const EnabledAssertion kAlwaysFf = FreeCheckerAlwaysFfAssignment(
       "u", BoolAtom("c"), NextValue, BoolAtom("b"));
@@ -199,10 +154,6 @@ TEST(DerivedFreeCheckerAssignments, TheEnablingConditionGatesEachActivation) {
                                            kRand.statement));
 }
 
-// Both statements are assumptions, so under §F.5.3.1 a word is feasible
-// under them iff each is satisfied on it: with both in force, a word with
-// eq_u on the first letter and next_u_c on every letter is feasible, one
-// lacking eq_u is not, and one lacking next_u_c on its second letter is not.
 TEST(DerivedFreeCheckerAssignments, TheStatementsAreAssumptions) {
   std::vector<EnabledAssertion> assumptions{Rand(), AlwaysFf()};
   EXPECT_TRUE(WordIsFeasible(Word{A({"eq_u", "next_u_c"}), A({"next_u_c"})},

@@ -15,24 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.47 Continuous assignment: the object model diagram draws a "cont assign"
-// object (reached from its module, carrying vpiLhs/vpiRhs/vpiDelay expression
-// edges and the vpiNetDeclAssign, vpiStrength0/vpiStrength1, delay and value
-// properties) and a "cont assign bit" object reached through vpiBit, which
-// reports its offset from the LSB through vpiOffset. Three numbered Details add
-// the normative rules these tests pin down:
-//   1) the size of a cont assign bit is always scalar;
-//   2) value change callbacks may be placed onto a cont assign or a cont assign
-//      bit;
-//   3) vpiOffset shall return zero for the LSB.
-// The structural edges and the delay/value reads are descriptive or belong to
-// dependency subclauses (vpi_get_delays() is §38.10, the value read §38.34, and
-// the value change callback machinery §38.36.1); these tests exercise the
-// properties §37.47's own text defines, through the production dispatch in
-// vpi.cpp.
-
-// The fixture installs a context so the public vpi_get entry point runs its
-// real dispatch and so callbacks register through the same context.
 class ContinuousAssignment : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -40,14 +22,10 @@ class ContinuousAssignment : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Detail 1: a cont assign bit is always scalar - vpi_get(vpiSize) reports one
-// even when the object was handed a wider stored size. A non-bit cont assign is
-// outside this rule and reports its own stored size, confirming the guard is
-// scoped to the bit object.
 TEST_F(ContinuousAssignment, ContAssignBitSizeIsAlwaysScalar) {
   VpiObject bit;
   bit.type = vpiContAssignBit;
-  bit.size = 8;  // a deliberately non-scalar stored width
+  bit.size = 8;
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&bit)), 1);
 
   VpiObject assign;
@@ -56,9 +34,6 @@ TEST_F(ContinuousAssignment, ContAssignBitSizeIsAlwaysScalar) {
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&assign)), 4);
 }
 
-// Detail 3: vpiOffset shall return zero for the LSB. The offset is measured
-// from the least significant bit, so the LSB bit reports zero and a bit three
-// positions above it reports three.
 TEST_F(ContinuousAssignment, LsbContAssignBitReportsZeroOffset) {
   VpiObject lsb;
   lsb.type = vpiContAssignBit;
@@ -71,9 +46,6 @@ TEST_F(ContinuousAssignment, LsbContAssignBitReportsZeroOffset) {
   EXPECT_EQ(vpi_get(vpiOffset, VpiHandleOf(&higher)), 3);
 }
 
-// Diagram property: a continuous assignment reports through vpiNetDeclAssign
-// whether it is a net declaration assignment. An assignment marked as such
-// reports TRUE; an ordinary assign statement reports FALSE.
 TEST_F(ContinuousAssignment, ReportsNetDeclAssign) {
   VpiObject net_decl;
   net_decl.type = vpiContAssign;
@@ -85,8 +57,6 @@ TEST_F(ContinuousAssignment, ReportsNetDeclAssign) {
   EXPECT_EQ(vpi_get(vpiNetDeclAssign, VpiHandleOf(&standalone)), 0);
 }
 
-// Diagram property: a continuous assignment reports the drive strengths it
-// carries on its 0 and 1 values through vpiStrength0 and vpiStrength1.
 TEST_F(ContinuousAssignment, ReportsDriveStrengths) {
   VpiObject assign;
   assign.type = vpiContAssign;
@@ -96,9 +66,6 @@ TEST_F(ContinuousAssignment, ReportsDriveStrengths) {
   EXPECT_EQ(vpi_get(vpiStrength1, VpiHandleOf(&assign)), vpiStrongDrive);
 }
 
-// Detail 2: a value change callback may be placed onto a cont assign or onto a
-// cont assign bit. Neither object kind is rejected by registration, so both
-// hand back a live callback handle.
 TEST_F(ContinuousAssignment, ValueChangeCallbackAllowedOnContAssignAndBit) {
   VpiObject assign;
   assign.type = vpiContAssign;
@@ -115,20 +82,6 @@ TEST_F(ContinuousAssignment, ValueChangeCallbackAllowedOnContAssignAndBit) {
   EXPECT_NE(ctx_.RegisterCb(&on_bit), nullptr);
 }
 
-// -----------------------------------------------------------------------------
-// The edges the enclosure carries. §37.47 draws `cont assign` and `cont assign
-// bit` inside one dotted outline with no name, and hangs vpiLhs, vpiRhs and
-// vpiDelay off that outline rather than off either object. §37.4.1 makes an
-// unnamed enclosure a grouping of the objects drawn in it, so both of them
-// carry all three edges. None of the three named a continuous assignment at
-// all: vpiLhs and vpiRhs were served for the procedural assignment family and
-// the alias statement only, and vpiDelay for the whole assignment but not its
-// bits, so the traversal fell through to a match of a child's own type against
-// a relation tag, which no object carries.
-// -----------------------------------------------------------------------------
-
-// §37.47 (figure, vpiLhs/vpiRhs): a continuous assignment reaches the net it
-// drives and the expression it drives it with.
 TEST_F(ContinuousAssignment, AContinuousAssignmentReachesItsTwoSides) {
   VpiObject target;
   target.type = kVpiNet;
@@ -144,8 +97,6 @@ TEST_F(ContinuousAssignment, AContinuousAssignmentReachesItsTwoSides) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&assign))), &source);
 }
 
-// §37.47 (figure): the two edges are drawn on the enclosure, so a cont assign
-// bit answers for them exactly as the whole assignment does.
 TEST_F(ContinuousAssignment, AContAssignBitReachesTheSameTwoSides) {
   VpiObject target;
   target.type = vpiNetBit;
@@ -161,8 +112,6 @@ TEST_F(ContinuousAssignment, AContAssignBitReachesTheSameTwoSides) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiRhs, VpiHandleOf(&bit))), &source);
 }
 
-// §37.47 (figure, vpiDelay): the delay edge is drawn on the same enclosure, so
-// a cont assign bit reaches the source-written delay its assignment does.
 TEST_F(ContinuousAssignment, AContAssignBitReachesItsSourceDelay) {
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiContAssign));
   EXPECT_TRUE(VpiObjectCarriesSourceDelay(vpiContAssignBit));
@@ -177,8 +126,6 @@ TEST_F(ContinuousAssignment, AContAssignBitReachesItsSourceDelay) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiDelay, VpiHandleOf(&bit))), &delay_expr);
 }
 
-// §37.47 (figure): an assignment written with no delay reaches none, and the
-// edges stay distinct - a target is not reported as a source.
 TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
   VpiObject target;
   target.type = kVpiNet;
@@ -192,33 +139,26 @@ TEST_F(ContinuousAssignment, TheEdgesStayDistinctAndReportNoneWhenAbsent) {
   EXPECT_EQ(vpi_handle(vpiDelay, VpiHandleOf(&assign)), nullptr);
 }
 
-// A design run with a PLI application registered, its continuous assignments
-// read back once the run is over.
-// How many times the value change callbacks $watchca places on top's
-// continuous assignment and on that assignment's bit 3 have been called back.
 int g_assign_changes = 0;
 int g_bit_changes = 0;
 vpiHandle g_assign_callback = nullptr;
 vpiHandle g_bit_callback = nullptr;
 
-PLI_INT32 CountAssignChange(p_cb_data /*data*/) {
+PLI_INT32 CountAssignChange(p_cb_data) {
   ++g_assign_changes;
   return 0;
 }
 
-PLI_INT32 CountBitChange(p_cb_data /*data*/) {
+PLI_INT32 CountBitChange(p_cb_data) {
   ++g_bit_changes;
   return 0;
 }
 
-// $unwatchbit: take the callback on the bit away, so a later change of the
-// assignment finds none placed on the bit.
-PLI_INT32 UnwatchBitCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 UnwatchBitCalltf(PLI_BYTE8*) {
   vpi_remove_cb(g_bit_callback);
   return 0;
 }
 
-// The first continuous assignment top reaches; null for none.
 vpiHandle FirstAssignOfTop() {
   vpiHandle it =
       vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
@@ -227,7 +167,6 @@ vpiHandle FirstAssignOfTop() {
   return assign;
 }
 
-// Places on `obj` a value change callback calling `routine`.
 vpiHandle PlaceValueChange(vpiHandle obj, PLI_INT32 (*routine)(p_cb_data)) {
   s_cb_data cb = {};
   cb.reason = cbValueChange;
@@ -236,9 +175,7 @@ vpiHandle PlaceValueChange(vpiHandle obj, PLI_INT32 (*routine)(p_cb_data)) {
   return vpi_register_cb(&cb);
 }
 
-// $watchca: place a value change callback on the first continuous assignment
-// top reaches and one on its bit at offset 3.
-PLI_INT32 WatchAssignCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 WatchAssignCalltf(PLI_BYTE8*) {
   vpiHandle assign = FirstAssignOfTop();
   if (assign == nullptr) return 0;
   g_assign_callback = PlaceValueChange(assign, &CountAssignChange);
@@ -250,9 +187,7 @@ PLI_INT32 WatchAssignCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-// $watchcatwice: place two value change callbacks on the first continuous
-// assignment top reaches, each counted with the assignment's.
-PLI_INT32 WatchAssignTwiceCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 WatchAssignTwiceCalltf(PLI_BYTE8*) {
   vpiHandle assign = FirstAssignOfTop();
   if (assign == nullptr) return 0;
   PlaceValueChange(assign, &CountAssignChange);
@@ -262,7 +197,6 @@ PLI_INT32 WatchAssignTwiceCalltf(PLI_BYTE8* /*user_data*/) {
 
 class ContinuousAssignmentsOfARun : public VpiDesignRun {
  protected:
-  // Registers the system task `name`, which runs `calltf`.
   static void RegisterTask(const char* name, PLI_INT32 (*calltf)(PLI_BYTE8*)) {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
@@ -271,7 +205,6 @@ class ContinuousAssignmentsOfARun : public VpiDesignRun {
     ASSERT_NE(vpi_register_systf(&data), nullptr);
   }
 
-  // How many objects of `type` `ref` reaches.
   static int CountOf(int type, vpiHandle ref) {
     int count = 0;
     vpiHandle it = vpi_iterate(type, ref);
@@ -280,7 +213,6 @@ class ContinuousAssignmentsOfARun : public VpiDesignRun {
     return count;
   }
 
-  // The continuous assignment of the top that is not a net declaration's.
   static vpiHandle AssignStatementOfTop() {
     vpiHandle it =
         vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr));
@@ -293,7 +225,6 @@ class ContinuousAssignmentsOfARun : public VpiDesignRun {
   }
 };
 
-// The value of `obj` read as an integer.
 int IntValueOf(vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -317,15 +248,12 @@ constexpr const char* kTwoAssignments =
     "  assign y = a & b;\n"
     "endmodule\n";
 
-// §37.47: a module reaches its continuous assignments, the one a net
-// declaration makes among them.
 TEST_F(ContinuousAssignmentsOfARun, AModuleReachesItsContinuousAssignments) {
   Run(kTwoAssignments);
   EXPECT_EQ(CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr)),
             2);
 }
 
-// vpiLhs is the net the assignment drives.
 TEST_F(ContinuousAssignmentsOfARun, ItsLeftHandSideIsTheNetItDrives) {
   Run(kTwoAssignments);
   vpiHandle ca = AssignStatementOfTop();
@@ -333,7 +261,6 @@ TEST_F(ContinuousAssignmentsOfARun, ItsLeftHandSideIsTheNetItDrives) {
   EXPECT_STREQ(vpi_get_str(vpiName, vpi_handle(vpiLhs, ca)), "y");
 }
 
-// vpiRhs is the expression it assigns, here an operation...
 TEST_F(ContinuousAssignmentsOfARun, ItsRightHandSideIsAnOperation) {
   Run(kTwoAssignments);
   vpiHandle ca = AssignStatementOfTop();
@@ -341,7 +268,6 @@ TEST_F(ContinuousAssignmentsOfARun, ItsRightHandSideIsAnOperation) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle(vpiRhs, ca)), vpiOperation);
 }
 
-// ...whose operator is the one the source wrote...
 TEST_F(ContinuousAssignmentsOfARun, TheOperationHasTheSourcesOperator) {
   Run(kTwoAssignments);
   vpiHandle ca = AssignStatementOfTop();
@@ -349,7 +275,6 @@ TEST_F(ContinuousAssignmentsOfARun, TheOperationHasTheSourcesOperator) {
   EXPECT_EQ(vpi_get(vpiOpType, vpi_handle(vpiRhs, ca)), vpiBitAndOp);
 }
 
-// ...and whose operands are the two nets it reads.
 TEST_F(ContinuousAssignmentsOfARun, TheOperationsOperandsAreTheNetsItReads) {
   Run(kTwoAssignments);
   vpiHandle ca = AssignStatementOfTop();
@@ -358,7 +283,6 @@ TEST_F(ContinuousAssignmentsOfARun, TheOperationsOperandsAreTheNetsItReads) {
             (std::vector<std::string>{"a", "b"}));
 }
 
-// The assignment a net declaration makes says so.
 TEST_F(ContinuousAssignmentsOfARun, ANetDeclarationsAssignmentIsMarked) {
   Run(kTwoAssignments);
   vpiHandle it =
@@ -369,35 +293,29 @@ TEST_F(ContinuousAssignmentsOfARun, ANetDeclarationsAssignmentIsMarked) {
   EXPECT_EQ(marked, 1);
 }
 
-// §37.46: the assignment is a driver of the net it drives...
 TEST_F(ContinuousAssignmentsOfARun, ItDrivesTheNetOnItsLeft) {
   Run(kTwoAssignments);
   EXPECT_EQ(CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.y"), nullptr)),
             1);
 }
 
-// ...and a load of every net it reads: a is read by both assignments.
 TEST_F(ContinuousAssignmentsOfARun, ItLoadsEachNetItReads) {
   Run(kTwoAssignments);
   EXPECT_EQ(CountOf(vpiLoad, vpi_handle_by_name(VpiText("top.a"), nullptr)), 2);
 }
 
-// One assignment to a concatenation is one object, though the elaborator
-// splits it into one assignment per element.
 TEST_F(ContinuousAssignmentsOfARun, AnAssignmentToAConcatenationIsOneObject) {
   Run("module top; wire [1:0] r; wire p, q; assign {p, q} = r; endmodule\n");
   EXPECT_EQ(CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top"), nullptr)),
             1);
 }
 
-// It drives every net of the concatenation.
 TEST_F(ContinuousAssignmentsOfARun, AnAssignmentToAConcatenationDrivesEach) {
   Run("module top; wire [1:0] r; wire p, q; assign {p, q} = r; endmodule\n");
   EXPECT_EQ(CountOf(vpiDriver, vpi_handle_by_name(VpiText("top.q"), nullptr)),
             1);
 }
 
-// An instance reaches the assignments its own definition wrote.
 TEST_F(ContinuousAssignmentsOfARun, AnInstanceReachesItsOwnAssignments) {
   Run("module sub(input c, output d); assign d = ~c; endmodule\n"
       "module top; wire x, z; sub u(.c(x), .d(z)); endmodule\n");
@@ -405,13 +323,6 @@ TEST_F(ContinuousAssignmentsOfARun, AnInstanceReachesItsOwnAssignments) {
       CountOf(vpiContAssign, vpi_handle_by_name(VpiText("top.u"), nullptr)), 1);
 }
 
-// §27.4 with §37.47 and §37.46: a loop generate block makes an instance of
-// itself per iteration, each holding its own instance of the continuous
-// assignment the block writes, so a two-iteration loop makes two, one in each
-// block instance's gen scope (§37.85) and none in the module's, each the
-// driver of its own block instance's net. They were one, made for the first
-// block instance alone, every instance's assignment coming from the one
-// statement a split concatenation's elements do.
 TEST_F(ContinuousAssignmentsOfARun,
        EachGenerateBlockInstanceHoldsItsAssignment) {
   Run("module top; wire [1:0] a;\n"
@@ -430,14 +341,6 @@ TEST_F(ContinuousAssignmentsOfARun,
       1);
 }
 
-// §37.47: a continuous assignment's value is that of its right-hand side,
-// read as the run now holds it (#7173). Detail 1 and 3: a vector assignment
-// has a cont assign bit per bit, each a scalar reaching the assignment as its
-// parent, reporting its offset from the least significant bit and holding that
-// bit of the assignment's value (#7172). Detail 2: a value change callback
-// placed on the assignment is called back as its value changes, and not for a
-// write that leaves it as it was, and one placed on a bit as that bit changes
-// (#7174).
 TEST_F(ContinuousAssignmentsOfARun, AVectorAssignmentHasAValueAndBits) {
   g_assign_changes = 0;
   g_bit_changes = 0;
@@ -463,11 +366,6 @@ TEST_F(ContinuousAssignmentsOfARun, AVectorAssignmentHasAValueAndBits) {
   EXPECT_EQ(g_bit_changes, 1);
 }
 
-// §37.47 with §11.6.1 and §10.7: the value a continuous assignment drives is
-// its right-hand side evaluated at the width of its left side, so a sum keeps
-// the carry an eight-bit target widens it to and loses the bit a three-bit
-// target truncates, and the bits above the operands' own width read it
-// (#7359).
 TEST_F(ContinuousAssignmentsOfARun, AnAssignmentsValueHasItsLeftSidesWidth) {
   Run("module top; logic [3:0] a = 4'hF, b = 4'h1, c = 4'hE;\n"
       "  wire [7:0] y; wire [2:0] z;\n"
@@ -491,7 +389,6 @@ TEST_F(ContinuousAssignmentsOfARun, AnAssignmentsValueHasItsLeftSidesWidth) {
   ASSERT_NE(z, nullptr);
   EXPECT_EQ(IntValueOf(y), 16);
   EXPECT_EQ(IntValueOf(z), 7);
-  // The bits of y's assignment at offsets 4 to 7, read as a number.
   int high = 0;
   vpiHandle bit_it = vpi_iterate(vpiBit, y);
   ASSERT_NE(bit_it, nullptr);
@@ -502,10 +399,6 @@ TEST_F(ContinuousAssignmentsOfARun, AnAssignmentsValueHasItsLeftSidesWidth) {
   EXPECT_EQ(high, 1);
 }
 
-// §37.47 detail 2 with §38.36.1: a second value change callback placed on an
-// assignment already watched is called back along with the first as the
-// assignment's value changes, each once per change, and neither for a write
-// that leaves the value as it was.
 TEST_F(ContinuousAssignmentsOfARun, TwoCallbacksOnOneAssignmentEachCalledOnce) {
   g_assign_changes = 0;
   RegisterTask("$watchcatwice", &WatchAssignTwiceCalltf);
@@ -519,9 +412,6 @@ TEST_F(ContinuousAssignmentsOfARun, TwoCallbacksOnOneAssignmentEachCalledOnce) {
   EXPECT_EQ(g_assign_changes, 2);
 }
 
-// §37.47 detail 2: an assignment of an enumeration's constant reads no net or
-// variable, so its value is the constant's throughout, and a value change
-// callback placed on it is never called back while another variable changes.
 TEST_F(ContinuousAssignmentsOfARun, AnAssignmentOfAConstantIsNeverCalledBack) {
   g_assign_changes = 0;
   RegisterTask("$watchca", &WatchAssignCalltf);
@@ -536,11 +426,6 @@ TEST_F(ContinuousAssignmentsOfARun, AnAssignmentOfAConstantIsNeverCalledBack) {
   EXPECT_EQ(g_assign_changes, 0);
 }
 
-// §37.47 detail 2: a value change callback placed on an assignment of an
-// equivalence, an operator Annex M gives no operation type, so that the right
-// side is no expression object, is called back as the assignment's value
-// changes, which it does as either operand does, and not for a write that
-// leaves it as it was; its value is the equivalence's, true for equal bits.
 TEST_F(ContinuousAssignmentsOfARun,
        AnEquivalencesAssignmentIsCalledBackAsItChanges) {
   g_assign_changes = 0;
@@ -560,9 +445,6 @@ TEST_F(ContinuousAssignmentsOfARun,
   EXPECT_EQ(IntValueOf(assign), 1);
 }
 
-// §37.47 detail 2 with §8.9: an assignment reading a static class property,
-// which is its class's own storage and no variable, is called back as the
-// property changes, and not for a write that leaves it as it was.
 TEST_F(ContinuousAssignmentsOfARun,
        AStaticPropertysAssignmentIsCalledBackAsItChanges) {
   g_assign_changes = 0;

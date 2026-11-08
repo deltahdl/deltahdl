@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// R1: `/* tool state_vector signal_name */` names the vector signal that holds
-// the current state; `tool` and `state_vector` are the required keywords.
 TEST(FsmStatePragmaLexing, RecognizesCurrentStatePragma) {
   auto pragmas = CollectFsmPragmas("/* tool state_vector cur_state */");
   ASSERT_EQ(pragmas.size(), 1u);
@@ -23,8 +21,6 @@ TEST(FsmStatePragmaLexing, RecognizesCurrentStatePragma) {
   EXPECT_FALSE(pragmas[0].has_enum);
 }
 
-// R2: the same pragma may carry the enumeration name; `enum` is the required
-// keyword that binds the signal to the FSM.
 TEST(FsmStatePragmaLexing, RecognizesCombinedEnumPragma) {
   auto pragmas =
       CollectFsmPragmas("/* tool state_vector cur_state enum state_e */");
@@ -35,22 +31,15 @@ TEST(FsmStatePragmaLexing, RecognizesCombinedEnumPragma) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-// The leading `tool` keyword is required: an ordinary comment is not an FSM
-// pragma and is discarded like any other comment.
 TEST(FsmStatePragmaLexing, RequiresToolKeyword) {
   EXPECT_TRUE(CollectFsmPragmas("/* state_vector cur_state */").empty());
   EXPECT_TRUE(CollectFsmPragmas("/* just an ordinary comment */").empty());
 }
 
-// `state_vector` is a required keyword of the current-state form; substituting
-// any other word leaves the comment unrecognized.
 TEST(FsmStatePragmaLexing, RequiresStateVectorKeyword) {
   EXPECT_TRUE(CollectFsmPragmas("/* tool vector cur_state */").empty());
 }
 
-// `enum` is the required keyword that binds an enumeration name. Naming the
-// enumeration without the keyword is not a valid binding and is not recognized;
-// with the keyword the binding is captured.
 TEST(FsmStatePragmaLexing, EnumKeywordRequiredToBindName) {
   EXPECT_TRUE(
       CollectFsmPragmas("/* tool state_vector cur_state state_e */").empty());
@@ -60,9 +49,6 @@ TEST(FsmStatePragmaLexing, EnumKeywordRequiredToBindName) {
   EXPECT_TRUE(bound[0].has_enum);
 }
 
-// The pragma is written inside the module definition where the signal is
-// declared, and is recognized there while the surrounding source still lexes
-// into its ordinary token stream.
 TEST(FsmStatePragmaLexing, PragmaWithinModuleBody) {
   const std::string kSrc =
       "module fsm;\n"
@@ -75,9 +61,6 @@ TEST(FsmStatePragmaLexing, PragmaWithinModuleBody) {
   EXPECT_EQ(pragmas[0].enum_name, "state_e");
 }
 
-// The separate enum pragma sits immediately after the bit range of the signal
-// declaration; being a comment it is invisible to the token stream yet is still
-// recorded as an FSM pragma.
 TEST(FsmStatePragmaLexing, SeparatePragmaInDeclarationIsInvisibleToTokens) {
   const std::string kSrc = "logic [7:0] /* tool enum state_e */ cur_state;";
 
@@ -87,7 +70,6 @@ TEST(FsmStatePragmaLexing, SeparatePragmaInDeclarationIsInvisibleToTokens) {
   Lexer lexer(mgr.FileContent(fid), fid, diag);
   auto tokens = lexer.LexAll();
 
-  // The pragma comment leaks no tokens between the bit range and the name.
   ASSERT_GE(tokens.size(), 7u);
   EXPECT_EQ(tokens[0].kind, TokenKind::kKwLogic);
   EXPECT_EQ(tokens[1].kind, TokenKind::kLBracket);
@@ -101,10 +83,6 @@ TEST(FsmStatePragmaLexing, SeparatePragmaInDeclarationIsInvisibleToTokens) {
   EXPECT_EQ(lexer.FsmStatePragmas()[0].enum_name, "state_e");
 }
 
-// The enumeration name may be supplied by a separate pragma instead of the
-// combined form: a `state_vector` pragma names the signal and a distinct `enum`
-// pragma in the declaration binds the enumeration. Both are recognized and the
-// lexer keeps each as its own FSM pragma.
 TEST(FsmStatePragmaLexing, SeparateEnumPragmaPairsWithStateVectorPragma) {
   const std::string kSrc =
       "module fsm;\n"
@@ -123,18 +101,12 @@ TEST(FsmStatePragmaLexing, SeparateEnumPragmaPairsWithStateVectorPragma) {
   EXPECT_EQ(pragmas[1].enum_name, "state_e");
 }
 
-// A pragma that carries only the `tool` keyword, or names a keyword without its
-// required operand (the signal for `state_vector`, the name for `enum`), is
-// incomplete and is not recognized as an FSM pragma.
 TEST(FsmStatePragmaLexing, IncompletePragmasAreNotRecognized) {
   EXPECT_TRUE(CollectFsmPragmas("/* tool */").empty());
   EXPECT_TRUE(CollectFsmPragmas("/* tool state_vector */").empty());
   EXPECT_TRUE(CollectFsmPragmas("/* tool enum */").empty());
 }
 
-// The bracketed part-select and braced concatenation current-state forms belong
-// to descendant subclauses (§40.4.2 / §40.4.3); the §40.4.1 recognizer names
-// only a simple signal and leaves those forms alone.
 TEST(FsmStatePragmaLexing, IgnoresPartSelectAndConcatenationForms) {
   EXPECT_TRUE(
       CollectFsmPragmas("/* tool state_vector cur_state[1:0] fsm enum e */")
@@ -143,12 +115,6 @@ TEST(FsmStatePragmaLexing, IgnoresPartSelectAndConcatenationForms) {
       CollectFsmPragmas("/* tool state_vector {hi, lo} fsm enum e */").empty());
 }
 
-// The signal a pragma identifies and the enumeration it binds are identifiers
-// of the surrounding source, so the names a pragma can carry are the names a
-// declaration can give: §5.6 makes a simple identifier any sequence of letters,
-// digits, dollar signs and underscores. A signal declared with a dollar sign in
-// its name is identified as the vector holding the current state like any
-// other.
 TEST(FsmStatePragmaLexing, NamesMayCarryDollarSignsAsIdentifiersDo) {
   auto pragmas = CollectFsmPragmas("/* tool state_vector n$657 enum e$num */");
   ASSERT_EQ(pragmas.size(), 1u);
@@ -158,10 +124,6 @@ TEST(FsmStatePragmaLexing, NamesMayCarryDollarSignsAsIdentifiersDo) {
   EXPECT_EQ(pragmas[0].enum_name, "e$num");
 }
 
-// §5.6: the first character of a simple identifier shall not be a digit or a
-// dollar sign. A word opening with one names nothing the source could have
-// declared, so the comment identifies no signal and is not an FSM pragma -
-// whichever of the two names it stands in.
 TEST(FsmStatePragmaLexing, NamesMayNotOpenWithADigitOrDollarSign) {
   EXPECT_TRUE(CollectFsmPragmas("/* tool state_vector $state */").empty());
   EXPECT_TRUE(CollectFsmPragmas("/* tool state_vector 1state */").empty());
@@ -169,10 +131,6 @@ TEST(FsmStatePragmaLexing, NamesMayNotOpenWithADigitOrDollarSign) {
       CollectFsmPragmas("/* tool state_vector cur_state enum $e */").empty());
 }
 
-// §40.4.1's pragma opens with the tool keyword and names what follows it. A
-// comment holding the keyword alone names nothing, and one whose words after
-// the signal are not `enum` and an enumeration name is not the form either:
-// neither is recorded.
 TEST(FsmStatePragmaLexing,
      KeywordAloneOrTrailingWordsOtherThanEnumAreNotAPragma) {
   EXPECT_TRUE(CollectFsmPragmas("/* tool */").empty());
@@ -181,9 +139,6 @@ TEST(FsmStatePragmaLexing,
           .empty());
 }
 
-// The names a pragma carries are §5.6 simple identifiers, which may begin with
-// an underscore and hold a dollar sign anywhere but first, and may not begin
-// with a digit: an enumeration named `9e` makes the comment no pragma.
 TEST(FsmStatePragmaLexing, NamesAreSimpleIdentifiers) {
   auto pragmas = CollectFsmPragmas("/* tool state_vector _cur$state */");
   ASSERT_EQ(pragmas.size(), 1u);
@@ -191,7 +146,6 @@ TEST(FsmStatePragmaLexing, NamesAreSimpleIdentifiers) {
   EXPECT_TRUE(CollectFsmPragmas("/* tool enum 9e */").empty());
 }
 
-// Two pragmas on one line are two comments, and each is recorded.
 TEST(FsmStatePragmaLexing, TwoPragmasOnOneLineAreBothRecorded) {
   auto pragmas =
       CollectFsmPragmas("/* tool enum first_e */ /* tool enum second_e */");
@@ -200,10 +154,6 @@ TEST(FsmStatePragmaLexing, TwoPragmasOnOneLineAreBothRecorded) {
   EXPECT_EQ(pragmas[1].enum_name, "second_e");
 }
 
-// The parser rewinds the lexer through SavePos and RestorePos to look ahead,
-// which hands the lexer a comment it has already read. Each comment is one
-// pragma however often it is read: here every form of §40.4.1 through §40.4.3,
-// and the §40.4.3 prohibition report, is read twice and recorded once.
 TEST(FsmStatePragmaLexing, CommentReadAgainAfterARewindIsRecordedOnce) {
   SourceManager mgr;
   DiagEngine diag(mgr);

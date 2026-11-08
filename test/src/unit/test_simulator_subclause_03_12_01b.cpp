@@ -25,8 +25,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborates `srcs` together, each a compilation unit of its own (§3.12.1,
-// printed page 56), and lowers the design. Null where elaboration failed.
 RtlirDesign* LowerUnits(const std::vector<std::string>& srcs, SimFixture& f) {
   Elaborator elab(f.arena, f.diag,
                   ParseUnitsApart(srcs, f.mgr, f.arena, f.diag));
@@ -39,16 +37,12 @@ RtlirDesign* LowerUnits(const std::vector<std::string>& srcs, SimFixture& f) {
   return design;
 }
 
-// The value the run left in the variable `name`, 0 where none stands under it.
 uint64_t ValueOf(SimFixture& f, std::string_view name) {
   auto* var = f.ctx.FindVariable(name);
   EXPECT_NE(var, nullptr) << name;
   return var == nullptr ? 0 : var->value.ToUint64();
 }
 
-// Runs `srcs`, each a unit of its own, with `top` in the first and `child c()`
-// in the second, and answers the values of the first's `a` and the second's
-// `b`, each module setting its own from what its unit declares.
 std::vector<uint64_t> RunTopAndChild(const std::vector<std::string>& srcs) {
   SimFixture f;
   if (LowerUnits(srcs, f) == nullptr) return {};
@@ -56,8 +50,6 @@ std::vector<uint64_t> RunTopAndChild(const std::vector<std::string>& srcs) {
   return {ValueOf(f, "a"), ValueOf(f, "c.b")};
 }
 
-// §3.12.1 with §6.21: `int g;` in two units is two variables, so each unit's
-// module reads its own, written bare or through `$unit::`.
 TEST(SeparateUnitsSim, EachUnitsVariableIsItsOwn) {
   SimFixture f;
   ASSERT_NE(LowerUnits({"int g = 1;\n"
@@ -80,9 +72,6 @@ TEST(SeparateUnitsSim, EachUnitsVariableIsItsOwn) {
   EXPECT_EQ(ValueOf(f, "c.sb"), 2u);
 }
 
-// §3.12.1 with §6.7: `wire [3:0] w;` in two units is two nets, so each unit's
-// module drives its own and reads back what it drove, written bare or through
-// `$unit::`; one net shared by both would read x in each.
 TEST(SeparateUnitsSim, EachUnitsNetIsItsOwn) {
   SimFixture f;
   ASSERT_NE(LowerUnits({"wire [3:0] w;\n"
@@ -107,8 +96,6 @@ TEST(SeparateUnitsSim, EachUnitsNetIsItsOwn) {
   EXPECT_EQ(ValueOf(f, "c.sb"), 2u);
 }
 
-// §3.12.1 with §13.4: each unit's function of one name is its own, called by
-// the unit's modules and by the unit's own subroutines.
 TEST(SeparateUnitsSim, EachUnitsFunctionIsItsOwn) {
   SimFixture f;
   ASSERT_NE(LowerUnits({"function int f(); return 10; endfunction\n"
@@ -131,9 +118,6 @@ TEST(SeparateUnitsSim, EachUnitsFunctionIsItsOwn) {
   EXPECT_EQ(ValueOf(f, "c.bv"), 20u);
 }
 
-// §3.12.1 with §8.3: each unit's class of one name is its own, so `new` in a
-// module constructs its own unit's class; a package's class is the same in
-// both.
 TEST(SeparateUnitsSim, EachUnitsClassIsItsOwn) {
   EXPECT_EQ(RunTopAndChild({"package q; class K; endclass endpackage\n"
                             "class C; int v = 3; endclass\n"
@@ -153,9 +137,6 @@ TEST(SeparateUnitsSim, EachUnitsClassIsItsOwn) {
             (std::vector<uint64_t>{3, 4}));
 }
 
-// §3.12.1 with §6.24.1: a cast to a unit's typedef sizes the value to that
-// unit's type, 4 bits in the first unit and 6 in the second; a package's
-// typedef is the same in both.
 TEST(SeparateUnitsSim, EachUnitsTypedefIsItsOwn) {
   EXPECT_EQ(RunTopAndChild({"package q; typedef int qt; endpackage\n"
                             "typedef logic [3:0] t;\n"
@@ -174,9 +155,6 @@ TEST(SeparateUnitsSim, EachUnitsTypedefIsItsOwn) {
             (std::vector<uint64_t>{15, 63}));
 }
 
-// §3.12.1 with §19.3: each unit's covergroup of one name is its own, so an
-// instance a procedure constructs has its own unit's bins: one value sampled
-// covers one of two bins in the first unit and one of four in the second.
 TEST(SeparateUnitsSim, EachUnitsCovergroupIsItsOwn) {
   EXPECT_EQ(RunTopAndChild({"covergroup cg with function sample(int v);\n"
                             "  coverpoint v { bins b[] = {[0:1]}; }\n"
@@ -204,9 +182,6 @@ TEST(SeparateUnitsSim, EachUnitsCovergroupIsItsOwn) {
             (std::vector<uint64_t>{50, 25}));
 }
 
-// §3.12.1 with §11.12: each unit's let of one name is its own, so a module's
-// use of it expands its own unit's body, adding one in the first unit and
-// multiplying by ten in the second.
 TEST(SeparateUnitsSim, EachUnitsLetIsItsOwn) {
   EXPECT_EQ(RunTopAndChild({"let f(x) = x + 1;\n"
                             "module top;\n"
@@ -222,9 +197,6 @@ TEST(SeparateUnitsSim, EachUnitsLetIsItsOwn) {
             (std::vector<uint64_t>{5, 40}));
 }
 
-// §3.12.1 with §35.5.4: each unit's import of one SystemVerilog name is its
-// own, so a call reaches the C function the module's own unit imported; an
-// import the module declares itself is reached as ever.
 int SeparateUnitsAddOne(int x) { return x + 1; }
 int SeparateUnitsAddTwo(int x) { return x + 2; }
 int SeparateUnitsAddThree(int x) { return x + 3; }
@@ -247,8 +219,6 @@ TEST(SeparateUnitsSim, EachUnitsDpiImportIsItsOwn) {
       f);
   ASSERT_NE(design, nullptr);
   ASSERT_NE(f.ctx.GetDpiRuntime(), nullptr);
-  // Each unit's declaration is held under its own unit's scope, and the child
-  // instance stands in the second unit.
   const auto* second = f.ctx.GetDpiRuntime()->FindImportIn("$unit#1", "f");
   ASSERT_NE(second, nullptr);
   EXPECT_EQ(second->c_name, "add_two");
@@ -266,8 +236,6 @@ TEST(SeparateUnitsSim, EachUnitsDpiImportIsItsOwn) {
   EXPECT_EQ(ValueOf(f, "c.bh"), 13u);
 }
 
-// §3.12.1 with §26.3: a unit's import is a declaration of that unit's scope,
-// so each unit's module reads the x its own unit imported.
 TEST(SeparateUnitsSim, EachUnitsImportIsItsOwn) {
   EXPECT_EQ(RunTopAndChild({"package p1; int x = 5; endpackage\n"
                             "import p1::*;\n"
@@ -285,10 +253,6 @@ TEST(SeparateUnitsSim, EachUnitsImportIsItsOwn) {
             (std::vector<uint64_t>{5, 6}));
 }
 
-// §3.12.1: an instance's names reach the unit its module was declared in, and
-// a name written in a generate block of the instance reaches the same unit,
-// the block's prefix extending the instance's. A design of one unit records
-// none.
 TEST(SeparateUnitsSim, InstanceUnitIsTheNearestRecordedHolder) {
   UnitScopes units;
   units.SetInstanceUnit("", -1);
@@ -306,8 +270,6 @@ TEST(SeparateUnitsSim, InstanceUnitIsTheNearestRecordedHolder) {
   EXPECT_FALSE(UnitScopes::IsUnitScope("pkg"));
 }
 
-// §3.12.1 with §8.23 and §8.9: each unit's class of one name keeps its own
-// static property, reached as `C::s` from a module of each unit.
 TEST(SeparateUnitsSim, EachUnitsClassKeepsItsOwnStatics) {
   EXPECT_EQ(RunTopAndChild({"class C; static int s = 5; endclass\n"
                             "module top;\n"
@@ -323,10 +285,6 @@ TEST(SeparateUnitsSim, EachUnitsClassKeepsItsOwnStatics) {
             (std::vector<uint64_t>{5, 7}));
 }
 
-// §3.12.1 with §3.14.2.3: a unit's task runs in its own unit's time scale, so
-// the second unit's `#1` waits 10 ns, one of its module's time units; waited
-// in the first unit's 1 ns, the child would read $time as 0. A unit
-// declaring no time scale keeps the default.
 TEST(SeparateUnitsSim, EachUnitsTaskRunsInItsOwnTimeScale) {
   EXPECT_EQ(RunTopAndChild({"timeunit 1ns;\n"
                             "timeprecision 1ps;\n"
@@ -347,17 +305,8 @@ TEST(SeparateUnitsSim, EachUnitsTaskRunsInItsOwnTimeScale) {
             (std::vector<uint64_t>{1, 1}));
 }
 
-// §3.12.1: the PLI reaches the items of every compilation unit, each unit a
-// scope of its own drawn as a package named "$unit"; a unit declaring no data
-// adds no scope.
-// The names each compilation unit reaches, one list per unit.
 using NamesByUnit = std::vector<std::vector<std::string>>;
 
-// Three files each a compilation unit: the first two each declare a function
-// f and a task t of their own and a variable marking the unit, mark0 and
-// mark1; the first's top, holding `top_items`, instantiates the second's
-// child, holding `child_items`, as c; the third declares nothing outside its
-// module.
 std::vector<std::string> UnitsOfOneName(std::string_view top_items,
                                         std::string_view child_items) {
   const std::string kOwn =
@@ -381,8 +330,6 @@ class SeparateUnitsVpi : public VpiDesignRun {
     LowerAndRun(design, f_);
   }
 
-  // The names of the objects of `type` each compilation unit reaches, the
-  // lists in sorted order, so that which file a unit is does not matter.
   static NamesByUnit NamesPerUnit(int type) {
     NamesByUnit reached;
     for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
@@ -392,8 +339,6 @@ class SeparateUnitsVpi : public VpiDesignRun {
     return reached;
   }
 
-  // The compilation unit whose scope declares the variable `marker`, null for
-  // none.
   static VpiObject* UnitMarked(std::string_view marker) {
     for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
       if (Named(vpiVariables, pkg, marker) != nullptr) return VpiObjectOf(pkg);
@@ -401,15 +346,11 @@ class SeparateUnitsVpi : public VpiDesignRun {
     return nullptr;
   }
 
-  // The compilation unit holding the task or function `relation` of `call`
-  // reaches, null where there is no call or it reaches nothing.
   static VpiObject* UnitOfCallee(vpiHandle call, int relation) {
     vpiHandle callee = call == nullptr ? nullptr : vpi_handle(relation, call);
     return callee == nullptr ? nullptr : VpiObjectOf(callee)->parent;
   }
 
-  // §37.10 detail 5: each object of `type` a compilation unit reaches is
-  // full-named "$unit::" followed by its name.
   static void ExpectUnitFullNames(int type) {
     for (vpiHandle pkg : ObjectsOf(vpiPackage, nullptr)) {
       for (vpiHandle obj : ObjectsOf(type, pkg)) {
@@ -444,10 +385,6 @@ TEST_F(SeparateUnitsVpi, EachUnitIsACompilationUnitScope) {
   EXPECT_EQ(values, (std::vector<int>{3, 4}));
 }
 
-// §3.12.1 with §37.12 and §37.57: a let a compilation unit declares is a let
-// decl of that unit's own scope, which a unit declaring nothing else has too,
-// and a module's use of it is a let expr reaching the let of the unit the
-// module was declared in.
 TEST_F(SeparateUnitsVpi, EachUnitsLetIsALetDeclOfItsOwnScope) {
   RunUnits(
       {"let g(y) = y + 1;\n"
@@ -456,8 +393,6 @@ TEST_F(SeparateUnitsVpi, EachUnitsLetIsALetDeclOfItsOwnScope) {
        "let h(y) = y + 2;\n"
        "module child; logic [3:0] b, v; assign v = h(b); endmodule\n",
        "module other; endmodule\n"});
-  // The let decl the right side of the first continuous assignment of
-  // `scope` instantiates, null where it is no let expr.
   const auto kUsed = [](vpiHandle scope) -> VpiObject* {
     vpiHandle assigns = vpi_iterate(vpiContAssign, scope);
     vpiHandle assign = assigns == nullptr ? nullptr : vpi_scan(assigns);
@@ -478,10 +413,6 @@ TEST_F(SeparateUnitsVpi, EachUnitsLetIsALetDeclOfItsOwnScope) {
   EXPECT_EQ(h->parent->name, "$unit");
 }
 
-// §3.12.1 with §37.10 detail 10: a nettype a compilation unit declares is a
-// nettype decl of that unit's own scope, which a unit declaring nothing else
-// has too, so each unit reaches its own and none of another's, and the third
-// unit, declaring no nettype, reaches none.
 TEST_F(SeparateUnitsVpi, EachUnitsNettypeIsANettypeDeclOfItsOwnScope) {
   RunUnits(
       {"nettype logic una;\n"
@@ -492,10 +423,6 @@ TEST_F(SeparateUnitsVpi, EachUnitsNettypeIsANettypeDeclOfItsOwnScope) {
   EXPECT_EQ(NamesPerUnit(vpiNetTypedef), (NamesByUnit{{}, {"una"}, {"unb"}}));
 }
 
-// §3.12.1 (printed page 56): the PLI traverses every compilation unit, so of
-// three files each a unit, the third, whose compilation-unit scope declares
-// nothing, is reached as the other two are, a package with vpiUnit TRUE named
-// "$unit".
 TEST_F(SeparateUnitsVpi, AUnitDeclaringNothingIsReachedBesideTheOthers) {
   RunUnits(
       {"int g = 3;\n"
@@ -512,8 +439,6 @@ TEST_F(SeparateUnitsVpi, AUnitDeclaringNothingIsReachedBesideTheOthers) {
   EXPECT_EQ(units, 3);
 }
 
-// §3.12.1 with §37.41: a task or function a compilation unit declares is a
-// task or function of that unit's own scope, which no other unit reaches.
 TEST_F(SeparateUnitsVpi, EachUnitsTaskOrFunctionIsATaskFuncOfItsOwnScope) {
   RunUnits(
       {"function int f(); return 1; endfunction\n"
@@ -525,8 +450,6 @@ TEST_F(SeparateUnitsVpi, EachUnitsTaskOrFunctionIsATaskFuncOfItsOwnScope) {
   ExpectUnitFullNames(vpiTaskFunc);
 }
 
-// Two units each declaring a function of one name each hold their own, so the
-// unit a function is reached from is the one it is a child of.
 TEST_F(SeparateUnitsVpi, TwoUnitsFunctionsOfOneNameAreEachTheirOwn) {
   RunUnits(
       {"function int f(); return 1; endfunction\n"
@@ -544,8 +467,6 @@ TEST_F(SeparateUnitsVpi, TwoUnitsFunctionsOfOneNameAreEachTheirOwn) {
   EXPECT_EQ(found, 2);
 }
 
-// §3.12.1 with §35.5.4: a task or function a compilation unit imports through
-// DPI is a task or function of that unit's scope alone.
 TEST_F(SeparateUnitsVpi, AUnitsDpiImportIsATaskFuncOfItsOwnScope) {
   RunUnits({"module top; child c(); endmodule\n",
             "import \"DPI-C\" function int c_f(input int a);\n"
@@ -555,8 +476,6 @@ TEST_F(SeparateUnitsVpi, AUnitsDpiImportIsATaskFuncOfItsOwnScope) {
   ExpectUnitFullNames(vpiTaskFunc);
 }
 
-// §3.12.1 with §37.31: a class a compilation unit declares is a class defn of
-// that unit's scope alone.
 TEST_F(SeparateUnitsVpi, AUnitsClassIsAClassDefnOfItsOwnScope) {
   RunUnits({"module top; child c(); endmodule\n",
             "class C; endclass\n"
@@ -566,8 +485,6 @@ TEST_F(SeparateUnitsVpi, AUnitsClassIsAClassDefnOfItsOwnScope) {
   ExpectUnitFullNames(vpiClassDefn);
 }
 
-// §3.12.1 with §37.85 detail 5: a typedef a compilation unit declares is a
-// typespec of that unit's scope alone.
 TEST_F(SeparateUnitsVpi, AUnitsTypedefIsATypespecOfItsOwnScope) {
   RunUnits(
       {"typedef logic [3:0] nib_t;\n"
@@ -577,9 +494,6 @@ TEST_F(SeparateUnitsVpi, AUnitsTypedefIsATypespecOfItsOwnScope) {
   ExpectUnitFullNames(vpiTypedef);
 }
 
-// §3.12.1 with §37.42: where two units each declare a function f, a call
-// written in a module of each unit reaches its own unit's f, the one its run
-// calls.
 TEST_F(SeparateUnitsVpi, AModulesCallReachesItsOwnUnitsFunction) {
   RunUnits(UnitsOfOneName("initial begin : b void'(f()); end\n",
                           "initial begin : b void'(f()); end\n"));
@@ -591,7 +505,6 @@ TEST_F(SeparateUnitsVpi, AModulesCallReachesItsOwnUnitsFunction) {
             UnitMarked("mark1"));
 }
 
-// A task enable written in each unit reaches its own unit's task.
 TEST_F(SeparateUnitsVpi, AModulesTaskEnableReachesItsOwnUnitsTask) {
   RunUnits(UnitsOfOneName("initial begin : b t(); end\n",
                           "initial begin : b t(); end\n"));
@@ -602,8 +515,6 @@ TEST_F(SeparateUnitsVpi, AModulesTaskEnableReachesItsOwnUnitsTask) {
             UnitMarked("mark1"));
 }
 
-// A call in a generate block of the second unit's module reaches that unit's
-// f.
 TEST_F(SeparateUnitsVpi, AGenerateBlocksCallReachesItsOwnUnitsFunction) {
   RunUnits(UnitsOfOneName(
       "", "if (1) begin : g\n  initial begin : b void'(f()); end\nend\n"));
@@ -613,8 +524,6 @@ TEST_F(SeparateUnitsVpi, AGenerateBlocksCallReachesItsOwnUnitsFunction) {
       UnitMarked("mark1"));
 }
 
-// A call in the body of a task the second unit's module declares reaches that
-// unit's f.
 TEST_F(SeparateUnitsVpi, AModuleTasksCallReachesItsOwnUnitsFunction) {
   RunUnits(UnitsOfOneName("", "task k(); void'(f()); endtask\n"));
   vpiHandle k = Named(vpiTaskFunc, By("top.c"), "k");
@@ -624,8 +533,6 @@ TEST_F(SeparateUnitsVpi, AModuleTasksCallReachesItsOwnUnitsFunction) {
             UnitMarked("mark1"));
 }
 
-// A call in a continuous assignment of the second unit's module reaches that
-// unit's f.
 TEST_F(SeparateUnitsVpi, AContinuousAssignmentsCallReachesItsOwnUnitsFunction) {
   RunUnits(UnitsOfOneName("", "wire [31:0] y;\nassign y = f();\n"));
   const std::vector<vpiHandle> kAssigns = ObjectsOf(vpiContAssign, By("top.c"));
@@ -635,8 +542,6 @@ TEST_F(SeparateUnitsVpi, AContinuousAssignmentsCallReachesItsOwnUnitsFunction) {
             UnitMarked("mark1"));
 }
 
-// A call in an interface's and in a program's initial procedure, each declared
-// and instantiated in the second unit, reaches that unit's f.
 TEST_F(SeparateUnitsVpi, AnInterfacesAndAProgramsCallsReachTheirUnitsFunction) {
   RunUnits(
       {"int mark0;\n"
@@ -657,8 +562,6 @@ TEST_F(SeparateUnitsVpi, AnInterfacesAndAProgramsCallsReachTheirUnitsFunction) {
       UnitMarked("mark1"));
 }
 
-// A call in the body of a task each unit itself declares reaches the f of the
-// unit declaring the task.
 TEST_F(SeparateUnitsVpi, AUnitTasksCallReachesItsOwnUnitsFunction) {
   RunUnits(
       {"function int f(); return 1; endfunction\n"
@@ -679,8 +582,6 @@ TEST_F(SeparateUnitsVpi, AUnitTasksCallReachesItsOwnUnitsFunction) {
   EXPECT_EQ(walked, 2);
 }
 
-// §35.5.4: a call of a function both units import through DPI, written in the
-// second unit's module, reaches that unit's import.
 TEST_F(SeparateUnitsVpi, AModulesDpiCallReachesItsOwnUnitsImport) {
   RunUnits(
       {"int mark0;\n"

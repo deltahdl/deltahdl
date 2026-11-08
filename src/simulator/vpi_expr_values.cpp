@@ -30,8 +30,6 @@ namespace delta {
 
 namespace {
 
-// Makes `stand_in` a process of the instance and generate blocks `scope`
-// records, which reads names as a process running there would.
 void StandInWhere(Process& stand_in, const VpiExprScope& scope) {
   stand_in.stand_in = true;
   stand_in.inst_prefix = scope.inst_prefix;
@@ -57,9 +55,6 @@ Logic4Vec VpiEvaluateExpressionObject(const VpiObject& obj, SimContext& sim) {
 
 namespace {
 
-// The aval and bval words of the value of `obj` now: the whole assignment's,
-// or a cont assign bit's one bit of it. A bit lies below the width of the left
-// side, which the value is evaluated at, so the word holding it is there.
 std::vector<uint64_t> ValueBitsNow(const VpiObject& obj, SimContext& sim) {
   const Logic4Vec kValue = VpiEvaluateExpressionObject(obj, sim);
   std::vector<uint64_t> bits;
@@ -76,8 +71,6 @@ std::vector<uint64_t> ValueBitsNow(const VpiObject& obj, SimContext& sim) {
   return bits;
 }
 
-// The class whose own storage the static property `name`, written `C::n`, is
-// (§8.9), which NamesStaticProperty has found it to be.
 const ClassTypeInfo* StaticPropertyClass(SimContext& sim,
                                          std::string_view name) {
   const auto kScope = name.rfind("::");
@@ -85,14 +78,6 @@ const ClassTypeInfo* StaticPropertyClass(SimContext& sim,
       ->StaticPropertyDeclarer(name.substr(kScope + 2));
 }
 
-// Has `notify` called as anything changes that the right-hand side of the
-// continuous assignment or cont assign bit `obj` reads (§10.3.2): the storage
-// of each net and variable, and the class of each static class property,
-// which its writes notify (§8.9). The names are those the source
-// expression reads, resolved where it stands, so a right side the VPI model
-// gives no expression object, or one whose operands it models only in part, is
-// watched all the same; a name that stands for neither, which no change can
-// come to, is dropped.
 void WatchReads(const VpiObject& obj, SimContext& sim,
                 const std::function<bool()>& notify) {
   Process stand_in;
@@ -114,8 +99,6 @@ void WatchReads(const VpiObject& obj, SimContext& sim,
   for (const ClassTypeInfo* cls : classes) cls->AddStaticWatcher(notify);
 }
 
-// Whether a cbValueChange registration placed on `obj` is still live. One
-// placed on no object is not placed on `obj`, which is never null.
 bool HasValueChangeOn(const VpiContext& vpi, const VpiObject* obj) {
   return std::ranges::any_of(
       vpi.RegisteredCallbacks(), [obj](const s_cb_data& cb) {

@@ -5,7 +5,6 @@
 
 using namespace delta;
 
-// Create a CoverGroup with two coverpoints ("a", "b") and a 2-bin cross.
 inline CoverGroup* SetupTwoPointCross(CoverageDB& db) {
   auto* g = db.CreateGroup("cg");
   CoverageDB::AddCoverPoint(g, "a");

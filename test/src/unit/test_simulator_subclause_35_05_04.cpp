@@ -33,13 +33,6 @@ TEST(DpiRuntime, RegisterImportAndCall) {
   EXPECT_EQ(result.AsInt(), 30);
 }
 
-// §35.5.4 declares an imported subroutine where the source writes it, and §35.6
-// has a call to one written exactly as a call to a native subroutine. What
-// joins the two is the registry: a call reaches its declaration through it, and
-// a design's own declarations reached it by no route at all -- the registry was
-// built by whichever unit test constructed one, so every rule clause 35 holds
-// of was held of a registry the simulator never consulted, and `x = f(a);`
-// against an imported `f` yielded a one-bit zero.
 TEST(DpiImportLowering, AnImportedFunctionOfTheDesignIsRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -54,10 +47,6 @@ TEST(DpiImportLowering, AnImportedFunctionOfTheDesignIsRegistered) {
   EXPECT_TRUE(dpi->HasImport("add_one"));
 }
 
-// §35.5.1.2 reads each formal's direction to decide which way its value
-// crosses, and §35.6.1 copies the written ones back into the actuals, so the
-// directions travel with the declaration. A lowering that registered names
-// alone satisfies the case above and loses every write-back.
 TEST(DpiImportLowering, AnImportedFunctionCarriesItsFormalsDirections) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -79,11 +68,6 @@ TEST(DpiImportLowering, AnImportedFunctionCarriesItsFormalsDirections) {
   EXPECT_EQ(import->args[1].type, DataTypeKind::kInt);
 }
 
-// §35.5.6 admits packed arrays, structs and unions built of bit and logic as
-// formal types and names no width limit, and DataTypeKind says only `bit` for
-// `bit [127:0]`. So the width the declaration wrote has to travel with the
-// formal: without it the crossing sizes that formal by its kind and hands the
-// foreign side one bit of the design's 128.
 TEST(DpiImportLowering, AnImportedFunctionCarriesItsPackedFormalsWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -100,17 +84,9 @@ TEST(DpiImportLowering, AnImportedFunctionCarriesItsPackedFormalsWidth) {
   ASSERT_NE(import, nullptr);
   ASSERT_EQ(import->args.size(), 2u);
   EXPECT_EQ(import->args[0].width, 128U);
-  // A formal whose type states its own width records none: the kind is the one
-  // answer about how wide an `int` is, and a second one beside it could differ
-  // from it.
   EXPECT_EQ(import->args[1].width, 0U);
 }
 
-// §35.5.6.1: a formal written with unpacked dimensions after its name, sized
-// or open, is an array of values of its type, and the C side receives it as
-// an array or an open-array handle rather than as one such value. Nothing
-// else about the formal says so -- `bit [7:0] b [0:3]` has the kind and width
-// of `bit [7:0] b` -- so the registration records it.
 TEST(DpiImportLowering, AFormalWithUnpackedDimensionsIsRecordedAsSuch) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,11 +108,6 @@ TEST(DpiImportLowering, AFormalWithUnpackedDimensionsIsRecordedAsSuch) {
   EXPECT_FALSE(import->args[2].has_unpacked_dimensions);
 }
 
-// §35.4 makes the declaration a reference to a global symbol the foreign side
-// defines and §35.5.4 leaves the binding to the tool. Nothing supplies one
-// here, so the call reaches no implementation, and what it must not do is
-// answer: a zero the design reads as data cannot be told from a foreign
-// function that returned zero.
 TEST(DpiImportLowering, ACallToAnUnresolvedImportIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -154,14 +125,6 @@ TEST(DpiImportLowering, ACallToAnUnresolvedImportIsReported) {
       "35.5.4"));
 }
 
-// §35.5.4 (printed page 977 of IEEE 1800-2023): an import declaration
-// defines a subroutine of that name in the scope the declaration is written in,
-// and the standard puts no scope off limits -- a package, an interface, a
-// program, a module that is not the top and the compilation unit each hold
-// one. Only the top module's declarations reached the registry, so a call
-// to any other's found no import and read a silent 0. Each case below has the
-// declaration registered and the call reach it: with no foreign
-// implementation bound, reaching it is what the §35.5.4 report shows.
 TEST(DpiImportLowering, AnImportDeclaredInAPackageIsRegistered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -185,8 +148,6 @@ TEST(DpiImportLowering, AnImportDeclaredInAPackageIsRegistered) {
       "35.5.4"));
 }
 
-// §26.3 reaches the package's declaration through the package scope
-// resolution operator, `p::p_mul(7, 8)`, with no import written.
 TEST(DpiImportLowering, AnImportDeclaredInAPackageIsReachedThroughItsScope) {
   SimFixture f;
   auto* design = ElaborateSrc(

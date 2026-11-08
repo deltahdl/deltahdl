@@ -20,58 +20,6 @@
 
 namespace delta {
 
-// §11.5.1's writes: what a bit-select or part-select of a variable deposits,
-// and §10.7's resize, which is the step every one of them takes before the
-// deposit. They sit apart from the member-path resolution in
-// statement_assign.cpp because the question is a different one: that file
-// answers which storage a name reaches, and this one answers what lands in a
-// window of storage already found.
-
-// Deposits `rhs_val` in the window of `var` that `bits` names. §11.5.1 has a
-// write through a part-select that is partly out of range change only its
-// in-range bits, and which bits of the value the affected ones receive is
-// bits.src_lo: a select running off the low end of its object has its own low
-// bits land nowhere, so `a[1 -: 4] = 4'b1101` on a `logic [7:0] a` -- which the
-// clause reads as `a[1:-2]` -- gives `a[1:0]` the value's bits [3:2] and must
-// leave `a` at 8'h03. Taking the value's low bits whichever end the select ran
-// off left it at 8'h01. The offset is zero for a select running off the high
-// end, where the bits that land are the value's least significant ones.
-//
-// The window is deposited rather than computed in a machine word, because
-// changing only the in-range bits is a statement about every bit of
-// the target the select did not name and not only about the ones beside it.
-// Reading the target through Logic4Vec::ToUint64 and rebuilding it with
-// MakeLogic4VecVal moved three sets of them. ToUint64 returns words[0] alone
-// and MakeLogic4VecVal fills a fresh zeroed array, so a target wider than one
-// word lost everything above bit 63: `w = '1; w[3:0] = 4'h0;` on a
-// `logic [99:0] w` must leave 96 ones and left 60, w[99:64] being neither named
-// by the select nor the value's to touch. ToUint64 returns `aval & ~bval` and
-// MakeLogic4VecVal sets no bval, so the x and z that §6.3.1 lets every bit of a
-// 4-state vector hold -- each bit takes any of the four values on its own, and
-// §6.11.2 makes `logic` one of those types, carrying extra bits that encode x
-// and z -- were read as 0 on the way in and stored as 0 on the way out:
-// `a = 8'hxx; a[1:0] = 2'b11;` must read 8'bxxxxxx11 and read 8'b00000011, and
-// `a = 8'h00; a[1:0] = 2'b1x;` must read 8'b0000001x and read 8'b00000010. And
-// `mask << bits.lo` was undefined once the window began at bit 64 or above, the
-// shift count being taken modulo 64 on x86-64, so `w[71:68] = 4'hF` on the same
-// `logic [99:0] w` landed on w[7:4] and left w[71:68] at zero. DepositBitField
-// is documented multi-word safe for a start bit of 64 or more, which answers
-// the shift and the lost high words at once, and ExtractBitField takes the
-// value's landing bits with their 4-state encoding kept, which answers the
-// projection on the source side and makes bits.src_lo simply where the extract
-// begins.
-//
-// The deposit is made into a fresh copy of the target's current value rather
-// than through the words it is holding, for the reason WriteOwnedBits
-// (statement_assign_decl.cpp) gives: copying a Logic4Vec copies its `words`
-// pointer rather than the words (common/types.h), so a variable last written
-// whole from another object shares that object's storage and an in-place
-// deposit would write these bits into whatever else is holding it.
-//
-// §6.11.2 makes `bit` and `int` 2-state types, which have no unknown values,
-// so a 2-state target is coerced here explicitly. MakeLogic4VecVal
-// gave that for free by never setting a bval; now that the deposit carries x
-// and z, an x reaching such a target would otherwise survive.
 void WritePartSelect(Variable* var, const PartSelectBits& bits,
                      const Logic4Vec& rhs_val, Arena& arena) {
   Logic4Vec updated = ExtractBitField(arena, var->value, 0, var->value.width);
@@ -82,21 +30,6 @@ void WritePartSelect(Variable* var, const PartSelectBits& bits,
   if (!var->is_4state) CoerceTo2State(var->value);
 }
 
-// §11.5.1: the ranges a select's indices are resolved against. A variable
-// answers them from its declaration -- a bit-addressed view for a bit-select or
-// a part-select, and for one index of a packed multidimensional array the
-// element-addressed view §7.4.1 gives that index, `elem_width` bits per element
-// (Variable::packed_elem_width). A window a select already carved out of the
-// variable, `depth` indices deep, is addressed by the packed dimension those
-// indices reach (§7.4.4, Variable::PackedLevelWithin), the same views one
-// dimension in: elements of that dimension's own element width, or bits of its
-// declared range at the innermost. Only the outermost dimension was recorded,
-// so every window was a run of `width` bits addressed as [width-1:0] with one
-// bit per index, and `z[1][0]` on a `logic [1:0][1:0][7:0] z` was bit 16 of
-// `z` rather than the eight-bit subfield at bits 23 to 16. A window past the
-// dimensions, or one the dimension does not account for, keeps that flat view,
-// which the read side's SelectBaseRange (eval_select.cpp) gives the same
-// window.
 struct SelectAddressing {
   PackedRange bits;
   PackedRange elems;
@@ -115,8 +48,6 @@ struct SelectAddressing {
   }
 };
 
-// The bits `sel`'s own index or range addresses of an object addressed by
-// `at`, counted from the object's least significant bit.
 static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
                                         const Expr* sel, SimContext& ctx,
                                         Arena& arena) {
@@ -124,9 +55,6 @@ static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
   if (HasUnknownBits(idx_val)) return {0, 0};
   auto idx = SelectBoundValue(idx_val);
   if (sel->index_end == nullptr) {
-    // §7.4.1: a single index on a packed multidimensional array addresses an
-    // outermost element -- the inner dimensions' width -- rather than one bit,
-    // and addresses it whole or not at all, so the source offset stays zero.
     if (at.elem_width > 1) {
       if (!at.elems.Contains(idx)) return {0, 0};
       auto base = static_cast<uint32_t>(at.elems.OffsetOf(idx));
@@ -140,19 +68,7 @@ static PartSelectBits ResolveSelectBits(const SelectAddressing& at,
   auto target = PartSelectTargetIndices(idx, SelectBoundValue(end_val),
                                         sel->is_part_select_plus,
                                         sel->is_part_select_minus);
-  // §11.5.1 spells an indexed part-select's width out separately and requires
-  // it to be a positive constant, so a width of zero names no bit of
-  // the object -- which is what a zero width from this function already means.
-  // The pair PartSelectTargetIndices answers cannot say so on its own: it is
-  // the two ends of a width the select does not have, and for `a[3 +: 0]` it is
-  // the indices 3 and 2, which any declaration holding them resolves to the
-  // two-bit window a[3:2]. The write path reports that width as an error ahead
-  // of this call, in ReportZeroWidthPartSelect below; every caller reads the
-  // zero this returns as the absence it is.
   if (target.declared_width == 0) return {0, 0};
-  // §7.4.4 with §7.4.5: a part-select of a packed array of packed arrays
-  // addresses whole elements of the dimension it indexes, `joe[7][3:2]` the
-  // two bytes 3 and 2 of a `bit [3:0][7:0]` element.
   if (at.elem_width > 1) {
     PartSelectBits elems =
         PartSelectStorageBits(at.elems, target.first, target.second);
@@ -166,18 +82,6 @@ size_t SelectDepthWithin(const Variable& var, const Expr* sel, SimContext& ctx,
                          Arena& arena) {
   const Expr* base = sel->base;
   if (base == nullptr || base->kind != ExprKind::kSelect) return 0;
-  // The longest prefix of the base that names a variable decides. The base
-  // itself naming `var` is `var`'s own name, `y[0]` under `y[0][3]`; a shorter
-  // prefix naming `var` leaves the indices between as selects within it, one
-  // dimension each: `y[0]` under `y[0][3][1]` and `x` under `x[1][3]` at one,
-  // `z` under `z[1][0][3]` at two. A prefix naming some other variable, or no
-  // prefix naming any, is answered zero and the caller's own resolution
-  // stands: TryWriteAssocElementBits (assoc_element.cpp) hands `aa[3][7:0]` to
-  // the writers on a stack Variable lending the element the array's
-  // declaration, which no name resolves to, and the range there is the
-  // element's own. Only a prefix that resolves to `var` says anything, so a
-  // variable built for the write is never mistaken for one the chain stands
-  // on. A prefix whose index carries x or z has no name and is passed over.
   size_t depth = 0;
   for (const Expr* p = base; p != nullptr; p = p->base, ++depth) {
     std::string name;
@@ -194,23 +98,6 @@ size_t SelectDepthWithin(const Variable& var, const Expr* sel, SimContext& ctx,
 
 PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
                                  SimContext& ctx, Arena& arena) {
-  // §7.4.1 has an index of a packed array select a subfield and further indices
-  // select within that subfield, and §7.4.4 lets the packed dimensions be
-  // stacked, so a select chain is resolved from the inside out: the base's own
-  // window first, and this select's index within it. `y[0][3][1]` on a
-  // `logic [3:0][7:0] y[1:0]` is bit 1 of the eight-bit subfield 3 of the
-  // element `y[0]`, storage bit 25 of that element, and `x[1][3]` on a
-  // `logic [1:0][7:0] x` is storage bit 11 of `x`. Every writer of a select
-  // asks this function, so the chain is resolved once for all of them; each
-  // had asked it of the outermost index alone, which either addressed an
-  // element of `var` where a bit of a subfield was named or, from
-  // TryResolveCompoundElement, materialized a fresh variable under the chain's
-  // full name and lost the write. Each index steps one packed dimension in
-  // (§7.4.4): `z[1][0][3]` on a `logic [1:0][1:0][7:0] z` is bit 3 of the
-  // eight-bit `z[1][0]`, itself subfield 0 of the sixteen-bit `z[1]`, storage
-  // bit 19. An empty inner window -- an inner index carrying x or z, or out of
-  // range -- addresses nothing, and §11.5.1 has such a write leave the data
-  // stored alone.
   size_t depth = SelectDepthWithin(var, sel, ctx, arena);
   if (depth == 0) {
     return ResolveSelectBits(SelectAddressing::OfVariable(var), sel, ctx,
@@ -224,12 +111,6 @@ PartSelectBits SelectStorageBits(const Variable& var, const Expr* sel,
   return {inner.lo + within.lo, within.width, within.src_lo};
 }
 
-// Whether two stored values differ, which is what the notification in
-// WriteBitSelect turns on. It is the comparison EventAwaiter::CheckEdge makes
-// for a non-edge event (awaiters_event_control.h) and the one the VCD writer
-// makes to decide a transition (eval_system_task_dump.cpp), written out again
-// here rather than shared with either, so that this file's own answer to
-// whether §9.4.2's expression result changed needs nothing from theirs.
 static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
   if (a.nwords != b.nwords) return true;
   for (uint32_t i = 0; i < a.nwords; ++i) {
@@ -240,15 +121,6 @@ static bool StoredBitsDiffer(const Logic4Vec& a, const Logic4Vec& b) {
   return false;
 }
 
-// §11.5.1's report for a select written with a width of zero, which is the one
-// answer the resolution below cannot give: SelectStorageBits returns an empty
-// window for it, and returns the same empty window for an unknown index, an
-// out-of-range index and a select landing on no bit of the object, all of which
-// the clause leaves silent. The width belongs to the select as written rather
-// than to the object it addresses -- §11.5.1 requires it to be a positive
-// constant -- so it is read on its own, from a base of zero, which is the
-// declared width PartSelectTargetIndices gives either indexed form whatever the
-// base is. Only those two forms carry a width, so `a[7:0]` reads nothing twice.
 void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena) {
   if (!sel->index_end) return;
   if (!sel->is_part_select_plus && !sel->is_part_select_minus) return;
@@ -260,34 +132,6 @@ void ReportZeroWidthPartSelect(const Expr* sel, SimContext& ctx, Arena& arena) {
                       Subclause("11.5.1"));
 }
 
-// The write itself, which §11.5.1 states as two questions this file now answers
-// once each. Which bit an address reaches depending in part on the declaration
-// is the resolution, and SelectStorageBits answers it; a write through a
-// part-select partly out of range changing only its in-range bits is the
-// deposit, and WritePartSelect answers that. This function walked the same four
-// arms a second time with the write attached -- the shape a correction lands on
-// one of and not the other, as #3532 records on the nonblocking path, and one
-// copy-paste-test cannot see, the two walks being an early-returning writer
-// against a value-returning resolver rather than duplicated text. The
-// bit-select goes with them, being the one-bit case of that window rather than
-// a write of its own: computed in a machine word instead, `uint64_t{1} << off`
-// was undefined for a bit at 64 or above, and `enable[64] = 1'b1;` on a
-// `logic [64:0] enable` set enable[0].
-//
-// The packed arm's write carried one test the resolver has no counterpart for,
-// `off < var->value.width`, and it is dropped rather than moved into
-// SelectStorageBits. RecordPackedRange (lowerer_register.cpp) records a
-// declared range only once its span times the element width equals value.width,
-// so an index that range contains has its element wholly inside the value, and
-// where the two disagree there is no declared range at all, only the implicit
-// [width-1:0] one. DepositBitField answers both, breaking at the first bit at
-// or past dst.width -- that same limit to the in-range bits -- so
-// an element past the value deposits none of itself. Only a read needs the test
-// (TryPackedElementSelect, eval_select.cpp), owing a value where a write that
-// lands nowhere owes nothing.
-//
-// Nothing here says anything about the notification, which WriteBitSelect
-// decides from the stored value once this returns.
 static void WriteBitSelectBits(Variable* var, const Expr* lhs,
                                const Logic4Vec& rhs_val, SimContext& ctx,
                                Arena& arena) {
@@ -297,52 +141,8 @@ static void WriteBitSelectBits(Variable* var, const Expr* lhs,
   WritePartSelect(var, bits, rhs_val, arena);
 }
 
-// Writes the window of `var` that `lhs` names, and wakes `var`'s watchers when
-// that write moved the value.
-//
-// The notification is made here rather than by the callers because each of the
-// five call sites had to remember the rule for itself, and they did not agree:
-// #3521 is the record of one forgetting the notification entirely, and #3522
-// the record of the four that remembered it remembering it in a form too
-// coarse -- an unconditional NotifyWatchers() after a call that returns having
-// written nothing down six separate paths. §9.4.2 closes by ruling that an
-// operand changing while the expression's result does not is no event, so a
-// statement that stored no bit owes no event at all: §11.5.1 has an
-// out-of-range write leave the stored data untouched, yet `a[9] = 1'b1;` on a
-// `logic [7:0] a` ran an `always_comb` block reading `a` a third time.
-//
-// This function is the only one holding both the value before the write and the
-// value after it, and a change in the result can only be measured between
-// those two. The baseline is a Logic4Snapshot rather than a Logic4Vec copy
-// because a Logic4Vec copied from `value` shares `value`'s words -- the copy
-// takes the `words` pointer (common/types.h) -- so the deposit below would
-// write through the baseline as well, the two sides of the comparison would be
-// one value, and no change would ever be seen. That is #3358, and it is why
-// Variable::prev_value is a snapshot too.
-//
-// A bool returned by the writer would not have been enough. It says "I wrote",
-// not "the value changed", and those part company: `a[3] = 1'b1;` on a bit
-// already 1 takes a writing path all the way to the deposit and changes
-// nothing, which §9.4.2's last sentence is precisely about.
-//
-// The comparison sits at the end rather than beside the deposit, because the
-// deposit is not where the paths end: the window WriteBitSelectBits resolves is
-// empty for an unknown index, an out-of-range index, a zero declared width and
-// a select landing on no bit of the object, and it returns having written
-// nothing down every one of them. Reading the stored value once, after the
-// write, is blind to which path ran.
 void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
                     SimContext& ctx, Arena& arena) {
-  // §10.6.2: a force overrides procedural assignments to the variable until a
-  // release is executed on it. Naming a bit-select or a part-select as the
-  // target does not take the statement out of that class -- the clause's own
-  // bar on forcing a bit-select or part-select of a variable restricts what may
-  // be forced, not what a force overrides -- so this declines as every
-  // whole-variable writer does. It is the one place the statement form, the
-  // compound form, the increment, the expression forms and the subroutine-body
-  // form all pass through. It declines ahead of the snapshot, as WriteVar
-  // (statement_assign_core.cpp) declines ahead of its own notification: nothing
-  // is written, so there is nothing to compare and nobody to wake.
   if (var->is_forced) return;
   Logic4Snapshot before;
   before.Capture(var->value);
@@ -350,13 +150,6 @@ void WriteBitSelect(Variable* var, const Expr* lhs, const Logic4Vec& rhs_val,
   if (StoredBitsDiffer(before.Get(), var->value)) var->NotifyWatchers();
 }
 
-// Single-word resize for known (no x/z) values that fit in 64 bits, applying
-// sign extension when the source is signed and being widened.
-// Logic4Vec::is_signed carries the signedness §11.7 gives the value itself,
-// which $signed and $unsigned set, so the result takes the flag from val
-// instead of the false MakeLogic4VecVal leaves in place. ResizeToWidth sets
-// that flag from val on its wide path, and a value resized here is stored
-// beside those, so the two paths have to answer alike.
 static Logic4Vec ResizeNarrowKnown(const Logic4Vec& val, uint32_t target_width,
                                    Arena& arena) {
   uint64_t v = val.ToUint64();
@@ -370,8 +163,6 @@ static Logic4Vec ResizeNarrowKnown(const Logic4Vec& val, uint32_t target_width,
   return result;
 }
 
-// Replicates the source MSB across the widened high bits of result when val is
-// signed and being widened past its original width.
 static void SignExtendWideResult(const Logic4Vec& val, uint32_t target_width,
                                  Logic4Vec& result) {
   if (!val.is_signed || target_width <= val.width || val.width == 0) return;
@@ -398,7 +189,6 @@ static void SignExtendWideResult(const Logic4Vec& val, uint32_t target_width,
   }
 }
 
-// Clears any bits above target_width in the final (partial) word of result.
 static void MaskHighBits(uint32_t target_width, Logic4Vec& result) {
   uint32_t last_bit = target_width % 64;
   if (last_bit == 0) return;
@@ -409,10 +199,6 @@ static void MaskHighBits(uint32_t target_width, Logic4Vec& result) {
 }
 
 Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
-  // §5.7.1: an unbased unsized literal sets every bit of the width it is
-  // resized to, and the value resized to it stands for the literal no more
-  // -- a 1-bit variable set from `'1` holds a 1-bit 1 -- so the flag stops
-  // here whether or not the width changes.
   if (val.fills_width && target_width > val.width)
     return FillUnbasedUnsized(val, target_width, arena);
   val.fills_width = false;
@@ -437,14 +223,6 @@ Logic4Vec ResizeToWidth(Logic4Vec val, uint32_t target_width, Arena& arena) {
   return result;
 }
 
-// §10.7 with §7.10.1: an element store into a queue is an assignment to a
-// variable of the element type, so the value is truncated or extended to
-// the element width as a fixed-size array's element store is (WriteVar);
-// stored as it arrived, `d[0] = 1` on `byte d[]` made a 32-bit element, and
-// `{<< 8 {..., d}}` streamed four bytes for it, the suite's
-// 11.4.14.4--dynamic_array_stream-sim.sv packing 32 bytes where 17 were
-// written. A string is dynamically sized (§6.16), a real is its own 64
-// bits, and a handle is a handle, so those keep their width.
 Logic4Vec SizedForQueueElement(const QueueObject& q, Logic4Vec val,
                                Arena& arena) {
   if (val.is_string || val.is_real || q.holds_class_handles) return val;
@@ -481,8 +259,6 @@ std::vector<std::string> MultiDimLeafSuffixes(const ArrayInfo& info) {
   return out;
 }
 
-// §7.6 with §7.4.2: a multidimensional array copied whole takes every leaf
-// of a source of its shape, by position; nothing where the shapes differ.
 static void CopyMultiDimLeaves(std::string_view dst_name, const ArrayInfo& dst,
                                std::string_view src_name, const ArrayInfo& src,
                                SimContext& ctx) {
@@ -516,14 +292,6 @@ void CopyArrayElements(std::string_view dst_name, const ArrayInfo& dst,
     auto* sv = ctx.FindVariable(sn);
     auto* dv = ctx.FindVariable(dn);
     if (sv && dv) {
-      // §7.6 does a whole-array copy by assigning each element of the source
-      // to the matching element of the target, so this store is an assignment
-      // in its own right, and §6.8 makes what it assigns to a data object that
-      // keeps its value from one assignment to the next. The destination
-      // element therefore takes a copy of the source's words rather than the
-      // pointer to them that a plain Logic4Vec assignment would leave the two
-      // sharing. This is the whole-array spelling `b = a;` of the copy the
-      // slice and subarray forms already own their words on.
       dv->value = OwnRhsWords(sv->value, ctx.GetArena());
       dv->NotifyWatchers();
     }

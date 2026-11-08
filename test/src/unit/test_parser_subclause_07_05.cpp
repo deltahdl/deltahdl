@@ -57,9 +57,6 @@ TEST(DynamicArrayParsing, LeftmostDynamicWithInnerFixed) {
   EXPECT_NE(item->unpacked_dims[1], nullptr);
 }
 
-// §7.5: any unpacked dimension may be a dynamic array dimension, including the
-// element position — a dynamic array whose element is itself a dynamic array
-// parses to two unsized (null) unpacked dimensions.
 TEST(DynamicArrayParsing, ArrayElementDynamicBothDimsUnsized) {
   auto r = Parse(
       "module t;\n"

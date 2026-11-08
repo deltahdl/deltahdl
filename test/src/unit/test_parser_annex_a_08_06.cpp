@@ -10,14 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A.8.6 gathers the operator tokens into four productions: unary_operator,
-// binary_operator, unary_module_path_operator and binary_module_path_operator.
-// Where an operator also has a clause of its own — §11.4.4 relational, §11.4.7
-// logical, §11.4.8 bitwise, §11.4.9 reduction, §11.4.10 shift and §30.4.4.1
-// module paths — the clause file holds the plain name and covers the prose, and
-// the case here is named `<Op>As<Production>` for the production it places the
-// token in.
-
 TEST(OperatorParsing, UnaryReductionAnd) {
   VerifyInitialRhsOp("module m; initial x = &a; endmodule\n", ExprKind::kUnary,
                      TokenKind::kAmp);
@@ -118,9 +110,6 @@ TEST(OperatorParsing, BinaryLogicShiftRight) {
                      ExprKind::kBinary, TokenKind::kGtGt);
 }
 
-// A.8.6 lists `->` under binary_operator, but the operands come from a specify
-// path condition here rather than from an expression, so the name states that
-// context. §11.4.7's file carries the expression form.
 TEST(OperatorParsing, ImplicationInSpecifyPathCondition) {
   auto r = Parse(
       "module m;\n"
@@ -132,8 +121,6 @@ TEST(OperatorParsing, ImplicationInSpecifyPathCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// `<->` likewise reaches the parser through a specify path condition here, so
-// the name states that context; §11.4.7's file carries the expression form.
 TEST(OperatorParsing, EquivalenceInSpecifyPathCondition) {
   auto r = Parse(
       "module m;\n"
@@ -255,10 +242,6 @@ TEST(OperatorParsing, PostfixDecrement) {
                       ExprKind::kPostfixUnary, TokenKind::kMinusMinus);
 }
 
-// A binary_operator standing where a primary is required leaves
-// Parser::ParsePrimaryExpr with no production to take, and §11.2 owns the
-// report it writes there; A.8.6 states the grammar but has no report of its
-// own. Every case below names that report.
 TEST(OperatorParsing, BinaryStarRejectedAsPrefix) {
   auto r = Parse("module m; initial x = * a; endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
@@ -334,12 +317,6 @@ TEST(OperatorParsing, BinaryPowerMissingRhs) {
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
-// -- Module-path operators (unary_module_path_operator /
-//    binary_module_path_operator). Their natural syntactic home is a module
-//    path condition, so exercise them through a specify state-dependent path.
-
-// Parse a specify block whose state-dependent path condition holds the given
-// module-path expression, expecting a clean parse.
 static ParseResult ParseModulePathCond(const std::string& cond) {
   return Parse(
       "module m;\n"

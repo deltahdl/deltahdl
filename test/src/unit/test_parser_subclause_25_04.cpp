@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -36,11 +34,6 @@ TEST(InterfaceDeclaration, WithMixedDirectionPorts) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[2].name, "c");
 }
 
-// §25.4 states that interface port declarations follow the same syntax and
-// semantics as module ports. That includes the non-ANSI form, where the header
-// only names the ports and separate declarations inside the body supply their
-// directions. The interface parser must detect the non-ANSI header and fold the
-// body directions back onto the matching header ports.
 TEST(InterfaceDeclaration, WithNonAnsiPortDeclaration) {
   auto r = Parse(
       "interface ifc(clk, rst);\n"

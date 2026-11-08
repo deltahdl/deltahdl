@@ -10,15 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.4.1 governs $fgetc and $ungetc. Every rule here operates on a file
-// descriptor, and its behavior depends entirely on how that descriptor was
-// produced -- the §21.3.1 $fopen that created it -- so each test builds the
-// descriptor from real $fopen source syntax and drives the whole pipeline,
-// observing the read results through $display.
-
-// §21.3.4.1: $fgetc reads a single byte from the file named by fd and yields
-// its value; each call consumes exactly one byte, so consecutive calls walk
-// the data byte by byte.
 TEST(ReadCharacterAtATime, FgetcReadsOneBytePerCall) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_seq.txt";
@@ -41,9 +32,6 @@ TEST(ReadCharacterAtATime, FgetcReadsOneBytePerCall) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: $fgetc is a function, so besides the assignment form shown by the
-// standard's example it can sit directly in expression-operand position; the
-// byte it yields participates in the enclosing comparison.
 TEST(ReadCharacterAtATime, FgetcAsExpressionOperand) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_operand.txt";
@@ -65,9 +53,6 @@ TEST(ReadCharacterAtATime, FgetcAsExpressionOperand) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the descriptor a character is read from may equally come from a
-// read-update open type -- "r+" admits reading just as "r" does, and the
-// byte-per-call semantics are identical.
 TEST(ReadCharacterAtATime, FgetcReadsThroughReadUpdateDescriptor) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_rplus.txt";
@@ -90,8 +75,6 @@ TEST(ReadCharacterAtATime, FgetcReadsThroughReadUpdateDescriptor) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: when the read cannot deliver a byte, the result is set to EOF
-// (-1). Exhausting the data drives that path without any descriptor misuse.
 TEST(ReadCharacterAtATime, FgetcReturnsEofWhenDataExhausted) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_eof.txt";
@@ -114,10 +97,6 @@ TEST(ReadCharacterAtATime, FgetcReturnsEofWhenDataExhausted) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: a genuine read error -- here, a descriptor whose file has been
-// closed out from under it -- also sets the result to EOF (-1), and $ferror
-// can then describe the cause (via the §21.3.7 per-descriptor record). A
-// subsequent successful read on a fresh descriptor reports no error.
 TEST(ReadCharacterAtATime, FgetcErrorYieldsEofAndFerrorReportsCause) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_err.txt";
@@ -149,9 +128,6 @@ TEST(ReadCharacterAtATime, FgetcErrorYieldsEofAndFerrorReportsCause) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the result of $fgetc is wider than 8 bits precisely so a data
-// byte of 0xFF (255) stays distinct from the EOF sentinel (-1). The byte
-// occupies the low 8 bits with zero extension.
 TEST(ReadCharacterAtATime, FgetcHighByteDistinctFromEof) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_ff.txt";
@@ -173,9 +149,6 @@ TEST(ReadCharacterAtATime, FgetcHighByteDistinctFromEof) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the character pushed by $ungetc shall be the one returned by the
-// next $fgetc on that descriptor; reads after that continue with the stream's
-// own remaining data. A successful push back yields the result code zero.
 TEST(ReadCharacterAtATime, UngetcCharacterReturnedByNextFgetc) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_push.txt";
@@ -196,14 +169,10 @@ TEST(ReadCharacterAtATime, UngetcCharacterReturnedByNextFgetc) {
           "  end\n"
           "endmodule\n",
       f);
-  // Read 'X', push 'Z', read back 'Z', then continue with the stream's 'Y'.
   EXPECT_NE(out.find("c1=88 code=0 c2=90 c3=89"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the pushed character c is an expression; a parameter constant is
-// as valid a source for it as a literal, and the pushed value round-trips
-// through the next $fgetc unchanged.
 TEST(ReadCharacterAtATime, UngetcAcceptsParameterCharacter) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_param.txt";
@@ -227,9 +196,6 @@ TEST(ReadCharacterAtATime, UngetcAcceptsParameterCharacter) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the pushed character may equally come from a variable -- the
-// classic shape pushes back the very character just read, so the following
-// $fgetc delivers it a second time before the stream moves on.
 TEST(ReadCharacterAtATime, UngetcPushesBackVariableJustRead) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_var.txt";
@@ -250,14 +216,10 @@ TEST(ReadCharacterAtATime, UngetcPushesBackVariableJustRead) {
           "  end\n"
           "endmodule\n",
       f);
-  // 'M' is read, pushed back from the variable, read again, then 'N' follows.
   EXPECT_NE(out.find("c1=77 code=0 c2=77 c3=78"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the file itself is unchanged by $ungetc -- the push back lives
-// only in the descriptor's buffer. Reopening the file after a push back and a
-// read back delivers the original bytes with no trace of the pushed character.
 TEST(ReadCharacterAtATime, UngetcLeavesFileUnchanged) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_unchanged.txt";
@@ -283,16 +245,10 @@ TEST(ReadCharacterAtATime, UngetcLeavesFileUnchanged) {
           "  end\n"
           "endmodule\n",
       f);
-  // The pushed 'Z' was read back, yet the reopened file still holds exactly
-  // "XY" -- two bytes, then EOF.
   EXPECT_NE(out.find("c=90 r1=88 r2=89 r3=-1"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: when the push back cannot be performed the result code is EOF
-// rather than zero, and $ferror can describe the failure. Pushing EOF itself
-// (-1, in real negative-literal syntax) is refused by the stream, driving the
-// failure branch deterministically.
 TEST(ReadCharacterAtATime, UngetcErrorYieldsEofAndFerrorReportsCause) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_pusherr.txt";
@@ -316,10 +272,6 @@ TEST(ReadCharacterAtATime, UngetcErrorYieldsEofAndFerrorReportsCause) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: a refused push back inserts nothing -- the guarantee that the
-// pushed character is returned by the next $fgetc applies only to a push that
-// succeeded, so after a failed push the next read delivers the stream's own
-// byte.
 TEST(ReadCharacterAtATime, FailedUngetcPushesNothing) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_pushnone.txt";
@@ -338,15 +290,10 @@ TEST(ReadCharacterAtATime, FailedUngetcPushesNothing) {
           "  end\n"
           "endmodule\n",
       f);
-  // The failed push left the stream untouched: the first read still sees 'P'.
   EXPECT_NE(out.find("code=-1 c=80"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: the failure rule holds for a descriptor opened "w" too, whose
-// push back deltahdl holds itself rather than in the host stream. EOF itself
-// cannot be pushed, so the call answers EOF, $ferror describes it, and the
-// next $fgetc finds nothing pushed and a file it may not read.
 TEST(ReadCharacterAtATime, UngetcOfEofOntoAWriteOnlyFdFailsAndPushesNothing) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_w_pusheof.txt";
@@ -370,8 +317,6 @@ TEST(ReadCharacterAtATime, UngetcOfEofOntoAWriteOnlyFdFailsAndPushesNothing) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1: a push back onto a descriptor whose file has been closed has no
-// buffer to go into, so it fails with EOF and a cause $ferror can report.
 TEST(ReadCharacterAtATime, UngetcOntoAClosedFdFails) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213411_closed_push.txt";

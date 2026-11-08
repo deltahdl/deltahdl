@@ -9,13 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §25.7.4: an extern forkjoin task called through the interface runs every
-// definition its connected modules export, as a fork-join of their enables,
-// so countTargets from the interface's own initial procedure counts both
-// memMod instances. A call through one instance's path,
-// `top.mem2.a.Read(200)`, runs that instance's definition alone, whose
-// address range holds 200, and returns after its delay of 10. Before the
-// definitions were registered, the count was 0 and the call took no time.
 TEST(InterfaceForkjoinSim, CallRunsEveryDefinitionAndOneByPath) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface simple_bus;\n"
@@ -52,8 +45,6 @@ TEST(InterfaceForkjoinSim, CallRunsEveryDefinitionAndOneByPath) {
             "number of targets = 2\nread 200 t=12\nonly one t=12\n");
 }
 
-// §25.7.4: the definitions run at once, not one after another, so a call
-// whose two definitions each wait 5 returns at time 5, not 10.
 TEST(InterfaceForkjoinSim, DefinitionsRunConcurrently) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface bus;\n"
@@ -75,9 +66,6 @@ TEST(InterfaceForkjoinSim, DefinitionsRunConcurrently) {
             "t=5\n");
 }
 
-// §25.7.4: a call of an extern forkjoin task that no connected module
-// defines is a run-time error, after which the call returns with no effect.
-// Before this the call returned with no report.
 TEST(InterfaceForkjoinSim, CallWithNoDefinitionIsReported) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface simple_bus;\n"
@@ -98,10 +86,6 @@ TEST(InterfaceForkjoinSim, CallWithNoDefinitionIsReported) {
                             "25.7.4"));
 }
 
-// §25.7.4: a disable of an extern forkjoin task through one module instance,
-// m1.a.Hit, ends only the call to that instance; m2's call runs on and the
-// fork-join returns when it does. Before, the disable ended every call by the
-// task's name and the wait ended at 5.
 std::string RunDisabledForkjoin(const char* disable, SimFixture& f) {
   return RunCapture(
       std::string(
@@ -134,7 +118,6 @@ TEST(InterfaceForkjoinSim, DisableThroughModuleInstanceEndsItsCallAlone) {
             "finished 20\ndone at 20\n");
 }
 
-// The same disable through the interface instance, s.Hit, ends every call.
 TEST(InterfaceForkjoinSim, DisableThroughInterfaceInstanceEndsEveryCall) {
   SimFixture f;
   EXPECT_EQ(RunDisabledForkjoin("disable s.Hit", f), "done at 5\n");

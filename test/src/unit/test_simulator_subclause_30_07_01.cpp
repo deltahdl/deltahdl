@@ -35,17 +35,6 @@ TEST(ApplyPulseControlOverride, PreservesPropagationDelays) {
   for (int i = 0; i < 12; ++i) EXPECT_EQ(pd.delays[i], 10u);
 }
 
-// --- §30.7.1 resolution from real source. The PATHPULSE$ specparam rules --
-// reject-only mirrors to the error limit, a non-path-specific specparam reaches
-// every path, and a path-specific specparam takes precedence -- depend on how
-// the specparams and module paths are written, so they are exercised on a
-// SpecifyManager built from actual parsed/elaborated source rather than a hand
-// assembled state.
-
-// Parses + elaborates a module (fixed ports clk/data/pre/q), then seeds a
-// SpecifyManager: one default-limit PathDelay per module path declaration
-// (§30.4.2/§30.5.1), and every PATHPULSE$ specparam evaluated and applied
-// through the production resolver (§30.7.1).
 void BuildResolvedSpecify(const std::string& specify_body, SimFixture& f,
                           SpecifyManager& mgr,
                           const std::string& module_items = "") {
@@ -65,7 +54,7 @@ void BuildResolvedSpecify(const std::string& specify_body, SimFixture& f,
     for (auto* si : item->specify_items) {
       if (si->kind == SpecifyItemKind::kPathDecl) {
         PathDelay pd = BuildPathDelayFromDecl(si->path, f.ctx, f.arena);
-        InitDefaultPulseLimits(pd);  // §30.7 default: limits equal the delay
+        InitDefaultPulseLimits(pd);
         mgr.AddPathDelay(pd);
       }
     }
@@ -81,9 +70,6 @@ const PathDelay* FindPath(const SpecifyManager& mgr, std::string_view src,
   return nullptr;
 }
 
-// §30.7.1: a lone reject limit applies to both the reject and error limit. The
-// specparam is written with a single value, so has_error is false and the
-// resolver mirrors the reject limit onto the error limit across every slot.
 TEST(PulseControlResolution, RejectOnlyMirrorsErrorFromSource) {
   SimFixture f;
   SpecifyManager mgr;
@@ -99,8 +85,6 @@ TEST(PulseControlResolution, RejectOnlyMirrorsErrorFromSource) {
   }
 }
 
-// §30.7.1: when no module path is specified, the limits apply to every module
-// path in the module. Both declared paths receive the module-wide limits.
 TEST(PulseControlResolution, NonPathSpecificAppliesToEveryPath) {
   SimFixture f;
   SpecifyManager mgr;
@@ -121,10 +105,6 @@ TEST(PulseControlResolution, NonPathSpecificAppliesToEveryPath) {
   }
 }
 
-// §30.7.1: a path-specific PATHPULSE$ takes precedence over a non-path-specific
-// one for the path it names, regardless of declaration order. The module-wide
-// specparam is written LAST here, yet clk=>q still keeps its path-specific
-// limits while the unnamed data=>q path falls back to the module-wide value.
 TEST(PulseControlResolution, PathSpecificWinsRegardlessOfOrder) {
   SimFixture f;
   SpecifyManager mgr;
@@ -141,14 +121,11 @@ TEST(PulseControlResolution, PathSpecificWinsRegardlessOfOrder) {
   for (int i = 0; i < 12; ++i) {
     EXPECT_EQ(named->reject_limit[i], 2u);
     EXPECT_EQ(named->error_limit[i], 9u);
-    EXPECT_EQ(other->reject_limit[i], 3u);  // module-wide reject-only mirror
+    EXPECT_EQ(other->reject_limit[i], 3u);
     EXPECT_EQ(other->error_limit[i], 3u);
   }
 }
 
-// Input form: a limit_value is a constant_mintypmax_expression, so it may be a
-// specparam constant (11.2.1) rather than a literal. The resolved limit equals
-// the specparam's value.
 TEST(PulseControlResolution, LimitValueFromSpecparamConstant) {
   SimFixture f;
   SpecifyManager mgr;
@@ -163,11 +140,6 @@ TEST(PulseControlResolution, LimitValueFromSpecparamConstant) {
   EXPECT_EQ(p->error_limit[0], 5u);
 }
 
-// §30.7.1, multiple-path declaration: a PATHPULSE$ is recognized only for the
-// first path input/output terminal, and one that names a non-first terminal is
-// ignored. Driven from a real `*>` multiple-path declaration (clk, pre *> q):
-// the specparam naming the first input terminal (clk) sets the limits, while
-// the one naming the non-first input terminal (pre) leaves them unchanged.
 TEST(PulseControlResolution, MultiPathFirstTerminalAppliesNonFirstIgnored) {
   SimFixture f;
   SpecifyManager mgr;
@@ -178,15 +150,10 @@ TEST(PulseControlResolution, MultiPathFirstTerminalAppliesNonFirstIgnored) {
       f, mgr);
   const PathDelay* p = FindPath(mgr, "clk", "q");
   ASSERT_NE(p, nullptr);
-  // First-terminal specparam applied; the non-first (pre) specparam was ignored
-  // rather than overwriting the limits with its reject value of 9.
   EXPECT_EQ(p->reject_limit[0], 1u);
   EXPECT_EQ(p->error_limit[0], 2u);
 }
 
-// Input form: a limit_value is a constant_mintypmax_expression, so it may be a
-// module parameter (11.2.1) -- a different evaluation path than a literal or a
-// specparam. The resolved limit equals the parameter's value.
 TEST(PulseControlResolution, LimitValueFromParameterConstant) {
   SimFixture f;
   SpecifyManager mgr;
@@ -200,9 +167,6 @@ TEST(PulseControlResolution, LimitValueFromParameterConstant) {
   EXPECT_EQ(p->error_limit[0], 6u);
 }
 
-// Input form: a limit_value that is a localparam constant -- again a distinct
-// evaluation path from a parameter or specparam. The resolved limit equals the
-// localparam's value.
 TEST(PulseControlResolution, LimitValueFromLocalparamConstant) {
   SimFixture f;
   SpecifyManager mgr;
@@ -216,8 +180,6 @@ TEST(PulseControlResolution, LimitValueFromLocalparamConstant) {
   EXPECT_EQ(p->error_limit[0], 7u);
 }
 
-// Input form: a limit_value written as a min:typ:max triple. Under the default
-// delay mode the typical member is selected and becomes the pulse limit.
 TEST(PulseControlResolution, LimitValueMintypmaxSelectsTypical) {
   SimFixture f;
   SpecifyManager mgr;
@@ -231,9 +193,6 @@ TEST(PulseControlResolution, LimitValueMintypmaxSelectsTypical) {
   EXPECT_EQ(p->error_limit[0], 5u);
 }
 
-// §30.7.1: a path-specific PATHPULSE$ overrides only the path it names; a
-// sibling path with no PATHPULSE$ of its own keeps its default limits (equal to
-// its §30.5.1 delay) rather than inheriting the named path's limits.
 TEST(PulseControlResolution, PathSpecificAffectsOnlyNamedPath) {
   SimFixture f;
   SpecifyManager mgr;
@@ -248,14 +207,10 @@ TEST(PulseControlResolution, PathSpecificAffectsOnlyNamedPath) {
   ASSERT_NE(other, nullptr);
   EXPECT_EQ(named->reject_limit[0], 2u);
   EXPECT_EQ(named->error_limit[0], 5u);
-  EXPECT_EQ(other->reject_limit[0],
-            8u);  // default, untouched by the clk=>q spec
+  EXPECT_EQ(other->reject_limit[0], 8u);
   EXPECT_EQ(other->error_limit[0], 8u);
 }
 
-// §30.7.1: a path-specific PATHPULSE$ that names no existing module path
-// matches nothing and is ignored -- the real path keeps its default limits
-// (equal to the §30.5.1 delay) untouched.
 TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
   SimFixture f;
   SpecifyManager mgr;
@@ -265,32 +220,10 @@ TEST(PulseControlResolution, UnmatchedPathSpecificIsIgnored) {
       f, mgr);
   const PathDelay* p = FindPath(mgr, "clk", "q");
   ASSERT_NE(p, nullptr);
-  // Default limits from the delay of 12 remain, unaffected by the ignored
-  // data=>q specparam.
   EXPECT_EQ(p->reject_limit[0], 12u);
   EXPECT_EQ(p->error_limit[0], 12u);
 }
 
-// §30.7.1's worked example, run rather than inspected. The prose above the
-// example reads the 3 back off exactly the path asserted here: no PATHPULSE$
-// declaration names the path (data=>q), so it takes the reject and error limit
-// of 3 the last PATHPULSE$ declaration sets. Both limits are asserted because
-// §30.7.1 mirrors a lone reject limit onto the error limit.
-//
-// The specify block is the example's, its last limit written `(3)` as Syntax
-// 30-7 and A.2.4 parenthesize it; the example's bare `3` is reported (A.2.4).
-// What is added is the module header the example does not print: §30.4.1
-// requires a module path source to be a net connected to an input or inout
-// port and a destination to be connected to an output or inout port, and
-// CheckSpecifyPathTerminal in src/elaborator/elaborator_validate_specify.cpp
-// rejects a path terminal that is a declared local signal, so clk, data, clr
-// and pre are input ports and q is an output port.
-//
-// The example's numbers are kept as printed. 3 is the value the claim rests
-// on, and it differs from every other limit and delay in the source (12, 10, 4,
-// 2, 9), so a limit taken from the wrong specparam or from a path's default
-// (its own delay of 10) is caught. Nothing asserts on the 0 in `(0,4)`, since a
-// reject limit of 0 and an unset one read the same.
 TEST(PulseControlResolution, StandardExampleNonspecificLimitReachesPath) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -317,8 +250,6 @@ TEST(PulseControlResolution, StandardExampleNonspecificLimitReachesPath) {
   EXPECT_EQ(unnamed->error_limit[0], 3u);
 }
 
-// A buffer from a to y whose specify block is `specify_body`, driven 1 at 0,
-// 0 at 10 and 1 at 14, printing each change of y after time 0.
 std::string BufferPulseDesign(const std::string& specify_body) {
   return "module mybuf(input a, output y);\n"
          "  assign y = a;\n"
@@ -339,10 +270,6 @@ std::string BufferPulseDesign(const std::string& specify_body) {
          "endmodule\n";
 }
 
-// §30.7.1 (printed pages 887-888): `PATHPULSE$ = (3)`, the example's limit,
-// with no terminals, sets both limits of every path of the module, so a 4-wide
-// pulse through a path of 7 passes: y falls at 17 and rises at 21. With the
-// default limits, the delay itself, it was rejected.
 TEST(PulseControlRun, NonspecificLimitReachesEveryPath) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferPulseDesign("    (a => y) = 7;\n"
@@ -351,8 +278,6 @@ TEST(PulseControlRun, NonspecificLimitReachesEveryPath) {
             "t=7 y=1\nt=17 y=0\nt=21 y=1\n");
 }
 
-// §30.7.1: `PATHPULSE$ = (0)` makes both limits 0, so no pulse is filtered and
-// the 2-wide pulse a (7, 9) path makes of a 4-wide input propagates.
 TEST(PulseControlRun, ZeroLimitsLetEveryPulsePropagate) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferPulseDesign("    specparam PATHPULSE$ = (0);\n"
@@ -361,9 +286,6 @@ TEST(PulseControlRun, ZeroLimitsLetEveryPulsePropagate) {
             "t=7 y=1\nt=19 y=0\nt=21 y=1\n");
 }
 
-// §30.7.1 with §30.7 (printed page 886): `PATHPULSE$ = (1, 5)` sets the reject
-// limit 1 and the error limit 5 apart, so the 2-wide pulse, at or above the
-// one and below the other, is filtered to x.
 TEST(PulseControlRun, PulseBetweenTheLimitsIsFilteredToX) {
   SimFixture f;
   EXPECT_EQ(RunCapture(BufferPulseDesign("    specparam PATHPULSE$ = (1, 5);\n"
@@ -372,10 +294,6 @@ TEST(PulseControlRun, PulseBetweenTheLimitsIsFilteredToX) {
             "t=7 y=1\nt=19 y=x\nt=21 y=1\n");
 }
 
-// §30.7.1 (printed page 887): where both forms appear, a path's own specparams
-// win over the general one for that path, so a's path propagates its pulse
-// under (0, 0) while b's, under the nonspecific 3, rejects its own: y stays 1
-// through b's pulse.
 TEST(PulseControlRun, PathSpecificLimitsTakePrecedence) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module myand(input a, input b, output y);\n"
@@ -405,10 +323,6 @@ TEST(PulseControlRun, PathSpecificLimitsTakePrecedence) {
             "t=7 y=1\nt=19 y=0\nt=21 y=1\n");
 }
 
-// §30.7.1 (printed page 888): for a statement declaring several paths, the
-// PATHPULSE$ naming its first input and first output applies to every path it
-// declares, so under PATHPULSE$clr$q = (0, 4) a 2-wide pulse through pre in
-// `(clr, pre *> q) = 4` is filtered to x from 14 to 16.
 TEST(PulseControlRun, MultiplePathStatementTakesItsFirstTerminalsLimits) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module mycell(input clr, input pre, output q);\n"

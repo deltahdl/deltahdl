@@ -15,17 +15,6 @@
 
 namespace delta {
 
-// §20.8.2: these functions take a real value argument. What makes the 64 bits
-// of an evaluated argument a double is therefore the value's own real-ness, not
-// the shape of the node that produced it -- an evaluated expression carries
-// that on the result, so a negated literal, an arithmetic expression over real
-// operands and a nested call to one of these functions are all read as the
-// doubles they are. Reading the node kind instead recognised only a bare real
-// literal or a bare real variable, and passed anything else in as the unsigned
-// integer its bit pattern spells.
-//
-// A real literal is still answered before evaluating, because the literal
-// carries its double directly.
 static double ArgToDouble(const Expr* arg, SimContext& ctx, Arena& arena) {
   if (arg->kind == ExprKind::kRealLiteral) return arg->real_val;
   auto val = EvalExpr(arg, ctx, arena);
@@ -170,23 +159,8 @@ static Logic4Vec EvalAtanh(const Expr* expr, SimContext& ctx, Arena& arena) {
   return DoubleToResult(arena, std::atanh(x));
 }
 
-// ---------------------------------------------------------------------------
-// Annex N.2 reference algorithm for the probabilistic distribution functions.
-//
-// The LRM defines the exact numeric behavior of $dist_uniform, $dist_normal,
-// $dist_exponential, $dist_poisson, $dist_chi_square, $dist_t, and $dist_erlang
-// by giving C source code for them. The functions below are a faithful
-// transcription of that source. All randomness comes from a 32-bit
-// linear-congruential state threaded through every draw, so a given seed always
-// reproduces the same value (§20.14.2 repeatability) and every higher-level
-// distribution is built on the same base generator.
-
-// §N.2 uniform(): the base generator. It advances the seed with the 69069
-// multiplier, forms a float in [1.0, 2.0) from the top bits of the new state
-// (this relies on the IEEE 754 binary32 layout, as the reference notes), and
-// rescales it onto [start, end).
 static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
-  const double kD = 0.00000011920928955078125;  // 2^-23
+  const double kD = 0.00000011920928955078125;
   double a = 0.0, b = 0.0;
   if (*seed == 0) *seed = 259341593;
   if (start >= end) {
@@ -196,8 +170,6 @@ static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
     a = static_cast<double>(start);
     b = static_cast<double>(end);
   }
-  // The multiply is taken mod 2^32 (unsigned) to match the reference's long
-  // arithmetic without relying on signed overflow.
   *seed = static_cast<int32_t>(69069u * static_cast<uint32_t>(*seed) + 1u);
   uint32_t bits = (static_cast<uint32_t>(*seed) >> 9) | 0x3f800000u;
   float fs = 0.0F;
@@ -208,8 +180,6 @@ static double RefUniform(int32_t* seed, int32_t start, int32_t end) {
   return c;
 }
 
-// §N.2 normal(): the Marsaglia polar method, drawing pairs from uniform(-1,1)
-// until they fall inside the unit circle.
 static double RefNormal(int32_t* seed, int32_t mean, int32_t deviation) {
   double v1 = 0.0, v2 = 0.0, s = 1.0;
   while (s >= 1.0 || s == 0.0) {
@@ -221,14 +191,12 @@ static double RefNormal(int32_t* seed, int32_t mean, int32_t deviation) {
   return s * static_cast<double>(deviation) + static_cast<double>(mean);
 }
 
-// §N.2 exponential(): inverse transform of a uniform(0,1) draw.
 static double RefExponential(int32_t* seed, int32_t mean) {
   double n = RefUniform(seed, 0, 1);
   if (n != 0) n = -std::log(n) * mean;
   return n;
 }
 
-// §N.2 poisson(): counts uniform(0,1) products until they drop below e^-mean.
 static int32_t RefPoisson(int32_t* seed, int32_t mean) {
   int32_t n = 0;
   double q = -static_cast<double>(mean);
@@ -241,8 +209,6 @@ static int32_t RefPoisson(int32_t* seed, int32_t mean) {
   return n;
 }
 
-// §N.2 chi_square(): an odd degree contributes one squared normal; every pair
-// of degrees adds twice an exponential(1).
 static double RefChiSquare(int32_t* seed, int32_t deg_of_free) {
   double x = 0.0;
   if (deg_of_free % 2) {
@@ -257,8 +223,6 @@ static double RefChiSquare(int32_t* seed, int32_t deg_of_free) {
   return x;
 }
 
-// §N.2 t(): a standard normal divided by the root of a chi-square over its
-// degrees of freedom.
 static double RefT(int32_t* seed, int32_t deg_of_free) {
   double chi2 = RefChiSquare(seed, deg_of_free);
   double div = chi2 / static_cast<double>(deg_of_free);
@@ -266,7 +230,6 @@ static double RefT(int32_t* seed, int32_t deg_of_free) {
   return RefNormal(seed, 0, 1) / root;
 }
 
-// §N.2 erlangian(): the product of k uniform(0,1) draws shaped by the mean.
 static double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
   double x = 1.0;
   for (int32_t i = 1; i <= k; i++) x = x * RefUniform(seed, 0, 1);
@@ -275,28 +238,16 @@ static double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
   return -a * std::log(x) / b;
 }
 
-// §N.2: every rtl_dist_* wrapper except uniform rounds its real draw with
-// the annex's own idiom, (long)(r + 0.5) for a non-negative draw and the
-// negation of that of the negated draw for a negative one. The idiom is the
-// annex's code and not a rounding of this tool's choosing: it adds one half
-// in double and truncates, so the one double just below one half rounds up
-// where a rounding of the exact value would not, and a draw landing there is
-// answered as the annex answers it. It rounded with std::lround, which is
-// exact.
 int32_t RtlDistRound(double r) {
   if (r >= 0) return static_cast<int32_t>(r + 0.5);
   r = -r;
   return -static_cast<int32_t>(r + 0.5);
 }
 
-// §N.2 rtl_dist_uniform() common rounding: the reference floors a non-negative
-// draw and rounds a negative draw toward minus infinity.
 static int32_t FloorDistDraw(double r) {
   return r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
 }
 
-// §N.2 rtl_dist_uniform() general case (end is not LONG_MAX): widens the
-// interval by one, draws, floors, and clamps back into [start, end].
 static int32_t RtlDistUniformGeneral(int32_t* seed, int32_t start,
                                      int32_t end) {
   end++;
@@ -307,8 +258,6 @@ static int32_t RtlDistUniformGeneral(int32_t* seed, int32_t start,
   return i;
 }
 
-// §N.2 rtl_dist_uniform() LONG_MAX edge (end == INT32_MAX but start is not
-// INT32_MIN): widens the low end by one and offsets the draw upward by one.
 static int32_t RtlDistUniformHighEdge(int32_t* seed, int32_t start,
                                       int32_t end) {
   start--;
@@ -319,8 +268,6 @@ static int32_t RtlDistUniformHighEdge(int32_t* seed, int32_t start,
   return i;
 }
 
-// §N.2 rtl_dist_uniform() full-range edge (start == INT32_MIN and
-// end == INT32_MAX): maps the draw across the entire 32-bit span.
 static int32_t RtlDistUniformFullRange(int32_t* seed, int32_t start,
                                        int32_t end) {
   double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
@@ -328,11 +275,6 @@ static int32_t RtlDistUniformFullRange(int32_t* seed, int32_t start,
   return FloorDistDraw(r);
 }
 
-// §N.2 rtl_dist_uniform(): rounds toward the interval and clamps the result so
-// it stays inside [start, end], handling the LONG_MAX and LONG_MIN edges the
-// way the reference does (its long is the 32-bit integer modeled here). It is
-// declared in simulator/probabilistic_distribution.h for $random, which Table
-// N.1 computes with it over the whole range.
 int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   if (start >= end) return start;
   if (end != INT32_MAX) return RtlDistUniformGeneral(seed, start, end);
@@ -340,11 +282,6 @@ int32_t RtlDistUniform(int32_t* seed, int32_t start, int32_t end) {
   return RtlDistUniformFullRange(seed, start, end);
 }
 
-// §N.2 rtl_dist_*: each guards the argument the reference requires to be
-// positive and returns 0 otherwise (the diagnostic for that case is raised by
-// ValidateDistArgs, §20.14.2). $dist_normal accepts any mean. The six are
-// declared in simulator/probabilistic_distribution.h beside rtl_dist_uniform,
-// as the C functions Table N.1 names.
 int32_t RtlDistNormal(int32_t* seed, int32_t mean, int32_t sd) {
   return RtlDistRound(RefNormal(seed, mean, sd));
 }
@@ -369,15 +306,6 @@ int32_t RtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
   return RtlDistRound(RefErlangian(seed, k, mean));
 }
 
-// §20.14.2: the seed is an inout argument — a value goes in and a different
-// value comes back. When the seed names a variable, the advanced LCG state
-// produced by the §N.2 algorithm is written back, so consecutive calls walk the
-// stream while a run that re-initializes the seed to its original value replays
-// identically. Declared in simulator/probabilistic_distribution.h, since
-// $random's seed is written back the same way. Whatever variable the seed
-// names takes it, as an assignment to it would: a class property, a static
-// one through its class scope, and an element of a queue or an array among
-// them.
 void WriteBackDistributionSeed(const Expr* seed_arg, int32_t seed,
                                SimContext& ctx, Arena& arena) {
   if (seed_arg->kind != ExprKind::kIdentifier &&
@@ -390,9 +318,6 @@ void WriteBackDistributionSeed(const Expr* seed_arg, int32_t seed,
       arena);
 }
 
-// §20.14.2: mean, degree_of_freedom, and k_stage shall be greater than 0 for
-// the distributions that consume them. A non-positive value leaves the
-// distribution undefined, so it is reported; the draw still proceeds.
 static void RequirePositiveDistArg(const Expr* arg, SimContext& ctx,
                                    Arena& arena, std::string_view what) {
   auto v = static_cast<int32_t>(EvalExpr(arg, ctx, arena).ToUint64());
@@ -413,8 +338,6 @@ static void ValidateDistArgs(const Expr* expr, SimContext& ctx, Arena& arena,
     if (args.size() > 2) RequirePositiveDistArg(args[2], ctx, arena, "mean");
     return;
   }
-  // The positivity requirement covers exponential, poisson, chi-square, t, and
-  // erlang — not $dist_normal, whose mean may take any value.
   if (args.size() <= 1) return;
   if (name == "$dist_exponential" || name == "$dist_poisson") {
     RequirePositiveDistArg(args[1], ctx, arena, "mean");
@@ -462,12 +385,8 @@ static Logic4Vec EvalHyperbolicSysCall(const Expr* expr, SimContext& ctx,
 static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
                                  Arena& arena, std::string_view name) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
-  // §20.14.2: report any argument the distribution requires to be positive.
   ValidateDistArgs(expr, ctx, arena, name);
 
-  // §N.2: the seed is the 32-bit LCG state. Read it from the inout first
-  // argument, run the reference algorithm (which advances it), then write the
-  // advanced state back so the seed behaves as an inout argument (§20.14.2).
   auto arg = [&](size_t i) -> int32_t {
     if (i >= expr->args.size()) return 0;
     return static_cast<int32_t>(EvalExpr(expr->args[i], ctx, arena).ToUint64());
@@ -492,7 +411,6 @@ static Logic4Vec EvalDistSysCall(const Expr* expr, SimContext& ctx,
   }
 
   WriteBackDistributionSeed(expr->args[0], seed, ctx, arena);
-  // §20.14.2: each function returns an integer, which is signed.
   Logic4Vec out = MakeLogic4VecVal(
       arena, 32, static_cast<uint64_t>(static_cast<uint32_t>(result)));
   out.is_signed = true;

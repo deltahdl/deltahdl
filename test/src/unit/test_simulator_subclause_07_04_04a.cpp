@@ -24,9 +24,6 @@ TEST(MultidimensionalArraySimulation, PackedAndUnpackedDims) {
 }
 
 TEST(MultidimensionalArraySimulation, DistinctUnpackedElementsAreIndependent) {
-  // §7.4.4: each unpacked index selects a separate element. Writing two
-  // different elements and combining them in one expression shows they hold
-  // independent storage rather than aliasing.
   auto v = RunAndGet(
       "module t;\n"
       "  bit [3:0] [7:0] joe [1:10];\n"
@@ -42,9 +39,6 @@ TEST(MultidimensionalArraySimulation, DistinctUnpackedElementsAreIndependent) {
 }
 
 TEST(MultidimensionalArraySimulation, PackedElementParticipatesInArithmetic) {
-  // §7.4.4: an element of a multidimensional array is a single packed word
-  // (here 32 bits from [3:0][7:0]) and takes part in arithmetic as one value,
-  // mirroring the standard's whole-element add of one array slot into another.
   auto v = RunAndGet(
       "module t;\n"
       "  bit [3:0] [7:0] joe [1:10];\n"
@@ -60,11 +54,6 @@ TEST(MultidimensionalArraySimulation, PackedElementParticipatesInArithmetic) {
 }
 
 TEST(MultidimensionalArraySimulation, PackedDimsViaTypedefStagingWidthHonored) {
-  // §7.4.4: packed dimensions staged through a typedef combine into one wide
-  // packed word. bsix is bit [1:5]; `bsix [1:10] v5` stacks a second packed
-  // range on top, giving a single 50-bit value. Filling it with '1 and reading
-  // it into a 64-bit register must yield 50 set bits, proving the staged
-  // dimension sizes the storage rather than being dropped down to 5 bits.
   auto v = RunAndGet(
       "module t;\n"
       "  typedef bit [1:5] bsix;\n"
@@ -76,16 +65,11 @@ TEST(MultidimensionalArraySimulation, PackedDimsViaTypedefStagingWidthHonored) {
       "  end\n"
       "endmodule\n",
       "result");
-  EXPECT_EQ(v, 0x0003FFFFFFFFFFFFull);  // 50 ones
+  EXPECT_EQ(v, 0x0003FFFFFFFFFFFFull);
 }
 
 TEST(MultidimensionalArraySimulation,
      UnpackedDimsViaTypedefStagingAddressable) {
-  // §7.4.4: unpacked dimensions may also be assembled in stages through a
-  // typedef. mem_type is an array [0:3] of bsix; `mem_type ba [0:7]` prepends a
-  // second unpacked range, so ba is addressed with two unpacked indices
-  // [0:7][0:3]. Distinct two-index elements hold independent 5-bit words, in
-  // a declaration among the module's items and in one inside a procedure.
   auto v = RunAndGet(
       "module t;\n"
       "  typedef bit [1:5] bsix;\n"
@@ -107,10 +91,6 @@ TEST(MultidimensionalArraySimulation,
 
 TEST(MultidimensionalArraySimulation,
      ThreeUnpackedDimsIndexIndependentElements) {
-  // §7.4.4: a multidimensional array is an array of arrays. A three-dimensional
-  // unpacked array A[2][3][4] is addressed by three indices; each fully indexed
-  // element is independent storage, so writing three distinct slots and
-  // combining them recovers exactly the written values.
   auto v = RunAndGet(
       "module t;\n"
       "  int A[2][3][4];\n"
@@ -127,15 +107,6 @@ TEST(MultidimensionalArraySimulation,
 }
 
 TEST(MultidimensionalArraySimulation, NonblockingReachesSameElementAsBlocking) {
-  // §10.4.2: the variable_lvalue of a nonblocking assignment is any data type a
-  // procedural assignment statement accepts, and §7.4.5 makes an indexed name
-  // one such lvalue, so `A[1][2] <= 9` must land in the very element
-  // `A[1][2] = 9` would have written. The two elements are read out of the run
-  // by their own names rather than summed, because a sum cannot say which of
-  // them carried the value -- nor that the array's base variable took it
-  // instead. The delay lets the update region run: a nonblocking assignment
-  // read back at time 0 still shows the old value. 9 is odd on purpose; an even
-  // value would leave a wrongly written base variable at 0 as well.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -157,42 +128,6 @@ TEST(MultidimensionalArraySimulation, NonblockingReachesSameElementAsBlocking) {
   EXPECT_EQ(written_nonblocking->value.ToUint64(), 9u);
 }
 
-// §7.4.4 makes a multidimensional array an array of arrays, so the name of one
-// of its inner arrays is itself an aggregate and `mirror[0][0] = bank[0][0]`
-// copies the two elements that inner array holds. §6.8 gives each of those
-// four names its own storage -- a variable stands for a data storage element
-// and keeps its value from one assignment to the next -- which
-// TrySubarrayAssign (src/simulator/statement_assign_core.cpp) has to leave
-// standing. It gathers the source subarray by walking the context for the
-// leaves under that prefix and stores each leaf's Logic4Vec into the matching
-// destination leaf, and a Logic4Vec copies its `words` pointer rather than the
-// words (src/common/types.h), so the two subarrays were one row of storage read
-// under two names.
-//
-// This handler neither resizes nor coerces, so the copy is silent where it is
-// made and the case writes one destination leaf afterwards and reads the source
-// leaf it was paired with. It is a regression guard rather than a
-// discriminator: no writer left in the tree reaches an unpacked-array leaf's
-// words in place. WriteVar puts its own resized value in the leaf before it
-// applies §6.11.2, WritePartSelect deposits into a fresh extract of the target,
-// §13.5.1's argument binding owns its copy since #3564, and a member deposit
-// cannot resolve against an indexed name at all, BuildLhsName
-// (src/simulator/statement_assign.cpp) having no select arm. A 2-state
-// destination is what would make it bite -- the leaves of a multidimensional
-// array do carry their declared state-ness, unlike those of a one-dimensional
-// one -- because this store leaves the source's words in the destination and
-// coercing them there would clear the source.
-//
-// Three dimensions because two do not reach this handler: TrySubarrayAssign
-// asks for a select of a select on both sides, and on `bank[2][2]` the name
-// `bank[0]` is a select of a plain identifier.
-//
-// ToUint64 would report nothing here. It projects aval & ~bval, so an unknown
-// bit already reads as 0 through it; the assertions read words[0] instead.
-// 8'b0x11z000 is stored as aval 0x70 with bval 0x48, an x digit being aval 1
-// with bval 1 and a z digit aval 0 with bval 1, and the 2-state conversion of
-// it would be aval 0x30 with bval 0x00. The second leaf is what says the
-// subarray copy ran at all.
 TEST(MultidimensionalArraySimulation, SubarrayCopyElementsGetTheirOwnWords) {
   SimFixture f;
   auto* origin = RunAndFindVar(
@@ -219,11 +154,6 @@ TEST(MultidimensionalArraySimulation, SubarrayCopyElementsGetTheirOwnWords) {
   EXPECT_EQ(carried->value.words[0].aval & 0xFFu, 0x3Cu);
 }
 
-// §7.4.4: a multidimensional array is an array whose elements are arrays, so
-// `int a[0:1][0:2]` is two arrays of three, six elements in all. A declaration
-// inside a begin-end block was built from its first dimension alone, so the
-// array had two elements and a write to `a[1][2]` reached a leaf nothing had
-// created. The read is what says so: the write was silent either way.
 TEST(MultidimensionalArraySimulation, BlockLocalArrayBuildsEveryDimension) {
   auto v = RunAndGet(
       "module t;\n"
@@ -238,10 +168,6 @@ TEST(MultidimensionalArraySimulation, BlockLocalArrayBuildsEveryDimension) {
   EXPECT_EQ(v, 7u);
 }
 
-// §7.4.2's size form of the same declaration -- the clause gives
-// `int Array[8][32]` and `int Array[0:7][0:31]` as the same array -- which the
-// block builder read only for a lone dimension while the range form beside it
-// took the first of several.
 TEST(MultidimensionalArraySimulation, BlockLocalArrayBuildsEverySizeFormDim) {
   auto v = RunAndGet(
       "module t;\n"
@@ -256,9 +182,6 @@ TEST(MultidimensionalArraySimulation, BlockLocalArrayBuildsEverySizeFormDim) {
   EXPECT_EQ(v, 7u);
 }
 
-// The per-dimension extents rather than the leaves: a foreach reads dim_sizes,
-// which the block path left empty, so it iterated the outermost dimension alone
-// and this counted 2 where §7.4.4 gives 6.
 TEST(MultidimensionalArraySimulation,
      BlockLocalArrayRecordsEveryDimensionSize) {
   auto v = RunAndGet(
@@ -274,8 +197,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 6u);
 }
 
-// The same declaration among a module's items, which says the two builders
-// agree rather than that one of them works.
 TEST(MultidimensionalArraySimulation, ModuleScopeArrayAgreesWithTheBlockLocal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -290,14 +211,6 @@ TEST(MultidimensionalArraySimulation, ModuleScopeArrayAgreesWithTheBlockLocal) {
   EXPECT_EQ(v, 7u);
 }
 
-// §7.4.5: a write through an invalid index does nothing, apart from a write to
-// element [$+1] of a queue and the creation of a new associative array element.
-// A fixed unpacked array is neither exception, and the write invented a
-// variable for the name it built instead -- 32 bits wide whatever the element
-// type declared, in the design-wide table under a name FindVariable will not
-// read back from inside an instance, and made again on every execution. Nothing
-// existing under the name afterwards is what says the operation was not
-// performed.
 TEST(MultidimensionalArraySimulation,
      WriteToAnAbsentCompoundElementIsNoOperation) {
   SimFixture f;
@@ -316,9 +229,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(f.ctx.FindVariable("a[5][0]"), nullptr);
 }
 
-// The same write executed twice: the fabrication made one cell per execution,
-// so a loop writing an out-of-range element grew the table for as long as it
-// ran.
 TEST(MultidimensionalArraySimulation, RepeatedAbsentCompoundWriteMakesNoCells) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -337,9 +247,6 @@ TEST(MultidimensionalArraySimulation, RepeatedAbsentCompoundWriteMakesNoCells) {
   EXPECT_EQ(f.ctx.FindVariable("a[6][0]"), nullptr);
 }
 
-// The guard: an index that is in range names an element that exists, and the
-// write reaches it at the element's own declared width rather than the 32 the
-// fabricated cell had.
 TEST(MultidimensionalArraySimulation, WriteToAPresentCompoundElementReachesIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -357,17 +264,6 @@ TEST(MultidimensionalArraySimulation, WriteToAPresentCompoundElementReachesIt) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §7.4.4: packed dimensions may also be built up in stages through typedef,
-// whose example `typedef bit [1:5] bsix; bsix [1:10] v5;` is 50 bits -- the
-// use-site range multiplies the width the name stands for rather than replacing
-// it. `nib [1:0] x` on a `typedef bit [3:0] nib` is therefore eight bits.
-//
-// It was two: the width came from a reader that tested the packed dimensions
-// before the name and answered from the range alone, so the declaration took
-// the width of the index rather than of what is indexed and the name was
-// discarded. 8'hA5 is the discriminating value -- its low two bits are 2'b01,
-// so the truncated declaration reads 1 -- and nib is four bits against a
-// two-bit use-site range so that no coincidence of the two can pass.
 TEST(MultidimensionalArraySimulation,
      UseSitePackedDimStacksOnTheTypedefsWidth) {
   auto v = RunAndGet(
@@ -384,8 +280,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0xA5u);
 }
 
-// The same declaration in a subroutine body, which is the other of the two
-// paths that size a declaration from the elaborated table.
 TEST(MultidimensionalArraySimulation, UseSitePackedDimStacksInASubroutineBody) {
   auto v = RunAndGet(
       "module t;\n"
@@ -402,10 +296,6 @@ TEST(MultidimensionalArraySimulation, UseSitePackedDimStacksInASubroutineBody) {
   EXPECT_EQ(v, 0xA5u);
 }
 
-// A use-site dimension on a typedef that carries none of its own: §7.4.4 stacks
-// the range on a width of one, so `flag [3:0] v` is four bits. It is what a
-// repair that multiplied unconditionally would break, by doubling a width that
-// had nothing to stack on.
 TEST(MultidimensionalArraySimulation,
      UseSitePackedDimOnAScalarTypedefIsItself) {
   auto v = RunAndGet(
@@ -422,15 +312,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0xDu);
 }
 
-// §6.18 gives a declared object the type the name stands for and §7.4.4 keeps a
-// typedef's unpacked dimensions in the type rather than in the declaration that
-// uses the name, so `q_t qu;` declares a queue wherever it is written. A
-// declaration among a module's items adopted those dimensions; one written
-// inside a subroutine is a statement and adopted nothing, so the local was a
-// plain vector of the element's width and push_back reached no store at all.
-//
-// The size is what says it is a queue: a vector answers §20.7's $size of its
-// own width or nothing, where three pushes onto a queue answer 3.
 TEST(MultidimensionalArraySimulation, QueueTypedefLocalInAFunctionIsAQueue) {
   auto v = RunAndGet(
       "module t;\n"
@@ -449,9 +330,6 @@ TEST(MultidimensionalArraySimulation, QueueTypedefLocalInAFunctionIsAQueue) {
   EXPECT_EQ(v, 308u);
 }
 
-// The fixed-size half of the same rule: four elements, each its own storage,
-// where the declaration was one variable of one element's width and the three
-// writes below all landed in it.
 TEST(MultidimensionalArraySimulation, ArrayTypedefLocalInAFunctionHasElements) {
   auto v = RunAndGet(
       "module t;\n"
@@ -469,10 +347,6 @@ TEST(MultidimensionalArraySimulation, ArrayTypedefLocalInAFunctionHasElements) {
   EXPECT_EQ(v, 509u);
 }
 
-// The same two declarations written in an initial block, which is the other
-// procedural declaration path: a statement executed by the statement executor
-// rather than by the subroutine-body executor, and each has to reach the
-// dimensions for itself.
 TEST(MultidimensionalArraySimulation, AggregateTypedefLocalsInAnInitialBlock) {
   auto v = RunAndGet(
       "module t;\n"
@@ -492,14 +366,6 @@ TEST(MultidimensionalArraySimulation, AggregateTypedefLocalsInAnInitialBlock) {
   EXPECT_EQ(v, 267u);
 }
 
-// §7.4.1 (printed page 153) has an index of a packed array select a subfield
-// and §7.4.4 (printed 155) stacks the packed dimensions ahead of the unpacked
-// ones, so on a `logic [3:0][7:0] y[1:0]` the chain `y[0][3][1]` is bit 1 of
-// the eight-bit subfield 3 of the element `y[0]`: storage bit 25, which §11.5.1
-// (printed 296) addresses by the declaration's ranges. The write path resolved
-// one index past the element and made the third a fresh variable named after
-// the whole chain, so the element read 0; bit 25 set reads 32'h02000000, and
-// no other bit of the element gives that value.
 TEST(MultidimensionalArraySimulation,
      BitOfPackedSubfieldOfUnpackedElementWrites) {
   auto v = RunAndGet(
@@ -514,10 +380,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0x02000000u);
 }
 
-// The same chain on a variable with packed dimensions alone: `x[1][3]` on a
-// `logic [1:0][7:0] x` is bit 3 of subfield 1, storage bit 11 (§7.4.1). With no
-// unpacked dimension there was no element to stand on, and the chain was made
-// a variable of its own; bit 11 set reads 16'h0800.
 TEST(MultidimensionalArraySimulation,
      BitOfPackedSubfieldOfPackedVariableWrites) {
   auto v = RunAndGet(
@@ -532,10 +394,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0x0800u);
 }
 
-// One index past the element still writes the subfield whole (§7.4.1): 8'hAB
-// into subfield 2 of `y[1]` lands in bits 23 to 16 and leaves bit 0 standing,
-// which the resolver taking the element for the chain's base has to keep doing
-// now that it also answers a chain of three.
 TEST(MultidimensionalArraySimulation,
      SubfieldOfUnpackedElementStillWritesWhole) {
   auto v = RunAndGet(
@@ -550,11 +408,6 @@ TEST(MultidimensionalArraySimulation,
   EXPECT_EQ(v, 0x00AB0001u);
 }
 
-// §11.5.1's part-select of the subfield: `y[0][3][7:4]` is the upper four bits
-// of subfield 3, storage bits 31 to 28, so 4'hC there reads 32'hC0000000. The
-// part-select form never reached the element at all -- the compound resolver
-// declines a range and the fallback wrote the array's base carrier -- so the
-// element read 0.
 TEST(MultidimensionalArraySimulation, PartSelectOfPackedSubfieldWrites) {
   auto v = RunAndGet(
       "module t;\n"
@@ -568,12 +421,6 @@ TEST(MultidimensionalArraySimulation, PartSelectOfPackedSubfieldWrites) {
   EXPECT_EQ(v, 0xC0000000u);
 }
 
-// §11.5.1: a bit-select outside the address bounds has no effect on the data
-// stored when written. Bit 9 of an eight-bit subfield is outside it, and the
-// index is chosen so that a resolver adding it to the subfield's offset without
-// checking the bound would land inside the element: 16 + 9 is bit 25 of `y[0]`
-// and 0 + 8 is bit 8 of `x`, each of which would read as a set bit. Both reads
-// stay 0.
 TEST(MultidimensionalArraySimulation, OutOfRangeSubfieldIndexWritesNothing) {
   auto src =
       "module t;\n"
@@ -590,9 +437,6 @@ TEST(MultidimensionalArraySimulation, OutOfRangeSubfieldIndexWritesNothing) {
   EXPECT_EQ(RunAndGet(src, "x"), 0u);
 }
 
-// §10.4.2 gives the nonblocking form the same target the blocking one takes,
-// and its select window is resolved through the same call, so `y[0][3][1] <=
-// 1'b1` lands on storage bit 25 of `y[0]` once the update region has run.
 TEST(MultidimensionalArraySimulation, NonblockingBitOfPackedSubfieldWrites) {
   auto v = RunAndGet(
       "module t;\n"
@@ -607,12 +451,6 @@ TEST(MultidimensionalArraySimulation, NonblockingBitOfPackedSubfieldWrites) {
   EXPECT_EQ(v, 0x02000000u);
 }
 
-// The read of the same chains (§7.4.1, §11.5.1): with `y[0]` holding
-// 32'h5A000000, `y[0][3]` is the subfield 8'h5A and `y[0][3][1]` its bit 1,
-// which is set. The subfield read answered bit 3 of the element, 0, the
-// packed-element read asking only after a bare name; and the three-index read
-// answered Table 7-1's default for an element that exists, 'x, which projects
-// to 0.
 TEST(MultidimensionalArraySimulation, SubfieldAndBitOfUnpackedElementRead) {
   auto src =
       "module t;\n"
@@ -629,11 +467,6 @@ TEST(MultidimensionalArraySimulation, SubfieldAndBitOfUnpackedElementRead) {
   EXPECT_EQ(RunAndGet(src, "b"), 1u);
 }
 
-// §11.4.12 sizes a concatenation lvalue element by its own width, and §7.4.1
-// makes `x[1][3]` one bit rather than the eight of `x[1]`. Sized at eight it
-// took the value's low byte, 8'h57, and left `x[0]` the bits above: x read
-// 16'h0801. At one bit it takes bit 0 of 9'h157 into storage bit 11 and `x[0]`
-// takes bits 8 to 1, 8'hAB, so x reads 16'h08AB.
 TEST(MultidimensionalArraySimulation, ConcatLvalueBitOfPackedSubfieldIsOneBit) {
   auto v = RunAndGet(
       "module t;\n"
@@ -647,17 +480,6 @@ TEST(MultidimensionalArraySimulation, ConcatLvalueBitOfPackedSubfieldIsOneBit) {
   EXPECT_EQ(v, 0x08ABu);
 }
 
-// §7.4.4 reads the packed dimensions left to right, each index selecting one
-// element of the next, and §7.4.1 nests them: on the 32-bit
-// `logic [1:0][1:0][7:0] z`, `z[1]` is bits 31 to 16, `z[1][0]` the lower
-// eight of those, bits 23 to 16, and `z[1][0][3]` their bit 3, storage bit 19,
-// so the write reads 32'h00080000; `z[0][1]` is bits 15 to 8 of `z[0]`, whose
-// bit 7 is storage bit 15, and `z[1][1]` is bits 31 to 24, so the three
-// together read 32'h5A088000. With only the outermost dimension recorded,
-// `z[1][0]` was bit 0 of the sixteen-bit `z[1]`, storage bit 16, and `z[1][1]`
-// its bit 1, so the whole-subfield write put the value's bit 0, which is
-// clear, at storage bit 17, and the bit writes, with nothing left to index in
-// a one-bit window, wrote nothing: z read 0.
 TEST(MultidimensionalArraySimulation, ThirdPackedDimensionBitWrites) {
   auto v = RunAndGet(
       "module t;\n"
@@ -673,11 +495,6 @@ TEST(MultidimensionalArraySimulation, ThirdPackedDimensionBitWrites) {
   EXPECT_EQ(v, 0x5A088000u);
 }
 
-// The reads of the same chains: with z holding 32'h89ABCDEF, `z[1]` is
-// 16'h89AB and `z[1][0]` its low byte 8'hAB; `z[0]` is 16'hCDEF, `z[0][1]` is
-// 8'hCD, and bit 6 of that is set. Read as bits of the sixteen-bit windows,
-// `z[1][0]` was bit 0 of 16'h89AB, 1, and `z[0][1]` bit 1 of 16'hCDEF, whose
-// bit 6 is out of range and read x, 0.
 TEST(MultidimensionalArraySimulation, ThirdPackedDimensionSubfieldAndBitRead) {
   auto src =
       "module t;\n"
@@ -694,10 +511,6 @@ TEST(MultidimensionalArraySimulation, ThirdPackedDimensionSubfieldAndBitRead) {
   EXPECT_EQ(RunAndGet(src, "b"), 1u);
 }
 
-// §11.5.1's part-select of the innermost subfield: `z[0][1][7:4]` is the upper
-// four bits of storage bits 15 to 8, so 4'hC there reads 32'h0000C000. The
-// one-bit window `z[0][1]` was resolved to had no bits 7 to 4, so nothing was
-// written and z read 0.
 TEST(MultidimensionalArraySimulation, ThirdPackedDimensionPartSelectWrites) {
   auto v = RunAndGet(
       "module t;\n"
@@ -711,11 +524,6 @@ TEST(MultidimensionalArraySimulation, ThirdPackedDimensionPartSelectWrites) {
   EXPECT_EQ(v, 0x0000C000u);
 }
 
-// §11.5.1 has the bit an index reaches decided by the declaration, and the
-// inner dimension is declared too: on `logic [1:0][0:7] w`, index 0 of the
-// subfield `w[1]` is its most significant bit, storage bit 15, so the write
-// reads 16'h8000 and the read of `w[1][0]` on 16'h8000 is 1. Addressed as a
-// flat [7:0] window, `w[1][0]` was storage bit 8, reading 16'h0100 and 0.
 TEST(MultidimensionalArraySimulation, InnerPackedDimensionRangeAsDeclared) {
   auto src =
       "module t;\n"
@@ -732,11 +540,6 @@ TEST(MultidimensionalArraySimulation, InnerPackedDimensionRangeAsDeclared) {
   EXPECT_EQ(RunAndGet(src, "w"), 0x8000u);
 }
 
-// §7.4.4 (printed page 155) lets an array's dimensions be defined in stages
-// with typedef, and §8.5 puts no restriction on a property's type, so a
-// property declared through a typedef written outside the class has the
-// typedef's dimensions. Only a class-scope typedef's reached a property: this
-// one was a single int, and the element write through the handle was lost.
 TEST(MultidimensionalArraySimulation, PropertyTakesAModuleTypedefsFixedDim) {
   auto v = RunAndGet(
       "module t;\n"
@@ -754,8 +557,6 @@ TEST(MultidimensionalArraySimulation, PropertyTakesAModuleTypedefsFixedDim) {
   EXPECT_EQ(v, 94u);
 }
 
-// The queue half: three pushes onto a property declared through a
-// compilation-unit queue typedef answer a size of 3.
 TEST(MultidimensionalArraySimulation, PropertyTakesAUnitTypedefsQueueDim) {
   auto v = RunAndGet(
       "typedef int q_t[$];\n"
@@ -774,8 +575,6 @@ TEST(MultidimensionalArraySimulation, PropertyTakesAUnitTypedefsQueueDim) {
   EXPECT_EQ(v, 308u);
 }
 
-// The associative half: two keys written through a property declared through
-// a compilation-unit associative typedef are two entries.
 TEST(MultidimensionalArraySimulation, PropertyTakesAUnitTypedefsAssocDim) {
   auto v = RunAndGet(
       "typedef int a_t[string];\n"
@@ -793,8 +592,6 @@ TEST(MultidimensionalArraySimulation, PropertyTakesAUnitTypedefsAssocDim) {
   EXPECT_EQ(v, 24u);
 }
 
-// §26.3: a class a package declares reads the package's typedef by its bare
-// name, so its property takes that typedef's dimensions too.
 TEST(MultidimensionalArraySimulation, PropertyTakesAPackageTypedefsQueueDim) {
   auto v = RunAndGet(
       "package p;\n"
@@ -814,12 +611,6 @@ TEST(MultidimensionalArraySimulation, PropertyTakesAPackageTypedefsQueueDim) {
   EXPECT_EQ(v, 25u);
 }
 
-// §7.4.4 with §7.4.5: a packed array of packed arrays is indexed one packed
-// dimension at a time, the leftmost first, so `joe[7][3:2]` of `bit [3:0][7:0]
-// joe [1:10]` is two bytes and `joe[6][1:0]` the low two. A packed array of a
-// packed typedef, `bsix [1:10] v5` under `typedef bit [1:5] bsix;`, selects a
-// whole bsix with `v5[1]` and a bit of it, numbered [1:5] from the left, with
-// `v5[1][5]`.
 TEST(MultidimensionalArraySimulation, PackedArrayOfPackedArraysIndexedPerDim) {
   SimFixture f;
   std::string out = RunCapture(
@@ -841,10 +632,6 @@ TEST(MultidimensionalArraySimulation, PackedArrayOfPackedArraysIndexedPerDim) {
   EXPECT_EQ(out, "12340013 4660 52\n20 8 0\n");
 }
 
-// §7.4.4 with §20.7: each packed dimension of a packed array of packed arrays
-// is a dimension of its own to the array query functions, numbered after the
-// unpacked ones from the left: `bit [3:0][7:0] joe [1:10]` has three
-// dimensions, the second [3:0] and the third [7:0].
 TEST(MultidimensionalArraySimulation, QueriesNumberEachPackedDimension) {
   SimFixture f;
   std::string out = RunCapture(
@@ -863,13 +650,6 @@ TEST(MultidimensionalArraySimulation, QueriesNumberEachPackedDimension) {
   EXPECT_EQ(out, "3 1\n4 3 0 1\n8 7 0\n");
 }
 
-// §7.4.4 lets a typedef define a packed array's dimensions, and §7.4.1 has
-// each index of a packed multidimensional array address one element of its
-// dimension, so `x[1]` of `T x` under `typedef logic [1:0][3:0] T` is the four
-// bits 7:4 and `x[0][2]` bit 2 of the element below them. Declared through the
-// type's name alone, the variable recorded none of those dimensions, and each
-// index read a single bit. An assignment pattern fills it element by element
-// by the same dimensions (§10.9.1).
 TEST(MultidimensionalArraySimulation, TypedefDefinesThePackedDimensions) {
   SimFixture f;
   auto out = RunCapture(
@@ -889,10 +669,6 @@ TEST(MultidimensionalArraySimulation, TypedefDefinesThePackedDimensions) {
   EXPECT_EQ(out, "a 5 0 1\na3\n12\n");
 }
 
-// The same at module scope, where the elaborator gives a variable declared
-// through a type name the type the name stands for. It gave one of a single
-// packed dimension alone, so a module variable of a two-dimensional typedef
-// reached the run with no dimensions and each index read a single bit.
 TEST(MultidimensionalArraySimulation, TypedefDefinesAModuleVariablesDims) {
   SimFixture f;
   auto out = RunCapture(
@@ -912,11 +688,6 @@ TEST(MultidimensionalArraySimulation, TypedefDefinesAModuleVariablesDims) {
   EXPECT_EQ(out, "a 5 0 1\na3\n12\n");
 }
 
-// §7.4.4 with §11.5.1: an element type written as a name standing for an
-// integral type -- a vector, an integer atom, a packed structure -- is a
-// packed object, so an index past the element selects a bit or a
-// part of it, written in place whether the assignment blocks or not, while the
-// staged typedef above still reads its second index as an array dimension.
 TEST(MultidimensionalArraySimulation, IndexPastANamedVectorElementSelectsBits) {
   SimFixture f;
   std::string out = RunCapture(

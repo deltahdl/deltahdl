@@ -98,9 +98,6 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignClassIndexMixedTypeRejected) {
                             7, "7.9.9"));
 }
 
-// The two arrays agree on being associative and on their int index type, so
-// §7.9.9 lets the assignment through and the §7.6 element-equivalence rule is
-// what rejects it: an int element is not equivalent to a logic [7:0] one.
 TEST(AssocArrayAssignmentElaboration, AssocAssignElementTypeMismatchRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -175,9 +172,6 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignToDynamicRejected) {
                             4, "7.9.9"));
 }
 
-// §7.9.9: two associative arrays sharing an integral (byte) index type are
-// compatible. Covers an integral index type distinct from the int/string forms
-// above.
 TEST(AssocArrayAssignmentElaboration, AssocAssignByteIndexOk) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,8 +184,6 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignByteIndexOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.9.9: distinct integral index types are not the same index type, so the
-// assignment is rejected even though both operands are associative arrays.
 TEST(AssocArrayAssignmentElaboration,
      AssocAssignIntegralIndexMismatchRejected) {
   ElabFixture f;
@@ -208,8 +200,6 @@ TEST(AssocArrayAssignmentElaboration,
                             4, "7.9.9"));
 }
 
-// §7.9.9: a wildcard-indexed associative array is compatible with another
-// wildcard-indexed associative array of the same element type.
 TEST(AssocArrayAssignmentElaboration, AssocAssignWildcardIndexSameTypeOk) {
   ElabFixture f;
   ElaborateSrc(
@@ -222,8 +212,6 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignWildcardIndexSameTypeOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.9.9: a wildcard index type differs from an explicit integral index type,
-// so the assignment between them is rejected.
 TEST(AssocArrayAssignmentElaboration, AssocAssignWildcardVsTypedRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -239,8 +227,6 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignWildcardVsTypedRejected) {
                             4, "7.9.9"));
 }
 
-// §7.9.9: a queue is one of the "other types of arrays" that cannot be assigned
-// to an associative array (queue source rejected).
 TEST(AssocArrayAssignmentElaboration, AssocAssignFromQueueRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -256,8 +242,6 @@ TEST(AssocArrayAssignmentElaboration, AssocAssignFromQueueRejected) {
                             4, "7.9.9"));
 }
 
-// §7.9.9: nor can an associative array be assigned to a queue (queue target
-// rejected).
 TEST(AssocArrayAssignmentElaboration, AssocAssignToQueueRejected) {
   ElabFixture f;
   ElaborateSrc(

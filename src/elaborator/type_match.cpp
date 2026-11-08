@@ -46,10 +46,6 @@ static bool VectorMatchesPredef(const DataType& vec, const DataType& predef,
   return vec_width == EvalTypeWidth(predef);
 }
 
-// Whether two bounds of a packed dimension are the same: both absent, or both
-// present with equal values, folded against `scope`, the parameters and genvar
-// values in force where the types are written. A bound that does not fold
-// there is not told apart from the other.
 static bool SameBound(const Expr* a, const Expr* b, const ScopeMap& scope) {
   if ((a == nullptr) != (b == nullptr)) return false;
   if (a == nullptr) return true;
@@ -58,9 +54,6 @@ static bool SameBound(const Expr* a, const Expr* b, const ScopeMap& scope) {
   return !va || !vb || *va == *vb;
 }
 
-// §6.22.1(f): two fixed-size array types match only where they have the same
-// left and right bounds, dimension by dimension, so `bit [11:0]` does not
-// match `bit [12:0]`, nor `bit [7:0]` match `bit [0:7]`.
 static bool SamePackedBounds(const DataType& a, const DataType& b,
                              const ScopeMap& scope) {
   if (!SameBound(a.packed_dim_left, b.packed_dim_left, scope) ||
@@ -77,8 +70,6 @@ static bool SamePackedBounds(const DataType& a, const DataType& b,
   return true;
 }
 
-// Whether two unpacked dimensions are the same: a range `[l:r]` bound by bound,
-// and a size `[n]` by its value.
 static bool SameUnpackedDim(const Expr* a, const Expr* b,
                             const ScopeMap& scope) {
   bool a_range = a != nullptr && a->kind == ExprKind::kBinary &&
@@ -90,8 +81,6 @@ static bool SameUnpackedDim(const Expr* a, const Expr* b,
   return SameBound(a->lhs, b->lhs, scope) && SameBound(a->rhs, b->rhs, scope);
 }
 
-// Whether two members of one declaration have the same type: the kind,
-// signing, name and dimensions, and a nested aggregate's own members.
 static bool SameMember(const StructMember& a, const StructMember& b,
                        const ScopeMap& scope) {
   if (CanonKind(a.type_kind) != CanonKind(b.type_kind) ||
@@ -118,10 +107,6 @@ static bool SameMember(const StructMember& a, const StructMember& b,
                     });
 }
 
-// §6.22.1(c) and (d): an enum, struct or union type matches only a type of
-// its own declaration. Two specializations of one class's struct typedef
-// (§6.25) share the declaration and are still different types, which the
-// members they were specialized to tell apart.
 static bool SameDeclaration(const DataType& a, const DataType& b,
                             const ScopeMap& scope) {
   bool declared = a.kind == DataTypeKind::kEnum ||
@@ -193,9 +178,6 @@ bool TypesEquivalent(const DataType& a, const DataType& b) {
 
 bool ElementTypesEquivalent(const ElementTypeInfo& a,
                             const ElementTypeInfo& b) {
-  // §6.22.2: an enumeration or a class is equivalent only to a type matching
-  // it, never to another of the same width, so an element type left as a name
-  // is judged by the name that identifies it.
   if (a.kind == DataTypeKind::kNamed || b.kind == DataTypeKind::kNamed) {
     return a.kind == b.kind && a.type_name == b.type_name;
   }
@@ -214,10 +196,6 @@ bool ElementTypesEquivalent(const ElementTypeInfo& a,
 bool IsAssignmentCompatible(const DataType& a, const DataType& b) {
   if (TypesEquivalent(a, b)) return true;
 
-  // §6.22.3/§6.22.4: assignment compatibility for integral types is symmetric
-  // EXCEPT when the target (b) is an enum -- an integral value requires an
-  // explicit cast to be assigned to an enum, so an enum target is excluded here
-  // and only the legal enum-source direction is accepted by the rule below.
   if (IsIntegralType(a.kind) && IsIntegralType(b.kind) &&
       b.kind != DataTypeKind::kEnum)
     return true;
@@ -245,23 +223,13 @@ bool IsCastCompatible(const DataType& a, const DataType& b) {
   return false;
 }
 
-// §6.22.5: a chandle is one of the handle types the clause singles out as
-// type-incompatible with every type other than itself. (Class handles and
-// interface class handles are spelled with named types and are covered by the
-// residual rule below: a named type is never integral, real, or an enum, so it
-// is cast-compatible only with the same named type and incompatible with all
-// others.)
 static bool IsHandleType(const DataType& dtype) {
   return dtype.kind == DataTypeKind::kChandle;
 }
 
 bool IsTypeIncompatible(const DataType& a, const DataType& b) {
-  // The handle types named by §6.22.5 are incompatible with every type that is
-  // not the same handle type; no implicit or explicit cast can bridge them.
   if (IsHandleType(a) || IsHandleType(b)) return !TypesMatch(a, b);
 
-  // Otherwise type-incompatible is the residual: the nonequivalent types with
-  // no implicit or explicit casting rule, i.e. anything not cast-compatible.
   return !IsCastCompatible(a, b);
 }
 

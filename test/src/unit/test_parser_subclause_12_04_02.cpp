@@ -272,9 +272,6 @@ TEST(QualifiedIfParsing, NestedQualifiedIfs) {
   EXPECT_EQ(inner->qualifier, CaseQualifier::kUnique);
 }
 
-// Syntax 12-2 and Syntax 12-3 put `unique_priority` only in front of an if
-// and a case keyword, so each qualifier before any other statement is
-// reported where it stands, and the if and case forms are not.
 TEST(QualifiedIfParsing, QualifierBeforeAStatementThatIsNoIfOrCaseRejected) {
   auto r = Parse(
       "module m;\n"

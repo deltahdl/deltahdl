@@ -34,16 +34,11 @@ bool HasPackedDimension(const DataType& type) {
          type.has_unsized_packed_dim;
 }
 
-// The key RtlirDesign's type tables record a typedef name under: the bare name
-// for a module's or an imported one, "Scope::name" for a package's or a
-// class's.
 std::string TypeKey(const DataType& type) {
   if (type.scope_name.empty()) return std::string(type.type_name);
   return std::string(type.scope_name) + "::" + std::string(type.type_name);
 }
 
-// §H.7.4: a packed struct or union crosses as the one-dimensional packed array
-// of its width, 4-state where any member is.
 DpiCrossingType PackedAggregate(const DataType& type, uint32_t width) {
   DpiCrossingType out;
   out.kind = Is4stateType(type, TypedefMap{}) ? DataTypeKind::kLogic
@@ -54,7 +49,6 @@ DpiCrossingType PackedAggregate(const DataType& type, uint32_t width) {
   return out;
 }
 
-// A type whose kind is its own, written without a typedef name.
 DpiCrossingType Written(const DataType& type) {
   DpiCrossingType out;
   out.kind = type.kind;
@@ -67,7 +61,6 @@ DpiCrossingType Written(const DataType& type) {
   return out;
 }
 
-// §H.7.3: an enumeration crosses as its base type, int where none is written.
 DpiCrossingType EnumBase(const DataType& type, const RtlirDesign& design) {
   DataType base;
   if (type.enum_base_kind == DataTypeKind::kImplicit) {
@@ -83,7 +76,6 @@ DpiCrossingType EnumBase(const DataType& type, const RtlirDesign& design) {
   return DpiCrossingTypeOf(base, design);
 }
 
-// The entry `map` records under `key`, or null where it records none.
 template <typename Value>
 const Value* Find(const std::unordered_map<std::string_view, Value>& map,
                   std::string_view key) {
@@ -91,9 +83,6 @@ const Value* Find(const std::unordered_map<std::string_view, Value>& map,
   return it == map.end() ? nullptr : &it->second;
 }
 
-// A typedef name standing for a type of kind `kind` that is no enumeration
-// and no packed aggregate, recorded under `key`: its width and signedness the
-// design's tables give.
 DpiCrossingType NamedOfKind(DataTypeKind kind, const DataType& type,
                             const std::string& key, const RtlirDesign& design) {
   const auto* width = Find(design.type_widths, key);
@@ -109,7 +98,6 @@ DpiCrossingType NamedOfKind(DataTypeKind kind, const DataType& type,
   return out;
 }
 
-// §6.18: a typedef name crosses as the type it stands for.
 DpiCrossingType Named(const DataType& type, const RtlirDesign& design) {
   const std::string kKey = TypeKey(type);
   const auto* kind = Find(design.type_kinds, kKey);
@@ -128,9 +116,6 @@ DpiCrossingType Named(const DataType& type, const RtlirDesign& design) {
   return NamedOfKind(*kind, type, kKey, design);
 }
 
-// One unpacked dimension a declaration wrote, as its lower and upper bound;
-// none where it is open or a bound does not fold. §7.4.2 writes `[N]` for the
-// range [0:N-1].
 std::optional<SvActualDimension> SizedDimension(const Expr* dim,
                                                 const ScopeMap& scope) {
   if (dim == nullptr) return std::nullopt;
@@ -180,35 +165,16 @@ DpiArg DpiFormalOfArg(const FunctionArg& arg, const ScopeMap& scope) {
   DpiArg formal;
   formal.name = arg.name;
   formal.type = arg.data_type.kind;
-  // §35.5.1.2 reads the direction to decide which way each formal's value
-  // crosses, so it travels with the declaration rather than being inferred
-  // at the call.
   formal.direction = arg.direction;
-  // §35.6: the default the declaration gave a formal, which a call site
-  // that omits the argument takes.
   formal.default_value = arg.default_value;
-  // §35.5.6 admits as a formal type any packed array, struct or union built
-  // from bit and logic, and names no width limit, and
-  // DataTypeKind says only kBit or kLogic for one of those. So the width
-  // the declaration wrote travels beside the kind for exactly those types;
-  // every other formal's type states its own width, and recording one for
-  // it would put a second answer beside the kind's.
   if (DataTypeKind kind = arg.data_type.kind; kind == DataTypeKind::kBit ||
                                               kind == DataTypeKind::kLogic ||
                                               kind == DataTypeKind::kReg) {
     formal.width = EvalTypeWidth(arg.data_type);
   }
-  // §H.7.4: an integer type the declaration qualified unsigned crosses
-  // as the unsigned C type; the parser has already settled the default
-  // signedness of a type that named neither qualifier.
   formal.is_unsigned = !arg.data_type.is_signed;
-  // §H.7.5: a struct or union crosses under the name of its type.
   formal.type_name = arg.data_type.type_name;
-  // §35.5.6.1: a formal with unpacked dimensions is an array of values of
-  // its type rather than one of them.
   formal.has_unpacked_dimensions = !arg.unpacked_dims.empty();
-  // §35.5.6.1: a dimension's bounds are constant expressions, the declaring
-  // module's parameters among what they may name.
   formal.unpacked_dims = DpiSizedUnpackedDimensions(arg.unpacked_dims, scope);
   formal.declaration = &arg;
   return formal;
@@ -227,7 +193,6 @@ std::vector<SvActualDimension> DpiSizedUnpackedDimensions(
 
 namespace {
 
-// A member of an unpacked struct or union, as the type its declaration names.
 DataType MemberType(const StructMember& member) {
   if (member.nested_type != nullptr) return *member.nested_type;
   DataType type;
@@ -241,8 +206,6 @@ DataType MemberType(const StructMember& member) {
   return type;
 }
 
-// The declaration of the unpacked struct or union `type` names or is, typedef
-// names followed to it; null where none is found.
 const DataType* AggregateDeclaration(const DataType& type,
                                      const SimContext& ctx) {
   const DataType* decl = &type;
@@ -256,23 +219,16 @@ const DataType* AggregateDeclaration(const DataType& type,
              : nullptr;
 }
 
-// Sets `formal`, written as `type` with the unpacked dimensions `unpacked`, to
-// what it crosses as: its type, its sized dimensions and, for an unpacked
-// struct or union, each member as a formal of its own (§H.7.8).
 void ResolveFormal(DpiArg& formal, const DataType& type,
                    const std::vector<Expr*>& unpacked,
                    const RtlirDesign& design, const SimContext& ctx) {
   formal.has_unpacked_dimensions = !unpacked.empty();
-  // Dimensions the registration already folded against the declaring scope
-  // stand; a member's are folded here.
   if (formal.unpacked_dims.empty()) {
     formal.unpacked_dims = DpiSizedUnpackedDimensions(unpacked, ScopeMap{});
   }
   formal.is_open_array =
       std::find(unpacked.begin(), unpacked.end(), nullptr) != unpacked.end();
   DpiCrossingType crossing = DpiCrossingTypeOf(type, design);
-  // A name the design's tables do not resolve may still stand for an
-  // unpacked struct or union the run records the declaration of.
   const DataType* decl = crossing.kind == DataTypeKind::kStruct ||
                                  crossing.kind == DataTypeKind::kUnion ||
                                  crossing.kind == DataTypeKind::kNamed
@@ -308,7 +264,6 @@ void ResolveDpiFormalTypes(DpiRuntime& dpi, const RtlirDesign& design,
     }
   };
   for (DpiRtFunction& import : dpi.Imports()) resolve(import.args);
-  // §35.7 with §H.8.2: an export's formals cross as an import's would.
   for (DpiRtExport& exp : dpi.Exports()) resolve(exp.args);
 }
 

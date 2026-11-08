@@ -13,14 +13,11 @@ namespace delta {
 
 namespace {
 
-// The name the item `item` declares, a class's being its declaration's.
 std::string_view DeclaredName(const ModuleItem& item) {
   return item.kind == ModuleItemKind::kClassDecl ? item.class_decl->name
                                                  : item.name;
 }
 
-// The last item of kind `kind` among the items of the site `site` declaring
-// `name`, a forward typedef (§6.18), which names no type, excepted.
 FoundItem ItemBefore(const TypeSite& site, ModuleItemKind kind,
                      std::string_view name) {
   FoundItem found;
@@ -34,8 +31,6 @@ FoundItem ItemBefore(const TypeSite& site, ModuleItemKind kind,
   return found;
 }
 
-// §26.2: the item of kind `kind` the package `package` of the compilation unit
-// declares under `name`.
 FoundItem PackageItem(const CompilationUnit& unit, std::string_view package,
                       ModuleItemKind kind, std::string_view name) {
   FoundItem found;
@@ -48,8 +43,6 @@ FoundItem PackageItem(const CompilationUnit& unit, std::string_view package,
   return found;
 }
 
-// §26.3: the item of kind `kind` named `name` an import among the first `end`
-// of `items` brings in, by its item name or with a wildcard.
 FoundItem ImportedItem(const CompilationUnit& unit,
                        const std::vector<ModuleItem*>& items, std::size_t end,
                        ModuleItemKind kind, std::string_view name) {
@@ -64,10 +57,6 @@ FoundItem ImportedItem(const CompilationUnit& unit,
   return found;
 }
 
-// §23.9 with §26.3: the item of kind `kind` named `name` the site `site` sees:
-// one its scope declares, else one an import of its scope brings in, else,
-// for a scope within a module, one the scope around it sees (§23.9), else,
-// for a module, one the compilation unit declares or imports.
 FoundItem SiteItem(const CompilationUnit& unit, const TypeSite& site,
                    ModuleItemKind kind, std::string_view name) {
   FoundItem found = ItemBefore(site, kind, name);

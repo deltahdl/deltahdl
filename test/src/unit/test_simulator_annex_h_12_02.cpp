@@ -8,24 +8,6 @@
 #include "simulator/svdpi.h"
 #include "simulator/svdpi_open_array.h"
 
-// Annex H.12.2 - Array querying functions.
-//
-// H.12.2 defines the DPI C-layer functions used to inquire about the
-// dimensions of an open array: svLeft, svRight, svLow, svHigh, svIncrement,
-// svSize (each taking a handle and a dimension index) and svDimensions (taking
-// only a handle). Two normative statements govern them:
-//
-//   Q1 - they are modeled on the SystemVerilog array querying functions and use
-//        the same semantics (see 20.7);
-//   Q2 - a dimension argument of 0 refers to the packed part of the array
-//        (which is one-dimensional) and dimensions greater than 0 refer to the
-//        unpacked part.
-//
-// These tests build an svOpenArrayHandle backed by an SvOpenArrayDesc carrying
-// distinct packed and unpacked ranges and observe the svdpi.cpp query functions
-// applying those two rules; the last runs a design whose imports query the
-// handles the run builds for open arrays of several element types.
-
 namespace {
 
 svOpenArrayHandle MakeHandle(const SvOpenArrayDimRange* ranges, int n_dims,
@@ -37,85 +19,61 @@ svOpenArrayHandle MakeHandle(const SvOpenArrayDimRange* ranges, int n_dims,
   return desc;
 }
 
-// Q2: the dimension index selects which part of the array is queried -
-// dimension 0 returns the packed range while dimensions greater than 0 return
-// successive unpacked ranges, never confusing one for another. The handle
-// models: logic [15:0] arr [0:7] [-1:-8].
 TEST(ArrayQueryingFunctions, DimensionZeroIsPackedPart) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}, {-1, -8}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 3, &desc);
 
-  // Dimension 0 is the packed part [15:0].
   EXPECT_EQ(svLeft(h, 0), 15);
   EXPECT_EQ(svRight(h, 0), 0);
 
-  // Dimensions > 0 are the unpacked parts, in declaration order.
   EXPECT_EQ(svLeft(h, 1), 0);
   EXPECT_EQ(svRight(h, 1), 7);
   EXPECT_EQ(svLeft(h, 2), -1);
   EXPECT_EQ(svRight(h, 2), -8);
 }
 
-// Q1: low/high/size derive from the bounds exactly as 20.7 prescribes - low is
-// the smaller bound, high the larger, size the element count - for an ascending
-// unpacked range.
 TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsAscending) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
-  // Unpacked [0:7]: low=0, high=7, size=8.
   EXPECT_EQ(svLow(h, 1), 0);
   EXPECT_EQ(svHigh(h, 1), 7);
   EXPECT_EQ(svSize(h, 1), 8);
 }
 
-// Q1: the same derivations hold for the descending packed range, and for a
-// range whose bounds are negative - low/high are orientation-independent.
 TEST(ArrayQueryingFunctions, LowHighSizeMatchTwentySevenSemanticsDescending) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {-1, -8}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
-  // Packed [15:0]: low=0, high=15, size=16.
   EXPECT_EQ(svLow(h, 0), 0);
   EXPECT_EQ(svHigh(h, 0), 15);
   EXPECT_EQ(svSize(h, 0), 16);
 
-  // Unpacked [-1:-8]: low=-8, high=-1, size=8.
   EXPECT_EQ(svLow(h, 1), -8);
   EXPECT_EQ(svHigh(h, 1), -1);
   EXPECT_EQ(svSize(h, 1), 8);
 }
 
-// Q1: svIncrement follows 20.7's $increment - it is 1 when the left bound is
-// greater than or equal to the right bound (a descending range) and -1
-// otherwise (an ascending range).
 TEST(ArrayQueryingFunctions, IncrementMatchesTwentySevenSemantics) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
-  EXPECT_EQ(svIncrement(h, 0), 1);   // [15:0] descending -> +1
-  EXPECT_EQ(svIncrement(h, 1), -1);  // [0:7] ascending  -> -1
+  EXPECT_EQ(svIncrement(h, 0), 1);
+  EXPECT_EQ(svIncrement(h, 1), -1);
 }
 
-// Q1/Q2: svDimensions reports the total number of queryable dimensions - the
-// single packed dimension plus every unpacked dimension - so that valid
-// dimension arguments span 0 .. svDimensions-1.
 TEST(ArrayQueryingFunctions, DimensionsCountsPackedPlusUnpacked) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}, {-1, -8}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 3, &desc);
 
-  // One packed part + two unpacked parts.
   EXPECT_EQ(svDimensions(h), 3);
 }
 
-// Q1 edge case: a single-element range [0:0] degenerates correctly - left and
-// right coincide, so low == high, size is 1, and the bound-equal case of
-// $increment yields +1.
 TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
   const SvOpenArrayDimRange kRanges[] = {{0, 0}, {0, 0}};
   SvOpenArrayDesc desc;
@@ -124,34 +82,25 @@ TEST(ArrayQueryingFunctions, DegenerateSingleElementRange) {
   EXPECT_EQ(svLow(h, 0), 0);
   EXPECT_EQ(svHigh(h, 0), 0);
   EXPECT_EQ(svSize(h, 0), 1);
-  EXPECT_EQ(svIncrement(h, 0), 1);  // left >= right -> +1
+  EXPECT_EQ(svIncrement(h, 0), 1);
 }
 
-// Q2/Q3 error path: only the dimension indices in the valid span are
-// addressable (0 for the packed part, 1 .. svDimensions-1 for the unpacked
-// parts). A query against an index outside that span - or against a null handle
-// - resolves no range, so the functions fall back to safe defaults rather than
-// reading past the descriptor. This exercises the handle/dimension guard in
-// production.
 TEST(ArrayQueryingFunctions, OutOfRangeDimensionAndNullHandle) {
   const SvOpenArrayDimRange kRanges[] = {{15, 0}, {0, 7}};
   SvOpenArrayDesc desc;
   svOpenArrayHandle h = MakeHandle(kRanges, 2, &desc);
 
-  // Index at and beyond the dimension count, and a negative index, are invalid.
   EXPECT_EQ(svLeft(h, 2), 0);
   EXPECT_EQ(svRight(h, 5), 0);
   EXPECT_EQ(svLow(h, -1), 0);
   EXPECT_EQ(svHigh(h, 2), 0);
   EXPECT_EQ(svSize(h, 2), 0);
-  EXPECT_EQ(svIncrement(h, 2), 0);  // no range -> neither +1 nor -1
+  EXPECT_EQ(svIncrement(h, 2), 0);
 
-  // A null handle has no dimensions and answers every query with the default.
   EXPECT_EQ(svDimensions(nullptr), 0);
   EXPECT_EQ(svLeft(nullptr, 0), 0);
   EXPECT_EQ(svSize(nullptr, 0), 0);
   EXPECT_EQ(svIncrement(nullptr, 0), 0);
-  // Nor has it an unpacked dimension for an element access to index.
   EXPECT_EQ(svGetArrElemPtr(nullptr, 0), nullptr);
 }
 
@@ -160,9 +109,6 @@ struct Pair {
   int j;
 };
 
-// The C side of the design below, counting the dimensions of each open array
-// it is handed. The pairs are read through the variable argument
-// svGetArrElemPtr, which takes one index per unpacked dimension.
 int DimensionsOfPairs(svOpenArrayHandle h) {
   int sum = 0;
   for (int a = svLow(h, 1); a <= svHigh(h, 1); ++a) {
@@ -186,11 +132,6 @@ uint64_t VariableValue(SimFixture& f, std::string_view name) {
   return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
 }
 
-// Q1 with 20.7: $dimensions counts an array's packed and unpacked dimensions,
-// an integer type of predefined width being a packed [n-1:0]. An unpacked
-// struct and a real have no packed dimension, so an open array of either
-// counts its unpacked dimensions alone -- two for the pairs, one for the reals
-// -- while an open array of ints counts its [31:0] beside its one.
 TEST(ArrayQueryingFunctions, AnElementWithNoPackedPartAddsNoDimension) {
   SimFixture f;
   RunWithImportsBound(

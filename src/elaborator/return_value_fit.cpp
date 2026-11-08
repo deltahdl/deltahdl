@@ -1,8 +1,3 @@
-// The type comparison §12.8's and §18.17.7's return checks share, declared in
-// return_value_fit.h. Split out of elaborator_validate_jump_statements.cpp,
-// which keeps §12.8's walk over a function's returns, so that
-// elaborator_validate_randsequence.cpp reads a production's returns with it.
-
 #include "elaborator/return_value_fit.h"
 
 #include <cstddef>
@@ -29,11 +24,6 @@ namespace delta {
 
 namespace {
 
-// Map literal expression kinds whose type is obvious from the syntax alone
-// to the corresponding DataTypeKind. Returns kImplicit when no narrow
-// classification is possible without full expression type inference. §5.9
-// makes a string literal in an assignment an unsigned integer constant, eight
-// bits a character, so it maps to a bit vector.
 DataTypeKind ObviousLiteralKind(const Expr* e) {
   if (!e) return DataTypeKind::kImplicit;
   switch (e->kind) {
@@ -50,19 +40,11 @@ DataTypeKind ObviousLiteralKind(const Expr* e) {
   }
 }
 
-// The unpacked dimensions of a variable written with none: a for loop's
-// declared variable and a foreach loop variable.
 const std::vector<Expr*>* NoUnpackedDims() {
   static const std::vector<Expr*> kNone;
   return &kNone;
 }
 
-// §12.7.1: the variables the initialization of for loop `s` declares, each
-// with the data type written before it. Stmt::for_init_types holds
-// DataTypeKind::kImplicit for an item that assigns a variable declared outside
-// the loop rather than declaring one; Parser::ParseForLocalDeclInits and
-// Parser::ParseForPlainInits push one type for each item. An item with no
-// left-hand side is one the parser could not read as an assignment.
 void EnterForLocals(const Stmt* s, DeclaredLocals& locals) {
   for (size_t i = 0; i < s->for_init_types.size(); ++i) {
     const Stmt* init = s->for_inits[i];
@@ -73,13 +55,6 @@ void EnterForLocals(const Stmt* s, DeclaredLocals& locals) {
   }
 }
 
-// §12.7.3: whether the dimension the `rank`th loop variable of a foreach over
-// `array` walks is a fixed-size, dynamic or queue dimension, the ones over
-// which the loop variable is an int. Its unpacked dimensions come first, then
-// the packed dimensions of its type. Parser::ParseUnpackedDims writes a dynamic
-// dimension as null and every associative one as an identifier, its index
-// type or `*`, which a parameter naming a fixed size is too, so an identifier
-// other than a queue's `$` is not plainly any of the three.
 bool WalksIntIndexedDim(const DeclaredLocal& array, size_t rank) {
   if (rank >= array.unpacked->size())
     return array.type->kind != DataTypeKind::kNamed;
@@ -88,11 +63,6 @@ bool WalksIntIndexedDim(const DeclaredLocal& array, size_t rank) {
          dim->text == "$";
 }
 
-// §12.7.3: the loop variables of foreach loop `s`, each an int where the
-// dimension it walks is plainly one an int indexes and otherwise a name whose
-// type the check does not read. The array's entry is copied before any loop
-// variable is entered, since a loop variable may share its name and the array
-// is read in the scope around the loop.
 void EnterForeachLocals(const Stmt* s, DeclaredLocals& locals) {
   static const DataType kLoopIndex = [] {
     DataType t;
@@ -196,8 +166,6 @@ bool ReturnValueFits(const CheckedType& ret, const CheckedType& value,
 
 namespace {
 
-// Enters each method the body of `cls` declares into `methods` with `cls`, and
-// those of the classes nested in it (§8.23) with their own class.
 void EnterClassMethods(const ClassDecl* cls, ClassMethods& methods) {
   if (cls == nullptr) return;
   for (const auto* m : cls->members) {
@@ -249,9 +217,6 @@ DeclaredLocals ScopeVariables(const std::vector<ModuleItem*>& items) {
 
 namespace {
 
-// Enters into `scopes` `cls`, with the names a method of it finds over those
-// of `around`, the scope around it, and each class nested in it, with its own
-// over those `cls` gives its methods.
 void EnterClassScope(const ClassDecl* cls, const DeclaredLocals& around,
                      const SoleClassIndex& classes, const CompilationUnit& unit,
                      ClassScopes& scopes) {

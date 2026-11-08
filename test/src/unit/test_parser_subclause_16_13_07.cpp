@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §16.13.7 by way of §16.10: the local variables a named property declares
-// ahead of its body, `logic v = e;`, are captured with their type keyword
-// and initialization assignment beside the body's tree.
 TEST(PropertyLocalParsing, ALocalDeclaredAheadOfThePropertyIsCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -36,9 +33,6 @@ TEST(PropertyLocalParsing, ALocalDeclaredAheadOfThePropertyIsCaptured) {
   EXPECT_EQ(item->prop_locals[0].init->text, "e");
 }
 
-// §16.10 with §7.4.1: a property's local declared of a packed type, `logic
-// [3:0] x`, is captured with the packed dimension written after its keyword
-// (#5745).
 TEST(PropertyLocalParsing, APackedLocalIsCapturedWithItsDimension) {
   auto r = Parse(
       "module m;\n"
@@ -58,8 +52,6 @@ TEST(PropertyLocalParsing, APackedLocalIsCapturedWithItsDimension) {
   EXPECT_EQ(item->prop_locals[0].packed_dims[0].second->text, "0");
 }
 
-// §16.10 with §6.11: a property's locals are captured with the signing
-// keyword written after their type keyword, and with none where none is.
 TEST(PropertyLocalParsing, ALocalsSigningKeywordIsCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -78,9 +70,6 @@ TEST(PropertyLocalParsing, ALocalsSigningKeywordIsCaptured) {
   EXPECT_EQ(item->prop_locals[2].signing, TokenKind::kEof);
 }
 
-// §16.10 with §6.18: a property's local declared with a type name the module
-// declares is captured with that name in its keyword's place, and with the
-// packed dimensions written after the name.
 TEST(PropertyLocalParsing, ALocalOfATypeNameIsCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -103,8 +92,6 @@ TEST(PropertyLocalParsing, ALocalOfATypeNameIsCaptured) {
   EXPECT_EQ(item->prop_locals[1].packed_dims.size(), 1u);
 }
 
-// §16.10 with §6.24.1: a property whose body opens with a cast to a type
-// name, `nib_t'(a)`, declares no local.
 TEST(PropertyLocalParsing, ACastToATypeNameDeclaresNoLocal) {
   auto r = Parse(
       "module m;\n"
@@ -120,8 +107,6 @@ TEST(PropertyLocalParsing, ACastToATypeNameDeclaresNoLocal) {
   EXPECT_TRUE(item->prop_locals.empty());
 }
 
-// §16.10: a sequence whose local declaration is malformed, `int ;`, naming
-// no variable, has no operands captured.
 TEST(PropertyLocalParsing, AMalformedSequenceLocalLeavesTheBodyUncaptured) {
   auto r = Parse(
       "module m;\n"
@@ -136,8 +121,6 @@ TEST(PropertyLocalParsing, AMalformedSequenceLocalLeavesTheBodyUncaptured) {
   EXPECT_TRUE(item->seq_linear.operands.empty());
 }
 
-// §16.10: a property whose local declaration is malformed, `int ;`, naming
-// no variable, has no body captured.
 TEST(PropertyLocalParsing, AMalformedLocalLeavesTheBodyUncaptured) {
   auto r = Parse(
       "module m;\n"
@@ -153,8 +136,6 @@ TEST(PropertyLocalParsing, AMalformedLocalLeavesTheBodyUncaptured) {
   EXPECT_TRUE(item->prop_locals.empty());
 }
 
-// §16.10: a local declared without an initialization is captured with
-// none, and a body without locals has none.
 TEST(PropertyLocalParsing, ALocalWithoutAnInitializationHasNone) {
   auto r = Parse(
       "module m;\n"

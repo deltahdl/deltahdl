@@ -63,10 +63,6 @@ TEST(VariableDeclaration, Logic4StateDefaultInit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// Table 6-7 gives the default by type, and an element of an unpacked array is
-// a variable of the array's element type, so a 4-state element left without a
-// value defaults to 'x exactly as the scalar above does. Reading it as zero
-// would make an element nobody wrote indistinguishable from one written 0.
 TEST(VariableDeclaration, Logic4StateArrayElementDefaultInit) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -85,15 +81,6 @@ TEST(VariableDeclaration, Logic4StateArrayElementDefaultInit) {
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// Table 6-7 gives a scalar and an element of an array of the same type one
-// default, so the two are the same value and the words holding them are equal
-// word for word. The assertion deliberately carries no `& 0xFF`: the mask the
-// two cases above use is the width of the declaration written into the
-// assertion, and masking is what hid the two producers disagreeing about the
-// bits above it -- the element's 'x came from MakeAllX, which filled every bit
-// of the top word, and the scalar's from SimContext::CreateVariable, which
-// masked. §11.4.5 is where the disagreement showed, `arr[0] === data` reading
-// 0 for two values of the same declared type and the same default.
 TEST(VariableDeclaration, ArrayElementDefaultXMatchesScalarDefaultX) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -117,9 +104,6 @@ TEST(VariableDeclaration, ArrayElementDefaultXMatchesScalarDefaultX) {
   EXPECT_EQ(element->value.words[0].bval, scalar->value.words[0].bval);
 }
 
-// The 2-state half of the same rule, which is what keeps the fix from being a
-// blanket switch to 'x: Table 6-7 gives a 2-state integral '0, so an element of
-// a bit array left without a value stays zero.
 TEST(VariableDeclaration, Bit2StateArrayElementDefaultIsZero) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -314,11 +298,6 @@ TEST(VariableDeclaration, StaticInitializerWithClassNew) {
 
 TEST(VariableDeclaration,
      EnumImplicitBaseDefaultsToBaseTypeZeroNotFirstMember) {
-  // Table 6-7: an enumeration's default initial value is its base type's
-  // default value, NOT its first enumerator. With no explicit base the base
-  // type is int (2-state), whose default is 0 -- even though the first
-  // enumerator here is 5. Observing 0 (rather than 5) exercises exactly this
-  // rule.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -337,9 +316,6 @@ TEST(VariableDeclaration,
 }
 
 TEST(VariableDeclaration, Enum4StateBaseDefaultsToX) {
-  // Table 6-7: an enumeration inherits its base type's default. A 4-state base
-  // (logic) makes the default x, distinguishing it from a 2-state-base enum
-  // whose default is 0. x is Convention A (aval=bval=1) per bit.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -357,9 +333,6 @@ TEST(VariableDeclaration, Enum4StateBaseDefaultsToX) {
 }
 
 TEST(VariableDeclaration, ClassHandleDefaultIsNull) {
-  // Table 6-7: a class-handle variable with no initializer defaults to null,
-  // encoded as an all-zero handle (aval=bval=0) -- the same null encoding used
-  // for chandle.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "class C;\n"
@@ -394,12 +367,6 @@ TEST(VariableDeclaration, VariableStoresValueBetweenAssignmentAndRead) {
   EXPECT_EQ(val, 99u);
 }
 
-// §10.9.1 forbids an element no rule covers, so this declaration is reported at
-// elaboration -- and the value the element ends up with still has to be one
-// answer rather than two. The one-dimensional keyed maker gave a known 0 where
-// the positional maker beside it and the multidimensional one both give §6.8's
-// Table 6-7 default, so one spelling of an illegal pattern read 00 and the
-// other read 'x.
 TEST(VariableDeclaration,
      KeyedPatternUncoveredElementTakesItsDefaultInitialValue) {
   LowerFixture f;
@@ -421,10 +388,6 @@ TEST(VariableDeclaration,
                             2, "10.9.1"));
 }
 
-// The run-time keyed writer answers the same question for a pattern written as
-// a statement. §10.9.1 forbids the uncovered element there as it does in the
-// declaration, and the report stands at the statement, but the run still gives
-// the element a value, and it has to be the same one.
 TEST(VariableDeclaration,
      KeyedPatternStatementUncoveredElementTakesItsDefaultInitialValue) {
   SimFixture f;
@@ -441,13 +404,6 @@ TEST(VariableDeclaration,
                             3, "10.9.1"));
 }
 
-// Table 6-7 (printed page 107) with §13.3 and §13.4: a 4-state local of a
-// subroutine body takes 'x whatever the subroutine's lifetime -- in an
-// automatic function, an automatic task, a class method and a static
-// function -- while the int, string and real beside it take 0, "" and 0.0.
-// Each read 0 where a module-scope logic read x. The static function's local
-// is a 4-bit vector printed in binary, since how %0h renders a vector of
-// unknowns is §21.2.1.2's question and not this one.
 TEST(VariableDeclaration, Logic4StateSubroutineLocalDefaultsToX) {
   SimFixture f;
   EXPECT_EQ(

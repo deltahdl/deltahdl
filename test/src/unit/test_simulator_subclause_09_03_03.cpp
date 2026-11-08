@@ -170,10 +170,6 @@ TEST(BlockStartFinishSimulation, DeeplyNestedSeqBlocksFinishBeforeContinue) {
   LowerRunAndCheck(f, design, {{"r", 5u}});
 }
 
-// A parallel block's finish time (with join) is the moment its last
-// time-ordered statement completes; control must not reach the statement
-// after the block until that time. A concurrent process sampling before the
-// finish time must observe that the post-join statement has not yet run.
 TEST(BlockStartFinishSimulation, ForkJoinNextStatementWaitsForFinishTime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -200,20 +196,10 @@ TEST(BlockStartFinishSimulation, ForkJoinNextStatementWaitsForFinishTime) {
   auto* flag = f.ctx.FindVariable("flag");
   ASSERT_NE(snap, nullptr);
   ASSERT_NE(flag, nullptr);
-  // At t=15 the join has not finished (longest child completes at t=20), so
-  // the statement following the block has not run yet.
   EXPECT_EQ(snap->value.ToUint64(), 0u);
-  // The post-join statement runs once the finish time (t=20) is reached.
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
 
-// A fork...join_none block's finish time equals its start time (Table 9-1, see
-// 9.3.2): the parent continues concurrently with the spawned children. The
-// §9.3.3 gating rule therefore lets execution reach the statement following the
-// block at the same simulation time as the fork, before the (delayed) children
-// have finished. A concurrent process sampling shortly after start must observe
-// that the post-join_none statement has already run while a delayed child has
-// not yet completed.
 TEST(BlockStartFinishSimulation,
      ForkJoinNoneContinuesImmediatelyBeforeChildren) {
   SimFixture f;
@@ -244,22 +230,11 @@ TEST(BlockStartFinishSimulation,
   ASSERT_NE(snap_flag, nullptr);
   ASSERT_NE(snap_x, nullptr);
   ASSERT_NE(x, nullptr);
-  // join_none finishes immediately, so the post-block statement runs at t=0 and
-  // the flag is already set when the observer samples at t=5.
   EXPECT_EQ(snap_flag->value.ToUint64(), 1u);
-  // The children keep running concurrently: the #10 child has not run at t=5.
   EXPECT_EQ(snap_x->value.ToUint64(), 0u);
-  // Once its delay elapses the background child does complete.
   EXPECT_EQ(x->value.ToUint64(), 1u);
 }
 
-// "Joining of events": a fork whose children are event controls (rather than
-// delays) finishes only once every child's event has fired, in whatever order
-// the events happen to occur. The §9.3.3 gating rule holds the statement after
-// the join until that finish time. Two named events (see 15.5 / 9.4.2) are
-// triggered at t=10 and t=20 by a separate process; the post-join assignment
-// must not take effect after only the first event, and must take effect once
-// the second (later) event completes the block.
 TEST(BlockStartFinishSimulation, ForkJoinsSeparateEventsBeforeNextStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -295,22 +270,11 @@ TEST(BlockStartFinishSimulation, ForkJoinsSeparateEventsBeforeNextStatement) {
   ASSERT_NE(snap_early, nullptr);
   ASSERT_NE(snap_late, nullptr);
   ASSERT_NE(areg, nullptr);
-  // At t=15 only Aevent has fired; the join has not finished, so the post-join
-  // assignment has not run.
   EXPECT_EQ(snap_early->value.ToUint64(), 0u);
-  // By t=25 both events have fired (finish time t=20), so the assignment ran.
   EXPECT_EQ(snap_late->value.ToUint64(), 7u);
   EXPECT_EQ(areg->value.ToUint64(), 7u);
 }
 
-// Sequential and parallel blocks can be embedded within each other. When two
-// begin-end blocks are the children of a fork, they execute in parallel rather
-// than one-after-another: each block starts on its own event guard and its
-// internal timeline overlaps the other's. Both guards fire at t=5, then each
-// block waits #10 and assigns at t=15. Were the blocks serialized, the second
-// block would not start until the first finished (t=15) and would assign only
-// at t=25; an observer at t=20 seeing the second block's write proves the two
-// embedded sequential blocks ran concurrently.
 TEST(BlockStartFinishSimulation, EmbeddedSeqBlocksInForkRunInParallel) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -348,15 +312,11 @@ TEST(BlockStartFinishSimulation, EmbeddedSeqBlocksInForkRunInParallel) {
   ASSERT_NE(snap_wb, nullptr);
   ASSERT_NE(wa, nullptr);
   ASSERT_NE(wb, nullptr);
-  // Second block's write is visible at t=20, so it did not wait for the first
-  // block to finish: the two embedded sequential blocks executed in parallel.
   EXPECT_EQ(snap_wb->value.ToUint64(), 1u);
   EXPECT_EQ(wa->value.ToUint64(), 1u);
   EXPECT_EQ(wb->value.ToUint64(), 1u);
 }
 
-// An empty sequential block has no statements, so its finish time equals its
-// start time and control passes immediately to the following statement.
 TEST(BlockStartFinishSimulation, EmptySeqBlockFinishesImmediately) {
   SimFixture f;
   auto* design = ElaborateSrc(

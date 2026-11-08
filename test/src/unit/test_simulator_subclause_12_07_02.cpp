@@ -118,9 +118,6 @@ TEST(LoopStatementSim, RepeatXCountZeroIterations) {
 }
 
 TEST(LoopStatementSim, RepeatNegativeCountZeroIterations) {
-  // §12.7.2: a negative count (signed expression) is treated as zero, so the
-  // body never runs. Without negative handling, the bit pattern of -1 would be
-  // read as a huge unsigned iteration count.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -138,9 +135,6 @@ TEST(LoopStatementSim, RepeatNegativeCountZeroIterations) {
 }
 
 TEST(LoopStatementSim, RepeatCountEvaluatedOnceBeforeLoop) {
-  // §12.7.2: the count expression is evaluated once before the loop starts;
-  // mutating the controlling variable inside the body has no effect on the
-  // number of iterations.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -177,9 +171,6 @@ TEST(LoopStatementSim, RepeatZCountZeroIterations) {
 }
 
 TEST(LoopStatementSim, RepeatParameterCount) {
-  // §12.7.2: the count expression may be sourced from a parameter (§11.2.1) --
-  // the very form the LRM's multiplier example uses, "repeat (size)". The
-  // parameter is resolved during elaboration and read once before the loop.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -196,8 +187,6 @@ TEST(LoopStatementSim, RepeatParameterCount) {
 }
 
 TEST(LoopStatementSim, RepeatLocalparamCount) {
-  // §12.7.2: a localparam (another §11.2.1 constant form) as the repeat count
-  // drives the same evaluate-once-then-iterate behaviour as a parameter.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -214,10 +203,6 @@ TEST(LoopStatementSim, RepeatLocalparamCount) {
 }
 
 TEST(LoopStatementSim, RepeatCompoundCountCachedWhenOperandMutated) {
-  // §12.7.2: the count expression is evaluated exactly once before the loop
-  // starts, so changing *any part* of a compound count expression inside the
-  // body has no effect on the iteration count. Here the count is a+b; mutating
-  // operand a inside the loop must not extend the run.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -238,9 +223,6 @@ TEST(LoopStatementSim, RepeatCompoundCountCachedWhenOperandMutated) {
 }
 
 TEST(LoopStatementSim, RepeatPartiallyUnknownCountZeroIterations) {
-  // §12.7.2: a single unknown bit makes the whole count unknown, so it is
-  // treated as zero and the body never runs. Were the known bits used instead,
-  // this pattern would suggest several iterations.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -258,10 +240,6 @@ TEST(LoopStatementSim, RepeatPartiallyUnknownCountZeroIterations) {
 }
 
 TEST(LoopStatementSim, RepeatGenvarCount) {
-  // §12.7.2: the count expression may be a genvar (§11.2.1), which is admitted
-  // only inside a generate scope and substituted as a per-instance constant.
-  // Each unrolled instance runs its body the genvar's value of times, so the
-  // element written by instance i ends at i.
   SimFixture f;
   RunModuleArray(f,
                  "module t;\n"
@@ -279,10 +257,6 @@ TEST(LoopStatementSim, RepeatGenvarCount) {
 }
 
 TEST(LoopStatementSim, RepeatConstantFunctionCallCount) {
-  // §12.7.2: the count expression may be a function call (the last §11.2.1
-  // constant form), which takes the call-evaluation path rather than a plain
-  // variable read. The returned value is read once before the loop and drives
-  // the iteration count.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -300,10 +274,6 @@ TEST(LoopStatementSim, RepeatConstantFunctionCallCount) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §12.7.2's own shift-add multiplier, run as a function body (§13.4): the
-// loop runs `size` times inside the call, so 13 * 17 is 221 where a body that
-// skipped the loop returned 0. The widths are written as literals, the
-// example's `longsize` and `size` standing for 16 and 8.
 TEST(LoopStatementSim, RepeatInsideAFunctionRunsItsCount) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -327,8 +297,6 @@ TEST(LoopStatementSim, RepeatInsideAFunctionRunsItsCount) {
   EXPECT_EQ(var->value.ToUint64(), 221u);
 }
 
-// A class method's body runs a repeat on its argument's count as a module
-// function's does.
 TEST(LoopStatementSim, RepeatInsideAClassMethodRunsItsCount) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -350,7 +318,6 @@ TEST(LoopStatementSim, RepeatInsideAClassMethodRunsItsCount) {
   EXPECT_EQ(var->value.ToUint64(), 30u);
 }
 
-// §12.8: a break ends a repeat in a function body before its count runs out.
 TEST(LoopStatementSim, BreakEndsARepeatInsideAFunction) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -369,9 +336,6 @@ TEST(LoopStatementSim, BreakEndsARepeatInsideAFunction) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §12.8: a continue skips the rest of the body and the repeat goes on to its
-// next iteration, so the count still runs out and the assignment after the
-// continue is never reached.
 TEST(LoopStatementSim, ContinueInARepeatInsideAFunctionGoesOn) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -390,9 +354,6 @@ TEST(LoopStatementSim, ContinueInARepeatInsideAFunctionGoesOn) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §12.7.2: a negative count of a signed expression runs the body no times in a
-// function body as it does in a process; read as unsigned, -1 would run it
-// more than four billion times.
 TEST(LoopStatementSim, NegativeRepeatCountInsideAFunctionRunsNoTimes) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -411,9 +372,6 @@ TEST(LoopStatementSim, NegativeRepeatCountInsideAFunctionRunsNoTimes) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §12.7.2 runs a repeat loop as many times as its count gives, and a real
-// count gives the integer it rounds to (§6.12.1): 2.6 runs three times, and
-// -1.0 runs none, a negative count running none.
 TEST(LoopStatementSim, RepeatRealCountRoundsToAnInteger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -430,8 +388,6 @@ TEST(LoopStatementSim, RepeatRealCountRoundsToAnInteger) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// A count of 2^64 + 3 is far more than the low word's 3, so the loop is still
-// counting when $finish ends the run at time 10.
 TEST(LoopStatementSim, RepeatCountAbove64BitsIsNotCutToItsLowWord) {
   SimFixture f;
   auto* var = RunAndFindVar(

@@ -28,10 +28,6 @@ static void CollectExprVars(const Expr* expr, SimContext& ctx,
     if (var) vars.push_back(var);
     return;
   }
-  // §10.6: a member of another instance or an interface, `u1.x`, is a
-  // variable the right-hand side reads, held under the dotted name; its two
-  // halves name nothing it reads. A structure member's path names no variable
-  // of its own and is watched through its base below.
   std::string dotted;
   if (expr->kind == ExprKind::kMemberAccess && DottedNamePath(expr, dotted)) {
     if (auto* var = ctx.FindVariable(dotted)) {
@@ -54,7 +50,6 @@ static void CollectExprVars(const Expr* expr, SimContext& ctx,
   for (auto* a : expr->args) CollectExprVars(a, ctx, vars);
 }
 
-// Returns the distinct variables referenced by `rhs`, excluding `self`.
 std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs, SimContext& ctx,
                                               Variable* self) {
   std::vector<Variable*> rhs_vars;
@@ -66,22 +61,6 @@ std::vector<Variable*> CollectDistinctRhsVars(const Expr* rhs, SimContext& ctx,
   return rhs_vars;
 }
 
-// --- §10.6 on an element of a queue or of an associative array ---
-//
-// §6.4 makes every data type but an unpacked structure, union or array
-// singular, so an element of one of those containers is a singular variable
-// however the container itself is typed, and both §10.6.1 and §10.6.2, whose
-// targets include a singular variable, reach it. What such an element does not
-// have is a Variable: its value is a bare Logic4Vec inside a QueueObject or an
-// AssocArrayObject, with nowhere to keep the flag a force sets or the
-// expression it recomputes from. ResolveLhsVariable answers the container's own
-// one-element carrier for it, which no read of the container consults, so both
-// statements settled a variable nothing reads and the element kept its value.
-
-// The element a §10.6 statement names, and the container that holds it. The
-// name is carried because a write to an element is announced through the
-// variable the container is registered under (§9.4.2), which is what an
-// `@(q[0])` and an always_comb reading it are armed on.
 struct ContainerElement {
   QueueObject* queue = nullptr;
   AssocArrayObject* assoc = nullptr;
@@ -93,9 +72,6 @@ struct ContainerElement {
   uint32_t elem_width = 32;
 };
 
-// The record `elem`'s drives are kept in. `create` is what a statement
-// installing one passes; a statement ending one asks without it and is answered
-// null where nothing stands.
 static ElementDrive* ElementDriveFor(const ContainerElement& elem,
                                      bool create) {
   if (elem.queue != nullptr) {
@@ -117,10 +93,8 @@ static ElementDrive* ElementDriveFor(const ContainerElement& elem,
   return create ? &drives[elem.int_key] : nullptr;
 }
 
-// Drops a record that no longer holds anything, so an element carries a record
-// only while a statement stands on it.
 static void ForgetEmptyElementDrive(const ContainerElement& elem) {
-  ElementDrive* drive = ElementDriveFor(elem, /*create=*/false);
+  ElementDrive* drive = ElementDriveFor(elem, false);
   if (drive == nullptr || drive->Drives()) return;
   if (elem.queue != nullptr) {
     elem.queue->element_drives.erase(elem.queue_id);
@@ -131,10 +105,6 @@ static void ForgetEmptyElementDrive(const ContainerElement& elem) {
   }
 }
 
-// Resolves `lhs` to the queue element it names, and whether it names one. An
-// index that is out of range or carries an unknown bit names no element:
-// §7.10.1 has such an index ignore a write, and a statement that drives nothing
-// installs nothing.
 static bool ResolveQueueElement(const Expr* lhs, QueueObject* q,
                                 SimContext& ctx, Arena& arena,
                                 ContainerElement& out) {
@@ -148,10 +118,6 @@ static bool ResolveQueueElement(const Expr* lhs, QueueObject* q,
   return true;
 }
 
-// The same for an associative array, whose key is the element's identity.
-// §7.8.6 makes an index carrying an unknown bit invalid, and an entry the array
-// does not hold is not an element to stand on: §7.8.7 allocates one on a write
-// and a §10.6 statement is not that write.
 static bool ResolveAssocElement(const Expr* lhs, AssocArrayObject* aa,
                                 SimContext& ctx, Arena& arena,
                                 ContainerElement& out) {
@@ -171,8 +137,6 @@ static bool ResolveAssocElement(const Expr* lhs, AssocArrayObject* aa,
   return true;
 }
 
-// Resolves a §10.6 target to the container element it names. A select with a
-// second index is a slice rather than an element and names none.
 static bool ResolveContainerElement(const Expr* lhs, SimContext& ctx,
                                     Arena& arena, ContainerElement& out) {
   if (lhs == nullptr || lhs->kind != ExprKind::kSelect) return false;
@@ -189,10 +153,6 @@ static bool ResolveContainerElement(const Expr* lhs, SimContext& ctx,
   return false;
 }
 
-// Stores `val` in the element, at the element's own width, and announces the
-// change the way every other write to one does (§9.4.2). The element the
-// identity names is looked up again on each store, because a queue's elements
-// move under it.
 static void StoreContainerElement(const ContainerElement& elem,
                                   const Logic4Vec& val, SimContext& ctx,
                                   Arena& arena) {
@@ -220,9 +180,6 @@ static void StoreContainerElement(const ContainerElement& elem,
   NotifyOwningVar(ctx, elem.name);
 }
 
-// The value one drive puts in the element: the whole right-hand value where the
-// statement named the element alone, and §11.4.12's slice of it where the
-// target was a concatenation.
 static Logic4Vec ElementDriveValue(const ElementDriveSource& src,
                                    SimContext& ctx, Arena& arena) {
   auto val = EvalExpr(src.rhs, ctx, arena, src.rhs_width);
@@ -230,10 +187,6 @@ static Logic4Vec ElementDriveValue(const ElementDriveSource& src,
   return ExtractBitField(arena, val, src.src_lo, src.width);
 }
 
-// Installs, on each variable the drive's expression reads, a watcher that
-// recomputes the element while the drive stands. The drive is looked up again
-// rather than captured, so a record dropped by a release -- or by the removal
-// of the element the queue identity named -- retires the watcher.
 static void InstallElementDriveWatchers(const ContainerElement& elem,
                                         const ElementDriveSource& src,
                                         bool forced, SimContext& ctx,
@@ -242,7 +195,7 @@ static void InstallElementDriveWatchers(const ContainerElement& elem,
   auto* arena_ptr = &arena;
   for (auto* rhs_var : CollectDistinctRhsVars(src.rhs, ctx, nullptr)) {
     rhs_var->AddWatcher([elem, src, forced, ctx_ptr, arena_ptr]() {
-      const ElementDrive* drive = ElementDriveFor(elem, /*create=*/false);
+      const ElementDrive* drive = ElementDriveFor(elem, false);
       if (drive == nullptr) return true;
       const ElementDriveSource& standing =
           forced ? drive->forced : drive->assigned;
@@ -254,15 +207,11 @@ static void InstallElementDriveWatchers(const ContainerElement& elem,
   }
 }
 
-// §10.6.1 and §10.6.2: installs the statement's drive on the element, writes
-// the value it computes now, and arms the recomputation. A force installed over
-// an assign leaves the assign standing beneath it, which is what §10.6.2's
-// release reestablishes.
 static void DriveContainerElement(const ContainerElement& elem,
                                   const Stmt* stmt,
                                   const ElementDriveSource& src,
                                   SimContext& ctx, Arena& arena) {
-  ElementDrive* drive = ElementDriveFor(elem, /*create=*/true);
+  ElementDrive* drive = ElementDriveFor(elem, true);
   bool forced = stmt->kind == StmtKind::kForce;
   if (forced) {
     drive->forced = src;
@@ -273,14 +222,10 @@ static void DriveContainerElement(const ContainerElement& elem,
   InstallElementDriveWatchers(elem, src, forced, ctx, arena);
 }
 
-// §10.6.2's release and §10.6.1's deassign, on the element the target names.
-// Releasing an element that has an assign standing beneath the force
-// reestablishes that assignment, which is what the clause requires of a
-// variable in the same position.
 static void EndContainerElementDrive(const ContainerElement& elem,
                                      const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
-  ElementDrive* drive = ElementDriveFor(elem, /*create=*/false);
+  ElementDrive* drive = ElementDriveFor(elem, false);
   if (drive == nullptr) return;
   if (stmt->kind == StmtKind::kDeassign) {
     drive->assigned = {};
@@ -294,10 +239,6 @@ static void EndContainerElementDrive(const ContainerElement& elem,
   ForgetEmptyElementDrive(elem);
 }
 
-// Answers one of the four §10.6 statements on a container element, and whether
-// the target named one. `src_lo`, `width` and `rhs_width` are the concatenation
-// slot the element takes; a lone target passes a zero width and takes the whole
-// right-hand value.
 bool TryContainerElementDrive(const Expr* lhs, const Stmt* stmt,
                               const ElementDriveSource& slot, SimContext& ctx,
                               Arena& arena) {

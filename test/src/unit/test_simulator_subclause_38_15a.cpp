@@ -92,12 +92,10 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatOne) {
   EXPECT_EQ(val.value.scalar, vpi1);
 }
 
-// §38.15, Table 38-3 (scalar row): a single unknown bit is reported as vpiX
-// (a=0,b=1) or vpiZ (a=1,b=1), alongside the vpi0/vpi1 cases above.
 TEST_F(VpiGetValueSim, GetValueScalarFormatX) {
   auto* var = sim_ctx_.CreateVariable("sx", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 1);
-  var->value.words[0].bval = 1;  // a=1,b=1 -> x
+  var->value.words[0].bval = 1;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("sx"), nullptr);
@@ -112,7 +110,7 @@ TEST_F(VpiGetValueSim, GetValueScalarFormatX) {
 TEST_F(VpiGetValueSim, GetValueScalarFormatZ) {
   auto* var = sim_ctx_.CreateVariable("sz", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
-  var->value.words[0].bval = 1;  // a=0,b=1 -> z
+  var->value.words[0].bval = 1;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("sz"), nullptr);
@@ -139,8 +137,6 @@ TEST_F(VpiGetValueSim, GetValueBinStrFormat) {
   EXPECT_STREQ(val.value.str, "1010");
 }
 
-// §38.15, Table 38-3 (binary row): the returned string uses the characters
-// 1, 0, x, and z. Bit 2 is x (a=1,b=1) and bit 1 is z (a=0,b=1).
 TEST_F(VpiGetValueSim, GetValueBinStrFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("bxz", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1100);
@@ -172,9 +168,6 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormat) {
   EXPECT_STREQ(val.value.str, "ab");
 }
 
-// §38.15, Table 38-3 (hex row): a nibble whose bits are all z prints lowercase
-// 'z'; a nibble with only some z bits prints uppercase 'Z'. High nibble is all
-// z (a=0,b=F) -> 'z'; low nibble has one z bit among three 0 bits -> 'Z'.
 TEST_F(VpiGetValueSim, GetValueHexStrFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("hxz", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0x00);
@@ -191,13 +184,10 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormatUnknownBits) {
   EXPECT_STREQ(val.value.str, "zZ");
 }
 
-// §38.15, Table 38-3 (hex row): a nibble with some x bits prints uppercase 'X';
-// a nibble whose bits are all x prints lowercase 'x'. Low nibble is all x
-// (a=F,b=F) -> 'x'; a single x bit in the other nibble would be 'X' (below).
 TEST_F(VpiGetValueSim, GetValueHexStrFormatAllXLowercase) {
   auto* var = sim_ctx_.CreateVariable("hax", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0x0F);
-  var->value.words[0].bval = 0x0F;  // low nibble a=F,b=F -> all x
+  var->value.words[0].bval = 0x0F;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("hax"), nullptr);
@@ -210,12 +200,10 @@ TEST_F(VpiGetValueSim, GetValueHexStrFormatAllXLowercase) {
   EXPECT_STREQ(val.value.str, "0x");
 }
 
-// §38.15, Table 38-3 (hex row): a nibble with only some x bits prints uppercase
-// 'X'. Low nibble has one x bit (a=1,b=1) among three 0 bits.
 TEST_F(VpiGetValueSim, GetValueHexStrFormatSomeXUppercase) {
   auto* var = sim_ctx_.CreateVariable("hsx", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0x01);
-  var->value.words[0].bval = 0x01;  // low nibble {0,0,0,x} -> some x
+  var->value.words[0].bval = 0x01;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("hsx"), nullptr);
@@ -243,13 +231,10 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormat) {
   EXPECT_STREQ(val.value.str, "75");
 }
 
-// §38.15, Table 38-3 (octal row): a digit covering an unknown bit is reported
-// as x (or z when the whole group is z) rather than as a numeric digit. The
-// low group is driven all-z (a=1,b=1), so it must render as 'z'.
 TEST_F(VpiGetValueSim, GetValueOctStrFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("ocz", 6);
   var->value = MakeLogic4VecVal(arena_, 6, 0b111000);
-  var->value.words[0].bval = 0b000111;  // low octal digit is all z (a=0,b=1)
+  var->value.words[0].bval = 0b000111;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("ocz"), nullptr);
@@ -262,9 +247,6 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatUnknownBits) {
   EXPECT_STREQ(val.value.str, "7z");
 }
 
-// §38.15, Table 38-3 (octal row): a digit with only some z bits (not a whole-
-// group z) is reported as uppercase 'Z'. Bit 0 alone is z (a=0,b=1); the other
-// two bits of the group are 0, so the group is not all-z.
 TEST_F(VpiGetValueSim, GetValueOctStrFormatSomeZReportsUppercaseZ) {
   auto* var = sim_ctx_.CreateVariable("ocz2", 6);
   var->value = MakeLogic4VecVal(arena_, 6, 0);
@@ -281,12 +263,10 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatSomeZReportsUppercaseZ) {
   EXPECT_STREQ(val.value.str, "0Z");
 }
 
-// §38.15, Table 38-3 (octal row): a digit whose bits are all x prints lowercase
-// 'x'. The low group is driven all x (a=7,b=7).
 TEST_F(VpiGetValueSim, GetValueOctStrFormatAllXReportsLowercaseX) {
   auto* var = sim_ctx_.CreateVariable("ocax", 6);
   var->value = MakeLogic4VecVal(arena_, 6, 0b000111);
-  var->value.words[0].bval = 0b000111;  // low digit a=7,b=7 -> all x
+  var->value.words[0].bval = 0b000111;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("ocax"), nullptr);
@@ -299,12 +279,10 @@ TEST_F(VpiGetValueSim, GetValueOctStrFormatAllXReportsLowercaseX) {
   EXPECT_STREQ(val.value.str, "0x");
 }
 
-// §38.15, Table 38-3 (octal row): a digit with only some x bits prints
-// uppercase 'X'. The low group has one x bit (a=1,b=1) among two 0 bits.
 TEST_F(VpiGetValueSim, GetValueOctStrFormatSomeXReportsUppercaseX) {
   auto* var = sim_ctx_.CreateVariable("ocsx", 6);
   var->value = MakeLogic4VecVal(arena_, 6, 0b000001);
-  var->value.words[0].bval = 0b000001;  // low digit {0,0,x} -> some x
+  var->value.words[0].bval = 0b000001;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("ocsx"), nullptr);
@@ -333,9 +311,6 @@ TEST_F(VpiGetValueSim, GetValueStringFormat) {
   EXPECT_STREQ(val.value.str, "AB");
 }
 
-// §38.15, Table 38-3 (vpiTimeVal row): the value is handed back in an
-// s_vpi_time the routine owns, value.time pointing at it, its high and low
-// words the value's upper and lower 32 bits (#4960).
 TEST_F(VpiGetValueSim, GetValueTimeFormat) {
   auto* var = sim_ctx_.CreateVariable("t", 64);
   var->value = MakeLogic4VecVal(arena_, 64, (uint64_t{3} << 32) | 500);
@@ -353,9 +328,6 @@ TEST_F(VpiGetValueSim, GetValueTimeFormat) {
   EXPECT_EQ(val.value.time->low, 500u);
 }
 
-// §38.15, Table 38-3 (vpiDecStrVal row): the value as a string of decimal
-// digits in memory the routine owns, a signed variable's negative value
-// written with its sign and an unsigned one's as its magnitude (#4959).
 TEST_F(VpiGetValueSim, GetValueDecStrFormatHonoursSignedness) {
   auto* sv = sim_ctx_.CreateVariable("sv", 8);
   sv->value = MakeLogic4VecVal(arena_, 8, 0xFB);
@@ -377,9 +349,6 @@ TEST_F(VpiGetValueSim, GetValueDecStrFormatHonoursSignedness) {
   EXPECT_STREQ(val.value.str, "251");
 }
 
-// §38.15, Table 38-3 (vpiIntVal row): any x or z bit in the object value is
-// mapped to a 0 in the returned integer. Bit 2 is driven unknown (a=1,b=1),
-// so it must read back as 0: 0b1111 with bit 2 cleared is 0b1011 == 11.
 TEST_F(VpiGetValueSim, GetValueIntFormatMapsUnknownBitsToZero) {
   auto* var = sim_ctx_.CreateVariable("xz", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1111);
@@ -395,9 +364,6 @@ TEST_F(VpiGetValueSim, GetValueIntFormatMapsUnknownBitsToZero) {
   EXPECT_EQ(val.value.integer, 0b1011);
 }
 
-// §38.15, Table 38-3 (vpiVectorVal row) and the vector paragraph: the value is
-// returned as an array of s_vpi_vecval whose size is ((vector_size-1)/32+1),
-// with the LSB carried by element 0 and bit 33 by the LSB of element 1.
 TEST_F(VpiGetValueSim, GetValueVectorFormatTwoWords) {
   auto* var = sim_ctx_.CreateVariable("v", 40);
   var->value = MakeLogic4VecVal(arena_, 40, 0x123456789Aull);
@@ -410,16 +376,12 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatTwoWords) {
   val.format = vpiVectorVal;
   vpi_get_value(h, &val);
   ASSERT_NE(val.value.vector, nullptr);
-  // Element 0 holds bits [31:0], element 1 holds bits [39:32].
   EXPECT_EQ(val.value.vector[0].aval, 0x3456789Au);
   EXPECT_EQ(val.value.vector[0].bval, 0u);
   EXPECT_EQ(val.value.vector[1].aval, 0x12u);
   EXPECT_EQ(val.value.vector[1].bval, 0u);
 }
 
-// §38.15 (vector paragraph): the array_size formula ((vector_size-1)/32+1)
-// yields a single s_vpi_vecval at the 32-bit boundary, carrying all 32 bits in
-// element 0. This pins the boundary opposite the multi-word case above.
 TEST_F(VpiGetValueSim, GetValueVectorFormatSingleWordBoundary) {
   auto* var = sim_ctx_.CreateVariable("vw", 32);
   var->value = MakeLogic4VecVal(arena_, 32, 0xDEADBEEFull);
@@ -436,13 +398,10 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatSingleWordBoundary) {
   EXPECT_EQ(val.value.vector[0].bval, 0u);
 }
 
-// §38.15, Table 38-3 (vpiVectorVal row) / Figure 38-8: unknown bits use the ab
-// encoding 11=X, 01=Z, which now matches the internal four-state word, so the
-// returned value is a direct copy. A z bit is internal a=0,b=1.
 TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("vz", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1011);
-  var->value.words[0].bval = 0b0100;  // bit 2 is z (a=0,b=1)
+  var->value.words[0].bval = 0b0100;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("vz"), nullptr);
@@ -452,19 +411,14 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesUnknownBits) {
   val.format = vpiVectorVal;
   vpi_get_value(h, &val);
   ASSERT_NE(val.value.vector, nullptr);
-  // ab encoding: bit 2 z -> aval bit cleared, bval bit set.
   EXPECT_EQ(val.value.vector[0].aval, 0b1011u);
   EXPECT_EQ(val.value.vector[0].bval, 0b0100u);
 }
 
-// §38.15, Table 38-3 (vpiVectorVal row) / Figure 38-8: the other unknown
-// encoding is 11=X. An x bit is internal a=1,b=1, so both the aval and bval
-// bits are set in the returned vecval -- distinct from the z case above where
-// aval is clear.
 TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesXBit) {
   auto* var = sim_ctx_.CreateVariable("vx", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1111);
-  var->value.words[0].bval = 0b0100;  // bit 2 is x (a=1,b=1)
+  var->value.words[0].bval = 0b0100;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("vx"), nullptr);
@@ -474,14 +428,10 @@ TEST_F(VpiGetValueSim, GetValueVectorFormatEncodesXBit) {
   val.format = vpiVectorVal;
   vpi_get_value(h, &val);
   ASSERT_NE(val.value.vector, nullptr);
-  // ab encoding: bit 2 x -> both aval and bval bits set.
   EXPECT_EQ(val.value.vector[0].aval, 0b1111u);
   EXPECT_EQ(val.value.vector[0].bval, 0b0100u);
 }
 
-// §38.15, Table 38-3 (vpiStrengthVal row) and the strength paragraph: the value
-// is returned as one s_vpi_strengthval per bit, and a reg or variable always
-// reports strong strength on both drive components.
 TEST_F(VpiGetValueSim, GetValueStrengthFormat) {
   auto* var = sim_ctx_.CreateVariable("st", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b1010);
@@ -494,7 +444,6 @@ TEST_F(VpiGetValueSim, GetValueStrengthFormat) {
   val.format = vpiStrengthVal;
   vpi_get_value(h, &val);
   ASSERT_NE(val.value.strength, nullptr);
-  // Element i carries the strength of bit i: bits are 0,1,0,1 from LSB up.
   EXPECT_EQ(val.value.strength[0].logic, vpi0);
   EXPECT_EQ(val.value.strength[1].logic, vpi1);
   EXPECT_EQ(val.value.strength[2].logic, vpi0);
@@ -503,14 +452,10 @@ TEST_F(VpiGetValueSim, GetValueStrengthFormat) {
   EXPECT_EQ(val.value.strength[0].s1, vpiStrongDrive);
 }
 
-// §38.15, Table 38-3 (vpiStrengthVal row): the per-bit logic value carries the
-// bit's four-state value, so an x bit reports vpiX and a z bit reports vpiZ,
-// while the drive components stay strong on a variable. Bits from LSB up are
-// 1, 0, x (a=1,b=1), z (a=0,b=1).
 TEST_F(VpiGetValueSim, GetValueStrengthFormatUnknownBits) {
   auto* var = sim_ctx_.CreateVariable("stu", 4);
   var->value = MakeLogic4VecVal(arena_, 4, 0b0101);
-  var->value.words[0].bval = 0b1100;  // bit 2 x, bit 3 z
+  var->value.words[0].bval = 0b1100;
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("stu"), nullptr);
@@ -528,9 +473,6 @@ TEST_F(VpiGetValueSim, GetValueStrengthFormatUnknownBits) {
   EXPECT_EQ(val.value.strength[2].s1, vpiStrongDrive);
 }
 
-// §38.15: with vpiObjTypeVal the routine fills the value and rewrites the
-// format field according to the object type. A multi-bit reg is a vector, so
-// the format becomes vpiVectorVal and the vector arm is populated.
 TEST_F(VpiGetValueSim, GetValueObjTypeVectorObject) {
   auto* var = sim_ctx_.CreateVariable("ot", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 0xAB);
@@ -547,8 +489,6 @@ TEST_F(VpiGetValueSim, GetValueObjTypeVectorObject) {
   EXPECT_EQ(val.value.vector[0].aval, 0xABu);
 }
 
-// §38.15: with vpiObjTypeVal a single-bit object is a scalar, so the format
-// becomes vpiScalarVal and the scalar arm carries the bit value.
 TEST_F(VpiGetValueSim, GetValueObjTypeScalarObject) {
   auto* var = sim_ctx_.CreateVariable("ot1", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 1);
@@ -564,9 +504,6 @@ TEST_F(VpiGetValueSim, GetValueObjTypeScalarObject) {
   EXPECT_EQ(val.value.scalar, vpi1);
 }
 
-// Builds a real object the way the runtime stores one: the IEEE-754 bit
-// pattern of `d` laid into a 64-bit four-state word with is_real set. Mirrors
-// eval_expr.cpp's real construction so the VPI read observes a genuine double.
 static void SetRealValue(Variable* var, Arena& arena, double d) {
   uint64_t bits = 0;
   std::memcpy(&bits, &d, sizeof(double));
@@ -574,8 +511,6 @@ static void SetRealValue(Variable* var, Arena& arena, double d) {
   var->value.is_real = true;
 }
 
-// §38.15: with vpiObjTypeVal a real object reports vpiRealVal; the routine
-// fills the real arm and rewrites the format field accordingly.
 TEST_F(VpiGetValueSim, GetValueObjTypeRealObject) {
   auto* var = sim_ctx_.CreateVariable("otr", 64);
   SetRealValue(var, arena_, 42.0);
@@ -591,9 +526,6 @@ TEST_F(VpiGetValueSim, GetValueObjTypeRealObject) {
   EXPECT_DOUBLE_EQ(val.value.real, 42.0);
 }
 
-// §38.15, Table 38-3 (vpiRealVal row): a real object read in vpiRealVal format
-// yields the stored floating-point value, not its bit pattern reinterpreted as
-// an integer. 3.5 must come back as exactly 3.5.
 TEST_F(VpiGetValueSim, GetValueRealObjectRealFormat) {
   auto* var = sim_ctx_.CreateVariable("rr", 64);
   SetRealValue(var, arena_, 3.5);
@@ -608,10 +540,6 @@ TEST_F(VpiGetValueSim, GetValueRealObjectRealFormat) {
   EXPECT_DOUBLE_EQ(val.value.real, 3.5);
 }
 
-// §38.15: a real object returned in a format other than vpiRealVal/vpiStringVal
-// is first converted to an integer using the §6.12.1 rounding (nearest, ties
-// away from zero). 2.5 rounds to 3, distinguishing it from round-half-to-even
-// (which would give 2) and from a raw bit-pattern truncation (garbage).
 TEST_F(VpiGetValueSim, GetValueRealObjectIntFormatRoundsHalfAwayFromZero) {
   auto* var = sim_ctx_.CreateVariable("ri", 64);
   SetRealValue(var, arena_, 2.5);
@@ -626,8 +554,6 @@ TEST_F(VpiGetValueSim, GetValueRealObjectIntFormatRoundsHalfAwayFromZero) {
   EXPECT_EQ(val.value.integer, 3);
 }
 
-// §38.15: the same §6.12.1 rounding applies to negative reals, rounding away
-// from zero. -2.5 rounds to -3.
 TEST_F(VpiGetValueSim, GetValueRealObjectIntFormatNegativeRounding) {
   auto* var = sim_ctx_.CreateVariable("rin", 64);
   SetRealValue(var, arena_, -2.5);
@@ -642,9 +568,6 @@ TEST_F(VpiGetValueSim, GetValueRealObjectIntFormatNegativeRounding) {
   EXPECT_EQ(val.value.integer, -3);
 }
 
-// §38.15: when the requested format is vpiStringVal, a real object is returned
-// as a decimal-notation string of the floating-point number (not an ASCII
-// repacking of its bits). 3.5 renders as the text "3.5".
 TEST_F(VpiGetValueSim, GetValueRealObjectStringFormat) {
   auto* var = sim_ctx_.CreateVariable("rs", 64);
   SetRealValue(var, arena_, 3.5);
@@ -660,38 +583,30 @@ TEST_F(VpiGetValueSim, GetValueRealObjectStringFormat) {
   EXPECT_STREQ(val.value.str, "3.5");
 }
 
-// §38.15: the buffer vpi_get_value() uses for string values shall be different
-// from the buffer vpi_get_str() uses. So a pointer returned by vpi_get_str()
-// must survive a following vpi_get_value() call in a string format -- the value
-// string lands in a separate buffer and does not clobber the earlier name.
 TEST_F(VpiGetValueSim, GetValueStringBufferDistinctFromGetStr) {
   auto* var = sim_ctx_.CreateVariable("nm", 32);
-  var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);  // packs to "AB"
+  var->value = MakeLogic4VecVal(arena_, 32, 0x00004142);
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("nm"), nullptr);
   ASSERT_NE(h, nullptr);
 
-  // Hold the pointer returned by vpi_get_str(vpiName, ...).
   const char* name = vpi_get_str(vpiName, h);
   ASSERT_NE(name, nullptr);
   EXPECT_STREQ(name, "nm");
 
-  // Retrieving a string value must not overwrite the vpi_get_str() buffer.
   s_vpi_value val = {};
   val.format = vpiStringVal;
   vpi_get_value(h, &val);
   ASSERT_NE(val.value.str, nullptr);
   EXPECT_STREQ(val.value.str, "AB");
   EXPECT_NE(static_cast<const void*>(val.value.str),
-            static_cast<const void*>(name));  // the two buffers are distinct
-  EXPECT_STREQ(name, "nm");                   // the name buffer is left intact
+            static_cast<const void*>(name));
+  EXPECT_STREQ(name, "nm");
 }
 
-// A design run whose block variables are read back by name once it is over.
 class BlockVariableValuesOfARun : public VpiDesignRun {
  protected:
-  // Each variable named in `expected` reads the integer beside its name.
   static void ExpectValues(
       const std::vector<std::pair<const char*, int>>& expected) {
     for (const auto& [name, value] : expected) {
@@ -705,9 +620,6 @@ class BlockVariableValuesOfARun : public VpiDesignRun {
   }
 };
 
-// §38.15 with §37.12: the object of a variable a named block declares reads
-// the value the block left in it, in the top and in an instance below it
-// alike, though its storage is made only when the block runs (#4996).
 TEST_F(BlockVariableValuesOfARun, ABlockVariableReadsWhatTheBlockLeft) {
   Run("module m; initial begin : blk int v; v = 7; end endmodule\n"
       "module top; m i0(); initial begin : blk int v; v = 3; end\n"
@@ -715,8 +627,6 @@ TEST_F(BlockVariableValuesOfARun, ABlockVariableReadsWhatTheBlockLeft) {
   ExpectValues({{"top.blk.v", 3}, {"top.i0.blk.v", 7}});
 }
 
-// The same holds for a variable of a named block another named block encloses,
-// keyed under both blocks' names.
 TEST_F(BlockVariableValuesOfARun, ANestedBlocksVariableReadsItsValue) {
   Run("module top;\n"
       "  initial begin : outer begin : inner int v; v = 5; end end\n"
@@ -724,17 +634,13 @@ TEST_F(BlockVariableValuesOfARun, ANestedBlocksVariableReadsItsValue) {
   ExpectValues({{"top.outer.inner.v", 5}});
 }
 
-// §38.15, Table 38-3: the binary, octal and hex string formats give every
-// digit of the value, the ones above bit 63 among them, read from the second
-// storage word. Each digit was read from the first word shifted by its bit
-// position, which held nothing of bits 64 to 71.
 TEST_F(VpiGetValueSim, DigitStringsReadEveryWordOfAWideValue) {
   auto* var = sim_ctx_.CreateVariable("w", 72);
   var->value.words[0] = {0x1, 0};
   var->value.words[1] = {0xAB, 0};
   auto* xz = sim_ctx_.CreateVariable("xz", 72);
   xz->value.words[0] = {0x1, 0};
-  xz->value.words[1] = {0xF0, 0xFF};  // bits 71:68 x, bits 67:64 z
+  xz->value.words[1] = {0xF0, 0xFF};
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("w"), nullptr);
@@ -758,13 +664,10 @@ TEST_F(VpiGetValueSim, DigitStringsReadEveryWordOfAWideValue) {
   EXPECT_STREQ(val.value.str, "xz0000000000000001");
 }
 
-// §38.15, Table 38-3: vpiStringVal reads each eight bits of the value as one
-// character, so an 80-bit value holds ten. The value was read through its first
-// word alone, which holds the last eight.
 TEST_F(VpiGetValueSim, StringValReadsEveryCharacterOfAWideValue) {
   auto* var = sim_ctx_.CreateVariable("s", 80);
-  var->value.words[0] = {0x636465666768696Aull, 0};  // "cdefghij"
-  var->value.words[1] = {0x6162, 0};                 // "ab"
+  var->value.words[0] = {0x636465666768696Aull, 0};
+  var->value.words[1] = {0x6162, 0};
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("s"), nullptr);
@@ -776,11 +679,9 @@ TEST_F(VpiGetValueSim, StringValReadsEveryCharacterOfAWideValue) {
   EXPECT_STREQ(val.value.str, "abcdefghij");
 }
 
-// §38.15, Table 38-3: a hex digit some of whose bits are x and the rest z is
-// written `X`, an x and a z both being unknown but the digit not all x.
 TEST_F(VpiGetValueSim, HexDigitOfMixedXAndZBitsIsUppercaseX) {
   auto* var = sim_ctx_.CreateVariable("xz", 4);
-  var->value.words[0] = {0xA, 0xF};  // bits 3:0 x, z, x, z
+  var->value.words[0] = {0xA, 0xF};
   vpi_ctx_.Attach(sim_ctx_);
 
   vpiHandle h = vpi_handle_by_name(VpiText("xz"), nullptr);
@@ -791,9 +692,6 @@ TEST_F(VpiGetValueSim, HexDigitOfMixedXAndZBitsIsUppercaseX) {
   EXPECT_STREQ(val.value.str, "X");
 }
 
-// §38.15: with a null handle there is nothing to read, and with a null value
-// structure nowhere to read into, so the routine returns leaving the buffer
-// it was given as it was.
 TEST_F(VpiGetValueSim, ANullHandleOrValueReadsNothing) {
   auto* var = sim_ctx_.CreateVariable("nv", 8);
   var->value = MakeLogic4VecVal(arena_, 8, 1);
@@ -809,10 +707,6 @@ TEST_F(VpiGetValueSim, ANullHandleOrValueReadsNothing) {
   EXPECT_EQ(val.value.integer, 77);
 }
 
-// §37.17 detail 26 with §11.5.1: a select whose index is not a constant
-// stands for the element its index names, and one whose index expression the
-// model could not build names none, reading x in each of its bits as an index
-// holding x does. It read as the whole vector it was made of.
 TEST_F(VpiGetValueSim, ASelectWhoseIndexWasNotBuiltSelectsNothing) {
   auto* var = sim_ctx_.CreateVariable("v16", 16);
   var->value = MakeLogic4VecVal(arena_, 16, 0x1234);

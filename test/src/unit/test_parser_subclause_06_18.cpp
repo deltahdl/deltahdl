@@ -20,10 +20,6 @@ TEST(TypeDeclParsing, TypedefBasic) {
   EXPECT_EQ(item->name, "byte_t");
 }
 
-// The five ForwardTypedef* cases below cover the forward typedef forms
-// listed in 6.18. test_parser_annex_a_02_01_03.cpp carries the matching
-// cases for the forward_type alternatives of the A.2.1.3
-// type_declaration production, named ForwardType*.
 TEST(TypeDeclParsing, ForwardTypedefClass) {
   auto r = Parse("module m; typedef class my_class; endmodule");
   ASSERT_NE(r.cu, nullptr);
@@ -237,9 +233,6 @@ TEST(DataTypeParsing, HierarchicalTypeReferenceRejected) {
       "  inner i();\n"
       "  i.data_t x;\n"
       "endmodule\n");
-  // `i` names no type, so the parse falls through to Parser::ParsePlainVarDecl
-  // and the '.' is met where the §6.8 data declaration wants its ';'. §6.18 has
-  // no report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '.'", 6, "6.8"));
 }
 
@@ -266,17 +259,6 @@ TEST(DataTypeParsing, InterfacePortTypedef) {
   EXPECT_EQ(td->typedef_type.type_name, "data_t");
 }
 
-// §6.18 requires a user-defined data type to be declared before any reference
-// to its type_identifier. `my_type x;` written above the typedef breaches it,
-// and the breach is not the parser's to report: the same two identifiers and
-// semicolon are what a module instantiation missing its port connection list
-// spells, this parser holds no table of module names, and a module may be
-// instantiated above its own declaration. What the parser records is the data
-// declaration the shape also spells, with the type name kept, so that the
-// elaborator has the name to report about.
-// UserDefinedTypeElaboration.TypeReferenceBeforeItsDeclarationIsReported in
-// test/src/unit/test_elaborator_subclause_06_18.cpp is where the §6.18 report
-// is asserted.
 TEST(DataTypeParsing, TypeReferenceBeforeDeclarationParsesAsADataDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -293,26 +275,7 @@ TEST(DataTypeParsing, TypeReferenceBeforeDeclarationParsesAsADataDeclaration) {
   EXPECT_TRUE(item->type_name_undeclared_at_parse);
 }
 
-// The six cases below cover the rest of A.2.4's variable_decl_assignment after
-// a type name the parser has not yet met. The case above covers the sole
-// declarator with no dimension and no initializer, which was for a time the
-// only shape read as a declaration; A.2.3 gives
-// `list_of_variable_decl_assignments ::= variable_decl_assignment { ,
-// variable_decl_assignment }`, so the comma list, the initializer and the
-// dimensions are the same data_declaration. None of them can be an
-// instantiation: A.4.1.1 gives
-// `hierarchical_instance ::= name_of_instance ( [ list_of_port_connections ] )`
-// and §23.3.2 states it in prose -- every module instantiation needs the
-// parentheses, even of a module with no ports -- and not one of the four
-// sources contains a `(`.
-//
-// Each case asserts the node the parser built and not merely that nothing was
-// reported, because the behaviour these replace reported an error and built a
-// kModuleInst, so an assertion on the report alone would pass on a repair that
-// silenced the report and left the wrong node.
 TEST(ParserUndeclaredTypeDecl, ACommaSeparatedListIsADataDeclaration) {
-  // §6.18 prints `intP a, b;` as its own example of using a named type, so this
-  // is the shape the clause itself writes.
   auto r = Parse(
       "module m;\n"
       "  my_type a, b;\n"
@@ -332,8 +295,6 @@ TEST(ParserUndeclaredTypeDecl, ACommaSeparatedListIsADataDeclaration) {
 }
 
 TEST(ParserUndeclaredTypeDecl, AnInitializerIsADataDeclaration) {
-  // `[ = expression ]` of A.2.4. The `=` used to reach ParsePortConnection,
-  // where ParseExpr reported "expected expression" under §11.2 and consumed it.
   auto r = Parse(
       "module m;\n"
       "  my_type a = 0;\n"
@@ -350,9 +311,6 @@ TEST(ParserUndeclaredTypeDecl, AnInitializerIsADataDeclaration) {
 }
 
 TEST(ParserUndeclaredTypeDecl, AnUnpackedDimensionIsADataDeclaration) {
-  // `{ variable_dimension }` of A.2.4. This is the case that used to build a
-  // kModuleInst carrying [3:0] as an instance range, so the assertion on the
-  // dimension is what tells the two readings apart.
   auto r = Parse(
       "module m;\n"
       "  my_type a [3:0];\n"
@@ -368,10 +326,6 @@ TEST(ParserUndeclaredTypeDecl, AnUnpackedDimensionIsADataDeclaration) {
 }
 
 TEST(ParserUndeclaredTypeDecl, AnUnsizedDimensionIsADataDeclaration) {
-  // A.2.5's `unsized_dimension ::= [ ]`, which A.2.4 admits on the
-  // dynamic_array_variable_identifier alternative. Parser::ParseUnpackedDims
-  // records it as a null dimension, so the size alone would not distinguish it
-  // from the sized case above.
   auto r = Parse(
       "module m;\n"
       "  my_type a [];\n"
@@ -385,13 +339,7 @@ TEST(ParserUndeclaredTypeDecl, AnUnsizedDimensionIsADataDeclaration) {
   EXPECT_EQ(item->unpacked_dims[0], nullptr);
 }
 
-// The two cases below hold the boundary from the instantiation side. Without
-// them a repair reading every undeclared name as a type would pass all four
-// cases above and stop the parser recognising an instantiation at all.
 TEST(ParserUndeclaredTypeDecl, ANamedInstanceWithPortsIsStillAnInstantiation) {
-  // The port-connection list A.4.1.1 requires, and §23.3.2 permits the module
-  // to be declared further on, so the parser cannot settle this by looking for
-  // a declaration.
   auto r = Parse(
       "module m;\n"
       "  my_mod u (x, y);\n"
@@ -406,10 +354,6 @@ TEST(ParserUndeclaredTypeDecl, ANamedInstanceWithPortsIsStillAnInstantiation) {
 
 TEST(ParserUndeclaredTypeDecl,
      AnInstanceWithARangeAndPortsIsStillAnInstantiation) {
-  // A.4.1.1 puts `{ unpacked_dimension }` in name_of_instance, so an array of
-  // instances wears the same brackets as a declarator's dimension and is told
-  // from it only by the `(` that follows. This is the case that decides the
-  // dimensions must be skipped before the `(` is looked for.
   auto r = Parse(
       "module m;\n"
       "  my_mod u [3:0] (x, y);\n"
@@ -422,13 +366,6 @@ TEST(ParserUndeclaredTypeDecl,
   EXPECT_NE(item->inst_range_left, nullptr);
 }
 
-// Parses a module whose one item is `typedef <qualified> alias_t;` and checks
-// that it parsed without a report into one typedef of a kNamed type held in
-// scope `scope` under `type_name`. The typedef's type is A.2.2.1's
-// `[ class_scope | package_scope ] type_identifier`, which the parser once
-// read as a bare name -- `r` taken for the typedef's own name and the `::`
-// after it reported as a missing semicolon -- so a qualified name is what
-// tells the repaired parse from the old one.
 static void ExpectQualifiedTypedef(const char* qualified, const char* scope,
                                    const char* type_name) {
   std::string src = std::string("module m;\n  typedef ") + qualified +
@@ -447,25 +384,14 @@ static void ExpectQualifiedTypedef(const char* qualified, const char* scope,
 }
 
 TEST(TypeDeclParsing, PackageQualifiedTypedefType) {
-  // §26.3 (printed page 808) reaches a package's typedef through the package
-  // scope resolution operator, and A.2.1.3's type_declaration takes any
-  // data_type, so `typedef r::real_holder_t idx_t;` is one typedef of a named
-  // type held in scope r, not a forward typedef of `r`.
   ExpectQualifiedTypedef("r::real_holder_t", "r", "real_holder_t");
 }
 
 TEST(TypeDeclParsing, ClassQualifiedTypedefType) {
-  // A.2.2.1 admits a class_scope before the type_identifier as it does a
-  // package_scope, so `typedef C::T alias_t;` reads the same way with the
-  // class held as the scope.
   ExpectQualifiedTypedef("C::T", "C", "T");
 }
 
 TEST(TypeDeclParsing, ForwardStructTypedefStaysForward) {
-  // §6.18 (printed page 118) lists `typedef struct type_identifier;` among the
-  // forward typedef forms. Reading the typedef's type through the declared-
-  // data-type path must leave this form to the forward probe that precedes
-  // it: the item carries the forward kind and no type of its own.
   auto r = Parse(
       "module m;\n"
       "  typedef struct pair_t;\n"
@@ -481,10 +407,6 @@ TEST(TypeDeclParsing, ForwardStructTypedefStaysForward) {
   EXPECT_EQ(fwd->typedef_type.kind, DataTypeKind::kImplicit);
 }
 
-// A.2.2.1 lets packed dimensions follow an inline struct or union body, so
-// the typedef names a packed array of the aggregate (§7.4.1, and §37.25
-// detail 8's own example); the identifier after them is the typedef's name,
-// not the start of a forward typedef.
 TEST(TypeDeclParsing, TypedefOfAnInlineAggregateTakesPackedDimensions) {
   auto r = Parse(
       "module m;\n"

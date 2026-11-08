@@ -22,8 +22,6 @@ namespace {
 
 namespace fs = std::filesystem;
 
-// Scratch directory used to exercise `begin_keywords` spanning an `include
-// boundary. Cleans itself up on destruction.
 struct KeywordIncludeDir {
   fs::path dir;
 
@@ -105,10 +103,6 @@ TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBegin) {
                             "22.14"));
 }
 
-// §22.14 is what requires the two directives to be written as a pair, so the
-// record the unmatched closer leaves names that subclause. A reader of the run
-// then learns which rule was enforced without matching the wording of the
-// message.
 TEST(KeywordVersionPreprocessing, ErrorEndKeywordsWithoutBeginNames22_14) {
   PreprocFixture f;
   Preprocess("`end_keywords\n", f);
@@ -174,11 +168,6 @@ TEST(KeywordVersionPreprocessing, DoubleNestedBeginKeywords) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §22.14: `resetall does not undo the effect of `begin_keywords. The 1364-2001
-// keyword set is selected and then `resetall appears; afterward `logic` (a word
-// reserved only in later standards) must still lex as an identifier, directly
-// showing the active keyword version survived the reset rather than reverting
-// to the default set.
 TEST(KeywordVersionPreprocessing, ResetallDoesNotAffectKeywordVersion) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -342,10 +331,6 @@ TEST(KeywordVersionPreprocessing, SameVersionNested) {
             KeywordVersion::kVer18002023);
 }
 
-// §22.14: a `begin_keywords directive affects all source that follows, even
-// across source file boundaries, until the matching `end_keywords. Here the
-// directive lives in the top file while the affected `logic` identifier lives
-// in an included file; under "1364-2001" it must still lex as an identifier.
 TEST(KeywordVersionPreprocessing, EffectCrossesIncludeBoundary) {
   KeywordIncludeDir tmp;
   tmp.Write("inc.svh", "logic\n");
@@ -376,8 +361,6 @@ TEST(KeywordVersionPreprocessing, EffectCrossesIncludeBoundary) {
   EXPECT_TRUE(found_logic);
 }
 
-// Lexes preprocessed text and returns the kind of every token whose spelling
-// matches `text`, so a test can say what a particular word turned into.
 std::vector<TokenKind> KindsOf(const std::string& preprocessed,
                                std::string_view text) {
   SourceManager mgr;
@@ -391,10 +374,6 @@ std::vector<TokenKind> KindsOf(const std::string& preprocessed,
   return kinds;
 }
 
-// §22.14: the two directives shall be used as a pair, `begin_keywords first
-// and `end_keywords sometime later. A region that is opened and never closed
-// has no matching `end_keywords anywhere, which is only knowable once the last
-// source file has been preprocessed.
 TEST(KeywordVersionPreprocessing, ErrorBeginKeywordsNeverClosed) {
   PreprocFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -411,8 +390,6 @@ TEST(KeywordVersionPreprocessing, ErrorBeginKeywordsNeverClosed) {
                             "22.14"));
 }
 
-// The inner directive of a nested pair is the one left unmatched here: the
-// single `end_keywords closes the inner region, so the outer one is reported.
 TEST(KeywordVersionPreprocessing, ErrorNestedBeginKeywordsNeverClosed) {
   PreprocFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -430,8 +407,6 @@ TEST(KeywordVersionPreprocessing, ErrorNestedBeginKeywordsNeverClosed) {
                             "22.14"));
 }
 
-// A properly paired region draws no complaint from the same end-of-compilation
-// check, which keeps the diagnostic above from being unconditional.
 TEST(KeywordVersionPreprocessing, ClosedRegionIsNotReportedUnterminated) {
   PreprocFixture f;
   auto fid = f.mgr.AddFile("<test>",
@@ -444,21 +419,12 @@ TEST(KeywordVersionPreprocessing, ClosedRegionIsNotReportedUnterminated) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §22.14: a `begin_keywords region affects all source that follows, across
-// source file boundaries, until the matching `end_keywords. The pair is split
-// across two separately preprocessed files here: the region opened in the
-// first file is still in effect at the top of the second, where `logic` lexes
-// as an identifier, and the `end_keywords in the second file closes it, so
-// nothing is left unterminated.
 TEST(KeywordVersionPreprocessing, KeywordRegionSpansSeparateSourceFiles) {
   PreprocFixture f;
   auto first = f.mgr.AddFile("<first>", "`begin_keywords \"1364-2001\"\n");
   auto second = f.mgr.AddFile("<second>", "logic\n`end_keywords\n");
 
   Preprocessor pp(f.mgr, f.diag, {});
-  // The driver preprocesses each source file with the same preprocessor and
-  // concatenates the results, which is what lets a region opened in one file
-  // still be in effect in the next.
   std::string out = pp.Preprocess(first);
   out += pp.Preprocess(second);
   pp.ReportUnterminatedKeywordRegions();
@@ -469,9 +435,6 @@ TEST(KeywordVersionPreprocessing, KeywordRegionSpansSeparateSourceFiles) {
   EXPECT_EQ(kinds[0], TokenKind::kIdentifier);
 }
 
-// §22.14 names the closing directive `end_keywords exactly. A macro whose name
-// merely starts with those characters is a macro usage, not a directive, so it
-// must expand rather than try to close a keyword region that was never opened.
 TEST(KeywordVersionPreprocessing, MacroNamedLikeEndKeywordsIsNotTheDirective) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -483,9 +446,6 @@ TEST(KeywordVersionPreprocessing, MacroNamedLikeEndKeywordsIsNotTheDirective) {
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
 
-// The same whole-word rule for the opening directive: `begin_keywords_note is
-// a macro usage, so no version_specifier is demanded and no keyword region is
-// opened for the end-of-compilation check to complain about.
 TEST(KeywordVersionPreprocessing,
      MacroNamedLikeBeginKeywordsIsNotTheDirective) {
   PreprocFixture f;
@@ -500,9 +460,6 @@ TEST(KeywordVersionPreprocessing,
   EXPECT_EQ(out.find(kKeywordMarker), std::string::npos);
 }
 
-// The whole-word rule keys off name characters, and a quotation mark is not
-// one: Syntax 22-10 puts the version_specifier in quotes, so a quote sitting
-// flush against the keyword still ends it and the directive is recognized.
 TEST(KeywordVersionPreprocessing, QuoteFlushAgainstBeginKeywordsIsRecognized) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -517,8 +474,6 @@ TEST(KeywordVersionPreprocessing, QuoteFlushAgainstBeginKeywordsIsRecognized) {
             KeywordVersion::kVer18002012);
 }
 
-// Syntax 22-10 requires the version_specifier to be quoted. The bare text of a
-// legal specifier is not the directive's operand form.
 TEST(KeywordVersionPreprocessing, ErrorUnquotedVersionSpecifier) {
   PreprocFixture f;
   Preprocess("`begin_keywords 1800-2023\n`end_keywords\n", f);
@@ -527,8 +482,6 @@ TEST(KeywordVersionPreprocessing, ErrorUnquotedVersionSpecifier) {
       "expected quoted version string after `begin_keywords", 1, "22.14"));
 }
 
-// A directive need not start in column one. Both halves of the pair are still
-// the directive when the line is indented.
 TEST(KeywordVersionPreprocessing, IndentedDirectiveIsRecognized) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -543,8 +496,6 @@ TEST(KeywordVersionPreprocessing, IndentedDirectiveIsRecognized) {
   EXPECT_EQ(kinds[0], TokenKind::kIdentifier);
 }
 
-// Syntax 22-10 ends `begin_keywords at its quoted version_specifier, so a
-// comment may follow on the same line without becoming part of the operand.
 TEST(KeywordVersionPreprocessing, TrailingCommentAfterDirectiveIsIgnored) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -559,8 +510,6 @@ TEST(KeywordVersionPreprocessing, TrailingCommentAfterDirectiveIsIgnored) {
             KeywordVersion::kVer18002012);
 }
 
-// The mirror of the skipped-branch case: a `begin_keywords reached through a
-// conditional branch that is taken opens its region normally.
 TEST(KeywordVersionPreprocessing, BeginKeywordsInTakenIfdefBranch) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -578,9 +527,6 @@ TEST(KeywordVersionPreprocessing, BeginKeywordsInTakenIfdefBranch) {
   EXPECT_EQ(kinds[0], TokenKind::kIdentifier);
 }
 
-// Syntax 22-10 lists the version_specifier alternatives as exact text. The
-// quotes delimit the operand, so padding inside them is part of the specifier
-// and makes it one the production does not list.
 TEST(KeywordVersionPreprocessing, ErrorPaddedVersionSpecifier) {
   PreprocFixture f;
   Preprocess("`begin_keywords \"  1800-2023  \"\n`end_keywords\n", f);
@@ -589,10 +535,6 @@ TEST(KeywordVersionPreprocessing, ErrorPaddedVersionSpecifier) {
                             1, "22.14"));
 }
 
-// §22.14: the region runs until the matching `end_keywords wherever that
-// directive lives. Here the closing half sits in an included file, so the
-// boundary is crossed by the close rather than by the region's body: `logic` is
-// an identifier before the include and the type keyword again after it.
 TEST(KeywordVersionPreprocessing, EndKeywordsInIncludedFileClosesRegion) {
   KeywordIncludeDir tmp;
   tmp.Write("close.svh", "`end_keywords\n");
@@ -614,17 +556,6 @@ TEST(KeywordVersionPreprocessing, EndKeywordsInIncludedFileClosesRegion) {
   EXPECT_EQ(kinds[1], TokenKind::kKwLogic);
 }
 
-// Syntax 22-10 ends `begin_keywords at its quoted version_specifier and
-// `end_keywords at the keyword itself, so neither directive claims the rest of
-// its line. Source text sharing the line is ordinary source, and it is already
-// governed by the version the directive just selected or restored.
-//
-// That text is written straight after the version byte, because
-// Preprocessor::HandleBeginKeywords and Preprocessor::HandleEndKeywords in
-// src/preprocessor/preprocessor_directives.cpp write the keyword marker and the
-// version byte and nothing else. Lexer::ConsumeKeywordMarker in
-// src/lexer/lexer.cpp consumes a newline only when one follows the version
-// byte, which is what keeps the text on the marker's own line lexable.
 TEST(KeywordVersionPreprocessing, SourceOnTheDirectiveLineIsOrdinarySource) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -637,15 +568,10 @@ TEST(KeywordVersionPreprocessing, SourceOnTheDirectiveLineIsOrdinarySource) {
   ASSERT_EQ(opened.size(), 1u);
   EXPECT_EQ(opened[0], TokenKind::kIdentifier);
 
-  // Both trailing declarations survived into the output rather than being
-  // swallowed by the directive.
   EXPECT_EQ(KindsOf(out, "wire").size(), 2u);
   EXPECT_EQ(KindsOf(out, "second").size(), 1u);
 }
 
-// §22.14: both directives can only appear outside a design element. §3.2 lists
-// the design element kinds, and the restriction is not specific to modules, so
-// each kind is checked in turn with the directive placed inside it.
 TEST(KeywordVersionPreprocessing, ErrorInsideEveryDesignElementKind) {
   struct Case {
     const char* header;
@@ -682,10 +608,6 @@ TEST(KeywordVersionPreprocessing, ErrorInsideEveryDesignElementKind) {
   }
 }
 
-// §22.14 defers to §3.2 for what a design element is, and §3.2's list does not
-// include an interface class — that is a class, closed by endclass. Code that
-// follows one is still outside every design element, so the pair is legal
-// there.
 TEST(KeywordVersionPreprocessing, LegalAfterInterfaceClass) {
   PreprocFixture f;
   Preprocess(
@@ -697,8 +619,6 @@ TEST(KeywordVersionPreprocessing, LegalAfterInterfaceClass) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The same class with its name on the line after "interface class": the line
-// ends with the word class, and it is still a class rather than an interface.
 TEST(KeywordVersionPreprocessing, LegalAfterInterfaceClassNamedOnTheNextLine) {
   PreprocFixture f;
   Preprocess(
@@ -711,8 +631,6 @@ TEST(KeywordVersionPreprocessing, LegalAfterInterfaceClassNamedOnTheNextLine) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// An interface whose name only begins with the letters of class is an
-// interface, so the placement rule rejects a directive written inside it.
 TEST(KeywordVersionPreprocessing, ErrorInsideInterfaceNamedLikeClass) {
   PreprocFixture f;
   Preprocess(
@@ -726,9 +644,6 @@ TEST(KeywordVersionPreprocessing, ErrorInsideInterfaceNamedLikeClass) {
                             2, "22.14"));
 }
 
-// Whatever whitespace separates a design element's keyword from its name, the
-// header still opens the element, so the placement rule still rejects a
-// directive written inside it.
 TEST(KeywordVersionPreprocessing, ErrorInsideTabSeparatedDesignElementHeader) {
   PreprocFixture f;
   Preprocess(
@@ -742,8 +657,6 @@ TEST(KeywordVersionPreprocessing, ErrorInsideTabSeparatedDesignElementHeader) {
                             2, "22.14"));
 }
 
-// A directive that shares its line with a design element header is inside that
-// element, and one that follows the closing keyword is outside it again.
 TEST(KeywordVersionPreprocessing, PlacementOnSharedLineFollowsTheElement) {
   PreprocFixture inside;
   Preprocess("module m; `begin_keywords \"1364-2001\"\n`end_keywords\n",
@@ -761,8 +674,6 @@ TEST(KeywordVersionPreprocessing, PlacementOnSharedLineFollowsTheElement) {
   EXPECT_FALSE(outside.diag.HasErrors());
 }
 
-// The companion positive: outside every design element is exactly where the
-// pair belongs, including in the gap between two of them.
 TEST(KeywordVersionPreprocessing, LegalBetweenDesignElements) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -777,10 +688,6 @@ TEST(KeywordVersionPreprocessing, LegalBetweenDesignElements) {
   EXPECT_NE(out.find(kKeywordMarker), std::string::npos);
 }
 
-// §22.14: the directives only select which identifiers are reserved words.
-// They do not change the tokens the source lexes into otherwise, so numbers,
-// string literals, operators, and ordinary identifiers come out of an old
-// keyword region exactly as they do with no directive at all.
 TEST(KeywordVersionPreprocessing, VersionDoesNotChangeOtherTokens) {
   const std::string kBody = "a = 12'h1F + 3.5e-2; b = \"txt\"; c <= d ** 2;\n";
 
@@ -808,10 +715,6 @@ TEST(KeywordVersionPreprocessing, VersionDoesNotChangeOtherTokens) {
   EXPECT_EQ(kinds(with_region), kinds(without_region));
 }
 
-// A comment may stand ahead of the directive on its line. The comment keeps
-// its text in the output, and the marker the directive writes behind it keeps
-// its version byte: the preprocessor puts a comment's text back by reading
-// marks of the same byte as the keyword marker, and it reads none in a marker.
 TEST(KeywordVersionPreprocessing, CommentAheadOfTheDirectiveKeepsItsText) {
   PreprocFixture f;
   auto out = Preprocess(

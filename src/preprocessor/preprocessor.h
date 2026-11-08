@@ -28,37 +28,13 @@ namespace delta {
 
 using FileResolver = std::function<std::string(std::string_view)>;
 
-// One expression of a `pragma directive's own list: the pragma_keyword that
-// names it, and the pragma_value written against it when it has one. A keyword
-// standing alone leaves `value` empty, and so does one whose value is a
-// parenthesized list of further expressions, because those expressions qualify
-// the value rather than saying anything the directive's own list says.
-//
-// `has_value` records which of the two spellings §22.5.1 gives a pragma
-// expression the directive used, which an empty `value` cannot say on its own:
-// the parenthesized form leaves nothing there and was still written with a
-// value. A keyword whose own definition admits one spelling and not the other
-// is read against this rather than against the text of the value.
 struct PragmaKeywordExpression {
   std::string_view keyword;
   std::string_view value;
   bool has_value = false;
-  // The parenthesized form of a pragma_value, as the directive wrote it and
-  // with its parentheses, and empty where the value was written any other way.
-  //
-  // A keyword whose definition spells its value as a list of further
-  // expressions -- §34.5.9.1 spells one that way -- says nothing through
-  // `value`, that being the text of a value written as a single token. What
-  // such a keyword records is the list, so the list is carried here rather
-  // than left to be read off the directive a second time.
   std::string_view value_list;
 };
 
-// What §22.11's grammar makes of a `pragma directive's text after the word
-// `pragma: the report it calls for, empty when the text is well formed, and
-// otherwise its pragma_name and the pragma_expressions of its list, which
-// point into the text read. `block_comment_open` says the text ends in a
-// block comment left open, which runs on past the directive.
 struct PragmaReading {
   std::string_view error;
   std::string_view name;
@@ -71,29 +47,11 @@ PragmaReading ReadPragmaDirective(std::string_view rest);
 struct PreprocConfig {
   std::vector<std::string> include_dirs;
   std::vector<std::pair<std::string, std::string>> defines;
-  // The key the user supplies for envelope decryption (§34.3). A tool that
-  // processes SystemVerilog source text recovers the cleartext of every
-  // protected region the text carries when it is given the key those regions
-  // were encrypted under. Left empty, no key was supplied and the regions stay
-  // as they are written.
   std::string protect_key;
-  // The keys the user supplies under the names that select them (§34.5.12).
-  // Where a protected region states whose keys it was encrypted under and
-  // which of them was used, the single key those two names pick out of this
-  // list is the one the region is read with, so a user holding several keys
-  // need not say which region each belongs to. Left empty, no key was supplied
-  // under a name and `protect_key` is what every region is read with.
   ProtectKeyList protect_keys;
-  // How a decrypt_license expression met in an encrypted model is answered
-  // (§34.5.28.2): the run supplies the loading of the library it names and the
-  // call into it. Left empty, nothing can be loaded, so no such licence is
-  // granted and the model it guards is not decrypted.
   ProtectLicenseAsk ask_license;
 };
 
-// A runtime_license expression met in an encrypted model, and where. §34.5.29.2
-// has the tool ask it before the model is executed, which is past the end of
-// preprocessing, so it is carried to the run that executes.
 struct ProtectRuntimeLicense {
   ProtectLicense license;
   SourceLoc loc;
@@ -103,17 +61,10 @@ struct CondState {
   bool active;
   bool any_taken;
   bool parent_active;
-  // §22.6 (Syntax 22-5): where the `ifdef or `ifndef opening the conditional
-  // stands, and whether its one `else group has been read.
   SourceLoc opened = {};
   bool else_seen = false;
 };
 
-// Which of §34.5's three blocks a run of lines is being gathered for, each
-// announced by a keyword standing on the directive above it: §34.5.27's key
-// block, §34.5.15's data block and §34.5.22's digest block. Only one of the
-// three can be owed a block at a time, an announcement being answered by the
-// lines that follow it.
 enum class ProtectBlockKind : std::uint8_t {
   kNone,
   kKey,
@@ -121,23 +72,13 @@ enum class ProtectBlockKind : std::uint8_t {
   kDigest,
 };
 
-// Where the output and the origin table stood before one source line was
-// written, taken with Preprocessor::MarkOutput so that the output lines the
-// source line wrote can be counted and recorded afterwards.
 struct OutputMark {
   size_t output_size = 0;
   size_t origins_size = 0;
 };
 
-// What a text leaves unfinished of a function-like macro usage (22.5.1):
-// nothing, an actual argument list still open at the text's end, or the macro
-// name at the text's end with its list yet to open -- §22.5.1 allows white
-// space between the name and the left parenthesis, and §5.3 makes a newline
-// white space, so the list may open on the line after the name.
 enum class MacroUsageEnd : std::uint8_t { kComplete, kListOpen, kNameAlone };
 
-// The callbacks ProcessSource hands the emitting of one active line, defined in
-// src/preprocessor/preprocessor.cpp beside the loop that supplies them.
 struct ActiveLineEmit;
 
 class Preprocessor {
@@ -146,74 +87,24 @@ class Preprocessor {
 
   std::string Preprocess(uint32_t file_id);
 
-  // The source each line of everything Preprocess() has returned was written
-  // on, one entry per line and in the order the lines were written. It
-  // accumulates across calls because a driver handed several source files
-  // concatenates the results into one text. §22.12 makes
-  // this the compiler's business: the output splices in the lines of every
-  // `include and joins a `define body that spanned continuation lines, so a
-  // position in it is a position in no file the user wrote. Registering the
-  // output with SourceManager::AddPreprocessedFile and this table is what lets
-  // a report about it name the file and line somebody can open.
   const std::vector<OutputLineOrigin>& LineOrigins() const {
     return line_origins_;
   }
-  // §22.14 pairs `begin_keywords with a later `end_keywords, and the region
-  // between them is allowed to run past the end of a source file. A region is
-  // therefore only known to be unterminated once every source file has been
-  // preprocessed, which is why this is a separate call the driver makes after
-  // its last Preprocess() rather than something Preprocess() does on its own.
   void ReportUnterminatedKeywordRegions();
-  // §3.12.1 (printed page 56): in the use model where each file is a
-  // compilation unit of its own, the directives one unit read do not affect
-  // another. Called between two units' files, this puts back the macro table
-  // every unit starts with, holding the configuration's defines and the
-  // predefined macros alone, returns each directive and pragma to its initial
-  // state, and reports a `begin_keywords region the ending unit left open.
-  // What spans the design stays: the line origins, the module directive
-  // records and §3.14.3's global precision.
   void BeginCompilationUnit();
   static std::string_view Trim(std::string_view s);
 
  private:
   std::string ProcessSource(std::string_view src, uint32_t file_id, int depth);
 
-  // Records that one output line was written on line `line` of `file_id`. Its
-  // one caller, NoteOutputLines, reaches it only while recording_origins_ is
-  // true, which is how text run for its definitions alone and appended to no
-  // output stays out of the table.
   void NoteOutputLine(uint32_t file_id, uint32_t line);
-  // Where `output` and the table stand now, taken before a source line is
-  // written so NoteOutputLines can count what it wrote.
   OutputMark MarkOutput(const std::string& output) const;
-  // Records every output line written to `output` since `mark` as written on
-  // line `line` of `file_id`, less the lines a nested run recorded meanwhile.
-  // Called wherever a source line's newline has been appended, which is the
-  // one place the lines it wrote are known to be complete. A source line can
-  // write more than one: §22.5.1 replaces a backslash-newline in a macro's
-  // text with a newline in the expansion, so a usage of such a macro writes a
-  // line per line of the body, and a table with one entry per source line
-  // would name the wrong line for everything after it. An `include's lines are
-  // the nested case: HandleInclude appends the included file's whole output,
-  // whose lines the nested run recorded against that file, before the
-  // directive's own line is ended.
   void NoteOutputLines(uint32_t file_id, uint32_t line,
                        const std::string& output, OutputMark mark);
-  // Reports every kKeywordMarker byte `src` holds against `file_id` and returns
-  // `src` with each replaced by a space, or an empty string when it holds none.
   std::string WithoutKeywordMarkers(std::string_view src, uint32_t file_id);
 
-  // Registers the file name the `line directive just read gave, and keeps its
-  // id for the origins of the lines that follow. Defined in
-  // src/preprocessor/preprocessor_directives.cpp beside HandleLine, which is
-  // its only caller and which it is separate from so that HandleLine stays
-  // inside the statement count etc/clang_tidy/src.yml allows.
   void TakeLineFileOverrideId();
 
-  // Whether `line` carried the value a keyword on the line before it announced,
-  // in which case it belongs to the protected block above rather than being a
-  // directive or a line of the design (§34.5.13, §34.5.14, §34.5.19, §34.5.20,
-  // §34.5.22, §34.5.26, §34.5.27).
   bool TookAnnouncedValue(std::string_view line, SourceLoc loc, int depth,
                           std::string& output);
   void ProcessUndefDirective(std::string_view line, SourceLoc loc,
@@ -227,21 +118,12 @@ class Preprocessor {
   void OutputRemainder(std::string_view line, std::string_view directive,
                        uint32_t file_id, uint32_t line_num,
                        std::string& output);
-  // Emits the text after a directive that has no newline-terminated end (22.2),
-  // first dispatching it as a directive so a same-line trailing directive (e.g.
-  // `celldefine `timescale ...) is still acted on.
   void ProcessDirectiveRemainder(std::string_view line,
                                  std::string_view directive, SourceLoc loc,
                                  int depth, std::string& output);
-  // True when an inline `ifdef…`endif resolves entirely on this line (22.6).
   bool HasInlineConditional(std::string_view line) const;
-  // Emits one active source line (22.2) through `emit`, each comment it holds
-  // going out with the text it was written with.
   void EmitCommentedActiveLine(std::string_view line,
                                const ActiveLineEmit& emit, std::string& output);
-  // What `text` leaves unfinished of a function-like macro usage (22.5.1),
-  // which is what the line loop in src/preprocessor/preprocessor.cpp asks
-  // before joining the next physical line onto it.
   MacroUsageEnd EndOfMacroUsage(std::string_view text) const;
   void OutputText(std::string_view text, uint32_t file_id, uint32_t line_num,
                   std::string& output);
@@ -251,9 +133,6 @@ class Preprocessor {
   void HandleUndef(std::string_view rest, SourceLoc loc);
   void HandleIfdef(std::string_view rest, bool inverted, SourceLoc loc);
   void HandleElsif(std::string_view rest, SourceLoc loc);
-  // §22.6 (Syntax 22-5): the truth of the ifdef_condition `name` after
-  // `directive`, a macro name or a parenthesized expression, reporting one
-  // that is neither, or missing.
   bool EvalIfdefCondition(std::string_view name, std::string_view directive,
                           SourceLoc loc);
   bool EvalIfdefExpr(std::string_view expr, SourceLoc loc);
@@ -263,7 +142,6 @@ class Preprocessor {
   bool EvalIfdefUnary(std::string_view& expr);
   void HandleElse(SourceLoc loc);
   void HandleEndif(SourceLoc loc);
-  // §22.6: reports each conditional the source left open, and closes it.
   void ReportUnclosedConditionals();
   void HandleInclude(std::string_view filename, SourceLoc loc, int depth,
                      std::string& output, bool angle_bracket);
@@ -290,10 +168,6 @@ class Preprocessor {
                                SourceLoc loc, std::string& expanded,
                                std::string_view& rest);
   std::string ExpandInlineConditionals(std::string_view line, SourceLoc loc);
-  // §22.6: reads one line of a block of text a conditional directive ignores,
-  // carrying the comment and string state the next line opens in and reporting
-  // a string literal it leaves open, which §5.9 forbids there as anywhere.
-  // Defined in preprocessor_inline_cond.cpp.
   void NoteIgnoredLine(std::string_view line, SourceLoc loc);
   std::string ExpandInlineMacros(std::string_view line, uint32_t file_id,
                                  uint32_t line_num);
@@ -316,8 +190,6 @@ class Preprocessor {
   std::string ResolveInclude(std::string_view filename,
                              const std::string& src_dir, bool quoted);
   void DefinePredefined(std::string name, std::string body);
-  // §22.11.1: restores every pragma_name this implementation recognises, as the
-  // resetall pragma does.
   void ResetAllPragmas();
   void TrackDesignElement(std::string_view trimmed);
   void TrackDesignElementHeader(std::string_view trimmed);
@@ -328,182 +200,51 @@ class Preprocessor {
                                std::string& output);
   void SkipBlockCommentLine(std::string_view line, uint32_t file_id,
                             uint32_t line_num, int depth, std::string& output);
-  // Reports `directive_name` written inside a design element, and says so.
-  // `subclause` is the subclause of IEEE 1800-2023 that keeps that directive
-  // outside a design element, which differs per directive: §22.3 states it for
-  // `resetall, §22.7 for `timescale, §22.8 for `default_nettype, §22.9 for
-  // `unconnected_drive and `nounconnected_drive, and §22.14 for `begin_keywords
-  // and `end_keywords. The caller passes it because one report here stands for
-  // all of them and cannot name a single subclause of its own.
   bool RejectInsideDesignElement(std::string_view directive_name, SourceLoc loc,
                                  Subclause subclause);
   void ResetDirectiveState();
   void HandlePragma(std::string_view rest, SourceLoc loc);
-  // §22.11.1: restores the default values and state of the pragma_keywords
-  // belonging to the pragma `pragma_name names, which is what the reset and
-  // resetall pragmas do to every pragma they affect. A pragma_name this
-  // implementation does not recognise carries no such state and is left alone.
   void ResetPragma(std::string_view pragma_name);
   void ApplyProtectKeywords(
       const std::vector<PragmaKeywordExpression>& keywords, SourceLoc loc);
-  // Holds `expr` to the spelling its own subclause defines, where it names one
-  // of the reserved words that mark where a protected region starts or stops:
-  // each of those words is defined standing alone, so one written with a
-  // pragma_value marks nothing and is reported instead.
   bool ReportDelimiterWrittenWithValue(const PragmaKeywordExpression& expr,
                                        SourceLoc loc);
   void CheckDataKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckDigestKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyKeyname(const PragmaKeywordExpression& expr, SourceLoc loc);
   void CheckKeyDesignation(const PragmaKeywordExpression& expr, SourceLoc loc);
-  // §34.5.10.2: the same rule stated of a value rather than of the expression
-  // that carried it, for the two designations §34.5.13.1 and §34.5.14.1 write
-  // as a bare keyword with the value on the line beneath it.
   void CheckDataKeyDesignationValue(std::string_view keyword,
                                     std::string_view value, SourceLoc loc);
-  // Holds the value `expr` writes to what §34.5.16 requires of a designation of
-  // a key belonging to the entity that provided the key a protected region's
-  // digest is under: unique for that entity, which is the entity the text has
-  // named for the digest or, where it named none, the one it named for the
-  // data.
   void CheckDigestDesignation(const PragmaKeywordExpression& expr,
                               SourceLoc loc);
-  // §34.5.16.2: the same rule stated of a value rather than of the expression
-  // that carried it, for the two designations §34.5.19.1 and §34.5.20.1 write
-  // as a bare keyword with the value on the line beneath it.
   void CheckDigestDesignationValue(std::string_view keyword,
                                    std::string_view value, SourceLoc loc);
-  // Holds `value`, written against `keyword`, to what §34.5.23 and §34.5.26
-  // require of a designation of a key belonging to the entity that provided
-  // the keys a protected region's own keys are under: unique for that entity,
-  // and reaching the same key as the other designation of it.
   void CheckKeyBlockDesignation(std::string_view keyword,
                                 std::string_view value, SourceLoc loc);
-  // What §34.5.23 and §34.5.26 have one protect pragma expression do to the
-  // reading of those keys: a designation written against a keyword is held to
-  // both requirements, and the keyword announcing a public key leaves the line
-  // after it to be read as that key's encoded value.
   void ApplyKeyBlockKeywords(const PragmaKeywordExpression& expr,
                              SourceLoc loc);
-  // What §34.5.27 and §34.5.14 have one protect pragma expression do to the
-  // reading of a protected region. Each of the two keywords, written in the
-  // spelling its own subclause defines, speaks for the line after it rather
-  // than for its own: one says a key block begins there, and the other says the
-  // encoded value of the key opening the region's data block is written there.
   void ApplyAnnouncedBlockKeywords(const PragmaKeywordExpression& expr);
-  // What §34.5.32 has one protect pragma expression do to what the envelope in
-  // force lets a tool look at. The expression describes an object of that
-  // envelope and the access asked for it, so a viewport is gathered where an
-  // envelope is open to hold it, and the two rules the subclause states about
-  // where one may stand are reported here.
-  //
-  // §34.5.32.2 leaves the access value an implementation-specific relaxation
-  // of protection, so a value this tool does not define is reported as
-  // granting nothing. The viewports of a decryption envelope are kept, where
-  // it closes, in the SourceManager for the stages that know the objects they
-  // name.
   void ApplyViewport(const PragmaKeywordExpression& expr, SourceLoc loc);
-  // §34.5.32.2: the viewports of a decryption envelope closing here, recorded
-  // in the SourceManager with the sources its text was read into.
   void RecordEnvelopeViewports();
   void RecordRegionViewports(SourceLoc closed_at);
-  // What §34.5.28 and §34.5.29 have one protect pragma expression say about
-  // the tool reading it. Each states a licence the tool is to obtain before it
-  // decrypts a model or before it executes one, and the value naming that
-  // licence is read here so that a value not written in the spelling either
-  // Syntax subclause defines is reported rather than stored as though it named
-  // something.
-  //
-  // A decrypt_license met in an encrypted model is asked through the
-  // configuration's ask_license and, where it is not granted, reported and the
-  // envelope's decryption refused (§34.5.28.2). A runtime_license met there is
-  // recorded for the run that executes the model (§34.5.29.2).
   void ApplyLicense(const PragmaKeywordExpression& expr, SourceLoc loc);
-  // §34.5.28.2 asks before the decrypted text is processed: every
-  // decrypt_license the recovered `cleartext` writes for its own model is asked
-  // about first, each refusal reported at its line of `block_id`.
   bool RecoveredTextLicensed(std::string_view cleartext, uint32_t block_id);
   bool LicencesOfDirectiveGranted(std::string_view body, uint32_t block_id,
                                   uint32_t line_num, int* sealed_inside);
   bool AskDecryptLicense(const ProtectLicense& license, SourceLoc loc);
-  // Finishes the run of pragma expressions gathered for the block a decryption
-  // envelope carries. §34.5.4.2 has the expression closing such an envelope
-  // mark where that run ends and state that what it holds suffices to open the
-  // block, so nothing gathered inside it is still owed a line and nothing it
-  // recovered is offered to the block of any later envelope.
-  //
-  // Two kinds of state are settled here. A keyword whose definition speaks for
-  // the line beneath it is left waiting where that line was never written, and
-  // the line it would otherwise take is the directive carrying the closing
-  // expression itself -- which would spend the envelope's own ending on a
-  // designation and leave every line after it inside an envelope that never
-  // closed. And a key the run recovered but never spent on a block belongs to
-  // the block that run was gathered for, so the envelope after it is opened by
-  // what its own run carries rather than by what this one left standing.
-  //
-  // Two readings call this, because neither reaches every closing expression on
-  // its own. The line reader has to act before a line is taken as an announced
-  // value, so it acts on the directive's own characters and cannot see a list;
-  // the expression reader sees the list in writing order but is reached only
-  // once the line has survived being taken for something else. Calling it twice
-  // over one directive settles the same state twice, which costs nothing.
   void EndAccumulatedProtectPragmas();
-  // Puts back the protect pragma keyword state this class holds outside
-  // `protect_keywords_`: the eight keywords whose definitions speak for the
-  // line beneath them and are waiting for it, and the two keys a key block
-  // recovered.
-  //
-  // §22.11.1 has a reset restore the default values and the state of the
-  // pragma_keywords belonging to the pragma it names, and both kinds are that.
-  // A keyword still waiting for its line has been written and not yet answered,
-  // which is the state half of that sentence; a key recovered from a key block
-  // is the value §34.5.14 and §34.5.20 give their keywords, held as the key
-  // itself because that is what came out of the block.
-  //
-  // The default of each is the same thing: nothing announced and no key
-  // carried, which is where a reading stands before any text is read.
   void ResetAnnouncementsAndRecoveredKeys();
-  // Which of the three block keywords is standing over the next line, or kNone
-  // where none is.
   ProtectBlockKind AnnouncedProtectBlockKind() const;
-  // Begins gathering the block a key_block, data_block or digest_block
-  // expression on the line before announced, `line` being its first line, and
-  // says whether it did. A line taken this way belongs to the block above it
-  // rather than being a directive or text of the design.
-  //
-  // A keyword whose next line opens a `pragma directive announced an empty
-  // block: nothing is gathered and false comes back, so that directive is read
-  // as itself rather than eaten as block characters.
   bool StartGatheredProtectBlock(std::string_view line, SourceLoc loc);
-  // Adds a further line to the block being gathered.
   void AppendGatheredProtectBlockLine(std::string_view line);
   std::string_view GatheredBlockLine(std::string_view line) const;
-  // Reads the block gathered so far as the keyword that announced it, and
-  // leaves nothing gathered. Does nothing where no block is being gathered.
   void FinishGatheredProtectBlock(int depth, std::string& output);
-  // Reads `block` as the key block a key_block expression announced. The block
-  // is key material of the protected region rather than text of the design.
   void ReadProtectKeyBlock(std::string_view block, SourceLoc loc, int depth);
-  // The same, for the encoded value a data_decrypt_key expression on the line
-  // before it announced.
   bool TakeDataDecryptKeyValue(std::string_view line, SourceLoc loc);
-  // The same, for the encoded value a digest_decrypt_key expression on the line
-  // before it announced (§34.5.20): the key that opens the region's digests.
   bool TakeDigestDecryptKeyValue(std::string_view line, SourceLoc loc);
-  // Reads `block` as the digest block a digest_block expression announced.
-  // §34.5.22 has that digest checked against the block it follows, so this
-  // authenticates what the reading last recovered rather than adding anything
-  // to the design.
   void ReadProtectDigestBlock(std::string_view block, SourceLoc loc);
-  // Reads `block` as the data block a data_block expression announced. What it
-  // carries is the region's design in its encrypted and encoded form, so it is
-  // opened here and the design it recovers to is appended to `output` in place
-  // of the envelope it arrived in.
   void ReadProtectDataBlock(std::string_view block, SourceLoc loc, int depth,
                             std::string& output);
-  // §34.3.2 has decryption envelopes in a recovered text decrypted after their
-  // enclosing envelope is replaced, so a data block's text is held here until
-  // that envelope's end_protected and only then read (ReadRecoveredText).
   struct RecoveredText {
     std::string cleartext;
     uint32_t block_id;
@@ -511,42 +252,14 @@ class Preprocessor {
   };
   std::optional<RecoveredText> recovered_text_;
   void ReadRecoveredText(std::string& output);
-  // At the end of a text: a block whose lines ran to it, and a recovered text
-  // whose envelope it never closed, have nothing left to wait for.
   void FinishProtectedReading(int depth, std::string& output);
-  // Takes `line` as the encoded value announced by a key_public_key expression
-  // on the line before it, and says whether it did. A line taken this way is
-  // the designation of a key rather than text of the design, so the caller
-  // neither dispatches it as a directive nor emits it.
   bool TakeKeyPublicKeyValue(std::string_view line, SourceLoc loc);
-  // The same, for the encoded value a data_public_key expression on the line
-  // before it announced (§34.5.13): the public key the region's data are under.
-  // A line taken this way designates a key rather than being text of the
-  // design, so the caller neither dispatches it as a directive nor emits it.
   bool TakeDataPublicKeyValue(std::string_view line, SourceLoc loc);
-  // The same, for the encoded value a digest_public_key expression on the line
-  // before it announced (§34.5.19): the public key the digest is under. A line
-  // taken this way designates a key rather than being text of the design, so
-  // the caller neither dispatches it as a directive nor emits it.
   bool TakeDigestPublicKeyValue(std::string_view line, SourceLoc loc);
-  // Holds the designations in effect for a key of the entity the data_keyowner
-  // names to what §34.5.13 requires of them: where a region wrote both the name
-  // given to that key and the public key it is, the two refer to one key.
   void CheckDataDesignationAgreement(SourceLoc loc);
-  // The same, for the designations a region wrote for a key of the entity the
-  // digest_keyowner names: §34.5.19 has the name given to that key and the
-  // public key it is refer to one key wherever a region wrote both.
   void CheckDigestDesignationAgreement(SourceLoc loc);
-  // Reads one encoded value of a protected envelope out of the coding scheme
-  // in effect where it stands, leaving what it stands for in `*bytes` and
-  // saying whether it could be read at all. §34.5.9 governs every such value
-  // alike -- the block carrying a region's data and the value written beneath
-  // a keyword that announces a key -- so both are read through here and a
-  // reader is told the same thing about either.
   bool ReadEncodedProtectValue(std::string_view text, SourceLoc loc,
                                std::string* bytes);
-  // Takes the byte count out of the coding scheme in effect, the count having
-  // been spent on the value just read (§34.5.9.2).
   void SpendEncodedValueSize();
   std::string_view ProtectKeyInEffect() const;
   bool ProcessDelayModeDirective(std::string_view line, SourceLoc loc);
@@ -570,10 +283,6 @@ class Preprocessor {
       std::string_view params, std::vector<std::string>& defaults);
   static std::string_view ExtractBalancedArgs(std::string_view text);
   static std::vector<std::string_view> SplitMacroArgs(std::string_view args);
-  // Given text whose first character is the '(' opening a formal parameter
-  // list, returns the index of the matching ')', honoring the matched-pair and
-  // escaped-identifier protections of 22.5.1 (so a ')' inside a default value
-  // is not read as the end of the list). Returns npos if unbalanced.
   static size_t FindMacroParamListClose(std::string_view text);
   static std::string SubstituteParams(
       std::string_view body, const std::vector<std::string>& params,
@@ -583,47 +292,25 @@ class Preprocessor {
   DiagEngine& diag_;
   PreprocConfig config_;
   MacroTable macros_;
-  // The table as the constructor left it, holding the configuration's defines
-  // and the predefined macros, which BeginCompilationUnit gives each new unit.
   MacroTable initial_macros_;
   std::vector<CondState> cond_stack_;
   int include_depth_ = 0;
   static constexpr int kMaxIncludeDepth = 15;
 
-  // The table LineOrigins() answers with, filled as the output is written.
   std::vector<OutputLineOrigin> line_origins_;
-  // Whether lines being written now reach the output LineOrigins() describes.
-  // False while Preprocessor::ReadProtectKeyBlock in
-  // src/preprocessor/preprocessor_protect_values.cpp runs a recovered protected
-  // block for what it defines, because that run appends its text to no output:
-  // an entry recorded for it would name a line the output does not have and
-  // would displace every line after it.
   bool recording_origins_ = false;
-  // Whether the text being read is what a key block recovered to, whose names
-  // for the data's and the digest's keys come with the keys themselves
-  // (§34.5.14.2, §34.5.20).
   bool reading_key_block_ = false;
-  // The data and digest key names a key block has carried a key for, each as
-  // its entity and name joined by a NUL. The reader holds those keys from then
-  // on, whatever list it was given (§34.5.14.2, §34.5.20).
   std::unordered_set<std::string> names_carried_by_key_blocks_;
   bool KeynameCarriedByKeyBlock(std::string_view owner, std::string_view name);
 
  public:
   const TimeScale& CurrentTimescale() const { return current_timescale_; }
   TimeUnit GlobalPrecision() const { return global_precision_; }
-  // The magnitude, 1, 10 or 100, of the precision GlobalPrecision names.
   int GlobalPrecisionMagnitude() const { return global_precision_magnitude_; }
   bool HasTimescale() const { return has_timescale_; }
-  // Whether any `timescale was read, so GlobalPrecision holds the finest of
-  // their precisions. A `resetall clears HasTimescale but not this, because
-  // §3.14.3 counts every precision in the design toward the global one.
   bool HasGlobalPrecision() const { return has_global_precision_; }
   NetType DefaultNetType() const { return default_net_type_; }
   bool InCelldefine() const { return in_celldefine_; }
-  // Annex E: the default decay time, charge strength and delay mode in force
-  // at each module header the preprocessor passed, under the module's name,
-  // in source order.
   const std::vector<ModuleDirectives>& ModuleDirectivesList() const {
     return module_directives_;
   }
@@ -634,116 +321,30 @@ class Preprocessor {
   uint32_t LineOffset() const { return line_offset_; }
   bool HasLineOverride() const { return has_line_override_; }
   const std::string& LineFile() const { return line_file_override_; }
-  // The protected envelopes the protect pragma expressions seen so far have
-  // opened and closed. The envelopes describe regions of the source text, so
-  // the state outlives any one directive and is read off the preprocessor
-  // rather than off the text it produced.
   const ProtectEnvelopeState& ProtectEnvelopes() const {
     return protect_envelopes_;
   }
-  // The values the protect pragma keywords of §34.4 have been given by the
-  // source text read so far. Their scope is lexical rather than declarative,
-  // so it neither begins nor ends with a declaration, and it carries from one
-  // file of the compilation input into the next and into every file they
-  // include. That is why it is read off the preprocessor, which spans all of
-  // them, rather than off any one text it produced.
   const ProtectKeywordScope& ProtectKeywords() const {
     return protect_keywords_;
   }
-  // The objects §34.5.32.2 has the envelope in force permit access to, in the
-  // order the text described them.
-  //
-  // They belong to that envelope rather than to the compilation input: the
-  // subclause has a viewport describe objects within the current protected
-  // envelope, so what one describes goes away with the envelope it was written
-  // in and is not offered to the next.
-  //
-  // What a decryption envelope's viewports are granted is decided later, where
-  // the objects they name are known; SourceManager::Viewports() carries them
-  // there once the envelope has closed.
   const std::vector<ProtectViewport>& ProtectViewports() const {
     return protect_viewports_;
   }
-  // The runtime_license expressions met in encrypted models, in the order the
-  // text wrote them, for the run that executes the design to ask before it
-  // begins (§34.5.29.2).
   const std::vector<ProtectRuntimeLicense>& RuntimeLicenses() const {
     return runtime_licenses_;
   }
-  // The key that opens the digest of whatever the reading has reached, which
-  // §34.5.18 has selected by combining the entity in effect for the digest
-  // with the name in effect for its key. Empty where that pair selects none of
-  // the keys the user supplied.
-  //
-  // Like the values it is built from, this belongs to a position in the text
-  // rather than to any one directive, which is why it is read off the
-  // preprocessor as the reading passes rather than off a text it produced.
   std::string_view DigestKeyInEffect() const;
 
-  // The identifier naming the algorithm the message digests of whatever the
-  // reading has reached are computed with, which §34.5.21 has the
-  // digest_method pragma expression specify. On the writing side it names the
-  // algorithm the digests of the blocks written after it are produced by; on
-  // the reading side it names the algorithm a digest is regenerated from a
-  // data block with, which is why a text is read for it as well as written
-  // with it.
-  //
-  // A text that has stated no digest_method is read under the default that
-  // subclause's own file settles, §34.4 filling a keyword no directive has
-  // written from its default and the standard settling none for this one.
-  //
-  // Like the values it is built from, it belongs to the position the reading
-  // has reached rather than to any one directive, which is why it is read off
-  // the preprocessor as the reading passes.
   std::string DigestMethodInEffect() const;
 
-  // The key §34.5.20 has open the digests of whatever the reading has reached:
-  // the one a key block carried for them, and the key the region's data are
-  // under where no key block carried one, that being the default the subclause
-  // settles for a text that specified none.
-  //
-  // It is held as the key rather than as a name for one, because that is what a
-  // digest_decrypt_key expression carries: the encoded value of a key, written
-  // on the line beneath the keyword announcing it. Nothing is read against it
-  // and nothing selects among anything with it.
   std::string_view DigestDecryptKeyInEffect() const;
 
-  // The key a protected region's digest block is opened with, which §34.5.22
-  // has picked out by the designations a region wrote for its digest's key.
-  //
-  // The designations are consulted in the order that decides them: a key a key
-  // block carried was made for this region and travelled inside the envelope,
-  // so it is the key rather than something selecting one; the entity and name a
-  // region wrote for its digest select one of the keys the user supplied; and a
-  // region that wrote neither has its digest under the key its data are under.
   std::string_view DigestBlockKeyInEffect() const;
 
-  // How the last digest block the reading reached compared against the block it
-  // immediately follows, which is the comparison §34.5.22 has a consuming tool
-  // authenticate a protected region by.
-  //
-  // A comparison that came out wrong is reported where it happened, that being
-  // the one outcome saying something happened to the data. The other two are
-  // not reported and are still worth reading: a digest this reader could not
-  // open is one written for a reader holding another key, and a reading that
-  // reached no digest at all read a text that was never asked to carry one.
   ProtectDigestCheck LastDigestBlockCheck() const {
     return last_digest_block_check_;
   }
 
-  // The coding scheme, line length and byte count the encoding pragma
-  // expression in effect states, which §34.5.9 has every encoded value of a
-  // protected envelope written and read under: the block carrying its data,
-  // the block carrying its keys, and the encoded value §34.5.26 writes on the
-  // line beneath the keyword announcing a public key.
-  //
-  // A text that has stated no encoding is read in this implementation's own
-  // scheme, §34.4 filling a keyword no directive has written from its default
-  // and the standard settling no default for this one.
-  //
-  // Like the values it is built from, it belongs to the position the reading
-  // has reached rather than to any one directive, which is why it is read off
-  // the preprocessor as the reading passes.
   ProtectEncoding ProtectEncodingInEffect() const;
 
   uint64_t DefaultDecayTime() const { return default_decay_time_; }
@@ -769,13 +370,8 @@ class Preprocessor {
   uint32_t line_override_src_line_ = 0;
   bool has_line_override_ = false;
   std::string line_file_override_;
-  // The id `line_file_override_` is registered under, so an origin can name it,
-  // and the id kept for each name TakeLineFileOverrideId has registered.
   uint32_t line_file_override_id_ = 0;
   std::unordered_map<std::string, uint32_t> line_file_override_ids_;
-  // One entry per `begin_keywords region still open, innermost last. The
-  // opening location rides along so an unterminated region can be blamed on
-  // the directive that opened it.
   struct KeywordRegion {
     KeywordVersion version;
     SourceLoc loc;
@@ -783,38 +379,18 @@ class Preprocessor {
   std::vector<KeywordRegion> keyword_version_stack_;
   std::vector<std::string> expansion_stack_;
   uint32_t design_element_depth_ = 0;
-  // An attribute instance opened on a line and not yet closed (A.1.2), so the
-  // next line starts inside it.
   bool in_attribute_instance_ = false;
-  // A design element header whose keyword, and lifetime if any, ended its
-  // line, held until the line naming the element (§5.3).
   std::string pending_header_;
-  // §22.6: set while an ifdef_macro_expression is evaluated when it is found
-  // to be no expression Syntax 22-5 admits.
   bool ifdef_expr_malformed_ = false;
   std::vector<std::string> cell_module_names_;
   std::vector<ModuleDirectives> module_directives_;
   bool in_block_comment_ = false;
-  // A.8.8's triple_quoted_string may span lines, so one left open at a line's
-  // end is carried to the next as an open block comment is.
   bool in_triple_string_ = false;
-  // §5.9: a quoted_string whose newline a backslash escapes runs on into the
-  // next line, so it too is carried (CopyContinuedQuotedString).
   bool in_continued_string_ = false;
-  // §22.6 with §5.9: the same, for a string a backslash continues from one
-  // line of an ignored block of text to the next (NoteIgnoredLine).
   bool in_ignored_string_ = false;
   ProtectEnvelopeState protect_envelopes_;
   ProtectKeywordScope protect_keywords_;
-  // The viewports written since the envelope in force opened. §34.5.32.2 has
-  // each of them describe an object of that envelope, so they are gathered for
-  // as long as it stands and dropped where it ends.
   std::vector<ProtectViewport> protect_viewports_;
-  // §34.2 lets an envelope contain another, and §34.5.32.2 gives a viewport to
-  // the protected envelope in force where it is written, so the enclosing
-  // envelopes' viewports are held here while an inner one is open and taken
-  // back when it closes. protect_viewports_ above is the current envelope's
-  // alone.
   struct EnclosingViewports {
     std::vector<ProtectViewport> viewports;
     uint32_t envelope_source = 0;
@@ -822,115 +398,33 @@ class Preprocessor {
     uint32_t first_source = 0;
   };
   std::vector<EnclosingViewports> protect_viewport_stack_;
-  // The source the data block of the decryption envelope in force recovered
-  // to, and 0 until that block is read.
   uint32_t protect_envelope_source_ = 0;
-  // Where the envelope in force opened, and the id the first source registered
-  // after that was given: an encryption envelope compiled where it is written
-  // is the text from there to its end.
   SourceLoc protect_envelope_opened_at_;
   uint32_t protect_envelope_first_source_ = 0;
-  // What RuntimeLicenses() answers with.
   std::vector<ProtectRuntimeLicense> runtime_licenses_;
-  // The decryption envelope depth at which a decrypt_license expression was
-  // refused, or 0 where none stands refused. §34.5.28.2 has an unlicensed tool
-  // perform no decryption, so a data block read at or below that depth
-  // recovers nothing into the output, and the refusal lapses once the envelope
-  // it was met in closes.
   size_t decryption_refused_depth_ = 0;
-  // The designations the source text has written for the keys of the entities
-  // it names. They are unique for the entity they are written under, so they
-  // accumulate across the whole compilation input alongside the keyword values
-  // themselves rather than starting over at any point within it.
   ProtectKeyDesignations protect_key_designations_;
-  // The same, for the entity §34.5.23 names as having provided the keys a
-  // region's own keys are under. That entity is a different one from the one
-  // whose keys the data are under -- a producer may hold the two apart -- so
-  // its designations are unique for it rather than for the other, and they
-  // accumulate on their own.
   ProtectKeyDesignations protect_key_block_designations_;
-  // The same, for the entity §34.5.16 names as having provided the key a
-  // region's digest is under. A design may have its digest under a key of one
-  // provider and its data under a key of another, so its designations are
-  // unique for the provider the digest names rather than for the one the data
-  // name, and they accumulate on their own.
   ProtectKeyDesignations protect_digest_designations_;
-  // Whether the line about to be read is the encoded value of a public key,
-  // which is what §34.5.26 makes of the line following the keyword announcing
-  // one. The announcement and the value are two lines, so what the first said
-  // is carried here until the second arrives.
   bool key_public_key_value_next_ = false;
-  // The same, for the line §34.5.13 makes of the one following the keyword
-  // announcing the public key a region's data are under. It is carried apart
-  // from the one above because the two designate keys of two entities, so a
-  // line answering one announcement says nothing about the other.
   bool data_public_key_value_next_ = false;
-  // And for the line §34.5.19 makes of the one following the keyword announcing
-  // the public key a region's digest is under. It is carried apart from the two
-  // above because a region may have its digest under a key of one provider and
-  // its data under a key of another, so a line answering one announcement says
-  // nothing about the others.
   bool digest_public_key_value_next_ = false;
-  // The same, for the two keywords whose definitions speak for the line after
-  // them: §34.5.27's, which says a key block begins there, and §34.5.14's,
-  // which says the encoded value of the key opening the region's data block is
-  // written there.
   bool key_block_value_next_ = false;
   bool data_decrypt_key_value_next_ = false;
-  // And for the two whose definitions do the same for the digest a block is
-  // checked against: §34.5.20's, which says the key opening that digest is
-  // written on the line after it, and §34.5.22's, which says the digest itself
-  // is.
   bool digest_decrypt_key_value_next_ = false;
   bool digest_block_value_next_ = false;
-  // And for §34.5.15's, which says a data block begins on the line after it.
   bool data_block_value_next_ = false;
-  // Which of those three blocks is being gathered, and what has been gathered
-  // for it. §34.5.15.2 starts a data block on the line after its keyword
-  // and says nothing about where it ends, and §34.5.22.2 and §34.5.27.2 word
-  // the digest block and the key block the same way, so a block is the run of
-  // lines after its keyword rather than the one line beneath it. The lines are
-  // joined with the break between them, because §34.5.9.2's uuencode and
-  // quoted-printable carry meaning in where a line ends -- the first writes a
-  // length character at the head of each and the second a soft break at the
-  // tail -- and §34.5.9's byte count is stated once for the whole block, which
-  // is what the joined text is measured against. The location is the first
-  // line's, so a block reported on names where it began.
   ProtectBlockKind gathering_block_ = ProtectBlockKind::kNone;
   SourceLoc gathering_block_loc_;
   std::string gathering_block_text_;
-  // The key §34.5.14 has open a protected region's data block, recovered from
-  // the key block that carried it.
-  //
-  // It is held as the key rather than among the keyword values because that is
-  // what it is: those record what a source text wrote, and this came out of an
-  // encrypted block as the key itself, so nothing is read against it and
-  // nothing selects among anything with it. Empty until a key block has been
-  // opened, which is every reading of a text that carries none.
   std::string data_decrypt_key_;
-  // The key §34.5.20 has open a protected region's digest block, recovered from
-  // the key block that carried it. It is held apart from the key that opens the
-  // data for the reason the subclause gives it a keyword of its own: a reader
-  // holding the one has not thereby been given the other, and a digest under
-  // the very key its data are under could be recomputed by whoever could alter
-  // them.
   std::string digest_decrypt_key_;
-  // §34.5.22 has the digest a digest block carries checked against the block it
-  // immediately follows, so what the reading last recovered is held here
-  // until the digest arrives. Empty where nothing was recovered to check, which
-  // is what a reader that could not open the block above sees; a digest with
-  // nothing to check is passed over rather than reported, several key blocks of
-  // one envelope being alternative ways in and a reader being expected to open
-  // only its own.
   ProtectDigestTarget digest_target_;
-  // The outcome of the last such comparison, standing at the value that means
-  // no digest has been reached until one has been.
   ProtectDigestCheck last_digest_block_check_ = ProtectDigestCheck::kNotChecked;
 
   uint64_t default_decay_time_ = 0;
   double default_decay_time_real_ = 0.0;
   bool default_decay_time_infinite_ = true;
-  // Whether the decay time in force was written as a real constant.
   bool default_decay_time_is_real_ = false;
   uint32_t default_trireg_strength_ = 0;
   bool has_default_trireg_strength_ = false;
@@ -938,7 +432,6 @@ class Preprocessor {
 };
 
 bool IsCompilerDirective(std::string_view name);
-// Every directive but `__FILE__ and `__LINE__, the two that stand for a value.
 bool IsDirectiveOtherThanValue(std::string_view name);
 bool HasUnterminatedString(std::string_view body);
 bool IsIdentChar(char c);

@@ -23,10 +23,6 @@ namespace delta {
 
 namespace {
 
-// The declaration named `name` among `decls`, or nullptr. An empty `library`
-// asks for a cell of that name wherever it was compiled; a library named
-// confines the answer to the cells compiled into it, so a name several
-// libraries hold cells under picks out the one that library holds.
 ModuleDecl* FindNamedInLibrary(const std::vector<ModuleDecl*>& decls,
                                std::string_view library,
                                std::string_view name) {
@@ -37,10 +33,6 @@ ModuleDecl* FindNamedInLibrary(const std::vector<ModuleDecl*>& decls,
   return nullptr;
 }
 
-// The declaration a descent continues into for the cell named `name`: the
-// instantiable cell kinds whose bodies can hold further instances, every one
-// of which a compiled form holds as a module declaration. Returns nullptr when
-// no loaded cell of one of those kinds answers to the name in `library`.
 ModuleDecl* FindDescendableCell(const CompilationUnit& unit,
                                 std::string_view library,
                                 std::string_view name) {
@@ -50,10 +42,6 @@ ModuleDecl* FindDescendableCell(const CompilationUnit& unit,
   return FindNamedInLibrary(unit.checkers, library, name);
 }
 
-// True when a loaded cell named `name` is a primitive. A primitive is the
-// instantiable cell kind that holds no instances of its own, so reaching one
-// ends that branch of the descent: it has been compiled, and there is nothing
-// below it to ask after.
 bool HoldsPrimitive(const CompilationUnit& unit, std::string_view name) {
   for (const auto* udp : unit.udps) {
     if (udp->name == name) return true;
@@ -61,12 +49,6 @@ bool HoldsPrimitive(const CompilationUnit& unit, std::string_view name) {
   return false;
 }
 
-// The names of the cells `items` declares rather than instantiates: one
-// declared directly among them, one inside a generate alternative, and one
-// declared deeper still inside another such declaration. A cell declared this
-// way travels inside the precompiled form of the cell that declares it, so an
-// instance naming it already has something compiled to bind to and there is no
-// separate entry to go looking for in any library.
 void CollectNestedCellNames(const std::vector<ModuleItem*>& items,
                             std::unordered_set<std::string_view>& names) {
   for (const auto* item : items) {
@@ -87,10 +69,6 @@ void CollectNestedCellNames(const std::vector<ModuleItem*>& items,
   }
 }
 
-// The loaded configuration of that name, or nullptr. A configuration is one of
-// the design elements a library holds, so one reaches a bind the same way every
-// other cell does: read back out of a compiled form. §33.5.4 names it lib.cell,
-// which takes it from that library alone.
 const ConfigDecl* FindConfig(const CompilationUnit& unit,
                              std::string_view name) {
   const auto& [lib, cell] = SplitLibCell(name);
@@ -127,15 +105,10 @@ void SeparateCompilationBinder::ReachSubinstances(const ModuleDecl* decl,
   for (const auto& child : instantiated) {
     if (declared_within.contains(child.name)) continue;
     if (!descent.reached.insert(child.name).second) continue;
-    // An instance names a cell, not a library, so the cell that answers to it
-    // is looked for wherever it was compiled. Which library the design finally
-    // binds it from is settled when the design is bound, not here.
     auto* child_decl = FindDescendableCell(unit_, {}, child.name);
     if (child_decl != nullptr) {
       descent.pending.push_back(child_decl);
     } else if (!HoldsPrimitive(unit_, child.name)) {
-      // The instantiation is where the design asks for this cell, so that is
-      // where the report about it stands.
       not_precompiled_.push_back({std::string(child.name), child.loc});
     }
   }
@@ -148,10 +121,6 @@ bool SeparateCompilationBinder::RunDescent(Descent& descent) {
     ReachSubinstances(decl, descent);
   }
 
-  // The descent reaches the cells of a design in the order its own walk takes,
-  // which is nothing the design states, so the report is put in name order: the
-  // same design missing the same cells names them the same way however the walk
-  // reached them.
   std::sort(not_precompiled_.begin(), not_precompiled_.end(),
             [](const MissingCell& a, const MissingCell& b) {
               return a.name < b.name;
@@ -172,9 +141,6 @@ bool SeparateCompilationBinder::AllCellsPrecompiled(
     if (!descent.reached.insert(cell).second) continue;
     auto* decl = FindDescendableCell(unit_, lib, cell);
     if (decl == nullptr) {
-      // A top-level cell is named to this tool rather than instantiated by
-      // anything, so nothing written in a source description says where the
-      // name came from and the report about it stands at no position.
       not_precompiled_.push_back({std::string(name), SourceLoc::None()});
       continue;
     }
@@ -190,8 +156,6 @@ bool SeparateCompilationBinder::DesignCellsPrecompiled(const ConfigDecl* cfg) {
     auto* decl =
         FindDescendableCell(unit_, design_cell.library, design_cell.cell);
     if (decl == nullptr) {
-      // The design statement is where this cell was asked for, so the report
-      // about it stands at the cell name that statement wrote.
       not_precompiled_.push_back(
           {std::string(design_cell.cell), design_cell.loc});
       continue;
@@ -217,9 +181,6 @@ RtlirDesign* SeparateCompilationBinder::BindConfig(
 
   const ConfigDecl* cfg = FindConfig(unit_, config_name);
   if (cfg == nullptr) {
-    // The name is what this tool was invoked with in place of the names of the
-    // top-level cells, and no source description reaches a bind, so there is
-    // nothing written anywhere for this report to stand at.
     diag_.Error(SourceLoc::None(),
                 std::format("config '{}' was not precompiled", config_name),
                 Subclause("33.5.4"));
@@ -232,11 +193,6 @@ RtlirDesign* SeparateCompilationBinder::BindConfig(
     return nullptr;
   }
 
-  // The cells the design statement names root the design, so they are where
-  // the check that everything below them was precompiled starts -- each taken
-  // from the library the statement named for it, because a root of that name in
-  // some other library heads a different hierarchy and would have the check
-  // walk cells this design does not contain while missing ones it does.
   if (!DesignCellsPrecompiled(cfg)) return nullptr;
 
   Elaborator elab(arena_, diag_, &unit_);

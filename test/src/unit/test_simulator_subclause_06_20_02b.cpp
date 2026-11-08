@@ -1,7 +1,3 @@
-// §6.20.2 with §6.18: a parameter declared with a typedef name is of the type
-// the name stands for, so whether its value keeps x and z bits is decided by
-// that type, never by the name alone. A packed structure is 2-state when every
-// member is (§7.2.1), and a 4-state type keeps each unknown bit as written.
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -10,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Module and interface parameters of typedefs declared in the compilation
-// unit and in the module itself. A 4-state typedef, a vector, an integer or
-// a packed structure of logic, keeps 1x0z and an integer's x bits, as the
-// `integer` parameter beside it does; a 2-state typedef, a vector of bit or a
-// packed structure of bit, reads 1000. Read off the name alone, every typedef
-// was taken as 2-state and P, I, S and L read 1000, 0000, 1000 and 1000.
 TEST(ValueParameterSimulation, TypedefModuleParameterKeepsXAndZOfItsType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef logic [3:0] n4_t;\n"
@@ -46,9 +36,6 @@ TEST(ValueParameterSimulation, TypedefModuleParameterKeepsXAndZOfItsType) {
             "1x0z xxxx xxxx 1x0z 1000 1000 1x0z 1000 z1x0 0100\n");
 }
 
-// The same conversion of a value a port override gives: the 4-state
-// structure and vector typedefs keep 1x0z and z0x1, the 2-state structure
-// reads 1000.
 TEST(ValueParameterSimulation,
      TypedefParameterPortOverrideKeepsXAndZOfItsType) {
   SimFixture f;
@@ -66,12 +53,6 @@ TEST(ValueParameterSimulation,
             "1x0z 1000 z0x1\n");
 }
 
-// Class parameters of a 2-state packed structure typedef, declared in the
-// compilation unit or in the class: a parameter port's default, a body
-// parameter, a specialization's actual, and a body parameter of a class with
-// no parameter port all read 1000, where the 4-state structure beside them
-// keeps 1x0z. A structure's typedef was given no width in class scope, so
-// its value was neither sized nor cleared and every one read 1x0z.
 TEST(ValueParameterSimulation, TwoStateStructTypedefClassParameterTakesZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("typedef struct packed {bit [3:0] a;} gb_t;\n"
@@ -95,9 +76,6 @@ TEST(ValueParameterSimulation, TwoStateStructTypedefClassParameterTakesZero) {
             "1000 1x0z 1000 1000 0010 1000 1x0z\n");
 }
 
-// A package's parameters of a 2-state and a 4-state packed structure typedef
-// of its own, and a module parameter of the package's 2-state structure named
-// through the package: the 2-state ones read 1000, the 4-state one 1x0z.
 TEST(ValueParameterSimulation,
      StructTypedefPackageParameterTakesItsTypesState) {
   SimFixture f;
@@ -115,10 +93,6 @@ TEST(ValueParameterSimulation,
             "1000 1x0z 1000\n");
 }
 
-// §6.20.2 applies §6.12.1 to a package's and the compilation unit's
-// parameters as to a module's: a real value given an integral type is
-// rounded, away from zero at a half, never carried as its double's bits. A
-// 2.6 made 3435973837 of int, 13 of bit [3:0] and 2 of time, and -2.5 made 0.
 TEST(ValueParameterSimulation, PackageAndUnitIntegralParameterRoundsAReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("parameter int CU = 2.6;\n"
@@ -140,11 +114,6 @@ TEST(ValueParameterSimulation, PackageAndUnitIntegralParameterRoundsAReal) {
             "3 3 3 3 -3 3 -3 2.6\n");
 }
 
-// A package's or the compilation unit's parameter of a signed 2-state type
-// holds a signed value at run time, as a module's does: -1 compares below 0,
-// widens to an int as -1 and prints as -1. An unsigned bit [7:0] beside them
-// reads 255 and compares above 0. The sign was dropped, so byte -1 read 255
-// and shortint -1 printed 65535.
 TEST(ValueParameterSimulation, PackageAndUnitParameterOfASignedTypeIsSigned) {
   SimFixture f;
   EXPECT_EQ(RunCapture("parameter byte CB = -1;\n"
@@ -169,12 +138,6 @@ TEST(ValueParameterSimulation, PackageAndUnitParameterOfASignedTypeIsSigned) {
             "1 -1 -1 -2 1 -1 0 255 -1\n");
 }
 
-// A class parameter declared with a type parameter of the class is of the
-// type the specialization gives that type parameter (§8.25, §6.20.3), so a
-// 2-state actual or default takes x and z as 0 and a 4-state one keeps them:
-// a body parameter and a header parameter read through a specialization, a
-// typedef of one and an object of one, and the body parameter of a class
-// whose type parameter defaults to bit. Each read 1x0z.
 TEST(ValueParameterSimulation, TypeParameterTypedClassParameterTakesItsState) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class F #(type T = logic [3:0], T Q = 4'b1x0z);\n"
@@ -203,17 +166,6 @@ TEST(ValueParameterSimulation, TypeParameterTypedClassParameterTakesItsState) {
             "1000 1x0z 1000 1000 1000 0100 z1x0 1000 1x0z\n1000 1000\n");
 }
 
-// §6.20.2 with §6.20.3: a value parameter declared with a type parameter of
-// its own module, interface or program, as a port, in the body or in a
-// generate block, is of the type that type parameter has in the instance: the
-// default, or the instance's actual written as a keyword type or a typedef
-// name. Of a 2-state type it takes x and z as 0, of a 4-state one it keeps
-// them. Asked of the name T alone, every one was taken as 4-state and kept
-// them: a's P read x where int holds 0, and e, g, ib and pa kept 1x0z. A
-// typedef name given as the actual, declared in the compilation unit, in the
-// instantiating module or in a package, names a type of the other state
-// from the default's, so each of g, h, i and pc to pe reads the default's
-// state where the actual is not followed.
 TEST(ValueParameterSimulation, TypeParameterTypedModuleParameterTakesItsState) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package pk;\n"
@@ -271,11 +223,6 @@ TEST(ValueParameterSimulation, TypeParameterTypedModuleParameterTakesItsState) {
             "t.pc z1x0\nt.pd z1x0\nt.pe z1x0\n");
 }
 
-// §6.20.2 with §6.20.3 and §6.12: a value parameter declared with a type
-// parameter standing for real holds a double of 64 bits, and one standing
-// for shortreal a single-precision value of 32 bits, whichever of the two is
-// the default and whichever the actual. 0.1 in single precision reads
-// 0.100000001490. Asked of the name T, each was held as a double of 64 bits.
 TEST(ValueParameterSimulation, TypeParameterTypedModuleParameterTakesItsReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module mr #(type T = real, T P = 7);\n"
@@ -298,10 +245,6 @@ TEST(ValueParameterSimulation, TypeParameterTypedModuleParameterTakesItsReal) {
             "t.c 0.100000001490 32\nt.d 0.100000000000 64\n");
 }
 
-// A package's parameter of an unpacked array is an array of elements, each
-// converted to the element type: a 2-state element takes x and z as 0, a
-// 4-state element keeps them, and an int element holds its value. Every
-// element read as bits of one carrier, A[0] and A[1] reading 0.
 TEST(ValueParameterSimulation, PackageArrayParameterElementsTakeTheirType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package pk;\n"
@@ -317,13 +260,6 @@ TEST(ValueParameterSimulation, PackageArrayParameterElementsTakeTheirType) {
             "1000 0100 1x0z z1x0 9 5\n");
 }
 
-// A constant computed from a 2-state parameter given x or z, its value cut at
-// the declared type, a sum, a range and the parameter given to an int, reads
-// those bits as the 0 the parameter holds, in a module, a port override by
-// name and by position, a package, the compilation unit, an interface, a
-// generate block and a class. A logic parameter keeps them, and an int made
-// of it holds them as 0. The fold read the digits up to the first x or z, so
-// 4'b1x1x stood for 1 and 8'bx000_0101 for 0: ZZ read 1, S 2, w 2 bits.
 TEST(ValueParameterSimulation, TwoStateParameterFeedsAConstantWithXAndZAsZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package pk;\n"
@@ -371,13 +307,6 @@ TEST(ValueParameterSimulation, TwoStateParameterFeedsAConstantWithXAndZAsZero) {
             "t.a 10 11\nt.b 1 2\n10 11 1x1x 10 11 11 6 5 11 10 11 6 10 11\n");
 }
 
-// §6.20.2 with §6.12: a constant computed from a shortreal parameter reads the
-// single-precision value the parameter holds, 0.1 reading 0.100000001490 and
-// comparing unequal to the double 0.1, whether the parameter is declared
-// shortreal, a typedef naming it or a type parameter given it, in a module,
-// a port override, a generate block and a class. A real parameter beside it
-// keeps the double. The fold kept the double for each, D reading
-// 0.100000000000 and EQ 1.
 TEST(ValueParameterSimulation,
      ShortrealParameterFeedsAConstantAtSinglePrecision) {
   SimFixture f;
@@ -421,12 +350,6 @@ TEST(ValueParameterSimulation,
             "0.100000001490 0.100000001490\n");
 }
 
-// §11.4.5 and §11.4.6 with §6.20.2: a 4-state parameter given x keeps it, so
-// `==` against a known value is x and `===` false, in a localparam and in a
-// generate condition alike, and a bare literal holding x compares the same.
-// A 2-state parameter given the same literal holds 1010 and compares equal.
-// Reading every literal's x as 0 folded L and the bare literal to 1010, made
-// EQ, CE, LE and LCE 1 and elaborated blocks a to d and not f.
 TEST(ValueParameterSimulation, FourStateParameterKeepsXInAConstantComparison) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -463,11 +386,6 @@ TEST(ValueParameterSimulation, FourStateParameterKeepsXInAConstantComparison) {
             "e\ng\n0 0 0 0 1 1\n");
 }
 
-// §6.20.2: a constant derived from a 4-state parameter holding x keeps the x
-// where its own type is 4-state -- a logic and an integer localparam, a logic
-// port overridden by name and by position, a package's logic localparam --
-// and holds it as 0 where its type is 2-state, bit and int. The value folded
-// for L, holding no x, was copied into M, J and the ports instead.
 TEST(ValueParameterSimulation, ConstantOfAFourStateParameterKeepsXAndZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package pk;\n"
@@ -493,18 +411,6 @@ TEST(ValueParameterSimulation, ConstantOfAFourStateParameterKeepsXAndZ) {
             "1x1z 00000000000000000000000000001x1z 1010 10 z1x0\n");
 }
 
-// §6.20.2 with §6.11.2: a parameter of a 2-state type whose value names a
-// 4-state parameter holding x or z takes those bits as 0, so a constant sized
-// by it reads 10 of 4'b1x1x and is 11 bits wide. Each place such a value can
-// be written is covered: a module localparam of bit and int, a concatenation
-// of the name, a chain through a second 4-state parameter, a port override by
-// name and by position, a generate block, an interface, a package parameter
-// read by its qualified name, a package name read from a module by its
-// qualified name and through a named and a wildcard import, a compilation-unit
-// parameter read in the unit and in a module, and a class port and body
-// parameter under the default specialization and under one whose actual, by
-// position or by name, is a 4-state parameter. The fold kept the digits up to
-// the first x, so each range was 2 bits wide, and 1 bit for z1z1.
 TEST(ValueParameterSimulation, TwoStateParameterOfAFourStateNameTakesZero) {
   SimFixture f;
   EXPECT_EQ(RunCapture("parameter logic [3:0] UL = 4'b1x1x;\n"
@@ -576,16 +482,6 @@ TEST(ValueParameterSimulation, TwoStateParameterOfAFourStateNameTakesZero) {
             "10 11 11 171 11 11 11 6 6 6 11 11 11 11 6 6\n");
 }
 
-// §6.20.2 with §6.11.2 and §23.9: what a 2-state parameter reads of a 4-state
-// parameter holding x or z belongs to that parameter alone, so a name that
-// hides it reads as its own value. Each hiding name stands beside a 2-state
-// parameter that does read the hidden one: a compilation-unit parameter and
-// one a wildcard import brings in, each hidden by a module's enumeration
-// constant and by a loop generate's genvar. The compilation-unit one is also
-// hidden by a constant function's argument, local variable and loop variable,
-// and by an enumeration constant a module passes to a port override by name
-// and by position. The enumeration constants and genvars took the hidden
-// parameter's reading, 10 or 5, in the range and at run time.
 TEST(ValueParameterSimulation, NameHidingAFourStateParameterKeepsItsValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("parameter logic [3:0] L = 4'b1x1x;\n"

@@ -23,8 +23,6 @@ namespace delta {
 
 namespace {
 
-// vpiCovered, vpiCoveredCount and vpiCoveredMax of a handle of `kind`
-// standing for `entities`; nothing for any other property.
 std::optional<int> EntityProperty(int property, CoverageHandleKind kind,
                                   const EntityCoverage& entities) {
   switch (property) {
@@ -39,12 +37,6 @@ std::optional<int> EntityProperty(int property, CoverageHandleKind kind,
   }
 }
 
-// §40.5.2 on an assertion handle. vpiCovered is true once the assertion has
-// been attempted, has succeeded at least once and has never failed; it is
-// covered by each nonvacuous success, or each match of a cover sequence,
-// which vpiCoveredCount counts; it is one entity; and each assertion-specific
-// property reads its own tally. `property` is one IsItemCoverageProperty
-// accepts.
 int AssertionProperty(int property, const AssertionCoverageCounters& c) {
   if (property == vpiCovered) return AssertionCovered(c) ? 1 : 0;
   if (property == vpiCoveredCount) {
@@ -58,7 +50,6 @@ int AssertionProperty(int property, const AssertionCoverageCounters& c) {
       c));
 }
 
-// §40.5.1's coverage status properties and its assertion-specific ones.
 bool IsItemCoverageProperty(int property) {
   switch (property) {
     case vpiCovered:
@@ -76,8 +67,6 @@ bool IsItemCoverageProperty(int property) {
   }
 }
 
-// The statement and the instance key the model's statement object `obj`
-// stands for; null where it is no statement object.
 const VpiStmtObjects::key_type* StatementOf(const VpiObject* obj,
                                             const VpiStmtObjects& stmts) {
   for (const auto& [key, held] : stmts) {
@@ -86,15 +75,11 @@ const VpiStmtObjects::key_type* StatementOf(const VpiObject* obj,
   return nullptr;
 }
 
-// Whether `obj` is the handle of a whole signal whose bits the run counts the
-// toggles of, rather than of a bit or a part of one.
 bool IsCountedSignal(const VpiObject* obj, const CodeCoverage& code) {
   return obj->var != nullptr && code.toggles.contains(obj->var) &&
          !VpiIsBitObjectType(obj->type);
 }
 
-// The hierarchical name of the instance `obj` is in; empty where it is in
-// none.
 std::string InstanceScopeOf(VpiObject* obj) {
   const VpiObject* inst = VpiInstanceOf(obj);
   return inst != nullptr ? inst->full_name : std::string();

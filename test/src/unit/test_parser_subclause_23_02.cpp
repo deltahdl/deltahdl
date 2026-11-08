@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -28,36 +26,24 @@ TEST(ModuleDeclarations, ModuleNameMatchesIdentifier) {
 }
 
 TEST(ModuleDeclarations, ModuleKeywordWithoutNameIsRejected) {
-  // A name is required: when the keyword is not followed by an identifier,
-  // the definition must be diagnosed rather than accepted with an empty name.
   auto r = Parse("module ; endmodule");
-  // §23.2.1 owns the module header the name belongs to, and the report the
-  // missing name draws stands there rather than under §23.2.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 1, "23.2.1"));
 }
 
 TEST(ModuleDeclarations, MacromoduleKeywordWithoutNameIsRejected) {
-  // The name requirement applies equally on the interchangeable `macromodule`
-  // path: with no identifier after the keyword the definition must be
-  // diagnosed rather than accepted with an empty name.
   auto r = Parse("macromodule ; endmodule");
-  // §23.2.1 owns the module header on the `macromodule` path too.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 1, "23.2.1"));
 }
 
 TEST(ModuleDefinitions, ModuleWithoutEndmoduleIsRejected) {
-  // The closing keyword is mandatory: a definition that opens with `module`
-  // but is never terminated must be diagnosed rather than silently accepted.
   auto r = Parse("module m;");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endmodule', got EOF", 1, "23.2"));
 }
 
 TEST(ModuleDefinitions, MacromoduleWithoutEndmoduleIsRejected) {
-  // The same enclosure rule applies when the definition opens with the
-  // interchangeable `macromodule` keyword.
   auto r = Parse("macromodule m;");
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endmodule', got EOF", 1, "23.2"));

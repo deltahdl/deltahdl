@@ -12,7 +12,6 @@
 
 namespace fs = std::filesystem;
 
-// Scratch directory holding an included source file, removed on destruction.
 struct KeywordSimIncludeDir {
   fs::path dir;
 
@@ -30,12 +29,6 @@ struct KeywordSimIncludeDir {
   }
 };
 
-// §22.14: the directives only pick the reserved word list; they do not change
-// the semantics of the code they enclose. The 1364-2001 spelling of this
-// design (`reg`, and `logic` used as an ordinary net name) computes the same
-// value the unguarded 1800-2023 spelling does. The unguarded arm doubles as
-// the runtime witness that, with no `begin_keywords anywhere, the
-// implementation's default reserved word list is what applies.
 TEST(KeywordVersionSimulation, KeywordRegionDoesNotChangeComputedValue) {
   auto guarded = PreprocessAndGet(
       "`begin_keywords \"1364-2001\"\n"
@@ -57,12 +50,6 @@ TEST(KeywordVersionSimulation, KeywordRegionDoesNotChangeComputedValue) {
   EXPECT_EQ(plain, guarded);
 }
 
-// §22.14: under a version that does not reserve it, the word is an ordinary
-// identifier wherever an identifier may appear — including as an operand in an
-// expression, which no earlier declaration-position test reaches. Here `logic`
-// names a net under 1364-2001, is driven, and is then read back inside an
-// arithmetic expression, so the value observed at the end of the run is what
-// shows the word carried a real signal rather than merely parsing.
 TEST(KeywordVersionSimulation, OldVersionIdentifierIsAnExpressionOperand) {
   auto result = PreprocessAndGet(
       "`begin_keywords \"1364-2001\"\n"
@@ -77,11 +64,6 @@ TEST(KeywordVersionSimulation, OldVersionIdentifierIsAnExpressionOperand) {
   EXPECT_EQ(result, 17u);
 }
 
-// §22.14: nested pairs are stacked, and `end_keywords returns to the specifier
-// in effect before the matching `begin_keywords. The inner module is written
-// against 1364-2001 and the outer against the enclosing 1800-2012 region; both
-// elaborate and run together, and the instantiated inner module drives the
-// value the outer one reports.
 TEST(KeywordVersionSimulation, NestedRegionsSimulate) {
   auto result = PreprocessAndGet(
       "`begin_keywords \"1800-2012\"\n"
@@ -100,12 +82,6 @@ TEST(KeywordVersionSimulation, NestedRegionsSimulate) {
   EXPECT_EQ(result, 21u);
 }
 
-// §22.14: the region a `begin_keywords opens covers all source that follows,
-// including source that arrives from another file, until the matching
-// `end_keywords. The directive is in the top file and the module it governs is
-// in an included one, where `logic` names a net — something only the 1364-2001
-// list permits. The design elaborates and runs, so the region really did reach
-// across the file boundary rather than merely surviving as preprocessor state.
 TEST(KeywordVersionSimulation, RegionReachesIntoIncludedFile) {
   KeywordSimIncludeDir tmp;
   tmp.Write("driver.svh",

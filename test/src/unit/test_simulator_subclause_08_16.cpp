@@ -26,10 +26,6 @@ TEST(ClassSim, E2eCastFunctionReturnsOneOnSuccess) {
 }
 
 TEST(ClassSim, E2eCastAssignmentCompatibleDirectionSucceeds) {
-  // Success case 1: the source and destination are assignment compatible, i.e.
-  // the destination type is the same as or a superclass of the source
-  // expression's type. Casting a derived handle into a base-typed destination
-  // is that direction, so the cast succeeds and returns 1.
   EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
                       "class Derived extends Base; int y; endclass\n"
                       "module t;\n"
@@ -46,10 +42,6 @@ TEST(ClassSim, E2eCastAssignmentCompatibleDirectionSucceeds) {
 }
 
 TEST(ClassSim, E2eCastSameTypeSucceeds) {
-  // Success case 1, the "same type" sub-form: the destination and source are
-  // the identical class type — the most direct assignment-compatible cast — so
-  // $cast succeeds and returns 1. (The superclass-of-source sub-form is covered
-  // separately by E2eCastAssignmentCompatibleDirectionSucceeds.)
   EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
                       "module t;\n"
                       "  int result;\n"
@@ -102,10 +94,6 @@ TEST(ClassSim, E2eCastTaskFormFailsWithError) {
                             8, "6.24.2"));
 }
 
-// §8.16 / §6.24.2 interweave: the task form of a class-handle downcast that
-// succeeds performs the assignment and, the assignment being valid, raises no
-// run-time error. This is the positive counterpart to the task form that fails:
-// only an invalid cast triggers the diagnostic.
 TEST(ClassSim, E2eCastTaskFormSucceedsNoError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -159,11 +147,6 @@ TEST(ClassSim, E2eCastNullAssignsNull) {
 }
 
 TEST(ClassSim, E2eSuccessfulCastWritesDestinationHandle) {
-  // A successful cast does more than report success: it performs the
-  // assignment, so afterwards the destination handle references the very
-  // object the source pointed at. Here the base handle b points at a Derived
-  // object, the downcast into d2 succeeds, and d2 then refers to the same
-  // object as the original derived handle d.
   EXPECT_EQ(RunAndGet("class Base; int x; endclass\n"
                       "class Derived extends Base; int y; endclass\n"
                       "module t;\n"
@@ -253,12 +236,6 @@ TEST(ClassSim, E2eCastFailsIncompatibleTypesEvenIfNull) {
             0u);
 }
 
-// §8.16 success case 2: the source expression's declared type is an interface
-// class (§8.26) that the destination concrete class implements, and the
-// run-time object is assignment compatible. Here an interface-class-typed
-// handle ih refers to a C object; the run-time-checked $cast back to the
-// concrete C succeeds (returns 1). This is distinct from the superclass-source
-// case: the static source type is an interface class, not a base class.
 TEST(ClassSim, E2eCastFromInterfaceClassSourceSucceeds) {
   EXPECT_EQ(RunAndGet("interface class IntfC;\n"
                       "  pure virtual function int get();\n"

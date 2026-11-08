@@ -14,11 +14,6 @@ namespace delta {
 
 namespace {
 
-// 18.5.3: a bound of a distribution item, read both as the integer an integral
-// variable's distribution takes it for and as the real a real variable's does.
-// 6.11.3: a signed operand holding a negative number is read as the type it
-// was written in, so the clause's ZSTATE of -100 is -100 rather than a large
-// positive.
 struct DistBound {
   int64_t integral = 0;
   double real = 0.0;
@@ -38,10 +33,6 @@ DistBound EvalDistBound(const Expr* e, RandomizeCtx& rc) {
   return b;
 }
 
-// 11.4.13: the ends of a value_range written about a centre, '[centre +/-
-// tol]' spanning tol either side of it and '[centre +%- tol]' spanning tol
-// percent of it, the clause's [VALUE_NOM +%- 1.0] being 3.3 give or take
-// 0.033.
 void ToleranceEnds(const DistBound& centre, const DistBound& tol, bool relative,
                    DistWeight& w) {
   double half = relative ? centre.real * tol.real / 100.0 : tol.real;
@@ -57,19 +48,6 @@ void ToleranceEnds(const DistBound& centre, const DistBound& tol, bool relative,
 
 }  // namespace
 
-// 18.5.3: translate a captured "expression dist { dist_list }" into a kDist
-// solver constraint. The distribution names the single variable it weights, so
-// the target must be a plain identifier, or in a joint solve a variable of
-// the tree (18.5.8); each item's value/range bounds and its
-// weight are constant expressions, folded here both to the integers an
-// integral variable is drawn from and to the reals a real one is, the solver
-// reading whichever its variable takes. A range keeps its per_element flag so
-// the solver spreads a ':=' weight across the range, and an item with no
-// explicit weight keeps the DistWeight default weight of 1. Returns false for
-// any other target, leaving the distribution unbuilt.
-// 18.5.3: a weight read as the unsigned value of its whole expression, held
-// to the largest uint64_t where a word above the lowest is set, so that no
-// nonzero weight reads as zero.
 static uint64_t DistWeightValue(const Logic4Vec& v) {
   for (uint32_t i = 1; i < v.nwords; ++i) {
     if (v.words[i].aval != 0) return UINT64_MAX;
@@ -80,8 +58,6 @@ static uint64_t DistWeightValue(const Logic4Vec& v) {
 bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
                          ConstraintExpr& out) {
   if (ref.target == nullptr) return false;
-  // 18.5.8: in a joint solve, a target reaching another object's variable
-  // through a handle, `left.v`, weights that variable.
   std::string name = ref.target->kind == ExprKind::kIdentifier
                          ? std::string(ref.target->text)
                          : JointVariableName(ref.target, rc);

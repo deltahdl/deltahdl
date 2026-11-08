@@ -10,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §24.3.2: procedural program code runs in the reactive region set, so a design
-// variable written across a program connection is updated there. A program
-// initial block that reads a design value and writes a design variable must do
-// so while executing in the reactive region.
 TEST(ProgramPortConnectionSim, ProgramDrivesDesignVariableInReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -36,9 +32,6 @@ TEST(ProgramPortConnectionSim, ProgramDrivesDesignVariableInReactive) {
   EXPECT_EQ(b->value.ToUint64(), 42u);
 }
 
-// §24.3.2: a net reached through a program connection is driven and resolved in
-// the reactive region set. A continuous assign inside a program drives a design
-// net; the resolved net value must reflect that reactive-region drive.
 TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
   SimFixture f;
   auto* dnet = RunAndFindVar(
@@ -55,10 +48,6 @@ TEST(ProgramPortConnectionSim, ProgramContinuousAssignDrivesDesignNet) {
   EXPECT_EQ(dnet->value.ToUint64(), 55u);
 }
 
-// §24.3.2: design processes that are sensitive to the variables and nets
-// updated across the region boundary are woken in the active region set. A
-// design always block sensitive to a variable written by a program must wake
-// and observe the program's reactive-region update.
 TEST(ProgramPortConnectionSim,
      DesignAlwaysSensitiveToProgramWriteObservesUpdate) {
   SimFixture f;
@@ -77,10 +66,6 @@ TEST(ProgramPortConnectionSim,
   EXPECT_EQ(obs->value.ToUint64(), 77u);
 }
 
-// §24.3.2: driving and resolution of a net happen right after an event changes
-// a driver on a program net. A design process that samples the resolved net at
-// a later time step must see the value produced by the program's
-// reactive-region drive.
 TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
   SimFixture f;
   auto* s = RunAndFindVar(
@@ -103,11 +88,6 @@ TEST(ProgramPortConnectionSim, NetResolutionImmediateOnProgramDriverChange) {
   EXPECT_EQ(s->value.ToUint64(), 5u);
 }
 
-// §24.3.2 (worked example): the program's continuous assign is held until the
-// Reactive region, and the design always it triggers does not run until the
-// Active region of the next pass, so the simulator must iterate the whole
-// scheduling loop. The design always therefore still fires from the
-// program-driven net change.
 TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -130,13 +110,6 @@ TEST(ProgramPortConnectionSim, MultiIterationLoopProgramAssignDesignAlways) {
   EXPECT_GE(hits->value.ToUint64(), 1u);
 }
 
-// §24.3.2 (across an actual program port connection): a program instantiated
-// with ports drives a design net through its output port. The drive and
-// resolution happen in the reactive region set, and a design always block
-// sensitive to that net is woken in the active region set, so it captures the
-// program-driven value. This exercises the port-binding path (input/output
-// bindings lowered as reactive continuous assigns), not a nested hierarchical
-// reference.
 TEST(ProgramPortConnectionSim,
      ProgramOutputPortDrivesDesignNetAndWakesDesignAlways) {
   SimFixture f;
@@ -161,11 +134,6 @@ TEST(ProgramPortConnectionSim,
   EXPECT_EQ(cap->value.ToUint64(), 1u);
 }
 
-// §24.3.2 (across an actual program port connection): a design variable on the
-// other side of a program output port is updated in the reactive region set.
-// The program reads a design value through its input port and drives a design
-// variable through its output port; the final variable value reflects the
-// reactive-region update carried across the port connection.
 TEST(ProgramPortConnectionSim,
      ProgramOutputPortUpdatesDesignVariableInReactive) {
   SimFixture f;
@@ -184,16 +152,6 @@ TEST(ProgramPortConnectionSim,
   EXPECT_EQ(cv->value.ToUint64(), 200u);
 }
 
-// §24.3.2 (worked example form, ordered port list): the LRM's own example wires
-// the program with a positional port connection, `p p_i(dout, din)`, rather
-// than by name. This drives the §23.3.2.1 ordered-connection path through the
-// full pipeline. Data flows design net -> program input port -> the program's
-// reactive continuous assign -> program output port -> design net, and the
-// design `always` sensitive to that net fires. Because the program assign is
-// held to the Reactive region and the design `always` runs in the Active region
-// of a later scheduling pass, the counter only advances if the simulator
-// iterates the whole loop and carries the reactive-region drive across the
-// ordered port connection.
 TEST(ProgramPortConnectionSim, PositionalPortConnectionCarriesReactiveDrive) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -219,9 +177,6 @@ TEST(ProgramPortConnectionSim, PositionalPortConnectionCarriesReactiveDrive) {
   EXPECT_GE(hits->value.ToUint64(), 1u);
 }
 
-// §24.3.2 with §24.3: a program's blocking write to its output port as the
-// last statement of its only initial reaches the connected design variable in
-// that time step, before the implicit $finish ends the run.
 TEST(ProgramPortConnectionSim, OutputPortWriteInTheLastStepReachesTheDesign) {
   SimFixture f;
   auto* q = RunAndFindVar(
@@ -239,12 +194,6 @@ TEST(ProgramPortConnectionSim, OutputPortWriteInTheLastStepReachesTheDesign) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 4u);
 }
 
-// §24.3.2 with §24.3.1: a program's input port net is driven by the design
-// expression connected to it as soon as that changes, not in the Reactive
-// region where the program's own code runs. A sequence the program declares,
-// clocked by the port, is evaluated in the Observed region of the tick, so the
-// program process waking on the same tick in the Reactive region sees it end
-// at 15, 25 and 35.
 TEST(ProgramPortConnectionSim,
      InputPortFollowsTheDesignBeforeTheObservedRegion) {
   SimFixture f;
@@ -268,12 +217,6 @@ TEST(ProgramPortConnectionSim,
       "n=3\n$finish at time 45\n");
 }
 
-// §24.3.2: a program's unpacked-array input port carries the design array
-// connected to it, element by element, and its unpacked-array output port
-// carries back what the program's code writes: the program reads d[1], 6,
-// and writes 7 into o[0], which the design reads as os[0]. An input with a
-// data type and no kind is a net (§23.2.2.3), and int is no type a net may
-// have (§6.7.1), so the input is declared var.
 TEST(ProgramPortConnectionSim, ArrayPortsCarryValuesBothWays) {
   SimFixture f;
   EXPECT_EQ(
@@ -293,10 +236,6 @@ TEST(ProgramPortConnectionSim, ArrayPortsCarryValuesBothWays) {
       "os=7\n");
 }
 
-// §24.3.2 with §24.3.1: an element of a program's unpacked-array input port
-// follows the design array as a scalar input port does, so the sequence the
-// program clocks by c[0] ends where the Reactive process reads it, at 15, 25
-// and 35.
 TEST(ProgramPortConnectionSim, ArrayInputPortFollowsTheDesignBeforeObserved) {
   SimFixture f;
   EXPECT_EQ(

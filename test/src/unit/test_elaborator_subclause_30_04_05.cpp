@@ -10,9 +10,6 @@ namespace {
 TEST(FullAndParallelConnectionElaboration, VectorAndScalarEndpointsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
-      // 30.3.1: only an output or inout port can serve as a module path
-      // destination; the scalar endpoint path drives the scalar output qs (the
-      // input sel would be an illegal destination).
       "module m(input sel, input [7:0] in1, in2, output [7:0] q,\n"
       "         output qs);\n"
       "  specify\n"
@@ -81,10 +78,6 @@ TEST(FullAndParallelConnectionElaboration, ErrorParallelWidthMismatch) {
                             3, "30.4.5"));
 }
 
-// §30.4.5: a parallel connection requires equal bit counts. Here the endpoints
-// are part-selects (Syntax 30-3 constant_range_expression) rather than whole
-// ports, so the equal-width rule is decided from the selected ranges: [5:2] and
-// [3:0] both name four bits, so the parallel path is legal.
 TEST(FullAndParallelConnectionElaboration, ParallelEqualWidthPartSelects) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -98,9 +91,6 @@ TEST(FullAndParallelConnectionElaboration, ParallelEqualWidthPartSelects) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5: the same part-select terminals, but now the selected ranges differ
-// in width (four bits versus two), so the parallel connection is rejected even
-// though both endpoints are eight-bit ports.
 TEST(FullAndParallelConnectionElaboration,
      ErrorParallelPartSelectWidthMismatch) {
   ElabFixture f;
@@ -117,8 +107,6 @@ TEST(FullAndParallelConnectionElaboration,
                             3, "30.4.5"));
 }
 
-// §30.4.5: full connections carry no width constraint, so the width-mismatched
-// part-selects that the parallel rule rejects above are accepted under '*>'.
 TEST(FullAndParallelConnectionElaboration, FullAllowsPartSelectWidthMismatch) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -132,9 +120,6 @@ TEST(FullAndParallelConnectionElaboration, FullAllowsPartSelectWidthMismatch) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5: a bit-select names exactly one bit, so a parallel path between two
-// bit-selects is one-bit-to-one-bit and satisfies the equal-width rule
-// regardless of which bit each names.
 TEST(FullAndParallelConnectionElaboration, ParallelBitSelectsEqualWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -148,8 +133,6 @@ TEST(FullAndParallelConnectionElaboration, ParallelBitSelectsEqualWidth) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5 negative: a one-bit bit-select source cannot form a parallel path to
-// a two-bit part-select destination.
 TEST(FullAndParallelConnectionElaboration,
      ErrorParallelBitSelectWidthMismatch) {
   ElabFixture f;
@@ -166,8 +149,6 @@ TEST(FullAndParallelConnectionElaboration,
                             3, "30.4.5"));
 }
 
-// §30.4.5: an indexed part-select ([base+:width]) selects `width` bits, so two
-// four-bit plus-indexed selects form a legal equal-width parallel path.
 TEST(FullAndParallelConnectionElaboration, ParallelPlusIndexedEqualWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -181,8 +162,6 @@ TEST(FullAndParallelConnectionElaboration, ParallelPlusIndexedEqualWidth) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §30.4.5 negative: a four-bit plus-indexed source against a two-bit
-// destination violates the equal-width rule.
 TEST(FullAndParallelConnectionElaboration,
      ErrorParallelPlusIndexedWidthMismatch) {
   ElabFixture f;
@@ -199,9 +178,6 @@ TEST(FullAndParallelConnectionElaboration,
                             3, "30.4.5"));
 }
 
-// §30.4.5: the minus-indexed part-select ([base-:width]) likewise selects
-// `width` bits, so a four-bit minus-indexed source matches a four-bit
-// destination.
 TEST(FullAndParallelConnectionElaboration, ParallelMinusIndexedEqualWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(

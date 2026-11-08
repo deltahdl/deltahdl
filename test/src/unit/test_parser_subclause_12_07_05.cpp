@@ -57,7 +57,6 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingSemicolon) {
       "    do x = x + 1; while (x < 10)\n"
       "  end\n"
       "endmodule\n");
-  // The `end` on line 4 is the token standing where §12.7.5 requires the ';'.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "12.7.5"));
 }
 
@@ -68,7 +67,6 @@ TEST(LoopSyntaxParsing, ErrorDoWhileMissingWhileKeyword) {
       "    do x = x + 1; (x < 10);\n"
       "  end\n"
       "endmodule\n");
-  // The '(' stands where §12.7.5 requires the `while` that closes a do loop.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'while', got '('", 3, "12.7.5"));
 }
 

@@ -201,9 +201,6 @@ TEST(ExpressionSim, TaggedUnionExpressionSimulates) {
             42u);
 }
 
-// §A.8.3 indexed_range ::= expression +: constant_expression. Unlike
-// constant_indexed_range, the base is a general expression, so a runtime
-// variable may drive it; the selected slice depends on the variable's value.
 TEST(ExpressionSim, IndexedRangePlusVariableBaseSimulates) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [15:0] data;\n"
@@ -219,8 +216,6 @@ TEST(ExpressionSim, IndexedRangePlusVariableBaseSimulates) {
             0xABu);
 }
 
-// §A.8.3 indexed_range ::= expression -: constant_expression, with the base
-// supplied by a runtime variable.
 TEST(ExpressionSim, IndexedRangeMinusVariableBaseSimulates) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  logic [15:0] data;\n"

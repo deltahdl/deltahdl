@@ -5,23 +5,6 @@
 #include "fixture_elaborator.h"
 #include "helpers_reported_error.h"
 
-// Annex C.2.7 - "always statement in checkers".
-//
-// The general-purpose always procedure in a checker was permitted by IEEE Std
-// 1800-2009, but the specialized always_comb/always_latch/always_ff forms were
-// forbidden. This version of the standard adds the three specialized forms to
-// checkers and, because a general always in a checker would have carried the
-// always_ff limitations anyway, deprecates and removes the general always
-// procedure from checkers. The implementable rule: a plain always inside a
-// checker body is rejected, while the three specialized forms are accepted.
-//
-// The rule is enforced by CheckCheckerBodyItemRules in
-// src/elaborator/elaborator_items_udp.cpp, the same place the other rules on
-// what a checker body may hold live. It reports as an error under §17.5, which
-// lists the always procedures a checker admits; Annex C.2.7 records why the
-// general form is not among them. These tests observe that production code by
-// elaborating each form and reading back the report.
-
 namespace {
 
 TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerIsRejected) {
@@ -39,9 +22,6 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerIsRejected) {
 }
 
 TEST(AlwaysProcedureInCheckers, AlwaysFfInCheckerIsAccepted) {
-  // Contrast with GeneralAlwaysInCheckerIsRejected: identical body, only the
-  // procedure keyword changes. always_ff is one of the three specialized forms
-  // added for checkers, so it must elaborate cleanly.
   ElabFixture f;
   ElaborateSrc(
       "checker chk(input logic clk);\n"
@@ -74,11 +54,6 @@ TEST(AlwaysProcedureInCheckers, AlwaysLatchInCheckerIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.10 item 6: a checker_generate_item may hold nothing that a
-// checker_declaration could not hold outside one, so the general always C.2.7
-// removes from a checker body is removed from a generate block of that body
-// too, whichever construct holds the block: an if, its else, a for, or a case
-// arm.
 TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerGenerateIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -108,8 +83,6 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysInCheckerGenerateIsRejected) {
   }
 }
 
-// The specialized forms a checker admits are admitted inside its generate
-// blocks as in its body.
 TEST(AlwaysProcedureInCheckers, AlwaysFfInCheckerGenerateIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -124,9 +97,6 @@ TEST(AlwaysProcedureInCheckers, AlwaysFfInCheckerGenerateIsAccepted) {
 }
 
 TEST(AlwaysProcedureInCheckers, GeneralAlwaysOutsideCheckerIsStillAllowed) {
-  // The deprecation is scoped to checker bodies. A general always procedure in
-  // an ordinary module remains legal, proving the rejection keys on the checker
-  // context and not on the always keyword itself.
   ElabFixture f;
   ElaborateSrc(
       "module m(input logic clk);\n"
@@ -139,9 +109,6 @@ TEST(AlwaysProcedureInCheckers, GeneralAlwaysOutsideCheckerIsStillAllowed) {
 
 TEST(AlwaysProcedureInCheckers,
      GeneralAlwaysRejectedAlongsideAcceptedSpecializedForms) {
-  // Integration: a checker mixing an accepted always_comb with a forbidden
-  // general always is still rejected. The presence of valid specialized forms
-  // does not suppress the general-always diagnostic.
   ElabFixture f;
   ElaborateSrc(
       "checker chk(input logic clk);\n"

@@ -1,14 +1,3 @@
-// §20.4.1 Timescale retrieval system functions. $timeunit and $timeprecision
-// return the time unit and precision of a design element, encoded as the
-// Table 20-2 base-10 order (an integer in the range 2 to -15). The value each
-// function reports depends on which design element it names — the current
-// scope with no argument, a named element, the compilation unit ($unit), or
-// the simulation time unit ($root, see §3.14.3) — and on how that element's
-// timescale was produced by its `timeunit`/`timeprecision` declarations. These
-// tests therefore build the timescale from real source and drive it through the
-// full pipeline (parse -> elaborate -> lower -> run), reading the returned
-// order back through $display so the production selection and Table 20-2
-// encoding are observed end to end rather than from a hand-seeded context.
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -18,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// With no argument, $timeunit reports the current scope's time unit and
-// $timeprecision its precision — here the top module's own `timeunit 1ms/1us`
-// declaration, encoded as -3 and -6 per Table 20-2.
 TEST(TimescaleSystemFunctions, NoArgumentReportsCurrentScopeUnitAndPrecision) {
   SimFixture f;
   std::string out = RunCapture(
@@ -35,8 +21,6 @@ TEST(TimescaleSystemFunctions, NoArgumentReportsCurrentScopeUnitAndPrecision) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// An argument that names a design element reports that element's timescale. The
-// top module names itself; its declared 100us/10ns maps to -4 and -8.
 TEST(TimescaleSystemFunctions, NamedElementArgumentReportsThatElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -51,11 +35,6 @@ TEST(TimescaleSystemFunctions, NamedElementArgumentReportsThatElement) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// A named argument resolves the *named* child instance, not the calling scope:
-// the parent runs at 1ns/1ns while the instance c1 declares 100ps/10fs, so
-// $timeunit(c1)/$timeprecision(c1) report the child's -10 and -14. §3.14.2.3
-// bars a design where some elements declare a time unit and others do not,
-// so the parent declares its own.
 TEST(TimescaleSystemFunctions, NamedInstanceArgumentReportsChildTimescale) {
   SimFixture f;
   std::string out = RunCapture(
@@ -74,8 +53,6 @@ TEST(TimescaleSystemFunctions, NamedInstanceArgumentReportsChildTimescale) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// The $unit argument reports the compilation unit's timescale, set here by a
-// compilation-unit-scope `timeunit 1s/1ms` declaration (order 0 and -3).
 TEST(TimescaleSystemFunctions, UnitArgumentReportsCompilationUnit) {
   SimFixture f;
   std::string out = RunCapture(
@@ -90,9 +67,6 @@ TEST(TimescaleSystemFunctions, UnitArgumentReportsCompilationUnit) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// The $root argument yields the simulation time unit for both functions — the
-// smallest precision across the design (§3.14.3). With the module declaring a
-// 1ps precision, both report -12.
 TEST(TimescaleSystemFunctions, RootArgumentReportsSimulationTimeUnit) {
   SimFixture f;
   std::string out = RunCapture(
@@ -107,9 +81,6 @@ TEST(TimescaleSystemFunctions, RootArgumentReportsSimulationTimeUnit) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// A magnitude of 10 or 100 shifts the Table 20-2 order up by one or two. Here
-// 10s -> 1 for the unit and 100ns -> -7 for the precision, exercising the
-// off-decade rows the plain 1-magnitude cases never reach.
 TEST(TimescaleSystemFunctions, MagnitudeMultiplierShiftsTableOrder) {
   SimFixture f;
   std::string out = RunCapture(
@@ -124,8 +95,6 @@ TEST(TimescaleSystemFunctions, MagnitudeMultiplierShiftsTableOrder) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// With no timescale declared anywhere the current scope defaults to 1ns, so
-// both functions report -9.
 TEST(TimescaleSystemFunctions, DefaultCurrentScopeIsNanosecond) {
   SimFixture f;
   std::string out = RunCapture(
@@ -139,9 +108,6 @@ TEST(TimescaleSystemFunctions, DefaultCurrentScopeIsNanosecond) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// The returned order stays within the Table 20-2 range of 2 to -15: the
-// coarsest unit (100s -> 2) and the finest precision (1fs -> -15) sit at the
-// two extremes.
 TEST(TimescaleSystemFunctions, ReturnValueSpansTableRange) {
   SimFixture f;
   std::string out = RunCapture(
@@ -156,10 +122,6 @@ TEST(TimescaleSystemFunctions, ReturnValueSpansTableRange) {
   EXPECT_EQ(out, "unit_ok\nprec_ok\n");
 }
 
-// §20.4.1 with §3.14.3: the simulation time unit is the smallest time
-// precision in the design, magnitude and all, so a design whose finest
-// precision is 100 ps answers -10 for $root, from two modules whose precisions
-// are 100 ps and 1 ns; and $printtimescale($root) names it for both fields.
 TEST(TimescaleSystemFunctions, RootArgumentKeepsThePrecisionsMagnitude) {
   SimFixture f;
   std::string out = RunCapture(
@@ -178,10 +140,6 @@ TEST(TimescaleSystemFunctions, RootArgumentKeepsThePrecisionsMagnitude) {
   EXPECT_EQ(out, "-10 -10\nTime scale of ($root) is 100ps / 100ps\n");
 }
 
-// §20.4.1, §20.4.2: an instance named as the argument answers that element's
-// unit and precision, and the process goes on to the statements after the
-// call: $timeunit(s1) and $timeprecision(s1) are the instance's -9 and -12,
-// $printtimescale(s1) reports it, and the display after them runs.
 TEST(TimescaleSystemFunctions, AnInstanceArgumentReportsItAndTheProcessGoesOn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -201,9 +159,6 @@ TEST(TimescaleSystemFunctions, AnInstanceArgumentReportsItAndTheProcessGoesOn) {
   EXPECT_EQ(out, "-9 -12\nTime scale of (s1) is 1ns / 1ps\ndone\n");
 }
 
-// §20.4.1 with §3.14.3: the global time precision counts the compilation
-// unit's precision as well as the instances', so the 1fs the unit declares,
-// finer than top's 1ps, is what $root answers.
 TEST(TimescaleSystemFunctions, RootArgumentCountsTheCompilationUnitsPrecision) {
   SimFixture f;
   std::string out = RunCapture(
@@ -217,10 +172,6 @@ TEST(TimescaleSystemFunctions, RootArgumentCountsTheCompilationUnitsPrecision) {
   EXPECT_EQ(out, "-15\n");
 }
 
-// §20.4.1 with §3.14.3: a package's precision counts toward the global one,
-// magnitude and all, though no instance holds it: the 10fs of p makes $root
-// answer -14, where top alone gives -12 and the unit without its magnitude
-// -15.
 TEST(TimescaleSystemFunctions, RootArgumentCountsAPackagesPrecision) {
   SimFixture f;
   std::string out = RunCapture(
@@ -235,10 +186,6 @@ TEST(TimescaleSystemFunctions, RootArgumentCountsAPackagesPrecision) {
   EXPECT_EQ(out, "-14\n");
 }
 
-// §20.4.1 and §20.4.2 with §3.14.3: every `timescale precision counts toward
-// the global one, magnitude and all, a directive that stands before no design
-// element's header included: the trailing 1ns / 10ps makes $root's precision
-// 10ps, where top alone gives 1ns and the unit without its magnitude 1ps.
 TEST(TimescaleSystemFunctions, RootArgumentCountsATrailingTimescalePrecision) {
   SimFixture f;
   std::string out = PreprocessAndCapture(
@@ -254,10 +201,6 @@ TEST(TimescaleSystemFunctions, RootArgumentCountsATrailingTimescalePrecision) {
   EXPECT_EQ(out, "-11\nTime scale of ($root) is 10ps / 10ps\n");
 }
 
-// §20.4.1 and §20.4.2: an argument may name an instance through the
-// instances above it, as the standard's own b_dat.c1 does. a_dat's 1ms / 1us
-// is what a dotted name that resolved to nothing would report in place of
-// c1's 1ns / 1ns.
 TEST(TimescaleSystemFunctions, AHierarchicalArgumentReportsTheInstanceItNames) {
   SimFixture f;
   std::string out = PreprocessAndCapture(
@@ -280,8 +223,6 @@ TEST(TimescaleSystemFunctions, AHierarchicalArgumentReportsTheInstanceItNames) {
   EXPECT_EQ(out, "-9 -9\nTime scale of (b.c1) is 1ns / 1ns\n");
 }
 
-// §20.4.1 and §20.4.2 with §3.2: a package is a design element, so naming one
-// reports the time scale it declares rather than the calling module's.
 TEST(TimescaleSystemFunctions, APackageArgumentReportsThePackage) {
   SimFixture f;
   std::string out = RunCapture(

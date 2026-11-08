@@ -116,16 +116,10 @@ struct SpecifyItem {
 
   bool is_ondetect = false;
   bool is_noshowcancelled = false;
-  // A.7.1: the list_of_path_outputs of a pulsestyle_declaration or a
-  // showcancelled_declaration, each entry A.7.3's
-  // specify_output_terminal_descriptor as a path's destination is.
   std::vector<SpecifyTerminal> path_outputs;
 
   std::string_view param_name;
   Expr* param_value = nullptr;
-  // A.2.1.1: `specparam_declaration ::= specparam [ packed_dimension ]
-  // list_of_specparam_assignments ;`. The range is written once and governs
-  // every assignment of the declaration, so each item made from one carries it.
   Expr* param_packed_left = nullptr;
   Expr* param_packed_right = nullptr;
 
@@ -138,7 +132,6 @@ struct SpecifyItem {
 
 struct UdpTableRow {
   std::vector<char> inputs;
-  // Where the row starts, which a report about the row stands at.
   SourceLoc loc;
 
   std::vector<std::pair<char, char>> paren_edges;
@@ -149,28 +142,13 @@ struct UdpTableRow {
 struct UdpDecl {
   std::string_view name;
   SourceRange range;
-  // Syntax 29-1 (printed page 861): `extern udp_nonansi_declaration` and
-  // `extern udp_ansi_declaration` declare a primitive's ports without its
-  // body, so a prototype names the primitive a definition of the same name
-  // gives the table of, and is no second definition (§3.13).
   bool is_extern = false;
   std::vector<Attribute> attrs;
   std::string_view output_name;
   std::vector<std::string_view> input_names;
   bool is_sequential = false;
   bool has_initial = false;
-  // The one bit the output holds when simulation begins, where the parser can
-  // read it: §29.3.3's initial statement assigns one of A.5.3's init_val
-  // literals, and A.5.2's `output reg port_identifier = constant_expression`
-  // may write a literal too. 'x' where nothing gave one, and where the header
-  // wrote an expression the parser cannot fold, which the run evaluates from
-  // initial_expr instead.
   char initial_value = 'x';
-  // A.5.2's constant_expression as written after `output reg port_identifier
-  // =`, kept for the run to evaluate: `~1'b0` is the negation of a literal and
-  // not the literal, so the bit it stands for is not one the parser can read.
-  // Null where the initial value came from §29.3.3's initial statement, whose
-  // right-hand side A.5.3 closes over literals, or where there is none.
   Expr* initial_expr = nullptr;
   std::vector<UdpTableRow> table;
   std::string_view library;

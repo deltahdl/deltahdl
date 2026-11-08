@@ -12,10 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §19.7.1: strobe and real_interval can be set only in the covergroup
-// definition; a procedural write to either through the covergroup type, at the
-// covergroup's level or a coverpoint's, is an error. Every other type option,
-// merge_instances and weight among them, can be assigned during simulation.
 TEST(TypeOptionWrites, DefinitionOnlyTypeOptionWrittenProcedurallyIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,8 +42,6 @@ TEST(TypeOptionWrites, DefinitionOnlyTypeOptionWrittenProcedurallyIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.7.1: the rule binds a write through a covergroup type alone; a class's
-// static struct named type_option takes a strobe member like any other.
 TEST(TypeOptionWrites, ClassMemberNamedTypeOptionIsAssignable) {
   ElabFixture f;
   ElaborateSrc(
@@ -62,11 +56,6 @@ TEST(TypeOptionWrites, ClassMemberNamedTypeOptionIsAssignable) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.7.1: a type option is set with a constant expression, so a module
-// variable, a call of a function reading one and a call of a system function
-// that is no constant one are errors there, while a parameter, a function
-// reading only a parameter or its arguments and $clog2 are not. A formal of
-// the covergroup is the parser's to report, once.
 TEST(TypeOptionValues, NonConstantValueIsError) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(

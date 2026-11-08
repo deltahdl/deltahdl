@@ -25,31 +25,11 @@ namespace delta {
 
 struct StructFieldInfo;
 
-// Shared between eval_randomize.cpp, which randomizes a single object, and
-// eval_randomize_joint.cpp, which randomizes an object tree in one solve.
-
-// 18.5.11: a constraint expression is written inside a class body, so it names
-// the class's own members without qualification -- a property, or a call to one
-// of its own methods. Resolving either needs the object in scope: an
-// unqualified identifier is read as a property of `this` against the enclosing
-// class (8.6/8.15), and an unqualified call is resolved against the enclosing
-// class and the classes it inherits from (8.13). Evaluating a constraint
-// expression with neither in scope leaves an unqualified call resolving to no
-// method at all, and a call that resolves to nothing yields zero -- which is
-// exactly the value 18.5.11 requires be the function's return value, which
-// the constraint that consumes it holds fixed as it would a state variable.
-//
-// Holds the object in scope for as long as the guard lives, and steps back out
-// when it is destroyed, so an evaluation that returns early cannot leave the
-// scope stack unbalanced. A null object (or one with no class type) binds
-// nothing, leaving whatever scope the caller was already in.
 class ConstraintEvalScope {
  public:
   ConstraintEvalScope(ClassObject* obj, SimContext& ctx)
       : ctx_(ctx), bound_(obj != nullptr && obj->type != nullptr) {
     if (!bound_) return;
-    // 18.7.1: the `this` in scope before the object is bound is the one
-    // local::this names in an inline constraint of the call.
     caller_this_ = ctx_.SetConstraintCallerThis(ctx_.CurrentThis());
     ctx_.PushThis(obj);
     ctx_.PushMethodClass(obj->type);
@@ -73,295 +53,118 @@ class ConstraintEvalScope {
   ClassObject* caller_this_ = nullptr;
 };
 
-// A rand/randc variable discovered on the randomized object, paired with the
-// class level that declares it (for the scoped "Class::name" property alias)
-// and the solver variable being built for it.
 struct RandInfo {
   std::string name;
   const ClassTypeInfo* level = nullptr;
-  // 18.4.2: a static randc shares its cyclic permutation across every instance
-  // of the declaring class, so its history is stored on the (shared) class type
-  // rather than on the object. Track the static-ness of the source member here.
   bool is_static = false;
   RandVariable var;
 
-  // 18.5.8: in a joint (global-constraint) solve the same variable name can
-  // appear on several objects, so 'name' carries a path-qualified name unique
-  // across the whole active random object tree while 'member' keeps the plain
-  // property name and 'owner' names the object the value is written back to.
-  // For an ordinary single-object solve owner stays null and member stays
-  // empty, and the single object's own name/level are used, so nothing changes
-  // there.
   std::string member;
   ClassObject* owner = nullptr;
 
-  // 18.5.7: for an element of a rand member declared as an array, the name of
-  // that member, so a relation naming the array whole -- a reduction method
-  // over it, a select at an index the solver does not fold -- is read as
-  // referencing the element, and the element's index. 18.5.7.1: for the size
-  // of a rand member declared as a dynamic array, which `var.is_array_size`
-  // marks, the name of that member as well, so that rand_mode() on the
-  // member holds the size with the elements. Empty for a variable that is
-  // neither.
   std::string array_base;
   int64_t array_index = 0;
-  // §18.4: the variable is the size or an element of a rand member declared
-  // as a queue, which the object holds as a queue rather than under keys.
   bool in_queue = false;
-  // §18.4: for an element of a rand member declared as an associative array,
-  // the key it is held under, an integer or, for a string index, `str_key`.
   bool in_assoc = false;
   AssocIndex int_key;
   std::string str_key;
-  // §18.4: for a rand member of a rand unpacked structure property, the
-  // property's name and the member's lowest bit in the value it holds, into
-  // which the member is written back; empty for any other variable.
   std::string struct_base;
   uint32_t struct_offset = 0;
-  // §18.4: for an element of a rand dynamic array member of such a structure,
-  // the member, whose elements the element is written back into.
   const StructFieldInfo* dyn_field = nullptr;
 };
 
-// §18.4: the random variables of the rand member `m` of `level` where it is
-// an unpacked structure: one per integral member its type declares rand or
-// randc, named `h1.addr`, its other members keeping their values. False,
-// adding nothing, where `m` holds no unpacked structure of a named type.
-// Defined in eval_randomize_struct.cpp.
 bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
                           SimContext& ctx, std::vector<RandInfo>& out);
 
-// State threaded through the randomize() build helpers; bundled to keep helper
-// parameter lists small.
 struct JointVarScope;
 
 struct RandomizeCtx {
   ClassObject* obj;
   SimContext& ctx;
   Arena& arena;
-  // 18.5.5: the solver the relations are built for, which a relation
-  // evaluated over a trial reads the real variables' draws from: the trial
-  // handed to it holds the integral draws alone, a real variable being drawn
-  // into the solver's real values (18.4.1), so an antecedent or relation
-  // written over a real variable read it as 0 without this.
   const ConstraintSolver* solver = nullptr;
-  // 18.5.13: stable storage for the inner relation of each soft constraint. A
-  // kSoft ConstraintExpr points to its inner relation through a raw pointer, so
-  // the inner must outlive the solve; owning it on the heap here keeps that
-  // address stable even as the solver copies the block holding the kSoft.
   std::vector<std::unique_ptr<ConstraintExpr>> soft_inners = {};
-  // The locals a trial binds the random variables to, by name, made once
-  // per randomize() call and bound to each trial's values in place: a
-  // relation over a wide domain is evaluated some hundred times per call,
-  // and a local made per evaluation is arena storage the run never gets
-  // back (eval_randomize_custom.cpp).
   std::unordered_map<std::string, Variable*> trial_locals = {};
-  // 18.7: the inline block of the randomize() with call, read with the
-  // class's own blocks where they decide whether an array is resized (18.4);
-  // null for a call without one.
   const ClassMember* inline_block = nullptr;
-  // 18.5.8: the path the solver names this object's variables under, empty
-  // but in a joint solve, where each object of the tree has its own.
   std::string solver_prefix = {};
-  // 18.5.8: in a joint solve, the variables of the tree this object's
-  // relations reach; null otherwise.
   JointVarScope* joint = nullptr;
-  // 18.7.1: the receiver of the randomize() with call, which local::
-  // qualifies to name the object's own members (InlineReceiverName).
   std::string inline_receiver = {};
 };
 
-// §18.4: the random variables of the elements of each rand dynamic array
-// member of the rand unpacked structure member `m` of `level`, as the object
-// of `rc` holds them, named `h1.data[0]` on, their count kept. Defined in
-// eval_randomize_struct.cpp.
 void AddRandStructDynamicElements(const ClassMember* m,
                                   const ClassTypeInfo* level,
                                   std::vector<RandInfo>& out, RandomizeCtx& rc);
 
-// 18.5.8: one active random object taking part in a joint solve, paired with
-// the dotted path prefix under which its variables and constraints are named in
-// the single shared solver. The root object has an empty prefix; an object
-// reached through the root's rand handle 'h' has prefix "h.", one two levels
-// down "h.g.", and so on.
 struct JointObject {
   ClassObject* obj;
   std::string prefix;
 };
 
-// 18.5.8: the joint solve's variable set as one object's constraints see it:
-// the object whose scope a relation is evaluated in, and each random variable
-// of the tree under that object's prefix, named within the prefix, `v` for its
-// own and `left.v` for one it reaches through its handle `left`, with the
-// object holding it and the set of those names.
 struct JointVarScope {
   ClassObject* owner = nullptr;
   std::vector<RandInfo> rands = {};
   std::unordered_set<std::string> names = {};
 };
 
-// 18.5.8: whether `name`, read within the object of `rc`, names a random
-// variable of the tree `rc` is solved with, its own or one it reaches
-// through a handle; false outside a joint solve (eval_randomize_joint.cpp).
 bool IsJointVariable(const std::string& name, const RandomizeCtx& rc);
-// 18.5.8: the name within the object of `rc` of the random variable of the
-// tree the operand `e` names, `v`, `left.v` or `arr[1].y`; empty outside a
-// joint solve or for any other operand (eval_randomize_joint.cpp).
 std::string JointVariableName(const Expr* e, const RandomizeCtx& rc);
-// 18.5.8: `rel`, a relation of the object of `rc` reaching a random variable
-// of another object of the tree, built into `out` over the variables of the
-// tree the object reaches; false for a relation over the object's own
-// variables alone, or outside a joint solve (eval_randomize_joint.cpp).
 bool TryJointRelation(const Expr* rel, std::vector<RandInfo>& rands,
                       RandomizeCtx& rc, bool fold, ConstraintExpr& out);
 
-// A copy of an expression with the nodes `rewrite` answers for replaced by
-// its answer, the others copied over their rewritten children; a node the
-// rewrite answers null for is copied (eval_randomize_iterative.cpp).
-// §18.4: a rand packed structure is one integral random variable, so a
-// member of it the relation `rel` names, `p.hi`, is rewritten as the
-// part-select of the bits the member occupies, `p[7:4]`, which the solver
-// reads off the variable; a rand member of a rand unpacked structure,
-// `h1.addr`, is rewritten as the identifier of its own variable, and so is a
-// random variable named through the receiver of a randomize() with call,
-// `local::obj.x` (18.7.1). Defined in eval_randomize_membership.cpp.
 const Expr* PackedMembersAsSelects(const Expr* rel,
                                    std::vector<RandInfo>& rands,
                                    RandomizeCtx& rc);
 
 using ExprRewrite = std::function<Expr*(const Expr*)>;
 Expr* RewriteExpr(const Expr* e, const ExprRewrite& rewrite, Arena& arena);
-// An identifier node spelling `text`, the text held by the arena, placed
-// where `like` was (eval_randomize_iterative.cpp).
 Expr* IdentifierExpr(std::string_view text, const Expr* like, Arena& arena);
 
 RandInfo* FindRand(std::vector<RandInfo>& rands, std::string_view name);
-// Whether `e`, or any expression in `list`, references one of the random
-// variables.
 bool RefsRandVar(const Expr* e, std::vector<RandInfo>& rands);
 bool AnyRefsRandVar(const std::vector<Expr*>& list,
                     std::vector<RandInfo>& rands);
-// 18.5.4: `rel` as `x inside { ... }` over a rand variable and items free of
-// random variables, a set membership the solver draws a member of; fills
-// `out` and answers true, any other shape answering false
-// (eval_randomize_membership.cpp).
 bool TrySetMembershipConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                                 RandomizeCtx& rc, ConstraintExpr& out);
-// 18.5.5: `rel` as `antecedent -> relation`, the parser's form of every
-// implication and if-else constraint, as the solver's implication over the
-// relation translated, which the solver applies where the antecedent holds;
-// answers false where the relation would be a tried one anyway
-// (eval_randomize_membership.cpp).
 bool TryImplicationConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                               RandomizeCtx& rc, ConstraintExpr& out);
-// 18.5.12: where `rel` is an implication, the parser's form of every
-// implication and if-else constraint, sets on `out` the constraint guard its
-// antecedent is: the predicate whose four-state value the solver resolves
-// before it imposes `out` -- a FALSE one eliminating it, an ERROR one, an
-// evaluation error no operand sifts away, failing randomize(), and a TRUE or
-// RANDOM one generating it. `refs_rand` answers whether a subexpression
-// involves a random variable, which makes it RANDOM; any other is evaluated
-// in the scope of `owner`, whose members it names (eval_randomize_guard.cpp).
 void AttachConstraintGuard(const Expr* rel,
                            const std::function<bool(const Expr*)>& refs_rand,
                            ClassObject* owner, RandomizeCtx& rc,
                            ConstraintExpr& out);
-// 18.5.13.2: `rel`, the parser's `antecedent -> relation` of a soft
-// consequent, `p -> soft q`, as the solver's implication over the relation
-// translated, referencing the relation's variables alone: the antecedent
-// gates the soft constraint rather than appearing in it, so a 'disable
-// soft' on its variable leaves the constraint in place
-// (eval_randomize_membership.cpp).
 ConstraintExpr SoftImplication(const Expr* rel, std::vector<RandInfo>& rands,
                                RandomizeCtx& rc);
-// Evaluates `rel` with each name in `names` bound to its value in `vals`,
-// as a truth or as the value it takes.
 bool EvalCustomRelation(const Expr* rel, const std::vector<std::string>& names,
                         RandomizeCtx& rc,
                         const std::unordered_map<std::string, int64_t>& vals);
 int64_t EvalCustomValue(const Expr* e, const std::vector<std::string>& names,
                         RandomizeCtx& rc,
                         const std::unordered_map<std::string, int64_t>& vals);
-// Whether `e` references the random variable `name`, bare or as this.name.
 bool RefsNamedRandVar(const Expr* e, std::string_view name);
-// Writes the integral `v` into the words of `value`, held to its width: how
-// a trial binds a local it made once to each value it evaluates over
-// (eval_randomize_custom.cpp).
 void SetLocalWords(Logic4Vec& value, int64_t v);
-// The value `v` as the solver's variable `name` holds it, wrapped to the
-// variable's width in its signedness, so that x derived as 10 - y over a
-// pair of ints is the int whose sum with y is 10 at the width of an int
-// (eval_randomize_custom.cpp).
 int64_t HeldToVariable(int64_t v, const std::string& name, RandomizeCtx& rc);
-// 18.5: `rel` as the solver's kCustom relation, evaluated against the values
-// drawn, referencing the random variables it names and, where it is `x ==
-// expression` over the others, deriving x from them
-// (eval_randomize_custom.cpp).
 ConstraintExpr MakeCustomConstraint(const Expr* rel,
                                     std::vector<RandInfo>& rands,
                                     RandomizeCtx& rc);
-// 18.5.7: `rel` as an array reduction method over a rand array member --
-// sum, product, and, or or xor, with no with clause -- compared against a
-// value free of random variables, as the solver's reduction over the
-// element variables in index order; answers false for any other shape
-// (eval_randomize_iterative.cpp).
 bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, ConstraintExpr& out);
-// 18.5.7: build each foreach iterative constraint of the member `m` into
-// `block`: the relations of its constraint_set instanced once per element of
-// the array, the loop variable standing for the element's index and a select
-// of the array at the loop variable for the element's variable, each
-// translated as a relation written in the block would be
-// (eval_randomize_iterative.cpp).
 void AddForeachConstraints(const ClassMember* m, std::vector<RandInfo>& rands,
                            RandomizeCtx& rc, ConstraintBlock& block);
-// 18.5: `rel` as `a && b`, which holds where both do, as the solver's
-// implication of both under an antecedent that always holds, each side
-// translated on its own so that a comparison among them folds the domain
-// as it would alone; answers false for any other shape
-// (eval_randomize_membership.cpp).
 bool TryConjunctionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
                               RandomizeCtx& rc, ConstraintExpr& out, bool fold);
 void CollectRandVariables(const ClassTypeInfo* type, SimContext& ctx,
                           std::vector<RandInfo>& out);
-// 18.4: the solver variable for the rand/randc data member `m` declared at
-// `level`, drawn over the range its declared type admits; a member declared
-// as an array is built once and copied per element by the caller.
 RandInfo BuildRandMember(const ClassMember* m, const ClassTypeInfo* level,
                          SimContext& ctx);
-// 18.4/18.5.7.1: add the random variables of each rand member of the object
-// declared as a dynamic array: where an active constraint block constrains
-// the member's size method, one variable for the size, drawn ahead of the
-// others, and one per element up to the largest size the size constraints
-// admit; otherwise one per element the array holds, its size being left as
-// it is (eval_randomize_dynamic.cpp).
 void AddDynamicArrayVariables(std::vector<RandInfo>& rands, RandomizeCtx& rc);
-// 18.5.7.1: `rel` with each size method call on a dynamic array property of
-// the object's class, `A.size` or `A.size()`, replaced by the identifier of
-// the key the size is held under, which is the size variable's name where
-// the size is solved and the object's own count where it is not; `rel`
-// itself where it holds no such call (eval_randomize_dynamic.cpp).
 const Expr* ResolveArraySizes(const Expr* rel, RandomizeCtx& rc);
 bool ComparisonKind(TokenKind op, ConstraintKind& out);
 void FoldBound(RandInfo& ri, ConstraintKind kind, int64_t c);
-// 18.4.1: the same for a real variable's range, a bound on one side leaving
-// the other and an equality closing both on the value.
 void FoldRealBound(RandInfo& ri, ConstraintKind kind, double c);
-// Folds the comparison of the rand variable `name` against the constant
-// `cv`, `c` as an integer, into its domain, a real one's range through
-// FoldRealBound and an integral one's bounds through FoldBound; a name that
-// is no rand variable folds nothing.
 void FoldComparison(std::vector<RandInfo>& rands, std::string_view name,
                     ConstraintKind kind, const Logic4Vec& cv, int64_t c);
-// 18.6.1: the value the solver drew for `ri`, named under `prefix`, as the
-// member holds it, 18.4.1 a real as the real it is and 6.11.3 an integral
-// one in the member's declared signedness.
 Logic4Vec SolvedValue(const RandInfo& ri, const ConstraintSolver& solver,
                       const std::string& prefix, Arena& arena);
 bool IsObjectConstraintActive(const ClassObject* obj, std::string_view name);
-// §18.8: the class declaring the random variable `name` of `obj`, an
-// element or the size named by its member's key, where the declaration is
-// static, so that the class holds its rand_mode() state; null otherwise.
 const ClassTypeInfo* StaticRandOwner(const ClassObject* obj,
                                      std::string_view name);
 bool IsObjectRandActive(const ClassObject* obj, std::string_view name);
@@ -372,39 +175,19 @@ void CollectRandObjectMembers(const ClassTypeInfo* type, SimContext& ctx,
 
 TokenKind MirrorComparison(TokenKind op);
 
-// §18.4 with §18.8: each object the active rand object-handle members of
-// `obj` hold, a member's own or, for an array of handles, each element's,
-// with the key the handle is kept under; null handles left out.
 std::vector<std::pair<std::string, ClassObject*>> ActiveRandObjectMembers(
     const ClassObject* obj, SimContext& ctx);
-// 18.5.8 with 18.6.2: the tree of active random objects `obj` heads, `obj`
-// first, each under the path it is named by, calling each one's
-// pre_randomize() for the call `expr` before reading its handles, so the
-// members the tree takes are the ones pre_randomize() left in place.
 std::vector<JointObject> CollectActiveRandomObjects(ClassObject* obj,
                                                     const Expr* expr,
                                                     SimContext& ctx,
                                                     Arena& arena);
-// 18.5.8: randomizes the active random object tree `objects`, the root
-// first, as one solve; 18.5.13.1: `inline_block`, the constraint member of
-// the call's with clause or null, is applied to the root with the highest
-// soft priority. 18.6.2: post_randomize() runs on each object once every
-// value is written.
 bool RandomizeObjectTree(SimContext& ctx, Arena& arena, const Expr* expr,
                          const std::vector<JointObject>& objects,
                          const ClassMember* inline_block);
-// 18.5.4: adds the values the items of an inside range list name, evaluated
-// in the scope of `owner`, to `out`: a single value, or every value of a
-// closed range of constants; answers false for an item this path does not
-// enumerate (eval_randomize_membership.cpp).
 bool EnumerateInsideItems(const std::vector<Expr*>& elements,
                           ClassObject* owner, RandomizeCtx& rc,
                           std::vector<int64_t>& out);
 
-// §18.4.1 with §11.4.13: the set membership `rel`, a rand real variable
-// inside a set of real values and ranges, as the distribution of its items,
-// each weighted 1, a range across its whole width, so that each draw takes a
-// value or a value within a range. Defined in eval_randomize_dist.cpp.
 bool BuildRealSetDist(const Expr* rel, RandomizeCtx& rc, ConstraintExpr& out);
 
 bool BuildDistConstraint(const ConstraintDistRef& ref, RandomizeCtx& rc,
@@ -417,10 +200,6 @@ ConstraintExpr TranslateRelation(const Expr* rel, std::vector<RandInfo>& rands,
                                  RandomizeCtx& rc, bool fold = true);
 void AddConstraintMember(const ClassMember* m, std::vector<RandInfo>& rands,
                          RandomizeCtx& rc, ConstraintSolver& solver);
-// 18.5/18.5.2/18.5.13.1: the constraint members of the class chain of `type`
-// with a body the solver can act on, a base class's ahead of a derived
-// one's and a same-named base one replaced by the derived one
-// (eval_randomize_blocks.cpp).
 std::vector<const ClassMember*> ConstraintMembersInOrder(
     const ClassTypeInfo* type);
 void CollectConstraintBlocks(const ClassTypeInfo* type,
@@ -440,43 +219,15 @@ void WriteBackSolved(ClassObject* obj, std::vector<RandInfo>& rands,
 
 bool ExtractConstraintModeParts(const Expr* expr, std::string_view& obj_name,
                                 std::string_view& constraint_name);
-// 18.8: the parts of a rand_mode() call: the object, the variable named or
-// none, and, for the element form on an unpacked array member, the select
-// naming the element, null otherwise (eval_randomize_mode.cpp).
 bool ExtractRandModeParts(const Expr* expr, std::string_view& obj_name,
                           std::string_view& var_name, const Expr*& element);
-// 18.7/18.11/18.11.1: what one randomize() call adds on top of the object's own
-// declaration -- the call expression, the inline constraint block of a
-// `with { ... }` clause, the argument list naming the call's complete active
-// random set (null when the call takes no arguments), and whether this is the
-// randomize(null) inline constraint checker.
-// 18.7: binds, as locals of the scope the caller pushed, the members of
-// the object whose method contains the randomize() call `expr` that its
-// inline block names and neither the object being randomized `obj`, in an
-// unrestricted block, nor a local of the call answers
-// (eval_randomize_inline.cpp).
 void BindCallersMembers(const Expr* expr, ClassObject* obj, SimContext& ctx,
                         Arena& arena);
-// 18.7: an unlisted name of a restricted block that the object declares but
-// the calling scope holds as a variable, bound as a local of the call holding
-// the variable's value; defined in eval_randomize_inline.cpp.
 void BindCallersVariables(const Expr* expr, ClassObject* obj, SimContext& ctx,
                           Arena& arena);
-// 18.7.1: each local::-qualified name the inline block of the randomize()
-// call `expr` reads, read in the scope containing the call and bound as a
-// local of the scope the caller pushed, named by its qualified path
-// (eval_randomize_inline.cpp).
 void BindLocalQualifiedNames(const Expr* expr, SimContext& ctx, Arena& arena);
-// 18.7: the head of each dotted name of the inline block of `expr` that the
-// object being randomized `obj` declares and a variable visible from the call
-// would otherwise answer, bound as a local of the scope the caller pushed
-// holding the object's handle (eval_randomize_inline.cpp).
 void BindObjectHandleHeads(const Expr* expr, ClassObject* obj, SimContext& ctx,
                            Arena& arena);
-// 18.7.1: the receiver of the randomize() with call `call` as the caller
-// names it, `obj` of obj.randomize() with, which local::obj binds to the
-// scope of the randomized object's class; empty for a call with no receiver
-// written (eval_randomize.cpp).
 std::string InlineReceiverName(const Expr* call);
 
 struct InlineRandomizeCall {
@@ -486,41 +237,25 @@ struct InlineRandomizeCall {
   bool null_checker;
 };
 
-// One object of a randomize() call: the path its variables are named under
-// in the solver, the context its relations are built in, its random
-// variables, and, where it is solved on its own, its solver.
 struct ObjectSolve {
   ClassObject* obj = nullptr;
   std::string prefix = {};
   std::unique_ptr<RandomizeCtx> rc = nullptr;
   std::vector<RandInfo> rands = {};
   std::unique_ptr<ConstraintSolver> solver = nullptr;
-  // 18.5.8: in a joint solve, the variables of the tree the object reaches.
   JointVarScope joint = {};
 };
 
-// 18.6.1: solves the object of `part` alone under the call `call`, leaving
-// the solve on `part` for the values to be written back from; whether it
-// solved.
 bool SolveObject(ObjectSolve& part, const InlineRandomizeCall& call,
                  SimContext& ctx, Arena& arena);
-// 18.6.2 with 18.6.3: solves each of `objects` on its own, the first under
-// `call` and the others as its random object members, and only when every
-// one solves writes all their values back and then runs their
-// post_randomize(); whether all solved.
 bool RandomizeEachObject(const std::vector<JointObject>& objects,
                          const InlineRandomizeCall& call, SimContext& ctx,
                          Arena& arena);
-// 18.8 with 18.11: each of `rands` added to `solver`, an inactive one, or
-// under an argument list `inline_random` one it does not name, as a state
-// variable holding its present value.
 void PrepareRandVariables(ClassObject* obj, std::vector<RandInfo>& rands,
                           const std::unordered_set<std::string>* inline_random,
                           ConstraintSolver& solver);
 void SetObjectConstraintActive(ClassObject* obj, std::string_view name,
                                bool active);
-// §18.8: the rand_mode() states of `obj` that the random variable `name`
-// reads, its declaring class's where it is static and the object's otherwise.
 std::unordered_map<std::string, bool>& RandModesOf(ClassObject* obj,
                                                    std::string_view name);
 void SetObjectRandActive(ClassObject* obj, std::string_view name, bool active);

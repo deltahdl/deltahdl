@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §F.4.1: nested property instances in a body must be captured so the
-// rewriter knows what to flatten in.
 TEST(PropertyInstanceParsing, NestedPropertyInstanceCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -36,7 +34,6 @@ TEST(PropertyInstanceParsing, NestedPropertyInstanceCaptured) {
   EXPECT_TRUE(captured);
 }
 
-// §F.4.1 step 2 needs the callee's formals to substitute actual arguments.
 TEST(PropertyInstanceParsing, FormalArgsCapturedForRewrite) {
   auto r = Parse(
       "module m;\n"

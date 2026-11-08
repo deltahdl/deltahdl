@@ -144,17 +144,6 @@ TEST(GateDelayElaboration, CmosSwitchDelayForwardsToContAssign) {
   EXPECT_EQ(mod->assigns[0].delay_decay->int_val, 9u);
 }
 
-// §28.16 gives a delay a direction as well as a size: a net delay runs from a
-// change on any of the net's drivers to the moment the net's value is updated
-// and passed on, and §28.16.2 gives a trireg's third delay as running from its
-// drivers turning off to its stored charge becoming unknown. Neither runs
-// backwards. The clause names no negative form, so a source that writes one is
-// reported rather than reinterpreted: cast into the unsigned tick counts the
-// model runs on, -5 became 18446744073709551611 and the charge decayed after
-// six hundred billion years.
-//
-// Runs `decl` as the whole body of a module and asserts the report stands at
-// the declaration's own line, so the cases differ only in the delay they write.
 void ExpectDelayReported(const std::string& decl, const std::string& value) {
   ElabFixture f;
   const std::string kSrc = "module m;\n  " + decl + "\nendmodule\n";
@@ -165,39 +154,22 @@ void ExpectDelayReported(const std::string& decl, const std::string& value) {
       LineHolding(kSrc, decl), "28.16"));
 }
 
-// The charge decay slot, which is where the wrap was visible: it is the one
-// delay the elaborator folds and stores rather than leaving as an expression.
 TEST(DelaySignElaboration, NegativeTriregDecayTimeIsReported) {
   ExpectDelayReported("trireg #(0, 0, -5) c;", "-5");
 }
 
-// A transition slot of an ordinary net, which reaches the check by a different
-// route: §28.16.2.2's decay time is folded at elaboration while a rise delay is
-// left an expression for the run to evaluate, so a check on the folded value
-// alone would pass this.
 TEST(DelaySignElaboration, NegativeNetRiseDelayIsReported) {
   ExpectDelayReported("wire #(-1) w;", "-1");
 }
 
-// A gate instance's delay, so the rule reads as one rule over §28.16's delays
-// rather than as a property of net declarations.
 TEST(DelaySignElaboration, NegativeGateDelayIsReported) {
   ExpectDelayReported("and #(-2) g(y, a, b);", "-2");
 }
 
-// §28.16.1: each delay's minimum, typical and maximum are written as three
-// expressions between colons, and any three expressions will do. Which of the
-// three is the delay is settled per run, so each is a delay in some run and
-// each is checked. Reading the folded scalar instead would see whichever member
-// the active mode selects -- the typical one by default -- and pass the
-// negative written beside it.
 TEST(DelaySignElaboration, NegativeMinimumOfAMinTypMaxDelayIsReported) {
   ExpectDelayReported("wire #(-1:2:3) w;", "-1");
 }
 
-// Zero is a delay, and §28.16.2.1 gives a decay time of zero the transition to
-// x happening at once, so the check is on the sign and not on the value being
-// positive. A rule requiring the delay to exceed zero would reject this.
 TEST(DelaySignElaboration, ZeroDelayIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -210,20 +182,10 @@ TEST(DelaySignElaboration, ZeroDelayIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A real delay in a transition slot, which reaches the sign check by a
-// different route from the decay time: §28.16.2.2's third delay is folded and
-// stored at elaboration, while a rise delay is carried to the run as an
-// expression, so a check that read only what was folded would pass this.
-// A.2.2.3 admits the real_number and §3.14.1 rounds it, which leaves its sign
-// what the source wrote.
 TEST(DelaySignElaboration, NegativeRealNetDelayIsReported) {
   ExpectDelayReported("wire #(-1.5) w;", "-2");
 }
 
-// The rounding is §3.14.1's and not a truncation, which is what separates -2
-// from the -1 truncating toward zero would give. Stated on a slot whose value
-// no elaborated field carries, so the claim is about the fold rather than about
-// what is stored.
 TEST(DelaySignElaboration, RealNetDelayRoundsRatherThanTruncates) {
   ExpectDelayReported("wire #(-2.5) w;", "-3");
 }

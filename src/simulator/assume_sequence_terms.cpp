@@ -24,15 +24,6 @@
 
 namespace delta {
 
-// §16.7 to §16.10's operators as a term holds them: a boolean operand with
-// the match items written with it; the match of the tick read; a wait of
-// `lo` to `hi` ticks of `clock` before its operand; an operand followed by
-// another `lo` to `hi` ticks after its match; or, and, intersect,
-// first_match and throughout; a consecutive repetition from `lo` to `hi`
-// times of its first operand, `count` matched and the second the current
-// one; a goto repetition of `expr`, nonconsecutive where `flags` bit 0 is
-// set and past its last match where bit 1 is; and an operand read under
-// an attempt's local variables.
 enum class SeqTermKind : uint8_t {
   kBool,
   kMatch,
@@ -59,7 +50,6 @@ struct SeqTerm {
   uint8_t flags = 0;
   std::vector<const SeqTerm*> operands;
   const LocalValues* locals = nullptr;
-  // The ways read at a tick, by the clocks that ticked and the anchor.
   mutable std::map<uint64_t, std::vector<SeqWay>> ways;
 };
 
@@ -70,7 +60,6 @@ using Kind = SeqTermKind;
 constexpr uint32_t kUnbounded = SeqCycleDelay::kUnbounded;
 constexpr uint8_t kNonconsecutive = 1;
 constexpr uint8_t kTail = 2;
-// §16.9.2.1: an attempt begun in the term may match empty.
 constexpr uint8_t kNullable = 4;
 
 std::string Id(const void* p) {
@@ -110,8 +99,6 @@ uint32_t Less(uint32_t bound) {
   return bound > 0 ? bound - 1 : 0;
 }
 
-// The way `first` took at this tick, matching there, followed at the same
-// tick by the way `then` of what comes after it.
 SeqWay Joined(const SeqWay& first, const SeqWay& then) {
   SeqWay way = then;
   way.literals.insert(way.literals.begin(), first.literals.begin(),
@@ -233,13 +220,10 @@ const LocalValues* SeqTerms::Locals(std::vector<Logic4Vec> values,
   return slot.get();
 }
 
-// §16.9.2.1: whether an attempt begun in `term` may match without reading a
-// tick, as a repetition begun that may repeat zero times does.
 bool SeqTerms::Nullable(const SeqTerm* term) {
   return (term->flags & kNullable) != 0;
 }
 
-// The clock the first tick an attempt begun in `term` reads is of.
 int SeqTerms::FirstClock(const SeqTerm* term) {
   switch (term->kind) {
     case Kind::kBool:
@@ -252,9 +236,6 @@ int SeqTerms::FirstClock(const SeqTerm* term) {
   }
 }
 
-// §16.10: a variable of the local `decl`'s declared type holding `value`,
-// stood up under a name of its own in a scope it outlives, and the
-// identifier naming it, which BindLocalsOf binds where it is read.
 Expr* SeqTerms::LocalReference(SeqLocalDecl decl, const Logic4Vec& value) {
   std::string name =
       std::string(decl.name) + "@v" + std::to_string(local_vars_.size());
@@ -344,8 +325,6 @@ void SeqTerms::Expand(const SeqTerm* term, uint32_t ticked, bool anchor,
   }
 }
 
-// §16.9.9: the condition holds at every tick of its clock the guarded
-// sequence reads, the one it matches at among them.
 void SeqTerms::ExpandThroughout(const SeqTerm* term, uint32_t ticked,
                                 bool anchor, std::vector<SeqWay>& out) {
   bool reads = Ticked(ticked, term->clock);
@@ -359,10 +338,6 @@ void SeqTerms::ExpandThroughout(const SeqTerm* term, uint32_t ticked,
   }
 }
 
-// §16.7 and §16.13.1: a wait counts the ticks of its clock: at a tick of
-// it, one tick passes and the operand is read once none is left to wait;
-// at another time step the wait stands, but at the one it was begun at,
-// which counts as the tick before the first it waits for.
 void SeqTerms::ExpandWait(const SeqTerm* term, uint32_t ticked, bool anchor,
                           std::vector<SeqWay>& out) {
   const SeqTerm* x = term->operands[0];
@@ -377,12 +352,6 @@ void SeqTerms::ExpandWait(const SeqTerm* term, uint32_t ticked, bool anchor,
   out.insert(out.end(), ways.begin(), ways.end());
 }
 
-// §16.7: `a ##[lo:hi] b`, b begun from lo to hi ticks after each match of
-// a. §16.9.2.1: an a that may match empty also lets b begin from lo - 1 to
-// hi - 1 ticks after the attempt begins, `empty ##n b` being `##(n-1) b`;
-// a b that may match empty lets the whole match from lo - 1 to hi - 1 ticks
-// after a's match, `a ##n empty` being `a ##(n-1) 1`; neither form follows
-// a delay of ##0.
 void SeqTerms::ExpandThen(const SeqTerm* term, uint32_t ticked, bool anchor,
                           std::vector<SeqWay>& out) {
   const SeqTerm* a = term->operands[0];
@@ -414,10 +383,6 @@ void SeqTerms::ExpandThen(const SeqTerm* term, uint32_t ticked, bool anchor,
   out.insert(out.end(), ways.begin(), ways.end());
 }
 
-// §16.9.5 and §16.9.6: the attempts of both operands go on together; an
-// intersect matches where both match at the same tick, and an and once
-// both have matched, an operand that has matched leaving the other to go
-// on alone.
 void SeqTerms::ExpandPair(const SeqTerm* term, uint32_t ticked, bool anchor,
                           std::vector<SeqWay>& out) {
   bool conjunction = term->kind == Kind::kAnd;
@@ -425,7 +390,6 @@ void SeqTerms::ExpandPair(const SeqTerm* term, uint32_t ticked, bool anchor,
   const std::vector<SeqWay>& right = Ways(term->operands[1], ticked, anchor);
   for (const SeqWay& a : left) {
     for (const SeqWay& b : right) {
-      // Exactly one of the two matched: an intersect has no way on.
       bool one_matched = (a.next == nullptr) != (b.next == nullptr);
       if (one_matched && !conjunction) continue;
       SeqWay way = Joined(a, b);
@@ -435,9 +399,6 @@ void SeqTerms::ExpandPair(const SeqTerm* term, uint32_t ticked, bool anchor,
   }
 }
 
-// The term a pair goes on in where its operands go on in `a` and `b`,
-// nullptr for one that matched: both on together, the one left alone, or
-// none where both matched.
 const SeqTerm* SeqTerms::PairedNext(Kind kind, const SeqTerm* a,
                                     const SeqTerm* b) {
   if (a == nullptr) return b;
@@ -445,8 +406,6 @@ const SeqTerm* SeqTerms::PairedNext(Kind kind, const SeqTerm* a,
   return Make(kind, {a, b});
 }
 
-// §16.9.8: the attempt ends at the first tick it matches at, every match
-// there being one; the ways going on past it go on only where none matches.
 void SeqTerms::ExpandFirstMatch(const SeqTerm* term, uint32_t ticked,
                                 bool anchor, std::vector<SeqWay>& out) {
   const std::vector<SeqWay>& ways = Ways(term->operands[0], ticked, anchor);
@@ -465,9 +424,6 @@ void SeqTerms::ExpandFirstMatch(const SeqTerm* term, uint32_t ticked,
   }
 }
 
-// §16.9.2: a consecutive repetition matches once from `lo` to `hi` of its
-// operand's matches have followed one another, each beginning the tick
-// after the one before it ended.
 void SeqTerms::ExpandRepeat(const SeqTerm* term, uint32_t ticked, bool anchor,
                             std::vector<SeqWay>& out) {
   const SeqTerm* body = term->operands[0];
@@ -490,10 +446,6 @@ void SeqTerms::ExpandRepeat(const SeqTerm* term, uint32_t ticked, bool anchor,
   }
 }
 
-// §16.9.2: a goto repetition waits at the ticks its operand does not hold
-// at and counts those it does, matching at the last of `lo` to `hi` of
-// them; a nonconsecutive one also matches at each later tick it does not
-// hold at, before it holds again.
 void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
   Expr* e = term->expr;
   if ((term->flags & kTail) != 0) {
@@ -503,7 +455,6 @@ void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
   }
   out.push_back({{{e, false}}, term, {}});
   uint32_t done = term->count + 1;
-  // §16.10: the operand's match items are performed at each tick it holds.
   auto counted = [&](uint8_t flags) {
     SeqTerm next = *term;
     next.ways.clear();
@@ -511,7 +462,6 @@ void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
     next.flags = flags;
     return Intern(std::move(next));
   };
-  // An unbounded count is kUnbounded, which no count reaches.
   if (done < term->hi) {
     out.push_back(
         {{{e, true}}, counted(term->flags & kNonconsecutive), {term->items}});
@@ -524,8 +474,6 @@ void SeqTerms::ExpandGoto(const SeqTerm* term, std::vector<SeqWay>& out) {
   }
 }
 
-// §16.10: an operand under an attempt's locals reads each local as the
-// value the attempt holds for it.
 void SeqTerms::ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
                           std::vector<SeqWay>& out) {
   const LocalValues* locals = term->locals;
@@ -543,11 +491,6 @@ void SeqTerms::ExpandBind(const SeqTerm* term, uint32_t ticked, bool anchor,
 
 namespace {
 
-// §16.10: the match item `item` performed on `locals`, each local stood up
-// under its own name in a scope of its own (StandUpLocal), so the item reads
-// them by name and assigns its own as an attempt of a sequence assigns it
-// (AssignMatchItem); the value it then holds is read back with the
-// signedness of its type.
 void PerformMatchItem(const SeqMatchAssign& item, LocalValues& locals,
                       SimContext& ctx, Arena& arena) {
   const std::vector<SeqLocalDecl>& decls = *locals.decls;
@@ -585,12 +528,6 @@ const SeqTerm* SeqTerms::Take(const SeqWay& way) {
               way.next->operands[0]);
 }
 
-// §16.7 to §16.10 and §16.13.1: a flattened sequence read into terms: its
-// `or` operands, each the `and` of its chain's `intersect` groups, each the
-// `intersect` of chains, a chain being its operands under their delays and
-// repetitions, under the throughouts spanning parts of it, and a nested
-// operand a sequence of its own; each operand on the clock it names or the
-// one flowing to it.
 struct SeqTerms::Builder {
   SeqTerms& terms;
   const ObligationScope& scope;
@@ -632,8 +569,6 @@ struct SeqTerms::Builder {
     return all;
   }
 
-  // A part of a chain, and how many ticks before its first operand the
-  // interval of a throughout beginning there begins.
   struct Part {
     const SeqTerm* term = nullptr;
     uint32_t lead = 0;
@@ -650,8 +585,6 @@ struct SeqTerms::Builder {
     return bound == kUnbounded ? kUnbounded : bound - by;
   }
 
-  // §16.9.9: the first throughout from the one numbered `from` on that
-  // begins at operand `i`; the count of throughouts where none does.
   static size_t SpanAt(const LinearSequence& s, size_t i, size_t from) {
     for (size_t k = from; k < s.throughouts.size(); ++k) {
       if (s.throughouts[k].first == i) return k;
@@ -659,11 +592,6 @@ struct SeqTerms::Builder {
     return s.throughouts.size();
   }
 
-  // The chain's operands from `i` to `j`. §16.9.9: a throughout beginning
-  // at `i`, the first from the one numbered `from` on, guards its span from
-  // `lead` ticks before its first operand is read to its last operand's
-  // match, the delay before the span shortened by those ticks; a further
-  // one beginning there is read inside it.
   Part Range(const LinearSequence& s, size_t i, size_t j, size_t from,
              int clock) {
     Part head;
@@ -691,10 +619,6 @@ struct SeqTerms::Builder {
     return head;
   }
 
-  // §16.9.2: the operand at `i` under its repetition, a boolean or a nested
-  // sequence, on the clock it names or `clock`; one that may repeat zero
-  // times may match empty, and a consecutive one performs its match items
-  // at each repetition's match.
   const SeqTerm* Item(const LinearSequence& s, size_t i, int clock) {
     int own = ClockOf(OperandClock(s, i), clock);
     const SeqRepetition& rep = s.repetitions[i];
@@ -736,9 +660,6 @@ struct SeqTerms::Builder {
 
 namespace {
 
-// §16.10: the locals the flattened sequence `s` declares and those its
-// operands' and nested sequences' bodies declare, each under the name of
-// its own the flattening gave it.
 void CollectLocals(const LinearSequence& s, std::vector<SeqLocalDecl>& out) {
   out.insert(out.end(), s.locals.begin(), s.locals.end());
   for (const auto* list : {&s.alternatives, &s.conjuncts, &s.intersects}) {
@@ -756,8 +677,6 @@ const SeqTerm* SeqTerms::Begin(const ModuleItem* item, int clock,
   if (!FlattenLinearSequence(item, ctx_, arena_, *seq)) return nullptr;
   Builder builder{*this, scope, reads};
   const SeqTerm* term = builder.Body(*seq, clock);
-  // §16.10: an attempt's copies of every local of the sequence, a nested
-  // sequence's among them, begun with the attempt.
   auto decls = std::make_unique<std::vector<SeqLocalDecl>>();
   CollectLocals(*seq, *decls);
   if (!decls->empty()) {

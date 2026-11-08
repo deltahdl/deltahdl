@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.9: constraint_mode() is predefined and no class may override it, so a
-// class that declares a method of that name is illegal.
 TEST(ConstraintModeBuiltin, OverrideRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -26,9 +24,6 @@ TEST(ConstraintModeBuiltin, OverrideRejected) {
       "18.9"));
 }
 
-// 18.9: the override prohibition is by method name, independent of signature.
-// Declaring constraint_mode with the nonvoid (int, no-argument) query
-// signature is just as illegal as the void form.
 TEST(ConstraintModeBuiltin, OverrideViaNonvoidSignatureRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -47,8 +42,6 @@ TEST(ConstraintModeBuiltin, OverrideViaNonvoidSignatureRejected) {
       "18.9"));
 }
 
-// A class that defines an ordinary method and leaves constraint_mode alone
-// elaborates cleanly.
 TEST(ConstraintModeBuiltin, NonOverridingClassAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -60,9 +53,6 @@ TEST(ConstraintModeBuiltin, NonOverridingClassAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.9: a constraint_mode() call names a constraint that the object's class
-// hierarchy declares. Naming a constraint block that does not exist is a
-// compile-time error.
 TEST(ConstraintModeNamedBlock, MissingConstraintRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -85,8 +75,6 @@ TEST(ConstraintModeNamedBlock, MissingConstraintRejected) {
                     9, "18.9"));
 }
 
-// Naming a constraint block that does exist on the object's class elaborates
-// without error.
 TEST(ConstraintModeNamedBlock, ExistingConstraintAccepted) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -102,8 +90,6 @@ TEST(ConstraintModeNamedBlock, ExistingConstraintAccepted) {
              "endmodule\n"));
 }
 
-// A constraint block inherited from a base class counts as existing in the
-// hierarchy, so naming it is legal.
 TEST(ConstraintModeNamedBlock, InheritedConstraintAccepted) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -123,10 +109,6 @@ TEST(ConstraintModeNamedBlock, InheritedConstraintAccepted) {
              "endmodule\n"));
 }
 
-// 18.9: the existence check searches the whole class hierarchy, so a name that
-// appears in neither the derived class nor any of its base classes is the
-// error case. This exercises the multi-level walk returning "not found" across
-// two levels, distinct from the single-class rejection.
 TEST(ConstraintModeNamedBlock, MissingConstraintAcrossHierarchyRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -152,10 +134,6 @@ TEST(ConstraintModeNamedBlock, MissingConstraintAcrossHierarchyRejected) {
                             13, "18.9"));
 }
 
-// 18.9: the no-name form applies to every constraint in the object and is
-// allowed only as a void call. Because it names no constraint block, the
-// existence check shall not fire: a call with no constraint identifier
-// elaborates cleanly even though no block named "constraint_mode" exists.
 TEST(ConstraintModeNamedBlock, UnnamedFormNotTreatedAsMissingBlock) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -171,10 +149,6 @@ TEST(ConstraintModeNamedBlock, UnnamedFormNotTreatedAsMissingBlock) {
              "endmodule\n"));
 }
 
-// 18.9: omitting the constraint name is allowed only in the void form, which
-// takes an on/off argument. A call that names no constraint and passes no
-// argument is neither a legal void call nor a legal nonvoid query (the query
-// form must name a block), so it is rejected.
 TEST(ConstraintModeNamedBlock, UnnamedNoArgQueryRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -197,9 +171,6 @@ TEST(ConstraintModeNamedBlock, UnnamedNoArgQueryRejected) {
                             10, "18.9"));
 }
 
-// 18.9: the nonvoid query form is legal when it names a constraint block. This
-// guards the no-name/no-argument rejection above from over-firing: a named,
-// argument-less constraint_mode() query still elaborates cleanly.
 TEST(ConstraintModeNamedBlock, NamedNoArgQueryAccepted) {
   EXPECT_TRUE(
       ElabOk("class Packet;\n"
@@ -216,28 +187,6 @@ TEST(ConstraintModeNamedBlock, NamedNoArgQueryAccepted) {
              "endmodule\n"));
 }
 
-// The fourteen cases below write a constraint_mode() call into each statement
-// link Elaborator::WalkStmtsForClassHandleOps in
-// src/elaborator/elaborator_validate_class_handles.cpp did not read before
-// #3319. That walk wrote out six of the thirteen links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h names, so a call one level down
-// -- in a fork arm, a for header, an assertion action block, a randcase item or
-// a randsequence code block -- reached neither §18.9 check.
-//
-// The two checks take a case each per link because they answer different
-// sources and report different rules: CheckUnnamedConstraintModeHasArgument
-// reads a call that names no constraint block and passes no argument, and
-// CheckNamedConstraintModeExists reads a call naming a block the class
-// hierarchy does not hold. The first seven cases are the former, the next seven
-// the latter.
-//
-// Both reports stand at the call itself, so each case names the line its own
-// call is written on. The handle is declared at module scope, which puts it in
-// the map of handle types before any statement is walked.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword`, and A.6.9's
-// subroutine_call_statement is one such statement.
 TEST(ConstraintModeNamedBlock, UnnamedConstraintModeQueryInAForkArmIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -261,10 +210,6 @@ TEST(ConstraintModeNamedBlock, UnnamedConstraintModeQueryInAForkArmIsReported) {
                             10, "18.9"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
-// whose right-hand side is an expression, and A.8.1 admits a subroutine call
-// there. The nonvoid query form is what fits that position, and it is the
-// form the rule is about.
 TEST(ConstraintModeNamedBlock,
      UnnamedConstraintModeQueryInAForInitializationIsReported) {
   ElabFixture f;
@@ -288,9 +233,6 @@ TEST(ConstraintModeNamedBlock,
                             10, "18.9"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
-// takes the same expression on its right.
 TEST(ConstraintModeNamedBlock, UnnamedConstraintModeQueryInAForStepIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -313,10 +255,6 @@ TEST(ConstraintModeNamedBlock, UnnamedConstraintModeQueryInAForStepIsReported) {
                             10, "18.9"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// one below it cover one arm each.
 TEST(ConstraintModeNamedBlock,
      UnnamedConstraintModeQueryInAnAssertionPassStmtIsReported) {
   ElabFixture f;
@@ -361,10 +299,6 @@ TEST(ConstraintModeNamedBlock,
                             9, "18.9"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. The rule is about the source, so it holds whether the weighted draw
-// would select the item or not.
 TEST(ConstraintModeNamedBlock,
      UnnamedConstraintModeQueryInARandcaseItemIsReported) {
   ElabFixture f;
@@ -389,11 +323,6 @@ TEST(ConstraintModeNamedBlock,
                             10, "18.9"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
-// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
-// other member of Stmt. RsRule::weight_code is the second statement position
-// under that one link, and ForEachRandsequenceRuleStmt visits both.
 TEST(ConstraintModeNamedBlock,
      UnnamedConstraintModeQueryInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -418,12 +347,6 @@ TEST(ConstraintModeNamedBlock,
                             10, "18.9"));
 }
 
-// The same seven links for the named form, whose constraint block does not
-// exist in the class hierarchy.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword`, and A.6.9's
-// subroutine_call_statement is one such statement.
 TEST(ConstraintModeNamedBlock, MissingConstraintModeBlockInAForkArmIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -448,10 +371,6 @@ TEST(ConstraintModeNamedBlock, MissingConstraintModeBlockInAForkArmIsReported) {
                     10, "18.9"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
-// whose right-hand side is an expression, and A.8.1 admits a subroutine call
-// there. The nonvoid query form is what fits that position, and it is the
-// form the rule is about.
 TEST(ConstraintModeNamedBlock,
      MissingConstraintModeBlockInAForInitializationIsReported) {
   ElabFixture f;
@@ -476,9 +395,6 @@ TEST(ConstraintModeNamedBlock,
                     10, "18.9"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and an operator_assignment
-// takes the same expression on its right.
 TEST(ConstraintModeNamedBlock, MissingConstraintModeBlockInAForStepIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -502,10 +418,6 @@ TEST(ConstraintModeNamedBlock, MissingConstraintModeBlockInAForStepIsReported) {
                     10, "18.9"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// one below it cover one arm each.
 TEST(ConstraintModeNamedBlock,
      MissingConstraintModeBlockInAnAssertionPassStmtIsReported) {
   ElabFixture f;
@@ -552,10 +464,6 @@ TEST(ConstraintModeNamedBlock,
                     9, "18.9"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. The rule is about the source, so it holds whether the weighted draw
-// would select the item or not.
 TEST(ConstraintModeNamedBlock,
      MissingConstraintModeBlockInARandcaseItemIsReported) {
   ElabFixture f;
@@ -581,11 +489,6 @@ TEST(ConstraintModeNamedBlock,
                     10, "18.9"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, which Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp puts
-// in RsProd::code_stmts, reached through Stmt::rs_productions and through no
-// other member of Stmt. RsRule::weight_code is the second statement position
-// under that one link, and ForEachRandsequenceRuleStmt visits both.
 TEST(ConstraintModeNamedBlock,
      MissingConstraintModeBlockInARandsequenceCodeBlockIsReported) {
   ElabFixture f;

@@ -10,10 +10,6 @@
 
 namespace delta {
 
-// §16.14.2: the `[lo:hi]` item of a dist_list as the range an inside
-// expression holds, §11.4.13's bracketed pair; an item written about a centre,
-// `[centre +/- tol]` or `[centre +%- tol]`, is the pair inside reads that
-// form as, the tolerance operator marking it.
 Expr* ParserPropertySpecHelpers::RangeOfDistItem(
     Parser& p, const ConstraintDistItem& item) {
   auto* range = p.arena_.Create<Expr>();
@@ -30,10 +26,6 @@ Expr* ParserPropertySpecHelpers::RangeOfDistItem(
   return range;
 }
 
-// §18.5.3: one dist_item of an assertion's dist_list. A default item is held
-// to the rules a constraint's is, its weight given through :/ and one at most
-// in the list, `defaults` counting those written so far; one breaking them is
-// reported and kept, so the rest of the list is still read.
 bool ParserPropertySpecHelpers::ParseAssertionDistItem(Parser& p,
                                                        ConstraintDistItem& item,
                                                        int& defaults) {
@@ -45,8 +37,6 @@ bool ParserPropertySpecHelpers::ParseAssertionDistItem(Parser& p,
   return true;
 }
 
-// §18.5.3: the default rules of the dist_list whose `{` is the current token,
-// the lexer left past its `}`.
 void ParserPropertySpecHelpers::CheckDistListDefaults(Parser& p) {
   p.Consume();
   int depth = 1;
@@ -63,12 +53,6 @@ void ParserPropertySpecHelpers::CheckDistListDefaults(Parser& p) {
   }
 }
 
-// §18.5.3: the default rules of each dist_list of a property_spec a trial
-// parse has read and accepted, from the spec's first token to the
-// parenthesis closing it, where the lexer is left. The trial reads the spec
-// with its reports suppressed, so ParseAssertionDistItem's reports go with
-// the suppression and are made again here; that the trial was accepted means
-// each `dist` opens a list and the closing parenthesis is there.
 void ParserPropertySpecHelpers::CheckSpecDistDefaults(Parser& p) {
   int parens = 0;
   while (!p.Check(TokenKind::kRParen) || parens > 0) {
@@ -83,16 +67,6 @@ void ParserPropertySpecHelpers::CheckSpecDistDefaults(Parser& p) {
   }
 }
 
-// §A.8.3's expression_or_dist, `expression [ dist { dist_list } ]`, in an
-// assertion. §16.14.2 has a dist in an assert or cover statement be the
-// inside operator over the same values, its weights ignored, and has the
-// property an assume statement assumes hold the same with or without its
-// biasing, the weights only selecting among the values of a free
-// variable, which this tool leaves to the design; so a dist is read as the
-// inside expression over its items, with the items as written beside it for
-// §37.34's distribution. A `default` item stands for the values the other
-// items leave out (§18.5.3), which inside holds no range for, so it is kept
-// among the items alone, where the run reads it.
 Expr* ParserPropertySpecHelpers::ParseExpressionOrDist(Parser& p) {
   Expr* expr = p.ParseExpr();
   if (expr == nullptr || !p.Check(TokenKind::kKwDist)) return expr;

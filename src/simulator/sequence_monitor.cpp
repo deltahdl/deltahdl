@@ -28,39 +28,18 @@ namespace delta {
 
 namespace {
 
-// One attempt of the sequence part way through: the operand it is to match
-// next, the clock ticks that have passed since the operand before it matched,
-// or since the attempt began for the first operand, and §16.10's local
-// variables, of which each attempt holds its own copy, in the order of the
-// flattened body's locals.
 struct LinearAttempt {
   size_t pos;
   uint32_t waited;
   std::vector<Logic4Vec> locals;
-  // §16.9.2: inside a repetition of the operand at pos, the iterations
-  // matched so far; `repeating` once the attempt has arrived at a repeated
-  // operand, after which it is kept from tick to tick by the repetition's
-  // own rules rather than the operand's delay range.
   uint32_t count = 0;
   bool repeating = false;
-  // §16.13.1: the attempt has just crossed to an operand on another clock
-  // under `##0`, which is read at the nearest tick of that clock, the one
-  // coincident with the crossing where there is one and the next one
-  // otherwise, so the first tick of the new clock counts no wait.
   bool crossed_zero = false;
-  // §16.10: which of the matches ending at this tick the operand reading
-  // `triggered` hands its locals on from, an attempt going on per match; a
-  // pick other than the first marks a copy made for its match.
   uint32_t flow_pick = 0;
-  // §16.9.5 to §16.9.7: where the operand at pos is a nested sequence, the
-  // attempt of it begun where this attempt arrived at the operand.
   LinearSequenceAttempt* sub = nullptr;
-  // §16.9.2: `sub` is an iteration begun after the one before it matched.
   bool sub_begins = false;
 };
 
-// §16.13.1: whether the clock the operand at `pos` is evaluated on ticked at
-// this time step; every clock has where the property is on one clock.
 bool OperandClockTicked(const LinearSequence& body, size_t pos,
                         SimContext& ctx) {
   uint32_t ticked = ctx.AssertionSamples().ClockTicks();
@@ -68,10 +47,6 @@ bool OperandClockTicked(const LinearSequence& body, size_t pos,
   return clock >= 32 || ((ticked >> clock) & 1u) != 0;
 }
 
-// One operand of an attempt at this tick: the initialization items run before
-// the Boolean is read, the Boolean is read over the attempt's locals, and the
-// locals flowing out of it and the other match items take their values where
-// it holds. Reports whether it held.
 bool EvalOperand(const LinearSequence& body, LinearAttempt& attempt,
                  SimContext& ctx, Arena& arena) {
   uint32_t pick = attempt.flow_pick;
@@ -88,27 +63,17 @@ bool EvalOperand(const LinearSequence& body, LinearAttempt& attempt,
   return true;
 }
 
-// §16.7: the delay before an operand is a range of clock ticks, and the
-// operand is checked at every tick within it, so an attempt inside the range
-// matches at each such tick the operand holds at and stays alive to the range's
-// end. A delay with no upper bound keeps the attempt alive for the run, and
-// once its wait has reached the lower bound every further tick reads the same,
-// so its wait is held at that bound and the attempts that reach it coincide.
 bool WithinDelay(const SeqCycleDelay& delay, uint32_t waited) {
   return waited >= delay.min && waited <= delay.max;
 }
 
 void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
                   std::vector<LinearAttempt>& carry) {
-  // A copy made for one match ending at this tick is carried by the attempt
-  // it was copied from.
   if (attempt.flow_pick != 0) return;
   if (attempt.waited >= delay.max) return;
   if (delay.max == SeqCycleDelay::kUnbounded && attempt.waited > delay.min) {
     attempt.waited = delay.min;
   }
-  // Two attempts at one position and wait coincide only where they carry no
-  // locals, an attempt's locals being its own.
   if (attempt.locals.empty()) {
     for (const auto& kept : carry) {
       if (kept.pos == attempt.pos && kept.waited == attempt.waited &&
@@ -121,17 +86,6 @@ void CarryAttempt(LinearAttempt attempt, const SeqCycleDelay& delay,
   carry.push_back(std::move(attempt));
 }
 
-// §16.14.5 always-semantics: one clock tick of every in-flight attempt, and of
-// the fresh attempt this tick begins. An attempt whose operand's delay the
-// tick falls within checks the operand: holding, it matches the sequence at
-// its last operand or begins waiting for the next, a next operand with a `##0`
-// before it checked at this same tick as §16.7 has the concatenation with a
-// delay of 0 overlap; and whether or not it holds, the attempt stays for the
-// later ticks of its range. Reports whether any attempt matched at this tick.
-// What one tick of an attempt reads and writes: the sequence, the attempts
-// to read again at this tick, at the operand after a match with a delay of 0
-// to it, the ones kept for the next tick, whether the sequence matched at
-// this tick, and the context the operands are evaluated in.
 struct TickStep {
   const LinearSequence& body;
   std::vector<LinearAttempt>& pending;
@@ -139,28 +93,20 @@ struct TickStep {
   SimContext& ctx;
   Arena& arena;
   bool matched = false;
-  // §16.10: where not null, the locals of each attempt that matched at this
-  // tick, for a monitor whose end point hands them on.
   std::vector<std::vector<Logic4Vec>>* ended = nullptr;
 };
 
-// The sequence matched at this tick with the attempt's locals as they stand.
 void MatchAt(TickStep& step, const LinearAttempt& attempt) {
   step.matched = true;
   if (step.ended != nullptr) step.ended->push_back(attempt.locals);
 }
 
-// The attempt's operand has matched at this tick: the sequence ends here where
-// it was the last, and otherwise an attempt at the next operand begins its
-// wait here with the locals as written.
 void EndOperand(TickStep& step, LinearAttempt& advanced) {
   if (advanced.pos + 1 == step.body.operands.size()) {
     MatchAt(step, advanced);
     return;
   }
   LinearAttempt next{advanced.pos + 1, 0, advanced.locals};
-  // §16.13.1: `##0` to an operand on another clock reads it at the nearest
-  // tick of that clock, coincident or later.
   const SeqCycleDelay& delay = step.body.delays[next.pos];
   next.crossed_zero =
       delay.max == 0 && OperandClockIndex(step.body, next.pos) !=
@@ -168,21 +114,14 @@ void EndOperand(TickStep& step, LinearAttempt& advanced) {
   step.pending.push_back(std::move(next));
 }
 
-// Keeps an attempt inside a repetition for the next tick.
 void KeepRepeating(TickStep& step, LinearAttempt advanced) {
   advanced.waited = 0;
   advanced.repeating = true;
   step.carry.push_back(std::move(advanced));
 }
 
-// §16.9.2 consecutive repetition `b[*min:max]`: the operand matches at
-// consecutive ticks, the repetition ending at the last; the whole may end
-// after any number of matches from min to max, and a further match is read
-// at the very next tick while fewer than max have been.
 void StepConsecutive(TickStep& step, const LinearAttempt& attempt,
                      const SeqRepetition& rep) {
-  // §16.9.2.1: `a[*0]` admits the empty match alone, so a match of a is not
-  // an iteration of it.
   if (attempt.count >= rep.max) return;
   LinearAttempt advanced = attempt;
   if (!EvalOperand(step.body, advanced, step.ctx, step.arena)) return;
@@ -191,11 +130,6 @@ void StepConsecutive(TickStep& step, const LinearAttempt& attempt,
   if (advanced.count < rep.max) KeepRepeating(step, std::move(advanced));
 }
 
-// §16.9.2 goto `b[->min:max]` and nonconsecutive `b[=min:max]` repetition:
-// the operand matches at ticks that need not be consecutive, the whole ending
-// at the last match after min to max of them, or, for the nonconsecutive
-// form, at any later tick the operand does not hold at, before any further
-// match.
 void StepNonconsecutive(TickStep& step, const LinearAttempt& attempt,
                         const SeqRepetition& rep) {
   LinearAttempt advanced = attempt;
@@ -212,11 +146,6 @@ void StepNonconsecutive(TickStep& step, const LinearAttempt& attempt,
   KeepRepeating(step, std::move(advanced));
 }
 
-// §16.9.2: the nested sequence at the attempt matched, one more iteration of
-// its repetition: the operand ends once the iterations reach the minimum, and
-// below the maximum another begins at the next tick, `s[*2]` being `s ##1 s`.
-// §16.10: the match items of the group or instance the nested sequence stands
-// for are performed at each such match, before the chain goes on from it.
 void EndNestedIteration(TickStep& step, const LinearAttempt& holder) {
   const SeqRepetition& rep = step.body.repetitions[holder.pos];
   LinearAttempt ended = holder;
@@ -238,10 +167,6 @@ void EndNestedIteration(TickStep& step, const LinearAttempt& holder) {
   step.carry.push_back(std::move(ended));
 }
 
-// §16.9.5 to §16.9.7: one tick of the attempt of the nested sequence the
-// attempt stands at, `begin` at the tick it arrived at the operand, read with
-// the attempt's locals in scope: the chain goes on from each of its matches,
-// and the attempt waits in it while it can match further.
 void StepNested(TickStep& step, LinearAttempt holder, bool begin) {
   const LinearSequence& nested = *NestedOperand(step.body, holder.pos);
   SequenceStep result = SequenceStep::kFailed;
@@ -259,18 +184,12 @@ void StepNested(TickStep& step, LinearAttempt holder, bool begin) {
   }
 }
 
-// An attempt arriving at a nested sequence begins an attempt of it here.
 void BeginNested(TickStep& step, LinearAttempt attempt,
                  const LinearSequence& nested) {
   attempt.sub = NewSequenceAttempt(nested, step.arena);
   StepNested(step, std::move(attempt), true);
 }
 
-// An attempt arriving at its operand within the delay range reads it: a
-// plain operand ends where it holds, a nested sequence begins an attempt of
-// its own, a repeated one begins its repetition, and an empty consecutive
-// repetition also lets the attempt pass on, as §16.9.2.1 has `empty ##n seq`
-// be `##(n-1) seq`.
 void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
                      const SeqRepetition& rep) {
   const LinearSequence* nested = NestedOperand(step.body, attempt.pos);
@@ -290,7 +209,6 @@ void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
   if (rep.min == 0 && attempt.pos + 1 < step.body.operands.size()) {
     step.pending.push_back({attempt.pos + 1, 1, attempt.locals});
   }
-  // §16.9.2.1: `s[*0]` admits the empty match alone, no iteration of s.
   if (nested == nullptr) {
     StepConsecutive(step, attempt, rep);
   } else if (rep.max > 0) {
@@ -298,12 +216,6 @@ void ArriveAtOperand(TickStep& step, const LinearAttempt& attempt,
   }
 }
 
-// One attempt at this tick: inside a repetition it steps by the repetition's
-// rules; otherwise it reads its operand where the tick is within the delay
-// range, and stays for the next tick while the range runs.
-// §16.9.2.1: `seq ##n empty` is `seq ##(n-1) `true`, so an attempt owed a
-// last operand that admits the empty match ends a tick before the delay to
-// that operand would be up, and `seq ##0 empty` ends nowhere.
 bool EndsAsTrailingEmpty(const TickStep& step, const LinearAttempt& attempt) {
   const SeqRepetition& rep = step.body.repetitions[attempt.pos];
   if (attempt.repeating || rep.kind != SeqRepetition::Kind::kConsecutive) {
@@ -315,13 +227,6 @@ bool EndsAsTrailingEmpty(const TickStep& step, const LinearAttempt& attempt) {
   return WithinDelay(step.body.delays[attempt.pos], attempt.waited + 1);
 }
 
-// §16.9.9: whether the attempt is inside the interval of a throughout at
-// this tick: past its first operand and not past its last, or at the first
-// operand, in its repetition or with the delay before the throughout up, the
-// interval beginning where the guarded sequence begins, `lead` ticks before
-// its first operand is read. An interval beginning at the tick its first
-// operand is read at, after a ranged delay, holds no attempt still waiting
-// for that operand (ThroughoutsBeginningHereHold).
 bool InsideThroughout(const TickStep& step, const LinearAttempt& attempt,
                       const SeqThroughout& guard) {
   if (attempt.pos < guard.first || attempt.pos > guard.last) return false;
@@ -330,11 +235,6 @@ bool InsideThroughout(const TickStep& step, const LinearAttempt& attempt,
   return attempt.waited + guard.lead >= step.body.delays[guard.first].min;
 }
 
-// §16.9.9: whether the condition of every throughout whose interval begins
-// at the tick the attempt's operand is read at, after a ranged delay, holds
-// at this tick, the operand being read now; one that does not ends only the
-// interval beginning here, the attempt waiting on for the later ticks of the
-// range.
 bool ThroughoutsBeginningHereHold(TickStep& step, LinearAttempt& attempt) {
   for (const SeqThroughout& guard : step.body.throughouts) {
     if (!guard.begins_at_read || guard.first != attempt.pos) continue;
@@ -344,9 +244,6 @@ bool ThroughoutsBeginningHereHold(TickStep& step, LinearAttempt& attempt) {
   return true;
 }
 
-// §16.9.9: an attempt inside the interval of a throughout whose condition
-// does not hold at this tick is dropped, `(exp)[*0:$] intersect seq` having
-// no match over an interval exp is false at a tick of.
 bool ThroughoutHolds(TickStep& step, LinearAttempt& attempt) {
   for (const SeqThroughout& guard : step.body.throughouts) {
     if (!InsideThroughout(step, attempt, guard)) continue;
@@ -356,9 +253,6 @@ bool ThroughoutHolds(TickStep& step, LinearAttempt& attempt) {
   return true;
 }
 
-// §16.10: an attempt about to read an operand that hands locals on from
-// several matches ending at this tick goes on as one attempt per match, the
-// copies for the matches after the first read next.
 void ForkPerFlowedMatch(TickStep& step, const LinearAttempt& attempt) {
   if (attempt.repeating || attempt.flow_pick != 0 ||
       !OperandClockTicked(step.body, attempt.pos, step.ctx) ||
@@ -376,8 +270,6 @@ void ForkPerFlowedMatch(TickStep& step, const LinearAttempt& attempt) {
 }
 
 void StepAttempt(TickStep& step, LinearAttempt attempt) {
-  // §16.13.1: an attempt at an operand on a clock that did not tick at this
-  // time step waits as it is for a tick of that clock.
   if (!OperandClockTicked(step.body, attempt.pos, step.ctx)) {
     step.carry.push_back(std::move(attempt));
     return;
@@ -403,8 +295,6 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
       ThroughoutsBeginningHereHold(step, attempt)) {
     ArriveAtOperand(step, attempt, rep);
   }
-  // A goto or nonconsecutive repetition, once begun, waits by its own rules
-  // rather than by the delay range before it.
   if (rep.kind == SeqRepetition::Kind::kGoto ||
       rep.kind == SeqRepetition::Kind::kNonconsecutive) {
     if (WithinDelay(delay, attempt.waited)) return;
@@ -412,8 +302,6 @@ void StepAttempt(TickStep& step, LinearAttempt attempt) {
   CarryAttempt(std::move(attempt), delay, step.carry);
 }
 
-// The attempts one tick reads: those in flight, a tick of each one's wait
-// counted, and a fresh one where `begin_attempt` says the tick begins one.
 std::vector<LinearAttempt> TickPending(const LinearSequence& body,
                                        const std::vector<LinearAttempt>& active,
                                        SimContext& ctx, Arena& arena,
@@ -421,9 +309,6 @@ std::vector<LinearAttempt> TickPending(const LinearSequence& body,
   std::vector<LinearAttempt> pending;
   pending.reserve(active.size() + 1);
   for (LinearAttempt attempt : active) {
-    // §16.13.1: a tick of the clock the attempt's operand is evaluated on
-    // is a tick of its wait, the first after crossing to it under `##0`
-    // counting none; a step at which that clock did not tick is none.
     if (OperandClockTicked(body, attempt.pos, ctx)) {
       if (attempt.crossed_zero) {
         attempt.crossed_zero = false;
@@ -433,15 +318,12 @@ std::vector<LinearAttempt> TickPending(const LinearSequence& body,
     }
     pending.push_back(std::move(attempt));
   }
-  // §16.10: a new attempt begins with a new copy of every local variable.
   if (begin_attempt) {
     pending.push_back({0, 0, InitialLocals(body.locals, ctx, arena)});
   }
   return pending;
 }
 
-// Steps every attempt the tick holds pending, those kept for the next tick
-// left in its carry.
 void StepPending(TickStep& step) {
   while (!step.pending.empty()) {
     LinearAttempt attempt = std::move(step.pending.back());
@@ -463,11 +345,6 @@ bool AdvanceLinearAttempts(const LinearSequence& body,
   return step.matched;
 }
 
-// §16.9.6: one attempt of `s1 intersect s2 ...`, begun at one tick: the
-// attempts of the chain and of each of its intersects that tick began. The
-// whole matches at a tick where every operand matches at it, the matches
-// paired by their shared length; it is spent once any operand has no attempt
-// in flight, no further pair being possible.
 struct IntersectAttempt {
   std::vector<std::vector<LinearAttempt>> active;
 };
@@ -482,10 +359,6 @@ IntersectAttempt FreshIntersectAttempt(const LinearSequence& chain) {
       std::vector<std::vector<LinearAttempt>>(chain.intersects.size() + 1)};
 }
 
-// Advances one intersect-attempt over every operand at this tick, the
-// operands' own attempts begun where `begin` says this is the tick the
-// intersect-attempt begins at. Reports whether the whole matched at this
-// tick.
 bool AdvanceIntersectAttempt(const LinearSequence& chain,
                              IntersectAttempt& attempt, bool begin,
                              SimContext& ctx, Arena& arena) {
@@ -506,12 +379,6 @@ bool IntersectAttemptIsSpent(const IntersectAttempt& attempt) {
   return false;
 }
 
-// §16.9.5: one attempt of `s1 and s2 ...`, begun at one tick: the attempts
-// of each operand chain, an intersection of its own, that tick began, and
-// whether each chain has matched since. The whole matches at a tick where
-// every chain has matched by then and one matches at that tick, which is the
-// later of the end points; it is dropped once no chain can go on, or every
-// chain has matched and none has an attempt in flight.
 struct AndAttempt {
   std::vector<IntersectAttempt> active;
   std::vector<bool> matched;
@@ -531,9 +398,6 @@ AndAttempt FreshAndAttempt(const LinearSequence& body) {
   return fresh;
 }
 
-// Advances one and-attempt over every chain at this tick, the chains' own
-// attempts begun where `begin` says this is the tick the and-attempt begins
-// at. Reports whether the whole matched at this tick.
 bool AdvanceAndAttempt(const LinearSequence& body, AndAttempt& attempt,
                        bool begin, SimContext& ctx, Arena& arena) {
   bool matched_now = false;
@@ -565,8 +429,6 @@ bool AndAttemptIsSpent(const AndAttempt& attempt) {
   return false;
 }
 
-// One tick of a conjunction: the and-attempts in flight advance, a new one
-// begins, and the spent ones are dropped. Reports whether any matched.
 bool AdvanceConjunction(const LinearSequence& body,
                         std::vector<AndAttempt>& attempts, SimContext& ctx,
                         Arena& arena) {
@@ -585,9 +447,6 @@ bool AdvanceConjunction(const LinearSequence& body,
   return matched;
 }
 
-// One tick of an `or` operand: a plain chain advances its own attempts, and a
-// chain with intersects or conjuncts its and-attempts, whose attempts are
-// kept apart by the tick they began at as the pairing of matches needs.
 struct OperandAttempts {
   std::vector<LinearAttempt> linear;
   std::vector<AndAttempt> conjunctive;
@@ -601,19 +460,9 @@ bool AdvanceOperand(const LinearSequence& body, OperandAttempts& attempts,
   return AdvanceConjunction(body, attempts.conjunctive, ctx, arena);
 }
 
-// §16.9.8: one attempt of `first_match(s)`, begun at one tick: an
-// and-attempt for each `or` operand of s, all begun at that tick, so that the
-// attempt's matches over every operand are kept together. The whole matches
-// at the first tick any operand matches at, every match ending there being a
-// match of the first_match, and is dropped then, the matches that would end
-// later discarded; it is dropped as well once no operand can go on.
 struct FirstMatchAttempt {
   std::vector<AndAttempt> operands;
-  // §16.14.6.1: the values the instance this attempt is saved when it was
-  // queued, bound around every step of the attempt; nullptr for a static
-  // assertion's attempt.
   const InstanceBindings* bindings = nullptr;
-  // §39.4.2: the time the attempt began at, in ticks.
   uint64_t started = 0;
 };
 
@@ -649,9 +498,6 @@ bool FirstMatchAttemptIsSpent(const FirstMatchAttempt& attempt) {
   return true;
 }
 
-// One tick of a first_match body: the attempts in flight advance, a new one
-// begins, and those that matched or are spent are dropped. Reports whether
-// any matched.
 bool AdvanceFirstMatch(const LinearSequence& body,
                        std::vector<FirstMatchAttempt>& attempts,
                        SimContext& ctx, Arena& arena) {
@@ -670,8 +516,6 @@ bool AdvanceFirstMatch(const LinearSequence& body,
   return matched;
 }
 
-// The attempts of a whole body: those of a first_match body, kept apart by
-// the tick they began at, or each `or` operand's own.
 struct BodyAttempts {
   std::vector<FirstMatchAttempt> first_match;
   OperandAttempts body;
@@ -683,9 +527,6 @@ bool AdvanceBody(const LinearSequence& body, BodyAttempts& attempts,
   if (body.first_match) {
     return AdvanceFirstMatch(body, attempts.first_match, ctx, arena);
   }
-  // §16.9.7: the body's `or` operands are matched side by side, each with
-  // attempts of its own, and the sequence reaches an end point at a tick any
-  // of them ends at.
   bool matched = AdvanceOperand(body, attempts.body, ctx, arena);
   for (size_t i = 0; i < body.alternatives.size(); ++i) {
     if (AdvanceOperand(body.alternatives[i], attempts.alternatives[i], ctx,
@@ -696,8 +537,6 @@ bool AdvanceBody(const LinearSequence& body, BodyAttempts& attempts,
   return matched;
 }
 
-// §16.13.6: mark the sequence endpoint event triggered and wake its waiters,
-// mirroring the named-event `-> ev` trigger path (stmt_exec.cpp).
 void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
   auto* var = ctx.FindVariable(ep_name);
   if (!var) return;
@@ -706,8 +545,6 @@ void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
   var->watchers.clear();
   auto& sched = ctx.GetScheduler();
   Region region = ctx.IsReactiveContext() ? Region::kReactive : Region::kActive;
-  // A watcher declining this trigger, one whose iff (§9.4.2.3) is false at it,
-  // stays armed for the next, as one on a named event does.
   for (auto& cb : pending) {
     auto* event = sched.GetEventPool().Acquire();
     event->callback = [var, watcher = std::move(cb)]() mutable {
@@ -717,18 +554,12 @@ void FireSequenceEndpoint(SimContext& ctx, const std::string& ep_name) {
   }
 }
 
-// §16.10: whether the monitor keeps the locals of its matching attempts for
-// its end point to hand on, as it does for one chain holding locals, which is
-// the shape an instance with a local passed to it flattens to.
 bool KeepsMatchLocals(const LinearSequence& body) {
   return !body.locals.empty() && !body.first_match &&
          body.alternatives.empty() && body.conjuncts.empty() &&
          body.intersects.empty();
 }
 
-// One tick of a monitor keeping its matching attempts' locals: the chain's
-// attempts advance, and the locals of each that matched are recorded under
-// the end point at this time step, each by its name.
 bool AdvanceKeepingLocals(const LinearSequence& body, BodyAttempts& active,
                           const std::string& ep_name, SimContext& ctx,
                           Arena& arena) {
@@ -760,16 +591,11 @@ SimCoroutine MakeSequenceMonitorCoroutine(LinearSequence body,
   bool keeps_locals = KeepsMatchLocals(body);
   while (!ctx.StopRequested()) {
     co_await EventAwaiter{ctx, clock, arena};
-    // §16.13.6: the end point's triggered status is set in the Observed
-    // region of the tick, after the time step's Active region has read it,
-    // and the sequence reads its operands there as §16.5.1 samples them.
     co_await RegionAwaiter{ctx, Region::kObserved};
     auto& samples = ctx.AssertionSamples();
     bool outer_evaluating_property = samples.EvaluatingProperty();
     samples.SetEvaluatingProperty(true);
     for (const Expr* site : past_sites) EvalExpr(site, ctx, arena);
-    // §16.14.5: a new evaluation attempt begins at every clock tick, which
-    // each advance adds beside the ones in flight.
     bool matched = keeps_locals
                        ? AdvanceKeepingLocals(body, active, ep_name, ctx, arena)
                        : AdvanceBody(body, active, ctx, arena);
@@ -801,17 +627,10 @@ SequenceStep StepSequenceAttempt(const LinearSequence& body,
   return spent ? SequenceStep::kFailed : SequenceStep::kPending;
 }
 
-// §16.12.2: one evaluation attempt of a sequential property is one attempt
-// of its sequence, begun at the tick the property's attempt begins at and
-// kept apart from the others as first_match keeps them; it holds where the
-// sequence matches and fails where no attempt of the sequence can go on, a
-// prefix witnessing that the sequence cannot match.
 struct SequencePropertyState {
   LinearSequence body;
   std::vector<const Expr*> past_sites;
   std::vector<FirstMatchAttempt> attempts;
-  // The time step the attempts last advanced at, §16.14.6.3's second pass
-  // of one step beginning attempts without advancing those again.
   SimTime advanced_at{UINT64_MAX};
 };
 
@@ -826,8 +645,6 @@ SequencePropertyState* CreateSequencePropertyState(const ModuleItem* seq,
 
 namespace {
 
-// §16.12: the outcomes of a tick the disable condition is true at, every
-// attempt in flight and every one beginning disabled, none left in flight.
 std::vector<SequenceOutcome> DisableSequenceAttempts(
     SequencePropertyState& state, const SequenceTick& tick, SimTime now) {
   std::vector<SequenceOutcome> outcomes;
@@ -843,10 +660,6 @@ std::vector<SequenceOutcome> DisableSequenceAttempts(
   return outcomes;
 }
 
-// The attempt `attempt` just stepped, `matched` where it matched at this tick:
-// the outcome it reached, matched or failed where it can match no more, added
-// to `outcomes`; whether it stays in flight, as an attempt that has not
-// matched or, with `every_match`, one that has does while it can match again.
 bool SettleSequenceAttempt(const FirstMatchAttempt& attempt, bool matched,
                            bool every_match,
                            std::vector<SequenceOutcome>& outcomes) {
@@ -866,13 +679,8 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
     Arena& arena) {
   std::vector<SequenceOutcome> outcomes;
   for (const Expr* site : state.past_sites) EvalExpr(site, ctx, arena);
-  // §16.9.4: a deferred step stands in the time step of its own tick.
   SimTime now = ctx.AssertionSamples().StepTime(ctx.CurrentTime());
-  // §16.12: a disable condition true at any tick of an attempt disables it,
-  // and the attempts beginning at this tick with it.
   if (tick.disabled) return DisableSequenceAttempts(state, tick, now);
-  // §16.14.6.3: at a second pass of one time step the attempts already
-  // advanced at it advance no more; the new ones begin.
   size_t advanced = state.advanced_at == now ? state.attempts.size() : 0;
   state.advanced_at = now;
   for (const InstanceBindings* bindings : tick.instances) {
@@ -888,7 +696,6 @@ std::vector<SequenceOutcome> AdvanceSequenceProperty(
       continue;
     }
     bool first = i + tick.instances.size() >= state.attempts.size();
-    // §16.14.6.1: the attempt reads the values its instance saved.
     samples.SetInstanceBindings(state.attempts[i].bindings);
     samples.NoteAttemptStepped(state.attempts[i].started);
     bool matched = AdvanceFirstMatchAttempt(state.body, state.attempts[i],

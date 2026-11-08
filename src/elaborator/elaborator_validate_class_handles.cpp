@@ -58,8 +58,6 @@ static bool IsAllowedClassBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// Returns true when any of *cls*'s directly listed interface types (the
-// implements and extends-interface lists) is itself derived from *b*.
 static bool AnyInterfaceDerivedFrom(const ClassDecl* cls, std::string_view b,
                                     const CompilationUnit* unit) {
   for (const auto& iface : cls->implements_types) {
@@ -93,12 +91,6 @@ static bool AreClassTypesComparable(std::string_view type_a,
          IsClassDerivedFrom(type_b, type_a, unit);
 }
 
-// §8.8: a typed constructor call writes the class scope before 'new' to fix
-// the constructed object's type independently of the assignment target (e.g.
-// Derived::new or Param#(...)::new). Return that scope type name when *rhs*
-// is such a call, otherwise an empty view. The argument-less form is parsed
-// as a bare scope-resolved member access; the parenthesized form is a call
-// whose callee is that member access.
 static std::string_view TypedConstructorScopeType(const Expr* rhs) {
   if (!rhs) return {};
   const Expr* access = nullptr;
@@ -115,9 +107,6 @@ static std::string_view TypedConstructorScopeType(const Expr* rhs) {
   return access->lhs->text;
 }
 
-// The tables the class-handle checks of one module read: the names of its
-// class handle variables, the class each is declared with, and every
-// variable's declared kind.
 struct ClassHandleTables {
   const std::unordered_set<std::string_view>& class_vars;
   const std::unordered_map<std::string_view, std::string_view>& class_var_types;
@@ -126,10 +115,6 @@ struct ClassHandleTables {
   const CompilationUnit* unit;
 };
 
-// Whether `e` is plainly a value of an integral or real type, none of which a
-// class handle is assignment compatible with (§11.4.5): a number, a real, a
-// string or an unbased unsized literal, a variable declared with such a type,
-// or an operator over such operands.
 static bool IsPlainValue(
     const Expr* e,
     const std::unordered_map<std::string_view, DataTypeKind>& types) {
@@ -153,13 +138,6 @@ static bool IsPlainValue(
   }
 }
 
-// §11.3.6 (printed page 274): an assignment written in parentheses stands
-// within an expression, and §8.4 (printed page 182) lets one write a handle of
-// the target's class or of a class extending it, or null, into a handle. Such
-// an assignment `e`, a handle among its operands and the target one where
-// `lhs_class`, is judged as an assignment statement is, rather than as an
-// operator on handles: no handle is written into a variable of an integral or
-// real type, and no value of such a type into a handle.
 static void CheckClassHandleAssignExpr(const Expr* e,
                                        const ClassHandleTables& t,
                                        bool lhs_class, DiagEngine& diag) {
@@ -187,9 +165,6 @@ static void CheckClassHandleAssignExpr(const Expr* e,
   }
 }
 
-// Validates the operands of a binary expression that involves at least one
-// class-handle variable: rejects disallowed operators and, for comparisons of
-// two handles, requires assignment-compatible types.
 static void CheckClassHandleBinary(const Expr* e, const ClassHandleTables& t,
                                    DiagEngine& diag) {
   const auto& class_vars = t.class_vars;
@@ -210,9 +185,6 @@ static void CheckClassHandleBinary(const Expr* e, const ClassHandleTables& t,
                Subclause("8.4"));
   }
 
-  // §11.4.5 (printed page 279): an equality operator takes a class handle
-  // only against an operand assignment compatible with it, another handle or
-  // null; a value of an integral or real type is none.
   if (lhs_class != rhs_class && IsAllowedClassBinaryOp(e->op) &&
       IsPlainValue(lhs_class ? e->rhs : e->lhs, t.var_types)) {
     diag.Error(e->range.start,
@@ -227,10 +199,6 @@ static void CheckClassHandleBinary(const Expr* e, const ClassHandleTables& t,
     auto rt = class_var_types.find(rhs_name);
     if (lt != class_var_types.end() && rt != class_var_types.end() &&
         !AreClassTypesComparable(lt->second, rt->second, unit)) {
-      // §11.4.5 states the compatibility rule for the comparison: logical or
-      // case equality on a class handle or the literal null is legal only when
-      // one operand is assignment compatible with the other. §8.4 names only ==
-      // and !=, while this site accepts ==, !=, ===, !==, ==? and !=?.
       diag.Error(e->range.start,
                  "class handle comparison requires assignment compatible "
                  "types",
@@ -239,9 +207,6 @@ static void CheckClassHandleBinary(const Expr* e, const ClassHandleTables& t,
   }
 }
 
-// Validates a cast expression: a class handle may not be cast to a non-class
-// type, and a non-class value (other than 'null') may not be cast to a class
-// type.
 static void CheckClassHandleCast(
     const Expr* e, const std::unordered_set<std::string_view>& class_vars,
     const CompilationUnit* unit, DiagEngine& diag) {
@@ -260,10 +225,6 @@ static void CheckClassHandleCast(
   }
 }
 
-// §11.4.11 (printed page 286), case e): whether one class the class `a` is or
-// derives from is one the class `b` is or derives from. Where `b` derives from
-// `a` itself, or `a` names no class the unit declares -- a built-in class such
-// as mailbox -- the first step answers.
 static bool ShareABaseClass(std::string_view a, std::string_view b,
                             const CompilationUnit* unit) {
   if (IsClassDerivedFrom(b, a, unit)) return true;
@@ -274,10 +235,6 @@ static bool ShareABaseClass(std::string_view a, std::string_view b,
   return false;
 }
 
-// §11.4.11: a conditional whose two operands are class handles is legal where
-// one is assignment compatible with the other or both derive from a common
-// base class. Two variables of unrelated class types are neither; a null
-// operand is no variable and is legal with any handle.
 static void CheckConditionalClassOperands(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& types,
@@ -297,20 +254,10 @@ static void CheckConditionalClassOperands(
              Subclause("11.4.11"));
 }
 
-// Returns true when *e* is a bare `new` object-construction call (the
-// scope-less form written simply as `new` or `new(args)`), as opposed to a
-// typed constructor call such as `Derived::new`.
 static bool IsBareNewCall(const Expr* e) {
   return e && e->kind == ExprKind::kCall && e->text == "new";
 }
 
-// A.2.4's class_new writes a shallow copy as `new expression`, and its
-// footnote 23 (printed page 1217) has that expression evaluate to an object
-// handle. A source naming a variable or a net declared with a type other than
-// a named one, or a value parameter declared with a keyword type, is no handle
-// and is reported. A handle, a name of a named type, which may be a class, and
-// a source these tables cannot judge -- `this`, a select, a call, a name under
-// a package or class scope, an untyped parameter -- draw no report.
 static void CheckShallowCopySource(const Expr* e, const ClassHandleTables& t,
                                    DiagEngine& diag) {
   if (!IsBareNewCall(e) || e->lhs == nullptr) return;
@@ -373,10 +320,6 @@ static void CheckClassHandleExpr(const Expr* e, const ClassHandleTables& t,
   for (const auto* elem : e->elements) CheckClassHandleExpr(elem, t, diag);
 }
 
-// Extracts the call expression a statement evaluates (directly as an expression
-// statement or as the right-hand side of a blocking/nonblocking assignment),
-// unwrapping a single enclosing cast. Returns nullptr when the statement does
-// not evaluate a call.
 static const Expr* ExtractCallFromStmt(const Stmt* s) {
   if (!s) return nullptr;
   const Expr* call = nullptr;
@@ -415,8 +358,6 @@ static void CheckInterfaceHandleRandConstraintMode(
              Subclause("8.26.9"));
 }
 
-// Returns true when *cls* or any of its base classes declares a constraint
-// block named *constraint_name*.
 static bool ClassHierarchyHasConstraint(const ClassDecl* cls,
                                         std::string_view constraint_name,
                                         const CompilationUnit* unit) {
@@ -431,24 +372,16 @@ static bool ClassHierarchyHasConstraint(const ClassDecl* cls,
   return false;
 }
 
-// Matches the named form obj.constraint_id.constraint_mode(...) of a call
-// statement. On success returns the prefix member access (whose left side is
-// the object handle identifier and whose right side is the constraint name),
-// and nullptr otherwise.
 static const Expr* MatchNamedConstraintModePrefix(const Stmt* s) {
   const Expr* call = ExtractCallFromStmt(s);
   if (!call) return nullptr;
 
-  // callee must be <object>.<constraint_id>.constraint_mode
   const Expr* callee = call->lhs;
   if (!callee || callee->kind != ExprKind::kMemberAccess) return nullptr;
   if (!callee->rhs || callee->rhs->kind != ExprKind::kIdentifier)
     return nullptr;
   if (callee->rhs->text != "constraint_mode") return nullptr;
 
-  // The named form prefixes the method with object.constraint_id, so the
-  // receiver of constraint_mode is itself a member access whose left side is a
-  // plain object handle and whose right side is the constraint name.
   const Expr* prefix = callee->lhs;
   if (!prefix || prefix->kind != ExprKind::kMemberAccess) return nullptr;
   if (!prefix->lhs || prefix->lhs->kind != ExprKind::kIdentifier)
@@ -458,12 +391,6 @@ static const Expr* MatchNamedConstraintModePrefix(const Stmt* s) {
   return prefix;
 }
 
-// 18.9: a constraint_mode() call names a constraint block declared in the
-// object's class hierarchy, and naming any other is a compile-time error. This
-// applies only to the named form obj.constraint_id.constraint_mode(...). The
-// check resolves the object handle to its class type; when the type cannot be
-// resolved it stays silent, so the error is reported only when the absence of
-// the block is certain.
 static void CheckNamedConstraintModeExists(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -488,13 +415,6 @@ static void CheckNamedConstraintModeExists(
              Subclause("18.9"));
 }
 
-// 18.8, 18.9: matches a call of the no-name form -- `handle.rand_mode()` or
-// `handle.constraint_mode()`, whose receiver is the object handle itself
-// rather than a named random variable or constraint block -- that carries no
-// argument, on a handle whose class type is known and is not an interface
-// class. Returns the method-name expression, which the caller anchors its
-// diagnostic at, or nullptr when *s* is not that form. An unresolved receiver
-// yields nullptr and so stays silent, mirroring the named-form checks.
 static const Expr* MatchUnnamedModeCallWithoutArgument(
     const Stmt* s, std::string_view method,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -507,8 +427,6 @@ static const Expr* MatchUnnamedModeCallWithoutArgument(
     return nullptr;
   if (callee->rhs->text != method) return nullptr;
 
-  // The named form's receiver is itself a member access (object.name) and is
-  // handled elsewhere; only a plain object handle is the no-name form.
   const Expr* recv = callee->lhs;
   if (!recv || recv->kind != ExprKind::kIdentifier) return nullptr;
 
@@ -521,12 +439,6 @@ static const Expr* MatchUnnamedModeCallWithoutArgument(
   return callee->rhs;
 }
 
-// 18.8: rand_mode() has two forms -- a void form that takes an on/off argument
-// (the variable name is optional and, when omitted, the operation applies to
-// all random variables) and a nonvoid form that takes no argument and reports
-// one named variable's state. Omitting the variable name is only permitted in
-// the void (argument-bearing) form, so a call that names no variable AND passes
-// no argument matches neither form and is illegal.
 static void CheckUnnamedRandModeHasArgument(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -541,12 +453,6 @@ static void CheckUnnamedRandModeHasArgument(
              Subclause("18.8"));
 }
 
-// 18.9: constraint_mode() has two forms -- a void form that takes an on/off
-// argument (the constraint name is optional and, when omitted, the operation
-// applies to all constraints) and a nonvoid form that takes no argument and
-// reports one named block's state. Omitting the constraint name is only
-// permitted in the void (argument-bearing) form, so a call that names no
-// constraint AND passes no argument matches neither form and is illegal.
 static void CheckUnnamedConstraintModeHasArgument(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -561,10 +467,6 @@ static void CheckUnnamedConstraintModeHasArgument(
              Subclause("18.9"));
 }
 
-// §8.21 and §8.26.5: no object of an abstract class or an interface class is
-// constructed directly; the class `name` names is reported at `loc` where it
-// is one of the two. The rule is on the source, so it is reported here whether
-// or not the construction ever runs.
 static void ReportUnconstructibleClass(std::string_view name, SourceLoc loc,
                                        const CompilationUnit* unit,
                                        DiagEngine& diag) {
@@ -583,12 +485,6 @@ static void ReportUnconstructibleClass(std::string_view name, SourceLoc loc,
   }
 }
 
-// §9.7, §8.21 and §8.26.5: the construction `init` of an object for a handle
-// declared `type`, written at `loc` as a declaration's initializer or an
-// assignment's right-hand side. A typed constructor call, `B::new`, builds an
-// object of the class it names; a bare `new` builds one of `type`, which §G.6
-// gives no constructor where it is the built-in process class (§9.7), and
-// which is reported where it is abstract or an interface class.
 static void CheckConstruction(std::string_view type, const Expr* init,
                               SourceLoc loc, const CompilationUnit* unit,
                               DiagEngine& diag) {
@@ -608,16 +504,11 @@ static void CheckConstruction(std::string_view type, const Expr* init,
   ReportUnconstructibleClass(type, loc, unit, diag);
 }
 
-// The class type a declaration of `type` with the unpacked dimensions `dims`
-// gives one handle of; empty for an array of handles, `process job[]`, whose
-// `new [N]` initializer is §7.5.1's dynamic_array_new, sizing the array, and
-// constructs no object.
 static std::string_view DeclaredHandleType(const DataType& type,
                                            const std::vector<Expr*>& dims) {
   return dims.empty() ? type.type_name : std::string_view();
 }
 
-// The construction a handle assignment writes, `p = new;` or `h = B::new;`.
 static void CheckNewOnUnconstructibleHandle(
     const Stmt* s,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -628,10 +519,6 @@ static void CheckNewOnUnconstructibleHandle(
   CheckConstruction(lt->second, s->rhs, s->range.start, unit, diag);
 }
 
-// §8.8: a typed constructor call may name a type different from the assignment
-// target, but that specified type shall be assignment compatible with the
-// target — i.e. the same class or one derived from it. Reject a scope type
-// that is an unrelated class.
 static void CheckTypedConstructorCompatibility(
     const Stmt* s, const std::unordered_set<std::string_view>& class_names,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -650,13 +537,6 @@ static void CheckTypedConstructorCompatibility(
   }
 }
 
-// §8.8: a typed constructor call used as a declaration initializer (e.g.
-// `C c = D::new;`) is an assignment to the declared handle, so the specified
-// type shall be assignment compatible with the declared type -- exactly the
-// rule the procedural-assignment path enforces via
-// CheckTypedConstructorCompatibility. A declaration carries its target type on
-// the declaration itself and its source expression in var_init, so the check
-// reads those rather than lhs/rhs.
 static void CheckTypedConstructorDeclInitCompatibility(
     const Stmt* s, const std::unordered_set<std::string_view>& class_names,
     const CompilationUnit* unit, DiagEngine& diag) {
@@ -670,11 +550,6 @@ static void CheckTypedConstructorDeclInitCompatibility(
   }
 }
 
-// §8.8: the same declaration-initializer compatibility rule applies when the
-// declaration is a module-scope variable (`C c = D::new;` at module level)
-// rather than a block-local one. A module item carries its target type in
-// data_type and its initializer in init_expr, and the walk over procedural
-// blocks never reaches it, so the module-scope declaration is checked here.
 static void CheckTypedConstructorModuleItemCompatibility(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& class_names,
@@ -689,8 +564,6 @@ static void CheckTypedConstructorModuleItemCompatibility(
   }
 }
 
-// Reject assignment of one class handle to another when the source type is not
-// assignment compatible with the target type.
 static void CheckClassHandleAssignCompatibility(
     const Stmt* s, const std::unordered_set<std::string_view>& class_var_names,
     const std::unordered_map<std::string_view, std::string_view>&
@@ -709,8 +582,6 @@ static void CheckClassHandleAssignCompatibility(
   }
 }
 
-// Returns true when *e* is a literal value (integer/real/time/string/unbased
-// unsized) that cannot be assigned to a class object handle.
 static bool IsNonClassLiteral(const Expr* e) {
   return e && (e->kind == ExprKind::kIntegerLiteral ||
                e->kind == ExprKind::kRealLiteral ||
@@ -719,7 +590,6 @@ static bool IsNonClassLiteral(const Expr* e) {
                e->kind == ExprKind::kUnbasedUnsizedLiteral);
 }
 
-// Reject a compound assignment (e.g. +=, |=) whose target is a class handle.
 static void CheckCompoundAssignOnClassHandle(const Stmt* s, DiagEngine& diag) {
   if (s->rhs && s->rhs->kind == ExprKind::kBinary &&
       IsCompoundAssignOp(s->rhs->op)) {
@@ -729,7 +599,6 @@ static void CheckCompoundAssignOnClassHandle(const Stmt* s, DiagEngine& diag) {
   }
 }
 
-// Reject assigning a literal (non-class) value to a class object handle.
 static void CheckNonClassLiteralAssign(const Stmt* s, DiagEngine& diag) {
   if (IsNonClassLiteral(s->rhs)) {
     diag.Error(s->range.start,
@@ -738,12 +607,6 @@ static void CheckNonClassLiteralAssign(const Stmt* s, DiagEngine& diag) {
   }
 }
 
-// The elaborated class environment a statement is validated against: the set of
-// declared class type names, the set of class-handle variable names in scope,
-// the map from each such variable to its declared class type, and the
-// compilation unit used to resolve class declarations. These read-only lookup
-// structures together describe one entity — the class-handle elaboration
-// context referenced throughout §8.8/§18.9 handle and constructor checks.
 namespace {
 struct ClassHandleContext {
   const std::unordered_set<std::string_view>& class_names;
@@ -753,8 +616,6 @@ struct ClassHandleContext {
 };
 }  // namespace
 
-// Runs every assignment-target check that applies when a blocking/nonblocking
-// assignment writes a class-handle variable.
 static void CheckClassHandleAssignTarget(const Stmt* s,
                                          const ClassHandleContext& ctx,
                                          DiagEngine& diag) {
@@ -775,13 +636,6 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   if (s->kind == StmtKind::kVarDecl &&
       s->var_decl_type.kind == DataTypeKind::kNamed &&
       class_names_.count(s->var_decl_type.type_name)) {
-    // §7.4.2 (printed pages 153-154) and §7.5: a block item declaration with
-    // an unpacked dimension, `C arr[2]` or `C d[]`, is an array whose
-    // elements are handles, and a select of it is an element, not §8.4's
-    // (printed 181) bit-select of a handle, as ValidateVarDeclTypes already
-    // reads a module-scope declaration. Every block-declared variable of a
-    // class type was taken for one handle, so `arr[1] = new` and `arr[1].v`
-    // in an initial block were reported.
     if (s->var_unpacked_dims.empty()) class_var_names_.insert(s->var_name);
     class_var_types_[s->var_name] = s->var_decl_type.type_name;
     CheckTypedConstructorDeclInitCompatibility(s, class_names_, unit_, diag_);
@@ -823,30 +677,6 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   CheckClassHandleExpr(s->rhs, kTables, diag_);
   CheckClassHandleExpr(s->expr, kTables, diag_);
   CheckClassHandleExpr(s->condition, kTables, diag_);
-  // §8.4 states which operations an object handle admits and §8.26.9 which
-  // ones an interface class handle admits, and neither names a statement the
-  // rules are suspended in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names no link itself. It wrote out
-  // six of the thirteen, so `fork r = a + 1; join` and `assert (1) else r = a +
-  // 1;` performed arithmetic on a handle where nothing looked, and a handle
-  // declared in one of those seven links never entered class_var_names_ either,
-  // which left every later operation on it unchecked as well.
-  // §6.21 says of a declaration in a block that such variables are visible to
-  // the block and every block nested below it, so the binding a declaration
-  // makes ends where its block does. The two tables are members written
-  // straight into, and nothing unwound them at a block's end: a handle declared
-  // in one procedural block rebound its name for the rest of the module, and
-  // every later check reading the tables read the wrong class.
-  //
-  // The cost ran both ways. A handle shadowed by a narrower class lost the
-  // reports its own class earns -- §8.18's local member reached from outside
-  // went unreported -- and one shadowed by a stricter class gained reports it
-  // does not earn.
-  //
-  // A block and a fork are the scopes §6.21 names, so the tables are put back
-  // as they were when the walk leaves one. Every other statement's children are
-  // in the scope the statement itself stands in, and a declaration among them
-  // is a declaration of that scope.
   bool opens_scope = s->kind == StmtKind::kBlock || s->kind == StmtKind::kFork;
   auto outer_names =
       opens_scope ? class_var_names_ : decltype(class_var_names_)();
@@ -860,11 +690,6 @@ void ElaboratorClassRules::WalkStmtsForClassHandleOps(const Stmt* s) {
   }
 }
 
-// A.2.4 with §6.20.2 (printed page 126): the value parameters `decl` declares
-// with a keyword type, in its parameter port list or its body. A type
-// parameter names a type, one of a named type may be a class, and one declared
-// with no type takes its final value's, which A.8.4's constant_primary lets be
-// `null`, so none of those is held.
 static std::unordered_set<std::string_view> KeywordTypedParams(
     const ModuleDecl& decl) {
   auto keyword = [](DataTypeKind k) {
@@ -889,12 +714,6 @@ static std::unordered_set<std::string_view> KeywordTypedParams(
 }
 
 void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
-  // Block-local class handles are not seeded into class_var_names_ (only
-  // module-scope handles are); they are collected during the walk itself
-  // (WalkStmtsForClassHandleOps records each kVarDecl in source order before
-  // reaching later assignments). Guarding on class_var_names_ would skip the
-  // walk entirely when every handle is declared inside a procedural block, so
-  // guard on class_names_ instead, mirroring ValidateLocalProtectedAccess.
   if (class_names_.empty()) return;
   keyword_typed_params_ = KeywordTypedParams(*decl);
   const ClassHandleTables kTables{class_var_names_, class_var_types_,
@@ -915,8 +734,6 @@ void ElaboratorClassRules::ValidateClassHandleOps(const ModuleDecl* decl) {
       WalkStmtsForClassHandleOps(item->body);
     }
   }
-  // §8.4 names no scope its rules are suspended in, so a task's or a
-  // function's body, and a class method's, is held to them as a procedure's.
   WalkSubroutinesForClassHandleOps(decl->items);
 }
 

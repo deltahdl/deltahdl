@@ -49,11 +49,6 @@ TEST(ConstraintElaboration, ClassWithConstraintPrototype) {
 }
 
 TEST(ConstraintElaboration, ClassWithExternConstraintPrototype) {
-  // With the explicit form of constraint prototype (the extern keyword), it
-  // shall be an error if no corresponding external constraint block is
-  // provided. The report names §18.5.1, which is where the external
-  // constraint block is defined, rather than the §18.5.2 this comment used
-  // to cite.
   ElabFixture f;
   ElabOk(
       "class C;\n"
@@ -70,8 +65,6 @@ TEST(ConstraintElaboration, ClassWithExternConstraintPrototype) {
 }
 
 TEST(ConstraintElaboration, ClassWithPureConstraintPrototype) {
-  // §18.5.2: it shall be an error to declare a pure constraint in a
-  // non-abstract class (C here is not virtual).
   ElabFixture f;
   ElabOk(
       "class C;\n"
@@ -129,11 +122,6 @@ TEST(ConstraintElaboration, ConstraintWithComplexBlock) {
 constexpr const char* kNoArrayMethod =
     "'()' follows a constraint_primary that is no array built-in method";
 
-// A.10 footnote 12: a constraint_primary is written with `()` only where it is
-// an array built-in method. A call with no array before it, a call of a method
-// no array has, and an array method called on a property that is no array are
-// each reported, in a disable soft, in either list of a solve-before, and in a
-// set's disable soft (#7584).
 TEST(ConstraintElaboration, ParenthesesOnANonArrayMethodPrimaryAreErrors) {
   ElabFixture f;
   ElabOk(
@@ -164,10 +152,6 @@ TEST(ConstraintElaboration, ParenthesesOnANonArrayMethodPrimaryAreErrors) {
       ReportedError(f.diag.Diagnostics(), kNoArrayMethod, 12, "A.1.10"));
 }
 
-// An array built-in method takes the `()`, a property of a named type that is
-// no class is taken for an array, and a receiver written as other than a
-// property's name is not judged. A call in an expression item stands in no
-// constraint_primary at all (#7584).
 TEST(ConstraintElaboration, ParenthesesOnAnArrayMethodPrimaryAreAccepted) {
   ElabFixture f;
   ElabOk(
@@ -199,8 +183,6 @@ TEST(ConstraintElaboration, ParenthesesOnAnArrayMethodPrimaryAreAccepted) {
       ReportedError(f.diag.Diagnostics(), kNoArrayMethod, 14, "A.1.10"));
 }
 
-// A class handle names no array, so a method called on one is no array's
-// built-in method, whatever its name (#7584).
 TEST(ConstraintElaboration, ParenthesesOnAClassHandlePrimaryAreErrors) {
   ElabFixture f;
   ElabOk(
@@ -218,9 +200,6 @@ TEST(ConstraintElaboration, ParenthesesOnAClassHandlePrimaryAreErrors) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoArrayMethod, 7, "A.1.10"));
 }
 
-// The inline block of a randomize() with is read against the properties of the
-// class of the object it randomizes; a name that is no property of that class
-// is not judged (#7584).
 TEST(ConstraintElaboration, ParenthesesOnAnInlineNonArrayPrimaryAreErrors) {
   ElabFixture f;
   ElabOk(

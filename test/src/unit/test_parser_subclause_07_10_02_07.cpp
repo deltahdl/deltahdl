@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The push_back() prototype takes a single input item argument. Observe that
-// the parser names the method push_back on the queue and carries exactly one
-// argument expression for the pushed item.
 TEST(AggregateTypeParsing, QueuePushBackItemArgument) {
   auto r = Parse(
       "module t;\n"

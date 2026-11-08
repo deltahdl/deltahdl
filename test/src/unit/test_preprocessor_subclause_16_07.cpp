@@ -41,8 +41,6 @@ TEST(SequenceConcatPreprocessor, UnboundedDelayRangeWithDollarSurvives) {
 }
 
 TEST(SequenceConcatPreprocessor, MacroWithArgExpandsToCycleDelay) {
-  // §16.7's cycle_delay_range is just a token sequence to the preprocessor;
-  // a function-style macro should substitute its formal into the delay slot.
   PreprocFixture f;
   auto result = Preprocess(
       "`define WAIT(n) ##n\n"

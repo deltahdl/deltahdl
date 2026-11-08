@@ -66,9 +66,6 @@ TEST(BitStreamCastSim, BitStreamStructRoundTrip) {
   EXPECT_EQ(p2->value.ToUint64(), 0xCAFEu);
 }
 
-// §6.24.3: a one-element array streams as the one element it holds, so cast to
-// a type of its element's size it gives that element back. An array of int
-// elements is #7625.
 TEST(BitStreamCastSim, SingleElementArrayCast) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -85,10 +82,6 @@ TEST(BitStreamCastSim, SingleElementArrayCast) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// §6.24.3 packs each element whole, whatever its width. An element 32 bits
-// wide or wider is the case a 32-bit element mask gets wrong: shifted by the
-// element's own width it is no mask at all, and at 64 bits it keeps the low
-// half alone. Every value below has its top bit set, so a mask cut short shows.
 TEST(BitStreamCastSim, IntArrayElementIsPackedWhole) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -139,8 +132,6 @@ TEST(BitStreamCastSim, LongintArrayElementIsPackedWhole) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFCAFEF00Dull);
 }
 
-// The queue and the associative array are packed by their own loops, which
-// take the same mask.
 TEST(BitStreamCastSim, TwoIntQueueElementsFillASixtyFourBitType) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -177,11 +168,6 @@ TEST(BitStreamCastSim, TwoIntAssocElementsFillASixtyFourBitType) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFCAFEF00Dull);
 }
 
-// §6.24.3: when the source carries any 4-state bit, the packed bit-stream is
-// itself 4-state. Pre-seed the array's high element with an X-bearing logic
-// value so that the cast result preserves an unknown bit in the expected
-// position. The cast names a 16-bit type, since a size cast such as 16'(...)
-// takes an integral operand alone (§6.24.1).
 TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -201,11 +187,6 @@ TEST(BitStreamCastSim, BitStreamSourceFourStatePropagates) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// §6.24.3: a queue is a dynamically sized array and thus a bit-stream type.
-// When packed, the element at index 0 occupies the most significant bits, so a
-// four-element byte queue casts to the same integer a fixed byte array would.
-// The queue is built from real §7.10 push_back calls and driven through the
-// full pipeline so the packing is observed on the live queue.
 TEST(BitStreamCastSim, BitStreamQueueSourceToIntPacksIndexZeroInMsb) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -225,11 +206,6 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToIntPacksIndexZeroInMsb) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// §6.24.3: the first conversion step packs the source into a generic value that
-// is 4-state when the source carries any 4-state data. Exercise this through a
-// queue source (the dynamically sized bit-stream form) so an X in the queue's
-// leading element survives into the packed cast result. The cast names a
-// 16-bit type, since a size cast takes an integral operand alone (§6.24.1).
 TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -249,12 +225,6 @@ TEST(BitStreamCastSim, BitStreamQueueSourceFourStatePropagates) {
   EXPECT_NE(var->value.words[0].bval, 0u);
 }
 
-// §6.24.3: the second conversion step assigns the generic packed value to the
-// destination, and where the destination designates a 2-state type the packed
-// bits are assigned as if cast to 2-state. So casting a 4-state source array
-// that carries X into a 2-state `shortint` destination, as wide as the array
-// as §6.24.3 requires of a fixed-size source, yields a purely 2-state result:
-// the unknown bits become 0 while the known bytes survive in place.
 TEST(BitStreamCastSim, FourStateSourceIntoTwoStateDestStripsUnknown) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -270,17 +240,10 @@ TEST(BitStreamCastSim, FourStateSourceIntoTwoStateDestStripsUnknown) {
       f, "result");
   ASSERT_NE(var, nullptr);
   ASSERT_GT(var->value.nwords, 0u);
-  // The destination is 2-state, so no unknown bits survive.
   EXPECT_EQ(var->value.words[0].bval, 0u);
-  // The fully known low byte (arr[1]) is preserved.
   EXPECT_EQ(var->value.ToUint64() & 0xFFu, 0x55u);
 }
 
-// §6.24.3: a dynamic array is a dynamically sized bit-stream type; when packed,
-// the element at index 0 takes the most significant bits, just as for a queue
-// or a fixed array. The dynamic array is built from real §7.5 syntax -- a
-// new[] allocation followed by per-element writes -- and driven through the
-// full pipeline so the packing is observed on the live dynamic array.
 TEST(BitStreamCastSim, BitStreamDynamicArraySourceToIntPacksIndexZeroInMsb) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -301,11 +264,6 @@ TEST(BitStreamCastSim, BitStreamDynamicArraySourceToIntPacksIndexZeroInMsb) {
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// §6.24.3: bit-stream casting converts between aggregate types, including from
-// a dynamically sized type into a structure. Casting a two-byte queue into a
-// 16-bit packed struct reinterprets the packed bits, with the index-0 element
-// landing in the most significant field. The queue is built from real §7.10
-// push_back calls and the struct destination is observed after the run.
 TEST(BitStreamCastSim, BitStreamQueueSourceToPackedStruct) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -324,12 +282,6 @@ TEST(BitStreamCastSim, BitStreamQueueSourceToPackedStruct) {
   EXPECT_EQ(var->value.ToUint64(), 0xCAFEu);
 }
 
-// §6.24.3: an associative array is a legal bit-stream cast source (only its use
-// as a destination is prohibited). When packed, its items are placed in
-// index-sorted order with the first key's element in the most significant bits.
-// The keys are written out of insertion order to show the ordering follows the
-// sorted key sequence, not insertion order. Built from real §7.8 associative
-// array syntax and driven through the full pipeline.
 TEST(BitStreamCastSim, BitStreamAssocSourcePacksInIndexSortedOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -346,14 +298,9 @@ TEST(BitStreamCastSim, BitStreamAssocSourcePacksInIndexSortedOrder) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // Sorted keys 0,1,2,3 -> DE (MSB), AD, BE, EF (LSB).
   EXPECT_EQ(var->value.ToUint64(), 0xDEADBEEFu);
 }
 
-// §6.24.3: a bit-stream cast to an unpacked-array type fills its elements from
-// the operand's stream, left to right, most significant bits first: 8'h81
-// cast to `typedef bit B8 [8:1]` sets e[8] and e[1] and clears e[7], and
-// 16'hA5C3 cast to `typedef byte P [2]` splits into its two bytes, A5 first.
 TEST(BitStreamCastSim, CastToAnUnpackedArrayTypedefFillsItsElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -375,11 +322,6 @@ TEST(BitStreamCastSim, CastToAnUnpackedArrayTypedefFillsItsElements) {
             "1 1 0 a5 c3\n");
 }
 
-// §6.24.3's Control example: a bit-stream cast fills a 36-bit unpacked struct
-// member by member from the stream's most significant bits, the unpacked
-// array member `command` taking both of its bytes, and the reverse cast gives
-// the same 36 bits back. Laid out with one byte for `command`, the struct was
-// 28 bits and every field boundary moved.
 TEST(BitStreamCastSim, CastIntoAStructWithAnUnpackedArrayMember) {
   SimFixture f;
   EXPECT_EQ(
@@ -402,14 +344,6 @@ TEST(BitStreamCastSim, CastIntoAStructWithAnUnpackedArrayMember) {
       "fffe a 11 22 fffea1122\n");
 }
 
-// §6.24.3 (printed page 143): to a bit-stream cast a string is a dynamic array
-// of bytes, so a cast into an unpacked structure holding one gives its first
-// string member every bit the fixed-size members leave, and a later string
-// member none, a nested structure's members streaming in its place. 48 bits
-// into {int n; string s;} are n = 7 and s = "hi"; 24 bits into
-// {byte b; in_t i;}, in_t being {string s; string t;}, are b = 8'h41,
-// i.s = "BC" and an empty i.t. Laid over the structure's stored bits, 7 and
-// "hi" fell into the place of s's handle and n read 0.
 TEST(BitStreamCastSim, CastIntoAStructGivesItsStringMemberTheRemainingBytes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -432,10 +366,6 @@ TEST(BitStreamCastSim, CastIntoAStructGivesItsStringMemberTheRemainingBytes) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed page 143): a size mismatch the cast meets only at run time
-// is an error then. A 44-bit source leaves the string member of
-// {int n; string s;} 12 bits, which are no whole number of bytes, and a 16-bit
-// source is narrower than the 32 bits of n alone.
 TEST(BitStreamCastSim, CastIntoAStructWithAStringOfNoWholeBytesIsAnError) {
   SimFixture f;
   RunCapture(
@@ -463,12 +393,6 @@ TEST(BitStreamCastSim, CastIntoAStructWithAStringOfNoWholeBytesIsAnError) {
                             8, "6.24.3"));
 }
 
-// §6.24.3 (printed pages 142 and 143): the cast from an unpacked structure
-// first streams it, a string member as its bytes, so {7, "hi"} in
-// {int n; string s;} is the 48 bits 48'h0000_0007_6869, and
-// {8'h41, {"BC", ""}} in {byte b; in_t i;}, in_t being {string s; string t;},
-// the 24 bits 24'h414243. Cut from the structure's stored bits, the cast
-// packed s's handle and lost n.
 TEST(BitStreamCastSim, CastFromAStructStreamsItsStringMemberAsBytes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -486,8 +410,6 @@ TEST(BitStreamCastSim, CastFromAStructStreamsItsStringMemberAsBytes) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed page 143): the 48 bits {7, "hi"} streams to are an error
-// at run time to a cast to a 40-bit type.
 TEST(BitStreamCastSim, CastFromAStructOfAnotherStreamedSizeIsAnError) {
   SimFixture f;
   RunCapture(
@@ -505,11 +427,6 @@ TEST(BitStreamCastSim, CastFromAStructOfAnotherStreamedSizeIsAnError) {
                             6, "6.24.3"));
 }
 
-// §6.24.3 (printed pages 142 and 143): a dynamic array member is a dynamically
-// sized item, all of whose elements the cast from its structure streams, so
-// {8'h41, {8'h42, 8'h43}} in {byte b; byte d[];} is 24'h414243, and the
-// structure whose d was never written streams b alone. Cut from the stored
-// bits, the cast packed d's 64-bit handle in place of its two bytes.
 TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicArrayMemberElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -529,11 +446,6 @@ TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicArrayMemberElements) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed page 143): in a cast into a structure, its first dynamic
-// array member takes the bits the fixed-size members leave as a new array of
-// its elements, so 24'h414243 into {byte b; byte d[];} gives b = 8'h41 and d
-// the two elements 8'h42 and 8'h43. Laid over the stored bits, the source
-// filled d's handle and b read 0.
 TEST(BitStreamCastSim, CastIntoAStructGivesItsDynamicArrayMemberTheRemainder) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -551,9 +463,6 @@ TEST(BitStreamCastSim, CastIntoAStructGivesItsDynamicArrayMemberTheRemainder) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed page 143): a size mismatch the cast meets only at run time
-// is an error then. A 56-bit source leaves the int elements of
-// {byte b; int d[];} 48 bits, whole bytes but no whole number of ints.
 TEST(BitStreamCastSim, CastIntoAStructOfNoWholeDynamicElementsIsAnError) {
   SimFixture f;
   RunCapture(
@@ -572,11 +481,6 @@ TEST(BitStreamCastSim, CastIntoAStructOfNoWholeDynamicElementsIsAnError) {
                             5, "6.24.3"));
 }
 
-// §6.24.3 (printed pages 142 and 143): each element of an unpacked array of
-// strings is a string, a dynamic array of bytes, so {8'h41, {"B", "CD"}} in
-// {byte b; string v [2];} streams as 32'h41424344, and 24'h414243 cast into it
-// gives the first element, v[0], "BC" and v[1] nothing. Taken as one
-// fixed-size member, the array streamed its elements' handles.
 TEST(BitStreamCastSim, AStringArrayMemberStreamsEachElementAsBytes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -596,11 +500,6 @@ TEST(BitStreamCastSim, AStringArrayMemberStreamsEachElementAsBytes) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed pages 142 and 143): each element of a dynamic array of
-// strings is a dynamic array of bytes, so the cast from {byte b; string d[];}
-// streams b and then every element's bytes, an empty element none:
-// {8'h41, {"B", "", "CD"}} is 32'h41424344. Resized to the 64 bits the
-// structure stores a string handle in, each element streamed as eight bytes.
 TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicStringElementsAsBytes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -619,13 +518,6 @@ TEST(BitStreamCastSim, CastFromAStructStreamsItsDynamicStringElementsAsBytes) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed page 143): the conversion is greedy, the first dynamically
-// sized item taking every bit the fixed-size members leave and each later one
-// none, and that holds again inside a dynamic array of strings, each string
-// being a dynamic array of bytes: 32'h41424344 cast into
-// {byte b; string d[];} gives b = 8'h41 and d the one element "BCD", and an
-// 8-bit source leaves d no elements. Unpacked as 64-bit string handles, the 24
-// bits were no whole number of elements and the cast failed.
 TEST(BitStreamCastSim, CastIntoAStructGivesItsDynamicStringArrayOneString) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -645,10 +537,6 @@ TEST(BitStreamCastSim, CastIntoAStructGivesItsDynamicStringArrayOneString) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.24.3 (printed page 143): a size mismatch the cast meets only at run time
-// is an error then. A 28-bit source leaves the dynamic array of strings in
-// {byte b; string d[];} 20 bits, which are no whole number of the bytes its
-// strings are made of.
 TEST(BitStreamCastSim, CastIntoAStructOfNoWholeDynamicStringBytesIsAnError) {
   SimFixture f;
   RunCapture(

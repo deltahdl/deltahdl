@@ -72,10 +72,6 @@ TEST(QueueSizeSimulation, SizeInForLoopCondition) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-// 7.10 allows a queue to be built from an unpacked array concatenation {a,b,c}
-// as well as from an assignment pattern '{a,b,c}; the two initializers take
-// different lowering paths. Confirm size() reports the element count of a queue
-// produced by the concatenation form, driven end to end from real source.
 TEST(QueueSizeSimulation, SizeCountsConcatenationInitializedQueue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -92,10 +88,6 @@ TEST(QueueSizeSimulation, SizeCountsConcatenationInitializedQueue) {
   EXPECT_EQ(f.ctx.FindVariable("sz")->value.ToUint64(), 4u);
 }
 
-// A queue declared without an initializer starts empty (7.10), so size() on it
-// shall report 0. Drive the empty-queue case end to end: overwrite a nonzero
-// seed with the query result so the observed 0 proves size() actually ran and
-// returned 0, rather than the variable merely retaining its default.
 TEST(QueueSizeSimulation, EmptyQueueSizeIsZeroFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -115,9 +107,6 @@ TEST(QueueSizeSimulation, EmptyQueueSizeIsZeroFromSource) {
   EXPECT_EQ(f.ctx.FindVariable("sz")->value.ToUint64(), 0u);
 }
 
-// size() is a live query: each call must report the queue's current element
-// count, so growing and shrinking the queue between calls changes the result,
-// including dropping back to zero once the queue is emptied by removal.
 TEST(QueueSizeSimulation, SizeTracksLiveCount) {
   SimFixture f;
   auto* q = MakeQueue(f, "q", {10, 20});

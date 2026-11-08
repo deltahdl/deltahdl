@@ -12,91 +12,60 @@ using namespace delta;
 namespace {
 
 TEST(AttachSubroutineCall, EmptyMatchSequenceRejectsAttachment) {
-  // §16.11: it is an error to attach a sequence_match_item to a sequence
-  // that admits an empty match. §16.12.22's classifier supplies the empty
-  // notion: kAdmitsOnlyEmpty is the rejected case.
   EXPECT_FALSE(
       IsSequenceMatchItemAttachLegal(SequenceMatchClass::kAdmitsOnlyEmpty));
 }
 
 TEST(AttachSubroutineCall, NondegenerateSequenceAcceptsAttachment) {
-  // §16.11 + §16.12.22: a sequence that admits at least one nonempty match
-  // is the right shape for a subroutine_call or any sequence_match_item.
   EXPECT_TRUE(IsSequenceMatchItemAttachLegal(
       SequenceMatchClass::kAdmitsAtLeastOneNonempty));
 }
 
 TEST(AttachSubroutineCall, NoMatchSequenceRejectsAttachment) {
-  // §16.11: the other degenerate class — a sequence that admits no match at
-  // all — is likewise not a legal host for an attached sequence_match_item.
   EXPECT_FALSE(
       IsSequenceMatchItemAttachLegal(SequenceMatchClass::kAdmitsNoMatch));
 }
 
 TEST(AttachSubroutineCall, AutomaticByReferenceForbidden) {
-  // §16.11: an automatic variable shall not be passed by reference under any
-  // circumstance.
-  EXPECT_FALSE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByRef,
-                                        /*from_procedural_assertion=*/true,
-                                        /*is_constant=*/true));
+  EXPECT_FALSE(
+      IsAutomaticArgUseAllowed(SubroutineArgPassing::kByRef, true, true));
 }
 
 TEST(AttachSubroutineCall, AutomaticByConstReferenceForbidden) {
-  // §16.11: the no-by-reference rule for automatics covers const ref just as
-  // it covers ref — neither by-reference form is allowed for an automatic
-  // variable, even a constant one from a procedural assertion.
-  EXPECT_FALSE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByConstRef,
-                                        /*from_procedural_assertion=*/true,
-                                        /*is_constant=*/true));
+  EXPECT_FALSE(
+      IsAutomaticArgUseAllowed(SubroutineArgPassing::kByConstRef, true, true));
 }
 
 TEST(AttachSubroutineCall, AutomaticAsConstantInputFromProceduralAllowed) {
-  // §16.11: an automatic variable may be passed as a constant input from a
-  // subroutine call attached to a sequence inside a procedural assertion
-  // (§16.14.6.1).
   EXPECT_TRUE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByValueInput,
-                                       /*from_procedural_assertion=*/true,
-                                       /*is_constant=*/true));
+                                       true, true));
 }
 
 TEST(AttachSubroutineCall, LocalVarArgumentMustBeByValue) {
-  // §16.11: if a local variable appears in an actual argument expression,
-  // that argument shall be passed by value.
-  EXPECT_FALSE(IsLocalVarArgPassingLegal(
-      /*local_var_in_arg_expr=*/true, SubroutineArgPassing::kByRef));
-  EXPECT_TRUE(IsLocalVarArgPassingLegal(
-      /*local_var_in_arg_expr=*/true, SubroutineArgPassing::kByValueInput));
+  EXPECT_FALSE(IsLocalVarArgPassingLegal(true, SubroutineArgPassing::kByRef));
+  EXPECT_TRUE(
+      IsLocalVarArgPassingLegal(true, SubroutineArgPassing::kByValueInput));
 }
 
 TEST(AttachSubroutineCall, LocalVarArgumentByConstReferenceRejected) {
-  // §16.11: const ref is a by-reference form, so an actual argument that
-  // mentions a local variable may not be passed by const ref either.
-  EXPECT_FALSE(IsLocalVarArgPassingLegal(
-      /*local_var_in_arg_expr=*/true, SubroutineArgPassing::kByConstRef));
+  EXPECT_FALSE(
+      IsLocalVarArgPassingLegal(true, SubroutineArgPassing::kByConstRef));
 }
 
 TEST(AttachSubroutineCall, NonLocalVarArgumentAllowsAnyPassingMode) {
-  // §16.11: the by-value restriction is scoped to arguments that mention a
-  // local variable. When no local variable appears, any of the three passing
-  // modes is permitted.
-  EXPECT_TRUE(IsLocalVarArgPassingLegal(
-      /*local_var_in_arg_expr=*/false, SubroutineArgPassing::kByRef));
-  EXPECT_TRUE(IsLocalVarArgPassingLegal(
-      /*local_var_in_arg_expr=*/false, SubroutineArgPassing::kByConstRef));
-  EXPECT_TRUE(IsLocalVarArgPassingLegal(
-      /*local_var_in_arg_expr=*/false, SubroutineArgPassing::kByValueInput));
+  EXPECT_TRUE(IsLocalVarArgPassingLegal(false, SubroutineArgPassing::kByRef));
+  EXPECT_TRUE(
+      IsLocalVarArgPassingLegal(false, SubroutineArgPassing::kByConstRef));
+  EXPECT_TRUE(
+      IsLocalVarArgPassingLegal(false, SubroutineArgPassing::kByValueInput));
 }
 
 TEST(AttachSubroutineCall, RunsAtEveryEndPointInListOrder) {
-  // §16.11: all attached calls execute at every end point of the sequence,
-  // and within each end point the calls run in list order.
   EXPECT_TRUE(AttachedSubroutineRunsAtEveryEndPoint());
   EXPECT_TRUE(AttachedSubroutineCallsExecuteInListOrder());
 }
 
 TEST(AttachSubroutineCall, AllFiveCallableKindsAreAttachable) {
-  // §16.11: the callable forms allowed for attachment are tasks, task
-  // methods, void functions, void function methods, and system tasks.
   EXPECT_TRUE(IsAttachableSubroutineKind(AttachableSubroutineKind::kTask));
   EXPECT_TRUE(
       IsAttachableSubroutineKind(AttachableSubroutineKind::kTaskMethod));
@@ -109,10 +78,6 @@ TEST(AttachSubroutineCall, AllFiveCallableKindsAreAttachable) {
 }
 
 TEST(AttachSubroutineCall, EachArgIsByValueOrByReference) {
-  // §16.11: each argument of an attached subroutine call shall be passed
-  // either by value (as an input) or by reference (ref / const ref). An
-  // output or inout formal copies its argument back (§13.5), which is
-  // neither.
   EXPECT_TRUE(
       IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByValueInput));
   EXPECT_TRUE(IsArgPassingAllowedForAttachedCall(SubroutineArgPassing::kByRef));
@@ -125,34 +90,20 @@ TEST(AttachSubroutineCall, EachArgIsByValueOrByReference) {
 }
 
 TEST(AttachSubroutineCall, AutomaticAsNonConstantInputFromProceduralRejected) {
-  // §16.11: an automatic variable shall not be passed as a non-constant
-  // input from an attached subroutine call in procedural code. The
-  // constant-input case is the only allowed mode for an automatic.
   EXPECT_FALSE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByValueInput,
-                                        /*from_procedural_assertion=*/true,
-                                        /*is_constant=*/false));
+                                        true, false));
 }
 
 TEST(AttachSubroutineCall, AutomaticOutsideProceduralAssertionRejected) {
-  // §16.11: the permission to pass an automatic variable as a constant
-  // input is scoped to procedural-code subroutine calls. Outside that
-  // scope, no automatic passing is allowed.
   EXPECT_FALSE(IsAutomaticArgUseAllowed(SubroutineArgPassing::kByValueInput,
-                                        /*from_procedural_assertion=*/false,
-                                        /*is_constant=*/true));
+                                        false, true));
 }
 
 TEST(AttachSubroutineCall, ByValueInputVariableTypeMustBeAllowed) {
-  // §16.11: a variable passed by value as an input shall be of a type
-  // allowed in §16.6. The gate forwards the §16.6 verdict.
-  EXPECT_TRUE(IsByValueInputArgumentTypeAllowed(/*type_allowed_in_16_6=*/true));
-  EXPECT_FALSE(
-      IsByValueInputArgumentTypeAllowed(/*type_allowed_in_16_6=*/false));
+  EXPECT_TRUE(IsByValueInputArgumentTypeAllowed(true));
+  EXPECT_FALSE(IsByValueInputArgumentTypeAllowed(false));
 }
 
-// §16.11: an automatic variable is not passed by reference to a subroutine
-// call attached to a sequence; by value, from an assertion in procedural
-// code, it may be.
 TEST(AttachedSubroutineCall, AnAutomaticPassedByReferenceIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -175,8 +126,6 @@ TEST(AttachedSubroutineCall, AnAutomaticPassedByReferenceIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 10, "16.11"));
 }
 
-// §16.11: an actual holding a local variable is passed by value, which the
-// const ref formal of show does not.
 TEST(AttachedSubroutineCall, ALocalPassedByReferenceIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -196,8 +145,6 @@ TEST(AttachedSubroutineCall, ALocalPassedByReferenceIsReported) {
                             7, "16.11"));
 }
 
-// §16.11: a variable passed by value is of a type §16.6 allows, which
-// chandle is not.
 TEST(AttachedSubroutineCall, AChandlePassedByValueIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -217,8 +164,6 @@ TEST(AttachedSubroutineCall, AChandlePassedByValueIsReported) {
                             7, "16.11"));
 }
 
-// §16.11: a subroutine call is not attached to a sequence that admits an
-// empty match, as b[*0:1] does.
 TEST(AttachedSubroutineCall, ACallOnAnEmptyMatchingSequenceIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -235,9 +180,6 @@ TEST(AttachedSubroutineCall, ACallOnAnEmptyMatchingSequenceIsReported) {
                             4, "16.11"));
 }
 
-// §16.11: an argument of a call attached to a sequence is passed by value
-// as an input or by reference; an output or an inout formal copies it back
-// (§13.5) instead, which is neither way.
 TEST(AttachedSubroutineCall, AnArgumentToAnOutputOrInoutFormalIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -259,15 +201,6 @@ TEST(AttachedSubroutineCall, AnArgumentToAnOutputOrInoutFormalIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 9, "16.11"));
 }
 
-// §16.11 with §23.9, §26.3, §8.10, §8.13 and §8.5: the rules on an attached
-// call's actuals reach a subroutine written through a package's scope, one a
-// wildcard or an explicit package import makes visible, one the compilation
-// unit declares, a class's static method written through the class's scope,
-// and a method called through a handle, its own class's or one it inherits;
-// each passes the local variable v by reference here. A call of a task through
-// an instance's name, of a sequence's formal argument, which stands for its
-// actual, and of a queue's built-in push_back (§7.10.2) pass nothing by
-// reference and draw no report.
 TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -327,10 +260,6 @@ TEST(AttachedSubroutineCall, ACalleeReachedThroughAScopeOrAHandleIsChecked) {
   }
 }
 
-// §16.11 with §23.6: the rules on an attached call's actuals reach a task of
-// another instance named hierarchically: of a module instance, of an instance
-// within one, and of an interface instance; each passes the local variable v
-// by reference here.
 TEST(AttachedSubroutineCall, ACalleeReachedThroughAnInstanceIsChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -364,9 +293,6 @@ TEST(AttachedSubroutineCall, ACalleeReachedThroughAnInstanceIsChecked) {
   }
 }
 
-// §16.11 with §35.5: a subroutine the module imports through DPI is a
-// subroutine an attached call may call, and its actuals are held to the
-// same rules: chandle is no type an assertion may use (§16.6).
 TEST(AttachedSubroutineCall, AnImportedDpiCalleeIsChecked) {
   ElabFixture f;
   ElaborateSrc(

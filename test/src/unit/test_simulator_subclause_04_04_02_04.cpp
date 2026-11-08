@@ -122,22 +122,11 @@ TEST(NbaRegionSim, NonblockingAssignWithDelaySchedulesNBALater) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 5u);
 }
 
-// D2 input form: two nonblocking assignments issued together in the active set.
-// Each samples its right-hand side immediately but defers the write into the
-// NBA region, so the pair exchanges values. A blocking read-after-write would
-// instead leave both variables holding the first source's value.
 TEST(NbaRegionSim, NonblockingAssignPairSwapsThroughNBARegion) {
   SimFixture f;
   ExpectNonblockingPairExchangesValues(f);
 }
 
-// End-to-end observation of D1 ("NBA runs after all Inactive events") built
-// from the §4.4.2.3 dependency's real `#0` syntax rather than kernel-scheduled
-// events. The process schedules an NBA update, then an explicit `#0` suspends
-// it into the Inactive region and resumes it within the same time slot. The
-// read that follows the resume therefore still sees the pre-update value,
-// proving the NBA region has not yet run when the Inactive-resumed code
-// executes.
 TEST(NbaRegionSim, NBAUpdateAppliesAfterZeroDelayInactiveResume) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -156,8 +145,6 @@ TEST(NbaRegionSim, NBAUpdateAppliesAfterZeroDelayInactiveResume) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // The Inactive-resumed read happened before the NBA update landed.
   EXPECT_EQ(f.ctx.FindVariable("obs")->value.ToUint64(), 1u);
-  // The NBA update did eventually apply once the region ran.
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 99u);
 }

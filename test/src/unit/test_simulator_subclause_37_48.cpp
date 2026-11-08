@@ -12,21 +12,6 @@
 namespace delta {
 namespace {
 
-// §37.48 Clocking block: a clocking block (vpiClockingBlock) groups the default
-// input/output skews, the clocking event, and the clocking io decls
-// (vpiClockingIODecl) it contains. These tests observe the production code that
-// applies the clause's three numbered "Details" that refine traversal -
-// vpiPrefix (detail 2), vpiActual (detail 3), and an io decl's vpiExpr (detail
-// 4) - and the figure's vpiClockingEvent edge, through the same-pipeline public
-// vpi_handle dispatch. Like vpiPrefix/vpiActual/vpiExpr, the vpiClockingEvent
-// relation reaches an object whose type tag differs from the relation tag, so
-// the generic child walk cannot serve it and a dedicated helper carries it.
-// Detail 1 only records which construct the skew/edge relations target, and the
-// figure's remaining structural relations and properties are served by the
-// generic machinery; neither refines behavior here.
-
-// The fixture installs a context so the public vpi_handle entry point runs its
-// real dispatch over the test objects.
 class ClockingBlock : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -34,12 +19,8 @@ class ClockingBlock : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// D2: vpiPrefix of a clocking block reaches the virtual interface var the
-// clocking block expression is immediately prefixed by. Observed through the
-// helper and the public vpi_handle(vpiPrefix, ...) dispatch. The relation is
-// non-NULL exactly because the clocking block carries that prefix.
 TEST_F(ClockingBlock, PrefixReachesVirtualInterfacePrefix) {
-  VpiObject vif;  // the virtual interface that prefixes the clocking block
+  VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;
 
   VpiObject block;
@@ -50,11 +31,8 @@ TEST_F(ClockingBlock, PrefixReachesVirtualInterfacePrefix) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, VpiHandleOf(&block))), &vif);
 }
 
-// D2: a clocking block that is not a virtual-interface-prefixed expression has
-// no virtual interface var prefix, so vpiPrefix reports NULL rather than
-// reaching some unrelated child.
 TEST_F(ClockingBlock, PrefixIsNullWhenNotVirtualInterfacePrefixed) {
-  VpiObject event_ctrl;  // an ordinary (non-vif) child of the clocking block
+  VpiObject event_ctrl;
   event_ctrl.type = vpiEventControl;
 
   VpiObject block;
@@ -65,19 +43,15 @@ TEST_F(ClockingBlock, PrefixIsNullWhenNotVirtualInterfacePrefixed) {
   EXPECT_EQ(vpi_handle(vpiPrefix, VpiHandleOf(&block)), nullptr);
 }
 
-// D3: vpiActual of a clocking block reaches the concrete clocking block
-// selected through its virtual interface prefix when that prefix holds a value
-// at the current simulation time (its own vpiActual is bound).
 TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
-  VpiObject iface;  // the interface the virtual interface currently holds
+  VpiObject iface;
   iface.type = vpiInterface;
 
   VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;
-  vif.actual = &iface;  // prefix has a value at the current simulation time
+  vif.actual = &iface;
 
-  VpiObject
-      resolved;  // the concrete clocking block selected through the prefix
+  VpiObject resolved;
   resolved.type = vpiClockingBlock;
 
   VpiObject block;
@@ -89,13 +63,9 @@ TEST_F(ClockingBlock, ActualReachesResolvedClockingBlockWhenPrefixHasValue) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
 }
 
-// D3: when the prefix is a virtual interface that has no value at the current
-// simulation time - its own vpiActual being NULL - the clocking block's
-// vpiActual is NULL as well, even though a resolved actual is otherwise
-// present.
 TEST_F(ClockingBlock, ActualIsNullWhenVirtualInterfacePrefixHasNoValue) {
   VpiObject vif;
-  vif.type = vpiVirtualInterfaceVar;  // uninitialized: no value bound yet
+  vif.type = vpiVirtualInterfaceVar;
 
   VpiObject resolved;
   resolved.type = vpiClockingBlock;
@@ -103,30 +73,24 @@ TEST_F(ClockingBlock, ActualIsNullWhenVirtualInterfacePrefixHasNoValue) {
   VpiObject block;
   block.type = vpiClockingBlock;
   block.children = {&vif};
-  block.actual = &resolved;  // present, but suppressed by the empty prefix
+  block.actual = &resolved;
 
   EXPECT_EQ(VpiClockingBlockActual(&block), nullptr);
   EXPECT_EQ(vpi_handle(vpiActual, VpiHandleOf(&block)), nullptr);
 }
 
-// D3 edge: the no-value suppression is gated on a virtual interface prefix. A
-// clocking block that is not prefixed by a virtual interface reports its actual
-// directly, so the detail-3 rule does not steal an otherwise valid traversal.
 TEST_F(ClockingBlock, ActualReachesActualWhenNotVirtualInterfacePrefixed) {
   VpiObject resolved;
   resolved.type = vpiClockingBlock;
 
   VpiObject block;
-  block.type = vpiClockingBlock;  // no virtual interface var child
+  block.type = vpiClockingBlock;
   block.actual = &resolved;
 
   EXPECT_EQ(VpiClockingBlockActual(&block), &resolved);
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
 }
 
-// D3 with no run: a context attached to none has no run to say what the
-// virtual interface var prefixing a clocking block holds now, so the block's
-// vpiActual reaches the block it was built standing for.
 TEST_F(ClockingBlock, ActualWithNoRunIsTheBlockAPrefixedBlockWasBuiltWith) {
   VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;
@@ -142,10 +106,6 @@ TEST_F(ClockingBlock, ActualWithNoRunIsTheBlockAPrefixedBlockWasBuiltWith) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiActual, VpiHandleOf(&block))), &resolved);
 }
 
-// Figure (clocking io decl -> nets / variables / ref obj): the io-decl expr
-// predicate recognizes a ref obj, a net, and a variable of any kind the
-// `variables` class groups (§37.4.1) -- a logic var and an int var alike -- and
-// rejects an unrelated kind such as a delay control.
 TEST_F(ClockingBlock, IODeclExprGroupMembership) {
   EXPECT_TRUE(VpiIsClockingIODeclExprType(vpiRefObj));
   EXPECT_TRUE(VpiIsClockingIODeclExprType(kVpiNet));
@@ -155,11 +115,8 @@ TEST_F(ClockingBlock, IODeclExprGroupMembership) {
   EXPECT_FALSE(VpiIsClockingIODeclExprType(vpiDelayControl));
 }
 
-// D4: vpiExpr of a clocking io decl reaches the ref obj the io decl names. This
-// is the clause's own example - the io decl "enable" reaches "top.mem1.enable".
-// Observed through the helper and the public vpi_handle(vpiExpr, ...) dispatch.
 TEST_F(ClockingBlock, IODeclExprReachesNamedRefObj) {
-  VpiObject ref;  // the ref obj "top.mem1.enable" the io decl names
+  VpiObject ref;
   ref.type = vpiRefObj;
 
   VpiObject io_decl;
@@ -170,10 +127,8 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedRefObj) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &ref);
 }
 
-// D4: a clocking io decl whose only children are its skews names no expression,
-// so vpiExpr reports NULL rather than handing back a skew's delay control.
 TEST_F(ClockingBlock, IODeclExprIsNullWhenNothingNamed) {
-  VpiObject skew;  // an input/output skew delay control, not the named expr
+  VpiObject skew;
   skew.type = vpiDelayControl;
 
   VpiObject io_decl;
@@ -184,15 +139,11 @@ TEST_F(ClockingBlock, IODeclExprIsNullWhenNothingNamed) {
   EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&io_decl)), nullptr);
 }
 
-// D4 input form (figure clocking io decl -> nets): the named target need not be
-// a ref obj. When the io decl directly names a net - as an io decl bound to a
-// signal declared as a net does - vpiExpr reaches that net, past a leading skew
-// delay control that is not the named expression.
 TEST_F(ClockingBlock, IODeclExprReachesNamedNet) {
-  VpiObject skew;  // a leading input skew, not the named expression
+  VpiObject skew;
   skew.type = vpiDelayControl;
 
-  VpiObject net;  // the net the io decl names
+  VpiObject net;
   net.type = kVpiNet;
 
   VpiObject io_decl;
@@ -203,13 +154,8 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedNet) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &net);
 }
 
-// D4 input form (figure clocking io decl -> variables): the named target may be
-// a variable rather than a ref obj or net - the case of an io decl bound to a
-// signal declared as a variable (e.g. "output q" where q is a reg). vpiExpr
-// reaches that variable through the same resolver, completing the figure's
-// three-way {nets, variables, ref obj} reach.
 TEST_F(ClockingBlock, IODeclExprReachesNamedVariable) {
-  VpiObject var;  // the variable the io decl names
+  VpiObject var;
   var.type = kVpiReg;
 
   VpiObject io_decl;
@@ -220,13 +166,8 @@ TEST_F(ClockingBlock, IODeclExprReachesNamedVariable) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &var);
 }
 
-// D4 input form (figure clocking io decl -> variables grouping): the named
-// target may be any variable the `variables` class groups (§37.4.1), not only
-// the logic var whose code the reg shares. vpiExpr reaches it through the same
-// resolver, so the grouping arm is observed end to end and not just at the type
-// predicate.
 TEST_F(ClockingBlock, IODeclExprReachesVariablesGrouping) {
-  VpiObject var;  // a variable of a kind the variables class groups
+  VpiObject var;
   var.type = vpiIntVar;
 
   VpiObject io_decl;
@@ -237,13 +178,8 @@ TEST_F(ClockingBlock, IODeclExprReachesVariablesGrouping) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, VpiHandleOf(&io_decl))), &var);
 }
 
-// Figure (clocking block -> event control via vpiClockingEvent): the clocking
-// event driving the block is reached through vpiClockingEvent, modeled as an
-// event-control child. Observed through the helper and the public
-// vpi_handle(vpiClockingEvent, ...) dispatch - the generic child walk cannot
-// serve it because the relation and object tags differ.
 TEST_F(ClockingBlock, ClockingEventReachesEventControl) {
-  VpiObject event_ctrl;  // the "@(posedge clk)" driving the block
+  VpiObject event_ctrl;
   event_ctrl.type = vpiEventControl;
 
   VpiObject block;
@@ -255,11 +191,8 @@ TEST_F(ClockingBlock, ClockingEventReachesEventControl) {
             &event_ctrl);
 }
 
-// Figure (clocking block -> event control): a clocking block that carries no
-// event control reaches nothing through vpiClockingEvent rather than handing
-// back some unrelated child such as a virtual interface prefix.
 TEST_F(ClockingBlock, ClockingEventIsNullWhenNoEventControl) {
-  VpiObject vif;  // an unrelated (non-event-control) child
+  VpiObject vif;
   vif.type = vpiVirtualInterfaceVar;
 
   VpiObject block;
@@ -270,9 +203,6 @@ TEST_F(ClockingBlock, ClockingEventIsNullWhenNoEventControl) {
   EXPECT_EQ(vpi_handle(vpiClockingEvent, VpiHandleOf(&block)), nullptr);
 }
 
-// Edge: each clocking-block helper speaks only for its own object kind, so an
-// unrelated handle (or a null handle) reaches nothing through it. This guards
-// the dispatch from misapplying the detail rules to the wrong object.
 TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
   VpiObject other;
   other.type = vpiModule;
@@ -287,18 +217,12 @@ TEST_F(ClockingBlock, HelpersGuardOnObjectKind) {
   EXPECT_EQ(VpiClockingBlockClockingEvent(nullptr), nullptr);
 }
 
-// The clocking blocks of a run: those a design declares, built from the
-// elaborated design rather than by hand (#4956).
 class ClockingBlocksOfARun : public VpiDesignRun {
  protected:
-  // The event control the body of top's task `name` is.
   static vpiHandle ControlOf(const char* name) {
     return vpi_handle(vpiStmt, Named(vpiTaskFunc, By("top"), name));
   }
 
-  // The condition of the event control the body of the task `tf` is, is a
-  // clocking block whose prefix is the virtual interface var `var_name`,
-  // standing for no block while the var holds none, as every var here does.
   static void ExpectBlockPrefixedBy(vpiHandle tf, const char* var_name) {
     ASSERT_NE(tf, nullptr) << var_name;
     vpiHandle control = vpi_handle(vpiStmt, tf);
@@ -313,19 +237,11 @@ class ClockingBlocksOfARun : public VpiDesignRun {
     EXPECT_EQ(vpi_handle(vpiActual, block), nullptr) << var_name;
   }
 
-  // The same for top's task `task`.
   static void ExpectBlockPrefixedBy(const char* task, const char* var_name) {
     ExpectBlockPrefixedBy(Named(vpiTaskFunc, By("top"), task), var_name);
   }
 };
 
-// Details 2 and 3: a clocking block named through a virtual interface var,
-// vif.cb, is a clocking block whose prefix is the var, and stands for the
-// block of that name, not one declared before it, of the interface instance
-// the var holds now, or for none while it holds none (#7175); a member of the
-// interface that is no clocking block, vif.clk, stays a reference the var
-// prefixes. The tasks waiting on them are never called, so no wait runs
-// through a null interface.
 TEST_F(ClockingBlocksOfARun,
        AVirtualInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -359,10 +275,6 @@ TEST_F(ClockingBlocksOfARun,
   EXPECT_EQ(vpi_get(vpiType, signal), vpiRefObj);
 }
 
-// Details 2 and 3: a clocking block named through a virtual interface var a
-// task declares, as an argument or in its body, is a clocking block whose
-// prefix is that var, as one a module declares is, standing for no block while
-// the var holds none (#8202).
 TEST_F(ClockingBlocksOfARun,
        ATasksVirtualInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -376,9 +288,6 @@ TEST_F(ClockingBlocksOfARun,
   ExpectBlockPrefixedBy("wait_local", "lv");
 }
 
-// Details 2 and 3: so is one named through a var declared with a typedef of a
-// virtual interface type, whose interface the design records for the name
-// (§6.18), whether the module or a task declares the var (#8204).
 TEST_F(ClockingBlocksOfARun,
        ATypedefVirtualInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -393,10 +302,6 @@ TEST_F(ClockingBlocksOfARun,
   ExpectBlockPrefixedBy("wait_arg", "v");
 }
 
-// Details 2 and 3: so is one named through a virtual interface var of an
-// interface the design never instantiates, whose declaration still declares
-// the block (§25.9), while a member that is no clocking block stays a
-// reference the var prefixes (#8206).
 TEST_F(ClockingBlocksOfARun,
        AnUninstantiatedInterfacesClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -416,8 +321,6 @@ TEST_F(ClockingBlocksOfARun,
             VpiObjectOf(By("top.vif")));
 }
 
-// Details 2 and 3: so is one named in a method through a virtual interface
-// property of its class (§25.9), the property the class defn holds (#8208).
 TEST_F(ClockingBlocksOfARun,
        AClassPropertysVirtualInterfaceClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -430,9 +333,6 @@ TEST_F(ClockingBlocksOfARun,
       Named(vpiTaskFunc, Named(vpiClassDefn, By("top"), "C"), "run"), "vif");
 }
 
-// Details 2 and 3: and one named in a package's task through a virtual
-// interface var the package declares (§26.2), which is a virtual interface
-// var as a module's is (#8207).
 TEST_F(ClockingBlocksOfARun,
        APackagesVirtualInterfaceClockingBlockHasPrefixAndActual) {
   Run("interface bus(input logic clk);\n"
@@ -444,8 +344,6 @@ TEST_F(ClockingBlocksOfARun,
   ExpectBlockPrefixedBy(Named(vpiTaskFunc, By("pkg"), "run"), "vif");
 }
 
-// A module's default clocking block is reached from it as a clocking block and
-// as its default clocking, named as declared and reaching its clocking event.
 TEST_F(ClockingBlocksOfARun, ADefaultClockingBlockIsReachedFromItsModule) {
   Run("module top; logic clk, a, b;\n"
       "  default clocking cb @(posedge clk); input a; output b; endclocking\n"
@@ -461,9 +359,6 @@ TEST_F(ClockingBlocksOfARun, ADefaultClockingBlockIsReachedFromItsModule) {
   EXPECT_EQ(vpi_get(vpiType, event), vpiEventControl);
 }
 
-// A clocking block reaches an io decl per clocking signal, in the order
-// declared, each reporting its direction and reaching through vpiExpr the
-// signal it is named after (detail 4).
 TEST_F(ClockingBlocksOfARun, AClockingBlockReachesItsIoDecls) {
   Run("module top; logic clk, a, b;\n"
       "  clocking cb @(posedge clk); input a; output b; endclocking\n"
@@ -483,9 +378,6 @@ TEST_F(ClockingBlocksOfARun, AClockingBlockReachesItsIoDecls) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, b)), VpiObjectOf(By("top.b")));
 }
 
-// Detail 1: a clocking block reports its default skews' edges and reaches
-// their delays; an io decl its own, or, where it writes none, the block's
-// default for its direction, its output skew reached as the expression itself.
 TEST_F(ClockingBlocksOfARun, SkewsAndEdgesAreTheBlocksDefaultsAndAnIoDeclsOwn) {
   Run("module top; logic clk, a, b, c;\n"
       "  clocking cb @(posedge clk);\n"
@@ -517,8 +409,6 @@ TEST_F(ClockingBlocksOfARun, SkewsAndEdgesAreTheBlocksDefaultsAndAnIoDeclsOwn) {
   EXPECT_EQ(value.value.integer, 3);
 }
 
-// A clocking block a generate block declares is each generate block
-// instance's, named under it, and not its module's (§37.12).
 TEST_F(ClockingBlocksOfARun, AGenerateBlocksClockingBlockIsItsGenScopes) {
   Run("module top; logic clk, a;\n"
       "  for (genvar i = 0; i < 2; i++) begin : g\n"
@@ -536,10 +426,6 @@ TEST_F(ClockingBlocksOfARun, AGenerateBlocksClockingBlockIsItsGenScopes) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, a)), VpiObjectOf(By("top.a")));
 }
 
-// The event a clocking block's name carries (§14.10) is the run's, and no
-// variable of the instance: the instance holds none of the block's name, the
-// block's full name reaches the block, and `@(cb)` waits on the block, the
-// condition of its event control (§37.65) (#8203).
 TEST_F(ClockingBlocksOfARun, AClockingBlocksNameIsTheBlockAndNoVariable) {
   Run("module top; logic clk;\n"
       "  clocking cb @(posedge clk); endclocking\n"
@@ -556,8 +442,6 @@ TEST_F(ClockingBlocksOfARun, AClockingBlocksNameIsTheBlockAndNoVariable) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiCondition, control)), VpiObjectOf(cb));
 }
 
-// §37.48 detail 1: vpiInputEdge and vpiOutputEdge are drawn on a clocking
-// block and a clocking io decl, and a net reports vpiUndefined for both.
 TEST(ClockingBlockModel, ANetHasNoClockingEdges) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -568,10 +452,6 @@ TEST(ClockingBlockModel, ANetHasNoClockingEdges) {
   SetGlobalVpiContext(nullptr);
 }
 
-// Details 2 and 3 with §23.4: so is one named through a virtual interface var
-// whose type names an interface the module declares nested in its body, the
-// module's own var, a task's argument or body variable, or a property of a
-// class the module declares alike (#8267).
 TEST_F(ClockingBlocksOfARun,
        ANestedInterfacesVirtualInterfaceClockingBlockHasPrefixAndActual) {
   Run("module top; logic clk;\n"

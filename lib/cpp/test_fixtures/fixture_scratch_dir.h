@@ -9,15 +9,6 @@
 #include <string>
 #include <system_error>
 
-// A scratch directory that exists for as long as one test does, for a rule
-// whose input is a file the tool has to read off disk rather than a string a
-// test hands it.
-//
-// The name is unique per process and per instance, so tests that run
-// concurrently do not write over each other. The path is canonicalized because
-// a loader that anchors a relative path to a file's own directory canonicalizes
-// first -- on macOS /var resolves to /private/var -- and a test asserting on
-// paths has to see what the loader sees.
 struct ScratchDir {
   std::filesystem::path dir;
 
@@ -39,8 +30,6 @@ struct ScratchDir {
   ScratchDir(const ScratchDir&) = delete;
   ScratchDir& operator=(const ScratchDir&) = delete;
 
-  // Writes `content` to `rel` under the directory, creating any intermediate
-  // directories the relative path names, and returns the full path.
   std::filesystem::path Write(const std::string& rel,
                               const std::string& content) {
     auto full = dir / rel;
@@ -51,12 +40,6 @@ struct ScratchDir {
   }
 };
 
-// A ScratchDir that is the process's working directory for as long as it
-// lives, so a file a test's source names by a relative path -- a §21.7.1.1
-// dump file, "dump.vcd" or "module1.dump" -- lands in it, apart from any
-// concurrently running test, and is removed with it rather than left in the
-// directory the test binary was started in. The entry directory is restored
-// before the scratch directory is removed.
 struct ScratchWorkingDir : ScratchDir {
   std::filesystem::path entry = std::filesystem::current_path();
 

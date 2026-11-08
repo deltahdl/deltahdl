@@ -23,15 +23,6 @@
 namespace delta {
 namespace {
 
-// §37.3.6 (Object protection properties) states that every object carries a
-// vpiIsProtected Boolean property - not drawn in the data model diagrams - that
-// vpi_get() reports as TRUE when the handle denotes code sealed in a decryption
-// envelope and FALSE otherwise. Unless otherwise specified, accessing any
-// relationship or property of a protected object is an error; the vpiType and
-// vpiIsProtected properties are the stated exception and shall be permitted for
-// all objects. These tests drive the production routines through the public C
-// entry points, exactly as a PLI program would, by installing a private context
-// as the global one.
 class VpiObjectProtection : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -40,18 +31,12 @@ class VpiObjectProtection : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim: every object has a vpiIsProtected property and vpi_get() reports it as
-// a Boolean - FALSE for an ordinary object that holds no protected code.
 TEST_F(VpiObjectProtection, GetIsProtectedReportsFalseForOrdinaryObject) {
   VpiObject net;
   net.type = vpiNet;
-  // default-constructed objects are not protected
   EXPECT_EQ(vpi_get(vpiIsProtected, VpiHandleOf(&net)), 0);
 }
 
-// Claim: access to the vpiType property of a protected object shall be
-// permitted for all objects - vpi_get(vpiType, ...) returns the real type
-// constant rather than erroring, and leaves no error recorded.
 TEST_F(VpiObjectProtection, GetTypeIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -63,9 +48,6 @@ TEST_F(VpiObjectProtection, GetTypeIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Claim: access to the vpiIsProtected property of a protected object is
-// likewise permitted - it is not blocked by the protected-object guard and
-// reports TRUE without recording an error.
 TEST_F(VpiObjectProtection, GetIsProtectedIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -77,11 +59,6 @@ TEST_F(VpiObjectProtection, GetIsProtectedIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Claim: unless otherwise specified, access to a property of a protected object
-// is an error. Any property other than the two permitted exceptions records an
-// error and yields vpiUndefined, the value vpi_get() returns on an error. The
-// vpiSize of a variable is otherwise specified, §37.59 detail 8 permitting it
-// on a protected expression, so a variable's vpiLineNo is queried.
 TEST_F(VpiObjectProtection, GetOtherPropertyOnProtectedObjectIsAnError) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -95,9 +72,6 @@ TEST_F(VpiObjectProtection, GetOtherPropertyOnProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
-// Claim (string form of the permitted exception): vpiType remains accessible on
-// a protected object through vpi_get_str, which hands back the type-constant
-// name without recording an error.
 TEST_F(VpiObjectProtection, GetStrTypeIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -111,9 +85,6 @@ TEST_F(VpiObjectProtection, GetStrTypeIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Claim (string form of the general rule): a string query for any other
-// property of a protected object is an error - it records the error and
-// supplies no string (a null pointer).
 TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -127,12 +98,6 @@ TEST_F(VpiObjectProtection, GetStrOtherPropertyOnProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
-// Claim (string form of the second permitted exception): vpiIsProtected is,
-// like vpiType, permitted on a protected object for all objects. Through
-// vpi_get_str it has no string representation (it is a Boolean), so the call
-// hands back a null pointer - but the protected-object guard must not have
-// fired, so no error is recorded. This distinguishes the permitted exception
-// (silent null) from a blocked property (null plus a recorded error).
 TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -144,13 +109,6 @@ TEST_F(VpiObjectProtection, GetStrIsProtectedIsPermittedOnProtectedObject) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Claim (relationship half of the general rule): the protected-object guard
-// covers access to an object's *relationships*, not only its properties - a
-// protected object's relationships are as closed to access as its properties.
-// Traversing a one-to-one relationship out of a protected reference object
-// records an error and yields no handle, whereas the identical traversal from
-// an ordinary object resolves normally. This confirms the guard keys off the
-// reference object's protection state rather than the traversal itself.
 TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   VpiObject child;
   child.type = vpiNet;
@@ -158,7 +116,6 @@ TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   VpiObject open_mod;
   open_mod.type = vpiModule;
   open_mod.children.push_back(&child);
-  // The contained-net relationship resolves from an unprotected reference.
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiNet, VpiHandleOf(&open_mod))), &child);
   s_vpi_error_info ok = {};
   EXPECT_EQ(vpi_chk_error(&ok), 0);
@@ -167,7 +124,6 @@ TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   locked_mod.type = vpiModule;
   locked_mod.children.push_back(&child);
   locked_mod.is_protected = true;
-  // ...but the same traversal is refused once the reference is protected.
   EXPECT_EQ(vpi_handle(vpiNet, VpiHandleOf(&locked_mod)), nullptr);
 
   s_vpi_error_info info = {};
@@ -175,10 +131,6 @@ TEST_F(VpiObjectProtection, RelationshipAccessOnProtectedObjectIsAnError) {
   EXPECT_NE(info.level, 0);
 }
 
-// Claim (the one-to-many half): iterating a relationship of a protected object
-// is refused the same way, yielding no iterator and recording an error that
-// vpi_chk_error() reports, while the iteration of an ordinary object succeeds
-// with none.
 TEST_F(VpiObjectProtection, IterationOnProtectedObjectIsAnError) {
   VpiObject child;
   child.type = vpiNet;
@@ -205,15 +157,10 @@ TEST_F(VpiObjectProtection, IterationOnProtectedObjectIsAnError) {
   EXPECT_NE(std::string(info.message).find("protected"), std::string::npos);
 }
 
-// Edge (boundary of the protected-object rule): the access error applies only
-// to protected objects. An ordinary object reports a non-exception property
-// such as vpiSize normally and records no error, confirming the guard keys off
-// the object's protection state rather than the property being requested.
 TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   VpiObject reg;
   reg.type = vpiReg;
   reg.size = 16;
-  // not protected
 
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&reg)), 16);
 
@@ -221,10 +168,6 @@ TEST_F(VpiObjectProtection, GetNonExceptionPropertyOnOrdinaryObjectSucceeds) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Whether each object of an instance that a location recorder other than the
-// instance's own marks -- its continuous assignment, its initial process, the
-// block that process runs and its assertion -- is protected, -1 for one the
-// instance holds none of.
 struct WrittenItemsSeen {
   int cont_assign = -1;
   int process = -1;
@@ -232,11 +175,6 @@ struct WrittenItemsSeen {
   int assertion = -1;
 };
 
-// What a PLI application reads of the design below while it runs: whether the
-// instance of the sealed module, the instance of the cleartext one and a net
-// declared inside the sealed module are protected, whether the sealed
-// instance's type and nets can be read, whether the cleartext one's nets can,
-// and the protection of each instance's written items.
 struct ProtectionSeen {
   int sealed_protected = -1;
   int sealed_type = -1;
@@ -250,8 +188,6 @@ struct ProtectionSeen {
 
 ProtectionSeen g_seen;
 
-// The net named `name` among the children of `scope`, read off the object
-// itself, which no VPI routine reaches inside a protected scope.
 VpiObject* NetNamedIn(vpiHandle scope, std::string_view name) {
   if (scope == nullptr) return nullptr;
   for (VpiObject* child : VpiObjectOf(scope)->children) {
@@ -260,8 +196,6 @@ VpiObject* NetNamedIn(vpiHandle scope, std::string_view name) {
   return nullptr;
 }
 
-// The first child of `obj` whose type is `type`, read off the object itself,
-// and null for none.
 VpiObject* ChildOfType(VpiObject* obj, int type) {
   if (obj == nullptr) return nullptr;
   for (VpiObject* child : obj->children) {
@@ -270,7 +204,6 @@ VpiObject* ChildOfType(VpiObject* obj, int type) {
   return nullptr;
 }
 
-// Whether `obj` is protected, -1 for no object.
 int ProtectionOf(VpiObject* obj) {
   return obj == nullptr ? -1 : vpi_get(vpiIsProtected, VpiHandleOf(obj));
 }
@@ -284,7 +217,7 @@ WrittenItemsSeen ReadWrittenItems(vpiHandle scope) {
           ProtectionOf(ChildOfType(instance, vpiAssert))};
 }
 
-PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 ReadProtectionCalltf(PLI_BYTE8*) {
   vpiHandle sealed = vpi_handle_by_name(VpiText("u"), nullptr);
   if (sealed != nullptr) {
     g_seen.sealed_protected = vpi_get(vpiIsProtected, sealed);
@@ -307,8 +240,6 @@ PLI_INT32 ReadProtectionCalltf(PLI_BYTE8* /*user_data*/) {
 
 constexpr std::string_view kKey = "protection-exchange-key";
 
-// A design instantiating a module sealed in a decryption envelope and one
-// written in the clear, encrypted by this tool under kKey.
 std::string SealedDesignSource() {
   const std::string kAuthored =
       "`pragma protect begin\n"
@@ -334,7 +265,6 @@ std::string SealedDesignSource() {
   return EncryptEnvelopes(kAuthored, kKey);
 }
 
-// Registers the $probe whose calltf reads the design's protection into g_seen.
 void RegisterProtectionProbe() {
   g_seen = ProtectionSeen();
   s_vpi_systf_data data = {};
@@ -357,42 +287,30 @@ class VpiProtectionInARun : public ::testing::Test {
   SimFixture f_;
 };
 
-// §37.3.6: the instance of a module declared in a decryption envelope
-// represents code contained in it, so it reports vpiIsProtected TRUE.
 TEST_F(VpiProtectionInARun, AnInstanceOfASealedModuleIsProtected) {
   EXPECT_EQ(g_seen.sealed_protected, 1);
 }
 
-// Its vpiType stays readable, as it does for every object.
 TEST_F(VpiProtectionInARun, ItsTypeStaysReadable) {
   EXPECT_EQ(g_seen.sealed_type, vpiModule);
 }
 
-// The nets it contains are not reached through it, that being a relationship
-// of a protected object.
 TEST_F(VpiProtectionInARun, ItsNetsAreNotReached) {
   EXPECT_FALSE(g_seen.sealed_nets_reached);
 }
 
-// A net declared inside the sealed module is itself code the envelope
-// contained.
 TEST_F(VpiProtectionInARun, ANetDeclaredInsideItIsProtected) {
   EXPECT_EQ(g_seen.inner_net_protected, 1);
 }
 
-// The instance of a module written in the clear is not protected.
 TEST_F(VpiProtectionInARun, AnInstanceOfACleartextModuleIsNot) {
   EXPECT_EQ(g_seen.clear_protected, 0);
 }
 
-// And its nets are reached as ever.
 TEST_F(VpiProtectionInARun, ACleartextInstancesNetsAreReached) {
   EXPECT_TRUE(g_seen.clear_nets_reached);
 }
 
-// A continuous assignment, a process, the block it runs and an assertion
-// written inside the envelope represent code it contained, so each is
-// protected...
 TEST_F(VpiProtectionInARun, TheItemsWrittenInsideItAreProtected) {
   EXPECT_EQ(g_seen.sealed_items.cont_assign, 1);
   EXPECT_EQ(g_seen.sealed_items.process, 1);
@@ -400,7 +318,6 @@ TEST_F(VpiProtectionInARun, TheItemsWrittenInsideItAreProtected) {
   EXPECT_EQ(g_seen.sealed_items.assertion, 1);
 }
 
-// ...and the same items written in the clear are not.
 TEST_F(VpiProtectionInARun, TheItemsWrittenInTheClearAreNot) {
   EXPECT_EQ(g_seen.clear_items.cont_assign, 0);
   EXPECT_EQ(g_seen.clear_items.process, 0);
@@ -421,25 +338,18 @@ class VpiProtectionInABoundRun : public ::testing::Test {
   SimFixture f_;
 };
 
-// §37.3.6: the code is the code the envelope contained whichever invocation
-// runs it, so the instance of the sealed module is protected in a run that
-// binds it from a library as in one that compiles it.
 TEST_F(VpiProtectionInABoundRun, AnInstanceOfASealedModuleIsProtected) {
   EXPECT_EQ(g_seen.sealed_protected, 1);
 }
 
-// And the net declared inside it.
 TEST_F(VpiProtectionInABoundRun, ANetDeclaredInsideItIsProtected) {
   EXPECT_EQ(g_seen.inner_net_protected, 1);
 }
 
-// The library holds the cleartext module beside it, and its instance is not.
 TEST_F(VpiProtectionInABoundRun, AnInstanceOfACleartextModuleIsNot) {
   EXPECT_EQ(g_seen.clear_protected, 0);
 }
 
-// A variable the design holds, its VPI object marked protected as one
-// declared in a decryption envelope is, for the value routines to be asked of.
 class VpiProtectedValueAccess : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -454,7 +364,6 @@ class VpiProtectedValueAccess : public ::testing::Test {
 
   void Protect() { VpiObjectOf(handle_)->is_protected = true; }
 
-  // The message of the error the last routine recorded, empty for none.
   std::string LastError() {
     s_vpi_error_info info = {};
     if (vpi_chk_error(&info) == 0 || info.message == nullptr) return "";
@@ -471,8 +380,6 @@ class VpiProtectedValueAccess : public ::testing::Test {
   vpiHandle handle_ = nullptr;
 };
 
-// §37.3.6: a protected object's value is not read: vpi_get_value records an
-// error and leaves the caller's value as it was.
 TEST_F(VpiProtectedValueAccess, GetValueLeavesTheCallersValue) {
   Protect();
   s_vpi_value value = {};
@@ -490,8 +397,6 @@ TEST_F(VpiProtectedValueAccess, GetValueIsAnError) {
   EXPECT_NE(LastError().find("protected"), std::string::npos);
 }
 
-// §37.3.6: nor is it written: vpi_put_value records an error, changes nothing
-// and schedules no event.
 TEST_F(VpiProtectedValueAccess, PutValueChangesNothing) {
   Protect();
   s_vpi_value value = {};
@@ -510,7 +415,6 @@ TEST_F(VpiProtectedValueAccess, PutValueIsAnError) {
   EXPECT_NE(LastError().find("protected"), std::string::npos);
 }
 
-// The array forms refuse a protected object the same way.
 TEST_F(VpiProtectedValueAccess, GetValueArrayIsAnError) {
   Protect();
   s_vpi_arrayvalue values = {};
@@ -529,7 +433,6 @@ TEST_F(VpiProtectedValueAccess, PutValueArrayIsAnError) {
   EXPECT_NE(LastError().find("protected"), std::string::npos);
 }
 
-// An object no envelope sealed is read as ever, with no error.
 TEST_F(VpiProtectedValueAccess, AnUnprotectedObjectIsRead) {
   s_vpi_value value = {};
   value.format = vpiIntVal;

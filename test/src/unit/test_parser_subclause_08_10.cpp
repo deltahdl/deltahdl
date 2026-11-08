@@ -89,11 +89,6 @@ TEST(StaticMethodParsing, StaticVirtualTaskError) {
       2, "8.10"));
 }
 
-// §8.10 (printed page 187): the qualifier before `function` makes the method
-// static and leaves its variables automatic, so it lands on the method item's
-// is_static_method and not on is_static, the lifetime keyword's flag. Folded
-// into is_static, the qualifier made §13.5.2's lifetime rule refuse the
-// method's ref formal.
 TEST(StaticMethodParsing, StaticFlagPropagatedToMethod) {
   auto r = Parse(
       "class C;\n"
@@ -109,9 +104,6 @@ TEST(StaticMethodParsing, StaticFlagPropagatedToMethod) {
   EXPECT_FALSE(m->is_virtual);
 }
 
-// The lifetime keyword after `task` is the other flag: is_static is set and
-// is_static_method is not, so the §8.6 report above stands on the lifetime
-// alone and the member is no static method.
 TEST(StaticMethodParsing, StaticLifetimeSetsTheLifetimeFlagAlone) {
   auto r = Parse(
       "class TwoTasks;\n"
@@ -127,9 +119,6 @@ TEST(StaticMethodParsing, StaticLifetimeSetsTheLifetimeFlagAlone) {
   EXPECT_FALSE(m->method->is_static_method);
 }
 
-// §8.10 distinguishes 'static' used as a method qualifier (before the method
-// keyword) from 'static' used as a variable-lifetime qualifier (after it). The
-// latter form on a class method is the ILLEGAL case the subclause illustrates.
 TEST(StaticMethodParsing, StaticLifetimeFunctionRejected) {
   auto r = Parse(
       "class C;\n"
@@ -137,8 +126,6 @@ TEST(StaticMethodParsing, StaticLifetimeFunctionRejected) {
       "    return 0;\n"
       "  endfunction\n"
       "endclass\n");
-  // §8.6 owns the report: Parser::ValidateClassMethod files the lifetime
-  // qualifier under the subclause stating a class method is automatic.
   EXPECT_TRUE(ReportedError(
       r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }
@@ -149,7 +136,6 @@ TEST(StaticMethodParsing, StaticLifetimeTaskRejected) {
       "  task static t2();\n"
       "  endtask\n"
       "endclass\n");
-  // §8.6 owns the report, as in StaticLifetimeFunctionRejected above.
   EXPECT_TRUE(ReportedError(
       r.diags, "class method shall not have static lifetime", 2, "8.6"));
 }

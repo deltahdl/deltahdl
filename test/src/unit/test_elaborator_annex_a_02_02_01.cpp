@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -165,8 +163,6 @@ TEST(NetAndVariableTypeElaboration, TypeReferenceElaborates) {
   auto* design = ElaborateSrc(
       "module m;\n"
       "  int x;\n"
-      // §6.23: a type_reference used in a variable declaration shall be
-      // preceded by the 'var' keyword.
       "  var type(x) y;\n"
       "endmodule\n",
       f);
@@ -210,10 +206,6 @@ TEST(NetAndVariableTypeElaboration, ConstDeclarationElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.2.2.1's package_scope includes `$unit ::`, through which §3.12.1 names a
-// compilation-unit declaration a local one hides: m's own T is a byte, and
-// `$unit::T a` is the unit's 4-bit T all the same, as `$unit::C::U b` is the
-// int the unit's class C declares (#7595).
 TEST(NetAndVariableTypeElaboration, TypeNamedThroughTheUnitScopeIsTheUnits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -238,9 +230,6 @@ TEST(NetAndVariableTypeElaboration, TypeNamedThroughTheUnitScopeIsTheUnits) {
   }
 }
 
-// A nettype's data type named through `$unit ::` is judged as the compilation
-// unit's type: §6.6.7 bars a class and a dynamic array from a nettype, and the
-// unit's C and DA are those, whatever a module would name C or DA (#7595).
 TEST(NetAndVariableTypeElaboration, NettypeOfAUnitClassOrDynamicArrayRejected) {
   ElabFixture f;
   Elaborate(
@@ -263,9 +252,6 @@ TEST(NetAndVariableTypeElaboration, NettypeOfAUnitClassOrDynamicArrayRejected) {
   }
 }
 
-// A.2.2.1's net_port_type writes a port of a user-defined nettype as the
-// nettype's name alone, so a packed dimension after it is reported on a body
-// port declaration.
 TEST(NetAndVariableTypeElaboration, APackedDimensionAfterABodyPortsNettype) {
   ElabFixture f;
   Elaborate(
@@ -283,8 +269,6 @@ TEST(NetAndVariableTypeElaboration, APackedDimensionAfterABodyPortsNettype) {
                              "a net of nettype 'nt' takes", 4, "A.2.2.1"));
 }
 
-// The same holds for an ANSI port naming a package's nettype, which the report
-// names as the package does.
 TEST(NetAndVariableTypeElaboration, APackedDimensionAfterAnAnsiPortsNettype) {
   ElabFixture f;
   Elaborate(

@@ -82,9 +82,6 @@ TEST(ValueParameters, DependentParamResolvesValue) {
   EXPECT_EQ(mask.resolved_value, 255);
 }
 
-// §6.20.2: a parameter with neither a type nor a range specification takes its
-// type and range from the value assigned to it; nothing is fixed by the
-// declaration itself.
 TEST(ValueParameters, UntypedUnrangedHasNoDeclaredTypeOrRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -103,8 +100,6 @@ TEST(ValueParameters, UntypedUnrangedHasNoDeclaredTypeOrRange) {
   EXPECT_EQ(p.resolved_value, 42);
 }
 
-// §6.20.2: a parameter with a range but no type specification has the range of
-// its declaration and is unsigned.
 TEST(ValueParameters, RangedUntypedIsUnsignedWithDeclaredRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -122,8 +117,6 @@ TEST(ValueParameters, RangedUntypedIsUnsignedWithDeclaredRange) {
   EXPECT_EQ(p.decl_width, 8u);
 }
 
-// §6.20.2: a parameter with a type but no range specification is of the type
-// specified; an int parameter carries that type's 32-bit width.
 TEST(ValueParameters, TypedUnrangedTakesDeclaredType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -140,8 +133,6 @@ TEST(ValueParameters, TypedUnrangedTakesDeclaredType) {
   EXPECT_EQ(p.decl_width, 32u);
 }
 
-// §6.20.2: a parameter with a signed type specification and a range is signed
-// and has the range of its declaration.
 TEST(ValueParameters, SignedRangedIsSignedWithDeclaredRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -159,9 +150,6 @@ TEST(ValueParameters, SignedRangedIsSignedWithDeclaredRange) {
   EXPECT_EQ(p.decl_width, 4u);
 }
 
-// §6.20.2: the sign and range of a ranged, untyped parameter are not affected
-// by a value override, so an override is coerced into the declared (unsigned)
-// width.
 TEST(ValueParameters, OverrideDoesNotAffectUnsignedRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -181,9 +169,6 @@ TEST(ValueParameters, OverrideDoesNotAffectUnsignedRange) {
   EXPECT_EQ(child->params[0].resolved_value, 15);
 }
 
-// §6.20.2: a signed, ranged parameter keeps its sign and range under an
-// override, so the override is coerced to the declared width with sign
-// extension.
 TEST(ValueParameters, OverrideDoesNotAffectSignedRange) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -202,9 +187,6 @@ TEST(ValueParameters, OverrideDoesNotAffectSignedRange) {
   EXPECT_EQ(child->params[0].resolved_value, -8);
 }
 
-// §6.20.2: a parameter with no range and only an implicit (bare `signed`) type
-// takes its range from the final value, so an override is not masked to a
-// fixed declared width.
 TEST(ValueParameters, OverrideOnSignedImplicitFollowsValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -223,9 +205,6 @@ TEST(ValueParameters, OverrideOnSignedImplicitFollowsValue) {
   EXPECT_EQ(child->params[0].resolved_value, 5);
 }
 
-// §6.20.2: bit-selects and part-selects of a parameter of an integral type are
-// allowed; here a part-select of an integral parameter feeds another
-// parameter's constant value.
 TEST(ValueParameters, PartSelectOfIntegralParameterAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -243,8 +222,6 @@ TEST(ValueParameters, PartSelectOfIntegralParameterAllowed) {
   EXPECT_EQ(x.resolved_value, 0xB);
 }
 
-// §6.20.2: a single-bit select of an integral parameter is likewise allowed;
-// bit 7 of 8'hAB is 1.
 TEST(ValueParameters, BitSelectOfIntegralParameterAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -262,8 +239,6 @@ TEST(ValueParameters, BitSelectOfIntegralParameterAllowed) {
   EXPECT_EQ(b.resolved_value, 1);
 }
 
-// §6.20.2: a value parameter may be set to an expression built from another
-// local parameter, one of the allowed constant primaries.
 TEST(ValueParameters, LocalParamSetFromLocalParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -281,8 +256,6 @@ TEST(ValueParameters, LocalParamSetFromLocalParam) {
   EXPECT_EQ(b.resolved_value, 5);
 }
 
-// §6.20.2: a parameter with a concrete data type but no range takes that
-// type's width; a byte parameter is 8 bits wide.
 TEST(ValueParameters, ByteTypedParameterTakesByteWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -299,9 +272,6 @@ TEST(ValueParameters, ByteTypedParameterTakesByteWidth) {
   EXPECT_EQ(p.decl_width, 8u);
 }
 
-// §6.20.2: the sign and range of a signed, ranged parameter are fixed by its
-// declaration, so a negative override survives unchanged when it fits the
-// declared width.
 TEST(ValueParameters, SignedOverrideRoundTripsNegative) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -320,9 +290,6 @@ TEST(ValueParameters, SignedOverrideRoundTripsNegative) {
   EXPECT_EQ(child->params[0].resolved_value, -2);
 }
 
-// §6.20.2: the real-to-integer conversion of §6.12.1 applies to parameters, so
-// an integer-typed parameter initialized from a real constant rounds to the
-// nearest integer (5.7 -> 6).
 TEST(ValueParameters, IntegerParameterFromRealConstantRounds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -339,13 +306,6 @@ TEST(ValueParameters, IntegerParameterFromRealConstantRounds) {
   EXPECT_EQ(p.resolved_value, 6);
 }
 
-// §6.20.2: the §6.12.1 real-to-integer conversion applies whenever the
-// parameter is in an integer context. A parameter with a packed range but no
-// type keyword is in an integer context by virtue of the range alone, so a real
-// initializer is rounded to the nearest integer (5.7 -> 6). This exercises the
-// range-induced integer context, distinct from the type-induced context of the
-// `int`/`integer` tests above. Rounding (6) rather than truncation (5) confirms
-// the §6.12.1 rule and not a mere cast.
 TEST(ValueParameters, RangedUntypedParameterAppliesRealToIntConversion) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -364,8 +324,6 @@ TEST(ValueParameters, RangedUntypedParameterAppliesRealToIntConversion) {
   EXPECT_EQ(p.resolved_value, 6);
 }
 
-// §6.20.2: the same conversion rounds half away from zero for negative real
-// initializers (-2.5 -> -3) of an integer-typed parameter.
 TEST(ValueParameters, IntegerParameterFromNegativeRealRoundsAwayFromZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -382,10 +340,6 @@ TEST(ValueParameters, IntegerParameterFromNegativeRealRoundsAwayFromZero) {
   EXPECT_EQ(p.resolved_value, -3);
 }
 
-// §6.20.2 (R3): a parameter given a type and no range has that type. The rule
-// must adapt to each admitted integer type, so a shortint parameter carries
-// that type's 16-bit width. Input form distinct from the int/byte tests: a
-// different concrete two-state type.
 TEST(ValueParameters, ShortintTypedParameterTakesShortintWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -402,8 +356,6 @@ TEST(ValueParameters, ShortintTypedParameterTakesShortintWidth) {
   EXPECT_EQ(p.decl_width, 16u);
 }
 
-// §6.20.2 (R3): a longint parameter is of the longint type and so carries its
-// 64-bit width — the widest admitted integer type input form.
 TEST(ValueParameters, LongintTypedParameterTakesLongintWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -420,8 +372,6 @@ TEST(ValueParameters, LongintTypedParameterTakesLongintWidth) {
   EXPECT_EQ(p.decl_width, 64u);
 }
 
-// §6.20.2 (R3): a bit-typed parameter is of the single-bit `bit` type, the
-// narrowest admitted type input form (width 1).
 TEST(ValueParameters, BitTypedParameterTakesSingleBitWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -438,11 +388,6 @@ TEST(ValueParameters, BitTypedParameterTakesSingleBitWidth) {
   EXPECT_EQ(p.decl_width, 1u);
 }
 
-// §6.20.2 (R2): a ranged, untyped parameter is unsigned and its range is not
-// affected by an override. A negative override value therefore does not make
-// the parameter signed: -1 into a 4-bit unsigned parameter is coerced to its
-// unsigned representation (15), not left as -1. This is the negative-override
-// input form, complementing the large-positive override test above.
 TEST(ValueParameters, NegativeOverrideIntoUnsignedRangeBecomesUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -461,10 +406,6 @@ TEST(ValueParameters, NegativeOverrideIntoUnsignedRangeBecomesUnsigned) {
   EXPECT_EQ(child->params[0].resolved_value, 15);
 }
 
-// §6.20.2 (R8, via §6.12.1): a real initializer exactly on a half boundary
-// rounds away from zero. Positive-tie input form: 2.5 -> 3 (a plain cast would
-// truncate to 2, and round-to-even would give 2), complementing the negative
-// tie -2.5 -> -3.
 TEST(ValueParameters, IntegerParameterFromPositiveHalfRoundsAwayFromZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -481,10 +422,6 @@ TEST(ValueParameters, IntegerParameterFromPositiveHalfRoundsAwayFromZero) {
   EXPECT_EQ(p.resolved_value, 3);
 }
 
-// §6.20.2 (R9): bit-/part-selects of parameters of integral types are allowed.
-// Integral-operand input form distinct from the packed-range declaration: here
-// the parameter is declared with the integral type `int`, and a part-select of
-// it still folds to a constant (bits [3:0] of 0xAB == 0xB).
 TEST(ValueParameters, PartSelectOfIntegerTypedParameterAllowed) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -502,13 +439,6 @@ TEST(ValueParameters, PartSelectOfIntegerTypedParameterAllowed) {
   EXPECT_EQ(b.resolved_value, 0xB);
 }
 
-// §6.20.2 (R9, negative): the rule permits selects only of parameters of
-// integral types. A real parameter is not integral, so a bit-select of it is
-// not allowed; here a continuous assignment reads bit 0 of a real parameter and
-// the elaborator rejects it. Built from real value-parameter syntax and driven
-// through the full parse+elaborate pipeline. §11.5.1 names a real variable or
-// real parameter as the alternative this operand falls under, so the report
-// names a real parameter rather than a scalar.
 TEST(ValueParameters, BitSelectOfRealParameterRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -523,16 +453,6 @@ TEST(ValueParameters, BitSelectOfRealParameterRejected) {
                             "11.5.1"));
 }
 
-// §6.20.2 forbids a hierarchical reference in a value parameter's default, and
-// CheckParamMapHierRefs in
-// src/elaborator/elaborator_validate_queries_dims.cpp stands that report at
-// the default expression's range.start. Here the default is a conditional
-// expression, and Parser::TryParseSpecialInfix in src/parser/expr_parser.cpp
-// left every ExprKind::kTernary without a position before this commit, so the
-// report printed "<unknown location>" and then dropped the source line and the
-// caret with it. Naming the line is what tells a user where the source broke
-// the rule; the conditional begins at its condition `sel` on line 2, which is
-// where `top.a` is written too.
 TEST(ValueParameters, HierarchicalReferenceInConditionalDefaultNamesItsLine) {
   ElabFixture f;
   ElaborateSrc(
@@ -546,15 +466,6 @@ TEST(ValueParameters, HierarchicalReferenceInConditionalDefaultNamesItsLine) {
       "parameter 'P' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
-// §6.20.2: a parameter constant may carry a type specification and a range
-// specification, so a parameter's value is a constant expression. A class #()
-// parameter port whose default names a module variable has no constant value,
-// and RecordClassParam in src/elaborator/elaborator_resolve.cpp stands the
-// report at that default expression's range.start -- the `v` on line 4. Before
-// that report the parameter was left out of the scope altogether, which read to
-// every later consumer as a name it could not see rather than as a value the
-// source got wrong, so the source elaborated with the parameter silently
-// absent.
 TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -569,14 +480,6 @@ TEST(ValueParameters, NonConstantClassParamDefaultIsRejected) {
       "class parameter 'P' value is not a constant expression", 4, "6.20.2"));
 }
 
-// §6.20.1 rules that every param_assignment in a class body becomes a
-// localparam declaration whether or not there is a parameter_port_list (printed
-// page 125 of IEEE 1800-2023), so a parameter declared in the class body is
-// under the §6.20.2 constancy rule exactly as a #() parameter port is. The two
-// reach RecordClassParam through different loops in RegisterClassParams --
-// cls->params for the ports, cls->members for the body declarations -- so a fix
-// covering only the ports leaves this one silent. The default's `v` stands on
-// line 5.
 TEST(ValueParameters, NonConstantClassBodyParamDefaultIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -592,12 +495,6 @@ TEST(ValueParameters, NonConstantClassBodyParamDefaultIsRejected) {
       "class parameter 'P' value is not a constant expression", 5, "6.20.2"));
 }
 
-// §6.20.1: in a list of parameter constants a parameter may depend on the ones
-// before it, which holds inside a class body as it does in a module.
-// `B = A * 2` is therefore a constant expression and the source is legal. This
-// is what the cheapest repair of the two rejections above would break, by
-// folding each class parameter against the compilation unit alone and reporting
-// every one that names a sibling.
 TEST(ValueParameters, ClassParamDefaultDependsOnEarlierClassParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -610,12 +507,6 @@ TEST(ValueParameters, ClassParamDefaultDependsOnEarlierClassParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §8.25 binds a class's type parameter only when the class is specialized, so
-// `$bits(T)` has no value where it stands and is not a breach of §6.20.2's
-// constancy rule. The source is legal and must elaborate without a report,
-// which is what distinguishes a value the source got wrong from a value that
-// is not yet decided. A rejection here would make every parameterized class
-// whose value parameter is sized from its type parameter unwritable.
 TEST(ValueParameters, ClassParamDefaultComputedFromTypeParamIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -628,14 +519,6 @@ TEST(ValueParameters, ClassParamDefaultComputedFromTypeParamIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2: hierarchical names are forbidden. The sentence admits no exception
-// for a hierarchical name whose target happens to be a parameter, so `parent.P`
-// is a breach of it although `P` is a parameter of `parent`. What the clause
-// rules out is the target's being reached hierarchically. Reading the parameter
-// from the declaration of `parent` rather than from an elaborated instance of
-// it is what makes the value wrong: an instance override of `P` supplied under
-// §23.10.2 does not reach `K`, so two instances of `child` under
-// differently-overridden parents would take the same `K`.
 TEST(ValueParameters,
      HierarchicalParameterReferenceInParameterValueIsReported) {
   ElabFixture f;
@@ -653,12 +536,6 @@ TEST(ValueParameters,
       "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
-// §6.20.2 names `parameter`, `localparam` and `specparam` in one sentence, so
-// the localparam spelling of the source above breaks the same rule and draws
-// the same report. §6.20.4's report stands beside it, because a hierarchical
-// name is not a constant expression either; what this case asserts is that the
-// clause naming what is wrong with the initializer is one of the two, which it
-// was not before this commit.
 TEST(ValueParameters,
      HierarchicalParameterReferenceInLocalparamValueIsReported) {
   ElabFixture f;
@@ -676,10 +553,6 @@ TEST(ValueParameters,
       "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
-// §6.20.2 on a hierarchical name whose target is a variable rather than a
-// parameter. This arm of the rule was already enforced, and it is here so that
-// a repair of the parameter arm is written as widening the rule rather than as
-// deleting the check that carries it.
 TEST(ValueParameters, HierarchicalVariableReferenceInParameterValueIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -696,12 +569,6 @@ TEST(ValueParameters, HierarchicalVariableReferenceInParameterValueIsReported) {
       "parameter 'K' value contains a hierarchical reference", 2, "6.20.2"));
 }
 
-// §6.20.2 states three rules in three consecutive sentences, and this is the
-// middle one: package references are permitted. It sits between what a value
-// parameter may be set to and the sentence forbidding hierarchical names, and
-// it was the untested one, so `p::N` was rejected under the sentence three
-// words after it. Sharing a width or a depth through a package parameter is
-// what §26.2 packages are ordinarily for.
 TEST(ValueParameters, PackageParameterReferenceInParameterValueIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -716,9 +583,6 @@ TEST(ValueParameters, PackageParameterReferenceInParameterValueIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.2's first sentence names parameter, localparam and specparam together,
-// so the localparam spelling of the source above is admitted by the same
-// sentence and rejected by the same defect.
 TEST(ValueParameters, PackageParameterReferenceInLocalparamValueIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -733,10 +597,6 @@ TEST(ValueParameters, PackageParameterReferenceInLocalparamValueIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The value, because acceptance alone would pass an elaborator that admitted
-// the reference and then read nothing through it. K is 4 rather than 0, so a
-// reference resolved to nothing is a different number from a reference
-// resolved.
 TEST(ValueParameters, PackageParameterReferenceResolvesItsValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -757,12 +617,6 @@ TEST(ValueParameters, PackageParameterReferenceResolvesItsValue) {
   EXPECT_EQ(k->resolved_value, 4);
 }
 
-// §6.20.2 forbids a hierarchical name, and a method call is not one. §23.6
-// makes a hierarchical name one qualified by the scope it is declared in, while
-// `NAME.len()` is §13.5's `expression.method(...)` written on a parameter of
-// this very module. §11.2.1 admits a constant function of such operands and
-// §6.16.1 associates len() with string, so the source is legal and was
-// rejected.
 TEST(ValueParameters, MethodCallOnAStringParameterIsAcceptedInAParameterValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -775,9 +629,6 @@ TEST(ValueParameters, MethodCallOnAStringParameterIsAcceptedInAParameterValue) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The value, because acceptance alone would pass an elaborator that admitted
-// the call and read nothing through it. "abc" is three characters, and 3 is not
-// what an unresolved parameter holds.
 TEST(ValueParameters, MethodCallOnAStringParameterResolvesItsValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -796,12 +647,6 @@ TEST(ValueParameters, MethodCallOnAStringParameterResolvesItsValue) {
   EXPECT_EQ(w->resolved_value, 3);
 }
 
-// The arm where the call really is illegal. §5.13 associates len() with string
-// alone, so `S.len()` over an integer S is not a constant expression and
-// §6.20.4 is the rule it breaks. That report already stood; what this asserts
-// is that §6.20.2's no longer stands beside it, naming a hierarchical name the
-// source does not contain. Reporting the right rule and reporting any rule are
-// what this case separates.
 TEST(ValueParameters, MethodCallOnANonStringParameterReportsOnly6_20_4) {
   ElabFixture f;
   ElaborateSrc(
@@ -818,14 +663,6 @@ TEST(ValueParameters, MethodCallOnANonStringParameterReportsOnly6_20_4) {
   }
 }
 
-// §8.26 lets a class declaration appear "within a module", and §6.20.1 says the
-// same thing of every class body wherever it stands, so the constancy rule the
-// two cases above assert of a compilation-unit class is the rule here too.
-// Registration walked the compilation unit's classes alone, so a class written
-// inside a module had its defaults folded and checked nowhere: this source
-// elaborated in silence, and the default was then evaluated at each
-// construction against whatever `n` held, a per-object value where §6.20 has
-// one constant. The `n` stands on line 3.
 TEST(ValueParameters, NonConstantModuleScopedClassParamDefaultIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -840,12 +677,6 @@ TEST(ValueParameters, NonConstantModuleScopedClassParamDefaultIsRejected) {
       "class parameter 'W' value is not a constant expression", 3, "6.20.2"));
 }
 
-// The other half of the same registration: §6.20.1's constant_param_expression
-// is constant in the scope the class stands in, and a class inside a module
-// stands in the module's, so a default naming one of the module's parameters
-// folds rather than being reported. It is what a repair that folded a
-// module-scope class against the compilation unit alone would break, every such
-// default naming a name that scope has never heard of.
 TEST(ValueParameters, ModuleScopedClassParamDefaultFoldsAgainstAModuleParam) {
   ElabFixture f;
   ElaborateSrc(
@@ -858,11 +689,6 @@ TEST(ValueParameters, ModuleScopedClassParamDefaultFoldsAgainstAModuleParam) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.2 with §6.20.2 (printed page 126): the folded resolved_value holds 64
-// bits and the declared range survives an override, so an instance's parameter
-// value assignment leaves the expression it was folded from on the parameter,
-// for the simulator to read whole, while a parameter holding its declaration's
-// own value records none -- default_value already names that expression.
 TEST(ValueParameters, InstanceOverrideRecordsItsExpressionAndADefaultDoesNot) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -887,14 +713,6 @@ TEST(ValueParameters, InstanceOverrideRecordsItsExpressionAndADefaultDoesNot) {
   EXPECT_EQ(u->params[1].override_expr, nullptr);
 }
 
-// §6.20.2 has a localparam take a constant expression, and §5.7.1 (printed
-// page 77) sizes a based literal by its size constant, so a 96-bit literal is
-// a constant whose value reaches past the 64 bits resolved_value holds. The
-// fold keeps the value's low 64 bits, so a constant computed from those bits
-// at elaboration -- the low byte of P -- is the byte the digits wrote, 0x33,
-// where a fold that lost the whole value to its width read 0. The literal's
-// width is read from its size constant apart from its digits, so $bits of the
-// same literal is 96 either way.
 TEST(ValueParameters, WideLiteralLocalparamFoldsItsLowSixtyFourBits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -916,10 +734,6 @@ TEST(ValueParameters, WideLiteralLocalparamFoldsItsLowSixtyFourBits) {
   EXPECT_EQ(w->resolved_value, 96);
 }
 
-// §6.20.2 (printed page 126) gives P the 96 bits of its declared range, and
-// §11.5.1 (printed 296) lets a select address any of them, so a select at or
-// above bit 64 reads the digits there and a shift by 64 brings them down: a
-// fold that held the low 64 bits alone read 0 through H, M and QL.
 TEST(ValueParameters, SelectAtOrAboveBitSixtyFourReadsTheWideValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(

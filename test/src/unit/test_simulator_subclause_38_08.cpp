@@ -15,8 +15,6 @@
 namespace delta {
 namespace {
 
-// A stand-in application callback routine. vpi_get_cb_info() reports the stored
-// cb_rtn pointer; it is never invoked by these tests.
 int SampleCbRtn(s_cb_data*) { return 0; }
 
 class VpiGetCbInfoSim : public ::testing::Test {
@@ -32,8 +30,6 @@ class VpiGetCbInfoSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.8: vpi_get_cb_info() shall report the information about a simulation-
-// related callback into an s_cb_data structure.
 TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
   int marker = 0;
   VpiObject watched;
@@ -57,8 +53,6 @@ TEST_F(VpiGetCbInfoSim, ReportsRegisteredCallbackInfo) {
   EXPECT_EQ(out.user_data, reinterpret_cast<PLI_BYTE8*>(&marker));
 }
 
-// §38.8: the routine reports the callback's trigger object as well, so a handle
-// stored at registration round-trips back through vpi_get_cb_info().
 TEST_F(VpiGetCbInfoSim, ReportsTriggerObject) {
   sim_ctx_.CreateVariable("sig", 8);
   vpi_ctx_.Attach(sim_ctx_);
@@ -78,8 +72,6 @@ TEST_F(VpiGetCbInfoSim, ReportsTriggerObject) {
   EXPECT_EQ(out.reason, cbForce);
 }
 
-// §38.8: the reported s_cb_data carries the callback's time and value pointers
-// too (Figure 38-2 fields), so they round-trip back through vpi_get_cb_info().
 TEST_F(VpiGetCbInfoSim, ReportsTimeAndValuePointers) {
   s_vpi_time cb_time = {};
   s_vpi_value cb_value = {};
@@ -97,9 +89,6 @@ TEST_F(VpiGetCbInfoSim, ReportsTimeAndValuePointers) {
   EXPECT_EQ(out.value, &cb_value);
 }
 
-// §38.8: the memory for the destination structure is allocated by the
-// application. The routine only writes the caller-supplied storage; it neither
-// allocates nor frees it. A null destination is therefore a safe no-op.
 TEST_F(VpiGetCbInfoSim, NullDestinationIsSafeNoOp) {
   s_cb_data reg = {};
   reg.reason = cbStartOfReset;
@@ -107,10 +96,9 @@ TEST_F(VpiGetCbInfoSim, NullDestinationIsSafeNoOp) {
   vpiHandle cb = vpi_register_cb(&reg);
   ASSERT_NE(cb, nullptr);
 
-  vpi_get_cb_info(cb, nullptr);  // no crash, nothing to write into
+  vpi_get_cb_info(cb, nullptr);
 }
 
-// §38.8: a null handle names no callback, so the destination is left untouched.
 TEST_F(VpiGetCbInfoSim, NullHandleLeavesDestinationUntouched) {
   s_cb_data out = {};
   out.reason = 4242;
@@ -118,9 +106,6 @@ TEST_F(VpiGetCbInfoSim, NullHandleLeavesDestinationUntouched) {
   EXPECT_EQ(out.reason, 4242);
 }
 
-// §38.8: vpi_get_cb_info() reports simulation-related callbacks only. A handle
-// that names a system task/function callback (read through vpi_get_systf_info)
-// is not a valid argument here, so the destination is left untouched.
 TEST_F(VpiGetCbInfoSim, SystfCallbackHandleLeavesDestinationUntouched) {
   s_vpi_systf_data systf = {};
   systf.type = kVpiSysTask;
@@ -134,9 +119,6 @@ TEST_F(VpiGetCbInfoSim, SystfCallbackHandleLeavesDestinationUntouched) {
   EXPECT_EQ(out.reason, 5151);
 }
 
-// §38.8: the handle names a callback. An object of any other kind names none,
-// so the destination is left untouched rather than read out of the callback
-// registry by whatever index that object happens to carry.
 TEST_F(VpiGetCbInfoSim, NonCallbackHandleLeavesDestinationUntouched) {
   sim_ctx_.CreateVariable("v", 8);
   vpi_ctx_.Attach(sim_ctx_);
@@ -149,15 +131,10 @@ TEST_F(VpiGetCbInfoSim, NonCallbackHandleLeavesDestinationUntouched) {
   EXPECT_EQ(out.reason, 3131);
 }
 
-// §38.8 reports the registration, which a firing does not consume. §38.36.2
-// hands a simulation-time callback's routine a structure of the run's own
-// carrying the current simulation time, so what the application asked for is
-// still there to be read back afterwards - the same time pointer, with the
-// delay it was written with.
 TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
   s_vpi_time cb_time = {};
   cb_time.type = vpiSimTime;
-  cb_time.low = 15;  // the delay asked for
+  cb_time.low = 15;
 
   int marker = 0;
   s_cb_data reg = {};
@@ -178,9 +155,6 @@ TEST_F(VpiGetCbInfoSim, ReportsTheRegistrationAfterTheCallbackHasFired) {
   EXPECT_EQ(cb_time.low, 15u);
 }
 
-// §38.8 with §39.4.2: a callback placed on an assertion is a callback object
-// that stands for no simulation-related registration, so there is no s_cb_data
-// to report for it and the caller's structure is left as it was.
 TEST_F(VpiGetCbInfoSim, AnAssertionCallbackHasNoSimulationRecordToReport) {
   VpiHandle placed = vpi_ctx_.CreateAssertionCallbackObject(7);
   s_cb_data out = {};

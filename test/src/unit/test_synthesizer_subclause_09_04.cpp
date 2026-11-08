@@ -12,15 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4: a procedural timing control delays when a procedural statement occurs,
-// which is a property of a simulation rather than of hardware. The kind stands
-// for the timing controls as a family, above the delay control of §9.4.1 and
-// the event control of §9.4.2, and it gets its own sentence and its own
-// position like every other construct the walk rejects.
-//
-// The statement is built here rather than parsed because no production yields
-// this kind: src/parser/ builds a kDelay or a kEventControl for every timing
-// control it reads, so a source text cannot reach the branch under test.
 TEST(ProceduralTimingControlSynthesis, TimingControlStmtIsRejectedByName) {
   SynthFixture f;
   auto fid = f.src_mgr.AddFile("<test>",
@@ -31,10 +22,6 @@ TEST(ProceduralTimingControlSynthesis, TimingControlStmtIsRejectedByName) {
   stmt->kind = StmtKind::kTimingControl;
   stmt->range.start = SourceLoc{fid, 2, 3};
   SynthLower synth(f.arena, f.diag);
-  // The module is what CheckStmtSynthesizable asks which identifiers name
-  // events of, and only for a kEventControl. A kTimingControl reaches
-  // NonSynthStmtRule without consulting it, so an empty module is enough and
-  // says the statement kind under test does not depend on one.
   RtlirModule mod;
   EXPECT_FALSE(synth.CheckStmtSynthesizable(stmt, &mod));
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),

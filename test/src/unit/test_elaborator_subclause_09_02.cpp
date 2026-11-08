@@ -60,9 +60,6 @@ TEST(StructuredProcedureElaboration, AllSixProcedureTypesElaborate) {
 
 TEST(StructuredProcedureElaboration, MultipleProcessesElaborate) {
   ElabFixture f;
-  // §6.10: implicit declarations apply only to nets in specific contexts; an
-  // undeclared name on a procedural assignment LHS is an error, so the
-  // variables these processes drive must be declared explicitly.
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic a, b, c;\n"
@@ -123,7 +120,6 @@ TEST(StructuredProcedureElaboration,
       "  function :initial int f(); return 0; endfunction\n"
       "endmodule\n",
       f);
-  // Rejected under §13.4, whose Syntax 13-2 prints footnote 25.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "a function's dynamic_override_specifiers belong on a class "
@@ -138,7 +134,6 @@ TEST(StructuredProcedureElaboration, DynamicOverrideRejectedOnModuleLevelTask) {
       "  task :final t(); endtask\n"
       "endmodule\n",
       f);
-  // Rejected under §13.3, whose Syntax 13-1 prints footnote 25.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "a task's dynamic_override_specifiers belong on a class "
@@ -154,7 +149,6 @@ TEST(StructuredProcedureElaboration,
       "  task :extends t(); endtask\n"
       "endmodule\n",
       f);
-  // Rejected under §13.3, whose Syntax 13-1 prints footnote 25.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "a task's dynamic_override_specifiers belong on a class "
@@ -162,10 +156,6 @@ TEST(StructuredProcedureElaboration,
                     2, "13.3"));
 }
 
-// Footnote 25 accepting path: the override specifier IS legal when the method
-// is declared in a class that is not an interface class. This anchors the three
-// module-level rejections above -- without it, a rule that flagged any override
-// specifier regardless of scope would still pass those negatives.
 TEST(StructuredProcedureElaboration,
      DynamicOverrideAcceptedOnNonInterfaceClassMethod) {
   ElabFixture f;

@@ -92,9 +92,6 @@ TEST(ObjectMethodElaboration, MultipleMethodCallsElaborate) {
              "endmodule\n"));
 }
 
-// The example of #5795: a select of a member the class does not declare,
-// b.nosuch, stands under §8.5, and a call of a method its class does not
-// declare, b.h.nosuch(), under §8.6, each reported at the name it selects.
 TEST(ObjectMethodElaboration, UndeclaredMemberAndMethodAreReported) {
   ElabFixture f;
   ElabOk(
@@ -113,8 +110,6 @@ TEST(ObjectMethodElaboration, UndeclaredMemberAndMethodAreReported) {
                             "8.6"));
 }
 
-// A method a class inherits (§8.13) is one of its members, and so are the
-// methods §18 gives every object.
 TEST(ObjectMethodElaboration, InheritedAndBuiltInMethodsAreMembers) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -132,9 +127,6 @@ TEST(ObjectMethodElaboration, InheritedAndBuiltInMethodsAreMembers) {
              "endmodule\n"));
 }
 
-// A method an interface class declares (§8.26) is a member of each class
-// implementing it and of each interface class extending it, the interface
-// class two others extend among them.
 TEST(ObjectMethodElaboration, MethodOfAnInterfaceClassIsAMember) {
   EXPECT_TRUE(
       ElabOk("interface class J;\n"
@@ -158,8 +150,6 @@ TEST(ObjectMethodElaboration, MethodOfAnInterfaceClassIsAMember) {
              "endmodule\n"));
 }
 
-// A method of a class reaches a property of its own by its bare name, and a
-// call through that property is held to the property's class.
 TEST(ObjectMethodElaboration, UndeclaredMethodThroughAPropertyIsReported) {
   ElabFixture f;
   ElabOk(
@@ -176,8 +166,6 @@ TEST(ObjectMethodElaboration, UndeclaredMethodThroughAPropertyIsReported) {
                             "8.6"));
 }
 
-// A method returning a handle selects from what it returns, which is not
-// resolved, and the method itself is a member of the class it is called on.
 TEST(ObjectMethodElaboration, SelectFromAMethodResultIsUnchecked) {
   EXPECT_TRUE(
       ElabOk("class H;\n"

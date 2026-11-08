@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "common/types.h"
@@ -642,9 +641,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.7 / Table 23-1: a uwire external net paired with an internal wand is
-// a dominated net whose merge is flagged. Exercises uwire in the external
-// position (the reverse pairing, uwire internal, is covered separately).
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWandExternalUwireWarns) {
   ElabFixture f;
@@ -661,9 +657,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.7 / Table 23-1: a wire-category internal net dominates a uwire
-// external net with no warning; the no-warn (negative) case for uwire on the
-// external side.
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWireExternalUwireNoWarning) {
   ElabFixture f;
@@ -680,9 +673,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.7 / Table 23-1: `tri` on the external side resolves to the same
-// category as `wire`, so pairing it with an internal wand does not warn.
-// Exercises the tri alias resolved through the external-signal lookup.
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWandExternalTriNoWarning) {
   ElabFixture f;
@@ -699,9 +689,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.7 / Table 23-1: `triand` on the external side resolves to the wand
-// category, so an internal wor paired with it warns. Exercises the triand alias
-// in the external position.
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWorExternalTriandWarns) {
   ElabFixture f;
@@ -718,9 +705,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// §23.3.3.7 / Table 23-1: `trior` on the external side resolves to the wor
-// category, so an internal wand paired with it warns. Exercises the trior alias
-// in the external position.
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWandExternalTriorWarns) {
   ElabFixture f;
@@ -737,9 +721,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_GT(f.diag.WarningCount(), 0u);
 }
 
-// Returns the resolved net type of the named net in the named elaborated
-// module, or kNone when either is absent. Lets the collapse tests observe the
-// type the instantiation-side net ends up with after port binding.
 static NetType ElaboratedNetType(RtlirDesign* design, std::string_view module,
                                  std::string_view net_name) {
   auto it = design->all_modules.find(module);
@@ -750,9 +731,6 @@ static NetType ElaboratedNetType(RtlirDesign* design, std::string_view module,
   return NetType::kNone;
 }
 
-// §23.3.3.7 / Table 23-1: an internal wand net dominates an external wire net,
-// so the collapsed simulated net (the instantiation-side net) takes the wand
-// type.
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalWandDominatesCollapsedNetBecomesWand) {
   ElabFixture f;
@@ -769,8 +747,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kWand);
 }
 
-// §23.3.3.7 / Table 23-1: an internal trireg net dominates an external wire
-// net, so the collapsed simulated net takes the trireg type.
 TEST(DissimilarNetTypePortConnectionElaboration,
      InternalTriregDominatesCollapsedNetBecomesTrireg) {
   ElabFixture f;
@@ -787,9 +763,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kTrireg);
 }
 
-// §23.3.3.7 / Table 23-1: when the external net dominates (external wand,
-// internal wire), the instantiation-side net keeps the external type; the
-// collapse leaves the dominating external net unchanged.
 TEST(DissimilarNetTypePortConnectionElaboration,
      ExternalWandDominatesCollapsedNetStaysWand) {
   ElabFixture f;
@@ -806,9 +779,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kWand);
 }
 
-// §23.3.3.7 / Table 23-1: when neither net dominates (internal wand, external
-// trireg), the external net type is used, so the instantiation-side net keeps
-// its declared trireg type.
 TEST(DissimilarNetTypePortConnectionElaboration,
      NeitherDominatesCollapsedNetKeepsExternalTrireg) {
   ElabFixture f;
@@ -825,9 +795,6 @@ TEST(DissimilarNetTypePortConnectionElaboration,
   EXPECT_EQ(ElaboratedNetType(design, "top", "w"), NetType::kTrireg);
 }
 
-// §23.3.3.7 / Table 23-1 with §23.2.2.3: an input port declared with a data
-// type alone is a net of the default net type, here wand, which dominates the
-// external wire, so the collapsed net is a wand (#7391).
 TEST(DissimilarNetTypePortConnectionElaboration,
      DataTypedInputOfTheDefaultNetTypeDominatesExternalWire) {
   ElabFixture f;

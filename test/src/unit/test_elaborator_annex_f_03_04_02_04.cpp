@@ -12,28 +12,16 @@
 
 using namespace delta;
 
-// §F.3.4.2.4 unfolds the remaining derived sequence operators: and, within
-// and throughout into intersect with a padding of 1[*0:$] or a repetition of
-// the Boolean, and a sequence match item list into fusions with the §F.3.2
-// sampling form. Each case checks the tree a form unfolds to against the
-// identity the subclause states, then the words that tightly satisfy it, under
-// §F.5.2 for the first three and §F.5.5 for the local variable form.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto BoolSeq(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// 1[*0:$] in the §F.3.4.2.1 unfolding of [*0:$].
 std::shared_ptr<const SequenceExpr> AnyRun() {
   return SeqRepeatAtLeast(SeqBoolean(BoolTrue()), 0);
 }
 
-// (R1 and R2) is (((R1 ##1 1[*0:$]) intersect R2) or (R1 intersect (R2 ##1
-// 1[*0:$]))): (a ##1 b) and c is matched by a c then b, where c ends first,
-// and a and (c ##1 d) by a c then d, where a ends first; neither by a word
-// whose operands start at different letters.
 TEST(DerivedSequenceOperators, AndMatchesBothFromOneLetterToTheLongerEnd) {
   auto ab = SeqConcat(BoolSeq("a"), BoolSeq("b"));
   auto c = BoolSeq("c");
@@ -51,9 +39,6 @@ TEST(DerivedSequenceOperators, AndMatchesBothFromOneLetterToTheLongerEnd) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"c"}), A({"a", "d"})}, *a_and_cd));
 }
 
-// (R1 within R2) is ((1[*0:$] ##1 R1 ##1 1[*0:$]) intersect R2): a within
-// (c ##1 c ##1 c) is matched by three letters c with a at any of them, and not
-// by three letters c without a or by a word that is not three letters c.
 TEST(DerivedSequenceOperators, WithinMatchesTheFirstInsideTheSecond) {
   auto a = BoolSeq("a");
   auto c = BoolSeq("c");
@@ -76,8 +61,6 @@ TEST(DerivedSequenceOperators, WithinMatchesTheFirstInsideTheSecond) {
   EXPECT_FALSE(TightlySatisfies(Word{A({"a", "c"}), A({"c"})}, *a_within_ccc));
 }
 
-// (b throughout R) is ((b[*0:$]) intersect R): b throughout (a ##1 c) is
-// matched by a then c with b at both letters and not with b missing at either.
 TEST(DerivedSequenceOperators, ThroughoutHoldsTheBooleanAtEveryLetter) {
   auto b = BoolAtom("b");
   auto ac = SeqConcat(BoolSeq("a"), BoolSeq("c"));
@@ -96,10 +79,6 @@ TEST(DerivedSequenceOperators, ThroughoutHoldsTheBooleanAtEveryLetter) {
       TightlySatisfies(Word{A({"a", "b"}), A({"b"})}, *b_throughout_ac));
 }
 
-// (R, v = e) is (R ##0 (1, v = e)) and (R, v1 = e1, ..., vk = ek) is
-// ((R, v1 = e1) ##0 (1, v2 = e2, ..., vk = ek)): under §F.5.5 the match of
-// a ##1 c with two assignments binds both names to the letter the match ends
-// at, and a word that does not match R binds nothing.
 TEST(DerivedSequenceOperators, MatchItemsFuseSamplingsOntoTheLastLetter) {
   auto ac = SeqConcat(BoolSeq("a"), BoolSeq("c"));
   auto one = SeqBoolean(BoolTrue());

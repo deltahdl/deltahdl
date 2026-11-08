@@ -5,8 +5,6 @@
 
 using namespace delta;
 
-// Add a coverpoint "x" to |g| with two user-defined value bins, b0 matching
-// value 0 and b1 matching value 1, and return the new coverpoint.
 inline CoverPoint* AddTwoValueBinPoint(CoverGroup* g) {
   auto* cp = CoverageDB::AddCoverPoint(g, "x");
   CoverBin b0;

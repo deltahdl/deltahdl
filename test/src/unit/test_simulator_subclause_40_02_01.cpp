@@ -18,22 +18,12 @@ using namespace delta;
 
 namespace {
 
-// §40.2.1 "SystemVerilog coverage API" lists the criteria the API is written
-// to: (a) it works alike for every kind of coverage, a common interface across
-// the coverage types; (b) it supports statement, toggle, FSM and assertion
-// coverage, and may support more; (c) a new coverage type can be added to it
-// without disturbing any use of the existing ones; and (d) it can report the
-// coverage of a chosen part of the design's hierarchy without the user listing
-// every instance in that part. These tests hold the four to the access
-// functions of §40.3.2 and the routines of §40.5.3, which are what the API is
-// made of.
-
-constexpr int kAssertion = 20;  // §40.3.1 SV_COV_ASSERTION
-constexpr int kFsmState = 21;   // §40.3.1 SV_COV_FSM_STATE
-constexpr int kStatement = 22;  // §40.3.1 SV_COV_STATEMENT
-constexpr int kToggle = 23;     // §40.3.1 SV_COV_TOGGLE
-constexpr int kHier = 11;       // §40.3.1 SV_COV_HIER
-constexpr int kStart = 0;       // §40.3.1 SV_COV_START
+constexpr int kAssertion = 20;
+constexpr int kFsmState = 21;
+constexpr int kStatement = 22;
+constexpr int kToggle = 23;
+constexpr int kHier = 11;
+constexpr int kStart = 0;
 
 constexpr std::string_view kScope = "top.dut";
 
@@ -63,10 +53,6 @@ int RunGetMax(SimFixture& f, int coverage_type, std::string_view scope) {
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 
-// Criterion (a): the interface is the same whichever coverage is meant - the
-// coverage type is an argument of the one call rather than a call of its own,
-// so a program written against one type reads another by changing that
-// argument and nothing else.
 TEST(CoverageApiCriteria, OneInterfaceServesEveryCoverageType) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();
@@ -79,7 +65,6 @@ TEST(CoverageApiCriteria, OneInterfaceServesEveryCoverageType) {
   cov.SetCoverableItems(std::string(kScope), kToggle, 8);
   cov.SetCoveredItems(std::string(kScope), kToggle, 2);
 
-  // The same three functions, the same argument positions, two coverages.
   EXPECT_EQ(RunControl(f, kStart, kStatement, kScope),
             static_cast<int>(CoverageStatus::kOk));
   EXPECT_EQ(RunControl(f, kStart, kToggle, kScope),
@@ -90,11 +75,6 @@ TEST(CoverageApiCriteria, OneInterfaceServesEveryCoverageType) {
   EXPECT_EQ(RunGet(f, kToggle, kScope), 2);
 }
 
-// Criterion (b): the four coverage types §40.3.1 names - assertion, FSM state,
-// statement and toggle - are each supported, each with a count of its own, so
-// asking for one never answers out of another's tally. (FSM transitions, the
-// other half of the FSM coverage the criterion names, are a coverage type the
-// standard's own enumerations do not name; criterion (c) is what admits them.)
 TEST(CoverageApiCriteria, TheMinimumCoverageTypesAreEachSupported) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();
@@ -109,9 +89,6 @@ TEST(CoverageApiCriteria, TheMinimumCoverageTypesAreEachSupported) {
   EXPECT_EQ(RunGet(f, kToggle, kScope), 4);
 }
 
-// Criterion (b) on the VPI side of the same API: §40.5.1's four coverage-type
-// constants are the same four types, and each controls the collection through
-// the routine of §40.5.3.
 TEST(CoverageApiCriteria, TheVpiSideNamesTheSameMinimumTypes) {
   SimFixture f;
   VpiContext vpi_ctx;
@@ -133,11 +110,6 @@ TEST(CoverageApiCriteria, TheVpiSideNamesTheSameMinimumTypes) {
   SetGlobalVpiContext(nullptr);
 }
 
-// Criterion (c): a coverage type this tool has no notion of - a vendor's own,
-// say - goes through the same interface and reports that it offers no coverage,
-// and asking for it leaves every other type answering exactly as it did. That
-// is what criterion (c) asks of the interface: a new coverage type leaves every
-// existing use as it was.
 TEST(CoverageApiCriteria, AnUnknownCoverageTypeBreaksNoExistingUsage) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();
@@ -152,14 +124,9 @@ TEST(CoverageApiCriteria, AnUnknownCoverageTypeBreaksNoExistingUsage) {
   EXPECT_EQ(RunControl(f, kStart, kVendorCoverageType, kScope),
             static_cast<int>(CoverageStatus::kNoCoverage));
 
-  // The type that was there before is unchanged by the one that was not.
   EXPECT_EQ(RunGet(f, kToggle, kScope), 5);
 }
 
-// Criterion (d): coverage of a subhierarchy is obtained by naming that
-// subhierarchy, in one call. The instances inside it are never named by the
-// caller, and a second subhierarchy answers with its own numbers rather than
-// with the design's.
 TEST(CoverageApiCriteria, ASubhierarchyIsNamedRatherThanEnumerated) {
   SimFixture f;
   CoverageControlState& cov = f.ctx.GetCoverageControlState();
@@ -169,9 +136,6 @@ TEST(CoverageApiCriteria, ASubhierarchyIsNamedRatherThanEnumerated) {
   EXPECT_EQ(RunGet(f, kStatement, "top.dut"), 30);
   EXPECT_EQ(RunGet(f, kStatement, "top.checker"), 4);
 
-  // A subhierarchy the design does not hold is a bad argument, which is how the
-  // one call reports that it named nothing rather than silently answering out
-  // of the whole design.
   EXPECT_EQ(RunGet(f, kStatement, "top.absent"),
             static_cast<int>(CoverageStatus::kError));
 }

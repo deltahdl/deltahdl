@@ -35,8 +35,6 @@ TEST(ClassConstraintElaboration, WeakRefNewWithNullOk) {
 }
 
 TEST(ClassConstraintElaboration, WeakRefTwoInstancesSameReferentOk) {
-  // NOTE: weak0/weak1/strong0/strong1 are reserved drive-strength keywords
-  // (Annex B / Table B.1), so they cannot name variables here.
   EXPECT_TRUE(
       ElabOk("class obj;\n"
              "  int x;\n"

@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.20.6: unlike a localparam (fixed during elaboration), a const may be set
-// during simulation. An automatic const local to a subroutine takes its value
-// from a run-time argument each time the subroutine is entered. A single call
-// observes the const being computed at run time from the passed argument.
 TEST(ConstConstantSim, AutomaticConstTakesRuntimeArgumentValue) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int result;\n"
@@ -26,10 +22,6 @@ TEST(ConstConstantSim, AutomaticConstTakesRuntimeArgumentValue) {
             42u);
 }
 
-// §6.20.6: the automatic const is re-evaluated on every invocation, so two
-// calls with different arguments yield different const values within the same
-// simulation. A value fixed at elaboration could not vary between calls; this
-// distinguishes a const from a localparam.
 TEST(ConstConstantSim, AutomaticConstReevaluatedEachCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -48,9 +40,6 @@ TEST(ConstConstantSim, AutomaticConstReevaluatedEachCall) {
   LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 21u}});
 }
 
-// §6.20.6: a const in an automatic task takes its value from the task's input
-// each time the task is entered; two calls with different inputs give two
-// different values.
 TEST(ConstConstantSim, AutomaticTaskConstReevaluatedEachCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -70,8 +59,6 @@ TEST(ConstConstantSim, AutomaticTaskConstReevaluatedEachCall) {
   LowerRunAndCheck(f, design, {{"r1", 6u}, {"r2", 15u}});
 }
 
-// §6.20.6: a const declared automatic in a begin block of an initial process
-// is set during simulation from a variable assigned just before the block.
 TEST(ConstConstantSim, ConstVarAutomaticInBlockTakesRuntimeValue) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int result;\n"
@@ -88,9 +75,6 @@ TEST(ConstConstantSim, ConstVarAutomaticInBlockTakesRuntimeValue) {
             4u);
 }
 
-// §6.20.6: an automatic const in a loop body is initialized on every entry of
-// the body, so each iteration sees its own value; a value kept from the first
-// entry would leave every element 2.
 TEST(ConstConstantSim, AutomaticConstInLoopBodyNewValueEachEntry) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -112,9 +96,6 @@ TEST(ConstConstantSim, AutomaticConstInLoopBodyNewValueEachEntry) {
   LowerRunAndCheck(f, design, {{"r1", 2u}, {"r2", 4u}, {"r3", 6u}});
 }
 
-// §6.20.6: the initializer of an automatic const may read a module variable,
-// an expression no constant could take; the value read is the one the
-// variable holds when the block is entered.
 TEST(ConstConstantSim, AutomaticConstReadsModuleVariableAtEntry) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -134,8 +115,6 @@ TEST(ConstConstantSim, AutomaticConstReadsModuleVariableAtEntry) {
   LowerRunAndCheck(f, design, {{"r1", 7u}, {"r2", 9u}});
 }
 
-// §6.20.6: a const declared without a lifetime in a block nested inside an
-// automatic task is automatic too, and takes the task's input each call.
 TEST(ConstConstantSim, ImplicitlyAutomaticConstInTaskBlock) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -157,10 +136,6 @@ TEST(ConstConstantSim, ImplicitlyAutomaticConstInTaskBlock) {
   LowerRunAndCheck(f, design, {{"r1", 4u}, {"r2", 9u}});
 }
 
-// §6.20.6: a class method is automatic, so a const in it takes its value
-// from the argument and the object's property each time the method runs; the
-// second call, with a new argument and a changed property, gives a new value
-// where a const kept from the first call would give 105 again.
 TEST(ConstConstantSim, ClassMethodConstTakesRuntimeValue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -186,9 +161,6 @@ TEST(ConstConstantSim, ClassMethodConstTakesRuntimeValue) {
   LowerRunAndCheck(f, design, {{"r1", 105u}, {"r2", 207u}});
 }
 
-// §6.20.6: an automatic const may be initialized by a call of a function that
-// is not a constant function; the call runs at each entry, so the counter it
-// advances shows in each const.
 TEST(ConstConstantSim, AutomaticConstFromFunctionCallReevaluated) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -213,9 +185,6 @@ TEST(ConstConstantSim, AutomaticConstFromFunctionCallReevaluated) {
   LowerRunAndCheck(f, design, {{"r1", 1u}, {"r2", 2u}});
 }
 
-// §6.20.6: a const in an automatic task may be set from a module variable;
-// it reads the value the variable holds when the task is entered, 7 and then
-// 9, never the 5 it was declared with.
 TEST(ConstConstantSim, AutomaticTaskConstReadsModuleVariableWhenCalled) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -238,9 +207,6 @@ TEST(ConstConstantSim, AutomaticTaskConstReadsModuleVariableWhenCalled) {
   LowerRunAndCheck(f, design, {{"x", 14u}, {"y", 18u}});
 }
 
-// §6.20.6 with §6.21: in a module declared automatic, a task or function with
-// no lifetime keyword is automatic, so a const in it takes each call's
-// argument; a static const would keep the value of its first initialization.
 TEST(ConstConstantSim, ConstInAutomaticModuleSubroutineIsAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -267,8 +233,6 @@ TEST(ConstConstantSim, ConstInAutomaticModuleSubroutineIsAutomatic) {
                    {{"r1", 4u}, {"r2", 9u}, {"r3", 6u}, {"r4", 16u}});
 }
 
-// §6.20.6 with §6.21: a program declared automatic makes its task and function
-// automatic by default, so a const in each takes each call's argument.
 TEST(ConstConstantSim, ConstInAutomaticProgramSubroutineIsAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -298,9 +262,6 @@ TEST(ConstConstantSim, ConstInAutomaticProgramSubroutineIsAutomatic) {
                    {{"u.r1", 3u}, {"u.r2", 9u}, {"u.r3", 12u}, {"u.r4", 21u}});
 }
 
-// §6.20.6 with §6.21: an interface declared automatic makes its task and
-// function automatic by default, so a const in each, reached through an
-// interface instance, takes each call's argument.
 TEST(ConstConstantSim, ConstInAutomaticInterfaceSubroutineIsAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -330,9 +291,6 @@ TEST(ConstConstantSim, ConstInAutomaticInterfaceSubroutineIsAutomatic) {
                    {{"r1", 6u}, {"r2", 9u}, {"r3", 9u}, {"r4", 36u}});
 }
 
-// §6.20.6 with §6.21: a package declared automatic makes its task and
-// function automatic by default, so a const in each, called through the
-// package scope, takes each call's argument.
 TEST(ConstConstantSim, ConstInAutomaticPackageSubroutineIsAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -361,9 +319,6 @@ TEST(ConstConstantSim, ConstInAutomaticPackageSubroutineIsAutomatic) {
                    {{"r1", 7u}, {"r2", 17u}, {"r3", 9u}, {"r4", 37u}});
 }
 
-// §6.20.6 with §6.21: a const declared automatic inside a static task or
-// function overrides the enclosing static lifetime and is set on each entry,
-// so two calls give two values; a static const would repeat the first.
 TEST(ConstConstantSim, ExplicitlyAutomaticConstInStaticSubroutine) {
   SimFixture f;
   auto* design = ElaborateSrc(

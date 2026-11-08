@@ -11,12 +11,6 @@ bool IsImplicitResultType(const DataType& result) {
          result.type_ref_expr == nullptr;
 }
 
-// The prototype is read through the head of a task or function declaration,
-// which A.2.6 and A.2.7 let carry three things a prototype does not: a
-// lifetime, an `interface_identifier .` or class_scope prefix on the name, and
-// for a function an implicit result type (IsImplicitResultType),
-// function_prototype taking a data_type_or_void. Each is reported at the
-// prototype's `task` or `function` keyword.
 void ValidateExternTfPrototype(DiagEngine& diag, const ModuleItem* item) {
   if (item->is_automatic || item->is_static) {
     diag.Error(item->loc, "a task or function prototype takes no lifetime",
@@ -37,12 +31,6 @@ void ValidateExternTfPrototype(DiagEngine& diag, const ModuleItem* item) {
   }
 }
 
-// A class's `extern` and `pure virtual` methods are read through the same head,
-// and their method_prototype is the same function_prototype or task_prototype,
-// so the same three things are reported. A `static` lifetime is left to
-// ValidateClassMethod, which reports it on any class method under §8.6, a
-// class method being automatic. A constructor's class_constructor_prototype,
-// `function new`, writes no result type at all.
 void ValidateClassMethodPrototype(DiagEngine& diag, const ModuleItem* item) {
   if (item->is_automatic) {
     diag.Error(item->loc, "a class method prototype takes no lifetime",

@@ -32,10 +32,6 @@ TEST(DefaultNettypeElaboration, NoneWithExplicitDeclsElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The directive selects the type given to an implicitly declared net. Drive a
-// value other than the wire fallback through the real preprocessor and confirm
-// the net created for an undeclared continuous-assignment target adopts that
-// type, proving the directive — not the default — controls it end to end.
 TEST(DefaultNettypeElaboration, DirectiveControlsImplicitNetType) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -57,11 +53,6 @@ TEST(DefaultNettypeElaboration, DirectiveControlsImplicitNetType) {
   EXPECT_TRUE(found) << "implicit net 'w' not created";
 }
 
-// §22.8: the directive governs the net type of every implicitly declared net,
-// including the implicit scalar nets assumed for undeclared primitive (gate)
-// terminals — a producing position distinct from the continuous-assignment
-// target above. Drive a non-default directive through the real preprocessor and
-// confirm each gate-terminal net adopts it rather than the wire fallback.
 TEST(DefaultNettypeElaboration, DirectiveControlsPrimitiveTerminalNetType) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

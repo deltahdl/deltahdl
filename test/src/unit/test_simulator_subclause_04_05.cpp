@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -100,23 +98,13 @@ TEST(SimulationAlgorithmSim, ExecuteRegionDrainsAllEventsInFIFOOrder) {
   }
 }
 
-// One stage of a cascading event chain: a region to schedule into and the
-// label the stage records when it runs.
 struct CascadeStage {
   Region region;
   const char* label;
 };
 
-// Builds a chain of events from `stages` such that the first stage's callback
-// records its label and schedules the second stage in the current time slot,
-// the second schedules the third, and so on. The first stage is scheduled into
-// its own region at time {0}; each later stage is scheduled (in the current
-// time slot) from within the preceding stage's callback. Returns nothing; the
-// chain is wired into `sched`.
 void ScheduleReactiveCascade(Scheduler& sched, std::vector<std::string>& order,
                              const std::vector<CascadeStage>& stages) {
-  // Build callbacks back-to-front so each stage can capture an already-wired
-  // pointer to the next stage's event.
   std::vector<Event*> events(stages.size(), nullptr);
   for (size_t idx = stages.size(); idx-- > 0;) {
     Event* ev = sched.GetEventPool().Acquire();
@@ -323,11 +311,6 @@ TEST(SimulationAlgorithmSim,
   EXPECT_EQ(order[3], "pre_postponed");
 }
 
-// End-to-end observation of execute_time_slot's region order built from real
-// source syntax (the §4.4 region structure this pass depends on): the whole
-// Active region must fully drain before the NBA region runs. A blocking write
-// lands in the Active region, a nonblocking write is deferred to NBA, so a
-// later blocking read in the same block still sees the pre-NBA value.
 TEST(SimulationAlgorithmSim,
      RegionOrderDefersNonblockingUpdateUntilActiveDrains) {
   SimFixture f;
@@ -346,17 +329,10 @@ TEST(SimulationAlgorithmSim,
   lowerer.Lower(design);
   f.scheduler.Run();
 
-  // NBA update applied only after the Active region drained.
   EXPECT_EQ(f.ctx.FindVariable("a")->value.ToUint64(), 2u);
-  // The blocking read observed a before the NBA update took effect.
   EXPECT_EQ(f.ctx.FindVariable("b")->value.ToUint64(), 1u);
 }
 
-// End-to-end observation of execute_region's update-event branch through a
-// distinct input form of a process sensitive to the object (the §4.3
-// construct): a process armed with an explicit level-sensitive event control.
-// When the driven variable is updated at a later time slot, the update event
-// schedules evaluation of the sensitive process, which recomputes its target.
 TEST(SimulationAlgorithmSim, UpdatePropagatesThroughExplicitSensitivityList) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -375,7 +351,6 @@ TEST(SimulationAlgorithmSim, UpdatePropagatesThroughExplicitSensitivityList) {
   f.scheduler.Run();
 
   EXPECT_EQ(f.ctx.FindVariable("src")->value.ToUint64(), 5u);
-  // The sensitive always block re-evaluated after src's update event.
   EXPECT_EQ(f.ctx.FindVariable("dst")->value.ToUint64(), 6u);
 }
 

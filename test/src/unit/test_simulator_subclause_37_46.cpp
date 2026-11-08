@@ -14,26 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.46 Net drivers and loads: the vpiDriver and vpiLoad edges relate a net to
-// the objects that drive it and the objects that load (read) it. The figure's
-// driver kinds are a port, a force, a delay terminal, a continuous assignment
-// (whole or single bit), and a primitive terminal; the load kinds are those
-// without a port but with an assignment statement, since a net is loaded - not
-// driven - by an assignment statement, and a port loads a net only through the
-// complex-expression rule below. Detail 1 refines the load side: a complex,
-// non-concatenation expression on an input port loads the nets it reads, the
-// port carrying it is the load object reported, and that expression is reached
-// through vpi_handle(vpiHighConn, port). These are exercised through the public
-// iterate/scan and handle API.
-
-// Figure (net drivers): vpiDriver on a net reaches every net-driver kind - a
-// port, a force, a delay terminal, a continuous assignment, a single bit of
-// one, and a primitive terminal - while skipping children that are not drivers.
-// A force drives the net its target names and a prim term the net an output
-// terminal connects.
-// The net case differs from a variable (§37.21): an assignment statement loads
-// a net but does not drive it, so it is excluded from the driver iteration
-// here.
 TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
   VpiContext ctx;
 
@@ -50,8 +30,6 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
   VpiObject prim_term;
   prim_term.type = vpiPrimTerm;
 
-  // Not a net driver: an assignment statement loads but never drives a net, and
-  // an unrelated child is no driver at all.
   VpiObject assign_stmt;
   assign_stmt.type = vpiAssignStmt;
   VpiObject unrelated;
@@ -79,12 +57,6 @@ TEST(NetDriversAndLoads, DriverIterationReachesEveryNetDriverKind) {
   EXPECT_FALSE(VpiIterationContains(drivers, &unrelated));
 }
 
-// Figure (net loads): vpiLoad on a net reaches the net-load kinds - a delay
-// terminal, an assignment statement, a force, a continuous assignment, a single
-// bit of one, and a primitive terminal. A plain port that merely drives the net
-// (no complex expression) is not a load, so it is left out even though it is a
-// child of the net. A force loads the net its expression reads and a prim term
-// the net an input terminal connects.
 TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   VpiContext ctx;
 
@@ -101,8 +73,6 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   VpiObject prim_term;
   prim_term.type = vpiPrimTerm;
 
-  // A driver-only port: it carries no complex expression on an input, so detail
-  // 1 does not make it a load.
   VpiObject driver_port;
   driver_port.type = vpiPort;
 
@@ -126,18 +96,10 @@ TEST(NetDriversAndLoads, LoadIterationReachesNetLoadKindsExcludingPlainPort) {
   EXPECT_FALSE(VpiIterationContains(loads, &driver_port));
 }
 
-// Detail 1 (both shalls): a complex expression that is not a concatenation on
-// an input port shall be considered a load for each net it reads, and that
-// complex expression shall be reachable through vpi_handle(vpiHighConn, port).
-// Modeled on the clause's example - trinet feeding ram's fourth port through
-// !trinet - the input port appears when iterating the net's loads, and its
-// vpiHighConn reaches the operation.
 TEST(NetDriversAndLoads,
      ComplexExpressionInputPortIsLoadAndHighConnReachesExpr) {
   VpiContext ctx;
 
-  // The complex connection on the port: an operation (here a logical negation),
-  // not a simple reference and not a concatenation.
   VpiObject complex_expr;
   complex_expr.type = vpiOperation;
   complex_expr.op_type = vpiNotOp;
@@ -156,14 +118,10 @@ TEST(NetDriversAndLoads,
   ASSERT_EQ(loads.size(), 1u);
   EXPECT_TRUE(VpiIterationContains(loads, &port));
 
-  // Shall #2: the complex expression is reached through the port's vpiHighConn.
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiHighConn, VpiHandleOf(&port))),
             &complex_expr);
 }
 
-// Detail 1 (concatenation carve-out): a concatenation on an input port does not
-// make the whole port a load - the concatenation's operands connect their nets
-// individually - so the port is excluded from the net's load iteration.
 TEST(NetDriversAndLoads, ConcatenationOnInputPortIsNotLoad) {
   VpiContext ctx;
 
@@ -185,12 +143,6 @@ TEST(NetDriversAndLoads, ConcatenationOnInputPortIsNotLoad) {
   EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
-// Detail 1 (concatenation carve-out, replication form): a multiple
-// concatenation (replication, {n{...}}) is also a concatenation, so its grouped
-// operand connections drive/load their nets individually. A replication on an
-// input port therefore does not make the whole port a complex-expression load,
-// and the port is excluded from the net's load iteration just as a plain
-// concatenation is.
 TEST(NetDriversAndLoads, MultipleConcatenationOnInputPortIsNotLoad) {
   VpiContext ctx;
 
@@ -212,9 +164,6 @@ TEST(NetDriversAndLoads, MultipleConcatenationOnInputPortIsNotLoad) {
   EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
-// Detail 1 (complex requirement): a simple reference on an input port is a
-// direct connection, not a complex expression, so it does not make the port a
-// load under detail 1's rule.
 TEST(NetDriversAndLoads, SimpleReferenceOnInputPortIsNotComplexLoad) {
   VpiContext ctx;
 
@@ -235,9 +184,6 @@ TEST(NetDriversAndLoads, SimpleReferenceOnInputPortIsNotComplexLoad) {
   EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
-// Detail 1 (input requirement): the rule is scoped to input ports. A complex,
-// non-concatenation expression on an output port does not make the port a load,
-// so it is excluded from the net's load iteration.
 TEST(NetDriversAndLoads, ComplexExpressionOnOutputPortIsNotLoad) {
   VpiContext ctx;
 
@@ -259,15 +205,9 @@ TEST(NetDriversAndLoads, ComplexExpressionOnOutputPortIsNotLoad) {
   EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
-// Detail 1 (edge - no expression present): the rule applies to a complex
-// expression carried on an input port, so an input port with no connection
-// expression at all has nothing complex to read the net and is not a load. The
-// load iteration still works for the net's other loads, confirming the port is
-// specifically excluded rather than the iteration simply yielding nothing.
 TEST(NetDriversAndLoads, InputPortWithoutHighConnectionIsNotLoad) {
   VpiContext ctx;
 
-  // An input port with no high connection - no expression to make it a load.
   VpiObject port;
   port.type = vpiPort;
   port.direction = vpiInput;
@@ -286,18 +226,13 @@ TEST(NetDriversAndLoads, InputPortWithoutHighConnectionIsNotLoad) {
   EXPECT_FALSE(VpiIterationContains(loads, &port));
 }
 
-// §37.4.1 read on this figure: the `ports` enclosure inside both classes is
-// dotted, so it is a class rather than an object kind, and §37.14 draws a port
-// and a port bit inside it. A relation drawn to a class reaches the kinds the
-// class groups, so a port bit driving a net is a driver of it. The enclosure
-// was read as the single kind vpiPort, so a port bit was a driver to nothing.
 TEST(NetDriversAndLoads, DriverIterationReachesAPortBit) {
   VpiContext ctx;
 
   VpiObject port_bit;
   port_bit.type = vpiPortBit;
   VpiObject assign_stmt;
-  assign_stmt.type = vpiAssignStmt;  // a net load, never a net driver
+  assign_stmt.type = vpiAssignStmt;
 
   VpiObject net;
   net.type = kVpiNet;
@@ -309,15 +244,12 @@ TEST(NetDriversAndLoads, DriverIterationReachesAPortBit) {
   EXPECT_TRUE(VpiIterationContains(drivers, &port_bit));
 }
 
-// The same reading on the load side, where detail 1 decides which ports are
-// loads: a port bit carrying a complex expression on an input is a load of the
-// nets that expression reads, exactly as a whole port is.
 TEST(NetDriversAndLoads, LoadIterationReachesAPortBitWithAComplexExpression) {
   VpiContext ctx;
 
   VpiObject expr;
   expr.type = vpiOperation;
-  expr.op_type = vpiNotOp;  // complex, and not a concatenation
+  expr.op_type = vpiNotOp;
 
   VpiObject port_bit;
   port_bit.type = vpiPortBit;
@@ -326,7 +258,7 @@ TEST(NetDriversAndLoads, LoadIterationReachesAPortBitWithAComplexExpression) {
 
   VpiObject plain_bit;
   plain_bit.type = vpiPortBit;
-  plain_bit.direction = vpiInput;  // no complex expression: not a load
+  plain_bit.direction = vpiInput;
 
   VpiObject net;
   net.type = kVpiNet;
@@ -337,12 +269,9 @@ TEST(NetDriversAndLoads, LoadIterationReachesAPortBitWithAComplexExpression) {
   ASSERT_EQ(loads.size(), 1u);
   EXPECT_TRUE(VpiIterationContains(loads, &port_bit));
 
-  // Detail 1: vpi_handle(vpiHighConn, portH) reaches the complex expression.
   EXPECT_EQ(ctx.Handle(vpiHighConn, loads[0]), &expr);
 }
 
-// §37.46 (figure): the loads of a net are the kinds the figure lists, so a
-// net's own bits, which it holds beside its loads, are none of them.
 TEST(NetDriversAndLoads, ALoadIterationPassesOverTheNetsBits) {
   VpiContext ctx;
   VpiObject bit;
@@ -359,9 +288,6 @@ TEST(NetDriversAndLoads, ALoadIterationPassesOverTheNetsBits) {
   EXPECT_EQ(loads[0], &cont_assign);
 }
 
-// §37.46 (figure): the net bit is one of the nets the driver and load edges
-// are drawn from, so it reaches the net drivers and net loads it holds, a
-// force naming it and reading it both.
 TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
   VpiContext ctx;
   VpiObject force;
@@ -383,9 +309,6 @@ TEST(NetDriversAndLoads, ANetBitReachesItsNetDriversAndLoads) {
   EXPECT_TRUE(VpiIterationContains(loads, &assign_stmt));
 }
 
-// §37.45 details 1 and 2 tell the two terms of a delay device apart by the
-// device; a delay term held by anything else is told apart by nothing, so the
-// figure, which draws a delay term on both sides, makes it a driver and a load.
 TEST(NetDriversAndLoads, ADelayTermHeldByNoDelayDeviceDrivesAndLoads) {
   VpiContext ctx;
   VpiObject holder;
@@ -406,21 +329,13 @@ TEST(NetDriversAndLoads, ADelayTermHeldByNoDelayDeviceDrivesAndLoads) {
   EXPECT_EQ(loads[0], &term);
 }
 
-// The drivers and loads of the nets of a run: a primitive's terminals, a
-// force and a port connected to a complex expression, each hung on the nets it
-// connects, names or reads.
 class NetDriversAndLoadsOfARun : public VpiDesignRun {
  protected:
-  // Whether `kinds` holds `kind`.
   static bool Holds(const std::vector<int>& kinds, int kind) {
     return std::ranges::find(kinds, kind) != kinds.end();
   }
 };
 
-// A continuous assignment drives the nets its target writes and loads the nets
-// its expression reads, and is the one without the other unless a net stands on
-// both sides: assign w = x leaves it out of w's loads and x's drivers, and it
-// is a load of i through the index of the select it reads (#7375).
 TEST_F(NetDriversAndLoadsOfARun, AContinuousAssignmentDrivesOrLoadsByItsSide) {
   Run("module top; wire w, x, i; wire [1:0] v, u;\n"
       "  assign w = x;\n"
@@ -436,11 +351,6 @@ TEST_F(NetDriversAndLoadsOfARun, AContinuousAssignmentDrivesOrLoadsByItsSide) {
   EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.v")), vpiContAssign));
 }
 
-// A prim term drives the net its output terminal connects and loads the nets
-// its input terminals connect (#7169); a force drives the net its target names
-// and loads the nets its expression reads (#7170); and detail 1: a port
-// connected to a complex expression loads the nets the expression reads
-// (#7171).
 TEST_F(NetDriversAndLoadsOfARun, PrimTermsForcesAndComplexPortsDriveAndLoad) {
   Run("module ram(input a, input b); endmodule\n"
       "module top; wire y, a, b, trinet, n, m;\n"
@@ -459,9 +369,6 @@ TEST_F(NetDriversAndLoadsOfARun, PrimTermsForcesAndComplexPortsDriveAndLoad) {
   EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.trinet")), vpiPort));
 }
 
-// A force whose expression is an operation loads every net among its operands
-// at any depth, once each however often it is read and none for a constant,
-// and one whose target is a bit of a vector net drives that net (#7170).
 TEST_F(NetDriversAndLoadsOfARun, AForceReachesTheNetsThroughOperandsAndBits) {
   Run("module top; wire n, m, k; wire [1:0] v;\n"
       "  initial begin force n = m & k & 1'b1; force v[1] = m & m; end\n"
@@ -473,9 +380,6 @@ TEST_F(NetDriversAndLoadsOfARun, AForceReachesTheNetsThroughOperandsAndBits) {
   EXPECT_FALSE(Holds(KindsOf(vpiLoad, By("top.v")), vpiForce));
 }
 
-// A bidirectional switch passes values both ways between the two ends of its
-// channel (§28.8), so the inout prim term on each end both drives and loads
-// the net it connects, while the control terminal only loads its net.
 TEST_F(NetDriversAndLoadsOfARun, ASwitchChannelTermDrivesAndLoadsItsNet) {
   Run("module top; wire a, b, c;\n"
       "  tranif1 g(a, b, c);\n"
@@ -486,8 +390,6 @@ TEST_F(NetDriversAndLoadsOfARun, ASwitchChannelTermDrivesAndLoadsItsNet) {
   EXPECT_FALSE(Holds(KindsOf(vpiDriver, By("top.c")), vpiPrimTerm));
 }
 
-// A call reads what its arguments read, so a continuous assignment passing a
-// net, or a bit of a vector net, to a function is a load of it (#8168).
 TEST_F(NetDriversAndLoadsOfARun, AContinuousAssignmentLoadsTheNetsACallReads) {
   Run("module top;\n"
       "  function automatic logic f(logic a); return a; endfunction\n"
@@ -500,8 +402,6 @@ TEST_F(NetDriversAndLoadsOfARun, AContinuousAssignmentLoadsTheNetsACallReads) {
                     vpiContAssign));
 }
 
-// A force loads the nets the index of a select and a call's argument read
-// (#8166).
 TEST_F(NetDriversAndLoadsOfARun, AForceLoadsTheNetsItsIndexAndArgumentRead) {
   Run("module top;\n"
       "  function automatic logic f(logic a); return a; endfunction\n"
@@ -512,8 +412,6 @@ TEST_F(NetDriversAndLoadsOfARun, AForceLoadsTheNetsItsIndexAndArgumentRead) {
   EXPECT_TRUE(Holds(KindsOf(vpiLoad, By("top.w")), vpiForce));
 }
 
-// §37.46 draws the assign stmt among the net loads, so a procedural assign is
-// a load of a net its expression reads (#8169).
 TEST_F(NetDriversAndLoadsOfARun, AProceduralAssignLoadsTheNetItReads) {
   Run("module top; logic q; wire n;\n"
       "  initial assign q = n;\n"

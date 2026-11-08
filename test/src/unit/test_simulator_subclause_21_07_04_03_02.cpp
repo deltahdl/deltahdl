@@ -9,40 +9,6 @@
 namespace delta {
 namespace {
 
-// §21.7.4.3.2 (Drivers) is the semantic companion to the extended-VCD port
-// value change. It is a description, not a grammar: it contains no BNF
-// production and no "shall" sentence. Its declarative content is:
-//
-//   Claim 1 (driver definition). A port's dumped value is resolved only from
-//     drivers that are primitives, continuous assignments, or procedural
-//     continuous assignments. A port with none of these is not an active
-//     driver.
-//   Claim 2 (conflict states). The port_value characters 0 and 1 mean both an
-//     input and an output are active with that same value; 0 and 1 are the
-//     conflict states.
-//   Claim 3 (conflict resolution). When an input driver and an output driver
-//     disagree, the resolved character and strength depend on the two drive
-//     strengths: equal strength range -> 0/1 with the stronger strength; strong
-//     input over weak output -> d/u with the input strength; weak input under
-//     strong output -> l/h with the output strength.
-//   Claim 4 (strength range). Strengths 7..5 are "strong"; strengths 4..1 are
-//     "weak" -- the partition Claim 3 compares.
-//
-// Claims 2 to 4 decompose an inout port into its input end, the drivers outside
-// its instance, and its output end, those inside, which the writer reads from
-// the origin each continuous-assignment driver records on the net
-// (Net::driver_origins); InoutEndsPickTheConflictCharacter in
-// test_simulator_subclause_21_07_04_03_01.cpp observes them, beside the
-// character vocabulary of §21.7.4.3.1 they resolve to.
-//
-// These tests observe Claim 1 through the production path. Each of the three
-// driver kinds §21.7.4.3.2 admits is built from real source syntax, elaborated,
-// lowered, and run under $dumpports; the writer then dumps the port it drives
-// as an active (strong-strength) port, and an undriven port -- the negative of
-// Claim 1 -- as high-impedance at highz strength. The dependency subclauses
-// §21.7.4.3 (the p<value><s0><s1> form and its strength components) and
-// §21.7.4.2 (the $var port declaration that names the identifier code) supply
-// the record the driver's resolved value flows into.
 class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
  protected:
   std::string RunPortVcd(const std::string& src) {
@@ -52,7 +18,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
                        .extended = true});
   }
 
-  // Split a whitespace-separated line into tokens.
   static std::vector<std::string> Tokens(const std::string& line) {
     std::vector<std::string> out;
     size_t i = 0;
@@ -65,7 +30,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
     return out;
   }
 
-  // Read a line by index within the file content.
   static std::vector<std::string> Lines(const std::string& content) {
     std::vector<std::string> out;
     size_t pos = 0;
@@ -81,11 +45,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
     return out;
   }
 
-  // §21.7.4.2: a $var port line has the layout
-  // "$var port <size|[range]> <code> <name> $end", so the identifier code is
-  // the token immediately before the port name. Return that token (e.g. "<0")
-  // for the tokens of one line, or an empty string when the line is not a
-  // $var port line for the named port.
   static std::string IdentOnPortLine(const std::vector<std::string>& tokens,
                                      const std::string& name) {
     if (tokens.size() < 2 || tokens[0] != "$var" || tokens[1] != "port") {
@@ -100,9 +59,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
     return "";
   }
 
-  // §21.7.4.2: each $var port line records the identifier code (a <-prefixed
-  // integer) and the port name. Return the identifier token (e.g. "<0") that
-  // was assigned to the named port.
   static std::string IdentFor(const std::string& content,
                               const std::string& name) {
     for (auto& line : Lines(content)) {
@@ -112,10 +68,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
     return "<none>";
   }
 
-  // Extended-VCD value change for a named port: the p-record whose trailing
-  // identifier token matches the port's $var code. Returns
-  // "<port_value>|<s0s1>" -- the state character run and the two strength
-  // component digits -- or a diagnostic marker.
   std::string PortRecord(const std::string& content, const std::string& name) {
     std::string ident = IdentFor(content, name);
     if (ident == "<none>") return "<no-ident>";
@@ -124,7 +76,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
       if (line.empty() || line[0] != 'p') continue;
       auto t = Tokens(line);
       if (t.size() != 2 || t[1] != ident) continue;
-      // t[0] == "p<value><s0><s1>"
       std::string body = t[0].substr(1);
       if (body.size() < 3) return "<malformed>";
       std::string value = body.substr(0, body.size() - 2);
@@ -137,13 +88,6 @@ class ExtendedVcdDriversSim : public VcdDumpRunTestBase {
   }
 };
 
-// §21.7.4.3.2 Claim 1: a gate primitive is a driver. Instantiating buf so it
-// drives the net w, then dumping w under $dumpports, resolves w's value from
-// that primitive. The writer reports w as an active port: the state character
-// is the driven value (1) and the 1_strength_component is strong (6), which
-// §28.6 gives a primitive written with no drive_strength specification, never
-// the highz 0 an undriven port would carry. The 0_strength_component is highz
-// because nothing drives w's 0 side (§21.7.4.3).
 TEST_F(ExtendedVcdDriversSim, PrimitiveDriverDumpsActivePort) {
   auto content = RunPortVcd(
       "module t;\n"
@@ -158,10 +102,6 @@ TEST_F(ExtendedVcdDriversSim, PrimitiveDriverDumpsActivePort) {
   EXPECT_EQ(PortRecord(content, "w"), "1|06") << content;
 }
 
-// §21.7.4.3.2 Claim 1: a continuous assignment is a driver. A net resolved by
-// assign is dumped as an active port -- driven value, and strong on the side
-// it drives because §28.6 gives an assignment written with no drive_strength
-// specification strong0 and strong1.
 TEST_F(ExtendedVcdDriversSim, ContinuousAssignmentDriverDumpsActivePort) {
   auto content = RunPortVcd(
       "module t;\n"
@@ -172,13 +112,6 @@ TEST_F(ExtendedVcdDriversSim, ContinuousAssignmentDriverDumpsActivePort) {
   EXPECT_EQ(PortRecord(content, "w"), "1|06") << content;
 }
 
-// §21.7.4.3.2 Claim 1: a procedural continuous assignment is a driver. This
-// driver kind has two syntactic forms; the force/release form is one. Forcing a
-// net high with a force statement drives it, and the writer dumps it as an
-// active port -- the value driven, and the strength on the side the value
-// drives, which §10.3.4 defaults to strong. The 0 side is not driven, so its
-// component is the highz digit, exactly as it is for a net a (pull0, pull1)
-// assignment drives to 1.
 TEST_F(ExtendedVcdDriversSim,
        ForceProceduralContinuousAssignmentDumpsActivePort) {
   auto content = RunPortVcd(
@@ -192,11 +125,6 @@ TEST_F(ExtendedVcdDriversSim,
   EXPECT_EQ(PortRecord(content, "w"), "1|06") << content;
 }
 
-// §21.7.4.3.2 Claim 1: the assign/deassign form is the other syntactic position
-// of the procedural continuous assignment driver kind, and it takes a different
-// production path than force. A variable driven by a procedural assign is
-// dumped as an active port -- driven value, strong strength -- confirming this
-// form counts as a driver too.
 TEST_F(ExtendedVcdDriversSim,
        AssignProceduralContinuousAssignmentDumpsActivePort) {
   auto content = RunPortVcd(
@@ -210,12 +138,6 @@ TEST_F(ExtendedVcdDriversSim,
   EXPECT_EQ(PortRecord(content, "v"), "1|66") << content;
 }
 
-// §21.7.4.3.2 Claim 1, negative form: a port with none of the three driver
-// kinds is not an active driver. An undriven net resolves to high impedance, so
-// the writer dumps it with the three-state character §21.7.4.3.1 gives an
-// object of unknown direction, F, and the highz strength pair 00 -- distinct
-// from the strong 66 an active driver produces.
-// This is the closest input Claim 1 must reject as "driven".
 TEST_F(ExtendedVcdDriversSim, UndrivenPortIsNotAnActiveDriver) {
   auto content = RunPortVcd(
       "module t;\n"

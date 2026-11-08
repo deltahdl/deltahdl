@@ -176,9 +176,6 @@ TEST(SignedUnsignedArithmetic, DefaultNetElaboratesAsUnsigned) {
   EXPECT_FALSE(mod->nets[0].is_signed);
 }
 
-// §11.4.3.1: types other than the signed-by-default integer types are unsigned
-// unless explicitly declared signed. A 2-state packed vector exercises the
-// "other types are unsigned" default through a non-logic, non-net declaration.
 TEST(SignedUnsignedArithmetic, BitVectorVariableElaboratesAsUnsigned) {
   ElabFixture f;
   auto* design = ElaborateSrc(

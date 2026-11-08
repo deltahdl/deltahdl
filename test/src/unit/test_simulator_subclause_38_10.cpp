@@ -23,10 +23,6 @@ namespace {
 
 using VpiGetDelaysSim = VpiDelaysSimBase;
 
-// §38.10 shall #1 + the rule that the delays keep their source order:
-// vpi_get_delays() places the object's delays into the caller-allocated da
-// array, one entry per delay (mtm and pulsere both off), in the order they
-// occur in the source.
 TEST_F(VpiGetDelaysSim, RetrievesDelaysInSourceOrder) {
   VpiDelayInfo d0;
   d0.delay = 11.0;
@@ -48,9 +44,6 @@ TEST_F(VpiGetDelaysSim, RetrievesDelaysInSourceOrder) {
   EXPECT_DOUBLE_EQ(da[2].real, 33.0);
 }
 
-// §38.10 shall #2: the form of the delay information is controlled by the
-// delay structure's time_type. At the same data, vpiScaledRealTime fills the
-// real field while vpiSimTime fills the high/low 64-bit halves.
 TEST_F(VpiGetDelaysSim, TimeTypeControlsFormat) {
   VpiDelayInfo d;
   d.delay = 7.0;
@@ -75,9 +68,6 @@ TEST_F(VpiGetDelaysSim, TimeTypeControlsFormat) {
   EXPECT_DOUBLE_EQ(as_sim[0].real, 0.0);
 }
 
-// §38.10 shall #2 (edge): a time_type of vpiSuppressTime asks for no time
-// value. The routine still stamps the entry's type, but leaves the value
-// cleared even though the object carries a nonzero delay.
 TEST_F(VpiGetDelaysSim, SuppressTimeTypeYieldsNoTimeValue) {
   VpiDelayInfo d;
   d.delay = 7.0;
@@ -91,21 +81,18 @@ TEST_F(VpiGetDelaysSim, SuppressTimeTypeYieldsNoTimeValue) {
   vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(da[0].type, vpiSuppressTime);
-  EXPECT_DOUBLE_EQ(da[0].real, 0.0);  // suppressed despite the stored 7.0
+  EXPECT_DOUBLE_EQ(da[0].real, 0.0);
   EXPECT_EQ(da[0].low, 0u);
   EXPECT_EQ(da[0].high, 0u);
 }
 
-// §38.10 shall #3: the routine ignores the value of the type flag in each
-// s_vpi_time entry. A garbage type on input is overwritten with the delay
-// structure's time_type, and the value is formatted accordingly.
 TEST_F(VpiGetDelaysSim, IgnoresInputEntryTypeFlag) {
   VpiDelayInfo d;
   d.delay = 5.0;
   VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
 
   s_vpi_time da[2] = {};
-  da[0].type = 999;  // bogus per-entry type that must be ignored
+  da[0].type = 999;
   da[1].type = -42;
   s_vpi_delay delay = {};
   delay.da = da;
@@ -118,20 +105,17 @@ TEST_F(VpiGetDelaysSim, IgnoresInputEntryTypeFlag) {
   EXPECT_DOUBLE_EQ(da[0].real, 5.0);
 }
 
-// §38.10 (Table 38-2, row 2): with mtm_flag set and pulsere_flag clear, each
-// delay occupies three entries - min, then typ, then max delay.
 TEST_F(VpiGetDelaysSim, MtmFlagExpandsToMinTypMax) {
   VpiDelayInfo d;
   d.min_delay = 1.0;
   d.typ_delay = 2.0;
   d.max_delay = 3.0;
-  VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});  // no_of_delays = 2
+  VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
 
-  // Two delays, three entries each (min:typ:max) -> six entries.
   s_vpi_time wide[6] = {};
   s_vpi_delay delay = {};
   delay.da = wide;
-  delay.no_of_delays = 2;  // legal for a primitive (2 or 3)
+  delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
   delay.mtm_flag = 1;
   vpi_get_delays(VpiHandleOf(prim), &delay);
@@ -139,19 +123,15 @@ TEST_F(VpiGetDelaysSim, MtmFlagExpandsToMinTypMax) {
   EXPECT_DOUBLE_EQ(wide[0].real, 1.0);
   EXPECT_DOUBLE_EQ(wide[1].real, 2.0);
   EXPECT_DOUBLE_EQ(wide[2].real, 3.0);
-  // Second delay's run starts at index 3.
   EXPECT_DOUBLE_EQ(wide[3].real, 1.0);
 }
 
-// §38.10 (Table 38-2, row 3): with pulsere_flag set and mtm_flag clear, each
-// delay occupies three entries - the delay, the reject limit, and the error
-// limit.
 TEST_F(VpiGetDelaysSim, PulsereFlagExpandsToDelayRejectError) {
   VpiDelayInfo d;
   d.delay = 10.0;
   d.reject = 4.0;
   d.error = 8.0;
-  VpiHandle path = MakeDelayObject(vpiModPath, {d});  // no_of_delays = 1 legal
+  VpiHandle path = MakeDelayObject(vpiModPath, {d});
 
   s_vpi_time da[3] = {};
   s_vpi_delay delay = {};
@@ -166,9 +146,6 @@ TEST_F(VpiGetDelaysSim, PulsereFlagExpandsToDelayRejectError) {
   EXPECT_DOUBLE_EQ(da[2].real, 8.0);
 }
 
-// §38.10 (Table 38-2, row 4): with both flags set each delay occupies nine
-// entries - min:typ:max of the delay, then of the reject limit, then of the
-// error limit, in that order.
 TEST_F(VpiGetDelaysSim, MtmAndPulsereExpandToNineElements) {
   VpiDelayInfo d;
   d.min_delay = 1.0;
@@ -196,40 +173,34 @@ TEST_F(VpiGetDelaysSim, MtmAndPulsereExpandToNineElements) {
   }
 }
 
-// §38.10: the legal number of delays is fixed by the object's category. A
-// primitive accepts 2 or 3; an illegal request (here 4) is rejected with an
-// error recorded and the caller's array left untouched.
 TEST_F(VpiGetDelaysSim, IllegalNoOfDelaysForPrimitiveIsRejected) {
   VpiDelayInfo d;
   d.delay = 1.0;
   VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d, d, d});
 
   s_vpi_time da[4] = {};
-  da[0].real = -1.0;  // sentinel that must survive an unfilled call
+  da[0].real = -1.0;
   s_vpi_delay delay = {};
   delay.da = da;
-  delay.no_of_delays = 4;  // not 2 or 3 -> illegal for a primitive
+  delay.no_of_delays = 4;
   delay.time_type = vpiScaledRealTime;
   vpi_get_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
-  EXPECT_DOUBLE_EQ(da[0].real, -1.0);  // untouched
+  EXPECT_DOUBLE_EQ(da[0].real, -1.0);
 }
 
-// §38.10: for a timing check the legal number of delays must match the number
-// of limits the check actually has. A request matching the stored limit count
-// is honored.
 TEST_F(VpiGetDelaysSim, TimingCheckNoOfDelaysMatchesLimitCount) {
   VpiDelayInfo a;
   a.delay = 2.0;
   VpiDelayInfo b;
   b.delay = 4.0;
-  VpiHandle tchk = MakeDelayObject(vpiTchk, {a, b});  // two limits
+  VpiHandle tchk = MakeDelayObject(vpiTchk, {a, b});
 
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
   delay.da = da;
-  delay.no_of_delays = 2;  // matches the two limits
+  delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
   vpi_get_delays(VpiHandleOf(tchk), &delay);
 
@@ -237,7 +208,6 @@ TEST_F(VpiGetDelaysSim, TimingCheckNoOfDelaysMatchesLimitCount) {
   EXPECT_DOUBLE_EQ(da[0].real, 2.0);
   EXPECT_DOUBLE_EQ(da[1].real, 4.0);
 
-  // A count that does not match the number of limits is rejected.
   vpi_ctx_.ResetErrorStatus();
   s_vpi_time bad[3] = {};
   s_vpi_delay bad_delay = {};
@@ -248,8 +218,6 @@ TEST_F(VpiGetDelaysSim, TimingCheckNoOfDelaysMatchesLimitCount) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.10: an intermodule path accepts 2 or 3 delays. The handle reads back its
-// stored delays in order when the count is legal.
 TEST_F(VpiGetDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   VpiDelayInfo a;
   a.delay = 12.0;
@@ -269,10 +237,6 @@ TEST_F(VpiGetDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   EXPECT_DOUBLE_EQ(da[1].real, 34.0);
 }
 
-// §38.10: a path-delay (module path) object has its own legal set of delay
-// counts - 1, 2, 3, 6, or 12 - distinct from the other categories. A count in
-// that set (here 6) is honored; a count outside it (here 4) is rejected with an
-// error and the array left untouched.
 TEST_F(VpiGetDelaysSim, ModulePathLegalSetAcceptsSixRejectsFour) {
   std::vector<VpiDelayInfo> six;
   for (int i = 0; i < 6; ++i) {
@@ -285,7 +249,7 @@ TEST_F(VpiGetDelaysSim, ModulePathLegalSetAcceptsSixRejectsFour) {
   s_vpi_time da[6] = {};
   s_vpi_delay delay = {};
   delay.da = da;
-  delay.no_of_delays = 6;  // in {1,2,3,6,12} -> legal for a module path
+  delay.no_of_delays = 6;
   delay.time_type = vpiScaledRealTime;
   vpi_get_delays(VpiHandleOf(path), &delay);
 
@@ -294,10 +258,9 @@ TEST_F(VpiGetDelaysSim, ModulePathLegalSetAcceptsSixRejectsFour) {
     EXPECT_DOUBLE_EQ(da[i].real, static_cast<double>(i + 1)) << "entry " << i;
   }
 
-  // 4 is not in the path-delay legal set, so the request is rejected.
   vpi_ctx_.ResetErrorStatus();
   s_vpi_time bad[4] = {};
-  bad[0].real = -1.0;  // sentinel that must survive an unfilled call
+  bad[0].real = -1.0;
   s_vpi_delay bad_delay = {};
   bad_delay.da = bad;
   bad_delay.no_of_delays = 4;
@@ -305,37 +268,31 @@ TEST_F(VpiGetDelaysSim, ModulePathLegalSetAcceptsSixRejectsFour) {
   vpi_get_delays(VpiHandleOf(path), &bad_delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
-  EXPECT_DOUBLE_EQ(bad[0].real, -1.0);  // untouched
+  EXPECT_DOUBLE_EQ(bad[0].real, -1.0);
 }
 
-// §38.10 / §38.1: the structure and its da array are application-allocated, so
-// the routine fills the caller's memory in place and a null destination (or a
-// null da, or a null handle) leaves nothing to do and must be safe.
 TEST_F(VpiGetDelaysSim, NullArgumentsAreSafe) {
   VpiDelayInfo d;
   d.delay = 1.0;
   VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
 
-  vpi_get_delays(VpiHandleOf(prim), nullptr);  // null structure
+  vpi_get_delays(VpiHandleOf(prim), nullptr);
 
   s_vpi_delay no_array = {};
   no_array.no_of_delays = 2;
   no_array.time_type = vpiScaledRealTime;
-  vpi_get_delays(VpiHandleOf(prim), &no_array);  // null da
+  vpi_get_delays(VpiHandleOf(prim), &no_array);
 
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
-  vpi_get_delays(nullptr, &delay);  // null handle
+  vpi_get_delays(nullptr, &delay);
 
   SUCCEED();
 }
 
-// The vpi_get_delays() suite with a question of its own: whether the routine
-// accepts `n` delays of an object of `type` carrying `delays`, recording no
-// error.
 class VpiDelayCountSim : public VpiDelaysSimBase {
  protected:
   bool AcceptsDelays(int type, int n, std::vector<VpiDelayInfo> delays) {
@@ -351,11 +308,6 @@ class VpiDelayCountSim : public VpiDelaysSimBase {
   }
 };
 
-// §38.10: the number of delays a request may name is fixed by the object's
-// category -- 1, 2, 3, 6 or 12 for a module path, 2 or 3 for an intermodule
-// path and for a continuous assignment (§37.47 with §10.3.3), 2 or 3 for the
-// module input port delay of a port or a port bit (§37.14), and none for an
-// object that bears no delays, a net among them.
 TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
   const VpiDelayInfo kD;
   EXPECT_TRUE(AcceptsDelays(vpiModPath, 3, {kD, kD, kD}));
@@ -371,10 +323,6 @@ TEST_F(VpiDelayCountSim, EachCategoryAcceptsItsOwnDelayCounts) {
   EXPECT_FALSE(AcceptsDelays(vpiNet, 2, {kD, kD}));
 }
 
-// §37.14 detail 2 with §38.10: a port other than an interface port is no
-// object the delay routines refuse outright, and it is then judged as any
-// other object is -- its module input port delay is a rise, a fall and a
-// turn-off, so a request for one is the error.
 TEST_F(VpiGetDelaysSim, APortThatIsNoInterfacePortIsJudgedByItsCategory) {
   VpiHandle port = MakeDelayObject(vpiPort, {});
   port->port_type = vpiPort;
@@ -389,8 +337,6 @@ TEST_F(VpiGetDelaysSim, APortThatIsNoInterfacePortIsJudgedByItsCategory) {
                "for this object");
 }
 
-// §38.10: a request for more delays than the object stores reads the ones it
-// does not store as zero, a primitive of two asked for three.
 TEST_F(VpiGetDelaysSim, ADelayTheObjectDoesNotStoreReadsAsZero) {
   VpiDelayInfo d;
   d.delay = 4.0;
@@ -406,19 +352,6 @@ TEST_F(VpiGetDelaysSim, ADelayTheObjectDoesNotStoreReadsAsZero) {
   EXPECT_DOUBLE_EQ(da[2].real, 0.0);
 }
 
-// -----------------------------------------------------------------------------
-// §38.10: vpi_get_delays() reads an object's delays or pulse limits into an
-// s_vpi_delay structure the application has allocated.
-//
-// Every case above hands the routine an object it filled in itself, so what
-// they observe is the retrieval and never the delays -- and no object a run
-// built carried one at all, the design's module paths, primitives and timing
-// checks reaching the VPI as nothing. The routine was complete over objects
-// that only a test ever made.
-// -----------------------------------------------------------------------------
-
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 int g_paths_seen = 0;
 uint64_t g_smallest_delay = 0;
 uint64_t g_largest_delay = 0;
@@ -432,9 +365,6 @@ PLI_INT32 DisplayPathDelaysCalltf(PLI_BYTE8*) {
   for (vpiHandle path = vpi_scan(paths); path != nullptr;
        path = vpi_scan(paths)) {
     ++g_paths_seen;
-    // The structure is the application's, which is what §38.10 says of it, and
-    // one delay is a legal count for a path delay object, whose no_of_delays
-    // must be 1, 2, 3, 6 or 12.
     s_vpi_time da[1] = {};
     s_vpi_delay delays = {};
     delays.da = da;
@@ -467,10 +397,6 @@ void RegisterPathDelayProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// A module whose specify block declares two module paths with different delays,
-// instantiated so the application has a module object to iterate from. The two
-// delays stand in a ratio of three, which is what a case can read whatever time
-// unit the run keeps its ticks in.
 void RunAModuleOfTwoPaths(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m(input a, input c, output b, output d);\n"
@@ -505,9 +431,6 @@ TEST_F(VpiGetDelaysInARun, TheDesignsModulePathsAreObjectsToRetrieveFrom) {
   SimFixture f;
   RunAModuleOfTwoPaths(f);
 
-  // Both paths the specify block declared are reached, which they were not
-  // before: a run put no delay-bearing object within reach of an application at
-  // all, so the iteration handed back nothing to retrieve from.
   EXPECT_EQ(g_paths_seen, 2);
 }
 
@@ -518,25 +441,14 @@ TEST_F(VpiGetDelaysInARun, TheRetrievedDelayIsTheOneTheSourceDeclared) {
   RunAModuleOfTwoPaths(f);
 
   ASSERT_EQ(g_paths_seen, 2);
-  // Neither delay is zero, and the larger is three times the smaller, which is
-  // the ratio the source wrote them in. The ratio rather than the two numbers
-  // because the value the routine reports is in the run's own time unit, and
-  // what the case is about is the delay coming from the declaration rather than
-  // from anywhere else.
   EXPECT_GT(g_smallest_delay, 0u);
   EXPECT_EQ(g_largest_delay, g_smallest_delay * 3);
 }
 
-// §38.10 with §37.47 and §10.3.3: vpi_get_delays reads a continuous
-// assignment's delays, its rise and fall delays as two (#5108).
 TEST_F(ContAssignDelaysOfARun, AContinuousAssignmentsDelaysAreRead) {
   EXPECT_EQ(ContAssignDelaysRead(), (std::vector<uint32_t>{3, 4}));
 }
 
-// The values vpi_get_delays() reads back from `obj`'s `count` delays, two
-// unless named, with mtm_flag set, in Table 38-2's order -- each delay's
-// minimum, typical and maximum -- as multiples of the first, so the case reads
-// them whatever unit the run keeps its ticks in.
 std::vector<double> MtmMultiples(vpiHandle obj, int count = 2) {
   s_vpi_time da[6] = {};
   s_vpi_delay delay = {};
@@ -556,11 +468,8 @@ std::vector<double> MtmMultiples(vpiHandle obj, int count = 2) {
 
 using MtmDelaysOfARun = VpiDesignRun;
 
-// The six delays each case below writes, as min:typ:max triples.
 std::vector<double> OneToSix() { return {1, 2, 3, 4, 5, 6}; }
 
-// §38.10 Table 38-2 with §11.11: with mtm_flag set, each delay reads back as
-// the minimum, typical and maximum its min:typ:max expression wrote (#7456).
 TEST_F(MtmDelaysOfARun, AGatesMinTypMaxDelaysAreRead) {
   Run("module top(input a, output y);\n"
       "  buf #(1:2:3, 4:5:6) g(y, a);\n"
@@ -594,8 +503,6 @@ TEST_F(MtmDelaysOfARun, AModulePathsMinTypMaxDelaysAreRead) {
   EXPECT_EQ(MtmMultiples(paths[0]), OneToSix());
 }
 
-// §38.10 Table 38-2 with §11.11 and §37.68: a delay control written
-// min:typ:max reads back its three values under mtm_flag.
 TEST_F(MtmDelaysOfARun, ADelayControlsMinTypMaxDelayIsRead) {
   Run("module top; initial #(1:2:3) $noop; endmodule\n");
   vpiHandle procs = vpi_iterate(vpiProcess, By("top"));
@@ -606,9 +513,6 @@ TEST_F(MtmDelaysOfARun, ADelayControlsMinTypMaxDelayIsRead) {
   EXPECT_EQ(MtmMultiples(control, 1), (std::vector<double>{1, 2, 3}));
 }
 
-// §38.10 Table 38-2: a module path no declaration wrote delays for, as one
-// filed straight into the run's specify manager, reads its run delay back as
-// its minimum, typical and maximum alike.
 TEST_F(MtmDelaysOfARun, AModulePathOfNoWrittenDelayReadsItsRunDelay) {
   Run("module top(input a, output y); assign y = a; initial $noop;\n"
       "endmodule\n");

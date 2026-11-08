@@ -13,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a ternary expression `cond ? t : e` referencing existing variables by
-// name. Shared by the TernaryX signedness tests, whose only differences are the
-// variable declarations and the expected result.
 Expr* MakeTernarySelect(SimFixture& f, const char* cond, const char* t,
                         const char* e) {
   auto* tern = f.arena.Create<Expr>();
@@ -503,11 +500,6 @@ TEST(ExprType, PartSelectAssignedToWiderVarIsZeroExtended) {
   EXPECT_EQ(val, 0x00FFu);
 }
 
-// A based number (no 's') is unsigned, so when it is the source of an
-// assignment to a wider signed target it is zero-extended, not sign-extended,
-// even though its own high bit is set. Drives the §5.7.1 literal syntax through
-// the full pipeline so the classification is observed via real assignment
-// extension rather than an inspected flag.
 TEST(ExprType, BasedLiteralUnsignedZeroExtendedFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"
@@ -518,9 +510,6 @@ TEST(ExprType, BasedLiteralUnsignedZeroExtendedFullPipeline) {
   EXPECT_EQ(val, 0x0080u);
 }
 
-// The 's' notation flips the same literal to signed, so the identical value is
-// now sign-extended into the wider target. This is the discriminating negative
-// of the rule above and exercises the branch for the s notation exception.
 TEST(ExprType, SignedBasedLiteralSignExtendedFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"
@@ -531,10 +520,6 @@ TEST(ExprType, SignedBasedLiteralSignExtendedFullPipeline) {
   EXPECT_EQ(val, 0xFF80u);
 }
 
-// A bit-select result is unsigned regardless of the operand's signedness. The
-// single selected bit of a signed vector, assigned to a wider signed target, is
-// therefore zero-extended (result 0x0001); a signed 1-bit '1' would instead
-// sign-extend to all ones. Built from §11.5.1 bit-select syntax end-to-end.
 TEST(ExprType, BitSelectOfSignedIsUnsignedFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"
@@ -549,10 +534,6 @@ TEST(ExprType, BitSelectOfSignedIsUnsignedFullPipeline) {
   EXPECT_EQ(val, 0x0001u);
 }
 
-// A concatenation result is unsigned regardless of its operands' signedness.
-// Concatenating two signed nibbles yields an unsigned byte, so assignment to a
-// wider signed target zero-extends (0x00FF); a signed byte would sign-extend to
-// 0xFFFF. Built from §11.4.12 concatenation syntax end-to-end.
 TEST(ExprType, ConcatOfSignedIsUnsignedFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"
@@ -568,12 +549,6 @@ TEST(ExprType, ConcatOfSignedIsUnsignedFullPipeline) {
   EXPECT_EQ(val, 0x00FFu);
 }
 
-// When all operands are signed the result is signed, so a signed sum that is
-// narrower than its target sign-extends on assignment. Two signed bytes summing
-// to -1 give 0xFFFF in a wider signed target; an unsigned result would instead
-// zero-extend to 0x00FF. Operand signedness is taken from the `logic signed`
-// declarations, driven end-to-end. Complements the unsigned-operand case in
-// TypeNotDeterminedByLhs.
 TEST(ExprType, AllSignedOperandsYieldSignedResultFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"
@@ -589,10 +564,6 @@ TEST(ExprType, AllSignedOperandsYieldSignedResultFullPipeline) {
   EXPECT_EQ(val, 0xFFFFu);
 }
 
-// If any operand is real the whole expression is real, so an integer multiplied
-// by a real fraction keeps its fractional part instead of truncating to an
-// integer. The int operand comes from a real declaration and the real result is
-// read back through a real target, driven end-to-end.
 TEST(ExprType, AnyRealOperandYieldsRealResultFullPipeline) {
   auto val = RunAndGetReal(
       "module t;\n"
@@ -607,12 +578,6 @@ TEST(ExprType, AnyRealOperandYieldsRealResultFullPipeline) {
   EXPECT_DOUBLE_EQ(val, 1.5);
 }
 
-// An unbased decimal literal is signed, so when it is the sole literal operand
-// alongside a signed variable the whole addition stays signed and its narrower
-// result sign-extends into the wider target. -2 + 1 gives -1 -> 0xFFFF; had the
-// decimal literal been unsigned the mixed expression would be unsigned and
-// yield 0x00FF. This observes the decimal-is-signed rule through a real literal
-// operand end-to-end, distinct from the flag-only DecimalLiteralIsSigned.
 TEST(ExprType, DecimalLiteralOperandIsSignedFullPipeline) {
   auto val = RunAndGet(
       "module t;\n"

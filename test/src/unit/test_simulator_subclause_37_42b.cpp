@@ -20,8 +20,6 @@
 namespace delta {
 namespace {
 
-// Detail 8: an omitted or null argument is written into an object, and with
-// no object there is nothing to write.
 TEST(TaskFuncCallModel, MarkingNoObjectAsAnArgumentDoesNothing) {
   VpiMakeEmptyArgument(nullptr);
   VpiMakeNullArgument(nullptr);
@@ -30,8 +28,6 @@ TEST(TaskFuncCallModel, MarkingNoObjectAsAnArgumentDoesNothing) {
   EXPECT_EQ(arg.const_type, vpiNullConst);
 }
 
-// §37.42: a call's arguments are the ones it was written with; a missing one
-// is no argument.
 TEST(TaskFuncCallModel, AMissingArgumentIsNoneOfTheCalls) {
   VpiObject arg;
   arg.type = vpiConstant;
@@ -44,8 +40,6 @@ TEST(TaskFuncCallModel, AMissingArgumentIsNoneOfTheCalls) {
   EXPECT_EQ(iter.children[0], &arg);
 }
 
-// §37.42 (figure): only a system task or function call reaches a user systf;
-// any other object asked for one resolves nothing here.
 TEST(TaskFuncCallModel, OnlyASystemCallReachesAUserSystf) {
   VpiObject module;
   module.type = vpiModule;
@@ -54,12 +48,8 @@ TEST(TaskFuncCallModel, OnlyASystemCallReachesAUserSystf) {
   EXPECT_EQ(out, nullptr);
 }
 
-// A design whose one continuous assignment calls a function, run with a PLI
-// application registered.
 class CallsInAnAssignment : public VpiDesignRun {
  protected:
-  // The function the call on the right of the assignment `scope` holds, the
-  // top or the gen scope of the generate block writing it (§37.85), reaches.
   static vpiHandle CalledFunction(const char* scope = "top") {
     vpiHandle it = vpi_iterate(vpiContAssign, By(scope));
     if (it == nullptr) return nullptr;
@@ -67,8 +57,6 @@ class CallsInAnAssignment : public VpiDesignRun {
   }
 };
 
-// §37.42 with §3.12.1: a call of a function the compilation unit declares
-// reaches the unit's function, made where the unit holds no other data.
 TEST_F(CallsInAnAssignment, ACallReachesTheCompilationUnitsFunction) {
   Run("function int f(); return 1; endfunction\n"
       "module top; wire [31:0] y; assign y = f(); endmodule\n");
@@ -77,8 +65,6 @@ TEST_F(CallsInAnAssignment, ACallReachesTheCompilationUnitsFunction) {
   EXPECT_STREQ(vpi_get_str(vpiFullName, f), "$unit::f");
 }
 
-// §27.4: a call in a generate block reaches the block's function of the name
-// written, beside another the block declares...
 TEST_F(CallsInAnAssignment, ACallReachesItsNameAmongTheBlocksFunctions) {
   Run("module top; if (1) begin : g\n"
       "  function int a(); return 1; endfunction\n"
@@ -89,8 +75,6 @@ TEST_F(CallsInAnAssignment, ACallReachesItsNameAmongTheBlocksFunctions) {
   EXPECT_EQ(VpiObjectOf(CalledFunction("top.g")), VpiObjectOf(b));
 }
 
-// ...and a call in a block nested in it reaches the function of the
-// enclosing block where the nested one declares none.
 TEST_F(CallsInAnAssignment, ACallReachesTheEnclosingBlocksFunction) {
   Run("module top; if (1) begin : g\n"
       "  function int f(); return 1; endfunction\n"
@@ -100,8 +84,6 @@ TEST_F(CallsInAnAssignment, ACallReachesTheEnclosingBlocksFunction) {
   EXPECT_EQ(VpiObjectOf(CalledFunction("top.g.h")), VpiObjectOf(f));
 }
 
-// §23.9: a call in the second of two sibling blocks that each declare a
-// function of the name reaches its own block's, not the first block's.
 TEST_F(CallsInAnAssignment, ACallReachesItsOwnBlocksFunctionOverASiblings) {
   Run("module top; if (1) begin : a\n"
       "  function int f(); return 1; endfunction int u; end\n"
@@ -112,8 +94,6 @@ TEST_F(CallsInAnAssignment, ACallReachesItsOwnBlocksFunctionOverASiblings) {
   EXPECT_EQ(VpiObjectOf(CalledFunction("top.b")), VpiObjectOf(f));
 }
 
-// §37.85 detail 2: a call in an unnamed block reaches the function of the
-// block's implicit scope (#5737).
 TEST_F(CallsInAnAssignment, ACallInAnUnnamedBlockReachesItsFunction) {
   Run("module top; if (1) begin\n"
       "  function int f(); return 1; endfunction\n"
@@ -123,8 +103,6 @@ TEST_F(CallsInAnAssignment, ACallInAnUnnamedBlockReachesItsFunction) {
   EXPECT_EQ(VpiObjectOf(CalledFunction("top.genblk1")), VpiObjectOf(f));
 }
 
-// §23.9: a call the module writes outside every block reaches the module's
-// function, not that of a block declared ahead of it.
 TEST_F(CallsInAnAssignment, AModuleCallReachesTheModulesFunctionOverABlocks) {
   Run("module top;\n"
       "  if (1) begin : g function int f(); return 1; endfunction end\n"
@@ -135,8 +113,6 @@ TEST_F(CallsInAnAssignment, AModuleCallReachesTheModulesFunctionOverABlocks) {
   EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(f));
 }
 
-// §26.3: a call reaches the package function the module imports by its name,
-// passing over an import of another of the package's items...
 TEST_F(CallsInAnAssignment, ACallReachesAFunctionImportedByName) {
   Run("package p; int x; function int f(); return 1; endfunction\n"
       "  function int g(); return 2; endfunction endpackage\n"
@@ -147,7 +123,6 @@ TEST_F(CallsInAnAssignment, ACallReachesAFunctionImportedByName) {
   EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(g));
 }
 
-// ...and the function of the one wildcard-imported package that declares it.
 TEST_F(CallsInAnAssignment, ACallReachesTheWildcardImportDeclaringIt) {
   Run("package p; function int f(); return 1; endfunction endpackage\n"
       "package q; function int h(); return 3; endfunction endpackage\n"
@@ -158,11 +133,6 @@ TEST_F(CallsInAnAssignment, ACallReachesTheWildcardImportDeclaringIt) {
   EXPECT_EQ(VpiObjectOf(CalledFunction()), VpiObjectOf(h));
 }
 
-// §37.42 with §26.3: a callee written `p::f` resolves to the function the
-// package p declares, with no object where none was made for it; any other
-// callee but a name resolves to none: an expression of another kind, a
-// member access, and a scope resolution missing a side or joining anything
-// but two names.
 TEST(TaskFuncCallModel, OnlyAPackagesFunctionResolvesAScopedCallee) {
   ModuleItem function;
   function.kind = ModuleItemKind::kFunctionDecl;
@@ -206,8 +176,6 @@ TEST(TaskFuncCallModel, OnlyAPackagesFunctionResolvesAScopedCallee) {
   }
 }
 
-// §37.42: a name no generate block, module, compilation unit or imported
-// package declares resolves to no task or function and no object.
 TEST(TaskFuncCallModel, ANameNothingDeclaresResolvesToNone) {
   RtlirDesign design;
   RtlirModule mod;
@@ -223,9 +191,6 @@ TEST(TaskFuncCallModel, ANameNothingDeclaresResolvesToNone) {
   EXPECT_EQ(kCalled.object, nullptr);
 }
 
-// §23.9 with §37.42: the module's own lookup passes over a function only a
-// generate block declares. A call no block encloses still resolves to that
-// declaration, which names the kind of call, but reaches no object.
 TEST(TaskFuncCallModel, ABlocksFunctionCalledOutsideItsBlockHasNoObject) {
   ModuleItem function;
   function.kind = ModuleItemKind::kFunctionDecl;
@@ -244,10 +209,6 @@ TEST(TaskFuncCallModel, ABlocksFunctionCalledOutsideItsBlockHasNoObject) {
   EXPECT_EQ(kCalled.object, nullptr);
 }
 
-// The method func calls a scope's statements make, each as the name of the
-// variable it is applied to, in the order written. Nothing names the built-in
-// method such a call makes (§37.42 detail 11, §37.60 detail 1), so the
-// variable is what tells the calls apart.
 class CallStatementsInAScope : public VpiDesignRun {
  protected:
   static std::vector<std::string> MethodCallsOf(vpiHandle scope) {
@@ -261,8 +222,6 @@ class CallStatementsInAScope : public VpiDesignRun {
     return calls;
   }
 
-  // That the method task call `method` the block top.b holds reaches the
-  // method of that name of the class defn `cls` that `scope` holds.
   static void ExpectTaskCallReaches(const char* method, const char* scope,
                                     const char* cls) {
     vpiHandle call = CallOf(vpiMethodTaskCall, By("top.b"), method);
@@ -275,13 +234,6 @@ class CallStatementsInAScope : public VpiDesignRun {
   }
 };
 
-// A block's queue (§7.10.2), its associative arrays indexed by a keyword, a
-// typedef name and a class (§7.8), its fixed-size array sized by a parameter
-// (§7.12.2), its string (§6.16) and its enum (§6.19.5) each take the built-in
-// methods of their kind, so a call of one as a statement is a method func call
-// applied to the block's variable. The kind each variable is read as decides
-// whether the method is one of its own: an associative array has no sort and a
-// fixed-size array no delete.
 TEST_F(CallStatementsInAScope, ABlocksBuiltInValuesTakeTheirKindsMethods) {
   Run("module top; typedef enum {A, B} e_t; class C; endclass\n"
       "  localparam int N = 2;\n"
@@ -296,9 +248,6 @@ TEST_F(CallStatementsInAScope, ABlocksBuiltInValuesTakeTheirKindsMethods) {
             (std::vector<std::string>{"q", "s", "t", "c", "p", "str", "e"}));
 }
 
-// A module's dynamic array (§7.5), its fixed-size array (§7.12.2) and its enum
-// declared without a typedef (§6.19) take the built-in methods of their kind
-// as a block's do.
 TEST_F(CallStatementsInAScope, AModulesArraysAndAnonymousEnumTakeTheirMethods) {
   Run("module top; int d[]; int f[2]; enum {X, Y} e;\n"
       "  initial begin : b d.delete(); f.sort(); e.next(); end\n"
@@ -307,10 +256,6 @@ TEST_F(CallStatementsInAScope, AModulesArraysAndAnonymousEnumTakeTheirMethods) {
             (std::vector<std::string>{"d", "f", "e"}));
 }
 
-// §8.4 with §37.42 detail 2: a call through a member chain, h.b.run(), finds
-// the chain's member among the class's members wherever the class declares
-// it, past a method and another property declared ahead of it, and is a
-// method task call of the class the member holds a handle of.
 TEST_F(CallStatementsInAScope, AChainsMemberIsFoundPastTheMembersBeforeIt) {
   Run("module top;\n"
       "  class B; task run(); endtask endclass\n"
@@ -328,9 +273,6 @@ TEST_F(CallStatementsInAScope, AChainsMemberIsFoundPastTheMembersBeforeIt) {
                 Named(vpiMethods, Named(vpiClassDefn, By("top"), "B"), "run")));
 }
 
-// §13.4.1 with §37.42: a function call written in a void cast is a func call
-// statement reaching the function it calls, with the arguments it was written
-// with, the cast discarding the value and adding nothing to the model (#5782).
 TEST_F(CallStatementsInAScope, AVoidCastCallIsTheFuncCallItWraps) {
   Run("module top; function int f(int a); return a; endfunction\n"
       "  initial begin : b void'(f(3)); end\n"
@@ -342,10 +284,6 @@ TEST_F(CallStatementsInAScope, AVoidCastCallIsTheFuncCallItWraps) {
   EXPECT_EQ(KindsOf(vpiArgument, call), std::vector<int>{vpiConstant});
 }
 
-// §8.10 with §8.23 and §37.42: a static method called through its class's
-// scope, C::f(), or through a package's class, p::D::g(), is a method func
-// call applied to no object, reaching the method of the class defn made where
-// the class is declared (#5775).
 TEST_F(CallStatementsInAScope, AStaticMethodCalledThroughItsScopeIsACall) {
   Run("package q; endpackage\n"
       "package p; localparam int K = 1;\n"
@@ -368,8 +306,6 @@ TEST_F(CallStatementsInAScope, AStaticMethodCalledThroughItsScopeIsACall) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, g)), VpiObjectOf(d_g));
 }
 
-// ...and so does one of a class a generate block declares, called in the
-// block, reaching the method of the class defn made under the block (#7382).
 TEST_F(CallStatementsInAScope, AGenerateBlocksStaticMethodCalledIsACall) {
   Run("module top;\n"
       "  if (1) begin : g\n"
@@ -384,8 +320,6 @@ TEST_F(CallStatementsInAScope, AGenerateBlocksStaticMethodCalledIsACall) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, f)), VpiObjectOf(c_f));
 }
 
-// ...a loop's block among them: a call in a block nested in each instance
-// reaches the method of that instance's class defn (#7383).
 TEST_F(CallStatementsInAScope, ALoopBlocksCallReachesItsOwnInstancesMethod) {
   Run("module top;\n"
       "  for (genvar i = 0; i < 2; i++) begin : g\n"
@@ -404,10 +338,6 @@ TEST_F(CallStatementsInAScope, ALoopBlocksCallReachesItsOwnInstancesMethod) {
   }
 }
 
-// §8.23 and §8.25 with §37.42: a static method called through a
-// specialization's scope is one of the class the specialization gives C's type
-// parameter as its base: B2's tick for C #(.T(B2)) and C #(B2), and B's run
-// for C #(.T()), whose empty argument leaves the parameter its default.
 TEST_F(CallStatementsInAScope, AScopesSpecializationChoosesItsBase) {
   Run("module top;\n"
       "  class B; static function void run(); endfunction endclass\n"
@@ -436,9 +366,6 @@ TEST_F(CallStatementsInAScope, AScopesSpecializationChoosesItsBase) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiFunction, calls[2])), VpiObjectOf(run));
 }
 
-// §6.18 with §37.42: a handle whose class a typedef names is a handle of that
-// class, so a call applied to it, or through a property of its class, is a
-// method task call reaching the class's method (#5778).
 TEST_F(CallStatementsInAScope, ACallOnATypedefsHandleReachesItsClassMethod) {
   Run("module top;\n"
       "  class C; task go(); endtask endclass\n"
@@ -450,9 +377,6 @@ TEST_F(CallStatementsInAScope, ACallOnATypedefsHandleReachesItsClassMethod) {
   ExpectTaskCallReaches("go", "top", "C");
 }
 
-// §26.3 with §37.42: a handle of a class a package declares, imported by name
-// or with a wildcard, is a handle of that class, so a call applied to it is a
-// method task call reaching the method of the package's class defn (#5786).
 TEST_F(CallStatementsInAScope, ACallOnAnImportedClasssHandleReachesItsMethod) {
   Run("package q; endpackage\n"
       "package p; localparam int K = 1;\n"
@@ -467,9 +391,6 @@ TEST_F(CallStatementsInAScope, ACallOnAnImportedClasssHandleReachesItsMethod) {
   ExpectTaskCallReaches("go", "p", "E");
 }
 
-// §23.6 with §37.42 detail 2: a method called through a class var of an
-// instance below, u.h.run(), is a method task call applied to that instance's
-// variable, reaching the method of the class defn the instance holds (#5776).
 TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
   Run("module sub; class B; task run(); endtask endclass B h = new;\n"
       "endmodule\n"
@@ -482,10 +403,6 @@ TEST_F(CallStatementsInAScope, AChainThroughAnInstanceReachesItsVariable) {
             VpiObjectOf(By("top.u.h")));
 }
 
-// §37.42 detail 2: a method called through an expression's value, an
-// element of an array of handles, a property of an element, a function's
-// result or a package's variable, is a method task call reaching its class's
-// method (#5777), applied to an object it reaches through vpiPrefix (#5792).
 TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
   Run("package q; endpackage\n"
       "package p; class D; task go(); endtask endclass\n"
@@ -514,18 +431,12 @@ TEST_F(CallStatementsInAScope, ACallThroughAnExpressionReachesItsMethod) {
     prefixed.push_back(vpi_handle(vpiPrefix, stmt) != nullptr);
     reached.push_back(VpiObjectOf(vpi_handle(vpiTask, stmt)));
   }
-  // Whether each call, in the order written, reaches a prefix.
   EXPECT_EQ(prefixed, (std::vector<bool>{true, true, true, true}));
   EXPECT_EQ(reached,
             (std::vector<VpiObject*>{VpiObjectOf(b_run), VpiObjectOf(b_run),
                                      VpiObjectOf(b_run), VpiObjectOf(d_go)}));
 }
 
-// §25.9 with §37.42: a call of an interface's task through a virtual
-// interface, a module's, a block's or a class property's, is a task call
-// (#5784), and one of its function a func call. The
-// interface's declaration says which, so a call through a virtual interface
-// of an interface nothing instantiates is a task call too (#5791).
 TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
   Run("interface other; endinterface\n"
       "interface ifc; logic x; function void f(); endfunction\n"
@@ -545,9 +456,6 @@ TEST_F(CallStatementsInAScope, ACallThroughAVirtualInterfaceIsATaskCall) {
   EXPECT_EQ(ObjectsOf(vpiTaskCall, By("top.b.g")).size(), 1U);
 }
 
-// §35.5 with §37.42: a call of a function imported through DPI is a func
-// call, and a call of an imported task a task call (#5785). The calls never
-// run, so the run calls no foreign code.
 TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
   Run("module top;\n"
       "  import \"DPI-C\" function int c_f(int a);\n"
@@ -558,11 +466,6 @@ TEST_F(CallStatementsInAScope, ACallOfADpiImportIsACall) {
   EXPECT_EQ(ObjectsOf(vpiTaskCall, By("top.b")).size(), 1U);
 }
 
-// §8.6, §8.10 and §11.4.11 with §37.42: a method called on the handle a
-// method call returns, a.self().run(), a static method's, B::make().run(), a
-// package's function's, p::make_d().go(), or the one a conditional yields,
-// (s ? a : c).run(), is a method task call of the class that handle's type
-// names (#5789).
 TEST_F(CallStatementsInAScope, ACallOnAResultOrAConditionalReachesItsMethod) {
   Run("package p; class D; task go(); endtask endclass\n"
       "  function automatic D make_d(); D d = new; return d; endfunction\n"
@@ -582,10 +485,6 @@ TEST_F(CallStatementsInAScope, ACallOnAResultOrAConditionalReachesItsMethod) {
   ExpectTaskCallReaches("go", "p", "D");
 }
 
-// §7.2 with §37.42 detail 2: a method called through a structure's member
-// that holds a class handle, the structure declared through a typedef or
-// written out, of the module or of a block, is a method task call of the
-// member's class (#5788).
 TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
   Run("module sub; endmodule\n"
       "module top; sub u ();\n"
@@ -601,9 +500,6 @@ TEST_F(CallStatementsInAScope, ACallThroughAStructMemberReachesItsMethod) {
   ExpectTaskCallReaches("run", "top", "B");
 }
 
-// §9.7 with §37.42: a method of process called on the handle process::self()
-// returns is a method func call of the built-in class, not user-defined
-// (#5797).
 TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
   Run("module top; initial begin : b process::self().srandom(1); end\n"
       "endmodule\n");
@@ -614,10 +510,6 @@ TEST_F(CallStatementsInAScope, ACallOnProcessSelfIsAMethodFuncCall) {
   EXPECT_EQ(vpi_get(vpiUserDefn, call), 0);
 }
 
-// §23.8 with §37.42: a task a module's procedure calls by a name its module
-// does not declare is the task of the nearest enclosing module declaring it,
-// through any number of levels, and the task call reaches that module's task
-// object (#5802).
 TEST_F(CallStatementsInAScope, ACallResolvedUpwardReachesTheEnclosingTask) {
   Run("module deep; initial begin : b t(); end endmodule\n"
       "module leaf; deep k (); endmodule\n"
@@ -631,8 +523,6 @@ TEST_F(CallStatementsInAScope, ACallResolvedUpwardReachesTheEnclosingTask) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(task));
 }
 
-// §11.12 with §37.42: a method called on the handle a let yields is a method
-// task call of the class of the let's expression (#5803).
 TEST_F(CallStatementsInAScope, ACallOnALetsHandleReachesItsMethod) {
   Run("module top;\n"
       "  class B; task run(); endtask endclass\n"
@@ -648,11 +538,6 @@ TEST_F(CallStatementsInAScope, ACallOnALetsHandleReachesItsMethod) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(run));
 }
 
-// §18.12 with §37.42: a call of the scope randomize function, written without
-// its std:: prefix or with it, is a func call, unnamed as any call statement
-// without a label is (§37.60 detail 1). No design declares the function, so
-// the call reaches no function object, as detail 11 has a built-in method's
-// call reach none (#5828).
 TEST_F(CallStatementsInAScope, AScopeRandomizeCallIsAFuncCall) {
   Run("module top; int a;\n"
       "  initial begin : b randomize(a); std::randomize(a); end\n"
@@ -665,11 +550,6 @@ TEST_F(CallStatementsInAScope, AScopeRandomizeCallIsAFuncCall) {
   }
 }
 
-// §37.42 detail 1 with §7.12.1: an array locator method call written as a
-// statement reaches its with expression through vpiWith, whichever of the
-// locator methods it calls (#5830). A locator call written with no with
-// clause, a reduction method's call, which detail 1 does not name, and a scope
-// randomize call, a func call rather than a method's, reach none.
 TEST_F(CallStatementsInAScope, ALocatorCallReachesItsWithExpression) {
   Run("module top; int q[$] = '{1, 2}; int z;\n"
       "  initial begin : b\n"
@@ -697,12 +577,6 @@ TEST_F(CallStatementsInAScope, ALocatorCallReachesItsWithExpression) {
   }
 }
 
-// §18.6, §18.8, §18.9 and §18.13 with §37.42: a call through a class handle
-// of one of the built-in methods every class has, which neither the class nor
-// a class it extends declares, is a method func call applied to the handle.
-// It is not user-defined and reaches no function object (detail 11). A class
-// overriding pre_randomize declares it, and a call of it through a handle of
-// that class reaches the declaration (#5831).
 TEST_F(CallStatementsInAScope, ACallOfAClassBuiltInMethodIsAMethodFuncCall) {
   Run("module top;\n"
       "  class B; rand int x; endclass\n"
@@ -737,10 +611,6 @@ TEST_F(CallStatementsInAScope, ACallOfAClassBuiltInMethodIsAMethodFuncCall) {
             VpiObjectOf(declared));
 }
 
-// §8.13 and §8.25 with §37.42: a call through a handle of a class extending
-// its own type parameter, C #(int N = 1, type T = B) extends T, reaches the
-// method of the class the parameter takes, through a variable or a property:
-// B's run for the default C, B2's tick for C #(1, B2) and C #(.T(B2)).
 TEST_F(CallStatementsInAScope, ACallReachesTheMethodATypeParameterBaseHas) {
   Run("module top;\n"
       "  class B; function void run(); endfunction endclass\n"
@@ -772,10 +642,6 @@ TEST_F(CallStatementsInAScope, ACallReachesTheMethodATypeParameterBaseHas) {
   }
 }
 
-// §8.25 with §37.42 detail 2: a call through an expression other than a chain
-// of names, an element of an array of handles, a property selected from one,
-// or what a function or a method returns, reaches the method of the base the
-// specialization the value is read as gives C, B2's tick, for C #(.T(B2)).
 TEST_F(CallStatementsInAScope, AnExpressionsSpecializationChoosesItsBase) {
   Run("module top;\n"
       "  class B; endclass\n"
@@ -807,9 +673,6 @@ TEST_F(CallStatementsInAScope, AnExpressionsSpecializationChoosesItsBase) {
   }
 }
 
-// §7.2 and §8.25 with §37.42: a structure's member of a specialized class
-// type, C #(.T(B2)) c, holds a handle of the class the specialization gives
-// C's type parameter as its base, so s.c.tick() reaches B2's tick.
 TEST_F(CallStatementsInAScope, AStructMembersSpecializationChoosesItsBase) {
   Run("module top;\n"
       "  class B; endclass\n"
@@ -827,10 +690,6 @@ TEST_F(CallStatementsInAScope, AStructMembersSpecializationChoosesItsBase) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTask, call)), VpiObjectOf(tick));
 }
 
-// §15.4 and §18.6.1 with §37.42: a built-in class is a class too, so a call
-// of randomize through a handle of a class extending mailbox, which declares
-// no randomize, is a method func call of a built-in method, though §15.4 names
-// no such method of mailbox (#5836).
 TEST_F(CallStatementsInAScope, ACallOfRandomizeThroughABuiltInBaseIsACall) {
   Run("module top;\n"
       "  class M extends mailbox #(int); endclass\n"
@@ -840,12 +699,6 @@ TEST_F(CallStatementsInAScope, ACallOfRandomizeThroughABuiltInBaseIsACall) {
   EXPECT_EQ(MethodCallsOf(By("top.b")), std::vector<std::string>{"m"});
 }
 
-// §18.8 and §18.9 with §37.42: rand_mode applied to a random variable, and
-// constraint_mode applied to a constraint block, through a class handle, are
-// method func calls of built-in methods, not user-defined and reaching no
-// function object (detail 11). The prefix of the call of rand_mode is the
-// variable it is applied to, read in the object the handle references
-// (detail 2) (#5835).
 TEST_F(CallStatementsInAScope, AModeCallOnAMemberIsAMethodFuncCall) {
   Run("module top;\n"
       "  class C; rand int x; constraint c { x > 0; } endclass\n"
@@ -864,10 +717,6 @@ TEST_F(CallStatementsInAScope, AModeCallOnAMemberIsAMethodFuncCall) {
   EXPECT_STREQ(vpi_get_str(vpiName, prefix), "x");
 }
 
-// §37.42 detail 1 with §18.7: a call of randomize written with an inline
-// constraint block, restricted to an identifier list or not, reaches the block
-// through vpiWith as a constraint; one written with none reaches nothing
-// (#5834).
 TEST_F(CallStatementsInAScope, ARandomizeCallReachesItsInlineConstraint) {
   Run("module top;\n"
       "  class C; rand int x; endclass\n"
@@ -891,12 +740,6 @@ TEST_F(CallStatementsInAScope, ARandomizeCallReachesItsInlineConstraint) {
   EXPECT_EQ(vpi_handle(vpiWith, calls[2]), nullptr);
 }
 
-// §37.42 details 2 and 11: a method call written within an expression is a
-// method func call named after its method, which a call statement of it is
-// not (§37.60 detail 1), and applied through vpiPrefix to the value it is
-// called on, as a call statement of it is. A method the class
-// declares is reached through vpiFunction, a built-in method's call reaches
-// none, and the call's value is the method's result (#5832).
 TEST_F(CallStatementsInAScope, AMethodCallInAnExpressionIsAMethodFuncCall) {
   Run("module top;\n"
       "  class C; function int get(); return 7; endfunction endclass\n"

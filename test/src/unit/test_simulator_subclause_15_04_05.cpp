@@ -17,8 +17,6 @@ using namespace delta;
 
 namespace {
 
-// A 64-bit two-state message holding `v`, as the C++ cases below place one,
-// and the low word of a message read back out of the queue.
 Logic4Snapshot Msg(uint64_t v) {
   Logic4Word word{v, 0};
   Logic4Vec vec{64, 1, &word};
@@ -29,13 +27,6 @@ Logic4Snapshot Msg(uint64_t v) {
 
 uint64_t Word(const Logic4Snapshot& msg) { return msg.Get().ToUint64(); }
 
-// Minimal getter coroutine used to observe the get-side wakeup. It starts
-// suspended; the first resume runs it to the co_await, where — while the
-// mailbox is empty — the awaiter parks the handle on the mailbox's get-waiter
-// queue. A later put() that places a message resumes it through production
-// WakeGetWaiters(), at which point it retrieves the message and records that it
-// ran. Parking on get_waiters is exactly what a get awaiter's suspend does; the
-// rule under observation here is the resume performed by WakeGetWaiters().
 struct GetWaiter {
   MailboxObject& mbx;
   bool await_ready() { return !mbx.messages.empty(); }
@@ -83,58 +74,45 @@ TEST(IpcSync, MailboxGetEmptyReturnsBlock) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.5: a get() on an empty mailbox blocks the current process until a
-// message is placed in the mailbox. The getter parks while the mailbox is empty
-// and is resumed only once a put() supplies a message, after which it retrieves
-// that message.
 TEST(IpcSync, MailboxGetBlocksUntilMessagePlaced) {
-  MailboxObject mb;  // empty
+  MailboxObject mb;
   std::vector<int> ran;
   Logic4Snapshot got;
   auto getter = SpawnGetter(mb, got, ran, 9);
-  getter.h.resume();  // runs to the co_await; empty -> parks on get_waiters
+  getter.h.resume();
   ASSERT_EQ(mb.get_waiters.size(), 1u);
   EXPECT_TRUE(ran.empty());
 
-  // Placing a message wakes the parked getter via WakeGetWaiters().
   EXPECT_EQ(mb.TryPut(Msg(0x55).Get()), 1);
   ASSERT_EQ(ran.size(), 1u);
   EXPECT_EQ(ran[0], 9);
   EXPECT_TRUE(mb.get_waiters.empty());
-  // The resumed getter retrieved the placed message and consumed it.
   EXPECT_EQ(Word(got), 0x55u);
   EXPECT_EQ(mb.Num(), 0);
 
   getter.h.destroy();
 }
 
-// §15.4.5: the mailbox waiting queue is FIFO — the arrival order of processes
-// blocked in get() shall be preserved. Two getters park on an empty mailbox in
-// arrival order; each subsequent put() wakes the earliest-arrived waiter first,
-// so the first getter retrieves the first placed message and the second getter
-// the second. This observes production WakeGetWaiters() servicing get_waiters
-// from the front.
 TEST(IpcSync, MailboxWaitingQueuePreservesArrivalOrder) {
-  MailboxObject mb;  // empty
+  MailboxObject mb;
   std::vector<int> ran;
   Logic4Snapshot got_first;
   Logic4Snapshot got_second;
   auto first = SpawnGetter(mb, got_first, ran, 1);
   auto second = SpawnGetter(mb, got_second, ran, 2);
-  first.h.resume();   // parks first on get_waiters
-  second.h.resume();  // parks second behind it
+  first.h.resume();
+  second.h.resume();
   ASSERT_EQ(mb.get_waiters.size(), 2u);
   EXPECT_TRUE(ran.empty());
 
-  // Each placed message wakes exactly the head of the waiting queue.
   EXPECT_EQ(mb.TryPut(Msg(0xAA).Get()), 1);
   ASSERT_EQ(ran.size(), 1u);
-  EXPECT_EQ(ran[0], 1);  // the earliest arrival ran first
+  EXPECT_EQ(ran[0], 1);
   EXPECT_EQ(Word(got_first), 0xAAu);
 
   EXPECT_EQ(mb.TryPut(Msg(0xBB).Get()), 1);
   ASSERT_EQ(ran.size(), 2u);
-  EXPECT_EQ(ran[1], 2);  // the later arrival ran second
+  EXPECT_EQ(ran[1], 2);
   EXPECT_EQ(Word(got_second), 0xBBu);
   EXPECT_TRUE(mb.get_waiters.empty());
 
@@ -168,13 +146,10 @@ TEST(IpcSync, MailboxGetFreesSpaceForPut) {
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// Two non-equivalent message types, §6.22.2 c)'s int and §6.22.1 a)'s string.
 constexpr MailboxMessageType kTypeInt =
     MailboxMessageType::Integral(32, true, MailboxMessageType::States::kTwo);
 constexpr MailboxMessageType kTypeString = MailboxMessageType::String();
 
-// §15.4.5: the mailbox maintains the data type placed by put(), so a get()
-// whose variable type matches that stored type retrieves the value.
 TEST(IpcSync, MailboxGetMaintainsTypePlacedByPut) {
   MailboxObject mb;
   mb.TryPut(Msg(0xAB).Get(), kTypeInt);
@@ -184,25 +159,15 @@ TEST(IpcSync, MailboxGetMaintainsTypePlacedByPut) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.5: a single (typeless) mailbox can carry messages of different types,
-// and the implementation maintains the type placed by each put() individually.
-// Two messages with distinct stored types coexist in the queue; each get()
-// checks the type of the specific (front) message it retrieves, so a get()
-// whose variable type matches the front message succeeds while the other stored
-// type waits its turn and is then retrieved by a get() of its own matching
-// type.
 TEST(IpcSync, MailboxGetRetrievesEachMessageWithItsOwnStoredType) {
   MailboxObject mb;
-  mb.TryPut(Msg(0xAB).Get(), kTypeInt);     // first placed, first out
-  mb.TryPut(Msg(0xCD).Get(), kTypeString);  // second placed, second out
+  mb.TryPut(Msg(0xAB).Get(), kTypeInt);
+  mb.TryPut(Msg(0xCD).Get(), kTypeString);
   Logic4Snapshot msg;
 
-  // The front message was placed as kTypeInt: a kTypeString get() sees the
-  // front's maintained type, not the later kTypeString message, and errors.
   EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kTypeError);
   EXPECT_EQ(mb.Num(), 2);
 
-  // Retrieved by its own stored type; the queue then advances to the second.
   EXPECT_EQ(mb.Get(msg, kTypeInt), MbxGetStatus::kRetrieved);
   EXPECT_EQ(Word(msg), 0xABu);
   EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kRetrieved);
@@ -210,23 +175,15 @@ TEST(IpcSync, MailboxGetRetrievesEachMessageWithItsOwnStoredType) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.5: when the variable type is not equivalent to the stored message type,
-// a run-time type error is generated instead of a retrieval.
 TEST(IpcSync, MailboxGetTypeMismatchGeneratesError) {
   MailboxObject mb;
   mb.TryPut(Msg(0xAB).Get(), kTypeInt);
   Logic4Snapshot msg = Msg(0xEE);
   EXPECT_EQ(mb.Get(msg, kTypeString), MbxGetStatus::kTypeError);
-  // The errored get() does not consume the message and does not clobber msg.
   EXPECT_EQ(Word(msg), 0xEEu);
   EXPECT_EQ(mb.Num(), 1);
 }
 
-// §15.4.5 (printed pages 375-376): get() on an empty mailbox blocks the
-// process until a message is placed in the mailbox, and then removes that
-// message. The put() at time 3 is what ends the wait, so the value 8 reaches
-// v at time 3: 8 and the time test read as 81. A get() that did not wait
-// would have stored nothing and read the time as 0.
 TEST(MailboxSim, GetWaitsUntilAMessageIsPlaced) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -244,11 +201,6 @@ TEST(MailboxSim, GetWaitsUntilAMessageIsPlaced) {
   EXPECT_EQ(var->value.ToUint64(), 81u);
 }
 
-// §15.4 (printed page 374) with §15.4.3 (printed 375): a message is any
-// singular expression, so a 96-bit vector travels through the mailbox whole
-// and get() hands all of it back: the two words of v read the three 32-bit
-// pieces the literal was written from. Held as one 64-bit word, the message
-// lost 32'h01234567, the upper piece, and v's second word read 0.
 TEST(MailboxSim, GetHandsBackAWideMessageWhole) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -271,10 +223,6 @@ TEST(MailboxSim, GetHandsBackAWideMessageWhole) {
   EXPECT_EQ(var->value.words[1].bval, 0u);
 }
 
-// §15.4 (printed page 374): a 4-state message keeps its x and z bits through
-// the mailbox, so the variable get() fills reads case-equal to the value
-// put() placed: 1 and a num() of 0 read as 10. Held as a 64-bit word, the
-// unknown bits were dropped and the case equality read 0.
 TEST(MailboxSim, GetHandsBackAFourStateMessageWhole) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -298,10 +246,6 @@ TEST(MailboxSim, GetHandsBackAFourStateMessageWhole) {
   EXPECT_EQ(b->value.words[0].bval & 0xFFu, 0x50u);
 }
 
-// §15.4.9 (printed page 377) with §15.4.5: the subclause's own example puts
-// "hello" into a `mailbox #(string)` and get() leaves the string variable
-// holding "hello". Held as a 64-bit word, the message carried the characters
-// but the store sized them to the variable and a string read back cut.
 TEST(MailboxSim, GetHandsBackAStringMessageWhole) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -318,8 +262,6 @@ TEST(MailboxSim, GetHandsBackAStringMessageWhole) {
   EXPECT_EQ(VecToStr(var->value), "hello");
 }
 
-// §15.4.5's run-time error, reported at the variable get() named, spelled
-// as `target`, on line `line`; and the value a variable was left holding.
 void ExpectGetTypeError(const SimFixture& f, const std::string& target,
                         uint32_t line) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -342,12 +284,6 @@ void ExpectString(SimFixture& f, std::string_view name,
   EXPECT_EQ(VecToStr(var->value), expected);
 }
 
-// §15.4.5 (printed page 376): when the type of the message variable is not
-// equivalent to the type of the message in the mailbox, a run-time error is
-// generated. The typeless mailbox holds the int 7, and get() into a string
-// is reported at the variable, leaves the message in the queue and the
-// string as it was: "keep" and a num() of 1. An untyped retrieval stored
-// the 7 over the string and answered 0 for num().
 TEST(MailboxSim, GetIntoAVariableOfAnotherTypeIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -369,14 +305,6 @@ TEST(MailboxSim, GetIntoAVariableOfAnotherTypeIsAnError) {
   ExpectWord(f, "n", 1u);
 }
 
-// §15.4.3 (printed page 375) has put() place any singular expression, and
-// §15.4.5 (printed 376) has the mailbox maintain the data type it was placed
-// with: `a + 1` over the int a is, by §11.6.1 and §11.8.1, a 32-bit signed
-// integral, so get() into a string is the run-time error, reported at the
-// string with the message left in the queue and the string as it was, and
-// get() into an int then reads the sum: 5 and a num() of 0 read as 50. A
-// computed actual placed with no type stored the 5 over the string and
-// raised nothing, the int get() then waiting on an empty mailbox.
 TEST(MailboxSim, PutOfAComputedActualCarriesTheSumsType) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -399,14 +327,6 @@ TEST(MailboxSim, PutOfAComputedActualCarriesTheSumsType) {
   ExpectWord(f, "n", 50u);
 }
 
-// §15.4.5 (printed page 376) with §7.2.1: the message variable may be any
-// valid left-hand expression, and a member of a structure is of the type its
-// declaration gives it. The int 7 is not equivalent to the 8-bit byte member
-// (§6.22.2 c) asks for one total width), so `mb.get(s.b)` is the run-time
-// error, reported at the member with 9 left in it, and `mb.get(s.i)` into the
-// int member reads the 7: 9, 7 and a num() of 0 read as 970. A member with
-// no type read stored the 7 in the byte, and the int member's get() then
-// waited on an empty mailbox, leaving n at 0.
 TEST(MailboxSim, GetIntoAMemberOfAnotherTypeIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -430,13 +350,6 @@ TEST(MailboxSim, GetIntoAMemberOfAnotherTypeIsAnError) {
   ExpectWord(f, "n", 970u);
 }
 
-// §15.4.5 (printed page 376) with §7.4.2: an element of an unpacked array is
-// of the array's element type, the signed 8-bit byte. The int 6 is not
-// equivalent to it, so `mb.get(arr[i])` is the run-time error and the int w
-// takes the 6; the literal 8'sd3 is 8 bits and signed, so the element then
-// reads it, where the unsigned 8'd3 would not have (§6.22.2 c) asks for one
-// signedness): 6, 3 and a num() of 0 read as 630. An element with no type
-// read stored the 6, and the int's get() then waited on an empty mailbox.
 TEST(MailboxSim, GetIntoAnElementOfAnotherTypeIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -460,13 +373,6 @@ TEST(MailboxSim, GetIntoAnElementOfAnotherTypeIsAnError) {
   ExpectWord(f, "n", 630u);
 }
 
-// §6.22.1 b) and d) (printed page 135) with §6.22.2 a) (printed 136): a
-// typedef that renames a class matches the class, so a handle declared
-// through it is of a type equivalent to one declared by the class name, and
-// §15.4.5 (printed 376) hands the message to get(). The block-local `c_t h`
-// holding v = 5 is put and the `C g` get() takes it: 5 and a num() of 0 read
-// as 50. Typed by the typedef's name, the get() was reported not equivalent
-// and g stayed null.
 TEST(MailboxSim, GetIntoAHandleOfTheClassTakesATypedefdHandlesMessage) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int v;\n"
@@ -488,12 +394,6 @@ TEST(MailboxSim, GetIntoAHandleOfTheClassTakesATypedefdHandlesMessage) {
             50u);
 }
 
-// §6.22.1 d) (printed page 135): a typedef for a class matches the class it
-// renames and no other, so a `d_t k` declared through a typedef of D is not
-// equivalent to the C handle in the queue, and §15.4.5 (printed 376) makes
-// its get() the run-time error, reported at k with the message left in the
-// queue: a num() of 1. A typedef resolved to any class at all would have
-// stored the C handle in k and answered 0.
 TEST(MailboxSim, GetIntoAHandleOfAnotherTypedefdClassIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -523,13 +423,6 @@ TEST(MailboxSim, GetIntoAHandleOfAnotherTypedefdClassIsAnError) {
   ExpectWord(f, "n", 1u);
 }
 
-// §15.4.3 (printed page 375) has put() place an object handle, and §15.3
-// makes a semaphore a built-in class of which the run keeps no class record,
-// so its handle is a message of the class named by the declaration and not
-// of any type: §15.4.5 (printed 376) makes get() into an int the run-time
-// error, reported at n with n as it was and the message left in the queue:
-// 4 and a num() of 1. A handle of an unrecorded class typed as any would
-// have stored the handle over the 4 and answered 0.
 TEST(MailboxSim, GetOfABuiltInClassHandleIntoAnIntIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -551,13 +444,6 @@ TEST(MailboxSim, GetOfABuiltInClassHandleIntoAnIntIsAnError) {
   ExpectWord(f, "k", 1u);
 }
 
-// §7.2.1 (printed page 147) gives each member of a packed structure its
-// declared type, and §6.22.2 c) (printed 136) has two integral types
-// equivalent at one total width, one signedness and one number of states:
-// the member `logic signed [7:0] m` is 8 bits and signed, so §15.4.5
-// (printed 376) hands it the literal 8'sd3, which is both: 3 and a num() of
-// 0 read as 30. Typed by its kind alone, the member read unsigned, the get()
-// was reported not equivalent and r stayed 0.
 TEST(MailboxSim, GetIntoASignedLogicMemberTakesASignedMessage) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  mailbox mb = new;\n"
@@ -573,11 +459,6 @@ TEST(MailboxSim, GetIntoASignedLogicMemberTakesASignedMessage) {
             30u);
 }
 
-// §6.22.2 c) (printed page 136): the unsigned 8'd3 is of the member's width
-// but not of its signedness, so `mb.get(s.m)` into the `logic signed [7:0]`
-// member is §15.4.5's run-time error (printed 376), reported at the member
-// with the message left in the queue and the member as it was: 5 and a
-// num() of 1 read as 51. The member typed unsigned took the 3 and read 30.
 TEST(MailboxSim, GetIntoASignedLogicMemberRefusesAnUnsignedMessage) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -599,13 +480,6 @@ TEST(MailboxSim, GetIntoASignedLogicMemberRefusesAnUnsignedMessage) {
   ExpectWord(f, "n", 51u);
 }
 
-// §15.4.3 (printed page 375) has put() suspend the process only while a
-// bounded mailbox is full, and §13.4 (printed 340) forbids a function to
-// suspend the process enabling it, so a put() a void function reaches on an
-// unbounded mailbox places its message where it stands: the module's get()
-// then reads the 8 and num() 0, 80. Served by the expression evaluator, which
-// answers num() and the try_* forms alone, the function's put() placed
-// nothing, the get() waited on the empty mailbox and r stayed 0.
 TEST(MailboxSim, PutInsideAFunctionPlacesTheMessage) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  mailbox mb = new;\n"
@@ -623,12 +497,6 @@ TEST(MailboxSim, PutInsideAFunctionPlacesTheMessage) {
             80u);
 }
 
-// §13.4 (printed page 340) with §15.4.3 (printed 375): a put() on a mailbox
-// bounded at one message that already holds one would suspend the process,
-// which a function may not do, so the function's second put() is the error,
-// reported at the call under §13.4 with the message not placed: the get()
-// reads the first message, 8, and num() 0, 80. A put() that placed the 9
-// over the bound would have read 81.
 TEST(MailboxSim, PutInsideAFunctionOnAFullMailboxIsAnError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -655,11 +523,6 @@ TEST(MailboxSim, PutInsideAFunctionOnAFullMailboxIsAnError) {
   ExpectWord(f, "n", 80u);
 }
 
-// §15.4.5 with §9.7 and §8.11: a class task that waits in get() goes on, once
-// another process's put() places the message, as the process and on the object
-// that called it, so the message lands in the task's x and `got` is written on
-// c: 7, 9 and the time 5 read as 795. Resumed under the process that called
-// put(), the task stored the message nowhere and wrote `got` on no object.
 TEST(MailboxSim, GetInAClassTaskResumesOnItsOwnObject) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -691,10 +554,6 @@ TEST(MailboxSim, GetInAClassTaskResumesOnItsOwnObject) {
   EXPECT_EQ(var->value.ToUint64(), 795u);
 }
 
-// §15.4.5 with §25.3: an interface's mailbox is reached through the instance,
-// `c.mb`, so `c.mb.get(v)` waits on the interface's queue until the
-// interface task send() puts 21 into it at time 3, read as 213. Resolved by
-// no key, the get() reached no mailbox and returned at once with v 0.
 TEST(MailboxSim, InterfaceMailboxGetReachedThroughTheInstance) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -715,12 +574,6 @@ TEST(MailboxSim, InterfaceMailboxGetReachedThroughTheInstance) {
   EXPECT_EQ(var->value.ToUint64(), 213u);
 }
 
-// §15.4.5 with §7.10: get() may retrieve into any left-hand expression of the
-// message's type, a property of an object, an element of a queue and an
-// element of an array among them, each taking the next message: 3, 4 and 5,
-// read as 345. An `int q[$]` element was typed as a select of the queue's
-// carrier, so its int message was refused as of another type and left in the
-// mailbox, and arr[1] took the 4 meant for q[0]: 304.
 TEST(MailboxSim, GetStoresIntoAPropertyAQueueElementAndAnArrayElement) {
   SimFixture f;
   auto* var = RunAndFindVar(

@@ -52,8 +52,6 @@ static bool IsExtFileIOSysCall(std::string_view n) {
 static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
   int ret = 0;
   if (expr->args.empty()) {
-    // §20.17.1: invoked with no string argument, $system calls the C system()
-    // with the NULL string rather than executing any command.
     ret = std::system(nullptr);
   } else {
     auto text = expr->args[0]->text;
@@ -63,22 +61,13 @@ static Logic4Vec EvalSystemCommand(const Expr* expr, Arena& arena) {
     } else {
       cmd = std::string(text);
     }
-    // §20.17.1: the argument is handed to C system() as if executed from the
-    // terminal.
     ret = std::system(cmd.c_str());
   }
-  // §20.17.1: as a function, $system returns the system() result with the
-  // signed data type int.
   auto result = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(ret));
   result.is_signed = true;
   return result;
 }
 
-// §20.17.2: build the call-stack text reported by $stacktrace. The chain runs
-// from the context that invoked $stacktrace up to the top-level process, so the
-// innermost active subroutine is listed first and each enclosing caller follows
-// on its own line. The exact content is implementation dependent; here it is
-// the names of the subroutine frames currently on the call stack.
 std::string BuildStackTraceReport(const SimContext& ctx) {
   const auto& frames = ctx.FuncNameStack();
   std::string report;
@@ -105,24 +94,6 @@ static bool IsArrayQuerySysCall(std::string_view n) {
          n == "$size";
 }
 
-// The verification system functions and tasks EvalVerifSysCall answers, named
-// one by one out of the clauses that define them: §20.12 Syntax 20-13 for the
-// six sampled value functions and, through IsGlobalClockingSampledFunction, the
-// ten global clocking functions §16.9.4 describes; §20.11 Syntax 20-12 for the
-// ten assertion control tasks, through the parser's own predicate over them;
-// §20.13 for the five coverage functions; §20.15 for the five stochastic queue
-// tasks.
-//
-// A prefix or a suffix stood for four of those lists and claimed a misspelling
-// with them -- $assertofff, $coverage_gett, $q_ad, $risen_gclk -- which
-// EvalVerifSysCall then answered with a zero. A name no classifier claims is
-// reported under §20.1 instead, and a misspelling is what that report is for.
-//
-// The §20.16 PLA names are gone from here with the $async$/$sync$ prefixes that
-// held them: ClassifyPlaTask generates exactly the sixteen of Table 20-12 and
-// TryEvalPlaSystemTask consults it ahead of every other classifier, so a
-// well-formed PLA name never reaches this point and a malformed one is not a
-// name of the language.
 static bool IsVerifSysCall(std::string_view n) {
   return n == "$sampled" || n == "$rose" || n == "$fell" || n == "$stable" ||
          n == "$past" || n == "$changed" ||
@@ -133,9 +104,6 @@ static bool IsVerifSysCall(std::string_view n) {
          n == "$q_remove" || n == "$q_full" || n == "$q_exam";
 }
 
-// §21.3.2 file-output tasks: $fdisplay, $fwrite, $fstrobe, $fmonitor and their
-// b/h/o radix variants ($fdisplayb, $fwriteh, …). Returns true when `n` is one
-// of those base names or a base name with a single b/h/o radix suffix.
 static bool IsFileOutputTask(std::string_view n) {
   for (auto base : {"$fdisplay", "$fwrite", "$fstrobe", "$fmonitor"}) {
     if (n == base) return true;
@@ -154,10 +122,7 @@ static bool IsIOSysCall(std::string_view n) {
       n == "$writememh" || n == "$writememb" || n == "$sscanf") {
     return true;
   }
-  // §D.14: $sreadmemh / $sreadmemb load a memory from string arguments.
   if (n == "$sreadmemh" || n == "$sreadmemb") return true;
-  // §21.3.3: the variable-targeted output tasks share the IO syscall path
-  // with their $fwrite / $fdisplay counterparts.
   if (n == "$swrite" || n == "$swriteb" || n == "$swriteh" || n == "$swriteo" ||
       n == "$sformat") {
     return true;
@@ -174,21 +139,6 @@ std::string ExtractStringArg(const Expr* arg) {
   return std::string(text);
 }
 
-// §20.1 catalogues the system tasks and system functions SystemVerilog has,
-// each under the subclause that defines it, and leaves the ones for I/O to
-// Clause 21. A name no classifier claimed is one this tool can carry out
-// no part of, whether it is a misspelling, a task of the standard not
-// implemented here, or a name the standard has never had. The three are not
-// told apart, which would take the standard's whole catalogue; what they share
-// is that the call does nothing, and that is what is said.
-//
-// A value is still returned, because the caller is an expression evaluator and
-// the run carries on to whatever else it can report. What changed is that the
-// value is no longer the only thing produced.
-// Annex D.1 lists the system tasks and system functions Annex D describes,
-// informative rather than part of the standard and ones an implementation may
-// be without, each under the subclause that describes it. The subclause of a
-// name D.1 lists, or empty for a name it does not.
 static std::string_view AnnexDSubclauseOf(std::string_view name) {
   struct AnnexDTask {
     std::string_view name;
@@ -211,10 +161,6 @@ static std::string_view AnnexDSubclauseOf(std::string_view name) {
 
 static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
                                       Arena& arena, std::string_view name) {
-  // A name D.1 lists that no classifier claimed is an optional task or
-  // function this implementation is one of those without, which D.1 allows,
-  // and the report says which annex subclause describes it rather than that
-  // it is no system task at all.
   std::string_view annex_d = AnnexDSubclauseOf(name);
   if (!annex_d.empty()) {
     ctx.GetDiag().Error(
@@ -226,9 +172,6 @@ static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
         Subclause("D.1"));
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  // §38.36.3: an application that registered for cbUnresolvedSystf is told of
-  // a system task or function no one provides as the call is encountered,
-  // user_data pointing at its name.
   std::string unresolved(name);
   GetGlobalVpiContext().DispatchCallbacks(kCbUnresolvedSystf, nullptr,
                                           unresolved.data());
@@ -240,15 +183,6 @@ static Logic4Vec ReportUnknownSysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Dispatch the system calls selected by a name-family classifier (math,
-// utility, IO, file IO, array-query, verification, PRNG), and report a name
-// none of them claims. Kept separate from the timekeeping/output dispatch so
-// each chain stays self-contained.
-//
-// EvalPrngCall stood at the end without a predicate of its own, answering
-// every name it did not match with a one-bit zero, so the chain ran out
-// silently rather than running out at all. IsPrngSysCall is what lets it
-// decline, and declining is what makes the line below reachable.
 static Logic4Vec EvalClassifiedSysCall(const Expr* expr, SimContext& ctx,
                                        Arena& arena, std::string_view name) {
   if (IsMathSysCall(name)) return EvalMathSysCall(expr, ctx, arena, name);
@@ -282,16 +216,10 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   if (name == "$printtimescale")
     return EvalPrinttimescaleTask(expr, ctx, arena);
   if (name == "$system") return EvalSystemCommand(expr, arena);
-  // §20.17.2: called as a function, $stacktrace returns a string holding the
-  // call stack of the invoking context. (The task form, which displays the
-  // same information, is handled where statements execute.)
   if (name == "$stacktrace") {
     return StringToLogic4Vec(arena, BuildStackTraceReport(ctx));
   }
   if (IsVcdSysCall(name)) return EvalVcdSysCall(expr, ctx, arena, name);
-  // §32.9: $sdf_annotate reads timing data out of an SDF file and into the
-  // region of the design its module_instance operand names. It produces no
-  // value of its own.
   if (name == "$sdf_annotate") {
     EvalSdfAnnotateTask(expr, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 0);
@@ -299,10 +227,6 @@ static Logic4Vec EvalMiscSysCall(const Expr* expr, SimContext& ctx,
   return EvalClassifiedSysCall(expr, ctx, arena, name);
 }
 
-// §20.2 / Table 20-1: emit the banner that $finish and $stop print before
-// halting, at the reporting level given by their first argument. Level 0 emits
-// nothing, level 1 reports the current time, and level 2 additionally reports
-// resource statistics.
 void EmitFinishDiagnostic(SimContext& ctx, std::string_view task, int64_t level,
                           std::ostream& os) {
   if (level <= 0) return;
@@ -316,11 +240,6 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
                                      Arena& arena, std::string_view name) {
   if (name == "$fatal") {
     ExecSeverityTask(expr, ctx, arena, "FATAL", std::cerr);
-    // §20.10: calling $fatal produces an implicit $finish. Its optional first
-    // argument is a finish_number consistent with $finish's argument (§20.2),
-    // which selects how much diagnostic information the tool reports before it
-    // halts. A leading string argument means no finish_number was supplied, so
-    // the default reporting level of 1 applies.
     int64_t level = 1;
     if (!expr->args.empty() && expr->args[0] &&
         expr->args[0]->kind != ExprKind::kStringLiteral) {
@@ -330,10 +249,6 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
     EmitFinishDiagnostic(ctx, "$finish", level, ctx.Out());
     ctx.RequestFinish();
   } else if (name == "$error") {
-    // §20.10: a run-time error, which EmitSeverityHeader notes for the
-    // run's exit status; the suite's three chapter-16 -fail files fail an
-    // assertion into `$error` and are counted as passing on that status
-    // alone (#2928, #2926).
     ExecSeverityTask(expr, ctx, arena, "ERROR", std::cerr);
   } else if (name == "$warning") {
     ExecSeverityTask(expr, ctx, arena, "WARNING", ctx.Out());
@@ -343,10 +258,6 @@ static Logic4Vec EvalSeveritySysCall(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Annex D.11: the argument to $scope is a complete hierarchical name. Rebuild
-// that name as a string from its expression form (a bare or scoped identifier,
-// or a dotted member-access chain) without evaluating it, since it names a
-// level of hierarchy rather than a readable object.
 static std::string HierarchicalScopeName(const Expr* e) {
   if (!e) return {};
   switch (e->kind) {
@@ -367,11 +278,6 @@ static std::string HierarchicalScopeName(const Expr* e) {
   }
 }
 
-// Annex D.13: each entry in the $showvars variable list names a variable, or a
-// bit-select or part-select of one. Because the status of every bit of a
-// selected vector is displayed, a selection is reduced to the name of the
-// vector it selects from; a plain reference keeps its own name. Either way the
-// name is rebuilt from the expression without evaluating it.
 static std::string ShowVarsVariableName(const Expr* e) {
   if (!e) return {};
   if (e->kind == ExprKind::kSelect) {
@@ -380,16 +286,6 @@ static std::string ShowVarsVariableName(const Expr* e) {
   return HierarchicalScopeName(e);
 }
 
-// Annex D.10: $scale converts a time value held in one module into the time
-// unit of the module that invokes $scale. The argument is the complete
-// hierarchical name of the source value: the hierarchy above the final
-// component names the source module, whose time unit applies to the raw value,
-// and the final component names the value itself. The result is that value
-// rescaled by the ratio of the source time unit to the invoking module's time
-// unit, so a value expressed in a coarser unit grows and one expressed in a
-// finer unit shrinks. A bare name carries no enclosing module of its own, so
-// the invoking module's unit applies on both sides and the value passes through
-// unchanged.
 static Logic4Vec EvalScale(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty() || expr->args[0] == nullptr) {
     return MakeLogic4VecVal(arena, 64, 0);
@@ -406,8 +302,6 @@ static Logic4Vec EvalScale(const Expr* expr, SimContext& ctx, Arena& arena) {
     }
   }
 
-  // EffectiveTimeOrder yields the base-10 order of each unit (Table 20-2), so
-  // their difference is the power of ten relating the two units.
   int order_diff = EffectiveTimeOrder(src->unit, src->magnitude) -
                    EffectiveTimeOrder(dst.unit, dst.magnitude);
   uint64_t result = raw;
@@ -419,12 +313,6 @@ static Logic4Vec EvalScale(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 64, result);
 }
 
-// §20.2 / Table 20-1: $stop and $finish accept an optional diagnostic level
-// argument (0, 1, or 2) that selects how much information accompanies the
-// control action. Level 0 prints nothing; level 1 reports the simulation time
-// and the controlling task (its location); level 2 additionally summarizes the
-// memory and CPU time used by the run. When no argument is supplied the level
-// defaults to 1.
 static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
                                      Arena& arena, std::string_view task,
                                      std::ostream& os) {
@@ -436,17 +324,6 @@ static void EmitSimControlDiagnostic(const Expr* expr, SimContext& ctx,
   EmitFinishDiagnostic(ctx, task, level, os);
 }
 
-// Optional $countdrivers system function (Annex D.2). It counts the drivers on
-// a net so that bus contention can be identified. The net argument shall be a
-// scalar net or a bit-select of a vector net; the selected bit is the one whose
-// drivers are tallied. The function returns 0 when at most one driver drives
-// the net and 1 otherwise (contention). When the optional output arguments are
-// present they receive, in declared order, the per-state tallies of Table D.1:
-// net_is_forced, number_of_01x_drivers, number_of_0_drivers,
-// number_of_1_drivers, number_of_x_drivers.
-// Resolve which net and which bit of it the $countdrivers net argument names. A
-// bare identifier is a scalar net (bit 0); a bit-select names a vector net bit.
-// `net_name` is left empty when the argument is neither form.
 static void ResolveCountDriversNet(const Expr* net_arg, SimContext& ctx,
                                    Arena& arena, std::string_view& net_name,
                                    uint32_t& bit) {
@@ -462,9 +339,6 @@ static void ResolveCountDriversNet(const Expr* net_arg, SimContext& ctx,
   }
 }
 
-// Tally the selected bit's state across every driver registered on `net`. A
-// driver in the high-impedance (z) state is not actively driving and is not
-// counted; the 0/1/x tallies cover the drivers that are.
 static void TallyCountDriversBit(const Net* net, uint32_t bit, uint64_t& n0,
                                  uint64_t& n1, uint64_t& nx) {
   const uint32_t kWord = bit / 64;
@@ -482,11 +356,6 @@ static void TallyCountDriversBit(const Net* net, uint32_t bit, uint64_t& n0,
   }
 }
 
-// D.2: the net $countdrivers is given has to be a scalar net or one bit
-// selected from a vector net. An argument that names no net, or that names a
-// vector net whole, is neither, and the call is reported under D.2 rather than
-// counting the drivers of no net or of the vector's bit 0. Returns whether the
-// argument is one of the two.
 static bool CheckCountDriversNet(const Expr* expr, const Expr* net_arg,
                                  const Net* net, SimContext& ctx) {
   std::string_view fault;
@@ -520,12 +389,6 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
   TallyCountDriversBit(net, bit, n0, n1, nx);
   const uint64_t kN01x = n0 + n1 + nx;
 
-  // Write back any supplied output arguments per Table D.1, in declared order.
-  // Table D.1's net_is_forced is asked of the bit the net argument names, and
-  // §10.6.2 lets a force name one bit of a vector net by a constant select: a
-  // force
-  // on bus[3] holds bit 3 and no other, so bus[7] reports 0 for it. Reading the
-  // flag alone answered 1 for every bit of the net.
   const bool kForced = net->resolved->BitIsForced(bit);
   const uint64_t kOuts[5] = {kForced ? 1u : 0u, kN01x, n0, n1, nx};
   for (size_t i = 1; i < expr->args.size() && i <= 5u; ++i) {
@@ -535,40 +398,21 @@ static Logic4Vec EvalCountDrivers(const Expr* expr, SimContext& ctx,
     }
   }
 
-  // Returns 0 with no more than one driver, 1 otherwise to flag contention.
   return MakeLogic4VecVal(arena, 1, kN01x > 1 ? 1 : 0);
 }
 
-// Optional $getpattern function (Annex D.3): it reads stimulus patterns from a
-// memory they were loaded into, one word per call, which the continuous
-// assignment it stands in drives onto its concatenation of scalar nets a bit
-// at a time. The word is the value of the memory element the argument names;
-// the elaborator holds the call to the placements D.3 allows, so the argument
-// is that element, and a call written with none answers a zero.
 static Logic4Vec EvalGetpattern(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
   return EvalExpr(expr->args[0], ctx, arena);
 }
 
-// Optional $scope system task (Annex D.11). It selects a level of hierarchy
-// as the interactive scope used to identify objects. Its single argument is
-// the complete hierarchical name of a module, task, function, or named block;
-// record that name as the new interactive scope.
-//
-// D.11 requires the argument to be the full hierarchical name of a module, a
-// task, a function or a named block, and the lowerer registered every such name
-// of the design: an argument naming none of them is reported under D.11 and
-// the scope stays where it was, where any text was recorded as the scope.
 static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
                                  Arena& arena) {
   if (!expr->args.empty() && expr->args[0]) {
     std::string name = HierarchicalScopeName(expr->args[0]);
     if (ctx.IsHierarchicalScope(name)) {
       ctx.SetInteractiveScope(name);
-      // §38.36.3: a change of the interactive scope calls the
-      // cbInteractiveScopeChange callbacks, given the new scope where the
-      // VPI model holds one.
       VpiContext& vpi = GetGlobalVpiContext();
       if (VpiHandle found = vpi.HandleByName(name.c_str(), nullptr)) {
         vpi.NoteInteractiveScope(VpiLabelledAssertionsBeginOr(found));
@@ -585,13 +429,6 @@ static Logic4Vec EvalAnnexDScope(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Optional $list system task (Annex D.6). It produces a listing of a module,
-// task, function, or named block. With no argument the object listed is the
-// current scope setting (the interactive scope established by $scope); with
-// an argument, the argument has to name one particular module, task, function
-// or named block, one of the complete hierarchical names the
-// lowerer registered, and an argument naming none of them is reported under
-// D.6 and lists nothing. Resolve which scope is selected and record it.
 static Logic4Vec EvalAnnexDList(const Expr* expr, SimContext& ctx,
                                 Arena& arena) {
   if (expr->args.empty() || !expr->args[0]) {
@@ -612,15 +449,6 @@ static Logic4Vec EvalAnnexDList(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Optional $showscopes system task (Annex D.12). It produces a complete list
-// of the modules, tasks, functions, and named blocks defined at the current
-// scope level (the interactive scope established by $scope). An optional
-// integer argument widens the listing: a nonzero value lists every such
-// object in or below the current hierarchical scope, while no argument or a
-// zero value lists only the objects at the current scope level itself. The
-// list is the registered complete hierarchical names under the scope, the
-// ones $scope may name, printed one per line to the standard output; the
-// request was recorded without the list being produced.
 static Logic4Vec EvalAnnexDShowScopes(const Expr* expr, SimContext& ctx,
                                       Arena& arena) {
   bool recursive = false;
@@ -636,13 +464,6 @@ static Logic4Vec EvalAnnexDShowScopes(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Annex D.13: the status of one variable of the current scope, printed as its
-// name and its value in binary, every bit of a vector with x and z as they
-// stand. `key` is what the variable is looked up by: from the root of the
-// design, by the instance's prefix and the declared name, for a module
-// instance's, so the lookup does not turn on the instance the call stands in;
-// a name the lookup finds no variable under, one the scope does not declare,
-// is printed as having none.
 static void ShowVariableStatus(std::string_view name, const std::string& key,
                                SimContext& ctx) {
   const Variable* var = ctx.FindVariable(key);
@@ -654,18 +475,6 @@ static void ShowVariableStatus(std::string_view name, const std::string& key,
   ctx.Out() << FormatArg(var->value, 'b') << "\n";
 }
 
-// Optional $showvars system task (Annex D.13). It produces status information
-// for the reg and net variables, scalar and vector, in the current scope (the
-// interactive scope established by $scope). With no argument every variable
-// in that scope is reported; with a list of variables only the named ones
-// are. A bit-select or part-select of a vector reports the status of all bits
-// of that vector, so such a selection is reduced to the name of its
-// underlying vector. The variables of a module instance are the ones the
-// lowerer registered for it, keyed under the instance's prefix; a task,
-// function or named block registers none, its declarations being storage of
-// the run rather than of the design, so with no argument it reports nothing
-// and with a list each name is looked up from where the call stands. The
-// names given are recorded as well, so the selection can be observed.
 static Logic4Vec EvalAnnexDShowVars(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   std::vector<std::string> vars;
@@ -688,10 +497,6 @@ static Logic4Vec EvalAnnexDShowVars(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Optional $log system task (Annex D.7). The log file holds a copy of
-// everything printed to standard output. An optional filename argument closes
-// the current log file and starts a new one, directing subsequent output
-// there; with no argument logging is simply reenabled.
 static Logic4Vec EvalAnnexDLog(const Expr* expr, SimContext& ctx,
                                Arena& arena) {
   if (!expr->args.empty() && expr->args[0]) {
@@ -702,14 +507,6 @@ static Logic4Vec EvalAnnexDLog(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// Dispatch the optional Annex-D interactive/diagnostic tasks ($scope, $list,
-// $showscopes, $showvars, $nolog, $log). Returns true and writes the call's
-// value to `out` when `name` is one of them; returns false otherwise so the
-// caller continues its own dispatch. The branches and their semantics are
-// exactly those of the original inline chain. D.8's $reset, $reset_count and
-// $reset_value are not among them: this implementation is without the reset
-// they describe, as D.1 allows, so a call of one reaches ReportUnknownSysCall's
-// D.1 report.
 static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
                                          Arena& arena, std::string_view name,
                                          Logic4Vec& out) {
@@ -729,7 +526,6 @@ static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
     out = EvalAnnexDShowVars(expr, ctx, arena);
     return true;
   }
-  // Optional $nolog system task (Annex D.7): disables the standard-output copy.
   if (name == "$nolog") {
     ctx.Log().Disable();
     out = MakeLogic4VecVal(arena, 1, 0);
@@ -742,12 +538,6 @@ static bool TryEvalAnnexDInteractiveTask(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// §19.9: the predefined coverage system tasks and system functions. They act on
-// the run's live coverage database (SimContext::CoverageData). $get_coverage
-// returns the overall coverage of all covergroup types as a real in 0..100;
-// $set_coverage_db_name records the database file name; $load_coverage_db loads
-// cumulative coverage from the named file. Returns false for any other name so
-// the caller keeps dispatching.
 static bool TryEvalCoverageSysCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, std::string_view name,
                                    Logic4Vec& out) {
@@ -778,19 +568,6 @@ static bool TryEvalCoverageSysCall(const Expr* expr, SimContext& ctx,
   return false;
 }
 
-// What a registered PLI application makes of a system call written in an
-// expression, and whether the registry claimed the name at all. Answers both
-// halves through `out` so that the evaluator below asks the registry once,
-// where it asked once before §36.5's report was owed as well.
-//
-// §36.5: a user-defined system task may stand wherever a void function may,
-// and §13.4.1 gives a void function call exactly one such place, a statement,
-// since only a call of a non-void function may serve as an expression. The
-// caller is the other position, so a task named there is a task standing where
-// a value is wanted, and the clause's own reason is what is reported: a task
-// yields no value. The
-// statement executor calls the application instead (TryExecSystemCallTask),
-// which is why nothing reaching here is the task's one legal position.
 static bool TryEvalRegisteredSystf(const Expr* expr, SimContext& ctx,
                                    Arena& arena, std::string_view name,
                                    Logic4Vec& out) {
@@ -805,19 +582,10 @@ static bool TryEvalRegisteredSystf(const Expr* expr, SimContext& ctx,
     return true;
   }
 
-  // §36.4: `expr` is the call site, so the task/function arguments it wrote are
-  // what the application reads through §37.42's vpiArgument iteration. They are
-  // not handed to the application as C arguments, which the clause rules out,
-  // and the calltf's own parameter stays its registered user_data.
   return GetGlobalVpiContext().CallRegisteredSystf(std::string(name).c_str(),
                                                    expr, ctx, out, arena);
 }
 
-// The optional system functions of Annex D that answer a value: D.2's
-// $countdrivers, D.3's $getpattern and D.10's $scale, which reads the time
-// value named by a hierarchical reference and converts it from the time unit
-// of the module that holds it to the time unit of the module that invokes it.
-// Answers whether `name` is one of them, leaving its value in `result`.
 static bool TryEvalAnnexDFunction(const Expr* expr, SimContext& ctx,
                                   Arena& arena, std::string_view name,
                                   Logic4Vec& result) {
@@ -836,26 +604,11 @@ static bool TryEvalAnnexDFunction(const Expr* expr, SimContext& ctx,
 Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto name = expr->callee;
 
-  // §36.3.2: an application registered through the PLI under the name of a
-  // built-in system task or system function takes the built-in's place and
-  // replaces what it does, the clause's own example being an application
-  // registered as $random. The registry is therefore asked ahead of everything
-  // below rather than after it, and §38.37.1 has the application's calltf
-  // called on every invocation of the system task or system function while the
-  // simulation runs, which is here.
-  //
-  // A name no registration claims falls through to the built-ins, and past them
-  // to §20.1's report. §36.3.2's one exception needs nothing of this dispatch:
-  // a timing check such as $setup is not a system task and no application can
-  // replace it, and a timing check reaches the specify machinery rather than
-  // this evaluator.
   Logic4Vec systf_result;
   if (TryEvalRegisteredSystf(expr, ctx, arena, name, systf_result)) {
     return systf_result;
   }
 
-  // §20.16.1: a PLA modeling system task evaluates the array and drives its
-  // output terms; it produces no value of its own.
   if (TryEvalPlaSystemTask(expr, ctx, arena)) {
     return MakeLogic4VecVal(arena, 1, 0);
   }
@@ -864,8 +617,6 @@ Logic4Vec EvalSystemCall(const Expr* expr, SimContext& ctx, Arena& arena) {
     ExecDisplayWrite(expr, ctx, arena);
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  // §20.2: $stop suspends the run and $finish ends it, returning control to the
-  // host; both honor the Table 20-1 diagnostic level before halting.
   if (name == "$finish" || name == "$stop") {
     EmitSimControlDiagnostic(expr, ctx, arena, name, ctx.Out());
     ctx.RequestFinish();

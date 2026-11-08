@@ -61,9 +61,6 @@ TEST(TypeParameterElab, TypeParamLogicVectorWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.20.3: a data type parameter can only be set to a data type. Giving a
-// `parameter type` an ordinary value expression as its default must be an
-// error.
 TEST(TypeParameterElab, TypeParamSetToValueIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -76,11 +73,6 @@ TEST(TypeParameterElab, TypeParamSetToValueIsError) {
                             2, "6.20.3"));
 }
 
-// §6.20.3: a type parameter restricted with a leading basic data type keyword
-// must be assigned a conforming type. An `enum`-restricted type parameter
-// bound to a non-enum type does not conform and must be rejected. The report
-// names §6.20.3, the subclause that states the restriction keyword, and so do
-// the struct, union, class and interface class cases below.
 TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -95,9 +87,6 @@ TEST(TypeParameterElab, RestrictedEnumTypeParamMismatchIsError) {
       2, "6.20.3"));
 }
 
-// §6.20.3: when the assigned type does conform to the restriction keyword the
-// declaration is legal. An `enum`-restricted type parameter bound to an enum
-// typedef conforms and must elaborate without error.
 TEST(TypeParameterElab, RestrictedEnumTypeParamConformsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -110,9 +99,6 @@ TEST(TypeParameterElab, RestrictedEnumTypeParamConformsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.3: the restriction keyword may also be `struct` (the same forward-type
-// keyword set §6.18 uses). A `struct`-restricted type parameter bound to a
-// non-struct type does not conform and must be rejected.
 TEST(TypeParameterElab, RestrictedStructTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,8 +113,6 @@ TEST(TypeParameterElab, RestrictedStructTypeParamMismatchIsError) {
       2, "6.20.3"));
 }
 
-// §6.20.3: a `struct`-restricted type parameter bound to a struct typedef
-// conforms to the specified basic data type and must elaborate cleanly.
 TEST(TypeParameterElab, RestrictedStructTypeParamConformsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -141,8 +125,6 @@ TEST(TypeParameterElab, RestrictedStructTypeParamConformsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.3: likewise a `union`-restricted type parameter bound to a non-union
-// type does not conform to the specified basic data type and must be rejected.
 TEST(TypeParameterElab, RestrictedUnionTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -157,9 +139,6 @@ TEST(TypeParameterElab, RestrictedUnionTypeParamMismatchIsError) {
       2, "6.20.3"));
 }
 
-// §6.20.3: a `union`-restricted type parameter bound to a union typedef
-// conforms to the specified basic data type and must elaborate cleanly (the
-// positive counterpart of RestrictedUnionTypeParamMismatchIsError).
 TEST(TypeParameterElab, RestrictedUnionTypeParamConformsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -172,9 +151,6 @@ TEST(TypeParameterElab, RestrictedUnionTypeParamConformsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.3: the restriction keyword may also be `class`. A `class`-restricted
-// type parameter assigned a built-in (non-class) type does not conform and must
-// be rejected.
 TEST(TypeParameterElab, RestrictedClassTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -187,9 +163,6 @@ TEST(TypeParameterElab, RestrictedClassTypeParamMismatchIsError) {
                             2, "6.20.3"));
 }
 
-// §6.20.3: a `class`-restricted type parameter assigned an actual class type
-// conforms and must elaborate cleanly (the positive counterpart of
-// RestrictedClassTypeParamMismatchIsError).
 TEST(TypeParameterElab, RestrictedClassTypeParamConformsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -204,21 +177,6 @@ TEST(TypeParameterElab, RestrictedClassTypeParamConformsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.3: a name that no class declaration defines conforms to a `class`
-// restriction no more than a built-in type does, so the assignment is an error.
-// The name has to answer two questions at once, and §19.3's covergroup is what
-// answers both. Parser::ParseDataType in src/parser/parser_types.cpp reads an
-// identifier as a type only when an earlier declaration registered it, and
-// Parser::ParseCovergroupDecl in src/parser/parser_verify.cpp registers a
-// covergroup name; a name declared nowhere at all reads as an expression
-// instead, which is TypeParamSetToValueIsError's rule rather than this one. And
-// the name has to reach no data type either, so that CheckTypeParamIsClass in
-// src/elaborator/elaborator_items.cpp gets past its first branch, which answers
-// for a resolved concrete type. A typedef of a built-in -- `typedef int
-// my_type;` -- is registered but resolves, and so takes that first branch and
-// reports a type that is not a class, which is
-// RestrictedClassTypeParamMismatchIsError's rule. A covergroup name resolves to
-// no data type and no ClassDecl, so it is the case this test is for.
 TEST(TypeParameterElab, ClassTypeParamAssignedUndeclaredNameIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -235,11 +193,6 @@ TEST(TypeParameterElab, ClassTypeParamAssignedUndeclaredNameIsError) {
                             4, "6.20.3"));
 }
 
-// §6.20.3: the built-in classes §15.x predefines conform to a `class`
-// restriction, and `mailbox` is one of them. No ClassDecl declares it, so the
-// elaborator answers for it from its set of known class names instead. A check
-// that demanded a ClassDecl of every assigned name would reject every built-in
-// class, and this is the case that says so.
 TEST(TypeParameterElab, ClassTypeParamAssignedABuiltInClassIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -251,9 +204,6 @@ TEST(TypeParameterElab, ClassTypeParamAssignedABuiltInClassIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.3: the restriction keyword may also be `interface class`. An
-// `interface class`-restricted type parameter assigned a built-in (non-class)
-// type does not conform and must be rejected.
 TEST(TypeParameterElab, RestrictedInterfaceClassTypeParamMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -268,12 +218,6 @@ TEST(TypeParameterElab, RestrictedInterfaceClassTypeParamMismatchIsError) {
                     2, "6.20.3"));
 }
 
-// §6.20.3: `class` and `interface class` are two of the five basic data types
-// the clause lists, and §8.26 makes them different kinds of declaration, so an
-// ordinary class does not conform to an `interface class` restriction. The
-// assigned name reaches a ClassDecl here, which is what separates this from
-// ClassTypeParamAssignedUndeclaredNameIsError above; that declaration's
-// is_interface is false, so the report names the kind the name does have.
 TEST(TypeParameterElab, InterfaceClassTypeParamAssignedOrdinaryClassIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -291,11 +235,6 @@ TEST(TypeParameterElab, InterfaceClassTypeParamAssignedOrdinaryClassIsError) {
                             5, "6.20.3"));
 }
 
-// §6.20.3: an `interface class`-restricted type parameter assigned an interface
-// class conforms to the specified basic data type and must elaborate cleanly.
-// A check that rejected every name, rather than reading
-// ClassDecl::is_interface, would reject this source while still passing
-// InterfaceClassTypeParamAssignedOrdinaryClassIsError above.
 TEST(TypeParameterElab, InterfaceClassTypeParamAssignedInterfaceClassIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -310,11 +249,6 @@ TEST(TypeParameterElab, InterfaceClassTypeParamAssignedInterfaceClassIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.20.3: a type parameter's default may itself be a user-defined type name
-// (from §6.18's typedef), not just a built-in keyword. The type parameter must
-// resolve through that typedef so a dependent variable gets the named type's
-// width. Built from the §6.18 typedef dependency's real syntax and driven
-// through parse+elaborate.
 TEST(TypeParameterElab, NamedTypedefTypeParamDefaultResolvesWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -332,9 +266,6 @@ TEST(TypeParameterElab, NamedTypedefTypeParamDefaultResolvesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §6.20.3: a type parameter used as a class scope resolution prefix (here in a
-// typedef declaration, an allowed context) shall resolve to a class. A type
-// parameter bound to a non-class type does not, so it must be rejected.
 TEST(TypeParameterElab, TypeParamScopePrefixNotAClassIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -349,11 +280,6 @@ TEST(TypeParameterElab, TypeParamScopePrefixNotAClassIsError) {
                             3, "6.20.3"));
 }
 
-// §6.20.3: a type parameter may resolve to a class type, but using it as the
-// prefix of the class scope resolution operator is restricted to typedef
-// declarations, the type operator, and type parameter assignments. Here the
-// type parameter prefixes '::' inside an ordinary expression, which is not one
-// of the permitted contexts, so elaboration must report an error.
 TEST(TypeParameterElab, TypeParamScopePrefixInExpressionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -372,10 +298,6 @@ TEST(TypeParameterElab, TypeParamScopePrefixInExpressionIsError) {
                             7, "6.20.3"));
 }
 
-// §6.20.3: overriding a type parameter with a defparam statement is illegal.
-// The child's T is a parameter-port type parameter, so the hierarchical
-// defparam targeting it must be rejected. §23.10.1 states the rule for the
-// defparam statement, so the report names that subclause.
 TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
   ElabFixture f;
   ElaborateSrc(
@@ -391,10 +313,6 @@ TEST(TypeParameterElab, DefparamCannotOverrideTypeParam) {
                             "23.10.1"));
 }
 
-// §6.20.3: the scope-resolution restriction also covers a type parameter that
-// is declared in the parameter port list (not just the module body) and that
-// appears as a '::' prefix inside a continuous assignment. This exercises the
-// port-list collection and continuous-assign paths of the elaborator check.
 TEST(TypeParameterElab, PortTypeParamScopePrefixInContAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -409,9 +327,6 @@ TEST(TypeParameterElab, PortTypeParamScopePrefixInContAssignIsError) {
                             3, "6.20.3"));
 }
 
-// §6.20.3: the restriction is specific to a type parameter prefix. A type
-// parameter used as an ordinary data type, and a genuine class name used as a
-// scope resolution prefix, are both legal and must elaborate cleanly.
 TEST(TypeParameterElab, TypeParamAsTypeWithClassScopeOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -425,16 +340,6 @@ TEST(TypeParameterElab, TypeParamAsTypeWithClassScopeOk) {
              "endmodule\n"));
 }
 
-// §6.20.3: a data object declaration is none of the three contexts §8.23
-// permits a type parameter to prefix the class scope resolution operator in --
-// a typedef declaration, the type operator, and a type parameter assignment --
-// so the subclause's own worked example, `C::T x;` written with `C` a type
-// parameter, must be rejected. §6.20.3 states the type parameter case in its
-// own words, so the report names that subclause, as
-// TypeParamScopePrefixInExpressionIsError above establishes for the expression
-// position. The prefix is bound to `int` here, so the source also provokes the
-// report that the prefix does not resolve to a class; the needle below is
-// contained only in the context report, which is the one this test is about.
 TEST(TypeParameterElab, TypeParamScopePrefixInVarDeclIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -449,11 +354,6 @@ TEST(TypeParameterElab, TypeParamScopePrefixInVarDeclIsError) {
       "6.20.3"));
 }
 
-// §6.20.3: the restriction is on the three prefix kinds §8.23 names, not on the
-// declaration position. A variable whose data type is selected through an
-// ordinary class name is legal wherever it is written, so it must still
-// elaborate. This is what a check that rejected every scope-prefixed
-// declaration would break, while still rejecting the case above.
 TEST(TypeParameterElab, OrdinaryClassScopePrefixInVarDeclOk) {
   EXPECT_TRUE(
       ElabOk("class Cfg;\n"
@@ -464,10 +364,6 @@ TEST(TypeParameterElab, OrdinaryClassScopePrefixInVarDeclOk) {
              "endmodule\n"));
 }
 
-// §6.20.3 with §6.18: a typedef declaration is one of the three places a type
-// parameter may prefix the class scope resolution operator, so a type selected
-// through a type parameter bound to a class is accepted there, in a module and
-// in a parameterized class alike, and names the class's own type.
 TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypedefOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -491,9 +387,6 @@ TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypedefOk) {
   EXPECT_EQ(v->width, 8u);
 }
 
-// §6.20.3 with §6.23: the type operator is another of the three places, so
-// `type(T::inner)` with T bound to a class declares a variable of the class's
-// type.
 TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypeOperatorOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -511,8 +404,6 @@ TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypeOperatorOk) {
   EXPECT_EQ(w->width, 8u);
 }
 
-// §6.20.3: a type parameter assignment is the third place, and there too the
-// prefix must resolve to a class; T bound to int does not, so it is reported.
 TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeParamAssignmentIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -526,8 +417,6 @@ TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeParamAssignmentIsError) {
                             2, "6.20.3"));
 }
 
-// §6.20.3: the nearest allowed form, the same assignment with T bound to a
-// class, is accepted and gives U the class's type.
 TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypeParamAssignmentOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -546,8 +435,6 @@ TEST(TypeParameterElab, ClassBoundTypeParamPrefixInTypeParamAssignmentOk) {
   EXPECT_EQ(u->width, 8u);
 }
 
-// §6.20.3: the type operator, the remaining place a type parameter may prefix
-// the operator, reports the prefix where it is bound to int.
 TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeOperatorIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -561,9 +448,6 @@ TEST(TypeParameterElab, IntBoundTypeParamPrefixInTypeOperatorIsError) {
                             2, "6.20.3"));
 }
 
-// §6.20.3: what the prefix resolves to is the type the instance binds the
-// parameter to. An override naming a class makes a default of int no error,
-// and an override naming int makes a default naming a class one.
 TEST(TypeParameterElab, OverrideDecidesWhetherThePrefixIsAClass) {
   const char* modules =
       "class K;\n"
@@ -587,13 +471,6 @@ TEST(TypeParameterElab, OverrideDecidesWhetherThePrefixIsAClass) {
                             8, "6.20.3"));
 }
 
-// §6.20.3 inside a class: a specialization binds the class's type parameter,
-// and where the class's body selects a type through it -- a typedef or a body
-// `localparam type` -- the specialization is reported when it binds the
-// parameter to a type that is not a class. Each place a specialization is
-// written is checked: a module's variable and typedef, a compilation-unit
-// typedef, another class's property, and the default specialization `P` alone.
-// The same forms binding the class X are accepted.
 TEST(TypeParameterElab, SpecializationBindingANonClassPrefixIsError) {
   struct Form {
     const char* where;
@@ -631,8 +508,6 @@ TEST(TypeParameterElab, SpecializationBindingANonClassPrefixIsError) {
   }
 }
 
-// §6.20.3 with §8.25.1: `P` alone is the default specialization, binding the
-// parameter's default, so a default of int is reported and one of X is not.
 TEST(TypeParameterElab, DefaultSpecializationBindingANonClassPrefixIsError) {
   const std::string kBody =
       "  localparam type J = C::T;\n"
@@ -654,16 +529,6 @@ TEST(TypeParameterElab, DefaultSpecializationBindingANonClassPrefixIsError) {
                             5, "6.20.3"));
 }
 
-// §6.20.3 in every place a type parameter can be declared and used, `@`
-// standing for the type it is bound to and `%` for the use: an interface
-// (§25.3), a program (§24.3), a generate block (§27), an initial procedure's
-// block, a function and a task body (§13), a type parameter a function body
-// declares itself, a checker the module declares (§17, whose items take no
-// parameter declaration, A.1.8), a package (§26.2) and the compilation unit
-// (§3.12.1), each with the uses the clause permits that the place admits -- a
-// typedef, a type parameter assignment and the type operator. With the
-// parameter bound to int each use is reported; with it bound to the class K
-// the same use is accepted.
 TEST(TypeParameterElab, TypeParamPrefixInEveryPlaceMustResolveToAClass) {
   struct Place {
     const char* where;

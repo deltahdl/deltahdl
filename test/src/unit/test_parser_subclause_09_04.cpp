@@ -15,7 +15,6 @@ using namespace delta;
 
 namespace {
 
-// The actuals of the one property instance asserted in `r`'s module.
 template <typename T>
 const std::vector<Expr*>* AssertedActuals(T& r) {
   auto* item = FindItemByKind(r, ModuleItemKind::kAssertProperty);
@@ -23,8 +22,6 @@ const std::vector<Expr*>* AssertedActuals(T& r) {
   return &item->assert_expr->args;
 }
 
-// Whether `e` is the `or` of an edge event of kind `lhs_edge` over
-// `lhs_signal` and the event `rhs`.
 bool IsEitherOfEdgeAnd(const Expr* e, TokenKind lhs_edge,
                        std::string_view lhs_signal, const Expr*& rhs) {
   if (e == nullptr || e->kind != ExprKind::kBinary ||
@@ -36,8 +33,6 @@ bool IsEitherOfEdgeAnd(const Expr* e, TokenKind lhs_edge,
   return e->lhs->op == lhs_edge && e->lhs->lhs->text == lhs_signal;
 }
 
-// Whether `e` is the `or` of the events `lhs` and `rhs`, neither of which
-// an edge keyword opens.
 bool IsEitherOfSignals(const Expr* e, std::string_view lhs,
                        std::string_view rhs) {
   return e != nullptr && e->kind == ExprKind::kBinary &&
@@ -46,10 +41,6 @@ bool IsEitherOfSignals(const Expr* e, std::string_view lhs,
          e->rhs->kind == ExprKind::kIdentifier && e->rhs->text == rhs;
 }
 
-// §9.4, footnote 36 to Syntax 9-4: an event expression of comma-separated
-// events passed by position is written in parentheses, and the parenthesized
-// list is read as one event actual, the `or` of its events, ahead of the
-// actual that follows it.
 TEST(EventActualParsing, AParenthesizedCommaListIsOneEventActual) {
   auto r = Parse(
       "module m;\n"
@@ -74,10 +65,6 @@ TEST(EventActualParsing, AParenthesizedCommaListIsOneEventActual) {
   EXPECT_EQ((*args)[1]->text, "c");
 }
 
-// §9.4: a list whose first event has no edge keyword is an event actual
-// still where an edge keyword opens a later event, here one in a group nested
-// in the list after a `,`, the group's `or` and the list's `,` each read as
-// the `or` of the events they join.
 TEST(EventActualParsing, AnEdgeLaterInTheListMakesItEvents) {
   auto r = Parse(
       "module m;\n"
@@ -111,10 +98,6 @@ TEST(EventActualParsing, AnEdgeLaterInTheListMakesItEvents) {
   EXPECT_EQ((*args)[1]->text, "a");
 }
 
-// §9.4 with §17.3: a checker's port actual is read the same way, the
-// parenthesized list one actual and the expression after it a second; a
-// parenthesized signal in the list, `(b)`, which holds no event of its own,
-// is the signal.
 TEST(EventActualParsing, ACheckerPortTakesAParenthesizedCommaList) {
   auto r = Parse(
       "checker ck(event e, logic v);\n"
@@ -139,10 +122,6 @@ TEST(EventActualParsing, ACheckerPortTakesAParenthesizedCommaList) {
   EXPECT_EQ(inst->inst_ports[1].second->text, "c");
 }
 
-// §9.4, footnote 36 to Syntax 9-4, with §9.4.2: the events of a
-// parenthesized list need no edge keyword, so a list of bare signals passed
-// by position is one event actual too, the `or` of its events, and not the
-// parenthesized operand its first signal would make of it.
 TEST(EventActualParsing, AnUnedgedCommaListIsOneEventActual) {
   auto r = Parse(
       "module m;\n"
@@ -162,12 +141,6 @@ TEST(EventActualParsing, AnUnedgedCommaListIsOneEventActual) {
   EXPECT_EQ((*args)[1]->text, "c");
 }
 
-// §9.4 with §16.11: a parenthesized list of names reads both as an event list
-// and as a sequence calling the names after the first at its match, A.8.2
-// writing a call's list of arguments as optional, and is read as the event
-// list, a scoped or a member's name among them as well. A list holding
-// anything else, a sequence before the comma, a literal or an assignment, is
-// a sequence with its match items.
 TEST(EventActualParsing, OnlyAListOfNamesIsReadAsAnEventList) {
   auto r = Parse(
       "package P; logic b; endpackage\n"
@@ -201,9 +174,6 @@ TEST(EventActualParsing, OnlyAListOfNamesIsReadAsAnEventList) {
   }
 }
 
-// §9.4 with §16.10: a parenthesized list holding a select after its comma is
-// no sequence, `w[1]` being neither the assignment nor the call a match item
-// is, so it is read as the event list it also is, the `or` of its events.
 TEST(EventActualParsing, AListNoSequenceReadsIsAnEventList) {
   auto r = Parse(
       "module m;\n"
@@ -229,8 +199,6 @@ TEST(EventActualParsing, AListNoSequenceReadsIsAnEventList) {
   EXPECT_EQ(events->rhs->kind, ExprKind::kSelect);
 }
 
-// §9.4 with §17.3: a checker's port actual that is a list of bare signals is
-// one event actual as well, ahead of the expression after it.
 TEST(EventActualParsing, ACheckerPortTakesAnUnedgedCommaList) {
   auto r = Parse(
       "checker ck(event e, logic v);\n"
@@ -250,9 +218,6 @@ TEST(EventActualParsing, ACheckerPortTakesAnUnedgedCommaList) {
   EXPECT_EQ(inst->inst_ports[1].second->text, "c");
 }
 
-// §16.12.18 beside §9.4: an `iff` in parentheses joins two properties as
-// well as guarding an event, and where the parentheses read whole as a
-// property_expr, the actual is that property rather than a guarded event.
 TEST(EventActualParsing, AParenthesizedIffPropertyStaysAProperty) {
   auto r = Parse(
       "module m;\n"
@@ -272,10 +237,6 @@ TEST(EventActualParsing, AParenthesizedIffPropertyStaysAProperty) {
   EXPECT_FALSE(IsEventActual((*args)[0]));
 }
 
-// §9.4: a parenthesized actual in which no edge keyword opens an event is
-// left to the reading of an expression, the selects, the parenthesized
-// operand and the concatenation with its `,` all within it, so that it is an
-// operand and no event.
 TEST(EventActualParsing, AParenthesizedExpressionStaysAnExpression) {
   auto r = Parse(
       "module m;\n"

@@ -16,11 +16,6 @@ TEST(CompilerDirectiveParsing, DefaultNettypeTri) {
                               "endmodule\n"));
 }
 
-// The 9 net-type keywords (tri/wand/wor/tri0/tri1/triand/trior/trireg/uwire)
-// are consumed by the preprocessor before the parser runs, so parser behavior
-// is identical for every value; DefaultNettypeTri above is the representative
-// acceptance case, and per-value NetType mapping is exercised in the
-// preprocessor's canonical tests.
 TEST(CompilerDirectiveParsing, DefaultNettypeBeforeAndAfterModule) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("`default_nettype none\n"

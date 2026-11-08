@@ -48,10 +48,6 @@ TEST(InterfaceClassMethodDefaults, MixedDefaultAndNonDefaultArgsOk) {
              "endmodule\n"));
 }
 
-// The report stands at the implementing method rather than at the interface
-// prototype: CheckImplInterfaceArgDefaults in
-// src/elaborator/elaborator_validate_class_inheritance.cpp passes the
-// implementation's location.
 TEST(InterfaceClassMethodDefaults, ImplementorMissingDefaultError) {
   ElabFixture f;
   ElabOk(
@@ -160,10 +156,6 @@ TEST(InterfaceClassMethodDefaults, MismatchedSecondDefaultValueError) {
                             "8.26.8"));
 }
 
-// A default that is not a constant expression is rejected on the prototype
-// itself, by CheckInterfaceClassMethodArgDefaults in
-// src/elaborator/elaborator_validate_class_overrides.cpp, without any
-// implementor to compare against.
 TEST(InterfaceClassMethodDefaults, NonConstantDefaultValueError) {
   ElabFixture f;
   ElabOk(
@@ -193,8 +185,6 @@ TEST(InterfaceClassMethodDefaults, ConstantExpressionDefaultValueOk) {
              "endmodule\n"));
 }
 
-// The default value must be the same for *every* implementing class; a second
-// implementor whose default differs from the interface prototype is rejected.
 TEST(InterfaceClassMethodDefaults, SecondImplementorMismatchedDefaultError) {
   ElabFixture f;
   ElabOk(
@@ -219,8 +209,6 @@ TEST(InterfaceClassMethodDefaults, SecondImplementorMismatchedDefaultError) {
                             "8.26.8"));
 }
 
-// Equality is judged on the evaluated constant, not the source text: a literal
-// default and a syntactically different expression of equal value agree.
 TEST(InterfaceClassMethodDefaults, EquivalentConstantExpressionDefaultsOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -235,8 +223,6 @@ TEST(InterfaceClassMethodDefaults, EquivalentConstantExpressionDefaultsOk) {
              "endmodule\n"));
 }
 
-// Conversely, two constant expressions that evaluate to different values are a
-// mismatch even though both are well-formed constant expressions.
 TEST(InterfaceClassMethodDefaults,
      ConstantExpressionDefaultValueMismatchError) {
   ElabFixture f;
@@ -257,10 +243,6 @@ TEST(InterfaceClassMethodDefaults,
                             "8.26.8"));
 }
 
-// A default expression may be any constant expression of 11.2.1, not only a
-// bare literal. Here a compilation-unit localparam supplies the default; the
-// interface prototype admits it as a constant expression and it agrees with the
-// implementor's identical reference.
 TEST(InterfaceClassMethodDefaults, LocalparamConstantDefaultOk) {
   EXPECT_TRUE(
       ElabOk("localparam int K = 5;\n"
@@ -276,10 +258,6 @@ TEST(InterfaceClassMethodDefaults, LocalparamConstantDefaultOk) {
              "endmodule\n"));
 }
 
-// Because the default is evaluated in the scope containing the subroutine
-// declaration, a value parameter of the interface class itself -- visible by
-// its bare name inside the class body -- is a valid constant-expression
-// default.
 TEST(InterfaceClassMethodDefaults, ClassParameterConstantDefaultOk) {
   EXPECT_TRUE(
       ElabOk("interface class IC #(int P = 7);\n"
@@ -289,10 +267,6 @@ TEST(InterfaceClassMethodDefaults, ClassParameterConstantDefaultOk) {
              "endmodule\n"));
 }
 
-// A constant-expression default may also name a compilation-unit `parameter` --
-// a distinct 11.2.1 constant form from a bare literal or a localparam. The
-// interface prototype admits it and it agrees with the implementor's identical
-// reference.
 TEST(InterfaceClassMethodDefaults, ParameterConstantDefaultOk) {
   EXPECT_TRUE(
       ElabOk("parameter int P = 8;\n"
@@ -308,10 +282,6 @@ TEST(InterfaceClassMethodDefaults, ParameterConstantDefaultOk) {
              "endmodule\n"));
 }
 
-// The rule that a default be the same in every implementor folds a
-// named-constant default to its value before comparing: an implementor whose
-// literal default differs from the interface's localparam-valued default is a
-// mismatch.
 TEST(InterfaceClassMethodDefaults, LocalparamDefaultValueMismatchError) {
   ElabFixture f;
   ElabOk(

@@ -1,10 +1,3 @@
-// §13.4.1's Node example (printed page 343), taken one step at a time to find
-// which step lost the value #3808 read 0 for. The rest of the subclause's
-// simulator cases stand in test_simulator_subclause_13_04_01a.cpp; these three
-// share one class and are here so that neither file passes the size gate's
-// limit. After them, the implicit return variable's type (printed page 342)
-// where it is a string or a class.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -15,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The class the three cases share: `value_t` is `bit [15:10]` (§6.18), the
-// constructor's formal, the protected property and get_val's return are all
-// declared with it, and get_first_node hands out a node whose next holds
-// 6'h3F.
 constexpr const char* kNodeExampleClass =
     "  class Node;\n"
     "    typedef bit [15:10] value_t;\n"
@@ -37,11 +26,6 @@ constexpr const char* kNodeExampleClass =
     "    return n1;\n"
     "  endfunction\n";
 
-// The first step: the value stored through the formal `value_t v`, kept in
-// the protected property and handed back by `get_val()`, read into an `int`
-// so that neither the local's type nor a select is in the way. 63 is the six
-// bits 6'h3F holds; a formal, property or return sized to fewer bits reads
-// less, and a `new` that stored nothing reads 0.
 TEST(FunctionReturnSim, ClassScopedTypedefValueReturnsThroughAMethodIntoAnInt) {
   SimFixture f;
   auto* got = RunAndFindVar(std::string("module t;\n") + kNodeExampleClass +
@@ -59,12 +43,6 @@ TEST(FunctionReturnSim, ClassScopedTypedefValueReturnsThroughAMethodIntoAnInt) {
   EXPECT_EQ(got->value.ToUint64(), 63u);
 }
 
-// The second step: the same value held in a local declared `Node::value_t`,
-// the class-scoped name §8.23 makes reachable from the procedure. The node is
-// built with 8'hFF here rather than the example's 6'h3F: §6.18 makes the local
-// the six bits the name stands for, so it keeps 63 of the 255 the property
-// handed out, and a local created at the 32-bit carrier a name nothing could
-// size falls to reads 255.
 TEST(FunctionReturnSim, ClassScopedTypedefLocalHoldsTheReturnedSixBits) {
   SimFixture f;
   auto* got = RunAndFindVar(std::string("module t;\n") + kNodeExampleClass +
@@ -83,14 +61,6 @@ TEST(FunctionReturnSim, ClassScopedTypedefLocalHoldsTheReturnedSixBits) {
   EXPECT_EQ(got->value.ToUint64(), 63u);
 }
 
-// The third step, which is the example itself and where #3808 read 0:
-// `my_bits = next_value[13:10]`. §11.5.1 (printed page 296) has the bit an
-// index addresses decided by the declaration, and the declaration is
-// `Node::value_t`, so the select names the four bits above the two least
-// significant of the six -- 4'hF, 15, of 6'h3F. A procedure's declaration
-// recorded no range at all, so the local was addressed as [5:0], the four
-// indices 13 to 10 lay outside it, the select read x and the 2-state my_bits
-// made that 0.
 TEST(FunctionReturnSim,
      NodeExampleStepByStepSelectsTheReturnedValueByItsRange) {
   SimFixture f;
@@ -113,11 +83,6 @@ TEST(FunctionReturnSim,
   EXPECT_EQ(got->value.ToUint64(), 15u);
 }
 
-// §13.4.1 (printed page 342): the variable a function's own name declares has
-// the function's return type, and §6.16 (printed 112) makes a string as long
-// as the text last assigned to it. A module function's, a class method's and a
-// package function's `f = "hello world"` each hand out all eleven characters;
-// a variable created at a 32-bit carrier kept the last four, `orld`.
 TEST(FunctionReturnSim, StringReturnVariableAssignedByNameHandsOutAllOfIt) {
   SimFixture f;
   std::string out = RunCapture(
@@ -138,11 +103,6 @@ TEST(FunctionReturnSim, StringReturnVariableAssignedByNameHandsOutAllOfIt) {
   EXPECT_EQ(out, "<hello world> <hello world> <hello world>\n");
 }
 
-// §13.4.1 with §6.16.1 and §21.3.3: inside the body the implicit variable is
-// the string it was declared, so `f.len()` counts the eleven characters
-// assigned to it and `$swrite(f, "%m")` writes the whole hierarchical name,
-// the ten characters of t.scope_of, into it. At the 32-bit carrier, len()
-// read 0 and $swrite kept the name's last four characters.
 TEST(FunctionReturnSim, StringReturnVariableIsAStringInsideTheBody) {
   SimFixture f;
   std::string out = RunCapture(
@@ -159,14 +119,6 @@ TEST(FunctionReturnSim, StringReturnVariableIsAStringInsideTheBody) {
   EXPECT_EQ(out, "11\n<t.scope_of>\n");
 }
 
-// §11.4.14 (printed page 291) reports a stream wider than its target only
-// where the target is a fixed-size variable, and resizes a dynamically sized
-// one to it, which §6.16 (printed 112) makes a string, so `f = {>>{q}}` on a
-// queue of strings fills the implicit string variable whatever it held before
-// -- the empty string, or the two characters `xy` assigned ahead of the
-// stream. Both read `abcdef`; the 32-bit carrier was reported narrower than
-// the 48-bit stream, and a string holding `xy` was reported so by the same
-// check.
 TEST(FunctionReturnSim, StringReturnVariableTakesAStreamOfStrings) {
   SimFixture f;
   std::string out = RunCapture(
@@ -187,20 +139,10 @@ TEST(FunctionReturnSim, StringReturnVariableTakesAStreamOfStrings) {
       "endmodule\n",
       f);
   EXPECT_FALSE(f.has_errors);
-  // The report is the run's, raised after has_errors was read.
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_EQ(out, "<abcdef> <abcdef>\n");
 }
 
-// §13.4.1 (printed page 342) with §8.7 (printed 184): the implicit variable
-// has the function's return type, and the left-hand side of an assignment of
-// `new` decides the class constructed, so `mk = new` in a function returning M
-// constructs an M and the call hands its handle out -- from a module function,
-// a static method and an instance method alike, with and without constructor
-// arguments. Each handle is non-null and the object's `v` reads through it:
-// 4 from the default, 9 from the argument. The variable had no class recorded
-// under its name, so the `new` was evaluated as a value and the call returned
-// null.
 TEST(FunctionReturnSim, ClassReturnVariableAssignedNewConstructsTheObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -225,12 +167,6 @@ TEST(FunctionReturnSim, ClassReturnVariableAssignedNewConstructsTheObject) {
   EXPECT_EQ(out, "0 0 0\n4 4 9\n");
 }
 
-// §13.4.1: a `return` writes the same implicit variable an assignment to the
-// function's name does, so `return new` and `return new(7)` in a function
-// returning M construct an M as `mk = new` does, from a module function and
-// from a static method of a package's class alike. The handles are non-null
-// and `v` reads 4 and 7 through them; evaluated as a value, the `new`
-// returned null.
 TEST(FunctionReturnSim, ReturnNewConstructsAnObjectOfTheReturnType) {
   SimFixture f;
   std::string out = RunCapture(
@@ -255,13 +191,6 @@ TEST(FunctionReturnSim, ReturnNewConstructsAnObjectOfTheReturnType) {
   EXPECT_EQ(out, "0 0 4 7\n");
 }
 
-// §13.4.1 (printed page 342) with §8.3: the implicit variable is the
-// function's own, of its return type, so a call of another function of the
-// same name made while the body runs -- B's make, returning a B -- leaves the
-// outer make's variable an A, and `$cast(make, a)` casts an A into it and
-// succeeds. Recorded under the bare name for the whole run, the inner call's
-// class stood for the outer's variable, the cast failed and the call
-// returned null.
 TEST(FunctionReturnSim, ReturnVariableClassOutlivesANestedSameNamedCall) {
   SimFixture f;
   std::string out = RunCapture(
@@ -288,11 +217,6 @@ TEST(FunctionReturnSim, ReturnVariableClassOutlivesANestedSameNamedCall) {
   EXPECT_EQ(out, "0 1\n");
 }
 
-// §13.4.1 with §7.6 and §7.10: a call of a function returning an unpacked
-// array, assigned to an array variable or a queue, copies every element it
-// returned -- a module function's, a method's through a handle and a
-// method's called bare in another method -- and the call runs once. Read as
-// the one value the call yields, each target received zeros or a single zero.
 TEST(FunctionReturnSim, ArrayReturnedByACallIsAssignedElementForElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -322,11 +246,6 @@ TEST(FunctionReturnSim, ArrayReturnedByACallIsAssignedElementForElement) {
   EXPECT_EQ(out, "'{7, 8, 9} '{7, 8, 9} '{4, 5} '{11, 12} 12 n=2\n");
 }
 
-// §7.2 with §7.4.5, §7.12.1 and §13.4.1: a member select on the element an
-// array-valued call yields reads that member of the element -- of a queue
-// and of a fixed-size array of structures a function returns, and of the
-// queue a locator returns. The element select alone read right, `e =
-// mk()[1]`, and its member read 0.
 TEST(FunctionReturnSim, MemberOfAnElementOfAnArrayValuedCall) {
   SimFixture f;
   auto out = RunCapture(
@@ -349,12 +268,6 @@ TEST(FunctionReturnSim, MemberOfAnElementOfAnArrayValuedCall) {
   EXPECT_EQ(out, "50 4 50 30\n");
 }
 
-// §13.4.1 with §7.4, §7.5 and §7.10: the implicit variable of a function whose
-// return type names an unpacked-array typedef is an array of that type, so the
-// body may fill it element by element or through its methods, or return an
-// assignment pattern or another such call, and whichever way the body ends
-// the caller reads that array -- a structure element's member included. Made
-// one element wide, each read 0 or the empty queue.
 TEST(FunctionReturnSim, ImplicitVariableOfAnArrayReturnTypeIsAnArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -388,12 +301,6 @@ TEST(FunctionReturnSim, ImplicitVariableOfAnArrayReturnTypeIsAnArray) {
   EXPECT_EQ(out, "8 9 2 5 '{7, 8, 9} '{4, 5} '{2, 2, 2} '{3, 1, 1} 50\n");
 }
 
-// §13.4.1 (printed page 342) with §8.25 and §6.20: an instance method's
-// implicit variable has the method's return type, whose packed range may name
-// a parameter or localparam of the class -- 6 bits under C #(6), 3 in the
-// default specialization C, 5 through D's localparam -- and `logic` keeps it
-// unsigned. The range was folded with none of the class's constants, so each
-// call answered one bit and `g2 = 5` read -1.
 TEST(FunctionReturnSim, InstanceMethodReturnRangeNamesClassConstants) {
   SimFixture f;
   std::string out = RunCapture(
@@ -420,10 +327,6 @@ TEST(FunctionReturnSim, InstanceMethodReturnRangeNamesClassConstants) {
   EXPECT_EQ(out, "63 5 127 7 31\n");
 }
 
-// §13.4.1 (printed pages 343-344): parentheses tell a call used as an implicit
-// variable from a hierarchical reference into the function's scope. F.member,
-// without them, reads the static function's own local, 0 before any call;
-// F().member calls F and reads the member of the object it returns, 1.
 TEST(FunctionReturnSim, FunctionNameWithoutParenthesesIsAScope) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -445,10 +348,6 @@ TEST(FunctionReturnSim, FunctionNameWithoutParenthesesIsAScope) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-// §13.4.1 (printed page 343): a call used as an implicit variable has the
-// function's return type and is indexed by it, so with g returning
-// bit [15:10], g()[13:10] reads bits 13 to 10 of that type and g()[15] its
-// most significant bit (#6432): 4'b1101 and 1 of 6'b101101.
 TEST(FunctionReturnSim, SelectOnACallUsesTheReturnTypesRange) {
   SimFixture f;
   auto* v = RunAndFindVar(

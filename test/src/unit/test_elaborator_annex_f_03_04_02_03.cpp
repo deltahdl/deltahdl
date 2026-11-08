@@ -11,30 +11,18 @@
 
 using namespace delta;
 
-// §F.3.4.2.3 unfolds the nonconsecutive repetition operators of §16.9.2 over
-// a Boolean b into consecutive repetitions of the unit (!b[*0:$] ##1 b), a
-// run of letters without b ending at one with it: a goto repetition is that
-// unit repeated, so the word ends at its last b, and a nonconsecutive
-// repetition is the goto followed by one more run without b. Each case checks
-// the tree a form unfolds to against the identity the subclause states, then
-// the words that tightly satisfy it under §F.5.2.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
-// The letter without b, the letter with it.
 Letter N() { return A({"a"}); }
 Letter B() { return A({"b"}); }
 
-// The unit (!b[*0:$] ##1 b) in the §F.3.4.2.1 unfolding of [*0:$].
 std::shared_ptr<const SequenceExpr> Unit(
     const std::shared_ptr<const BooleanExpr>& b) {
   return SeqConcat(SeqRepeatAtLeast(SeqBoolean(BoolNot(b)), 0), SeqBoolean(b));
 }
 
-// b[->m] is (!b[*0:$] ##1 b)[*m]: a word with m letters b, ending at the
-// last, whatever stands between.
 TEST(DerivedNonconsecutiveRepetition, GotoCountsTheLettersAndEndsAtTheLast) {
   auto b = BoolAtom("b");
   EXPECT_TRUE(
@@ -49,9 +37,6 @@ TEST(DerivedNonconsecutiveRepetition, GotoCountsTheLettersAndEndsAtTheLast) {
   EXPECT_TRUE(TightlySatisfies(Word{}, *SeqGotoExactly(b, 0)));
 }
 
-// b[->m:n] is (!b[*0:$] ##1 b)[*m:n] and b[->m:$] is (!b[*0:$] ##1 b)[*m:$]:
-// the count of letters b is bounded by the range, and the word still ends at
-// the last of them.
 TEST(DerivedNonconsecutiveRepetition, GotoRangesBoundTheCount) {
   auto b = BoolAtom("b");
   EXPECT_TRUE(SequenceExprEqual(*SeqGotoRange(b, 1, 2),
@@ -73,9 +58,6 @@ TEST(DerivedNonconsecutiveRepetition, GotoRangesBoundTheCount) {
   EXPECT_FALSE(TightlySatisfies(Word{B(), B(), N()}, *two_or_more));
 }
 
-// b[=m] is (b[->m] ##1 !b[*0:$]), and the ranges likewise end in a run
-// without b: the count of letters b is what the form names, and the word may
-// go on past the last of them through letters without b.
 TEST(DerivedNonconsecutiveRepetition, NonconsecutiveAllowsARunAfterTheLast) {
   auto b = BoolAtom("b");
   auto run_without = SeqRepeatAtLeast(SeqBoolean(BoolNot(b)), 0);

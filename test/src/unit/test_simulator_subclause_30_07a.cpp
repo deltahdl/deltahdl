@@ -35,17 +35,6 @@ TEST(PulseFiltering, ClassifierProducesOneOfThreeCategories) {
   EXPECT_EQ(c, PulseClassification::kPropagate);
 }
 
-// --- §30.7 head text: the default pulse limits are DERIVED from a module path
-// transition delay, which the §30.5/§30.5.1 syntax produces. The classification
-// rule (ClassifyPulse) is a pure function of three integers, so it stays a
-// synthetic single-stage test above; but the default-limit rule consumes a real
-// delay, so it is re-observed here on a PathDelay parsed and elaborated from
-// actual `(a => y) = (rise, fall);` source rather than a hand-set delays[]
-// array.
-
-// Figure 30-5: a buffer path with rise delay 7 and fall delay 9. By default the
-// reject and error limits equal the transition delay, so each limit array slot
-// mirrors the delay produced by the parsed source.
 TEST(PulseFilteringFromSource, DefaultLimitsMirrorParsedTransitionDelays) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y", "    (a => y) = (7, 9);", f);
@@ -62,9 +51,6 @@ TEST(PulseFilteringFromSource, DefaultLimitsMirrorParsedTransitionDelays) {
   EXPECT_EQ(pd.error_limit[1], 9u);
 }
 
-// Figure 30-5: a pulse of width 2 is narrower than the reject limit derived
-// from the rise delay of 7, so with default limits it is rejected and no pulse
-// emerges.
 TEST(PulseFilteringFromSource, NarrowPulseRejectedUnderDerivedDefaults) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y", "    (a => y) = (7, 9);", f);
@@ -75,14 +61,10 @@ TEST(PulseFilteringFromSource, NarrowPulseRejectedUnderDerivedDefaults) {
   InitDefaultPulseLimits(pd);
   EXPECT_EQ(ClassifyPulse(2, pd.reject_limit[0], pd.error_limit[0]),
             PulseClassification::kReject);
-  // A pulse as wide as the derived delay passes unfiltered.
   EXPECT_EQ(ClassifyPulse(7, pd.reject_limit[0], pd.error_limit[0]),
             PulseClassification::kPropagate);
 }
 
-// The limits that govern filtering are those of the transition forming the
-// pulse's trailing edge: width 8 propagates against the rise slot (limit 7) but
-// is rejected against the fall slot (limit 9), both derived from real source.
 TEST(PulseFilteringFromSource, TrailingEdgeDerivedLimitsGovern) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y", "    (a => y) = (7, 9);", f);
@@ -97,8 +79,6 @@ TEST(PulseFilteringFromSource, TrailingEdgeDerivedLimitsGovern) {
             PulseClassification::kReject);
 }
 
-// A path delay supplied through a specparam (a constant expression per 11.2.1)
-// still yields default limits equal to the resolved delay.
 TEST(PulseFilteringFromSource, SpecparamDelayDrivesDefaultLimits) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y",
@@ -115,9 +95,6 @@ TEST(PulseFilteringFromSource, SpecparamDelayDrivesDefaultLimits) {
             PulseClassification::kReject);
 }
 
-// Input form: a min:typ:max path delay. The selected member (the typical value
-// under the default delay mode) becomes the delay, and the default pulse limits
-// mirror that selected member rather than the min or max.
 TEST(PulseFilteringFromSource, MinTypMaxDelaySelectsDefaultLimit) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y", "    (a => y) = 6:8:10;", f);
@@ -125,20 +102,16 @@ TEST(PulseFilteringFromSource, MinTypMaxDelaySelectsDefaultLimit) {
   ASSERT_NE(c.design, nullptr);
   LowerAndRun(c.design, f);
   PathDelay pd = BuildPathDelayFromDecl(*c.decl, f.ctx, f.arena);
-  ASSERT_EQ(pd.delays[0], 8u);  // typical member selected
+  ASSERT_EQ(pd.delays[0], 8u);
   InitDefaultPulseLimits(pd);
   EXPECT_EQ(pd.reject_limit[0], 8u);
   EXPECT_EQ(pd.error_limit[0], 8u);
-  // A pulse narrower than the selected delay is rejected; one as wide passes.
   EXPECT_EQ(ClassifyPulse(7, pd.reject_limit[0], pd.error_limit[0]),
             PulseClassification::kReject);
   EXPECT_EQ(ClassifyPulse(8, pd.reject_limit[0], pd.error_limit[0]),
             PulseClassification::kPropagate);
 }
 
-// Input form: a six-value transition-delay list, which the §30.5.1 machinery
-// expands across all twelve transition slots. The default pulse limits must
-// mirror the resolved delay in EVERY slot, not just the first two.
 TEST(PulseFilteringFromSource, DefaultLimitsMirrorEverySlotFromSixDelays) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y",
@@ -154,9 +127,6 @@ TEST(PulseFilteringFromSource, DefaultLimitsMirrorEverySlotFromSixDelays) {
   }
 }
 
-// Negative/degenerate form: a delay that resolves negative is clamped to zero
-// by the §30.5.1 dependency, so the default limits are zero and filtering is
-// effectively disabled — every pulse width propagates.
 TEST(PulseFilteringFromSource, ClampedZeroDelayDisablesFiltering) {
   SimFixture f;
   auto c = ElaboratePathDecl("input a, output y", "    (a => y) = -4;", f);

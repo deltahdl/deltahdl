@@ -79,9 +79,6 @@ TEST(InitialProcedureElaboration, NullStatementInitialElaborates) {
 
 TEST(InitialProcedureElaboration, BeginEndBodyPreserved) {
   ElabFixture f;
-  // 6.10: a procedural assignment target gets no implicit declaration (only
-  // nets in continuous-assign/port/terminal contexts do), so a and b must be
-  // declared or the elaborator correctly reports undeclared identifiers.
   auto* design = ElaborateSrc(
       "module m;\n"
       "  logic a, b;\n"

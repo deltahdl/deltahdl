@@ -50,10 +50,6 @@ TEST(FunctionBackgroundProcessElaboration, EventTriggerOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.4: a clocking drive is one of the non-blocking statements that shall
-// be allowed inside a function (alongside nonblocking assignments, event
-// triggers, and fork-join_none). The synchronous drive syntax comes from the
-// §14.16 dependency: a nonblocking assignment to a clocking-block output.
 TEST(FunctionBackgroundProcessElaboration, ClockingDriveOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -98,8 +94,6 @@ TEST(FunctionBackgroundProcessElaboration, ForkJoinError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // The rejection is §13.4's rule on which join form a function may contain,
-  // not the §13.4.4 rule this file is named for.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "only fork/join_none is permitted inside a function", 3, "13.4"));
@@ -116,7 +110,6 @@ TEST(FunctionBackgroundProcessElaboration, ForkJoinAnyError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // As above, §13.4 is the rule that rejects a join_any inside a function.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "only fork/join_none is permitted inside a function", 3, "13.4"));
@@ -253,10 +246,6 @@ TEST(FunctionBackgroundProcessElaboration, ContAssignToPureFuncOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.4: the LRM's own illegal example is a variable-declaration
-// initializer (`bit y = watch_for_zero(stack);`). A module-scope variable
-// initializer runs at time zero, outside any initial/always/fork procedure,
-// so calling a function that schedules a background event there is illegal.
 TEST(FunctionBackgroundProcessElaboration, VarInitToBackgroundFuncNbaError) {
   ElabFixture f;
   ElaborateSrc(
@@ -276,9 +265,6 @@ TEST(FunctionBackgroundProcessElaboration, VarInitToBackgroundFuncNbaError) {
       7, "13.4.4"));
 }
 
-// §13.4.4: a net-declaration assignment is a continuous assignment, another
-// context in which the side effect of spawning a background event is not
-// allowed.
 TEST(FunctionBackgroundProcessElaboration, NetDeclInitToBackgroundFuncError) {
   ElabFixture f;
   ElaborateSrc(
@@ -298,8 +284,6 @@ TEST(FunctionBackgroundProcessElaboration, NetDeclInitToBackgroundFuncError) {
       7, "13.4.4"));
 }
 
-// §13.4.4: a variable initializer that calls an ordinary function with no
-// background side effect stays legal — the rule flags only the side effect.
 TEST(FunctionBackgroundProcessElaboration, VarInitToPureFuncOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -332,25 +316,6 @@ TEST(FunctionBackgroundProcessElaboration, InitialCallToBackgroundFuncOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §13.4.4 asks whether the called function schedules an event that cannot
-// become active until after it returns, and puts no condition on where the
-// statement that schedules it stands. StmtSpawnsBackgroundProcess in
-// src/elaborator/elaborator_validate_subroutine.cpp had written out ten of the
-// thirteen child-statement links Stmt declares, and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The two
-// cases below cover the one newly reached position a background-spawning
-// statement can be written in. Stmt::for_inits and Stmt::for_steps are the
-// other two and get no case: A.6.8 admits only a variable assignment or a
-// for_variable_declaration in a for_initialization, and only an
-// operator_assignment, an inc_or_dec_expression or a function_subroutine_call
-// in a for_step, so a nonblocking assignment, an event trigger and a fork are
-// all barred from both.
-
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements and a nonblocking assignment written there schedules the event
-// §13.4.4 is about. The statements are kept in RsProd::code_stmts, reached
-// through Stmt::rs_productions and through no other member of Stmt.
 TEST(FunctionBackgroundProcessElaboration,
      ContAssignToFuncWithNbaInRandsequenceCodeBlockError) {
   ElabFixture f;
@@ -374,10 +339,6 @@ TEST(FunctionBackgroundProcessElaboration,
       10, "13.4.4"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(FunctionBackgroundProcessElaboration,
      ContAssignToFuncWithNbaInRandsequenceWeightCodeBlockError) {
   ElabFixture f;
@@ -403,9 +364,6 @@ TEST(FunctionBackgroundProcessElaboration,
                             12, "13.4.4"));
 }
 
-// A function that schedules the event through a call of another function
-// tries to schedule it as much as one that writes the statement itself, and
-// the check follows a recursive call no further than once (#6435).
 TEST(FunctionBackgroundProcessElaboration,
      BackgroundEventThroughAnotherFunction) {
   ElabFixture f;

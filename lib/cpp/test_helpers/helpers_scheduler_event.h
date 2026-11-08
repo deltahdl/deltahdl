@@ -24,7 +24,6 @@ struct RegionLabel {
   std::string label;
 };
 
-// Schedule a labeled event at time 0.
 inline void ScheduleLabeled(Scheduler& sched, Region region,
                             const std::string& label,
                             std::vector<std::string>& order) {
@@ -33,7 +32,6 @@ inline void ScheduleLabeled(Scheduler& sched, Region region,
   sched.ScheduleEvent({0}, region, ev);
 }
 
-// Schedule a labeled event at an explicit time.
 inline void ScheduleLabeled(Scheduler& sched, uint64_t time, Region region,
                             const std::string& label,
                             std::vector<std::string>& order) {
@@ -42,7 +40,6 @@ inline void ScheduleLabeled(Scheduler& sched, uint64_t time, Region region,
   sched.ScheduleEvent({time}, region, ev);
 }
 
-// Verify that two regions execute in the given order.
 inline void VerifyTwoRegionOrder(const RegionLabel& first,
                                  const RegionLabel& second) {
   Arena arena;
@@ -56,7 +53,6 @@ inline void VerifyTwoRegionOrder(const RegionLabel& first,
   EXPECT_EQ(order[1], second.label);
 }
 
-// Verify that three regions execute in the given order.
 inline void VerifyThreeRegionOrder(const RegionLabel& r1, const RegionLabel& r2,
                                    const RegionLabel& r3) {
   Arena arena;
@@ -72,7 +68,6 @@ inline void VerifyThreeRegionOrder(const RegionLabel& r1, const RegionLabel& r2,
   EXPECT_EQ(order[2], r3.label);
 }
 
-// Verify that four regions execute in the given order.
 inline void VerifyFourRegionOrder(const RegionLabel& r1, const RegionLabel& r2,
                                   const RegionLabel& r3,
                                   const RegionLabel& r4) {
@@ -91,7 +86,6 @@ inline void VerifyFourRegionOrder(const RegionLabel& r1, const RegionLabel& r2,
   EXPECT_EQ(order[3], r4.label);
 }
 
-// Verify main→side→main iteration (e.g., Active→NBA→Active).
 inline void VerifyIterationChain(Region main_region,
                                  const std::string& main_label,
                                  Region side_region,
@@ -121,7 +115,6 @@ inline void VerifyIterationChain(Region main_region,
   EXPECT_EQ(order[2], main_label + "2");
 }
 
-// Verify region restart: initial runs, trigger schedules into target.
 inline void VerifyRegionRestart(const RegionLabel& initial,
                                 const RegionLabel& trigger,
                                 const RegionLabel& target) {
@@ -150,7 +143,6 @@ inline void VerifyRegionRestart(const RegionLabel& initial,
   EXPECT_EQ(order[2], target.label);
 }
 
-// Verify events at times 0, 1, 2 execute in order for a given region.
 inline void VerifyEventsAcrossTimeSlots(Region region) {
   Arena arena;
   Scheduler sched(arena);
@@ -169,7 +161,6 @@ inline void VerifyEventsAcrossTimeSlots(Region region) {
   EXPECT_EQ(times[2], 2u);
 }
 
-// Verify a region can read a value set by Active.
 inline void VerifyRegionCanReadActiveValue(Region reader_region) {
   Arena arena;
   Scheduler sched(arena);
@@ -185,7 +176,6 @@ inline void VerifyRegionCanReadActiveValue(Region reader_region) {
   EXPECT_EQ(sampled, 42);
 }
 
-// Verify all 17 regions execute in the correct order.
 inline void VerifyAllRegionOrder() {
   Arena arena;
   Scheduler sched(arena);
@@ -217,9 +207,6 @@ inline void VerifyAllRegionOrder() {
   EXPECT_EQ(order, expected);
 }
 
-// Verify that scheduling an NBA event from an Active callback into the current
-// time slot is not flagged against the given region's illegal-schedule counter.
-// `illegal_schedule_count` reads the region-specific counter off the scheduler.
 inline void VerifyScheduleFromActiveIsNotFlagged(
     const std::function<size_t(Scheduler&)>& illegal_schedule_count) {
   Arena arena;
@@ -237,9 +224,6 @@ inline void VerifyScheduleFromActiveIsNotFlagged(
   EXPECT_EQ(illegal_schedule_count(sched), 0u);
 }
 
-// The VPI object of kind vpiIntegerVar standing for `var`, which it makes a
-// 32-bit variable holding its one word in `storage`: a target a test's
-// vpi_put_value() can write, a variable being among those §38.34 lists.
 inline VpiObject IntegerVarObject(Variable& var, Logic4Word& storage) {
   var.value.width = 32;
   var.value.nwords = 1;
@@ -250,9 +234,6 @@ inline VpiObject IntegerVarObject(Variable& var, Logic4Word& storage) {
   return obj;
 }
 
-// Verify that a VPI write performed from an Active callback writes the value
-// and is not flagged against the given region's illegal-write counter.
-// `illegal_write_count` reads the region-specific counter off the scheduler.
 inline void VerifyVpiWriteFromActiveIsNotFlagged(
     const std::function<size_t(Scheduler&)>& illegal_write_count) {
   Arena arena;

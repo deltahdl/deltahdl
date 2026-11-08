@@ -167,8 +167,6 @@ TEST(SpecifyTerminalParsing, TerminalWithEdgeSensitivePath) {
 }
 
 TEST(SpecifyTerminalParsing, ListOfPathInputsMultiple) {
-  // A.7.4: a list_of_path_inputs is only valid with the full connection '*>';
-  // the parallel '=>' connects a single source to a single destination.
   auto r = Parse(
       "module m;\n"
       "  specify\n"
@@ -259,8 +257,6 @@ TEST(SpecifyTerminalParsing, ErrorTerminalUnclosedBracket) {
       "    (a[3 => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the specify_input_terminal_descriptor bracket, and the '=>'
-  // opening the path stands where the ']' closing the range belongs.
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got '=>'", 3, "30.4"));
 }
 
@@ -271,8 +267,6 @@ TEST(SpecifyTerminalParsing, ErrorEmptyTerminalList) {
       "    ( => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the terminal identifier ParseSpecifyTerminal demands, and the
-  // '=>' stands in its place.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got '=>'", 3, "30.4"));
 }
@@ -284,8 +278,6 @@ TEST(SpecifyTerminalParsing, ErrorTrailingCommaInInputList) {
       "    (a, => b) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the terminal identifier the comma promises, and the '=>' stands
-  // in its place.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got '=>'", 3, "30.4"));
 }
@@ -297,7 +289,6 @@ TEST(SpecifyTerminalParsing, ErrorEmptyOutputList) {
       "    (a => ) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the terminal identifier ParseSpecifyTerminal demands.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }
@@ -309,7 +300,6 @@ TEST(SpecifyTerminalParsing, ErrorTrailingCommaInOutputList) {
       "    (a => b,) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the terminal identifier the comma promises.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 3, "30.4"));
 }
@@ -321,7 +311,6 @@ TEST(SpecifyTerminalParsing, ErrorOutputTerminalUnclosedBracket) {
       "    (a => b[3) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // §30.4 owns the specify_output_terminal_descriptor bracket.
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ')'", 3, "30.4"));
 }
 
@@ -357,11 +346,6 @@ TEST(SpecifyTerminalParsing, OutputIdentifierInterfaceForm) {
   EXPECT_EQ(si->path.dst_ports[0].name, "x");
 }
 
-// specify_input_terminal_descriptor ::= input_identifier [[
-// constant_range_expression ]] admits the interface_identifier.port_identifier
-// alternative of input_identifier *combined with* a range. The interface-form
-// and range sub-forms were only ever exercised separately; this checks the
-// descriptor captures both at once.
 TEST(SpecifyTerminalParsing, InputIdentifierInterfaceFormWithPartSelect) {
   auto r = Parse(
       "module m;\n"
@@ -381,9 +365,6 @@ TEST(SpecifyTerminalParsing, InputIdentifierInterfaceFormWithPartSelect) {
   EXPECT_NE(si->path.src_ports[0].range_right, nullptr);
 }
 
-// specify_output_terminal_descriptor ::= output_identifier [[
-// constant_range_expression ]] admits the interface_identifier.port_identifier
-// form combined with a bit-select.
 TEST(SpecifyTerminalParsing, OutputIdentifierInterfaceFormWithBitSelect) {
   auto r = Parse(
       "module m;\n"
@@ -403,12 +384,6 @@ TEST(SpecifyTerminalParsing, OutputIdentifierInterfaceFormWithBitSelect) {
   EXPECT_EQ(si->path.dst_ports[0].range_right, nullptr);
 }
 
-// specify_input_terminal_descriptor ::= input_identifier [[
-// constant_range_expression ]]. The range bounds are constant *expressions*,
-// not just literals — a parameter reference embedded in an expression bound
-// takes the identifier branch of the expression parser, distinct from the
-// numeric-literal branch the other range tests cover. Input built from a real
-// parameter declaration.
 TEST(SpecifyTerminalParsing, InputTerminalPartSelectWithParameterBound) {
   auto r = Parse(
       "module m;\n"
@@ -424,10 +399,6 @@ TEST(SpecifyTerminalParsing, InputTerminalPartSelectWithParameterBound) {
   ExpectSoleTerminal(si->path.src_ports, "a", SpecifyRangeKind::kPartSelect);
 }
 
-// specify_output_terminal_descriptor ::= output_identifier [[
-// constant_range_expression ]]. A bare localparam identifier as a bit-select
-// bound — another constant form of §11.2.1 admitted by the range expression.
-// Input built from a real localparam.
 TEST(SpecifyTerminalParsing, OutputTerminalBitSelectWithLocalparamBound) {
   auto r = Parse(
       "module m;\n"
@@ -453,8 +424,6 @@ TEST(TimingCheckEventDefParsing, TerminalBitSelect) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  // Syntax 31-3 writes the data_event first, so the bit-select terminal is the
-  // $setup data event.
   EXPECT_EQ(tc->data_terminal.name, "data");
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
   EXPECT_NE(tc->data_terminal.range_left, nullptr);
@@ -474,13 +443,6 @@ TEST(TimingCheckEventDefParsing, TerminalBitSelectOnDataSignal) {
   EXPECT_EQ(tc->data_terminal.range_kind, SpecifyRangeKind::kBitSelect);
 }
 
-// --- list_of_path_inputs and list_of_path_outputs are comma-separated
-// terminal descriptors, and a descriptor is an identifier with an optional
-// range: A.7.3 puts no brace around either list. A.8.1's
-// module_path_concatenation does take braces, but it is a module_path_primary
-// (A.8.4) and stands only in the module_path_expression a state-dependent
-// path's `if` tests. ---
-
 TEST(SpecifyTerminalParsing, ErrorBraceGroupedInputListIsRejected) {
   auto r = Parse(
       "module m(input a, input b, output q);\n"
@@ -488,8 +450,6 @@ TEST(SpecifyTerminalParsing, ErrorBraceGroupedInputListIsRejected) {
       "    ({a, b} *> q) = 5;\n"
       "  endspecify\n"
       "endmodule\n");
-  // The report stands at the '{'; the group is skipped and the rest of the
-  // declaration is read, so nothing else is reported.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "path terminals are listed with commas alone; a concatenation is no "
@@ -528,8 +488,6 @@ TEST(SpecifyTerminalParsing, ErrorReplicatedInputListIsRejected) {
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
-// The comma-separated lists A.7.3 does write are unchanged by the rejection
-// of the brace form: this is §30.4.6's own example.
 TEST(SpecifyTerminalParsing, CommaSeparatedListsWithoutBracesAreKept) {
   auto r = Parse(
       "module m(input a, input b, input c, output q1, output q2);\n"

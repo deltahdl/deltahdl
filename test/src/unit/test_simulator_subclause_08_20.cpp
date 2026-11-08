@@ -203,10 +203,6 @@ TEST(ClassSim, FinalMethodInVTable) {
   EXPECT_EQ(obj->ResolveVirtualMethod("locked"), method);
 }
 
-// 8.20: the 'virtual' qualifier is optional in a derived override; a method
-// that overrides an inherited virtual method stays virtual, so dispatch
-// through a base-typed handle reaches the derived body even though the
-// override omits the keyword.
 TEST(ClassSim, ImplicitOverrideWithoutVirtualKeywordDispatches) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  virtual function int compute();\n"
@@ -232,12 +228,6 @@ TEST(ClassSim, ImplicitOverrideWithoutVirtualKeywordDispatches) {
             2u);
 }
 
-// §8.20 with §8.24: a virtual method whose body is declared out of the class
-// block is still the one a call through a base-typed handle reaches, in the
-// derived class that overrides it and in one that inherits it. The vtable
-// entry has to hold the body and not the `extern` prototype, and the derived
-// class copies the base's entries when it is lowered, so the base's body must
-// be in place by then; a prototype in either place answers 0.
 TEST(ClassSim, ExternVirtualBodyDispatchedThroughBaseHandle) {
   EXPECT_EQ(RunAndGet("class Base;\n"
                       "  extern virtual function int compute();\n"
@@ -288,9 +278,6 @@ TEST(ClassSim, ExternVirtualBodyInheritedByDerivedVTable) {
             12u);
 }
 
-// §8.20 with §8.24 and §26.3: the same dispatch for classes a package
-// declares, whose out-of-block bodies are the package's own items, reached
-// through a wildcard import.
 TEST(ClassSim, PackageExternVirtualBodyDispatchedThroughBaseHandle) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class Base;\n"
@@ -321,10 +308,6 @@ TEST(ClassSim, PackageExternVirtualBodyDispatchedThroughBaseHandle) {
             21u);
 }
 
-// §8.6 with §8.20: a method call whose return type is a class yields a handle,
-// and a property selected on the call applies to the object returned, here the
-// invoking object itself through `return this`. Read as a name, the select
-// reached no object and answered 0; the sentinel tells that from the read.
 TEST(ClassSim, PropertyReadOnMethodCallResult) {
   EXPECT_EQ(RunAndGet("class Node;\n"
                       "  int v;\n"
@@ -344,8 +327,6 @@ TEST(ClassSim, PropertyReadOnMethodCallResult) {
             30u);
 }
 
-// §8.6: each call in the chain applies to the object the call before it
-// returned, so three levels deep the property read is the last object's.
 TEST(ClassSim, PropertyReadOnThreeChainedMethodCallResults) {
   EXPECT_EQ(RunAndGet("class Node;\n"
                       "  int v;\n"
@@ -366,9 +347,6 @@ TEST(ClassSim, PropertyReadOnThreeChainedMethodCallResults) {
             3u);
 }
 
-// §8.6: a handle property selected on the call's result names the object it
-// refers to, and the property read after it is that object's: the node
-// `mk(6)` made links back to the node `mk(5)` made, whose v is 5.
 TEST(ClassSim, PropertyPathOnMethodCallResult) {
   EXPECT_EQ(RunAndGet("class Node;\n"
                       "  int v;\n"
@@ -389,8 +367,6 @@ TEST(ClassSim, PropertyPathOnMethodCallResult) {
             5u);
 }
 
-// §8.6: a method called on a method call's result runs on the object the
-// first call returned, the non-virtual `get` reading the v that `mk` set.
 TEST(ClassSim, MethodCalledOnMethodCallResult) {
   EXPECT_EQ(RunAndGet("class Node;\n"
                       "  int v;\n"
@@ -412,11 +388,6 @@ TEST(ClassSim, MethodCalledOnMethodCallResult) {
             30u);
 }
 
-// §8.20: a virtual function's override may return a derived class type of the
-// base's return type, and a virtual method called on that result dispatches
-// by the returned object's type. `c` holds a D, so `some_method` is D's,
-// returning a D whose n is the argument, and `who` is D's: 7 * 10 + 2. C's
-// `who` answers 1, and a select that reaches no object answers 0.
 TEST(ClassSim, VirtualMethodCalledOnMethodCallResult) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  virtual function C some_method(int a);\n"
@@ -450,12 +421,6 @@ TEST(ClassSim, VirtualMethodCalledOnMethodCallResult) {
             72u);
 }
 
-// §8.20: a virtual method overrides in all of its base classes, a non-virtual
-// one only in its own class and its descendants, so a method becomes virtual
-// from the class that first declares it so downward. `f1` is non-virtual in
-// `base`, and a call through a `base` handle to a `B` object is `base`'s own
-// `f1` even though `A` below it declares the name virtual and `B` overrides
-// that: 1 * 10 + the 3 the same object gives through its own handle.
 TEST(ClassSim, NonVirtualBaseMethodThroughBaseHandleIgnoresGrandchildVirtual) {
   EXPECT_EQ(RunAndGet("class base;\n"
                       "  function int f1();\n"
@@ -485,9 +450,6 @@ TEST(ClassSim, NonVirtualBaseMethodThroughBaseHandleIgnoresGrandchildVirtual) {
             13u);
 }
 
-// §8.20: from the class that declares `f1` virtual downward the call
-// dispatches by the object's type, so through an `A` handle the `B` object's
-// override answers 3, not `A`'s own 2.
 TEST(ClassSim, MethodVirtualFromMidClassDispatchesThroughMidHandle) {
   EXPECT_EQ(RunAndGet("class base;\n"
                       "  function int f1();\n"
@@ -517,10 +479,6 @@ TEST(ClassSim, MethodVirtualFromMidClassDispatchesThroughMidHandle) {
             3u);
 }
 
-// §8.20, Example 1: through a base handle to a derived object the virtual
-// method is the derived class's and the non-virtual one is the base's own:
-// 1 * 10 + 4, where a static resolution of both would give 12 and a virtual
-// one of both 34.
 TEST(ClassSim, VirtualMethodThroughBaseHandleStillDispatchesToDerived) {
   EXPECT_EQ(RunAndGet("class P;\n"
                       "  function int a();\n"
@@ -551,10 +509,6 @@ TEST(ClassSim, VirtualMethodThroughBaseHandleStillDispatchesToDerived) {
             14u);
 }
 
-// §8.20 with §8.14's `:initial`, the issue's own shape: `f1` is non-virtual in
-// `base` and `A` declares it `:initial`, so only `B`'s `virtual function
-// :initial` makes the name virtual, from `B` downward; through the `base`
-// handle the call is `base`'s 1, and through `A`'s it is `A`'s 2.
 TEST(ClassSim, GrandchildVirtualInitialMethodThroughBaseAndMidHandles) {
   EXPECT_EQ(RunAndGet("class base;\n"
                       "  function int f1();\n"

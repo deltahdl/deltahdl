@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The Packet of test/src/e2e/constraint_driven_generation.sv, an object
-// modelling the data to be randomized with random variables and the
-// constraints that determine their legal values, around the statements of
-// an initial.
 std::string Design(const std::string& body) {
   return "typedef enum {RUNT, PLAIN, JUMBO} kind_t;\n"
          "class Packet;\n"
@@ -42,10 +38,6 @@ std::string Design(const std::string& body) {
          "endmodule\n";
 }
 
-// §18.2: the constraints, written declaratively on the object, are
-// processed by a solver that generates random values meeting them, so
-// every randomize() of the Packet succeeds and yields values its own
-// check finds legal.
 TEST(ConstraintDrivenGeneration, EveryRandomizeMeetsTheConstraints) {
   SimFixture f;
   std::string out =
@@ -58,9 +50,6 @@ TEST(ConstraintDrivenGeneration, EveryRandomizeMeetsTheConstraints) {
   EXPECT_EQ(out, "24 24\n");
 }
 
-// §18.2: a corner case the constraints reach without a directed test
-// naming it: a jumbo is 9000 long and, tag implying a plain frame,
-// untagged.
 TEST(ConstraintDrivenGeneration, TheConstraintsReachACorner) {
   SimFixture f;
   std::string out =

@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A class C holding the members `decls` under the constraint blocks
-// `constraints`, randomized `draws` times by an initial that counts the draws
-// for which `holds` is true, as the design
-// test/src/e2e/iterative_constraints.sv does, and displays the count.
 std::string Counting(const std::string& decls, const std::string& constraints,
                      int draws, const std::string& holds) {
   return "class C;\n" + decls + constraints +
@@ -33,11 +29,6 @@ std::string Counting(const std::string& decls, const std::string& constraints,
          "endmodule\n";
 }
 
-// 18.5.7: an arrayed variable is constrained through a loop variable and an
-// indexing expression. The clause's C1, a foreach holding each element of A
-// inside {2, 4, 8, 16}, holds every element of every draw in the set, which
-// an array the object held as one value, or a foreach that imposed nothing,
-// would not.
 TEST(IterativeConstraintsRun, AForeachConstrainsEveryElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -50,11 +41,6 @@ TEST(IterativeConstraintsRun, AForeachConstrainsEveryElement) {
   EXPECT_EQ(out, "32\n");
 }
 
-// 18.5.7: the loop variable is the element's index, so the clause's C2, each
-// element above twice its index, holds A[3] above 6 while A[0] is free above
-// 0: over 64 draws of 4-bit elements every draw holds the relation and A[0]
-// is drawn at or below 6 at least once, which the last index standing for
-// every element would never allow.
 TEST(IterativeConstraintsRun, TheLoopVariableIsTheIndex) {
   SimFixture f;
   std::string out = RunCapture(
@@ -79,10 +65,6 @@ TEST(IterativeConstraintsRun, TheLoopVariableIsTheIndex) {
   EXPECT_EQ(out, "64 1\n");
 }
 
-// 18.5.7: an arrayed variable is constrained through an array reduction
-// method. Three elements each below 10 whose sum is held to 12 add up to 12
-// on every draw, read back element by element and through the same sum()
-// on the object from outside the class.
 TEST(IterativeConstraintsRun, AReductionMethodConstrainsTheArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -96,10 +78,6 @@ TEST(IterativeConstraintsRun, AReductionMethodConstrainsTheArray) {
   EXPECT_EQ(out, "32\n");
 }
 
-// 18.5.7 constrains the elements a class holds one by one: a property
-// declared as an array is written and read element by element, from a method
-// of the class and through a handle, its size() the count it declared, and
-// an element never written its type's initial value.
 TEST(IterativeConstraintsRun, TheElementsAreHeldOneByOne) {
   SimFixture f;
   std::string out = RunCapture(

@@ -42,9 +42,6 @@ TEST(TypeParameterSim, LocalparamTypeResolvesWidth) {
   EXPECT_EQ(var->value.ToUint64(), 0xABu);
 }
 
-// §6.20.3: a type parameter whose type is a packed vector sets the width of a
-// dependent variable, observable at run time when an over-wide value assigned
-// to it is truncated to that width.
 TEST(TypeParameterSim, VectorTypeParamResolvesWidth) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -91,10 +88,6 @@ TEST(TypeParameterSim, MultipleTypeParamsResolveCorrectly) {
   EXPECT_EQ(vy->value.ToUint64(), 0xCAFEu);
 }
 
-// §23.10.2 with §6.20.3: an override is written in the instantiating module,
-// so `child #(bus_t)` hands the child the parent's bus_t, 13 bits, although the
-// child's own type parameter has the same name; so does §6.23's
-// `parameter type bus_t = type(A_bus)` for a parent's bus_t.
 TEST(TypeParameterSim, OverrideNamesTheParentsTypeOfTheSameName) {
   const std::string kSrc =
       "module child #(type bus_t = bit [7:0]) ();\n"
@@ -113,9 +106,6 @@ TEST(TypeParameterSim, OverrideNamesTheParentsTypeOfTheSameName) {
   EXPECT_EQ(RunAndGet(kSrc, "u2.w"), 13u);
 }
 
-// Each override reads the parent's names, not a child parameter an earlier
-// override has already set: `.A(B), .B(A)` swaps the parent's byte and
-// shortint into the child.
 TEST(TypeParameterSim, OverridesSwappingTwoNamesReadTheParents) {
   const std::string kSrc =
       "module child #(type A = int, type B = int) ();\n"
@@ -132,11 +122,6 @@ TEST(TypeParameterSim, OverridesSwappingTwoNamesReadTheParents) {
   EXPECT_EQ(RunAndGet(kSrc, "u.wb"), 8u);
 }
 
-// A.2.8 admits a parameter_declaration among a begin-end block's items, and
-// §6.20.3 has a type parameter name a data type, so `T x` is a `logic [7:0]`
-// that keeps eight bits of 9'h1FF, and `U y` a signed shortint holding -1.
-// The block's type parameter named no type a declaration was sized by, so
-// both fell to the 32-bit carrier of a type nothing sizes.
 TEST(TypeParameterSim, BlockTypeParamNamesTheTypeOfALaterDeclaration) {
   SimFixture f;
   EXPECT_EQ(
@@ -156,9 +141,6 @@ TEST(TypeParameterSim, BlockTypeParamNamesTheTypeOfALaterDeclaration) {
       "8 255 16 -1\n");
 }
 
-// The same rule in a subroutine body, whose block_item_declarations A.2.6 and
-// A.2.7 take from A.2.8: a function's `bit [3:0]` local keeps four bits of
-// 5'h1F, and a task's `byte` local holds 9'h181 as the signed -127.
 TEST(TypeParameterSim, SubroutineTypeParamNamesTheTypeOfALocal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -184,9 +166,6 @@ TEST(TypeParameterSim, SubroutineTypeParamNamesTheTypeOfALocal) {
             "15 -127\n");
 }
 
-// §6.20.3 with §7.4: a declaration writing unpacked dimensions after a
-// block's type parameter is an array of the parameter's type, so each element
-// of `P b [2]` is a signed shortint holding -1.
 TEST(TypeParameterSim, ArrayOfABlockTypeParamHasElementsOfItsType) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -201,10 +180,6 @@ TEST(TypeParameterSim, ArrayOfABlockTypeParamHasElementsOfItsType) {
             "16 -1\n");
 }
 
-// §6.20.3: the clause's own example, written at compilation-unit scope. P's
-// type parameter C is bound to the class X, and C::T selects X's int through it
-// in a type parameter assignment, so a P_X object's y is a 32-bit int: a value
-// wider than 32 bits keeps only its low 32.
 TEST(TypeParameterSim, ClassTypeSelectedThroughTypeParamAssignment) {
   EXPECT_EQ(RunAndGet("class P #(type C);\n"
                       "  localparam type C_t = C::T;\n"
@@ -227,13 +202,6 @@ TEST(TypeParameterSim, ClassTypeSelectedThroughTypeParamAssignment) {
             (uint64_t{32} << 32) | 0x3456789Au);
 }
 
-// §6.20.3 with §6.18: a class property declared through a name the class gives
-// its meaning to is as wide as the type the name reaches -- a typedef of the
-// class, a body `localparam type`, a type selected through a type parameter
-// bound to a class, under the default specialization and under one naming the
-// class, and a compilation-unit typedef or a class's typedef named directly.
-// Each reaches byte, so a 40-bit value written to y keeps its low 8 bits, and
-// r holds the 32-bit $bits(o.y) above those 8 bits.
 TEST(TypeParameterSim, PropertyDeclaredThroughAClassTypeNameIsItsWidth) {
   struct Form {
     const char* classes;

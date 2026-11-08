@@ -52,10 +52,6 @@ TEST(ReplicationSim, ReplicationMultipleInner) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5A5u);
 }
 
-// §11.4.12.1: the multiplier is a constant expression. This exercises the
-// parameter form (§11.2.1) that the clause's own example uses — a localparam
-// drives the copy count — and observes through the full pipeline that the
-// elaborated constant produces exactly that many copies (three 4'hA nibbles).
 TEST(ReplicationSim, LocalparamMultiplierCopyCount) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -70,10 +66,6 @@ TEST(ReplicationSim, LocalparamMultiplierCopyCount) {
   EXPECT_EQ(var->value.ToUint64(), 0xAAAu);
 }
 
-// §11.4.12.1: the multiplier is a constant expression. A module `parameter`
-// (§11.2.1) is a distinct constant form from a localparam and takes its own
-// declaration/override path; this drives one as the copy count through the
-// full pipeline and observes three copies of 4'hA (0xAAA).
 TEST(ReplicationSim, ParameterMultiplierCopyCount) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -161,9 +153,6 @@ TEST(ReplicationEval, ZeroReplicationWidth) {
   EXPECT_EQ(result.width, 0u);
 }
 
-// §11.4.12.1: a zero-multiplier replication has size zero and is ignored, so
-// inside a concatenation it contributes no bits and the result equals the
-// positive-size operand alone.
 TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -181,11 +170,6 @@ TEST(ReplicationSim, ZeroReplicationIgnoredInConcat) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-// §11.4.12.1: a zero multiplier yields size zero and is ignored inside a
-// concatenation — the same rule the clause frames as useful in parameterized
-// code. Here the zero comes from a `parameter` (§11.2.1) evaluated at
-// elaboration rather than a literal, exercising the constant-fold path, and
-// the run confirms the result is the positive-size operand alone (0xA5).
 TEST(ReplicationSim, ParameterZeroMultiplierIgnoredInConcat) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -204,12 +188,6 @@ TEST(ReplicationSim, ParameterZeroMultiplierIgnoredInConcat) {
   EXPECT_EQ(var->value.ToUint64(), 0xA5u);
 }
 
-// §11.4.12.1: the operands of a replication are evaluated exactly once,
-// regardless of how many copies the multiplier requests. Driving a
-// side-effecting operand (post-increment) through the full pipeline lets us
-// observe the count from real source: i advances by exactly one, and the four
-// copies all carry the single pre-increment value 5 (0x05050505) rather than
-// the 5,6,7,8 sequence a per-copy re-evaluation would produce.
 TEST(ReplicationSim, OperandsEvaluatedOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -230,11 +208,6 @@ TEST(ReplicationSim, OperandsEvaluatedOnce) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 0x05050505u);
 }
 
-// §11.4.12.1: a zero multiplier still evaluates its operand exactly once even
-// though the replication contributes no bits. Placed inside a concatenation
-// with a positive-size operand (so the zero replication is legal), the
-// post-increment fires once (i advances to 6) and the result equals the
-// positive operand alone (0xA5).
 TEST(ReplicationSim, OperandsEvaluatedOnceWithZeroMultiplier) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -257,9 +230,6 @@ TEST(ReplicationSim, OperandsEvaluatedOnceWithZeroMultiplier) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 0xA5u);
 }
 
-// §11.4.12.1 joins copies of the whole inner concatenation, so an operand
-// wider than 64 bits is copied entire, and §11.4.12.2 leaves a replicated
-// string longer than eight characters untruncated.
 TEST(ReplicationSim, WideOperandsAndLongStringsAreCopiedWhole) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

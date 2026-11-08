@@ -8,17 +8,6 @@ using namespace delta;
 
 namespace {
 
-// This file covers the cast §6.24.1 defines, written on the right-hand side of
-// a continuous assignment, which `SynthLower::LowerExprBit` in
-// src/synthesizer/synth_lower.cpp has no lowering for.
-
-// The case fails on a run that answers a netlist for this module. The
-// right-hand side reaches `SynthLower::LowerExprBit` in
-// src/synthesizer/synth_lower.cpp as an `ExprKind::kCast`, and that function
-// builds no node for the kind. A design that wrote the cast got a netlist
-// contributing constant zero at every bit of the expression while the run
-// reported success. §6.24.1 gives the size cast the width its constant
-// expression names, which is the eight bits the target declares.
 TEST(CastSynthesis, SizeCastIsReportedRatherThanLoweredToZero) {
   SynthFixture f;
   const auto* mod =

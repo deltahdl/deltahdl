@@ -8,72 +8,42 @@ using namespace delta;
 
 namespace {
 
-// §5.6.3: a name following the `$` is recognized as a system task/function
-// identifier token. This observes the recognition rule directly, independent of
-// the §5.6 length-limit checks below. The lexer makes no task-vs-function
-// distinction, so a single recognition case covers the rule at this stage.
 TEST(SystemNameLexing, NameLexesAsSystemIdentifier) {
   auto r = LexOne("$display");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$display");
 }
 
-// §5.6.3 conditions the rule on a name *following* the `$`. When nothing
-// name-like follows, the construct is not interpreted as a system
-// task/function: the lexer emits a plain dollar token rather than a system
-// identifier. This observes the negative branch of the recognition decision.
 TEST(SystemNameLexing, BareDollarIsNotSystemIdentifier) {
   auto r = LexOne("$;");
   EXPECT_EQ(r.token.kind, TokenKind::kDollar);
   EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
 }
 
-// §5.6.3 recognition negative at the end-of-input boundary: a `$` that is the
-// last character of the source has no following name at all, so it likewise
-// yields a bare dollar rather than a system task/function identifier. This
-// exercises the past-the-end lookahead path, distinct from the `$;` (non-word
-// follows) and `$ ` (white space follows) negatives.
 TEST(SystemNameLexing, BareDollarAtEndOfInput) {
   auto r = LexOne("$");
   EXPECT_EQ(r.token.kind, TokenKind::kDollar);
   EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
 }
 
-// §5.6.3 (Syntax 5-1 char class): the character after the `$` may be any of a
-// letter, digit, underscore, or `$`. This case (and the two below) exercise the
-// non-letter members of the first/continuation character class so the full
-// admitted set is observed at the stage that owns the token rule. The letter
-// member is covered by NameLexesAsSystemIdentifier above. See the
-// §5.3-dependent negatives below for where the class stops applying.
 TEST(SystemNameLexing, DigitFirstSystemIdentifier) {
   auto r = LexOne("$12step");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$12step");
 }
 
-// §5.6.3 char class, underscore member: a leading underscore after the `$` is
-// admitted, so the whole `$_name` is a single system task/function identifier.
 TEST(SystemNameLexing, UnderscoreFirstSystemIdentifier) {
   auto r = LexOne("$_reset");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$_reset");
 }
 
-// §5.6.3 char class, `$` member: `$` is admitted in the continuation, so an
-// embedded dollar does not terminate the identifier — the lexer consumes the
-// whole `$test$plusargs` as one system task/function identifier token rather
-// than splitting it at the interior `$`.
 TEST(SystemNameLexing, EmbeddedDollarSystemIdentifier) {
   auto r = LexOne("$test$plusargs");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$test$plusargs");
 }
 
-// §5.6.3 footnote 55 (rule 1): the `$` shall not be followed by white space.
-// A `$` immediately followed by a §5.3 white-space character is therefore not
-// the start of a system task/function name; the lexer emits a bare dollar and
-// tokenizes the following name independently. This observes the white-space
-// branch specifically, distinct from the generic non-word case ($;) above.
 TEST(SystemNameLexing, DollarFollowedByWhitespaceIsNotSystemIdentifier) {
   auto tokens = Lex("$ display ");
   ASSERT_GE(tokens.size(), 2u);
@@ -83,20 +53,12 @@ TEST(SystemNameLexing, DollarFollowedByWhitespaceIsNotSystemIdentifier) {
   EXPECT_EQ(tokens[1].text, "display");
 }
 
-// Syntax 5-1's footnote 55 has that a system_tf_identifier is not escaped, and
-// §5.6.1 makes what the escape backslash introduces a user-defined name. The
-// token is still the escaped identifier the backslash asks for, so that what
-// follows it is lexed in step, but it is never a system identifier, and the
-// report below is what the standard has for it.
 TEST(SystemNameLexing, EscapedNameIsNotSystemIdentifier) {
   auto r = LexOne("\\$display ");
   EXPECT_EQ(r.token.kind, TokenKind::kEscapedIdentifier);
   EXPECT_NE(r.token.kind, TokenKind::kSystemIdentifier);
 }
 
-// The spelling after the backslash is a system_tf_identifier of A.9.3, `$` and
-// then letters, digits, underscores and dollar signs only, and footnote 55
-// forbids escaping one: the escape is reported under §5.6.3 where it is lexed.
 TEST(SystemNameLexing, EscapedSystemTfIdentifierIsRejected) {
   auto diags = LexDiagnostics("\\$display ");
   EXPECT_TRUE(ReportedError(
@@ -104,9 +66,6 @@ TEST(SystemNameLexing, EscapedSystemTfIdentifierIsRejected) {
       "5.6.3"));
 }
 
-// The issue's shape: the report is on the line of the escaped name, so that
-// the design is rejected rather than the statement accepted and dropped as a
-// call of an undeclared user name.
 TEST(SystemNameLexing, EscapedSystemTaskEnableIsRejectedOnItsLine) {
   auto diags = LexDiagnostics(
       "module t;\n"
@@ -117,22 +76,12 @@ TEST(SystemNameLexing, EscapedSystemTaskEnableIsRejectedOnItsLine) {
       "5.6.3"));
 }
 
-// A name with a character outside A.9.3's set after the `$` is not a
-// system_tf_identifier, so escaping it is the ordinary §5.6.1 way of writing
-// a user-defined name that begins with a dollar sign; an escaped plain name
-// and an unescaped system name are the two legal spellings beside it.
 TEST(SystemNameLexing, EscapedNameThatIsNoSystemTfIdentifierReportsNothing) {
   EXPECT_TRUE(LexDiagnostics("\\$display-x ").empty());
   EXPECT_TRUE(LexDiagnostics("\\display ").empty());
   EXPECT_TRUE(LexDiagnostics("$display ").empty());
 }
 
-// §5.6.3: further user-defined system tasks and system functions may be defined
-// through the PLI of Clause 36. What a name of one may be is therefore Clause
-// 36's to say and not this subclause's, and §5.6's cap on identifier length
-// does not reach a name that is neither of the two things §5.6 calls an
-// identifier. A name past that cap is one system identifier here; §36.3's own
-// file holds the rule and both sides of it.
 TEST(SystemNameLexing, ANameOfAnyLengthLexesAsOneSystemIdentifier) {
   std::string id = "$" + std::string(2000, 'a');
   id += " ";
@@ -143,9 +92,6 @@ TEST(SystemNameLexing, ANameOfAnyLengthLexesAsOneSystemIdentifier) {
   EXPECT_EQ(tokens[0].text.size(), 2001u);
 }
 
-// Only a name spelled as a system_tf_identifier is refused escaped. An escaped
-// identifier beginning with $ and holding a character no such name may hold,
-// here a plus sign, is an ordinary escaped identifier.
 TEST(SystemNameLexing, EscapedNameThatNoSystemNameSpellsIsAccepted) {
   EXPECT_TRUE(LexDiagnostics("\\$a+b ").empty());
   auto tokens = Lex("\\$a+b ");
@@ -154,9 +100,6 @@ TEST(SystemNameLexing, EscapedNameThatNoSystemNameSpellsIsAccepted) {
   EXPECT_EQ(tokens[0].text, "$a+b");
 }
 
-// A system_tf_identifier may hold underscores and dollar signs after its
-// first $, and one spelled with both is as much a system name, and as
-// forbidden escaped, as one spelled with letters alone.
 TEST(SystemNameLexing, EscapedSystemNameWithUnderscoreAndDollarIsRejected) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("\\$my$task_1 "),
                             "cannot be written as an escaped identifier", 1,

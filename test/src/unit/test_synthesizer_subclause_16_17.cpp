@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §16.17: the `expect` statement blocks the executing process until the given
-// property succeeds or fails, and the statement after it is scheduled once the
-// Observed region has finished evaluating that property. Both halves are
-// simulation semantics: nothing in a netlist evaluates a property, and nothing
-// in a netlist waits for a region. The report names the construct, because the
-// action block hanging off an `expect` holds ordinary assignments that would
-// otherwise be dropped along with it.
 TEST(ExpectStatementSynthesis, ExpectIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

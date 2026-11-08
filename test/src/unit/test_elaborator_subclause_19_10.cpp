@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §19.10: `option` and `type_option` are structures with fixed members, so a
-// name neither declares, or a member of the other structure, is an error in
-// the definition and in a procedural write alike.
 TEST(OptionMembers, NameTheStructureDoesNotDeclareIsError) {
   ElabFixture f;
   ElaborateSrc(

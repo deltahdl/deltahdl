@@ -1,24 +1,3 @@
-// §21.4 Loading memory array data from a file — the runtime behavior of the
-// $readmemb / $readmemh system tasks.
-//
-// Every rule in §21.4 is a runtime rule whose behavior depends on how its
-// inputs are produced: the destination memory's declared bounds, width, and
-// dimensionality decide the load window and the row-major geometry; the file
-// text decides the radix, the x/z/underscore handling, and the @-address
-// repositioning; and the filename argument may be produced as a string literal,
-// a string-typed variable, or a packed integral value. These tests therefore
-// declare real memories and call the tasks from procedural source, driving each
-// module through the full pipeline (parse -> elaborate -> lower -> run) and
-// reading the loaded words back with $display — rather than hand-building a
-// system-call node and a memory in an isolated evaluator. The data files are
-// real scratch files written before each run.
-//
-// Several tests read back an address the load never wrote, either because it
-// falls outside the window or because the file ran out of words. §21.4 says the
-// operation leaves those untouched, so what they hold is the memory's default
-// initial value -- and every memory here is declared `reg`, which Table 6-7
-// gives 'x. Such an address therefore displays as x, and an expectation of zero
-// would be asserting that the load had touched it.
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -32,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Writes `data` to a scratch file tagged by `tag` and returns its path. The
-// path contains no characters that need escaping inside a SystemVerilog string
-// literal, so it can be embedded directly in the source under test.
 std::string WriteData(const std::string& tag, const std::string& data) {
   std::string path = "/tmp/deltahdl_t2104_" + tag + ".mem";
   std::ofstream ofs(path);
@@ -43,8 +19,6 @@ std::string WriteData(const std::string& tag, const std::string& data) {
   return path;
 }
 
-// §21.4: as the file is read, each unsized number is assigned to a successive
-// word element of the memory; $readmemh reads the numbers as hexadecimal.
 TEST(ReadmemFileLoadSim, ReadmemhLoadsSuccessiveWords) {
   SimFixture f;
   std::string path = WriteData("succ_h", "0A\n14\n1E\n");
@@ -63,7 +37,6 @@ TEST(ReadmemFileLoadSim, ReadmemhLoadsSuccessiveWords) {
   std::remove(path.c_str());
 }
 
-// §21.4: for $readmemb each number is binary rather than hexadecimal.
 TEST(ReadmemFileLoadSim, ReadmembReadsBinaryNumbers) {
   SimFixture f;
   std::string path = WriteData("succ_b", "1010\n0110\n");
@@ -82,8 +55,6 @@ TEST(ReadmemFileLoadSim, ReadmembReadsBinaryNumbers) {
   std::remove(path.c_str());
 }
 
-// §21.4: the file may contain only white space, comments (both the // and /* */
-// forms), and numbers; white space and comments serve only to separate numbers.
 TEST(ReadmemFileLoadSim, CommentsAndWhitespaceSeparateNumbers) {
   SimFixture f;
   std::string path = WriteData(
@@ -103,9 +74,6 @@ TEST(ReadmemFileLoadSim, CommentsAndWhitespaceSeparateNumbers) {
   std::remove(path.c_str());
 }
 
-// §21.4: within a $readmemh number the unknown value (x), the high-impedance
-// value (z), and the underscore separator may appear. Underscores are dropped;
-// x and z survive per hex digit.
 TEST(ReadmemFileLoadSim, HexNumberAcceptsUnknownHighZAndUnderscore) {
   SimFixture f;
   std::string path = WriteData("xzu_h", "Ax z5 1_F\n");
@@ -120,14 +88,10 @@ TEST(ReadmemFileLoadSim, HexNumberAcceptsUnknownHighZAndUnderscore) {
           "  end\n"
           "endmodule\n",
       f);
-  // "Ax": high nibble known A, low nibble unknown -> "ax"; "z5": high nibble
-  // high-Z, low nibble 5 -> "z5"; "1_F": underscore vanishes -> "1f".
   EXPECT_EQ(out, "ax z5 1f\n");
   std::remove(path.c_str());
 }
 
-// §21.4: the same unknown / high-Z / underscore rules apply to $readmemb, one
-// digit per bit.
 TEST(ReadmemFileLoadSim, BinaryNumberAcceptsUnknownAndUnderscore) {
   SimFixture f;
   std::string path = WriteData("xzu_b", "10x1\n1_0_1\n");
@@ -142,17 +106,10 @@ TEST(ReadmemFileLoadSim, BinaryNumberAcceptsUnknownAndUnderscore) {
           "  end\n"
           "endmodule\n",
       f);
-  // §21.4: x, z and the underscore may be used in a number as in SystemVerilog
-  // source, so each line reads as the binary literal it spells and lands
-  // right-justified in the 8-bit word. "10x1" is 4'b10x1 -- most significant
-  // digit first, so the unknown is bit 1, not bit 2 -- and "1_0_1" drops its
-  // underscores to leave 0b101.
   EXPECT_EQ(out, "000010x1 00000101\n");
   std::remove(path.c_str());
 }
 
-// §21.4: an @-address in the file (an '@' immediately followed by a hexadecimal
-// index) repositions the load cursor; subsequent data loads from that address.
 TEST(ReadmemFileLoadSim, AtAddressRepositionsCursor) {
   SimFixture f;
   std::string path = WriteData("at", "@2\nAA\nBB\n");
@@ -171,7 +128,6 @@ TEST(ReadmemFileLoadSim, AtAddressRepositionsCursor) {
   std::remove(path.c_str());
 }
 
-// §21.4: the @-address digits may be upper- or lowercase hexadecimal.
 TEST(ReadmemFileLoadSim, AtAddressAcceptsUpperAndLowerHexDigits) {
   SimFixture f;
   std::string path = WriteData("at_hex", "@0a\nAA\n@1B\nBB\n");
@@ -190,8 +146,6 @@ TEST(ReadmemFileLoadSim, AtAddressAcceptsUpperAndLowerHexDigits) {
   std::remove(path.c_str());
 }
 
-// §21.4: as many @-address specifications as needed may appear; each one
-// repositions the cursor independently.
 TEST(ReadmemFileLoadSim, MultipleAtAddresses) {
   SimFixture f;
   std::string path = WriteData("at_multi", "@2\nAA\n@5\nBB\n");
@@ -206,20 +160,16 @@ TEST(ReadmemFileLoadSim, MultipleAtAddresses) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(
-      out,
-      "aa xx bb\n");  // mem[3] is not part of either run, so it is untouched
+  EXPECT_EQ(out, "aa xx bb\n");
   std::remove(path.c_str());
 }
 
-// §21.4: with no addressing in the task and none in the file, the default start
-// address is the lowest address in the memory and loading proceeds upward.
 TEST(ReadmemFileLoadSim, DefaultStartIsLowestAddressUpward) {
   SimFixture f;
   std::string path = WriteData("default", "01\n02\n");
   std::string out = RunCapture(
       "module t;\n"
-      "  reg [7:0] mem [1:4];\n"  // lowest address is 1
+      "  reg [7:0] mem [1:4];\n"
       "  initial begin\n"
       "    $readmemh(\"" +
           path +
@@ -232,8 +182,6 @@ TEST(ReadmemFileLoadSim, DefaultStartIsLowestAddressUpward) {
   std::remove(path.c_str());
 }
 
-// §21.4: a start address supplied without a finish address makes loading begin
-// there and continue upward toward the highest address.
 TEST(ReadmemFileLoadSim, StartAddressOnlyLoadsUpward) {
   SimFixture f;
   std::string path = WriteData("start_only", "AA\nBB\n");
@@ -252,9 +200,6 @@ TEST(ReadmemFileLoadSim, StartAddressOnlyLoadsUpward) {
   std::remove(path.c_str());
 }
 
-// §21.4: when the start address exceeds the finish address, the address is
-// decremented between consecutive loads. A matching word count draws no
-// warning.
 TEST(ReadmemFileLoadSim, StartGreaterThanFinishLoadsDownward) {
   SimFixture f;
   std::string path = WriteData("down", "11\n22\n33\n44\n");
@@ -274,8 +219,6 @@ TEST(ReadmemFileLoadSim, StartGreaterThanFinishLoadsDownward) {
   std::remove(path.c_str());
 }
 
-// §21.4: the descending load direction set by start > finish continues to be
-// followed even after an @-address in the file repositions the cursor.
 TEST(ReadmemFileLoadSim, DownwardDirectionPersistsAfterAtAddress) {
   SimFixture f;
   std::string path = WriteData("dir_down", "@5\nAA\nBB\n");
@@ -290,12 +233,10 @@ TEST(ReadmemFileLoadSim, DownwardDirectionPersistsAfterAtAddress) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "aa bb\n");  // continued downward past the @-address
+  EXPECT_EQ(out, "aa bb\n");
   std::remove(path.c_str());
 }
 
-// §21.4: the upward direction of a start-only load likewise persists after an
-// @-address in the file.
 TEST(ReadmemFileLoadSim, UpwardDirectionPersistsAfterAtAddress) {
   SimFixture f;
   std::string path = WriteData("dir_up", "@3\nAA\nBB\n");
@@ -310,12 +251,10 @@ TEST(ReadmemFileLoadSim, UpwardDirectionPersistsAfterAtAddress) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out, "aa bb\n");  // continued upward past the @-address
+  EXPECT_EQ(out, "aa bb\n");
   std::remove(path.c_str());
 }
 
-// §21.4: when addressing is specified both in the task and in the file, a file
-// address outside the task's range is an error, and the load is terminated.
 TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeIsError) {
   SimFixture f;
   std::string path = WriteData("oob_addr", "@9\nAA\n");
@@ -333,17 +272,13 @@ TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "file address outside the range given by the task",
                             4, "21.4"));
-  EXPECT_EQ(out, "xx\n");  // the out-of-range load did not occur
+  EXPECT_EQ(out, "xx\n");
   std::remove(path.c_str());
 }
 
-// §21.4: a warning is issued when the number of data words differs from the
-// range implied by start through finish and no addresses appear in the file.
-// The words present are loaded from the start address; uncovered addresses are
-// left unmodified.
 TEST(ReadmemFileLoadSim, WordCountMismatchWarnsAndLeavesGapUnmodified) {
   SimFixture f;
-  std::string path = WriteData("mismatch", "AA\nBB\n");  // 2 words, window of 4
+  std::string path = WriteData("mismatch", "AA\nBB\n");
   std::string out = RunCapture(
       "module t;\n"
       "  reg [7:0] mem [0:7];\n"
@@ -356,12 +291,10 @@ TEST(ReadmemFileLoadSim, WordCountMismatchWarnsAndLeavesGapUnmodified) {
           "endmodule\n",
       f);
   EXPECT_GE(f.diag.WarningCount(), 1u);
-  EXPECT_EQ(out, "aa bb xx xx\n");  // mem[3], mem[4] unmodified
+  EXPECT_EQ(out, "aa bb xx xx\n");
   std::remove(path.c_str());
 }
 
-// §21.4: when the word count matches the start-through-finish window exactly,
-// no warning is issued.
 TEST(ReadmemFileLoadSim, MatchingWordCountDrawsNoWarning) {
   SimFixture f;
   std::string path = WriteData("match", "AA\nBB\nCC\nDD\n");
@@ -381,8 +314,6 @@ TEST(ReadmemFileLoadSim, MatchingWordCountDrawsNoWarning) {
   std::remove(path.c_str());
 }
 
-// §21.4: the filename may be produced by a string-typed variable, not only a
-// string literal.
 TEST(ReadmemFileLoadSim, FilenameFromStringVariable) {
   SimFixture f;
   std::string path = WriteData("str_fn", "07\n");
@@ -403,8 +334,6 @@ TEST(ReadmemFileLoadSim, FilenameFromStringVariable) {
   std::remove(path.c_str());
 }
 
-// §21.4: the filename may also come from an integral value whose packed bytes
-// spell the name (the third accepted filename form).
 TEST(ReadmemFileLoadSim, FilenameFromIntegralValue) {
   SimFixture f;
   std::string path = WriteData("int_fn", "07\n");
@@ -425,9 +354,6 @@ TEST(ReadmemFileLoadSim, FilenameFromIntegralValue) {
   std::remove(path.c_str());
 }
 
-// §21.4: the memory_name may name the lowest dimension with slice syntax; the
-// load is confined to the slice's bounds and defaults to the slice's low
-// address.
 TEST(ReadmemFileLoadSim, SliceMemoryNameConfinesLoad) {
   SimFixture f;
   std::string path = WriteData("slice", "AA\nBB\nCC\nDD\nEE\n");
@@ -442,13 +368,10 @@ TEST(ReadmemFileLoadSim, SliceMemoryNameConfinesLoad) {
           "  end\n"
           "endmodule\n",
       f);
-  EXPECT_EQ(out,
-            "aa dd xx\n");  // EE lies beyond the slice, so mem[8] is untouched
+  EXPECT_EQ(out, "aa dd xx\n");
   std::remove(path.c_str());
 }
 
-// §21.4: start_addr / finish_addr within a slice's bounds drive the load (here
-// downward) exactly as for a whole array.
 TEST(ReadmemFileLoadSim, SliceStartFinishWithinBoundsLoads) {
   SimFixture f;
   std::string path = WriteData("slice_win", "11\n22\n33\n44\n");
@@ -468,8 +391,6 @@ TEST(ReadmemFileLoadSim, SliceStartFinishWithinBoundsLoads) {
   std::remove(path.c_str());
 }
 
-// §21.4 (shall): a start_addr or finish_addr outside the slice's bounds is an
-// error, and the load does not occur.
 TEST(ReadmemFileLoadSim, SliceStartOutsideBoundsIsError) {
   SimFixture f;
   std::string path = WriteData("slice_oob", "11\n22\n");
@@ -491,9 +412,6 @@ TEST(ReadmemFileLoadSim, SliceStartOutsideBoundsIsError) {
   std::remove(path.c_str());
 }
 
-// §21.4: the memory_name may be a partially indexed multidimensional array that
-// resolves to a lesser-dimensioned array. Indexing the highest dimension of a
-// 2-D memory yields a single-dimension sub-array, filled in address order.
 TEST(ReadmemFileLoadSim, PartiallyIndexedMultiDimResolvesToOneDim) {
   SimFixture f;
   std::string path = WriteData("partial_1d", "AA\nBB\nCC\nDD\n");
@@ -508,13 +426,10 @@ TEST(ReadmemFileLoadSim, PartiallyIndexedMultiDimResolvesToOneDim) {
           "  end\n"
           "endmodule\n",
       f);
-  // mem[1] fills across the lowest dimension; row [0] is untouched.
   EXPECT_EQ(out, "aa dd 00\n");
   std::remove(path.c_str());
 }
 
-// §21.4: a partially indexed memory_name may still name its lowest dimension
-// with slice syntax, narrowing the resolved sub-array's load window.
 TEST(ReadmemFileLoadSim, PartiallyIndexedMultiDimWithLowestDimSlice) {
   SimFixture f;
   std::string path = WriteData("partial_slice", "AA\nBB\nCC\n");
@@ -530,13 +445,10 @@ TEST(ReadmemFileLoadSim, PartiallyIndexedMultiDimWithLowestDimSlice) {
           "  end\n"
           "endmodule\n",
       f);
-  // Only [1] and [2] of row 1 are in the slice; CC lies beyond it.
   EXPECT_EQ(out, "00 aa bb 00\n");
   std::remove(path.c_str());
 }
 
-// §21.4 / §21.4.3: partially indexing a 3-D memory's highest dimension resolves
-// to a 2-D sub-array, which is then filled in row-major order.
 TEST(ReadmemFileLoadSim, PartiallyIndexedThreeDimResolvesToTwoDim) {
   SimFixture f;
   std::string path = WriteData("partial_2d", "AA\nBB\nCC\nDD\nEE\nFF\n");
@@ -552,14 +464,10 @@ TEST(ReadmemFileLoadSim, PartiallyIndexedThreeDimResolvesToTwoDim) {
           "  end\n"
           "endmodule\n",
       f);
-  // Row-major over the two remaining dimensions of mem[1]; mem[0] untouched.
   EXPECT_EQ(out, "aa ff 00\n");
   std::remove(path.c_str());
 }
 
-// §21.4 (shall, negative): a higher-order dimension of the memory_name must be
-// selected with a single index, not a range. Writing a range there (a slice on
-// a non-final subscript) is rejected and no data is loaded.
 TEST(ReadmemFileLoadSim, HigherOrderDimensionAsRangeIsError) {
   SimFixture f;
   std::string path = WriteData("hi_dim_range", "AA\nBB\n");
@@ -567,7 +475,6 @@ TEST(ReadmemFileLoadSim, HigherOrderDimensionAsRangeIsError) {
       "module t;\n"
       "  bit [7:0] mem [0:2][0:3];\n"
       "  initial begin\n"
-      // mem[1:2] ranges the higher-order dimension 0, which is illegal.
       "    $readmemh(\"" +
           path +
           "\", mem[1:2][0]);\n"
@@ -579,14 +486,10 @@ TEST(ReadmemFileLoadSim, HigherOrderDimensionAsRangeIsError) {
                             "a higher-order dimension must be indexed, not "
                             "sliced",
                             4, "21.4"));
-  EXPECT_EQ(out, "00\n");  // the malformed name loaded nothing
+  EXPECT_EQ(out, "00\n");
   std::remove(path.c_str());
 }
 
-// §21.4 (shall, negative): slice syntax is permitted only on the lowest
-// dimension. Slicing a dimension that still encloses inner dimensions leaves
-// the name resolving to more than one dimension through a range, which is
-// rejected.
 TEST(ReadmemFileLoadSim, SliceOnNonLowestDimensionIsError) {
   SimFixture f;
   std::string path = WriteData("mid_dim_slice", "AA\nBB\n");
@@ -594,7 +497,6 @@ TEST(ReadmemFileLoadSim, SliceOnNonLowestDimensionIsError) {
       "module t;\n"
       "  bit [7:0] mem [0:1][0:2][0:2];\n"
       "  initial begin\n"
-      // Dimension 1 is sliced while dimension 2 (the lowest) is left open.
       "    $readmemh(\"" +
           path +
           "\", mem[0][1:2]);\n"
@@ -609,9 +511,6 @@ TEST(ReadmemFileLoadSim, SliceOnNonLowestDimensionIsError) {
   std::remove(path.c_str());
 }
 
-// §21.4 (negative): a memory_name must resolve to an unpacked array. Fully
-// indexing every dimension names a single element, not an array, and is
-// rejected rather than loaded.
 TEST(ReadmemFileLoadSim, FullyIndexedMemoryNameIsError) {
   SimFixture f;
   std::string path = WriteData("full_index", "AA\nBB\n");
@@ -619,7 +518,6 @@ TEST(ReadmemFileLoadSim, FullyIndexedMemoryNameIsError) {
       "module t;\n"
       "  bit [7:0] mem [0:2][0:3];\n"
       "  initial begin\n"
-      // Both dimensions are indexed, so the name is a single element.
       "    $readmemh(\"" +
           path +
           "\", mem[1][2]);\n"
@@ -635,8 +533,6 @@ TEST(ReadmemFileLoadSim, FullyIndexedMemoryNameIsError) {
   std::remove(path.c_str());
 }
 
-// §21.4: $readmemh numbers are hexadecimal, and their digits may be lowercase
-// a-f as well as the uppercase A-F exercised above (a distinct decode path).
 TEST(ReadmemFileLoadSim, HexNumberAcceptsLowercaseHexDigits) {
   SimFixture f;
   std::string path = WriteData("lower_hex", "ab\ncd\n");
@@ -655,8 +551,6 @@ TEST(ReadmemFileLoadSim, HexNumberAcceptsLowercaseHexDigits) {
   std::remove(path.c_str());
 }
 
-// §21.4: an unopenable file leaves the memory untouched and reports a warning
-// rather than silently succeeding.
 TEST(ReadmemFileLoadSim, MissingFileWarnsAndLeavesMemoryUntouched) {
   SimFixture f;
   std::string out = RunCapture(
@@ -672,11 +566,6 @@ TEST(ReadmemFileLoadSim, MissingFileWarnsAndLeavesMemoryUntouched) {
   EXPECT_EQ(out, "xx\n");
 }
 
-// §21.4: an @-address in the file that falls outside the window the task's
-// start and finish arguments give is an error that ends the load. The design
-// makes two calls and only the second one reads a file whose address is
-// outside its window, so a report carrying no location fails this and so does
-// one that names the first call.
 TEST(ReadmemFileLoadSim, AddressOutsideTheArrayRangeIsReportedAtTheCall) {
   SimFixture f;
   std::string inside = WriteData("addr_inside", "@0\n0A\n14\n1E\n28\n");
@@ -701,9 +590,6 @@ TEST(ReadmemFileLoadSim, AddressOutsideTheArrayRangeIsReportedAtTheCall) {
   std::remove(outside.c_str());
 }
 
-// §21.4: any start_addr and finish_addr shall fall within the bounds of the
-// slice's range when slice syntax names the memory, and the report that
-// rejects one names §21.4.
 TEST(ReadmemFileLoadSim, SliceBoundsErrorNames21_4) {
   SimFixture f;
   std::string path = WriteData("sub_slice", "31\n32\n");
@@ -720,8 +606,6 @@ TEST(ReadmemFileLoadSim, SliceBoundsErrorNames21_4) {
   std::remove(path.c_str());
 }
 
-// §21.4: the addresses in the data file shall be within the range the task
-// arguments specify; otherwise an error is issued and the load is terminated.
 TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeNames21_4) {
   SimFixture f;
   std::string path = WriteData("sub_range", "@12\n41\n");
@@ -738,8 +622,6 @@ TEST(ReadmemFileLoadSim, FileAddressOutsideTaskRangeNames21_4) {
   std::remove(path.c_str());
 }
 
-// §21.4: a warning shall be issued when the number of data words differs from
-// the range the start-through-finish addresses imply, and it names §21.4.
 TEST(ReadmemFileLoadSim, WordCountMismatchWarningNames21_4) {
   SimFixture f;
   std::string path = WriteData("sub_count", "51\n");
@@ -756,9 +638,6 @@ TEST(ReadmemFileLoadSim, WordCountMismatchWarningNames21_4) {
   std::remove(path.c_str());
 }
 
-// §21.4: memory_name shall resolve to an unpacked array, so a fully indexed
-// name selects a single element rather than a memory. The report that rejects
-// the name names §21.4.
 TEST(ReadmemFileLoadSim, MemoryNameShapeErrorNames21_4) {
   SimFixture f;
   std::string path = WriteData("sub_shape", "61\n");
@@ -776,12 +655,6 @@ TEST(ReadmemFileLoadSim, MemoryNameShapeErrorNames21_4) {
   std::remove(path.c_str());
 }
 
-// §21.4 states the format of the load file and the addressing the task and the
-// file may carry. It says nothing about a file that cannot be opened, so the
-// report that one raises states a fact about the run rather than a breach of
-// the standard, and the subclause it records is empty. This is the case
-// Subclause::None() exists for: without this test, a later edit could start
-// writing a subclause into every site and nothing would notice.
 TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
   SimFixture f;
   RunCapture(
@@ -793,18 +666,6 @@ TEST(ReadmemFileLoadSim, UnopenableFileStatesNoRuleOfTheStandard) {
   EXPECT_TRUE(ReportedWarning(f.diag.Diagnostics(), "cannot open file", 3, ""));
 }
 
-// §9.4.2: a non-edge implicit event is detected whenever the expression's value
-// changes, and the clause names no writer whose change is exempt. A system task
-// that writes one of its arguments has written a user variable, so a process
-// parked on it resumes -- which every case above could pass without, the store
-// having happened all along and the value being what they read back. §21.4's
-// load writes the memory's elements, which is what a testbench most often waits
-// on. The wait is the route that reaches them: CollectSelectReads puts the
-// folded prefix `mem[2]` into the read set beside the base name, so a watcher
-// stands on the very element the load writes. An always_comb reading the same
-// element would not do -- its inferred sensitivity list reduces every read to
-// its base signal name, so it watches `mem` and no element write of any kind
-// reaches it, which is #3592 rather than anything §21.4 decides.
 TEST(ReadmemFileLoadSim, LoadedElementReleasesAWaitOnIt) {
   SimFixture f;
   std::string path = WriteData("event_h", "AB\nCD\nEF\n");
@@ -830,10 +691,6 @@ TEST(ReadmemFileLoadSim, LoadedElementReleasesAWaitOnIt) {
   std::remove(path.c_str());
 }
 
-// §21.4 with §8.5: the memory_name is any unpacked array, and a class
-// object's array property is one -- named through a handle at module level,
-// or as a lowest-dimension slice of one, whose bounds narrow the load. A
-// module array named from inside a class method is loaded as it is anywhere.
 TEST(ReadmemFileLoadSim, ArrayPropertyThroughAHandleIsLoaded) {
   SimFixture f;
   std::string path = WriteData("class_prop", "aa bb\n");
@@ -869,9 +726,6 @@ TEST(ReadmemFileLoadSim, ArrayPropertyThroughAHandleIsLoaded) {
   std::remove(path.c_str());
 }
 
-// §21.4 with §23.6: the memory_name may name an instance's array through a
-// hierarchical reference, one level down or two, and a slice of one narrows
-// the load as it does for a local array.
 TEST(ReadmemFileLoadSim, HierarchicallyNamedArrayIsLoaded) {
   SimFixture f;
   std::string path = WriteData("hier", "12 34\n");

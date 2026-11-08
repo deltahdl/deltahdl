@@ -10,7 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A 64-bit two-state message holding `v`, as the C++ cases below place one.
 Logic4Snapshot Msg(uint64_t v) {
   Logic4Word word{v, 0};
   Logic4Vec vec{64, 1, &word};
@@ -43,9 +42,6 @@ TEST(IpcSync, MailboxNumAtBound) {
   EXPECT_EQ(mb.Num(), 3);
 }
 
-// num() reports the live message count. A retrieval attempt on an empty
-// mailbox removes nothing, so num() must keep reporting zero rather than
-// underflowing — the read-side mirror of the at-bound put case above.
 TEST(IpcSync, MailboxNumUnchangedByFailedGet) {
   delta::MailboxObject mb;
   EXPECT_EQ(mb.Num(), 0);
@@ -54,10 +50,6 @@ TEST(IpcSync, MailboxNumUnchangedByFailedGet) {
   EXPECT_EQ(mb.Num(), 0);
 }
 
-// §15.4.2 (printed page 375): num() returns the number of messages in the
-// mailbox at the moment it is asked, so it reads 2 after two put() calls and
-// 1 after a get() has removed one: 21. Left unlowered, the num() calls
-// evaluated to nothing and r read x.
 TEST(MailboxSim, NumCountsTheMessagesInTheQueue) {
   SimFixture f;
   auto* var = RunAndFindVar(

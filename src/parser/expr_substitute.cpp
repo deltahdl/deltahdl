@@ -99,8 +99,6 @@ EdgeSpelling SpellEdge(Edge edge) {
   return {TokenKind::kKwEdge, "edge"};
 }
 
-// §9.4.2: a guard holding where `own` and `other` both hold, the one alone
-// where the other is null.
 Expr* ConjoinGuards(Expr* own, Expr* other, Arena& arena) {
   if (own == nullptr) return other;
   if (other == nullptr) return own;

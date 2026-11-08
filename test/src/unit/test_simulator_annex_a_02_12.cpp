@@ -5,21 +5,8 @@
 
 using namespace delta;
 
-// §A.2.12 end-to-end coverage. The productions of §A.2.12 (let_declaration,
-// let_port_item, let_formal_type, let_expression, let_list_of_arguments,
-// let_actual_arg) are syntactic, but the let construct they define is consumed
-// by the whole pipeline: the declaration's `= expression` right-hand side and
-// each let_actual_arg are real §A.8.3 expressions, and a typed let_formal_type
-// is a real §A.2.2.1 data_type. These tests build a let from real source
-// syntax, invoke it, and observe the simulated result — i.e. observe the
-// productions being expanded by production code (EvalLetExpansion), not merely
-// parsed.
-
 namespace {
 
-// let_declaration with no port list, referenced as a bare let_expression
-// (let_identifier alone). The right-hand side is a real literal expression;
-// the value flows through expansion into the assigned variable.
 TEST(LetSim, NoPortLetExpandsToRhs) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -32,8 +19,6 @@ TEST(LetSim, NoPortLetExpandsToRhs) {
   LowerRunAndCheck(f, design, {{"x", 42u}});
 }
 
-// let_expression with positional let_actual_arg entries, each a literal
-// §A.8.3 expression, substituted into the let body.
 TEST(LetSim, PositionalLiteralActualsSubstituted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -46,9 +31,6 @@ TEST(LetSim, PositionalLiteralActualsSubstituted) {
   LowerRunAndCheck(f, design, {{"x", 14u}});
 }
 
-// let_actual_arg ::= expression: an actual may be a compound expression built
-// from real signal references and arithmetic, not just a literal. This drives
-// the non-literal §A.8.3 expression path into the same let.
 TEST(LetSim, CompoundExpressionActualsSubstituted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -65,9 +47,6 @@ TEST(LetSim, CompoundExpressionActualsSubstituted) {
   LowerRunAndCheck(f, design, {{"x", 7u}});
 }
 
-// let_formal_type ::= data_type_or_implicit — the explicit data_type form. The
-// formal's packed §A.2.2.1 data_type governs its width, so a wider actual is
-// narrowed to the formal type before the body evaluates.
 TEST(LetSim, TypedFormalNarrowsActualToDataTypeWidth) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -77,12 +56,9 @@ TEST(LetSim, TypedFormalNarrowsActualToDataTypeWidth) {
       "  initial x = low(8'hAB);\n"
       "endmodule\n",
       f);
-  // 8'hAB truncated to the 4-bit formal is 4'hB == 11.
   LowerRunAndCheck(f, design, {{"x", 11u}});
 }
 
-// let_formal_type ::= untyped — the untyped alternative imposes no width, so
-// the actual passes through unchanged.
 TEST(LetSim, UntypedFormalPassesActualThrough) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -95,8 +71,6 @@ TEST(LetSim, UntypedFormalPassesActualThrough) {
   LowerRunAndCheck(f, design, {{"x", 200u}});
 }
 
-// let_port_item ::= ... [ = expression ] — when the invocation omits the
-// actual, the formal's default expression is evaluated and used in the body.
 TEST(LetSim, PortDefaultUsedWhenActualOmitted) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -109,8 +83,6 @@ TEST(LetSim, PortDefaultUsedWhenActualOmitted) {
   LowerRunAndCheck(f, design, {{"x", 10u}});
 }
 
-// let_list_of_arguments, the fully-named alternative: each formal is bound by
-// name and substituted into the body regardless of listing order.
 TEST(LetSim, NamedActualsBindByName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -123,8 +95,6 @@ TEST(LetSim, NamedActualsBindByName) {
   LowerRunAndCheck(f, design, {{"x", 20u}});
 }
 
-// A.2.12's let_formal_type may be a type_reference (§6.23): a is x's int, so
-// f(-5) is -4, where a one-bit formal would narrow -5 to 1 and give 2.
 TEST(LetSim, FormalOfATypeReferenceTakesTheReferencedType) {
   SimFixture f;
   auto* design = ElaborateSrc(

@@ -1,11 +1,3 @@
-// The checker rules that decide what a name inside or beside a checker may
-// reach, split out of elaborator_validate_hier_refs.cpp, which is named for
-// §23.6's hierarchical name and had reached the line cap holding the program
-// rules beside these. §23.6 bars a hierarchical reference into a checker, and
-// §17.7.1 bars a free checker variable from a continuous or blocking
-// assignment and any checker variable from an assignment in an initial
-// procedure.
-
 #include <format>
 #include <string_view>
 #include <unordered_set>
@@ -36,31 +28,6 @@ static bool ExprRefersToChecker(
   return false;
 }
 
-// §23.6 ends by forbidding hierarchical references into checkers (Clause 17),
-// and §23.7 decides which dotted names are hierarchical at all: a hierarchical
-// name's first component matches a scope name and a member select's matches a
-// data object or interface port name, settled by resolving that first
-// component, after which a name resolving to a data object or interface port is
-// a select of it. §23.9 says which declaration the first component reaches -- a
-// locally declared item is the one used -- and it lists a begin-end block among
-// the scopes a declaration can be local to. So a name that merely spells a
-// checker instance's identifier is a member select of the local, not a
-// hierarchical reference into the checker, and this rule, which resolves
-// nothing, reported one: a block-local `chk_inst` was refused for `chk_inst.a`
-// wherever the module held a checker instance named `chk_inst`.
-//
-// The set is therefore taken by value and narrowed as the walk enters a scope,
-// never widened on the way out -- the shape WalkStmtsForProgramRef below
-// already uses for §24.3. What is erased is the declared name, because that is
-// the component ExprRefersToChecker matches: HierRefLeftmost reduces
-// `chk_inst.a` to `chk_inst`, so a declaration of `chk_inst` is what shadows it
-// and a declaration of `a` is not. A block's declarations are erased before its
-// statements are read, since a declaration and the use it shadows are siblings
-// under the block rather than one inside the other.
-//
-// ExprRefersToChecker keeps the set by reference: an expression declares
-// nothing, so the narrowing this walk has already done is the whole of what it
-// needs, and it is passed the narrowed set from here.
 static void WalkStmtsForCheckerRef(
     const Stmt* s, std::unordered_set<std::string_view> checker_names,
     DiagEngine& diag) {
@@ -77,20 +44,11 @@ static void WalkStmtsForCheckerRef(
     diag.Error(s->range.start,
                "hierarchical reference into a checker is not permitted",
                Subclause("23.6"));
-  // §23.6 ends by forbidding hierarchical references into checkers (Clause 17)
-  // and puts no condition on where the reference is written, so every position
-  // a statement holds a statement in is one this report reaches.
-  // ForEachChildStmt in elaborator_validate_internal.h states those positions
-  // once for the whole elaborator, which is why the list is not written out
-  // again here. The visitor takes `Stmt* const&` because `s` is a
-  // `const Stmt*`.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForCheckerRef(sub, checker_names, diag);
   });
 }
 
-// The report of §23.6's rule on one expression an item holds outside any
-// statement, at the item.
 static void ReportIfRefersToChecker(
     const Expr* e, SourceLoc loc,
     const std::unordered_set<std::string_view>& checker_names,
@@ -109,8 +67,6 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
       ReportIfRefersToChecker(item->assign_rhs, item->loc, checker_inst_names_,
                               diag_);
     }
-    // §17.7.1's `wire x = my_check.a;`: a net or variable declaration's
-    // initializer is an assignment outside the checker too.
     if (item->kind == ModuleItemKind::kNetDecl ||
         item->kind == ModuleItemKind::kVarDecl) {
       ReportIfRefersToChecker(item->init_expr, item->loc, checker_inst_names_,
@@ -122,42 +78,6 @@ void Elaborator::ValidateHierRefIntoChecker(const ModuleDecl* decl) {
   }
 }
 
-// §17.7.1: flags any blocking procedural assignment whose target is one of the
-// checker's free variables. A free variable may only be updated by a
-// nonblocking assignment (from an always_ff procedure), so a blocking
-// assignment to it — in any procedure — is illegal.
-//
-// §17.5 decides which statement positions hold such an assignment in
-// conforming source, listing what a checker always procedure may contain:
-// blocking and nonblocking assignments, selection statements, loop statements,
-// timing event control, subroutine calls, immediate, deferred and concurrent
-// assertions, and let declarations. A loop statement is on that list and
-// A.6.8's `for_initialization ::= list_of_variable_assignments` puts an
-// assignment in a for-loop header; an immediate assertion is on it too, and
-// A.6.10's `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` with §16.3's `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null` puts one in either arm. A randcase
-// (§18.16) and a randsequence (A.6.12) are on neither list, so no conforming
-// checker always procedure holds one and no test covers the assignment
-// §17.7.1 forbids in a randcase item or in a randsequence code block. The walk
-// descends them anyway: what a checker procedure may hold is §17.5's rule to
-// report, not a reason to keep a shorter list here.
-//
-// §23.9 decides which declaration the assignment target reaches -- a locally
-// declared item is the one used -- and it lists a begin-end block among the
-// scopes a declaration can be local to. So a block-local named after a free
-// variable is what an assignment to that name updates, the free variable is not
-// written at all, and this rule, which resolves nothing, refused one. The set
-// is therefore taken by value and narrowed as the walk enters a scope, never
-// widened on the way out, and the erase is keyed on the free variable's own
-// name, because that is what HierRefLeftmost reduces the assignment target to.
-//
-// The narrowing runs below the checker body rather than at it.
-// ValidateFreeCheckerVariableAssignments builds the set from the checker's own
-// declarations, so a second declaration of one of those names in the checker
-// body is the collision §23.9 forbids -- one identifier declares one item in a
-// scope -- rather than a different variable an assignment could reach. Only a
-// scope below the body can hold that other variable.
 static void WalkStmtsForFreeBlockingAssign(
     const Stmt* s, std::unordered_set<std::string_view> free_vars,
     DiagEngine& diag) {
@@ -177,21 +97,11 @@ static void WalkStmtsForFreeBlockingAssign(
                       target),
           Subclause("17.7.1"));
   }
-  // ForEachChildStmt in elaborator_validate_internal.h states Stmt's child
-  // statement links once for the whole elaborator, which is why the list is not
-  // written out again here.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForFreeBlockingAssign(sub, free_vars, diag);
   });
 }
 
-// §17.7.1: continuous assignments and blocking procedural assignments to a free
-// checker variable are illegal; a free variable is left to the nonblocking form
-// only. Collects the free (rand) checker variables declared in the checker body
-// and rejects any continuous assign or blocking procedural assign that targets
-// one. Runs only on checker declarations.
-// §17.7.1: a free checker variable is updated only by a nonblocking
-// assignment, so a continuous assignment may not target one.
 static void CheckContAssignNotFreeVariable(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& free_vars, DiagEngine& diag) {
@@ -223,24 +133,6 @@ void Elaborator::ValidateFreeCheckerVariableAssignments(
   }
 }
 
-// §17.7.1: flags a blocking or nonblocking assignment inside an initial
-// procedure whose target names one of the checker's variables. A checker
-// variable may only be initialized in its declaration, never assigned from an
-// initial procedure. Variables declared locally inside the initial block are
-// not checker variables and so are not in `checker_vars`.
-//
-// §17.5 decides which statement positions hold an assignment in conforming
-// source: an initial procedure in a checker body may hold let declarations,
-// immediate, deferred and concurrent assertions, and a procedural timing
-// control statement that uses an event control alone. A.6.10's
-// `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3's `action_block ::= statement_or_null | [ statement ]
-// else statement_or_null` put an assignment in either arm of an assertion on
-// that list. A randcase (§18.16) and a randsequence (A.6.12) are on neither
-// list, so no conforming checker initial procedure holds one and no test covers
-// either position. The walk descends them anyway: what a checker initial
-// procedure may hold is §17.5's rule to report, not a reason to keep a shorter
-// list here.
 static void WalkStmtsForCheckerVarAssignInInitial(
     const Stmt* s, const std::unordered_set<std::string_view>& checker_vars,
     DiagEngine& diag) {
@@ -257,18 +149,11 @@ static void WalkStmtsForCheckerVarAssignInInitial(
                              target),
                  Subclause("17.7.1"));
   }
-  // ForEachChildStmt in elaborator_validate_internal.h states Stmt's child
-  // statement links once for the whole elaborator, which is why the list is not
-  // written out again here.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForCheckerVarAssignInInitial(sub, checker_vars, diag);
   });
 }
 
-// §17.7.1: a checker variable may not be assigned in an initial procedure (it
-// may only be initialized in its declaration). Collects the variables declared
-// in the checker body and rejects any assignment to one of them from an initial
-// procedure. Runs only on checker declarations.
 void Elaborator::ValidateCheckerVariableInitialAssignment(
     const ModuleDecl* decl) {
   if (decl->decl_kind != ModuleDeclKind::kChecker) return;

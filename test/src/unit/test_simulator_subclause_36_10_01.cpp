@@ -20,9 +20,6 @@ class VpiErrorHandling : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // §36.10.1: drive the previously called VPI routine into its error path so
-  // an error status is left pending. vpi_register_systf() rejects a name that
-  // lacks the leading dollar sign, which records an error (see §38.37.1).
   void CallVpiRoutineThatErrors() {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
@@ -30,7 +27,6 @@ class VpiErrorHandling : public ::testing::Test {
     vpi_register_systf(&data);
   }
 
-  // §36.10.1: a previous VPI routine call that completes without error.
   void CallVpiRoutineThatSucceeds() {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
@@ -46,19 +42,12 @@ class VpiErrorHandling : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.10.1 (C2): the nonzero result genuinely distinguishes an error from
-// success - when the previously called routine did not error, the same query
-// returns zero, so a nonzero return is what signals an error occurred.
 TEST_F(VpiErrorHandling, ChkErrorReturnsZeroWhenNoErrorOccurred) {
   CallVpiRoutineThatSucceeds();
 
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
-// §36.10.1 (C2, edge): the determination is scoped to the previously called
-// VPI routine, not to any error ever seen. After a routine errors, a later
-// routine that succeeds becomes the previously called one, so vpi_chk_error()
-// reports no error - the pending status does not persist across a good call.
 TEST_F(VpiErrorHandling, ChkErrorTracksMostRecentRoutineNotAnyPriorError) {
   CallVpiRoutineThatErrors();
   ASSERT_NE(vpi_chk_error(nullptr), 0);
@@ -68,8 +57,6 @@ TEST_F(VpiErrorHandling, ChkErrorTracksMostRecentRoutineNotAnyPriorError) {
   EXPECT_EQ(vpi_chk_error(nullptr), 0);
 }
 
-// §36.10.1 (C4): the vpi_chk_error() routine can provide detailed information
-// about the error through the structure passed to it.
 TEST_F(VpiErrorHandling, ChkErrorProvidesDetailedInformation) {
   CallVpiRoutineThatErrors();
 
@@ -81,8 +68,6 @@ TEST_F(VpiErrorHandling, ChkErrorProvidesDetailedInformation) {
   EXPECT_NE(info.message, nullptr);
 }
 
-// §36.10.1 (C3): callbacks can be set up for when an error occurs - a callback
-// registered for the error reasons is accepted and yields a usable handle.
 TEST_F(VpiErrorHandling, ErrorCallbackCanBeRegistered) {
   s_cb_data err = {};
   err.reason = cbError;
@@ -95,24 +80,12 @@ TEST_F(VpiErrorHandling, ErrorCallbackCanBeRegistered) {
   EXPECT_NE(vpi_register_cb(&pli_err), nullptr);
 }
 
-// §36.10.1: a callback can also be placed for the moment an error happens.
-// Registering one is half of that sentence and the case above is that half. The
-// other half is the occurrence, and no error a VPI routine recorded reached a
-// callback at all: they could be set up, and then nothing ever happened to
-// them.
-
-// What the applications below recorded. A callback routine is a plain C
-// function with no return path to the case that provoked it.
 int g_pli_error_calls = 0;
 int g_error_calls = 0;
 int g_level_seen_in_callback = 0;
 
 int CountingPliErrorCb(s_cb_data*) {
   ++g_pli_error_calls;
-  // §38.36.3: a cbError callback may call vpi_chk_error() to learn about the
-  // error. vpi_chk_error() is the one routine that leaves the error status
-  // alone (§38.2), so the error is still standing when the callback asks about
-  // it.
   g_level_seen_in_callback = vpi_chk_error(nullptr);
   return 0;
 }
@@ -143,20 +116,12 @@ TEST_F(VpiErrorHandling, TheErrorCallbackOccursWhenTheErrorDoes) {
 
   CallVpiRoutineThatErrors();
 
-  // §38.36.3 separates the two reasons by where the error arose: cbPLIError is
-  // an error raised at run time inside a call to a PLI function, and this one
-  // arose inside vpi_register_systf(), which is one.
   EXPECT_EQ(g_pli_error_calls, 1);
   EXPECT_EQ(g_error_calls, 0);
-  // And the callback could ask what the error was, which is §36.10.1's other
-  // sentence: vpi_chk_error() can report the error in detail.
   EXPECT_EQ(g_level_seen_in_callback, vpiError);
 }
 
 TEST_F(VpiErrorHandling, NoCallbackOccursWhenTheRoutineSucceeds) {
-  // The callback is set up for an error, so a routine that recorded none
-  // delivers nothing. Without this the case above passes on a tool that ran the
-  // error callbacks at the end of every VPI routine it was handed.
   RegisterErrorCallbacks();
 
   CallVpiRoutineThatSucceeds();
@@ -165,13 +130,10 @@ TEST_F(VpiErrorHandling, NoCallbackOccursWhenTheRoutineSucceeds) {
   EXPECT_EQ(g_error_calls, 0);
 }
 
-// What the re-entrant application below recorded.
 int g_nested_calls = 0;
 
 int ReentrantPliErrorCb(s_cb_data*) {
   ++g_nested_calls;
-  // A callback is free to call VPI routines of its own, and this one calls the
-  // routine that records an error.
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = VpiText("still_no_dollar_prefix");
@@ -189,10 +151,6 @@ TEST_F(VpiErrorHandling, AnErrorRaisedInsideTheCallbackDoesNotReenterIt) {
 
   CallVpiRoutineThatErrors();
 
-  // §36.10.1 says nothing about a callback's own errors, and the one thing a
-  // tool must not do with them is hand this callback an error it has not
-  // returned from yet. It runs once for the error that occurred, and the error
-  // its own routine call recorded is left standing for whoever asks next.
   EXPECT_EQ(g_nested_calls, 1);
 }
 

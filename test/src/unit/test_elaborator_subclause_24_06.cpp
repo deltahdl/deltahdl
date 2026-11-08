@@ -24,8 +24,6 @@ TEST(AnonymousProgramNameSpaceSharing,
       "endpackage\n"
       "module top; endmodule\n",
       f, "top");
-  // The collision is reported at the second declaration of `t`, the one inside
-  // the anonymous program on line 4.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'t' declared in anonymous program collides with "
                             "name in surrounding package",
@@ -44,8 +42,6 @@ TEST(AnonymousProgramNameSpaceSharing,
       "endpackage\n"
       "module top; endmodule\n",
       f, "top");
-  // The anonymous program declares `f` first, so the collision is reported at
-  // the package-level declaration on line 5.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'f' declared in anonymous program collides with "
                             "name in surrounding package",
@@ -62,8 +58,6 @@ TEST(AnonymousProgramNameSpaceSharing,
       "endprogram\n"
       "module top; endmodule\n",
       f, "top");
-  // The compilation-unit `t` comes first, so the collision is reported at the
-  // anonymous program's declaration on line 3.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'t' declared in anonymous program collides with "
                             "name in surrounding package",
@@ -84,8 +78,6 @@ TEST(AnonymousProgramNameSpaceSharing,
       "endpackage\n"
       "module top; endmodule\n",
       f, "top");
-  // Both declarations of `f` sit in anonymous programs; the collision is
-  // reported at the second one, on line 6.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "'f' declared in anonymous program collides with "
                             "name in surrounding package",
@@ -122,12 +114,6 @@ TEST(AnonymousProgramNameSpaceSharing,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.6: a class is one of the items A.1.11 admits into an anonymous program,
-// and it shares the enclosing package's name space like any other. The package
-// declares C first, so the collision stands at the anonymous program's own
-// declaration. A check comparing only the subroutines reports nothing here, and
-// nothing else does either: the §3.13 compilation-unit check passes over an
-// anonymous program's items on the ground that this check judges them.
 TEST(AnonymousProgramNameSpaceSharing,
      PackageClassAndAnonymousProgramClassSameNameIsError) {
   ElabFixture f;
@@ -146,10 +132,6 @@ TEST(AnonymousProgramNameSpaceSharing,
                             4, "24.6"));
 }
 
-// §24.6: the same for a class at compilation-unit scope, which reaches the
-// check by the other of its two entry points. The anonymous program declares C
-// first here, so the collision stands at the compilation-unit declaration that
-// follows it — the shared name space is shared in both directions.
 TEST(AnonymousProgramNameSpaceSharing,
      AnonymousProgramClassAndCompilationUnitClassSameNameIsError) {
   ElabFixture f;
@@ -166,10 +148,6 @@ TEST(AnonymousProgramNameSpaceSharing,
                             4, "24.6"));
 }
 
-// §24.6 shares the whole name space of the package, so a variable declared
-// beside the anonymous program collides with the function the program declares
-// as a second subroutine would. Only a task, a function, a class and a
-// covergroup were compared on either side, so the variable passed unreported.
 TEST(AnonymousProgramNameSpaceSharing,
      AnonymousProgramFunctionAndPackageVariableSameNameIsError) {
   ElabFixture f;
@@ -186,8 +164,6 @@ TEST(AnonymousProgramNameSpaceSharing,
                             3, "24.6"));
 }
 
-// The compilation-unit scope is shared the same way, and a variable declared
-// there after the anonymous program's task is the declaration reported.
 TEST(AnonymousProgramNameSpaceSharing,
      AnonymousProgramTaskAndCompilationUnitVariableSameNameIsError) {
   ElabFixture f;
@@ -202,9 +178,6 @@ TEST(AnonymousProgramNameSpaceSharing,
                             2, "24.6"));
 }
 
-// §24.6: a covergroup is likewise an anonymous_program_item, and likewise
-// shares the name space. It reaches the check by a different item kind from the
-// class above, so neither case stands for the other.
 TEST(AnonymousProgramNameSpaceSharing,
      PackageCovergroupAndAnonymousProgramCovergroupSameNameIsError) {
   ElabFixture f;
@@ -223,10 +196,6 @@ TEST(AnonymousProgramNameSpaceSharing,
                             4, "24.6"));
 }
 
-// §24.6: what the shared name space forbids is one name declared twice, not a
-// class declared inside an anonymous program at all. Distinct names elaborate,
-// so the cases above report a collision rather than the anonymous program's
-// class itself.
 TEST(AnonymousProgramNameSpaceSharing,
      DistinctClassNamesAcrossAnonymousProgramAndPackageElaborates) {
   ElabFixture f;
@@ -243,31 +212,9 @@ TEST(AnonymousProgramNameSpaceSharing,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.6 opens by ruling that program definitions and instances together make a
-// space of program-wide data, tasks and functions that only programs can reach,
-// and its NOTE draws the consequence for an anonymous program: nothing outside
-// every program block can refer to an identifier it declares. §24.3 says what a
-// program block is, giving `program_declaration` its syntax and ruling that
-// referencing a program signal from outside every program block is an error;
-// the same paragraph makes a reference from one program scope to another legal,
-// which is what ProgramCallingAnonymousProgramTaskElaborates below stands for.
-//
-// The three rejection cases below share this substring rather than the whole
-// sentence so that one literal serves every position a reference can stand in.
-// The report names no identifier: the walk answers whether an expression
-// mentions any of the anonymous program's names, so it has no name to quote and
-// one wording serves them all. No other report in the tree says a reference is
-// barred from a place, so the fragment is this rule's alone.
 constexpr std::string_view kNotReferencedOutside =
     "cannot be referenced outside";
 
-// §24.6: a design module is not a program, so a task an anonymous program
-// declared at compilation-unit scope is outside its reach. The parser flattens
-// the anonymous program's items into CompilationUnit::cu_items (§24.6 declares
-// no new scope), so the call resolves like any call to a compilation-unit task
-// -- CompilationUnitElaboration.ForwardReferenceToCuScopeTaskAccepted in
-// test_elaborator_subclause_03_12_01.cpp is the same shape with no anonymous
-// program around the declaration, and it elaborates.
 TEST(AnonymousProgramWideSpace, ModuleCallingAnonymousProgramTaskIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -282,11 +229,6 @@ TEST(AnonymousProgramWideSpace, ModuleCallingAnonymousProgramTaskIsError) {
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 5, "24.6"));
 }
 
-// §24.6: the space is reachable by programs alone, not accessible to nobody. A
-// named program is a program block, so the identical call made from inside one
-// is legal and elaborates. Without this case, refusing the call from every
-// scope satisfies the case above while leaving the anonymous program with no
-// caller at all, which is the opposite of what the clause is for.
 TEST(AnonymousProgramWideSpace, ProgramCallingAnonymousProgramTaskElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -303,13 +245,6 @@ TEST(AnonymousProgramWideSpace, ProgramCallingAnonymousProgramTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.6: an anonymous program may stand inside a package (Clause 26) or a
-// compilation-unit scope (§3.12.1), and the space is one space however the item
-// was declared. A package's items are held in PackageDecl::items rather than in
-// CompilationUnit::cu_items and reach a module through the import (§26.3), so
-// this is a second route into the module and not the first one written twice: a
-// check placed only where the compilation-unit names are gathered leaves this
-// call unreported.
 TEST(AnonymousProgramWideSpace,
      ModuleCallingImportedAnonymousProgramTaskIsError) {
   ElabFixture f;
@@ -328,25 +263,6 @@ TEST(AnonymousProgramWideSpace,
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 8, "24.6"));
 }
 
-// §24.6's NOTE bars every identifier an anonymous program declares from being
-// referenced outside a program block, and puts no kind on the identifier.
-// A.1.11 gives `anonymous_program_item ::= task_declaration |
-// function_declaration | class_declaration | interface_class_declaration |
-// covergroup_declaration | class_constructor_declaration | ;`, so a class is
-// one of the things an anonymous program declares, and §24.3 counts class
-// definitions among a program block's contents. The subject the clause's first
-// sentence enumerates -- data, tasks and functions -- is therefore not the
-// limit of what the NOTE covers, and a rule written over subroutine calls alone
-// leaves the type name reachable.
-//
-// The reference here is the module's own variable declaration naming the class
-// as its type, which the elaborator already recognizes as a class reference:
-// Elaborator::ValidateVarDeclTypes in src/elaborator/elaborator_decls_var.cpp
-// selects a declaration whose DataType::type_name is in class_names_, and
-// ClassifyCuScopeItem in src/elaborator/elaborator_resolve.cpp is what put the
-// anonymous program's class into class_names_. The declaration carries no
-// initializer, so the report stands on naming the type and not on calling
-// new().
 TEST(AnonymousProgramWideSpace,
      ModuleDeclaringAnonymousProgramClassHandleIsError) {
   ElabFixture f;
@@ -362,16 +278,6 @@ TEST(AnonymousProgramWideSpace,
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, 5, "24.6"));
 }
 
-// §24.6's note bars a reference to an anonymous program's identifier from
-// outside every program block, and the clause names the two scopes an anonymous
-// program stands in without telling them apart: a package (Clause 26) and a
-// compilation-unit scope (§3.12.1). Neither a package nor the compilation unit
-// is a program block, so an item of either that is not itself in an anonymous
-// program is a place the note reaches, exactly as a module's item is. Every
-// case above writes the reference inside a module or a program, whose items are
-// in ModuleDecl::items; a package's items are in PackageDecl::items and the
-// compilation unit's in CompilationUnit::cu_items, and a check reading module
-// declarations reaches neither list.
 void ExpectProgramWideSpaceRefRejected(const std::string& src, uint32_t line) {
   ElabFixture f;
   ElaborateSrc(src, f, "top");
@@ -379,13 +285,6 @@ void ExpectProgramWideSpaceRefRejected(const std::string& src, uint32_t line) {
       ReportedError(f.diag.Diagnostics(), kNotReferencedOutside, line, "24.6"));
 }
 
-// §24.6: the reference stands in a package task's body, and the task is a
-// package item outside the anonymous program, so the call is made outside every
-// program block. §26.2 admits no procedural block in a package -- that is what
-// "process is not allowed in a package" reports -- so a subroutine body is the
-// only place a statement stands there, and a check reading a package item's
-// declaration positions alone never sees this call. The report stands at the
-// statement rather than at the task, on line 6.
 TEST(AnonymousProgramWideSpace, PackageTaskCallingAnonymousProgramTaskIsError) {
   ExpectProgramWideSpaceRefRejected(
       "package pkg;\n"
@@ -400,13 +299,6 @@ TEST(AnonymousProgramWideSpace, PackageTaskCallingAnonymousProgramTaskIsError) {
       6);
 }
 
-// §24.6: the reference is the package variable's own type name, naming the
-// class the package's anonymous program declared. A.1.11 admits a class into an
-// anonymous program and §24.3 counts class definitions among a program block's
-// contents, so the type name is an identifier the note covers.
-// ModuleDeclaringAnonymousProgramClassHandleIsError above is the same
-// declaration written in a module, and the report stands at the declaration
-// rather than inside a statement.
 TEST(AnonymousProgramWideSpace,
      PackageItemDeclaringAnonymousProgramClassHandleIsError) {
   ExpectProgramWideSpaceRefRejected(
@@ -420,11 +312,6 @@ TEST(AnonymousProgramWideSpace,
       5);
 }
 
-// §24.6 names the compilation-unit scope beside the package, and §3.12.1 is
-// what it cites for it. The reference here is a compilation-unit variable's
-// initializer calling the function the anonymous program declared, which is a
-// third position and a second scope, so neither this case nor the two above
-// stands for another.
 TEST(AnonymousProgramWideSpace,
      CompilationUnitItemCallingAnonymousProgramFunctionIsError) {
   ExpectProgramWideSpaceRefRejected(
@@ -436,14 +323,6 @@ TEST(AnonymousProgramWideSpace,
       4);
 }
 
-// §24.6 makes the program-wide space reachable by programs alone, and an
-// anonymous program is a program block: the items it declares are that space's
-// own declarations. So one anonymous program naming another's task is not a
-// reference from outside every program block, and it shall elaborate. This is
-// what keeps the space usable, because the package and compilation-unit items
-// the three cases above are reported from are the same two lists an anonymous
-// program's own items stand in, and a walk that did not pass over them would
-// leave the anonymous program's task with no caller at all.
 TEST(AnonymousProgramWideSpace,
      AnonymousProgramCallingAnotherAnonymousProgramTaskElaborates) {
   ElabFixture f;
@@ -462,14 +341,6 @@ TEST(AnonymousProgramWideSpace,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §24.6 shares an anonymous program's name space with the surrounding package
-// or compilation-unit scope and with nothing below it, so a block-local `t` is
-// a different thing from the anonymous program's `t` and a reference to it is
-// not the reference the note bars. The rule matched identifier text with
-// nothing resolving the reference first, so this legal source was refused.
-//
-// The local carries the anonymous program's name deliberately: one named
-// anything else cannot fail.
 TEST(AnonymousProgramWideSpace, ABlockLocalOfTheSameNameIsNotReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -487,9 +358,6 @@ TEST(AnonymousProgramWideSpace, ABlockLocalOfTheSameNameIsNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A formal argument shadows the same way and reaches the body by a route no
-// statement walk sees, so it is erased where the subroutine is read rather than
-// where its statements are.
 TEST(AnonymousProgramWideSpace, AFormalArgumentOfTheSameNameIsNotReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -507,10 +375,6 @@ TEST(AnonymousProgramWideSpace, AFormalArgumentOfTheSameNameIsNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The true positive beside the two above: the same module task calling the
-// anonymous program's `t`, with nothing of that name declared in between. A fix
-// that silenced the rule everywhere would pass both cases above and fail this
-// one, which is what makes them a set rather than two acceptances.
 TEST(AnonymousProgramWideSpace,
      ACallWithNoShadowingDeclarationIsStillReported) {
   ElabFixture f;
@@ -531,15 +395,6 @@ TEST(AnonymousProgramWideSpace,
                             6, "24.6"));
 }
 
-// §24.6's note bars a reference to an anonymous program's declaration from
-// outside every program block and names no position such a reference may not
-// stand in. A class method is outside every program block, and the walk read an
-// item's own statements and never the methods of a class it declares -- so
-// putting the call in a class rather than beside it was enough to get past the
-// rule, and a class is where a verification environment puts its code.
-//
-// The same call written in the module's own initial block is reported already,
-// so only the placement can fail this.
 TEST(AnonymousProgramWideSpace, ACallFromAClassMethodInAModuleIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -561,10 +416,6 @@ TEST(AnonymousProgramWideSpace, ACallFromAClassMethodInAModuleIsReported) {
                             7, "24.6"));
 }
 
-// A class written at compilation-unit scope stands in
-// CompilationUnit::classes rather than in cu_items, so it reaches the walk by a
-// route of its own and is missed on its own: the case above would pass over a
-// fix that read only the classes an item list carries.
 TEST(AnonymousProgramWideSpace,
      ACallFromACompilationUnitClassMethodIsReported) {
   ElabFixture f;
@@ -586,10 +437,6 @@ TEST(AnonymousProgramWideSpace,
                             6, "24.6"));
 }
 
-// The class arm selects the reference and not the name: a method declaring `t`
-// of its own is reading its own, and §24.6 shares the anonymous program's name
-// space with nothing below the enclosing scope. Without this the two cases
-// above are satisfied by an arm that reports every mention.
 TEST(AnonymousProgramWideSpace, AClassMethodLocalOfTheSameNameIsNotReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -609,12 +456,6 @@ TEST(AnonymousProgramWideSpace, AClassMethodLocalOfTheSameNameIsNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A class nested in a class reaches the class arm by a member of its own:
-// ClassMember carries it in nested_class, while the item walk the arm sends a
-// method through reads the class_decl of that method. So the two cases above
-// would pass over a fix that read only the class a method declares, and §23.9
-// puts a method of the nested class outside every program block exactly as a
-// method of the outer class is.
 TEST(AnonymousProgramWideSpace, ACallFromANestedClassMethodIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -638,9 +479,6 @@ TEST(AnonymousProgramWideSpace, ACallFromANestedClassMethodIsReported) {
                             8, "24.6"));
 }
 
-// The acceptance beside it, for the reason AClassMethodLocalOfTheSameNameIsNot
-// Reported above gives: the arm selects the reference and not the name, and a
-// nested method declaring `t` of its own is reading its own.
 TEST(AnonymousProgramWideSpace,
      ANestedClassMethodLocalOfTheSameNameIsNotReported) {
   ElabFixture f;

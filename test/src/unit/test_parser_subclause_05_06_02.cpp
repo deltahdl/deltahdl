@@ -22,16 +22,10 @@ TEST(LexicalConventionParsing, KeywordsAreReserved) {
 
 TEST(LexicalConventionParsing, UppercaseNotKeyword) {
   auto r = Parse("MODULE m; endmodule");
-  // §3.12.1 lists what may open a compilation unit, and Parser::ParseTopLevel
-  // files the report under it; `MODULE` is an ordinary identifier there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected top-level declaration", 1, "3.12.1"));
 }
 
-// 5.6.2: putting a backslash in front of a keyword strips its reserved
-// meaning, so \begin does not open a sequential block. The
-// §5.6.1 file carries the complementary rule that it is instead treated as a
-// user-defined identifier.
 TEST(LexicalConventionParsing, EscapedKeywordNotInterpretedAsKeyword) {
   EXPECT_TRUE(ParseOk("module m; logic \\begin ; endmodule"));
 }

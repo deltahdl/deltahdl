@@ -414,8 +414,6 @@ TEST(RandsequenceSyntaxParsing, ProductionItemEmptyArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.6.12 writes at least one production, so a body with none is reported; the
-// statement is still built, with no production in it.
 TEST(RandsequenceSyntaxParsing, EmptyRandsequenceBody) {
   auto r = Parse(
       "module m;\n"
@@ -442,8 +440,6 @@ TEST(RandsequenceSyntaxParsing, MissingEndsequenceErrors) {
       "      main : { ; };\n"
       "  end\n"
       "endmodule\n");
-  // Without endsequence the enclosing end reaches the production list, where
-  // §18.17 reports it as a missing production identifier.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got 'end'", 5, "18.17"));
 }
@@ -469,7 +465,6 @@ TEST(RandsequenceSyntaxParsing, MissingSemicolonInProductionErrors) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
-  // The endsequence keyword stands where §18.17 requires the production's ';'.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endsequence'", 5, "18.17"));
 }
@@ -484,17 +479,10 @@ TEST(RandsequenceSyntaxParsing, RandJoinSingleItemErrors) {
       "    endsequence\n"
       "  end\n"
       "endmodule\n");
-  // rand join takes two production items, so the ';' after the first stands
-  // where §18.17 requires the second one's identifier.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ';'", 4, "18.17"));
 }
 
-// rs_code_block ::= { { data_declaration } { statement_or_null } }, so of
-// A.2.8's block item declarations a code block takes the data_declarations
-// alone: a localparam, a parameter or a let is reported, in a production's
-// code block and in a weight's, while a variable, a typedef and a variable of
-// the typedef's type are not.
 TEST(RandsequenceSyntaxParsing, CodeBlockDeclaresDataOnly) {
   auto r = Parse(
       "module m;\n"
@@ -525,9 +513,6 @@ TEST(RandsequenceSyntaxParsing, CodeBlockDeclaresDataOnly) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 13, "A.6.12"));
 }
 
-// A code block's data_declarations all come before its first
-// statement_or_null, so a declaration after a statement, or after a null
-// statement, is reported, and the one opening a code block is not.
 TEST(RandsequenceSyntaxParsing, CodeBlockDeclarationAfterAStatementIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -557,9 +542,6 @@ TEST(RandsequenceSyntaxParsing, CodeBlockDeclarationAfterAStatementIsReported) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 5, "A.6.12"));
 }
 
-// A.6.12's rs_weight_specification written without parentheses: an integral
-// number or a ps_identifier, an identifier alone or under one package scope or
-// $unit's. Any expression goes in parentheses.
 TEST(RandsequenceSyntaxParsing, WeightFormsWithoutParenthesesAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -575,9 +557,6 @@ TEST(RandsequenceSyntaxParsing, WeightFormsWithoutParenthesesAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Every other primary after a bare `:=` is reported where it starts: a real or
-// unbased literal, a select, a call, a hierarchical name, a name under two
-// scopes or under $unit's and a package's, and the `$` and `null` primaries.
 TEST(RandsequenceSyntaxParsing, OtherWeightFormsWithoutParenthesesRejected) {
   auto r = Parse(
       "module m;\n"
@@ -608,7 +587,6 @@ TEST(RandsequenceSyntaxParsing, OtherWeightFormsWithoutParenthesesRejected) {
   }
 }
 
-// A.6.12 writes at least one rs_production before `endsequence`.
 TEST(RandsequenceSyntaxParsing, RandsequenceWithNoProductionRejected) {
   auto r = Parse(
       "module m;\n"
@@ -620,8 +598,6 @@ TEST(RandsequenceSyntaxParsing, RandsequenceWithNoProductionRejected) {
       "A.6.12"));
 }
 
-// A.6.12 writes at least one rs_case_item before a case production's
-// `endcase`.
 TEST(RandsequenceSyntaxParsing, CaseProductionWithNoItemRejected) {
   auto r = Parse(
       "module m;\n"
@@ -635,8 +611,6 @@ TEST(RandsequenceSyntaxParsing, CaseProductionWithNoItemRejected) {
       r.diags, "a case production holds at least one item", 5, "A.6.12"));
 }
 
-// A.6.12's parentheses after a production's name enclose a tf_port_list, not
-// an optional one, so a production with no formal is written without them.
 TEST(RandsequenceSyntaxParsing, ProductionWithEmptyParenthesesRejected) {
   auto r = Parse(
       "module m;\n"
@@ -653,9 +627,6 @@ TEST(RandsequenceSyntaxParsing, ProductionWithEmptyParenthesesRejected) {
   EXPECT_FALSE(ReportedError(r.diags, msg, 5, "A.6.12"));
 }
 
-// A.6.12's rs_production_item takes A.8.4's list_of_arguments: positional
-// arguments, any of them left empty, then named ones, each name kept with its
-// argument and an empty `.name()` kept as a null one.
 TEST(RandsequenceSyntaxParsing, ProductionItemArgumentsByNameAndOmitted) {
   auto r = Parse(
       "module m;\n"
@@ -694,8 +665,6 @@ TEST(RandsequenceSyntaxParsing, ProductionItemArgumentsByNameAndOmitted) {
   EXPECT_EQ(mixed.arg_names[0], "b");
 }
 
-// `default` stands in a constructor's argument list alone (§8.17), and is no
-// argument of a production.
 TEST(RandsequenceSyntaxParsing, ProductionItemDefaultArgumentRejected) {
   auto r = Parse(
       "module m;\n"

@@ -4,20 +4,10 @@
 
 #include "fixture_simulator.h"
 
-// Annex D.3: $getpattern exists to apply stimulus patterns quickly to many
-// scalar inputs at once, reading a pattern from a memory element and driving
-// it, through the continuous assignment it stands in, onto the concatenation of
-// scalar nets. D.3's example steps an index through the memory, and each change
-// of the index puts the next pattern on the circuit. The function was parsed
-// and evaluated by nothing, so the nets took a zero for every pattern.
-
 using namespace delta;
 
 namespace {
 
-// D.3's example reduced to three inputs and two patterns loaded by
-// assignment: each change of the index drives the word it names onto the
-// nets, the leftmost net taking the word's first bit.
 TEST(GetpatternSim, EachIndexChangeDrivesThePatternItNames) {
   SimFixture f;
   std::string out = RunCapture(

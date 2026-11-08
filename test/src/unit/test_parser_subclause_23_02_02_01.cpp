@@ -185,9 +185,6 @@ TEST(NonAnsiStylePortDeclarations, ConcatenationPortExpression) {
   EXPECT_EQ(mod->ports[0].port_expr->kind, ExprKind::kConcatenation);
 }
 
-// §23.2.2.1: a port reference may be an escaped identifier as well as a simple
-// identifier. The escaped name (stored without its leading backslash) carries
-// through to the port and matches its body direction declaration.
 TEST(NonAnsiStylePortDeclarations, EscapedIdentifierPortReference) {
   auto r = Parse(
       "module m(\\a$b );\n"
@@ -201,9 +198,6 @@ TEST(NonAnsiStylePortDeclarations, EscapedIdentifierPortReference) {
   EXPECT_EQ(mod->ports[0].direction, Direction::kInput);
 }
 
-// §23.2.2.1: the concatenation port_expression form admits bit-selects and
-// part-selects of internal vectors as its elements, not only plain names, the
-// concatenation taking any of the other forms.
 TEST(NonAnsiStylePortDeclarations, ConcatenationOfSelectsPortExpression) {
   auto r = Parse("module m({a[3:0], b[1]}); endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -339,8 +333,6 @@ TEST(NonAnsiStylePortDeclarations, SignednessInheritanceParses) {
               "endmodule\n"));
 }
 
-// §23.2.2.1: a port name shall not be given a direction declaration more than
-// once in the module body.
 TEST(NonAnsiStylePortDeclarations, DuplicatePortDirectionDeclarationIsError) {
   auto r = Parse(
       "module m(a);\n"
@@ -351,8 +343,6 @@ TEST(NonAnsiStylePortDeclarations, DuplicatePortDirectionDeclarationIsError) {
                             "23.2.2.1"));
 }
 
-// §23.2.2.1: redeclaring a port with a second, conflicting direction is also
-// rejected.
 TEST(NonAnsiStylePortDeclarations, ConflictingPortDirectionDeclarationIsError) {
   auto r = Parse(
       "module m(a);\n"
@@ -363,14 +353,6 @@ TEST(NonAnsiStylePortDeclarations, ConflictingPortDirectionDeclarationIsError) {
                             "23.2.2.1"));
 }
 
-// Covers ParserPortHelpers::ParseNonAnsiPortSelect in
-// src/parser/parser_port.cpp, which builds both the ExprKind::kIdentifier
-// naming the port and the ExprKind::kSelect wrapping it. Neither carried a
-// range.start before this commit, and src/parser/parser_port.cpp assigned none
-// at any site, so a report standing at either printed "<unknown location>"
-// instead of a file, line and column. §23.2.2.1 writes the port expression as
-// `port_identifier [ constant_range_expression ]`, so both nodes begin at the
-// port name: `a`, at column 10 of line 1.
 TEST(NonAnsiStylePortDeclarations, PortSelectStartsAtItsPortName) {
   auto r = Parse("module m(a[3:0]);\nendmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -388,9 +370,6 @@ TEST(NonAnsiStylePortDeclarations, PortSelectStartsAtItsPortName) {
   EXPECT_EQ(sel->base->range.start.column, 10u);
 }
 
-// §23.2.2.1 (printed pages 731 and 732): an input or output port declaration
-// whose data type is implicit holds no net or variable type, and such a port is
-// a net until the body declares it again; `output reg` holds a variable type.
 TEST(NonAnsiStylePortDeclarations, AnImplicitlyTypedInputOrOutputIsANet) {
   auto r = Parse(
       "module m(a, b, c);\n"
@@ -406,9 +385,6 @@ TEST(NonAnsiStylePortDeclarations, AnImplicitlyTypedInputOrOutputIsANet) {
   EXPECT_FALSE(mod->ports[2].data_type.is_net);
 }
 
-// Syntax 23-3 (§23.2.2.1, printed page 731) gives an input, output and ref
-// declaration a variable_port_type, which A.2.2.1 lets open with `var`; such a
-// port holds a variable type and is no net, an implicit one after `var` too.
 TEST(NonAnsiStylePortDeclarations, AVarDeclaredPortIsAVariable) {
   auto r = Parse(
       "module m(a, b, c);\n"

@@ -16,9 +16,6 @@ void Append(std::vector<T>& to, const std::vector<T>& from) {
   to.insert(to.end(), from.begin(), from.end());
 }
 
-// The lists of `from` that §3.12.1 makes visible in every unit, and the
-// configurations and library declarations that bind them (§33), appended to
-// `to`'s.
 void AppendDesignElements(const CompilationUnit& from, CompilationUnit& to) {
   Append(to.modules, from.modules);
   Append(to.packages, from.packages);
@@ -30,8 +27,6 @@ void AppendDesignElements(const CompilationUnit& from, CompilationUnit& to) {
   Append(to.lib_includes, from.lib_includes);
 }
 
-// The lists of `from` that belong to its own compilation-unit scope, appended
-// to `to`'s.
 void AppendUnitScope(const CompilationUnit& from, CompilationUnit& to) {
   Append(to.cu_items, from.cu_items);
   Append(to.classes, from.classes);
@@ -45,7 +40,6 @@ void AppendUnitScope(const CompilationUnit& from, CompilationUnit& to) {
                                  from.dotted_escaped_names.end());
 }
 
-// `unit` with its design elements replaced by `pooled`'s.
 CompilationUnit* ViewOver(const CompilationUnit& unit,
                           const CompilationUnit& pooled, Arena& arena) {
   auto* view = arena.Create<CompilationUnit>(unit);
@@ -76,8 +70,6 @@ CompilationUnitSet PoolCompilationUnits(
       for (const auto* decl : *decls) set.owner[decl] = k;
     }
   }
-  // The first unit's directives and time scale stand for the merged view,
-  // which no design element is elaborated under.
   set.merged = ViewOver(*units.front(), pooled, arena);
   for (size_t k = 1; k < units.size(); ++k) {
     AppendUnitScope(*units[k], *set.merged);

@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §25.5.5 / Syntax 25-2: modport_clocking_declaration ::= clocking
-// clocking_identifier. A clocking item inside a modport parses to a modport
-// port flagged as clocking and carrying the clocking block's name.
 TEST(ClockingModportParsing, ModportClockingDecl) {
   auto r = Parse(
       "interface ifc;\n"
@@ -25,9 +22,6 @@ TEST(ClockingModportParsing, ModportClockingDecl) {
   EXPECT_EQ(mp->ports[0].name, "cb");
 }
 
-// §25.5.5 / Syntax 25-2: modport_ports_declaration ::= { attribute_instance }
-// modport_clocking_declaration. An attribute instance may prefix the clocking
-// alternative and the declaration still parses.
 TEST(ClockingModportParsing, AttrOnClockingPort) {
   EXPECT_TRUE(
       ParseOk("interface bus(input logic clk);\n"
@@ -37,10 +31,6 @@ TEST(ClockingModportParsing, AttrOnClockingPort) {
               "endinterface\n"));
 }
 
-// §25.5.5 / Syntax 25-2: the clocking alternative is one of the
-// modport_ports_declaration choices, so a clocking item may sit alongside an
-// ordinary simple port in the same modport. Both entries parse, and only the
-// second is flagged as clocking.
 TEST(ClockingModportParsing, ClockingMixedWithSimplePort) {
   auto r = Parse(
       "interface ifc(input logic clk);\n"
@@ -58,9 +48,6 @@ TEST(ClockingModportParsing, ClockingMixedWithSimplePort) {
   EXPECT_EQ(mp->ports[1].name, "cb");
 }
 
-// §25.5.5 / Syntax 25-2 (negative): modport_clocking_declaration ::= clocking
-// clocking_identifier requires an identifier operand after `clocking`. Omitting
-// it leaves the production incomplete and must be a parse error.
 TEST(ClockingModportParsing, ClockingWithoutIdentifierRejected) {
   auto r = Parse(
       "interface ifc(input logic clk);\n"

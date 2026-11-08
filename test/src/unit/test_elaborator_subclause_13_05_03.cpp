@@ -23,10 +23,6 @@ TEST(DefaultArgumentElaboration, MissingArgNoDefaultError) {
                             "13.5.3"));
 }
 
-// §13.5.3: an argument with no default shall be given, or the compiler issues
-// an error. The report that does so names the subclause stating the rule, so a
-// caller learns which rule was enforced without matching the wording of the
-// message.
 TEST(DefaultArgumentElaboration, MissingArgumentWithNoDefaultNames13_5_3) {
   ElabFixture f;
   ElaborateSrc(
@@ -142,9 +138,6 @@ TEST(DefaultArgumentElaboration, DefaultRefsUndeclaredNameError) {
                             "13.5.3"));
 }
 
-// §11.9: the member a tagged union expression names is a member of the union
-// type its context gives it, no name of any scope, so a default value of
-// `tagged Invalid` references nothing §13.5.3 has to resolve (#6353).
 TEST(DefaultArgumentElaboration, TaggedMemberNameInDefaultIsNoName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -157,8 +150,6 @@ TEST(DefaultArgumentElaboration, TaggedMemberNameInDefaultIsNoName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The value a tagged expression carries is an expression of the default, and
-// a name in it is still resolved in the declaring scope.
 TEST(DefaultArgumentElaboration, TaggedMemberValueInDefaultIsResolved) {
   ElabFixture f;
   ElaborateSrc(

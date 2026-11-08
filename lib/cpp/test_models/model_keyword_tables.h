@@ -4,17 +4,6 @@
 
 using namespace delta;
 
-// The reserved-keyword tables of §22.14, transcribed once. A version_specifier
-// given to `begin_keywords names one of these tables, and each table is defined
-// as what it adds to the ones it includes, so a test for a later version reads
-// several of them together.
-//
-// Every §22.14 test file used to carry its own transcription of the tables it
-// needed. Holding them once means two tests cannot disagree about what the
-// standard reserves.
-
-// Table 22-1 -- the reserved keywords of IEEE 1364-1995, the oldest
-// version_specifier `begin_keywords accepts.
 inline constexpr const char* kVerilog1995Keywords[] = {
     "always",    "and",          "assign",     "begin",     "buf",
     "bufif0",    "bufif1",       "case",       "casex",     "casez",
@@ -39,7 +28,6 @@ inline constexpr const char* kVerilog1995Keywords[] = {
     "xnor",      "xor",
 };
 
-// Table 22-2 -- what IEEE 1364-2001 reserves over Table 22-1.
 inline constexpr const char* kVerilog2001AddedKeywords[] = {
     "automatic",
     "cell",
@@ -64,12 +52,10 @@ inline constexpr const char* kVerilog2001AddedKeywords[] = {
     "use",
 };
 
-// Table 22-3 -- what IEEE 1364-2005 reserves over IEEE 1364-2001.
 inline constexpr const char* kVerilog2005AddedKeywords[] = {
     "uwire",
 };
 
-// Table 22-4 -- what IEEE 1800-2005 reserves over IEEE 1364-2005.
 inline constexpr const char* kSystemVerilog2005AddedKeywords[] = {
     "alias",         "always_comb",  "always_ff",    "always_latch",
     "assert",        "assume",       "before",       "bind",
@@ -98,8 +84,6 @@ inline constexpr const char* kSystemVerilog2005AddedKeywords[] = {
     "within",
 };
 
-// Table 22-5 -- what IEEE 1800-2009 reserves over the four lists it
-// includes.
 inline constexpr const char* kSystemVerilog2009AddedKeywords[] = {
     "accept_on",      "checker",        "endchecker",   "eventually",
     "global",         "implies",        "let",          "nexttime",
@@ -109,19 +93,14 @@ inline constexpr const char* kSystemVerilog2009AddedKeywords[] = {
     "until_with",     "untyped",        "weak",
 };
 
-// Table 22-6 -- what IEEE 1800-2012 and later reserve over Table 22-5.
 inline constexpr const char* kSystemVerilog2012AddedKeywords[] = {
     "implements", "interconnect", "nettype", "soft"};
 
-// A reserved word paired with the token kind the lexer folds it to once the
-// version reserving it is in force.
 struct VersionedWord {
   const char* text;
   TokenKind kind;
 };
 
-// Table 22-2 -- what IEEE 1364-2001 reserves over Table 22-1. With the keyword
-// each entry names.
 inline constexpr VersionedWord kVerilog2001AddedKeywordTokens[] = {
     {"automatic", TokenKind::kKwAutomatic},
     {"cell", TokenKind::kKwCell},
@@ -146,8 +125,6 @@ inline constexpr VersionedWord kVerilog2001AddedKeywordTokens[] = {
     {"use", TokenKind::kKwUse},
 };
 
-// Table 22-4 -- what IEEE 1800-2005 reserves over IEEE 1364-2005. With the
-// keyword each entry names.
 inline constexpr VersionedWord kSystemVerilog2005AddedKeywordTokens[] = {
     {"alias", TokenKind::kKwAlias},
     {"always_comb", TokenKind::kKwAlwaysComb},
@@ -248,8 +225,6 @@ inline constexpr VersionedWord kSystemVerilog2005AddedKeywordTokens[] = {
     {"within", TokenKind::kKwWithin},
 };
 
-// Table 22-5 -- what IEEE 1800-2009 reserves over the four lists it
-// includes. With the keyword each entry names.
 inline constexpr VersionedWord kSystemVerilog2009AddedKeywordTokens[] = {
     {"accept_on", TokenKind::kKwAcceptOn},
     {"checker", TokenKind::kKwChecker},
@@ -276,8 +251,6 @@ inline constexpr VersionedWord kSystemVerilog2009AddedKeywordTokens[] = {
     {"weak", TokenKind::kKwWeak},
 };
 
-// Table 22-6 -- what IEEE 1800-2012 and later reserve over Table 22-5. With the
-// keyword each entry names.
 inline constexpr VersionedWord kSystemVerilog2012AddedKeywordTokens[] = {
     {"implements", TokenKind::kKwImplements},
     {"interconnect", TokenKind::kKwInterconnect},
@@ -285,11 +258,6 @@ inline constexpr VersionedWord kSystemVerilog2012AddedKeywordTokens[] = {
     {"soft", TokenKind::kKwSoft},
 };
 
-// The ten of Table 22-2 that the configuration-free companion list drops. Two
-// version_specifiers were published for the same Verilog standard --
-// "1364-2001" and "1364-2001-noconfig" -- and these ten words are the whole of
-// what the two disagree about, so they are what settles which of the pair a
-// later specifier's "all previous versions" brings in.
 inline constexpr const char* kConfigurationWords[] = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",

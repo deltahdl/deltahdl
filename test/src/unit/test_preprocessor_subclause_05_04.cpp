@@ -112,9 +112,6 @@ TEST(CommentPreprocessor, CommentAfterMacroDefinition) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §5.4: a /* inside a one-line comment opens nothing, on a `define line as
-// anywhere. Read as an open block comment, it joined every line after it into
-// the macro's text, and the module that follows vanished with them.
 TEST(CommentPreprocessor, BlockOpenerInALineCommentOnADefineJoinsNoLine) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -125,10 +122,6 @@ TEST(CommentPreprocessor, BlockOpenerInALineCommentOnADefineJoinsNoLine) {
   EXPECT_NE(out.find("module t; endmodule"), std::string::npos);
 }
 
-// §5.4 with §5.9: a `/*` inside a string literal opens no block comment, so the
-// declaration after the string on the same line reaches the output, and the
-// `*/` in the one-line comment that ends the line closes nothing. The same
-// holds for the string a macro's text holds and for a triple-quoted string.
 TEST(CommentPreprocessor, BlockOpenerInsideAStringOpensNoComment) {
   for (const char* line : {"string s = \"/*\"; int x = 1; // */\n",
                            "string s = `M; int x = 1; // */\n",
@@ -142,8 +135,6 @@ TEST(CommentPreprocessor, BlockOpenerInsideAStringOpensNoComment) {
   }
 }
 
-// The string keeps the comment markers as its characters: the text written
-// between the quotes reaches the output whole.
 TEST(CommentPreprocessor, CommentMarkersInsideAStringStayInIt) {
   PreprocFixture f;
   auto out = Preprocess(

@@ -337,8 +337,6 @@ TEST(PatternParsing, PatternTaggedMissingMember) {
       "  end\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §7.3.2 owns the tagged union member name the parser demands here; A.6.7.1
-  // only states the pattern production that admits `tagged`.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ':'", 4, "7.3.2"));
 }
@@ -381,7 +379,6 @@ TEST(AssignmentPatternParsing, UnclosedBrace) {
       "  int a[2];\n"
       "  initial a = '{1, 2;\n"
       "endmodule\n");
-  // §10.9 owns the assignment pattern braces; A.6.7.1 only states its BNF.
   EXPECT_TRUE(ReportedError(r.diags, "expected '}', got ';'", 3, "10.9"));
 }
 
@@ -400,12 +397,6 @@ TEST(AssignmentPatternLvalueParsing, VariableLvalueInProceduralAssign) {
   EXPECT_EQ(stmt->lhs->kind, ExprKind::kAssignmentPattern);
 }
 
-// §A.6.7.1 constant_assignment_pattern_expression ::=
-// assignment_pattern_expression. The same '{...} assignment pattern must be
-// accepted in a constant-expression position — here a localparam initializer —
-// not only in the procedural and continuous-assign positions the other tests
-// cover. The parser reaches the same ParseAssignmentPattern code, so the
-// resulting node is a plain kAssignmentPattern.
 TEST(ConstantAssignmentPatternExpressionParsing, PositionalInLocalparam) {
   auto r = Parse(
       "module m;\n"
@@ -420,9 +411,6 @@ TEST(ConstantAssignmentPatternExpressionParsing, PositionalInLocalparam) {
   EXPECT_EQ(param->init_expr->elements.size(), 3u);
 }
 
-// §A.6.7.1: a member-keyed structure pattern is equally valid as a
-// constant_assignment_pattern_expression; drive it through a value parameter's
-// default (a constant-expression position) built from a real struct typedef.
 TEST(ConstantAssignmentPatternExpressionParsing, StructureKeyedInParameter) {
   auto r = Parse(
       "module m;\n"
@@ -440,11 +428,6 @@ TEST(ConstantAssignmentPatternExpressionParsing, StructureKeyedInParameter) {
   EXPECT_EQ(param->init_expr->pattern_keys[1]->text, "y");
 }
 
-// §A.6.7.1 assignment_pattern ::= '{ constant_expression { expression {, ...} }
-// }. The replication count is a constant_expression; exercise the parameter
-// form (a §11.2.1 constant other than an integer literal, unlike the
-// Replication test above). The count node is the referenced identifier, not a
-// literal.
 TEST(AssignmentPatternParsing, ReplicationCountFromParameter) {
   auto r = Parse(
       "module m;\n"
@@ -465,12 +448,6 @@ TEST(AssignmentPatternParsing, ReplicationCountFromParameter) {
   EXPECT_EQ(rep->repeat_count->kind, ExprKind::kIdentifier);
 }
 
-// §A.6.7.1 pattern ::= constant_expression. The PatternConstantExpr test covers
-// the integer-literal constant form; a named constant (a localparam) is the
-// other §11.2.1 constant form and reaches the pattern through the identifier
-// branch of primary-expression parsing rather than the literal branch.
-// Complements the literal case so both constant-expression parse paths are
-// observed.
 TEST(PatternParsing, PatternConstantExprParameter) {
   auto r = Parse(
       "module m;\n"
@@ -486,22 +463,15 @@ TEST(PatternParsing, PatternConstantExprParameter) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §A.6.7.1 negative: the keyed assignment-pattern form
-// '{ structure_pattern_key : expression } requires an expression after the
-// colon. Omitting it must be rejected at parse time.
 TEST(AssignmentPatternParsing, KeyedMissingValue) {
   auto r = Parse(
       "module m;\n"
       "  int a;\n"
       "  initial a = '{x:};\n"
       "endmodule\n");
-  // The value after the key is read as an expression, so `}` reaches
-  // ParsePrimaryExpr, whose report is filed under §11.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
-// §A.6.7.1 negative: pattern ::= . variable_identifier requires an identifier
-// after the dot; a dot with no following identifier must be rejected.
 TEST(PatternParsing, PatternDotMissingIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -509,17 +479,10 @@ TEST(PatternParsing, PatternDotMissingIdentifier) {
       "    if (v matches .) x = 1;\n"
       "  end\n"
       "endmodule\n");
-  // Parser::ParseDotPattern reads the pattern and files the missing name under
-  // §12.6, whose Syntax 12-4 writes it.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got ')'", 3, "12.6"));
 }
 
-// A.6.7.1 writes `. variable_identifier` and `.*` as two of a pattern's forms,
-// and a pattern stands after `matches`, as a pattern-matching case item, or
-// inside another pattern. A.8.4's primary has neither form, so each is
-// reported where no pattern is open: as an expression, as an operand, as an
-// assignment pattern's members and as a tagged union expression's member.
 TEST(PatternParsing, APatternFormOutsideAPatternIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -546,10 +509,6 @@ TEST(PatternParsing, APatternFormOutsideAPatternIsReported) {
   EXPECT_EQ(r.diags.size(), 5u);
 }
 
-// After `matches`, and in a pattern-matching case item ahead of its `&&&`
-// filter, a pattern takes both forms at its top, as a tagged union pattern's
-// member, inside parentheses and as a structure pattern's members, keyed or
-// not.
 TEST(PatternParsing, APatternFormInsideAPatternIsAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -572,9 +531,6 @@ TEST(PatternParsing, APatternFormInsideAPatternIsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A replication, `'{ n { ... } }`, is an assignment pattern's form, and its
-// members are expressions (A.6.7.1). So a `.name` or a `.*` in a replication
-// within a pattern stands outside any pattern and is reported.
 TEST(PatternParsing, APatternFormInAReplicationIsReported) {
   auto r = Parse(
       "module m;\n"

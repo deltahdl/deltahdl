@@ -14,9 +14,6 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// The compile-based variants of vpi_iterate, declared as vpi_compatibility.cpp
-// defines them, with the C linkage Annex K.2 gives the prototype Annex L.2
-// renames to these, so one translation unit can call more than one.
 extern "C" {
 vpiHandle vpi_iterate_1364v1995(PLI_INT32 type, vpiHandle ref);
 vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref);
@@ -25,8 +22,6 @@ vpiHandle vpi_iterate_1800v2012(PLI_INT32 type, vpiHandle ref);
 namespace delta {
 namespace {
 
-// §36.10.2: a startup routine records the tool phase it observes while it runs,
-// and exercises the two routines that are available during the startup phase.
 VpiToolPhase g_phase_during_routine = VpiToolPhase::kFull;
 bool g_routine_systf_registered = false;
 bool g_routine_allowed_cb_registered = false;
@@ -37,19 +32,16 @@ int NoopCb(s_cb_data*) { return 0; }
 void StartupRoutine() {
   g_phase_during_routine = GetGlobalVpiContext().ToolPhase();
 
-  // Both registration routines are available in the startup phase.
   s_vpi_systf_data systf = {};
   systf.type = vpiSysTask;
   systf.tfname = VpiText("$my_task");
   g_routine_systf_registered = vpi_register_systf(&systf) != nullptr;
 
-  // A callback for an early-phase reason is accepted...
   s_cb_data ok = {};
   ok.reason = cbEndOfCompile;
   ok.cb_rtn = NoopCb;
   g_routine_allowed_cb_registered = vpi_register_cb(&ok) != nullptr;
 
-  // ...while a callback for any other reason is refused during startup.
   VpiObject watched;
   watched.type = vpiReg;
   s_cb_data bad = {};
@@ -72,8 +64,6 @@ class VpiFunctionAvailability : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.10.2 (C2): only the two registration routines are available while the
-// vlog_startup_routines[] array executes; every other routine is not.
 TEST_F(VpiFunctionAvailability, OnlyRegistrationRoutinesAvailableInStartup) {
   EXPECT_TRUE(VpiRoutineAvailableInStartup(VpiRoutine::kRegisterSystf));
   EXPECT_TRUE(VpiRoutineAvailableInStartup(VpiRoutine::kRegisterCb));
@@ -82,15 +72,12 @@ TEST_F(VpiFunctionAvailability, OnlyRegistrationRoutinesAvailableInStartup) {
   EXPECT_FALSE(VpiRoutineAvailableInStartup(VpiRoutine::kIterate));
 }
 
-// §36.10.2 (C5/C6): the startup and sizetf phases restrict functionality; only
-// the full phase makes all functionality available.
 TEST_F(VpiFunctionAvailability, OnlyFullPhaseIsUnrestricted) {
   EXPECT_TRUE(VpiPhaseRestrictsFunctionality(VpiToolPhase::kStartup));
   EXPECT_TRUE(VpiPhaseRestrictsFunctionality(VpiToolPhase::kSizetf));
   EXPECT_FALSE(VpiPhaseRestrictsFunctionality(VpiToolPhase::kFull));
 }
 
-// §36.10.2 (C3): exactly the six early-phase reasons are allowed; nothing else.
 TEST_F(VpiFunctionAvailability, StartupCallbackReasonSetIsTheSixReasons) {
   EXPECT_TRUE(VpiStartupCallbackReasonAllowed(cbEndOfCompile));
   EXPECT_TRUE(VpiStartupCallbackReasonAllowed(cbStartOfSimulation));
@@ -105,8 +92,6 @@ TEST_F(VpiFunctionAvailability, StartupCallbackReasonSetIsTheSixReasons) {
   EXPECT_FALSE(VpiStartupCallbackReasonAllowed(cbAfterDelay));
 }
 
-// §36.10.2 (C3): in the startup phase, vpi_register_cb() accepts every one of
-// the six early-phase reasons.
 TEST_F(VpiFunctionAvailability, RegisterCbAcceptsEarlyReasonsInStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
   const int kReasons[] = {cbEndOfCompile,    cbStartOfSimulation,
@@ -120,8 +105,6 @@ TEST_F(VpiFunctionAvailability, RegisterCbAcceptsEarlyReasonsInStartup) {
   }
 }
 
-// §36.10.2 (C3): a non-early-phase reason is refused during startup, with an
-// error recorded and no callback added.
 TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
   size_t before = vpi_ctx_.RegisteredCallbacks().size();
@@ -137,8 +120,6 @@ TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInStartup) {
   EXPECT_EQ(vpi_ctx_.LastError().level, vpiError);
 }
 
-// §36.10.2 (C5): the sizetf phase permits no access beyond the startup phase,
-// so the same callback-reason restriction is in force.
 TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInSizetfPhase) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kSizetf);
   VpiObject stmt;
@@ -150,8 +131,6 @@ TEST_F(VpiFunctionAvailability, RegisterCbRejectsOtherReasonInSizetfPhase) {
   EXPECT_EQ(vpi_register_cb(&cb), nullptr);
 }
 
-// §36.10.2 (C6): once the full phase is reached, the restriction is lifted and
-// any callback reason is accepted.
 TEST_F(VpiFunctionAvailability, RegisterCbAcceptsAnyReasonInFullPhase) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kFull);
   VpiObject watched;
@@ -163,9 +142,6 @@ TEST_F(VpiFunctionAvailability, RegisterCbAcceptsAnyReasonInFullPhase) {
   EXPECT_NE(vpi_register_cb(&cb), nullptr);
 }
 
-// §36.10.2 (C2/C5/C6 end to end): walking vlog_startup_routines[] runs the
-// routines in the startup phase, where the registration routines work and an
-// illegal callback reason is refused, and restores the full phase afterwards.
 TEST_F(VpiFunctionAvailability, StartupWalkEstablishesAndRestoresPhase) {
   g_phase_during_routine = VpiToolPhase::kFull;
   g_routine_systf_registered = false;
@@ -175,21 +151,13 @@ TEST_F(VpiFunctionAvailability, StartupWalkEstablishesAndRestoresPhase) {
   VlogStartupRoutine routines[] = {&StartupRoutine, nullptr};
   InvokeVlogStartupRoutines(routines);
 
-  // The routine saw the startup phase in force.
   EXPECT_EQ(g_phase_during_routine, VpiToolPhase::kStartup);
-  // The two available routines worked; the disallowed callback reason did not.
   EXPECT_TRUE(g_routine_systf_registered);
   EXPECT_TRUE(g_routine_allowed_cb_registered);
   EXPECT_FALSE(g_routine_illegal_cb_registered);
-  // The phase is restored once the array has been walked.
   EXPECT_EQ(vpi_ctx_.ToolPhase(), VpiToolPhase::kFull);
 }
 
-// §36.10.2 (C2) as the interface applies it, rather than as a predicate answers
-// it: at this point only the two routines it lists may be called, so a call to
-// any other from a startup routine is refused. vpi_iterate is one of the three
-// VpiRoutine names for the bulk of the interface that waits, and a refusal
-// reports through §36.10.1's vpi_chk_error.
 TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
 
@@ -203,9 +171,6 @@ TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringStartup) {
                "before then");
 }
 
-// §36.10.2 (C4): the phase after that is the one in which the sizetf routines
-// run, and it opens no further access. So the sizetf phase refuses what the
-// startup phase refused, rather than opening anything.
 TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringTheSizetfPhase) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kSizetf);
 
@@ -213,11 +178,6 @@ TEST_F(VpiFunctionAvailability, IterateIsRefusedDuringTheSizetfPhase) {
   EXPECT_NE(vpi_chk_error(nullptr), 0);
 }
 
-// §36.10.2 (C6): the cbEndOfCompile routines run once the sizetf routines have,
-// and from then until the tool finishes, everything is available. So the full
-// phase refuses none of the three the model names -- and the two registration
-// routines were never refused in any phase, which is what makes the restriction
-// a restriction on the rest rather than on everything.
 TEST_F(VpiFunctionAvailability, TheFullPhaseRefusesNothingAndStartupSparesTwo) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kFull);
   EXPECT_FALSE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kIterate));
@@ -230,10 +190,6 @@ TEST_F(VpiFunctionAvailability, TheFullPhaseRefusesNothingAndStartupSparesTwo) {
   EXPECT_TRUE(vpi_ctx_.RoutineIsUnavailableNow(VpiRoutine::kIterate));
 }
 
-// §36.10.2 (C2): the value routines wait with the rest. vpi_get_value writes
-// nothing into the caller's structure while it is refused, so the format the
-// caller asked for is still there afterwards and no value has been read over
-// it.
 TEST_F(VpiFunctionAvailability, GetValueIsRefusedDuringStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
 
@@ -246,7 +202,6 @@ TEST_F(VpiFunctionAvailability, GetValueIsRefusedDuringStartup) {
   EXPECT_NE(vpi_chk_error(nullptr), 0);
 }
 
-// §36.10.2 (C2): and so does the write side.
 TEST_F(VpiFunctionAvailability, PutValueIsRefusedDuringStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);
 
@@ -257,9 +212,6 @@ TEST_F(VpiFunctionAvailability, PutValueIsRefusedDuringStartup) {
   EXPECT_NE(vpi_chk_error(nullptr), 0);
 }
 
-// §36.10.2 (C2) with §36.12.2.1: an application compiled against one VPI
-// compatibility mode calls vpi_iterate under that mode's name, and the routine
-// is no more available to it during startup than under its own (#7446).
 TEST_F(VpiFunctionAvailability,
        ACompatibilityModeIterateIsRefusedDuringStartup) {
   vpi_ctx_.SetToolPhase(VpiToolPhase::kStartup);

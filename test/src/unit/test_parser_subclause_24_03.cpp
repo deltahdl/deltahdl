@@ -183,9 +183,6 @@ TEST(ProgramItemsParsing, ProgramTimeunitAfterOtherItemRejected) {
       "  int x;\n"
       "  timeunit 1ns;\n"
       "endprogram\n");
-  // §3.14.2.2 owns the placement rule for a later timeunit, so
-  // ValidateTimeScopeAfterParse in src/parser/parser_items.cpp files the report
-  // there rather than §24.3.
   EXPECT_TRUE(ReportedError(r.diags,
                             "timeunit as a later item requires a matching "
                             "prior declaration in the same time scope",
@@ -436,9 +433,6 @@ TEST(ProgramItemsParsing, CannotContainNestedProgramDecl) {
       r.diags, "program declarations not allowed in programs", 2, "24.3"));
 }
 
-// A.1.2 makes the extern form an alternative of module_declaration, so §24.3
-// keeps it out of a program as well, whichever module_keyword it is written
-// with.
 TEST(ProgramItemsParsing, CannotContainExternModuleDecl) {
   auto r = Parse(
       "program t;\n"
@@ -774,11 +768,6 @@ TEST(ProgramDeclaration, AnonymousProgramAllowsEmptyItemAndCovergroup) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// The rejecting half of the pair below: a program_ansi_header whose package
-// import is followed by neither a parameter_port_list nor a
-// list_of_port_declarations is not a program_declaration. The same
-// requirement stated once for each of the three ansi headers that may carry
-// a header import lives in test_parser_subclause_26_04.cpp.
 TEST(ProgramDeclaration, AnsiHeaderPackageImportWithoutPortListFails) {
   auto r = Parse(
       "package pkg;\n"
@@ -786,8 +775,6 @@ TEST(ProgramDeclaration, AnsiHeaderPackageImportWithoutPortListFails) {
       "endpackage\n"
       "program prg import pkg::*;\n"
       "endprogram\n");
-  // The three ansi headers share one report, which for a program header cites
-  // §24.3, where Syntax 24-1 footnote 1 states the requirement.
   EXPECT_TRUE(ReportedError(r.diags,
                             "package_import_declaration in ansi header must be "
                             "followed by parameter_port_list or "
@@ -821,38 +808,14 @@ TEST(ProgramDeclaration, AnonymousProgramAllowsInterfaceClassDecl) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// ---------------------------------------------------------------------------
-// The admitting half of A.1.11's closed set, which Syntax 24-1 reproduces in
-// this clause labelled as an excerpt from Annex A. Each case below writes one
-// alternative the production does admit and reads the item back, so the check
-// over an anonymous program's body is shown to be a filter over the kinds
-// A.1.11 lists rather than a blanket rejection of what an anonymous program
-// holds. The cases for the kinds it excludes live in
-// test/src/unit/test_parser_annex_a_01_11.cpp.
-//
-// §24.6 admits an anonymous program at compilation-unit scope, which is where
-// these stand: it declares no scope of its own, so its items land in the
-// compilation unit's own item list and that is where each case finds them.
-// ---------------------------------------------------------------------------
-
-// The report an item outside A.1.11's set draws, named here so a case can
-// claim it did not fire over an item inside the set.
 constexpr std::string_view kExcludedItemMessage =
     "an anonymous program may contain only task, function, class, interface "
     "class, covergroup, and class constructor declarations";
 
-// A compilation unit whose only description is an anonymous program holding
-// `item` and nothing else.
 ParseResult ParseAnonymousProgramHolding(const std::string& item) {
   return Parse("program;\n" + item + "\nendprogram\n");
 }
 
-// Whether the anonymous program's one item reached the compilation unit as an
-// item of kind `kind`, unreported and marked as having come from an anonymous
-// program. FilterAnonymousProgramItems in src/parser/parser.cpp marks only the
-// items it keeps, and ValidateNameSpaceCompilationUnit in
-// src/elaborator/elaborator_validate_config.cpp reads that mark, so an item
-// kept without it is checked as though no anonymous program had held it.
 void ExpectAnonymousProgramKept(const ParseResult& r, ModuleItemKind kind) {
   EXPECT_EQ(FindDiag(r, kExcludedItemMessage), nullptr);
   ASSERT_NE(r.cu, nullptr);
@@ -881,9 +844,6 @@ TEST(ProgramDeclaration, AnonymousProgramKeepsClassDeclaration) {
   EXPECT_FALSE(r.cu->cu_items[0]->class_decl->is_interface);
 }
 
-// interface_class_declaration is its own alternative of anonymous_program_item
-// and the parser records it under the same kind as a class_declaration, so the
-// case reads the flag that tells the two apart rather than the kind alone.
 TEST(ProgramDeclaration, AnonymousProgramKeepsInterfaceClassDeclaration) {
   auto r = ParseAnonymousProgramHolding(
       "  interface class anon_iface_class;\n"
@@ -900,10 +860,6 @@ TEST(ProgramDeclaration, AnonymousProgramKeepsCovergroupDeclaration) {
   ExpectAnonymousProgramKept(r, ModuleItemKind::kCovergroupDecl);
 }
 
-// class_constructor_declaration is its own alternative of
-// anonymous_program_item and the parser records an out-of-block `new` as a
-// function declaration carrying the class it belongs to, so the case reads
-// that name as well as the kind.
 TEST(ProgramDeclaration, AnonymousProgramKeepsClassConstructorDeclaration) {
   auto r = ParseAnonymousProgramHolding(
       "  function anon_ctor_class::new(); endfunction");
@@ -913,11 +869,6 @@ TEST(ProgramDeclaration, AnonymousProgramKeepsClassConstructorDeclaration) {
   EXPECT_EQ(r.cu->cu_items[0]->name, "new");
 }
 
-// A.1.11's last alternative is a bare `;`, and what it declares is nothing:
-// the body loop in Parser::TryParseAnonymousProgram consumes the semicolon
-// before ParseModuleItem is reached, so no item is built and none reaches the
-// filter. The compilation unit is therefore empty rather than holding an item
-// of some kind that a filter over kinds would then have to admit.
 TEST(ProgramDeclaration, AnonymousProgramNullItemDeclaresNothing) {
   auto r = ParseAnonymousProgramHolding("  ;");
   EXPECT_EQ(FindDiag(r, kExcludedItemMessage), nullptr);

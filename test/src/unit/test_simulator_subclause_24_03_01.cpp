@@ -105,16 +105,6 @@ TEST(ProgramSchedulingSim, ProgramNbaCommitsAfterDesignNba) {
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
-// A program initial's event control on a design signal resumes in the Reactive
-// region (24.3.1): when trig transitions, the program statement is scheduled
-// into the Reactive region, after the design's NBA region has committed v<=10,
-// so the program-driven v=99 wins. The design drives trig one time step later
-// (#1) because a program initial executes in the Reactive region (24.3.1),
-// strictly after the Active region of the same time slot; were trig driven at
-// time 0 the program's @(trig) would not yet be armed when the design's Active
-// write occurred, a clocking-block-less program/design race (24.3.2). Delaying
-// the design write lets the program arm @(trig) first, so the resume is
-// deterministic and exercises the Reactive-region scheduling under test.
 TEST(ProgramSchedulingSim, ProgramEventWaitResumesInReactive) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -158,10 +148,6 @@ TEST(ProgramSchedulingSim, MultipleProgramInitialsEachRunInReactive) {
   EXPECT_EQ(b->value.ToUint64(), 200u);
 }
 
-// A subroutine declared outside the program (here in the enclosing module)
-// inherits the reactive scheduling region of the program thread that calls it.
-// The task's blocking write therefore lands in the Reactive region, after the
-// design's NBA region has committed, so the program-driven value wins.
 TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramRunsBlockingInReactive) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -180,10 +166,6 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramRunsBlockingInReactive) {
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
-// The same inheritance applies to nonblocking assignments: an NBA executed
-// inside a module-declared subroutine that is called from a program thread is
-// scheduled in the Re-NBA region, which runs after the design NBA region, so
-// the subroutine reads the design's already-committed value.
 TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramSchedulesNbaInReactive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -209,14 +191,6 @@ TEST(ProgramSchedulingSim, ModuleTaskCalledFromProgramSchedulesNbaInReactive) {
   EXPECT_EQ(b->value.ToUint64(), 10u);
 }
 
-// Paragraph 4 enumerates the subroutine's declaration site as a module,
-// package, or interface - the inherited region does not depend on which. Here
-// the called subroutine is declared in a package, imported at module scope, and
-// invoked by the program thread; its output argument is copied back into the
-// module variable on return, and that write executes in the caller's Reactive
-// region (after the design NBA v<=10 commits), so the program-driven v=99 wins.
-// This is the package syntactic position of the same inheritance rule the
-// module-declared cases exercise.
 TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -238,16 +212,6 @@ TEST(ProgramSchedulingSim, PackageTaskCalledFromProgramRunsBlockingInReactive) {
   EXPECT_EQ(v->value.ToUint64(), 99u);
 }
 
-// Negative/contrast to ModuleTaskCalledFromProgramRunsBlockingInReactive: the
-// same module-declared task, but now called from a design (module) initial. The
-// region a subroutine's blocking write lands in is inherited dynamically from
-// the calling thread, not fixed by where the subroutine is declared (24.3.1).
-// Because the caller is design code executing in the active region set, the
-// task's blocking v=99 happens in the Active region, strictly before the
-// design NBA v<=10 commits, so the NBA wins and v ends at 10 - the opposite
-// outcome of the program-caller case, where the identical task landed the write
-// in the Reactive region after the NBA. Together the two tests show module code
-// may execute in either the active or the reactive region set per 24.3.1.
 TEST(ProgramSchedulingSim, ModuleTaskCalledFromDesignRunsBlockingInActive) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -289,11 +253,6 @@ TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramRunsWithoutCrash) {
   EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
 }
 
-// Concurrent assertions keep their invariant scheduling inside a program: they
-// are still sampled and evaluated in the Observed region rather than skipped
-// because the code lives in program scope. With the same structure as the
-// passing case but a predicate that does not hold, the assertion must actually
-// fire, proving production evaluates it instead of silently ignoring it.
 TEST(ProgramSchedulingSim, ConcurrentAssertionInProgramStillEvaluatesAndFails) {
   SimFixture f;
   auto* design = ElaborateSrc(

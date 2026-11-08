@@ -16,9 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §11.4.5 makes === answer 1'b1 or 1'b0 and never x, so a case-equality result
-// asserted here is read as a known 1: the value, and the bit that would say it
-// was unknown.
 void ExpectKnownTrue(SimFixture& f, std::string_view name) {
   auto* r = f.ctx.FindVariable(name);
   ASSERT_NE(r, nullptr);
@@ -26,11 +23,6 @@ void ExpectKnownTrue(SimFixture& f, std::string_view name) {
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
-// §11.4.5: for the logical equality (==) and inequality (!=) operators, if an
-// unknown (x) or high-impedance (z) bit makes the relation ambiguous, the
-// result shall be 1'bx. The x bit is produced by a 4-state literal stored into
-// a declared variable and read back as an operand, so the whole path from
-// source through elaboration and simulation is exercised.
 TEST(EqualityOperatorSim, LogicalEqualityAmbiguousXOperandYieldsX) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -46,7 +38,6 @@ TEST(EqualityOperatorSim, LogicalEqualityAmbiguousXOperandYieldsX) {
       f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.width, 1u);
-  // An x result is flagged by its unknown (bval) bit being set.
   EXPECT_NE(r->value.words[0].bval & 1u, 0u);
 }
 
@@ -68,10 +59,6 @@ TEST(EqualityOperatorSim, LogicalInequalityAmbiguousZOperandYieldsX) {
   EXPECT_NE(r->value.words[0].bval & 1u, 0u);
 }
 
-// Runs `op` between a and b, two 8-bit logic variables holding the literals
-// `a` and `b`, and reads r as the known bit `want`, its unknown bit clear:
-// what §11.4.5 (printed page 279) promises where the relation is not
-// ambiguous.
 void ExpectKnownEquality(std::string_view a, std::string_view b,
                          std::string_view op, uint64_t want) {
   SimFixture f;
@@ -92,31 +79,18 @@ void ExpectKnownEquality(std::string_view a, std::string_view b,
   EXPECT_EQ(r->value.ToUint64(), want);
 }
 
-// §11.4.5 (printed page 279): == is 1'bx only where the unknown bits leave
-// the relation ambiguous, and 8'b1101x001 against 8'b1101x000 differ at bit
-// 0, which both hold known, so they are unequal whatever bit 3 holds: 0.
-// This is the suite's 11.4.5--equality-op.sv (#2914); asked whether either
-// operand held an unknown bit before any bit was compared, it read x, as
-// the two ambiguous cases above rightly do.
 TEST(EqualityOperatorSim, LogicalEqualityKnownMismatchBesideAnXIsFalse) {
   ExpectKnownEquality("8'b1101x001", "8'b1101x000", "==", 0);
 }
 
-// The same with z in place of x, the file's second pair: 0.
 TEST(EqualityOperatorSim, LogicalEqualityKnownMismatchBesideAZIsFalse) {
   ExpectKnownEquality("8'b1101z001", "8'b1101z000", "==", 0);
 }
 
-// §11.4.5: != answers 1 for the same operands, the known mismatch deciding
-// it; a rule that read the unknown bit first answered x here too.
 TEST(EqualityOperatorSim, LogicalInequalityKnownMismatchBesideAnXIsTrue) {
   ExpectKnownEquality("8'b1101x001", "8'b1101x000", "!=", 1);
 }
 
-// §11.4.5: for case equality (===) and case inequality (!==), the x and z bits
-// participate in the comparison and must match for the operands to be equal;
-// the result is always a known 1'b1 or 1'b0, never x. Both operands here carry
-// identical x and z bits, so === reports a known match.
 TEST(EqualityOperatorSim, CaseEqualityMatchesXZFromSource) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -132,7 +106,6 @@ TEST(EqualityOperatorSim, CaseEqualityMatchesXZFromSource) {
       f, "r");
   ASSERT_NE(r, nullptr);
   EXPECT_EQ(r->value.ToUint64(), 1u);
-  // The result is a known value: no unknown bit is set.
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
@@ -172,16 +145,6 @@ TEST(EqualityOperatorSim, CaseInequalityXZMismatchIsKnownTrue) {
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
-// §11.4.5: x and z bits take part in the comparison and have to match for the
-// operands to be equal, and the result of these operators is always known.
-// Table 6-7 gives a `logic [7:0]` scalar and an element of a `logic [7:0]`
-// array the same 'x default, so the two compare equal to each other and to the
-// literal spelling the same value, whichever producer built them -- the
-// element's came from MakeAllX and the scalar's from
-// SimContext::CreateVariable. `arr[0] === s` is the discriminating half: two
-// values of one declared type and one default, with no literal to be right
-// about. The width is 8 rather than 64 because a width that fills its last word
-// leaves no bits above itself to disagree over.
 TEST(EqualityOperatorSim,
      CaseEqualityMatchesDefaultInitialValueOfArrayElement) {
   SimFixture f;
@@ -202,9 +165,6 @@ TEST(EqualityOperatorSim,
   ASSERT_NO_FATAL_FAILURE(ExpectKnownTrue(f, "r2"));
 }
 
-// The same rule with no array involved: EvalUnaryMinus answers an operand
-// carrying an unknown bit with an all-x value of the operand's width, so a fix
-// applied to what declares an array element would leave this one failing.
 TEST(EqualityOperatorSim, CaseEqualityMatchesAllXProducedByUnaryMinus) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -377,12 +337,6 @@ TEST(EqualityOperatorEval, PackedStructInequality) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §11.4.5: when both operands are signed, the comparison is a signed one and
-// the narrower operand is sign-extended to the wider width. Here a is 4-bit
-// signed -1 (1111); extended to 8 bits it becomes 0xFF, which equals the 8-bit
-// signed -1. A zero-extension would give 0x0F and mismatch, so a result of 1
-// confirms the sign-extending path. Both operands are declared signed so the
-// signedness is produced by real source, not asserted synthetically.
 TEST(EqualityOperatorSim, BothSignedSignExtendsNarrowerOperand) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -401,11 +355,6 @@ TEST(EqualityOperatorSim, BothSignedSignExtendsNarrowerOperand) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// §11.4.5: the signed comparison distinguishes a sign-extended negative from a
-// same-low-bits positive. a is 4-bit signed -1 -> 0xFF; b is 8-bit signed 15 ->
-// 0x0F. As signed values -1 != 15, so the result is 0. Were a zero-extended, it
-// would read 0x0F and spuriously match, so 0 confirms the signed
-// interpretation.
 TEST(EqualityOperatorSim, BothSignedNegativeDiffersFromPositive) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -545,12 +494,6 @@ TEST(EqualityOperatorSim, UnsignedNarrowMismatchesWiderTopBits) {
   EXPECT_EQ(y->value.ToUint64(), 0u);
 }
 
-// §11.4.5: when one operand is unsigned, the whole comparison is unsigned and
-// the narrower operand is zero-extended (never sign-extended). a is 4-bit
-// signed -1 (0xF); mixed with the unsigned 8-bit b it is zero-extended to
-// 0x0F (15), which equals b. A both-signed reading would sign-extend a to 0xFF
-// and mismatch, so a result of 1 confirms the unsigned interpretation forced by
-// the single unsigned operand.
 TEST(EqualityOperatorSim, MixedSignedUnsignedComparesUnsigned) {
   auto v = RunAndGet(
       "module t;\n"
@@ -567,12 +510,6 @@ TEST(EqualityOperatorSim, MixedSignedUnsignedComparesUnsigned) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.4.5: signedness that comes from a default-signed integer type (rather
-// than an explicit 'signed' keyword) still drives a signed comparison that
-// sign-extends the narrower operand. byte -1 (0xFF) sign-extends to 32 bits
-// (0xFFFFFFFF) and equals int -1. Were byte treated as unsigned it would read
-// 0x000000FF and mismatch, so 1 confirms the signed interpretation taken from
-// the type default.
 TEST(EqualityOperatorSim, DefaultSignedTypesSignExtend) {
   auto v = RunAndGet(
       "module t;\n"
@@ -589,10 +526,6 @@ TEST(EqualityOperatorSim, DefaultSignedTypesSignExtend) {
   EXPECT_EQ(v, 1u);
 }
 
-// §11.4.5: case inequality (!==) on two operands that carry identical x and z
-// bits reports a known 1'b0 -- they match bit for bit, including the unknowns.
-// Completes the !== input form alongside the === match and === /!== mismatch
-// cases; the result is always known, never x.
 TEST(EqualityOperatorSim, CaseInequalityMatchesXZIsKnownFalse) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -611,13 +544,6 @@ TEST(EqualityOperatorSim, CaseInequalityMatchesXZIsKnownFalse) {
   EXPECT_EQ(r->value.words[0].bval & 1u, 0u);
 }
 
-// §11.4.5 compares unpacked arrays element by element, and §10.9 gives an
-// assignment pattern written with its type the value of an array of that type,
-// positional or replicated. So `v == arr_t'{9, 9, 3}` is 0 for v = '{1, 2, 3}
-// and `v != arr_t'{1, 2, 4}` is 1, and the same holds through a subroutine
-// formal and through a class property handle. The array's name read as its
-// last element alone, and through a formal or a handle nothing matched. A
-// pattern without its type is no operand of `==` (§10.8), so each is typed.
 TEST(EqualityOperatorSim, AnUnpackedArrayEqualsAPatternElementByElement) {
   SimFixture f;
   std::string out = RunCapture(

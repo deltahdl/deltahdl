@@ -149,11 +149,6 @@ TEST(VirtualInterfaceSim, ReboundInstanceReflectsNewTarget) {
   EXPECT_EQ(y->value.ToUint64(), 0x22u);
 }
 
-// §25.9: referencing a component through a virtual interface that is bound to
-// no instance is a run-time error, and the reference is what it is about. The
-// design holds two references and only the second one goes through an unbound
-// virtual interface, so a report carrying no location fails this and so does
-// one that names the first reference.
 TEST(VirtualInterfaceSim, NullReferenceIsReportedAtTheReference) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,8 +175,6 @@ TEST(VirtualInterfaceSim, NullReferenceIsReportedAtTheReference) {
                             "25.9"));
 }
 
-// §25.9: attempting to use a null virtual interface shall result in a fatal
-// run-time error, and the report names §25.9.
 TEST(VirtualInterfaceSim, NullReferenceNames25_9) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,26 +195,6 @@ TEST(VirtualInterfaceSim, NullReferenceNames25_9) {
                             "25.9"));
 }
 
-// §25.9: once a virtual interface is initialized, every component of the
-// interface instance behind it is reached directly with dot notation, and only
-// in procedural statements. The clause's own example writes a component that
-// way with a nonblocking assignment, `bus.req <= 1'b1;`, so the write is a
-// redirection through the binding exactly as the read is, and what it must
-// reach is the bound instance's own variable.
-//
-// The claim is read off `u.req`, the instance's signal, rather than back
-// through `vif.req`. A read-back through the virtual interface is answered by
-// the same redirection the write would have to perform, so it is satisfied by
-// a write that landed anywhere that path also looks; `u.req` is only satisfied
-// by a write that reached the interface instance.
-//
-// `u.req` is driven to 1'b0 before the binding, so the two outcomes are
-// distinct values and not a value against x: the run reads 1'b1 when the
-// nonblocking write reached the instance and 1'b0 when it was dropped. The #1
-// is what makes the read an observation of the write at all -- §10.4.2 has a
-// nonblocking assignment update in the NBA region of the current time step, so
-// a read placed in the same statement sequence at time 0 sees the old value
-// however the write behaves.
 TEST(VirtualInterfaceSim, NonblockingComponentWriteReachesInstance) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -244,23 +217,6 @@ TEST(VirtualInterfaceSim, NonblockingComponentWriteReachesInstance) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §25.9: the same rule under a blocking assignment. The clause grants the
-// components of the underlying instance to procedural statements without
-// distinguishing the two assignment forms, so `vh.data = 8'hC3;` must reach
-// the instance as the nonblocking form above must.
-//
-// The component is a vector rather than a bit, and the value 8'hC3 has bits
-// set in both nibbles, so a write that reached the instance only partially --
-// one bit of it, or a truncation to the 1-bit component the case above uses --
-// is a different reading from the whole 0xC3 and fails.
-//
-// The observation is made on the context variable the run left behind rather
-// than through a second procedural read: `top.dut.data` IS the interface
-// instance's variable, so nothing at all stands between the write and the
-// claim. The read of `vh.data` into `echo` is a separate claim, and not the
-// one that catches a dropped write -- it says the read redirect of §25.9 is
-// still in force over a component the write has just touched, and it would be
-// satisfied by a write that never reached `dut`.
 TEST(VirtualInterfaceSim, BlockingComponentWriteReachesInstance) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -289,17 +245,6 @@ TEST(VirtualInterfaceSim, BlockingComponentWriteReachesInstance) {
   EXPECT_EQ(through_handle->value.ToUint64(), 0xC3u);
 }
 
-// §25.9 makes a component available through the virtual interface only once the
-// virtual interface has been initialized, and the file's cases above hold the
-// simulator to reporting a read that is not: a reference through an unbound
-// handle is a fatal run-time error carrying §25.9. A write names the component
-// by the same dot notation and through the same absent binding, so it is the
-// same violation, and a run that drops the write in silence reports nothing
-// where the read reports.
-//
-// Two writes stand in the design and only the second one goes through an
-// unbound handle, so a report carrying no location fails this and so does one
-// that names the write through `held`. Line 12 is `dropped.q = 1'b1;`.
 TEST(VirtualInterfaceSim, WriteThroughNullVirtualInterfaceIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -325,15 +270,6 @@ TEST(VirtualInterfaceSim, WriteThroughNullVirtualInterfaceIsReported) {
                             "25.9"));
 }
 
-// §25.9: once a virtual interface variable is initialized, every component of
-// the interface instance it represents is reached through it by the dot
-// notation, and the clause's own transactor waits on a posedge of one that
-// way. §9.4.2 then detects the posedge on the instance's variable as on any
-// other. The process resumes at the edge, so `x` records 30, the time of the
-// 0-to-1 transition. Recording 10 would mean the negedge at 10 resumed it, a
-// level wait rather than a posedge one; 0 that nothing resumed it before the
-// watchdog ended the run, which is what an event control that resolved `v.clk`
-// to nothing did.
 TEST(VirtualInterfaceSim, EventControlPosedgeThroughVirtualInterface) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
                       "module top;\n"
@@ -357,10 +293,6 @@ TEST(VirtualInterfaceSim, EventControlPosedgeThroughVirtualInterface) {
             30u);
 }
 
-// §9.4.2: a non-edge implicit event is detected on any change of the
-// expression, so `@(v.clk)` resumes on the 1-to-0 transition at 20, which a
-// posedge wait would let pass; 60, the later posedge, is what such a wait
-// would record, and 0 what an unarmed one leaves.
 TEST(VirtualInterfaceSim, EventControlLevelThroughVirtualInterface) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
                       "module top;\n"
@@ -384,9 +316,6 @@ TEST(VirtualInterfaceSim, EventControlLevelThroughVirtualInterface) {
             20u);
 }
 
-// §9.4.2: every operand of an `or` list is watched, so a change on `v.b`
-// alone resumes the process at 35. Recording 70, when `v.a` changes, would
-// mean only the first operand reached the instance.
 TEST(VirtualInterfaceSim, OrListEventControlThroughVirtualInterface) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic a, b; endinterface\n"
                       "module top;\n"
@@ -411,12 +340,6 @@ TEST(VirtualInterfaceSim, OrListEventControlThroughVirtualInterface) {
             35u);
 }
 
-// §9.4.2: a change in an operand of the expression without a change in its
-// result is not an event, so `@(v.a & v.b)` lets the change of `v.a` at 15
-// pass and resumes when `v.b` makes the conjunction 1 at 40. Recording 15
-// would mean the operands were watched as two bare names rather than as the
-// one expression; 0 that the names were collected from the handle rather
-// than from the instance and nothing resumed the process.
 TEST(VirtualInterfaceSim, CompoundEventControlThroughVirtualInterface) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic a, b; endinterface\n"
                       "module top;\n"
@@ -441,11 +364,6 @@ TEST(VirtualInterfaceSim, CompoundEventControlThroughVirtualInterface) {
             40u);
 }
 
-// §25.9: an event control names a component through the virtual interface
-// exactly as a read does, so waiting on one through an unbound variable is
-// the same fatal run-time error a read through it is, reported at the wait
-// rather than left as a process that nothing will ever resume. Line 7 is the
-// `@(posedge v.clk);`.
 TEST(VirtualInterfaceSim, EventControlThroughNullVirtualInterfaceIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -466,11 +384,6 @@ TEST(VirtualInterfaceSim, EventControlThroughNullVirtualInterfaceIsReported) {
                             "25.9"));
 }
 
-// §25.9: the same violation in a compound operand. The operands of
-// `v.a & v.b` are reached through an unbound variable, and the expression is
-// evaluated when the wait arms whatever names it yields to watch, so the
-// error is reported at line 6, the `@(v.a & v.b);`, whether or not any
-// watcher was armed.
 TEST(VirtualInterfaceSim,
      CompoundEventControlThroughNullVirtualInterfaceIsReported) {
   SimFixture f;
@@ -491,12 +404,6 @@ TEST(VirtualInterfaceSim,
                             "25.9"));
 }
 
-// §25.9: a virtual interface can be declared as a class property, and once it
-// is initialized every component of the instance it represents is reached
-// through it by the dot notation. The module binds the property from outside,
-// `d.vif = dif`, and the method reads `vif.a` by the property's bare name; the
-// read reaches the instance's own `a`, which the module wrote 0x35 into. A
-// property bound to nothing reports a null reference and reads 0.
 TEST(VirtualInterfaceSim, ClassPropertyBoundFromModuleReadsInstanceComponent) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -520,10 +427,6 @@ TEST(VirtualInterfaceSim, ClassPropertyBoundFromModuleReadsInstanceComponent) {
             0x35u);
 }
 
-// §25.9: the clause's own transactor writes `bus.req <= 1'b1` through its
-// property. A nonblocking write through the property lands on the instance's
-// own variable, which the module reads back by its hierarchical name; an
-// unbound property would leave `dif.a` at its uninitialized value.
 TEST(VirtualInterfaceSim, ClassTaskWritesInstanceComponentThroughProperty) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -545,11 +448,6 @@ TEST(VirtualInterfaceSim, ClassTaskWritesInstanceComponentThroughProperty) {
             0x35u);
 }
 
-// §25.9: the transactor's wait_for_bus waits on `@(posedge bus.grant)` with
-// `bus` a property. The event control arms on the instance's own `clk`, so the
-// task ends at 30, when another process drives the edge, and the enabling
-// process records that time; 0 is what a wait that armed nothing would leave,
-// the watchdog ending the run.
 TEST(VirtualInterfaceSim, ClassTaskWaitsOnEdgeThroughProperty) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
                       "class drv;\n"
@@ -577,10 +475,6 @@ TEST(VirtualInterfaceSim, ClassTaskWaitsOnEdgeThroughProperty) {
             30u);
 }
 
-// §25.9: a virtual interface property can be initialized by an argument to
-// new(), which is how the clause's SBusTransactor is built, `bus = s` in its
-// constructor. The instance passed to new() is what the property represents
-// afterwards, so the read through it answers the instance's 0x5C.
 TEST(VirtualInterfaceSim, ClassPropertyInitializedThroughNewArgument) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -606,9 +500,6 @@ TEST(VirtualInterfaceSim, ClassPropertyInitializedThroughNewArgument) {
             0x5Cu);
 }
 
-// §25.9: a virtual interface may be passed as an argument to a task. The
-// formal is a virtual interface of its own, so `v.a` in the body is the
-// component of the instance the call passed, 0x47.
 TEST(VirtualInterfaceSim, TaskFormalReceivesInterfaceInstance) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "module top;\n"
@@ -626,10 +517,6 @@ TEST(VirtualInterfaceSim, TaskFormalReceivesInterfaceInstance) {
             0x47u);
 }
 
-// §25.9 and §13.5.2: an output formal declared `virtual bus_if` is copied to
-// its actual when the function returns, and the actual is a class property
-// named from the module, `get(d.vif)`. The property then represents the
-// instance the function assigned, and a read through it answers 0x63.
 TEST(VirtualInterfaceSim, OutputArgumentWritesClassProperty) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -656,14 +543,6 @@ TEST(VirtualInterfaceSim, OutputArgumentWritesClassProperty) {
             0x63u);
 }
 
-// §25.9 and §13.5.2, the copy-out reaching a property named by its bare name:
-// a method of the class passes its own property as the actual of a static
-// method of another class, `db::get(vif, src)`, which is how a component asks
-// a resource database for its interface, and the instance arrives through the
-// method's own virtual interface formal. The copy-out writes the property of
-// the object the method runs on, against that object's class rather than the
-// database's, and the read that follows it in the same method answers the
-// instance's 0x6E.
 TEST(VirtualInterfaceSim, OutputArgumentWritesPropertyNamedInsideMethod) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class db;\n"
@@ -693,10 +572,6 @@ TEST(VirtualInterfaceSim, OutputArgumentWritesPropertyNamedInsideMethod) {
             0x6Eu);
 }
 
-// §25.9: a virtual interface is assigned from another virtual interface, so
-// one held as a property of a container object, `bx.v`, is read back and
-// assigned to the transactor's own property, which then represents the same
-// instance and reads its 0x7B.
 TEST(VirtualInterfaceSim, PropertyReadBackFromContainerObject) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class box;\n"
@@ -726,11 +601,6 @@ TEST(VirtualInterfaceSim, PropertyReadBackFromContainerObject) {
             0x7Bu);
 }
 
-// §25.9: a virtual interface property has the value null before it is
-// initialized and compares equal to null then, and unequal once it represents
-// an instance. The two comparisons are packed as {before, after}, so 2 is the
-// answer; 3 would mean the binding was not seen, 0 that the null state was
-// not.
 TEST(VirtualInterfaceSim, ClassPropertyComparesWithNullBeforeAndAfterBinding) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"

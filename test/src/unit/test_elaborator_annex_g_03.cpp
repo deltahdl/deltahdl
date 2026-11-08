@@ -1,22 +1,3 @@
-// IEEE 1800-2023 Annex G.3 (Std package -- Semaphore).
-//
-// Section G.3 presents the prototype of the built-in `semaphore` class that
-// the std package provides; its semantics are owned by clause 15.3. The
-// prototype is:
-//
-//   class semaphore;
-//     function new(int keyCount = 0);
-//     function void put(int keyCount = 1);
-//     task get(int keyCount = 1);
-//     function int try_get(int keyCount = 1);
-//   endclass
-//
-// These tests observe the elaborator providing that prototype out of the std
-// package: `semaphore` resolves as a built-in class without any user
-// `class semaphore` definition (Elaborator::RegisterCuScopeItems registers the
-// std-package class name), and each prototype method elaborates with the
-// documented default arguments omitted at the call site.
-
 #include <gtest/gtest.h>
 
 #include "elaborator/std_package.h"
@@ -27,7 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The std package supplies the class name; no user declaration is required.
 TEST(SemaphoreStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -42,7 +22,6 @@ TEST(SemaphoreStdPackageElaborator, BuiltInClassNeedsNoUserDefinition) {
   EXPECT_EQ(mod->variables[0].class_type_name, "semaphore");
 }
 
-// new() with the keyCount argument omitted (prototype default 0).
 TEST(SemaphoreStdPackageElaborator, NewWithDefaultKeyCount) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -58,8 +37,6 @@ TEST(SemaphoreStdPackageElaborator, NewWithDefaultKeyCount) {
   EXPECT_NE(mod->variables[0].init_expr, nullptr);
 }
 
-// The full prototype surface: put / get / try_get, each invoked with the
-// documented default keyCount omitted.
 TEST(SemaphoreStdPackageElaborator, PrototypeMethodsWithDefaultArgs) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -77,8 +54,6 @@ TEST(SemaphoreStdPackageElaborator, PrototypeMethodsWithDefaultArgs) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same prototype methods accept an explicit keyCount, matching the
-// `int keyCount` formals in the prototype.
 TEST(SemaphoreStdPackageElaborator, PrototypeMethodsWithExplicitArgs) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,8 +71,6 @@ TEST(SemaphoreStdPackageElaborator, PrototypeMethodsWithExplicitArgs) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The prototype's new() constructor also applies when the handle is built
-// procedurally after declaration, then driven through the prototype methods.
 TEST(SemaphoreStdPackageElaborator, DeferredConstructionAndUse) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -114,9 +87,6 @@ TEST(SemaphoreStdPackageElaborator, DeferredConstructionAndUse) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// try_get is `function int`: its value feeds an expression context (here an
-// if-condition), and the elaborator accepts the value-returning prototype
-// method there.
 TEST(SemaphoreStdPackageElaborator, TryGetResultUsableInCondition) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -131,10 +101,6 @@ TEST(SemaphoreStdPackageElaborator, TryGetResultUsableInCondition) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §G.3: the prototype as src/elaborator/std_package.h writes it down -- the
-// constructor new and the methods put, get and try_get, put and get void, get
-// the one task, try_get returning int, each with the single formal int
-// keyCount carrying a default, so that a call may pass one actual or none.
 TEST(SemaphoreStdPackageElaborator, ThePrototypeIsWrittenDown) {
   const auto& prototype = SemaphorePrototype();
   ASSERT_EQ(prototype.size(), 4u);
@@ -165,9 +131,6 @@ TEST(SemaphoreStdPackageElaborator, ThePrototypeIsWrittenDown) {
   EXPECT_TRUE(StdClassPrototype(StdPackageMember::kRandomize).empty());
 }
 
-// §G.3: a call on a semaphore handle of a method the prototype does not
-// declare is rejected, at the call, under the subclause giving the
-// prototype; the prototype's own methods are accepted beside it.
 TEST(SemaphoreStdPackageElaborator, AMethodOutsideThePrototypeIsRejected) {
   ElabFixture f;
   ElabOk(
@@ -185,10 +148,6 @@ TEST(SemaphoreStdPackageElaborator, AMethodOutsideThePrototypeIsRejected) {
                             "G.3"));
 }
 
-// §G.3: each method has the one formal keyCount, so a call passing two
-// actuals is rejected, at the call, whether the handle is a module variable
-// or one a procedural block declares, while a call passing one or none is
-// accepted; the count reported is the one given.
 TEST(SemaphoreStdPackageElaborator, ACallWithMoreActualsThanFormalsIsRejected) {
   ElabFixture f;
   ElabOk(
@@ -217,10 +176,6 @@ TEST(SemaphoreStdPackageElaborator, ACallWithMoreActualsThanFormalsIsRejected) {
   }
 }
 
-// §G.3 with §7.5 and §7.10: a declaration with an unpacked dimension is a
-// container of semaphore handles and not a handle, so `q.push_back(t)` and
-// `a.size()` call the container's methods, which the semaphore prototype does
-// not govern, while `t.peek()` on the handle beside them is still rejected.
 TEST(SemaphoreStdPackageElaborator, AContainerOfSemaphoresTakesItsOwnMethods) {
   ElabFixture f;
   ElabOk(

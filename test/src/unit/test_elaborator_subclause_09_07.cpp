@@ -41,11 +41,6 @@ TEST(FineGrainProcessControlElaboration, ProcessMethodCallsElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7: the process class prototype lists srandom()/get_randstate()/
-// set_randstate() as members (their RNG semantics are §18.13.3/.4/.5). Calling
-// them on a process handle -- including reading a state string and feeding it
-// back -- elaborates without error, i.e. the process class exposes these
-// members alongside the control methods.
 TEST(FineGrainProcessControlElaboration, ProcessRandStateMethodsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -82,10 +77,6 @@ TEST(FineGrainProcessControlElaboration, ProcessInForkElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7 gives the prototype as `class :final process;` and states that the
-// process class cannot be extended. The report names §8.13, which is the
-// clause stating that a class declared `:final` cannot be extended, because
-// that is the rule the extension breaks; §9.7 is what makes process `:final`.
 TEST(FineGrainProcessControlElaboration, ExtendProcessError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -100,9 +91,6 @@ TEST(FineGrainProcessControlElaboration, ExtendProcessError) {
                             "8.13"));
 }
 
-// §9.7: objects of type process are created internally when processes are
-// spawned, so a call to new on a process handle is an error. The report stands
-// at the assignment, not at the declaration of the handle.
 TEST(FineGrainProcessControlElaboration, ProcessNewError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -118,11 +106,6 @@ TEST(FineGrainProcessControlElaboration, ProcessNewError) {
                             "9.7"));
 }
 
-// §9.7 gives the process class no construction by the user, so `new` written
-// as a declaration's initializer, at module scope or in a block, is reported
-// as the assignment `p = new;` is. An array of process handles initialized
-// with `new [N]` sizes the array (§7.5.1), as §9.7's own example does, and
-// constructs no process.
 TEST(FineGrainProcessControlElaboration, ProcessNewInADeclarationError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -199,11 +182,6 @@ TEST(FineGrainProcessControlElaboration, AllStateEnumMembersElaborate) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §9.7 with §G.6: the process class declares the enumeration state, whose
-// base type is int, so a module variable declared process::state is 32 bits
-// wide and names the enumeration under the key the simulator registers it by.
-// No typedef of the design declares it, and the variable was sized 0 and
-// named no enumeration while only the design's typedef table was asked.
 TEST(FineGrainProcessControlElaboration, ModuleStateVariableNamesTheEnum) {
   ElabFixture f;
   auto* design = ElaborateSrc(

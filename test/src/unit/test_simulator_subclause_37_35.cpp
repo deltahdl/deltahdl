@@ -23,27 +23,6 @@
 namespace delta {
 namespace {
 
-// §37.35 Primitive, prim term: the VPI object model for a primitive (gate,
-// switch, or UDP) and the prim-term objects that carry its terminals. The
-// diagram's property labels (vpiDefName, vpiName/vpiFullName, vpiPrimType,
-// vpiStrength0/1, the array-member booleans) and structural edges (to module,
-// primitive array, udp defn, the delay expr, and the prim term's
-// value/direction) are read by the generic object-model machinery and the
-// value/delay routines owned by other subclauses. The four numbered Details
-// carry this clause's own rules, and the tests below observe the production
-// code that applies them:
-//   D1 - vpiSize returns a primitive's number of inputs (the kVpiSize
-//   dispatch). D2 - vpi_put_value() is allowed only on a sequential UDP
-//   primitive
-//        (the guard at the head of PutValue).
-//   D3 - vpiTermIndex reports a prim term's terminal order, first index zero
-//        (the vpiTermIndex dispatch).
-//   D4 - vpiIndex from a primitive reaches its array index, or NULL when the
-//        primitive is not an array element (the Handle transition).
-
-// The fixture installs a context so the public vpi_get/vpi_handle/vpi_put_value
-// entry points run their real dispatch, and provides the simulation plumbing a
-// sequential-UDP value put needs.
 class PrimitivePrimTerm : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -57,13 +36,10 @@ class PrimitivePrimTerm : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D1: vpiSize on a primitive reports its number of inputs. A primitive stores
-// that input count as its size, and vpi_get(vpiSize) hands it back through the
-// shared size dispatch.
 TEST_F(PrimitivePrimTerm, SizeReportsNumberOfInputs) {
   VpiObject prim;
   prim.type = vpiPrimitive;
-  prim.size = 3;  // a three-input primitive
+  prim.size = 3;
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&prim)), 3);
 
   VpiObject gate;
@@ -72,9 +48,6 @@ TEST_F(PrimitivePrimTerm, SizeReportsNumberOfInputs) {
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&gate)), 2);
 }
 
-// D3: a prim term reports its terminal index through vpiTermIndex, which fixes
-// the terminal order. The first terminal carries index zero; successive
-// terminals report 1, 2, ... so the order is recoverable.
 TEST_F(PrimitivePrimTerm, TermIndexReportsTerminalOrder) {
   VpiObject first;
   first.type = vpiPrimTerm;
@@ -86,14 +59,11 @@ TEST_F(PrimitivePrimTerm, TermIndexReportsTerminalOrder) {
   third.type = vpiPrimTerm;
   third.index = 2;
 
-  // The first terminal has term index zero.
   EXPECT_EQ(vpi_get(vpiTermIndex, VpiHandleOf(&first)), 0);
   EXPECT_EQ(vpi_get(vpiTermIndex, VpiHandleOf(&second)), 1);
   EXPECT_EQ(vpi_get(vpiTermIndex, VpiHandleOf(&third)), 2);
 }
 
-// D4: vpiIndex from a primitive that is an element of a primitive array reaches
-// the index expression that locates it within the array.
 TEST_F(PrimitivePrimTerm, IndexTransitionReachesArrayIndex) {
   VpiObject index_expr;
   index_expr.type = vpiConstant;
@@ -107,9 +77,6 @@ TEST_F(PrimitivePrimTerm, IndexTransitionReachesArrayIndex) {
             &index_expr);
 }
 
-// D4: for a primitive that is not part of a primitive array, the vpiIndex
-// transition returns NULL - even if some other expr is hanging off the object,
-// the transition is meaningful only for an array member.
 TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
   VpiObject stray_expr;
   stray_expr.type = vpiConstant;
@@ -117,16 +84,12 @@ TEST_F(PrimitivePrimTerm, IndexTransitionIsNullWhenNotAnArrayElement) {
   VpiObject standalone;
   standalone.type = vpiPrimitive;
   standalone.array_member = false;
-  standalone.index_expr = &stray_expr;  // present but must not be reported
+  standalone.index_expr = &stray_expr;
   standalone.children.push_back(&stray_expr);
 
   EXPECT_EQ(vpi_handle(vpiIndex, VpiHandleOf(&standalone)), nullptr);
 }
 
-// §37.35: a primitive's value is that of the expression its first prim term
-// that is no input connects, passing over an input term and any child that is
-// no prim term ahead of it, and a prim term's is that of the expression it
-// connects; a term connecting none has none.
 TEST_F(PrimitivePrimTerm, AValueIsThatOfTheDrivenTermsExpression) {
   VpiObject a;
   a.type = vpiNet;
@@ -154,9 +117,6 @@ TEST_F(PrimitivePrimTerm, AValueIsThatOfTheDrivenTermsExpression) {
   EXPECT_EQ(VpiPrimitiveValueSource(&unconnected), nullptr);
 }
 
-// D2: vpi_put_value() applied to a primitive that is not a sequential UDP - a
-// gate, switch, combinational UDP, or generic primitive - is rejected. The put
-// returns NULL and records a vpi_chk_error() error, leaving nothing written.
 TEST_F(PrimitivePrimTerm, PutValueRejectedOnNonSequentialPrimitive) {
   const int kKinds[] = {vpiGate, vpiSwitch, vpiUdp, vpiPrimitive};
   for (int kind : kKinds) {
@@ -176,9 +136,6 @@ TEST_F(PrimitivePrimTerm, PutValueRejectedOnNonSequentialPrimitive) {
   }
 }
 
-// D2: the same routine accepts a value put to a sequential UDP - the one
-// primitive kind that may be written. The §37.35 restriction does not fire, and
-// (with the required vpiNoDelay flag) the value is applied with no error.
 TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
   auto* var = sim_ctx_.CreateVariable("seq", 1);
   var->value = MakeLogic4VecVal(arena_, 1, 0);
@@ -199,19 +156,6 @@ TEST_F(PrimitivePrimTerm, PutValueAcceptedOnSequentialUdp) {
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 
-// -----------------------------------------------------------------------------
-// The `primitive` class. §37.35 draws it as a class definition - bold italic
-// letters in a dotted enclosure - holding the gate, switch and udp object
-// definitions, and §37.5 draws the module's edge to that enclosure. §37.4.1
-// makes such an enclosure a grouping rather than an object of its own, so
-// vpiPrimitive names the group; matching it against an object's own type, which
-// is what the generic traversal does, reached no primitive of any design.
-// -----------------------------------------------------------------------------
-
-// Class membership: the kinds the enclosure holds are the gate, the switch and
-// the udp. The class constant itself is not one of them, and neither is the
-// iterator nor the io decl, whose object types share their numbers with the
-// vpiSeqPrim and vpiCombPrim values of vpiPrimType (#7369).
 TEST_F(PrimitivePrimTerm, ThePrimitiveClassGroupsTheConcreteKinds) {
   EXPECT_TRUE(VpiIsPrimitiveType(vpiGate));
   EXPECT_TRUE(VpiIsPrimitiveType(vpiSwitch));
@@ -223,9 +167,6 @@ TEST_F(PrimitivePrimTerm, ThePrimitiveClassGroupsTheConcreteKinds) {
   EXPECT_FALSE(VpiIsPrimitiveType(vpiIODecl));
 }
 
-// §37.5 (figure, module ==> primitive): a module's primitives are what the edge
-// drawn to the class reaches, so the iteration hands back the gate, the switch
-// and the UDP the module instantiates. A net of the same module is not one.
 TEST_F(PrimitivePrimTerm, AModuleIteratesThePrimitivesItInstantiates) {
   VpiObject gate;
   gate.type = vpiGate;
@@ -248,9 +189,6 @@ TEST_F(PrimitivePrimTerm, AModuleIteratesThePrimitivesItInstantiates) {
   EXPECT_EQ(vpi_scan(it), nullptr);
 }
 
-// §37.35 (figure, primitive <-> prim term): a terminal and the primitive it
-// belongs to are drawn to each other, the primitive end being the class. The
-// terminal reaches its primitive, whichever of the class's kinds it is.
 TEST_F(PrimitivePrimTerm, APrimTermReachesThePrimitiveItBelongsTo) {
   VpiObject udp;
   udp.type = vpiUdp;
@@ -263,8 +201,6 @@ TEST_F(PrimitivePrimTerm, APrimTermReachesThePrimitiveItBelongsTo) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, VpiHandleOf(&term))), &udp);
 }
 
-// §37.35 (figure): an object standing in no such relationship reaches no
-// primitive rather than some object of an unrelated kind.
 TEST_F(PrimitivePrimTerm, AnObjectWithNoPrimitiveReachesNone) {
   VpiObject net;
   net.type = kVpiNet;
@@ -277,9 +213,6 @@ TEST_F(PrimitivePrimTerm, AnObjectWithNoPrimitiveReachesNone) {
   EXPECT_EQ(vpi_iterate(vpiPrimitive, VpiHandleOf(&mod)), nullptr);
 }
 
-// §37.35 (figure): a prim term reaches the expression its terminal connects
-// through vpiExpr. A child of no expression kind, an attribute here, is not
-// that expression, so a term holding no other reaches nothing.
 TEST_F(PrimitivePrimTerm, ExprPassesOverAChildOfNoExpressionKind) {
   VpiObject attribute;
   attribute.type = vpiAttribute;
@@ -289,11 +222,8 @@ TEST_F(PrimitivePrimTerm, ExprPassesOverAChildOfNoExpressionKind) {
   EXPECT_EQ(vpi_handle(vpiExpr, VpiHandleOf(&term)), nullptr);
 }
 
-// The primitives of a run: those a design instantiates, built from the
-// elaborated design rather than by hand (#4957).
 class PrimitivesOfARun : public VpiDesignRun {
  protected:
-  // The terminals of `prim`, in the order written.
   static std::vector<vpiHandle> TermsOf(vpiHandle prim) {
     std::vector<vpiHandle> terms;
     vpiHandle it = vpi_iterate(vpiPrimTerm, prim);
@@ -303,8 +233,6 @@ class PrimitivesOfARun : public VpiDesignRun {
     return terms;
   }
 
-  // What the second terminal of top's gate g reaches through vpiExpr; null
-  // where top has no such gate.
   static vpiHandle SecondTerminalExprOfG() {
     vpiHandle g = Named(vpiPrimitive, By("top"), "g");
     const std::vector<vpiHandle> kTerms = TermsOf(g);
@@ -319,10 +247,6 @@ constexpr const char* kPrimitives =
     "  pullup pu(p);\n"
     "endmodule\n";
 
-// An and gate is a gate of the instance, reporting its primitive type and its
-// number of inputs (detail 1), its terminals in order from index zero
-// (detail 3), the output first, each reaching the net or variable it connects
-// and the gate it belongs to.
 TEST_F(PrimitivesOfARun, AnAndGateIsAGateOfTheRun) {
   Run(kPrimitives);
   EXPECT_EQ(KindsOf(vpiPrimitive, By("top")),
@@ -344,8 +268,6 @@ TEST_F(PrimitivesOfARun, AnAndGateIsAGateOfTheRun) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, kTerms[1])), VpiObjectOf(g1));
 }
 
-// A MOS switch is a switch, its data input and control its two inputs; a
-// pullup is a gate with one output and no input.
 TEST_F(PrimitivesOfARun, ASwitchAndAPullupHaveTheirShapes) {
   Run(kPrimitives);
   vpiHandle m1 = Named(vpiPrimitive, By("top"), "m1");
@@ -362,9 +284,6 @@ TEST_F(PrimitivesOfARun, ASwitchAndAPullupHaveTheirShapes) {
   EXPECT_EQ(vpi_get(vpiDirection, kTerms[0]), vpiOutput);
 }
 
-// §37.35 with §38.11: a primitive's definition name is what it is an instance
-// of - a gate's or a switch's built-in primitive, named by its keyword. Every
-// primitive answered null.
 TEST_F(PrimitivesOfARun, AGateOrSwitchIsAnInstanceOfItsKeyword) {
   Run(kPrimitives);
   const struct {
@@ -380,11 +299,6 @@ TEST_F(PrimitivesOfARun, AGateOrSwitchIsAnInstanceOfItsKeyword) {
   }
 }
 
-// §37.35 with §29.8: an instance of a UDP is a udp of the instance holding it,
-// the third kind the primitive class groups. It reports its UDP's primitive
-// type, its number of inputs and its UDP's name as its definition name, its
-// output terminal first and its inputs after, and reaches the udp defn of its
-// UDP (§37.36). No UDP instance had an object, so none of this answered.
 TEST_F(PrimitivesOfARun, AUdpInstanceIsAUdpOfTheRun) {
   Run("primitive mux_udp(y, s, a, b);\n"
       "  output y;\n"
@@ -422,10 +336,6 @@ TEST_F(PrimitivesOfARun, AUdpInstanceIsAUdpOfTheRun) {
   EXPECT_STREQ(vpi_get_str(vpiDefName, defn), "mux_udp");
 }
 
-// §37.35 with Table 28-1 (§28.3): every gate and switch keyword makes a
-// primitive of its own kind -- a gate or a switch, with that keyword's
-// primitive type and the keyword as its definition name. Only and, nmos and
-// pullup were tested, so a wrong entry for any other keyword went unseen.
 TEST_F(PrimitivesOfARun, EveryGateAndSwitchKeywordHasItsShape) {
   Run("module top; wire w, v; logic a, b, c;\n"
       "  and g_and(w, a, b); nand g_nand(w, a, b);\n"
@@ -484,10 +394,6 @@ TEST_F(PrimitivesOfARun, EveryGateAndSwitchKeywordHasItsShape) {
   }
 }
 
-// §37.13 detail 1 read on §37.35's prim terms: a bidirectional switch's two
-// channel terminals are inout and its control an input (§28.8); a buf gate
-// drives every terminal but its last (§28.5); a pulldown drives its one
-// terminal (§28.10). The size counts the inputs (detail 1).
 TEST_F(PrimitivesOfARun, TerminalsRunAsTheirPrimitiveDrivesThem) {
   Run("module top; wire w, v, x; logic a, c;\n"
       "  tranif1 t(w, v, c);\n"
@@ -513,8 +419,6 @@ TEST_F(PrimitivesOfARun, TerminalsRunAsTheirPrimitiveDrivesThem) {
   }
 }
 
-// §28.3.4 makes a gate's instance name optional, and an instantiation written
-// without one is still a primitive of the instance, of its keyword's type.
 TEST_F(PrimitivesOfARun, AnUnnamedGateIsAPrimitiveOfTheInstance) {
   Run("module top; wire y; logic a, b;\n"
       "  or (y, a, b);\n"
@@ -527,8 +431,6 @@ TEST_F(PrimitivesOfARun, AnUnnamedGateIsAPrimitiveOfTheInstance) {
   EXPECT_EQ(TermsOf(prim).size(), 3U);
 }
 
-// §37.35 with §29.5: an instance of a sequential UDP reports vpiSeqPrim, where
-// a combinational one reports vpiCombPrim.
 TEST_F(PrimitivesOfARun, ASequentialUdpInstanceReportsVpiSeqPrim) {
   Run("primitive latch_udp(q, d, en);\n"
       "  output reg q;\n"
@@ -547,10 +449,6 @@ TEST_F(PrimitivesOfARun, ASequentialUdpInstanceReportsVpiSeqPrim) {
   EXPECT_EQ(vpi_get(vpiPrimType, u1), vpiSeqPrim);
 }
 
-// §37.35 with §37.17 details 3 and 26: a terminal written as a member of an
-// unpacked structure, `s.a`, reaches that member variable. The member access
-// was taken for a hierarchical name, and its first name resolving in the
-// scope gave no object at all.
 TEST_F(PrimitivesOfARun, ATerminalSelectingAStructMemberReachesTheMember) {
   Run("module top; struct {logic a; logic b;} s; wire y; logic c;\n"
       "  and g(y, s.a, c);\n"
@@ -560,9 +458,6 @@ TEST_F(PrimitivesOfARun, ATerminalSelectingAStructMemberReachesTheMember) {
   EXPECT_EQ(VpiObjectOf(SecondTerminalExprOfG()), VpiObjectOf(member));
 }
 
-// §37.35 with §37.17 details 2 and 26: a terminal written as an element of an
-// unpacked array, `v[1]`, reaches that element. The select looked for a bit
-// of the array, which has none, and gave no object.
 TEST_F(PrimitivesOfARun, ATerminalSelectingAnArrayElementReachesTheElement) {
   Run("module top; logic v [2]; wire y; logic c;\n"
       "  and g(y, v[1], c);\n"
@@ -572,10 +467,6 @@ TEST_F(PrimitivesOfARun, ATerminalSelectingAnArrayElementReachesTheElement) {
   EXPECT_EQ(VpiObjectOf(SecondTerminalExprOfG()), VpiObjectOf(element));
 }
 
-// A gate whose terminal selects an element the model has no object for -- of
-// an array net by a varying index, or of an unpacked array by a constant index
-// outside it, a read §11.5.1 makes legal -- still has a prim term per
-// terminal, and its other terminals reach what they connect.
 TEST_F(PrimitivesOfARun, TerminalsSelectingNoModelledElementAreKept) {
   Run("module top; wire w [2]; logic u [2]; int i; wire y, z; logic c;\n"
       "  and g(y, w[i], c);\n"
@@ -592,8 +483,6 @@ TEST_F(PrimitivesOfARun, TerminalsSelectingNoModelledElementAreKept) {
   }
 }
 
-// §37.35 (figure): vpiPrimitive reaches the primitive an object belongs to,
-// its parent where that is one, and otherwise a primitive it holds.
 TEST_F(PrimitivePrimTerm, PrimitiveIsTheParentOrElseAHeldPrimitive) {
   VpiObject module;
   module.type = vpiModule;
@@ -606,7 +495,6 @@ TEST_F(PrimitivePrimTerm, PrimitiveIsTheParentOrElseAHeldPrimitive) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrimitive, VpiHandleOf(&holder))), &gate);
 }
 
-// The integer value of `obj`, -1 where nothing is written.
 int IntValueOf(vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -615,8 +503,6 @@ int IntValueOf(vpiHandle obj) {
   return value.value.integer;
 }
 
-// §37.35 (figure): a primitive's value is its output's, and a prim term's the
-// value of the expression it connects (#7138).
 TEST_F(PrimitivesOfARun, AGateAndItsTermsReadTheirValues) {
   Run("module top; wire y; logic a = 1, b = 0;\n"
       "  and g(y, a, b);\n"
@@ -631,7 +517,6 @@ TEST_F(PrimitivesOfARun, AGateAndItsTermsReadTheirValues) {
   EXPECT_EQ(IntValueOf(kTerms[2]), 0);
 }
 
-// The delays vpi_get_delays reads off `prim`, `count` of them, in ticks.
 std::vector<PLI_UINT32> DelaysOf(vpiHandle prim, int count) {
   std::vector<s_vpi_time> da(static_cast<std::size_t>(count));
   s_vpi_delay delay = {};
@@ -645,11 +530,6 @@ std::vector<PLI_UINT32> DelaysOf(vpiHandle prim, int count) {
   return ticks;
 }
 
-// §37.35 with §28.16 and §29.8: a primitive reports through vpi_get_delays
-// the delays it was written with: a gate its rise, its fall and, where none
-// was written, a turn-off that is the smaller of the two; a switch the three
-// written; a UDP its rise and a fall that is the rise where none was written
-// (#7139).
 TEST_F(PrimitivesOfARun, APrimitiveReportsItsWrittenDelays) {
   Run("primitive inv_udp(o, a);\n"
       "  output o; input a;\n"
@@ -672,8 +552,6 @@ TEST_F(PrimitivesOfARun, APrimitiveReportsItsWrittenDelays) {
             (std::vector<PLI_UINT32>{0, 0}));
 }
 
-// §37.35 with §28.3.6: each element of an instance array of gates reports the
-// delays the array was written with.
 TEST_F(PrimitivesOfARun, AnArrayElementReportsTheArraysDelays) {
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
       "  wire [1:0] y; logic [1:0] a;\n"
@@ -683,12 +561,6 @@ TEST_F(PrimitivesOfARun, AnArrayElementReportsTheArraysDelays) {
             (std::vector<PLI_UINT32>{4, 6, 4}));
 }
 
-// §37.35 detail 2 with §38.34: a value put to a sequential UDP while it runs
-// becomes its state and its output at once, so the row that holds the output
-// (en low) holds the value put when an input moves after it. A put with a
-// scheduled delay is refused, and one in a format giving no bit writes
-// nothing (#7137). An x put is the state x, and a put with no value at all
-// writes nothing either.
 class SequentialUdpPuts : public PrimitivesOfARun {
  protected:
   void SetUp() override {
@@ -700,10 +572,9 @@ class SequentialUdpPuts : public PrimitivesOfARun {
     ASSERT_NE(vpi_register_systf(&data), nullptr);
   }
 
-  // The latch u1 of top, null for none.
   static vpiHandle Latch() { return Named(vpiPrimitive, By("top"), "u1"); }
 
-  static PLI_INT32 PutOneCalltf(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 PutOneCalltf(PLI_BYTE8*) {
     s_vpi_value value = {};
     value.format = vpiScalarVal;
     value.value.scalar = vpi1;
@@ -761,9 +632,6 @@ TEST_F(SequentialUdpPuts, APutBecomesTheUdpsState) {
   EXPECT_EQ(q.value.scalar, vpiX);
 }
 
-// ...and so does one put to an element of an instance array of them, a
-// primitive of its own (§28.3.6, §29.8), the other elements keeping theirs
-// (#7370).
 TEST_F(SequentialUdpPuts, APutBecomesAnArrayElementsState) {
   Run("primitive latch_udp(q, d, en);\n"
       "  output reg q; input d, en;\n"
@@ -786,8 +654,6 @@ TEST_F(SequentialUdpPuts, APutBecomesAnArrayElementsState) {
   EXPECT_EQ(IntValueOf(By("top.q")), 1);
 }
 
-// §37.35 with §37.4.1: a module's primitives are its gates, switches and udps
-// alone, its io decls being none of them (#7369).
 TEST_F(PrimitivesOfARun, AModulesIoDeclsAreNoPrimitives) {
   Run("module top(input a, output y);\n"
       "  and g(y, a, a);\n"

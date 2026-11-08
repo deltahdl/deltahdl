@@ -388,15 +388,6 @@ TEST(FunctionElaboration, FunctionWithForkJoinAnyError) {
       "only fork/join_none is permitted inside a function", 3, "13.4"));
 }
 
-// §13.4 rule a) enumerates fork-join and fork-join_any (alongside #, ##, @,
-// wait, wait fork, wait_order, and expect) as the time-controlling statements a
-// function shall not contain. fork-join_none is deliberately absent from that
-// list: it spawns background processes without suspending the enclosing
-// function, so it stays legal. This is the same restriction §9.3.2 refers to
-// when it notes that a parallel block has restricted usage inside function
-// calls (see 13.4). This positive case makes the negative fork-join and
-// fork-join_any tests above discriminating on the join keyword rather than on
-// the mere presence of a fork.
 TEST(FunctionElaboration, FunctionWithForkJoinNoneIsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -449,9 +440,6 @@ TEST(FunctionElaboration, DynamicOverrideOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // Footnote 25 of Syntax 13-2 in §13.4 is the rule that rejects this: the
-  // specifier parses on any subroutine, and the elaborator refuses it outside
-  // a class scope.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "a function's dynamic_override_specifiers belong on a class "
@@ -467,7 +455,6 @@ TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
       "  endfunction\n"
       "endmodule\n",
       f);
-  // Footnote 25 of Syntax 13-2 in §13.4 is the rule that rejects this.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "a function's dynamic_override_specifiers belong on a class "
@@ -477,15 +464,12 @@ TEST(FunctionElaboration, DynamicOverrideFinalOnModuleScopeFunctionError) {
 
 TEST(FunctionElaboration, DynamicOverrideExtendsOnModuleScopeFunctionError) {
   ElabFixture f;
-  // §8.20 is reported while parsing, so the source does not parse and the
-  // permissive helper is what records that.
   ElaborateSrcAllowingParseErrors(
       "module m;\n"
       "  function :initial :extends void f();\n"
       "  endfunction\n"
       "endmodule\n",
       f);
-  // Footnote 25 of Syntax 13-2 in §13.4 is the rule that rejects this.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "a function's dynamic_override_specifiers belong on a class "
@@ -524,15 +508,6 @@ TEST(FunctionElaboration, InputOnlyArgCallInContAssignOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Stmt::for_steps is a position CheckFuncBodyStmt in
-// src/elaborator/elaborator_validate_funcbody.cpp reaches for the first time
-// now that it takes its child-statement links from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. A.6.8 gives
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`, and a task enable is a function_subroutine_call,
-// so §13.4 rule b) -- no function may enable a task, whether or not the task
-// holds a time-controlling statement -- reaches a for step. It went unenforced
-// there while the walk wrote out its own list of nine links.
 TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
   ElabFixture f;
   ElaborateSrc(
@@ -548,58 +523,12 @@ TEST(FunctionElaboration, TaskEnabledFromAForStepError) {
                             "function cannot enable a task", 5, "13.4"));
 }
 
-// §13.4.3 lists the constraints a constant function is held to, and none of
-// them says where in the body the statement or expression breaking one may
-// stand. Five walks in src/elaborator/elaborator_validate_funcchecks.cpp
-// enforce them — BodyContainsFork and BodyContainsNonblocking and
-// BodyContainsEventScheduling for the bans on any fork construct and on a
-// statement whose own action leaves an event pending past the function's
-// return, CollectLocalDeclNames and WalkConstFuncStmt for the ban on naming an
-// identifier that names no parameter or function and no local of the function —
-// and each had written out a short list of its own of the thirteen
-// child-statement links Stmt declares. They now take the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and the
-// cases below cover the positions that reaches which their own lists did not.
-//
-// Five positions are newly reached, and each walk gets one case per position.
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. §18.16 gives
-// `randcase_item ::= expression : statement_or_null`, whose statement the
-// parser keeps in the second member of a Stmt::randcase_items entry. A.6.12
-// gives `rs_code_block ::= { { data_declaration } { statement_or_null } }`,
-// reached from an rs_prod as RsProd::code_stmts and, per §18.17.1, from after a
-// weight specification as RsRule::weight_code; both hang off
-// Stmt::rs_productions, and a walk reaches one without reaching the other.
-//
-// §18.17.6 gives break and return a meaning inside a randsequence production
-// code block that they have nowhere else, and none of these five walks is about
-// break or return, so each is owed inside one.
-//
-// Stmt::fork_stmts, Stmt::for_inits and Stmt::for_steps get no case. A.6.8
-// admits only a variable_assignment or a for_variable_declaration in a
-// for_initialization and only an operator_assignment, an inc_or_dec_expression
-// or a function_subroutine_call in a for_step, so neither can hold a fork, a
-// nonblocking assignment, a timing control or a declaration.
-// src/parser/parser_stmt_block.cpp fills Stmt::fork_stmts on a StmtKind::kFork
-// alone, so BodyContainsFork answers at that fork before descending, and
-// §13.4.3's ban on any fork construct stops the other four walks before they
-// see the inside of one.
-//
-// These cases cover §13.4.3 and belong in
-// test/src/unit/test_elaborator_subclause_13_04_03.cpp. They stand here because
-// that file is at 908 lines against the 1000-line maximum
-// .github/workflows/deltahdl.yml enforces.
-
-// The statement each walk is looking for, written once and placed by the
-// helpers below into each of the five positions.
 constexpr const char* kForkStmt = "fork t = 1; join_none";
 constexpr const char* kNbaStmt = "t <= 1;";
 constexpr const char* kEventTriggerStmt = "-> ev;";
 constexpr const char* kLocalDeclStmt = "begin int u; u = 1; end";
 constexpr const char* kModuleVarStmt = "t = i;";
 
-// What each walk's rule reports, with the function named `cf` by ConstFuncSrc.
 constexpr const char* kForkMsg =
     "constant function 'cf' uses fork, which constant functions are barred "
     "from";
@@ -612,11 +541,6 @@ constexpr const char* kIdentMsg =
     "constant function 'cf' references identifier 'i' that is not a parameter, "
     "function name, or local declaration";
 
-// One module holding `body` as the whole of a constant function's body between
-// its own `int t;` declaration and its return. §13.4.3 holds of a function
-// called where a constant expression is required, so `cf` is called from a
-// localparam initializer, and every report below stands at that call rather
-// than at the offending statement.
 std::string ConstFuncSrc(const std::string& body) {
   return std::string(
              "module m;\n"
@@ -639,10 +563,6 @@ void ExpectConstFuncError(const std::string& body, const std::string& message) {
                             LineHolding(src, "localparam int P"), "13.4.3"));
 }
 
-// The companion to ExpectConstFuncError for CollectLocalDeclNames, whose rule
-// is that a name declared in the position is in scope rather than that a
-// statement there is rejected. Without the collection reaching the position,
-// WalkConstFuncStmt reaches the use and reports the name as declared nowhere.
 void ExpectConstFuncAccepted(const std::string& body) {
   ElabFixture f;
   auto* design = ElaborateSrc(ConstFuncSrc(body), f);
@@ -650,7 +570,6 @@ void ExpectConstFuncAccepted(const std::string& body) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The five positions, each placing `stmt` where the old lists did not look.
 std::string InAssertPassStmt(const std::string& stmt) {
   return "    assert (n) " + stmt;
 }
@@ -784,48 +703,6 @@ TEST(ConstantFunctionBodyReachElaboration,
   ExpectConstFuncAccepted(InRandsequenceWeightCodeBlock(kLocalDeclStmt));
 }
 
-// The expression side of that conversion. WalkConstFuncStmt now takes the
-// positions a statement holds an expression in from ForEachChildExpr in
-// src/elaborator/elaborator_validate_internal.h, having written out ten of
-// them: Stmt::condition, lhs, rhs, expr, delay, for_cond, repeat_event_count,
-// assert_expr, var_init and the patterns of each case item. §13.4.3 bars the
-// reference and not the position it stands in, so each position newly reached
-// gets a case reading back the report for a reference to the module variable
-// `i`.
-//
-// A.6.5 writes `event_expression ::= [ edge_identifier ] expression [ iff
-// expression ]` and A.6.2 admits an event_control after the `=` of a
-// blocking_assignment, which fills Stmt::events with an entry holding those
-// two expressions. §18.16 gives `randcase_item ::= expression :
-// statement_or_null`, whose weight the parser keeps in the first member of a
-// Stmt::randcase_items entry. A.2.5 gives `unpacked_dimension ::= [
-// constant_range ] | [ constant_expression ]`, kept in
-// Stmt::var_unpacked_dims. A.6.12 gives a randsequence twelve expression
-// positions outside its code blocks, which ForEachRandsequenceExpr reaches:
-// the rs_weight_specification of a rule and the expression of its rand join,
-// the list_of_arguments of each of the six rs_production_items a rule can
-// hold, and the condition of an rs_if_else, the count of an rs_repeat, and the
-// case_expression and case_item_expressions of an rs_case.
-//
-// Stmt::wait_order_events and Stmt::cycle_delay get no case. Every statement
-// Annex A admits either in is one §13.4.3 rejects before this walk runs: A.6.5
-// fills wait_order_events for `wait_order ( hierarchical_identifier { ,
-// hierarchical_identifier } ) action_block` alone and admits a cycle_delay in a
-// procedural_timing_control, both of which ValidateConstFuncBodyContent answers
-// with "schedules an event that would run once it has returned", and A.6.11's
-// clocking_drive, the other cycle_delay position, is written with `<=` and is
-// answered as a nonblocking assignment.
-// A.6.2's blocking_assignment takes a delay_or_event_control, to which A.6.5
-// gives no cycle_delay alternative, and the one spelling reaching the walk
-// with a cycle delay on it -- `q = ##2 d;`, which src/parser/parser_stmt.cpp
-// builds from the intra-assignment timing it shares with the nonblocking form
-// -- is what §14.11's "cycle delay (##) is not a legal intra-assignment delay"
-// rejects. A case for either would rest on a source Annex A does not admit, or
-// read back a rejection rather than the reference report.
-
-// One randsequence statement whose top production `main` is `rules`, with `a`
-// and `b` defined for an rs_production_item to name and `c` carrying the
-// tf_port_list §18.17.7 gives a production that takes an argument.
 std::string InRandsequence(const std::string& rules) {
   return "    randsequence(main)\n      main : " + rules +
          ";\n      a : { t = 0; };\n      b : { t = 0; };\n"

@@ -11,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §12.5: a case item may list several expressions separated by commas; the
-// selector matches the item when it equals any one of them. Here the middle
-// expression of the list is the matching one, driven end to end from source.
 TEST(CaseStatementSim, CaseMultiExpressionItemMatchesAnyExpr) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -446,10 +443,6 @@ TEST(CaseStatementSim, CaseDefaultInMiddlePosition) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// §12.5: all case expressions are made equal to the length of the longest, and
-// when every expression is signed the shorter ones are sign-extended. A 4-bit
-// signed selector holding -1 must therefore match the 8-bit signed pattern that
-// also denotes -1, not the 8-bit pattern whose low nibble happens to agree.
 TEST(CaseStatementSim, CaseAllSignedSignExtendsToLongest) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -470,10 +463,6 @@ TEST(CaseStatementSim, CaseAllSignedSignExtendsToLongest) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.5: if any of the case expressions is unsigned, all of them are treated as
-// unsigned. So even though the selector is declared signed, the presence of
-// unsigned item expressions forces a zero-extended comparison: -1 in 4 bits
-// widens to 0x0F, matching the unsigned 8'h0F pattern rather than 8'hFF.
 TEST(CaseStatementSim, CaseUnsignedItemForcesZeroExtend) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -494,10 +483,6 @@ TEST(CaseStatementSim, CaseUnsignedItemForcesZeroExtend) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.5: the length equalization also governs a plain unsigned comparison. A
-// 4-bit selector holding 0xF is widened to the 8-bit item length, so it matches
-// 8'h0F and does not match 8'hFF -- a comparison that only looked at the low
-// nibble would wrongly match 8'hFF.
 TEST(CaseStatementSim, CaseUnsignedWidthEqualizeToLongest) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -536,11 +521,6 @@ TEST(CaseStatementSim, CaseNullBodyItemMatch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// §12.5: the case expression is evaluated exactly once, before any of the item
-// expressions. A function whose side effect counts its own invocations is used
-// as the case expression; after the statement runs the counter must read 1 (an
-// implementation that re-evaluated the expression per item comparison would
-// leave it at the number of items scanned).
 TEST(CaseStatementSim, CaseExpressionEvaluatedExactlyOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -574,9 +554,6 @@ TEST(CaseStatementSim, CaseExpressionEvaluatedExactlyOnce) {
   EXPECT_EQ(x->value.ToUint64(), 30u);
 }
 
-// §12.5: a default item is ignored during the linear search. Here the default
-// sits ahead of a matching item in the list, yet the search must skip it and
-// execute the later matching item, not the default.
 TEST(CaseStatementSim, CaseDefaultIgnoredDuringSearch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -596,10 +573,6 @@ TEST(CaseStatementSim, CaseDefaultIgnoredDuringSearch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5: a plain-case comparison is exact for every bit with respect to 0, 1,
-// x, and z. This drives a heterogeneous selector that mixes all four values and
-// requires the matching item to agree in every position; a pattern that differs
-// only in a single z-versus-x bit must not match.
 TEST(CaseStatementSim, CaseExactMatchMixedFourState) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -619,10 +592,6 @@ TEST(CaseStatementSim, CaseExactMatchMixedFourState) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.5 (width equalization, consuming the §11.6.1 concatenation width): a case
-// item may be any expression, including a concatenation whose length is fixed
-// by the bit-length rules. The 4-bit concatenation is widened to the 8-bit
-// selector length, so 0xB matches 0x0B and does not match 0xFB.
 TEST(CaseStatementSim, CaseConcatItemWidthEqualizesToSelector) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -642,11 +611,6 @@ TEST(CaseStatementSim, CaseConcatItemWidthEqualizesToSelector) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.5 (sign treatment, consuming §11.8.1 signedness): signedness can come
-// from the operand's type, not just an explicit `signed` keyword. A `byte`
-// selector is signed, and with all-signed item expressions the shorter selector
-// is sign-extended to the 16-bit item length, so -1 matches 16'shFFFF rather
-// than the same low byte 16'sh00FF.
 TEST(CaseStatementSim, CaseTypeDerivedSignedSelectorSignExtends) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -667,9 +631,6 @@ TEST(CaseStatementSim, CaseTypeDerivedSignedSelectorSignExtends) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5 makes every expression of a case statement as long as the longest of
-// them before it is evaluated, so the sum of two 4-bit values keeps its carry
-// against a 5-bit item.
 TEST(CaseStatementSim, CaseExpressionEvaluatedAtTheCommonLength) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -683,9 +644,6 @@ TEST(CaseStatementSim, CaseExpressionEvaluatedAtTheCommonLength) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-// An unbased unsized item fills the common length, the wider item's, not the
-// case expression's alone: '1 is 16'hFFFF, which the 8-bit 8'hFF zero-extends
-// short of.
 TEST(CaseStatementSim, UnbasedUnsizedItemFillsTheCommonLength) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -699,7 +657,6 @@ TEST(CaseStatementSim, UnbasedUnsizedItemFillsTheCommonLength) {
   EXPECT_EQ(v->value.ToUint64(), 3u);
 }
 
-// A case expression written '1 is filled to the common length too.
 TEST(CaseStatementSim, UnbasedUnsizedCaseExpressionFillsTheCommonLength) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -712,9 +669,6 @@ TEST(CaseStatementSim, UnbasedUnsizedCaseExpressionFillsTheCommonLength) {
   EXPECT_EQ(v->value.ToUint64(), 1u);
 }
 
-// §12.5: an unsigned expression anywhere in the statement makes every one of
-// them unsigned and zero-extended, so the signed -1 in s is 32'h0000000F
-// against the item -1's 32'hFFFFFFFF; the unsigned 4'd0 decides that.
 TEST(CaseStatementSim, OneUnsignedItemMakesEveryExpressionUnsigned) {
   SimFixture f;
   auto* v = RunAndFindVar(

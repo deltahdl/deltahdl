@@ -49,9 +49,6 @@ TEST(ConstEval, ZeroPowerNegative) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("0 ** -1", f)), std::nullopt);
 }
 
-// Table 11-4: integral power with a negative exponent. For a base whose
-// magnitude exceeds one the truncated reciprocal is zero; a base of one stays
-// one; a base of negative one alternates with the parity of the exponent.
 TEST(ConstEval, IntegralPowerNegativeExponentTable) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("2 ** -1", f)), 0);
@@ -61,9 +58,6 @@ TEST(ConstEval, IntegralPowerNegativeExponentTable) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-1) ** -2", f)), 1);
 }
 
-// Table 11-4: integral power with a positive exponent and a negative base.
-// A base below negative one raises normally; a base of negative one alternates
-// between negative one and one with the parity of the exponent.
 TEST(ConstEval, IntegralPowerNegativeBasePositiveExponent) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("(-2) ** 3", f)), -8);
@@ -167,12 +161,6 @@ TEST(OperatorElaboration, BinaryPowerElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.3 in a constant expression: parameter operands take a different
-// evaluation path than literals (the elaborator must resolve the parameter
-// reference to its value first). Once resolved, integer division truncates the
-// negative quotient toward zero (-3, not -4) and modulus carries the sign of
-// the first operand (-1). The operands are produced by real parameter
-// declarations and the folded localparam values are read back after elaborate.
 TEST(OperatorElaboration, ParameterOperandDivisionAndModulus) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -200,9 +188,6 @@ TEST(OperatorElaboration, ParameterOperandDivisionAndModulus) {
   EXPECT_TRUE(saw_r);
 }
 
-// §11.4.3 in a constant expression: localparam operands are another admitted
-// constant form. A power whose base and exponent are both localparams folds to
-// 3 ** 4 == 81 during elaboration.
 TEST(OperatorElaboration, LocalparamOperandPower) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -224,11 +209,6 @@ TEST(OperatorElaboration, LocalparamOperandPower) {
   EXPECT_TRUE(saw_p);
 }
 
-// §11.4.3 in a constant expression: a genvar is a constant operand (11.2.1).
-// The loop's continuation is a multiplication over the genvar, i * i <= 9, true
-// for i = 1, 2, 3 and false at i = 4, so the elaborator unrolls exactly three
-// blocks. The resulting variable count observes the multiply applied to a
-// genvar operand.
 TEST(OperatorElaboration, GenvarOperandControlsGenerateUnroll) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -294,9 +274,6 @@ TEST(ConstEvalReal, BinaryMulReals) {
   EXPECT_DOUBLE_EQ(val.value_or(0.0), 6.0);
 }
 
-// §11.4.3 truncates a quotient toward zero and wraps a signed result at its
-// width, so the most negative 64-bit value divided by -1 is itself, and its
-// remainder by -1 is 0, as for any other dividend.
 TEST(ArithmeticOperatorElaboration, MostNegativeDividedByMinusOneWraps) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("64'sh8000_0000_0000_0000 / -1", f)),

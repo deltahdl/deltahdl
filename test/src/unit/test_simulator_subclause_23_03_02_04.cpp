@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -64,10 +63,6 @@ TEST(WildcardPortConnectionSimulation, DefaultValueUsedForMissingSignal) {
 
 TEST(WildcardPortConnectionSimulation,
      WildcardMixedWithImplicitNamePropagates) {
-  // §23.3.2.4: a .* connection mixes with an implicit .name connection
-  // (§23.3.2.3). The `.a` implicit named connection is built from real source
-  // syntax; the .* then supplies the remaining ports. Both sides must reach the
-  // child for the sum to appear, observed by running the design end to end.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input logic [7:0] a, input logic [7:0] b,\n"
@@ -85,10 +80,6 @@ TEST(WildcardPortConnectionSimulation,
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §23.3.2.4: `.*` connects each port whose name exists in the instantiating
-// scope, a variable an explicit import brings in among them, while a name only
-// a wildcard import could supply is no sufficient reference and the port takes
-// its default.
 TEST(WildcardPortConnectionSimulation,
      ExplicitImportIsConnectedAndWildcardIsNot) {
   SimFixture f;

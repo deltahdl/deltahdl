@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.13.5: set_randstate() installs the given value as the object's RNG state,
-// so a state read from an object and installed on it again replays the four
-// draws that followed the read, installed on another object it makes that
-// object continue the stream in all four draws, the installed state reads back,
-// and a third object's state is kept, as the design
-// test/src/e2e/set_randstate_method.sv runs it.
 TEST(SetRandstateRun, TheStateInstalledOnAnObjectSetsWhatItDrawsNext) {
   SimFixture f;
   std::string out = RunCapture(
@@ -54,14 +48,6 @@ TEST(SetRandstateRun, TheStateInstalledOnAnObjectSetsWhatItDrawsNext) {
   EXPECT_EQ(out, "4 4 1 1\n");
 }
 
-// 18.13.5 via 9.7: the state of the RNG associated with a process is set with
-// the set_randstate() of the process, so a state read from the running
-// process and installed again replays the four $urandom draws that followed
-// the read, installed on a forked thread it makes the thread continue the
-// stream in all four draws, and the install on the thread does not set the
-// parent: the fork seeds the thread with the parent's next value (18.14.1),
-// so the parent is left where a fork without the install leaves it, as the
-// design test/src/e2e/set_randstate_method.sv runs it.
 TEST(SetRandstateRun, TheStateInstalledOnTheProcessOrAThreadSetsWhatItDraws) {
   SimFixture f;
   std::string out = RunCapture(

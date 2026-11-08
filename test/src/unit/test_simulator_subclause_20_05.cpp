@@ -68,11 +68,9 @@ TEST(SysTask, RealtobitsReinterpretsRealAsBits) {
   EXPECT_EQ(result.ToUint64(), expected_bits);
 }
 
-// $shortrealtobits yields the 32-bit single-precision representation of the
-// shortreal value.
 TEST(SysTask, ShortrealtobitsReinterpretsShortrealAs32Bits) {
   SysTaskFixture f;
-  double dval = 1.5;  // exactly representable in single precision
+  double dval = 1.5;
   auto* expr = MkSysCall(f.arena, "$shortrealtobits", {MkReal(f.arena, dval)});
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 32u);
@@ -82,8 +80,6 @@ TEST(SysTask, ShortrealtobitsReinterpretsShortrealAs32Bits) {
   EXPECT_EQ(result.ToUint64() & 0xFFFFFFFFu, expected_bits);
 }
 
-// $bitstoshortreal turns a 32-bit pattern (as produced by $shortrealtobits)
-// back into a shortreal value.
 TEST(SysTask, BitstoshortrealReinterprets32BitsAsShortreal) {
   SysTaskFixture f;
   float fval = 1.5f;
@@ -96,10 +92,6 @@ TEST(SysTask, BitstoshortrealReinterprets32BitsAsShortreal) {
   EXPECT_DOUBLE_EQ(ResultToDouble(result), 1.5);
 }
 
-// NOTE 1: conversions round the result to the nearest valid IEEE 754
-// representation rather than truncating the mantissa. 0.1 is not exactly
-// representable in single precision, so the narrowed value must match the
-// round-to-nearest single-precision result.
 TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
   SysTaskFixture f;
   double dval = 0.1;
@@ -111,18 +103,6 @@ TEST(SysTask, ShortrealtobitsRoundsToNearestRepresentation) {
   EXPECT_EQ(result.ToUint64() & 0xFFFFFFFFu, expected_bits);
 }
 
-// §20.5 declares the operand of $shortrealtobits a shortreal_val, and the task
-// turns a shortreal value into the 32-bit vector that represents it. §6.12
-// makes a shortreal a C float, so a shortreal variable already holds that
-// 32-bit representation and the task is a round trip on it.
-//
-// ShortrealtobitsReinterpretsShortrealAs32Bits and
-// ShortrealtobitsRoundsToNearestRepresentation above pass a real literal, so
-// the task never receives an operand at the width §6.12 gives a shortreal.
-// Declaring the variable and running the assignment is the only way to reach
-// it. 1.5 is exactly representable in
-// single precision: sign 0, biased exponent 127 (0x7F), and a mantissa whose
-// leading fraction bit alone is set (0x400000) pack as 0x3FC00000.
 TEST(SysTask, ShortrealtobitsReadsAShortrealVariable) {
   auto b = RunAndGet(
       "module t;\n"
@@ -137,8 +117,6 @@ TEST(SysTask, ShortrealtobitsReadsAShortrealVariable) {
   EXPECT_EQ(b, 0x3FC00000u);
 }
 
-// $signed returns a value with the same size and value as the input, marked
-// signed.
 TEST(SysTask, SignedCastPreservesSizeAndValueAndMarksSigned) {
   SysTaskFixture f;
   auto in = EvalExpr(MkInt(f.arena, 0xABCDu), f.ctx, f.arena);
@@ -149,8 +127,6 @@ TEST(SysTask, SignedCastPreservesSizeAndValueAndMarksSigned) {
   EXPECT_EQ(result.ToUint64(), in.ToUint64());
 }
 
-// $unsigned returns a value with the same size and value as the input, marked
-// unsigned.
 TEST(SysTask, UnsignedCastPreservesSizeAndValueAndMarksUnsigned) {
   SysTaskFixture f;
   auto in = EvalExpr(MkInt(f.arena, 0xABCDu), f.ctx, f.arena);
@@ -161,9 +137,6 @@ TEST(SysTask, UnsignedCastPreservesSizeAndValueAndMarksUnsigned) {
   EXPECT_EQ(result.ToUint64(), in.ToUint64());
 }
 
-// $rtoi truncates rather than rounds, and truncation is toward zero: a
-// negative real loses its fractional part without moving toward -infinity, so
-// -3.7 becomes -3 (0xFFFFFFFD in the 32-bit result).
 TEST(SysTask, RtoiTruncatesNegativeTowardZero) {
   SysTaskFixture f;
   auto* real_arg = f.arena.Create<Expr>();
@@ -175,8 +148,6 @@ TEST(SysTask, RtoiTruncatesNegativeTowardZero) {
   EXPECT_EQ(result.ToUint64(), 0xFFFFFFFDu);
 }
 
-// $bitstoreal recovers the original real value from a bit pattern produced by
-// $realtobits, so chaining the two is an identity on the real value.
 TEST(SysTask, BitstorealInvertsRealtobitsRoundTrip) {
   SysTaskFixture f;
   double dval = 3.14159;
@@ -192,9 +163,6 @@ TEST(SysTask, BitstorealInvertsRealtobitsRoundTrip) {
   EXPECT_DOUBLE_EQ(ResultToDouble(result), dval);
 }
 
-// The signedness casts change only the signedness, never the bit pattern, so
-// the guarantee of an unchanged value holds even when the most significant bit
-// is set.
 TEST(SysTask, CastFunctionsPreserveValueWithHighBitSet) {
   SysTaskFixture f;
   auto in = EvalExpr(MkInt(f.arena, 0xFFFFFFFFu), f.ctx, f.arena);
@@ -214,9 +182,6 @@ TEST(SysTask, CastFunctionsPreserveValueWithHighBitSet) {
   EXPECT_EQ(unsigned_res.ToUint64(), in.ToUint64());
 }
 
-// §20.5: $itor and $bitstoreal return reals, which arithmetic and a real
-// format specifier tell from integers by the value's mark: `$itor(5) + 1` is
-// the real 6.0, and $bitstoreal of 1.5's pattern prints 1.5.
 TEST(SysTask, ItorAndBitstorealResultsAreReal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -231,9 +196,6 @@ TEST(SysTask, ItorAndBitstorealResultsAreReal) {
             "5.000000 6.000000 1.500000\n");
 }
 
-// §20.5: $rtoi returns an integer, which is signed, so a negative result
-// prints negative and compares below 0 used directly, with no intermediate
-// variable.
 TEST(ConversionSim, RtoiResultIsASignedInteger) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -245,8 +207,6 @@ TEST(ConversionSim, RtoiResultIsASignedInteger) {
             "-2 -2 1\n");
 }
 
-// §20.5: $itor and $bitstoreal return reals wherever they are used: assigned
-// to a real, nested in a real function and compared with a real.
 TEST(ConversionSim, ItorAndBitstorealResultsAreReals) {
   SimFixture f;
   EXPECT_EQ(
@@ -263,11 +223,6 @@ TEST(ConversionSim, ItorAndBitstorealResultsAreReals) {
       "16.000000 4 1\n");
 }
 
-// §20.5: $realtobits takes a real and $shortrealtobits a shortreal, so an
-// operand of another type reaches each as its value converted (§6.12.1),
-// never as its bits: the int 3 gives the patterns of 3.0, the int -2 that of
-// -2.0, the shortreal 3.0 the double 3.0, and the real 0.1 the float nearest
-// it.
 TEST(ConversionSim, RealtobitsAndShortrealtobitsConvertTheirOperandByValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -283,9 +238,6 @@ TEST(ConversionSim, RealtobitsAndShortrealtobitsConvertTheirOperandByValue) {
             "3dcccccd\n");
 }
 
-// §20.5: $rtoi takes a real, so an integral operand reaches it as its value
-// converted to real (§6.12.1): the int 7 truncates to 7 and the signed byte
-// -3 to -3, where reading their bits as a float's gives 0.
 TEST(ConversionSim, RtoiConvertsAnIntegralOperandByValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -297,10 +249,6 @@ TEST(ConversionSim, RtoiConvertsAnIntegralOperandByValue) {
             "7 -3\n");
 }
 
-// §20.5: $itor converts an integer value to real, so the signed byte -3 gives
-// -3.0 rather than the 253.0 its pattern spells, and a real operand reaches it
-// rounded to the nearest integer, ties away from zero (§6.12.1): 2.5 gives 3.0
-// and -2.5 gives -3.0.
 TEST(ConversionSim, ItorConvertsItsOperandToAnIntegerByValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

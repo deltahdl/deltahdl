@@ -11,7 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Locate a constraint member of the given name within a parsed class.
 const ClassMember* FindConstraint(const ClassDecl* cls, std::string_view name) {
   for (const auto* m : cls->members) {
     if (m->kind == ClassMemberKind::kConstraint && m->name == name) return m;
@@ -19,9 +18,6 @@ const ClassMember* FindConstraint(const ClassDecl* cls, std::string_view name) {
   return nullptr;
 }
 
-// 18.5.1: a constraint prototype may take an implicit form, written as a
-// constraint declaration with a name but no block. The parser records such a
-// member as a prototype that does not use the 'extern' keyword.
 TEST(ExternalConstraintBlockParsing, ImplicitPrototypeFormRecognized) {
   auto r = Parse(
       "class C;\n"
@@ -36,9 +32,6 @@ TEST(ExternalConstraintBlockParsing, ImplicitPrototypeFormRecognized) {
   EXPECT_FALSE(m->is_constraint_extern);
 }
 
-// 18.5.1: the explicit prototype form uses the 'extern' keyword before the
-// named, bodyless constraint declaration. The parser marks it both as a
-// prototype and as the extern form.
 TEST(ExternalConstraintBlockParsing, ExplicitPrototypeFormRecognized) {
   auto r = Parse(
       "class C;\n"
@@ -53,8 +46,6 @@ TEST(ExternalConstraintBlockParsing, ExplicitPrototypeFormRecognized) {
   EXPECT_TRUE(m->is_constraint_extern);
 }
 
-// 18.5.1: a prototype is distinguished from an ordinary in-class constraint by
-// the absence of a block. A constraint that carries a block is not a prototype.
 TEST(ExternalConstraintBlockParsing, ConstraintWithBodyIsNotPrototype) {
   auto r = Parse(
       "class C;\n"
@@ -68,9 +59,6 @@ TEST(ExternalConstraintBlockParsing, ConstraintWithBodyIsNotPrototype) {
   EXPECT_FALSE(m->is_constraint_prototype);
 }
 
-// 18.5.1: a prototype is completed by an external constraint block declared
-// outside the class using the class scope resolution operator. The parser
-// records the block's owning class and constraint name from 'C::proto2'.
 TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsClassAndName) {
   auto r = Parse(
       "class C;\n"
@@ -84,9 +72,6 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsClassAndName) {
   EXPECT_EQ(r.cu->external_constraints.front().constraint_name, "proto2");
 }
 
-// 18.5.1 with 26.2: the block shares its scope with the class it completes,
-// so the parser records the item list of the package that declares it, and
-// none for the block at compilation-unit scope.
 TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsItsPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -111,10 +96,6 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockRecordsItsPackage) {
   EXPECT_EQ(r.cu->external_constraints[1].scope_items, nullptr);
 }
 
-// 18.5.1 with A.1.11: extern_constraint_declaration is a
-// package_or_generate_item_declaration, which a module body reaches, so a
-// block beside a class inside a module is read and records the module's items
-// as its scope; the static form is read there too.
 TEST(ExternalConstraintBlockParsing, ExternalBlockInAModuleRecordsTheModule) {
   auto r = Parse(
       "module m;\n"
@@ -138,9 +119,6 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockInAModuleRecordsTheModule) {
             &r.cu->modules[0]->items);
 }
 
-// 18.5.1 with A.1.11: a generate block holds package_or_generate_item
-// declarations too, so a block beside a class in one records the generate
-// block's items, the list that holds the class.
 TEST(ExternalConstraintBlockParsing, ExternalBlockInAGenerateBlock) {
   auto r = Parse(
       "module m;\n"
@@ -162,10 +140,6 @@ TEST(ExternalConstraintBlockParsing, ExternalBlockInAGenerateBlock) {
   EXPECT_EQ(scope->front()->name, "C");
 }
 
-// 18.5.1: an external constraint block completes the prototype with the
-// relations in its body. The parser captures each top-level relation so that
-// elaboration can attach them to the prototype; a block with two relations
-// records two, not the discarded body of before.
 TEST(ExternalConstraintBlockParsing, ExternalBlockCapturesBodyRelations) {
   auto r = Parse(
       "class C;\n"

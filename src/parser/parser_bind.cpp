@@ -1,9 +1,3 @@
-// A.1.4's bind_directive -- its bind_target_instance, its two forms and the
-// instantiation it carries -- and the one thing else a `bind` can open, IEEE
-// 1800-2012 §11.11's overload_declaration, which Annex C.2.8 has removed. Moved
-// out of parser.cpp, which the C.2.8 report took past the limit
-// assert-no-oversized-source-files enforces.
-
 #include <string>
 #include <utility>
 #include <vector>
@@ -17,11 +11,6 @@
 
 namespace delta {
 
-// Reads A.1.4's bind_target_instance, `hierarchical_identifier
-// constant_bit_select`, where A.9.3 gives hierarchical_identifier as
-// `[ $root . ] { identifier constant_bit_select . } identifier` and
-// constant_bit_select as `{ [ constant_expression ] }`: any identifier of the
-// path may be followed by selects, and by more than one of them.
 BindTargetInstance Parser::ParseBindTargetInstance() {
   BindTargetInstance target;
   if (Check(TokenKind::kSystemIdentifier) && CurrentToken().text == "$root") {
@@ -45,11 +34,6 @@ BindTargetInstance Parser::ParseBindTargetInstance() {
   return target;
 }
 
-// Whether `kind` is one of the fifteen operators IEEE 1800-2012 §11.11 let an
-// overload_declaration bind a function to: `+ ++ - -- * ** / % == != < <= >
-// >= =`. Annex C.2.8 has that construct deprecated by IEEE 1800-2017 and
-// absent from this version, so `bind` followed by one of these is nothing this
-// standard writes.
 static bool IsOverloadableOperator(TokenKind kind) {
   switch (kind) {
     case TokenKind::kPlus:
@@ -73,12 +57,6 @@ static bool IsOverloadableOperator(TokenKind kind) {
   }
 }
 
-// A.1.4's bind_directive, or null for the removed construct of Annex C.2.8:
-// `bind` followed by an operator was IEEE 1800-2012 §11.11's
-// overload_declaration, `bind overload_operator function data_type
-// function_identifier ( overload_proto_formals ) ;`, which is reported at the
-// operator as removed and read on to its ';' so that what follows is still
-// read; there is no bind directive in it to record.
 BindDirective* Parser::ParseBindDirective() {
   auto bind_loc = CurrentLoc();
   Expect(TokenKind::kKwBind, Subclause("23.11"));
@@ -94,17 +72,10 @@ BindDirective* Parser::ParseBindDirective() {
   auto* decl = arena_.Create<BindDirective>();
   decl->loc = bind_loc;
 
-  // Which of A.1.4's two forms the directive takes is settled by the token
-  // after the target, so the target is read as a bind_target_instance either
-  // way and held to bind_target_scope once a ':' names the first form.
   auto target_loc = CurrentLoc();
   decl->target = ParseBindTargetInstance();
 
   if (Match(TokenKind::kColon)) {
-    // A.1.4: bind_target_scope ::= module_identifier | interface_identifier,
-    // one name, since §23.11 has it name the module or interface whose
-    // instances the list then narrows; an instance path, a select or a
-    // `$root .` prefix names an instance instead.
     if (decl->target.from_root || decl->target.segments.size() != 1 ||
         !decl->target.segments[0].selects.empty()) {
       diag_.Error(target_loc,
@@ -121,9 +92,6 @@ BindDirective* Parser::ParseBindDirective() {
   return decl;
 }
 
-// A.1.4: a bind_directive among a body's items, a module_common_item, so not
-// one of a checker's, a program's or a package's. One in a generate block is
-// also an item of the block, since §27.5 instantiates it only with the block.
 void Parser::ParseBindItem(std::vector<ModuleItem*>& items) {
   RejectInCheckerBody("a bind directive is not an item of a checker");
   RejectInProgramBody(CurrentLoc(),
@@ -144,9 +112,6 @@ void Parser::ParseBindItem(std::vector<ModuleItem*>& items) {
   }
 }
 
-// A.1.4 puts a bind_directive among the items of a compilation unit. Answers
-// whether one stood at the current position, whether or not it was the removed
-// construct that leaves nothing to record.
 bool Parser::TryParseUnitBindDirective(CompilationUnit* unit) {
   if (!Check(TokenKind::kKwBind)) return false;
   if (auto* bd = ParseBindDirective()) unit->bind_directives.push_back(bd);

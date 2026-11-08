@@ -42,17 +42,6 @@ TEST(ClassObjectElaboration, ForwardTypedefInterfaceClassOk) {
              "endmodule\n"));
 }
 
-// §6.18 carries the rule: a forward typedef's actual data type definition is
-// resolved within the same local scope or generate block. §8.27 restates it for
-// a forward class declaration and says so, opening with a pointer to the
-// forward typedefs of §6.18, so both sites pass Subclause("6.18").
-// Elaborator::ValidateForwardClassTypedefs in
-// src/elaborator/elaborator_validate_classes.cpp walks the compilation unit's
-// items and Elaborator::ValidateForwardTypedefsInScope in
-// src/elaborator/elaborator_scope_rules_enclosing.cpp walks a ModuleDecl's
-// items; the two lists are disjoint, and that is what tells the two sites
-// apart. This source declares its forward typedef at compilation-unit scope, so
-// only the first site reaches it.
 TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
   ElabFixture f;
   ElabOk(
@@ -68,10 +57,6 @@ TEST(ClassObjectElaboration, UnresolvedForwardTypedefClassError) {
       "is never resolved by a definition in the same scope", 1, "6.18"));
 }
 
-// §8.27: the bare `typedef C2;` form is equivalent to `typedef class C2;` and
-// shall work the same way. Equivalence includes the resolution rule: an
-// unresolved bare forward typedef must be rejected by the same production path
-// that rejects the class-keyword form (see UnresolvedForwardTypedefClassError).
 TEST(ClassObjectElaboration, UnresolvedBareForwardTypedefClassError) {
   ElabFixture f;
   ElabOk(
@@ -111,20 +96,6 @@ TEST(ClassObjectElaboration, BareForwardTypedefWithoutClassKeywordOk) {
              "endmodule\n"));
 }
 
-// §8.27's forward declaration introduces the name before the type: `typedef
-// class C;` says C is a class and nothing else, so the elaborated table has no
-// width to record for it. It recorded 1, which is §6.10's answer for the
-// implicit type a forward declaration leaves behind and is not what a class is
-// -- §8.3 makes a class variable a handle to an object, which this simulator
-// carries in 64 bits.
-//
-// What made that worth answering at the table is that it turned on an unrelated
-// declaration: a class the design does not forward-declare is in no typedef map
-// at all, so its name answers 0, and the same class name answered 1 in a file
-// that happened to write the forward declaration. The vector typedef beside it
-// is the control -- a name that does have a width still records it -- and the
-// absent entry is told from a recorded 0, so "no width" reads as an answer
-// rather than as the name never having reached the table.
 TEST(ClassObjectElaboration, ForwardDeclaredClassIsRecordedWithNoWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -1,27 +1,3 @@
-// §20.3's simulation time functions and §20.4's timescale system tasks:
-// $time, $stime and $realtime, which report the current simulation time in the
-// time unit of the module that invoked them; $timeunit and $timeprecision,
-// which report the time unit and precision of a design element as the Table
-// 20-2 base-10 order; $printtimescale, which displays both; and $timeformat,
-// which sets the units, precision, suffix and minimum field width the %t
-// format specifier renders a time with.
-//
-// What the group shares is the timescale model SimContext holds: a tick count
-// kept in the design's global precision, and a per-scope TimeScale saying what
-// unit and precision that scope was declared in. Every function here either
-// converts between the two or reports one of them, which is why §20.3 and
-// §20.4 sit together rather than with the rest of the system functions.
-//
-// These were in src/simulator/eval_system_func.cpp, which reached 951 lines
-// against the 950 that assert-no-oversized-source-files in
-// .github/workflows/deltahdl.yml warns at and the 1000 it fails at. The
-// dispatcher that selects them, EvalMiscSysCall, stays there and reaches the
-// four entry points below through simulator/eval_systask_internal.h.
-//
-// ExtractStringArg stays with the dispatcher as well: Annex D's $log takes the
-// file name it opens through the same unquoting that $timeformat's
-// suffix_string does, so the header declares it and this file calls across.
-
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -35,43 +11,29 @@
 #include "simulator/evaluation.h"
 #include "simulator/scope.h"
 #include "simulator/sim_context.h"
-// §37.82: the VPI model reaches the $timeformat() call that set the active time
-// format, so the run stands one up as the task runs.
 #include "simulator/vpi_context.h"
 #include "simulator/vpi_globals.h"
 
 namespace delta {
 
-// §20.3.1: $time reports the current simulation time as a 64-bit integer
-// expressed in the time unit of the module that invoked it. The scheduler
-// keeps time in ticks of the global precision (the finest precision in the
-// design), so converting to the invoking module's unit divides the tick count
-// by the number of precision steps that make up one unit. Because $time has an
-// integer return type, the quotient is rounded to the nearest integer; the
-// design's time precision itself plays no part in that rounding.
 static uint64_t CurrentTimeInModuleUnits(SimContext& ctx) {
   uint64_t ticks = ctx.CurrentTime().ticks;
   const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   int unit_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
   int prec_order = static_cast<int>(ctx.StepTimeUnit());
-  int exp = unit_order - prec_order;  // >= 0: the unit is no finer than a tick
+  int exp = unit_order - prec_order;
   if (exp <= 0) return ticks;
   uint64_t steps_per_unit = 1;
   for (int i = 0; i < exp; ++i) steps_per_unit *= 10;
-  return (ticks + steps_per_unit / 2) / steps_per_unit;  // round to nearest
+  return (ticks + steps_per_unit / 2) / steps_per_unit;
 }
 
-// §20.3.3: $realtime reports the current simulation time scaled to the
-// invoking module's time unit just as $time does, but the result is a real
-// number rather than an integer. Because the return type is real, the scaled
-// value keeps its fractional part instead of being rounded to the nearest
-// integer (e.g. a 16 ns time under a 10 ns unit yields 1.6, not 2).
 static double CurrentTimeInModuleUnitsReal(SimContext& ctx) {
   uint64_t ticks = ctx.CurrentTime().ticks;
   const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   int unit_order = EffectiveTimeOrder(scale.unit, scale.magnitude);
   int prec_order = static_cast<int>(ctx.StepTimeUnit());
-  int exp = unit_order - prec_order;  // >= 0: the unit is no finer than a tick
+  int exp = unit_order - prec_order;
   if (exp <= 0) return static_cast<double>(ticks);
   double steps_per_unit = 1.0;
   for (int i = 0; i < exp; ++i) steps_per_unit *= 10.0;
@@ -81,10 +43,6 @@ static double CurrentTimeInModuleUnitsReal(SimContext& ctx) {
 Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
                           std::string_view name) {
   if (name == "$stime") {
-    // §20.3.2: $stime reports the current time scaled to the invoking module's
-    // time unit just as $time does, but as an unsigned 32-bit value. When the
-    // scaled time does not fit in 32 bits, only its low-order 32 bits are
-    // returned; the 32-bit result width performs that truncation.
     return MakeLogic4VecVal(arena, 32, CurrentTimeInModuleUnits(ctx));
   }
   if (name == "$realtime") {
@@ -101,11 +59,6 @@ Logic4Vec EvalTimeSysCall(SimContext& ctx, Arena& arena,
   return MakeLogic4VecVal(arena, 64, ctx.CurrentTime().ticks);
 }
 
-// Extract the design-element name an argument to $timeunit, $timeprecision or
-// $printtimescale refers to. Bare $root/$unit are modeled by the parser as
-// argument-less system calls and a simple name as an identifier; a
-// hierarchical name, §20.4.1's own b_dat.c1, is a chain of member accesses,
-// rebuilt into the dotted path the lowerer registers the instance under.
 static std::string TimescaleArgName(const Expr* arg) {
   if (arg->kind == ExprKind::kSystemCall) return std::string(arg->callee);
   if (arg->kind == ExprKind::kMemberAccess) return FlattenHierPath(arg);
@@ -116,28 +69,17 @@ static std::string TimescaleArgName(const Expr* arg) {
   return {};
 }
 
-// The time scale of the design element `target` names: a module or an
-// instance, or else a package, which §3.2 counts among the design elements and
-// the lowerer registers under its name and "::" (§3.14.2.2); null where it
-// names neither.
 static const TimeScale* FindNamedTimeScale(const SimContext& ctx,
                                            const std::string& target) {
   if (const TimeScale* found = ctx.FindScopeTimeScale(target)) return found;
   return ctx.FindScopeTimeScale(target + "::");
 }
 
-// §20.4.1: $timeunit and $timeprecision return the time unit or precision of a
-// design element, encoded as the base-10 order from Table 20-2 (an integer in
-// the range 2 to -15). With no argument the current scope is reported; an
-// argument names the design element, $unit names the compilation unit, and
-// $root yields the simulation time unit for both functions (see 3.14.3).
 Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx, Arena& arena,
                              std::string_view name) {
   bool want_precision = (name == "$timeprecision");
   const TimeScale* scale = &ActiveInstanceTimeScale(ctx);
   if (!expr->args.empty() && expr->args[0] != nullptr) {
-    // $root is the time scope of the simulation time unit (§3.14.3), which
-    // the lowerer registers beside the design elements'.
     std::string target = TimescaleArgName(expr->args[0]);
     if (target == "$unit") {
       scale = &ctx.CompUnitTimeScale();
@@ -156,13 +98,9 @@ Logic4Vec EvalTimescaleQuery(const Expr* expr, SimContext& ctx, Arena& arena,
   return result;
 }
 
-// Render a Table 20-2 base-10 order (in the range 2 .. -15) as the
-// magnitude-and-unit text used in $printtimescale output, e.g. -7 -> "100ns",
-// -12 -> "1ps", -15 -> "1fs". The SI unit comes from the nearest multiple of
-// three at or below the order; the remainder selects the 1/10/100 mantissa.
 static std::string TimeOrderToUnitString(int order) {
   int base = (order >= 0) ? (order / 3) * 3 : -(((-order) + 2) / 3) * 3;
-  int diff = order - base;  // 0, 1, or 2
+  int diff = order - base;
   const char* mantissa = diff == 2 ? "100" : (diff == 1 ? "10" : "1");
   const char* unit = nullptr;
   switch (base) {
@@ -183,30 +121,14 @@ static std::string TimeOrderToUnitString(int order) {
       break;
     default:
       unit = "fs";
-      break;  // -15
+      break;
   }
   return std::string(mantissa) + unit;
 }
 
-// Annex D.10: the time unit of the module of the instance the running process
-// stands in, reached by the prefix the process carries, which the lowerer
-// registered as the instance's path below the top; the top module's own unit,
-// which CurrentTimeScale holds, when the process stands in the top or when none
-// is running. The prefix ends in the dot that joins it to a name, which no
-// registered path carries.
-//
-// §3.14.2.3 (printed page 60) makes the compilation-unit scope a time scope of
-// its own, whose unit a timeunit declaration sets and a `timescale directive
-// cannot, so a subroutine it declares -- a method of a class it
-// declares among them -- runs in that unit whichever instance calls it.
 const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
   if (const Scope* frame = ctx.PackageFrame()) {
-    // §3.12.1: where each file is a unit of its own, a unit's frame is
-    // "$unit#k", whose time scale stands under "$unit#k::" as a package's
-    // does (RegisterUnitTimeScales in unit_scope_items.cpp).
     if (frame->package == "$unit") return ctx.CompUnitTimeScale();
-    // §3.14.2.2: a package that declares its time unit is a time scope of its
-    // own, registered by the lowerer under the package's name and "::".
     std::string key(frame->package);
     key += "::";
     if (const TimeScale* found = ctx.FindScopeTimeScale(key)) return *found;
@@ -217,21 +139,10 @@ const TimeScale& ActiveInstanceTimeScale(const SimContext& ctx) {
   return ctx.CurrentTimeScale();
 }
 
-// §20.4.2: assemble the line $printtimescale displays for `expr`, reading the
-// timescale model in `ctx`. The output names the targeted design element and
-// reports its time unit and precision in the fixed format
-// "Time scale of (<name>) is <unit> / <precision>". With no argument the
-// current scope is described; a named argument selects that element; the
-// special $unit and $root arguments select the compilation unit and the
-// simulation time unit, and in those two cases the literal "$unit"/"$root" is
-// shown in place of a design-element name.
 std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
   std::string name;
   const TimeScale* scale = &ActiveInstanceTimeScale(ctx);
   if (!expr->args.empty() && expr->args[0] != nullptr) {
-    // $root names the time scope of the simulation time unit, whose unit and
-    // precision are both the global precision (§3.14.3), registered by the
-    // lowerer beside the design elements'.
     std::string target = TimescaleArgName(expr->args[0]);
     if (target == "$unit") {
       scale = &ctx.CompUnitTimeScale();
@@ -242,9 +153,6 @@ std::string BuildPrinttimescaleReport(const Expr* expr, SimContext& ctx) {
         scale = found;
     }
   } else {
-    // §20.4.2: with no argument the report is of the current scope, which for
-    // a process standing in an instance below the top is that instance, named
-    // by its path from the top.
     name = ctx.CurrentScopeName();
     std::string prefix = ctx.ActiveInstancePrefix();
     if (!prefix.empty()) {
@@ -265,21 +173,12 @@ Logic4Vec EvalPrinttimescaleTask(const Expr* expr, SimContext& ctx,
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// $timeformat (20.4.3) shall accept units_number and precision_number values
-// in the Table 20-2 range from 2 to -15; out-of-range integers are rejected
-// and the configured state is left untouched.
 static bool TimeformatRangeOk(int64_t v) { return v <= 2 && v >= -15; }
 
-// Evaluate one $timeformat integer field (units_number or precision_number),
-// range-check it against Table 20-2, and store it into `out`. Returns false and
-// emits a diagnostic naming `field` when the value is out of range, in which
-// case `out` is left untouched and the caller must abort.
 static bool ApplyTimeformatRangeField(const Expr* arg, SimContext& ctx,
                                       Arena& arena, const char* field,
                                       int& out) {
   auto v = static_cast<int64_t>(EvalExpr(arg, ctx, arena).ToUint64());
-  // The value arrives as an unsigned 64-bit word, so widen the negative
-  // 32-bit pattern back into a signed integer for the range check.
   auto field_value = static_cast<int32_t>(v);
   if (!TimeformatRangeOk(field_value)) {
     ctx.GetDiag().Error(
@@ -292,10 +191,6 @@ static bool ApplyTimeformatRangeField(const Expr* arg, SimContext& ctx,
   return true;
 }
 
-// Apply the two range-checked integer fields (units_number, precision_number)
-// of a $timeformat call onto `spec`. Returns false when either field is out of
-// the Table 20-2 range, in which case the diagnostic has been emitted and the
-// caller must abort without committing the spec.
 static bool ApplyTimeformatRangeFields(const Expr* expr, SimContext& ctx,
                                        Arena& arena, TimeFormatSpec& spec) {
   if (expr->args.size() >= 1 && expr->args[0]) {
@@ -313,9 +208,6 @@ static bool ApplyTimeformatRangeFields(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// Apply the optional suffix_string (arg 2) and minimum_field_width (arg 3) of a
-// $timeformat call onto `spec`. A string literal suffix is taken verbatim; any
-// other expression is evaluated and formatted as a string.
 static void ApplyTimeformatTextFields(const Expr* expr, SimContext& ctx,
                                       Arena& arena, TimeFormatSpec& spec) {
   if (expr->args.size() >= 3 && expr->args[2]) {
@@ -334,7 +226,6 @@ static void ApplyTimeformatTextFields(const Expr* expr, SimContext& ctx,
 }
 
 Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // Bare $timeformat with no parens block leaves the configured state alone.
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 1, 0);
 
   TimeFormatSpec spec = ctx.GetTimeFormat();
@@ -343,10 +234,6 @@ Logic4Vec EvalTimeformatTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   }
   ApplyTimeformatTextFields(expr, ctx, arena, spec);
   ctx.SetTimeFormat(spec);
-  // §37.82: an application reaches the $timeformat() call the active format
-  // came from through vpi_handle(vpiActiveTimeFormat, NULL), and detail 1 keeps
-  // NULL for a run where the task has not been called - so this call is what it
-  // reaches from here on.
   GetGlobalVpiContext().NoteTimeFormatCall(expr, ctx);
   return MakeLogic4VecVal(arena, 1, 0);
 }

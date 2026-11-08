@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §30.5: path_delay_value may be a bare list_of_path_delay_expressions.
-// Observes the single-value (t_path_delay_expression) alternative without
-// surrounding parentheses.
 TEST(SpecifyPathDelayParsing, PathDelayValueBare) {
   auto r = Parse(
       "module m;\n"
@@ -26,7 +23,6 @@ TEST(SpecifyPathDelayParsing, PathDelayValueBare) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-// §30.5: the delay values may be optionally enclosed in parentheses.
 TEST(SpecifyPathDelayParsing, PathDelayValueParenthesized) {
   auto r = Parse(
       "module m;\n"
@@ -41,7 +37,6 @@ TEST(SpecifyPathDelayParsing, PathDelayValueParenthesized) {
   ASSERT_EQ(si->path.delays.size(), 1u);
 }
 
-// §30.5: list_of_path_delay_expressions two-value alternative.
 TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr2) {
   auto r = Parse(
       "module m;\n"
@@ -56,7 +51,6 @@ TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr2) {
   ASSERT_EQ(si->path.delays.size(), 2u);
 }
 
-// §30.5: list_of_path_delay_expressions three-value alternative.
 TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr3) {
   auto r = Parse(
       "module m;\n"
@@ -71,7 +65,6 @@ TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr3) {
   ASSERT_EQ(si->path.delays.size(), 3u);
 }
 
-// §30.5: list_of_path_delay_expressions six-value alternative.
 TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr6) {
   auto r = Parse(
       "module m;\n"
@@ -86,7 +79,6 @@ TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr6) {
   ASSERT_EQ(si->path.delays.size(), 6u);
 }
 
-// §30.5: list_of_path_delay_expressions twelve-value alternative.
 TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr12) {
   auto r = Parse(
       "module m;\n"
@@ -101,8 +93,6 @@ TEST(SpecifyPathDelayParsing, ListOfPathDelayExpr12) {
   ASSERT_EQ(si->path.delays.size(), 12u);
 }
 
-// §30.5: path_delay_expression is a constant_mintypmax_expression, so a delay
-// value may take the min:typ:max form.
 TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -118,8 +108,6 @@ TEST(SpecifyPathDelayParsing, PathDelayExprMinTypMax) {
   EXPECT_EQ(si->path.delays[0]->kind, ExprKind::kMinTypMax);
 }
 
-// §30.5: only one, two, three, six, or twelve delay values are permitted; any
-// other count is rejected.
 TEST(SpecifyPathDelayParsing, InvalidDelayCount) {
   auto r = Parse(
       "module m;\n"
@@ -131,8 +119,6 @@ TEST(SpecifyPathDelayParsing, InvalidDelayCount) {
       r.diags, "path delay must have 1, 2, 3, 6, or 12 values", 3, "30.5"));
 }
 
-// §30.5: one or more delay values must appear on the right-hand side; an empty
-// list is rejected.
 TEST(SpecifyPathDelayParsing, ErrorEmptyDelayList) {
   auto r = Parse(
       "module m;\n"
@@ -140,9 +126,6 @@ TEST(SpecifyPathDelayParsing, ErrorEmptyDelayList) {
       "    (a => b) = ();\n"
       "  endspecify\n"
       "endmodule\n");
-  // §11.2 owns the expression a path delay value is, and the empty list is
-  // rejected by the missing operand; §30.5 reports only the value count, which
-  // an empty list does not reach.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §17.6: one or more covergroup declarations are permitted within a checker.
-// The clause's my_check shape writes the covergroup directly in the checker
-// body (built from real §19.3 covergroup syntax), and it parses cleanly. This
-// is the accepting baseline the placement prohibition is contrasted against.
 TEST(CovergroupInCheckerPlacement, CovergroupInCheckerBodyParses) {
   EXPECT_TRUE(
       ParseOk("checker chk(logic clk, logic active);\n"
@@ -20,11 +16,6 @@ TEST(CovergroupInCheckerPlacement, CovergroupInCheckerBodyParses) {
               "endchecker\n"));
 }
 
-// §17.6 (negative form): a covergroup declaration shall not appear in any
-// procedural block of the checker. Relocating the very same covergroup into an
-// always_ff procedure is illegal — a covergroup declaration is not a procedural
-// statement, so the parser rejects the checker. Only the placement changed
-// relative to the accepting baseline above.
 TEST(CovergroupInCheckerPlacement, CovergroupInsideProceduralBlockIsRejected) {
   auto r = Parse(
       "checker chk(logic clk, logic active);\n"
@@ -34,8 +25,6 @@ TEST(CovergroupInCheckerPlacement, CovergroupInsideProceduralBlockIsRejected) {
       "    endgroup\n"
       "  end\n"
       "endchecker\n");
-  // §11.2 owns the report: `covergroup` begins no statement, so the parser
-  // reaches it while reading an expression and rejects it there.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

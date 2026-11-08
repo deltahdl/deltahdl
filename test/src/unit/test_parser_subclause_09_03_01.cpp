@@ -229,9 +229,6 @@ TEST(SequentialBlockParsing, EmptySeqBlock) {
   EXPECT_EQ(stmt->stmts.size(), 0u);
 }
 
-// Syntax 9-2 gives seq_block an optional [ : block_identifier ] after begin.
-// Exercise that BNF element: a named begin-end block parses and the block
-// identifier is recorded on the block statement.
 TEST(SequentialBlockParsing, NamedSequentialBlockRecordsBlockIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -268,10 +265,6 @@ TEST(SequentialBlockParsing, MissingEndKeywordProducesParseError) {
       "  initial begin\n"
       "    a = 1;\n"
       "endmodule\n");
-  // The block's statement loop stops at `endmodule` without consuming it, so
-  // ParseBlockStmt asks for `end` at that token, on line 4. It asked at the EOF
-  // on line 5 until the loop was given the stop set, the block having swallowed
-  // the `endmodule` looking for a statement.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'end', got 'endmodule'", 4, "9.3.1"));
 }
@@ -344,13 +337,6 @@ TEST(BlockItemDeclParsing, AttributeInstanceBeforeBlockItem) {
   EXPECT_EQ(body->stmts[0]->attrs[0].name, "foo");
 }
 
-// §9.3.1 is what makes the `end` obligatory: a sequential block is bounded by
-// the keywords begin and end, so a source that runs out before the closing
-// keyword breaches that subclause and no other. The sentence Parser::Expect
-// writes names the token it wanted rather than the rule, so the subclause on
-// the record is the only thing that says which rule was read. The block's
-// report comes first because the block is what the parser is inside when the
-// source runs out; the module's own missing `endmodule` is reported after it.
 TEST(SequentialBlockParsing, MissingEndNames9_3_1) {
   auto r = Parse(
       "module m;\n"
@@ -359,13 +345,6 @@ TEST(SequentialBlockParsing, MissingEndNames9_3_1) {
   EXPECT_TRUE(ReportedError(r.diags, "expected 'end'", 3, "9.3.1"));
 }
 
-// A.2.2.1 lets a data_type be a type_identifier behind a package_scope, and
-// A.2.8 lets any data_declaration open a sequential block, so `pkg::t v;` is a
-// block item whatever the enclosing scope has imported. The package's type is
-// never imported here and `pkg` is a package name rather than a type name, so
-// the declaration is decided on the `::` alone: a predicate that first asked
-// whether the leading name is a known type read the line as an expression
-// statement and demanded a `;` where the variable name stands.
 static const char* const kScopedTypePackage =
     "package pkg;\n"
     "  typedef logic [3:0] nib_t;\n"
@@ -401,9 +380,6 @@ TEST(BlockVarDeclParsing, PackageScopedTypeDeclInSeqBlock) {
   EXPECT_EQ(body->stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-// The packed dimension A.2.2.1 lets follow the type_identifier: `[` after the
-// scoped name is not what makes the line a statement, the token after the
-// closing `]` is.
 TEST(BlockVarDeclParsing, PackageScopedTypeWithPackedDimDeclInSeqBlock) {
   auto r = Parse(std::string(kScopedTypePackage) +
                  "module m;\n"
@@ -457,12 +433,6 @@ TEST(BlockVarDeclParsing, PackageScopedTypeDeclInFunctionBody) {
   EXPECT_EQ(fn->func_body_stmts[1]->kind, StmtKind::kBlockingAssign);
 }
 
-// The same leading `pkg::` opens a statement when what follows the scoped name
-// is a call's `(`, an assignment operator, a select on the way to one, or the
-// `;` of a task call written without its argument list, so each of these stays
-// the statement it is with the leading name unknown as a type. `pkg::arr[0]`
-// is what tells the packed-dimension case above apart: after the `]` comes `=`
-// here and a variable name there.
 TEST(BlockVarDeclParsing, PackageScopedCallAndAssignStayStatements) {
   auto r = Parse(std::string(kScopedTypePackage) +
                  "module m;\n"

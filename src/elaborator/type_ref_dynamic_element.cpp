@@ -18,11 +18,6 @@ namespace delta {
 
 namespace {
 
-// Whether the value `base` stands for, a select is applied to, is a dynamic
-// object: a value declared with unpacked dimensions, the outermost of which is
-// not of fixed size; or one whose type, a typedef names, is an array whose
-// outermost dimension is not, or the queue an array locator method gives,
-// either of which ExprSelfArrayType reads through.
 bool IsDynamicObject(const Expr* base, const ExprTypeScope& scope) {
   std::optional<DeclaredValue> value = ExprValue(base, scope);
   if (value && value->unpacked_dims != 0)

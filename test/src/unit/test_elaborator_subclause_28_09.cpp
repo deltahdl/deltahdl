@@ -13,10 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §28.9 makes a cmos switch an nmos and a pmos sharing the data input and the
-// output with a control each, and an rcmos an rnmos and an rpmos, so the
-// switch elaborates to the two continuous assignments of those switches, both
-// driving the first terminal.
 void ExpectPairedMosSwitches(std::string_view keyword, bool resistive) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -53,9 +49,6 @@ TEST(CmosSwitchElaboration, RcmosElaboratesToAnRnmosAndAnRpmos) {
   ExpectPairedMosSwitches("rcmos", true);
 }
 
-// The nmos half conducts on a 1 of its control and the pmos half on a 0, each
-// written as Table 28-6 reads it: z data drives z whatever the control, and
-// otherwise the control selects the data or z.
 TEST(CmosSwitchElaboration, CmosHalvesConductOnOppositeControlValues) {
   ElabFixture f;
   auto* design = Elaborate(

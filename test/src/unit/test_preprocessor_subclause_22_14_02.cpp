@@ -15,10 +15,6 @@ using namespace delta;
 
 namespace {
 
-// A sample of the words later standards reserve that Table 22-1 omits, spread
-// across the standards that introduced them: 1364-2001, 1364-2005, 1800-2005,
-// 1800-2009, and 1800-2012. Under the "1364-1995" specifier every one of them
-// is an ordinary identifier.
 constexpr const char* kWordsAddedAfterVerilog1995[] = {
     "automatic", "generate", "genvar",  "localparam", "signed", "unsigned",
     "uwire",     "logic",    "bit",     "int",        "byte",   "string",
@@ -26,8 +22,6 @@ constexpr const char* kWordsAddedAfterVerilog1995[] = {
     "checker",   "let",      "global",  "until",      "soft",   "nettype",
 };
 
-// Lexes `src` and returns the kind of the first token whose spelling is
-// `word`, or kError when the token never appears.
 TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
   SourceManager mgr;
   DiagEngine diag(mgr);
@@ -39,10 +33,6 @@ TokenKind KindOfWordIn(const std::string& src, const std::string& word) {
   return TokenKind::kError;
 }
 
-// Puts `word` inside a real `begin_keywords "1364-1995" region, runs the
-// preprocessor over it, and reports the kind the lexer then gives the word.
-// Nothing here hand-builds the version marker: the directive is written as
-// source and the marker the preprocessor emits is what reaches the lexer.
 TokenKind KindInsideRegion(const std::string& word) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -51,8 +41,6 @@ TokenKind KindInsideRegion(const std::string& word) {
   return KindOfWordIn(out, word);
 }
 
-// The same word with no directive governing it, so the implementation's
-// default reserved word list decides its kind.
 TokenKind KindUnderDefaultList(const std::string& word) {
   PreprocFixture f;
   auto out = Preprocess(word + "\n", f);
@@ -60,11 +48,6 @@ TokenKind KindUnderDefaultList(const std::string& word) {
   return KindOfWordIn(out, word);
 }
 
-// The directive selects this list by handing the lexer a marker naming the
-// version. The byte written after the marker is the value of
-// KeywordVersion::kVer13641995 itself, and source following it has to keep
-// lexing normally for the list to take effect at all, which is what the tokens
-// checked at the end show.
 TEST(KeywordVersionPreprocessing, Verilog1995DirectiveEmitsItsVersionMarker) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -84,10 +67,6 @@ TEST(KeywordVersionPreprocessing, Verilog1995DirectiveEmitsItsVersionMarker) {
   EXPECT_EQ(KindOfWordIn(out, "logic"), TokenKind::kIdentifier);
 }
 
-// Membership carried through the real directive path: every word Table 22-1
-// lists is still a reserved word inside the region, and is the very same
-// reserved word it is under the default list — the list selects which words
-// are reserved, not what a reserved word means.
 TEST(KeywordVersionPreprocessing,
      EveryVerilog1995WordStaysReservedInTheRegion) {
   for (const char* word : kVerilog1995Keywords) {
@@ -99,9 +78,6 @@ TEST(KeywordVersionPreprocessing,
   }
 }
 
-// The exclusivity side through the same path: a word a later standard reserved
-// arrives inside the region as a plain identifier, while the same word under
-// the default list arrives as a keyword.
 TEST(KeywordVersionPreprocessing,
      WordsOutsideVerilog1995ListBecomeIdentifiers) {
   for (const char* word : kWordsAddedAfterVerilog1995) {
@@ -110,10 +86,6 @@ TEST(KeywordVersionPreprocessing,
   }
 }
 
-// The negative form of the mapping: only this exact spelling names Table 22-1.
-// A near miss is not a quiet fallback to the 1995 list — it is rejected, and
-// no version marker is emitted, so the words the list would have freed stay
-// reserved.
 TEST(KeywordVersionPreprocessing,
      NearMissSpecifierDoesNotSelectVerilog1995List) {
   const char* const kNearMisses[] = {"1364-95",    "1995",      "1364-1995 ",

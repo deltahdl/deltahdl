@@ -19,8 +19,6 @@ namespace delta {
 
 namespace {
 
-// The stored value an element stands for, or null where its store no longer
-// holds one at its index.
 Logic4Vec* StoredValue(QueueObject* queue, AssocArrayObject* assoc, int index) {
   if (queue != nullptr) {
     if (index < 0 ||
@@ -41,17 +39,11 @@ Logic4Vec* StoredValue(const VpiObject& element) {
                      element.index);
 }
 
-// Copies the words of `from` into `to`, as many as both hold. Logic4Vec
-// copies its words pointer rather than its words, so a plain assignment would
-// leave the two sharing one store.
 void CopyWords(const Logic4Vec& from, Logic4Vec& to) {
   const uint32_t kWords = std::min(from.nwords, to.nwords);
   for (uint32_t i = 0; i < kWords; ++i) to.words[i] = from.words[i];
 }
 
-// Copies `width` bits of `from`, starting `from_offset` above its least
-// significant end, into `to` from `to_offset` up. Bits past either value's
-// width are left alone.
 void CopyBits(const Logic4Vec& from, uint32_t from_offset, Logic4Vec& to,
               uint32_t to_offset, uint32_t width) {
   for (uint32_t i = 0; i < width; ++i) {

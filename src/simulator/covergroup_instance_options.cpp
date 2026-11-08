@@ -26,9 +26,6 @@ namespace delta {
 
 namespace {
 
-// The members of one level's option or type_option structure (§19.10), each
-// under the name an option assignment gives it, grouped by the type its
-// value takes: an int, a bit, a string or a real.
 template <typename Options>
 struct OptionFields {
   std::span<const std::pair<std::string_view, int32_t Options::*>> ints;
@@ -49,7 +46,6 @@ template <typename Options, size_t N>
 using RealFields =
     std::array<std::pair<std::string_view, double Options::*>, N>;
 
-// Table 19-1: the instance options of a covergroup.
 constexpr IntFields<CoverOptions, 5> kGroupInts = {{
     {"weight", &CoverOptions::weight},
     {"goal", &CoverOptions::goal},
@@ -68,7 +64,6 @@ constexpr StringFields<CoverOptions, 2> kGroupStrings = {{
     {"comment", &CoverOptions::comment},
 }};
 
-// Table 19-3: the type options of a covergroup.
 constexpr IntFields<CoverGroupTypeOption, 2> kGroupTypeInts = {{
     {"weight", &CoverGroupTypeOption::weight},
     {"goal", &CoverGroupTypeOption::goal},
@@ -85,7 +80,6 @@ constexpr RealFields<CoverGroupTypeOption, 1> kGroupTypeReals = {{
     {"real_interval", &CoverGroupTypeOption::real_interval},
 }};
 
-// Table 19-2: the instance options of a coverpoint.
 constexpr IntFields<CoverPointOption, 4> kPointInts = {{
     {"weight", &CoverPointOption::weight},
     {"goal", &CoverPointOption::goal},
@@ -99,7 +93,6 @@ constexpr StringFields<CoverPointOption, 1> kPointStrings = {{
     {"comment", &CoverPointOption::comment},
 }};
 
-// Table 19-4: the type options of a coverpoint.
 constexpr IntFields<CoverPointTypeOption, 2> kPointTypeInts = {{
     {"weight", &CoverPointTypeOption::weight},
     {"goal", &CoverPointTypeOption::goal},
@@ -111,7 +104,6 @@ constexpr RealFields<CoverPointTypeOption, 1> kPointTypeReals = {{
     {"real_interval", &CoverPointTypeOption::real_interval},
 }};
 
-// Table 19-2: the instance options of a cross.
 constexpr IntFields<CrossOption, 4> kCrossInts = {{
     {"weight", &CrossOption::weight},
     {"goal", &CrossOption::goal},
@@ -125,7 +117,6 @@ constexpr StringFields<CrossOption, 1> kCrossStrings = {{
     {"comment", &CrossOption::comment},
 }};
 
-// Table 19-4: the type options of a cross.
 constexpr IntFields<CrossTypeOption, 2> kCrossTypeInts = {{
     {"weight", &CrossTypeOption::weight},
     {"goal", &CrossTypeOption::goal},
@@ -147,8 +138,6 @@ constexpr OptionFields<CrossOption> kCrossFields = {
 constexpr OptionFields<CrossTypeOption> kCrossTypeFields = {
     kCrossTypeInts, {}, kCrossTypeStrings, {}};
 
-// §19.7: sets the option `member` to `value`, an int as an integral value, a
-// bit as true where nonzero, a string as a string and a real as a real.
 template <typename Options>
 void SetOptionValue(Options& options, const OptionFields<Options>& fields,
                     std::string_view member, const Logic4Vec& value) {
@@ -168,8 +157,6 @@ void SetOptionValue(Options& options, const OptionFields<Options>& fields,
   }
 }
 
-// §19.7: sets the member an option assignment names to the value of its
-// expression, evaluated when the covergroup is instantiated.
 template <typename Options>
 void SetOption(Options& options, const OptionFields<Options>& fields,
                const CoverageOption& option, SimContext& ctx, Arena& arena) {
@@ -181,10 +168,6 @@ void SetOption(Options& options, const OptionFields<Options>& fields,
   SetOptionValue(options, fields, option.member, value);
 }
 
-// §19.7: the instance options an assignment after instantiation may set;
-// per_instance and get_inst_coverage are set in the covergroup definition
-// only, and auto_bin_max, detect_overlap and cross_retain_auto_bins in the
-// covergroup or coverpoint definition only.
 constexpr std::array<std::string_view, 6> kProcedurallyAssignable = {
     "name", "weight", "goal", "comment", "at_least", "cross_num_print_missing"};
 
@@ -193,8 +176,6 @@ bool ProcedurallyAssignable(std::string_view member) {
          kProcedurallyAssignable.end();
 }
 
-// §19.10: the value of an option member, an int as a signed 32-bit value, a
-// bit as one bit, a string as a string and a real as a real.
 template <typename Options>
 bool ReadOption(const Options& options, const OptionFields<Options>& fields,
                 std::string_view member, Arena& arena, Logic4Vec& out) {
@@ -226,8 +207,6 @@ bool ReadOption(const Options& options, const OptionFields<Options>& fields,
   return false;
 }
 
-// §19.7: writes `value` to the instance option `member` of a coverpoint or a
-// cross, whose new weight and at_least take effect in its coverage at once.
 void SetPointOptionValue(SampledCoverpoint& point, std::string_view member,
                          const Logic4Vec& value) {
   SetOptionValue(point.option, kPointFields, member, value);
@@ -245,17 +224,11 @@ void SetCrossOptionValue(CrossCover& cross, std::string_view member,
   }
 }
 
-// §19.7: whether a coverpoint or cross sets the option `member` itself, in
-// its definition or by an assignment to it, so that the covergroup's value of
-// it is not its default.
 bool SetsOwnOption(const std::vector<std::string_view>& own,
                    std::string_view member) {
   return std::ranges::find(own, member) != own.end();
 }
 
-// §19.7.1: the type option assignments of the item `index` of a covergroup
-// definition where it is the coverpoint or cross `item`, added to `found`;
-// whether it is that item.
 bool ItemTypeOptions(const CoverageSpecOrOption& spec, size_t index,
                      std::string_view item,
                      std::vector<const CoverageOption*>& found) {
@@ -278,24 +251,17 @@ bool ItemTypeOptions(const CoverageSpecOrOption& spec, size_t index,
   return false;
 }
 
-// §19.7.1: a type option named through the covergroup type `decl`, of the
-// covergroup where `item` is empty and else of its coverpoint or cross `item`.
 struct TypeOptionName {
   const CovergroupDecl* decl = nullptr;
   std::string_view item;
   std::string_view member;
 };
 
-// §19.7.1: the type option assignments a definition gives one level of a
-// covergroup type, `defined`, and the type options written through the type
-// since, `writes`.
 struct DefinedTypeOptions {
   std::vector<const CoverageOption*> defined;
   std::vector<const TypeOptionWrite*> writes;
 };
 
-// §19.7.1: the type options of one level, starting from the defaults of
-// Table 19-3 in `options`, as `set` gives them.
 template <typename Options>
 Options DefinedOptions(Options options, const OptionFields<Options>& fields,
                        const DefinedTypeOptions& set, SimContext& ctx,
@@ -309,9 +275,6 @@ Options DefinedOptions(Options options, const OptionFields<Options>& fields,
   return options;
 }
 
-// §19.7.1: the type option `name`, as its definition and the writes through
-// the type since give it, where no instance of the type has been built to
-// read it from.
 bool ReadDefinedTypeOption(const TypeOptionName& name, SimContext& ctx,
                            Arena& arena, Logic4Vec& out) {
   DefinedTypeOptions set;
@@ -502,9 +465,6 @@ const CovergroupInstance* CovergroupTable::AnyOf(
   return nullptr;
 }
 
-// §19.7.1: `cg::type_option.member = ...;` and `cg::x::type_option.member =
-// ...;`, where `access` is the `cg::type_option` or `cg::x::type_option` the
-// member is selected from.
 bool TryCovergroupTypeOptionAssign(const Stmt* stmt, SimContext& ctx,
                                    Arena& arena) {
   const Expr* lhs = stmt->lhs;
@@ -517,7 +477,6 @@ bool TryCovergroupTypeOptionAssign(const Stmt* stmt, SimContext& ctx,
   write.decl = TypeOptionOwner(lhs->lhs, ctx, write.item);
   if (write.decl == nullptr) return false;
   write.member = std::string(lhs->rhs->text);
-  // §19.7.1: strobe and real_interval are set in the definition only.
   if (write.member == "strobe" || write.member == "real_interval") return true;
   write.value = EvalExpr(stmt->rhs, ctx, arena);
   if (!OptionValueAccepted(write.member, write.value, stmt->rhs->range.start,

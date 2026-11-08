@@ -22,31 +22,8 @@
 #include "simulator/struct_string_member.h"
 #include "simulator/variable.h"
 
-// §10.9.2's structure assignment patterns, and the packed array patterns that
-// share their placement of a value at a member's bits.
-
 namespace delta {
 
-// §10.9.2 places a member's value at the bits the member occupies in the packed
-// result. DepositBitField resolves the word each bit falls in and carries the
-// bval plane, which is what the two halves of this need: a member of a struct
-// wider than one word sits at a bit offset of 64 or more, where the shift this
-// once made was undefined behaviour rather than a placement, and §6.3.1 lets
-// every bit of a 4-state member be x or z, which a uint64_t value could not
-// express and an OR into aval could not have cleared. ExtractBitField is the
-// coercion the mask here used to be -- §10.9.2 evaluates each member expression
-// as though it were assigned to that member's type -- zero-filling a narrower
-// value and truncating a wider one across every word rather than the first.
-//
-// The deposit assigns each bit where the placements used to OR into a zeroed
-// result. That is what makes an x depositable at all, and nothing accumulates
-// across placements: §10.9.2's demand that one of these rules cover every
-// member is exactly what PatternState::assigned enforces, so no two of the
-// three rules write one member's bits.
-// §10.9.2 (printed page 263) with §5.7.1 (printed 78): a member's value is
-// the expression assigned to the member, so an unbased unsized literal,
-// `'{default: '1}` or a positional `'1`, sets every bit of the member; any
-// other value is the member's width of its low bits, as before.
 static Logic4Vec MemberBits(const Logic4Vec& val, uint32_t width,
                             Arena& arena) {
   if (val.fills_width && width > val.width)
@@ -54,10 +31,6 @@ static Logic4Vec MemberBits(const Logic4Vec& val, uint32_t width,
   return ExtractBitField(arena, val, 0, width);
 }
 
-// §10.9 with §10.9.1 (printed pages 261-262): a positional pattern for a
-// packed array fills it element for element, each item converted to the
-// element as an assignment to the element converts it, and an item that is
-// itself a pattern fills its element over the next dimension the same way.
 static Logic4Vec PackedArrayItem(const Expr* item,
                                  std::span<const uint32_t> inner,
                                  uint32_t elem_width, SimContext& ctx,
@@ -90,21 +63,12 @@ std::optional<Logic4Vec> EvalPackedArrayPattern(const Expr* pattern,
   return result;
 }
 
-// §10.9.2 with §6.16: the bits one element of `f`'s type holds for `val`, a
-// string (§7.2) as a handle to its text and any other value `width` bits of
-// it, for a member that is no array or an element of one that is.
 static Logic4Vec ElementBits(const StructFieldInfo& f, const Logic4Vec& val,
                              uint32_t width, Arena& arena) {
   return f.type_kind == DataTypeKind::kString ? StringMemberHandle(val, arena)
                                               : MemberBits(val, width, arena);
 }
 
-// §10.9.2: `val`, the member's whole value, placed as the member `f` of the
-// structure `result` holds, a string member as a handle to the string; `base`
-// is the offset within `result` of the substructure `f` belongs to. An array
-// member's value already holds each element's bits, a string element's handle
-// among them (EvalArrayMemberPattern), and is placed as it stands; taken as one
-// string, an array of strings was one handle across every element.
 static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
                             const Logic4Vec& val, Arena& arena,
                             uint32_t base = 0) {
@@ -113,12 +77,6 @@ static void PlaceFieldValue(Logic4Vec& result, const StructFieldInfo& f,
   DepositBitField(result, base + f.bit_offset, bits, f.width);
 }
 
-// §10.9.2 (printed page 264): the value of a type key or the default: key
-// placed as the member `f`. For an unpacked array member the keys are applied
-// by the rules for arrays (§10.9.1), so each element takes the value as an
-// assignment to the element would; placed across the member as one value,
-// `int a [2]` held a scalar in a[1] alone and `string v [2]` one handle that
-// neither element read.
 static void PlaceKeyValue(Logic4Vec& result, const StructFieldInfo& f,
                           const Logic4Vec& val, Arena& arena,
                           uint32_t base = 0) {
@@ -146,19 +104,6 @@ struct PatternState {
   Arena& arena;
 };
 
-// §10.9.2 (printed page 263): each member expression is evaluated in the
-// context of an assignment to the type of the member it initializes, by
-// position or by name, and §7.2.1 gives a member that is itself a structure a
-// layout of its own (StructFieldInfo::nested). An element that is a pattern,
-// bare or typed, for such a member was evaluated as any expression is, with
-// no type to place it by, so its elements were concatenated in written order
-// at their self-determined widths: `s = '{'{b: 2, a: 1}, 3}` swapped the
-// nested members, and `'{p: '{8'd1, 8'd2}, c: 3}` packed two bytes into the
-// low end of p. The value of the member's expression: a pattern for a nested
-// structure placed by that structure's layout, as the enclosing pattern is by
-// `info`'s, and any other expression evaluated as it was.
-// §10.9.1: the items a pattern for an array lists, in order, a replication
-// `'{4{1}}` or `'{2{a, b}}` giving its items that many times over.
 static std::vector<const Expr*> ArrayPatternItems(const Expr* pattern,
                                                   SimContext& ctx,
                                                   Arena& arena) {
@@ -176,15 +121,6 @@ static std::vector<const Expr*> ArrayPatternItems(const Expr* pattern,
   return items;
 }
 
-// §10.9.1 with §7.2 and §7.4.2: a pattern for an unpacked array member gives
-// each of its elements a value, left to right, each evaluated as assigned to
-// the element's type, the leftmost element in the member's most significant
-// bits. Concatenated at their own widths, `'{2, 3, 4, 5}` for `byte
-// data[4]` left the four 32-bit values' low 32 bits, one byte of them 5.
-// Nothing where the pattern lists other than one item per element. An element
-// of strings holds a handle to its item's whole text (§6.16), the item
-// evaluated at its own width; cut to the element's 64 bits, `"abcdefghij"`
-// lost its first two characters and named no text.
 static std::optional<Logic4Vec> EvalArrayMemberPattern(
     const Expr* pattern, const StructFieldInfo& field, SimContext& ctx,
     Arena& arena) {
@@ -204,9 +140,6 @@ static std::optional<Logic4Vec> EvalArrayMemberPattern(
 
 Logic4Vec EvalStructMemberValue(const Expr* elem, const StructFieldInfo& field,
                                 SimContext& ctx, Arena& arena) {
-  // §10.9.2 with §7.5: the item of a dynamic array member, a pattern or an
-  // initializer, gives it the elements the item lists, held under a new
-  // handle, which is the member's value.
   if (field.is_dynamic) {
     Logic4Vec handle;
     QueueObject* q = NewDynMember(field, handle, arena);
@@ -244,28 +177,16 @@ static void ApplyMemberKeys(const Expr* expr, const StructTypeInfo* info,
   }
 }
 
-// The type keys and the default key of one structure pattern, each value
-// evaluated once: the last key written of each type, which §10.9.2 has
-// override an earlier one, and the default with the name of the structure type
-// its value has, empty where it has none.
 namespace {
 struct TypeAndDefaultKeys {
   std::vector<std::pair<PatternKeyType, Logic4Vec>> types;
   bool has_default = false;
   Logic4Vec default_value;
   std::string_view default_type;
-  // The context the keys' typedef names and the members' are resolved in.
   const SimContext* ctx = nullptr;
 };
 }  // namespace
 
-// The name of the type a structure layout registered as `name` is of. A
-// variable's own layout is registered under the variable's name
-// (RegisterAggregateLayout), which stands for the type its declaration wrote,
-// spelled as a member's layout spells it, "scope::name" for a scoped one; any
-// other registration is under the type's name. Taken as the type, a variable's
-// registration matched no member's, so `'{default: pv}` spread pv over a
-// member of pv's own type.
 static std::string_view LayoutTypeName(std::string_view name, SimContext& ctx) {
   const Variable* var = ctx.FindVariable(name);
   if (var == nullptr || var->declared_type == nullptr ||
@@ -277,9 +198,6 @@ static std::string_view LayoutTypeName(std::string_view name, SimContext& ctx) {
                                              "::" + std::string(t->type_name));
 }
 
-// The name of the structure type `value` has as a variable of one, which a
-// default value carries whole onto a member of that type; empty for any other
-// expression.
 static std::string_view StructTypeOfValue(const Expr* value, SimContext& ctx) {
   if (value->kind != ExprKind::kIdentifier) return {};
   const StructTypeInfo* layout = ctx.GetVariableStructType(value->text);
@@ -302,9 +220,6 @@ static TypeAndDefaultKeys CollectTypeAndDefaultKeys(const Expr* expr,
       keys.default_type = StructTypeOfValue(expr->elements[i], ctx);
       continue;
     }
-    // Syntax 10-5: a key is a built-in type keyword or a typedef name, and
-    // the keys are gathered last written first, so the first that matches a
-    // member is the one §10.9.2 has override the others.
     std::optional<PatternKeyType> type = ResolvePatternKeyType(key, ctx);
     if (!type) continue;
     keys.types.emplace_back(*type, EvalExpr(expr->elements[i], ctx, arena));
@@ -312,15 +227,6 @@ static TypeAndDefaultKeys CollectTypeAndDefaultKeys(const Expr* expr,
   return keys;
 }
 
-// §10.9.2 (printed page 264): the value a member no member key named takes,
-// with `base` the offset of the substructure it belongs to. A type key of the
-// member's type gives it its value. Failing that, an unmatched member that is
-// itself a structure has the type keys and the default applied to each of its
-// members in turn -- unless the default's own type is that structure, which
-// it is then assigned whole -- and any other member takes the default.
-// Applied to the top-level members alone, the type keys never reached a
-// nested structure's members, and a default of a member's own type was spread
-// over its fields.
 static void PlaceTypeOrDefault(Logic4Vec& result, const StructFieldInfo& f,
                                uint32_t base, const TypeAndDefaultKeys& keys,
                                Arena& arena) {
@@ -408,9 +314,6 @@ Logic4Vec EvalDefaultForElement(const Expr* value, const StructTypeInfo* layout,
   return EvalStructPatternValue(pattern, layout, ctx, arena);
 }
 
-// §5.10 and §10.9.2: the items a positional pattern gives, one per member, a
-// replication `'{N{a, b}}` -- held by the pattern itself or by its one
-// element -- spelled out as its items N times over, so each member takes one.
 static std::vector<const Expr*> PatternItems(const Expr* expr, SimContext& ctx,
                                              Arena& arena) {
   const Expr* rep = expr;
@@ -431,23 +334,9 @@ static std::vector<const Expr*> PatternItems(const Expr* expr, SimContext& ctx,
 
 Logic4Vec EvalStructPatternValue(const Expr* expr, const StructTypeInfo* info,
                                  SimContext& ctx, Arena& arena) {
-  // Keyed form (member name / type / default keys): field-by-field placement.
   if (!expr->pattern_keys.empty())
     return EvalStructPattern(expr, info, ctx, arena);
 
-  // §10.9.2: positional form -- element i initializes member i in declaration
-  // order, each evaluated in the context of an assignment to that member's
-  // type. Coercing each element to its member's width (rather than
-  // concatenating at its self-determined width) is what keeps an over-wide
-  // element from spilling into the following members, and a nested pattern
-  // is placed by its member's own layout (EvalMemberExpr). A replication gives
-  // the items PatternItems spells out, one per member as well; a pattern with
-  // other than one item per member falls back to the width-summing
-  // concatenation path. A structure wider than a word took
-  // that path too, from before PlaceFieldValue deposited a member above the
-  // first word; the placement now reaches any width, and the fallback left
-  // `'{'{1, 2}, 3}` for a 96-bit structure concatenated, its nested pattern
-  // never reaching the member's layout.
   const std::vector<const Expr*> kItems = PatternItems(expr, ctx, arena);
   if (kItems.size() == info->fields.size()) {
     auto result = MakeLogic4Vec(arena, info->total_width);

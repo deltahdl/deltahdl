@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// IEEE 1800-2023 6.16 rules that a string value is of arbitrary length and is
-// never truncated. "John Smith" is ten characters, so a named override that
-// carries the value as an integer keeps only its low bytes and displays the
-// tail of the string rather than the whole of it.
 TEST(StringParamOverride,
      ANamedOverrideLongerThanFourCharactersKeepsEveryCharacter) {
   SimFixture f;
@@ -24,9 +20,6 @@ TEST(StringParamOverride,
             "John Smith\n");
 }
 
-// Five characters is the first length a 32-bit override value cannot hold, so
-// "hello" is the shortest string that distinguishes a widened value from a
-// truncated one. An override routed through a 32-bit integer displays "ello".
 TEST(StringParamOverride,
      ANamedOverrideOfExactlyFiveCharactersKeepsEveryCharacter) {
   SimFixture f;
@@ -40,10 +33,6 @@ TEST(StringParamOverride,
             "hello\n");
 }
 
-// Nine characters is the first length an int64_t cannot hold, so "resolvers"
-// separates a fix that widened the override value from one that stopped
-// routing the characters through an integer at all. A 64-bit value displays
-// "esolvers".
 TEST(StringParamOverride, ANamedOverrideOfNineCharactersKeepsEveryCharacter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module child #(parameter string NAME = \"x\") ();\n"
@@ -56,10 +45,6 @@ TEST(StringParamOverride, ANamedOverrideOfNineCharactersKeepsEveryCharacter) {
             "resolvers\n");
 }
 
-// An override must leave the parameter typed as a string, not as the integer
-// the value travelled in. SimContext::IsStringVariable answers false when the
-// override registered u.NAME as a plain vector, which is how a run displays
-// the characters as a number even when every one of them survived.
 TEST(StringParamOverride,
      AnOverriddenStringParameterIsRegisteredAsAStringVariable) {
   SimFixture f;
@@ -74,11 +59,6 @@ TEST(StringParamOverride,
   EXPECT_TRUE(f.ctx.IsStringVariable("u.NAME"));
 }
 
-// §23.10.2 admits a constant expression as an instance parameter value
-// assignment, and §11.2.1 makes a parameter one of the operands such an
-// expression consists of. The name is written in the instantiating module, so
-// its characters are the parent's to supply; a fold that took only a literal
-// left NAME holding the packed number and displayed "mith".
 TEST(StringParamOverride,
      ANamedOverrideNamingAnotherParameterKeepsEveryCharacter) {
   SimFixture f;
@@ -93,12 +73,6 @@ TEST(StringParamOverride,
             "John Smith\n");
 }
 
-// §23.10 (printed page 764): an override value is converted to the parameter's
-// type, so `.R(3.25)` on `parameter real R` makes R 3.25; and a parameter with
-// neither type nor range takes the new value's type and range, so `.Q(2.5)`
-// makes Q the real 2.5, 64 bits. A real override was folded as an integer, had
-// no value and was dropped: R kept 1.5 and Q read 0.0. The instance with no
-// real override keeps Q integral.
 TEST(NamedParamAssignment, RealOverrideTakesTheParametersTypeOrGivesItsOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter Q = 5, parameter real R = 1.5,\n"
@@ -115,9 +89,6 @@ TEST(NamedParamAssignment, RealOverrideTakesTheParametersTypeOrGivesItsOwn) {
             "Q 7.000000 R 1.500000 S abc bitsQ 32\n");
 }
 
-// The same beside ranged parameters, which keep their range: 20 into
-// [3:0] P is 4, and a signed [3:0] S reads 15 as -1. An integral override
-// of a parameter declared real is a real, `.R(3)` reading 3.0.
 TEST(NamedParamAssignment, RealOverrideBesideRangedAndIntegralOverrides) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m #(parameter [3:0] P = 0, parameter Q = 5,\n"
@@ -133,11 +104,6 @@ TEST(NamedParamAssignment, RealOverrideBesideRangedAndIntegralOverrides) {
             "p 4 q 2.500000 s -1 r 3.000000\n");
 }
 
-// §23.10.2 with §6.20.1: an override gives a parameter any value its
-// declaration could hold, and an array parameter's is an assignment pattern,
-// whether the parameter is declared among the items, A, or in the parameter
-// port list, P. Each element reads the override's item. The pattern was
-// dropped, and A and P printed their declared 1 2.
 TEST(NamedParamAssignment, AssignmentPatternOverridesAnArrayParameter) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"
@@ -155,9 +121,6 @@ TEST(NamedParamAssignment, AssignmentPatternOverridesAnArrayParameter) {
             "5 6\n7 8\n");
 }
 
-// §23.10.2: the override is written in the instantiating module, so a name in
-// its pattern is that module's: top's K, 9, rather than sub's own K, 1, which
-// would print 1 2.
 TEST(NamedParamAssignment, ArrayParameterOverrideReadsTheInstantiatingScope) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"

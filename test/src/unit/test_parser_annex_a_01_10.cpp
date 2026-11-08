@@ -570,15 +570,12 @@ TEST(ConstraintItemsParsing, ErrorConstraintPrototypeMissingSemicolon) {
       "class C;\n"
       "  constraint c\n"
       "endclass\n");
-  // 'endclass' stands where the header demands the '{' that opens the block.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '{', got 'endclass'", 3, "18.5"));
 }
 
 TEST(ConstraintItemsParsing, ErrorExternConstraintMissingScope) {
   auto r = Parse("constraint c { x > 0; }\n");
-  // §18.5.1 owns the external constraint block's class scope, so the '::' that
-  // introduces it is what the report names as missing.
   EXPECT_TRUE(ReportedError(r.diags, "expected '::', got '{'", 1, "18.5.1"));
 }
 
@@ -587,9 +584,6 @@ TEST(ConstraintItemsParsing, ErrorConstraintUnmatchedBrace) {
       "class C;\n"
       "  constraint c { x > 0;\n"
       "endclass\n");
-  // The unclosed block swallows 'endclass', so §8.3 owns the report: the class
-  // declaration is what runs out of source. The end of the source stands on
-  // line 4, the line the trailing newline opened.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endclass', got EOF", 4, "8.3"));
 }
 
@@ -600,7 +594,6 @@ TEST(ConstraintItemsParsing, ErrorExternConstraintMissingIdentifier) {
       "  extern constraint c;\n"
       "endclass\n"
       "constraint C:: { x > 0; }\n");
-  // §18.5.1 owns the external constraint block, so its name is demanded there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got '{'", 5, "18.5.1"));
 }
@@ -626,10 +619,6 @@ TEST(ConstraintItemsParsing, MultipleConstraintBlockItems) {
   EXPECT_EQ(r.cu->classes[0]->members[4]->name, "all");
 }
 
-// constraint_prototype ::= [ constraint_prototype_qualifier ] [ static ]
-// constraint ...: the `extern` or `pure` stands before `static`, so
-// `static extern constraint c;` is no prototype A.1.10 writes, while the
-// qualifier first is one, and is still read as static (#7582).
 TEST(ConstraintItemsParsing, StaticBeforePrototypeQualifierIsError) {
   auto r = Parse(
       "virtual class C;\n"
@@ -654,9 +643,6 @@ TEST(ConstraintItemsParsing, StaticBeforePrototypeQualifierIsError) {
   EXPECT_TRUE(members[3]->is_static);
 }
 
-// constraint_declaration ::= [ static ] constraint ... constraint_block: a
-// constraint written with a block takes no qualifier but `static`, the
-// constraint_prototype_qualifier being the prototype's alone (#7581).
 TEST(ConstraintItemsParsing, ExternOrPureConstraintWithABlockIsError) {
   auto r = Parse(
       "virtual class C;\n"
@@ -675,8 +661,6 @@ TEST(ConstraintItemsParsing, ExternOrPureConstraintWithABlockIsError) {
       ReportedError(r.diags, "is no qualifier of a constraint", 5, "A.1.10"));
 }
 
-// constraint_prototype_qualifier ::= extern | pure, and a prototype takes one
-// of them at most (#7583).
 TEST(ConstraintItemsParsing, ExternAndPureConstraintPrototypeIsError) {
   auto r = Parse(
       "virtual class C;\n"
@@ -747,9 +731,6 @@ TEST(ConstraintItemsParsing, ConstraintPrimaryClassScope) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
 }
 
-// constraint_primary ::= ... hierarchical_identifier select [ ( ) ]: the
-// empty parentheses an array built-in method takes, which A.10 footnote 12
-// allows on no other primary; the elaborator holds that rule.
 TEST(ConstraintItemsParsing, ConstraintPrimaryWithParens) {
   auto r = Parse(
       "class C;\n"
@@ -765,9 +746,6 @@ TEST(ConstraintItemsParsing, ConstraintPrimaryWithParens) {
             ConstraintItemKind::kDisableSoft);
 }
 
-// uniqueness_constraint ::= unique { range_list }: the brace list is a
-// range_list, so a value_range element (here the range [1:5]) is admitted
-// alongside a plain variable, not just the bare-identifier list.
 TEST(ConstraintItemsParsing, UniquenessConstraintValueRange) {
   auto r = Parse(
       "class C;\n"
@@ -779,10 +757,6 @@ TEST(ConstraintItemsParsing, UniquenessConstraintValueRange) {
   EXPECT_EQ(r.cu->classes[0]->members[1]->name, "c");
 }
 
-// dist_item ::= value_range [ dist_weight ] | default :/ expression: the
-// default alternative is grammatical only with the :/ weight operator, so the
-// closest rejected input -- 'default' followed by the := operator -- is not
-// derivable from this production and the parser reports it.
 TEST(ConstraintItemsParsing, ErrorDistDefaultEqualWeight) {
   auto r = Parse(
       "class C;\n"
@@ -798,9 +772,6 @@ TEST(ConstraintItemsParsing, ErrorDistDefaultEqualWeight) {
 constexpr const char* kItemsDoNotParse =
     "the constraint block's items do not parse from here";
 
-// constraint_block ::= { { constraint_block_item } }: text from which A.1.10
-// derives no item is reported where the block's parse breaks off, once per
-// block (#7580).
 TEST(ConstraintItemsParsing, ItemOutsideTheGrammarIsError) {
   auto r = Parse(
       "class C;\n"
@@ -820,8 +791,6 @@ TEST(ConstraintItemsParsing, ItemOutsideTheGrammarIsError) {
   EXPECT_TRUE(ReportedError(r.diags, kItemsDoNotParse, 8, "A.1.10"));
 }
 
-// An out-of-block constraint's block and the inline block of a
-// randomize() with are read by the same parse (#7580).
 TEST(ConstraintItemsParsing, OutOfBlockAndInlineItemOutsideTheGrammarIsError) {
   auto r = Parse(
       "class C;\n"
@@ -839,8 +808,6 @@ TEST(ConstraintItemsParsing, OutOfBlockAndInlineItemOutsideTheGrammarIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 9, "A.1.10"));
 }
 
-// constraint_set ::= constraint_expression | { { constraint_expression } }:
-// a solve-before is an item of the block alone, never one of a set (#7580).
 TEST(ConstraintItemsParsing, SolveBeforeInAConstraintSetIsError) {
   auto r = Parse(
       "class C;\n"
@@ -854,8 +821,6 @@ TEST(ConstraintItemsParsing, SolveBeforeInAConstraintSetIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 5, "A.1.10"));
 }
 
-// A constraint_set written in braces ends its item at the '}', so a ';' after
-// it stands where no item A.1.10 writes begins (#7580).
 TEST(ConstraintItemsParsing, SemicolonAfterAConstraintSetIsError) {
   auto r = Parse(
       "class C;\n"
@@ -867,9 +832,6 @@ TEST(ConstraintItemsParsing, SemicolonAfterAConstraintSetIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 4, "A.1.10"));
 }
 
-// ps_or_hierarchical_array_identifier opens with an implicit_class_handle,
-// super as well as this, so a foreach over a base class's array parses
-// (#7580).
 TEST(ConstraintItemsParsing, ForeachOverASuperArrayParses) {
   auto r = Parse(
       "class B;\n"
@@ -886,9 +848,6 @@ TEST(ConstraintItemsParsing, ForeachOverASuperArrayParses) {
   EXPECT_EQ(member->constraint_items[0]->kind, ConstraintItemKind::kForeach);
 }
 
-// disable soft constraint_primary ; and solve_before_list ::=
-// constraint_primary { , constraint_primary }: what stands there is a name with
-// its selects and at most an empty (), never another expression (#7585).
 TEST(ConstraintItemsParsing, NonPrimaryInDisableSoftOrSolveBeforeIsError) {
   auto r = Parse(
       "class C;\n"
@@ -911,9 +870,6 @@ TEST(ConstraintItemsParsing, NonPrimaryInDisableSoftOrSolveBeforeIsError) {
   EXPECT_FALSE(ReportedError(r.diags, kItemsDoNotParse, 10, "A.1.10"));
 }
 
-// A constraint_primary opens with this., super. or a class scope, reaches a
-// member through '.', takes selects, part selects among them, and may end in
-// an empty () (#7585).
 TEST(ConstraintItemsParsing, PrimaryFormsInDisableSoftAndSolveBeforeParse) {
   auto r = Parse(
       "class B;\n"

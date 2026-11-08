@@ -8,13 +8,7 @@ using namespace delta;
 
 namespace {
 
-// Sequences are verification constructs; the synth lowerer should ignore
-// the sequence body and still produce an AIG for the surrounding logic.
-
 TEST(SequenceSynthesis, MultipleSequenceFormsCoexistInSynth) {
-  // §16.7 lets several sequence_expr forms appear in the same module.
-  // The synth lowerer must ignore each sequence body and still emit AIG
-  // for the synthesizable always_ff alongside.
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
                            "module m(input clk, input d, output logic q);\n"

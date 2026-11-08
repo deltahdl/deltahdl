@@ -272,19 +272,9 @@ TEST(DelayParsing, Delay3OverArityRejected) {
       "module m;\n"
       "  wire #(1, 2, 3, 4) w;\n"
       "endmodule");
-  // Parser::ParseGateDelay stops after the third delay and demands the closing
-  // parenthesis, so the fourth delay is reported under §28.16.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ','", 2, "28.16"));
 }
 
-// A.2.2.3's delay_value, the delay written after `#` with no parenthesis, is a
-// decimal number, a real number, a time literal, 1step or a name behind at most
-// one package scope. Each delay below is none of these, written at a
-// continuous assignment, a gate, a procedural delay, an intra-assignment
-// delay, a nonblocking trigger and a clocking skew, and each is reported: a
-// select, a based number, a member name, a selected member name, a system call,
-// a name behind two scopes, a `$root.` name and a class scope behind `$unit::`.
-// Each was read as an expression and accepted.
 TEST(DelayParsing, ADelayOutsideDelayValueFormsIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -310,9 +300,6 @@ TEST(DelayParsing, ADelayOutsideDelayValueFormsIsReported) {
   }
 }
 
-// The forms A.2.2.3 gives delay_value draw no report: decimal digits, with an
-// underscore among them, a time literal, a real number, a name, and a name
-// behind a package's scope or the compilation unit's.
 TEST(DelayParsing, DelayValueFormsAreAccepted) {
   auto r = Parse(
       "package p;\n"
@@ -332,10 +319,6 @@ TEST(DelayParsing, DelayValueFormsAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A delay_value that is a name ends at the name, so an unnamed gate instance
-// after `#d` keeps its terminals (A.3.1): `and #d (y, a, b)` is a gate of
-// delay d driving y from a and b. Read as an expression, the name took the
-// terminals as a call's arguments, `d(y, a, b)`, and left the gate none.
 TEST(DelayParsing, ANameDelayLeavesAnUnnamedGateItsTerminals) {
   auto r = Parse(
       "module m;\n"

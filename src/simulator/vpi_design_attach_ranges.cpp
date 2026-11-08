@@ -19,13 +19,8 @@ namespace delta {
 
 namespace {
 
-// One dimension as §37.22 draws it: the bounds of a fixed one, none for a
-// dynamic, queue or associative one, which is an empty range.
 using DimBounds = std::optional<PackedRange>;
 
-// §37.17 detail 4: the unpacked dimensions of `var`, leftmost first. A queue,
-// dynamic or associative array's leftmost dimension is an empty range, and
-// so is every dimension whose bounds did not fold.
 std::vector<DimBounds> UnpackedDims(const RtlirVariable& var) {
   std::vector<DimBounds> dims;
   if (var.is_queue || var.is_dynamic || var.is_assoc) dims.emplace_back();
@@ -36,9 +31,6 @@ std::vector<DimBounds> UnpackedDims(const RtlirVariable& var) {
   return dims;
 }
 
-// The dimensions vpiRange iterates for `var`: an array var's unpacked
-// dimensions, and otherwise the packed dimensions it declares (detail 4),
-// which leave out the implicit range of a packed struct or union.
 std::vector<DimBounds> RangeDims(const RtlirVariable& var, SimContext& ctx) {
   std::vector<DimBounds> dims = UnpackedDims(var);
   if (!dims.empty()) return dims;
@@ -48,9 +40,6 @@ std::vector<DimBounds> RangeDims(const RtlirVariable& var, SimContext& ctx) {
   return dims;
 }
 
-// §37.16 detail 26: the packed dimensions `net` declares, which leave out the
-// implicit range of a packed struct or union net and the base type's of an
-// enum net (detail 1).
 std::vector<DimBounds> PackedNetDims(const RtlirNet& net, SimContext& ctx) {
   std::vector<DimBounds> dims;
   if (!net.has_declared_packed_dim) return dims;
@@ -60,10 +49,6 @@ std::vector<DimBounds> PackedNetDims(const RtlirNet& net, SimContext& ctx) {
   return dims;
 }
 
-// Detail 4: a range object per dimension under `obj`, leftmost first. Detail
-// 6: the leftmost one's bounds are the variable's vpiLeftRange and
-// vpiRightRange, which are null where that range is empty. Answers the
-// leftmost range, null where there are none.
 VpiObject* AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
                         const VpiAttachBuild& build) {
   if (dims.empty()) return nullptr;
@@ -77,9 +62,6 @@ VpiObject* AttachRanges(VpiObject* obj, const std::vector<DimBounds>& dims,
   return leftmost;
 }
 
-// §37.16 detail 26: the ranges vpiRange reaches from `net`, keyed under
-// `prefix`: an array net's unpacked ranges, and a net's packed ones, a net in
-// an array net's among them, which the run keys under its element's name.
 void AttachNetRanges(const RtlirNet& net, const std::string& prefix,
                      const VpiObjectMap& objects, SimContext& ctx,
                      const VpiAttachBuild& build) {
@@ -99,9 +81,6 @@ void AttachNetRanges(const RtlirNet& net, const std::string& prefix,
   if (array != nullptr) AttachRanges(array, unpacked, build);
 }
 
-// §37.17 details 4 and 6: the ranges of the variable `var`, whose object is
-// `obj`. §37.22 detail 1: a dynamic array's or queue's leftmost range takes its
-// bounds from the elements the array holds when it is read.
 void AttachVariableRanges(VpiObject& obj, const RtlirVariable& var,
                           SimContext& ctx, const VpiAttachBuild& build) {
   VpiObject* leftmost = AttachRanges(&obj, RangeDims(var, ctx), build);
@@ -115,9 +94,6 @@ void AttachVariableRanges(VpiObject& obj, const RtlirVariable& var,
 VpiObject* VpiRangeObject(VpiObject* parent,
                           const std::optional<PackedRange>& bounds,
                           const VpiAttachBuild& build) {
-  // §37.22: the bounds reached through vpiLeftRange and vpiRightRange and the
-  // size the number of elements the dimension holds; an empty range has
-  // neither bound and size 0.
   VpiObject* range = build.alloc();
   range->type = vpiRange;
   range->parent = parent;
@@ -149,10 +125,6 @@ void AttachDeclaredRanges(VpiObject* obj, const DataType& type,
 void AttachVariableAndNetRanges(const RtlirDesign& design,
                                 const VpiObjectMap& objects, SimContext& ctx,
                                 const VpiAttachBuild& build) {
-  // §37.17 details 4 and 6 and §37.16 detail 26: a variable's and a net's
-  // dimensions are reached as range objects and its leftmost bounds through
-  // vpiLeftRange and vpiRightRange. A generic interconnect is shaped apart
-  // with its own (AttachInterconnects).
   WalkInstancePaths(
       &design, [&](const RtlirModule* mod, const std::string& prefix) {
         InstancePrefixOverride scope(ctx.InstancePrefixOverride(),

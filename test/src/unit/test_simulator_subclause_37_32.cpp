@@ -28,16 +28,6 @@
 namespace delta {
 namespace {
 
-// §37.32 class typespec: a class typespec is either a lexical construct or a
-// class specialization, with name, class type, declared lifetime, and a set of
-// relations. These tests observe the production helpers in class_object.cpp and
-// the shared vpiAutomatic lifetime model from §37.3.7.
-
-// C1 + C2: §37.32 rules that a class typespec represents either a lexical
-// construct or a class specialization, and that the member-collection relations
-// are unsupported on one representing only a lexical construct. The two forms
-// are modeled distinctly here, in that VpiClassTypespecSupportsMembers is what
-// tells them apart: this fails when either form answers the other's way.
 TEST(ClassTypespec, LexicalTypespecDoesNotSupportMembers) {
   ClassTypespecInfo lexical;
   lexical.kind = ClassTypespecKind::kLexical;
@@ -48,7 +38,6 @@ TEST(ClassTypespec, LexicalTypespecDoesNotSupportMembers) {
   EXPECT_TRUE(VpiClassTypespecSupportsMembers(spec));
 }
 
-// C4: a specialization must carry a non-empty name.
 TEST(ClassTypespec, SpecializationNameMustBeNonEmpty) {
   ClassTypespecInfo named;
   named.kind = ClassTypespecKind::kSpecialization;
@@ -61,8 +50,6 @@ TEST(ClassTypespec, SpecializationNameMustBeNonEmpty) {
   EXPECT_FALSE(VpiClassTypespecNameValid(unnamed));
 }
 
-// C1 + C4 edge: the valid-name requirement applies only to specializations, so
-// a purely lexical typespec with no name is still well formed.
 TEST(ClassTypespec, LexicalTypespecNeedsNoName) {
   ClassTypespecInfo lexical;
   lexical.kind = ClassTypespecKind::kLexical;
@@ -71,17 +58,12 @@ TEST(ClassTypespec, LexicalTypespecNeedsNoName) {
   EXPECT_TRUE(VpiClassTypespecNameValid(lexical));
 }
 
-// C5: iterating methods returns both static and automatic methods but excludes
-// built-in methods that have no explicit declaration.
 TEST(ClassTypespec, MethodsExcludeUndeclaredBuiltins) {
   ClassTypespecInfo spec;
   spec.kind = ClassTypespecKind::kSpecialization;
-  spec.methods.push_back(
-      {"push", /*is_static=*/false, /*has_explicit_decl=*/true});
-  spec.methods.push_back(
-      {"create", /*is_static=*/true, /*has_explicit_decl=*/true});
-  spec.methods.push_back(
-      {"randomize", /*is_static=*/false, /*has_explicit_decl=*/false});
+  spec.methods.push_back({"push", false, true});
+  spec.methods.push_back({"create", true, true});
+  spec.methods.push_back({"randomize", false, false});
 
   std::vector<ClassTypespecMethod> visible = VpiClassTypespecMethods(spec);
   ASSERT_EQ(visible.size(), 2u);
@@ -89,20 +71,14 @@ TEST(ClassTypespec, MethodsExcludeUndeclaredBuiltins) {
   EXPECT_EQ(visible[1].name, "create");
 }
 
-// C2 + C5 edge: the member-collection relations are unsupported on a lexical
-// typespec, so iterating its methods yields nothing even when entries are
-// present.
 TEST(ClassTypespec, LexicalTypespecYieldsNoMethods) {
   ClassTypespecInfo lexical;
   lexical.kind = ClassTypespecKind::kLexical;
-  lexical.methods.push_back(
-      {"push", /*is_static=*/false, /*has_explicit_decl=*/true});
+  lexical.methods.push_back({"push", false, true});
 
   EXPECT_TRUE(VpiClassTypespecMethods(lexical).empty());
 }
 
-// C9: vpiExtends returns the base typespec, and the base typespec of a
-// specialization is itself a specialization.
 TEST(ClassTypespec, ExtendsReturnsSpecializationBase) {
   ClassTypespecInfo base;
   base.kind = ClassTypespecKind::kSpecialization;
@@ -115,7 +91,6 @@ TEST(ClassTypespec, ExtendsReturnsSpecializationBase) {
   EXPECT_EQ(VpiExtendsOf(derived), &base);
   EXPECT_TRUE(VpiClassTypespecBaseIsSpecialization(derived));
 
-  // A specialization whose base is a lexical typespec violates the invariant.
   ClassTypespecInfo lexical_base;
   lexical_base.kind = ClassTypespecKind::kLexical;
   ClassTypespecInfo bad;
@@ -124,8 +99,6 @@ TEST(ClassTypespec, ExtendsReturnsSpecializationBase) {
   EXPECT_FALSE(VpiClassTypespecBaseIsSpecialization(bad));
 }
 
-// C9 edge: a typespec that derives from nothing reports a null base and
-// vacuously satisfies the base-is-a-specialization invariant.
 TEST(ClassTypespec, TypespecWithoutBaseHasNullExtends) {
   ClassTypespecInfo root;
   root.kind = ClassTypespecKind::kSpecialization;
@@ -135,8 +108,6 @@ TEST(ClassTypespec, TypespecWithoutBaseHasNullExtends) {
   EXPECT_TRUE(VpiClassTypespecBaseIsSpecialization(root));
 }
 
-// C12: vpiLocalParam is true for parameters declared in the class body and
-// false for parameter-port-list parameters.
 TEST(ClassTypespec, LocalParamReflectsBodyDeclaration) {
   ClassTypespecParam port_param;
   port_param.name = "WIDTH";
@@ -149,7 +120,6 @@ TEST(ClassTypespec, LocalParamReflectsBodyDeclaration) {
   EXPECT_TRUE(VpiClassTypespecParamIsLocal(body_param));
 }
 
-// C13: vpiClassDefn returns NULL for built-in classes and the class otherwise.
 TEST(ClassTypespec, ClassDefnIsNullForBuiltins) {
   ClassTypeInfo user_class;
   user_class.name = "MyClass";
@@ -162,9 +132,6 @@ TEST(ClassTypespec, ClassDefnIsNullForBuiltins) {
   EXPECT_EQ(VpiClassDefnOf(builtin), nullptr);
 }
 
-// C14 weave: the class typespec's declared lifetime is the §37.3.7 vpiAutomatic
-// property; the typespec carries the same Boolean field, and a VpiObject built
-// from it reports the lifetime through vpi_get(vpiAutomatic).
 TEST(ClassTypespec, DeclaredLifetimeReusesAutomaticModel) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -180,8 +147,6 @@ TEST(ClassTypespec, DeclaredLifetimeReusesAutomaticModel) {
   EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&obj)), 1);
 }
 
-// C3: vpiRhs of a parameter assignment is the explicit argument when supplied,
-// and otherwise the declared default.
 TEST(ClassTypespec, ParamRhsPrefersExplicitArgument) {
   ClassTypespecParamAssign explicit_arg;
   explicit_arg.name = "WIDTH";
@@ -198,34 +163,19 @@ TEST(ClassTypespec, ParamRhsPrefersExplicitArgument) {
   EXPECT_EQ(VpiClassTypespecParamRhs(defaulted), "16");
 }
 
-// C6: value access through a class typespec is disallowed for a non-static
-// member but allowed for static members or when not reached via the typespec.
 TEST(ClassTypespec, ValueAccessDisallowedForNonStaticTypespecMember) {
-  EXPECT_FALSE(VpiClassTypespecValueAccessAllowed(
-      /*obtained_from_class_typespec=*/true, /*is_static=*/false));
-  EXPECT_TRUE(VpiClassTypespecValueAccessAllowed(
-      /*obtained_from_class_typespec=*/true, /*is_static=*/true));
-  EXPECT_TRUE(VpiClassTypespecValueAccessAllowed(
-      /*obtained_from_class_typespec=*/false, /*is_static=*/false));
+  EXPECT_FALSE(VpiClassTypespecValueAccessAllowed(true, false));
+  EXPECT_TRUE(VpiClassTypespecValueAccessAllowed(true, true));
+  EXPECT_TRUE(VpiClassTypespecValueAccessAllowed(false, false));
 }
 
-// C7 + C8: iterating constraints excludes inline constraints and keeps
-// declaration order, with external constraints ordered by their prototype.
 TEST(ClassTypespec, ConstraintsExcludeInlineAndKeepDeclarationOrder) {
   ClassTypespecInfo spec;
   spec.kind = ClassTypespecKind::kSpecialization;
-  spec.constraints.push_back({"c_first", /*is_inline=*/false,
-                              /*is_extern=*/false, /*decl_order=*/0,
-                              /*prototype_order=*/0});
-  spec.constraints.push_back({"c_inline", /*is_inline=*/true,
-                              /*is_extern=*/false, /*decl_order=*/1,
-                              /*prototype_order=*/0});
-  spec.constraints.push_back({"c_extern", /*is_inline=*/false,
-                              /*is_extern=*/true, /*decl_order=*/3,
-                              /*prototype_order=*/1});
-  spec.constraints.push_back({"c_last", /*is_inline=*/false,
-                              /*is_extern=*/false, /*decl_order=*/2,
-                              /*prototype_order=*/0});
+  spec.constraints.push_back({"c_first", false, false, 0, 0});
+  spec.constraints.push_back({"c_inline", true, false, 1, 0});
+  spec.constraints.push_back({"c_extern", false, true, 3, 1});
+  spec.constraints.push_back({"c_last", false, false, 2, 0});
 
   std::vector<ClassTypespecConstraint> visible =
       VpiClassTypespecConstraints(spec);
@@ -235,7 +185,6 @@ TEST(ClassTypespec, ConstraintsExcludeInlineAndKeepDeclarationOrder) {
   EXPECT_EQ(visible[2].name, "c_last");
 }
 
-// C10: a class definition reports the specializations that directly name it.
 TEST(ClassTypespec, ClassDefnReportsDirectSpecializations) {
   ClassTypespecInfo spec_a;
   spec_a.name = "Stack#(int)";
@@ -253,29 +202,16 @@ TEST(ClassTypespec, ClassDefnReportsDirectSpecializations) {
   EXPECT_EQ(specs[1], &spec_b);
 }
 
-// C11: a virtual interface array expands to one variable per element when
-// counted expanded, but collapses to a single variable when counted by array.
 TEST(ClassTypespec, VirtualInterfaceArrayExpandsPerElement) {
   ClassTypespecInfo spec;
   spec.kind = ClassTypespecKind::kSpecialization;
-  spec.vif_vars.push_back({"vif_scalar", /*array_size=*/0});
-  spec.vif_vars.push_back({"vif_array", /*array_size=*/3});
+  spec.vif_vars.push_back({"vif_scalar", 0});
+  spec.vif_vars.push_back({"vif_array", 3});
 
   EXPECT_EQ(VpiClassTypespecVirtualInterfaceVarCount(spec), 4);
   EXPECT_EQ(VpiClassTypespecArrayVarCount(spec), 2);
 }
 
-// §37.32 details 1 and 3 (printed page 1043 of IEEE 1800-2023): a class
-// typespec whose parameter values are all resolved represents a class
-// specialization, and for such a typespec the vpiRhs of each param assignment
-// may be any object carrying the value the parameter has, where a typespec
-// representing only a lexical construct answers the explicit parameter
-// expression or, failing that, the expression the parameter was declared with.
-// The typespec built from a class type the run holds is the resolved one:
-// §8.25 makes the specialization the type and the run keeps its parameters'
-// values on it. Two parameters discriminate: the record carried the written
-// expression's text alone and no value at all, and the type's own storage
-// gives 4 and 8.
 TEST(ClassTypespec, SpecializationTypespecCarriesItsResolvedParameterValues) {
   Arena arena;
   ClassDecl decl;
@@ -307,10 +243,8 @@ TEST(ClassTypespec, SpecializationTypespecCarriesItsResolvedParameterValues) {
   EXPECT_EQ(ts.param_assigns[1].bound_value.ToUint64(), 8u);
 }
 
-// §37.32 against designs read and run whole.
 class ClassTypespecsOfARun : public VpiDesignRun {
  protected:
-  // The integer value of `obj`, -1 where nothing is written.
   static int IntValueOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -319,8 +253,6 @@ class ClassTypespecsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The class specialization typespec `defn` reaches through
-  // vpiClassTypespec whose parameter `name` holds `value`, null for none.
   static vpiHandle SpecializationWith(vpiHandle defn, std::string_view name,
                                       int value) {
     for (vpiHandle typespec : ObjectsOf(vpiClassTypespec, defn)) {
@@ -331,8 +263,6 @@ class ClassTypespecsOfARun : public VpiDesignRun {
     return nullptr;
   }
 
-  // The value each param assign `typespec` reaches assigns, by the name of
-  // the parameter it assigns, in the order reached; -1 for none.
   static std::vector<std::pair<std::string, int>> AssignedValues(
       vpiHandle typespec) {
     std::vector<std::pair<std::string, int>> assigned;
@@ -344,9 +274,6 @@ class ClassTypespecsOfARun : public VpiDesignRun {
     return assigned;
   }
 
-  // What the param assign of the parameter `param` reaches through vpiRhs on
-  // the typespec the extends clause of the class `derived`, which `scope`
-  // declares, writes; null for none.
   static vpiHandle ExtendsRhs(const char* scope, const char* derived,
                               std::string_view param) {
     vpiHandle typespec = vpi_handle(
@@ -379,9 +306,6 @@ constexpr const char* kSpecializations =
     "  semaphore s = new;\n"
     "endmodule\n";
 
-// §37.32 details 1 and 10: a class defn reaches through vpiClassTypespec the
-// class specializations of its class, each reaching the defn and reporting a
-// user-defined class type (#7126, #7127).
 TEST_F(ClassTypespecsOfARun, ADefnReachesItsSpecializations) {
   Run(kSpecializations);
   vpiHandle b = Named(vpiClassDefn, By("top"), "B");
@@ -396,10 +320,6 @@ TEST_F(ClassTypespecsOfARun, ADefnReachesItsSpecializations) {
   EXPECT_NE(vpi_get_str(vpiName, three), nullptr);
 }
 
-// §37.32 details 3, 5, 8 and 12: a specialization's typespec reaches the
-// variables, methods, constraints and named events of its class, the methods
-// alone being its internal scopes, and its parameters with the values the
-// specialization gives them, each assigned by a param assign (#7125, #7128).
 TEST_F(ClassTypespecsOfARun, ASpecializationReachesItsMembers) {
   Run(kSpecializations);
   vpiHandle three =
@@ -415,10 +335,6 @@ TEST_F(ClassTypespecsOfARun, ASpecializationReachesItsMembers) {
             (std::vector<std::pair<std::string, int>>{{"W", 3}, {"V", 2}}));
 }
 
-// §37.32 details 1 and 9 with §37.33: a class obj's typespec is the class
-// specialization it was created as, which extends the specialization of its
-// base, itself extending none; a lexical typespec has no members (detail 2)
-// (#7125).
 TEST_F(ClassTypespecsOfARun, AClassObjsTypespecExtendsItsBasesSpecialization) {
   Run(kSpecializations);
   vpiHandle obj = vpi_handle(vpiClassObj, By("top.d"));
@@ -438,9 +354,6 @@ TEST_F(ClassTypespecsOfARun, AClassObjsTypespecExtendsItsBasesSpecialization) {
   EXPECT_TRUE(NamesOf(vpiVariables, lexical).empty());
 }
 
-// §37.32 detail 3: the typespec an extends clause writes is a lexical
-// construct, whose param assigns reach the expression the clause gives each
-// parameter, by place or by name, and else the parameter's default (#7128).
 TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypespecAssignsWhatItWrites) {
   Run(kSpecializations);
   const auto kWritten = [](const char* derived) {
@@ -454,9 +367,6 @@ TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypespecAssignsWhatItWrites) {
             (std::vector<std::pair<std::string, int>>{{"W", 4}, {"V", 5}}));
 }
 
-// §37.32 detail 1: the type of a variable no class defn contains is a class
-// specialization, so a module's class var reaches the typespec of the one it
-// was declared as, with its class's members (#7372).
 TEST_F(ClassTypespecsOfARun, AModulesClassVarIsOfItsSpecialization) {
   Run(kSpecializations);
   vpiHandle typespec = vpi_handle(vpiClassTypespec, By("top.b3"));
@@ -465,9 +375,6 @@ TEST_F(ClassTypespecsOfARun, AModulesClassVarIsOfItsSpecialization) {
   EXPECT_EQ(NamesOf(vpiVariables, typespec), (std::vector<std::string>{"x"}));
 }
 
-// §37.32 detail 3: a type an extends clause gives a type parameter, or the
-// default type one was declared with, is assigned as a typespec of that type
-// (#7371).
 TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypeIsAssignedItsTypespec) {
   Run("module top;\n"
       "  class B2 #(type T = int, int N = 1); endclass\n"
@@ -489,10 +396,6 @@ TEST_F(ClassTypespecsOfARun, AnExtendsClausesTypeIsAssignedItsTypespec) {
   EXPECT_EQ(kAssigned("G"), (std::vector<int>{vpiIntTypespec, vpiConstant}));
 }
 
-// §37.32 detail 3: a type written as a name, given a type parameter by an
-// extends clause or declared as its default, is assigned the typespec the
-// name finds: a typedef's own, or a class typespec reaching the class's defn
-// (#7374).
 TEST_F(ClassTypespecsOfARun, AnExtendsClausesNamedTypeIsAssignedItsTypespec) {
   Run("module top;\n"
       "  typedef bit [3:0] nib_t;\n"
@@ -513,8 +416,6 @@ TEST_F(ClassTypespecsOfARun, AnExtendsClausesNamedTypeIsAssignedItsTypespec) {
             VpiObjectOf(Named(vpiClassDefn, By("top"), "C")));
 }
 
-// §37.32 detail 3: a class a package declares finds a type its extends clause
-// gives as a name among the package's typedefs (#7374).
 TEST_F(ClassTypespecsOfARun, APackagesExtendsClauseFindsThePackagesTypedef) {
   Run("package pk;\n"
       "  typedef byte b_t;\n"
@@ -529,9 +430,6 @@ TEST_F(ClassTypespecsOfARun, APackagesExtendsClauseFindsThePackagesTypedef) {
   EXPECT_EQ(VpiObjectOf(ExtendsRhs("pk", "PD", "T")), VpiObjectOf(b));
 }
 
-// §37.32 detail 3 with §27.4: a class a generate block declares finds a type
-// its extends clause gives as a name among the typedefs of the blocks
-// enclosing it, the innermost first, before the module's (#7381).
 TEST_F(ClassTypespecsOfARun,
        AGenerateBlocksExtendsClauseFindsTheBlocksTypedef) {
   Run("module top;\n"
@@ -553,8 +451,6 @@ TEST_F(ClassTypespecsOfARun,
   EXPECT_EQ(VpiObjectOf(ExtendsRhs("top.g.h", "D", "U")), VpiObjectOf(m));
 }
 
-// §37.32: the typespec of a mailbox's and a semaphore's class obj reports the
-// built-in class it stands for (#7126).
 TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {
   Run(kSpecializations);
   const auto kTypeOf = [](const char* var) {
@@ -565,10 +461,6 @@ TEST_F(ClassTypespecsOfARun, ABuiltInClassReportsItsClassType) {
   EXPECT_EQ(kTypeOf("top.s"), vpiSemaphoreClass);
 }
 
-// §37.32 with §37.12: the typespec of a class that extends another holds the
-// typespec of the class it extends as an object it relates to, not a scope,
-// so D, which declares no method, has no internal scope, B #(8) not among
-// them.
 TEST_F(ClassTypespecsOfARun, TheTypespecAClassExtendsIsNoInternalScope) {
   Run(kSpecializations);
   vpiHandle d =
@@ -577,9 +469,6 @@ TEST_F(ClassTypespecsOfARun, TheTypespecAClassExtendsIsNoInternalScope) {
   EXPECT_EQ(NamesOf(vpiInternalScope, d), (std::vector<std::string>{}));
 }
 
-// §37.32 with §38.6: vpiClassType is drawn on a class typespec alone, so a
-// class defn, a class obj and a module, none of which carries it, answer
-// vpiUndefined (#8189).
 TEST_F(ClassTypespecsOfARun, AnObjectOtherThanAClassTypespecHasNoClassType) {
   Run(kSpecializations);
   vpiHandle b = Named(vpiClassDefn, By("top"), "B");
@@ -590,8 +479,6 @@ TEST_F(ClassTypespecsOfARun, AnObjectOtherThanAClassTypespecHasNoClassType) {
   EXPECT_EQ(vpi_get(vpiClassType, By("top")), vpiUndefined);
 }
 
-// §37.32 detail 1 with §37.33: a class obj of a class no class defn stands
-// for still holds a typespec of its class, reaching no defn.
 TEST(ClassObjTypespec, AClassWithNoDefnHasATypespecOfItsOwn) {
   SourceManager mgr;
   Arena arena;

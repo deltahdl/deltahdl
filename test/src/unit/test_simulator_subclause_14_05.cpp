@@ -64,9 +64,6 @@ TEST(ClockingHierExprSim, InoutHierSignalBidirectional) {
   EXPECT_EQ(bidir->value.ToUint64(), 0x11u);
 }
 
-// §14.5 (printed page 357) lets a clocking block signal stand for any
-// hierarchical expression, so `input st = u.state` samples `u.state`, where it
-// sampled a signal of the clockvar's own name, which there is none of.
 TEST(ClockingHierExprSim, ClockvarBoundToAnotherNameSamplesIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"
@@ -92,7 +89,6 @@ TEST(ClockingHierExprSim, ClockvarBoundToAnotherNameSamplesIt) {
             "t=15 st=6\n$finish at time 15\n");
 }
 
-// The same from a program, the expression headed by the top module's name.
 TEST(ClockingHierExprSim, ProgramClockvarSamplesACrossModuleSignal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module cpu;\n"
@@ -118,8 +114,6 @@ TEST(ClockingHierExprSim, ProgramClockvarSamplesACrossModuleSignal) {
             "t=5 state=6\n$finish at time 5\n");
 }
 
-// §14.5 with §14.16: an output clockvar bound to `top.d` drives `top.d`, and a
-// process of the module waiting on it wakes.
 TEST(ClockingHierExprSim, OutputClockvarDrivesTheSignalItsExpressionNames) {
   SimFixture f;
   EXPECT_EQ(
@@ -138,11 +132,6 @@ TEST(ClockingHierExprSim, OutputClockvarDrivesTheSignalItsExpressionNames) {
       "mod d=5 at 5\n");
 }
 
-// §14.5 (printed pages 357-358): a clockvar may be bound to an expression that
-// is no name. An input bound to a concatenation of slices samples the whole
-// concatenation under its own name, and an output bound to a slice drives
-// that slice alone. With no variable of the clockvar's name, the input read x
-// and the drive landed nowhere, leaving q at 11110000.
 TEST(ClockingHierExprSim, ClockvarBoundToASliceOrConcatenation) {
   SimFixture f;
   EXPECT_EQ(

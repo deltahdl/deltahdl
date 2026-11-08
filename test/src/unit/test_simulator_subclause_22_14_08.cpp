@@ -9,40 +9,18 @@ using namespace delta;
 
 namespace {
 
-// Wraps `body` in a real `begin_keywords "1800-2012" region and drives the
-// whole pipeline over it -- preprocess, parse, elaborate, lower, simulate --
-// returning the final value of `var_name`. The diagnostic check is what keeps
-// the result meaningful: source this version's list admits has to run clean,
-// not merely produce a number after the front end recovered from something it
-// rejected.
 uint64_t RunSystemVerilog2012(const std::string& body, const char* var_name) {
   return RunUnderKeywordVersion("1800-2012", body, var_name);
 }
 
-// The same wrapper for "1800-2009", the union of the five lists this version
-// includes. It is what the added words are measured against: source that runs
-// there and cannot be written under this version's list is source the addition
-// took away, and a run that comes out differently under the two is the addition
-// doing something.
 uint64_t RunIncludedLists(const std::string& body, const char* var_name) {
   return RunUnderKeywordVersion("1800-2009", body, var_name);
 }
 
-// The same wrapper again for the configuration-free companion of "1364-2001".
-// Two lists were published for that standard and this version includes one of
-// them; the companion is the one that leaves ten words out, so it is the only
-// list against which that half of the inclusion can be measured.
 uint64_t RunNoconfigList(const std::string& body, const char* var_name) {
   return RunUnderKeywordVersion("1364-2001-noconfig", body, var_name);
 }
 
-// The added word whose clause changes what a call resolves to. A class names
-// the interface classes it honours, and the methods those interfaces demanded
-// have to be reachable at a run -- both through a handle of the class's own
-// type and through one typed as the interface, which is the whole point of
-// declaring the relationship. The interface classes are written with `interface
-// class`, `pure`, and `virtual` from the fourth included list, so the addition
-// is usable only because of the inclusion.
 TEST(SystemVerilog2012KeywordSimulation, AddedImplementsDispatchesAtRuntime) {
   auto direct = RunSystemVerilog2012(
       "interface class reader;\n"
@@ -66,7 +44,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedImplementsDispatchesAtRuntime) {
       "  end\n"
       "endmodule\n",
       "result");
-  // The value written is read back twice and one more is added.
   EXPECT_EQ(direct, 43u);
 
   auto through_interface = RunSystemVerilog2012(
@@ -88,26 +65,9 @@ TEST(SystemVerilog2012KeywordSimulation, AddedImplementsDispatchesAtRuntime) {
       "  end\n"
       "endmodule\n",
       "result");
-  // A handle typed as the interface reaches the implementing method, which is
-  // what the clause exists to make possible.
   EXPECT_EQ(through_interface, 43u);
 }
 
-// The added word that binds a name to a net's data type, run rather than merely
-// declared. A net declared through the bound name has to really carry a value
-// from its driver to its reader, and the width it carries has to be the one the
-// bound type gave it: the same declaration with no such binding is a scalar and
-// loses everything above the low bit, so a byte arriving whole is the binding
-// doing its work. A second name bound to the first is here too, since resolving
-// one nettype through another is a step the plain form does not take.
-//
-// The width is shown in the widening direction only. A net whose bound type is
-// narrower than the value driven onto it keeps the whole value at a run, while
-// the same declaration written as an ordinary sized net truncates as it should
-// -- so the bound width does not reach the continuous assignment's lowering.
-// That is a gap in how a net declaration is lowered rather than in which words
-// are reserved, and no test here can drive it; the width the binding produces
-// is observed at the elaborator, where it really is applied.
 TEST(SystemVerilog2012KeywordSimulation, AddedNettypeNetsCarryValuesAtRuntime) {
   auto through_binding = RunSystemVerilog2012(
       "module m;\n"
@@ -124,8 +84,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedNettypeNetsCarryValuesAtRuntime) {
       "result");
   EXPECT_EQ(through_binding, 43u);
 
-  // The same driver onto a net declared without the binding, which is a single
-  // bit and so keeps only the low one.
   auto without_binding = RunSystemVerilog2012(
       "module m;\n"
       "  wire        plain;\n"
@@ -148,16 +106,9 @@ TEST(SystemVerilog2012KeywordSimulation, AddedNettypeNetsCarryValuesAtRuntime) {
       "  initial #1 result = first + second;\n"
       "endmodule\n",
       "result");
-  // The second name resolves through the first, so both nets carry a byte and
-  // 21 plus 22 comes out.
   EXPECT_EQ(chained, 43u);
 }
 
-// The first of the added word's two keyword roles at a run. Qualifying a union
-// makes its members share storage, so a value written through one member is the
-// value read back through the other -- something no separate-storage type does,
-// and something that cannot be observed at all before the type is laid out and
-// driven.
 TEST(SystemVerilog2012KeywordSimulation, AddedSoftUnionOverlaysStorage) {
   auto overlaid = RunSystemVerilog2012(
       "module m;\n"
@@ -172,8 +123,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedSoftUnionOverlaysStorage) {
       "result");
   EXPECT_EQ(overlaid, 43u);
 
-  // Written through the second member and read through the first, so the
-  // sharing is not an artefact of which member the writer happened to pick.
   auto reversed = RunSystemVerilog2012(
       "module m;\n"
       "  typedef union soft { logic [7:0] a; logic [7:0] b; } overlay_t;\n"
@@ -188,14 +137,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedSoftUnionOverlaysStorage) {
   EXPECT_EQ(reversed, 43u);
 }
 
-// The added word's other keyword role, run. Qualifying a constraint marks it
-// as one the solver honours when it can and drops when it must, so the run
-// lands on the preferred value. Under "1800-2009", the union of everything this
-// version includes, the word is an ordinary identifier, and a name standing
-// before the relation leaves an item A.1.10 does not write, so that source has
-// no run to compare; the elaborator's cases for this subclause read its report.
-// Both the preference winning and the later preference outranking the earlier
-// one are here, along with the directive that discards a preference outright.
 TEST(SystemVerilog2012KeywordSimulation,
      AddedSoftConstraintsSteerRandomization) {
   const std::string kPreferred =
@@ -214,7 +155,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "endmodule\n";
   EXPECT_EQ(RunSystemVerilog2012(kPreferred, "result"), 43u);
 
-  // Two preferences on the same variable: the later one outranks the earlier.
   auto later_wins = RunSystemVerilog2012(
       "class c;\n"
       "  rand int v;\n"
@@ -232,8 +172,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "result");
   EXPECT_EQ(later_wins, 43u);
 
-  // A hard relation outranks the preference outright, which is what makes the
-  // qualifier a preference rather than a second way of writing a constraint.
   auto hard_wins = RunSystemVerilog2012(
       "class c;\n"
       "  rand int v;\n"
@@ -251,8 +189,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "result");
   EXPECT_EQ(hard_wins, 21u);
 
-  // The directive that discards the preferences on a variable, which is the
-  // other production the word appears in.
   auto discarded = RunSystemVerilog2012(
       "class c;\n"
       "  rand int v;\n"
@@ -271,9 +207,6 @@ TEST(SystemVerilog2012KeywordSimulation,
   EXPECT_EQ(discarded, 7u);
 }
 
-// The distribution form of the constraint qualifier, run rather than merely
-// captured. A qualified distribution is a preference like a qualified relation,
-// so the run lands on the weighted value under this version.
 TEST(SystemVerilog2012KeywordSimulation, AddedSoftDistributionSteersSolver) {
   const std::string kSrc =
       "class c;\n"
@@ -292,9 +225,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedSoftDistributionSteersSolver) {
   EXPECT_EQ(RunSystemVerilog2012(kSrc, "result"), 43u);
 }
 
-// The union qualifier written straight into a data declaration rather than
-// through a typedef -- a different item, and one whose layout is only
-// observable once the members are written and read at a run.
 TEST(SystemVerilog2012KeywordSimulation, AddedSoftUnionNeedsNoTypedef) {
   auto overlaid = RunSystemVerilog2012(
       "module m;\n"
@@ -309,9 +239,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedSoftUnionNeedsNoTypedef) {
   EXPECT_EQ(overlaid, 43u);
 }
 
-// The nettype declaration written as a package item, carried end to end: the
-// name is bound in one scope, imported into another, and the net declared
-// through it there really carries a byte from its driver to its reader.
 TEST(SystemVerilog2012KeywordSimulation, AddedNettypeCrossesAPackageBoundary) {
   auto result = RunSystemVerilog2012(
       "package pkg;\n"
@@ -332,18 +259,6 @@ TEST(SystemVerilog2012KeywordSimulation, AddedNettypeCrossesAPackageBoundary) {
   EXPECT_EQ(result, 43u);
 }
 
-// The other side of the addition, carried to a run. Every test above shows an
-// added word doing its keyword job under this version; this one shows all four
-// of them naming storage that really holds a value under "1800-2009", the union
-// of everything this version includes. Without this leg the runtime evidence
-// would be consistent with the words having been reserved all along rather than
-// added by this version_specifier.
-//
-// Nothing here uses `interconnect` in its keyword role at a run, and that is
-// deliberate: the net it declares is a generic connection whose type is settled
-// by what it joins, and it is resolved away before a running design is built --
-// it holds no value of its own to read back. Its keyword role is observed where
-// it exists, at the parser and the elaborator.
 TEST(SystemVerilog2012KeywordSimulation,
      AddedWordsNameStorageUnderIncludedLists) {
   const char* const kSrc =
@@ -357,19 +272,12 @@ TEST(SystemVerilog2012KeywordSimulation,
       "endmodule\n";
   EXPECT_EQ(RunIncludedLists(kSrc, "result"), 43u);
 
-  // Each is read back on its own as well, so a name that failed to become
-  // storage shows up here rather than being absorbed into a total.
   EXPECT_EQ(RunIncludedLists(kSrc, "implements"), 7u);
   EXPECT_EQ(RunIncludedLists(kSrc, "interconnect"), 9u);
   EXPECT_EQ(RunIncludedLists(kSrc, "nettype"), 11u);
   EXPECT_EQ(RunIncludedLists(kSrc, "soft"), 16u);
 }
 
-// The first included list driven end to end from its own syntax. Inclusion is
-// not only about what a word may no longer name: the gate primitives have to go
-// on building structure, the resolved net type has to go on combining two
-// drivers, and the procedural statements have to go on driving control flow --
-// all under a region opened for this version_specifier.
 TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog1995RolesStillRun) {
   auto gates = RunSystemVerilog2012(
       "module m;\n"
@@ -388,7 +296,6 @@ TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog1995RolesStillRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // and(1,1) is 1, nor(1,1) is 0, and a wand resolving two ones is 1.
   EXPECT_EQ(gates, 5u);
 
   auto control = RunSystemVerilog2012(
@@ -413,17 +320,9 @@ TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog1995RolesStillRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // Twenty from the for loop, ten from the repeat, two from the while, and one
-  // from the matching casez branch.
   EXPECT_EQ(control, 33u);
 }
 
-// The second included list at runtime. `automatic` is the entry whose whole
-// point is a runtime one -- each call needs storage of its own, which only a
-// recursive call shows -- and the value it works against is a `localparam`.
-// Both the factorial and the task's accumulation have to survive re-entry for
-// this number to come out. These are entries the configuration-free companion
-// list keeps as well; the ten it drops are driven end to end by the test below.
 TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog2001RolesStillRun) {
   auto result = RunSystemVerilog2012(
       "module m;\n"
@@ -445,7 +344,6 @@ TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog2001RolesStillRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // 20 + 3! + 17 = 43.
   EXPECT_EQ(result, 43u);
 
   auto signedness = RunSystemVerilog2012(
@@ -460,23 +358,9 @@ TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog2001RolesStillRun) {
       "  end\n"
       "endmodule\n",
       "result");
-  // The signed copy reads as negative and the unsigned copy does not.
   EXPECT_EQ(signedness, 43u);
 }
 
-// The half of the second inclusion that the test above cannot reach, driven end
-// to end from the companion list's own directive syntax. Two reserved word
-// lists were published for that Verilog standard and they differ on exactly ten
-// words; this version includes the one that keeps them, so the ten are reserved
-// here and cannot name anything. Under the companion specifier the very same
-// ten name storage that really holds a value -- declared, initialized, summed,
-// and read back off a completed run. Without this the choice between the two
-// lists would rest on front-end evidence alone.
-//
-// A configuration declaration itself has no runtime form: it says which source
-// to bind and leaves nothing behind in a running design. That is why the words
-// are exercised here as the identifiers the companion list leaves them, which
-// is what makes the difference between the two lists observable at this stage.
 TEST(SystemVerilog2012KeywordSimulation,
      ConfigurationWordsNameStorageUnderTheNoconfigList) {
   auto result = RunNoconfigList(
@@ -499,14 +383,9 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // Thirty-four from the first and one from each of the other nine.
   EXPECT_EQ(result, 43u);
 }
 
-// The third included list at runtime -- one word, and a net type is only fully
-// observed once a value travels through it. The scalar net gates the addition
-// and the vector net carries it, so the result cannot come out right unless
-// both were really built and really driven under this version's list.
 TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog2005RoleStillRuns) {
   auto result = RunSystemVerilog2012(
       "module m;\n"
@@ -524,15 +403,9 @@ TEST(SystemVerilog2012KeywordSimulation, IncludedVerilog2005RoleStillRuns) {
       "  end\n"
       "endmodule\n",
       "result");
-  // The bus holds 22, doubled and less one is 43, and the flag lets it through.
   EXPECT_EQ(result, 43u);
 }
 
-// The fourth included list at runtime, which is the largest thing this version
-// inherits and the vocabulary the additions are written alongside. The typed
-// storage has to carry values through the widths its words name, the user-
-// defined types have to reach the run with the width and members their
-// definitions gave them, and the statements have to drive control flow.
 TEST(SystemVerilog2012KeywordSimulation,
      IncludedSystemVerilog2005RolesStillRun) {
   auto types = RunSystemVerilog2012(
@@ -558,7 +431,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // 20 + 10 + 6 + 4 + 2 + 1 + 0 = 43.
   EXPECT_EQ(types, 43u);
 
   auto user_types = RunSystemVerilog2012(
@@ -575,7 +447,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // The third enumeration member stands for 2.
   EXPECT_EQ(user_types, 43u);
 
   auto statements = RunSystemVerilog2012(
@@ -606,9 +477,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // Two do-while passes give 20; the for loop adds one on i=0 and one on i=2
-  // for 22; foreach adds the four array elements for 26; the case arm makes 29;
-  // and the membership test adds twice(6) for 41.
   EXPECT_EQ(statements, 41u);
 
   auto processes = RunSystemVerilog2012(
@@ -631,17 +499,9 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // The second edge latches 22 and the combinational block then holds 22 -- the
-  // first edge's 21 is overwritten, so a block that never re-ran cannot get
-  // here.
   EXPECT_EQ(processes, 44u);
 }
 
-// The fifth included list at runtime. Its `let` declaration substitutes an
-// expression wherever the name is used, from both scopes it may be written in;
-// its untyped formal takes whatever actual is handed to it; and its permissive
-// case qualifier really selects a branch, including the case where no branch
-// matches at all and the running value is left alone.
 TEST(SystemVerilog2012KeywordSimulation,
      IncludedSystemVerilog2009RolesStillRun) {
   auto substituted = RunSystemVerilog2012(
@@ -658,8 +518,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // The two-argument let contributes 22, the compilation-unit let 20, and the
-  // literal one more: 43.
   EXPECT_EQ(substituted, 43u);
 
   auto qualified = RunSystemVerilog2012(
@@ -683,8 +541,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n",
       "result");
-  // Twenty from the matching case arm, twelve from the wildcard arm, eleven
-  // from the taken conditional branch.
   EXPECT_EQ(qualified, 43u);
 
   auto no_match = RunSystemVerilog2012(
@@ -702,22 +558,6 @@ TEST(SystemVerilog2012KeywordSimulation,
   EXPECT_EQ(no_match, 43u);
 }
 
-// The constant forms this list admits, each reaching the run as an operand. A
-// literal and a `parameter` come from the first included list, a `localparam`
-// and the `automatic` that lets a constant function be written come from the
-// second, and `int` -- the type the function returns and takes -- comes from
-// the fourth.
-//
-// The fifth constant form -- a genvar -- has no test at this stage, and cannot
-// have one. It shows its value in the copies its loop produces rather than in a
-// width or an operand, so observing it at runtime means giving each pass of the
-// loop something to drive and reading the results back after a run. Nothing a
-// loop generate construct produces reaches a running design here: the same
-// array driven by plain continuous assignments reads back correctly while the
-// generated form reads zero, and that holds with no `begin_keywords region at
-// all. The fault is in how the construct is lowered, not in which words are
-// reserved, so no test here can drive it. The genvar is observed instead at the
-// elaborator, where the copies really are produced.
 TEST(SystemVerilog2012KeywordSimulation, ConstantFormsCarryValuesAtRuntime) {
   auto from_literal = RunSystemVerilog2012(
       "module m;\n"
@@ -757,11 +597,6 @@ TEST(SystemVerilog2012KeywordSimulation, ConstantFormsCarryValuesAtRuntime) {
   EXPECT_EQ(from_function, 43u);
 }
 
-// The same constant forms sizing a declaration rather than standing in an
-// expression -- the position where a constant expression is actually required,
-// and a different path into the running design. Each variable is four bits wide
-// and is handed a value too large for it, so the truncation is what proves the
-// width really came from the constant.
 TEST(SystemVerilog2012KeywordSimulation,
      ConstantFormsSizeDeclarationsAtRuntime) {
   const char* const kSrc =
@@ -785,7 +620,6 @@ TEST(SystemVerilog2012KeywordSimulation,
       "  end\n"
       "endmodule\n";
 
-  // 0x1B truncated to four bits is 11, and three of them less ten is 23.
   EXPECT_EQ(RunSystemVerilog2012(kSrc, "result"), 23u);
   EXPECT_EQ(RunSystemVerilog2012(kSrc, "from_literal"), 11u);
   EXPECT_EQ(RunSystemVerilog2012(kSrc, "from_parameter"), 11u);
@@ -793,11 +627,6 @@ TEST(SystemVerilog2012KeywordSimulation,
   EXPECT_EQ(RunSystemVerilog2012(kSrc, "from_function"), 11u);
 }
 
-// The negative the six tables imply, carried all the way to a run: a word none
-// of them lists is an ordinary identifier under this version, so it can name
-// storage that really holds a value. Each is a near miss of a real entry, since
-// this version is the last that reserves anything new and so has no later list
-// to be bounded against.
 TEST(SystemVerilog2012KeywordSimulation,
      WordsOutsideTheTablesRunAsIdentifiers) {
   auto result = RunSystemVerilog2012(

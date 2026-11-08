@@ -51,7 +51,7 @@ TEST(BitwiseEval, BinaryXnorWithX) {
 
   auto* a = f.ctx.CreateVariable("za", 4);
   a->value = MakeLogic4Vec(f.arena, 4);
-  a->value.words[0].aval = 0b1100;  // bit2 = x = (aval=1, bval=1)
+  a->value.words[0].aval = 0b1100;
   a->value.words[0].bval = 0b0100;
 
   auto* b = f.ctx.CreateVariable("zb", 4);
@@ -61,7 +61,7 @@ TEST(BitwiseEval, BinaryXnorWithX) {
                           MakeId(f.arena, "za"), MakeId(f.arena, "zb"));
   auto result = EvalExpr(expr, f.ctx, f.arena);
   EXPECT_EQ(result.width, 4u);
-  EXPECT_EQ(result.words[0].aval, 0b1101u);  // bit2 = x = (aval=1, bval=1)
+  EXPECT_EQ(result.words[0].aval, 0b1101u);
   EXPECT_EQ(result.words[0].bval, 0b0100u);
 }
 
@@ -220,14 +220,6 @@ TEST(BitwiseEval, BinaryXnorMixedSignYieldsUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.4.8: for the unary bitwise negation operator, if the operand is signed
-// the result is signed. Signedness is a property of the operand's declaration,
-// so this drives a real `logic signed` operand through the full pipeline, and
-// it is observed where §11.8.1 lets the sign of an operand decide: a
-// comparison with the signed decimal 0 is a signed comparison when the other
-// operand is signed too, so the negation of 4'b0001, whose top bit is set,
-// reads below zero and the comparison answers 1. Were the result unsigned the
-// comparison would be unsigned and answer 0.
 TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultIsSignedFromSource) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -244,11 +236,6 @@ TEST(OperatorSim, UnaryBitwiseNotSignedOperandResultIsSignedFromSource) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 1u);
 }
 
-// §11.4.8: if the operand of the unary bitwise negation operator is unsigned,
-// the result is unsigned. Same construction as the signed case but with a
-// plain (unsigned) `logic` operand: §11.8.1 makes the comparison unsigned
-// when either operand is, so the negation of 4'b0001 reads as the positive
-// number its bits make and is not below zero.
 TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultIsUnsignedFromSource) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -265,12 +252,6 @@ TEST(OperatorSim, UnaryBitwiseNotUnsignedOperandResultIsUnsignedFromSource) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0u);
 }
 
-// §11.4.8 sends the negation's sizing to §11.8.2, and §11.6.1's Table 11-21
-// keeps its operand context-determined, so in `y = ~a` the 4-bit operand is
-// extended to the 8 bits of the assignment before it is inverted, by zero for
-// an unsigned operand: 8'b0000_0001 inverts to 8'hFE. An inversion at the
-// operand's own 4 bits widened afterwards would read 8'h0E, which is what
-// the test this one replaces expected.
 TEST(OperatorSim, UnaryBitwiseNotExtendsUnsignedOperandBeforeInverting) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -287,14 +268,6 @@ TEST(OperatorSim, UnaryBitwiseNotExtendsUnsignedOperandBeforeInverting) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xFEu);
 }
 
-// §11.4.8: for a binary bitwise operator whose operands are of unequal bit
-// length, the smaller operand is extended to the size of the larger before the
-// bit-by-bit combination, and when both operands are signed that extension is a
-// sign-extension. Signedness is a property of each operand's declaration, so
-// this drives real `logic signed` declarations through the full pipeline rather
-// than hand-building a signed carrier. The narrow operand 4'b1111 sign-extends
-// to 8'hFF, so OR-ing with zero yields 8'hFF -- a zero-extension would instead
-// have produced 8'h0F, so the sign-fill is observed from source syntax.
 TEST(OperatorSim, BinaryBitwiseBothSignedSignExtendsSmallerFromSource) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -313,14 +286,6 @@ TEST(OperatorSim, BinaryBitwiseBothSignedSignExtendsSmallerFromSource) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0xFFu);
 }
 
-// §11.4.8: if one or both operands of a binary bitwise operator are unsigned,
-// the operation is unsigned and the smaller operand is zero-extended -- even
-// when the smaller operand is itself declared signed. This mixed-signedness
-// case is where the sign- vs zero-extension decision diverges: the unsigned
-// `wide` operand makes the whole operation unsigned, so the signed narrow value
-// 4'b1111 must be zero-extended (not sign-extended). OR-ing with zero then
-// yields 8'h0F; had the narrow operand's own sign governed the fill the result
-// would have been 8'hFF, so this observes the "one operand unsigned" rule.
 TEST(OperatorSim, BinaryBitwiseMixedSignZeroExtendsSmallerFromSource) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -339,9 +304,6 @@ TEST(OperatorSim, BinaryBitwiseMixedSignZeroExtendsSmallerFromSource) {
   EXPECT_EQ(y->value.ToUint64() & 0xFFu, 0x0Fu);
 }
 
-// §11.4.8: two unsigned operands of unequal width also zero-extend the smaller
-// operand, so a set narrow field never leaks 1s into the high bits. Driven from
-// plain (unsigned) `logic` declarations through the full pipeline.
 TEST(OperatorSim, BinaryBitwiseBothUnsignedZeroExtendsSmallerFromSource) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -379,7 +341,7 @@ constexpr Logic4Word kFour[4] = {
 };
 constexpr Logic4Word kOut0 = {0, 0};
 constexpr Logic4Word kOut1 = {1, 0};
-constexpr Logic4Word kOutX = {1, 1};  // canonical Convention A: x = (1, 1)
+constexpr Logic4Word kOutX = {1, 1};
 
 TEST(BitwiseTruthTable, BinaryAndAllCells) {
   const Logic4Word kExpected[4][4] = {
@@ -497,9 +459,6 @@ TEST(BitwiseEval, BinaryXnorBothUnsignedYieldsUnsigned) {
   EXPECT_FALSE(result.is_signed);
 }
 
-// §11.4.8 makes a bitwise result signed where both operands are, and §11.8.2
-// extends each operand to the expression's width before the operator applies,
-// by sign then, whether or not the two widths agree.
 TEST(BitwiseOperatorSim, SignedOperandsOfEqualWidthAreSignExtended) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

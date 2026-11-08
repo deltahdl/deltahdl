@@ -56,13 +56,6 @@ uint32_t SpecparamWidth(const DataType& type, const Expr* init,
     uint32_t w = EvalTypeWidth(type);
     return w == 0 ? 32 : w;
   }
-  // §6.20.5: a specify parameter with no range specification takes the range of
-  // its final value, whatever expression states that value. A sized integer
-  // literal carries the width directly (a 4'd5 value is 4 bits), an unsized
-  // literal is 32 bits, and a signing conversion is as wide as its operand
-  // under §11.7. An initializer whose width InferExprWidth cannot answer -- a
-  // bare identifier, whose declaration it does not read -- keeps the 32-bit
-  // default.
   if (init != nullptr) {
     uint32_t w = InferExprWidth(init, typedefs);
     return w == 0 ? 32 : w;
@@ -80,30 +73,16 @@ bool SpecparamIsReal(const DataType& type, const Expr* init) {
 void Elaborator::ElaborateSpecparam(ModuleItem* item, RtlirModule* mod) {
   RtlirVariable var;
   var.name = ScopedName(item->name);
-  // §37.3.3: a §6.20.5 specify parameter is written in the source text like
-  // any other declaration, so its object reports where.
   var.loc = item->loc;
   var.width = SpecparamWidth(item->data_type, item->init_expr, typedefs_);
   var.is_real = SpecparamIsReal(item->data_type, item->init_expr);
   if (var.is_real) var.width = 64;
   var.init_expr = item->init_expr;
-  // §37.83: the attributes it is written with, which its object carries.
   var.attrs = ResolveAttributes(item->attrs, diag_, BuildParamScope(mod));
   mod->variables.push_back(var);
-  // §32.4.3 has an SDF LABEL section annotate to specparams, and §6.20.5 admits
-  // this declaration site as much as the one inside a specify block: a
-  // specparam may be declared in a specify block or in the module body.
-  // RegisterModuleSpecparams (src/simulator/specify.h) binds these names to
-  // SpecifyManager, and it is the lowered name -- var.name, already scoped by
-  // ScopedName -- that a LABEL has to reach, because
-  // SpecifyManager::ApplyAnnotatedSpecparam looks the storage up as the
-  // instance prefix followed by this name.
   mod->specparam_names.push_back(var.name);
 }
 
-// §23.2.2.1: a non-ANSI port written as a select of a vector, `y[7:4]` under
-// `output [7:0] y`, declares that vector as much as a port named y does, so
-// `assign y = ...` inside the module drives it rather than a net of its own.
 bool PortSelectsFrom(const RtlirPort& port, std::string_view name) {
   if (port.selected_width == 0) return false;
   const Expr* root = port.port_expr;
@@ -125,19 +104,6 @@ bool IsNameDeclared(std::string_view name, const RtlirModule* mod) {
   return false;
 }
 
-// True when `name` is a parameter of `mod` that a reference standing in the
-// generate blocks `scopes` can see. A parameter is a declaration of the module
-// like a net or a variable, but it is held apart from both, so the implicit-net
-// rule has to ask about it separately.
-//
-// RtlirParamDecl::name is bare whatever scope the parameter was declared in, so
-// the name alone does not answer: §23.9 lists generate blocks among the
-// elements that open a new scope, and a parameter one block declares is not
-// visible to a reference at module level or in a sibling block. Match
-// RtlirParamDecl::gen_block_prefix against the prefixes in force instead. A
-// parameter of the module itself has none and is visible throughout, which is
-// what §23.3.3.3 needs when such a parameter drives an input port from inside a
-// generate block.
 static bool IsParamDeclared(std::string_view name, const RtlirModule* mod,
                             const std::vector<std::string_view>& scopes) {
   for (const auto& p : mod->params) {
@@ -149,50 +115,12 @@ static bool IsParamDeclared(std::string_view name, const RtlirModule* mod,
 
 bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                                         RtlirModule* mod) {
-  // Ask IsNameDeclared about one key per enclosing scope, innermost first.
-  // §6.10 assumes an implicit net for an identifier declared neither in the
-  // scope of the continuous assignment nor in any scope directly referenceable
-  // from it, and §23.9 lists the scopes and fixes the order: an identifier
-  // referenced without a hierarchical path in a generate block is declared in
-  // that block or in a module, interface, program, checker, task, function,
-  // named block or generate block higher in the same branch of the name tree,
-  // and the search climbs until it finds an item of that name or meets a
-  // module, interface, program or checker boundary.
-  //
-  // RtlirModule::nets, RtlirModule::variables and RtlirModule::ports hold the
-  // string Elaborator::ScopedName produced, so the key for each scope is that
-  // scope's generate prefix followed by the identifier. gen_prefix_scopes_
-  // holds those prefixes outermost first, and the module itself is the bare
-  // identifier. Outside a generate block gen_prefix_scopes_ is empty and the
-  // bare key is the only one.
-  //
-  // Dropping any of them is a defect. Without the innermost key a second
-  // reference to one undeclared identifier in one generate block pushes a
-  // second net of that name, which SimContext::CreateNet in
-  // src/simulator/sim_context.cpp then registers over the first. Without the
-  // bare key a reference in a generate block to a net the module declares gains
-  // a prefixed net that shadows it, and the continuous assignment drives the
-  // new net. Without the keys in between the same shadowing happens one block
-  // in: inside block 'a' nested in block 'b', a net that 'b' declares is held
-  // as "b_w", which neither "b_a_w" nor "w" matches.
   for (auto it = gen_prefix_scopes_.rbegin(); it != gen_prefix_scopes_.rend();
        ++it) {
     if (IsNameDeclared(std::string(*it) + std::string(name), mod)) return true;
   }
   if (IsNameDeclared(name, mod)) return true;
-  // §6.10 gives an implicit net to an identifier used in a port connection or
-  // on the left of a continuous assignment only when it is not declared. A
-  // parameter is declared, and §23.3.3.3 lets any expression drive an input
-  // port, so a parameter named as a port actual is the expression that drives
-  // it. Creating a scalar net of the same name here would instead shadow the
-  // parameter with an undriven wire and deliver zero to the port.
   if (IsParamDeclared(name, mod, gen_prefix_scopes_)) return true;
-  // §3.12.1 (printed page 56) searches the compilation-unit scope for a name
-  // the module does not declare, so its declarations are among those §6.10
-  // (printed 108) lets the reference reach, and §10.3.2 (printed 249) lets a
-  // continuous assignment drive a variable. `int g;` outside every module with
-  // `assign g = 1;` in a module got an implicit net `g` shadowing the unit's.
-  // The search reaches only the part of the unit written before the reference.
   if (UnitDeclaresData(unit_, name, loc)) return true;
   if (mod->default_nettype == NetType::kNone) {
     diag_.Error(loc,
@@ -202,37 +130,9 @@ bool Elaborator::MaybeCreateImplicitNet(std::string_view name, SourceLoc loc,
                 Subclause("22.8"));
     return false;
   }
-  // §6.10: an identifier used in an instance terminal/port-connection list or
-  // on the left side of a continuous assignment gets an implicit scalar net of
-  // the default net type. It shares the implicit-net constructor with the
-  // port-expression case; here the width is scalar and the net is unsigned.
-  //
-  // The redeclaration key carries the generate prefix and net_names_ does not,
-  // which is what Elaborator::ElaborateNetDecl does for an explicit net at
-  // src/elaborator/elaborator_decls.cpp:598 and :600. §6.10 settles the first:
-  // an implicit net declared by a reference in a generate block is declared in
-  // that block alone. The name this reference declares therefore belongs to the
-  // block, and a declaration of it in another block or in the module is a
-  // different scope rather than a redeclaration of this one.
-  //
-  // net_names_ answers a different question -- whether a simple name written
-  // in this module names a net rather than a variable -- and every one of its
-  // readers looks it up by the identifier the source wrote.
-  // Elaborator::ValidateContAssignIdentLhs in
-  // src/elaborator/elaborator_cont_assign.cpp is the closest: it passes `name`
-  // here and then reads net_names_ back with that same `name`, so a prefixed
-  // entry would make it treat the net it just created as a variable and report
-  // a second assignment to it under §10.3.2.
   std::string_view scoped = ScopedName(name);
-  RtlirNet net = MakeImplicitPortNet(
-      scoped, /*port_width=*/1, /*port_is_signed=*/false, mod->default_nettype);
-  // §23.4: a nested module sees the enclosing modules' names, so the reference
-  // may name an outer object rather than declare a net of its own; the net is
-  // pushed either way, for the assignment to lower against, and
-  // RtlirNet::refers_outward tells Lowerer which. §6.10 gives a name declared
-  // nowhere to the scope of the reference, so it is the nested module's own.
+  RtlirNet net = MakeImplicitPortNet(scoped, 1, false, mod->default_nettype);
   net.refers_outward = IsNameInEnclosingScope(name);
-  // §37.16 detail 9: the reference stands where the net is first referenced.
   net.implicit_ref_loc = loc;
   mod->nets.push_back(net);
   declared_names_.insert(scoped);
@@ -265,15 +165,6 @@ void Elaborator::ValidateTypenameAsElabConstant(const Expr* init) {
 
 namespace {
 
-// §28.3.6: validates the per-terminal bit-lengths of a gate, switch or
-// user-defined primitive instance array whose instance range has already been
-// confirmed present. `scope` is the caller's parameter scope used to evaluate
-// the range bounds. An interconnect terminal must match the instance-array
-// length exactly; an ordinary terminal must be either scalar-width (broadcast)
-// or equal to the array length. §29.8 puts an array of primitive instances
-// under the same rule -- the terminal connection rules of §28.3.6 still apply
-// -- so the reports name a primitive as well as a gate, and cite 28.3.6, which
-// is where the rule is stated.
 void CheckGateInstanceArrayTerminalWidths(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::unordered_set<std::string_view>& interconnect_names,
@@ -314,9 +205,6 @@ void CheckGateInstanceArrayTerminalWidths(
   }
 }
 
-// Emits the gate-instance name-conflict diagnostic. The conflict with the
-// output net is a comparison between two names the source wrote, so it reads
-// item->gate_inst_name on both sides.
 void CheckGateInstNameDiagnostics(const ModuleItem* item, DiagEngine& diag) {
   if (!item->gate_inst_name.empty() && !item->gate_terminals.empty() &&
       item->gate_terminals[0] &&
@@ -330,8 +218,6 @@ void CheckGateInstNameDiagnostics(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// Builds an RTLIR import record from an import-declaration item and appends it
-// to the module's import list.
 void RecordImportDecl(const ModuleItem* item, RtlirModule* mod) {
   RtlirImport imp;
   imp.package_name = item->import_item.package_name;
@@ -340,8 +226,6 @@ void RecordImportDecl(const ModuleItem* item, RtlirModule* mod) {
   mod->imports.push_back(imp);
 }
 
-// Records a class declaration's name (and parameterized status) and pushes the
-// class decl onto the module per §8.
 void RecordClassDecl(
     const ModuleItem* item, RtlirModule* mod,
     std::unordered_set<std::string_view>& class_names,
@@ -354,8 +238,6 @@ void RecordClassDecl(
   mod->class_decls.push_back(item->class_decl);
 }
 
-// §6.10: every undeclared identifier in a primitive/alias terminal list becomes
-// an implicit scalar net; `make_net` creates one net per identifier terminal.
 template <typename MakeNet>
 void CreateImplicitNetsForTerminals(const std::vector<Expr*>& terminals,
                                     SourceLoc loc, MakeNet&& make_net) {
@@ -366,19 +248,10 @@ void CreateImplicitNetsForTerminals(const std::vector<Expr*>& terminals,
   }
 }
 
-bool HasInstanceArrayRange(const ModuleItem* item) {  // §28.3.6
+bool HasInstanceArrayRange(const ModuleItem* item) {
   return item->inst_range_left != nullptr && item->inst_range_right != nullptr;
 }
 
-// §3.13 (e) (printed page 58): the module name space unifies, beside the nets,
-// variables, subroutines, instances and named blocks entered where each is
-// elaborated, the parameters, user-defined types, classes, lets, covergroups,
-// sequences, properties, clocking blocks and nested modules, interfaces,
-// programs and checkers (§23.4) a module declares, and a genvar, which §27.4
-// has it declare. The name `item` declares as one of those, or empty: §6.18's
-// forward typedef announces the type its later definition declares, an extern
-// module (§23.5) only its ports, and `default clocking cb;` names a clocking
-// block declared elsewhere.
 std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
   switch (item->kind) {
     case ModuleItemKind::kParamDecl:
@@ -387,8 +260,6 @@ std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
     case ModuleItemKind::kCovergroupDecl:
     case ModuleItemKind::kSequenceDecl:
     case ModuleItemKind::kPropertyDecl:
-    // §3.13 (e) with §6.20.5: a specparam the module's body declares is one
-    // of the parameters the module name space unifies.
     case ModuleItemKind::kSpecparam:
       return item->name;
     case ModuleItemKind::kTypedef:
@@ -411,24 +282,6 @@ std::string_view ModuleNameSpaceEntry(const ModuleItem* item) {
 
 }  // namespace
 
-// §28.3.6 rules the terminal of an instance array, whose bit-length shall be
-// either one or the instance-array length. §4.9.6 rules the output or inout
-// terminal of a single instance, which connects straight to 1-bit nets or
-// 1-bit structural net expressions. Both kinds of instance ask this together
-// because §29.8 puts them under one rule: a user-defined primitive instance
-// connects its terminals by the terminal connection rules of §28.3.6, the
-// rules a gate instance connects by, and §4.9.6 states its rule of primitive
-// terminals, UDP terminals among them.
-//
-// The instance range is what makes §28.3.6's widths a question at all, so an
-// item carrying none is left alone by CheckGateInstanceArrayTerminalWidths: its
-// rule is about the bit length of each single-instance port or terminal of the
-// instantiated module or primitive against the length of an array, and there is
-// no array here to measure against. ValidatePrimitiveOutputTerminalWidths asks
-// the complementary question, so it is asked of every item, and one ScopeMap
-// answers both. The driven terminals' selects may also name the genvars of the
-// loop generate block the instance stands in (§27.4), which
-// ValidatePrimitiveDrivenTerminals is handed beside the parameters.
 void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
                                          const RtlirModule* mod) {
   ScopeMap scope = BuildParamScope(mod);
@@ -452,9 +305,6 @@ void Elaborator::CheckPrimitiveTerminals(const ModuleItem* item,
                               diag_);
 }
 
-// A folder that judges each comparison with `judge` and, where it is decided,
-// records the answer for the instance `mod` and the generate scope
-// `gen_prefix`, where the simulator finds it as the comparison runs.
 static TypeRefCompareFolder RecordingInto(
     RtlirModule* mod, std::string_view gen_prefix,
     std::function<std::optional<int64_t>(const Expr*)> judge) {
@@ -469,34 +319,20 @@ static TypeRefCompareFolder RecordingInto(
 }
 
 void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
-  // A generate block's bind directive is applied with the rest by
-  // Elaborator::ApplyBindDirectives, once this block is known to be selected.
   if (item->kind == ModuleItemKind::kBindDirective) {
     generate_binds_.insert(item->bind_directive);
     return;
   }
-  // §28.16: every delay a source can write reaches this walk, and each is
-  // checked before the item is built. The nine slots live on the item rather
-  // than on what it becomes, so one place sees the net delays, the continuous
-  // assignment's and the gate or primitive instance's alike.
   if (ItemCarriesDelay(item)) {
     ValidateItemDelaysNonNegative(item, BuildParamScope(mod), diag_);
   }
   DeclareInModuleNameSpace(ModuleNameSpaceEntry(item), item->loc);
-  // §37.83: the attributes of an item, and of the statements it holds, that
-  // no record of the item's own keeps.
   RecordNodeAttributes(*item, *mod, diag_,
                        [&] { return BuildParamScope(mod); });
-  // A.8.6: the item's ordinary expressions join no operands under a property
-  // operator.
   ReportItemImplicationOperators(*item, diag_);
   const TypeRefCompareFolder kFold = RecordingInto(
       mod, InternedGenPrefix(),
       [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
-  // §6.23: the type references a continuous assignment, a parameter's value
-  // or a declaration's ranges write, judged as the item is elaborated, so that
-  // one a generate block writes is judged with the block's names in scope.
-  // The operands are judged before a comparison of them is folded away.
   type_ref_mod_ = mod;
   WalkItemExprsForTypeRefArg(item);
   FoldItemTypeRefCompares(item, kFold);
@@ -506,10 +342,6 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
-  // §6.23 with §23.9: each statement's type references are judged, and its
-  // comparisons of them folded, with the names the procedure declares in
-  // scope at it, which hide the module's. The operands are judged first,
-  // since a folded comparison no longer holds them.
   ResolveProceduralTypeRefs(
       item, ResolverAmongLocals(mod, resolve), arena_,
       [&](Stmt* s, std::span<const ProceduralLocal> locals) {
@@ -518,70 +350,29 @@ void Elaborator::ElaborateItem(ModuleItem* item, RtlirModule* mod) {
           FoldTypeRefComparesOfStmt(s, kFold);
         });
       });
-  // §11.12's rules on a let's formals, for each let the item's procedure or
-  // subroutine body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachBlockLet(item->body, elaborate_let);
   for (const Stmt* s : item->func_body_stmts) ForEachBlockLet(s, elaborate_let);
   ElaborateBehavioralItem(item, mod);
 }
 
-// §8.26: a class declared inside a module. Its name and parameterized status go
-// onto the module, and §6.20.1 makes every param_assignment in its body a
-// localparam whose value is a constant expression -- said of a class declared
-// here as much as of one declared at compilation-unit scope, where
-// RegisterClassParams asks it. The module's own parameter scope is what such a
-// default folds against, since §6.20.1's constant expression is constant in the
-// scope the class stands in.
 void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   RecordClassDecl(item, mod, class_names_, parameterized_class_names_);
-  // §3.12.1 (printed page 57) with §3.13 (e): the class hides the compilation
-  // unit's typedef of its name, and a declaration's name is looked up in the
-  // type tables before the class names, so that typedef's entries go. Left in
-  // place, `t h;` under the module's `class t` and the unit's
-  // `typedef int t [2]` declared an array of two ints. A generate block's
-  // class has the enclosing scope's entries back after the block
-  // (TakeEnclosingTypedefs in elaborator_generate.cpp).
   typedefs_.erase(item->name);
   td_array_dims_.erase(item->name);
   if (item->class_decl == nullptr) return;
   module_classes_[item->class_decl->name] = item->class_decl;
-  // §37.32 detail 3 with §27.4: a generate block instance's class finds the
-  // names its extends clause writes among its block's typedefs.
   if (!gen_block_path_.empty()) {
     mod->gen_block_classes.push_back({item->class_decl, gen_block_path_});
   }
-  // §8.23: the class's typedefs are reached through its name from outside
-  // the class, `Node::value_t v;` in the module's own procedure, and the
-  // "Class::name" key is what the type tables answer such a name by;
-  // RegisterClassTypedefs in elaborator_resolve.cpp keys the compilation
-  // unit's classes so, and a class of a module had no key at all, so a local
-  // declared with the name was sized as a name nothing could resolve. They are
-  // keyed ahead of the class's parameters, whose values are converted to the
-  // types the class's typedefs name (§6.20.2).
   RegisterClassTypedefKeys(item->class_decl, item->class_decl->name,
                            {unit_, typedefs_, td_array_dims_, arena_});
   RegisterModuleClassParams(item->class_decl, BuildParamScope(mod),
                             cu_param_scope_, arena_, diag_);
-  // §13.3 with §7.2.1: the class's methods are reached by no item walk, so
-  // their inline aggregate formals are resolved here, against the module's
-  // typedefs as they stand at the declaration and the class's own (§8.23),
-  // as ElaborateBehavioralItem resolves the module's own subroutines. A
-  // member naming a typedef the module forward-declares above the class and
-  // defines below it (§6.18) finds a placeholder here and is resolved by
-  // ResolveModuleClassFormalTypes once the walk has reached the definition.
   ResolveClassMethodFormalTypes(item->class_decl, typedefs_, arena_);
-  // §6.23: the type references the class writes, resolved against its own
-  // properties and then the module's names, and each a method's statement
-  // writes judged with the names the method declares in scope at it.
   auto resolve = [&](DataType& dt, SourceLoc loc) {
     ResolveTypeRef(dt, loc, mod);
   };
-  // §6.23 with §6.22.1: a comparison a method writes is folded as one a
-  // module's subroutine writes, with the method's locals and the class's
-  // properties in scope, and kept for the instance the class is declared in.
-  // A method runs outside every generate block of the instance, whichever
-  // block declares its class, so the answer is kept under none.
   const TypeRefCompareFolder kFold = RecordingInto(
       mod, {},
       [this, mod](const Expr* e) { return EvalConstTypeRefCompare(e, mod); });
@@ -593,7 +384,6 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
                            FoldTypeRefComparesOfStmt(s, kFold);
                          });
                        });
-  // §11.12's rules on a let's formals, for each let a method's body declares.
   auto elaborate_let = [&](ModuleItem* let) { ElaborateLetFormals(let, mod); };
   ForEachClassBodyItem(item->class_decl, [&](const ModuleItem* method) {
     for (const Stmt* s : method->func_body_stmts)
@@ -601,9 +391,8 @@ void Elaborator::ElaborateModuleClassDecl(ModuleItem* item, RtlirModule* mod) {
   });
 }
 
-// Declarations, types, instances, and structural items (§6, §23, §25, §28).
 bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
-  auto make_implicit_net = [&](std::string_view n, SourceLoc l) {  // §6.10
+  auto make_implicit_net = [&](std::string_view n, SourceLoc l) {
     MaybeCreateImplicitNet(n, l, mod);
   };
   switch (item->kind) {
@@ -629,11 +418,6 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateNettypeDecl(item, mod);
       return true;
     case ModuleItemKind::kGateInst:
-      // §27.4: a generate block forms a scope of its own and a further level of
-      // hierarchy once instantiated, so a gate instance written in a loop
-      // generate body declares its name afresh in each iteration rather than
-      // again; DeclareInModuleNameSpace keys it by the generate prefix that
-      // tells those scopes apart, and leaves an unnamed instance out.
       CheckGateInstNameDiagnostics(item, diag_);
       DeclareInModuleNameSpace(item->gate_inst_name, item->loc);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
@@ -646,13 +430,9 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
       return true;
     case ModuleItemKind::kUdpInst:
-      // §27.4 keys the instance name by the generate block instance it stands
-      // in, as the kGateInst case above does and for the same reason.
       DeclareInModuleNameSpace(item->gate_inst_name, item->loc);
       CreateImplicitNetsForTerminals(item->gate_terminals, item->loc,
                                      make_implicit_net);
-      // Checked before ElaborateUdpInst expands the array, so a terminal the
-      // widths rule rejects is reported rather than expanded.
       CheckPrimitiveTerminals(item, mod);
       ElaborateUdpInst(item, mod);
       ResolveInterconnectPrimitiveTerminals(item->gate_terminals, mod);
@@ -672,9 +452,6 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     }
     case ModuleItemKind::kImportDecl:
-      // §26.3: the package's typedefs and parameters become visible from here
-      // on, so they are registered as this item is reached rather than ahead of
-      // the walk. RecordImportDecl only mirrors the directive into the RTLIR.
       ApplyBodyImport(item->import_item);
       RecordImportDecl(item, mod);
       return true;
@@ -686,12 +463,6 @@ bool Elaborator::ElaborateDeclItem(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
-// §9.2.2.2.1 with §8.23, §23.6 and §23.8: a procedure may call a class's
-// static method or a function a hierarchical path reaches by a scoped name,
-// and what that function reads joins the inferred list as what a function
-// called by its bare name reads does, the function entered in the table the
-// inference reads (AddScopedCallFunctions) from the chain of modules being
-// elaborated.
 void Elaborator::AddInferenceCallees(const Stmt* body) {
   const CompilationUnit& unit = *unit_;
   const std::function<const ModuleDecl*(std::string_view)> kFind =
@@ -702,14 +473,6 @@ void Elaborator::AddInferenceCallees(const Stmt* body) {
                          inference_funcs_);
 }
 
-// §16.14.6: the concurrent assertions the procedure embeds take their clock
-// from it, or from the default clocking, before the process is built over its
-// body. §17.3: each checker the procedure instantiates is a procedural checker
-// instance, elaborated as a child instance is and marked as one; the process
-// keeps the statement and the instance's name, by which the run finds the
-// instance when the statement is reached. An initial procedure never infers a
-// sensitivity list, so the two members BuildProcessWithSensitivity consults
-// only when inferring one -- func_map and const_names -- are left null for it.
 void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
                               RtlirProcessKind kind) {
   ElaborateProceduralConcurrentAssertions(item, mod, property_registry_, arena_,
@@ -738,9 +501,6 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   }
   bool infers = kind != RtlirProcessKind::kInitial;
   if (infers) AddInferenceCallees(item->body);
-  // §9.2.2.1 with Annex P: a general purpose always may let time advance
-  // through a task it enables, so its checks are handed the tasks a call in it
-  // can name.
   const std::unordered_set<std::string> kTasks =
       kind == RtlirProcessKind::kAlways ? ReachableTaskNames()
                                         : std::unordered_set<std::string>{};
@@ -754,22 +514,7 @@ void Elaborator::AddProcedure(ModuleItem* item, RtlirModule* mod,
   mod->processes.back().checker_instances = std::move(sites);
 }
 
-// Processes, generates, subroutines, assertions, and remaining items (§9, §16,
-// §13, §27).
-//
-// §14.14: a procedure names $global_clock either in its own sensitivity list
-// (`always @($global_clock)`) or in an event control within its body
-// (`initial @($global_clock) done = 1;`). Both are rewritten into the effective
-// global clocking declaration's event expression, which is handed to
-// AddProcess in ProcessBuildEnv::global_clocking_event and written onto the
-// process rather than onto `item`. `item` belongs to the one ModuleDecl the
-// parser built for the module, and two instances of that module can inherit
-// different events under rule b), so a rewrite made on `item` would give both
-// whichever instance was elaborated first.
 bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
-  // A final procedure never infers a sensitivity list, so the two members
-  // BuildProcessWithSensitivity consults only when inferring one -- func_map
-  // and const_names -- are left at their defaults.
   const ProcessBuildEnv kNoInferenceEnv{
       .arena = arena_,
       .diag = diag_,
@@ -791,21 +536,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
     case ModuleItemKind::kGenerateIf:
     case ModuleItemKind::kGenerateCase:
     case ModuleItemKind::kGenerateFor:
-      // §26.3: an imported name is locally visible only before that point in
-      // the current scope, so copy typedefs_ and cu_param_scope_ onto the
-      // pending entry here, where they hold the scope this generate was written
-      // in. Elaborator::ResolveDefparamsAndGenerates folds the condition after
-      // every module has been elaborated, and without the copy it would fold
-      // against the union of every module's imports.
-      //
-      // func_decls_ is copied for the same reason and reaches §13.4.3 rather
-      // than §26.3: Elaborator::ElaborateItems filled it from this module's
-      // ModuleDecl before the item loop that reached here, and
-      // ItemElaborationStateSaver takes it back out when the module returns,
-      // and property_registry_ for §16.12's instances of a named property or
-      // sequence, which it fills and takes back the same way. td_array_dims_
-      // is copied with typedefs_, the dimensions of the array typedefs this
-      // module's scope holds and no other design element's (§3.13 (e)).
       pending_generates_.push_back(
           {item, mod, typedefs_, cu_param_scope_, func_decls_,
            property_registry_, config_inst_path_, current_library_,
@@ -813,9 +543,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       return true;
     case ModuleItemKind::kFunctionDecl:
     case ModuleItemKind::kTaskDecl:
-      // §27.4 keys the name by the generate block instance the declaration
-      // stands in, as the kGateInst case in Elaborator::ElaborateDeclItem does
-      // and for the same reason.
       DeclareInModuleNameSpace(item->name, item->loc);
       ReportMisplacedOverrideSpecifiers(*item, diag_);
       ValidateFunctionBody(item);
@@ -830,9 +557,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       ValidateElabSystemTask(item, mod);
       return true;
     case ModuleItemKind::kDpiImport:
-      // §35.5.4 has an import define a subroutine of its name in the scope it
-      // stands in, which §35.2.1 lets a scope define once, so the name enters
-      // the module name space as a function's does.
       if (dpi_import_names_.insert(ScopedName(item->name)).second) {
         DeclareInModuleNameSpace(item->name, item->loc);
       }
@@ -843,8 +567,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       ElaborateLetFormals(item, mod);
       let_names_.insert(item->name);
       mod->let_decls.push_back(item);
-      // §37.12 with §27.4: a generate block instance's let is its gen
-      // scope's.
       if (!gen_block_path_.empty()) {
         mod->gen_block_lets.push_back(
             {item, gen_block_path_, gen_prefix_scopes_});
@@ -856,12 +578,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       mod->specify_blocks.push_back(item);
       return true;
     case ModuleItemKind::kCovergroupDecl:
-      // §19.3 (footnote 29): the extends form of a covergroup is legal only
-      // within a class. The grammar accepts `covergroup extends base ;` in any
-      // scope, so the restriction is a semantic one applied here. A covergroup
-      // declaration handled as a module item belongs to a module, interface,
-      // checker, or program — class covergroups are elaborated as class
-      // members and never reach this path — so an inherited base is illegal.
       if (!item->covergroup_extends_base.empty()) {
         diag_.Error(item->loc,
                     "a covergroup may only use 'extends' inside a class",
@@ -870,9 +586,6 @@ bool Elaborator::ElaborateBehavioralItem(ModuleItem* item, RtlirModule* mod) {
       mod->let_decls.push_back(item);
       return true;
     case ModuleItemKind::kDpiExport:
-      // §35.7: an export declaration has no effect on SystemVerilog usage of
-      // the subroutine it names, so it is held apart from let_decls, whose
-      // entries the run resolves a call to before it reaches a function.
       mod->dpi_export_decls.push_back(item);
       return true;
     default:

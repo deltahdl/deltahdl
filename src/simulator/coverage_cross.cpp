@@ -13,8 +13,6 @@
 
 namespace delta {
 
-// --- LRM 19.6: cross coverage -----------------------------------------------
-
 void CoverageDB::EnsureCrossCoverPoints(CoverGroup* group,
                                         const std::vector<std::string>& names) {
   for (const auto& name : names) {
@@ -25,8 +23,6 @@ void CoverageDB::EnsureCrossCoverPoints(CoverGroup* group,
         break;
       }
     }
-    // A bare variable used in a cross is given an implicit coverpoint, just as
-    // though "coverpoint <var>;" had been written (LRM 19.6).
     if (!found) AddCoverPoint(group, name);
   }
 }
@@ -48,9 +44,6 @@ bool CoverageDB::CrossItemsInSameGroup(const CoverGroup* group,
 
 namespace {
 
-// The indices of the bins of the coverpoint `name` that may contribute a cross
-// product: default, default sequence, ignore, and illegal bins are skipped
-// (LRM 19.5, 19.6). Empty when the coverpoint is absent.
 std::vector<size_t> ContributingBins(const CoverGroup& group,
                                      const std::string& name) {
   std::vector<size_t> contributing;
@@ -106,8 +99,6 @@ std::string CoverageDB::CrossProductName(const CoverGroup* group,
 }
 
 void CoverageDB::AutoCreateCrossBins(CoverGroup* group, CrossCover* cross) {
-  // One cross bin per product of the crossed coverpoints' bins that may
-  // contribute one (LRM 19.6), named after those bins.
   cross->bins.clear();
   for (auto& tuple : CrossProductTuples(group, cross)) {
     CrossBin cbin;
@@ -121,11 +112,7 @@ bool CoverageDB::CrossBareVariableAllowed(bool variable_is_real) {
   return !variable_is_real;
 }
 
-// --- LRM 19.6.1: defining cross coverage bins -------------------------------
-
 std::vector<int64_t> CoverageDB::BinsofBinValues(const CoverBin& bin) {
-  // A transition bin has no value set of its own; binsof intersects against the
-  // last value of each of its transition sequences (LRM 19.6.1.1).
   if (!bin.transitions.empty()) {
     std::vector<int64_t> last_values;
     for (const auto& seq : bin.transitions) {
@@ -141,14 +128,12 @@ std::vector<std::vector<int64_t>> CoverageDB::BinsofYield(const CoverPoint* cp,
   std::vector<std::vector<int64_t>> yielded;
   if (cp == nullptr) return yielded;
   if (bin_index >= 0) {
-    // binsof(cp.bin) yields the single named coverpoint bin.
     if (static_cast<size_t>(bin_index) < cp->bins.size()) {
       yielded.push_back(
           BinsofBinValues(cp->bins[static_cast<size_t>(bin_index)]));
     }
     return yielded;
   }
-  // binsof(cp) yields every bin of the coverpoint.
   for (const auto& bin : cp->bins) {
     yielded.push_back(BinsofBinValues(bin));
   }
@@ -167,8 +152,6 @@ std::vector<size_t> CoverageDB::SelectBinsByIntersect(
         break;
       }
     }
-    // The inclusion form keeps the bins that intersect the desired values; the
-    // negated form keeps those that do not (LRM 19.6.1).
     if (intersects != negate) selected.push_back(i);
   }
   return selected;
@@ -245,12 +228,8 @@ std::vector<std::vector<size_t>> CoverageDB::RetainedAutoCrossProducts(
   return retained;
 }
 
-// --- LRM 19.6.1.2: cross bin with covergroup expressions --------------------
-
 namespace {
 
-// True when the value-set list produces at least one value tuple: it must be
-// non-empty and every coverpoint must contribute at least one value.
 bool ValueSetsYieldAnyTuple(
     const std::vector<std::vector<int64_t>>& bin_tuple_value_sets) {
   if (bin_tuple_value_sets.empty()) return false;
@@ -260,8 +239,6 @@ bool ValueSetsYieldAnyTuple(
   return true;
 }
 
-// Advances the per-coverpoint value index combination to the next value tuple.
-// Returns false when every tuple has been visited.
 bool AdvanceValueTupleIndex(
     const std::vector<std::vector<int64_t>>& bin_tuple_value_sets,
     std::vector<size_t>& idx) {
@@ -279,8 +256,6 @@ bool AdvanceValueTupleIndex(
 uint64_t CoverageDB::CountSatisfyingValueTuples(
     const std::vector<std::vector<int64_t>>& bin_tuple_value_sets,
     const std::function<bool(const std::vector<int64_t>&)>& pred) {
-  // No coverpoints, or any coverpoint with an empty value set, yields no value
-  // tuples, hence nothing can satisfy the expression.
   if (!ValueSetsYieldAnyTuple(bin_tuple_value_sets)) return 0;
   uint64_t satisfying = 0;
   std::vector<size_t> idx(bin_tuple_value_sets.size(), 0);
@@ -300,7 +275,6 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuples(
     const CrossWithMatchPolicy& policy) {
   std::vector<size_t> selected;
   for (size_t c = 0; c < candidate_bin_tuples.size(); ++c) {
-    // A bare cross_identifier (no with clause) keeps every candidate bin tuple.
     if (pred == nullptr) {
       selected.push_back(c);
       continue;
@@ -309,7 +283,6 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuples(
     uint64_t satisfying = CountSatisfyingValueTuples(sets, *pred);
     bool keep = false;
     if (policy.require_all) {
-      // The $ form requires every value tuple to satisfy the expression.
       uint64_t total = sets.empty() ? 0 : 1;
       for (const auto& values : sets) total *= values.size();
       keep = total > 0 && satisfying == total;
@@ -325,11 +298,6 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuplesBySetExpression(
     const std::vector<std::vector<std::vector<int64_t>>>& candidate_bin_tuples,
     const std::vector<std::vector<int64_t>>& set_expression_elements,
     const CrossWithMatchPolicy& policy) {
-  // LRM 19.6.1.4: the cross_set_expression is a queue of value tuples; a
-  // candidate bin tuple is selected by how many of its value tuples are present
-  // as elements of that queue, under the same matches policy as the with
-  // covergroup expression (LRM 19.6.1.2). Membership of a value tuple in the
-  // queue is the per-value-tuple predicate the shared policy machinery counts.
   std::function<bool(const std::vector<int64_t>&)> present =
       [&set_expression_elements](const std::vector<int64_t>& tuple) {
         return std::find(set_expression_elements.begin(),
@@ -339,13 +307,9 @@ std::vector<size_t> CoverageDB::SelectCrossBinTuplesBySetExpression(
   return SelectCrossBinTuples(candidate_bin_tuples, &present, policy);
 }
 
-// --- LRM 19.6.2: excluding cross products -----------------------------------
-
 std::vector<std::vector<size_t>> CoverageDB::ExcludeIgnoredCrossProducts(
     const std::vector<std::vector<size_t>>& products,
     const std::vector<std::vector<size_t>>& ignored) {
-  // Every cross product that satisfies the ignore_bins select expression is
-  // dropped; the rest keep their order (LRM 19.6.2).
   std::vector<std::vector<size_t>> kept;
   for (const auto& product : products) {
     if (std::find(ignored.begin(), ignored.end(), product) == ignored.end()) {
@@ -355,21 +319,11 @@ std::vector<std::vector<size_t>> CoverageDB::ExcludeIgnoredCrossProducts(
   return kept;
 }
 
-bool CoverageDB::IgnoredCrossProductRetained(bool /*also_in_other_cross_bin*/) {
-  // An ignored cross product is never retained: its exclusion takes precedence
-  // over inclusion in any other cross coverage bin of the enclosing cross
-  // (LRM 19.6.2).
-  return false;
-}
-
-// --- LRM 19.6.3: specifying illegal cross products --------------------------
+bool CoverageDB::IgnoredCrossProductRetained(bool) { return false; }
 
 std::vector<std::vector<size_t>> CoverageDB::ExcludeIllegalCrossProducts(
     const std::vector<std::vector<size_t>>& products,
     const std::vector<std::vector<size_t>>& illegal) {
-  // Every cross product that satisfies the illegal_bins select expression is
-  // excluded from coverage, just as for ignore_bins; the rest keep their order
-  // (LRM 19.6.3).
   std::vector<std::vector<size_t>> kept;
   for (const auto& product : products) {
     if (std::find(illegal.begin(), illegal.end(), product) == illegal.end()) {
@@ -382,26 +336,16 @@ std::vector<std::vector<size_t>> CoverageDB::ExcludeIllegalCrossProducts(
 CrossSampleOutcome CoverageDB::ClassifyCrossSample(
     const std::vector<size_t>& product,
     const std::vector<std::vector<size_t>>& illegal,
-    const std::vector<std::vector<size_t>>& ignored,
-    bool /*also_in_other_cross_bin*/) {
-  // Illegal takes precedence over every other treatment: if the product is
-  // selected by illegal_bins it raises a run-time error and counts toward no
-  // coverage, regardless of whether it is also ignored or included in another
-  // cross bin (LRM 19.6.3).
+    const std::vector<std::vector<size_t>>& ignored, bool) {
   if (std::find(illegal.begin(), illegal.end(), product) != illegal.end()) {
     return CrossSampleOutcome::kIllegalError;
   }
-  // A non-illegal product selected by ignore_bins is excluded with no error
-  // (LRM 19.6.2).
   if (std::find(ignored.begin(), ignored.end(), product) != ignored.end()) {
     return CrossSampleOutcome::kIgnored;
   }
   return CrossSampleOutcome::kCounted;
 }
 
-// §19.7, Table 19-1: the report of `cross` of the covergroup instance `group`
-// ReportMissingCrossBins makes, where any of its cross bins is not covered,
-// naming the cross by the instance's name.
 static void ReportMissingBinsOf(const CoverGroup& group,
                                 const CrossCover& cross, std::ostream& os) {
   std::vector<const CrossBin*> missing;

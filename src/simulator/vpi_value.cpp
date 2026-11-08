@@ -18,9 +18,6 @@
 #include "simulator/scheduler.h"
 #include "simulator/sim_context.h"
 #include "simulator/statement_assign.h"
-#include "simulator/vpi_user.h"
-// §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/stmt_exec.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/variable.h"
@@ -34,6 +31,7 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_primitive_value.h"
 #include "simulator/vpi_table_entry_value.h"
+#include "simulator/vpi_user.h"
 #include "simulator/vpi_value_numbers.h"
 #include "simulator/vpi_value_pools.h"
 #include "simulator/vpi_value_refusals.h"
@@ -43,28 +41,19 @@ namespace delta {
 
 static int ScalarFromBits(uint64_t aval, uint64_t bval) {
   if (!bval) return aval ? kVpi1 : kVpi0;
-  return aval ? kVpiX : kVpiZ;  // x=(1,1), z=(0,1)
+  return aval ? kVpiX : kVpiZ;
 }
 
 static void GetValueVector(const Logic4Vec& v, s_vpi_value* value,
                            std::vector<std::vector<s_vpi_vecval>>& pool) {
   int width = static_cast<int>(v.width);
-  // §38.15: the vector value occupies an array of s_vpi_vecval whose size is
-  // ((vector_size - 1) / 32 + 1), one element per 32 bits of the vector; a
-  // value of no bits is handed back as one element of 0.
   const int kGroups = (width + 31) / 32;
   std::vector<s_vpi_vecval> vec(static_cast<size_t>(std::max(kGroups, 1)));
   for (int i = 0; i < kGroups; ++i) {
-    // Internal four-state words are 64 bits wide, so two vecval elements map
-    // onto each word: the LSB of the vector lands in element 0, bit 33 in the
-    // LSB of element 1, and so on.
     const Logic4Word& word = v.words[i / 2];
     int shift = (i % 2) * 32;
     auto a32 = static_cast<uint32_t>((word.aval >> shift) & 0xFFFFFFFFu);
     auto b32 = static_cast<uint32_t>((word.bval >> shift) & 0xFFFFFFFFu);
-    // §38.15 / Figure 38-8: the returned encoding is ab 00=0, 10=1, 11=X,
-    // 01=Z. The internal word now uses this same canonical encoding (X=a1/b1,
-    // Z=a0/b1), so the boundary value is a direct copy with no conversion.
     vec[static_cast<size_t>(i)].aval = a32;
     vec[static_cast<size_t>(i)].bval = b32;
   }
@@ -76,10 +65,6 @@ static void GetValueStrength(
     const Logic4Vec& v, s_vpi_value* value,
     std::vector<std::vector<s_vpi_strengthval>>& pool) {
   int width = static_cast<int>(v.width);
-  // §38.15: the strength arm holds one descriptor per bit of the vector, a
-  // value of no bits one of 0. A reg or variable is always reported at strong
-  // strength, so both the 0 and 1 drive components carry the strong-drive
-  // code.
   std::vector<s_vpi_strengthval> arr(
       static_cast<size_t>(std::max(width, 1)),
       s_vpi_strengthval{kVpi0, vpiStrongDrive, vpiStrongDrive});
@@ -94,14 +79,9 @@ static void GetValueStrength(
 }
 
 static void GetValueIntVal(const Logic4Vec& v, s_vpi_value* value) {
-  // §38.15, Table 38-3: any x or z bit of the object maps to a 0 in the
-  // returned integer, and a signed object's value keeps its sign.
   value->value.integer = static_cast<int>(VpiKnownIntegerValue(v));
 }
 
-// §38.15, Table 38-3 (vpiTimeVal row): the value in an s_vpi_time the routine
-// owns, value.time pointing at it, its high and low words the value's upper
-// and lower 32 bits.
 static void GetValueTime(const Logic4Vec& v, s_vpi_value* value,
                          std::deque<s_vpi_time>& pool) {
   const uint64_t kValue = v.ToUint64();
@@ -113,17 +93,10 @@ static void GetValueTime(const Logic4Vec& v, s_vpi_value* value,
   value->value.time = &time;
 }
 
-// §38.15: unpack the IEEE-754 pattern that a real object stores in its
-// four-state word (§6.13 lays that pattern into the value bits). §6.12 makes
-// a shortreal single precision, and RealVecToDouble reads which precision the
-// object carries off its width.
 static double ObjectRealValue(const Logic4Vec& v) { return RealVecToDouble(v); }
 
 static void GetValueObjType(const Logic4Vec& v, s_vpi_value* value,
                             std::vector<std::vector<s_vpi_vecval>>& pool) {
-  // §38.15: fill in the value and rewrite the format field to the closest
-  // format for the object's type. A real object reports vpiRealVal, a
-  // single-bit object is a scalar, and anything wider is a vector.
   if (v.is_real) {
     value->format = kVpiRealVal;
     value->value.real = ObjectRealValue(v);
@@ -145,9 +118,6 @@ static void RecordVpiError(s_vpi_error_info& error, const char* message) {
 
 static void DispatchIntegerFormat(const Logic4Vec& v, s_vpi_value* value,
                                   VpiValuePools& pools) {
-  // §38.15, Table 38-3: fill the value buffer according to the requested
-  // format. Each arm is the format-specific conversion; most delegate to a
-  // dedicated helper, while the scalar and real arms are short inline reads.
   switch (value->format) {
     case kVpiIntVal:
       GetValueIntVal(v, value);
@@ -193,9 +163,6 @@ static void DispatchIntegerFormat(const Logic4Vec& v, s_vpi_value* value,
   }
 }
 
-// §37.16, §37.17: the one bit at `offset` of `whole`, as a value of its own.
-// Every bit and select stands inside its vector, so the bit is one `whole`
-// holds.
 static Logic4Word BitOfValue(const Logic4Vec& whole, int offset) {
   const auto kWord = static_cast<uint32_t>(offset) / 64;
   const uint32_t kShift = static_cast<uint32_t>(offset) % 64;
@@ -203,8 +170,6 @@ static Logic4Word BitOfValue(const Logic4Vec& whole, int offset) {
                     (whole.words[kWord].bval >> kShift) & 1};
 }
 
-// §37.16 detail 31, §37.17 detail 26: the `width` bits at `offset` of `whole`,
-// copied into `words`, as a value of their own.
 static Logic4Vec SliceOfValue(const Logic4Vec& whole, int64_t offset, int width,
                               std::vector<Logic4Word>& words) {
   words.assign((static_cast<std::size_t>(width) + 63) / 64, Logic4Word{0, 0});
@@ -225,8 +190,6 @@ static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
 
 static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
                                      VpiValuePools& pools) {
-  // A net bit or var bit reads its own bit of its parent's storage, and a
-  // select leaving packed dimensions unindexed the bits it spans.
   if (obj->bit_offset >= 0) {
     std::vector<Logic4Word> words;
     const Logic4Vec kSlice = SliceOfValue(obj->var->value, obj->bit_offset,
@@ -234,10 +197,6 @@ static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
     DispatchIntegerFormat(kSlice, value, pools);
     return;
   }
-  // §38.15: a signed variable's value is read with its sign. A declared
-  // variable's signedness is its declaration's (§6.11), whatever a value
-  // written to it carried: `logic a = 1` holds a 1 that reads as 1, not as a
-  // signed -1, through the variable or a reference to it.
   Logic4Vec whole = obj->var->value;
   const bool kDeclared = obj->decl_signed || obj->var->is_signed;
   whole.is_signed = obj->var->declared_type != nullptr
@@ -246,16 +205,9 @@ static void DispatchGetValueByFormat(VpiHandle obj, s_vpi_value* value,
   DispatchValueByFormat(whole, value, pools);
 }
 
-// §38.15: `v` in the format `value` asks for, a real value read as a real in
-// the formats that take one and as its rounded integer in the others.
 static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
                                   VpiValuePools& pools) {
   if (v.is_real) {
-    // §38.15: a real object is read as its floating-point value only in the
-    // vpiRealVal and vpiStringVal formats. vpiObjTypeVal reduces to vpiRealVal
-    // for a real object. Every other format first converts the real to an
-    // integer using the rounding defined in §6.12.1 (round to nearest, ties
-    // away from zero) and then formats that integer.
     if (value->format == kVpiObjTypeVal) {
       GetValueObjType(v, value, pools.vectors);
       return;
@@ -266,15 +218,12 @@ static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
       return;
     }
     if (value->format == kVpiStringVal) {
-      // §38.15: return a decimal-notation string of the floating-point number
-      // with at most 16 digits of precision.
       char buf[64];
       std::snprintf(buf, sizeof(buf), "%.16g", d);
       pools.strings.emplace_back(buf);
       value->value.str = VpiText(pools.strings.back().c_str());
       return;
     }
-    // §6.12.1 rounding: nearest integer, ties away from zero.
     auto rounded = static_cast<uint64_t>(std::llround(d));
     Logic4Word iw{rounded, 0};
     Logic4Vec int_view;
@@ -287,24 +236,12 @@ static void DispatchValueByFormat(const Logic4Vec& v, s_vpi_value* value,
   DispatchIntegerFormat(v, value, pools);
 }
 
-// §37.16 detail 31, §37.17 detail 26: a select out of a vector whose index is
-// not a constant, which holds no bits of its parent's storage of its own and
-// stands for those its index names when its value is read or written.
-// PackedSelectObject records the dimension every such select indexes, each
-// vector with bits recording its packed dimensions (MakeVectorBits). The
-// dimension a varying select indexes, null for any other object.
 static const PackedRange* VaryingSelectDim(const VpiObject& obj) {
   return obj.select_dim.has_value() ? &*obj.select_dim : nullptr;
 }
 
-// The index a varying select's index expression now holds: the value of the
-// variable or net it names, or of the expression it is, an index holding no
-// storage being one; none where it holds an x or z bit (§11.5.1).
 static std::optional<int64_t> VaryingIndex(const VpiObject& obj,
                                            SimContext* sim) {
-  // An index expression the model could not build names no element, as an
-  // index holding x does; read as the vector the select was made of, such a
-  // select stood for all of it.
   if (obj.index_expr == nullptr) return std::nullopt;
   VpiObject& index = *obj.index_expr;
   Logic4Vec held;
@@ -318,9 +255,6 @@ static std::optional<int64_t> VaryingIndex(const VpiObject& obj,
   return SelectBoundValue(held);
 }
 
-// §37.16 detail 31, §37.17 detail 26: the offset in its parent's storage of
-// the bits a varying select now stands for; none where its index names no
-// element of the dimension it indexes.
 static std::optional<int64_t> VaryingOffset(const VpiObject& obj,
                                             const PackedRange& dim,
                                             SimContext* sim) {
@@ -330,8 +264,6 @@ static std::optional<int64_t> VaryingOffset(const VpiObject& obj,
          (dim.OffsetOf(*kIndex) * std::max(obj.size, 1));
 }
 
-// §11.5.1: the value a read that selects nothing gives, `width` bits of x in a
-// 4-state value and of 0 in a 2-state one.
 static void DispatchUnselected(int width, bool is_4state, s_vpi_value* value,
                                VpiValuePools& pools) {
   const uint64_t kFill = is_4state ? ~uint64_t{0} : 0;
@@ -349,9 +281,6 @@ static void DispatchUnselected(int width, bool is_4state, s_vpi_value* value,
   DispatchIntegerFormat(fill, value, pools);
 }
 
-// §38.15 for a varying select: the value of the bits its index selects, or,
-// when it selects none, x of a 4-state vector and 0 of a 2-state one in each
-// of its bits (§11.5.1). Its storage is its vector's (SliceObject).
 static void GetVaryingSelectValue(VpiHandle obj, const PackedRange& dim,
                                   s_vpi_value* value, VpiValuePools& pools,
                                   SimContext* sim) {
@@ -378,8 +307,6 @@ VpiObject* VpiVarSelectElement(const VpiObject& select, SimContext* sim) {
   return nullptr;
 }
 
-// An element of the array var a var select selects from, at the bottom of its
-// subarrays; every element is one width and kind (§7.4).
 static const VpiObject& AnyElement(const VpiObject& select) {
   const VpiObject* member = select.parent;
   while (member->type == vpiVarSelect) member = member->parent;
@@ -391,30 +318,17 @@ static const VpiObject& AnyElement(const VpiObject& select) {
   return *member;
 }
 
-// §37.12: binds the object of a variable a named block declares to the storage
-// the run made for it when the block ran, after the model was built, once that
-// storage exists.
 static void BindRunStorage(VpiObject& obj, SimContext* sim) {
-  // An object carries a run key only where a run built it, so the run is
-  // there to look it up in.
   if (obj.var == nullptr && !obj.run_key.empty()) {
     obj.var = sim->FindVariable(obj.run_key);
   }
 }
 
-// The object whose value `obj` reads in its place: `obj` itself where it reads
-// its own, or null where its value is already written to `value`.
 static VpiHandle ValueStandIn(VpiHandle obj, s_vpi_value* value,
                               VpiValuePools& pools, SimContext* sim) {
-  // §37.35: a primitive and a prim term read the expression they connect.
   if (VpiHandle source = VpiPrimitiveValueSource(obj); source != obj) {
     return source;
   }
-  // §37.45 details 1 and 2: a delay term reads the value on its side of the
-  // delay. The input term's is the value a module path transition still
-  // carries across the delay where one runs on its net, and otherwise the
-  // net's as it stands; the output term's is the net's past the delay. Every
-  // delay term is made on its net (MakeDelayTerm).
   if (obj->type == vpiDelayTerm) {
     const Net* run_net = obj->term_net->net;
     if (obj->parent->in_term == obj && run_net != nullptr &&
@@ -424,8 +338,6 @@ static VpiHandle ValueStandIn(VpiHandle obj, s_vpi_value* value,
     }
     return VpiDelayTermValueNet(*obj);
   }
-  // §37.19 with §11.5.1: a var select reads the element its index names now,
-  // and the default of its elements' type where the index names none.
   if (obj->type == vpiVarSelect) {
     if (VpiHandle element = VpiVarSelectElement(*obj, sim)) return element;
     const VpiObject& element = AnyElement(*obj);
@@ -435,10 +347,6 @@ static VpiHandle ValueStandIn(VpiHandle obj, s_vpi_value* value,
   return obj;
 }
 
-// §37.3.5 with §38.15: an operation or a call holds no storage; its value is
-// its expression's, evaluated now. Any other object without storage gives
-// none, and the caller's buffer is left as it was. §37.47: a cont assign
-// bit's value is its one bit of the assignment's.
 static void GetStoragelessValue(const VpiObject& obj, s_vpi_value* value,
                                 VpiValuePools& pools, SimContext* sim) {
   if (obj.expr_scope == nullptr) return;
@@ -452,8 +360,6 @@ static void GetStoragelessValue(const VpiObject& obj, s_vpi_value* value,
   DispatchValueByFormat(VpiEvaluateExpressionObject(obj, *sim), value, pools);
 }
 
-// §37.36 with §38.15: a table entry's vector, its row's symbols two bytes
-// each (VpiTableEntryVector).
 static void GetTableEntryVector(const VpiObject& obj, s_vpi_value* value,
                                 VpiValuePools& pools) {
   s_vpi_value row = {};
@@ -465,8 +371,6 @@ static void GetTableEntryVector(const VpiObject& obj, s_vpi_value* value,
 
 void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
   if (!obj || !value) return;
-  // §37.3.6: an object a decryption envelope sealed gives up no value; the
-  // caller's buffer is left as it was.
   if (VpiReadSealed(*obj)) {
     last_error_.state = kVpiPLI;
     last_error_.level = kVpiError;
@@ -474,11 +378,6 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
         VpiText("vpi_get_value() on a protected object is an error");
     return;
   }
-  // §37.3.5: applying vpi_get_value() to an expression with side effects shall
-  // fully evaluate the expression together with its side effects. Reading the
-  // value performs that evaluation, so record that the side effect occurred
-  // before the value is handed back below - the count is the observable
-  // evidence that evaluation, and thus the embedded state change, took place.
   if (VpiExpressionHasSideEffects(obj)) {
     ++obj->side_effect_count;
   }
@@ -502,19 +401,13 @@ void VpiContext::GetValue(VpiHandle obj, s_vpi_value* value) {
     GetTableEntryVector(*obj, value, value_pools_);
     return;
   }
-  // §38.15: an integer or time variable is read as the type it is.
   if (value->format == kVpiObjTypeVal)
     value->format = VpiObjTypeFormat(obj->type);
   DispatchGetValueByFormat(obj, value, value_pools_);
 }
 
-// Applies the §38.34 format-legality checks for the (now known) target
-// variable. Returns true (with error recorded) when the requested format is not
-// legal for the object and the put must be refused.
 static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
                                      s_vpi_error_info& error) {
-  // §38.34: it is illegal to give the value the vpiStringVal format when the
-  // target is a real object. Record the error and leave the object unchanged.
   if (value->format == kVpiStringVal && obj->var->value.is_real) {
     RecordVpiError(error,
                    "vpi_put_value(): vpiStringVal is not a legal format for a "
@@ -522,8 +415,6 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
     return true;
   }
 
-  // §38.34: it is illegal to give the value the vpiStrengthVal format when the
-  // target is a vector object (more than one bit wide).
   if (value->format == kVpiStrengthVal && obj->var->value.width > 1) {
     RecordVpiError(
         error,
@@ -534,12 +425,6 @@ static bool PutValueFormatIsRejected(VpiHandle obj, const s_vpi_value* value,
   return false;
 }
 
-// §38.34 with §6.12: the real number a value put to a real object stands for:
-// a real's own, and in any other format the integer the value gives, its x
-// and z bits read as 0 and the 64 bits it is decoded to read as a signed
-// integer. That is the inverse of §38.15's reading of a real in such a format
-// as its rounded integer, so a value read in one is put back as itself. None
-// for a value that decodes to nothing.
 static std::optional<double> RealPutValue(const s_vpi_value& value) {
   if (value.format == kVpiRealVal) return value.value.real;
   std::vector<Logic4Word> words;
@@ -548,17 +433,9 @@ static std::optional<double> RealPutValue(const s_vpi_value& value) {
       static_cast<int64_t>(words.front().aval & ~words.front().bval));
 }
 
-// §38.34 with Table 38-3: the value `value` gives, decoded from whichever
-// format it is in, written to every bit of the target variable, or, for a net
-// bit or var bit, to its bit of the parent's storage, and for a select leaving
-// packed dimensions unindexed (§37.16 detail 31, §37.17 detail 26) to the
-// `size` bits it spans, from the least significant up. A format that gives no
-// bits writes nothing.
 static void PutValueWriteBits(VpiHandle obj, const s_vpi_value* value) {
   const uint32_t kWidth = VpiPutWidth(*obj);
   std::vector<Logic4Word> bits;
-  // §38.34 with §6.12: a real object holds the real number the value stands
-  // for in its own precision, rather than the value's bits.
   if (obj->var->is_real || obj->var->value.is_real) {
     const std::optional<double> kReal = RealPutValue(*value);
     if (!kReal) return;
@@ -574,11 +451,6 @@ static void PutValueWriteBits(VpiHandle obj, const s_vpi_value* value) {
   }
 }
 
-// §38.34: resolves whether the target carries a writable variable before any
-// value is stored. Returns true when PutValue must stop here (no var and no
-// net, the net-only write attempt, or the named-event trigger all finish in
-// this phase, and the caller returns nullptr); returns false to continue to the
-// value-store path.
 static bool PutValueResolveWritableTarget(VpiHandle obj, Scheduler* scheduler,
                                           SimContext* sim) {
   if (!obj->var && !obj->net) return true;
@@ -588,10 +460,6 @@ static bool PutValueResolveWritableTarget(VpiHandle obj, Scheduler* scheduler,
     return true;
   }
 
-  // §38.34: putting to a vpiNamedEvent toggles (triggers) the named event. Such
-  // an object needs no value, so value_p may be NULL and is not consulted.
-  // In a run that is the trigger `->` makes (§15.5.1), which resumes the
-  // processes waiting on it.
   if (obj->var->is_event) {
     if (scheduler != nullptr && sim != nullptr) {
       TriggerEvent(obj->var, *sim);
@@ -603,20 +471,13 @@ static bool PutValueResolveWritableTarget(VpiHandle obj, Scheduler* scheduler,
   return false;
 }
 
-// §38.34: notes the write attempt, stores the supplied value into the target,
-// and, for vpiForceFlag, latches it as the held forced value. This is the
-// committed-write phase reached once every legality check has passed.
 static void PutValueApplyWriteAndForce(VpiHandle obj, const s_vpi_value* value,
                                        int mode, Scheduler* scheduler) {
   if (scheduler) scheduler->NoteWriteAttempt();
 
   PutValueWriteBits(obj, value);
-  // §4.3: the write is an update event of the object, which resumes what
-  // waits on it (§9.4.2), as vpi_put_value_array's writes do.
   obj->var->NotifyWatchers();
 
-  // §38.34: vpiForceFlag performs a procedural force (§10.6.2): the supplied
-  // value takes effect now and is held as the forced value.
   if (mode == vpiForceFlag) {
     obj->var->is_forced = true;
     obj->var->force_active = true;
@@ -625,9 +486,6 @@ static void PutValueApplyWriteAndForce(VpiHandle obj, const s_vpi_value* value,
   }
 }
 
-// §38.34: vpiNoDelay, vpiForceFlag, and vpiReleaseFlag all act immediately and
-// ignore time_p; every other mode takes its delay from time_p, where a delay is
-// present when a nonzero time is supplied.
 static bool PutValueHasDelay(int mode, const s_vpi_time* time) {
   bool immediate =
       (mode == vpiNoDelay || mode == vpiForceFlag || mode == vpiReleaseFlag);
@@ -635,15 +493,8 @@ static bool PutValueHasDelay(int mode, const s_vpi_time* time) {
          (time->low != 0 || time->high != 0 || time->real != 0.0);
 }
 
-// Applies the §38.34/§37.43 delay-mode restrictions (sequential UDP must be
-// written with vpiNoDelay; no delayed put on an automatic variable). Returns
-// true (with error recorded) when the put must be refused.
 static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
                                         s_vpi_error_info& error) {
-  // §38.34: a sequential UDP is always set with no delay, no matter what delay
-  // the primitive instance carries, so a value may be put to it only with the
-  // vpiNoDelay flag. Supplying one of the scheduled delay modes instead is an
-  // error, and the put is rejected.
   if (obj->prim_type == vpiSeqPrim &&
       (mode == vpiInertialDelay || mode == vpiTransportDelay ||
        mode == vpiPureTransportDelay)) {
@@ -653,10 +504,6 @@ static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
     return true;
   }
 
-  // §37.43 detail 3: it is illegal to put a value with a delay on an automatic
-  // variable. A delay would schedule the update for a future time, but the
-  // automatic object's storage may no longer exist by then. Reject the put
-  // rather than applying it.
   if (obj->automatic && has_delay) {
     RecordVpiError(error,
                    "vpi_put_value(): a value with a delay may not be put on an "
@@ -666,27 +513,18 @@ static bool PutValueDelayModeIsRejected(VpiHandle obj, int mode, bool has_delay,
   return false;
 }
 
-// §37.3.6: nor is a value written to an object a decryption envelope sealed;
-// the error is recorded and nothing is scheduled.
 static bool PutValueIsSealed(const VpiObject& obj, s_vpi_error_info& error) {
   if (!VpiWriteSealed(obj)) return false;
   RecordVpiError(error, "vpi_put_value() on a protected object is an error");
   return true;
 }
 
-// The object a value put to `obj` is written to: `obj` itself, or for a
-// varying select (§37.16, §37.17) a slice, made through `alloc`, of the bits
-// its index names; null when it names none and nothing is written (§11.5.1).
 static VpiHandle PutValueTargetOf(VpiHandle obj,
                                   const std::function<VpiObject*()>& alloc,
                                   SimContext* sim) {
-  // §37.19: a put to a var select writes the element its index names now, and
-  // nothing where it names none (§11.5.1).
   if (obj->type == vpiVarSelect) return VpiVarSelectElement(*obj, sim);
   const PackedRange* dim = VaryingSelectDim(*obj);
   if (dim == nullptr) return obj;
-  // A varying select stands for the bits its index names when the value is
-  // put, made a slice of them here, one bit wide for a select of one bit.
   const std::optional<int64_t> kOffset = VaryingOffset(*obj, *dim, sim);
   if (!kOffset) return nullptr;
   VpiObject* slice = alloc();
@@ -699,14 +537,8 @@ static VpiHandle PutValueTargetOf(VpiHandle obj,
   return slice;
 }
 
-// §38.34: a vpiCancelEvent put, which leaves a scheduled event no longer
-// scheduled and hands back no handle.
-// §9.4.3 with §37.33: a put into a class property is a write of it, which
-// resumes what waits on the owning object's properties, or, for a static
-// property, on the class's.
 static void NotifyPropertyWrite(const VpiObject& obj, SimContext& ctx) {
   const ClassObject& owner = *obj.property_of;
-  // A class object is an instance of its class, which it always names.
   const ClassTypeInfo* declarer = owner.type->StaticPropertyDeclarer(obj.name);
   if (declarer != nullptr) {
     declarer->NotifyStaticWatchers();
@@ -722,9 +554,6 @@ static VpiHandle CancelScheduledEvent(VpiHandle obj) {
   return nullptr;
 }
 
-// §38.36.2 with §4.4.2.9: whether a put with `flags` is refused for being
-// made while a cbReadOnlySynch routine runs, as `at_read_only_synch` says one
-// is: no value is written, and no event scheduled, then; a cancel writes none.
 static bool PutValueRefusedInReadOnlySynch(bool at_read_only_synch, int flags,
                                            s_vpi_error_info& error) {
   if (!at_read_only_synch || (flags & ~vpiReturnEvent) == vpiCancelEvent) {
@@ -736,8 +565,6 @@ static bool PutValueRefusedInReadOnlySynch(bool at_read_only_synch, int flags,
   return true;
 }
 
-// §38.34: release the force on `obj` as the procedural release of §10.6.2
-// does in the run `sim`, or, outside a run, clear its forced state.
 static void PutValueRelease(VpiObject& obj, SimContext* sim) {
   if (sim != nullptr) {
     ReleaseForcedTarget(obj.var, obj.net, *sim, sim->GetArena());
@@ -748,8 +575,6 @@ static void PutValueRelease(VpiObject& obj, SimContext* sim) {
   }
 }
 
-// The run a put writes in: its scheduler and context, null outside one, its
-// simulation time unit, and how a handle for a scheduled event is made.
 struct PutValueRun {
   Scheduler* scheduler;
   SimContext* sim;
@@ -757,11 +582,6 @@ struct PutValueRun {
   std::function<VpiObject*()> alloc;
 };
 
-// §38.34: write `value` to the resolved target `obj` under `flags`, at the
-// delay `time` gives, in `run`: a put with a delay in a run is an event in its
-// queue, and any other is written now, the waiters on the object or the class
-// property it is woken; the scheduled event's handle where vpiReturnEvent
-// asked for it, else null.
 static VpiHandle PutValueWrite(VpiObject* obj, s_vpi_value* value,
                                const s_vpi_time* time, int flags,
                                const PutValueRun& run) {
@@ -778,15 +598,10 @@ static VpiHandle PutValueWrite(VpiObject* obj, s_vpi_value* value,
 
   PutValueApplyWriteAndForce(obj, value, kMode, run.scheduler);
   if (!kHasDelay) VpiStoreElementCopy(*obj);
-  // A class property's object is made by a run, which is there to wake.
   if (obj->property_of != nullptr) {
     NotifyPropertyWrite(*obj, *run.sim);
   }
 
-  // §38.34: a handle to the scheduled event is returned only when
-  // vpiReturnEvent was requested and a delay actually scheduled an event; in
-  // every other case (no bit mask, no delay, or nothing scheduled) the return
-  // value is NULL.
   if (!kReturnEvent || !kHasDelay) return nullptr;
   VpiObject* ev = run.alloc();
   ev->type = vpiSchedEvent;
@@ -804,15 +619,8 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
     return nullptr;
   }
 
-  // §38.34: vpiReturnEvent is an independent bit mask layered on top of the
-  // delay-mode selector that lives in the low bits of the flags word.
   int mode = flags & ~vpiReturnEvent;
 
-  // §38.34: vpiCancelEvent removes a previously scheduled event. The object
-  // must be a vpiSchedEvent handle, and value_p and time_p are not needed. It
-  // is not an error to cancel an event that has already occurred, so a handle
-  // that is no longer scheduled is simply left alone. Cancelling removes the
-  // event from the queue and frees the handle to it.
   if (mode == vpiCancelEvent) {
     CancelScheduledEvent(obj);
     if (obj->type == vpiSchedEvent) ReleaseHandle(obj);
@@ -836,9 +644,6 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
     return nullptr;
   }
 
-  // §38.34: vpiReleaseFlag releases a forced value, the same operation as the
-  // procedural release of §10.6.2, and writes the object's post-release value
-  // back through value_p so the caller can observe what the object settled to.
   if (mode == vpiReleaseFlag) {
     PutValueRelease(*obj, sim_ctx_);
     GetValue(obj, value);
@@ -850,8 +655,4 @@ VpiHandle VpiContext::PutValue(VpiHandle obj, s_vpi_value* value,
       {scheduler_, sim_ctx_, sim_time_unit_, [this] { return AllocObject(); }});
 }
 
-// §38.35: the value formats vpi_put_value_array() accepts. The int/vector/time/
-// real forms are the vpi_get_value() formats reused from §38.15 (Table 38-3);
-// the raw aval/bval forms and the short/long/short-real C-scalar forms are the
-// additions §38.35 defines. Any other format is unsupported.
 }  // namespace delta

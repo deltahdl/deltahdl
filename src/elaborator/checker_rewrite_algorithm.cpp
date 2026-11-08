@@ -10,28 +10,22 @@ CheckerRewriteStage FirstCheckerRewriteStage() {
   return CheckerRewriteStage::kCheckerInstances;
 }
 
-CheckerRewriteStage NextCheckerRewriteStage(CheckerRewriteStage /*stage*/) {
-  // The checker main loop drains a single kind of instance, so its only stage
-  // is its own successor — there is no second pass to advance to.
+CheckerRewriteStage NextCheckerRewriteStage(CheckerRewriteStage) {
   return CheckerRewriteStage::kCheckerInstances;
 }
 
 std::optional<ActualArgumentSource> CheckerActualArgumentFor(
     bool bound_in_instance, bool default_declared) {
-  // Step 2 is the same binding rule as §F.4.1.1 step 2, over the input
-  // formals alone.
   return ActualArgumentFor(bound_in_instance, default_declared);
 }
 
 bool CheckerAlgorithmHandlesFormal(FormalKind kind) {
   switch (kind) {
-    case FormalKind::kUntyped:           // step 3
-    case FormalKind::kTypedNonMatching:  // step 4
-    case FormalKind::kTypedMatching:     // step 5
+    case FormalKind::kUntyped:
+    case FormalKind::kTypedNonMatching:
+    case FormalKind::kTypedMatching:
       return true;
     case FormalKind::kLocalVariable:
-      // A checker formal input argument is never a local variable;
-      // flatten_checker has no step that prepends local variable declarations.
       return false;
   }
   return false;
@@ -39,14 +33,10 @@ bool CheckerAlgorithmHandlesFormal(FormalKind kind) {
 
 ReferenceReplacement ReplaceCheckerFormalReference(FormalKind kind,
                                                    ActualNature actual) {
-  // Steps 3–5 are the same per-reference substitution as §F.4.1.1; the checker
-  // algorithm reuses that decision rather than re-deriving it.
   return ReplaceFormalReference(kind, actual);
 }
 
 CastReplacedFormalLvalueRule CheckerCastReplacedFormalLvalueRule() {
-  // The step-4 replacement is a cast, which is never a variable_lvalue, and the
-  // prohibition spans the whole checker.
   CastReplacedFormalLvalueRule rule;
   rule.replacement_may_be_lvalue = false;
   rule.scope = LvalueProhibitionScope::kWholeChecker;
@@ -55,13 +45,10 @@ CastReplacedFormalLvalueRule CheckerCastReplacedFormalLvalueRule() {
 
 bool CheckerParenthesizedActualNeedsParentheses(
     bool reference_already_parenthesized) {
-  // Step 5b is the same rule as §F.4.1.1 step 5b.
   return ParenthesizedActualNeedsParentheses(reference_already_parenthesized);
 }
 
 FlattenedCheckerShape FlattenedCheckerForm() {
-  // Step 6 returns the body: nothing prepended, nothing appended, and no
-  // enclosing parentheses.
   FlattenedCheckerShape shape;
   shape.prepends_local_var_declarations = false;
   shape.appends_match_item_assignments = false;

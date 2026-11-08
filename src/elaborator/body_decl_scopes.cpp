@@ -11,7 +11,6 @@
 
 namespace delta {
 
-// A for-loop variable writes no unpacked dimension (A.6.8).
 static const std::vector<Expr*> kNoUnpackedDims;
 
 void BodyDeclScopes::DeclareFormal(const FunctionArg& arg) {

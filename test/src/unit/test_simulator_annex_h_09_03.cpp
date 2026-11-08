@@ -26,10 +26,6 @@ TEST(DpiRuntime, SetAndGetScope) {
   EXPECT_EQ(rt.GetScope(), saved);
 }
 
-// §H.9.3: every svSetScope call reports the scope that was active immediately
-// before it, and svGetScope keeps returning the most recently installed scope.
-// Walking several context transitions confirms the previous-scope handoff holds
-// across a chain rather than only for a single swap.
 TEST(SvDpi, ScopeSetReturnsImmediatelyPriorScopeAcrossChain) {
   svScope original = svGetScope();
   int a = 1, b = 2, c = 3;
@@ -47,9 +43,6 @@ TEST(SvDpi, ScopeSetReturnsImmediatelyPriorScopeAcrossChain) {
   svSetScope(original);
 }
 
-// §H.9.3 edge case: installing a null scope clears the active scope while still
-// reporting the prior non-null scope, exercising the swap with the boundary
-// sentinel value.
 TEST(SvDpi, ScopeSetToNullClearsActiveScopeAndReturnsPrior) {
   svScope original = svGetScope();
   int dummy = 7;
@@ -64,15 +57,6 @@ TEST(SvDpi, ScopeSetToNullClearsActiveScopeAndReturnsPrior) {
   svSetScope(original);
 }
 
-// The user data these cases store lives as long as the process, so each case's
-// scope is a registered name of its own and its key a static object of its
-// own, whose address no other case can repeat; §H.9.3 likewise suggests the
-// address of a static symbol as a key. Stack locals would be laid out at the
-// same addresses by cases run one after another in one process, and a case's
-// never-stored key would find what an earlier case stored.
-
-// §H.9.3: a pointer stored under a (scope, key) pair is returned by a later
-// svGetUserData with the same scope and key.
 TEST(SvDpi, UserDataStoreRoundTrip) {
   static int key_obj = 0;
   int payload = 99;
@@ -83,8 +67,6 @@ TEST(SvDpi, UserDataStoreRoundTrip) {
   EXPECT_EQ(svGetUserData(scope, &key_obj), &payload);
 }
 
-// §H.9.3: the key together with the scope identifies an entry, so different
-// keys (and different scopes) address independent storage.
 TEST(SvDpi, UserDataKeyedByScopeAndKey) {
   static int key1 = 0;
   static int key2 = 0;
@@ -103,7 +85,6 @@ TEST(SvDpi, UserDataKeyedByScopeAndKey) {
   EXPECT_EQ(svGetUserData(sb, &key1), &data3);
 }
 
-// §H.9.3: a lookup for a (scope, key) that was never stored returns null.
 TEST(SvDpi, UserDataReturnsNullWhenNeverStored) {
   static int key_obj = 0;
   svScope scope =
@@ -112,8 +93,6 @@ TEST(SvDpi, UserDataReturnsNullWhenNeverStored) {
   EXPECT_EQ(svGetUserData(scope, &key_obj), nullptr);
 }
 
-// §H.9.3 error cases: a null scope or null payload makes svPutUserData fail
-// with -1 and stores nothing; svGetUserData with a null scope returns null.
 TEST(SvDpi, UserDataRejectsNullScopeOrPayload) {
   static int key_obj = 0;
   int payload = 5;
@@ -124,14 +103,9 @@ TEST(SvDpi, UserDataRejectsNullScopeOrPayload) {
   EXPECT_EQ(svPutUserData(scope, &key_obj, nullptr), -1);
   EXPECT_EQ(svGetUserData(nullptr, &key_obj), nullptr);
 
-  // The rejected put left no entry behind.
   EXPECT_EQ(svGetUserData(scope, &key_obj), nullptr);
 }
 
-// §H.9.3: an svScope that names no instance scope is invalid, and passing one
-// is an error: svPutUserData returns -1 and stores nothing, and svGetUserData
-// returns NULL, even where a scope that is one holds data under the same key.
-// Both took any non-null handle, so the address of an object stood as a scope.
 TEST(SvDpi, UserDataRejectsAHandleThatNamesNoScope) {
   static int not_a_scope = 0;
   static int key_obj = 0;
@@ -147,9 +121,6 @@ TEST(SvDpi, UserDataRejectsAHandleThatNamesNoScope) {
   EXPECT_EQ(svGetUserData(peer, &key_obj), &peer_payload);
 }
 
-// §H.9.3: the scope svGetScope reports inside a call chain is a valid one,
-// the unnamed scope a frame pushes among them, so user data is stored and
-// retrieved under it; a handle no frame holds stays invalid while one stands.
 TEST(SvDpi, UserDataAcceptsTheUnnamedScopeOfTheCurrentFrame) {
   static int not_a_scope = 0;
   static int key_obj = 0;
@@ -170,16 +141,11 @@ TEST(SvDpi, UserDataAcceptsTheUnnamedScopeOfTheCurrentFrame) {
   DpiSetForeignRuntime(installed);
 }
 
-// §H.9.3: svGetScopeFromName shall return NULL for a name that is not a
-// recognized instance scope, and a null query is likewise NULL.
 TEST(SvDpi, GetScopeFromNameUnrecognizedIsNull) {
   EXPECT_EQ(svGetScopeFromName("top.no_such_scope_h_09_03"), nullptr);
   EXPECT_EQ(svGetScopeFromName(nullptr), nullptr);
 }
 
-// §H.9.3: once a fully qualified instance-scope name is recognized,
-// svGetScopeFromName hands back its handle and svGetNameFromScope reverses that
-// handle to the same fully qualified name.
 TEST(SvDpi, ScopeNameAndHandleRoundTrip) {
   const char* name = "top.dut_h_09_03.u_alu";
   const DpiScope* registered = DpiRegisterScope(name);
@@ -191,54 +157,34 @@ TEST(SvDpi, ScopeNameAndHandleRoundTrip) {
 
   EXPECT_STREQ(svGetNameFromScope(handle), name);
 
-  // Registering the same name again is idempotent: the same recognized handle
-  // comes back, so the name resolves deterministically.
   EXPECT_EQ(svGetScopeFromName(name), handle);
 }
 
-// §H.9.3: an unrecognized handle (one this simulator never produced) and a null
-// handle map to an empty name rather than an out-of-bounds dereference.
 TEST(SvDpi, GetNameFromUnrecognizedScopeIsEmpty) {
   int stray = 0;
   EXPECT_STREQ(svGetNameFromScope(reinterpret_cast<svScope>(&stray)), "");
   EXPECT_STREQ(svGetNameFromScope(nullptr), "");
 }
 
-// §H.9.3: whether caller file/line is available is implementation-specific.
-// When it is unavailable this simulator returns FALSE (0) and leaves the
-// caller's fileName and lineNumber untouched.
 TEST(SvDpi, GetCallerInfoUnavailableReturnsFalseAndLeavesArgsUnmodified) {
   const char* file = reinterpret_cast<const char*>(0xDEADBEEF);
   int line = 12345;
 
   EXPECT_EQ(svGetCallerInfo(&file, &line), 0);
 
-  // FALSE result: the out-parameters are not modified.
   EXPECT_EQ(file, reinterpret_cast<const char*>(0xDEADBEEF));
   EXPECT_EQ(line, 12345);
 }
 
-// ---------------------------------------------------------------------------
-// The clause's prose beside its function comments.
-// ---------------------------------------------------------------------------
-
-// §H.9.3: the terms scope and context are equivalent for DPI tasks and
-// functions.
 TEST(DpiContextUtilities, ScopeAndContextAreOneTerm) {
   EXPECT_TRUE(DpiScopeAndContextAreEquivalent());
 }
 
-// Installs `rt` as the registry the C layer reaches for the length of a case
-// and takes it back out afterwards, the installation being process-wide.
 struct ForeignRuntimeInstalled {
   explicit ForeignRuntimeInstalled(DpiRuntime* rt) { DpiSetForeignRuntime(rt); }
   ~ForeignRuntimeInstalled() { DpiSetForeignRuntime(nullptr); }
 };
 
-// §H.9.3: unless a prior svSetScope call occurred, svGetScope retrieves the
-// scope of the executing import's declaration site, not its call site; after
-// one it retrieves the scope that call set, and the call reported the scope
-// active before it.
 TEST(DpiContextUtilities, GetScopeIsTheDeclarationSiteUntilSetScopeMovesIt) {
   DpiRuntime rt;
   ForeignRuntimeInstalled installed(&rt);
@@ -257,10 +203,6 @@ TEST(DpiContextUtilities, GetScopeIsTheDeclarationSiteUntilSetScopeMovesIt) {
   rt.LeaveImportCall();
 }
 
-// §H.9.3: the behavior of the scope utilities is undefined for an entity that
-// is not a member of a DPI context call chain, and that of an export for a
-// member of a chain lacking the context characteristic; a member of a context
-// chain has both defined. The runtime tells the two chains apart.
 TEST(DpiContextUtilities, BehaviorIsDefinedForAMemberOfAContextChainAlone) {
   DpiRuntime rt;
   EXPECT_FALSE(DpiBehaviorIsDefinedForChainMember(rt.InContextCallChain()));
@@ -276,10 +218,6 @@ TEST(DpiContextUtilities, BehaviorIsDefinedForAMemberOfAContextChainAlone) {
   rt.LeaveImportCall();
 }
 
-// §H.9.3: shared or unique user data storage is controllable by the key: a
-// related set of context imports using one key share, and a unique key gives
-// unique storage. The address of a static C symbol is the suggested origin
-// of a key, an arbitrary integer an unsafe one.
 TEST(DpiContextUtilities, TheUserKeyControlsSharedOrUniqueStorage) {
   EXPECT_EQ(DpiUserDataStorageOf(true), DpiUserDataStorage::kShared);
   EXPECT_EQ(DpiUserDataStorageOf(false), DpiUserDataStorage::kUnique);
@@ -288,10 +226,6 @@ TEST(DpiContextUtilities, TheUserKeyControlsSharedOrUniqueStorage) {
   EXPECT_FALSE(DpiUserKeyGenerationIsSafe(DpiUserKeyOrigin::kArbitraryInteger));
 }
 
-// §H.9.3: a module m declaring a context import f and instantiated twice has
-// f execute under two svScope values, and the two executing instances cannot
-// share user data through svPutUserData's storage: what one instance stores
-// under a key the other does not retrieve under the same key.
 TEST(DpiContextUtilities, InstancesOfOneModuleShareNoUserData) {
   EXPECT_FALSE(DpiUserDataStorageIsSharedAcrossContexts());
   svScope i1 = const_cast<DpiScope*>(DpiRegisterScope("top.i1_m_h_09_03"));
@@ -304,10 +238,6 @@ TEST(DpiContextUtilities, InstancesOfOneModuleShareNoUserData) {
   EXPECT_EQ(svGetUserData(i2, &key), nullptr);
 }
 
-// §H.9.3: a user sharing a data area across contexts allocates the common
-// area and stores its pointer for each context individually -- one
-// svPutUserData call per context under the common key -- after which each
-// context retrieves the same area.
 TEST(DpiContextUtilities, ACommonAreaIsSharedByStoringItsPointerPerContext) {
   svScope i1 = const_cast<DpiScope*>(DpiRegisterScope("top.i1_n_h_09_03"));
   svScope i2 = const_cast<DpiScope*>(DpiRegisterScope("top.i2_n_h_09_03"));
@@ -320,17 +250,11 @@ TEST(DpiContextUtilities, ACommonAreaIsSharedByStoringItsPointerPerContext) {
   EXPECT_EQ(svGetUserData(i2, &key), &common_area);
 }
 
-// §H.9.3: svSetScope shall be called before calling an export function unless
-// the export is called while executing an import, which hands it the
-// surrounding import's scope as the default scope.
 TEST(DpiContextUtilities, SetScopeIsRequiredBeforeAnExportCallOutsideAnImport) {
   EXPECT_TRUE(DpiSvSetScopeIsRequiredBeforeExportCall(false));
   EXPECT_FALSE(DpiSvSetScopeIsRequiredBeforeExportCall(true));
 }
 
-// §H.9.3: the scope svGetScopeFromName retrieves can be a module, program,
-// interface or generate scope; a package and the compilation unit have no
-// instance-scope handle.
 TEST(DpiContextUtilities, InstanceScopeHandlesNameFourKindsOfScope) {
   EXPECT_TRUE(
       DpiDeclarativeScopeHasInstanceScopeHandle(DpiDeclarativeScope::kModule));
@@ -346,9 +270,6 @@ TEST(DpiContextUtilities, InstanceScopeHandlesNameFourKindsOfScope) {
       DpiDeclarativeScope::kCompilationUnit));
 }
 
-// §H.9.3: a user data value of 0 is indiscernible from the NULL every error
-// of svGetUserData returns, so its use is not suggested; any other pointer
-// is told apart from an error.
 TEST(DpiContextUtilities, AZeroUserDataValueIsIndiscernibleFromAnError) {
   int payload = 0;
   EXPECT_TRUE(DpiUserDataIsDiscernibleFromError(&payload));
@@ -359,9 +280,6 @@ TEST(DpiContextUtilities, AZeroUserDataValueIsIndiscernibleFromAnError) {
   EXPECT_EQ(svGetUserData(scope, &key), nullptr);
 }
 
-// §H.9.3: the file name svGetCallerInfo provides is owned by the
-// SystemVerilog implementation and valid only until the next call to any
-// SystemVerilog function; an application shall not modify or free it.
 TEST(DpiContextUtilities,
      TheCallerInfoStringIsTheImplementationsUntilNextCall) {
   EXPECT_TRUE(DpiCallerInfoFileNameIsValid(false));

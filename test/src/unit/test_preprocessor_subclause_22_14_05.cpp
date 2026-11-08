@@ -14,10 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The directive carrying this version_specifier to the stage that applies it.
-// The list is selected by name in the source and travels to the lexer as the
-// marker the preprocessor emits, so the byte written has to be this version's
-// and not the one belonging to the version it extends.
 TEST(KeywordVersionPreprocessing, Verilog2005DirectiveEmitsItsOwnMarker) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -43,15 +39,7 @@ TEST(KeywordVersionPreprocessing, Verilog2005DirectiveEmitsItsOwnMarker) {
   EXPECT_NE(out[pos + 1], other[other_pos + 1]);
 }
 
-// The negative for the specifier, driven from real source rather than from a
-// direct call on the string. Only the exact spelling names this list, so a word
-// differing from it by its year or by a separator selects nothing and leaves
-// the source that follows to be read under whatever list was already in force.
-// `logic` is what makes that visible: this version leaves it an ordinary
-// identifier while the default list reserves it, so the kind it lexes with says
-// which of the two governed the region.
 TEST(KeywordVersionPreprocessing, Verilog2005OnlyTheExactSpecifierSelectsIt) {
-  // The spelling this subclause defines: the word is free.
   EXPECT_EQ(KindAfterSpecifier("1364-2005", "logic"), TokenKind::kIdentifier);
 
   const char* const kNearMisses[] = {
@@ -63,10 +51,6 @@ TEST(KeywordVersionPreprocessing, Verilog2005OnlyTheExactSpecifierSelectsIt) {
   }
 }
 
-// Table 22-1 carried through a real region, swept whole. Each word arrives at
-// the lexer holding the keyword it holds under the list it comes from, which is
-// what taking in 1364-1995's identifiers amounts to once the directive is in
-// force.
 TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog1995Keyword) {
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
   for (const char* word : kVerilog1995Keywords) {
@@ -77,10 +61,6 @@ TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog1995Keyword) {
   }
 }
 
-// Table 22-2 the same way, and with the keyword named outright. The paired leg
-// under "1364-1995" is what makes each of these an inclusion: under the list
-// that version reserves the very same word is an ordinary identifier, so its
-// being a keyword here comes from the second list this version names.
 TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog2001Keyword) {
   EXPECT_EQ(std::size(kVerilog2001AddedKeywordTokens), 21u);
   for (const auto& word : kVerilog2001AddedKeywordTokens) {
@@ -90,18 +70,12 @@ TEST(KeywordVersionPreprocessing, Verilog2005ReservesEveryVerilog2001Keyword) {
   }
 }
 
-// Table 22-3: the word this version contributes itself. Both lists it includes
-// leave it an identifier, so the region opened for this version_specifier is
-// the only one of the three under which it lexes as a keyword.
 TEST(KeywordVersionPreprocessing, Verilog2005ReservesTheWordItAddsItself) {
   EXPECT_EQ(KindInRegion("1364-2005", "uwire"), TokenKind::kKwUwire);
   EXPECT_EQ(KindInRegion("1364-2001", "uwire"), TokenKind::kIdentifier);
   EXPECT_EQ(KindInRegion("1364-1995", "uwire"), TokenKind::kIdentifier);
 }
 
-// The negative the three tables imply: a word none of them lists reaches the
-// lexer as an ordinary identifier under this version, however firmly a later
-// standard reserves it.
 TEST(KeywordVersionPreprocessing, Verilog2005LeavesLaterWordsAsIdentifiers) {
   const char* const kLater[] = {
       "logic",   "interface", "endinterface", "bit",     "byte",

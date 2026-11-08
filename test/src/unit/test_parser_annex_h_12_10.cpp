@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §H.12.10, the SystemVerilog side of Example 8: an import f1 taking one
-// 128-bit packed logic vector, its formal unnamed as a prototype allows,
-// and an import f2 taking an open array of 128-bit packed logic vectors.
 class ExampleEightParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -37,7 +34,6 @@ TEST_F(ExampleEightParsing, TheSystemVerilogSideParses) {
   EXPECT_NE(Import("f2"), nullptr);
 }
 
-// f1's one formal is a packed logic vector with a range and no name.
 TEST_F(ExampleEightParsing, F1TakesOneUnnamedPackedVector) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 = Import("f1");
@@ -50,8 +46,6 @@ TEST_F(ExampleEightParsing, F1TakesOneUnnamedPackedVector) {
   EXPECT_TRUE(f1->func_args[0].unpacked_dims.empty());
 }
 
-// f2's one formal is the same packed vector with one unsized unpacked
-// dimension, the open array.
 TEST_F(ExampleEightParsing, F2TakesAnOpenArrayOfPackedVectors) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f2 = Import("f2");

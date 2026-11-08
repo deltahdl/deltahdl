@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// How many instances named `bound` the child `inst` of the design's first top
-// holds, a bind's among them.
 int BoundInChild(const RtlirDesign* design, std::string_view inst,
                  std::string_view bound) {
   int count = 0;
@@ -47,10 +45,6 @@ TEST(BindDirective, DesignwideInsertionAddsInstanceToEveryInstanceOfTarget) {
   EXPECT_TRUE(found);
 }
 
-// bind_target_scope may be an interface_identifier, and with no
-// bind_target_instance_list the instantiation is inserted designwide into every
-// instance of that interface. Distinct input form from the module-scope case:
-// the target is an interface and (per footnote 4) the bound thing is a checker.
 TEST(BindDirective, DesignwideInsertionIntoInterfaceScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -166,9 +160,6 @@ TEST(BindDirective, InterfaceTargetWithProgramInstantiationIsError) {
       "23.11"));
 }
 
-// Footnote 4 also governs the second bind form: when the bind_target_instance
-// resolves to an interface instance, the bind_instantiation must still be an
-// interface or checker instantiation, so binding a module there is an error.
 TEST(BindDirective, SecondFormInterfaceInstanceRejectsModuleInstantiation) {
   ElabFixture f;
   ElaborateSrc(
@@ -185,8 +176,6 @@ TEST(BindDirective, SecondFormInterfaceInstanceRejectsModuleInstantiation) {
       "23.11"));
 }
 
-// bind_instantiation may be a program_instantiation: a program bound into a
-// module becomes part of that module, mirroring the standard's fpu example.
 TEST(BindDirective, ProgramInstantiationBoundIntoModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -206,8 +195,6 @@ TEST(BindDirective, ProgramInstantiationBoundIntoModule) {
   EXPECT_TRUE(found);
 }
 
-// bind_instantiation may be an interface_instantiation bound into a module
-// scope, as in the standard's interface-into-cr_unit example.
 TEST(BindDirective, InterfaceInstantiationBoundIntoModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -227,7 +214,6 @@ TEST(BindDirective, InterfaceInstantiationBoundIntoModule) {
   EXPECT_TRUE(found);
 }
 
-// bind_instantiation may be a checker_instantiation bound into a module scope.
 TEST(BindDirective, CheckerInstantiationBoundIntoModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -371,8 +357,6 @@ TEST(BindDirective, BindUnderAnotherBindInstantiationIsError) {
       "bind target shall not be a scope created by a bind", 6, "23.11"));
 }
 
-// A bind_target_scope must name a module or interface; a bare target naming
-// neither a known scope nor any instance denotes nothing bindable.
 TEST(BindDirective, UnknownTargetScopeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -386,10 +370,6 @@ TEST(BindDirective, UnknownTargetScopeIsError) {
                             3, "23.11"));
 }
 
-// §23.11: a bind_target_scope shall be a module or an interface. A program name
-// is not a legal target scope, so a bind naming a program as its scope denotes
-// nothing bindable and is an error even though the program is a known design
-// element that could otherwise be a bind_instantiation.
 TEST(BindDirective, ProgramNameAsTargetScopeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -405,8 +385,6 @@ TEST(BindDirective, ProgramNameAsTargetScopeIsError) {
                     4, "23.11"));
 }
 
-// §23.11 companion to the program case: a checker name is likewise not a legal
-// bind_target_scope, so binding into a checker scope is an error.
 TEST(BindDirective, CheckerNameAsTargetScopeIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -422,9 +400,6 @@ TEST(BindDirective, CheckerNameAsTargetScopeIsError) {
                     4, "23.11"));
 }
 
-// The scope-kind restriction narrows only programs and checkers: a plain module
-// name remains a valid bind_target_scope and still binds designwide, so this
-// accepting companion guards against over-rejecting.
 TEST(BindDirective, ModuleNameRemainsValidTargetScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -443,8 +418,6 @@ TEST(BindDirective, ModuleNameRemainsValidTargetScope) {
   EXPECT_TRUE(found);
 }
 
-// A bind_target_instance must resolve to an instance; a hierarchical path that
-// matches no instance in the design is an error.
 TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -459,10 +432,6 @@ TEST(BindDirective, SecondFormUnknownInstancePathIsError) {
                             4, "23.11"));
 }
 
-// §23.11: a bind directive may be written inside a module scope (not only at
-// compilation-unit scope). Such a nested directive is still collected and still
-// binds designwide into its named target, so the bound instance appears in the
-// target regardless of where the directive was written.
 TEST(BindDirective, BindDeclaredInsideModuleAppliesToTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -483,9 +452,6 @@ TEST(BindDirective, BindDeclaredInsideModuleAppliesToTarget) {
   EXPECT_TRUE(found);
 }
 
-// Companion placement: a bind directive written inside an interface scope is
-// likewise collected and applied to its target, exercising the interface-scope
-// collection path distinct from the module- and compilation-unit-scope ones.
 TEST(BindDirective, BindDeclaredInsideInterfaceAppliesToTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -509,9 +475,6 @@ TEST(BindDirective, BindDeclaredInsideInterfaceAppliesToTarget) {
   EXPECT_TRUE(found);
 }
 
-// §23.11: a bound instance's actual ports resolve against the target scope. A
-// prior test covers a variable actual; this covers a net (wire) declared in the
-// target, a distinct declaration form the resolution must admit.
 TEST(BindDirective, BoundInstancePortConnectsToTargetScopeNet) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -528,9 +491,6 @@ TEST(BindDirective, BoundInstancePortConnectsToTargetScopeNet) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.11: a bound instance's actual may name a port of the target scope, the
-// third declaration form (alongside variables and nets) the target-scope
-// resolution admits.
 TEST(BindDirective, BoundInstancePortConnectsToTargetScopePort) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -546,9 +506,6 @@ TEST(BindDirective, BoundInstancePortConnectsToTargetScopePort) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.11: port associations in a bind_instantiation may be positional, not only
-// named. The ordered actual binds by position and still resolves against the
-// target scope, exercising the ordered-connection path.
 TEST(BindDirective, BoundInstanceOrderedPortConnectionResolvesInTargetScope) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -565,10 +522,6 @@ TEST(BindDirective, BoundInstanceOrderedPortConnectionResolvesInTargetScope) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.11 (via §3.13): the module name space of the target scope includes
-// instance names, so a bound instance whose name collides with an existing
-// child instance in the target is an error — distinct from a collision with a
-// variable, which a prior test covers.
 TEST(BindDirective, BoundInstanceNameClashWithChildInstanceIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -586,10 +539,6 @@ TEST(BindDirective, BoundInstanceNameClashWithChildInstanceIsError) {
                             7, "23.11"));
 }
 
-// Locate the bound child instance `inst_name` inside the elaborated target
-// module `target_name`, and return the resolved value of its parameter `param`.
-// Returns -1 when the instance, its resolution, or the parameter is missing so
-// a caller's positive expectation fails loudly rather than silently passing.
 int64_t BoundChildParamValue(RtlirDesign* design, std::string_view target_name,
                              std::string_view inst_name,
                              std::string_view param) {
@@ -603,9 +552,6 @@ int64_t BoundChildParamValue(RtlirDesign* design, std::string_view target_name,
   return -1;
 }
 
-// §23.11: parameter associations written on a bind_instantiation take effect. A
-// named override with a literal value must reach the bound instance's resolved
-// parameters, driven end-to-end through parse and elaborate.
 TEST(BindDirective, BindInstantiationNamedParameterOverrideTakesEffect) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -619,8 +565,6 @@ TEST(BindDirective, BindInstantiationNamedParameterOverrideTakesEffect) {
   EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 8);
 }
 
-// Positional parameter overrides on a bind_instantiation follow a distinct
-// resolution path from named ones and must likewise take effect.
 TEST(BindDirective, BindInstantiationPositionalParameterOverrideTakesEffect) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -634,10 +578,6 @@ TEST(BindDirective, BindInstantiationPositionalParameterOverrideTakesEffect) {
   EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 8);
 }
 
-// §23.11: the bind actuals refer to objects from the viewpoint of the bind
-// target. A parameter override whose value is a parameter of the target scope
-// must resolve against the target's parameter environment (a constant-form
-// distinct from a literal).
 TEST(BindDirective, BindInstantiationOverrideResolvesTargetScopeParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -651,8 +591,6 @@ TEST(BindDirective, BindInstantiationOverrideResolvesTargetScopeParameter) {
   EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 5);
 }
 
-// Companion constant-form: the override value may be a localparam of the target
-// scope, resolved the same way through the target's parameter environment.
 TEST(BindDirective, BindInstantiationOverrideResolvesTargetScopeLocalparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -668,8 +606,6 @@ TEST(BindDirective, BindInstantiationOverrideResolvesTargetScopeLocalparam) {
   EXPECT_EQ(BoundChildParamValue(design, "cpu", "p", "W"), 6);
 }
 
-// Negative form of the named override: naming a parameter the bound module does
-// not declare is an error, now reachable through the bind path.
 TEST(BindDirective, BindInstantiationOverrideOfUnknownParameterIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -678,15 +614,11 @@ TEST(BindDirective, BindInstantiationOverrideOfUnknownParameterIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe #(.NOPE(8)) p();\n",
       f, "top");
-  // The override reaches the same named-override check an ordinary
-  // instantiation does, so the report names §23.10.2.2 and not §23.11.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "module 'probe' has no parameter 'NOPE'", 4,
                             "23.10.2.2"));
 }
 
-// Negative form of the positional override: supplying more positional overrides
-// than the bound module has overridable parameters is an error.
 TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -695,8 +627,6 @@ TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
       "module top; cpu c(); endmodule\n"
       "bind cpu probe #(8) p();\n",
       f, "top");
-  // The override reaches the same positional-override check an ordinary
-  // instantiation does, so the report names §23.10.2.1 and not §23.11.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "too many positional parameter overrides for module "
@@ -704,11 +634,6 @@ TEST(BindDirective, BindInstantiationTooManyPositionalOverridesIsError) {
                     4, "23.10.2.1"));
 }
 
-// §23.11: a bind target scope is a module or an interface, and a bind target
-// instance is an instance of one. A target that is neither denotes nothing
-// bindable, and the report that says so names the subclause, which lets a
-// caller learn which rule was enforced without matching the wording of the
-// message.
 TEST(BindDirective, TargetIsNeitherScopeNorInstanceNames23_11) {
   ElabFixture f;
   ElaborateSrc(
@@ -721,11 +646,6 @@ TEST(BindDirective, TargetIsNeitherScopeNorInstanceNames23_11) {
                             "is neither a module or interface", 4, "23.11"));
 }
 
-// §23.11: with a bind_target_instance_list, the instantiation goes into the
-// listed instances of the target scope alone, and a bind_target_instance is a
-// hierarchical name, which §23.8 resolves from the scope it is written in:
-// written in top, `c1, c3` are top's c1 and c3. The path was compared with
-// "top.c1" as the walk spells it, and nothing was bound.
 TEST(BindDirective, TargetInstanceListIsReadFromTheDirectivesModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -745,7 +665,6 @@ TEST(BindDirective, TargetInstanceListIsReadFromTheDirectivesModule) {
   EXPECT_EQ(BoundInChild(design, "c3", "p"), 1);
 }
 
-// The second form, `bind c2 probe p();` written in top, binds into top's c2.
 TEST(BindDirective, TargetInstanceIsReadFromTheDirectivesModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -763,8 +682,6 @@ TEST(BindDirective, TargetInstanceIsReadFromTheDirectivesModule) {
   EXPECT_EQ(BoundInChild(design, "c2", "p"), 1);
 }
 
-// A directive at compilation-unit scope stands in no instance, so its list
-// names an instance by its full path from a top module.
 TEST(BindDirective, TargetInstanceListAtUnitScopeIsAFullPath) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -782,10 +699,6 @@ TEST(BindDirective, TargetInstanceListAtUnitScopeIsAFullPath) {
   EXPECT_EQ(BoundInChild(design, "c2", "p"), 1);
 }
 
-// §23.11: a bind target instance is an instance of a module or an interface,
-// and a listed one is an instance of the target scope. nosuch names nothing and
-// m1 is an instance of another module, so each entry is reported; both were
-// passed over in silence.
 TEST(BindDirective, TargetInstanceListEntryNamingNoInstanceIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -807,11 +720,6 @@ TEST(BindDirective, TargetInstanceListEntryNamingNoInstanceIsReported) {
                             7, "23.11"));
 }
 
-// §23.11 with §23.6: a bound instance stands at the end of its target scope,
-// so a hierarchical name reaches it like any instance: s1.c names the m2 the
-// directive puts in s1, whether the directive names the scope or the
-// instance. The name was checked before the bind added it and reported
-// unresolved. s1.d, which nothing binds, is still reported.
 TEST(BindDirective, HierarchicalNameReachesABoundInstance) {
   ElabFixture f;
   ElaborateSrc(
@@ -836,12 +744,6 @@ TEST(BindDirective, HierarchicalNameReachesABoundInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §23.9 stops the search for a variable named without a hierarchical path at
-// a module boundary, and §23.11 places a bound instance in its target rather
-// than making the target a scope the bound module's names resolve through, so
-// `a` read in `mon` names no declaration: `leaf` declares it, not `mon`. The
-// test fails on an elaborator that lets the bound module's bare reads see the
-// target's names.
 TEST(BindDirective, BoundModuleReadingItsTargetsVariableByBareNameErrors) {
   ElabFixture f;
   ElaborateSrc(

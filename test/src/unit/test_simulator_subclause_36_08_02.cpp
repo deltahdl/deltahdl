@@ -13,10 +13,6 @@
 namespace delta {
 namespace {
 
-// §36.8.2: a compiletf application is typically used to check the correctness
-// of the arguments a user-defined system task or function is given. These stubs
-// record that they ran and what single argument they received, so a test can
-// observe the routine actually being invoked.
 const char* g_compiletf_arg = nullptr;
 int g_compiletf_calls = 0;
 
@@ -31,9 +27,6 @@ void ResetCompiletfProbe() {
   g_compiletf_calls = 0;
 }
 
-// A VpiContext fixture so the round-trip tests can register a system task or
-// function and read its record back, exercising the optional-compiletf rule
-// against the production registry rather than a bare struct.
 class CompiletfApplicationRoutine : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -42,31 +35,10 @@ class CompiletfApplicationRoutine : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// -----------------------------------------------------------------------------
-// §36.8.2: a compiletf routine runs when parsing or compiling the source meets
-// the user-defined system task or system function name, once for every place
-// the source description writes it. The when of that call is delegated to
-// §36.10.2 and §38.37.1; what §36.8.2 itself fixes is that compiletf runs while
-// the design is being compiled/built - in contrast to calltf, which runs on
-// every invocation during simulation. That compile-time-per-instance
-// classification is what distinguishes compiletf from the execution-time
-// routine.
-// -----------------------------------------------------------------------------
-
 TEST_F(CompiletfApplicationRoutine, IsACompileTimeRoutineUnlikeCalltf) {
-  // compiletf fires while the simulation data structure is compiled/built...
   EXPECT_TRUE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCompiletf));
-  // ...whereas calltf fires per execution during simulation, not at compile
-  // time.
   EXPECT_FALSE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCalltf));
 }
-
-// -----------------------------------------------------------------------------
-// §36.8.2: the routine runs when the source's use of the user-defined system
-// task or system function name is met. Unlike sizetf (functions only, §36.8.1),
-// compiletf applies to both kinds, so the same compiletf application runs
-// whether the registration is a system task or a system function.
-// -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   int payload = 0;
@@ -85,8 +57,6 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   ResetCompiletfProbe();
   VpiSystfInvoke(task.compiletf, task.user_data);
   EXPECT_EQ(g_compiletf_calls, 1);
-  // The single argument passed is the registration's user_data, typed as char
-  // *.
   EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
 
   ResetCompiletfProbe();
@@ -95,18 +65,11 @@ TEST_F(CompiletfApplicationRoutine, RunsForBothSystemTaskAndSystemFunction) {
   EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
 }
 
-// -----------------------------------------------------------------------------
-// §36.8.2: a registration need not supply a compiletf routine. A registration
-// that supplies no compiletf application is accepted and reads back with no
-// compiletf, and asking the runtime to run the absent routine is a harmless
-// no-op.
-// -----------------------------------------------------------------------------
-
 TEST_F(CompiletfApplicationRoutine, IsOptional) {
   s_vpi_systf_data no_compiletf = {};
   no_compiletf.type = kVpiSysTask;
   no_compiletf.tfname = VpiText("$check_args");
-  no_compiletf.compiletf = nullptr;  // omitted - allowed
+  no_compiletf.compiletf = nullptr;
 
   VpiHandle handle = vpi_ctx_.RegisterSystf(&no_compiletf);
   ASSERT_NE(handle, nullptr);
@@ -115,17 +78,10 @@ TEST_F(CompiletfApplicationRoutine, IsOptional) {
   vpi_ctx_.GetSystfInfo(handle, &read_back);
   EXPECT_EQ(read_back.compiletf, nullptr);
 
-  // Driving the missing routine does nothing and reports no result.
   ResetCompiletfProbe();
   EXPECT_EQ(VpiSystfInvoke(read_back.compiletf, read_back.user_data), 0);
   EXPECT_EQ(g_compiletf_calls, 0);
 }
-
-// -----------------------------------------------------------------------------
-// §36.8.2: when a compiletf application is supplied, the registration preserves
-// it so it can be called at compile time. The stored routine round-trips and,
-// when invoked, receives the registration's user_data as its lone argument.
-// -----------------------------------------------------------------------------
 
 TEST_F(CompiletfApplicationRoutine,
        SuppliedRoutineRoundTripsAndReceivesUserData) {
@@ -151,22 +107,6 @@ TEST_F(CompiletfApplicationRoutine,
   EXPECT_EQ(g_compiletf_arg, reinterpret_cast<const char*>(&payload));
 }
 
-// -----------------------------------------------------------------------------
-// §36.8.2: the routine's usual job is checking the arguments the source passes
-// to the user-defined system task or system function. §36.4 leaves an
-// application no way to those arguments other than the call handle
-// vpi_handle(vpiSysTfCall, NULL) answers with -- the PLI application is not
-// handed the task/function arguments -- and §38.37.1 makes user_data the one
-// argument the compiletf, sizetf and calltf routines receive -- so a compiletf
-// run with no call standing is a compiletf that can check nothing at all. The
-// cases below run a real design and let the application look.
-// -----------------------------------------------------------------------------
-
-// What the compiletf below found, left at file scope because a compiletf is a
-// plain C function with no return path to the case that provoked it. The
-// names are copied rather than kept as pointers: §38.11 has vpi_get_str() place
-// its answer in one buffer reused by every call, so the pointer from the first
-// call names the second call's string by the time a case reads it.
 int g_call_type_seen = 0;
 int g_args_seen_at_compile = -1;
 std::string g_call_name_seen;
@@ -185,8 +125,6 @@ PLI_INT32 InspectingCompiletf(PLI_BYTE8*) {
   g_call_type_seen = vpi_get(vpiType, call);
   const char* call_name = vpi_get_str(vpiName, call);
   if (call_name != nullptr) g_call_name_seen = call_name;
-  // §37.42 detail 5: the registration the call is of, whose name
-  // vpi_get_systf_info() reads back through the call's user systf.
   vpiHandle systf = vpi_handle(vpiUserSystf, call);
   if (systf != nullptr) {
     s_vpi_systf_data info = {};
@@ -206,10 +144,6 @@ PLI_INT32 InspectingCompiletf(PLI_BYTE8*) {
   return 0;
 }
 
-// Registers $probe with the inspecting compiletf and no calltf. The calltf is
-// left out because §36.8.2's period is the build rather than the execution, and
-// a registration with nothing to run at execution is what keeps the two apart:
-// everything a case below reads was written before the scheduler ran an event.
 void RegisterInspectingProbe(int type) {
   s_vpi_systf_data data = {};
   data.type = type;
@@ -232,25 +166,14 @@ TEST_F(CompiletfApplicationRoutine, ReachesTheCallTheSourceWroteItFor) {
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 
-  // The call the compiletf was run for is the one the source wrote: a system
-  // task call of the registration, carrying the two arguments the call site
-  // listed. Written as a statement with no label, it has no name of its own
-  // (§37.60 detail 1). A compiletf reached with no call standing leaves every
-  // one of these at the value it was cleared to.
   EXPECT_EQ(g_call_type_seen, vpiSysTaskCall);
   EXPECT_EQ(g_call_name_seen, "");
   EXPECT_EQ(g_systf_name_seen, "$probe");
   EXPECT_EQ(g_args_seen_at_compile, 2);
-  // §36.4: an argument that names a variable is reached as that variable, which
-  // is what lets a compiletf say which name a call was written against.
   EXPECT_EQ(g_first_arg_name_seen, "r");
 }
 
 TEST_F(CompiletfApplicationRoutine, ReachesASystemFunctionCallTheSameWay) {
-  // §36.8.2 applies to both kinds -- the routine runs when the source's use of
-  // the user-defined task or function name is met -- and §37.42 gives a
-  // function call its own object type, so the application can tell which kind
-  // it is checking the arguments of.
   RegisterInspectingProbe(vpiSysFunc);
 
   SimFixture f;

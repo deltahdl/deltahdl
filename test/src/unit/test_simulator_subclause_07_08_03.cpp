@@ -103,10 +103,6 @@ TEST(ClassIndexAssocArraySimulation, ClassIndex_EmptySize) {
   EXPECT_EQ(aa->Size(), 0u);
 }
 
-// §7.8.3 end to end: a class handle produced by §8.4 'new' is used as an index
-// to store and then read back a value. Built from real source and run through
-// the full pipeline so the runtime store/read is keyed by the handle the
-// allocator actually produced, not by a hand-poked map entry.
 TEST(ClassIndexAssocArraySimulation, EndToEndObjectHandleKeyWriteRead) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -130,8 +126,6 @@ TEST(ClassIndexAssocArraySimulation, EndToEndObjectHandleKeyWriteRead) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 55u);
 }
 
-// §7.8.3 end to end: two objects from separate §8.4 'new' calls are distinct
-// keys, so a value stored under one handle does not disturb the other.
 TEST(ClassIndexAssocArraySimulation, EndToEndDistinctObjectKeys) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -157,8 +151,6 @@ TEST(ClassIndexAssocArraySimulation, EndToEndDistinctObjectKeys) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 10u);
 }
 
-// §7.8.3 end to end: a null index is valid. Store and read back through the
-// null handle key over the full lowering and evaluation path.
 TEST(ClassIndexAssocArraySimulation, EndToEndNullKeyWriteRead) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,9 +172,6 @@ TEST(ClassIndexAssocArraySimulation, EndToEndNullKeyWriteRead) {
   EXPECT_EQ(f.ctx.FindVariable("result")->value.ToUint64(), 77u);
 }
 
-// §7.8.3 end to end: a handle of a §8.13 derived class is a valid index into an
-// array declared with the base class as index. The derived object built by
-// 'new' keys the store, and the value reads back through the same handle.
 TEST(ClassIndexAssocArraySimulation, EndToEndDerivedHandleKeyWriteRead) {
   SimFixture f;
   auto* design = ElaborateSrc(

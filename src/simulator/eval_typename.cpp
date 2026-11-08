@@ -1,9 +1,3 @@
-// §20.6.1 (printed pages 628-629 of IEEE 1800-2023): $typename during the
-// run, written by the clause's steps (elaborator/typename_writer.h) from the
-// running design: a variable, a property or a type parameter of the object a
-// method runs on, a typedef name, a type node, a built-in type keyword, or an
-// expression's self-determined type.
-
 #include <algorithm>
 #include <cstdint>
 #include <optional>
@@ -28,10 +22,6 @@ namespace delta {
 
 namespace {
 
-// Step a: the type the typedef name `type_name`, written behind the scope
-// `scope_name` where it was, stands for in the running design, null where no
-// typedef declares it; `prefix` is set to the scope a package's typedef made
-// visible by an import is named behind.
 const DataType* DeclaredTypeOfName(SimContext& ctx, std::string_view scope_name,
                                    std::string_view type_name,
                                    std::string& prefix) {
@@ -40,15 +30,12 @@ const DataType* DeclaredTypeOfName(SimContext& ctx, std::string_view scope_name,
                                              "::" + std::string(type_name);
   const DataType* named = ctx.FindTypeDeclaration(key);
   if (named != nullptr || !scope_name.empty()) return named;
-  // §26.3: a name a package declares, made visible by an import.
   std::string_view imported = ctx.FindPackageTypedefKey(type_name);
   if (imported.empty()) return nullptr;
   prefix = std::string(imported.substr(0, imported.size() - type_name.size()));
   return ctx.FindTypeDeclaration(imported);
 }
 
-// What the §20.6.1 steps ask of the place a type is written in, answered from
-// the running design.
 TypenameEnvironment SimTypenameEnvironment(SimContext& ctx, Arena& arena) {
   TypenameEnvironment env;
   env.value_of = [&ctx, &arena](const Expr* expr) {
@@ -87,8 +74,6 @@ TypenameEnvironment SimTypenameEnvironment(SimContext& ctx, Arena& arena) {
   return env;
 }
 
-// The declaration of the property `name` of the object's class or a class it
-// derives from, null where none declares it.
 const ClassMember* PropertyDeclaration(const ClassTypeInfo* type,
                                        std::string_view name) {
   for (; type != nullptr; type = type->parent) {
@@ -102,9 +87,6 @@ const ClassMember* PropertyDeclaration(const ClassTypeInfo* type,
   return nullptr;
 }
 
-// A variable as $typename writes it: by the type its declaration recorded,
-// or else by the kind the variable alone says it is; empty where neither
-// says.
 std::string TypenameOfVariable(const Variable& var, std::string_view name,
                                TypenameWriter& writer) {
   std::string unpacked(var.declared_unpacked);
@@ -117,9 +99,6 @@ std::string TypenameOfVariable(const Variable& var, std::string_view name,
   return {};
 }
 
-// What an identifier argument names, as $typename writes it: a variable, a
-// property or a type parameter of the object a method runs on, a typedef
-// name, or a built-in type keyword; empty where it names none of them.
 std::string TypenameOfIdentifier(std::string_view name, TypenameWriter& writer,
                                  SimContext& ctx) {
   if (const Variable* var = ctx.FindVariable(name)) {
@@ -144,10 +123,6 @@ std::string TypenameOfIdentifier(std::string_view name, TypenameWriter& writer,
   return {};
 }
 
-// A select of one element of an unpacked array or queue, `q[0]` of a
-// property `string q[$]` or of a variable `AB_t AB[10]`, as $typename writes
-// it: the element type, which is the declared type without the dimension the
-// select takes away; empty where `arg` is no such select.
 std::string TypenameOfElement(const Expr* arg, TypenameWriter& writer,
                               SimContext& ctx) {
   if (arg->kind != ExprKind::kSelect || arg->index_end != nullptr ||

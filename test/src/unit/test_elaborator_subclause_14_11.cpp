@@ -22,9 +22,6 @@ TEST(CycleDelayElab, WithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// §14.11: the missing-default-clocking diagnostic is conditional, not a blanket
-// rejection of ##. When a default clocking block governs the current module the
-// rule must stay silent, so the same cycle delay elaborates cleanly.
 TEST(CycleDelayElab, WithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -41,12 +38,6 @@ TEST(CycleDelayElab, WithDefaultClockingNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11 + §14.12: what constitutes a cycle is fixed by the default clocking in
-// effect. §14.12 lets the default be established by a reference/assignment form
-// -- `default clocking <name>;` naming an already-declared clocking block --
-// rather than an inline default block. The missing-default-clocking rule must
-// consume that reference form too and stay silent, since a default IS in
-// effect.
 TEST(CycleDelayElab, WithReferenceFormDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -64,11 +55,6 @@ TEST(CycleDelayElab, WithReferenceFormDefaultClockingNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11: the missing-default-clocking requirement is stated for the current
-// module, interface, checker, or program -- not only a module. A cycle delay in
-// a program with no default clocking in effect is rejected. The scope is
-// exercised end-to-end: the program is declared with real syntax and reached by
-// instantiating it from a top module so the elaborator visits its body.
 TEST(CycleDelayElab, ProgramScopeWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -87,10 +73,6 @@ TEST(CycleDelayElab, ProgramScopeWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// §14.11: the same program with a default clocking in effect elaborates
-// cleanly. Pairing this positive with the negative above isolates the
-// diagnostic to the missing-default-clocking rule rather than any incidental
-// program-scope error.
 TEST(CycleDelayElab, ProgramScopeWithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -110,9 +92,6 @@ TEST(CycleDelayElab, ProgramScopeWithDefaultClockingNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11: the interface is another enumerated scope for the requirement. A
-// cycle delay in an instantiated interface with no default clocking is
-// rejected.
 TEST(CycleDelayElab, InterfaceScopeWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -131,8 +110,6 @@ TEST(CycleDelayElab, InterfaceScopeWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// §14.11: the interface positive pair -- a default clocking in effect keeps the
-// rule silent for the same cycle delay in interface scope.
 TEST(CycleDelayElab, InterfaceScopeWithDefaultClockingNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -152,12 +129,6 @@ TEST(CycleDelayElab, InterfaceScopeWithDefaultClockingNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11 names the checker as the fourth scope whose missing default clocking
-// is an error, and a cycle delay in an instantiated checker without one is
-// rejected. Two rules independently reject this source, though -- §17.5 allows
-// an initial procedure in a checker only an event control for timing -- so it
-// is the companion below, which supplies the default clocking and is still
-// rejected, that says which of them is doing the work.
 TEST(CycleDelayElab, CheckerScopeWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -176,24 +147,6 @@ TEST(CycleDelayElab, CheckerScopeWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 3, "14.11"));
 }
 
-// The checker scope has no positive pair, unlike the module, interface and
-// program scopes above: supplying the default clocking §14.11 asks for does not
-// make this legal, because a second rule reaches it first.
-//
-// §17.5: what an initial procedure in a checker body may hold is limited to let
-// declarations, the immediate, deferred and concurrent assertions, and
-// procedural timing control statements whose control is an event control. A.6.5
-// lists the three alternatives of procedural_timing_control -- delay_control,
-// event_control and cycle_delay -- as siblings, so a cycle delay is not an
-// event control and has no place in a checker initial procedure whatever
-// clocking is in effect. §14.11's own description points the same way: it
-// defines ## as a wait for clocking block events, which is what it does, not
-// what the grammar calls it.
-//
-// So §14.11 naming the checker among its four scopes is not about a cycle delay
-// written as a procedural statement in a checker procedure. The distinction
-// this test now records is that adding the default clocking changes nothing
-// here, which is exactly what separates checker scope from the three above.
 TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -210,20 +163,12 @@ TEST(CycleDelayElab, CheckerInitialCycleDelayRejectedWithDefaultClocking) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // The rejection this case records is §17.5's, not §14.11's: the default
-  // clocking above silences ValidateCycleDelayDefaultClocking, and what is left
-  // is the checker-initial rule reported by CheckCheckerBodyItemRules in
-  // src/elaborator/elaborator_items_udp.cpp.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "an initial procedure in checker 'chk' may use only an event control", 6,
       "17.5"));
 }
 
-// §14.11: the missing-default-clocking check applies to a cycle delay wherever
-// it sits in a process body, not only at the top level. The validator descends
-// into nested control flow, so a ## buried inside a branch is still rejected
-// when no default clocking governs the module.
 TEST(CycleDelayElab, NestedCycleDelayWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -241,9 +186,6 @@ TEST(CycleDelayElab, NestedCycleDelayWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// §14.11: a cycle delay is not legal as an intra-assignment delay on a blocking
-// assignment. A default clocking is present so the missing-default-clocking
-// rule stays silent; the only remaining violation is the intra-assignment ##.
 TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -262,8 +204,6 @@ TEST(CycleDelayElab, IntraAssignBlockingCycleDelayErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
 }
 
-// §14.11: the same prohibition applies to a nonblocking assignment carrying a
-// cycle-delay intra-assignment timing control.
 TEST(CycleDelayElab, IntraAssignNonblockingCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -282,10 +222,6 @@ TEST(CycleDelayElab, IntraAssignNonblockingCycleDelayErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
 }
 
-// §14.11: the intra-assignment cycle-delay prohibition applies wherever the
-// offending assignment sits, not only at the top of a process body. The
-// validator descends into nested control flow, so an intra-assignment ## buried
-// inside a branch is still rejected even when a default clocking is present.
 TEST(CycleDelayElab, NestedIntraAssignCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -306,11 +242,6 @@ TEST(CycleDelayElab, NestedIntraAssignCycleDelayErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 7, "14.11"));
 }
 
-// §14.11: the intra-assignment prohibition is about the timing control, not the
-// exact target shape. A cycle delay on a blocking assignment whose target is a
-// bit-select of an ordinary variable is still an illegal intra-assignment delay
-// -- the target is not a clocking-block variable, so it cannot be a synchronous
-// drive. A default clocking is present so only the intra-assignment rule fires.
 TEST(CycleDelayElab, IntraAssignBitSelectLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -330,9 +261,6 @@ TEST(CycleDelayElab, IntraAssignBitSelectLhsCycleDelayErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 7, "14.11"));
 }
 
-// §14.11: the same holds for a part-select target on a nonblocking assignment.
-// A slice of an ordinary variable is not a clockvar, so the leading ## is an
-// illegal intra-assignment delay rather than a synchronous drive.
 TEST(CycleDelayElab, IntraAssignPartSelectLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -352,10 +280,6 @@ TEST(CycleDelayElab, IntraAssignPartSelectLhsCycleDelayErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 7, "14.11"));
 }
 
-// §14.11: a concatenation target is another non-clockvar lvalue form. A cycle
-// delay on a blocking assignment to a concatenation of ordinary variables is an
-// illegal intra-assignment delay, not a synchronous drive, and must be
-// rejected.
 TEST(CycleDelayElab, IntraAssignConcatLhsCycleDelayErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -376,10 +300,6 @@ TEST(CycleDelayElab, IntraAssignConcatLhsCycleDelayErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 8, "14.11"));
 }
 
-// §14.11/§14.16: a bit-select of a clocking output variable is still a
-// synchronous drive, so a leading cycle delay on it is legal. The tightened
-// discriminator must peel the select and recognize the clockvar underneath
-// rather than treating any non-identifier target as an intra-assignment.
 TEST(CycleDelayElab, SynchronousDriveBitSelectWithCycleDelayNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -397,9 +317,6 @@ TEST(CycleDelayElab, SynchronousDriveBitSelectWithCycleDelayNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11/§14.16: the prohibition targets plain assignments, not synchronous
-// drives. A clocking-block variable driven through a member access with a cycle
-// delay is a legal synchronous drive and must not be flagged.
 TEST(CycleDelayElab, SynchronousDriveWithCycleDelayNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -416,14 +333,6 @@ TEST(CycleDelayElab, SynchronousDriveWithCycleDelayNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11: a cycle delay written where the enclosing module, interface, checker
-// or program specifies no default clocking is a compile-time error. The rule is
-// stated against the module, not against a process, so an always block that a
-// generate if holds is judged by the same default clocking as one written
-// beside it. The report stands at the always keyword on line 3, the location of
-// the process item holding the cycle delay. A walk that reads ModuleItem::body
-// off the items of the module reaches no generate item's gen_body, so the
-// nested ## is accepted silently.
 TEST(CycleDelayElab, GenerateBlockWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -441,11 +350,6 @@ TEST(CycleDelayElab, GenerateBlockWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 3, "14.11"));
 }
 
-// §14.11: the same rule, an error for a cycle delay in a module, interface,
-// checker or program with no default clocking, reaches a generate loop's body
-// as readily as a generate if's, and a loop is a different ModuleItemKind, so
-// one walk has to cover both. The report stands at the always keyword on line
-// 3. Without that walk the elaborator accepts the nested ## silently.
 TEST(CycleDelayElab, GenerateLoopWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -463,13 +367,6 @@ TEST(CycleDelayElab, GenerateLoopWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 3, "14.11"));
 }
 
-// §14.11: a cycle delay may not serve as the intra-assignment delay of an
-// assignment, blocking or nonblocking. The rule names no process, so an
-// assignment in a task body breaks the rule exactly as one in an initial block
-// does. The report stands at the assignment on line 6. A default clocking is
-// present so the missing-default-clocking rule stays silent. A walk that reads
-// ModuleItem::body reaches no subroutine's func_body_stmts, so the ## in the
-// task is accepted silently.
 TEST(CycleDelayElab, IntraAssignCycleDelayInTaskErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -488,14 +385,6 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInTaskErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
 }
 
-// §14.11: the same rule, which bars a cycle delay as the intra-assignment delay
-// of either kind of assignment, covers a function body, and the subclause
-// asserted here is what distinguishes the rule that fired. §13.4 separately
-// forbids a time-controlling statement in a function, and the function-body
-// checker in src/elaborator/elaborator_validate_funcbody.cpp reports that one
-// under "13.4", so a §14.11 walk that never reached func_body_stmts would leave
-// this case with no 14.11 report at all. The report stands at the assignment on
-// line 6.
 TEST(CycleDelayElab, IntraAssignCycleDelayInFunctionErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -514,13 +403,6 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInFunctionErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 6, "14.11"));
 }
 
-// §14.11/§14.16: the intra-assignment prohibition reaches a task body, and the
-// synchronous-drive exemption has to travel with it. §14.16 makes a leading
-// cycle delay on a write to a clocking output variable a synchronous drive
-// rather than an intra-assignment delay, so this source is legal wherever the
-// drive is written. A walk that reached func_body_stmts while dropping the
-// clockvar test would reject a design the standard permits. There is no report
-// to name, so the assertion is that the source was accepted.
 TEST(CycleDelayElab, SynchronousDriveInTaskNoError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -538,21 +420,6 @@ TEST(CycleDelayElab, SynchronousDriveInTaskNoError) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §14.11 makes a cycle delay a compile-time error where the enclosing module,
-// interface, checker or program specifies no default clocking. It conditions
-// the rule on the module and not on the statement the delay is written in, so
-// the five cases below write the same `##5;` the file opens with in five
-// statement links HasCycleDelay did not read.
-//
-// The walk wrote out six of the thirteen links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states, so
-// Elaborator::ValidateCycleDelayDefaultClocking concluded each of these modules
-// wrote no cycle delay at all. The construct enclosing the `##` decided whether
-// the rule held, and no clause of IEEE 1800-2023 says that.
-//
-// The report stands at the procedural item rather than at the delay, which is
-// why every case below expects line 2: the rule is about the module the item is
-// written in, so ValidateCycleDelayDefaultClocking reports the item once.
 TEST(CycleDelayElab, ForkArmWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -570,8 +437,6 @@ TEST(CycleDelayElab, ForkArmWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// A.6.7 gives `randcase_item ::= expression : statement_or_null`, and the
-// parser puts that statement in the second of each Stmt::randcase_items pair.
 TEST(CycleDelayElab, RandcaseItemWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -589,9 +454,6 @@ TEST(CycleDelayElab, RandcaseItemWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, which is two statement links rather than one:
-// Stmt::assert_pass_stmt here, and Stmt::assert_fail_stmt in the case below.
 TEST(CycleDelayElab, AssertionPassStmtWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -622,12 +484,6 @@ TEST(CycleDelayElab, AssertionFailStmtWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a production code block holds statements like any other block.
-// §18.17.6 gives `break` and `return` a meaning there that they have nowhere
-// else, and that carve-out is why commit 68ac2cbc8 had to settle the clause
-// before §12.8's walk could descend the link. §14.11 has no such carve-out, so
-// a `##` written in a production code block is a cycle delay like any other.
 TEST(CycleDelayElab, RandsequenceCodeBlockWithoutDefaultClockingErrors) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -645,12 +501,6 @@ TEST(CycleDelayElab, RandsequenceCodeBlockWithoutDefaultClockingErrors) {
       "cycle delay (##) requires a default clocking block", 2, "14.11"));
 }
 
-// §14.11's other rule, that a cycle delay is not a legal intra-assignment delay
-// outside a synchronous drive, is found by a second walk,
-// FindIntraAssignCycleDelay, which wrote out the same six links. `r` is an
-// ordinary variable rather than a writable clockvar, so the `##1` on it is
-// illegal wherever it stands. The report is at the offending statement, which
-// this walk returns, and not at the item.
 TEST(CycleDelayElab, IntraAssignCycleDelayInForkArmErrors) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -672,11 +522,6 @@ TEST(CycleDelayElab, IntraAssignCycleDelayInForkArmErrors) {
       "cycle delay (##) is not a legal intra-assignment delay", 9, "14.11"));
 }
 
-// §14.11 (printed page 361) asks for a default clocking of the module,
-// interface, checker or program the cycle delay is written in. A package is
-// none of these, so a ## in a method of a class it declares has none, and the
-// default clocking of the module that imports the class and calls the method
-// does not supply one.
 TEST(CycleDelayElab, PackageClassMethodErrors) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -701,8 +546,6 @@ TEST(CycleDelayElab, PackageClassMethodErrors) {
       "cycle delay (##) requires a default clocking block", 3, "14.11"));
 }
 
-// §14.11: the same holds for a task the package declares itself, and for a
-// method of a class nested in a package's class (§8.23).
 TEST(CycleDelayElab, PackageTaskAndNestedClassMethodError) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -725,7 +568,6 @@ TEST(CycleDelayElab, PackageTaskAndNestedClassMethodError) {
       "cycle delay (##) requires a default clocking block", 5, "14.11"));
 }
 
-// §14.11: a package whose class methods and tasks write no ## draws no report.
 TEST(CycleDelayElab, PackageWithoutCycleDelayNoError) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -740,12 +582,6 @@ TEST(CycleDelayElab, PackageWithoutCycleDelayNoError) {
              f));
 }
 
-// §14.16 with §25.5.5 and §25.9.1 (printed pages 368, 791-792 and 803): a
-// synchronous drive through a path to an interface instance, `b1.sb.c <= ##1
-// 1`, and through a virtual interface formal, `v.sb.c <= ##1 1`, carries a
-// leading cycle delay as one on the interface's own clockvar does; the
-// module's own `a <= ##1 1`, on no clockvar, is still refused. Asked of the
-// module's own clocking blocks alone, both drives were reported under §14.11.
 TEST(CycleDelayElab, DriveThroughAnInterfaceClockingBlockPathTakesACycleDelay) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -779,9 +615,6 @@ TEST(CycleDelayElab, DriveThroughAnInterfaceClockingBlockPathTakesACycleDelay) {
       "cycle delay (##) is not a legal intra-assignment delay", 13, "14.11"));
 }
 
-// §14.11 gives a cycle delay a non-negative integer value, so one that folds
-// to a negative constant, written as a literal or through a parameter, and on
-// a statement or a synchronous drive alike, is reported; zero is a count.
 TEST(CycleDelayElab, NegativeConstantCycleDelayErrors) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -811,9 +644,6 @@ TEST(CycleDelayElab, NegativeConstantCycleDelayErrors) {
                              "14.11"));
 }
 
-// §14.12 makes a default clocking valid in the nested modules of the module
-// that declares it, so a cycle delay in a nested module with none of its own
-// counts its enclosing module's.
 TEST(CycleDelayElab, NestedModuleTakesTheEnclosingDefaultClocking) {
   EXPECT_TRUE(
       ElabOk("module top;\n"
@@ -826,9 +656,6 @@ TEST(CycleDelayElab, NestedModuleTakesTheEnclosingDefaultClocking) {
              "endmodule\n"));
 }
 
-// §14.12 makes a default clocking valid in the scope holding it, and a
-// generate block is one, so a cycle delay written in it has a default clocking
-// though the module declares none.
 TEST(CycleDelayElab, GenerateBlockDefaultClockingCountsInIt) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

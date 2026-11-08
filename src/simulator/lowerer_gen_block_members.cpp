@@ -1,8 +1,3 @@
-// §27.4 and §27.5 with §23.6: what a named generate block instance declares,
-// registered under the hierarchical name that reaches it from outside the
-// block, `g.v` or `u.g[1].v`, beside the flattened key the elaborator stores
-// it under and a reference inside the block reads it by.
-
 #include <cstdint>
 #include <string>
 
@@ -17,12 +12,6 @@
 
 namespace delta {
 
-// A variable or net is answered under the path as the object stored under its
-// flattened key, shared rather than copied, so a write through either name is
-// read through the other. A parameter is stored under its simple name, which
-// every instance of a loop block shares, so each instance's is lowered afresh
-// under the path, as is the loop index's implicit localparam (§27.4), an
-// integer holding the index the instance was elaborated with.
 void Lowerer::RegisterGenBlockMembers(const RtlirModule* mod) {
   for (const RtlirGenBlockMember& member : mod->gen_block_members) {
     auto* key = arena_.Create<std::string>(inst_prefix_ +
@@ -35,8 +24,6 @@ void Lowerer::RegisterGenBlockMembers(const RtlirModule* mod) {
         ctx_.AliasVariable(*key, *stored);
         AliasVariableKinds(*key, *stored, ctx_, arena_);
         ctx_.AliasNet(*key, *stored);
-        // §15.3 and §15.4: a semaphore's or a mailbox's object, which the
-        // run keeps in tables of its own.
         ctx_.AliasSemaphore(*key, *stored);
         ctx_.AliasMailbox(*key, *stored);
         break;

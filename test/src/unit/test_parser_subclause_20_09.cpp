@@ -49,9 +49,6 @@ TEST(OptionalSystemTaskExtendedParsing, Onehot) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
 }
 
-// list_of_control_bits ::= control_bit { , control_bit }
-// The grammar permits one or more control_bit entries after the expression
-// argument. Cover the multi-entry case explicitly.
 TEST(OptionalSystemTaskExtendedParsing, CountbitsMultipleControlBits) {
   auto r = Parse(
       "module m;\n"
@@ -62,14 +59,9 @@ TEST(OptionalSystemTaskExtendedParsing, CountbitsMultipleControlBits) {
   ASSERT_NE(stmt, nullptr);
   ASSERT_NE(stmt->rhs, nullptr);
   EXPECT_EQ(stmt->rhs->kind, ExprKind::kSystemCall);
-  // expression argument plus three control_bit entries.
   EXPECT_EQ(stmt->rhs->args.size(), 4u);
 }
 
-// list_of_control_bits ::= control_bit { , control_bit }
-// The single-entry base of the production: $countbits with exactly one
-// control_bit is the minimal legal form and must parse as a system call whose
-// argument list is the expression plus that one control_bit.
 TEST(OptionalSystemTaskExtendedParsing, CountbitsSingleControlBit) {
   auto r = Parse(
       "module m;\n"
@@ -83,8 +75,6 @@ TEST(OptionalSystemTaskExtendedParsing, CountbitsSingleControlBit) {
   EXPECT_EQ(stmt->rhs->args.size(), 2u);
 }
 
-// §20.9 explicitly states the control_bit arguments may be variables; the
-// parser must therefore accept identifier-shaped expressions for them.
 TEST(OptionalSystemTaskExtendedParsing, CountbitsVariableControlBit) {
   auto r = Parse(
       "module m;\n"

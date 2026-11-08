@@ -22,11 +22,8 @@ namespace delta {
 
 namespace {
 
-// §40.3.2.1 `SV_COV_RESET: a statement reset has executed no times.
 void ClearExecutions(StatementTally& tally) { tally.executions = 0; }
 
-// A.6.12: the statements a randsequence's code blocks hold, in a production
-// and after a rule's weight.
 void ForEachRandsequenceCode(const Stmt* stmt,
                              const std::function<void(const Stmt*)>& visit) {
   for (const auto& production : stmt->rs_productions) {
@@ -39,16 +36,11 @@ void ForEachRandsequenceCode(const Stmt* stmt,
   }
 }
 
-// The statements of the task or function `item`.
 void ForEachSubroutineStmt(const ModuleItem* item,
                            const std::function<void(const Stmt*)>& fn) {
   for (const Stmt* stmt : item->func_body_stmts) ForEachCoverableStmt(stmt, fn);
 }
 
-// The statements of the instance of `mod`, each once: those of its
-// procedures, but not of the processes that carry an assertion written as a
-// module item, which is no statement, and those of its tasks and functions,
-// its generate blocks' among them.
 std::vector<const Stmt*> InstanceStatements(const RtlirModule& mod) {
   std::vector<const Stmt*> stmts;
   std::unordered_set<const Stmt*> seen;

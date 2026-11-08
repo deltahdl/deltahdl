@@ -55,9 +55,6 @@ TEST(Precedence, EqualityHigherThanBitwiseAnd) {
   EXPECT_EQ(rhs->rhs->op, TokenKind::kEqEq);
 }
 
-// Bitwise OR binds tighter than the logical AND on the right-hand side
-// too, so the OR nests as the logical AND's right operand. The sibling
-// file carries the left-operand case.
 TEST(Precedence, BitwiseOrHigherThanLogicalAndOnRight) {
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a && b | c; endmodule\n");
@@ -101,9 +98,6 @@ TEST(Precedence, TernaryHigherThanImplication) {
   EXPECT_EQ(rhs->rhs->kind, ExprKind::kTernary);
 }
 
-// Table 11-2 ranks the conditional operator above -> and <->, so an
-// implication after a conditional's false expression takes the whole
-// conditional as its left operand rather than ending the false expression.
 TEST(Precedence, ImplicationAfterTernaryTakesTheTernary) {
   auto* rhs = ParsePrecedenceRhs(
       "module m;\n"
@@ -131,8 +125,6 @@ TEST(Precedence, EquivalenceAfterTernaryTakesTheTernary) {
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kTernary);
 }
 
-// The conditional operator is right associative, and an operator ranked above
-// it, ||, stays inside the false expression.
 TEST(Precedence, TernaryFalseExpressionNestsToTheRight) {
   auto* rhs = ParsePrecedenceRhs(
       "module m;\n"
@@ -183,9 +175,6 @@ TEST(Precedence, AllPrecedenceLevelsInOneExpression) {
   EXPECT_EQ(rhs->op, TokenKind::kPipePipe);
 }
 
-// Table 11-2 read through the binding powers the parser parses by, which a
-// reader outside the parser rebuilding an expression's text has to agree
-// with: an operator listed higher binds tighter...
 TEST(OperatorBindingPower, HigherRowsBindTighter) {
   EXPECT_GT(InfixBindingPower(TokenKind::kStar).first,
             InfixBindingPower(TokenKind::kPlus).first);
@@ -195,13 +184,11 @@ TEST(OperatorBindingPower, HigherRowsBindTighter) {
             InfixBindingPower(TokenKind::kPipePipe).first);
 }
 
-// ...a unary operator tighter than every binary one...
 TEST(OperatorBindingPower, UnaryOperatorsBindTightest) {
   EXPECT_GT(PrefixBindingPower(TokenKind::kMinus),
             InfixBindingPower(TokenKind::kPower).second);
 }
 
-// ...the implication operators group to the right and the rest to the left...
 TEST(OperatorBindingPower, AssociativityFollowsTheTable) {
   const auto kImplies = InfixBindingPower(TokenKind::kArrow);
   EXPECT_GT(kImplies.first, kImplies.second);
@@ -209,7 +196,6 @@ TEST(OperatorBindingPower, AssociativityFollowsTheTable) {
   EXPECT_LT(kPlus.first, kPlus.second);
 }
 
-// ...and a token that is no operator has no binding power.
 TEST(OperatorBindingPower, ANonOperatorHasNone) {
   EXPECT_EQ(InfixBindingPower(TokenKind::kSemicolon).first, -1);
   EXPECT_EQ(PrefixBindingPower(TokenKind::kStar), -1);

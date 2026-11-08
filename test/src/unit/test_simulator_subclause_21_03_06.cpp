@@ -10,19 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.6 governs $fflush. Its one semantic rule operates on a descriptor
-// whose meaning is decided by how it was produced -- the §21.3.1 $fopen that
-// created it (two-argument form yields an fd, single-argument form an mcd) --
-// so every test builds the descriptor from real $fopen source syntax and
-// drives the whole pipeline. The flush is observed by opening a second,
-// independent read descriptor on the same path: bytes still sitting in the
-// writer's stream buffer are invisible to it, while flushed bytes are read
-// back, so a pre-flush read of -1 (EOF) against a post-flush read of the data
-// discriminates the flush itself from the write.
-
-// §21.3.6: $fflush given a single file descriptor writes that descriptor's
-// buffered output to its file. Before the flush an independent reader sees an
-// empty file; after it, the written bytes.
 TEST(FlushingOutput, FdArgumentPublishesBufferedBytes) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_fd.txt";
@@ -55,10 +42,6 @@ TEST(FlushingOutput, FdArgumentPublishesBufferedBytes) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: $fflush given a multichannel descriptor writes the buffered output
-// of the file(s) the mcd selects. The single-argument $fopen of §21.3.1 is
-// what produces such a descriptor, and flushing it must resolve the set bit to
-// its channel's file rather than treating the value as an fd.
 TEST(FlushingOutput, McdArgumentPublishesSelectedChannel) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_mcd.txt";
@@ -91,10 +74,6 @@ TEST(FlushingOutput, McdArgumentPublishesSelectedChannel) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: the mcd argument names the file or files it selects -- an mcd built
-// by ORing two §21.3.1 channels selects both, and one flush must publish the
-// buffered output of each. The ORed value also exercises the argument as a
-// computed expression rather than a plain variable.
 TEST(FlushingOutput, OredMcdFlushesEverySelectedFile) {
   SysTaskFixture f;
   std::string pa = "/tmp/deltahdl_21306_ora.txt";
@@ -135,9 +114,6 @@ TEST(FlushingOutput, OredMcdFlushesEverySelectedFile) {
   std::remove(pb.c_str());
 }
 
-// §21.3.6: invoked with no arguments, $fflush writes the buffered output of
-// all open files -- here one opened as an fd and one as an mcd, neither named
-// by the call.
 TEST(FlushingOutput, NoArgumentFlushesAllOpenFiles) {
   SysTaskFixture f;
   std::string pa = "/tmp/deltahdl_21306_all_fd.txt";
@@ -178,9 +154,6 @@ TEST(FlushingOutput, NoArgumentFlushesAllOpenFiles) {
   std::remove(pb.c_str());
 }
 
-// §21.3.6 negative-adjacent form: an mcd of zero selects no channels, so the
-// flush must publish nothing -- discriminating the with-argument form from a
-// flush-all. Only the later flush that names the fd makes the bytes visible.
 TEST(FlushingOutput, EmptyMcdSelectsNoFiles) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_empty.txt";
@@ -214,9 +187,6 @@ TEST(FlushingOutput, EmptyMcdSelectsNoFiles) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6 negative form: a value carrying the fd high bit but naming no open
-// file resolves to no stream. The flush publishes nothing (another channel's
-// buffered byte stays invisible) and the run continues normally.
 TEST(FlushingOutput, UnopenedFdFlushesNothingAndIsHarmless) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_stale.txt";
@@ -244,10 +214,6 @@ TEST(FlushingOutput, UnopenedFdFlushesNothingAndIsHarmless) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: flushing writes the buffered output without disturbing the stream
-// -- the descriptor stays open at its position, so writes may continue and a
-// second flush publishes the later bytes after the earlier ones. Also drives
-// the descriptor through an int (rather than integer) variable.
 TEST(FlushingOutput, StreamRemainsUsableAfterFlush) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_resume.txt";
@@ -281,10 +247,6 @@ TEST(FlushingOutput, StreamRemainsUsableAfterFlush) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: the fd argument admits a descriptor of any open type, not only the
-// write type -- here a read-update ("r+") descriptor whose in-place overwrite
-// sits in the buffer. An independent reader still sees the seeded bytes before
-// the flush and the overwritten bytes after it.
 TEST(FlushingOutput, ReadUpdateDescriptorPublishesOnFlush) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_rplus.txt";
@@ -317,9 +279,6 @@ TEST(FlushingOutput, ReadUpdateDescriptorPublishesOnFlush) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: an append-type descriptor is likewise a valid fd argument. Its
-// writes land at the end of the file, and flushing it completes without
-// disturbing the stream -- the appended byte follows the seeded ones.
 TEST(FlushingOutput, AppendDescriptorFlushCompletes) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_append.txt";
@@ -349,9 +308,6 @@ TEST(FlushingOutput, AppendDescriptorFlushCompletes) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.6: the descriptor argument is an ordinary expression, so it can come
-// from an array element rather than a scalar variable; the flush publishes the
-// bytes written through that same element.
 TEST(FlushingOutput, ArrayElementExpressionArgument) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_21306_elem.txt";

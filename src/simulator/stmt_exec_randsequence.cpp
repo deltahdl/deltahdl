@@ -1,18 +1,3 @@
-// §18.16's randcase and the §18.17 randsequence statement: ExecRandcase and
-// ExecRandsequence, which src/simulator/stmt_exec.cpp reaches by name through
-// simulator/stmt_exec_internal.h. ExecRandsequence pushes the automatic scope
-// §18.17 gives the statement and generates its top production; SelectRule
-// draws one rule of a production against the weights §18.17.1 attaches to the
-// rules; ExecRsProd generates a production list in each of the forms
-// §18.17.2's if-else, §18.17.3's case and §18.17.4's repeat give it;
-// ExecRandJoinItems interleaves the operand sequences of §18.17.5's rand join;
-// and ClassifyRandseqResult decides what the break and return of §18.17.6, and
-// the disable of §9.6.2, do to the generation that is running.
-//
-// The values a production is called with and the values it returns stand in
-// src/simulator/stmt_exec_randsequence_values.cpp, which answers §18.17.7 and
-// is called from here alone.
-
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -39,22 +24,6 @@
 
 namespace delta {
 
-// A random number in [0, total), for the weighted choice §18.16 gives randcase
-// and §18.17.1 gives a randsequence production. Both make the chance of a
-// choice proportional to its weight -- for §18.17.1, the chance that a
-// production list is generated -- and a draw that cannot reach the whole range
-// does not give that.
-//
-// A total wider than 32 bits is not covered by one draw, so the number is
-// composed from two. §18.16 allows that outright: a randcase may call
-// $urandom_range() more than once to handle a number wider than 32 bits.
-// SelectRule drew a single Urandom32 against a 64-bit total, so once
-// a production's weights summed past 2^32 every rule whose cumulative interval
-// began at or beyond that was unreachable, and `a := 64'h1_0000_0000 | b :=
-// 64'h1_0000_0000` selected b with probability zero.
-//
-// The two statements share this rather than each carrying a copy, because a
-// copy is what let one of them keep the narrow draw after the other was fixed.
 static uint64_t DrawBelow(uint64_t total, SimContext& ctx) {
   if (total <= 0xFFFFFFFFULL) return ctx.Urandom32() % total;
   uint64_t hi = ctx.Urandom32();
@@ -64,10 +33,6 @@ static uint64_t DrawBelow(uint64_t total, SimContext& ctx) {
 
 const Stmt* SelectRandcaseBranch(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena) {
-  // §18.16: each branch's weight expression is evaluated at most once, in
-  // declaration order. Cache the drawn weights so a side-effecting expression
-  // runs a single time and the same value feeds both the sum and the
-  // selection. Weights are summed as unsigned values.
   std::vector<uint64_t> weights;
   weights.reserve(stmt->randcase_items.size());
   uint64_t total_weight = 0;
@@ -83,10 +48,6 @@ const Stmt* SelectRandcaseBranch(const Stmt* stmt, SimContext& ctx,
     return nullptr;
   }
 
-  // §18.16: one random number in [0, sum); branches are selected in
-  // declaration order, with smaller numbers landing on the earlier (top)
-  // weights. A zero-weight branch leaves the cumulative total unchanged and so
-  // can never be selected.
   uint64_t pick = DrawBelow(total_weight, ctx);
   uint64_t cumulative = 0;
   for (size_t i = 0; i < stmt->randcase_items.size(); ++i) {
@@ -102,18 +63,10 @@ ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   co_return co_await ExecStmt(branch, ctx, arena);
 }
 
-// The two types below are also defined in
-// src/simulator/stmt_exec_randsequence_values.cpp, which builds and reads them
-// on behalf of the generation below. A change to either definition has to be
-// made in both files.
-
 static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap);
 
-// §18.17.7: the implicit variables a rule declares for the value-returning
-// productions it names, and the actual arguments a production is called with.
-// Defined in src/simulator/stmt_exec_randsequence_values.cpp.
 RuleValueCapture BuildRuleValueCapture(const Stmt* stmt, const RsRule& selected,
                                        SimContext& ctx);
 RuleValueCapture BuildStepValueCapture(const Stmt* stmt,
@@ -133,10 +86,6 @@ void BindProductionFormals(const RsProduction* production,
                            const std::vector<std::optional<Logic4Vec>>& actuals,
                            SimContext& ctx, Arena& arena);
 
-// §18.17.7: which production of the randsequence statement a name reaches,
-// and whether it returns a value.
-// src/simulator/stmt_exec_randsequence_values.cpp reads all three, so they
-// carry external linkage.
 const RsProduction* FindProduction(const Stmt* stmt, std::string_view name) {
   for (const auto& prod : stmt->rs_productions) {
     if (prod.name == name) return &prod;
@@ -144,37 +93,16 @@ const RsProduction* FindProduction(const Stmt* stmt, std::string_view name) {
   return nullptr;
 }
 
-// §18.17.7: a production yields a readable value only when it declares a
-// non-void return type. A production with no return type assumes a void return
-// type, so it contributes no implicit variable.
 bool ProductionReturnsValue(const RsProduction* p) {
   return p != nullptr && p->has_return_type &&
          p->return_type.kind != DataTypeKind::kVoid;
 }
 
-// §18.17.7: reports whether a production returns a string. §6.16 gives a
-// string no declared width: it is as wide as the characters it holds, and one
-// that was never written is "", the empty string, of zero length. Storage for
-// such a value is therefore sized by what was returned, and not by the 32-bit
-// carrier every other return type with no computable width falls back to.
 bool ProductionReturnsString(const RsProduction* p) {
   return p != nullptr && p->has_return_type &&
          p->return_type.kind == DataTypeKind::kString;
 }
 
-// What a randsequence generation loop must do with the StmtResult its body
-// left, factored out of the "unwind / abort the production / keep generating"
-// branch every loop in this file repeats.
-//
-// kUnwind covers the two results that leave the whole generation. §18.17.6
-// has break end the sequence generation, and §9.6.2 has a disable end the
-// activity of a task or named block, which is something the randsequence
-// statement is running inside, so the generation ends either way and the loop
-// hands the result to its caller unchanged. kAbortProduction covers return,
-// which §18.17.6 gives a narrower reach: it abandons the production being
-// generated, and generation goes on with the production that follows the
-// abandoned one, so what a return ends is decided at the site rather than
-// here. kKeepGenerating covers the rest.
 enum class RandseqAction : uint8_t {
   kKeepGenerating,
   kAbortProduction,
@@ -211,10 +139,6 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
                                  SimContext& ctx, Arena& arena,
                                  RuleValueCapture* cap) {
   uint64_t count = RepeatCount(prod, ctx, arena);
-  // §20.2: $finish makes the simulator exit and hands control back to the
-  // host operating system, so the iterations after the one that ran it do not
-  // generate. SimContext::RequestFinish raises the stop the process loops guard
-  // on, and this loop guards on it for the same reason.
   for (uint64_t i = 0; i < count && !ctx.StopRequested(); ++i) {
     auto result =
         co_await ExecRsProduction(stmt, prod.repeat_item, ctx, arena, cap);
@@ -228,12 +152,6 @@ static ExecTask ExecRsProdRepeat(const Stmt* stmt, const RsProd& prod,
 static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
                                SimContext& ctx, Arena& arena,
                                RuleValueCapture* cap) {
-  // 18.17.3: evaluate the case expression once, then compare it against each
-  // case item expression in the order written. Items separated by commas share
-  // a production, so any pattern matching wins for that item. The first item
-  // whose expression matches generates its production. The default item is a
-  // fallback used only when no case item expression matches, regardless of
-  // where it appears in the list, so remember it and resolve it after the scan.
   auto val = EvalExpr(prod.case_expr, ctx, arena).ToUint64();
   const RsCaseItem* default_item = nullptr;
   for (const auto& ci : prod.case_items) {
@@ -254,10 +172,6 @@ static ExecTask ExecRsProdCase(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
-// 18.17: each code block inside a randsequence opens an automatic scope with no
-// name. Variables it declares are recreated on each execution and do not leak
-// to sibling code blocks or outlive the block, so we bracket the statements
-// with a fresh automatic scope.
 static ExecTask ExecRsProdCodeBlock(const RsProd& prod, SimContext& ctx,
                                     Arena& arena) {
   ctx.PushScope();
@@ -268,9 +182,6 @@ static ExecTask ExecRsProdCodeBlock(const RsProd& prod, SimContext& ctx,
       block_result = result;
       break;
     }
-    // §20.2: a $finish written here exits the simulator, so the statements
-    // after it in this block do not run either. ExecBlock guards the statements
-    // of a begin-end block on the same stop.
     if (ctx.StopRequested()) break;
   }
   ctx.PopScope();
@@ -295,56 +206,18 @@ static ExecTask ExecRsProd(const Stmt* stmt, const RsProd& prod,
   co_return StmtResult::kDone;
 }
 
-// §18.17.1: a weight expression is evaluated when the production holding it is
-// selected, so weights can change from one selection to the next. One
-// selection evaluates each rule's weight once, so cache the drawn weights
-// before summing and walk the cached values: rs_weight_specification admits a
-// parenthesized expression and so a function call, and a second evaluation
-// would perform that call's effect twice and let the cumulative walk run
-// against numbers other than the ones the total was drawn from. §18.16 states
-// the same rule for the sibling randcase statement outright: each weight
-// expression is evaluated no more than once, in an order left unspecified, and
-// an implementation may cache identical ones. A rule that specifies no weight
-// counts 1, which is what §18.17.1 makes the weight of a production list
-// written without ':='.
-// §18.17.1: whether `v` reads as a negative value, which for a signed value is
-// its sign bit being set. The signedness is the evaluated value's rather than
-// anything read off the expression's text, because Syntax 18-14 gives
-// `rs_weight_specification ::= integral_number | ps_identifier | ( expression
-// )` and a parameter named through the second form can be declared signed.
 static bool WeightIsNegative(const Logic4Vec& v) {
   if (!v.is_signed || v.width == 0 || v.nwords == 0) return false;
   uint32_t top = v.width - 1;
   return ((v.words[top / 64].aval >> (top % 64)) & 1ULL) != 0;
 }
 
-// A value the clause requires to come out as a known integral value of zero
-// or more, as its reports name it, with the clause requiring it.
 struct NonNegativeRule {
   std::string_view what;
   std::string_view noun;
   Subclause rule;
 };
 
-// §18.17.1: an rs_weight_specification has to come out as an integral value of
-// zero or more, and §18.17.4 a repeat production's count likewise. Returns the
-// value to use, reporting one that is not such a value and counting it as
-// zero.
-//
-// Zero is what a reported weight counts as, because it is the one value that
-// cannot decide the draw. A negative weight read through ToUint64 arrived as
-// its two's-complement value, so `a := (-1) | b := 1` gave a a weight of
-// 18446744073709551615 and made b unreachable, and the total then wrapped to
-// zero and SelectRule returned the first rule outright. An unknown weight was
-// already zero there -- ToUint64 reads x and z alike as 0 -- so for that one
-// nothing changes but the report. A reported repeat count generates its
-// production no times, where a negative one read through ToUint64 repeated it
-// some 2^64 times.
-//
-// The run carries on afterwards, as it does after every other error the
-// simulator raises while executing; §18.17.1 says nothing about what follows
-// one, and stopping the generation would take the rest of the statement's
-// reports with it.
 static uint64_t NonNegativeOrReport(const Logic4Vec& val, const Expr* e,
                                     const NonNegativeRule& rule,
                                     SimContext& ctx) {
@@ -396,13 +269,6 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   if (total_weight == 0) return production.rules[0];
   uint64_t pick = DrawBelow(total_weight, ctx);
 
-  // §18.17.1: the probability of a production list being generated is
-  // proportional to its weight, so the draw lands in the interval each rule's
-  // weight spans and a zero-weight rule spans no interval and is never
-  // selected. Summing the cached weights again reaches total_weight exactly,
-  // and pick is below total_weight, so the draw is always covered: the last
-  // rule covers whatever the rules before it do not, and is returned without a
-  // test rather than as a fallback for a walk that cannot run out.
   uint64_t cumulative = 0;
   for (size_t i = 0; i + 1 < production.rules.size(); ++i) {
     cumulative += weights[i];
@@ -411,12 +277,6 @@ static const RsRule& SelectRule(const RsProduction& production, SimContext& ctx,
   return production.rules.back();
 }
 
-// 18.17.5: the optional weight following the rand join keywords states, as a
-// real value, how strongly the remaining length of each operand sequence biases
-// which sequence advances next. It shall be a real number in [0.0, 1.0], so a
-// value outside that interval is reported and then taken as the nearer end of
-// it, as a weight §18.17.1 does not allow is reported and taken as zero; the
-// neutral 0.5 stands for an omitted expression.
 static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
   if (!expr) return 0.5;
   auto v = EvalExpr(expr, ctx, arena);
@@ -430,30 +290,12 @@ static double EvalRandJoinBias(Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 namespace {
-// One operand of a rand join, expanded one level (to depth 1) into the
-// production items it will contribute. The interleaver emits these items in
-// order; cursor marks how many have already been generated.
-//
-// §18.17.7: item is the appearance the enclosing rand join rule wrote, which
-// fixes which implicit variable of that rule this operand writes; production is
-// what the appearance names; ret_value is the storage a return statement in the
-// operand assigns to; and cap holds the implicit variables of the operand's own
-// rule, since steps generates the productions that rule names.
 struct RandJoinSeq {
   std::vector<const RsProd*> steps;
   size_t cursor = 0;
   const RsProductionItem* item = nullptr;
   const RsProduction* production = nullptr;
-  // §18.17.7: the rule whose production list these steps are, kept so that the
-  // rs_code_block Syntax 18-14 lets that rule carry after its weight can be run
-  // once the last of them has generated.
   const RsRule* rule = nullptr;
-  // §18.17.7: each production opens a scope spanning all its rules and code
-  // blocks. This operand's steps interleave with another operand's,
-  // so that scope cannot sit on the shared stack for the duration -- the next
-  // step taken would be some other operand's and would run inside it. Each
-  // operand keeps a stack of its own instead, the caller's frames with the
-  // production's frame on top, swapped in for a step and back out after.
   std::vector<Scope> scopes;
   RuleValueCapture cap;
   Logic4Vec ret_value;
@@ -462,9 +304,6 @@ struct RandJoinSeq {
 };
 }  // namespace
 
-// 18.17.5: expanding an operand to depth 1 yields the production items of its
-// selected rule. A nested rand join contributes its own operands as the
-// depth-1 items, so wrap each in a production item step.
 static void CollectRandJoinSteps(const RsRule& rule, Arena& arena,
                                  std::vector<const RsProd*>& steps) {
   if (rule.is_rand_join) {
@@ -479,13 +318,6 @@ static void CollectRandJoinSteps(const RsRule& rule, Arena& arena,
   for (const auto& prod : rule.prods) steps.push_back(&prod);
 }
 
-// 18.17.5: at each step choose one operand and emit its next production. A
-// sequence's length is the number of productions it has not yet contributed.
-// The bias maps to an exponent on that length: 0.5 (exponent 1) keeps the
-// choice proportional to remaining length so no length is prioritized, values
-// toward 0.0 (negative exponent) favor the shortest remaining sequences, and
-// values toward 1.0 favor the longest. Returns seqs.size() when every operand
-// sequence has been drained.
 static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
                                     double exponent, SimContext& ctx) {
   double total = 0.0;
@@ -493,8 +325,7 @@ static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
     if (seq.Remaining() > 0)
       total += std::pow(static_cast<double>(seq.Remaining()), exponent);
   }
-  if (total <= 0.0)
-    return seqs.size();  // every operand sequence has been drained
+  if (total <= 0.0) return seqs.size();
 
   double draw = (ctx.Urandom32() / 4294967296.0) * total;
   double cumulative = 0.0;
@@ -508,8 +339,6 @@ static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
     }
   }
   if (chosen == seqs.size()) {
-    // Floating point rounding can leave draw just past the running total;
-    // fall back to the last operand that still has productions to emit.
     for (size_t i = seqs.size(); i-- > 0;) {
       if (seqs[i].Remaining() > 0) {
         chosen = i;
@@ -520,17 +349,6 @@ static size_t ChooseRandJoinOperand(const std::vector<RandJoinSeq>& seqs,
   return chosen;
 }
 
-// §18.17.5 / §18.17.7: run one operand rule's trailing rs_code_block, and
-// return what it did so the caller can act on a break, a disable or a return.
-// This is ExecSelectedRule's loop over the same kind of block, and it is
-// deliberately the same: the two used to differ, which is what made one rule
-// text behave one way as an ordinary production and another as a rand join
-// operand.
-//
-// §18.17 gives every code block within the randsequence an anonymous automatic
-// scope and puts no condition on where the block stands, so this one gets one
-// too. The result is carried out of the loop rather than returned from inside
-// it, so the scope is popped however the block ends.
 static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
                                           Arena& arena) {
   ctx.PushScope();
@@ -541,8 +359,6 @@ static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
       block_result = r;
       break;
     }
-    // §20.2: a $finish here exits the simulator, so the rest of this weight
-    // code does not run.
     if (ctx.StopRequested()) break;
   }
   ctx.PopScope();
@@ -550,11 +366,6 @@ static ExecTask RunRandJoinRuleWeightCode(const RsRule& rule, SimContext& ctx,
 }
 
 namespace {
-// 18.17: the randsequence execution environment threaded through the generation
-// helpers: the randsequence statement that owns the production declarations,
-// the simulator context the productions run in, and the arena their run-time
-// values and names are allocated from. Bundles the {stmt, ctx, arena} trio that
-// recurs throughout this file into the single entity it describes.
 struct RandseqEngine {
   const Stmt* stmt;
   SimContext& ctx;
@@ -562,14 +373,6 @@ struct RandseqEngine {
 };
 }  // namespace
 
-// 18.17.5: expand one rand join operand to depth 1 into its production-item
-// steps. Selects the operand's rule and collects its steps into seq, keeping
-// the rule so the interleaving can run its trailing code block once the last
-// of those steps has generated.
-//
-// §18.17.7: record what the operand names and size the storage its generation
-// returns into, and declare the implicit variables of the rule the steps came
-// from, because those steps are what generates the productions that rule names.
 static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
                                     const RsProductionItem& item,
                                     RandJoinSeq& seq) {
@@ -579,44 +382,24 @@ static ExecTask BuildOneRandJoinSeq(const RandseqEngine& eng,
   seq.production = production;
   seq.returns_value = ProductionReturnsValue(production);
   if (seq.returns_value) {
-    // §6.16: a string has no declared width and starts as "", so leave its
-    // storage empty; every other return type EvalTypeWidth gives no width to
-    // keeps the 32-bit carrier, as ExecRsProduction sizes it.
     uint32_t w = DeclaredTypeWidth(production->return_type, eng.ctx);
     if (w == 0 && !ProductionReturnsString(production)) w = 32;
     seq.ret_value = MakeLogic4VecVal(eng.arena, w, 0);
   }
-  // §18.17.7: data is passed to a production as to a task, in a task call's
-  // syntax, and ExecRsProduction evaluates a call's actuals in the
-  // caller's scope before entering the production's own. Nothing evaluated them
-  // here at all, so `rand join D(5) D(20)` ran D with its formal unbound.
   std::vector<std::optional<Logic4Vec>> actuals =
       EvalProductionActuals(production, item, eng.ctx, eng.arena);
 
-  // The rest is ExecRsProduction's order: enter the production's scope, bind
-  // the formals into it, and select the rule inside it, so a weight expression
-  // naming a formal reads the bound value. The stack is built on a copy of the
-  // caller's frames and taken back out, leaving the caller's exactly as it was.
   std::vector<Scope> caller = eng.ctx.SwapScopeStack({});
   eng.ctx.SwapScopeStack(caller);
   eng.ctx.PushScope();
   BindProductionFormals(production, actuals, eng.ctx, eng.arena);
   seq.rule = &SelectRule(*production, eng.ctx, eng.arena);
   CollectRandJoinSteps(*seq.rule, eng.arena, seq.steps);
-  // §18.17.7 declares a rule's implicit variables in the scope of the
-  // production that rule belongs to, so they are created here rather than in
-  // the caller's frame. Two operands naming one production used to share one
-  // set of them.
   seq.cap = BuildStepValueCapture(eng.stmt, seq.steps, eng.ctx);
   seq.scopes = eng.ctx.SwapScopeStack(std::move(caller));
   co_return StmtResult::kDone;
 }
 
-// 18.17.5: expand each rand join operand one level into the production items of
-// its selected rule. Nothing here can end the interleaving any more: expansion
-// selects a rule and reads its production list, and the code block that could
-// break, disable or return now runs after the operand's own steps rather than
-// before them.
 static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
                                   const RsRule& selected,
                                   std::vector<RandJoinSeq>& seqs) {
@@ -629,21 +412,9 @@ static ExecTask BuildRandJoinSeqs(const RandseqEngine& eng,
   co_return StmtResult::kDone;
 }
 
-// §18.17.7: generate one production of one rand join operand, with a return
-// statement inside it assigning to that operand's own storage. §18.17.5
-// interleaves the operands, so more than one of them is part-generated at any
-// moment and a single shared return slot would let one operand's return
-// statement write another operand's value. An operand of void return type holds
-// no slot at all, for the reason ExecRsProduction gives: the return statement
-// assigns its expression to the production whose code block holds it.
-//
-// The steps generate the productions the operand's own rule names, so they are
-// given that rule's implicit variables and not the enclosing rand join rule's.
 static ExecTask ExecOneRandJoinStep(const RandseqEngine& eng,
                                     RandJoinSeq& seq) {
   const RsProd* step = seq.steps[seq.cursor++];
-  // §18.17.7: the step generates inside the operand production's own scope,
-  // which is where its formals and its rule's implicit variables stand.
   std::vector<Scope> caller = eng.ctx.SwapScopeStack(std::move(seq.scopes));
   Logic4Vec* prev_slot =
       eng.ctx.SetRsReturnSlot(seq.returns_value ? &seq.ret_value : nullptr);
@@ -654,15 +425,6 @@ static ExecTask ExecOneRandJoinStep(const RandseqEngine& eng,
   co_return result;
 }
 
-// §18.17.7: write the implicit variable this operand of a rand join rule
-// declares, once the operand has generated the last production it contributed.
-// Which element it writes is fixed by where the operand is written and not by
-// when it generated: the clause fills the array's elements with the values the
-// production's instances return in the order those instances are written, and
-// §18.17.5 reorders generation alone. The clause already reads that way for
-// the ordinary productions, giving the code block of `if (cond) D(5) else
-// D(20)` an `int D[1:2]` whose second element the else branch writes when it
-// is the only branch that generated.
 static void StoreRandJoinOperandValue(const RandJoinSeq& seq,
                                       const RuleValueCapture& cap,
                                       SimContext& ctx, Arena& arena) {
@@ -670,9 +432,6 @@ static void StoreRandJoinOperandValue(const RandJoinSeq& seq,
   RuleProductionSlot slot =
       SlotForAppearance(&cap, *seq.item, seq.production->name);
   if (slot.idx == 0) return;
-  // §6.16: a string cannot hold the "\0" character, so an integral expression
-  // returned by a string production loses the zero bytes of its own width.
-  // ExecRsProduction strips them on the ordinary path for the same reason.
   Logic4Vec value = ProductionReturnsString(seq.production)
                         ? StripStringZeros(seq.ret_value, arena)
                         : seq.ret_value;
@@ -681,27 +440,14 @@ static void StoreRandJoinOperandValue(const RandJoinSeq& seq,
 
 static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
                                   SimContext& ctx, Arena& arena) {
-  // 18.17.5: rand join randomly interleaves its operand sequences while keeping
-  // the productions within each operand in their original relative order. Each
-  // operand is first expanded one level (depth 1) into the production items of
-  // its selected rule; those items are the units that get interleaved.
   double bias = EvalRandJoinBias(selected.rand_join_expr, ctx, arena);
 
-  // §18.17.7: a rand join rule is a rule, so it declares an implicit variable
-  // for each of the productions it names that returns a value. Syntax 18-13
-  // writes those productions after the rand join keywords, and they are
-  // declared before any of them generates so that a production named more than
-  // once is an array from the start.
   RuleValueCapture cap = BuildRuleValueCapture(stmt, selected, ctx);
 
   std::vector<RandJoinSeq> seqs;
   RandseqEngine eng{stmt, ctx, arena};
   co_await BuildRandJoinSeqs(eng, selected, seqs);
 
-  // §20.2: a $finish executed by any operand exits the simulator, so the steps
-  // the other operands have not contributed yet do not generate. The interleave
-  // guards on the stop SimContext::RequestFinish raises, as the process loops
-  // do.
   double exponent = 4.0 * bias - 1.0;
   while (!ctx.StopRequested()) {
     size_t chosen = ChooseRandJoinOperand(seqs, exponent, ctx);
@@ -711,29 +457,9 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
     auto action = ClassifyRandseqResult(result);
     if (action == RandseqAction::kUnwind) co_return result;
     if (action == RandseqAction::kAbortProduction) {
-      // 18.17.6: return aborts the current production; drop the remainder of
-      // this operand's sequence and keep interleaving the others.
       seqs[chosen].cursor = seqs[chosen].steps.size();
     }
     if (seqs[chosen].Remaining() == 0) {
-      // §18.17.7 reads a rule's trailing code block against what stands to its
-      // left -- a code block can read the return values only of productions
-      // already generated, those written to its left -- and an operand's whole
-      // production list is written to its left. So the block runs as that
-      // operand's last step, which is also the only place inside its own
-      // sequence that keeps it to the right of its own productions; §18.17.5
-      // says where an operand's productions go and nothing about where a block
-      // trailing its rule lands, and its keeping each sequence in its own
-      // relative order is what puts it inside that sequence rather than before
-      // every sequence. An operand is chosen only while it has steps remaining,
-      // so this runs once per operand and never twice.
-      //
-      // The block runs in the production's own scope and with the production's
-      // own return slot, both for the reason §18.17.7 gives the rest of the
-      // production them: it is part of the production. It ran in the enclosing
-      // production's scope with the enclosing production's slot still active,
-      // so it read the wrong variables and a `return <expr>` in it wrote the
-      // wrong production's value.
       std::vector<Scope> caller =
           ctx.SwapScopeStack(std::move(seqs[chosen].scopes));
       Logic4Vec* prev_slot = ctx.SetRsReturnSlot(
@@ -742,22 +468,9 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
           co_await RunRandJoinRuleWeightCode(*seqs[chosen].rule, ctx, arena);
       ctx.SetRsReturnSlot(prev_slot);
       seqs[chosen].scopes = ctx.SwapScopeStack(std::move(caller));
-      // §18.17.6: a break or a disable ends the whole randsequence. A return
-      // aborts the current production, which by this point has generated, so it
-      // is absorbed here exactly as ExecRsProduction absorbs one at the end of
-      // an ordinary production -- the two paths agreeing being the point of
-      // running the block here at all.
       if (ClassifyRandseqResult(block) == RandseqAction::kUnwind) {
         co_return block;
       }
-      // §18.17.7: the operand's value is written once the whole production has
-      // generated, its trailing block included, because a `return <expr>` in
-      // that block is one of the ways the production produces it.
-      // ExecRsProduction stores after ExecSelectedRule for the same reason, and
-      // storing before the block would have published a value the block had not
-      // yet had the chance to set. The store writes the enclosing rule's
-      // implicit variable, so it runs in the caller's scope rather than the
-      // operand's.
       StoreRandJoinOperandValue(seqs[chosen], cap, ctx, arena);
     }
   }
@@ -766,45 +479,17 @@ static ExecTask ExecRandJoinItems(const Stmt* stmt, const RsRule& selected,
 
 static ExecTask ExecRuleProds(const Stmt* stmt, const RsRule& selected,
                               SimContext& ctx, Arena& arena) {
-  // §18.17.7: only the return values of productions already generated (to the
-  // left of a code block) are available. Each generation stores its value into
-  // the implicit variable as it finishes, so a later code block observes it
-  // while an earlier one does not.
   RuleValueCapture cap = BuildRuleValueCapture(stmt, selected, ctx);
   for (const auto& prod : selected.prods) {
     auto result = co_await ExecRsProd(stmt, prod, ctx, arena, &cap);
-    // §18.17.6: a return aborts the generation of the current production, so
-    // the productions written after this one are not generated. Surface the
-    // abort rather than reporting a normal completion, because the rule's own
-    // code block is not generated either; ExecRsProduction turns it back into a
-    // normal completion once the aborted production has finished. A break and a
-    // disable are surfaced unchanged, each ending more than this rule.
     if (ClassifyRandseqResult(result) != RandseqAction::kKeepGenerating) {
       co_return result;
     }
-    // §20.2: a $finish executed while this production generated exits the
-    // simulator, so the productions after it in the list do not generate.
     if (ctx.StopRequested()) break;
   }
   co_return StmtResult::kDone;
 }
 
-// §18.17.7: generate the rule's production list, then run the rs_code_block
-// Syntax 18-14 writes after the rs_weight_specification. The clause reads that
-// block against what stands to its left -- a code block can read the return
-// values only of productions already generated, those written to its left --
-// and the whole production list is written to its left. §18.17.7's own
-// GenQueue example needs exactly that, giving the rule
-// `LIST ITEM := 8 { q = { q, ITEM }; }` a code block that reads ITEM, a
-// value-returning production of that same rule. A rand join rule is the case
-// with nothing else: Syntax 18-18 admits only rs_production_items after the
-// keywords, so this is the one code block such a rule can hold.
-//
-// §18.17.6 leaves break and return doing what they do from any code block: a
-// break here terminates the randsequence, and a return aborts the current
-// production, which by this point has finished generating its list. A list that
-// broke or was itself aborted never reaches the block, an aborted production
-// having nothing further to generate.
 static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
                                  SimContext& ctx, Arena& arena) {
   StmtResult prods_result = StmtResult::kDone;
@@ -814,18 +499,6 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
     prods_result = co_await ExecRuleProds(stmt, selected, ctx, arena);
   }
   if (prods_result != StmtResult::kDone) co_return prods_result;
-  // §18.17: every code block inside a randsequence opens an anonymous
-  // automatic scope of its own, and Syntax 18-14 makes this one of them --
-  // `rs_rule ::= rs_production_list [ := rs_weight_specification [
-  // rs_code_block ] ]`. It ran in the enclosing production's scope instead, so
-  // a data declaration A.6.12 admits at the head of an rs_code_block outlived
-  // the block: visible to the rest of the production, and still standing when
-  // the same rule was selected again. ExecRsProdCodeBlock above pushes the
-  // scope for the block written as a production of its own.
-  //
-  // The result is carried out of the loop rather than returned from inside it,
-  // because a break, a return or a disable leaves the block early and a scope
-  // left on the stack is worse than one never pushed.
   ctx.PushScope();
   StmtResult block_result = StmtResult::kDone;
   for (auto* s : selected.weight_code) {
@@ -834,8 +507,6 @@ static ExecTask ExecSelectedRule(const Stmt* stmt, const RsRule& selected,
       block_result = result;
       break;
     }
-    // §20.2: a $finish here exits the simulator, so the rest of this code block
-    // does not run.
     if (ctx.StopRequested()) break;
   }
   ctx.PopScope();
@@ -854,26 +525,10 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   ctx.PushScope();
   BindProductionFormals(production, actuals, ctx, arena);
 
-  // §18.17.7: returning data requires a (non-void) return type. Provide storage
-  // for this production's return value and point the engine's return slot at
-  // it, so a 'return <expr>' anywhere in the production writes here. Every
-  // production is generated with a slot of its own, a void one with none: the
-  // return statement assigns its expression to the production whose code block
-  // holds it, so a void production left holding the slot of the production that
-  // triggered it would write its own returned expression into that
-  // production's value.
   Logic4Vec ret_value;
   bool returns_value = ProductionReturnsValue(production);
   if (returns_value) {
     uint32_t w = DeclaredTypeWidth(production->return_type, ctx);
-    // §6.16: a string has no declared width and starts as "", the empty
-    // string, of zero length. DispatchReturn hands this slot's width to
-    // EvalExpr as the context width. A string literal ignores it, so
-    // `return "minus"` keeps its five characters whatever the slot holds, but
-    // a context-sized expression does not: a 32-bit slot sizes
-    // `return k ? "minus" : "times"` to four characters through EvalTernary. A
-    // zero width leaves every returned expression self-determined. Every other
-    // return type EvalTypeWidth gives no width to keeps the 32-bit carrier.
     if (w == 0 && !ProductionReturnsString(production)) w = 32;
     ret_value = MakeLogic4VecVal(arena, w, 0);
   }
@@ -886,26 +541,15 @@ static ExecTask ExecRsProduction(const Stmt* stmt, const RsProductionItem& call,
   ctx.SetRsReturnSlot(prev_slot);
   ctx.PopScope();
 
-  // §6.16: a string cannot hold the "\0" character, and assigning a value to a
-  // string drops that value's zero bytes. A returned string literal carries
-  // none, but an integral expression returned by a string production carries
-  // the zero bytes of its own width, so strip them before the value reaches
-  // the implicit variable. Stripping a slot nothing returned into leaves the
-  // empty string.
   if (returns_value && ProductionReturnsString(production)) {
     ret_value = StripStringZeros(ret_value, arena);
   }
 
-  // §18.17.7: the implicit variable belongs to the rule that named the
-  // production, so it is written once this production's own scope is gone.
   RuleProductionSlot slot = SlotForAppearance(cap, call, production->name);
   if (returns_value && slot.idx != 0) {
     StoreRuleProductionValue(slot, production, ret_value, ctx, arena);
   }
 
-  // §18.17.6: a return aborts only the current production. Once that production
-  // has finished generating, surface a normal completion so the enclosing rule
-  // continues with the next production.
   if (result == StmtResult::kReturn) co_return StmtResult::kDone;
   co_return result;
 }
@@ -916,26 +560,12 @@ ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   std::string_view top = stmt->rs_top_production;
   if (top.empty()) top = stmt->rs_productions[0].name;
 
-  // 18.17: a randsequence statement opens an automatic scope around the
-  // productions it generates and their code blocks. Production identifiers are
-  // already resolved only within this statement, so the pushed scope provides
-  // the enclosing automatic lifetime for the block.
   ctx.PushScope();
   RsProductionItem top_call;
   top_call.name = top;
   auto result = co_await ExecRsProduction(stmt, top_call, ctx, arena, nullptr);
   ctx.PopScope();
 
-  // §18.17.6: a break ends the sequence generation, and one executed in a
-  // production code block leaves the randsequence block altogether, the
-  // clause's own example going on at the line labeled next_statement. The
-  // randsequence statement therefore absorbs a break and completes normally,
-  // and it absorbs nothing else. §9.6.2 gives a disable a target outside this
-  // statement -- it ends the activity of a task or named block, and execution
-  // resumes at the statement after that block or after the task enable -- so a
-  // disable raised in a production code block travels on to whichever block or
-  // task it named. ExecRsProduction has already absorbed the return of the top
-  // production, which §18.17.6 gives no reach past the production it aborts.
   if (result == StmtResult::kBreak) co_return StmtResult::kDone;
   co_return result;
 }

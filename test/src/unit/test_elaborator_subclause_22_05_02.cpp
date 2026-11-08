@@ -55,9 +55,6 @@ TEST(UndefElaboration, UndefExcludesConditionalCodeFromElaboration) {
   EXPECT_TRUE(found);
 }
 
-// A macro removed by `undef has no value, so the parameter that elaborates
-// here comes entirely from the definition made after the removal — the formal
-// argument list of the discarded definition leaves nothing behind.
 TEST(UndefElaboration, RedefineAfterUndefDropsFormalArgumentsForElaboration) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

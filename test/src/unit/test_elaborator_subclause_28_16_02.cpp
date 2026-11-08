@@ -47,11 +47,6 @@ TEST(ChargeDecayElaboration, ThirdDelayBecomesDecayTicks) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2: the third delay specifies the charge decay time, which is a
-// constant expression. A literal is covered above; here the decay time is given
-// as a module parameter. Elaboration must resolve the parameter in the module's
-// scope (not treat the identifier as unresolvable and fall back to zero), so
-// the decay ticks equal the parameter's value.
 TEST(ChargeDecayElaboration, DecayTimeFromParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,9 +67,6 @@ TEST(ChargeDecayElaboration, DecayTimeFromParameter) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2 constant-expression input form, localparam: a localparam takes the
-// same scope-resolution path as a parameter but is a distinct constant kind, so
-// exercise it separately. The decay ticks equal the localparam's value.
 TEST(ChargeDecayElaboration, DecayTimeFromLocalparam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,21 +88,6 @@ TEST(ChargeDecayElaboration, DecayTimeFromLocalparam) {
   EXPECT_TRUE(found);
 }
 
-// §28.16.2: a trireg takes up to three delays as any net does; the first two
-// time a driver taking it to 1 and to 0, and the third is the charge decay time
-// rather than the delay of a move to z. That it is like any other net carries
-// §28.16.1's three-valued form into each of the three slots, so a declaration
-// may write a triple in every one of them and the charge decay time is the
-// third triple's.
-//
-// The charge decay time is 8, the typical member of the third triple. §11.11
-// orders the three as minimum, then typical, then maximum, and the typical
-// member is the one elaboration can reach: nothing in production writes the
-// DelayMode in src/simulator/sim_context_types.h that would name another, which
-// is #3264. A decay time read off the first triple answers 2, one taking the
-// third triple's minimum answers 7, and a fold that gives up on a triple
-// answers 0 -- which §28.16.2.1 makes a trireg that never decays, the opposite
-// of what this declaration asks for.
 TEST(ChargeDecayElaboration, DecayTimeIsTheThirdTripleWhenEveryDelayIsATriple) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -125,15 +102,6 @@ TEST(ChargeDecayElaboration, DecayTimeIsTheThirdTripleWhenEveryDelayIsATriple) {
   EXPECT_EQ(cap->decay_ticks, 8u);
 }
 
-// §28.16 gives every net's three delays one meaning -- the first is the rise to
-// 1, the second the fall to 0, the third the move to high impedance -- and
-// §28.16.2 replaces the third for one net type alone: a trireg takes up to
-// three delays as any net does, but its third is the charge decay time rather
-// than the delay of a move to z.
-//
-// So a wire's third delay is a turn-off delay and no charge decay time, and the
-// three values are distinct from each other and from zero so that no
-// coincidence satisfies the assertion.
 TEST(ChargeDecayElaboration, ThirdDelayOfANonTriregIsNoChargeDecayTime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -147,16 +115,10 @@ TEST(ChargeDecayElaboration, ThirdDelayOfANonTriregIsNoChargeDecayTime) {
   ASSERT_NE(w, nullptr);
   EXPECT_EQ(w->decay_ticks, 0u);
   EXPECT_FALSE(w->decays);
-  // §28.16: the delay the wire does have. Without this the case above would
-  // hold of a net whose third delay was dropped altogether.
   ASSERT_NE(w->delay_turnoff, nullptr);
   EXPECT_EQ(w->delay_turnoff->int_val, 3u);
 }
 
-// The same declaration on the net type §28.16.2 wrote the replacement for, so
-// the case above is a claim about the net type rather than about three-delay
-// declarations. A fix that stopped reading the third delay at all would satisfy
-// it and fail this.
 TEST(ChargeDecayElaboration, ThirdDelayOfATriregIsTheChargeDecayTime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -172,15 +134,8 @@ TEST(ChargeDecayElaboration, ThirdDelayOfATriregIsTheChargeDecayTime) {
   EXPECT_TRUE(cap->decays);
 }
 
-// The other way a decay time reaches a net: §28.16.2.2's compilation-unit
-// default, which fills in where a trireg's declaration writes no third delay.
-// It is a trireg default too, so a wire in a unit carrying the directive takes
-// none of it -- and a three-delay wire is the case where a check on the delay
-// rather than on the net type would let the directive's value through as well.
 TEST(ChargeDecayElaboration, DefaultDecayTimeDoesNotReachANonTrireg) {
   ElabFixture f;
-  // The directive is a preprocessor one, so the source goes through the
-  // preprocessor rather than straight to the parser.
   auto* design = ElaborateWithPreprocessor(
       "`default_decay_time 100\n"
       "module t;\n"
@@ -195,14 +150,6 @@ TEST(ChargeDecayElaboration, DefaultDecayTimeDoesNotReachANonTrireg) {
   EXPECT_FALSE(w->decays);
 }
 
-// A.2.2.3 writes delay_value over "unsigned_number | real_number |
-// ps_identifier | time_literal | 1step", so a decay time with a decimal point
-// is a form the grammar admits. §3.14.1 settles what it becomes: the time
-// precision fixes how a delay value is rounded before simulation uses it, and
-// where the precision equals the time unit, delay values round to whole
-// numbers. RtlirNet::decay_ticks is a raw tick count that nothing scales later,
-// so the rounding is the elaborator's, and 50.5 is a decay time of 51 rather
-// than a net left holding its charge.
 TEST(ChargeDecayElaboration, RealThirdDelayRoundsToADecayTime) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -218,12 +165,6 @@ TEST(ChargeDecayElaboration, RealThirdDelayRoundsToADecayTime) {
   EXPECT_TRUE(cap->decays);
 }
 
-// The same quantity through the other spelling E.2 gives it, which is the claim
-// the two halves are for: a decay time written on the directive and one written
-// in the declaration are the same decay time. Held apart in two files with no
-// case over both, the two disagreed -- the declaration folded to nothing and
-// the directive truncated -- and a fix to either alone would only have moved
-// the disagreement.
 TEST(ChargeDecayElaboration, RealDirectiveAndRealThirdDelayAgree) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

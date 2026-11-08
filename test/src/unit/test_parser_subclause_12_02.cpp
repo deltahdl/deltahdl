@@ -1,15 +1,3 @@
-// Tests for §12.2 "Overview", whose one rule is that procedural programming
-// statements stand only inside the constructs it lists: the six blocks that
-// activate on their own -- initial, always, always_comb, always_latch,
-// always_ff and final -- and the two that activate when called, task and
-// function.
-//
-// The rule has two halves and needs both. Each of the eight has to take a
-// procedural statement, and a procedural statement written where none of the
-// eight is has to be rejected. The rejection is the module-item grammar's,
-// §23.2.4, because a statement is not one of the things a module body may
-// hold; §12.2 is the clause that says which constructs put one back in reach.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -23,9 +11,6 @@ using namespace delta;
 
 namespace {
 
-// The eight containers, each parsed with one procedural assignment inside and
-// read back by the module-item kind it produced. A container that parsed to
-// something else would hold the statement somewhere the simulator never runs.
 void ExpectContainerHoldsStatement(const char* src, ModuleItemKind kind) {
   auto r = Parse(src);
   ASSERT_NE(r.cu, nullptr);
@@ -33,16 +18,12 @@ void ExpectContainerHoldsStatement(const char* src, ModuleItemKind kind) {
   EXPECT_NE(FindItemByKind(r, kind), nullptr);
 }
 
-// A procedural statement written among a module's items, where none of §12.2's
-// eight constructs is. The module body admits no statement, so the report is
-// the module-item grammar's.
 void ExpectRejectedAtModuleScope(const char* src, uint32_t line) {
   auto r = Parse(src);
   EXPECT_TRUE(ReportedError(r.diags, "unexpected token in module body", line,
                             "23.2.4"));
 }
 
-// §12.2: `initial` is a procedural block that automatically activates.
 TEST(ProceduralStatementContainment, InitialHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -52,7 +33,6 @@ TEST(ProceduralStatementContainment, InitialHoldsStatement) {
       ModuleItemKind::kInitialBlock);
 }
 
-// §12.2: `always` is one of the six.
 TEST(ProceduralStatementContainment, AlwaysHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -62,7 +42,6 @@ TEST(ProceduralStatementContainment, AlwaysHoldsStatement) {
       ModuleItemKind::kAlwaysBlock);
 }
 
-// §12.2: `always_comb` is one of the six.
 TEST(ProceduralStatementContainment, AlwaysCombHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -72,7 +51,6 @@ TEST(ProceduralStatementContainment, AlwaysCombHoldsStatement) {
       ModuleItemKind::kAlwaysCombBlock);
 }
 
-// §12.2: `always_latch` is one of the six.
 TEST(ProceduralStatementContainment, AlwaysLatchHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -82,7 +60,6 @@ TEST(ProceduralStatementContainment, AlwaysLatchHoldsStatement) {
       ModuleItemKind::kAlwaysLatchBlock);
 }
 
-// §12.2: `always_ff` is one of the six.
 TEST(ProceduralStatementContainment, AlwaysFFHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -92,8 +69,6 @@ TEST(ProceduralStatementContainment, AlwaysFFHoldsStatement) {
       ModuleItemKind::kAlwaysFFBlock);
 }
 
-// §12.2: `final` is one of the six, and the one whose statements run after the
-// simulation rather than during it.
 TEST(ProceduralStatementContainment, FinalHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -103,7 +78,6 @@ TEST(ProceduralStatementContainment, FinalHoldsStatement) {
       ModuleItemKind::kFinalBlock);
 }
 
-// §12.2: `task` is a procedural block that activates when called.
 TEST(ProceduralStatementContainment, TaskHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -115,7 +89,6 @@ TEST(ProceduralStatementContainment, TaskHoldsStatement) {
       ModuleItemKind::kTaskDecl);
 }
 
-// §12.2: `function` is the other of the two.
 TEST(ProceduralStatementContainment, FunctionHoldsStatement) {
   ExpectContainerHoldsStatement(
       "module m;\n"
@@ -126,8 +99,6 @@ TEST(ProceduralStatementContainment, FunctionHoldsStatement) {
       ModuleItemKind::kFunctionDecl);
 }
 
-// §12.2 with §9.4: a timing control is a procedural statement, so one standing
-// among a module's items is outside every construct that may hold it.
 TEST(ProceduralStatementContainment, DelayControlAtModuleScopeRejected) {
   ExpectRejectedAtModuleScope(
       "module m;\n"
@@ -137,8 +108,6 @@ TEST(ProceduralStatementContainment, DelayControlAtModuleScopeRejected) {
       3);
 }
 
-// §12.2 with §9.3.1: a sequential block is a procedural statement, and a
-// module body is not a place for one.
 TEST(ProceduralStatementContainment, SequentialBlockAtModuleScopeRejected) {
   ExpectRejectedAtModuleScope(
       "module m;\n"
@@ -148,7 +117,6 @@ TEST(ProceduralStatementContainment, SequentialBlockAtModuleScopeRejected) {
       3);
 }
 
-// §12.2 with §9.3.2: a parallel block is a procedural statement too.
 TEST(ProceduralStatementContainment, ParallelBlockAtModuleScopeRejected) {
   ExpectRejectedAtModuleScope(
       "module m;\n"
@@ -158,9 +126,6 @@ TEST(ProceduralStatementContainment, ParallelBlockAtModuleScopeRejected) {
       3);
 }
 
-// §12.2 with §12.7.3: a loop statement is a procedural statement. `while` is
-// the loop keyword that names no generate construct, so it reaches the module
-// body's own rejection rather than being read as one.
 TEST(ProceduralStatementContainment, WhileLoopAtModuleScopeRejected) {
   ExpectRejectedAtModuleScope(
       "module m;\n"
@@ -170,8 +135,6 @@ TEST(ProceduralStatementContainment, WhileLoopAtModuleScopeRejected) {
       3);
 }
 
-// §12.2 with §12.8: a jump statement is a procedural statement, and `return`
-// outside a subroutine has no construct to return from.
 TEST(ProceduralStatementContainment, ReturnAtModuleScopeRejected) {
   ExpectRejectedAtModuleScope(
       "module m;\n"

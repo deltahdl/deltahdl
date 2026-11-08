@@ -34,12 +34,6 @@ namespace delta {
 
 namespace {
 
-// §23.10.2.2 with §8.25.1: the `#(...)` of a scope form is a parameter value
-// assignment list, which the parser leaves on the identifier as expressions in
-// `elements`, each named entry carrying its parameter's name in `arg_names`.
-// SpecializationOf reads the actuals a variable's declaration gives it, where
-// the expression stands under `type_ref_expr` and the name under
-// `param_arg_name`, so the list is rewritten into that shape.
 std::vector<DataType> ScopeActuals(const Expr& base) {
   std::vector<DataType> actuals(base.elements.size());
   for (size_t i = 0; i < base.elements.size(); ++i) {
@@ -50,12 +44,6 @@ std::vector<DataType> ScopeActuals(const Expr& base) {
   return actuals;
 }
 
-// §8.25 (printed page 204 of IEEE 1800-2023): the extends clause of a
-// parameterized class may name one of the class's own type parameters, `class
-// D #(type B = P) extends B;`. This is the actual `actuals` binds that
-// parameter to; null where the extends clause names no type parameter of the
-// class, and where the list leaves that parameter out, which leaves the
-// parameter's default standing.
 const DataType* BaseActual(const ClassDecl* decl,
                            const std::vector<DataType>& actuals) {
   if (decl->base_class.empty() ||
@@ -69,9 +57,6 @@ const DataType* BaseActual(const ClassDecl* decl,
   return nullptr;
 }
 
-// §8.25: the type the specialization `holder` binds its own type parameter
-// `pname` to, null where it binds it nothing -- the class declaration's own
-// type, which §8.25.1 makes the default specialization, binds none.
 const DataType* HolderActualFor(const ClassTypeInfo* holder,
                                 std::string_view pname) {
   if (holder->param_actuals == nullptr) return nullptr;
@@ -83,17 +68,6 @@ const DataType* HolderActualFor(const ClassTypeInfo* holder,
   return nullptr;
 }
 
-// §8.3 with §8.23: a class-scope typedef is an item of the class declaring
-// it, so a name one names in an actual list the class `holder` writes -- UVM's
-// `this_type` in uvm_object_registry#(T,Tname)'s `typedef
-// uvm_registry_common#(this_type, ...) common_type;` -- denotes the class that
-// typedef names in `holder`, or in a base `holder` inherits it from (§8.13).
-// The class the run holds under `holder`'s own name for it, null where
-// `actual` writes a list of its own or names no such typedef. Kept by the bare
-// name, the actual was read again in the scope of the class it specializes,
-// where the same name is that class's own typedef: uvm_registry_common's
-// Tregistry named uvm_registry_common itself, and Tregistry::get() answered no
-// registry.
 const ClassTypeInfo* HolderScopeClass(const ClassTypeInfo* holder,
                                       const DataType& actual, SimContext& ctx) {
   if (!actual.type_params.empty() || !actual.scope_name.empty()) return nullptr;
@@ -106,54 +80,16 @@ const ClassTypeInfo* HolderScopeClass(const ClassTypeInfo* holder,
   return nullptr;
 }
 
-// §8.3 with §6.18: an actual naming a class-scope typedef of `holder` that
-// stands for no class -- UVM's `rsrc_sv_q_t` in uvm_resource_types's `typedef
-// uvm_shared#(rsrc_sv_q_t) rsrc_shared_q_t;`, a queue of uvm_resource_base --
-// names the type that typedef declares in `holder`, so the actual is
-// qualified with `holder`'s name, where TypedefItemSeenFrom
-// (eval_array_class_assoc.h) finds it. Left bare, the name was looked up
-// from the specialized class, which declares no such typedef, and uvm_shared's
-// `T value` lost the queue dimension.
 void QualifyHolderTypedef(const ClassTypeInfo* holder, DataType& actual) {
   if (!actual.type_params.empty() || !actual.scope_name.empty()) return;
   if (ClassScopeTypedefItem(holder, actual.type_name) == nullptr) return;
   actual.scope_name = holder->name;
 }
 
-// §8.25: the name of the generic class the class named `name` specializes,
-// the part of a specialization's name ahead of the `#(` SpecializationOf
-// appends its list after; `name` itself for a class that is no
-// specialization.
 std::string_view GenericNameOf(std::string_view name) {
   return name.substr(0, name.find("#("));
 }
 
-// §8.25: the class `spec` extends, where its declaration's extends clause
-// names one of the class's own type parameters, is the one this set of actuals
-// binds that parameter to. BaseClassOf in lowerer_class.cpp binds the
-// declaration's base from the parameter's default, there being one
-// ClassTypeInfo per declaration when it runs, and that default is the base of
-// §8.25.1's default specialization alone; the copy a specialization is made of
-// carries it until this answers the actual's class instead. An actual that is
-// no named type, and one naming no class, leave the default standing.
-//
-// Where the extends clause writes a `#(...)` list instead, `class D3 #(type P
-// = real) extends C #(P);` (printed page 204 of IEEE 1800-2023), what it
-// names is a specialization of the base, C#(P) binding C's T to P, and the
-// class `spec` extends is that specialization with each of the class's own
-// parameters the list names replaced by the type `spec` binds it to. The copy
-// carries the base's declaration, whose static member variables are the
-// default specialization's, so a static property the base declares -- UVM's
-// `static this_type m_t_inst` in uvm_typed_callbacks#(T), which
-// uvm_callbacks#(T,CB) extends -- was read off a copy that
-// uvm_typed_callbacks#(T)'s own static methods never wrote.
-// §8.13 with §8.25: the specialization of `base` that the extends clause of
-// `info` names. A value actual may name one of the class's own value
-// parameters, `extends Mem #(.K(W))`, which stands for the value `info` binds
-// it to -- its declaration's default for the class itself, the actual for a
-// specialization of it -- so those values are bound in a scope of their own
-// while the list is read. Read with nothing bound, `G #(8)`'s base was Mem
-// #(0).
 ClassTypeInfo* BaseUnderOwnParams(const ClassTypeInfo* info,
                                   ClassTypeInfo* base, SimContext& ctx,
                                   Arena& arena) {
@@ -180,10 +116,6 @@ void BindSpecializationBase(ClassTypeInfo* spec,
   const ClassDecl* decl = spec->decl;
   if (!decl->base_class_type_params.empty() &&
       decl->type_param_names.count(decl->base_class) == 0) {
-    // Asked for again by its generic's name, the copy holding its base for
-    // reading alone, and the base BindDeclarationBase gave the declaration
-    // being a specialization already, named by the generic's name and its
-    // list.
     ClassTypeInfo* base =
         spec->parent != nullptr
             ? ctx.FindClassType(GenericNameOf(spec->parent->name))
@@ -198,17 +130,6 @@ void BindSpecializationBase(ClassTypeInfo* spec,
     spec->parent = base;
 }
 
-// §8.25 with §23.10.2.2: a type parameter's actual matches another by
-// matching types, so each type actual is held as the type it spells. A scope
-// form's list, `C#(byte)::`, reaches here through ScopeActuals as the
-// expressions the parser left, each an implicit type carrying the element
-// that spells it, and a declaration's list leaves a name the parser did not
-// read as a type the same way (ParseOneTypeParam in parser_types.cpp).
-// Spelled by no name and an implicit kind, every such actual keyed alike, so
-// C#(byte):: and C#(shortint):: were one specialization with one set of
-// static member variables, and neither was the C#(byte) a declaration
-// writes, which the parser reads as the keyword's type. A value parameter's
-// actual is an expression and stays one.
 std::vector<DataType> SpelledActuals(const ClassDecl* decl,
                                      const std::vector<DataType>& actuals) {
   std::vector<DataType> spelled = actuals;
@@ -247,16 +168,6 @@ const DataType* RunningTypeActual(std::string_view name, SimContext& ctx) {
 
 namespace {
 
-// §8.25 (printed page 204 of IEEE 1800-2023): a type parameter used in a type
-// resolves to a type only after elaboration, so a scope form written in a
-// method of a parameterized class whose list names that class's own type
-// parameter -- UVM's `uvm_typeid#(CB)::get()` in uvm_callbacks#(T,CB) --
-// names the specialization of `decl` the running specialization's actual
-// gives, a different one under each specialization of the running class.
-// These are the actuals `written` spells, each naming such a parameter
-// replaced by the type RunningTypeActual answers for it; spelled by the name
-// alone, every such scope keyed by the parameter's name, and one
-// specialization answered for every T.
 std::vector<DataType> ActualsUnderRunningClass(
     const ClassDecl* decl, const std::vector<DataType>& written,
     SimContext& ctx) {
@@ -288,11 +199,6 @@ std::vector<DataType> ActualsUnderSpecialization(
       continue;
     }
     const DataType* a = HolderActualFor(holder, actual.type_name);
-    // §8.25.1: the generic class stands for the default specialization, so
-    // with no actuals of its own its parameter is its default, which UVM's
-    // `typedef uvm_resource #(T) rsrc_t;` in uvm_resource_db_implementation_t
-    // #(type T = uvm_object) writes. Left as the bare name, the list spelled
-    // a specialization keyed by `T` that no other name reached.
     if (a == nullptr && holder->param_actuals == nullptr)
       a = TypeParamActual(nullptr, holder->decl, actual.type_name);
     if (a == nullptr) continue;
@@ -321,19 +227,11 @@ namespace {
 
 using ParamValues = std::vector<std::pair<std::string_view, Logic4Vec>>;
 
-// The key SpecializationOf registers the specialization of `generic` that
-// `spelled` names under, `vector#(4)`, with the value each value parameter
-// takes collected into `values`. An empty list spells the declaration's
-// defaults.
 std::string SpecializationKey(const ClassTypeInfo* generic,
                               const std::vector<DataType>& spelled,
                               SimContext& ctx, Arena& arena,
                               ParamValues& values) {
   const ClassDecl* decl = generic->decl;
-  // §8.25.1 with §6.20.2: an actual, like a default, is sized by the type the
-  // parameter's declaration writes, and a range may name an earlier
-  // parameter, so one sizer takes the list in header order and records each
-  // value for the ranges after it.
   ClassParamSizer sizer(decl);
   sizer.UseTypeActuals(&spelled);
   std::string key(generic->name);
@@ -341,8 +239,6 @@ std::string SpecializationKey(const ClassTypeInfo* generic,
   for (size_t i = 0; i < decl->params.size(); ++i) {
     if (i != 0) key += ",";
     std::string_view pname = decl->params[i].first;
-    // §23.10.2.2 through §8.25: an actual is matched to its parameter by the
-    // name it was written with, in the named form, and otherwise by position.
     const DataType* actual = ActualForParam(spelled, i, pname);
     if (decl->type_param_names.count(pname) != 0) {
       key += TypeActualKey(decl, i, actual, ctx);
@@ -351,15 +247,8 @@ std::string SpecializationKey(const ClassTypeInfo* generic,
     const Expr* expr = actual != nullptr && actual->type_ref_expr != nullptr
                            ? actual->type_ref_expr
                            : decl->params[i].second;
-    // A parameter the declaration gives no default and the specialization no
-    // actual has no value to spell; §8.25 makes such a class one every
-    // specialization must override, and 0 is what the lowerer stores for it.
     Logic4Vec value = expr != nullptr ? sizer.Value(i, expr, ctx, arena)
                                       : MakeLogic4VecVal(arena, 32, 0);
-    // The low 64 bits spell the value in the key. Two specializations whose
-    // parameters agree there and differ above it would share a key; every
-    // parameter deltahdl sizes today fits, and the alternative spelling costs
-    // the readable name §37.32 asks a specialization to carry.
     key += std::to_string(value.ToUint64());
     values.emplace_back(pname, value);
   }
@@ -367,15 +256,6 @@ std::string SpecializationKey(const ClassTypeInfo* generic,
   return key;
 }
 
-// §8.25 with §8.20: a virtual method an object of `spec` dispatches to is a
-// method of `spec`, or of the base level of `spec` that declares it, and runs
-// as that class's, with its type parameters, its class-scope typedefs and its
-// statics. The vtable copied from the declaration names the generic class
-// and the generic bases as the owners, so each entry is moved to the level
-// of `spec`'s chain made from the same declaration. Left on the declaration,
-// uvm_resource_db_default_implementation_t #(T)'s get_by_name ran under the
-// generic class, and the `rsrc_t::get_type()` it passed was another
-// specialization's handle than the one every stored resource reported.
 void OwnVTableEntries(ClassTypeInfo* spec) {
   for (VTableEntry& entry : spec->vtable) {
     if (entry.owner == nullptr) continue;
@@ -389,9 +269,6 @@ void OwnVTableEntries(ClassTypeInfo* spec) {
   }
 }
 
-// §8.25 with §23.10.2.2: the actual `actuals` gives the type parameter `name`
-// of `decl`, null where the list leaves it at its default or `decl` declares
-// no parameter of that name.
 const DataType* TypeParamActualIn(const ClassDecl* decl,
                                   const std::vector<DataType>& actuals,
                                   std::string_view name) {
@@ -401,9 +278,6 @@ const DataType* TypeParamActualIn(const ClassDecl* decl,
   return nullptr;
 }
 
-// Whether `actual` sizes a property as one integral value: not a string, not
-// a real, and no typedef with unpacked dimensions, which #4367 makes a queue or
-// array property.
 bool ActualSizesIntegralProperty(const DataType& actual, SimContext& ctx) {
   if (DeclaredTypeIsString(actual, ctx) || DeclaredTypeIsReal(actual, ctx))
     return false;
@@ -412,18 +286,6 @@ bool ActualSizesIntegralProperty(const DataType& actual, SimContext& ctx) {
   return item == nullptr || item->unpacked_dims.empty();
 }
 
-// §8.25 (printed pages 203-204) with §6.20.3 (printed page 128): a property
-// whose declared type is a type parameter of the class, `T value`, is declared
-// with the type the specialization's actual names, so `value` of
-// `S #(bit [7:0])` is an 8-bit variable. The declaration's property table,
-// which the specialization copies, sizes such a property with the 32-bit
-// carrier its collector gives any name and leaves its width undeclared, so a
-// write kept all 32 bits of 300 where §10.7 keeps 8, and `$bits` answered 32.
-// The specialization's own table takes the actual's width and signedness, and
-// its state-ness where the actual is written as a keyword type rather than a
-// name. An actual this cannot size as one integral value -- a string, a real,
-// a class, a typedef with unpacked dimensions -- leaves the property as the
-// declaration sized it.
 void SizeTypeParamProperties(ClassTypeInfo* spec,
                              const std::vector<DataType>& actuals,
                              SimContext& ctx) {
@@ -446,9 +308,6 @@ void SizeTypeParamProperties(ClassTypeInfo* spec,
   }
 }
 
-// §6.20.1: the property `name` the class body of `decl` declares, null where
-// it declares none; a parameter carried as a property member (is_param) is no
-// property.
 const ClassMember* DeclaredProperty(const ClassDecl* decl,
                                     std::string_view name) {
   for (const auto* m : decl->members) {
@@ -459,11 +318,6 @@ const ClassMember* DeclaredProperty(const ClassDecl* decl,
   return nullptr;
 }
 
-// §8.25 with §7.4.1: the constants a property's packed dimension folds against
-// under the specialization `spec` -- the compilation unit's, the value each of
-// its header parameters takes (`values`), and then the parameters of the
-// class body, which may name them (§6.20.1) -- as ClassParamScope in
-// lowerer_class.cpp gathers them at the declaration's defaults.
 ScopeMap SpecializationParamScope(const ClassTypeInfo* spec,
                                   const ParamValues& values) {
   ScopeMap scope;
@@ -481,11 +335,6 @@ ScopeMap SpecializationParamScope(const ClassTypeInfo* spec,
   return scope;
 }
 
-// §8.23: a property declared by `type`, the bare name of a structure or union
-// typedef the class declares, holds the layout that typedef has under the
-// specialization `spec`, folded with its values `scope` and registered under
-// its own key, `Box#(16)::S`, which `prop` takes with the layout's width.
-// False for a property declared by any other type.
 bool SizeClassTypedefProperty(ClassTypeInfo::PropertyInfo& prop,
                               const DataType& type, const ClassTypeInfo* spec,
                               const ScopeMap& scope, SimContext& ctx) {
@@ -503,11 +352,6 @@ bool SizeClassTypedefProperty(ClassTypeInfo::PropertyInfo& prop,
   return true;
 }
 
-// §8.13 with §8.23 and §8.25: the key of the layout a property of the
-// specialization `spec`, declared by `type`, holds where `type` is the bare
-// name of a structure or union typedef a base class with value parameters
-// declares: the layout under the base specialization `spec` extends,
-// `Base#(4)::S` for `D #(4)` extending `Base #(N)`. Empty for any other type.
 std::string_view BaseTypedefKey(const DataType& type, const ClassTypeInfo& spec,
                                 SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) return {};
@@ -520,9 +364,6 @@ std::string_view BaseTypedefKey(const DataType& type, const ClassTypeInfo& spec,
   return ClassTypedefLayoutKey(*owner, type.type_name, ctx);
 }
 
-// A property of `spec` declared by a parameterized base's typedef takes the
-// layout that typedef has under the base `spec` extends (BaseTypedefKey),
-// which is known only once the base is bound, and that layout's width.
 void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
   for (auto& prop : spec->properties) {
     const ClassMember* member = DeclaredProperty(spec->decl, prop.name);
@@ -537,10 +378,6 @@ void SizeBaseTypedefProperties(ClassTypeInfo* spec, SimContext& ctx) {
   }
 }
 
-// §7.4.2 with §8.25: the element count of `prop`, a fixed unpacked array
-// declared by `member` with one dimension, folded again with the
-// specialization's values in `scope`; left as it was where the dimension does
-// not fold to a size.
 void RefoldPropertyArraySize(ClassTypeInfo::PropertyInfo& prop,
                              const ClassMember& member, const ScopeMap& scope,
                              SimContext& ctx, Arena& arena) {
@@ -550,27 +387,11 @@ void RefoldPropertyArraySize(ClassTypeInfo::PropertyInfo& prop,
   if (dim.size > 0) prop.array_size = dim.size;
 }
 
-// §8.25 (printed page 203): a property whose packed dimension names a value
-// parameter, the clause's `bit [size-1:0] a`, is as wide as the
-// specialization binds the parameter, ten bits in `vector #(10)`. The table a
-// specialization copies was sized at the declaration's defaults
-// (CollectClassMembers in lowerer_class.cpp), which are the default
-// specialization's (§8.25.1), so `logic [W-1:0] v` stayed 8 bits under
-// `C #(16)`. Each property the class declares is folded again with the
-// specialization's own values; one whose type does not fold -- a name, a type
-// parameter, which SizeTypeParamProperties sizes, or `type(this)`, which names
-// the class (§6.23 with §8.11) -- is left as it was.
-//
-// §7.4.2 with §8.25: a fixed unpacked dimension naming one, `int g[N]`, is
-// folded again the same way, so `Box #(string, 6)` holds six elements where
-// the default specialization holds three.
 void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
                               const std::vector<DataType>& actuals,
                               SimContext& ctx, Arena& arena) {
   if (values.empty() && actuals.empty()) return;
   ScopeMap scope = SpecializationParamScope(spec, values);
-  // §8.25 with §20.6.2: a packed dimension `$bits(T)` sizes is folded with T
-  // at the type the specialization's actual gives it.
   TypedefMap type_params = TypeParamTypes(spec->decl, actuals, ctx);
   TypedefRegistryGuard type_param_guard(&type_params, nullptr);
   for (auto& prop : spec->properties) {
@@ -580,8 +401,6 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
     const DataType& type = *TypeOfThisNamed(&member->data_type, spec, ctx);
     if (SizeClassTypedefProperty(prop, type, spec, scope, ctx)) continue;
     uint32_t width = EvalTypeWidth(type, {}, scope);
-    // §6.18 with §6.20.3: a name the class gives its meaning to is sized as
-    // the specialization binds it, `typedef C::T C_t;` by the C it binds.
     if (width == 0)
       width = DeclaredTypeWidth(
           ClassPropertyType(type, spec->decl, type_params), ctx);
@@ -593,11 +412,6 @@ void SizeValueParamProperties(ClassTypeInfo* spec, const ParamValues& values,
 
 }  // namespace
 
-// §7.4.2 with §23.9: a size `scope` does not fold, `[K]` or `[P * 2]` naming
-// a parameter of the module the class is declared in, as the running scope
-// reads it; nothing for a name no variable of that scope answers, which is
-// how an associative array's index type or a type parameter, `[T]`, is
-// written, and nothing where the value is unknown.
 static std::optional<int64_t> RunningScopeSize(const Expr* dim, SimContext& ctx,
                                                Arena& arena) {
   bool readable = dim->kind == ExprKind::kIdentifier
@@ -631,10 +445,6 @@ PropertyArrayDim FoldPropertyDimension(const Expr* dim, const ScopeMap& scope,
   return {static_cast<uint32_t>(left - right + 1), right, left > right};
 }
 
-// §8.25 with §6.20.1: a parameter port array's elements are filled from the
-// specialization's actual, an assignment pattern, as the default fills the
-// generic class's (MakeParamArraysStatic in lowerer_class.cpp), so the copy of
-// its record the specialization owns is pointed at that pattern.
 static void TakeParamArrayActuals(ClassTypeInfo* spec,
                                   const std::vector<DataType>& spelled) {
   const ClassDecl* decl = spec->decl;
@@ -651,8 +461,6 @@ static void TakeParamArrayActuals(ClassTypeInfo* spec,
 
 namespace {
 
-// The actuals a specialization is made from: as SpelledActuals spells them,
-// and the values its value parameters take from them.
 struct MadeActuals {
   const std::vector<DataType>* spelled = nullptr;
   const ParamValues* values = nullptr;
@@ -660,54 +468,28 @@ struct MadeActuals {
 
 }  // namespace
 
-// The specialization of `generic` the actuals `made` give, registered under
-// `key`.
 static ClassTypeInfo* MakeSpecialization(ClassTypeInfo* generic,
                                          std::string key,
                                          const MadeActuals& made,
                                          SimContext& ctx, Arena& arena) {
   const std::vector<DataType>& spelled = *made.spelled;
   const ParamValues& values = *made.values;
-  // The declaration's type is copied rather than built again: the interfaces,
-  // the members, the vtable and the methods are facts about the declaration
-  // and are shared by every specialization, and only the static storage, the
-  // parameters standing in it, the actuals themselves and a base the actuals
-  // name are the specialization's own.
   auto* spec = arena.Create<ClassTypeInfo>(*generic);
   spec->name = *arena.Create<std::string>(std::move(key));
-  // §8.25: the actuals are a fact about the specialization, which is the
-  // type, rather than about the declaration each object of it is constructed
-  // on, so the list is kept here; copied into the arena because a caller may
-  // have built it for the call alone (ScopeActuals above). Construction reads
-  // it where the name the `new` was written against carries no list of its
-  // own (BindTypeParamActuals in eval_class_params.cpp).
   spec->param_actuals = arena.Create<std::vector<DataType>>(spelled);
   SizeTypeParamProperties(spec, spelled, ctx);
   SizeValueParamProperties(spec, values, spelled, ctx, arena);
   TakeParamArrayActuals(spec, spelled);
-  // The values are the specialization's before its base is bound, since an
-  // extends clause's list may name them, `extends Mem #(.K(W))`.
   for (auto& [pname, value] : values)
     spec->static_properties[std::string(pname)] = value;
   BindSpecializationBase(spec, spelled, ctx, arena);
   SizeBaseTypedefProperties(spec, ctx);
   OwnVTableEntries(spec);
-  // §6.20.4 with §8.25: the body's parameters are the specialization's too,
-  // `C#(4)::N` 8 where the declaration's copy, folded with W's default, is 16.
   ClassParamSizer body_sizer(generic->decl, generic->name);
   body_sizer.UseTypeActuals(spec->param_actuals);
   FoldClassBodyParams(body_sizer, ClassStaticLookup(spec),
                       ClassStaticStore(spec), ctx, arena);
   ctx.RegisterClassType(spec->name, spec);
-  // §8.25: a class-scope typedef whose actuals name a type parameter of this
-  // class resolves to a type only once the actuals are known, so the aliases
-  // are bound again under the specialization's own name, `Reg#(byte)::box_t`
-  // standing beside the `Reg::box_t` the declaration bound with the parameter
-  // standing for nothing. SimContext::FindClassType tries the running
-  // method's class before any other, so a method of the specialization
-  // reaches its own. Registered ahead of this, so a typedef naming this very
-  // specialization -- `typedef Reg#(T) this_type;` -- finds it by its key
-  // rather than making it again without end.
   RegisterClassScopeTypedefAliases(spec, ctx, arena);
   InitSpecializationStaticProperties(spec, ctx, arena);
   return spec;
@@ -721,19 +503,9 @@ ClassTypeInfo* SpecializationOf(ClassTypeInfo* generic,
   std::vector<DataType> spelled = SpelledActuals(generic->decl, actuals);
   ParamValues values;
   std::string key = SpecializationKey(generic, spelled, ctx, arena, values);
-  // §8.25 (printed pages 203-204): actuals that match the declaration's
-  // defaults parameter for parameter name the default specialization, which
-  // §8.25.1 makes the one the unadorned name and `#()` name, so `S #(int)`
-  // under `type T = int` is S itself, its static member variables included.
-  // Made as a type of its own, `S #(int)::n` read none of what `S s = new;`
-  // had counted.
   ParamValues default_values;
   if (key == SpecializationKey(generic, {}, ctx, arena, default_values))
     return generic;
-  // §8.25: a module instance's own generic class has specializations of its
-  // own, held under the instance (SimContext::SetClassInstanceScope), and a
-  // specialization of any other is held under no instance, whichever
-  // instance's code asks for it.
   const std::string kOuter =
       ctx.SetClassInstanceScope(std::string(generic->instance_scope));
   ClassTypeInfo* spec = generic->instance_scope.empty()
@@ -759,19 +531,12 @@ void BindDeclarationBase(ClassTypeInfo* info, SimContext& ctx, Arena& arena) {
   ClassTypeInfo* spec = BaseUnderOwnParams(info, base, ctx, arena);
   if (spec == nullptr || spec == base) return;
   info->parent = spec;
-  // The vtable was built against the generic base, so an entry the base
-  // declares is re-owned by the specialization, whose statics its body then
-  // reads.
   OwnVTableEntries(info);
-  // §8.25: so were the properties the base's typedefs declare, which take the
-  // widths of the specialization the class extends, `Base#(16)::S`.
   SizeBaseTypedefProperties(info, ctx);
 }
 
 ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
                                         Arena& arena) {
-  // §26.3: the prefix may name a package's class, `p::C#(4)::`, held under
-  // the "p::C" key ScopedClassKey spells (Lowerer::LowerPackageClass).
   ClassTypeInfo* generic = ctx.FindClassType(ScopedClassKey(base, arena));
   if (generic == nullptr || generic->decl == nullptr) return nullptr;
   if (base->has_param_spec && !base->elements.empty()) {
@@ -780,13 +545,6 @@ ClassTypeInfo* ScopeNamedSpecialization(const Expr* base, SimContext& ctx,
         ActualsUnderRunningClass(generic->decl, ScopeActuals(*base), ctx), ctx,
         arena);
   }
-  // §8.25.1: the unadorned name is a legal scope prefix only inside the class
-  // it names, and there it refers to the members of the class in hand rather
-  // than denoting the default specialization, so it names whichever
-  // specialization the running method belongs to. That class is told from an
-  // unrelated one of the name by sharing the declaration the bare name found,
-  // every specialization being a copy of it; it is asked for again by its own
-  // name because the stack hands it out for reading alone.
   const ClassTypeInfo* running = ctx.CurrentMethodClass();
   if (running == nullptr || running->decl != generic->decl) return nullptr;
   return ctx.FindClassType(running->name);
@@ -800,9 +558,6 @@ bool TryScopeSpecializationStaticMember(const Expr* expr, SimContext& ctx,
   }
   const ClassTypeInfo* spec = ScopeNamedSpecialization(expr->lhs, ctx, arena);
   if (spec == nullptr) return false;
-  // §8.13: the property may be one a base declares, and a base's one storage
-  // is where it lives, so the walk that finds the declaring level is asked
-  // rather than the specialization's own map.
   const ClassTypeInfo* declarer = spec->StaticPropertyDeclarer(expr->rhs->text);
   if (declarer == nullptr) return false;
   out = declarer->static_properties.find(std::string(expr->rhs->text))->second;

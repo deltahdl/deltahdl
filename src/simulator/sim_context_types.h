@@ -23,8 +23,6 @@ struct Expr;
 struct ModuleItem;
 struct Process;
 
-// §21.3.7: the outcome SimContext records for the most recent file I/O
-// operation on a descriptor that failed, which $ferror reports.
 struct FileIoError {
   int32_t code = 0;
   std::string msg;
@@ -33,26 +31,9 @@ struct FileIoError {
 struct EnumMemberInfo {
   std::string_view name;
   uint64_t value = 0;
-  // §6.19: the x and z bits of a member of a 4-state enumeration assigned
-  // such a value, the bval word of its value, whose aval word `value` holds;
-  // 0 for a member whose value is a number.
   uint64_t xz = 0;
 };
 
-// §27.4 with §13.4 and §23.6: the scope a subroutine declared in a generate
-// block instance runs in when it is called by its hierarchical name from
-// outside the block, `blk[1].triple(10)`. A generate block is a scope of its
-// own and a fresh level of the hierarchy, so the body reads the
-// block's own declarations and the implicit localparam of each loop generate
-// block around it by their simple names, which a process of the block
-// resolves through Process::gen_prefixes and the constants
-// Lowerer::InstallGenBlockConsts gives it, and which the calling process, if
-// it stands outside the block, has none of. `inst_prefix` is the module
-// instance the block is in, as Process::inst_prefix spells it; `gen_prefixes`
-// is the block instance's name prefixes as Process::gen_prefixes holds them;
-// and `consts` is each loop's localparam, name and value.
-// §25.5.4: what a modport expression port stands for; see
-// DeclaredNameTables::RegisterModportExpression.
 struct ModportExpressionPort {
   Expr* expr = nullptr;
   std::string instance_prefix;
@@ -64,10 +45,6 @@ struct GenBlockSubroutineScope {
   std::vector<std::pair<std::string_view, int64_t>> consts;
 };
 
-// §6.19 with §8.5: the key the enumeration a class property declares inline,
-// `enum {a, b} e;` in class C, is registered under, "C::$e": in the class's
-// scope, beside its typedefs' "C::name", under a name `$` keeps from every
-// source identifier.
 inline std::string ClassInlineEnumKey(std::string_view cls,
                                       std::string_view prop) {
   return std::string(cls) + "::$" + std::string(prop);
@@ -76,15 +53,8 @@ inline std::string ClassInlineEnumKey(std::string_view cls,
 struct EnumTypeInfo {
   std::string_view type_name;
   std::vector<EnumMemberInfo> members;
-  // §6.19.5.3 and §6.19.5.4 with Table 6-7: the enumeration's width and
-  // whether its base type is 4-state, which decide its default initial value,
-  // all x or all 0, that next() and prev() return for a value that is no
-  // member.
   uint32_t width = 32;
   bool is_4state = false;
-  // §6.19: whether the base type is signed, which the values first(), last(),
-  // next() and prev() return carry along with the width, as the enumeration's
-  // own values do.
   bool is_signed = false;
 };
 
@@ -95,57 +65,22 @@ struct StructFieldInfo {
   uint32_t bit_offset = 0;
   uint32_t width = 0;
   DataTypeKind type_kind = DataTypeKind::kLogic;
-  // §7.2.1 with §6.22.2 c): whether the member's declared type is signed --
-  // by its signing modifier, `logic signed [7:0]`, or by its kind where none
-  // stands (§6.11.1's byte, shortint, int, integer and longint). Unrecorded,
-  // a member's type was read as signed by its kind alone, so a signed logic
-  // member typed unsigned.
   bool is_signed = false;
-  // §18.4: whether the member's declaration wrote rand or randc, so that a
-  // rand variable of an unpacked structure randomizes it.
   bool is_rand = false;
   bool is_randc = false;
-  // §7.2 with §7.5 and §7.10: whether the member is a dynamic array or a
-  // queue, whose bits hold a handle to its elements
-  // (src/simulator/dyn_struct_member.h), each `dyn_elem_width` bits wide and
-  // of the member's type_kind and signing, and the most a bounded queue's
-  // `[$:N]` lets it hold, -1 where nothing bounds it.
   bool is_dynamic = false;
   uint32_t dyn_elem_width = 0;
   int32_t dyn_max_size = -1;
-  // §7.2.1: the layout of this field's own type when it is itself a struct or
-  // union, so a nested member is reachable by its dotted path. Null for
-  // scalars.
   const StructTypeInfo* nested = nullptr;
-  // §21.2.1.6 (C7b): the member's type as written where it names one, the
-  // "scope::name" spelling for a package's -- how an enum member is known to
-  // print as the name of its value. Empty for a built-in type.
   std::string_view type_name = {};
-  // §7.2 with §7.4.2: for a member that is a one-dimensional unpacked array,
-  // how many elements it holds and the bounds of its dimension, left first;
-  // the field's width is every element's, the leftmost element in its most
-  // significant bits. 0 elements for a member that is no such array.
   uint32_t elem_count = 0;
   int64_t elem_left = 0;
   int64_t elem_right = 0;
-  // §7.4.2: the unpacked dimensions the member's declaration writes, outermost
-  // first, of whatever number; null for a member the layout was given none
-  // for. The elements above are recorded for one dimension alone.
   const std::vector<Expr*>* unpacked_dims = nullptr;
-  // §7.2.2: the member's default value as its declaration writes it, which a
-  // variable of the structure takes where it has no initializer of its own;
-  // null for a member written with none.
   const Expr* default_expr = nullptr;
-  // §7.4.1: for a member of more than one packed dimension, `bit [1:0][7:0]`,
-  // the bounds of its outermost dimension and the width of one of that
-  // dimension's elements, which a single index selects; 0 elements wide for a
-  // member of one packed dimension or none, which an index selects a bit of.
   int64_t packed_left = 0;
   int64_t packed_right = 0;
   uint32_t packed_elem_width = 0;
-  // §6.22.1: the bounds of the member's one packed dimension as declared,
-  // `logic [8:1]`'s [8:1], which a type key's are compared with; empty for a
-  // member written with no dimension of its own or with more than one.
   std::optional<PackedRange> decl_range = std::nullopt;
 };
 
@@ -158,40 +93,20 @@ struct StructTypeInfo {
   bool is_soft = false;
 };
 
-// §7.2.1: the member of `info` named `name`, or null where it declares none
-// so named.
 const StructFieldInfo* FindStructField(const StructTypeInfo* info,
                                        std::string_view name);
-// §7.2.1 / §23.6: resolve a (possibly dotted) member path within `info` to the
-// absolute bit offset and width within the base variable, descending through
-// nested struct/union fields. Returns false if any path segment is not a field.
-// When `out_kind` is non-null it receives the resolved member's declared type
-// kind, which the read path uses to apply §7.3.1's 4-state-to-2-state
-// conversion when a 2-state member of a packed union is read.
 bool ResolveStructFieldPath(const StructTypeInfo* info, std::string_view path,
                             uint32_t* bit_offset, uint32_t* width,
                             DataTypeKind* out_kind = nullptr);
-// The same, answering the member the path ends at -- its width, kind and
-// signing (§7.2.1) -- with its absolute offset in `bit_offset`; null where a
-// segment is not a member.
 const StructFieldInfo* ResolveStructField(const StructTypeInfo* info,
                                           std::string_view path,
                                           uint32_t* bit_offset);
 
-// Annex D.13: the reg and net variables a module instance declares, which
-// $showvars reports the status of. `prefix` is what the instance's variables
-// are keyed by in SimContext, empty for a top-level module and the instance
-// path with its trailing dot below one; `names` are the declared names in
-// declaration order, nets before variables.
 struct ScopeVariableSet {
   std::string prefix;
   std::vector<std::string> names;
 };
 
-// §10.6: one expression a procedural continuous assignment drives an element
-// from, and the part of that expression's value the element takes -- the whole
-// of it where the statement named the element alone, and §11.4.12's slice where
-// the target was a concatenation.
 struct ElementDriveSource {
   const Expr* rhs = nullptr;
   uint32_t src_lo = 0;
@@ -199,15 +114,6 @@ struct ElementDriveSource {
   uint32_t rhs_width = 0;
 };
 
-// §10.6.1 gives the assign statement a singular variable reference and §10.6.2
-// gives force the same, and §6.4 makes every data type but an unpacked
-// structure, union or array singular -- which an element of one is, whatever
-// the container's own type. An element of a queue or of an associative array is
-// therefore a target of both statements, and it is a bare Logic4Vec with no
-// Variable to carry Variable::is_forced or Variable::assign_cont_rhs. What the
-// two statements install is recorded here instead, one record per element, and
-// the container's own writers consult it the way every other writer consults
-// the flags on a Variable.
 struct ElementDrive {
   ElementDriveSource forced;
   ElementDriveSource assigned;
@@ -217,9 +123,6 @@ struct ElementDrive {
   }
 };
 
-// §7.4.2: one fixed-size dimension of an array: how many elements it holds,
-// the lower of its bounds, and whether it was written from a higher left
-// bound down, `[2:0]`.
 struct FixedDimShape {
   uint32_t size = 0;
   int64_t lo = 0;
@@ -230,43 +133,16 @@ struct QueueObject {
   std::vector<Logic4Vec> elements;
   std::vector<uint64_t> element_ids;
   uint32_t elem_width = 32;
-  // Whether the element type is 4-state. Fixes the value yielded when an
-  // element of the queue is absent (Table 7-1, see 7.4.5): x for 4-state
-  // element types, 0 for 2-state ones.
   bool is_4state = true;
-  // §6.11 with §7.5 and §7.10: whether the element type is signed, so that
-  // an element reads signed however the value written into it was typed:
-  // `push_back(u)` of an unsigned u into `int q[$]` stores an int.
   bool is_signed = false;
-  // §21.2.1.1 and §21.2.1.7: the element type the declaration names, so that
-  // a queue or dynamic array of byte prints as the characters it spells.
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
   int32_t max_size = -1;
   uint32_t generation = 0;
-  // §8.4: whether the element type is a class, so that each element is a
-  // handle and `q[i].v` names a property of the object the element refers
-  // to. Read by TryEvalQueueElementMember in
-  // src/simulator/eval_array_class_queue.h, which must not take an integral
-  // or structure element that happens to equal a live handle for one.
   bool holds_class_handles = false;
-  // §15.5 with §7.10: whether the element type is event, so that each element
-  // is a handle to an event, its value the event's identity
-  // (DeclaredNameTables::RegisterEventIdentity), and `@q[0]` waits on that
-  // event (EventArrayElement in class_event_property.h).
   bool holds_events = false;
 
-  // §10.6: what a force or an assign standing on an element drives it from,
-  // keyed by the identity §7.10.3 gives that element. The identity is what the
-  // record is keyed by rather than the position, because a queue's elements
-  // move: a push_front slides every one of them along, and the statement stands
-  // on the element it named rather than on the place it was in. An element
-  // removed from the queue takes its record with it, which is the only answer
-  // available -- the clause says nothing about a force on an element that has
-  // since been deleted, and there is nothing left for a release to name.
   std::map<uint64_t, ElementDrive> element_drives;
 
-  // Whether a §10.6 statement is driving the element at `index`, which makes a
-  // procedural write to it a no-op.
   bool ElementIsDriven(size_t index) const {
     if (index >= element_ids.size()) return false;
     auto it = element_drives.find(element_ids[index]);
@@ -275,58 +151,20 @@ struct QueueObject {
 
   uint64_t AllocateId() { return ++next_elem_id_; }
 
-  // §7.10.3: gives every element the queue holds a fresh identity, which is
-  // what the clause requires: assigning to a whole queue leaves every
-  // reference to an element of the original queue outdated.
   void AssignFreshIds();
 
-  // §7.10.3: gives an identity to each element appended since the last call and
-  // leaves the identities of the elements already there alone. Growing a queue
-  // removes nothing, so every reference taken on it stays valid; only the new
-  // elements need identities of their own.
   void AllocateIdsForAppended();
 
-  // §7.4 with §7.10 (printed pages 153 and 169): whether each element of this
-  // queue or dynamic array is itself a queue, `int qq[$][$]` or `q_t d[]`
-  // under `typedef int q_t[$];`. Such an element keeps a placeholder in
-  // `elements`, so the size, the identities and the iteration of the outer
-  // array stay what they are, and its own queue in `element_queues`, under
-  // the element's identity where the queue keeps one and under its position
-  // otherwise (ElementQueueOfSelect in eval_array_element_queue.h). The inner
-  // queue's elements are as wide, as four-state and as much handles as this
-  // array's element type says: elem_width and is_4state describe the element
-  // type at the bottom of the dimensions, and holds_class_handles the same.
   bool elements_are_queues = false;
-  // §7.4 with §7.5: how many levels of queues each element's queue holds
-  // below it, one for the elements of `int arr[2][][]`'s arr[0], whose own
-  // elements are queues too; each element's queue is made with one level
-  // fewer.
   uint32_t nested_queue_levels = 0;
-  // §7.10 and §7.5 with §7.4: where each element is a fixed-size array,
-  // `int q[$][3]`, the number of elements it holds; its queue is made with
-  // that many, each the element type's default, and keeps that many. 0 where
-  // the elements are queues of their own size or no queues.
   uint32_t element_array_size = 0;
-  // The bounds of that fixed-size array, the lower of them and whether it
-  // was written from the higher down, `[2:0]` (RtlirElementShape).
   int64_t element_array_lo = 0;
   bool element_array_descending = false;
-  // §7.4.4: where each element is a multidimensional fixed-size array, `int
-  // q[$][2][3]`, its dimensions after the first, outermost first, which the
-  // element queues below each level are made with in turn; empty otherwise.
   std::vector<FixedDimShape> element_inner_dims;
   std::map<uint64_t, QueueObject*> element_queues;
-  // The key element_queues keeps the queue of the element at position `pos`
-  // under: the element's identity where this queue keeps one per element, and
-  // the position otherwise.
   uint64_t ElementQueueKeyAt(uint64_t pos) const {
     return element_ids.size() == elements.size() ? element_ids[pos] : pos;
   }
-  // §7.4.2: where this queue keeps an element that is a fixed-size array, the
-  // bounds that array was declared with, so that its declared index `index`
-  // addresses the position PositionOf gives: from `index_lo` up, or, for a
-  // dimension written from the higher bound down, from the higher bound
-  // down. 0 and ascending for any other queue, whose index is its position.
   int64_t index_lo = 0;
   bool index_descending = false;
   int64_t PositionOf(int64_t index) const {
@@ -338,16 +176,6 @@ struct QueueObject {
   uint64_t next_elem_id_ = 0;
 };
 
-// The name the aggregate was declared under, carried on both ref bindings
-// below. A queue's and an associative array's elements are bare Logic4Vecs
-// rather than Variables, so a ref formal bound to one is copied out at the end
-// of the call rather than aliased -- and §9.4.2 has that write announce itself,
-// a change to an aggregate's elements that a method or function reads having
-// the event expression evaluated again, which means telling the watchers
-// armed on the aggregate's own Variable. Nothing else on either binding names
-// it: the QueueObject and the AssocArrayObject are reached by pointer and the
-// local variable carries the formal's name. The view is the call argument's
-// base identifier text, which the AST owns and which outlives the call.
 struct QueueRefBinding {
   QueueObject* queue = nullptr;
   uint64_t element_id = 0;
@@ -374,87 +202,26 @@ struct AssocArrayObject {
   bool is_string_key = false;
   bool is_wildcard = false;
   bool is_4state = false;
-  // §6.11 with §7.8: whether the element type is signed, so that an element
-  // reads signed however the value written into it was typed: `aa[0] = u` of
-  // an unsigned u into `int aa[int]` stores an int (TakeElementSignedness in
-  // evaluation.h).
   bool is_signed = false;
-  // Signedness of an integral index type: controls whether an index expression
-  // is sign- or zero-extended to the index width before becoming a key, which
-  // in turn fixes the iteration ordering (§7.8.4).
   bool is_index_signed = true;
   bool has_default = false;
   Logic4Vec default_value;
-  // §7.8.7: the value an element allocated by a write starts at when the
-  // declaration carried no '{default:...}, recorded only when the element type
-  // supplies one of its own. A struct whose members carry initializers is the
-  // case the subclause gives: `typedef struct {int x=1,y=2;} xy_t;
-  // xy_t b[int];` allocates b[2] holding 1 and 2. What a read of a
-  // nonexistent entry yields is a separate question, which Table 7-1 (see
-  // §7.4.5) answers: for an unpacked struct, member by member, a member's
-  // initial assignment included (NonexistentElementOf).
   bool has_elem_init = false;
   Logic4Vec elem_init;
-  // §8.4 with §7.8: the key the run holds the class under whose handles the
-  // elements are, where the array is a class property declared with a
-  // class's name (`C m[string]`, §8.23's `Outer::Inner m[string]`), set by
-  // MakeAssocProperty (eval_array_class_assoc.cpp) from the declaration as
-  // written in the declaring class; empty where the elements are values. A
-  // declared array's element class is recorded under the array's name
-  // instead (SetVariableClassType), which is where the property had none,
-  // so `x.m["k"] = new` constructed nothing and `x.m["k"].v` read 0. The key
-  // is kept rather than a flag so the `new` into an entry knows what to
-  // construct without resolving the declaration again.
   std::string_view elem_class;
-  // §7.8.3 (printed page 164) with §12.7.3: the class the index type names
-  // where the array is keyed by class handles, `bit m[P]` or uvm_phase's
-  // `edges_t m_successors` under `typedef bit edges_t[uvm_phase];`; empty for
-  // any other index type. A foreach over the array gives its loop variable the
-  // index type, so the variable is a handle of this class, and
-  // `succ.m_find_successor(...)` on it runs P's method on the object the key
-  // designates. Without the class the loop variable was a plain vector and
-  // every method called through it ran nothing.
   std::string_view index_class;
-  // §7.8 with §12.7.3 and §6.19: the typedef the index type names, `color_t`
-  // for `int m[color_t]`, empty for a built-in or class index. A foreach over
-  // the array gives its loop variable the index type, so where the typedef is
-  // an enumeration, `c.name()` on the loop variable names the key's member.
   std::string_view index_type_name;
-  // §10.6: what a force or an assign standing on an element drives it from,
-  // keyed the way the element itself is. An associative array's keys are its
-  // elements' identities, so a record outlives every insertion and deletion of
-  // another entry and goes only when its own entry is deleted.
   std::map<AssocIndex, ElementDrive> int_drives;
   std::map<std::string, ElementDrive> str_drives;
-  // §7.8 with §7.10 (printed pages 163 and 169): whether each element is
-  // itself a queue, `int aq[string][$]` or UVM's `rsrc_sv_q_t all[int]` under
-  // `typedef uvm_resource_base rsrc_sv_q_t[$];`. The entry in int_data or
-  // str_data marks the key present, so num(), exists() and foreach see it,
-  // and the element's queue is kept under the same key below
-  // (ElementQueueOfSelect in eval_array_element_queue.h), its elements as
-  // wide, as four-state and as signed as this array's element type, and
-  // handles where `element_queue_handles` says the type is a class.
   bool elements_are_queues = false;
   bool element_queue_handles = false;
-  // §7.4 with §7.5: how many levels of queues each element's queue holds
-  // below it (QueueObject::nested_queue_levels).
   uint32_t nested_queue_levels = 0;
-  // §7.8 with §7.4.2: where each element is a fixed-size array, `int
-  // af[int][2]`, its size and bounds, and a multidimensional one's dimensions
-  // after the first, which each element's queue is made with, as
-  // QueueObject's own fields of the same names describe its elements.
   uint32_t element_array_size = 0;
   int64_t element_array_lo = 0;
   bool element_array_descending = false;
   std::vector<FixedDimShape> element_inner_dims;
   std::map<AssocIndex, QueueObject*> int_element_queues;
   std::map<std::string, QueueObject*> str_element_queues;
-  // §7.8 with §7.4 (printed pages 162 and 153): for an array whose element
-  // type is an associative array, `int m[string][int]`, the empty array each
-  // element starts as, keyed and valued as the elements are; null for any
-  // other array. As with elements that are queues, the entry in int_data or
-  // str_data marks the key present and the element's own array is kept under
-  // the same key below (ElementAssocOfSelect in eval_array_element_assoc.h).
   const AssocArrayObject* element_assoc = nullptr;
   std::map<AssocIndex, AssocArrayObject*> int_element_assocs;
   std::map<std::string, AssocArrayObject*> str_element_assocs;
@@ -470,68 +237,22 @@ struct ArrayInfo {
   bool is_queue = false;
   bool is_4state = true;
   DataTypeKind elem_type_kind = DataTypeKind::kImplicit;
-  // §10.9.1 with §6.22.1: the typedef name the element type was written as,
-  // empty for a built-in type, whether the element is signed and the bounds
-  // of its outermost packed dimension -- what a type key of an assignment
-  // pattern is matched against. Empty where the array's maker did not record
-  // them, the element then taking its kind's signing and the range its
-  // typedef or its width gives.
   std::string_view elem_type_name = {};
   std::optional<bool> elem_is_signed = std::nullopt;
   std::optional<PackedRange> elem_range = std::nullopt;
-  // RtlirElementShape::type_is_unpacked_array: the element type is a name
-  // standing for an unpacked array, `mem_type ba [0:7]` under
-  // `typedef bsix mem_type [0:3]`.
   bool elem_type_is_unpacked_array = false;
-  // §21.4.3: address extents of each unpacked dimension, outermost (leftmost in
-  // the declaration) first, for a multidimensional unpacked array. Empty when
-  // the array has a single unpacked dimension, in which case lo/size above
-  // describe it. $readmemb/$readmemh consult these to fill the array in
-  // row-major order and to resolve an @-address against the highest dimension.
   std::vector<uint32_t> dim_los = {};
   std::vector<uint32_t> dim_sizes = {};
-  // §11.5.2 addresses a dimension from the address bounds its declaration
-  // gives, which is its smaller bound whichever way round the two were
-  // written, while §10.9.1 counts an assignment pattern's positional items from
-  // the dimension's left bound; the two are the same bound only for an
-  // ascending dimension. dim_los/dim_sizes above record the address extent and
-  // so cannot tell `[1:3]` from `[3:1]`, and this says which of the two each
-  // dimension was: outermost first, one entry per entry of those. With it the
-  // declared bounds come back exactly -- a descending dimension was written
-  // [lo+size-1:lo] and an ascending one [lo:lo+size-1]. is_descending above
-  // says the same of the outermost dimension alone, for the paths that read
-  // the lo/size pair rather than these vectors.
   std::vector<bool> dim_descending = {};
-  // §7.4 with §7.10: whether each element of this fixed-size array is itself
-  // a queue, `q_t fx[2]` under `typedef int q_t[$];`. Each element's queue is
-  // a QueueObject created under the element's own name, `fx[1]`, where
-  // ElementQueueOfSelect (eval_array_element_queue.h) finds it.
   bool elements_are_queues = false;
 };
 
-// §20.15.3: a queued entry as the queue manager retains it. $q_add records the
-// job_id and the user-defined inform_id; $q_remove hands both back through its
-// output arguments when the entry is taken off the queue. §20.15.5 additionally
-// stamps each entry with the simulation time it was placed, so the queue's
-// wait-time statistics can be derived when an entry leaves or is examined.
 struct StochasticQueueEntry {
   uint64_t job_id = 0;
   uint64_t inform_id = 0;
   uint64_t arrival_tick = 0;
 };
 
-// §20.15: per-queue bookkeeping for the stochastic-analysis queue tasks.
-// The queue type and capacity validated at creation and the running occupancy
-// drive the §20.15.6 status codes (the full and empty conditions of Table
-// 20-11). `entries` holds the stored entries in arrival order so that
-// §20.15.3 $q_remove can return the job_id/inform_id of the entry it removes,
-// selected per the FIFO/LIFO discipline fixed by the q_type (see §20.15.1).
-//
-// The remaining fields accumulate the activity statistics that §20.15.5
-// $q_exam reports through Table 20-10: the peak occupancy ever reached, the
-// span and number of arrivals (for the mean interarrival time), and the
-// completed-wait totals (count, sum and minimum) gathered as entries are
-// removed.
 struct StochasticQueue {
   int64_t q_type = 0;
   int64_t max_length = 0;
@@ -547,8 +268,6 @@ struct StochasticQueue {
   uint64_t shortest_wait = 0;
 };
 
-// State block governed by $timeformat (see 20.4.3). The four members map
-// 1:1 to the task's arguments and persist between invocations.
 struct TimeFormatSpec {
   int units_number = -9;
   int precision_number = 0;
@@ -556,36 +275,21 @@ struct TimeFormatSpec {
   int minimum_field_width = 20;
 };
 
-// §6.7.1: the optional defining attributes of a net beyond its name, nettype
-// and width — charge strength and decay (for trireg), the user-nettype flag,
-// the resolution-function name, and whether the net is signed.
 struct NetSpec {
   Strength charge_strength = Strength::kMedium;
   uint64_t decay_ticks = 0;
-  // §28.16.2.1: whether the net decays at all, which a count of zero cannot
-  // say -- a charge decay time of zero is the transition to x happening at
-  // once, and it is the *absence* of a third delay that §28.16.2.2 makes a net
-  // hold its charge. See RtlirNet::decays.
   bool decays = false;
   bool is_user_nettype = false;
   std::string_view resolve_func = {};
   bool is_signed = false;
 };
 
-// §7.8: the optional defining attributes of an associative array beyond its
-// name, element width and string-key flag — the index width, the wildcard
-// (index type [*]) flag, the 4-state-element flag, and whether the integral
-// index type is signed.
 struct AssocArraySpec {
   uint32_t index_width = 32;
   bool is_wildcard = false;
   bool is_4state = false;
   bool is_index_signed = true;
-  // §7.8.3: the class an index of a class type names; empty for any other
-  // index type. See AssocArrayObject::index_class.
   std::string_view index_class = {};
-  // §7.8 with §12.7.3: the typedef the index type names. See
-  // AssocArrayObject::index_type_name.
   std::string_view index_type_name = {};
 };
 

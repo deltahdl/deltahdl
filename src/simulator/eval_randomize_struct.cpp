@@ -20,8 +20,6 @@ namespace delta {
 
 namespace {
 
-// The layout of the structure the property `name` of `level` holds, null
-// where it holds none.
 const StructTypeInfo* PropertyLayout(std::string_view name,
                                      const ClassTypeInfo* level,
                                      SimContext& ctx) {
@@ -40,8 +38,6 @@ bool AddRandStructMembers(const ClassMember* m, const ClassTypeInfo* level,
   const StructTypeInfo* layout = PropertyLayout(m->name, level, ctx);
   if (layout == nullptr || layout->is_packed || layout->is_union) return false;
   for (const StructFieldInfo& field : layout->fields) {
-    // A member of no integral layout -- an array, fixed or dynamic, or a
-    // nested aggregate -- is no variable of the structure's bits.
     if (!(field.is_rand || field.is_randc) || field.width == 0 ||
         field.elem_count != 0 || field.is_dynamic || field.nested != nullptr) {
       continue;

@@ -19,23 +19,12 @@ using namespace delta;
 
 namespace {
 
-// --- Driven from real source syntax --------------------------------------
-// Every option behavior below is observed on checks built from genuine
-// $setuphold (§31.3.3) and $recrem (§31.3.6) declarations: the negative limits,
-// the notifier, and the optional delayed reference/data signal arguments all
-// come from parsed source, and the design is elaborated and lowered first so
-// that a limit written as a specparam resolves at evaluation time. The
-// invocation options are the only input that does not come from source, since
-// they are selected outside the design.
-
 struct ElaboratedTimingCheck {
   const TimingCheckDecl* decl = nullptr;
   RtlirDesign* design = nullptr;
   bool has_errors = false;
 };
 
-// The first timing check the given specify block declares, or nullptr when it
-// declares none: a specify block may hold path declarations and nothing else.
 const TimingCheckDecl* FirstTimingCheckIn(const ModuleItem* specify_block) {
   for (auto* si : specify_block->specify_items) {
     if (si->kind == SpecifyItemKind::kTimingCheck) return &si->timing_check;
@@ -43,8 +32,6 @@ const TimingCheckDecl* FirstTimingCheckIn(const ModuleItem* specify_block) {
   return nullptr;
 }
 
-// The first timing check declared by any specify block anywhere in `cu`, or
-// nullptr when no specify block in it declares one.
 const TimingCheckDecl* FirstTimingCheckDecl(const CompilationUnit* cu) {
   for (auto* mod : cu->modules) {
     for (auto* item : mod->items) {
@@ -55,8 +42,6 @@ const TimingCheckDecl* FirstTimingCheckDecl(const CompilationUnit* cu) {
   return nullptr;
 }
 
-// Parses AND elaborates a module carrying the given specify body, returning its
-// first timing check declaration together with the design.
 ElaboratedTimingCheck ElaborateTimingCheck(const std::string& module_body,
                                            const std::string& specify_body,
                                            SimFixture& f) {
@@ -77,12 +62,6 @@ ElaboratedTimingCheck ElaborateTimingCheck(const std::string& module_body,
   return out;
 }
 
-// Registers the one timing check `module_body` / `specify_body` declares on
-// two managers: `on` has the negative timing check option in force and `off`
-// does not, so the same declaration is read under both settings.
-//
-// The design is elaborated and lowered before either registration, so a limit
-// written as a specparam has resolved by the time the check is built.
 void RegisterCheckUnderBothOptions(const std::string& module_body,
                                    const std::string& specify_body,
                                    SimFixture& f, SpecifyManager& on,
@@ -93,23 +72,16 @@ void RegisterCheckUnderBothOptions(const std::string& module_body,
   ASSERT_FALSE(c.has_errors);
   LowerAndRun(c.design, f);
 
-  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  on.SetTimingCheckInvocationOptions({true, false});
   on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  off.SetTimingCheckInvocationOptions({false, false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
 }
 
-// The internal delay a check requests for a delayed copy: a negative limit is
-// what has to be compensated, so its magnitude is the requested delay. Only
-// whether that delay survives the invocation options is §31.9.4's concern.
 int64_t RequestedDelayFor(int64_t signed_limit) {
   return signed_limit < 0 ? -signed_limit : 0;
 }
 
-// §31.9.4 C1 (accepting path): a $setuphold whose setup limit is a negative
-// literal gets negative-value handling once the enabling option is selected, so
-// the shifted violation window of §31.9.1 is what decides violations: a data
-// transition inside (ref+10, ref+20) violates, one before the window does not.
 TEST(NegativeTimingCheckOptionFromSource, SetupholdNegativeLiteralHonored) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -121,7 +93,7 @@ TEST(NegativeTimingCheckOptionFromSource, SetupholdNegativeLiteralHonored) {
   LowerAndRun(c.design, f);
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({true, false});
   mgr.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
 
   ASSERT_EQ(mgr.TimingCheckCount(), 1u);
@@ -135,11 +107,6 @@ TEST(NegativeTimingCheckOptionFromSource, SetupholdNegativeLiteralHonored) {
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
-// §31.9.4 C1 (rejecting path): the same source run without the enabling option.
-// The negative setup value is not handled, so the check keeps the ordinary
-// two-sided behavior with that limit taken as zero -- a data transition at
-// ref+5, which the negative window would have let pass, now violates, and the
-// negative-window verdict at ref+15 is no longer what reports it.
 TEST(NegativeTimingCheckOptionFromSource,
      SetupholdNegativeIgnoredWithoutOption) {
   SimFixture f;
@@ -152,21 +119,17 @@ TEST(NegativeTimingCheckOptionFromSource,
   LowerAndRun(c.design, f);
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({false, false});
   mgr.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
 
   const auto& entry = mgr.GetTimingChecks().front();
   EXPECT_FALSE(entry.negative_timing_check_enabled);
-  EXPECT_EQ(entry.limit, 0u);    // negative setup not honored
-  EXPECT_EQ(entry.limit2, 20u);  // positive hold unaffected
+  EXPECT_EQ(entry.limit, 0u);
+  EXPECT_EQ(entry.limit2, 20u);
 
   EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
-// §31.9.4 C1: the negative limit need not be a literal. Here both limits are
-// specparams -- the constant form a timing check limit admits -- resolved
-// through elaboration and lowering, and the option still decides whether the
-// resulting negative value is handled.
 TEST(NegativeTimingCheckOptionFromSource, NegativeSpecparamLimitGatedByOption) {
   SimFixture f;
   SpecifyManager on, off;
@@ -185,9 +148,6 @@ TEST(NegativeTimingCheckOptionFromSource, NegativeSpecparamLimitGatedByOption) {
   EXPECT_EQ(off.GetTimingChecks().front().limit, 0u);
 }
 
-// §31.9.4 C1: a constant expression that evaluates negative is gated the same
-// way, and a check whose limits are both positive is never turned into a
-// negative-value check by the option being on.
 TEST(NegativeTimingCheckOptionFromSource,
      NegativeConstantExpressionGatedPositiveLimitsUnaffected) {
   SimFixture f;
@@ -202,7 +162,7 @@ TEST(NegativeTimingCheckOptionFromSource,
   LowerAndRun(c.design, f);
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({true, false});
   mgr.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_EQ(mgr.GetTimingChecks().front().signed_limit, -10);
   EXPECT_TRUE(mgr.GetTimingChecks().front().negative_timing_check_enabled);
@@ -216,16 +176,12 @@ TEST(NegativeTimingCheckOptionFromSource,
   LowerAndRun(p.design, g);
 
   SpecifyManager positive;
-  positive.SetTimingCheckInvocationOptions(
-      {/*negative=*/true, /*all_off=*/false});
+  positive.SetTimingCheckInvocationOptions({true, false});
   positive.AddTimingCheckUnderOptions(*p.decl, g.ctx, g.arena);
   EXPECT_FALSE(
       positive.GetTimingChecks().front().negative_timing_check_enabled);
 }
 
-// §31.9.4 C2: a model written with explicitly declared delayed reference and
-// data signals can be run without the enabling option; the delayed signals then
-// are copies of the originals -- the original signals, undelayed.
 TEST(NegativeTimingCheckOptionFromSource, DeclaredDelayedSignalsBecomeCopies) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -235,15 +191,13 @@ TEST(NegativeTimingCheckOptionFromSource, DeclaredDelayedSignalsBecomeCopies) {
   ASSERT_NE(c.design, nullptr);
   ASSERT_FALSE(c.has_errors);
   LowerAndRun(c.design, f);
-  // The delayed-signal arguments really came from the source.
   EXPECT_EQ(c.decl->delayed_ref, "dclk");
   EXPECT_EQ(c.decl->delayed_data, "ddata");
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({true, false});
   mgr.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   const auto& entry = mgr.GetTimingChecks().front();
-  // §31.9.4 C1 for the both-limits-negative form: the option carries it.
   EXPECT_TRUE(entry.negative_timing_check_enabled);
   EXPECT_EQ(entry.signed_limit, -10);
   EXPECT_EQ(entry.signed_limit2, -4);
@@ -252,11 +206,8 @@ TEST(NegativeTimingCheckOptionFromSource, DeclaredDelayedSignalsBecomeCopies) {
   ASSERT_EQ(kRefDelay, 10);
   ASSERT_EQ(kDataDelay, 4);
 
-  // Without the option neither negative value is honored: both sides fall back
-  // to the ordinary treatment with the limit taken as zero, which reports
-  // nothing at all for this check.
   SpecifyManager off;
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  off.SetTimingCheckInvocationOptions({false, false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(off.GetTimingChecks().front().limit, 0u);
@@ -264,18 +215,16 @@ TEST(NegativeTimingCheckOptionFromSource, DeclaredDelayedSignalsBecomeCopies) {
   EXPECT_FALSE(off.CheckSetupholdViolation("clk", 100, "data", 98));
   EXPECT_FALSE(off.CheckSetupholdViolation("clk", 100, "data", 105));
 
-  // With the option in force the declared delayed signals carry their delays.
-  auto delayed = ResolveDelayedSignalsUnderOptions(
-      *c.decl, kRefDelay, kDataDelay, {/*negative=*/true, /*all_off=*/false});
+  auto delayed = ResolveDelayedSignalsUnderOptions(*c.decl, kRefDelay,
+                                                   kDataDelay, {true, false});
   EXPECT_FALSE(delayed.are_copies_of_originals);
   EXPECT_EQ(delayed.ref_signal, "dclk");
   EXPECT_EQ(delayed.data_signal, "ddata");
   EXPECT_EQ(delayed.ref_delay, 10);
   EXPECT_EQ(delayed.data_delay, 4);
 
-  // Run without it and they degenerate to copies of clk and data.
-  auto copies = ResolveDelayedSignalsUnderOptions(
-      *c.decl, kRefDelay, kDataDelay, {/*negative=*/false, /*all_off=*/false});
+  auto copies = ResolveDelayedSignalsUnderOptions(*c.decl, kRefDelay,
+                                                  kDataDelay, {false, false});
   EXPECT_TRUE(copies.are_copies_of_originals);
   EXPECT_EQ(copies.ref_signal, "clk");
   EXPECT_EQ(copies.data_signal, "data");
@@ -283,9 +232,6 @@ TEST(NegativeTimingCheckOptionFromSource, DeclaredDelayedSignalsBecomeCopies) {
   EXPECT_EQ(copies.data_delay, 0);
 }
 
-// §31.9.4 C2: the collapse applies just as much when only one delayed signal is
-// declared, and when the check declares none at all (the implicit copies of
-// §31.9.1).
 TEST(NegativeTimingCheckOptionFromSource,
      PartialAndImplicitDelayedSignalsBecomeCopies) {
   SimFixture f;
@@ -299,16 +245,14 @@ TEST(NegativeTimingCheckOptionFromSource,
   EXPECT_EQ(only_ref.decl->delayed_ref, "dclk");
   EXPECT_TRUE(only_ref.decl->delayed_data.empty());
 
-  auto on = ResolveDelayedSignalsUnderOptions(
-      *only_ref.decl, 10, 0, {/*negative=*/true, /*all_off=*/false});
+  auto on =
+      ResolveDelayedSignalsUnderOptions(*only_ref.decl, 10, 0, {true, false});
   EXPECT_EQ(on.ref_signal, "dclk");
-  // No declared delayed data signal: the copy is the implicit one, tracked
-  // under the original data signal's name.
   EXPECT_EQ(on.data_signal, "data");
   EXPECT_EQ(on.ref_delay, 10);
 
-  auto off = ResolveDelayedSignalsUnderOptions(
-      *only_ref.decl, 10, 0, {/*negative=*/false, /*all_off=*/false});
+  auto off =
+      ResolveDelayedSignalsUnderOptions(*only_ref.decl, 10, 0, {false, false});
   EXPECT_TRUE(off.are_copies_of_originals);
   EXPECT_EQ(off.ref_signal, "clk");
   EXPECT_EQ(off.ref_delay, 0);
@@ -322,19 +266,14 @@ TEST(NegativeTimingCheckOptionFromSource,
   LowerAndRun(implicit_only.design, g);
   ASSERT_TRUE(implicit_only.decl->delayed_ref.empty());
   ASSERT_TRUE(implicit_only.decl->delayed_data.empty());
-  // Nothing declared and a negative value present: the copies the check would
-  // otherwise make internally collapse without the option just the same.
-  auto implicit_off = ResolveDelayedSignalsUnderOptions(
-      *implicit_only.decl, 10, 0, {/*negative=*/false, /*all_off=*/false});
+  auto implicit_off = ResolveDelayedSignalsUnderOptions(*implicit_only.decl, 10,
+                                                        0, {false, false});
   EXPECT_TRUE(implicit_off.are_copies_of_originals);
   EXPECT_EQ(implicit_off.ref_signal, "clk");
   EXPECT_EQ(implicit_off.data_signal, "data");
   EXPECT_EQ(implicit_off.ref_delay, 0);
 }
 
-// §31.9.4 C3: with the option that turns all timing checks off, a negative
-// $setuphold built from real source reports nothing at all, and its delayed
-// signals are copies of the originals even though the enabling option is on.
 TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesAndCollapses) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -346,16 +285,15 @@ TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesAndCollapses) {
   LowerAndRun(c.design, f);
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/true});
+  mgr.SetTimingCheckInvocationOptions({true, true});
   mgr.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(mgr.GetTimingChecks().front().negative_timing_check_enabled);
 
-  // Nothing is reported for either the shifted-window or the ordinary timing.
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 115));
   EXPECT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
 
-  auto delayed = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 10, 20, {/*negative=*/true, /*all_off=*/true});
+  auto delayed =
+      ResolveDelayedSignalsUnderOptions(*c.decl, 10, 20, {true, true});
   EXPECT_TRUE(delayed.are_copies_of_originals);
   EXPECT_EQ(delayed.ref_signal, "clk");
   EXPECT_EQ(delayed.data_signal, "data");
@@ -363,20 +301,6 @@ TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesAndCollapses) {
   EXPECT_EQ(delayed.data_delay, 0);
 }
 
-// §31.9.4: the rules hold identically for $recrem (§31.3.6). The negative value
-// here is the recovery limit, Syntax 31-8 writing $recrem's recovery limit
-// first, and Table 31-6 gives the recovery limit the data_event role and the
-// removal limit the reference_event role. So the removal limit of 10 bounds the
-// side before the reference and the recovery limit of -5 bounds the side after
-// it, and the window with the option on is (100 - 10, 100 + -5), which is
-// (90, 95) and lies wholly before the reference.
-//
-// Without the option the negative value is not handled at all: it is clamped to
-// zero, the after side bounds nothing, and the before side reports every
-// transition within 10 of the reference. The option therefore narrows the
-// window here rather than moving it, so a transition at 97 violates only with
-// the option off, and one at 92 violates either way -- which is what says the
-// window with the option on is not empty.
 TEST(NegativeTimingCheckOptionFromSource, RecremFollowsTheSameOptionBehavior) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -390,31 +314,26 @@ TEST(NegativeTimingCheckOptionFromSource, RecremFollowsTheSameOptionBehavior) {
   EXPECT_EQ(c.decl->delayed_data, "dclk");
 
   SpecifyManager on;
-  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  on.SetTimingCheckInvocationOptions({true, false});
   on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_TRUE(on.CheckRecremViolation("clr", 100, "clk", 92));
   EXPECT_FALSE(on.CheckRecremViolation("clr", 100, "clk", 97));
 
   SpecifyManager off;
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  off.SetTimingCheckInvocationOptions({false, false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 92));
   EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 97));
 
   SpecifyManager all_off;
-  all_off.SetTimingCheckInvocationOptions(
-      {/*negative=*/true, /*all_off=*/true});
+  all_off.SetTimingCheckInvocationOptions({true, true});
   all_off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(all_off.CheckRecremViolation("clr", 100, "clk", 107));
   EXPECT_FALSE(all_off.CheckRecremViolation("clr", 100, "clk", 95));
 }
 
-// §31.9.4 C2/C3 for $recrem's delayed signals: with the enabling option in
-// force they are NOT copies -- they are the declared ones, each carrying its
-// delay -- while both the absent enabling option and the all-checks-off option
-// collapse them to the original reference and data signals.
 TEST(NegativeTimingCheckOptionFromSource, RecremDelayedSignalsUnderEachOption) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -425,23 +344,20 @@ TEST(NegativeTimingCheckOptionFromSource, RecremDelayedSignalsUnderEachOption) {
   ASSERT_FALSE(c.has_errors);
   LowerAndRun(c.design, f);
 
-  auto on = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 5, 3, {/*negative=*/true, /*all_off=*/false});
+  auto on = ResolveDelayedSignalsUnderOptions(*c.decl, 5, 3, {true, false});
   EXPECT_FALSE(on.are_copies_of_originals);
   EXPECT_EQ(on.ref_signal, "dclr");
   EXPECT_EQ(on.data_signal, "dclk");
   EXPECT_EQ(on.ref_delay, 5);
   EXPECT_EQ(on.data_delay, 3);
 
-  auto off = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 5, 3, {/*negative=*/false, /*all_off=*/false});
+  auto off = ResolveDelayedSignalsUnderOptions(*c.decl, 5, 3, {false, false});
   EXPECT_TRUE(off.are_copies_of_originals);
   EXPECT_EQ(off.ref_signal, "clr");
   EXPECT_EQ(off.data_signal, "clk");
   EXPECT_EQ(off.ref_delay, 0);
 
-  auto all_off = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 5, 3, {/*negative=*/true, /*all_off=*/true});
+  auto all_off = ResolveDelayedSignalsUnderOptions(*c.decl, 5, 3, {true, true});
   EXPECT_TRUE(all_off.are_copies_of_originals);
   EXPECT_EQ(all_off.ref_signal, "clr");
   EXPECT_EQ(all_off.data_signal, "clk");
@@ -449,10 +365,6 @@ TEST(NegativeTimingCheckOptionFromSource, RecremDelayedSignalsUnderEachOption) {
   EXPECT_EQ(all_off.data_delay, 0);
 }
 
-// §31.9.4 C1: the negative value may sit on the hold side alone. With the
-// option on, the window sits wholly before the reference -- (ref-10, ref-4) --
-// so a transition at ref-7 violates and one at ref-2 does not; without the
-// option that same ref-2 transition is what the ordinary setup side reports.
 TEST(NegativeTimingCheckOptionFromSource, NegativeHoldOnlyGatedByOption) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -464,7 +376,7 @@ TEST(NegativeTimingCheckOptionFromSource, NegativeHoldOnlyGatedByOption) {
   LowerAndRun(c.design, f);
 
   SpecifyManager on;
-  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  on.SetTimingCheckInvocationOptions({true, false});
   on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   const auto& entry = on.GetTimingChecks().front();
   EXPECT_TRUE(entry.negative_timing_check_enabled);
@@ -474,26 +386,21 @@ TEST(NegativeTimingCheckOptionFromSource, NegativeHoldOnlyGatedByOption) {
   EXPECT_FALSE(on.CheckSetupholdViolation("clk", 100, "data", 98));
 
   SpecifyManager off;
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  off.SetTimingCheckInvocationOptions({false, false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(off.GetTimingChecks().front().limit, 10u);
   EXPECT_EQ(off.GetTimingChecks().front().limit2, 0u);
   EXPECT_TRUE(off.CheckSetupholdViolation("clk", 100, "data", 98));
 
-  // And the delayed signals the model declared collapse to the originals.
-  auto copies = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 0, 4, {/*negative=*/false, /*all_off=*/false});
+  auto copies =
+      ResolveDelayedSignalsUnderOptions(*c.decl, 0, 4, {false, false});
   EXPECT_TRUE(copies.are_copies_of_originals);
   EXPECT_EQ(copies.ref_signal, "clk");
   EXPECT_EQ(copies.data_signal, "data");
   EXPECT_EQ(copies.data_delay, 0);
 }
 
-// A timing check limit may be a min:typ:max triple, parenthesized because
-// A.7.5.2 writes a timing_check_limit as an expression, so the negative value
-// §31.9.4's option gates can come from the selected member of a triple rather
-// than from a plain constant.
 TEST(NegativeTimingCheckOptionFromSource, NegativeMinTypMaxLimitGatedByOption) {
   SimFixture f;
   SpecifyManager on, off;
@@ -513,9 +420,6 @@ TEST(NegativeTimingCheckOptionFromSource, NegativeMinTypMaxLimitGatedByOption) {
   EXPECT_TRUE(off.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
-// §31.9.4 C2: a delayed signal argument may name a bit of a vector. Whatever
-// form the declared delayed signal takes, running without the enabling option
-// still leaves the check evaluating the original reference and data signals.
 TEST(NegativeTimingCheckOptionFromSource, BitSelectDelayedSignalsCollapse) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -531,24 +435,18 @@ TEST(NegativeTimingCheckOptionFromSource, BitSelectDelayedSignalsCollapse) {
   EXPECT_EQ(c.decl->delayed_data, "ddata");
   EXPECT_NE(c.decl->delayed_data_expr, nullptr);
 
-  auto on = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 10, 0, {/*negative=*/true, /*all_off=*/false});
+  auto on = ResolveDelayedSignalsUnderOptions(*c.decl, 10, 0, {true, false});
   EXPECT_FALSE(on.are_copies_of_originals);
   EXPECT_EQ(on.ref_signal, "dclk");
   EXPECT_EQ(on.ref_delay, 10);
 
-  auto off = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 10, 0, {/*negative=*/false, /*all_off=*/false});
+  auto off = ResolveDelayedSignalsUnderOptions(*c.decl, 10, 0, {false, false});
   EXPECT_TRUE(off.are_copies_of_originals);
   EXPECT_EQ(off.ref_signal, "clk");
   EXPECT_EQ(off.data_signal, "data");
   EXPECT_EQ(off.ref_delay, 0);
 }
 
-// §31.9.4 C1: the gate holds however a check came to carry negative values, not
-// only at the moment its declaration was read. A check registered while the
-// enabling option was in force loses its negative-value handling as soon as the
-// options say the option is gone, and the ordinary treatment takes over.
 TEST(NegativeTimingCheckOptionFromSource,
      DroppingTheOptionRegatesRegisteredCheck) {
   SimFixture f;
@@ -561,14 +459,13 @@ TEST(NegativeTimingCheckOptionFromSource,
   LowerAndRun(c.design, f);
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({true, false});
   mgr.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   ASSERT_TRUE(mgr.GetTimingChecks().front().negative_timing_check_enabled);
   ASSERT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 115));
   ASSERT_FALSE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
 
-  // Same check, run without the enabling option: the shifted window is gone.
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({false, false});
   const auto& entry = mgr.GetTimingChecks().front();
   EXPECT_FALSE(entry.negative_timing_check_enabled);
   EXPECT_EQ(entry.limit, 0u);
@@ -576,9 +473,6 @@ TEST(NegativeTimingCheckOptionFromSource,
   EXPECT_TRUE(mgr.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
-// §31.9.4 C2: the remaining declared-delayed-signal form -- a delayed data
-// signal with the delayed reference argument left empty. With the option in
-// force the declared copy stands; without it, both sides are the originals.
 TEST(NegativeTimingCheckOptionFromSource, DelayedDataOnlyDeclaredCollapses) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -591,33 +485,19 @@ TEST(NegativeTimingCheckOptionFromSource, DelayedDataOnlyDeclaredCollapses) {
   ASSERT_TRUE(c.decl->delayed_ref.empty());
   ASSERT_EQ(c.decl->delayed_data, "ddata");
 
-  auto on = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 10, 0, {/*negative=*/true, /*all_off=*/false});
+  auto on = ResolveDelayedSignalsUnderOptions(*c.decl, 10, 0, {true, false});
   EXPECT_FALSE(on.are_copies_of_originals);
   EXPECT_EQ(on.data_signal, "ddata");
-  // No declared delayed reference: the internal copy stands in for clk.
   EXPECT_EQ(on.ref_signal, "clk");
   EXPECT_EQ(on.ref_delay, 10);
 
-  auto off = ResolveDelayedSignalsUnderOptions(
-      *c.decl, 10, 0, {/*negative=*/false, /*all_off=*/false});
+  auto off = ResolveDelayedSignalsUnderOptions(*c.decl, 10, 0, {false, false});
   EXPECT_TRUE(off.are_copies_of_originals);
   EXPECT_EQ(off.ref_signal, "clk");
   EXPECT_EQ(off.data_signal, "data");
   EXPECT_EQ(off.ref_delay, 0);
 }
 
-// §31.9.4 C1: for $recrem the negative value may sit on the second limit, which
-// Syntax 31-8 writes as the removal limit. Table 31-6 gives that limit the
-// reference_event role, so it bounds the side before the reference, and the
-// recovery limit of 10 bounds the side after. The window with the option on is
-// (100 - -5, 100 + 10), which is (105, 110) and lies wholly after the
-// reference.
-//
-// Without the option the negative removal value is clamped to zero, the before
-// side bounds nothing, and the after side reports every transition within 10 of
-// the reference. So a transition at 102 violates only with the option off, and
-// one at 107 violates either way.
 TEST(NegativeTimingCheckOptionFromSource,
      RecremNegativeSecondLimitGatedByOption) {
   SimFixture f;
@@ -630,7 +510,7 @@ TEST(NegativeTimingCheckOptionFromSource,
   LowerAndRun(c.design, f);
 
   SpecifyManager on;
-  on.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  on.SetTimingCheckInvocationOptions({true, false});
   on.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(on.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(on.GetTimingChecks().front().signed_limit2, -5);
@@ -638,7 +518,7 @@ TEST(NegativeTimingCheckOptionFromSource,
   EXPECT_FALSE(on.CheckRecremViolation("clr", 100, "clk", 102));
 
   SpecifyManager off;
-  off.SetTimingCheckInvocationOptions({/*negative=*/false, /*all_off=*/false});
+  off.SetTimingCheckInvocationOptions({false, false});
   off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(off.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(off.GetTimingChecks().front().limit2, 0u);
@@ -646,16 +526,6 @@ TEST(NegativeTimingCheckOptionFromSource,
   EXPECT_TRUE(off.CheckRecremViolation("clr", 100, "clk", 102));
 }
 
-// §31.9.4 C1, the constant forms the limit position does NOT admit: a negative
-// value written as a module parameter or a localparam is rejected while the
-// design is elaborated, so it never reaches the option gate at all. The same
-// value written as a specparam elaborates cleanly and is gated as usual, which
-// is the contrast this test pins down.
-//
-// The rejection enforces §31.2 -- a timing check's limit is a constant
-// expression and may use specparams -- so the report names §31.2 and not
-// §31.9.4, and it stands on the $setuphold line rather than on the parameter
-// declaration.
 TEST(NegativeTimingCheckOptionFromSource, NonSpecparamNegativeLimitIsRejected) {
   SimFixture f;
   auto from_parameter = ElaborateTimingCheck(
@@ -684,15 +554,12 @@ TEST(NegativeTimingCheckOptionFromSource, NonSpecparamNegativeLimitIsRejected) {
   LowerAndRun(from_specparam.design, h);
 
   SpecifyManager mgr;
-  mgr.SetTimingCheckInvocationOptions({/*negative=*/true, /*all_off=*/false});
+  mgr.SetTimingCheckInvocationOptions({true, false});
   mgr.AddTimingCheckUnderOptions(*from_specparam.decl, h.ctx, h.arena);
   EXPECT_TRUE(mgr.GetTimingChecks().front().negative_timing_check_enabled);
   EXPECT_EQ(mgr.GetTimingChecks().front().signed_limit, -10);
 }
 
-// §31.9.4 C3: the option switches off ALL timing checks, not just those with
-// negative values -- an ordinary all-positive $setuphold reports nothing under
-// it, while the same check reports normally with the option absent.
 TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesPositiveCheck) {
   SimFixture f;
   auto c = ElaborateTimingCheck(
@@ -703,26 +570,18 @@ TEST(NegativeTimingCheckOptionFromSource, AllChecksOffSuppressesPositiveCheck) {
   LowerAndRun(c.design, f);
 
   SpecifyManager checking;
-  checking.SetTimingCheckInvocationOptions(
-      {/*negative=*/false, /*all_off=*/false});
+  checking.SetTimingCheckInvocationOptions({false, false});
   checking.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_TRUE(checking.CheckSetupholdViolation("clk", 100, "data", 95));
   EXPECT_TRUE(checking.CheckSetupholdViolation("clk", 100, "data", 105));
 
   SpecifyManager all_off;
-  all_off.SetTimingCheckInvocationOptions(
-      {/*negative=*/false, /*all_off=*/true});
+  all_off.SetTimingCheckInvocationOptions({false, true});
   all_off.AddTimingCheckUnderOptions(*c.decl, f.ctx, f.arena);
   EXPECT_FALSE(all_off.CheckSetupholdViolation("clk", 100, "data", 95));
   EXPECT_FALSE(all_off.CheckSetupholdViolation("clk", 100, "data", 105));
 }
 
-// §31.9.4 (printed page 923): without the option that enables negative timing
-// checks the delayed reference and data signals simply copy the originals. dclk
-// and dd, named by the check and declared nowhere else, follow clk and d:
-// `@(posedge dclk)` fires when clk rises at 20 and dd reads the 1 d took at 10.
-// They were never created -- dd was an unresolved identifier or read 0, and
-// dclk's edge never came.
 TEST(DelayedSignalCopies, UndeclaredDelayedSignalsCopyTheirOriginals) {
   SimFixture f;
   EXPECT_EQ(
@@ -744,8 +603,6 @@ TEST(DelayedSignalCopies, UndeclaredDelayedSignalsCopyTheirOriginals) {
       "20 1\n");
 }
 
-// A delayed copy of a vector is as wide as the vector, and a delayed signal
-// the module declares itself is driven the same way.
 TEST(DelayedSignalCopies, VectorAndDeclaredDelayedSignalsCopyWhole) {
   SimFixture f;
   EXPECT_EQ(
@@ -765,10 +622,6 @@ TEST(DelayedSignalCopies, VectorAndDeclaredDelayedSignalsCopyWhole) {
       "1010 1\n");
 }
 
-// §31.9.1 Example 3: a signal delayed in some of its timing checks and not in
-// others is used in its delayed form in all of them, one delayed signal per
-// original, so del_CLK named by one of two checks on CLK is created once and
-// follows CLK.
 TEST(DelayedSignalCopies, DelayedSignalNamedByOneOfTwoChecksIsShared) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top(\n"

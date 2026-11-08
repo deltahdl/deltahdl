@@ -34,12 +34,6 @@ inline void MakeDynArray(SimFixture& f, std::string_view name,
   for (auto v : vals) {
     q->elements.push_back(MakeLogic4VecVal(f.arena, 32, v));
   }
-  // A dynamic array's elements carry ids exactly as a queue's do, and the two
-  // lists are indexed together: Lowerer::LowerDynArrayInit and the `new[]` arm
-  // beside it both call AssignFreshIds, so a dynamic array a run built always
-  // has one id per element. Leaving them empty here built a shape no run
-  // produces, and a reference taken on an element of such an array was
-  // recorded against no identity at all.
   q->AssignFreshIds();
   ArrayInfo info;
   info.is_dynamic = true;
@@ -61,12 +55,6 @@ inline void RegAutoFunc(SimFixture& f, std::string_view name,
   f.ctx.RegisterFunction(name, func);
 }
 
-// Elaborates and runs `src`, then checks the elements the queue `name` was
-// left holding against `expected`, in order.
-//
-// A queue method is stated as real source and read back as the whole queue,
-// since what a method did shows in the ordering and length of what it left
-// behind as much as in any single element.
 inline void RunAndExpectQueue(const char* src, std::string_view name,
                               std::initializer_list<uint64_t> expected) {
   SimFixture f;

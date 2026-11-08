@@ -110,9 +110,6 @@ TEST(UdpPortGrammar, SimNonAnsiPortLevelInit) {
   EXPECT_EQ(state.GetOutput(), '0');
 }
 
-// udp_declaration_port_list: the optional { attribute_instance } prefix on
-// udp_output_declaration and udp_input_declaration is consumed by the ANSI
-// header parser; the surrounding port grammar must still parse normally.
 TEST(UdpPortGrammar, AttributesOnAnsiPortDeclarations) {
   auto r = Parse(
       "primitive dff((* keep *) output reg q = 1'b0,"
@@ -134,10 +131,6 @@ TEST(UdpPortGrammar, AttributesOnAnsiPortDeclarations) {
   EXPECT_EQ(udp->initial_value, '0');
 }
 
-// udp_port_declaration: each of udp_output_declaration, udp_reg_declaration and
-// udp_input_declaration carries an optional { attribute_instance } prefix in
-// the non-ANSI body. The prefixes must be consumed without disturbing the port
-// set.
 TEST(UdpPortGrammar, AttributesOnNonAnsiPortDeclarations) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -160,10 +153,6 @@ TEST(UdpPortGrammar, AttributesOnNonAnsiPortDeclarations) {
   EXPECT_TRUE(udp->is_sequential);
 }
 
-// udp_declaration_port_list with the first alternative of
-// udp_output_declaration
-// ({ attribute_instance } output port_identifier) — a combinational UDP whose
-// ANSI output port carries no reg keyword, so the primitive is not sequential.
 TEST(UdpPortGrammar, CombinationalOutputDeclAnsi) {
   auto r = Parse(
       "primitive and_udp(output q, input a, input b);\n"
@@ -185,9 +174,6 @@ TEST(UdpPortGrammar, CombinationalOutputDeclAnsi) {
   EXPECT_FALSE(udp->has_initial);
 }
 
-// udp_output_declaration second alternative with the optional [ =
-// constant_expression ] omitted: a sequential reg output that declares no
-// port-level initial value.
 TEST(UdpPortGrammar, OutputRegDeclWithoutInitializer) {
   auto r = Parse(
       "primitive dff(output reg q, input d, input clk);\n"
@@ -204,8 +190,6 @@ TEST(UdpPortGrammar, OutputRegDeclWithoutInitializer) {
   EXPECT_FALSE(udp->has_initial);
 }
 
-// udp_port_declaration requires each declaration to be terminated by a
-// semicolon; dropping it on a non-ANSI body declaration is rejected.
 TEST(UdpPortGrammar, NonAnsiPortDeclarationMissingSemicolon) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -216,8 +200,6 @@ TEST(UdpPortGrammar, NonAnsiPortDeclarationMissingSemicolon) {
       "    1 r : ? : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.2 owns the UDP port declarations, so Parser::ParseUdpPortDecls files
-  // the missing semicolon there rather than under A.5.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'table'", 4, "29.3.2"));
 }
 
@@ -250,11 +232,6 @@ TEST(UdpPortGrammar, SimStandaloneRegSequential) {
   EXPECT_EQ(state.GetOutput(), '1');
 }
 
-// udp_output_declaration's second alternative writes `output reg
-// port_identifier [ = constant_expression ]`: the value is an expression, not
-// one of A.5.3's init_val literals, so `~1'b0` is a negation of the literal
-// rather than the literal that ends its spelling. The parser keeps the
-// expression as written for the run to evaluate.
 TEST(UdpPortGrammar, AnsiOutputRegInitialValueIsKeptAsAnExpression) {
   auto r = Parse(
       "primitive dff(output reg q = ~1'b0, input d, input clk);\n"
@@ -292,10 +269,6 @@ TEST(UdpPortGrammar, NonAnsiOutputRegInitialValueIsKeptAsAnExpression) {
   ASSERT_EQ(udp->input_names.size(), 2u);
 }
 
-// A literal initial value is read as the one bit a 1-bit reg keeps of it, its
-// least significant bit, rather than as the last character of its spelling: `3`
-// ends in a character that is neither 0 nor 1, and `4'h3` likewise, yet both
-// stand for a value whose low bit is 1.
 TEST(UdpPortGrammar, LiteralInitialValueIsItsLeastSignificantBit) {
   auto r = Parse(
       "primitive p_dec(output reg q = 3, input d);\n"
@@ -331,11 +304,6 @@ TEST(UdpPortGrammar, LiteralInitialValueIsItsLeastSignificantBit) {
   EXPECT_EQ(r.cu->udps[3]->initial_value, '0');
 }
 
-// udp_output_declaration's first alternative is `output port_identifier` with
-// no initial value: the `[ = constant_expression ]` belongs to the `output reg`
-// alternative alone. An initial value on an output declared without reg is
-// reported at its `=`, and the declaration is otherwise taken as written so
-// the header's port count still agrees with the table below.
 TEST(UdpPortGrammar, AnsiOutputWithoutRegTakesNoInitialValue) {
   auto r = Parse(
       "primitive p(output q = 1'b0, input a, input b);\n"
@@ -373,13 +341,6 @@ TEST(UdpPortGrammar, NonAnsiOutputWithoutRegTakesNoInitialValue) {
   EXPECT_FALSE(r.cu->udps[0]->has_initial);
 }
 
-// Every identifier A.5.2 writes -- port_identifier in udp_port_list and the
-// two port declarations, variable_identifier in udp_reg_declaration -- is
-// A.9.3's `simple_identifier | escaped_identifier`. The parser looked for a
-// simple identifier at each, so a UDP whose ports carried escaped names was
-// reported as a missing identifier in either header form. §5.6.1 ends an
-// escaped identifier at white space, so each below is followed by a space
-// before the ',' or ';' after it.
 TEST(UdpPortGrammar, EscapedPortIdentifiers) {
   auto r = Parse(
       "primitive p1 (\\q+ , \\a.0 , b);\n"
@@ -406,11 +367,6 @@ TEST(UdpPortGrammar, EscapedPortIdentifiers) {
   EXPECT_EQ(r.cu->udps[1]->input_names[0], "i-");
 }
 
-// udp_reg_declaration ::= { attribute_instance } reg variable_identifier, and
-// udp_input_declaration ::= { attribute_instance } input
-// list_of_udp_port_identifiers: neither carries `= constant_expression`, which
-// A.5.2 writes on `output reg` alone. An initial value on either was reported
-// as a missing ';' or ')'.
 TEST(UdpPortGrammar, InitialValueOnRegOrInputDeclarationIsRejected) {
   auto r = Parse(
       "primitive p1 (q, a);\n"
@@ -436,11 +392,6 @@ TEST(UdpPortGrammar, InitialValueOnRegOrInputDeclarationIsRejected) {
   EXPECT_EQ(r.cu->udps[1]->input_names.size(), 1u);
 }
 
-// udp_port_list ::= output_port_identifier , input_port_identifier
-// { , input_port_identifier }: names alone, which a non-ANSI header and its
-// extern form both write. An attribute instance before the first name had been
-// read as if it opened a udp_declaration_port_list entry, and dropped once the
-// list proved to be names.
 TEST(UdpPortGrammar, AttributeBeforeAPortListOfNamesIsRejected) {
   auto r = Parse(
       "primitive p((* keep *) y, a);\n"
@@ -459,8 +410,6 @@ TEST(UdpPortGrammar, AttributeBeforeAPortListOfNamesIsRejected) {
   EXPECT_EQ(r.cu->udps[1]->input_names.size(), 1u);
 }
 
-// The declaration list keeps the attribute instances its entries open with, in
-// a definition and an extern declaration alike.
 TEST(UdpPortGrammar, AttributeBeforeADeclarationListIsKept) {
   auto r = Parse(
       "primitive p((* keep *) output y, input a);\n"

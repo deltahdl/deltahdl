@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.7: a name of an inline constraint block qualified by this binds to the
-// class of the object randomize() with is called on, and it is an error
-// where that class declares no member of the name.
 TEST(InlineConstraints, AThisNameTheClassLacksIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -29,9 +26,6 @@ TEST(InlineConstraints, AThisNameTheClassLacksIsReported) {
                             7, "18.7"));
 }
 
-// 18.7: a name qualified by super binds to the class the randomized object's
-// class extends, so super.x is an error where only the derived class D
-// declares x and its base B does not.
 TEST(InlineConstraints, ASuperNameTheBaseLacksIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -54,8 +48,6 @@ TEST(InlineConstraints, ASuperNameTheBaseLacksIsReported) {
                             10, "18.7"));
 }
 
-// 18.7: this.x, which the class declares, this.y, which it inherits, and
-// super.y, which its base declares, all resolve, and the block elaborates.
 TEST(InlineConstraints, ThisAndSuperNamesTheClassesDeclareElaborate) {
   EXPECT_TRUE(
       ElabOk("class B;\n"
@@ -73,10 +65,6 @@ TEST(InlineConstraints, ThisAndSuperNamesTheClassesDeclareElaborate) {
              "endmodule\n"));
 }
 
-// 18.7 with 8.26: an enumeration a class declares puts its literals in the
-// class's scope, so this.BUSY, a literal of D's state_e, resolves in D, and
-// so does super.HOT, a literal of the anonymous enumeration of B's property
-// t that D extends, and the block elaborates.
 TEST(InlineConstraints, ThisAndSuperEnumLiteralsElaborate) {
   EXPECT_TRUE(
       ElabOk("class B;\n"

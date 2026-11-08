@@ -6,18 +6,8 @@
 
 using namespace delta;
 
-// §21.2.1.5 Hierarchical name format. The %m format specifier takes no argument
-// and expands to the hierarchical name of the design element, subroutine, named
-// block, or labeled statement that invokes the system task carrying it. These
-// tests drive the full simulator ($display passes the run-time context into the
-// formatter in eval_format.cpp, which builds the name from the running
-// process's instance path and the active subroutine / named-block scopes) and
-// capture the displayed text end to end.
-
 namespace {
 
-// §21.2.1.5 (C2): invoked directly from a top-level module, %m reports that
-// module's name, the root of the design-element hierarchy.
 TEST(HierarchicalNameFormat, TopLevelModuleName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -31,10 +21,6 @@ TEST(HierarchicalNameFormat, TopLevelModuleName) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
 }
 
-// §21.2.1.5 (C1): %m accepts no argument. With a following %0d specifier and a
-// single expression supplied, %m expands to the scope name without consuming
-// the expression, leaving it for %0d. If %m had drawn an argument, the decimal
-// field would have nothing to print.
 TEST(HierarchicalNameFormat, PercentMConsumesNoArgument) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -52,9 +38,6 @@ TEST(HierarchicalNameFormat, PercentMConsumesNoArgument) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip=42\n");
 }
 
-// §21.2.1.5 (C2): named blocks are part of the hierarchy, each contributing a
-// level reported in lexical-nesting order from the outermost scope inward. The
-// nested case also covers the single-block append as its first level.
 TEST(HierarchicalNameFormat, NestedNamedBlocks) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -72,9 +55,6 @@ TEST(HierarchicalNameFormat, NestedNamedBlocks) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.outer.inner\n");
 }
 
-// §21.2.1.5 (C2): a subroutine is a hierarchy level too. When the task that
-// calls $display is itself invoked from the module, %m names the task within
-// the module.
 TEST(HierarchicalNameFormat, SubroutineScopeInHierarchy) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -91,10 +71,6 @@ TEST(HierarchicalNameFormat, SubroutineScopeInHierarchy) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.show\n");
 }
 
-// §21.2.1.5 (C2): for a system task running inside an instantiated submodule,
-// %m reports the full instance path -- the top module name followed by the
-// instance name, not the submodule's type name. This is the case the subclause
-// highlights: distinguishing among many instances of the same module.
 TEST(HierarchicalNameFormat, ChildInstancePathReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -111,9 +87,6 @@ TEST(HierarchicalNameFormat, ChildInstancePathReported) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.u1\n");
 }
 
-// §21.2.1.5 (C2): a function is a subroutine the same way a task is. When the
-// display call runs inside a function invoked as an expression operand, %m
-// names the function within the module.
 TEST(HierarchicalNameFormat, FunctionScopeInHierarchy) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,8 +105,6 @@ TEST(HierarchicalNameFormat, FunctionScopeInHierarchy) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.get\n");
 }
 
-// §21.2.1.5 (C2): a named block of a function is a level beneath the function,
-// so %m written in it names the block too.
 TEST(HierarchicalNameFormat, FunctionNamedBlockInHierarchy) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -152,8 +123,6 @@ TEST(HierarchicalNameFormat, FunctionNamedBlockInHierarchy) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.f.b\n");
 }
 
-// §21.2.1.5 (C2): a labeled statement is a hierarchy level of its own. A label
-// prefixed directly to the display call contributes that level to %m.
 TEST(HierarchicalNameFormat, LabeledStatementScope) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -167,9 +136,6 @@ TEST(HierarchicalNameFormat, LabeledStatementScope) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.lbl\n");
 }
 
-// §21.2.1.5 (C2): the labeled-statement scope covers system tasks invoked
-// anywhere under the labeled statement, not just a label directly on the call.
-// A labeled loop whose body runs $display reports the label as a level.
 TEST(HierarchicalNameFormat, LabeledLoopEnclosesCall) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -185,9 +151,6 @@ TEST(HierarchicalNameFormat, LabeledLoopEnclosesCall) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.lp\n");
 }
 
-// §21.2.1.5 (C1+C2): the uppercase %M alternative of Table 21-1 expands the
-// same way, and the specifier works in the write task family too ($write emits
-// no trailing newline, so the format string supplies one).
 TEST(HierarchicalNameFormat, UppercaseFormInWriteTask) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -201,10 +164,6 @@ TEST(HierarchicalNameFormat, UppercaseFormInWriteTask) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
 }
 
-// §21.2.1.5 (C1+C2): %m substitutes the scope name regardless of the invoking
-// task's default radix. In $displayb, an argument-less expression would print
-// in binary, but %m is a name substitution, not a value, so the text is
-// unchanged from the $display form.
 TEST(HierarchicalNameFormat, BinaryRadixTaskPositionUnaffected) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -218,9 +177,6 @@ TEST(HierarchicalNameFormat, BinaryRadixTaskPositionUnaffected) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
 }
 
-// §21.2.1.5 (C2): the strobed family of the display group carries the same
-// format machinery, so %m in $strobe names the invoking scope when the strobed
-// output matures at the end of the time step.
 TEST(HierarchicalNameFormat, StrobedTaskPosition) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -234,12 +190,6 @@ TEST(HierarchicalNameFormat, StrobedTaskPosition) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip\n");
 }
 
-// §21.2.1.5 (C2) edge: the instance path and an inner subroutine scope compose
-// into one name. A task that runs $display inside an instantiated submodule
-// contributes both the instance level and the subroutine level, joined in
-// order: top module, instance, task. This is the only case that exercises a
-// non-empty instance prefix and an active scope together, observing the
-// separator between the two contributions.
 TEST(HierarchicalNameFormat, SubroutineWithinInstanceComposesPath) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -259,12 +209,6 @@ TEST(HierarchicalNameFormat, SubroutineWithinInstanceComposesPath) {
   EXPECT_EQ(testing::internal::GetCapturedStdout(), "chip.u1.show\n");
 }
 
-// §21.2.1.5 with §27.4 (printed page 820): an instance a loop generate
-// creates in each iteration is named through the block instance, `g[0].pi`,
-// and so is one in a conditional block, `c.mc`, and every instance below
-// either -- a module's own loop block, `h[1].l2`, inside one reached through
-// `g[0].c`. %m printed the flat key the instance's storage is filed under,
-// `top.g_0_pi` and `top.c_mc`.
 TEST(HierarchicalNameFormat, InstanceInAGenerateBlockIsNamedThroughIt) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p(input var int v);\n"
@@ -300,8 +244,6 @@ TEST(HierarchicalNameFormat, InstanceInAGenerateBlockIsNamedThroughIt) {
             "top.g[0].c.m.l\ntop.g[0].c.m.h[0].l2\ntop.g[0].c.m.h[1].l2\n");
 }
 
-// §21.2.1.5 with §23.3.3.5: each element of an array of instances is named by
-// its index, `u[0]` and `u[1]`. %m printed the array's name, `top.u`, for both.
 TEST(HierarchicalNameFormat, ElementOfAnArrayOfInstancesIsNamedByItsIndex) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf; initial $display(\"%m\"); endmodule\n"
@@ -312,10 +254,6 @@ TEST(HierarchicalNameFormat, ElementOfAnArrayOfInstancesIsNamedByItsIndex) {
             "top.u[0]\ntop.u[1]\n");
 }
 
-// §21.2.1.5: a static variable's initializer is written in the instance that
-// declares the variable, so %m there names that instance, `top.u1.u2`, though
-// the initializer is evaluated before any process runs. With no process %m
-// fell back to the first top module's name, `top`.
 TEST(HierarchicalNameFormat, StaticInitializerNamesItsInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf;\n"

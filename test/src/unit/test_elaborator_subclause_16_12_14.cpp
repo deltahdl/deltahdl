@@ -10,8 +10,6 @@ using namespace delta;
 namespace {
 
 TEST(AbortProperty, RecognizesEveryAbortOperator) {
-  // §16.12.14: a property is an abort property when it has one of the forms
-  // accept_on, reject_on, sync_accept_on, or sync_reject_on.
   AbortOperator op{};
   EXPECT_TRUE(ClassifyAbortOperator("accept_on", op));
   EXPECT_EQ(op, AbortOperator::kAcceptOn);
@@ -30,8 +28,6 @@ TEST(AbortProperty, RejectsNonAbortKeywords) {
 }
 
 TEST(AbortProperty, SyncFormsAreSynchronousAbortProperties) {
-  // §16.12.14: accept_on and reject_on are the asynchronous abort properties;
-  // sync_accept_on and sync_reject_on are the synchronous abort properties.
   EXPECT_FALSE(IsSynchronousAbort(AbortOperator::kAcceptOn));
   EXPECT_FALSE(IsSynchronousAbort(AbortOperator::kRejectOn));
   EXPECT_TRUE(IsSynchronousAbort(AbortOperator::kSyncAcceptOn));
@@ -39,8 +35,6 @@ TEST(AbortProperty, SyncFormsAreSynchronousAbortProperties) {
 }
 
 TEST(AbortProperty, AcceptFormsForceTrueAndRejectFormsForceFalse) {
-  // §16.12.14: when the abort condition becomes true the accept forms make the
-  // overall evaluation true and the reject forms make it false.
   EXPECT_TRUE(AbortConditionForcesTrue(AbortOperator::kAcceptOn));
   EXPECT_TRUE(AbortConditionForcesTrue(AbortOperator::kSyncAcceptOn));
   EXPECT_FALSE(AbortConditionForcesTrue(AbortOperator::kRejectOn));
@@ -48,38 +42,21 @@ TEST(AbortProperty, AcceptFormsForceTrueAndRejectFormsForceFalse) {
 }
 
 TEST(AbortProperty, NestingOfAbortOperatorsIsAllowed) {
-  // §16.12.14: any nesting of accept_on, reject_on, sync_accept_on, and
-  // sync_reject_on is allowed.
   EXPECT_TRUE(AbortOperatorsMayNest());
 }
 
 TEST(AbortProperty, AbortConditionForbidsLocalVariablesTriggeredAndMatched) {
-  // §16.12.14: abort conditions shall not contain any reference to local
-  // variables nor to the sequence methods triggered and matched.
   EXPECT_FALSE(AbortConditionAllowsLocalVariableReference());
   EXPECT_FALSE(AbortConditionAllowsTriggeredMethod());
   EXPECT_FALSE(AbortConditionAllowsMatchedMethod());
 
-  EXPECT_TRUE(AbortConditionContentIsLegal(
-      /*references_local_variable=*/false,
-      /*references_triggered_method=*/false,
-      /*references_matched_method=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(
-      /*references_local_variable=*/true, /*references_triggered_method=*/false,
-      /*references_matched_method=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(
-      /*references_local_variable=*/false, /*references_triggered_method=*/true,
-      /*references_matched_method=*/false));
-  EXPECT_FALSE(AbortConditionContentIsLegal(
-      /*references_local_variable=*/false,
-      /*references_triggered_method=*/false,
-      /*references_matched_method=*/true));
+  EXPECT_TRUE(AbortConditionContentIsLegal(false, false, false));
+  EXPECT_FALSE(AbortConditionContentIsLegal(true, false, false));
+  EXPECT_FALSE(AbortConditionContentIsLegal(false, true, false));
+  EXPECT_FALSE(AbortConditionContentIsLegal(false, false, true));
 }
 
 TEST(AbortProperty, NonSampledSampledValueFunctionsRequireExplicitClock) {
-  // §16.12.14: the abort condition may contain sampled value functions (see
-  // §16.9.3); when a function other than $sampled is used the clock argument
-  // shall be explicitly specified.
   EXPECT_FALSE(AbortConditionSampledValueRequiresExplicitClock(
       SampledValueFunction::kSampled));
   EXPECT_TRUE(AbortConditionSampledValueRequiresExplicitClock(
@@ -87,23 +64,17 @@ TEST(AbortProperty, NonSampledSampledValueFunctionsRequireExplicitClock) {
   EXPECT_TRUE(AbortConditionSampledValueRequiresExplicitClock(
       SampledValueFunction::kPast));
 
-  // $sampled is well formed with or without an explicit clock argument.
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kSampled, /*clock_explicitly_specified=*/false));
+      SampledValueFunction::kSampled, false));
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kSampled, /*clock_explicitly_specified=*/true));
-  // Any other sampled value function needs the explicit clock argument.
+      SampledValueFunction::kSampled, true));
   EXPECT_FALSE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kChanged, /*clock_explicitly_specified=*/false));
+      SampledValueFunction::kChanged, false));
   EXPECT_TRUE(AbortConditionSampledValueClockIsWellFormed(
-      SampledValueFunction::kChanged, /*clock_explicitly_specified=*/true));
+      SampledValueFunction::kChanged, true));
 }
 
 TEST(AbortProperty, SampledValueFunctionsArePermittedInAbortConditions) {
-  // §16.12.14: the abort condition may contain sampled value functions (see
-  // §16.9.3). None of them is categorically forbidden — each is well formed
-  // once its clock-argument requirement is satisfied (only $sampled may omit
-  // it).
   for (SampledValueFunction fn :
        {SampledValueFunction::kSampled, SampledValueFunction::kRose,
         SampledValueFunction::kFell, SampledValueFunction::kStable,
@@ -116,8 +87,6 @@ TEST(AbortProperty, SampledValueFunctionsArePermittedInAbortConditions) {
 }
 
 TEST(AbortProperty, ClassificationRejectsCaseVariantsAndEmptyKeyword) {
-  // §16.12.14 (error/edge): the abort operators are spelled exactly; an empty
-  // string, a case variant, or surrounding whitespace is not an abort operator.
   AbortOperator op{};
   EXPECT_FALSE(ClassifyAbortOperator("", op));
   EXPECT_FALSE(IsAbortOperator("Accept_On"));
@@ -127,17 +96,9 @@ TEST(AbortProperty, ClassificationRejectsCaseVariantsAndEmptyKeyword) {
 }
 
 TEST(AbortProperty, AbortConditionRejectsAllForbiddenReferencesAtOnce) {
-  // §16.12.14 (error/edge): an abort condition that references a local variable
-  // and both the triggered and matched methods together is illegal — any one
-  // forbidden reference is enough, so their combination is too.
-  EXPECT_FALSE(AbortConditionContentIsLegal(
-      /*references_local_variable=*/true, /*references_triggered_method=*/true,
-      /*references_matched_method=*/true));
+  EXPECT_FALSE(AbortConditionContentIsLegal(true, true, true));
 }
 
-// §16.12.14: an abort condition references no local variable and neither
-// sequence method: the condition v == 1 reads the local v of p, and
-// s.triggered a sequence method; c reads neither.
 TEST(AbortConditionRules, ALocalOrSequenceMethodIsReported) {
   const char* const kReport =
       "an abort condition may not reference a local variable or the sequence "
@@ -162,8 +123,6 @@ TEST(AbortConditionRules, ALocalOrSequenceMethodIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.12.14"));
 }
 
-// §16.12.14: a sampled value function other than $sampled in an abort
-// condition gives its clocking event explicitly.
 TEST(AbortConditionRules, AnUnclockedSampledValueCallIsReported) {
   const char* const kReport =
       "$rose in an abort condition shall have its clocking event specified "

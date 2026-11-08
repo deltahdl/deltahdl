@@ -19,15 +19,12 @@ namespace delta {
 
 namespace {
 
-// §37.11: the kind of instance array whose elements are instances of `type`,
-// 0 for a kind no instance array is drawn for.
 int ArrayKindOf(int type) {
   if (type == kVpiModule) return vpiModuleArray;
   if (type == vpiInterface) return vpiInterfaceArray;
   return type == vpiProgram ? vpiProgramArray : 0;
 }
 
-// §37.11 detail 2: a range of `array`, sized and bounded as `range` is.
 void AddArrayRange(VpiObject* array, const PackedRange& range,
                    const VpiAttachBuild& build) {
   VpiObject* dim = build.alloc();
@@ -39,8 +36,6 @@ void AddArrayRange(VpiObject* array, const PackedRange& range,
   array->children.push_back(dim);
 }
 
-// Where the elements of an instance array stand: the scope's instance path
-// and the run their connections are read in.
 struct ArraySite {
   const VpiObjectMap& objects;
   const std::string& prefix;
@@ -48,12 +43,6 @@ struct ArraySite {
   const VpiAttachBuild& build;
 };
 
-// §37.11: the instance array `element` belongs to, held by the scope the
-// element stands in and made there the first time it is asked for: named
-// after the array, of the kind its elements make it, sized by its leftmost
-// range, reaching every range leftmost first (detail 2) and that range's
-// bounds, and, through vpiExpr, a vpiListOp operation whose operands are the
-// connections the instantiation wrote to it (detail 1).
 VpiObject* ArrayOf(VpiObject* element, const InstArrayElement& array,
                    const ArraySite& site) {
   VpiObject* holder = element->parent;
@@ -111,11 +100,6 @@ void VpiAddArrayElement(VpiObject* array, VpiObject* element, int64_t index,
 void AttachInstanceArrays(const RtlirDesign* design,
                           const VpiObjectMap& objects, SimContext& ctx,
                           const VpiAttachBuild& build) {
-  // §37.11 with §37.5 detail 2 and §37.6 detail 1: an instance array of
-  // modules, interfaces or programs is an object of its own, reaching its
-  // elements by their indices, and each element reaches its index. The
-  // elaborator expands the array into its elements, which keep their place
-  // in the scope around them; nothing made the array or gave them an index.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule* mod, const std::string& prefix, VpiObject*) {

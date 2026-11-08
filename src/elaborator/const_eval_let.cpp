@@ -1,11 +1,3 @@
-// §11.12 with A.8.4 (printed pages 1210-1211 of IEEE 1800-2023): a let call
-// standing in a constant expression is a constant_let_expression, one of the
-// constant primaries. A.10 footnote 50 (printed page 1218) has its arguments
-// and its body be constant expressions, the body's formals counted as
-// constant primaries, and its value is the body's with each formal standing
-// for its argument. The lets are the ones the module a live
-// ParamRangeRegistryGuard installed declares.
-
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
@@ -23,13 +15,8 @@ namespace delta {
 
 namespace {
 
-// How many of the registered module's lets a call may name: every one, except
-// while a let's body is read, which §11.12 lets name only the lets declared
-// before it, so that no body reaches the let it belongs to.
 std::size_t g_visible_lets = std::numeric_limits<std::size_t>::max();
 
-// Holds g_visible_lets at the lets declared before the one whose body is read,
-// for as long as it is read.
 class LetBodyScope {
  public:
   explicit LetBodyScope(std::size_t index) : saved_(g_visible_lets) {
@@ -43,9 +30,6 @@ class LetBodyScope {
   std::size_t saved_;
 };
 
-// The position among the registered module's lets of the one `call` names,
-// among those a call may name; none where it names none. A call written
-// through a scope or as a method names no let, its callee being empty.
 std::optional<std::size_t> RegisteredLetIndex(const Expr* call) {
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return std::nullopt;
@@ -56,9 +40,6 @@ std::optional<std::size_t> RegisteredLetIndex(const Expr* call) {
   return std::nullopt;
 }
 
-// The expression the formal `k` of `let` takes in `call`: the argument in its
-// position or, past the positional ones, the argument written by its name, and
-// its default where the argument is left out; null where it has neither.
 const Expr* LetActual(const Expr* call, const ModuleItem* let, std::size_t k) {
   const std::size_t kPositional = call->args.size() - call->arg_names.size();
   const Expr* actual = nullptr;

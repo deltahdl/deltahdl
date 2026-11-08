@@ -1,11 +1,3 @@
-// Tests for IEEE 1800-2023 clause 7.9.1 -- the num() and size() associative
-// array methods. Both return the number of entries currently in the array,
-// and both return 0 when the array is empty. Because that count is produced by
-// element allocation on write (clause 7.8, this pass's dependency), every test
-// builds the array from real declaration + indexed-assignment source and drives
-// it through parse -> elaborate -> lower -> run, observing the value the method
-// hands back rather than hand-building the array object.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -16,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause 7.9.1 worked example: an int-keyed array populated with three
-// distinct keys reports num() == 3.
 TEST(AssocArrayNumSizeMethods, NumReturnsEntryCount_IntKeyed) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -34,7 +24,6 @@ TEST(AssocArrayNumSizeMethods, NumReturnsEntryCount_IntKeyed) {
   EXPECT_EQ(v, 3u);
 }
 
-// size() is an alias for num(): same array, same count.
 TEST(AssocArrayNumSizeMethods, SizeReturnsEntryCount_IntKeyed) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -51,8 +40,6 @@ TEST(AssocArrayNumSizeMethods, SizeReturnsEntryCount_IntKeyed) {
   EXPECT_EQ(v, 3u);
 }
 
-// The clause 7.9.1 example writes `imem.num` with no parentheses; the method
-// call is also valid as a property reference.
 TEST(AssocArrayNumSizeMethods, NumPropertyFormNoParens) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -84,8 +71,6 @@ TEST(AssocArrayNumSizeMethods, SizePropertyFormNoParens) {
   EXPECT_EQ(v, 2u);
 }
 
-// The count is over entries regardless of the index (key) data type: a
-// string-keyed array reports its live entry count just the same.
 TEST(AssocArrayNumSizeMethods, NumReturnsEntryCount_StringKeyed) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -117,9 +102,6 @@ TEST(AssocArrayNumSizeMethods, SizeReturnsEntryCount_StringKeyed) {
   EXPECT_EQ(v, 3u);
 }
 
-// Empty array: both methods return 0. This is the rule's boundary case and the
-// closest thing to a "reject" -- nothing has been allocated, so the count is 0
-// rather than any nonzero value.
 TEST(AssocArrayNumSizeMethods, NumReturnsZeroForEmptyIntKeyed) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -142,8 +124,6 @@ TEST(AssocArrayNumSizeMethods, SizeReturnsZeroForEmptyStringKeyed) {
   EXPECT_EQ(v, 0u);
 }
 
-// "Number of entries" counts distinct keys: overwriting an existing key is a
-// write to the same entry (clause 7.8), so the count does not grow.
 TEST(AssocArrayNumSizeMethods, CountIsDistinctKeysNotWrites) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -160,7 +140,6 @@ TEST(AssocArrayNumSizeMethods, CountIsDistinctKeysNotWrites) {
   EXPECT_EQ(v, 1u);
 }
 
-// num() and size() are aliases: on the same populated array they agree.
 TEST(AssocArrayNumSizeMethods, NumEqualsSize) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -178,13 +157,6 @@ TEST(AssocArrayNumSizeMethods, NumEqualsSize) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.9.1 counts the entries of the array whatever names it, and §8.5 puts no
-// restriction on a class property's type, so a property declared with an
-// associative dimension is an associative array of the object. This is
-// uvm_report_server::reset_severity_counts: a method of the class writes one
-// entry per member of the enumeration keying the array, and size() counts the
-// four. An element write to the property went nowhere before -- no writer
-// knew the property as an array -- so the count read 0.
 TEST(AssocArrayNumSizeMethods, SizeCountsTheEnumKeyedEntriesAClassMethodWrote) {
   uint64_t v = RunAndGet(
       "package p;\n"
@@ -219,9 +191,6 @@ TEST(AssocArrayNumSizeMethods, SizeCountsTheEnumKeyedEntriesAClassMethodWrote) {
   EXPECT_EQ(v, 4u);
 }
 
-// An int-keyed property written by a method counts its distinct keys, as
-// §7.9.1's own example does for a declared array: five keys, one of them
-// written twice, make five entries.
 TEST(AssocArrayNumSizeMethods, NumCountsTheIntKeyedEntriesAClassMethodWrote) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -250,9 +219,6 @@ TEST(AssocArrayNumSizeMethods, NumCountsTheIntKeyedEntriesAClassMethodWrote) {
   EXPECT_EQ(v, 5u);
 }
 
-// §8.5: the property is reached through the instance too, so size() called
-// on `c.imem` from the module counts what the method wrote, and an element
-// written through the handle joins the count.
 TEST(AssocArrayNumSizeMethods, SizeThroughAHandleCountsEntriesOfTheProperty) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -276,8 +242,6 @@ TEST(AssocArrayNumSizeMethods, SizeThroughAHandleCountsEntriesOfTheProperty) {
   EXPECT_EQ(v, 23u);
 }
 
-// §7.9.1's parenthesis-free `imem.num` reads the property's count inside a
-// method as it reads a declared array's.
 TEST(AssocArrayNumSizeMethods, NumPropertyFormCountsAClassPropertysEntries) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -300,8 +264,6 @@ TEST(AssocArrayNumSizeMethods, NumPropertyFormCountsAClassPropertysEntries) {
   EXPECT_EQ(v, 3u);
 }
 
-// §7.9.1 with §7.9.2: delete(index) on the property removes the one entry, so
-// three written and one deleted count two.
 TEST(AssocArrayNumSizeMethods, SizeCountsAClassPropertysEntriesAfterADelete) {
   uint64_t v = RunAndGet(
       "class C;\n"
@@ -325,9 +287,6 @@ TEST(AssocArrayNumSizeMethods, SizeCountsAClassPropertysEntriesAfterADelete) {
   EXPECT_EQ(v, 2u);
 }
 
-// §8.9: a static property declared with an associative dimension is one array
-// shared by every instance, so the keys two objects write are counted
-// together from either.
 TEST(AssocArrayNumSizeMethods,
      SizeCountsAStaticClassPropertysEntriesFromAnyInstance) {
   uint64_t v = RunAndGet(

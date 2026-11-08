@@ -8,14 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §16.16.1: the clause's a2, @(clk1) a and @(clk1) b, and a4, a and
-// @(posedge clk1) c in an always at posedge clk1, are legal, each of their
-// leading clocks identical, and run: with clk1 toggling every 5, b 1 from
-// 12 to 22 and c from 22 to 32, a2 passes at the changes of clk1 where b
-// is 1, 15 and 20, and a4 at the posedge where c is 1, 25; c1, a sequence
-// clocked by posedge clk1 that switches to negedge clk1 after its first
-// tick, has that one leading clock and is covered at 30, the negedge after
-// 25, and attempts at 5, 15, 25 and 35.
 TEST(SemanticLeadingClockRun, IdenticalLeadingClocksRunAsOne) {
   SimFixture f;
   std::string out = RunCapture(

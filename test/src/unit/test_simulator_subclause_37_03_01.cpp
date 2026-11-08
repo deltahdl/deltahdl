@@ -13,17 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.3.1 (Accessing object relationships and properties) states the access
-// conventions every VPI program relies on. It introduces no BNF; its normative
-// content is a set of cross-cutting type and representation contracts plus the
-// two traversal mechanisms, all of which the existing simulator C-ABI already
-// applies (the routines themselves being described in Clause 38). These tests
-// observe the production routines vpi_get(), vpi_get_str(), vpi_handle(), and
-// vpi_iterate()/vpi_scan() honoring those conventions.
-//
-// Each test drives a private VpiContext through the public C entry points by
-// installing it as the global context, exactly as a PLI program would reach the
-// routines.
 class VpiObjectAccess : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -32,10 +21,6 @@ class VpiObjectAccess : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim: integer and Boolean properties shall be derived with the vpi_get
-// family, and they shall be of type PLI_INT32. vpi_get() carries that contract:
-// its result type is the 32-bit integer alias, and it returns the stored
-// integer value of an integer-valued property.
 TEST_F(VpiObjectAccess, GetDerivesIntegerPropertiesAsPliInt32) {
   static_assert(std::is_same_v<decltype(vpi_get(0, nullptr)), int>,
                 "vpi_get must return the integer property type");
@@ -49,11 +34,6 @@ TEST_F(VpiObjectAccess, GetDerivesIntegerPropertiesAsPliInt32) {
   EXPECT_EQ(vpi_get(vpiSize, VpiHandleOf(&net)), 8);
 }
 
-// Claim: the routine vpi_get64() returns 64-bit integer properties as type
-// PLI_INT64. The full-width path preserves the whole 64-bit value, whereas
-// vpi_get() must narrow the same property to its PLI_INT32 result - so a
-// property value that does not fit in 32 bits survives only through
-// vpi_get64().
 TEST_F(VpiObjectAccess, Get64DerivesSixtyFourBitPropertiesAsPliInt64) {
   static_assert(std::is_same_v<decltype(vpi_get64(0, nullptr)), PLI_INT64>,
                 "vpi_get64 must return the 64-bit property type");
@@ -62,20 +42,13 @@ TEST_F(VpiObjectAccess, Get64DerivesSixtyFourBitPropertiesAsPliInt64) {
 
   VpiObject obj;
   obj.type = vpiClassObj;
-  // A class object's identifier is a genuinely 64-bit value; give it one whose
-  // low half is 7 but whose high half is set, so it cannot fit in 32 bits.
   obj.obj_id = (std::int64_t{1} << 32) | 7;
 
-  // The full 64-bit width survives vpi_get64()...
   EXPECT_EQ(vpi_get64(vpiObjId, VpiHandleOf(&obj)),
             (std::int64_t{1} << 32) | 7);
-  // ...while vpi_get() narrows the very same property to its 32-bit result.
   EXPECT_EQ(vpi_get(vpiObjId, VpiHandleOf(&obj)), 7);
 }
 
-// Claim: string properties shall be accessed with vpi_get_str() and shall be of
-// type PLI_BYTE8 *. The example retrieves the full hierarchical name, so the
-// result points at that name string.
 TEST_F(VpiObjectAccess, GetStrAccessesStringPropertiesAsPliByte8) {
   static_assert(std::is_same_v<PLI_BYTE8, char>,
                 "string properties are PLI_BYTE8 *");
@@ -90,9 +63,6 @@ TEST_F(VpiObjectAccess, GetStrAccessesStringPropertiesAsPliByte8) {
   EXPECT_EQ(std::string(full_name), "top.m1");
 }
 
-// Claim: one-to-one relationships are traversed with vpi_handle(), which
-// returns a handle to the related object - the example walks from a net to the
-// module that contains it. The result is itself a vpiHandle.
 TEST_F(VpiObjectAccess, HandleTraversesOneToOneRelationship) {
   static_assert(std::is_same_v<decltype(vpi_handle(0, nullptr)), vpiHandle>,
                 "vpi_handle returns a vpiHandle");
@@ -108,10 +78,6 @@ TEST_F(VpiObjectAccess, HandleTraversesOneToOneRelationship) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiModule, VpiHandleOf(&net))), &mod);
 }
 
-// Claim: one-to-many relationships are traversed with an iteration mechanism -
-// vpi_iterate() creates an object of type vpiIterator, which vpi_scan() then
-// walks one related object at a time. Here the nets contained in a module are
-// enumerated.
 TEST_F(VpiObjectAccess, IterateAndScanTraverseOneToManyRelationship) {
   VpiObject mod;
   mod.type = vpiModule;
@@ -127,50 +93,34 @@ TEST_F(VpiObjectAccess, IterateAndScanTraverseOneToManyRelationship) {
 
   vpiHandle iter = vpi_iterate(vpiNet, VpiHandleOf(&mod));
   ASSERT_NE(iter, nullptr);
-  // The created object's own type is vpiIterator (the requested type only
-  // selects which related objects it walks).
   EXPECT_EQ(vpi_get(vpiType, iter), vpiIterator);
 
   EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &w1);
   EXPECT_EQ(VpiObjectOf(vpi_scan(iter)), &w2);
-  // Exhausting the iteration reports null and retires the iterator handle.
   EXPECT_EQ(vpi_scan(iter), nullptr);
 }
 
-// Claim: for a Boolean property, a value of 1 shall represent TRUE and a value
-// of 0 shall represent FALSE. The 1/0 representation is general, not tied to
-// one property: it holds for a property derived by computation (vpiExpanded,
-// reported as the negation of the vectored flag) and for one read straight from
-// a stored flag (vpiExplicitScalared) - in every case vpi_get() yields only 1
-// or 0, never the raw stored object state.
 TEST_F(VpiObjectAccess, GetEncodesEveryBooleanPropertyAsOneOrZero) {
   VpiObject vectored_net;
   vectored_net.type = vpiNet;
   vectored_net.is_vectored = true;
-  // A derived Boolean: a vectored net is reported unexpanded (FALSE -> 0).
   EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&vectored_net)), 0);
 
   VpiObject plain_net;
   plain_net.type = vpiNet;
-  // The same derived Boolean is TRUE -> 1 for a net with no vector keyword.
   EXPECT_EQ(vpi_get(vpiExpanded, VpiHandleOf(&plain_net)), 1);
 
   VpiObject scalared_net;
   scalared_net.type = vpiNet;
   scalared_net.is_scalared = true;
-  // A stored Boolean: TRUE -> 1, FALSE -> 0.
   EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&scalared_net)), 1);
   EXPECT_EQ(vpi_get(vpiExplicitScalared, VpiHandleOf(&plain_net)), 0);
 }
 
-// Edge of the string-property rule: vpi_get_str() accesses string properties
-// other than the full name (here the simple name), and when an object carries
-// no distinct full hierarchical name the full-name query falls back to that
-// simple name. Both still hand back a PLI_BYTE8 * string.
 TEST_F(VpiObjectAccess, GetStrAccessesNamePropertyAndFullNameFallback) {
   VpiObject net;
   net.type = vpiNet;
-  net.name = "w1";  // no separate full_name stored
+  net.name = "w1";
 
   const char* name = vpi_get_str(vpiName, VpiHandleOf(&net));
   ASSERT_NE(name, nullptr);
@@ -181,9 +131,6 @@ TEST_F(VpiObjectAccess, GetStrAccessesNamePropertyAndFullNameFallback) {
   EXPECT_EQ(std::string(full_name), "w1");
 }
 
-// Edge of the one-to-one traversal rule: when the reference object has no such
-// relationship, vpi_handle() produces no handle. A net with no containing
-// module and no children yields a null handle for the vpiModule relation.
 TEST_F(VpiObjectAccess, HandleReturnsNoHandleForAbsentRelationship) {
   VpiObject net;
   net.type = vpiNet;

@@ -11,26 +11,6 @@
 namespace delta {
 namespace {
 
-// §37.3 -- VPI object classifications. Data model diagrams classify the VPI
-// objects: they draw the objects of a SystemVerilog design that the VPI
-// routines must give access to, with the relationships among them and each
-// one's properties.
-//
-// The clause reads one for the reader: Figure 37-1, simplified, has one module
-// reach many nets and each net reach one module, and gives a net the
-// properties vpiName, vpiVector and vpiSize, a string, a Boolean and an integer
-// in that order.
-//
-// That is two relations and three properties, stated of a design rather than of
-// a diagram, and the cases below ask a design for all five. What makes them
-// §37.3's rather than §37.16's is that the clause is what says a diagram is a
-// claim about the design objects the VPI routines must give access to: a
-// relation drawn and not reachable, or a property named and not answered, is
-// the diagram failing to classify anything.
-
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it, and §38.11 has vpi_get_str hand back one
-// buffer every call reuses, so a name is copied as it is read.
 int g_nets_from_module = 0;
 int g_nets_reaching_back = 0;
 std::string g_bus_name;
@@ -46,19 +26,15 @@ PLI_INT32 WalkModuleNetsCalltf(PLI_BYTE8*) {
   g_module_scalar = vpi_get(vpiScalar, mod);
   g_module_vector = vpi_get(vpiVector, mod);
 
-  // The one-to-many relation, which §38.23 walks with an iterator.
   vpiHandle nets = vpi_iterate(vpiNet, mod);
   if (nets == nullptr) return 0;
   for (vpiHandle net = vpi_scan(nets); net != nullptr; net = vpi_scan(nets)) {
     ++g_nets_from_module;
 
-    // The one-to-one relation back, which §38.18 takes with a handle. It is the
-    // module the walk started from and not merely a module.
     if (vpi_compare_objects(vpi_handle(vpiModule, net), mod) == 1) {
       ++g_nets_reaching_back;
     }
 
-    // The three properties, read off whichever net this is.
     const char* name = vpi_get_str(vpiName, net);
     int size = vpi_get(vpiSize, net);
     int vector = vpi_get(vpiVector, net);
@@ -90,9 +66,6 @@ void RegisterFigureProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// Figure 37-1's design: a module holding nets, instantiated so the application
-// has a module object to start from. One net is a vector and one is not, which
-// is what makes the Boolean property say something.
 void RunModuleWithTwoNets(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -122,11 +95,7 @@ TEST_F(VpiObjectClassifications, BothRelationsOfTheFigureAreTraversable) {
   SimFixture f;
   RunModuleWithTwoNets(f);
 
-  // The one-to-many: both nets the module declares.
   EXPECT_EQ(g_nets_from_module, 2);
-  // The one-to-one, from each of them: the module they came from, compared as
-  // §37.2.3 requires rather than by a C pointer equality the clause says
-  // cannot settle it.
   EXPECT_EQ(g_nets_reaching_back, 2);
 }
 
@@ -136,22 +105,12 @@ TEST_F(VpiObjectClassifications, TheThreePropertiesOfANetAreAnswered) {
   SimFixture f;
   RunModuleWithTwoNets(f);
 
-  // vpiName, a string: the name the source declared.
   EXPECT_EQ(g_bus_name, "bus");
-  // vpiSize, an integer: the eight bits it was declared with.
   EXPECT_EQ(g_bus_size, 8);
-  // vpiVector, a Boolean: true of the vector net and false of the scalar one,
-  // which is the whole of what a Boolean property is worth. A net answered 0
-  // to this whatever it was declared as before now, the property applying to a
-  // port and to nothing else.
   EXPECT_EQ(g_bus_vector, 1);
   EXPECT_EQ(g_scalar_vector, 0);
 }
 
-// The figure names vpiVector on the net and not on the module, and §37.10
-// gives a module neither vpiScalar nor vpiVector, so the module both relations
-// start from answers FALSE to each Boolean rather than a value read off some
-// width it does not have.
 TEST_F(VpiObjectClassifications, TheModuleIsNeitherScalarNorVector) {
   RegisterFigureProbe();
 

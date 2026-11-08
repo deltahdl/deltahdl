@@ -26,10 +26,6 @@ TEST(ConstEval, BitsExpr) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(16'h0)", f)), 16);
 }
 
-// §20.6.2 (NC5): $bits on a fixed-size built-in data type folds to an
-// elaboration-time constant. A bare type keyword contributes its atom width and
-// a ranged vector its full packed width — resolved purely by const evaluation,
-// with nothing run. This is the data_type argument form of the BNF.
 TEST(ConstEval, BitsOfBuiltinDataTypeFolds) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(int)", f)), 32);
@@ -38,27 +34,17 @@ TEST(ConstEval, BitsOfBuiltinDataTypeFolds) {
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(logic [31:0])", f)), 32);
 }
 
-// §20.6.2: the result is fixed by the inner expression's declared width
-// alone; the value content is never actually evaluated. A literal whose
-// digits are entirely x is uninterpretable as a number, yet $bits still
-// returns its declared 12-bit width at elaboration time.
 TEST(ConstEval, BitsLiteralIsResolvedWithoutEvaluatingValue) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits(12'bxxxxxxxxxxxx)", f)), 12);
 }
 
-// §5.7.1 (printed page 78) with §20.6.2: an unbased unsized literal is one
-// bit wide in a self-determined context, and $bits's argument is one, so
-// `$bits('1)` and `$bits('x)` fold to 1. The fold had no width for the
-// literal and declined.
 TEST(ConstEval, BitsOfUnbasedUnsizedLiteralIsOne) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits('1)", f)), 1);
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("$bits('x)", f)), 1);
 }
 
-// §20.6.2: applying $bits directly to a dynamically sized type identifier
-// (queue typedef here) has no defined extent and shall be an error.
 TEST(BitsCallRestrictions, BitsOnQueueTypedefIsError) {
   ElabFixture f;
   Elaborate(
@@ -74,9 +60,6 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefIsError) {
       "20.6.2"));
 }
 
-// §20.6.2: the same restriction covers a dynamically sized type spelled as a
-// dynamic array (byte dt[]), not only a queue — applying $bits directly to the
-// type identifier has no defined extent and shall be an error.
 TEST(BitsCallRestrictions, BitsOnDynamicArrayTypedefIsError) {
   ElabFixture f;
   Elaborate(
@@ -92,9 +75,6 @@ TEST(BitsCallRestrictions, BitsOnDynamicArrayTypedefIsError) {
       "20.6.2"));
 }
 
-// §20.6.2: because $bits folds to an elaboration-time constant for a
-// fixed-size argument, it may appear inside the packed dimension of a data
-// type declaration, and the resulting typedef shall elaborate cleanly.
 TEST(BitsCallRestrictions, BitsResultUsableInDataTypeDeclaration) {
   ElabFixture f;
   Elaborate(
@@ -106,9 +86,6 @@ TEST(BitsCallRestrictions, BitsResultUsableInDataTypeDeclaration) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.6.2 (NC5): the elaboration-time constant that $bits folds to on a
-// fixed-size argument may appear in the packed dimension of a plain variable
-// declaration, not just a typedef. The variable shall elaborate cleanly.
 TEST(BitsCallRestrictions, BitsResultUsableInVariableDeclaration) {
   ElabFixture f;
   Elaborate(
@@ -119,9 +96,6 @@ TEST(BitsCallRestrictions, BitsResultUsableInVariableDeclaration) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.6.2 (NC5): the same elaboration-time constant may size a net
-// declaration. A wire whose width is derived from $bits shall elaborate
-// cleanly.
 TEST(BitsCallRestrictions, BitsResultUsableInNetDeclaration) {
   ElabFixture f;
   Elaborate(
@@ -132,7 +106,6 @@ TEST(BitsCallRestrictions, BitsResultUsableInNetDeclaration) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.6.2: the same query on a fixed-size type identifier is legal.
 TEST(BitsCallRestrictions, BitsOnFixedTypedefIsLegal) {
   ElabFixture f;
   Elaborate(
@@ -145,8 +118,6 @@ TEST(BitsCallRestrictions, BitsOnFixedTypedefIsLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §20.6.2: $bits shall not enclose a function whose return type is a
-// dynamically sized data type.
 TEST(BitsCallRestrictions, BitsEnclosingDynamicReturnFuncIsError) {
   ElabFixture f;
   Elaborate(
@@ -163,8 +134,6 @@ TEST(BitsCallRestrictions, BitsEnclosingDynamicReturnFuncIsError) {
                             5, "20.6.2"));
 }
 
-// §20.6.2 (with §8.26 satisfied): $bits shall not be applied to an object
-// whose type is an interface class.
 TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
   ElabFixture f;
   Elaborate(
@@ -183,26 +152,6 @@ TEST(BitsCallRestrictions, BitsOnInterfaceClassObjectIsError) {
       "20.6.2"));
 }
 
-// §20.6.2 makes it an error to call $bits directly on the identifier of a
-// dynamically sized data type, and states no condition on where the call
-// stands. So the error is owed wherever a statement can be written, and the
-// five cases below each put the call in one statement position of a module
-// whose 'qt' is a queue typedef.
-//
-// Each of those five is a position
-// Elaborator::ValidateBitsCallRestrictions reached only once CheckBitsCallStmt
-// in src/elaborator/elaborator_validate_queries_dims.cpp took its list of
-// nested statements from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. Every one of them elaborated
-// clean beforehand, leaving a $bits applied to a type with no defined extent
-// unreported.
-
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and A.6.2's
-// operator_assignment is `variable_lvalue assignment_operator expression`, so
-// the loop's third header clause holds a statement of its own, kept in
-// Stmt::for_steps. The initializer here assigns a constant, so the report can
-// only name the call in the step.
 TEST(BitsCallRestrictions, BitsOnQueueTypedefInAForStepIsError) {
   ElabFixture f;
   Elaborate(
@@ -221,10 +170,6 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefInAForStepIsError) {
       "20.6.2"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(BitsCallRestrictions,
      BitsOnQueueTypedefInAnAssertionPassStatementIsError) {
   ElabFixture f;
@@ -259,10 +204,6 @@ TEST(BitsCallRestrictions,
       "20.6.2"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §20.6.2's
-// error is a static one, so it stands whether the weighted draw would select
-// the item or not.
 TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandcaseItemIsError) {
   ElabFixture f;
   Elaborate(
@@ -278,10 +219,6 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandcaseItemIsError) {
       "20.6.2"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandsequenceCodeBlockIsError) {
   ElabFixture f;
   Elaborate(
@@ -301,14 +238,6 @@ TEST(BitsCallRestrictions, BitsOnQueueTypedefInARandsequenceCodeBlockIsError) {
       "20.6.2"));
 }
 
-// §20.6.2 (printed page 629) has $bits answer the number of bits an
-// expression holds and lets a fixed-size answer stand as an elaboration-time
-// constant, and §6.20.2 (printed page 126) gives a parameter declared with a
-// range the range of its declaration. So $bits of a parameter declared
-// `logic [95:0]` is 96, and a localparam set to it resolves at elaboration
-// with that value, where a fold that sized literals and type keywords alone
-// left the localparam with no value at all -- is_resolved false on its
-// declaration.
 TEST(BitsOfDeclaration, RangedParameterAnswersItsDeclaredWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -325,10 +254,6 @@ TEST(BitsOfDeclaration, RangedParameterAnswersItsDeclaredWidth) {
   EXPECT_EQ(w->resolved_value, 96);
 }
 
-// §6.20.2 (printed page 126): a parameter declared with a type and no range is
-// of that type, so `localparam int N = 5` holds int's 32 bits whatever its
-// value needs -- 5 fits in 3 bits, which is the answer a fold sizing the value
-// rather than the declaration would give.
 TEST(BitsOfDeclaration, TypedParameterAnswersItsTypeWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -345,11 +270,6 @@ TEST(BitsOfDeclaration, TypedParameterAnswersItsTypeWidth) {
   EXPECT_EQ(bn->resolved_value, 32);
 }
 
-// §6.20.2 (printed page 127): a parameter declared with neither type nor range
-// takes an implied range from the size of the final value assigned to it, and
-// at least 32 bits when that value is unsized. The clause's own examples set
-// `newconst = 3'h4` to [2:0] and `newconst = 4` to at least [31:0], so a sized
-// literal of 8 bits gives 8 and an unsized decimal gives 32.
 TEST(BitsOfDeclaration, ImplicitParameterAnswersItsValueWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -372,11 +292,6 @@ TEST(BitsOfDeclaration, ImplicitParameterAnswersItsValueWidth) {
   EXPECT_EQ(br->resolved_value, 32);
 }
 
-// §20.6.2 (printed page 629) lets the constant $bits folds to size the
-// declaration of another variable, its own example being a typedef of
-// `bit [$bits(MyType):1]`. A variable whose packed range is written in terms
-// of $bits of a 96-bit parameter is 96 bits wide, and not the 1 bit a range
-// with an unfolded bound falls back to.
 TEST(BitsOfDeclaration, ParameterWidthSizesAVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -392,10 +307,6 @@ TEST(BitsOfDeclaration, ParameterWidthSizesAVariable) {
   EXPECT_EQ(v->width, 96u);
 }
 
-// §20.6.2 (printed page 629) opens with `logic [31:0] v` and has $bits(v)
-// answer 32, the bits the declaration gives the variable. A variable the
-// module has already elaborated carries that width, so a localparam set to
-// $bits of a 16-bit variable resolves to 16 at elaboration.
 TEST(BitsOfDeclaration, VariableAnswersItsDeclaredWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -412,10 +323,6 @@ TEST(BitsOfDeclaration, VariableAnswersItsDeclaredWidth) {
   EXPECT_EQ(bx->resolved_value, 16);
 }
 
-// §6.20.2 (printed page 126): a parameter declared with neither type nor range
-// takes the size of its final value, and a name standing for a 96-bit
-// parameter is 96 bits wide, so `localparam S = P` holds 96 bits and $bits(S)
-// answers 96 -- not the 32 of a fold that read every name as an int.
 TEST(BitsOfDeclaration, ImplicitParameterSetFromAWideParameterIsAsWide) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -432,12 +339,6 @@ TEST(BitsOfDeclaration, ImplicitParameterSetFromAWideParameterIsAsWide) {
   EXPECT_EQ(ParamValue(design, "SH"), 0x01234567);
 }
 
-// §11.6.1's Table 11-21 (printed pages 299-300) sizes a self-determined
-// expression by its operator: the arithmetic and bitwise operators take the
-// wider operand, a shift and a power the left operand, a comparison, an
-// equality, a logical operator, an implication, a reduction and `!` one bit,
-// unary `+ - ~` their operand, a conditional the wider arm. B is 8 bits and
-// an unsized literal at least 32, so `B + B` is 8 bits and `B + 1` is 32.
 TEST(BitsOfDeclaration, OperatorExpressionIsSizedBySelfDeterminedBitLength) {
   const std::vector<std::pair<std::string, int64_t>> kCases{
       {"B + B", 8},   {"B - B", 8},   {"B * B", 8},
@@ -472,10 +373,6 @@ TEST(BitsOfDeclaration, OperatorExpressionIsSizedBySelfDeterminedBitLength) {
   }
 }
 
-// A binary operator Table 11-21 does not size -- the sequence implication,
-// which makes no expression at all -- leaves $bits unfolded rather than sized
-// as something it is not. A.8.6's binary_operator holds no implication, so the
-// operand is reported as well.
 TEST(BitsOfDeclaration, OperatorWithNoSelfDeterminedBitLengthIsLeftUnsized) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -491,11 +388,6 @@ TEST(BitsOfDeclaration, OperatorWithNoSelfDeterminedBitLengthIsLeftUnsized) {
   EXPECT_TRUE(design == nullptr || ParamUnresolved(design, "W"));
 }
 
-// §6.20.2 (printed page 127): a parameter declared with a type keeps the
-// width and signedness of that type whatever value it was set to, so a byte
-// set to 300 is read as the 44 the low eight bits hold and a 4-bit unsigned
-// vector set to -1 as 15. One with a bare `signed` and no range takes the
-// range of its value, so SG is the 32-bit -3 it was set to.
 TEST(BitsOfDeclaration, ParameterNameReadsAtItsDeclaredWidthAndSign) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -517,11 +409,6 @@ TEST(BitsOfDeclaration, ParameterNameReadsAtItsDeclaredWidthAndSign) {
   EXPECT_EQ(ParamValue(design, "BSG"), 32);
 }
 
-// §13.4.3 folds a constant function's body against its locals, which sit in
-// the same scope map as the module's parameters under bare names. A formal
-// named as a byte parameter is holds the 300 the call passed, not the 44 the
-// parameter's width would leave, so the declaration is applied only to a name
-// whose value is the parameter's.
 TEST(BitsOfDeclaration, FormalNamedAsAParameterIsNotCutToItsWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -538,10 +425,6 @@ TEST(BitsOfDeclaration, FormalNamedAsAParameterIsNotCutToItsWidth) {
   EXPECT_EQ(ParamValue(design, "R"), 300);
 }
 
-// §6.20.2: a parameter with neither type nor range whose value is an
-// enumeration constant (§6.19) takes the value's size, and the constant is not
-// among the module's parameters the fold sizes it against, so the name reads
-// as a 32-bit signed integer, as every name did before.
 TEST(BitsOfDeclaration, ImplicitParameterSetFromAnEnumConstantReadsAsInt) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -556,12 +439,6 @@ TEST(BitsOfDeclaration, ImplicitParameterSetFromAnEnumConstantReadsAsInt) {
   EXPECT_EQ(ParamValue(design, "X"), 2);
 }
 
-// §23.9 has a module's own P hide the compilation unit's inside the module,
-// so a value written as `P + 1` names the parameter it initializes, which
-// §6.20.1 does not admit; the elaborator folded it against the unit's P
-// before this and still does. Sizing a later read of P folds `P + 1` again,
-// which names P again, and the fold is capped rather than run without end:
-// elaboration terminates and H reads the low word alone.
 TEST(BitsOfDeclaration, SelfReferentialWideParameterTerminates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -577,11 +454,6 @@ TEST(BitsOfDeclaration, SelfReferentialWideParameterTerminates) {
   EXPECT_EQ(ParamValue(design, "L"), 2);
 }
 
-// §5.7.1 (printed page 77): a based literal's digits give its value in the
-// base its base format character names, in either case, with x ending the
-// digits the fold reads, and the size constant states the width the value is
-// cut to from the left. Each form's bits above 64 are read back through a
-// select at or above bit 64.
 TEST(BitsOfDeclaration, WideLiteralOfEachBaseCarriesItsHighBits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -620,10 +492,6 @@ TEST(BitsOfDeclaration, WideLiteralOfEachBaseCarriesItsHighBits) {
   EXPECT_EQ(ParamValue(design, "PZL"), 1);
 }
 
-// §11.5.1 (printed page 296): a bit-select at or above bit 64 reads the bit
-// the digits wrote there. A part-select running off the bottom of the value,
-// and a bit-select below its range, read x for the bits outside it, P being a
-// 4-state vector; a folded constant holds no x, so neither folds.
 TEST(BitsOfDeclaration, BitSelectAboveSixtyFourAndBelowZero) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -644,12 +512,6 @@ TEST(BitsOfDeclaration, BitSelectAboveSixtyFourAndBelowZero) {
   EXPECT_TRUE(ParamUnresolved(design, "NEG"));
 }
 
-// §11.4.8 combines two 96-bit operands bit by bit across all 96, and §11.4.10
-// shifts across them, the arithmetic right shift of a signed operand filling
-// from its sign bit (PS, bit 95 set) and of one whose sign bit is clear (PP)
-// or that is unsigned (P) with zeros. `P + 1` is arithmetic, which 994404a79
-// carried across the words too; its low word here is the low word plus one,
-// and test_elaborator_subclause_20_06_02b.cpp reads the carry above it.
 TEST(BitsOfDeclaration, ShiftAndBitwiseOperatorsWorkAcrossTheWideValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -713,15 +575,6 @@ TEST(BitsOfDeclaration, ShiftAndBitwiseOperatorsWorkAcrossTheWideValue) {
   EXPECT_EQ(ParamValue(design, "IL"), 0x00112234);
 }
 
-// §23.10.2 with §6.20.2: an instance's parameter value assignment written as
-// a literal names nothing and reads the same in every scope, so the bits
-// above 64 of a 96-bit override are read where the instantiated module
-// selects them; one written as the parent's parameter stands in the parent,
-// whose names mean nothing in the child, so its words above bit 63 are
-// recorded on the child's parameter as the value is resolved, against the
-// parent's registration, and the child reads the same 0x01234567 through
-// it. 64b2dfbe0 refolded a literal override alone and read 0 above bit 64
-// through the second instance.
 TEST(BitsOfDeclaration, LiteralOverrideReadsAboveBitSixtyFour) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -750,11 +603,6 @@ TEST(BitsOfDeclaration, LiteralOverrideReadsAboveBitSixtyFour) {
   EXPECT_EQ(value(children[1].resolved, "L"), 0x00112233);
 }
 
-// §20.6.2 (printed page 629) with §6.24.3: an unpacked array holds its
-// element's bits per element, so `logic [7:0] arr[4]` is 32 bits, and a net
-// is sized as a variable is -- `wire [3:0] v` four bits and `wire [7:0] w[3]`
-// twenty-four. An array whose extent the declaration does not fix is no
-// constant at all (test_elaborator_subclause_20_06_02b.cpp).
 TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -783,16 +631,6 @@ TEST(BitsOfDeclaration, NetAndUnpackedArrayAnswerTheirBits) {
   EXPECT_EQ(v->num_unpacked_dims, 0u);
 }
 
-// §20.6.2 (printed page 629) with §6.18 (printed 118): a typedef name is
-// sized by the type it stands for -- the clause's own `$bits(MyType)` of a
-// structure typedef is 9 -- through the table a TypedefRegistryGuard installs
-// over the scope being elaborated, so `localparam int BT = $bits(my_t)`
-// reads 12 for `typedef logic [11:0] my_t`, the packed structure of a 4-bit
-// and an 8-bit member reads 12, and a name standing for another name reads
-// what that name does. d6a7eab50 left every typedef name to the run, the
-// fold having reached no table, and pinned it here as
-// TypedefNameIsLeftToTheRun; the queue typedef that stays refused is in
-// test_elaborator_subclause_20_06_02b.cpp.
 TEST(BitsOfDeclaration, TypedefNameAnswersItsTypeWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(

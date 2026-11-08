@@ -21,11 +21,6 @@ TEST(SourceText, DefaultDisableIff) {
   EXPECT_NE(r.cu->modules[0]->items[0]->init_expr, nullptr);
 }
 
-// §16.15: a default disable iff may also be declared within a generate block.
-// The grammar left-hand side is module_or_generate_item_declaration, so the
-// parser accepts the declaration in a generate-block body exactly as in a
-// module body. Real source is driven through the parser and the nested item is
-// checked to be the default disable iff production.
 TEST(SourceText, DefaultDisableIffInGenerateBlock) {
   auto r = Parse(
       "module m;\n"
@@ -49,9 +44,6 @@ TEST(SourceText, DefaultDisableIffInGenerateBlock) {
   EXPECT_NE(gen->gen_body[0]->init_expr, nullptr);
 }
 
-// §16.15: the declaration is legal directly within an interface body -- one of
-// the enumerated syntactic positions. The parser accepts it via the shared
-// module-item path.
 TEST(SourceText, DefaultDisableIffInInterface) {
   auto r = Parse(
       "interface ifc;\n"
@@ -66,8 +58,6 @@ TEST(SourceText, DefaultDisableIffInInterface) {
   EXPECT_NE(r.cu->interfaces[0]->items[0]->init_expr, nullptr);
 }
 
-// §16.15: and directly within a program body -- the remaining enumerated
-// declaration position.
 TEST(SourceText, DefaultDisableIffInProgram) {
   auto r = Parse(
       "program p;\n"
@@ -82,10 +72,6 @@ TEST(SourceText, DefaultDisableIffInProgram) {
   EXPECT_NE(r.cu->programs[0]->items[0]->init_expr, nullptr);
 }
 
-// §16.15 writes the declaration as `default disable iff expression_or_dist ;`,
-// so the `iff` keyword is part of the form rather than an option in it. A
-// declaration written without it is rejected at the token standing where the
-// keyword belongs, and the report names `iff` under §16.15.
 TEST(DefaultDisableIff, MalformedDefaultDisableNames16_15) {
   auto r = Parse(
       "module m;\n"

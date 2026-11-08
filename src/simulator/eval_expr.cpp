@@ -52,9 +52,6 @@ bool ExtractMethodCallParts(const Expr* expr, MethodCallParts& out) {
   return true;
 }
 
-// §11.4.12.1: the concatenation a replication repeats, its operands
-// self-determined -- an unbased unsized literal among them one bit wide
-// (§5.7.1) -- and joined as a concatenation joins them, every word of each.
 static Logic4Vec EvalReplicateInner(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   std::vector<Logic4Vec> parts;
@@ -70,8 +67,6 @@ static Logic4Vec EvalReplicateInner(const Expr* expr, SimContext& ctx,
   return inner;
 }
 
-// §11.4.12.1 joins `count` copies of the inner concatenation, the whole of it
-// each time, and §11.4.12.2 leaves a string replication untruncated.
 Logic4Vec EvalReplicate(const Expr* expr, SimContext& ctx, Arena& arena) {
   uint32_t count = static_cast<uint32_t>(
       EvalExpr(expr->repeat_count, ctx, arena).ToUint64());
@@ -108,13 +103,6 @@ static bool TryCollectionAccess(std::string_view base, std::string_view field,
   return false;
 }
 
-// Bundles the subject of a member access (`base_name.field_name`) together with
-// the resolved base variable (when one exists), the evaluation context and the
-// position the access was written at. A single instance is built once in
-// ResolveMemberByType and shared across the per-feature member-access helpers
-// below. The name is rebuilt from the expression before the helpers run and no
-// longer points back at it, so the position is carried here rather than
-// recovered: it is what a report from one of those helpers names.
 struct MemberAccess {
   std::string_view base_name;
   std::string_view field_name;
@@ -124,9 +112,6 @@ struct MemberAccess {
   SourceLoc loc;
 };
 
-// Reads field `field` from class object `obj`, honoring declared-type scoping
-// (§8.15) when `declared_type` is known so a base method reads a shadowed base
-// field rather than the derived one.
 static Logic4Vec ReadClassField(ClassObject* obj,
                                 const ClassTypeInfo* declared_type,
                                 std::string_view field, Arena& arena) {
@@ -135,13 +120,6 @@ static Logic4Vec ReadClassField(ClassObject* obj,
   return obj->GetProperty(field, arena);
 }
 
-// Resolves a (possibly chained) field path against class object `obj`. A single
-// field is read directly. A chained path `first.rest` (e.g. `a.next.data` for a
-// forward-typedef linked list, §6.18) fetches `first` as a class handle and
-// recurses into the referenced object; the inner fields carry no declared-type
-// shadowing context, so they are read by bare name. When `first` does not name
-// a live class handle, the chain falls back to reading the whole dotted path as
-// a single flattened key on `obj` (the legacy nested-handle storage scheme).
 Logic4Vec ResolveClassFieldChain(ClassObject* obj,
                                  const ClassTypeInfo* declared_type,
                                  std::string_view field_path, SimContext& ctx,
@@ -153,13 +131,6 @@ Logic4Vec ResolveClassFieldChain(ClassObject* obj,
   auto first = field_path.substr(0, dot);
   auto rest = field_path.substr(dot + 1);
   Logic4Vec handle_val = ReadClassField(obj, declared_type, first, arena);
-  // §7.2.1: `first` declared with a structure's type holds that structure
-  // rather than a handle, so the rest of the path selects a member of the
-  // value just read. Asked before the handle lookup, because a structure
-  // whose bits happen to equal a live handle's number is still a structure.
-  // The flattened key below names a property the class never declared, which
-  // answers what an earlier write to the same path left there and a known
-  // zero where there was none.
   PropertyFieldWindow window = ResolveClassPropertyField(
       declared_type ? declared_type : obj->type, field_path, ctx);
   if (window.valid) {
@@ -197,8 +168,6 @@ static bool TryClassEnumAccess(Variable* base_var, std::string_view field_name,
   return true;
 }
 
-// Looks up a static property or enum member named `field_name` directly on
-// `cls_type` (no inheritance walk). Returns true and fills `out` on a hit.
 static bool TryLocalStaticMember(const ClassTypeInfo* cls_type,
                                  std::string_view field_name, Arena& arena,
                                  Logic4Vec& out) {
@@ -215,9 +184,6 @@ static bool TryLocalStaticMember(const ClassTypeInfo* cls_type,
   return false;
 }
 
-// Walks the interface-class inheritance graph rooted at `cls_type` (parent
-// interface plus all extended interfaces) searching for a static property or
-// enum member named `field_name`. Returns true and fills `out` on a hit.
 static bool TryInterfaceStaticMember(const ClassTypeInfo* cls_type,
                                      std::string_view field_name, Arena& arena,
                                      Logic4Vec& out) {
@@ -235,11 +201,6 @@ static bool TryInterfaceStaticMember(const ClassTypeInfo* cls_type,
   return false;
 }
 
-// §8.13 (printed pages 189-190) with §8.9 (printed 186): `D::n` reads the
-// static property D declares or inherits, the nearest declaration first, so
-// where D extends C it reads C's one storage, what `C::n = 5` wrote. Read
-// from D's own static_properties alone, which hold D's declarations, it
-// answered 0.
 static bool TryStaticMemberAccess(std::string_view base_name,
                                   std::string_view field_name, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
@@ -252,17 +213,11 @@ static bool TryStaticMemberAccess(std::string_view base_name,
          TryInterfaceStaticMember(cls_type, field_name, arena, out);
 }
 
-// Resolves member access on the implicit `this`/`super` object. `is_super`
-// selects the parent-type property view used by super. Returns true and fills
-// `out` when `base_name` named one of those keywords.
 static bool TryThisSuperMember(std::string_view base_name,
                                std::string_view field_name, SimContext& ctx,
                                Arena& arena, Logic4Vec& out) {
   if (base_name == "this") {
     auto* self = ctx.CurrentThis();
-    // §8.11 with §7.2: `this.s.a` is a member of the structure the property s
-    // holds, a path the property name alone does not answer; it is resolved
-    // as a handle's `h.s.a` is, from the running method's class.
     out = self ? ResolveClassFieldChain(self, ctx.CurrentMethodClass(),
                                         field_name, ctx, arena)
                : MakeLogic4Vec(arena, 1);
@@ -270,9 +225,6 @@ static bool TryThisSuperMember(std::string_view base_name,
   }
   if (base_name == "super") {
     auto* self = ctx.CurrentThis();
-    // §8.15: super resolves against the parent of the lexically enclosing class
-    // (tracked during method execution); fall back to the dynamic type's parent
-    // when no enclosing-class context is active.
     const ClassTypeInfo* enclosing = ctx.CurrentMethodClass();
     const ClassTypeInfo* super_type =
         enclosing ? enclosing->parent
@@ -287,14 +239,6 @@ static bool TryThisSuperMember(std::string_view base_name,
   return false;
 }
 
-// §11.9 (printed page 304): a member read inconsistent with the tagged
-// union's current tag is a run-time error, and §7.3.2 (printed 151) makes
-// that so for a tagged union wherever it stands -- the variable `u.Other`
-// reads or the member `s.u.Other` reads, whose tag `s.u = tagged Valid 9`
-// set under the member's own key. The walk FindUnionTagMismatch shares with
-// the write side asks each tagged union on the path; this checked the base
-// variable's own layout alone, a structure, and so read `s.u.Other` against
-// no tag. Reports the error and fills `out` with all-X; true when it fired.
 static bool TryUnionTagMismatch(const MemberAccess& ma,
                                 const StructTypeInfo* sinfo, Logic4Vec& out) {
   UnionTagMismatch m =
@@ -309,10 +253,6 @@ static bool TryUnionTagMismatch(const MemberAccess& ma,
   return true;
 }
 
-// §11.9 with §8.5: the same run-time error for a class property of a tagged
-// union type, `o.None` in a method or `b.o.None` through a handle, read against
-// the tag the property's own object holds (PropertyAggregateLayout). Reports
-// the error and fills `out` with all-X; true when it fired.
 static bool TryPropertyTagMismatch(const MemberAccess& ma, Logic4Vec& out) {
   std::string name(ma.base_name);
   std::string_view member = ma.field_name;
@@ -338,8 +278,6 @@ static bool TryPropertyTagMismatch(const MemberAccess& ma, Logic4Vec& out) {
   return true;
 }
 
-// §16.13.5: whether the end point named `ep_name` is matched as read now,
-// its match stored until the first tick of the reading clock after it.
 static bool SequenceMatched(std::string_view ep_name, SimContext& ctx) {
   auto* ep = ctx.FindVariable(ep_name);
   if (ep == nullptr) return false;
@@ -347,10 +285,6 @@ static bool SequenceMatched(std::string_view ep_name, SimContext& ctx) {
                                   ctx.CurrentTime().ticks);
 }
 
-// §16.9.11 and §16.13.5: `triggered` and `matched` on the end point
-// `ep_name`, the first true at the time step of the match alone and the
-// second storing a match until the first tick of the reading clock after
-// it; false where `field_name` names neither.
 static bool TryEndPointMethod(std::string_view ep_name,
                               std::string_view field_name, SimContext& ctx,
                               Arena& arena, Logic4Vec& out) {
@@ -361,8 +295,6 @@ static bool TryEndPointMethod(std::string_view ep_name,
   return true;
 }
 
-// The same on the named sequence `base_name`, whose end point the instance
-// reading it declares.
 static bool TrySequenceEndPointMethod(std::string_view base_name,
                                       std::string_view field_name,
                                       SimContext& ctx, Arena& arena,
@@ -371,10 +303,6 @@ static bool TrySequenceEndPointMethod(std::string_view base_name,
                            arena, out);
 }
 
-// §16.13.6 with §23.6: `triggered` or `matched` applied to a sequence named
-// through the instance hierarchy, `u.s.triggered`, reads the end point of the
-// sequence s declared in the instance u, which s's monitor in u fires under
-// u's prefix; false where the name selects no instance's sequence.
 static bool TryHierarchicalSequenceMethod(const Expr* expr, SimContext& ctx,
                                           Arena& arena, Logic4Vec& out) {
   if (expr->lhs == nullptr || expr->rhs == nullptr ||
@@ -387,9 +315,6 @@ static bool TryHierarchicalSequenceMethod(const Expr* expr, SimContext& ctx,
   return TryEndPointMethod(ep_name, expr->rhs->text, ctx, arena, out);
 }
 
-// Handles the named-event `.triggered` and named-sequence `.triggered` and
-// `.matched` pseudo-methods. Returns true and fills `out` when `field_name`
-// named one of these and the base referred to a matching event/sequence.
 static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
   Variable* base_var = ma.base_var;
   SimContext& ctx = ma.ctx;
@@ -397,8 +322,6 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
   std::string_view base_name = ma.base_name;
   std::string_view field_name = ma.field_name;
   if (base_var && base_var->is_event && field_name == "triggered") {
-    // §15.5.3: the triggered method of a null named event evaluates to false,
-    // independent of any triggered state recorded for the current time step.
     out = base_var->is_null_event
               ? MakeLogic4VecVal(arena, 1, 0u)
               : MakeLogic4VecVal(arena, 1,
@@ -409,11 +332,6 @@ static bool TryEventSequenceMethod(const MemberAccess& ma, Logic4Vec& out) {
          TrySequenceEndPointMethod(base_name, field_name, ctx, arena, out);
 }
 
-// §15.5.3: `function bit triggered()` may be called with its empty argument
-// list, `ev.triggered()`, as well as without, the member form
-// TryEventSequenceMethod serves; this is the call form, on a named event --
-// a package's `p::e.triggered()` by its "p.e" key -- or on a class's event
-// property (TryClassEventTriggered), 0 for a null event.
 bool TryEvalEventTriggeredCall(const Expr* expr, SimContext& ctx, Arena& arena,
                                Logic4Vec& out) {
   MethodCallParts parts;
@@ -437,8 +355,6 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   if (TryThisSuperMember(base_name, field_name, ctx, arena, out)) return out;
 
   auto* base_var = ctx.FindVariable(base_name);
-  // §23.9: the base resolves within the running instance, so its layout is
-  // asked for by the key that instance's storage was created under.
   const StructTypeInfo* sinfo = StructLayoutOfName(base_name, ctx);
 
   MemberAccess ma{base_name, field_name, base_var, ctx, arena, loc};
@@ -459,10 +375,6 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
     return out;
   }
 
-  // §8.26: a class-scoped enum literal accessed through an instance handle
-  // (p.ERR_OVERFLOW) resolves to its enum value. This is tried before the
-  // general property read, which would otherwise claim the (unknown) name and
-  // return 0; a name that is not an enum member falls through to it.
   if (TryClassEnumAccess(base_var, field_name, ctx, arena, out)) return out;
   if (TryClassPropertyAccess(ma, out)) return out;
   if (TryCollectionAccess(base_name, field_name, ctx, arena, out)) return out;
@@ -474,40 +386,18 @@ static Logic4Vec ResolveMemberByType(std::string_view base_name,
   return MakeLogic4Vec(arena, 1);
 }
 
-// §16.5.2: inside an assertion, a variable's sampled value is the one value it
-// has at a clock tick, and §16.5.1 puts no condition on where the
-// variable is declared, so a variable a property reaches across an instance
-// boundary reads the value sampled for this time slot exactly as one the
-// module declares itself. The store answers nothing outside a clocked
-// concurrent assertion's property and nothing for a variable no such property
-// reads, so every other hierarchical read is the live read it was.
 static Logic4Vec ReadReferencedVariable(const Variable& var, SimContext& ctx) {
   const Logic4Vec* sampled =
       ctx.AssertionSamples().ReadWithinProperty(&var, ctx.CurrentTime());
   Logic4Vec val = sampled != nullptr ? *sampled : var.value;
-  // §11.8.1: the operand's signedness is its declaration's, whatever the value
-  // stored in it carried, as EvalIdentifier derives it for a simple name:
-  // `logic w` set to the signed literal 1 and read as `a.w` read -1.
   val.is_signed = var.is_signed;
   return val;
 }
 
-// §25.9: a component referenced through a virtual interface redirects to the
-// bound interface instance. Referencing a component of an unbound (null or
-// uninitialized) virtual interface is a fatal runtime error. Returns true and
-// fills `out` when `expr` accessed a member through a virtual interface: a
-// variable declared so, a property declared so of the class whose method is
-// running, or, `this.vif.a` and `d.vif.a`, a property declared so of the
-// object a handle expression denotes, which ResolveVirtualInterfaceBaseExpr
-// tells apart from any other base. Before the base was resolved as an
-// expression, `d.vif.a` fell to the class field chain, which took the
-// interface handle for a class handle, found no object, and read a flattened
-// key the class never declared.
 static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
                                       Arena& arena, Logic4Vec& out) {
   VirtualInterfaceBase base =
       ResolveVirtualInterfaceBaseExpr(expr->lhs, ctx, arena);
-  // §27.5 with §23.6: `vif.g.v`, through a named generate block of it.
   std::string inner;
   if (!base.is_virtual_interface) {
     base = ResolveVirtualInterfaceInnerPath(expr, ctx, arena, inner);
@@ -525,21 +415,10 @@ static bool TryVirtualInterfaceMember(const Expr* expr, SimContext& ctx,
   if (!inner.empty()) field = inner;
   auto* tv =
       ctx.FindVariable(VirtualInterfaceComponentName(base.handle, field, ctx));
-  // §16.5.1 with §25.9: sampled within a property, and signed as declared.
   out = tv ? ReadReferencedVariable(*tv, ctx) : MakeLogic4Vec(arena, 1);
   return true;
 }
 
-// §8.25.1: an explicit specialization used as the scope-resolution prefix
-// (`C#(3)::p`) denotes the parameter in that specialization, not the class's
-// default. When the accessed name is a value parameter port that the prefix
-// overrides -- by ordered position or by name -- evaluate the override
-// expression instead of falling through to the default stored on the class.
-// Type parameters carry no value and body-local parameters are not overridable
-// through `#(...)`, so both are left to the ordinary member-access path.
-// §8.25.1: the port position `name` occupies in a class's parameter port list.
-// A type parameter carries no value and is not overridable through #(...), so
-// it has no position here.
 static size_t ValueParamPosition(const ClassDecl& decl, std::string_view name) {
   if (decl.type_param_names.count(name)) return decl.params.size();
   for (size_t i = 0; i < decl.params.size(); ++i) {
@@ -548,10 +427,6 @@ static size_t ValueParamPosition(const ClassDecl& decl, std::string_view name) {
   return decl.params.size();
 }
 
-// §8.25.1: the specialization argument that overrides `name`. A named override
-// binding the parameter takes precedence regardless of its position in the
-// override list; otherwise the ordered override occupying the parameter's own
-// port position applies.
 static const Expr* FindSpecializationOverride(const Expr& base,
                                               const ClassDecl& decl,
                                               std::string_view name) {
@@ -568,20 +443,12 @@ static const Expr* FindSpecializationOverride(const Expr& base,
   return nullptr;
 }
 
-// §8.25 with §6.20.2 (printed pages 126-127): the actual `value` the prefix
-// of `access`, `C#(...)::name`, gives the parameter it names is converted to
-// the parameter's declared type, cut or extended to its width and, for a
-// 2-state type, its x and z bits taken as 0 (ClassParamSizer); the parameters
-// ahead of it are sized first, in header order, for a range that names one of
-// them.
 static Logic4Vec SizedSpecializationActual(const Expr& access,
                                            const ClassDecl& decl,
                                            const Expr* value, SimContext& ctx,
                                            Arena& arena) {
   const Expr& base = *access.lhs;
   ClassParamSizer sizer(&decl);
-  // §8.25 with §6.20.3: a parameter declared with a type parameter is of the
-  // type the specialization's actual names.
   if (const ClassTypeInfo* spec = ScopeNamedSpecialization(&base, ctx, arena))
     sizer.UseTypeActuals(spec->param_actuals);
   size_t pos = ValueParamPosition(decl, access.rhs->text);
@@ -612,11 +479,6 @@ static bool TryParameterizedScopeParam(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §16.9.11, §16.13.5 and §16.13.6: whether the expression applies
-// `triggered` or `matched` to a sequence instance with arguments, `e2(ready,
-// proc1, proc2).triggered`, to a sequence actual, the identifier carrying it
-// standing where the formal of `subseq.triggered` stood, or to a name the
-// lowering gave an end point of its own for the clock of its context.
 static bool ReadsAMonitorEndPoint(const Expr* expr, SimContext& ctx) {
   if (expr->lhs == nullptr || expr->rhs == nullptr ||
       (expr->rhs->text != "triggered" && expr->rhs->text != "matched")) {
@@ -630,10 +492,6 @@ static bool ReadsAMonitorEndPoint(const Expr* expr, SimContext& ctx) {
           !ctx.FindSequenceInstanceEndpoint(expr->lhs).empty());
 }
 
-// §16.9.11, §16.13.5 and §16.13.6: `.triggered` or `.matched` applied to a
-// sequence instance with arguments or to a sequence actual reads the
-// endpoint of the monitor the lowering gave it; answers false where no
-// monitor was made for it.
 static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
                                  Arena& arena, Logic4Vec& out) {
   if (!ReadsAMonitorEndPoint(expr, ctx)) return false;
@@ -645,10 +503,6 @@ static bool TryInstanceTriggered(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §17.3 with §16.9.11: `triggered` or `matched` applied to a sequence formal
-// of the checker instance being evaluated reads the end point of the actual
-// the instance binds to it, which the lowering registered under its full
-// name; false where the name is no such formal.
 static bool TryCheckerFormalEndPoint(const Expr* expr, SimContext& ctx,
                                      Arena& arena, Logic4Vec& out) {
   if (expr->lhs == nullptr || expr->rhs == nullptr ||
@@ -665,20 +519,12 @@ static bool TryCheckerFormalEndPoint(const Expr* expr, SimContext& ctx,
          TryEndPointMethod(ep_name, expr->rhs->text, ctx, arena, out);
 }
 
-// The member selects that are no read of a member of a value: a sequence's
-// end point (§16.9.11), an array reduction or ordering method with a with
-// clause (§7.12), a parameter of a parameterized class scope (§8.25.1), and a
-// process (§9.7), enumeration (§6.19.5.7) or semaphore (§15.3) method written
-// without an argument list, `p.kill`, `c.next` or `s.try_get`, which leave no
-// member of the name to read. True with `out` set when the select was one.
 static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
                                         Arena& arena, Logic4Vec& out) {
   if (TryInstanceTriggered(expr, ctx, arena, out)) return true;
   if (TryCheckerFormalEndPoint(expr, ctx, arena, out)) return true;
   if (TryHierarchicalSequenceMethod(expr, ctx, arena, out)) return true;
   if (TryEvalArrayReductionWithClause(expr, ctx, arena, out)) return true;
-  // §7.12.2: a bare-member sort()/rsort() carrying a with clause (parenthesis-
-  // free form, or any queue receiver) reorders in place; yield a void result.
   if (TryExecArrayOrderingWithClauseStmt(expr, ctx, arena)) {
     out = MakeLogic4VecVal(arena, 1, 0);
     return true;
@@ -691,12 +537,6 @@ static bool TryMemberSelectThatIsNoRead(const Expr* expr, SimContext& ctx,
          TryClassEventTriggered(expr, ctx, arena, out);
 }
 
-// §7.8.7: `b[2].x` reads a member of an associative array element, and §8.4
-// `q[1].v` or `a[1].v` a property of the object an element of a queue or of
-// an array property (§7.4.2) refers to; the name EvalMemberAccess builds
-// reaches none. §8.6: nor `n.self().v`, a property of the object a method call
-// returned. §8.9 with §8.4: nor `C::m_inst.k` or a static method's bare
-// `m_inst.k`, a property of the object a static property holds a handle to.
 static bool TryObjectMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
                                 Logic4Vec& out) {
   return TryEvalAssocMemberField(expr, ctx, arena, out) ||
@@ -706,18 +546,6 @@ static bool TryObjectMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
          TryStaticHandleMember(expr, ctx, arena, out);
 }
 
-// §18.7.1: a name qualified by local:: — the local::x used to steer an inline
-// randomize()...with constraint from the calling scope — bypasses the
-// randomized object's class scope and resolves in the scope containing the
-// method call. The call reads each such name of its block in that scope as
-// it begins and binds the value as a local named by the qualified path
-// (BindLocalQualifiedNames), which no local a trial binds for a random
-// variable of the object can hide; true with `out` read from it. That read
-// is this expression evaluated in the calling scope itself, where `local` is
-// a reserved keyword that cannot name any declaration: the leading "local."
-// segment is dropped from `resolved`, so local::x denotes the same
-// declaration an unqualified x written there would, local::this and
-// local::super that scope's own.
 static bool TryLocalScopeQualifier(std::string& resolved, SimContext& ctx,
                                    Logic4Vec& out) {
   constexpr std::string_view kLocalScopePrefix = "local.";
@@ -730,8 +558,6 @@ static bool TryLocalScopeQualifier(std::string& resolved, SimContext& ctx,
   return false;
 }
 
-// Whether the path `expr` starts at no variable or array, so a select after it
-// picks an instance, not an element, whose index would then be read twice.
 static bool HeadNamesAnInstance(const Expr* expr, SimContext& ctx) {
   const Expr* head = expr;
   while (head->kind == ExprKind::kMemberAccess ||
@@ -744,8 +570,6 @@ static bool HeadNamesAnInstance(const Expr* expr, SimContext& ctx) {
          ctx.FindArrayInfo(head->text) == nullptr;
 }
 
-// The variable the path `expr`, spelled `resolved`, names: `$root`-headed from
-// the top first (§23.3.1), a non-literal instance select by its value (§23.6).
 static Variable* FindReferencedVariable(const Expr* expr,
                                         const std::string& resolved,
                                         SimContext& ctx, Arena& arena) {
@@ -758,12 +582,6 @@ static Variable* FindReferencedVariable(const Expr* expr,
   return var;
 }
 
-// §16.8.1 (c): a reference to a sequence's formal bound to a variable_lvalue
-// has the formal's type, and stands as a cast of the actual to it
-// (CastActualToFormal), so a member of it, `p.lo` or `p.lo.b`, is the member
-// of the cast's value the casting type's structure layout places there. A
-// cast to a type of no structure is left to the reads after, a method of an
-// enum's cast, `Cols'(1).next`, among them.
 static bool TryCastMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   const Expr* base = expr->lhs;
@@ -779,9 +597,6 @@ static bool TryCastMemberRead(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// A member of a structure value that no name holds: one of a cast
-// (TryCastMemberRead) or of a container's element, `d[1].a`
-// (TryContainerElementMember).
 static bool TryMemberOfAValue(const Expr* expr, SimContext& ctx, Arena& arena,
                               Logic4Vec& out) {
   return TryCastMemberRead(expr, ctx, arena, out) ||
@@ -811,8 +626,6 @@ Logic4Vec EvalMemberAccess(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto dot = MemberPathSplit(resolved, ctx);
   if (dot == std::string::npos) return MakeLogic4Vec(arena, 1);
   auto base_name = std::string_view(resolved).substr(0, dot);
-  // §23.7: a name whose head is no variable may be `f.x`, the static local
-  // of the function f.
   if (ctx.FindVariable(base_name) == nullptr) {
     if (Variable* local = FunctionStaticLocal(expr, ctx, arena)) {
       return local->value;

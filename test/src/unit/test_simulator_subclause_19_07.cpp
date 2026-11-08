@@ -65,8 +65,6 @@ TEST(Coverage, AutoBinMaxControl) {
   EXPECT_EQ(cp->auto_bin_count, 8u);
 }
 
-// LRM 19.7, Table 19-1: a newly instantiated covergroup carries the default
-// values listed for each instance-specific option.
 TEST(Coverage, InstanceOptionDefaults) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -84,8 +82,6 @@ TEST(Coverage, InstanceOptionDefaults) {
   EXPECT_FALSE(o.get_inst_coverage);
 }
 
-// LRM 19.7: each instance can initialize an instance option to its own value,
-// affecting only that instance.
 TEST(Coverage, InstanceOptionsArePerInstance) {
   CoverageDB db;
   auto* g1 = db.CreateGroup("cg1");
@@ -96,17 +92,12 @@ TEST(Coverage, InstanceOptionsArePerInstance) {
   EXPECT_DOUBLE_EQ(g2->options.goal, 100.0);
 }
 
-// LRM 19.7, Table 19-1: the weight option shall be a non-negative integral
-// value.
 TEST(Coverage, WeightOptionMustBeNonNegative) {
   EXPECT_TRUE(CoverageDB::OptionWeightValid(0));
   EXPECT_TRUE(CoverageDB::OptionWeightValid(5));
   EXPECT_FALSE(CoverageDB::OptionWeightValid(-1));
 }
 
-// LRM 19.7, Table 19-2: instance options are restricted to particular
-// syntactic levels. Every instance option may be set at the covergroup level;
-// the coverpoint and cross levels accept only specific subsets.
 TEST(Coverage, InstanceOptionSyntacticLevels) {
   const InstanceOptionKind kAll[] = {
       InstanceOptionKind::kName,
@@ -126,7 +117,6 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
         CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCovergroup));
   }
 
-  // weight, goal, comment, at_least: allowed at all three levels.
   for (InstanceOptionKind kind :
        {InstanceOptionKind::kWeight, InstanceOptionKind::kGoal,
         InstanceOptionKind::kComment, InstanceOptionKind::kAtLeast}) {
@@ -135,7 +125,6 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
     EXPECT_TRUE(CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
   }
 
-  // auto_bin_max and detect_overlap: coverpoint yes, cross no.
   for (InstanceOptionKind kind :
        {InstanceOptionKind::kAutoBinMax, InstanceOptionKind::kDetectOverlap}) {
     EXPECT_TRUE(
@@ -144,8 +133,6 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
         CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
   }
 
-  // cross_num_print_missing and cross_retain_auto_bins: cross yes, coverpoint
-  // no.
   for (InstanceOptionKind kind : {InstanceOptionKind::kCrossNumPrintMissing,
                                   InstanceOptionKind::kCrossRetainAutoBins}) {
     EXPECT_FALSE(
@@ -153,7 +140,6 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
     EXPECT_TRUE(CoverageDB::OptionAllowedAt(kind, CoverSyntacticLevel::kCross));
   }
 
-  // name, per_instance, get_inst_coverage: covergroup level only.
   for (InstanceOptionKind kind :
        {InstanceOptionKind::kName, InstanceOptionKind::kPerInstance,
         InstanceOptionKind::kGetInstCoverage}) {
@@ -164,9 +150,6 @@ TEST(Coverage, InstanceOptionSyntacticLevels) {
   }
 }
 
-// LRM 19.7: covergroup-level options act as defaults for lower levels except
-// weight, goal, comment, and per_instance. The covergroup-only options (name,
-// get_inst_coverage) likewise do not propagate.
 TEST(Coverage, InstanceOptionDefaultPropagation) {
   for (InstanceOptionKind kind :
        {InstanceOptionKind::kAtLeast, InstanceOptionKind::kAutoBinMax,
@@ -185,9 +168,6 @@ TEST(Coverage, InstanceOptionDefaultPropagation) {
   }
 }
 
-// LRM 19.7: per_instance and get_inst_coverage are definition-only;
-// auto_bin_max, detect_overlap, and cross_retain_auto_bins are
-// covergroup/coverpoint definition-only; the rest may be set procedurally.
 TEST(Coverage, InstanceOptionProceduralSettability) {
   for (InstanceOptionKind kind :
        {InstanceOptionKind::kPerInstance, InstanceOptionKind::kGetInstCoverage,
@@ -205,8 +185,6 @@ TEST(Coverage, InstanceOptionProceduralSettability) {
   }
 }
 
-// §19.7: an option assignment in the definition takes effect when the
-// covergroup is instantiated; at_least = 2 leaves the bin hit once uncovered.
 TEST(CovergroupInstanceSim, AtLeastSetInDefinitionAppliesToInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -227,8 +205,6 @@ TEST(CovergroupInstanceSim, AtLeastSetInDefinitionAppliesToInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.7 and §19.10: option is a member of every instance, so c.option.at_least
-// reads the value the definition gave it.
 TEST(CovergroupInstanceSim, OptionReadThroughInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -245,9 +221,6 @@ TEST(CovergroupInstanceSim, OptionReadThroughInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.7: an instance option other than per_instance, get_inst_coverage,
-// auto_bin_max, detect_overlap and cross_retain_auto_bins may be assigned after
-// instantiation, at the covergroup level or at a coverpoint's.
 TEST(CovergroupInstanceSim, ProceduralOptionWritesSetTheInstanceOptions) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -266,11 +239,6 @@ TEST(CovergroupInstanceSim, ProceduralOptionWritesSetTheInstanceOptions) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.7: an instance option may be assigned procedurally after the covergroup
-// is built, and one set at the covergroup level is the default of each of its
-// coverpoints that sets none of its own: at_least 2 on e, as on c's cx itself
-// and in d's definition, leaves one hit short of covering the bin. Assigned
-// to e, it was held but its coverpoint counted the bin after one hit.
 TEST(CoverageOptionSim,
      ACovergroupOptionAssignedProcedurallyIsItsItemsDefault) {
   SimFixture f;
@@ -299,10 +267,6 @@ TEST(CoverageOptionSim,
   EXPECT_EQ(out, "0.00 0.00 0.00 2 2\n");
 }
 
-// §19.7: a covergroup-level option assigned procedurally is the default of
-// each cross that does not set its own: xy sets at_least 1 in its definition
-// and covers its bin after one hit, while yx takes the covergroup's 2. A
-// cross's own option, yx's weight, written after instantiation, is its own.
 TEST(CoverageOptionSim,
      ACovergroupOptionAssignedProcedurallyIsItsCrossesDefault) {
   SimFixture f;
@@ -327,11 +291,6 @@ TEST(CoverageOptionSim,
   EXPECT_EQ(out, "100.00 0.00 2\n");
 }
 
-// §19.7, Table 19-1: with detect_overlap true, two bins of a coverpoint whose
-// range lists share a value draw a warning, an array's bin among them and two
-// intervals of a real coverpoint (§19.5.1), while an ignore_bins sharing
-// values with a bin draws none, and neither does a coverpoint that leaves the
-// option at its default of 0.
 TEST(CoverageOptionSim, DetectOverlapWarnsOfOverlappingRangeLists) {
   SimFixture f;
   RunCapture(
@@ -366,10 +325,6 @@ TEST(CoverageOptionSim, DetectOverlapWarnsOfOverlappingRangeLists) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.7, Table 19-1: with detect_overlap true, two transition bins whose
-// transition lists share a transition draw a warning; §19.5.2 expands
-// `0, 1 => 2` into `0 => 2` and `1 => 2`. The option set on the covergroup is
-// each coverpoint's default, and an ignore_bins transition draws none.
 TEST(CoverageOptionSim, DetectOverlapWarnsOfOverlappingTransitionLists) {
   SimFixture f;
   RunCapture(
@@ -392,10 +347,6 @@ TEST(CoverageOptionSim, DetectOverlapWarnsOfOverlappingTransitionLists) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.7, Table 19-1: cross_num_print_missing is how many of a cross's missing
-// cross bins the coverage report lists, 0 by default listing none. ab sets 2
-// of its 3 missing; the covergroup-level 1 of cg2 is xy's default, and pq,
-// whose one bin is covered, has none to list; ba keeps 0.
 TEST(CoverageOptionSim, CrossNumPrintMissingListsThatManyMissingBins) {
   SimFixture f;
   RunCapture(
@@ -434,10 +385,6 @@ TEST(CoverageOptionSim, CrossNumPrintMissingListsThatManyMissingBins) {
             "  <auto[0],auto[1]>\n");
 }
 
-// §19.7, Table 19-1, and §19.7.1, Table 19-3: a weight is a non-negative
-// integral value. One given by a covergroup formal or assigned procedurally,
-// through an instance or the type, is a run-time error when negative, and the
-// weight keeps the value it had; 0 is legal.
 TEST(CovergroupInstanceSim, NegativeWeightSetAtRunTimeIsReported) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

@@ -22,60 +22,23 @@
 
 namespace delta {
 
-// True for the ten operators §11.4.4, §11.4.5 and §11.4.6 define: the four
-// relational operators of Table 11-8, the four equality operators of
-// Table 11-9 and the two wildcard equality operators of Table 11-10. Each
-// compares its two operands whole and answers one bit, which is what separates
-// them from the operators SynthLower::LowerBinaryBit lowers a bit at a time.
 bool IsCompareOp(TokenKind op);
 
-// True for the four operators §11.4.10 defines: the logical shifts `<<` and
-// `>>` and the arithmetic shifts `<<<` and `>>>`. Each moves its left operand
-// by the number of bit positions its right operand gives, so the bit of the
-// result a caller asks for is built from a different bit of the left operand.
 bool IsShiftOp(TokenKind op);
 
-// True for the unary operators §11.8.1 rules unsigned whatever their operand
-// is. The subclause names the six §11.4.9 reduction operators itself, ruling
-// the result of a comparison or a reduction unsigned whatever its operands
-// are. §11.4.7 states the result of the logical negation `!` as `1'b0` or
-// `1'b1`, and §11.8.1 rules a based number unsigned. §11.6.1 Table 11-21 makes
-// each of them one bit long.
 bool IsUnsignedResultUnaryOp(TokenKind op);
 
-// True for the four §11.4.7 logical operators. §11.4.7 states the result of
-// each as `1'b1`, `1'b0` or `1'bx`, and §11.8.1 rules a based number unsigned,
-// so the type of neither operand reaches the result. §11.6.1 Table 11-21 makes
-// each of them one bit long.
 bool IsLogicalOp(TokenKind op);
 
-// One stage of a ripple-carry chain: answer `a XOR b XOR carry` and leave the
-// majority of the three in `carry`. §11.4.3 addition and subtraction, the
-// §11.4.2 increment and decrement operators and the §11.4.4 relational
-// operators are all built from this stage, so it states the carry once.
 uint32_t FullAdderBit(AigGraph& aig, uint32_t a, uint32_t b, uint32_t& carry);
 
-// What a construct this synthesizer has no lowering for is called in IEEE
-// 1800-2023, and the subclause that defines it. An empty message is a construct
-// that does lower.
 struct NonSynthRule {
   std::string_view message;
   std::string_view subclause;
 };
 
-// What IEEE 1800-2023 calls an expression kind this synthesizer has no lowering
-// for, and the subclause that defines it. A kind LowerExprBit lowers has no
-// entry and comes back with an empty message. Defined in synth_lower.cpp beside
-// LowerExprBit; synth_lower_check.cpp asks the same table so that a declaration
-// initializer, which LowersToNothing drops before the lowering runs, draws the
-// report the identical expression draws on the right of an assignment.
 NonSynthRule NonSynthExprRule(ExprKind kind);
 
-// The signal of the first term of `events` naming an event variable of `mod`,
-// or null when none does. Defined in synth_lower_check.cpp; both the check of
-// an `always` construct's sensitivity list and the check of an event control
-// written as a statement ask it, so the two cannot come to disagree about which
-// identifiers name events.
 const Expr* NamedEventTerm(const std::vector<EventExpr>& events,
                            const RtlirModule* mod);
 
@@ -87,22 +50,9 @@ class SynthLower {
 
   uint32_t LowerExprBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // §11.4.13: the literal answering whether `sel_expr` lies within the value
-  // range `range`, both bounds included. `range` is the baseless
-  // ExprKind::kSelect Parser::ParseInsideValueRange builds for `[lo:hi]`.
-  // Reports the range and answers constant false for a bound with no value to
-  // compare against: the `$` §11.4.13 admits, and the `+/-` and `+%-` forms,
-  // whose second operand is a tolerance rather than an upper bound. Public
-  // because BuildPatternMatch reaches it through LowerCtx::synth.
   uint32_t LowerInsideRangeMatch(const Expr* sel_expr, const Expr* range,
                                  AigGraph& aig, uint32_t width);
 
-  // §11.8.2: bit `bit` of a context-determined operand, a signed identifier
-  // extended by its sign where the propagated type is signed. That is an
-  // operand of a binary arithmetic or bitwise operator, and the case expression
-  // §12.5 and the left operand of `==?` §11.4.6 compare over a common length.
-  // Defined in synth_lower.cpp. Public because BuildPatternMatch reaches it
-  // through LowerCtx::synth.
   uint32_t LowerContextOperandBit(const Expr* operand, AigGraph& aig,
                                   uint32_t bit);
 
@@ -110,9 +60,6 @@ class SynthLower {
   bool CheckExprSynthesizable(const Expr* expr);
 
  private:
-  // True where every operand of a §11.4.12 concatenation or a §11.4.12.1
-  // replication is synthesizable, which is what the braces enclose and, for a
-  // replication, the multiplier before them.
   bool CheckElementsSynthesizable(const Expr* expr);
 
   bool CheckSynthesizable(const RtlirModule* mod);
@@ -125,219 +72,94 @@ class SynthLower {
 
   void MapPorts(const RtlirModule* mod, AigGraph& aig);
 
-  // §23.7: which of the three dotted-name constructs `expr` is, and the
-  // subclause that defines it. A member of SynthLower because the clause
-  // decides it from the module the name was written in, which the free
-  // NonSynthExprRule in synth_lower.cpp cannot read.
   NonSynthRule DottedNameRule(const Expr* expr) const;
 
-  // Clear the state left by the last module lowered, and read the parameters of
-  // `mod`, which are the constants a select's index folds against.
   void ResetForModule(const RtlirModule* mod);
 
-  // Record what the lowering has to know about one declared signal: how many
-  // bits it has, whether it was declared signed, the literals its bits carry,
-  // and the range §11.5.1 resolves a select on it against.
   void RecordSignal(std::string_view name, uint32_t width, bool is_signed,
                     const RtlirModule* mod);
 
-  // §6.20: a parameter is a constant fixed at elaboration, so where its name
-  // stands as an operand it stands for its value. Each value parameter of the
-  // module is recorded as a signal whose bits are the constants of that value,
-  // at the width and signedness §6.20.2 reads it at and with the range it was
-  // declared with, so that every reader of a signal's bits, width, type and
-  // range answers the parameter as it answers a declared signal. A parameter
-  // array is recorded as an array whose elements are constants. A parameter
-  // this cannot record is kept in unlowered_params_, so that an operand naming
-  // it is reported rather than read as zero.
   void MapParams(const RtlirModule* mod);
-  // Record `param` and answer whether it was recorded. Defined, with the two
-  // below, in synth_lower_param.cpp.
   bool MapParam(const RtlirParamDecl& param);
   bool MapParamArray(const RtlirParamDecl& param, ParamStorageShape shape);
   void RecordParamSignal(const RtlirParamDecl& param, ParamStorageShape shape,
                          std::vector<uint32_t> bits);
 
-  // Report `expr` where `name` names a parameter MapParams could not record,
-  // and answer whether it did.
   bool ReportIfUnloweredParam(const Expr* expr, const Expr* name);
 
-  // Give an input port one AIG input per bit of `width`, and record an output
-  // port so that RegisterOutputs can emit what drove it. `width` is the port's
-  // storage rather than RtlirPort::width, which is one element's worth where
-  // the port declares an unpacked array.
   void MapPortBits(const RtlirPort& port, uint32_t width, AigGraph& aig);
 
   uint32_t LowerIdentBit(std::string_view name, uint32_t bit);
 
-  // §5.7.1: lower one bit of an integer literal. The literal's own digits are
-  // what answers it, because §5.7.1 sizes a literal by its size constant and
-  // admits one wider than the 64 bits Expr::int_val holds.
   uint32_t LowerLiteralBit(const Expr* expr, uint32_t bit);
 
-  // The digits of `expr` decoded to bit positions, decoded once per literal.
   const PatternBits& LiteralBits(const Expr* expr);
 
   uint32_t LowerBinaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
   uint32_t LowerUnaryBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // §11.4.3: lower one bit of `a + b` or `a - b` as a ripple-carry chain over
-  // both operands. Bit `bit` of a sum depends on every operand bit below it, so
-  // this reads the operands at every index from zero up to `bit` rather than at
-  // `bit` alone.
   uint32_t LowerAddSubBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // Report `a * b`, `a / b`, `a % b` or `a ** b` (§11.4.3) and answer true, and
-  // answer false for every other operator. A reported expression sets
-  // lowering_incomplete_, so Lower answers with no netlist rather than with one
-  // whose bits stand for nothing the design wrote.
   bool ReportArithIfUnlowered(const Expr* expr);
 
-  // §11.4.4, §11.4.5 and §11.4.6: lower one bit of a comparison. All three
-  // subclauses rule that the result is 1'b0 or 1'b1, so bit 0 carries the
-  // comparison and every bit above it is zero.
   uint32_t LowerCompareBit(const Expr* expr, AigGraph& aig, uint32_t bit);
-  // The answer recorded for `expr`, a comparison of two type references, in
-  // the generate block instance being lowered, or nullopt where none is.
   std::optional<bool> TypeRefCompareHere(const Expr* expr) const;
 
-  // The comparison an operator answers before the negation §11.4.4 and §11.4.5
-  // define four of the ten by: `a >= b` for both `a >= b` and `a < b`, and the
-  // equality of the operands for both `a == b` and `a != b`.
   uint32_t LowerCompareMatch(const Expr* expr, AigGraph& aig);
 
-  // §11.4.6: the match of the left operand against the wildcards written into
-  // the right one. Reports the expression and answers constant false when the
-  // right operand is not an integer literal, since a wildcard position can only
-  // be read out of a literal's own digits.
   uint32_t LowerWildcardMatch(const Expr* expr, AigGraph& aig);
 
   void ReportWildcardUnlowered(const Expr* expr);
 
-  // §11.4.5: the literal that is true exactly where the two operands hold the
-  // same bit at every position below `width`.
   uint32_t CompareEqual(const Expr* lhs, const Expr* rhs, AigGraph& aig,
                         uint32_t width, bool is_signed);
 
-  // §11.4.4: the literal that is true exactly where `lhs` is at least `rhs`,
-  // which is the carry out of the subtraction of the two.
   uint32_t CompareAtLeast(const Expr* lhs, const Expr* rhs, AigGraph& aig,
                           uint32_t width, bool is_signed);
 
-  // The number of bit positions a comparison of the two operands is carried
-  // out over.
   uint32_t CompareWidth(const Expr* lhs, const Expr* rhs);
 
-  // §11.8.2: lower one bit of an operand the expression around it has
-  // propagated a wider size to. The positions above the width
-  // SynthLower::ExtendedOperandWidth answers for the operand are extension
-  // positions, and the standard sign-extends an operand into them only when
-  // the type propagated to it is signed, which is what `sign_extend` carries.
-  // §11.4.4 and §11.4.5 extend both operands of a comparison to the width it is
-  // carried out over, and §11.4.10 extends a shift's left operand to the width
-  // the shift moves it within.
   uint32_t LowerExtendedOperandBit(const Expr* expr, AigGraph& aig,
                                    uint32_t bit, bool sign_extend);
 
-  // The number of positions an operand's own value occupies, above which
-  // SynthLower::LowerExtendedOperandBit extends it, or 0 where that is not
-  // known and the operand is read as SynthLower::LowerExprBit answers it.
   uint32_t ExtendedOperandWidth(const Expr* expr);
 
-  // §11.4.12: lower one bit of a concatenation. The bit of the result at `bit`
-  // is a bit of whichever operand's own width spans that position, so this
-  // reads the widths of the operands and not only their bits.
   uint32_t LowerConcatBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // §11.4.12.1: lower one bit of a replication, which is that many copies of
-  // the concatenation it multiplies.
   uint32_t LowerReplicateBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // Lower one bit of the operands of `expr` joined as §11.4.12 joins them,
-  // which is what both a concatenation and one copy of a replication are.
   uint32_t LowerElementsBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // How many bits `expr` carries, and nothing where the synthesizer cannot say.
-  // §11.4.12 needs the size of every operand of a concatenation to place any of
-  // them, so an operand this cannot answer for is one the concatenation has no
-  // lowering for.
   std::optional<uint32_t> ExprWidth(const Expr* expr);
 
-  // How many bits a unary, binary or conditional operator expression carries,
-  // for SynthLower::ExprWidth, and nothing where an operand it needs has none.
   std::optional<uint32_t> OperatorWidth(const Expr* expr);
 
-  // The widths of the operands of `expr` together.
   std::optional<uint32_t> ElementsWidth(const Expr* expr);
 
-  // §11.4.12.1: the multiplier of `expr` times the width of what it replicates.
   std::optional<uint32_t> ReplicateWidth(const Expr* expr);
 
-  // Report that `expr` has no lowering and answer no netlist for the module.
-  // An expression the synthesizer builds nothing for used to leave the graph
-  // carrying a constant while the run reported success.
   void ReportExprUnlowered(const Expr* expr, std::string_view message,
                            Subclause subclause);
 
-  // Report that the assignment whose target is `target` would be dropped, and
-  // answer no netlist for the module. A target this cannot resolve is every
-  // target that is not a name and not a select over a run of bits it can name.
   void ReportUnloweredTarget(const Expr* target);
 
-  // §11.4.9: lower one bit of a reduction operator. The subclause gives it a
-  // single-bit result, so bit 0 carries the fold across the operand's bits and
-  // every bit above it is zero.
   uint32_t LowerReductionBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // Whether `expr` is true, as one literal. §11.4.7, §11.4.11 and §12.4 each
-  // take a value as true where it is nonzero, so this is the OR of every bit of
-  // `expr` across its self-determined width. An operand SynthLower::ExprWidth
-  // cannot answer for is reported under `subclause` and answered false.
   uint32_t LowerTruthValue(const Expr* expr, AigGraph& aig,
                            Subclause subclause);
 
-  // §11.4.7: lower one bit of `&&`, `||`, `->` or `<->`. Each yields one bit
-  // over the truth values of its two operands, so bit 0 carries the result and
-  // every bit above it is zero.
   uint32_t LowerLogicalBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // §11.4.3: lower one bit of the unary minus, which §11.4.3.1 makes the
-  // two's complement of the operand. Bit `bit` of it depends on every operand
-  // bit below `bit`, so this reads the operand at every index up to `bit`.
   uint32_t LowerNegateBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // §11.5.1: lower one bit of a bit-select, a non-indexed part-select or an
-  // indexed part-select. The bit of the result at `bit` is a bit of the
-  // selected signal at an offset the declaration of that signal decides, so
-  // this reads the declared range rather than taking an index for an offset.
   uint32_t LowerSelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // Where a select lands in the storage of the signal it selects from. `name`
-  // is that signal, `lo` is how far the least significant selected bit sits
-  // above the least significant end of it, and `count` is how many bits the
-  // select addresses. `count` is zero where the select does not resolve: its
-  // base is not a signal this module declares, or an index of it did not fold
-  // to a constant. `lo` is signed because §11.5.1 lets a part-select run off
-  // the end of the vector, and the bits that do so read as zero here rather
-  // than wrapping onto bits that are in range.
   struct SelectStorage {
     std::string_view name;
     int64_t lo = 0;
     uint32_t count = 0;
   };
 
-  // §11.5.2: the shape of an unpacked array. `elem_width` is how many bits one
-  // element holds, `lo` is the lowest address its declaration admits and
-  // `count` is how many elements it holds, so element `addr` occupies the
-  // `elem_width` bits at `(addr - lo) * elem_width`. §11.5.2 has the bounds the
-  // memory was declared with decide what an address selects, and an address
-  // names its element whichever way §7.4.2 let the dimension be written, so the
-  // direction decides which addresses are admitted rather than which element
-  // each reaches. §11.5.2: one dimension of an unpacked array as its
-  // declaration admits addressing it. `lo` is the smallest address the
-  // dimension admits and `count` is how many elements it holds, so an address
-  // `a` of this dimension selects the element at `a - lo` and every other
-  // address is out of bounds.
   struct ArrayDim {
     int64_t lo = 0;
     uint32_t count = 0;
@@ -345,13 +167,8 @@ class SynthLower {
 
   struct ArrayShape {
     uint32_t elem_width = 0;
-    // One entry per unpacked dimension, outermost first, because §11.5.2 has a
-    // word selected by giving one address per dimension. Element `[a0][a1]` of
-    // a two-dimensional array occupies the `elem_width` bits at
-    // `((a0 - lo0) * count1 + (a1 - lo1)) * elem_width`.
     std::vector<ArrayDim> dims;
 
-    // How many elements the whole array holds.
     [[nodiscard]] uint32_t Count() const {
       uint32_t n = 1;
       for (const auto& d : dims) n *= d.count;
@@ -359,31 +176,14 @@ class SynthLower {
     }
   };
 
-  // The shape of the array `base` names, or null where `base` names no array
-  // whose address ranges reached RTLIR.
   const ArrayShape* ArrayShapeOf(const Expr* base);
 
-  // §11.5.2: record the shape of `name` from the address ranges its
-  // declaration wrote, so a select on it resolves against them. `num_dims` is
-  // the number of unpacked dimensions the declaration wrote and `dims` the
-  // ranges that folded, so a shorter `dims` is a declaration this cannot
-  // address and records nothing. Answers whether a shape was recorded, which is
-  // what says the storage holds one element per address rather than one
-  // element.
   bool RecordArrayShape(std::string_view name, uint32_t elem_width,
                         uint32_t num_dims,
                         const std::vector<RtlirUnpackedDim>& dims);
 
-  // The storage a declaration of one element's width `elem_width` occupies:
-  // that width where `name` has no recorded array shape, and one element per
-  // address the shape admits where it has.
   uint32_t ArrayStorageWidth(std::string_view name, uint32_t elem_width);
 
-  // What a chain of selects names against the array its base was declared as.
-  // §11.5.2 has a word selected by giving one address per dimension, so a chain
-  // carrying exactly that many addresses names an element, a shorter one names
-  // a slice of the array, and a longer one names a §11.5.1 select within the
-  // element the leading addresses reach.
   enum class ArraySelectKind : uint8_t {
     kNotArray,
     kSlice,
@@ -393,93 +193,43 @@ class SynthLower {
 
   ArraySelectKind ClassifyArraySelect(const Expr* sel);
 
-  // §11.5.2: the storage the array select chain ending at `sel` addresses, for
-  // addresses that fold to constants.
   SelectStorage ResolveArraySelect(const Expr* sel);
 
-  // §11.5.2: lower one bit of an array select whose address did not fold,
-  // which the subclause admits by letting the address be any integer
-  // expression. Such a select chooses among the elements, so it is a
-  // multiplexer over the addresses the declaration admits.
   uint32_t LowerArraySelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // §11.5.2: drive the element an address that did not fold names, leaving
-  // every other element as it stands. Each element keeps what it held except
-  // where the address selects it.
   bool LowerArrayTarget(const Expr* lhs, const Expr* rhs, AigGraph& aig);
 
-  // §11.5.1: the storage `sel` addresses, resolved against the declared range
-  // of its base.
   SelectStorage ResolveSelect(const Expr* sel);
 
-  // True where `sel` addresses a bit of a vector, which is what §11.5.1
-  // defines, rather than an element of an unpacked array, which is §11.5.2.
   bool IsVectorSelect(const Expr* sel);
 
-  // Install the scope of the item being lowered, which stands in the generate
-  // blocks `prefixes` names: the module's parameters, the §27.4 loop index
-  // values `consts` carries, and the parameters those blocks declare (§23.9).
-  // Each loop index and block parameter is recorded as a signal whose bits are
-  // the constants of its value, over whatever the name held at module scope,
-  // and is folded into the scope a select's index is folded in. Defined, with
-  // the three below, in synth_lower_param.cpp.
   void SetGenScope(const GenBlockConsts& consts,
                    const GenBlockPrefixes& prefixes);
   void InstallScopeConstant(std::string_view name, std::vector<uint32_t> bits,
                             bool is_signed, PackedRange range);
-  // Put back each name SetGenScope recorded over as it stood at module scope.
   void RestoreShadowedSignals();
-  // Record the parameters `mod` declares in its generate blocks, and answer
-  // whether `param` was one SetGenScope can install.
   bool RecordBlockParam(const RtlirParamDecl& param);
 
-  // §11.5.1: lower one bit of a select whose index did not fold, which is the
-  // form the subclause writes `dword[8*sel +: 8]` and `vect[addr]` in. Such a
-  // select chooses among the bits of its base rather than renaming them, so it
-  // is a multiplexer over every index the declared range holds.
   uint32_t LowerVariableSelectBit(const Expr* expr, AigGraph& aig,
                                   uint32_t bit);
 
-  // §11.5.1: lower one bit of a select whose operand is an expression rather
-  // than a name, which carries no declaration to resolve an index against and
-  // no signal to read a bit out of. The bits of such an operand are addressed
-  // [width-1:0], so an index is an offset, and the bit the select names is the
-  // bit SynthLower::LowerExprBit answers at that offset.
   uint32_t LowerExprSelectBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // The literal that is true exactly where `expr` carries the value `value`.
   uint32_t ExprEqualsValue(const Expr* expr, AigGraph& aig, int64_t value);
 
-  // How many bits a select whose index did not fold addresses, and zero where
-  // it addresses none this builds anything for.
   int64_t VariableSelectWidth(const Expr* expr);
 
-  // The index that carries result bit `bit` of `expr` when its index carries
-  // `value`, over a select `width` bits wide.
   int64_t VariableSelectIndex(const Expr* expr, int64_t value, int64_t width,
                               uint32_t bit);
 
-  // The declared range the indices of a select on `base` are resolved against.
   PackedRange BaseRange(const Expr* base);
 
-  // Drive the storage a select target addresses from `rhs`, and leave the other
-  // bits of the signal as they stand. §11.5.1 has a write to a part-select
-  // change only the bits of it that are in range, so the bits outside
-  // the select keep what drove them.
   void LowerSelectTarget(const Expr* lhs, const Expr* rhs, AigGraph& aig);
 
-  // §11.4.10: lower one bit of `a << b`, `a >> b`, `a <<< b` or `a >>> b`. The
-  // bit of the result at `bit` is a bit of the left operand at another index,
-  // so this reads the left operand across the whole width the shift moves it
-  // within rather than at `bit` alone.
   uint32_t LowerShiftBit(const Expr* expr, AigGraph& aig, uint32_t bit);
 
-  // The number of bit positions a shift moves its left operand within.
   uint32_t ShiftWidth(const Expr* lhs);
 
-  // §10.7: lower one bit of an assignment right-hand side in the context of the
-  // target width. Bits above the RHS's own width are extension bits: the RHS
-  // sign bit when the RHS is signed, otherwise zero.
   uint32_t LowerAssignRhsBit(const Expr* rhs, AigGraph& aig, uint32_t bit);
 
   void LowerContAssign(const RtlirContAssign& assign, AigGraph& aig);
@@ -491,21 +241,11 @@ class SynthLower {
   void LowerIfStmt(const Stmt* stmt, AigGraph& aig);
   void LowerCaseStmt(const Stmt* stmt, AigGraph& aig);
 
-  // §12.5: the length the case expression of `stmt` and its case item
-  // expressions are compared at, which is the longest of them, and nothing
-  // where the case expression has no width SynthLower::ExprWidth can answer.
-  // An item it cannot answer for contributes nothing.
   std::optional<uint32_t> CaseCompareWidth(const Stmt* stmt);
 
-  // §12.5: whether the case expression of `stmt` and its case item
-  // expressions are compared as signed values, which they are only where every
-  // one of them is signed.
   bool IsSignedCase(const Stmt* stmt);
   void LowerAssignStmt(const Stmt* stmt, AigGraph& aig);
 
-  // Lower one of the four §11.4.2 increment and decrement operators over a
-  // whole variable, and answer false for any other expression so that its
-  // statement is reported rather than dropped.
   bool LowerIncDecStmt(const Expr* expr, AigGraph& aig);
 
   void CreateLatches(
@@ -522,12 +262,6 @@ class SynthLower {
   uint32_t SignalWidth(std::string_view name);
   bool IsSignedSignal(std::string_view name);
 
-  // §11.8.1: whether `expr` is signed, over the rules that subclause states for
-  // the type of an expression. SynthLower::IsSignedSignal answers the same
-  // question about one declared name, which is the leaf of this one. §11.4.10
-  // fills the bit positions `>>>` vacates with the sign bit only where the type
-  // of the whole expression the shift stands in is signed, so that expression
-  // is what has to be read and not the shift's own left operand.
   bool IsSignedExpr(const Expr* expr);
 
   void RegisterOutputs(AigGraph& aig);
@@ -541,32 +275,14 @@ class SynthLower {
 
   std::unordered_map<std::string_view, bool> signal_signed_;
 
-  // §11.5.1: the declared range of each signal, which is what a select on that
-  // signal resolves its indices against. A width cannot answer the question,
-  // because `[15:0]` and `[2:17]` are both sixteen bits wide and one value of
-  // an index reaches a different bit of each.
   std::unordered_map<std::string_view, PackedRange> signal_ranges_;
 
-  // The signals declared with an unpacked dimension. §11.5.2 addresses an array
-  // element and §11.5.1 addresses a bit of a vector, and the two are written
-  // alike, so the declaration is what tells them apart. Nothing here lowers
-  // §11.5.2, and a select on one of these names is left alone rather than
-  // resolved against the packed range of its element type.
   std::unordered_set<std::string_view> unpacked_arrays_;
 
-  // The value parameters of the module MapParams could not record as signals:
-  // a real or a string parameter, and a parameter array whose elements did
-  // not fold from a positional pattern, whether declared in the module or in
-  // one of its generate blocks.
   std::unordered_set<std::string_view> unlowered_params_;
 
-  // §27.4 with §23.9: the value parameters the module declares in its generate
-  // blocks, each recorded by SetGenScope while an item of its block is lowered.
   std::vector<const RtlirParamDecl*> block_params_;
 
-  // A name's module-scope state, kept while SetGenScope has recorded a loop
-  // index or a block parameter over it, and put back before the next item's
-  // scope goes in. `recorded` is false where the name held no signal.
   struct ShadowedSignal {
     std::string_view name;
     bool recorded = false;
@@ -578,72 +294,24 @@ class SynthLower {
   };
   std::vector<ShadowedSignal> shadowed_signals_;
 
-  // §11.5.2: the shape of each unpacked array this can address, which is the
-  // one-dimensional arrays a variable declaration gives a low bound for.
-  // `unpacked_arrays_` says a select on a name is §11.5.2 rather than §11.5.1;
-  // this says where the element the address names lands in the storage.
   std::unordered_map<std::string_view, ArrayShape> array_shapes_;
 
-  // The resolved parameters of the module being lowered, which is the scope a
-  // select's index is folded in. §11.5.1 rules that a non-indexed part-select
-  // is written with constant integer expressions, and a parameter is what such
-  // an expression is usually written from.
   ScopeMap param_scope_;
 
-  // §27.4 gives each instance of a loop generate block an implicit localparam
-  // named after the loop index, and the elaborator leaves that name unfolded in
-  // the body it shares between the instances. This is param_scope_ with the
-  // values of the assignment being lowered added, so `assign out[i] = in[i];`
-  // resolves `i` to the value its own instance was elaborated with.
   ScopeMap scope_;
 
   std::vector<std::pair<std::string_view, uint32_t>> output_ports_;
 
-  // §11.8.2: the size the assignment being lowered propagates back down to the
-  // context-determined operands of its right-hand side, and zero while no
-  // assignment is being lowered. §11.6.1 Table 11-21 gives a shift the bit
-  // length of its left operand and makes that operand context-determined, so
-  // this is the width a shift moves its left operand within: `y` eight bits
-  // wide makes `y = a << 1` a shift within eight positions, whatever width `a`
-  // was declared.
   uint32_t propagated_width_ = 0;
 
-  // §11.8.2: the type the assignment being lowered propagates back down to the
-  // context-determined operands of its right-hand side, which the same step
-  // propagates the size in propagated_width_ down with. §11.8.1 rules that an
-  // expression's type is not affected by any left-hand side it is assigned to,
-  // so
-  // this is the type of the right-hand side and not the type the target was
-  // declared with. Whatever sets propagated_width_ sets this beside it: a
-  // comparison, a truth value or a case statement (§12.5) propagates the type
-  // of its own operands.
   bool propagated_signed_ = false;
 
-  // The expressions ReportExprUnlowered has already reported: the §11.4.3
-  // arithmetic operators, and the §11.4.12 concatenations and §11.4.12.1
-  // replications whose operand widths it cannot answer. LowerContAssign and
-  // LowerAssignStmt ask for one bit at a time, so an unguarded report would
-  // name one expression once per bit of the assignment target.
   std::unordered_set<const Expr*> reported_exprs_;
 
-  // The literals already decoded to bit positions. LowerContAssign and
-  // LowerAssignStmt ask for one bit at a time, so an undecoded literal would be
-  // read once per bit of the assignment target.
   std::unordered_map<const Expr*, PatternBits> literal_bits_;
 
-  // Set by LowerStmt when it meets a statement it has no lowering for, by
-  // LowerBinaryBit when it meets a §11.4.3 arithmetic operator it has no
-  // lowering for, and by LowerWildcardMatch when a §11.4.6 wildcard comparison
-  // has no literal to read its wildcard positions out of. Each contributes
-  // nothing to the graph, so the graph no longer describes the module and Lower
-  // answers with no netlist rather than with a wrong one.
   bool lowering_incomplete_ = false;
 
-  // §6.23 with §6.20.3: what each comparison of two type references the module
-  // writes stands for in this instance, by the generate block instance it is
-  // written in, which the elaborator records in place of folding the shared
-  // tree (RtlirModule::type_ref_compares); and the generate prefix of the item
-  // being lowered, which picks a loop iteration's own entry.
   const std::vector<TypeRefCompareResult>* type_ref_compares_ = nullptr;
   std::string_view gen_prefix_;
 };

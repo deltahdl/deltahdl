@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Table B.1 -- the words SystemVerilog reserves -- in the alphabetical order
-// the annex prints them.
 constexpr const char* kReservedKeywords[] = {
     "accept_on",
     "alias",
@@ -268,22 +266,12 @@ constexpr const char* kReservedKeywords[] = {
 
 constexpr size_t kReservedKeywordCount = std::size(kReservedKeywords);
 
-// The plainest identifier slot there is: the name of a variable. No compiler
-// directive is in force anywhere in this file, which is the point -- Annex B
-// describes what the language reserves on its own, with nothing turned on.
 std::string VarDecl(std::string_view word) {
   return "module m;\n  reg [7:0] " + std::string(word) + ";\nendmodule\n";
 }
 
-// A constructor's name is spelled with a listed word, and the function-name
-// production takes it in that role rather than as a chosen name, so what that
-// position would record for it is not a reservation result.
 bool IsConstructorWord(std::string_view word) { return word == "new"; }
 
-// The listed words that begin a type or stand as a primary in their own right.
-// In an expression they are consumed in that role, so their acceptance says
-// nothing about whether a name could go there; the remaining 227 have no such
-// role and cannot reach an operand slot at all.
 bool HasOperandRoleOfItsOwn(std::string_view word) {
   constexpr std::string_view kWithOperandRole[] = {
       "bit",      "byte",      "const",  "int",    "integer",  "logic",
@@ -297,10 +285,6 @@ bool HasOperandRoleOfItsOwn(std::string_view word) {
   return false;
 }
 
-// The identifier positions a variable's own name slot does not reach, each one
-// entered through a different production. The '@' placeholder stands for the
-// name under test everywhere it appears. Every position carries the words it
-// cannot sweep and the number it does sweep, so nothing is dropped quietly.
 struct Position {
   const char* what;
   const char* tmpl;
@@ -399,7 +383,6 @@ constexpr Position kPositions[] = {
      nullptr, 248},
 };
 
-// Substitutes one name for every placeholder in a position template.
 std::string AtPosition(const Position& p, std::string_view word) {
   std::string src = p.tmpl;
   for (auto at = src.find('@'); at != std::string::npos;
@@ -409,15 +392,8 @@ std::string AtPosition(const Position& p, std::string_view word) {
   return src;
 }
 
-// A name no rule reserves, used as the control everywhere a rejection is
-// claimed: it shows the surrounding template parses, so the failure the sweep
-// records is the word in the slot and not the frame around it.
 constexpr const char* kControlName = "ctrl_name";
 
-// Every reserved word swept through a variable's name slot. The word cannot
-// name the variable, while a name that is not on the list builds the very same
-// declaration and is read back off the tree -- so the rejection is the
-// reservation doing its work rather than a template that never parsed.
 TEST(KeywordListParsing, NoReservedWordCanNameAVariable) {
   EXPECT_EQ(kReservedKeywordCount, 248u);
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
@@ -436,12 +412,6 @@ TEST(KeywordListParsing, NoReservedWordCanNameAVariable) {
   }
 }
 
-// Reservation has to stop a word from naming anything at all, not just a
-// variable, so the whole list goes through every identifier position above,
-// one word at a time. The control name runs the same template first, which is
-// what makes each rejection attributable to the word rather than the frame.
-// Each position's swept total is asserted, so a word that stops being reached
-// shows up as a count that no longer matches rather than as silent coverage.
 TEST(KeywordListParsing, NoReservedWordCanNameAnythingInAnyPosition) {
   EXPECT_EQ(std::size(kPositions), 14u);
   for (const auto& position : kPositions) {
@@ -460,10 +430,6 @@ TEST(KeywordListParsing, NoReservedWordCanNameAnythingInAnyPosition) {
   }
 }
 
-// The reservation stops at the table. Names a reader might expect to be taken
-// -- built-in class and method names, other languages' reserved words, plural
-// and near-miss spellings of listed words -- all still name a variable, which
-// is how this stage shows the list is not quietly wider than it is printed.
 TEST(KeywordListParsing, WordsOffTheReservedKeywordListStillNameADeclaration) {
   const char* const kNotReserved[] = {
       "randomize", "mailbox",  "semaphore", "process", "std",       "option",
@@ -485,10 +451,6 @@ TEST(KeywordListParsing, WordsOffTheReservedKeywordListStillNameADeclaration) {
   }
 }
 
-// The escape form is the closest accepting neighbour of every rejection above:
-// the same letters, introduced by a backslash, are a chosen name again. The
-// declaration builds and the variable it declares carries the keyword
-// spelling, which is what separates escaping from evading the rule.
 TEST(KeywordListParsing, EscapedFormOfAReservedWordNamesAVariable) {
   size_t built = 0;
   for (size_t i = 0; i < kReservedKeywordCount; ++i) {
@@ -508,10 +470,6 @@ TEST(KeywordListParsing, EscapedFormOfAReservedWordNamesAVariable) {
       << "the escape works for every listed word";
 }
 
-// The accepting side of the reservation. Words that cannot name anything are
-// still what the language is written in, so a design that spends them on their
-// own roles has to parse -- and the module it builds is read back to show the
-// keywords were consumed as keywords rather than skipped over.
 TEST(KeywordListParsing, ReservedWordsCarryTheirOwnRoles) {
   constexpr const char* kSrc =
       "package pkg;\n"

@@ -231,10 +231,6 @@ TEST(LexicalConventionLexing,
   EXPECT_EQ(r.token.text, "foo\"bar/*baz//qux'end");
 }
 
-// §5.6.1 is what bounds the characters an escaped identifier may carry, to the
-// printable ASCII characters other than white space, decimal 33 through 126
-// (hexadecimal 21 through 7E). The rejection names that subclause and not §5.6,
-// since §5.6 states no such bound for a simple identifier.
 TEST(LexicalConventionLexing, NonPrintableCharacterNames5_6_1) {
   auto diags = LexDiagnostics("\\cpu\x01 ");
   EXPECT_TRUE(ReportedError(
@@ -242,10 +238,6 @@ TEST(LexicalConventionLexing, NonPrintableCharacterNames5_6_1) {
       "5.6.1"));
 }
 
-// §5.6.1: an escaped identifier may hold any printable character, a period
-// among them, so `\a.b ` is one name. The lexer records each such name it reads
-// and no other: neither an escaped name with no period nor a simple identifier
-// followed by a period and another.
 TEST(LexicalConventionLexing, RecordsTheEscapedIdentifiersHoldingAPeriod) {
   SourceManager mgr;
   DiagEngine diag(mgr);

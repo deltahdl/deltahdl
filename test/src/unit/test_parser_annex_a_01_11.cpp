@@ -11,10 +11,6 @@ using namespace delta;
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// package_or_generate_item_declaration alternatives (one observer per alt).
-// ---------------------------------------------------------------------------
-
 TEST(PackageItemsParsing, NetDeclaration) {
   auto r = Parse(
       "package p;\n"
@@ -102,8 +98,6 @@ TEST(PackageItemsParsing, InterfaceClassInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Out-of-block constructor: the genuine class_constructor_declaration alt
-// appearing directly as a package item.
 TEST(PackageItemsParsing, PackageItemClassConstructorDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -114,7 +108,6 @@ TEST(PackageItemsParsing, PackageItemClassConstructorDecl) {
   ASSERT_EQ(r.cu->packages.size(), 1u);
 }
 
-// local_parameter_declaration and parameter_declaration alternatives.
 TEST(PackageItemsParsing, PackageItemLocalparamDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -149,7 +142,6 @@ TEST(PackageItemsParsing, CovergroupInPackage) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// assertion_item_declaration: property and sequence forms.
 TEST(PackageItemsParsing, PackageItemAssertionDecl) {
   auto r = Parse(
       "package pkg;\n"
@@ -183,10 +175,6 @@ TEST(PackageItemsParsing, PackageWithClassDecl) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kClassDecl));
 }
 
-// ---------------------------------------------------------------------------
-// package_item alternatives beyond package_or_generate_item_declaration.
-// ---------------------------------------------------------------------------
-
 TEST(PackageItemsParsing, PackageTimeunits) {
   auto r = Parse(
       "package p;\n"
@@ -197,8 +185,6 @@ TEST(PackageItemsParsing, PackageTimeunits) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// package_export_declaration is its own package_item alternative (the named
-// and the *::* wildcard forms), distinct from a DPI export.
 TEST(PackageItemsParsing, PackageExportDeclaration) {
   auto r = Parse(
       "package pkg;\n"
@@ -212,16 +198,9 @@ TEST(PackageItemsParsing, PackageExportDeclaration) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kExportDecl));
 }
 
-// ---------------------------------------------------------------------------
-// Integration: every alternative coexisting in one package, including the
-// package_export_declaration, timeunits, and anonymous_program alternatives.
-// ---------------------------------------------------------------------------
-
 TEST(PackageItemsParsing, AllPackageItemAlternatives) {
   auto r = Parse(
       "package pkg;\n"
-      // §3.14.2.2: timeunit/timeprecision shall precede any other items in the
-      // time scope, so it leads the package body.
       "  timeunit 1ns;\n"
       "  wire w;\n"
       "  int x;\n"
@@ -249,10 +228,6 @@ TEST(PackageItemsParsing, AllPackageItemAlternatives) {
   EXPECT_GE(r.cu->packages[0]->items.size(), 10u);
 }
 
-// ---------------------------------------------------------------------------
-// anonymous_program ::= program ; { anonymous_program_item } endprogram
-// ---------------------------------------------------------------------------
-
 TEST(PackageItemsParsing, AnonymousProgramEmpty) {
   auto r = Parse(
       "package pkg;\n"
@@ -263,8 +238,6 @@ TEST(PackageItemsParsing, AnonymousProgramEmpty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Every anonymous_program_item alternative: task, function, class,
-// interface class, class constructor, covergroup, and the null item.
 TEST(PackageItemsParsing, AnonymousProgramAllItemTypes) {
   auto r = Parse(
       "package pkg;\n"
@@ -304,8 +277,6 @@ TEST(PackageItemsParsing, ErrorAnonymousProgramWithPorts) {
       "  program(input clk);\n"
       "  endprogram\n"
       "endpackage\n");
-  // §24.6 owns anonymous_program, whose header is 'program ;' with no port
-  // list, so the ';' is demanded there.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '('", 2, "24.6"));
 }
 
@@ -315,9 +286,6 @@ TEST(PackageItemsParsing, ErrorAnonymousProgramMissingEndprogram) {
       "  program;\n"
       "    task t(); endtask\n"
       "endpackage\n");
-  // The body scan runs past 'endpackage' looking for 'endprogram' and reaches
-  // the end of the source, which stands on line 5, the line the trailing
-  // newline opened.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endprogram', got EOF", 5, "24.6"));
 }
@@ -328,48 +296,17 @@ TEST(PackageItemsParsing, ErrorAnonymousProgramWithName) {
       "  program named_prog;\n"
       "  endprogram\n"
       "endpackage\n");
-  // §24.6 owns anonymous_program, whose header is 'program ;' with no name.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got identifier", 2, "24.6"));
 }
 
-// ---------------------------------------------------------------------------
-// A.1.11 closes anonymous_program_item to task_declaration,
-// function_declaration, class_declaration, interface_class_declaration,
-// covergroup_declaration, class_constructor_declaration and the null item `;`.
-// A closed set is tested by what it excludes, so each case below writes one
-// kind the production leaves out. Every one of them is a
-// package_or_generate_item_declaration, which A.1.11 admits as a package_item
-// and not as an anonymous_program_item, so the surrounding package would take
-// it were the program not there.
-// ---------------------------------------------------------------------------
-
-// The report FilterAnonymousProgramItems in src/parser/parser.cpp writes and
-// the clause it names as the rule. Both stand here rather than in each case
-// that reads them, so a rewording at the emission site is one edit here.
-// A.1.11 is the clause because it is the production that closes the set; §24.6
-// states the name-space rule instead, and §24.3 the syntax of a named
-// program_declaration, whose Syntax 24-1 reproduces this production labelled
-// as an excerpt from Annex A.
 constexpr std::string_view kExcludedItemMessage =
     "an anonymous program may contain only task, function, class, interface "
     "class, covergroup, and class constructor declarations";
 constexpr std::string_view kExcludedItemSubclause = "A.1.11";
 
-// The line the item handed to ExpectAnonymousProgramExcludes stands on.
 constexpr uint32_t kExcludedItemLine = 3;
 
-// Whether a package holding one anonymous program whose whole body is `item`
-// rejects it under A.1.11, and whether the package came away declaring
-// nothing. `item` carries its own terminator and holds to one line, so the
-// report stands on kExcludedItemLine of the source composed here.
-//
-// The second claim is the one the report alone does not make. §24.6 has an
-// anonymous program declare its items in the surrounding package's name space
-// rather than in a scope of its own, so an excluded item the parser kept would
-// be an item the package declares -- a parameter or a typedef that collides
-// with one written outside the program, or an initial procedure the package
-// carries and nothing runs.
 void ExpectAnonymousProgramExcludes(const std::string& item) {
   auto r = Parse("package pkg;\n  program;\n    " + item +
                  "\n  endprogram\nendpackage\n");
@@ -380,61 +317,34 @@ void ExpectAnonymousProgramExcludes(const std::string& item) {
   EXPECT_TRUE(r.cu->packages[0]->items.empty());
 }
 
-// net_declaration is a package_or_generate_item_declaration and no
-// anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithNetDecl) {
   ExpectAnonymousProgramExcludes("wire w;");
 }
 
-// data_declaration is a package_or_generate_item_declaration and no
-// anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithDataDecl) {
   ExpectAnonymousProgramExcludes("int x;");
 }
 
-// An initial_construct is a non_port_program_item of a named
-// program_declaration (Syntax 24-1) and no anonymous_program_item. An
-// anonymous program declares no scope of its own (§24.6), so an initial
-// procedure kept here becomes a procedure of the package, which nothing
-// elaborates and nothing runs.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithInitialBlock) {
   ExpectAnonymousProgramExcludes("initial begin end");
 }
 
-// parameter_declaration is a package_or_generate_item_declaration and no
-// anonymous_program_item. It carries its value because footnote 22 to Syntax
-// 6-6 in §6.20.1 permits the constant_param_expression to be omitted only
-// inside a parameter_port_list, so A.1.11's is the only rule this source
-// breaks.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithParameterDecl) {
   ExpectAnonymousProgramExcludes("parameter int anon_p = 1;");
 }
 
-// A typedef is a data_declaration (A.2.1.3), hence a
-// package_or_generate_item_declaration and no anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithTypedef) {
   ExpectAnonymousProgramExcludes("typedef int anon_int_t;");
 }
 
-// An extern_constraint_declaration is a package_or_generate_item_declaration
-// and no anonymous_program_item.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithExternalConstraintBlock) {
   ExpectAnonymousProgramExcludes("constraint C::p { 1; }");
 }
 
-// A module_instantiation is a module_or_generate_item and no
-// anonymous_program_item; A.1.11 does not admit it even as a package_item.
-// The parser reads `m u0();` as a hierarchical_instance from its shape alone,
-// because A.4.1.1 makes the port-connection list mandatory, so no
-// module_declaration is needed above it to reach that item kind.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithModuleInst) {
   ExpectAnonymousProgramExcludes("m u0();");
 }
 
-// One rule reported once per breach, and the clause it names is the same for
-// both kinds: the citation belongs to A.1.11's item set rather than to
-// whichever kind the source wrote. The two items stand on different lines so
-// that the two reports are told apart by where the source broke the rule.
 TEST(PackageItemsParsing,
      AnonymousProgramExcludedItemsBothCiteTheGrammarClause) {
   auto r = Parse(
@@ -450,35 +360,18 @@ TEST(PackageItemsParsing,
       ReportedError(r.diags, kExcludedItemMessage, 4, kExcludedItemSubclause));
 }
 
-// A timeunit declaration is a package_or_generate_item_declaration and no
-// anonymous_program_item. It reaches no filter over the program's items,
-// because its parse path appends no ModuleItem at all, so the refusal stands
-// where the declaration is parsed. The item list is empty either way here,
-// which is why the report is the whole of the claim.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithTimeunitDecl) {
   ExpectAnonymousProgramExcludes("timeunit 1ns;");
 }
 
-// A timeprecision declaration is the same form and the same clause, reached by
-// the same parse path. It is written out rather than left to the case above
-// because the two keywords are read by one function and a refusal keyed on the
-// wrong one would pass that case.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithTimeprecisionDecl) {
   ExpectAnonymousProgramExcludes("timeprecision 1ps;");
 }
 
-// A.1.11's task_declaration and function_declaration do not reach the extern
-// method-prototype form. A prototype produces the same ModuleItemKind a
-// definition does, so a filter keyed on the kind admitted it; ModuleItem::
-// is_extern is what tells the two apart.
 TEST(PackageItemsParsing, ErrorAnonymousProgramWithExternFunctionPrototype) {
   ExpectAnonymousProgramExcludes("extern function void f();");
 }
 
-// The control the three above rest on: A.1.11 does admit a
-// function_declaration, so a refusal keyed on the kind alone -- or one that
-// read is_extern the wrong way round -- would reject the form the clause names.
-// The package declares it, an anonymous program having no scope of its own.
 TEST(PackageItemsParsing, AnonymousProgramWithFunctionDeclIsAccepted) {
   auto r = Parse(
       "package pkg;\n"
@@ -492,11 +385,6 @@ TEST(PackageItemsParsing, AnonymousProgramWithFunctionDeclIsAccepted) {
   EXPECT_EQ(r.cu->packages[0]->items.size(), 1u);
 }
 
-// package_item reaches package_or_generate_item_declaration, which lists no
-// specparam_declaration; A.1.4's non_port_module_item is what does, and
-// §6.20.5 has a specparam declared inside a module or a specify block. One in a
-// package body was accepted silently and recorded as an item of the package,
-// where the specify block beside it was already reported under §30.3.
 TEST(PackageItemsParsing, ErrorSpecparamInPackageIsRejected) {
   auto r = Parse(
       "package pkg;\n"
@@ -512,15 +400,6 @@ TEST(PackageItemsParsing, ErrorSpecparamInPackageIsRejected) {
   EXPECT_TRUE(
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
 }
-
-// ---------------------------------------------------------------------------
-// package_item admits what A.1.11 lists and nothing A.1.4's module body
-// reaches beyond it. Each item below was accepted in a package body silently
-// and recorded as an item of the package; each is now reported under A.1.11 at
-// the item and dropped, so that the package declares nothing the source could
-// not legally declare in it. The items §26.2 names as processes stay the
-// elaborator's to report.
-// ---------------------------------------------------------------------------
 
 TEST(PackageItemsParsing, ErrorModuleItemsInPackageAreRejected) {
   auto r = Parse(
@@ -582,14 +461,11 @@ TEST(PackageItemsParsing, ErrorModuleItemsInPackageAreRejected) {
       d, "a genvar declaration is not an item of a package", 18, "A.1.11"));
   ASSERT_NE(r.cu, nullptr);
   ASSERT_EQ(r.cu->packages.size(), 1u);
-  // The one item the list admits is the one kept.
   ASSERT_EQ(r.cu->packages[0]->items.size(), 1u);
   EXPECT_EQ(r.cu->packages[0]->items[0]->kind, ModuleItemKind::kVarDecl);
   EXPECT_EQ(r.cu->packages[0]->items[0]->name, "x");
 }
 
-// A UDP instance is told from a module instance by the primitive's
-// declaration, and is reported as the gate instance is.
 TEST(PackageItemsParsing, ErrorUdpInstanceInPackageIsRejected) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -603,8 +479,6 @@ TEST(PackageItemsParsing, ErrorUdpInstanceInPackageIsRejected) {
       "A.1.11"));
 }
 
-// checker_declaration is the one design element the list admits; the package
-// keeps it where it drops a module.
 TEST(PackageItemsParsing, CheckerDeclarationInPackageIsKept) {
   auto r = Parse(
       "package pkg;\n"
@@ -618,11 +492,6 @@ TEST(PackageItemsParsing, CheckerDeclarationInPackageIsKept) {
                             ModuleItemKind::kNestedModuleDecl));
 }
 
-// A bind_directive is kept on the design element being read and a package is
-// none, so one in a package was dropped with nothing said; a generate_region
-// reads its items into the package's list, so the region itself is what is
-// reported; and a port_declaration was reported as an unexpected token of a
-// module body under §23.2.4.
 TEST(PackageItemsParsing, ErrorBindGenerateRegionAndPortDeclInPackage) {
   auto r = Parse(
       "package pkg;\n"
@@ -645,11 +514,6 @@ TEST(PackageItemsParsing, ErrorBindGenerateRegionAndPortDeclInPackage) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
 }
 
-// The items of a checker declared in the package are the checker's, read under
-// A.1.8's checker_or_generate_item, and an anonymous program's are held to
-// anonymous_program_item by FilterAnonymousProgramItems: neither body is the
-// package's, so a continuous assignment in the checker draws no A.1.11 report
-// and one in the anonymous program draws that filter's alone.
 TEST(PackageItemsParsing, NestedBodiesAreNotThePackageBody) {
   auto r = Parse(
       "package pkg;\n"

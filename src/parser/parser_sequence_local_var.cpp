@@ -18,9 +18,6 @@ namespace delta {
 
 namespace {
 
-// §16.7: parse a plain decimal token like "5" into its integer value. Sized
-// or based literals ("5'd10", "3'b101") return false; the caller leaves
-// validation to downstream stages that have full constant-folding.
 bool TryParsePlainDecimal(std::string_view text, uint64_t& out) {
   if (text.empty()) return false;
   uint64_t v = 0;
@@ -42,9 +39,6 @@ bool IsEventFormalOf(const ModuleItem* item, std::string_view name) {
   return false;
 }
 
-// §16.8: an identifier written as the whole actual of an instance is bound to
-// the instantiated declaration's formal, so what may be written there is what
-// that formal admits, an event_expression where it is typed `event`.
 bool IsWholeInstanceActual(const ModuleItem* item, SourceLoc loc) {
   for (const auto& arg : item->assertion_instance_args) {
     if (arg.loc.file_id == loc.file_id && arg.loc.line == loc.line &&
@@ -55,10 +49,6 @@ bool IsWholeInstanceActual(const ModuleItem* item, SourceLoc loc) {
   return false;
 }
 
-// §16.8.1 rule b): a formal of type `event` is referenced only where an
-// event_expression may be written. The clocking events are consumed before the
-// sequence body scan reaches an identifier, so a reference to one read there
-// stands in the sequence_expr; one after `.` or `::` names a member instead.
 void ReportEventFormalReference(DiagEngine& diag, const ModuleItem* item,
                                 const Token& tok, bool after_select) {
   if (after_select || !IsEventFormalOf(item, tok.text) ||
@@ -74,14 +64,6 @@ void ReportEventFormalReference(DiagEngine& diag, const ModuleItem* item,
 
 }  // namespace
 
-// §16.8.2: the type of a local variable formal argument shall be one of the
-// types allowed in §16.6. The formal-type categories that §16.8.1 permits for
-// an ordinary (non-local) formal — `sequence`, `event`, `property`, and the
-// keyword `untyped` — are not among the §16.6 data types, so specifying one of
-// them as the type of a `local` formal is illegal (the illegal example in
-// §16.8.2 rejects `local event e` on exactly these grounds). These keywords are
-// recognised head-on so the diagnostic names the real problem (a disallowed
-// type) rather than being mistaken for a missing type.
 void ReportChandleFormal(DiagEngine& diag, const Token& type_tok) {
   if (type_tok.kind != TokenKind::kKwChandle) return;
   diag.Error(type_tok.loc,
@@ -103,13 +85,9 @@ bool IsDisallowedLocalVarTypeKw(TokenKind k) {
 }
 
 void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
-  // §16.7: only the literal `##[ [-]INTLIT : [-]INTLIT ]` form is checked
-  // here. Symbolic bounds need full constant evaluation and are deferred to
-  // later stages. The five-to-seven token window is peeked under SavePos so
-  // the body loop still sees every token afterwards.
   if (!Check(TokenKind::kLBracket)) return;
   auto saved = lexer_.SavePos();
-  Consume();  // [
+  Consume();
   bool lo_negative = false;
   if (Check(TokenKind::kMinus)) {
     lo_negative = true;
@@ -124,7 +102,7 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
     lexer_.RestorePos(saved);
     return;
   }
-  Consume();  // :
+  Consume();
   bool hi_negative = false;
   if (Check(TokenKind::kMinus)) {
     hi_negative = true;
@@ -146,13 +124,11 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   if (!TryParsePlainDecimal(lo.text, lo_mag)) return;
   if (!TryParsePlainDecimal(hi.text, hi_mag)) return;
 
-  // §16.7 S2: a literal lower or upper bound below zero is illegal.
   if (lo_negative || hi_negative) {
     diag_.Error(range_loc, "cycle-delay range bounds cannot be negative",
                 Subclause("16.7"));
     return;
   }
-  // §16.7 S6: the upper bound must be at least the lower bound.
   if (hi_mag < lo_mag) {
     diag_.Error(range_loc,
                 "cycle-delay range upper bound must be at least the lower "
@@ -161,9 +137,6 @@ void Parser::ValidateLiteralCycleDelayRange(SourceLoc range_loc) {
   }
 }
 
-// Advance the bracket-nesting and conditional-depth counters over one token of
-// a parenthesized constant_primary, marking `is_min_typ_max` when a top-level
-// ':' appears that is not the ':' of a `?:` conditional.
 static void ScanMinTypMaxToken(TokenKind k, int& nesting, int& cond_depth,
                                bool& is_min_typ_max) {
   if (k == TokenKind::kLParen || k == TokenKind::kLBracket ||
@@ -183,25 +156,18 @@ static void ScanMinTypMaxToken(TokenKind k, int& nesting, int& cond_depth,
   }
   if (k != TokenKind::kColon) return;
   if (cond_depth > 0) {
-    --cond_depth;  // the ':' of a conditional, not a min:typ:max separator.
+    --cond_depth;
   } else {
     is_min_typ_max = true;
   }
 }
 
 void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
-  // §16.7: inside a cycle_delay_range, it is illegal for the constant_primary
-  // to be a constant_mintypmax_expression (a `min:typ:max` triple) that is not
-  // also a plain constant_expression. The triple always takes the parenthesized
-  // `( a : b : c )` shape, so a top-level ':' inside the leading parentheses
-  // that is not the ':' of a `?:` conditional marks the illegal form. A plain
-  // `( expr )` or a `( sel ? a : b )` conditional stays legal. Tokens are
-  // peeked under SavePos/RestorePos so the body harvest loop still sees them.
   if (!Check(TokenKind::kLParen)) return;
   auto saved = lexer_.SavePos();
-  Consume();           // '('
-  int nesting = 1;     // open ( [ { — the leading '(' is the first level.
-  int cond_depth = 0;  // '?' tokens still awaiting their matching ':'.
+  Consume();
+  int nesting = 1;
+  int cond_depth = 0;
   bool is_min_typ_max = false;
   while (nesting > 0 && !Check(TokenKind::kEof)) {
     ScanMinTypMaxToken(CurrentToken().kind, nesting, cond_depth,
@@ -218,21 +184,12 @@ void Parser::ValidateCycleDelayMinTypMax(SourceLoc range_loc) {
 }
 
 void Parser::ValidateCycleDelayIntegerValue(SourceLoc range_loc) {
-  // §16.7: the constant_primary of a `## delay` is a constant_expression that
-  // shall result in an integer value. A real or string literal in that position
-  // can never yield an integer, so it is rejected here. This peeks the current
-  // token only (no Consume), so the body harvest loop still sees it afterwards.
-  // The bracketed-range and parenthesized-primary forms are handled by the
-  // sibling checks; this fires only on the bare `## <literal>` shape.
   if (Check(TokenKind::kRealLiteral) || Check(TokenKind::kStringLiteral)) {
     diag_.Error(range_loc, "cycle-delay value must be an integer",
                 Subclause("16.7"));
   }
 }
 
-// Skips the groups opened by `open` and closed by `close` at the cursor, one
-// after another, each with the groups nested in it: a type's packed
-// dimensions or a variable's unpacked ones, or a class's parameter values.
 static void SkipGroups(Lexer& lexer, TokenKind open, TokenKind close) {
   while (LexerCheck(lexer, open)) {
     int depth = 1;
@@ -251,9 +208,6 @@ static void SkipBracketGroups(Lexer& lexer) {
   SkipGroups(lexer, TokenKind::kLBracket, TokenKind::kRBracket);
 }
 
-// Skips the type name at the cursor, an identifier A.2.2.1 lets stand behind
-// a package_scope or a class_scope, `P::t` or `C#(8)::t`, each class's
-// parameter values read past. Answers whether a scope was read.
 static bool SkipTypeName(Lexer& lexer) {
   bool scoped = false;
   while (LexerCheck(lexer, TokenKind::kIdentifier)) {
@@ -269,9 +223,6 @@ static bool SkipTypeName(Lexer& lexer) {
   return scoped;
 }
 
-// Whether the identifier at the cursor, with its scope and packed
-// dimensions, is followed by another identifier, which makes it a type name
-// written before the name a declaration declares. The lexer is rewound.
 static bool AtTypeNameBeforeIdentifier(Lexer& lexer) {
   auto saved = lexer.SavePos();
   SkipTypeName(lexer);
@@ -307,10 +258,6 @@ bool AtAssertionVariableDecl(
   return kDeclares;
 }
 
-// Consumes the var_data_type prefix of an assertion_variable_declaration: its
-// `var`, where written, the type keyword or the type name with its scope, and
-// any signing token and packed dimensions. After `var` the type may be
-// implicit, and only the signing and dimensions are written.
 static void SkipAssertVarTypePrefix(Lexer& lexer) {
   const bool kVar = LexerCheck(lexer, TokenKind::kKwVar);
   if (kVar) lexer.Next();
@@ -328,9 +275,6 @@ static void SkipAssertVarTypePrefix(Lexer& lexer) {
   SkipBracketGroups(lexer);
 }
 
-// Skips the initializer expression of one variable_decl_assignment, stopping at
-// the top-level comma or semicolon that terminates it (or at an unbalanced
-// closing bracket). The '=' has already been consumed by the caller.
 static void SkipAssertVarInitExpr(Lexer& lexer) {
   int e_depth = 0;
   while (!lexer.Peek().Is(TokenKind::kEof)) {
@@ -355,14 +299,6 @@ static void SkipAssertVarInitExpr(Lexer& lexer) {
 }
 
 void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
-  // §16.10 Syntax 16-13: assertion_variable_declaration ::= var_data_type
-  // list_of_variable_decl_assignments ; — consume the data-type prefix
-  // (one keyword plus any packed dimensions or signing token) and then walk
-  // the comma-separated list of <identifier> [ = <expression> ] entries
-  // until the closing semicolon. Each identifier names a distinct local
-  // variable in the sequence/property body.
-  // §16.10 with §16.6: chandle is not among the types a local variable may
-  // be declared with, whether or not `var` is written before it.
   auto type_pos = lexer_.SavePos();
   Match(TokenKind::kKwVar);
   if (Check(TokenKind::kKwChandle)) {
@@ -388,45 +324,21 @@ void Parser::HarvestAssertionVariableDecl(ModuleItem* item) {
   if (Check(TokenKind::kSemicolon)) Consume();
 }
 
-// §16.8 sequence_port_list scan state carried across loop iterations. Groups
-// the parenthesis depth, the per-port-item §16.8.2 local-variable trackers,
-// and the formal-name expectation so each iteration's handler can update them
-// in place.
 struct SequencePortScan {
-  // The parser whose lexer the scan reads, which parses a formal's default.
   Parser* parser = nullptr;
   int depth = 1;
   bool expect_formal_name = true;
 
   bool item_saw_local = false;
-  // §16.8.2 tells a formal whose own port item writes `local` apart from one
-  // that takes `local` over from the formal before it. Only the first
-  // triggers the explicit-type-required check.
   bool item_local_explicit_here = false;
-  // §16.8.2: a local formal must have its type specified explicitly in
-  // the same port item. We mark `explicit type seen` when we consume a
-  // built-in type keyword or when the formal-name harvest finds more than
-  // one identifier in the chain (the first is a type alias).
   bool item_saw_explicit_type = false;
   Direction item_dir = Direction::kInput;
   bool item_saw_eq = false;
   SourceLoc item_start;
-  // §16.14.7: kind of the previously consumed port-list token, used to detect
-  // the head of a formal's default value (the token immediately after `=`) so a
-  // $inferred_clock default on a typed formal can be rejected.
   TokenKind prev_kind = TokenKind::kComma;
-  // §16.8.1: the type keyword in force for the formals that follow, kEof for
-  // untyped, cleared by `untyped` and by a type the keyword alone does not
-  // name, which a `[` or a type identifier after it shows.
   TokenKind carry_type_kw = TokenKind::kEof;
-  // §16.8: the data type in force for the formals that follow, null for none.
   DataType* carry_type = nullptr;
-  // §16.14.7: whether the type in force for the formals that follow admits a
-  // $inferred_clock default, which only an untyped or `event` formal does. A
-  // data type, written or carried from an earlier formal (§16.8), or
-  // `sequence`, does not.
   bool clock_default_allowed = true;
-  // A.2.10: the shape of the sequence_port_item the scan stands in.
   PortItemShape shape{"sequence"};
 
   void FinalizePortItem(DiagEngine& diag, ModuleItem* item) {
@@ -448,11 +360,6 @@ struct SequencePortScan {
     item->prop_seq_local_lvar_directions.push_back(item_dir);
   }
 
-  // §16.8.2 carry-through: a port item that supplies only an identifier
-  // inherits the `local` designation, direction, and type of the nearest
-  // preceding port item that declared them explicitly. A port item that
-  // begins with `local`, a direction keyword, or a built-in type keyword
-  // is a fresh starter and breaks the carry.
   void ResetAfterComma(Lexer& lexer) {
     bool next_is_fresh_starter = LexerCheck(lexer, TokenKind::kKwLocal) ||
                                  LexerCheck(lexer, TokenKind::kKwInput) ||
@@ -463,17 +370,12 @@ struct SequencePortScan {
       item_saw_local = false;
       item_dir = Direction::kInput;
     }
-    // Else: carry item_saw_local and item_dir from the previous port item.
-    // Per-port-item flags never carry: a carried port item neither sees
-    // `local` explicitly here nor declares its own type.
     item_local_explicit_here = false;
     item_saw_explicit_type = false;
     item_saw_eq = false;
     expect_formal_name = true;
   }
 
-  // §16.8.2 direction keyword: records the direction and polices the
-  // requirement that a direction be preceded by `local`.
   void HandleDirection(Lexer& lexer, DiagEngine& diag) {
     auto dir_tok = lexer.Next();
     if (!item_saw_local) {
@@ -490,9 +392,6 @@ struct SequencePortScan {
     }
   }
 
-  // Harvests the formal_port_identifier, after the user-defined type that
-  // leads it, where one does; §16.8.2: such a type satisfies the
-  // explicit-type requirement.
   void HarvestFormalName(Lexer& lexer, ModuleItem* item) {
     if (!shape.typed &&
         ParserPropertySpecHelpers::StartsNamedFormalType(*parser)) {
@@ -503,19 +402,12 @@ struct SequencePortScan {
     }
     auto name_tok = lexer.Next();
     item->prop_formals.push_back(name_tok.text);
-    // §16.8: an untyped formal, written `untyped` or with no type in force, is
-    // recorded as `untyped`, apart from a type the keyword alone does not name,
-    // whose actual §16.8 casts otherwise.
     bool untyped = carry_type_kw == TokenKind::kEof && clock_default_allowed;
     item->prop_formal_type_kw.push_back(untyped ? TokenKind::kKwUntyped
                                                 : carry_type_kw);
     item->prop_formal_types.push_back(carry_type);
     item->prop_formal_unpacked_dims.emplace_back();
-    // §16.8.2: whether this formal is a local variable formal argument, which
-    // §16.10 keeps out of the sequence's clocking events.
     item->prop_formal_is_local.push_back(item_saw_local);
-    // §16.8: the formal starts out with no default; a following `= actual`
-    // (handled in DispatchTopLevel) flips this entry to true.
     item->prop_formal_has_default.push_back(false);
     item->prop_formal_defaults.push_back(nullptr);
     item->prop_formal_inferred.push_back(InferredDefault::kNone);
@@ -523,7 +415,6 @@ struct SequencePortScan {
     shape.NameFormal();
   }
 
-  // depth==1 comma: finalize the closing port item, then prepare for the next.
   void HandleComma(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     FinalizePortItem(diag, item);
     shape.End(diag);
@@ -533,7 +424,6 @@ struct SequencePortScan {
     ResetAfterComma(lexer);
   }
 
-  // depth==1 `local`: opens a local-formal port item declared explicitly here.
   void HandleLocal(Lexer& lexer) {
     if (!item_saw_local) item_start = lexer.Peek().loc;
     item_saw_local = true;
@@ -541,12 +431,6 @@ struct SequencePortScan {
     lexer.Next();
   }
 
-  // §16.8.1: the data type a data type keyword opens types the formals after it
-  // until the next type, and `event`, `sequence` and `untyped` do the same for
-  // a formal that is not local, `untyped` ending a type's reach; packed
-  // dimensions after a data type keyword make a type the keyword alone does
-  // not name. Returns true where the token was one of these and its type was
-  // consumed.
   bool HandleTypeKeyword(Lexer& lexer, DiagEngine& diag) {
     TokenKind kind = lexer.Peek().kind;
     if (IsBuiltinTypeKwForLocalVar(kind)) {
@@ -569,12 +453,6 @@ struct SequencePortScan {
     return true;
   }
 
-  // Handles the depth==1 (top-level) tokens of a port item. Returns true if the
-  // current token was consumed here; false means the caller falls through to
-  // the default skip. All branches assume depth==1 has already been
-  // established.
-  // §16.8: `formal = default_expression` gives the most recently harvested
-  // formal a default actual argument.
   void HandleDefaultEq(Lexer& lexer, ModuleItem* item) {
     item_saw_eq = true;
     shape.BeginDefault();
@@ -586,8 +464,6 @@ struct SequencePortScan {
     RecordDefault(item);
   }
 
-  // §16.8: the default actual itself, kept beside the formal for an instance
-  // that omits the formal to take.
   void RecordDefault(ModuleItem* item) {
     if (parser == nullptr || item->prop_formal_defaults.empty()) return;
     item->prop_formal_defaults.back() =
@@ -604,13 +480,8 @@ struct SequencePortScan {
                LexerCheck(lexer, TokenKind::kKwInout)) {
       HandleDirection(lexer, diag);
     } else if (HandleTypeKeyword(lexer, diag)) {
-      // The keyword was consumed and its type recorded for the formals after.
     } else if (item_saw_local &&
                IsDisallowedLocalVarTypeKw(lexer.Peek().kind)) {
-      // §16.8.2: a local variable formal argument's type must be one of the
-      // §16.6 data types; `sequence`/`event`/`property`/`untyped` are not, so
-      // this is the disallowed-type error, not the missing-type error. Mark the
-      // type as seen so FinalizePortItem does not also flag a missing type.
       diag.Error(lexer.Peek().loc,
                  "the type of a local variable formal argument must be one of "
                  "the types allowed in §16.6",
@@ -632,9 +503,6 @@ struct SequencePortScan {
     return true;
   }
 
-  // Consumes one token of the port list, tracking the previous token kind so
-  // DispatchTopLevel can recognize a default-value head. Returns false once the
-  // matching ')' for the opening '(' has been consumed (list complete).
   bool Step(Lexer& lexer, DiagEngine& diag, ModuleItem* item) {
     TokenKind this_kind = lexer.Peek().kind;
     if (depth == 1 && this_kind != TokenKind::kRParen) {
@@ -670,10 +538,6 @@ struct SequencePortScan {
   }
 };
 
-// §16.8 sequence_port_list. On entry the opening '(' has already been consumed;
-// drains the comma-separated formal list through its matching ')', harvesting
-// formal_port_identifier names, policing the §16.8.2 local-variable rules and
-// holding each item to A.2.10's sequence_port_item (PortItemShape).
 static void ParseSequencePortList(Parser& parser, Lexer& lexer,
                                   DiagEngine& diag, ModuleItem* item) {
   SequencePortScan scan;
@@ -691,18 +555,6 @@ ModuleItem* Parser::ParseSequenceDecl() {
   Expect(TokenKind::kKwSequence, Subclause("16.8"));
   item->name = Expect(TokenKind::kIdentifier, Subclause("16.8")).text;
 
-  // §16.8 sequence_port_list: harvest formal_port_identifier names so the
-  // elaborator can flatten instances and run cycle detection.
-  //
-  // §16.8.2 local variable formal arguments: a port item may begin with the
-  // keyword `local`, optionally followed by one of the directions `input`,
-  // `inout`, or `output`. Two well-formedness rules are checked here:
-  //   (a) a direction without a preceding `local` is illegal in a sequence
-  //       port list;
-  //   (b) a default actual argument is illegal for a local formal of
-  //       direction `inout` or `output`.
-  // For each local-marked formal we also record its (possibly inferred)
-  // direction so later stages can apply the §16.10 local-variable rules.
   if (Match(TokenKind::kLParen)) {
     ParseSequencePortList(*this, lexer_, diag_, item);
   }
@@ -711,16 +563,8 @@ ModuleItem* Parser::ParseSequenceDecl() {
   ParserPropertySpecHelpers::RecordAssertionReads(*this, item,
                                                   TokenKind::kKwEndsequence);
 
-  // §16.16(b1): a sequence_expr may open with an explicit leading clocking
-  // event. Record its presence (the body's first token is `@`) so a clocking
-  // block, which forbids such an event on the declarations it contains, can
-  // reject it.
   item->decl_has_leading_clock = Check(TokenKind::kAt);
 
-  // §16.13.6: capture the simple clocked linear body for the simulator's
-  // sequence.triggered monitor. This is a trial parse that suppresses
-  // diagnostics and rewinds, so the harvest scan below runs over the same
-  // tokens unchanged.
   CaptureLinearSequenceBody(item);
 
   ScanSequenceBody(item);
@@ -729,20 +573,9 @@ ModuleItem* Parser::ParseSequenceDecl() {
   return item;
 }
 
-// §16.10: a local variable of the sequence, one its body declares or a local
-// variable formal argument, cannot be used in the body's clocking event
-// expression, which is the condition Annex F.5.1 puts on its clock rewrite.
-// The assertion_variable_declarations are harvested before this runs, so any
-// identifier inside a `@( ... )` event group (an edge signal or an iff guard)
-// that matches one is rejected. The whole parenthesized event group is
-// consumed so its names are not also recorded as sequence instance references.
 void Parser::ScanSequenceClockEvent(ModuleItem* item) {
-  // §16.16(b2): count each explicit clocking event so a multiclocked sequence
-  // (a non-leading or additional `@(...)`) can be recognized.
   ++item->decl_clock_event_count;
-  Consume();  // '@'
-  // §16.16: `@name` writes the clocking event as one identifier, an
-  // event_expression position as the parenthesized group is.
+  Consume();
   if (Check(TokenKind::kIdentifier)) {
     item->prop_instance_refs.push_back(Consume().text);
     return;
@@ -750,19 +583,12 @@ void Parser::ScanSequenceClockEvent(ModuleItem* item) {
   ScanClockEventGroupForLocals(lexer_, diag_, item);
 }
 
-// §16.10: assertion_variable_declarations precede the sequence_expr in the
-// body, so they are harvested while still at the head of the body. What
-// follows them is A.2.10's sequence_expr, held to the grammar, and the scan
-// then falls through to the sequence_instance reference scan the §16.8 cycle
-// rule needs.
 void Parser::ScanSequenceBody(ModuleItem* item) {
   while (AtAssertionVariableDecl(lexer_, known_types_)) {
     HarvestAssertionVariableDecl(item);
   }
   ParserPropertyGrammar::CheckDeclarationBody(*this, true,
                                               TokenKind::kKwEndsequence);
-  // Whether the token before stands for a member or a scope selection, `.` or
-  // `::`, so an identifier after it names a member rather than a formal.
   bool after_select = false;
   while (!Check(TokenKind::kKwEndsequence) && !AtEnd()) {
     if (Check(TokenKind::kAt)) {
@@ -789,18 +615,10 @@ void Parser::ScanSequenceBody(ModuleItem* item) {
   }
 }
 
-// §16.12 with §6.16: the data type a property formal is declared with,
-// read where the parse stands on the keyword opening it, its signing and
-// packed dimensions included, and kept for what reads the formal's type.
 DataType* ParserPropertySpecHelpers::ParseFormalType(Parser& p) {
   return p.arena_.Create<DataType>(p.ParseDataType());
 }
 
-// §16.8 and §16.12 with Annex A.2.2.1: whether the identifier at the cursor
-// names a formal's user-defined type rather than the formal, which another
-// identifier following it shows, past the scope, class parameters and packed
-// dimensions the type is written with; a dimension after the formal's own
-// name is followed by none.
 bool ParserPropertySpecHelpers::StartsNamedFormalType(Parser& p) {
   auto saved = p.lexer_.SavePos();
   p.Consume();
@@ -824,9 +642,6 @@ bool ParserPropertySpecHelpers::StartsNamedFormalType(Parser& p) {
   return typed;
 }
 
-// §16.8 and §16.12 with §6.18: a formal declared with the user-defined type
-// named at the cursor, with the scope, class parameters and packed dimensions
-// it is written with.
 DataType* ParserPropertySpecHelpers::ParseNamedFormalType(Parser& p) {
   auto* type = p.arena_.Create<DataType>(p.ParseNamedType());
   p.ParsePackedDims(*type);

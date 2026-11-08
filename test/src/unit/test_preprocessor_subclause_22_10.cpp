@@ -14,33 +14,8 @@
 using namespace delta;
 namespace fs = std::filesystem;
 
-// §22.10 `celldefine and `endcelldefine. The subclause states six things:
-//   C1  the two directives tag modules as cell modules,
-//   C2  pairing a `celldefine with an `endcelldefine is advisable but not
-//       required -- they are two independent directives,
-//   C3  the most recent occurrence of either directive controls whether
-//       modules are tagged,
-//   C4  more than one pair may appear in a single source description,
-//   C5  the directives may appear anywhere in the source description (keeping
-//       them outside design elements is a recommendation, not a rule), and
-//   C6  `resetall (§22.3) carries the effect of an `endcelldefine.
-//
-// Both directives are bare keywords with no operand, so the inputs that
-// exercise them are source *positions* and *neighbouring constructs* rather
-// than operand types: a module or macromodule header, a non-module design
-// element, a header carried on the directive's own line, a header arriving
-// through an `include, a header inside a conditional branch, and a longer
-// macro name that merely begins with the keyword.
-//
-// The tag itself is only observable once a module header has actually been
-// seen, so every test below builds its modules from real declaration syntax
-// and reads the collected cell-module list back off the preprocessor.
-
 namespace {
 
-// A `celldefine region that spans an `include has to be observed across two
-// real files, so the unit writes them to a scratch directory and lets the
-// preprocessor resolve the include relative to the includer.
 struct CelldefineUnitDir {
   fs::path dir;
 
@@ -80,10 +55,6 @@ std::string Squeeze(std::string_view text) {
   return out;
 }
 
-// ---------------------------------------------------------------------------
-// C1: the directives tag modules as cell modules.
-// ---------------------------------------------------------------------------
-
 TEST(CelldefinePreprocessing, TagsModuleDeclaredInRegion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -97,8 +68,6 @@ TEST(CelldefinePreprocessing, TagsModuleDeclaredInRegion) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "cellmod"));
 }
 
-// A macromodule is a module declaration too, so the region tags it the same
-// way a plain module header is tagged.
 TEST(CelldefinePreprocessing, TagsMacromoduleDeclaredInRegion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -112,9 +81,6 @@ TEST(CelldefinePreprocessing, TagsMacromoduleDeclaredInRegion) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "mm"));
 }
 
-// A header with no name, which the parser goes on to reject, declares no
-// module the tag could be recorded under, whichever of the two keywords opens
-// it, so none is recorded.
 TEST(CelldefinePreprocessing, NamelessHeaderInRegionTagsNothing) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -129,9 +95,6 @@ TEST(CelldefinePreprocessing, NamelessHeaderInRegionTagsNothing) {
   EXPECT_TRUE(pp.CellModuleNames().empty());
 }
 
-// The claim names no particular module header shape, so the parameter-port
-// list and the ANSI port list of a realistic cell must not confuse the name
-// the tag is recorded under.
 TEST(CelldefinePreprocessing, TagsModuleWithParameterAndPortLists) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -147,8 +110,6 @@ TEST(CelldefinePreprocessing, TagsModuleWithParameterAndPortLists) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "and2"));
 }
 
-// A lifetime keyword sits between the module keyword and the name, so the
-// name the tag is filed under must be found past it.
 TEST(CelldefinePreprocessing, TagsModuleWithExplicitLifetime) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -162,8 +123,6 @@ TEST(CelldefinePreprocessing, TagsModuleWithExplicitLifetime) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "auto_cell"));
 }
 
-// An escaped identifier is a legal module name, so a module that carries one
-// is a module the region tags like any other.
 TEST(CelldefinePreprocessing, TagsModuleWithEscapedName) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -180,8 +139,6 @@ TEST(CelldefinePreprocessing, TagsModuleWithEscapedName) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "\\plain$2"));
 }
 
-// A module declaration may itself be nested in another module, and both are
-// modules sitting inside the open region.
 TEST(CelldefinePreprocessing, TagsNestedModuleDeclaration) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -198,8 +155,6 @@ TEST(CelldefinePreprocessing, TagsNestedModuleDeclaration) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "inner_cell"));
 }
 
-// The directive occupies no line of its own by rule, so a header sharing the
-// directive's line is inside the region it just opened.
 TEST(CelldefinePreprocessing, TagsModuleSharingTheDirectiveLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -213,8 +168,6 @@ TEST(CelldefinePreprocessing, TagsModuleSharingTheDirectiveLine) {
   EXPECT_NE(out.find("module sameline;"), std::string::npos);
 }
 
-// A header that arrives through an `include is still part of the source
-// description the open region covers.
 TEST(CelldefinePreprocessing, TagsModuleArrivingThroughInclude) {
   CelldefineUnitDir tmp;
   tmp.WriteFile("cell_body.svh",
@@ -236,8 +189,6 @@ TEST(CelldefinePreprocessing, TagsModuleArrivingThroughInclude) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "outside_cell"));
 }
 
-// The region an included file opens keeps controlling the file that included
-// it, because a compilation unit is one source description.
 TEST(CelldefinePreprocessing, RegionOpenedInsideIncludeReachesIncluder) {
   CelldefineUnitDir tmp;
   tmp.WriteFile("open_cell.svh", "`celldefine\n");
@@ -258,9 +209,6 @@ TEST(CelldefinePreprocessing, RegionOpenedInsideIncludeReachesIncluder) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "after_end"));
 }
 
-// Negative for C1: the tag is for modules. A design element that is not a
-// module is left alone even though it sits in the region -- the module in the
-// same region witnesses that tagging was running at all.
 TEST(CelldefinePreprocessing, DoesNotTagNonModuleDesignElements) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -293,8 +241,6 @@ TEST(CelldefinePreprocessing, DoesNotTagNonModuleDesignElements) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "cfg"));
 }
 
-// Negative for C1: a module declared before any `celldefine has no directive
-// in front of it to tag it.
 TEST(CelldefinePreprocessing, DoesNotTagModuleDeclaredBeforeAnyDirective) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -310,12 +256,6 @@ TEST(CelldefinePreprocessing, DoesNotTagModuleDeclaredBeforeAnyDirective) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "witness_cell"));
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain"));
 }
-
-// ---------------------------------------------------------------------------
-// C1 (negative, keyword recognition): the directives are the bare keywords
-// `celldefine and `endcelldefine. A longer name that merely starts with one of
-// them is a macro usage, not the directive.
-// ---------------------------------------------------------------------------
 
 TEST(CelldefinePreprocessing, LongerNameStartingWithCelldefineIsAMacro) {
   PreprocFixture f;
@@ -355,12 +295,6 @@ TEST(CelldefinePreprocessing, LongerNameStartingWithEndcelldefineIsAMacro) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "after_real_end"));
 }
 
-// ---------------------------------------------------------------------------
-// C2: the two directives are independent; pairing is advisable, not required.
-// ---------------------------------------------------------------------------
-
-// An `endcelldefine with no `celldefine in front of it is not an error, and it
-// leaves tagging off.
 TEST(CelldefinePreprocessing, UnmatchedEndcelldefineIsHarmless) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -377,9 +311,6 @@ TEST(CelldefinePreprocessing, UnmatchedEndcelldefineIsHarmless) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain"));
 }
 
-// A `celldefine that is never closed is not an error either: it simply keeps
-// tagging to the end of the source description -- and it tags every module it
-// reaches, not just the first one after the directive.
 TEST(CelldefinePreprocessing, UnmatchedCelldefineKeepsTaggingToEnd) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -396,8 +327,6 @@ TEST(CelldefinePreprocessing, UnmatchedCelldefineKeepsTaggingToEnd) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "last_cell"));
 }
 
-// Because they are independent directives rather than a bracket pair, a
-// repeated `celldefine does not nest: one `endcelldefine still ends tagging.
 TEST(CelldefinePreprocessing, RepeatedCelldefineDoesNotNest) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -415,8 +344,6 @@ TEST(CelldefinePreprocessing, RepeatedCelldefineDoesNotNest) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "after_one_end"));
 }
 
-// The mirror image: a repeated `endcelldefine is harmless, and a later
-// `celldefine still turns tagging back on.
 TEST(CelldefinePreprocessing, RepeatedEndcelldefineIsHarmless) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -434,16 +361,6 @@ TEST(CelldefinePreprocessing, RepeatedEndcelldefineIsHarmless) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain"));
 }
 
-// ---------------------------------------------------------------------------
-// C3: the most recent occurrence of either directive controls tagging.
-// C4: a source description may hold more than one pair.
-// ---------------------------------------------------------------------------
-
-// More than one pair in a single source description, each pair controlling
-// only the modules between its own two directives. This also carries the plain
-// most-recent-occurrence pattern in both directions: cell_a shows an open
-// region tags, plain_b shows the following `endcelldefine stops tagging, and
-// cell_c shows a later `celldefine turns it back on.
 TEST(CelldefinePreprocessing, MultiplePairsEachTagOnlyTheirOwnModules) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -469,9 +386,6 @@ TEST(CelldefinePreprocessing, MultiplePairsEachTagOnlyTheirOwnModules) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain_d"));
 }
 
-// Nothing ties an occurrence to a line of its own, so both directives can land
-// on one line. The one further right is the more recent, and it is the one that
-// decides how the modules after that line are tagged.
 TEST(CelldefinePreprocessing, LaterOfTwoDirectivesOnOneLineWins) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -492,10 +406,6 @@ TEST(CelldefinePreprocessing, LaterOfTwoDirectivesOnOneLineWins) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain"));
 }
 
-// What follows the directive on its line is read as source text when it opens
-// with a backtick that is neither a directive nor a defined macro, so the
-// usage of the undefined macro is reported as §22.5.1 has it, and the
-// directive before it still takes effect.
 TEST(CelldefinePreprocessing, UndefinedUsageAfterTheDirectiveIsReported) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -509,9 +419,6 @@ TEST(CelldefinePreprocessing, UndefinedUsageAfterTheDirectiveIsReported) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "cell"));
 }
 
-// A source description is the whole compilation unit rather than one file, so
-// the allowance for several pairs is satisfied by pairs sitting in separate
-// files, each still controlling only its own modules.
 TEST(CelldefinePreprocessing, MultiplePairsSpanningTwoFiles) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -539,8 +446,6 @@ TEST(CelldefinePreprocessing, MultiplePairsSpanningTwoFiles) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "b_plain"));
 }
 
-// A source description spans every file of the compilation unit, so the most
-// recent occurrence carries across a file boundary.
 TEST(CelldefinePreprocessing, MostRecentOccurrenceCarriesAcrossFiles) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -562,12 +467,6 @@ TEST(CelldefinePreprocessing, MostRecentOccurrenceCarriesAcrossFiles) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "cross_file_plain"));
 }
 
-// ---------------------------------------------------------------------------
-// C5: the directives may appear anywhere in the source description. Placing
-// one inside a design element is only discouraged, never an error -- unlike
-// `timescale or `default_nettype, which this must not be lumped in with.
-// ---------------------------------------------------------------------------
-
 TEST(CelldefinePreprocessing, CelldefineInsideModuleIsAccepted) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -580,9 +479,6 @@ TEST(CelldefinePreprocessing, CelldefineInsideModuleIsAccepted) {
       f, pp);
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_TRUE(pp.InCelldefine());
-  // The enclosing module was already declared when the directive occurred, so
-  // the directive is not the most recent occurrence in front of it and the
-  // region does not reach backwards to tag it.
   EXPECT_FALSE(IsTaggedAsCell(pp, "t"));
   EXPECT_TRUE(IsTaggedAsCell(pp, "after_t"));
 }
@@ -637,8 +533,6 @@ TEST(CelldefinePreprocessing, CelldefineInsidePackageIsAccepted) {
   EXPECT_TRUE(IsTaggedAsCell(pp, "in_cell"));
 }
 
-// The last line of a source file, with no terminating newline, is still a
-// place the directive may appear.
 TEST(CelldefinePreprocessing, CelldefineOnFinalLineWithoutNewline) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -652,8 +546,6 @@ TEST(CelldefinePreprocessing, CelldefineOnFinalLineWithoutNewline) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "plain"));
 }
 
-// Text excluded by a conditional is not part of the source description, so a
-// directive sitting in a skipped branch never occurs.
 TEST(CelldefinePreprocessing, CelldefineInSkippedBranchDoesNotOccur) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -691,8 +583,6 @@ TEST(CelldefinePreprocessing, EndcelldefineInSkippedBranchDoesNotOccur) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "after_real_end"));
 }
 
-// The directives themselves carry no text into the compiled source, but text
-// following them on the same line is ordinary source and survives.
 TEST(CelldefinePreprocessing, DirectivesLeaveNoTextBehind) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -707,10 +597,6 @@ TEST(CelldefinePreprocessing, TextAfterEndcelldefineSurvives) {
   EXPECT_FALSE(f.diag.HasErrors());
   EXPECT_NE(out.find("wire x;"), std::string::npos);
 }
-
-// ---------------------------------------------------------------------------
-// C6: `resetall carries the effect of an `endcelldefine.
-// ---------------------------------------------------------------------------
 
 TEST(CelldefinePreprocessing, ResetallEndsTheCellRegion) {
   PreprocFixture f;
@@ -729,8 +615,6 @@ TEST(CelldefinePreprocessing, ResetallEndsTheCellRegion) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "afterreset"));
 }
 
-// `resetall only supplies the `endcelldefine effect; a `celldefine after it
-// opens a fresh region as usual.
 TEST(CelldefinePreprocessing, CelldefineAfterResetallOpensNewRegion) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -749,8 +633,6 @@ TEST(CelldefinePreprocessing, CelldefineAfterResetallOpensNewRegion) {
   EXPECT_FALSE(IsTaggedAsCell(pp, "afterreset"));
 }
 
-// §22.10 marks each module after `celldefine a cell, however its header
-// separates the keyword from the name (§5.3): a tab, a lifetime, a newline.
 TEST(Preprocessor, CellMarkPastAnyWhiteSpaceAndLifetime) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

@@ -236,8 +236,6 @@ TEST(LvalueElaboration, VarLvalueSingleElementConcatProcedural) {
 }
 
 TEST(LvalueElaboration, VarLvalueAssignmentPatternProcedural) {
-  // variable_lvalue's assignment_pattern_variable_lvalue alternative: the
-  // positional pattern `'{a, b}` stands as the procedural-assignment target.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -250,8 +248,6 @@ TEST(LvalueElaboration, VarLvalueAssignmentPatternProcedural) {
 }
 
 TEST(LvalueElaboration, NetLvalueAssignmentPatternContAssign) {
-  // net_lvalue's assignment_pattern_net_lvalue alternative: the pattern `'{x,
-  // y}` stands as a continuous-assignment target over nets.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -263,10 +259,6 @@ TEST(LvalueElaboration, NetLvalueAssignmentPatternContAssign) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.10 footnote 51 (printed page 1218), on A.8.5's variable_lvalue, holds
-// every select in the variable_lvalue a sequence match item assigns to a
-// constant_select. A module variable and a local variable are no constants,
-// and a literal and a parameter are.
 TEST(LvalueElaboration, MatchItemTargetSelectThatIsNotConstantIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -299,12 +291,6 @@ TEST(LvalueElaboration, MatchItemTargetSelectThatIsNotConstantIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A.10 footnote 52 (printed page 1218), on A.8.5's variable_lvalue, nests no
-// streaming concatenation within another variable_lvalue, and a streaming
-// concatenation written as the target of a procedural assignment, of an
-// assignment within an expression or of a continuous assignment is one. A
-// streaming concatenation read as a source may nest another, as §11.4.14.2's
-// own example does.
 TEST(LvalueElaboration, StreamNestedInAStreamTargetIsError) {
   ElabFixture f;
   ElaborateSrc(

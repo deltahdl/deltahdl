@@ -95,10 +95,6 @@ TEST(SpecifyPathDelaySim, ClampPathDelayPositivePasses) {
   EXPECT_EQ(ClampPathDelay(INT64_MAX), static_cast<uint64_t>(INT64_MAX));
 }
 
-// --- §30.5 dependency: a path delay may be a specparam, not just a literal.
-// Each claim is re-observed with the delay expressions built from real
-// specparam declarations and driven through parse+elaborate+lower. -----------
-
 TEST(SpecifyPathDelayFromSource, SpecparamDelaysDistributeAcrossTransitions) {
   SimFixture f;
   auto c = ElaboratePathDecl(
@@ -110,8 +106,8 @@ TEST(SpecifyPathDelayFromSource, SpecparamDelaysDistributeAcrossTransitions) {
   LowerAndRun(c.design, f);
   PathDelay pd = BuildPathDelayFromDecl(*c.decl, f.ctx, f.arena);
   EXPECT_EQ(pd.delay_count, 2u);
-  EXPECT_EQ(pd.delays[0], 3u);  // rise from specparam tr
-  EXPECT_EQ(pd.delays[1], 5u);  // fall from specparam tf
+  EXPECT_EQ(pd.delays[0], 3u);
+  EXPECT_EQ(pd.delays[1], 5u);
   EXPECT_EQ(pd.delays[2], 3u);
   EXPECT_EQ(pd.delays[4], 5u);
 }
@@ -139,9 +135,6 @@ TEST(SpecifyPathDelayFromSource, SpecparamMinTypMaxSelectsTypical) {
   for (int i = 0; i < 6; ++i) EXPECT_EQ(pd.delays[i], 2u) << "slot " << i;
 }
 
-// --- §30.5.1 Table 30-2: how many delays are listed decides the transition
-// association. Each input form (1/2/3/6/12) is built from real source. -------
-
 TEST(SpecifyPathDelayFromSource, OneDelayFillsAllBasicTransitions) {
   SimFixture f;
   const auto* decl = FirstPathDecl("    (a => b) = 7;", f);
@@ -159,7 +152,6 @@ TEST(SpecifyPathDelayFromSource, TwoDelaysSplitRiseAndFall) {
   ASSERT_EQ(decl->delays.size(), 2u);
   PathDelay pd = BuildPathDelayFromDecl(*decl, f.ctx, f.arena);
   EXPECT_EQ(pd.delay_count, 2u);
-  // 0->1, 0->z, z->1 take the rise delay; 1->0, 1->z, z->0 take the fall delay.
   EXPECT_EQ(pd.delays[0], 3u);
   EXPECT_EQ(pd.delays[1], 5u);
   EXPECT_EQ(pd.delays[2], 3u);
@@ -175,12 +167,12 @@ TEST(SpecifyPathDelayFromSource, ThreeDelaysAddZColumn) {
   ASSERT_EQ(decl->delays.size(), 3u);
   PathDelay pd = BuildPathDelayFromDecl(*decl, f.ctx, f.arena);
   EXPECT_EQ(pd.delay_count, 3u);
-  EXPECT_EQ(pd.delays[0], 2u);  // 0->1 rise
-  EXPECT_EQ(pd.delays[1], 4u);  // 1->0 fall
-  EXPECT_EQ(pd.delays[2], 6u);  // 0->z uses tz
-  EXPECT_EQ(pd.delays[3], 2u);  // z->1 uses rise
-  EXPECT_EQ(pd.delays[4], 6u);  // 1->z uses tz
-  EXPECT_EQ(pd.delays[5], 4u);  // z->0 uses fall
+  EXPECT_EQ(pd.delays[0], 2u);
+  EXPECT_EQ(pd.delays[1], 4u);
+  EXPECT_EQ(pd.delays[2], 6u);
+  EXPECT_EQ(pd.delays[3], 2u);
+  EXPECT_EQ(pd.delays[4], 6u);
+  EXPECT_EQ(pd.delays[5], 4u);
 }
 
 TEST(SpecifyPathDelayFromSource, SixDelaysKeepBasicSlots) {
@@ -209,9 +201,6 @@ TEST(SpecifyPathDelayFromSource, TwelveDelaysAreCarriedVerbatim) {
   }
 }
 
-// --- §30.5.1: a delay expression that evaluates negative is treated as zero,
-// observed on values produced by real path_delay_expressions. ----------------
-
 TEST(SpecifyPathDelayFromSource, NegativeSingleDelayBecomesZero) {
   SimFixture f;
   const auto* decl = FirstPathDecl("    (a => b) = -5;", f);
@@ -225,14 +214,11 @@ TEST(SpecifyPathDelayFromSource, NegativeAndPositiveMixClampsOnlyNegative) {
   const auto* decl = FirstPathDecl("    (a => b) = (-3, 5);", f);
   ASSERT_NE(decl, nullptr);
   PathDelay pd = BuildPathDelayFromDecl(*decl, f.ctx, f.arena);
-  EXPECT_EQ(pd.delays[0], 0u);  // clamped rise
-  EXPECT_EQ(pd.delays[1], 5u);  // fall unchanged
+  EXPECT_EQ(pd.delays[0], 0u);
+  EXPECT_EQ(pd.delays[1], 5u);
   EXPECT_EQ(pd.delays[2], 0u);
   EXPECT_EQ(pd.delays[4], 5u);
 }
-
-// --- §30.5.1: a single value is the typical delay; a min:typ:max triple picks
-// a member per the delay mode. Built from real source, distributed to slots. --
 
 TEST(SpecifyPathDelayFromSource, MinTypMaxSelectsTypicalByDefault) {
   SimFixture f;
@@ -268,10 +254,6 @@ TEST(SpecifyPathDelayFromSource, NegativeTypicalMemberClampsToZero) {
   for (int i = 0; i < 6; ++i) EXPECT_EQ(pd.delays[i], 0u) << "slot " << i;
 }
 
-// A buffer whose one path takes its delay from `delay`, driven 0 at 0, 1 at 10
-// and 0 at 20 under `timescale 1ns / 1ps, printing each change of its output
-// after 0. The output's first change, from x to 0, crosses the path as the
-// later ones do, so it too lands one path delay after its source's.
 std::string BufferWithPathDelay(const std::string& specparam,
                                 const std::string& delay) {
   return "`timescale 1ns / 1ps\n"
@@ -296,14 +278,6 @@ std::string BufferWithPathDelay(const std::string& specparam,
          "endmodule\n";
 }
 
-// §30.5 with §22.7 (printed page 716): the time unit is what time values, the
-// simulation time and delays among them, are measured in, so a path delay is a
-// count of the declaring module's unit, and a real one keeps what its fraction
-// the module's precision holds (§3.14.1). A specparam holding 2.5 -- a real, as
-// §6.20.5 (printed page 129) gives a specparam with no range its value's range
-// -- delays each transition by 2.5 ns under `timescale 1ns / 1ps. The delay was
-// read as 3 ticks of the 1 ps precision: the specparam stored the rounded
-// integer and the path took it unscaled.
 TEST(SpecifyPathDelayFromSource, RealSpecparamDelayCountsTheModuleUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(
@@ -311,8 +285,6 @@ TEST(SpecifyPathDelayFromSource, RealSpecparamDelayCountsTheModuleUnit) {
             "t=2.5 y=0\nt=12.5 y=1\nt=22.5 y=0\n");
 }
 
-// The same for a literal: an integer path delay of 3 is 3 ns, and a real 2.5
-// written in the path itself is 2.5 ns.
 TEST(SpecifyPathDelayFromSource, LiteralPathDelaysCountTheModuleUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(BufferWithPathDelay("", "3"), f),
@@ -322,8 +294,6 @@ TEST(SpecifyPathDelayFromSource, LiteralPathDelaysCountTheModuleUnit) {
             "t=2.5 y=0\nt=12.5 y=1\nt=22.5 y=0\n");
 }
 
-// §22.7: the unit is the declaring module's, not the top's, so a path of 2 in
-// a module under `timescale 1us / 1ns delays by 2000 of a 1 ns top's units.
 TEST(SpecifyPathDelayFromSource, PathDelayCountsItsOwnModulesUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us / 1ns\n"

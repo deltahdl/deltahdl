@@ -136,9 +136,6 @@ TEST(StringLiteralSyntaxParsing, TripleQuotedStringInSystemTaskArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A quoted string literal in a variable-declaration initializer position
-// (a distinct parse path from a procedural-assignment RHS) is accepted and
-// lowers to a string-literal expression node.
 TEST(StringLiteralSyntaxParsing, QuotedStringAsDeclarationInitializer) {
   auto r = Parse(
       "module m;\n"
@@ -152,8 +149,6 @@ TEST(StringLiteralSyntaxParsing, QuotedStringAsDeclarationInitializer) {
   EXPECT_EQ(decl->init_expr->kind, ExprKind::kStringLiteral);
 }
 
-// The triple-quoted form is likewise accepted in a declaration initializer and
-// lowers to the same string-literal node kind.
 TEST(StringLiteralSyntaxParsing, TripleQuotedStringAsDeclarationInitializer) {
   auto r = Parse(
       "module m;\n"

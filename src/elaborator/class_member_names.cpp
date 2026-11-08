@@ -23,10 +23,6 @@ namespace delta {
 
 namespace {
 
-// Adds to `names` each member, value parameter, type parameter and enumeration
-// constant `cls` declares itself. A range of constants, S[2] or T[3:4],
-// declares the names it generates, S0 and S1 or T3 and T4 (§6.19.2), which
-// `generated` owns; its bounds are integral numbers, which fold in any scope.
 void AddOwnMemberNames(const ClassDecl& cls,
                        std::unordered_set<std::string_view>& names,
                        std::unordered_set<std::string>& generated) {
@@ -46,7 +42,6 @@ void AddOwnMemberNames(const ClassDecl& cls,
   }
 }
 
-// The scope and name of each class `cls` extends or implements.
 std::vector<std::pair<std::string_view, std::string_view>> BaseNames(
     const ClassDecl& cls) {
   std::vector<std::pair<std::string_view, std::string_view>> bases;
@@ -116,8 +111,6 @@ const ClassDecl* SoleClassIndex::FindFrom(const ClassDecl& from,
 
 bool SoleClassIndex::SelectableNames(
     const ClassDecl& cls, std::unordered_set<std::string_view>& names) const {
-  // §18.6 randomize, pre_randomize and post_randomize, §18.8 rand_mode, §18.9
-  // constraint_mode and §18.13 srandom, get_randstate and set_randstate.
   names.insert({"randomize", "pre_randomize", "post_randomize", "rand_mode",
                 "constraint_mode", "srandom", "get_randstate",
                 "set_randstate"});

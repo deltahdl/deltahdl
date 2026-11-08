@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The classes of test/src/e2e/constraint_blocks.sv around the statements of
-// an initial that holds an Item it and an Other ot, with the module's
-// counters.
 std::string Design(const std::string& body) {
   return "class Item;\n"
          "  rand bit [7:0] lo;\n"
@@ -37,10 +34,6 @@ std::string Design(const std::string& body) {
          "endmodule\n";
 }
 
-// 18.5: the constraint blocks of a class all determine the values of its
-// random variables, each statement of each block holding at once: lo's two
-// range statements, hi's relations to lo and to the state variable limit,
-// and the arithmetic expression on their difference.
 TEST(ConstraintBlocksRun, EveryStatementOfEveryBlockHoldsAtOnce) {
   const std::string kSrc = Design(
       "    repeat (64) begin\n"
@@ -55,8 +48,6 @@ TEST(ConstraintBlocksRun, EveryStatementOfEveryBlockHoldsAtOnce) {
   EXPECT_EQ(RunCapture(kSrc, f), "64 64 64\n$finish at time 0\n");
 }
 
-// 18.5: a relation against a state variable reads the variable's value
-// current at the call, so lowering limit bounds hi below it.
 TEST(ConstraintBlocksRun, AStateVariablesCurrentValueBoundsTheDraw) {
   const std::string kSrc = Design(
       "    it.limit = 30;\n"
@@ -68,8 +59,6 @@ TEST(ConstraintBlocksRun, AStateVariablesCurrentValueBoundsTheDraw) {
   EXPECT_EQ(RunAndGet(kSrc, "under_limit"), uint64_t{64});
 }
 
-// 18.5: the block's name names it to constraint_mode(), so turning range
-// off frees lo from 10 to 20 while the other blocks still hold.
 TEST(ConstraintBlocksRun, ABlockTurnedOffByNameLeavesTheOthersHolding) {
   const std::string kSrc = Design(
       "    it.range.constraint_mode(0);\n"
@@ -85,8 +74,6 @@ TEST(ConstraintBlocksRun, ABlockTurnedOffByNameLeavesTheOthersHolding) {
   EXPECT_EQ(RunCapture(kSrc, f), "1 64\n$finish at time 0\n");
 }
 
-// 18.5: constraint block names need differ only within one class, not between
-// classes, so Other's own block named range constrains its n.
 TEST(ConstraintBlocksRun, ABlockNameIsUniqueWithinItsClassAlone) {
   const std::string kSrc = Design(
       "    repeat (16) begin\n"

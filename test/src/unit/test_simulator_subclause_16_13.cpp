@@ -10,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The design of test/src/e2e/multiclock_sequences.sv around one assertion:
-// clk0 rises at 5, 15, ..., 75 so that tick n of it is at 10n - 5, clk1 at
-// 12, 27, 45, 57 and 72, its tick at 45 together with clk0's fifth; sig0
-// is high at 1, 2, 5 and 7 and sig1 at 3 and 5.
 std::string MulticlockSource(const std::string& items) {
   return "module t;\n"
          "  logic clk0 = 0;\n"
@@ -44,8 +40,6 @@ std::string MulticlockSource(const std::string& items) {
          "endmodule\n";
 }
 
-// The pass and fail counts of the assertion over `spec`, clocked on clk0,
-// and the time of its last pass; `prelude` declares what the spec names.
 struct MulticlockCounts {
   uint64_t passes;
   uint64_t fails;
@@ -68,9 +62,6 @@ MulticlockCounts CountsOfMulticlock(const std::string& spec,
           last_pass->value.ToUint64()};
 }
 
-// Annex F.2 and §16.13.1: the assertion over `spec`, after `prelude`, which
-// names again a clock already in force, is evaluated as `plain`, the spec
-// without it, which the assertion evaluates to some pass or fail.
 void ExpectAsWithoutTheRedundantClock(const std::string& spec,
                                       const std::string& plain,
                                       const std::string& prelude = "") {
@@ -82,10 +73,6 @@ void ExpectAsWithoutTheRedundantClock(const std::string& spec,
   EXPECT_EQ(named.last_pass, bare.last_pass) << spec;
 }
 
-// §16.13.1: ##1 between subsequences on different clocks moves from the
-// end point of the first, at a tick of clk0, to the nearest strictly
-// subsequent tick of clk1: the attempt from 15 holds at 27, the one from
-// 45 fails at 57, the next tick of clk1 after 45, and the six others fail.
 TEST(MulticlockSequences, ASingleDelayMovesToTheNextTickOfTheSecondClock) {
   MulticlockCounts counts = CountsOfMulticlock("sig0 ##1 @(posedge clk1) sig1");
   EXPECT_EQ(counts.passes, 1u);
@@ -93,9 +80,6 @@ TEST(MulticlockSequences, ASingleDelayMovesToTheNextTickOfTheSecondClock) {
   EXPECT_EQ(counts.last_pass, 27u);
 }
 
-// §16.13.1: ##0 moves to the nearest possibly overlapping tick of clk1,
-// which is clk1's tick at 45 for the attempt from 45, where sig1 holds, and
-// the next tick of clk1 otherwise, as ##1 does.
 TEST(MulticlockSequences, AZeroDelayMovesToTheOverlappingTickWhereThereIsOne) {
   MulticlockCounts counts = CountsOfMulticlock("sig0 ##0 @(posedge clk1) sig1");
   EXPECT_EQ(counts.passes, 2u);
@@ -103,9 +87,6 @@ TEST(MulticlockSequences, AZeroDelayMovesToTheOverlappingTickWhereThereIsOne) {
   EXPECT_EQ(counts.last_pass, 45u);
 }
 
-// §16.13.1: where the clocks are identical the clocking event does not
-// change, and the sequence is the singly clocked sig0 ##1 sig1, which reads
-// sig1 a tick of clk0 after sig0 and holds from 15 alone, at 25.
 TEST(MulticlockSequences, TheSameClockNamedAgainChangesNothing) {
   MulticlockCounts counts = CountsOfMulticlock("sig0 ##1 @(posedge clk0) sig1");
   EXPECT_EQ(counts.passes, 1u);
@@ -117,11 +98,6 @@ TEST(MulticlockSequences, TheSameClockNamedAgainChangesNothing) {
   EXPECT_EQ(plain.last_pass, 25u);
 }
 
-// §16.13.1 with §9.4 Syntax 9-4: `@clk1` and `@(clk1)` are one clocking event,
-// every change of clk1, at 12, 20, 27, 35, 45, 50, 57, 65, 72 and 78. Of the
-// attempts where sig0 holds, from 5, 15, 45 and 65, only the one from 45 finds
-// sig1 at the next change, 50; the bare form is read and evaluated as the
-// parenthesised one is.
 TEST(MulticlockSequences, ABareNamedClockIsTheParenthesisedOnesEvent) {
   MulticlockCounts paren = CountsOfMulticlock("sig0 ##1 @(clk1) sig1");
   EXPECT_EQ(paren.passes, 1u);
@@ -133,11 +109,6 @@ TEST(MulticlockSequences, ABareNamedClockIsTheParenthesisedOnesEvent) {
   EXPECT_EQ(bare.last_pass, 50u);
 }
 
-// §16.13.1 with §15.5.1: a named event is a clock of a multiclocked sequence as
-// an edge of a signal is, each trigger a tick. ne is triggered at every fall
-// of clk and nclk is ~clk, so @(ne) and @(posedge nclk) tick at the same
-// instants, and a sequence gives the same matches on either, whether the
-// event clocks its second subsequence or its first.
 std::string EventClockSource(const std::string& second_clock,
                              const std::string& leading_clock) {
   return "module t;\n"
@@ -172,11 +143,6 @@ TEST(MulticlockSequences, ANamedEventClocksASubsequenceAsASignalEdgeDoes) {
   EXPECT_EQ(g.ctx.FindVariable("leading")->value.ToUint64(), 2u);
 }
 
-// §16.13.1 with §16.14.5: an attempt begins at a tick of the leading clock
-// alone. nclk is ~clk and rises at 0, from x to 1, before clk has risen at
-// all; the cover's ten attempts begin at clk's rises at 5, 15, ..., 95 and
-// each matches at the next rise of nclk, 10, 20, ..., 100, where an attempt
-// begun at 0 would match at 10 as well.
 TEST(MulticlockSequences, AnotherClockTickingFirstBeginsNoAttempt) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -192,10 +158,6 @@ TEST(MulticlockSequences, AnotherClockTickingFirstBeginsNoAttempt) {
   EXPECT_EQ(hits->value.ToUint64(), 10u);
 }
 
-// §16.13.1 with §23.6: a clock of a multiclocked sequence whose signal is
-// named by a path, `@(negedge i0.clk)` through an interface instance bound to
-// clk, ticks as the clock written over clk does, so the two covers match
-// equally often.
 TEST(MulticlockSequences, AClockNamedByAPathTicksAsItsSignalDoes) {
   SimFixture f;
   auto* path = RunAndFindVar(
@@ -219,12 +181,6 @@ TEST(MulticlockSequences, AClockNamedByAPathTicksAsItsSignalDoes) {
   EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 4u);
 }
 
-// §16.14.5 with §16.13.1: an assertion on an instance of a property whose
-// body names a second clock begins its attempts at its leading clock alone.
-// The interface's port clk falls from x at 0, a tick of the second clock
-// before the leading clock has risen, and no attempt begins there, so the
-// instance fails as often as the same property declared in the module, six
-// times by the end of the run, where an attempt begun at 0 made it seven.
 TEST(MulticlockSequences, AnInstancesSecondClockTickingFirstBeginsNoAttempt) {
   SimFixture f;
   auto* fi = RunAndFindVar(
@@ -250,10 +206,6 @@ TEST(MulticlockSequences, AnInstancesSecondClockTickingFirstBeginsNoAttempt) {
   EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 6u);
 }
 
-// The same for an instance with actuals, whose body's sequence the actuals
-// are substituted into: clk falls from x at 0, a tick of the property's second
-// clock before its leading clock has risen, and the instance fails as often as
-// the sequence written into the assertion.
 TEST(MulticlockSequences,
      AnInstanceWithActualsBeginsNoAttemptAtItsSecondClock) {
   SimFixture f;
@@ -275,12 +227,6 @@ TEST(MulticlockSequences,
   EXPECT_EQ(f.ctx.FindVariable("fm")->value.ToUint64(), 6u);
 }
 
-// §16.13.1 with §23.6: two clocks whose signals are named by paths through two
-// instances are two clocks, however alike their edges. i0 is bound to clk and
-// i1 to nclk, and b is 1 at nclk's rises and 0 at clk's, so the sequence
-// matches where its second subsequence waits for i1's clock, ten times by the
-// end of the run as the plain twin does, and would never match were it taken
-// to stay on i0's.
 TEST(MulticlockSequences, ClocksNamedByPathsThroughTwoInstancesAreTwoClocks) {
   SimFixture f;
   auto* path = RunAndFindVar(
@@ -302,11 +248,6 @@ TEST(MulticlockSequences, ClocksNamedByPathsThroughTwoInstancesAreTwoClocks) {
   EXPECT_EQ(f.ctx.FindVariable("c2")->value.ToUint64(), 10u);
 }
 
-// Annex F.2 eliminates a clocking event equal to the one in force, so a group
-// naming clk0 again under clk0 and repeated by a count is the unclocked
-// group's repetition, sig0 ##1 1 ##1 sig0 ##1 1: of the attempts the run
-// resolves, the one from tick 5 holds at 75, sig0 being high at 5 and 7, and
-// those from ticks 1, 2, 3, 4, 6 and 8 fail.
 TEST(MulticlockSequences, ARepeatedGroupNamingTheClockInForceIsUnclocked) {
   MulticlockCounts counts =
       CountsOfMulticlock("(@(posedge clk0) sig0 ##1 1)[*2]");
@@ -317,11 +258,6 @@ TEST(MulticlockSequences, ARepeatedGroupNamingTheClockInForceIsUnclocked) {
                                    "(sig0 ##1 1)[*2]");
 }
 
-// Annex F.2 and §16.13.1: a clock named again where it is already in force
-// changes nothing wherever it is written: in a group repeated by a range or
-// holding one operand, in a group repeated under a clock the chain changed
-// to, in the first operand of within or of intersect, after a delay of two
-// ticks and in the sequence a throughout guards.
 TEST(MulticlockSequences, AClockNamedAgainInAnyOperandChangesNothing) {
   ExpectAsWithoutTheRedundantClock("(@(posedge clk0) sig0 ##1 1)[*1:2]",
                                    "(sig0 ##1 1)[*1:2]");
@@ -341,18 +277,12 @@ TEST(MulticlockSequences, AClockNamedAgainInAnyOperandChangesNothing) {
                                    "sig0 throughout (1 ##1 1)");
 }
 
-// §16.13.1 with Annex F.3.2: a group writing no clock of its own, repeated
-// after the chain changed to clk1, is `@(posedge clk1)` over the repetition,
-// each copy of its operands read on clk1.
 TEST(MulticlockSequences, AGroupRepeatedAfterAClockChangeIsReadOnThatClock) {
   ExpectAsWithoutTheRedundantClock(
       "sig0 ##1 @(posedge clk1) (sig1 ##1 1)[*2]",
       "sig0 ##1 @(posedge clk1) sig1 ##1 1 ##1 sig1 ##1 1");
 }
 
-// Annex F.2 and §16.13.1: the redundant clock is eliminated whether the
-// repeated sequence is a named sequence declared on the clock in force, or
-// the group stands in a sequence or a property declared on it.
 TEST(MulticlockSequences, ARedundantClockInADeclarationChangesNothing) {
   ExpectAsWithoutTheRedundantClock(
       "sc0[*2]", "(sig0 ##1 1)[*2]",

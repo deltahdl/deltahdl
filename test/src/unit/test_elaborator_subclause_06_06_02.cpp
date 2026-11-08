@@ -42,8 +42,6 @@ TEST(UwireElaboration, UwireSingleContinuousAssignmentOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The report stands at the second continuous assignment, which is the one that
-// finds `w` already driven.
 TEST(UwireElaboration, UwireMultipleContinuousAssignmentsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -72,8 +70,6 @@ TEST(UwireElaboration, UwireNetDeclAssignPlusContinuousAssignError) {
 }
 
 TEST(UwireElaboration, MultipleContinuousAssignmentsOnPlainWireOk) {
-  // The single-driver restriction is specific to uwire: an ordinary wire
-  // resolves multiple drivers, so two continuous assignments are not an error.
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -117,8 +113,6 @@ TEST(UwireElaboration, UwireOnSecondBidirectionalTerminalError) {
 }
 
 TEST(UwireElaboration, UwireBitSelectOnBidirectionalTerminalError) {
-  // Connecting a single bit of a uwire net to a bidirectional terminal is
-  // still connecting (a bit of) a uwire net, so it is an error.
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -134,8 +128,6 @@ TEST(UwireElaboration, UwireBitSelectOnBidirectionalTerminalError) {
 }
 
 TEST(UwireElaboration, UwireOnResistiveBidirectionalSwitchTerminalError) {
-  // The restriction applies to every bidirectional pass switch variant,
-  // including the resistive rtran.
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -151,8 +143,6 @@ TEST(UwireElaboration, UwireOnResistiveBidirectionalSwitchTerminalError) {
 }
 
 TEST(UwireElaboration, UwireOnEnableLowControlSwitchTerminalError) {
-  // The restriction applies to the enable-low control switch tranif0; a uwire
-  // on either of its two bidirectional terminals is an error.
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -169,8 +159,6 @@ TEST(UwireElaboration, UwireOnEnableLowControlSwitchTerminalError) {
 }
 
 TEST(UwireElaboration, UwireOnResistiveEnableLowControlSwitchTerminalError) {
-  // rtranif0 is the resistive enable-low control bidirectional pass switch;
-  // the second bidirectional terminal here carries the uwire.
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -187,7 +175,6 @@ TEST(UwireElaboration, UwireOnResistiveEnableLowControlSwitchTerminalError) {
 }
 
 TEST(UwireElaboration, UwireOnResistiveEnableHighControlSwitchTerminalError) {
-  // rtranif1 is the resistive enable-high control bidirectional pass switch.
   ElabFixture f;
   ElaborateSrc(
       "module t;\n"
@@ -231,9 +218,6 @@ TEST(UwireElaboration, UwireVectorWidth) {
   EXPECT_EQ(mod->nets[0].net_type, NetType::kUwire);
 }
 
-// §6.6.2: the report that rejects a second driver on a uwire net names the
-// subclause stating the single-driver rule, so a caller learns which rule was
-// enforced without matching the wording of the message.
 TEST(UwireElaboration, MultipleContinuousAssignmentsNames6_6_2) {
   ElabFixture f;
   ElaborateSrc(
@@ -248,9 +232,6 @@ TEST(UwireElaboration, MultipleContinuousAssignmentsNames6_6_2) {
                             "6.6.2"));
 }
 
-// §6.6.2 makes it an error to connect any bit of a uwire net to more than one
-// driver, whatever the drivers are. The report stands at the driver that
-// finds the bit already driven.
 ::testing::AssertionResult UwireReported(const std::string& src,
                                          std::string_view name, uint32_t line) {
   ElabFixture f;
@@ -261,8 +242,6 @@ TEST(UwireElaboration, MultipleContinuousAssignmentsNames6_6_2) {
       "6.6.2");
 }
 
-// A gate's output drives the net as a continuous assignment does: beside an
-// assignment, and beside a second gate, it is a second driver.
 TEST(UwireElaboration, GateOutputIsADriver) {
   EXPECT_TRUE(
       UwireReported("module t(input logic a, b);\n"
@@ -285,7 +264,6 @@ TEST(UwireElaboration, GateOutputIsADriver) {
              "endmodule\n"));
 }
 
-// A UDP's output is a driver the same way.
 TEST(UwireElaboration, UdpOutputIsADriver) {
   const std::string kUdp =
       "primitive inv(output o, input i);\n"
@@ -306,7 +284,6 @@ TEST(UwireElaboration, UdpOutputIsADriver) {
                             "endmodule\n"));
 }
 
-// A unidirectional switch's output, and a pull gate's, drive the net too.
 TEST(UwireElaboration, SwitchAndPullOutputsAreDrivers) {
   EXPECT_TRUE(
       UwireReported("module t(input logic d, g, b);\n"
@@ -329,10 +306,6 @@ TEST(UwireElaboration, SwitchAndPullOutputsAreDrivers) {
              "endmodule\n"));
 }
 
-// The rule is stated of each bit: drivers of different bits of a uwire vector
-// are each the only driver of their bit, and two drivers reaching one bit,
-// through bit-selects, part-selects, indexed part-selects, the whole vector
-// or a concatenation, are reported.
 TEST(UwireElaboration, DriversOfOneBitThroughSelectsAreReported) {
   const std::string kHead =
       "module t(input logic [3:0] a, b);\n"
@@ -381,7 +354,6 @@ TEST(UwireElaboration, DriversOfDifferentBitsAreAccepted) {
              "endmodule\n"));
 }
 
-// A gate's output on one bit drives that bit alone.
 TEST(UwireElaboration, GateOutputOnOneBitDrivesThatBit) {
   EXPECT_TRUE(
       UwireReported("module t(input logic a, b);\n"
@@ -398,7 +370,6 @@ TEST(UwireElaboration, GateOutputOnOneBitDrivesThatBit) {
              "endmodule\n"));
 }
 
-// Elements of an array of uwire vectors are distinct nets, each driven once.
 TEST(UwireElaboration, ElementsOfAUwireArrayAreDrivenApart) {
   EXPECT_TRUE(
       ElabOk("module t(input logic a, b);\n"
@@ -408,8 +379,6 @@ TEST(UwireElaboration, ElementsOfAUwireArrayAreDrivenApart) {
              "endmodule\n"));
 }
 
-// The rule holds in an interface and a program as in a module; a program
-// takes no gate (§24.3), so its second driver is a declaration assignment.
 TEST(UwireElaboration, InterfaceAndProgramUwireDrivers) {
   EXPECT_TRUE(
       UwireReported("interface i;\n"
@@ -441,8 +410,6 @@ TEST(UwireElaboration, InterfaceAndProgramUwireDrivers) {
              "endmodule\n"));
 }
 
-// A uwire port is a uwire net of its module, written in the ANSI header or
-// in a non-ANSI port declaration.
 TEST(UwireElaboration, UwirePortDrivers) {
   EXPECT_TRUE(
       UwireReported("module t(output uwire u, input logic a, b);\n"
@@ -465,8 +432,6 @@ TEST(UwireElaboration, UwirePortDrivers) {
              "endmodule\n"));
 }
 
-// Under `default_nettype uwire an implicit net is a uwire net, whether the
-// left-hand side of a continuous assignment or a gate's terminal declares it.
 TEST(UwireElaboration, ImplicitUwireNetDrivers) {
   EXPECT_TRUE(
       UwireReported("`default_nettype uwire\n"
@@ -492,9 +457,6 @@ TEST(UwireElaboration, ImplicitUwireNetDrivers) {
              "`default_nettype wire\n"));
 }
 
-// An array of instances connects a terminal as wide as the array one bit to
-// each instance, and any other terminal whole to every instance, so each
-// instance drives it (§28.3.6).
 TEST(UwireElaboration, InstanceArrayTerminalDrivers) {
   EXPECT_TRUE(
       UwireReported("module t(input logic [1:0] a);\n"
@@ -521,8 +483,6 @@ TEST(UwireElaboration, InstanceArrayTerminalDrivers) {
              "endmodule\n"));
 }
 
-// A member of a uwire net of a packed structure is the bits of that member: two
-// members are driven apart, and the whole net and one member meet.
 TEST(UwireElaboration, StructureMemberDrivers) {
   const std::string kHead =
       "module t(input logic a, b);\n"
@@ -540,8 +500,6 @@ TEST(UwireElaboration, StructureMemberDrivers) {
                              "endmodule\n"));
 }
 
-// Selects of several dimensions name bits down each of them: a select of an
-// outer dimension reaches every bit beneath it.
 TEST(UwireElaboration, MultidimensionalSelectDrivers) {
   EXPECT_TRUE(
       UwireReported("module t(input logic [3:0] a, input logic b);\n"
@@ -566,10 +524,6 @@ TEST(UwireElaboration, MultidimensionalSelectDrivers) {
              "endmodule\n"));
 }
 
-// A generate block's own uwire net takes one driver, and a module's uwire net
-// driven from a loop generate block is driven once by each iteration: two
-// iterations driving one bit are two drivers, and each driving its own bit
-// is one.
 TEST(UwireElaboration, GenerateBlockUwireDrivers) {
   EXPECT_TRUE(
       UwireReported("module t(input logic a, b);\n"
@@ -597,10 +551,6 @@ TEST(UwireElaboration, GenerateBlockUwireDrivers) {
              "endmodule\n"));
 }
 
-// A uwire net the compilation unit declares is driven by the modules of the
-// design: by two assignments of one module, by two modules, and by two
-// instances of one module. §3.12.1 gives the unit no net declaration
-// assignment, so its net has no driver of its own.
 TEST(UwireElaboration, CompilationUnitUwireDrivers) {
   EXPECT_TRUE(
       UwireReported("uwire w;\n"
@@ -646,8 +596,6 @@ TEST(UwireElaboration, CompilationUnitUwireDrivers) {
              "endmodule\n"));
 }
 
-// Each element of an array of instances is an instance of its own (§23.3.2),
-// so a module that drives a unit's uwire net once drives it once per element.
 TEST(UwireElaboration, InstanceArrayDrivesAUnitUwireOncePerElement) {
   const std::string kUnit =
       "uwire w;\n"
@@ -663,8 +611,6 @@ TEST(UwireElaboration, InstanceArrayDrivesAUnitUwireOncePerElement) {
                              "endmodule\n"));
 }
 
-// A module's own object of the unit uwire net's name is that object, so its
-// drivers are not the unit net's: a port and a net of the module.
 TEST(UwireElaboration, LocalObjectHidesCompilationUnitUwire) {
   const std::string kUnit =
       "uwire w;\n"
@@ -682,8 +628,6 @@ TEST(UwireElaboration, LocalObjectHidesCompilationUnitUwire) {
                              "endmodule\n"));
 }
 
-// A select that is not constant names no bit, and Table 10-1 reports it; it
-// is counted as the driver of no bit.
 TEST(UwireElaboration, NonConstantSelectDrivesNoCountedBit) {
   ElabFixture f;
   ElaborateSrc(

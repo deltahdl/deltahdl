@@ -112,9 +112,6 @@ TEST(CastOperatorSim, SignedCastOfFourBitVector) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// 6.24.1: when the casting type is a constant expression giving a positive
-// width, the operand is truncated to that width. A numeric size cast narrower
-// than its operand (4'(8'hAB)) keeps only the low four bits, 0xB.
 TEST(CastOperatorSim, NumericSizeCastTruncates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -127,10 +124,6 @@ TEST(CastOperatorSim, NumericSizeCastTruncates) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-// 6.24.1: the size given by a numeric size cast may come from any constant
-// expression, including a parameter (a constant form of 11.2.1). Driving the
-// width through a parameter and running the design shows the parameter's value
-// selects the truncation width just as a literal does.
 TEST(CastOperatorSim, NumericSizeCastParameterWidthTruncates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -144,10 +137,6 @@ TEST(CastOperatorSim, NumericSizeCastParameterWidthTruncates) {
   EXPECT_EQ(var->value.ToUint64(), 0xBu);
 }
 
-// 6.24.1: a size cast returns the value a packed [n-1:0] vector would hold
-// after being assigned the operand, and the operand's own signedness passes
-// through unchanged. Widening a signed operand therefore sign-extends it: the
-// signed four-bit value 1100 (-4) cast to eight bits is 8'hFC, not 8'h0C.
 TEST(CastOperatorSim, NumericSizeCastSignExtendsSignedOperand) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -164,9 +153,6 @@ TEST(CastOperatorSim, NumericSizeCastSignExtendsSignedOperand) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// 6.24.1: the signedness that passes through is the operand's own, so widening
-// an unsigned operand zero-extends rather than sign-extends -- the same four
-// low bits 1111 cast to eight bits is 8'h0F, contrasting with the signed case.
 TEST(CastOperatorSim, NumericSizeCastZeroExtendsUnsignedOperand) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -183,9 +169,6 @@ TEST(CastOperatorSim, NumericSizeCastZeroExtendsUnsignedOperand) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Fu);
 }
 
-// 6.24.1: a size given by a localparam (another constant form of 11.2.1)
-// selects the truncation width at run time exactly as a literal or parameter
-// does. Built from real localparam syntax and driven through the full pipeline.
 TEST(CastOperatorSim, NumericSizeCastLocalparamWidthTruncates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -211,12 +194,6 @@ TEST(CastOperatorSim, IntCastFromRealRoundsHalfUp) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// §6.24.1: a signing cast returns the value a packed [n-1:0] type holds after
-// being assigned the expression, with n the operand's own width, and gives the
-// result the signedness the cast names. §11.7 spells the same conversion two
-// ways, so signed'(c) in a localparam initializer must resolve as $signed(c)
-// does: the unsigned four-bit 1100 becomes the signed -4, and assigning that
-// to the signed eight-bit parameter sign-extends it to 8'hFC.
 TEST(CastOperatorSim, SigningCastFoldsInLocalparamInitializer) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -230,10 +207,6 @@ TEST(CastOperatorSim, SigningCastFoldsInLocalparamInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 0xFCu);
 }
 
-// §6.24.1: a size cast returns the value at the cast size and passes the
-// operand's self-determined signedness through unchanged. A localparam
-// initialized from 8'(4'b1100) therefore holds 8'h0C, the unsigned four-bit
-// operand zero-extended to eight bits, and not the sign-extended 8'hFC.
 TEST(CastOperatorSim, SizeCastFoldsInLocalparamInitializer) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -247,11 +220,6 @@ TEST(CastOperatorSim, SizeCastFoldsInLocalparamInitializer) {
   EXPECT_EQ(var->value.ToUint64(), 0x0Cu);
 }
 
-// §9.4.2: a non-edge implicit event is detected whenever the expression's value
-// changes, and the clause names no writer whose change is exempt. A system task
-// that writes one of its arguments has written a user variable, so a process
-// parked on it resumes -- which every case above could pass without, the store
-// having happened all along and the value being what they read back.
 TEST(CastOperatorSim, CastDestinationWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -270,10 +238,6 @@ TEST(CastOperatorSim, CastDestinationWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §6.24.1 (printed page 139): a cast returns what a variable of the casting
-// type holds once the expression is assigned to it, so `shortreal'(2)` is
-// the single-precision 2.0 and a signed operand keeps its sign. The integer
-// was turned into a double's pattern cut to 32 bits, which reads back as 0.
 TEST(CastOperatorSim, IntegerCastToShortrealIsItsValueInSinglePrecision) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -289,13 +253,6 @@ TEST(CastOperatorSim, IntegerCastToShortrealIsItsValueInSinglePrecision) {
             "2.000000 -3.000000 -5.000000 -5.000000\n");
 }
 
-// §6.24.1: a cast yields what a variable of the casting type holds once the
-// operand is assigned to it, and a 4-state variable keeps x and z bits
-// (§10.7) while a 2-state one reads them as 0 (§6.3.2.2): `integer'(l)` is
-// l zero-extended with its x and z, `integer'(4'bx)` holds x in the low four
-// bits, `time'(l)` is 64 bits wide, and `int'(l)` has the x and z at 0. The
-// cast was rebuilt from the operand's numeric projection, which read x and z
-// as 0 and made every cast 2-state.
 TEST(CastOperatorSim, CastToA4StateTypeKeepsXAndZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -315,10 +272,6 @@ TEST(CastOperatorSim, CastToA4StateTypeKeepsXAndZ) {
             "x 00000000000000000000000000001000 64\n");
 }
 
-// §6.24.1 with §11.8.1: a cast to a signed type is signed, as a variable of
-// the type is, so an expression whose operands are all signed casts is
-// evaluated signed: §11.7's `byte'(regA) + byte'(regB)` with 8'h80 and 8'h01
-// is -127, and `int'(1) - 4` is -3. The cast's result was unsigned.
 TEST(CastOperatorSim, CastToASignedTypeIsSigned) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -335,10 +288,6 @@ TEST(CastOperatorSim, CastToASignedTypeIsSigned) {
             "-127 -3 -128\n");
 }
 
-// §6.24.1 with §11.6.1: a size cast evaluates its operand as if assigned to a
-// vector of the cast's width, which is the operand's context width, so the
-// product in §11.12's `($bits(x) + $bits(y))'(x * y)` is taken at 10 bits:
-// 15 * 10 is 150, where the 6-bit product of the operands alone is 22.
 TEST(CastOperatorSim, SizeCastIsItsOperandsContextWidth) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -353,11 +302,6 @@ TEST(CastOperatorSim, SizeCastIsItsOperandsContextWidth) {
             "150 150 150\n");
 }
 
-// A.2.2.1 admits a class or package scope before a casting type, so a typedef
-// named through its class (§8.23) or its package (§26.3) is a casting type,
-// and a bare typedef name inside the class's method names the class's: each
-// converts to the type, `byte` truncating 261 to 5 and `shortint` 70000 to
-// 4464. The scoped name was read as a size and the operand passed through.
 TEST(CastOperatorSim, CastToAClassOrPackageTypedef) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p; typedef shortint S; endpackage\n"

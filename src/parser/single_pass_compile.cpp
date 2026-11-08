@@ -27,10 +27,6 @@ namespace delta {
 namespace {
 
 bool ReadWholeFile(const std::filesystem::path& path, std::string& text) {
-  // A directory, or a device, named where a source description was expected
-  // opens without complaint on some platforms and then yields no bytes. Left
-  // to the read alone it would pass for a description that happens to declare
-  // no cells, and the command line would look like it had been honoured.
   std::error_code ec;
   if (!std::filesystem::is_regular_file(path, ec)) return false;
   std::ifstream ifs(path, std::ios::binary);
@@ -41,11 +37,6 @@ bool ReadWholeFile(const std::filesystem::path& path, std::string& text) {
   return true;
 }
 
-// The libraries claiming one source description, written out as a list for a
-// diagnostic to name them in. Naming them is what tells a reader which two
-// declarations of the library map have to be reconciled, and it tells a caller
-// reading the diagnostic back that the compile stopped on the ambiguity rather
-// than on any of the other things that stop a compile.
 std::string JoinLibraryNames(const std::vector<std::string_view>& names) {
   std::string joined;
   for (auto name : names) {
@@ -55,19 +46,12 @@ std::string JoinLibraryNames(const std::vector<std::string_view>& names) {
   return joined;
 }
 
-// The library-writing side of compiling one source description: the map that
-// receives the cells, the engine that reports a collision between them, and
-// the record of what was written. These travel together so that one traversal
-// serves every kind of cell a description can declare.
 struct CellWriteSink {
   LibraryMap& libs;
   DiagEngine& diag;
   std::vector<WrittenCell>& written;
 };
 
-// Writes every declaration of one cell kind into the library its source
-// description was mapped to, and records the identity of each write so that a
-// later run can tell whether the library still holds this description's cell.
 template <typename Decl>
 void WriteCellsOfKind(const std::vector<Decl*>& decls, bool is_module,
                       CellWriteSink& sink) {
@@ -82,36 +66,11 @@ void WriteCellsOfKind(const std::vector<Decl*>& decls, bool is_module,
   }
 }
 
-// §3.14.2.2: a module, program, package or interface definition, and a
-// compilation-unit scope likewise, each has no more than one time unit and one
-// time precision, and a timeunit or timeprecision declaration written again as
-// a later item has to agree with the one before it in the same time scope.
-// §3.12.1 case a) makes every file of one compilation command line a single
-// compilation unit, which is the use
-// model this compiler implements, so a compilation-unit timeunit in a second
-// file of one command line is such a repeat and has to match the first file's.
-//
-// `target` is what the descriptions before this one built up and `src` is the
-// description just compiled, so this must run before
-// AppendCompilationUnitDeclarations in src/parser/ast_design.h carries the
-// first-wins value over. CheckCuTimeunitConsistency in src/parser/parser.cpp
-// makes the same two reports for a repeat within one file; the messages are
-// repeated here verbatim so that one rule reads one way whichever file the
-// second declaration was written in.
-//
-// The magnitude is compared as well as the unit, because 1ps and 10ps are both
-// TimeUnit::kPs and differ only in cu_time_unit_magnitude, and §3.14.2.2 asks
-// whether the declarations match rather than whether their units do. The two
-// halves are asked independently, since a description can repeat a matching
-// time unit and a conflicting precision.
 void ReportCuTimescaleConflict(DiagEngine& diag, const CompilationUnit& target,
                                const CompilationUnit& src) {
   if (target.has_cu_timeunit && src.has_cu_timeunit &&
       (target.cu_time_unit != src.cu_time_unit ||
        target.cu_time_unit_magnitude != src.cu_time_unit_magnitude)) {
-    // The later declaration is the one the report stands at, because it is the
-    // repeat that failed to match rather than the declaration it failed to
-    // match.
     diag.Error(src.cu_timeunit_loc, "timeunit does not match prior declaration",
                Subclause("3.14.2.2"));
   }
@@ -129,11 +88,6 @@ void ReportCuTimescaleConflict(DiagEngine& diag, const CompilationUnit& target,
 SinglePassCompiler::SinglePassCompiler(LibraryMap& lib_map, SourceManager& mgr,
                                        Arena& arena, DiagEngine& diag)
     : lib_map_(lib_map), mgr_(mgr), arena_(arena), diag_(diag) {
-  // A report this compiler makes about a library declaration stands at a
-  // position `diag` resolves through `mgr`, so the map file the declaration is
-  // written in has to be a file `mgr` holds. Handing the map this manager here
-  // is what puts it there, and it is done at construction because a map file is
-  // loaded before anything is compiled out of it.
   lib_map.ResolvePositionsAgainst(mgr);
 }
 
@@ -150,15 +104,8 @@ bool SinglePassCompiler::CellsStillHeldInLibraries(
 CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
                                                   std::string text,
                                                   CompilationUnit& unit) {
-  // A description that several library declarations claim equally belongs to
-  // no one library, so there is nowhere to map its cells to.
   std::string_view library = lib_map_.LibraryForFile(path);
   if (library.empty()) {
-    // The report stands at the first of the library declarations claiming the
-    // description. §33.3.1.1 makes the claim an error without singling out one
-    // of the declarations that make it, so the message names every claimant and
-    // the position picks the one a reader of the map file reaches first, which
-    // is the same declaration on every run.
     diag_.Error(lib_map_.FirstDeclarationClaiming(path),
                 "source description claimed by more than one library (" +
                     JoinLibraryNames(lib_map_.LibrariesForFile(path)) +
@@ -170,16 +117,7 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   uint32_t fid = mgr_.AddFile(path, text);
   Lexer lexer(mgr_.FileContent(fid), fid, diag_);
   Parser parser(lexer, arena_, diag_);
-  // The compilation-unit scope the descriptions before this one on the command
-  // line built up, because §3.12.1 case a) has every file see their
-  // declarations under the ordinary visibility rules, and the names have to be
-  // known while the file is parsed rather than after it. `byte_t b;` parses as
-  // an instantiation of a module called byte_t until the parser is told byte_t
-  // is a type, and `import p::*;` puts back nothing at all until the parser has
-  // heard of p.
   parser.AdoptCompilationUnitScope(cu_scope_);
-  // Errors already on the engine belong to descriptions compiled earlier in
-  // the run, so it is the errors this parse adds that decide its outcome.
   uint32_t errors_before = diag_.ErrorCount();
   auto* parsed = parser.Parse();
   if (parsed == nullptr) return CompileOutcome::kFailed;
@@ -190,41 +128,17 @@ CompileOutcome SinglePassCompiler::MapIntoLibrary(const std::string& path,
   entry.text = std::move(text);
   entry.parsed = parsed;
   CellWriteSink sink{lib_map_, diag_, entry.cells};
-  // Every cell the description declares goes into the library, whether or not
-  // the design being built instantiates it. Only a module collides with
-  // another module of its name loudly enough to warn about (§33.3.1.1).
-  //
-  // All seven design element kinds, in the order AppendCellDeclarations in
-  // src/parser/ast_design.h moves them. §33.2.1 defines a library as a named
-  // set of cells and a cell as a design element in the sense of §3.2, and
-  // lists six kinds only as examples: the module, primitive, interface,
-  // program, package and configuration. §3.2 names seven:
-  // the module of Clause 23, the program of Clause 24, the interface of Clause
-  // 25, the checker of Clause 17, the package of Clause 26, the primitive of
-  // Clause 28 and the configuration of Clause 33. The two lists
-  // read the same way down the page because they answer the same question, and
-  // the checker went missing from this one while the other had it.
-  WriteCellsOfKind(parsed->modules, /*is_module=*/true, sink);
-  WriteCellsOfKind(parsed->interfaces, /*is_module=*/false, sink);
-  WriteCellsOfKind(parsed->programs, /*is_module=*/false, sink);
-  WriteCellsOfKind(parsed->checkers, /*is_module=*/false, sink);
-  WriteCellsOfKind(parsed->udps, /*is_module=*/false, sink);
-  WriteCellsOfKind(parsed->packages, /*is_module=*/false, sink);
-  WriteCellsOfKind(parsed->configs, /*is_module=*/false, sink);
+  WriteCellsOfKind(parsed->modules, true, sink);
+  WriteCellsOfKind(parsed->interfaces, false, sink);
+  WriteCellsOfKind(parsed->programs, false, sink);
+  WriteCellsOfKind(parsed->checkers, false, sink);
+  WriteCellsOfKind(parsed->udps, false, sink);
+  WriteCellsOfKind(parsed->packages, false, sink);
+  WriteCellsOfKind(parsed->configs, false, sink);
 
-  // The cells and the compilation-unit scope both, because this compiler is
-  // §3.12.1 case a): every file of one compilation command line forms a single
-  // compilation unit, whose declarations each file then sees under the
-  // ordinary visibility rules. A typedef, class, bind or out-of-block
-  // constraint this description wrote outside every design element is such a
-  // declaration, and dropping it would hide it from the rest of the command
-  // line and from this description itself, since the unit built here is the
-  // only one elaboration reads.
   AppendCellDeclarations(unit, *parsed);
   ReportCuTimescaleConflict(diag_, unit, *parsed);
   AppendCompilationUnitDeclarations(unit, *parsed);
-  // The parse started from cu_scope_, so what it ends holding is that scope
-  // plus whatever this description added to it.
   entry.cu_scope = parser.CompilationUnitScope();
   cu_scope_ = entry.cu_scope;
   compiled_[path] = std::move(entry);
@@ -246,17 +160,7 @@ CompileOutcome SinglePassCompiler::CompileSource(
                   prior->second.text == text &&
                   CellsStillHeldInLibraries(prior->second);
   if (reusable) {
-    // Not recompiling a cell is not the same as dropping it: the parse the
-    // earlier compile produced is what this unit gains, so the design still
-    // binds against the cell. Its compilation-unit scope comes over for the
-    // same reason, and out of the same parse, so what a description
-    // contributes to the unit does not turn on whether this run compiled it or
-    // an earlier one did.
     AppendCellDeclarations(unit, *prior->second.parsed);
-    // §3.14.2.2 is checked here as well as in MapIntoLibrary, or a conflicting
-    // compilation-unit timeunit would be reported only when this run was the
-    // one that compiled the description. What a description is worth to the
-    // unit does not turn on that, and neither does whether it conforms.
     ReportCuTimescaleConflict(diag_, unit, *prior->second.parsed);
     AppendCompilationUnitDeclarations(unit, *prior->second.parsed);
     MergeCompilationUnitScope(cu_scope_, prior->second.cu_scope);
@@ -267,22 +171,11 @@ CompileOutcome SinglePassCompiler::CompileSource(
 
 bool SinglePassCompiler::CompileCommandLine(
     const std::vector<std::filesystem::path>& files, CompilationUnit& unit) {
-  // Whatever the libraries already hold was put there by an earlier command
-  // line, so meeting one of those names again is a recompile rather than two
-  // descriptions of one cell within a single run (§33.3.1.1).
   lib_map_.BeginNewInvocation();
-  // A command line is a compilation unit (§3.12.1 case a)), so its
-  // compilation-unit scope starts empty however many command lines this
-  // compiler has already run.
   cu_scope_ = CompilationUnitScopeNames{};
   std::unordered_set<std::string> named;
   bool ok = true;
   for (const auto& file : files) {
-    // One description named twice -- two option files listing a common source,
-    // say -- is still one description. Letting it through a second time would
-    // put a second copy of each of its cells into the unit the design binds
-    // in, so a repeated command-line entry would build a design declaring
-    // every one of those cells twice.
     if (!named.insert(file.string()).second) continue;
     if (CompileSource(file, unit) == CompileOutcome::kFailed) ok = false;
   }

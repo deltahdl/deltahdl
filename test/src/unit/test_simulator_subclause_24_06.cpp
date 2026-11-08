@@ -4,9 +4,6 @@
 
 namespace {
 
-// §24.6 with §8.7: a class an anonymous program declares is part of the
-// compilation unit's program-wide space, so a program constructs an object of
-// it like one of any other class, its constructor setting the property.
 TEST(AnonymousProgramSim, ClassDeclaredInAnAnonymousProgramIsConstructed) {
   auto v = RunAndGet(
       "program;\n"

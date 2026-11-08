@@ -10,12 +10,6 @@
 
 using namespace delta;
 
-// Elaborates a top module that instantiates the canonical two-port child
-//   module child(input logic a, output logic b); assign b = a; endmodule
-// using the given connection clause (e.g. ".a, .b" or ".*"), then asserts the
-// resolved port bindings carry the expected names and directions. Shared by the
-// implicit-named (§23.3.2.3) and wildcard (§23.3.2.4) connection test suites,
-// which differ only in the connection clause.
 inline void ExpectTwoPortDirections(ElabFixture& f,
                                     const std::string& connection) {
   auto* design = ElaborateSrc(

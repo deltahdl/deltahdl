@@ -57,8 +57,6 @@ TEST(NameSpaceElaboration, DuplicatePackageDefinition) {
 }
 
 TEST(NameSpaceElaboration, DistinctPackagesOk) {
-  // §3.13(b): the package name space only forbids reusing a package name;
-  // distinctly named packages coexist.
   EXPECT_TRUE(
       ElabOk("package p1; endpackage\n"
              "package p2; endpackage\n"
@@ -107,10 +105,6 @@ TEST(NameSpaceElaboration, DuplicateCuScopeFunction) {
       "redeclaration of 'helper' in compilation-unit scope", 2, "3.13"));
 }
 
-// §8.24 has an out-of-block method body declare its name in its class's scope,
-// so two classes' bodies of one method name standing together in the
-// compilation unit are two methods, not a §3.13 redeclaration; the check took
-// each body's bare name for the unit's and reported the second.
 TEST(NameSpaceElaboration, OutOfBlockBodiesOfTwoClassesShareANameUnreported) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -129,9 +123,6 @@ TEST(NameSpaceElaboration, OutOfBlockBodiesOfTwoClassesShareANameUnreported) {
       "redeclaration of 'compute' in compilation-unit scope", 8, "3.13"));
 }
 
-// §3.13 still holds a free function of the unit to one declaration where a
-// class body of the same name stands beside it: the body is the class's, the
-// function the unit's, and a second free function is the redeclaration.
 TEST(NameSpaceElaboration, FreeFunctionBesideAnOutOfBlockBodyStillChecked) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -167,9 +158,6 @@ TEST(NameSpaceElaboration, CuScopeClassAndCuItemSameName) {
              "int foo;\n"
              "module m; endmodule\n",
              f));
-  // A class is held in CompilationUnit::classes, which
-  // elaborator_validate_config.cpp walks after CompilationUnit::cu_items, so
-  // the class is the later insertion and the report stands on line 1.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "redeclaration of 'foo' in compilation-unit scope",
                             1, "3.13"));
@@ -194,15 +182,12 @@ TEST(NameSpaceElaboration, CheckerAndCuItemSameName) {
              "int foo;\n"
              "module m; endmodule\n",
              f));
-  // CompilationUnit::checkers is walked after CompilationUnit::cu_items, so the
-  // checker is the later insertion and the report stands on line 1.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "redeclaration of 'foo' in compilation-unit scope",
                             1, "3.13"));
 }
 
 TEST(NameSpaceElaboration, DuplicateCuScopeTask) {
-  // §3.13(c): tasks are unified in the compilation-unit scope name space.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("task t; endtask\n"
@@ -215,7 +200,6 @@ TEST(NameSpaceElaboration, DuplicateCuScopeTask) {
 }
 
 TEST(NameSpaceElaboration, DuplicateCuScopeVariable) {
-  // §3.13(c): variable declarations are unified in the compilation-unit scope.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("int a;\n"
@@ -228,7 +212,6 @@ TEST(NameSpaceElaboration, DuplicateCuScopeVariable) {
 }
 
 TEST(NameSpaceElaboration, DuplicateCuScopeNet) {
-  // §3.13(c): net declarations are unified in the compilation-unit scope.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("wire w;\n"
@@ -241,7 +224,6 @@ TEST(NameSpaceElaboration, DuplicateCuScopeNet) {
 }
 
 TEST(NameSpaceElaboration, DuplicateCuScopeNamedEvent) {
-  // §3.13(c): named events are unified in the compilation-unit scope.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("event e;\n"
@@ -254,7 +236,6 @@ TEST(NameSpaceElaboration, DuplicateCuScopeNamedEvent) {
 }
 
 TEST(NameSpaceElaboration, DuplicateCuScopeParameter) {
-  // §3.13(c): parameters are unified in the compilation-unit scope name space.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("localparam int P = 1;\n"
@@ -280,10 +261,6 @@ TEST(NameSpaceElaboration, RedeclVarInModuleScope) {
              "  logic x;\n"
              "endmodule\n",
              f));
-  // §3.13(e) is what refers the module name space here; a variable reusing a
-  // variable's name in it is the case §6.5's closing sentence names, so that
-  // is the subclause the report carries, §23.9's general rule standing for a
-  // clash with a declaration of another kind, as the task case below reads.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 3, "6.5"));
 }
@@ -325,9 +302,6 @@ TEST(NameSpaceElaboration, TaskSameNameAsVariableError) {
 }
 
 TEST(NameSpaceElaboration, NamedEventSameNameAsVariableError) {
-  // §3.13(e): named events are unified with variables in the module name space,
-  // so an event may not share a name with a variable in the same module. The
-  // event is a variable of the event type, so the clash is §6.5's own case.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -420,11 +394,6 @@ TEST(NameSpaceElaboration, DuplicateLocalInSameProceduralBlockError) {
              "  end\n"
              "endmodule\n",
              f));
-  // A procedural block is checked by CheckOneBlockLocals in
-  // src/elaborator/elaborator_scope_rules.cpp, which reports under §23.9, the
-  // subclause CheckBlockDeclDups in
-  // src/elaborator/elaborator_validate_funcbody.cpp also names for a
-  // subroutine body.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'x'", 4, "23.9"));
 }
@@ -456,9 +425,6 @@ TEST(NameSpaceElaboration, SameLocalNameInSiblingBlocksOk) {
 }
 
 TEST(NameSpaceElaboration, SameLocalNameInFunctionNestedBlockOk) {
-  // §3.13(f): a nested begin-end inside a function body is a distinct block
-  // name space, so reusing the name there is legal shadowing, not a
-  // redeclaration.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  function int f();\n"
@@ -480,9 +446,6 @@ TEST(NameSpaceElaboration, PortReintroducedAsVariableElaboratesOk) {
 }
 
 TEST(NameSpaceElaboration, PortReintroducedAsNetElaboratesOk) {
-  // §3.13(g): a port name may be reintroduced in the module name space by a
-  // variable OR a net declaration; here the net form is observed at
-  // elaboration.
   EXPECT_TRUE(
       ElabOk("module m(data);\n"
              "  input data;\n"
@@ -491,10 +454,6 @@ TEST(NameSpaceElaboration, PortReintroducedAsNetElaboratesOk) {
 }
 
 TEST(NameSpaceElaboration, AttributeNameCoincidesWithVariableElaboratesOk) {
-  // §3.13(h): an attribute name (§5.12 real syntax `(* ... *)`) lives only in
-  // the attribute name space and never enters the module name space, so it may
-  // coincide with a variable name without a redeclaration error. Driven through
-  // the full pipeline so the attribute is really parsed and elaborated.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  (* keep *) logic keep;\n"

@@ -1,29 +1,3 @@
-// §31.3.1's $setup and §31.3.2's $hold, evaluated against a running design,
-// and the dispatch that arms Clause 31's other ten checks.
-// WatchTimingChecks, declared in simulator/timing_check_driver.h, is that
-// dispatch: it reads each entry's kind and hands the entry to the file written
-// for the shape that kind measures -- simulator/timing_check_stability.h for
-// §31.3's remaining four, simulator/timing_check_pulse.h for §31.4.4, §31.4.5
-// and §31.4.6, simulator/timing_check_skew.h for §31.4.1 through §31.4.3.
-// simulator/timing_check_driver_internal.h holds what all four need: §31.5's
-// edge matching, the watcher that arms on an edge, §31.2's report and §31.6's
-// notifier.
-//
-// What is left here answers the one question a $setup or a $hold asks that the
-// others do not: which transition of which signal closes the window, which
-// §31.3.1's Table 31-1 and §31.3.2's Table 31-2 decide.
-//
-// SetupWindowViolated and HoldWindowViolated below restate the arithmetic of
-// SpecifyManager::CheckSetupViolation and SpecifyManager::CheckHoldViolation
-// (src/simulator/specify_timing_violation.cpp) from the two clauses those
-// members read, rather than calling them. Both members select a check by the
-// spelling of its signals -- `check.ref_signal != ref`, with no comparison of
-// TimingCheckEntry::inst_prefix -- so with one check registered per module
-// instance a single call answers for every instance of the cell, and answers
-// true when any of them is violated. A watcher already knows which entry it was
-// armed for, so it evaluates that entry and no other. Every file this dispatch
-// reaches follows that rule for the same reason.
-
 #include "simulator/timing_check_driver.h"
 
 #include <cstddef>
@@ -47,35 +21,18 @@
 namespace delta {
 namespace {
 
-// §31.3.1: the window runs from limit before the timecheck time up to the
-// timecheck time, and the check reports a violation when the timestamp time
-// lies strictly between those two ends. The end points are not part of the
-// violation region, which is also what makes a zero limit never issue a
-// violation, as the clause states outright.
 bool SetupWindowViolated(uint64_t limit, uint64_t timestamp_ticks,
                          uint64_t timecheck_ticks) {
   return timestamp_ticks < timecheck_ticks &&
          timecheck_ticks - timestamp_ticks < limit;
 }
 
-// §31.3.2: the window runs from the timestamp time to limit after it, and the
-// check reports a violation when the timecheck time is at or after the
-// beginning and before the end. The window includes
-// the end point it opens on and excludes the one it closes at, so a timecheck
-// event at the timestamp time violates any nonzero limit.
 bool HoldWindowViolated(uint64_t limit, uint64_t timestamp_ticks,
                         uint64_t timecheck_ticks) {
   return timecheck_ticks >= timestamp_ticks &&
          timecheck_ticks - timestamp_ticks < limit;
 }
 
-// Which of the two signals a §31.3 check names is its timestamp event and which
-// is its timecheck event, each with the §31.5 edge_control_specifier it was
-// written with and qualified by the instance prefix the check was registered
-// under. The edge is a TimingCheckEdge
-// (simulator/timing_check_driver_internal.h) rather than a SpecifyEdge, so an
-// event written in §31.5's general form carries the edge_descriptor list it
-// named and is matched on that list.
 struct StabilityWindowEvents {
   std::string timestamp_signal;
   TimingCheckEdge timestamp_edge;
@@ -83,26 +40,6 @@ struct StabilityWindowEvents {
   TimingCheckEdge timecheck_edge;
 };
 
-// Table 31-1 makes $setup's data_event the timestamp event and its
-// reference_event the timecheck event; Table 31-2 makes $hold's reference_event
-// the timestamp event and its data_event the timecheck event. That is what
-// decides which transition a check is evaluated on: §31.3.1 and §31.3.2 both
-// write the end points of the window in terms of the timecheck time and place
-// the timestamp time inside it, so the timecheck event's edge is what closes
-// the window and the timestamp event's transition is what is measured against
-// it. The reference signal closes a $setup window and the data signal closes a
-// $hold one, which Syntax 31-3 and Syntax 31-4 both write as the check's second
-// argument.
-//
-// The two fields are read by the names §31.3 gives them, so this depends on
-// TimingCheckEntry::ref_signal carrying the reference_event of the declaration
-// it was built from. Syntax 31-3 is the one check syntax of Clause 31 that
-// writes the data event first, and Parser::ParseTimingCheck
-// (src/parser/parser_specify.cpp) reads a check's two terminals positionally,
-// so a $setup whose terminals are not put back in the fields named for them
-// arrives with each in the other's; that is issue #3407, and a $setup evaluated
-// here would measure the clock against the data signal's window rather than the
-// other way round.
 StabilityWindowEvents EventsOf(const TimingCheckEntry& check) {
   if (check.kind == TimingCheckKind::kSetup) {
     return StabilityWindowEvents{
@@ -114,46 +51,16 @@ StabilityWindowEvents EventsOf(const TimingCheckEntry& check) {
       check.inst_prefix + check.data_signal, DataEdgeOf(check)};
 }
 
-// One §31.3 check between the two transitions it measures: which entry it is,
-// which two signals it measures between, and when its timestamp event last
-// happened.
-//
-// The entry is held as a position in SpecifyManager::GetTimingChecks rather
-// than as a pointer to it or a copy of it. A pointer would dangle, because
-// SpecifyManager::AddTimingCheck appends to that vector during the run --
-// §32.9's $sdf_annotate registers what an SDF file names -- and an append moves
-// every element. A copy would freeze the limit, and §32.4.2's TIMINGCHECK
-// annotation exists to change it; reading the entry back at every timecheck
-// event is what lets an annotation reach a check already armed.
 struct StabilityWindow {
   ArmedCheck armed;
   StabilityWindowEvents events;
   bool has_timestamp = false;
   uint64_t timestamp_ticks = 0;
 
-  // When the timecheck event last happened, and whether an evaluation of this
-  // check is already scheduled for the slot running now.
-  // ScheduleTimingCheckEvaluation (simulator/timing_check_driver_internal.h)
-  // defers the comparison to Region::kPrePostponed so that a timestamp event
-  // committed later in the same slot has been recorded before the two times are
-  // compared. The time is kept rather than read at the evaluation, because
-  // SimContext::CurrentTime is the same at both points and the timecheck event
-  // is what the clauses measure from.
   uint64_t timecheck_ticks = 0;
   std::shared_ptr<bool> pending = std::make_shared<bool>(false);
 };
 
-// Reports the violation a check just detected, naming the signal that
-// transitioned inside the window and the signal whose edge bounds it. §31.3.1
-// and §31.3.2 both call the measured transition the data event and the bounding
-// one the reference event, and they put them at opposite ends of the window,
-// which is why the two messages differ in more than the name of the check.
-//
-// The report stands where the check was written, which TimingCheckEntry::loc
-// (simulator/specify_timing_check.h) carries from the declaration. A design
-// declaring several checks over one clock is otherwise given several reports it
-// cannot tell apart. Both signals are named under the instance prefix the check
-// was registered with, so a reader can tell two instances of one cell apart.
 void ReportViolation(TimingCheckKind kind, const StabilityWindow& window,
                      SimContext& ctx) {
   if (kind == TimingCheckKind::kSetup) {
@@ -173,11 +80,6 @@ void ReportViolation(TimingCheckKind kind, const StabilityWindow& window,
       "31.3.2", window.armed.Entry().loc, ctx);
 }
 
-// The timecheck event of a §31.3 check has arrived at `timecheck_ticks`.
-// Reports a violation when the timestamp event fell inside the window the two
-// clauses define, and does nothing until a timestamp event has been seen at
-// all: §31.3 defines the window with respect to one transition, and before the
-// first there is no window to place anything in.
 void EvaluateStabilityWindow(const StabilityWindow& window,
                              uint64_t timecheck_ticks, SimContext& ctx) {
   if (!window.has_timestamp) return;
@@ -192,9 +94,6 @@ void EvaluateStabilityWindow(const StabilityWindow& window,
   NoteViolation(check, ctx);
 }
 
-// Arms the two watchers one §31.3 check needs. Nothing is armed when either
-// signal names no variable of the design, which is what a check whose specify
-// block was registered for a module the design never elaborated leaves behind.
 void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
                         SimContext& ctx) {
   const TimingCheckEntry& check = mgr.GetTimingChecks()[index];
@@ -208,16 +107,6 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
   auto window = std::make_shared<StabilityWindow>();
   window->armed = ArmedCheck{&mgr, index};
   window->events = std::move(events);
-  // §31.7 gates a transition by the `&&&` condition written on the
-  // timing_check_event that transitioned, so each watcher is armed with the
-  // event it is on and not with the role that event plays in the window. The
-  // two are crossed for a $setup and not for a $hold: the timestamp watcher of
-  // a $setup stands on the data_event and its timecheck watcher on the
-  // reference_event, while a $hold has them the other way round, which is the
-  // assignment EventsOf makes above. ConditionedEvent::is_data_event is what
-  // states which of the two an armed watcher is on, and
-  // ConditionedEvent::Condition reads TimingCheckEntry::data_condition_expr or
-  // TimingCheckEntry::ref_condition_expr accordingly.
   WatchConditionedEdge(timestamp_var, std::move(timestamp_edge),
                        ConditionedEvent{window->armed, is_setup}, ctx,
                        {[window, &ctx]() {
@@ -225,11 +114,6 @@ void ArmStabilityWindow(const SpecifyManager& mgr, std::size_t index,
                           window->timestamp_ticks = ctx.CurrentTime().ticks;
                         },
                         nullptr});
-  // §31.3 evaluates a check at its timecheck event, so only that watcher asks
-  // for an evaluation and a timestamp event on its own still asks for none.
-  // What the deferral changes is that the evaluation reads a timestamp event
-  // committed later in the same slot, which the clause counts and the commit
-  // order used to decide.
   WatchConditionedEdge(
       timecheck_var, std::move(timecheck_edge),
       ConditionedEvent{window->armed, !is_setup}, ctx,

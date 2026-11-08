@@ -11,9 +11,6 @@ using namespace delta;
 namespace {
 
 TEST(CovergroupInChecker, CovergroupInBodyIsLegalButNotInProceduralBlock) {
-  // §17.6: a covergroup declaration or instance is permitted within a checker,
-  // as cg_active and cg_active_1 are in the my_check example, but it shall not
-  // appear in any procedural block of the checker.
   EXPECT_TRUE(CheckerCovergroupPlacementIsLegal(
       CheckerCovergroupPlacement::kCheckerBody));
   EXPECT_FALSE(CheckerCovergroupPlacementIsLegal(
@@ -21,9 +18,6 @@ TEST(CovergroupInChecker, CovergroupInBodyIsLegalButNotInProceduralBlock) {
 }
 
 TEST(CovergroupInChecker, CovergroupMayReferenceFormalsAndCheckerVariables) {
-  // §17.6: a covergroup may reference any variable visible in its scope,
-  // including checker formal arguments (such as active) and checker variables
-  // (such as active_d1).
   EXPECT_TRUE(CheckerCovergroupMayReference(
       CheckerCovergroupReference::kCheckerFormalArgument));
   EXPECT_TRUE(CheckerCovergroupMayReference(
@@ -33,44 +27,22 @@ TEST(CovergroupInChecker, CovergroupMayReferenceFormalsAndCheckerVariables) {
 }
 
 TEST(CovergroupInChecker, ConstActualForReferencedFormalIsAnError) {
-  // §17.6: it shall be an error if a formal argument referenced by a covergroup
-  // has a const actual argument.
-  EXPECT_TRUE(CheckerCovergroupConstFormalIsError(
-      /*formal_referenced_by_covergroup=*/true, /*actual_is_const=*/true));
+  EXPECT_TRUE(CheckerCovergroupConstFormalIsError(true, true));
 }
 
 TEST(CovergroupInChecker, ConstActualIsLegalWhenFormalIsNotReferenced) {
-  // §17.6: the error is specific to a formal that a covergroup references; a
-  // const actual is otherwise unobjectionable, and a referenced formal with a
-  // non-const actual is fine.
-  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(
-      /*formal_referenced_by_covergroup=*/false, /*actual_is_const=*/true));
-  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(
-      /*formal_referenced_by_covergroup=*/true, /*actual_is_const=*/false));
-  // Neither condition present: a formal that no covergroup references and whose
-  // actual is not const is plainly fine.
-  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(
-      /*formal_referenced_by_covergroup=*/false, /*actual_is_const=*/false));
+  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(false, true));
+  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(true, false));
+  EXPECT_FALSE(CheckerCovergroupConstFormalIsError(false, false));
 }
 
 TEST(CovergroupInChecker, SampleMethodCallIsAPermittedTrigger) {
-  // §17.6: in addition to its clocking event, a covergroup in a checker may be
-  // triggered by a procedural call to its sample() method, as op_test triggers
-  // cg_op via cg_op_1.sample().
   EXPECT_TRUE(CheckerCovergroupTriggerIsPermitted(
       CheckerCovergroupTrigger::kClockingEvent));
   EXPECT_TRUE(CheckerCovergroupTriggerIsPermitted(
       CheckerCovergroupTrigger::kProceduralSampleCall));
 }
 
-// §17.6: one or more covergroup declarations are permitted within a checker,
-// and a covergroup may reference any variable visible in its scope, including
-// the checker's formal arguments and its checker variables. This drives the
-// my_check shape from the clause — a covergroup built from real §19.3 syntax
-// whose coverpoints read the checker formal `active` and the checker variable
-// `active_d1` — through parse and elaboration and observes the real elaborator
-// accepting it: the checker elaborates without error and its body carries the
-// covergroup declaration.
 TEST(CovergroupInChecker, CovergroupInCheckerBodyElaboratesAndIsCarried) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -96,9 +68,6 @@ TEST(CovergroupInChecker, CovergroupInCheckerBodyElaboratesAndIsCarried) {
   EXPECT_TRUE(carries_covergroup);
 }
 
-// §17.6: a covergroup shall not be instantiated in a procedural block of a
-// checker, whatever lifetime its declaration is written with; the instance at
-// the checker's own level beside it is legal.
 TEST(CovergroupInChecker, InstanceInACheckerProcedureIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -119,8 +88,6 @@ TEST(CovergroupInChecker, InstanceInACheckerProcedureIsRejected) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §17.6: a formal a covergroup of the checker references has no const actual:
-// u1 binds mode, which cp covers, to a const cast, while u2 binds a variable.
 TEST(CheckerCovergroupRules, AConstActualForACoveredFormalIsReported) {
   const char* const kReport =
       "the formal 'mode' of checker 'c', which a covergroup references, has a "

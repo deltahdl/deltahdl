@@ -9,18 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.2 owns Syntax 31-4, the $hold_timing_check production:
-//   $hold ( reference_event , data_event , timing_check_limit [ , [ notifier ]
-//   ] ) ;
-// The shared timing-check parser (ParseTimingCheck / ParseTimingCheckKind /
-// ParseTimingCheckTrailingArgs) carries it. The terminals are recorded
-// positionally, so for $hold the first argument (the reference_event) lands in
-// ref_terminal and the second (the data_event) in data_terminal -- the reverse
-// of the $setup ordering in §31.3.1. The timestamp/timecheck role assignment of
-// Table 31-2 is applied later by the simulator. The optional trailing notifier
-// (notifier ::= variable_identifier) is the same notifier whose
-// violation-response semantics §31.6 defines.
-
 TEST(TimingCheckCommandParsing, HoldParsesReferenceDataLimit) {
   auto sp = ParseSpecifySingle(
       "module m(input d, clk);\n"
@@ -34,20 +22,15 @@ TEST(TimingCheckCommandParsing, HoldParsesReferenceDataLimit) {
   auto* si = sp.sole_item;
   EXPECT_EQ(si->kind, SpecifyItemKind::kTimingCheck);
   EXPECT_EQ(si->timing_check.check_kind, TimingCheckKind::kHold);
-  // First positional argument is the reference_event.
   EXPECT_EQ(si->timing_check.ref_edge, SpecifyEdge::kPosedge);
   EXPECT_EQ(si->timing_check.ref_terminal.name, "clk");
-  // Second positional argument is the data_event.
   EXPECT_EQ(si->timing_check.data_edge, SpecifyEdge::kNone);
   EXPECT_EQ(si->timing_check.data_terminal.name, "d");
   ASSERT_EQ(si->timing_check.limits.size(), 1u);
-  // The optional notifier is omitted here, so nothing is recorded for it.
   EXPECT_TRUE(si->timing_check.notifier.empty());
 }
 
 TEST(TimingCheckCommandParsing, HoldNotifierIsOptionalLastArgument) {
-  // The trailing notifier (see §31.6) is the optional last argument of the
-  // $hold syntax; when present, the parser records the variable identifier.
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -62,10 +45,6 @@ TEST(TimingCheckCommandParsing, HoldNotifierIsOptionalLastArgument) {
 }
 
 TEST(TimingCheckCommandParsing, HoldAcceptsTrailingCommaWithoutNotifier) {
-  // Syntax 31-4's optional [ , [ notifier ] ] also permits the separating
-  // comma to appear with the notifier itself omitted; the parser accepts this
-  // and records no notifier (the trailing-comma branch of the trailing-arg
-  // loop, distinct from the no-comma and comma+notifier forms).
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -80,7 +59,6 @@ TEST(TimingCheckCommandParsing, HoldAcceptsTrailingCommaWithoutNotifier) {
 }
 
 TEST(TimingCheckCommandParsing, HoldLimitIsExpression) {
-  // timing_check_limit ::= expression, so a specparam is accepted as the limit.
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -96,18 +74,12 @@ TEST(TimingCheckCommandParsing, HoldLimitIsExpression) {
 }
 
 TEST(TimingCheckCommandParsing, HoldRejectsMissingLimit) {
-  // Negative form of Syntax 31-4: the timing_check_limit is a mandatory
-  // argument (only the trailing notifier is optional). A $hold call that
-  // supplies only the reference_event and data_event, with no limit, does not
-  // match the production, so the parser reports an error.
   auto r = Parse(
       "module m;\n"
       "specify\n"
       "  $hold(posedge clk, data);\n"
       "endspecify\n"
       "endmodule\n");
-  // The shared timing-check parser files the missing separator under §31.2, the
-  // system_timing_check production, rather than under §31.3.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 

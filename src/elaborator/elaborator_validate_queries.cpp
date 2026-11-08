@@ -24,11 +24,6 @@ namespace delta {
 
 namespace {
 
-// §20.16, Syntax 20-16 and Table 20-12: a PLA modeling system task is named
-// $<array_type>$<logic>$<format>, where array_type is sync or async, logic is
-// one of and/or/nand/nor, and format is array or plane. Matching a callee
-// against those three dollar-separated components recognizes exactly the
-// sixteen tasks the table enumerates and nothing else.
 bool IsPlaSystemTask(std::string_view callee) {
   if (callee.empty() || callee.front() != '$') return false;
   std::string_view rest = callee.substr(1);
@@ -42,7 +37,7 @@ bool IsPlaSystemTask(std::string_view callee) {
   std::string_view array_type = take();
   std::string_view logic = take();
   std::string_view format = take();
-  if (!rest.empty()) return false;  // more than three components
+  if (!rest.empty()) return false;
   bool ok_type = array_type == "sync" || array_type == "async";
   bool ok_logic =
       logic == "and" || logic == "or" || logic == "nand" || logic == "nor";
@@ -50,9 +45,6 @@ bool IsPlaSystemTask(std::string_view callee) {
   return ok_type && ok_logic && ok_format;
 }
 
-// §20.16: the output terms are variables alone. The output-terms argument may
-// be a single lvalue or a concatenation of them; flag every leaf whose base
-// identifier names a net rather than a variable.
 void CheckPlaOutputOperand(
     const Expr* e, const std::unordered_set<std::string_view>& net_names,
     SourceLoc loc, DiagEngine& diag) {
@@ -90,24 +82,6 @@ void CheckPlaOutputTermsExpr(
   for (auto* el : e->elements) CheckPlaOutputTermsExpr(el, net_names, diag);
 }
 
-// §20.16 states its rule over the arguments of a call -- input terms may be
-// nets or variables, output terms only variables -- and names no position the
-// call may stand in, so every position a statement holds a statement in is one
-// this check is owed at.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// Stmt::for_steps is walked because the shared list is walked whole, and no
-// conforming source puts a PLA call in one. A.6.8 gives `for_step_assignment
-// ::= operator_assignment | inc_or_dec_expression | function_subroutine_call`.
-// A PLA task returns no value, so it is no operator_assignment's right-hand
-// side and no inc_or_dec_expression; and the one form Syntax 20-16 defines,
-// `$array_type$logic$format ( memory_identifier , input_terms , output_terms )
-// ;`, carries the terminating semicolon a statement carries and a for_step does
-// not.
 void CheckPlaOutputTermsStmt(
     const Stmt* s, const std::unordered_set<std::string_view>& net_names,
     DiagEngine& diag) {
@@ -122,21 +96,11 @@ void CheckPlaOutputTermsStmt(
   });
 }
 
-// §21.3.3, Syntax 21-6: the string-formatting output tasks whose first
-// argument is the variable receiving the formatted result. $sformatf is
-// deliberately excluded — it returns the result as its function value and
-// takes no output variable.
 bool IsStringOutputTask(std::string_view callee) {
   return callee == "$swrite" || callee == "$swriteb" || callee == "$swriteh" ||
          callee == "$swriteo" || callee == "$sformat";
 }
 
-// §21.3.3 limits the variable that receives $swrite's text, and $sformat's, to
-// three kinds: integral, string, or an unpacked array whose elements are bytes.
-// A real-valued destination has no character representation, so it is the
-// closest illegal form of that requirement and is rejected here.
-// Other declared kinds (vectors, byte, enum, string, packed structs) are left
-// alone to avoid false positives.
 void CheckStringOutputTarget(const Expr* e, const TypeMap& types,
                              DiagEngine& diag) {
   if (e == nullptr || e->args.empty() || e->args[0] == nullptr) return;
@@ -168,28 +132,6 @@ void CheckStringOutputTargetsExpr(const Expr* e, const TypeMap& types,
   for (auto* el : e->elements) CheckStringOutputTargetsExpr(el, types, diag);
 }
 
-// §21.3.3 states its rule over the first argument of a call -- a variable of
-// integral type, an unpacked array of byte, or a string -- and names no
-// position the call may stand in, so every position a statement holds a
-// statement in is one this check is owed at.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// Stmt::for_steps is walked because the shared list is walked whole, and no
-// conforming source puts one of these calls in one. A.6.8's for_step_assignment
-// is an operator_assignment, an inc_or_dec_expression or a
-// function_subroutine_call; $swrite and $sformat return no value, so neither is
-// an operand of the first two. Syntax 21-6 settles the third: it gives
-// `string_output_tasks ::= string_output_task_name ( output_var [ ,
-// list_of_arguments ] ) ;` and `variable_format_string_output_task ::= $sformat
-// ( output_var , format_string [ , list_of_arguments ] ) ;` with the
-// terminating semicolon a statement carries, and gives
-// `variable_format_string_output_function ::= $sformatf ( format_string [ ,
-// list_of_arguments ] )` without one. The semicolon is what tells the two tasks
-// from the function inside that one syntax box, and a for_step carries none.
 void CheckStringOutputTargetsStmt(const Stmt* s, const TypeMap& types,
                                   DiagEngine& diag) {
   if (s == nullptr) return;
@@ -206,9 +148,6 @@ void CheckStringOutputTargetsStmt(const Stmt* s, const TypeMap& types,
 }  // namespace
 
 void Elaborator::ValidateStringOutputTaskTargets(const ModuleDecl* decl) {
-  // §21.3.3: the destination variable of $swrite/$swriteb/$swriteh/$swriteo and
-  // $sformat shall be an integral, unpacked-array-of-byte, or string type; a
-  // real destination is rejected.
   for (const auto* item : decl->items) {
     if (item->body) CheckStringOutputTargetsStmt(item->body, var_types_, diag_);
     for (auto* s : item->func_body_stmts)
@@ -219,26 +158,11 @@ void Elaborator::ValidateStringOutputTaskTargets(const ModuleDecl* decl) {
 
 namespace {
 
-// §20.9, Syntax 20-10: the five bit-vector system functions -- $countbits and
-// the derived $countones, $onehot, $onehot0, and $isunknown.
 bool IsBitVectorFunction(std::string_view callee) {
   return callee == "$countbits" || callee == "$countones" ||
          callee == "$onehot" || callee == "$onehot0" || callee == "$isunknown";
 }
 
-// §20.9: $countbits, and each of the related functions by the same rule, works
-// on an expression argument whose type is a bit-stream type. A real, event,
-// chandle, or virtual-interface operand is not a bit-stream type; when the
-// leading argument names such a variable, reject it. The control_bit arguments
-// to $countbits (args[1..]) are 1-bit logic values, not the expression operand,
-// so only the first argument carries this restriction.
-// Whether the name selects a member of whatever it stands on, rather than
-// naming that object. §20.9's reject list is a property of the argument's own
-// type, and the declared kind LhsBaseName's answer carries is the argument's
-// only when no member intervenes: `$isunknown(vif.sig)` names a signal of the
-// interface a `virtual interface` handle is bound to, and that signal is of a
-// bit-stream type where the handle is not. Nothing here types a member select,
-// so one is left alone rather than judged by its base.
 static bool NamesAMember(const Expr* e) {
   while (e) {
     if (e->kind == ExprKind::kMemberAccess) return true;
@@ -250,9 +174,6 @@ static bool NamesAMember(const Expr* e) {
 
 void CheckBitVectorFunctionArg(const Expr* call, const TypeMap& types,
                                DiagEngine& diag) {
-  // §20.9, Syntax 20-10: list_of_control_bits is non-empty, so $countbits shall
-  // carry at least one control_bit after the expression argument. A call with
-  // only the expression (or none at all) does not match the grammar.
   if (call->callee == "$countbits" && call->args.size() < 2) {
     diag.Error(call->range.start,
                "'$countbits' requires at least one control_bit argument",
@@ -293,20 +214,6 @@ void CheckBitVectorArgExpr(const Expr* e, const TypeMap& types,
   for (auto* el : e->elements) CheckBitVectorArgExpr(el, types, diag);
 }
 
-// §20.9 states its rule over the expression argument of a call and names no
-// position the call may stand in, so every position a statement holds a
-// statement in is one this check is owed at.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// Stmt::for_steps holds this check's subject, unlike the PLA and string-output
-// tasks above. Syntax 20-10 gives `bit_vector_function` with no terminating
-// semicolon, so each of the five is a function whose call is an expression, and
-// A.6.8's `for_step_assignment ::= operator_assignment | ...` admits one as the
-// right-hand side of the assignment the loop step is written as.
 void CheckBitVectorArgStmt(const Stmt* s, const TypeMap& types,
                            DiagEngine& diag) {
   if (s == nullptr) return;
@@ -322,24 +229,16 @@ void CheckBitVectorArgStmt(const Stmt* s, const TypeMap& types,
 }  // namespace
 
 void Elaborator::ValidateBitVectorFunctionArgs(const ModuleDecl* decl) {
-  // §20.9: the bit-vector functions ($countbits, $countones, $onehot, $onehot0,
-  // $isunknown) work on an expression argument of a bit-stream type, so
-  // reject a statically recognizable non-bit-stream operand (a real, event,
-  // chandle, or virtual interface).
   for (const auto* item : decl->items) {
     if (item->body) CheckBitVectorArgStmt(item->body, var_types_, diag_);
     for (auto* s : item->func_body_stmts)
       CheckBitVectorArgStmt(s, var_types_, diag_);
     CheckBitVectorArgExpr(item->init_expr, var_types_, diag_);
-    // A continuous assignment is another place these functions may appear.
     CheckBitVectorArgExpr(item->assign_rhs, var_types_, diag_);
   }
 }
 
 void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
-  // §20.16 admits nothing but variables, and so no net, as a PLA modeling
-  // system task's output terms. Input terms may be nets or variables, so only
-  // the output-terms argument is checked.
   for (const auto* item : decl->items) {
     if (item->body) CheckPlaOutputTermsStmt(item->body, net_names_, diag_);
     for (auto* s : item->func_body_stmts)
@@ -350,30 +249,18 @@ void Elaborator::ValidatePlaOutputTerms(const ModuleDecl* decl) {
 
 namespace {
 
-// §20.16.3: the constant-folded declaration ranges of a signal that may be
-// named as a PLA memory or term, used to test the ascending-order requirement.
 struct PlaDeclRanges {
   std::optional<int64_t> packed_left;
   std::optional<int64_t> packed_right;
-  // Each unpacked dimension that folds to a constant [left:right] range.
   std::vector<std::pair<int64_t, int64_t>> unpacked;
 };
 
 using PlaRangeMap = std::unordered_map<std::string_view, PlaDeclRanges>;
 
-// §20.16.3: PLA input terms, output terms and memory are given in ascending
-// order. A declared range is ascending when its left index is no greater than
-// its right index; flag a memory or term whose declaration runs the other way.
-// The check uses only the base identifier's declaration, so a term given as a
-// concatenation of scalars or a range that does not fold to a constant is
-// simply left unchecked.
 void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
                           bool check_unpacked, const char* message,
                           DiagEngine& diag) {
   if (!arg) return;
-  // A single bit-select (e.g. b[0]) names exactly one term, so there is no
-  // term ordering to violate -- the declared range direction of the base
-  // vector is irrelevant. Only a whole-vector term carries an order here.
   if (arg->kind == ExprKind::kSelect && arg->index && !arg->index_end &&
       !arg->is_part_select_plus && !arg->is_part_select_minus) {
     return;
@@ -397,26 +284,23 @@ void CheckPlaArgAscending(const Expr* arg, const PlaRangeMap& ranges,
   }
 }
 
-// §20.16.3: at every PLA system task call, check the memory (first argument)
-// for ascending packed and unpacked ranges and the input/output term arguments
-// for ascending packed ranges.
 void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
                            DiagEngine& diag) {
   if (!e) return;
   if (e->kind == ExprKind::kSystemCall && IsPlaSystemTask(e->callee)) {
     if (e->args.size() >= 1)
-      CheckPlaArgAscending(e->args[0], ranges, /*check_unpacked=*/true,
+      CheckPlaArgAscending(e->args[0], ranges, true,
                            "the memory of a PLA modeling system task has a "
                            "descending range; give it an ascending one",
                            diag);
     if (e->args.size() >= 2)
-      CheckPlaArgAscending(e->args[1], ranges, /*check_unpacked=*/false,
+      CheckPlaArgAscending(e->args[1], ranges, false,
                            "the input terms of a PLA modeling system task have "
                            "a descending range; give them an ascending one",
                            diag);
     if (e->args.size() >= 3)
       CheckPlaArgAscending(
-          e->args[2], ranges, /*check_unpacked=*/false,
+          e->args[2], ranges, false,
           "the output terms of a PLA modeling system task have a descending "
           "range; give them an ascending one",
           diag);
@@ -432,20 +316,6 @@ void CheckPlaAscendingExpr(const Expr* e, const PlaRangeMap& ranges,
   for (auto* el : e->elements) CheckPlaAscendingExpr(el, ranges, diag);
 }
 
-// §20.16.3 states its rule over the memory and term arguments of a call -- PLA
-// input terms, output terms and memory are given in ascending order -- and
-// names no position the call may stand in, so every position a statement holds
-// a statement in is one this check is owed at.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// Stmt::for_steps is walked whole and reaches nothing, for the reason
-// CheckPlaOutputTermsStmt above records: the call this check is about is the
-// one Syntax 20-16 defines, and that form ends in the semicolon A.6.8 gives no
-// for_step_assignment.
 void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
                            DiagEngine& diag) {
   if (!s) return;
@@ -458,11 +328,6 @@ void CheckPlaAscendingStmt(const Stmt* s, const PlaRangeMap& ranges,
       s, [&](Stmt* const& sub) { CheckPlaAscendingStmt(sub, ranges, diag); });
 }
 
-// §20.16.3: fold a single declaration's packed and constant unpacked ranges
-// into the PlaDeclRanges record used by the ascending-order check. The range
-// bounds are §11.2.1 constant expressions, so they are folded in the module's
-// parameter scope: a parameter- or localparam-valued bound resolves the same
-// way an integer literal does.
 PlaDeclRanges CollectPlaDeclRanges(const ModuleItem* item,
                                    const ScopeMap& scope) {
   PlaDeclRanges r;
@@ -481,9 +346,6 @@ PlaDeclRanges CollectPlaDeclRanges(const ModuleItem* item,
 }  // namespace
 
 void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
-  // §20.16.3 has a PLA call's input terms, output terms and memory run from
-  // the low index up. Collect each signal's declared ranges first, then check
-  // every PLA call that names one as its memory or as a term.
   PlaRangeMap ranges;
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kVarDecl &&
@@ -503,10 +365,6 @@ void Elaborator::ValidatePlaAscendingOrder(const ModuleDecl* decl) {
 
 namespace {
 
-// §20.7.1: a single unpacked dimension is "variable-sized" when it is a dynamic
-// array ([], stored as a null dimension), a queue ([$]), or a wildcard
-// associative array ([*]) — the same classification §20.7 uses for a
-// dynamically sized dimension.
 bool DimIsVariableSized(const Expr* d) {
   if (d == nullptr) return true;
   return d->kind == ExprKind::kIdentifier && (d->text == "$" || d->text == "*");
@@ -515,16 +373,11 @@ bool DimIsVariableSized(const Expr* d) {
 using VarDimMap =
     std::unordered_map<std::string_view, const std::vector<Expr*>*>;
 
-// §20.7: the query functions that answer for one dimension, whose use on an
-// associative array dimension is restricted to integral index types.
 bool QueriesOneDimension(std::string_view callee) {
   return callee == "$left" || callee == "$right" || callee == "$low" ||
          callee == "$high" || callee == "$increment" || callee == "$size";
 }
 
-// §20.7: a query of one dimension of `v` (dimension n, 1 where the call
-// writes no n) is an error where that dimension is associative with a
-// `string` index, a type with no integral values.
 void CheckQueryOnStringIndex(const Expr* e, const VarDimMap& vars,
                              const ScopeMap& scope, DiagEngine& diag) {
   if (!QueriesOneDimension(e->callee)) return;
@@ -547,22 +400,9 @@ void CheckQueryOnStringIndex(const Expr* e, const VarDimMap& vars,
              Subclause("20.7"));
 }
 
-// §20.7.1: when a §20.7 query function is called as (v, n) on an array variable
-// v with a constant dimension index n greater than 1, it is an error if the
-// n-th dimension is variable-sized. The slowest-varying unpacked dimension is
-// dimension 1, so unpacked_dims[n-1] names dimension n. Dimension 1 (or a query
-// with no dimension argument) stays legal even when it is variable-sized, since
-// a query on the outermost dynamic dimension still has a well-defined extent;
-// an inner variable-sized dimension does not, because each element of the
-// slower-varying dimension can hold a differently sized object. $dimensions and
-// $unpacked_dimensions take no second argument, so they never reach this check.
 void CheckQueryOnVariableSizedDim(const Expr* e, const VarDimMap& vars,
                                   const ScopeMap& scope, DiagEngine& diag) {
   if (e->args.size() < 2 || e->args[1] == nullptr) return;
-  // §20.7: the dimension index is a constant expression, so fold it in the
-  // module's parameter scope. This resolves a parameter, localparam, or
-  // genvar-valued n the same way a literal one is resolved; a non-constant
-  // (e.g. run-time-variable) index folds to nothing and is left alone.
   auto n_val = ConstEvalInt(e->args[1], scope);
   auto it = vars.find(e->args[0]->text);
   if (!n_val || *n_val <= 1 || it == vars.end()) return;
@@ -602,20 +442,6 @@ void CheckArrayQueryOnVarDimExpr(const Expr* e, const VarDimMap& vars,
     CheckArrayQueryOnVarDimExpr(el, vars, scope, diag);
 }
 
-// §20.7.1 states its rule over the arguments of a call -- calling a §20.7
-// function with arguments (v, n) is an error when dimension n is variable-sized
-// -- and names no position the call may stand in, so every position a statement
-// holds a statement in is one this check is owed at.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// Stmt::for_steps holds this check's subject. §20.7's array query functions
-// return a value, so a call is an expression, and A.6.8's `for_step_assignment
-// ::= operator_assignment | ...` admits one as the right-hand side of the
-// assignment the loop step is written as.
 void CheckArrayQueryOnVarDimStmt(const Stmt* s, const VarDimMap& vars,
                                  const ScopeMap& scope, DiagEngine& diag) {
   if (!s) return;
@@ -633,8 +459,6 @@ void CheckArrayQueryOnVarDimStmt(const Stmt* s, const VarDimMap& vars,
 }  // namespace
 
 void Elaborator::ValidateArrayQueryOnVariableDim(const ModuleDecl* decl) {
-  // Map every array variable in the module to its unpacked dimension list, then
-  // reject any (v, n>1) query whose n-th dimension is variable-sized.
   VarDimMap vars;
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kVarDecl && !item->unpacked_dims.empty())

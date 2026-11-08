@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §25.9: a virtual interface property reaches every component of its
-// instance by the dot notation, and §8.11 lets a method name its own property
-// through `this`, so `this.vif.a` in a method is the instance's `a`, 0x35.
-// Before the base of the access was resolved as an expression, the read took
-// `vif.a` for a flat key of the object and answered 0.
 TEST(VirtualInterfaceSim, ThisQualifiedPropertyReadsInstanceComponent) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -37,9 +32,6 @@ TEST(VirtualInterfaceSim, ThisQualifiedPropertyReadsInstanceComponent) {
             0x35u);
 }
 
-// §25.9: a nonblocking write through `this.vif` lands on the instance's own
-// variable, which the module reads back as `dif.a`; before this the write was
-// stored under a flat key of the object and `dif.a` stayed at 0.
 TEST(VirtualInterfaceSim, ThisQualifiedPropertyWriteReachesInstance) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -62,10 +54,6 @@ TEST(VirtualInterfaceSim, ThisQualifiedPropertyWriteReachesInstance) {
             0x2Cu);
 }
 
-// §25.9: the module reads a component through the transactor's property by
-// the handle it holds, `d.vif.a`, which is the instance's `a`, 0x4A. Before
-// this the read followed `d` into the object, took the interface handle held
-// in `vif` for a class handle, found no object, and answered 0.
 TEST(VirtualInterfaceSim, PropertyReadThroughHandleFromModule) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -86,9 +74,6 @@ TEST(VirtualInterfaceSim, PropertyReadThroughHandleFromModule) {
             0x4Au);
 }
 
-// §25.9: a nonblocking write from the module through the transactor's
-// property, `d.vif.a <= 8'h5C`, lands on the instance's own variable, read
-// back as `dif.a`; before this it was stored under a flat key of the object.
 TEST(VirtualInterfaceSim, NonblockingWriteThroughHandleFromModule) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -108,8 +93,6 @@ TEST(VirtualInterfaceSim, NonblockingWriteThroughHandleFromModule) {
             0x5Cu);
 }
 
-// §25.9: the blocking form of the same write reaches the same variable, so
-// the module reads its own 0x6D back through `dif.a` in the next statement.
 TEST(VirtualInterfaceSim, BlockingWriteThroughHandleFromModule) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class drv;\n"
@@ -131,11 +114,6 @@ TEST(VirtualInterfaceSim, BlockingWriteThroughHandleFromModule) {
             0x6Du);
 }
 
-// §25.9: an event control on a component reached through the transactor's
-// property from the module, `@(posedge d.vif.clk)`, arms on the instance's
-// own `clk`, so the block resumes at 30 when another process drives the edge;
-// before this the flattened `d.vif.clk` named no variable, nothing was
-// armed, and the block sat until the watchdog ended the run with x at 0.
 TEST(VirtualInterfaceSim, EventControlThroughHandleFromModule) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
                       "class drv;\n"
@@ -160,9 +138,6 @@ TEST(VirtualInterfaceSim, EventControlThroughHandleFromModule) {
             30u);
 }
 
-// §25.9: the handle chain is followed as deep as the design writes it, so a
-// property of an object held by another object, `outer.inner.vif.a`, is the
-// instance's `a`, 0x7B, for a read and for a write from the module.
 TEST(VirtualInterfaceSim, TwoLevelHandleChainReachesInstanceComponent) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "class inner_t;\n"
@@ -214,11 +189,6 @@ TEST(VirtualInterfaceSim, TwoLevelHandleChainWriteReachesInstance) {
             0x3Eu);
 }
 
-// §25.9 and §6.18: a virtual interface declared as a local of a module task,
-// through a typedef name standing for the type, is assigned from an instance
-// and reaches the instance's `a`, 0x47, through the dot notation. Before this
-// the local was a 32-bit vector no reader took for a virtual interface, so
-// `v.a` named nothing and x stayed at 0.
 TEST(VirtualInterfaceSim, ModuleTaskLocalReadsInstanceComponent) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "module top;\n"
@@ -239,8 +209,6 @@ TEST(VirtualInterfaceSim, ModuleTaskLocalReadsInstanceComponent) {
             0x47u);
 }
 
-// §25.9: a write through a module task's local lands on the instance's own
-// variable, read back as `dif.a`, 0x58.
 TEST(VirtualInterfaceSim, ModuleTaskLocalWriteReachesInstance) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "module top;\n"
@@ -260,9 +228,6 @@ TEST(VirtualInterfaceSim, ModuleTaskLocalWriteReachesInstance) {
             0x58u);
 }
 
-// §25.9: an event control through a module task's local arms on the
-// instance's own `clk`, so the task ends at 30 and the enabling block records
-// that time; 0 is what a wait that armed nothing leaves.
 TEST(VirtualInterfaceSim, ModuleTaskLocalWaitsOnInstanceEdge) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
                       "module top;\n"
@@ -287,11 +252,6 @@ TEST(VirtualInterfaceSim, ModuleTaskLocalWaitsOnInstanceEdge) {
             30u);
 }
 
-// §25.9: a virtual interface declared as a local of a class function is
-// assigned from another virtual interface, the formal the instance arrived
-// through, and reads the instance's `a`, 0x63. A function body's local is
-// made on a path of its own (CreateFuncLocalVar), which is why the function
-// and the task are each tried.
 TEST(VirtualInterfaceSim, ClassFunctionLocalReadsInstanceComponent) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "typedef virtual bus_if vif_t;\n"
@@ -316,8 +276,6 @@ TEST(VirtualInterfaceSim, ClassFunctionLocalReadsInstanceComponent) {
             0x63u);
 }
 
-// §25.9: a write through a class task's local lands on the instance's own
-// variable, read back as `dif.a`, 0x6E.
 TEST(VirtualInterfaceSim, ClassTaskLocalWriteReachesInstance) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "typedef virtual bus_if vif_t;\n"
@@ -341,8 +299,6 @@ TEST(VirtualInterfaceSim, ClassTaskLocalWriteReachesInstance) {
             0x6Eu);
 }
 
-// §25.9: an event control through a class task's local arms on the
-// instance's own `clk`, so the task ends at 30.
 TEST(VirtualInterfaceSim, ClassTaskLocalWaitsOnInstanceEdge) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic clk; endinterface\n"
                       "typedef virtual bus_if vif_t;\n"
@@ -371,9 +327,6 @@ TEST(VirtualInterfaceSim, ClassTaskLocalWaitsOnInstanceEdge) {
             30u);
 }
 
-// §25.9 with A.2.2.1: the local written directly as `virtual bus_if v;`, no
-// typedef between, once IsBlockVarDeclStartCore takes `virtual` as opening a
-// declaration; it reads the instance's `a`, 0x69, as the typedef form does.
 TEST(VirtualInterfaceSim, ModuleTaskDirectLocalReadsInstanceComponent) {
   EXPECT_EQ(RunAndGet("interface bus_if; logic [7:0] a; endinterface\n"
                       "module top;\n"
@@ -393,11 +346,6 @@ TEST(VirtualInterfaceSim, ModuleTaskDirectLocalReadsInstanceComponent) {
             0x69u);
 }
 
-// §25.9 reads an interface variable through a virtual interface as through the
-// instance, and a `logic` declared without `signed` is unsigned (§6.11), so a
-// one-bit member holding 1 reads 1 through either, however it was written.
-// The read through the virtual interface took the signedness of the unsized
-// literal that set the member, and a one-bit signed 1 is -1.
 TEST(VirtualInterfaceSim, AMemberReadThroughTheHandleKeepsItsSignedness) {
   SimFixture f;
   std::string out = RunCapture(
@@ -414,9 +362,6 @@ TEST(VirtualInterfaceSim, AMemberReadThroughTheHandleKeepsItsSignedness) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// §25.9 with §25.3: an instance an interface holds is reached through a
-// virtual interface to the outer one, so a write to vo.in.v is a write to
-// o.in.v.
 TEST(VirtualInterfaceSim, NestedInterfaceInstanceIsReached) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface inner_if; int v; endinterface\n"

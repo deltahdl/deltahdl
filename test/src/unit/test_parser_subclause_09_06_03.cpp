@@ -87,7 +87,6 @@ TEST(DisableForkParsing, DisableForkMissingSemicolon) {
       "    disable fork\n"
       "  end\n"
       "endmodule\n");
-  // The `end` on line 4 is the token that stood where the ';' should have.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 4, "9.6.3"));
 }
 

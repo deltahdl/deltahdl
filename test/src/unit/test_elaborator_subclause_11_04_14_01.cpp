@@ -33,11 +33,6 @@ TEST(StreamExpressionConcatElaboration, MultipleElementsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.1: a non-null class handle streams its data members in turn. It is
-// illegal to stream a handle whose class exposes a local member, because that
-// member is not accessible at the point of the streaming operator. This is a
-// distinct application of the rule from the bit-stream cast of §6.24.3: a bare
-// handle in a streaming concatenation never forms a cast node.
 TEST(StreamExpressionConcatElaboration, ClassHandleWithLocalMemberRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -57,8 +52,6 @@ TEST(StreamExpressionConcatElaboration, ClassHandleWithLocalMemberRejected) {
                             7, "11.4.14.1"));
 }
 
-// §11.4.14.1: a protected member is likewise inaccessible at the streaming
-// operator, so the handle is illegal as a streaming concatenation operand.
 TEST(StreamExpressionConcatElaboration,
      ClassHandleWithProtectedMemberRejected) {
   ElabFixture f;
@@ -79,9 +72,6 @@ TEST(StreamExpressionConcatElaboration,
                             7, "11.4.14.1"));
 }
 
-// §11.4.14.1: an operand that is not a bit-stream type, an unpacked array, a
-// struct, a union, or a class handle cannot be packed; the procedure's final
-// branch issues an error. A real variable is such a non-streamable operand.
 TEST(StreamExpressionConcatElaboration, RealOperandRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -97,8 +87,6 @@ TEST(StreamExpressionConcatElaboration, RealOperandRejected) {
                             4, "11.4.14.1"));
 }
 
-// §11.4.14.1: a chandle is likewise not a bit-stream type, so it is an illegal
-// streaming concatenation operand.
 TEST(StreamExpressionConcatElaboration, ChandleOperandRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,9 +102,6 @@ TEST(StreamExpressionConcatElaboration, ChandleOperandRejected) {
                             4, "11.4.14.1"));
 }
 
-// §11.4.14.1: an event is another type that is neither a bit-stream type nor a
-// streamable aggregate, so the final branch rejects it as a streaming
-// concatenation operand.
 TEST(StreamExpressionConcatElaboration, EventOperandRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -132,8 +117,6 @@ TEST(StreamExpressionConcatElaboration, EventOperandRejected) {
                             4, "11.4.14.1"));
 }
 
-// §11.4.14.1: a class handle whose members are all accessible (public) may be
-// streamed; its data members are packed without error.
 TEST(StreamExpressionConcatElaboration, ClassHandleWithPublicMembersAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -151,9 +134,6 @@ TEST(StreamExpressionConcatElaboration, ClassHandleWithPublicMembersAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.14.1 streams an untagged union through its first member, and an
-// unpacked tagged union is none of the kinds a stream_expression may be, so it
-// is skipped with an error.
 TEST(StreamExpressionConcatElaboration, UnpackedTaggedUnionOperandReported) {
   ElabFixture f;
   ElaborateSrc(

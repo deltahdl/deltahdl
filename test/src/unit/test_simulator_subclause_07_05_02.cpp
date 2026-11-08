@@ -83,9 +83,6 @@ TEST(DynamicArraySizeSimulation, SizeAfterDeleteIsZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.5.2: a dynamic array explicitly created with a zero-length new[] is empty,
-// so its current size is reported as zero. This is the created-array branch at
-// the empty boundary, distinct from a never-created array.
 TEST(DynamicArraySizeSimulation, SizeOfEmptyCreatedArrayIsZero) {
   auto v = RunAndGet(
       "module t;\n"
@@ -97,8 +94,6 @@ TEST(DynamicArraySizeSimulation, SizeOfEmptyCreatedArrayIsZero) {
   EXPECT_EQ(v, 0u);
 }
 
-// §7.5.2 prototype "function int size();": the returned value is an int, i.e. a
-// 32-bit quantity, independent of the array's element width or current length.
 TEST(DynamicArraySizeSimulation, SizeReturnsIntWidth) {
   SimFixture f;
   MakeDynArray(f, "d", {10, 20, 30});
@@ -109,9 +104,6 @@ TEST(DynamicArraySizeSimulation, SizeReturnsIntWidth) {
   EXPECT_EQ(out.width, 32u);
 }
 
-// §7.5.2: the clause example writes the query without parentheses
-// (int j = addr.size;). The bare property form reads the same current size as
-// the method-call form, so a 4-element array reports 4.
 TEST(DynamicArraySizeSimulation, NoParenthesesPropertyForm) {
   auto v = RunAndGet(
       "module t;\n"
@@ -123,9 +115,6 @@ TEST(DynamicArraySizeSimulation, NoParenthesesPropertyForm) {
   EXPECT_EQ(v, 4u);
 }
 
-// §7.5.2: the clause example uses the size result as an operand of the new[]
-// size expression (addr = new[addr.size() * 4] (addr);). Starting from a
-// 5-element array, quadrupling yields 20 elements.
 TEST(DynamicArraySizeSimulation, SizeUsedInNewSizeExpression) {
   auto v = RunAndGet(
       "module t;\n"
@@ -140,10 +129,6 @@ TEST(DynamicArraySizeSimulation, SizeUsedInNewSizeExpression) {
   EXPECT_EQ(v, 20u);
 }
 
-// §7.5.2 prototype "function int size()": size reports the element count of the
-// slowest-varying dimension, independent of the element data type or its width.
-// A dynamic array of 4-bit vectors (the element type from the §7.5 example)
-// created with new[6] still reports 6.
 TEST(DynamicArraySizeSimulation, ReportsElementCountForVectorElementType) {
   auto v = RunAndGet(
       "module t;\n"
@@ -155,10 +140,6 @@ TEST(DynamicArraySizeSimulation, ReportsElementCountForVectorElementType) {
   EXPECT_EQ(v, 6u);
 }
 
-// §7.5.2: size reports the element count of the array's own (slowest-varying)
-// dimension. For a multidimensional dynamic array, calling size on the variable
-// queries the outer dimension, so an outer dimension created with new[3]
-// reports 3 regardless of the inner subarrays being unsized.
 TEST(DynamicArraySizeSimulation, ReportsOuterDimensionOfMultidimensionalArray) {
   auto v = RunAndGet(
       "module t;\n"
@@ -173,8 +154,6 @@ TEST(DynamicArraySizeSimulation, ReportsOuterDimensionOfMultidimensionalArray) {
   EXPECT_EQ(v, 3u);
 }
 
-// §7.5.2: the size method is equivalent to the $size(addr, 1) array query
-// system function. For a created array both yield the same element count.
 TEST(DynamicArraySizeSimulation, EquivalentToDollarSizeDimensionOne) {
   auto v = RunAndGet(
       "module t;\n"
@@ -186,8 +165,6 @@ TEST(DynamicArraySizeSimulation, EquivalentToDollarSizeDimensionOne) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.5.2: the equivalence with $size(addr, 1) holds for an uncreated array as
-// well; both report zero.
 TEST(DynamicArraySizeSimulation, EquivalentToDollarSizeWhenUncreated) {
   auto v = RunAndGet(
       "module t;\n"

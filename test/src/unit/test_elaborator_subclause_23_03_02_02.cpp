@@ -57,9 +57,6 @@ TEST(NamedPortConnectionElaboration, PortBindingPortMismatch) {
   auto* mod = design->top_modules[0];
   ASSERT_EQ(mod->children.size(), 1);
 
-  // §23.3.2.2 makes the bogus connection an error that binds nothing, so the
-  // one binding is a, which it leaves unconnected and which as a net port
-  // takes 'z (§23.3.3.3).
   ASSERT_EQ(mod->children[0].port_bindings.size(), 1);
   EXPECT_EQ(mod->children[0].port_bindings[0].port_name, "a");
   EXPECT_GT(f.diag.ErrorCount(), 0u);
@@ -88,10 +85,6 @@ TEST(NamedPortConnectionElaboration, EmptyNamedPortDoesNotUseDefault) {
     }
   }
   ASSERT_NE(a_binding, nullptr);
-  // The rule only bites when the port actually carries a default: confirm the
-  // declared default survived elaboration, then confirm it was deliberately
-  // NOT substituted for the explicit empty named connection. Without the first
-  // check, a lost default would make the unconnected result a false pass.
   ASSERT_NE(mod->children[0].resolved, nullptr);
   const RtlirPort* a_port = nullptr;
   for (const auto& p : mod->children[0].resolved->ports) {
@@ -102,7 +95,6 @@ TEST(NamedPortConnectionElaboration, EmptyNamedPortDoesNotUseDefault) {
   }
   ASSERT_NE(a_port, nullptr);
   EXPECT_NE(a_port->default_value, nullptr);
-  // Left unconnected, the net port a takes 'z (§23.3.3.3), not its default.
   ASSERT_NE(a_binding->connection, nullptr);
   EXPECT_EQ(a_binding->connection->kind, ExprKind::kUnbasedUnsizedLiteral);
   EXPECT_EQ(a_binding->connection->text, "'z");
@@ -121,8 +113,6 @@ TEST(NamedPortConnectionElaboration, OmittedPortWithoutDefaultIsUnconnected) {
       f);
   ASSERT_NE(design, nullptr);
   auto* mod = design->top_modules[0];
-  // b, which has no default, is unconnected, and as a net port takes 'z
-  // (§23.3.3.3).
   const auto& bindings = mod->children[0].port_bindings;
   for (const auto& b : bindings) {
     if (b.port_name != "b") continue;
@@ -152,11 +142,6 @@ TEST(NamedPortConnectionElaboration, OmittedOutputPortHasNoBinding) {
 }
 
 TEST(NamedPortConnectionElaboration, OmittedPortWithDefaultUsesDefault) {
-  // §23.3.2.2: a port left out of a named connection list is unconnected only
-  // when it has no default value. An omitted input that does carry a default
-  // (here rst_n) is bound to that default -- the inverse of the explicit empty
-  // ".rst_n()" form, which leaves the port unconnected and discards the
-  // default.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child(input logic [7:0] a,\n"
@@ -192,8 +177,6 @@ TEST(NamedPortConnectionElaboration, OmittedPortWithDefaultUsesDefault) {
   }
   ASSERT_NE(rst_port, nullptr);
   EXPECT_NE(rst_port->default_value, nullptr);
-  // The binding points at the declared default expression, not at the high-Z
-  // sentinel an unconnected input net would otherwise receive.
   EXPECT_EQ(rst_binding->connection, rst_port->default_value);
 }
 
@@ -227,11 +210,6 @@ TEST(NamedPortConnectionElaboration, ReversedOrderBindsCorrectly) {
   EXPECT_TRUE(found_b);
 }
 
-// §23.3.2.2: the port_name shall be a port the module declaration names. A
-// named connection whose port_name names no port of the instantiated module
-// breaches that requirement, so it is an error, and the report naming it
-// carries the subclause, so a caller learns which rule was enforced without
-// matching the wording of the message.
 TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
   ElabFixture f;
   ElaborateSrc(
@@ -246,10 +224,6 @@ TEST(NamedPortConnectionElaboration, PortNameNamesNoPortNames23_3_2_2) {
                             "23.3.2.2"));
 }
 
-// §23.3.2.2 (printed page 744): a port may be connected only once in an
-// instance, and the clause's example connecting an input, an output and an
-// inout port twice each is "illegal". Each port named twice is reported, once;
-// both connections were applied without a word.
 TEST(NamedPortConnectionElaboration, PortConnectedTwiceIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -276,8 +250,6 @@ TEST(NamedPortConnectionElaboration, PortConnectedTwiceIsError) {
   EXPECT_EQ(repeats, 3u);
 }
 
-// Each port connected once, however the connections are ordered, raises no
-// such report.
 TEST(NamedPortConnectionElaboration, EachPortConnectedOnceIsAccepted) {
   ElabFixture f;
   ElaborateSrc(

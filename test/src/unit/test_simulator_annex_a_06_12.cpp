@@ -30,11 +30,6 @@ TEST(RandsequenceSim, IfTrueBranchExecutes) {
 
 TEST(RandsequenceSim, ReturnTerminatesProduction) {
   SimFixture f;
-  // 18.17.6: a return ends generation of the *current* production and no other;
-  // the code after it in that production's block does not run, but sequence
-  // generation continues with the next production in the enclosing list. Here
-  // `first`'s `x = 8'd55` is skipped by the return (so x stays 10), yet
-  // `second` is still generated and adds 5, leaving x == 15.
   auto* var = RunRandseqAndFindVar(f,
                                    "module t;\n"
                                    "  logic [7:0] x;\n"
@@ -115,12 +110,6 @@ TEST(RandsequenceSim, NestedRandsequenceExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §18.17.7 passes data to a production in a task call's syntax, so A.6.12's
-// rs_production_item takes A.8.4's list_of_arguments: a positional argument
-// left empty and a named one written `.b()` take the formal's default, and a
-// named argument binds the formal of its name wherever it stands. Each call
-// appends its two digits, a then b, so a formal bound by position where its
-// name should have bound it shows as a swapped pair.
 TEST(RandsequenceSim, ProductionArgumentsBindByNameAndOmittedTakeDefaults) {
   SimFixture f;
   auto* var = RunRandseqAndFindVar(f,

@@ -14,17 +14,6 @@
 
 using namespace delta;
 
-// Annex H.8.6 (Argument passing by handle, open arrays): an argument
-// specified as an open, unsized array is always passed by a handle,
-// regardless of the direction of the SystemVerilog formal, and is reached
-// through library functions; the implementation of a handle is tool
-// specific and transparent to the user, the handle being the generic
-// pointer void* under the name svOpenArrayHandle; and an argument passed by
-// handle shall always have a const qualifier, because the user shall not
-// modify the contents of a handle. The cases check the mode and C type an
-// open array takes under every direction and type, the handle's own type,
-// and that the array behind it is reached through the library functions.
-
 namespace {
 
 DpiArg Formal(DataTypeKind type, Direction direction, uint32_t width = 0) {
@@ -36,8 +25,6 @@ DpiArg Formal(DataTypeKind type, Direction direction, uint32_t width = 0) {
   return formal;
 }
 
-// §H.8.6: by handle whatever the direction, and whatever the element type,
-// the C type being const svOpenArrayHandle every time.
 TEST(DpiPassingByHandle, AnOpenArrayIsAHandleUnderEveryDirectionAndType) {
   for (const Direction kDirection :
        {Direction::kInput, Direction::kOutput, Direction::kInout}) {
@@ -53,9 +40,6 @@ TEST(DpiPassingByHandle, AnOpenArrayIsAHandleUnderEveryDirectionAndType) {
   EXPECT_FALSE(DpiUserMayModifyHandleContents());
 }
 
-// §H.8.6: the handle is the generic pointer, and what it points to is the
-// tool's own -- the user reaches the array's dimensions and bounds through
-// the library functions of §H.12.2 and never through the pointer's type.
 TEST(DpiPassingByHandle, TheHandleIsAGenericPointerReadThroughTheLibrary) {
   EXPECT_TRUE((std::is_same<svOpenArrayHandle, void*>::value));
   const SvOpenArrayDimRange kRanges[] = {{7, 0}, {3, 1}, {2, 5}};
@@ -74,12 +58,6 @@ TEST(DpiPassingByHandle, TheHandleIsAGenericPointerReadThroughTheLibrary) {
   EXPECT_EQ(svRight(kHandle, 2), 5);
 }
 
-// The C functions the design below calls, each reading or writing an open
-// array through the handle §H.8.6 passes it by: the sum of an array of ints
-// with its first dimension's ranges, the high byte of each element of an array
-// of 40-bit vectors with the packed dimension's left bound, the sum of products
-// over an array of structs, the sum over a two-dimensional array of ints with
-// its sizes, and outputs written element by element.
 int SumOpenInts(svOpenArrayHandle h) {
   int sum = 0;
   for (int i = svLow(h, 1); i <= svHigh(h, 1); ++i) {
@@ -137,7 +115,6 @@ void FillOpen(svOpenArrayHandle bits, svOpenArrayHandle vecs,
   }
 }
 
-// A design passing open arrays of each kind to C, run to its end.
 void RunOpenArrayDesign(SimFixture& f) {
   RunWithImportsBound(
       "module t;\n"
@@ -179,16 +156,11 @@ void RunOpenArrayDesign(SimFixture& f) {
       "annex_h_08_06_open_arrays");
 }
 
-// The value the design's variable `name` holds once the run is over, all ones
-// where the run holds no such variable.
 uint64_t VariableValue(SimFixture& f, std::string_view name) {
   auto* var = f.ctx.FindVariable(name);
   return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
 }
 
-// §H.8.6 with §35.6.1.1: an open array is passed by handle, and its unsized
-// dimension takes the actual's range, [5:2] here, its elements reached by
-// their own indices.
 TEST(DpiOpenArrayArguments, AnOpenArrayOfIntsTakesTheActualsRange) {
   SimFixture f;
   RunOpenArrayDesign(f);
@@ -196,32 +168,24 @@ TEST(DpiOpenArrayArguments, AnOpenArrayOfIntsTakesTheActualsRange) {
   EXPECT_EQ(VariableValue(f, "s1"), 1005242U);
 }
 
-// §H.12.5: an element of packed type is reached through its canonical
-// representation, and dimension 0 is the packed part.
 TEST(DpiOpenArrayArguments, PackedElementsAreReachedCanonically) {
   SimFixture f;
   RunOpenArrayDesign(f);
   EXPECT_EQ(VariableValue(f, "s2"), 39123U);
 }
 
-// §H.12.4: an element of an unpacked struct is reached by its address, in the
-// layout C gives the struct.
 TEST(DpiOpenArrayArguments, StructElementsAreReachedByAddress) {
   SimFixture f;
   RunOpenArrayDesign(f);
   EXPECT_EQ(VariableValue(f, "s3"), 6233U);
 }
 
-// §35.6.1.1: every unsized dimension takes the actual's range, and an element
-// is reached by one index per dimension, row-major.
 TEST(DpiOpenArrayArguments, TwoUnsizedDimensionsTakeTheActualsRanges) {
   SimFixture f;
   RunOpenArrayDesign(f);
   EXPECT_EQ(VariableValue(f, "s4"), 1823U);
 }
 
-// An open output array is copied back element by element at the indices C
-// wrote them under.
 TEST(DpiOpenArrayArguments, OpenOutputArraysAreCopiedBack) {
   SimFixture f;
   RunOpenArrayDesign(f);

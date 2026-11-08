@@ -159,11 +159,6 @@ TEST(ClassSim, IsAReturnsFalseForUnrelatedType) {
   EXPECT_FALSE(b->IsA(a));
 }
 
-// §8.4: assignment of a class object copies the handle, so two variables that
-// were assigned from the same allocated object refer to that one object and
-// compare equal. Exercised end to end (elaborate/lower/run) rather than from a
-// hand-built handle value: 'new' produces the object, the assignment aliases
-// the second handle, and the listed '==' / '===' operators observe the alias.
 TEST(ClassSim, AssignedHandlesAliasSameObjectCompareEqual) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -190,10 +185,6 @@ TEST(ClassSim, AssignedHandlesAliasSameObjectCompareEqual) {
   EXPECT_EQ(ceq->value.ToUint64(), 1u);
 }
 
-// §8.4: distinct objects created by separate 'new' calls have distinct handles,
-// so handles pointing at different objects compare unequal. Built from real
-// source syntax and run through the full pipeline so the '==' / '!=' operators
-// act on handles the allocator actually produced.
 TEST(ClassSim, DistinctObjectsCompareUnequal) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -220,10 +211,6 @@ TEST(ClassSim, DistinctObjectsCompareUnequal) {
   EXPECT_EQ(neq->value.ToUint64(), 1u);
 }
 
-// §8.4: the conditional operator is one of the operators valid on object
-// handles. Built end to end from 11.4.11's real ternary syntax -- two distinct
-// objects are allocated and each branch is selected in turn, so the result
-// handle aliases the object the condition chose, observed with '=='.
 TEST(ClassSim, ConditionalOperatorSelectsHandleAtRuntime) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -252,10 +239,6 @@ TEST(ClassSim, ConditionalOperatorSelectsHandleAtRuntime) {
   EXPECT_EQ(pb->value.ToUint64(), 1u);
 }
 
-// §8.4: assignment of a class object whose type is assignment compatible with
-// the target is valid. The compatible source is a derived-class handle built
-// from 6.22.3's real 'extends' inheritance; after assigning it into a base
-// handle the two handles alias the one object, observed with '=='.
 TEST(ClassSim, CompatibleDerivedHandleAssignmentAliasesAtRuntime) {
   SimFixture f;
   auto* aliased = RunAndFindVar(
@@ -276,10 +259,6 @@ TEST(ClassSim, CompatibleDerivedHandleAssignmentAliasesAtRuntime) {
   EXPECT_EQ(aliased->value.ToUint64(), 1u);
 }
 
-// §8.4: assignment of null is a valid operation on an object handle. After an
-// object is allocated and null is then assigned over it, comparing the handle
-// with null yields true -- observed end to end rather than from a hand-set
-// handle value.
 TEST(ClassSim, NullAssignmentClearsHandleAtRuntime) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -312,14 +291,6 @@ TEST(ClassSim, UninitializedHandleDetectableAsNull) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// 8.4: an object is used by declaring a variable of the class type, which holds
-// an object handle, then creating an object of the class with new and assigning
-// it to that variable -- the clause illustrates it with `Packet p; p = new;`.
-// Nothing there makes the construction depend on the construct the declaration
-// sits in, so a handle local to a function body is constructed exactly as one
-// in an initial block is. The handle is compared against null rather than a
-// property being read, so the test reports whether an object exists rather than
-// what it contains.
 TEST(ClassSim, NewConstructsHandleDeclaredInFunctionBody) {
   const char* src =
       "class P;\n"
@@ -337,9 +308,6 @@ TEST(ClassSim, NewConstructsHandleDeclaredInFunctionBody) {
   EXPECT_EQ(RunAndGet(src, "rx"), 222u);
 }
 
-// 8.4, the declaration-initializer spelling of the same construction: the
-// object is created where the handle is declared rather than by a later
-// assignment, and a function body is no exception.
 TEST(ClassSim, NewInitializerConstructsHandleDeclaredInFunctionBody) {
   const char* src =
       "class P;\n"
@@ -356,11 +324,6 @@ TEST(ClassSim, NewInitializerConstructsHandleDeclaredInFunctionBody) {
   EXPECT_EQ(RunAndGet(src, "rx"), 222u);
 }
 
-// 8.4: the object a function-body handle refers to is a whole object, so its
-// properties are writable and read back. Constructing the handle is not enough
-// on its own -- a handle left null would read 0 here for the same reason it
-// would report null above, so this pins the object down as usable rather than
-// merely non-null.
 TEST(ClassSim, PropertyOfHandleConstructedInFunctionBodyReadsBack) {
   const char* src =
       "class P;\n"
@@ -379,8 +342,6 @@ TEST(ClassSim, PropertyOfHandleConstructedInFunctionBodyReadsBack) {
   EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-// 8.4: a class method's body is a subroutine body like any other, so a handle
-// local to a method is constructed there too.
 TEST(ClassSim, NewConstructsHandleDeclaredInClassMethodBody) {
   const char* src =
       "class Q;\n"
@@ -403,11 +364,6 @@ TEST(ClassSim, NewConstructsHandleDeclaredInClassMethodBody) {
   EXPECT_EQ(RunAndGet(src, "rx"), 222u);
 }
 
-// §8.4 (printed page 182 of IEEE 1800-2023): accessing a non-static
-// member or a virtual method through a null object handle is illegal, the
-// result indeterminate, and an implementation may issue an error. `c.get()` on
-// a `C c;` never assigned answered 0 in silence, a value a testbench reads as
-// valid; it is reported at the call, and the 0 is what the call yields.
 TEST(ClassSim, MethodCalledThroughANullHandleIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -430,9 +386,6 @@ TEST(ClassSim, MethodCalledThroughANullHandleIsReported) {
                             10, "8.4"));
 }
 
-// §8.10: a static method belongs to the class and is callable through a
-// handle whether or not it refers to an object, so the null handle raises no
-// report and the method runs.
 TEST(ClassSim, StaticMethodCalledThroughANullHandleRuns) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -453,8 +406,6 @@ TEST(ClassSim, StaticMethodCalledThroughANullHandleRuns) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
 }
 
-// The class the null-receiver cases below call through: an instance function,
-// an instance task and a static function, and a holder of one of its objects.
 const char* const kNullReceiverClasses =
     "class C;\n"
     "  int v = 5;\n"
@@ -466,7 +417,6 @@ const char* const kNullReceiverClasses =
     "  C inner;\n"
     "endclass\n";
 
-// How many diagnostics the run reported whose message holds `text`.
 static int CountReports(const SimFixture& f, std::string_view text) {
   int n = 0;
   for (const auto& d : f.diag.Diagnostics()) {
@@ -475,9 +425,6 @@ static int CountReports(const SimFixture& f, std::string_view text) {
   return n;
 }
 
-// §8.4: the rule holds whatever expression holds the null handle, so a call
-// through an element of an array of handles that holds none is reported at the
-// call, as one through a named null handle is.
 TEST(ClassSim, MethodCalledThroughANullArrayElementIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -494,8 +441,6 @@ TEST(ClassSim, MethodCalledThroughANullArrayElementIsReported) {
                             "8.4"));
 }
 
-// §8.4: a task enabled through a null handle held in another object's property
-// is reported once, at the enable.
 TEST(ClassSim, TaskEnabledThroughANullHeldHandleIsReportedOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -515,8 +460,6 @@ TEST(ClassSim, TaskEnabledThroughANullHeldHandleIsReportedOnce) {
   EXPECT_EQ(CountReports(f, "called through a null handle"), 1);
 }
 
-// §8.4: a task enabled through a named null handle is reported once, as a
-// function called through one is.
 TEST(ClassSim, TaskEnabledThroughANamedNullHandleIsReportedOnce) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -533,7 +476,6 @@ TEST(ClassSim, TaskEnabledThroughANamedNullHandleIsReportedOnce) {
   EXPECT_EQ(CountReports(f, "called through the null handle"), 1);
 }
 
-// §8.4: a call through the null handle a function returns is reported too.
 TEST(ClassSim, MethodCalledThroughANullReturnedHandleIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -552,8 +494,6 @@ TEST(ClassSim, MethodCalledThroughANullReturnedHandleIsReported) {
                             "8.4"));
 }
 
-// §8.4: an entry of an associative array of handles that holds null is a null
-// handle like any other, and a call through it is reported at the call.
 TEST(ClassSim, MethodCalledThroughANullAssociativeEntryIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -574,8 +514,6 @@ TEST(ClassSim, MethodCalledThroughANullAssociativeEntryIsReported) {
   EXPECT_EQ(CountReports(f, "called through a null handle"), 1);
 }
 
-// §8.10: a static method is callable through such an entry, so nothing is
-// reported and the method runs.
 TEST(ClassSim, StaticMethodCalledThroughANullAssociativeEntryRuns) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -594,9 +532,6 @@ TEST(ClassSim, StaticMethodCalledThroughANullAssociativeEntryRuns) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
 }
 
-// §8.10: a static method is callable through an element of an array of handles
-// that holds none, as through a named null handle, so nothing is reported and
-// the method runs.
 TEST(ClassSim, StaticMethodCalledThroughANullArrayElementRuns) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kNullReceiverClasses) +
@@ -612,10 +547,6 @@ TEST(ClassSim, StaticMethodCalledThroughANullArrayElementRuns) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 7u);
 }
 
-// Elaborates, lowers and runs `src` clean, then reads the value the run left
-// in `r` and the width `$bits` reported into `w`. A property that folded to
-// its base type's one bit truncates the value written through it and reports
-// that one bit, so both are what the sizing of the property decides.
 static std::pair<uint64_t, uint64_t> RunAndReadValueAndBits(
     const std::string& src) {
   SimFixture f;
@@ -632,14 +563,6 @@ static std::pair<uint64_t, uint64_t> RunAndReadValueAndBits(
   return {r->value.ToUint64(), w->value.ToUint64()};
 }
 
-// §6.20.4 (printed page 129 of IEEE 1800-2023) lets a local parameter be
-// declared at compilation-unit scope, §3.12.1 (printed 56) has a name the class
-// body does not declare searched in the compilation-unit scope written before
-// it, and §7.4.1 (printed 153) has a packed dimension's bounds be constant
-// expressions. The property is therefore ten bits: 10'h3FF written through it
-// reads back 1023 and $bits answers 10. Folded against the class's own
-// parameters alone, the range did not fold, the property was the one bit of
-// its `logic` base type, and both read 1.
 TEST(ClassSim, CompilationUnitLocalparamSizesClassPropertyRange) {
   auto [r, w] = RunAndReadValueAndBits(
       "localparam int W = 10;\n"
@@ -659,12 +582,6 @@ TEST(ClassSim, CompilationUnitLocalparamSizesClassPropertyRange) {
   EXPECT_EQ(w, 10u);
 }
 
-// §26.3 (printed page 808 of IEEE 1800-2023): a package's parameter is
-// named from any scope through the package scope resolution operator, and
-// §7.4.1 admits any constant expression as a bound, so `[p::W*2-1:0]` is twenty
-// bits where
-// `[p::W-1:0]` is ten. 20'hFFFFF reads back 1048575 from the doubled range,
-// which a ten-bit property would have cut to 1023 and a one-bit one to 1.
 TEST(ClassSim, PackageParameterSizesClassPropertyRange) {
   auto [r, w] = RunAndReadValueAndBits(
       "package p;\n"
@@ -688,12 +605,6 @@ TEST(ClassSim, PackageParameterSizesClassPropertyRange) {
   EXPECT_EQ(w, 10u);
 }
 
-// §3.12.1 (printed page 56 of IEEE 1800-2023) includes among the
-// compilation-unit scope's names the ones a package import made available
-// there, so a wildcard import written outside every module lets the class body
-// name the package's parameter bare. The bare and the qualified spellings size
-// alike: 10'h3FF through the bare-named range reads 1023 and $bits of the
-// qualified one is 10.
 TEST(ClassSim, ImportedPackageParameterSizesClassPropertyRange) {
   auto [r, w] = RunAndReadValueAndBits(
       "package p;\n"
@@ -717,12 +628,6 @@ TEST(ClassSim, ImportedPackageParameterSizesClassPropertyRange) {
   EXPECT_EQ(w, 10u);
 }
 
-// §8.26 lets a class declaration stand within a module, and §3.12.1's search
-// reaches the compilation-unit scope from there as from a class declared in
-// it, so a module's class sizes its properties by the unit's localparam and
-// by a package's parameter as a compilation-unit class does: 10'h3FF through
-// the package-sized property reads 1023 and the localparam-sized one is ten
-// bits wide.
 TEST(ClassSim, ClassDeclaredInModuleSizesPropertyByUnitConstants) {
   auto [r, w] = RunAndReadValueAndBits(
       "package p;\n"
@@ -746,13 +651,6 @@ TEST(ClassSim, ClassDeclaredInModuleSizesPropertyByUnitConstants) {
   EXPECT_EQ(w, 10u);
 }
 
-// §8.4 (printed page 181 of the LRM): a variable of a class type holds an
-// object handle, and §7.4.2 (printed 153-154) and §7.5 (printed 157) make
-// each element of an unpacked array a variable of the element type, so
-// `C arr[2]` is two handles, each constructed by `new` into its element and
-// read through it. The three tests below share the class and read 7, its
-// property's initializer; a `new` that constructed nothing and a read that
-// reached no object answer 0.
 static std::string HandleArrayDesign(std::string_view rest) {
   return "class C;\n"
          "  int v = 7;\n"
@@ -760,10 +658,6 @@ static std::string HandleArrayDesign(std::string_view rest) {
          std::string(rest);
 }
 
-// The module-scope fixed-size array: `arr[0] = new` had no path (the `new`
-// target key named no select, and the element constructors served array
-// properties alone) and `arr[0].v` none either, the member name built from
-// the select being no variable's.
 TEST(ClassSim, NewIntoAnElementOfADeclaredFixedArrayIsReadThroughIt) {
   EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
                                         "  C arr[2];\n"
@@ -777,8 +671,6 @@ TEST(ClassSim, NewIntoAnElementOfADeclaredFixedArrayIsReadThroughIt) {
             7u);
 }
 
-// The module-scope dynamic array, sized by new[] (§7.5.1) and then given an
-// object in its second element.
 TEST(ClassSim, NewIntoAnElementOfADeclaredDynamicArrayIsReadThroughIt) {
   EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
                                         "  C d[];\n"
@@ -793,9 +685,6 @@ TEST(ClassSim, NewIntoAnElementOfADeclaredDynamicArrayIsReadThroughIt) {
             7u);
 }
 
-// Both arrays declared in the initial block itself, whose elements are the
-// block's own (§7.4.2 in a begin-end block): 77 is the fixed array's second
-// element then the dynamic array's first.
 TEST(ClassSim, NewIntoElementsOfBlockDeclaredArraysIsReadThroughThem) {
   EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
                                         "  int y;\n"
@@ -812,14 +701,6 @@ TEST(ClassSim, NewIntoElementsOfBlockDeclaredArraysIsReadThroughThem) {
             77u);
 }
 
-// §13.4 (printed page 340): a function body's declarations are the body's
-// own, and §7.4.2 (printed 153-154) with §8.4 (printed 181) make each element
-// of the body's `C arr[2]` a handle. The body's assignment reaches the
-// element constructor through the module path's dispatch
-// (TryDispatchSpecialBlockingAssign, which ExecFuncBlockingAssign in
-// eval_function_body_assign.cpp asks after its own four forms), so `arr[0] =
-// new` constructs into the local's element and `arr[0].v` reads its 7. Pinned
-// here for the subroutine-body shape, beside the block's.
 TEST(ClassSim, NewIntoAnElementOfAFunctionBodyArrayIsReadThroughIt) {
   EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
                                         "  function int f();\n"
@@ -834,8 +715,6 @@ TEST(ClassSim, NewIntoAnElementOfAFunctionBodyArrayIsReadThroughIt) {
             7u);
 }
 
-// The same statement in a task body, whose dynamic local is sized by new[]
-// first (§7.5.1, printed 158) and written to the module's y.
 TEST(ClassSim, NewIntoAnElementOfATaskBodyDynamicArrayIsReadThroughIt) {
   EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
                                         "  int y;\n"
@@ -851,11 +730,6 @@ TEST(ClassSim, NewIntoAnElementOfATaskBodyDynamicArrayIsReadThroughIt) {
             7u);
 }
 
-// §8.4: `arr[1].h = new` constructs an object of the class the handle
-// property h is declared with and stores it in the object arr[1] refers to,
-// as `obj.h = new` does through a handle variable, so the handle read back
-// through the element reaches an N whose v is 9. The base was taken only as
-// a name, so the bare `new` was read as a value and h stayed null.
 TEST(ClassSim, NewIntoAHandlePropertyOfADeclaredArrayElementConstructsIt) {
   EXPECT_EQ(RunAndGet("class N;\n"
                       "  int v = 9;\n"
@@ -878,10 +752,6 @@ TEST(ClassSim, NewIntoAHandlePropertyOfADeclaredArrayElementConstructsIt) {
             9u);
 }
 
-// §8.4 with §7.4: an element selected by a variable, `arr[i]`, is the handle
-// arr[1] is while i holds 1, so `arr[i].v = 5` writes v of the object arr[1]
-// refers to, read back as 5 over its initial 7. The member path's name
-// carried the select only for a literal index, and the write went nowhere.
 TEST(ClassSim, AWriteThroughAVariableIndexedElementReachesItsObject) {
   EXPECT_EQ(RunAndGet(HandleArrayDesign("module t;\n"
                                         "  C arr[2];\n"
@@ -897,9 +767,6 @@ TEST(ClassSim, AWriteThroughAVariableIndexedElementReachesItsObject) {
             5u);
 }
 
-// §8.4: `arr[i].h = new` stores the object it constructs in h of the object
-// arr[i] refers to, as `arr[1].h = new` does, so it is read back through
-// arr[1].h. The object was constructed and its handle went nowhere.
 TEST(ClassSim, NewThroughAVariableIndexedElementIsStoredInItsObject) {
   EXPECT_EQ(RunAndGet("class N;\n"
                       "  int v = 9;\n"

@@ -22,9 +22,6 @@ TEST(StdBuiltinPackage, UserPackageNamedStdIsRejected) {
 }
 
 TEST(StdBuiltinPackage, EmptyUserPackageNamedStdIsRejected) {
-  // The `std` name is reserved for the built-in package regardless of what the
-  // user package would contain: even an empty `package std` is illegal, since
-  // users cannot supply declarations for the built-in package.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("package std;\n"
@@ -45,12 +42,6 @@ TEST(StdBuiltinPackage, ModuleWildcardImportOfStdElaborates) {
 }
 
 TEST(StdBuiltinPackage, StdScopeResolutionBaseIsAcceptedInElaboration) {
-  // §26.7: `std ::` names the always-available built-in package, so a
-  // `std ::`-qualified reference is never diagnosed as an unresolved package or
-  // scope. Drive a std-scoped reference through elaboration -- its scope base
-  // flows through the scope-resolution base check -- and observe that it
-  // elaborates cleanly. Contrast with the unknown-base foil below, which is
-  // identical except for the base identifier.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  int x;\n"
@@ -60,13 +51,6 @@ TEST(StdBuiltinPackage, StdScopeResolutionBaseIsAcceptedInElaboration) {
 }
 
 TEST(StdBuiltinPackage, UnknownScopeResolutionBaseIsRejected) {
-  // Foil for the rule above: `std` is accepted only because it is the built-in
-  // package. The same reference through a base that names no declared package
-  // (and is not `std`) must be rejected -- confirming the acceptance of `std`
-  // is specific to the built-in package, not a blanket pass for every
-  // `base ::` prefix.
-  // The rejection is reported under §26.3, not §26.7: the base is diagnosed by
-  // ReportUnknownScopeBases in src/elaborator/elaborator_scope_rules.cpp.
   ElabFixture f;
   EXPECT_FALSE(
       ElabOk("module m;\n"
@@ -81,9 +65,6 @@ TEST(StdBuiltinPackage, UnknownScopeResolutionBaseIsRejected) {
 }
 
 TEST(StdBuiltinPackage, StdIsImplicitlyWildcardImported) {
-  // §26.7: every module receives an implicit wildcard import of the built-in
-  // `std` package, even when the source contains no import declaration. Observe
-  // the import the elaborator injects on the elaborated module.
   ElabFixture f;
   auto* design = Elaborate("module m; endmodule\n", f);
   ASSERT_NE(design, nullptr);
@@ -97,9 +78,6 @@ TEST(StdBuiltinPackage, StdIsImplicitlyWildcardImported) {
   EXPECT_TRUE(has_std_wildcard);
 }
 
-// §26.7 (printed pages 816-817): std's declarations are those Annex G makes,
-// so `std::nosuch` names nothing and is reported at its base, as a user
-// package's undeclared member is. A std base was skipped unasked.
 TEST(StdPackage, ScopedReferenceToANameStdDoesNotDeclareIsReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -116,7 +94,6 @@ TEST(StdPackage, ScopedReferenceToANameStdDoesNotDeclareIsReported) {
                             4, "26.3"));
 }
 
-// A member std does declare is reached through the scope as before.
 TEST(StdPackage, ScopedReferenceToAStdClassElaborates) {
   EXPECT_TRUE(
       ElabOk("module top;\n"

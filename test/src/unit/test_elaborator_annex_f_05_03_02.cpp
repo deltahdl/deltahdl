@@ -20,10 +20,6 @@ Letter L(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
 
 auto BoolSeq(const std::string& name) { return SeqBoolean(BoolAtom(name)); }
 
-// initial @( 1 ) strong( a ##1 b ): a single activation at index 0 whose body
-// is the strong sequence a then b. Under T^p(., 1) the constant clock
-// collapses, so the body holds exactly when a ##1 b is tightly matched within
-// the word.
 auto InitialStrongAThenB() {
   return AssertionWithClock(
       AssertionStatement::Activation::kInitial,
@@ -31,8 +27,6 @@ auto InitialStrongAThenB() {
       TopProperty(PropStrong(SeqConcat(BoolSeq("a"), BoolSeq("b")))));
 }
 
-// initial @( 1 ) weak( a ##1 b ): the same obligation in its weak form, which
-// tolerates the sequence still being open at the end of the word.
 auto InitialWeakAThenB() {
   return AssertionWithClock(
       AssertionStatement::Activation::kInitial,
@@ -40,10 +34,6 @@ auto InitialWeakAThenB() {
       TopProperty(PropWeak(SeqConcat(BoolSeq("a"), BoolSeq("b")))));
 }
 
-// §F.5.3.2: w |=^- A completes w with the top tail T^omega; the open obligation
-// a ##1 b is discharged by the tail, so a lone [a] satisfies weakly. The two-
-// letter [a][b] satisfies outright, while a word that cannot even start the
-// sequence is rejected however the tail is chosen.
 TEST(FiniteWordSatisfaction, WeakCompletesWithTheTopTail) {
   auto a = InitialStrongAThenB();
   EXPECT_TRUE(WeaklySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
@@ -52,9 +42,6 @@ TEST(FiniteWordSatisfaction, WeakCompletesWithTheTopTail) {
   EXPECT_FALSE(WeaklySatisfiesByFiniteWord(Word{L({"x"})}, *BoolTrue(), *a));
 }
 
-// §F.5.3.2: w |=^+ A completes w with the bottom tail _|_^omega, which can
-// never finish an open obligation. The completed [a][b] still matches, but a
-// lone [a] is left unfinished and so does not satisfy strongly.
 TEST(FiniteWordSatisfaction, StrongCompletesWithTheBottomTail) {
   auto a = InitialStrongAThenB();
   EXPECT_TRUE(
@@ -62,25 +49,18 @@ TEST(FiniteWordSatisfaction, StrongCompletesWithTheBottomTail) {
   EXPECT_FALSE(StronglySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
 }
 
-// §F.5.3.2: a finite word that meets a strong obligation completely returns
-// "Holds strongly" -- w |=^+ A.
 TEST(FiniteWordSatisfaction, HoldsStronglyWhenStrongSatisfactionHolds) {
   auto a = InitialStrongAThenB();
   EXPECT_EQ(CheckFiniteWord(Word{L({"a"}), L({"b"})}, *BoolTrue(), *a),
             FiniteWordVerdict::kHoldsStrongly);
 }
 
-// §F.5.3.2: "Fails" when even the top-tail completion cannot satisfy the
-// assertion -- not (w |=^- A).
 TEST(FiniteWordSatisfaction, FailsWhenNotEvenWeaklySatisfied) {
   auto a = InitialStrongAThenB();
   EXPECT_EQ(CheckFiniteWord(Word{L({"x"})}, *BoolTrue(), *a),
             FiniteWordVerdict::kFails);
 }
 
-// §F.5.3.2: "Pending" when the top-tail completion satisfies the assertion but
-// the word itself does not yet -- w |=^- A and not w |= A. A lone [a] leaves
-// the strong obligation a ##1 b open: weak holds, neutral does not.
 TEST(FiniteWordSatisfaction, PendingWhenWeakHoldsButNeutralDoesNot) {
   auto a = InitialStrongAThenB();
   EXPECT_TRUE(WeaklySatisfiesByFiniteWord(Word{L({"a"})}, *BoolTrue(), *a));
@@ -89,11 +69,6 @@ TEST(FiniteWordSatisfaction, PendingWhenWeakHoldsButNeutralDoesNot) {
             FiniteWordVerdict::kPending);
 }
 
-// §F.5.3.2: "Holds (but does not hold strongly)" when the word neutrally
-// satisfies the assertion yet the bottom-tail completion does not -- w |= A and
-// not w |=^+ A. The weak obligation weak( a ##1 b ) is met by [a] under neutral
-// satisfaction (it completes the sequence with T^omega internally), but the
-// adversarial _|_^omega completion leaves it unmet.
 TEST(FiniteWordSatisfaction, HoldsWithoutStrengthWhenNeutralButNotStrong) {
   auto a = InitialWeakAThenB();
   EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{L({"a"})}, *BoolTrue(), *a));
@@ -102,20 +77,12 @@ TEST(FiniteWordSatisfaction, HoldsWithoutStrengthWhenNeutralButNotStrong) {
             FiniteWordVerdict::kHolds);
 }
 
-// §F.5.3.2: the word may be empty. On the empty word the two completions still
-// differ for initial @(1) strong(a ##1 b): the top tail makes the complement an
-// all-_|_ word, so no enabling clock tick fires and weak satisfaction holds
-// vacuously, while the bottom tail's complement does tick and leaves the strong
-// obligation unmet, so strong satisfaction fails.
 TEST(FiniteWordSatisfaction, WeakAndStrongDifferOnTheEmptyWord) {
   auto a = InitialStrongAThenB();
   EXPECT_TRUE(WeaklySatisfiesByFiniteWord(Word{}, *BoolTrue(), *a));
   EXPECT_FALSE(StronglySatisfiesByFiniteWord(Word{}, *BoolTrue(), *a));
 }
 
-// §F.5.3.2: classifying the empty word. Weak holds and the empty word neutrally
-// satisfies the assertion (no activation point fires), but strong does not, so
-// the verdict is "Holds (but does not hold strongly)".
 TEST(FiniteWordSatisfaction, EmptyWordHoldsWithoutStrength) {
   auto a = InitialStrongAThenB();
   EXPECT_TRUE(NeutrallySatisfiesAssertion(Word{}, *BoolTrue(), *a));
@@ -124,7 +91,6 @@ TEST(FiniteWordSatisfaction, EmptyWordHoldsWithoutStrength) {
             FiniteWordVerdict::kHolds);
 }
 
-// §F.5.3.2: the labels a tool reports for each verdict.
 TEST(FiniteWordSatisfaction, VerdictLabelsMatchTheStandard) {
   EXPECT_STREQ(FiniteWordVerdictLabel(FiniteWordVerdict::kHoldsStrongly),
                "Holds strongly");
@@ -137,18 +103,6 @@ TEST(FiniteWordSatisfaction, VerdictLabelsMatchTheStandard) {
 using Activation = AssertionStatement::Activation;
 using Role = AssertionStatement::Role;
 
-// §F.5.3.2 reads the finite word through an infinite completion, so an always
-// form has activation points in the tail as well as in w, and every point
-// sees an infinite suffix. always @( 1 ) assert strong( a ##1 b ) on [a]: the
-// word does not neutrally satisfy the statement, since its one activation
-// sees the suffix [a], which no prefix of meets a ##1 b; but w T^omega gives
-// that activation the suffix [a] T^omega, which meets it, and no letter of
-// the top tail activates the statement, its complement being _|_, so the
-// word satisfies the statement weakly, while w _|_^omega leaves the first
-// activation unmet and the word does not satisfy it strongly. The verdict is
-// therefore "Pending", where a reading that completed the word with a finite
-// run of the tail would have found the last letter of every run unable to
-// start a ##1 b and said "Fails".
 TEST(FiniteWordSatisfaction, TheTailHasActivationPointsOfItsOwn) {
   auto a = AssertionWithClock(
       Activation::kAlways, Role::kAssert, BoolTrue(),
@@ -161,8 +115,6 @@ TEST(FiniteWordSatisfaction, TheTailHasActivationPointsOfItsOwn) {
             FiniteWordVerdict::kPending);
 }
 
-// The word w followed by count copies of the tail letter: a finite prefix of
-// the completion w T^omega or w _|_^omega.
 Word Completed(const Word& word, const Letter& tail, std::size_t count) {
   Word out = word;
   for (std::size_t i = 0; i < count; ++i) {
@@ -171,16 +123,6 @@ Word Completed(const Word& word, const Letter& tail, std::size_t count) {
   return out;
 }
 
-// The points of the bottom tail see the suffix _|_^omega, whose complement
-// T^omega meets every sequence, and every one of them activates a statement,
-// the complement T satisfying the clock and the enabling condition. initial
-// @( 1 ) cover not strong( a ##1 b ) on the empty word: no letter activates
-// it, and none of the top tail does, so the word neither neutrally nor weakly
-// satisfies it; and every point of the bottom tail activates it and sees a
-// suffix on which the negation fails, so the word does not satisfy it
-// strongly either, and the verdict is "Fails" -- where a finite run of the
-// tail has a last point whose one-letter suffix is too short to meet a ##1 b,
-// on which the negation passes and the cover is met.
 TEST(FiniteWordSatisfaction, EveryPointOfTheBottomTailSeesTheWholeTail) {
   auto a = AssertionWithClock(
       Activation::kInitial, Role::kCover, BoolTrue(),
@@ -194,10 +136,6 @@ TEST(FiniteWordSatisfaction, EveryPointOfTheBottomTailSeesTheWholeTail) {
                                           *BoolTrue(), *a));
 }
 
-// The condition the subclause states for each verdict, in its own terms, on
-// the cases above: "Holds strongly" is w |=^+ A, "Fails" is not w |=^- A,
-// "Holds (but does not hold strongly)" is w |= A and not w |=^+ A, and
-// "Pending" is w |=^- A and not w |= A.
 TEST(FiniteWordSatisfaction, EachVerdictHasTheConditionTheSubclauseStates) {
   auto a = InitialStrongAThenB();
   const Word kAB{L({"a"}), L({"b"})};
@@ -224,11 +162,6 @@ TEST(FiniteWordSatisfaction, EachVerdictHasTheConditionTheSubclauseStates) {
                                           *BoolTrue(), *a));
 }
 
-// The family the agreement cases range over: for each of a strong and a weak
-// sequence, a negation, an implication, a nexttime, an until, an accept_on
-// abort and a disable iff guard, the four statements the constant clock gives
-// it -- initial or always, assert or cover -- and one always assert under the
-// clock clk.
 std::vector<std::shared_ptr<const AssertionStatement>> Assertions() {
   const auto kAThenB = SeqConcat(BoolSeq("a"), BoolSeq("b"));
   const std::vector<std::shared_ptr<const TopLevelProperty>> kTops{
@@ -255,9 +188,6 @@ std::vector<std::shared_ptr<const AssertionStatement>> Assertions() {
   return out;
 }
 
-// The words the agreement cases range over: the empty word, words that meet,
-// start or miss the sequences, letters carrying the abort, disable and clock
-// atoms, and the letters T and _|_ of Sigma themselves.
 std::vector<Word> Words() {
   return {Word{},
           Word{L({"a"})},
@@ -273,15 +203,6 @@ std::vector<Word> Words() {
           Word{L({"a", "clk"}), L({"x"}), L({"b", "clk"})}};
 }
 
-// §F.5.3.2 defines each relation by neutral satisfaction of the completed
-// word, w |=^- A iff w T^omega |= A and w |=^+ A iff w _|_^omega |= A. The
-// complement of the top tail is _|_, which satisfies no clock or enabling
-// condition, so no point of that tail activates a statement and a finite run
-// of it long enough for every body to have settled is read as the tail
-// itself: on the family, weak satisfaction agrees with §F.5.3.1 asked about
-// the word followed by such a run, and is true on some pair and false on
-// another. The bottom tail activates at every point, so no finite run of it
-// stands in for it, which the case above shows.
 TEST(FiniteWordSatisfaction,
      WeakSatisfactionIsNeutralSatisfactionOfTheTopCompletion) {
   const std::size_t kRun = 16;
@@ -299,7 +220,6 @@ TEST(FiniteWordSatisfaction,
   EXPECT_TRUE(weak_true && weak_false);
 }
 
-// The verdicts whose condition holds of a word and an assertion.
 std::vector<FiniteWordVerdict> VerdictsHolding(const Word& word,
                                                const AssertionStatement& a) {
   const std::vector<FiniteWordVerdict> kVerdicts{
@@ -314,11 +234,6 @@ std::vector<FiniteWordVerdict> VerdictsHolding(const Word& word,
   return out;
 }
 
-// The four conditions the subclause lists partition the pairs of a word and
-// an assertion, since w |=^+ A implies w |= A, which implies w |=^- A, and
-// the verdict CheckFiniteWord returns is the one whose condition holds. On
-// the family, exactly one condition holds of every pair, it is the verdict's,
-// and every verdict occurs.
 TEST(FiniteWordSatisfaction, TheVerdictIsTheOneConditionThatHolds) {
   std::set<FiniteWordVerdict> seen;
   for (const auto& a : Assertions()) {
@@ -332,13 +247,6 @@ TEST(FiniteWordSatisfaction, TheVerdictIsTheOneConditionThatHolds) {
   EXPECT_EQ(seen.size(), 4U);
 }
 
-// The enabling condition b of §F.5.3.1 reaches both relations through the
-// completion. always @( 1 ) assert strong( a ) under b: on [x], which carries
-// neither, no letter of the word or of the top tail activates the statement
-// while every letter of the bottom tail does and fails it, so the word holds
-// without holding strongly, where under the constant 1 the first letter
-// activates and fails it and the word fails; and on [b] the letter activates
-// and fails it under b as well.
 TEST(FiniteWordSatisfaction, TheEnablingConditionReachesBothRelations) {
   auto a = AssertionWithClock(Activation::kAlways, Role::kAssert, BoolTrue(),
                               TopProperty(PropStrong(BoolSeq("a"))));

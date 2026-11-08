@@ -27,29 +27,20 @@ namespace delta {
 
 namespace {
 
-// One level of an array var being given its members: the object they hang
-// from, the flat key and the full name that object is reached by, and the
-// indices that selected it out of the array, outermost first.
 struct ArrayLevel {
   VpiObject* holder;
   std::string key;
   std::vector<int64_t> indices;
 };
 
-// What attaching one array var's members reads: the declaration's unpacked
-// dimensions, the array object every subarray copies its kind from, and the
-// model to find the elements in and to build in.
 struct ArrayAttach {
   const std::vector<RtlirUnpackedDim>& dims;
   const VpiObject& array;
   const VpiObjectMap& objects;
   const VpiAttachBuild& build;
-  // The kind each element stands as where the array's declaration says it,
-  // zero to leave the kind the run's object for the element has.
   int element_type = 0;
 };
 
-// The indices of one dimension in the order it declares them, left first.
 std::vector<int64_t> IndicesOf(const RtlirUnpackedDim& dim) {
   std::vector<int64_t> indices;
   const int64_t kStep = dim.left <= dim.right ? 1 : -1;
@@ -60,10 +51,6 @@ std::vector<int64_t> IndicesOf(const RtlirUnpackedDim& dim) {
   return indices;
 }
 
-// §37.17 details 2, 18 and 26: `member` made the member of `level.holder` at
-// `index`: its vpiParent is the holder, it carries its index for vpiIndex and
-// an index select (§38.19), and its vpiIndex iteration reaches the indices
-// that select it out of the array, starting with its own and working outward.
 void Adopt(VpiObject* member, const ArrayLevel& level, int64_t index,
            const VpiAttachBuild& build) {
   if (member->parent != nullptr) std::erase(member->parent->children, member);
@@ -78,9 +65,6 @@ void Adopt(VpiObject* member, const ArrayLevel& level, int64_t index,
   level.holder->children.push_back(member);
 }
 
-// The members of the array at `level`, one per index of dimension `depth`: the
-// elements the run keyed under the array's name at the innermost dimension,
-// and a subarray, an array var of its own, at every other.
 void AttachLevel(const ArrayLevel& level, std::size_t depth,
                  const ArrayAttach& attach) {
   const bool kInnermost = depth + 1 == attach.dims.size();
@@ -92,8 +76,6 @@ void AttachLevel(const ArrayLevel& level, std::size_t depth,
       if (element == nullptr) continue;
       Adopt(element, level, index, attach.build);
       if (attach.element_type != 0) element->type = attach.element_type;
-      // §37.17 detail 20: the array answers vpiScalar and vpiVector as its
-      // element does (RecordVariableFacts), so the element answers alike.
       element->decl_scalar = attach.array.decl_scalar;
       element->decl_vector = attach.array.decl_vector;
       continue;
@@ -112,9 +94,6 @@ void AttachLevel(const ArrayLevel& level, std::size_t depth,
   }
 }
 
-// §38.16 and §38.35: the indices each unpacked dimension of `array` declares,
-// left first, from which vpi_get_value_array and vpi_put_value_array find
-// the flat ordinal of the element a coordinate names.
 void RecordDimensionIndices(VpiObject& array,
                             const std::vector<RtlirUnpackedDim>& dims) {
   array.array_dim_indices.clear();
@@ -126,15 +105,6 @@ void RecordDimensionIndices(VpiObject& array,
   }
 }
 
-// The kind an element of the array `var` stands as where its declaration says
-// it, zero where the run's object for the element says it. §37.17 with
-// §37.33: an element of an array of class handles is a class var, and §37.12
-// detail 7 with §37.29: an element of an array of virtual interfaces is a
-// virtual interface var, which the run made a reg like every element. §37.17
-// (printed page 1025) makes an element of an array of any other built-in type
-// a variable of that type, an int var of `int a[4]`, and §37.27 an element of
-// an event array a named event. An element of a structure or union array
-// keeps the reg the run made it, which its bits are indexed as (VarBitDims).
 int DeclaredElementType(const RtlirVariable& var) {
   if (!var.class_type_name.empty()) return vpiClassVar;
   const int kKind = VpiDataTypeVariableKind(var.decl_kind);
@@ -143,33 +113,22 @@ int DeclaredElementType(const RtlirVariable& var) {
   return kKept ? 0 : kKind;
 }
 
-// Whether `var` is an array var whose every unpacked dimension is fixed, the
-// arrays whose elements the run keys under the array's name.
 bool HasFixedElements(const RtlirVariable& var) {
   return var.num_unpacked_dims > 0 && !var.is_queue && !var.is_dynamic &&
          !var.is_assoc && var.unpacked_dims.size() == var.num_unpacked_dims;
 }
 
-// The members of the array `array`, keyed `key`, hung from it one unpacked
-// dimension of `attach.dims` at a time.
 void AttachArray(VpiObject& array, const std::string& key,
                  const ArrayAttach& attach) {
   AttachLevel({&array, key, {}}, 0, attach);
   RecordDimensionIndices(array, attach.dims);
 }
 
-// §37.16 details 1, 2 and 24: a net declared with an unpacked dimension is an
-// array net, each net in it is an array member whose vpiParent is the array
-// net, and the array net's vpiSize is the number of nets it holds. The run
-// keys each element net under `n[i]` beside the array, as it does an array
-// var's elements, so the array net stood as a net of its own and its elements
-// as its siblings. A generic interconnect is shaped apart (ShapeInterconnect).
 void AttachNetArray(const RtlirNet& net, const std::string& prefix,
                     const VpiObjectMap& objects, const VpiAttachBuild& build) {
   if (net.unpacked_dims.empty() || VpiNetIsInterconnect(net)) return;
   const std::string kKey = VpiFlatName(prefix, net.name);
   VpiObject* array = FindObjectForFlatName(objects, kKey);
-  // A net standing for an enclosing module's (§23.4) has no object here.
   if (array == nullptr) return;
   array->type = vpiNetArray;
   int count = 1;
@@ -180,24 +139,17 @@ void AttachNetArray(const RtlirNet& net, const std::string& prefix,
   AttachArray(*array, kKey, {net.unpacked_dims, *array, objects, build});
 }
 
-// One dimension of a generic interconnect, which §37.24 draws as a level of
-// interconnect arrays, packed where the declaration wrote it before the name.
 struct InterconnectDim {
   PackedRange range;
   bool packed;
 };
 
-// One generic interconnect being shaped: its dimensions, the unpacked ones
-// outermost and the packed ones inside them (§7.4), the run's objects to take
-// an element from, and the model to build in.
 struct InterconnectShape {
   const std::vector<InterconnectDim>& dims;
   const VpiObjectMap& objects;
   const VpiAttachBuild& build;
 };
 
-// The dimensions of an interconnect declared with the unpacked dimensions
-// `unpacked` and the packed ones `type` writes (§6.6.8), none for a null type.
 std::vector<InterconnectDim> InterconnectDims(
     const std::vector<RtlirUnpackedDim>& unpacked, const DataType* type,
     SimContext& ctx) {
@@ -212,11 +164,6 @@ std::vector<InterconnectDim> InterconnectDims(
   return dims;
 }
 
-// §37.24 (figure): the ranges of the interconnect array `level` that the
-// dimensions from `depth` on make - one per dimension of the kind of the first,
-// as an array var's are its unpacked dimensions or else its packed ones
-// (§37.17 detail 4) - and the bounds of the first, its vpiLeftRange and
-// vpiRightRange.
 void AttachInterconnectRanges(VpiObject& level, std::size_t depth,
                               const InterconnectShape& shape) {
   const bool kPacked = shape.dims[depth].packed;
@@ -231,8 +178,6 @@ void AttachInterconnectRanges(VpiObject& level, std::size_t depth,
   level.right_range = first->right_range;
 }
 
-// The element of `level` that `suffix` selects: the run's net keyed `key`,
-// moved under `level`, or one made for it and named after it.
 VpiObject* InterconnectElement(VpiObject& level, const std::string& key,
                                const std::string& suffix,
                                const InterconnectShape& shape) {
@@ -250,11 +195,6 @@ VpiObject* InterconnectElement(VpiObject& level, const std::string& key,
   return element;
 }
 
-// §37.24 details 1 and 2 with §6.6.8: `level`, keyed `key` where the run keeps
-// objects under it, made the interconnect array of the dimensions from `depth`
-// on, whose vpiSize is the number of elements of the first and whose
-// vpiElement iteration reaches an element per index of it, or, past the last
-// dimension, an interconnect net.
 void ShapeInterconnectLevel(VpiObject& level, const std::string& key,
                             std::size_t depth, const InterconnectShape& shape) {
   if (depth == shape.dims.size()) {
@@ -277,8 +217,6 @@ void ShapeInterconnectLevel(VpiObject& level, const std::string& key,
   }
 }
 
-// The generic interconnect `net`, keyed `key` where the run keeps objects
-// under it, given the dimensions `dims`; left as it is where it has none.
 void ShapeInterconnect(VpiObject& net, const std::string& key,
                        const std::vector<InterconnectDim>& dims,
                        const VpiObjectMap& objects,
@@ -288,14 +226,11 @@ void ShapeInterconnect(VpiObject& net, const std::string& key,
   }
 }
 
-// The value of a range's bound, a 32-bit integer constant (VpiIntConstant).
 int64_t BoundOf(const VpiObject& constant) {
   return static_cast<int32_t>(
       static_cast<uint32_t>(constant.var->value.ToUint64()));
 }
 
-// An interconnect net under the interconnect net `net`, named `name`, whose
-// full name is the net's with `suffix` after it.
 VpiObject* SubInterconnectNet(VpiObject& net, std::string_view name,
                               const std::string& suffix,
                               const VpiAttachBuild& build) {
@@ -308,11 +243,6 @@ VpiObject* SubInterconnectNet(VpiObject& net, std::string_view name,
   return sub;
 }
 
-// §37.24 detail 1: the interconnect net `net` takes `typespec`, that of what it
-// is connected to, none where nothing is, and with it an interconnect net per
-// member of a struct or union typespec, reached through vpiMember, or per
-// element of an array typespec's first dimension, reached through vpiElement,
-// each taking the typespec of its member or element in turn.
 void GiveInterconnectTypespec(VpiObject& net, VpiObject* typespec,
                               const VpiAttachBuild& build) {
   if (typespec == nullptr) return;
@@ -360,11 +290,6 @@ void VpiRecordWrittenDims(VpiObject& array, const std::vector<Expr*>& dims,
 
 void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
                          const VpiAttachBuild& build) {
-  // §37.17 details 2, 18 and 26: each element of an array var is a member of
-  // the array, and a multidimensional array's subarrays are array vars of their
-  // own. The run keyed each element under `arr[i]` beside the array, so it
-  // stood in the scope as the array's sibling and no index reached it. An
-  // array net's nets are hung from it the same way (§37.16 detail 2).
   if (design == nullptr) return;
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
@@ -385,11 +310,6 @@ void AttachArrayElements(const RtlirDesign* design, const VpiObjectMap& objects,
 
 void AttachInterconnects(const RtlirDesign* design, const VpiObjectMap& objects,
                          SimContext& ctx, const VpiAttachBuild& build) {
-  // §37.24 details 1 and 2: a generic interconnect's every dimension is a
-  // level of interconnect arrays, its packed ones among them. Only an unpacked
-  // dimension made one, and of a body interconnect only the first: the
-  // interconnect nets below a second, which the run keys no net under, were
-  // left logic nets, and a packed dimension made bits.
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         InstancePrefixOverride scope(ctx.InstancePrefixOverride(),
@@ -431,10 +351,6 @@ void AttachInterconnectPorts(const RtlirDesign* design,
 void AttachInterconnectTypespecs(const RtlirDesign* design,
                                  const VpiObjectMap& objects,
                                  const VpiAttachBuild& build) {
-  // §37.24 detail 1: an interconnect net's typespec is that of the net it is
-  // connected to, through any interconnect nets between them. None was given
-  // one, so vpiTypespec of an interconnect net was null and its vpiElement and
-  // vpiMember iterations reached nothing.
   WalkInstanceObjects(
       design, objects,
       [&](const RtlirModule*, const std::string&, VpiObject* instance) {

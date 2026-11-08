@@ -25,10 +25,6 @@ TEST(QueueAccess, DefaultInitializationIsEmpty) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-// Cross-link with §10.10: §7.10 promises that the empty unpacked array
-// concatenation `{}` denotes the empty queue. The same TryQueueBlockingAssign
-// path that satisfies §10.10's zero-item rule must drain a previously
-// populated queue down to zero elements here.
 TEST(QueueAccess, EmptyConcatProducesEmptyQueue) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -44,10 +40,6 @@ TEST(QueueAccess, EmptyConcatProducesEmptyQueue) {
   EXPECT_EQ(q->elements.size(), 0u);
 }
 
-// Each queue element is named by its ordinal position: index 0 is the first
-// element, index `$` is the last. With a three-element queue this becomes
-// q[0] == 10 and q[$] == 30, which exercises the simulator's $-as-last-index
-// binding in EvalQueueIndex.
 TEST(QueueAccess, ZeroIndexIsFirstAndDollarIsLast) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -71,15 +63,6 @@ TEST(QueueAccess, ZeroIndexIsFirstAndDollarIsLast) {
   EXPECT_EQ(last->value.ToUint64(), 30u);
 }
 
-// §7.10.1: a queue supports every operation a fixed-size unpacked array does,
-// and §9.4.2 puts the duty of announcing an aggregate element's change on the
-// writer -- a change to an object data member, an aggregate element, or the
-// size of a dynamically sized array a method or function references makes the
-// event expression be reevaluated. A queue's elements live outside the variable
-// registered under its name, so the indexed write has to notify that variable's
-// watchers the way every mutating method does. 99 against 20 is the
-// discriminating pair: 20 is the value a run that notified on push_back and not
-// on the indexed write leaves standing, so no partial fix reads it.
 TEST(QueueAccess, IndexedElementWriteWakesAnAlwaysCombThatReadsTheElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -99,10 +82,6 @@ TEST(QueueAccess, IndexedElementWriteWakesAnAlwaysCombThatReadsTheElement) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// The other route onto the same notification, and the case the awaiter's own
-// comment names in prose: a wait re-evaluates its whole condition on each
-// notification where an always_comb re-runs its body, so a fix could serve one
-// and not the other.
 TEST(QueueAccess, IndexedElementWriteWakesAWaitOnTheElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -125,11 +104,6 @@ TEST(QueueAccess, IndexedElementWriteWakesAWaitOnTheElement) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §7.10.1 makes `q[$+1]` a legal write and §7.10 has the queue resize itself to
-// take it, so this store changes the element and the size at once -- both of
-// them changes §9.4.2 names. It is the append branch rather than the in-range
-// one, a separate store in the same function, so a notification placed only on
-// the latter leaves it reading 0.
 TEST(QueueAccess, IndexedAppendWakesAnAlwaysCombThatReadsTheQueue) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -147,10 +121,6 @@ TEST(QueueAccess, IndexedAppendWakesAnAlwaysCombThatReadsTheQueue) {
   EXPECT_EQ(var->value.ToUint64(), 7u);
 }
 
-// §7.10 with §8.5: a queue property declared with an initializer holds the
-// initializer's elements once the object is constructed (§8.7), and a
-// whole-queue assignment in a method, `q = {q, x}` (§10.10), appends to it:
-// three elements, the first still 5 and the last the appended 7.
 TEST(QueueAccess, QueuePropertyInitializerAndWholeQueueAssignmentInAMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int q[$] = {5, 6};\n"
@@ -170,9 +140,6 @@ TEST(QueueAccess, QueuePropertyInitializerAndWholeQueueAssignmentInAMethod) {
             357u);
 }
 
-// §7.10: a whole-queue assignment through a handle from the module, written
-// as an assignment pattern (§10.9), replaces the property's elements, and the
-// empty concatenation `{}` empties it.
 TEST(QueueAccess, QueuePropertyAssignedThroughAHandle) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int q[$];\n"
@@ -194,12 +161,6 @@ TEST(QueueAccess, QueuePropertyAssignedThroughAHandle) {
             351u);
 }
 
-// §7.10 with §7.4: a queue's elements may themselves be queues, and a method
-// called on one, `qq[1].push_back(42)`, operates on that element. Pushed a
-// queue of two and an empty one, the outer queue holds two elements, the
-// first of size 2 and the second, after its push, of size 1 holding 42.
-// With no storage for the inner queues, every inner size read 0 and the
-// element 0.
 TEST(QueueAccess, ElementOfAQueueOfQueuesTakesAPush) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int qq[$][$];\n"
@@ -219,12 +180,6 @@ TEST(QueueAccess, ElementOfAQueueOfQueuesTakesAPush) {
             221042u);
 }
 
-// §7.10 with §7.8.7: an element of an associative array of queues is
-// allocated when a queue method first uses it, so three pushes into
-// aq["a"] and aq["b"] leave two entries of sizes 2 and 1, aq["a"] holding 3
-// then 4, and pop_front on it answers 3 and leaves one element. Treated as a
-// read of a missing entry, each push warned and stored nothing, and every
-// count read 0.
 TEST(QueueAccess, AssociativeEntryIsAllocatedByAQueueMethod) {
   EXPECT_EQ(
       RunAndGet("module t;\n"
@@ -247,8 +202,6 @@ TEST(QueueAccess, AssociativeEntryIsAllocatedByAQueueMethod) {
       2213431u);
 }
 
-// The same for a fixed-size and a dynamic array whose element type is a
-// typedef'd queue: fx[1] and dy[1] each take one push and hold it.
 TEST(QueueAccess, ElementsOfFixedAndDynamicArraysOfQueuesTakePushes) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef int q_t[$];\n"
@@ -267,10 +220,6 @@ TEST(QueueAccess, ElementsOfFixedAndDynamicArraysOfQueuesTakePushes) {
             1145u);
 }
 
-// UVM's uvm_resource_pool::sort_by_precedence buckets resources by pushing
-// onto `all[prec]` of a function-local `rsrc_sv_q_t all[int]`: push_front on
-// an entry allocates it and prepends, so all[2] holds 6 then 5 and all[7]
-// holds 8, two entries in all.
 TEST(QueueAccess, PushFrontOnATypedefQueueEntryOfALocalAssociativeArray) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  typedef int q_t[$];\n"
@@ -289,13 +238,6 @@ TEST(QueueAccess, PushFrontOnATypedefQueueEntryOfALocalAssociativeArray) {
             2268u);
 }
 
-// §10.10 with §7.10: an element of an array of queues is an unpacked array,
-// so as an item of an unpacked array concatenation it contributes its
-// elements -- UVM's sort_by_precedence_q rebuilds its queue as `q = {q,
-// all[iter]}` over a local `rsrc_sv_q_t all[int]`, the typedef a class's
-// queue of handles. Bucketed as 7 under key 1 and 5 then 6 under key 2, the
-// rebuilt queue holds three handles whose ids read 756; taken as the entries'
-// placeholders, it held two values that were no handles.
 TEST(QueueAccess, ElementQueueOfAClassScopeTypedefIsAConcatenationItem) {
   EXPECT_EQ(RunAndGet("class B;\n"
                       "  int id;\n"
@@ -327,11 +269,6 @@ TEST(QueueAccess, ElementQueueOfAClassScopeTypedefIsAConcatenationItem) {
             3756u);
 }
 
-// §7.10 with §7.2 and §10.9.2: a pattern pushed into a queue of structures is
-// packed member by member at each member's width, and `q[1].green` reads the
-// member of the element; foreach over the queue reads each element's red. The
-// pattern was concatenated at its elements' own widths and the member read
-// as a name, both giving 0.
 TEST(QueueSim, MembersOfPushedStructElements) {
   const char* src =
       "module t;\n"
@@ -353,9 +290,6 @@ TEST(QueueSim, MembersOfPushedStructElements) {
   EXPECT_EQ(RunAndGet(src, "reds"), 231u);
 }
 
-// §7.10 with §6.16 and §8.5: a queue property of strings holds each element
-// whole -- read in a method, through the handle, into a string variable, and
-// returned by pop_front -- and not the four characters of a 32-bit value.
 TEST(QueueSim, StringQueuePropertyKeepsWholeElements) {
   SimFixture f;
   std::string out = RunCapture(
@@ -377,10 +311,6 @@ TEST(QueueSim, StringQueuePropertyKeepsWholeElements) {
   EXPECT_EQ(out, "hello\ngreetings 5 greetings\n");
 }
 
-// §7.10 with §8.7 and §7.12: a queue property declared with an unpacked
-// array concatenation holds its elements once the object is constructed, and
-// a method reduces them and filters them by a with clause that reads another
-// property, a local and a static property.
 TEST(QueueSim, InitializedQueuePropertyReadInItsMethods) {
   SimFixture f;
   std::string out = RunCapture(
@@ -407,9 +337,6 @@ TEST(QueueSim, InitializedQueuePropertyReadInItsMethods) {
   EXPECT_EQ(out, "4 12 27 312\n");
 }
 
-// §7.10 with §8.4 and §7.12: a queue of a class type holds handles, so an
-// element select, pop_front()'s result, q[$] and the item of a with clause
-// each reach the object's property and method.
 TEST(QueueSim, ElementsOfAQueueOfHandlesReachTheirObjects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -435,10 +362,6 @@ TEST(QueueSim, ElementsOfAQueueOfHandlesReachTheirObjects) {
   EXPECT_EQ(out, "8 16\n1 16 4\n1 2\n");
 }
 
-// §7.10 with §7.4 and §20.7: a queue's element type may be a fixed-size
-// array, `int q[$][3]`. Each element pushed is a whole three-element array,
-// so the queue's second dimension and the size of one element are 3, and
-// `q[1][2]` is the third element of the second array pushed.
 TEST(QueueSim, QueueOfFixedArraysHoldsWholeArrays) {
   SimFixture f;
   auto out = RunCapture(
@@ -459,11 +382,6 @@ TEST(QueueSim, QueueOfFixedArraysHoldsWholeArrays) {
   EXPECT_EQ(out, "2 3 3 6 1\n1 9 3 4\n");
 }
 
-// §7.10 and §7.8 with §25.3: a queue and an associative array declared in an
-// interface are members of the instance, reached from the instantiating
-// module through the instance's name like any other member: a push, an entry
-// write, size(), num() and an element read through `i.` all act on the
-// instance's own arrays.
 TEST(QueueSim, QueueAndAssocArrayOfAnInterfaceInstance) {
   SimFixture f;
   auto out = RunCapture(
@@ -485,10 +403,6 @@ TEST(QueueSim, QueueAndAssocArrayOfAnInterfaceInstance) {
   EXPECT_EQ(out, "2 2 8 2 0\n");
 }
 
-// §7.10 with §7.4.2 and §20.7: the fixed-size array a queue's elements are
-// may have any declared bounds. Under `int q[$][1:3]` an element's indices
-// run 1 to 3 from the left, and under `int r[$][2:0]` 2 down to 0, so the
-// leftmost value pushed is `q[0][1]` and `r[0][2]`.
 TEST(QueueSim, QueueOfFixedArraysKeepsTheElementBounds) {
   SimFixture f;
   auto out = RunCapture(
@@ -508,11 +422,6 @@ TEST(QueueSim, QueueOfFixedArraysKeepsTheElementBounds) {
   EXPECT_EQ(out, "3 1 4 50 6\n2 7 8 9\n");
 }
 
-// §7.10 with §6.11: an element of a queue has the queue's element type however
-// the value written into it was typed. On `bit [31:0] uq[$]`, `push_back(-5)`
-// stores the unsigned 32'hFFFFFFFB, and on `int q[$]`, `push_back(u)` of the
-// unsigned 32'hDEADBEEF stores a signed int, so of the two only `q[0]` is less
-// than 0, as of a `bit [31:0]` and an `int` variable assigned the same values.
 TEST(QueueSim, AnElementReadsWithTheElementTypesSignedness) {
   SimFixture f;
   auto out = RunCapture(
@@ -530,9 +439,6 @@ TEST(QueueSim, AnElementReadsWithTheElementTypesSignedness) {
   EXPECT_EQ(out, "0 1 1\n");
 }
 
-// §7.10 with §6.11 and §26.2: a queue a package declares has elements of its
-// element type as a module's does, so on `int p::q[$]` the unsigned
-// 32'hDEADBEEF pushed reads as a signed int, less than 0.
 TEST(QueueSim, AnElementOfAPackageQueueReadsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -551,9 +457,6 @@ TEST(QueueSim, AnElementOfAPackageQueueReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §7.10 with §6.11 and §13.5: a queue formal, `int a[$]`, has elements of its
-// own element type, so the unsigned 32'hDEADBEEF the actual was given reads
-// in the body as a signed int, less than 0.
 TEST(QueueSim, AnElementOfAQueueFormalReadsWithTheFormalsType) {
   SimFixture f;
   auto out = RunCapture(
@@ -573,9 +476,6 @@ TEST(QueueSim, AnElementOfAQueueFormalReadsWithTheFormalsType) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §7.10 with §6.11 and §7.4: each element of a fixed-size array of queues,
-// `q_t fx[2]` under `typedef int q_t[$];`, is a queue of ints, so the unsigned
-// 32'hDEADBEEF pushed onto `fx[1]` reads as a signed int, less than 0.
 TEST(QueueSim, AnElementOfAFixedArrayOfQueuesReadsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -593,9 +493,6 @@ TEST(QueueSim, AnElementOfAFixedArrayOfQueuesReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §7.10 with §6.11: each element of a queue of queues, `int qq[$][$]`, is a
-// queue of ints, so the unsigned 32'hDEADBEEF pushed onto the queue that is
-// pushed onto `qq` reads as a signed int, less than 0.
 TEST(QueueSim, AnElementOfAQueueOfQueuesReadsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -614,10 +511,6 @@ TEST(QueueSim, AnElementOfAQueueOfQueuesReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §7.10 with §6.11 and §7.8: each element of an associative array of queues,
-// `int aq[string][$]`, is a queue of ints, whether a module or a block
-// declares the array, so the unsigned 32'hDEADBEEF pushed onto `aq["k"]`
-// reads as a signed int, less than 0.
 TEST(QueueSim, AnElementOfAnAssociativeArrayOfQueuesReadsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -650,9 +543,6 @@ TEST(QueueSim, AnElementOfAnAssociativeArrayOfUnsignedQueuesReadsUnsigned) {
   EXPECT_EQ(out, "0 0\n");
 }
 
-// §7.8 with §7.10 and §6.18: an associative array declared in a procedural
-// block with a queue typedef as its element type, `q_t all[string]` under
-// `typedef int q_t[$];`, keeps queues of ints, whose elements read signed.
 TEST(QueueSim, AnElementOfABlockAssociativeArrayOfTypedefQueuesReadsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -670,9 +560,6 @@ TEST(QueueSim, AnElementOfABlockAssociativeArrayOfTypedefQueuesReadsSigned) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §7.10 with §10.10: the empty unpacked array concatenation empties a queue
-// whose elements are fixed-size arrays, as it empties any queue, whatever rows
-// it held.
 TEST(QueueSim, AnEmptyConcatenationEmptiesAQueueOfArrays) {
   SimFixture f;
   auto out = RunCapture(
@@ -689,9 +576,6 @@ TEST(QueueSim, AnEmptyConcatenationEmptiesAQueueOfArrays) {
   EXPECT_EQ(out, "0\n");
 }
 
-// §7.10 with §7.6: assigning one queue of fixed-size arrays to another copies
-// every element's values, so s holds r's two rows, and a later write to r
-// leaves s as it was.
 TEST(QueueSim, AssigningAQueueOfArraysCopiesEveryElement) {
   SimFixture f;
   auto out = RunCapture(
@@ -710,10 +594,6 @@ TEST(QueueSim, AssigningAQueueOfArraysCopiesEveryElement) {
   EXPECT_EQ(out, "2 4 5 3 9\n");
 }
 
-// §7.10 with §10.9.1: a queue nested three deep takes each level of a nested
-// assignment pattern as its elements: a[0][0] is {1, 2}, a[1][0] is {4}, and
-// a[0][0][1] can be written like any queue element. A copy of the whole queue
-// keeps the values the copied queue held before the write.
 TEST(QueueSim, AQueueNestedThreeDeepHoldsANestedPattern) {
   SimFixture f;
   auto out = RunCapture(
@@ -731,11 +611,6 @@ TEST(QueueSim, AQueueNestedThreeDeepHoldsANestedPattern) {
   EXPECT_EQ(out, "2 2 7 4 2 3\n");
 }
 
-// §7.10 with §7.4.4: a queue whose elements are two-dimensional fixed-size
-// arrays holds them whole: a pushed pattern lands at r[0], {{9, 8}, {7, 6}},
-// with r[0][1][0] reading 7, one of its leaves can be written, a copy of the
-// queue carries both levels of every element, and a nested pattern assigned
-// to the whole queue gives its one element's rows.
 TEST(QueueSim, AQueueOfTwoDimensionalArraysHoldsItsElements) {
   SimFixture f;
   auto out = RunCapture(
@@ -756,11 +631,6 @@ TEST(QueueSim, AQueueOfTwoDimensionalArraysHoldsItsElements) {
   EXPECT_EQ(out, "2 7 8 5 2 3\n1 1\n");
 }
 
-// §7.10 with §7.4.4: a queue of fixed-size arrays declared in a procedural
-// block holds its elements as one declared among a module's items does: the
-// row pushed onto q, {1, 2, 3}, reads back whole, as does the two-dimensional
-// element pushed onto r, and a dynamic array of rows sized with new[] holds a
-// row written into it.
 TEST(QueueSim, ABlockQueueOfArraysHoldsItsElements) {
   SimFixture f;
   auto out = RunCapture(

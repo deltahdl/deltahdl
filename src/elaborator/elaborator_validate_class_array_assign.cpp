@@ -28,11 +28,6 @@ namespace delta {
 
 namespace {
 
-// §7.4/§7.8 — the two array operands of a single assignment: the left-hand and
-// right-hand tracked arrays (`l`/`r`) together with the identifier expressions
-// that named them (`lhs`/`rhs`) and the source location of the assignment. The
-// shape/element compatibility checks all act on this one assignment entity, so
-// they take it as a unit rather than threading the five values separately.
 struct ArrayAssignPair {
   const Elaborator::VarArrayInfo& l;
   const Elaborator::VarArrayInfo& r;
@@ -41,17 +36,12 @@ struct ArrayAssignPair {
   SourceLoc loc;
 };
 
-// True when both tracked arrays are fixed-size, equally ranked, and have more
-// than one unpacked dimension -- the precondition for a faster-varying
-// dimension size comparison.
 bool BothFixedMultiDim(const Elaborator::VarArrayInfo& l,
                        const Elaborator::VarArrayInfo& r) {
   return !l.is_dynamic && !r.is_dynamic && !l.is_assoc && !r.is_assoc &&
          l.dim_sizes.size() == r.dim_sizes.size() && l.dim_sizes.size() > 1;
 }
 
-// Emits the faster-varying dimension size-mismatch diagnostic for dimension
-// `i` of the two tracked arrays.
 void ReportFasterVaryingDimMismatchAt(const ArrayAssignPair& p, size_t i,
                                       DiagEngine& diag) {
   diag.Error(p.loc,
@@ -62,10 +52,6 @@ void ReportFasterVaryingDimMismatchAt(const ArrayAssignPair& p, size_t i,
              Subclause("7.6"));
 }
 
-// Reports the first faster-varying (non-leftmost) unpacked dimension whose
-// size differs between the two fixed-size arrays. Returns true (with a
-// diagnostic emitted) when a mismatch is found, mirroring the early return of
-// the caller.
 bool ReportFasterVaryingDimMismatch(const ArrayAssignPair& p,
                                     DiagEngine& diag) {
   if (!BothFixedMultiDim(p.l, p.r)) return false;
@@ -78,16 +64,6 @@ bool ReportFasterVaryingDimMismatch(const ArrayAssignPair& p,
   return false;
 }
 
-// §7.6 — the slowest-varying (leftmost) dimension of a dynamic array or queue
-// may differ in kind and its size is not known until run time, but every
-// faster-varying dimension shall still meet the §6.22.2 equivalence
-// requirement, which for a fixed dimension means an identical declared size.
-// The leftmost dynamic/queue dimension contributes no entry to `dim_sizes`, so
-// when both arrays have a dynamic/queue leftmost dimension backed by a full
-// complement of fixed faster dimensions, `dim_sizes` holds exactly those faster
-// dimensions and comparing the two vectors element-wise enforces the rule for
-// that declaration shape. The both-fixed shape is handled separately, and the
-// leftmost dimension is intentionally left uncompared here.
 bool ReportFasterVaryingDimMismatchVarOuter(const ArrayAssignPair& p,
                                             DiagEngine& diag) {
   const Elaborator::VarArrayInfo& l = p.l;
@@ -114,8 +90,6 @@ bool ReportFasterVaryingDimMismatchVarOuter(const ArrayAssignPair& p,
   return false;
 }
 
-// Reports an associativity / associative-index-type mismatch between two
-// tracked arrays. Returns true (with a diagnostic emitted) when found.
 bool ReportAssocKindMismatch(const Elaborator::VarArrayInfo& l,
                              const Elaborator::VarArrayInfo& r, SourceLoc loc,
                              DiagEngine& diag) {
@@ -134,8 +108,6 @@ bool ReportAssocKindMismatch(const Elaborator::VarArrayInfo& l,
   return false;
 }
 
-// Reports a mismatch in the number of unpacked dimensions between two tracked
-// arrays. Returns true (with a diagnostic emitted) when found.
 bool ReportUnpackedDimCountMismatch(const ArrayAssignPair& p,
                                     DiagEngine& diag) {
   if (p.l.num_unpacked_dims != p.r.num_unpacked_dims) {
@@ -150,8 +122,6 @@ bool ReportUnpackedDimCountMismatch(const ArrayAssignPair& p,
   return false;
 }
 
-// Reports an element-type mismatch between two tracked arrays. Returns true
-// (with a diagnostic emitted) when found.
 bool ReportElementTypeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
   if (!ElementTypesEquivalent(
           {p.l.elem_type, p.l.elem_width, p.l.elem_is_signed,
@@ -168,8 +138,6 @@ bool ReportElementTypeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
   return false;
 }
 
-// Reports a fixed-size element-count mismatch between two tracked arrays.
-// Returns true (with a diagnostic emitted) when found.
 bool ReportFixedSizeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
   if (p.l.unpacked_size > 0 && !p.l.is_dynamic && p.r.unpacked_size > 0 &&
       !p.r.is_dynamic && p.l.unpacked_size != p.r.unpacked_size) {
@@ -184,10 +152,6 @@ bool ReportFixedSizeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
   return false;
 }
 
-// Validates the kind/shape compatibility of two tracked arrays in an
-// assignment (associativity, index type, dimension count, element type, and
-// fixed-size element count). Returns true (with a diagnostic emitted) when the
-// first incompatibility is found, mirroring the caller's early returns.
 bool ReportArrayShapeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
   if (ReportAssocKindMismatch(p.l, p.r, p.loc, diag)) return true;
   if (ReportUnpackedDimCountMismatch(p, diag)) return true;
@@ -199,9 +163,6 @@ bool ReportArrayShapeMismatch(const ArrayAssignPair& p, DiagEngine& diag) {
 using ArrayInfos =
     std::unordered_map<std::string_view, Elaborator::VarArrayInfo>;
 
-// The arrays an assignment's operands may name: those a procedural block or a
-// subroutine declares, which hide the module's own, and the module's. A name
-// the block declares as no array hides a module array just the same.
 struct ArrayScope {
   const ArrayInfos& module;
   std::unordered_map<std::string_view, std::optional<Elaborator::VarArrayInfo>>
@@ -216,7 +177,6 @@ struct ArrayScope {
   }
 };
 
-// What judging the assignments of a module reads besides the arrays in scope.
 struct ArrayAssignScan {
   const std::unordered_set<std::string_view>& packed_array_vars;
   const TypeShapeTables& tables;
@@ -224,8 +184,6 @@ struct ArrayAssignScan {
   DiagEngine& diag;
 };
 
-// §7.4.5: the number of elements the slice `sel` takes, when its bounds or its
-// width are literals; nullopt otherwise.
 std::optional<uint32_t> ConstantSliceWidth(const Expr* sel) {
   if (sel->is_part_select_plus || sel->is_part_select_minus) {
     auto width = ConstEvalInt(sel->index_end);
@@ -238,20 +196,10 @@ std::optional<uint32_t> ConstantSliceWidth(const Expr* sel) {
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// §7.4.4 and §7.4.5: the array an operand of an assignment stands for. A
-// tracked array named alone is itself; one selected by index through some of
-// its dimensions is the subarray those leave, and one whose last select is a
-// slice is that slice, each described as the whole array is. A subarray or
-// slice is described only where every dimension it keeps has a fixed size the
-// declaration states and the slice's width is a literal; nullopt for anything
-// else, including an element or a select inside one. `root` is set to the
-// array's name.
 std::optional<Elaborator::VarArrayInfo> OperandArrayInfo(
     const Expr* e, const ArrayScope& arrays, const Expr*& root) {
   const Expr* last = e->kind == ExprKind::kSelect ? e : nullptr;
   size_t selects = 0;
-  // A select standing as a side of an assignment always has a base; only a
-  // value range of `inside` is written as a select without one.
   for (; e->kind == ExprKind::kSelect; e = e->base) ++selects;
   if (e->kind != ExprKind::kIdentifier) return std::nullopt;
   const Elaborator::VarArrayInfo* found = arrays.Find(e->text);
@@ -313,8 +261,6 @@ void CheckArrayOperands(const Expr* lhs, const Expr* rhs, SourceLoc loc,
   if (ReportFasterVaryingDimMismatchVarOuter(kPair, scan.diag)) return;
 }
 
-// A declaration assignment is an assignment to the variable declared, so
-// §7.6 judges its initializer as it would the same right-hand side.
 void CheckInitializer(std::string_view name, const Expr* init, SourceLoc loc,
                       const ArrayScope& arrays, const ArrayAssignScan& scan) {
   Expr target;
@@ -323,10 +269,6 @@ void CheckInitializer(std::string_view name, const Expr* init, SourceLoc loc,
   CheckArrayOperands(&target, init, loc, arrays, scan);
 }
 
-// §7.4 to §7.10: an array a procedural block or a subroutine declares,
-// described as Elaborator::TrackVarArrayInfo describes a module's. Its sizes
-// are those its dimensions state as literals; one sized by a parameter is
-// left unsized, so that no count is compared for it.
 Elaborator::VarArrayInfo DeclaredArrayInfo(const DataType& type,
                                            const std::vector<Expr*>& dims,
                                            const ArrayAssignScan& scan) {
@@ -353,7 +295,6 @@ Elaborator::VarArrayInfo DeclaredArrayInfo(const DataType& type,
   return info;
 }
 
-// Records what a declaration makes of `name` in the block that declares it.
 void Declare(std::string_view name, const DataType& type,
              const std::vector<Expr*>& dims, ArrayScope& arrays,
              const ArrayAssignScan& scan) {
@@ -377,18 +318,11 @@ void WalkArrayAssignments(const Stmt* s, ArrayScope& arrays,
       s->kind == StmtKind::kNonblockingAssign) {
     CheckArrayOperands(s->lhs, s->rhs, s->range.start, arrays, scan);
   }
-  // §7.6 states the shape and element-type compatibility an array assignment
-  // requires and names no statement the requirement is suspended in, so this
-  // descends every link ForEachChildStmt in elaborator_validate_internal.h
-  // names and names no link itself. It wrote out six of the thirteen, so
-  // `fork a = b; join` and `assert (1) a = b;` were judged in neither form
-  // while the same `a = b;` one level up was reported.
   ForEachChildStmt(s, [&arrays, &scan](Stmt* const& sub) {
     WalkArrayAssignments(sub, arrays, scan);
   });
 }
 
-// A subroutine's arguments are declarations of its own, as its body's are.
 void WalkSubroutine(const ModuleItem* item, const ArrayInfos& module,
                     const ArrayAssignScan& scan) {
   ArrayScope arrays{module};
@@ -463,12 +397,6 @@ static void WalkStmtsForAssocSlice(
   CheckAssocSliceExpr(s->rhs, assoc_names, diag);
   CheckAssocSliceExpr(s->expr, assoc_names, diag);
   CheckAssocSliceExpr(s->condition, assoc_names, diag);
-  // §7.8 gives an associative array no slice, the rule the report names
-  // §7.4.6 for, and neither clause conditions it on the statement the slice is
-  // written in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names no link itself. It wrote out
-  // six of the thirteen, so `fork x = aa[1:2]; join` and a slice written in a
-  // randcase item were never looked at.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForAssocSlice(sub, assoc_names, diag);
   });
@@ -496,11 +424,6 @@ static bool IsTraversalMethod(std::string_view name) {
   return name == "first" || name == "last" || name == "next" || name == "prev";
 }
 
-// The subclause of IEEE 1800-2023 stating the wildcard restriction for one
-// associative array traversal method. §7.9.4 First(), §7.9.5 Last(), §7.9.6
-// Next() and §7.9.7 Prev() each bar their own method from an associative array
-// with a wildcard index type. The caller has already answered
-// IsTraversalMethod, so `name` is one of the four.
 static std::string_view TraversalMethodSubclause(std::string_view name) {
   if (name == "first") return "7.9.4";
   if (name == "last") return "7.9.5";
@@ -508,19 +431,11 @@ static std::string_view TraversalMethodSubclause(std::string_view name) {
   return "7.9.7";
 }
 
-// §7.8.1 — array manipulation methods (§7.12) that yield an index value or an
-// array of index values. A wildcard-indexed associative array may not be used
-// with these, since its keys have no stable index domain to return. This
-// includes unique_index, which returns an array of the qualifying indices.
 static bool IsIndexReturningMethod(std::string_view name) {
   return name == "find_index" || name == "find_first_index" ||
          name == "find_last_index" || name == "unique_index";
 }
 
-// §7.8.1 — true when `idx` is a nonintegral index expression for a wildcard
-// associative array: one whose value is real, whatever its form
-// (KindOfValue). (A string literal is not nonintegral here; it is cast to
-// an equivalent-width bit vector.)
 bool IsNonintegralIndex(const Expr* idx, const ValueScope& values) {
   if (!idx) return false;
   return KindOfValue(idx, values) == ValueKind::kReal;
@@ -533,18 +448,12 @@ static void CheckWildcardTraversalExpr(
   if (e->kind == ExprKind::kCall && e->base &&
       e->base->kind == ExprKind::kIdentifier && IsTraversalMethod(e->callee) &&
       wildcard_names.count(e->base->text)) {
-    // §7.8.1 bars foreach and the §7.12 methods that return an index, not
-    // these four. Each traversal method's own subclause states the rule, so
-    // the report names the one belonging to the method it rejected.
     diag.Error(e->range.start,
                std::format("'{}' is not allowed on wildcard associative "
                            "array '{}'",
                            e->callee, e->base->text),
                Subclause(TraversalMethodSubclause(e->callee)));
   }
-  // §7.8.1 — an array-locator method (e.g. `aa.find_index with (...)`) parses
-  // as a member access whose receiver is the array and whose member is the
-  // method name. Reject the index-returning locators on a wildcard array.
   if (e->kind == ExprKind::kMemberAccess && e->lhs &&
       e->lhs->kind == ExprKind::kIdentifier && e->rhs &&
       IsIndexReturningMethod(e->rhs->text) &&
@@ -555,8 +464,6 @@ static void CheckWildcardTraversalExpr(
                            e->rhs->text, e->lhs->text),
                Subclause("7.8.1"));
   }
-  // §7.8.1 — a wildcard index must be integral; a real (nonintegral) value used
-  // to index the array is illegal.
   if (e->kind == ExprKind::kSelect && e->base &&
       e->base->kind == ExprKind::kIdentifier &&
       IsNonintegralIndex(e->index, values) &&
@@ -584,11 +491,8 @@ static void WalkStmtsForWildcardTraversal(
     const Stmt* s, const std::unordered_set<std::string_view>& wildcard_names,
     const ValueScope& values, DiagEngine& diag) {
   if (!s) return;
-  // §7.8.1 — a wildcard-indexed associative array may not drive a foreach loop.
   std::string_view foreach_array;
   if (s->kind == StmtKind::kForeach && s->expr) {
-    // The array's own identifier: the name itself, or the last member of the
-    // chain Parser::ParseForeachArrayId reads a hierarchical name into.
     if (s->expr->kind == ExprKind::kIdentifier) {
       foreach_array = s->expr->text;
     } else if (s->expr->kind == ExprKind::kMemberAccess && s->expr->rhs) {
@@ -606,13 +510,6 @@ static void WalkStmtsForWildcardTraversal(
   CheckWildcardTraversalExpr(s->rhs, wildcard_names, values, diag);
   CheckWildcardTraversalExpr(s->expr, wildcard_names, values, diag);
   CheckWildcardTraversalExpr(s->condition, wildcard_names, values, diag);
-  // §7.8.1 bars a wildcard-indexed associative array from a foreach loop, from
-  // the §7.12 methods that return an index and from a nonintegral index, and
-  // names no statement the prohibition is lifted in, so this descends every
-  // link ForEachChildStmt in elaborator_validate_internal.h names and names no
-  // link itself. It wrote out six of the thirteen, so
-  // `fork foreach (aa[i]) ; join` and `assert (1) else x = aa[1.5];`
-  // elaborated clean.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForWildcardTraversal(sub, wildcard_names, values, diag);
   });
@@ -641,13 +538,6 @@ void Elaborator::ValidateAssocWildcardTraversal(const ModuleDecl* decl) {
   }
 }
 
-// Section 7.9.8 -- the argument passed to one of the four associative-array
-// traversal methods (first/last/next/prev) shall be assignment compatible with
-// the array's index type. A string-indexed array therefore requires a string
-// argument and an integral-indexed array requires an integral argument; the two
-// categories are not assignment compatible with each other. A narrower integral
-// argument is still assignment compatible -- the resulting truncation is
-// resolved at run time and is not flagged during elaboration.
 enum class AssocKeyCategory : std::uint8_t {
   kOther,
   kStringKey,
@@ -682,15 +572,10 @@ static bool TraversalArgIsIntegral(const Expr* arg, const TypeMap& var_types) {
   return it != var_types.end() && IsIntegralType(it->second);
 }
 
-// Reports a traversal-method call (`arr.first(x)` etc.) whose argument type is
-// not assignment compatible with the associative array's index category. Only
-// the call node itself is examined; child expressions are walked by the caller.
 static void CheckTraversalCallSite(
     const Expr* e,
     const std::unordered_map<std::string_view, AssocKeyCategory>& assoc_keys,
     const TypeMap& var_types, DiagEngine& diag) {
-  // `arr.first(x)` parses as a kCall whose lhs is the member access `arr.first`
-  // and whose args hold the traversal argument.
   if (e->kind != ExprKind::kCall || !e->lhs ||
       e->lhs->kind != ExprKind::kMemberAccess || e->args.empty()) {
     return;
@@ -705,10 +590,6 @@ static void CheckTraversalCallSite(
   auto method = access->rhs->text;
   auto it = assoc_keys.find(array_name);
   if (it == assoc_keys.end()) return;
-  // §7.9.4 First(), §7.9.5 Last(), §7.9.6 Next() and §7.9.7 Prev() each bar
-  // their own method from an associative array with a wildcard index type, so
-  // the report names the subclause belonging to the method it rejected rather
-  // than the clause the four sit under.
   if (it->second == AssocKeyCategory::kWildcard) {
     diag.Error(e->range.start,
                std::format("traversal method '{}' shall not be used on the "
@@ -761,13 +642,6 @@ static void WalkStmtsForTraversalArgType(
   CheckTraversalArgTypeExpr(s->rhs, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(s->expr, assoc_keys, var_types, diag);
   CheckTraversalArgTypeExpr(s->condition, assoc_keys, var_types, diag);
-  // §7.9.8 requires a traversal method's argument to be assignment compatible
-  // with the array's index type, and §7.9.4 through §7.9.7 bar the four methods
-  // on a wildcard-indexed array; neither rule is conditioned on the statement
-  // the call is written in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names no link itself. It wrote out
-  // six of the thirteen, so `fork status = aa.first(s); join` and the same call
-  // written in a randsequence production code block went unchecked.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForTraversalArgType(sub, assoc_keys, var_types, diag);
   });

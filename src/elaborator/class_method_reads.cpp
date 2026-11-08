@@ -19,22 +19,15 @@ namespace delta {
 
 namespace {
 
-// The names `this` and `super` stand for the object a method runs on and its
-// base (§8.11, §8.15); neither is declared.
 bool IsObjectName(std::string_view name) {
   return name == "this" || name == "super";
 }
 
-// Whether a name a class method reads resolves: one the unit declares, or
-// randomize, which §18.6.1 makes a method of every class that none declares
-// and whose call A.8.2 (printed page 1209) lets be written without its
-// argument list, so a method's bare `randomize` reads that method.
 bool ClassMethodReadResolves(const UnitDeclaredNames& declared,
                              std::string_view name) {
   return declared.Declares(name) || name == "randomize";
 }
 
-// The methods of `cls` and of the classes it nests, each given to `fn`.
 void ForEachMethod(const ClassDecl* cls,
                    const std::function<void(const ModuleItem*)>& fn) {
   for (const ClassMember* m : cls->members) {
@@ -47,8 +40,6 @@ void ForEachMethod(const ClassDecl* cls,
   }
 }
 
-// Every class of `unit`: those at compilation-unit scope and those the items of
-// its packages, modules, interfaces, programs and checkers declare.
 template <typename Fn>
 void ForEachClass(const CompilationUnit* unit, Fn&& fn) {
   for (const ClassDecl* cls : unit->classes) fn(cls);
@@ -93,8 +84,6 @@ bool UnitDeclaredNames::Declares(std::string_view name) const {
 
 void UnitDeclaredNames::AddItems(const std::vector<ModuleItem*>& items) {
   for (const ModuleItem* item : items) {
-    // §27.6 gives an unnamed generate block a name no hierarchical name may
-    // use, so that name is left out.
     if (!item->name.empty() && !item->name_is_generated) {
       names_.insert(item->name);
     }

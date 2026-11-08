@@ -90,9 +90,6 @@ TEST(UtilitySystemTaskTest, IsunknownTrueXVar) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §20.9: a wider control_bit is reduced to its low bit before matching. Here
-// 0xE has LSB 0, so the call counts the zero bits of the 32-bit operand
-// 0x000000A5 -> 32 - popcount(0xA5) = 28.
 TEST(UtilitySystemTaskTest, CountbitsControlBitOnlyLsbUsed) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$countbits",
@@ -101,9 +98,6 @@ TEST(UtilitySystemTaskTest, CountbitsControlBitOnlyLsbUsed) {
   EXPECT_EQ(result.ToUint64(), 28u);
 }
 
-// §20.9: a control_bit value repeated in the argument list contributes the
-// same as a single occurrence, so calling with '1 twice yields the same
-// result as calling with '1 once.
 TEST(UtilitySystemTaskTest, CountbitsControlBitDeduplicated) {
   SysTaskFixture f;
   auto* once = MkSysCall(f.arena, "$countbits",
@@ -117,10 +111,6 @@ TEST(UtilitySystemTaskTest, CountbitsControlBitDeduplicated) {
   EXPECT_EQ(r_twice.ToUint64(), 4u);
 }
 
-// §20.9: the control_bit may be a variable, not a constant. The simulator
-// must evaluate the control_bit expression at call time and use its LSB.
-// Here ctrl is a 1-bit variable holding 1, so the call counts the four 1-bits
-// of 0xA5.
 TEST(UtilitySystemTaskTest, CountbitsVariableControlBitAtRuntime) {
   SysTaskFixture f;
   MakeVar(f, "ctrl", 1, 1);
@@ -130,9 +120,6 @@ TEST(UtilitySystemTaskTest, CountbitsVariableControlBitAtRuntime) {
   EXPECT_EQ(result.ToUint64(), 4u);
 }
 
-// §20.9: $countones is equivalent to $countbits(expression, '1), so x/z bits
-// in the expression must not be counted. Build an 8-bit value whose bit 0 is
-// 1 and whose upper nibble is x; only the single known 1-bit must register.
 TEST(UtilitySystemTaskTest, CountonesIgnoresUnknownBits) {
   SysTaskFixture f;
   auto* var = f.ctx.CreateVariable("mix", 8);
@@ -143,10 +130,6 @@ TEST(UtilitySystemTaskTest, CountonesIgnoresUnknownBits) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §20.9: $isunknown is true when $countbits(expression, 'x, 'z) is non-zero,
-// so z-only operands must register as unknown just like x-only operands do.
-// Convert the default-x variable bits into z by also setting aval, leaving
-// bval set.
 TEST(UtilitySystemTaskTest, IsunknownTrueZVar) {
   SysTaskFixture f;
   auto* var = f.ctx.CreateVariable("zvar", 8);
@@ -158,11 +141,6 @@ TEST(UtilitySystemTaskTest, IsunknownTrueZVar) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §20.9: the expression argument shall be of a bit-stream type and is treated
-// as the vector {>>{expression}} produces (§11.4.14). A fixed unpacked array is
-// such a type, so $countones must count the one-bits across every element, not
-// treat the bare array name as an empty operand. arr[0]=4'b1011 (3 ones) and
-// arr[1]=4'b0100 (1 one) pack to eight bits with four ones total.
 TEST(UtilitySystemTaskTest, CountonesPacksUnpackedArrayOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -180,9 +158,6 @@ TEST(UtilitySystemTaskTest, CountonesPacksUnpackedArrayOperand) {
   EXPECT_EQ(out, "4\n");
 }
 
-// §20.9: a queue is a (dynamically sized) bit-stream type, so $countbits with a
-// queue operand counts matching bits across all live elements. Two 4-bit
-// elements 4'b1011 (3 ones) and 4'b0001 (1 one) give four one-bits.
 TEST(UtilitySystemTaskTest, CountbitsPacksQueueOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -200,10 +175,6 @@ TEST(UtilitySystemTaskTest, CountbitsPacksQueueOperand) {
   EXPECT_EQ(out, "4\n");
 }
 
-// §20.9: $isunknown is true when the packed bit-stream operand holds any x or
-// z. The unknown bits live in the second queue element, which only registers
-// once the queue is packed as {>>{q}} rather than read as a bare (empty)
-// operand.
 TEST(UtilitySystemTaskTest, IsunknownDetectsUnknownInQueueOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -219,8 +190,6 @@ TEST(UtilitySystemTaskTest, IsunknownDetectsUnknownInQueueOperand) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §20.9: a fully known bit-stream operand has no x or z, so $isunknown is 0
-// even across a multi-element unpacked array.
 TEST(UtilitySystemTaskTest, IsunknownFalseForKnownArrayOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -236,9 +205,6 @@ TEST(UtilitySystemTaskTest, IsunknownFalseForKnownArrayOperand) {
   EXPECT_EQ(out, "0\n");
 }
 
-// §20.9: $onehot over a bit-stream operand is true only when exactly one bit is
-// set across the whole packed vector. A single set bit in one array element
-// must register as one-hot; a second set bit anywhere in the operand must not.
 TEST(UtilitySystemTaskTest, OnehotAcrossUnpackedArrayOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -256,11 +222,6 @@ TEST(UtilitySystemTaskTest, OnehotAcrossUnpackedArrayOperand) {
   EXPECT_EQ(out, "1\n0\n");
 }
 
-// §20.9: $countbits(expr, 'x, 'z) counts the x/z bits, and 'x and 'z select
-// distinct bit values -- an x-only control bit must not count z bits and vice
-// versa. Drive an 8-bit variable whose low nibble is x x z z from real source:
-// $countbits(v,'x)=2 (x only), $countbits(v,'x,'z)=4 (x and z), and
-// $countbits(v,'1,'0)=4 (only the four known bits, x/z excluded).
 TEST(UtilitySystemTaskTest, CountbitsCountsUnknownBitsByValue) {
   SimFixture f;
   std::string out = RunCapture(
@@ -279,12 +240,6 @@ TEST(UtilitySystemTaskTest, CountbitsCountsUnknownBitsByValue) {
   EXPECT_EQ(out, "2 4 4\n");
 }
 
-// §20.9 (dep §11.4.14 / §7.5): a dynamic array is a bit-stream type, so
-// $countones counts one-bits across all of its live elements. The array is
-// built from real source with a '{...} initializer and packed as {>>{d}}. Its
-// three elements contribute 3 + 1 + 4 = 8 one-bits. (This form also covers
-// dynamic arrays, whose elements live in a queue backing store rather than in
-// named element variables.)
 TEST(UtilitySystemTaskTest, CountonesPacksDynamicArrayOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -300,10 +255,6 @@ TEST(UtilitySystemTaskTest, CountonesPacksDynamicArrayOperand) {
   EXPECT_EQ(out, "8\n");
 }
 
-// §20.9 (dep §11.4.14): a packed struct is a bit-stream type, so $countones
-// counts one-bits across all of its fields. Built from a real struct
-// declaration and member assignments: hi=4'b1011 (3) and lo=4'b0001 (1) give
-// four one-bits.
 TEST(UtilitySystemTaskTest, CountonesPacksPackedStructOperand) {
   SimFixture f;
   std::string out = RunCapture(
@@ -322,10 +273,6 @@ TEST(UtilitySystemTaskTest, CountonesPacksPackedStructOperand) {
   EXPECT_EQ(out, "4\n");
 }
 
-// §20.9: return types -- $countbits and $countones return int (32 bits), while
-// $onehot, $onehot0, and $isunknown return bit (a single bit). This is a
-// property of the function alone and does not depend on how the operand is
-// produced, so it is observed directly on the evaluated result.
 TEST(UtilitySystemTaskTest, BitVectorFunctionReturnWidths) {
   SysTaskFixture f;
   auto* countbits = MakeSysCall(f.arena, "$countbits",

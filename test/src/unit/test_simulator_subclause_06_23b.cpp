@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23 with §16.9.3: a value change function in the expression a type
-// reference names is one unsigned bit, so the sum with a byte is unsigned.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAValueChangeFunctionAsABit) {
   const std::string kSrc =
       "module t;\n"
@@ -24,8 +22,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAValueChangeFunctionAsABit) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
 }
 
-// §6.23 with §16.9.3: `$sampled` in the expression a type reference names has
-// its argument's type, eight bits here.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsSampledAsItsArgumentsType) {
   const std::string kSrc =
       "module t;\n"
@@ -37,8 +33,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsSampledAsItsArgumentsType) {
   EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
 }
 
-// §6.23 with §20.5: `$rtoi` in the expression a type reference names is an
-// integer, `$realtobits` 64 bits and `$shortrealtobits` 32 unsigned bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsConversionFunctionsTypes) {
   const std::string kSrc =
       "module t;\n"
@@ -59,8 +53,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsConversionFunctionsTypes) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
 }
 
-// §6.23 with §20.14: `$random` and the distribution functions in the
-// expression a type reference names are integers, 32 bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsRandomFunctionsAsIntegers) {
   const std::string kSrc =
       "module t;\n"
@@ -75,8 +67,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsRandomFunctionsAsIntegers) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xABCFu);
 }
 
-// §6.23 with §18.13: `$urandom` and `$urandom_range` in the expression a type
-// reference names are each an int unsigned, 32 unsigned 2-state bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsUrandomAsAnIntUnsigned) {
   const std::string kSrc =
       "module t;\n"
@@ -96,10 +86,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsUrandomAsAnIntUnsigned) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §6.24.1 and §6.12.1: a cast to a type reference standing for a
-// real type, written, declared, named by a typedef or the type of a real
-// expression, converts an integral value to real, so dividing it by 2 keeps
-// the half.
 TEST(TypeOfExprCastSim, CastToARealTypeReferenceConvertsToReal) {
   const std::string kSrc =
       "module t;\n"
@@ -119,8 +105,6 @@ TEST(TypeOfExprCastSim, CastToARealTypeReferenceConvertsToReal) {
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "e"), 2.5);
 }
 
-// §6.23 with §20.5 and §11.4.11: `$itor` returns a real, so an operation it is
-// an operand of in the expression a type reference names is real too.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsARealFunctionAsReal) {
   const std::string kSrc =
       "module t;\n"
@@ -132,8 +116,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsARealFunctionAsReal) {
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "a"), 2.5);
 }
 
-// §6.23 with §6.24.2 and §20.17.1: `$cast` and `$system` called as functions
-// in the expression a type reference names each return an int, 32 bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsCastAndSystemAsInts) {
   const std::string kSrc =
       "module t;\n"
@@ -148,9 +130,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsCastAndSystemAsInts) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xABCFu);
 }
 
-// §6.23 with §19.9 and §11.4.11: `$get_coverage` returns a real, so an
-// operation it is an operand of in the expression a type reference names is
-// real too.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsGetCoverageAsReal) {
   const std::string kSrc =
       "module t;\n"
@@ -162,10 +141,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsGetCoverageAsReal) {
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "a"), 2.5);
 }
 
-// §6.23: the expression a type reference names is not evaluated, so a function
-// called in it, in a declaration's type or a cast's, never runs, and the
-// declaration takes the type the function returns: v is an int, not the one
-// bit a type no rule gave would leave it.
 TEST(TypeOperandUnevaluatedSim, CalledFunctionNeverRuns) {
   const std::string kSrc =
       "module t;\n"
@@ -181,10 +156,6 @@ TEST(TypeOperandUnevaluatedSim, CalledFunctionNeverRuns) {
   EXPECT_EQ(RunAndGet(kSrc, "v"), 0xABCFu);
 }
 
-// §6.23: an increment or a decrement, before or after its operand, and an
-// assignment or an operator assignment in the expression a type reference
-// names are not carried out, so the variable each would change keeps its
-// value.
 TEST(TypeOperandUnevaluatedSim, IncrementsAndAssignmentsLeaveTheirOperands) {
   const std::string kSrc =
       "module t;\n"
@@ -207,9 +178,6 @@ TEST(TypeOperandUnevaluatedSim, IncrementsAndAssignmentsLeaveTheirOperands) {
   EXPECT_EQ(RunAndGet(kSrc, "y"), 1u);
 }
 
-// §6.23 with §18.13.1: `$urandom` in the expression a type reference names is
-// not called, so the draw after it is the one the reseeded sequence gives
-// second, as y is, and not its third.
 TEST(TypeOperandUnevaluatedSim, UrandomIsNotDrawn) {
   const std::string kSrc =
       "module t;\n"
@@ -227,9 +195,6 @@ TEST(TypeOperandUnevaluatedSim, UrandomIsNotDrawn) {
   EXPECT_EQ(RunAndGet(kSrc, "c"), RunAndGet(kSrc, "y"));
 }
 
-// §6.23 with §20.14: `$random` and `$dist_uniform` in the expression a type
-// reference names are not called, so neither writes back the seed variable
-// it is given.
 TEST(TypeOperandUnevaluatedSim, RandomFunctionsLeaveTheirSeeds) {
   const std::string kSrc =
       "module t;\n"
@@ -244,8 +209,6 @@ TEST(TypeOperandUnevaluatedSim, RandomFunctionsLeaveTheirSeeds) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 7u);
 }
 
-// §6.23 with §21.3.1: `$fopen` in the expression a type reference names is not
-// called, so the file it names for writing is never created.
 TEST(TypeOperandUnevaluatedSim, FopenOpensNoFile) {
   namespace fs = std::filesystem;
   const std::string kPath =
@@ -264,9 +227,6 @@ TEST(TypeOperandUnevaluatedSim, FopenOpensNoFile) {
   fs::remove(kPath, ec);
 }
 
-// §6.23 with §7.10.2: a queue method that removes an element, called in the
-// expression a type reference names, does not run, so the queue keeps its
-// size.
 TEST(TypeOperandUnevaluatedSim, QueueMethodRemovesNoElement) {
   const std::string kSrc =
       "module t;\n"
@@ -281,12 +241,6 @@ TEST(TypeOperandUnevaluatedSim, QueueMethodRemovesNoElement) {
   EXPECT_EQ(RunAndGet(kSrc, "n"), 3u);
 }
 
-// §6.23 with §6.22.1: a comparison of a type reference to a function's call
-// with another type reference matches the type the function returns, a typedef
-// it is declared with read through, in a procedural statement, a continuous
-// assignment, a parameter's value and a generate condition, and never calls
-// the function, which the constant contexts therefore do not hold to §13.4.3's
-// rules for a constant function: f reads count, a module variable.
 TEST(TypeOperandUnevaluatedSim, ComparisonTypesACallWithoutRunningIt) {
   const std::string kSrc =
       "module t;\n"

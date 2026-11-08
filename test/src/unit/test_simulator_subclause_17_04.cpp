@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// A checker whose clock and reset formals default to the context value
-// functions, its one assertion counting successes and failures.
 constexpr const char* kContextChecker =
     "checker chk(logic sig, event clock = $inferred_clock,\n"
     "            logic reset = $inferred_disable);\n"
@@ -20,8 +18,6 @@ constexpr const char* kContextChecker =
     "    else fail++;\n"
     "endchecker\n";
 
-// The successes and failures k's counters hold once `module` has run over
-// kContextChecker.
 std::pair<uint64_t, uint64_t> ContextCheckerCounts(const std::string& module) {
   SimFixture f;
   auto* pass =
@@ -31,11 +27,6 @@ std::pair<uint64_t, uint64_t> ContextCheckerCounts(const std::string& module) {
           f.ctx.FindVariable("k.fail")->value.ToUint64()};
 }
 
-// §17.4 with §16.14.7: an instance leaving both formals to their defaults
-// takes the default clocking, posedge clk, and the default disable iff, rst:
-// the posedge at 5 is disabled, 15 and 25 fail and 35 and 45 pass. The
-// disable default was evaluated at the run as an unknown system function and
-// the clock never ticked, so nothing was counted.
 TEST(CheckerContextInference, AStaticInstanceTakesTheScopesDefaults) {
   EXPECT_EQ(ContextCheckerCounts(
                 "module top;\n"
@@ -50,9 +41,6 @@ TEST(CheckerContextInference, AStaticInstanceTakesTheScopesDefaults) {
             std::make_pair(2ull, 2ull));
 }
 
-// §17.4 with §16.14.6: a procedural instance takes the clock its procedure
-// gives, the module declaring no default clocking, and the default disable
-// iff, so it counts as the static instance does.
 TEST(CheckerContextInference, AProceduralInstanceTakesTheProceduresClock) {
   EXPECT_EQ(ContextCheckerCounts(
                 "module top;\n"
@@ -68,8 +56,6 @@ TEST(CheckerContextInference, AProceduralInstanceTakesTheProceduresClock) {
             std::make_pair(2ull, 2ull));
 }
 
-// §16.14.7: outside the scope of any default disable iff, $inferred_disable
-// is 1'b0, so the posedge at 5 passes rather than being disabled.
 TEST(CheckerContextInference, NoDefaultDisableIffInfersFalse) {
   EXPECT_EQ(ContextCheckerCounts(
                 "module top;\n"

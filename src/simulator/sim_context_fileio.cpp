@@ -45,14 +45,6 @@ QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
   q->elem_width = elem_width;
   q->is_4state = is_4state;
   q->max_size = max_size;
-  // §23.9: a local declaration is taken first, and failing one the search
-  // climbs outward, and §13.5.1 makes a by-value formal
-  // a declaration of the subroutine. A queue declared where a scope is on the
-  // stack therefore belongs to that scope and goes away with it, exactly as
-  // RegisterArrayInScope puts an array's shape there: registered for the whole
-  // run instead, a formal named after a module's queue was the module's queue
-  // to every writer in the callee, and still answered to the name after the
-  // call returned.
   if (HasLocalScope()) {
     scope_stack_.back().queues[name] = q;
     return q;
@@ -61,13 +53,6 @@ QueueObject* SimContext::CreateQueue(std::string_view name, uint32_t elem_width,
   return q;
 }
 
-// §26.3 with §13.4: the keys a bare name read inside a package subroutine's
-// body may stand under, the package's own declaration first and then each
-// package an import of it brings the name in from, as PackageScopedKeys
-// orders them; none outside any package frame (PackageFrame), and none for a
-// hierarchical name, whose head is an instance rather than a declaration of
-// the package. FindInPackageScope (sim_context.cpp) reads a variable by them
-// and ScopedObjectKeys below puts them ahead of an object's other keys.
 std::vector<std::string> SimContext::PackageFrameKeys(
     std::string_view name) const {
   if (name.find('.') != std::string_view::npos) return {};
@@ -76,14 +61,6 @@ std::vector<std::string> SimContext::PackageFrameKeys(
   return PackageScopedKeys(frame->package, name);
 }
 
-// §3.12.1 (printed page 56): for upward name referencing the compilation-unit
-// scope is a top-level design element, so a hierarchical name a unit task,
-// function or class method writes, its frame naming the unit's scope, is a
-// full path from the top of the design, read as a `$root.` one is
-// (RootedStorageKey) and never under the calling instance, where an instance
-// of the caller's own named like the path's head would answer it. A dotted
-// name headed by a local or by a declaration of the unit is a member of that
-// object rather than a path.
 bool SimContext::IsUnitPathFromRoot(std::string_view name) {
   std::size_t dot = name.find('.');
   if (dot == std::string_view::npos) return false;
@@ -101,29 +78,6 @@ Variable* SimContext::FindUnitPathVariable(std::string_view name) {
   return it != variables_.end() ? it->second : nullptr;
 }
 
-// §23.9's upward search past the scope frames, for an object held in one of
-// the run-long tables rather than in a frame: the keys a bare `name` may
-// stand under, in the order the search tries them. A package subroutine's
-// body reads the package's own object or an import's first
-// (PackageFrameKeys); then, as FindVariable orders them, the generate block
-// instances the running process is in, innermost first (GenerateBlockKeys in
-// sim_context_name_tables.cpp), the object the running instance declares,
-// stored under the instance's prefix (CreateChildModuleVariables in
-// lowerer_child.cpp), and the bare key of the enclosing scope, which stays
-// the answer for a name that resolved by it before. Without the package keys
-// a bare `q.push_back(v)` or `m["k"] = v` inside a package function reached
-// no queue and no associative array: the frames held none, no instance's key
-// and no bare key matched, and "p1.q", the key the package's object was
-// created under (CreatePackageAggregate in lowerer_package_data.cpp), was
-// never tried, so the push ran on nothing and `p1::q.size()` afterwards read
-// 0. Without the block keys the shape, the elements and the queue an import
-// written in a generate block aliases under the block's prefix
-// (AliasImportedPackageName in lowerer_import.cpp) were reached by no
-// FindArrayInfo or FindQueue of the block's process, §27.3 and §26.3
-// notwithstanding: `a[1] = 7` after the block's `import p1::*` set bit 1 of
-// the carrier variable FindInGenerateBlock does answer, `foreach (a[i])` ran
-// once per bit of it, `$size(a)` answered its width and `q.push_back(2)`
-// reached no queue.
 std::vector<std::string> SimContext::ScopedObjectKeys(
     std::string_view name) const {
   std::vector<std::string> keys = PackageFrameKeys(name);
@@ -140,12 +94,6 @@ std::vector<std::string> SimContext::ScopedObjectKeys(
 }
 
 QueueObject* SimContext::FindQueue(std::string_view name) {
-  // §23.9 searches the innermost scope first, so a queue a subroutine or a
-  // begin-end block declares answers its own name while it is on the stack.
-  // The key walk below is a separate question and keeps its place under this
-  // one: it is what a package's queue reached from inside its subroutine or a
-  // module-scoped queue reached from inside an instance is found by, and a
-  // formal's copy has to be found before it.
   for (auto frame = scope_stack_.crbegin(); frame != VisibleFramesEnd();
        ++frame) {
     auto local = frame->queues.find(name);
@@ -165,8 +113,6 @@ uint32_t AssocArrayObject::Size() const {
 
 namespace {
 
-// Populates a freshly created AssocArrayObject's fields from the
-// CreateAssocArray arguments (§7.8: element shape + index type).
 void PopulateAssocArrayFields(AssocArrayObject* aa, uint32_t elem_width,
                               bool is_string_key, const AssocArraySpec& spec) {
   aa->elem_width = elem_width;
@@ -187,7 +133,6 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
                                                const AssocArraySpec& spec) {
   auto* aa = arena_.Create<AssocArrayObject>();
   PopulateAssocArrayFields(aa, elem_width, is_string_key, spec);
-  // §23.9 and §13.5.1, as in CreateQueue above.
   if (HasLocalScope()) {
     scope_stack_.back().assoc_arrays[name] = aa;
     return aa;
@@ -197,22 +142,11 @@ AssocArrayObject* SimContext::CreateAssocArray(std::string_view name,
 }
 
 AssocArrayObject* SimContext::FindAssocArray(std::string_view name) {
-  // §23.9's innermost-first search, as in FindQueue above.
   for (auto frame = scope_stack_.crbegin(); frame != VisibleFramesEnd();
        ++frame) {
     auto local = frame->assoc_arrays.find(name);
     if (local != frame->assoc_arrays.end()) return local->second;
   }
-  // §23.9: an associative array declared inside a module instance is stored
-  // under that instance's prefix (CreateChildModuleVariables in
-  // lowerer_child.cpp), so the prefixed name is what a bare reference from
-  // within the instance denotes and is tried ahead of the bare key, a
-  // package frame's own keys ahead of both (ScopedObjectKeys above), as in
-  // FindQueue. Asked by the bare key alone, no associative array answered the
-  // name inside an instance: an element write and read fell to the carrier
-  // variable the lowerer creates under the name, and num(), foreach and %p
-  // saw none. The bare key stays the answer for an array of the enclosing
-  // scope.
   for (const std::string& key : ScopedObjectKeys(name)) {
     auto it = assoc_arrays_.find(key);
     if (it != assoc_arrays_.end()) return it->second;
@@ -244,34 +178,6 @@ void SimContext::AliasMailbox(std::string_view alias_name,
   if (it != mailboxes_.end()) mailboxes_[alias_name] = it->second;
 }
 
-// §23.9: a net declared inside a module instance is stored under that
-// instance's prefix (CreateChildModuleNets in lowerer_child.cpp), so the
-// prefixed name is what a bare reference from within the instance denotes and
-// is tried first, as in FindQueue above; a net has no scope frame to search
-// ahead of it, a subroutine or a block declaring none. Asked by the bare key
-// alone, a net declared in an instantiated module was no net to any writer
-// naming it from within: a continuous assignment wrote the variable directly
-// instead of joining the net's drivers, so a second driver of the same net
-// overwrote the first rather than resolving with it, a release re-resolved
-// nothing and left the forced value standing (§10.6.2), and %v, $countdrivers
-// and a primitive's output found no net -- while a top-level net of the same
-// name took every one of them. The unprefixed lookup stays as the answer for a
-// net of the enclosing scope.
-// §23.9: a bare name is looked for in the instance's own scope, and the step
-// out to the enclosing module's is taken only where FindVariable takes it --
-// with no instance prefix in force, for a dotted §23.8 name and for a name a
-// package import bound flat -- and inside a module §23.4 declares within the
-// one instantiating it, the search goes on in the instances holding it, as
-// FindVariable's does. Taken from any instance, a child's `assign dout = ...`
-// on an `output logic [3:0] dout` port, whose storage is a variable rather than
-// a net under the child's prefix, found the parent's like-named net and drove
-// it, leaving the connected net undriven (§23.3.2.2).
-// §27.4 and §23.9: a net a generate block the running process `proc` stands
-// in declares is held under the block's prefix and is found ahead of one the
-// enclosing scope declares, innermost block first, as FindVariable finds a
-// variable (SimContext::FindInGenerateBlock). Looked up under the instance
-// prefix alone, a continuous assignment in a block drove the module's net of
-// its name, or none.
 static Net* FindNetInGenerateBlock(
     const std::unordered_map<std::string_view, Net*>& nets, const Process* proc,
     const std::string& prefix, std::string_view name) {
@@ -285,7 +191,6 @@ static Net* FindNetInGenerateBlock(
 }
 
 Net* SimContext::FindNet(std::string_view name) {
-  // §23.6: a name written from $root is absolute, as FindVariable reads one.
   constexpr std::string_view kRootPrefix = "$root.";
   if (name.starts_with(kRootPrefix)) {
     auto it = nets_.find(RootedStorageKey(name.substr(kRootPrefix.size())));
@@ -300,7 +205,6 @@ Net* SimContext::FindNet(std::string_view name) {
     auto prefixed = nets_.find(prefix + std::string(name));
     if (prefixed != nets_.end()) return prefixed->second;
   }
-  // §23.4: see FindVariable.
   if (Net* outer = FindInNestedDeclOuterScopes(nets_, prefix, name))
     return outer;
   if (!prefix.empty() && name.find('.') == std::string_view::npos &&
@@ -311,9 +215,6 @@ Net* SimContext::FindNet(std::string_view name) {
   return (it != nets_.end()) ? it->second : nullptr;
 }
 
-// §8.5 with §7.3.2: the object and the property path a tag key names where
-// the key is a class property's, "@<handle>.<path>" as PropertyAggregateLayout
-// forms it; null for a variable's key, and for a handle naming no object.
 static ClassObject* PropertyTagOwner(std::string_view key,
                                      const SimContext& ctx,
                                      std::string_view& path) {
@@ -352,19 +253,12 @@ std::string_view SimContext::GetVariableTag(std::string_view var_name) const {
 void SimContext::EnsureStdioDescriptors() {
   if (files_.stdio_ready) return;
   files_.stdio_ready = true;
-  // STDIN/STDOUT/STDERR are pre-opened by §21.3.1 at the reserved fd values.
-  // Channel 0 of an mcd points at the standard output (§21.3.1, LSB rule).
   files_.descriptors[kStdinFd] = stdin;
   files_.descriptors[kStdoutFd] = stdout;
   files_.descriptors[kStderrFd] = stderr;
   files_.mcd_channels[0] = stdout;
 }
 
-// §21.3.1 (printed page 667): a file that cannot be opened gives a zero mcd or
-// fd, and $ferror is how an application learns the cause of the most recent
-// error (§21.3.7, printed page 675). The failed open is the most recent
-// operation on the descriptor it answered, 0, so the host's cause is recorded
-// there for $ferror(0, str) to report.
 static void RecordFailedOpen(SimContext& ctx) {
   int code = errno != 0 ? errno : ENOENT;
   ctx.SetFileIoError(0, code, std::strerror(code));
@@ -380,23 +274,17 @@ uint32_t SimContext::OpenFile(std::string_view filename,
     RecordFailedOpen(*this);
     return 0;
   }
-  // Lowest free slot in 3..0x7FFFFFFF, so $fopen reuses channels closed earlier
-  // (§21.3.1).
   uint32_t slot = 3;
   while (files_.descriptors.count(kFdMsb | slot) != 0) ++slot;
   uint32_t fd = kFdMsb | slot;
   files_.descriptors[fd] = fp;
   files_.names[fd] = fname;
-  // §21.3.4: only the "r"/"r+" type families authorize reading. Every such
-  // type string begins with 'r', so track readability by that leading letter.
   if (!fmode.empty() && fmode.front() == 'r') files_.readable.insert(fd);
   return fd;
 }
 
 uint32_t SimContext::OpenMcd(std::string_view filename) {
   EnsureStdioDescriptors();
-  // mcd LSB (bit 0) is reserved for stdout; MSB (bit 31) must remain clear.
-  // §21.3.1 limits an implementation to channels 1..30 for output files.
   for (uint32_t bit = 1; bit < 31; ++bit) {
     if (files_.mcd_channels[bit] == nullptr) {
       std::string fname(filename);
@@ -413,10 +301,6 @@ uint32_t SimContext::OpenMcd(std::string_view filename) {
   return 0;
 }
 
-// Whether an operation writing through `writer` is on what an $fclose of
-// `closed` closes: the same file descriptor, or for a multichannel descriptor
-// a multichannel descriptor selecting any channel `closed` selects past the
-// standard output's.
 static bool WritesThroughClosed(uint32_t writer, uint32_t closed) {
   if ((closed & SimContext::kFdMsb) != 0) return writer == closed;
   return (writer & SimContext::kFdMsb) == 0 && (writer & closed & ~1U) != 0;
@@ -424,11 +308,6 @@ static bool WritesThroughClosed(uint32_t writer, uint32_t closed) {
 
 void SimContext::CloseFile(uint32_t descriptor) {
   EnsureStdioDescriptors();
-  // §21.3.1 (printed page 666): an $fclose cancels, without being asked to,
-  // every $fmonitor and $fstrobe still active on the file descriptor or
-  // multichannel descriptor it closes. A file descriptor's monitors are the
-  // ones on that descriptor; a multichannel descriptor's are those selecting
-  // any channel it closes, which a later $fopen may hand to another file.
   bool is_fd = (descriptor & kFdMsb) != 0;
   for (auto& monitor : files_.monitors) {
     if (WritesThroughClosed(monitor->descriptor, descriptor)) {
@@ -436,7 +315,6 @@ void SimContext::CloseFile(uint32_t descriptor) {
     }
   }
   if (is_fd) {
-    // STDIN/STDOUT/STDERR are not closable per §21.3.1.
     if (descriptor == kStdinFd || descriptor == kStdoutFd ||
         descriptor == kStderrFd) {
       return;
@@ -452,7 +330,6 @@ void SimContext::CloseFile(uint32_t descriptor) {
     files_.names.erase(descriptor);
     return;
   }
-  // Multichannel descriptor: every bit set selects a channel to close.
   for (uint32_t bit = 1; bit < 31; ++bit) {
     if ((descriptor & (uint32_t{1} << bit)) == 0) continue;
     if (files_.mcd_channels[bit] == nullptr) continue;
@@ -492,7 +369,6 @@ bool SimContext::FdEofDetected(uint32_t fd) const {
 }
 
 bool SimContext::IsFdReadable(uint32_t fd) const {
-  // §21.3.4: STDIN is pre-opened for reading; STDOUT/STDERR are append-only.
   if (fd == kStdinFd) return true;
   if (fd == kStdoutFd || fd == kStderrFd) return false;
   return files_.readable.count(fd) != 0;
@@ -513,22 +389,10 @@ SemaphoreObject* SimContext::CreateSemaphore(std::string_view name,
                                              int32_t keys) {
   auto* sem = arena_.Create<SemaphoreObject>(keys);
   semaphores_[name] = sem;
-  // §37.33: a class var's handle names the object by its identity.
   RecordContainedSemaphore(sem);
   return sem;
 }
 
-// §23.9: a semaphore declared inside a module instance is stored under that
-// instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
-// CreateSyncObjectForVar in sync_variable.cpp), so the prefixed name is what a
-// bare reference from within the instance denotes and is tried ahead of the
-// bare key, a package frame's own keys ahead of both (ScopedObjectKeys
-// above), as in FindQueue; a semaphore has no scope frame to search ahead of
-// them, a subroutine or a block declaring none. Asked by the bare key alone,
-// no semaphore answered the name inside an instance: `s = new(2)` filled no
-// bucket, get() and put() ran on none, and try_get() was served by no
-// semaphore. The bare key stays the answer for a semaphore of the enclosing
-// scope.
 SemaphoreObject* SimContext::FindSemaphore(std::string_view name) {
   for (const std::string& key : ScopedObjectKeys(name)) {
     auto it = semaphores_.find(key);
@@ -537,10 +401,6 @@ SemaphoreObject* SimContext::FindSemaphore(std::string_view name) {
   return nullptr;
 }
 
-// §8.12 with §15.3 and §15.4: `b = a` leaves one object under both names,
-// so what is rebound is the entry FindSemaphore or FindMailbox reads `b` by,
-// under the key the scope search reaches first, which keeps an instance's
-// and a generate block's own `b` the one that changes.
 SemaphoreObject** SimContext::SemaphoreSlot(std::string_view name) {
   for (const std::string& key : ScopedObjectKeys(name)) {
     auto it = semaphores_.find(key);
@@ -560,16 +420,10 @@ MailboxObject** SimContext::MailboxSlot(std::string_view name) {
 MailboxObject* SimContext::CreateMailbox(std::string_view name, int32_t bound) {
   auto* mb = arena_.Create<MailboxObject>(bound);
   mailboxes_[name] = mb;
-  // §37.33: a class var's handle names the object by its identity.
   RecordContainedMailbox(mb);
   return mb;
 }
 
-// §23.9: a mailbox declared inside a module instance is stored under that
-// instance's prefix (CreateChildModuleVariables in lowerer_child.cpp reaching
-// CreateSyncObjectForVar in sync_variable.cpp), so the keys are walked in the
-// order FindSemaphore above walks them (ScopedObjectKeys). The bare key
-// stays the answer for a mailbox of the enclosing scope.
 MailboxObject* SimContext::FindMailbox(std::string_view name) {
   for (const std::string& key : ScopedObjectKeys(name)) {
     auto it = mailboxes_.find(key);
@@ -586,8 +440,6 @@ void SimContext::SetEventTriggered(std::string_view name) {
 }
 
 bool SimContext::IsEventTriggered(std::string_view name) const {
-  // §23.9: a name read in an instance is the instance's own first, an end
-  // point of the instance's sequence among them (§16.13.6).
   std::string local = ActiveInstancePrefix() + std::string(name);
   for (std::string_view key : {std::string_view(local), name}) {
     auto vit = variables_.find(key);
@@ -599,8 +451,6 @@ bool SimContext::IsEventTriggered(std::string_view name) const {
   return it->second == scheduler_.CurrentTime().ticks;
 }
 
-// The class `table` holds under `name` within the scope `scope`, the key
-// "<scope>::<name>"; null where it holds none.
 static ClassTypeInfo* ClassUnder(
     const std::unordered_map<std::string_view, ClassTypeInfo*>& table,
     std::string_view scope, std::string_view name) {
@@ -608,9 +458,6 @@ static ClassTypeInfo* ClassUnder(
   return kFound == table.end() ? nullptr : kFound->second;
 }
 
-// §8.23: the class `table` holds under `name` within the class `base`, the
-// key "<base>::<name>", which a module instance's own class holds under that
-// instance as it holds the class (§8.25); null where it holds none.
 static ClassTypeInfo* NestedClassOf(
     const std::unordered_map<std::string_view, ClassTypeInfo*>& table,
     const ClassTypeInfo& base, std::string_view name) {
@@ -631,21 +478,12 @@ void SimContext::RegisterClassType(std::string_view name, ClassTypeInfo* info) {
                                            "::" + std::string(name))] = info;
 }
 
-// §8.25 (printed page 204): a parameterized class a module declares is a
-// generic class of each instance of the module, with specializations and
-// static members of its own, so the copies a later instance registers stand
-// under that instance's prefix (Lowerer::RegisterChildClasses), and a name is
-// looked for first under the running code's instance.
 std::string SimContext::SetClassInstanceScope(std::string scope) {
   if (!scope.empty()) instance_classes_ = true;
   std::swap(scope, class_scope_);
   return scope;
 }
 
-// §26.7 with Syntax 26-5: drops a leading `std::` from `name`, false where
-// what is left is std's semaphore or mailbox, which are no class the table
-// holds (BuiltinSyncKindOf), so that a user class of the bare name, which the
-// table may hold, is not taken for what `std::` names.
 static bool DropStdScope(std::string_view& name) {
   constexpr std::string_view kStdScope = "std::";
   if (!name.starts_with(kStdScope)) return true;
@@ -653,9 +491,6 @@ static bool DropStdScope(std::string_view& name) {
   return name != "semaphore" && name != "mailbox";
 }
 
-// §8.23: the class nested in the running method's class `method_class`, or
-// in a class lexically containing it, innermost first, each tried through its
-// base chain, that `name` names there; null where none does.
 static ClassTypeInfo* NestedClassInScopes(
     const std::unordered_map<std::string_view, ClassTypeInfo*>& table,
     const ClassTypeInfo* method_class, std::string_view name) {
@@ -675,30 +510,8 @@ ClassTypeInfo* SimContext::ExactClassType(std::string_view name) {
   return ClassUnder(class_types_, class_scope_, name);
 }
 
-// §8.23: a class nested in another is held under `Outer::Inner`, the name
-// that reaches it from outside the containing class, while a method of the
-// containing class names it `Inner` alone, classes being scopes that nest as
-// modules do. A name the table does not hold as written is therefore tried
-// under the running method's class and then under each class lexically
-// containing that one, innermost first, so `Inner i = new` in a method of
-// Outer, `Node link` in a method of StringList::Node and `mine = new` on a
-// property Outer declares `Inner mine` all construct the nested class.
-// §6.18 with §8.13 (printed pages 189-190): a class's own typedef that
-// names a class is held under `Class::alias` as a nested class is
-// (RegisterClassTypeAliases in lowerer_register.cpp), and a subclass
-// inherits the base's typedefs among its members, so each scope's base
-// chain is tried under the scope itself: uvm_callbacks#(T,CB)'s `this_type`
-// and the `super_type` its base declares both name a class from its
-// methods, where the bare name named none and `m_inst = new` stored null.
-// §26.7 with Syntax 26-5: `std::` before a built-in class's name reaches the
-// same declaration the bare name does, and §26.7 lets no user package be
-// called std, so a `std::` head is dropped before the table is asked.
 ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
   if (!DropStdScope(name)) return nullptr;
-  // §3.12.1: where each unit has a scope of its own, the running code's unit's
-  // class of the name stands ahead of another unit's
-  // (Lowerer::RegisterClassDecl).
-  // §8.25: so too the running code's instance's own class of the name.
   ClassTypeInfo* own = units_.Separate()
                            ? ClassUnder(class_types_, ActiveUnitScope(), name)
                            : nullptr;
@@ -712,12 +525,6 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
           NestedClassInScopes(class_types_, CurrentMethodClass(), name)) {
     return nested;
   }
-  // §26.2 with §26.3: a package's classes are visible by their bare names
-  // throughout the package, its subroutines and its classes' method bodies
-  // included, whose frames carry the package's name (Scope::package), while
-  // a bare name no import brought in stands for no class
-  // (Lowerer::LowerUnimportedPackageClasses); so the package's own code
-  // reaches its class under the package's key.
   const Scope* frame = PackageFrame();
   return frame != nullptr ? ClassUnder(class_types_, frame->package, name)
                           : nullptr;
@@ -725,16 +532,10 @@ ClassTypeInfo* SimContext::FindClassType(std::string_view name) const {
 
 std::vector<ClassTypeInfo*> SimContext::RegisteredClassTypes(bool all) const {
   std::vector<ClassTypeInfo*> classes;
-  // A package class's bare name no import brought in stands with no class
-  // behind it (Lowerer::LowerUnimportedPackageClasses) and is passed over;
-  // read through it, this dereferenced null.
   for (const auto& [key, info] : class_types_) {
     if (info != nullptr && (all || key == info->name)) classes.push_back(info);
   }
   if (!all) return classes;
-  // A class held under several keys -- its own name, `p::C`, an alias, an
-  // instance's scope -- is listed once, and in an order the table's own does
-  // not decide.
   std::ranges::sort(classes);
   classes.erase(std::ranges::unique(classes).begin(), classes.end());
   std::ranges::stable_sort(
@@ -751,20 +552,7 @@ void SimContext::SetVariableClassType(std::string_view var,
   var_class_types_[var] = type;
 }
 
-// §23.9 and §27.4: a class variable a program, an interface or a generate
-// block declares is recorded under the name its declaration was lowered as,
-// the instance prefix and the generate block prefixes ahead of the declared
-// name -- `pr.c` for a program's `c`, `blk[0].c` for a generate block's --
-// while a process of that scope names it bare, which FindVariable resolves by
-// the process's instance and generate blocks. The record is looked up the
-// same way: the name as written, then under each enclosing generate block
-// innermost first, then under the instance the name resolves within. Keyed by
-// the written name alone, `c.inc()` in the program found no class for `c`
-// and ran on no object.
 std::string_view SimContext::GetVariableClassType(std::string_view var) const {
-  // §13.4 with §8.3: a subroutine's own handle is answered by the frame that
-  // declares it (Scope::class_types), whatever a call made since recorded
-  // under the same bare name.
   if (const std::string_view* local = FindLocalClassType(var)) return *local;
   auto it = var_class_types_.find(var);
   if (it != var_class_types_.end()) return it->second;

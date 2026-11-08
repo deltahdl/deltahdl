@@ -87,11 +87,6 @@ TEST(SubroutineCallSim, NamedArgTaskOutputWriteback) {
   EXPECT_EQ(vb->value.ToUint64(), 10u);
 }
 
-// A named binding written with empty parentheses (e.g. .factor()) names the
-// formal but supplies no value, so the formal's default is used. This drives
-// the binding path where the argument index resolves by name yet the actual
-// expression slot is null, falling back to the default -- distinct from
-// omitting the name entirely. Here both arguments default: 5 * 3 == 15.
 TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -110,14 +105,6 @@ TEST(SubroutineCallSim, EmptyNamedBindingUsesDefault) {
   EXPECT_EQ(var->value.ToUint64(), 15u);
 }
 
-// Named binding resolves an actual to the formal named in the call regardless
-// of the formal's data type. The LRM's own worked example uses a string-typed
-// formal (fun(int j, string s)), so exercise that operand type end-to-end: a
-// reordered named call routes the string literal to the string formal and the
-// integer to the int formal. Had the names been ignored and the actuals bound
-// positionally, "yes" would land in j and 7 in s, so (s == "yes") would be
-// false and the function would return 0. Reading back 7 confirms the string
-// actual was bound to s and the integer to j purely by name.
 TEST(SubroutineCallSim, NamedArgBindsStringOperand) {
   SimFixture f;
   auto* var = RunAndFindVar(

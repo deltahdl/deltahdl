@@ -93,10 +93,6 @@ TEST(AlwaysCombSim, AlwaysCombTriggersAfterInitial) {
   EXPECT_EQ(b->value.ToUint64(), 99u);
 }
 
-// §9.2.2.2 triggers an always_comb once at time zero after every initial
-// procedure has started, so its one evaluation at time zero reads what the
-// initial procedure wrote, and the write, made before it was waiting, does not
-// trigger it again.
 TEST(AlwaysCombSim, TheTimeZeroEvaluationFollowsTheInitialProcedures) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; logic a, y;\n"
@@ -124,13 +120,6 @@ TEST(AlwaysCombSim, AlwaysCombRetriggersOnChange) {
   EXPECT_EQ(b->value.ToUint64(), 11u);
 }
 
-// Elaborates, lowers and runs `src` -- a design whose one always_comb copies
-// `a` into `b` and increments `runs` -- then asserts the procedure evaluated
-// exactly `expected_runs` times. The count is the whole observation: what
-// separates a select write that stored a bit from one that stored nothing is
-// whether the inferred sensitivity list saw an event, and `b` alone cannot
-// tell those apart, because a write that stores nothing leaves `b` holding the
-// value the previous evaluation already gave it.
 void ExpectAlwaysCombRunCount(const char* src, uint64_t expected_runs) {
   SimFixture f;
   auto* runs = RunAndFindVar(src, f, "runs");
@@ -140,28 +129,6 @@ void ExpectAlwaysCombRunCount(const char* src, uint64_t expected_runs) {
 
 TEST(AlwaysCombSim,
      AlwaysCombDoesNotRetriggerWhenAnOutOfBoundsBitSelectWriteChangesNothing) {
-  // §11.5.1 (printed page 296) says a bit-select address outside the vector's
-  // range stores nothing when written, and §9.4.2 (printed page 232) says a
-  // change in an operand that leaves the expression's result unchanged is not
-  // detected as an event. §9.2.2.2 (printed page 222) gives an always_comb an
-  // inferred sensitivity list, which is the list §9.4.2 governs. So the write
-  // of a[9] to an 8-bit `a` stores no bit and owes the procedure no event.
-  //
-  // Why the count is 1 rather than 2. The inferred list is {a} alone:
-  // exception (b) of §9.2.2.2.1 leaves out any expression the block also
-  // writes, which here is `b` and `runs`, and InferSensitivity is called with
-  // exclude_written true for an always_comb. §9.2.2.2 triggers the always_comb
-  // once at time zero after the initial procedure has started, so it evaluates
-  // once (`runs` 1) after the initial block's write of 8'd0, made while it was
-  // not yet waiting. At time 1 the out-of-bounds write stores nothing and the
-  // count must stay at 1.
-  //
-  // Reading 2 is the defect. A select write that returned having written
-  // nothing still notified the variable's watchers, and the AnyChangeAwaiter an
-  // always_comb waits on compares no baseline and resumes on any notify at all.
-  // @(a), always @*, $monitor and a clocking block each hold a baseline of
-  // their own and stay quiet on a notify that moved nothing, which is why
-  // always_comb is the construct that makes this observable.
   ExpectAlwaysCombRunCount(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -181,17 +148,6 @@ TEST(AlwaysCombSim,
 
 TEST(AlwaysCombSim,
      AlwaysCombRetriggersWhenAnInBoundsBitSelectWriteChangesTheVector) {
-  // The design above with its one index moved from the out-of-range 9 to the
-  // in-range 3, and the expected count moved with it. This is what stops the
-  // case above from being satisfied by never notifying from a select write at
-  // all: an in-bounds a[3] write does change the vector, §9.4.2 (printed page
-  // 232) therefore makes it an event on the inferred sensitivity list of
-  // §9.2.2.2 (printed page 222), and the always_comb must evaluate a second
-  // time. Suppressing the notify for every select write would leave `runs` at 1
-  // here while passing the other half of the pair -- the regression the
-  // neighbouring arm of this code needed a fix of its own to undo. The two
-  // cases differ only in the index, so the counts have to differ with it or
-  // neither is discriminating.
   ExpectAlwaysCombRunCount(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -211,34 +167,6 @@ TEST(AlwaysCombSim,
 
 TEST(AlwaysCombSim,
      AlwaysCombDoesNotRetriggerWhenAWriteDepositsTheValueTheVariableHolds) {
-  // §9.4.2 (printed page 232, last line of the clause) says a change in an
-  // operand that leaves the expression's result unchanged is not detected as an
-  // event, and §9.2.2.2 (printed page 222) gives an always_comb an inferred
-  // sensitivity list holding the expressions §9.2.2.2.1 defines -- the list
-  // §9.4.2 governs. A store that deposits the bits the variable already holds
-  // changes no result, so it owes the procedure no event, however genuinely the
-  // store itself happened.
-  //
-  // Why the count is 1 rather than 2. The inferred list is {a} alone:
-  // exception (b) of §9.2.2.2.1 leaves out any expression the block also
-  // writes, which here is `b` and `runs`, and InferSensitivity is called with
-  // exclude_written true for an always_comb. §9.2.2.2 triggers the always_comb
-  // once at time zero after the initial procedure has started, so it evaluates
-  // once (`runs` 1) after the initial block's write of 8'd5, made while it was
-  // not yet waiting. At time 1 the second write of 8'd5 changes nothing and the
-  // count must stay at 1.
-  //
-  // Reading 2 is the defect. The write takes ApplyGenericBlockingAssign's
-  // fall-through into AssignToScalarLhs, which stores the identical bits and
-  // notifies the variable's watchers regardless, and the AnyChangeAwaiter an
-  // always_comb waits on captures a baseline it never reads back -- every guard
-  // in its body is about frame or process liveness, or a sibling having
-  // consumed the suspension -- so any notify at all resumes the process.
-  //
-  // The same design written `always @(a) runs = runs + 1;` counts no event for
-  // the second write, because that path is EventAwaiter::CheckEdge, which
-  // compares its baseline word by word. One clause, one write, two answers from
-  // two awaiters: that divergence is what this case pins.
   ExpectAlwaysCombRunCount(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -257,16 +185,6 @@ TEST(AlwaysCombSim,
 }
 
 TEST(AlwaysCombSim, AlwaysCombRetriggersWhenAWriteChangesTheVariable) {
-  // The design above with the value written at time 1 moved from 8'd5 to 8'd7,
-  // and the expected count moved with it. This is what stops the case above
-  // from being satisfied by dropping the notify from the writers altogether:
-  // 8'd7 does change `a`, §9.4.2 (printed page 232) therefore makes it an event
-  // on the inferred sensitivity list of §9.2.2.2 (printed page 222), and the
-  // always_comb must evaluate a second time. A writer that stopped notifying
-  // would leave `runs` at 1 here while passing the other half of the pair --
-  // exactly the regression a neighbouring arm of this code needed a fix of its
-  // own to undo. The two programs differ only in the value written, so the
-  // counts have to differ with them or neither case is discriminating.
   ExpectAlwaysCombRunCount(
       "module t;\n"
       "  logic [7:0] a, b;\n"
@@ -322,11 +240,6 @@ TEST(AlwaysCombBasicSim, AlwaysCombResultWidth8) {
 }
 
 TEST(AlwaysCombSim, AlwaysCombNonblockingIntraDelay) {
-  // §9.2.2.2 shows `d <= #1ns b & c;` as a legal always_comb body: the
-  // combinational procedure may use a nonblocking assignment carrying an
-  // intra-assignment delay. Drive b and c from an initial block, let the
-  // inferred sensitivity retrigger the procedure, and observe that the
-  // nonblocking update lands the ANDed value after the delay.
   SimFixture f;
   auto* d = RunAndFindVar(
       "module t;\n"
@@ -361,31 +274,6 @@ TEST(AlwaysCombSim, AlwaysCombChainedDependency) {
   EXPECT_EQ(c->value.ToUint64(), 12u);
 }
 
-// §9.2.2.2 (printed page 222) gives an always_comb an inferred sensitivity list
-// holding the expressions §9.2.2.2.1 defines, and §9.4.2 (printed page 232)
-// makes an event out of any change in the expression's value on such a list.
-// §11.4.2 states the increment and decrement operators as blocking assignments,
-// so a bare `i++;` in a process body is a change of `i` exactly as `i = i + 1;`
-// would be, and the combinational procedure reading `i` owes an evaluation to
-// it.
-//
-// The route is the ordinary process body, not a subroutine's: `i++;` is a
-// kExprStmt that ExecStmt hands to ExecInlineTaskCall, whose non-call
-// fall-through evaluates it as an expression, reaching EvalIncDec and its store
-// to var->value. That store told the variable's watchers nothing, and the
-// watcher is the whole mechanism: DropUnwatchableNames keeps every name
-// ctx.FindVariable resolves, so this always_comb does hold a live watcher on
-// `i` and is waiting on precisely the notification the increment withheld.
-// This is the AnyChangeAwaiter arm of the same omission the wait statement
-// meets through ExecWait.
-//
-// The values separate the two answers the run can give. An always_comb
-// evaluates once at time zero whatever happens, there with `i` at its 2-state
-// default of 0 (§6.8, Table 6-7), so `y` is 8'd1; the initial block's write of
-// 7 is an ordinary assignment and retriggers the procedure, so `y` is 8'd8
-// before the increment ever runs. Only an evaluation caused by the increment
-// itself puts 8'd9 in `y`. A procedure that ran only its earlier times leaves
-// 8'd8, which is why the assertion is not merely "y moved off its default".
 TEST(AlwaysCombSim, AlwaysCombRetriggersOnAnIncrementOperatorWrite) {
   SimFixture f;
   auto* y = RunAndFindVar(

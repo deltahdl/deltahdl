@@ -6,18 +6,6 @@ using namespace delta;
 
 namespace {
 
-// These tests drive 18.8's runtime rule end to end. Each program elaborates a
-// real class with rand/randc variables, calls rand_mode() from source, and
-// copies the outcome to module variables the harness reads -- so the behavior
-// observed is that of parse/elaborate/run applying the rule through the
-// production rand_mode() dispatch and randomize() path, not a hand-built solver
-// state.
-
-// 18.8 / Table 18-3: rand_mode(0) on a named variable makes it inactive; an
-// inactive variable is not randomized but held at its current value and treated
-// as a state variable by the solver, while the object's remaining active
-// variables are still randomized. Here 'held' is pinned to 200 and disabled, so
-// randomize() leaves it at 200 and solves 'active' against its constraint.
 TEST(RandModeRuntime, DisabledVariableHeldWhileOthersRandomize) {
   const char* src =
       "class P;\n"
@@ -43,18 +31,12 @@ TEST(RandModeRuntime, DisabledVariableHeldWhileOthersRandomize) {
   EXPECT_EQ(RunAndGet(src, "ractive"), 123u);
 }
 
-// 18.8: called with no argument, the nonvoid form reports whether the variable
-// is active -- 1 (ON) when active, 0 (OFF) when inactive. All random variables
-// are initially active, so the query reads 1 before any change and 0 after
-// rand_mode(0).
 TEST(RandModeRuntime, NonvoidReturnsActiveState) {
   const char* src =
       "class P;\n"
       "  rand bit [7:0] x;\n"
       "endclass\n"
       "module t;\n"
-      // `before` is a reserved keyword (Table B.1), so the queried states are
-      // held in names that are legal to declare.
       "  int state_first;\n"
       "  int state_then;\n"
       "  initial begin\n"
@@ -68,10 +50,6 @@ TEST(RandModeRuntime, NonvoidReturnsActiveState) {
   EXPECT_EQ(RunAndGet(src, "state_then"), 0u);
 }
 
-// 18.8 (Packet example): the void form called with no variable name applies to
-// every random variable in the object. Disabling all then re-enabling only
-// source_value leaves source_value active (1) and dest_value inactive (0), as
-// the nonvoid queries report.
 TEST(RandModeRuntime, UnnamedFormDisablesAllThenSelectiveReEnable) {
   const char* src =
       "class Packet;\n"
@@ -93,10 +71,6 @@ TEST(RandModeRuntime, UnnamedFormDisablesAllThenSelectiveReEnable) {
   EXPECT_EQ(RunAndGet(src, "q_dst"), 0u);
 }
 
-// 18.8: with every variable disabled by the unnamed void form, randomize()
-// draws nothing -- each variable keeps its current value. Both variables are
-// pinned to known values and then all turned off, so randomize() succeeds and
-// leaves them unchanged (proof that none was drawn a fresh value).
 TEST(RandModeRuntime, AllDisabledHoldsEveryValue) {
   const char* src =
       "class P;\n"
@@ -122,11 +96,6 @@ TEST(RandModeRuntime, AllDisabledHoldsEveryValue) {
   EXPECT_EQ(RunAndGet(src, "rb"), 200u);
 }
 
-// 18.8 / Table 18-3: rand_mode(1) sets a previously disabled variable active
-// again, so randomize() draws it once more. While inactive the variable is a
-// state variable held at 9 (and its own constraint x==77 evaluated against that
-// held value makes the solve fail); after rand_mode(1) it is randomized and the
-// constraint pins it to 77.
 TEST(RandModeRuntime, ReEnableRestoresRandomization) {
   const char* src =
       "class P;\n"
@@ -155,11 +124,6 @@ TEST(RandModeRuntime, ReEnableRestoresRandomization) {
   EXPECT_EQ(RunAndGet(src, "on_val"), 77u);
 }
 
-// 18.8: the specified variable may live anywhere in the class hierarchy, so
-// rand_mode() reaches a variable inherited from a base class. Declaring the
-// disabled variable in a base class (18.4 rand syntax) and driving randomize()
-// through a derived handle shows the inherited variable held at its current
-// value while the derived class's own active variable is still randomized.
 TEST(RandModeRuntime, InheritedRandVariableDisabledAndHeld) {
   const char* src =
       "class Base;\n"
@@ -187,10 +151,6 @@ TEST(RandModeRuntime, InheritedRandVariableDisabledAndHeld) {
   EXPECT_EQ(RunAndGet(src, "rdy"), 44u);
 }
 
-// 18.8: the solver handles an inactive variable as though it had never been
-// rand or randc, and this holds for a randc variable too -- once inactive it is
-// not cycled through its permutation but held at its current value as a state
-// constant, while an active rand sibling is still randomized.
 TEST(RandModeRuntime, DisabledRandcVariableHeldAsStateConstant) {
   const char* src =
       "class P;\n"
@@ -216,12 +176,6 @@ TEST(RandModeRuntime, DisabledRandcVariableHeldAsStateConstant) {
   EXPECT_EQ(RunAndGet(src, "ro"), 5u);
 }
 
-// 18.8: on an object handle, rand_mode() switches that handle alone and leaves
-// the modes of the referenced object's random variables as they were. Disabling
-// the rand handle 'h' stops randomize() from recursing into the Inner object,
-// so its constrained member keeps the pre-set value 3; with the handle left
-// active the same randomize() recurses and the constraint pins the member to
-// 55.
 TEST(RandModeRuntime, ObjectHandleModeDoesNotCascadeIntoObject) {
   const char* src =
       "class Inner;\n"
@@ -263,13 +217,6 @@ TEST(RandModeRuntime, ObjectHandleModeDoesNotCascadeIntoObject) {
   EXPECT_EQ(RunAndGet(src, "en_v"), 55u);
 }
 
-// 18.8: an inactive variable is handled as though declared without rand or
-// randc, and the solver takes its value as a state variable. A set-membership
-// constraint on such a variable is therefore evaluated against the held value
-// rather than used to pick a fresh one from the set. The variable is held at 3,
-// which is outside the set, so the solve fails and the value is unchanged -- a
-// solver that instead picked from the set would report success and leave a
-// member of it behind.
 TEST(RandModeRuntime, DisabledVariableIsNotDrawnFromItsSetMembership) {
   const char* src =
       "class P;\n"
@@ -291,10 +238,6 @@ TEST(RandModeRuntime, DisabledVariableIsNotDrawnFromItsSetMembership) {
   EXPECT_EQ(RunAndGet(src, "rx"), 3u);
 }
 
-// 18.8, the same rule for a distribution: a dist targeting an inactive
-// variable is not sampled into it. Every weight in the distribution names a
-// value other than the one held, so a solve that sampled the distribution
-// would overwrite the held 3; holding it instead leaves the value in place.
 TEST(RandModeRuntime, DisabledVariableIsNotSampledFromItsDistribution) {
   const char* src =
       "class P;\n"

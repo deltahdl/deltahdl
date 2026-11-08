@@ -11,15 +11,8 @@
 namespace delta {
 namespace {
 
-// Whether `text` is written as a string. §22.5.1 spells a pragma_value four
-// ways and only one of them is a string, so a value carrying no quotation
-// marks around it is one of the other three however much it reads like the
-// name a producer meant. The §22.11 grammar that carried the value here closes
-// every string it opens, so the opening mark is the one to look for.
 bool WrittenAsString(std::string_view text) { return text.starts_with('"'); }
 
-// Takes the string written against one of the five names into `into`, and
-// reports whether the expression was that name written that way.
 bool TookString(const ListedKeyword& listed, std::string_view name,
                 std::string* into) {
   if (listed.name != name) return false;
@@ -28,11 +21,6 @@ bool TookString(const ListedKeyword& listed, std::string_view name,
   return true;
 }
 
-// The same for the one name written against a <number>. Digits are the whole of
-// that spelling, so text carrying anything else states no number, and a number
-// too large to be held states none either: a value the reading rounded or
-// wrapped would be compared against the entry function's return as though the
-// text had written it.
 bool TookNumber(const ListedKeyword& listed, std::string_view name,
                 uint64_t* into) {
   if (listed.name != name) return false;
@@ -54,11 +42,6 @@ bool TookNumber(const ListedKeyword& listed, std::string_view name,
 
 ProtectLicense ParseProtectLicense(std::string_view value) {
   if (!IsParenthesizedPragmaValue(value)) return {};
-  // The expressions of the list are what TopLevelKeywords walks, so the
-  // parentheses announcing the list come off before the walk rather than
-  // reaching it as characters of the first expression.
-  // The §22.11 grammar that carried the list here closes it, so the last
-  // character is the parenthesis matching the first.
   std::string_view inside = value.substr(1, value.size() - 2);
   ProtectLicense license;
   bool named_library = false;
@@ -76,11 +59,6 @@ ProtectLicense ParseProtectLicense(std::string_view value) {
     license.has_match = TookNumber(listed, kMatchSubkeyword, &license.match) ||
                         license.has_match;
   }
-  // All three, because both syntax lines write all three outside the brackets
-  // that mark the other two optional. A list short of one of them names a
-  // library with no entry point to call in it, or an entry point with no
-  // feature to ask about, and §34.5.28.2 spends all three in the one sentence
-  // that carries out the check.
   if (!named_library || !named_entry || !named_feature) return {};
   license.stated = true;
   return license;

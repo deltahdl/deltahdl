@@ -20,7 +20,6 @@
 
 using namespace delta;
 
-// Verify full-path src_ports and dst_ports by name.
 inline void VerifyFullPathPorts(SpecifyItem* si,
                                 std::initializer_list<const char*> src,
                                 std::initializer_list<const char*> dst) {
@@ -39,7 +38,6 @@ inline void VerifyFullPathPorts(SpecifyItem* si,
   }
 }
 
-// Verify ternary expression: condition, true_expr, false_expr all kIdentifier.
 inline void VerifyTernaryFieldsAllIdentifier(Expr* expr) {
   ASSERT_NE(expr, nullptr);
   EXPECT_EQ(expr->kind, ExprKind::kTernary);
@@ -51,7 +49,6 @@ inline void VerifyTernaryFieldsAllIdentifier(Expr* expr) {
   EXPECT_EQ(expr->false_expr->kind, ExprKind::kIdentifier);
 }
 
-// Verify func_args directions.
 inline void VerifyFuncArgDirections(ModuleItem* item,
                                     std::initializer_list<Direction> expected) {
   ASSERT_EQ(item->func_args.size(), expected.size());
@@ -62,7 +59,6 @@ inline void VerifyFuncArgDirections(ModuleItem* item,
   }
 }
 
-// Template AST navigation: first statement inside the first initial block.
 template <typename T>
 inline Stmt* FirstInitialStmtT(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -76,13 +72,11 @@ inline Stmt* FirstInitialStmtT(T& r) {
   return nullptr;
 }
 
-// Non-template wrappers for common ParseResult types.
 template <typename T>
 inline Stmt* FirstInitialStmt(T& r) {
   return FirstInitialStmtT(r);
 }
 
-// Template AST navigation: body of the first initial block.
 template <typename T>
 inline Stmt* InitialBodyT(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -97,7 +91,6 @@ inline Stmt* InitialBody(T& r) {
   return InitialBodyT(r);
 }
 
-// Find the first module item of a given kind.
 inline ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
                                   ModuleItemKind kind) {
   for (auto* item : items) {
@@ -106,14 +99,12 @@ inline ModuleItem* FindItemByKind(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// Template overload: find item by kind from a parse result.
 template <typename T, typename = decltype(std::declval<T>().cu)>
 inline ModuleItem* FindItemByKind(T& r, ModuleItemKind kind) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   return FindItemByKind(r.cu->modules[0]->items, kind);
 }
 
-// Count module items of a given kind.
 inline size_t CountItemsByKind(const std::vector<ModuleItem*>& items,
                                ModuleItemKind kind) {
   size_t count = 0;
@@ -123,13 +114,11 @@ inline size_t CountItemsByKind(const std::vector<ModuleItem*>& items,
   return count;
 }
 
-// Check if any module item of a given kind exists.
 inline bool HasItemOfKind(const std::vector<ModuleItem*>& items,
                           ModuleItemKind kind) {
   return FindItemByKind(items, kind) != nullptr;
 }
 
-// Find the first always block's body item.
 template <typename T>
 inline ModuleItem* FirstAlwaysItem(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -144,14 +133,12 @@ inline ModuleItem* FirstAlwaysItem(T& r) {
   return nullptr;
 }
 
-// Get the first item of a given kind from a module.
 template <typename T>
 inline ModuleItem* FirstItem(T& r, ModuleItemKind kind) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   return FindItemByKind(r.cu->modules[0]->items, kind);
 }
 
-// Get the very first module item (regardless of kind).
 template <typename T>
 inline ModuleItem* FirstItem(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -159,7 +146,6 @@ inline ModuleItem* FirstItem(T& r) {
   return items.empty() ? nullptr : items[0];
 }
 
-// Find first gate instantiation of a given kind.
 inline ModuleItem* FindGateByKind(const std::vector<ModuleItem*>& items,
                                   GateKind kind) {
   for (auto* item : items) {
@@ -169,7 +155,6 @@ inline ModuleItem* FindGateByKind(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// Collect all gate instantiations.
 inline std::vector<ModuleItem*> FindAllGates(
     const std::vector<ModuleItem*>& items) {
   std::vector<ModuleItem*> gates;
@@ -179,13 +164,11 @@ inline std::vector<ModuleItem*> FindAllGates(
   return gates;
 }
 
-// Find the first specify block in a module.
 template <typename T>
 inline ModuleItem* FindSpecifyBlock(T& r) {
   return FirstItem(r, ModuleItemKind::kSpecifyBlock);
 }
 
-// Get the Nth statement from the first initial block.
 template <typename T>
 inline Stmt* NthInitialStmt(T& r, size_t n) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -199,21 +182,18 @@ inline Stmt* NthInitialStmt(T& r, size_t n) {
   return nullptr;
 }
 
-// Get the RHS expression from the first initial block's first assignment.
 template <typename T>
 inline Expr* FirstInitialRHS(T& r) {
   auto* stmt = FirstInitialStmt(r);
   return stmt ? stmt->rhs : nullptr;
 }
 
-// Get the expression from the first initial block's first statement.
 template <typename T>
 inline Expr* FirstInitialExpr(T& r) {
   auto* stmt = FirstInitialStmt(r);
   return stmt ? stmt->expr : nullptr;
 }
 
-// Get the RHS of the first continuous assignment.
 template <typename T>
 inline Expr* FirstAssignRhs(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -223,19 +203,16 @@ inline Expr* FirstAssignRhs(T& r) {
   return nullptr;
 }
 
-// Find the first function declaration.
 template <typename T>
 inline ModuleItem* FirstFunctionDecl(T& r) {
   return FirstItem(r, ModuleItemKind::kFunctionDecl);
 }
 
-// Find the first module instance.
 template <typename T>
 inline ModuleItem* FirstModuleInst(T& r) {
   return FirstItem(r, ModuleItemKind::kModuleInst);
 }
 
-// Find the first always_comb item.
 template <typename T>
 inline ModuleItem* FirstAlwaysCombItem(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -245,7 +222,6 @@ inline ModuleItem* FirstAlwaysCombItem(T& r) {
   return nullptr;
 }
 
-// Find a return statement in a function/task body.
 inline Stmt* FindReturnStmt(Stmt* body) {
   if (!body) return nullptr;
   if (body->kind == StmtKind::kReturn) return body;
@@ -255,13 +231,11 @@ inline Stmt* FindReturnStmt(Stmt* body) {
   return nullptr;
 }
 
-// Find the first generate-if item.
 template <typename T>
 inline ModuleItem* FirstGenerateIf(T& r) {
   return FirstItem(r, ModuleItemKind::kGenerateIf);
 }
 
-// Find an item by name.
 inline ModuleItem* FindItemByName(const std::vector<ModuleItem*>& items,
                                   std::string_view name) {
   for (auto* item : items) {
@@ -270,7 +244,6 @@ inline ModuleItem* FindItemByName(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// Find a function declaration by name.
 inline ModuleItem* FindFunc(const std::vector<ModuleItem*>& items,
                             std::string_view name) {
   for (auto* item : items) {
@@ -280,7 +253,6 @@ inline ModuleItem* FindFunc(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// Find a clocking block by name.
 inline ModuleItem* FindClockingBlock(const std::vector<ModuleItem*>& items,
                                      std::string_view name) {
   for (auto* item : items) {
@@ -290,14 +262,12 @@ inline ModuleItem* FindClockingBlock(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// Find a clocking block from a parse result.
 template <typename T>
 inline ModuleItem* FindClockingBlock(T& r, std::string_view name) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
   return FindClockingBlock(r.cu->modules[0]->items, name);
 }
 
-// Find the specify block from a vector of module items.
 inline ModuleItem* FindSpecifyBlock(std::vector<ModuleItem*>& items) {
   return FindItemByKind(items, ModuleItemKind::kSpecifyBlock);
 }
@@ -305,14 +275,12 @@ inline ModuleItem* FindSpecifyBlock(const std::vector<ModuleItem*>& items) {
   return FindItemByKind(items, ModuleItemKind::kSpecifyBlock);
 }
 
-// Get the sole specify item from a specify block.
 inline SpecifyItem* GetSoleSpecifyItem(ModuleItem* spec_block) {
   EXPECT_EQ(spec_block->specify_items.size(), 1u);
   if (spec_block->specify_items.empty()) return nullptr;
   return spec_block->specify_items[0];
 }
 
-// Get the sole path/specify item from a parse result.
 template <typename T>
 inline SpecifyItem* GetSolePathItem(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -321,10 +289,6 @@ inline SpecifyItem* GetSolePathItem(T& r) {
   return spec->specify_items[0];
 }
 
-// Checks one terminal of the sole module path a parse result holds: the
-// identifier it names, the range form written after that identifier, and the
-// bounds that form carries -- a bit-select names one, and every other ranged
-// form names two. `ports` is the path's source or destination terminal list.
 inline void ExpectSoleTerminal(const std::vector<SpecifyTerminal>& ports,
                                std::string_view name, SpecifyRangeKind kind) {
   ASSERT_EQ(ports.size(), 1u);
@@ -338,9 +302,6 @@ inline void ExpectSoleTerminal(const std::vector<SpecifyTerminal>& ports,
   }
 }
 
-// Get the sole timing check declaration from a parse result. A specify block
-// may legally contain other items (e.g. a specparam declaring a limit value),
-// so scan for the timing-check item rather than assuming it appears first.
 template <typename T>
 inline TimingCheckDecl* GetSoleTimingCheck(T& r) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -352,7 +313,6 @@ inline TimingCheckDecl* GetSoleTimingCheck(T& r) {
   return nullptr;
 }
 
-// Result of parsing a module with a single specify item.
 struct SpecifyParseResult {
   ParseResult pr;
   ModuleItem* spec_block = nullptr;
@@ -370,7 +330,6 @@ inline SpecifyParseResult ParseSpecifySingle(const std::string& src) {
   return result;
 }
 
-// Collect all items of a given kind.
 inline std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
                                           ModuleItemKind kind) {
   std::vector<ModuleItem*> result;
@@ -380,7 +339,6 @@ inline std::vector<ModuleItem*> FindItems(const std::vector<ModuleItem*>& items,
   return result;
 }
 
-// Find all UDP instantiations.
 inline std::vector<ModuleItem*> FindUdpInsts(
     const std::vector<ModuleItem*>& items) {
   std::vector<ModuleItem*> insts;
@@ -390,7 +348,6 @@ inline std::vector<ModuleItem*> FindUdpInsts(
   return insts;
 }
 
-// Find all continuous assignments.
 inline std::vector<ModuleItem*> FindContAssigns(
     const std::vector<ModuleItem*>& items) {
   std::vector<ModuleItem*> result;
@@ -400,7 +357,6 @@ inline std::vector<ModuleItem*> FindContAssigns(
   return result;
 }
 
-// Find the Nth clocking block in the first module.
 template <typename T>
 inline ModuleItem* FindClockingBlockByIndex(T& r, size_t idx = 0) {
   if (!r.cu || r.cu->modules.empty()) return nullptr;
@@ -413,7 +369,6 @@ inline ModuleItem* FindClockingBlockByIndex(T& r, size_t idx = 0) {
   return nullptr;
 }
 
-// Validates parse result and retrieves a clocking block via output param.
 template <typename T>
 inline void GetClockingBlockChecked(T& r, ModuleItem*& out, size_t idx = 0) {
   ASSERT_NE(r.cu, nullptr);
@@ -422,7 +377,6 @@ inline void GetClockingBlockChecked(T& r, ModuleItem*& out, size_t idx = 0) {
   ASSERT_NE(out, nullptr);
 }
 
-// Verify always block has var decl as first statement.
 inline void VerifyAlwaysVarDecl(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -435,7 +389,6 @@ inline void VerifyAlwaysVarDecl(ParseResult& r) {
   EXPECT_EQ(item->body->stmts[0]->var_name, "temp");
 }
 
-// Verify always block first statement is nested if-else.
 inline void VerifyAlwaysNestedIfElse(ParseResult& r) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -447,7 +400,6 @@ inline void VerifyAlwaysNestedIfElse(ParseResult& r) {
   EXPECT_EQ(item->body->stmts[0]->kind, StmtKind::kIf);
 }
 
-// Return all statements from the first initial block.
 template <typename T>
 inline std::vector<Stmt*> AllInitialStmts(T& r) {
   if (!r.cu || r.cu->modules.empty()) return {};
@@ -460,7 +412,6 @@ inline std::vector<Stmt*> AllInitialStmts(T& r) {
   return {};
 }
 
-// A group of four statements from an initial block.
 struct FourStmts {
   Stmt* s0 = nullptr;
   Stmt* s1 = nullptr;
@@ -468,7 +419,6 @@ struct FourStmts {
   Stmt* s3 = nullptr;
 };
 
-// Get the first 4 statements from the first initial block.
 template <typename T>
 inline FourStmts Get4InitialStmts(T& r) {
   FourStmts fs;
@@ -483,7 +433,6 @@ inline FourStmts Get4InitialStmts(T& r) {
   return fs;
 }
 
-// Verify a 2-port module has expected names and directions.
 inline void VerifyTwoPortModule(ParseResult& r, const char* n0, Direction d0,
                                 const char* n1, Direction d1) {
   ASSERT_NE(r.cu, nullptr);
@@ -494,8 +443,6 @@ inline void VerifyTwoPortModule(ParseResult& r, const char* n0, Direction d0,
   EXPECT_EQ(mod->ports[1].name, n1);
   EXPECT_EQ(mod->ports[1].direction, d1);
 }
-
-// --- Aliases for alternative naming conventions ---
 
 inline ModuleItem* FindItem(const std::vector<ModuleItem*>& items,
                             ModuleItemKind kind) {
@@ -583,7 +530,6 @@ inline ModuleItem* FindFunctionByName(const std::vector<ModuleItem*>& items,
   return FindFunc(items, name);
 }
 
-// Find the first method member in a class declaration.
 inline ClassMember* FindMethodMember(ClassDecl* cls) {
   if (!cls) return nullptr;
   for (auto* m : cls->members) {
@@ -696,8 +642,6 @@ inline ModuleItem* FindClockingBlock(T& r) {
   return FirstItem(r, ModuleItemKind::kClockingBlock);
 }
 
-// --- Verify helpers ---
-
 inline void VerifyModportItem(ModportDecl* mp, std::string_view name,
                               Direction dir, std::string_view port_name) {
   EXPECT_EQ(mp->name, name);
@@ -721,10 +665,6 @@ inline void VerifyImportExportPort(const ModportPort& port, bool is_import,
   EXPECT_EQ(port.name, name);
 }
 
-// Verify the keys of an assignment pattern against their spellings. Each key is
-// an expression node, so a key written as a single name, number or keyword has
-// that spelling as the node's text, which is what a caller naming its expected
-// keys as strings is describing.
 inline void VerifyPatternKeys(const Expr* rhs,
                               const std::string expected_keys[], size_t count) {
   ASSERT_EQ(rhs->pattern_keys.size(), count);
@@ -733,8 +673,6 @@ inline void VerifyPatternKeys(const Expr* rhs,
   }
 }
 
-// Parse `src`, then verify the first initial assignment RHS is an expression of
-// the given kind with the given operator token.
 inline void VerifyInitialRhsOp(const std::string& src, ExprKind kind,
                                TokenKind op) {
   auto r = Parse(src);
@@ -746,8 +684,6 @@ inline void VerifyInitialRhsOp(const std::string& src, ExprKind kind,
   EXPECT_EQ(rhs->op, op);
 }
 
-// Parse `src`, then verify the first initial statement expression is of the
-// given kind with the given operator token.
 inline void VerifyInitialExprOp(const std::string& src, ExprKind kind,
                                 TokenKind op) {
   auto r = Parse(src);
@@ -773,9 +709,6 @@ inline void VerifyNestedPatternElements(T& r, size_t count) {
   }
 }
 
-// Parse `src`, then verify the first initial statement is a single
-// event-control statement carrying exactly one non-edge (Edge::kNone) event
-// whose signal is non-null and of the given expression kind.
 inline void VerifySingleNoneEventControlSignalKind(const std::string& src,
                                                    ExprKind signal_kind) {
   auto r = Parse(src);
@@ -790,10 +723,6 @@ inline void VerifySingleNoneEventControlSignalKind(const std::string& src,
   EXPECT_EQ(stmt->events[0].signal->kind, signal_kind);
 }
 
-// Verify a comma-separated list of hierarchical instances sharing one
-// module/interface identifier. The first `names.size()` module items are each
-// expected to be a kModuleInst with the given module name and the listed
-// instance names, in order.
 inline void VerifyHierarchicalInstanceList(
     const std::vector<ModuleItem*>& items, const char* module_name,
     std::initializer_list<const char*> names) {

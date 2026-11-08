@@ -16,23 +16,6 @@
 namespace delta {
 namespace {
 
-// §37.12 Scope: the VPI object model for a scope - the begin/fork blocks, tasks
-// and functions, for/foreach statements, and the other scoped constructs the
-// diagram draws. These tests observe the production helpers in vpi.cpp (and the
-// VpiContext::Handle/Get/Iterate paths they feed) that apply the clause's
-// numbered "Details".
-//
-// The diagram's structural reach (a scope's property/sequence decls, named
-// events, parameters, internal scopes, typedefs, etc.) and its vpiName/
-// vpiFullName strings are served by the generic machinery and carry no
-// §37.12-specific rule of their own. The details that do are exercised below:
-// scope-ness of an unnamed block (detail 1) and a for statement (detail 2), the
-// loop control variable's scope (details 2 and 3), the vpiImport iteration
-// (detail 4), the task/func body reached through vpiStmt (detail 5), the
-// vpiJoinType of a fork-join (detail 6), and the vpiVirtualInterfaceVar /
-// vpiVariables iterations over an array of virtual interfaces (detail 7).
-
-// Walk an iterator to completion, collecting every object it yields in order.
 std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   std::vector<VpiHandle> objects;
   if (!iterator) return objects;
@@ -40,28 +23,18 @@ std::vector<VpiHandle> Collect(VpiContext& ctx, VpiHandle iterator) {
   return objects;
 }
 
-// ---------------------------------------------------------------------------
-// Detail 1: an unnamed begin/fork is a scope iff it directly contains a block
-// item declaration; a named begin/fork is always a scope.
-// ---------------------------------------------------------------------------
-
-// D1: a block item declaration is a variable declaration or a type declaration.
-// Statements and other constructs are not block item declarations.
 TEST(ScopeModel, BlockItemDeclTypeClassification) {
-  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiLogicVar));  // a variable declaration
+  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiLogicVar));
   EXPECT_TRUE(VpiIsBlockItemDeclType(vpiIntVar));
   EXPECT_TRUE(VpiIsBlockItemDeclType(vpiStructVar));
-  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiTypedef));  // a type declaration
-  EXPECT_TRUE(
-      VpiIsBlockItemDeclType(vpiParameter));  // a localparam declaration
+  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiTypedef));
+  EXPECT_TRUE(VpiIsBlockItemDeclType(vpiParameter));
 
-  EXPECT_FALSE(VpiIsBlockItemDeclType(vpiAssignment));  // a statement
-  EXPECT_FALSE(VpiIsBlockItemDeclType(vpiNamedBegin));  // a nested block
+  EXPECT_FALSE(VpiIsBlockItemDeclType(vpiAssignment));
+  EXPECT_FALSE(VpiIsBlockItemDeclType(vpiNamedBegin));
   EXPECT_FALSE(VpiIsBlockItemDeclType(vpiModule));
 }
 
-// D1: an unnamed begin or fork is a scope only when one of its direct children
-// is a block item declaration; with only statement children it is not a scope.
 TEST(ScopeModel, UnnamedBlockIsScopeOnlyWithDirectDeclaration) {
   VpiObject var_decl;
   var_decl.type = vpiLogicVar;
@@ -78,7 +51,6 @@ TEST(ScopeModel, UnnamedBlockIsScopeOnlyWithDirectDeclaration) {
   stmt_only_begin.children.push_back(&stmt);
   EXPECT_FALSE(VpiBlockScopeIsScope(&stmt_only_begin));
 
-  // The same rule governs an unnamed fork.
   VpiObject declaring_fork;
   declaring_fork.type = vpiFork;
   declaring_fork.children.push_back(&var_decl);
@@ -90,8 +62,6 @@ TEST(ScopeModel, UnnamedBlockIsScopeOnlyWithDirectDeclaration) {
   EXPECT_FALSE(VpiBlockScopeIsScope(&stmt_only_fork));
 }
 
-// D1: a named begin or named fork is always a scope, even with no declaration
-// among its children.
 TEST(ScopeModel, NamedBlockIsAlwaysScope) {
   VpiObject stmt;
   stmt.type = vpiAssignment;
@@ -106,16 +76,11 @@ TEST(ScopeModel, NamedBlockIsAlwaysScope) {
   EXPECT_TRUE(VpiBlockScopeIsScope(&named_fork));
 }
 
-// D1 (boundary/error cases): a null block is not a scope; an unnamed begin with
-// no members at all has no block item declaration and so is not a scope (the
-// boundary of a block that itself holds a declaration); and a kind §37.12 does
-// not give a conditional scope rule to - here a module - is not classified as
-// one of these blocks.
 TEST(ScopeModel, BlockScopeIsScopeRejectsNullEmptyAndNonBlockKinds) {
   EXPECT_FALSE(VpiBlockScopeIsScope(nullptr));
 
   VpiObject empty_begin;
-  empty_begin.type = vpiBegin;  // no children -> no block item declaration
+  empty_begin.type = vpiBegin;
   EXPECT_FALSE(VpiBlockScopeIsScope(&empty_begin));
 
   VpiObject empty_fork;
@@ -126,10 +91,6 @@ TEST(ScopeModel, BlockScopeIsScopeRejectsNullEmptyAndNonBlockKinds) {
   module.type = vpiModule;
   EXPECT_FALSE(VpiBlockScopeIsScope(&module));
 }
-
-// ---------------------------------------------------------------------------
-// Detail 2: a for statement is a scope iff vpiLocalVarDecls returns TRUE.
-// ---------------------------------------------------------------------------
 
 TEST(ScopePublic, ForStatementIsScopeIffLocalVarDecls) {
   VpiContext ctx;
@@ -150,21 +111,10 @@ TEST(ScopePublic, ForStatementIsScopeIffLocalVarDecls) {
   SetGlobalVpiContext(nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Details 2 and 3: the scope of a loop control variable is its loop statement -
-// the foreach statement always (detail 3), or the for statement when it is a
-// scope (detail 2).
-// ---------------------------------------------------------------------------
-
-// D3: a foreach statement's loop control variable reaches the foreach statement
-// as its scope. D2: a for statement's loop control variable reaches the for
-// statement as its scope when the for declares its loop variables locally; when
-// it does not, the for statement is not the variable's scope.
 TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
 
-  // A foreach loop control variable -> the foreach statement (unconditional).
   VpiObject foreach_var;
   foreach_var.type = vpiIntVar;
   VpiObject foreach_stmt;
@@ -173,8 +123,6 @@ TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   foreach_stmt.children.push_back(&foreach_var);
   EXPECT_EQ(ctx.Handle(vpiScope, &foreach_var), &foreach_stmt);
 
-  // A for loop control variable, with the for declaring its variables locally,
-  // -> the for statement.
   VpiObject scoped_for_var;
   scoped_for_var.type = vpiIntVar;
   VpiObject scoped_for;
@@ -184,8 +132,6 @@ TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   scoped_for.children.push_back(&scoped_for_var);
   EXPECT_EQ(ctx.Handle(vpiScope, &scoped_for_var), &scoped_for);
 
-  // A for that is not a scope (shared loop variable) is not the variable's
-  // scope, so the for-statement routing does not apply.
   VpiObject shared_for_var;
   shared_for_var.type = vpiIntVar;
   VpiObject shared_for;
@@ -195,8 +141,6 @@ TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   shared_for.children.push_back(&shared_for_var);
   EXPECT_NE(ctx.Handle(vpiScope, &shared_for_var), &shared_for);
 
-  // A variable of a block that is no loop statement takes that block as its
-  // scope, the block being one by declaring the variable (detail 1).
   VpiObject block_var;
   block_var.type = vpiIntVar;
   VpiObject block;
@@ -208,27 +152,20 @@ TEST(ScopePublic, LoopControlVariableScopeIsItsLoopStatement) {
   SetGlobalVpiContext(nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Detail 4: vpiImport reaches the objects actually imported into a scope.
-// ---------------------------------------------------------------------------
-
-// D4: a scope's vpiImport iteration returns the objects imported and actually
-// referenced (those marked imported), not children merely declared in the scope
-// nor items only made visible by the import.
 TEST(ScopePublic, ImportIterationReturnsOnlyReferencedImports) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
 
   VpiObject imported_a;
-  imported_a.type = vpiParameter;  // an imported, referenced item
+  imported_a.type = vpiParameter;
   imported_a.imported = true;
   VpiObject imported_b;
   imported_b.type = vpiFunction;
   imported_b.imported = true;
   VpiObject local_decl;
-  local_decl.type = vpiParameter;  // declared locally, not imported
+  local_decl.type = vpiParameter;
   VpiObject visible_unreferenced;
-  visible_unreferenced.type = vpiFunction;  // made visible but not referenced
+  visible_unreferenced.type = vpiFunction;
   visible_unreferenced.imported = false;
 
   VpiObject scope;
@@ -243,7 +180,6 @@ TEST(ScopePublic, ImportIterationReturnsOnlyReferencedImports) {
   EXPECT_EQ(imports[0], &imported_a);
   EXPECT_EQ(imports[1], &imported_b);
 
-  // A scope with no imported objects yields no iterator.
   VpiObject bare;
   bare.type = vpiModule;
   bare.children.push_back(&local_decl);
@@ -252,12 +188,6 @@ TEST(ScopePublic, ImportIterationReturnsOnlyReferencedImports) {
   SetGlobalVpiContext(nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Detail 5: vpiStmt of a task/func is null with zero statements, the lone
-// statement with one, and the unnamed begin grouping them with more than one.
-// ---------------------------------------------------------------------------
-
-// D5: the "task func" node groups tasks and functions.
 TEST(ScopeModel, TaskFuncTypeClassification) {
   EXPECT_TRUE(VpiIsTaskFuncType(vpiTask));
   EXPECT_TRUE(VpiIsTaskFuncType(vpiFunction));
@@ -267,9 +197,6 @@ TEST(ScopeModel, TaskFuncTypeClassification) {
   EXPECT_FALSE(VpiIsTaskFuncType(vpiModule));
 }
 
-// D5: a task with no statements reports a null body. The io decls and variables
-// a task declares are not statements, so a task that holds only those still has
-// an empty body.
 TEST(ScopePublic, TaskWithNoStatementsHasNullStmt) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -289,9 +216,6 @@ TEST(ScopePublic, TaskWithNoStatementsHasNullStmt) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D5: when a task has more than one statement, the statements are grouped under
-// an unnamed begin and vpiStmt reaches that begin (which in turn contains the
-// statements).
 TEST(ScopePublic, TaskWithMultipleStatementsReturnsUnnamedBegin) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -301,7 +225,7 @@ TEST(ScopePublic, TaskWithMultipleStatementsReturnsUnnamedBegin) {
   s1.type = vpiAssignment;
   s2.type = vpiAssignment;
 
-  VpiObject grouping_begin;  // the unnamed begin wrapping the statements
+  VpiObject grouping_begin;
   grouping_begin.type = vpiBegin;
   grouping_begin.children.push_back(&s0);
   grouping_begin.children.push_back(&s1);
@@ -314,14 +238,11 @@ TEST(ScopePublic, TaskWithMultipleStatementsReturnsUnnamedBegin) {
   VpiHandle body = ctx.Handle(vpiStmt, &task);
   ASSERT_EQ(body, &grouping_begin);
   EXPECT_EQ(ctx.Get(vpiType, body), vpiBegin);
-  // The begin really does carry the statements it groups.
   EXPECT_EQ(grouping_begin.children.size(), 3u);
 
   SetGlobalVpiContext(nullptr);
 }
 
-// D5: a function with exactly one statement reports that statement directly,
-// with no grouping begin synthesized.
 TEST(ScopePublic, FunctionWithSingleStatementReturnsThatStatement) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -338,10 +259,6 @@ TEST(ScopePublic, FunctionWithSingleStatementReturnsThatStatement) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D5 (edge case): a task/func body reached through vpiStmt is the statement
-// among the children, found past the io decls and variables the task also
-// declares. This also exercises the combined vpiTaskFunc kind on the public
-// handle path.
 TEST(ScopePublic, TaskFuncStmtSkipsDeclarationsToReachBody) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -355,7 +272,6 @@ TEST(ScopePublic, TaskFuncStmtSkipsDeclarationsToReachBody) {
 
   VpiObject task_func;
   task_func.type = vpiTaskFunc;
-  // The declarations precede the body statement in child order.
   task_func.children.push_back(&io_decl);
   task_func.children.push_back(&local_var);
   task_func.children.push_back(&body);
@@ -365,11 +281,6 @@ TEST(ScopePublic, TaskFuncStmtSkipsDeclarationsToReachBody) {
   SetGlobalVpiContext(nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Detail 6: vpiJoinType reports one of vpiJoin/vpiJoinNone/vpiJoinAny.
-// ---------------------------------------------------------------------------
-
-// D6: only the three join constants are join types.
 TEST(ScopeModel, JoinTypeClassification) {
   EXPECT_TRUE(VpiIsJoinType(vpiJoin));
   EXPECT_TRUE(VpiIsJoinType(vpiJoinNone));
@@ -379,8 +290,6 @@ TEST(ScopeModel, JoinTypeClassification) {
   EXPECT_FALSE(VpiIsJoinType(-1));
 }
 
-// D6: a fork-join scope reports its terminating join kind through vpiJoinType;
-// a value outside the three legal join kinds collapses to vpiJoin.
 TEST(ScopePublic, ForkReportsJoinType) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -395,22 +304,12 @@ TEST(ScopePublic, ForkReportsJoinType) {
   fork.join_type = vpiJoinAny;
   EXPECT_EQ(ctx.Get(vpiJoinType, &fork), vpiJoinAny);
 
-  // An out-of-domain stored value is not a join type, so it reports vpiJoin.
   fork.join_type = vpiJoinAny + 100;
   EXPECT_EQ(ctx.Get(vpiJoinType, &fork), vpiJoin);
 
   SetGlobalVpiContext(nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// Detail 7: a scope's vpiVirtualInterfaceVar iteration expands an array of
-// virtual interfaces into its elements, while vpiVariables reports the array as
-// a single array var. The vif iteration is unsupported within a class defn.
-// ---------------------------------------------------------------------------
-
-// D7: iterating vpiVirtualInterfaceVar over a scope yields each standalone
-// virtual interface var, and for a declared array of virtual interfaces, each
-// element of the array separately.
 TEST(ScopePublic, VirtualInterfaceIterationExpandsArrayElements) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -418,7 +317,6 @@ TEST(ScopePublic, VirtualInterfaceIterationExpandsArrayElements) {
   VpiObject standalone_vif;
   standalone_vif.type = vpiVirtualInterfaceVar;
 
-  // An array of virtual interfaces: an array var whose elements are vif vars.
   VpiObject elem0, elem1;
   elem0.type = vpiVirtualInterfaceVar;
   elem1.type = vpiVirtualInterfaceVar;
@@ -436,14 +334,9 @@ TEST(ScopePublic, VirtualInterfaceIterationExpandsArrayElements) {
       Collect(ctx, ctx.Iterate(vpiVirtualInterfaceVar, &scope));
   ASSERT_EQ(vifs.size(), 3u);
   EXPECT_EQ(vifs[0], &standalone_vif);
-  EXPECT_EQ(vifs[1], &elem0);  // array expanded to its elements
+  EXPECT_EQ(vifs[1], &elem0);
   EXPECT_EQ(vifs[2], &elem1);
 
-  // D7: vpiVariables reports the array of virtual interfaces as the single
-  // array var that declares it, not its individual elements. The standalone
-  // virtual interface var comes back beside it, §37.17 drawing `virtual
-  // interface var` inside the `variables` class enclosure that this relation is
-  // drawn to (§37.4.1).
   std::vector<VpiHandle> vars = Collect(ctx, ctx.Iterate(vpiVariables, &scope));
   ASSERT_EQ(vars.size(), 2u);
   EXPECT_EQ(vars[0], &standalone_vif);
@@ -452,9 +345,6 @@ TEST(ScopePublic, VirtualInterfaceIterationExpandsArrayElements) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D7 (error/lexical-context case): the vpiVirtualInterfaceVar iteration is not
-// supported within a lexical context such as a class defn, so it yields no
-// iterator there even when the class declares virtual interface vars.
 TEST(ScopePublic, VirtualInterfaceIterationUnsupportedInClassDefn) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -471,11 +361,6 @@ TEST(ScopePublic, VirtualInterfaceIterationUnsupportedInClassDefn) {
   SetGlobalVpiContext(nullptr);
 }
 
-// ---------------------------------------------------------------------------
-// The scopes of a run: the blocks a design's procedures write, built from the
-// elaborated design rather than by hand.
-// ---------------------------------------------------------------------------
-
 class BlockScopesOfARun : public VpiDesignRun {
  protected:
   static std::string FullName(vpiHandle obj) {
@@ -484,8 +369,6 @@ class BlockScopesOfARun : public VpiDesignRun {
   }
 };
 
-// D1: a named begin is always a scope, so a procedure's named block is an
-// object of the run, named under the instance whose procedure wrote it.
 TEST_F(BlockScopesOfARun, ANamedBeginIsAnObjectOfTheRun) {
   Run("module top; int x; initial begin : blk x = 1; end endmodule\n");
   vpiHandle blk = By("top.blk");
@@ -495,7 +378,6 @@ TEST_F(BlockScopesOfARun, ANamedBeginIsAnObjectOfTheRun) {
   EXPECT_EQ(FullName(blk), "top.blk");
 }
 
-// D1: a named fork is always a scope as well.
 TEST_F(BlockScopesOfARun, ANamedForkIsAnObjectOfTheRun) {
   Run("module top; initial fork : fk #1; join_any endmodule\n");
   vpiHandle fk = By("top.fk");
@@ -504,7 +386,6 @@ TEST_F(BlockScopesOfARun, ANamedForkIsAnObjectOfTheRun) {
   EXPECT_EQ(FullName(fk), "top.fk");
 }
 
-// A named block inside another is named under the block around it.
 TEST_F(BlockScopesOfARun, ANestedNamedBlockIsNamedUnderTheBlockAroundIt) {
   Run("module top; initial begin : outer begin : inner end end endmodule\n");
   vpiHandle inner = By("top.outer.inner");
@@ -514,8 +395,6 @@ TEST_F(BlockScopesOfARun, ANestedNamedBlockIsNamedUnderTheBlockAroundIt) {
   EXPECT_EQ(By("top.inner"), nullptr);
 }
 
-// The blocks a procedure writes in the branches of an if, the items of a case
-// and the body of a loop are scopes of the run all the same.
 TEST_F(BlockScopesOfARun, ABlockInsideAnotherStatementIsAnObjectOfTheRun) {
   Run("module top; int x;\n"
       "  initial if (x == 0) begin : t end else begin : e end\n"
@@ -531,7 +410,6 @@ TEST_F(BlockScopesOfARun, ABlockInsideAnotherStatementIsAnObjectOfTheRun) {
   }
 }
 
-// A block of a submodule's procedure is a scope of that instance.
 TEST_F(BlockScopesOfARun, ABlockOfASubmoduleIsNamedUnderItsInstance) {
   Run("module sub; initial begin : sb end endmodule\n"
       "module top; sub u(); endmodule\n");
@@ -540,7 +418,6 @@ TEST_F(BlockScopesOfARun, ABlockOfASubmoduleIsNamedUnderItsInstance) {
   EXPECT_EQ(FullName(sb), "top.u.sb");
 }
 
-// D6: a fork reports the join keyword that closed it.
 TEST_F(BlockScopesOfARun, AForkReportsTheJoinKeywordThatClosedIt) {
   Run("module top;\n"
       "  initial fork : fj #1; join\n"
@@ -553,8 +430,6 @@ TEST_F(BlockScopesOfARun, AForkReportsTheJoinKeywordThatClosedIt) {
   EXPECT_EQ(vpi_get(vpiJoinType, By("top.fn")), vpiJoinNone);
 }
 
-// The variables a named block declares hang beneath it, each of the kind its
-// type gives (§37.17), and a block parameter is none of them.
 TEST_F(BlockScopesOfARun, ANamedBlocksVariablesHangBeneathIt) {
   Run("module top; initial begin : blk\n"
       "  parameter int P = 1; int v; logic [3:0] w; int a [2];\n"
@@ -571,9 +446,6 @@ TEST_F(BlockScopesOfARun, ANamedBlocksVariablesHangBeneathIt) {
   EXPECT_EQ(vpi_get(vpiType, By("top.blk.a")), vpiRegArray);
 }
 
-// A named block's variables of a real, string, chandle, event, enum or virtual
-// interface type are the kinds §37.17 and §37.27 draw for them, as a module's
-// of those types are, rather than regs (#5032).
 TEST_F(BlockScopesOfARun, ABlocksNonIntegralVariablesHaveTheirOwnKinds) {
   Run("interface intf; endinterface\n"
       "module top; initial begin : blk\n"
@@ -591,10 +463,6 @@ TEST_F(BlockScopesOfARun, ABlocksNonIntegralVariablesHaveTheirOwnKinds) {
   EXPECT_EQ(vpi_get(vpiType, By("top.blk.vi")), vpiVirtualInterfaceVar);
 }
 
-// A block's variable of a class type is a class var, whether the design
-// declares the class, the class is a built-in one, or a typedef names it; a
-// variable of any other typedef is the kind of the type the typedef names
-// (#5032).
 TEST_F(BlockScopesOfARun, ABlocksClassAndTypedefVariablesHaveTheirKinds) {
   Run("module top;\n"
       "  class C; endclass\n"
@@ -608,8 +476,6 @@ TEST_F(BlockScopesOfARun, ABlocksClassAndTypedefVariablesHaveTheirKinds) {
   EXPECT_EQ(vpi_get(vpiType, By("top.blk.en")), vpiEnumVar);
 }
 
-// D1: an unnamed begin or fork that directly declares a block item is a scope,
-// with the declared variable beneath it.
 TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresIsAScope) {
   Run("module top;\n"
       "  initial begin int v; v = 1; end\n"
@@ -626,9 +492,6 @@ TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresIsAScope) {
   EXPECT_EQ(NamesOf(vpiVariables, begin), (std::vector<std::string>{"v"}));
 }
 
-// D1: an unnamed begin that declares nothing directly is no scope, though a
-// named block inside it declares a variable; the named block stands in the
-// instance itself, as in the detail's example.
 TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresNothingIsNoScope) {
   Run("module top; initial begin\n"
       "  begin : BLK var logic v; v = 1'b1; end\n"
@@ -639,9 +502,6 @@ TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresNothingIsNoScope) {
   EXPECT_NE(By("top.BLK"), nullptr);
 }
 
-// D1 with §37.60: an unnamed begin that declares nothing is no scope but is a
-// begin of the run all the same, the body its procedure reaches, reaching the
-// statements it holds in order, each standing in the instance (#5060, #5061).
 TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresNothingIsABegin) {
   Run("module top; int a, b; initial begin a = 1; b <= 2; end endmodule\n");
   vpiHandle it = vpi_iterate(vpiProcess, By("top"));
@@ -660,7 +520,6 @@ TEST_F(BlockScopesOfARun, AnUnnamedBlockThatDeclaresNothingIsABegin) {
   EXPECT_EQ(KindsOf(vpiInternalScope, By("top")), std::vector<int>{});
 }
 
-// The same of an unnamed fork, which reports the join keyword closing it.
 TEST_F(BlockScopesOfARun, AnUnnamedForkThatDeclaresNothingIsAFork) {
   Run("module top; initial fork #1; #2; join_any endmodule\n");
   vpiHandle it = vpi_iterate(vpiProcess, By("top"));
@@ -673,9 +532,6 @@ TEST_F(BlockScopesOfARun, AnUnnamedForkThatDeclaresNothingIsAFork) {
             (std::vector<int>{vpiDelayControl, vpiDelayControl}));
 }
 
-// D1's example: the named block inside the plain begin is a statement of the
-// begin, while it stands in the instance as one of its scopes and is named
-// under the instance alone (#5060).
 TEST_F(BlockScopesOfARun, ANamedBlockInsideAPlainBeginIsOneOfItsStatements) {
   Run("module top; initial begin\n"
       "  begin : BLK var logic v; v = 1'b1; end\n"
@@ -693,8 +549,6 @@ TEST_F(BlockScopesOfARun, ANamedBlockInsideAPlainBeginIsOneOfItsStatements) {
   EXPECT_EQ(FullName(blk), "top.BLK");
 }
 
-// The vpiStmt iteration of a block reaches the statements it holds, in the
-// order written, and none of the variables it declares (#5061).
 TEST(ScopePublic, ABlocksStatementIterationReachesItsStatementsOnly) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -715,8 +569,6 @@ TEST(ScopePublic, ABlocksStatementIterationReachesItsStatementsOnly) {
   SetGlobalVpiContext(nullptr);
 }
 
-// The vpiInternalScope relation is drawn to the scope class, so it reaches the
-// instances and blocks a scope holds and none of its variables.
 TEST_F(BlockScopesOfARun, InternalScopesAreTheScopesAScopeHolds) {
   Run("module sub; endmodule\n"
       "module top; int x; sub u();\n"
@@ -730,8 +582,6 @@ TEST_F(BlockScopesOfARun, InternalScopesAreTheScopesAScopeHolds) {
             (std::vector<std::string>{"inner"}));
 }
 
-// A block reaches the scope it stands in through vpiScope: the block around
-// it, or the instance.
 TEST_F(BlockScopesOfARun, ABlockReachesTheScopeItStandsIn) {
   Run("module top; initial begin : outer begin : inner end end endmodule\n");
   vpiHandle outer = By("top.outer");
@@ -741,8 +591,6 @@ TEST_F(BlockScopesOfARun, ABlockReachesTheScopeItStandsIn) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiScope, outer)), VpiObjectOf(By("top")));
 }
 
-// A statement's scope is the nearest object around it that is a scope: an
-// unnamed begin declaring nothing is passed over (D1).
 TEST(ScopePublic, AStatementsScopeSkipsABlockThatIsNoScope) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -760,7 +608,6 @@ TEST(ScopePublic, AStatementsScopeSkipsABlockThatIsNoScope) {
   SetGlobalVpiContext(nullptr);
 }
 
-// A statement standing in no scope at all reaches none.
 TEST(ScopePublic, AStatementInNoScopeReachesNone) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -770,8 +617,6 @@ TEST(ScopePublic, AStatementInNoScopeReachesNone) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §9.3.5: a label on a statement other than a block creates a named begin
-// around it, which D1 makes a scope, and the procedure runs that begin.
 TEST_F(BlockScopesOfARun, ALabelOnAStatementCreatesANamedBegin) {
   Run("module top; event e; initial trig: -> e; endmodule\n");
   vpiHandle trig = By("top.trig");
@@ -784,9 +629,6 @@ TEST_F(BlockScopesOfARun, ALabelOnAStatementCreatesANamedBegin) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiStmt, vpi_scan(it))), VpiObjectOf(trig));
 }
 
-// §9.3.5: a label on a for loop that declares no variable, whether it assigns
-// its variable or initializes nothing, creates a named begin around it like
-// any other statement's.
 TEST_F(BlockScopesOfARun, ALabelOnAPlainForLoopCreatesANamedBegin) {
   Run("module top; int j;\n"
       "  initial ln: for (j = 0; j < 1; j++) ;\n"
@@ -799,9 +641,6 @@ TEST_F(BlockScopesOfARun, ALabelOnAPlainForLoopCreatesANamedBegin) {
   }
 }
 
-// §37.12 (figure) with §27.4: a variable a named block declares in a procedure
-// of a generate block hangs from the block, full-named under the generate
-// block and the named block both.
 TEST_F(BlockScopesOfARun, AGeneratedBlocksVariableIsNamedUnderBothBlocks) {
   Run("module top;\n"
       "  if (1) begin : g initial begin : blk int v; v = 4; end end\n"
@@ -812,8 +651,6 @@ TEST_F(BlockScopesOfARun, AGeneratedBlocksVariableIsNamedUnderBothBlocks) {
   EXPECT_EQ(FullName(v), "top.g.blk.v");
 }
 
-// §9.3.5: a label on a foreach loop, or on a for loop declaring its variables,
-// names the block the loop itself creates, so no named begin stands around it.
 TEST_F(BlockScopesOfARun, ALabelOnAScopedLoopCreatesNoNamedBegin) {
   Run("module top; int a [2];\n"
       "  initial lf: foreach (a[i]) a[i] = i;\n"
@@ -826,9 +663,6 @@ TEST_F(BlockScopesOfARun, ALabelOnAScopedLoopCreatesNoNamedBegin) {
   }
 }
 
-// §37.12 detail 7: no scope holds no virtual interface vars and no variables,
-// and of a scope's children only a virtual interface var, or an array of
-// them expanded into its elements, is one.
 TEST(ScopeModel, VirtualInterfaceVarsAreOnlyTheVifsAndTheirArrays) {
   EXPECT_TRUE(VpiScopeVirtualInterfaceVars(nullptr).empty());
   EXPECT_TRUE(VpiScopeVariables(nullptr).empty());
@@ -848,9 +682,6 @@ TEST(ScopeModel, VirtualInterfaceVarsAreOnlyTheVifsAndTheirArrays) {
             (std::vector<VpiHandle>{&element}));
 }
 
-// §37.12 detail 1: every variable kind and array var is a block item
-// declaration; details 2 and 3: a typedef and a parameter, though block item
-// declarations, are no loop control variables.
 TEST(ScopeModel, BlockItemDeclarationAndLoopVariableKinds) {
   for (int type : {vpiIntegerVar, vpiRealVar, vpiShortRealVar, vpiTimeVar,
                    vpiByteVar, vpiShortIntVar, vpiLongIntVar, vpiBitVar,
@@ -862,9 +693,6 @@ TEST(ScopeModel, BlockItemDeclarationAndLoopVariableKinds) {
   EXPECT_FALSE(VpiIsLoopControlVarType(vpiParameter));
 }
 
-// §37.12 detail 7: an array of virtual interfaces is an array var with a
-// virtual interface var element; no object, a non-array, and an array of
-// other elements are none.
 TEST(ScopeModel, OnlyAnArrayOfVifsIsAVifArray) {
   EXPECT_FALSE(VpiIsVirtualInterfaceArray(nullptr));
   VpiObject plain;
@@ -876,10 +704,6 @@ TEST(ScopeModel, OnlyAnArrayOfVifsIsAVifArray) {
   EXPECT_FALSE(VpiIsVirtualInterfaceArray(&array));
 }
 
-// §37.12 (figure): vpiInternalScope reaches every kind the scope class groups
-// -- a task among the tasks and functions, the instances, the four block
-// kinds, class defns, typespecs and objects, clocking blocks, gen scopes, and
-// for and foreach statements.
 TEST(ScopeModel, EveryKindTheScopeClassGroupsIsAnInternalScope) {
   for (int type :
        {vpiTask, vpiInterface, vpiProgram, vpiPackage, vpiBegin, vpiNamedFork,
@@ -889,8 +713,6 @@ TEST(ScopeModel, EveryKindTheScopeClassGroupsIsAnInternalScope) {
   }
 }
 
-// §37.12 (figure): the block kinds reach their statements through vpiStmt;
-// asked of an object that is no block, the relation is not this one's.
 TEST(ScopeModel, AStatementIterationOfANonBlockIsNoNestedWalk) {
   VpiObject module;
   module.type = vpiModule;
@@ -899,9 +721,6 @@ TEST(ScopeModel, AStatementIterationOfANonBlockIsNoNestedWalk) {
   EXPECT_TRUE(iter.children.empty());
 }
 
-// §37.12 (figure): a name written inside a statement that is no scope names a
-// scope only when the object bearing it is one; a variable of that name inside
-// an if statement is no nested scope.
 TEST(ScopeModel, AVariableInsideAStatementIsNoNestedScope) {
   VpiObject module;
   module.type = vpiModule;
@@ -920,8 +739,6 @@ TEST(ScopeModel, AVariableInsideAStatementIsNoNestedScope) {
   EXPECT_EQ(VpiNestedScopeNamed(&module, "inner"), &block);
 }
 
-// The §37.17 figure: a variable reaches the scope it is declared in through
-// vpiScope, a module's variable the module and a named block's the block.
 TEST_F(BlockScopesOfARun, AVariableReachesTheScopeItIsDeclaredIn) {
   Run("module top;\n"
       "  int a;\n"

@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §9.7 with §6.19.5.6: status() answers a value of the enumeration
-// process::state, so name() chained on the call is the member's name.
 TEST(FineGrainProcessControlRun, StatusNameOfAChainedCall) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -23,8 +21,6 @@ TEST(FineGrainProcessControlRun, StatusNameOfAChainedCall) {
             "WAITING\n");
 }
 
-// §9.7: the handle status() is called through may be an element of an array
-// of them, as §9.7's own example keeps them.
 TEST(FineGrainProcessControlRun, StatusNameThroughAnArrayElement) {
   SimFixture f;
   EXPECT_EQ(
@@ -39,8 +35,6 @@ TEST(FineGrainProcessControlRun, StatusNameThroughAnArrayElement) {
       "WAITING\n");
 }
 
-// §9.7 with §8.6: a process handle held as a property is read by its bare name
-// in a method, and through another handle, `w.q`, from outside.
 TEST(FineGrainProcessControlRun, StatusNameOfAPropertyInAClassFunction) {
   SimFixture f;
   EXPECT_EQ(
@@ -68,9 +62,6 @@ TEST(FineGrainProcessControlRun, StatusNameOfAPropertyInAClassFunction) {
       "q FINISHED\n");
 }
 
-// §9.7: await() and kill() act on the process the handle refers to, wherever
-// the handle is held; through an element of an array, await() waits for the
-// process to end and kill() ends it.
 TEST(FineGrainProcessControlRun, AwaitAndKillThroughArrayElements) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -93,9 +84,6 @@ TEST(FineGrainProcessControlRun, AwaitAndKillThroughArrayElements) {
             "kill @15 fin=10\n");
 }
 
-// §9.7's own do_n_way pattern in a class task: the forked processes' handles
-// held in a dynamic array property, the first awaited and the rest killed, the
-// status read without an argument list as the example writes it.
 TEST(FineGrainProcessControlRun, ClauseExampleJobArrayInAClassTask) {
   SimFixture f;
   EXPECT_EQ(
@@ -129,8 +117,6 @@ TEST(FineGrainProcessControlRun, ClauseExampleJobArrayInAClassTask) {
       "end @9 fin=1\n");
 }
 
-// §9.7 with A.8.2: a method call's argument list may be omitted, so `p.kill;`
-// kills, `q.suspend;` suspends and `p.status` reads the state.
 TEST(FineGrainProcessControlRun, MethodsWrittenWithoutAnArgumentList) {
   SimFixture f;
   EXPECT_EQ(
@@ -153,7 +139,6 @@ TEST(FineGrainProcessControlRun, MethodsWrittenWithoutAnArgumentList) {
       "x=0 p=1 q=1\n");
 }
 
-// §9.7 with A.8.2: `p.await;` waits as `p.await();` does.
 TEST(FineGrainProcessControlRun, AwaitWrittenWithoutAnArgumentList) {
   SimFixture f;
   EXPECT_EQ(
@@ -169,8 +154,6 @@ TEST(FineGrainProcessControlRun, AwaitWrittenWithoutAnArgumentList) {
       "await @5 x=1\n");
 }
 
-// §9.7: a process created by an initial procedure that runs to its end has
-// terminated normally, whether it last waited on an event or a delay.
 TEST(FineGrainProcessControlRun, InitialProcessThatEndsIsFinished) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -187,8 +170,6 @@ TEST(FineGrainProcessControlRun, InitialProcessThatEndsIsFinished) {
             "b=FINISHED c=FINISHED\n");
 }
 
-// §9.7: await() on a process created by an initial procedure returns when
-// that process ends.
 TEST(FineGrainProcessControlRun, AwaitOnAnInitialProcessReturnsAtItsEnd) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -201,9 +182,6 @@ TEST(FineGrainProcessControlRun, AwaitOnAnInitialProcessReturnsAtItsEnd) {
             "awaited @2\n");
 }
 
-// §9.7: the process is suspended before suspend() returns, so one suspending
-// itself goes no further until another resumes it, and then continues in that
-// time step.
 TEST(FineGrainProcessControlRun, ProcessSuspendingItselfStopsUntilResumed) {
   SimFixture f;
   EXPECT_EQ(
@@ -224,9 +202,6 @@ TEST(FineGrainProcessControlRun, ProcessSuspendingItselfStopsUntilResumed) {
       "a back @2\n");
 }
 
-// §9.7: a process suspended in a delay is desensitized to it. Resumed after
-// the delay has expired it continues at once; resumed before, the delay
-// expires on time.
 TEST(FineGrainProcessControlRun, ResumeAfterAndBeforeASuspendedDelayExpires) {
   SimFixture f;
   EXPECT_EQ(
@@ -249,9 +224,6 @@ TEST(FineGrainProcessControlRun, ResumeAfterAndBeforeASuspendedDelayExpires) {
       "a woke @15\n");
 }
 
-// §9.7: a process suspended while waiting on an event is desensitized to it,
-// so a trigger during the suspension passes it by; resume() resensitizes it and
-// the next trigger wakes it.
 TEST(FineGrainProcessControlRun,
      SuspendedEventWaitMissesTheTriggerAndWaitsForTheNext) {
   SimFixture f;
@@ -270,9 +242,6 @@ TEST(FineGrainProcessControlRun,
             "b back @7\n");
 }
 
-// §9.7 with §6.19.5.6: a module variable declared process::state holds a
-// member of that enumeration, so name() answers the member's name there as it
-// does for a procedural variable of the same type.
 TEST(FineGrainProcessControlRun, StatusNameOfAModuleStateVariable) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -288,8 +257,6 @@ TEST(FineGrainProcessControlRun, StatusNameOfAModuleStateVariable) {
             "WAITING\n");
 }
 
-// §9.7: a process ended by disable fork (§9.6.3) was forcibly terminated, so
-// status() answers KILLED and an await() on it returns.
 TEST(FineGrainProcessControlRun, AProcessDisableForkEndsIsKilled) {
   SimFixture f;
   EXPECT_EQ(
@@ -306,9 +273,6 @@ TEST(FineGrainProcessControlRun, AProcessDisableForkEndsIsKilled) {
       "KILLED\nafter 1\n");
 }
 
-// §9.7: kill() terminates every descendant, a grandchild spawned by a child
-// that has already finished among them, and each process it terminates
-// releases the processes awaiting it. Killing it again leaves it KILLED.
 TEST(FineGrainProcessControlRun, KillReachesAndReleasesEveryDescendant) {
   SimFixture f;
   EXPECT_EQ(
@@ -332,11 +296,6 @@ TEST(FineGrainProcessControlRun, KillReachesAndReleasesEveryDescendant) {
       "c 2\nx=0\n");
 }
 
-// §9.7: suspend() desensitizes a process blocked in a wait statement to its
-// condition, and resume() resensitizes it, scheduling it in the time step of
-// the resume where the condition then holds. p's condition becomes true while
-// it is suspended and holds at the resume; q's becomes true and false again, so
-// q waits on until it next holds.
 TEST(FineGrainProcessControlRun, SuspendDesensitizesAWaitCondition) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; bit go, go2; process p, q;\n"
@@ -360,9 +319,6 @@ TEST(FineGrainProcessControlRun, SuspendDesensitizesAWaitCondition) {
             "p 12\nq 15\n");
 }
 
-// §9.7 with §24: a program's process resumed while RUNNING goes into the
-// Reactive region of the time step, so it runs before the Re-NBA region applies
-// the nonblocking update its resumer made after the resume() call.
 TEST(FineGrainProcessControlRun,
      AResumedProgramProcessRunsInTheReactiveRegion) {
   SimFixture f;
@@ -377,10 +333,6 @@ TEST(FineGrainProcessControlRun,
             "r=0\n");
 }
 
-// §9.7: self() answers a handle to the calling process, and a method of the
-// class called directly on that handle acts on the process as it does through
-// a variable holding it: srandom() reseeds the process's generator, so the draw
-// after it repeats the one after the same seed given through the variable.
 TEST(FineGrainProcessControlRun, SrandomCalledOnSelfReseedsTheCallingProcess) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t; process p; int a, b;\n"
@@ -395,9 +347,6 @@ TEST(FineGrainProcessControlRun, SrandomCalledOnSelfReseedsTheCallingProcess) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §9.7: status() called on self()'s handle answers the state of the process
-// making the call, RUNNING, as a value of process::state whose name() is the
-// member's name.
 TEST(FineGrainProcessControlRun, StatusCalledOnSelfIsRunning) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -409,9 +358,6 @@ TEST(FineGrainProcessControlRun, StatusCalledOnSelfIsRunning) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §9.7 with §13.4: a function may return a handle to a process, and a method
-// of the class called on what it returns acts on that process as one called on
-// self() does: srandom() reseeds the calling process.
 TEST(FineGrainProcessControlRun,
      SrandomCalledOnAFunctionsResultReseedsItsProcess) {
   SimFixture f;
@@ -430,9 +376,6 @@ TEST(FineGrainProcessControlRun,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §9.7 with §8.6 and §26.7: a class method declared to return std::process
-// returns a handle of the same class, so status() called on its result through
-// the object answers RUNNING, by name, for the process calling it.
 TEST(FineGrainProcessControlRun, StatusCalledOnAMethodsResultIsRunning) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class W;\n"
@@ -451,10 +394,6 @@ TEST(FineGrainProcessControlRun, StatusCalledOnAMethodsResultIsRunning) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §9.7 with §7.2: a member of an unpacked structure may hold a handle to a
-// process, and a method of the class called through the member acts on that
-// process: srandom() reseeds it. The forked process is given the first handle,
-// so the member holds one that a member one bit wide would not keep.
 TEST(FineGrainProcessControlRun,
      SrandomCalledThroughAStructureMemberReseedsItsProcess) {
   SimFixture f;
@@ -476,9 +415,6 @@ TEST(FineGrainProcessControlRun,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §9.7 with §7.2 and §26.7: a member declared std::process, after a member of
-// another type, holds a handle of the same class, so status() called through
-// it answers RUNNING, by name, for the process the member refers to.
 TEST(FineGrainProcessControlRun, StatusCalledThroughAStructureMemberIsRunning) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

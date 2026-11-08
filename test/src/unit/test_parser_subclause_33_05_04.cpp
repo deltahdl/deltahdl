@@ -11,14 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §33.5.4: where a separate compilation tool did the compiling, the tool that
-// binds afterwards can be given the configuration to use instead of the names
-// of the top-level cells -- and in that strategy the configuration is itself
-// precompiled. So the compiled form has to carry everything a bind reads out of
-// a configuration, because the bind will never see the source description it
-// was written from: the cells its design statement names, and the rules that
-// bind the instances below them.
-
 TEST(PrecompiledConfig, DesignCellsAndRulesSurviveTheCompiledForm) {
   ScratchDir tmp;
   auto path = tmp.dir / "myLib.dpl";
@@ -54,10 +46,6 @@ TEST(PrecompiledConfig, DesignCellsAndRulesSurviveTheCompiledForm) {
   EXPECT_EQ(cfg->rules[1]->cell_name, "a");
 }
 
-// The configuration need not have been compiled by the same invocation that
-// compiled the cells it configures, nor into the same library: it is a design
-// element like any other, so a compile of its own puts it in the filesystem
-// beside them, and one read gathers the configuration and the cells together.
 TEST(PrecompiledConfig, ConfigCompiledSeparatelyIsHeldBesideTheCellsItNames) {
   ScratchDir tmp;
   auto path = tmp.dir / "design.dpl";
@@ -86,11 +74,6 @@ TEST(PrecompiledConfig, ConfigCompiledSeparatelyIsHeldBesideTheCellsItNames) {
   EXPECT_EQ(target.configs[0]->design_cells[0].cell, "top");
 }
 
-// The rule shape the round-trip above leaves out. An instance clause carries
-// more than a kind and a name -- the instance path it selects, the library and
-// cell its use clause expands to, and whether that use clause reaches a
-// configuration rather than a cell -- and a bind driven by the compiled form
-// reads every one of those out of it.
 TEST(PrecompiledConfig, InstanceClausesSurviveTheCompiledForm) {
   ScratchDir tmp;
   auto path = tmp.dir / "myLib.dpl";
@@ -124,10 +107,6 @@ TEST(PrecompiledConfig, InstanceClausesSurviveTheCompiledForm) {
   EXPECT_TRUE(cfg->rules[1]->use_config);
 }
 
-// A configuration may declare constants of its own ahead of its design
-// statement, and the parameter overrides its rules carry are written in terms
-// of them. They are part of the configuration, so they travel with it into the
-// compiled form rather than being resolved away when it is written.
 TEST(PrecompiledConfig, ConfigLocalParametersSurviveTheCompiledForm) {
   ScratchDir tmp;
   auto path = tmp.dir / "myLib.dpl";

@@ -162,14 +162,6 @@ TEST(DottedNameSimulation, MemberSelectAndHierarchicalNameInSameModule) {
   EXPECT_EQ(v2->value.ToUint64(), 10u);
 }
 
-// §23.7 rule b at run time, exercised through the interface (§25) dependency
-// end-to-end: an interface instance is a directly visible scope name, so a
-// dotted name rooted at it is a hierarchical name rather than a member select.
-// The interface is built from real source syntax and driven through the whole
-// pipeline; the parent writes and then reads the interface's variable through
-// the instance-rooted hierarchical name, and the resolved reference carries the
-// value at run time. This is the interface-instance scope-kind form of the
-// hierarchical-name rule, complementing the module-instance forms above.
 TEST(DottedNameSimulation,
      InterfaceInstanceScopeReadsAndWritesHierarchicalName) {
   SimFixture f;
@@ -190,12 +182,6 @@ TEST(DottedNameSimulation,
   EXPECT_EQ(v->value.ToUint64(), 0x5Au);
 }
 
-// §23.7 (printed pages 757-758): a dotted name whose first component resolves
-// to a subroutine is a hierarchical name into it, so `f.x` is the static
-// variable x of the function f -- here one imported from a package, the
-// standard's own example's `f.x = 3` making `p::f()` return 3. The write went
-// nowhere: the static local existed only once a call had declared it, and
-// nothing looked a dotted name up among a function's locals.
 TEST(DottedNameResolution, DottedNameWritesAnImportedFunctionsStaticLocal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -215,8 +201,6 @@ TEST(DottedNameResolution, DottedNameWritesAnImportedFunctionsStaticLocal) {
             "3 3\n");
 }
 
-// A read reaches the variable the calls keep: after two calls that count x
-// up, `p::f.x` and the module's own `g.y` read what the calls left there.
 TEST(DottedNameResolution, DottedNameReadsTheStaticLocalTheCallsKeep) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -243,10 +227,6 @@ TEST(DottedNameResolution, DottedNameReadsTheStaticLocalTheCallsKeep) {
             "1 2 2\n6 6\n");
 }
 
-// §23.7 with §6.21: a static local written with no initializer is not made
-// before the procedures start as one with an initializer is (§10.5), so
-// `f.x = 4` ahead of any call makes it in the function's static frame, where
-// the call then reads it.
 TEST(DottedNameResolution, DottedNameWritesAStaticLocalNoCallHasMade) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -266,13 +246,6 @@ TEST(DottedNameResolution, DottedNameWritesAStaticLocalNoCallHasMade) {
             "4\n");
 }
 
-// §23.7 rule c): a dotted name whose first name is a scope a package import
-// brings in, `f.x` with `import p::*`, is the hierarchical name behind the
-// package's name, `p::f.x`. A function declared in a package or a module is
-// static (§13.4.2), so its local is static though `static` is not written, and
-// the name reaches that one variable: written before any call, read after
-// calls that count in it, and the same through a module's own function,
-// whose automatic local and parameter the name passes over.
 TEST(DottedNameSimulation, NameThroughAStaticFunctionReachesItsLocal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -305,10 +278,6 @@ TEST(DottedNameSimulation, NameThroughAStaticFunctionReachesItsLocal) {
             "3 3\n5 5\n2 2\n");
 }
 
-// §23.7's dotted name 2 (printed pages 757-758): `s2.x` written in a generate
-// block before the block's instance s2 resolves its first name where it
-// stands, where only the structure p::s2 the module imports is visible, so
-// the write reaches p::s2.x and the instance's x keeps its value.
 TEST(DottedNameResolution, DottedNameBeforeAnInstanceWritesTheImportedStruct) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -332,9 +301,6 @@ TEST(DottedNameResolution, DottedNameBeforeAnInstanceWritesTheImportedStruct) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 with §26.3: the binding holds for a read standing in a block nested
-// inside the one declaring the instance after it, which reads p::s2.x's 7,
-// while a read after a block's instance reaches the instance's x, 3.
 TEST(DottedNameResolution, NestedReadBeforeAnInstanceReadsTheImportedStruct) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"

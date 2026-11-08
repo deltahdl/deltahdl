@@ -54,10 +54,6 @@ std::unordered_set<std::string_view> EnclosingSubroutineNames(
   return names;
 }
 
-// Whether `items`, or the items of a declaration nested among them at any
-// depth, declare `nested`; where they do, the imports of each scope on the way
-// to it are appended to `out`, innermost scope's first: every import written
-// above the declaration leading to `nested`, and each explicit one below it.
 static bool CollectEnclosingImports(const std::vector<ModuleItem*>& items,
                                     const ModuleDecl& nested,
                                     EnclosingImports& out) {

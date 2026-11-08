@@ -1,10 +1,3 @@
-// §9.2.2.2.1 "Implicit always_comb sensitivities", elaboration side: the cases
-// that drive the inference through ElaborateSrc and read RtlirProcess back, and
-// the cases that call CollectExprReads over a hand-built expression. The cases
-// that call CollectStmtReads over a hand-built statement are in
-// test_elaborator_subclause_09_02_02_02_01b.cpp, which the 1000-line cap in
-// .github/workflows/deltahdl.yml separated this file from.
-
 #include <gtest/gtest.h>
 
 #include <string_view>
@@ -260,14 +253,6 @@ Expr* MakeMember(Arena& arena, Expr* obj, std::string_view field) {
   return e;
 }
 
-// §9.2.2.2.1 asks for the expansion of the longest static prefix of every net
-// or variable identifier or select expression it reads, so the prefix `a[1]`
-// and the identifier it stands on are both collected. The bare name is there
-// because it is the only one of the two that names a simulation object:
-// `logic [3:0] a` is one Variable named `a`, so a watcher can be armed on `a`
-// and cannot be armed on `a[1]`. This case asserted the bare name absent until
-// an array of UDP instances -- whose every terminal is a literal bit-select --
-// was found watching nothing at all.
 TEST(AlwaysCombSensitivityCollection, SelectConstIdxUsesLSP) {
   Arena arena;
   auto* expr = SensSelect(arena, SensId(arena, "a"), SensIntLit(arena, 1));
@@ -285,9 +270,6 @@ TEST(AlwaysCombSensitivityCollection, NestedSelectUsesLSP) {
   CollectExprReads(outer, reads);
   EXPECT_TRUE(reads.count("a[1]"));
   EXPECT_TRUE(reads.count("i"));
-  // The identifier the whole chain stands on, for the reason
-  // SelectConstIdxUsesLSP above gives: it is the expansion that names an
-  // object.
   EXPECT_TRUE(reads.count("a"));
 }
 
@@ -376,9 +358,6 @@ TEST(AlwaysCombSensitivityInference, FunctionBodyReadsContributeToSensitivity) {
   ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a", "ext"});
 }
 
-// Functions are analyzed as normal functions, so a read reached through a chain
-// of calls (the block calls f, which in turn calls g) still contributes to the
-// sensitivity list.
 TEST(AlwaysCombSensitivityInference, TransitiveFunctionCallReadsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -399,10 +378,6 @@ TEST(AlwaysCombSensitivityInference, TransitiveFunctionCallReadsInSensitivity) {
                             {"a", "deep"});
 }
 
-// §9.2.2.2.1 exception (b) leaves out an expression the block also writes,
-// a select `y[0]` as much as a whole variable: the block both writes and reads
-// y[0], so y stays out of its list, where a select of y it only reads, y[1],
-// keeps y in the second block's. Each target of a concatenation is written.
 TEST(AlwaysCombSensitivityInference, WrittenSelectExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -441,8 +416,6 @@ TEST(AlwaysCombSensitivityInference, FunctionLocalVarsExcludedFromSensitivity) {
   ExpectSensitivityExcludes(design->top_modules[0]->processes[0], {"tmp"});
 }
 
-// A variable that is written within a called function is excluded from the
-// sensitivity list even though it is also read within that function.
 TEST(AlwaysCombSensitivityInference,
      FunctionWrittenVarExcludedFromSensitivity) {
   ElabFixture f;
@@ -463,8 +436,6 @@ TEST(AlwaysCombSensitivityInference,
   ExpectSensitivityExcludes(proc, {"shared"});
 }
 
-// An expression used in an immediate assertion inside a called function
-// contributes to the sensitivity list as if it were an if condition.
 TEST(AlwaysCombSensitivityInference, AssertExprInCalledFunctionInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -516,16 +487,6 @@ TEST(AlwaysCombSensitivityInference, TaskCallBodyExcludedFromSensitivity) {
   ExpectSensitivityExcludes(design->top_modules[0]->processes[0], {"ext"});
 }
 
-// §9.2.2.2.1 (printed page 223): an expression in an assertion action block
-// adds nothing to an always_comb's implicit sensitivity list. The sentence
-// before it puts the asserted expression itself in the list, as though it were
-// an if statement's condition, so b is in and c and d are out. That is the
-// clause's own example, whose always_comb triggers on b, c and e while the
-// disable_error read in its else branch stays out.
-//
-// This case is the reason CollectStmtReads stops at Stmt::assert_pass_stmt and
-// Stmt::assert_fail_stmt rather than descending every link ForEachChildStmt
-// hands it. A walk that took the whole list would put c and d in.
 TEST(AlwaysCombSensitivityInference, AssertBothPassAndFailActionsExcluded) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -555,12 +516,6 @@ TEST(AlwaysCombSensitivityCollection, WaitConditionExcludedFromSensitivity) {
   EXPECT_FALSE(reads.count("x"));
 }
 
-// §9.2.2.2.1 exception (c), driven from real source: a nonblocking assignment
-// with an intra-assignment delay is legal in an always_comb (see the §9.2.2.2
-// `d <= #... b & c;` example). An identifier that appears only inside that
-// delay control is excluded from the inferred list, while the right-hand-side
-// reads are kept. Full parse+elaborate observes the rule as production applies
-// it.
 TEST(AlwaysCombSensitivityInference,
      IntraAssignDelayIdentifierExcludedFromSensitivity) {
   ElabFixture f;
@@ -579,8 +534,6 @@ TEST(AlwaysCombSensitivityInference,
   ExpectSensitivityExcludes(proc, {"dly"});
 }
 
-// An identifier appearing only in a delay control expression contributes
-// nothing to the implicit sensitivity list.
 TEST(AlwaysCombSensitivityCollection, DelayExprExcludedFromSensitivity) {
   Arena arena;
   auto* delay_stmt = arena.Create<Stmt>();
@@ -592,8 +545,6 @@ TEST(AlwaysCombSensitivityCollection, DelayExprExcludedFromSensitivity) {
   EXPECT_FALSE(reads.count("d"));
 }
 
-// An identifier appearing only in an event control expression contributes
-// nothing to the implicit sensitivity list.
 TEST(AlwaysCombSensitivityCollection, EventControlExcludedFromSensitivity) {
   Arena arena;
   auto* event_stmt = arena.Create<Stmt>();
@@ -605,9 +556,6 @@ TEST(AlwaysCombSensitivityCollection, EventControlExcludedFromSensitivity) {
   EXPECT_FALSE(reads.count("e"));
 }
 
-// A method call on a class object (or a class scope-resolved call) contributes
-// only through its argument expressions; the object reference and method name
-// add nothing to the implicit sensitivity list.
 TEST(AlwaysCombSensitivityCollection, MethodCallObjectReferenceExcluded) {
   Arena arena;
   auto* callee = MakeMember(arena, SensId(arena, "obj"), "method");
@@ -623,9 +571,6 @@ TEST(AlwaysCombSensitivityCollection, MethodCallObjectReferenceExcluded) {
   EXPECT_FALSE(reads.count("method"));
 }
 
-// §9.2.2.2.1: only nets and variables populate the implicit sensitivity list. A
-// localparam read as a direct operand is a constant (11.2.1), not a net or
-// variable, so it is excluded while the real variable operand is kept.
 TEST(AlwaysCombSensitivityInference, LocalparamOperandExcludedFromSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -643,8 +588,6 @@ TEST(AlwaysCombSensitivityInference, LocalparamOperandExcludedFromSensitivity) {
   ExpectSensitivityExcludes(proc, {"P"});
 }
 
-// A module parameter used as a constant select index (11.2.1) does not become a
-// separate sensitivity read; the addressed variable's base name is kept.
 TEST(AlwaysCombSensitivityInference,
      ParameterSelectIndexExcludedFromSensitivity) {
   ElabFixture f;
@@ -663,9 +606,6 @@ TEST(AlwaysCombSensitivityInference,
   ExpectSensitivityExcludes(proc, {"IDX"});
 }
 
-// §11.5.3 dependency, real source: an indexed part-select read (`a[i +: 2]`)
-// expands to the longest static prefix `a` while its variable offset `i` is a
-// distinct net/variable read, so both belong to the inferred list.
 TEST(AlwaysCombSensitivityInference, IndexedPartSelectOffsetInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -682,9 +622,6 @@ TEST(AlwaysCombSensitivityInference, IndexedPartSelectOffsetInSensitivity) {
   ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a", "i"});
 }
 
-// §11.5.3 dependency, real source: a constant part-select (`a[3:1]`) has a
-// static prefix, so the addressed variable's base name is watched and no
-// constant bound is added as its own read.
 TEST(AlwaysCombSensitivityInference, ConstantPartSelectBaseInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -700,10 +637,6 @@ TEST(AlwaysCombSensitivityInference, ConstantPartSelectBaseInSensitivity) {
   ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a"});
 }
 
-// Constant-expression select index, literal form (11.2.1): a bit-select with a
-// literal index keeps the addressed variable's base name and adds no separate
-// index read. Complements the parameter and localparam index forms, which reach
-// the constant-exclusion path through a different declaration.
 TEST(AlwaysCombSensitivityInference, LiteralBitSelectIndexBaseInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -719,10 +652,6 @@ TEST(AlwaysCombSensitivityInference, LiteralBitSelectIndexBaseInSensitivity) {
   ExpectSensitivityContains(design->top_modules[0]->processes[0], {"a"});
 }
 
-// Constant-expression select index, localparam form (11.2.1): a localparam
-// declared as a module item reaches the constant-name set through a different
-// path than a parameter port, yet is likewise excluded as a select index while
-// the addressed array's base name is kept.
 TEST(AlwaysCombSensitivityInference,
      LocalparamSelectIndexExcludedFromSensitivity) {
   ElabFixture f;
@@ -742,9 +671,6 @@ TEST(AlwaysCombSensitivityInference,
   ExpectSensitivityExcludes(proc, {"LP"});
 }
 
-// Member-select read form (§11.5.3 dependency, real source): reading a packed
-// struct member (`p.lo`) contributes the struct variable's base name to the
-// inferred list.
 TEST(AlwaysCombSensitivityInference, StructMemberReadInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -764,10 +690,6 @@ TEST(AlwaysCombSensitivityInference, StructMemberReadInSensitivity) {
   ExpectSensitivityContains(design->top_modules[0]->processes[0], {"p"});
 }
 
-// §8.23 dependency, real source: a call to a static method reached through the
-// class scope resolution operator contributes to the list only through its
-// argument expressions; the scope-resolved callee reference itself adds
-// nothing.
 TEST(AlwaysCombSensitivityInference, ClassScopeResolvedCallArgInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -788,12 +710,6 @@ TEST(AlwaysCombSensitivityInference, ClassScopeResolvedCallArgInSensitivity) {
   ExpectSensitivityContains(proc, {"a"});
   ExpectSensitivityExcludes(proc, {"C"});
 }
-// §9.2.2.2.1 asks for the longest static prefix's expansions, plural, and both
-// of them reach the list: the base identifier, which is the expansion that
-// names an object for a packed vector, and the prefix itself, which is the one
-// that names an object for an unpacked array, whose elements are variables of
-// their own. Watching only the base left an always_comb reading `arr[1]`
-// watching a variable no element write touches.
 TEST(AlwaysCombSensitivityInference, ArrayElementReadListsPrefixAndBase) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -810,12 +726,6 @@ TEST(AlwaysCombSensitivityInference, ArrayElementReadListsPrefixAndBase) {
                             {"arr[1]", "arr"});
 }
 
-// §9.2.2.2.1 with §26.3: a package's function called through the package
-// scope is analyzed as any other function the block calls. What it reads of
-// its package joins the list through the package, `p.g` and the packed `p.w`
-// its select stands on, the keys the simulator holds them under, and never
-// by a bare name the module would resolve in its own scope; its formal stays
-// out.
 TEST(AlwaysCombSensitivityInference, PackageScopedCallReadsInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -839,10 +749,6 @@ TEST(AlwaysCombSensitivityInference, PackageScopedCallReadsInSensitivity) {
   ExpectSensitivityExcludes(proc, {"g", "w", "x", "p.x"});
 }
 
-// §9.2.2.2.1 with §26.3: a package's function a module imports and calls by
-// its bare name reads its package's objects all the same, and they join the
-// list through the package; the import brings in `f` alone, so the module
-// names no `g`.
 TEST(AlwaysCombSensitivityInference,
      ImportedPackageFunctionReadsInSensitivity) {
   ElabFixture f;
@@ -867,9 +773,6 @@ TEST(AlwaysCombSensitivityInference,
   ExpectSensitivityExcludes(proc, {"g"});
 }
 
-// §9.2.2.2.1: a class's constructor called in a function the block calls,
-// `new`, is a call that names no function of the module or a package, and
-// the function's other reads still join the list.
 TEST(AlwaysCombSensitivityInference, ConstructorCallInCalledFunctionNamesNone) {
   ElabFixture f;
   auto* design = ElaborateSrc(

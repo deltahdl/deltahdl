@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A disable reached through the then-branch of an `if` is reported at the
-// `disable` rather than at the `if` or at the procedure.
 TEST(DisableStatementSynthesis, RejectDisableInAlwaysComb) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -30,8 +28,6 @@ TEST(DisableStatementSynthesis, RejectDisableInAlwaysComb) {
                             "9.6.2"));
 }
 
-// The report stands wherever the disable stands, so a sequential procedure
-// gets it as a combinational one does.
 TEST(DisableStatementSynthesis, RejectDisableInAlwaysFF) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -51,9 +47,6 @@ TEST(DisableStatementSynthesis, RejectDisableInAlwaysFF) {
                             "9.6.2"));
 }
 
-// §9.6.2: a disable statement terminates the activity of an active process,
-// which is a different construct from the disable fork statement of §9.6.3.
-// The report names it and stands at the `disable`.
 TEST(DisableStatementSynthesis, DisableIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

@@ -9,10 +9,6 @@
 
 using namespace delta;
 
-// Elaborates `src`, runs the full lower/schedule pipeline, and verifies that
-// the source unpacked a 16'hABCD stream into byte targets `a` and `b`
-// (a == 0xAB, b == 0xCD). Shared by the §11.4.14 streaming-unpack tests whose
-// only difference is the source text driving the assignment.
 inline void RunStreamUnpackAbcdIntoAB(SimFixture& f, const std::string& src) {
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);

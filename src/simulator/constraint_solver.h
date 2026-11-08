@@ -20,16 +20,6 @@ enum class RandQualifier : uint8_t {
   kRandc,
 };
 
-// 6.11.3: an integer type is signed or unsigned, and which one it is decides
-// the order its values fall in. A value travels as the bits its declared type
-// reads: sign extended when the type is signed, and the plain w-bit pattern
-// when it is unsigned. An unsigned type wide enough to set the top bit
-// therefore has values whose patterns are negative int64_t numbers, and
-// ordering those with the built-in signed operators puts the top half of the
-// range below the bottom of it, which reads a full 64-bit unsigned range as
-// inverted and empty. Comparing in the declared order keeps the range whole.
-// Returns whether `a` precedes `b` in the order a type of the given signedness
-// reads them in.
 bool ValueLess(bool is_signed, int64_t a, int64_t b);
 
 enum class ConstraintKind : uint8_t {
@@ -47,17 +37,11 @@ enum class ConstraintKind : uint8_t {
   kUnique,
   kDist,
   kSoft,
-  // 18.5.13.2: a 'disable soft' directive. It names a random variable in
-  // var_name and imposes no relation of its own; instead it discards the
-  // lower-priority soft constraints that directly reference that variable.
   kDisableSoft,
   kArrayReduction,
   kCustom,
 };
 
-// 18.5.7.2: the operand by which an array reduction method joins the elements.
-// sum folds with addition, product with multiplication, and/or/xor with the
-// corresponding bitwise operator, each method joining by its own operator.
 enum class ArrayReductionOp : uint8_t {
   kSum,
   kProduct,
@@ -66,24 +50,8 @@ enum class ArrayReductionOp : uint8_t {
   kXor,
 };
 
-// 18.5.3: one entry of a distribution's weighted-value set. A plain integral
-// item weights the single 'value'; setting is_range weights the inclusive range
-// [lo, hi] instead. The weight itself is an unsigned magnitude (LRM: the weight
-// expression is interpreted as an unsigned value), with an absent weight
-// defaulting to 1. per_element distinguishes the two range operators: the ':='
-// operator applies the weight to each element of the range, whereas ':/' (and a
-// single value) applies it to the item as a whole. is_default marks the single
-// 'default :/ weight' item, which stands for every domain value not named by
-// any other item.
-// A distribution set may mix real and integral items, and a distribution over
-// a real variable reads each item as the real it names: real_value for a
-// single value and [real_lo, real_hi] for a range, which takes its weight as a
-// whole whichever operator wrote it (a range of real values is written with
-// ':/').
 struct DistWeight {
   int64_t value = 0;
-  // 18.5.3: the weight's unsigned value, held to the largest uint64_t where it
-  // is wider, so that no nonzero weight reads as zero.
   uint64_t weight = 1;
   int64_t lo = 0;
   int64_t hi = 0;
@@ -95,41 +63,26 @@ struct DistWeight {
   bool is_default = false;
 };
 
-// 18.5.12: a constraint guard is a predicate expression that gates whether a
-// constraint is created, rather than a relation the solver must satisfy. Its
-// subexpressions are evaluated in a four-state logic so that one that would
-// otherwise raise an evaluation error (a comparison against a null handle, an
-// out-of-range index) can be sifted away instead of failing randomize().
 enum class GuardValue : uint8_t {
-  kFalse,   // 0: the subexpression evaluates to false
-  kTrue,    // 1: the subexpression evaluates to true
-  kError,   // E: the subexpression causes an evaluation error
-  kRandom,  // R: the subexpression involves as-yet-unsolved random variables
+  kFalse,
+  kTrue,
+  kError,
+  kRandom,
 };
 
-// 18.5.12 / Figure 18-3: combine guard subexpression values under the three
-// logical operators. These reproduce the conjunction, disjunction, and
-// negation truth tables over {FALSE, TRUE, ERROR, RANDOM}.
 GuardValue GuardAnd(GuardValue a, GuardValue b);
 GuardValue GuardOr(GuardValue a, GuardValue b);
 GuardValue GuardNot(GuardValue a);
 
-// 18.5.12: the action that a fully evaluated guard imposes on its guarded set.
 enum class GuardOutcome : uint8_t {
-  kUnconditional,  // final TRUE: the guarded constraint is generated outright
-  kEliminated,     // final FALSE: the guarded constraint is dropped, no error
-  kError,          // final ERROR: an error is generated and randomize() fails
-  kConditional,    // final RANDOM: a conditional constraint is generated
+  kUnconditional,
+  kEliminated,
+  kError,
+  kConditional,
 };
 
 GuardOutcome GuardFinalOutcome(GuardValue final_value);
 
-// 18.5.12: a guard predicate is a tree of subexpressions joined by the logical
-// operators. A leaf reports the four-state value of one atomic subexpression
-// over the current variable values, so it can yield kError (e.g., a null
-// handle comparison) or kRandom (the subexpression depends on a random
-// variable). The operators are applied recursively until every subexpression
-// has been evaluated.
 struct GuardPredicate {
   enum class Op : uint8_t { kLeaf, kAnd, kOr, kNot } op = Op::kLeaf;
   std::function<GuardValue(const std::unordered_map<std::string, int64_t>&)>
@@ -153,46 +106,14 @@ struct ConstraintExpr {
   int64_t cond_value = 0;
   std::vector<ConstraintExpr> sub_constraints;
 
-  // 18.5.7.1: for a foreach iterative constraint over a dynamically sized array
-  // (dynamic array or queue), size_var names the array's size method. The size
-  // is fixed by the size constraints, which are solved before this iterative
-  // constraint; within the foreach block the size method is therefore a state
-  // variable, so the solver reads its already-committed value and imposes the
-  // per-element constraints (sub_constraints) only on the elements that exist,
-  // i.e. those whose index is below that size. Left empty for a fixed-size
-  // array, in which case every per-element constraint applies.
   std::string size_var;
 
-  // 18.5.5: the left side of an implication ("a" in a -> b) can be any
-  // expression of integral or real type, not only an equality test. When
-  // cond_fn is set it supplies the truth of the antecedent over the current
-  // values and takes precedence over the cond_var == cond_value short form
-  // above.
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> cond_fn;
 
-  // 18.5.6: an if-else constraint guards two constraint sets with a condition.
-  // sub_constraints holds the "then" set applied when the condition is true;
-  // else_constraints holds the optional "else" set applied when it is false.
-  // The condition is supplied by cond_fn (any integral or real expression) or
-  // the cond_var == cond_value short form, exactly as for an implication.
   std::vector<ConstraintExpr> else_constraints;
 
   std::vector<std::string> unique_vars;
 
-  // 18.5.7.2: an array reduction iterative constraint. In a constraint, an
-  // array reduction method is treated as an expression iterated over each
-  // element of the array, joined by the operand for that method (reduce_op).
-  // reduce_vars names the array's element variables in index order;
-  // reduce_with, when set, is the with-clause expression applied to each
-  // element value (the with-clause 'item') before it is folded, defaulting to
-  // the element value itself. The folded result — a single value — is compared
-  // against 'lo' under the relation reduce_cmp. reduce_width is the bit width
-  // of that result's type: the array element type by default, or the type of
-  // the with-clause expression when one is given, so the fold is truncated to
-  // that width exactly as the result type demands. As with a foreach iterative
-  // constraint, when the array is dynamically sized size_var names its size
-  // method; the size constraints are solved first, so only the elements whose
-  // index is below the committed size take part in the reduction.
   ArrayReductionOp reduce_op = ArrayReductionOp::kSum;
   std::vector<std::string> reduce_vars;
   std::function<int64_t(int64_t)> reduce_with;
@@ -202,41 +123,13 @@ struct ConstraintExpr {
   ConstraintExpr* inner = nullptr;
 
   std::function<bool(const std::unordered_map<std::string, int64_t>&)> eval_fn;
-  // A kCustom relation of the form `x == expression` over the other random
-  // variables, x in var_name: the value the expression takes over the values
-  // drawn, which the repair of a draw that does not satisfy the relation
-  // writes to x (constraint_solver_repair.cpp). 18.5.7.1: one of the form
-  // `x < expression`, or under any other comparison, derives a bound instead,
-  // derive_cmp being the comparison as read from x, which the repair draws x
-  // afresh under; the clause's array sorted through each element above the
-  // one before it is met that way, the draws tried over the whole domain of
-  // an int meeting it as good as never.
   std::function<int64_t(const std::unordered_map<std::string, int64_t>&)>
       derive_fn;
   ConstraintKind derive_cmp = ConstraintKind::kEqual;
-  // 18.5.13.1: where the expression x is derived from is another random
-  // variable y alone, the clause's y < p1.x, that variable, which the
-  // relation bounds the other way, y under the mirrored comparison against
-  // x, so that a repair of y draws it within the bound as well. Empty where
-  // the expression is no bare variable.
   std::string co_var_name;
 
-  // 18.5.11: the random variables this constraint references, used only by the
-  // function-argument priority solve. When a function call gives a random
-  // variable a higher priority, the priority solve commits the higher-priority
-  // variables first and treats them as state variables; it may then enforce a
-  // constraint only once every variable the constraint references has been
-  // committed. ref_vars names those variables so the solver can defer the
-  // constraint until they are all drawn. Left empty when the priority feature
-  // is not in use, in which case the constraint is checked in the final pass
-  // like any other.
   std::vector<std::string> ref_vars;
 
-  // 18.5.12: an optional constraint guard. When has_guard is set, the guard is
-  // evaluated before this constraint is imposed: a FALSE guard eliminates the
-  // constraint with no error, an ERROR guard makes randomize() fail, and a
-  // TRUE or RANDOM guard lets the constraint be generated (unconditionally or
-  // conditionally). Both implication (->) and if...else may serve as guards.
   bool has_guard = false;
   GuardPredicate guard;
 };
@@ -246,12 +139,6 @@ struct ConstraintBlock {
   bool enabled = true;
   std::vector<ConstraintExpr> constraints;
 
-  // 18.5.10: a constraint block declared static shares one on/off state across
-  // every instance of the class, so a constraint_mode() call on any instance
-  // turns the constraint on or off for all of them. is_static marks such a
-  // block; shared_enabled, when set, holds that one shared state and is
-  // consulted in place of the per-instance 'enabled' flag. A nonstatic block
-  // leaves shared_enabled null and keeps its own independent state.
   bool is_static = false;
   std::shared_ptr<bool> shared_enabled;
 };
@@ -263,150 +150,46 @@ struct RandVariable {
   int64_t max_val = 0xFFFF;
   uint32_t width = 32;
 
-  // 6.11.3: an integer type is signed or unsigned, and byte, shortint, int,
-  // integer and longint default to signed while time, bit, reg and logic
-  // default to unsigned. The declared signedness is half of what fixes the
-  // range a value is drawn from -- the width alone gives only its size -- so
-  // it travels with the width rather than being re-derived per solve.
-  //
-  // Signed is the default because min_val and max_val are signed integers: a
-  // caller that writes a negative bound and never mentions signedness means the
-  // negative number it spells, not the large positive value those bits read as
-  // unsigned. Every caller that knows the declared signedness assigns it here
-  // before binding the domain, so the default governs only a variable whose
-  // signedness was never declared.
   bool is_signed = true;
 
-  // 18.4.1: set [min_val, max_val] to the range the declared type admits, so
-  // the draw is uniform over that range and no constraint requiring a value in
-  // it is unsatisfiable. A w-bit unsigned type spans 0 .. 2**w-1; a w-bit
-  // signed type spans -2**(w-1) .. 2**(w-1)-1. Both bounds hold the bits the
-  // declared type reads rather than a number an int64_t counts to, so the top
-  // of a 64-bit unsigned range is all ones -- the value 2**64-1 of that type,
-  // and the pattern -1 of the int64_t carrying it. Everything that orders the
-  // domain or compares against it therefore reads it in the declared order
-  // below.
   void BindDomainToDeclaredRange();
 
-  // 6.11.3: order two of this variable's values as its declared type reads them
-  // (see ValueLess). Every bound comparison, tightening and draw over
-  // [min_val, max_val] goes through these, because a domain whose top has its
-  // high bit set is inverted and empty under the signed operators.
   bool DomainLess(int64_t a, int64_t b) const;
   int64_t DomainMin(int64_t a, int64_t b) const;
   int64_t DomainMax(int64_t a, int64_t b) const;
 
-  // 18.5: opposing bounds folded out of the constraints can leave the domain
-  // inverted, holding no value at all. Collapse such a domain onto its lower
-  // bound, so the solver is always handed a well-formed range. Inverted is
-  // judged in the declared order, which is what keeps an unsigned range
-  // reaching above 2**63-1 whole rather than mistaking it for an inverted one
-  // and collapsing it onto its bottom value.
   void CollapseEmptyDomain();
-  // 18.6.1: whether the bounds folded out of the constraints left the
-  // domain holding no value at all, which CollapseEmptyDomain records as it
-  // collapses the range: the constraints are then infeasible and the solve
-  // of an active variable so held fails rather than drawing the bound the
-  // range was collapsed onto, a value the declared range excludes.
   bool domain_empty = false;
 
-  // 18.4.2: how many values [min_val, max_val] holds, which is the length of
-  // the permutation a randc variable cycles through. A range covering the whole
-  // width counts 2**64 values, one more than a 64-bit count reaches, so the
-  // size saturates there. Zero when the domain is empty.
   uint64_t DomainSize() const;
 
-  // 18.4.1: draw a value uniformly distributed over [min_val, max_val], every
-  // value of the range equally probable. The draw runs in the declared order,
-  // so an unsigned range reaching above 2**63-1 is drawn from whole rather than
-  // from the half of it that is positive as an int64_t. An empty domain yields
-  // min_val.
   int64_t DrawUniform(std::mt19937& rng) const;
 
-  // Read `bits` -- a raw two's-complement bit pattern of this variable's width,
-  // as the variable's storage holds it -- as the number the declared type says
-  // it is, sign-extending when the type is signed. The solver compares against
-  // the value, so a signed variable holding a negative number has to reach it
-  // as that negative number and not as its unsigned bit pattern.
   int64_t ValueFromBits(uint64_t bits) const;
 
-  // 18.4.1: a rand variable can be real, and every value in its range is then
-  // equally likely, drawn from a continuous range rather than an integral
-  // domain. is_real selects the real generation path; [real_min, real_max) is
-  // the range the value is drawn from with a flat density, so that equal-width
-  // subranges are equally likely (18.4 forbids declaring a real variable randc,
-  // so only the noncyclical rand path applies here). real_value holds the
-  // variable's current real value, kept as a constant when it is inactive.
   bool is_real = false;
   double real_min = 0.0;
   double real_max = 0.0;
   double real_value = 0.0;
 
-  // 18.8: a random variable carries an active state that rand_mode() controls
-  // and that is initially ON. 18.5.8: only the active random variables are the
-  // ones randomized; every other variable reference is treated as a state
-  // variable whose current value is used as a constant. 'enabled' is that
-  // active state, shared by both clauses.
   bool enabled = true;
 
-  // 18.8 / 18.5.8: the variable's current value. When the variable is inactive
-  // (rand_mode() OFF) the solver does not draw a fresh value for it; instead it
-  // holds this value as a constant, so a global constraint (18.5.8) that
-  // references the inactive variable from an active variable solved alongside
-  // it sees a fixed operand rather than a random one.
   int64_t value = 0;
 
-  // 18.3: the solver draws an active random enum variable's value from that
-  // enum's named constants alone. When non-empty, enum_values is that
-  // named-constant set and confines the chosen value.
   std::vector<int64_t> enum_values;
 
-  // 18.4: an enum member of a packed structure or packed untagged union that
-  // is declared rand is exempt from the 18.3 enum-domain restriction. Clearing
-  // this flag keeps the enum_values set for reference but lets the solver draw
-  // from the full declared range.
   bool apply_enum_restriction = true;
 
-  // 18.4.2: the per-solver drawn-value history for the current randc
-  // permutation. It is used only when no external shared_randc_state is
-  // attached, i.e. for repeated solves on a single solver object.
   std::unordered_set<int64_t> randc_history;
 
-  // 18.4.2: externally owned randc permutation history that outlives the
-  // solver, used in place of randc_history above whenever it is set. The
-  // randc no-repeat property spans successive randomize() calls, so a caller
-  // that rebuilds the solver for each call attaches persistent state here and
-  // the solver advances it in place. It serves two cases: a nonstatic randc
-  // points it at the per-object history so one object's cycle continues across
-  // its own randomize() calls, and a static randc points every instance at one
-  // shared history so a single sequence advances no matter which instance
-  // drives it. is_static records the static declaration for reference; the
-  // solver keys its history choice on shared_randc_state alone. When it is
-  // null the per-solver randc_history is used instead.
   bool is_static = false;
   std::shared_ptr<std::unordered_set<int64_t>> shared_randc_state;
 
-  // 18.4.2: the values the constraints admitted when the permutation in
-  // progress began, which DrawAdmissibleRandc compares each call's against so
-  // that a change of the constraints recomputes the permutation; shared as
-  // shared_randc_state is, or held per solver where that is null.
   std::vector<int64_t> randc_domain;
   std::shared_ptr<std::vector<int64_t>> shared_randc_domain;
 
-  // 18.6.3: a static random variable has one copy for the whole class, so the
-  // instances name one storage cell rather than one apiece. When is_static is
-  // set, shared_value holds that one cell: each randomize() that draws a value
-  // for the variable writes it there, so the change is seen by every instance,
-  // and reading the variable consults the cell rather than the per-instance
-  // solved map. A nonstatic variable leaves this null and keeps its value
-  // solely in its own solver's values_.
   std::shared_ptr<int64_t> shared_value;
 
-  // 18.5.7.1: marks a variable that holds a dynamic array's size method. Such a
-  // variable is committed in a pass that runs before the general rand variables
-  // — mirroring the rule that an array's size constraints are solved before the
-  // iterative (foreach) constraints over that array — so a foreach reading the
-  // size sees the value already chosen and treats it as a state variable.
   bool is_array_size = false;
 };
 
@@ -416,40 +199,17 @@ class ConstraintSolver {
  public:
   explicit ConstraintSolver(uint32_t seed = 0);
 
-  // 18.5.8: names what is added after it under `prefix`, the path of the
-  // object of a joint solve whose relations are being added.
   void SetNameScope(std::string prefix);
 
   void AddVariable(const RandVariable& var);
 
-  // The variable added under `name`, or null where none was: what a relation
-  // evaluated over a trial reads the variable's declared width and
-  // signedness from (6.11.3), so that its value is compared as the type the
-  // variable was declared with.
   const RandVariable* FindVariable(std::string_view name) const;
 
   void AddConstraintBlock(const ConstraintBlock& block);
 
-  // 18.5.9: record a 'solve before_list before after_list' ordering constraint.
-  // Every variable in 'before' is to be solved before every variable in
-  // 'after', which alters the probability distribution over legal value
-  // combinations without changing the set of legal combinations. The ordering
-  // is partial: calling this more than once accumulates the constraints. A
-  // solve...before ordering never removes a solution, so it cannot by itself
-  // cause a solve to fail.
   void AddSolveBefore(const std::vector<std::string>& before,
                       const std::vector<std::string>& after);
 
-  // 18.5.11: record that using a random variable as a function argument gives
-  // it a higher priority than the variables of the constraint it appears in.
-  // Each 'higher' variable is solved before each 'lower' variable, and the
-  // higher-priority variables — solved as part of a higher-priority set of
-  // constraints — become state variables to the lower-priority set. Unlike
-  // solve...before (18.5.9), this ordering subdivides the solution space: the
-  // higher-priority constraints are solved without regard to the lower-priority
-  // ones, so the subdivision can make an otherwise solvable set fail. The
-  // ordering is partial and accumulates across calls; a cycle among the
-  // implicit priorities is an error that fails randomize().
   void AddFunctionArgPriority(const std::vector<std::string>& higher,
                               const std::vector<std::string>& lower);
 
@@ -457,41 +217,19 @@ class ConstraintSolver {
 
   bool SolveWith(const std::vector<ConstraintExpr>& inline_constraints);
 
-  // 18.12: a scope randomize invoked with no random-variable arguments behaves
-  // as a checker rather than a generator. It shall not change the value of any
-  // variable; instead every constraint expression — those of the enabled blocks
-  // together with any passed in 'constraints' (the with constraint_block) — is
-  // evaluated against the variables' current values. The call returns false (0)
-  // as soon as one expression is false and true (1) only when all of them hold.
   bool Check(const std::vector<ConstraintExpr>& constraints = {});
 
   int64_t GetValue(std::string_view name) const;
 
-  // 18.4.1: the real value drawn for a rand real variable by the most recent
-  // solve. Returns 0.0 for an unknown name or a variable that is not real.
   double GetRealValue(std::string_view name) const;
 
   void SetRandMode(std::string_view name, bool enabled);
   bool GetRandMode(std::string_view name) const;
 
-  // 18.8: when rand_mode() names no specific random_variable, the void form
-  // applies to every random variable in the object at once. This sets the
-  // active state of all known variables in a single call.
   void SetAllRandMode(bool enabled);
 
-  // 18.11: apply the inline random variable control list, i.e. the argument
-  // list passed to randomize(). The named variables become the complete set of
-  // active random variables for the call; every other variable known to the
-  // solver is treated as a state variable (made inactive). This is equivalent
-  // to a set of rand_mode() calls that enable the named variables and disable
-  // all the others. The cyclical random mode is never affected: a variable
-  // keeps its rand/randc qualifier, so a noncyclical variable named in the list
-  // is not promoted to cyclical and a randc variable is not demoted.
   void ApplyInlineRandomList(const std::vector<std::string>& names);
 
-  // 18.8 / 18.5.8: record a variable's current value. An inactive variable
-  // keeps this value as a constant while the active variables are randomized,
-  // which is the state-variable treatment that global constraints rely on.
   void SetValue(std::string_view name, int64_t value);
 
   void SetConstraintMode(std::string_view block_name, bool enabled);
@@ -505,16 +243,8 @@ class ConstraintSolver {
  private:
   int64_t GenerateRandValue(RandVariable& var);
 
-  // 18.4.1: draw a uniformly distributed real value over [real_min, real_max).
-  // A flat density makes any two equal-width subranges equally probable, which
-  // is the uniform-distribution guarantee the clause states for rand real.
   double GenerateRandRealValue(RandVariable& var);
 
-  // 18.5.3 / 6.11.3: is_signed is the declared signedness of the variable the
-  // distribution constrains, which fixes the order [domain_lo, domain_hi] and
-  // any weighted range within it are read in. Without it a range reaching above
-  // 2**63-1 -- the top half of an unsigned 64-bit domain -- is an inverted
-  // interval rather than the values it names.
   int64_t DrawDistItem(const DistWeight& item,
                        const std::vector<DistWeight>& weights,
                        int64_t domain_lo, int64_t domain_hi, bool is_signed);
@@ -523,100 +253,41 @@ class ConstraintSolver {
                              int64_t domain_lo, int64_t domain_hi,
                              bool is_signed);
 
-  // 18.5.3: the weight of an item applies to the item as a whole, whatever
-  // other constraints exclude from it: the clause's x > 101 with the range
-  // [100:102] weighted 3 leaves x at 102 three times as often as at 103. An
-  // item is chosen by its weight and a value drawn within it that the
-  // constraints confined to the variable admit; an item none of whose draws
-  // they admit is passed over and another chosen.
   int64_t SampleDist(const ConstraintExpr& c,
                      const std::vector<ConstraintExpr>& extra);
 
-  // 18.5.3: the same over a real variable, whose items are read as reals and
-  // whose draw is admitted by the domain its relational constraints leave.
   double DrawRealDistItem(const DistWeight& item,
                           const std::vector<DistWeight>& weights,
                           double domain_lo, double domain_hi);
   double SampleRealDist(const ConstraintExpr& c);
 
-  // 18.5.3: sample the distribution `c` into the value store its variable is
-  // drawn in, the real one for a real variable.
   void SeedDist(const ConstraintExpr& c,
                 const std::vector<ConstraintExpr>& extra);
 
-  // 18.5.3: whether the constraints that name the variable `name` and no
-  // other random variable hold under the value it was just given, which is
-  // what a draw within a distribution item is admitted by.
   bool DistValueAdmissible(const std::string& name,
                            const std::vector<ConstraintExpr>& extra) const;
 
-  // 18.6.1: whether an active variable's domain holds no value.
   bool HasEmptyDomain() const;
 
-  // 18.5.3: the expression a dist distributes has to involve a rand variable.
-  // In the solver model a distribution names the single variable it constrains,
-  // so that variable must be an active rand variable. True if any enabled
-  // distribution targets a variable that supplies no rand variable (one that is
-  // unknown to the solver or declared without the rand qualifier).
   bool DistLacksRandVariable() const;
 
-  // 18.5.4: a uniqueness constraint's group admits no randc variable. True if
-  // any enabled unique constraint names a variable that is declared randc, in
-  // which case randomization fails outright.
   bool HasRandcInUnique() const;
 
-  // 18.5.4: a uniqueness constraint group's members must all have equivalent
-  // types. The solver characterizes a member's type by whether it is real and
-  // by its bit width, so members that disagree on either are not of equivalent
-  // type. True if any enabled unique constraint mixes such members, which is an
-  // illegal group and makes randomization fail.
   bool UniqueMembersNotEquivalentType() const;
 
   bool ApplyConstraint(const ConstraintExpr& expr);
 
-  // 18.5.13: when include_soft is set, the soft constraints are enforced
-  // alongside the hard constraints; when clear, the soft constraints are
-  // discarded (each treated as the value true) and only the hard constraints
-  // are checked. 18.5.13.1: even when include_soft is set, a soft constraint
-  // listed in dropped_soft_ has been discarded by the priority resolution and
-  // is treated as true as well.
   bool CheckAllConstraints(const std::vector<ConstraintExpr>& extra,
                            bool include_soft);
 
-  // 18.5.13.1: resolve a soft constraint set that has no joint solution by
-  // discarding constraints according to their priority. Each soft constraint
-  // carries a priority fixed by declaration order — a constraint declared later
-  // in a construct, and a constraint in an inline (with) block over one in the
-  // class, has higher priority — and the solver keeps the highest-priority
-  // preferences it can. The constraints are reinstated one at a time from
-  // highest priority to lowest and each is retained only while the reinstated
-  // set stays jointly satisfiable with the hard constraints, realizing the
-  // clause's conceptual model (prefer both c1 and c2, then c1 only, then c2
-  // only, then neither). Returns true when a solution honoring the retained set
-  // is committed; only an unsatisfiable hard set makes it fail.
   bool SolveBySoftPriority(const std::vector<ConstraintExpr>& extra);
 
-  // 18.5.13.2: resolve the 'disable soft' directives for the current solve.
-  // Walking every enabled block and then the inline (with) constraints in
-  // declaration order — the same order that fixes soft-constraint priority in
-  // 18.5.13.1 — each directive discards the soft constraints already seen
-  // (those of lower priority) that directly reference the directive's variable.
-  // A discarded soft constraint is recorded in disabled_soft_ and treated as
-  // true for the rest of the solve, unconditionally: it is removed whether or
-  // not it contradicts anything, and ahead of the priority resolution among the
-  // soft constraints that remain. Recomputed per call into a cleared set.
   void ComputeDisabledSoft(const std::vector<ConstraintExpr>& extra);
 
-  // 6.11.3: the declared signedness of the named variable, which fixes the
-  // order its values and the constants a constraint compares them against fall
-  // in (see ValueLess). A name the solver holds no variable for falls back to
-  // signed, the order the int64_t carrying the value already has.
   bool DeclaredSigned(const std::string& name) const;
 
   bool EvalConstraint(const ConstraintExpr& expr) const;
 
-  // 18.5.7.2: the value the array reduction `expr` folds to over the values
-  // drawn, held to the width of its result type.
   int64_t FoldReduction(const ConstraintExpr& expr) const;
 
   bool EvalImplication(const ConstraintExpr& expr) const;
@@ -625,18 +296,10 @@ class ConstraintSolver {
 
   bool EvalForeach(const ConstraintExpr& expr) const;
 
-  // 18.5.7.2: evaluate an array reduction iterative constraint. Fold the
-  // array's existing elements (those below the committed size when the array is
-  // dynamically sized) with the method's operand, applying the with-clause
-  // expression to each element first, then truncate to the result type's width
-  // and test the configured relation against the target value.
   bool EvalArrayReduction(const ConstraintExpr& expr) const;
 
   bool EvalUnique(const ConstraintExpr& expr) const;
 
-  // 18.5.10: refresh each static block's per-instance 'enabled' flag from its
-  // shared state, so a constraint_mode() call routed through another instance
-  // of the class is observed here before the constraints are evaluated.
   void RefreshStaticBlockState();
 
   void ApplyDistConstraints(const std::vector<ConstraintExpr>& extra);
@@ -644,116 +307,44 @@ class ConstraintSolver {
   void ApplyDirectConstraints(const std::vector<ConstraintExpr>& extra,
                               bool include_soft);
 
-  // 18.5.7.1: the solver settles size constraints before the iterative ones, so
-  // the array sizes are drawn once, ahead of the attempts, from what the size
-  // constraints seed and the domain they fold, and every attempt holds the
-  // sizes drawn while it solves the other variables. An attempt that drew the
-  // sizes afresh would end on the first size at which the draws of the elements
-  // happened to meet the iterative constraints, which a size of one or two
-  // reaches within a few attempts and a size of ten as good as never, so the
-  // sizes drawn would lean to the smallest the size constraints admit. The
-  // clause has this ordering fail the solve where the size drawn admits no
-  // solution for the rest.
   std::unordered_map<std::string, int64_t> DrawArraySizesOnce(
       const std::vector<ConstraintExpr>& extra, bool include_soft,
       const std::function<int64_t(RandVariable&)>& gen);
   bool SizeConstraintsHold(const std::vector<ConstraintExpr>& extra);
   void HoldArraySizes(const std::unordered_map<std::string, int64_t>& sizes);
 
-  // 18.5.13: true when `c` is a soft constraint whose inner expression_or_dist
-  // is still to be seeded — the soft set is active for this attempt and the
-  // constraint has been discarded neither by the 18.5.13.1 priority resolution
-  // nor by an 18.5.13.2 'disable soft' directive.
   bool SoftSeedApplies(const ConstraintExpr& c, bool include_soft) const;
 
-  // 18.5.13: seed the inner expression_or_dist of a soft constraint that is
-  // being honored, so a satisfiable soft preference steers its variable.
   void SeedSoftBounds(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
   void SeedHonoredSoft(const ConstraintExpr& inner,
                        const std::vector<ConstraintExpr>& extra);
 
-  // 18.8: an inactive variable is handled as though it had been declared
-  // neither rand nor randc, so its value is a state value the solve reads and
-  // never writes. Report whether the named variable is one of those: true only
-  // when it is a known variable that is inactive. A name this solver does not
-  // hold is not a variable whose value is being held, so it reports false and
-  // the caller proceeds as before.
   bool HoldsStateValue(std::string_view name) const;
 
   bool SolveIterative(const std::vector<ConstraintExpr>& extra,
                       bool include_soft);
-  // 18.4.2: whether every constraint naming the randc variable `name` holds
-  // under the values of the attempt just tried, so that its value is kept
-  // for the next attempt rather than passed over in its permutation.
   bool RandcValueAdmissible(const std::string& name,
                             const std::vector<ConstraintExpr>& extra) const;
   std::function<int64_t(RandVariable&)> RandcOncePerSolve(
       std::unordered_map<std::string, int64_t>& drawn,
       const std::vector<ConstraintExpr>& extra);
-  // 18.4.2: draws the randc variable `var`'s next value from the values the
-  // hard constraints naming it and no other active random variable admit,
-  // `extra` among them, into `out`: one its permutation has not yet taken,
-  // the history beginning a new permutation once every such value has been
-  // taken or once one already taken is refused, the constraints having
-  // changed. False, drawing nothing, where no such constraint names it, its
-  // domain is too wide to enumerate or no value is admitted.
   bool DrawAdmissibleRandc(RandVariable& var,
                            const std::vector<ConstraintExpr>& extra,
                            int64_t& out);
-  // The values of `var`'s domain, enumerable where it holds at most a few
-  // thousand, that every hard constraint naming it and no other active
-  // random variable admits, `extra` among them, into `out`; false where no
-  // such constraint names it, or, with `need_custom`, none of them is one the
-  // solver tries rather than folds, or the domain is too wide, or nothing is
-  // admitted.
   bool OwnAdmissibleValues(const RandVariable& var,
                            const std::vector<ConstraintExpr>& extra,
                            bool need_custom, std::vector<int64_t>& out);
-  // Whether `c` is a hard constraint naming the variable `name` and no other
-  // active random variable, which decides alone whether a value is one the
-  // variable may take.
   bool ConstrainsAlone(const ConstraintExpr& c, const std::string& name) const;
-  // The values of `domain` every constraint of `own` admits for the variable
-  // `name`, the solve's values otherwise as they stand.
   std::vector<int64_t> AdmittedValues(
       const std::string& name, const std::vector<const ConstraintExpr*>& own,
       const std::vector<int64_t>& domain);
-  // 18.5: seeds each active, not cyclic, not yet drawn variable that a
-  // constraint the solver only tries narrows alone, `x % 7 == 3` or a
-  // member's bits of a packed structure, with a value drawn uniformly from
-  // the values OwnAdmissibleValues gives, enumerated once per solve into
-  // `enumerated`, which a draw over the whole domain finds as good as never.
   void SeedEnumerableVariables(
       const std::vector<ConstraintExpr>& extra,
       std::unordered_map<std::string, std::vector<int64_t>>& enumerated);
   void PruneRefusedRandcValues(std::unordered_map<std::string, int64_t>& drawn,
                                const std::vector<ConstraintExpr>& extra) const;
 
-  // After the general draw, each active constraint that does not hold under
-  // the values drawn is repaired in declaration order, the check that follows
-  // still deciding (constraint_solver_repair.cpp). 18.5.5: an implication
-  // whose antecedent holds has each constraint of its consequent that does
-  // not hold applied to the variable it constrains, an equality writing its
-  // constant, a set membership one of its members and a comparison a fresh
-  // draw from the narrowed domain, so that a consequent over a wide domain
-  // is met rather than waited for. 18.3: the solver handles algebraic
-  // factoring and mixed integer and bit expressions and finds a solution
-  // where one exists, which the draws tried against a relation over a wide
-  // domain do not: a relation that derives one variable from the others has
-  // that variable written from them, or drawn afresh under the bound they
-  // give it, and one over a single variable has the structured candidates of
-  // its domain tried, 0, the powers of two and their neighbours, the bounds
-  // and their negatives, one that satisfies it drawn at random. 18.5.7.1: a
-  // foreach over a dynamic array has the constraints of the elements below
-  // its size repaired, in index order, so that a relation between an element
-  // and the one before it is met element by element.
-  // 18.5.7.2: an array reduction that does not hold has one element below
-  // the size drawn rewritten to a value that meets it, a sum without a with
-  // clause to the value that meets the bound exactly and any reduction to
-  // the first value of the element's domain that does, so that a sum held
-  // to a value, or below one over a wide domain, is met rather than waited
-  // for.
   void RepairConstraints(const std::vector<ConstraintExpr>& extra);
   void RepairConstraint(const ConstraintExpr& c);
   void RepairConsequent(const ConstraintExpr& sub);
@@ -763,51 +354,27 @@ class ConstraintSolver {
                                 const std::string& name, int64_t candidate);
   void ApplyCustomRepair(const ConstraintExpr& c);
   void ApplyDerived(const ConstraintExpr& c);
-  // The domain of `name` narrowed by every active constraint that bounds it
-  // at the values drawn -- a bound derived from the others, a comparison
-  // against a constant, a set membership -- and, where a set membership
-  // holds it, the members the domain admits in `members`, `has_members`
-  // set; a constraint under an implication counts where its antecedent
-  // holds, a soft one where it is still honored.
   void NarrowAtValues(const ConstraintExpr& c, const std::string& name,
                       RandVariable& dom, std::vector<int64_t>& members,
                       bool& has_members) const;
   void NarrowBoundAtValues(const ConstraintExpr& c, const std::string& name,
                            RandVariable& dom) const;
-  // The same over every constraint of the enabled blocks and of the inline
-  // constraints of the solve a repair is running in.
   void NarrowByActive(const std::string& name, RandVariable& dom,
                       std::vector<int64_t>& members, bool& has_members) const;
-  // Seeds one attempt of the iterative solve: the inactive variables at
-  // their state values, the distributions sampled, the concrete constraints
-  // and, ahead of the attempts that repair, the soft bounds seeded, the
-  // array sizes held at `sizes` and the randc variables drawn.
   void SeedAttempt(const std::vector<ConstraintExpr>& extra, bool include_soft,
                    bool repair,
                    const std::unordered_map<std::string, int64_t>& sizes,
                    const std::function<int64_t(RandVariable&)>& gen_randc);
-  // The flat pass of one attempt: every variable drawn, the draws repaired
-  // where `repair` is set, and the constraints checked.
   bool FlatPass(const std::vector<ConstraintExpr>& extra, bool include_soft,
                 bool repair, const std::function<int64_t(RandVariable&)>& gen,
                 const std::function<double(RandVariable&)>& gen_real);
   bool AntecedentHolds(const ConstraintExpr& c) const;
   bool SoftHonored(const ConstraintExpr& c) const;
-  // 18.5.13.1: draws every active integral variable not yet drawn within
-  // its interval, the domain narrowed to a fixpoint by the comparisons
-  // against the other variables' intervals, the bounds against constants
-  // and, where a set membership holds it, the members the interval admits,
-  // each draw narrowing the rest; a variable whose interval the bounds
-  // close is left to the general draw (constraint_solver_propagate.cpp).
   void DrawPropagated(const std::vector<ConstraintExpr>& extra);
   void RepairFromCandidates(const ConstraintExpr& c);
   bool RepairMayWrite(const std::string& name) const;
-  // 18.5.9: repairs the active constraints writing the variables `names`
-  // alone, the ordered sets drawn before them standing as drawn.
   void RepairWithin(const std::vector<std::string>& names,
                     const std::vector<ConstraintExpr>& extra);
-  // 18.5.11: repairs the hard constraints every variable of which is among
-  // `committed`, writing the variables `names` alone.
   void RepairReadyWithin(const std::vector<std::string>& names,
                          const std::unordered_set<std::string>& committed,
                          const std::vector<ConstraintExpr>& extra);
@@ -816,65 +383,24 @@ class ConstraintSolver {
                          const std::vector<ConstraintExpr>& extra,
                          bool include_soft);
 
-  // 18.6.3: publish the values of the static random variables into their shared
-  // cells after a successful solve, so that the value this instance just drew
-  // is the one every other instance of the class now observes. Called only when
-  // the solve succeeds; a failed randomize() leaves the shared cells untouched,
-  // in keeping with the rule that the variables retain their previous values.
   void CommitStaticSharedValues();
 
-  // 18.5.9: partition the given active rand variables into ordered solve groups
-  // honoring the recorded solve...before constraints. Each group is solved in
-  // turn, earliest first; a variable is placed as late as the ordering allows
-  // (its distance to the end of the longest chain that depends on it), so that
-  // variables with nothing ordered after them — including every variable that
-  // is not explicitly ordered — fall into the final group and are solved last.
-  // The groups are returned earliest-first; empty groups are omitted.
   std::vector<std::vector<std::string>> ComputeSolveGroups(
       const std::vector<std::string>& vars) const;
 
-  // 18.5.9: solve the ordered groups by staged generate-and-test. Variables in
-  // an earlier group are drawn and committed before the later groups are solved
-  // against them, so an earlier variable's value is held fixed while the later
-  // variables are completed. An earlier value is kept whenever some completion
-  // of the remaining groups satisfies every constraint; only when no completion
-  // exists is it redrawn. This reproduces the solve...before distribution (an
-  // ordered variable is chosen over its own legal values, then the dependent
-  // variables subject to it) while preserving the full solution space.
   bool SolveOrderedGroups(const std::vector<std::vector<std::string>>& groups,
                           size_t idx, const std::vector<ConstraintExpr>& extra,
                           bool include_soft);
 
-  // 18.5.11: true when the recorded function-argument priority edges contain a
-  // cycle, i.e. a set of random variables whose implicit priorities are
-  // mutually contradictory. Such a circular dependency is an error and fails
-  // randomize().
   bool HasFunctionArgPriorityCycle() const;
 
-  // 18.5.11: partition the given active variables into priority layers honoring
-  // the function-argument priority edges. Layer 0 holds the highest-priority
-  // variables (those with nothing ordered before them) and is solved first; a
-  // variable falls one layer later than the latest variable that must precede
-  // it. Returned highest-priority-first; empty layers are omitted.
   std::vector<std::vector<std::string>> ComputePriorityLayers(
       const std::vector<std::string>& vars) const;
 
-  // 18.5.11: solve the priority layers in order, committing each layer before
-  // the next and never redrawing an earlier layer. Within a layer the variables
-  // are drawn until every constraint all of whose referenced variables are now
-  // committed holds; if no draw satisfies them the solve fails, because the
-  // higher-priority commitment is not reconsidered. This realizes the
-  // solution-space subdivision the clause describes — and its ability to fail —
-  // in contrast to the backtracking solve...before ordering.
   bool SolvePriorityLayers(const std::vector<std::vector<std::string>>& layers,
                            const std::vector<ConstraintExpr>& extra,
                            bool include_soft);
 
-  // 18.5.11: check the subset of constraints (enabled blocks plus 'extra')
-  // whose referenced variables are all present in 'committed'. A constraint
-  // that names a not-yet-committed variable, or that declares no referenced
-  // variables, is skipped so the priority solve does not evaluate it before its
-  // operands exist; the final full check still enforces every constraint.
   bool CheckCommittedConstraints(
       const std::vector<ConstraintExpr>& extra, bool include_soft,
       const std::unordered_set<std::string>& committed) const;
@@ -884,57 +410,22 @@ class ConstraintSolver {
   std::unordered_map<std::string, RandVariable> variables_;
   std::vector<ConstraintBlock> blocks_;
   std::unordered_map<std::string, int64_t> values_;
-  // 18.4.1: solved values for rand real variables, kept apart from the integral
-  // values_ map since their domain is the reals.
   std::unordered_map<std::string, double> real_values_;
   RandomizeCallback pre_randomize_;
   RandomizeCallback post_randomize_;
 
-  // 18.5.9: the recorded solve...before ordering edges. Each pair (before,
-  // after) requires 'before' to be solved ahead of 'after'. Empty when no
-  // ordering constraint applies, in which case the solver uses its default
-  // single-pass generate-and-test, which already draws each legal value
-  // combination with uniform probability.
   std::vector<std::pair<std::string, std::string>> solve_before_edges_;
 
-  // 18.5.11: the implicit priority edges induced by using a random variable as
-  // a function argument. Each pair (higher, lower) requires 'higher' to be
-  // solved ahead of 'lower' and, unlike solve_before_edges_, makes 'higher' a
-  // state variable to the constraints on 'lower' — a strict subdivision of the
-  // solution space rather than a redistribution within it. Empty when no
-  // function-argument ordering applies.
   std::vector<std::pair<std::string, std::string>> function_arg_priority_edges_;
 
-  // 18.5.12: set when a guard evaluates to ERROR. An ERROR guard generates an
-  // unconditional error, so the solve fails outright and is not retried.
   bool guard_error_ = false;
 
-  // 18.5.9: the variables a repair may write while an ordered solve repairs
-  // its last set, which is that set alone; empty outside one, where a
-  // repair may write any active variable.
   std::unordered_set<std::string> repair_scope_;
-  // The inline constraints of the solve a repair is running in, which bound
-  // the variables it writes as the blocks do; null outside a repair.
   const std::vector<ConstraintExpr>* repair_extra_ = nullptr;
 
-  // 18.5.13.1: the soft constraints the priority resolution has discarded for
-  // the current solve. A discarded soft constraint is treated as true: its
-  // inner relation is neither enforced nor seeded, exactly as if it were not
-  // present. Empty for the common case where every soft constraint is honored
-  // (or the whole soft set is satisfiable together with the hard constraints),
-  // so that path is left byte-identical to the 18.5.13 behavior.
   std::unordered_set<const ConstraintExpr*> dropped_soft_;
-  // 18.5: the admissible values SeedEnumerableVariables enumerated in the
-  // solve in progress, per variable, empty for one it does not enumerate.
   std::unordered_map<std::string, std::vector<int64_t>> enumerated_;
 
-  // 18.5.13.2: the soft constraints discarded by a 'disable soft' directive for
-  // the current solve. Distinct from dropped_soft_, which the priority
-  // resolution fills and clears as it reinstates constraints: a directive's
-  // discard is permanent for the call, so an entry here is treated as true (its
-  // inner relation neither enforced nor seeded) throughout the solve and is
-  // never reconsidered by the priority resolution. Empty when no 'disable soft'
-  // directive applies, leaving the 18.5.13 / 18.5.13.1 behavior unchanged.
   std::unordered_set<const ConstraintExpr*> disabled_soft_;
 };
 

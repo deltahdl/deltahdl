@@ -55,9 +55,6 @@ TEST(EscapedIdentifierPreprocessor, EscapedIdentifierInMacroContext) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §5.6.1: an escaped identifier holds any printable character up to the white
-// space ending it, so the `//` in `\a//b` opens no comment in macro text.
-// Read as one, it cut the text to `\a`.
 TEST(EscapedIdentifierPreprocessor, CommentOpenerInsideEscapedNameInMacroText) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -68,8 +65,6 @@ TEST(EscapedIdentifierPreprocessor, CommentOpenerInsideEscapedNameInMacroText) {
   EXPECT_NE(out.find("x \\a//b y"), std::string::npos);
 }
 
-// Nor does a `"` inside one open a string literal in macro text, which was
-// reported as an unterminated string.
 TEST(EscapedIdentifierPreprocessor, QuoteInsideEscapedNameInMacroText) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -80,8 +75,6 @@ TEST(EscapedIdentifierPreprocessor, QuoteInsideEscapedNameInMacroText) {
   EXPECT_NE(out.find("x \\a\"b y"), std::string::npos);
 }
 
-// The backslash is no part of the identifier, so a macro defined as `\cpu3`
-// is the macro `cpu3`, and `ifdef cpu3 finds it.
 TEST(EscapedIdentifierPreprocessor, EscapedMacroNameIsTheSimpleName) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -97,7 +90,6 @@ TEST(EscapedIdentifierPreprocessor, EscapedMacroNameIsTheSimpleName) {
   EXPECT_EQ(out.find("MISSING"), std::string::npos);
 }
 
-// And a usage written escaped finds a macro defined with the simple name.
 TEST(EscapedIdentifierPreprocessor, EscapedMacroUsageFindsTheSimpleName) {
   PreprocFixture f;
   auto out = Preprocess(
@@ -108,8 +100,6 @@ TEST(EscapedIdentifierPreprocessor, EscapedMacroUsageFindsTheSimpleName) {
   EXPECT_NE(out.find("x 7"), std::string::npos);
 }
 
-// An escaped identifier inside macro text, after other tokens, is stepped over
-// whole just as one opening the text is.
 TEST(EscapedIdentifierPreprocessor, EscapedNameAfterOtherMacroText) {
   PreprocFixture f;
   auto out = Preprocess(

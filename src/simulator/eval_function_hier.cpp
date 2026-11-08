@@ -34,15 +34,6 @@ namespace {
 bool AppendHierarchicalPath(const Expr* e, std::string& path, SimContext& ctx,
                             Arena& arena);
 
-// §23.6: a name in a path that refers to a loop generate block or to an
-// instance array is followed by an instance select, a constant expression in
-// brackets that selects one instance, `blk[1]` or `u[2]`; written inside a
-// generate block it may be the block's own loop index, `blk[g]`, which §27.4
-// makes an implicit localparam of the instance and which the running process
-// reads as one. The select is rendered as the lowerer keys the instance,
-// `blk[1]`, with a negative index spelled as GenBlockName spells it.
-// Answers false for a part select and for an index holding an x or z bit,
-// which selects no instance.
 bool AppendInstanceSelect(const Expr* e, std::string& path, SimContext& ctx,
                           Arena& arena) {
   if (e->base == nullptr || e->index == nullptr || e->index_end != nullptr ||
@@ -56,11 +47,6 @@ bool AppendInstanceSelect(const Expr* e, std::string& path, SimContext& ctx,
   return true;
 }
 
-// Appends the dotted path a chain of member accesses of identifiers writes,
-// "u1.tk" for `u1.tk` and "x.u1.tk" for `x.u1.tk`, a name followed by an
-// instance select rendered by AppendInstanceSelect, "blk[1].triple" for
-// `blk[1].triple`; answering false for any other shape: a scope resolution,
-// a parameterized identifier.
 bool AppendHierarchicalPath(const Expr* e, std::string& path, SimContext& ctx,
                             Arena& arena) {
   if (e == nullptr) return false;
@@ -80,13 +66,6 @@ bool AppendHierarchicalPath(const Expr* e, std::string& path, SimContext& ctx,
   return AppendHierarchicalPath(e->rhs, path, ctx, arena);
 }
 
-// §27.4 with §13.4: where `key` is one a generate block instance's subroutine
-// was registered under, the body runs in that block's scope
-// (RegisterGenBlockSubroutines in lowerer_register.cpp): the module instance
-// the block is in, which the key alone cannot say -- InstanceOfKey reads
-// "blk[1]." out of "blk[1].triple", and no instance is keyed so -- and the
-// block's own prefixes and loop localparams. Leaves `target` alone for every
-// other key.
 void ApplyGenBlockScope(std::string_view key, SimContext& ctx,
                         SubroutineTarget& target) {
   const GenBlockSubroutineScope* scope = ctx.FindGenBlockSubroutineScope(key);
@@ -95,49 +74,23 @@ void ApplyGenBlockScope(std::string_view key, SimContext& ctx,
   target.inst_prefix = scope->inst_prefix;
 }
 
-// The instance a registered key names: the key up to and including its last
-// `.`, "u1." for "u1.tk", and empty for a bare name, the top's.
 std::string InstanceOfKey(std::string_view key) {
   auto dot = key.rfind('.');
   return dot == std::string_view::npos ? std::string()
                                        : std::string(key.substr(0, dot + 1));
 }
 
-// §23.6: the complete path name to any object starts at a top-level module
-// and may be used from any level of the hierarchy or from a parallel one, so
-// "m.t1" written in the other top-level module n is m's t1, and "m.u1.tk" the
-// tk of m's child u1. A top's declarations are keyed under no prefix, as
-// Process::inst_prefix is empty there, so the instance the body runs in is
-// the path after the top's name: none for "m.t1", "u1." for "m.u1.tk". The
-// top's own subroutines are registered under its name too (LowerModule), so
-// "m.t1" as written answers m's t1 ahead of the bare "t1" of whichever top
-// registered last; a subroutine of an instance below the top is keyed with
-// the top's name left off. Leaves `target` alone when the head names no top.
 void ResolveTopHeadedPath(const std::string& path, SimContext& ctx,
                           SubroutineTarget& target) {
   std::string_view head = std::string_view(path).substr(0, path.find('.'));
   if (!ctx.IsTopModule(head)) return;
   std::string rest = path.substr(head.size() + 1);
   if (target.func == nullptr) target.func = ctx.FindFunction(rest);
-  // §27.4: a generate block's subroutine found under the path as written,
-  // "m.blk[1].triple" under the top's own name, already stands in its
-  // instance; one below the top, "m.u1.blk[1].triple", is registered as
-  // "u1.blk[1].triple" and is looked up so.
   if (target.gen_block != nullptr) return;
   target.inst_prefix = InstanceOfKey(rest);
   ApplyGenBlockScope(rest, ctx, target);
 }
 
-// §23.8: a path whose first name is the definition name of a module above
-// the caller, `mid.f(2)` called from an instance mid instantiates, names the
-// subroutine of the nearest enclosing instance of that module. The enclosing
-// instances are the caller's prefix cut back one name at a time, "m.u.t." to
-// "m.u." to "m.", each answering its module through FindInstanceType, and the
-// rest of the path is looked up under the first whose module the head names,
-// where RegisterInstanceSubroutines keyed that instance's subroutines.
-// Answers false where no enclosing instance below the top is of that module
-// or it declares no such subroutine; a top's own name is
-// ResolveTopHeadedPath's.
 bool ResolveUpwardModulePath(const std::string& path, std::string prefix,
                              SimContext& ctx, SubroutineTarget& target) {
   std::string_view head = std::string_view(path).substr(0, path.find('.'));
@@ -158,10 +111,6 @@ bool ResolveUpwardModulePath(const std::string& path, std::string prefix,
   return target.func != nullptr;
 }
 
-// The path `call` names, "tk" for a bare enable or `tk;`, "u1.tk" for a
-// hierarchical one, with or without its parentheses (`top.T;`),
-// "blk[1].triple" for one into a generate block instance; empty where the call
-// names no path a module subroutine is registered under.
 std::string CalleePath(const Expr* call, SimContext& ctx, Arena& arena) {
   if (call->kind == ExprKind::kIdentifier) return std::string(call->text);
   if (call->kind == ExprKind::kMemberAccess) {
@@ -177,13 +126,6 @@ std::string CalleePath(const Expr* call, SimContext& ctx, Arena& arena) {
   return path;
 }
 
-// §27.4: puts the caller's generate block prefixes back in the running
-// process for as long as it lives, with the callee's restored after, so an
-// expression of the caller read while the process stands in the callee's
-// block -- an actual, an output argument's variable -- resolves a bare name
-// against the caller's own block rather than the callee's. Does nothing
-// while no process runs or no call is in progress, as CallerInstancePrefix
-// answers the active instance there.
 class CallerGenBlockScope {
  public:
   explicit CallerGenBlockScope(SimContext& ctx) : proc_(ctx.CurrentProcess()) {
@@ -205,37 +147,17 @@ class CallerGenBlockScope {
   std::vector<std::string> callee_prefixes_;
 };
 
-// A bare callee a cross body declares while the cross is built (§19.6.1.4,
-// PushFunctionScope), and otherwise the one the package frame the call stands
-// in provides (§26.3).
 ModuleItem* ScopedOrPackageFunction(const std::string& name, SimContext& ctx) {
   if (ModuleItem* func = ctx.FindScopedFunction(name)) return func;
   return ctx.FindFunctionInPackageScope(name);
 }
 
-// §23.8 with §23.9: the subroutine the first top declares under the bare
-// callee `path`, called with no instance prefix in force (`active` empty) and
-// so from the first top's own processes, kept under the top's name as well
-// (RegisterInstanceSubroutines); every child instance registers its own under
-// the bare name after the top, so that key may hold another's. Null for a
-// dotted path, a call standing in an instance, or a name the top declares no
-// subroutine by.
 ModuleItem* FirstTopsOwnSubroutine(const std::string& path,
                                    const std::string& active, SimContext& ctx) {
   if (!active.empty() || path.find('.') != std::string::npos) return nullptr;
   return ctx.FindFunction(std::string(ctx.FirstTopModule()) + "." + path);
 }
 
-// §23.4 with §3.12.1: a module declared inside another sees the enclosing
-// module's names, which the search for an identifier reaches before the
-// compilation-unit scope, so a bare callee `path` called in such a module's
-// instance `active` is the subroutine of the innermost enclosing instance that
-// declares it, run in that instance, the first top's own standing under its
-// name (FirstTopsOwnSubroutine). The instance's own subroutine of the name
-// comes first, and the key under its prefix holds it; where units are
-// separate the key may hold the unit's instead (EnterInstanceUnit), which the
-// enclosing modules come before. Answers true with `target` filled where an
-// enclosing instance declares it; false for a dotted path.
 bool TryEnclosingDeclSubroutine(const std::string& path,
                                 const std::string& active, SimContext& ctx,
                                 SubroutineTarget& target) {
@@ -258,13 +180,6 @@ bool TryEnclosingDeclSubroutine(const std::string& path,
   return false;
 }
 
-// §23.9 with §3.12.1: the subroutine the compilation unit holding the calling
-// instance `active` declares under the bare callee `path`, the scope a module
-// item's name is looked for in next, kept under "$unit::name", or
-// "$unit#k::name" where the units are separate (RegisterFreeCuFunctions). The
-// bare-name registry holds whichever instance's subroutine of the name was
-// registered last instead. Null for a dotted path or a name the unit declares
-// no subroutine by.
 ModuleItem* UnitSubroutine(const std::string& path, const std::string& active,
                            SimContext& ctx) {
   if (path.find('.') != std::string::npos) return nullptr;
@@ -272,20 +187,12 @@ ModuleItem* UnitSubroutine(const std::string& path, const std::string& active,
                           "::" + path);
 }
 
-// §3.12.1 (printed page 57): whether `call` names its subroutine through
-// `$unit::`, as an enable, `$unit::t;`, or a call, `$unit::f()`, whose name
-// keeps the prefix as the parser read it (Parser::MakeSysScopePrefix).
 bool IsUnitScopedCallee(const Expr* call) {
   const Expr* name = call->kind == ExprKind::kCall ? call->lhs : call;
   return name != nullptr && name->kind == ExprKind::kIdentifier &&
          name->scope_prefix == "$unit";
 }
 
-// The subroutine looked for ahead of every instance's: for a callee written
-// `$unit::f()`, the compilation unit's, which §3.12.1 has the prefix name past
-// every nearer one of the name; and for a bare callee, the one the innermost
-// package frame provides (ScopedOrPackageFunction). Null where neither
-// answers, the search then going on through the instances.
 ModuleItem* UnitScopedOrFrameFunction(const Expr* call, const std::string& path,
                                       const std::string& active,
                                       SimContext& ctx) {
@@ -295,11 +202,6 @@ ModuleItem* UnitScopedOrFrameFunction(const Expr* call, const std::string& path,
   return ScopedOrPackageFunction(path, ctx);
 }
 
-// A path from the top of the design, "u1.tk" as written; a bare name found
-// here is the top's, a package's or the compilation unit's and runs where the
-// caller stands, as it did before instances were registered by prefix. The
-// first top's own subroutine comes first (FirstTopsOwnSubroutine), then the
-// compilation unit's (UnitSubroutine), then whichever the bare key holds.
 ModuleItem* TopUnitOrBareSubroutine(const std::string& path,
                                     const std::string& active,
                                     SimContext& ctx) {
@@ -308,9 +210,6 @@ ModuleItem* TopUnitOrBareSubroutine(const std::string& path,
   return ctx.FindFunction(path);
 }
 
-// The member access a dotted callee is written as: the call's own name,
-// `v.add` of `v.add(20)`, or the enable itself, `b.t` of `b.t;`; null for a
-// callee of any other shape.
 const Expr* DottedCallee(const Expr* call) {
   const Expr* callee =
       call->kind == ExprKind::kCall && call->callee.empty() ? call->lhs : call;
@@ -322,16 +221,6 @@ const Expr* DottedCallee(const Expr* call) {
   return callee;
 }
 
-// §25.7 with §25.9 and §25.3.2: a task or function of an interface is called
-// through any name that denotes an instance of it -- a virtual interface,
-// `v.add(20)`, a class's `vif.write(88)` or `C::vif.add(2)`, or an interface
-// port, `b.hit(10)` -- so the callee is the subroutine registered under the
-// key of the instance that name denotes, and its body runs in that instance,
-// or, for one a connected module exports (§25.7.3), in that module.
-// Answers true with `target` filled where the head of the callee is such a
-// name and the instance declares the subroutine, and where the head is a
-// virtual interface representing no instance, which §25.9 makes a fatal
-// run-time error, reported here and leaving `target.func` null.
 bool TryInterfaceInstanceCallee(const Expr* call, SimContext& ctx, Arena& arena,
                                 SubroutineTarget& target) {
   const Expr* callee = DottedCallee(call);
@@ -355,16 +244,10 @@ bool TryInterfaceInstanceCallee(const Expr* call, SimContext& ctx, Arena& arena,
   if (func == nullptr) return false;
   target.func = func;
   target.inst_prefix = scope + ".";
-  // §25.7.3: a body a connected module exports runs in that module.
   ApplyGenBlockScope(key, ctx, target);
   return true;
 }
 
-// §26.3: a subroutine called through the package scope resolution operator,
-// `pk::f(x)`, and, §13.5.5 (printed page 351), enabled as `p::t;`, its empty
-// parentheses being optional, which runs where the caller stands. Answers
-// true for a callee of either form, with `target.func` null where no package
-// subroutine answers the scoped name; false for any other callee.
 bool TryPackageScopedCallee(const Expr* call, SimContext& ctx, Arena& arena,
                             SubroutineTarget& target) {
   const Expr* scoped = nullptr;
@@ -392,12 +275,6 @@ std::string EvaluatedHierarchicalPath(const Expr* e, SimContext& ctx,
   return path;
 }
 
-// §26.3: a subroutine called through the package scope resolution operator,
-// `pk::f(x)`, parses as a call with no callee text and the scoped name as its
-// base; the lowerer registers every package subroutine under that "pk::f"
-// key (RegisterPackageScopedSubroutines), so the lookup goes by it. A class
-// scope never reaches this key: TryEvalClassScopeCall and the instance-task
-// path take those calls before the registry is asked.
 bool IsPackageScopedCall(const Expr* call) {
   const Expr* scoped = call->lhs;
   if (scoped == nullptr || scoped->kind != ExprKind::kMemberAccess ||
@@ -417,32 +294,12 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   std::string path = CalleePath(call, ctx, arena);
   if (path.empty()) return target;
   bool is_hierarchical = path.find('.') != std::string::npos;
-  // §26.3 with §26.2: a bare callee written where the innermost frame names
-  // a package -- a package subroutine's body or a package variable's
-  // initializer, or a module subroutine's body whose own import is recorded
-  // under a key of its own (LowerSubroutineBodyImports in lowerer_import.cpp)
-  // -- is looked up in that scope first, the package's own "pkg::name" and
-  // then what its imports bring in, as §26.3 searches the current scope's
-  // locally and potentially locally visible identifiers before the outer
-  // scopes: `function int calc(); import p::*; return five(); endfunction`
-  // calls p's five ahead of the module's own. Null outside any package frame
-  // or where the package provides no such name, and the module's and the
-  // top's registrations are searched then. A `$unit::` callee is the
-  // compilation unit's ahead of both (UnitScopedOrFrameFunction).
   target.func = UnitScopedOrFrameFunction(call, path, active, ctx);
   if (target.func != nullptr) {
     target.inst_prefix = std::move(active);
     return target;
   }
   if (TryEnclosingDeclSubroutine(path, active, ctx, target)) return target;
-  // §23.6: the first node of a path may be the top of the hierarchy the path
-  // is used from, so "u1.tk" written in instance "x." is "x.u1.tk" first,
-  // and the lowerer registers each instance's subroutines under that
-  // prefixed key (RegisterInstanceSubroutines). The same lookup makes a bare
-  // name the calling instance's own declaration ahead of another module's
-  // registered under the same bare name. With no prefix in force the
-  // relative key is the path itself, answered below with a top's name at its
-  // head read as §23.6's root rather than as an instance.
   std::string relative = active + path;
   if (ModuleItem* func =
           active.empty() ? nullptr : ctx.FindFunction(relative)) {
@@ -456,20 +313,11 @@ SubroutineTarget FindSubroutineTarget(const Expr* call, SimContext& ctx,
   }
   target.func = TopUnitOrBareSubroutine(path, active, ctx);
   target.inst_prefix = is_hierarchical ? InstanceOfKey(path) : active;
-  // §27.4 with §23.6: a path into a generate block instance, "blk[1].triple"
-  // from the top's own processes.
   if (is_hierarchical) ApplyGenBlockScope(path, ctx, target);
-  // §23.6: a path headed by a top-level module's name, from a parallel
-  // hierarchy or from anywhere in the design.
   if (is_hierarchical) ResolveTopHeadedPath(path, ctx, target);
   return target;
 }
 
-// §25.7.4: the fork-join a call of the extern forkjoin task `func`, whose
-// definitions are recorded under `key`, behaves as: one enable of each
-// definition by its defining instance's path, `top.mem1.a.countTargets;`,
-// passing the call's own arguments. With no definition the fork holds no
-// process, and the call is reported.
 static const Stmt* BuildForkjoinCall(const Expr* call, const ModuleItem* func,
                                      const std::vector<std::string_view>& defs,
                                      SimContext& ctx, Arena& arena) {
@@ -515,8 +363,6 @@ const Stmt* ExternForkjoinCall(const Expr* call, SimContext& ctx,
   return fork;
 }
 
-// §13.4.2: the owners of the subroutines the running process, or a call made
-// where none runs, has entered (Process::frame_owners).
 static std::vector<FrameOwnerEntry>& FrameOwners(SimContext& ctx) {
   Process* proc = ctx.CurrentProcess();
   return proc != nullptr ? proc->frame_owners : ctx.ProcesslessFrameOwners();
@@ -560,10 +406,6 @@ StaticLocalFrameScope::~StaticLocalFrameScope() {
 }
 
 void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
-  // §27.4: a subroutine reached through its block instance's name stands in
-  // that instance, whose prefixes the process takes on below; one reached
-  // by its bare name is called from within the block declaring it, so the
-  // caller's prefixes lead to that block at its depth.
   size_t gen_depth = target.gen_block != nullptr
                          ? target.gen_block->gen_prefixes.size()
                          : ctx.GenBlockSubroutineDepth(target.func);
@@ -575,9 +417,6 @@ void EnterCalleeInstance(SimContext& ctx, const SubroutineTarget& target) {
   if (proc == nullptr) return;
   proc->caller_inst_prefixes.push_back(std::move(proc->inst_prefix));
   proc->inst_prefix = target.inst_prefix;
-  // §27.4: the block's prefixes go in beside the instance, and the caller's
-  // own wait with its instance; a target of no generate block keeps the
-  // caller's, as a bare call from inside a block has always run with them.
   proc->caller_gen_prefixes.push_back(proc->gen_prefixes);
   if (target.gen_block != nullptr) {
     proc->gen_prefixes = target.gen_block->gen_prefixes;
@@ -607,19 +446,12 @@ void BindGenBlockConsts(const SubroutineTarget& target, SimContext& ctx,
                         Arena& arena) {
   if (target.gen_block == nullptr) return;
   for (const auto& [name, value] : target.gen_block->consts) {
-    // §27.4: the loop index is an integer, so the localparam is 32-bit
-    // signed, as Lowerer::InstallGenBlockConsts makes the block's own copy.
     Variable* var = ctx.CreateLocalVariable(name, 32, true);
     var->value = MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(value));
     var->value.is_signed = true;
   }
 }
 
-// §13.5: the actuals are expressions of the caller, so they are read in the
-// instance the call was written in, while the process itself stands in the
-// callee's (EnterCalleeInstance) so that a static subroutine's formals join
-// that instance's frame (§13.3.2). The binding never suspends, so the
-// override that names the caller's instance for it is scoped over it alone.
 void BindActualsInCaller(const ModuleItem* func, const Expr* expr,
                          SimContext& ctx, Arena& arena) {
   InstancePrefixOverride in_caller(ctx.InstancePrefixOverride(),
@@ -628,8 +460,6 @@ void BindActualsInCaller(const ModuleItem* func, const Expr* expr,
   BindFunctionArgs(func, expr, ctx, arena);
 }
 
-// §13.5.2: the output arguments are written back to the caller's variables,
-// read in the caller's instance as the actuals were.
 void WritebackInCaller(const ModuleItem* func, const Expr* expr,
                        SimContext& ctx, Arena& arena) {
   InstancePrefixOverride in_caller(ctx.InstancePrefixOverride(),
@@ -640,11 +470,6 @@ void WritebackInCaller(const ModuleItem* func, const Expr* expr,
   WritebackAssocRefs(ctx);
 }
 
-// §13.4 with §23.6: a function's body runs in the callee's instance. The
-// process already stands there, and the override naming it is for a call
-// made while the actuals of an enclosing call are being read, `u1.tk(u2.f(1))`,
-// where the caller's instance is in force through BindActualsInCaller. A
-// function never suspends, so the override is scoped over the body.
 void ExecFunctionBodyInCallee(const SubroutineTarget& target, const Expr* call,
                               Variable* ret_var, SimContext& ctx,
                               Arena& arena) {
@@ -658,10 +483,6 @@ void ExecFunctionBodyInCallee(const SubroutineTarget& target, const Expr* call,
 namespace delta {
 namespace {
 
-// The declaration of the static local `name` among `stmts`, searched through
-// the blocks and branches of the body: one written `static`, or, where
-// `every_static`, the subroutine being static, any local not written
-// `automatic` (§13.4.2 with §6.21), a block parameter being no variable.
 const Stmt* FindStaticLocalDecl(const std::vector<Stmt*>& stmts,
                                 std::string_view name, bool every_static);
 
@@ -705,8 +526,6 @@ Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
       member->rhs->kind != ExprKind::kIdentifier) {
     return nullptr;
   }
-  // The function part is looked up as a call naming it is: a bare name, a
-  // path, or a package scope, whose callee a call keeps on its left side.
   Expr call;
   call.kind = ExprKind::kCall;
   call.lhs = member->lhs;
@@ -716,14 +535,10 @@ Variable* FunctionStaticLocal(const Expr* member, SimContext& ctx,
     return nullptr;
   }
   std::string_view var = member->rhs->text;
-  // §13.4.2: a function declared in a module, an interface, a program or a
-  // package is static unless written automatic.
   bool is_static_sub = !target.func->is_automatic;
   const Stmt* decl =
       FindStaticLocalDecl(target.func->func_body_stmts, var, is_static_sub);
   if (decl == nullptr) return nullptr;
-  // §13.4.2: the static frame is keyed by the instance the function runs in,
-  // which the call's target names.
   EnterCalleeInstance(ctx, target);
   Variable* found = ctx.FindStaticFuncVar(target.func->name, var);
   if (found == nullptr) {

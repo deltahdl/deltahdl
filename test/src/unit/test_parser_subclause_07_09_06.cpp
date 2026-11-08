@@ -48,10 +48,6 @@ TEST(AssocArrayNextParsing, AssocArrayNextInIfCondition) {
               "endmodule\n"));
 }
 
-// The clause 7.9.6 worked example drives next() as the controlling expression
-// of a do/while loop, so parsing must accept a next() call in that condition
-// position -- distinct from the if-condition and assignment-RHS positions
-// above.
 TEST(AssocArrayNextParsing, AssocArrayNextInDoWhileCondition) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

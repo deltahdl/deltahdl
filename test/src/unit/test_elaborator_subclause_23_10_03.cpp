@@ -50,10 +50,6 @@ TEST(ParameterDependence, OverridePropagatesThroughDependencyChain) {
                        {{"A", 5}, {"B", 15}, {"C", 16}});
 }
 
-// §23.10.3 para 1: the dependence recompute holds no matter which §23.10.2
-// instantiation form supplies the override. Here the source parameter is fixed
-// by an ordered-list (positional) override -- a different resolution path than
-// the by-name form -- and the two dependent parameters still track it.
 TEST(ParameterDependence, OrderedListOverridePropagatesThroughDependencyChain) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -191,9 +187,6 @@ TEST(ParameterDependence, TypeParamOverrideRecomputesDependentVariableWidth) {
   EXPECT_EQ(u0->variables[0].width, 16u);
 }
 
-// §23.10.3 states that an override can make a parameter assignment illegal:
-// overriding T in its example with a class type makes the evaluation of p3
-// illegal and elaboration fail.
 TEST(ParameterDependence, TypeOverrideToClassMakesDependentAssignmentIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -213,9 +206,6 @@ TEST(ParameterDependence, TypeOverrideToClassMakesDependentAssignmentIllegal) {
                     4, "23.10.3"));
 }
 
-// §23.10.3 states that unless T is overridden with an integral type, evaluating
-// parameter p's default is illegal. The source here is the standard's own
-// example, with T left at its class default.
 TEST(ParameterDependence, UnoverriddenClassTypeDefaultFailsElaboration) {
   ElabFixture f;
   ElaborateSrc(
@@ -251,11 +241,6 @@ TEST(ParameterDependence, TypeOverrideToIntegralMakesClassDefaultLegal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.10.3 says of this source only that T2 needs an override at instantiation,
-// so p2 is evaluated only with the type that override supplies. What makes the
-// override compulsory is §6.20.1: a design element parameter with no default
-// has to be overridden in every instantiation of that element, which is the
-// rule the missing override is reported under.
 TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
   ElabFixture f;
   ElaborateSrc(
@@ -273,11 +258,6 @@ TEST(ParameterDependence, NoDefaultTypeParamWithDependentRequiresOverride) {
                     5, "6.20.1"));
 }
 
-// §23.10.3 para 4/5: when a no-default type parameter is overridden at
-// instantiation, a value parameter that depends on it is evaluated only with
-// the override type -- not merely free of errors, but sized by that exact type.
-// Two instances pick different override types, so the dependent parameter's own
-// declared width tracks the override rather than a constant.
 TEST(ParameterDependence,
      NoDefaultTypeParamSizesDependentParamFromOverrideType) {
   ElabFixture f;

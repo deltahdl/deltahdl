@@ -1,20 +1,3 @@
-// §37.3.2 and §38.35: the string-valued VPI properties, which vpi_get_str()
-// answers.
-//
-// What makes them a group is that the answer is a name rather than a number.
-// §37.3.2 has vpi_get_str(vpiType, ...) hand back the very identifier of the
-// type constant as the data model diagram of §37.3 spells it, so most of this
-// file is the mapping from a modelled object type or operator type onto that
-// spelling, and the rest reads a name, a file, a library or a cell off the
-// object. vpi_get() and vpi_get64(), which answer the integer-valued
-// properties of §38.33, stay in src/simulator/vpi_query.cpp.
-//
-// The two were in one file, which reached 980 lines against the 1000
-// assert-no-oversized-source-files in .github/workflows/deltahdl.yml fails at.
-// Nothing here is called from that file and nothing here calls into it:
-// VpiHasLocationProperties, the one name the two share, is declared in
-// simulator/vpi_model_helpers3.h and defined in simulator/vpi_helpers_nets.cpp.
-
 #include <cstddef>
 #include <string>
 
@@ -30,15 +13,11 @@
 
 namespace delta {
 
-// A constant of one of the sets §37.3.2 names through vpi_get_str(), with its
-// spelling.
 struct VpiConstantName {
   int value;
   const char* name;
 };
 
-// The spelling `table` gives the constant `value`, or null for a value it does
-// not list.
 template <std::size_t N>
 static const char* VpiConstantNameIn(const VpiConstantName (&table)[N],
                                      int value) {
@@ -48,15 +27,6 @@ static const char* VpiConstantNameIn(const VpiConstantName (&table)[N],
   return nullptr;
 }
 
-// §37.3.2: vpi_get_str(vpiType, ...) hands back the name of the type constant,
-// and that name is derived from the object's name in the data model diagram
-// (§37.3) - i.e. it is the very identifier of the type constant. These are the
-// object types the OBJECT TYPES sections of Annex K (vpi_user.h) and Annex M
-// (sv_vpi_user.h) define, each under its own spelling. Where two constants
-// share a value - vpiLogicNet and vpiNet, vpiArrayNet and vpiNetArray (§37.16
-// details 27 and 29), vpiLogicVar and vpiReg, vpiVarBit and vpiRegBit,
-// vpiArrayVar and vpiRegArray (§37.17 detail 19) - the clause lets either be
-// reported, and the IEEE 1364 spelling Annex K defines is.
 constexpr VpiConstantName kVpiTypeNames[] = {
     {vpiAlways, "vpiAlways"},
     {vpiAssignStmt, "vpiAssignStmt"},
@@ -273,17 +243,10 @@ constexpr VpiConstantName kVpiTypeNames[] = {
     {vpiLetExpr, "vpiLetExpr"},
 };
 
-// The spelling of `type`, or null for a value neither annex defines as an
-// object type.
 static const char* VpiTypeConstantName(int type) {
   return VpiConstantNameIn(kVpiTypeNames, type);
 }
 
-// §37.3.2: an operation's vpiOpType is one of the additional type properties;
-// its integer value names an operator constant in the vpiOpType return-value
-// namespace, Annex K's and the ones Annex M adds, each listed here with its
-// spelling so vpi_get_str(vpiOpType, ...) can hand the name back. Listing
-// Annex K's alone left a cast, an `inside` or a wildcard equality nameless.
 constexpr VpiConstantName kVpiOpTypeNames[] = {
     {vpiMinusOp, "vpiMinusOp"},
     {vpiPlusOp, "vpiPlusOp"},
@@ -376,8 +339,6 @@ constexpr VpiConstantName kVpiOpTypeNames[] = {
     {vpiInsideOp, "vpiInsideOp"},
 };
 
-// §37.3.2 with Annex K: the primitive, delay and timing check constants
-// vpiPrimType, vpiDelayType and vpiTchkType report, each with its spelling.
 constexpr VpiConstantName kVpiPrimTypeNames[] = {
     {vpiAndPrim, "vpiAndPrim"},           {vpiNandPrim, "vpiNandPrim"},
     {vpiNorPrim, "vpiNorPrim"},           {vpiOrPrim, "vpiOrPrim"},
@@ -410,17 +371,6 @@ constexpr VpiConstantName kVpiTchkTypeNames[] = {
     {vpiRemoval, "vpiRemoval"},   {vpiTimeskew, "vpiTimeskew"},
 };
 
-// §37.3.2: besides vpiType, some objects carry an additional type property
-// shown in the data model diagrams - vpiDelayType, vpiNetType, vpiOpType,
-// vpiPrimType, vpiResolvedNetType, or vpiTchkType. vpi_get() reports each as an
-// integer type constant, and the clause states that the *name* of that constant
-// is reachable through vpi_get_str(). This resolves the string form: it reads
-// the same value vpi_get() would report and maps it onto the constant's
-// spelling, so the two forms stay in step. The authoritative constant set lives
-// in Annex K and Annex M (§37.3.2 points there); values the simulator models
-// are named here, and an unmodelled value - like an unmodelled object type in
-// VpiTypeConstantName - yields no name (null), leaving room for other
-// subclauses' values.
 static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
   switch (property) {
     case vpiOpType:
@@ -434,74 +384,39 @@ static const char* VpiAdditionalTypeConstantName(int property, VpiHandle obj) {
     case vpiTchkType:
       return VpiConstantNameIn(kVpiTchkTypeNames, obj->tchk_type);
     default:
-      // vpiResolvedNetType, the last of the six VpiGetStrRawProperty routes
-      // here, which names the same constants vpiNetType does.
       return VpiNetTypeConstantName(VpiResolvedNetTypeOf(obj));
   }
 }
 
-// §37.41 detail 10 / §37.15 / §37.30 / §37.35 / §37.36: resolves vpiDefName,
-// whose value depends on the object kind - a module/UDP defn reports its own
-// name, a ref obj reports its actual interface/modport name, an interface
-// typespec reports its modport/interface identifier, a primitive what it is an
-// instance of, and any other kind has no definition name.
 static const char* VpiDefNameStr(VpiHandle obj) {
-  // §38.11: an instance reports what it is an instance of, which the design
-  // recorded against its path; a module object standing for a definition rather
-  // than an instance has no such record and its own name is its definition
-  // name. An interface, program or package instance is an instance as a
-  // module's is (§37.6, §37.9, §37.10), a package being its own definition.
   if (VpiIsInstanceType(obj->type)) {
     return obj->def_name.empty() ? obj->name.data() : obj->def_name.c_str();
   }
-  // §37.15 detail 6: a ref obj whose actual is an interface or modport
-  // reports that interface's definition name or the modport name.
   if (obj->type == vpiRefObj) return VpiRefObjDefName(obj);
-  // §37.30 detail 1: an interface typespec reports the modport identifier
-  // or the interface declaration's identifier as its definition name.
   if (obj->type == vpiInterfaceTypespec) {
     return VpiInterfaceTypespecDefName(obj);
   }
-  // §37.36: a udp defn reports its definition name - the UDP declaration's
-  // identifier - through vpiDefName.
   if (obj->type == vpiUdpDefn) return obj->name.data();
-  // §37.35 with §38.11: a primitive is an instance of a built-in gate or switch
-  // primitive, named by its keyword, or of a UDP, named by its identifier.
   if (VpiIsPrimitiveType(obj->type)) return obj->def_name.c_str();
   return nullptr;
 }
 
-// §37.14 / §37.60: resolves vpiName, which does not apply to a port bit,
-// prefers a port's explicit/inferred name, treats an unlabeled atomic statement
-// as nameless, and otherwise hands back the stored name.
 static const char* VpiNameStr(VpiHandle obj) {
-  // §37.14 detail 7: vpiName does not apply to a port bit.
   if (obj->type == vpiPortBit) return nullptr;
-  // §37.14 detail 8: a port returns its name - explicit name preferred,
-  // then any inferred name, else NULL. The model stores one name, so an
-  // unnamed (null) port yields NULL while a named port yields its name.
   if (obj->type == vpiPort) {
     return VpiPortName(obj->explicit_name, obj->name, obj->name);
   }
-  // §37.60 detail 1: an atomic statement's vpiName is its label when one
-  // was written, and NULL otherwise - never an empty string for an
-  // unlabeled statement.
   if (VpiIsAtomicStmtObject(obj)) {
     return obj->name.empty() ? nullptr : obj->name.data();
   }
   return obj->name.data();
 }
 
-// §37.3.3: vpiFile names the source file an object came from; an object kind
-// §37.3.3 excepts (no source file) or one with no stored file yields null.
 static const char* VpiFileStr(VpiHandle obj) {
   if (!VpiHasLocationProperties(obj->type)) return nullptr;
   return obj->file.empty() ? nullptr : obj->file.c_str();
 }
 
-// §37.83 and §37.10: vpiDefFile is drawn on the attribute object and on an
-// instance; one with no recorded definition file - and any other object kind -
-// yields null.
 static const char* VpiDefFileStr(VpiHandle obj) {
   if (obj->type != vpiAttribute && !VpiIsInstanceType(obj->type)) {
     return nullptr;
@@ -509,38 +424,23 @@ static const char* VpiDefFileStr(VpiHandle obj) {
   return obj->def_file.empty() ? nullptr : obj->def_file.c_str();
 }
 
-// §37.10: vpiLibrary names an instance's library, a module's, interface's,
-// program's or package's alike; any other object kind yields null.
 static const char* VpiLibraryStr(VpiHandle obj) {
   if (!VpiIsInstanceType(obj->type)) return nullptr;
   return obj->library_name.c_str();
 }
 
-// §37.10: vpiCell names an instance's cell, which is the definition it is an
-// instance of where no binding was recorded, never the instance's own name;
-// any other object kind yields null.
 static const char* VpiCellStr(VpiHandle obj) {
   if (!VpiIsInstanceType(obj->type)) return nullptr;
   return obj->cell_name.empty() ? obj->def_name.c_str()
                                 : obj->cell_name.c_str();
 }
 
-// §37.10: vpiConfig names the configuration bound to an instance; any other
-// object kind yields null.
 static const char* VpiConfigStr(VpiHandle obj) {
   if (!VpiIsInstanceType(obj->type)) return nullptr;
   return obj->config_name.c_str();
 }
 
-// §37.59 detail 2 and §37.42 detail 9: vpiDecompile hands back an expression,
-// or a system task or function call, functionally equivalent to the one written
-// in the source. It is drawn on the expressions and the system task calls; any
-// other object kind, and one that stored no decompiled form, yields null rather
-// than an empty string.
 static const char* VpiDecompileStr(VpiHandle obj) {
-  // §37.17 detail 28 and §37.16 detail 34: a variable or net decompiles to the
-  // name an expression would write it by, built when it is first asked for. A
-  // var bit is among the variables, sv_vpi_user.h making vpiVarBit vpiRegBit.
   if (VpiIsVariablesType(obj->type) || VpiIsNetsType(obj->type)) {
     if (obj->decompile.empty()) {
       obj->decompile = VpiStructMemberDecompileOf(obj);
@@ -551,31 +451,15 @@ static const char* VpiDecompileStr(VpiHandle obj) {
   return obj->decompile.empty() ? nullptr : obj->decompile.c_str();
 }
 
-// §38.31 and §38.9: the four callback reasons an application may read the
-// save/restart location from. Both clauses name two of them and neither names
-// any other, so a routine running for something else -- or for no callback at
-// all -- is not one of the application callback routines they describe.
 static bool VpiSaveRestartReasonAllowsLocation(int reason) {
   return reason == kCbStartOfSave || reason == kCbEndOfSave ||
          reason == kCbStartOfRestart || reason == kCbEndOfRestart;
 }
 
-// §38.11: resolves the string-valued property switch for vpi_get_str(), after
-// the caller has handled the null- and protected-object gating. Factored out of
-// VpiContext::GetStrRaw so the entry point stays small; the per-case spec
-// references are kept inline so the dispatch table stays self-documenting.
 static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
   switch (property) {
-    // §37.3.2: every object carries a vpiType property; queried as a string it
-    // yields the name of that type constant (see 37.3 for how the names
-    // derive).
     case kVpiType:
       return VpiTypeConstantName(obj->type);
-    // §37.3.2: the additional type properties are string-accessible as well - a
-    // vpi_get_str() on one returns the name of the constant the integer form
-    // reports, per the clause's statement that these constant names can be
-    // reached through vpi_get_str(). All six selectors route through the shared
-    // resolver, which maps the property's value onto its spelling.
     case vpiOpType:
     case vpiDelayType:
     case vpiNetType:
@@ -585,27 +469,13 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
       return VpiAdditionalTypeConstantName(property, obj);
     case kVpiName:
       return VpiNameStr(obj);
-    // §37.3.3: vpiFile names the source file an object came from - one of the
-    // two location properties, alongside vpiLineNo. It applies to every object
-    // that corresponds to source text; the object kinds §37.3.3 excepts have no
-    // source file and yield null regardless of any stored string. The `line
-    // directive (§22.12) may shift the reported file. §37.49 stores an
-    // assertion's file in the same field, and it is handed back here.
     case vpiFile:
       return VpiFileStr(obj);
-    // §37.83: an attribute reports the source file of its definition through
-    // the vpiDefFile string property. It is drawn only on the attribute object;
-    // an attribute with no recorded definition file - and any other object kind
-    // - yields null rather than an empty string.
     case vpiDefFile:
       return VpiDefFileStr(obj);
-    // §37.17 detail 25: a non-static class data member has no full name.
     case kVpiFullName:
       if (VpiIsNonStaticClassDataMember(obj)) return nullptr;
       return obj->full_name.empty() ? obj->name.data() : obj->full_name.c_str();
-    // §37.41 detail 10: vpiDPICIdentifier reports the C linkage name of a "DPI"
-    // or "DPI-C" task or function. An object that carries no such name yields
-    // null rather than an empty string.
     case vpiDPICIdentifier:
       return obj->dpi_c_identifier.empty() ? nullptr
                                            : obj->dpi_c_identifier.c_str();
@@ -617,9 +487,6 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
       return VpiCellStr(obj);
     case kVpiConfig:
       return VpiConfigStr(obj);
-    // §37.59 detail 2 and §37.42 detail 9: an expression, or a system task or
-    // function call, decompiles to a functionally equivalent one through the
-    // vpiDecompile string property.
     case vpiDecompile:
       return VpiDecompileStr(obj);
     default:
@@ -628,31 +495,15 @@ static const char* VpiGetStrRawProperty(int property, VpiHandle obj) {
 }
 
 PLI_BYTE8* VpiContext::GetStr(int property, VpiHandle obj) {
-  // §38.11: vpi_get_str() returns string property values. The value is placed
-  // in a single temporary buffer reused by every call - so a pointer from an
-  // earlier call is overwritten by the next - and that buffer is distinct from
-  // value_pools_, the storage for s_vpi_value strings. A null raw result (null
-  // or protected object, or a property with no string) yields null, not "".
   const char* raw = GetStrRaw(property, obj);
   if (!raw) return nullptr;
-  // Reserve once so repeated assigns of typical-length strings keep writing
-  // into the same allocation, leaving an earlier returned pointer valid until
-  // the next call overwrites its contents.
   if (get_str_buffer_.capacity() < 256) get_str_buffer_.reserve(256);
   get_str_buffer_.assign(raw);
-  // §37.4.2: a string property is of type PLI_BYTE8 *, so what leaves here is a
-  // pointer an application can hold in one. The buffer is this context's own,
-  // and §38.11 makes it the temporary every call overwrites.
   return get_str_buffer_.data();
 }
 
 const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
   if (!obj) {
-    // §38.31: a callback routine called for cbStartOfSave or cbEndOfSave can
-    // read the path to the save/restart location with
-    // vpi_get_str(vpiSaveRestartLocation, NULL), and §38.9 says the same of the
-    // two restart reasons. It is the one string property drawn on no object,
-    // and a null handle stopped here before reaching any property at all.
     if (property == vpiSaveRestartLocation &&
         VpiSaveRestartReasonAllowsLocation(current_callback_reason_) &&
         !save_restart_location_.empty()) {
@@ -660,11 +511,6 @@ const char* VpiContext::GetStrRaw(int property, VpiHandle obj) {
     }
     return nullptr;
   }
-  // §37.3.6: a protected object's properties are inaccessible unless otherwise
-  // specified, so a string query for one is an error. The vpiType and
-  // vpiIsProtected properties are the exception - permitted for all objects -
-  // so they fall through; any other property records the error and yields no
-  // string.
   if (VpiReadSealed(*obj) && property != kVpiType &&
       property != vpiIsProtected) {
     last_error_.state = kVpiPLI;

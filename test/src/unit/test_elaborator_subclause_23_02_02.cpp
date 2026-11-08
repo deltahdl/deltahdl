@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -58,8 +57,6 @@ TEST(PortDeclaration, UnionPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kUnion);
 }
 
-// The port is a variable: with no port kind §23.2.2.3 would make it a net,
-// whose data type §6.7.1 does not let be an event.
 TEST(PortDeclaration, EventPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -101,11 +98,6 @@ TEST(PortDeclaration, ArrayPortElaborates) {
   ASSERT_EQ(design->top_modules[0]->ports.size(), 2u);
 }
 
-// §23.2.2: a port may be a *variable* of any allowed data type. The mh1
-// example illustrates this with var-qualified integer and real ports. Those
-// var-typed scalar forms are only exercised at parse time elsewhere; observe
-// here that they survive elaboration with their data-type kind preserved and
-// the non-net (variable) flag set, alongside a struct output port.
 TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -129,19 +121,6 @@ TEST(PortDeclaration, VarTypedScalarPortsElaborate) {
   EXPECT_EQ(ports[2].direction, Direction::kOutput);
 }
 
-// §23.2.2: an enumeration is an admitted port data type, and §23.2.2.3 decides
-// the port kind separately from it: an input or inout port with no port kind is
-// a net of the default net type. No exception is made for a port that names a
-// data type -- that clause's own `module mh1 (integer x);` means
-// `inout wire integer x`, and `module mh7 (input var integer x);` shows that
-// `var` is what makes an input a variable. So the inline enum port carries the
-// enum kind at its base (int) width and is a net.
-//
-// Being a net, it is a net the standard forbids. §6.7.1 admits only a 4-state
-// integral type as a net's data type, so that every bit of a net is 4-state,
-// and an enumeration with no explicit base has the 2-state `int` base of §6.19.
-// So the port carries the enum kind at its base width, is a net, and is
-// rejected -- all three read off the same declaration.
 TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -160,19 +139,6 @@ TEST(PortDeclaration, EnumPortElaboratesAsANetWhenThePortKindIsOmitted) {
                             "net data type must be 4-state", 2, "6.7.1"));
 }
 
-// The same port with `var` written in front of it. §23.2.2.3 counts `var` among
-// the port kinds -- the net type keywords and var, written to declare a port of
-// one of those kinds -- so it says what the port is, not what type it has. The
-// port is then a variable rather than the net an input defaults to, and §6.7.1
-// is about nets, so the very enumeration rejected just above is accepted here.
-//
-// The two sources differ by that one word, which is what makes this pair worth
-// having: it reads the effect of `var` rather than the acceptability of an
-// enumeration. Syntax 23-4 writes the variable form as `var_data_type ::=
-// data_type | var data_type_or_implicit`, the same data_type the net form
-// takes, so an enumeration defined in place stands after `var` exactly as it
-// stands without it. The port name is asserted because a parse that did not
-// recognize the enumeration there would read the name from the `enum` keyword.
 TEST(PortDeclaration, VarEnumPortElaboratesAsAVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -191,11 +157,6 @@ TEST(PortDeclaration, VarEnumPortElaboratesAsAVariable) {
   EXPECT_TRUE(port.is_var);
 }
 
-// A struct defined in place is the other data_type form that has to be
-// recognized where a port's type is written, and `var` takes it for the same
-// reason it takes an enumeration. The output port above is written without a
-// port kind; this one is written with one, so the two spellings of the same
-// declared type are both covered.
 TEST(PortDeclaration, VarStructPortElaboratesAsAVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -214,10 +175,6 @@ TEST(PortDeclaration, VarStructPortElaboratesAsAVariable) {
   EXPECT_TRUE(port.is_var);
 }
 
-// The same port with a 4-state base is a legal net, so it elaborates cleanly.
-// This is what separates the rejection above from one that turned away every
-// enum port, and it is the spelling that makes an enum usable on an input
-// whose port kind is omitted.
 TEST(PortDeclaration, EnumPortWithAFourStateBaseIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,9 +187,6 @@ TEST(PortDeclaration, EnumPortWithAFourStateBaseIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2.3's rule is not about enumerations: an input port with the port kind
-// omitted is a net whatever data type it names, so any 2-state data type on one
-// is a net data type §6.7.1 does not admit.
 TEST(PortDeclaration, TwoStateInputPortIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -245,12 +199,6 @@ TEST(PortDeclaration, TwoStateInputPortIsRejected) {
                             "net data type must be 4-state", 2, "6.7.1"));
 }
 
-// The asymmetry §23.2.2.3 draws, and the reason the rejection above cannot be
-// written as a ban on 2-state port data types. An output whose data type is
-// written with the explicit data_type syntax defaults to the variable port
-// kind, and the clause's `module mh11(output integer x);` means
-// `output var integer x`. A variable is outside §6.7.1 entirely, so the same
-// 2-state data type is accepted here.
 TEST(PortDeclaration, TwoStateOutputPortIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -263,9 +211,6 @@ TEST(PortDeclaration, TwoStateOutputPortIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2: a port data type may carry multiple packed dimensions. The
-// elaborated width is the product of the two packed dimensions (4 * 8) with no
-// unpacked dimension.
 TEST(PortDeclaration, PackedArrayPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -283,8 +228,6 @@ TEST(PortDeclaration, PackedArrayPortElaborates) {
   EXPECT_EQ(port.num_unpacked_dims, 0u);
 }
 
-// §23.2.2: a port may be a multidimensional (2-D) unpacked array. Both unpacked
-// dimensions are folded to their element counts (4 and 2) during elaboration.
 TEST(PortDeclaration, MultiDimUnpackedArrayPortElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -325,12 +268,6 @@ TEST(PortDeclaration, UnpackedArrayOfStructPortElaborates) {
   EXPECT_EQ(design->top_modules[0]->ports[0].type_kind, DataTypeKind::kStruct);
 }
 
-// Elaborate a one-module source declaring one port, and expect that port's
-// single unpacked dimension to read back with the bounds `left` and `right`.
-//
-// The four cases that call this differ only in the dimension each declares, and
-// stating the readback once is what leaves that difference the whole of each
-// case.
 void ExpectSolePortUnpackedBounds(const char* src, int64_t left,
                                   int64_t right) {
   SCOPED_TRACE(src);
@@ -345,8 +282,6 @@ void ExpectSolePortUnpackedBounds(const char* src, int64_t left,
   EXPECT_EQ(port.unpacked_dims[0].right, right);
 }
 
-// The same for a source whose dimension is written as a size: expect the port
-// to record one unpacked dimension holding `size` elements.
 void ExpectSolePortUnpackedSize(const char* src, uint32_t size) {
   SCOPED_TRACE(src);
   ElabFixture f;
@@ -360,13 +295,6 @@ void ExpectSolePortUnpackedSize(const char* src, uint32_t size) {
   EXPECT_EQ(port.unpacked_dim_sizes[0], size);
 }
 
-// §7.4.2: an unpacked array is declared with its element address ranges after
-// the identifier, so `[1:4]` addresses elements 1 through 4. §11.5.2 makes
-// those bounds decide what a select reads: the bounds the memory's declaration
-// gives decide what an address expression reaches. RtlirPort records a size per
-// dimension and no bound of any kind, so this port and one declared `[0:3]`
-// read back identically after elaboration and `mem[1]` reaches a different
-// element of each.
 TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
   ExpectSolePortUnpackedBounds(
       "module m(\n"
@@ -376,10 +304,6 @@ TEST(PortDeclaration, UnpackedArrayPortRecordsItsAddressBounds) {
       1, 4);
 }
 
-// §7.4.2: [size] is shorthand for [0:size-1], so this port holds the same four
-// elements the port above holds, at addresses 0 through 3 rather than 1 through
-// 4. RtlirPort records size 4 for both and no bound of any kind, so the two
-// declarations are indistinguishable once elaborated.
 TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
   ExpectSolePortUnpackedBounds(
       "module m(\n"
@@ -389,11 +313,6 @@ TEST(PortDeclaration, UnpackedArrayPortDistinguishesTheSizeFormFromARange) {
       0, 3);
 }
 
-// §7.4.2 on the two indices of a range specification: either may be the larger,
-// or the two may be equal. Written the greater way round, element 4 is the
-// first of the array rather than the last. RtlirPort records size 4 and no
-// bound of any kind, so a descending declaration reads back exactly as `[1:4]`
-// does and the order written is lost.
 TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
   ExpectSolePortUnpackedBounds(
       "module m(\n"
@@ -403,14 +322,6 @@ TEST(PortDeclaration, DescendingUnpackedArrayPortRecordsItsDeclaredOrder) {
       4, 1);
 }
 
-// §7.4.2: a fixed-size unpacked dimension may instead be given as one positive
-// constant integer expression, its element count, and a parameter of the module
-// is such an expression. The fold is done in an empty scope, where `N` resolves
-// to nothing, so the dimension is dropped and RtlirPort records no dimension at
-// all rather than a size without a bound. §11.5.2 then never gets its first
-// step -- the word is selected first, with one address per dimension -- because
-// the synthesizer is never told the name is an array, and it lowers `mem[2]` as
-// a §11.5.1 bit-select of the one element.
 TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
   ExpectSolePortUnpackedSize(
       "module m #(parameter int N = 4) (\n"
@@ -420,14 +331,6 @@ TEST(PortDeclaration, ParameterSizedUnpackedArrayPortFolds) {
       4);
 }
 
-// The bound form of the same declaration. §7.4.2: a fixed-size unpacked
-// dimension is given by a range specification [ constant_expression :
-// constant_expression ], so a parameter stands as the second index as readily
-// as it stands as a size. It is resolved in the same empty scope, so the
-// dimension is dropped and RtlirPort records no dimension at all. §11.5.2's
-// step of selecting the word first, one address per dimension, is again never
-// reached, and the synthesizer lowers `mem[2]` as a §11.5.1 bit-select of the
-// one element.
 TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
   ExpectSolePortUnpackedBounds(
       "module m #(parameter int N = 4) (\n"
@@ -437,15 +340,6 @@ TEST(PortDeclaration, ParameterBoundedUnpackedArrayPortFolds) {
       1, 4);
 }
 
-// The same size expression on a non-ANSI port, whose parameter is declared in
-// the module body beside the port declaration that reads it. The packed width
-// on this shape already folds, so the scope holding `N` is reachable where the
-// port declaration is elaborated; the unpacked dimension is folded somewhere
-// else and comes back with nothing, so RtlirPort records no dimension at all
-// rather than the [0:size-1] range §7.4.2 makes a lone [size] stand for.
-// §11.5.2's step of selecting the word first, one address per dimension, is
-// never reached, and the synthesizer lowers `mem[2]` as a §11.5.1 bit-select of
-// the one element.
 TEST(PortDeclaration, BodyParameterSizedUnpackedArrayPortFolds) {
   ExpectSolePortUnpackedSize(
       "module m(mem);\n"

@@ -13,16 +13,6 @@
 
 using namespace delta;
 
-// §F.3.4.3.8 unfolds the unbounded temporal operators into the §F.3.2 until,
-// not and and: (always p) is (p until 0), (s_eventually p) is
-// (not (always (not p))), (p s_until q) is ((p until q) and s_eventually q),
-// (p until_with q) is (p until (p and q)), and (p s_until_with q) is
-// (p s_until (p and q)). The cases check that each factory builds the tree
-// its identity names in both property models and that, under §F.5.3.1,
-// always requires p from every letter, s_eventually from some letter, s_until
-// parts from until where q never releases it, and the with forms require p at
-// the releasing letter as well.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
@@ -31,11 +21,8 @@ std::shared_ptr<const SequenceExpr> Atom(const std::string& name) {
   return SeqBoolean(BoolAtom(name));
 }
 
-// The Boolean 0 the always identity releases on, as the §F.3.2 Boolean !1.
 std::shared_ptr<const BooleanExpr> Zero() { return BoolNot(BoolTrue()); }
 
-// (always p) is the until whose left operand is p and whose release is the
-// Boolean 0, read as strong(0) in the unclocked model.
 TEST(DerivedUnboundedTemporalOperators, AlwaysIsTheUntilReleasedByZero) {
   auto p = PropStrong(Atom("a"));
   auto form = PropAlways(p);
@@ -49,7 +36,6 @@ TEST(DerivedUnboundedTemporalOperators, AlwaysIsTheUntilReleasedByZero) {
       SequenceExprEqual(*form->rhs->sequence, *SeqBoolean(BoolTrue())));
 }
 
-// (s_eventually p) is the negation of the always over the negation of p.
 TEST(DerivedUnboundedTemporalOperators, SEventuallyNegatesTheAlwaysOfNotP) {
   auto p = PropStrong(Atom("a"));
   auto form = PropSEventually(p);
@@ -63,8 +49,6 @@ TEST(DerivedUnboundedTemporalOperators, SEventuallyNegatesTheAlwaysOfNotP) {
   EXPECT_EQ(form->lhs->rhs->kind, PropertyExpr::Kind::kStrong);
 }
 
-// (p s_until q) is the and of (p until q) with (s_eventually q); the with
-// forms release on (p and q), the strong one over the s_until tree.
 TEST(DerivedUnboundedTemporalOperators, TheUntilFormsAreTheStatedTrees) {
   auto p = PropStrong(Atom("a"));
   auto q = PropStrong(Atom("b"));
@@ -98,9 +82,6 @@ TEST(DerivedUnboundedTemporalOperators, TheUntilFormsAreTheStatedTrees) {
   EXPECT_EQ(s_until_with->rhs->lhs->lhs->lhs, s_until_with->lhs->rhs);
 }
 
-// The clocked forms are the same trees over the clocked until, with the
-// Boolean property 0 as the release of the always; the strong until is not
-// the plain one and the with form is not the plain until.
 TEST(DerivedUnboundedTemporalOperators, ClockedFormsAreTheStatedTrees) {
   auto q1 = ClkStrong(Atom("a"));
   auto q2 = ClkStrong(Atom("b"));
@@ -120,9 +101,6 @@ TEST(DerivedUnboundedTemporalOperators, ClockedFormsAreTheStatedTrees) {
                                    *ClkSUntil(q1, ClkAnd(q1, q2))));
 }
 
-// Under §F.5.3.1, always strong(a) holds where every letter carries a and
-// fails where one does not, whatever its position; s_eventually strong(a)
-// holds where some letter carries a and fails where none does.
 TEST(DerivedUnboundedTemporalOperators,
      AlwaysNeedsEveryLetterAndSEventuallySome) {
   auto always = PropAlways(PropStrong(Atom("a")));
@@ -139,9 +117,6 @@ TEST(DerivedUnboundedTemporalOperators,
   EXPECT_FALSE(NeutrallySatisfies(Word{A({"b"}), A({"b"})}, *s_eventually));
 }
 
-// strong(a) s_until strong(b) holds on a, a, b and fails on a, c, b, where a
-// lapses before b releases it, and on a, a, where b never does; the plain
-// until holds on a, a, which is where the two part.
 TEST(DerivedUnboundedTemporalOperators, SUntilNeedsTheRelease) {
   auto p = PropStrong(Atom("a"));
   auto q = PropStrong(Atom("b"));
@@ -156,10 +131,6 @@ TEST(DerivedUnboundedTemporalOperators, SUntilNeedsTheRelease) {
   EXPECT_FALSE(NeutrallySatisfies(Word{A({"c"})}, *s_until));
 }
 
-// strong(a) until_with strong(b) needs a on the letter with b: it holds on a
-// then a and b together, fails on a then b alone, where the plain until holds,
-// and holds on a, a with no b at all; the strong form fails there and agrees
-// on the other two.
 TEST(DerivedUnboundedTemporalOperators, TheWithFormsNeedPAtTheRelease) {
   auto p = PropStrong(Atom("a"));
   auto q = PropStrong(Atom("b"));
@@ -175,10 +146,6 @@ TEST(DerivedUnboundedTemporalOperators, TheWithFormsNeedPAtTheRelease) {
   EXPECT_FALSE(NeutrallySatisfies(Word{A({"a"}), A({"b"})}, *s_until_with));
 }
 
-// In the clocked model under @(clk), always strong(a) requires a at every
-// clk tick and nothing at the unclocked letters between them, and
-// s_eventually strong(a) requires a at some tick, so a carried only by an
-// unclocked letter satisfies neither where the unclocked s_eventually holds.
 TEST(DerivedUnboundedTemporalOperators, UnderAClockOnlyTheTicksCount) {
   auto clk = BoolAtom("clk");
   auto always = ClkClock(clk, ClkAlways(ClkStrong(Atom("a"))));

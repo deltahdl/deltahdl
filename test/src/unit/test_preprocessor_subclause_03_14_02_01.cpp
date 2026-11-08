@@ -93,29 +93,17 @@ TEST(DesignBuildingBlockParsing, FileOrderDependency) {
 
 TEST(DesignBuildingBlockParsing, ErrorMissingSlash) {
   auto r = PreprocessTimescale("`timescale 1ns 1ps\n");
-  // §22.7 is where the standard writes the valid magnitudes, the valid
-  // unit strings and the separator, so that is the rule these reports
-  // enforce even though the directive is introduced here.
   EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale format: missing '/'",
                             1, "22.7"));
 }
 
 TEST(DesignBuildingBlockParsing, ErrorInvalidMagnitude) {
   auto r = PreprocessTimescale("`timescale 5ns / 1ps\n");
-  // §22.7 is where the standard writes the valid magnitudes, the valid
-  // unit strings and the separator, so that is the rule these reports
-  // enforce even though the directive is introduced here.
   EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale unit", 1, "22.7"));
 }
 
-// §3.14.2.1 syntax requires a time_unit operand before the '/'. The separator
-// is present but the unit operand is absent, a path distinct from a missing '/'
-// or an empty precision after the '/'.
 TEST(DesignBuildingBlockParsing, ErrorEmptyUnitBeforeSlash) {
   auto r = PreprocessTimescale("`timescale / 1ps\n");
-  // §22.7 is where the standard writes the valid magnitudes, the valid
-  // unit strings and the separator, so that is the rule these reports
-  // enforce even though the directive is introduced here.
   EXPECT_TRUE(ReportedError(r.diags, "invalid `timescale unit", 1, "22.7"));
 }
 
@@ -131,9 +119,6 @@ TEST(DesignBuildingBlockParsing, WhitespaceAroundSlash) {
   EXPECT_EQ(r2.timescale.precision, TimeUnit::kPs);
 }
 
-// §3.14.2.1: a directive stays in effect from where it appears until the next
-// directive is read. An intervening design element does not reset it, so with
-// no replacing directive the originally captured value must survive unchanged.
 TEST(DesignBuildingBlockParsing, PersistsThroughInterveningModule) {
   auto r = PreprocessTimescale(
       "`timescale 1us / 1ns\n"
@@ -147,14 +132,8 @@ TEST(DesignBuildingBlockParsing, PersistsThroughInterveningModule) {
   EXPECT_EQ(r.timescale.prec_magnitude, 1);
 }
 
-// §3.14.2.1 syntax `timescale time_unit / time_precision requires both
-// operands. The separator is present here but the precision operand is absent,
-// a path distinct from a wholly missing '/'.
 TEST(DesignBuildingBlockParsing, ErrorEmptyPrecisionAfterSlash) {
   auto r = PreprocessTimescale("`timescale 1ns /\n");
-  // §22.7 is where the standard writes the valid magnitudes, the valid
-  // unit strings and the separator, so that is the rule these reports
-  // enforce even though the directive is introduced here.
   EXPECT_TRUE(
       ReportedError(r.diags, "invalid `timescale precision", 1, "22.7"));
 }

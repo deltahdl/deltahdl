@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// A Packet holding its size below 64, and the derived classes the cases
-// randomize, one adding a constraint over the size and one contradicting
-// the base's.
 const char* const kPackets =
     "class Packet;\n"
     "  rand bit [7:0] kind;\n"
@@ -25,10 +22,6 @@ const char* const kPackets =
     "  constraint oversize { size > 100; }\n"
     "endclass\n";
 
-// 18.6.1: randomize() is a virtual method, so called through a Packet
-// handle to a Framed it applies the constraints of the object's own class:
-// over 32 draws every call returns 1 with the size below 64 and even, as
-// the design test/src/e2e/randomize_method.sv runs it.
 TEST(RandomizeMethodRun, TheVirtualMethodRandomizesTheObjectsOwnClass) {
   SimFixture f;
   std::string out =
@@ -50,10 +43,6 @@ TEST(RandomizeMethodRun, TheVirtualMethodRandomizesTheObjectsOwnClass) {
   EXPECT_EQ(out, "32 32 32\n");
 }
 
-// 18.6.1: constraints a subclass adds can leave even a simple-looking
-// constraint with no solution: the Oversized holds its size above 100 beside
-// the base's below 64, so randomize() returns 0 and the size keeps the value it
-// had rather than the bound the empty range was collapsed onto.
 TEST(RandomizeMethodRun, ADerivedClassCanRenderTheConstraintsUnsatisfiable) {
   SimFixture f;
   std::string out =
@@ -71,10 +60,6 @@ TEST(RandomizeMethodRun, ADerivedClassCanRenderTheConstraintsUnsatisfiable) {
   EXPECT_EQ(out, "0 5\n");
 }
 
-// 18.6.1 with 8.4: randomize() is a method of the object any handle expression
-// yields, so an element of an array of handles, a handle held in another
-// object's property and a handle a function returns are each randomized: every
-// call returns 1 and leaves the object's size below 64.
 TEST(RandomizeMethodRun, AnyHandleExpressionNamesTheObjectRandomized) {
   SimFixture f;
   std::string out =
@@ -110,8 +95,6 @@ TEST(RandomizeMethodRun, AnyHandleExpressionNamesTheObjectRandomized) {
   EXPECT_EQ(out, "1 1 1 1 1 1\n");
 }
 
-// 18.6.1 with 18.7: the same receivers take an inline constraint, which names
-// the members of the object randomized.
 TEST(RandomizeMethodRun, AnyHandleExpressionTakesAnInlineConstraint) {
   SimFixture f;
   std::string out =
@@ -137,9 +120,6 @@ TEST(RandomizeMethodRun, AnyHandleExpressionTakesAnInlineConstraint) {
   EXPECT_EQ(out, "1 1 7 9\n");
 }
 
-// 8.4 with 18.6.1: a call through a handle expression that holds null is
-// illegal, and it is reported at the call as a call through a named null
-// handle is.
 TEST(RandomizeMethodRun, ANullHandleExpressionIsReported) {
   SimFixture f;
   auto* design = ElaborateSrc(std::string(kPackets) +
@@ -156,11 +136,6 @@ TEST(RandomizeMethodRun, ANullHandleExpressionIsReported) {
                             15, "8.4"));
 }
 
-// 18.6.1 with A.8.2: randomize is built in on every class and its call may be
-// written without its argument list, so h.randomize is h.randomize() and a
-// bare randomize in a method of the class is this.randomize(), each drawing x
-// to 9. A struct's member named randomize, through a variable or an element
-// of an array, stays the member it reads as (#8152).
 TEST(RandomizeMethodRun, ACallWrittenWithoutItsListRandomizes) {
   SimFixture f;
   std::string out = RunCapture(

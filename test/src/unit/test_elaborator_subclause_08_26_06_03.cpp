@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -107,13 +105,6 @@ TEST(InterfaceClassDiamondInheritance, ThreePathDiamondMergesOneCopy) {
              "endmodule\n"));
 }
 
-// §8.26.6.3 makes each specialization of a parameterized interface class a
-// type of its own, so IntfBase#(bit) and IntfBase#(logic) are two interface
-// classes rather than one reached twice: there is no diamond, and T arrives in
-// IntfFinal from both. The report carries §8.26.6.3, the rule that decides the
-// two paths are two, rather than §8.26.6.2, which describes the conflict once
-// that is settled; §8.26.6.2 stays on a conflict between unrelated interface
-// classes, which test_elaborator_subclause_08_26_06_02.cpp holds to.
 TEST(InterfaceClassDiamond, DifferentSpecializationsNotDiamondError) {
   ElabFixture f;
   ElabOk(
@@ -156,13 +147,6 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsWithOverrideOk) {
              "endmodule\n"));
 }
 
-// The method side of the same rule. ibase#(bit) and ibase#(string) are two
-// interface class types under §8.26.6.3, so fn(T) reaches ic3 twice with two
-// signatures and the conflict is that subclause's; the same two prototypes
-// from two unrelated interface classes are §8.26.6.1's, which
-// InterfaceClassMethodConflict.UnrelatedSpecializationsConflictError in
-// test_elaborator_subclause_08_26_06_01.cpp holds to. This is the shape of
-// sv-tests' 8.26.6.3--diamond_relationship_parametrized.sv; line 11 is ic3.
 TEST(InterfaceClassDiamond, DifferentSpecializationsMethodConflictError) {
   ElabFixture f;
   ElabOk(
@@ -186,11 +170,6 @@ TEST(InterfaceClassDiamond, DifferentSpecializationsMethodConflictError) {
                             "8.26.6.3"));
 }
 
-// Boundary of the specialization rule: identical parameterizations of a
-// parameterized base reached through two paths denote the same interface
-// class type, so they still form a diamond and merge to a single copy
-// rather than colliding. Mirror of DifferentSpecializationsNotDiamondError
-// with matching #(bit) arguments on both branches.
 TEST(InterfaceClassDiamond, SameSpecializationIsDiamondMergesOneCopy) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase #(type T = int);\n"
@@ -208,12 +187,6 @@ TEST(InterfaceClassDiamond, SameSpecializationIsDiamondMergesOneCopy) {
              "endmodule\n"));
 }
 
-// The specialization rule is not confined to type parameters: distinct value
-// parameterizations of a parameterized interface class are likewise distinct
-// interface class types (§8.26.6.3). Reaching such a base through two paths
-// with different value arguments is therefore not a diamond, so the parameter
-// SIZE inherited from IntfBase#(1) and IntfBase#(2) collides and must be
-// resolved. Value-arg counterpart of DifferentSpecializationsNotDiamondError.
 TEST(InterfaceClassDiamond, DifferentValueSpecializationsNotDiamondError) {
   ElabFixture f;
   ElabOk(
@@ -237,10 +210,6 @@ TEST(InterfaceClassDiamond, DifferentValueSpecializationsNotDiamondError) {
       "8.26.6.3"));
 }
 
-// Boundary of the value-specialization rule: identical value parameterizations
-// reached through two paths denote the same interface class type, so they still
-// form a diamond and the shared parameter merges to one copy rather than
-// colliding. Value-arg counterpart of SameSpecializationIsDiamondMergesOneCopy.
 TEST(InterfaceClassDiamond, SameValueSpecializationIsDiamondMergesOneCopy) {
   EXPECT_TRUE(
       ElabOk("interface class IntfBase #(int P = 1);\n"
@@ -258,12 +227,6 @@ TEST(InterfaceClassDiamond, SameValueSpecializationIsDiamondMergesOneCopy) {
              "endmodule\n"));
 }
 
-// The specialization discriminator admits any data type as the type argument,
-// not just the built-in keyword types. Here the two branches parameterize the
-// same base with distinct user typedefs (§6.18), so IntfBase#(NameA) and
-// IntfBase#(NameB) are different interface class types and the parameter T
-// inherited through both paths collides. Named-typedef operand counterpart of
-// DifferentSpecializationsNotDiamondError (which uses keyword bit/logic args).
 TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
   ElabFixture f;
   ElabOk(
@@ -289,10 +252,6 @@ TEST(InterfaceClassDiamond, DifferentNamedTypeSpecializationsNotDiamondError) {
       "8.26.6.3"));
 }
 
-// §8.1 lets a class be declared wherever a data declaration may appear. Two
-// different specializations of one interface class are not a diamond wherever
-// they are written, and one specialization reached twice is; the pair below
-// varies the scope alone.
 TEST(InterfaceClassDiamond, DifferentSpecializationsInsideAModuleError) {
   ElabFixture f;
   ElabOk(
@@ -335,29 +294,6 @@ TEST(InterfaceClassDiamond, SameSpecializationInsideAModuleOk) {
              "endmodule\n"));
 }
 
-// §8.26.6.3 makes every distinct parameterization of a parameterized interface
-// class an interface class specialization of its own, and that different
-// specializations of one parameterized interface class inherited by the same
-// interface class are not a diamond. IntfBase#(A) and IntfBase#(B) are
-// therefore different interface class types, so the parameter SIZE inherited
-// through both collides and must be resolved. The named constants are the point
-// of this test: it makes the same claim as
-// DifferentValueSpecializationsNotDiamondError above, which writes its
-// arguments as the literals 1 and 2, and a literal is the one form the
-// specialization key builder folds without consulting a parameter scope. That
-// test therefore passes whether the scope is consulted or not, and this one
-// does not. The same source as TwoLocalparamArgumentsAreTwoSpecializations with
-// the localparams moved into the module, which is the one variable that test
-// holds fixed. §8.26.6.3 makes every distinct parameterization of a
-// parameterized interface class a specialization of its own (printed page 214)
-// and makes no exception for where the argument's value is declared, so
-// IntfBase#(A) and IntfBase#(B) are two specializations here as much as at
-// compilation-unit scope and SIZE collides under §8.26.6.3.
-//
-// Elaborator::ValidateInterfaceClassRules runs before any module is elaborated,
-// so A and B have a value only where the module's own items are folded. Without
-// that fold both arguments key as "v?", the two parameterizations read as one
-// diamond, and the conflict this asserts is not reported at all.
 TEST(InterfaceClassSpecialization,
      TwoModuleLocalparamArgumentsAreTwoSpecializations) {
   ElabFixture f;
@@ -384,13 +320,6 @@ TEST(InterfaceClassSpecialization,
       "8.26.6.3"));
 }
 
-// The other direction, and the reason the fold has to compute the value rather
-// than merely notice that the argument is a name. §8.26.6.3 makes uniqueness a
-// property of the parameterization, so IntfBase#(2) and IntfBase#(A) with
-// `localparam int A = 2` are one specialization, SIZE is inherited once, and
-// the source is legal. An implementation that split every argument it could not
-// fold -- or that keyed a name by its spelling -- reports a conflict here while
-// still passing the test above.
 TEST(InterfaceClassSpecialization,
      AModuleLocalparamAndAnEqualLiteralAreOneSpecialization) {
   ElabFixture f;
@@ -440,15 +369,6 @@ TEST(InterfaceClassSpecialization,
       "8.26.6.3"));
 }
 
-// §8.26.6.3 rules that where inherited parameters come from the same interface
-// class, a single copy of SIZE is inherited and no conflict arises. This is the
-// boundary that rules out keying a specialization by the source position of its
-// argument: two extends clauses naming the one localparam A are the one
-// parameterization, and splitting them would report a conflict between a
-// parameterization and itself. This test passes both before and after the
-// change asked for by
-// InterfaceClassSpecialization.TwoLocalparamArgumentsAreTwoSpecializations, and
-// it is here to keep that fix from over-splitting.
 TEST(InterfaceClassSpecialization,
      OneLocalparamArgumentReachedTwiceIsOneSpecialization) {
   EXPECT_TRUE(
@@ -468,15 +388,6 @@ TEST(InterfaceClassSpecialization,
              "endmodule\n"));
 }
 
-// §8.26.6.3 makes a specialization unique by its parameterization, not by how
-// the argument was spelled, so the literal 2 and a localparam equal to 2 name
-// the one specialization of IntfBase and the parameter SIZE reached through
-// both merges to a single copy. This fails today in the opposite direction
-// from
-// InterfaceClassSpecialization.TwoLocalparamArgumentsAreTwoSpecializations:
-// the literal folds to the key fragment v2 and the localparam does not fold at
-// all, so the two keys differ and a conflict is reported between two
-// parameterizations that are in fact the same one.
 TEST(InterfaceClassSpecialization,
      ALiteralAndALocalparamOfEqualValueAreOneSpecialization) {
   EXPECT_TRUE(

@@ -21,10 +21,6 @@ using namespace delta;
 
 namespace {
 
-// §8.23: from outside a class, `::` reaches its static properties and methods,
-// its parameters and its types. A property or method written without `static`
-// belongs to an object, which `C::x` and `C::f()` in a module name none of, so
-// each is an error, while a static member and a parameter stay reachable.
 TEST(ClassScopeResolutionElaboration, ANonStaticMemberIsNotReachedFromOutside) {
   ElabFixture f;
   ElaborateSrc(
@@ -57,9 +53,6 @@ TEST(ClassScopeResolutionElaboration, ANonStaticMemberIsNotReachedFromOutside) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §8.8's typed constructor call names the constructor through `::` with no
-// object, `D::new(4)` building a D for a C handle, so `new` is the one method
-// written without `static` that `::` reaches from outside its class.
 TEST(ClassScopeResolutionElaboration, TheConstructorIsReachedFromOutside) {
   ElabFixture f;
   ElaborateSrc(
@@ -81,10 +74,6 @@ TEST(ClassScopeResolutionElaboration, TheConstructorIsReachedFromOutside) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §8.23: `Cfg::my_type` names the type Cfg declares and no other, so a module
-// array typedef sharing the bare name lends x none of its dimensions; adopted,
-// x would be a two-element array of one-bit logic, and `x = 5` an assignment
-// of an integral value to it.
 TEST(ClassScopeResolutionElaboration, ScopedTypedefTakesNoModuleArrayDims) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -104,11 +93,6 @@ TEST(ClassScopeResolutionElaboration, ScopedTypedefTakesNoModuleArrayDims) {
   EXPECT_EQ(x->width, 32u);
 }
 
-// §8.23 with §11.12: `A::B::C` names the C nested in the B nested in A,
-// walked from A, and not the C of a top-level B that the last prefix alone
-// would reach. That C derives from Base, so a handle of it fits a Base formal
-// and a formal of its own type, while a handle of the top-level B::C, which
-// derives from nothing, is reported for either.
 TEST(ClassScopeResolutionElaboration,
      ChainOfNestedClassesIsWalkedFromItsFirstName) {
   ElabFixture f;
@@ -143,11 +127,6 @@ TEST(ClassScopeResolutionElaboration,
   }
 }
 
-// §8.23 with §6.20.1: the class scope resolution operator reaches a member of
-// a class nested in another, and a class body's parameter is a localparam,
-// so `Outer::Inner::N` is a constant a module localparam may be set to. The
-// nested class's parameters were recorded under no key and only a name with
-// one identifier before `::` was read as one, so A had no value.
 TEST(ClassScopeResolutionElaboration, NestedClassParameterIsAConstant) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -165,9 +144,6 @@ TEST(ClassScopeResolutionElaboration, NestedClassParameterIsAConstant) {
   EXPECT_EQ(ParamValue(design, "A"), 5);
 }
 
-// The same for classes declared in the module (§8.26), whose parameters are
-// registered as the module's items are elaborated: `logic
-// [Outer::Inner::N-1:0] v` after the classes is five bits wide.
 TEST(ClassScopeResolutionElaboration, NestedModuleClassParameterSizesAVar) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -187,9 +163,6 @@ TEST(ClassScopeResolutionElaboration, NestedModuleClassParameterSizesAVar) {
   EXPECT_EQ(v->width, 5u);
 }
 
-// §8.23: only a chain of class or package names before `::` names a scoped
-// parameter, so `a[0].b` has no key even where "a.b" holds one: it neither
-// folds to that value nor counts as a constant.
 TEST(ClassScopeResolutionElaboration, SelectInAScopedChainHasNoKey) {
   EvalFixture f;
   ScopeMap scope{{"a.b", 3}};
@@ -198,11 +171,6 @@ TEST(ClassScopeResolutionElaboration, SelectInAScopedChainHasNoKey) {
   EXPECT_FALSE(IsConstantExpr(e, scope));
 }
 
-// §8.23 with §7.4.4: `Outer::Inner::t` is the typedef of the class Inner
-// declared within Outer, never that of the compilation unit's own Inner, so a
-// function's return type, its formal and its body's variable written with the
-// chain each take the nested class's three elements. Each was looked up by its
-// last prefix alone, `Inner::t`, and took the unit Inner's two.
 TEST(ClassScopeResolutionElaboration, ChainedTypedefTakesTheNestedClassesDims) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
@@ -231,8 +199,6 @@ TEST(ClassScopeResolutionElaboration, ChainedTypedefTakesTheNestedClassesDims) {
   EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 3u);
 }
 
-// §3.12.1 with §8.23: `$unit::C::t` heads its chain with the compilation unit,
-// whose class C's typedef it names, so the formal keeps C's two elements.
 TEST(ClassScopeResolutionElaboration, UnitLedChainTakesTheUnitClassesDims) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
@@ -251,9 +217,6 @@ TEST(ClassScopeResolutionElaboration, UnitLedChainTakesTheUnitClassesDims) {
   EXPECT_EQ(LiteralElementCount(g->func_args[0].unpacked_dims), 2u);
 }
 
-// The compilation unit's own parameterized `Inner`, whose typedef `t` is ten
-// elements longer than the nested class's, and the class `Inner` nested in
-// `Outer` with the same parameter.
 const char* const kNestedSpecializationClasses =
     "class Inner #(int p = 1);\n"
     "  typedef int t [p + 10];\n"
@@ -264,11 +227,6 @@ const char* const kNestedSpecializationClasses =
     "  endclass\n"
     "endclass\n";
 
-// §8.23 with §8.25: `Outer::Inner#(4)::t` specializes the class Inner nested
-// in Outer, so a module's variable, a function's return type, its formal and
-// its body's variable written so take that class's `[p]` folded with their own
-// values. The specialization found its class by the last prefix alone and took
-// the unit Inner's `[p + 10]`.
 TEST(ClassScopeResolutionElaboration, ChainedSpecializationIsTheNestedClasses) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
@@ -294,10 +252,6 @@ TEST(ClassScopeResolutionElaboration, ChainedSpecializationIsTheNestedClasses) {
   EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 2u);
 }
 
-// §8.23 with §26.3: `pkg::Inner#(4)::t` specializes the class Inner the
-// package pkg declares, whose typedef is twenty elements longer, never the
-// unit's Inner, so a module's variable and a function's body variable written
-// so each take twenty-four.
 TEST(ClassScopeResolutionElaboration, PackageSpecializationIsThePackagesClass) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(std::string(kNestedSpecializationClasses) +
@@ -324,9 +278,6 @@ TEST(ClassScopeResolutionElaboration, PackageSpecializationIsThePackagesClass) {
   EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 24u);
 }
 
-// A chain whose prefixes reach no class, `Outer::Missing::Inner`, names no
-// class to specialize, so the declaration takes none of the unit Inner's
-// fourteen elements.
 TEST(ClassScopeResolutionElaboration, ChainReachingNoClassIsNotSpecialized) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(std::string(kNestedSpecializationClasses) +
@@ -340,12 +291,6 @@ TEST(ClassScopeResolutionElaboration, ChainReachingNoClassIsNotSpecialized) {
   EXPECT_EQ(w->unpacked_size, 0u);
 }
 
-// §8.23: `Outer::Inner::s` is the typedef of the class Inner nested in Outer,
-// so a module's variable written so is that typedef's eight bits, not the
-// compilation unit Inner's four, and `Outer::Inner::u`, which the unit's Inner
-// does not declare, is six bits and no error. Both were looked up by their last
-// prefix alone, `Inner::s` and `Inner::u`: the first found the unit's
-// typedef, and the second nothing, reported as a type the unit's Inner lacks.
 TEST(ClassScopeResolutionElaboration, ChainedTypeIsTheNestedClassesTypedef) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
@@ -375,10 +320,6 @@ TEST(ClassScopeResolutionElaboration, ChainedTypeIsTheNestedClassesTypedef) {
   EXPECT_EQ(w->width, 6u);
 }
 
-// §8.23 with §26.3: a typedef of a class a package declares is reached through
-// the package, `pkg::C::t`, or through the class's bare name once the package
-// is imported, `C::u`. The type tables key no package class's typedef, so each
-// is resolved from the class itself, six bits and five.
 TEST(ClassScopeResolutionElaboration, PackageClassTypedefTakesItsType) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(

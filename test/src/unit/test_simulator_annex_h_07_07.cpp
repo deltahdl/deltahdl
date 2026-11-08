@@ -8,50 +8,29 @@
 #include "simulator/dpi_c_type.h"
 #include "simulator/svdpi.h"
 
-// Annex H.7.7 - Canonical representation of packed arrays.
-//
-// H.7.7 defines the C-layer carriers for packed values: svBitVecVal for
-// 2-state arrays and svLogicVecVal for 4-state arrays, with svLogicVecVal being
-// equivalent to the VPI s_vpi_vecval type. A packed array is a sequence of
-// 32-bit-wide elements, the first element holding the 32 least-significant bits
-// and each successive element holding the next-more-significant group. The last
-// element may contain unused bits whose contents are undetermined; the consumer
-// is responsible for masking or sign-extending them. These tests observe those
-// representation rules as applied by the svdpi.h carriers and the svdpi.cpp
-// accessors.
-
 namespace {
 
-// C1: the canonical 2-state carrier is a single 32-bit element, and the 4-state
-// carrier pairs two 32-bit words (aval/bval).
 TEST(PackedArrayCanonicalRepresentation, ElementCarrierWidths) {
   EXPECT_EQ(sizeof(svBitVecVal), 4u);
   EXPECT_EQ(sizeof(svLogicVecVal), 8u);
-  // The internal runtime carriers mirror the same canonical element widths.
   EXPECT_EQ(sizeof(delta::SvBitVecVal), sizeof(svBitVecVal));
   EXPECT_EQ(sizeof(delta::SvLogicVecVal), sizeof(svLogicVecVal));
 }
 
-// C2: svLogicVecVal is fully equivalent to the VPI s_vpi_vecval carrier - it is
-// the very same type, so a 4-state value written through one is observed
-// identically through the other.
 TEST(PackedArrayCanonicalRepresentation, LogicVecValIsVpiVecval) {
   static_assert(std::is_same<svLogicVecVal, s_vpi_vecval>::value,
                 "svLogicVecVal must be the s_vpi_vecval type");
 
   s_vpi_vecval raw;
-  raw.aval = 0x5u;  // bit0=1, bit2=1
-  raw.bval = 0x2u;  // bit1 has the x/z flag
+  raw.aval = 0x5u;
+  raw.bval = 0x2u;
 
   const svLogicVecVal* as_logic = &raw;
-  // bit0: aval=1,bval=0 -> 1 ; bit1: aval=0,bval=1 -> z ; bit2: aval=1,bval=0
   EXPECT_EQ(svGetBitselLogic(as_logic, 0), sv_1);
   EXPECT_EQ(svGetBitselLogic(as_logic, 1), sv_z);
   EXPECT_EQ(svGetBitselLogic(as_logic, 2), sv_1);
 }
 
-// C3: a packed array is grouped into 32-bit elements; the element count grows
-// by one for every additional (partial) group of 32 bits.
 TEST(PackedArrayCanonicalRepresentation, GroupedInto32BitElements) {
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(1), 1);
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(32), 1);
@@ -59,8 +38,6 @@ TEST(PackedArrayCanonicalRepresentation, GroupedInto32BitElements) {
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(64), 2);
   EXPECT_EQ(SV_PACKED_DATA_NELEMS(65), 3);
 
-  // A bit beyond the first group is accessed in the second element: setting
-  // global bit 40 must land in element[1], bit 8, leaving element[0] clear.
   svBitVecVal vec[2] = {0u, 0u};
   svPutBitselBit(vec, 40, 1);
   EXPECT_EQ(vec[0], 0u);
@@ -68,82 +45,49 @@ TEST(PackedArrayCanonicalRepresentation, GroupedInto32BitElements) {
   EXPECT_EQ(svGetBitselBit(vec, 40), 1u);
 }
 
-// C4: the first element holds the 32 least-significant bits and each successive
-// element holds the next-more-significant group.
 TEST(PackedArrayCanonicalRepresentation,
      FirstElementHoldsLeastSignificantBits) {
   svBitVecVal vec[2] = {0u, 0u};
-  svPutBitselBit(vec, 0, 1);   // least-significant bit of the whole array
-  svPutBitselBit(vec, 32, 1);  // first bit of the next-more-significant group
-  EXPECT_EQ(vec[0], 1u);       // LSBs live in element 0
-  EXPECT_EQ(vec[1], 1u);       // bit 32 is bit 0 of element 1
+  svPutBitselBit(vec, 0, 1);
+  svPutBitselBit(vec, 32, 1);
+  EXPECT_EQ(vec[0], 1u);
+  EXPECT_EQ(vec[1], 1u);
 
-  // 4-state arrays follow the same element ordering for both aval and bval.
   svLogicVecVal lvec[2] = {{0u, 0u}, {0u, 0u}};
   svPutBitselLogic(lvec, 0, sv_1);
   svPutBitselLogic(lvec, 33, sv_z);
   EXPECT_EQ(lvec[0].aval, 1u);
   EXPECT_EQ(lvec[0].bval, 0u);
   EXPECT_EQ(lvec[1].aval, 0u);
-  EXPECT_EQ(lvec[1].bval, 1u << 1);  // bit 33 -> element 1, bit 1, z sets bval
+  EXPECT_EQ(lvec[1].bval, 1u << 1);
 }
 
-// C5: the unused bits of the last element are undetermined - the carrier does
-// not auto-clear them - and the consumer masks (or sign-extends) them using the
-// provided utilities.
 TEST(PackedArrayCanonicalRepresentation, UnusedBitsAreMaskedByConsumer) {
-  // A 5-bit value stored in a 32-bit element alongside arbitrary upper bits.
-  svBitVecVal elem = 0xFFFFFFE9u;  // low 5 bits = 0x09, upper 27 bits = garbage
+  svBitVecVal elem = 0xFFFFFFE9u;
   EXPECT_EQ(SV_MASK(5), 0x1Fu);
-  EXPECT_EQ(SV_GET_UNSIGNED_BITS(elem, 5), 0x09u);  // upper unused bits masked
+  EXPECT_EQ(SV_GET_UNSIGNED_BITS(elem, 5), 0x09u);
 
-  // Sign extension replicates the value's high bit across the unused bits.
-  // The operands are runtime locals (like `elem` above) rather than literals so
-  // the width-4 utility is exercised dynamically; with literal operands the
-  // mask is constant-folded into an ineffective bitwise-and.
   svBitVecVal high_bit_set = 0x1Fu;
   svBitVecVal high_bit_clear = 0x0Fu;
   int narrow_width = 4;
-  EXPECT_EQ(SV_GET_SIGNED_BITS(high_bit_set, narrow_width),
-            0xFFFFFFFFu);  // high bit set -> -1
-  EXPECT_EQ(SV_GET_SIGNED_BITS(high_bit_clear, narrow_width),
-            0x0Fu);  // high bit clear
+  EXPECT_EQ(SV_GET_SIGNED_BITS(high_bit_set, narrow_width), 0xFFFFFFFFu);
+  EXPECT_EQ(SV_GET_SIGNED_BITS(high_bit_clear, narrow_width), 0x0Fu);
 }
 
-// C4 edge case: a part-select whose window straddles the 32-bit element
-// boundary must gather its low bits from the first element and its high bits
-// from the next-more-significant element, proving the LSB-first word ordering
-// across the whole array (svGetPartselBit's cross-word path).
 TEST(PackedArrayCanonicalRepresentation, PartSelectStraddlesElementBoundary) {
   svBitVecVal vec[2] = {0xF0000000u, 0x0000000Au};
-  // Bits 28..35: bits 28-31 are the top nibble of element 0 (0xF), bits 32-35
-  // are the bottom nibble of element 1 (0xA), so the 8-bit window reads 0xAF.
   svBitVecVal out = 0u;
   svGetPartselBit(&out, vec, 28, 8);
   EXPECT_EQ(out, 0xAFu);
 }
 
-// C5 edge case: a full 32-bit element has no unused bits, so the masking and
-// sign-extension utilities pass the element through unchanged (the width-32
-// branch).
 TEST(PackedArrayCanonicalRepresentation, FullWidthElementHasNoUnusedBits) {
-  // Runtime locals (not literals) so the width-32 branch is selected
-  // dynamically; with a literal width the macro's unused width-N branch
-  // constant-folds into an ineffective bitwise-and.
   svBitVecVal full_elem = 0xDEADBEEFu;
   int full_width = 32;
   EXPECT_EQ(SV_GET_UNSIGNED_BITS(full_elem, full_width), 0xDEADBEEFu);
   EXPECT_EQ(SV_GET_SIGNED_BITS(full_elem, full_width), 0xDEADBEEFu);
 }
 
-// Annex H.7.7 as a statement about the representation itself, in
-// src/simulator/dpi_c_type.h: the element type each packed type is
-// represented in, where a bit lies, how many bits of the last element are
-// unused, and what the user makes of them.
-
-// §H.7.7 with §H.7.3: a 2-state packed array is represented in svBitVecVal
-// and a 4-state one in svLogicVecVal -- logic and reg, and integer and time
-// -- while a real, a string or a struct has no canonical representation.
 TEST(DpiCanonicalRepresentation, TwoStateInBitVecValFourStateInLogicVecVal) {
   using delta::DataTypeKind;
   EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kBit), "svBitVecVal");
@@ -160,10 +104,6 @@ TEST(DpiCanonicalRepresentation, TwoStateInBitVecValFourStateInLogicVecVal) {
   EXPECT_EQ(delta::DpiCanonicalElementType(DataTypeKind::kStruct), "");
 }
 
-// §H.7.7: each element groups 32 bits, the first the 32 least significant
-// -- so bit 0 is bit 0 of element 0, bit 31 bit 31 of it, bit 32 bit 0 of
-// element 1, and bit 70 bit 6 of element 2 -- and the bit so placed is the
-// one the bit-select utility reaches.
 TEST(DpiCanonicalRepresentation, TheFirstElementHoldsTheLeastSignificantBits) {
   EXPECT_EQ(delta::kDpiCanonicalElementBits, 32U);
   EXPECT_EQ(delta::DpiCanonicalPositionOfBit(0).element, 0U);
@@ -181,9 +121,6 @@ TEST(DpiCanonicalRepresentation, TheFirstElementHoldsTheLeastSignificantBits) {
   EXPECT_EQ(svGetBitselBit(vec, 70), 1U);
 }
 
-// §H.7.7: the last element can contain unused bits -- 27 of them for a
-// 5-bit array, 31 for a 33-bit one, none for 32 or 64 bits -- and there are
-// as many elements as groups of 32 the width needs.
 TEST(DpiCanonicalRepresentation, TheLastElementCanHoldUnusedBits) {
   EXPECT_EQ(delta::DpiCanonicalUnusedBits(5), 27U);
   EXPECT_EQ(delta::DpiCanonicalUnusedBits(33), 31U);
@@ -194,25 +131,17 @@ TEST(DpiCanonicalRepresentation, TheLastElementCanHoldUnusedBits) {
   EXPECT_EQ(delta::DpiCanonicalWordCount(33), 2U);
 }
 
-// §H.7.7: the contents of the unused bits are undetermined and the user is
-// responsible for masking them, or for sign extension by the sign: the
-// last element of a 5-bit array holding 5'b01001 under 27 bits of anything
-// is 0x09 masked, and 0x09 sign-extended since its sign bit is clear, while
-// 5'b11001 is 0x19 masked and 0xFFFFFFF9 sign-extended; an element with no
-// unused bits is left as it is either way.
 TEST(DpiCanonicalRepresentation, TheUserMasksOrSignExtendsTheUnusedBits) {
-  const uint32_t kPositive = 0xFFFFFFE9U;  // 5'b01001 under garbage
+  const uint32_t kPositive = 0xFFFFFFE9U;
   EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kPositive, 5, false),
             0x09U);
   EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kPositive, 5, true),
             0x09U);
-  const uint32_t kNegative = 0x00000019U;  // 5'b11001 under clear bits
+  const uint32_t kNegative = 0x00000019U;
   EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kNegative, 5, false),
             0x19U);
   EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(kNegative, 5, true),
             0xFFFFFFF9U);
-  // A 33-bit array's last element holds one bit: bit 0 masked, or the sign
-  // over the whole element.
   EXPECT_EQ(
       delta::DpiCanonicalLastElementWithUnusedBits(0xFFFFFFFFU, 33, false), 1U);
   EXPECT_EQ(delta::DpiCanonicalLastElementWithUnusedBits(0x1U, 33, true),

@@ -5,10 +5,6 @@
 
 using namespace delta;
 
-// §30.4.3: an edge-sensitive path takes any input or inout port as its source,
-// its edge read off the least significant bit, and with a parallel connection
-// its destination is a scalar output or inout port or a bit-select of a vector
-// one. The width rule §30.4.5 gives a simple parallel path is not this path's.
 namespace {
 
 TEST(SpecifyPathElaboration, EdgeSensitivePathElaborates) {
@@ -52,8 +48,6 @@ TEST(SpecifyPathElaboration, EdgeParallelPathToAVectorIsRejected) {
                             3, "30.4.3"));
 }
 
-// Equal widths do not make the vector destination legal, as they would for a
-// simple parallel path.
 TEST(SpecifyPathElaboration, EdgeParallelPathBetweenEqualVectorsIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -84,8 +78,6 @@ TEST(SpecifyPathElaboration, EdgeParallelPathToAPartSelectIsRejected) {
                             3, "30.4.3"));
 }
 
-// A vector source is legal, its edge being its least significant bit's, so a
-// four-bit source reaches a scalar destination though the widths differ.
 TEST(SpecifyPathElaboration, EdgeParallelPathFromAVectorToAScalarElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -21,10 +21,6 @@ TEST(ConfigDefaultClause, DuplicateDefaultLiblistRejected) {
       "  default liblist other;\n"
       "endconfig\n",
       f, "top");
-  // Elaborator::ValidateConfigDefaultClauses reports at the second `default`
-  // clause on line 5, which is the one §33.4.1.2 refuses, rather than at the
-  // `config` keyword on line 2; the count in the message is what says both
-  // clauses were seen.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' has 2 default clauses; at most one is "
                             "allowed",
@@ -43,12 +39,6 @@ TEST(ConfigDefaultClause, SingleDefaultLiblistAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.1.2: the default clause selects every instance that no more-specific
-// selection clause matches. Here `top` instantiates two like-named `leaf`
-// cells; an instance clause names a library list for `top.b`, while a default
-// liblist governs the rest. The default must reach `top.a` (unmatched by the
-// instance clause). Returns the cell bound to the named child of the elaborated
-// config, or nullptr.
 RtlirModule* BindChildUnderTop(ElabFixture& f, const std::string& config_body,
                                std::string_view child_inst) {
   std::string src;
@@ -63,7 +53,6 @@ RtlirModule* BindChildUnderTop(ElabFixture& f, const std::string& config_body,
   cu->modules[0]->library = "libA";
   cu->modules[1]->library = "libB";
   cu->modules[2]->library = "libC";
-  // §33.4.1.1: the config compiles with its top module, into libC.
   for (auto* cfg : cu->configs) cfg->library = "libC";
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
@@ -74,8 +63,6 @@ RtlirModule* BindChildUnderTop(ElabFixture& f, const std::string& config_body,
   return nullptr;
 }
 
-// The instance that no more-specific clause matches (`top.a`) is bound by the
-// default liblist (libA).
 TEST(ConfigDefaultClause, DefaultSelectsInstanceWithoutSpecificClause) {
   ElabFixture f;
   auto* bound = BindChildUnderTop(f,
@@ -89,8 +76,6 @@ TEST(ConfigDefaultClause, DefaultSelectsInstanceWithoutSpecificClause) {
   EXPECT_EQ(bound->library, "libA");
 }
 
-// The instance a more-specific clause matches (`top.b`) is bound by that
-// clause (libB), not by the default, confirming the default yields to it.
 TEST(ConfigDefaultClause, MoreSpecificClauseOverridesDefault) {
   ElabFixture f;
   auto* bound = BindChildUnderTop(f,
@@ -104,9 +89,6 @@ TEST(ConfigDefaultClause, MoreSpecificClauseOverridesDefault) {
   EXPECT_EQ(bound->library, "libB");
 }
 
-// §33.4.1.2: with no more-specific selection clause present, the default
-// selects every instance. Both `top.a` and `top.b` fall to the default
-// liblist (libA), exercising the rule's reach over every instance.
 TEST(ConfigDefaultClause, DefaultGovernsEveryInstanceAbsentSpecificClause) {
   const char* cfg =
       "config c;\n"
@@ -123,10 +105,6 @@ TEST(ConfigDefaultClause, DefaultGovernsEveryInstanceAbsentSpecificClause) {
   EXPECT_EQ(b->library, "libA");
 }
 
-// §33.4.1.2: a cell selection clause outranks the default as the narrower one,
-// so the default does not select the cell it names. `top` instantiates a `leaf`
-// (named by a cell clause) and a `mid` (named by nothing). The cell clause
-// binds `leaf` to libB while the default reaches `mid`, binding it to libA.
 TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {
   ElabFixture f;
   std::string src;
@@ -145,11 +123,11 @@ TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {
   Lexer lexer(f.mgr.FileContent(fid), fid, f.diag);
   Parser parser(lexer, f.arena, f.diag);
   auto* cu = parser.Parse();
-  cu->modules[0]->library = "libA";  // leaf
-  cu->modules[1]->library = "libB";  // leaf
-  cu->modules[2]->library = "libA";  // mid
-  cu->modules[3]->library = "libB";  // mid
-  cu->modules[4]->library = "libC";  // top
+  cu->modules[0]->library = "libA";
+  cu->modules[1]->library = "libB";
+  cu->modules[2]->library = "libA";
+  cu->modules[3]->library = "libB";
+  cu->modules[4]->library = "libC";
   for (auto* cfg : cu->configs) cfg->library = "libC";
   Elaborator elab(f.arena, f.diag, cu);
   auto* design = elab.Elaborate(cu->configs[0]);
@@ -167,9 +145,6 @@ TEST(ConfigDefaultClause, CellClauseOverridesDefaultForNamedCellOnly) {
   EXPECT_EQ(mid_bound->library, "libA");
 }
 
-// §33.4.1.2: the report that refuses a second default clause names the
-// subclause stating the rule, so a caller learns which rule was enforced
-// without matching the wording of the message.
 TEST(ConfigDefaultClause, DuplicateDefaultLiblistNames33_4_1_2) {
   ElabFixture f;
   ElaborateSrc(

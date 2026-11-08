@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §H.14.5, the SystemVerilog side of Example 10: the declarations of
-// §H.10.3's Example 3 annotated "DPI" -- a typedef struct triple of an int,
-// a bit [6:1][1:8] b [65:2] and an int, an import f1 taking a triple, an
-// export of exported_sv_func and that function taking an int and an output
-// logic [63:0] -- selecting the deprecated SV3.1a semantics per §H.14.1.
 class ExampleTenParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -27,8 +22,6 @@ class ExampleTenParsing : public ::testing::Test {
       "endmodule\n");
 };
 
-// §H.14.5 with §35.5.4: the deprecated annotation warns and the module
-// parses under it.
 TEST_F(ExampleTenParsing, TheDeprecatedAnnotationWarnsAndParses) {
   ASSERT_NE(r_.cu, nullptr);
   EXPECT_FALSE(r_.has_errors);
@@ -39,8 +32,6 @@ TEST_F(ExampleTenParsing, TheDeprecatedAnnotationWarnsAndParses) {
       3, "35.5.4"));
 }
 
-// The import takes the triple under its type's name with the "DPI" spec
-// string, and the export names exported_sv_func under the same.
 TEST_F(ExampleTenParsing, TheImportTakesTheTripleAndTheExportIsNamed) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f1 =

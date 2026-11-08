@@ -11,7 +11,6 @@
 
 using namespace delta;
 
-// --- Local types for net declaration validation (§6.7) ---
 enum class LocalChargeStrength : uint8_t {
   kSmall,
   kMedium,
@@ -103,7 +102,6 @@ inline void InitializeTriregNet(Net& net, LocalChargeStrength str,
   }
 }
 
-// --- User-defined nettype support (§6.7.3) ---
 struct ModelUserNettype {
   std::function<Logic4Vec(Arena&, const std::vector<Logic4Vec>&)> resolution;
 };

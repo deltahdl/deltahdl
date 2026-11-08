@@ -1,6 +1,3 @@
-// §14.3 with §27.4 and §23.6: a clocking block declared in a generate block,
-// registered as the block instance's own and reached through its path.
-
 #include "simulator/lowerer_gen_block_clocking.h"
 
 #include <cstddef>
@@ -19,10 +16,6 @@ namespace delta {
 
 namespace {
 
-// The name a bare `path` written in the generate block instance `gen` is
-// spelled by after the instance prefix `inst_prefix`: the stored key of the
-// innermost enclosing block declaring it (§23.9), `g_0_e` for `e`, or `path`
-// itself where no block does or where `path` is hierarchical.
 std::string_view ResolveInGenBlock(std::string_view path,
                                    const RtlirGenBlockClocking& gen,
                                    std::string_view inst_prefix,

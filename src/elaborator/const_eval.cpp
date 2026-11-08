@@ -19,12 +19,6 @@
 
 namespace delta {
 
-// §11.6.1's Table 11-21 (printed pages 299-300) sizes a shift and a power by
-// their left operand alone, the right being self-determined; §11.4.10
-// (printed 284) and §11.4.3 (printed 276) say the same of the count and the
-// exponent. The compound assignment forms of the shifts are the shifts
-// themselves, which the parser folds into a binary expression. Every other
-// binary operator that makes a value takes the wider of its two operands.
 bool SizedByLeftOperand(TokenKind op) {
   switch (op) {
     case TokenKind::kLtLt:
@@ -42,19 +36,11 @@ bool SizedByLeftOperand(TokenKind op) {
   }
 }
 
-// §11.8.1 (printed page 302): the result is unsigned where any operand that
-// is not self-determined is unsigned, and a self-determined operand's sign
-// is its own and never the expression's. A shift's count and a power's
-// exponent are self-determined, so those two take their left operand's
-// signedness, as §11.4.10 (printed 284) says of a shift outright; every
-// other binary operator is signed where both operands are.
 bool BinaryResultSigned(TokenKind op, const ConstVal& lhs,
                         const ConstVal& rhs) {
   return lhs.is_signed && (SizedByLeftOperand(op) || rhs.is_signed);
 }
 
-// The power is not folded here: WidePower in const_eval_wide_arith.cpp
-// raises a base of any width, the exponent read across every word of it.
 static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
                                               int64_t rhs) {
   switch (op) {
@@ -70,9 +56,6 @@ static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
     case TokenKind::kSlash:
     case TokenKind::kSlashEq:
       if (rhs == 0) return std::nullopt;
-      // §11.4.3 wraps a signed result at its width, so a divisor of -1 is
-      // answered as a negation: the most negative value divided by it is the
-      // value itself, where the C++ quotient overflows.
       if (rhs == -1) return static_cast<int64_t>(-static_cast<uint64_t>(lhs));
       return lhs / rhs;
     case TokenKind::kPercent:
@@ -85,9 +68,6 @@ static std::optional<int64_t> EvalBinaryArith(TokenKind op, int64_t lhs,
   }
 }
 
-// The shifts are not folded here either: WideShift in const_eval_wide.cpp
-// shifts a left operand of any width by a count read across every word of
-// the right, where a C++ shift by 64 or more is undefined.
 static std::optional<int64_t> EvalBinaryBitwise(TokenKind op, int64_t lhs,
                                                 int64_t rhs) {
   switch (op) {
@@ -119,8 +99,6 @@ static std::optional<int64_t> EvalBinaryCompare(TokenKind op, int64_t lhs,
       return static_cast<int64_t>(lhs <= rhs);
     case TokenKind::kGtEq:
       return static_cast<int64_t>(lhs >= rhs);
-    // §11.4.5's case equality and §11.4.6's wildcard equality differ from ==
-    // and != only over x and z bits, which a folded constant does not hold.
     case TokenKind::kEqEq:
     case TokenKind::kEqEqEq:
     case TokenKind::kEqEqQuestion:
@@ -151,10 +129,6 @@ static std::optional<int64_t> EvalBinary(TokenKind op, int64_t lhs,
   return EvalBinaryCompare(op, lhs, rhs);
 }
 
-// §11.6.1's Table 11-21 (printed page 299) sizes unary `+ - ~` by their
-// operand, which is context-determined; `!` reads a self-determined operand
-// and answers one bit. The three are folded here at the operand's width, and
-// `!` separately in ConstEvalUnaryFull.
 static std::optional<int64_t> EvalUnary(TokenKind op, int64_t operand) {
   switch (op) {
     case TokenKind::kMinus:
@@ -174,16 +148,11 @@ static bool SizedByOperand(TokenKind op) {
 }
 
 uint32_t ConstLiteralWidth(const Expr* expr) {
-  // A literal the elaborator builds, with no text, keeps the 32 bits of an
-  // integer.
   if (expr->text.empty()) return 32;
   return LiteralWidth(expr->text, expr->int_val);
 }
 
 static int64_t Clog2(int64_t val) {
-  // The argument is treated as an unsigned value, so reinterpret the bit
-  // pattern as unsigned rather than special-casing negative inputs. An
-  // argument of 0 (or 1) yields 0.
   auto v = static_cast<uint64_t>(val);
   if (v <= 1) return 0;
   int64_t result = 0;
@@ -211,13 +180,6 @@ static std::optional<int64_t> EvalFirstArg(const Expr* expr,
   return ConstEvalInt(expr->args[0], scope);
 }
 
-// The parameter of the registered module that `name` names where the
-// expression being folded stands, or null when no module is registered, when
-// it declares no such parameter, or when the one it declares belongs to a
-// generate block the expression does not stand in -- §23.9 puts that
-// parameter in a scope of its own, so a reference written outside the block
-// is not naming it however the names agree. RegisteredGenPrefixes() is where
-// the reference stands.
 const RtlirParamDecl* RegisteredParamNamed(std::string_view name) {
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return nullptr;
@@ -231,9 +193,6 @@ const RtlirParamDecl* RegisteredParamNamed(std::string_view name) {
   return nullptr;
 }
 
-// A control_bit text starting with `'` (or sized as N'...) carries x or z if
-// any digit character following the base specifier is x/z/?. Constant integer
-// expressions contain no x or z bits, so x/z control_bits contribute zero.
 static bool ControlBitIsXZ(const Expr* ctrl) {
   if (!ctrl || ctrl->kind != ExprKind::kIntegerLiteral) return false;
   auto t = ctrl->text;
@@ -265,8 +224,6 @@ static std::optional<int64_t> EvalConstCountbits(const Expr* expr,
     if (ControlBitIsXZ(ctrl)) continue;
     auto cb = ConstEvalInt(ctrl, scope);
     if (!cb) return std::nullopt;
-    // Only the LSB of the control_bit is examined (§20.9). Duplicates collapse
-    // because match0/match1 are idempotent boolean sets.
     if ((*cb & 1) == 0) {
       match0 = true;
     } else {
@@ -282,14 +239,11 @@ static std::optional<int64_t> EvalConstCountbits(const Expr* expr,
   return result;
 }
 
-// §20.5: the integer-returning conversion functions take a real argument, so
-// they fold from the constant real value rather than an integral first arg.
 static std::optional<int64_t> EvalConstRealToIntCall(const Expr* expr,
                                                      const ScopeMap& scope) {
   if (expr->args.empty()) return std::nullopt;
   auto rv = ConstEvalReal(expr->args[0], scope);
   if (!rv) return std::nullopt;
-  // $rtoi truncates toward zero and returns an integer, a signed 32-bit type.
   if (expr->callee == "$rtoi")
     return static_cast<int32_t>(static_cast<int64_t>(*rv));
   if (expr->callee == "$realtobits") {
@@ -298,7 +252,6 @@ static std::optional<int64_t> EvalConstRealToIntCall(const Expr* expr,
     std::memcpy(&bits, &d, sizeof(d));
     return static_cast<int64_t>(bits);
   }
-  // $shortrealtobits: narrow to single precision, reinterpret the 32 bits.
   auto fv = static_cast<float>(*rv);
   uint32_t bits = 0;
   std::memcpy(&bits, &fv, sizeof(fv));
@@ -312,8 +265,6 @@ std::optional<int64_t> EvalConstSysCall(const Expr* expr,
     return EvalConstArrayQuery(expr, scope);
   }
   if (expr->callee == "$countbits") return EvalConstCountbits(expr, scope);
-  // §20.5: the integer-returning conversion functions take a real argument, so
-  // they fold from the constant real value rather than an integral first arg.
   if (expr->callee == "$rtoi" || expr->callee == "$realtobits" ||
       expr->callee == "$shortrealtobits")
     return EvalConstRealToIntCall(expr, scope);
@@ -325,8 +276,6 @@ std::optional<int64_t> EvalConstSysCall(const Expr* expr,
     return static_cast<int64_t>(Countones(*arg) == 1);
   if (expr->callee == "$onehot0")
     return static_cast<int64_t>(Countones(*arg) <= 1);
-  // A constant-expression argument has no x or z bits by definition, so
-  // $isunknown of a constant expression is always 0.
   if (expr->callee == "$isunknown") return 0;
   return std::nullopt;
 }
@@ -353,17 +302,6 @@ ConstVal NormalizeConstVal(int64_t value, uint32_t width, bool is_signed) {
   return ConstVal{v, width, is_signed};
 }
 
-// §5.7.1 (printed page 77): the size constant states the literal's exact
-// width, and the digits can reach past the 64 bits Expr::int_val holds -- the
-// low 64 bits, since ed521261c. The bits above them are read from the digits
-// again here (LiteralHighWords), so a select, a shift or a bitwise operator
-// on a 96-bit literal sees the whole of it. ConstVal spells no x or z, so
-// the digits are read only up to the first x, z or ? digit, as Expr::int_val
-// holds them, except while a value assigned to a parameter of a 2-state type
-// is folded (TwoStateLiteralGuard): that type holds each such digit's bits as
-// 0 (§6.11.2, §6.20.2), so `parameter bit [3:0] P = 4'b1x1x` folds to 10
-// (BasedLiteralLowWord). Read as 0 elsewhere, `4'b1x1x === 4'b1010` folded
-// true in a 4-state context.
 std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
   uint32_t width = ConstLiteralWidth(expr);
   uint64_t low = expr->int_val;
@@ -375,14 +313,6 @@ std::optional<ConstVal> ConstEvalLiteral(const Expr* expr) {
   return v;
 }
 
-// §5.7.1 (printed page 78): an unbased unsized literal sets every bit of the
-// value it stands for, so it is as wide as the context §11.8.2 propagates to
-// it -- the parameter or the operand it is assigned to -- and one bit where
-// it is self-determined, as an item of a concatenation is. ConstVal spells a
-// value with no x or z, so 'x and 'z fold to a 0 of that width, as a based
-// literal's x and z digits do in ConstEvalLiteral; the lowerer evaluates the
-// expression again to put the unknown bits in the parameter's storage
-// (ReevaluateParamValue in src/simulator/lowerer_register.cpp).
 std::optional<ConstVal> ConstEvalUnbasedUnsized(const Expr* expr,
                                                 FoldContext ctx) {
   uint32_t width = ctx.width > 0 ? ctx.width : 1;
@@ -399,10 +329,6 @@ static int ConstHexDigitVal(char c) {
   return -1;
 }
 
-// Decodes one backslash escape starting at text[i] (i points at the char after
-// the backslash) into a byte, advancing i past the consumed characters. Mirrors
-// the simulator's string-literal decoding so a literal folded here matches the
-// value produced at run time.
 static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
   char c = text[i];
   switch (c) {
@@ -430,7 +356,7 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
     default:
       break;
   }
-  if (c == '\n') return false;  // line continuation: emit nothing
+  if (c == '\n') return false;
   if (c == 'x') {
     uint8_t val = 0;
     for (int j = 0; j < 2 && i + 1 < text.size(); ++j) {
@@ -456,8 +382,6 @@ static bool ConstDecodeEscape(std::string_view text, size_t& i, uint8_t& out) {
   return true;
 }
 
-// §5.9: the bytes one string literal denotes, with the quotes removed and each
-// escape replaced by the one 8-bit value it stands for, a zero byte included.
 static std::string StringLiteralBytes(const Expr* expr) {
   std::string_view text = StringLiteralBody(expr->text);
   std::string bytes;
@@ -465,7 +389,7 @@ static std::string StringLiteralBytes(const Expr* expr) {
     uint8_t byte = 0;
     if (text[i] == '\\' && i + 1 < text.size()) {
       ++i;
-      if (!ConstDecodeEscape(text, i, byte)) continue;  // line continuation
+      if (!ConstDecodeEscape(text, i, byte)) continue;
     } else {
       byte = static_cast<uint8_t>(text[i]);
     }
@@ -474,49 +398,22 @@ static std::string StringLiteralBytes(const Expr* expr) {
   return bytes;
 }
 
-// The characters one string literal gives a string, its bytes less every zero
-// byte. §6.16 keeps the special character "\0" out of a string variable and
-// ignores an assignment of 0 to a string character (printed page 112 of IEEE
-// 1800-2023), so the value of "a\0b" is the two characters "ab" and its length
-// is 2. Dropping the character rather than reporting it is what the second
-// sentence says to do, and src/simulator/eval_string.cpp does the same thing to
-// the run-time value in StripStringZeros and in StringWriteByte.
 static std::string StringLiteralChars(const Expr* expr) {
   std::string chars = StringLiteralBytes(expr);
   std::erase(chars, '\0');
   return chars;
 }
 
-// The characters a name stands for, where it names a parameter of the module a
-// live ParamRangeRegistryGuard registered. §11.2.1 lists "parameters" among the
-// operands a constant expression consists of, so `parameter string B = A;` is a
-// constant expression whose value is A's characters.
-//
-// The registered module rather than a ScopeMap is what answers this, for the
-// reason StringParamValue in src/elaborator/const_eval_builtin_method.cpp
-// gives for reading the same field: a ScopeMap maps a name to an int64_t and
-// drops RtlirParamDecl::resolved_string on the way, so a string value cannot be
-// recovered from one. Empty for a name the module declares no parameter under
-// and for a parameter that took a value of some other type.
 static std::optional<std::string> StringParamChars(const Expr* expr) {
   const RtlirParamDecl* param = RegisteredParamNamed(expr->text);
   if (param == nullptr || !param->is_string_value) return std::nullopt;
   return std::string(param->resolved_string);
 }
 
-// The resolved parameters of the registered module as a scope, so a replication
-// multiplier written as a parameter name folds. §6.16's Table 6-9 makes the
-// multiplier an "expression of integral type", which ConstEvalInt answers.
 ScopeMap RegisteredModuleScope() {
   ScopeMap scope;
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return scope;
-  // §23.9: a parameter a generate block declares belongs to that block's scope
-  // and not to the module's, and this scope has no reference position to judge
-  // it from -- RegisteredModule() names a module and nothing about where inside
-  // it an expression stands. The module's own parameters, which carry an empty
-  // RtlirParamDecl::gen_block_prefix, are the ones every expression in it can
-  // name, so they are the ones registered.
   for (const auto& param : mod->params) {
     if (!param.is_resolved) continue;
     if (!param.gen_block_prefix.empty()) continue;
@@ -525,10 +422,6 @@ ScopeMap RegisteredModuleScope() {
   return scope;
 }
 
-// §6.16's Table 6-9 (printed page 114) gives concatenation over string
-// operands, each a string literal or a string-typed expression, with a
-// string-typed result. Empty where any operand does not fold, since a
-// concatenation missing an operand has no characters.
 static std::optional<std::string> ConcatenatedStringChars(const Expr* expr) {
   std::string chars;
   for (const Expr* element : expr->elements) {
@@ -539,9 +432,6 @@ static std::optional<std::string> ConcatenatedStringChars(const Expr* expr) {
   return chars;
 }
 
-// §6.16's Table 6-9 on the same page gives replication: M concatenated copies
-// of the inner concatenation, M being the multiplier's value. A multiplier of
-// zero gives the empty string, which the table states outright.
 static std::optional<std::string> ReplicatedStringChars(const Expr* expr) {
   auto count = ConstEvalInt(expr->repeat_count, RegisteredModuleScope());
   if (!count || *count < 0) return std::nullopt;
@@ -570,23 +460,13 @@ std::optional<std::string> ConstEvalString(const Expr* expr) {
   }
 }
 
-// §11.10: a string literal operand is a constant number formed from the 8-bit
-// ASCII code of each character, one byte per character, packed with the first
-// character in the most-significant position. This lets a string literal fold
-// in constant expressions (e.g. a parameter/localparam initializer).
 std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
-  // §5.9: a string literal used as an operand is an integer of one 8-bit value
-  // per character or escape, so its zero bytes stay; only a string drops them.
   auto chars = expr->kind == ExprKind::kStringLiteral
                    ? std::optional<std::string>(StringLiteralBytes(expr))
                    : ConstEvalString(expr);
   if (!chars) return std::nullopt;
   uint32_t width =
       chars->empty() ? 8u : static_cast<uint32_t>(chars->size()) * 8u;
-  // Every character is kept, the last in the low byte of the low word, so a
-  // literal of more than eight characters has its leading ones in the words
-  // above bit 63; keeping the low 64 bits alone had "Hello world" and
-  // "Xello world" fold to one value.
   std::vector<uint64_t> words((width + 63) / 64, 0);
   const size_t kCount = chars->size();
   for (size_t i = 0; i < kCount; ++i) {
@@ -597,10 +477,6 @@ std::optional<ConstVal> ConstEvalStringLiteral(const Expr* expr) {
   return ConstValOfWords(words, width, false);
 }
 
-// §11.4.9 (printed pages 283-284): the one bit a reduction operator answers,
-// folding its operator over every bit of the operand in turn -- AND, OR and
-// XOR, and their inversions for the NAND, NOR and XNOR forms. Empty for an
-// operator that is no reduction.
 static std::optional<int64_t> ReduceConstVal(TokenKind op, const ConstVal& v) {
   bool all = true;
   bool any = false;
@@ -633,24 +509,13 @@ static std::optional<int64_t> ReduceConstVal(TokenKind op, const ConstVal& v) {
 std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
                                            const ScopeMap& scope,
                                            FoldContext ctx) {
-  // §11.8.2 (printed page 302): the operand of `+ - ~` is context-determined,
-  // so it is folded in the context the expression stands in and the result is
-  // as wide; the operand of `!` is self-determined (Table 11-21, printed 299).
   auto operand = ConstEvalFull(expr->lhs, scope,
                                SizedByOperand(expr->op) ? ctx : FoldContext{});
   if (!operand) return std::nullopt;
-  // §11.4.7 (printed 280): `!` answers one bit from whether any bit of its
-  // operand is set, read across every word of it.
   if (expr->op == TokenKind::kBang)
     return ConstVal{ConstValIsNonZero(*operand) ? 0 : 1, 1, false};
-  // Table 11-21 (printed page 299): a reduction answers one unsigned bit from
-  // its self-determined operand.
   if (auto reduced = ReduceConstVal(expr->op, *operand))
     return ConstVal{*reduced, 1, false};
-  // §11.6.1's Table 11-21 (printed page 299) sizes unary `+ - ~` by their
-  // operand, so a result wider than 64 bits has words the int64 fold cannot
-  // hold; EvalWideUnary works those across every word and declines the rest,
-  // which fold below as before.
   if (operand->width > 64) {
     if (auto wide = EvalWideUnary(expr->op, *operand)) return wide;
   }
@@ -665,9 +530,6 @@ std::optional<ConstVal> ConstEvalUnaryFull(const Expr* expr,
   return ConstVal{v, operand->width, operand->is_signed};
 }
 
-// Normalizes the binary operands to their effective signed/unsigned values:
-// signed operands are sign-extended from their declared width, unsigned
-// operands are truncated to their declared width.
 static void NormalizeBinaryOperands(const ConstVal& lhs, const ConstVal& rhs,
                                     bool is_signed, int64_t& lv, int64_t& rv) {
   if (is_signed) {
@@ -679,11 +541,6 @@ static void NormalizeBinaryOperands(const ConstVal& lhs, const ConstVal& rhs,
   }
 }
 
-// Handles unsigned division and modulo, which require unsigned arithmetic on
-// the operands. Returns std::nullopt for non-div/mod operators (signaling the
-// caller to fall through to the generic signed evaluator) and on
-// divide-by-zero. The has_result output distinguishes "not a div/mod op" from a
-// real failure.
 static std::optional<ConstVal> EvalUnsignedDivMod(TokenKind op, int64_t lv,
                                                   int64_t rv, uint32_t width,
                                                   bool& handled) {
@@ -702,12 +559,6 @@ static std::optional<ConstVal> EvalUnsignedDivMod(TokenKind op, int64_t lv,
   return std::nullopt;
 }
 
-// §11.4.7 (printed page 281): && and -> are decided by a first operand that is
-// false and || by one that is true, and §11.3.5 then leaves the second operand
-// unevaluated. The answer, where the first operand decides it; empty where it
-// does not, or the operator is none of the three, which then fold both
-// operands. A second operand that does not fold -- a division by zero, whose
-// x §11.4.3 has the decided result ignore -- is thereby never asked.
 static std::optional<ConstVal> FoldDecidedByFirstOperand(
     const Expr* expr, const ScopeMap& scope) {
   const bool kOr = expr->op == TokenKind::kPipePipe;
@@ -716,46 +567,21 @@ static std::optional<ConstVal> FoldDecidedByFirstOperand(
   auto first = ConstEvalFull(expr->lhs, scope);
   if (!first) return std::nullopt;
   if (ConstValIsNonZero(*first) != kOr) return std::nullopt;
-  // A false first operand makes && false and -> true; a true one makes ||
-  // true.
   return ConstVal{expr->op == TokenKind::kAmpAmp ? 0 : 1, 1, false};
 }
 
 std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
                                             const ScopeMap& scope,
                                             FoldContext ctx) {
-  // §6.23 (printed page 138): a comparison of two type references stands for
-  // whether the types match, its operands being types rather than values.
   if (auto matched = RegisteredTypeRefCompare(expr))
     return ConstVal{*matched, 1, false};
   if (auto decided = FoldDecidedByFirstOperand(expr, scope)) return decided;
-  // §11.8.2 (printed pages 302-303): each operand is folded in the context
-  // the expression propagates to it -- FoldBinaryOperands says which take
-  // the context and which are self-determined -- before the operator is
-  // applied, so an operand that is narrower than the expression, or than the
-  // target of the assignment the expression is the right-hand side of, is
-  // extended first and its own operator worked at that width. Folded at its
-  // own width and extended after, `8'hAB << 8` read 0 in a 16-bit target.
   auto operands = FoldBinaryOperands(expr, scope, ctx);
   if (!operands) return std::nullopt;
   const ConstVal& lhs = operands->lhs;
   const ConstVal& rhs = operands->rhs;
-  // §11.6.1's Table 11-21 (printed pages 299-300) sizes a shift and a power
-  // by their left operand, the right being self-determined, and a bitwise or
-  // an arithmetic operator by the wider of its two. 64b2dfbe0 sized every
-  // one by the wider, so `8'd2 ** 32'd8` read 256 where the 8-bit result
-  // holds 0, `8'd1 << 32'd8` read 256 and `8'd1 << 96'd1` grew to 96 bits.
   bool left_sized = SizedByLeftOperand(expr->op);
   uint32_t w = left_sized ? lhs.width : std::max(lhs.width, rhs.width);
-  // A result wider than 64 bits has words the int64 fold cannot hold, and a
-  // comparison or a logical operator reads every bit of operands that wide;
-  // EvalWideBinary works those across every word, the four multiplicative
-  // operators through const_eval_wide_arith.cpp.
-  // Every shift and power goes there whatever its width, since the count and
-  // the exponent are read across every word of a right operand wider than
-  // the result, and a count of 64 or more is a C++ shift the int64 fold
-  // could not make. A division by zero and `0 ** -1` are empty there and
-  // here alike.
   if (left_sized || w > 64) {
     auto wide = EvalWideBinary(expr->op, lhs, rhs, w);
     if (wide || left_sized) return wide;
@@ -770,56 +596,30 @@ std::optional<ConstVal> ConstEvalBinaryFull(const Expr* expr,
   }
   auto result = EvalBinary(expr->op, lv, rv);
   if (!result) return std::nullopt;
-  // Table 11-21: a relational, an equality and a logical operator answer one
-  // bit, unsigned (§11.8.1, printed 302), whatever the width of their
-  // operands; sized by the wider operand, `8'd1 < 8'd2` was eight bits.
   if (AnswersOneBit(expr->op)) return ConstVal{*result, 1, false};
   return NormalizeConstVal(*result, w, s);
 }
 
-// The range the value `base` is addressed over. §11.5.1 lists a parameter among
-// the operands a select addresses, and a parameter carries a declaration, so a
-// select on one names bits by their index in the range it was declared with.
-// Everything else -- a concatenation, a literal, the result of another select
-// -- carries no declaration and is addressed as [width-1:0], where an index and
-// a bit offset are the same number; that is what an empty result stands for.
 static std::optional<PackedRange> SelectBaseRange(const Expr* base) {
   if (!base || base->kind != ExprKind::kIdentifier) return std::nullopt;
   return RegisteredParamRange(base->text);
 }
 
-// How far above the least significant end of the value the bit named `index`
-// sits, which is the distance the value has to be shifted down for that bit to
-// reach the bottom.
 static int64_t SelectOffset(const std::optional<PackedRange>& range,
                             int64_t index) {
   return range ? range->OffsetOf(index) : index;
 }
 
-// §11.5.1 (printed pages 295-296): a bit-select or a part-select whose
-// address falls outside the vector reads x there for a 4-state value and 0 for
-// a 2-state one. A folded constant holds no x, nor which state set its value
-// was declared with, so a select reaching outside its value is left unfolded
-// rather than answered 0: §11.5.1's NOTE 2 lets such an index be reported at
-// compile time, and a parameter it initializes is evaluated again in
-// simulation (ReevaluateParamValue in src/simulator/lowerer_register.cpp),
-// where the vector's state set is known.
 static bool InsideValue(const ConstVal& value, int64_t offset) {
   return offset >= 0 && offset < static_cast<int64_t>(value.width);
 }
 
-// A bit at or above 64 is read through ConstVal::high_words, so `P[95]` of a
-// 96-bit parameter is the bit its digits wrote and not a bit the int64 never
-// held.
 static std::optional<ConstVal> SelectOneBit(const ConstVal& value,
                                             int64_t offset) {
   if (!InsideValue(value, offset)) return std::nullopt;
   return ConstVal{ConstValBit(value, offset) ? 1 : 0, 1, false};
 }
 
-// The bits of a part-select keep the places they occupy in the selected field,
-// read from every word of the value, so a field of 64 bits or more folds whole
-// (`W[63:0]` of a 128-bit parameter).
 static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
                                               int64_t off_a, int64_t off_b) {
   const int64_t kHi = std::max(off_a, off_b);
@@ -833,8 +633,6 @@ static std::optional<ConstVal> SelectBitRange(const ConstVal& value,
   return ConstValOfWords(words, kWidth, false);
 }
 
-// The first parameter named `name` of the module a ParamRangeRegistryGuard
-// installed, or nullptr.
 static const RtlirParamDecl* RegisteredParam(std::string_view name) {
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return nullptr;
@@ -844,8 +642,6 @@ static const RtlirParamDecl* RegisteredParam(std::string_view name) {
   return nullptr;
 }
 
-// How far into an unpacked dimension `dim`, `[lo:hi]` or `[size]`, the element
-// `index` selects lies from the dimension's left bound, where both fold.
 static std::optional<int64_t> ElementOffset(const Expr* dim, const Expr* index,
                                             const ScopeMap& scope) {
   if (dim == nullptr) return std::nullopt;
@@ -859,11 +655,6 @@ static std::optional<int64_t> ElementOffset(const Expr* dim, const Expr* index,
   return lo <= hi ? idx->value - lo : lo - idx->value;
 }
 
-// A.2.1.1 gives a param_assignment unpacked dimensions, so a parameter may be
-// an array, and a select of one element of it -- `PARR[2]` of `parameter int
-// PARR[3] = '{10, 20, 30}` -- is a constant expression (§11.2.1) whose value
-// is that element of the positional pattern the parameter was given. The
-// parameter is looked for in the module a ParamRangeRegistryGuard installed.
 static std::optional<ConstVal> ParamArrayElement(const Expr* expr,
                                                  const ScopeMap& scope) {
   if (expr->index_end != nullptr || expr->base == nullptr ||
@@ -899,8 +690,6 @@ std::optional<ConstVal> ConstEvalSelectFull(const Expr* expr,
   if (expr->index_end) {
     auto end = ConstEvalFull(expr->index_end, scope);
     if (!end) return std::nullopt;
-    // §11.5.1: an indexed part-select's second expression is its width, the
-    // bits running up from the base for `+:` and down from it for `-:`.
     int64_t last = end->value;
     if (expr->is_part_select_plus) last = idx->value + end->value - 1;
     if (expr->is_part_select_minus) last = idx->value - end->value + 1;

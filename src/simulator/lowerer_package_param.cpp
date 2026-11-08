@@ -1,7 +1,3 @@
-// §6.20.2 (printed pages 126-127 of IEEE 1800-2023): the width and the
-// value a package's or the compilation unit's parameter is given, each
-// converted to the type its declaration writes.
-
 #include "simulator/lowerer_package_param.h"
 
 #include <cstdint>
@@ -20,12 +16,6 @@
 
 namespace delta {
 
-// §6.20.2 (printed pages 126-127): whether a parameter's declaration fixes
-// its width -- by a range or a type other than the implicit one, as
-// HasDeclaredWidth (src/elaborator/const_eval_bits.cpp) reads it off a
-// module's RtlirParamDecl -- and not by a real, shortreal or realtime type,
-// whose value is a real that no vector width sizes (§6.12). One declared with
-// neither takes the width of its value.
 static bool ParamDeclaresAWidth(const ModuleItem* item) {
   const DataType& type = item->data_type;
   if (type.packed_dim_left == nullptr && type.kind == DataTypeKind::kImplicit)
@@ -42,11 +32,6 @@ uint32_t DeclaredParamStorageWidth(const ModuleItem* item, SimContext& ctx) {
   return DeclaredTypeWidth(type, ctx);
 }
 
-// The width a parameter's declaration fixes, its range evaluated in the
-// package's frame where §6.20.1 lets a bound name an earlier parameter --
-// `logic [N-1:0] M` after `int N = 12` is twelve bits -- and 0 where the
-// declaration fixes none. Folded with no parameter in scope, `[N-1:0]` fell
-// to the base type's one bit and M held a single bit.
 static uint32_t DeclaredParamWidth(const ModuleItem* item, SimContext& ctx,
                                    Arena& arena) {
   if (!ParamDeclaresAWidth(item) || DeclaredTypeIsReal(item->data_type, ctx))

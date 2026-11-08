@@ -29,9 +29,6 @@ TEST(EventTriggeredElaborator, ForkTriggerAndWaitTriggeredElaborates) {
 }
 
 TEST(EventTriggeredElaborator, TriggeredCallFormElaborates) {
-  // §15.5.3: the parenthesized call form of the triggered method is a
-  // bit-valued expression, so it elaborates as the right-hand side of an
-  // assignment without being flagged as an unknown function call.
   EXPECT_TRUE(
       ElabOk("module m;\n"
              "  event ev;\n"
@@ -40,11 +37,6 @@ TEST(EventTriggeredElaborator, TriggeredCallFormElaborates) {
              "endmodule\n"));
 }
 
-// §15.5.3: triggered is the one built-in method a named event has, so a call
-// or select naming anything else through an event, a variable of the module,
-// an element of an array of them or a property a handle holds, is reported
-// (#7745). An event is never random (§18.4), so an event property has no
-// rand_mode either, even named by a method of its class (§18.8).
 TEST(EventTriggeredElaborator, AMemberOtherThanTriggeredIsReported) {
   ElabFixture f;
   ElabOk(
@@ -73,7 +65,6 @@ TEST(EventTriggeredElaborator, AMemberOtherThanTriggeredIsReported) {
       diags, "'foo' is not a built-in method of the event 'ev'", 9, "15.5.3"));
 }
 
-// §15.5.3: triggered, called or read, applies to an event wherever it is held.
 TEST(EventTriggeredElaborator, TriggeredOnAnyEventIsAccepted) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

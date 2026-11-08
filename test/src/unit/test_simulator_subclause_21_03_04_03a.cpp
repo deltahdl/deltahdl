@@ -13,18 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.4.3 governs $fscanf and $sscanf. Both read characters ($fscanf from a
-// file descriptor, $sscanf from a str expression), interpret them under a
-// control string, and store the converted fields into the argument variables,
-// returning the count of matched-and-assigned items (0 on an early matching
-// failure, EOF when the input runs out first). Every rule operates on inputs
-// produced elsewhere -- a §21.3.1 descriptor, a declared destination, a
-// $timeformat configuration -- so each test builds those from real source
-// syntax and drives the full pipeline.
-
-// Runs one $sscanf of a three-character strength sequence into a scalar reg and
-// displays what it returned and what it assigned, so the cases below differ
-// only in the sequence they are given to read.
 std::string ScanStrengthInto(const std::string& seq, SysTaskFixture& f) {
   return RunCapture(
       "module t;\n"
@@ -40,10 +28,6 @@ std::string ScanStrengthInto(const std::string& seq, SysTaskFixture& f) {
       f);
 }
 
-// C1 + C15: $fscanf reads formatted fields from the file specified by fd and
-// returns the number of successfully matched and assigned items; when the
-// input ends partway through the control string, the completed conversions
-// still count.
 TEST(ReadingFormattedData, FscanfReadsFieldsAndReturnsCount) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_fields.txt";
@@ -68,14 +52,10 @@ TEST(ReadingFormattedData, FscanfReadsFieldsAndReturnsCount) {
           "endmodule\n",
       f);
   EXPECT_NE(out.find("n=2 d=42 h=ff"), std::string::npos) << out;
-  // "ff" fails %d, so only one field converts on the second pass.
   EXPECT_NE(out.find("m=1"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// C5: the format can be an expression -- a string-typed variable for $sscanf
-// and an integral variable holding the control characters for $fscanf -- not
-// only a literal.
 TEST(ReadingFormattedData, FormatMayBeAVariableExpression) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_fmtvar.txt";
@@ -104,9 +84,6 @@ TEST(ReadingFormattedData, FormatMayBeAVariableExpression) {
   std::remove(tmp.c_str());
 }
 
-// C2: the str argument of $sscanf may be a string-typed expression, an
-// integral expression whose packed bytes spell the text, or an unpacked array
-// of byte read from its left bound.
 TEST(ReadingFormattedData, SscanfStrSourceForms) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -131,9 +108,6 @@ TEST(ReadingFormattedData, SscanfStrSourceForms) {
       << out;
 }
 
-// C6: for $sscanf, null characters shall also be considered white space. A
-// NUL sitting between two digit runs separates them the way a blank would;
-// were it dropped instead, the runs would fuse into one number.
 TEST(ReadingFormattedData, SscanfNulCharactersAreWhiteSpace) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -150,8 +124,6 @@ TEST(ReadingFormattedData, SscanfNulCharactersAreWhiteSpace) {
   EXPECT_NE(out.find("n=2 a=7 b=8"), std::string::npos) << out;
 }
 
-// C3: when the format is exhausted while arguments remain, the excess
-// arguments are ignored and keep their prior values.
 TEST(ReadingFormattedData, ExcessArgumentsAreIgnored) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -167,7 +139,6 @@ TEST(ReadingFormattedData, ExcessArgumentsAreIgnored) {
   EXPECT_NE(out.find("n=1 a=3 b=7"), std::string::npos) << out;
 }
 
-// C4: an argument too small to hold the converted input takes the LSBs.
 TEST(ReadingFormattedData, NarrowDestinationTakesLsbs) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -183,8 +154,6 @@ TEST(ReadingFormattedData, NarrowDestinationTakesLsbs) {
   EXPECT_NE(out.find("n=1 narrow=255"), std::string::npos) << out;
 }
 
-// C4: when the destination is real and the converted input exceeds its range,
-// the value +Inf (or -Inf) is transferred.
 TEST(ReadingFormattedData, RealDestinationOverflowBecomesInfinity) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -201,8 +170,6 @@ TEST(ReadingFormattedData, RealDestinationOverflowBecomesInfinity) {
   EXPECT_NE(out.find("n=1 rp=inf m=1 rn=-inf"), std::string::npos) << out;
 }
 
-// C7: an ordinary character in the control string shall match the next input
-// character; a mismatch ends the scan with nothing assigned.
 TEST(ReadingFormattedData, OrdinaryCharactersMustMatch) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -221,9 +188,6 @@ TEST(ReadingFormattedData, OrdinaryCharactersMustMatch) {
   EXPECT_NE(out.find("m=0 v=99"), std::string::npos) << out;
 }
 
-// C8: the assignment-suppression character * converts and consumes an input
-// field without taking a destination argument, and the suppressed field does
-// not count toward the return value.
 TEST(ReadingFormattedData, SuppressedConversionTakesNoArgument) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -238,8 +202,6 @@ TEST(ReadingFormattedData, SuppressedConversionTakesNoArgument) {
   EXPECT_NE(out.find("n=1 kept=4"), std::string::npos) << out;
 }
 
-// C8 + C9: a decimal maximum field width bounds how many characters one
-// conversion may consume; the next conversion resumes right after it.
 TEST(ReadingFormattedData, MaximumFieldWidthBoundsTheField) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -254,8 +216,6 @@ TEST(ReadingFormattedData, MaximumFieldWidthBoundsTheField) {
   EXPECT_NE(out.find("n=2 a=12 b=345"), std::string::npos) << out;
 }
 
-// C9: leading white space ahead of an input field is ignored for every
-// conversion except %c, which takes the next character verbatim.
 TEST(ReadingFormattedData, CharConversionDoesNotSkipWhiteSpace) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -270,13 +230,10 @@ TEST(ReadingFormattedData, CharConversionDoesNotSkipWhiteSpace) {
       "  end\n"
       "endmodule\n",
       f);
-  EXPECT_NE(out.find("n=1 cv=32"), std::string::npos) << out;  // the blank
+  EXPECT_NE(out.find("n=1 cv=32"), std::string::npos) << out;
   EXPECT_NE(out.find("m=1 d=42"), std::string::npos) << out;
 }
 
-// C10: the integer format specifiers read into any integral data type,
-// including an enumerated type (declared through typedef) and a packed
-// aggregate.
 TEST(ReadingFormattedData, IntegerCodesReadEnumAndPackedTypes) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -295,9 +252,6 @@ TEST(ReadingFormattedData, IntegerCodesReadEnumAndPackedTypes) {
   EXPECT_NE(out.find("n=1 ev=3 m=1 ps=a5 hi=a"), std::string::npos) << out;
 }
 
-// C10 negative: the integer format specifiers shall not be used with any
-// unpacked aggregate data type; the misuse converts nothing and the elements
-// keep their values.
 TEST(ReadingFormattedData, IntegerCodeRejectsUnpackedAggregate) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -314,9 +268,6 @@ TEST(ReadingFormattedData, IntegerCodeRejectsUnpackedAggregate) {
   EXPECT_NE(out.find("n=0 m0=9"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, b/h rows): a binary or hexadecimal field admits x, z (and
-// ?) digits alongside the base digits, each contributing its bit group to the
-// 4-state result, and underscores inside the digit string are skipped.
 TEST(ReadingFormattedData, IntegerFieldsAcceptFourStateDigits) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -338,9 +289,6 @@ TEST(ReadingFormattedData, IntegerFieldsAcceptFourStateDigits) {
       << out;
 }
 
-// C11 (Table 21-7, d row): a decimal field is an optionally signed digit
-// string, or a single x/z/? standing for an entirely unknown or
-// high-impedance value.
 TEST(ReadingFormattedData, DecimalFieldAcceptsSignAndLoneXz) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -360,9 +308,6 @@ TEST(ReadingFormattedData, DecimalFieldAcceptsSignAndLoneXz) {
       << out;
 }
 
-// C11 (Table 21-7, v row): %v matches a three-character net signal strength
-// sequence in the §21.2.1.4 form; the logic value is converted to its 4-value
-// equivalent and assigned.
 TEST(ReadingFormattedData, StrengthFieldReadsThreeCharacterSequence) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -378,10 +323,6 @@ TEST(ReadingFormattedData, StrengthFieldReadsThreeCharacterSequence) {
   EXPECT_NE(out.find("n=2 r1=1 rz=z"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, t row): a %t field is a floating-point number scaled and
-// rounded according to the timescale configured by $timeformat (§20.4.3). The
-// LRM's own figures: with a 1ns time unit (the default here) and
-// $timeformat(-3,2," ms",10), reading "10.345" yields 10350000.0.
 TEST(ReadingFormattedData, TimeFieldScalesPerTimeformat) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -398,10 +339,6 @@ TEST(ReadingFormattedData, TimeFieldScalesPerTimeformat) {
   EXPECT_NE(out.find("n=1 tv=1.035e+07"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, u row): %u transfers unformatted 2-value binary data
-// sufficient to fill the destination, in the same layout a matching
-// $fwrite("%u", data) emits, so a write-then-read round trip reproduces the
-// value.
 TEST(ReadingFormattedData, UnformattedTwoValueRoundTripsThroughFwrite) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_u.bin";
@@ -429,9 +366,6 @@ TEST(ReadingFormattedData, UnformattedTwoValueRoundTripsThroughFwrite) {
   std::remove(tmp.c_str());
 }
 
-// C11 (Table 21-7, z row): %z transfers unformatted 4-value binary data in
-// the s_vpi_vecval pair layout, preserving x and z across a $fwrite("%z")
-// round trip.
 TEST(ReadingFormattedData, UnformattedFourValueRoundTripsPreservingXz) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_z.bin";
@@ -459,9 +393,6 @@ TEST(ReadingFormattedData, UnformattedFourValueRoundTripsPreservingXz) {
   std::remove(tmp.c_str());
 }
 
-// C11 (Table 21-7, m row): %m assigns the current hierarchical path
-// (§21.2.1.5) as a string and does not read data from the input, so the
-// following conversion still sees the whole input.
 TEST(ReadingFormattedData, HierPathFieldConsumesNoInput) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -477,9 +408,6 @@ TEST(ReadingFormattedData, HierPathFieldConsumesNoInput) {
   EXPECT_NE(out.find("n=2 p=[t] v=77"), std::string::npos) << out;
 }
 
-// C12: %s stores a run of nonwhite characters into a string variable (which
-// resizes to the run), an unpacked array of byte (one character per element
-// from the left bound), or a packed integral variable.
 TEST(ReadingFormattedData, StringFieldDestinationForms) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -499,8 +427,6 @@ TEST(ReadingFormattedData, StringFieldDestinationForms) {
       << out;
 }
 
-// C13: unknown bits (x or z) in the format string or in the str argument of
-// $sscanf make the function return EOF (-1).
 TEST(ReadingFormattedData, UnknownBitsInFormatOrStrReturnEof) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -518,9 +444,6 @@ TEST(ReadingFormattedData, UnknownBitsInFormatOrStrReturnEof) {
   EXPECT_NE(out.find("n=-1 m=-1"), std::string::npos) << out;
 }
 
-// C14: when conversion terminates on a conflicting input character, that
-// character is left unread; trailing white space not matched by a directive
-// is left unread too. The next $fgetc calls observe both.
 TEST(ReadingFormattedData, ConflictingAndTrailingCharactersStayUnread) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_unread.txt";
@@ -541,14 +464,10 @@ TEST(ReadingFormattedData, ConflictingAndTrailingCharactersStayUnread) {
           "  end\n"
           "endmodule\n",
       f);
-  // 'x' (120) conflicted with the first %d; the blank (32) after "34" was not
-  // matched by any directive.
   EXPECT_NE(out.find("c1=120 d=34 c2=32"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// C15: EOF (-1) is returned when the input ends before the first conversion,
-// and 0 when an input character fails to match the control string early.
 TEST(ReadingFormattedData, EofAndMatchingFailureReturnValues) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_empty.txt";
@@ -571,8 +490,6 @@ TEST(ReadingFormattedData, EofAndMatchingFailureReturnValues) {
   std::remove(tmp.c_str());
 }
 
-// C8 + Table 21-7 (% row): %% matches a literal percent in the input and
-// assigns nothing; the digit after it still converts under %d.
 TEST(ReadingFormattedData, LiteralPercentMatchesWithoutAssigning) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -587,9 +504,6 @@ TEST(ReadingFormattedData, LiteralPercentMatchesWithoutAssigning) {
   EXPECT_NE(out.find("n=1 v=5"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, o row): an octal field is a sequence from the octal digits
-// plus x, z (or ?), and underscores; an x digit contributes a three-bit x
-// group to the 4-state result.
 TEST(ReadingFormattedData, OctalFieldAcceptsFourStateDigits) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -606,8 +520,6 @@ TEST(ReadingFormattedData, OctalFieldAcceptsFourStateDigits) {
   EXPECT_NE(out.find("n=1 ov=15 m=1 xv=2x7"), std::string::npos) << out;
 }
 
-// C11: each integer conversion code has an uppercase alternate (%D, %H, %B,
-// %O) that behaves like its lowercase form.
 TEST(ReadingFormattedData, UppercaseConversionCodesMatchLowercase) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -623,8 +535,6 @@ TEST(ReadingFormattedData, UppercaseConversionCodesMatchLowercase) {
   EXPECT_NE(out.find("n=1 d=42 m=1 h=ff"), std::string::npos) << out;
 }
 
-// C4: arguments of any length are supported -- a destination wider than one
-// machine word takes the whole converted field.
 TEST(ReadingFormattedData, WideDestinationTakesWholeField) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -641,11 +551,6 @@ TEST(ReadingFormattedData, WideDestinationTakesWholeField) {
       << out;
 }
 
-// C6 + C14: a single white-space character in the control string matches a
-// whole run of mixed input white space (blank, tab, newline); and when a
-// trailing white-space directive is present, the trailing input white space
-// IS consumed -- the arm where a directive matches it -- so the next read
-// starts at the character after it.
 TEST(ReadingFormattedData, WhitespaceDirectiveMatchesRunAndConsumesTrailing) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_wsdir.txt";
@@ -668,14 +573,10 @@ TEST(ReadingFormattedData, WhitespaceDirectiveMatchesRunAndConsumesTrailing) {
           "  end\n"
           "endmodule\n",
       f);
-  // The tab+newline run separates 1 from 2; the trailing directive ate both
-  // blanks, so $fgetc sees 'x' (120) rather than a blank.
   EXPECT_NE(out.find("n=2 a=1 b=2 m=1 d=5 c=120"), std::string::npos) << out;
   std::remove(tmp.c_str());
 }
 
-// C14 + C15: leading white space may be skipped without constituting a match,
-// so an input holding only white space still returns EOF (-1) rather than 0.
 TEST(ReadingFormattedData, WhitespaceOnlyInputReturnsEof) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -690,10 +591,6 @@ TEST(ReadingFormattedData, WhitespaceOnlyInputReturnsEof) {
   EXPECT_NE(out.find("n=-1"), std::string::npos) << out;
 }
 
-// C5: the remaining format-expression combinations -- $sscanf driven by an
-// integral variable holding the control characters, and $fscanf driven by a
-// string-typed variable -- so each front end is observed with each
-// non-literal format form.
 TEST(ReadingFormattedData, FormatExpressionFormsCrossFunctions) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_fmtcross.txt";
@@ -720,8 +617,6 @@ TEST(ReadingFormattedData, FormatExpressionFormsCrossFunctions) {
   std::remove(tmp.c_str());
 }
 
-// C11 (Table 21-7, h/x row): %x is an alternate spelling of the hexadecimal
-// conversion, including its 4-state digits.
 TEST(ReadingFormattedData, HexFieldViaXCode) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -737,8 +632,6 @@ TEST(ReadingFormattedData, HexFieldViaXCode) {
   EXPECT_NE(out.find("n=1 hv=z9"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, f/e/g row): %e and %g are alternate spellings of the
-// floating-point conversion and accept the same token forms as %f.
 TEST(ReadingFormattedData, RealFieldAliasCodes) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -755,8 +648,6 @@ TEST(ReadingFormattedData, RealFieldAliasCodes) {
   EXPECT_NE(out.find("n=1 re=150 m=1 rg=-0.25"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, v row): the strength sequence's logic value may itself be
-// unknown -- reading "StX" assigns x.
 TEST(ReadingFormattedData, StrengthFieldReadsUnknownValue) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -772,8 +663,6 @@ TEST(ReadingFormattedData, StrengthFieldReadsUnknownValue) {
   EXPECT_NE(out.find("n=1 rx=x"), std::string::npos) << out;
 }
 
-// C8 negative (Table 21-7, % row): %% demands a literal percent in the input;
-// when the input holds something else, the scan ends with nothing assigned.
 TEST(ReadingFormattedData, LiteralPercentMismatchEndsScan) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -789,8 +678,6 @@ TEST(ReadingFormattedData, LiteralPercentMismatchEndsScan) {
   EXPECT_NE(out.find("n=0 v=88"), std::string::npos) << out;
 }
 
-// C13 via the $fscanf front end: unknown bits in a variable-held format make
-// $fscanf report EOF (-1), leaving the destination untouched.
 TEST(ReadingFormattedData, FscanfUnknownBitsInFormatReturnsEof) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_213403_fmtxz.txt";
@@ -815,8 +702,6 @@ TEST(ReadingFormattedData, FscanfUnknownBitsInFormatReturnsEof) {
   std::remove(tmp.c_str());
 }
 
-// C11 (Table 21-7, f/e/g rows) + C15: a floating-point field with an exponent
-// part converts into a real destination, and the count reflects it.
 TEST(ReadingFormattedData, RealFieldConvertsIntoRealDestination) {
   SysTaskFixture f;
   std::string out = RunCapture(
@@ -832,8 +717,6 @@ TEST(ReadingFormattedData, RealFieldConvertsIntoRealDestination) {
   EXPECT_NE(out.find("n=1 rv=25"), std::string::npos) << out;
 }
 
-// §21.3.4.3: the integer format specifiers shall not be used with any unpacked
-// aggregate data type, and the warning that rejects one names §21.3.4.3.
 TEST(ReadingFormattedData, IntegerCodeOnAggregateNames21_3_4_3) {
   SysTaskFixture f;
   RunCapture(
@@ -851,35 +734,18 @@ TEST(ReadingFormattedData, IntegerCodeOnAggregateNames21_3_4_3) {
                               "21.3.4.3"));
 }
 
-// C11 (Table 21-7, v row): Table 21-3 gives L for a value that is either 0 or
-// high impedance, so L is one of the logic values a %v field may carry and the
-// reader takes it. What it assigns is the 4-value equivalent the same row asks
-// for: L names two of the four values without saying which of them holds, and x
-// is the value an integral variable has for that.
 TEST(ReadingFormattedData, StrengthFieldReadsAmbiguousZeroOrHighZ) {
   SysTaskFixture f;
   std::string out = ScanStrengthInto("StL", f);
   EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
 }
 
-// C11 (Table 21-7, v row): H is Table 21-3's value that is either 1 or high
-// impedance, the other ambiguous logic value, and reaches the reader as a
-// different character from the L above. Its 4-value equivalent is x for the
-// same reason.
 TEST(ReadingFormattedData, StrengthFieldReadsAmbiguousOneOrHighZ) {
   SysTaskFixture f;
   std::string out = ScanStrengthInto("PuH", f);
   EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
 }
 
-// The claim the two halves of the strength format are for: a sequence this tool
-// writes with %v is one it reads back with %v. FormatStrength is what
-// $display's %v renders a scalar net's strength through (§21.2.1.4), so the
-// sequence read here is the writer's own output for a 0 side whose strength
-// range reaches down to high impedance rather than a literal that could drift
-// from it, and the value scanned back is the 4-value equivalent of the logic
-// value that output carries. Neither half's own cases state this: they are in
-// different files and each names the three-character sequence itself.
 TEST(ReadingFormattedData, StrengthFieldReadsBackWhatPercentVWrote) {
   SysTaskFixture f;
   NetStrength ns;
@@ -891,13 +757,6 @@ TEST(ReadingFormattedData, StrengthFieldReadsBackWhatPercentVWrote) {
   EXPECT_NE(out.find("n=1 r=x"), std::string::npos) << out;
 }
 
-// §9.4.2: a non-edge implicit event is detected whenever the expression's value
-// changes, and the clause names no writer whose change is exempt. A system task
-// that writes one of its arguments has written a user variable, so a process
-// parked on it resumes -- which every case above could pass without, the store
-// having happened all along and the value being what they read back. The
-// inferred-sensitivity route rather than the event-control one, and the scanned
-// stores $fscanf shares with $sscanf.
 TEST(ReadingFormattedData, SscanfDestinationWakesAnAlwaysCombReadingIt) {
   SimFixture f;
   auto* var = RunAndFindVar(

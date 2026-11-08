@@ -31,10 +31,6 @@ TEST(AbstractClassElaboration, ConcreteOverridesAllPureVirtuals) {
              "endmodule\n"));
 }
 
-// §8.20 (printed page 197): an override of a virtual method is virtual
-// without the keyword, so a plain `function int area()` in Circle implements
-// Shape's pure area() and Circle is no abstract class; counted only when
-// written `virtual`, the override left area() reported as unimplemented.
 TEST(AbstractClassElaboration, OverrideWithoutVirtualKeywordImplementsPure) {
   EXPECT_TRUE(
       ElabOk("virtual class Shape;\n"
@@ -50,9 +46,6 @@ TEST(AbstractClassElaboration, OverrideWithoutVirtualKeywordImplementsPure) {
              "endmodule\n"));
 }
 
-// The report stands at the offending subclass's own declaration -- the site
-// passes `cls->range.start` -- rather than at the pure virtual method it leaves
-// unimplemented.
 TEST(AbstractClassElaboration, NonAbstractMissingPureVirtualError) {
   ElabFixture f;
   ElabOk(
@@ -218,9 +211,6 @@ TEST(AbstractClassElaboration,
                             "8.21"));
 }
 
-// §8.21: a class not declared virtual is a constructible one, so a pure
-// virtual method of its own is unimplemented whether or not it extends a
-// class. The rule holds over a class a package declares too.
 TEST(AbstractClassElaboration, BaseLessNonAbstractPureVirtualIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -243,11 +233,6 @@ TEST(AbstractClassElaboration, BaseLessNonAbstractPureVirtualIsAnError) {
                             6, "8.21"));
 }
 
-// §8.21 forbids constructing an object of an abstract class directly, which is
-// a rule on the source: a bare new for a handle of the class, as a module or
-// block declaration's initializer or assigned in a statement that never runs,
-// and a typed constructor call naming it are each reported at elaboration. A
-// typed constructor call naming a concrete subclass stays legal.
 TEST(AbstractClassElaboration, ConstructingAnAbstractClassIsAnError) {
   ElabFixture f;
   ElabOk(

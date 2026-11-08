@@ -5,19 +5,8 @@
 
 using namespace delta;
 
-// §16.4.3 Deferred assertions outside procedural code.
-//
-// A deferred assertion statement standing outside procedural code is a static
-// deferred assertion, which behaves as though an always_comb procedure held it.
-// The elaborator carries this rule by building an implicit always_comb process
-// whose body is the deferred assertion statement, so the assertion runs once at
-// time zero and re-evaluates whenever one of its operands changes — exactly the
-// behaviour of always_comb.
-
 namespace {
 
-// The deferred assertion outside procedural code becomes an always_comb
-// process rather than being dropped or treated as a concurrent assertion.
 TEST(StaticDeferredAssertion, ModuleLevelDeferredAssertBecomesAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -35,9 +24,6 @@ TEST(StaticDeferredAssertion, ModuleLevelDeferredAssertBecomesAlwaysComb) {
   EXPECT_TRUE(mod->processes[0].body->is_deferred);
 }
 
-// The static deferred assertion is exactly equivalent to wrapping the same
-// statement in an always_comb begin ... end block: both yield one always_comb
-// process with a deferred body.
 TEST(StaticDeferredAssertion, EquivalentToExplicitAlwaysCombWrapping) {
   ElabFixture statik;
   auto* static_design = ElaborateSrc(
@@ -69,9 +55,6 @@ TEST(StaticDeferredAssertion, EquivalentToExplicitAlwaysCombWrapping) {
   EXPECT_EQ(ep[0].kind, RtlirProcessKind::kAlwaysComb);
 }
 
-// A nameless static deferred assertion is legal: the always_comb treatment
-// means it is not subject to the naming rule of a concurrent assertion /
-// clocking item.
 TEST(StaticDeferredAssertion, NamelessDeferredAssertElaboratesCleanly) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -86,8 +69,6 @@ TEST(StaticDeferredAssertion, NamelessDeferredAssertElaboratesCleanly) {
   EXPECT_EQ(mod->processes[0].kind, RtlirProcessKind::kAlwaysComb);
 }
 
-// A final deferred assertion outside procedural code is likewise treated as a
-// static deferred assertion, producing an always_comb process.
 TEST(StaticDeferredAssertion, ModuleLevelFinalDeferredAssertBecomesAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -104,8 +85,6 @@ TEST(StaticDeferredAssertion, ModuleLevelFinalDeferredAssertBecomesAlwaysComb) {
   EXPECT_TRUE(mod->processes[0].body->is_final_deferred);
 }
 
-// Several static deferred assertions in one module each get their own implicit
-// always_comb process, just as several separate always_comb procedures would.
 TEST(StaticDeferredAssertion,
      MultipleStaticDeferredAssertionsEachBecomeAlwaysComb) {
   ElabFixture f;
@@ -123,11 +102,6 @@ TEST(StaticDeferredAssertion,
   EXPECT_EQ(mod->processes[1].kind, RtlirProcessKind::kAlwaysComb);
 }
 
-// A concurrent property assertion at module level is NOT a deferred assertion,
-// so it is not turned into an always_comb process — confirming the deferred
-// rule keys strictly on the deferred form. Per §16.14.5 a static concurrent
-// assertion uses `always` semantics, so the simple clocked boolean form is
-// modeled as a clocked (always_ff) process rather than an always_comb one.
 TEST(StaticDeferredAssertion, ConcurrentAssertNotWrappedInAlwaysComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(

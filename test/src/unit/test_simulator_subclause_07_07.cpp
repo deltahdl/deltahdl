@@ -64,8 +64,6 @@ TEST(ArrayArgPassing, CallerUnchangedEndToEnd) {
   EXPECT_EQ(v, 42u);
 }
 
-// A fixed-size formal may also receive a dynamic array of equal size. The
-// elements are copied in by value and read back through the formal.
 TEST(ArrayArgPassing, DynamicArrayEqualSizeToFixedFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -80,10 +78,6 @@ TEST(ArrayArgPassing, DynamicArrayEqualSizeToFixedFormal) {
   EXPECT_EQ(v, 20u);
 }
 
-// Passing a dynamic array whose size differs from a fixed-size formal is the
-// case the standard flags as requiring a run-time check: the mismatch is
-// diagnosed when the call is bound. The formal carries no position of its own,
-// so the report names where the actual was written: line 7, the call.
 TEST(ArrayArgPassing, DynamicArraySizeMismatchToFixedFormalRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -106,8 +100,6 @@ TEST(ArrayArgPassing, DynamicArraySizeMismatchToFixedFormalRuntimeError) {
                             7, "7.7"));
 }
 
-// The same equal-size run-time check governs a queue actual bound to a
-// fixed-size formal.
 TEST(ArrayArgPassing, QueueSizeMismatchToFixedFormalRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -134,8 +126,6 @@ TEST(ArrayArgPassing, QueueSizeMismatchToFixedFormalRuntimeError) {
                             10, "7.7"));
 }
 
-// An unsized formal dimension matches any size of the actual, so a formal that
-// accepts a dynamic array can be passed a fixed-size array of compatible type.
 TEST(ArrayArgPassing, FixedArrayToUnsizedDynamicFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -153,8 +143,6 @@ TEST(ArrayArgPassing, FixedArrayToUnsizedDynamicFormal) {
   EXPECT_EQ(v, 30u);
 }
 
-// A dynamic array bound to an unsized formal is copied by value through the
-// queue-backed representation, so the callee reads the actual's elements.
 TEST(ArrayArgPassing, DynamicArrayToUnsizedFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -169,8 +157,6 @@ TEST(ArrayArgPassing, DynamicArrayToUnsizedFormal) {
   EXPECT_EQ(v, 30u);
 }
 
-// A queue of equal size binds to a fixed-size formal: its elements are copied
-// in by value and read back through the formal.
 TEST(ArrayArgPassing, QueueEqualSizeToFixedFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -191,8 +177,6 @@ TEST(ArrayArgPassing, QueueEqualSizeToFixedFormal) {
   EXPECT_EQ(v, 20u);
 }
 
-// A queue bound to an unsized formal is copied by value into the formal's own
-// queue-backed storage, so the callee reads the actual's elements.
 TEST(ArrayArgPassing, QueueToUnsizedFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -213,10 +197,6 @@ TEST(ArrayArgPassing, QueueToUnsizedFormal) {
   EXPECT_EQ(v, 30u);
 }
 
-// §7.7 lists associative arrays among the array types passed by value: binding
-// an associative-array actual copies its entries into the formal, so the callee
-// reads back through the formal the value the caller stored under a given key.
-// Exercises the associative branch of the real argument-binding path.
 TEST(ArrayArgPassing, AssociativeArrayByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -234,10 +214,6 @@ TEST(ArrayArgPassing, AssociativeArrayByValueEndToEnd) {
   EXPECT_EQ(v, 22u);
 }
 
-// §7.7: the associative-array actual is passed as a copy, so mutating the
-// formal inside the callee leaves the caller's associative array untouched --
-// the same copy-by-value guarantee the fixed/dynamic/queue cases above observe,
-// now for the associative array type the subclause also enumerates.
 TEST(ArrayArgPassing, AssociativeArrayCallerUnchanged) {
   auto v = RunAndGet(
       "module t;\n"
@@ -258,8 +234,6 @@ TEST(ArrayArgPassing, AssociativeArrayCallerUnchanged) {
   EXPECT_EQ(v, 22u);
 }
 
-// Because the bind makes an independent copy, mutating the formal inside the
-// callee leaves the caller's dynamic array untouched.
 TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
   auto v = RunAndGet(
       "module t;\n"
@@ -279,18 +253,6 @@ TEST(ArrayArgPassing, DynamicArrayCallerUnchanged) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.7 lists strings among the element types an array argument may carry (its
-// own example uses `string arr[...]`). A string element takes a distinct,
-// non-integral storage path, so passing a string array by value must copy those
-// elements into the formal; the callee then reads back the value the caller
-// stored. Built from a real `'{...}` string-array initializer and driven
-// through the full pipeline.
-//
-// The callee reads the first element as well as a later one. An initializer
-// written as an assignment pattern reaches its first item by a different route
-// from the rest -- the first is the item the parser has to tell apart from a
-// key -- so a copy that carried every element but the first would still answer
-// a question asked only about a[1].
 TEST(ArrayArgPassing, StringArrayByValueEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -305,10 +267,6 @@ TEST(ArrayArgPassing, StringArrayByValueEndToEnd) {
   EXPECT_EQ(v, 5u);
 }
 
-// §7.7: the copy-by-value guarantee holds for the queue array type too --
-// mutating the formal inside the callee leaves the caller's queue untouched,
-// mirroring the fixed/dynamic/associative caller-unchanged cases for the
-// remaining array type.
 TEST(ArrayArgPassing, QueueCallerUnchanged) {
   auto v = RunAndGet(
       "module t;\n"
@@ -330,10 +288,6 @@ TEST(ArrayArgPassing, QueueCallerUnchanged) {
   EXPECT_EQ(v, 42u);
 }
 
-// §7.7: a subroutine is a task or a function; array arguments are passed by
-// value to either. The prior cases all call functions, so this exercises the
-// task syntactic position -- a fixed array copied into a task's input formal,
-// with the selected element handed back through an output formal and observed.
 TEST(ArrayArgPassing, ArrayArgToTaskEndToEnd) {
   auto v = RunAndGet(
       "module t;\n"
@@ -351,9 +305,6 @@ TEST(ArrayArgPassing, ArrayArgToTaskEndToEnd) {
   EXPECT_EQ(v, 33u);
 }
 
-// §7.7: a subroutine that accepts a fixed-size array can be passed a dynamic
-// array or queue only of equal size, which is a run-time check. The report it
-// raises names §7.7.
 TEST(ArrayArgPassing, FixedFormalSizeMismatchNames7_7) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -374,9 +325,6 @@ TEST(ArrayArgPassing, FixedFormalSizeMismatchNames7_7) {
                             "array size mismatch: formal expects", 7, "7.7"));
 }
 
-// §7.7 accepts a fixed-size actual of the formal's size whatever its range,
-// and §7.6 pairs the elements left to right: `b[5:2]` passed to `arr[4:1]`
-// puts b[3], the third from the left, at arr[2].
 TEST(ArrayArgPassing, FixedActualOfOtherRangePairsLeftToRight) {
   auto v = RunAndGet(
       "module t;\n"
@@ -391,8 +339,6 @@ TEST(ArrayArgPassing, FixedActualOfOtherRangePairsLeftToRight) {
   EXPECT_EQ(v, 30u);
 }
 
-// A formal written with a range takes a dynamic array of the size the range
-// spans, the leftmost index getting element 0.
 TEST(ArrayArgPassing, DynamicArrayToRangedFixedFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -424,9 +370,6 @@ TEST(ArrayArgPassing, QueueToRangedFixedFormal) {
   EXPECT_EQ(v, 7u);
 }
 
-// §13.5 copies an output formal to its actual on return, and §7.7 passes an
-// array by the rules of array assignment, so a dynamic array formal sized in
-// the body gives the actual its size and elements.
 TEST(ArrayArgPassing, OutputDynamicArrayFormalCopiesBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -445,8 +388,6 @@ TEST(ArrayArgPassing, OutputDynamicArrayFormalCopiesBack) {
   EXPECT_EQ(v, 307u);
 }
 
-// §13.3 copies nothing into an output formal, so the queue starts empty
-// whatever the actual held, and the actual ends holding what the task left.
 TEST(ArrayArgPassing, OutputQueueFormalOfTaskCopiesBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -503,8 +444,6 @@ TEST(ArrayArgPassing, InoutQueueFormalCopiesBack) {
   EXPECT_EQ(v, 307u);
 }
 
-// An output fixed-size formal bound to a dynamic array copies its elements
-// back into it, left to right.
 TEST(ArrayArgPassing, OutputFixedFormalToDynamicArrayCopiesBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -524,8 +463,6 @@ TEST(ArrayArgPassing, OutputFixedFormalToDynamicArrayCopiesBack) {
   EXPECT_EQ(v, 65u);
 }
 
-// The copy-out pairs the elements left to right as the copy-in does: the
-// formal's leftmost `o[4]` goes to the actual's leftmost `b[5]`.
 TEST(ArrayArgPassing, OutputFixedFormalOfOtherRangeCopiesBackLeftToRight) {
   auto v = RunAndGet(
       "module t;\n"
@@ -565,8 +502,6 @@ TEST(ArrayArgPassing, ClassMethodOutputDynamicFormalCopiesBack) {
   EXPECT_EQ(v, 308u);
 }
 
-// §8.5 with §7.7: an array property reached through a handle is an array
-// actual like any other and is copied into the formal.
 TEST(ArrayArgPassing, AssociativePropertyThroughHandleToFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -613,8 +548,6 @@ TEST(ArrayArgPassing, QueuePropertyThroughHandleToFormal) {
   EXPECT_EQ(v, 9u);
 }
 
-// A fixed-size array property holds its elements on the object, and is
-// copied into the formal left to right as a declared array is.
 TEST(ArrayArgPassing, FixedPropertyThroughHandleToFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -638,8 +571,6 @@ TEST(ArrayArgPassing, FixedPropertyThroughHandleToFormal) {
   EXPECT_EQ(v, 3u);
 }
 
-// An output dynamic array formal resizes a dynamic array property it is
-// copied back into, as §7.6's assignment to a dynamic array does.
 TEST(ArrayArgPassing, OutputDynamicFormalToDynamicPropertyCopiesBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -662,9 +593,6 @@ TEST(ArrayArgPassing, OutputDynamicFormalToDynamicPropertyCopiesBack) {
   EXPECT_EQ(v, 205u);
 }
 
-// §8.11: in a method, a bare name no declaration answers to is the running
-// object's property, so `fill3(f)` passes the object's array and takes the
-// output back into it.
 TEST(ArrayArgPassing, BarePropertyActualInMethodCopiesBack) {
   auto v = RunAndGet(
       "module t;\n"
@@ -691,9 +619,6 @@ TEST(ArrayArgPassing, BarePropertyActualInMethodCopiesBack) {
   EXPECT_EQ(v, 987u);
 }
 
-// §7.7 passes a multidimensional array by value like a one-dimensional one:
-// every element of every dimension reaches the formal, not only those one
-// index deep.
 TEST(ArrayArgPassing, TwoDimFixedActualReachesFunctionFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -711,9 +636,6 @@ TEST(ArrayArgPassing, TwoDimFixedActualReachesFunctionFormal) {
   EXPECT_EQ(v, 74u);
 }
 
-// §7.7's `int b[1:3][0:2]` for `fun(int a[3:1][3:1])`: §7.6 pairs the
-// elements left to right in each dimension, so b[2][0], the middle row's
-// leftmost element, is the formal's a[2][3].
 TEST(ArrayArgPassing, TwoDimActualOfOtherRangesPairsByPosition) {
   auto v = RunAndGet(
       "module t;\n"
@@ -731,8 +653,6 @@ TEST(ArrayArgPassing, TwoDimActualOfOtherRangesPairsByPosition) {
   EXPECT_EQ(v, 75u);
 }
 
-// §13.5 copies an output formal back on return, by position as §7.6 pairs
-// the elements: the formal's a[2][3] is the actual's b[2][1].
 TEST(ArrayArgPassing, TwoDimOutputFormalCopiedBackByPosition) {
   auto v = RunAndGet(
       "module t;\n"
@@ -768,9 +688,6 @@ TEST(ArrayArgPassing, TwoDimInoutFormalCopiedInAndBack) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.7 lets a fixed-size formal take a dynamic array of equal size, and a
-// dynamic array of dynamic arrays brings each level's size at run time: d's
-// element at position (1, 0) is the formal's a[2][3].
 TEST(ArrayArgPassing, DynamicOfDynamicActualReachesTwoDimFormal) {
   auto v = RunAndGet(
       "module t;\n"
@@ -790,8 +707,6 @@ TEST(ArrayArgPassing, DynamicOfDynamicActualReachesTwoDimFormal) {
   EXPECT_EQ(v, 96u);
 }
 
-// The run-time size check reaches every level: a row of two elements where
-// the formal's rows hold three is the §7.7 error, reported at the call.
 TEST(ArrayArgPassing, DynamicOfDynamicInnerSizeMismatchRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -819,9 +734,6 @@ TEST(ArrayArgPassing, DynamicOfDynamicInnerSizeMismatchRuntimeError) {
                             11, "7.7"));
 }
 
-// §7.7 copies a string array into a formal of string elements, so §6.16.1's
-// len() on an element of the formal counts the string's characters: the
-// actual's leftmost element "abc" is the formal's a[4].
 TEST(ArrayArgPassing, StringMethodOnElementOfStringArrayFormal) {
   auto v = RunAndGet(
       "module t;\n"

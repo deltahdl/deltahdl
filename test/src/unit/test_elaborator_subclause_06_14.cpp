@@ -120,9 +120,6 @@ TEST(ChandleDataType, ChandleInoutPort_Error) {
                             "6.14"));
 }
 
-// The rule §6.14 states here is reported under the clause that states the
-// obligation, §7.3.2 (no dynamic type or chandle type in an untagged union),
-// and stands at the `typedef` keyword.
 TEST(ChandleDataType, ChandleInUntaggedUnion_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -147,10 +144,6 @@ TEST(ChandleDataType, ChandleInTaggedUnion_Ok) {
 }
 
 TEST(ChandleDataType, ChandleInsertedIntoAssociativeArray_Ok) {
-  // §6.14: a chandle may be inserted into an associative array. Declaring a
-  // chandle-valued associative array and inserting a null handle at a key must
-  // elaborate without error -- the chandle usage restrictions (ports, packed
-  // types, untagged unions, ...) do not extend to associative-array elements.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -163,10 +156,6 @@ TEST(ChandleDataType, ChandleInsertedIntoAssociativeArray_Ok) {
 }
 
 TEST(ChandleDataType, ChandleAssociativeArrayElementRead_Ok) {
-  // §6.14: a chandle may be inserted into an associative array, and reading an
-  // element back with an index is a legal element access -- not a bit-select of
-  // a scalar chandle. Reading aa[key] into another chandle must not be
-  // rejected.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -180,13 +169,6 @@ TEST(ChandleDataType, ChandleAssociativeArrayElementRead_Ok) {
 }
 
 TEST(ChandleDataType, ChandleAssociativeArrayElementWrite_Ok) {
-  // §6.14: a chandle may be inserted into an associative array, and the handle
-  // inserted may come from a chandle variable rather than being the null the
-  // insertion test above uses. Writing one into an element is an assignment
-  // between two chandles, so neither the prohibition on assigning a chandle to
-  // a variable of another type nor the rule admitting assignment only from
-  // another chandle is violated. This is the write counterpart of the element
-  // read above.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -200,13 +182,6 @@ TEST(ChandleDataType, ChandleAssociativeArrayElementWrite_Ok) {
 }
 
 TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
-  // §6.14: a chandle is not a vector, so bit-selecting a scalar chandle is
-  // still illegal. This is the negative counterpart to the associative-array
-  // element access above -- the array base is what makes the index legal, not
-  // chandle. The lvalue is a chandle, so the assign-to-other-type rule is not
-  // what fires; the rule admitting assignment only from another chandle or null
-  // reports at the same line, and naming the bit-select report is what tells
-  // the two apart.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -219,9 +194,6 @@ TEST(ChandleDataType, ChandleScalarBitSelect_Error) {
                             "bit-select on chandle is illegal", 4, "6.14"));
 }
 
-// A chandle member of a packed structure is reported by the §7.2.1
-// packed-member-type rule, which names the member, and stands at the `typedef`
-// keyword.
 TEST(ChandleDataType, ChandleInPackedStruct_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -304,8 +276,6 @@ TEST(ChandleDataType, ChandleUnaryNot_Error) {
 }
 
 TEST(ChandleDataType, ChandleRelational_Error) {
-  // §6.14: only equality/inequality operators are valid on chandles; a
-  // relational operator such as < is not in the permitted set.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -370,19 +340,6 @@ TEST(ChandleDataType, ChandleCaseInequalityOk) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.14 states the operations a chandle admits -- the equality family, and no
-// bit-select of a scalar chandle -- and names no statement those rules are
-// suspended in. Elaborator::WalkStmtsForChandleOps in
-// src/elaborator/elaborator_validate_datatype_ops.cpp had written out six of
-// the thirteen child-statement links Stmt declares, so the addition of
-// ChandleAddition_Error above elaborated clean in any of the other seven. The
-// walk now takes its list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h, and each case below rewrites
-// that addition in one newly reached position.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, whose
-// statements the parser keeps in Stmt::fork_stmts.
 TEST(ChandleDataType, ChandleAdditionInForkArm_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -398,10 +355,6 @@ TEST(ChandleDataType, ChandleAdditionInForkArm_Error) {
                             "operator is not allowed on chandle", 5, "6.14"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// `variable_assignment ::= variable_lvalue = expression`, so an assignment
-// whose right-hand side adds two chandles stands in a for-loop header. The
-// parser keeps it in Stmt::for_inits.
 TEST(ChandleDataType, ChandleAdditionInForInitialization_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -415,10 +368,6 @@ TEST(ChandleDataType, ChandleAdditionInForInitialization_Error) {
                             "operator is not allowed on chandle", 4, "6.14"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and an
-// operator_assignment written with `=` carries an arbitrary expression. The
-// parser keeps it in Stmt::for_steps.
 TEST(ChandleDataType, ChandleAdditionInForStep_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -432,10 +381,6 @@ TEST(ChandleDataType, ChandleAdditionInForStep_Error) {
                             "operator is not allowed on chandle", 4, "6.14"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion (§16.3) holds a statement in
-// each arm, kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This
-// case and the next cover one arm each.
 TEST(ChandleDataType, ChandleAdditionInAssertionPassStatement_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -462,8 +407,6 @@ TEST(ChandleDataType, ChandleAdditionInAssertionFailStatement_Error) {
                             "operator is not allowed on chandle", 4, "6.14"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second of each Stmt::randcase_items pair.
 TEST(ChandleDataType, ChandleAdditionInRandcaseItem_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -479,10 +422,6 @@ TEST(ChandleDataType, ChandleAdditionInRandcaseItem_Error) {
                             "operator is not allowed on chandle", 5, "6.14"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block (§18.17) holds ordinary
-// procedural statements. The parser keeps them in RsProd::code_stmts, reached
-// through Stmt::rs_productions and through no other member of Stmt.
 TEST(ChandleDataType, ChandleAdditionInRandsequenceCodeBlock_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -500,12 +439,6 @@ TEST(ChandleDataType, ChandleAdditionInRandsequenceCodeBlock_Error) {
                             "operator is not allowed on chandle", 6, "6.14"));
 }
 
-// §6.14 (printed page 111 of IEEE 1800-2023): a chandle is assigned from
-// another chandle, and chandles are returned from functions; §35.5.5 (printed
-// 979) admits chandle as an imported function's result. The result of a call to
-// a function declared `chandle` is therefore a chandle, and `keep = give();` is
-// an assignment between chandles. The check knew a chandle by a variable's name
-// alone, so the call was "not a chandle" and the assignment was refused.
 TEST(ChandleDataType, ChandleAssignedFromAnImportedFunctionResult_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -522,7 +455,6 @@ TEST(ChandleDataType, ChandleAssignedFromAnImportedFunctionResult_Ok) {
                              4, "6.14"));
 }
 
-// §6.14: the same for a native function declared to return a chandle.
 TEST(ChandleDataType, ChandleAssignedFromANativeFunctionResult_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -541,9 +473,6 @@ TEST(ChandleDataType, ChandleAssignedFromANativeFunctionResult_Ok) {
                              6, "6.14"));
 }
 
-// §6.14: and the other direction the same knowledge settles -- a chandle
-// result assigned to a variable of another type is the assignment the
-// subclause forbids, which the call's opacity had let through.
 TEST(ChandleDataType, ImportedFunctionChandleResultAssignedToInt_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -560,9 +489,6 @@ TEST(ChandleDataType, ImportedFunctionChandleResultAssignedToInt_Error) {
                             5, "6.14"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a chandle
-// is kept out of a continuous assignment and an event expression inside one,
-// and a comparison of it with null stays allowed.
 TEST(ChandleDataType, ChandleInsideGenerateBlocksIsRejected) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "chandle c; wire w;", "assign w = c;"},

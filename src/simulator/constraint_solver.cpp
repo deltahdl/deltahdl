@@ -14,12 +14,6 @@
 
 namespace delta {
 
-// 18.4.1: draw a value uniformly distributed over the inclusive range [lo, hi]
-// read in the order a type of the given signedness reads it. An unsigned range
-// is drawn over the patterns themselves, which is how a range whose top has its
-// high bit set is covered whole; a signed one is drawn over the numbers. An
-// empty range yields its lower bound rather than being handed to a distribution
-// that requires lo <= hi.
 int64_t DrawUniformInRange(bool is_signed, int64_t lo, int64_t hi,
                            std::mt19937& rng) {
   if (ValueLess(is_signed, hi, lo)) return lo;
@@ -41,11 +35,6 @@ void RandVariable::BindDomainToDeclaredRange() {
   uint32_t w = width == 0 ? 32 : width;
   if (!is_signed) {
     min_val = 0;
-    // The top of a w-bit unsigned range is 2**w-1. At w == 64 that is 2**64-1,
-    // whose bits are those of -1 in the int64_t holding it: the declared order
-    // reads them back as the maximum they are, so the bound is exact at every
-    // width instead of stopping at the largest positive int64_t and putting the
-    // upper half of the range out of reach.
     max_val = w >= 64 ? static_cast<int64_t>(UINT64_MAX)
                       : static_cast<int64_t>((uint64_t{1} << w) - 1);
     return;
@@ -79,10 +68,6 @@ void RandVariable::CollapseEmptyDomain() {
 
 uint64_t RandVariable::DomainSize() const {
   if (DomainLess(max_val, min_val)) return 0;
-  // The difference of the two patterns is the number of values between them
-  // under either reading of them, so one more is the count. A range spanning
-  // the whole width leaves that count one beyond what 64 bits express, and
-  // saturates.
   uint64_t span =
       static_cast<uint64_t>(max_val) - static_cast<uint64_t>(min_val);
   return span == UINT64_MAX ? UINT64_MAX : span + 1;
@@ -130,11 +115,6 @@ void ConstraintSolver::SetAllRandMode(bool enabled) {
 
 void ConstraintSolver::ApplyInlineRandomList(
     const std::vector<std::string>& names) {
-  // 18.11: the argument list designates the complete set of active random
-  // variables; everything else becomes a state variable. Only the active flag
-  // is touched here — the qualifier (and thus the cyclical mode) is left as it
-  // was declared, so this can neither promote a variable to randc nor demote a
-  // randc variable to noncyclical rand.
   std::unordered_set<std::string> active(names.begin(), names.end());
   for (auto& [name, var] : variables_) {
     var.enabled = active.find(name) != active.end();
@@ -151,9 +131,6 @@ void ConstraintSolver::SetConstraintMode(std::string_view block_name,
   for (auto& block : blocks_) {
     if (block.name != block_name) continue;
     block.enabled = enabled;
-    // 18.5.10: turning a static constraint on or off affects every instance of
-    // the class, so record the change in the shared state the other instances
-    // read from.
     if (block.shared_enabled) *block.shared_enabled = enabled;
   }
 }
@@ -161,8 +138,6 @@ void ConstraintSolver::SetConstraintMode(std::string_view block_name,
 bool ConstraintSolver::GetConstraintMode(std::string_view block_name) const {
   for (const auto& block : blocks_) {
     if (block.name != block_name) continue;
-    // 18.5.10: a static constraint's on/off state is the one shared across all
-    // instances; report that rather than this instance's cached flag.
     return block.shared_enabled ? *block.shared_enabled : block.enabled;
   }
   return false;
@@ -189,11 +164,6 @@ const std::unordered_map<std::string, int64_t>& ConstraintSolver::GetValues()
 
 namespace {
 
-// 18.4.2: draw a randc value from an enum's named constants, cycling through
-// the permutation before repeating. Reject already-drawn values; once the full
-// set has been seen, clear the history and start a fresh permutation. Falls
-// back to the first unseen value (then to a reset to the first constant) if the
-// random draws keep colliding.
 int64_t DrawRandcEnumValue(RandVariable& var,
                            std::unordered_set<int64_t>& history,
                            std::mt19937& rng) {
@@ -219,11 +189,6 @@ int64_t DrawRandcEnumValue(RandVariable& var,
   return var.enum_values.front();
 }
 
-// 18.4.2: draw a randc value from the variable's declared integer range,
-// cycling through the permutation before repeating. Reject already-drawn
-// values; once the full range has been seen, clear the history and start a
-// fresh permutation. Falls back to the first unseen value (then to a reset to
-// the range minimum) if the random draws keep colliding.
 int64_t DrawRandcRangeValue(RandVariable& var,
                             std::unordered_set<int64_t>& history,
                             std::mt19937& rng) {
@@ -241,9 +206,6 @@ int64_t DrawRandcRangeValue(RandVariable& var,
     }
   }
 
-  // Walk the range by offset from its bottom, so the scan covers a range whose
-  // top has its high bit set and steps off the end of the declared type rather
-  // than off the end of the int64_t carrying it.
   for (uint64_t offset = 0; offset < range_size; ++offset) {
     auto v = static_cast<int64_t>(static_cast<uint64_t>(var.min_val) + offset);
     if (history.find(v) == history.end()) {
@@ -259,22 +221,8 @@ int64_t DrawRandcRangeValue(RandVariable& var,
 }  // namespace
 
 int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
-  // 18.4.2: the randc permutation's no-repeat property spans successive
-  // randomize() calls, so the drawn-value history must outlive any single
-  // solve. When shared_randc_state is attached the history lives there — a
-  // caller that rebuilds the solver each call points it at externally owned,
-  // persistent state so the same cycle advances across calls (a nonstatic
-  // variable uses its object's own history; a static variable shares one
-  // history across every instance of the class). When it is null the history
-  // is per-solver, which suffices for repeated solves on one solver object.
-  // Bind the active history once here and advance it below, so the same
-  // draw-and-reject logic serves every case.
   std::unordered_set<int64_t>& history =
       var.shared_randc_state ? *var.shared_randc_state : var.randc_history;
-  // 18.3: a random variable of enum type must take one of the enum's named
-  // constants. The 18.4 exception (an enum member of a packed struct/union)
-  // clears apply_enum_restriction, in which case the named set is ignored and
-  // the value is drawn from the full declared range below.
   if (!var.enum_values.empty() && var.apply_enum_restriction) {
     if (var.qualifier == RandQualifier::kRandc) {
       return DrawRandcEnumValue(var, history, rng_);
@@ -289,11 +237,6 @@ int64_t ConstraintSolver::GenerateRandValue(RandVariable& var) {
 }
 
 double ConstraintSolver::GenerateRandRealValue(RandVariable& var) {
-  // 18.4.1: every value in a random real's range is equally likely, so the
-  // probability of landing in any subrange is proportional only to its width. A
-  // uniform_real_distribution over [real_min, real_max) realizes that flat
-  // density directly. A degenerate or inverted range collapses to the lower
-  // bound rather than invoking the distribution on an empty interval.
   if (!(var.real_min < var.real_max)) return var.real_min;
   std::uniform_real_distribution<double> dist(var.real_min, var.real_max);
   return dist(rng_);
@@ -306,11 +249,6 @@ bool ConstraintSolver::HasEmptyDomain() const {
   return false;
 }
 
-// 18.5.3: the expression a dist distributes has to involve a rand variable. The
-// distribution names the single variable it constrains, so that target must
-// resolve to an active rand variable; a target the solver does not know, or one
-// declared without the rand qualifier, leaves the distribution with no rand
-// variable to act on.
 bool ConstraintSolver::DistLacksRandVariable() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -328,8 +266,6 @@ bool ConstraintSolver::DistLacksRandVariable() const {
 
 namespace {
 
-// 18.5.4: a uniqueness group violates the no-randc rule when any of its known
-// members is declared randc.
 bool UniqueGroupHasRandcMember(
     const ConstraintExpr& c,
     const std::unordered_map<std::string, RandVariable>& variables) {
@@ -343,9 +279,6 @@ bool UniqueGroupHasRandcMember(
   return false;
 }
 
-// 18.5.4: a uniqueness group mixes inequivalent types when any known member
-// differs from the first known member in real-ness or bit width. Members the
-// solver does not know are skipped, mirroring the lenient treatment elsewhere.
 bool UniqueGroupHasInequivalentTypes(
     const ConstraintExpr& c,
     const std::unordered_map<std::string, RandVariable>& variables) {
@@ -366,8 +299,6 @@ bool UniqueGroupHasInequivalentTypes(
 
 }  // namespace
 
-// 18.5.4: a uniqueness constraint's group admits no randc variable. Scan every
-// enabled unique constraint and report a randc member.
 bool ConstraintSolver::HasRandcInUnique() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -379,11 +310,6 @@ bool ConstraintSolver::HasRandcInUnique() const {
   return false;
 }
 
-// 18.5.4: a uniqueness constraint group's members must all have equivalent
-// types. Compare the known members of each enabled unique constraint against
-// the first known member: a difference in real-ness or bit width means the
-// group mixes inequivalent types. Members the solver does not know are left out
-// of the comparison, mirroring the lenient treatment elsewhere in the solver.
 bool ConstraintSolver::UniqueMembersNotEquivalentType() const {
   for (const auto& block : blocks_) {
     if (!block.enabled) continue;
@@ -396,9 +322,6 @@ bool ConstraintSolver::UniqueMembersNotEquivalentType() const {
 }
 
 GuardValue GuardAnd(GuardValue a, GuardValue b) {
-  // Figure 18-3 conjunction: a FALSE subexpression forces FALSE; otherwise an
-  // ERROR subexpression forces ERROR; otherwise a RANDOM subexpression yields
-  // RANDOM; with neither present the result is TRUE.
   if (a == GuardValue::kFalse || b == GuardValue::kFalse)
     return GuardValue::kFalse;
   if (a == GuardValue::kError || b == GuardValue::kError)
@@ -409,9 +332,6 @@ GuardValue GuardAnd(GuardValue a, GuardValue b) {
 }
 
 GuardValue GuardOr(GuardValue a, GuardValue b) {
-  // Figure 18-3 disjunction: a TRUE subexpression forces TRUE; otherwise an
-  // ERROR subexpression forces ERROR; otherwise a RANDOM subexpression yields
-  // RANDOM; with neither present the result is FALSE.
   if (a == GuardValue::kTrue || b == GuardValue::kTrue)
     return GuardValue::kTrue;
   if (a == GuardValue::kError || b == GuardValue::kError)
@@ -422,8 +342,6 @@ GuardValue GuardOr(GuardValue a, GuardValue b) {
 }
 
 GuardValue GuardNot(GuardValue a) {
-  // Figure 18-3 negation: ERROR and RANDOM pass through unchanged; TRUE and
-  // FALSE are swapped.
   switch (a) {
     case GuardValue::kFalse:
       return GuardValue::kTrue;
@@ -438,7 +356,6 @@ GuardValue GuardNot(GuardValue a) {
 }
 
 GuardOutcome GuardFinalOutcome(GuardValue final_value) {
-  // 18.5.12: what the predicate finally evaluates to decides the result.
   switch (final_value) {
     case GuardValue::kTrue:
       return GuardOutcome::kUnconditional;
@@ -455,9 +372,6 @@ GuardOutcome GuardFinalOutcome(GuardValue final_value) {
 GuardValue EvaluateGuard(
     const GuardPredicate& pred,
     const std::unordered_map<std::string, int64_t>& values) {
-  // 18.5.12: recurse through the operators until no subexpression is left
-  // unevaluated. A malformed node (a leaf without a function, a negation or a
-  // missing operand) is treated as an evaluation error.
   switch (pred.op) {
     case GuardPredicate::Op::kLeaf:
       return pred.leaf_fn ? pred.leaf_fn(values) : GuardValue::kError;

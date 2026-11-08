@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §O.1: Annex O, an informative annex, describes a number of scenarios that
-// can be used for IP protection -- three of them, one per subclause from
-// §O.3: a tool vendor's secret key, an IP author's secret key, and digital
-// envelopes.
 TEST(EncryptionFlowGeneral, TheAnnexDescribesThreeScenariosInformatively) {
   EXPECT_EQ(AnnexDescribingProtectionScenarios(), "Annex O");
   EXPECT_TRUE(ProtectionScenariosAreInformative());
@@ -23,10 +19,6 @@ TEST(EncryptionFlowGeneral, TheAnnexDescribesThreeScenariosInformatively) {
   EXPECT_EQ(scenarios[2], ProtectionScenario::kDigitalEnvelope);
 }
 
-// §O.1: the annex shows how the relevant pragmas are used to achieve the
-// desired effect of securely protecting, distributing and decrypting the
-// model. The pragma is the protect pragma of §34.2, and the three effects are
-// the ones the annex names.
 TEST(EncryptionFlowGeneral,
      ThePragmasAchieveProtectionDistributionAndDecryption) {
   EXPECT_EQ(PragmaUsedForProtection(), "protect");
@@ -43,11 +35,6 @@ TEST(EncryptionFlowGeneral,
       effects.end());
 }
 
-// §O.1 with §O.2: the pragmas the annex's scenarios use are the protect
-// pragma's keywords, and the region they protect is a begin-end block; both
-// keywords the annex's overview names are ones §34.4 tabulates, so a source
-// writing them writes the pragma the annex describes and not a pragma of some
-// other name.
 TEST(EncryptionFlowGeneral, TheRelevantPragmasAreTheProtectPragmasKeywords) {
   EXPECT_TRUE(IsProtectPragmaKeyword("begin"));
   EXPECT_TRUE(IsProtectPragmaKeyword("end"));

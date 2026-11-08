@@ -98,9 +98,6 @@ TEST(SpecifyTerminalElaboration, RefPortAsTerminalErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // §25.6 is where the rule keeping a ref port out of a specify block's
-  // terminals is written, so this report names §25.6 rather than the two module
-  // path restrictions of §30.4.1, which mention no ref port.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'r' cannot be used as a terminal in a specify block", 3,
@@ -108,8 +105,6 @@ TEST(SpecifyTerminalElaboration, RefPortAsTerminalErrors) {
 }
 
 TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
-  // C2: the destination must be connected to an output or inout port; a ref
-  // port is neither, so it is rejected on the destination side of the path.
   ElabFixture f;
   ElaborateSrc(
       "module m(input i, ref logic r);\n"
@@ -118,9 +113,6 @@ TEST(SpecifyTerminalElaboration, RefPortAsDestinationErrors) {
       "  endspecify\n"
       "endmodule\n",
       f);
-  // The ref-port prohibition is checked before the direction rule the comment
-  // above describes, so this is what the destination side actually reports, and
-  // it names §25.6, the subclause that sentence is written in.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "ref port 'r' cannot be used as a terminal in a specify block", 3,
@@ -173,9 +165,6 @@ TEST(SpecifyTerminalElaboration, VariableAsSourceErrors) {
                             "30.4.1"));
 }
 
-// §30.4.1: the report that refuses a variable module path source names the
-// subclause stating the rule, that a module path's source must be a net
-// connected to a module input or inout port.
 TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -189,11 +178,6 @@ TEST(SpecifyTerminalElaboration, VariableSourceNames30_4_1) {
       ReportedError(f.diag.Diagnostics(), "must be a net", 3, "30.4.1"));
 }
 
-// §23.2.2.3 (printed page 735): an implicit data type declaration makes a net
-// unless var is written, so a non-ANSI `input a;` -- the way the standard's own
-// specify examples declare their ports -- is a net and a legal path source
-// (§30.4.1). Its data type was left implicit rather than marked a net, and the
-// path was refused as a path from a variable.
 TEST(SpecifyTerminalElaboration, NonAnsiInputWithNoTypeIsANetSource) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -210,8 +194,6 @@ TEST(SpecifyTerminalElaboration, NonAnsiInputWithNoTypeIsANetSource) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2.1 lets a non-ANSI port be declared again in the body, and declared
-// again as a variable it is one, which a path source may not be.
 TEST(SpecifyTerminalElaboration, NonAnsiInputRedeclaredAsAVariable) {
   ElabFixture f;
   ElaborateSrc(

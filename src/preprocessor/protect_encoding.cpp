@@ -13,15 +13,6 @@
 namespace delta {
 namespace {
 
-// Table 34-2, in the order the table lists them: the identifier, whether every
-// implementation provides the scheme behind it, and the published algorithm
-// that identifier stands for.
-//
-// The two marked required are the ones a tool may be handed a block in without
-// having been told anything about the tool that wrote it. The two marked
-// optional are provided here as well, which the table permits and does not
-// require: what it requires of an implementation offering them is that it
-// offer them under these names rather than under names of its own.
 constexpr ProtectEncodingAlgorithm kProtectEncodingAlgorithms[] = {
     {kUuencodeEnctype, true, "IEEE Std 1003.1, the historical uuencode"},
     {kBase64Enctype, true, "IETF RFC 2045, also IEEE Std 1003.1 uuencode -m"},
@@ -45,9 +36,6 @@ std::string_view TrimSpace(std::string_view text) {
   return text.substr(begin, end - begin);
 }
 
-// Advances past a value written in quotes, returning the index just after the
-// quotation mark that closes the one opening at `i`. A quotation mark written
-// behind a backslash is content of the value rather than its end.
 size_t SkipQuotedValue(std::string_view text, size_t i) {
   ++i;
   while (i < text.size()) {
@@ -61,10 +49,6 @@ size_t SkipQuotedValue(std::string_view text, size_t i) {
   return i;
 }
 
-// Advances one position of the list, keeping track of how deeply nested in
-// parentheses the walk is, and stepping over a quoted value whole. A comma
-// inside either belongs to whatever is written there rather than to the list
-// being split.
 size_t ScanSubkeywordChar(std::string_view list, size_t i, size_t* depth) {
   if (list[i] == '"') return SkipQuotedValue(list, i);
   if (list[i] == '(') ++*depth;
@@ -72,9 +56,6 @@ size_t ScanSubkeywordChar(std::string_view list, size_t i, size_t* depth) {
   return i + 1;
 }
 
-// The expressions of the subkeyword list, one per element, as they were
-// written. Splitting on the commas of the list's own level is what keeps a
-// value that happens to hold a comma from being read as two expressions.
 std::vector<std::string_view> SplitSubkeywordList(std::string_view list) {
   std::vector<std::string_view> items;
   size_t start = 0;
@@ -93,8 +74,6 @@ std::vector<std::string_view> SplitSubkeywordList(std::string_view list) {
   return items;
 }
 
-// The count a <number> subkeyword carries. §34.5.9.1 writes both of them as
-// numbers, so text spelled any other way carries no count and is not one.
 bool ParseCount(std::string_view text, size_t* value) {
   if (text.empty()) return false;
   size_t count = 0;
@@ -106,23 +85,13 @@ bool ParseCount(std::string_view text, size_t* value) {
   return true;
 }
 
-// Whether `text` is written as a string. §22.5.1 spells a pragma_value four
-// ways and only one of them is a string, so a value carrying no quotation marks
-// around it is one of the other three however much it looks like the word a
-// producer meant.
 bool IsWrittenAsString(std::string_view text) {
   return text.size() >= 2 && text.front() == '"' && text.back() == '"';
 }
 
-// Applies one expression of the subkeyword list. A name §34.5.9.1 does not
-// define qualifies the value with something this subclause says nothing about,
-// so nothing is taken from it.
 void ApplySubkeyword(std::string_view name, std::string_view text,
                      ProtectEncoding* encoding) {
   if (name == kEnctypeSubkeyword) {
-    // §34.5.9.1 writes the scheme as a string, the way it writes the other two
-    // as numbers, so a bare word standing here names no scheme any more than a
-    // word standing where a count belongs is a count.
     if (IsWrittenAsString(text)) {
       encoding->enctype = std::string(ProtectPragmaValueBody(text));
     }
@@ -137,8 +106,6 @@ void ApplySubkeyword(std::string_view name, std::string_view text,
   }
 }
 
-// Breaks `text` so that no line of it runs past `line_length` characters. A
-// length of none leaves the text on the single line it was written as.
 std::string WrapLines(std::string_view text, size_t line_length) {
   if (line_length == 0 || text.size() <= line_length) return std::string(text);
   std::string wrapped;
@@ -149,8 +116,6 @@ std::string WrapLines(std::string_view text, size_t line_length) {
   return wrapped;
 }
 
-// The same text with the breaks taken back out, for a scheme whose own reading
-// has no place for them.
 std::string WithoutLineBreaks(std::string_view text) {
   std::string joined;
   joined.reserve(text.size());
@@ -188,10 +153,6 @@ bool ProtectEncodingIsAvailable(std::string_view enctype) {
   return IsProtectEncodingAlgorithm(enctype) || enctype == kBlockEnctype;
 }
 
-// The identity transformation writes whatever the data hold, and the two
-// line-oriented schemes break their output into lines by construction. What is
-// left are the two that write a long run of characters drawn from an alphabet
-// holding no line break.
 bool ProtectEncodingFitsOneLine(std::string_view enctype) {
   return enctype == kBase64Enctype || enctype == kBlockEnctype;
 }
@@ -202,17 +163,6 @@ ProtectEncoding DefaultProtectEncoding() {
   return encoding;
 }
 
-// The parentheses are stepped over rather than required, because the same list
-// reaches here both as the pragma_value a directive wrote and as the list
-// inside it, and the two describe one encoding.
-//
-// The scheme is what the whole value hangs on. §34.5.9.1 writes the other two
-// subkeywords inside brackets and this one outside them, so a list that named
-// no scheme is not the value this keyword is defined with, and a length or a
-// count written in such a list qualifies nothing: they say how a block was
-// written under a scheme, and there is no scheme for them to say it of. Taking
-// them anyway would let a text that stated no encoding at all be measured
-// against a count it never wrote against a scheme.
 ProtectEncoding ParseProtectEncoding(std::string_view value) {
   ProtectEncoding encoding;
   std::string_view list = TrimSpace(value);
@@ -229,10 +179,6 @@ ProtectEncoding ParseProtectEncoding(std::string_view value) {
   return encoding;
 }
 
-// The enctype is written whatever the descriptor holds, it being the one
-// subkeyword §34.5.9.1 requires; the other two are written only where the
-// descriptor carries them, an omitted optional being what says a text stated
-// no length and no count rather than stated them as zero.
 std::string ProtectEncodingValue(const ProtectEncoding& encoding) {
   std::string text = "(";
   text.append(kEnctypeSubkeyword).append("=\"").append(encoding.enctype);
@@ -256,10 +202,6 @@ std::string ProtectEncodingDirective(const ProtectEncoding& encoding) {
   return text;
 }
 
-// The count replaces whatever the descriptor arrived carrying. What a writer
-// holds is the scheme in force for the envelope; the size belongs to the one
-// value about to be written under it, so it is settled here rather than by the
-// caller keeping a descriptor per value.
 std::string ProtectEncodedValueDirective(const ProtectEncoding& encoding,
                                          size_t bytes) {
   ProtectEncoding described = encoding;
@@ -268,14 +210,8 @@ std::string ProtectEncodedValueDirective(const ProtectEncoding& encoding,
   return ProtectEncodingDirective(described);
 }
 
-// RFC 2045 §6.8: the longest line of the base64 writing, the length it is
-// broken at where the encoding expression states none.
 constexpr size_t kBase64MaxLine = 76;
 
-// The identity transformation is the one scheme a line length asks nothing of.
-// Table 34-2 has it perform no encoding at all, so there is no encoded text
-// standing beside the data to be broken, and a break put in would be a byte
-// the data never held.
 std::string EncodeProtectBlock(std::string_view bytes,
                                const ProtectEncoding& encoding) {
   if (encoding.enctype == kRawEnctype) return std::string(bytes);
@@ -305,12 +241,6 @@ std::string EncodeProtectValue(std::string_view bytes,
   return EncodeProtectBlock(bytes, encoding);
 }
 
-// The two line-oriented schemes are handed the text as it stands, a line
-// meaning something to each of them, and the identity transformation is handed
-// it as it stands because there every byte is data. base64 is too, its reading
-// stepping over whatever stands outside its alphabet. The tool's own scheme
-// writes one long run of characters, and there a break was put in by the
-// writing rather than by the data.
 bool DecodeProtectBlock(std::string_view text, std::string_view enctype,
                         std::string* bytes) {
   if (enctype == kRawEnctype) {
@@ -330,10 +260,6 @@ bool DecodeProtectBlock(std::string_view text, std::string_view enctype,
   return false;
 }
 
-// The scheme is asked about before the text is, because a scheme nothing here
-// provides makes the question about the text unanswerable rather than answers
-// it: there is no writing to measure the characters against, so nothing can be
-// concluded about whether they came out of one.
 ProtectEncodedValueRead ReadProtectEncodedValue(std::string_view text,
                                                 const ProtectEncoding& encoding,
                                                 std::string* bytes) {

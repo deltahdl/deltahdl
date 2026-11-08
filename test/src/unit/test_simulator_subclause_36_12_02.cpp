@@ -2,16 +2,6 @@
 
 #include "simulator/vpi_globals.h"
 
-// §36.12.2: to ease older applications onto the current VPI, a tool must be
-// able to emulate the older behaviors that conflict with this standard, so that
-// an application relying on them runs unchanged, and it must provide the two
-// mechanisms of §36.12.2.1 and §36.12.2.2 for it, usable together.
-//
-// This translation unit is such an older application: it selects a
-// compatibility version before the VPI headers, exactly as §36.12.2.1's
-// mechanism prescribes, and then calls the VPI as it always did. The selection
-// renames every call, so the capability is provided only if those names resolve
-// - and only if what they do is the behavior of the version selected.
 #define VPI_COMPATIBILITY_VERSION_1364v2001 1
 
 #include <vector>
@@ -39,10 +29,6 @@ class VpiCompatibilityEmulation : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// §36.12.1 Table 36-10 row 5 is N for IEEE Std 1364-2001: no IEEE Std 1364
-// edition let a vpiVariables iteration reach vpiReg or vpiRegArray objects. An
-// application built against that standard is handed the iteration it expects,
-// without the two kinds this standard added to it.
 TEST_F(VpiCompatibilityEmulation, AVariablesIterationExcludesRegsAndRegArrays) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -61,9 +47,6 @@ TEST_F(VpiCompatibilityEmulation, AVariablesIterationExcludesRegsAndRegArrays) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &int_var);
 }
 
-// Row 6 is N for the same standard: a vpiReg iteration on an array retrieves
-// the reg elements and nothing else, IEEE Std 1364-2001 not providing for
-// elements of other kinds.
 TEST_F(VpiCompatibilityEmulation, ARegIterationOnAnArrayRetrievesOnlyRegs) {
   VpiObject reg_word;
   reg_word.type = vpiReg;
@@ -80,9 +63,6 @@ TEST_F(VpiCompatibilityEmulation, ARegIterationOnAnArrayRetrievesOnlyRegs) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &reg_word);
 }
 
-// Row 7 is N for the same standard: in IEEE Std 1364-2001 and 1364-2005 a
-// vpiRegArray iteration reached arrays of vpiReg objects alone, so an array of
-// some other variable is not among them.
 TEST_F(VpiCompatibilityEmulation, ARegArrayIterationReachesOnlyArraysOfRegs) {
   VpiObject reg_word;
   reg_word.type = vpiReg;
@@ -106,8 +86,6 @@ TEST_F(VpiCompatibilityEmulation, ARegArrayIterationReachesOnlyArraysOfRegs) {
   EXPECT_EQ(VpiObjectOf(seen[0]), &reg_array);
 }
 
-// An iteration the emulation empties reaches no object, which §38.23 reports as
-// no iterator rather than one that scans to nothing on its first call.
 TEST_F(VpiCompatibilityEmulation, AnIterationLeftWithNothingIsNoIterator) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -119,9 +97,6 @@ TEST_F(VpiCompatibilityEmulation, AnIterationLeftWithNothingIsNoIterator) {
   EXPECT_EQ(vpi_iterate(vpiVariables, VpiHandleOf(&scope)), nullptr);
 }
 
-// The rest of the interface is the current one. The mechanism renames every
-// entry point, so each of the others has to resolve too, and what they do is
-// unchanged - a mode selection emulates the behaviors that differ and no other.
 TEST_F(VpiCompatibilityEmulation, TheOtherEntryPointsResolveAndAreUnchanged) {
   VpiObject mod;
   mod.type = vpiModule;

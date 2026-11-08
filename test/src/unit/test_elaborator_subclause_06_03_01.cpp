@@ -60,9 +60,6 @@ TEST(LogicValuesElab, UserTypeBuiltFromLogicInheritsFourState) {
 }
 
 TEST(LogicValuesElab, TwoStateTypeStoresOnlyZeroOrOne) {
-  // §6.3.1: some data types are 2-state and store only 0 or 1 in each bit,
-  // in contrast to the 4-state logic type. A 2-state declaration such as
-  // bit must therefore be classified as not 4-state by the elaborator.
   ElabFixture f;
   auto* design = Elaborate(
       "module t;\n"

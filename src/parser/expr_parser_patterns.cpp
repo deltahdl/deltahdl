@@ -21,11 +21,6 @@ Expr* Parser::ParseTypeRefExpr() {
 
   auto saved = lexer_.SavePos();
   auto dtype = ParseDataType();
-  // §6.24.1: a type keyword, a signing or a type name with a cast's apostrophe
-  // after it opens a cast, `type(byte'(x))` or `type(signed'(v))`, which is
-  // the expression the reference names rather than a data type. §8.10 and
-  // §8.23: a class's name and `::` with a parenthesis after the name it
-  // scopes call a static method, `type(C::f())`, an expression likewise.
   bool calls_scoped_method = dtype.kind == DataTypeKind::kNamed &&
                              !dtype.scope_name.empty() &&
                              Check(TokenKind::kLParen);
@@ -36,10 +31,6 @@ Expr* Parser::ParseTypeRefExpr() {
   }
   if (dtype.kind != DataTypeKind::kImplicit) {
     ref->text = dtype.type_name;
-    // §8.23 lists the type operator among the contexts in which a class scope
-    // resolution may prefix a type name, so `type(C::T)` names the typedef T
-    // of class C rather than a T of the enclosing scope. The DataType holding
-    // that prefix dies with this call, so carry it onto the expression.
     ref->scope_prefix = dtype.scope_name;
     ref->type_value = arena_.Create<DataType>(dtype);
   } else {
@@ -86,8 +77,6 @@ void Parser::ParseInsideRangeList(std::vector<Expr*>& out) {
 
 Expr* Parser::ParseInsideValueRange() {
   if (!Check(TokenKind::kLBracket)) return ParseExpr();
-  // §11.4.13 writes an open_range_list element as the bracketed pair itself, so
-  // the range begins at the bracket rather than at either bound.
   SourceLoc loc = CurrentLoc();
   Consume();
   auto* lo = ParseExpr();
@@ -111,11 +100,6 @@ Expr* Parser::ParseInsideValueRange() {
   return range;
 }
 
-// §10.9: the keys Syntax 10-5 does not write as an expression --
-// `assignment_pattern_key ::= simple_type | default`, where simple_type covers
-// the integer and real type keywords. Every other key the syntax admits is a
-// constant_expression or a member_identifier, both of which read as
-// expressions; these two do not, so they are recognized by their keyword.
 static bool IsAssignmentPatternKeyword(TokenKind k) {
   switch (k) {
     case TokenKind::kKwDefault:
@@ -145,8 +129,6 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   rep->repeat_count = count;
   rep->is_pattern_replication = true;
   rep->range.start = loc;
-  // A replication is an assignment pattern's form alone, and its members are
-  // expressions (A.6.7.1), so none of them is a pattern, even within one.
   int depth = std::exchange(pattern_depth_, 0);
   rep->elements.push_back(ParseExpr());
   while (Match(TokenKind::kComma)) {
@@ -157,11 +139,6 @@ Expr* Parser::ParsePatternReplication(Expr* count, SourceLoc loc) {
   return rep;
 }
 
-// A.6.7.1: the two patterns written with a leading period. The one followed
-// by a name, `. variable_identifier`, declares a pattern identifier, marked
-// for the elaborator's uniqueness check, and `.*` is the wildcard. Neither is
-// an expression, so one read where no pattern is open (pattern_depth_) is
-// reported, and built all the same so that the expression around it reads on.
 Expr* Parser::ParseDotPattern() {
   auto loc = CurrentLoc();
   if (pattern_depth_ == 0) {
@@ -179,12 +156,6 @@ Expr* Parser::ParseDotPattern() {
   return id;
 }
 
-// §10.9: a key written as one of the two keywords Syntax 10-5 gives for
-// `assignment_pattern_key`. Neither is something an expression parse can read,
-// so they are taken here, and only when a colon follows -- a keyword standing
-// anywhere else in a pattern is not a key and is left where it was found. The
-// colon itself is left for the caller to consume, so the two ways of writing a
-// key end at the same place. Returns null when no such key stands here.
 Expr* Parser::ParsePatternKeyword() {
   auto tok = CurrentToken();
   if (!IsAssignmentPatternKeyword(tok.kind)) return nullptr;
@@ -201,21 +172,6 @@ Expr* Parser::ParsePatternKeyword() {
   return key;
 }
 
-// §10.9: reads one element of an assignment pattern. Syntax 10-5 offers a
-// keyed form and a positional one,
-//
-//   assignment_pattern ::= ' { expression { , expression } }
-//                        | ' { array_pattern_key : expression { ... } }
-//
-// and what tells them apart is the colon that follows a key. A key is a
-// constant_expression, `N-1` as legal a one as `3`, so the deciding colon may
-// stand any distance into the element. The element is therefore read as an
-// expression first, and a colon behind it is what turns what was read into the
-// key of the value that follows. Reading a fixed number of tokens instead can
-// only recognize the keys it was written to recognize: reading exactly one left
-// every key of more than one token unparsed, and building a substitute node
-// from that token turned a string literal into an identifier bearing the
-// literal's text.
 void Parser::ParsePatternElement(Expr* pat, bool& named) {
   if (Check(TokenKind::kDot)) {
     pat->elements.push_back(ParseDotPattern());
@@ -244,9 +200,6 @@ Expr* Parser::ParseAssignmentPattern() {
   pat->kind = ExprKind::kAssignmentPattern;
   pat->range.start = loc;
 
-  // §10.9: every alternative of Syntax 10-5 writes at least one expression
-  // between `'{` and `}`. An empty queue or dynamic array is written `{}`, the
-  // empty unpacked array concatenation of §10.10.
   if (Check(TokenKind::kRBrace)) {
     diag_.Error(CurrentLoc(),
                 "assignment pattern needs at least one expression",
@@ -270,17 +223,12 @@ Expr* Parser::ParseAssignmentPattern() {
     bool was_named = named;
     size_t keys_before = pat->pattern_keys.size();
     ParsePatternElement(pat, named);
-    // §10.9: Syntax 10-5 gives the keyed form and the positional one as
-    // alternatives, so a pattern that has begun writing keys writes one for
-    // every element from there on.
     if (was_named && pat->pattern_keys.size() == keys_before) {
       diag_.Error(CurrentLoc(),
                   "assignment pattern element after a keyed element needs a "
                   "key of its own",
                   Subclause("10.9"));
     }
-    // The other way round breaks the same rule, and the keys would no longer
-    // line up with the elements every consumer pairs them with by index.
     if (!was_named && named) {
       diag_.Error(CurrentLoc(),
                   "a keyed assignment pattern element cannot follow a "

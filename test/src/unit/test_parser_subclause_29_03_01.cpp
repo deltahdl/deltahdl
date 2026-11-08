@@ -62,9 +62,6 @@ TEST(UdpDeclGrammar, NonAnsiWithPortDecls) {
   EXPECT_EQ(udp->input_names[0], "in");
 }
 
-// §29.3: a UDP definition is terminated by the endprimitive keyword, so a
-// definition that ends after endtable is incomplete. The annex A.5.1 file
-// carries the same requirement stated as the udp_declaration production.
 TEST(UdpDeclGrammar, UdpDefinitionWithoutEndprimitiveIsError) {
   auto r = Parse(
       "primitive inv(output y, input a);\n"
@@ -72,8 +69,6 @@ TEST(UdpDeclGrammar, UdpDefinitionWithoutEndprimitiveIsError) {
       "    0 : 1;\n"
       "    1 : 0;\n"
       "  endtable\n");
-  // Parser::ParseUdpDecl demands endprimitive under §29.3; the source runs out
-  // first, so the report stands on line 6, past the last written line.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endprimitive', got EOF", 6, "29.3"));
 }
@@ -100,9 +95,6 @@ TEST(UdpDeclGrammar, UdpWithNoInputPortsRejected) {
 }
 
 TEST(UdpDeclGrammar, UdpAnsiHeaderWithNoInputPortRejected) {
-  // §29.3.1: a UDP must have at least one input port. This exercises the
-  // requirement in the ANSI (port-declaration) header form, where the output
-  // is declared inline and no input port follows it.
   auto r = Parse(
       "primitive p(output q);\n"
       "  table : 0; endtable\n"
@@ -119,18 +111,10 @@ TEST(UdpDeclGrammar, UdpWithDuplicateOutputsRejected) {
       "  input c;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  // Parser::ParseUdpOutputDecl reports the second output declaration where it
-  // stands, on line 3.
   EXPECT_TRUE(ReportedError(r.diags, "UDP shall have exactly one output port",
                             3, "29.3.1"));
 }
 
-// §29.3.1: a UDP has many input ports and just one output port. The header is
-// A.5.2's `udp_declaration_port_list`, whose entries are port declarations, so
-// a second `output` is a second output declaration rather than a port name gone
-// missing. The header is written over three lines because the report's line is
-// what says which `output` was named: on one line a report about the first
-// satisfies the assertion too.
 TEST(UdpDeclGrammar, UdpDuplicateOutputInAnsiHeaderRejected) {
   auto r = Parse(
       "primitive p(output a,\n"
@@ -165,9 +149,6 @@ TEST(UdpDeclGrammar, UdpInoutPortInNonAnsiDeclRejected) {
 }
 
 TEST(UdpDeclGrammar, UdpInoutAsLeadingPortRejected) {
-  // §29.3.1: inout is barred regardless of position in the port list. Here the
-  // inout appears as the very first port, before the header disambiguates into
-  // its ANSI or non-ANSI form, so a distinct production path guards the rule.
   auto r = Parse(
       "primitive p(inout io, output o, input a);\n"
       "  table 0 : 0; endtable\n"
@@ -232,18 +213,11 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInNonAnsiPortListRejected) {
       "  output q;\n"
       "  table 0 : 0; endtable\n"
       "endprimitive\n");
-  // The report stands on the offending port-list entry, which is on line 1.
   EXPECT_TRUE(ReportedError(
       r.diags, "a UDP's output has to lead its port list, ahead of every input",
       1, "29.3.1"));
 }
 
-// §29.3.1: the output port comes first in the port list. A header beginning
-// `input` holds port declarations, so it is A.5.2's `udp_declaration_port_list`
-// with its entries in the wrong order rather than a `udp_port_list` whose first
-// name is missing. The report stands at the misplaced port, on a line of its
-// own so that the assertion cannot be satisfied by a report about the output
-// declaration below it.
 TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
   auto r = Parse(
       "primitive p(input a,\n"
@@ -255,10 +229,6 @@ TEST(UdpDeclGrammar, UdpOutputNotFirstInAnsiHeaderRejected) {
       1, "29.3.1"));
 }
 
-// The same header read for what it leaves behind. Reading it as A.5.2's
-// `udp_port_list` put the `input` keyword's own spelling where the output port
-// belongs and the `output` keyword's among the inputs, so the ports the user
-// declared are what says the header was read as the declarations it is.
 TEST(UdpDeclGrammar,
      UdpAnsiHeaderWithOutputSecondStillReadsItsPortsAsDeclarations) {
   auto r = Parse(
@@ -277,9 +247,6 @@ TEST(UdpDeclGrammar,
   EXPECT_EQ(udp->input_names[0], "a");
 }
 
-// §29.3.1's one-output rule holds over `extern udp_ansi_declaration` as much as
-// over the full declaration. A.5.1 gives that form no `udp_body`, so the header
-// is the only place the rule can be reported.
 TEST(UdpDeclGrammar, ExternUdpDuplicateOutputRejected) {
   auto r = Parse(
       "extern primitive p(output a,\n"
@@ -288,9 +255,6 @@ TEST(UdpDeclGrammar, ExternUdpDuplicateOutputRejected) {
                             2, "29.3.1"));
 }
 
-// The output-first rule for the same prototype form. With no `udp_body` there
-// are no separate port declarations for ReconcileUdpNonAnsiPortList to compare
-// the list against, so nothing else in the source can name this rule.
 TEST(UdpDeclGrammar, ExternUdpOutputNotFirstRejected) {
   auto r = Parse(
       "extern primitive p(input a,\n"
@@ -304,16 +268,10 @@ TEST(UdpDeclGrammar, UdpHeaderWithoutStateTableRejected) {
   auto r = Parse(
       "primitive p(output o, input a);\n"
       "endprimitive\n");
-  // §29.3.4 owns the udp_body table, so Parser::ParseUdpTable files the
-  // missing `table` keyword there rather than under §29.3.1.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'table', got 'endprimitive'", 2,
                             "29.3.4"));
 }
 
-// §29.3 Syntax 29-1 opens every udp_input_declaration with the keyword input,
-// so a name straight after the output declaration is no input at all. The
-// parser took a missing input keyword for an optional one and read `a` here as
-// an input without a report.
 TEST(UdpDeclGrammar, AnsiFirstInputWithoutTheInputKeywordRejected) {
   auto r = Parse(
       "primitive p1(output q, a);\n"
@@ -327,9 +285,6 @@ TEST(UdpDeclGrammar, AnsiFirstInputWithoutTheInputKeywordRejected) {
       1, "29.3"));
 }
 
-// The names after the first in one udp_input_declaration's
-// list_of_udp_port_identifiers carry no keyword of their own, so `b` continues
-// `input a` and the header is the one the check above leaves alone.
 TEST(UdpDeclGrammar, AnsiInputListContinuesWithoutTheKeyword) {
   auto r = Parse(
       "primitive p2(output q, input a, b);\n"

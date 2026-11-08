@@ -114,13 +114,6 @@ TEST(NetAliasingSimulation, AliasDoesNotAffectOtherNetBehavior) {
   EXPECT_EQ(vc->value.ToUint64(), 0u);
 }
 
-// §10.11 in an instantiated module: an alias statement makes its nets one
-// physical net, and §23.9 resolves the bare names it writes in the module
-// that declares them, so each instance of M has its own a and b joined. The
-// lowerer registered a top's alias alone; an instance's was never lowered,
-// so m1.b and m2.b were created under their instance prefixes and left
-// undriven, both reading z, which ToUint64 collapses to 0. Each instance's
-// b now reads what its own a is driven to: m1.b 4'b1010 and m2.b 4'b0101.
 TEST(NetAliasingSimulation, EachInstanceAliasBindsItsOwnNets) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -150,9 +143,6 @@ TEST(NetAliasingSimulation, EachInstanceAliasBindsItsOwnNets) {
   EXPECT_EQ(b2->value.ToUint64(), 0x5u);
 }
 
-// §23.9: the alias M writes names M's own nets, so the top's like-named a
-// and b, which no alias joins, stay two nets. The top's b is undriven and
-// reads z, collapsed to 0, while m.b reads the 1 m.a is driven to.
 TEST(NetAliasingSimulation, ChildAliasLeavesTheTopsLikeNamedNetsApart) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -177,10 +167,6 @@ TEST(NetAliasingSimulation, ChildAliasLeavesTheTopsLikeNamedNetsApart) {
   EXPECT_EQ(child_b->value.ToUint64(), 1u);
 }
 
-// §10.11's byte_swap example: an alias operand may be a concatenation of
-// part-selects, and the bits the two sides list are joined in order, so B is
-// the byte-swapped A. Joined whole net to whole net, the concatenation named
-// no net and B was left at z.
 TEST(NetAliasingSimulation, ByteSwapAliasOfPartSelects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -194,9 +180,6 @@ TEST(NetAliasingSimulation, ByteSwapAliasOfPartSelects) {
   EXPECT_EQ(out, "12345678 78563412\n");
 }
 
-// The join carries a value whichever side is driven: driving the whole net on
-// the right reaches the nets the concatenation on the left lists, and a later
-// change of it reaches them again.
 TEST(NetAliasingSimulation, PartSelectAliasCarriesTheOtherWay) {
   SimFixture f;
   std::string out = RunCapture(
@@ -213,10 +196,6 @@ TEST(NetAliasingSimulation, PartSelectAliasCarriesTheOtherWay) {
   EXPECT_EQ(out, "ab cd\n01 02\n");
 }
 
-// §10.11: the effects of several alias statements naming the same nets are
-// cumulative, so two statements sharing b join a, b and c into one net,
-// whichever order they name them in. Each statement pointed its nets at its
-// own first net, and the second took b away from a.
 TEST(NetAliasingSimulation, TwoStatementsSharingANetJoinAllThree) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -232,10 +211,6 @@ TEST(NetAliasingSimulation, TwoStatementsSharingANetJoinAllThree) {
   ExpectThreeNetsAllEqual(f, 1);
 }
 
-// §10.11 with §27.5: an alias in a generate block names the block's own nets
-// by their simple names, and a net the block does not declare by the name the
-// enclosing module gives it. Looked up under the module's names alone, the
-// block's nets were not found and no alias was made.
 TEST(NetAliasingSimulation, AnAliasInAGenerateBlockJoinsTheBlocksNets) {
   const char* src =
       "module m;\n"
@@ -257,10 +232,6 @@ TEST(NetAliasingSimulation, AnAliasInAGenerateBlockJoinsTheBlocksNets) {
   EXPECT_EQ(RunAndGet(src, "r2"), 1u);
 }
 
-// §10.11 with Annex A.8.5: an alias operand may be a positional assignment
-// pattern of nets, typed or not, whose items list their bits in order as a
-// concatenation's do, so a shares w[7:4] and b w[3:0], and c and d share v the
-// same way. A pattern operand was dropped, and no bit was aliased.
 TEST(NetAliasingSimulation, APatternOperandJoinsItsItemsBitsInOrder) {
   SimFixture f;
   std::string out = RunCapture(

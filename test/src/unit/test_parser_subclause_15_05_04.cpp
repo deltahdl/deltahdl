@@ -30,10 +30,6 @@ TEST(WaitOrderParser, WaitOrderBasic) {
   }
 }
 
-// Syntax 15-2's operand list is `hierarchical_identifier { ,
-// hierarchical_identifier }`: the trailing comma group may repeat zero times,
-// so a single operand is the minimal legal form. Exercise that base case at the
-// parse stage.
 TEST(WaitOrderParser, WaitOrderSingleEvent) {
   auto r = Parse(
       "module m;\n"
@@ -64,9 +60,6 @@ TEST(WaitOrderParser, WaitOrderTwoEvents) {
   ASSERT_EQ(stmt->wait_order_events.size(), 2u);
 }
 
-// Syntax 15-2 names each operand a hierarchical_identifier, so a dotted
-// (hierarchical) name is an admitted operand form, not just a bare identifier.
-// The operand should parse into a member-access expression in the event list.
 TEST(WaitOrderParser, WaitOrderHierarchicalOperand) {
   auto r = Parse(
       "module m;\n"
@@ -115,10 +108,6 @@ TEST(WaitOrderParser, WaitOrderWithElse) {
   EXPECT_NE(stmt->else_branch, nullptr);
 }
 
-// Syntax 15-2 requires at least one hierarchical_identifier inside the
-// parentheses: `wait_order ( hierarchical_identifier { ,
-// hierarchical_identifier } )`. An empty operand list has no identifier to
-// satisfy the first term, so the parser must reject it.
 TEST(WaitOrderParser, WaitOrderEmptyOperandListRejected) {
   auto r = Parse(
       "module m;\n"
@@ -126,8 +115,6 @@ TEST(WaitOrderParser, WaitOrderEmptyOperandListRejected) {
       "    wait_order();\n"
       "  end\n"
       "endmodule\n");
-  // §11.2 owns the report: the missing first operand is read as a missing
-  // expression, and §15.5.4's own report is the ')' the parser then wants.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 

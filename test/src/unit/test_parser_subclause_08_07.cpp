@@ -155,11 +155,6 @@ TEST(ClassConstructorParsing, DeclarationClassNewNoArgs) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.2.4 spells class_new `[ class_scope ] new [ ( list_of_arguments ) ]`, and
-// A.8.2 gives list_of_arguments a form that is named from its first element
-// and a form that is ordered and then named. The three tests below read a
-// `new` call of each form, and the fourth one whose named argument carries no
-// value, which A.8.2 allows as `. identifier ( )`.
 TEST(ClassConstructorParsing, NewCallNamedFromTheFirstArgument) {
   auto r = Parse(
       "module m;\n"
@@ -229,10 +224,6 @@ TEST(ClassConstructorParsing, DeclarationNewCallNamedArguments) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.7 (printed page 184) defines `new` as a function with no return type, and
-// A.1.9's class_constructor_declaration and class_constructor_prototype write
-// none between `function` and `new`. A type written there was read as the
-// constructor's return type and kept (#7577).
 TEST(ClassConstructorParsing, ConstructorWithAReturnTypeIsError) {
   auto r = Parse(
       "class C;\n"
@@ -258,8 +249,6 @@ TEST(ClassConstructorParsing, ConstructorWithAReturnTypeIsError) {
   EXPECT_EQ(ctor->return_type.kind, DataTypeKind::kImplicit);
 }
 
-// A class scope before `new` is no return type, and a method of the class
-// returning the class's own type is no constructor.
 TEST(ClassConstructorParsing, ConstructorWithoutAReturnTypeIsAccepted) {
   auto r = Parse(
       "class C;\n"

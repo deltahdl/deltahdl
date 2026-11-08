@@ -246,9 +246,6 @@ TEST(JumpStatementElaboration, ReturnInsideTaskOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §5.9 makes a string literal in an assignment an unsigned integer constant,
-// eight bits a character, so an integral or a real return type takes it as it
-// takes any integral constant.
 TEST(JumpStatementElaboration, ReturnStringLiteralFromNumericFunctionsOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -268,7 +265,6 @@ TEST(JumpStatementElaboration, ReturnStringLiteralFromNumericFunctionsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An integral constant is still no class handle (§8.4).
 TEST(JumpStatementElaboration, ReturnStringLiteralFromClassFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -299,8 +295,6 @@ TEST(JumpStatementElaboration, ReturnIntegerLiteralFromIntFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Claim 8, string operand type in the accepting position: a string-returning
-// function may return a string literal.
 TEST(JumpStatementElaboration, ReturnStringLiteralFromStringFunctionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -314,8 +308,6 @@ TEST(JumpStatementElaboration, ReturnStringLiteralFromStringFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Claim 8, real operand type in the accepting position: a real-returning
-// function may return a real literal.
 TEST(JumpStatementElaboration, ReturnRealLiteralFromRealFunctionOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -329,8 +321,6 @@ TEST(JumpStatementElaboration, ReturnRealLiteralFromRealFunctionOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Claim 8, negative form for a non-integral pairing: a real literal is not
-// assignment-compatible with a string return type, so the return is rejected.
 TEST(JumpStatementElaboration, ReturnRealLiteralFromStringFunctionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -363,24 +353,6 @@ TEST(JumpStatementElaboration, BreakInsideForeachOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.6 "Aborting productions—break and return" gives break and return a
-// meaning inside a randsequence production code block that §12.8 does not:
-// break jumps out of the randsequence block and return stops generating the
-// current production. Neither needs the enclosing loop or the enclosing
-// subroutine §12.8 requires, so the nine cases below are §12.8 cases: what they
-// observe is the two §12.8 reports, withheld. CheckBreakScope and CheckJumpLeaf
-// in src/elaborator/elaborator_validate_jump_statements.cpp emit them, and
-// JumpScope::in_production_code_block is the term that withholds them.
-//
-// A.6.12 reaches an rs_code_block from two places in an rs_rule -- an rs_prod
-// may be one, whose statements the parser keeps in RsProd::code_stmts, and a
-// weight_specification may be followed by one, whose statements go in
-// RsRule::weight_code -- so each gets a case of its own.
-
-// §18.17.6's own example: the break in the SETUP production's code block has
-// no enclosing loop, and the clause makes it leave the randsequence block
-// rather than break a loop, so §12.8's "break statement is not inside a loop"
-// is not the rule that governs it.
 TEST(JumpStatementElaboration, BreakInARandsequenceProductionCodeBlockOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -401,10 +373,6 @@ TEST(JumpStatementElaboration, BreakInARandsequenceProductionCodeBlockOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The second rs_code_block A.6.12's rs_rule admits, after the weight. It is a
-// separate statement list under Stmt::rs_productions, so the case above does
-// not answer for it: the production `a` below has an empty code block, which
-// leaves the weight block as the only place the break can stand.
 TEST(JumpStatementElaboration, BreakInARandsequenceWeightCodeBlockOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -422,10 +390,6 @@ TEST(JumpStatementElaboration, BreakInARandsequenceWeightCodeBlockOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.6: a return in a production code block stops generating the current
-// production, which is a meaning it has with no subroutine in sight, so §12.8's
-// "return statement is only allowed inside a subroutine" is not the rule that
-// governs it. The randsequence here stands in an initial block.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceProductionCodeBlockOutsideASubroutineOk) {
   ElabFixture f;
@@ -443,11 +407,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same return written where a subroutine does enclose it. §18.17.6 still
-// makes it abort the production rather than the function, so the acceptance
-// here is not the function's doing, and a fix that read the enclosing
-// subroutine instead of the production code block would pass this case and
-// fail the one above.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceProductionCodeBlockInAVoidFunctionOk) {
   ElabFixture f;
@@ -464,15 +423,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.8 requires a return in a value-returning function to carry an expression
-// of the right type, and CheckValueReturningFuncReturn in
-// src/elaborator/elaborator_validate_jump_statements.cpp reports the bare
-// return that breaks it. §18.17.6 makes the bare return below abort the
-// production rather than the function, so it is not the function's return and
-// that report is not about it. This is the case that pins the one exclusion
-// CheckValueReturningFuncReturn makes: it takes its child links from
-// ForEachChildStmt and stops at a randsequence statement, whose
-// Stmt::rs_productions ForEachChildStmt would otherwise descend.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceProductionCodeBlockInAValueReturningFunctionOk) {
   ElabFixture f;
@@ -490,13 +440,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §18.17.6 names break and return and says nothing about continue, so a
-// continue in a production code block keeps the §12.8 rule confining it to a
-// loop, which CheckContinueScope in
-// src/elaborator/elaborator_validate_jump_statements.cpp enforces with no
-// §18.17.6 term of its own. Without this case, an implementation that exempted
-// every jump statement written inside a randsequence would pass all the cases
-// above.
 TEST(JumpStatementElaboration,
      ContinueInARandsequenceProductionCodeBlockIsError) {
   ElabFixture f;
@@ -515,11 +458,6 @@ TEST(JumpStatementElaboration,
                             "12.8"));
 }
 
-// §18.17.6's third sentence: a break inside a loop statement behaves as §12.8
-// defines, ending the smallest enclosing loop. The for loop here is written
-// inside the production code block, so the break binds to it, and the
-// enclosing-loop count has to survive the production term being set rather than
-// be replaced by it.
 TEST(JumpStatementElaboration,
      BreakInAForLoopInARandsequenceProductionCodeBlockOk) {
   ElabFixture f;
@@ -538,11 +476,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The continue that the case above's break does not answer for: §18.17.6
-// leaves continue to §12.8 everywhere, so the loop written inside the
-// production code block is what makes this one legal. Paired with
-// ContinueInARandsequenceProductionCodeBlockIsError it says that the loop, and
-// not the production, is what continue is counted against.
 TEST(JumpStatementElaboration,
      ContinueInAForLoopInARandsequenceProductionCodeBlockOk) {
   ElabFixture f;
@@ -561,18 +494,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A break in a production code block whose only enclosing loop is outside the
-// randsequence block. It binds to the randsequence block, not to that loop:
-// §18.17.6 states without qualification that a break executed in a production
-// code block jumps out of the randsequence block, and its sentence on a break
-// inside a loop statement is about a loop the code block itself writes, which
-// this source does not. So the break leaves the randsequence and execution
-// resumes after endsequence, which here is the end of the for loop's body and
-// therefore its next iteration. The elaborator accepts the source on either
-// reading, one because §18.17.6 exempts the break and the other because §12.8
-// finds it a loop; the reading is what the randsequence executor has to
-// implement, and this case fixes which reading the comment in CheckBreakScope
-// records.
 TEST(JumpStatementElaboration,
      BreakInARandsequenceProductionCodeBlockInsideAnOuterLoopOk) {
   ElabFixture f;
@@ -592,18 +513,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The cases below stand on Stmt::body of a statement that is not a loop.
-// src/parser/parser_stmt.cpp fills that field for StmtKind::kDelay,
-// StmtKind::kCycleDelay, StmtKind::kEventControl and StmtKind::kWait as well
-// as for the loop statements, and CheckJumpRulesChildren in
-// src/elaborator/elaborator_validate_jump_statements.cpp reaches it through
-// ForEachChildStmt. §12.8 confines continue and break to a loop and return to a
-// subroutine without qualifying either by what a statement is waiting for, so a
-// jump written after a delay, a cycle delay, an event control or a wait is
-// judged exactly as one written on its own.
-
-// §12.8: the break is the whole body of a delay control, and no loop encloses
-// the delay control, so the break is not inside a loop.
 TEST(JumpStatementElaboration, BreakAfterADelayControlIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -615,11 +524,6 @@ TEST(JumpStatementElaboration, BreakAfterADelayControlIsError) {
                             "break statement is not inside a loop", 2, "12.8"));
 }
 
-// The continue that the case above's break does not answer for. §12.8 holds
-// both statements to the same enclosing loop, and CheckContinueScope in
-// src/elaborator/elaborator_validate_jump_statements.cpp is a separate
-// emission site from CheckBreakScope, so the link carries two reports and not
-// one.
 TEST(JumpStatementElaboration, ContinueAfterADelayControlIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -632,8 +536,6 @@ TEST(JumpStatementElaboration, ContinueAfterADelayControlIsError) {
                             "12.8"));
 }
 
-// §9.4.2's event control fills the same Stmt::body, so §12.8's rule reaches a
-// break written after @(posedge clk) as it reaches one written after a delay.
 TEST(JumpStatementElaboration, BreakAfterAnEventControlIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -646,8 +548,6 @@ TEST(JumpStatementElaboration, BreakAfterAnEventControlIsError) {
                             "break statement is not inside a loop", 3, "12.8"));
 }
 
-// §9.4.3's wait statement fills the same Stmt::body. A wait is not a loop, so
-// the break it guards is a break outside a loop.
 TEST(JumpStatementElaboration, BreakAfterAWaitStatementIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -660,9 +560,6 @@ TEST(JumpStatementElaboration, BreakAfterAWaitStatementIsError) {
                             "break statement is not inside a loop", 3, "12.8"));
 }
 
-// §14.11's cycle delay fills the same Stmt::body. The default clocking is
-// there because §14.11 makes a ## without one an error of its own, which would
-// leave the source rejected whether §12.8 reported the break or not.
 TEST(JumpStatementElaboration, BreakAfterACycleDelayIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -677,10 +574,6 @@ TEST(JumpStatementElaboration, BreakAfterACycleDelayIsError) {
                             "break statement is not inside a loop", 5, "12.8"));
 }
 
-// The third §12.8 report through the same link: return belongs in a subroutine,
-// and an initial block is not one. CheckJumpLeaf in
-// src/elaborator/elaborator_validate_jump_statements.cpp emits it, reading
-// JumpScope::in_subroutine, which an event control neither sets nor clears.
 TEST(JumpStatementElaboration,
      ReturnAfterAnEventControlOutsideASubroutineIsError) {
   ElabFixture f;
@@ -695,9 +588,6 @@ TEST(JumpStatementElaboration,
       "return statement is only allowed inside a subroutine", 3, "12.8"));
 }
 
-// The enclosing loop count passes through a delay control unchanged. Without
-// this case, a walk that reached Stmt::body with a fresh JumpScope rather than
-// the caller's would pass every rejection case above.
 TEST(JumpStatementElaboration, BreakAfterADelayControlInsideAForLoopOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -711,10 +601,6 @@ TEST(JumpStatementElaboration, BreakAfterADelayControlInsideAForLoopOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The enclosing fork-join count passes through a delay control too, which is
-// what selects §12.8's second break report rather than its first: a continue or
-// break inside a fork-join block may not control a loop outside it. The for
-// loop stands outside the fork.
 TEST(JumpStatementElaboration,
      BreakAfterADelayControlInsideAForkInsideALoopIsError) {
   ElabFixture f;
@@ -735,10 +621,6 @@ TEST(JumpStatementElaboration,
                             5, "12.8"));
 }
 
-// §18.17.6's term passes through a delay control as well, so a return written
-// after a delay inside a production code block still aborts the production
-// rather than a subroutine and §12.8's subroutine rule is still not the one
-// that governs it.
 TEST(JumpStatementElaboration,
      ReturnAfterADelayControlInARandsequenceProductionCodeBlockOk) {
   ElabFixture f;
@@ -755,14 +637,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// The weight code block A.6.12's rs_rule admits after a weight_specification
-// is a second statement list under Stmt::rs_productions, and
-// CheckValueReturningFuncReturn stops at the randsequence statement, so it
-// excludes that list along with the production code blocks. §18.17.6 makes the
-// bare return below abort the production rather than the function, so §13.4.1's
-// demand that a nonvoid function's return carry an expression is not about it.
-// The production `a` has an empty code block, which leaves the weight block as
-// the only place the return can stand.
 TEST(JumpStatementElaboration,
      ReturnInARandsequenceWeightCodeBlockInAValueReturningFunctionOk) {
   ElabFixture f;
@@ -781,12 +655,6 @@ TEST(JumpStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.8 names no enclosing declaration the rule is suspended in, but the walk
-// that applied it reached a module's procedural blocks and its module-level
-// subroutines and no class method, so the same break was reported in an initial
-// block and passed in a method. Fixing the walk fixes it for every check that
-// shares it, and a case per check is what says the walk rather than the check
-// was the fix.
 TEST(JumpStatementElaboration, BreakOutsideALoopInAClassMethodIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -800,11 +668,6 @@ TEST(JumpStatementElaboration, BreakOutsideALoopInAClassMethodIsReported) {
                             "break statement is not inside a loop", 3, "12.8"));
 }
 
-// §8.7 gives a class constructor no return type, so a bare return in one is the
-// whole of what a return there can be. It reaches the walk as an ordinary
-// function whose return type was never written -- which is not void either --
-// so without a guard the walk newly reaching class methods would report a
-// constructor for lacking an expression it may not have.
 TEST(JumpStatementElaboration, BareReturnInAConstructorIsAccepted) {
   ElabFixture f;
   ElaborateSrc(

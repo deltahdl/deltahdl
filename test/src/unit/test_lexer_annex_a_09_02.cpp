@@ -150,9 +150,6 @@ TEST(CommentLexing, CommentPreservesSurroundingTokenKinds) {
   }
 }
 
-// one_line_comment ::= // comment_text \n with comment_text containing block
-// delimiters: a "/*" or "*/" inside a line comment is ordinary comment_text, so
-// it neither opens a block nor produces tokens; the comment still ends at \n.
 TEST(CommentLexing, LineCommentCanContainBlockDelimiters) {
   auto tokens = Lex("a // /* not a block */ still line\nb");
   ASSERT_EQ(tokens.size(), 3u);
@@ -160,8 +157,6 @@ TEST(CommentLexing, LineCommentCanContainBlockDelimiters) {
   EXPECT_EQ(tokens[1].text, "b");
 }
 
-// block_comment ::= /* comment_text */: only the "*/" pair terminates the
-// comment, so a lone '*' that is not followed by '/' is ordinary comment_text.
 TEST(CommentLexing, BlockCommentLoneAsteriskDoesNotClose) {
   auto tokens = Lex("a /* x * y * z */ b");
   ASSERT_EQ(tokens.size(), 3u);

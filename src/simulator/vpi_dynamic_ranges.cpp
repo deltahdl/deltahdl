@@ -13,8 +13,6 @@ namespace delta {
 
 namespace {
 
-// Whether `array` is a dynamic array or a queue, the only variables the run
-// keeps a store of elements for (RecordArrayFacts).
 bool IsDynamicArray(const VpiObject& array) { return array.queue != nullptr; }
 
 }  // namespace
@@ -32,7 +30,6 @@ VpiHandle VpiDynamicRangeOf(VpiHandle obj) {
     return kDynamic ? obj : nullptr;
   }
   if (!IsDynamicArray(*obj)) return nullptr;
-  // §37.17 detail 4: the first range is the leftmost dimension's.
   for (VpiObject* child : obj->children) {
     if (child->type == vpiRange) return VpiDynamicRangeOf(child);
   }

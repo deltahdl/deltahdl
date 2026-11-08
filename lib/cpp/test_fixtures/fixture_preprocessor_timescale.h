@@ -12,11 +12,6 @@
 
 using namespace delta;
 
-// What a run of the preprocessor left behind for a case to make its claim
-// about: the record of the run and the timescale state the preprocessor ended
-// in. A `timescale it rejected still leaves that state behind, the default or
-// whatever an earlier directive set, so the record holds the case to reading
-// has_errors or diags as a ParseResult does.
 struct PreprocTimescaleResult : RecordedRun {
   TimeScale timescale;
   TimeUnit global_precision;
@@ -36,19 +31,10 @@ inline PreprocTimescaleResult PreprocessTimescale(const std::string& src) {
   return result;
 }
 
-// Alias for tests that use "Preprocess" as a 1-arg call.
 inline PreprocTimescaleResult Preprocess(const std::string& src) {
   return PreprocessTimescale(src);
 }
 
-// What a run of the preprocessor and then the parser left behind for a case to
-// make its claim about: everything a ParseResult holds, and the global
-// precision the preprocessor ended with. It is a ParseResult, so a case handed
-// one for a source that drew an error is held to reading has_errors or diags
-// as a case handed ParseResult itself is: a rejected source still leaves a
-// CompilationUnit of what the parser recovered and a global precision of
-// whatever the preprocessor ended with, and an absence or a default asserted on
-// either holds whether the rule it covers works or not.
 struct PreprocessedParseResult : ParseResult {
   bool has_preproc_global_precision = false;
   TimeUnit preproc_global_precision = TimeUnit::kS;

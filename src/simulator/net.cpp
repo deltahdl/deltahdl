@@ -32,9 +32,6 @@ static Logic4Word ResolveWord(Logic4Word a, Logic4Word b, NetType type) {
   }
 }
 
-// Fill every valid bit of a vector with a constant 0 or 1, leaving the unused
-// high bits of the final partial word clear. Callers that write a raw ~0 fill
-// would otherwise pollute those bits, and ToUint64 reads the whole word.
 static void FillConstBit(Logic4Vec& vec, bool one) {
   for (uint32_t w = 0; w < vec.nwords; ++w) {
     uint64_t word = one ? ~uint64_t{0} : 0;
@@ -70,8 +67,8 @@ static BitVal GetBitVal(const Logic4Vec& vec, uint32_t bit) {
   bool b = (vec.words[word].bval & mask) != 0;
   if (!b && !a) return {0};
   if (!b && a) return {1};
-  if (b && a) return {2};  // x = (aval=1, bval=1)
-  return {3};              // z = (aval=0, bval=1)
+  if (b && a) return {2};
+  return {3};
 }
 
 static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
@@ -84,10 +81,10 @@ static void SetBit(Logic4Vec& vec, uint32_t bit, uint8_t val) {
   } else if (val == 1) {
     vec.words[word].aval |= mask;
     vec.words[word].bval &= ~mask;
-  } else if (val == 2) {  // x = (aval=1, bval=1)
+  } else if (val == 2) {
     vec.words[word].aval |= mask;
     vec.words[word].bval |= mask;
-  } else {  // z = (aval=0, bval=1)
+  } else {
     vec.words[word].aval &= ~mask;
     vec.words[word].bval |= mask;
   }
@@ -114,34 +111,11 @@ static uint8_t WiredOr(uint8_t a, uint8_t b) {
   return 2;
 }
 
-// §28.12.3's signal whose value is known and whose strength is unambiguous: one
-// driver's
-// value and the strength level it drives at, in the vocabulary
-// CombineAmbigWithUnambig names them by.
 struct UnambigSignal {
   uint8_t vu;
   uint8_t su;
 };
 
-// Every driver weaker than `max_str` that §28.12.3 has a combination to make
-// with, strongest first. The clause combines a signal of known value and
-// unambiguous strength with a component of the ambiguous strength signal, so a
-// net with several weaker drivers has one such combination per driver rather
-// than one for the strongest of them.
-//
-// Two kinds of driver are left out. One whose value is x or z is not a signal
-// of known value, which is what the clause combines. One at the high-impedance
-// level is not either: §21.2.1.4 states that the high-impedance strength cannot
-// have a known logic value and that the only logic value allowed for that level
-// is z. By §28.12.1 the stronger signal dominates it, so it combines to
-// nothing, which is what leaving it out of the list says.
-//
-// The order is the strongest driver first, following §28.12.1's rule that the
-// stronger signal dominates the weaker: the strongest weaker driver is the one
-// that decides how far rules a and b move each bound, and every driver below it
-// then combines against bounds already at or above its own level. Any other
-// order gives the same result, because from a conflict range each combination
-// only raises the two lower bounds to the level the driver puts there.
 static std::vector<UnambigSignal> FindWeakerUnambig(
     const std::vector<Logic4Vec>& drivers,
     const std::vector<DriverStrength>& strengths, uint8_t max_str,
@@ -185,9 +159,6 @@ static void FoldDriverIntoMax(uint8_t val, uint8_t str, NetType net_type,
   }
 }
 
-// The strongest driver of one bit, folded as §28.12.1 has the stronger signal
-// dominate the weaker: the level, the value at that level, whether two values
-// tie there, and the strength the winning driver carries.
 static MaxTracker FoldDriversForBit(
     const std::vector<Logic4Vec>& drivers,
     const std::vector<DriverStrength>& strengths, NetType net_type,
@@ -197,20 +168,12 @@ static MaxTracker FoldDriversForBit(
     uint8_t val = GetBitVal(drivers[d], bit).val;
     if (val == 3) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
-    // §21.2.1.4, as in ResolveStrengthBit above: a driver at the high-impedance
-    // level drives nothing. FoldDriverIntoMax sets the conflict flag for one of
-    // these on its own for the same reason, and the caller is saved from
-    // reporting it only by the early return on an unset value below, which is a
-    // guard on the answer rather than on the fold.
     if (str == 0) continue;
     FoldDriverIntoMax(val, str, net_type, m);
   }
   return m;
 }
 
-// §28.12.3: one combination per signal of known value and unambiguous strength
-// weaker than the ambiguous one `out` holds, which is the clause's own shape --
-// a range, and the drivers beneath it.
 static void CombineWeakerUnambigInto(
     NetStrength& out, const std::vector<Logic4Vec>& drivers,
     const std::vector<DriverStrength>& strengths, uint8_t max_str,
@@ -221,21 +184,6 @@ static void CombineWeakerUnambigInto(
   }
 }
 
-// §28.12.2 gives a signal whose value is x strength levels drawn from both the
-// strength1 and the strength0 halves of the strength scale, so a driver whose
-// value is x stands on both sides of
-// the scale, each at the level its own declaration drives that side at: it is
-// the value that is unknown, not the strength. That is the case §21.2.1.4
-// renders with a mnemonic -- an unknown value whose 0 and 1 components sit at
-// one strength level gets one.
-//
-// §28.6 Table 28-5 is the other shape, and it is spelt in the driver's own
-// strength. A three-state gate with a control of x or z drives L or H -- an
-// outcome that is 0 or z, or one that is 1 or z -- which §28.12.2's
-// Figure 28-7 and Figure 28-8 draw as a range on one side of the scale running
-// from the driving level down to high impedance, and nothing at all on the
-// other. Such a driver spells x with the side it does not drive at the
-// high-impedance level.
 static NetStrength UnknownDriverSignal(DriverStrength ds) {
   NetStrength one;
   bool drives0 = ds.s0 != Strength::kHighz;
@@ -256,18 +204,6 @@ static NetStrength UnknownDriverSignal(DriverStrength ds) {
   return one;
 }
 
-// §28.12.2: two signals of ambiguous strength combine into another, whose range
-// of strength levels covers every level either of them held.
-// Figure 28-9 combines the PuH and the WeL two three-state gates with unknown
-// controls drive and Figure 28-10 draws the result as one range from We0 across
-// high impedance to Pu1, which §21.2.1.4 renders 35X. Every such driver joins
-// the range whatever its level: §28.12.1's dominance is stated of a signal of
-// unambiguous strength, and neither of those two dominates the other.
-//
-// A wired net reaches an unknown value through WiredAnd/WiredOr rather than by
-// a driver spelling x, and the answer is the same either way, so the net type
-// does not enter into it -- while it did, a strongly driven x on an ordinary
-// wire filled neither side and was reported as nothing driving the net.
 static void UnknownValueStrength(const std::vector<Logic4Vec>& drivers,
                                  const std::vector<DriverStrength>& strengths,
                                  uint32_t bit, NetStrength& out) {
@@ -292,17 +228,6 @@ static void ComputeSingleBitStrength(
   if (m.conflict) {
     out.s0_hi = s;
     out.s1_hi = s;
-    // §28.12.3 makes one combination per signal of known value and unambiguous
-    // strength, so every weaker driver is combined in turn. None of them moves
-    // a bound here, and the reason is worth stating rather than discovering:
-    // the range above runs from the conflict level down to high impedance on
-    // both sides -- §28.12.2 gives such a conflict the levels of both signals
-    // and every weaker level below them -- and §28.12.3's rule c
-    // returns every level rule b takes out of it, the gap between the surviving
-    // sides crossing high impedance (Figure 28-23). The combination is made
-    // because the clause has it made, and it decides the one-sided range a
-    // three-state gate with an unknown control drives (§28.6), which the arm
-    // below builds.
     CombineWeakerUnambigInto(out, drivers, strengths, m.str, bit);
     return;
   }
@@ -316,11 +241,6 @@ static void ComputeSingleBitStrength(
   }
   UnknownValueStrength(drivers, strengths, bit, out);
   if (out.IsAmbiguous()) {
-    // §28.12.3 combines an ambiguous signal with each weaker signal of known
-    // value and unambiguous strength, which is what Figure 28-23 draws for
-    // exactly this shape: a one-sided range and a weaker driver of the other
-    // value. An x driving both sides at one level is not ambiguous and nothing
-    // weaker reaches it (§28.12.1).
     CombineWeakerUnambigInto(out, drivers, strengths, m.str, bit);
   }
 }
@@ -334,32 +254,13 @@ static void ResolveStrengthBit(const std::vector<Logic4Vec>& drivers,
     uint8_t val = GetBitVal(drivers[d], bit).val;
     if (val == 3) continue;
     uint8_t str = EffectiveStrength(val, strengths[d]);
-    // §21.2.1.4: no known logic value goes with the high-impedance strength,
-    // whose one permitted value is z. A driver at that level therefore drives
-    // nothing whatever value it carries, and is passed over the same way a
-    // driver already spelling z is. Folding it in instead made it conflict with
-    // the nothing that had been seen so far -- MaxTracker::val starts at 3, and
-    // a lone such driver matched the equal-strength test against it, so a net
-    // one driver was holding at high impedance resolved to x.
     if (str == 0) continue;
     FoldDriverIntoMax(val, str, net_type, m);
   }
-  // §28.12.2: the value of a net two equally strong drivers disagree over is
-  // unknown. A tracker that saw no driver keeps the unset value, which is the
-  // z a net nothing drives holds.
   SetBit(result, bit, m.conflict ? 2 : m.val);
 }
 
 static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
-  // z = (aval=0, bval=1): a driver is all-z iff every bit set has bval set and
-  // aval clear.
-  //
-  // The test is masked to the driver's own width. A Logic4Vec's final word
-  // carries only `width % 64` significant bits and the bits above them are not
-  // maintained, so comparing the whole word against ~0 asks about bits that
-  // carry no value. That made this report false for every driver whose width is
-  // not a multiple of 64 -- including every scalar one, where an all-z driver
-  // has bval == 1 rather than ~0.
   for (const auto& drv : drivers) {
     for (uint32_t w = 0; w < drv.nwords; ++w) {
       uint32_t bits_in_word = drv.width - w * 64;
@@ -372,16 +273,13 @@ static bool AllDriversZ(const std::vector<Logic4Vec>& drivers) {
   return true;
 }
 
-// Whether nothing reaches the net but high impedance: neither its own drivers
-// nor the signals a bidirectional pass switch carries to it (§28.8), which
-// drive the net as its own drivers do.
 static bool AllSourcesZ(const Net& net) {
   return AllDriversZ(net.drivers) && AllDriversZ(net.switch_drivers);
 }
 
 static void SetAllX(Logic4Vec& val) {
   for (uint32_t w = 0; w < val.nwords; ++w) {
-    val.words[w] = {~uint64_t{0}, ~uint64_t{0}};  // x = (aval=1, bval=1)
+    val.words[w] = {~uint64_t{0}, ~uint64_t{0}};
   }
 }
 
@@ -404,21 +302,11 @@ static bool ResolveTriPullDefault(Net& net, Arena& arena) {
   return true;
 }
 
-// §6.6.6 and §28.15.3: supply0 and supply1 nets model the power supplies in a
-// circuit and carry supply strength. With nothing driving it the net holds 0
-// (supply0) or 1 (supply1) at supply strength on that side; a net something
-// does drive resolves its constant together with its drivers instead
-// (AppendImplicitNetSource), so that §28.12.1 combines an opposing driver of
-// supply strength with it into x.
 static void ResolveSupplyNet(Net& net, Arena& arena) {
   bool is_supply1 = net.type == NetType::kSupply1;
   if (is_supply1) {
-    // supply1 pins every bit to 1. Fill through the width-masked helper so the
-    // unused high bits of the top word stay 0 -- an unmasked ~0 fill leaks into
-    // the value read back through the full pipeline (e.g. a 1-bit supply1 net
-    // reading back as all ones).
     auto result = MakeLogic4Vec(arena, net.resolved->value.width);
-    FillConstBit(result, /*one=*/true);
+    FillConstBit(result, true);
     net.resolved->value = result;
   } else {
     net.resolved->value = MakeLogic4VecVal(arena, net.resolved->value.width, 0);
@@ -433,16 +321,6 @@ static void ResolveSupplyNet(Net& net, Arena& arena) {
   net.resolved->NotifyWatchers();
 }
 
-// Widen one side of a net's reported strength to take in what one of its bits
-// resolves to there.
-//
-// §28.12.2 has a signal's strength be a range of levels rather than one level
-// where it is ambiguous, and that is what a net whose bits do not resolve alike
-// reports: the range on each side spans every bit that drives that side. A bit
-// leaving the side at highz drives nothing there and widens nothing, so a side
-// no bit drives stays highz, and a net whose bits all resolve alike reports
-// exactly what one of them does -- which is what a scalar net, the only width
-// §21.2.1.4 gives %v, has always reported.
 static void WidenSide(Strength& hi, Strength& lo, Strength bit_hi,
                       Strength bit_lo) {
   if (bit_hi == Strength::kHighz) return;
@@ -474,15 +352,6 @@ bool Net::InCapacitiveState() const {
   return type == NetType::kTrireg && AllSourcesZ(*this);
 }
 
-// §6.6.5: a tri0 (tri1) net is equivalent to a wire carrying a continuous 0 (1)
-// of pull strength. When actual drivers are present, that implicit source
-// combines with them in the normal strength resolution rather than merely
-// filling the bits they leave floating: being pull strength, it overrides any
-// real driver weaker than pull, ties an equal-strength pull driver into a
-// conflict, and yields to strong/supply drivers. §28.15.3 gives a supply0
-// (supply1) net the same kind of source at supply strength. Materialize it as
-// an extra driver appended to local copies of the driver/strength lists so the
-// shared strength-resolution machinery applies it uniformly.
 static void AppendImplicitNetSource(std::vector<Logic4Vec>& drivers,
                                     std::vector<DriverStrength>& strengths,
                                     NetType type, uint32_t width,
@@ -496,9 +365,6 @@ static void AppendImplicitNetSource(std::vector<Logic4Vec>& drivers,
   strengths.push_back(DriverStrength{level, level});
 }
 
-// `charge`, where given, is the value a trireg in the charge storage state
-// holds, which §28.15.2 has drive the net at the trireg's charge strength
-// alongside its drivers.
 static void ResolveStrengthDriven(Net& net, Arena& arena,
                                   const Logic4Vec* charge = nullptr) {
   std::vector<Logic4Vec> drivers = net.drivers;
@@ -518,12 +384,6 @@ static void ResolveStrengthDriven(Net& net, Arena& arena,
   auto result = MakeLogic4Vec(arena, net.resolved->value.width);
   net.resolved_strength = NetStrength{};
   for (uint32_t b = 0; b < result.width; ++b) {
-    // §28.12 resolves each bit of a net on its own, and the strength of the
-    // signal it resolves to is a property of that bit. A net reports one pair,
-    // so each bit's contribution is folded into it rather than one bit being
-    // taken to speak for the rest. A bit some driver drives at x -- an L, an H
-    // or an x at two strengths -- is resolved over the states those drivers
-    // stand for (simulator/net_bit_outcomes.h says why).
     NetStrength bit_strength;
     if (AnyDriverUnknownAt(drivers, b) ||
         AnyDriverRangedAt(drivers, strengths, b)) {
@@ -556,20 +416,6 @@ static Logic4Vec CombineAllDrivers(const std::vector<Logic4Vec>& drivers,
   return result;
 }
 
-// §10.6.2: a force on a net overrides every driver of it -- gate outputs,
-// module outputs and continuous assignments -- until a release is executed on
-// the net. So while the force stands the net has one source and it is the
-// force, and the strength it reports is that source's rather than the
-// overridden drivers'.
-//
-// Which strength that is: §10.6 gives force no drive_strength syntax to carry
-// one, and §10.3.4 defaults a continuous assignment that specifies none to
-// (strong1, strong0). §21.7.4.3.2 counts a procedural continuous assignment
-// among the drivers a port record reports, so there is something to report and
-// the default is what it is. The forced value is folded through the same
-// per-bit machinery an ordinary driver goes through, so a forced 0 lands on the
-// 0 side, a forced 1 on the 1 side, a forced x on both (§28.12.2) and a forced
-// z on neither.
 static void ResolveForcedStrength(Net& net) {
   std::vector<Logic4Vec> drivers{net.resolved->value};
   std::vector<DriverStrength> strengths{{Strength::kStrong, Strength::kStrong}};
@@ -582,11 +428,6 @@ static void ResolveForcedStrength(Net& net) {
   }
 }
 
-// §10.6.2: a force on a constant bit-select or part-select of a vector net
-// overrides the drivers of those bits and no others, so the resolution below
-// runs as it always does and the forced bits are laid back over its answer.
-// forced_value carries the whole object with those bits in place, which is
-// where they are read from and where they go, for each part a force holds.
 static void ApplyPartialForcedValue(Net& net, Arena& arena) {
   for (const auto& part : net.resolved->held_parts) {
     const auto& window = part.window;
@@ -597,12 +438,6 @@ static void ApplyPartialForcedValue(Net& net, Arena& arena) {
   }
 }
 
-// The strength of the bits a partial force holds, which §10.6.2 makes the
-// force's rather than any driver's. The bits it does not hold keep the strength
-// the driver resolution just gave them, and the net's own strength is widened
-// back over the two kinds together. A resolution that recorded no per-bit
-// strength at all is left alone: it answers every bit from resolved_strength,
-// and there is no entry to correct.
 static void ApplyPartialForcedStrength(Net& net) {
   if (net.bit_strengths.empty()) return;
   std::vector<Logic4Vec> drivers{net.resolved->value};
@@ -623,7 +458,6 @@ NetStrength Net::BitStrength(uint32_t bit) const {
   return resolved_strength;
 }
 
-// Resolves the net from its drivers, which is every rule but §10.6.2's force.
 static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched);
 
 static void ResolveNet(Net& net, Arena& arena, Scheduler* sched);
@@ -642,12 +476,6 @@ static bool ValuesEqual(const Logic4Vec& a, const Logic4Vec& b) {
   return true;
 }
 
-// §28.16 and §10.3.3: a net declared with a net delay takes the value its
-// sources resolve to only once the delay Table 28-9 gives the net's own
-// transition -- from the value it holds to that one -- has passed, and with
-// it the strengths that value carries. The sources resolve into storage of
-// their own. A change arriving before the pending one has landed replaces it,
-// and one back to the value the net holds leaves none pending.
 static void ResolveAfterNetDelay(Net& net, const ContAssignDelays& delays,
                                  Arena& arena, Scheduler* sched) {
   Variable* shown = net.resolved;
@@ -689,14 +517,6 @@ static void ResolveAfterNetDelay(Net& net, const ContAssignDelays& delays,
   sched->ScheduleEvent(time, Region::kActive, event);
 }
 
-// §28.13 and §28.14: a switch reading the net as its data input passes the
-// net's strength on, so a change of that strength alone is told to the
-// variable's watchers as one of the value is, for the switch's own watcher to
-// pass (Variable::strength_generation).
-//
-// A net under a force, a net a switch joins to others -- which resolve as one
-// group -- and one resolved where no scheduler runs take a change at once,
-// which leaves none of a net delay pending.
 void Net::Resolve(Arena& arena, Scheduler* sched) {
   if (!resolved) return;
   NetStrength before = resolved_strength;
@@ -718,18 +538,8 @@ static void ResolveNet(Net& net, Arena& arena, Scheduler* sched) {
     return;
   }
 
-  // Every resolution below either records one strength per bit or gives the
-  // whole net one, so what a previous resolution recorded says nothing about
-  // this one and is dropped before it runs.
   net.bit_strengths.clear();
 
-  // §10.6.2: a force on a net overrides every driver of it, and a force naming
-  // the whole net leaves no bit for a driver to reach, so the drivers are not
-  // resolved at all. A force naming a select of the net overrides the drivers
-  // of those bits alone: the rest of the net goes on being driven, which is a
-  // resolution followed by the forced bits being laid back over it. Reading the
-  // flag alone here dropped every driver of every bit, so `assign bus = 8'h55;`
-  // stopped reaching bits 7:4 and 2:0 the moment `force bus[3] = 1'b1;` ran.
   if (net.resolved->WholeIsForced()) {
     ResolveForcedStrength(net);
     return;
@@ -744,10 +554,6 @@ static void ResolveNet(Net& net, Arena& arena, Scheduler* sched) {
 }
 
 static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
-  // §28.15.3: a supply0/supply1 net models a constant ground/power connection,
-  // so it carries value 0/1 at supply strength inherently -- like tri0/tri1, it
-  // must resolve even with no driver connected rather than staying z. A trireg
-  // with no driver holds its charge at its charge strength (§28.15.2).
   bool needs_resolution_when_undriven =
       net.is_user_nettype || net.type == NetType::kTri0 ||
       net.type == NetType::kTri1 || net.type == NetType::kSupply0 ||
@@ -757,11 +563,6 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
     return;
   }
 
-  // §28.15.2 (printed page 855) with §28.12.1's Table 28-7: a trireg holding
-  // charge drives at its charge strength, so its stored value stands against
-  // a weaker driver -- a `large` charge outranks a `weak` one -- and it stays
-  // in the charge storage state for as long as it does. Resolved from its
-  // drivers alone, a `bufif1 (weak1, weak0)` driving 0 overwrote a large 1.
   std::optional<Logic4Vec> charge;
   if (net.type == NetType::kTrireg)
     charge = SettleTriregCharge(net, arena, sched);
@@ -769,8 +570,6 @@ static void ResolveFromDrivers(Net& net, Arena& arena, Scheduler* sched) {
   if (ResolveSpecialNet(net, arena)) return;
   if (ResolveThroughNettypeFunction(net, arena)) return;
 
-  // A supply net something drives resolves its constant with its drivers at
-  // supply strength (AppendImplicitNetSource) whatever they record.
   bool supply = net.type == NetType::kSupply0 || net.type == NetType::kSupply1;
   if (!net.is_user_nettype &&
       (!net.driver_strengths.empty() || !net.switch_drivers.empty() || charge ||

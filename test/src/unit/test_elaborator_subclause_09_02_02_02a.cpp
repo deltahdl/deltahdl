@@ -1,13 +1,3 @@
-// §9.2.2.2 "Combinational logic always_comb procedure": the latch warning, the
-// implicit sensitivity, the timing controls the clause admits, the simulation
-// of an always_comb procedure, and the multiple-driver rule where the call that
-// reaches the second driver is written where a call is usually written -- a
-// right-hand side, a condition, an expression statement.
-//
-// The cases where that call is written somewhere else are in
-// test_elaborator_subclause_09_02_02_02b.cpp, which the 1000-line cap in
-// .github/workflows/deltahdl.yml separated this file from.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -110,7 +100,6 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndContAssignErrors) {
       "  always_comb y = b;\n"
       "endmodule\n",
       f);
-  // §10.3.2 is what fires: the conflict is with a continuous assignment.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'y' driven by always_comb and "
                             "continuous assignment",
@@ -409,9 +398,6 @@ TEST(AlwaysCombMultiDriver, OverlappingElementsConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
-  // §9.2.2.2: a variable assigned inside a function called by the procedure is
-  // treated as assigned by the always_comb itself, so a second driver of that
-  // variable is an error.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -424,7 +410,6 @@ TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
       "  assign y = a;\n"
       "endmodule\n",
       f);
-  // §10.3.2 is what fires: the second driver of 'y' is a continuous assignment.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'y' driven by always_comb and "
                             "continuous assignment",
@@ -432,10 +417,6 @@ TEST(AlwaysCombMultiDriver, FunctionAssignedLhsCountsAsCombDriver) {
 }
 
 TEST(AlwaysCombMultiDriver, TaskAssignedLhsNotCombDriver) {
-  // §9.2.2.2: variables assigned inside a task called by the procedure are
-  // explicitly excluded, so the always_comb is not a driver of 'y' and the
-  // initial procedure writing 'y' is no other process writing one of its
-  // variables.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -470,9 +451,6 @@ TEST(AlwaysCombMultiDriver, WholeArrayAndElementConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, IndependentElementAndContinuousAssignNoConflict) {
-  // §9.2.2.2: the single-driver rule permits one element of an array to be
-  // driven by an always_comb while a different element is driven continuously,
-  // since their longest static prefixes do not overlap.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -486,9 +464,6 @@ TEST(AlwaysCombMultiDriver, IndependentElementAndContinuousAssignNoConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, IndependentStructFieldsNoConflict) {
-  // §9.2.2.2: the structure analog of independent elements — distinct fields
-  // driven by separate always_comb procedures have non-overlapping prefixes and
-  // are therefore not multiple drivers of the same variable.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -506,8 +481,6 @@ TEST(AlwaysCombMultiDriver, IndependentStructFieldsNoConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, WholeStructAndFieldConflict) {
-  // §9.2.2.2: when one always_comb drives a whole structure and another drives
-  // a field of it, the prefixes overlap, so it is an illegal multiple driver.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -527,9 +500,6 @@ TEST(AlwaysCombMultiDriver, WholeStructAndFieldConflict) {
 }
 
 TEST(AlwaysCombTiming, NonblockingIntraAssignDelayAllowed) {
-  // §9.2.2.2 shows `d <= #1ns b & c;` as a legal always_comb body. An
-  // intra-assignment delay on a nonblocking assignment is not a statement-level
-  // timing control, so it shall not be rejected as one.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -542,8 +512,6 @@ TEST(AlwaysCombTiming, NonblockingIntraAssignDelayAllowed) {
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverCombAndGeneralAlwaysErrors) {
-  // §9.2.2.2: an always_comb LHS shall not be assigned by any other process; a
-  // general-purpose always block driving the same variable is illegal.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -559,8 +527,6 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndGeneralAlwaysErrors) {
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
-  // §9.2.2.2: an initial block is also a process, so it may not assign a
-  // variable that an always_comb drives.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -576,9 +542,6 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndInitialErrors) {
 }
 
 TEST(AlwaysCombMultiDriver, MultiDriverCombAndFinalErrors) {
-  // §9.2.2.2: no other process may assign a variable the always_comb assigns.
-  // §9.2 makes the final procedure a process, so a final block assigning an
-  // always_comb target is illegal.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -594,8 +557,6 @@ TEST(AlwaysCombMultiDriver, MultiDriverCombAndFinalErrors) {
 }
 
 TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysDifferentVarsOk) {
-  // §9.2.2.2: the rule only applies when the same variable is driven; distinct
-  // targets in an always_comb and a general always are legal.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -609,9 +570,6 @@ TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysDifferentVarsOk) {
 }
 
 TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysIndependentElementsOk) {
-  // §9.2.2.2 / §11.5.3: one array element driven by always_comb and a different
-  // element driven by a general always have non-overlapping longest static
-  // prefixes, so they are independent and legal.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -626,11 +584,6 @@ TEST(AlwaysCombMultiDriver, CombAndGeneralAlwaysIndependentElementsOk) {
 }
 
 TEST(AlwaysCombMultiDriver, IndependentElementsParamIndexNoConflict) {
-  // §9.2.2.2 / §11.5.3: the independent-elements exception depends on the
-  // longest static prefix, which keeps a select in the prefix only when its
-  // index is a constant expression. A module parameter is such a constant
-  // (§11.2.1). Two distinct parameter indices name distinct elements, so the
-  // two always_comb procedures drive non-overlapping prefixes and are legal.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m #(parameter int P0 = 0, parameter int P1 = 1);\n"
@@ -644,9 +597,6 @@ TEST(AlwaysCombMultiDriver, IndependentElementsParamIndexNoConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, IndependentElementsLocalparamIndexNoConflict) {
-  // §9.2.2.2 / §11.5.3: a localparam is also a constant expression (§11.2.1),
-  // so two distinct localparam indices resolve to distinct elements and the
-  // two always_comb drivers do not overlap.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -662,9 +612,6 @@ TEST(AlwaysCombMultiDriver, IndependentElementsLocalparamIndexNoConflict) {
 }
 
 TEST(AlwaysCombMultiDriver, OverlappingElementsParamIndexConflict) {
-  // §9.2.2.2 / §11.5.3 (negative form): when both always_comb procedures index
-  // the same parameter, the constant folds to the same element, the longest
-  // static prefixes overlap, and the multiple-driver rule rejects it.
   ElabFixture f;
   ElaborateSrc(
       "module m #(parameter int P = 0);\n"
@@ -693,16 +640,6 @@ TEST(AlwaysCombLatchWarning, NestedIncompleteIfWarnsLatch) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §9.2.2.2 asks a tool to warn when an always_comb procedure's behavior is not
-// combinational, for instance when a latch can be inferred. The subject is the
-// behavior, so an incomplete case is not the question by itself: what matters
-// is whether a value survives a pass through the procedure.
-//
-// Here `y` is assigned before the case runs, so every path out of the procedure
-// leaves `y` holding a value computed from `a` and `b` on this pass. Nothing is
-// carried over, so this is combinational logic, and it is the ordinary way to
-// write a case that does not enumerate its selector. A check that read the
-// shape of the control flow instead would warn about the missing default.
 TEST(AlwaysCombLatchWarning, UnconditionalAssignBeforeIncompleteCaseIsComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -723,9 +660,6 @@ TEST(AlwaysCombLatchWarning, UnconditionalAssignBeforeIncompleteCaseIsComb) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// The same point at an if with no else. The `if` narrows a value the procedure
-// has already given `y` on this pass, so no path leaves `y` holding what it
-// held before.
 TEST(AlwaysCombLatchWarning, UnconditionalAssignBeforeIncompleteIfIsComb) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -742,11 +676,6 @@ TEST(AlwaysCombLatchWarning, UnconditionalAssignBeforeIncompleteIfIsComb) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// The other direction, and the reason the check cannot be a rule about `else`
-// branches and `default` items being present. Both arms of this if are written,
-// so the control flow is complete, but `z` is assigned in one arm only: when
-// `sel` is false, `z` keeps the value it held before the procedure ran. That is
-// latched behavior in a body with nothing missing from its shape.
 TEST(AlwaysCombLatchWarning, CompleteIfElseAssigningDifferentOutputsWarns) {
   ElabFixture f;
   auto* design = ElaborateSrc(

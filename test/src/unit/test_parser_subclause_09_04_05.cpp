@@ -11,13 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §9.4.5 intra-assignment timing controls — parser coverage. Syntax 9-6/9-4 are
-// borrowed from Annex A, so these tests confirm the parser recognises each
-// distinct intra-assignment form: delay (simple, parenthesised, expression,
-// real), event control (posedge/negedge, blocking/nonblocking, OR lists), and
-// the repeat event control (count forms, edge kinds, event lists, RHS forms).
-// Redundant variants that parse identically have been removed.
-
 TEST(IntraAssignTimingParsing, BlockingParenthesizedIntraDelay) {
   auto r = Parse(
       "module m;\n"
@@ -442,9 +435,6 @@ TEST(IntraAssignTimingParsing, IntraAssignRepeatEventMissingAt) {
       "    a <= repeat(3) (posedge clk) b;\n"
       "  end\n"
       "endmodule\n");
-  // The repeat form demands the event control's '@' after the repeat count,
-  // and the '(' that opens the event expression stands there instead, on
-  // line 3.
   EXPECT_TRUE(ReportedError(r.diags, "expected '@', got '('", 3, "9.4.5"));
 }
 

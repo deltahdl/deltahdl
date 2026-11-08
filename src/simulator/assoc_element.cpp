@@ -31,34 +31,11 @@ Logic4Vec AssocAllocValue(const AssocArrayObject* aa, Arena& arena) {
   if (init == nullptr)
     return aa->is_4state ? MakeAllX(arena, aa->elem_width)
                          : MakeLogic4VecVal(arena, aa->elem_width, 0);
-  // A stored element is as wide as the element type, and a member written into
-  // one is deposited at an offset within that width, so an initial value
-  // narrower than the element is widened before it becomes the element. A real
-  // carries its pattern in a width that says which pattern it is (§6.12), so
-  // it is the one value left as it stands.
-  //
-  // §7.8.7 allocates the entry with the default or the user-given initial
-  // value: the value is what the entry takes, and §6.8 then makes the entry a
-  // data object that keeps its value from one assignment to the next. So the
-  // entry owes its own words. Returning *init handed back the array's own
-  // default_value or elem_init buffer, and TryWriteAssocMemberField writes
-  // through the words with DepositBitField rather than replacing them, so a
-  // member write to one defaulted key landed in every other defaulted key and
-  // in the stored default besides. The other branch already allocates,
-  // ResizeToWidth building its result at a width this one does not reach.
   if (init->is_real || init->width >= aa->elem_width)
     return OwnRhsWords(*init, arena);
   return ResizeToWidth(*init, aa->elem_width, arena);
 }
 
-// The associative array `sel` selects an element of, or null when its base
-// does not name one. A select of anything else — a queue, a fixed-size array,
-// a vector — reaches this on the same dispatch and is declined here. The base
-// is a declared array's bare name or, §8.5 restricting no property's type, a
-// property of an object named bare in a method (§8.11) or through a handle,
-// which FindAssocArrayOfBase resolves; `owner` receives the object whose
-// property it is, null for a declared array, so the writers below know which
-// watchers §9.4.2 has them tell.
 static AssocArrayObject* AssocOfSelect(const Expr* sel, SimContext& ctx,
                                        Arena& arena,
                                        ClassObject** owner = nullptr) {
@@ -67,9 +44,6 @@ static AssocArrayObject* AssocOfSelect(const Expr* sel, SimContext& ctx,
   return FindAssocArrayOfBase(sel->base, ctx, arena, owner);
 }
 
-// §9.4.2's announcement of a change to an element of the array `sel` selects
-// from: to the watchers on the variable under a declared array's name, or to
-// those on the variables designating the object whose property it is.
 static void AnnounceElementChange(const Expr* sel, ClassObject* owner,
                                   SimContext& ctx) {
   if (owner != nullptr) {
@@ -90,9 +64,6 @@ Logic4Vec* AssocEntryForWrite(const Expr* sel, SimContext& ctx, Arena& arena) {
       it = aa->str_data.emplace(key, AssocAllocValue(aa, arena)).first;
     return &it->second;
   }
-  // §7.8.6: an index carrying an x or z bit is invalid, and a write through
-  // one is a no-op. Allocating for it would create the entry the invalid write
-  // is forbidden to reach.
   if (HasUnknownBits(idx)) return nullptr;
   auto key =
       AssocIntKey(idx, aa->is_wildcard, aa->index_width, aa->is_index_signed);
@@ -107,8 +78,6 @@ void AllocateAssocEntryForModify(const Expr* lhs, SimContext& ctx,
   AssocEntryForWrite(lhs, ctx, arena);
 }
 
-// The dotted member path `expr` names, written the way ResolveStructFieldPath
-// reads it: `x` for a single member and `inner.x` for a member of a member.
 static void BuildFieldPath(const Expr* expr, std::string& out) {
   if (!expr) return;
   if (expr->kind == ExprKind::kIdentifier) {
@@ -122,9 +91,6 @@ static void BuildFieldPath(const Expr* expr, std::string& out) {
   }
 }
 
-// The member of an associative array's element a member path names: the
-// select of the element, `va[1]` of `va[1].in.k`, and the offset, width and
-// declared type of the member within the element's structure.
 struct AssocMemberWindow {
   const Expr* select = nullptr;
   uint32_t bit_offset = 0;
@@ -132,9 +98,6 @@ struct AssocMemberWindow {
   DataTypeKind kind = DataTypeKind::kImplicit;
 };
 
-// The select a member path `expr` starts at, `va[1]` of `va[1].in.k`, with
-// the members after it appended to `path` as ResolveStructFieldPath reads
-// them, `in.k`; null where `expr` is no member path rooted in a select.
 static const Expr* MemberPathRoot(const Expr* expr, std::string& path) {
   if (expr->kind == ExprKind::kSelect) return expr;
   if (expr->kind != ExprKind::kMemberAccess || expr->lhs == nullptr)
@@ -146,9 +109,6 @@ static const Expr* MemberPathRoot(const Expr* expr, std::string& path) {
   return root;
 }
 
-// §7.2 with §7.8: the member of an associative array's element the member
-// path `expr` names, however deeply nested, as its element's layout lays it
-// out. False unless `expr` is such a path and the member resolves.
 static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
                                AssocMemberWindow& out) {
   if (!expr || expr->kind != ExprKind::kMemberAccess) return false;
@@ -156,8 +116,6 @@ static bool ResolveAssocMember(const Expr* expr, SimContext& ctx,
   const Expr* sel = MemberPathRoot(expr, path);
   if (sel == nullptr || !AssocOfSelect(sel, ctx, ctx.GetArena())) return false;
   if (sel->base->kind != ExprKind::kIdentifier) return false;
-  // §23.9: the array resolves within the running instance, so its element
-  // layout is asked for by the key that instance's storage was created under.
   const StructTypeInfo* info = StructLayoutOfName(sel->base->text, ctx);
   if (!info) return false;
   out.select = sel;
@@ -170,8 +128,6 @@ bool TryWriteAssocMemberField(const Expr* lhs, const Logic4Vec& rhs_val,
   AssocMemberWindow member;
   if (!ResolveAssocMember(lhs, ctx, member)) return false;
   auto* entry = AssocEntryForWrite(member.select, ctx, arena);
-  // A declined entry is §7.8.6's invalid index, which allocates nothing and
-  // writes nothing, so there is no change for §9.4.2 to announce.
   if (!entry) return true;
   DepositBitField(*entry, member.bit_offset,
                   MemberBitsOf(rhs_val, member.kind, arena), member.width);
@@ -198,16 +154,9 @@ bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
   if (!aa) return false;
   auto* entry = AssocEntryForWrite(lhs->base, ctx, arena);
   if (!entry) return true;
-  // WriteBitSelect resolves the index against the declared range of the
-  // variable it writes, and an associative array's elements are stored as bare
-  // vectors carrying no range. The variable the lowerer creates under the
-  // array's name models one element and carries that declaration, so its range
-  // is what this element's bits are addressed through.
   Variable elem;
   elem.value = *entry;
   elem.is_4state = aa->is_4state;
-  // A property has no such variable: its width and state-ness are the
-  // array's own, set from the declaration when the array was built.
   const Variable* decl = nullptr;
   if (owner == nullptr && lhs->base->base->kind == ExprKind::kIdentifier)
     decl = ctx.FindVariable(lhs->base->base->text);
@@ -220,11 +169,6 @@ bool TryWriteAssocElementBits(const Expr* lhs, const Logic4Vec& rhs_val,
   }
   WriteBitSelect(&elem, lhs, rhs_val, ctx, arena);
   *entry = elem.value;
-  // §9.4.2 again, and `elem` cannot carry it: it is a stack Variable built to
-  // lend WriteBitSelect the declaration's packed range, so its watcher list is
-  // empty and the entry it is copied back into is a bare vector. The array's
-  // own variable -- the one looked up a few lines above for that range -- is
-  // where the watchers are.
   AnnounceElementChange(lhs->base, owner, ctx);
   return true;
 }

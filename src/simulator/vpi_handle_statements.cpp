@@ -1,36 +1,13 @@
-#include "simulator/vpi_user.h"
-// The statement-class predicates and the for-header helper these resolvers ask
-// are declared here.
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_internal.h"
 #include "simulator/vpi_model_helpers1.h"
 #include "simulator/vpi_model_helpers2.h"
 #include "simulator/vpi_object.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
-// ===========================================================================
-// The vpi_handle() relations of the statement model: the untagged arrow every
-// statement that holds a body draws to §37.4.1's `stmt` class, §37.74's two
-// single arrows to a for statement's header, §37.63's edge from a statement
-// back to the process it runs in, and the edges §37.50 draws from a concurrent
-// assertion to its actions among the others. They sit in a file of their own
-// because the resolvers they were written beside had grown past the length
-// .github/workflows/deltahdl.yml admits a source file.
-// ===========================================================================
-
-// §37.63/§37.66/§37.67/§37.70/§37.71/§37.73/§37.74: the body statement the
-// object model draws an untagged arrow to `stmt` for, and the two single arrows
-// §37.74 draws to a for statement's header. VpiIsBodyStmtOwnerType names the
-// kinds that draw the untagged arrow and says why they are one relation rather
-// than six; the body itself is the first child of a kind the `stmt` class
-// groups, because §37.4.1 makes that enclosure a class and no statement of a
-// design carries the class's name for its own type. The header's statements are
-// the for statement's alone and are held apart from its children for that same
-// reason, so they are answered here beside the body they are told from.
 bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.74: the single arrows to the first statement of each part of a for
-  // statement's header, drawn beside the iterations that walk all of them.
   if (ref->type == vpiFor &&
       (type == vpiForInitStmt || type == vpiForIncStmt)) {
     out = VpiForHeaderStmt(type, ref);
@@ -41,7 +18,6 @@ bool TryResolveForAndBodyStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->body;
     return true;
   }
-  // An else action a run recorded is no body, though written alone (§16.3).
   for (auto* child : ref->children) {
     if (!VpiIsScopeBodyStmtObject(child) || child == ref->else_stmt) continue;
     out = child;
@@ -65,9 +41,6 @@ bool TryResolveStmtProcessRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.42 (figure): the arrow from a system task or function call to the user
-// systf whose registration it calls, which a call of a built-in system task or
-// function has none of.
 bool TryResolveUserSystfRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiUserSystf ||
       (ref->type != vpiSysTaskCall && ref->type != vpiSysFuncCall)) {
@@ -77,10 +50,6 @@ bool TryResolveUserSystfRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
-// §37.52: the property expression a property spec reaches by its untagged
-// edge, the one child a run hangs from it. The property expr class groups
-// §37.54's sequence expr, which groups the bare expressions, a net or a
-// variable a name stands for among them (§37.58).
 static VpiHandle PropertySpecExpr(VpiHandle spec) {
   for (auto* child : spec->children) {
     if (VpiIsPropertyExprType(child->type) ||
@@ -91,9 +60,6 @@ static VpiHandle PropertySpecExpr(VpiHandle spec) {
   return nullptr;
 }
 
-// §37.53: the edges a sequence decl draws to its body and a seq formal decl
-// to its default value, §37.54's from a sequence inst to its declaration, and
-// §37.57's from a let decl to its body.
 static bool TryResolveSequenceDeclRelation(int type, VpiHandle ref,
                                            VpiHandle& out) {
   if (ref->type != vpiSequenceInst && ref->type != vpiSequenceDecl &&
@@ -106,15 +72,11 @@ static bool TryResolveSequenceDeclRelation(int type, VpiHandle ref,
     return true;
   }
   if (type != vpiExpr) return false;
-  // §37.57: a let decl's body, as a formal's default, is its first expression
-  // child, its seq formal decls being none.
   out = ref->type == vpiSequenceDecl ? VpiSeqDeclBodyExpr(ref)
                                      : VpiSeqFormalInitExpr(ref);
   return true;
 }
 
-// §37.51: the edges a property inst draws to its declaration and its disable
-// condition, and the one a prop formal decl draws to its default value.
 static bool TryResolvePropertyDeclRelation(int type, VpiHandle ref,
                                            VpiHandle& out) {
   if (ref->type == vpiPropFormalDecl) {
@@ -131,9 +93,6 @@ static bool TryResolvePropertyDeclRelation(int type, VpiHandle ref,
   return true;
 }
 
-// §37.56: a clocked seq reaches the sequence expr its run of operands is.
-// Annex M names no type for the sequence expr class, so the tagless edge is
-// read with the type of the object it reaches.
 static bool TryResolveClockedSeqRelation(int type, VpiHandle ref,
                                          VpiHandle& out) {
   if (ref->type != vpiClockedSeq) return false;
@@ -143,11 +102,6 @@ static bool TryResolveClockedSeqRelation(int type, VpiHandle ref,
   return true;
 }
 
-// §37.50: the edges a concurrent assertion draws to its clock, its property
-// and its actions; §37.52: those a property spec draws to its disable
-// condition and its property expression. Each is a relation tag no object
-// carries for its own type, so the traversal they fell through to reached
-// none of them.
 static bool TryResolveAssertionRelation(int type, VpiHandle ref,
                                         VpiHandle& out) {
   if (VpiIsConcurrentAssertionType(ref->type)) {
@@ -171,9 +125,6 @@ static bool TryResolveAssertionRelation(int type, VpiHandle ref,
   if (ref->type == vpiPropertyInst || ref->type == vpiPropFormalDecl) {
     return TryResolvePropertyDeclRelation(type, ref, out);
   }
-  // §37.52: a clocked property reaches the property it clocks, and a case
-  // property item the property it branches to, held apart from its
-  // conditions.
   if (type == vpiPropertyExpr && ref->type == vpiClockedProp) {
     out = PropertySpecExpr(ref);
     return true;

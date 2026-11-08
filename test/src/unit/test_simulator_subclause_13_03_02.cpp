@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §13.3.2: variables declared in a static task shall be initialized to the
-// default initialization value and retain their values between invocations.
-// First call observes the default (x starts at 0, so v == 5); the second call
-// observes retention (x kept its 5, so v == 10).
 TEST(TaskMemorySim, StaticTaskVarDefaultInitThenRetains) {
   auto val = RunAndGet(
       "module t;\n"
@@ -29,12 +25,6 @@ TEST(TaskMemorySim, StaticTaskVarDefaultInitThenRetains) {
   EXPECT_EQ(val, 10u);
 }
 
-// §13.3.2: the arguments of a static task -- including output arguments -- are
-// static storage that retains its value between invocations. An output argument
-// is never passed a value from the caller, so a read-before-write on the second
-// call observes the value left behind by the first. The task increments its own
-// output before copying it back, so retention yields 1 then 2; if the output
-// were (wrongly) re-defaulted each call, both calls would produce 1.
 TEST(TaskMemorySim, StaticTaskOutputArgRetainsBetweenInvocations) {
   auto val = RunAndGet(
       "module t;\n"
@@ -51,12 +41,6 @@ TEST(TaskMemorySim, StaticTaskOutputArgRetainsBetweenInvocations) {
   EXPECT_EQ(val, 2u);
 }
 
-// §13.3.2 + §13.5.1: an output argument of an automatic task is not passed the
-// caller's value; it is replicated and reinitialized to the default value
-// whenever execution enters its scope. Using a 2-state type (default 0), each
-// call computes 0 + 1 = 1 and copies it out, so the result is 1 regardless of
-// how many times the task ran before. (If the output were wrongly seeded from
-// the caller, the second call would read the retained 1 and produce 2.)
 TEST(TaskMemorySim, AutomaticTaskOutputArgDefaultInitEachEntry) {
   auto val = RunAndGet(
       "module t;\n"
@@ -73,8 +57,6 @@ TEST(TaskMemorySim, AutomaticTaskOutputArgDefaultInitEachEntry) {
   EXPECT_EQ(val, 1u);
 }
 
-// §13.3.2: a local variable of an automatic task is reallocated and default
-// initialized on every entry, so its value never carries across invocations.
 TEST(TaskMemorySim, AutomaticTaskLocalReinitializedEachEntry) {
   auto val = RunAndGet(
       "module t;\n"
@@ -94,8 +76,6 @@ TEST(TaskMemorySim, AutomaticTaskLocalReinitializedEachEntry) {
   EXPECT_EQ(val, 1u);
 }
 
-// §13.3.2: input arguments of an automatic task shall be initialized to the
-// values passed from the corresponding expressions in the enabling statement.
 TEST(TaskMemorySim, AutomaticTaskInputArgFromCallExpression) {
   auto val = RunAndGet(
       "module t;\n"
@@ -111,8 +91,6 @@ TEST(TaskMemorySim, AutomaticTaskInputArgFromCallExpression) {
   EXPECT_EQ(val, 14u);
 }
 
-// §13.3.2: inout arguments are initialized to the passed value on entry and the
-// final value is copied back out, so the round trip observes both directions.
 TEST(TaskMemorySim, AutomaticTaskInoutArgRoundTrip) {
   auto val = RunAndGet(
       "module t;\n"
@@ -129,10 +107,6 @@ TEST(TaskMemorySim, AutomaticTaskInoutArgRoundTrip) {
   EXPECT_EQ(val, 42u);
 }
 
-// §13.3.2: a static task's storage belongs to its module instance, so separate
-// instances of the same module have independent storage. Each instance calls
-// the task twice; with separate storage both counters reach 2, whereas shared
-// storage would let one instance's calls bleed into the other's count.
 TEST(TaskMemorySim, StaticTaskStorageIsPerInstance) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -156,12 +130,6 @@ TEST(TaskMemorySim, StaticTaskStorageIsPerInstance) {
   LowerRunAndCheck(f, design, {{"a.r", 2u}, {"b.r", 2u}});
 }
 
-// §13.3.2: a task may be enabled more than once concurrently; every variable of
-// an automatic task is replicated per concurrent invocation so each activation
-// keeps its own state. Two branches of a fork enter the same automatic task and
-// each stashes its own seed into the task local before the shared delay; after
-// the delay each reads back its own copy. Separate storage yields 11 and 22;
-// shared storage would let the second activation's write clobber the first.
 TEST(TaskMemorySim, AutomaticTaskConcurrentInvocationsHaveSeparateStorage) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -182,12 +150,6 @@ TEST(TaskMemorySim, AutomaticTaskConcurrentInvocationsHaveSeparateStorage) {
   LowerRunAndCheck(f, design, {{"r1", 11u}, {"r2", 22u}});
 }
 
-// §13.3.2: all variables of a static task are static -- a single variable per
-// declared local in the module instance, regardless of how many activations are
-// concurrent. The same fork enters a static task twice; both activations share
-// the one storage cell, so the second activation's write is what both read back
-// after the delay. Shared storage yields 22 and 22; per-invocation storage
-// would (wrongly) preserve the first activation's 11.
 TEST(TaskMemorySim, StaticTaskConcurrentInvocationsShareStorage) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -208,10 +170,6 @@ TEST(TaskMemorySim, StaticTaskConcurrentInvocationsShareStorage) {
   LowerRunAndCheck(f, design, {{"r1", 22u}, {"r2", 22u}});
 }
 
-// §13.3.2: variables of a static task, its input, output and inout arguments
-// among them, keep their values from one invocation to the next. An output
-// queue formal is copied nothing into, so the second call pushes onto what the
-// first left in it, and the actual receives both elements.
 TEST(TaskMemorySim, StaticTaskOutputQueueFormalRetainsValue) {
   auto val = RunAndGet(
       "module t;\n"
@@ -248,7 +206,6 @@ TEST(TaskMemorySim, StaticFunctionOutputFixedFormalRetainsValue) {
   EXPECT_EQ(val, 5u);
 }
 
-// A static task's queue local is kept between invocations as a scalar is.
 TEST(TaskMemorySim, StaticTaskQueueLocalRetainsValue) {
   auto val = RunAndGet(
       "module t;\n"

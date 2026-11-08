@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Builds a binary plus expression of two 16-bit integer literals
-// ("16'h0 + 16'h0") in the given arena, returning the plus node.
 static Expr* MakeSixteenBitAddition(Arena& arena) {
   auto* a = arena.Create<Expr>();
   a->kind = ExprKind::kIntegerLiteral;

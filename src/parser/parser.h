@@ -28,20 +28,11 @@
 
 namespace delta {
 
-// §23.9: restores Parser::known_types_ and known_nettypes_ when a scope
-// closes; defined in parser/parser_type_name_scope.h.
 class TypeNameScope;
-// §19.3: the state a covergroup body is read with; defined in
-// parser/parser_covergroup_internal.h.
 struct CovergroupBodyState;
-// A.2.1.3: a data_declaration's qualifiers; defined in
-// parser/parser_data_decl_internal.h.
 struct DataDeclQualifiers;
-// A.2.7: what a tf_port_declaration's declarators share; defined in
-// parser/parser_subroutine_body.cpp.
 struct TfPortHeader;
 
-// A.1.11: the report on an item an anonymous program does not admit.
 inline constexpr char kAnonymousProgramItemsMessage[] =
     "an anonymous program may contain only task, function, class, interface "
     "class, covergroup, and class constructor declarations";
@@ -53,39 +44,14 @@ class Parser {
   CompilationUnit* Parse();
   CompilationUnit* ParseLibraryText();
 
-  // §3.12.1 case a) makes every file of one compilation command line a single
-  // compilation unit, whose declarations each file then sees under the
-  // ordinary visibility rules, and one parser reads one file. These two are how
-  // a caller building that single compilation unit out of several files hands
-  // the compilation-unit scope from one file's parse to the next: without them
-  // a later file reads `byte_t b;` as an instantiation of a module called
-  // byte_t, because whether an identifier names a type decides how the
-  // declaration after it parses, and `import p::*;` puts nothing back because
-  // the parse has never heard of p.
-  //
-  // Call AdoptCompilationUnitScope before Parse and read CompilationUnitScope
-  // after it. What the second answers with is the compilation-unit scope and
-  // nothing narrower: every design element's own type names were taken back out
-  // by its TypeNameScope at its closing keyword, which is what makes the set
-  // safe to carry into a file that never saw that design element. The package
-  // and class entries are what §26.3's import declaration and §8.13's extends
-  // clause put back, and they are kept past their scope's closing keyword for
-  // exactly that reason, so they are carried whole. known_udps_ is the whole
-  // compilation-unit scope already: TypeNameScope saves and restores
-  // known_types_ and known_nettypes_ alone, and nothing else narrows it.
   void AdoptCompilationUnitScope(const CompilationUnitScopeNames& names);
   CompilationUnitScopeNames CompilationUnitScope() const;
 
-  // §3.12.1 (printed page 56): a declaration incomplete at the end of a file
-  // extends its compilation unit into the next file. True where the last
-  // Parse() reported an error at its end of input, which wanted more there.
   bool EndedInsideDeclaration() const { return ended_inside_declaration_; }
 
  private:
-  // Shared gate/UDP instance-tail parser (see parser_instance_internal.h).
   friend void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name);
   friend class TypeNameScope;
-  // File-local CPD-dedup helpers (defined static in their respective TUs).
   friend struct ParserStmtHelpers;
   friend struct ParserPortHelpers;
   friend struct ParserParamPortHelpers;
@@ -100,9 +66,6 @@ class Parser {
   friend struct ParserDataDeclHelpers;
   friend struct ParserClassOverrideHelpers;
   friend struct ParserConfigHelpers;
-  // Expect reports through the diagnostic engine and is reached from nowhere
-  // but this class, so the only way to ask what it reports is from inside it.
-  // Defined in test/src/unit/test_non_lrm_parser_expect.cpp.
   friend struct ParserExpectAccess;
 
   void ParseTopLevel(CompilationUnit* unit);
@@ -115,17 +78,9 @@ class Parser {
   bool StaticOpensConstraint();
   bool AtScopedIdentifier();
   bool TryParseCuScopeItem(CompilationUnit* unit);
-  // §H.9.2 with A.1.2: a DPI import or export can be declared at compilation-
-  // unit scope, whose description admits a package_item and through it A.1.11's
-  // dpi_import_export. Reads one import or export declaration standing there
-  // into unit->cu_items and answers whether one stood; a false answer consumed
-  // nothing.
   bool TryParseCuImportOrExportDecl(CompilationUnit* unit);
   void ParseOutOfBlockConstraint(CompilationUnit* unit,
                                  const std::vector<ModuleItem*>* scope_items);
-  // 18.5.1 with A.1.11: reads an extern_constraint_declaration standing as an
-  // item of the body whose items are `items`, recording `items` as its scope,
-  // and answers whether one stood; a false answer consumed nothing.
   bool TryParseExternConstraintItem(std::vector<ModuleItem*>& items);
 
   ModuleDecl* ParseModuleDecl();
@@ -148,7 +103,6 @@ class Parser {
   PortDecl ParsePortDecl(bool is_checker);
   void ParseModuleBody(ModuleDecl& mod);
   bool TryParseBodyPortDecl(ModuleDecl& mod);
-  // §5.12: `attrs` are those written before the declaration.
   void ParseNonAnsiPortDecls(ModuleDecl& mod,
                              std::vector<Attribute> attrs = {});
   void ParseModuleItem(std::vector<ModuleItem*>& items);
@@ -190,14 +144,6 @@ class Parser {
   void ParseParamsPortsAndSemicolon(ModuleDecl& decl);
 
   void ParseGenerateRegion(std::vector<ModuleItem*>& items);
-  // else_may_follow says whether A.4.2 lets an `else` stand after the
-  // generate_block being read, which is true of the first generate_block of an
-  // if_generate_construct and of no other position the production admits. It
-  // decides whether the item loop stops at an `else` or hands it on as an item.
-  // out_has_begin_end is set true when the block read was the `begin`/`end`
-  // form of A.4.2's generate_block and false when it was the single
-  // generate_item form or the null block `;`, which is the distinction §27.5
-  // rests on and which is not recoverable from the items alone.
   void ParseGenerateBody(std::vector<ModuleItem*>& body,
                          std::string_view& out_label, bool& out_has_begin_end,
                          bool else_may_follow);
@@ -214,12 +160,6 @@ class Parser {
   ModuleDecl* ParseProgramDecl();
   void ParseModportDecl(std::vector<ModportDecl*>& out);
   void ParseModportItem(ModportDecl* mp);
-  // What the modport_ports_declaration being read opened with, and so what a
-  // bare entry after a ',' continues: A.2.9's modport_simple_ports_declaration
-  // continues with modport_simple_ports of its port_direction, its
-  // modport_tf_ports_declaration with modport_tf_ports of its import_export,
-  // and its modport_clocking_declaration, one clocking_identifier, with
-  // nothing.
   struct ModportScan {
     enum class Opened : uint8_t { kNothing, kSimple, kTf, kClocking };
     Opened opened = Opened::kNothing;
@@ -244,8 +184,6 @@ class Parser {
   bool TryParseKeywordClassMember(std::vector<ClassMember*>& members,
                                   ClassMember* member, bool proto);
   bool ParseClassQualifiers(ClassMember* member);
-  // The qualifiers A.1.9 lets stand before one kind of class_item, as a set
-  // of ClassQualifier bits, for RejectMisplacedClassQualifiers.
   enum ClassQualifier : uint16_t {
     kQualRand = 1,
     kQualRandc = 2,
@@ -278,9 +216,6 @@ class Parser {
   void CaptureSoftConstraintRelation(ClassMember* member);
   void CaptureDisableSoftConstraint(ClassMember* member);
   bool TryCaptureBracedImplication(ClassMember* member);
-  // 18.5.13.2: an implied relation of a constraint set and whether it was
-  // written soft, and the parse of one from the token after the '->' or
-  // within the braces.
   struct ImpliedRelation;
   Expr* ParseImpliedRelation(Expr* antecedent, bool& soft);
   bool ParseImpliedSet(Expr* antecedent, std::vector<ImpliedRelation>& out);
@@ -299,8 +234,6 @@ class Parser {
   void CaptureLinearSequenceBody(ModuleItem* item);
   bool AtSelectBracket();
   bool in_sequence_body_ = false;
-  // §16.12.1: the clocked boolean body of a named property, kept so an
-  // instance of the property can be evaluated as an assertion in that form.
   void CaptureClockedBooleanPropertyBody(ModuleItem* item);
   bool PropertyBodyHasTemporalOperator();
   void CheckConstraintExprToken(const Token& tok);
@@ -324,8 +257,6 @@ class Parser {
   Expr* ParsePathpulseLimits(Expr*& error_limit);
 
   UdpDecl* ParseUdpDecl();
-  // Chooses between A.5.2's two port lists for the header in hand, and is what
-  // both ParseUdpDecl and ParseExternUdpDecl choose on.
   bool UdpPortListIsDeclarations();
   UdpAnsiPortEntry ParseUdpAnsiPortEntry();
   void ParseUdpAnsiHeader(UdpDecl* udp);
@@ -337,10 +268,6 @@ class Parser {
   void ParseUdpOutputDecl(UdpDecl* udp);
   void ParseUdpPortDecls(UdpDecl* udp);
   void ParseUdpTable(UdpDecl* udp);
-  // `reg_mismatch_reported` carries §29.3.2's report across the rows of one
-  // table, so a table whose every row disagrees with the reg declaration draws
-  // one report rather than one per row, and `row_width_reported` carries
-  // §29.3.4's the same way. ParseUdpTable owns both.
   void ParseUdpTableRow(UdpDecl* udp, bool& reg_mismatch_reported,
                         bool& row_width_reported);
 
@@ -380,9 +307,6 @@ class Parser {
   void ParseCovergroupDecl(std::vector<ModuleItem*>& items);
   void RejectDerivedCovergroupTail();
   void RejectNamedCovergroupExtends();
-  // The syntactic level a coverage option or bins item stands at inside a
-  // covergroup body (§19.7, Table 19-2); the covergroup level itself takes
-  // every instance option.
   enum class CovItemLevel : uint8_t { kCoverpoint, kCross };
   void ParseCoverageFormalList(std::vector<FunctionArg>& args,
                                std::string_view output_message,
@@ -427,10 +351,6 @@ class Parser {
   void CheckTransitionBins(const BinsOrOptions& bins);
   void ParseCoverCross(CovergroupBodyState& state, std::string_view label,
                        SourceLoc label_loc);
-  // §19.6: consume a cross's list_of_cross_items (positioned just after the
-  // `cross` keyword) up to the optional `iff`/body, enforcing that it names at
-  // least two bare cover_point/variable identifiers and no direct expressions,
-  // and record each item it names.
   void ValidateCrossItemList(std::vector<CrossItem>& items);
   void ParseCrossBody(CoverCrossDecl& cross, CovergroupBodyState& state);
   void ParseCrossBodyItem(CoverCrossDecl& cross, CovergroupBodyState& state);
@@ -487,9 +407,6 @@ class Parser {
   Token ParseFilePathSpec();
   SourceLoc ParseFilePathSpecList(std::vector<std::string_view>& paths);
   bool MatchIncdirOption();
-  // Copies text into the parser arena so the resulting view outlives the
-  // SourceManager that produced the token (needed for library-map loading,
-  // which parses each map file with a throwaway local SourceManager).
   std::string_view ArenaCopy(std::string_view text);
   void ParseBindItem(std::vector<ModuleItem*>& items);
   BindDirective* ParseBindDirective();
@@ -528,9 +445,6 @@ class Parser {
                              const std::vector<Attribute>& member_attrs,
                              bool is_rand, bool is_randc);
   DataType ParseFunctionReturnType();
-  // Dispatches an inline enum/struct/union type (which ParseDataType does not
-  // handle) into the appropriate parser, applying any trailing packed dims.
-  // Returns true and fills dt when an aggregate keyword was consumed.
   bool TryParseInlineAggregateType(DataType& dt);
   void ParseDynamicOverrideSpecifiers(ModuleItem* item);
   Direction ParseArgDirection(FunctionArg& arg, Direction sticky_dir,
@@ -539,13 +453,7 @@ class Parser {
   void ParseFuncBody(ModuleItem* item);
   ModuleItem* ParseFunctionDecl(bool prototype_only = false);
   ModuleItem* ParseTaskDecl(bool prototype_only = false);
-  // Carried state of the tf_port_item scan in ParseFunctionArgs (§8.17/§13.3):
-  // sticky direction, whether a 'default' sentinel was seen, the previous
-  // argument's data type, whether this is the first argument, and whether the
-  // previous slot was the 'default' sentinel.
   struct FuncArgScan {
-    // Whether the list is a class_constructor_arg_list, the one A.1.9 lets a
-    // `default` argument stand in.
     bool constructor_args = false;
     Direction sticky_dir = Direction::kInput;
     bool seen_default = false;
@@ -593,13 +501,8 @@ class Parser {
   void ParseScopedTypeOrInst(const Token& name_tok,
                              std::vector<ModuleItem*>& items);
   bool LooksLikeScopedInstTail();
-  // §17.3: whether a statement opens with a checker_instantiation, and the
-  // statement read from it.
   bool AtCheckerInstantiationStmt();
   Stmt* ParseCheckerInstantiationStmt();
-  // True where the tokens after the leading identifier are one more identifier
-  // and a semicolon and nothing else, which is the shape §6.18's undeclared
-  // type_identifier and a port-list-less instantiation share.
   bool LooksLikeUndeclaredTypeDecl();
   void ParsePlainVarDecl(const Token& name_tok,
                          std::vector<ModuleItem*>& items);
@@ -612,9 +515,6 @@ class Parser {
       std::vector<std::pair<std::string_view, Expr*>>& out);
   bool ParsePortConnection(ModuleItem* item);
   Expr* ParsePortActual();
-  // §16.13.6: records the name `triggered` or `matched` is applied to in
-  // `base`, its last name, or its callee where it is an instance with
-  // arguments; see CompilationUnit::triggered_names.
   void RecordTriggeredRead(const Expr* base);
   void ParseUnpackedDims(std::vector<Expr*>& dims);
   Expr* ParseAssocIndexDim();
@@ -649,11 +549,6 @@ class Parser {
   Stmt* ParseVoidCastCallStmt();
   Stmt* ParseAssignmentOrExprStmt();
   Stmt* ParseAssignmentOrExprNoSemi();
-  // §11.3.6: an assignment within an expression is enclosed in parentheses.
-  // Called once an expression has been read and the construct's closing token
-  // is due: a `=` standing there is the assignment its parentheses were left
-  // off, reported at the `=` and read through with every `= expr` chained
-  // after it, so the closing token is met where the author's construct ends.
   void SkipUnparenthesizedAssignInExpr();
   Stmt* ParseCycleDelayStmt();
   Stmt* ParseDelayStmt();
@@ -665,13 +560,7 @@ class Parser {
   Stmt* ParseReleaseStmt();
   bool IsBlockVarDeclStart();
   bool IsBlockVarDeclStartCore();
-  // True when the current identifier is followed by `::` and another
-  // identifier, the `pkg::t` or `Cls::t` spelling of A.2.2.1's scoped
-  // type_identifier. The lexer position is restored before returning.
   bool AtScopedTypeName();
-  // True when a leading type name, known or scoped, is actually a scoped
-  // statement (Class::method(...) call or Class::prop = ... assignment), not a
-  // scoped-type declaration. Assumes the current token is the type name.
   bool IsScopedCallOrAssignStmt();
   void ParseBlockVarDecls(std::vector<Stmt*>& stmts);
   void ParseBlockDataDecl(std::vector<Stmt*>& stmts,
@@ -788,18 +677,6 @@ class Parser {
 
   DataType ParseDataType();
   DataType ParseDeclaredDataType();
-  // True when the token the parse stands on opens a `data_type_or_void`
-  // (A.2.2.1), for a caller whose production makes that type optional and so
-  // has to decide whether one is written before it parses it. It answers for
-  // the whole of A.2.2.1's `data_type` rather than for its keyword cases
-  // alone: an identifier opens one when it names a type this scope has
-  // declared, which `known_types_` is what records.
-  //
-  // A leading `signing` or packed dimension is admitted too. Neither opens a
-  // `data_type` -- A.2.2.1 attaches `signing` to `integer_vector_type` and
-  // `integer_atom_type` and puts a bare one in `implicit_data_type` -- and
-  // ParseFunctionReturnType accepts both, so a caller sizing up what that
-  // function can consume gets the same answer here.
   bool AtDataTypeOrVoid();
   bool TryParseNetDataType(DataType& dtype, bool has_intervening);
   void ParsePackedDims(DataType& dtype);
@@ -807,25 +684,13 @@ class Parser {
   void TakeUnsizedPackedDim(DataType& dtype);
   DataType ParseVirtualInterfaceType();
   std::vector<EventExpr> ParseEventList();
-  bool OpensEventGroup(bool edges_only);  // at `(`: an event group follows
+  bool OpensEventGroup(bool edges_only);
   EventExpr ParseSingleEvent();
-  // §9.4 Syntax 9-4: a clocking_event written without parentheses, `@name`,
-  // the name read alone rather than as an expression.
   EventExpr ParseNamedClockingEvent();
 
   std::string_view ParseDottedPath();
-  // Consume the next token when it is the one asked for, and report it
-  // missing otherwise. Each caller is parsing a different production of the
-  // syntax and so enforcing a different rule, so the subclause of IEEE
-  // 1800-2023 the report names comes from the caller: a subclause written into
-  // either of these two would be right for one caller and wrong for every
-  // other. There is no form that omits it.
   Token Expect(TokenKind kind, Subclause subclause);
   Token ExpectIdentifier(Subclause subclause);
-  // Where ExpectIdentifier finds no identifier: takes a system identifier, or
-  // a decimal literal with an identifier directly against it, as the simple
-  // identifier whose first character §5.6 forbids, reporting it under §5.6
-  // and answering whether it did.
   bool TryTakeIllFormedSimpleIdentifier(Token* out);
   void MatchEndLabel(std::string_view name);
   bool CheckIdentifier();
@@ -836,51 +701,25 @@ class Parser {
   bool AtEnd();
   SourceLoc CurrentLoc();
   void Synchronize();
-  // Whether an error reported since report `first_report` is at the token now.
   bool ReportedAtEnd(size_t first_report);
-  // Synchronize() that guarantees forward progress: a body parse loop ending
-  // on its own end keyword alone would spin forever when Synchronize() halts
-  // on a foreign block-closing keyword without consuming it.
   void SynchronizeWithProgress();
 
-  // Makes every name of `names` a type name where the parser now stands.
   void AdoptTypeNames(const ScopeTypeNames& names);
-  // Applies one package_import_item to what the parser reads as a type name.
   void ApplyImportedTypeNames(const ImportItem& item);
-  // Makes the type names of the classes `decl` derives from type names in its
-  // own body, and those of the class named `class_name`, when this parse
-  // declared it, type names in the out-of-block method the parser stands in.
   void AdoptBaseClassTypeNames(const ClassDecl* decl);
   void AdoptMethodClassTypeNames(std::string_view class_name);
 
   Lexer& lexer_;
   Arena& arena_;
   DiagEngine& diag_;
-  // §16.13.6: see RecordTriggeredRead.
   std::unordered_set<std::string_view> triggered_names_;
-  std::vector<TimeLiteralSite> time_literals_;  // §5.8: see MakeLiteral.
-  ScopePrefixRecord scope_prefixes_;            // §3.12: see Consume.
+  std::vector<TimeLiteralSite> time_literals_;
+  ScopePrefixRecord scope_prefixes_;
   std::unordered_set<std::string_view> known_types_;
   std::unordered_set<std::string_view> known_nettypes_;
   std::unordered_set<std::string_view> known_udps_;
-  // The names of the modules, interfaces and programs declared so far in this
-  // parse, extern declarations included. §24.3 keeps out of a program any
-  // instance of a module, an interface or another program, and an
-  // instantiation names its cell by an identifier the parser can tell nothing
-  // from, so the report is made here only for a cell declared before the
-  // program that instantiates it; every other name is left to the elaborator,
-  // which knows every declaration and reports the same rule. A checker's name
-  // is never here, since A.1.7's non_port_program_item reaches a
-  // checker_instantiation through concurrent_assertion_item and §17.3 lets a
-  // checker be instantiated at any place a concurrent assertion can be.
   std::unordered_set<std::string_view> declared_design_elements_;
 
-  // What each package and each class declared, keyed by its own name and kept
-  // after that scope has closed. known_types_ answers what is a type name where
-  // the parser stands; these two answer what §26.3's import declaration and
-  // §8.13's extends clause can put back into it. They are maps rather than more
-  // saved sets because a package's names reach a module that named the package,
-  // not one containing it, and containment is all TypeNameScope expresses.
   std::unordered_map<std::string_view, ScopeTypeNames> package_types_;
   std::unordered_map<std::string_view, ScopeTypeNames> class_types_;
 
@@ -891,49 +730,22 @@ class Parser {
   bool InModuleBody() const;
   bool InInterfaceBody() const;
   bool InCheckerBody() const;
-  // True while a package's own items are read: not a design element declared
-  // inside the package, whose body is that element's, and not an anonymous
-  // program in it, which FilterAnonymousProgramItems in parser.cpp holds to
-  // A.1.11's anonymous_program_item.
   bool InPackageBody() const;
   int generate_block_depth_ = 0;
   bool InGenerateBlock() const { return generate_block_depth_ > 0; }
   bool in_generate_region_ = false;
   void ParseGenerateItem(std::vector<ModuleItem*>& items);
 
-  // How many of §18.17's rs_code_block are open around the statement being
-  // read. A.6.12 gives `rs_code_block ::= { { data_declaration }
-  // { statement_or_null } }`, so the block a statement stands in is closed by a
-  // right brace rather than by a keyword, and the statement loops of
-  // Parser::ParseBlockStmt and Parser::ParseForkStmt have to stop at one to
-  // leave it for Parser::ParseRsCodeBlockStmts. The count is what tells that
-  // brace from the one closing a concatenation under §11.4.12 or an assignment
-  // pattern under §10.9, neither of which any statement loop ever meets: both
-  // are consumed by the expression that opened them.
   int rs_code_block_depth_ = 0;
   bool ClosesOpenRsCodeBlock(TokenKind tk) const {
     return tk == TokenKind::kRBrace && rs_code_block_depth_ > 0;
   }
 
-  // §16.14: how many always or initial procedures the statement being parsed
-  // stands in, which are the only procedural code a concurrent assertion
-  // statement may be specified in. ParseAlwaysBlock and ParseInitialBlock
-  // count it and ParseProceduralConcurrentAssertLike reads it.
   int always_or_initial_depth_ = 0;
-  // §16.14.3 has its own rule against a concurrent assertion statement in a
-  // cover statement's pass statement, which the elaborator reports, so the
-  // §16.14 report stays out of one; ParseCoverProperty counts them.
   int cover_pass_statement_depth_ = 0;
-  // A.6.7.1: how many patterns the expression being read stands in, opened by
-  // `matches` and a pattern-matching case item. A `.name` or `.*` is reported
-  // where none is open, and the `&&&` filter after a pattern opens none.
   int pattern_depth_ = 0;
-  // Open constraint blocks, within which local:: is left to their own check.
   int constraint_block_depth_ = 0;
 
-  // §H.2: true while the formal argument list of a DPI import declaration is
-  // being parsed. Leaving a packed range unspecified is a relaxation granted to
-  // those formals alone, so the "[]" packed form is recognized only here.
   bool in_dpi_import_formals_ = false;
   int class_body_depth_ = 0;
   int package_body_depth_ = 0;

@@ -15,16 +15,6 @@
 
 namespace {
 
-// §6.19.2's Table 6-10 (printed page 121) has a `name[N]` member generate the
-// named constants name0 through nameN-1 and a `name[N:M]` member nameN through
-// nameM, the written name naming no constant, and §26.6 (printed 815) makes an
-// import of a declaration reached through an export an import of the original
-// declaration. p2 hands on everything it imports from p1, so `p2::VAL2` and
-// `p2::VAL1` name p1's constants. Before, PopulatePackageProvidedNames in
-// src/elaborator/elaborator_scope_rules_names.cpp held the member under the
-// written name VAL alone, and each read was reported as a name p2 neither
-// declares nor exports; the "p1.VAL2" constant the registration records is
-// keyed by the declaring package and answered for p1 only.
 TEST(PackageImport, RangedEnumConstantsAreProvidedThroughAWildcardExport) {
   EXPECT_TRUE(
       ElabOk("package p1;\n"
@@ -41,11 +31,6 @@ TEST(PackageImport, RangedEnumConstantsAreProvidedThroughAWildcardExport) {
              "endmodule\n"));
 }
 
-// The written name of a ranged member declares nothing (printed 121), so
-// §26.3's scope resolution operator (printed 808) finds no declaration of p1
-// under it: `p1::VAL` is reported at its own line while `p1::VAL2`, one of
-// the constants the member generates, is not. Before, the provided-name walk
-// admitted VAL as a declaration of p1 and the read passed.
 TEST(PackageScopeReference, WrittenNameOfARangedMemberIsNoDeclaration) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -68,11 +53,6 @@ TEST(PackageScopeReference, WrittenNameOfARangedMemberIsNoDeclaration) {
                             7, "26.3"));
 }
 
-// §26.3 (printed 810) makes every identifier a wildcard-imported package
-// declares a candidate for a bare reference, and the constants a ranged
-// member generates are such identifiers, for the `name[N]` form and the
-// decrementing `name[N:M]` form alike (printed 121): VAL2 and W1 both resolve
-// through the import, VAL2 the last of VAL0..VAL2 and W1 the last of W3..W1.
 TEST(PackageImport, BareRangedEnumConstantResolvesThroughAWildcardImport) {
   EXPECT_TRUE(
       ElabOk("package p1;\n"
@@ -85,9 +65,6 @@ TEST(PackageImport, BareRangedEnumConstantResolvesThroughAWildcardImport) {
              "endmodule\n"));
 }
 
-// §26.3 (printed 809-810) has an explicit import make the one identifier it
-// names locally visible, and a generated constant is an identifier p1
-// declares, so `import p1::VAL2;` brings VAL2 in for a bare read.
 TEST(PackageImport, ExplicitImportOfARangedEnumConstantIsClean) {
   EXPECT_TRUE(
       ElabOk("package p1;\n"
@@ -100,11 +77,6 @@ TEST(PackageImport, ExplicitImportOfARangedEnumConstantIsClean) {
              "endmodule\n"));
 }
 
-// Counting the generated constants as the declaring package's admits nothing
-// else and conflicts as §26.3 (printed 810) rules: p and q each generate VAL1
-// from a ranged member of their own, so the bare read on line 11 matches an
-// identifier the wildcard imports of two packages both define and is reported
-// as ambiguous, as a plain member of each would be.
 TEST(PackageImport, GeneratedEnumConstantsOfTwoImportsAreAmbiguous) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -127,16 +99,6 @@ TEST(PackageImport, GeneratedEnumConstantsOfTwoImportsAreAmbiguous) {
                             11, "26.3"));
 }
 
-// §6.19 (printed page 119) has an enumerated type declare its literals as
-// named constants of the scope holding it, and Syntax 6-5 makes the enum form
-// a data_type, so p's `enum {X, Y} v;` declares X and Y in p as a typedef
-// would; §26.3 (printed 810) then makes each a candidate the wildcard import
-// brings in. The module elaborates clean, Y has the backing variable an
-// imported literal is read through, and a local parameter reading Y folds to
-// 1, the second member of a zero-based enumeration (printed 120). Before,
-// EmitEnumLiteralsOfItems in src/elaborator/elaborator_typedef.cpp walked a
-// package's typedefs alone, so Y had no backing variable in the module and
-// the local parameter did not fold.
 TEST(PackageImport, BareEnumDataDeclarationLiteralsComeThroughAWildcardImport) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -158,10 +120,6 @@ TEST(PackageImport, BareEnumDataDeclarationLiteralsComeThroughAWildcardImport) {
   EXPECT_EQ(l->resolved_value, 1);
 }
 
-// A.2.1.3 gives one data declaration several declarators, and §6.19's own
-// `enum {red, yellow, green} light1, light2;` declares its three constants
-// once for the declaration rather than once per name, so the import brings Y
-// in once: the module holds one backing variable for it.
 TEST(PackageImport, ASharedEnumDeclarationImportsItsLiteralsOnce) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -178,15 +136,6 @@ TEST(PackageImport, ASharedEnumDeclarationImportsItsLiteralsOnce) {
   EXPECT_EQ(CountVarsEndingIn(design, "m", "Y"), 1u);
 }
 
-// §26.3 (printed 810) searches the locally visible identifiers, those the
-// scope declared before the reference among them, ahead of the candidates a
-// wildcard import supplies, so q's own VAL1, generated by its `VAL[2]`
-// (Table 6-10, printed 121) and worth 1, is what q's local parameter reads,
-// and not p's VAL1, worth 6 through `VAL[2] = 5`; a module reading `q::L`
-// folds to 1 with no report. Before, NamesDeclaredBefore in
-// src/elaborator/elaborator_enum_constants.cpp held the ranged member under
-// its written name VAL alone, so BindPackageImportConstants took VAL1 for a
-// name q had not declared and bound p's value over q's own, and L read 6.
 TEST(PackageImport, OwnGeneratedEnumConstantShadowsAWildcardImportsInAPackage) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -210,13 +159,6 @@ TEST(PackageImport, OwnGeneratedEnumConstantShadowsAWildcardImportsInAPackage) {
   EXPECT_EQ(m->resolved_value, 1);
 }
 
-// §26.3 (printed page 808): the package scope resolution operator reaches a
-// package's class without an import, so `p::C c;` in a module that imports
-// nothing from p declares a handle of p's class, under the "p::C" key the
-// simulator holds the class by. The elaborator marked a variable a handle only
-// when the type's bare name was one the module's scope reached, which a class
-// of a package the module does not import is not, so `c` was left a value of
-// no class and its `new` constructed nothing.
 TEST(PackageScopeReference, PackageQualifiedClassDeclaresAHandleWithoutImport) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -235,13 +177,6 @@ TEST(PackageScopeReference, PackageQualifiedClassDeclaresAHandleWithoutImport) {
   EXPECT_EQ(mod->variables[0].class_type_name, "p::C");
 }
 
-// §26.2 with §6.18: a package's typedef names a type as the package sees it,
-// so B, declared `typedef C B;` in p, names p's C whatever a module importing
-// p declares under the name C. Here the module's own C names p's B, and the
-// elaborator, which looked B's type C up among the module's names, followed C
-// to B and B back to C until the stack ran out (#5815); x is now p's C, four
-// bits. A typedef of p already written behind a package's scope, q::T, keeps
-// it, and names the module's nine-bit T no more than before.
 TEST(PackageScopeReference, AnImportedTypedefNamesItsOwnPackagesTypedef) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -266,9 +201,6 @@ TEST(PackageScopeReference, AnImportedTypedefNamesItsOwnPackagesTypedef) {
   EXPECT_EQ(y->width, 2u);
 }
 
-// §26.2 with §6.18: the same chain ending at a class of the package, whose
-// handle the module's C declares, elaborates (#5815). The class's name K is
-// no typedef of p, so B's C is p's typedef and C's K is left as written.
 TEST(PackageScopeReference, AnImportedTypedefChainEndingAtAPackageClass) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -286,9 +218,6 @@ TEST(PackageScopeReference, AnImportedTypedefChainEndingAtAPackageClass) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §26.3 (printed pages 809-810): a function body is a scope of its own, held
-// to the import rules a module body is. Wildcard imports of two packages
-// declaring c make a read of c ambiguous. Nothing in a body was checked.
 TEST(PackageScopeReference, AmbiguousWildcardReadInAFunctionBody) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -308,9 +237,6 @@ TEST(PackageScopeReference, AmbiguousWildcardReadInAFunctionBody) {
                             7, "26.3"));
 }
 
-// A declaration following a read the body's wildcard import resolved, here
-// in the initializer of the declaration before it, is illegal in the body as
-// in a module.
 TEST(PackageScopeReference, DeclarationAfterAWildcardClaimInATaskBody) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -331,7 +257,6 @@ TEST(PackageScopeReference, DeclarationAfterAWildcardClaimInATaskBody) {
                             7, "26.3"));
 }
 
-// An explicit import of a name the body declares collides with it.
 TEST(PackageScopeReference, ExplicitImportBesideALocalInAFunctionBody) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -349,7 +274,6 @@ TEST(PackageScopeReference, ExplicitImportBesideALocalInAFunctionBody) {
                             4, "26.3"));
 }
 
-// A body whose import and declarations agree elaborates.
 TEST(PackageScopeReference, FunctionBodyImportElaborates) {
   EXPECT_TRUE(
       ElabOk("package p; int c = 1; endpackage\n"
@@ -362,12 +286,6 @@ TEST(PackageScopeReference, FunctionBodyImportElaborates) {
              "endmodule\n"));
 }
 
-// §26.3 has an import make a package's declarations visible by their own
-// names, a nettype among them, and §6.6.7 makes a declaration written with a
-// nettype's name a net of that nettype. So n, under a wildcard import, and w,
-// under an explicit one, are nets of P's nt resolving through P's pres. Under
-// §6.22.6 n is of P's nt itself, so the pass switch joining it to a net of a
-// nettype renaming P::nt joins nets of one nettype (#7599).
 TEST(PackageImport, ImportedNettypeDeclaresANetOfThePackagesNettype) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -401,12 +319,6 @@ TEST(PackageImport, ImportedNettypeDeclaresANetOfThePackagesNettype) {
   }
 }
 
-// §26.3 continues a search that fails in a scope into the next outer lexical
-// scope, among the identifiers a wildcard import written there before the
-// point of the reference offers, and §24.3 makes a program declared in a
-// module a scope nested in it. So the program's call of set_v finds the task
-// the module imports from pkg above the program. Its own items holding no
-// import, it was reported as an undeclared identifier.
 TEST(PackageImport, ANestedProgramCallsATaskItsModuleWildcardImports) {
   ElabFixture f;
   ElaborateSrc(
@@ -424,7 +336,6 @@ TEST(PackageImport, ANestedProgramCallsATaskItsModuleWildcardImports) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The same through an explicit import of the task.
 TEST(PackageImport, ANestedProgramCallsATaskItsModuleExplicitlyImports) {
   ElabFixture f;
   ElaborateSrc(
@@ -442,9 +353,6 @@ TEST(PackageImport, ANestedProgramCallsATaskItsModuleExplicitlyImports) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The search goes on through each outer lexical scope in turn (§26.3): a
-// program in a module nested in top reaches the import top writes above the
-// nested module.
 TEST(PackageImport, ANestedProgramCallsATaskAnOuterModuleImports) {
   ElabFixture f;
   ElaborateSrc(
@@ -464,11 +372,6 @@ TEST(PackageImport, ANestedProgramCallsATaskAnOuterModuleImports) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §26.3 searches an outer scope's locally visible identifiers, those an
-// explicit import makes visible among them, and for a task or function call
-// takes them to the end of the scope. So the program's call of set_v finds the
-// task the module explicitly imports below the program. It was reported as an
-// undeclared identifier.
 TEST(PackageImport, ANestedProgramCallsATaskItsModuleExplicitlyImportsBelowIt) {
   ElabFixture f;
   ElaborateSrc(
@@ -486,11 +389,6 @@ TEST(PackageImport, ANestedProgramCallsATaskItsModuleExplicitlyImportsBelowIt) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A reference other than a call reaches only what the outer scope makes
-// visible before the point of the reference (§26.3), so the program's write
-// of w, which the module imports only below the program, names nothing,
-// whether the import names w or is a wildcard import of the package
-// declaring it.
 TEST(PackageImport, ANestedProgramWritesNoVariableItsModuleImportsBelowIt) {
   for (const char* imported : {"pkg::w", "pkg::*"}) {
     ElabFixture f;
@@ -512,11 +410,6 @@ TEST(PackageImport, ANestedProgramWritesNoVariableItsModuleImportsBelowIt) {
   }
 }
 
-// §26.3 with §7.4.4: `p::t` names package p's array typedef whatever t the
-// module declares itself, so a task's formal and its body's variable written
-// with it, and a function returning it, each take p's two elements. Each took
-// the module's three, the typedef's dimensions being looked up by the bare
-// name.
 TEST(PackageScopeReference,
      PackageScopedArrayTypedefKeepsThePackagesDimensions) {
   ElabFixture f;

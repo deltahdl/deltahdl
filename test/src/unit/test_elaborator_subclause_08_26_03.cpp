@@ -99,10 +99,6 @@ TEST(InterfaceClassTypeAccess, ScopeResolutionAccessToEnumValue) {
              "endmodule\n"));
 }
 
-// §8.26.3 elaboration case: a typedef whose definition uses the interface
-// class's type parameter resolves against the specialization named on the left
-// of ::, so IntfA#(bit)::T2 elaborates to bit[1:0]. The parser file for this
-// subclause carries the matching claim that the syntax itself parses.
 TEST(InterfaceClassTypeAccess,
      ScopeResolutionAccessToTypedefOfSpecializedInterfaceClass) {
   EXPECT_TRUE(
@@ -117,9 +113,6 @@ TEST(InterfaceClassTypeAccess,
              "endmodule\n"));
 }
 
-// §8.26.3 negative: a typedef of an interface class is not inherited through
-// 'implements'. Referencing it unqualified as a member type in the implementing
-// class is the error the LRM example marks. Mirrors the standard's Example 2.
 TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInImplementingClassIsError) {
   ElabFixture f;
   ElabOk(
@@ -141,9 +134,6 @@ TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInImplementingClassIsError) {
                             "8.26.3"));
 }
 
-// §8.26.3 accepting path (control): the same member typed with the interface
-// scope prefix resolves and is legal, so the rule keys on the unqualified form
-// only.
 TEST(InterfaceClassTypeAccess, TypedefQualifiedMemberInImplementingClassOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfC;\n"
@@ -160,10 +150,6 @@ TEST(InterfaceClassTypeAccess, TypedefQualifiedMemberInImplementingClassOk) {
              "endmodule\n"));
 }
 
-// §8.26.3 negative, input-form: the rule is not specific to the enum typedef of
-// the LRM example — a plain scalar typedef of the interface is equally not
-// inherited through 'implements', so its unqualified use as a member type in
-// the implementing class is likewise an error.
 TEST(InterfaceClassTypeAccess,
      PlainTypedefUnqualifiedInImplementingClassIsError) {
   ElabFixture f;
@@ -186,9 +172,6 @@ TEST(InterfaceClassTypeAccess,
                             "8.26.3"));
 }
 
-// §8.26.3 guard: a same-named typedef declared locally in the implementing
-// class is visible without a prefix, so the unqualified use resolves to the
-// local type rather than the interface's and is not flagged.
 TEST(InterfaceClassTypeAccess, LocalTypedefShadowsInterfaceTypedef) {
   EXPECT_TRUE(
       ElabOk("interface class IntfC;\n"
@@ -206,10 +189,6 @@ TEST(InterfaceClassTypeAccess, LocalTypedefShadowsInterfaceTypedef) {
              "endmodule\n"));
 }
 
-// §8.26.3 negative, method argument: the rule is about where a name resolves,
-// not about which kind of declaration writes it down. A method argument typed
-// with the interface's typedef spells the same unqualified name a data member
-// would, and it is not inherited through 'implements' either.
 TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodArgumentIsError) {
   ElabFixture f;
   ElabOk(
@@ -229,9 +208,6 @@ TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodArgumentIsError) {
                             "8.26.3"));
 }
 
-// §8.26.3 negative, method return type: the other position a method names a
-// type in. Kept apart from the argument case so that an implementation that
-// walked only the argument list would fail one of the two.
 TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodReturnTypeIsError) {
   ElabFixture f;
   ElabOk(
@@ -252,9 +228,6 @@ TEST(InterfaceClassTypeAccess, TypedefUnqualifiedInMethodReturnTypeIsError) {
                             "8.26.3"));
 }
 
-// §8.26.3 accepting path (control): the same method written with the interface
-// scope prefix on both its argument and its return type resolves and is legal,
-// so the rule keys on the unqualified form rather than on the mention.
 TEST(InterfaceClassTypeAccess, TypedefQualifiedInMethodSignatureOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfC;\n"
@@ -270,10 +243,6 @@ TEST(InterfaceClassTypeAccess, TypedefQualifiedInMethodSignatureOk) {
              "endmodule\n"));
 }
 
-// §8.26.3 negative, inside a module: classes declared in a module scope are
-// held to the rule as classes declared at compilation-unit scope are. This is
-// the shape the sv-tests case for this subclause is written in, and the scope
-// is the whole of the difference between it and the case above it.
 TEST(InterfaceClassTypeAccess,
      TypedefUnqualifiedInMethodArgumentInsideAModuleIsError) {
   ElabFixture f;
@@ -294,9 +263,6 @@ TEST(InterfaceClassTypeAccess,
                             "8.26.3"));
 }
 
-// §8.26.3 guard, method argument: a typedef the implementing class declares
-// itself is visible without a prefix, so an argument typed with that name
-// resolves to the local type and is not flagged.
 TEST(InterfaceClassTypeAccess, LocalTypedefShadowsInterfaceTypedefInArgument) {
   EXPECT_TRUE(
       ElabOk("interface class IntfC;\n"

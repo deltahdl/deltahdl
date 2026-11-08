@@ -13,16 +13,11 @@ TEST(ConfigDefaultClause, DefaultUseClauseRejected) {
       "  design work.top;\n"
       "  default use work.alt;\n"
       "endconfig\n");
-  // A default selection clause cannot take a use expansion clause (§33.4.1.6),
-  // so the pairing is reported under §33.4.1.2, at the 'use' written where only
-  // a liblist may stand.
   EXPECT_TRUE(
       ReportedError(r.diags, "not through a use clause", 3, "33.4.1.2"));
 }
 
 TEST(ConfigDefaultClause, DefaultUseClauseIsTheOnlyReport) {
-  // The use clause is read to its end, so the config's terminator and the
-  // declarations after it are read as what they are and draw no report.
   auto r = Parse(
       "config c;\n"
       "  design work.top;\n"

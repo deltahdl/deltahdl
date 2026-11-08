@@ -243,20 +243,14 @@ TEST(LexicalConventionParsing, BinaryOperatorMissingRightOperandFails) {
       "module m;\n"
       "  initial x = a +;\n"
       "endmodule\n");
-  // §11.2 owns the report: the parser demands an expression where the right
-  // operand belongs, and §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// A binary operator sits between two operands; with the left operand absent
-// (here a purely-binary '*' opening the expression) the parse must fail. This
-// is the mirror of the missing-right-operand case above.
 TEST(LexicalConventionParsing, BinaryOperatorMissingLeftOperandFails) {
   auto r = Parse(
       "module m;\n"
       "  initial x = * b;\n"
       "endmodule\n");
-  // §11.2 owns the report; §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -265,7 +259,6 @@ TEST(LexicalConventionParsing, UnaryOperatorMissingOperandFails) {
       "module m;\n"
       "  initial x = ~;\n"
       "endmodule\n");
-  // §11.2 owns the report; §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -274,7 +267,6 @@ TEST(LexicalConventionParsing, ConditionalMissingColonFails) {
       "module m;\n"
       "  initial x = a ? b;\n"
       "endmodule\n");
-  // §11.4.11 owns the conditional operator's ':' and reports its absence.
   EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ';'", 2, "11.4.11"));
 }
 
@@ -283,7 +275,6 @@ TEST(LexicalConventionParsing, ConditionalMissingFalseOperandFails) {
       "module m;\n"
       "  initial x = a ? b :;\n"
       "endmodule\n");
-  // §11.2 owns the report; §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
@@ -292,24 +283,17 @@ TEST(LexicalConventionParsing, ConditionalMissingTrueOperandFails) {
       "module m;\n"
       "  initial x = a ? : c;\n"
       "endmodule\n");
-  // §11.2 owns the report; §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// The conditional operator separates three operands; with the first operand
-// (the condition, before '?') absent, the parse must fail.
 TEST(LexicalConventionParsing, ConditionalMissingConditionOperandFails) {
   auto r = Parse(
       "module m;\n"
       "  initial x = ? b : c;\n"
       "endmodule\n");
-  // §11.2 owns the report; §5.5 states no rejection of its own.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// The places an expression can be written, each holding `expr` on its second
-// line: a procedural and a continuous assignment, a module's and a package's
-// parameter, a function's return and a class property's initializer.
 std::vector<std::string> ExpressionPlaces(const std::string& expr) {
   return {"module m;\n  initial x = " + expr + ";\nendmodule\n",
           "module m;\n  assign x = " + expr + ";\nendmodule\n",
@@ -320,20 +304,14 @@ std::vector<std::string> ExpressionPlaces(const std::string& expr) {
           "class c;\n  int v = " + expr + ";\nendclass\n"};
 }
 
-// How many errors `diags` holds.
 size_t ErrorsIn(const std::vector<Diagnostic>& diags) {
   return static_cast<size_t>(
       std::ranges::count(diags, DiagSeverity::kError, &Diagnostic::severity));
 }
 
-// The operators A.8.6 makes unary only: none of them is a binary operator too.
 constexpr std::array<const char*, 4> kUnaryOnlyOperators = {"!", "~", "~&",
                                                             "~|"};
 
-// §5.5: a unary operator stands to the left of its operand. One that has no
-// binary form, written after its operand or between two operands, is
-// reported under §5.5 at its line, once, wherever the expression stands; the
-// operand after it is read with it rather than reported again.
 TEST(LexicalConventionParsing, UnaryOnlyOperatorAfterAnOperandIsReported) {
   for (const char* op : kUnaryOnlyOperators) {
     const std::string kMessage =
@@ -349,9 +327,6 @@ TEST(LexicalConventionParsing, UnaryOnlyOperatorAfterAnOperandIsReported) {
   }
 }
 
-// The same operators to the left of their operand, and beside an operand of a
-// binary operator, are accepted in every one of those places, as is `~^`,
-// which is a binary operator as well as a unary one.
 TEST(LexicalConventionParsing, UnaryOnlyOperatorBeforeItsOperandIsAccepted) {
   for (const char* op : kUnaryOnlyOperators) {
     for (const std::string& expr :
@@ -366,9 +341,6 @@ TEST(LexicalConventionParsing, UnaryOnlyOperatorBeforeItsOperandIsAccepted) {
   }
 }
 
-// The report stands alone however the expression around the misplaced operator
-// is closed: by a comma between arguments, the colon of a conditional
-// operator, or a closing parenthesis, bracket or brace.
 TEST(LexicalConventionParsing,
      UnaryOnlyOperatorBeforeAClosingTokenIsOneReport) {
   for (const char* expr : {"f(a !, b)", "c ? a ! : b", "(a ~)", "y[a ~&]",

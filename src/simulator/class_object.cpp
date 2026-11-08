@@ -63,10 +63,6 @@ const ClassTypeInfo* ClassTypeInfo::StaticPropertyOwner(
   return nullptr;
 }
 
-// §8.13 (printed pages 189-190) with §8.9 (printed 186): a static property
-// read through a handle is the declaring class's one storage, C's for a D
-// object's `n` where D extends C, the same `c.n` through a C handle reads.
-// Asked of the object's own class alone, `d.n` read 0 after `C::n = 5`.
 const Logic4Vec* ClassObject::FindPropertyValue(std::string_view name) const {
   std::string key(name);
   if (auto cell = ref_cells.find(key); cell != ref_cells.end())
@@ -79,7 +75,6 @@ Variable* ClassObject::AcquireRefCell(std::string_view name, Arena& arena) {
   std::string key(name);
   auto it = ref_cells.find(key);
   if (it == ref_cells.end()) {
-    // Read before the entry exists: GetProperty reads a standing cell first.
     auto* var = arena.Create<Variable>();
     var->value = GetProperty(name, arena);
     it = ref_cells.emplace(key, RefCell{var, 0}).first;
@@ -105,11 +100,6 @@ Logic4Vec ClassObject::GetProperty(std::string_view name, Arena& arena) const {
   return MakeLogic4VecVal(arena, 32, 0);
 }
 
-// §5.7.1: what a property holds is its own value and no literal, so a 1-bit
-// property set from `'1` holds a 1-bit 1 that zero-extends when read into a
-// wider object; the flag that has the literal's value fill a resize stops at
-// the store, as it does at a variable's (ResizeToWidth in
-// statement_assign_select.cpp).
 static Logic4Vec StoredPropertyValue(const Logic4Vec& val) {
   Logic4Vec stored = val;
   stored.fills_width = false;
@@ -119,10 +109,6 @@ static Logic4Vec StoredPropertyValue(const Logic4Vec& val) {
 void ClassObject::SetProperty(std::string_view name, const Logic4Vec& raw) {
   Logic4Vec val = StoredPropertyValue(raw);
   std::string key(name);
-  // §8.13 with §8.9: the storage written is the declaring class's, C's for a
-  // D object's `n` where D extends C, so the processes watching that class
-  // (§9.4.2, `@(C::n)`) are the ones told. Asked of the object's own class
-  // alone, `d.n = 7` landed in the object's map and `C::n` read 0.
   const ClassTypeInfo* declarer =
       type != nullptr ? type->StaticPropertyDeclarer(name) : nullptr;
   if (declarer != nullptr) {
@@ -175,8 +161,6 @@ Logic4Vec ClassObject::GetPropertyForType(std::string_view name,
     std::string scoped = std::string(t->name) + "::" + std::string(name);
     auto it = properties.find(scoped);
     if (it == properties.end()) continue;
-    // §13.5.2: a ref cell stands for the bare key, the storage `t` declares
-    // unless a level below shadows it.
     auto cell = ref_cells.find(std::string(name));
     if (cell != ref_cells.end() && BareNameIsDeclaredBy(name, t))
       return cell->second.var->value;
@@ -185,9 +169,6 @@ Logic4Vec ClassObject::GetPropertyForType(std::string_view name,
   return GetProperty(name, arena);
 }
 
-// Whether the bare key of `name` on this object is the storage `owner`
-// declares: it is unless a class between the object's own type and `owner`,
-// exclusive, declares `name` again and so shadows it (§8.15).
 bool ClassObject::BareNameIsDeclaredBy(std::string_view name,
                                        const ClassTypeInfo* owner) const {
   for (const auto* t = type; t != nullptr && t != owner; t = t->parent) {
@@ -197,11 +178,6 @@ bool ClassObject::BareNameIsDeclaredBy(std::string_view name,
   return true;
 }
 
-// §8.15: a write from a method of `declared_type` lands on the declaration
-// that class sees, its own or the nearest base's. The bare key, what a read
-// through a handle answers, is kept in step whenever it names that same
-// storage: a base constructor writing `v` on a derived object was reaching the
-// scoped key alone, and `child.v` read the bare default of 0 afterwards.
 void ClassObject::SetPropertyForType(std::string_view name,
                                      const ClassTypeInfo* declared_type,
                                      const Logic4Vec& raw) {
@@ -218,8 +194,6 @@ void ClassObject::SetPropertyForType(std::string_view name,
   SetProperty(name, val);
 }
 
-// §8.12: the entries and index type of `src` in an AssocArrayObject of the
-// copy's own, each entry's words its own as OwnRhsWords makes them.
 static AssocArrayObject* CopyAssocArray(const AssocArrayObject* src,
                                         Arena& arena) {
   auto* dst = arena.Create<AssocArrayObject>();
@@ -244,11 +218,6 @@ static AssocArrayObject* CopyAssocArray(const AssocArrayObject* src,
   return dst;
 }
 
-// §8.12 (shallow copy, step 2) with §6.8: the copy's queue holds elements of
-// its own, each with its own words for the reason ShallowCopy gives, under
-// the width, state-ness and bound (§7.10.5) the declaration gave the property.
-// §7.10.3 gives the copy's elements identities of their own: a reference taken
-// on the source's element names the source's, not the copy's.
 static QueueObject* CopyQueue(const QueueObject* src, Arena& arena) {
   auto* dst = arena.Create<QueueObject>();
   dst->elem_width = src->elem_width;
@@ -267,64 +236,20 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   auto* copy = arena.Create<ClassObject>();
   copy->type = type;
   copy->instance = instance;
-  // §8.12 (shallow copy, step 2): every class property is copied into the new
-  // object. A class property is a variable, and §6.8 has a variable keep its
-  // value from one assignment to the next, so the copy's properties
-  // are storage of their own: the two objects hold two values that happen to
-  // start out equal. A map assignment copy-constructs each Logic4Vec, and a
-  // Logic4Vec copy carries the words pointer rather than the words
-  // (src/common/types.h), so it would leave every property of the copy naming
-  // the source property's buffer -- one storage element under two objects,
-  // which the in-place writers then expose: DepositBitField writes through the
-  // words it finds rather than replacing them, so a packed-member deposit into
-  // either object's property would be a deposit into both. Copy the words per
-  // entry instead. What §8.12 does leave shared is the object a handle
-  // property refers to, and that survives this: the handle is the property's
-  // value, so copying the value copies the handle and both objects still name
-  // the one object it refers to.
   for (const auto& [name, val] : properties)
     copy->properties[name] = OwnRhsWords(val, arena);
-  // §8.12 (shallow copy, step 2) again: a property declared with an
-  // associative dimension is a variable of the object like any other, so the
-  // copy takes entries of its own, each with its own words for the reason
-  // above, and the index type the declaration gave the property.
   for (const auto& [name, aa] : assoc_properties)
     copy->assoc_properties[name] = CopyAssocArray(aa, arena);
-  // §8.12 (shallow copy, step 2) once more for a property declared with a
-  // queue dimension: the copy's queue holds the source's elements at the time
-  // of the copy and grows and shrinks on its own after it (§7.10).
   for (const auto& [name, q] : queue_properties)
     copy->queue_properties[name] = CopyQueue(q, arena);
-  // §8.12 (shallow copy, step 2) for a semaphore or mailbox property: the
-  // property is a handle to the built-in object (§15.3.1, §15.4.1), so the
-  // copy names the same bucket or queue, as a copied class handle does.
   copy->semaphore_properties = semaphore_properties;
-  // §8.12 for an event property: the property is a handle to a
-  // synchronization object (§6.17), so the copy names the same event.
   copy->event_properties = event_properties;
   copy->mailbox_properties = mailbox_properties;
-  // §8.12 with §7.3.2: a tagged-union property's value carries its tag, so
-  // the copy's property holds the same tag as the source's until either is
-  // assigned again.
   copy->property_tags = property_tags;
-  // §8.12 has the copy be of the same class, which for a parameterized class
-  // is the same specialization (§8.25), so it is bound to the same types.
   copy->type_param_actuals = type_param_actuals;
-  // §8.12: a shallow copy carries over the source object's internal
-  // randomization state. The per-instance RNG (its seed and live generator
-  // state) is duplicated into the new object so it resumes from where the
-  // source left off rather than from a fresh, unseeded generator.
   copy->rng_seed = rng_seed;
   copy->rng = rng;
   copy->rng_initialized = rng_initialized;
-  // §8.12 (shallow copy, step 2): the internal states used for randomization
-  // are also copied. Besides the RNG that means the constraint_mode status of
-  // each constraint block (§18.9), the rand_mode status of each random variable
-  // (§18.8), and the cyclic state of randc variables (§18.4.2). The two mode
-  // maps are plain value maps, so a map copy duplicates them. The randc history
-  // is held behind shared_ptr; the copy must be an independent per-object cycle
-  // (the source and the copy each advance their own permutation), so each set
-  // is cloned into a fresh shared_ptr rather than aliasing the source's.
   copy->constraint_active = constraint_active;
   copy->rand_active = rand_active;
   for (const auto& [member, history] : randc_history) {
@@ -338,41 +263,30 @@ ClassObject* ClassObject::ShallowCopy(Arena& arena) const {
   return copy;
 }
 
-// §37.32: only a specialization exposes the member-collection relations; a
-// purely lexical typespec answers them as empty/unsupported.
 bool VpiClassTypespecSupportsMembers(const ClassTypespecInfo& ts) {
   return ts.kind == ClassTypespecKind::kSpecialization;
 }
 
-// §37.32: a specialization must have a non-empty name; for any other kind the
-// name is not required to be meaningful.
 bool VpiClassTypespecNameValid(const ClassTypespecInfo& ts) {
   if (ts.kind != ClassTypespecKind::kSpecialization) return true;
   return !ts.name.empty();
 }
 
-// §37.32: built-in classes report no defining class.
 const ClassTypeInfo* VpiClassDefnOf(const ClassTypeInfo& cls) {
   if (cls.is_builtin) return nullptr;
   return &cls;
 }
 
-// §37.32: the base class typespec, or nullptr if none.
 const ClassTypespecInfo* VpiExtendsOf(const ClassTypespecInfo& ts) {
   return ts.extends;
 }
 
-// §37.32: the base typespec of a specialization is required to also be a
-// specialization. The check is vacuously satisfied when there is no base or
-// when ts is not itself a specialization.
 bool VpiClassTypespecBaseIsSpecialization(const ClassTypespecInfo& ts) {
   if (ts.kind != ClassTypespecKind::kSpecialization) return true;
   if (ts.extends == nullptr) return true;
   return ts.extends->kind == ClassTypespecKind::kSpecialization;
 }
 
-// §37.32: iterating methods yields both static and automatic methods but drops
-// built-in methods that were never explicitly declared.
 std::vector<ClassTypespecMethod> VpiClassTypespecMethods(
     const ClassTypespecInfo& ts) {
   std::vector<ClassTypespecMethod> result;
@@ -383,13 +297,10 @@ std::vector<ClassTypespecMethod> VpiClassTypespecMethods(
   return result;
 }
 
-// §37.32: vpiLocalParam is true exactly for parameters declared in the class
-// body.
 bool VpiClassTypespecParamIsLocal(const ClassTypespecParam& param) {
   return param.is_local_param;
 }
 
-// §37.32: an explicit argument overrides the declared default for vpiRhs.
 std::string_view VpiClassTypespecParamRhs(const ClassTypespecParamAssign& pa) {
   return pa.has_explicit_arg ? pa.explicit_rhs : pa.default_rhs;
 }
@@ -414,8 +325,6 @@ ClassTypespecInfo VpiClassTypespecOf(const ClassTypeInfo* type) {
   for (const auto& [pname, pexpr] : type->decl->params) {
     kAdd(pname, type->decl->localparam_port_names.count(pname) != 0);
   }
-  // §37.33 detail 8 with §8.25: a parameter declared within the class body is
-  // one of the class's parameters too, and a local one.
   for (const ClassMember* member : type->decl->members) {
     if (member->kind == ClassMemberKind::kProperty && member->is_param) {
       kAdd(member->name, true);
@@ -424,15 +333,11 @@ ClassTypespecInfo VpiClassTypespecOf(const ClassTypeInfo* type) {
   return ts;
 }
 
-// §37.32: reading a value through the typespec is allowed unless the member is
-// a non-static member reached only via the typespec.
 bool VpiClassTypespecValueAccessAllowed(bool obtained_from_class_typespec,
                                         bool is_static) {
   return !obtained_from_class_typespec || is_static;
 }
 
-// §37.32: drop inline constraints, then order the rest by declaration order,
-// using the prototype order for external constraints.
 std::vector<ClassTypespecConstraint> VpiClassTypespecConstraints(
     const ClassTypespecInfo& ts) {
   std::vector<ClassTypespecConstraint> result;
@@ -449,8 +354,6 @@ std::vector<ClassTypespecConstraint> VpiClassTypespecConstraints(
   return result;
 }
 
-// §37.32: expanding arrays counts each element of a virtual interface array as
-// a separate variable; scalars count once.
 int VpiClassTypespecVirtualInterfaceVarCount(const ClassTypespecInfo& ts) {
   int total = 0;
   for (const ClassTypespecVifVar& v : ts.vif_vars) {
@@ -459,13 +362,10 @@ int VpiClassTypespecVirtualInterfaceVarCount(const ClassTypespecInfo& ts) {
   return total;
 }
 
-// §37.32: collapsing arrays counts each virtual interface variable once,
-// regardless of array size.
 int VpiClassTypespecArrayVarCount(const ClassTypespecInfo& ts) {
   return static_cast<int>(ts.vif_vars.size());
 }
 
-// §37.32: the specializations directly naming this class definition.
 std::vector<const ClassTypespecInfo*> VpiClassDefnSpecializations(
     const ClassTypeInfo& cls) {
   return cls.direct_specializations;

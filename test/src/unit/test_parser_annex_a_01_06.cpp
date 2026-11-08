@@ -12,19 +12,11 @@ using namespace delta;
 
 namespace {
 
-// Return the items of the first interface declaration in the parse result.
 const std::vector<ModuleItem*>& IfaceItems(ParseResult& r) {
   static const std::vector<ModuleItem*> kEmpty;
   if (!r.cu || r.cu->interfaces.empty()) return kEmpty;
   return r.cu->interfaces[0]->items;
 }
-
-// --- interface_or_generate_item ---
-// An interface_or_generate_item is either a module_common_item (the set of
-// constructs shared with modules, defined in A.1.4) or an
-// extern_tf_declaration. These tests observe that the shared module-item parse
-// path is reused for interface bodies, so a module_common_item is accepted
-// inside an interface and records the same item kind it would in a module.
 
 TEST(InterfaceOrGenerateItem, ModuleCommonItemContinuousAssignAndProcedural) {
   auto r = Parse(
@@ -53,9 +45,6 @@ TEST(InterfaceOrGenerateItem, ModuleCommonItemElaborationSeverityTask) {
   EXPECT_TRUE(HasItemOfKind(IfaceItems(r), ModuleItemKind::kElabSystemTask));
 }
 
-// interface_or_generate_item ::= { attribute_instance } module_common_item |
-// ... The production permits a leading run of attribute_instances; the shared
-// module-item parse path collects them and attaches them to the resulting item.
 TEST(InterfaceOrGenerateItem, AttributeInstancePrefixOnModuleCommonItem) {
   auto r = Parse(
       "interface ifc;\n"
@@ -68,10 +57,6 @@ TEST(InterfaceOrGenerateItem, AttributeInstancePrefixOnModuleCommonItem) {
   ASSERT_EQ(item->attrs.size(), 1u);
   EXPECT_EQ(item->attrs[0].name, "keep");
 }
-
-// --- extern_tf_declaration ---
-// extern_tf_declaration ::= extern method_prototype ;
-//                         | extern forkjoin task_prototype ;
 
 TEST(ExternTfDeclaration, ExternMethodPrototypeFunction) {
   auto r = Parse(
@@ -112,11 +97,6 @@ TEST(ExternTfDeclaration, ExternForkjoinTaskPrototype) {
   EXPECT_TRUE(item->is_forkjoin);
 }
 
-// --- interface_item: port_declaration ; ---
-// interface_item ::= port_declaration ; | non_port_interface_item
-// A non-ANSI interface lists its port directions in the body as
-// port_declarations, which coexist with non_port_interface_items.
-
 TEST(InterfaceItem, NonAnsiPortDeclarationAndNonPortItem) {
   auto r = Parse(
       "interface ifc(a, b);\n"
@@ -134,8 +114,6 @@ TEST(InterfaceItem, NonAnsiPortDeclarationAndNonPortItem) {
   EXPECT_TRUE(HasItemOfKind(iface->items, ModuleItemKind::kContAssign));
 }
 
-// A.1.2's ( .* ) form of interface_declaration holds { interface_item }, so
-// its body declares the directions of the extern declaration's ports.
 TEST(InterfaceItem, WildcardHeaderBodyPortDeclaration) {
   auto r = Parse(
       "extern interface i(b);\n"
@@ -150,7 +128,6 @@ TEST(InterfaceItem, WildcardHeaderBodyPortDeclaration) {
   EXPECT_EQ(r.cu->interfaces[1]->ports[0].direction, Direction::kOutput);
 }
 
-// A.1.3 opens every port_declaration with { attribute_instance }.
 TEST(InterfaceItem, AttributedNonAnsiPortDeclaration) {
   auto r = Parse(
       "interface i(b);\n"
@@ -165,9 +142,6 @@ TEST(InterfaceItem, AttributedNonAnsiPortDeclaration) {
   EXPECT_EQ(r.cu->interfaces[0]->ports[0].attrs[0].name, "tag");
 }
 
-// After a port_declaration, a timeunits_declaration is a
-// non_port_interface_item, which footnote 3 of A.10 admits only as a matching
-// repeat of an earlier one.
 TEST(NonPortInterfaceItem, TimeprecisionAfterPortDeclarationRejected) {
   auto r = Parse(
       "interface i(b);\n"
@@ -180,8 +154,6 @@ TEST(NonPortInterfaceItem, TimeprecisionAfterPortDeclarationRejected) {
                             3, "3.14.2.2"));
 }
 
-// non_port_interface_item writes no { attribute_instance } before a
-// generate_region or a timeunits_declaration.
 TEST(NonPortInterfaceItem, AttributeBeforeAnItemThatTakesNoneRejected) {
   auto r = Parse(
       "interface i;\n"
@@ -195,11 +167,6 @@ TEST(NonPortInterfaceItem, AttributeBeforeAnItemThatTakesNoneRejected) {
                             "instance",
                             3, "A.1.6"));
 }
-
-// --- non_port_interface_item ---
-// non_port_interface_item ::= generate_region | interface_or_generate_item
-//   | program_declaration | modport_declaration | interface_declaration
-//   | timeunits_declaration
 
 TEST(NonPortInterfaceItem, ModportDeclaration) {
   auto r = Parse(
@@ -253,8 +220,6 @@ TEST(NonPortInterfaceItem, NestedProgramDeclaration) {
   EXPECT_EQ(item->nested_module_decl->decl_kind, ModuleDeclKind::kProgram);
 }
 
-// interface_declaration and program_declaration are non_port_interface_items
-// in their extern forms too, which A.1.2 makes alternatives of both.
 TEST(NonPortInterfaceItem, NestedExternInterfaceAndProgramDeclaration) {
   auto r = Parse(
       "interface j;\n"
@@ -286,46 +251,23 @@ TEST(NonPortInterfaceItem, TimeunitsDeclaration) {
   EXPECT_TRUE(r.cu->interfaces[0]->has_timeprecision);
 }
 
-// --- error conditions / edge cases ---
-
-// extern_tf_declaration ::= extern method_prototype ; — the trailing `;` is
-// required after the prototype.
 TEST(ExternTfDeclaration, ExternMethodPrototypeMissingSemicolonRejected) {
   auto r = Parse(
       "interface ifc;\n"
       "  extern function void f(int x)\n"
       "endinterface\n");
-  // §13.4 owns the function declaration whose prototype this is, so the ';'
-  // it wants is reported there. `endinterface` is what stands there instead,
-  // on line 3.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endinterface'", 3, "13.4"));
 }
 
-// The `forkjoin` keyword form is defined only for a task_prototype
-// (extern forkjoin task_prototype ;); pairing it with a function is rejected.
 TEST(ExternTfDeclaration, ExternForkjoinWithFunctionRejected) {
   auto r = Parse(
       "interface ifc;\n"
       "  extern forkjoin function void f();\n"
       "endinterface\n");
-  // `forkjoin` commits the parse to a task declaration, so §13.3 reports the
-  // `task` keyword it then wants against the `function` that stands there.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'task', got 'function'", 2, "13.3"));
 }
-
-// --- extern_tf_declaration outside an interface ---
-// interface_or_generate_item is the one production that admits an
-// extern_tf_declaration: A.1.4's module_common_item, A.1.7's
-// non_port_program_item, A.1.8's checker_or_generate_item and A.1.11's
-// package_item reach task_declaration and function_declaration but no
-// prototype, and A.1.2's description admits none at compilation-unit scope.
-// §25.7 gives the prototype its purpose: subroutines a module defines under a
-// hierarchical name must also be declared extern in the interface. Each case
-// below writes the prototype in one of those bodies and expects the report at
-// its `extern`, with the body read on past the prototype's ';' so that the item
-// after it is still recorded.
 
 constexpr const char* kExternOutsideInterface =
     "an extern task or function prototype is an item of an interface";
@@ -385,8 +327,6 @@ TEST(ExternTfDeclaration, ErrorExternMethodPrototypeInPackageIsRejected) {
       HasItemOfKind(r.cu->packages[0]->items, ModuleItemKind::kVarDecl));
 }
 
-// At compilation-unit scope the prototype used to be skipped to its ';' with
-// nothing said, so the source parsed clean with the prototype gone.
 TEST(ExternTfDeclaration,
      ErrorExternMethodPrototypeAtCompilationUnitScopeIsRejected) {
   auto r = Parse(
@@ -399,10 +339,6 @@ TEST(ExternTfDeclaration,
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 }
 
-// A.4.2's generate_item reaches interface_or_generate_item, so a prototype in
-// a generate block of an interface is where A.1.6 puts it. The control the
-// rejections above rest on: a rule keyed on the generate block rather than on
-// the interface holding it would reject this.
 TEST(ExternTfDeclaration, ExternMethodPrototypeInInterfaceGenerateBlock) {
   auto r = Parse(
       "interface ifc;\n"
@@ -415,15 +351,6 @@ TEST(ExternTfDeclaration, ExternMethodPrototypeInInterfaceGenerateBlock) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 }
-
-// --- non_port_interface_item admits no specify_block or
-// specparam_declaration ---
-// A.1.4's non_port_module_item lists specify_block and
-// { attribute_instance } specparam_declaration; non_port_interface_item lists
-// neither. §30.3 places the specify block inside a module and §25.6 keeps it
-// there when an interface's signals are its terminals, and §6.20.5 has a
-// specparam declared inside a module or a specify block. Each was accepted in
-// an interface body silently and recorded as an item of it.
 
 TEST(NonPortInterfaceItem, ErrorSpecifyBlockInInterfaceIsRejected) {
   auto r = Parse(
@@ -451,7 +378,6 @@ TEST(NonPortInterfaceItem, ErrorSpecparamInInterfaceIsRejected) {
       "6.20.5"));
 }
 
-// The control: the same two items in a module body, which A.1.4 admits.
 TEST(NonPortInterfaceItem, SpecifyBlockAndSpecparamInModuleAreAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -464,11 +390,6 @@ TEST(NonPortInterfaceItem, SpecifyBlockAndSpecparamInModuleAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A.1.6's interface_or_generate_item reaches a module_common_item and an
-// extern_tf_declaration; a parameter_override comes only from A.1.4's
-// module_or_generate_item, so a defparam is no item of an interface, and
-// §27.3's footnote 35 holds a generate block in one to the same items. Each is
-// reported and still read, so the body goes on (#6771).
 TEST(InterfaceItemParsing, ADefparamIsNoInterfaceItem) {
   auto r = Parse(
       "interface ifc;\n"
@@ -486,8 +407,6 @@ TEST(InterfaceItemParsing, ADefparamIsNoInterfaceItem) {
       "A.1.6"));
 }
 
-// A.1.6 leaves a gate_instantiation out of an interface as it leaves a
-// parameter_override, in the body and in a generate block of it (#5915).
 TEST(InterfaceItemParsing, AGateIsNoInterfaceItem) {
   auto r = Parse(
       "interface ifc;\n"
@@ -505,7 +424,6 @@ TEST(InterfaceItemParsing, AGateIsNoInterfaceItem) {
       "A.1.6"));
 }
 
-// A module body takes both, as A.1.4's module_or_generate_item gives them.
 TEST(InterfaceItemParsing, AModuleTakesADefparamAndAGate) {
   auto r = Parse(
       "module m;\n"
@@ -517,11 +435,6 @@ TEST(InterfaceItemParsing, AModuleTakesADefparamAndAGate) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// --- The prototype in an extern_tf_declaration ---
-// A.2.7's task_prototype and A.2.6's function_prototype write no lifetime,
-// name the subroutine with an identifier alone, and give a function a
-// data_type_or_void for its result. Those are what a declaration's head adds,
-// and a prototype read through that head is reported when it carries them.
 TEST(ExternTfDeclaration, ALifetimeInAPrototypeIsReported) {
   auto r = Parse(
       "interface bus;\n"
@@ -576,8 +489,6 @@ TEST(ExternTfDeclaration, PrototypesAsA26AndA27WriteThemAreAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A type reference is one of A.2.2.1's data_types, so an extern prototype
-// whose result is one writes its result type out.
 TEST(ExternTfDeclaration, ATypeReferenceResultInAPrototypeIsAccepted) {
   auto r = Parse(
       "interface bus;\n"

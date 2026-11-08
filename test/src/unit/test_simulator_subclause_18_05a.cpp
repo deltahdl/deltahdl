@@ -183,20 +183,6 @@ TEST(Constraint, LessThanConstraint) {
   EXPECT_LT(solver.GetValue("x"), 10);
 }
 
-// 18.5: constraint expressions declared in constraint blocks decide the values
-// of random variables. A relation between two random variables is such an
-// expression, so it has to hold of the values randomize() commits. Neither side
-// is a bound the other can be folded against before the solve: both are still
-// to be drawn, and reading one of them early yields the value it happens to be
-// holding rather than the one it will take.
-//
-// Stated from source rather than by building solver variables, because what
-// goes wrong lives in the translation from the constraint expression to the
-// solver, not in the solver's own handling of a bound. Two-bit variables keep
-// it cheap -- a quarter of the sixteen combinations satisfy the equality, and
-// six satisfy the ordering -- so a solve that honors the relation converges at
-// once, while one that folded it would satisfy it only by coincidence and
-// report success regardless.
 TEST(Constraint, EqualityBetweenTwoRandomVariablesHoldsFromSource) {
   const char* src =
       "class C;\n"
@@ -219,8 +205,6 @@ TEST(Constraint, EqualityBetweenTwoRandomVariablesHoldsFromSource) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5, the ordering form of the same rule: `a < b` relates two random
-// variables and holds of every committed pair.
 TEST(Constraint, OrderingBetweenTwoRandomVariablesHoldsFromSource) {
   const char* src =
       "class C;\n"
@@ -243,11 +227,6 @@ TEST(Constraint, OrderingBetweenTwoRandomVariablesHoldsFromSource) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5: the solver handles the set membership operator, and where a
-// solution exists it finds it: `x inside {[10:12]}` over an int, three
-// members among 2^32 values, is drawn from the set rather than tried
-// against, so every randomize() lands in the range and answers 1; a
-// negative range and a list of values are drawn the same way.
 TEST(Constraint, SetMembershipOverAWideDomainIsDrawnFromTheSet) {
   const char* src =
       "class C;\n"
@@ -274,8 +253,6 @@ TEST(Constraint, SetMembershipOverAWideDomainIsDrawnFromTheSet) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.12.1: the same set membership in the with clause of a scope randomize
-// over an int scope variable.
 TEST(Constraint, ScopeRandomizeSetMembershipOverAnIntIsDrawnFromTheSet) {
   const char* src =
       "module t;\n"

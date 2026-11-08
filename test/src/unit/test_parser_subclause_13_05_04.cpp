@@ -115,15 +115,6 @@ TEST(TaskAndFunctionParsing, PositionalArgsNoNamedArgs) {
   EXPECT_TRUE(call->arg_names.empty());
 }
 
-// §13.5.4 writes an argument bound by name as `. identifier ( expression )`, so
-// the parentheses around the actual are part of the form rather than an option
-// in it. An argument whose name is not followed by them is rejected at the
-// token standing where the '(' belongs, and the report names §13.5.4.
-//
-// The token asked for is what tells this report apart from the one the call
-// itself writes: Parser::ParseCallExpr has already found its own '(' by the
-// time Parser::ParseTrailingNamedArgs looks for this one, so only the named
-// argument can report a '(' missing here.
 TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
   auto r = Parse(
       "module m;\n"
@@ -132,20 +123,6 @@ TEST(NamedArgument, MissingActualParenthesesName13_5_4) {
   EXPECT_TRUE(ReportedError(r.diags, "expected '('", 2, "13.5.4"));
 }
 
-// §13.5.4 closes the actual of an argument bound by name with the ')' that
-// opened after the formal name. An actual left unclosed is rejected at the
-// token standing where that ')' belongs, and the report names §13.5.4.
-//
-// The token this stops at is inside the actual's own parentheses, which the
-// call's own ')' cannot be, so the subclause says which of the two ended the
-// argument list: Parser::ParseTrailingNamedArgs's or Parser::ParseCallExpr's.
-//
-// A source whose named argument is whole reports §13.5 instead, and correctly:
-// in `foo(.a(1);` the ')' present closes the actual, so the argument is
-// complete and the ')' missing is the call's own. Reading that report as the
-// named argument's is the mistake this case and the one above exist to make
-// impossible, because both stop at a token only Parser::ParseTrailingNamedArgs
-// reaches.
 TEST(NamedArgument, UnclosedActualNames13_5_4) {
   auto r = Parse(
       "module m;\n"
@@ -164,9 +141,6 @@ TEST(TaskAndFunctionParsing, PositionalAfterNamedIsError) {
       "    x = fun(.s(\"yes\"), 2);\n"
       "  end\n"
       "endmodule\n");
-  // Once a named argument has been read, Parser::ParseTrailingNamedArgs asks
-  // for the '.' of another, so the positional `2` on line 6 is what the report
-  // stands at.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '.', got integer literal", 6, "13.5.4"));
 }

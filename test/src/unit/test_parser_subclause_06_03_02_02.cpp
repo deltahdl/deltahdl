@@ -1,13 +1,3 @@
-// §6.3.2.2 Drive strength: the drive strength specification lets the statement
-// that declares a net also place a continuous assignment on it. What the parser
-// owes that sentence is the pairing -- the strength and the assignment reaching
-// one declaration together, with the strength0 and strength1 keywords landing
-// on their own fields whichever order they were written in.
-//
-// Every source below drives strength0 and strength1 to different values
-// (weak0 is 2, pull1 is 3), so a reading that swapped the two fields, or
-// filled both from one keyword, is a failure rather than a coincidence.
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -60,11 +50,6 @@ TEST(NetDeclDriveStrengthParsing, DeclarationWithNoStrengthLeavesBothUnset) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// One strength, written once, heads a list whose declarators each decide for
-// themselves whether an assignment is placed on them. The strength reaches
-// both nets and only the first carries an assignment, which is the shape
-// §6.3.2.2's rule has to be able to tell apart -- a check reading the
-// statement rather than the declaration would see an assignment here and stop.
 TEST(NetDeclDriveStrengthParsing, StrengthHeadsAListOfSeparateDeclarators) {
   auto r = Parse(
       "module m;\n"
@@ -81,14 +66,6 @@ TEST(NetDeclDriveStrengthParsing, StrengthHeadsAListOfSeparateDeclarators) {
   EXPECT_EQ(items[1]->init_expr, nullptr);
 }
 
-// §6.3.2 attaches one condition to a drive strength -- drive strength is used
-// only where a net's declaring statement also places a continuous assignment on
-// it -- and says nothing about which net type carries it. §A.2.1.3 gives
-// `net_declaration ::= net_type [ drive_strength | charge_strength ] [ vectored
-// | scalared ] data_type_or_implicit [ delay3 ] list_of_net_decl_assignments
-// ;` and §A.2.2.1 lists `trireg` among the alternatives of `net_type`, so the
-// strength is available here exactly as it is on a `wire`. The two strengths
-// differ, as everywhere else in this file.
 TEST(NetDeclDriveStrengthParsing, TriregCarriesAStrengthWithItsAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -104,11 +81,6 @@ TEST(NetDeclDriveStrengthParsing, TriregCarriesAStrengthWithItsAssignment) {
   EXPECT_NE(item->init_expr, nullptr);
 }
 
-// §A.2.1.3 puts `delay3` after the strength, so a `trireg` may write both. The
-// delay is what pins that the strength parse left the position where the rest
-// of the declaration expects it: a parse consuming one token too few or too
-// many shows up here as the delay going missing, where the case above would
-// still pass on the two strength fields alone.
 TEST(NetDeclDriveStrengthParsing, TriregStrengthPrecedesItsDelay) {
   auto r = Parse(
       "module m;\n"

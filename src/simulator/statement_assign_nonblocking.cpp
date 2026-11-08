@@ -34,10 +34,6 @@
 
 namespace delta {
 
-// §11.4.14: a deferred nonblocking write being installed onto `event`. Bundles
-// the target variable, the sampled right-hand value, and the arena used by the
-// update callback so the select and whole-variable setup helpers share one
-// entity.
 struct NbaWrite {
   Event* event;
   Variable* var;
@@ -45,9 +41,6 @@ struct NbaWrite {
   Arena& arena;
 };
 
-// §11.4.14: the NBA scheduling slot a deferred write lands in (the resolved
-// region and the post-delay simulation time) together with the evaluation
-// context. Shared by the array-concatenation and queue NBA scheduling paths.
 struct NbaScheduleSlot {
   SimTime time;
   Region region;
@@ -58,11 +51,6 @@ struct NbaScheduleSlot {
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val);
 
-// Hands `event` to the scheduler as a nonblocking update: the NBA region, or
-// the reactive one when the statement runs in a reactive context, at the time
-// an intra-assignment delay of `delay_ticks` puts it. The schedulers below
-// differ in the callback they install and not in where the event goes, so
-// where it goes is stated once.
 static void ScheduleNbaEvent(Event* event, uint64_t delay_ticks,
                              SimContext& ctx) {
   auto region = ctx.IsReactiveContext() ? Region::kReNBA : Region::kNBA;
@@ -70,34 +58,6 @@ static void ScheduleNbaEvent(Event* event, uint64_t delay_ticks,
                                    region, event);
 }
 
-// §4.9.4: both the right-hand value and the left-hand target are computed from
-// the values standing when the update is placed in the event region. EvalExpr
-// on a bare identifier hands back the variable's own vec (evaluation.cpp), and
-// copying a Logic4Vec copies its `words` pointer rather than the words
-// (common/types.h), so a sampled right-hand value aliases the storage it was
-// read from. A whole-variable write replaces that storage and cannot be seen
-// through the alias, but an in-place writer reaches through it and changes what
-// a pending update will store: the packed struct member deposit
-// WriteResolvedField makes (statement_assign.cpp) left
-// `s = 16'hAABB; d <= s; s.b = 8'h00;` storing 16'h00BB, and the CoerceTo2State
-// in SetupWholeVarNbaCallback below writes through the alias in the other
-// direction, clearing the source variable's x and z bits when the target is
-// 2-state.
-//
-// The copy is taken once, where the value is sampled, so every capture
-// downstream already owns its words. A Logic4Snapshot is the wrong tool for it
-// even though it is the right one for the lvalue index snapshots below: a
-// snapshot's storage is a member of the snapshot object, so a callback doing
-// `var->value = snap.Get()` would leave the variable pointing at words that
-// die with the lambda. Those index snapshots are read and discarded inside the
-// callback body; this value has to outlive the callback, which is what the
-// arena gives it.
-//
-// ExtractBitField copies the bits -- multi-word safe and 4-state preserving --
-// but builds its result with MakeLogic4Vec, which leaves is_real, is_signed
-// and is_string at their defaults. Those are read downstream, where
-// ConvertRealForKnownLhs converts across the §6.12.1 real boundary on is_real
-// and ResizeToWidth sign-extends on is_signed, so they are carried over here.
 static Logic4Vec SampleNbaRhs(const Logic4Vec& val, Arena& arena) {
   Logic4Vec copy = ExtractBitField(arena, val, 0, val.width);
   copy.is_real = val.is_real;
@@ -106,23 +66,14 @@ static Logic4Vec SampleNbaRhs(const Logic4Vec& val, Arena& arena) {
   return copy;
 }
 
-// Replace each collected element with a copy that owns its words. Every
-// collector pushes a variable's own vec or a queue's own elements, so every
-// entry arrives aliasing live storage. Copying here rather than inside each
-// collector reaches the queue splice and CollectQueueElements
-// (statement_assign_pattern.cpp) as well, and asks no collector for an arena.
 static void SampleConcatElements(std::vector<Logic4Vec>& elems, Arena& arena) {
   for (auto& elem : elems) elem = SampleNbaRhs(elem, arena);
 }
 
-// Schedule the per-element NBA writes for an unpacked-array concatenation
-// target. Reports a size mismatch (and stops) when element counts differ.
 static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
                                            const ArrayInfo* ainfo,
                                            const std::vector<Logic4Vec>& elems,
                                            const NbaScheduleSlot& slot) {
-  // Counted and stored by the innermost elements, as the blocking
-  // DistributeConcatToArray does.
   uint32_t count = ArrayElementCount(*ainfo);
   if (elems.size() != count) {
     slot.ctx.GetDiag().Error(
@@ -145,12 +96,6 @@ static void ScheduleArrayConcatNbaElements(const Stmt* stmt,
   }
 }
 
-// §7.10.4: a right-hand side that gives a queue its elements rather than one
-// value. The subclause writes those as an unpacked array concatenation, as in
-// `q = {q, 6}`, and as a bare slice of a queue, as in `q = q[1:$]`. The second
-// carries no braces, so a test for a concatenation alone reads it as the single
-// value its elements would concatenate to and leaves the queue holding one
-// element where the slice named several.
 static bool IsQueueValuedRhs(const Expr* rhs, SimContext& ctx) {
   if (rhs->kind == ExprKind::kConcatenation) return true;
   if (rhs->kind != ExprKind::kSelect || !rhs->base || !rhs->index_end)
@@ -159,29 +104,17 @@ static bool IsQueueValuedRhs(const Expr* rhs, SimContext& ctx) {
          ctx.FindQueue(rhs->base->text) != nullptr;
 }
 
-// §9.4.5 with §9.4.1: whether an update `delay_ticks` after the present lies
-// within the times the simulation can reach. A negative intra-assignment delay
-// is an unsigned time value and may put the update past the last of them, in
-// which case it is never made; added to the present as it is, its time
-// wrapped to one before it, which the scheduler refuses.
 static bool UpdateTimeReachable(uint64_t delay_ticks, const SimContext& ctx) {
   return delay_ticks <=
          std::numeric_limits<uint64_t>::max() - ctx.CurrentTime().ticks;
 }
 
-// The ticks the intra-assignment delay of `stmt` puts its update after the
-// present; 0 where it writes none.
 static uint64_t IntraAssignDelayTicks(const Stmt* stmt, SimContext& ctx,
                                       Arena& arena) {
   if (!stmt->delay) return 0;
   return DelayExprToTicks(stmt->delay, ctx, arena);
 }
 
-// §10.4.2 evaluates the right-hand side of a nonblocking assignment when the
-// statement executes, so the elements are collected here and the event
-// installs the value they made. A right-hand side naming the target queue
-// therefore reads what the queue held at execution, as §7.10.4's `q = q[1:$]`
-// requires.
 static std::vector<Logic4Vec> SampleConcatNbaElements(const Stmt* stmt,
                                                       bool fixed_target,
                                                       SimContext& ctx,
@@ -196,7 +129,6 @@ static std::vector<Logic4Vec> SampleConcatNbaElements(const Stmt* stmt,
   return elems;
 }
 
-// The update installing `elems` as the queue `q`'s elements.
 static void ScheduleQueueConcatNba(QueueObject* q, const Stmt* stmt,
                                    std::vector<Logic4Vec> elems,
                                    const NbaScheduleSlot& slot) {
@@ -208,10 +140,6 @@ static void ScheduleQueueConcatNba(QueueObject* q, const Stmt* stmt,
                      elems = std::move(elems)]() {
     q->elements = elems;
     EnforceQueueBound(q, "nonblocking assignment", loc, ctx);
-    // §7.10.3: assigning the queue variable outdates every reference to the
-    // elements it held. Fresh ids do that, where clearing the list would also
-    // stop the queue recording a reference taken after the assignment, which
-    // the subclause outdates nothing of.
     q->AssignFreshIds();
     ++q->generation;
   };
@@ -223,9 +151,6 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   if (!stmt->lhs || stmt->lhs->kind != ExprKind::kIdentifier || !stmt->rhs)
     return false;
 
-  // §10.10 sizes a dynamic array target from the concatenation, which the
-  // queue path below does: a dynamic array's elements are held as a queue's,
-  // and the ArrayInfo it also registers records no size.
   auto* ainfo = ctx.FindArrayInfo(stmt->lhs->text);
   if (ainfo != nullptr && ainfo->is_dynamic) ainfo = nullptr;
   auto* q = ainfo ? nullptr : ctx.FindQueue(stmt->lhs->text);
@@ -249,17 +174,6 @@ static bool TryArrayConcatNba(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   return true;
 }
 
-// §7.3.2 (printed page 151): a tagged union's value is its tag beside the
-// member's bits, and §11.9 (printed 304) checks every member access of a
-// union against the tag its last assignment gave it. Whether `lhs` names a
-// tagged union whose nonblocking update carries a tag beside the bits, and
-// in `key` what that tag stands under: the key the storage was created by
-// (TagKeyOfName) for the bare name of a tagged union variable, that key
-// followed by the member path for a tagged union member of a variable, "s.u"
-// (TaggedUnionMemberKey, the blocking store's). A select names no union of
-// its own here, and a structure has no tag. The member form landed the bits
-// alone: `s.u <= tagged Valid 5` left s.u's earlier tag standing, so
-// `s.u.Other = 3` after the update was not reported and overwrote the 5.
 static bool TaggedUnionTargetKey(const Expr* lhs, SimContext& ctx,
                                  std::string& key) {
   if (lhs == nullptr) return false;
@@ -272,17 +186,6 @@ static bool TaggedUnionTargetKey(const Expr* lhs, SimContext& ctx,
   return true;
 }
 
-// §10.4.2 (printed page 253): the right-hand side of a nonblocking assignment
-// is evaluated when the statement executes and its value scheduled for the
-// NBA region, so the tag that value carries is taken here, beside the bits:
-// the member a `tagged M v` names, or the member a call's body returned
-// (EvalWithReturnedTag), which the vector never holds. `update` carries no
-// tag for every other right-hand side, and for a target that is no tagged
-// union, whose value is evaluated as it was. The blocking form takes the tag
-// off the same two right-hand sides (AssignToScalarLhs,
-// EvalRhsCarryingReturnedTag); the nonblocking one scheduled the bits alone,
-// so `u <= tagged Valid 5` left u's earlier tag standing and `u.Other` raised
-// nothing once the update landed.
 static Logic4Vec EvalNbaRhs(const Stmt* stmt, SimContext& ctx, Arena& arena,
                             NbaUpdateTag& update) {
   update = NbaUpdateTag{};
@@ -307,21 +210,10 @@ NbaSample SampleNonblockingRhs(const Stmt* stmt, SimContext& ctx,
   sample.value = EvalNbaRhs(stmt, ctx, arena, sample.tag);
   sample.value =
       ApplyStreamPackToTargetWidening(stmt, sample.value, ctx, arena);
-  // Every capture reached through ScheduleNonblockingAssign flows from here, so
-  // one copy at the point of sampling covers all of them.
   sample.value = SampleNbaRhs(sample.value, arena);
   return sample;
 }
 
-// Wraps the deposit installed on `event` so the one callback then sets the
-// tag `update` carries, which lands beside the bits in the same update; the
-// deposit stands alone where the sample carries none. The tag is declined
-// while `forced_var` is forced, as SetupWholeVarNbaCallback declines the
-// deposit; null where the deposit asks no such question (WriteResolvedField).
-// The tag is set in the update and not where the statement executed: an
-// intra-assignment event control (§9.4.5) holds the update until the event,
-// and a member read between the statement and the event checks against the
-// tag the union still holds.
 static void AttachUpdateTag(Event* event, const Variable* forced_var,
                             const NbaUpdateTag& update, SimContext& ctx) {
   if (!update.Carries()) return;
@@ -347,16 +239,8 @@ StmtResult ExecNonblockingAssignImpl(const Stmt* stmt, SimContext& ctx,
 static void SetupWholeVarNbaCallback(Event* event, Variable* var,
                                      const Logic4Vec& rhs_val) {
   event->kind = EventKind::kUpdate;
-  // Record the most recently scheduled pending value so the class garbage
-  // collector can keep a handle awaiting an NBA update reachable (see the
-  // pending_nba scan in the class GC).
   var->pending_nba = rhs_val;
   var->has_pending_nba = true;
-  // §10.4.2: each scheduled nonblocking update carries its own sampled
-  // right-hand value and applies it at its own scheduled time. When several
-  // intra-assignment-delayed NBAs target the same variable at distinct future
-  // times (Example 7), they must not cancel one another, so the update value
-  // is captured here rather than read from the single shared pending_nba slot.
   event->callback = [var, rhs_val]() {
     if (!var->is_forced) {
       var->value = rhs_val;
@@ -367,52 +251,6 @@ static void SetupWholeVarNbaCallback(Event* event, Variable* var,
   };
 }
 
-// §10.4.2 evaluates whatever the variable_lvalue needs evaluated -- an index
-// expression, a class handle, a virtual interface reference -- at the time it
-// evaluates the right-hand side, and §4.9.4 computes both the right-hand value
-// and the left-hand target from the values in effect when the update is placed
-// in the event region. The streaming arm below defers the write itself, but
-// its unpacker evaluates the lvalue's index expressions where it runs, which is
-// the update region, so `{>>{a[idx], b}} <= x` would read whatever `idx` held
-// when the update fired rather than what it held when the statement executed.
-// The arm therefore pairs each index node under the left-hand side with the
-// value it has now (CollectLhsIndexSnapshots, in
-// statement_assign_lhs_snapshots.cpp) and installs the pairs in its callback.
-//
-// The snapshots are installed for the length of one callback body and dropped
-// again at its end. The store is one map per SimContext keyed by expression
-// node -- not one per event and not one per process -- so holding them live
-// from the statement through to the update region would let a second execution
-// of the same statement (a loop body scheduling it twice in one time step, two
-// processes or two instances running it, an intra-assignment delay whose
-// statement re-executes before its update fires) overwrite the key an event
-// still pending reads, and the first clear would empty the store for every
-// event after it. Update-region callbacks run one at a time, so each installing
-// its own values over the same keys is enough. The words the stash points at
-// are the ones the captured vector owns, and the callback it is captured on is
-// released only after it returns (Scheduler::DrainQueue), so every entry is
-// cleared while the storage behind it is still standing.
-
-// §11.4.14.3: a streaming_concatenation can be the target of a nonblocking
-// assignment too, performing the same reverse (unpack) operation. The source
-// is sampled now; defer the per-target writes to the NBA region so the
-// streaming semantics match the blocking form.
-// §11.4.12: a concatenation is handled as a packed vector of bits and may stand
-// on the left-hand side of an assignment, and §10.9 gives an assignment pattern
-// the same use. §10.4.2 gives the nonblocking form the same variable_lvalue the
-// blocking form takes, any data type a procedural assignment accepts, so a
-// concatenation is a nonblocking target exactly as it is a blocking one, and
-// `{a, b} <= x` has to distribute where `{a, b} = x` does.
-//
-// §10.4.2 evaluates what the left-hand side needs evaluated -- an index, a
-// class handle -- where the statement executes, and §11.4.12 gives each
-// element of a concatenation target its own slice of the value, the rightmost
-// the least significant bits. So the update is placed element by element, each
-// element taken through ScheduleNonblockingAssign as a lone target is: a
-// nested concatenation is distributed again and a select deposits its window,
-// as each would be standing alone. Unpacking the whole value in the update
-// region resolved a member access, `{h.f, b}` or `{arr[i].f, b}`, against the
-// handle or the index as it stood then.
 namespace {
 using LhsWriter = void (*)(const Expr*, const Logic4Vec&, SimContext&, Arena&);
 struct DeferredLhsWrite {
@@ -422,8 +260,6 @@ struct DeferredLhsWrite {
 };
 }  // namespace
 
-// §10.4.2: an update performed in the NBA region by `w.write`, with every
-// index of the target pinned to its value where the statement executed.
 static void ScheduleDeferredLhsWrite(const DeferredLhsWrite& w,
                                      uint64_t delay_ticks, SimContext& ctx,
                                      Arena& arena) {
@@ -447,9 +283,6 @@ static void ScheduleStreamingConcatNba(const Stmt* stmt,
                            delay_ticks, ctx, arena);
 }
 
-// A member of an element an index selects, `arr[i].f`, which the nonblocking
-// field path resolves no storage for; its write is the blocking one, deferred
-// with the index pinned.
 static bool NamesSelectedElementMember(const Expr* el) {
   return el->kind == ExprKind::kMemberAccess && el->lhs != nullptr &&
          el->lhs->kind == ExprKind::kSelect;
@@ -481,68 +314,18 @@ static void ScheduleConcatNba(const Stmt* stmt, const Logic4Vec& rhs_val,
   }
 }
 
-// §11.5.1: install the deferred update that deposits the sampled right-hand
-// value in the window `bits` names -- the bits of the target the select
-// addresses, and where in the value the bits they receive begin. The window is
-// already resolved when this is called; see SetupSelectNbaCallback below for
-// why it is resolved there and not here.
 static void SetupPartSelectNbaCallback(const NbaWrite& write,
                                        const PartSelectBits& bits) {
   Variable* var = write.var;
   Logic4Vec rhs_val = write.rhs_val;
   Arena& arena = write.arena;
   write.event->callback = [var, bits, rhs_val, &arena]() {
-    // §10.6.2: a force overrides procedural assignments to the variable until a
-    // release is executed on it, and §10.4 names a nonblocking assignment as
-    // one of the three kinds of procedural assignment whatever its left-hand
-    // side is. The check sits inside the callback rather than where the event
-    // was scheduled, as it does in SetupWholeVarNbaCallback, because the flag
-    // that governs the write is the one standing when the update region runs
-    // and not when it was queued. WritePartSelect itself does not ask -- its
-    // blocking caller WriteBitSelect asks before it evaluates the indices,
-    // which is the wrong moment here -- so this is where a forced target is
-    // declined.
     if (var->is_forced) return;
     WritePartSelect(var, bits, rhs_val, arena);
     var->NotifyWatchers();
   };
 }
 
-// Configure the deferred update callback for a nonblocking assignment whose
-// left-hand side is a bit-select or a part-select of `write.var`. Returns
-// false, having installed no callback, when the select addresses no bit of the
-// object and the assignment is therefore dropped: §11.5.1 has a write through
-// an index carrying x or z, and one through an address wholly outside the
-// declared bounds, leave the stored data untouched, which is a zero width
-// from SelectStorageBits.
-//
-// One installer answers both select forms because SelectStorageBits answers
-// both: an ordinary bit-select is the one-bit window its declared range gives
-// the index (Variable::BitSelectRange), and a single index of a packed
-// multidimensional array addresses that array's element rather than one bit
-// (§7.4.1), whose window is as wide as the element. A separate bit-select
-// installer stood here and tested `idx >= var->value.width`, reading the index
-// as a storage offset, so on a `logic [15:8] a` -- eight bits of storage
-// addressed by the indices 8 through 15 -- every nonblocking bit-select write
-// was dropped.
-//
-// §11.5.1 is stated once, by SelectStorageBits and WritePartSelect, rather than
-// twice. The copy that stood here computed its window in uint32_t against
-// `var->value.width` alone and predated three corrections to that shared
-// arithmetic. It read §5.7.1's signed decimal `-2` as 4294967294, so on a
-// `logic [7:0] a` the write `a[1:-2] <= 4'b1101` left 8'h1A where the clause
-// requires 8'h03. It carried no source offset, so a select running off the low
-// end took the value's least significant bits, and `a[1 -: 4] <= 4'b1101` on
-// the same variable left 8'h0D where that same 8'h03 is required -- §11.5.1
-// reads the indexed form as `a[1:-2]`, whose most significant end is index 1,
-// so `a[1]` takes the value's bit 3 and `a[0]` its bit 2. And it read an index
-// as a storage offset rather than resolving it against the declaration, so on a
-// `logic [15:8] a` the write `a[9:8] <= 2'b11` was dropped whole.
-//
-// The resolution is asked here, where the event is scheduled, and not from
-// inside the callback, because §10.4.2 evaluates the left-hand side's index
-// expressions along with the right-hand side when the statement executes. Only
-// the arithmetic moved into the shared helpers; when it runs is unchanged.
 static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
                                    SimContext& ctx) {
   PartSelectBits bits = SelectStorageBits(*write.var, lhs, ctx, write.arena);
@@ -551,32 +334,6 @@ static bool SetupSelectNbaCallback(const NbaWrite& write, const Expr* lhs,
   return true;
 }
 
-// §10.4.2 gives the nonblocking form the same target the blocking form takes --
-// `nonblocking_assignment ::= variable_lvalue <= [ delay_or_event_control ]
-// expression`, where variable_lvalue is any data type a procedural assignment
-// accepts -- so a select that names an element must reach the same object here
-// as it does in TrySelectBlockingAssign, which asks these two resolvers in this
-// order. §7.4.5: an indexed name selects one element of a packed or unpacked
-// array.
-//
-// TryResolveArrayElement answers only a one-dimensional indexed name, declining
-// outright when the select's base is itself a select, so `A[1][2] <= 43` on an
-// `int A[2][3]` fell through to the base variable `A` -- the element-width cell
-// LowerVar registers under the declared name, which no element is stored in --
-// and the select branch below read the element index 2 as a bit position and
-// wrote one bit of it. TryResolveCompoundElement is entered on exactly that
-// condition: it rebuilds the full indexed name and finds the leaf that
-// CreateMultiDimLeaves made. Every route into ScheduleNonblockingAssign shares
-// this resolution, so the event-controlled forms get it too.
-//
-// Both decline an lhs carrying an index_end, so a slice such as `A[1][1:2] <=
-// x` still reaches the part-select callback. A packed sub-select of an unpacked
-// element -- `logic [7:0] mem [0:3]; mem[0][3] <= 1'b1;` -- is not an element
-// at all and is answered by neither: §11.5.1 makes it a bit of the element
-// mem[0], so it is resolved by the caller through TryResolveCompoundElementBase
-// and takes the select-window callback the same bit-select of a plain variable
-// takes. Asking it there rather than here is what keeps that route open: an
-// element answered from this function is written whole.
 static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
                                          Arena& arena, bool* absent_element) {
   *absent_element = false;
@@ -586,45 +343,12 @@ static Variable* ResolveNbaSelectElement(const Expr* lhs, SimContext& ctx,
   return TryResolveCompoundElement(lhs, ctx, arena, absent_element);
 }
 
-// §10.4.2 gives the nonblocking form the same `variable_lvalue` the blocking
-// form takes, and A.8.5 makes a dotted member path the first production of
-// variable_lvalue, so a member of a packed struct and a property of a class
-// object are nonblocking targets exactly as they are blocking ones. Neither is
-// a key in the variable table -- a packed member is a window of bits inside one
-// variable and a property lives on the ClassObject -- so ResolveLhsVariable
-// answers nothing for either and the assignment was dropped in silence: no
-// event, no write, no diagnostic.
-//
-// The target is resolved here, where the statement executes, and only the
-// deposit is deferred, for the reason SetupSelectNbaCallback resolves a
-// select's window here: §10.4.2 evaluates whatever an lvalue needs evaluated --
-// an index, a class handle, a virtual interface reference -- together with the
-// right-hand expression. Calling WriteStructField from the callback would
-// satisfy the clause for neither, since it re-resolves the base itself --
-// `this` is a property of the running process, which in the update region is no
-// longer the process that executed the statement, and the base handle is read
-// from a variable that may have been assigned since.
-//
-// Nothing is taken from the event pool until the target resolves, so a path
-// naming no storage -- a null handle, a `this` outside a method -- costs no
-// event. §10.4.2 leaves nothing to write there, which is the answer the
-// blocking form gives it too.
-// §14.16's clockvar of a synchronous drive: the block a `cb.sig <= value`
-// names and the signal within it, or nothing where the left-hand side is not a
-// clockvar at all. The clause writes the target as `clockvar_expression ::=
-// clockvar select` with `clockvar ::= hierarchical_identifier`, so the base
-// names the block and the member names the signal.
 static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
                                                 SimContext& ctx,
                                                 std::string_view* block_name) {
   if (lhs->kind != ExprKind::kMemberAccess || lhs->lhs == nullptr) {
     return nullptr;
   }
-  // §23.9: a clockvar spells its block by the bare name the module declared, so
-  // the block it reaches is the one belonging to the instance the assignment is
-  // running in. §25.5.5 and §25.9.1: or by a path to its interface instance,
-  // `b1.sb.b` or `vif.sb.b` (ResolveClockingBlockOf); only the bare name was
-  // taken, and a drive through any path was dropped.
   const ClockingBlock* block = ResolveClockingBlockOf(lhs->lhs, ctx);
   if (block == nullptr) return nullptr;
   std::string_view member = lhs->text;
@@ -634,10 +358,6 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
   if (member.empty()) return nullptr;
   for (const auto& sig : block->signals) {
     if (sig.signal_name != member) continue;
-    // §14.3: a clocking block's output and inout clockvars are what drive
-    // values onto the signals they stand for. An input clockvar names a
-    // sampled value and is not a drive target, so it is left to decline here
-    // rather than driven.
     if (sig.direction == ClockingDir::kInput) return nullptr;
     *block_name = block->name;
     return &sig;
@@ -645,25 +365,6 @@ static const ClockingSignal* FindClockvarSignal(const Expr* lhs,
   return nullptr;
 }
 
-// §14.16: a clocking block's output and inout clockvars drive their signals at
-// a set time: the signal takes its new value at the named clocking event,
-// shifted by the output skew. A synchronous drive is written with the
-// nonblocking operator and reaches this function as one, so the clockvar target
-// is recognised here and handed to ClockingManager::ScheduleOutputDrive, which
-// places the value in the Re-NBA region the clause names. Returns whether the
-// left-hand side was a clockvar; a false answer leaves the ordinary
-// nonblocking paths to it.
-//
-// The drive carries the whole value the right-hand side produced. §14.16 also
-// admits a bit-select and a slice of a clockvar -- `dom.sig[2]`, `dom.sig[8:2]`
-// -- and those reach here as a select of a member access rather than as a
-// member access, so they are not clockvars to this function and take the
-// ordinary path, which finds no variable for them and drops them. That is the
-// state they were already in.
-//
-// §14.16 (printed pages 368-369): the drive's `##N`, `cycles`, postpones the
-// update by N cycles of the clockvar's block after the drive's governing
-// event, the right-hand side having been evaluated already; `##0` is no delay.
 static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
                                      SimContext& ctx, uint32_t cycles = 0) {
   std::string_view block_name;
@@ -676,7 +377,6 @@ static bool TryScheduleClockvarDrive(const Expr* lhs, const Logic4Vec& rhs_val,
   return true;
 }
 
-// An integer literal standing for the index `v` the drive evaluated.
 static Expr* IndexLiteral(const Expr* like, const Logic4Vec& v, Arena& arena) {
   auto* literal = arena.Create<Expr>();
   literal->kind = ExprKind::kIntegerLiteral;
@@ -687,13 +387,6 @@ static Expr* IndexLiteral(const Expr* like, const Logic4Vec& v, Arena& arena) {
   return literal;
 }
 
-// §14.16 (printed page 368): a synchronous drive's target may be a bit-select
-// or a slice of a clockvar, `cb.q[2]` or `cb.q[7:4]`, which drives that part
-// of the signal alone. The indices are evaluated where the drive runs, as its
-// right-hand side is, and the drive assigns the same select of the signal
-// itself at its clocking event. A select was no clockvar to
-// TryScheduleClockvarDrive, found no variable on the ordinary path, and was
-// dropped.
 static bool TryScheduleClockvarSelectDrive(const Expr* lhs,
                                            const Logic4Vec& rhs_val,
                                            uint32_t cycles, SimContext& ctx,
@@ -724,9 +417,6 @@ static bool TryScheduleClockvarSelectDrive(const Expr* lhs,
   return true;
 }
 
-// §14.16: a synchronous drive, `cb.v <= ##N r` or `cb.q[7:4] <= r`, whose
-// cycle delay is read off the statement where it executes; dropped, `cb.v <=
-// ##2 r` updated v in the current cycle. True where the statement was one.
 static bool TryScheduleSynchronousDrive(const Stmt* stmt,
                                         const Logic4Vec& rhs_val,
                                         SimContext& ctx, Arena& arena) {
@@ -751,33 +441,17 @@ static void ScheduleResolvedFieldNba(const FieldTarget& target,
 static void ScheduleFieldNba(const Expr* lhs, const NbaSample& sample,
                              uint64_t delay_ticks, SimContext& ctx,
                              Arena& arena) {
-  // A member access is the production this answers for, and it is the one the
-  // blocking form gates the same fallback on (AssignToScalarLhs and
-  // PerformBlockingAssign both ask WriteStructField on that kind alone), so the
-  // two forms reach it on the same left-hand sides and no others.
-  // §8.6: a bare name inside a method that no variable answers may be a
-  // property of the object the method runs on, `x <= 71` in a method of the
-  // class declaring x; ResolveBarePropertyTarget answers it, on the object
-  // resolved here as §10.4.2 asks, else nothing.
   if (lhs->kind == ExprKind::kIdentifier) {
     ScheduleResolvedFieldNba(ResolveBarePropertyTarget(lhs->text, ctx), sample,
                              delay_ticks, ctx, arena);
     return;
   }
   if (lhs->kind != ExprKind::kMemberAccess) return;
-  // §14.16: a clockvar names a clocking block's output rather than a member of
-  // an object, and it is asked first because ResolveFieldTarget takes `cb` for
-  // a variable, finds none, and drops the statement. Both arrive here for the
-  // same reason -- a dotted left-hand side that is no key in the variable table
-  // -- so this is where the two are told apart.
   if (TryScheduleClockvarDrive(lhs, sample.value, ctx)) return;
   ScheduleResolvedFieldNba(ResolveFieldTarget(lhs, ctx), sample, delay_ticks,
                            ctx, arena);
 }
 
-// Defers the deposit into a target resolved where the statement executed to
-// the NBA region, the tag the sample carries for a tagged union member
-// landing in the same update; a target that names no storage costs no event.
 static void ScheduleResolvedFieldNba(const FieldTarget& target,
                                      const NbaSample& sample,
                                      uint64_t delay_ticks, SimContext& ctx,
@@ -793,9 +467,6 @@ static void ScheduleResolvedFieldNba(const FieldTarget& target,
   ScheduleNbaEvent(event, delay_ticks, ctx);
 }
 
-// The update of a target that stands for storage reached some other way: a
-// clockvar, whose drive is synchronous (§14.16), and a modport expression
-// port, whose update lands on the expression it stands for (§25.5.4).
 static bool TryScheduleElsewhere(const Stmt* stmt, const NbaSample& sample,
                                  uint64_t delay_ticks, SimContext& ctx,
                                  Arena& arena) {
@@ -808,9 +479,6 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
                                uint64_t delay_ticks, SimContext& ctx,
                                Arena& arena) {
   if (!stmt->lhs) return;
-  // §10.4.2: the target is resolved here, where the statement executes, and
-  // each resolver below re-derives it from the same index nodes, so they are
-  // evaluated once for all of them.
   LhsIndexPin pin(stmt->lhs, ctx, arena);
 
   const Logic4Vec& rhs_val = sample.value;
@@ -819,9 +487,6 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
     ScheduleStreamingConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;
   }
-  // The gate is asked before an event is taken from the pool, rather than by
-  // letting the unpacker decline inside the callback, which would spend one on
-  // every left-hand side that is not a concatenation.
   if (IsConcatLhs(stmt->lhs)) {
     ScheduleConcatNba(stmt, rhs_val, delay_ticks, ctx, arena);
     return;
@@ -830,14 +495,7 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
   bool is_select = (stmt->lhs->kind == ExprKind::kSelect);
   bool absent_element = false;
   auto* elem = ResolveNbaSelectElement(stmt->lhs, ctx, arena, &absent_element);
-  // §7.4.5, as on the blocking path: a write to an array with an invalid index
-  // performs no operation, and the fallback below would otherwise take the
-  // name down to the array's base carrier.
   if (absent_element) return;
-  // §11.5.1's bit of an unpacked element: the object the trailing index selects
-  // within, which is not an element and so must not be written whole. It stands
-  // in for ResolveLhsVariable, which would answer the array's base carrier and
-  // let the window below be resolved against that.
   auto* sub_elem =
       elem ? nullptr : TryResolveCompoundElementBase(stmt->lhs, ctx, arena);
   auto* var = elem                  ? elem
@@ -853,20 +511,6 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
   event->kind = EventKind::kUpdate;
   if (is_select && !elem) {
     NbaWrite write{event, var, rhs_val, arena};
-    // §11.5.1 makes a select that addresses no bit of its object -- one whose
-    // index carries x or z, and one whose address lies wholly outside the
-    // declared bounds -- leave the stored data untouched when written, so
-    // declining the write is the clause rather than an error, and only the
-    // bookkeeping was wrong. The event is taken from the pool before the window
-    // is resolved because NbaWrite carries the Event* the installer writes its
-    // callback onto, so the one this path does not use is handed back here.
-    // EventPool::Release (scheduler.cpp:22) resets kind, target, callback and
-    // superseded before relinking, so an event returned mid-setup is as clean
-    // as one the scheduler drains from a queue, and SetupSelectNbaCallback
-    // installs no callback on the path that returns false, so there is nothing
-    // else to undo. Returning without it lost the event for the rest of the
-    // run: the arena has no per-object free, and every other route back to the
-    // pool runs on an event that reached a queue.
     if (!SetupSelectNbaCallback(write, stmt->lhs, ctx)) {
       ctx.GetScheduler().GetEventPool().Release(event);
       return;
@@ -874,8 +518,6 @@ void ScheduleNonblockingAssign(const Stmt* stmt, const NbaSample& sample,
   } else {
     auto converted = ConvertRealOnAssign(rhs_val, stmt->lhs, *var, ctx, arena);
     SetupWholeVarNbaCallback(event, var, converted);
-    // §7.3.2: the whole of a tagged union variable, whose update carries the
-    // tag the right-hand side gave it, set once the bits have landed.
     AttachUpdateTag(event, var, sample.tag, ctx);
   }
   PinEventHandles(*event, ctx, {rhs_val});

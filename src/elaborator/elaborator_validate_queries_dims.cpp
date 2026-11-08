@@ -27,10 +27,6 @@ namespace delta {
 
 namespace {
 
-// §20.6.2 (NC9, NC12, NC13): the names in a module that have no defined
-// bit-stream size and therefore may not be enclosed by '$bits': dynamically
-// sized typedefs (NC12), functions whose return type is such a typedef (NC9),
-// and objects whose type is an interface class (NC13, see §8.26).
 struct BitsDynamicNames {
   const std::unordered_set<std::string_view>& dyn_types;
   const std::unordered_set<std::string_view>& dyn_funcs;
@@ -42,8 +38,6 @@ bool IsBitsCall(const Expr* e) {
          e->args.size() == 1 && e->args[0];
 }
 
-// §20.6.2 (NC12, NC13): a bare identifier argument names either a dynamically
-// sized typedef or an interface-class object; flag whichever applies.
 void CheckBitsCallIdentArg(const Expr* call, const Expr* a,
                            const BitsDynamicNames& names, DiagEngine& diag) {
   if (names.dyn_types.count(a->text) != 0) {
@@ -62,8 +56,6 @@ void CheckBitsCallIdentArg(const Expr* call, const Expr* a,
   }
 }
 
-// §20.6.2 (NC9): a call argument that names a function with a dynamically sized
-// return type has no defined bit-stream size.
 void CheckBitsCallFuncArg(const Expr* call, const Expr* a,
                           const BitsDynamicNames& names, DiagEngine& diag) {
   std::string_view name = a->callee;
@@ -78,10 +70,6 @@ void CheckBitsCallFuncArg(const Expr* call, const Expr* a,
   }
 }
 
-// §20.6.2: report the restricted forms of a confirmed $bits call: a bare
-// identifier naming a dynamically sized typedef (NC12) or an interface-class
-// object (NC13), or a call to a function with a dynamically sized return type
-// (NC9).
 void CheckBitsCallArg(const Expr* call, const Expr* a,
                       const BitsDynamicNames& names, DiagEngine& diag) {
   if (a->kind == ExprKind::kIdentifier) {
@@ -91,9 +79,6 @@ void CheckBitsCallArg(const Expr* call, const Expr* a,
   }
 }
 
-// §20.6.2: a single argument that is a bare identifier names either the
-// dynamically sized typedef itself (NC12) or an interface-class object (NC13);
-// in either case there is no defined bit-stream size.
 void CheckBitsCallExpr(const Expr* e, const BitsDynamicNames& names,
                        DiagEngine& diag) {
   if (!e) return;
@@ -115,23 +100,6 @@ void CheckBitsCallExpr(const Expr* e, const BitsDynamicNames& names,
   for (auto* el : e->elements) CheckBitsCallExpr(el, names, diag);
 }
 
-// §20.6.2 makes it an error to apply $bits directly to a dynamically sized data
-// type identifier or to an object of an interface class type, and an error to
-// enclose a function returning a dynamically sized data type. None of the three
-// names a position the call is allowed to stand in, so every position a
-// statement holds a statement in is one such a call may be written in and the
-// check is owed at each of them.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, and A.6.2's
-// operator_assignment is `variable_lvalue assignment_operator expression`, so a
-// $bits call may stand in a for-loop step exactly as it may in the loop's
-// initializer.
 void CheckBitsCallStmt(const Stmt* s, const BitsDynamicNames& names,
                        DiagEngine& diag) {
   if (!s) return;
@@ -145,8 +113,6 @@ void CheckBitsCallStmt(const Stmt* s, const BitsDynamicNames& names,
       s, [&](Stmt* const& sub) { CheckBitsCallStmt(sub, names, diag); });
 }
 
-// §20.6.2 (NC12): the typedefs in the module whose declared unpacked dimensions
-// are dynamically sized.
 std::unordered_set<std::string_view> CollectDynamicTypes(
     const ModuleDecl* decl) {
   std::unordered_set<std::string_view> dyn_types;
@@ -159,8 +125,6 @@ std::unordered_set<std::string_view> CollectDynamicTypes(
   return dyn_types;
 }
 
-// §20.6.2 (NC9): the functions in the module whose return type names one of the
-// dynamically sized typedefs.
 std::unordered_set<std::string_view> CollectDynamicFuncs(
     const ModuleDecl* decl,
     const std::unordered_set<std::string_view>& dyn_types) {
@@ -178,10 +142,6 @@ std::unordered_set<std::string_view> CollectDynamicFuncs(
 }  // namespace
 
 void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
-  // §20.6.2: $bits cannot be used directly on a dynamically sized type
-  // identifier (NC12), cannot enclose a function whose return type is
-  // dynamically sized (NC9), and cannot be applied to an object whose type is
-  // an interface class (NC13, see §8.26).
   std::unordered_set<std::string_view> dyn_types = CollectDynamicTypes(decl);
   std::unordered_set<std::string_view> dyn_funcs =
       CollectDynamicFuncs(decl, dyn_types);
@@ -200,11 +160,6 @@ void Elaborator::ValidateBitsCallRestrictions(const ModuleDecl* decl) {
   }
 }
 
-// A.8.3 (printed page 1210): a constant_part_select_range is a constant_range
-// or a constant_indexed_range, `constant_expression +: constant_expression` or
-// its `-:` form, so an indexed part-select whose base and width are both
-// constant is a constant select like `a[3:0]`. Refused whatever its operands,
-// `assign a[1 -: 4] = ...` was reported as wanting a constant select.
 static bool IsConstantBitSelect(const Expr* e, const ScopeMap& scope) {
   if (e->is_part_select_plus || e->is_part_select_minus) {
     return ConstEvalInt(e->index, scope).has_value() &&
@@ -217,10 +172,6 @@ static bool IsConstantBitSelect(const Expr* e, const ScopeMap& scope) {
   return true;
 }
 
-// Table 10-1 (printed page 247) and §10.6.2 (printed page 257): a select a
-// continuous assignment or a force writes through is a constant one, and so is
-// every select beneath it on the way down to the name the target is rooted
-// at, `w[i][0]` and `s[i].f` included.
 bool SelectPathIsConstant(const Expr* e, const ScopeMap& scope) {
   while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
     if (e->kind == ExprKind::kMemberAccess) {
@@ -235,14 +186,9 @@ bool SelectPathIsConstant(const Expr* e, const ScopeMap& scope) {
 
 namespace {
 
-// Reports whether an expression names any of the given run-time signals
-// (module variables or nets). A part-select bound that does so cannot be a
-// constant expression.
 bool ExprNamesSignal(const Expr* e,
                      const std::unordered_set<std::string_view>& signals);
 
-// Whether any of an expression's scalar (single-pointer) child slots names one
-// of the given run-time signals.
 bool ScalarChildNamesSignal(
     const Expr* e, const std::unordered_set<std::string_view>& signals) {
   for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
@@ -257,8 +203,6 @@ bool ExprNamesSignal(const Expr* e,
                      const std::unordered_set<std::string_view>& signals) {
   if (!e) return false;
   if (e->kind == ExprKind::kIdentifier) return signals.count(e->text) > 0;
-  // §20.6.2 and §20.7: $bits, or an array query of fixed dimensions, reads no
-  // value of what it is called on, so a signal there is no read of it.
   if (e->kind == ExprKind::kSystemCall && IsConstantWhateverItsArguments(e))
     return false;
   if (ScalarChildNamesSignal(e, signals)) return true;
@@ -271,11 +215,6 @@ bool ExprNamesSignal(const Expr* e,
 
 using PackedDims = std::vector<std::pair<int64_t, int64_t>>;
 
-// §11.5.2: the word is selected first, with one address per dimension, and only
-// then does a range select bits of that word. The addresses run through the
-// unpacked dimensions before the packed ones, so what a range has to be judged
-// against is the count of unpacked dimensions together with the packed
-// dimensions themselves, outermost first.
 struct DeclaredShape {
   size_t unpacked_count = 0;
   PackedDims packed;
@@ -285,20 +224,11 @@ using ShapeMap = std::unordered_map<std::string_view, DeclaredShape>;
 
 struct PartSelectBoundsCtx {
   const std::unordered_set<std::string_view>& signals;
-  // The signals whose packed dimensions all fold to constants, keyed by name. A
-  // declaration missing from this cannot say which bit a range reaches, so its
-  // ranges go unjudged.
   const ShapeMap& shapes;
-  // The module's parameter scope, which a bound written with a parameter folds
-  // in.
   const ScopeMap& scope;
   DiagEngine& diag;
 };
 
-// The name a range is written against and how many addresses stand between the
-// two: `vect[3:0]` gives ("vect", 0) and `arr[2][3:0]` gives ("arr", 1). An
-// empty name means the range is written against something other than a plain
-// run of addresses on a name, which no declaration describes.
 struct AddressedBase {
   std::string_view name;
   size_t addresses = 0;
@@ -312,8 +242,6 @@ AddressedBase FindAddressedBase(const Expr* base) {
       return found;
     }
     if (cur->kind != ExprKind::kSelect) break;
-    // A range, or an indexed part-select, is not an address, and what stands to
-    // its left is not a word whose declared bounds can be read off a name.
     if (!cur->index || cur->index_end || cur->is_part_select_plus ||
         cur->is_part_select_minus)
       break;
@@ -322,10 +250,6 @@ AddressedBase FindAddressedBase(const Expr* base) {
   return {};
 }
 
-// The declared range a written range selects from: the packed dimension the
-// next address would have consumed. Nothing when the addresses stop short of
-// the packed dimensions -- the range is then a slice of an unpacked dimension,
-// which §7.4.5 governs -- or run past the last of them.
 const std::pair<int64_t, int64_t>* GoverningRange(const DeclaredShape& shape,
                                                   size_t addresses) {
   if (addresses < shape.unpacked_count) return nullptr;
@@ -334,9 +258,6 @@ const std::pair<int64_t, int64_t>* GoverningRange(const DeclaredShape& shape,
   return &shape.packed[index];
 }
 
-// §11.5.1: check one qualifying non-indexed part-select (msb:lsb, on a word the
-// declaration `range` describes) for constant bounds and correct index
-// ordering.
 void CheckOnePartSelectBounds(const Expr* e,
                               const std::pair<int64_t, int64_t>& range,
                               const PartSelectBoundsCtx& ctx) {
@@ -352,10 +273,6 @@ void CheckOnePartSelectBounds(const Expr* e,
   auto lsb = ConstEvalInt(e->index_end, ctx.scope);
   if (!msb || !lsb) return;
   bool descending = range.first >= range.second;
-  // The first index shall name a more significant bit than the second. For a
-  // descending declaration the more significant bit has the larger index; for
-  // an ascending one it has the smaller index. Equal indices (a one-bit
-  // part-select) are permitted.
   bool reversed = descending ? (*msb < *lsb) : (*msb > *lsb);
   if (reversed)
     ctx.diag.Error(e->range.start,
@@ -364,9 +281,6 @@ void CheckOnePartSelectBounds(const Expr* e,
                    Subclause("11.5.1"));
 }
 
-// Only a non-indexed range (msb:lsb, not an indexed +:/-: form and not a plain
-// bit-select) written against a declaration whose shape says which packed
-// dimension it selects from falls under these §11.5.1 rules.
 void CheckPartSelectNode(const Expr* e, const PartSelectBoundsCtx& ctx) {
   if (e->kind != ExprKind::kSelect || !e->index || !e->index_end) return;
   if (e->is_part_select_plus || e->is_part_select_minus) return;
@@ -396,17 +310,6 @@ void CheckPartSelectBoundsExpr(const Expr* e, const PartSelectBoundsCtx& ctx) {
   for (const auto* el : e->elements) CheckPartSelectBoundsExpr(el, ctx);
 }
 
-// §11.5.1 requires of a non-indexed part-select that msb_expr and lsb_expr both
-// be constant integer expressions and that the first address a more significant
-// bit than the second. It puts no condition on where the select stands, and
-// §11.5 makes a part-select an operand, so every position a statement holds a
-// statement in is one a part-select may be written in and both rules are owed
-// at each of them.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
 void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
   if (!s) return;
   CheckPartSelectBoundsExpr(s->lhs, ctx);
@@ -418,11 +321,6 @@ void CheckPartSelectBoundsStmt(const Stmt* s, const PartSelectBoundsCtx& ctx) {
       s, [&ctx](Stmt* const& sub) { CheckPartSelectBoundsStmt(sub, ctx); });
 }
 
-// Folds a declaration's packed dimensions into `out`, outermost first. Returns
-// false when one of them is not constant: a declaration the elaborator cannot
-// resolve says nothing about which bit a range reaches, so none of its
-// dimensions is kept. A declaration with no packed dimension at all fills
-// nothing and succeeds.
 bool CollectPackedDims(const DataType& type, const ScopeMap& scope,
                        PackedDims& out) {
   if (!type.packed_dim_left || !type.packed_dim_right) return true;
@@ -439,12 +337,6 @@ bool CollectPackedDims(const DataType& type, const ScopeMap& scope,
   return true;
 }
 
-// §11.5.1 has a non-indexed part-select's bounds be constant expressions,
-// which a variable a process or a subroutine declares, a loop's included, or a
-// subroutine's formal is not, any more than a module's variable is: adds those
-// names of `decl` to `names`. The members of an enumeration such a block
-// declares and its lets are left out, A.8.4 counting an enum_identifier and a
-// constant_let_expression among a constant expression's primaries.
 void CollectProcedureNames(const ModuleDecl* decl,
                            std::unordered_set<std::string_view>& names) {
   for (const auto* item : decl->items) {
@@ -468,14 +360,9 @@ void Elaborator::ValidatePartSelectBounds(const ModuleDecl* decl) {
     signals.insert(item->name);
     DeclaredShape shape;
     shape.unpacked_count = item->unpacked_dims.size();
-    // §11.5.1 folds the declaration's range in the module's parameter scope,
-    // which ValidateModuleConstraints installs for these checks.
     if (!CollectPackedDims(item->data_type, replicate_multiplier_scope_,
                            shape.packed))
       continue;
-    // A declaration with no packed dimension has no word for a range to select
-    // bits of, so every range written against it is a slice of an unpacked
-    // dimension and belongs to §7.4.5 rather than here.
     if (shape.packed.empty()) continue;
     shapes[item->name] = std::move(shape);
   }
@@ -510,8 +397,6 @@ void Elaborator::ValidateSpecparamInParams(const ModuleDecl* decl) {
 
 namespace {
 
-// §6.20.5: flag a single declaration range expression that references any
-// specify parameter.
 void CheckSpecparamInRange(
     const Expr* range, SourceLoc loc,
     const std::unordered_set<std::string_view>& specparam_names,
@@ -529,8 +414,6 @@ void CheckSpecparamInRange(
   }
 }
 
-// §6.20.5: check every packed and unpacked dimension expression of one net or
-// variable declaration for a specparam reference.
 void CheckDeclRangesForSpecparam(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& specparam_names,
@@ -555,11 +438,6 @@ static void ReportHierRefInDeclRange(const ModuleItem* item,
                                      DiagEngine& diag);
 
 void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
-  // §6.20.5: a specify parameter is reserved for timing/delay values and may
-  // not participate in the range specification of a declaration. Flag any
-  // packed or unpacked dimension expression of a net or variable declaration
-  // that references a specparam. The same ranges are constant expressions,
-  // which no hierarchical name is (ReportHierRefInDeclRange).
   for (const auto* item : decl->items) {
     if (item->kind != ModuleItemKind::kNetDecl &&
         item->kind != ModuleItemKind::kVarDecl)
@@ -573,7 +451,6 @@ void Elaborator::ValidateSpecparamInDeclRange(const ModuleDecl* decl) {
 
 static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit);
 
-// True when any expression of `list` contains a hierarchical reference.
 static bool AnyExprContainsHierRef(const std::vector<Expr*>& list,
                                    const CompilationUnit* unit) {
   for (auto* sub : list) {
@@ -584,48 +461,14 @@ static bool AnyExprContainsHierRef(const std::vector<Expr*>& list,
 
 static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
   if (!e) return false;
-  // §6.20.2 rules that a value parameter's expression may hold literals, value
-  // parameters or local parameters, genvars, enumerated names, or a constant
-  // function of these, that package references are permitted, and that
-  // hierarchical names are not. The parser builds one kMemberAccess node for
-  // both spellings and records which was written, so which spelling it is
-  // decides this and what the name reaches does not: a dotted name is a breach
-  // whether it names another module's parameter or one of its variables, and a
-  // `::` name is not a hierarchical name at all. §26.3 gives `::` a package
-  // prefix and §8.23 a class one, and neither is the dotted path §23.6 calls a
-  // hierarchical name.
-  //
-  // A `::` prefix naming nothing declared is not exempted here so much as not
-  // this rule's business: what is wrong with such a source is the name, which
-  // §26.3 reports, and §6.20.4 reports the initializer that is not a constant
-  // expression as a result.
 
-  // §6.23 holds the operand of a type reference to a rule of its own, which
-  // tells a member of a structure the module declares, `type(p.f)`, from a
-  // hierarchical name and reports only the latter (CheckTypeRefArgInner, run
-  // over parameter values and declaration ranges by ValidateTypeRefArgs), so a
-  // dotted name there is not judged by its spelling here.
   if (e->kind == ExprKind::kTypeRef) return false;
 
-  // §13.5: a method call is written `expression.method(...)`, and the parser
-  // records it as a kCall whose callee is the kMemberAccess naming the method.
-  // The dot in that node separates an expression from the method invoked on it
-  // rather than qualifying a name by the scope it is declared in, which is what
-  // §23.6 makes a hierarchical name, so the call is judged by the expression it
-  // is called on and by its arguments and not by the callee itself. Without
-  // this, `S.len()` on a string parameter of this very module was reported as a
-  // hierarchical reference, naming a rule the source did not break and one its
-  // author could not act on. A call written on a hierarchical name is still
-  // reported, because the expression underneath the callee is where that name
-  // is and it is still walked.
   if (e->kind == ExprKind::kCall && e->lhs != nullptr &&
       e->lhs->kind == ExprKind::kMemberAccess) {
     return ExprContainsHierRef(e->lhs->lhs, unit) ||
            AnyExprContainsHierRef(e->args, unit);
   }
-  // §5.13 lets a built-in method called with no arguments drop its
-  // parentheses, so `e.last` is the call `e.last()` and is judged as the call
-  // is, by the expression it is called on.
   if (e->kind == ExprKind::kMemberAccess && BuiltinMethodMember(e) != nullptr)
     return ExprContainsHierRef(e->lhs, unit);
   if (e->kind == ExprKind::kMemberAccess) return !e->is_scope_resolution;
@@ -637,11 +480,6 @@ static bool ExprContainsHierRef(const Expr* e, const CompilationUnit* unit) {
          AnyExprContainsHierRef(e->args, unit);
 }
 
-// §11.2.1 with A.8.4: a declaration's range is a constant expression, whose
-// constant_primary reaches a parameter by its own name or a package's and
-// never by a hierarchical one, as the §6.20.2 check below reads a parameter's
-// value; a range written with one, `logic [c.r.W:0] v`, is reported where it
-// would otherwise have been folded to nothing and the vector made one bit.
 static void ReportHierRefInDeclRange(const ModuleItem* item,
                                      const CompilationUnit* unit,
                                      DiagEngine& diag) {
@@ -663,8 +501,6 @@ static void ReportHierRefInDeclRange(const ModuleItem* item,
 
 namespace {
 
-// Flag the elaborated parameter overrides in decl->params whose value contains
-// a hierarchical reference.
 void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
                            DiagEngine& diag) {
   for (const auto& [pname, pval] : decl->params) {
@@ -679,22 +515,6 @@ void CheckParamMapHierRefs(const ModuleDecl* decl, const CompilationUnit* unit,
   }
 }
 
-// Validate one parameter declaration item: it must carry a default value, its
-// value may not contain a hierarchical reference, and a localparam's
-// initializer must be a constant expression in param_scope.
-//
-// §6.20.4 lets local parameters take constant expressions (§11.2.1), and
-// §11.2.1 gives the operands a constant expression consists of. Neither rule
-// mentions how the expression is written, so the check below tests the
-// expression rather than its ExprKind. The first guard below keeps §6.20.3's
-// type parameters out, which Syntax 6-6 gives their own production taking a
-// data type where a param_assignment takes a constant_param_expression, so
-// there is no value for IsConstantExpr to answer about.
-//
-// `parameter_is_local` is for the scopes §6.20.4 lists after that rule, where
-// it makes the parameter keyword mean localparam. A declaration in one of them
-// is held to the constant-expression rule whether it was written `parameter` or
-// `localparam`, and only the caller knows which scope the item was declared in.
 void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                            const CompilationUnit* unit, DiagEngine& diag,
                            bool parameter_is_local = false) {
@@ -717,14 +537,6 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
                Subclause("6.20.2"));
   }
 
-  // The §6.20.4 check below is not skipped when the §6.20.2 one above has
-  // already reported, although a hierarchical name is not a constant
-  // expression either. The two answer different questions about the same
-  // initializer -- whether it names something hierarchically, and whether it is
-  // a constant expression -- and a source can break the second while keeping
-  // the first, as `localparam int N = S.len();` over an integer S does. Folding
-  // them into one report was tried in 3dc382ad0 and lost the §6.20.4 report on
-  // exactly those sources.
   if ((item->is_localparam || parameter_is_local) &&
       !IsConstantExpr(item->init_expr, param_scope)) {
     diag.Error(item->loc,
@@ -735,29 +547,12 @@ void ValidateOneValueParam(const ModuleItem* item, const ScopeMap& param_scope,
   }
 }
 
-// What a generate body's parameter declarations are validated against, which is
-// everything ValidateOneValueParam needs and cannot read off the item.
 struct GenerateParamCtx {
   const CompilationUnit* unit;
   const RtlirModule* mod;
   DiagEngine& diag;
 };
 
-// §23.9: the generate block prefixes the elaborated instances of the parameter
-// `item` declares were registered under, one for each instance of the block it
-// stands in. The walk below reads a body from the source and so stands in no
-// one instance of it, and these are what put the body's own declarations in
-// reach of a fold that reads one of them: StringParamValue in
-// src/elaborator/const_eval_builtin_method.cpp answers `S.len()` from the
-// declaration Elaborator::ElaborateParamDecl registered for S, and finds a
-// generate block's declaration only from inside that block. The walk runs once
-// the construct is elaborated, so every instance is registered by then; see
-// ValidateGenerateValueParams.
-//
-// An instance is told by the initializer it was registered with, which is the
-// declaration's own. A declaration written with none, which
-// ValidateOneValueParam has just reported, matches every other such one, and
-// what that adds only widens what the rest of a block already in error reads.
 void AddInstancePrefixes(const ModuleItem* item, const RtlirModule* mod,
                          GenBlockPrefixes& prefixes) {
   for (const auto& pd : mod->params) {
@@ -771,25 +566,11 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
                                        GenBlockPrefixes prefixes,
                                        const GenerateParamCtx& ctx);
 
-// The three shapes a generate construct holds items in: the body of a loop or
-// of an `if` arm, the `else` arm, and the arms of a `case`.
-//
-// The `else` arm is walked as an item rather than as its gen_body, because
-// Parser::ParseGenerateIf builds `else if` out of a nested kGenerateIf item;
-// reading gen_else->gen_body alone would stop at the first arm and leave every
-// later one unvisited.
 void ValidateValueParamsInGenerate(const ModuleItem* item,
                                    const ScopeMap& scope,
                                    const GenBlockPrefixes& prefixes,
                                    const GenerateParamCtx& ctx) {
   ScopeMap body_scope = scope;
-  // §27.4: the loop index is an implicit localparam of the generate block, so
-  // an initializer reading it is a constant expression. Bind the name here,
-  // because Elaborator::BuildParamScope holds a module's parameters alone and
-  // the loop has not been elaborated yet. The value bound is not the index:
-  // IsConstantExpr asks only whether the name names a constant, and which
-  // index each instance of the block gets is settled when the loop is
-  // elaborated, in Elaborator::ElaborateGenerateFor.
   if (item->kind == ModuleItemKind::kGenerateFor && item->gen_init &&
       item->gen_init->lhs)
     body_scope[item->gen_init->lhs->text] = 0;
@@ -800,9 +581,6 @@ void ValidateValueParamsInGenerate(const ModuleItem* item,
     ValidateValueParamsInGenerateBody(ci.body, scope, prefixes, ctx);
 }
 
-// §6.20.4 lets a local parameter be declared in a generate block, and rules
-// that `parameter` written there means `localparam`, so every value parameter
-// a body declares is held to the constant-expression rule.
 void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
                                        ScopeMap scope,
                                        GenBlockPrefixes prefixes,
@@ -813,10 +591,6 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
         RegisteredGenScopeGuard in_block(prefixes);
         ValidateOneValueParam(item, scope, ctx.unit, ctx.diag, true);
       }
-      // §6.20.1 lets a later declaration in the block read an earlier one, so
-      // bind the name whatever the check above decided about it. Binding only
-      // the ones that passed would report every declaration downstream of a
-      // breach as well, for a breach none of them committed.
       scope[item->name] = 0;
       AddInstancePrefixes(item, ctx.mod, prefixes);
       continue;
@@ -833,11 +607,6 @@ void ValidateValueParamsInGenerateBody(const std::vector<ModuleItem*>& items,
 void Elaborator::ValidateValueParams(const ModuleDecl* decl,
                                      const RtlirModule* mod) {
   ScopeMap param_scope = BuildParamScope(mod);
-  // A generate construct keeps its items in ModuleItem::gen_body rather than
-  // in decl->items, and ValidateGenerateValueParams reaches the
-  // declarations §6.20.4 permits inside one. Parser::ParseGenerateRegion parses
-  // a bare `generate ... endgenerate` straight into decl->items, so a
-  // declaration written there is reached by this loop.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kParamDecl)
       ValidateOneValueParam(item, param_scope, unit_, diag_);
@@ -846,11 +615,6 @@ void Elaborator::ValidateValueParams(const ModuleDecl* decl,
   CheckParamMapHierRefs(decl, unit_, diag_);
 }
 
-// Elaborator::ProcessPendingGenerate calls this as the construct's elaboration
-// ends, rather than Elaborator::ValidateValueParams with the module's own
-// declarations, because the construct is elaborated after the module: only
-// then are the block's parameters registered for a fold that reads one, as
-// `S.len()` reads a string parameter S the block declares above it.
 void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
                                  const ScopeMap& scope,
                                  const CompilationUnit* unit,
@@ -859,25 +623,8 @@ void ValidateGenerateValueParams(const ModuleItem* item, const RtlirModule* mod,
   ValidateValueParamsInGenerate(item, scope, {}, ctx);
 }
 
-// §6.20.4 lets a local parameter be declared in a package, and rules that
-// `parameter` written there means `localparam`, so a package's value
-// parameters are held to the constant-expression rule exactly as a module's
-// local ones are. Elaborator::ValidateValueParams never sees them: a package is
-// not a module and is not elaborated through Elaborator::ElaborateItems.
 void Elaborator::ValidatePackageValueParams() {
   for (const auto* pkg : unit_->packages) {
-    // RegisterPackageParams records a package's constants in cu_param_scope_
-    // under their "package.name" keys alone (§26.3), so a declaration reading
-    // a bare name an earlier declaration in the same package introduced is not
-    // constant against that scope by itself. Bind each name as the walk
-    // reaches it, for the §6.20.1 reason the generate-body walk binds them.
-    // §6.19 declares an enumeration's members as constants of the package as
-    // well, so `parameter R = (DEEP | SHALLOW);` over members of an
-    // enumeration the package declared is a constant expression, and they are
-    // bound where the enumeration stands. §26.3 lets the package import
-    // another, whose constants an import makes visible by bare name from
-    // where it is written, so `import base::K; parameter int KK = K;` and
-    // the wildcard form read a constant too.
     ScopeMap scope = cu_param_scope_;
     for (const auto* item : pkg->items) {
       BindPackageImportConstants(pkg, item, cu_param_scope_, scope);

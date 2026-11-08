@@ -19,14 +19,6 @@
 
 namespace delta {
 
-// §9.2.2.2: a variable passed to an output formal of a called task/function is
-// written by the call, not read. It must stay out of an always_comb's implicit
-// sensitivity list; otherwise the block re-triggers on its own write and spins
-// in a zero-delay loop. An inout actual is read as well as written, so only
-// pure outputs are excluded. Callee formals come from the runtime subroutine
-// registry, which is populated (RegisterModuleSubroutines) before processes are
-// lowered.
-// Records the base identifiers of any output actuals of a single call node.
 static void CollectOutputActualsOfCall(const Expr* call, SimContext& ctx,
                                        std::unordered_set<std::string>& out) {
   const ModuleItem* fn = ctx.FindFunction(call->callee);
@@ -77,9 +69,6 @@ static void CollectCallOutputActuals(const Stmt* stmt, SimContext& ctx,
     CollectCallOutputActuals(ci.body, ctx, out);
 }
 
-// The names of the elements of `info`'s unpacked dimensions from `d` on, each
-// `prefix` followed by one index per dimension, as the lowerer names the
-// element Variables: `a[0][2]`, counted from each dimension's lower address.
 static void AppendElementNames(const ArrayInfo& info, size_t d,
                                const std::string& prefix, Arena& arena,
                                std::vector<std::string_view>& out) {
@@ -109,7 +98,6 @@ std::vector<std::string_view> UnpackedElementNames(std::string_view name,
 const std::vector<EventExpr>& ImplicitListEvents(
     const std::vector<EventExpr>& sens, SimContext& ctx, Arena& arena) {
   auto* events = arena.Create<std::vector<EventExpr>>(sens);
-  // A constant select, `a[2]`, is on the list already beside its array.
   std::unordered_set<std::string_view> listed;
   for (const auto& ev : sens) {
     if (ev.signal != nullptr) listed.insert(ev.signal->text);
@@ -138,16 +126,12 @@ std::vector<std::string_view> AlwaysCombWatchedNames(
   for (const auto& ev : sens) {
     if (!ev.signal || ev.signal->text.empty()) continue;
     if (call_outputs.count(std::string(ev.signal->text)) != 0) continue;
-    // §9.2.2.2.1: `y = x + h.a` reads the handle `h` and a member of the object
-    // it refers to, and neither is on the list: a write to `h.a` through the
-    // handle does not re-run the block.
     if (!ctx.GetVariableClassType(ev.signal->text).empty()) continue;
     read_vars.push_back(ev.signal->text);
     std::vector<std::string_view> elements =
         UnpackedElementNames(ev.signal->text, ctx);
     read_vars.insert(read_vars.end(), elements.begin(), elements.end());
   }
-  // A constant select, `a[2]`, is on the list already beside its array.
   std::ranges::sort(read_vars);
   read_vars.erase(std::ranges::unique(read_vars).begin(), read_vars.end());
   DropUnwatchableNames(ctx, read_vars);

@@ -1,16 +1,3 @@
-// The state a system task writes into SimContext and a later call or a test
-// reads back: the $finish request of §20.2, the $timeformat and
-// $timeunit/$timeprecision settings of §20.4, the severity-task report of
-// §20.10, the whole-design assertion controls of §20.11, the $monitor display
-// list of §21.2.3, and the optional interactive tasks of Annex D ($reset,
-// $scope, $list, $showscopes, $showvars). Each body only records or answers a
-// value; the tasks themselves are evaluated elsewhere. The $log and $nolog
-// state of Annex D.7 is the OutputLog member's own.
-//
-// It is split out of sim_context.h, where these bodies were defined inside the
-// class, so the header carries the interface and no one file carries the whole
-// of the context's implementation.
-
 #include <algorithm>
 #include <cstdint>
 #include <string>
@@ -48,8 +35,6 @@ void SimContext::RecordListing(std::string_view name) {
 
 std::vector<std::string> SimContext::HierarchicalScopesUnder(
     std::string_view scope, bool recursive) const {
-  // A scope's own name is not under it, and a name under it has this prefix;
-  // one at the level directly below has no dot beyond the prefix.
   std::string prefix = std::string(scope) + ".";
   std::vector<std::string> out;
   for (const std::string& name : hierarchical_scopes_) {

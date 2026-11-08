@@ -13,15 +13,6 @@
 namespace delta {
 namespace {
 
-// §37.49 assertion: the VPI assertion object model. The assertion class groups
-// the immediate/concurrent assertion kinds and sequence/property instances, is
-// reachable from a null reference, traverses to its enclosing instance (reusing
-// the §37.10 vpiInstance relation) and to its clocking block, and exposes a
-// source span and a name. These tests observe the production helpers in vpi.cpp
-// and the VpiContext methods that apply those rules.
-
-// A: every object kind the assertion class groups is an assertion; unrelated
-// object kinds (including a clocking block) are not.
 TEST(AssertionModel, AssertionTypeCoversTheGroupedKinds) {
   EXPECT_TRUE(VpiIsAssertionType(vpiAssert));
   EXPECT_TRUE(VpiIsAssertionType(vpiAssume));
@@ -38,19 +29,15 @@ TEST(AssertionModel, AssertionTypeCoversTheGroupedKinds) {
   EXPECT_FALSE(VpiIsAssertionType(vpiClockingBlock));
 }
 
-// A edge: vpiAssertion names the class, not a concrete object kind, so the
-// class selector itself is not classified as one of the grouped member kinds.
 TEST(AssertionModel, ClassSelectorIsNotItselfAMemberKind) {
   EXPECT_FALSE(VpiIsAssertionType(vpiAssertion));
 }
 
-// A + circle: iterating the assertion class from a null reference returns every
-// assertion-kind object in the design and skips non-assertions.
 TEST(AssertionModel, IterateAssertionClassFromNullReturnsAllAssertions) {
   VpiContext ctx;
   VpiHandle a = ctx.CreateAssertion("a_req", vpiAssert);
   VpiHandle c = ctx.CreateAssertion("c_cov", vpiImmediateCover);
-  ctx.CreateParameter("WIDTH", 8);  // not an assertion
+  ctx.CreateParameter("WIDTH", 8);
 
   VpiHandle it = ctx.Iterate(vpiAssertion, nullptr);
   ASSERT_NE(it, nullptr);
@@ -62,17 +49,13 @@ TEST(AssertionModel, IterateAssertionClassFromNullReturnsAllAssertions) {
   EXPECT_EQ(seen[1], c);
 }
 
-// D edge: with no assertions in the design, the class iteration reports nothing
-// rather than handing back an empty iterator to scan.
 TEST(AssertionModel, IterateAssertionClassWithNoAssertionsIsNull) {
   VpiContext ctx;
-  ctx.CreateParameter("WIDTH", 8);  // a non-assertion object exists
+  ctx.CreateParameter("WIDTH", 8);
 
   EXPECT_EQ(ctx.Iterate(vpiAssertion, nullptr), nullptr);
 }
 
-// A grouping: iterating the assertion class under a scope returns only the
-// assertion-kind children of that scope, in order.
 TEST(AssertionModel, IterateAssertionClassUnderScopeFiltersChildren) {
   VpiContext ctx;
   VpiObject scope;
@@ -94,8 +77,6 @@ TEST(AssertionModel, IterateAssertionClassUnderScopeFiltersChildren) {
   EXPECT_EQ(seen[1], &seq_child);
 }
 
-// C: an assertion traverses to its governing clocking block, and reports none
-// when no clocking block is associated.
 TEST(AssertionModel, ClockingBlockRelationFindsAssociatedBlock) {
   VpiObject assertion;
   assertion.type = vpiAssert;
@@ -110,8 +91,6 @@ TEST(AssertionModel, ClockingBlockRelationFindsAssociatedBlock) {
   EXPECT_EQ(VpiAssertionClockingBlock(&unclocked), nullptr);
 }
 
-// C edge: a null handle yields no clocking block, and the relation matches by
-// type, so an assertion whose children are all non-clocking reports none.
 TEST(AssertionModel, ClockingBlockRelationRejectsNullAndOtherChildren) {
   EXPECT_EQ(VpiAssertionClockingBlock(nullptr), nullptr);
 
@@ -123,8 +102,6 @@ TEST(AssertionModel, ClockingBlockRelationRejectsNullAndOtherChildren) {
   EXPECT_EQ(VpiAssertionClockingBlock(&assertion), nullptr);
 }
 
-// B (borrowed §37.10 vpiInstance): an assertion resolves to the nearest
-// enclosing instance it is written in.
 TEST(AssertionModel, AssertionResolvesEnclosingInstance) {
   VpiObject program;
   program.type = vpiProgram;
@@ -138,11 +115,9 @@ TEST(AssertionModel, AssertionResolvesEnclosingInstance) {
   EXPECT_EQ(VpiInstanceOf(&assertion), &module);
 }
 
-// B edge: an assertion that sits only inside non-instance scopes (e.g. a named
-// block) with no enclosing instance resolves to no instance at all.
 TEST(AssertionModel, AssertionWithoutEnclosingInstanceResolvesNone) {
   VpiObject block;
-  block.type = vpiNamedBegin;  // a scope that is not an instance
+  block.type = vpiNamedBegin;
   VpiObject assertion;
   assertion.type = vpiAssert;
   assertion.parent = &block;
@@ -150,8 +125,6 @@ TEST(AssertionModel, AssertionWithoutEnclosingInstanceResolvesNone) {
   EXPECT_EQ(VpiInstanceOf(&assertion), nullptr);
 }
 
-// E: the assertion exposes the integer span through vpi_get and its file/name
-// through vpi_get_str.
 TEST(AssertionModel, LocationAndNamePropertiesAreReported) {
   VpiContext ctx;
   std::string name = "handshake_p";
@@ -172,8 +145,6 @@ TEST(AssertionModel, LocationAndNamePropertiesAreReported) {
   EXPECT_STREQ(ctx.GetStr(vpiName, &assertion), "handshake_p");
 }
 
-// E edge: an assertion with no recorded span reports zero for each integer
-// location component rather than an unset/garbage value.
 TEST(AssertionModel, UnsetLocationSpanReportsZero) {
   VpiContext ctx;
   VpiObject assertion;
@@ -185,8 +156,6 @@ TEST(AssertionModel, UnsetLocationSpanReportsZero) {
   EXPECT_EQ(ctx.Get(vpiEndColumn, &assertion), 0);
 }
 
-// E edge: an assertion with no recorded file reports no file string rather than
-// an empty one.
 TEST(AssertionModel, MissingFileReportsNull) {
   VpiContext ctx;
   VpiObject assertion;
@@ -195,16 +164,11 @@ TEST(AssertionModel, MissingFileReportsNull) {
   EXPECT_EQ(ctx.GetStr(vpiFile, &assertion), nullptr);
 }
 
-// E input form: the location and name property groups are drawn on the abstract
-// assertion class, so they apply to every grouped member kind - not only the
-// assert directive the other E tests use. An assertion registered as a property
-// instance through the real construction path reports the name it was created
-// with and the source span recorded on it just the same.
 TEST(AssertionModel, LocationAndNameApplyToAnyAssertionMemberKind) {
   VpiContext ctx;
   VpiHandle p = ctx.CreateAssertion("p_handshake", vpiPropertyInst);
   ASSERT_NE(p, nullptr);
-  EXPECT_TRUE(VpiIsAssertionType(p->type));  // a property inst is an assertion
+  EXPECT_TRUE(VpiIsAssertionType(p->type));
   p->file = "checks.sv";
   p->start_line = 40;
   p->column = 3;
@@ -219,12 +183,8 @@ TEST(AssertionModel, LocationAndNameApplyToAnyAssertionMemberKind) {
   EXPECT_EQ(ctx.Get(vpiEndColumn, p), 7);
 }
 
-// The assertions of a run: those a design writes as module items, built from
-// the elaborated design rather than by hand (#4955).
 class AssertionsOfARun : public VpiDesignRun {};
 
-// An instance reaches each assertion written as its item, of the kind it is,
-// named by its label and reporting the line it starts on.
 TEST_F(AssertionsOfARun, AnInstanceReachesTheAssertionsItsItemsWrite) {
   Run("module top; logic clk, a;\n"
       "  a1: assert property (@(posedge clk) a);\n"
@@ -252,8 +212,6 @@ TEST_F(AssertionsOfARun, AnInstanceReachesTheAssertionsItsItemsWrite) {
   EXPECT_EQ(vpi_get(vpiStartLine, c1), 4);
 }
 
-// An assertion a generate block writes is each generate block instance's,
-// named under it (§37.12), and not its module's (#5076).
 TEST_F(AssertionsOfARun, AGenerateBlocksAssertionIsItsGenScopes) {
   Run("module top; logic clk, a;\n"
       "  for (genvar i = 0; i < 2; i++) begin : g\n"
@@ -268,8 +226,6 @@ TEST_F(AssertionsOfARun, AGenerateBlocksAssertionIsItsGenScopes) {
   EXPECT_EQ(FullNameOfChild(By("top"), "a1"), "");
 }
 
-// An assertion reports the line and column its text ends at, the closing
-// semicolon of an item written over two lines (#5077).
 TEST_F(AssertionsOfARun, AnAssertionReportsWhereItsTextEnds) {
   Run("module top; logic clk, a;\n"
       "  a1: assert property (@(posedge clk)\n"
@@ -282,9 +238,6 @@ TEST_F(AssertionsOfARun, AnAssertionReportsWhereItsTextEnds) {
   EXPECT_EQ(vpi_get(vpiEndColumn, a1), 26);
 }
 
-// An instance reaches each immediate assertion its procedures write as a
-// statement, of the kind it is, named by its label and reporting where it
-// stands (#5075).
 TEST_F(AssertionsOfARun,
        AnInstanceReachesTheImmediateAssertionsOfItsProcedures) {
   Run("module top; logic a;\n"
@@ -310,9 +263,6 @@ TEST_F(AssertionsOfARun,
   EXPECT_EQ(vpi_get(vpiEndColumn, c1), 18);
 }
 
-// An instance reaches each concurrent assertion its procedures write, of the
-// kind it is and named by its label, though no statement of the procedure
-// stands for it (§37.60) (#5082).
 TEST_F(AssertionsOfARun,
        AnInstanceReachesTheConcurrentAssertionsOfItsProcedures) {
   Run("module top; logic clk, a;\n"
@@ -332,13 +282,6 @@ TEST_F(AssertionsOfARun,
   EXPECT_EQ(vpi_get(vpiStartLine, q1), 4);
 }
 
-// An assertion reaches the clocking block that clocks it (§39.3.2): the
-// default clocking whose event it takes where it writes no clock (§16.16
-// (a)), a generate block's assertion among them, and the block it names as
-// its clocking event (§14.13), in a procedure too, and the default clocking
-// a procedure giving no clock leaves it (§16.14.6). One clocked by an event
-// of no block reaches none, though a default clocking stands in its scope,
-// and so does one taking its procedure's clock (#7176, #7331).
 TEST_F(AssertionsOfARun, AnAssertionReachesTheClockingBlockClockingIt) {
   Run("module top; logic clk, a; logic [1:0] v;\n"
       "  clocking other @(posedge clk); endclocking\n"

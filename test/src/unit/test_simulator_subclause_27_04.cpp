@@ -11,17 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §27.4: inside a loop generate construct's block there is an implicit
-// localparam, an integer parameter of the loop index's name and type, whose
-// value in each block instance is the loop index at the moment that instance
-// was elaborated. The genvar itself is gone by simulation time, so a reference
-// to the name inside the block is a reference to that localparam.
-//
-// Every instance runs one shared body, so the value has to be private to the
-// instance. Delaying each instance by a different amount interleaves the four
-// bodies and makes the assignments run in the reverse of elaboration order: a
-// value shared between the instances would leave every element holding the
-// index of whichever instance ran last, rather than its own.
 TEST(LoopGenerateIndexSim, IndexHoldsItsOwnInstanceValueAcrossADelay) {
   SimFixture f;
   RunModuleArray(f,
@@ -39,10 +28,6 @@ TEST(LoopGenerateIndexSim, IndexHoldsItsOwnInstanceValueAcrossADelay) {
                  "out", {10u, 11u, 12u, 13u});
 }
 
-// §27.4: each loop generate construct contributes its own implicit localparam,
-// and a generate block nested in two of them is one instance of each. Both loop
-// indices are therefore in scope in the innermost body, holding the values that
-// selected this instance.
 TEST(LoopGenerateIndexSim, NestedBlockSeesBothEnclosingIndices) {
   SimFixture f;
   RunModuleArray(f,
@@ -59,10 +44,6 @@ TEST(LoopGenerateIndexSim, NestedBlockSeesBothEnclosingIndices) {
                  "out", {0u, 1u, 10u, 11u});
 }
 
-// §27.4: the implicit localparam may be used wherever an ordinary integer
-// parameter could be within the block, which includes a continuous assignment.
-// Each instance's assignment drives the element its own index selects, from a
-// right-hand side its own index scales.
 TEST(LoopGenerateIndexSim, ContinuousAssignmentSeesItsInstanceIndex) {
   SimFixture f;
   RunModuleArray(f,
@@ -77,9 +58,6 @@ TEST(LoopGenerateIndexSim, ContinuousAssignmentSeesItsInstanceIndex) {
                  "out", {0u, 3u, 6u, 9u});
 }
 
-// §27.4: the loop index is an integer, so the parameter named after it is
-// signed. A descending loop that runs the index negative therefore compares as
-// negative, rather than wrapping to a large unsigned value.
 TEST(LoopGenerateIndexSim, NegativeIndexIsSigned) {
   SimFixture f;
   RunModuleArray(f,
@@ -94,11 +72,6 @@ TEST(LoopGenerateIndexSim, NegativeIndexIsSigned) {
                  "out", {7u, 9u, 9u});
 }
 
-// §27.4: a generate block forms a scope of its own and a further level of
-// hierarchy once instantiated, so a declaration inside the block belongs to the
-// instance and is named by its simple name from within it. Each instance stores
-// a different value in its own `x` and reads it back, so an instance finding
-// nothing (or finding a neighbour's) shows up as the wrong element.
 TEST(LoopGenerateIndexSim, BlockLocalDeclarationIsReadBackWithinItsInstance) {
   SimFixture f;
   RunModuleArray(f,
@@ -117,10 +90,6 @@ TEST(LoopGenerateIndexSim, BlockLocalDeclarationIsReadBackWithinItsInstance) {
                  "out", {20u, 21u, 22u, 23u});
 }
 
-// §27.4: the block's scope is the inner one, so a declaration in it hides a
-// like-named declaration of the enclosing module for references written inside
-// the block. The module-level `v` keeps the value its own process gave it,
-// which distinguishes hiding from the instances writing through to it.
 TEST(LoopGenerateIndexSim, BlockLocalDeclarationHidesTheModuleLevelName) {
   SimFixture f;
   RunModuleArray(f,
@@ -144,18 +113,6 @@ TEST(LoopGenerateIndexSim, BlockLocalDeclarationHidesTheModuleLevelName) {
   EXPECT_EQ(outer->value.ToUint64(), 99u);
 }
 
-// §27.4: a named generate block declares an array of generate block instances,
-// and its indices are the values the genvar takes during elaboration. Two
-// sibling blocks written over one genvar are therefore two distinct arrays, and
-// since each instance forms a scope of its own and a further level of hierarchy
-// once instantiated, `a`'s `x` at index 4 and `b`'s `x` at index 4 are
-// different objects.
-//
-// Every instance writes its block's constant before any instance reads one
-// back, so a run that gave the two blocks one object leaves both reads holding
-// whichever write ran last, rather than each block's own constant. The loop
-// runs 4 to 5 while the array it reports through is read at 0 to 3, so no index
-// equals the offset of the element it selects.
 TEST(LoopGenerateIndexSim, SiblingBlocksOverOneGenvarKeepSeparateVariables) {
   SimFixture f;
   RunModuleArray(f,
@@ -182,10 +139,6 @@ TEST(LoopGenerateIndexSim, SiblingBlocksOverOneGenvarKeepSeparateVariables) {
                  "out", {10u, 10u, 20u, 20u});
 }
 
-// §27.4 with §23.6: each instance of a loop generate block is a scope named by
-// the block and the genvar value, `g[1]`, and what it declares is reached from
-// outside through that name. A write from the module lands in the instance's
-// own variable, which the instance then reads by its simple name.
 TEST(LoopGenerateHierarchicalNameSim, WriteThroughTheInstanceNameReachesIt) {
   SimFixture f;
   RunModuleArray(f,
@@ -200,9 +153,6 @@ TEST(LoopGenerateHierarchicalNameSim, WriteThroughTheInstanceNameReachesIt) {
                  "out", {80u, 81u});
 }
 
-// §27.4: what an instance of a loop block nested in another declares is read
-// through both instance names, as §27.4's Example 5 names them: a localparam
-// of the inner block and the implicit localparam of each loop index.
 TEST(LoopGenerateHierarchicalNameSim, NestedInstanceDeclarationsAreRead) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -218,10 +168,6 @@ TEST(LoopGenerateHierarchicalNameSim, NestedInstanceDeclarationsAreRead) {
             "n 7 1 2\n");
 }
 
-// §27.4: the implicit localparam named as the loop index is a declaration of
-// each instance, holding the index the instance was elaborated with, so it is
-// read through the instance name like any other. The indices step by two so no
-// instance's value is its position in the loop.
 TEST(LoopGenerateHierarchicalNameSim, ImplicitIndexLocalparamIsRead) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -233,8 +179,6 @@ TEST(LoopGenerateHierarchicalNameSim, ImplicitIndexLocalparamIsRead) {
             "gv 4 6\n");
 }
 
-// §27.4 Example 4 declares a net in each instance of a loop block and names
-// it `bitnum[k].t1`; the value its continuous assignment drives is read there.
 TEST(LoopGenerateHierarchicalNameSim, InstanceNetIsRead) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -250,9 +194,6 @@ TEST(LoopGenerateHierarchicalNameSim, InstanceNetIsRead) {
             "t 12 13\n");
 }
 
-// §23.6: a path is usable from any scope, another generate block among them,
-// and written inside a loop block its instance select may be the block's own
-// loop index, which §27.4 makes a constant of the instance.
 TEST(LoopGenerateHierarchicalNameSim, AnotherBlockSelectsByItsIndex) {
   SimFixture f;
   RunModuleArray(f,
@@ -269,9 +210,6 @@ TEST(LoopGenerateHierarchicalNameSim, AnotherBlockSelectsByItsIndex) {
                  "out", {13u, 12u});
 }
 
-// §23.6: an instance select is a constant expression, which need not be a
-// literal. One naming a localparam of the module selects the instance its
-// value names.
 TEST(LoopGenerateHierarchicalNameSim, LocalparamIndexSelectsTheInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -289,8 +227,6 @@ TEST(LoopGenerateHierarchicalNameSim, LocalparamIndexSelectsTheInstance) {
             "vidx 37 36\n");
 }
 
-// §27.4 with §23.6: a loop block declared in an interface is a scope of the
-// interface instance, reached through the instance name and then the block's.
 TEST(LoopGenerateHierarchicalNameSim, InterfaceInstanceBlockIsReached) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc;\n"
@@ -308,10 +244,6 @@ TEST(LoopGenerateHierarchicalNameSim, InterfaceInstanceBlockIsReached) {
             "if 100 101\n");
 }
 
-// §27.4 with §6.8: a declaration's initializer in a loop block is evaluated in
-// the instance, where the loop index is that instance's implicit localparam,
-// so each instance's e starts at its own value, 20 and 21. Read with the
-// first instance's index everywhere, both instances started at 20.
 TEST(LoopGenerateIndexSim, DeclarationInitializerReadsItsInstanceIndex) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -324,10 +256,6 @@ TEST(LoopGenerateIndexSim, DeclarationInitializerReadsItsInstanceIndex) {
             "e 20 21\n");
 }
 
-// §27.4 with §23.3: an instance written in a loop generate block is an
-// ordinary instance of its module in every block instance, so the module's
-// own variable is declared and its procedures run: n counts the five rising
-// edges of clk before 52.
 TEST(LoopGenerateInstanceSim, ModuleInstanceInTheBlockRunsItsBody) {
   SimFixture f;
   std::string out = RunCapture(
@@ -349,10 +277,6 @@ TEST(LoopGenerateInstanceSim, ModuleInstanceInTheBlockRunsItsBody) {
   EXPECT_EQ(out, "n=5\n");
 }
 
-// Each block instance's module instance evaluates its own concurrent
-// assertion over a, sampled 1, 0, 0, 1 and 1 at the five rising edges of clk,
-// and its counts are read through `g[i].c`. Every instance takes the one
-// signal: a connection the genvar indexes is #4126's.
 TEST(LoopGenerateInstanceSim, EachModuleInstanceEvaluatesItsAssertion) {
   SimFixture f;
   std::string out = RunCapture(
@@ -376,7 +300,6 @@ TEST(LoopGenerateInstanceSim, EachModuleInstanceEvaluatesItsAssertion) {
   EXPECT_EQ(out, "3 2 3 2 3 2\n");
 }
 
-// The same for a checker instantiated in each block instance.
 TEST(LoopGenerateInstanceSim, EachCheckerInstanceEvaluatesItsAssertion) {
   SimFixture f;
   std::string out = RunCapture(
@@ -400,11 +323,6 @@ TEST(LoopGenerateInstanceSim, EachCheckerInstanceEvaluatesItsAssertion) {
   EXPECT_EQ(out, "3 2 3 2 3 2\n");
 }
 
-// §27.4's implicit localparam stands wherever a parameter may, so a localparam
-// a loop block declares from it is a constant with a distinct value in each
-// instance, read through the instance's name. The test fails on an elaborator
-// that folds the declaration without the genvar's value, which leaves it
-// unresolved and reads 0 in every instance.
 TEST(LoopGenerateIndexSim, LocalparamFromTheIndexHoldsEachInstanceValue) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -419,10 +337,6 @@ TEST(LoopGenerateIndexSim, LocalparamFromTheIndexHoldsEachInstanceValue) {
             "lp 0 10 20\n");
 }
 
-// The implicit localparam sizes a declared dimension as a parameter does, so
-// each instance's variable is as wide as its own index gives. The test fails
-// on an elaborator that sizes the dimension without the genvar's value, which
-// falls back to one bit in every instance.
 TEST(LoopGenerateIndexSim, IndexSizesEachInstanceDimension) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -438,8 +352,6 @@ TEST(LoopGenerateIndexSim, IndexSizesEachInstanceDimension) {
             "dim 1 2 3\n");
 }
 
-// The same through a localparam of the index, which is folded per instance
-// before it sizes the dimension.
 TEST(LoopGenerateIndexSim, LocalparamOfTheIndexSizesEachInstanceDimension) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -456,11 +368,6 @@ TEST(LoopGenerateIndexSim, LocalparamOfTheIndexSizesEachInstanceDimension) {
             "lw 2 4 6\n");
 }
 
-// §27.4 Example 5 overrides an instance's parameter from the implicit
-// localparam, and §23.10 takes any constant expression of the instantiating
-// scope, so each instance receives its own index. The test fails on an
-// elaborator that resolves the override without the genvar's value, which
-// leaves P at its default 0 in both instances.
 TEST(LoopGenerateInstanceSim, NamedOverrideFromTheIndexReachesEachInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf #(parameter int P = 0);\n"
@@ -476,7 +383,6 @@ TEST(LoopGenerateInstanceSim, NamedOverrideFromTheIndexReachesEachInstance) {
             "ip 100\nip 101\n");
 }
 
-// The same through a positional override computed from the index.
 TEST(LoopGenerateInstanceSim,
      PositionalOverrideFromTheIndexReachesEachInstance) {
   SimFixture f;
@@ -493,10 +399,6 @@ TEST(LoopGenerateInstanceSim,
             "ip 7\nip 9\n");
 }
 
-// §27.4 Example 3 indexes arrays by the implicit localparam in each instance's
-// port connections, so instance g[k] reads src[2 - k] and drives dst[k]. The
-// test fails on a simulator that evaluates the connections with no value for
-// the genvar, which connects every instance to the wrong elements.
 TEST(LoopGenerateInstanceSim, PortConnectionsReadTheInstanceIndex) {
   SimFixture f;
   EXPECT_EQ(
@@ -520,11 +422,6 @@ TEST(LoopGenerateInstanceSim, PortConnectionsReadTheInstanceIndex) {
       "p 5 7 9\n");
 }
 
-// §27.4 with §6.21: each instance of a loop generate block is a scope of its
-// own, so a static variable its procedure declares is one per instance. Each
-// instance starts its s at its own value and counts it once; kept in one frame
-// for both, s was made by whichever instance came first, and the second count
-// carried on from the first.
 TEST(LoopGenerateStaticFrameSim, AProceduresStaticLocalIsItsInstances) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -540,10 +437,6 @@ TEST(LoopGenerateStaticFrameSim, AProceduresStaticLocalIsItsInstances) {
             "s1 12\ns0 11\n");
 }
 
-// §27.4 with §6.21: the static variable of a named block in a block
-// instance's procedure, kept from one pass to the next, is the instance's.
-// Kept in one frame for both instances, the second instance's passes added to
-// the first's sum.
 TEST(LoopGenerateStaticFrameSim, ANamedBlocksVariableIsItsInstances) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -561,11 +454,6 @@ TEST(LoopGenerateStaticFrameSim, ANamedBlocksVariableIsItsInstances) {
             "2 4\n");
 }
 
-// §27.4 with §13.4.2: a function a loop generate block declares is declared
-// once per instance, so its static variable is one per instance, while a
-// function the module declares is one function whose static variable every
-// instance's call shares. Kept in one frame, f's s counted on from the other
-// instance's; kept by the calling block, bump's count started again at 1.
 TEST(LoopGenerateStaticFrameSim, ABlocksFunctionKeepsAStaticPerInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -586,9 +474,6 @@ TEST(LoopGenerateStaticFrameSim, ABlocksFunctionKeepsAStaticPerInstance) {
             "f1 12\nf0 11\nn 2\n");
 }
 
-// §27.4 with §23.6: a call through the block instance's name, `b[1].f()`,
-// reaches the frame the instance's own bare calls keep, and the other
-// instance's stays apart.
 TEST(LoopGenerateStaticFrameSim, AHierarchicalCallSharesTheInstancesFrame) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -606,10 +491,6 @@ TEST(LoopGenerateStaticFrameSim, AHierarchicalCallSharesTheInstancesFrame) {
             "h1 21\nh0 11\nin0 12\nin1 22\n");
 }
 
-// §27.4 with §23.9: a bare call from a block nested in the declaring block
-// reaches the declaring instance's frame, one for every nested instance of
-// it. Kept by the innermost calling block, each of c[0] and c[1] counted
-// apart and the second call of each b[i] read the first again.
 TEST(LoopGenerateStaticFrameSim, ANestedBlocksCallSharesTheDeclaringFrame) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

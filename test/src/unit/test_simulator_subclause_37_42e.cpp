@@ -20,11 +20,6 @@
 namespace delta {
 namespace {
 
-// §37.42: the calls a design writes outside every procedure - in a port
-// connection, a primitive terminal, a clocking block, a constraint, a
-// package's property, a modport port and an extends clause - each the tf call
-// a procedure's call is, named, standing in its scope (§37.12) and reaching
-// what it calls.
 class CallsOutsideProcedures : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -38,8 +33,6 @@ class CallsOutsideProcedures : public VpiDesignRun {
     ASSERT_NE(sf_, nullptr);
   }
 
-  // Checks that `call` is a func call of the function `name`, standing in
-  // `scope`.
   static void ExpectFunctionCall(vpiHandle call, const char* name,
                                  vpiHandle scope) {
     ASSERT_NE(call, nullptr);
@@ -51,8 +44,6 @@ class CallsOutsideProcedures : public VpiDesignRun {
     EXPECT_STREQ(vpi_get_str(vpiName, function), name);
   }
 
-  // Checks that `call` is a call of $sf, standing in `scope` and reaching the
-  // systf its registration returned (detail 5).
   void ExpectSystemCall(vpiHandle call, vpiHandle scope) const {
     ASSERT_NE(call, nullptr);
     EXPECT_EQ(vpi_get(vpiType, call), vpiSysFuncCall);
@@ -62,13 +53,11 @@ class CallsOutsideProcedures : public VpiDesignRun {
     EXPECT_EQ(VpiObjectOf(vpi_handle(vpiUserSystf, call)), VpiObjectOf(sf_));
   }
 
-  // What the first port of the instance `name` is connected to.
   static vpiHandle HighConnOf(const std::string& name) {
     const std::vector<vpiHandle> kPorts = ObjectsOf(vpiPort, By(name));
     return kPorts.empty() ? nullptr : vpi_handle(vpiHighConn, kPorts[0]);
   }
 
-  // The operand number `n` of the operation `op`, null for none.
   static vpiHandle OperandOf(vpiHandle op, std::size_t n) {
     const std::vector<vpiHandle> kOperands = OperandsOf(op);
     return n < kOperands.size() ? kOperands[n] : nullptr;
@@ -77,8 +66,6 @@ class CallsOutsideProcedures : public VpiDesignRun {
   vpiHandle sf_ = nullptr;
 };
 
-// A call a port connection makes stands in the instance writing the
-// connection (#7279).
 TEST_F(CallsOutsideProcedures, APortConnectionsCallIsShaped) {
   Run("module sub(input logic [31:0] a); endmodule\n"
       "module top; int x;\n"
@@ -90,7 +77,6 @@ TEST_F(CallsOutsideProcedures, APortConnectionsCallIsShaped) {
   ExpectSystemCall(HighConnOf("top.w"), By("top"));
 }
 
-// A call a primitive's terminal makes stands in the instance (#7282).
 TEST_F(CallsOutsideProcedures, APrimitiveTerminalsCallIsShaped) {
   Run("module top; wire y, z; logic b;\n"
       "  function automatic logic f(logic v); return v; endfunction\n"
@@ -106,8 +92,6 @@ TEST_F(CallsOutsideProcedures, APrimitiveTerminalsCallIsShaped) {
   ExpectSystemCall(kInputOf("h"), By("top"));
 }
 
-// A call a clocking block's event is written with stands in the block, a
-// scope of its own (§37.12) (#7283).
 TEST_F(CallsOutsideProcedures, AClockingBlocksCallIsShaped) {
   Run("module top; logic clk;\n"
       "  function automatic logic f(logic v); return v; endfunction\n"
@@ -127,7 +111,6 @@ TEST_F(CallsOutsideProcedures, AClockingBlocksCallIsShaped) {
   ExpectSystemCall(kEdgeOf(cs), cs);
 }
 
-// A call a constraint makes stands in the class declaring it (#7284).
 TEST_F(CallsOutsideProcedures, AConstraintsCallIsShaped) {
   Run("module top;\n"
       "  function automatic int f(int v); return v; endfunction\n"
@@ -143,9 +126,6 @@ TEST_F(CallsOutsideProcedures, AConstraintsCallIsShaped) {
   ExpectSystemCall(OperandOf(kItems[1], 1), defn);
 }
 
-// A call a package's property makes stands in the package, its callee found
-// among the package's own functions, as a package sees no other but by
-// import (§26.2) (#7285).
 TEST_F(CallsOutsideProcedures, APackagePropertysCallIsShaped) {
   Run("package pk;\n"
       "  function automatic int f(int v); return v; endfunction\n"
@@ -161,8 +141,6 @@ TEST_F(CallsOutsideProcedures, APackagePropertysCallIsShaped) {
   ExpectSystemCall(OperandOf(equality, 1), pk);
 }
 
-// A call a constraint of a package's class makes finds its callee among the
-// package's functions too (§26.2).
 TEST_F(CallsOutsideProcedures, APackageClasssConstraintFindsItsCallee) {
   Run("package pk;\n"
       "  function automatic int f(int v); return v; endfunction\n"
@@ -177,8 +155,6 @@ TEST_F(CallsOutsideProcedures, APackageClasssConstraintFindsItsCallee) {
   ExpectFunctionCall(OperandOf(kItems[0], 1), "f", defn);
 }
 
-// A call a modport port's expression makes stands in the interface instance
-// (#7286).
 TEST_F(CallsOutsideProcedures, AModportPortsCallIsShaped) {
   Run("interface ifc; int a;\n"
       "  function automatic int f(int v); return v; endfunction\n"
@@ -194,7 +170,6 @@ TEST_F(CallsOutsideProcedures, AModportPortsCallIsShaped) {
   ExpectSystemCall(vpi_handle(vpiExpr, kDecls[1]), u);
 }
 
-// A call an extends clause passes stands in the derived class (#7287).
 TEST_F(CallsOutsideProcedures, AnExtendsClausesCallIsShaped) {
   Run("module top;\n"
       "  function automatic int f(int v); return v; endfunction\n"
@@ -215,11 +190,6 @@ TEST_F(CallsOutsideProcedures, AnExtendsClausesCallIsShaped) {
   ExpectSystemCall(kPassed(e), e);
 }
 
-// A call a package's property makes of a function the package imports finds
-// it through the import, a named one of another name passed over and a
-// wildcard one of a package not declaring it too, a named import of it ahead
-// of a wildcard import written after it, while a function the package
-// declares itself is found ahead of every import (§26.3) (#7290).
 TEST_F(CallsOutsideProcedures, APackagesCallFindsAnImportedFunction) {
   Run("package p;\n"
       "  function automatic int g(int v); return v; endfunction\n"
@@ -247,9 +217,6 @@ TEST_F(CallsOutsideProcedures, APackagesCallFindsAnImportedFunction) {
             VpiObjectOf(Named(vpiTaskFunc, By("p"), "h")));
 }
 
-// A call a class's constraint makes of a method the class declares, or one
-// it inherits, is a method call of that method, applied to no object in the
-// class defn (§8.6, §37.42 detail 2) (#7289).
 TEST_F(CallsOutsideProcedures, AConstraintsCallOfItsClasssMethodReachesIt) {
   Run("module top;\n"
       "  class B; function int g(); return 2; endfunction endclass\n"
@@ -278,9 +245,6 @@ TEST_F(CallsOutsideProcedures, AConstraintsCallOfItsClasssMethodReachesIt) {
             VpiObjectOf(Named(vpiMethods, b, "g")));
 }
 
-// A call a class obj's constraint makes stands in the class obj, its callee
-// found where the class is declared, and a call of the class's own method is
-// applied to the class obj (§37.12, §37.42 detail 2) (#7288).
 TEST_F(CallsOutsideProcedures, AClassObjsConstraintsCallIsShaped) {
   Run("module top;\n"
       "  function automatic int f(int v); return v; endfunction\n"
@@ -303,10 +267,6 @@ TEST_F(CallsOutsideProcedures, AClassObjsConstraintsCallIsShaped) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiPrefix, own)), VpiObjectOf(obj));
 }
 
-// A call a class obj's constraint inherited from a package's class makes
-// finds its callee where the base is declared, the package, rather than where
-// the derived class is, the compilation unit, whose own functions alone a call
-// standing there would be found among (§8.13, §26.3) (#7291).
 TEST_F(CallsOutsideProcedures, AnInheritedConstraintsCallFindsItsCallee) {
   Run("package p;\n"
       "  function automatic int g(int v); return v; endfunction\n"
@@ -325,8 +285,6 @@ TEST_F(CallsOutsideProcedures, AnInheritedConstraintsCallFindsItsCallee) {
             VpiObjectOf(Named(vpiTaskFunc, By("p"), "g")));
 }
 
-// A held call whose callee no shape resolves - here none is written - keeps
-// the arguments it is written with, as an unshaped call does.
 TEST(DeferredCallModel, ACallNoShapeResolvesKeepsItsArguments) {
   SimFixture f;
   RtlirDesign* design = ElaborateSrc("module top; endmodule\n", f);

@@ -8,40 +8,6 @@
 
 namespace {
 
-// §26.3 rules on printed page 809 that the import declaration makes a package's
-// identifiers directly visible, seen in the current scope without the package
-// name in front, and puts no condition on the statement the reference stands
-// in. A bare read that neither the module nor an imported package supplies
-// therefore names nothing, which Elaborator::ValidateUnresolvedReferences
-// reports through ReportUnresolvedRefs in
-// src/elaborator/elaborator_scope_rules.cpp as "reference to unresolved
-// identifier" under §23.9 -- PackageImport.UnresolvedReferenceIsError in
-// test/src/unit/test_elaborator_subclause_26_03a.cpp is that report for a read
-// written directly in an initial procedure.
-//
-// CollectProcRhsIdents in src/elaborator/elaborator_scope_rules_names.cpp
-// collects the reads that report judges, and it had written out nine of the
-// thirteen child-statement links Stmt declares. It now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and the
-// five cases below cover one newly reached position each:
-// Stmt::assert_pass_stmt, Stmt::assert_fail_stmt, the body of a randcase item,
-// and the two statement lists Stmt::rs_productions holds, which
-// ForEachRandsequenceRuleStmt reaches by different members --
-// RsProd::code_stmts and RsRule::weight_code -- so each is its own position.
-//
-// The omission cost a report not made: a read of an undeclared name in one of
-// those five positions was never collected, so the source elaborated clean. The
-// accepting counterparts, which show that a declaration in the same newly
-// reached position still answers for the read, stand in
-// test/src/unit/test_elaborator_subclause_06_05b.cpp.
-//
-// The module wildcard-imports `pkg` so that the read is judged against the
-// import and not merely against the module: `pkg` declares `supplied` and does
-// not declare `absent`, so §26.3 makes nothing visible under that name and the
-// report stands.
-//
-// `stmt` is written at line 8 and may run to several lines, so the line the
-// report stands at is read back out of the source rather than counted.
 void ExpectUnresolvedProcReadIn(const std::string& stmt) {
   ElabFixture f;
   std::string src =
@@ -54,10 +20,6 @@ void ExpectUnresolvedProcReadIn(const std::string& stmt) {
                             LineHolding(src, "r = absent;"), "23.9"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// which the parser keeps in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt.
-// This case and the next cover one arm each.
 TEST(PackageImport, UnresolvedProcReadInAnAssertionPassStmt) {
   ExpectUnresolvedProcReadIn("assert (r) r = absent;");
 }
@@ -66,18 +28,10 @@ TEST(PackageImport, UnresolvedProcReadInAnAssertionFailStmt) {
   ExpectUnresolvedProcReadIn("assert (r) else r = absent;");
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §26.3 is a rule about the source, so it holds whether the weighted
-// draw would select the item or not.
 TEST(PackageImport, UnresolvedProcReadInARandcaseItem) {
   ExpectUnresolvedProcReadIn("randcase 1: r = absent; endcase");
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(PackageImport, UnresolvedProcReadInARandsequenceCodeBlock) {
   ExpectUnresolvedProcReadIn(
       "begin\n"
@@ -87,10 +41,6 @@ TEST(PackageImport, UnresolvedProcReadInARandsequenceCodeBlock) {
       "    end");
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(PackageImport, UnresolvedProcReadInARandsequenceWeightCodeBlock) {
   ExpectUnresolvedProcReadIn(
       "begin\n"
@@ -101,14 +51,6 @@ TEST(PackageImport, UnresolvedProcReadInARandsequenceWeightCodeBlock) {
       "    end");
 }
 
-// §26.3 lets a module read a package's declarations through the package scope
-// resolution operator, and A.8.4 makes a package-scoped parameter a constant
-// primary, so `p::RECURSION` sizes a packed dimension. RegisterPackageParams in
-// src/elaborator/elaborator_resolve.cpp folded each package parameter against
-// the compilation-unit scope alone, which holds no member of the package's
-// enumerations (§6.19), so RECURSION was never recorded under its qualified
-// key and the dimension did not fold. The members are (1 << 4), (1 << 5) and
-// (1 << 6), whose OR is 112; their ordinals OR to 3.
 TEST(PackageScopeReference,
      PackageParameterOverPackageEnumMembersSizesTheVariable) {
   ElabFixture f;
@@ -131,9 +73,6 @@ TEST(PackageScopeReference,
   EXPECT_EQ(data->width, 112u);
 }
 
-// The parameter declared with the enumeration as its type. INITIALIZED is the
-// fourth member and carries no value of its own, so §6.19's implicit increment
-// gives it 3 and `[p::POST_INIT:0]` four bits.
 TEST(PackageScopeReference,
      PackageParameterTypedByAPackageEnumSizesTheVariable) {
   ElabFixture f;
@@ -155,10 +94,6 @@ TEST(PackageScopeReference,
   EXPECT_EQ(data->width, 4u);
 }
 
-// A.8.4 writes `[ package_scope ] enum_identifier` as a constant primary of
-// its own, so a member is read through the package scope resolution operator
-// without a parameter in between. GREEN is 5, so `[p::GREEN:0]` is six bits;
-// its ordinal would give two.
 TEST(PackageScopeReference, PackageEnumMemberSizesTheVariable) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -176,13 +111,6 @@ TEST(PackageScopeReference, PackageEnumMemberSizesTheVariable) {
   EXPECT_EQ(data->width, 6u);
 }
 
-// The same parameter reached by a wildcard import rather than the operator.
-// RegisterImportItem in src/elaborator/elaborator_import.cpp folded the
-// imported parameter's initializer again, against a scope holding none of the
-// package's enumeration constants under their bare names, so K was left
-// unresolved; it now reads the value registration recorded. J reads two of the
-// imported literals directly, which Elaborator::BuildParamScope supplies from
-// the enumerations RegisterImportedEnumLiterals brought into the module.
 TEST(PackageImport, WildcardImportedParameterOverEnumMembersHoldsItsValue) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -211,11 +139,6 @@ TEST(PackageImport, WildcardImportedParameterOverEnumMembersHoldsItsValue) {
   EXPECT_EQ(j->resolved_value, 80);
 }
 
-// §6.20.1 lets a package parameter read an earlier one by its bare name, and
-// the value the later one is recorded under its qualified key is what a module
-// then reads. Registration folded B against the compilation-unit scope, which
-// held A only as "p.A", so `p::B` did not fold; the validator alone bound the
-// bare name, and only to answer whether B was constant.
 TEST(PackageScopeReference,
      PackageParameterReadingAnEarlierOneSizesTheVariable) {
   ElabFixture f;
@@ -235,14 +158,6 @@ TEST(PackageScopeReference,
   EXPECT_EQ(data->width, 7u);
 }
 
-// §26.3 (printed page 809) has an import make a package's identifiers
-// visible in the importing scope without the package qualifier, a wildcard
-// import every one of them and an explicit import the one it names, and puts
-// no condition on the expression the identifier then stands in; so a class the
-// package declares serves as the base of a `::` static method call by its bare
-// name, as it does qualified. The check that reports an unknown base consulted
-// the module's own names and the packages alone, so the wildcard-imported form
-// was reported while `p::pk_t::get()` was not.
 TEST(PackageScopeReference, WildcardImportedClassIsAScopeBase) {
   ElabFixture f;
   ElaborateSrc(
@@ -281,8 +196,6 @@ TEST(PackageScopeReference, ExplicitlyImportedClassIsAScopeBase) {
                              9, "26.3"));
 }
 
-// §26.3: an explicit import brings in the one identifier it names, so a class
-// of the same package it does not name is no base without the qualifier.
 TEST(PackageScopeReference, AClassTheImportDoesNotNameIsNoScopeBase) {
   ElabFixture f;
   ElaborateSrc(
@@ -303,13 +216,6 @@ TEST(PackageScopeReference, AClassTheImportDoesNotNameIsNoScopeBase) {
                             10, "26.3"));
 }
 
-// §3.12.1 makes the compilation-unit scope one the module's upward search
-// (§23.9) reaches, and §26.3 (printed page 809) has an import make the
-// package's identifiers visible within the scope it is written in; so a
-// wildcard import above the module makes a package's localparam readable by
-// its bare name inside the module, and its class a `::` base. The uvm-tagged
-// sv-tests files import uvm_pkg this way. Both reads were reported, the check
-// consulting the module's own imports alone.
 TEST(PackageImport, CompilationUnitWildcardImportResolvesABareRead) {
   ElabFixture f;
   ElaborateSrc(
@@ -346,8 +252,6 @@ TEST(PackageImport, CompilationUnitWildcardImportedClassIsAScopeBase) {
                              9, "26.3"));
 }
 
-// §26.3: an explicit import at compilation-unit scope brings in the one name
-// it writes, no other.
 TEST(PackageImport, CompilationUnitExplicitImportResolvesItsNameAlone) {
   ElabFixture f;
   ElaborateSrc(
@@ -372,16 +276,6 @@ TEST(PackageImport, CompilationUnitExplicitImportResolvesItsNameAlone) {
                             "23.9"));
 }
 
-// §26.3 has an import make a package's declarations visible in the scope it is
-// written in, and §3.12.1 makes the compilation-unit scope the outermost one a
-// module's names resolve through, so a package class made visible by a
-// wildcard import written outside every module is a class type in a following
-// module: `B h;` declares a class variable, and §8.13 lets `h = d` assign a
-// subclass handle to it. RegisterImportItem in
-// src/elaborator/elaborator_import.cpp entered a package's typedefs and
-// parameters into the module's scopes and passed over its classes, so
-// ValidateVarDeclTypes never took `h` for a class variable and the assignment
-// was reported under §8.4 as a handle assigned to a non-class variable.
 TEST(PackageImport, CuScopeWildcardImportedPackageClassIsAClassType) {
   ElabFixture f;
   ElaborateSrc(
@@ -400,8 +294,6 @@ TEST(PackageImport, CuScopeWildcardImportedPackageClassIsAClassType) {
       "cannot assign class object handle to a non-class variable", 8, "8.4"));
 }
 
-// The same through a header import (§26.4) and an explicit import naming the
-// class, the two other positions RegisterImportItem serves.
 TEST(PackageImport, HeaderWildcardImportedPackageClassIsAClassType) {
   ElabFixture f;
   ElaborateSrc(
@@ -437,8 +329,6 @@ TEST(PackageImport, ExplicitlyImportedPackageClassIsAClassType) {
       "cannot assign class object handle to a non-class variable", 8, "8.4"));
 }
 
-// A class the explicit import does not name stays out of the module's class
-// types, so the report the fix silences is still made for it.
 TEST(PackageImport, AClassTheImportDoesNotNameIsNoClassType) {
   ElabFixture f;
   ElaborateSrc(
@@ -458,15 +348,6 @@ TEST(PackageImport, AClassTheImportDoesNotNameIsNoClassType) {
       "cannot assign class object handle to a non-class variable", 9, "8.4"));
 }
 
-// §26.3 searches a scope's locally visible identifiers, an explicit import's
-// among them, before the candidates a wildcard import supplies (printed page
-// 810), so in the clause's top2 module FALSE is q's.
-// RegisterImportedEnumLiterals in src/elaborator/elaborator_typedef.cpp emitted
-// every literal of p as a module variable, FALSE included, and that variable
-// held the name against the import lowering. The literal the explicit import
-// names is left to it; TRUE, which no explicit import names, is still emitted,
-// and bool_t keeps both members, so a fix that dropped the member from the type
-// or the whole type from the module would fail here.
 TEST(PackageImport, WildcardLiteralAnExplicitImportNamesIsNotEmitted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -493,12 +374,6 @@ TEST(PackageImport, WildcardLiteralAnExplicitImportNamesIsNotEmitted) {
   EXPECT_EQ(it->second.size(), 2u);
 }
 
-// §26.3 with A.2.8: a package import declaration is a block item declaration,
-// which a function body may open with, and the import makes the package's
-// names visible in that body (printed page 809). The module never imports p,
-// so `r = K * five()` reads a name only the body's own wildcard import brings
-// in; ReportSubroutineUnresolved in src/elaborator/elaborator_scope_rules.cpp
-// held the body to the module's imports alone and reported K under §23.9.
 TEST(PackageImport, WildcardImportInAFunctionBodyResolvesItsReads) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -519,11 +394,6 @@ TEST(PackageImport, WildcardImportInAFunctionBodyResolvesItsReads) {
              f));
 }
 
-// The same import as the first item of an automatic task body whose read
-// stands after a delay control, the shape the Clause 26 discovery's probe 77
-// reported "reference to unresolved identifier 'K'" on; an explicit import
-// of the parameter alone is enough for it, the callee being searched beyond
-// the module under §23.9 whatever the body imports.
 TEST(PackageImport, ExplicitImportInATaskBodyResolvesItsRead) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -542,10 +412,6 @@ TEST(PackageImport, ExplicitImportInATaskBodyResolvesItsRead) {
              f));
 }
 
-// §26.3 makes the import's names visible in the current scope, the body that
-// holds it, so a second function of the module without an import of its own
-// still reads nothing of p: its K is reported under §23.9, on its own line,
-// while the importing body before it passes.
 TEST(PackageImport, AnImportInOneFunctionBodyReachesNoOtherBody) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -574,16 +440,6 @@ TEST(PackageImport, AnImportInOneFunctionBodyReachesNoOtherBody) {
                              "23.9"));
 }
 
-// §26.6's own packages and module (printed pages 815-816): p2 hands p1's x on
-// under `import p1::x; export p1::*;`, p4 under `import p1::*; export p1::*;`,
-// and top imports both by wildcard and declares `int z = x;`. §26.3 rules the
-// wildcard imports of two packages defining one potentially locally visible
-// identifier that a reference matches illegal (printed 810), and §26.6 makes
-// an import of a declaration reached through an export an import of the
-// original declaration, several exported paths to one declaration causing no
-// conflict (printed 815). Both packages hand on p1's one x, so neither the
-// declaration initializer nor the procedural read is ambiguous, and neither
-// is unresolved -- the Clause 26 discovery's probes 45, 109 and 130.
 TEST(PackageImport,
      DeclarationInitializerReadsAVariableReachedByTwoExportPaths) {
   ElabFixture f;
@@ -609,9 +465,6 @@ TEST(PackageImport,
              f));
 }
 
-// The same one declaration handed on by an explicit export on one path and by
-// `export *::*` on the other, three packages deep on the second: still one
-// candidate.
 TEST(PackageImport, ExplicitAndStarExportPathsToOneDeclarationAreOneCandidate) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -639,11 +492,6 @@ TEST(PackageImport, ExplicitAndStarExportPathsToOneDeclarationAreOneCandidate) {
              f));
 }
 
-// Two exported paths are one candidate only where they reach one declaration:
-// p3 hands on p1's x while p2 declares an x of its own, so the initializer's
-// x matches two distinct declarations and §26.3's conflict stands, reported
-// at the reference on line 14 under §26.3. A check that took every supplier
-// of a name for one candidate would pass this.
 TEST(PackageImport, ExportedAndOwnDeclarationsOfOneNameStayAmbiguous) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -669,13 +517,6 @@ TEST(PackageImport, ExportedAndOwnDeclarationsOfOneNameStayAmbiguous) {
                             14, "26.3"));
 }
 
-// §26.3 Example 2 (printed page 811): the block's `x = 1` stands before the
-// block's own `import p2::*`, so b supplies no candidate and the reference is
-// searched outward into top, whose import of p does; p::x is imported into
-// top, and the module's read of x after the block is p::x alone. The block's
-// import is b's and never a second module-level candidate, so nothing is
-// ambiguous and the source elaborates clean. A check that counted the block's
-// import among the module's would report x ambiguous between p and p2.
 TEST(PackageImport, BlockImportAfterTheReferenceRaisesNoAmbiguity) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -697,10 +538,6 @@ TEST(PackageImport, BlockImportAfterTheReferenceRaisesNoAmbiguity) {
              f));
 }
 
-// §26.3 (printed page 810): a reference after the block's import is searched
-// in the block first, where p2's x is the one candidate, so the module's
-// import of p is never reached and the two never conflict. The module's own
-// read of x after the block still resolves through p alone.
 TEST(PackageImport, BlockImportBeforeTheReferenceHidesTheModulesCandidate) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -722,11 +559,6 @@ TEST(PackageImport, BlockImportBeforeTheReferenceHidesTheModulesCandidate) {
              f));
 }
 
-// §26.3's conflict (printed page 810) is between wildcard imports of one
-// scope: a reference in the block that the block does not resolve reaches
-// top, where both p and p2 supply x, and is reported at the reference on
-// line 11. A check that never searched a generate block's references let it
-// pass.
 TEST(PackageImport, TwoModuleImportsReachedFromABlockAreAmbiguous) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -750,11 +582,6 @@ TEST(PackageImport, TwoModuleImportsReachedFromABlockAreAmbiguous) {
                             11, "26.3"));
 }
 
-// §26.3 Example 1 (printed page 811): line 2's reference imports p::x into
-// top, line 3's `int x` is top.b.x and legal, being a declaration of b rather
-// than of top, line 4 writes top.b.x, and line 5's `int x` is illegal, a
-// declaration in top of a name a wildcard import already made locally
-// visible there -- reported at line 12 and nowhere else.
 TEST(PackageImport, ModuleDeclarationAfterABlocksClaimIsIllegal) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -782,18 +609,6 @@ TEST(PackageImport, ModuleDeclarationAfterABlocksClaimIsIllegal) {
                              8, "26.3"));
 }
 
-// §6.19 (printed page 119) has an enumerated type declare its literals as
-// named constants, and printed 120 makes two enumerations naming one literal
-// illegal in one scope, so the literals stand in the scope holding the enum;
-// §7.2's Syntax 7-1 (printed 146) gives a structure member any data_type, the
-// enum form among them, and §23.9's list of the elements that define a scope
-// (printed 761) names no structure, so an enum written as a member's type
-// declares its literals in the package. §26.3 (printed 808) reaches such a
-// declaration through the package scope resolution operator. `p::A` was
-// reported "reference to 'p::A', which package 'p' neither declares nor
-// exports" before, the provided-name walk of
-// src/elaborator/elaborator_scope_rules_names.cpp reading the members of an
-// enum written at the top of a typedef or a data declaration alone.
 TEST(PackageImport, ScopedReferenceToAStructMemberEnumLiteral) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -805,12 +620,6 @@ TEST(PackageImport, ScopedReferenceToAStructMemberEnumLiteral) {
              "endmodule\n"));
 }
 
-// The same literals through a wildcard import: §26.3 (printed 809) makes every
-// identifier the package declares visible in the importing scope without the
-// qualifier, so the bare `B` resolves. It was reported "reference to
-// unresolved identifier 'B'" under §23.9 before, the wildcard-imported
-// package answering for none of the literals a structure member's enum
-// declares.
 TEST(PackageImport, WildcardImportSuppliesAStructMemberEnumLiteral) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -823,12 +632,6 @@ TEST(PackageImport, WildcardImportSuppliesAStructMemberEnumLiteral) {
              "endmodule\n"));
 }
 
-// §7.2 (printed 146) gives struct_union_member to a union as to a structure,
-// and a member's type may itself be a structure holding an enum, so a literal
-// of a union member's enum, of an enum two members deep, and of one written
-// on the member of a structure-typed data declaration is each a declaration
-// of the package. `p::U1`, `p::D1` and `p::V1` were each reported as neither
-// declared nor exported before.
 TEST(PackageImport, UnionAndNestedStructMemberEnumLiteralsAreProvided) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -845,12 +648,6 @@ TEST(PackageImport, UnionAndNestedStructMemberEnumLiteralsAreProvided) {
              "endmodule\n"));
 }
 
-// §26.3 (printed 810) makes it illegal for the wildcard imports of two
-// packages to supply one identifier a reference matches, and the literal a
-// structure member's enum declares is such an identifier: p and q each
-// declare B that way, so the bare read on line 11 is ambiguous. It was
-// reported as an unresolved identifier under §23.9 before, neither package
-// counted as supplying B.
 TEST(PackageImport, StructMemberEnumLiteralsOfTwoImportsAreAmbiguous) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -873,11 +670,6 @@ TEST(PackageImport, StructMemberEnumLiteralsOfTwoImportsAreAmbiguous) {
                             11, "26.3"));
 }
 
-// Counting the literals of a structure member's enum admits nothing else:
-// `p::Z`, a name no enum of p at any depth declares and no export hands on,
-// stays reported under §26.3 at the reference's line, as 2bb77fd69 reports
-// `p5::x`; `p::e`, the member's own name, is a name of the structure's type
-// and no declaration of the package, and is reported the same way.
 TEST(PackageImport, ScopedReferenceToNoMemberOfTheStructStaysReported) {
   ElabFixture f;
   EXPECT_FALSE(

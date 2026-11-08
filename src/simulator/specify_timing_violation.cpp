@@ -1,23 +1,3 @@
-// §31: whether an observed pair of transitions violates a timing check the
-// design declared. Each SpecifyManager::Check*Violation member below reads
-// timing_checks_ for the entries of one TimingCheckKind and compares the time
-// between the reference event and the data event against that entry's limits.
-// The free functions beside them answer the rules those comparisons are made
-// under: §31.7's scalar_timing_check_condition (ClassifyTimingCheckCondition,
-// TimingCheckConditionEnables), §31.8's per-bit expansion of a vector signal
-// (TimingCheckExpandedCount, VectorTransitionViolationCount) and §31.9's
-// negative timing checks (AdjustNegativeTimingCheckLimit,
-// NegativeTimingWindowCanYieldViolation, ResolveDelayedSignals).
-//
-// SpecifyManager::CheckSetupholdViolation stands in
-// src/simulator/specify_timing_check.cpp, beside the
-// BuildTimingCheckUnderOptions that fills in the TimingCheckEntry values read
-// here. SpecifyManager's pulse handling -- §30.7.1's PATHPULSE$ specparams,
-// §30.7.4's pulsestyle and showcancelled declarations, §32.7's SDF pulse
-// limits and §32.4.3's rebuild of a path whose delay reads an annotated
-// specparam -- stands in src/simulator/specify_pulse.cpp, which these
-// functions were split out of.
-
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -92,17 +72,8 @@ bool SpecifyManager::CheckRecoveryViolation(std::string_view ref,
   return false;
 }
 
-// Shared implementation for the two-sided timing checks, $recrem and
-// $setuphold. Both filter by kind and signals, then compare the data event
-// against a pair of limits, and the only difference between them is which
-// declared limit bounds which side of the reference time. TwoSidedLimitOrder
-// (simulator/specify_internal.h) is that difference, stated once per kind by
-// the member that names the kind.
 namespace {
 
-// The two limits of a two-sided check, each named for the side of the reference
-// time it bounds rather than for the constraint that declared it. The signed
-// pair carries the same two limits as §31.9 wrote them.
 struct SidedLimits {
   uint64_t before = 0;
   uint64_t after = 0;
@@ -120,11 +91,6 @@ SidedLimits SidedLimitsOf(const TimingCheckEntry& check,
                      check.signed_limit2};
 }
 
-// §31.9.1 requirement (a): a change of the signal strictly inside the violation
-// window, its end points excluded, triggers a timing violation. A negative
-// limit moves an end point across the reference time rather than bounding one
-// side of it, so the window is the one open interval the two signed limits mark
-// out around that time and neither side is answered on its own.
 bool NegativeTimingWindowViolated(const SidedLimits& limits, uint64_t ref_time,
                                   uint64_t data_time) {
   const auto kRefT = static_cast<int64_t>(ref_time);
@@ -133,8 +99,6 @@ bool NegativeTimingWindowViolated(const SidedLimits& limits, uint64_t ref_time,
          kDataT < kRefT + limits.signed_after;
 }
 
-// True when the elapsed time between `ref_time` and `data_time` violates the
-// limit bounding the side the data event fell on.
 bool TwoSidedLimitViolated(const SidedLimits& limits, uint64_t ref_time,
                            uint64_t data_time) {
   if (limits.before == 0 && limits.after == 0) return false;
@@ -170,8 +134,6 @@ bool SpecifyManager::CheckRecremViolation(std::string_view ref,
                                           uint64_t ref_time,
                                           std::string_view data,
                                           uint64_t data_time) const {
-  // §31.9.4: the option that switches all timing checks off suppresses this
-  // check the same way it suppresses $setuphold.
   if (timing_check_options_.all_timing_checks_off) return false;
   return CheckTimingViolation(timing_checks_, TimingCheckKind::kRecrem,
                               {ref, ref_time, data, data_time},
@@ -298,14 +260,8 @@ bool ReportsFullskewViolation(uint64_t timestamp_time, uint64_t next_event_time,
 
 FullskewWindowAction FullskewSecondTimestampAction(
     bool timestamp_condition_holds, bool remain_active_flag) {
-  // A timestamp whose condition holds (or that carries no condition) always
-  // opens a fresh timing window, superseding any window in progress and
-  // re-arming the check if it was dormant.
   if (timestamp_condition_holds) return FullskewWindowAction::kReplaceWindow;
 
-  // With a false condition the remain_active_flag is decisive: when set, the
-  // event is discarded and the existing window stands; when clear, the check
-  // turns dormant.
   if (remain_active_flag) return FullskewWindowAction::kIgnore;
   return FullskewWindowAction::kGoDormant;
 }
@@ -325,17 +281,10 @@ bool ReportsTimeskewViolation(uint64_t ref_time, uint64_t next_event_time,
 Logic4Word ToggleNotifierOnViolation(Logic4Word current) {
   const bool kPreA = (current.aval & 1u) != 0u;
   const bool kPreB = (current.bval & 1u) != 0u;
-  // z, which Table 31-13's fourth row leaves where it is.
   if (kPreB && !kPreA) return Logic4Word{0u, 1u};
 
-  // 1, which Table 31-13's third row takes to 0.
   if (kPreA && !kPreB) return Logic4Word{0u, 0u};
 
-  // 0, which Table 31-13's second row takes to 1, and x, whose row allows
-  // either 0 or 1. That row is a licence rather than a value, so 0 and 1 both
-  // conform and 1 is the answer chosen here; §31.6 prefers neither. The two
-  // rows share this return because they were given the same answer and not
-  // because the table joins them.
   return Logic4Word{1u, 0u};
 }
 
@@ -377,11 +326,6 @@ bool TimingCheckConditionEnables(TimingCheckConditionKind kind,
   return false;
 }
 
-// §31.7's Syntax 31-16: scalar_constant is one of ten spellings, `1'b0`,
-// `1'b1`, `1'B0`, `1'B1`, `'b0`, `'b1`, `'B0`, `'B1`, `1` and `0`. A comparison
-// whose right-hand side is anything else, another signal or a wider literal, is
-// not one of the four comparison forms but the plain `expression` form, whose
-// own value gates the event.
 static bool IsScalarConstant(const Expr* e) {
   if (e->kind != ExprKind::kIntegerLiteral) return false;
   static constexpr std::string_view kSpellings[] = {
@@ -392,8 +336,6 @@ static bool IsScalarConstant(const Expr* e) {
   return false;
 }
 
-// The comparison form `condition` is, or kPlain where it is none: one of the
-// four operators of Syntax 31-16 with a scalar_constant on its right.
 static TimingCheckConditionKind ComparisonFormOf(const Expr* condition) {
   if (condition->kind != ExprKind::kBinary) {
     return TimingCheckConditionKind::kPlain;
@@ -421,17 +363,14 @@ static TimingCheckConditionKind ComparisonFormOf(const Expr* condition) {
 
 TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition) {
   TimingCheckConditionClass result;
-  if (condition == nullptr) return result;  // unconditioned event -> plain
+  if (condition == nullptr) return result;
 
-  // `~ expression`: the bitwise-negation form of scalar_timing_check_condition.
   if (condition->kind == ExprKind::kUnary &&
       condition->op == TokenKind::kTilde) {
     result.kind = TimingCheckConditionKind::kNegate;
     return result;
   }
 
-  // `expression <op> scalar_constant`: the four comparison forms. The LSB of
-  // the right-hand scalar_constant is the value compared against.
   result.kind = ComparisonFormOf(condition);
   if (result.kind != TimingCheckConditionKind::kPlain) {
     result.scalar_constant_bit =
@@ -442,21 +381,13 @@ TimingCheckConditionClass ClassifyTimingCheckCondition(const Expr* condition) {
 
 const Expr* TimingCheckConditioningSignal(const Expr* condition) {
   if (condition == nullptr) return nullptr;
-  // `~ expression`: the negation is applied by TimingCheckConditionEnables, so
-  // the operand is what carries the conditioning signal's value. A unary node
-  // holds its operand in lhs.
   if (condition->kind == ExprKind::kUnary &&
       condition->op == TokenKind::kTilde) {
     return condition->lhs;
   }
-  // `expression <op> scalar_constant`: the comparison is applied by
-  // TimingCheckConditionEnables against the scalar_constant it already carries,
-  // so the left-hand operand is the conditioning signal.
   if (ComparisonFormOf(condition) != TimingCheckConditionKind::kPlain) {
     return condition->lhs;
   }
-  // Any other expression is the plain form, whose own value gates the check --
-  // the same expression ClassifyTimingCheckCondition reports as kPlain.
   return condition;
 }
 
@@ -478,8 +409,6 @@ uint64_t TimingCheckExpandedCount(TimingCheckKind kind, uint32_t ref_width,
 uint32_t VectorTransitionViolationCount(uint64_t before, uint64_t after,
                                         uint32_t width) {
   if (width == 0) return 0u;
-  // Mask off any bits beyond the vector width, then count the positions whose
-  // value differs -- each is one single-bit transition, hence one violation.
   uint64_t mask = (width >= 64u) ? ~uint64_t{0} : ((uint64_t{1} << width) - 1u);
   uint64_t changed = (before ^ after) & mask;
   uint32_t count = 0;
@@ -533,10 +462,6 @@ uint64_t LatchedNegativeTimingWindowValue(int64_t window_lower,
                                           uint64_t old_value,
                                           uint64_t new_value) {
   (void)window_upper;
-  // The new value is stable across the excluded-endpoint interior only when the
-  // data has already settled by the time the window opens; a change at or after
-  // the open boundary leaves the old value as the stable (and, inside the
-  // window, incorrectly clocked) one.
   return data_transition_time <= window_lower ? new_value : old_value;
 }
 
@@ -564,13 +489,9 @@ std::vector<ResolvedDelayedSignal> ResolveDelayedSignals(
       }
     }
     if (existing == nullptr) {
-      // First time this signal is seen: one copy, explicit if declared here.
       resolved.push_back({signal, delayed_name, !delayed_name.empty()});
       continue;
     }
-    // The signal already has its single shared copy. If this check supplies an
-    // explicit name and the copy is still implicit, promote it -- an explicit
-    // declaration in any referencing check is used for all of them.
     if (!existing->is_explicit && !delayed_name.empty()) {
       existing->delayed_name = delayed_name;
       existing->is_explicit = true;

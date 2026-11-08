@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A list_of_net_decl_assignments declares one net per element; the A.2.3
-// sibling file checks that each element also carries its own initializer.
 TEST(DeclarationListParsing, ListOfNetDeclAssignmentsOneNetPerElement) {
   auto r = Parse("module m; wire a = 1'b0, b = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
@@ -20,10 +18,6 @@ TEST(DeclarationListParsing, ListOfNetDeclAssignmentsOneNetPerElement) {
   EXPECT_GE(count, 2);
 }
 
-// §10.3.1: the net declaration assignment is the net declaration form of a
-// continuous assignment, placed on the net in the statement that declares it.
-// The A.2.4 sibling file covers the same `[ = expression ]` branch of the
-// net_decl_assignment production.
 TEST(DeclarationAssignmentParsing, NetDeclAssignmentContinuousAssignForm) {
   auto r = Parse("module m; wire w = 1'b1; endmodule\n");
   ASSERT_NE(r.cu, nullptr);

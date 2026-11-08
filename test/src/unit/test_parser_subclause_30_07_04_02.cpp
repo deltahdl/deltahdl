@@ -70,7 +70,6 @@ TEST(SpecifyBlockDeclParsing, ErrorShowcancelledMissingSemicolon) {
       "    showcancelled out1\n"
       "  endspecify\n"
       "endmodule\n");
-  // The report stands at the endspecify that followed the output list.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endspecify'", 4, "30.7.4.2"));
 }

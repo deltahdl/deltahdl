@@ -39,8 +39,6 @@ TEST(AssignmentWithinExpressionElaboration, AssignInContinuousAssignIsIllegal) {
                             3, "11.3.6"));
 }
 
-// §11.3.6: an assignment operator is illegal in an expression within a
-// procedural continuous assignment.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignIsIllegal) {
   ElabFixture f;
@@ -55,9 +53,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             3, "11.3.6"));
 }
 
-// The same procedural continuous assignment without an embedded assignment
-// operator is legal, confirming it is the assignment-in-expression that is
-// rejected above.
 TEST(AssignmentWithinExpressionElaboration,
      ProceduralContinuousAssignWithoutEmbeddedAssignIsLegal) {
   EXPECT_TRUE(
@@ -67,33 +62,6 @@ TEST(AssignmentWithinExpressionElaboration,
              "endmodule\n"));
 }
 
-// §11.3.6 bars an assignment operator from an event expression, from an
-// expression in a procedural continuous assignment and from any expression
-// outside a procedural statement, and names no statement the procedural
-// continuous assignment may stand in to escape that.
-// ElaboratorOperationRules::WalkStmtsForAssignInExpr in
-// src/elaborator/elaborator_validate_cast_ops.cpp had written out six of the
-// thirteen child-statement links Stmt declares and now takes the list from
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h. The five
-// cases below are
-// AssignmentWithinExpressionElaboration.AssignInProceduralContinuousAssignIsIllegal
-// above rewritten in five of the seven positions the walk was missing, each of
-// which elaborated clean beforehand with the embedded assignment unreported.
-//
-// Stmt::for_inits and Stmt::for_steps get no case. A.6.8 gives
-// `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`, and A.6.2 gives `procedural_continuous_assignment
-// ::= assign variable_assignment | ...`, which is a statement_item and none of
-// those five forms. No `assign` statement can be written at either end of a
-// loop header, so both links are descended for the list's sake rather than for
-// an instance.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ]
-// { block_item_declaration } { statement_or_null } join_keyword ...`, so a fork
-// holds statements the way a begin-end block does. The parser keeps them in
-// Stmt::fork_stmts rather than in Stmt::stmts.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignInForkArmIsIllegal) {
   ElabFixture f;
@@ -110,10 +78,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             4, "11.3.6"));
 }
 
-// A.6.10 gives `simple_immediate_assert_statement ::= assert ( expression )
-// action_block` and §16.3 gives `action_block ::= statement_or_null |
-// [ statement ] else statement_or_null`, so the pass arm of an immediate
-// assertion holds an ordinary statement, kept in Stmt::assert_pass_stmt.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignInAssertionPassStatementIsIllegal) {
   ElabFixture f;
@@ -129,8 +93,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             4, "11.3.6"));
 }
 
-// The else arm of the same production, kept in Stmt::assert_fail_stmt, a link
-// the pass-arm case above does not reach.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignInAssertionFailStatementIsIllegal) {
   ElabFixture f;
@@ -146,10 +108,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             4, "11.3.6"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. §11.3.6
-// judges the expression as written rather than what runs, so the report stands
-// whether the weighted draw would select the item or not.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignInRandcaseItemIsIllegal) {
   ElabFixture f;
@@ -164,10 +122,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             3, "11.3.6"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInProceduralContinuousAssignInRandsequenceCodeBlockIsIllegal) {
   ElabFixture f;
@@ -186,10 +140,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             5, "11.3.6"));
 }
 
-// §11.3.6 makes an assignment operator illegal in an event expression, and an
-// event control written as a statement holds one as surely as a procedure's
-// sensitivity list does. `@((a = b))` inside an initial block was never
-// looked at, and the process blocked on it for ever.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInAProceduralEventControlIsIllegal) {
   ElabFixture f;
@@ -206,8 +156,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             4, "11.3.6"));
 }
 
-// The same inside a nested statement and in an intra-assignment event control,
-// each an event expression of its own.
 TEST(AssignmentWithinExpressionElaboration,
      AssignInANestedOrIntraAssignmentEventControlIsIllegal) {
   ElabFixture f;
@@ -228,8 +176,6 @@ TEST(AssignmentWithinExpressionElaboration,
                             5, "11.3.6"));
 }
 
-// §11.3.6 bars an assignment operator from an expression within a procedural
-// continuous assignment, and force is one (§10.6.2) as assign is.
 TEST(AssignInExprElaboration, AssignmentWithinForceExpressionReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -244,8 +190,6 @@ TEST(AssignInExprElaboration, AssignmentWithinForceExpressionReported) {
                             3, "11.3.6"));
 }
 
-// §11.3.6 also bars one from an expression outside any procedural statement:
-// a declaration's initializer, a parameter's value and a port connection.
 TEST(AssignInExprElaboration, AssignmentOutsideProceduralStatementReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -266,11 +210,6 @@ TEST(AssignInExprElaboration, AssignmentOutsideProceduralStatementReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §11.3.6 with §6.23: the expression a type reference names is an expression
-// still, though it is not evaluated, so an assignment operator in it is barred
-// wherever one in any other expression is. The elaborator folds a comparison of
-// two type references to the bit it stands for, and these show that the fold
-// leaves the assignment in it for this rule to report.
 void ExpectTypeReferenceAssignmentReported(const std::string& line) {
   ElabFixture f;
   ElaborateSrc(
@@ -305,7 +244,6 @@ TEST(AssignInExprElaboration,
       "  initial assign c = type((a = b)) == type(logic);");
 }
 
-// Within a procedural statement the same type reference is allowed.
 TEST(AssignInExprElaboration, AssignmentInATypeReferenceOfABlockingAssign) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

@@ -9,15 +9,8 @@
 namespace delta {
 namespace {
 
-// Whether `text` is written as a string. §22.5.1 spells a pragma_value four
-// ways and only one of them is a string, so a value carrying no quotation
-// marks around it is one of the other three however much it reads like the
-// name a producer meant. The §22.11 grammar that carried the value here closes
-// every string it opens, so the opening mark is the one to look for.
 bool WrittenAsString(std::string_view text) { return text.starts_with('"'); }
 
-// Takes the string written against one of the two names into `into`, and
-// reports whether the expression was that name written that way.
 bool TookSubkeyword(const ListedKeyword& listed, std::string_view name,
                     std::string* into) {
   if (listed.name != name) return false;
@@ -30,11 +23,6 @@ bool TookSubkeyword(const ListedKeyword& listed, std::string_view name,
 
 ProtectViewport ParseProtectViewport(std::string_view value) {
   if (!IsParenthesizedPragmaValue(value)) return {};
-  // The expressions of the list are what TopLevelKeywords walks, so the
-  // parentheses announcing the list come off before the walk rather than
-  // reaching it as characters of the first expression.
-  // The §22.11 grammar that carried the list here closes it, so the last
-  // character is the parenthesis matching the first.
   std::string_view inside = value.substr(1, value.size() - 2);
   ProtectViewport viewport;
   bool named_object = false;
@@ -47,9 +35,6 @@ ProtectViewport ParseProtectViewport(std::string_view value) {
         TookSubkeyword(listed, kAccessSubkeyword, &viewport.access) ||
         named_access;
   }
-  // Both, because §34.5.32.1 writes both. An expression naming one of them
-  // describes an object nothing is permitted for, or permits something of no
-  // object, and neither is what the subclause has a viewport say.
   if (!named_object || !named_access) return {};
   viewport.stated = true;
   return viewport;

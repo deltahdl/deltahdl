@@ -56,9 +56,6 @@ TEST(GenericInterfaceReference, NonAnsiDeclarationIsError) {
                             2, "25.3.3"));
 }
 
-// The same reference written with no direction, `interface a;`, begins as a
-// nested interface declaration would; naming a port of the non-ANSI header,
-// it is the reference §25.3.3 forbids there, reported once under the clause.
 TEST(GenericInterfaceReference, NonAnsiBareReferenceIsError) {
   auto r = Parse(
       "module memMod(a);\n"
@@ -74,8 +71,6 @@ TEST(GenericInterfaceReference, NonAnsiBareReferenceIsError) {
   EXPECT_EQ(errors, 1u);
 }
 
-// A nested interface declaration whose name is no port of the header is still
-// read as one.
 TEST(GenericInterfaceReference, NestedInterfaceInNonAnsiModuleIsNotAPort) {
   auto r = Parse(
       "module memMod(a);\n"

@@ -19,18 +19,11 @@ namespace delta {
 
 namespace {
 
-// §5.6 has an over-long identifier reported, and the report names the limit it
-// exceeded. Built from kMaxIdentifierLength so the number in the message is the
-// number that was applied.
 std::string IdentifierTooLongMessage() {
   return std::format("identifier exceeds maximum length of {} characters",
                      kMaxIdentifierLength);
 }
 
-// Whether `name`, the text of an escaped identifier after its backslash, is
-// spelled as A.9.3's system_tf_identifier: a `$` and then letters, digits,
-// underscores and dollar signs only. Syntax 5-1's footnote 55 has that such a
-// name is not escaped, so the escape is what LexEscapedIdentifier reports.
 bool IsSystemTfSpelling(std::string_view name) {
   if (name.empty() || name.front() != '$') return false;
   for (char ch : name.substr(1)) {
@@ -41,7 +34,6 @@ bool IsSystemTfSpelling(std::string_view name) {
   return true;
 }
 
-// Split a pragma comment body into whitespace-delimited words.
 std::vector<std::string_view> SplitPragmaWords(std::string_view body) {
   std::vector<std::string_view> words;
   size_t i = 0;
@@ -62,11 +54,6 @@ std::vector<std::string_view> SplitPragmaWords(std::string_view body) {
   return words;
 }
 
-// Build the simple §40.4.1 current-state / enum-only pragma from a word list
-// whose leading `tool` keyword the caller has already matched. Returns true and
-// fills `out` for a recognized simple form, false otherwise. A `state_vector`
-// word whose state operand is not a simple identifier is a descendant form
-// (§40.4.2 / §40.4.3); the caller handles that case before calling this.
 bool BuildSimpleFsmStatePragma(const std::vector<std::string_view>& words,
                                SourceLoc loc, Lexer::FsmStatePragma& out) {
   out.loc = loc;
@@ -74,7 +61,6 @@ bool BuildSimpleFsmStatePragma(const std::vector<std::string_view>& words,
     out.form = Lexer::FsmStatePragma::Form::kStateVector;
     out.signal_name = words[2];
     if (words.size() == 3) {
-      // Bare current-state pragma; the enum name is supplied separately.
       return true;
     }
     if (words.size() == 5 && words[3] == "enum" &&
@@ -83,13 +69,10 @@ bool BuildSimpleFsmStatePragma(const std::vector<std::string_view>& words,
       out.enum_name = words[4];
       return true;
     }
-    // An interposed FSM name or other trailing tokens belong to the descendant
-    // pragma forms, not the simple §40.4.1 signal pragma.
     return false;
   }
   if (words.size() == 3 && words[1] == "enum" &&
       Lexer::IsSimplePragmaIdentifier(words[2])) {
-    // Separate `tool enum enumeration_name` pragma placed after the bit range.
     out.form = Lexer::FsmStatePragma::Form::kEnumOnly;
     out.has_enum = true;
     out.enum_name = words[2];
@@ -98,12 +81,6 @@ bool BuildSimpleFsmStatePragma(const std::vector<std::string_view>& words,
   return false;
 }
 
-// One bound of a §40.4.2 part-select `signal_name[n:n]`. The bounds are bit
-// numbers of the signal, so digits that do not name one are not the form. A run
-// of digits too long to be an index is rejected rather than carried round: a
-// bound that wrapped would let the pragma through naming a range of the signal
-// nothing in the source wrote, and a coverage tool would report the FSM as held
-// by the wrong bits of the vector.
 bool ParsePartSelectBound(std::string_view text, int& out) {
   int value = 0;
   for (char c : text) {
@@ -120,9 +97,6 @@ bool ParsePartSelectBound(std::string_view text, int& out) {
   return true;
 }
 
-// Find the index of the word carrying the closing brace of a §40.4.3
-// concatenation. The braced list may span several whitespace-delimited words.
-// Returns words.size() when no closing brace is present.
 size_t FindConcatCloseBrace(const std::vector<std::string_view>& words) {
   for (size_t k = 2; k < words.size(); ++k) {
     if (words[k].find('}') != std::string_view::npos) {
@@ -132,10 +106,6 @@ size_t FindConcatCloseBrace(const std::vector<std::string_view>& words) {
   return words.size();
 }
 
-// Reconstruct the `{...}` region as one contiguous view of the source, so the
-// internal spaces and commas are preserved regardless of how the comment body
-// split into words, and return the text between the braces. words[2] opens
-// with the `{` and words[close] holds the `}`, which the caller has found.
 std::string_view ExtractBracedInside(const std::vector<std::string_view>& words,
                                      size_t close) {
   const char* region_begin = words[2].data();
@@ -146,10 +116,6 @@ std::string_view ExtractBracedInside(const std::vector<std::string_view>& words,
   return region.substr(1, close_brace - 1);
 }
 
-// Split a concatenation body on commas and collect every member. Each member
-// must be a whole signal: §40.4.3 forbids bit-selects or part-selects here,
-// which IsSimplePragmaIdentifier rejects (a `[` is not an identifier
-// character). Returns true and fills `names` when every member is valid.
 bool ParseConcatMembers(std::string_view inside,
                         std::vector<std::string_view>& names) {
   size_t i = 0;
@@ -158,7 +124,6 @@ bool ParseConcatMembers(std::string_view inside,
     std::string_view piece = comma == std::string_view::npos
                                  ? inside.substr(i)
                                  : inside.substr(i, comma - i);
-    // Trim surrounding whitespace from the member.
     size_t b = 0;
     size_t e = piece.size();
     while (b < e && std::isspace(static_cast<unsigned char>(piece[b]))) {
@@ -180,8 +145,6 @@ bool ParseConcatMembers(std::string_view inside,
   return !names.empty();
 }
 
-// Whether c is a digit an escape of the kind may take: a hex_digit other than
-// an x_digit or z_digit for `\xdd`, one of 0 to 7 for `\ddd`.
 bool IsEscapeDigit(char c, bool hex) {
   if (hex) return std::isxdigit(static_cast<unsigned char>(c)) != 0;
   return c >= '0' && c <= '7';
@@ -223,7 +186,6 @@ uint32_t Lexer::SkipLineComment() {
     Advance();
   }
   uint32_t body_end = pos_;
-  // The newline that ended the comment, unless the text ended first.
   Advance();
   return body_end;
 }
@@ -243,12 +205,6 @@ uint32_t Lexer::SkipBlockComment(SourceLoc start_loc) {
 }
 
 bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
-  // The names a §40.4 pragma carries - the signal holding the current state,
-  // the enumeration binding it to an FSM, the FSM the tool reports - are
-  // identifiers of the surrounding source, so what counts as one here is what
-  // §5.6 counts as a simple identifier: any sequence of letters, digits, dollar
-  // signs and underscores, whose first character is a letter or an underscore
-  // and never a digit or a dollar sign.
   if (word.empty()) {
     return false;
   }
@@ -266,8 +222,6 @@ bool Lexer::IsSimplePragmaIdentifier(std::string_view word) {
 
 bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
                             int& msb, int& lsb) {
-  // A §40.4.2 part-select word has the shape `signal_name[msb:lsb]`: a simple
-  // base identifier followed by a bracketed two-bound range.
   size_t open = word.find('[');
   if (open == std::string_view::npos || open == 0 || word.back() != ']') {
     return false;
@@ -294,39 +248,23 @@ bool Lexer::ParsePartSelect(std::string_view word, std::string_view& base,
 }
 
 void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
-  // The parser rewinds the lexer through SavePos and RestorePos, which hands a
-  // comment it has read before to this function again. The lexer reads the
-  // text in order otherwise, so every comment before the furthest one read has
-  // been seen, and one comment is one pragma recorded or one report made.
   auto offset = static_cast<uint32_t>(body.data() - source_.data());
   if (offset < first_unseen_comment_) {
     return;
   }
   first_unseen_comment_ = offset + 1;
 
-  // Split the comment body into whitespace-delimited words.
   std::vector<std::string_view> words = SplitPragmaWords(body);
 
-  // Every §40.4.1 FSM pragma opens with the required `tool` keyword.
   if (words.empty() || words[0] != "tool") {
     return;
   }
 
-  // A `state_vector` word whose state operand is not a simple identifier is a
-  // descendant form (§40.4.2 part-select / §40.4.3 concatenation), not the
-  // simple signal named by §40.4.1; dispatch to the matching recognizer.
   if (words.size() >= 3 && words[1] == "state_vector" &&
       !IsSimplePragmaIdentifier(words[2])) {
     if (words[2].front() == '{') {
-      // §40.4.3: a concatenation of signals can hold the current state. The
-      // pragma supplies an FSM name and an enumeration name:
-      //   `tool state_vector {sig , sig, ...} FSM_name enum enum_name`.
       TryRecognizeFsmConcatPragma(words, loc);
     } else {
-      // §40.4.2: a part-select of a vector signal can hold the current state.
-      // Such a pragma must also supply an FSM name for the coverage tool to
-      // report under, distinct from the enumeration name:
-      //   `tool state_vector signal_name[msb:lsb] FSM_name enum enum_name`.
       TryRecognizeFsmPartSelectPragma(words, loc);
     }
     return;
@@ -339,7 +277,6 @@ void Lexer::TryRecognizeFsmStatePragma(std::string_view body, SourceLoc loc) {
   fsm_state_pragmas_.push_back(pragma);
 }
 
-// Whether `a` stands before `b` in the one text they are both in.
 static bool LocBefore(SourceLoc a, SourceLoc b) {
   return a.file_id == b.file_id &&
          (a.line < b.line || (a.line == b.line && a.column < b.column));
@@ -360,9 +297,6 @@ std::string_view Lexer::ClaimFsmEnumPragma(SourceLoc before) {
 
 void Lexer::TryRecognizeFsmPartSelectPragma(
     const std::vector<std::string_view>& words, SourceLoc loc) {
-  // The caller has already matched the leading `tool state_vector`. §40.4.2's
-  // form names a part-select, an FSM name, and an enumeration name:
-  //   tool state_vector signal_name[msb:lsb] FSM_name enum enum_name
   if (words.size() != 6 || words[4] != "enum") {
     return;
   }
@@ -371,8 +305,6 @@ void Lexer::TryRecognizeFsmPartSelectPragma(
   if (!ParsePartSelect(words[2], pragma.signal_name, pragma.msb, pragma.lsb)) {
     return;
   }
-  // The FSM name is required so the coverage tool has a name to report the FSM
-  // under, and it is distinct from the enumeration name.
   if (!IsSimplePragmaIdentifier(words[3]) ||
       !IsSimplePragmaIdentifier(words[5])) {
     return;
@@ -385,18 +317,6 @@ void Lexer::TryRecognizeFsmPartSelectPragma(
 
 void Lexer::ReportConcatSelectProhibition(std::string_view inside,
                                           SourceLoc loc) {
-  // §40.4.3: the concatenation may hold no bit-select or part-select of a
-  // signal. The caller has matched the whole of the form around the braces -
-  // the keywords, the FSM name, the enumeration binding - so a select between
-  // them is an FSM its author meant to specify and the prohibition is what
-  // stopped it being one. Saying so is the difference between an FSM the user
-  // can see went unrecognized and one that quietly did. A member that breaks
-  // some other rule is not this report: the comment is then one the recognizer
-  // passed over rather than a prohibition it applied.
-  //
-  // The source stays legal, so this is a warning rather than an error: a pragma
-  // is a comment, and a comment the tool cannot use leaves the design it
-  // annotates as well formed as it was.
   if (inside.find('[') == std::string_view::npos) {
     return;
   }
@@ -408,18 +328,10 @@ void Lexer::ReportConcatSelectProhibition(std::string_view inside,
 
 void Lexer::TryRecognizeFsmConcatPragma(
     const std::vector<std::string_view>& words, SourceLoc loc) {
-  // The caller has already matched the leading `tool state_vector`. §40.4.3's
-  // form names a brace-delimited concatenation, an FSM name, and an enumeration
-  // name:  tool state_vector { sig , sig, ... } FSM_name enum enum_name
-  // The braced list may be split across several whitespace-delimited words, so
-  // find the word carrying the closing brace and rejoin the brace region from
-  // the contiguous source span the words point into.
   size_t close = FindConcatCloseBrace(words);
   if (close == words.size()) {
-    return;  // no closing brace for the concatenation
+    return;
   }
-  // The braced list is followed by exactly three words: the FSM name, the
-  // literal `enum` keyword, and the enumeration name.
   if (words.size() != close + 4 || words[close + 2] != "enum") {
     return;
   }
@@ -452,10 +364,6 @@ void Lexer::SkipWhitespaceAndComments() {
       Advance();
       continue;
     }
-    // Only the Preprocessor writes a keyword-version marker, so only its output
-    // may be read for one. In a file the user wrote, the same byte is a
-    // character §5.2 gives no lexical token to begin, and leaving it here sends
-    // it to LexOperator, which reports it as any other such character.
     if (Current() == kKeywordMarker &&
         origin_ == TextOrigin::kPreprocessorOutput) {
       ConsumeKeywordMarker();
@@ -463,9 +371,6 @@ void Lexer::SkipWhitespaceAndComments() {
     }
 
     if (Current() == '/' && PeekChar() == '/') {
-      // §40.4.7 — the FSM recognition pragmas work in one-line comments that
-      // follow `//` just as they do in `/* */` block comments. Skip the comment
-      // and hand its body to the same recognizer the block-comment path uses.
       auto comment_loc = MakeLoc();
       Advance();
       Advance();
@@ -489,10 +394,6 @@ void Lexer::SkipWhitespaceAndComments() {
   }
 }
 
-// Consume the run of spaces and tabs at the current position and report
-// whether there was one. Callers that must know whether white space stood at a
-// point in the source read the result; callers that only need to step over it
-// discard it.
 bool Lexer::SkipSpacesAndTabs() {
   uint32_t before = pos_;
   while (Current() == ' ' || Current() == '\t') {
@@ -501,10 +402,6 @@ bool Lexer::SkipSpacesAndTabs() {
   return pos_ != before;
 }
 
-// Preprocessor::HandleBeginKeywords and HandleEndKeywords write the marker and
-// the version byte together, so the byte after a marker is its version. The
-// newline ending the directive's line is white space, which the caller's loop
-// steps over as it does any other.
 void Lexer::ConsumeKeywordMarker() {
   Advance();
   keyword_version_ = static_cast<KeywordVersion>(Current());
@@ -655,13 +552,6 @@ Token Lexer::LexStringLiteral() {
   return tok;
 }
 
-// §5.9.1 (Table 5-1): the digits of a `\ddd` escape are octal_digits and
-// those of a `\xdd` escape hex_digits, and it is illegal for either to be an
-// x_digit or a z_digit, which Syntax 5-2 has be x, X, z, Z and ?. An escape
-// that took fewer digits than its kind allows and is followed by one of those
-// letters is such an escape; one that took its full count is complete and the
-// letter after it is an ordinary character. pos_ is at the backslash, and the
-// report is placed there, on the escape's own line.
 void Lexer::CheckEscapeDigits() {
   uint32_t p = pos_ + 1;
   const bool kHex = CharAt(p) == 'x';
@@ -737,17 +627,6 @@ Token Lexer::LexSystemIdentifier() {
   tok.kind = TokenKind::kSystemIdentifier;
   tok.loc = loc;
   tok.text = source_.substr(start, pos_ - start);
-  // No length is checked here, unlike LexIdentifier and LexEscapedIdentifier.
-  // §5.6 lets an implementation cap identifier length, and an identifier there
-  // is a simple or an escaped identifier -- a simple identifier may not begin
-  // with a digit or $, so a name this lexes is neither. §5.6.3 hands its rules
-  // to Clause 36 instead, where the PLI defines further user-defined system
-  // tasks and functions, and §36.3 states them: the name begins with $, its
-  // remaining characters are letters, digits, underscores or dollar signs, it
-  // is case sensitive, and it may be any length with every character
-  // significant. A.9.3's system_tf_identifier production bounds no length
-  // either, and footnote 55 adds only that the $ is not followed by white space
-  // and that the name is not escaped.
   return tok;
 }
 
@@ -776,9 +655,6 @@ Token Lexer::LexEscapedIdentifier() {
   if (tok.text.size() > kMaxIdentifierLength) {
     diag_.Error(loc, IdentifierTooLongMessage(), Subclause("5.6"));
   }
-  // Syntax 5-1's footnote 55 (§5.6.3): a system_tf_identifier is not escaped.
-  // §5.6.1 makes the escaped spelling a user-defined name, so `\$display` is
-  // neither the system task nor anything a design declares.
   if (IsSystemTfSpelling(tok.text)) {
     diag_.Error(loc,
                 std::format("system task or function name '{}' cannot be "

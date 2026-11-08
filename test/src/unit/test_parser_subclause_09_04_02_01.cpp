@@ -145,9 +145,6 @@ TEST(EventOrOperatorParsing, FiveSignalCommaSeparated) {
   }
 }
 
-// §9.4.2.1: a comma-separated sensitivity list shall be synonymous to the
-// or-separated form. Parse both spellings of the same list and confirm
-// ParseEventList yields structurally identical event vectors.
 TEST(EventOrOperatorParsing, CommaListSynonymousWithOrList) {
   auto parse_events = [](const char* sens) {
     std::string src =
@@ -202,12 +199,6 @@ TEST(EventOrOperatorParsing, InterleavedOrGroupsWithComma) {
   ASSERT_EQ(item->sensitivity.size(), 5u);
 }
 
-// Syntax 9-4 lets an event_expression be a parenthesized event_expression, so
-// a group of or-ed or comma-separated events, or one event with its iff, stands
-// in parentheses whatever its first operand is, and a group may be
-// parenthesized again. Parentheses holding none of
-// `or`, `,` or `iff` at their own level of nesting are part of an expression,
-// a select or a concatenation inside them included.
 TEST(EventOrOperatorParsing, AParenthesizedGroupOpensWithAnyOperand) {
   auto r = Parse(
       "module m;\n"
@@ -249,9 +240,6 @@ TEST(EventOrOperatorParsing, AParenthesizedGroupOpensWithAnyOperand) {
   EXPECT_EQ(controls[10]->events[0].signal->kind, ExprKind::kCall);
 }
 
-// Parentheses the source leaves unclosed are scanned to the end of the file and
-// no further, and read as the expression they open, whose missing `)` is
-// reported.
 TEST(EventOrOperatorParsing, UnclosedParenthesesAreReported) {
   auto r = Parse("module m; initial @((a");
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got EOF", 1, "11.5"));

@@ -167,9 +167,6 @@ TEST(AttributeSyntaxParsing, AttrNameEscapedIdentifier) {
   EXPECT_EQ(r.cu->modules[0]->attrs[0].name, "full-case");
 }
 
-// Parser::ParseAttributes files every report it writes under §5.12, which
-// carries the attribute_instance prose; A.9.1 states the grammar and has no
-// report of its own.
 TEST(AttributeSyntaxParsing, ErrorUnterminatedAttribute) {
   auto r = Parse("(* missing_end module m; endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got 'module'", 1, "5.12"));
@@ -193,15 +190,11 @@ TEST(AttributeSyntaxParsing, ErrorMissingCommaBetweenSpecs) {
       ReportedError(r.diags, "expected '*)', got identifier", 1, "5.12"));
 }
 
-// The attr_spec value is parsed as an expression, so §11.2 owns the report for
-// a value that is missing, not §5.12.
 TEST(AttributeSyntaxParsing, ErrorMissingValueAfterEquals) {
   auto r = Parse("(* depth = *) module m; endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 1, "11.2"));
 }
 
-// attr_name must be an identifier; a numeric literal in the name position is
-// the closest non-identifier input the rule must reject.
 TEST(AttributeSyntaxParsing, ErrorNonIdentifierAttrName) {
   auto r = Parse("(* 5 = 1 *) module m; endmodule\n");
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got integer literal",
@@ -226,9 +219,6 @@ TEST(AttributeSyntaxParsing, AttrOnPortDeclaration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.3 class syntax supplies the syntactic position; the attribute_instance
-// production must be accepted prefixing a class member built from real class
-// syntax, exercising the class-scope position of ParseAttributes.
 TEST(AttributeSyntaxParsing, AttrOnClassMember) {
   auto r = Parse(
       "class c;\n"
@@ -239,8 +229,6 @@ TEST(AttributeSyntaxParsing, AttrOnClassMember) {
   ASSERT_EQ(r.cu->classes.size(), 1u);
 }
 
-// A malformed attribute_instance (no attr_spec) in the class-member position
-// must be rejected, confirming the production is genuinely applied there.
 TEST(AttributeSyntaxParsing, ErrorEmptyAttrOnClassMember) {
   auto r = Parse(
       "class c;\n"

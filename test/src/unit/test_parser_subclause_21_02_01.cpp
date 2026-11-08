@@ -44,11 +44,6 @@ TEST(IoSystemTaskParsing, SystemCallLeadingEmptyArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Claim 1 (Syntax 21-1): the "( list_of_arguments )" group is optional and the
-// list inside it may itself be empty. An empty parenthesized call is a distinct
-// surface form from the parenthesis-free call, so the parser must accept it and
-// produce a system call carrying no arguments. (Its runtime effect -- a bare
-// newline for $display -- is checked in the simulator suite.)
 TEST(IoSystemTaskParsing, DisplayEmptyParens) {
   auto r = Parse(
       "module t;\n"

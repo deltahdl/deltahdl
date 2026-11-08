@@ -13,11 +13,6 @@
 
 using namespace delta;
 
-// Parses each of `srcs` as a compilation unit of its own, the use model
-// §3.12.1 (printed page 56) has a tool provide where each file is one. A
-// package is visible in every unit, so each parse is handed the package names
-// the units before it declared, which is what lets a later unit's
-// `import p::*;` read p's type names as types.
 inline std::vector<CompilationUnit*> ParseUnitsApart(
     const std::vector<std::string>& srcs, SourceManager& mgr, Arena& arena,
     DiagEngine& diag) {

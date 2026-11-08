@@ -26,9 +26,6 @@ TEST(StructuredProcedureSimulation, AllProcedureTypesCoexist) {
   EXPECT_EQ(sum->value.ToUint64(), 30u);
 }
 
-// The $finish at 21 falls between the firings at 20 and 22: §4.7 leaves open
-// the order of two processes due at one time, and §20.2 runs nothing of that
-// step after the $finish, so it is kept off a firing's own tick.
 TEST(StructuredProcedureSimulation, AlwaysRepeatsUntilTermination) {
   auto val = RunAndGet(
       "module m;\n"
@@ -63,8 +60,6 @@ TEST(StructuredProcedureSimulation, NoImpliedOrderInitialAndAlways) {
   EXPECT_EQ(vb->value.ToUint64(), 42u);
 }
 
-// Each always fires at 2, 4, 6, 8 and 10, and the $finish at 11 falls off
-// those ticks, for the reason AlwaysRepeatsUntilTermination gives.
 TEST(StructuredProcedureSimulation, NoLimitOnAlwaysCount) {
   SimFixture f;
   auto* design = ElaborateSrc(

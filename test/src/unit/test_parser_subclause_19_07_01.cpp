@@ -12,10 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §19.7.1, Table 19-4: strobe, merge_instances and distribute_first are type
-// options of the covergroup level alone, and real_interval of the covergroup
-// and coverpoint levels, so each written in a coverpoint or cross body the
-// table excludes it from is an error.
 TEST_F(VerifyParseTest, TypeOptionAtALevelThatDoesNotTakeItIsError) {
   Parse(R"(
     module m;
@@ -44,8 +40,6 @@ TEST_F(VerifyParseTest, TypeOptionAtALevelThatDoesNotTakeItIsError) {
   EXPECT_EQ(diag_.ErrorCount(), 5u);
 }
 
-// §19.7.1, Table 19-4: weight, goal and comment are type options of every
-// level, and real_interval of a coverpoint, so none of them is reported.
 TEST_F(VerifyParseTest, TypeOptionAtALevelThatTakesItIsAccepted) {
   Parse(R"(
     module m;

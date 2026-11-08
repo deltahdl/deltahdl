@@ -23,8 +23,6 @@
 
 namespace delta {
 
-// Whether an event list holds an edge event on a name `is_real` answers true
-// for.
 template <typename IsReal>
 static bool HasEdgeOnReal(const std::vector<EventExpr>& events,
                           IsReal&& is_real) {
@@ -36,13 +34,6 @@ static bool HasEdgeOnReal(const std::vector<EventExpr>& events,
   return false;
 }
 
-// §6.12 with §9.4.2: an event control a procedural statement carries,
-// `@(posedge r) stmt` or `@(negedge r);`, is an edge event as an always
-// block's is, so the edge on a real is reported at the statement. A real the
-// procedure declares, in the block holding the event control or one enclosing
-// it, is a real variable as a module's is; `locals` holds the names the
-// enclosing blocks declared real, and a block's own are dropped when the walk
-// leaves it.
 template <typename IsModuleReal>
 static void ReportEdgeOnRealInStmt(const Stmt* s,
                                    std::vector<std::string_view>& locals,
@@ -121,11 +112,6 @@ static bool IsAllowedChandleBinaryOp(TokenKind op) {
          op == TokenKind::kEqEqQuestion || op == TokenKind::kBangEqQuestion;
 }
 
-// §6.14: the operators a chandle operand admits. Only the equality family is
-// allowed on a chandle, and a scalar chandle cannot be bit-selected -- though
-// indexing a chandle associative array, queue, or unpacked array selects a
-// whole element and is a legal use, so a select is only flagged when its base
-// is a scalar chandle rather than an array.
 static void CheckChandleOperandUse(
     const Expr* e, const TypeMap& types,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -172,15 +158,6 @@ static void CheckChandleExpr(
   }
 }
 
-// §6.14: whether an expression is a chandle, for the rules that permit only
-// assignment from another chandle and forbid assigning a chandle to a variable
-// of any other type.
-//
-// A chandle need not be named directly. §6.14 says chandles can be inserted
-// into associative arrays, so an element of one is a chandle too, and both
-// reading and writing it are assignments between chandles. The arrays map is
-// what tells an element access apart from a bit-select of a scalar chandle,
-// which stays illegal.
 static bool YieldsChandle(
     const Expr* e, const TypeMap& types,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -191,10 +168,6 @@ static bool YieldsChandle(
          arrays.find(ExprIdent(e->base)) != arrays.end();
 }
 
-// §6.14 has chandles returned from functions and §35.5.5 admits chandle as
-// an imported function's result, so a call to a function declared `chandle`
-// yields a chandle: `keep = give();` is an assignment between chandles, and
-// `r = give();` into an int is the assignment to another type §6.14 forbids.
 static bool CallYieldsChandle(
     const Expr* e, const std::unordered_set<std::string_view>& chandle_funcs) {
   return e != nullptr && e->kind == ExprKind::kCall &&
@@ -209,11 +182,6 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
     bool lhs_ch = YieldsChandle(s->lhs, var_types_, var_array_info_);
     bool rhs_ch = YieldsChandle(s->rhs, var_types_, var_array_info_) ||
                   CallYieldsChandle(s->rhs, chandle_result_funcs_);
-    // §10.10: a concatenation assigned to a chandle array or queue is an
-    // unpacked array concatenation, not a scalar chandle assignment; its
-    // per-element null legality is checked in CheckNullItemInArrayConcatAssign,
-    // so the scalar rule admitting only another chandle or null does not apply
-    // here.
     bool unpacked_concat_target =
         s->lhs->kind == ExprKind::kIdentifier &&
         var_array_info_.count(s->lhs->text) > 0 &&
@@ -234,13 +202,6 @@ void Elaborator::WalkStmtsForChandleOps(const Stmt* s) {
   CheckChandleExpr(s->rhs, var_types_, var_array_info_, diag_);
   CheckChandleExpr(s->expr, var_types_, var_array_info_, diag_);
   CheckChandleExpr(s->condition, var_types_, var_array_info_, diag_);
-  // §6.14 admits only the equality family on a chandle and no bit-select of a
-  // scalar one, and names no statement those rules are suspended in, so this
-  // descends every link ForEachChildStmt in elaborator_validate_internal.h
-  // names. It wrote out six of the thirteen, so with a, b chandle and r int,
-  // `fork r = a + b; join` (§9.3.2) and `for (r = a + b; r < 1; r = r + 1) ;`
-  // (A.6.8) elaborated clean while the same assignment written one level up
-  // was reported.
   ForEachChildStmt(s,
                    [this](Stmt* const& sub) { WalkStmtsForChandleOps(sub); });
 }
@@ -277,8 +238,6 @@ static bool IsVirtualInterfaceVar(const Expr* e, const TypeMap& types) {
   return it != types.end() && it->second == DataTypeKind::kVirtualInterface;
 }
 
-// §25.9: leftmost identifier of a (possibly hierarchical) reference, e.g. "u"
-// for the defparam path u.W.
 static std::string_view ReferenceRootName(const Expr* e) {
   while (e != nullptr) {
     if (e->kind == ExprKind::kIdentifier) return e->text;
@@ -293,18 +252,6 @@ static std::string_view ReferenceRootName(const Expr* e) {
   return {};
 }
 
-// §25.9: the components of the underlying interface instance may be used only
-// in procedural statements, never in continuous assignments or sensitivity
-// lists. A call does not carry the read out of the assignment that makes it:
-// `assign x = f(vif.a)` evaluates f, and so reads the component, on the
-// continuous assignment's own re-evaluation and not in a procedural statement,
-// so an argument is as much a use in the assignment as an operand is. Every
-// child expression a node holds is therefore descended. pattern_keys is not
-// one: a key is as often a name in another namespace -- a struct member, a
-// type, `default` -- as an expression, and matching one against a variable
-// would report a use that is not there. inline_constraint is a ClassMember
-// rather than an expression, and its relations are solved inside randomize()
-// rather than evaluated as an operand of the assignment.
 static bool ExprUsesVirtualInterface(const Expr* e, const TypeMap& types) {
   if (!e) return false;
   if (IsVirtualInterfaceVar(e, types)) return true;
@@ -338,15 +285,6 @@ void Elaborator::ValidateVirtualInterfaceContAssign(const ModuleItem* item) {
   }
 }
 
-// The three procedure kinds whose sensitivity list the elaborator infers rather
-// than reads out of the source: §9.2.2.2 gives an always_comb an inferred
-// sensitivity list holding the expressions §9.2.2.2.1 defines,
-// §9.2.2.3 gives always_latch the same one, and §9.2.2.2.2 has `always @*` wait
-// for a change on a signal of its inferred sensitivity list. item->sensitivity
-// is empty for all three -- an always_comb or always_latch carrying an explicit
-// event control is rejected outright, and `always @*` records
-// is_star_sensitivity with no operands -- so the loop over it above answers for
-// none of them.
 static bool InfersItsSensitivityList(const ModuleItem* item) {
   if (item->kind == ModuleItemKind::kAlwaysCombBlock) return true;
   if (item->kind == ModuleItemKind::kAlwaysLatchBlock) return true;
@@ -354,19 +292,6 @@ static bool InfersItsSensitivityList(const ModuleItem* item) {
          item->is_star_sensitivity;
 }
 
-// §25.9: a component of the interface a virtual interface is bound to may be
-// used only in procedural statements, never in continuous assignments or
-// sensitivity lists, and an inferred list is a sensitivity list -- the clause
-// draws no distinction between one the source wrote and one the tool derived
-// from what the block reads.
-//
-// Reported once for the procedure, at the procedure's own line, because the
-// list is the procedure's: naming every read would name one fault several
-// times. The read positions are the ones ForEachStmtReadExpr walks, which is
-// the walk CollectStmtReads builds the list from, so the check cannot reject a
-// component the list would not have carried -- §9.2.2.2.1's exception for a
-// timing control expression and its exclusion of an assertion action block are
-// honoured by asking that walk rather than by restating them.
 void Elaborator::ReportVirtualInterfaceInInferredSensitivity(
     const ModuleItem* item) {
   if (!InfersItsSensitivityList(item)) return;
@@ -385,11 +310,6 @@ void Elaborator::ValidateVirtualInterfaceSensitivity(const ModuleItem* item) {
   if (!IsProceduralItemKind(item->kind)) return;
   ReportVirtualInterfaceInInferredSensitivity(item);
   for (const auto& ev : item->sensitivity) {
-    // §25.9 bars a component from a sensitivity list, and §9.4.2.3 puts the
-    // iff operand inside the event expression it qualifies: the event
-    // expression triggers only when the expression after iff is true. The event
-    // control reads that operand rather than waits on it, which is still not
-    // the procedural-statement use the clause allows.
     if (ExprUsesVirtualInterface(ev.signal, var_types_) ||
         ExprUsesVirtualInterface(ev.iff_condition, var_types_)) {
       diag_.Error(item->loc,
@@ -417,15 +337,6 @@ static bool IsLiteralExpr(const Expr* e) {
   }
 }
 
-// §25.9: == / != involving a virtual interface is legal only when the other
-// operand is another virtual interface of the same type, an interface instance,
-// or the null literal. Reports a differing-type comparison between two virtual
-// interfaces, and a comparison of a virtual interface against a value of an
-// incompatible data type (e.g. an integer literal or an int variable). Operands
-// this walker cannot classify (selects, calls, member accesses) are left alone
-// to avoid false positives.
-// A bare identifier that names a variable of some type other than virtual
-// interface -- never a legal operand opposite a virtual interface (§25.9).
 static bool IsNonVirtualInterfaceVar(const Expr* e, const TypeMap& types) {
   if (e->kind != ExprKind::kIdentifier) return false;
   auto name = ExprIdent(e);
@@ -434,8 +345,6 @@ static bool IsNonVirtualInterfaceVar(const Expr* e, const TypeMap& types) {
   return it != types.end() && it->second != DataTypeKind::kVirtualInterface;
 }
 
-// §25.9: two virtual interfaces may only be compared when they are of the same
-// interface type.
 static void CheckViPairSameInterface(
     const Expr* e,
     const std::unordered_map<std::string_view, std::string_view>& vi_iface,
@@ -450,8 +359,6 @@ static void CheckViPairSameInterface(
   }
 }
 
-// §25.9: a virtual interface compared with an interface instance requires the
-// instance to be of the same interface type.
 static void CheckViAgainstInstance(
     const Expr* e, const Expr* vi_side, std::string_view inst_iface,
     const std::unordered_map<std::string_view, std::string_view>& vi_iface,
@@ -498,10 +405,6 @@ static void CheckViEqualityOperands(
   }
 }
 
-// The tables CheckVirtualInterfaceExpr reads: the kinds of the variables that
-// are single virtual interfaces, the interface each virtual interface variable
-// refers to an instance of, the interface of each interface instance, and the
-// number of unpacked dimensions of each array of virtual interfaces.
 struct ViExprTables {
   const TypeMap& types;
   const std::unordered_map<std::string_view, std::string_view>& vi_iface;
@@ -509,8 +412,6 @@ struct ViExprTables {
   const std::unordered_map<std::string_view, std::size_t>& array_dims;
 };
 
-// §25.9 with §7.4: whether the select `e` selects into an element of an array
-// of virtual interfaces, past the array's last unpacked dimension, va[0][1].
 static bool SelectsIntoVifElement(
     const Expr* e,
     const std::unordered_map<std::string_view, std::size_t>& array_dims) {
@@ -524,8 +425,6 @@ static bool SelectsIntoVifElement(
   return kDims != array_dims.end() && selects > kDims->second;
 }
 
-// §25.9: the operations the node `e` itself applies to a virtual interface
-// that §25.9 forbids, each reported.
 static void ReportViOperation(const Expr* e, const ViExprTables& tables,
                               DiagEngine& diag) {
   const TypeMap& types = tables.types;
@@ -556,8 +455,6 @@ static void ReportViOperation(const Expr* e, const ViExprTables& tables,
   }
 }
 
-// §25.9: each forbidden operation on a virtual interface in `e` and in every
-// expression it holds.
 static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
                                       DiagEngine& diag) {
   if (!e) return;
@@ -576,8 +473,6 @@ static void CheckVirtualInterfaceExpr(const Expr* e, const ViExprTables& tables,
 using ViStringMap = std::unordered_map<std::string_view, std::string_view>;
 using ViParamMap = std::unordered_map<std::string_view, std::vector<int64_t>>;
 
-// §25.9: two virtual interfaces are of the same type only when their interface
-// types match.
 static void CheckViToViInterfaceTypes(std::string_view lhs_name,
                                       std::string_view rhs_name,
                                       const ViStringMap& vi_var_interface_types,
@@ -593,8 +488,6 @@ static void CheckViToViInterfaceTypes(std::string_view lhs_name,
   }
 }
 
-// §25.9: modports must match for two virtual interfaces to be assignment
-// compatible.
 static void CheckViToViModports(std::string_view lhs_name,
                                 std::string_view rhs_name,
                                 const ViStringMap& vi_var_modports,
@@ -605,8 +498,6 @@ static void CheckViToViModports(std::string_view lhs_name,
       vi_var_modports, loc, diag);
 }
 
-// §25.9: the actual parameter values shall match for two virtual interfaces to
-// be of the same type and assignment compatible.
 static void CheckViToViParamValues(std::string_view lhs_name,
                                    std::string_view rhs_name,
                                    const ViParamMap& vi_var_param_values,
@@ -620,11 +511,6 @@ static void CheckViToViParamValues(std::string_view lhs_name,
   }
 }
 
-// Parameter bundle for virtual-interface assignment checking, grouping the
-// elaborator state needed to validate a single assignment statement (§25.9) so
-// it can be threaded through the free helpers without member access. It holds
-// the per-name descriptors of both assignment entities: the virtual-interface
-// variable (vi_var_*) and the interface instance (interface_inst_*).
 struct ViAssignContext {
   const TypeMap& var_types;
   const ViStringMap& interface_inst_types;
@@ -636,9 +522,6 @@ struct ViAssignContext {
   const std::function<const ModuleDecl*(std::string_view)>& find_module;
 };
 
-// §25.9: two virtual interfaces are of the same type, and hence assignment
-// compatible, only when their interface types, modports, and actual parameter
-// values all match.
 static void CheckViToViAssign(std::string_view lhs_name,
                               std::string_view rhs_name,
                               const ViAssignContext& ctx, SourceLoc loc,
@@ -650,8 +533,6 @@ static void CheckViToViAssign(std::string_view lhs_name,
                          diag);
 }
 
-// §25.9: assigning an interface instance to a virtual interface requires a
-// matching interface type.
 static void CheckViFromInstanceTypes(std::string_view lhs_name,
                                      std::string_view rhs_name,
                                      const ViAssignContext& ctx, SourceLoc loc,
@@ -667,8 +548,6 @@ static void CheckViFromInstanceTypes(std::string_view lhs_name,
   }
 }
 
-// §25.9: the actual parameter values of the interface instance shall match
-// those of the virtual interface.
 static void CheckViFromInstanceParamValues(std::string_view lhs_name,
                                            std::string_view rhs_name,
                                            const ViAssignContext& ctx,
@@ -685,8 +564,6 @@ static void CheckViFromInstanceParamValues(std::string_view lhs_name,
   }
 }
 
-// §25.9: it is illegal to assign an interface instance to a virtual interface
-// when a defparam targeting that instance is declared outside the interface.
 static void CheckViFromInstanceDefparam(
     std::string_view rhs_name,
     const std::unordered_set<std::string_view>& vi_external_defparam_insts,
@@ -700,9 +577,6 @@ static void CheckViFromInstanceDefparam(
   }
 }
 
-// §25.9: assigning an interface instance to a virtual interface requires
-// matching interface type and actual parameter values, and is forbidden when a
-// defparam declared outside the interface targets that instance.
 static void CheckViFromInstanceAssign(std::string_view lhs_name,
                                       std::string_view rhs_name,
                                       const ViAssignContext& ctx, SourceLoc loc,
@@ -713,8 +587,6 @@ static void CheckViFromInstanceAssign(std::string_view lhs_name,
                               diag);
 }
 
-// §25.9: validate a single blocking/nonblocking assignment whose operands may
-// involve virtual interfaces, interface instances, or null.
 static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
                                             const ViAssignContext& ctx,
                                             DiagEngine& diag) {
@@ -723,12 +595,6 @@ static void CheckVirtualInterfaceAssignStmt(const Stmt* s,
   auto rhs_name = ExprIdent(s->rhs);
   bool rhs_is_iface_inst =
       !rhs_name.empty() && ctx.interface_inst_types.count(rhs_name) != 0;
-  // §25.9 admits another virtual interface, an interface instance or null as
-  // the source, and an interface instance is reached in more ways than its
-  // simple name: an element of an instance array, `s[1]`, one in a generate
-  // block, `g[1].s`, an interface port, and the value a function returns. The
-  // source is refused only where it is plainly none of the three, a literal or
-  // a variable of another type, as the comparison rule above reads its operand.
   bool rhs_plainly_not_vi = !IsNullLiteral(s->rhs) &&
                             (IsLiteralExpr(s->rhs) ||
                              IsNonVirtualInterfaceVar(s->rhs, ctx.var_types));
@@ -764,7 +630,6 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   if ((s->kind == StmtKind::kBlockingAssign ||
        s->kind == StmtKind::kNonblockingAssign) &&
       s->lhs && s->rhs) {
-    // §23.4: an interface instance's interface may be nested in the module.
     const std::function<const ModuleDecl*(std::string_view)> kFindModule =
         [this](std::string_view name) { return FindModuleInScope(name); };
     const ViAssignContext kCtx{var_types_,
@@ -782,14 +647,6 @@ void Elaborator::WalkStmtsForVirtualInterfaceOps(const Stmt* s) {
   CheckVirtualInterfaceExpr(s->rhs, kTables, diag_);
   CheckVirtualInterfaceExpr(s->expr, kTables, diag_);
   CheckVirtualInterfaceExpr(s->condition, kTables, diag_);
-  // §25.9 admits only ==, !=, === and !== on a virtual interface, and only
-  // another virtual interface, an interface instance or null as the operand
-  // opposite one. It names no statement those rules are suspended in, so this
-  // descends every link ForEachChildStmt in elaborator_validate_internal.h
-  // names. It wrote out six of the thirteen, so with a, b, c virtual
-  // interfaces, `c = a + b` written in a fork arm (§9.3.2) or in an assertion
-  // action block (§16.3) reached neither CheckVirtualInterfaceExpr nor
-  // CheckVirtualInterfaceAssignStmt.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForVirtualInterfaceOps(sub); });
 }
@@ -801,9 +658,6 @@ static bool ScopeHasVirtualInterfaceVar(const TypeMap& types) {
   return false;
 }
 
-// §25.9: a defparam declared in this scope (i.e. outside the interface)
-// targeting an interface instance taints that instance for assignment to a
-// virtual interface.
 static void CollectExternalDefparamInsts(
     const ModuleDecl* decl, const ViStringMap& interface_inst_types,
     std::unordered_set<std::string_view>& vi_external_defparam_insts) {
@@ -848,19 +702,11 @@ static bool IsEventVar(const Expr* e, const TypeMap& types) {
   return it != types.end() && it->second == DataTypeKind::kEvent;
 }
 
-// §15.5.5.3: an event variable may be compared against another event or null
-// only with equality (==), inequality (!=), case equality (===), or case
-// inequality (!==). The four case/logical equality operators are the only
-// binary operators allowed on an event operand.
 static bool IsAllowedEventBinaryOp(TokenKind op) {
   return op == TokenKind::kEqEq || op == TokenKind::kBangEq ||
          op == TokenKind::kEqEqEq || op == TokenKind::kBangEqEq;
 }
 
-// §15.5.5.3: reject any operator applied to an event variable other than the
-// permitted comparisons (and the implicit Boolean test, which uses the event
-// directly rather than through an operator node). Arithmetic, relational,
-// bitwise, unary, and select operators on events are all illegal.
 static void CheckEventExpr(const Expr* e, const TypeMap& types,
                            DiagEngine& diag) {
   if (!e) return;
@@ -902,17 +748,9 @@ static void CheckEventExpr(const Expr* e, const TypeMap& types,
 
 void Elaborator::WalkStmtsForEventOps(const Stmt* s) {
   if (!s) return;
-  // Event-control event lists (s->events) are not operator expressions and are
-  // intentionally left untouched here; only value expressions are inspected.
   CheckEventExpr(s->rhs, var_types_, diag_);
   CheckEventExpr(s->expr, var_types_, diag_);
   CheckEventExpr(s->condition, var_types_, diag_);
-  // §15.5.5.3 admits only ==, !=, === and !== on an event variable and names
-  // no statement the rule is suspended in, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names. It wrote out six
-  // of the thirteen, so with a, b event variables, `x = a + b` written in a
-  // fork arm (§9.3.2) or in a randcase item (§18.16) reached CheckEventExpr
-  // from nowhere.
   ForEachChildStmt(s, [this](Stmt* const& sub) { WalkStmtsForEventOps(sub); });
 }
 

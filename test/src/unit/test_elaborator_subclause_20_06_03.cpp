@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §20.6.3 has $isunbounded take a parameter's name as its argument, so a
-// variable, an expression or a literal is an error wherever the call stands.
 TEST(IsunboundedElab, AnArgumentThatNamesNoParameterIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -30,8 +28,6 @@ TEST(IsunboundedElab, AnArgumentThatNamesNoParameterIsRejected) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), message, 8, "20.6.3"));
 }
 
-// §20.6.3: a parameter of the port list or of the body, a localparam and a
-// package-qualified parameter are each a parameter's name.
 TEST(IsunboundedElab, AParameterNameIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,10 +44,6 @@ TEST(IsunboundedElab, AParameterNameIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Syntax 20-8 takes a hierarchical_parameter_identifier as well: `s.P` names
-// the parameter P of the instance s, `t.s.P` the same parameter from the top
-// module's own name (§23.8), and `a[0].P` that of an element of an instance
-// array (§23.6).
 TEST(IsunboundedElab, AHierarchicalParameterNameIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -70,8 +62,6 @@ TEST(IsunboundedElab, AHierarchicalParameterNameIsAccepted) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A hierarchical name that reaches a variable of the instance names no
-// parameter, and is rejected as a bare name of one would be.
 TEST(IsunboundedElab, AHierarchicalNameOfAVariableIsRejected) {
   ElabFixture f;
   ElaborateSrc(

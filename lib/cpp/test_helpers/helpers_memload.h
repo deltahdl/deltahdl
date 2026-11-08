@@ -12,12 +12,6 @@
 
 using namespace delta;
 
-// Registers an unpacked array `name[lo .. lo+size-1]` of `width`-bit 4-state
-// elements, each backed by a zero-initialized element variable named
-// `name[index]` (the naming convention the simulator uses), so the $readmem* /
-// $writemem* / $fread tasks have a memory to operate on. The address range
-// ascends. A test wanting a 2-state element type or a descending range states
-// the ArrayInfo itself and calls SimContext::RegisterArray.
 inline void SetupMem(SimFixture& f, const char* name, int lo, int size,
                      uint32_t width) {
   f.ctx.RegisterArray(
@@ -31,7 +25,6 @@ inline void SetupMem(SimFixture& f, const char* name, int lo, int size,
   }
 }
 
-// Returns the element variable `name[addr]` of an array registered by SetupMem.
 inline Variable* Cell(SimFixture& f, const char* name, int addr) {
   std::string nm = std::string(name) + "[" + std::to_string(addr) + "]";
   return f.ctx.FindVariable(nm);

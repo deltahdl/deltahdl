@@ -7,13 +7,8 @@
 namespace delta {
 namespace {
 
-// §37.42 details 2 and 11: a call of a built-in method of a string, an enum or
-// an unpacked array (§6.16, §6.19.5, §7.5, §7.9, §7.10.2, §7.12) is a method
-// func call applied to the value it is called on, and that value may be
-// reached through members as well as named directly.
 class BuiltInCallsThroughMembers : public VpiDesignRun {
  protected:
-  // The first statement the block top.b holds.
   static vpiHandle FirstStatement() {
     vpiHandle stmts = vpi_iterate(vpiStmt, By("top.b"));
     if (stmts == nullptr) return nullptr;
@@ -23,9 +18,6 @@ class BuiltInCallsThroughMembers : public VpiDesignRun {
   }
 };
 
-// A queue member of a structure variable takes the queue's methods. The call,
-// a statement with no label, has no name (§37.60 detail 1), and nothing else
-// names the built-in method it makes (§37.42 detail 11).
 TEST_F(BuiltInCallsThroughMembers, AStructuresQueueMemberTakesItsMethods) {
   Run("module top; typedef struct { int q[$]; } s_t; s_t s;\n"
       "  initial begin : b s.q.delete(); end\n"
@@ -36,8 +28,6 @@ TEST_F(BuiltInCallsThroughMembers, AStructuresQueueMemberTakesItsMethods) {
   EXPECT_EQ(vpi_get_str(vpiName, call), nullptr);
 }
 
-// A queue property of a class takes them too, and a call of one within an
-// expression is the method func call rather than an unnamed func call.
 TEST_F(BuiltInCallsThroughMembers, AClassQueuePropertysCallIsAMethodCall) {
   Run("module top; class C; int q[$]; endclass\n"
       "  C h = new; int r;\n"
@@ -51,7 +41,6 @@ TEST_F(BuiltInCallsThroughMembers, AClassQueuePropertysCallIsAMethodCall) {
   EXPECT_STREQ(vpi_get_str(vpiName, call), "size");
 }
 
-// A string property's methods are a string's (§6.16).
 TEST_F(BuiltInCallsThroughMembers, AClassStringPropertyTakesStringMethods) {
   Run("module top; class C; string str; endclass\n"
       "  C h = new; int r;\n"
@@ -65,10 +54,6 @@ TEST_F(BuiltInCallsThroughMembers, AClassStringPropertyTakesStringMethods) {
   EXPECT_STREQ(vpi_get_str(vpiName, call), "len");
 }
 
-// An enumeration's named constant takes the enumeration's methods (§6.19.5)
-// as a variable of it does. The call, written in a void cast and with no label,
-// is the built-in method call it wraps, unnamed and no user's (§37.42 detail
-// 11), though the constant records no type of its own for the call's prefix.
 TEST_F(BuiltInCallsThroughMembers, AnEnumConstantTakesTheEnumsMethods) {
   Run("module top; typedef enum {A, B} e_t;\n"
       "  initial begin : b void'(A.name()); end\n"

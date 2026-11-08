@@ -17,8 +17,6 @@
 
 namespace delta {
 
-// A typedef or a nettype, whichever `item` declares: the two are written alike
-// (A.2.1.3), and a nettype's type answers to §6.6.7 besides.
 static void VisitTypedef(const ModuleItem* item,
                          const DeclaredTypeVisit& visit) {
   const bool kIsNettype = item->kind == ModuleItemKind::kNettypeDecl;
@@ -26,8 +24,6 @@ static void VisitTypedef(const ModuleItem* item,
          kIsNettype ? item : nullptr});
 }
 
-// A block's nettype is carried as a kBlockItemDecl statement over its item
-// (Parser::ParseBlockVarDecls).
 static void VisitStmt(const Stmt* s, const DeclaredTypeVisit& visit) {
   if (s == nullptr) return;
   if (s->kind == StmtKind::kVarDecl) {
@@ -40,7 +36,6 @@ static void VisitStmt(const Stmt* s, const DeclaredTypeVisit& visit) {
   ForEachChildStmt(s, [&visit](Stmt* const& sub) { VisitStmt(sub, visit); });
 }
 
-// A function's return carries no unpacked dimension of its own.
 static const std::vector<Expr*>& NoDims() {
   static const std::vector<Expr*> kNone;
   return kNone;
@@ -57,8 +52,6 @@ static void VisitSubroutine(const ModuleItem* item,
 
 static void VisitClass(const ClassDecl* cls, const DeclaredTypeVisit& visit);
 
-// What an item declares within itself: a procedural block's or a
-// subroutine's declarations, and a class's members.
 static void VisitInner(const ModuleItem* item, const DeclaredTypeVisit& visit) {
   if (item->class_decl != nullptr) VisitClass(item->class_decl, visit);
   if (item->kind == ModuleItemKind::kFunctionDecl ||
@@ -92,8 +85,6 @@ void ForEachInnerDeclaredType(const ModuleDecl* decl,
   for (const ModuleItem* item : decl->items) VisitInner(item, visit);
 }
 
-// An item of the compilation unit or of a package: a variable, a nettype, a
-// typedef where `typedefs` asks for one, and what the item declares within.
 static void VisitScopeItem(const ModuleItem* item, bool typedefs,
                            const DeclaredTypeVisit& visit) {
   if (item->kind == ModuleItemKind::kVarDecl) VisitVariable(item, visit);
@@ -106,11 +97,10 @@ static void VisitScopeItem(const ModuleItem* item, bool typedefs,
 void ForEachUnitDeclaredType(const CompilationUnit* unit,
                              const DeclaredTypeVisit& visit) {
   for (const ModuleItem* item : unit->cu_items)
-    VisitScopeItem(item, /*typedefs=*/false, visit);
+    VisitScopeItem(item, false, visit);
   for (const ClassDecl* cls : unit->classes) VisitClass(cls, visit);
   for (const PackageDecl* pkg : unit->packages) {
-    for (const ModuleItem* item : pkg->items)
-      VisitScopeItem(item, /*typedefs=*/true, visit);
+    for (const ModuleItem* item : pkg->items) VisitScopeItem(item, true, visit);
   }
 }
 

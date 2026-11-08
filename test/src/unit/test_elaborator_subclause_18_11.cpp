@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §18.11 states that a call to randomize() may change the random mode of local
-// class members only where it can reach them, which is inside the class
-// declaring them. Naming a property in randomize()'s inline argument list
-// changes that property's random mode, so naming a local member through an
-// external class handle is illegal.
 TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
   ElabFixture f;
   ElabOk(
@@ -32,10 +27,6 @@ TEST(InlineRandomControlVisibility, LocalMemberArgRejectedFromOutside) {
       "18.11"));
 }
 
-// §18.11 conditions the change of random mode on the call being able to reach
-// those properties. A protected member is reachable only within its class
-// hierarchy, so naming it as a randomize() argument through an external handle
-// is rejected under the same sentence.
 TEST(InlineRandomControlVisibility, ProtectedMemberArgRejectedFromOutside) {
   ElabFixture f;
   ElabOk(
@@ -57,10 +48,6 @@ TEST(InlineRandomControlVisibility, ProtectedMemberArgRejectedFromOutside) {
       8, "18.11"));
 }
 
-// 18.11: a public property carries no access restriction, so naming it as a
-// randomize() argument through an external handle is allowed. This source
-// matches the rejected cases with only the visibility qualifier changed, so the
-// difference in outcome isolates the random-mode access rule.
 TEST(InlineRandomControlVisibility, PublicMemberArgAcceptedFromOutside) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -75,14 +62,6 @@ TEST(InlineRandomControlVisibility, PublicMemberArgAcceptedFromOutside) {
              "endmodule\n"));
 }
 
-// 18.11: a randomize() argument list can switch a local member's random mode
-// only from a scope with access to that member -- namely from within the class
-// in which the local member is declared. Naming the local member in a
-// randomize() call inside one of the class's own methods therefore elaborates
-// cleanly, in contrast to the same name being rejected through an external
-// handle. This is the accepting side of the access rule, with the member's
-// visibility unchanged from the rejected case and only the calling scope moved
-// inside the class.
 TEST(InlineRandomControlVisibility, LocalMemberArgAcceptedWithinClassScope) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -101,9 +80,6 @@ TEST(InlineRandomControlVisibility, LocalMemberArgAcceptedWithinClassScope) {
              "endmodule\n"));
 }
 
-// §18.11: randomize()'s arguments are resolved in the class of the object
-// and are limited to the names of its properties, so naming a variable of
-// the calling scope that the class does not declare is an error.
 TEST(InlineRandomControlVisibility, ANameNoPropertyOfTheClassIsRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -125,8 +101,6 @@ TEST(InlineRandomControlVisibility, ANameNoPropertyOfTheClassIsRejected) {
                             9, "18.11"));
 }
 
-// §18.11: a property the class inherits is a property of the object, and
-// randomize(null) names no variable at all, so both calls elaborate.
 TEST(InlineRandomControlVisibility, AnInheritedPropertyAndNullAreAccepted) {
   EXPECT_TRUE(
       ElabOk("class B;\n"

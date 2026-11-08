@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §20.10.1 — a severity task that appears at module-item level (outside any
-// procedural code) parses as an elaboration severity system task.
 TEST(ElabSeverityTaskParsing, FatalAtModuleLevelIsElabSystemTask) {
   auto r = Parse(
       "module m;\n"
@@ -24,9 +22,6 @@ TEST(ElabSeverityTaskParsing, FatalAtModuleLevelIsElabSystemTask) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kElabSystemTask));
 }
 
-// §20.10.1 — when called from within a procedure (here, an initial block),
-// the same severity task name becomes a run-time severity system task; it
-// must not be parsed as an elaboration severity task module item.
 TEST(ElabSeverityTaskParsing, FatalInsideInitialIsRunTime) {
   auto r = Parse(
       "module m;\n"
@@ -44,8 +39,6 @@ TEST(ElabSeverityTaskParsing, FatalInsideInitialIsRunTime) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-// §20.10.1 — all four severity task names are recognized at module-item
-// level as elaboration severity tasks.
 TEST(ElabSeverityTaskParsing, AllFourSeverityNamesRecognized) {
   auto r = Parse(
       "module m;\n"

@@ -155,35 +155,6 @@ TEST(EventControlSim, NoEventOnSameValueWrite) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2 (printed page 232) closes with the rule this case holds the simulator
-// to: a change in an operand that leaves the expression's result unchanged is
-// not detected as an event. A write that deposits the value the variable
-// already holds changes no operand's value, so `@(sig)` shall not resume on it.
-//
-// This is the discriminating replacement for NoEventOnSameValueWrite above,
-// which offers the same three writes but reads a variable the waiting process
-// sets to one constant. That variable reads 1 whether the event control fired
-// on the same-value write or waited for the real change that follows it, so the
-// assertion holds of a simulator that obeys the rule and of one that ignores
-// it. Counting the resumptions is what tells the two apart: an event control
-// that resumes on every notification of a write reaches 3, and one that
-// compares the value it was given against the value it holds reaches 2.
-//
-// The count is 2 rather than 1 because the always procedure arms before the
-// first write reaches it. Lowerer::LowerProcesses lowers every non-initial
-// process ahead of the initial ones, and an Active region queue is first-in
-// first-out, so `always @(sig)` has captured its baseline x before the initial
-// block runs. The x-to-5 write at time 0 is the first resumption and the 5-to-7
-// write at time 2 is the second; the 5-to-5 write at time 1 is the one the rule
-// excludes. `woke` counts from zero without being assigned one, because it is
-// 2-state and Table 6-7 gives such a variable a default of '0.
-//
-// It also blocks a regression that the always_comb cases for #3523 cannot see.
-// That issue is that AnyChangeAwaiter re-runs an always_comb on a same-value
-// write, and dropping the NotifyWatchers calls from WriteVar and
-// AssignToScalarLhs would bring the always_comb counts out right while `@(sig)`
-// stopped firing at all. This case counts what an event control does with those
-// same notifications, so that cure fails it.
 TEST(EventControlSim, SameValueWriteWakesNoEventControlCountedByEvaluations) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -658,9 +629,6 @@ TEST(EventControlSim, ClockingBlockInputResolvesThroughClockingManager) {
   EXPECT_EQ(data->watchers.size(), 1u);
 }
 
-// The LSB-only edge-event rule discriminated: an upper bit toggles while the
-// LSB is held constant, so a posedge must NOT fire. A broken any-bit
-// implementation would resume and write x.
 TEST(EventControlSim, PosedgeIgnoresUpperBitChangeWhenLsbHeld) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -737,15 +705,6 @@ TEST(EventControlSim, NamedEventTriggerReleasesWaiter) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2 admits any expression as an event_expression and puts no condition on
-// the names in it, so a hierarchical name stands in one exactly as a local name
-// does. A compound event over two of them armed watchers on nothing:
-// CollectExprIdentifiers descended a member access as though it were an
-// operator, collecting `u` and `a` from `u.a` as two bare names, and neither
-// names anything in the instance the event is written in.
-//
-// Both operands are driven, and the process writes `hit` when it resumes, so a
-// process that never resumes leaves the 0 it was initialised with.
 TEST(EventControlSim, CompoundEventOverHierarchicalNamesResumes) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -768,12 +727,6 @@ TEST(EventControlSim, CompoundEventOverHierarchicalNamesResumes) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// The pair that isolates the disagreement, over one signal: `@(u.a)` goes to
-// ResolveSignalToVariable, which flattens the name, and `@(u.a & 1'b1)` went to
-// the collector, which shredded it. The first passed before this change and the
-// second did not, and only the pair says the two paths have to agree about what
-// one name denotes. Both counters are asserted, so a fix that broke the direct
-// path to mend the compound one would not pass.
 TEST(EventControlSim, TheDirectAndCompoundPathsAgreeOnAHierarchicalName) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -797,11 +750,6 @@ TEST(EventControlSim, TheDirectAndCompoundPathsAgreeOnAHierarchicalName) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// The referencing scope declares `a` of its own, so a walk that collected the
-// leaf name alone finds a variable and arms a watcher on it -- the wrong one.
-// Only the instance's `a` is driven, and the local one is not, so a process
-// following the local name never resumes. This is what separates flattening the
-// name from happening upon a variable of the same leaf name.
 TEST(EventControlSim, CompoundEventFollowsTheHierarchicalNameNotTheLocalOne) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -826,14 +774,6 @@ TEST(EventControlSim, CompoundEventFollowsTheHierarchicalNameNotTheLocalOne) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.4.2: an event control on a packed structure resumes on a write to one of
-// its members, because a member write changes the value the event control
-// names. The write has to be a member write: an assignment to the whole
-// variable, and equally a bit-select or part-select of it, rebuilds the
-// variable's value, so a watcher holding a stale reference to the old
-// representation would still see the two apart. A packed-struct member write
-// deposits into the words the variable already holds, so only a watcher that
-// kept a value of its own can tell the before from the after.
 TEST(EventControlSim, PackedStructMemberWriteFiresAnyChangeEvent) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -855,13 +795,6 @@ TEST(EventControlSim, PackedStructMemberWriteFiresAnyChangeEvent) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §9.4.2: a posedge event control on a packed structure resumes when a member
-// write drives bit 0 of the structure from 0 to 1. A packed structure lays its
-// last member out in the low bits (§7.2.1), so `b` covers bits [3:0] and
-// `s.b = 4'h1` is the write that moves bit 0. As above, a whole-variable
-// assignment or a select assignment replaces the variable's value and so could
-// not fail this; the member write edits the value in place, and the edge is
-// visible only to a watcher holding its own copy of the previous value.
 TEST(EventControlSim, PackedStructMemberWriteFiresPosedge) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -883,15 +816,6 @@ TEST(EventControlSim, PackedStructMemberWriteFiresPosedge) {
   EXPECT_EQ(var->value.ToUint64(), 44u);
 }
 
-// §9.4.2: successive event controls on a packed structure each resume on the
-// next member write. The waiter here is offered three member writes: one that
-// deposits the value the member already holds, which is no change and leaves
-// the first event control still waiting, then two that do change it. So the
-// first event control's watcher has to carry its baseline across a
-// notification it did not resume on, and the second event control has to arm a
-// baseline of its own afterwards. Every one of the three writes edits the
-// structure's value in place, which is why a whole-variable or select
-// assignment could not stand in for any of them.
 TEST(EventControlSim, SuccessivePackedStructMemberWritesResumeTwoWaits) {
   SimFixture f;
   auto* design = ElaborateSrc(

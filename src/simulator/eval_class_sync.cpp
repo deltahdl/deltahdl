@@ -25,17 +25,6 @@
 
 namespace delta {
 
-// §26.2 (printed page 808 of IEEE 1800-2023): a package's declarations
-// are visible by their bare names throughout the package, its classes included,
-// and the run keys a package's typedef "pkg::name" (RegisterTypeDeclarations
-// in lowerer_register.cpp), the bare key standing only where a module's
-// import added it. So a name written bare in a class the package `package`
-// declares -- the property's own type, or a step of its chain, which the
-// targets record bare -- is looked up under the package's key first and
-// then under its own; a name written with a scope, `q::t`, under that
-// alone. Empty where nothing records the name. Looked up bare alone, the
-// `mb_t mb = new` of p's own class found nothing while no module imported p
-// and the property was no mailbox.
 static std::string_view TypeTargetFor(std::string_view name,
                                       std::string_view package,
                                       const SimContext& ctx) {
@@ -47,10 +36,6 @@ static std::string_view TypeTargetFor(std::string_view name,
   return ctx.FindTypeTarget(name);
 }
 
-// §26.7 (printed page 817): `std::` before a name reaches the built-in
-// package's declaration whatever user code calls by the bare name, so
-// `std::semaphore` is the built-in class even beside a user class semaphore,
-// which the bare name means where one is declared (§15.2).
 SyncKind BuiltinSyncKindOf(std::string_view name, const SimContext& ctx) {
   constexpr std::string_view kStdScope = "std::";
   const bool kStdScoped = name.starts_with(kStdScope);
@@ -64,11 +49,6 @@ SyncKind BuiltinSyncKindOf(std::string_view name, const SimContext& ctx) {
   return kind;
 }
 
-// §6.18 (printed page 118 of IEEE 1800-2023): a typedef name stands for
-// the type it was declared with, which may be another typedef name, and §26.3
-// reaches a package's under `p::name`, the key the run records it by. The
-// written name is followed through the chain to the name at its end, at most as
-// many steps as the table has entries, so a chain that returns to itself ends.
 SyncKind SyncKindOfType(const DataType& type, std::string_view package,
                         const SimContext& ctx) {
   if (type.kind != DataTypeKind::kNamed) return SyncKind::kNone;
@@ -90,17 +70,11 @@ SyncKind SyncKindOfType(const DataType& type, const SimContext& ctx) {
   return SyncKindOfType(type, {}, ctx);
 }
 
-// A property's declaration and the class that declares it, whose maps hold
-// the object where the property is static (§8.9).
 struct SyncMember {
   const ClassMember* member = nullptr;
   const ClassTypeInfo* declaring = nullptr;
 };
 
-// §8.13: the declaration of the property `name` nearest to `from` on its
-// base chain, the one a bare name in a method of `from` denotes, of
-// whatever type, with the class declaring it; none where no class of the
-// chain declares the name.
 static SyncMember NearestPropertyDecl(const ClassTypeInfo* from,
                                       std::string_view name) {
   for (const ClassTypeInfo* t = from; t != nullptr; t = t->parent) {
@@ -113,8 +87,6 @@ static SyncMember NearestPropertyDecl(const ClassTypeInfo* from,
   return {};
 }
 
-// The kind of the property `m` declares, its type read in the package the
-// declaring class stands in (ClassTypeInfo::package, §26.2).
 static SyncKind SyncKindOfMember(const SyncMember& m, const SimContext& ctx) {
   return SyncKindOfType(m.member->data_type, m.declaring->package, ctx);
 }
@@ -125,10 +97,6 @@ static bool IsSyncMember(const SyncMember& m, const SimContext& ctx) {
          SyncKindOfMember(m, ctx) != SyncKind::kNone;
 }
 
-// The nearest declaration of `name` on the base chain of `from`, where it
-// is a property of a semaphore or mailbox type with no unpacked dimension,
-// static (§8.9) or not; none where the nearest declaration is anything else
-// or none declares the name.
 static SyncMember SyncPropertyMember(const ClassTypeInfo* from,
                                      std::string_view name,
                                      const SimContext& ctx) {
@@ -136,16 +104,6 @@ static SyncMember SyncPropertyMember(const ClassTypeInfo* from,
   return IsSyncMember(nearest, ctx) ? nearest : SyncMember{};
 }
 
-// §8.23 (printed pages 200-201): a nested class's method reaches the static
-// properties of the classes enclosing it, innermost first, by their bare
-// names, and a non-static one only through a handle. The nearest
-// declaration of `name` on the base chain of the class nearest to `from`
-// that declares one, where it is a static semaphore or mailbox property;
-// none where that declaration is anything else, or no enclosing class
-// declares the name. Asked of a bare name only once the base chain of
-// `from` itself declares nothing of the name (§8.13), as StaticPropertyOwner
-// walks the chain for a static value property. Walked along the base chain
-// alone, `mb.put(v)` in the nested class reached nothing.
 static SyncMember EnclosingStaticSyncMember(const ClassTypeInfo* from,
                                             std::string_view name,
                                             const SimContext& ctx) {
@@ -167,8 +125,6 @@ static SyncProperty MakeSyncProperty(const SyncMember& m, ClassObject* obj,
           std::move(spelling)};
 }
 
-// The receiver as it was written, `c.mb`, `C::mb` or `pk().mb`, for a report
-// to name.
 static std::string SpellHandlePath(const Expr* expr) {
   if (expr->kind == ExprKind::kIdentifier) return std::string(expr->text);
   if (expr->kind == ExprKind::kCall) return std::string(expr->callee) + "()";
@@ -176,12 +132,6 @@ static std::string SpellHandlePath(const Expr* expr) {
          std::string(expr->rhs->text);
 }
 
-// §8.11 with §8.13: the bare name `name` inside a method, resolved against
-// the lexically enclosing class or, in a property initializer or a
-// constructor with no class pushed, the running object's own. A local of
-// the method -- a formal named as the property is -- shadows the property
-// (§8.6), as it shadows a queue property in FindQueueOfName. A static
-// method has no object (§8.10) and reaches a static property all the same.
 static SyncProperty ResolveBareSyncProperty(std::string_view name,
                                             SimContext& ctx) {
   ClassObject* self = ctx.CurrentThis();
@@ -195,12 +145,6 @@ static SyncProperty ResolveBareSyncProperty(std::string_view name,
   return MakeSyncProperty(member, self, std::string(name), ctx);
 }
 
-// §8.4: the class the handle side `side` of a member access is declared of,
-// for naming the property a null handle would have reached: the class a
-// variable was declared with, or the one a property of the running object
-// names (§8.25's type parameter read through the object), or the enclosing
-// class for a `this` no object stands behind (a static method, §8.10).
-// Null for a longer path, whose declared class is not followed.
 static const ClassTypeInfo* DeclaredClassOfHandleSide(const Expr* side,
                                                       SimContext& ctx) {
   if (side->kind != ExprKind::kIdentifier) return nullptr;
@@ -213,11 +157,6 @@ static const ClassTypeInfo* DeclaredClassOfHandleSide(const Expr* side,
   return class_name.empty() ? nullptr : ctx.FindClassType(class_name);
 }
 
-// §8.4: `h.name` or `this.name`, the property of the object the handle side
-// refers to, or, where it refers to none, the property the handle's declared
-// class gives that name, so that the null handle is reported rather than the
-// receiver resolved through the run's tables to a variable of the name; a
-// static one (§8.9) is the class's and is served through a null handle too.
 static SyncProperty ResolveSyncPropertyThroughHandle(const Expr* recv,
                                                      SimContext& ctx,
                                                      Arena& arena) {
@@ -234,9 +173,6 @@ static SyncProperty ResolveSyncPropertyThroughHandle(const Expr* recv,
   return MakeSyncProperty(member, nullptr, SpellHandlePath(recv->lhs), ctx);
 }
 
-// §8.9 (printed page 186) with §8.23: `C::name`, the static property `name`
-// of the class C, which needs no object. A package's `p::name` names no
-// class and is left to the run's tables.
 static SyncProperty ResolveScopedSyncProperty(const Expr* recv,
                                               SimContext& ctx) {
   if (recv->lhs == nullptr || recv->lhs->kind != ExprKind::kIdentifier)
@@ -263,9 +199,6 @@ SyncProperty ResolveSyncProperty(const Expr* recv, SimContext& ctx,
   return ResolveSyncPropertyThroughHandle(recv, ctx, arena);
 }
 
-// §8.4: the report for a method reached through a property that holds no
-// semaphore or mailbox, or through a null handle, worded as
-// ResolveThroughNullHandle words it for a method of a user class.
 static void ReportNullSyncProperty(const SyncProperty& prop,
                                    std::string_view method, SourceLoc loc,
                                    SimContext& ctx) {
@@ -277,22 +210,6 @@ static void ReportNullSyncProperty(const SyncProperty& prop,
                       Subclause("8.4"));
 }
 
-// §8.4 (printed pages 181-182 of IEEE 1800-2023): a handle is compared
-// with null by whether it refers to an object, an uninitialized one holding
-// null, and §15.3 (printed 372) and §15.4 (printed 374) make a semaphore or
-// mailbox variable a handle to the bucket or the queue. The value under the
-// property's name is what `mb == null`, `if (mb)` and `c.mb != null` read
-// through the generic paths, so it is kept beside the map as the handle's
-// carrier: the identity of the object the map holds (SyncObjectIdentity in
-// sync_objects.h), so that `c.x == c.y` reads whether the two refer to one
-// object, and kNullClassHandle while it holds none, as a class handle's is
-// for null; a 1 for every object compared two properties each built by its
-// own `new` equal. An instance property's is
-// written under the declaring class's scoped key and, where no class
-// between the object's own and the declaring one shadows the name (§8.15),
-// the bare one, the pair ClassObject::SetPropertyForType writes; a static
-// property's into the class's own storage (§8.9). Left at the 0 the
-// construction stored, a property holding a mailbox compared equal to null.
 static void MirrorSyncCarrier(const SyncProperty& prop, uint64_t identity,
                               SimContext& ctx) {
   std::string name(prop.member->name);
@@ -308,9 +225,6 @@ static void MirrorSyncCarrier(const SyncProperty& prop, uint64_t identity,
     prop.obj->properties[name] = carrier;
 }
 
-// §8.9 with §8.4: the map the property's object stands in -- the declaring
-// class's for a static property, the object's otherwise -- or null for an
-// instance property with no object, whose access is illegal.
 static std::unordered_map<std::string, SemaphoreObject*>* SemaphoreMapOf(
     const SyncProperty& prop) {
   if (prop.member->is_static)
@@ -333,15 +247,6 @@ static bool IsNewCall(const Expr* expr) {
          expr->text == "new";
 }
 
-// The semaphore or mailbox the property holds, or null where it holds none:
-// the entry the construction (TryInitClassSyncProperty), the class's static
-// initialization (§8.9, TryInitStaticSyncProperty) or an assignment left,
-// null included, or no entry for an instance property with no object. A
-// static property declared through a typedef was built here on the first
-// reference, the typedef table being filled after the packages' and the
-// unit's classes were lowered (RegisterClassTypeAliases); the table is
-// filled ahead of every class now (RegisterTypeTargets in
-// lowerer_register.cpp), so every static one is built at lowering.
 template <typename T>
 static T* HeldSyncObject(std::unordered_map<std::string, T*>* held,
                          const SyncProperty& prop) {
@@ -413,10 +318,6 @@ static SyncHandle HandleOfVariable(const Variable* var, const SimContext& ctx) {
   return {};
 }
 
-// §15.3 and §15.4 with §8.12: the semaphore or mailbox `expr` is a handle
-// to -- a property's (HandleOfProperty), a formal's (§13.5.1, a local of the
-// name shadowing the run's tables), or a module's, an instance's or a
-// package's by name or by `p::name` (ScopedOrBareTargetKey).
 static SyncHandle ResolveSyncHandle(const Expr* expr, SimContext& ctx,
                                     Arena& arena) {
   SyncProperty prop = ResolveSyncProperty(expr, ctx, arena);
@@ -434,22 +335,16 @@ static SyncHandle ResolveSyncHandle(const Expr* expr, SimContext& ctx,
   return {};
 }
 
-// The identity of the object a handle refers to, null where it holds none.
 static uint64_t IdentityOfHandle(const SyncHandle& handle) {
   if (handle.sem != nullptr) return SyncObjectIdentity(handle.sem);
   return SyncObjectIdentity(handle.mbx);
 }
 
-// §8.12: the object `source` holds now has a second name
-// (SemaphoreObject::shared).
 static void MarkShared(const SyncHandle& source) {
   if (source.sem != nullptr) source.sem->shared = true;
   if (source.mbx != nullptr) source.mbx->shared = true;
 }
 
-// §8.12: the property `target` made a handle to the object `source` names,
-// the same object under two names, or the null handle where `source` holds
-// none, its carrier following (MirrorSyncCarrier).
 static void StoreSyncHandle(const SyncProperty& target,
                             const SyncHandle& source, SimContext& ctx) {
   std::string name(target.member->name);
@@ -462,11 +357,6 @@ static void StoreSyncHandle(const SyncProperty& target,
   MarkShared(source);
 }
 
-// §8.7 and §8.9: the property's initializer `init` -- a `new(...)`, which
-// builds the object in the property's map, or any other expression, which
-// makes the property a handle to the semaphore or mailbox it names (§8.12)
-// or leaves it null where it names none; no initializer leaves it the null
-// handle §8.4 (printed page 182) gives an uninitialized one, its carrier 0.
 static void InitSyncProperty(const SyncProperty& prop, const Expr* init,
                              SimContext& ctx) {
   if (init == nullptr) {
@@ -503,12 +393,6 @@ bool TryInitStaticSyncProperty(const ClassTypeInfo* info, std::string_view name,
   return true;
 }
 
-// §8.12 with §15.3 and §15.4: a module's, an instance's or a package's
-// semaphore or mailbox variable assigned a handle, `b = a`, is left naming
-// the object the source is a handle to, or none for `null` (`is_null`), the
-// run's entry for it rebound (SimContext::SemaphoreSlot and MailboxSlot). A
-// source of the other class leaves it alone. Left unbound, `b.put(4)` placed
-// the message in b's own mailbox, or in none.
 static void RebindScopedSyncHandle(const Stmt* stmt, bool is_null,
                                    SimContext& ctx, Arena& arena) {
   std::string_view key = ScopedOrBareTargetKey(stmt->lhs, arena);
@@ -536,8 +420,6 @@ bool TrySyncHandleAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
   bool is_null =
       stmt->rhs->kind == ExprKind::kIdentifier && stmt->rhs->text == "null";
   if (target.kind == SyncKind::kNone) {
-    // The generic store still copies the handle's carrier into the variable,
-    // which `a == b` and `b == null` read.
     if (stmt->rhs->kind == ExprKind::kIdentifier ||
         stmt->rhs->kind == ExprKind::kMemberAccess) {
       RebindScopedSyncHandle(stmt, is_null, ctx, arena);
@@ -585,10 +467,6 @@ MailboxObject* MailboxOfFormal(const Expr* recv, SimContext& ctx) {
   return var == nullptr ? nullptr : ctx.MailboxOfHandle(var);
 }
 
-// §15.2 with §8.13: the key under which an object of a class extending the
-// built-in semaphore or mailbox keeps the base's bucket or queue, in the maps
-// that hold its properties' (ClassObject::semaphore_properties and
-// mailbox_properties); no property can be named so.
 static constexpr std::string_view kBuiltinBaseKey = "$base";
 
 void BuildBuiltinSyncBase(ClassObject* obj, std::string_view base_class,
@@ -607,10 +485,6 @@ void BuildBuiltinSyncBase(ClassObject* obj, std::string_view base_class,
   }
 }
 
-// The object whose built-in base the call `expr` of `method` acts on: the
-// running object for a call written unqualified inside one of its methods,
-// `try_get()`, and the handle's object for `h.try_get()` or `h.try_get`;
-// null for any other call.
 static ClassObject* BuiltinBaseReceiver(const Expr* expr,
                                         std::string_view method,
                                         SimContext& ctx, Arena& arena) {
@@ -648,7 +522,6 @@ Logic4Vec NewContainedSyncObject(const Expr* new_expr,
                                  std::string_view class_type, SimContext& ctx,
                                  Arena& arena) {
   const void* obj = nullptr;
-  // The element class is written bare or as `std::semaphore` (§26.7).
   if (BuiltinSyncKindOf(class_type, ctx) == SyncKind::kSemaphore) {
     auto* sem = ctx.GetArena().Create<SemaphoreObject>(
         SemaphoreKeyArg(new_expr, ctx, arena, 0));
@@ -671,8 +544,6 @@ void RecordContainedSyncHandle(const Expr* item, SimContext& ctx,
   } else if (handle.kind == SyncKind::kMailbox) {
     ctx.RecordContainedMailbox(handle.mbx);
   }
-  // §8.12: the element is a second name for the object, so a later `t = new`
-  // builds t a new one and leaves the element's alone.
   MarkShared(handle);
 }
 

@@ -1,18 +1,3 @@
-// The `b` half of the §9.4.2 event-control family. Where the `a` file reads the
-// event control against writes made from an initial or always block, this file
-// reads it against writes a subroutine call makes: once from inside a void
-// function's body, and once through a function's `output` formal on copy-out.
-// §9.4.2 says the event control resumes on a change to the expression however
-// that change was produced, so the writer's syntax is what these cases vary.
-// The cases from PostfixIncrementWakesAnEventControl on carry the same reading
-// to a third writer, the increment and decrement operators, whose store
-// notified nobody at all: the bare `i++` statement, the prefix and decrement
-// spellings, a for-loop step, and a target held by force, which has to suppress
-// the notification along with the store. The last three cases read it against
-// a fourth storage, a static class property (§8.9), whose writes through the
-// class scope operator and from a static method announced themselves to no
-// watcher at all.
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -22,17 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A void function called with parentheses is the one writer that reaches the
-// subroutine-body executor: SetupTaskCall declines it, so ExecFunctionBody runs
-// the body and ExecFuncIdentifierAssign performs `x = v`. That path stored the
-// value and notified nobody, and because a notification destructively moves the
-// watcher vector, the always block parked on `@(x)` never ran again. The two
-// calls below are therefore invisible before the fix and the count stops at the
-// one wake the initial block's own write produced.
-//
-// A task body would not read this rule: ExecInlineTaskCall walks the body
-// through ExecStmt to AssignToScalarLhs, which already notifies, so the same
-// source written with a task passes either way.
 TEST(EventControlSim, FunctionBodyWriteWakesAnEventControl) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -55,13 +29,6 @@ TEST(EventControlSim, FunctionBodyWriteWakesAnEventControl) {
   EXPECT_EQ(var->value.ToUint64(), 3u);
 }
 
-// The argument copy-out, which is a different route and not a second reading of
-// the hole above: #3481 suspected it of the same silence, but
-// WritebackOutputArgs hands the value to PerformBlockingAssign, which notifies.
-// So this case passes on either side of the fix and stands as a guard on the
-// route the issue questioned, pinning it beside the body write. The middle call
-// writes the value already held, which the awaiter's own change gate drops, so
-// a copy-out that notified unconditionally would read 3 here rather than 2.
 TEST(EventControlSim, OutputFormalCopyOutWakesAnEventControl) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -84,14 +51,6 @@ TEST(EventControlSim, OutputFormalCopyOutWakesAnEventControl) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// The increment operators are the third writer, and the one §9.4.2 covers by
-// the same sentence as the other two: WriteIncDecTarget stored the new value
-// and told nobody, so `i++` in an ordinary process body changed the variable
-// without waking anything parked on it. A bare `i++;` is a kExprStmt, which
-// ExecStmt hands to ExecInlineTaskCall, whose non-call fall-through evaluates
-// the expression -- so this is the plainest statement form there is, and it was
-// the one form of write that left an awaiter parked for the rest of the run.
-// Both increments below were therefore invisible and the count stopped at 0.
 TEST(EventControlSim, PostfixIncrementWakesAnEventControl) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -110,17 +69,6 @@ TEST(EventControlSim, PostfixIncrementWakesAnEventControl) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// EvalPrefixUnary and EvalPostfixUnary are separate entry points that meet only
-// inside EvalIncDec, and the decrement differs from the increment in the token
-// each tests for, so the case above reaches one of the two doors and one of the
-// two tokens. This walks the other three spellings through one process: `++w`
-// and `--w` come in by the prefix door, `w--` by the postfix door with the
-// minus token. The opening `w = 4'd7` is an ordinary blocking assignment, which
-// notified all along, so it is the wake a broken build still counts: 1 here
-// rather than 4 says the store landed and the notification did not, and it is
-// what separates that from a build that never woke the block at all. The value
-// of w is read as well because a notification that fired without the store
-// having moved the variable would satisfy the count alone.
 TEST(EventControlSim, PrefixAndDecrementSpellingsWakeAnEventControl) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -146,16 +94,6 @@ TEST(EventControlSim, PrefixAndDecrementSpellingsWakeAnEventControl) {
   EXPECT_EQ(w->value.ToUint64(), 6u);
 }
 
-// A for-loop step is the second route into the same store: ExecFor runs each
-// step through ExecStmt rather than as a statement of the body, so the loop
-// below reaches WriteIncDecTarget without ever writing k with an `=` after the
-// initialization. That initialization is the discriminating one. `k = 1` moves
-// k off 0 and notifies the way any blocking assignment does, so a build in
-// which the step notifies nobody still counts one wake; the three steps are
-// what carry the count from 1 to 4. The leading `#1` puts the loop after the
-// always block has parked, and the body's `#1` gives the woken block a chance
-// to run between one step and the next, so the four wakes are four separate
-// resumptions rather than a single collapsed one.
 TEST(EventControlSim, ForStepIncrementWakesAnEventControl) {
   SimFixture f;
   auto* taps = RunAndFindVar(
@@ -177,19 +115,6 @@ TEST(EventControlSim, ForStepIncrementWakesAnEventControl) {
   EXPECT_EQ(k->value.ToUint64(), 4u);
 }
 
-// §10.6.2: a force overrides a procedural assignment until a release is
-// executed on the variable, so an increment under a force stores nothing -- and
-// a change nobody made is not a change §9.4.2 asks anyone to detect. That is
-// why the notification belongs inside the is_forced gate and not after it, and
-// this case is what holds it there: p stays at the forced 5 across two
-// increments, and the process parked on @(p) is still parked when the run ends.
-// The awaiter is armed at time 1, after the force at time 0, so the force's own
-// effect on p cannot be what leaves fired at 0; only the two increments at
-// times 2 and 3 are being watched. Unlike the three cases above this one reads
-// the same values before the fix and after it. It is not a test of the missing
-// notification but of where the notification was put: it fails only for a build
-// that notifies outside the gate, which would set fired to 1 while p still read
-// 5.
 TEST(EventControlSim, ForcedTargetIncrementWakesNoEventControl) {
   SimFixture f;
   auto* fired = RunAndFindVar(
@@ -218,14 +143,6 @@ TEST(EventControlSim, ForcedTargetIncrementWakesNoEventControl) {
   EXPECT_EQ(p->value.ToUint64(), 5u);
 }
 
-// §9.4.2 detects an implicit event on any change in the value of the
-// expression, and a member of an object reached through a handle is an
-// expression like any other. The member is written through a second handle
-// to the same object, once with the value it already holds (no change, so no
-// event) and once with a new one, so the wake-up time reads 4 rather than 2,
-// and the value read after the wake-up is the new one. Before the fix the
-// operand resolved to no variable and the process waited for ever, leaving
-// woke at 0.
 TEST(EventControlSim, MemberOfAnObjectThroughAHandleWakesAnEventControl) {
   SimFixture f;
   auto* woke = RunAndFindVar(
@@ -251,14 +168,6 @@ TEST(EventControlSim, MemberOfAnObjectThroughAHandleWakesAnEventControl) {
   EXPECT_EQ(woke->value.ToUint64(), 42u);
 }
 
-// §9.4.2 with §8.6 and §8.11: inside a class task the object's own property
-// is named bare or as `this.x`, and an event control on it wakes when another
-// process writes the property through a handle. Each task records the time
-// of its wake-up; `posedge` on a one-bit property is an edge event (Table
-// 9-2), detected on the 0-to-1 transition at time 6 and not on the 1-to-0 at
-// time 4. The three tasks are enabled from module-level fork branches, each
-// call binding `this` (§13.3 with §8.6). Before the fix none of the controls
-// ever woke and the result stayed 0.
 TEST(EventControlSim, OwnPropertyInsideAMethodWakesAnEventControl) {
   SimFixture f;
   auto* result = RunAndFindVar(
@@ -300,14 +209,6 @@ TEST(EventControlSim, OwnPropertyInsideAMethodWakesAnEventControl) {
   EXPECT_EQ(result->value.ToUint64(), 336u);
 }
 
-// §9.4.2 with §8.9: a static property is one storage for the whole class,
-// named through the class scope operator, and an event control on `C::n`
-// wakes when another process writes it through the same operator. The
-// property is neither a variable nor a member of any object in hand, so the
-// operand resolved to nothing and the process never woke, leaving the
-// sentinel in place; the fix arms on the class, whose storage every static
-// write announces. The wake is at time 2 with the value just written, and
-// 21 is what neither the sentinel nor a wake on the second write gives.
 TEST(EventControlSim, StaticPropertyThroughTheClassScopeWakesAnEventControl) {
   SimFixture f;
   auto* woke = RunAndFindVar(
@@ -330,13 +231,6 @@ TEST(EventControlSim, StaticPropertyThroughTheClassScopeWakesAnEventControl) {
   EXPECT_EQ(woke->value.ToUint64(), 21u);
 }
 
-// §9.4.3 with §8.9: the wait statement's condition reads the static property
-// through the class scope operator, and the process resumes when a write
-// makes the condition true. The read set of the condition held `C` and `n`
-// as two bare names, neither of which designates the class's storage, so
-// nothing was armed and the sentinel stayed. The condition is false at the
-// first write and true at the second, so 4 is the one answer of a wait that
-// both wakes and re-evaluates.
 TEST(EventControlSim, WaitOnAStaticPropertyThroughTheClassScopeResumes) {
   SimFixture f;
   auto* waited = RunAndFindVar(
@@ -359,14 +253,6 @@ TEST(EventControlSim, WaitOnAStaticPropertyThroughTheClassScopeResumes) {
   EXPECT_EQ(waited->value.ToUint64(), 4u);
 }
 
-// §9.4.2 with §8.9 and §8.10: the write comes from a static method of the
-// class, which names the property by its bare name, and it wakes both a
-// module-level `@(C::n)` and a bare `@(n)` inside an instance method of the
-// same class. The bare form used to arm on the object the method runs on,
-// which a static write never announces to; the static form armed on nothing.
-// The module-level wake records 3 * 10 + 5 and the method's wake the time 3,
-// so 3503 is reached only when both arms are on the class's storage: a
-// stranded static form leaves 3, a stranded bare form 3500.
 TEST(EventControlSim, StaticPropertyWrittenFromAStaticMethodWakesBothForms) {
   SimFixture f;
   auto* result = RunAndFindVar(
@@ -398,10 +284,6 @@ TEST(EventControlSim, StaticPropertyWrittenFromAStaticMethodWakesBothForms) {
   EXPECT_EQ(result->value.ToUint64(), 3503u);
 }
 
-// §9.4 Syntax 9-4: `always @e n++;` is the unparenthesized clocking event
-// guarding the procedure's statement, so each trigger of `e` runs `n++` once,
-// exactly as `always @(e) n++;` would. The procedure used to stop parsing at
-// the `@`, reading `e` as its statement and `n` as a stray name.
 TEST(EventControlSim, AlwaysAtBareEventNameCountsEachTrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -420,9 +302,6 @@ TEST(EventControlSim, AlwaysAtBareEventNameCountsEachTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// `@e -> f;` waits on `e` and then triggers `f`, which wakes the process
-// waiting on `f`. Read as `@(e -> f);`, it waited on an implication that
-// never changed and triggered nothing, so `got` stayed 0.
 TEST(EventControlSim, BareEventNameGuardsATrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(

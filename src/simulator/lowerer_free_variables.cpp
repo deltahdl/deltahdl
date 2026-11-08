@@ -34,13 +34,6 @@ namespace delta {
 
 namespace {
 
-// One assumption of a checker instance's assume set, written in the terms of
-// the instance whose free variables it constrains: the scope `clock_prefix`
-// names, in which its leading clock is read; the clocks it is evaluated
-// on, the leading one first and the others in the instance's terms, with
-// the time step each last ticked at and the ones that ticked at this one,
-// a bit each; the obligation each of its attempts begins with and those of
-// its attempts in flight; and its disable condition.
 struct AssumeSetMember {
   std::string clock_prefix;
   std::shared_ptr<PropertyClocks> clocks;
@@ -52,10 +45,6 @@ struct AssumeSetMember {
   bool fired = false;
 };
 
-// The assume set of a checker instance: `args` names the active free
-// variables a solution attempt draws, `scope` is the process whose scope and
-// random stream it draws them in, and `solves` holds the scope randomize call
-// made for each set of conditions an attempt has been held to.
 struct AssumeSet {
   AssumeSet(SimContext& ctx, Arena& arena) : obligations(ctx, arena) {}
   AssumeObligations obligations;
@@ -83,9 +72,6 @@ Expr* RandomizeCall(const std::vector<Expr*>& args, ClassMember* constraints,
   return call;
 }
 
-// §16.13: the clocks of each member that ticked at this time step; and
-// §16.12.1: the members that ticked and whose disable condition holds drop
-// their attempts in flight and begin none.
 void ReadTicks(AssumeSet& set, SimTime now) {
   for (AssumeSetMember& m : set.members) {
     m.ticked = 0;
@@ -99,14 +85,10 @@ void ReadTicks(AssumeSet& set, SimTime now) {
   }
 }
 
-// The scope randomize call an attempt makes over the conditions under which
-// no attempt in flight of a member that ticked fails, a new one begun among
-// them.
 Expr* SolveFor(AssumeSet& set, Arena& arena) {
   std::vector<Expr*> key;
   for (AssumeSetMember& m : set.members) {
     if (!m.fired) continue;
-    // §16.13: an attempt begins at a tick of the leading clock.
     if ((m.ticked & 1u) != 0) m.live.push_back(m.begin);
     for (const ObligationNode* node : m.live) {
       Expr* cond = set.obligations.NoFailCondition(node, m.ticked);
@@ -124,8 +106,6 @@ Expr* SolveFor(AssumeSet& set, Arena& arena) {
   return solve;
 }
 
-// Each attempt in flight of a member that ticked steps past this tick, the
-// values the attempt drew read, and leaves once it owes nothing more.
 void StepMembers(AssumeSet& set) {
   set.obligations.NewTimeStep();
   for (AssumeSetMember& m : set.members) {
@@ -143,9 +123,6 @@ void StepMembers(AssumeSet& set) {
   }
 }
 
-// §17.7.2: a solution attempt, made before the Observed region, reads every
-// other variable at its sampled value and each active free variable at its
-// current one, which the sampling store answers for it.
 void AttemptSolution(AssumeSet& set, SimContext& ctx, Arena& arena) {
   Process* saved = ctx.CurrentProcess();
   ctx.SetCurrentProcess(set.scope);
@@ -154,8 +131,6 @@ void AttemptSolution(AssumeSet& set, SimContext& ctx, Arena& arena) {
   ReadTicks(set, ctx.CurrentTime());
   Logic4Vec drawn;
   Expr* solve = SolveFor(set, arena);
-  // §16.10: the conditions read the attempts' locals through the variables
-  // their values stand in.
   ctx.PushScope();
   for (const Expr* cond : solve->inline_constraint->constraint_exprs) {
     set.obligations.BindLocalsOf(cond);
@@ -168,8 +143,6 @@ void AttemptSolution(AssumeSet& set, SimContext& ctx, Arena& arena) {
   set.scheduled = false;
 }
 
-// §17.7.2: one solution attempt in the Pre-Observed region of the time step,
-// whichever assume set clock event, or how many, called for it.
 void RequestSolutionAttempt(AssumeSet& set, SimContext& ctx, Arena& arena) {
   if (set.scheduled) return;
   set.scheduled = true;
@@ -181,9 +154,6 @@ void RequestSolutionAttempt(AssumeSet& set, SimContext& ctx, Arena& arena) {
                                    event);
 }
 
-// §17.7.2: each clock `k` of the assumption `set.members[i]` is one of the
-// clock events of the assume set, each of which triggers a solution
-// attempt.
 SimCoroutine MakeAssumeClockCoroutine(AssumeSet& set, size_t i, size_t k,
                                       SimContext& ctx, Arena& arena) {
   AssumeSetMember& m = set.members[i];
@@ -195,8 +165,6 @@ SimCoroutine MakeAssumeClockCoroutine(AssumeSet& set, size_t i, size_t k,
   }
 }
 
-// §16.13: the numbering of the clocks an assumption is evaluated on, among
-// `clocks`, the leading clock its first.
 ObligationScope ScopeOf(const ObligationRewrite& rewrite,
                         const std::shared_ptr<PropertyClocks>& clocks) {
   return {rewrite, [clocks](const std::vector<EventExpr>& clock) {
@@ -204,9 +172,6 @@ ObligationScope ScopeOf(const ObligationRewrite& rewrite,
           }};
 }
 
-// §16.13: the clocks of the assumption `proc` evaluates, its leading clock
-// first, which the statement keeps apart from the clocks its operands name
-// that the process also wakes on.
 std::shared_ptr<PropertyClocks> ClocksLedBy(const RtlirProcess& proc) {
   auto clocks = std::make_shared<PropertyClocks>();
   clocks->clocks.push_back(proc.body->assert_clock);
@@ -226,8 +191,6 @@ bool ReadsAny(const std::vector<Expr*>& reads,
   });
 }
 
-// §17.7.2 with §17.3: the formals of the instance `self` whose actual holds a
-// const cast or an automatic value of the procedure instantiating it.
 std::unordered_set<std::string> BarredFormals(const RtlirModuleInst& self) {
   std::unordered_set<std::string_view> automatics(
       self.procedure_automatics.begin(), self.procedure_automatics.end());
@@ -244,9 +207,6 @@ std::unordered_set<std::string> BarredFormals(const RtlirModuleInst& self) {
   return barred;
 }
 
-// An assumption the assume set may hold: its process, the scope its clock
-// is read in, the rewrite into the terms of the checker the set is
-// collected for, and the expressions it reads in those terms.
 struct Candidate {
   const RtlirProcess* proc = nullptr;
   std::string clock_prefix;
@@ -254,10 +214,6 @@ struct Candidate {
   std::vector<Expr*> reads;
 };
 
-// §17.7.2: the assumptions of the checker `mod`, lowered under `prefix`, and
-// those of its child checkers, each in `mod`'s terms, a child's formals
-// replaced by its actuals; of them, one that reads a formal the instance
-// `self` binds to a const cast or an automatic value is left out.
 std::vector<Candidate> CollectAssumptions(const RtlirModule* mod,
                                           const std::string& prefix,
                                           const RtlirModuleInst& self,
@@ -274,7 +230,6 @@ std::vector<Candidate> CollectAssumptions(const RtlirModule* mod,
                       c.reads);
     out.push_back(std::move(c));
   }
-  // §17.2: a checker instantiates no other kind of definition.
   for (const RtlirModuleInst& child : mod->children) {
     ActualsByFormal actuals;
     for (const RtlirPortBinding& binding : child.port_bindings) {
@@ -297,8 +252,6 @@ std::vector<Candidate> CollectAssumptions(const RtlirModule* mod,
   return out;
 }
 
-// §17.7.2: the assume set's members, the assumptions of `candidates` that
-// read one of the active free variables `active`.
 void AddMembers(const std::vector<Candidate>& candidates,
                 const std::unordered_set<std::string>& active, AssumeSet& set) {
   for (const Candidate& c : candidates) {
@@ -318,19 +271,6 @@ void AddMembers(const std::vector<Candidate>& candidates,
 
 }  // namespace
 
-// §17.7.2: every free variable of a checker instance whose declaration
-// writes no initializer starts at an unconstrained random value, drawn from
-// the instance's initialization stream. Its active free variables are then
-// assigned, at each clock event of its assume set, values with which no
-// attempt in flight of the assumptions of the set that ticked fails at that
-// tick, a new attempt of each begun there among them, found by §18.12's
-// scope randomize over them with the conditions under which none fails as
-// its constraints; the other variables the conditions read stand at their
-// sampled values. The set holds the instance's assumptions and its child
-// checkers' that read one of its active free variables; where it holds none,
-// the attempt is made, unconstrained, at every time step. An active free
-// variable is read at its current value, which §17.7.2 makes its sampled
-// value, so it is kept out of the sampling store.
 void Lowerer::LowerFreeVariableSolver(const RtlirModule* mod) {
   if (!mod->random_initial_variables.empty()) {
     std::vector<Expr*> initial;
@@ -364,8 +304,6 @@ void Lowerer::LowerFreeVariableSolver(const RtlirModule* mod) {
     return;
   }
   for (size_t i = 0; i < set->members.size(); ++i) {
-    // The leading clock is read in the scope of the checker declaring the
-    // assumption, the others, rewritten, in this instance's.
     for (size_t k = 0; k < set->members[i].ticked_at.size(); ++k) {
       auto* p = arena_.Create<Process>();
       p->kind = ProcessKind::kAlways;

@@ -18,9 +18,6 @@
 
 namespace delta {
 
-// §32.4.1 (printed page 925): the select the specify path terminal `t` was
-// written with, spelled as PathDelay::src_select describes; empty for a whole
-// port. An indexed part-select, `a[i +: 2]`, is spelled as the part it covers.
 TerminalSelect SpecifyTerminalSelect(const SpecifyTerminal& t, SimContext& ctx,
                                      Arena& arena) {
   TerminalSelect sel;
@@ -53,11 +50,6 @@ static std::string TerminalSelectText(const SpecifyTerminal& t, SimContext& ctx,
          "]";
 }
 
-// §30.4.2 (printed page 873): a path terminal is a port_identifier or
-// `interface_identifier . port_identifier`, and the second names the signal of
-// the module's interface port by both names, as the module's own text reads it
-// (`p.a`). Kept as the port name alone, a path from `p.a` started at an `a`
-// nothing in the module reads, so no transition was ever timed through it.
 std::string SpecifyTerminalName(const SpecifyTerminal& t) {
   if (t.interface_name.empty()) return std::string(t.name);
   std::string name(t.interface_name);
@@ -65,17 +57,10 @@ std::string SpecifyTerminalName(const SpecifyTerminal& t) {
   return name;
 }
 
-// §22.7 (printed page 716): the time unit is what time values, simulation time
-// and delays among them, are measured in, so a path delay is a
-// count of the declaring module's time unit, and a real one, `specparam tr =
-// 2.5`, keeps what of its fraction the module's precision holds (§3.14.1). The
-// path's slots are counted in ticks of the design's global precision, which
-// §32.4.1's SDF values are scaled into as well.
 static uint64_t PathDelayTicks(const Logic4Vec& value, const TimeScale& scale,
                                TimeUnit precision) {
   if (value.is_real) {
     const double kDelay = RealVecToDouble(value);
-    // §30.5.1: a delay expression that evaluates negative is treated as zero.
     return kDelay <= 0.0 ? 0u : RealDelayToTicks(kDelay, scale, precision);
   }
   const uint32_t kWidth = value.width == 0 ? 64u : value.width;
@@ -101,13 +86,8 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   pd.edge = decl.edge;
   pd.is_ifnone = decl.is_ifnone;
   pd.condition = SpecifyConditionText(decl.condition);
-  // §30.4.4: SelectModulePathDelay in simulator/module_path_delay.cpp evaluates
-  // this condition for §30.5.3's activity test, which the text above cannot
-  // answer, being rendered for §32.4.1's SDF COND matching.
   pd.condition_expr = decl.condition;
 
-  // The parser accepts only the one/two/three/six/twelve delay lists of
-  // Syntax 30-6 (§30.5); an empty list defaults to a single typical delay.
   const TimeScale& scale = ActiveInstanceTimeScale(ctx);
   std::size_t count = decl.delays.size();
   if (count > 12) count = 12;
@@ -119,23 +99,14 @@ PathDelay BuildPathDelayFromDecl(const SpecifyPathDecl& decl, SimContext& ctx,
   pd.dst_index = dst_index;
 
   for (std::size_t i = 0; i < count; ++i) {
-    // §30.5.1: a single value is the typical delay; a colon-separated
-    // min:typ:max triple selects one member. EvalExpr resolves a
-    // constant_mintypmax_expression against the context's delay mode.
     pd.delays[i] = PathDelayTicks(EvalExpr(decl.delays[i], ctx, arena), scale,
                                   ctx.GlobalPrecision());
   }
 
-  // §30.5.1 / Table 30-2: distribute the listed delays over the twelve
-  // transition slots according to how many were specified.
   ExpandTransitionDelays(pd);
   return pd;
 }
 
-// Calls `visit` on every specify item of kind `kind` that `blocks` declares, in
-// declaration order, skipping a null block or item. The six registration passes
-// below walk the same items and differ only in what they do with one, so the
-// walk is written once here.
 template <typename Visit>
 static void ForEachSpecifyItemOfKind(const std::vector<ModuleItem*>& blocks,
                                      SpecifyItemKind kind, const Visit& visit) {
@@ -148,30 +119,15 @@ static void ForEachSpecifyItemOfKind(const std::vector<ModuleItem*>& blocks,
   }
 }
 
-// §30.4: the module path delays, one per path_declaration. Each path is given
-// the §30.7 default pulse limits, which is the state the PATHPULSE$ specparams
-// resolved afterwards replace.
 static void RegisterPathDelays(const std::vector<ModuleItem*>& blocks,
                                std::string_view inst_prefix, SimContext& ctx,
                                Arena& arena, SpecifyManager& mgr) {
   ForEachSpecifyItemOfKind(
       blocks, SpecifyItemKind::kPathDecl, [&](const SpecifyItem& si) {
-        mgr.AddPathDelayFromDecl(si.path, ctx, arena,
-                                 /*default_pulse_limits=*/true, inst_prefix);
+        mgr.AddPathDelayFromDecl(si.path, ctx, arena, true, inst_prefix);
       });
 }
 
-// §31.2: the system_timing_check declarations of Syntax 30-1, each built under
-// the invocation options §31.9.4 gives the manager and filed as a
-// TimingCheckEntry so §32.4.2's SDF TIMINGCHECK annotation has a declared check
-// to land on.
-//
-// The check is registered under `inst_prefix` because §31.3 has it name its
-// reference and data signals by the declaring module's own port names, so two
-// instances of one cell declare checks spelled identically and would otherwise
-// be filed as one. The prefix is also what
-// SpecifyManager::RebuildTimingChecksForSpecparam evaluates a constraint limit
-// under when §32.4.3's LABEL annotation reprices a specparam that limit reads.
 static void RegisterTimingChecks(const std::vector<ModuleItem*>& blocks,
                                  std::string_view inst_prefix, SimContext& ctx,
                                  Arena& arena, SpecifyManager& mgr) {
@@ -182,19 +138,6 @@ static void RegisterTimingChecks(const std::vector<ModuleItem*>& blocks,
                            });
 }
 
-// §30.3: the specparam_declarations of Syntax 30-1, bound to `mgr` so §32.4.3's
-// LABEL annotation can reach them. Binding is also what gives the manager the
-// context and arena a LABEL writes an annotated value into, so this runs for a
-// specify block that declares no specparam at all.
-//
-// The names are bound under `inst_prefix` because §30.3 has the declaration
-// name the specparam by a bare name, while Lowerer::CreateChildModuleVariables
-// keys an instantiated module's specparam under its instance prefix.
-//
-// Only the specparams declared inside a specify block are collected, `blocks`
-// being all this is given. §6.20.5's other declaration site, the module body
-// outside every specify block, is bound by RegisterModuleSpecparams below,
-// which reads the names off RtlirModule::specparam_names.
 static void RegisterSpecparams(const std::vector<ModuleItem*>& blocks,
                                std::string_view inst_prefix, SimContext& ctx,
                                Arena& arena, SpecifyManager& mgr) {
@@ -207,13 +150,6 @@ static void RegisterSpecparams(const std::vector<ModuleItem*>& blocks,
   mgr.BindDesignSpecparams(std::move(names), ctx, arena, inst_prefix);
 }
 
-// §30.7.4.1: the pulsestyle_onevent and pulsestyle_ondetect declarations of
-// Syntax 30-8, each selecting the pulse filtering style for every path output
-// it names.
-// The output is qualified with `inst_prefix` because §30.4 has the
-// declaration name a port of the module it stands in by its bare name, so two
-// instances of one cell name the same output and would otherwise share one
-// style.
 static void RegisterPulseStyles(const std::vector<ModuleItem*>& blocks,
                                 std::string_view inst_prefix,
                                 SpecifyManager& mgr) {
@@ -229,12 +165,6 @@ static void RegisterPulseStyles(const std::vector<ModuleItem*>& blocks,
       });
 }
 
-// §30.7.4.2: the showcancelled and noshowcancelled declarations of
-// Syntax 30-9, each selecting the negative-pulse mode for every path output it
-// names.
-// The output is qualified with `inst_prefix` for the same reason
-// RegisterPulseStyles qualifies it: a bare port name is shared by every
-// instance of the cell declaring the specify block.
 static void RegisterShowCancelled(const std::vector<ModuleItem*>& blocks,
                                   std::string_view inst_prefix,
                                   SpecifyManager& mgr) {
@@ -251,15 +181,6 @@ static void RegisterShowCancelled(const std::vector<ModuleItem*>& blocks,
       });
 }
 
-// §30.7.1: the PATHPULSE$ specparams of Syntax 30-7, collected across every
-// block and resolved onto `mgr` in one call. Collecting first is what lets a
-// path-specific PATHPULSE$ specparam take precedence over a nonpath-specific
-// one whichever order the two were declared in. A specparam that states only a
-// reject limit leaves `has_error` clear, and §30.7.1 makes that reject limit
-// serve as the error limit too.
-// `specs` holds the specparams of this one scope, and they are resolved onto
-// `mgr` in one call, so a nonpath-specific PATHPULSE$ specparam reaches the
-// module paths of the instance that declared it and no others.
 static void RegisterPathPulseSpecparams(const std::vector<ModuleItem*>& blocks,
                                         std::string_view inst_prefix,
                                         SimContext& ctx, Arena& arena,

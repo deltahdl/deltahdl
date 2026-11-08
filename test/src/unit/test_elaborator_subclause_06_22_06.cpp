@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.22.6(a) end to end: two nets declared with the same nettype carry matching
-// nettypes, so connecting them to the two bidirectional terminals of a pass
-// switch raises no different-nettype diagnostic.
 TEST(MatchingNettypes, SameNettypeTerminalsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -23,9 +20,6 @@ TEST(MatchingNettypes, SameNettypeTerminalsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.22.6(b) end to end: a net of an aliasing nettype matches a net of the
-// nettype it renames, so the production validator that compares the two pass
-// switch terminals does not flag them as different nettypes.
 TEST(MatchingNettypes, AliasAndRenamedNettypeTerminalsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -40,14 +34,6 @@ TEST(MatchingNettypes, AliasAndRenamedNettypeTerminalsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.22.6 end to end: two unrelated user-defined nettypes do not match, so the
-// production validator rejects connecting their nets across a pass switch.
-// §6.22.6 only defines the matching relation, listing a) a nettype matching
-// itself and the nettype of the nets declared with it within its type
-// identifier's scope, and b) the renaming case; the "shall" the report enforces
-// is §28.8's, that a bidirectional switch may not join nets of two different
-// user-defined net types, nor one of a user-defined net type to one of a
-// built-in net type, so the report names §28.8.
 TEST(MatchingNettypes, DistinctNettypeTerminalsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -59,19 +45,12 @@ TEST(MatchingNettypes, DistinctNettypeTerminalsRejected) {
       "  tran sw(a, b);\n"
       "endmodule\n",
       f);
-  // The two nettype names are in the substring because
-  // CheckBidirNettypeCompatibility in src/elaborator/elaborator_gates.cpp has a
-  // sibling report under the same subclause, for a user-defined nettype tied to
-  // a built-in net, and both begin "bidirectional pass switch cannot connect".
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "cannot connect different user-defined nettypes "
                             "('foo_t' and 'bar_t')",
                             6, "28.8"));
 }
 
-// §6.22.6(b) edge case: renaming is transitive. An alias of an alias still
-// renames the original user-defined nettype, so a net of the chained alias
-// matches a net of the base nettype and the production validator accepts them.
 TEST(MatchingNettypes, AliasOfAliasMatchesBaseNettype) {
   ElabFixture f;
   ElaborateSrc(
@@ -87,8 +66,6 @@ TEST(MatchingNettypes, AliasOfAliasMatchesBaseNettype) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.22.6(b) edge case: two simple nettypes that each rename the same
-// user-defined nettype match each other, since both resolve to that nettype.
 TEST(MatchingNettypes, SiblingAliasesOfSameNettypeMatch) {
   ElabFixture f;
   ElaborateSrc(
@@ -104,10 +81,6 @@ TEST(MatchingNettypes, SiblingAliasesOfSameNettypeMatch) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §6.22.6 names the only two ways nettypes match, and a nettype declared over
-// a data type is neither a renaming of that type nor of any other nettype
-// declared over it: foo_t and bar_t are two nettypes, each over the typedef T,
-// so the pass switch joining their nets is reported as §28.8 has it (#7598).
 TEST(MatchingNettypes, NettypesDeclaredOverOneTypedefDoNotMatch) {
   ElabFixture f;
   ElaborateSrc(

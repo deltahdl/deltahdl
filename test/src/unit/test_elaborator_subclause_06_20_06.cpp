@@ -30,8 +30,6 @@ TEST(ConstConstantElaboration, ConstIntWithInitializerSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// A const variable is a constant, so the report is the one §6.20 states for an
-// assignment to any constant rather than a const-specific one.
 TEST(ConstConstantElaboration, ConstReassignmentIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -56,9 +54,6 @@ TEST(ConstConstantElaboration, ConstNonblockingReassignmentIsError) {
                             3, "6.20"));
 }
 
-// §6.20.6: a const variable cannot be written wherever the write appears, so
-// the report an assignment inside `initial` draws is the same one an assignment
-// inside `always_ff` draws.
 TEST(ConstConstantElaboration, ConstReassignmentInAlwaysFfIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -127,9 +122,6 @@ TEST(ConstConstantElaboration, ConstCreatesVariable) {
   EXPECT_TRUE(found);
 }
 
-// §6.20.6: a static const may be set to an enumerated name. The elaborator
-// accepts an enumeration member as the initializing expression without
-// requiring a cast or flagging it as a non-constant.
 TEST(ConstConstantElaboration, ConstInitializedFromEnumNameSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -142,8 +134,6 @@ TEST(ConstConstantElaboration, ConstInitializedFromEnumNameSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: a static const may be set to a constant function of the permitted
-// operands. A call to a user function in the initializer elaborates cleanly.
 TEST(ConstConstantElaboration, ConstInitializedFromConstantFunctionSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -158,11 +148,6 @@ TEST(ConstConstantElaboration, ConstInitializedFromConstantFunctionSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: unlike a value parameter, a const constant may be initialized from a
-// hierarchical name, because const constants are calculated after elaboration.
-// The elaborator does not emit the "hierarchical name not allowed" diagnostic
-// it raises for enum named constants when the same form appears in a const
-// initializer (the LRM example is `const logic option = a.b.c;`).
 TEST(ConstConstantElaboration, ConstWithHierarchicalNameInitializerSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -174,11 +159,6 @@ TEST(ConstConstantElaboration, ConstWithHierarchicalNameInitializerSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: a static const may be set to a genvar. Inside a generate-for the
-// loop index is a constant, so a const declared in the loop body may be
-// initialized from it; the declaration elaborates without a non-constant
-// diagnostic. The genvar is built from real generate-loop syntax so the const
-// initializer observes an actual loop index, not a stand-in value.
 TEST(ConstConstantElaboration, ConstInitializedFromGenvarSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -193,10 +173,6 @@ TEST(ConstConstantElaboration, ConstInitializedFromGenvarSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: an automatic const (one declared in an automatic scope, such as an
-// automatic subroutine) may be set to any expression that would be legal
-// without the const keyword, unlike a static const which must be set at
-// elaboration time. Here the initializer depends on a run-time argument value.
 TEST(ConstConstantElaboration, ConstAutomaticAcceptsRuntimeInitializer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -211,9 +187,6 @@ TEST(ConstConstantElaboration, ConstAutomaticAcceptsRuntimeInitializer) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: an instance of a class (an object handle) may be declared with the
-// const keyword, initialized at its declaration from a constructor call. The
-// declaration elaborates without error.
 TEST(ConstConstantElaboration, ConstClassHandleDeclarationSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -231,8 +204,6 @@ TEST(ConstConstantElaboration, ConstClassHandleDeclarationSucceeds) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §6.20.6: a const object handle behaves like a variable that cannot be
-// written, so rebinding the handle to a different object is an error.
 TEST(ConstConstantElaboration, ConstClassHandleReassignmentIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -249,9 +220,6 @@ TEST(ConstConstantElaboration, ConstClassHandleReassignmentIsError) {
                             "assignment to constant 'obj'", 7, "6.20"));
 }
 
-// §6.20.6: although a const object handle cannot be rebound, the members of the
-// referenced object remain writable. A write to a member of a const handle is
-// not flagged as a write to a constant.
 TEST(ConstConstantElaboration, ConstObjectMemberWriteSucceeds) {
   ElabFixture f;
   auto* design = ElaborateSrc(

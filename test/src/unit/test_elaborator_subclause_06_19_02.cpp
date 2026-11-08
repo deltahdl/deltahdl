@@ -118,9 +118,6 @@ TEST(Elaboration, EnumRangeNMDecrementing) {
 }
 
 TEST(Elaboration, EnumRangeNMEqualBoundsSingle) {
-  // Boundary of the name[N:M] form where N == M: neither incrementing nor
-  // decrementing, so exactly one constant nameN is generated. This exercises a
-  // distinct expansion path from the incrementing/decrementing cases.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -171,10 +168,6 @@ TEST(Elaboration, EnumRangeNZeroIsError) {
       "6.19.2"));
 }
 
-// Syntax 6-5 (printed page 119) takes an integral_number for each bound, so
-// `-1`, a unary expression, is the parser's to report; the elaborator's
-// non-negative rule is what a bound that parsed would meet, and no integral
-// number is negative.
 TEST(Elaboration, EnumRangeNMNegativeIsError) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(
@@ -187,10 +180,6 @@ TEST(Elaboration, EnumRangeNMNegativeIsError) {
       "enumeration range bound must be an integral number", 2, "6.19.2"));
 }
 
-// Table 6-10: a bound with an x or z digit is no integral number, whether it
-// is the N of name[N] or either bound of name[N:M], and whatever its other
-// digits fold to; one whose digits are all x is reported as that, not as a
-// count below one.
 TEST(Elaboration, EnumRangeBoundWithXOrZDigitIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -217,8 +206,6 @@ TEST(Elaboration, EnumRangeBoundWithXOrZDigitIsError) {
 }
 
 TEST(Elaboration, EnumRangeNOneProducesSingle) {
-  // Boundary of the positive-N rule: N == 1 is the smallest legal count and
-  // yields exactly one generated constant, name0.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -236,9 +223,6 @@ TEST(Elaboration, EnumRangeNOneProducesSingle) {
 }
 
 TEST(Elaboration, EnumRangeNMZeroBoundsAllowed) {
-  // Zero is a legal bound for the name[N:M] form, since both bounds need only
-  // be non-negative. The label uses `register` (not `reg`, a reserved keyword)
-  // matching the §6.19 example name[N:M] form.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"
@@ -259,9 +243,6 @@ TEST(Elaboration, EnumRangeNMZeroBoundsAllowed) {
   EXPECT_EQ(it->second[2].value, 2);
 }
 
-// A negative second bound of name[N:M]: Syntax 6-5 (printed page 119) takes
-// an integral_number there, so `-1`, a unary expression, is the parser's to
-// report, as the negative first bound above is.
 TEST(Elaboration, EnumRangeNMNegativeEndIsError) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(
@@ -275,10 +256,6 @@ TEST(Elaboration, EnumRangeNMNegativeEndIsError) {
 }
 
 TEST(Elaboration, EnumRangeSecondLrmExample) {
-  // The second worked example of §6.19.2: two ranged members, each with its own
-  // value. The name[N]=C form seeds the first generated constant with C and
-  // increments; a following name[N:M]=C form must RESET the running value to
-  // its own C rather than continue from the previous member's last value.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module top;\n"

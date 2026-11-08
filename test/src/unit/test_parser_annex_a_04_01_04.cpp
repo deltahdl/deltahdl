@@ -8,18 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A.4.1.4 checker_instantiation ::=
-//     ps_checker_identifier name_of_instance ( [
-//     list_of_checker_port_connections ] ) ;
-// Checker instantiation shares the generic instance-parsing path
-// (ParseModuleInstList) with module/interface/program instantiation, so the
-// parsed item is recorded as kModuleInst. These tests pin every §A.4.1.4
-// production and alternative; the sub-symbols (ps_checker_identifier,
-// name_of_instance, property_actual_arg, attribute_instance,
-// formal_port_identifier) are owned by their respective dependency subclauses.
-
-// list_of_checker_port_connections, alt 1: ordered list with a populated
-// property_actual_arg in each ordered_checker_port_connection.
 TEST(CheckerInstantiationGrammar, CheckerInstOrderedPorts) {
   auto r = Parse(
       "checker my_chk(input logic a, input logic b, input logic c);\n"
@@ -31,9 +19,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstOrderedPorts) {
   EXPECT_EQ(item->inst_ports.size(), 3u);
 }
 
-// list_of_checker_port_connections, alt 2: named list. Each
-// named_checker_port_connection uses the `. formal_port_identifier
-// ( property_actual_arg )` form.
 TEST(CheckerInstantiationGrammar, CheckerInstNamedPorts) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -47,8 +32,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstNamedPorts) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-// named_checker_port_connection, form 1 with the optional `( ... )` omitted:
-// `. formal_port_identifier`.
 TEST(CheckerInstantiationGrammar, CheckerInstNamedPortNoParens) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -62,9 +45,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstNamedPortNoParens) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-// named_checker_port_connection, form 1 with empty parens: the inner
-// property_actual_arg is itself optional, so `. formal_port_identifier ( )`
-// is legal and leaves the connection's actual argument unbound.
 TEST(CheckerInstantiationGrammar, CheckerInstNamedEmptyParens) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -80,9 +60,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstNamedEmptyParens) {
   EXPECT_NE(item->inst_ports[1].second, nullptr);
 }
 
-// ordered_checker_port_connection with the optional property_actual_arg
-// omitted: an empty ordered slot (`a, , c`) is a distinct alternative whose
-// actual argument is unbound.
 TEST(CheckerInstantiationGrammar, CheckerInstOrderedBlankConnection) {
   auto r = Parse(
       "checker my_chk(input logic a, input logic b, input logic c);\n"
@@ -97,9 +74,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstOrderedBlankConnection) {
   EXPECT_NE(item->inst_ports[2].second, nullptr);
 }
 
-// Both ordered_checker_port_connection and named_checker_port_connection are
-// prefixed by `{ attribute_instance }`. The attribute prefix is accepted and
-// the underlying connections still parse.
 TEST(CheckerInstantiationGrammar, CheckerInstPortConnectionAttributes) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic rst);\n"
@@ -115,8 +89,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstPortConnectionAttributes) {
   EXPECT_EQ(item->inst_ports[1].first, "rst");
 }
 
-// ps_checker_identifier name_of_instance ( ... ) ; — pins the item kind and
-// the checker/instance identifiers of the simple (unscoped) form.
 TEST(CheckerInstantiationGrammar, BasicCheckerInst) {
   auto r = Parse(
       "checker my_chk(input logic clk, input logic data);\n"
@@ -130,7 +102,6 @@ TEST(CheckerInstantiationGrammar, BasicCheckerInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// named_checker_port_connection, form 2: `{ attribute_instance } . *`.
 TEST(CheckerInstantiationGrammar, CheckerInstWildcardPort) {
   auto r = Parse(
       "checker my_chk(input logic clk);\n"
@@ -142,8 +113,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstWildcardPort) {
   EXPECT_TRUE(item->inst_wildcard);
 }
 
-// checker_instantiation with list_of_checker_port_connections omitted: the
-// optional connection list reduces to empty parens.
 TEST(CheckerInstantiationGrammar, CheckerInstEmptyPorts) {
   auto r = Parse(
       "checker my_chk;\n"
@@ -156,7 +125,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstEmptyPorts) {
   EXPECT_TRUE(item->inst_ports.empty());
 }
 
-// name_of_instance carries an optional unpacked_dimension.
 TEST(CheckerInstantiationGrammar, CheckerInstArray) {
   auto r = Parse(
       "checker my_chk(input logic clk);\n"
@@ -170,7 +138,6 @@ TEST(CheckerInstantiationGrammar, CheckerInstArray) {
   EXPECT_NE(item->inst_range_right, nullptr);
 }
 
-// ps_checker_identifier in its package-scoped form (`pkg :: my_chk`).
 TEST(CheckerInstantiationGrammar, PackageScopedCheckerInst) {
   auto r = Parse(
       "package pkg;\n"
@@ -189,20 +156,15 @@ TEST(CheckerInstantiationGrammar, PackageScopedCheckerInst) {
   EXPECT_EQ(item->inst_name, "u0");
 }
 
-// The trailing `;` of checker_instantiation is mandatory.
 TEST(CheckerInstantiationGrammar, Error_MissingSemicolon) {
   auto r = Parse(
       "checker my_chk;\n"
       "endchecker\n"
       "module m; my_chk u0() endmodule\n");
-  // Parser::ParseModuleInstList files the shared instantiation reports under
-  // §23.3.2, and a checker instance takes that same path.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "23.3.2"));
 }
 
-// list_of_checker_port_connections is either an all-ordered list or an
-// all-named list; the two forms cannot be interleaved in one connection list.
 TEST(CheckerInstantiationGrammar, Error_MixedOrderedAndNamedPorts) {
   auto r = Parse(
       "checker my_chk(input logic a, input logic clk);\n"
@@ -212,18 +174,11 @@ TEST(CheckerInstantiationGrammar, Error_MixedOrderedAndNamedPorts) {
       "  my_chk u0(a, .clk(clk));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §23.3.2 owns the no-mixing rule, and Parser::ParsePortConnection reports
-  // it for a checker instance through the shared instantiation path.
   EXPECT_TRUE(ReportedError(
       r.diags, "ordered and named port connections cannot be mixed", 5,
       "23.3.2"));
 }
 
-// checker_instantiation writes one name_of_instance where A.4.1.1's three
-// forms write `hierarchical_instance { , hierarchical_instance }`. The parser
-// reads all four through one path and cannot tell a checker's name from a
-// module's, so it records which instances continued a list after a ',' and
-// the elaborator, which knows the cell, reports the checker's under A.4.1.4.
 TEST(CheckerInstantiationGrammar, InstanceListContinuationIsRecorded) {
   auto r = Parse(
       "checker chk(input logic a);\n"

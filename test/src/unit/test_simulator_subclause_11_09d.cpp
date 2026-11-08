@@ -13,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborates and runs `src`, answering the variable `y` it declares so a
-// test reads the value a member access produced beside what the run
-// reported.
 Variable* RunReadingY(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   EXPECT_NE(design, nullptr);
@@ -27,8 +24,6 @@ Variable* RunReadingY(const std::string& src, SimFixture& f) {
   return y;
 }
 
-// Elaborates and runs `src` with standard output captured, answering the
-// text the run printed.
 std::string RunPrinting(const std::string& src, SimFixture& f) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
@@ -39,13 +34,6 @@ std::string RunPrinting(const std::string& src, SimFixture& f) {
   return captured.str();
 }
 
-// §7.3.2 (printed page 151): a tagged union's value is its tag beside the
-// member's bits wherever the union stands, so `s.u = tagged Valid 9` gives
-// the member u of s the tag Valid with the 9, and §11.9 (printed 304) has
-// `s.u.Valid` read consistently with that tag: the 9 comes back and nothing
-// is reported. The read checked the layout of s alone, a structure with no
-// tag of its own, so this was clean before as well; it is the reading beside
-// the one below that tells a check against the member's tag from none.
 TEST(TaggedUnionEval, MemberReadConsistentWithTheMembersTagIsClean) {
   SimFixture f;
   auto* y = RunReadingY(
@@ -66,14 +54,6 @@ TEST(TaggedUnionEval, MemberReadConsistentWithTheMembersTagIsClean) {
                              "run-time error: accessing member", 8, "11.9"));
 }
 
-// §11.9 (printed page 304): reading a member inconsistent with the current
-// tag is a run-time error, and the tag `s.u = tagged Valid 9` gives the
-// member u of s is Valid (§7.3.2, printed 151), so `y = s.u.Other` is
-// reported against it, naming the union as the access spelled it, and y
-// takes the unknown value a refused read yields rather than the 9 Valid
-// holds. The read split the access into the variable s and the path
-// u.Other, asked s's layout, a structure, for a tag, and let the read through
-// with the 9.
 TEST(TaggedUnionEval, MemberReadIsCheckedAgainstTheMembersTag) {
   SimFixture f;
   auto* y = RunReadingY(
@@ -97,11 +77,6 @@ TEST(TaggedUnionEval, MemberReadIsCheckedAgainstTheMembersTag) {
       8, "11.9"));
 }
 
-// §7.3.2 (printed page 151) puts no bound on how deep the structure holding
-// the tagged union stands: `m.s.u = tagged Valid 9` tags the union two
-// members down, under the key the whole path spells, and §11.9 (printed 304)
-// checks `m.s.u.Other` against that tag while `m.s.u.Valid` reads the 9.
-// The walk descends a segment at a time, so the union is found at any depth.
 TEST(TaggedUnionEval, TwoLevelMemberReadIsCheckedAgainstItsUnionsTag) {
   SimFixture f;
   auto* y = RunReadingY(
@@ -130,12 +105,6 @@ TEST(TaggedUnionEval, TwoLevelMemberReadIsCheckedAgainstItsUnionsTag) {
       10, "11.9"));
 }
 
-// §21.2.1.6 (printed page 662): a tagged union prints under %p as its tag
-// beside the currently valid member's value, and §7.3.2 (printed 151) has the
-// member u of s hold the tag `s.u = tagged Valid 9` gave it, so `s.u` prints
-// as the variable `u` would after `u = tagged Valid 9`: '{Valid:9}. The
-// formatter asked for a tag by the argument's name, which a member access has
-// none of, and printed the member's bits as one number.
 TEST(TaggedUnionEval, MemberTaggedUnionPrintsTagAndValue) {
   SimFixture f;
   auto out = RunPrinting(
@@ -153,13 +122,6 @@ TEST(TaggedUnionEval, MemberTaggedUnionPrintsTagAndValue) {
   EXPECT_EQ(out, "'{Valid:9}\n");
 }
 
-// §11.9 packs a tagged union expression's member expression against the
-// member's type wherever the expression stands, and §11.4.11 has a known
-// predicate of `?:` yield the arm it selects. So a tagged expression that is
-// an arm of `?:`, positional or by name, and one that is the member expression
-// of another tagged expression, keep the first member of their structure:
-// reg1 1 and 19, cc 2. Concatenated at the items' own widths and cut to the
-// member's, the first member was lost and read 0.
 TEST(TaggedUnionSim, ANestedTaggedExpressionKeepsItsStructsFirstMember) {
   SimFixture f;
   std::string out = RunCapture(
@@ -186,11 +148,6 @@ TEST(TaggedUnionSim, ANestedTaggedExpressionKeepsItsStructsFirstMember) {
   EXPECT_EQ(out, "1 4 19 2 83\n");
 }
 
-// §11.9 (printed page 304): a member read inconsistent with the tag is a
-// run-time error, and the read gives all x. A structure so read, stored and
-// then read for its string member, gives the empty string: the member's x
-// handle names no text. The logic member keeps the structure's storage 4-state
-// (§6.8), so the x reaches the string member's bits; it reads as x itself.
 TEST(TaggedUnionEval, AStringMemberOfAStructureReadAgainstTheTagIsEmpty) {
   SimFixture f;
   std::string out = RunCapture(

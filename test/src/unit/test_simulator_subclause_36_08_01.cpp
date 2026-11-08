@@ -11,18 +11,8 @@
 namespace delta {
 namespace {
 
-// §36.8.1: a sizetf application returns the number of bits the system
-// function's return value is. These stubs return distinct widths so a test can
-// observe that the value the sizetf returns - not a fixed constant - becomes
-// the reported width.
 PLI_INT32 SizetfReturning12(PLI_BYTE8*) { return 12; }
 PLI_INT32 SizetfReturning64(PLI_BYTE8*) { return 64; }
-
-// -----------------------------------------------------------------------------
-// §36.8.1: the sizetf returns the width, in bits, of the value the calltf gives
-// back as the system function's result. The width a sized system function
-// reports is exactly whatever its sizetf application returns.
-// -----------------------------------------------------------------------------
 
 TEST(SizetfApplicationRoutine, ReturnValueIsTheFunctionReturnWidth) {
   s_vpi_systf_data sized = {};
@@ -30,41 +20,25 @@ TEST(SizetfApplicationRoutine, ReturnValueIsTheFunctionReturnWidth) {
   sized.sysfunctype = kVpiSizedFunc;
   sized.sizetf = &SizetfReturning12;
 
-  // The width reported for the function is the value its sizetf returned.
   EXPECT_EQ(VpiSystfResultSizeBits(sized), 12);
 
-  // A sizetf that returns a different value yields that different width, so the
-  // reported size tracks the returned value rather than any fixed number.
   sized.sizetf = &SizetfReturning64;
   EXPECT_EQ(VpiSystfResultSizeBits(sized), 64);
 }
-
-// -----------------------------------------------------------------------------
-// §36.8.1: a user-defined system function registered without a sizetf returns a
-// 32-bit value.
-// -----------------------------------------------------------------------------
 
 TEST(SizetfApplicationRoutine, NoSizetfSpecifiedDefaultsTo32Bits) {
   s_vpi_systf_data sized = {};
   sized.type = kVpiSysFunc;
   sized.sysfunctype = kVpiSizedFunc;
-  sized.sizetf = nullptr;  // no sizetf application supplied
+  sized.sizetf = nullptr;
 
   EXPECT_EQ(VpiSystfResultSizeBits(sized), 32);
 }
 
-// -----------------------------------------------------------------------------
-// §36.8.1: no sizetf runs for a user-defined system task, nor for a function
-// whose sysfunctype is vpiRealFunc. Whether a sizetf would run is decided
-// before any call, so a system task and a real-valued function both report that
-// the routine is not to be called - even when a sizetf application is supplied
-// in the registration.
-// -----------------------------------------------------------------------------
-
 TEST(SizetfApplicationRoutine, NotCalledForSystemTask) {
   s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
-  task.sizetf = &SizetfReturning12;  // present, but must not be consulted
+  task.sizetf = &SizetfReturning12;
 
   EXPECT_FALSE(VpiSystfSizetfIsCalled(task));
 }
@@ -73,14 +47,11 @@ TEST(SizetfApplicationRoutine, NotCalledForRealValuedFunction) {
   s_vpi_systf_data real_func = {};
   real_func.type = kVpiSysFunc;
   real_func.sysfunctype = kVpiRealFunc;
-  real_func.sizetf = &SizetfReturning12;  // present, but must not be consulted
+  real_func.sizetf = &SizetfReturning12;
 
   EXPECT_FALSE(VpiSystfSizetfIsCalled(real_func));
 }
 
-// How many times the counting sizetf below has run. §36.8.1 bounds that at one
-// per registration, so the count is the whole subject of the case that reads
-// it.
 int g_sizetf_runs = 0;
 
 PLI_INT32 CountingSizetfReturning17(PLI_BYTE8*) {
@@ -104,12 +75,6 @@ class SizetfInARun : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.8.1: a sizetf routine runs no more than once. The width is asked for
-// three times and the routine runs once, every later ask answering with what
-// that run returned. Asked straight through VpiSystfResultSizeBits, which
-// measures a record rather than a registration, the same three asks run it
-// three times -- that free function is what the cases above use, and it is the
-// registration that carries the once.
 TEST_F(SizetfInARun, ASizetfRunsOncePerRegistration) {
   g_sizetf_runs = 0;
   s_vpi_systf_data sized = {};
@@ -128,9 +93,6 @@ TEST_F(SizetfInARun, ASizetfRunsOncePerRegistration) {
   EXPECT_EQ(g_sizetf_runs, 1);
 }
 
-// §36.8.1: the sizetf runs when its system function appears in the design. The
-// design calls $sized_once once, and that is what runs the sizetf --
-// registering it did not.
 TEST_F(SizetfInARun, ASizetfRunsBecauseTheFunctionAppearsInTheDesign) {
   g_sizetf_runs = 0;
   s_vpi_systf_data sized = {};
@@ -153,11 +115,6 @@ TEST_F(SizetfInARun, ASizetfRunsBecauseTheFunctionAppearsInTheDesign) {
   EXPECT_EQ(g_sizetf_runs, 1);
 }
 
-// §36.8.1: the sizetf returns the width, in bits, of the value the calltf gives
-// back as the system function's result. The sizetf answers 17, so the value the
-// application writes through is seventeen bits wide -- not the thirty-two
-// §38.37.1 gives a sized function that supplies no sizetf, which is what the
-// call answered with before.
 TEST_F(SizetfInARun, TheCallsResultIsAsWideAsTheSizetfSaid) {
   g_sizetf_runs = 0;
   s_vpi_systf_data sized = {};

@@ -10,12 +10,6 @@
 
 using namespace delta;
 
-// §12.6.2/§12.6.3: a `matches ... &&& <side-effect>` predicate is a sequential
-// conjunction evaluated left to right; once the matches clause fails, the
-// side-effecting clause to its right must not run. `pred_stmt` is the single
-// procedural statement (an if-matches or a ternary-matches assignment) whose
-// matches clause fails, so `cnt` must stay 0 and `y` must take the else
-// value 2.
 inline void RunMatchesShortCircuitSkipsLaterClause(
     const std::string& pred_stmt) {
   SimFixture f;

@@ -169,19 +169,16 @@ TEST(SvaEngine, KillClearsPendingAssertions) {
   EXPECT_EQ(count, 0);
 }
 
-// §20.11: Lock (control_type 1) prevents any status change until Unlock
-// (control_type 2); while locked, $assertcontrol does not affect the assertion.
 TEST(SvaEngine, LockPreventsStatusChangeUntilUnlock) {
   AssertionControl ctrl;
   ctrl.Lock("inst1");
   ctrl.SetOff("inst1");
-  EXPECT_TRUE(ctrl.IsEnabled("inst1"));  // Off was ignored while locked
+  EXPECT_TRUE(ctrl.IsEnabled("inst1"));
   ctrl.Unlock("inst1");
   ctrl.SetOff("inst1");
   EXPECT_FALSE(ctrl.IsEnabled("inst1"));
 }
 
-// §20.11: Unlock is the only control that reaches a locked assertion.
 TEST(SvaEngine, UnlockReachesLockedAssertion) {
   AssertionControl ctrl;
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kLock), "inst1");
@@ -191,7 +188,6 @@ TEST(SvaEngine, UnlockReachesLockedAssertion) {
   EXPECT_FALSE(ctrl.IsLocked("inst1"));
 }
 
-// §20.11: ApplyControl dispatches Off (4) and On (3) by integer control_type.
 TEST(SvaEngine, ApplyControlOffOnByControlType) {
   AssertionControl ctrl;
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kOff), "inst1");
@@ -200,8 +196,6 @@ TEST(SvaEngine, ApplyControlOffOnByControlType) {
   EXPECT_TRUE(ctrl.IsEnabled("inst1"));
 }
 
-// §20.11: VacuousOff (11) stops the pass action on vacuous success while
-// leaving nonvacuous success enabled; PassOn (6) re-enables both.
 TEST(SvaEngine, VacuousOffDisablesOnlyVacuousPass) {
   AssertionControl ctrl;
   ctrl.SetVacuousOff("inst1");
@@ -211,8 +205,6 @@ TEST(SvaEngine, VacuousOffDisablesOnlyVacuousPass) {
   EXPECT_TRUE(ctrl.IsVacuousPassEnabled("inst1"));
 }
 
-// §20.11: PassOff (7) stops both kinds of pass action; NonvacuousOn (10)
-// re-enables only the nonvacuous pass action.
 TEST(SvaEngine, NonvacuousOnReenablesNonvacuousPassOnly) {
   AssertionControl ctrl;
   ctrl.SetPassOff("inst1");
@@ -222,8 +214,6 @@ TEST(SvaEngine, NonvacuousOnReenablesNonvacuousPassOnly) {
   EXPECT_FALSE(ctrl.IsVacuousPassEnabled("inst1"));
 }
 
-// §20.11: the action controls (control_type 6 through 11) do not affect the
-// statistics counters, while the status controls (1 through 5) do.
 TEST(SvaEngine, OnlyStatusControlsAffectStatistics) {
   EXPECT_TRUE(
       ControlTypeAffectsStatistics(static_cast<int>(AssertControlType::kKill)));
@@ -233,7 +223,6 @@ TEST(SvaEngine, OnlyStatusControlsAffectStatistics) {
       static_cast<int>(AssertControlType::kVacuousOff)));
 }
 
-// §20.11: $assertoff is equivalent to $assertcontrol(4, 15, 7, ...).
 TEST(SvaEngine, AssertOffEquivalentToControl) {
   AssertControlInvocation inv;
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertoff", inv));
@@ -242,8 +231,6 @@ TEST(SvaEngine, AssertOffEquivalentToControl) {
   EXPECT_EQ(inv.directive_type, 7u);
 }
 
-// §20.11: the action control tasks expand with assertion_type 31; e.g.
-// $assertfailoff is $assertcontrol(9, 31, 7, ...).
 TEST(SvaEngine, AssertFailOffEquivalentToControl) {
   AssertControlInvocation inv;
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertfailoff", inv));
@@ -252,21 +239,16 @@ TEST(SvaEngine, AssertFailOffEquivalentToControl) {
   EXPECT_EQ(inv.assertion_type, 31u);
 }
 
-// §20.11: a name that is not a convenience control task does not expand.
 TEST(SvaEngine, NonControlTaskHasNoEquivalent) {
   AssertControlInvocation inv;
   EXPECT_FALSE(EquivalentAssertControlForTask("$display", inv));
 }
 
-// §20.11: assertion_type defaults to 255 and directive_type defaults to 7 when
-// the arguments are not specified.
 TEST(SvaEngine, ControlArgumentDefaults) {
   EXPECT_EQ(kAssertionTypeDefault, 255u);
   EXPECT_EQ(kDirectiveTypeDefault, 7u);
 }
 
-// §20.11: ApplyControl dispatches PassOff (7) to disabling the pass action and
-// PassOn (6) to re-enabling it, keyed by integer control_type.
 TEST(SvaEngine, ApplyControlPassOffPassOnByControlType) {
   AssertionControl ctrl;
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kPassOff), "inst1");
@@ -275,8 +257,6 @@ TEST(SvaEngine, ApplyControlPassOffPassOnByControlType) {
   EXPECT_TRUE(ctrl.IsPassEnabled("inst1"));
 }
 
-// §20.11: ApplyControl dispatches FailOff (9) to disabling the fail action and
-// FailOn (8) to re-enabling it.
 TEST(SvaEngine, ApplyControlFailOffFailOnByControlType) {
   AssertionControl ctrl;
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kFailOff), "inst1");
@@ -285,8 +265,6 @@ TEST(SvaEngine, ApplyControlFailOffFailOnByControlType) {
   EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
 }
 
-// §20.11: ApplyControl dispatches VacuousOff (11) to disabling only the vacuous
-// pass action and NonvacuousOn (10) to enabling the nonvacuous pass action.
 TEST(SvaEngine, ApplyControlVacuousOffNonvacuousOnByControlType) {
   AssertionControl ctrl;
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kVacuousOff), "inst1");
@@ -298,8 +276,6 @@ TEST(SvaEngine, ApplyControlVacuousOffNonvacuousOnByControlType) {
   EXPECT_TRUE(ctrl.IsNonvacuousPassEnabled("inst1"));
 }
 
-// §20.11: ApplyControl dispatches Kill (5), which disables the assertion and
-// records that it was killed.
 TEST(SvaEngine, ApplyControlKillByControlType) {
   AssertionControl ctrl;
   ctrl.ApplyControl(static_cast<int>(AssertControlType::kKill), "inst1");
@@ -307,8 +283,6 @@ TEST(SvaEngine, ApplyControlKillByControlType) {
   EXPECT_TRUE(ctrl.WasKilled("inst1"));
 }
 
-// §20.11: the $asserton/$assertoff/$assertkill tasks expand with assertion_type
-// 15 and directive_type 7; their control_types are On (3), Off (4), Kill (5).
 TEST(SvaEngine, StatusTaskEquivalents) {
   AssertControlInvocation inv;
   ASSERT_TRUE(EquivalentAssertControlForTask("$asserton", inv));
@@ -320,8 +294,6 @@ TEST(SvaEngine, StatusTaskEquivalents) {
   EXPECT_EQ(inv.assertion_type, 15u);
 }
 
-// §20.11: the action control tasks expand with assertion_type 31; this covers
-// the pass/fail/vacuity tasks not exercised elsewhere.
 TEST(SvaEngine, ActionTaskEquivalents) {
   AssertControlInvocation inv;
   ASSERT_TRUE(EquivalentAssertControlForTask("$assertpasson", inv));
@@ -342,22 +314,18 @@ TEST(SvaEngine, ActionTaskEquivalents) {
             static_cast<uint32_t>(AssertControlType::kVacuousOff));
 }
 
-// §20.11: while an assertion is locked, no control other than Unlock affects it
-// — a pass action control is ignored until the lock is removed.
 TEST(SvaEngine, LockAlsoBlocksActionControls) {
   AssertionControl ctrl;
   ctrl.Lock("inst1");
   ctrl.SetPassOff("inst1");
-  EXPECT_TRUE(ctrl.IsPassEnabled("inst1"));  // PassOff ignored while locked
+  EXPECT_TRUE(ctrl.IsPassEnabled("inst1"));
   ctrl.SetFailOff("inst1");
-  EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));  // FailOff ignored while locked
+  EXPECT_TRUE(ctrl.IsFailEnabled("inst1"));
   ctrl.Unlock("inst1");
   ctrl.SetPassOff("inst1");
   EXPECT_FALSE(ctrl.IsPassEnabled("inst1"));
 }
 
-// §20.11: the status controls (1 through 5) affect statistics counters; the
-// boundary is at control_type 5/6. Lock (1) and On (3) affect them.
 TEST(SvaEngine, StatusControlsBelowSixAffectStatistics) {
   EXPECT_TRUE(
       ControlTypeAffectsStatistics(static_cast<int>(AssertControlType::kLock)));
@@ -367,8 +335,6 @@ TEST(SvaEngine, StatusControlsBelowSixAffectStatistics) {
       static_cast<int>(AssertControlType::kPassOff)));
 }
 
-// §20.11: an assertion_type mask selects assertion kinds by OR-ing Table 20-6
-// values; mask 3 (Concurrent|SimpleImmediate) affects those two kinds only.
 TEST(SvaEngine, AssertionTypeMaskSelectsKinds) {
   uint32_t mask = static_cast<uint32_t>(AssertionTypeBit::kConcurrent) |
                   static_cast<uint32_t>(AssertionTypeBit::kSimpleImmediate);
@@ -379,8 +345,6 @@ TEST(SvaEngine, AssertionTypeMaskSelectsKinds) {
       mask, AssertionTypeBit::kObservedDeferredImmediate));
 }
 
-// §20.11: the default assertion_type (255) affects every Table 20-6 kind,
-// including unique and priority types.
 TEST(SvaEngine, DefaultAssertionTypeAffectsAllKinds) {
   EXPECT_TRUE(ControlAffectsAssertionType(kAssertionTypeDefault,
                                           AssertionTypeBit::kConcurrent));
@@ -390,8 +354,6 @@ TEST(SvaEngine, DefaultAssertionTypeAffectsAllKinds) {
                                           AssertionTypeBit::kPriority));
 }
 
-// §20.11: a directive_type mask selects directive kinds; mask 3 (Assert|Cover)
-// affects assert and cover but not assume directives.
 TEST(SvaEngine, DirectiveTypeMaskSelectsDirectives) {
   uint32_t mask = static_cast<uint32_t>(DirectiveTypeBit::kAssert) |
                   static_cast<uint32_t>(DirectiveTypeBit::kCover);
@@ -400,7 +362,6 @@ TEST(SvaEngine, DirectiveTypeMaskSelectsDirectives) {
   EXPECT_FALSE(ControlAffectsDirectiveType(mask, DirectiveTypeBit::kAssume));
 }
 
-// §20.11: the default directive_type (7) affects all three directive kinds.
 TEST(SvaEngine, DefaultDirectiveTypeAffectsAllDirectives) {
   EXPECT_TRUE(ControlAffectsDirectiveType(kDirectiveTypeDefault,
                                           DirectiveTypeBit::kAssert));
@@ -410,11 +371,6 @@ TEST(SvaEngine, DefaultDirectiveTypeAffectsAllDirectives) {
                                           DirectiveTypeBit::kAssume));
 }
 
-// The full-pipeline tests below drive an assertion control system task from
-// real source and observe its effect on a real immediate assertion (§16.3),
-// which is how §20.11's control_type/assertion_type/directive_type semantics
-// are meant to be applied. Each builds the assertion and the control task from
-// source, then parses, elaborates, lowers, and runs the design.
 int RunAndGetAssertionFailCount(const char* src) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
@@ -426,8 +382,6 @@ int RunAndGetAssertionFailCount(const char* src) {
   return f.ctx.AssertionFailCount();
 }
 
-// §20.11: $assertoff (Off) shall stop the checking of the immediate assertions
-// it selects, so a failing immediate assert reports no violation.
 TEST(AssertControlSim, AssertOffStopsImmediateAssertionChecking) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -445,8 +399,6 @@ TEST(AssertControlSim, AssertOffStopsImmediateAssertionChecking) {
   EXPECT_EQ(f.ctx.AssertionFailCount(), 0);
 }
 
-// §20.11: $asserton (On) shall re-enable checking after an $assertoff, so only
-// the assertion evaluated while checking is on reports its failure.
 TEST(AssertControlSim, AssertOnReenablesImmediateAssertionChecking) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -466,8 +418,6 @@ TEST(AssertControlSim, AssertOnReenablesImmediateAssertionChecking) {
   EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
 }
 
-// §20.11: $assertcontrol dispatches by integer control_type; Off (4) stops
-// checking and On (3) re-enables it, exactly as the convenience tasks do.
 TEST(AssertControlSim, AssertControlOffThenOnByControlType) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
@@ -480,10 +430,6 @@ TEST(AssertControlSim, AssertControlOffThenOnByControlType) {
             1);
 }
 
-// §20.11: the assertion_type argument selects which assertion kinds a control
-// affects. An Off whose mask is Concurrent-only (bit 1) does not include simple
-// immediate (bit 2), so a simple immediate assert keeps checking and still
-// reports its failure -- the mask is honored end to end.
 TEST(AssertControlSim, AssertionTypeMaskExcludesSimpleImmediate) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
@@ -492,7 +438,6 @@ TEST(AssertControlSim, AssertionTypeMaskExcludesSimpleImmediate) {
                                         "  end\n"
                                         "endmodule\n"),
             1);
-  // With the default mask (255) the same Off does stop the checking.
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
                                         "    $assertcontrol(4, 255, 7);\n"
@@ -502,9 +447,6 @@ TEST(AssertControlSim, AssertionTypeMaskExcludesSimpleImmediate) {
             0);
 }
 
-// §20.11: the directive_type argument likewise selects directive kinds. An Off
-// whose directive mask is Cover-only (bit 2) does not include assert (bit 1),
-// so an assert directive keeps checking.
 TEST(AssertControlSim, DirectiveTypeMaskExcludesAssertDirective) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
@@ -515,7 +457,6 @@ TEST(AssertControlSim, DirectiveTypeMaskExcludesAssertDirective) {
             1);
 }
 
-// §20.11: Kill (5), like Off, stops the checking of the selected assertions.
 TEST(AssertControlSim, AssertKillStopsImmediateAssertionChecking) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
@@ -526,10 +467,6 @@ TEST(AssertControlSim, AssertKillStopsImmediateAssertionChecking) {
             0);
 }
 
-// §20.11: $assertfailoff (FailOff) stops the fail action, including the default
-// $error, but the action controls do not affect the statistics counters -- so
-// the failure is still counted while no ERROR is reported. $assertfailon
-// restores the report.
 TEST(AssertControlSim, FailOffSuppressesDefaultErrorButStillCounts) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -565,9 +502,6 @@ TEST(AssertControlSim, FailOffSuppressesDefaultErrorButStillCounts) {
   EXPECT_EQ(g.ctx.LastSeverity(), "ERROR");
 }
 
-// §20.11: a control that names a scope list affects the assertions of those
-// scopes alone: turning off the instance `u` leaves the assertion of `t`
-// itself checked, and turning off `t` reaches it.
 TEST(AssertControlSim, AScopeListSelectsTheAssertionsOfItsScopes) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module m;\n"
                                         "endmodule\n"
@@ -583,9 +517,6 @@ TEST(AssertControlSim, AScopeListSelectsTheAssertionsOfItsScopes) {
             1);
 }
 
-// §20.11: control_type shall be an integer expression, not necessarily a
-// literal. A localparam supplies the control_type here, which resolves to Off;
-// the failing assert is then not checked.
 TEST(AssertControlSim, ControlTypeFromLocalparam) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  localparam int OFF = 4;\n"
@@ -597,9 +528,6 @@ TEST(AssertControlSim, ControlTypeFromLocalparam) {
             0);
 }
 
-// §20.11: control_type and assertion_type are integer expressions; parameters
-// supply both here (Off with the default-all mask), so the failing assert is
-// not checked -- the same effect as the literal form, via the parameter path.
 TEST(AssertControlSim, ControlAndAssertionTypeFromParameters) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  parameter int OFF = 4;\n"
@@ -612,9 +540,6 @@ TEST(AssertControlSim, ControlAndAssertionTypeFromParameters) {
             0);
 }
 
-// §20.11: the default directive_type (7) selects assume directives too, so Off
-// stops the checking of an immediate assume (which is otherwise checked like an
-// assert, §16.3).
 TEST(AssertControlSim, AssertOffStopsImmediateAssume) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
@@ -625,9 +550,6 @@ TEST(AssertControlSim, AssertOffStopsImmediateAssume) {
             0);
 }
 
-// §20.11: the assertion_type mask selects the deferred immediate kinds as well.
-// $assertoff (assertion_type 15) includes observed deferred immediate, so a
-// failing `assert #0` is not checked and records no failure.
 TEST(AssertControlSim, AssertOffStopsDeferredObservedAssertion) {
   EXPECT_EQ(RunAndGetAssertionFailCount("module t;\n"
                                         "  initial begin\n"
@@ -638,10 +560,6 @@ TEST(AssertControlSim, AssertOffStopsDeferredObservedAssertion) {
             0);
 }
 
-// §20.11: the directive_type mask selects cover directives. An Off whose
-// directive mask is Cover (bit 2) stops the checking of an immediate cover, so
-// the cover records no evaluation. Built from real source and driven end to
-// end.
 TEST(AssertControlSim, DirectiveMaskStopsCoverImmediate) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -660,11 +578,6 @@ TEST(AssertControlSim, DirectiveMaskStopsCoverImmediate) {
   EXPECT_EQ(f.ctx.ImmediateCovers().Evaluated(), 0u);
 }
 
-// §20.11: Kill aborts the attempts of the selected assertions that are in
-// flight, and an aborted attempt reaches no verdict. `a` is high at the rises
-// of 25 and 45 and `b` never, so the attempts begun there fail at 35 and 55;
-// the kill at 32 aborts the one begun at 25, and the rise of 35 begins none,
-// checking being off until 42. The seven attempts with `a` low pass.
 TEST(AssertControlSim, AssertKillAbortsAnImplicationInFlight) {
   SimFixture f;
   std::string out = RunCapture(
@@ -687,10 +600,6 @@ TEST(AssertControlSim, AssertKillAbortsAnImplicationInFlight) {
   EXPECT_EQ(out, "p=7 f=1\n");
 }
 
-// The same for a sequential property: every attempt of `1 ##1 b` fails at
-// the rise after its own, but the one begun at 25 is aborted at 32 and the
-// rise of 35 begins none, so the attempts of 5, 15 and 45 to 85 fail, the one
-// of 95 ending with the run undecided.
 TEST(AssertControlSim, AssertKillAbortsASequenceInFlight) {
   SimFixture f;
   std::string out = RunCapture(
@@ -710,10 +619,6 @@ TEST(AssertControlSim, AssertKillAbortsASequenceInFlight) {
   EXPECT_EQ(out, "f=7\n");
 }
 
-// §20.11: Off begins no new attempt but leaves one already under way to run on
-// to its verdict. The attempt begun at the rise of 5 is in flight when
-// $assertoff runs at 6 and fails at 25, `b` never being high; the rises of 15
-// and later begin none, so nothing else fails.
 TEST(AssertControlSim, AssertOffLetsAnImplicationInFlightFinish) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -728,8 +633,6 @@ TEST(AssertControlSim, AssertOffLetsAnImplicationInFlightFinish) {
             "fail 25\n");
 }
 
-// The same for a sequential property: the attempt of `1 ##2 b` begun at 5
-// finishes failing at 25 under Off, and no later one begins.
 TEST(AssertControlSim, AssertOffLetsASequenceInFlightFinish) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -744,11 +647,6 @@ TEST(AssertControlSim, AssertOffLetsASequenceInFlightFinish) {
             "fail 25\n");
 }
 
-// §16.9.4 puts the attempt of an assertion naming a future sampled value
-// function in flight until the global clocking tick after its own. Each
-// attempt of `$rising_gclk(b)` fails there, `b` never rising; the kill at 7
-// aborts the one begun at 5, so the attempts of 15 to 85 fail, the one of 95
-// ending with the run undecided.
 TEST(AssertControlSim, AssertKillAbortsAFutureSampledValueAttemptInFlight) {
   SimFixture f;
   std::string out = RunCapture(
@@ -769,9 +667,6 @@ TEST(AssertControlSim, AssertKillAbortsAFutureSampledValueAttemptInFlight) {
   EXPECT_EQ(out, "f=8\n");
 }
 
-// §20.11: FailOff (9) stops the fail action and PassOff (7) the pass action
-// of the assertions selected, immediate ones among them by the default
-// assertion_type, until FailOn (8) and PassOn (6) restore them.
 TEST(AssertControlSim, FailOffAndPassOffStopTheActionBlocks) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -798,10 +693,6 @@ TEST(AssertControlSim, FailOffAndPassOffStopTheActionBlocks) {
             "pass1\nfail2b\npass3\nfail4\n");
 }
 
-// §20.11 with Table 20-6: the assertion_type argument selects the assertions
-// a control affects, so Off of simple immediate assertions (2) leaves the
-// concurrent `a1` failing at 3, Off of concurrent ones (1) stops it at 5, and
-// On restores it at 7.
 TEST(AssertControlSim, TheAssertionTypeSelectsTheAssertionsControlled) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -826,9 +717,6 @@ TEST(AssertControlSim, TheAssertionTypeSelectsTheAssertionsControlled) {
             "cfail 1\ncfail 3\ncfail 7\n");
 }
 
-// §20.11: an assertion named in the list_of_scopes_or_assertions is the one
-// the task acts on: `ay` is off from 0 until its $asserton at 6, and `ax` is
-// killed at 2 and on again at 4.
 TEST(AssertControlSim, ANamedAssertionInTheListIsControlledAlone) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -855,10 +743,6 @@ TEST(AssertControlSim, ANamedAssertionInTheListIsControlledAlone) {
             "xfail 1\nxfail 5\nxfail 7\nyfail 7\n");
 }
 
-// §20.11 with Table 20-5: Lock (1) holds an assertion against every later
-// control until Unlock (2), so the $assertoff at 0 leaves the locked `a1`
-// failing at 1, and the one after the unlock at 2 stops it with `a2` until
-// the $asserton at 4.
 TEST(AssertControlSim, ALockedAssertionIsUnaffectedUntilUnlocked) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

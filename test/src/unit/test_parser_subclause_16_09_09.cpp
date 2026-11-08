@@ -29,11 +29,6 @@ TEST(AssertionSemanticsParsing, Throughout) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.9: the left operand of `throughout` is a condition and the right
-// operand is a full sequence. The desugaring `(exp)[*0:$] intersect seq` leans
-// on consecutive repetition (§16.9.2), so the guarded sequence must be allowed
-// to carry a `[*N]` repetition. This mirrors the shape of the standard's own
-// burst example: a negated condition held throughout a repeated match.
 TEST(AssertionSemanticsParsing, ThroughoutGuardsRepeatedSequence) {
   auto r = Parse(
       "module m;\n"
@@ -46,10 +41,6 @@ TEST(AssertionSemanticsParsing, ThroughoutGuardsRepeatedSequence) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.9: the guarded sequence may itself be an intersect composition — the
-// very operator (§16.9.6) the throughout desugaring is defined in terms of. The
-// parser must accept a throughout whose right operand is an intersect of two
-// subsequences.
 TEST(AssertionSemanticsParsing, ThroughoutGuardsIntersectSequence) {
   auto r = Parse(
       "module m;\n"
@@ -61,10 +52,6 @@ TEST(AssertionSemanticsParsing, ThroughoutGuardsIntersectSequence) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.9 with §16.7: a throughout reached after a ranged delay is read, a 1
-// standing at the start of each interval the range begins, at the tick it is
-// read at, and the guarded sequence after it; in a sequence a module or a
-// package declares, a property and an assertion alike.
 TEST(AssertionSemanticsParsing, AThroughoutAfterARangedDelayIsRead) {
   for (const char* delay : {"##[1:2]", "##[1:$]"}) {
     auto r = Parse(InEverySequencePlace(
@@ -87,10 +74,6 @@ TEST(AssertionSemanticsParsing, AThroughoutAfterARangedDelayIsRead) {
   }
 }
 
-// §16.9.9 with §16.7: the sequence a throughout guards may open with a ranged
-// delay, the interval beginning where the throughout does, the least of the
-// range before its first operand; the same throughout after a delay of one
-// tick count keeps its interval's start where the delay ends.
 TEST(AssertionSemanticsParsing, AThroughoutGuardingARangedDelayIsRead) {
   auto r = Parse(InEverySequencePlace("@(posedge clk) e throughout ##[1:2] b"));
   ASSERT_NE(r.cu, nullptr);

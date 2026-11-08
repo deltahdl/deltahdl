@@ -6,25 +6,10 @@
 
 namespace delta {
 
-// Annex O: the encryption/decryption flow. §O.1 has the annex describe a
-// number of scenarios that can be used for IP protection, and show how the
-// relevant pragmas -- the protect pragma's, whose keywords §34.4 tabulates --
-// are used to achieve the desired effect of securely protecting, distributing
-// and decrypting the model. The annex is informative: what it describes is
-// how the pragmas of Clause 34 are put to use, and each scenario is a use of
-// them rather than a rule of its own. This header states what §O.1 says; the
-// scenarios themselves are §O.3 through §O.5, and the pragmas they use are
-// processed where Clause 34 is.
-
-// §O.1: the annex that describes the scenarios.
 std::string_view AnnexDescribingProtectionScenarios();
 
-// §O.1: the annex is informative, not normative.
 bool ProtectionScenariosAreInformative();
 
-// §O.1: the scenarios the annex describes, one per subclause from §O.3 on:
-// the tool vendor secret key encryption system, the IP author secret key
-// encryption system, and digital envelopes.
 enum class ProtectionScenario : std::uint8_t {
   kToolVendorSecretKey,
   kIpAuthorSecretKey,
@@ -32,11 +17,8 @@ enum class ProtectionScenario : std::uint8_t {
 };
 std::span<const ProtectionScenario> ProtectionScenariosDescribed();
 
-// §O.1: the pragma whose use the scenarios show, the protect pragma of §34.2.
 std::string_view PragmaUsedForProtection();
 
-// §O.1: the effects the pragmas are used to achieve -- securely protecting
-// the model, distributing it, and decrypting it.
 enum class ProtectionEffect : std::uint8_t {
   kSecurelyProtecting,
   kDistributing,
@@ -44,118 +26,46 @@ enum class ProtectionEffect : std::uint8_t {
 };
 std::span<const ProtectionEffect> EffectsThePragmasAchieve();
 
-// §O.2: the data to be protected is placed within a protect begin-end block,
-// the block the protect pragma's begin and end keywords delimit.
 std::string_view KeywordOpeningTheProtectedBlock();
 std::string_view KeywordClosingTheProtectedBlock();
 
-// §O.2: what the block protects the data from -- inappropriate access, and
-// unauthorized modification.
 enum class ProtectionThreat : std::uint8_t {
   kInappropriateAccess,
   kUnauthorizedModification,
 };
 std::span<const ProtectionThreat> ThreatsTheBlockProtectsFrom();
 
-// §O.2: information written in the block, once encrypted, is protected as
-// the data is -- a pragma expression the author writes inside the block is
-// encrypted with the block rather than standing in the clear outside it.
 bool InformationInTheBlockIsProtectedOnceEncrypted();
 
-// §O.3: in the tool vendor secret key encryption system the key is the tool
-// vendor's own, proprietary and embedded within the tool itself, and the same
-// key serves both encryption and decryption -- the simplest scenario in the
-// EDA domain, roughly equivalent to the historical `protect technique, whose
-// drawback is that it is completely tool-vendor-specific: the IP author
-// encrypts the IP, and any IP consumer with appropriate licences and the same
-// tool vendor can use it.
 bool ToolVendorSecretKeyIsEmbeddedInTheTool();
 bool ToolVendorSecretKeyEncryptsAndDecrypts();
 bool ToolVendorSecretKeySystemIsToolVendorSpecific();
 std::string_view DirectiveTheToolVendorSecretKeySystemIsEquivalentTo();
 
-// §O.3 as this tool has it: the scenario turns on a key the vendor keeps
-// secret inside the tool, and this tool embeds none. Every key it holds is
-// one it was given under §34.5.10's owner and name, or the exchange key of
-// §34.3.1, on the command line of the run -- so the same key given to the
-// encrypting run and to the decrypting run is what stands in for the
-// vendor's, and a decrypting run given no key opens nothing.
 bool ToolEmbedsAVendorSecretKey();
 
-// §O.3.1: the pragmas the encryption input of the tool vendor secret key
-// system requires -- data_keyname naming one of the tool's embedded keys, and
-// begin and end surrounding the regions to be encrypted -- and the further
-// ones the input may include: the author's name and information, the key
-// owner of the name provided, a method appropriate for the key where the
-// default rounds, initialization vector or key width are not what is wanted,
-// a different encoding, a digest block where a message authorization code is
-// wanted, and a decryption or a run-time licence where the author wants one.
-// Each is a keyword §34.4 tabulates for the protect pragma.
 std::span<const std::string_view> PragmasRequiredByToolVendorSecretKeyInput();
 std::span<const std::string_view> PragmasOptionalInToolVendorSecretKeyInput();
 
-// §O.3.2: the encrypting tool should take the input file and copy all
-// cleartext to the corresponding output sections, and for each protect
-// begin-end block generate begin_protected to start the protected region,
-// then data_keyowner, data_keyname, data_method and encoding, author and
-// author_info if the input provided them, digest_block followed by the
-// encoded encrypted digest, data_block followed by the encoded encrypted data
-// composed of the licences and the text found between begin and end, and
-// end_protected. The annex writes the second licence as encrypt_license, a
-// name §34.4 does not tabulate and §O.3.1's input does not list; the licence
-// that input lists beside decrypt_license is runtime_license, and that is
-// what the data are read as composed of here.
 bool CleartextIsCopiedToTheToolVendorSecretKeyOutput();
 std::span<const std::string_view>
 ExpressionsTheToolVendorSecretKeyOutputCarries();
 std::span<const std::string_view>
 WhatTheToolVendorSecretKeyDataBlockIsComposedOf();
 
-// §O.4: in the IP author secret key encryption system the IP is encrypted
-// with the public key of the IP author's public/private key pair, and the
-// decrypting tool has the IP author's private key in its secure key database,
-// the IP authors having to provide their private keys to the tools' database
-// so that the tool can decrypt the design.
 bool IpAuthorSecretKeyEncryptsWithTheAuthorsPublicKey();
 bool IpAuthorSecretKeyDecryptsWithThePrivateKeyInTheToolsDatabase();
 bool IpAuthorsProvideTheirPrivateKeysToTheToolsDatabase();
 
-// §O.4 as this tool has it: the database the scenario has the tool keep is
-// the list of keys a run is given under §34.5.10's owner and name, and the
-// author's key is provided by giving it to the decrypting run under the
-// author's own owner and name; the design it opens is the one an encrypting
-// run sealed under the key the same owner and name designated. The algorithm
-// this tool encrypts with is the symmetric one of §34.3.1, so the key the
-// database holds under the author's name is the key the author encrypted
-// under, and no second key of a pair is derived from it.
 bool ToolsKeyDatabaseIsTheKeysGivenToTheRun();
 bool ToolDerivesADecryptionKeyFromTheAuthorsEncryptionKey();
 
-// §O.4.1: the pragmas the encryption input of the IP author secret key
-// system requires and may include are the ones §O.3.1 lists, with two
-// differences in what they carry: data_keyname names the provider's key,
-// and data_method names a public/private encryption scheme beside its method
-// specifier, a method appropriate for the key where the default rounds,
-// initialization vector or key width are not what is wanted.
 std::span<const std::string_view> PragmasRequiredByIpAuthorSecretKeyInput();
 std::span<const std::string_view> PragmasOptionalInIpAuthorSecretKeyInput();
 bool IpAuthorSecretKeyDataMethodNamesAPublicPrivateScheme();
 
-// §O.4.1 as this tool has it: the scheme the input's data_method names is
-// one this tool would encrypt under, and this tool provides no public/private
-// scheme -- §34.5.11's table names rsa, elgamal and pgp-rsa, and this tool
-// provides des-cbc and its own symmetric cipher -- so
-// an input naming one draws the report §34.5.11.2 has for an algorithm the
-// implementation does not provide, and the author's key stands in the
-// tool's database as §O.4 has it.
 bool ToolProvidesAPublicPrivateEncryptionScheme();
 
-// §O.4.2: the output of the IP author secret key system is the one §O.3.2
-// has the tool generate -- the cleartext copied to the output sections and,
-// for each block, the same ten expressions with the same two blocks on the
-// lines beneath their keywords -- with data_keyname the provider's key name
-// and data_method the public/private encryption scheme's name. What the
-// data are composed of is the same as well.
 bool CleartextIsCopiedToTheIpAuthorSecretKeyOutput();
 std::span<const std::string_view>
 ExpressionsTheIpAuthorSecretKeyOutputCarries();
@@ -163,33 +73,12 @@ std::span<const std::string_view>
 WhatTheIpAuthorSecretKeyDataBlockIsComposedOf();
 bool IpAuthorSecretKeyOutputNamesThePublicPrivateSchemeAsItsMethod();
 
-// §O.5: in a digital envelope each recipient has a public and a private key
-// for an asymmetric algorithm; the sender encrypts the design under a
-// symmetric key algorithm and then encrypts the symmetric key under the
-// recipient's public key, recording it in a key_block of the protected
-// envelope; the recipient recovers the symmetric key with its private key
-// and decrypts the design with it. Efficient methods serve the design data
-// while no secret is ever transmitted unencrypted; the envelope can be
-// created under either secret key scheme, the recipient's or the tool's keys
-// protecting the transmission of the symmetric key; and with more than one
-// key_block a single envelope can be decrypted by the tools of different
-// vendors or different users.
 bool DigitalEnvelopeEncryptsTheDesignUnderASymmetricKey();
 bool DigitalEnvelopeEncryptsTheSymmetricKeyUnderTheRecipientsPublicKey();
 std::string_view KeywordRecordingTheEncryptedSymmetricKey();
 bool DigitalEnvelopesCanBeCreatedUnderEitherSecretKeyScheme();
 bool AnEnvelopeWithSeveralKeyBlocksOpensToSeveralRecipients();
 
-// §O.5's example: the key encrypting the data_block is specified either by a
-// data_keyowner/data_keyname pair, which the encrypting tool encrypts into
-// the key_block with the data_method, or by a data_decrypt_key expression,
-// the key itself, encrypted into the key_block. The first leaves the
-// decrypting tool needing the key the pair names; the second leaves it
-// needing nothing, the key being in the file, and the annex has the
-// encrypting tool read the pair's key and put it in the key_block as
-// data_decrypt_key for better security -- the dependency gone and the
-// data_block safe from hit-and-trial with the keys at the user's end. That
-// is the specification this tool writes into every key_block it forms.
 enum class DataKeySpecification : std::uint8_t {
   kKeyownerAndKeyname,
   kDataDecryptKey,
@@ -198,45 +87,12 @@ DataKeySpecification DataKeySpecificationNeedingTheKeyAtTheDecryptingTool();
 DataKeySpecification DataKeySpecificationTheAnnexPrefers();
 DataKeySpecification DataKeySpecificationThisToolWritesIntoAKeyBlock();
 
-// §O.5.1: the pragmas expected when using digital envelopes -- key_keyowner
-// naming the recipient's owner identity, key_method naming an encryption
-// scheme, key_keyname naming the provider's key, data_keyname naming the
-// provider's key, and begin and end surrounding the regions to be
-// encrypted -- and the further ones the input may include, the eight
-// §O.3.1's input may: the author's name and information, the key owner of
-// the name provided, which shall be the owner of that key, a method
-// appropriate for the given key name where the default rounds,
-// initialization vector or key width are not what is wanted, a different
-// encoding, a digest block where a message authorization code is wanted,
-// and a decryption or a run-time licence where the author wants one.
 std::span<const std::string_view> PragmasExpectedByDigitalEnvelopeInput();
 std::span<const std::string_view> PragmasOptionalInDigitalEnvelopeInput();
 bool DataKeyownerShallBeTheOwnerOfTheKeyNameProvided();
 
-// §O.5.1 as this tool has it: the scheme key_method names is the one the
-// key_block is sealed under, and this tool seals a key block under
-// §34.5.11's required des-cbc where the input names it and under its own
-// cipher otherwise, an input naming a scheme it does not provide drawing
-// §34.5.24.2's report. key_keyowner and key_keyname reach the recipient's
-// key among the keys the sender's run holds, and data_keyname names the
-// symmetric key the design is under, which the run makes where it holds
-// none under that name.
 std::span<const std::string_view> KeyMethodsThisToolSealsAKeyBlockUnder();
 
-// §O.5.2: the encrypting tool should take the input file and copy all
-// cleartext to the corresponding output sections, and for each protect
-// begin-end block generate begin_protected to start the protected region,
-// then key_keyowner, key_method and key_keyname, a key_block holding the
-// data key's owner, the data_method and the symmetric data key itself in
-// encrypted form, encoding, author and author_info if the input provided
-// them, digest_block followed by the encoded encrypted digest, data_block
-// followed by the encoded encrypted data composed of the licences and the
-// text found between begin and end, and end_protected. The data are read as
-// composed of what §O.3.2's are, the annex writing the second licence there
-// under the same untabulated name. The annex writes key_block with its data
-// against it; §34.5.27 has the block on the lines beneath the keyword, and
-// that is where this tool writes it, as it writes the two blocks the annex
-// puts beneath theirs.
 bool CleartextIsCopiedToTheDigitalEnvelopeOutput();
 std::span<const std::string_view> ExpressionsTheDigitalEnvelopeOutputCarries();
 std::span<const std::string_view> WhatTheDigitalEnvelopeKeyBlockContains();

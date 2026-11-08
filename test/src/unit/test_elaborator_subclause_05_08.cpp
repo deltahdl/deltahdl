@@ -27,10 +27,6 @@ TEST(TimeLiteralElaboration, TimeLiteralInAssignmentElaborates) {
              "endmodule\n"));
 }
 
-// §5.8: a time literal is interpreted as a realtime value scaled to the current
-// time unit. When such a literal initializes an integer-typed parameter the
-// elaborator must const-evaluate it through the real path, so 3000ps under the
-// default ns unit scales to 3.0 and rounds to 3 (not the raw magnitude 3000).
 TEST(TimeLiteralElaboration, TimeLiteralConstFoldsIntoIntegerParam) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,10 +43,6 @@ TEST(TimeLiteralElaboration, TimeLiteralConstFoldsIntoIntegerParam) {
   EXPECT_EQ(p.resolved_value, 3);
 }
 
-// §5.8, constant-expression form via a module `parameter` (as opposed to the
-// `localparam` above): a parameter's default value takes a distinct resolution
-// path, but the time literal must still be interpreted as its scaled realtime
-// value, so 3000ps under the default ns unit const-folds to 3.
 TEST(TimeLiteralElaboration, TimeLiteralConstFoldsIntoParameter) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -67,11 +59,6 @@ TEST(TimeLiteralElaboration, TimeLiteralConstFoldsIntoParameter) {
   EXPECT_EQ(p.resolved_value, 3);
 }
 
-// §5.8 + §3.14: the same literal scales to whatever the current time unit is.
-// With an explicit `timeunit 1ps` the literal 3000ps is already in the current
-// unit, so it const-folds to 3000 rather than the ns-scaled 3. The module
-// declares a 1 ps precision as well, since §3.14 rejects the 1 ns default
-// precision §3.14.2.3 would otherwise give it under a 1 ps unit.
 TEST(TimeLiteralElaboration, TimeLiteralConstFoldScalesToCurrentUnit) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -90,12 +77,6 @@ TEST(TimeLiteralElaboration, TimeLiteralConstFoldScalesToCurrentUnit) {
   EXPECT_EQ(p.resolved_value, 3000);
 }
 
-// §5.8 (printed page 80) has a time literal be its number followed without a
-// space by its unit, and Syntax 5-2's footnote 49 (printed 76) forbids white
-// space between the two, so `2.1 ns` is the real 2.1 and then the identifier
-// ns: `#2.1 ns;` is a delay of 2.1 whose statement is the call `ns;`, and
-// with no task ns declared the statement is an error. The delay ran and the
-// statement did nothing.
 TEST(TimeLiteralElaboration, UnitSeparatedFromItsNumberBySpaceIsRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -112,9 +93,6 @@ TEST(TimeLiteralElaboration, UnitSeparatedFromItsNumberBySpaceIsRejected) {
                             "5.8"));
 }
 
-// The literal written as the clause has it reports nothing, and so does a
-// delay followed by a call to a task that happens to be named like a unit,
-// which is what `#2 fs;` is when a task fs is declared.
 TEST(TimeLiteralElaboration, UnitJoinedToItsNumberReportsNothing) {
   EXPECT_TRUE(
       ElabOk("module t;\n"

@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// The module of test/src/e2e/multiclock_sequence_rules.sv around one
-// assertion.
 std::string RulesSource(const std::string& spec) {
   return "module m;\n"
          "  logic clk0, clk1, clk2, sig0, sig1, s1, s2;\n"
@@ -24,9 +22,6 @@ std::string RulesSource(const std::string& spec) {
          "endmodule\n";
 }
 
-// The module writing `body` under clk0 in each place a sequence stands, a
-// sequence declared on clk0 at line 4, a property at line 5 and an
-// assertion at line 6, beside sequences declared on clk0 and on clk1.
 std::string ClockPlaces(const std::string& body) {
   return "module m;\n"
          "  logic clk0, clk1, sig0, sig1;\n"
@@ -44,10 +39,6 @@ std::string ClockPlaces(const std::string& body) {
          "endmodule\n";
 }
 
-// §16.13.1: each maximal singly clocked subsequence of a multiclocked
-// sequence shall admit only nonempty matches: the clause's sig1[*0:1]
-// after the change to clk1 admits an empty match, which would leave the
-// ending clock ambiguous, and is reported.
 TEST(MulticlockSequenceLegality, AnEmptyMatchingSubsequenceIsReported) {
   ElabFixture f;
   Elaborate(RulesSource("@(posedge clk0) sig0 ##1 @(posedge clk1) sig1[*0:1]"),
@@ -59,8 +50,6 @@ TEST(MulticlockSequenceLegality, AnEmptyMatchingSubsequenceIsReported) {
                             3, "16.13.1"));
 }
 
-// §16.13.1: differently clocked subsequences are concatenated by ##1 or
-// ##0 alone; the clause's ##2 between them is reported.
 TEST(MulticlockSequenceLegality,
      ADelayOtherThanOneOrZeroAcrossClocksIsReported) {
   ElabFixture f;
@@ -72,9 +61,6 @@ TEST(MulticlockSequenceLegality,
                             3, "16.13.1"));
 }
 
-// §16.13.1: differently clocked operands are combined by no other sequence
-// operator; the clause's intersect over them is reported, naming the
-// operator.
 TEST(MulticlockSequenceLegality, AnIntersectOverDifferentClocksIsReported) {
   ElabFixture f;
   Elaborate(RulesSource("@(posedge clk1) s1 intersect @(posedge clk2) s2"), f);
@@ -85,8 +71,6 @@ TEST(MulticlockSequenceLegality, AnIntersectOverDifferentClocksIsReported) {
                             3, "16.13.1"));
 }
 
-// §16.13.1: the two joins the clause allows, and a delay under the same
-// clock named again, which changes nothing, are not reported.
 TEST(MulticlockSequenceLegality, TheJoinsTheClauseAllowsAreNotReported) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -101,34 +85,25 @@ TEST(MulticlockSequenceLegality, TheJoinsTheClauseAllowsAreNotReported) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.13.1: a singly clocked sequence is a degenerate multiclocked sequence and
-// is always legal, even when its subsequence admits the empty match.
 TEST(MulticlockSequenceLegality, SinglyClockedSequenceIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk", MulticlockJoin::kLeading, /*admits_empty=*/true},
+      {"clk", MulticlockJoin::kLeading, true},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R1 (§16.13.1): when subsequences governed by different clocks are
-// concatenated, every maximal singly clocked subsequence must match only
-// nonempty words. Two non-empty-matching subsequences joined by `##1` across a
-// clock boundary are legal.
 TEST(MulticlockSequenceLegality, DifferentlyClockedNonemptyJoinIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kSingleDelay, false},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R1 (§16.13.1): a maximal singly clocked subsequence that admits the empty
-// match makes the clocking event of the join ambiguous, so the multiclocked
-// concatenation is illegal. Mirrors `... ##1 @(posedge clk2) sig1[*0:1]`.
 TEST(MulticlockSequenceLegality, EmptyMatchingTrailingSubsequenceIsIllegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/true},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kSingleDelay, true},
   };
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
@@ -138,33 +113,26 @@ TEST(MulticlockSequenceLegality, EmptyMatchingTrailingSubsequenceIsIllegal) {
   EXPECT_FALSE(error.empty());
 }
 
-// R1 (§16.13.1): the empty-match restriction also rejects an empty-matching
-// leading subsequence of a cross-clock concatenation.
 TEST(MulticlockSequenceLegality, EmptyMatchingLeadingSubsequenceIsIllegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/true},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, true},
+      {"clk2", MulticlockJoin::kSingleDelay, false},
   };
   EXPECT_TRUE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R2 (§16.13.1): the zero-delay concatenation (`##0`) is one of the two
-// operators permitted across a clock boundary.
 TEST(MulticlockSequenceLegality, DifferentlyClockedZeroDelayJoinIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kZeroDelay, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kZeroDelay, false},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R2 (§16.13.1): an operator other than `##1`/`##0` joining differently clocked
-// operands is illegal. Mirrors `s1 ##2 @(posedge clk2) s2` and
-// `s1 intersect @(posedge clk2) s2` for non-identical clocks.
 TEST(MulticlockSequenceLegality, DifferentlyClockedOtherJoinIsIllegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kOther, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kOther, false},
   };
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
@@ -174,36 +142,28 @@ TEST(MulticlockSequenceLegality, DifferentlyClockedOtherJoinIsIllegal) {
   EXPECT_FALSE(error.empty());
 }
 
-// R2 (§16.13.1): when the joined operands share a clock the context is singly
-// clocked, so operators beyond `##1`/`##0` are not restricted by the
-// cross-clock rule.
 TEST(MulticlockSequenceLegality, IdenticallyClockedOtherJoinIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk", MulticlockJoin::kOther, /*admits_empty=*/false},
+      {"clk", MulticlockJoin::kLeading, false},
+      {"clk", MulticlockJoin::kOther, false},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R1 + R2 (§16.13.1): a chain crossing more than one clock boundary is legal as
-// long as every subsequence matches only nonempty words and each boundary is
-// joined by `##1` or `##0`. Exercises the legality scan past the first join.
 TEST(MulticlockSequenceLegality, MultipleClockBoundariesNonemptyJoinIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
-      {/*clock=*/"clk3", MulticlockJoin::kZeroDelay, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kSingleDelay, false},
+      {"clk3", MulticlockJoin::kZeroDelay, false},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R1 (§16.13.1): the empty-match restriction reaches subsequences in the
-// interior of a longer chain, not just the leading or trailing one.
 TEST(MulticlockSequenceLegality, EmptyMatchingInteriorSubsequenceIsIllegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/true},
-      {/*clock=*/"clk3", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kSingleDelay, true},
+      {"clk3", MulticlockJoin::kSingleDelay, false},
   };
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
@@ -213,42 +173,29 @@ TEST(MulticlockSequenceLegality, EmptyMatchingInteriorSubsequenceIsIllegal) {
   EXPECT_FALSE(error.empty());
 }
 
-// R2 (§16.13.1): the operator restriction is decided per boundary by the clocks
-// actually adjacent at that boundary. Within a sequence that crosses clocks
-// overall, a join between two subsequences sharing the same clock stays singly
-// clocked and may use an operator other than `##1`/`##0`.
 TEST(MulticlockSequenceLegality, SameClockOtherJoinWithinMulticlockIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk1", MulticlockJoin::kOther, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk1", MulticlockJoin::kOther, false},
+      {"clk2", MulticlockJoin::kSingleDelay, false},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R1 (§16.13.1): the empty-match restriction applies only once the
-// concatenation genuinely spans more than one clock. A chain of several
-// subsequences that all share one clock collapses to a singly clocked sequence,
-// so an empty-matching subsequence among them stays legal even though the same
-// subsequence would be rejected across a clock boundary. Contrasts with
-// EmptyMatchingInteriorSubsequenceIsIllegal, which differs only in the clocks.
 TEST(MulticlockSequenceLegality, SameClockChainWithEmptyMatchIsLegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk", MulticlockJoin::kSingleDelay, /*admits_empty=*/true},
-      {/*clock=*/"clk", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
+      {"clk", MulticlockJoin::kLeading, false},
+      {"clk", MulticlockJoin::kSingleDelay, true},
+      {"clk", MulticlockJoin::kSingleDelay, false},
   };
   EXPECT_FALSE(CheckMulticlockSequenceLegality(kSubsequences).has_value());
 }
 
-// R2 (§16.13.1): conversely, an operator other than `##1`/`##0` at a boundary
-// whose adjacent subsequences are differently clocked is illegal even when it
-// appears deeper in the chain.
 TEST(MulticlockSequenceLegality, CrossClockOtherJoinInInteriorIsIllegal) {
   const std::vector<MulticlockSubsequence> kSubsequences = {
-      {/*clock=*/"clk1", MulticlockJoin::kLeading, /*admits_empty=*/false},
-      {/*clock=*/"clk2", MulticlockJoin::kSingleDelay, /*admits_empty=*/false},
-      {/*clock=*/"clk3", MulticlockJoin::kOther, /*admits_empty=*/false},
+      {"clk1", MulticlockJoin::kLeading, false},
+      {"clk2", MulticlockJoin::kSingleDelay, false},
+      {"clk3", MulticlockJoin::kOther, false},
   };
   const std::optional<std::string> kError =
       CheckMulticlockSequenceLegality(kSubsequences);
@@ -258,12 +205,6 @@ TEST(MulticlockSequenceLegality, CrossClockOtherJoinInInteriorIsIllegal) {
   EXPECT_FALSE(error.empty());
 }
 
-// Annex F.3.2 gives a repetition no clocked form, F.2 eliminating only a
-// clock equal to the one in force, so a sequence repeated under a clock of its
-// own other than clk0 is reported: a group repeated by a count or a range, a
-// group of one operand, a group joining sequences, a group changing clock
-// inside and an instance of a sequence declared on clk1; in a sequence, a
-// property and an assertion alike.
 TEST(MulticlockSequenceLegality, ARepeatedSequenceOnAnotherClockIsReported) {
   for (const char* body :
        {"(@(posedge clk1) sig0 ##1 sig1)[*2]",
@@ -283,10 +224,6 @@ TEST(MulticlockSequenceLegality, ARepeatedSequenceOnAnotherClockIsReported) {
   }
 }
 
-// Annex F.2 and F.3.2: the nearest forms, each clock written in the repeated
-// sequence equal to the one in force where it stands, clk0 or the clk1 the
-// chain changed to, are not reported, nor is a group writing no clock of its
-// own repeated under the one the chain changed to.
 TEST(MulticlockSequenceLegality, ARepeatedSequenceOnTheClockInForceIsLegal) {
   for (const char* body :
        {"(@(posedge clk0) sig0 ##1 sig1)[*2]",
@@ -301,9 +238,6 @@ TEST(MulticlockSequenceLegality, ARepeatedSequenceOnTheClockInForceIsLegal) {
   }
 }
 
-// §16.13.1: differently clocked operands are joined by ##1 and ##0 alone, so
-// a first operand of within or intersect, or of and or or in a sequence,
-// written on clk1 under clk0 is reported, naming the operator.
 TEST(MulticlockSequenceLegality, AFirstOperandOnAnotherClockIsReported) {
   for (const auto& [body, op] :
        std::vector<std::pair<std::string, std::string>>{
@@ -325,8 +259,6 @@ TEST(MulticlockSequenceLegality, AFirstOperandOnAnotherClockIsReported) {
   }
 }
 
-// §16.13.1 with Annex F.2: the same first operands written on clk0, the clock
-// in force, join their operators without a report.
 TEST(MulticlockSequenceLegality, AFirstOperandOnTheClockInForceIsLegal) {
   for (const char* body :
        {"(@(posedge clk0) sig0 ##1 sig1) within (sig0 ##1 sig1 ##1 sig0)",

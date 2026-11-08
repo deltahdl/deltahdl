@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §31.3.1, Table 31-1: the $setup limit is a "Non-negative constant
-// expression". Syntax 31-3 writes the data event first and the reference event
-// second. A limit of zero is the boundary of the accepting path.
 TEST(SetupTimingCheckElaboration, ZeroLimitElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -23,8 +20,6 @@ TEST(SetupTimingCheckElaboration, ZeroLimitElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A negative literal limit is refused. §31.9 (printed page 919) lets only
-// $setuphold and $recrem accept negative values, and $setup is neither.
 TEST(SetupTimingCheckElaboration, NegativeLiteralLimitRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -41,8 +36,6 @@ TEST(SetupTimingCheckElaboration, NegativeLiteralLimitRejected) {
                             4, "31.3.1"));
 }
 
-// The same through a specparam whose value is negative (§31.2: a limit is a
-// constant expression that can include specparams).
 TEST(SetupTimingCheckElaboration, NegativeSpecparamLimitRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -59,7 +52,6 @@ TEST(SetupTimingCheckElaboration, NegativeSpecparamLimitRejected) {
                             4, "31.3.1"));
 }
 
-// A limit expression that folds to a non-negative value is accepted.
 TEST(SetupTimingCheckElaboration, NonNegativeSpecparamExpressionElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

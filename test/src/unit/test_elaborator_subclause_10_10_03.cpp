@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -76,9 +74,6 @@ TEST(UnpackedArrayConcatElaboration, VectorConcatInByteArrayConcatOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3 (printed page 266): a complete unpacked array concatenation is no
-// item of another, and braces holding an unpacked array are one, written in a
-// nonblocking assignment as in a blocking one.
 TEST(UnpackedArrayConcatElaboration, NonblockingNestedConcatError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -106,10 +101,6 @@ TEST(UnpackedArrayConcatElaboration, UnpackedConcatAsAssignPatternItemOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.10.3 (printed page 266): inner braces are a vector concatenation, a
-// self-determined item of whatever width assigned to one element, so A's three
-// elements and one 48-bit item fill a four-element array, assigned by a
-// procedure or initializing the array in its declaration.
 TEST(UnpackedArrayConcatElaboration, NestedConcatOfAnyWidthIsOneElement) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -126,8 +117,6 @@ TEST(UnpackedArrayConcatElaboration, NestedConcatOfAnyWidthIsOneElement) {
   EXPECT_EQ(FindDiag(f, "is not self-determined"), nullptr);
 }
 
-// §10.10.3 holds the declaration's initializer to the nesting prohibition as
-// it holds a procedural assignment.
 TEST(UnpackedArrayConcatElaboration, DeclInitNestedConcatError) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -143,9 +132,6 @@ TEST(UnpackedArrayConcatElaboration, DeclInitNestedConcatError) {
                             3, "10.10.3"));
 }
 
-// A nested concatenation whose self-determined width matches the target
-// element is a vector concatenation, not an unpacked array concatenation, and
-// stays legal — including when it initializes the array in its declaration.
 TEST(UnpackedArrayConcatElaboration, DeclInitVectorConcatInByteArrayOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -157,8 +143,6 @@ TEST(UnpackedArrayConcatElaboration, DeclInitVectorConcatInByteArrayOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A flat declaration-initializer unpacked array concatenation (no item is
-// itself a concatenation) is unaffected by the nesting rule.
 TEST(UnpackedArrayConcatElaboration, DeclInitFlatArrayConcatOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(

@@ -61,11 +61,6 @@ void Preprocessor::ResetDirectiveState() {
   delay_mode_directive_ = DelayModeDirective::kNone;
 }
 
-// Annex E.4 to E.7: each of the four delay mode directives selects its mode
-// for the modules that follow it, and each is to come before the declaration
-// of the module it controls, so one inside a design element is reported under
-// the subclause that describes it. The mode is carried per module header by
-// TrackDesignElement.
 bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
                                              SourceLoc loc) {
   if (StartsWithDirective(line, "delay_mode_distributed")) {
@@ -96,43 +91,25 @@ bool Preprocessor::ProcessDelayModeDirective(std::string_view line,
   return false;
 }
 
-// A directive keyword ends where the identifier does: a name character sitting
-// flush against it belongs to a longer name, so `celldefine_region is a usage
-// of the macro celldefine_region rather than the `celldefine directive plus
-// stray text.
 static bool DirectiveKeywordIsWholeWord(std::string_view line,
                                         std::string_view keyword) {
   auto trimmed = Preprocessor::Trim(line);
-  size_t after_keyword = 1 + keyword.size();  // backtick + keyword
+  size_t after_keyword = 1 + keyword.size();
   if (trimmed.size() <= after_keyword) return true;
   return !IsIdentChar(trimmed[after_keyword]);
 }
 
-// §22.10 spells these two directives as the bare keywords `celldefine and
-// `endcelldefine; neither takes an operand. A line that only looks like one of
-// them because a macro name happens to start the same way must not open or
-// close a cell-module region.
 static bool StartsWithCellDirective(std::string_view line,
                                     std::string_view keyword) {
   return StartsWithDirective(line, keyword) &&
          DirectiveKeywordIsWholeWord(line, keyword);
 }
 
-// Syntax 22-8 separates the `pragma keyword from the pragma_name that follows
-// it, so `pragma_name is a usage of the macro pragma_name and not this
-// directive carrying the pragma_name "_name".
 bool StartsWithPragmaDirective(std::string_view line) {
   return StartsWithDirective(line, "pragma") &&
          DirectiveKeywordIsWholeWord(line, "pragma");
 }
 
-// Syntax 22-8 gives `pragma a grammar of its own instead of a single operand:
-// a pragma_name followed by an optional comma-separated pragma_expression
-// list. The expressions are spelled with a handful of lexical shapes and the
-// punctuation that joins them, so a small dedicated tokenizer covers the whole
-// directive. A pragma_value may be any identifier, but a pragma_name and a
-// pragma_keyword are restricted to the simple form, so the two identifier
-// flavors are kept apart here rather than merged.
 enum class PragmaTokenKind : std::uint8_t {
   kSimpleIdentifier,
   kEscapedIdentifier,
@@ -144,10 +121,6 @@ enum class PragmaTokenKind : std::uint8_t {
   kEquals,
 };
 
-// A token carries its spelling beside its kind. The grammar alone settles
-// whether a directive is well formed, but which specification the directive
-// belongs to is the pragma_name, and what an expression asks that
-// specification for is the pragma_keyword, so both have to be readable.
 struct PragmaToken {
   PragmaTokenKind kind;
   std::string_view text;
@@ -155,28 +128,18 @@ struct PragmaToken {
 
 using PragmaTokens = std::vector<PragmaToken>;
 
-// A simple_identifier opens with a letter or underscore and continues with
-// identifier characters; '$' is legal only after the first one, which is
-// exactly what IsIdentChar admits.
 static size_t ScanPragmaIdentifier(std::string_view s, size_t i) {
   ++i;
   while (i < s.size() && IsIdentChar(s[i])) ++i;
   return i;
 }
 
-// A number token opens with a digit, or with the tick of a based literal whose
-// size was left off ('h1F) or of an unbased unsized literal ('0).
 static bool StartsPragmaNumber(std::string_view s, size_t i) {
   if (std::isdigit(static_cast<unsigned char>(s[i]))) return true;
   return s[i] == '\'' && i + 1 < s.size() &&
          std::isalnum(static_cast<unsigned char>(s[i + 1]));
 }
 
-// A pragma_value number may carry a size and a base, a decimal point, or an
-// exponent, so consume the characters those spellings use. The sign of an
-// exponent is part of the number; a sign anywhere else is not. A number opens
-// with a digit or a tick, so a sign is never its first character and always
-// has one before it.
 static size_t ScanPragmaNumber(std::string_view s, size_t i) {
   while (i < s.size()) {
     char c = s[i];
@@ -193,10 +156,6 @@ static size_t ScanPragmaNumber(std::string_view s, size_t i) {
   return i;
 }
 
-// Returns the index just past the closing quote, or npos when the string
-// literal runs off the end of the directive. A triple-quoted literal closes
-// only on the next triple quote, so a single quote written inside one is
-// ordinary content rather than a terminator.
 static size_t ScanPragmaString(std::string_view s, size_t i) {
   if (s.compare(i, 3, "\"\"\"") == 0) {
     size_t close = s.find("\"\"\"", i + 3);
@@ -215,27 +174,19 @@ static size_t ScanPragmaString(std::string_view s, size_t i) {
   return std::string_view::npos;
 }
 
-// An escaped identifier runs from the backslash to the next whitespace
-// character.
 static size_t ScanPragmaEscapedIdentifier(std::string_view s, size_t i) {
   ++i;
   while (i < s.size() && !std::isspace(static_cast<unsigned char>(s[i]))) ++i;
   return i;
 }
 
-// Returns false when the text holds a character no pragma token may start
-// with -- a '$'-led system name, for instance, which is neither an identifier
-// nor a number nor a string. `block_comment_open` is set when the directive
-// line ends inside a block comment, which the caller has to carry forward.
-// What scanning one pragma token asks the tokenizer to do next.
 enum class PragmaScanStep : std::uint8_t {
-  kAdvanced,   // a token was consumed; carry on
-  kStop,       // the directive text ends here
-  kInvalid,    // the text is not a well-formed pragma
-  kNotHandled  // this scanner does not recognize the character
+  kAdvanced,
+  kStop,
+  kInvalid,
+  kNotHandled
 };
 
-// The identifier, number, and string forms a pragma expression list may hold.
 static PragmaScanStep ScanPragmaWordToken(std::string_view s, size_t& i,
                                           PragmaTokens& out) {
   size_t start = i;
@@ -248,7 +199,6 @@ static PragmaScanStep ScanPragmaWordToken(std::string_view s, size_t& i,
   }
   if (c == '\\') {
     size_t end = ScanPragmaEscapedIdentifier(s, i);
-    // A lone backslash names nothing.
     if (end == i + 1) return PragmaScanStep::kInvalid;
     i = end;
     out.push_back(
@@ -270,9 +220,6 @@ static PragmaScanStep ScanPragmaWordToken(std::string_view s, size_t& i,
   return PragmaScanStep::kNotHandled;
 }
 
-// A comment is not part of the expression list. A one-line comment ends the
-// directive text, and so does a block comment left open at the end of the line;
-// a closed one is simply skipped over.
 static PragmaScanStep ScanPragmaCommentToken(std::string_view s, size_t& i,
                                              bool& block_comment_open) {
   if (s[i] != '/' || i + 1 >= s.size()) return PragmaScanStep::kNotHandled;
@@ -287,8 +234,6 @@ static PragmaScanStep ScanPragmaCommentToken(std::string_view s, size_t& i,
   return PragmaScanStep::kAdvanced;
 }
 
-// The punctuation that joins the expressions of a pragma. Anything else is not
-// part of the directive's grammar.
 static bool PushPragmaPunctuation(std::string_view s, size_t i,
                                   PragmaTokens& out) {
   std::string_view text = s.substr(i, 1);
@@ -332,23 +277,14 @@ static bool TokenizePragma(std::string_view s, PragmaTokens& out,
   return true;
 }
 
-// `keywords`, when not null, collects the pragma_keyword of each expression
-// the caller is walking, and the pragma_value written against it, in the order
-// the expressions are written. It is null for the expressions nested inside a
-// parenthesized pragma_value, because those qualify the value rather than the
-// directive.
 static bool ParsePragmaExpressionList(
     const PragmaTokens& toks, size_t& i,
     std::vector<PragmaKeywordExpression>* keywords);
 
-// pragma_value ::= ( pragma_expression { , pragma_expression } )
-//                | number | string | identifier
 static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
   if (i >= toks.size()) return false;
   if (toks[i].kind == PragmaTokenKind::kOpenParen) {
     ++i;
-    // The parenthesized form holds a list, not an optional one, so an empty
-    // pair of parentheses is not a pragma_value.
     if (!ParsePragmaExpressionList(toks, i, nullptr)) return false;
     if (i >= toks.size() || toks[i].kind != PragmaTokenKind::kCloseParen) {
       return false;
@@ -366,11 +302,6 @@ static bool ParsePragmaValue(const PragmaTokens& toks, size_t& i) {
   return false;
 }
 
-// The directive text that the tokens from `first` up to `last` were scanned
-// out of, as one run. Every token is a view into the same directive text, so
-// the run from where the first one starts to where the last one ends is the
-// text those tokens were written as, spacing and punctuation included. The one
-// caller hands a nonempty run of tokens it has just parsed.
 static std::string_view SpannedText(const PragmaTokens& toks, size_t first,
                                     size_t last) {
   const char* start = toks[first].text.data();
@@ -380,23 +311,11 @@ static std::string_view SpannedText(const PragmaTokens& toks, size_t first,
   return {start, size};
 }
 
-// pragma_expression ::= pragma_keyword | pragma_keyword = pragma_value
-//                     | pragma_value
-// A lone simple identifier satisfies both the bare-keyword alternative and the
-// identifier pragma_value, so only the '=' lookahead has to be decided here.
-// The left side of an '=' is a pragma_keyword, which admits the simple form
-// only.
 static bool ParsePragmaExpression(
     const PragmaTokens& toks, size_t& i,
     std::vector<PragmaKeywordExpression>* keywords) {
   if (i >= toks.size()) return false;
-  // A pragma_keyword is a simple identifier, whichever alternative it came
-  // from, so the two spellings that expose one are the identifier standing
-  // alone and the identifier on the left of an '='.
   bool has_keyword = toks[i].kind == PragmaTokenKind::kSimpleIdentifier;
-  // The '=' is what settles which of the two spellings the expression was
-  // written in, whatever the value after it turns out to look like, so it is
-  // read before the expression is recorded rather than off the value.
   bool has_value = has_keyword && i + 1 < toks.size() &&
                    toks[i + 1].kind == PragmaTokenKind::kEquals;
   if (keywords != nullptr && has_keyword) {
@@ -406,15 +325,9 @@ static bool ParsePragmaExpression(
     i += 2;
     size_t value_start = i;
     if (!ParsePragmaValue(toks, i)) return false;
-    // A value spelled as one token is a value the keyword can be said to
-    // carry. A parenthesized one is a list of further expressions, and reading
-    // it as the keyword's value would name only its opening parenthesis.
     if (keywords != nullptr && i == value_start + 1) {
       keywords->back().value = toks[value_start].text;
     }
-    // The list itself is what a keyword defined with a parenthesized value
-    // records, so it is collected whole -- from the opening parenthesis to the
-    // closing one, as the directive spelled the text between them.
     if (keywords != nullptr && i > value_start + 1) {
       keywords->back().value_list = SpannedText(toks, value_start, i);
     }
@@ -448,9 +361,6 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
     return true;
   }
   if (StartsWithPragmaDirective(line)) {
-    // The directive text is ordinary source as far as 22.5.1 is concerned, so
-    // macro usages inside it are substituted before the pragma grammar sees
-    // it, the same way `timescale and `default_nettype treat their operands.
     std::string expanded = ExpandInlineMacros(AfterDirective(line, "pragma"),
                                               loc.file_id, loc.line);
     HandlePragma(expanded, loc);
@@ -463,16 +373,6 @@ bool Preprocessor::ProcessSimpleStateDirective(std::string_view line,
   return false;
 }
 
-// Checks the directive against Syntax 22-8 and consumes it. The pragma_name
-// is what identifies the specification, so it is mandatory and must be a
-// simple_identifier; the pragma_expression list that qualifies it is optional.
-// A pragma_name this implementation does not recognize leaves the
-// interpretation of the surrounding source text alone, which for the
-// preprocessor means the directive line contributes no output and changes no
-// directive state. The protect name is the one this implementation does
-// recognize: it is reserved for describing protected envelopes, so its
-// expressions -- and no other pragma's, however they are spelled -- decide
-// which regions of text an envelope covers.
 PragmaReading ReadPragmaDirective(std::string_view rest) {
   PragmaReading reading;
   PragmaTokens toks;
@@ -496,8 +396,6 @@ PragmaReading ReadPragmaDirective(std::string_view rest) {
 
 void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
   PragmaReading reading = ReadPragmaDirective(rest);
-  // The directive ends where the comment begins, but the comment itself keeps
-  // running, so the lines after it are not source text either.
   if (reading.block_comment_open) in_block_comment_ = true;
   if (!reading.error.empty()) {
     diag_.Error(loc, std::string(reading.error), Subclause("22.11"));
@@ -509,9 +407,6 @@ void Preprocessor::HandlePragma(std::string_view rest, SourceLoc loc) {
     ApplyProtectKeywords(keywords, loc);
     return;
   }
-  // §22.11.1: the reset pragma restores the state of every pragma_name written
-  // as one of its own pragma_keywords, and resetall restores the state of every
-  // pragma_name this implementation recognises.
   if (name == kResetPragmaName) {
     for (const auto& expr : keywords) ResetPragma(expr.keyword);
     return;
@@ -525,23 +420,9 @@ void Preprocessor::ResetAllPragmas() {
   }
 }
 
-// §22.11.1: the default values a reset restores are the values the tool defines
-// before any SystemVerilog text has been processed. For the protect pragma
-// those are the defaults its keyword table gives, which is what a keyword scope
-// holding nothing reports. Protect is the one name RecognizedPragmaNames holds
-// (src/preprocessor/standard_pragmas.cpp), so a recognized name is protect.
 void Preprocessor::ResetPragma(std::string_view pragma_name) {
   if (!IsRecognizedPragmaName(pragma_name)) return;
   protect_keywords_.Reset();
-  // §22.11.1 restores the state of the pragma_keywords as well as their values,
-  // and the keyword scope holds only what a directive wrote against a name. Two
-  // kinds of protect pragma keyword state are held apart from it and go back
-  // here: a keyword still waiting for the line its definition speaks for, and a
-  // key §34.5.14 or §34.5.20 gave a keyword that came out of a key block as the
-  // key itself. Preprocessor::ProtectKeyInEffect answers with the first of
-  // those ahead of every name a text writes, so a reset that left it standing
-  // would open the next data block with a key the reset was written to take
-  // away.
   ResetAnnouncementsAndRecoveredKeys();
 }
 
@@ -585,11 +466,6 @@ bool Preprocessor::ProcessExpandedStateDirective(std::string_view line,
                                   Subclause("22.9")))
       return true;
     unconnected_drive_ = NetType::kWire;
-    // §22.9 gives `unconnected_drive one of the arguments pull1 or pull0 and
-    // this directive none, so a strength keyword after it is an argument the
-    // directive does not take and goes with the directive rather than to the
-    // parser as a stray keyword. Anything else after it is a language element
-    // on the directive's line, which §22.2 allows.
     auto [arg, remainder] =
         SplitFirstToken(AfterDirective(line, "nounconnected_drive"));
     if (arg == "pull0" || arg == "pull1") {
@@ -617,8 +493,6 @@ bool Preprocessor::ProcessMiscStateDirective(std::string_view line,
     OutputRemainder(line, "resetall", file_id, line_num, output);
     return true;
   }
-  // E.2 and E.3 set no limit on where either directive is written, unlike
-  // E.4's `delay_mode_distributed, so each is read wherever it stands.
   if (StartsWithDirective(line, "default_decay_time")) {
     HandleDefaultDecayTime(AfterDirective(line, "default_decay_time"), loc);
     return true;
@@ -633,45 +507,28 @@ bool Preprocessor::ProcessMiscStateDirective(std::string_view line,
 
 bool Preprocessor::ProcessStateDirective(std::string_view line, SourceLoc loc,
                                          int depth, std::string& output) {
-  // loc already carries file_id/line, so they are not separate parameters here
-  // (keeping the arity <= 5 for readability-function-size).
   if (ProcessSimpleStateDirective(line, loc, depth, output)) return true;
   if (ProcessExpandedStateDirective(line, loc, loc.file_id, loc.line, output))
     return true;
   return ProcessMiscStateDirective(line, loc, loc.file_id, loc.line, output);
 }
 
-// Syntax 22-4 spells the directive as the keyword `undef followed by a
-// separate text_macro_identifier. A name character sitting directly against
-// the keyword therefore belongs to a longer macro name (`undefX is a usage of
-// the macro undefX), so such a line is not this directive at all.
 static bool StartsWithUndefDirective(std::string_view line) {
   if (!StartsWithDirective(line, "undef")) return false;
   auto trimmed = Preprocessor::Trim(line);
-  constexpr size_t kAfterKeyword = 1 + 5;  // backtick + "undef"
+  constexpr size_t kAfterKeyword = 1 + 5;
   if (trimmed.size() <= kAfterKeyword) return true;
   return !IsIdentChar(trimmed[kAfterKeyword]);
 }
 
-// §22.5.3 spells this directive as the bare keyword `undefineall, which takes
-// no arguments at all. A name character sitting directly against the keyword
-// therefore belongs to a longer macro name — `undefineall_saved is a usage of
-// the macro undefineall_saved — so such a line is not this directive and must
-// not wipe the macro table.
 static bool StartsWithUndefineAllDirective(std::string_view line) {
   if (!StartsWithDirective(line, "undefineall")) return false;
   auto trimmed = Preprocessor::Trim(line);
-  constexpr size_t kAfterKeyword = 1 + 11;  // backtick + "undefineall"
+  constexpr size_t kAfterKeyword = 1 + 11;
   if (trimmed.size() <= kAfterKeyword) return true;
   return !IsIdentChar(trimmed[kAfterKeyword]);
 }
 
-// §5.6 opens a simple_identifier with a letter or an underscore and an
-// escaped_identifier with a backslash. Syntax 22-4 admits only an identifier
-// after the keyword, so an operand starting with anything else — a digit, a
-// dollar sign, punctuation — is not a text_macro_identifier at all. The caller
-// has already refused an empty operand, whose name FindUndefNameEnd finds
-// empty.
 static bool StartsTextMacroIdentifier(std::string_view text) {
   return std::isalpha(static_cast<unsigned char>(text[0])) != 0 ||
          text[0] == '_' || text[0] == '\\';
@@ -699,11 +556,6 @@ void Preprocessor::ProcessIncludeDirective(std::string_view line, SourceLoc loc,
   HandleInclude(expanded_arg, loc, depth, output, angle_bracket);
 }
 
-// Syntax 22-10 spells both halves of the pair as whole directive keywords:
-// `begin_keywords is followed by a quoted version_specifier and `end_keywords
-// takes no operand at all. A name character flush against either keyword is
-// therefore part of a longer macro name, so `end_keywords_saved is a use of
-// the macro end_keywords_saved and not this directive plus stray text.
 static bool StartsWithKeywordsDirective(std::string_view line,
                                         std::string_view keyword) {
   return StartsWithDirective(line, keyword) &&
@@ -749,9 +601,6 @@ bool Preprocessor::ProcessActiveOnlyDirective(std::string_view line,
   return TryExpandMacro(trimmed, output, file_id, line_num, depth);
 }
 
-// Syntax 22-4 makes the text_macro_identifier part of the `undef directive, so
-// a bare `undef, or one handed something that is not an identifier, names no
-// macro to remove.
 void Preprocessor::ProcessUndefDirective(std::string_view line, SourceLoc loc,
                                          std::string& output) {
   auto trimmed_rest = Trim(AfterDirective(line, "undef"));
@@ -781,14 +630,8 @@ bool Preprocessor::ProcessDirective(std::string_view line, uint32_t file_id,
     return true;
   }
   if (StartsWithUndefineAllDirective(line)) {
-    // The rule reaches macros defined within the compilation unit, and text
-    // excluded by a conditional never becomes part of it. Wiping the table
-    // from a branch that was compiled away would let a directive that is not
-    // in the source description take effect, so gate it like `define/`undef.
     if (IsActive()) {
       macros_.UndefineAll();
-      // The directive takes no arguments, so anything left on the line is
-      // ordinary source text rather than an operand and is passed through.
       OutputRemainder(line, "undefineall", file_id, line_num, output);
     }
     return true;

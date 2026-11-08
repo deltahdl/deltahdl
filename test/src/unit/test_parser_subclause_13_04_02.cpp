@@ -189,8 +189,6 @@ TEST(FunctionLifetimeParsing, AutomaticFunctionMultipleVarTypes) {
   EXPECT_EQ(item->func_body_stmts[2]->var_decl_type.kind, DataTypeKind::kReal);
 }
 
-// §13.4.2: a local variable inside a static function may itself be declared
-// with the automatic keyword, overriding the enclosing function's lifetime.
 TEST(FunctionLifetimeParsing, AutomaticLocalInStaticFunction) {
   auto r = Parse(
       "module m;\n"
@@ -210,8 +208,6 @@ TEST(FunctionLifetimeParsing, AutomaticLocalInStaticFunction) {
   EXPECT_TRUE(item->func_body_stmts[0]->var_is_automatic);
 }
 
-// §13.4.2: conversely, a local variable inside an automatic function may be
-// declared static, overriding the enclosing function's lifetime.
 TEST(FunctionLifetimeParsing, StaticLocalInAutomaticFunction) {
   auto r = Parse(
       "module m;\n"

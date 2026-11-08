@@ -115,8 +115,6 @@ TEST(PriorityIfViolationSim, PriorityIfChainMiddleBranchMatchNoWarning) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A unique-if inside a function whose conditions are mutually exclusive on the
-// call must not report; otherwise the per-subroutine check would be spurious.
 TEST(IfViolationMultiProcessSim, FunctionUniqueIfSingleMatchNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -136,8 +134,6 @@ TEST(IfViolationMultiProcessSim, FunctionUniqueIfSingleMatchNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A unique-if inside a function with no matching branch and no else reports the
-// no-match violation, just as it would in a process body.
 TEST(IfViolationMultiProcessSim, FunctionUniqueIfNoMatchNoElseReports) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -157,8 +153,6 @@ TEST(IfViolationMultiProcessSim, FunctionUniqueIfNoMatchNoElseReports) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// A priority-if inside a function with no matching branch and no else likewise
-// reports a violation from within the subroutine body.
 TEST(IfViolationMultiProcessSim, FunctionPriorityIfNoMatchReports) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -178,10 +172,6 @@ TEST(IfViolationMultiProcessSim, FunctionPriorityIfNoMatchReports) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2.2: when two distinct processes both call the same function, the check
-// runs once per caller and each execution is independent. Both callers pass
-// overlapping arguments, so the shared function's uniqueness check fails in
-// each calling process and the violation is reported twice.
 TEST(IfViolationMultiProcessSim, TwoProcessesCallSharedFunctionReportTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -202,10 +192,6 @@ TEST(IfViolationMultiProcessSim, TwoProcessesCallSharedFunctionReportTwice) {
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-// §12.4.2.2: the per-caller executions are independent, so a failure in one
-// calling process does not implicate another. Here the first caller passes
-// overlapping arguments (violation) while the second passes mutually exclusive
-// arguments (no violation); exactly one report is produced.
 TEST(IfViolationMultiProcessSim, SharedFunctionOneCallerViolatesOtherPasses) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -226,12 +212,6 @@ TEST(IfViolationMultiProcessSim, SharedFunctionOneCallerViolatesOtherPasses) {
   EXPECT_EQ(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2.2: a violation queued by a function check belongs to the calling
-// process, so when that process (an always_comb) is re-triggered and its final
-// re-evaluation passes, the stale report is flushed. The first evaluation calls
-// chk(1,1) (overlap, violation queued in the always_comb process); the
-// nonblocking update of b re-triggers the procedure, and chk(1,0) on resume no
-// longer overlaps, so the pending violation is flushed before it can mature.
 TEST(IfViolationMultiProcessSim, AlwaysCombRetriggerFlushesFunctionViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -257,8 +237,6 @@ TEST(IfViolationMultiProcessSim, AlwaysCombRetriggerFlushesFunctionViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// A clean (mutually exclusive) unique-if inside a task must not report, so the
-// task-body check is not spuriously firing.
 TEST(IfViolationMultiProcessSim, TaskUniqueIfSingleMatchNoViolation) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -278,12 +256,6 @@ TEST(IfViolationMultiProcessSim, TaskUniqueIfSingleMatchNoViolation) {
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 
-// §12.4.2.2: the per-process rule is qualifier-agnostic on the overlap path --
-// a unique0-if reports a uniqueness violation when more than one condition is
-// true, just like a plain unique-if (unique0 only suppresses the *no-match*
-// report). Placed inside a shared function called by two distinct processes,
-// the overlap therefore fails independently in each caller and is reported
-// twice, exactly as the unique-if scenario-a example does.
 TEST(IfViolationMultiProcessSim,
      TwoProcessesCallSharedUnique0FunctionReportTwice) {
   SimFixture f;
@@ -305,11 +277,6 @@ TEST(IfViolationMultiProcessSim,
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-// §12.4.2.2: the per-process rule holds for the priority qualifier too. A
-// priority-if with no matching branch and no else reports a violation, and when
-// two distinct processes call the shared function each execution is
-// independent, so the no-match violation is attributed to each caller and
-// reported twice -- the priority analog of the unique/unique0 scenario-a cases.
 TEST(IfViolationMultiProcessSim,
      TwoProcessesCallSharedPriorityFunctionReportTwice) {
   SimFixture f;
@@ -331,9 +298,6 @@ TEST(IfViolationMultiProcessSim,
   EXPECT_GE(f.diag.WarningCount(), 2u);
 }
 
-// §12.4.2.2: when two distinct processes call the same task, the check runs
-// once per caller and each execution is independent, so an overlap that fails
-// in both callers is reported twice.
 TEST(IfViolationMultiProcessSim, TwoProcessesCallSharedTaskReportTwice) {
   SimFixture f;
   auto* design = ElaborateSrc(

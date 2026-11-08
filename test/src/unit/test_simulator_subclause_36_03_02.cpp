@@ -14,15 +14,6 @@
 namespace delta {
 namespace {
 
-// §36.3.2 governs overriding built-in system task and system function names.
-// Built-in system tasks/functions (Clause 20, Clause 21, and tool-specific
-// ones) live in the same '$'-prefixed namespace as user-defined names. When a
-// user-provided PLI application is registered (through the PLI mechanism of
-// §36.9.1) under a built-in name, that application overrides the built-in. The
-// production carrier is the simulator's system-task/function registry, whose
-// ResolveSystf() consults the registry first and returns the overriding
-// application for a name, falling back (null) to the built-in when none claims
-// it.
 class OverrideBuiltinSystf : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -31,17 +22,10 @@ class OverrideBuiltinSystf : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §36.3.2: with no PLI application registered under a built-in name, nothing
-// overrides it - resolving the name finds no registration, so the built-in
-// stands.
 TEST_F(OverrideBuiltinSystf, UnclaimedBuiltinNameResolvesToNothing) {
   EXPECT_EQ(vpi_ctx_.ResolveSystf("$random"), nullptr);
 }
 
-// §36.3.2: if a user-provided PLI application is associated with the same name
-// as a built-in system function, the user application shall override the
-// built-in. After registering an application under the built-in name, resolving
-// that name returns the user application (here, its calltf), not the built-in.
 TEST_F(OverrideBuiltinSystf, UserApplicationOverridesBuiltinName) {
   static int called = 0;
   called = 0;
@@ -63,16 +47,10 @@ TEST_F(OverrideBuiltinSystf, UserApplicationOverridesBuiltinName) {
   EXPECT_STREQ(resolved->tfname, "$random");
   ASSERT_NE(resolved->calltf, nullptr);
 
-  // The resolved application is the user's: invoking its calltf runs the
-  // user-provided functionality that replaced the built-in $random.
   resolved->calltf(nullptr);
   EXPECT_EQ(called, 1);
 }
 
-// §36.3.2: the override replaces the built-in's functionality. Modelling a
-// built-in registered ahead of a user application sharing the name, resolving
-// the name returns the most recently registered (user) application, so the user
-// version is the one that runs.
 TEST_F(OverrideBuiltinSystf, LaterRegistrationOverridesEarlierOfSameName) {
   auto builtin_impl = [](PLI_BYTE8*) -> PLI_INT32 { return 1; };
   auto user_impl = [](PLI_BYTE8*) -> PLI_INT32 { return 2; };
@@ -95,13 +73,9 @@ TEST_F(OverrideBuiltinSystf, LaterRegistrationOverridesEarlierOfSameName) {
   const s_vpi_systf_data* resolved = vpi_ctx_.ResolveSystf("$random");
   ASSERT_NE(resolved, nullptr);
   ASSERT_NE(resolved->calltf, nullptr);
-  // The overriding (later, user) application is resolved, not the earlier one.
   EXPECT_EQ(resolved->calltf(nullptr), 2);
 }
 
-// §36.3.2: the built-in system functions $signed and $unsigned can be
-// overridden. Registering user applications under those names is accepted and
-// each resolves to its own override.
 TEST_F(OverrideBuiltinSystf, SignedAndUnsignedCanBeOverridden) {
   s_vpi_systf_data signed_fn = {};
   signed_fn.type = vpiSysFunc;
@@ -124,12 +98,6 @@ TEST_F(OverrideBuiltinSystf, SignedAndUnsignedCanBeOverridden) {
   EXPECT_STREQ(ru->tfname, "$unsigned");
 }
 
-// §36.3.2: $signed and $unsigned are unique in that the return width is based
-// on the width of their argument. When overridden, the PLI version shall have
-// the same return width for all instances of the system function, and that
-// width is defined by the PLI sizetf routine. Resolving the overridden name and
-// reading its sizetf-defined result width yields the same width on every query
-// (every instance), rather than varying per call.
 TEST_F(OverrideBuiltinSystf, OverriddenSignedHasSameWidthForAllInstances) {
   auto fixed_width = [](PLI_BYTE8*) -> PLI_INT32 { return 17; };
 
@@ -144,8 +112,6 @@ TEST_F(OverrideBuiltinSystf, OverriddenSignedHasSameWidthForAllInstances) {
   const s_vpi_systf_data* resolved = vpi_ctx_.ResolveSystf("$signed");
   ASSERT_NE(resolved, nullptr);
 
-  // The sizetf routine defines the PLI return width; it is the same for every
-  // instance of the overridden system function.
   int first = VpiSystfResultSizeBits(*resolved);
   int second = VpiSystfResultSizeBits(*resolved);
   EXPECT_EQ(first, 17);
@@ -153,16 +119,10 @@ TEST_F(OverrideBuiltinSystf, OverriddenSignedHasSameWidthForAllInstances) {
   EXPECT_EQ(first, second);
 }
 
-// §36.3.2 edge: the override rule keys on a system task/function name. Asking
-// to resolve a null name names nothing, so no override is found and the lookup
-// reports none (the built-in, if any, would stand) rather than dereferencing.
 TEST_F(OverrideBuiltinSystf, NullNameResolvesToNothing) {
   EXPECT_EQ(vpi_ctx_.ResolveSystf(nullptr), nullptr);
 }
 
-// §36.3.2: the override applies to a built-in system task as well as a system
-// function - the rule covers both kinds of name. A user application registered
-// as a task under a built-in name is the override that resolves for that name.
 TEST_F(OverrideBuiltinSystf, UserTaskApplicationOverridesBuiltinName) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;
@@ -176,9 +136,6 @@ TEST_F(OverrideBuiltinSystf, UserTaskApplicationOverridesBuiltinName) {
   EXPECT_EQ(resolved->type, vpiSysTask);
 }
 
-// §36.3.2 edge: only a registration sharing the name overrides a built-in.
-// With other applications registered but none under the queried built-in name,
-// nothing claims it, so the lookup finds no override and the built-in stands.
 TEST_F(OverrideBuiltinSystf,
        NonMatchingRegistrationsLeaveBuiltinNameUnclaimed) {
   s_vpi_systf_data other = {};
@@ -191,9 +148,6 @@ TEST_F(OverrideBuiltinSystf,
   EXPECT_EQ(vpi_ctx_.ResolveSystf("$random"), nullptr);
 }
 
-// How many times the application registered under $setup below has been
-// called. §36.3.2's exception is that it is never called at all, so the counter
-// exists to be read as zero.
 int g_setup_calls = 0;
 
 PLI_INT32 SetupCalltf(PLI_BYTE8*) {
@@ -201,18 +155,6 @@ PLI_INT32 SetupCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §36.3.2's one exception to the override rule: a timing check such as $setup
-// is not a system task, so no registration overrides it. The registration
-// itself is accepted -- §36.9.1 takes any name beginning with $, and nothing
-// there knows which names clause 31 spends -- so what carries the exception is
-// that the $setup a specify block writes never becomes a call:
-// Parser::ParseTimingCheck reads it into a TimingCheckEntry, which reaches
-// SpecifyManager rather than the evaluator's dispatch.
-//
-// Both halves are asserted because a dispatch that took this $setup for a
-// system task name would fail them together -- the application would run and
-// the check would not be registered -- while a run that registered the check
-// and called the application too would fail only the first.
 TEST_F(OverrideBuiltinSystf, ATimingCheckCannotBeOverridden) {
   g_setup_calls = 0;
   s_vpi_systf_data setup = {};
@@ -222,8 +164,6 @@ TEST_F(OverrideBuiltinSystf, ATimingCheckCannotBeOverridden) {
   ASSERT_NE(vpi_register_systf(&setup), nullptr);
 
   SimFixture f;
-  // §31.3.1 orders $setup's arguments data_event, reference_event, limit, so
-  // `d` is the data event and `clk` the reference.
   auto* design = ElaborateSrc(
       "module top(\n"
       "    output logic d,\n"

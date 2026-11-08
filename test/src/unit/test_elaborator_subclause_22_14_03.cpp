@@ -15,26 +15,10 @@ using namespace delta;
 
 namespace {
 
-// The additions of this version doing their elaborated job rather than merely
-// lexing as keywords: `localparam` produces a resolved constant,
-// `genvar`/`generate`/`endgenerate` produce one copy of the loop body per
-// iteration, and `signed`/`unsigned` select what they select. They are tied
-// together deliberately. The localparam is the loop bound, so the number of
-// declarations reaching the design can only come out right if it resolved; and
-// the nested condition picks out a single iteration, so the genvar has to hold
-// a different constant on each pass rather than merely make the loop run the
-// right number of times.
 TEST(Verilog2001KeywordElaboration, AdditionsDoTheirElaboratedJob) {
   ExpectVerilog2001DeclarationsElaborate("1364-2001");
 }
 
-// A declaration's width can come from any of the constant forms, and each
-// reaches the elaborator by a different path. This version is the first whose
-// list makes them all writable at once: the literal and the `parameter` are
-// inherited, while `localparam` and the `automatic` function whose call is
-// folded are both additions. Every form has to arrive at the same width. The
-// remaining constant form, a genvar, is covered by the loop generate test
-// above.
 TEST(Verilog2001KeywordElaboration, ConstantFormsAllProduceTheSameWidth) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -62,10 +46,6 @@ TEST(Verilog2001KeywordElaboration, ConstantFormsAllProduceTheSameWidth) {
   }
 }
 
-// The inclusion half at this stage: the variable and net type keywords the
-// earlier list names still declare their own storage under this one, each with
-// the width, the real/vector distinction, and the net type its own type
-// implies.
 TEST(Verilog2001KeywordElaboration, InheritedTypeKeywordsKeepTheirStorage) {
   struct VarCase {
     const char* decl;
@@ -116,21 +96,10 @@ TEST(Verilog2001KeywordElaboration, InheritedTypeKeywordsKeepTheirStorage) {
   }
 }
 
-// Words neither table lists are ordinary identifiers under this version, and
-// they stay ordinary identifiers all the way into the elaborated design: each
-// names a variable that really exists there, carrying the storage its
-// declaration asked for. Getting past the parser is not enough -- the design is
-// what the rest of the tool works from.
 TEST(Verilog2001KeywordElaboration, FreedWordsNameElaboratedVariables) {
   ExpectFreedWordsNameElaboratedVariables("1364-2001");
 }
 
-// The elaborated design keeps nets and constants in containers of their own,
-// separate from the variables above, so a freed word has to survive each of
-// those paths in its own right. This also puts both sides of the rule in one
-// declaration list: the constants are introduced by `parameter`, inherited from
-// the earlier list, and by `localparam`, an addition of this version, while
-// every name they carry is a word a later standard reserved.
 TEST(Verilog2001KeywordElaboration, FreedWordsNameElaboratedNetsAndConstants) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(In2001("module m;\n"
@@ -163,29 +132,15 @@ TEST(Verilog2001KeywordElaboration, FreedWordsNameElaboratedNetsAndConstants) {
   EXPECT_EQ(p->resolved_value, 9);
 }
 
-// A freed word naming the design element itself, its ports, and the instance
-// that binds to it -- the region governs a whole elaborated hierarchy, not one
-// declaration inside one module.
 TEST(Verilog2001KeywordElaboration, FreedWordNamesModulePortsAndInstance) {
   ExpectFreedWordsNameModulePortsAndInstance(
       "1364-2001", {"bit", "logic", "byte", "interface"});
 }
 
-// The negative for the additions, carried to this stage: none of the words
-// Table 22-2 lists can name a variable that reaches the design, while the same
-// declaration under the list this version extends builds one. Sweeping all
-// twenty-one rather than sampling is what makes the table, and not a handful of
-// its entries, the thing being checked.
 TEST(Verilog2001KeywordElaboration, AdditionsCannotNameElaboratedVariables) {
   ExpectKeywordTableIsReserved("1364-2001", kVerilog2001AddedKeywordSweep);
 }
 
-// The negative from the other direction: a word neither table lists carries no
-// keyword meaning, so a declaration written with it as a data type does not
-// elaborate. `uwire` is the sharpest case, being the sole word the very next
-// version adds. The same source outside the region does elaborate, which is
-// what shows the region -- and not some unrelated limitation -- is doing the
-// rejecting.
 TEST(Verilog2001KeywordElaboration, WordOutsideTheListIsNotADataType) {
   ExpectDeclsFailInRegionButElaborateOutside(
       "1364-2001", {"logic [7:0] v;", "uwire v;", "bit [7:0] v;"});

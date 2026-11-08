@@ -18,15 +18,6 @@
 
 namespace delta {
 
-// The `[ ... ]` after an instance name. A.4.1.1's name_of_instance is
-// `instance_identifier { unpacked_dimension }`, and §28.3.5 gives the one
-// unpacked_dimension an array of instances takes: a range written in square
-// brackets as two constant expressions, the left-hand index (lhi) and the
-// right-hand index (rhi), with a colon between them, and no more than one such
-// range to an instance identifier. The first range is recorded; a size alone,
-// A.2.5's `[ constant_expression ]`, is reported where its colon was due and
-// the instance is one, as it was; and every range after the first is reported
-// and read past.
 void Parser::ParseInstanceRange(ModuleItem* item, bool first) {
   Expect(TokenKind::kLBracket, Subclause("28.3.5"));
   Expr* left = ParseExpr();
@@ -66,12 +57,6 @@ void ParseGateInstanceTail(Parser& p, ModuleItem* item, bool has_name) {
   p.Expect(TokenKind::kRParen, Subclause("28.3.6"));
 }
 
-// What A.3.1 lets an instance of each A.3.4 type carry. n_input_gate_instance
-// and n_output_gate_instance are written `[ drive_strength ] [ delay2 ]`,
-// enable_gate_instance `[ drive_strength ] [ delay3 ]`, mos_switch_instance
-// and cmos_switch_instance `[ delay3 ]`, pass_en_switch_instance `[ delay2 ]`,
-// pass_switch_instance nothing, and the pull gates `[ pullup_strength ]` and
-// `[ pulldown_strength ]` alone.
 static bool GateAllowsStrength(GateKind kind) {
   switch (GateTypeOf(kind)) {
     case GateType::kNInputGate:
@@ -100,13 +85,6 @@ static bool GateUsesDelay3(GateKind kind) {
   }
 }
 
-// Whether `e` has one of the forms A.8.5 gives net_lvalue: a
-// ps_or_hierarchical_net_identifier with its constant_select, `{ net_lvalue
-// { , net_lvalue } }`, or `[ assignment_pattern_expression_type ]
-// assignment_pattern_net_lvalue`, whose elements A.6.7.1 writes with no key.
-// None of them is written in parentheses. Declared in
-// parser_instance_internal.h for the UDP instance in parser_udp_inst.cpp, whose
-// output_terminal is the same net_lvalue a gate's is.
 bool IsNetLvalue(const Expr* e) {
   if (e->is_parenthesized) return false;
   switch (e->kind) {
@@ -144,13 +122,6 @@ static void ValidateOutputNetLvalues(const std::vector<Expr*>& terms,
                  Subclause("28.3"));
 }
 
-// The terminals A.3.3 makes a net_lvalue, by the instance form A.3.1 gives
-// each A.3.4 type: the two inout_terminals a pass_switch_instance or
-// pass_en_switch_instance opens with, every output_terminal of an
-// n_output_gate_instance, which is each terminal but the last, and the one
-// output_terminal every other instance opens with. The enable_terminal,
-// input_terminal, ncontrol_terminal and pcontrol_terminal after them are
-// expressions, and are left as read.
 static void ValidateGateTerminalLvalues(GateKind kind,
                                         const std::vector<Expr*>& terms,
                                         DiagEngine& diag, SourceLoc loc) {
@@ -171,13 +142,6 @@ static void ValidateGateTerminalLvalues(GateKind kind,
   }
 }
 
-// The terminals A.3.1 gives an instance of each A.3.4 type:
-// cmos_switch_instance four, mos_switch_instance, enable_gate_instance and
-// pass_en_switch_instance three, pass_switch_instance two, pull_gate_instance
-// one, and n_input_gate_instance `output_terminal , input_terminal { ,
-// input_terminal
-// }` and n_output_gate_instance `output_terminal { , output_terminal } ,
-// input_terminal`, two at least.
 static bool ValidGateTerminalCount(GateKind kind, size_t count) {
   switch (GateTypeOf(kind)) {
     case GateType::kCmosSwitch:
@@ -374,8 +338,6 @@ ModuleItem* Parser::ParseOneGateInstance(GateKind kind, SourceLoc loc) {
   item->loc = loc;
   item->gate_kind = kind;
 
-  // A.4.1.1's name_of_instance opens with an instance_identifier, which A.9.3
-  // spells `simple_identifier | escaped_identifier`.
   ParseGateInstanceTail(*this, item, CheckIdentifier());
   if (!ValidGateTerminalCount(kind, item->gate_terminals.size()))
     diag_.Error(loc, "incorrect number of terminals for gate instance",
@@ -410,11 +372,6 @@ static bool IsStrength1Token(TokenKind k) {
   }
 }
 
-// A.2.2.3 (printed page 1184): whether `delay`, read after `#` with no
-// parenthesis, has one of delay_value's forms: an unsigned_number, decimal
-// digits alone; a real_number or a time_literal; or a ps_identifier, a name
-// alone or behind one package scope, `p::` or `$unit::` (A.9.3). The fifth
-// form, 1step, is read by Parser::ParseDelayValue before it comes here.
 static bool IsDelayValueForm(const Expr* delay) {
   switch (delay->kind) {
     case ExprKind::kIntegerLiteral:
@@ -435,17 +392,6 @@ static bool IsDelayValueForm(const Expr* delay) {
   }
 }
 
-// A.2.2.3: the delay_value written after `#` with no parenthesis, where A.6.5's
-// delay_control, A.6.11's clocking_skew and every delay2 and delay3 have one.
-// Any other expression is written in parentheses, `# ( mintypmax_expression )`,
-// so one standing here is reported, and read on as far as its selects and
-// member names so that the construct after it still parses. A name stops at
-// a parenthesis, which after `#d` opens what the delay governs, the terminals
-// of a gate instance written with no name (A.3.1).
-//
-// The fifth form, 1step, reaches here as the number 1 and the name step, which
-// stand for it only when nothing separates them: `#1 step` is a delay of 1 and
-// whatever opens with step, a statement or a gate instance's name.
 Expr* Parser::ParseDelayValue() {
   SourceLoc loc = CurrentLoc();
   if (Check(TokenKind::kIntLiteral) && CurrentToken().text == "1") {
@@ -495,9 +441,6 @@ void Parser::ParseGateDelay(Expr*& d1, Expr*& d2, Expr*& d3) {
   }
 }
 
-// The strength value ParseStrength0 and ParseStrength1 give highz0 and highz1,
-// the two keywords A.2.2.2 lists in drive_strength alone and in neither
-// strength0 nor strength1.
 constexpr uint8_t kHighzStrength = 1;
 
 static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
@@ -506,12 +449,6 @@ static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
     diag.Error(loc, "drive strength not allowed on this gate type",
                Subclause("28.3.2"));
 
-  // A.3.2 writes pullup_strength and pulldown_strength over strength0 and
-  // strength1 alone, `( strength0 , strength1 )`, `( strength1 , strength0 )`
-  // and the one keyword the gate drives with, where A.2.2.2's drive_strength
-  // adds the four forms that pair highz0 or highz1 with the other; §28.10 has
-  // a pull source drive pull strength unless a strength is specified, and a
-  // highz strength is no strength a source can place.
   if (GateTypeOf(gate_kind) == GateType::kPullGate &&
       (str0 == kHighzStrength || str1 == kHighzStrength))
     diag.Error(loc,
@@ -534,11 +471,6 @@ static void ValidateGateStrength(GateKind gate_kind, SourceLoc loc,
                Subclause("28.3.2"));
 }
 
-// §28.3.2 and A.3.2: a pull gate's strength written as a pair is one strength0
-// keyword and one strength1 keyword. ParseStrength0 and ParseStrength1 answer
-// none for a keyword of the other side, so a pair of one side leaves the second
-// unrecorded; every other gate type answers it through the check that both
-// strengths are given.
 static void ValidatePullStrengthPair(GateKind gate_kind, SourceLoc loc,
                                      uint8_t str0, uint8_t str1,
                                      DiagEngine& diag) {
@@ -559,10 +491,6 @@ static void ValidateGateDelay(GateKind gate_kind, SourceLoc loc, Expr* delay,
                Subclause("28.3.3"));
 }
 
-// §28.3.2: the drive strength written after a gate keyword's `(`, which holds
-// a strength keyword: one keyword, or a pair of a keyword of each side in
-// either order, checked against what the gate type admits. Answers the
-// strength0 and strength1 codes, 0 for a side not written.
 std::pair<uint8_t, uint8_t> Parser::ParseGateStrength(GateKind kind,
                                                       SourceLoc loc) {
   uint8_t str0 = 0;
@@ -673,10 +601,6 @@ static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwVar:
     case TokenKind::kKwEvent:
     case TokenKind::kKwChandle:
-    // A.1.11's package_or_generate_item_declaration reaches net_declaration,
-    // whose net_type A.2.2.1 gives every one of these keywords, and
-    // data_declaration, which may open with `const`, with a lifetime, or with a
-    // `virtual interface` data type.
     case TokenKind::kKwWire:
     case TokenKind::kKwTri:
     case TokenKind::kKwTriand:
@@ -692,11 +616,6 @@ static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
     case TokenKind::kKwConst:
     case TokenKind::kKwStatic:
     case TokenKind::kKwVirtual:
-    // §3.12.1 gives the compilation-unit scope every item a package may hold,
-    // a data declaration of an enumeration, structure or union written in the
-    // declaration among them (§6.19's `enum {X, Y} v;`), which
-    // ParseTypedItemOrInst already reads; the gate alone refused the head and
-    // reported "expected top-level declaration".
     case TokenKind::kKwEnum:
     case TokenKind::kKwStruct:
     case TokenKind::kKwUnion:
@@ -706,22 +625,6 @@ static bool IsCuScopeDataTypeKeyword(TokenKind tk) {
   }
 }
 
-// §3.12.1 (printed page 56) gives the compilation-unit scope every item a
-// package may hold, and A.1.2's package_item reaches data_declaration, whose
-// data_type A.2.2.1 lets be a type_identifier: the `C` of `class C; ...
-// endclass  C h;` outside every module, which §8.3 (printed 180) makes a type
-// at its declaration, or a package's class the unit's `import p::*;` made
-// visible under §26.3 (printed 810). Both stand in known_types_ by the time
-// the declaration is read -- ParseClassDecl registers the class's name ahead
-// of its scope guard and ApplyImportedTypeNames adopts the package's -- and
-// ParseTypedItemOrInst reads such a name as a named type, as it does in a
-// module body; the keyword gate alone refused the identifier and reported
-// "expected top-level declaration".
-//
-// A data_type may also be a type named through a package or class scope,
-// `p::byte_t v;` (A.2.2.1's `[ class_scope | package_scope ] type_identifier`),
-// whose first identifier is a package and never in known_types_; no other
-// item a compilation unit holds opens with an identifier and `::`.
 bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
   std::vector<ModuleItem*> items;
   if (Check(TokenKind::kKwInterconnect)) {
@@ -739,8 +642,6 @@ bool Parser::TryParseCuScopeDataDecl(CompilationUnit* unit) {
   return true;
 }
 
-// Whether the `static` at the current token opens §18.5.1's external
-// constraint block rather than a data declaration of static lifetime.
 bool Parser::StaticOpensConstraint() {
   auto saved = lexer_.SavePos();
   Consume();
@@ -749,7 +650,6 @@ bool Parser::StaticOpensConstraint() {
   return opens_constraint;
 }
 
-// Whether the current token is an identifier followed by `::`.
 bool Parser::AtScopedIdentifier() {
   if (!Check(TokenKind::kIdentifier)) return false;
   auto saved = lexer_.SavePos();

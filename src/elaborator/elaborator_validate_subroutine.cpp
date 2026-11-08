@@ -20,8 +20,6 @@
 
 namespace delta {
 
-// §7.7: returns true when a positional DPI formal is an open-array (unsized)
-// output formal that may not receive a dynamic array or queue actual.
 static bool IsDpiOpenArrayOutputFormal(const FunctionArg& formal) {
   bool is_open =
       !formal.unpacked_dims.empty() && formal.unpacked_dims[0] == nullptr;
@@ -30,8 +28,6 @@ static bool IsDpiOpenArrayOutputFormal(const FunctionArg& formal) {
   return is_open && is_output;
 }
 
-// §7.7: true when the i-th positional actual of `call` is an identifier naming
-// a dynamic array or queue, given the per-variable array info map.
 static bool ActualIsDynamicOrQueue(
     const Expr* actual,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -42,17 +38,11 @@ static bool ActualIsDynamicOrQueue(
   return vit->second.is_dynamic || vit->second.is_queue;
 }
 
-// §7.7: at a DPI import call, an open-array (unsized) formal with an output
-// direction may not receive a dynamic array or queue actual. The unsized
-// dimension means the C side has no agreed-upon element count to write back
-// into, so this association is prohibited.
 void Elaborator::CheckDpiOpenArrayCall(const Expr* call) {
   if (!call || call->kind != ExprKind::kCall || call->callee.empty()) return;
   auto it = dpi_import_decls_.find(call->callee);
   if (it == dpi_import_decls_.end() || it->second == nullptr) return;
   const ModuleItem* imp = it->second;
-  // The rule is the formal's, so an actual bound to it by name is judged as
-  // one bound by position is.
   size_t positional_count = call->args.size() - call->arg_names.size();
   for (size_t i = 0; i < imp->func_args.size(); ++i) {
     const FunctionArg& formal = imp->func_args[i];
@@ -84,31 +74,6 @@ void Elaborator::WalkExprForDpiCalls(const Expr* e) {
   for (auto* el : e->elements) WalkExprForDpiCalls(el);
 }
 
-// §7.7 puts no condition on where the call it prohibits stands, and A.6.9 makes
-// a subroutine_call_statement a statement, so a DPI import call may be written
-// in every position a statement holds a statement in and the check is owed at
-// each of them.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It hands the visitor the field itself, so a walker that only reads the
-// tree takes a `Stmt* const&`.
-//
-// §7.7 bars passing a dynamic array or queue as the actual of a DPI formal that
-// has unsized dimensions and an output direction mode, and A.8.4 makes a
-// function_subroutine_call a primary, so the prohibited call may be written in
-// every position a statement holds an expression in and the check is owed at
-// each of those too. ForEachChildExpr in the same header states them, and this
-// walk hands every one of them to WalkExprForDpiCalls. It had read Stmt::rhs,
-// Stmt::expr and Stmt::condition alone, which left the call in
-// `for (i = 0; f(dyn) < 1; i = i + 1)` and in `assert (f(dyn) == 0);`
-// unreported.
-//
-// A.6.5 gives `wait_order ( hierarchical_identifier { , hierarchical_identifier
-// } ) action_block`, so Stmt::wait_order_events holds no expression a call can
-// stand in and no source makes that position answer. It is visited rather than
-// skipped, because visiting it costs one null check and keeps the list one
-// list.
 void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
   if (!s) return;
   ForEachChildExpr(s, [this](Expr* const& e) { WalkExprForDpiCalls(e); });
@@ -117,22 +82,11 @@ void Elaborator::WalkStmtsForDpiArgs(const Stmt* s) {
 
 namespace {
 
-// §13.3 enables a task from a statement, and §13.2 admits a nonvoid function
-// alone as an operand of an expression: a task returns no value, so a call to
-// one anywhere but as the statement itself, `x = t(1);`, has nothing to yield
-// and is reported, wherever the expression stands. `tasks` holds the names a
-// call written in the module names a task by: the module's own tasks and its
-// imported ones (task_names_, RecordTaskFuncNames), so an imported task
-// (§35.2.1) is caught with a native one; the compilation unit's tasks that no
-// function of the module hides (§23.9); and each package's tasks under the
-// "pk::t" a call through the package scope resolution operator names (§26.3).
 struct TaskOperandCheck {
   std::unordered_set<std::string> tasks;
   DiagEngine& diag;
 };
 
-// `root` is the expression that is the statement, the one call position that
-// is an enable.
 void WalkExprForTaskOperands(const Expr* e, const Expr* root,
                              const TaskOperandCheck& chk) {
   if (e == nullptr) return;
@@ -166,9 +120,6 @@ void WalkStmtsForTaskOperands(const Stmt* s, const TaskOperandCheck& chk) {
 void WalkItemsForTaskOperands(const std::vector<ModuleItem*>& items,
                               const TaskOperandCheck& chk);
 
-// §27.1: a generate block's items are the design's like any other, so the
-// procedures, continuous assignments and declarations of every block a
-// conditional, loop or case generate holds are walked as the module's are.
 void WalkGenerateForTaskOperands(const ModuleItem* item,
                                  const TaskOperandCheck& chk) {
   switch (item->kind) {
@@ -188,8 +139,6 @@ void WalkGenerateForTaskOperands(const ModuleItem* item,
   }
 }
 
-// A procedure's and a subroutine's statements, and the expressions a
-// continuous assignment's right side and a declaration's initializer are.
 void WalkItemsForTaskOperands(const std::vector<ModuleItem*>& items,
                               const TaskOperandCheck& chk) {
   for (const ModuleItem* item : items) {
@@ -202,7 +151,6 @@ void WalkItemsForTaskOperands(const std::vector<ModuleItem*>& items,
   }
 }
 
-// The compilation unit's tasks and each package's (TaskOperandCheck).
 void AddUnitAndPackageTasks(
     const CompilationUnit& unit,
     const std::unordered_map<std::string_view, const ModuleItem*>& funcs,
@@ -250,9 +198,6 @@ void Elaborator::ValidateTaskCallsInExpressions(const ModuleDecl* decl) {
   WalkItemsForTaskOperands(decl->items, chk);
 }
 
-// §9.2.3 allows in a final procedure only the statements a function
-// declaration allows, and §13.4 bars a function from enabling a task, so a
-// task enabled anywhere in the procedure's statements is reported.
 static void CheckFinalTaskEnables(
     const Stmt* s, const std::unordered_set<std::string>& task_names,
     DiagEngine& diag) {
@@ -291,8 +236,6 @@ void Elaborator::ValidateDpiOpenArrayArgs(const ModuleDecl* decl) {
   }
 }
 
-// §13.4.4: true when this statement node itself (ignoring substatements) is a
-// background-process-spawning construct.
 static bool StmtNodeSpawnsBackgroundProcess(const Stmt* s) {
   if (s->kind == StmtKind::kNonblockingAssign) return true;
   if (s->kind == StmtKind::kEventTrigger) return true;
@@ -305,29 +248,6 @@ static bool StmtNodeSpawnsBackgroundProcess(const Stmt* s) {
 
 static bool StmtSpawnsBackgroundProcess(const Stmt* s);
 
-// §13.4.4: true when any substatement of `s` spawns a background process. The
-// clause asks whether the function schedules an event that cannot become
-// active until after the function returns, and puts no condition on where the
-// statement that schedules it stands, so every position a statement holds a
-// statement in is one it may be written in.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator. It visits every one of them and gives the
-// visitor no way to stop, so the search short-circuits by keeping the answer in
-// `found` and calling StmtSpawnsBackgroundProcess only while `found` is false.
-//
-// Stmt::fork_stmts is walked deliberately rather than skipped. §13.4.4 says a
-// fork-join_none inside a function may hold whatever statements a task may, so
-// a nonblocking assignment written inside one schedules an event that cannot
-// become active until after the function returns exactly as one written beside
-// it does.
-//
-// Stmt::for_inits and Stmt::for_steps are walked because the shared list is
-// walked whole, and no source can make either of them answer true: A.6.8 admits
-// only a variable assignment or a for_variable_declaration in a
-// for_initialization, and only an operator_assignment, an inc_or_dec_expression
-// or a function_subroutine_call in a for_step, none of which is a nonblocking
-// assignment, an event trigger or a fork.
 static bool ChildStmtSpawnsBackgroundProcess(const Stmt* s) {
   bool found = false;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
@@ -337,14 +257,12 @@ static bool ChildStmtSpawnsBackgroundProcess(const Stmt* s) {
   return found;
 }
 
-// §13.4.4
 static bool StmtSpawnsBackgroundProcess(const Stmt* s) {
   if (!s) return false;
   if (StmtNodeSpawnsBackgroundProcess(s)) return true;
   return ChildStmtSpawnsBackgroundProcess(s);
 }
 
-// §13.4.4
 static bool FuncSpawnsBackgroundProcess(const ModuleItem* func) {
   if (!func) return false;
   for (const auto* s : func->func_body_stmts) {
@@ -353,8 +271,6 @@ static bool FuncSpawnsBackgroundProcess(const ModuleItem* func) {
   return false;
 }
 
-// §13.4.4
-// The callees of the calls in `e`, and in the statement `s` and those below it.
 static void CollectExprCallees(const Expr* e,
                                std::vector<std::string_view>& out) {
   if (e == nullptr) return;
@@ -370,10 +286,6 @@ static void CollectStmtCallees(const Stmt* s,
   ForEachChildStmt(s, [&](Stmt* const& sub) { CollectStmtCallees(sub, out); });
 }
 
-// §13.4.4: whether a call of `func` tries to schedule an event that cannot
-// become active until it returns, by a statement of its own or through a call
-// of another of the module's functions; `visited` keeps a recursive call from
-// being followed twice.
 static bool FuncReachesBackgroundProcess(
     const ModuleItem* func,
     const std::unordered_map<std::string_view, const ModuleItem*>& func_decls,
@@ -425,12 +337,6 @@ static void CheckBackgroundFuncCallInExpr(
 
 void Elaborator::ValidateBackgroundFuncCallContext(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
-    // §13.4.4: spawning a background event is a side effect that is only
-    // permitted when the calling thread is created by an initial/always
-    // procedure or a fork block. A continuous assignment is one such
-    // disallowed context; so is the initialization of a declaration, which
-    // happens at time zero outside any such procedure. The LRM's own illegal
-    // example is a variable initializer (`bit y = watch_for_zero(stack);`).
     if (item->kind == ModuleItemKind::kContAssign) {
       CheckBackgroundFuncCallInExpr(item->assign_rhs, func_decls_, diag_);
     } else if (item->kind == ModuleItemKind::kVarDecl ||

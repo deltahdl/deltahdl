@@ -18,10 +18,6 @@ namespace delta {
 
 namespace {
 
-// §11.9 takes a tagged union expression's type from the context it stands in.
-// This walk carries that context down a module: the declared type of each name
-// an assignment may write, the module's functions by name for the formal an
-// argument binds to, and the return type of the function whose body is walked.
 class TaggedContextWalk {
  public:
   TaggedContextWalk(const TypedefMap& typedefs, DiagEngine& diag)
@@ -65,18 +61,10 @@ bool IsValueLiteral(const Expr* e) {
   }
 }
 
-// The type a context gives, followed through the typedef table to the type it
-// stands for. A name the table holds nothing for -- a class, a type parameter
-// -- and a chain of names running through one of them twice say nothing the
-// walk can judge, and answer nullptr. A declaration written with a type
-// reference has had it resolved to the type it names by now.
 const DataType* TaggedContextWalk::Resolve(const DataType* type) const {
   return TypeAtChainEnd(*type, typedefs_);
 }
 
-// The declared type of a variable an assignment writes by its name, the block's
-// own declarations and the subroutine's formals hiding the module's. A select
-// or member of it, and a name with an unpacked dimension, carry no type here.
 const DataType* TaggedContextWalk::TypeOfName(const Expr* target) const {
   if (target->kind != ExprKind::kIdentifier) return nullptr;
   for (size_t i = locals_.size(); i > 0; --i) {
@@ -100,14 +88,6 @@ void TaggedContextWalk::ReportNoMember(const Expr* e, const DataType* context) {
               Subclause("11.9"));
 }
 
-// §11.9: the expression after the member name shall have that member's type,
-// a void member taking none. A member whose type is a tagged union gives its
-// value the context a tagged expression written there is checked against.
-// §10.8 for the value of `tagged M v` (§11.9): a literal fits a member of
-// any type but an unpacked structure or union, and a variable fits one whose
-// type is equivalent to its own (§6.22.2) where either is such an aggregate,
-// two integral or real types being assignment compatible. A value of any
-// other form, or of a type the walk does not know, is left alone.
 bool TaggedContextWalk::ValueFitsMember(const Expr* value,
                                         const DataType& member) const {
   const bool kMemberAggregate = IsUnpackedAggregateType(member);
@@ -146,9 +126,6 @@ void TaggedContextWalk::CheckTaggedValue(const Expr* e,
   }
 }
 
-// §11.9: a tagged union expression stands where its context gives it a type,
-// which shall be a tagged union having the member named after `tagged`. A
-// conditional hands its context to both arms (§11.4.11).
 void TaggedContextWalk::CheckTagged(const Expr* e, const DataType* context) {
   if (e == nullptr || context == nullptr) return;
   if (e->kind == ExprKind::kTernary) {
@@ -175,7 +152,6 @@ void TaggedContextWalk::CheckTagged(const Expr* e, const DataType* context) {
   ReportNoMember(e, context);
 }
 
-// §6.24.1: a cast to a type the module names gives its operand that type.
 void TaggedContextWalk::CheckCast(const Expr* e) {
   const std::string_view kName = e->rhs != nullptr ? e->rhs->text : e->text;
   if (!typedefs_.contains(kName)) return;
@@ -185,12 +161,6 @@ void TaggedContextWalk::CheckCast(const Expr* e) {
   CheckTagged(e->lhs, &named);
 }
 
-// §13.5: an actual binds to a formal by position or by name, and the formal's
-// type is the context of the actual. Only a call naming a function of this
-// module by its bare name reaches one of `functions_`; a method's, a
-// hierarchical name's and a compilation unit's function are other functions,
-// and a class's `new`, which the parser writes as a call naming no callee
-// expression, is none of the module's.
 void TaggedContextWalk::CheckCallArgs(const Expr* e) {
   if (e->lhs == nullptr || e->lhs->kind != ExprKind::kIdentifier ||
       !e->lhs->scope_prefix.empty())
@@ -228,9 +198,6 @@ void TaggedContextWalk::CheckAssigned(const Expr* target, const Expr* value) {
   WalkExpr(value);
 }
 
-// §11.9 names no statement a tagged expression's context is suspended in, so
-// the walk descends every link ForEachChildStmt names. A declaration a block
-// makes is visible to the statements after it in that block and no further.
 void TaggedContextWalk::WalkStmt(const Stmt* s) {
   if (s == nullptr) return;
   if (s->kind == StmtKind::kVarDecl) {
@@ -271,8 +238,6 @@ void TaggedContextWalk::Collect(const ModuleItem* item) {
     functions_[item->name] = item;
 }
 
-// A subroutine's body, its formals hiding the module's names and a function's
-// return type the context of each return statement.
 void TaggedContextWalk::WalkSubroutine(const ModuleItem* item) {
   return_type_ = item->kind == ModuleItemKind::kFunctionDecl
                      ? &item->return_type
@@ -303,10 +268,6 @@ void TaggedContextWalk::Run(const ModuleDecl* decl) {
 
 }  // namespace
 
-// §11.9 (printed page 304), which §7.3.2 defers the rule to: a tagged union
-// expression takes its type from its context -- an assignment's target, a
-// declaration's, a cast's type, a function's return type, a formal's -- and
-// shall name a member of that type with a value of the member's type.
 void ElaboratorOperationRules::ValidateTaggedUnionMembers(
     const ModuleDecl* decl) {
   TaggedContextWalk(typedefs_, diag_).Run(decl);

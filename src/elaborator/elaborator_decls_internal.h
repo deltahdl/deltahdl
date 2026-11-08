@@ -18,60 +18,31 @@
 
 namespace delta {
 
-// §11.5.1/§11.5.2: how many addresses a name admits before a select reaches a
-// bit, and what that bit sits in. Shared by the variable and net declaration
-// paths, because §11.5.2 delegates a select of an array element to §11.5.1, to
-// be addressed as a net's or a variable's select is.
 void RecordVarSelectShape(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, VarSelectShape>& shapes);
 
-// §11.5.1: whether a declaration with no unpacked dimension and no packed
-// dimension of its own declares a scalar, which a select may not address: not
-// an integer atom, a real, a packed structure or union, a name standing for a
-// vector or an integer atom, or a string. Shared by the variable and net
-// declaration paths, a net's type being as able as a variable's to carry its
-// width in a typedef, a packed structure or a nettype. Defined in
-// elaborator_decls_var.cpp.
 bool DeclaresScalar(const DataType& dtype, const TypedefMap& typedefs);
 
-// §7.8: the set of user-defined type names an unpacked dimension may name as a
-// user-defined associative index — the typedef table and the set of class
-// names that together form the type-name resolution context.
 struct TypeNameContext {
   const TypedefMap& typedefs;
   const std::unordered_set<std::string_view>& class_names;
 };
 
-// §23.2.2.1: bundle of name-table state that a net/variable declaration checks
-// against (and updates) for redeclaration and partial-port reconciliation.
 struct DeclNameTables {
   const std::unordered_set<std::string_view>& ansi_port_names;
   const std::unordered_set<std::string_view>& non_ansi_complete_ports;
   const std::unordered_map<std::string_view, uint32_t>& non_ansi_partial_ports;
   std::unordered_set<std::string_view>& declared_names;
-  // §27.4: the declaration's generate-prefixed name, used as the redeclaration
-  // key so distinct loop-iteration instances do not collide. Equals the bare
-  // name for an unprefixed top-level declaration.
   std::string_view scoped_name;
-  // Whether the name the declaration reuses was declared by a net or a
-  // variable of this module, the case §6.5's closing sentence names; a clash
-  // with a declaration of any other kind is §23.9's general rule.
   bool redeclares_net_or_variable;
 };
 
-// §23.2.2.1: the declared type whose vector width is reconciled against an
-// earlier partial port declaration — the data type paired with the typedef
-// table needed to evaluate its width.
 struct DeclTypeRef {
   const DataType& dtype;
   const TypedefMap& typedefs;
 };
 
-// §7.4.2/§7.8: everything one unpacked dimension is resolved against — the
-// type-name context a user-defined associative index is looked up in, the
-// constant scope its bounds are folded in, and where a bound that does not
-// fold is reported.
 struct UnpackedDimContext {
   const TypeNameContext& types;
   const ScopeMap& scope;
@@ -84,23 +55,12 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
 void InferDynArraySize(const std::vector<Expr*>& dims, const Expr* init,
                        RtlirVariable& var);
 
-// §7.4 (printed pages 153-156): what the unpacked dimensions `item` declares
-// make of `var`: each dimension's kind and extent (ComputeUnpackedDims), a
-// dynamic array's size from its initializer (InferDynArraySize), and whether
-// and how its elements are arrays themselves, `td_array_dims` holding each
-// typedef's unpacked dimensions and the scope in `ctx` folding the bounds.
-// Defined in elaborator_decls_element.cpp.
 void ElaborateUnpackedDims(
     const ModuleItem* item,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
         td_array_dims,
     const UnpackedDimContext& ctx, RtlirVariable& var);
 
-// §11.5.1 with §6.18: sets the resolved type as `var.dtype` for a declaration
-// written with a typedef name standing for a vector of one packed dimension,
-// so that the lowerer records the range the name was declared with, or for an
-// integral keyword type, so that it knows the kind (§21.7.5); see the
-// definition in elaborator_decls_var.cpp.
 void SetPackedTypedefTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, Arena& arena);
 

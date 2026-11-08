@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -18,9 +16,6 @@ using namespace delta;
 
 namespace {
 
-// The predicate of `x = <predicate> ? 1 : 0;`. A cond_predicate stands only in
-// an if statement's condition or a conditional operator's (A.6.6, A.8.3), so
-// it is read in the second and handed back to be evaluated on its own.
 Expr* ParsePredicateFrom(const std::string& predicate, SimFixture& f) {
   return ParseExprFrom(predicate + " ? 1 : 0", f)->condition;
 }
@@ -50,9 +45,6 @@ TEST(Matches, VariableMatch) {
   EXPECT_EQ(result.ToUint64(), 1u);
 }
 
-// §12.6: a constant expression pattern (11.2.1) succeeds when the value equals
-// its value. The constant here is a localparam, not a literal, so it exercises
-// the parameter-resolution code path end-to-end (elaborate + lower + run).
 TEST(Matches, ConstantLocalparamPatternMatchesRuntime) {
   SimFixture f;
   uint64_t y = RunModule(f,
@@ -70,8 +62,6 @@ TEST(Matches, ConstantLocalparamPatternMatchesRuntime) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6: same constant expression pattern rule, but the constant is a module
-// parameter and the value differs from it, so the match fails (result 0).
 TEST(Matches, ConstantParameterPatternNoMatchRuntime) {
   SimFixture f;
   uint64_t y = RunModule(f,
@@ -88,11 +78,6 @@ TEST(Matches, ConstantParameterPatternNoMatchRuntime) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 (printed page 325): a constant expression pattern succeeds when the
-// value equals the constant's value; §12.6.2 (printed 328) matches `e matches
-// p` the same way. A 96-bit value equal to a 96-bit constant in every word
-// matches, and one that differs from it only at bit 80 -- in the second 64-bit
-// word -- does not. The two results are read together as eq * 10 + ne.
 TEST(Matches, ConstantPatternWiderThanOneWordComparesEveryWord) {
   SimFixture f;
   uint64_t r = RunModule(
@@ -114,11 +99,6 @@ TEST(Matches, ConstantPatternWiderThanOneWordComparesEveryWord) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6 (printed page 325): the same rule with a 32-bit constant against a
-// 96-bit value, the constant extended to the value's width. The value whose
-// low word alone holds the constant and whose bit 64 is set differs from it;
-// the value holding the constant with clear upper words equals it. The two
-// results are read together as high_set * 10 + high_clear.
 TEST(Matches, ConstantPatternNarrowerThanTheValueExtendsToItsWidth) {
   SimFixture f;
   uint64_t r = RunModule(f,
@@ -139,9 +119,6 @@ TEST(Matches, ConstantPatternNarrowerThanTheValueExtendsToItsWidth) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.6.1 lets pattern matching ignore bits only in casez (z) and casex (x
-// and z); a `matches` clause compares every bit, so an x or a z in the
-// constant pattern matches only an x or a z in the value, never a 0 or a 1.
 TEST(Matches, XInPatternIsNoWildcard) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("wv", 4);
@@ -181,8 +158,6 @@ TEST(Matches, ResultAlwaysDetermined) {
   EXPECT_EQ(result.width, 1u);
 }
 
-// §12.6: even when the pattern contains x or z bits, the 1-bit result must be
-// 0 or 1 — never x or z.
 TEST(Matches, ResultDeterminedWhenPatternHasXZ) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("pv", 4);
@@ -193,7 +168,6 @@ TEST(Matches, ResultDeterminedWhenPatternHasXZ) {
   EXPECT_EQ(result.width, 1u);
 }
 
-// §12.6: result is 1-bit even when both the value and the pattern carry x/z.
 TEST(Matches, ResultDeterminedWhenValueAndPatternHaveXZ) {
   SimFixture f;
   MakeVar4(f, "vp", 4, 0b1010, 0b0101);
@@ -203,11 +177,8 @@ TEST(Matches, ResultDeterminedWhenValueAndPatternHaveXZ) {
   EXPECT_EQ(result.width, 1u);
 }
 
-// §12.6: the 1-bit result is 0 (fail) — never x or z — even when the value
-// being matched carries x/z bits and the pattern cannot match it.
 TEST(Matches, ResultDeterminedFalseWithValueXZ) {
   SimFixture f;
-  // aval 0b1010 with bval 0b0101 makes two of the value's bits x/z.
   MakeVar4(f, "fv", 4, 0b1010, 0b0101);
   auto* expr = ParsePredicateFrom("fv matches 4'b0101", f);
   auto result = EvalExpr(expr, f.ctx, f.arena);
@@ -240,11 +211,6 @@ TEST(Matches, TripleAmpSecondFalse) {
   EXPECT_EQ(result.ToUint64(), 0u);
 }
 
-// §12.6 gives a pattern identifier the type of the part of the value it
-// matches, so `.s` bound to the anonymous structure member `Add` is that
-// structure, and §7.2 selects its members by name: s.reg1 and s.regd read the
-// 1 and 6 the value holds, in a process and in a function body alike. The
-// binding carried the member's bits without its layout, and each select read 0.
 TEST(PatternMatchSim, IdentifierBoundToStructureMemberSelectsItsMembers) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -271,9 +237,6 @@ TEST(PatternMatchSim, IdentifierBoundToStructureMemberSelectsItsMembers) {
             "1 6\n1 6\n");
 }
 
-// Syntax 12-4 ends `tagged Valid .*` before the `&&&` filter, so the false
-// flag fails the predicate and x is 2 (§12.6.2), and `tagged Invalid` ends
-// before `?`, so the conditional on the failed match adds 20 (§12.6.3).
 TEST(PatternMatchingSim, TaggedMemberPatternStopsAtFilterAndQuestion) {
   SimFixture f;
   EXPECT_EQ(
@@ -293,10 +256,6 @@ TEST(PatternMatchingSim, TaggedMemberPatternStopsAtFilterAndQuestion) {
       "22\n");
 }
 
-// §12.6 declares a pattern identifier as a variable of the member's type,
-// here a 2-state vector's and an enumeration's, each read as the member
-// holds it. A real member's is #6418's to show, its union storing the real
-// converted to an integer.
 TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -317,8 +276,6 @@ TEST(PatternMatchingSim, BoundVariableHasTheMembersType) {
   EXPECT_EQ(v->value.ToUint64(), 1300u);
 }
 
-// §12.6 binds a pattern identifier to the member's value with the member's
-// type, so one bound to a real member is the real it holds (#6418).
 TEST(PatternMatchingSim, BoundRealMemberIsReal) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -336,9 +293,6 @@ TEST(PatternMatchingSim, BoundRealMemberIsReal) {
   EXPECT_EQ(v->value.ToUint64(), 10u);
 }
 
-// §12.6 matches the subject's value once, so an element subject's index is
-// evaluated once: `arr[i++]` advances i once, and the value and the tag it is
-// matched against are both arr[0]'s (#6421).
 TEST(PatternMatchingSim, ElementSubjectIndexEvaluatedOnce) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -359,9 +313,6 @@ TEST(PatternMatchingSim, ElementSubjectIndexEvaluatedOnce) {
   EXPECT_EQ(v->value.ToUint64(), 31u);
 }
 
-// §12.6 gives a pattern identifier the type of the member it binds, and a
-// class handle member binds a handle of that class, through which §8.4
-// reaches the class's methods (#6412).
 TEST(PatternMatchingSim, ClassHandleMemberBindsAHandle) {
   SimFixture f;
   auto* v = RunAndFindVar(

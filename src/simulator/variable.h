@@ -20,19 +20,8 @@ struct Expr;
 struct StructTypeInfo;
 struct ToggleSignal;
 
-// §40.2.2 toggle coverage: look at the bits of the signal `signal` records
-// now that it may have changed (defined in toggle_coverage.cpp).
 void ObserveToggle(ToggleSignal& signal);
 
-// §10.6.1/§11.4.12: which bits of a procedural continuous assignment's
-// right-hand value a variable owns, and where in the variable they land. A
-// concatenation target makes those two different windows and the two are
-// unrelated numbers: `bus[3]` in `assign {w, bus[3]} = ...` takes bit 0 of the
-// value and lands on bit 3 of `bus`. `rhs_width` is §10.7's context the value
-// is evaluated in -- the size of the assignment's left-hand side -- which is
-// the whole concatenation's width, so a later re-evaluation answers what the
-// first one did. A dst_width of zero is the whole of it, which is the singular
-// target: it owns every bit of the value and every bit of itself.
 struct ProcContAssignWindow {
   uint32_t rhs_width = 0;
   uint32_t src_lo = 0;
@@ -41,15 +30,10 @@ struct ProcContAssignWindow {
   uint32_t dst_width = 0;
 };
 
-// §7.4.4: one packed dimension of a declaration as an index on it is resolved
-// -- the range the index is checked against and the width of the element one
-// value of it selects, which is the product of the dimensions inside it and 1
-// at the innermost, where an index selects a bit.
 struct PackedLevel {
   PackedRange range;
   uint32_t elem_width = 1;
 
-  // The width of the object the dimension is a dimension of.
   uint64_t Width() const {
     return static_cast<uint64_t>(range.HighIndex() - range.LowIndex() + 1) *
            elem_width;
@@ -58,119 +42,26 @@ struct PackedLevel {
 
 struct Variable {
   Logic4Vec value{};
-  // §9.4.2: the baseline an event control's awaiter compares against to decide
-  // whether a change was the edge it waits for. It belongs to those awaiters
-  // alone: they seed it when they arm and resync it to the current value
-  // whenever a watched variable moves without qualifying, so it says what the
-  // last armed awaiter left there and says nothing at all about a variable no
-  // awaiter watches. Nothing in the assignment, NBA or net-resolution paths
-  // maintains it.
-  //
-  // A second reader with a different meaning for it is what produced #3253,
-  // where the VCD writer's change detection lost transitions to those resyncs,
-  // and #3357, where a clocking block's event depended on whether an unrelated
-  // process happened to wait on the same clock. Both now keep records of their
-  // own.
-  //
-  // It is a Logic4Snapshot rather than a Logic4Vec because a baseline has to
-  // hold what the value was after the value has moved on, and a Logic4Vec
-  // copied from `value` shares `value`'s words: a member assignment writes
-  // through those words rather than replacing them, so the two sides of the
-  // comparison would be one value and no change would ever be seen (#3358).
   Logic4Snapshot prev_value{};
 
-  // §6.16: whether this variable is a string, which decides whether its value
-  // is read as text -- the %s rendering over a task's default radix, the
-  // §6.16.1 through §6.16.15 methods resolving on it, and an assignment going
-  // through StripStringZeros.
-  //
-  // It lives on the variable because it used to live in a set of names.
-  // SimContext::string_vars_ keyed the unqualified text and was erased by
-  // nothing, so one block-local `string s;` made every variable called `s` a
-  // string for the rest of the run, everywhere in the design. What identifies
-  // a variable is the variable, and every reader already holds it or can find
-  // it by the same lookup the mark now hangs off.
   bool is_string = false;
 
-  // §6.12: whether this variable was declared real, shortreal or realtime, so
-  // that a value assigned to it converts numerically under §6.12.1 rather than
-  // being resized, and a value read from it is a real (EvalIdentifier). It
-  // lives on the variable for the reason is_string does: the set of names
-  // SimContext::RegisterRealVariable keeps is keyed by the bare text, so a
-  // subroutine's `real a` formal or `real l` local registered there would make
-  // every `a` and `l` in the design a real for the rest of the run, and left
-  // unregistered -- as they were -- the formal and the local were known to be
-  // real by their value alone, and `l = a + b` stored the sum as an integer
-  // whose bits the caller read back as a double, 0.0. A module-scope or
-  // procedural declaration is still registered under its name as well, for
-  // the readers that hold a name and no Variable.
   bool is_real = false;
 
-  // §25.9: whether this variable was declared `virtual interface`, so that its
-  // value is the handle of the interface instance it represents -- the number
-  // SimContext::VirtualInterfaceHandle issues for the instance's scope, 0 for
-  // the null it holds before initialization -- and a member reached through it
-  // by the dot notation is a component of that instance rather than of this
-  // variable, which has none. A module-scope declaration and a subroutine's
-  // formal alike carry it; a class property declared so is marked on its
-  // ClassTypeInfo::PropertyInfo, since an object holds no Variable.
   bool is_virtual_interface = false;
 
-  // §12.6 with §7.2: the structure layout a pattern identifier bound to a
-  // structure member has, the member's own (StructFieldInfo::nested), which
-  // no type name registers; a member select of the identifier reads through
-  // it (StructLayoutOfName). Kept on the variable, so it ends with the scope
-  // the binding is declared in. Null for every other variable, whose layout
-  // the name table gives.
   const StructTypeInfo* local_layout = nullptr;
 
-  // §30.5.3: the simulation time this variable's value last changed, in ticks.
-  // The active specify paths are the ones whose input changed latest, and
-  // choosing among the module paths reaching one output is the
-  // only thing that asks. Nothing writes it but the watcher
-  // WatchModulePathSources in src/simulator/module_path_delay.cpp arms, and
-  // that arms only on the source terminal of a registered module path, so it
-  // stays 0 for every other variable in the design and for every design that
-  // declared no specify block. Zero therefore means "never recorded", not
-  // "changed at time zero", and only paths watched by the same arming are ever
-  // compared against each other.
   uint64_t last_change_ticks = 0;
-  // §30.5.3 again, for a path whose input is a select of this variable,
-  // `(a[1] => y)`: the time each bit last changed, by storage offset, which is
-  // the input such a path transitions on. Sized and written by the same watcher
-  // only where some registered path's source is a select of this variable, and
-  // empty everywhere else.
   std::vector<uint64_t> bit_change_ticks;
-  // §30.4.3 (printed page 874): which edge the change recorded last was at the
-  // least significant bit, which is where a vector source's edge is detected
-  // -- kEdgeRise for §9.4.2's posedge (0 to x, z or 1, and x or z
-  // to 1), kEdgeFall for its negedge, 0 for a change that left the bit alone.
-  // An edge-sensitive module path from this variable is active on its own edge
-  // alone. Written by the same watcher, and per bit, beside bit_change_ticks,
-  // where a path starts at a select.
   static constexpr uint8_t kEdgeRise = 1;
   static constexpr uint8_t kEdgeFall = 2;
   uint8_t last_change_edge = 0;
   std::vector<uint8_t> bit_change_edges;
 
-  // §10.6: is_forced says some procedural continuous assignment holds this
-  // variable, so that every other writer declines; force_active says the one
-  // holding it is a force. §10.6.2 has a force override an active assign, a
-  // deassign end the assign alone and a release the force alone, so the two
-  // are kept apart rather than read off the one flag.
   bool is_forced = false;
   bool force_active = false;
   Logic4Vec forced_value{};
-  // §10.6.2 names a constant bit-select or part-select of a vector net among
-  // the things a force may hold, and holds exactly what was named: the drivers
-  // it overrides are the drivers of those bits, and the rest of the net goes on
-  // being driven. Each part held is the window of this variable its bits are,
-  // empty for a hold on the whole of it -- which is every force on a variable,
-  // §10.6.2 barring a bit-select or part-select of a variable as its target --
-  // with the right-hand side holding it. Two forces on different bits of a net
-  // are two parts, each released on its own. The values are deposited through
-  // the same windows, so forced_value carries the whole object with every
-  // held bit in place.
   struct HeldPart {
     ProcContAssignWindow window;
     const Expr* rhs = nullptr;
@@ -183,65 +74,25 @@ struct Variable {
   bool is_signed = false;
   bool is_4state = true;
   uint64_t triggered_ticks = UINT64_MAX;
-  // §28.13 and §28.14: a count Net::Resolve advances each time the net this
-  // variable holds the value of resolves to another strength with its value
-  // unchanged, for a MOS or CMOS switch reading the net as its data input to
-  // pass the new strength on (AnyChangeAwaiter::strength_changes). Only a net
-  // whose Net::strength_watched is set keeps it.
   uint64_t strength_generation = 0;
 
-  // §20.6.1: the data type the declaration gave the variable, null where none
-  // was recorded, and what $typename writes before a user-defined type the
-  // declaration's scope declares: "pkg::" for a package's variable, empty for
-  // a module's or a subroutine's. `declared_unpacked` is the unpacked
-  // dimensions the declaration wrote, as `$typename` appends them, "$[0:9]"
-  // for `AB_t AB[10]`, and empty for none.
   const DataType* declared_type = nullptr;
   std::string_view declared_scope;
   std::string_view declared_unpacked;
 
-  // §7.4.1: for a packed multidimensional array stored as one flat vector (e.g.
-  // `logic [1:0][7:0]`), the bit width of one outermost element. A single-index
-  // select `x[i]` then selects that many bits at the element's offset instead
-  // of one bit. Zero means an ordinary vector (single-bit selects).
   uint32_t packed_elem_width = 0;
 
-  // §11.5.1: the outermost packed dimension of this variable's declaration,
-  // exactly as written, recorded only when the declaration carries one. An
-  // `int`, a scalar and a string carry none and are addressed as [width-1:0].
-  // For a packed multidimensional array the range indexes elements rather than
-  // bits, matching packed_elem_width above.
   bool has_packed_range = false;
   PackedRange packed_range{};
 
-  // §7.4.4: the packed dimensions inside the outermost one, outermost first
-  // and exactly as declared -- [1:0] then [7:0] for a `logic [1:0][1:0][7:0]`
-  // -- whose spans multiply to packed_elem_width. RecordPackedRange records
-  // them with it, so that a chain of selects steps one dimension per index
-  // (§7.4.1) instead of reading every index past the first as a bit of the
-  // subfield the first selected: with only the outermost dimension known,
-  // `z[1][0]` on that declaration was bit 16 of `z`, bit 0 of the sixteen-bit
-  // `z[1]`, with nothing left for a third index to address, where §7.4.4 has
-  // it the eight bits 23 to 16 and `z[1][0][3]` their bit 3, storage bit 19.
   std::vector<PackedRange> inner_packed_dims;
 
-  // §7.4.1: how many single-index selects deep an element of this variable is
-  // of the named type its declaration's packed dimensions are written on, when
-  // that type was declared signed -- 0 for `x[1]` of `s8_t [1:0] x`, 1 for
-  // `z[1][0]` of `s8_t [1:0][1:0] z` -- and none otherwise. An element there is
-  // signed; every other element of a packed array, and every part-select, is
-  // unsigned.
   std::optional<size_t> signed_elem_depth;
 
-  // The range an index in a select of this variable is resolved against.
   PackedRange DeclaredRange() const {
     return has_packed_range ? packed_range : PackedRange::Implicit(value.width);
   }
 
-  // §7.4.4: the dimension an index reaches `depth` single-index selects inside
-  // this variable: 0 is the declaration's own outermost dimension, 1 the first
-  // inner one. None where the depth has exhausted the dimensions, the window
-  // there a run of bits with no declaration of its own.
   std::optional<PackedLevel> PackedLevelAt(size_t depth) const {
     if (depth == 0) {
       return PackedLevel{DeclaredRange(),
@@ -257,11 +108,6 @@ struct Variable {
     return level;
   }
 
-  // PackedLevelAt for a window of `width` bits, and none where the dimension
-  // does not account for that width: a window an index of a queue or of an
-  // associative array carved out is a whole element, and the variable under
-  // the array's name models one element rather than the array, so a further
-  // index of it is not a dimension of this variable's declaration.
   std::optional<PackedLevel> PackedLevelWithin(size_t depth,
                                                uint32_t width) const {
     auto level = PackedLevelAt(depth);
@@ -269,19 +115,11 @@ struct Variable {
     return level;
   }
 
-  // The range a select addressed by bit resolves against. A packed
-  // multidimensional array's declared outer range counts elements rather than
-  // bits (§7.4.1), so a select that addresses this variable's bits keeps the
-  // flattened [width-1:0] view of it.
   PackedRange BitSelectRange() const {
     if (packed_elem_width > 1) return PackedRange::Implicit(value.width);
     return DeclaredRange();
   }
 
-  // §10.6.2: whether a force holds bit `bit` of this variable. A force naming
-  // the whole object holds every bit of it, which is what the empty window
-  // says; a force naming a select of a vector net holds the bits it named, and
-  // a driver of any other bit is overridden by nothing.
   bool BitIsForced(uint32_t bit) const {
     if (!is_forced) return false;
     return std::ranges::any_of(held_parts, [bit](const HeldPart& part) {
@@ -291,12 +129,6 @@ struct Variable {
     });
   }
 
-  // Whether a force holds every bit of this variable, which is the force that
-  // needs no resolution of the drivers underneath it. A window covering the
-  // whole object is that force written the long way: an element of a
-  // concatenation naming a whole net records its own width rather than the
-  // empty window, and §10.6.2 says the same thing about it as about the bare
-  // name.
   bool WholeIsForced() const {
     if (!is_forced) return false;
     if (held_parts.empty()) return true;
@@ -310,29 +142,11 @@ struct Variable {
 
   const Expr* assign_cont_rhs = nullptr;
 
-  // §10.6.1: releasing a variable with an assign procedural continuous
-  // assignment active puts that assignment back in force, and
-  // what the assignment gives this variable is its window of the right-hand
-  // value rather than the whole of it. The expression alone could not say so,
-  // and the release recomputed a window from its own target instead: after
-  // `assign {a, b} = 16'h1234;`, `release a;` reestablished the entire sixteen
-  // bits on the eight-bit `a` where §11.4.12's packed vector of bits gives it
-  // 8'h12. The window is recorded here as the assignment is installed, so the
-  // two cannot drift apart and a release naming a target written differently
-  // from the assign's reestablishes what the assign actually installed.
   ProcContAssignWindow assign_cont_window{};
 
-  // §10.6.2: releasing a variable a continuous assignment drives reestablishes
-  // that assignment and schedules its reevaluation. Set by the continuous
-  // assignment the first time it drives this variable; empty for a variable
-  // no continuous assignment drives.
   std::function<void()> cont_assign_reevaluate;
 
   std::vector<std::function<bool()>> watchers;
-  // §40.2.2: the toggle coverage record of this signal's bits, looked at on
-  // each change alongside the watchers; null for a variable no instance counts
-  // the toggles of. It is kept apart from the watchers so that every signal
-  // of a design can carry one without each write rebuilding the watcher list.
   ToggleSignal* toggle = nullptr;
 
   void AddWatcher(std::function<bool()> cb) {

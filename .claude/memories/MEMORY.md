@@ -22,6 +22,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [No comments in any file](no-comments-in-any-file.md) — no tracked file carries a comment or docstring but clang-format's namespace end comments, the six annex headers and test inputs whose comment is under test; the why goes in the commit message.
 - [The module's own terms](module-terms-in-descriptions.md) — write about module M so a reader who has never heard of its callers understands it.
 - [New struct members go last](new-struct-members-go-last.md) — tests brace-initialize AST structs by position; a member inserted before the last one they name shifts them all and breaks the build.
+- [Per-module elaboration tables are listed twice](per-module-elaboration-tables-are-listed-twice.md) — a new `Elaborator` table is cleared in `ResetItemElaborationState` and saved and put back in `ItemElaborationStateSaver`, or nested modules leak into each other.
 - [Names say what a thing does](names-say-what-a-thing-does.md) — an identifier names its thing's meaning, never the clause, table, figure or annex number it was written for, nor a bare serial; editions, mandated names and literals keep their digits.
 
 ## Formatting and prose
@@ -61,6 +62,7 @@ relevance — see [recording-what-a-session-learns](recording-what-a-session-lea
 - [Naming a const local](const-local-naming.md) — `kCamelCase`, or drop the `const`; a `const` reference is a plain `lower_case` variable; the clang-tidy shards are what say so.
 - [One declaration per test name](unique-test-names.md) — each `Suite.Name` in one file only; a CI job fails on duplicates.
 - [Rename rather than delete a duplicate](renaming-rather-than-deleting-a-duplicate-test.md) — keep both files covering one rule and qualify the names.
+- [A test that constrains a fix](a-test-that-constrains-a-fix.md) — a case that passes before the fix and fails only on a wrong one is not redundant; name the wrong implementation it alone catches before deleting it.
 - [Letter suffixes on split test files](test-file-letter-suffixes.md) — every file in a split family ends with a letter; the bare name means one file.
 - [Check the letter before writing](checking-for-the-letter-before-writing.md) — `ls test/src/unit/` first, or a redirect silently destroys existing cases.
 - [A VpiDesignRun SetUp calls the base first](vpi-design-run-setup.md) — an override of `SetUp` that skips `VpiDesignRun::SetUp()` builds no VPI model, and its cases read another case's leftovers.

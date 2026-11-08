@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -85,9 +83,6 @@ TEST(PortDeclParsing, RefOmittedTypeDefaultsToLogic) {
 }
 
 TEST(PortDeclParsing, FirstPortExplicitTypeOmittedDirectionDefaultsToInout) {
-  // §23.2.2.3: an explicit data type makes the first port ANSI-style even with
-  // no direction keyword, so the omitted direction defaults to inout. With the
-  // port kind also omitted, an inout port becomes a net.
   auto r = Parse("module m(integer x); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -99,8 +94,6 @@ TEST(PortDeclParsing, FirstPortExplicitTypeOmittedDirectionDefaultsToInout) {
 }
 
 TEST(PortDeclParsing, InputExplicitIntegerKindDefaultsToNet) {
-  // §23.2.2.3: an input port with the port kind omitted defaults to a net, even
-  // when the data type is given explicitly rather than left implicit.
   auto r = Parse("module m(input integer x); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -111,9 +104,6 @@ TEST(PortDeclParsing, InputExplicitIntegerKindDefaultsToNet) {
 }
 
 TEST(PortDeclParsing, RefExplicitTypeIsAlwaysVariable) {
-  // §23.2.2.3: a ref port is always a variable; this holds even when the data
-  // type is stated explicitly, so the ref rule overrides the net defaults that
-  // an explicit type would otherwise leave in place for other directions.
   auto r = Parse("module m(ref integer x); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -309,12 +299,6 @@ TEST(PortDeclParsing, ExplicitPortInheritsOnlyDirection) {
 }
 
 TEST(PortDeclParsing, VarOnlyFirstPortDefaultsToInoutVariable) {
-  // §23.2.2.3 (LRM example mh4): the port kind is given (var) but the direction
-  // is omitted, so for the first port the direction defaults to inout while the
-  // explicit var keeps the port a variable rather than a net. This is exactly
-  // the state the LRM flags as an error, because an inout port may not be a
-  // variable; the parser resolves the defaults here, the elaborator rejects the
-  // combination (see the matching elaborator test).
   auto r = Parse("module m(var x); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -326,9 +310,6 @@ TEST(PortDeclParsing, VarOnlyFirstPortDefaultsToInoutVariable) {
 }
 
 TEST(PortDeclParsing, InterconnectPortGetsNoLogicDataType) {
-  // §23.2.2.3: the rule that an omitted data type defaults to logic is
-  // explicitly excepted for interconnect ports, which carry no data type.
-  // The resolved port therefore stays interconnect rather than logic.
   auto r = Parse("module m(interconnect x); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -339,9 +320,6 @@ TEST(PortDeclParsing, InterconnectPortGetsNoLogicDataType) {
 }
 
 TEST(PortDeclParsing, SubsequentPortInheritsInterconnect) {
-  // §23.2.2.3: when a subsequent port omits direction, port kind, and data
-  // type, those are inherited from the previous port; if the previous port
-  // was an interconnect port, this port is interconnect as well.
   auto r = Parse("module m(interconnect x, y); endmodule");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);

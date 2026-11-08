@@ -25,38 +25,6 @@
 
 namespace delta {
 
-// §8.23: a class value parameter or local parameter is a public element and a
-// constant expression, reachable from outside the class via the class scope
-// resolution operator (Class::PARAM). Record each such parameter under its
-// "Class.name" key so a constant expression referring to it -- which parses as
-// a member access whose compound key is "Class.name" -- folds at elaboration.
-// Type parameters carry no value and are skipped.
-//
-// A value that is not a constant expression is reported here rather than left
-// out. §6.20.1's Syntax 6-6 writes a param_assignment as `parameter_identifier
-// { variable_dimension } [ = constant_param_expression ]`, and makes every
-// param_assignment in a class body a localparam declaration whether or not the
-// class has a parameter_port_list (printed page 125 of IEEE 1800-2023),
-// so a class body parameter and a #() parameter port are both under that rule.
-// Leaving the parameter out instead is what let a breach elaborate in silence:
-// a name absent from the scope reads to every later consumer as a name it
-// cannot see rather than as a value the source got wrong, and
-// CollectUnpackedDimSizes in elaborator_decls_var.cpp drops the array dimension
-// the parameter was sizing rather than reporting it.
-//
-// §6.20.1: one class's list of parameter constants, as far as registration has
-// read it. `formals` holds every parameter name the class declares, type
-// parameters included; a value that mentions one is left alone whether it folds
-// or not, because §8.25 binds those only when the class is specialized, and
-// `class C #(type T = int, int S = $bits(T));` is legal and has no value where
-// it stands. `values` is `cu_param_scope` with the values recorded so far
-// layered over it under their bare names, which is what §6.20.1 requires when
-// it lets a parameter in a list of parameter constants depend on earlier ones.
-// `key_prefix` is the class's path in the keys its parameters are recorded
-// under, "Outer.Inner" for a class nested in another (§8.23), and
-// `type_scope` the same path as its typedefs are keyed, "Outer::Inner". The
-// three fields that follow are where a recorded value goes and how a breach
-// is reported.
 struct ClassParamRegistration {
   const ClassDecl* cls;
   std::unordered_set<std::string_view> formals;
@@ -68,17 +36,10 @@ struct ClassParamRegistration {
   DiagEngine& diag;
 };
 
-// §6.20.7 (printed page 131): `$` assigned to a parameter, which stands for no
-// number and so has none to fold.
 static bool IsDollarValue(const Expr* e) {
   return e->kind == ExprKind::kIdentifier && e->text == "$";
 }
 
-// §6.20.2 (printed pages 126-127): whether a class value parameter declared
-// with `type` takes a real value -- declared with a real type, or declared
-// with neither type nor range and given a real expression, where a real
-// expression makes the parameter real. Null for a declaration recording no
-// type.
 static bool TakesRealClassParamValue(const Expr* pexpr, const DataType* type) {
   if (type != nullptr && IsRealType(type->kind)) return true;
   bool untyped =
@@ -87,14 +48,6 @@ static bool TakesRealClassParamValue(const Expr* pexpr, const DataType* type) {
   return untyped && HasRealOperand(pexpr);
 }
 
-// §8.25 with §6.20.2 (printed pages 126-127) and §11.6.1: an integral value is
-// folded as the right-hand side of an assignment to a parameter of the
-// declared `type`, its range folded against the parameters recorded before it
-// (FoldDeclaredParamValue), so `logic [W-1:0] INIT = '1` after `int W = 8`
-// records 255 and not the 1 the literal is on its own (§5.7.1). §6.20.2 also
-// applies §6.12.1's conversion to parameters, so a real expression given to a
-// parameter of an integral type is rounded (FoldRealValueAsInteger), ahead of
-// the integer fold as a module's parameter orders the two.
 static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
                                                     const DataType* type,
                                                     const ScopeMap& values) {
@@ -103,9 +56,6 @@ static std::optional<int64_t> FoldClassParamInteger(const Expr* pexpr,
   return FoldDeclaredParamValue(pexpr, *type, values);
 }
 
-// §6.20.1 with §10.9.1: whether `e`, an item of a parameter array's assignment
-// pattern, is a constant expression, integral or real, and for a pattern nested
-// in it for a further dimension, whether each of its own items is.
 static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
   if (e->kind != ExprKind::kAssignmentPattern)
     return ConstEvalInt(e, values).has_value() ||
@@ -115,9 +65,6 @@ static bool PatternItemsConstant(const Expr* e, const ScopeMap& values) {
   });
 }
 
-// §6.20.2 with §6.11.2: what a parameter of a 2-state type whose value names
-// this one reads of it (TwoStateReading), where it is declared with a 4-state
-// `type` and holds x or z, and empty otherwise.
 static std::optional<int64_t> ClassParamTwoStateReading(
     const Expr* pexpr, const DataType* type, int64_t val,
     const ScopeMap& values) {
@@ -125,20 +72,6 @@ static std::optional<int64_t> ClassParamTwoStateReading(
   return TwoStateReading(pexpr, *type, values, val);
 }
 
-// A real value and `$` are checked for being constant and recorded nowhere,
-// since the qualified "Class.name" scope holds integers alone; the simulator
-// reads a real class parameter as a real (ClassParamSizer in
-// src/simulator/eval_class_params.cpp).
-//
-// A parameter declared with unpacked dimensions, `is_array`, holds an array of
-// values (§6.20.1), which no integer stands for: a pattern is judged item by
-// item (PatternItemsConstant), a value written as anything else -- the name of
-// another parameter array -- stands as written, and neither is recorded.
-//
-// §10.8 (printed page 259) makes an explicitly typed parameter's value an
-// assignment-like context, so a pattern there takes the parameter's type -- a
-// structure's or a union's as much as an array's -- and is judged item by item
-// as an array's is.
 static void RecordClassParam(std::string_view pname, const Expr* pexpr,
                              const DataType* type, bool is_array,
                              ClassParamRegistration& reg) {
@@ -172,11 +105,6 @@ static void RecordClassParam(std::string_view pname, const Expr* pexpr,
   SetTwoStateReading(reg.cu_param_scope, *qname, reading);
 }
 
-// The #() parameter ports live in cls->params; type parameters carry no value
-// and are skipped. They are taken before the body declarations because that is
-// the order they are written in, and a body declaration may name one of them.
-// Body parameter and localparam declarations are class members flagged is_param
-// (parser_class.cpp records them as kProperty members).
 static void RegisterOneClassParams(ClassParamRegistration& reg) {
   const auto& params = reg.cls->params;
   const auto& types = reg.cls->param_types;
@@ -194,11 +122,6 @@ static void RegisterOneClassParams(ClassParamRegistration& reg) {
   }
 }
 
-// The parameters of the class `reg` registers, and then those of each class
-// nested in it (§8.23), which a constant expression reaches through the chain
-// of class names, `Outer::Inner::N`: each is recorded under the full path,
-// "Outer.Inner.N", and folded over the enclosing class's values with its own
-// names layered over them.
 static void RegisterClassTreeParams(ClassParamRegistration& reg) {
   RegisterOneClassParams(reg);
   for (const auto* m : reg.cls->members) {
@@ -218,9 +141,6 @@ static void RegisterClassTreeParams(ClassParamRegistration& reg) {
 void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                          Arena& arena, DiagEngine& diag) {
   for (auto* cls : unit->classes) {
-    // cu_param_scope appears twice: once copied into `values`, which the class
-    // layers its own bare names over, and once bound as the scope the qualified
-    // "Class.name" keys are written to.
     ClassParamRegistration reg{cls,
                                ClassParamNames(cls),
                                cls->name,
@@ -233,21 +153,6 @@ void RegisterClassParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
-// §8.26: a class declaration may appear within a module, and §6.20.1 says the
-// same thing of every class body wherever it stands: every param_assignment in
-// a class body becomes a localparam declaration whether or not there is a
-// parameter_port_list, whose value Syntax 6-6 makes a
-// constant_param_expression. The walk below reaches the compilation unit's
-// classes alone, so a class written inside a module had its defaults folded and
-// checked nowhere and `class C #(parameter int W = n);` over a variable n
-// elaborated in silence -- and the default was then evaluated at each
-// construction against the simulation context, a per-object value where §6.20
-// has one constant.
-//
-// `module_scope` is what the class layers its own names over, so a default
-// naming one of the module's parameters folds against it, and the qualified
-// "Class.name" keys go to the compilation-unit scope the unit's classes write
-// to, which is where every consumer of a class parameter looks.
 void RegisterModuleClassParams(const ClassDecl* cls,
                                const ScopeMap& module_scope,
                                ScopeMap& cu_param_scope, Arena& arena,
@@ -258,9 +163,6 @@ void RegisterModuleClassParams(const ClassDecl* cls,
   RegisterClassTreeParams(reg);
 }
 
-// Whether `e` mentions any name in `names`, at any depth. Every identifier the
-// expression carries is compared, whatever node holds it, so a type parameter
-// named by a `type` operator or a cast counts as a mention.
 bool ExprMentionsAny(const Expr* e,
                      const std::unordered_set<std::string_view>& names) {
   if (!e) return false;
@@ -280,10 +182,6 @@ bool ExprMentionsAny(const Expr* e,
   return false;
 }
 
-// §6.20.7 (printed page 131): a parameter holding `$` may stand wherever `$`
-// may be written as a literal, which an override is. Its value is not in the
-// ScopeMap, so it is found among the parameters of the module a live
-// ParamRangeRegistryGuard registered.
 static bool NamesUnboundedParam(const Expr* e) {
   if (e->kind != ExprKind::kIdentifier) return false;
   const RtlirParamDecl* pd = RegisteredParamNamed(e->text);
@@ -305,9 +203,6 @@ std::unordered_set<std::string_view> NonIntegralParamNames(
   return names;
 }
 
-// §10.8 (printed page 260): a parameter override in a class's instantiation is
-// an assignment-like context, so a pattern there is constant when its items
-// are.
 bool IsConstantClassParamValue(const Expr* e, const ScopeMap& scope) {
   if (e->kind == ExprKind::kAssignmentPattern)
     return PatternItemsConstant(e, scope);
@@ -315,8 +210,6 @@ bool IsConstantClassParamValue(const Expr* e, const ScopeMap& scope) {
          ConstEvalReal(e, scope);
 }
 
-// Every parameter name `cls` declares: its type parameters, its #() parameter
-// ports and its body parameter declarations.
 std::unordered_set<std::string_view> ClassParamNames(const ClassDecl* cls) {
   std::unordered_set<std::string_view> names = cls->type_param_names;
   for (const auto& [pname, pexpr] : cls->params) names.insert(pname);

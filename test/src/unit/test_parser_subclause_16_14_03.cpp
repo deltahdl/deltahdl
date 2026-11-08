@@ -24,11 +24,6 @@ TEST(AssertionSemanticsParsing, CoverProperty) {
   EXPECT_TRUE(found);
 }
 
-// §16.14.3 and §16.12.1: a cover statement whose whole spec is one name is an
-// instance of a named property or sequence when the name is a declaration's.
-// The parser records the name for the elaborator to substitute the body, as
-// it does for an assert, and reports nothing, so the cover is not left
-// unevaluated at the parse for opening with no clocking event.
 TEST(AssertionSemanticsParsing, CoverInstanceSpecIsRecordedUnreported) {
   auto r = Parse(
       "module m;\n"

@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -61,12 +60,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
                             2, "23.3.3.2"));
 }
 
-// §9.2.2.2 makes always_comb a structured procedure exactly as §9.2.2.1 makes
-// always one, and neither narrows what its body may assign, so the §23.3.3.2
-// rule that a variable input port is not the target of an assignment is the
-// same rule here as in the initial case above. The procedure keyword is the
-// only thing this case varies, because that is what decides whether the
-// assignment is collected as a procedural one at all.
 TEST(PortConnectionRulesForVariablesElaboration,
      InputPortDrivenFromAlwaysCombIsRejected) {
   ElabFixture f;
@@ -106,8 +99,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
       "  assign v = 1'b0;\n"
       "endmodule\n",
       f);
-  // The implied continuous assignment of §23.3.3.2 collides with the explicit
-  // one under the §6.5 single-continuous-driver rule, which is what reports.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'v' driven by both output port and "
                             "continuous assignment",
@@ -126,8 +117,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
       "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
-  // §6.5 is the rule reported: the implied continuous assignment of §23.3.3.2
-  // and a procedural assignment cannot both drive the variable.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'v' driven by output port has "
                             "procedural assignments",
@@ -145,8 +134,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
       "  child c(.y(v));\n"
       "endmodule\n",
       f);
-  // §6.5 is the rule reported: the initializer is a second driver on the
-  // variable the §23.3.3.2 implied continuous assignment already drives.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'v' driven by output port has an "
                             "initializer",
@@ -169,10 +156,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.3.3.2 admits an output port connected to a concatenation of variables,
-// not only a single variable. The implied continuous assignment drives each
-// variable element, so an additional continuous assignment to any element is
-// illegal just as it is for the single-variable form.
 TEST(PortConnectionRulesForVariablesElaboration,
      OutputPortConcatVariableElementDoubleDriveErrors) {
   ElabFixture f;
@@ -186,17 +169,12 @@ TEST(PortConnectionRulesForVariablesElaboration,
       "  assign a = 1'b0;\n"
       "endmodule\n",
       f);
-  // The collision between the implied continuous assignment and the explicit
-  // one is reported under §6.5, at the instantiation that implies the driver.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'a' driven by both output port and "
                             "continuous assignment",
                             6, "6.5"));
 }
 
-// A net element inside a concatenation connected to an output port keeps the
-// §23.3.3.3 net rule: multiple drivers are permitted, so an extra continuous
-// assignment to that net element is legal.
 TEST(PortConnectionRulesForVariablesElaboration,
      OutputPortConcatNetElementAllowsExtraDriver) {
   ElabFixture f;
@@ -214,9 +192,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// A variable element that is driven by the output ports of two separate
-// instances is driven by multiple outputs, which is illegal regardless of the
-// concatenation wrapping.
 TEST(PortConnectionRulesForVariablesElaboration,
      OutputPortConcatVariableDrivenByTwoOutputsErrors) {
   ElabFixture f;
@@ -235,9 +210,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
                             "23.3.3.2"));
 }
 
-// R2a admits a concatenation of variables as the output-port connection, not
-// only a single variable. With no other driver on any element, the connection
-// is legal -- the accepting counterpart to the concat double-drive rejections.
 TEST(PortConnectionRulesForVariablesElaboration,
      OutputPortConnectsToVariableConcatenation) {
   ElabFixture f;
@@ -282,17 +254,12 @@ TEST(PortConnectionRulesForVariablesElaboration,
       "  child u(.w(v));\n"
       "endmodule\n",
       f);
-  // §23.2.2.3 makes `inout logic w` a net, so the rule reported for the
-  // variable connection is §23.3.3.3's rather than §23.3.3.2's.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'v' cannot be connected to inout "
                             "port 'w'",
                             5, "23.3.3.3"));
 }
 
-// A ref port connected to an equivalent variable binds with ref direction and
-// is accepted -- the latter also guarding that the equivalence gate does not
-// reject a matching-width, matching-type variable connection.
 TEST(PortConnectionRulesForVariablesElaboration,
      RefPortBindingHasRefDirection) {
   ElabFixture f;
@@ -343,10 +310,6 @@ TEST(PortConnectionRulesForVariablesElaboration, RefPortLeftUnconnectedErrors) {
                             4, "23.3.3.2"));
 }
 
-// §23.3.3.2 requires a ref port to be connected to an *equivalent* variable
-// data type, not merely an assignment-compatible one. A variable whose packed
-// width differs from the ref port is not equivalent and shall be rejected --
-// distinct from the net-connection rejection above.
 TEST(PortConnectionRulesForVariablesElaboration,
      RefPortConnectedToNonEquivalentVariableErrors) {
   ElabFixture f;
@@ -401,10 +364,6 @@ TEST(PortConnectionRulesForVariablesElaboration,
                             4, "23.3.3.2"));
 }
 
-// §23.3.3.2 (printed page 747): a ref port's connection is referenced, not
-// driven, so the variable may carry an initializer and take procedural
-// assignments in the parent. Both were reported as §6.5 errors of a variable
-// "driven by output port".
 TEST(PortConnectionRulesForVariablesElaboration,
      RefConnectionMayBeInitializedAndAssignedProcedurally) {
   ElabFixture f;

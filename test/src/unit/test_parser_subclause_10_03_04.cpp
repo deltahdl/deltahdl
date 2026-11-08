@@ -105,9 +105,6 @@ TEST(DriveStrengthParsing, NetDeclReversedStrengthOrder) {
   EXPECT_EQ(item->drive_strength1, 4u);
 }
 
-// §10.3.4: a drive strength specification must pair one strength-for-1 keyword
-// with one strength-for-0 keyword. Two strength-0 keywords leave the
-// strength-1 slot unfilled, which the parser rejects.
 TEST(DriveStrengthParsing, TwoStrength0KeywordsIsError) {
   auto r = Parse(
       "module m;\n"
@@ -121,7 +118,6 @@ TEST(DriveStrengthParsing, TwoStrength0KeywordsIsError) {
       "10.3.4"));
 }
 
-// The mirror case: two strength-1 keywords leave the strength-0 slot unfilled.
 TEST(DriveStrengthParsing, TwoStrength1KeywordsIsError) {
   auto r = Parse(
       "module m;\n"
@@ -135,8 +131,6 @@ TEST(DriveStrengthParsing, TwoStrength1KeywordsIsError) {
       "10.3.4"));
 }
 
-// §10.3.4: on a net declaration the strength follows the net-type keyword and
-// precedes any delay. Both the drive strength and the net delay are captured.
 TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
   auto r = Parse(
       "module m;\n"
@@ -152,11 +146,6 @@ TEST(DriveStrengthParsing, NetDeclStrengthBeforeDelay) {
   EXPECT_NE(item->net_delay, nullptr);
 }
 
-// §10.3.4: the strength specification comes right after the keyword, the net
-// type's or `assign`, and ahead of any delay, which §A.6.1 writes as `assign [
-// drive_strength ] [ delay3 ] list_of_net_assignments ;`. The report stands at
-// the strength's own opening parenthesis on line 3, which is the token in the
-// wrong place.
 TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
   auto r = Parse(
       "module m;\n"
@@ -170,12 +159,6 @@ TEST(DriveStrengthParsing, StrengthAfterDelayIsError) {
                             3, "10.3.4"));
 }
 
-// §10.3.4 names the net-type keyword alongside `assign`, and §A.2.1.3 writes
-// the same order into `net_declaration ::= net_type [ drive_strength |
-// charge_strength ] [ vectored | scalared ] data_type_or_implicit [ delay3 ]
-// list_of_net_decl_assignments ;`. This case reaches the rule through
-// Parser::ParseVarDeclList, where the net delay is read, rather than through
-// Parser::ParseContinuousAssign, so it is not redundant with the case above.
 TEST(DriveStrengthParsing, NetDeclDelayBeforeStrengthIsError) {
   auto r = Parse(
       "module m;\n"

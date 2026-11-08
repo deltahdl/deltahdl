@@ -13,8 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 32-1 writes $sdf_annotate as a statement, so each test wraps the call
-// under test in an initial block and pulls the parsed call back out.
 const Expr* SdfCall(const ParseResult& r) {
   if (r.cu == nullptr || r.cu->modules.empty()) return nullptr;
   for (auto* item : r.cu->modules.back()->items) {
@@ -34,7 +32,6 @@ ParseResult ParseSdfAnnotate(const std::string& args) {
                ");\nendmodule\n");
 }
 
-// The one required operand: a call naming only the SDF file.
 TEST(SdfAnnotateSyntax, SdfFileAloneIsAWholeCall) {
   ParseResult r = ParseSdfAnnotate("\"timing.sdf\"");
   EXPECT_FALSE(r.has_errors);
@@ -47,8 +44,6 @@ TEST(SdfAnnotateSyntax, SdfFileAloneIsAWholeCall) {
   EXPECT_EQ(call->args[0]->kind, ExprKind::kStringLiteral);
 }
 
-// sdf_file is an expression, so it may be written as the name of a variable
-// holding the file name rather than as a literal.
 TEST(SdfAnnotateSyntax, SdfFileMayBeWrittenAsAnExpression) {
   ParseResult r = Parse(
       "module top;\n  string f = \"timing.sdf\";\n"
@@ -61,7 +56,6 @@ TEST(SdfAnnotateSyntax, SdfFileMayBeWrittenAsAnExpression) {
   EXPECT_EQ(call->args[0]->kind, ExprKind::kIdentifier);
 }
 
-// All seven operands, each written out.
 TEST(SdfAnnotateSyntax, EveryOperandMayBeSupplied) {
   ParseResult r = ParseSdfAnnotate(
       "\"timing.sdf\", top.dut, \"cfg.txt\", \"ann.log\", \"MAXIMUM\", "
@@ -76,8 +70,6 @@ TEST(SdfAnnotateSyntax, EveryOperandMayBeSupplied) {
   EXPECT_EQ(call->args[6]->text, "\"FROM_MTM\"");
 }
 
-// Each operand after the first is optional on its own, so a call may skip over
-// the ones it does not care about on its way to a later one.
 TEST(SdfAnnotateSyntax, OperandsSkippedOnTheWayToALaterOneAreEmptySlots) {
   ParseResult r = ParseSdfAnnotate("\"timing.sdf\", , , , \"MINIMUM\"");
   EXPECT_FALSE(r.has_errors);
@@ -92,8 +84,6 @@ TEST(SdfAnnotateSyntax, OperandsSkippedOnTheWayToALaterOneAreEmptySlots) {
   EXPECT_EQ(call->args[4]->text, "\"MINIMUM\"");
 }
 
-// A trailing operand may simply be left off, so the shorter forms are calls in
-// their own right rather than a longer call with empty slots.
 TEST(SdfAnnotateSyntax, TrailingOperandsMayBeLeftOff) {
   for (int count = 1; count <= 7; ++count) {
     std::string args = "\"timing.sdf\"";
@@ -112,9 +102,6 @@ TEST(SdfAnnotateSyntax, TrailingOperandsMayBeLeftOff) {
   }
 }
 
-// The first slot may be written empty on the way to a later operand. That is a
-// call with no sdf_file, which the annotator rejects when it runs; the parser's
-// part is to keep the empty slot rather than shift the operands along.
 TEST(SdfAnnotateSyntax, SdfFileSlotMayBeWrittenEmpty) {
   ParseResult r = ParseSdfAnnotate(", top.dut");
   EXPECT_FALSE(r.has_errors);
@@ -126,8 +113,6 @@ TEST(SdfAnnotateSyntax, SdfFileSlotMayBeWrittenEmpty) {
   EXPECT_EQ(call->args[1]->kind, ExprKind::kMemberAccess);
 }
 
-// A module_instance need not be a dotted path; a bare instance name is one of
-// its ordinary forms.
 TEST(SdfAnnotateSyntax, ModuleInstanceMayBeABareInstanceName) {
   ParseResult r = ParseSdfAnnotate("\"timing.sdf\", dut");
   EXPECT_FALSE(r.has_errors);
@@ -139,8 +124,6 @@ TEST(SdfAnnotateSyntax, ModuleInstanceMayBeABareInstanceName) {
   EXPECT_EQ(call->args[1]->text, "dut");
 }
 
-// Array indices are permitted in a module_instance, so an indexed element of
-// an instance array is kept as an indexed name rather than flattened away.
 TEST(SdfAnnotateSyntax, ModuleInstanceMayCarryArrayIndices) {
   ParseResult r = ParseSdfAnnotate("\"timing.sdf\", top.bank[1]");
   EXPECT_FALSE(r.has_errors);
@@ -154,8 +137,6 @@ TEST(SdfAnnotateSyntax, ModuleInstanceMayCarryArrayIndices) {
   ASSERT_NE(call->args[1]->index, nullptr);
 }
 
-// A deeper hierarchical path, and an index part way along it, are both ordinary
-// module_instance forms.
 TEST(SdfAnnotateSyntax, ModuleInstanceMayIndexPartWayAlongAPath) {
   ParseResult r = ParseSdfAnnotate("\"timing.sdf\", top.bank[2].core");
   EXPECT_FALSE(r.has_errors);
@@ -168,23 +149,16 @@ TEST(SdfAnnotateSyntax, ModuleInstanceMayIndexPartWayAlongAPath) {
   EXPECT_EQ(call->args[1]->lhs->kind, ExprKind::kSelect);
 }
 
-// The call is a statement, so it is terminated by a semicolon like any other.
-// Dropping the semicolon is not a $sdf_annotate call.
 TEST(SdfAnnotateSyntax, CallWithoutItsTerminatingSemicolonIsRejected) {
   ParseResult r = Parse(
       "module top;\n  initial $sdf_annotate(\"timing.sdf\")\nendmodule\n");
-  // The statement terminator is §12.3's rule, and it is what the parser
-  // reports; §32.9 has no report of its own here.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "12.3"));
 }
 
-// The operand list is parenthesized; an unclosed list is not a call.
 TEST(SdfAnnotateSyntax, CallWithAnUnclosedOperandListIsRejected) {
   ParseResult r = Parse(
       "module top;\n  initial $sdf_annotate(\"timing.sdf\";\nendmodule\n");
-  // The closing parenthesis of a system task call is §13.5's rule, and it is
-  // what the parser reports; §32.9 has no report of its own here.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "13.5"));
 }
 

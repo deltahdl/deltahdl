@@ -38,10 +38,6 @@ TEST(UnpackedArraySimulation, RangeFormElementAccess) {
   EXPECT_EQ(v, 0x42u);
 }
 
-// §7.4.2 / §11.2.1: the size of a fixed-size unpacked array may be given by a
-// parameter. End-to-end, the top element is only addressable when that bound
-// resolves in the parameter scope; a mis-resolved (zero) size would make this
-// access fall outside the array.
 TEST(UnpackedArraySimulation, ParameterSizedArrayElementAccess) {
   auto v = RunAndGet(
       "module t;\n"
@@ -57,18 +53,6 @@ TEST(UnpackedArraySimulation, ParameterSizedArrayElementAccess) {
   EXPECT_EQ(v, 0x55u);
 }
 
-// The three cases above declare at module scope, which the lowerer builds. A
-// declaration written inside a procedural block is built by
-// CreateBlockArrayElements in statement_assign_decl.cpp instead, and that read
-// only §7.4.2's range form: the size form registered no array and created no
-// elements, so `a[i]` was a bit-select of the single carrier variable the
-// declaration left behind. Each case below is carried out through a
-// module-scope scalar, because a block-local array's element variables go away
-// with the block and cannot be looked up once the run has ended.
-
-// §7.4.2: [size] is shorthand for [0:size-1], so index 2 of `int a[3]` is the
-// top element and holds what was written to it. A bit-select of the carrier
-// writes bit 2 instead, and 9 truncated to that one bit reads 1.
 TEST(UnpackedArraySimulation, SizeFormInAProceduralBlockAddressesElements) {
   auto v = RunAndGet(
       "module t;\n"
@@ -84,11 +68,6 @@ TEST(UnpackedArraySimulation, SizeFormInAProceduralBlockAddressesElements) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.4.2 states the two spellings as the same array, giving `int Array[8][32]`
-// and `int Array[0:7][0:31]` as one declaration written two ways, so the claim
-// is an equality rather than two readings that happen to agree. The range form
-// already built its array here, so the comparison reads 0 while the size form
-// does not: 5 written through a bit-select comes back as 1.
 TEST(UnpackedArraySimulation, SizeFormAndRangeFormAgreeInAProceduralBlock) {
   auto v = RunAndGet(
       "module t;\n"
@@ -105,10 +84,6 @@ TEST(UnpackedArraySimulation, SizeFormAndRangeFormAgreeInAProceduralBlock) {
   EXPECT_EQ(v, 1u);
 }
 
-// One element read cannot say the elements are separate storage: three bits of
-// one carrier answer to three indices too. Writing all three and summing them
-// separates the readings, 11 + 22 + 33 against the 1 + 0 + 1 that the low three
-// bits of the carrier hold once each value has been cut down to one bit.
 TEST(UnpackedArraySimulation, SizeFormInAProceduralBlockGivesEachIndexItsOwn) {
   auto v = RunAndGet(
       "module t;\n"
@@ -125,11 +100,6 @@ TEST(UnpackedArraySimulation, SizeFormInAProceduralBlockGivesEachIndexItsOwn) {
   EXPECT_EQ(v, 66u);
 }
 
-// §7.10 writes a queue's dimension as `$`, which is not a size however much it
-// looks like one dimension written in one pair of brackets. CreateBlockQueue is
-// asked before the array builder and answers for it; this case is what says the
-// size form did not take the queue's dimension away from it, and it would read
-// 0 from a queue that was never built.
 TEST(UnpackedArraySimulation, QueueDimensionInAProceduralBlockIsNotASize) {
   auto v = RunAndGet(
       "module t;\n"
@@ -144,14 +114,6 @@ TEST(UnpackedArraySimulation, QueueDimensionInAProceduralBlockIsNotASize) {
   EXPECT_EQ(v, 7u);
 }
 
-// §7.4.2 in an instantiated module: `int a[4]` declared in M, which top
-// instantiates as `m`, is stored under "m.a" and its elements under "m.a[i]",
-// and §23.9 resolves the bare name `a` inside M through the instance. The
-// lookup for the array's shape (SimContext::FindArrayInfo) asked for the bare
-// key alone, so an element read `a[1]` found no array and fell to a bit-select
-// of the carrier variable the lowerer creates under the name -- a carrier the
-// element writes never touch -- reading 0 for both terms; the elements read
-// back 22 and 44.
 TEST(UnpackedArraySimulation, ChildInstanceElementsReadBackByBareName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -177,12 +139,6 @@ TEST(UnpackedArraySimulation, ChildInstanceElementsReadBackByBareName) {
   EXPECT_EQ(r->value.ToUint64(), 2244u);
 }
 
-// §12.7.3 and §20.7 on the same array: foreach steps through the four
-// elements and $size answers the declared dimension, both asking the array's
-// shape by its bare name inside the instance (§23.9). With no shape found,
-// foreach ran once per bit of the 32-bit carrier and $size measured that
-// carrier, answering 32; the loop fills 10, 20, 30, 40 and the sum is 100
-// under a size of 4.
 TEST(UnpackedArraySimulation, ChildInstanceForeachAndSizeSeeTheArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -207,13 +163,6 @@ TEST(UnpackedArraySimulation, ChildInstanceForeachAndSizeSeeTheArray) {
   EXPECT_EQ(r->value.ToUint64(), 4100u);
 }
 
-// §7.4.2 (printed page 154): an element of a net array is used as a scalar or
-// vector net is, so each element is driven and resolved apart from the others.
-// `assign n[1] = 1'b1;` drives n[1] alone and leaves n[0] and n[2] undriven at
-// z; the two drivers of the wor element r[0] are or-ed and r[1], driven by
-// neither, is z; and a bit-select of an element of `wire [3:0] v[2:1]` drives
-// that one bit of it. The array was held as one net of an element's width, so
-// n[1] selected a bit it did not have and read x, as did every element.
 TEST(UnpackedArraySimulation, NetArrayElementsAreNetsOfTheirOwn) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -232,10 +181,6 @@ TEST(UnpackedArraySimulation, NetArrayElementsAreNetsOfTheirOwn) {
             "z1z 1z 1010 zzz1\n");
 }
 
-// §7.4.2 with §7.4.5: so is an element of a net array of more than one
-// unpacked dimension, `assign n[1][5] = 1'b1;` driving n[1][5] alone and
-// leaving the elements beside it, in its subarray and in the next, at z. The
-// array was held as one net with no element nets, so every element read x.
 TEST(UnpackedArraySimulation, MultidimensionalNetArrayElementsAreNets) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -248,11 +193,6 @@ TEST(UnpackedArraySimulation, MultidimensionalNetArrayElementsAreNets) {
             "1zz\n");
 }
 
-// The same elements as the targets of output ports: each instance drives the
-// one element its connection names, `.y(nouts[2])`, and an array of instances
-// over the whole array drives one element per instance, left index to left
-// index (§23.3.3.5). An element no instance drives stays z. A net array a child
-// declares is its own per instance and reads by hierarchical name.
 TEST(UnpackedArraySimulation, NetArrayElementsDrivenThroughOutputPorts) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module leaf(input logic a, output wire y);\n"
@@ -278,13 +218,6 @@ TEST(UnpackedArraySimulation, NetArrayElementsDrivenThroughOutputPorts) {
             "z0z1 010 5 z\n");
 }
 
-// §7.4.2 with §7.2 and §10.9.2: each element of an unpacked array of
-// structures is a structure, so a nested pattern initializer packs each item
-// by the element's layout -- reds 3, 1 and 2 -- and a member write to an
-// element, `c[1].green = 7`, and a whole-element pattern assignment,
-// `c[2] = '{9, 8, 7}`, are stored and read back through `c[i].member`.
-// Packed at the items' own widths and written to no layout, every member read
-// 0.
 TEST(UnpackedArraySim, StructElementsInitializedWrittenAndRead) {
   const char* src =
       "module t;\n"
@@ -307,10 +240,6 @@ TEST(UnpackedArraySim, StructElementsInitializedWrittenAndRead) {
   EXPECT_EQ(RunAndGet(src, "sum"), 13u);
 }
 
-// §7.4.2 with §7.2: each element of a multidimensional unpacked array of
-// structures is a structure too, so a member write to `c[x][y]`, by indices
-// written out and by a foreach with a loop variable per dimension, is stored
-// in that element and read back through `c[x][y].member`.
 TEST(UnpackedArraySim, MultidimensionalStructElementsWrittenAndRead) {
   const char* src =
       "module t;\n"
@@ -332,10 +261,6 @@ TEST(UnpackedArraySim, MultidimensionalStructElementsWrittenAndRead) {
   EXPECT_EQ(RunAndGet(src, "sum"), 18u);
 }
 
-// §7.4.2 with §8.5: a class property may be a multidimensional unpacked
-// array, and each element `g[i][j]` is a variable of its own, written and
-// read in a method, through a handle, and by a foreach with a loop variable
-// per dimension.
 TEST(UnpackedArraySim, MultidimensionalClassPropertyElementsAreVariables) {
   SimFixture f;
   std::string out = RunCapture(
@@ -366,10 +291,6 @@ TEST(UnpackedArraySim, MultidimensionalClassPropertyElementsAreVariables) {
   EXPECT_EQ(out, "53 5 3 7 15\n2 4 15\n");
 }
 
-// §12.7.3 with §7.4.2 and §8.5: a foreach naming a loop variable per
-// dimension of a multidimensional class property reached through a handle,
-// `foreach (h.g[i, j])` in an initial block, runs as nested loops over all
-// six elements, the last dimension varying fastest.
 TEST(UnpackedArraySim, ForeachOverAMultidimensionalPropertyThroughAHandle) {
   SimFixture f;
   std::string out = RunCapture(
@@ -391,10 +312,6 @@ TEST(UnpackedArraySim, ForeachOverAMultidimensionalPropertyThroughAHandle) {
   EXPECT_EQ(out, "6 15 5 2\n");
 }
 
-// §7.4.2 with §6.16: an element of a fixed-size array of strings is a string
-// variable, so it holds the whole text of each write rather than as many
-// characters as the first one: "longer" after "x" keeps all six, in an array
-// a module declares with one dimension or two and in one a block declares.
 TEST(UnpackedArraySim, AStringElementHoldsTheWholeTextOfEachWrite) {
   SimFixture f;
   std::string out = RunCapture(
@@ -415,10 +332,6 @@ TEST(UnpackedArraySim, AStringElementHoldsTheWholeTextOfEachWrite) {
   EXPECT_EQ(out, "longer longer longer g 1\n");
 }
 
-// §7.4, §7.8 and §7.10 with §26.3 and §6.16: an element of a package's array
-// of strings named through the package scope is a string, so a string method
-// reads its text and one that writes its object writes it, for a queue, a
-// fixed-size and an associative array alike.
 TEST(UnpackedArraySim, AStringMethodActsOnAPackageScopedElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -441,9 +354,6 @@ TEST(UnpackedArraySim, AStringMethodActsOnAPackageScopedElement) {
   EXPECT_EQ(out, "2 3 4\nQb Qbc Qbcd\n");
 }
 
-// §7.4.2: a range bound may be negative, and a block's declaration reads it as
-// the signed value it was written as, so `[-2:1]` is four elements from -2
-// rather than a range from 1 up to the bound's 32 bits.
 TEST(UnpackedArraySim, ANegativeBoundInAProceduralBlockIsSigned) {
   SimFixture f;
   std::string out = RunCapture(

@@ -1,10 +1,3 @@
-// §11.6.1 and §11.8.1: the self-determined length and signedness of an
-// expression as its form gives them, which the context-determined evaluators
-// in evaluation.cpp and eval_ternary.cpp size and sign their operands by
-// (§11.8.2), by the classes of operator elaborator/operator_classes.h names;
-// and §11.3.4's 2- or 4-state nature of it, which a cast to a type reference
-// (§6.23) takes.
-
 #include <algorithm>
 #include <array>
 #include <cstdint>
@@ -31,15 +24,11 @@
 
 namespace delta {
 
-// The three readers below answer about `expr` together; unknown where its
-// width is.
 static SelfType ReadSelfType(const Expr* expr, SimContext& ctx) {
   uint32_t width = SimSelfWidth(expr, ctx);
   return {width, SimSelfSigned(expr, ctx), SimSelf4State(expr, ctx), width > 0};
 }
 
-// Whether a value of `kind` is integral (§6.11.1), which the readers here
-// size: not a real, a string, a chandle or an event.
 static bool HoldsIntegralValue(DataTypeKind kind) {
   static constexpr std::array kNonIntegral = {
       DataTypeKind::kReal,   DataTypeKind::kShortreal, DataTypeKind::kRealtime,
@@ -47,10 +36,6 @@ static bool HoldsIntegralValue(DataTypeKind kind) {
   return std::ranges::find(kNonIntegral, kind) == kNonIntegral.end();
 }
 
-// The variable named `name` where a select addresses its bits as a packed
-// vector (§7.4.1); null for a string, of which a select reads a byte (§6.16),
-// and for an unpacked array, a queue or an associative array, of which it
-// reads an element.
 static const Variable* PackedVariable(std::string_view name, SimContext& ctx) {
   if (ctx.FindQueue(name) != nullptr || ctx.FindAssocArray(name) != nullptr)
     return nullptr;
@@ -60,8 +45,6 @@ static const Variable* PackedVariable(std::string_view name, SimContext& ctx) {
   return var;
 }
 
-// §11.5.1: the number of elements a select names -- one for an index, the
-// width of an indexed part-select, or the span of a part-select's bounds.
 static uint64_t SelectedCount(const Expr* expr, SimContext& ctx) {
   if (expr->index_end == nullptr) return 1;
   Arena& arena = ctx.GetArena();
@@ -74,12 +57,6 @@ static uint64_t SelectedCount(const Expr* expr, SimContext& ctx) {
   return static_cast<uint64_t>(std::abs(start - end) + 1);
 }
 
-// §11.5.1 with §7.4.1 and §11.8.1: a select of a packed variable is as many of
-// its outermost elements as it names, each one bit for a plain vector, never
-// wider than the variable; it is unsigned, and 2- or 4-state as the variable
-// is. An element of an unpacked array of one dimension has the array's
-// element type (§7.4.2) where that is integral. Unknown for a slice or a
-// select of anything else.
 static SelfType SelectSelfType(const Expr* expr, SimContext& ctx) {
   if (expr->base->kind != ExprKind::kIdentifier) return {};
   std::string_view name = expr->base->text;
@@ -98,17 +75,12 @@ static SelfType SelectSelfType(const Expr* expr, SimContext& ctx) {
   return {width, false, var->is_4state, width > 0};
 }
 
-// §7.2: a member of a structure has the type its member was declared with,
-// 2-state where that type is (§7.2.1); unknown where that type is not
-// integral.
 static SelfType MemberSelfType(const Expr* expr, SimContext& ctx) {
   const StructFieldInfo* field = ResolveStructMember(expr, ctx);
   if (field == nullptr || !HoldsIntegralValue(field->type_kind)) return {};
   return {field->width, field->is_signed, !MemberIsTwoState(*field, ctx), true};
 }
 
-// §11.4.12: a concatenation is unsigned, as wide as its operands together and
-// 4-state where one of them is; unknown where an operand's width is.
 static SelfType ConcatenationSelfType(const Expr* expr, SimContext& ctx) {
   uint32_t width = 0;
   bool four_state = false;
@@ -121,8 +93,6 @@ static SelfType ConcatenationSelfType(const Expr* expr, SimContext& ctx) {
   return {width, false, four_state, width > 0};
 }
 
-// §11.4.12.1: a replication is its count of copies of its operands'
-// concatenation.
 static SelfType ReplicationSelfType(const Expr* expr, SimContext& ctx) {
   SelfType copy = ConcatenationSelfType(expr, ctx);
   auto count = static_cast<uint32_t>(
@@ -131,8 +101,6 @@ static SelfType ReplicationSelfType(const Expr* expr, SimContext& ctx) {
   return {width, false, copy.four_state, width > 0};
 }
 
-// §13.4.1: a call of a function has the type it returns, read from its
-// declaration without calling it; unknown for a real or a type nothing sizes.
 static SelfType CallSelfType(const Expr* expr, SimContext& ctx) {
   const ModuleItem* func = FindSubroutineTarget(expr, ctx, ctx.GetArena()).func;
   if (func == nullptr || DeclaredTypeIsReal(func->return_type, ctx)) return {};
@@ -142,10 +110,6 @@ static SelfType CallSelfType(const Expr* expr, SimContext& ctx) {
           DeclaredTypeIs4State(type, ctx), width > 0};
 }
 
-// §11.7: $signed and $unsigned are their argument's bits with the signing
-// each names, and a function kArgumentTypedFunctions lists is its argument's
-// type; a system function kSystemFunctionTypes lists has the type it gives.
-// Unknown for any other system function.
 static SelfType SystemCallSelfType(const Expr* expr, SimContext& ctx) {
   for (const SystemFunctionType& listed : kSystemFunctionTypes) {
     if (listed.name == expr->callee) return listed.type;
@@ -161,8 +125,6 @@ static SelfType SystemCallSelfType(const Expr* expr, SimContext& ctx) {
   return arg;
 }
 
-// The self-determined type of an operand none of the readers' own cases
-// takes, as far as its form says; unknown for a form this does not read.
 static SelfType OperandSelfType(const Expr* expr, SimContext& ctx) {
   switch (expr->kind) {
     case ExprKind::kSelect:
@@ -184,33 +146,23 @@ static SelfType OperandSelfType(const Expr* expr, SimContext& ctx) {
   }
 }
 
-// Whether an operand of a form the readers' own cases do not take is signed:
-// as its type says, and signed where that is unknown, which leaves the
-// operand's own sign to decide.
 static bool OperandIsSigned(const Expr* expr, SimContext& ctx) {
   SelfType type = OperandSelfType(expr, ctx);
   return !type.known || type.is_signed;
 }
 
-// Whether such an operand is 4-state: as its type says, and 4-state where
-// that is unknown.
 static bool OperandIs4State(const Expr* expr, SimContext& ctx) {
   SelfType type = OperandSelfType(expr, ctx);
   return !type.known || type.four_state;
 }
 
-// §11.6.1: the self-determined bit length of an expression, resolving variable
-// widths through the simulation context. Returns 0 ("indeterminate") for a
-// form whose width this cannot read; callers treat 0 as "do not force-widen",
-// so such an operand keeps its own evaluated width and the result is left
-// unchanged.
 uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
   if (!expr) return 0;
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
       return LiteralWidth(expr->text, expr->int_val);
     case ExprKind::kUnbasedUnsizedLiteral:
-      return 1;  // §5.7.1: one bit where self-determined
+      return 1;
     case ExprKind::kIdentifier: {
       auto* var = ctx.FindVariable(expr->text);
       return var ? var->value.width : 0;
@@ -224,7 +176,7 @@ uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
         return std::max(SimSelfWidth(expr->lhs, ctx),
                         SimSelfWidth(expr->rhs, ctx));
       if (IsLeftWidthBinaryOp(expr->op)) return SimSelfWidth(expr->lhs, ctx);
-      return 1;  // comparison / equality / logical -> one-bit result
+      return 1;
     case ExprKind::kTernary:
       return std::max(SimSelfWidth(expr->true_expr, ctx),
                       SimSelfWidth(expr->false_expr, ctx));
@@ -233,14 +185,6 @@ uint32_t SimSelfWidth(const Expr* expr, SimContext& ctx) {
   }
 }
 
-// §11.8.1: whether an expression's self-determined type is signed, as far as
-// its form says. A literal is signed by its base, a name by its declared type,
-// an arithmetic or bitwise operator where both its operands are, a unary
-// operator and a shift or power by the operand they size from, and a
-// conditional where both its results are. A comparison, a logical operator, a
-// reduction, a concatenation and a select of a packed vector are unsigned. A
-// form this does not read, and a real value, answer signed, which leaves the
-// operand's own sign to decide.
 bool SimSelfSigned(const Expr* expr, SimContext& ctx) {
   switch (expr->kind) {
     case ExprKind::kIntegerLiteral:
@@ -266,10 +210,6 @@ bool SimSelfSigned(const Expr* expr, SimContext& ctx) {
   }
 }
 
-// §11.4.11 with §6.12: whether an expression's self-determined type is real,
-// as its form says: a real or time literal, a real variable, a call of a
-// system function kRealSystemFunctions lists, and an operator one of whose
-// operands it takes its type from is.
 bool SimSelfReal(const Expr* expr, SimContext& ctx) {
   switch (expr->kind) {
     case ExprKind::kRealLiteral:
@@ -293,12 +233,6 @@ bool SimSelfReal(const Expr* expr, SimContext& ctx) {
   }
 }
 
-// §11.3.4: whether an expression's self-determined type is 4-state, as its
-// form says. An operator applied to 2-state operands only gives a 2-state
-// result, so a name is 4-state by its declared type, an operator and a
-// conditional where any operand they read is, the condition included, and an
-// operand of another form by its own type; a form this does not read, a
-// literal among them, is 4-state.
 bool SimSelf4State(const Expr* expr, SimContext& ctx) {
   switch (expr->kind) {
     case ExprKind::kIdentifier: {

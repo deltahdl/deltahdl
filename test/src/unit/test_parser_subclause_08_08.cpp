@@ -70,9 +70,6 @@ TEST(TypedConstructorCallParsing, TypedConstructorAstStructure) {
   EXPECT_FALSE(r.has_errors);
   auto* rhs = FirstInitialRHS(r);
   ASSERT_NE(rhs, nullptr);
-  // §8.8: the argument-less typed constructor call "D::new" parses as a
-  // scope-resolved member access (D::new); the parenthesized form wraps that
-  // member access in a call (see elaborator_validate_class_handles.cpp).
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
   ASSERT_NE(rhs->lhs, nullptr);
   EXPECT_EQ(rhs->lhs->kind, ExprKind::kIdentifier);

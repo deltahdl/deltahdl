@@ -8,9 +8,6 @@
 
 using namespace delta;
 
-// Verify that a successfully parsed module contains exactly one item of each of
-// the five concurrent assertion kinds: assert, assume, cover property, cover
-// sequence, and restrict property.
 inline void VerifyAllFiveConcurrentAssertionTypes(ParseResult& r) {
   EXPECT_FALSE(r.has_errors);
   ASSERT_NE(

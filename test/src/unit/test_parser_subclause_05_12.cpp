@@ -196,8 +196,6 @@ TEST(LexicalConventionParsing, NestedAttributeError) {
       "module m;\n"
       "  (* foo = 1 + (* bar *) 2 *) logic x;\n"
       "endmodule\n");
-  // The inner `*)` closes the outer attribute_instance too, so the outer one
-  // never meets its own `*)` and Parser::ParseAttributes reports the miss.
   EXPECT_TRUE(ReportedError(r.diags, "expected '*)', got 'logic'", 2, "5.12"));
 }
 
@@ -208,8 +206,6 @@ TEST(LexicalConventionParsing, NonNestedConstExprOk) {
               "endmodule\n"));
 }
 
-// Syntax 5-4: attr_name is an identifier. A non-identifier token (here a
-// number literal) in the attr_name position is rejected by the parser.
 TEST(LexicalConventionParsing, AttrNameMustBeIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -219,8 +215,6 @@ TEST(LexicalConventionParsing, AttrNameMustBeIdentifier) {
                             2, "5.12"));
 }
 
-// Syntax 5-4: an attribute_instance contains one or more attr_spec, so an
-// empty (* *) with no attr_spec is rejected.
 TEST(LexicalConventionParsing, EmptyAttributeInstanceRejected) {
   auto r = Parse(
       "module m;\n"
@@ -230,9 +224,6 @@ TEST(LexicalConventionParsing, EmptyAttributeInstanceRejected) {
       ReportedError(r.diags, "expected identifier, got '*)'", 2, "5.12"));
 }
 
-// §5.12 Example 5: an attribute prefix binds only to the declaration it
-// immediately precedes. A single prefix is shared by every name declared in
-// that declaration, while a declaration with no prefix carries no attributes.
 TEST(LexicalConventionParsing, PrefixBindsOnlyToItsDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -263,16 +254,12 @@ TEST(LexicalConventionParsing, PrefixBindsOnlyToItsDeclaration) {
   ASSERT_NE(find("reg1"), nullptr);
   ASSERT_NE(find("reg2"), nullptr);
 
-  // The single prefix is distributed to both names of the multi-name
-  // declaration.
   EXPECT_TRUE(has_fsm_state(find("state1")));
   EXPECT_TRUE(has_fsm_state(find("state2")));
   EXPECT_TRUE(has_fsm_state(find("state3")));
 
-  // The unprefixed declaration does not inherit the preceding prefix.
   EXPECT_FALSE(has_fsm_state(find("reg1")));
 
-  // A later prefixed declaration is attributed independently.
   EXPECT_TRUE(has_fsm_state(find("reg2")));
 }
 
@@ -318,9 +305,6 @@ TEST(LexicalConventionParsing, MultipleAttributesOnModule) {
   EXPECT_GE(r.cu->modules[0]->attrs.size(), 2u);
 }
 
-// An attribute instance is the declaration's it is written before: one before
-// an interface, a program or a class is that declaration's, and one before a
-// package is no module's, whatever modules the compilation unit holds.
 TEST(LexicalConventionParsing, TopLevelAttributesStayWithTheirDeclaration) {
   auto r = Parse(
       "module m; endmodule\n"
@@ -343,9 +327,6 @@ TEST(LexicalConventionParsing, TopLevelAttributesStayWithTheirDeclaration) {
   EXPECT_EQ(r.cu->classes[0]->attrs[0].name, "on_class");
 }
 
-// An attribute instance after an operator in a property body names the
-// attribute, so the names the body reads are its operands alone, whatever
-// operator the attribute follows.
 TEST(LexicalConventionParsing, PropertyBodyAttributeIsNoRead) {
   auto r = Parse(
       "module m; logic a, b, c;\n"

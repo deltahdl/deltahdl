@@ -203,10 +203,6 @@ TEST(LetDeclElaboration, LetDeclInTaskElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.12: a typed let formal shall be `event` or one of the types allowed in
-// §16.6. `untyped` is the non-typed case and so is also accepted; `sequence`
-// and `property` are not — that is what sets the let list apart from the
-// sequence (§16.8.1) and property (§16.12.18) formal lists.
 TEST(LetConstructRules, TypedFormalMustBeEventOrAllowedDataType) {
   EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kUntyped));
   EXPECT_TRUE(IsLetFormalTypeAllowed(LetFormalTypeKind::kEvent));
@@ -215,59 +211,38 @@ TEST(LetConstructRules, TypedFormalMustBeEventOrAllowedDataType) {
   EXPECT_FALSE(IsLetFormalTypeAllowed(LetFormalTypeKind::kForbidden));
 }
 
-// §11.12, rule 1: the actual for an event-typed formal shall be an
-// event_expression.
 TEST(LetConstructRules, EventFormalRequiresEventExpressionActual) {
-  EXPECT_TRUE(IsLetEventFormalActualLegal(/*actual_is_event_expression=*/true));
-  EXPECT_FALSE(
-      IsLetEventFormalActualLegal(/*actual_is_event_expression=*/false));
+  EXPECT_TRUE(IsLetEventFormalActualLegal(true));
+  EXPECT_FALSE(IsLetEventFormalActualLegal(false));
 }
 
-// §11.12, rule 1: a reference to an event-typed formal is legal only where an
-// event_expression may be written.
 TEST(LetConstructRules, EventTypedFormalReferenceMustBeEventExpressionPlace) {
-  EXPECT_TRUE(
-      IsLetEventTypedFormalRefLegal(/*in_event_expression_position=*/true));
-  EXPECT_FALSE(
-      IsLetEventTypedFormalRefLegal(/*in_event_expression_position=*/false));
+  EXPECT_TRUE(IsLetEventTypedFormalRefLegal(true));
+  EXPECT_FALSE(IsLetEventTypedFormalRefLegal(false));
 }
 
-// §11.12, rule 2: a non-event typed formal requires its actual's
-// self-determined result type to be cast compatible (§6.22.4) with the formal
-// type.
 TEST(LetConstructRules, NonEventFormalRequiresCastCompatibleActual) {
-  EXPECT_TRUE(IsLetNonEventFormalActualLegal(
-      /*self_determined_type_cast_compatible=*/true));
-  EXPECT_FALSE(IsLetNonEventFormalActualLegal(
-      /*self_determined_type_cast_compatible=*/false));
+  EXPECT_TRUE(IsLetNonEventFormalActualLegal(true));
+  EXPECT_FALSE(IsLetNonEventFormalActualLegal(false));
 }
 
-// §11.12: an event formal is substituted as an event_expression, while a
-// non-event typed formal's actual is cast to the formal type before being
-// substituted in the rewriting algorithm (§F.4).
 TEST(LetConstructRules, SubstitutionCastsOnlyNonEventFormals) {
-  EXPECT_EQ(LetTypedFormalSubstitution(/*formal_is_event=*/true),
+  EXPECT_EQ(LetTypedFormalSubstitution(true),
             LetTypedFormalSubstitutionMode::kEventExpressionSubstitution);
-  EXPECT_EQ(LetTypedFormalSubstitution(/*formal_is_event=*/false),
+  EXPECT_EQ(LetTypedFormalSubstitution(false),
             LetTypedFormalSubstitutionMode::kCastBeforeSubstitution);
 }
 
-// §11.12: in the declaring scope, the let body shall be defined before it is
-// used.
 TEST(LetConstructRules, BodyMustBeDefinedBeforeUse) {
-  EXPECT_TRUE(IsLetUseAfterDeclarationLegal(/*declared_before_use=*/true));
-  EXPECT_FALSE(IsLetUseAfterDeclarationLegal(/*declared_before_use=*/false));
+  EXPECT_TRUE(IsLetUseAfterDeclarationLegal(true));
+  EXPECT_FALSE(IsLetUseAfterDeclarationLegal(false));
 }
 
-// §11.12: no hierarchical references to let declarations are allowed.
 TEST(LetConstructRules, HierarchicalReferenceToLetIsIllegal) {
-  EXPECT_TRUE(IsLetReferenceLegal(/*is_hierarchical_reference=*/false));
-  EXPECT_FALSE(IsLetReferenceLegal(/*is_hierarchical_reference=*/true));
+  EXPECT_TRUE(IsLetReferenceLegal(false));
+  EXPECT_FALSE(IsLetReferenceLegal(true));
 }
 
-// §11.12: a sampled value call in a let body inherits the instantiation
-// context's clock; it is an error if a clock is required but cannot be
-// inferred there.
 TEST(LetConstructRules, SampledValueClockMustBeResolvableInContext) {
   EXPECT_TRUE(
       IsLetSampledValueClockResolved(LetSampledValueClockStatus::kExplicit));
@@ -277,9 +252,6 @@ TEST(LetConstructRules, SampledValueClockMustBeResolvableInContext) {
       LetSampledValueClockStatus::kRequiredButNotInferable));
 }
 
-// §11.12: the elaborator applies the typed-formal rule on the real path. A
-// chandle is not a type allowed in a Boolean expression, so a chandle-typed
-// formal is rejected during elaboration.
 TEST(LetDeclElaboration, LetFormalWithChandleTypeIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -294,8 +266,6 @@ TEST(LetDeclElaboration, LetFormalWithChandleTypeIsRejected) {
       2, "11.12"));
 }
 
-// §11.12: a void-typed formal is likewise outside the allowed type list and is
-// rejected.
 TEST(LetDeclElaboration, LetFormalWithVoidTypeIsRejected) {
   ElabFixture f;
   Elaborate(
@@ -310,8 +280,6 @@ TEST(LetDeclElaboration, LetFormalWithVoidTypeIsRejected) {
       2, "11.12"));
 }
 
-// §11.12: an integral typed formal is a type allowed in a Boolean expression,
-// so the same validation accepts it without error.
 TEST(LetDeclElaboration, LetFormalWithAllowedTypeElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -323,13 +291,6 @@ TEST(LetDeclElaboration, LetFormalWithAllowedTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.12: the type rule's first accepting arm is `event` itself — the text
-// permits a typed formal to be `event` or one of the §16.6 types. The
-// classifier and reject tests above cover the §16.6 arm (int) and the rejected
-// types (chandle, void); this drives an `event`-typed formal from real source
-// through the same elaborator type check to observe the `event` arm being
-// accepted. The body does not reference the formal, so this isolates the
-// type-acceptance decision from any event-in-Boolean-context question.
 TEST(LetDeclElaboration, LetFormalWithEventTypeElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -341,9 +302,6 @@ TEST(LetDeclElaboration, LetFormalWithEventTypeElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.12 has a let declared before it is used, so a reference to `tmp` in a
-// procedure written above `let tmp = a && b;` is illegal. It elaborated clean
-// and read 0.
 TEST(LetDeclElaboration, LetUsedBeforeItsDeclarationIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -358,8 +316,6 @@ TEST(LetDeclElaboration, LetUsedBeforeItsDeclarationIsIllegal) {
                             "11.12"));
 }
 
-// The same of a let with formals called before its declaration, from a
-// continuous assignment; the call after the declaration is the legal one.
 TEST(LetDeclElaboration, LetCalledBeforeItsDeclarationIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -376,10 +332,6 @@ TEST(LetDeclElaboration, LetCalledBeforeItsDeclarationIsIllegal) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §11.12's example d: a let may be referred to only within the scope that
-// declares it and the scopes nested in it, and the reference to my_let
-// through the generate block's hierarchical name is the example's illegal
-// one. It elaborated clean.
 TEST(LetDeclElaboration, HierarchicalReferenceToALetIsIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -404,8 +356,6 @@ TEST(LetDeclElaboration, HierarchicalReferenceToALetIsIllegal) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §11.12 bars every hierarchical reference to a let, and a path through an
-// instance to the let its module declares is one.
 TEST(LetElaboration, HierarchicalReferenceToAChildModulesLetReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -423,10 +373,6 @@ TEST(LetElaboration, HierarchicalReferenceToAChildModulesLetReported) {
                             "11.12"));
 }
 
-// §11.12 asks a let be declared before its use in the scope declaring it, and
-// a generate block and a begin-end block are such scopes. A let used where an
-// earlier statement of the block declared it, and a block declaring a type and
-// no let, draw nothing.
 TEST(LetElaboration, LetUsedBeforeDeclarationInANestedScopeReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -475,9 +421,6 @@ TEST(LetElaboration, LetUsedBeforeDeclarationInANestedScopeReported) {
                              "11.12"));
 }
 
-// §11.12, rule 1: a reference to an event formal stands where an
-// event_expression may be written, which an operand of `+` is not; the
-// clocking event of a sampled value call is such a place.
 TEST(LetDeclElaboration, EventFormalReferencedAsAValueReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -496,11 +439,6 @@ TEST(LetDeclElaboration, EventFormalReferencedAsAValueReported) {
                              "11.12"));
 }
 
-// §11.12, example e, with §16.8: a formal written with no type of its own takes
-// the last type written before it, so `y` of `f(event e, y)` is an event formal
-// too and its reference as an operand of `+` is reported, in a module and in
-// the compilation unit alike; `y` written untyped takes no type, and `y`
-// written `type(i)` takes the type of `i`, not `event`.
 TEST(LetDeclElaboration, FormalTakingEventFromTheOneBeforeItReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -525,13 +463,6 @@ TEST(LetDeclElaboration, FormalTakingEventFromTheOneBeforeItReported) {
   }
 }
 
-// §11.12, rule 2: an integral or real formal takes no actual of an unpacked
-// array, structure or union type that neither assignment nor a bit-stream cast
-// of as many bits (§6.24.3) converts to it, whether a call binds it by
-// position or by name or the declaration gives it as the default, nor a handle
-// of a class with a local member, which §6.24.3 makes no cast's source. An
-// untyped formal, a formal of the structure's own type, and actuals of
-// integral or packed types are left alone.
 TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -572,10 +503,6 @@ TEST(LetDeclElaboration, ActualNotCastCompatibleWithTypedFormalReported) {
   }
 }
 
-// §11.12 clocks a sampled value call in a let body as if written where the let
-// is instantiated, and its example (f) has an always_comb give `$past` no
-// clock. A let whose call names its clock, one with no sampled value call, a
-// procedure clocked by an edge and a concurrent assertion each give one.
 TEST(LetDeclElaboration, LetSampledValueWithNoInferableClockReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -605,7 +532,6 @@ TEST(LetDeclElaboration, LetSampledValueWithNoInferableClockReported) {
   }
 }
 
-// A module's default clocking clocks the call where the procedure gives none.
 TEST(LetDeclElaboration, LetSampledValueClockedByDefaultClockingAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -620,12 +546,6 @@ TEST(LetDeclElaboration, LetSampledValueClockedByDefaultClockingAccepted) {
       ReportedError(f.diag.Diagnostics(), "no clock is inferred", 5, "11.12"));
 }
 
-// §11.12, rule 2, by cast compatibility (§6.22.4): an unpacked array is no
-// actual for a structure formal, a structure of another typedef none for
-// either's formal, and a structure a block declares none for an int formal,
-// none of them of as many bits as the formal for a bit-stream cast (§6.24.3);
-// an int for a real one, an enum for an int one and a structure for its own
-// type's are.
 TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
   ElabFixture f;
   ElaborateSrc(
@@ -659,8 +579,6 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(),
                              "is not cast compatible with the type of formal",
                              14, "11.12"));
-  // An int or a real for a structure formal, a chandle for an int one and an
-  // int for a class one (§6.22.5) are no more cast compatible.
   for (uint32_t line : {15u, 16u, 17u, 18u}) {
     EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                               "is not cast compatible with the type of formal",
@@ -668,12 +586,6 @@ TEST(LetDeclElaboration, ActualTypesAreJudgedByCastCompatibility) {
   }
 }
 
-// §11.12 with §6.22.5, §8.12 and §8.16: a class handle fits a formal of its
-// own class, of a class it derives from, or of one derived from it, the last
-// by $cast, a typedef of a class standing for that class and a package's
-// typedef of int for int; a handle of an unrelated class, a handle of a class
-// with a protected member, its own or inherited, for an int or a string
-// formal (§6.24.3), and an int or a string for a class formal are reported.
 TEST(LetDeclElaboration, ClassActualsAndFormalsAreJudgedByTheirHierarchy) {
   ElabFixture f;
   ElaborateSrc(
@@ -709,12 +621,6 @@ TEST(LetDeclElaboration, ClassActualsAndFormalsAreJudgedByTheirHierarchy) {
   }
 }
 
-// §11.12 with §6.22.5 and §26.3: a class named through a chain of typedefs,
-// or behind its package's prefix, is judged as that class, so a handle of a
-// class deriving from it fits, while an int for a typedef of a class, a
-// package's typedef of int for a class formal, a class handle for a package's
-// unrelated class, and a package's class handle for an unrelated class formal
-// are reported.
 TEST(LetDeclElaboration, ClassesNamedThroughTypedefsAndPackagesAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -751,11 +657,6 @@ TEST(LetDeclElaboration, ClassesNamedThroughTypedefsAndPackagesAreJudged) {
   }
 }
 
-// §11.12 with §8.23: a class nested in another and named through the outer
-// class's prefix is judged as that nested class, not as a class of the same
-// bare name elsewhere, so Outer::Inner deriving from Base fits a Base formal,
-// a Base handle fits an Outer::Inner formal by $cast, and a handle of the
-// unrelated top-level Inner is reported for either.
 TEST(LetDeclElaboration, NestedClassesNamedThroughTheirOuterClassAreJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -785,11 +686,6 @@ TEST(LetDeclElaboration, NestedClassesNamedThroughTheirOuterClassAreJudged) {
   }
 }
 
-// §11.12 with §6.16 and §6.24.3: a string is cast compatible with an integral
-// or packed type, another string, and an unpacked structure or union whose
-// members all are bit-stream types, so an actual of one of these for a string
-// formal is not reported; a real is not, so a string for a real formal, a real
-// for a string one, a structure or union holding a real, and a chandle are.
 TEST(LetDeclElaboration, StringActualsAndFormalsAreJudgedAsBitStreamTypes) {
   ElabFixture f;
   ElaborateSrc(
@@ -826,11 +722,6 @@ TEST(LetDeclElaboration, StringActualsAndFormalsAreJudgedAsBitStreamTypes) {
   }
 }
 
-// §11.12, rule 2, with A.2.2.1 and §6.8: a signing or a packed dimension
-// written alone before a formal's name is a type, logic with them, so an
-// unpacked array or structure is no actual for `[3:0] x` or `signed x`, while
-// an int, a real and a string are; a formal written with no type at all takes
-// any actual.
 TEST(LetDeclElaboration, ActualForFormalWritingOnlySigningOrDimensionJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -859,16 +750,6 @@ TEST(LetDeclElaboration, ActualForFormalWritingOnlySigningOrDimensionJudged) {
                              12, "11.12"));
 }
 
-// §11.12, example e, with §16.8: a formal written with no type of its own takes
-// the last type written before it, so `y` of `f(int x, y)` takes int and an
-// unpacked array or structure of other than 32 bits is no actual for it,
-// whether bound by position, by name or as its default, and `y` of
-// `w([3:0] x, y)` takes logic [3:0]. `y` of `p(arr_t x, y)` takes the
-// typedef's unpacked dimensions with it, and `y` of `q(int x [3], y)` none of
-// the dimensions written after `x`. A formal written untyped takes no type,
-// nor does one after it with none of its own, so any actual fits `y` and `z`
-// of `g(int x, untyped y, z)`; nor is a type carried past a type reference the
-// generate block's let has not resolved.
 TEST(LetDeclElaboration, ActualForFormalTakingTypeWrittenBeforeItJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -909,10 +790,6 @@ TEST(LetDeclElaboration, ActualForFormalTakingTypeWrittenBeforeItJudged) {
   }
 }
 
-// §11.12 lists a sequential and a parallel block among the scopes a let may be
-// declared in, so a begin-end and a fork block's statements read the block's
-// own let though nothing outside the block declares the name; a name nothing
-// declares is still unresolved.
 TEST(LetElaboration, ABlocksOwnLetResolvesInItsStatements) {
   ElabFixture f;
   ElaborateSrc(

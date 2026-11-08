@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §21.3.4, Syntax 21-7: the file_read_functions production names the family of
-// read system functions. Each alternative parses as an ordinary system-function
-// call, so the generic call grammar accepts every form of the production.
-
 TEST(FileReadFunctions, FgetcForm) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -90,9 +86,6 @@ TEST(FileReadFunctions, FreadMemoryFormWithStartAndCount) {
               "endmodule\n"));
 }
 
-// With both optionals absent, the memory form collapses to two arguments; the
-// destination being an unpacked array rather than an integral variable is what
-// distinguishes it from the integral form at the call site.
 TEST(FileReadFunctions, FreadMemoryFormBare) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -105,8 +98,6 @@ TEST(FileReadFunctions, FreadMemoryFormBare) {
               "endmodule\n"));
 }
 
-// The memory form's start/count arguments are optional; supplying a start
-// without a count is a distinct instantiation of the production's grammar.
 TEST(FileReadFunctions, FreadMemoryFormWithStartOnly) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -119,12 +110,6 @@ TEST(FileReadFunctions, FreadMemoryFormWithStartOnly) {
               "endmodule\n"));
 }
 
-// The nested optional brackets in Syntax 21-7 also permit the start position to
-// be skipped while a count is still given, written with an empty argument slot
-// between the commas. The system-call grammar accepts the elided argument.
-// Every alternative of the production is a system function, so a call is not
-// confined to the right-hand side of an assignment: it can sit anywhere an
-// expression operand can, e.g. inside a condition.
 TEST(FileReadFunctions, ReadCallAsExpressionOperand) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -136,9 +121,6 @@ TEST(FileReadFunctions, ReadCallAsExpressionOperand) {
               "endmodule\n"));
 }
 
-// The production's operands are ordinary expressions, not bare identifiers:
-// the descriptor can be an array element, the format a variable, and the
-// pushed-back character an arithmetic expression.
 TEST(FileReadFunctions, ReadCallOperandsMayBeExpressions) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -152,8 +134,6 @@ TEST(FileReadFunctions, ReadCallOperandsMayBeExpressions) {
               "endmodule\n"));
 }
 
-// The negative form: an argument list left unterminated is not an instance of
-// the production and must be rejected by the call grammar.
 TEST(FileReadFunctions, UnterminatedReadCallRejected) {
   auto r = Parse(
       "module t;\n"
@@ -162,9 +142,6 @@ TEST(FileReadFunctions, UnterminatedReadCallRejected) {
       "    c = $fgetc(fd;\n"
       "  end\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a system function call's argument
-  // list, so Parser::ParseSystemCall files the report under it rather than
-  // under §21.3.4.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 

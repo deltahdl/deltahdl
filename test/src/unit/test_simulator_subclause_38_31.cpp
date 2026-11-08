@@ -10,15 +10,6 @@
 namespace delta {
 namespace {
 
-// §38.31: vpi_put_data() is only legal from an application routine running for
-// reason cbStartOfSave or cbEndOfSave. These probe routines stand in for such
-// an application routine: the simulator invokes them from DispatchCallbacks
-// (which sets the active callback reason), and they call vpi_put_data() and
-// record what it returned. The companion read probes and the fixture used to
-// observe what was written (vpi_get_data(), §38.9) live in
-// helpers_vpi_save_restore_probe.h.
-
-// A single vpi_put_data() call.
 struct SingleWrite {
   int id = 0;
   const char* data = nullptr;
@@ -32,15 +23,12 @@ int WriteOnceCb(s_cb_data* cb) {
   return 0;
 }
 
-// A vpi_put_data() call made with a null source buffer.
 int WriteFromNullCb(s_cb_data* cb) {
   auto* p = reinterpret_cast<SingleWrite*>(cb->user_data);
   p->returned = vpi_put_data(p->id, nullptr, p->len);
   return 0;
 }
 
-// Two successive vpi_put_data() calls for the same id, then a third for a
-// different id, exercising repeated and interleaved writes.
 struct MultiWrite {
   int id_a = 0;
   int id_b = 0;
@@ -63,7 +51,6 @@ int WriteInterleavedCb(s_cb_data* cb) {
   return 0;
 }
 
-// Two successive vpi_put_data() calls for the same id within one save routine.
 struct DoubleWrite {
   int id = 0;
   const char* first = nullptr;
@@ -83,10 +70,6 @@ int WriteTwiceCb(s_cb_data* cb) {
 
 using VpiPutDataSim = VpiSaveRestoreSim;
 
-// §38.31 C1+C2: from a cbStartOfSave routine the call shall place numOfBytes of
-// data into the implementation's save/restart location, and the return value
-// shall be the number of bytes written. The bytes are observed by reading them
-// back with vpi_get_data() under a restart reason.
 TEST_F(VpiPutDataSim, WritesDataInsideStartOfSave) {
   const char kPayload[] = {'D', 'e', 'l', 't', 'a'};
   SingleWrite w;
@@ -95,8 +78,7 @@ TEST_F(VpiPutDataSim, WritesDataInsideStartOfSave) {
   w.len = 5;
   DispatchWith(cbStartOfSave, WriteOnceCb, &w);
 
-  EXPECT_EQ(w.returned, 5);  // number of bytes written
-  // A clean write records no error (the C entry cleared the prior status).
+  EXPECT_EQ(w.returned, 5);
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 
   SingleRead r;
@@ -107,7 +89,6 @@ TEST_F(VpiPutDataSim, WritesDataInsideStartOfSave) {
   EXPECT_EQ(0, std::memcmp(r.buf, kPayload, 5));
 }
 
-// §38.31 C6: the routine is equally legal from a cbEndOfSave routine.
 TEST_F(VpiPutDataSim, WritesDataInsideEndOfSave) {
   const char kPayload[] = {'X', 'Y', 'Z'};
   SingleWrite w;
@@ -120,18 +101,13 @@ TEST_F(VpiPutDataSim, WritesDataInsideEndOfSave) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.31 C6: the routine can only be called from a cbStartOfSave/cbEndOfSave
-// routine. Called from any other context it fails (an error is detected) and
-// per C3 a failure returns zero.
 TEST_F(VpiPutDataSim, RejectedOutsideSaveCallback) {
   const char kPayload[] = {'a', 'b', 'c', 'd'};
-  int returned =
-      vpi_put_data(1, const_cast<char*>(kPayload), 4);  // no callback
+  int returned = vpi_put_data(1, const_cast<char*>(kPayload), 4);
 
   EXPECT_EQ(returned, 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 
-  // The rejected write stored nothing: a later restart read finds no data.
   SingleRead r;
   r.id = 1;
   r.request = 4;
@@ -139,11 +115,6 @@ TEST_F(VpiPutDataSim, RejectedOutsideSaveCallback) {
   EXPECT_EQ(r.returned, 0);
 }
 
-// §38.31 C6 edge: the allowed reasons are specifically the save reasons. A
-// callback IS active here, but it is a restart reason (the reason that makes
-// the companion reader vpi_get_data() legal, §38.9). The writer must still
-// reject it, telling a running save callback apart from a running callback of
-// any other reason. Per C3 the rejection returns zero.
 TEST_F(VpiPutDataSim, RejectedInsideNonSaveCallback) {
   const char kPayload[] = {'w', 'x', 'y', 'z'};
   SingleWrite w;
@@ -155,7 +126,6 @@ TEST_F(VpiPutDataSim, RejectedInsideNonSaveCallback) {
   EXPECT_EQ(w.returned, 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 
-  // Nothing was stored under the id: a later restart read finds no data.
   SingleRead r;
   r.id = 21;
   r.request = 4;
@@ -163,22 +133,18 @@ TEST_F(VpiPutDataSim, RejectedInsideNonSaveCallback) {
   EXPECT_EQ(r.returned, 0);
 }
 
-// §38.31 C1+C3: numOfBytes shall be greater than zero. A non-positive count is
-// a detected error and returns zero.
 TEST_F(VpiPutDataSim, NonPositiveCountReturnsZero) {
   const char kPayload[] = {'q'};
   SingleWrite w;
   w.id = 5;
   w.data = kPayload;
-  w.len = 0;  // not greater than zero
+  w.len = 0;
   DispatchWith(cbStartOfSave, WriteOnceCb, &w);
 
   EXPECT_EQ(w.returned, 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.31 C1+C3: the source storage must be supplied by the application. A null
-// dataLoc is a detected error and returns zero.
 TEST_F(VpiPutDataSim, NullSourceReturnsZero) {
   SingleWrite w;
   w.id = 8;
@@ -189,10 +155,6 @@ TEST_F(VpiPutDataSim, NullSourceReturnsZero) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.31 C4: there shall be no restriction on how many times the routine is
-// called for a given id, nor on the order in which ids are written. Two writes
-// to one id are interleaved with a write to another; each succeeds and reports
-// its own byte count.
 TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
   const char kA1[] = {'0', '1'};
   const char kB[] = {'!', '?'};
@@ -212,8 +174,6 @@ TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
   EXPECT_EQ(w.ret_b, 2);
   EXPECT_EQ(w.ret_a2, 3);
 
-  // id_a accumulated both of its writes, in order, undisturbed by the id_b
-  // write that landed between them.
   SingleRead ra;
   ra.id = 9;
   ra.request = 5;
@@ -222,17 +182,9 @@ TEST_F(VpiPutDataSim, RepeatedAndInterleavedWritesAreUnrestricted) {
   EXPECT_EQ(0, std::memcmp(ra.buf, "01234", 5));
 }
 
-// §38.31 C5: data from multiple calls with the same id shall be stored so that
-// vpi_get_data() can pull it back out using different sizes of chunks. Here two
-// writes establish six bytes, retrieved as a 2-byte chunk followed by a 4-byte
-// chunk that crosses the boundary between the two writes.
 TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
   const char kFirst[] = {'A', 'B', 'C'};
   const char kSecond[] = {'D', 'E', 'F'};
-  // Both writes happen in a single save routine: a cbStartOfSave callback is
-  // persistent (§38.36.3), so dispatching the reason a second time would
-  // re-fire the first write as well. One dispatch with both vpi_put_data()
-  // calls writes exactly the six intended bytes.
   DoubleWrite w;
   w.id = 3;
   w.first = kFirst;
@@ -245,8 +197,8 @@ TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
 
   DoubleRead r;
   r.id = 3;
-  r.req1 = 2;  // chunk one
-  r.req2 = 4;  // chunk two, spans the two original writes
+  r.req1 = 2;
+  r.req2 = 4;
   DispatchWith(cbStartOfRestart, ReadTwiceCb, &r);
 
   EXPECT_EQ(r.ret1, 2);
@@ -255,15 +207,6 @@ TEST_F(VpiPutDataSim, MultipleWritesReadBackInDifferentChunkSizes) {
   EXPECT_EQ(0, std::memcmp(r.buf2, "CDEF", 4));
 }
 
-// §38.31 names one more thing an application does from a save routine: a
-// callback routine called for cbStartOfSave or cbEndOfSave may ask
-// vpi_get_str(vpiSaveRestartLocation, NULL) for the path to the tool's
-// save/restart location. That query answered null under every run, and not
-// because the tool had no location to report: vpi_get_str() refused a null
-// handle before reaching any property at all, and this is the one string
-// property drawn on no object.
-
-// What the application read.
 std::string g_location_in_save;
 bool g_location_read_in_save = false;
 bool g_location_read_outside = false;
@@ -296,17 +239,11 @@ TEST_F(VpiPutDataSim, TheSaveRestartLocationIsNotReadableElsewhere) {
   g_location_read_outside = false;
   vpi_ctx_.SetSaveRestartLocation("run.save");
 
-  // §38.31 and §38.9 name four reasons between them and no others, so a routine
-  // running for one they do not name is not one of the application callback
-  // routines they describe. Without this the case above passes on a tool that
-  // answered the query from anywhere.
   DispatchWith(cbEndOfSimulation, ReadLocationOutsideCb, nullptr);
 
   EXPECT_FALSE(g_location_read_outside);
 }
 
-// §38.31: the location is as readable from a cbEndOfSave routine as from a
-// cbStartOfSave one.
 TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableAtTheEndOfASave) {
   g_location_in_save.clear();
   g_location_read_in_save = false;
@@ -318,9 +255,6 @@ TEST_F(VpiPutDataSim, TheSaveRestartLocationIsReadableAtTheEndOfASave) {
   EXPECT_EQ(g_location_in_save, "end.save");
 }
 
-// §38.31: the query hands back the path to a location; a tool that has been
-// given none has no path to hand back, and the query answers null rather than
-// an empty string.
 TEST_F(VpiPutDataSim, NoSaveRestartLocationIsReadAsNull) {
   g_location_read_in_save = true;
 

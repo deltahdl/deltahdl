@@ -24,7 +24,6 @@
 namespace delta {
 
 void Elaborator::ValidateDpiImport(const ModuleItem* item) {
-  // §35.5.2's restrictions apply only to imports declared pure.
   if (!item->dpi_is_pure) return;
 
   if (item->dpi_is_task) {
@@ -52,14 +51,6 @@ void Elaborator::ValidateDpiImport(const ModuleItem* item) {
 
 namespace {
 
-// §35.5.5 holds exported function result types to the same restrictions. An
-// exported function's result is therefore limited to the same small-value set
-// imposed on imported function results: void, the C-compatible scalar
-// integer/real types, chandle, string, and scalar bit/logic. A native function
-// whose return type is omitted carries an implicit single-bit logic result,
-// which is itself a small value, so the implicit kind is permitted here.
-// Named/typedef results are deferred. Wide vector types (integer, time, packed
-// bit/logic) and aggregates are rejected.
 bool IsPermittedDpiResultType(const DataType& type) {
   switch (type.kind) {
     case DataTypeKind::kImplicit:
@@ -84,10 +75,6 @@ bool IsPermittedDpiResultType(const DataType& type) {
   }
 }
 
-// §35.5.4 forbids importing one subroutine name into one scope more than once.
-// This scans the items of one scope for repeated DPI import subroutine names. A
-// module declaration, a package body and the compilation unit are each one such
-// scope.
 void CheckDuplicateImportNamesInScope(const std::vector<ModuleItem*>& items,
                                       DiagEngine& diag) {
   std::unordered_set<std::string_view> sv_names_in_scope;
@@ -105,20 +92,10 @@ void CheckDuplicateImportNamesInScope(const std::vector<ModuleItem*>& items,
   }
 }
 
-// The word for what the source exported. §35.8 lets a foreign language call
-// tasks as it calls functions, names them exported tasks, and applies the whole
-// of §35.7 to them (printed page 983 of IEEE 1800-2023). So the two checks
-// below are reached for an exported task as readily as for an exported
-// function, and a report that spells the word as a literal tells a user who
-// wrote `task` to go looking for a function they never declared.
 std::string_view ExportedSubroutineKind(const ModuleItem* callable) {
   return callable->kind == ModuleItemKind::kTaskDecl ? "task" : "function";
 }
 
-// §35.7: an exported subroutine adheres to the same restrictions on argument
-// types as imports. The §35.5.4 prohibition on the ref qualifier in a DPI
-// declaration therefore carries through to the exported routine's formal
-// arguments.
 void CheckExportRefArguments(const ModuleItem* callable, const ModuleItem* item,
                              DiagEngine& diag) {
   for (const auto& arg : callable->func_args) {
@@ -133,14 +110,6 @@ void CheckExportRefArguments(const ModuleItem* callable, const ModuleItem* item,
   }
 }
 
-// §35.5.6: it is erroneous for an exported DPI subroutine to declare a formal
-// argument of a dynamic array type. (Unsized "open" array formals are a
-// relaxation reserved for imports under §35.5.6.1; exports get no such
-// allowance.) A dynamic array shows up as an unpacked dimension with no bounds
-// -- the empty-bracket "[]" form, recorded by the parser as a null dimension
-// entry. Queues ("[$]"), associative arrays ("[*]" / "[type]") and fixed-size
-// unpacked arrays all carry a non-null dimension marker, so they are not
-// mistaken for dynamic arrays here.
 void CheckExportDynamicArrayArguments(const ModuleItem* callable,
                                       const ModuleItem* item,
                                       DiagEngine& diag) {
@@ -164,22 +133,12 @@ void CheckExportDynamicArrayArguments(const ModuleItem* callable,
   }
 }
 
-// §35.5.5: an imported function's result written as a typedef name is
-// permitted only where the type behind the name is. The parser holds such a
-// result as a kNamed type and has no typedef table to look it up in, so
-// ValidateDpiResultType in src/parser/parser_dpi_validate.cpp passes it and the
-// rule is enforced here, over the names the enclosing scope resolves. A name
-// that does not resolve is left alone. The report names the typedef the source
-// wrote, which is what a reader has in front of them.
 void CheckImportResultTypedefType(const ModuleItem* item,
                                   const TypedefMap& typedefs,
                                   const DpiClassNames& classes,
                                   DiagEngine& diag) {
   if (item->dpi_is_task) return;
   if (item->return_type.kind != DataTypeKind::kNamed) return;
-  // §35.5.4's footnote 27 forbids passing a class at all, and §35.5.5 restricts
-  // a result to small values, of which a class handle is not one. The same
-  // unresolved name hid both.
   if (NamesAClass(item->return_type, typedefs, classes)) {
     diag.Error(item->loc,
                std::format("imported function '{}' has a class type as its "
@@ -200,14 +159,6 @@ void CheckImportResultTypedefType(const ModuleItem* item,
       Subclause("35.5.5"));
 }
 
-// §35.5.6 lists the only types permitted for the formal arguments of import and
-// export subroutines. The clause names imports and exports together, so the
-// permitted set an exported subroutine's formals are held to is the same one
-// the import path applies, and both consult ClassifyDpiFormalType for it. A
-// formal written as a typedef name is followed to the type behind the name
-// first, since the clause permits the name only where that type is permitted.
-// The dynamic array formal is a separate rule of the same clause, checked by
-// CheckExportDynamicArrayArguments.
 void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
                             const TypedefMap& typedefs,
                             const DpiClassNames& classes, DiagEngine& diag) {
@@ -244,10 +195,6 @@ void CheckExportFormalTypes(const ModuleItem* callable, const ModuleItem* item,
   }
 }
 
-// §35.5.5: an exported function's result type is subject to the same
-// small-value restriction as an imported function's result. §35.8 gives tasks
-// no return value type, so the check applies only when the exported routine is
-// a function and its message needs no word taken from the declaration.
 void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
                            const TypedefMap& typedefs, DiagEngine& diag) {
   if (callable->kind == ModuleItemKind::kFunctionDecl &&
@@ -262,10 +209,6 @@ void CheckExportResultType(const ModuleItem* callable, const ModuleItem* item,
   }
 }
 
-// §35.4 claim 14: exports sharing one linkage name across scopes must have
-// equivalent type signatures. Records the signature the first time the linkage
-// name is seen and compares against it on later exports. `sig` is the
-// signature of the routine `item` exports.
 void CheckExportSignatureEquivalence(
     const DpiExportSignature& sig, std::string_view link_name,
     const ModuleItem* item,
@@ -283,9 +226,6 @@ void CheckExportSignatureEquivalence(
   }
 }
 
-// §35.4: multiple export declarations with the same c_identifier in one scope
-// are forbidden. Records the linkage name in the per-scope set and reports a
-// repeat.
 void CheckExportDuplicateLinkName(
     const ModuleItem* item, std::string_view link_name,
     std::unordered_set<std::string_view>& export_link_in_scope,
@@ -300,17 +240,12 @@ void CheckExportDuplicateLinkName(
   }
 }
 
-// §35.7: at most one export per SystemVerilog function in a scope. Records the
-// SV function name in the per-scope set and reports a repeat.
 void CheckExportDuplicateSvFunc(
     const ModuleItem* item,
     std::unordered_set<std::string_view>& exported_sv_func_in_scope,
     DiagEngine& diag) {
   auto [_func, func_inserted] = exported_sv_func_in_scope.insert(item->name);
   if (!func_inserted) {
-    // §35.8 applies everything §35.7 says of exported functions to exported
-    // tasks. The word comes from the export declaration's own keyword, which
-    // the check below holds to what the declaration names.
     std::string_view kind = item->dpi_is_task ? "task" : "function";
     diag.Error(item->loc,
                std::format("SystemVerilog {} '{}' is already exported in this "
@@ -321,27 +256,14 @@ void CheckExportDuplicateSvFunc(
   }
 }
 
-// §35.4/§35.7: the per-scope context against which one export declaration is
-// validated. Each module declaration is one scope (§35.4/§35.7), and it carries
-// the SystemVerilog function/task callables indexed by name plus the two
-// per-scope dedup sets the "forbidden in one scope" rules consult: the set of
-// export linkage names already seen and the set of SystemVerilog functions
-// already exported. It carries the typedefs visible in the scope as well, since
-// §35.5.6 decides a formal argument written as a typedef name by the type the
-// name stands for.
 struct ExportScopeContext {
   const std::unordered_map<std::string_view, const ModuleItem*>& sv_callables;
   std::unordered_set<std::string_view>& export_link_in_scope;
   std::unordered_set<std::string_view>& exported_sv_func_in_scope;
   const TypedefMap& typedefs;
-  // §35.5.4 footnote 27: the class names the checks tell from a name they
-  // cannot resolve.
   const DpiClassNames& classes;
 };
 
-// §35.4/§35.7: run the full battery of export-declaration checks for one export
-// item, given the enclosing scope's context (indexed callables and per-scope
-// bookkeeping sets) and the cross-scope signature table.
 void ValidateExportDeclaration(
     const ModuleItem* item, std::string_view link_name,
     ExportScopeContext& scope,
@@ -353,10 +275,6 @@ void ValidateExportDeclaration(
 
   auto callable_it = scope.sv_callables.find(item->name);
   if (callable_it == scope.sv_callables.end()) {
-    // §35.7: an export declaration is allowed only in the scope where the
-    // function being exported is defined. If the scope contains no
-    // SystemVerilog function or task with the named identifier, the export
-    // has nothing to attach to.
     diag.Error(item->loc,
                std::format("DPI export names '{}', which is not a "
                            "SystemVerilog function or task defined in the "
@@ -368,11 +286,6 @@ void ValidateExportDeclaration(
 
   const ModuleItem* callable = callable_it->second;
   if (!callable->method_class.empty()) {
-    // §35.7: every SystemVerilog function but a class member function may be
-    // exported. An out-of-block method definition is written in the scope its
-    // class is declared in and carries the bare method name, so it is indexed
-    // among the scope's callables and an export naming it would otherwise
-    // attach to it.
     diag.Error(
         item->loc,
         std::format("SystemVerilog {} '{}' is a member of class '{}' and class "
@@ -382,13 +295,6 @@ void ValidateExportDeclaration(
         Subclause("35.7"));
     return;
   }
-  // §35.8: A.2.6 writes the exported-task form as `export dpi_spec_string
-  // [ c_identifier = ] task task_identifier ;` beside the function form, so an
-  // export written with `task` names a task and one written with `function`
-  // names a function. The keyword is not decoration: §35.8 gives an exported
-  // task no return value type, makes it callable from an imported task alone,
-  // and gives its call an int result the clause defines, none of which holds of
-  // an exported function.
   if (item->dpi_is_task != (callable->kind == ModuleItemKind::kTaskDecl)) {
     diag.Error(item->loc,
                std::format("DPI export declares '{}' with the '{}' keyword, "
@@ -409,10 +315,6 @@ void ValidateExportDeclaration(
       export_signatures, diag);
 }
 
-// §35.5.4: every declaration, in whatever scope, has to carry exactly the same
-// type signature. Compares one import's signature against the first one seen
-// under the same linkage name, recording it the first time. Argument names and
-// defaults may differ.
 void CheckImportSignatureAgreement(
     const ModuleItem* item, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
@@ -437,9 +339,6 @@ void CheckImportSignatureAgreement(
   }
 }
 
-// §35.4: index one scope's SystemVerilog function and task declarations by name
-// so each export can look up the routine it names and obtain its signature for
-// the cross-scope equivalence check.
 std::unordered_map<std::string_view, const ModuleItem*> IndexSvCallables(
     const std::vector<ModuleItem*>& items) {
   std::unordered_map<std::string_view, const ModuleItem*> sv_callables;
@@ -453,10 +352,6 @@ std::unordered_map<std::string_view, const ModuleItem*> IndexSvCallables(
   return sv_callables;
 }
 
-// §35.4: track the DPI version string ("DPI-C" or the deprecated "DPI")
-// associated with each linkage identifier the first time it is seen. Any later
-// declaration sharing that linkage identifier must agree on the version string,
-// for imports and exports alike.
 void CheckDpiVersionStringAgreement(
     const ModuleItem* item, std::string_view link_name,
     std::unordered_map<std::string_view, std::string_view>& link_version,
@@ -477,23 +372,11 @@ void CheckDpiVersionStringAgreement(
   }
 }
 
-// §35.4: the global name space of linkage names itself, which every scope's
-// declarations resolve into. What it holds is what the clause states across
-// scopes: the DPI version string each linkage name was first declared with, and
-// the SystemVerilog signature each export linkage name was first observed
-// under. ExportScopeContext carries what the clause states within one scope,
-// and is rebuilt per scope where this outlives them all.
 struct DpiGlobalNameSpace {
   std::unordered_map<std::string_view, std::string_view>& link_version;
   std::unordered_map<std::string_view, DpiExportSignature>& export_signatures;
 };
 
-// §35.4: validate one DPI declaration (import or export) against the global
-// name space. Export declarations additionally run the full per-scope export
-// battery via ValidateExportDeclaration, and import declarations have their
-// typedef-named formal arguments held to §35.5.6 here, where the scope's
-// typedefs are known; every DPI declaration, import or export, contributes to
-// the shared version-string agreement check.
 void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
                               DpiGlobalNameSpace& global, DiagEngine& diag) {
   auto link_name = DpiLinkageName(item);
@@ -512,15 +395,6 @@ void ProcessDpiGlobalNameItem(const ModuleItem* item, ExportScopeContext& scope,
   CheckDpiVersionStringAgreement(item, link_name, global.link_version, diag);
 }
 
-// §35.5.4: check one scope's import declarations, both against each other and
-// against every declaration of the same linkage name seen so far. The duplicate
-// subroutine names the clause forbids are a within-scope rule and the signature
-// agreement it requires holds across scopes, so signatures and first_decl_loc
-// are threaded through every scope while the duplicate check starts afresh in
-// each.
-//
-// `typedefs` are the names the scope resolves, which a signature is built
-// through so that a formal written as a typedef name is the type it names.
 void CheckDpiScopeImportDeclarations(
     const std::vector<ModuleItem*>& items, const TypedefMap& typedefs,
     std::unordered_map<std::string_view, DpiSignatureKey>& signatures,
@@ -530,30 +404,18 @@ void CheckDpiScopeImportDeclarations(
 
   for (const auto* item : items) {
     if (item == nullptr) continue;
-    // Signature comparison applies to imports only — an export declaration
-    // carries no signature in its syntax (the signature comes from the
-    // SystemVerilog function being exported).
     if (item->kind != ModuleItemKind::kDpiImport) continue;
     CheckImportSignatureAgreement(item, typedefs, signatures, first_decl_loc,
                                   diag);
   }
 }
 
-// What a scope resolves a type name against. §35.5.5 and §35.5.6 judge a formal
-// or a result by the type its name stands for, and §35.5.4's footnote 27 by
-// whether that name is a class, so a scope's checks need what the source around
-// it declares: the unit the scope belongs to, the typedefs visible outside it,
-// and the class names collected across every scope a DPI declaration can be
-// written in.
 struct DpiNameContext {
   const CompilationUnit* unit;
   const TypedefMap& typedefs;
   const DpiClassNames& classes;
 };
 
-// §35.4: the DPI declarations of one scope, each run through the global-name
-// checks. Items that are neither an import nor an export are what the scope
-// otherwise holds and are passed over.
 void ProcessDpiScopeItems(const std::vector<ModuleItem*>& items,
                           ExportScopeContext& scope, DpiGlobalNameSpace& global,
                           DiagEngine& diag) {
@@ -567,33 +429,14 @@ void ProcessDpiScopeItems(const std::vector<ModuleItem*>& items,
   }
 }
 
-// §35.4: run the global-name checks over one scope's DPI declarations. `global`
-// carries the rules the clause states across scopes and is the same object for
-// every scope; the sets built here carry the rules it states within one, and
-// start afresh for each.
 void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
                                  const DpiNameContext& names,
                                  DpiGlobalNameSpace& global, DiagEngine& diag) {
-  // Index this scope's SystemVerilog function and task declarations by name so
-  // each export can look up the routine it names and obtain its signature for
-  // the cross-scope equivalence check.
   std::unordered_map<std::string_view, const ModuleItem*> sv_callables =
       IndexSvCallables(items);
 
-  // §35.5.6 permits a typedef as a formal argument's type only where the type
-  // behind the name is permitted, so the checks below need the names this scope
-  // resolves. The outer table holds the compilation-unit, package- and
-  // class-qualified ones but no scope-local one, which this adds.
   TypedefMap dpi_typedefs = DpiScopeTypedefs(items, names.unit, names.typedefs);
 
-  // §35.4: multiple export declarations with the same c_identifier in the same
-  // scope are forbidden, so this tracks the export linkage names seen here.
-  //
-  // §35.7 allows each SystemVerilog function one export declaration.
-  // Linkage-name deduplication catches the explicit/implicit c_identifier
-  // overlap from §35.4, but two exports of the same SV function with distinct
-  // c_identifiers would slip past that check. Tracking SV function names per
-  // scope catches that case directly.
   std::unordered_set<std::string_view> export_link_in_scope;
   std::unordered_set<std::string_view> exported_sv_func_in_scope;
 
@@ -604,29 +447,6 @@ void ValidateDpiScopeGlobalNames(const std::vector<ModuleItem*>& items,
   ProcessDpiScopeItems(items, scope, global, diag);
 }
 
-// §35.4 and §35.7 state their rules over the scope a DPI declaration is written
-// in, so this returns the item list of every scope one can be written in.
-// A.1.11 makes dpi_import_export a package_or_generate_item_declaration and so
-// a package_item, and A.1.4's module_or_generate_item_declaration carries the
-// same production into a module, an interface and a program. A.1.8 gives a
-// checker none, and Parser::ParseImportDecl and Parser::ParseExportDecl report
-// one written there, but still read it into the checker's items, so those are
-// walked too; the parser fills all four through Parser::ParseModuleItem and a
-// package body through it as well.
-// §3.12.1's compilation-unit scope holds every declaration outside any other
-// scope and comes last, since a declaration reaches it only by being in none of
-// the others; where each file is a unit of its own, `separate_units` holds the
-// units, and each unit's scope is a scope of its own.
-// §27.6 makes a generate block a scope, so the items of one are a scope of
-// their own for every rule §35.4, §35.5.4 and §35.7 state over declarations in
-// one scope, and they belong in the tables those clauses state across scopes --
-// the version-string agreement, the export signature equivalence and the import
-// signature agreement. The parser holds them in ModuleItem::gen_body on the
-// kGenerateIf, kGenerateFor or kGenerateBlock item enclosing them, which is in
-// none of the lists the walk below collects, so a declaration written there was
-// held to none of those rules and contributed to none of those tables. A
-// generate block inside a generate block is a scope again, so the descent is
-// recursive.
 void AddGenerateScopes(const std::vector<ModuleItem*>& items,
                        std::vector<const std::vector<ModuleItem*>*>& scopes) {
   for (const auto* item : items) {
@@ -651,10 +471,6 @@ std::vector<const std::vector<ModuleItem*>*> DpiDeclarationScopes(
   }
   if (separate_units.empty()) scopes.push_back(&unit->cu_items);
   for (const auto* own : separate_units) scopes.push_back(&own->cu_items);
-  // The generate blocks of every scope collected above, each its own scope. The
-  // list is walked by index rather than by iterator because the descent appends
-  // to it, and a generate block of a generate block is reached by the recursion
-  // rather than by a second pass over the grown list.
   size_t direct_scopes = scopes.size();
   for (size_t k = 0; k < direct_scopes; ++k) {
     AddGenerateScopes(*scopes[k], scopes);
@@ -680,25 +496,12 @@ void Elaborator::ValidateDpiDeclarations() {
 void Elaborator::ValidateDpiGlobalNameSpace() {
   if (unit_ == nullptr) return;
 
-  // §35.4: track the DPI version string ("DPI-C" or the deprecated "DPI")
-  // associated with each linkage identifier the first time we see it. Any
-  // later declaration sharing that linkage identifier must agree on the
-  // version string — the rule applies to imports and exports alike.
   std::unordered_map<std::string_view, std::string_view> link_version;
 
-  // §35.4: track the SystemVerilog signature each export linkage name was
-  // first observed under. Subsequent exports of the same linkage name across
-  // any scope must agree, since claim 14 requires equivalent type signatures
-  // for cross-scope exports sharing one c_identifier.
   std::unordered_map<std::string_view, DpiExportSignature> export_signatures;
 
   DpiGlobalNameSpace global{link_version, export_signatures};
 
-  // §35.5.4 footnote 27 is about the type a name stands for, and a class may be
-  // declared in a scope other than the one the declaration naming it is in --
-  // at compilation-unit scope, beside the module holding the import. So the
-  // names are collected across every scope a DPI declaration can be written in
-  // before any of them is checked.
   auto scopes = DpiDeclarationScopes(unit_, units_.units);
   DpiClassNames classes = CollectDpiClassNames(unit_, scopes);
 
@@ -709,13 +512,6 @@ void Elaborator::ValidateDpiGlobalNameSpace() {
   }
 }
 
-// §11.12: map an explicitly-typed let formal's data type onto the categories
-// the type rule cares about. An implicit type (a bare name, signing, or range,
-// and also the `untyped` keyword, which leaves the type implicit) is not a
-// "typed" formal, so it is reported separately by the caller. `event` is its
-// own category; the integral, real, string, and user-defined types stand in
-// for the §16.6-allowed type list; chandle, void, virtual interface, and the
-// net kinds are outside that list.
 static LetFormalTypeKind ClassifyLetFormalType(const DataType& dt) {
   switch (dt.kind) {
     case DataTypeKind::kImplicit:
@@ -739,17 +535,10 @@ static LetFormalTypeKind ClassifyLetFormalType(const DataType& dt) {
     case DataTypeKind::kUwire:
       return LetFormalTypeKind::kForbidden;
     default:
-      // Integral, real, string, named, enum, struct, and union types are all
-      // usable in the §16.6 contexts a let body forms.
       return LetFormalTypeKind::kAssertionExpressionType;
   }
 }
 
-// §11.12, rule 1: each reference to a formal of type event stands where an
-// event_expression may be written. A let body is an expression, whose only
-// such places are the clocking events of its sampled value calls (§16.9.3),
-// which the call holds apart from the expression tree; an identifier of the
-// tree naming an event formal stands anywhere else.
 static void ReportEventFormalRefs(
     const Expr* e, const std::unordered_set<std::string_view>& events,
     DiagEngine& diag) {
@@ -768,8 +557,6 @@ static void ReportEventFormalRefs(
 
 void Elaborator::ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod) {
   for (auto& arg : item->func_args) {
-    // `let f(type(x) a) = a + 1;` gives a the type of x, which the formal's
-    // checks below and its actual's conversion read.
     if (mod != nullptr) ResolveTypeRef(arg.data_type, item->loc, mod);
     LetFormalTypeKind kind = ClassifyLetFormalType(arg.data_type);
     if (!IsLetFormalTypeAllowed(kind)) {
@@ -780,8 +567,6 @@ void Elaborator::ElaborateLetFormals(ModuleItem* item, const RtlirModule* mod) {
                   Subclause("11.12"));
     }
   }
-  // The event formals are those taking `event`, `y` of `f(event e, y)` among
-  // them, as LetFormalTypes carries a type to a formal written with none.
   std::unordered_set<std::string_view> events;
   const std::vector<const DataType*> kTypes = LetFormalTypes(item->func_args);
   for (size_t i = 0; i < kTypes.size(); ++i) {

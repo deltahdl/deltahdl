@@ -112,7 +112,6 @@ TEST(TimingCheckArgumentParsing, TimingCheckLimitComplexExpr) {
   EXPECT_NE(tc->limits[0], nullptr);
 }
 
-// reference_event ::= timing_check_event (the plain, non-controlled variant).
 TEST(TimingCheckArgumentParsing, ReferenceEventTimingCheckEvent) {
   auto r = Parse(
       "module m;\n"
@@ -127,7 +126,6 @@ TEST(TimingCheckArgumentParsing, ReferenceEventTimingCheckEvent) {
   EXPECT_EQ(tc->ref_terminal.name, "clk");
 }
 
-// data_event ::= timing_check_event (an edge-qualified data event).
 TEST(TimingCheckArgumentParsing, DataEventTimingCheckEvent) {
   auto r = Parse(
       "module m;\n"
@@ -142,7 +140,6 @@ TEST(TimingCheckArgumentParsing, DataEventTimingCheckEvent) {
   EXPECT_EQ(tc->data_terminal.name, "data");
 }
 
-// timestamp_condition ::= mintypmax_expression (sixth $setuphold argument).
 TEST(TimingCheckArgumentParsing, TimestampConditionMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -157,7 +154,6 @@ TEST(TimingCheckArgumentParsing, TimestampConditionMinTypMax) {
   EXPECT_EQ(tc->timestamp_cond->kind, ExprKind::kMinTypMax);
 }
 
-// timecheck_condition ::= mintypmax_expression (seventh $setuphold argument).
 TEST(TimingCheckArgumentParsing, TimecheckConditionMinTypMax) {
   auto r = Parse(
       "module m;\n"
@@ -172,8 +168,6 @@ TEST(TimingCheckArgumentParsing, TimecheckConditionMinTypMax) {
   EXPECT_EQ(tc->timecheck_cond->kind, ExprKind::kMinTypMax);
 }
 
-// start_edge_offset / end_edge_offset ::= mintypmax_expression ($nochange
-// captures them as the two limit slots after the reference/data events).
 TEST(TimingCheckArgumentParsing, NochangeStartAndEndEdgeOffset) {
   auto r = Parse(
       "module m;\n"
@@ -185,11 +179,10 @@ TEST(TimingCheckArgumentParsing, NochangeStartAndEndEdgeOffset) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_EQ(tc->limits.size(), 2u);
-  EXPECT_NE(tc->limits[0], nullptr);  // start_edge_offset
-  EXPECT_NE(tc->limits[1], nullptr);  // end_edge_offset
+  EXPECT_NE(tc->limits[0], nullptr);
+  EXPECT_NE(tc->limits[1], nullptr);
 }
 
-// threshold ::= constant_expression (third $width argument, after the limit).
 TEST(TimingCheckArgumentParsing, WidthThresholdArgument) {
   auto r = Parse(
       "module m;\n"
@@ -201,10 +194,9 @@ TEST(TimingCheckArgumentParsing, WidthThresholdArgument) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   ASSERT_EQ(tc->limits.size(), 2u);
-  EXPECT_NE(tc->limits[1], nullptr);  // threshold
+  EXPECT_NE(tc->limits[1], nullptr);
 }
 
-// event_based_flag ::= constant_expression (fifth $timeskew argument).
 TEST(TimingCheckArgumentParsing, EventBasedFlagExpression) {
   auto r = Parse(
       "module m;\n"
@@ -218,10 +210,6 @@ TEST(TimingCheckArgumentParsing, EventBasedFlagExpression) {
   ASSERT_NE(tc->event_based_flag, nullptr);
 }
 
-// notifier ::= variable_identifier, which A.9.3 spells `simple_identifier |
-// escaped_identifier`; an escaped name at the notifier's place is the
-// notifier, without the backslash, and §5.6.1 ends it at the white space
-// before the ')'.
 TEST(TimingCheckArgumentParsing, NotifierEscapedIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -236,8 +224,6 @@ TEST(TimingCheckArgumentParsing, NotifierEscapedIdentifier) {
   EXPECT_EQ(tc->limits.size(), 1u);
 }
 
-// A notifier is a variable_identifier and nothing else: a literal where the
-// notifier stands is rejected rather than read as a further limit.
 TEST(TimingCheckArgumentParsing, NotifierThatIsNoIdentifierIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -250,7 +236,6 @@ TEST(TimingCheckArgumentParsing, NotifierThatIsNoIdentifierIsRejected) {
       "A.7.5.2"));
 }
 
-// An expression over an identifier is no variable_identifier either.
 TEST(TimingCheckArgumentParsing, NotifierExpressionIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -263,9 +248,6 @@ TEST(TimingCheckArgumentParsing, NotifierExpressionIsRejected) {
       "A.7.5.2"));
 }
 
-// delayed_reference and delayed_data are each a terminal_identifier with an
-// optional `[ constant_mintypmax_expression ]`, and a terminal_identifier is
-// an escaped_identifier where written so.
 TEST(TimingCheckArgumentParsing, DelayedReferenceAndDataEscapedIdentifiers) {
   auto r = Parse(
       "module m;\n"
@@ -282,8 +264,6 @@ TEST(TimingCheckArgumentParsing, DelayedReferenceAndDataEscapedIdentifiers) {
   EXPECT_NE(tc->delayed_data_expr, nullptr);
 }
 
-// `[ , [ delayed_reference ] [ , [ delayed_data ] ] ]`: the delayed_reference
-// may be omitted while the delayed_data behind it is given.
 TEST(TimingCheckArgumentParsing, DelayedReferenceOmittedBeforeDelayedData) {
   auto r = Parse(
       "module m;\n"
@@ -298,8 +278,6 @@ TEST(TimingCheckArgumentParsing, DelayedReferenceOmittedBeforeDelayedData) {
   EXPECT_EQ(tc->delayed_data, "dD");
 }
 
-// A delayed_reference is a terminal_identifier: a literal where it stands is
-// rejected at the literal, and the delayed_data behind it is still read.
 TEST(TimingCheckArgumentParsing, DelayedReferenceThatIsNoIdentifierIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -315,8 +293,6 @@ TEST(TimingCheckArgumentParsing, DelayedReferenceThatIsNoIdentifierIsRejected) {
   EXPECT_EQ(tc->delayed_data, "dD");
 }
 
-// A delayed_data is a terminal_identifier: an expression where it stands is
-// rejected at the expression.
 TEST(TimingCheckArgumentParsing, DelayedDataThatIsNoIdentifierIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -339,15 +315,9 @@ TEST(TimingCheckArgumentParsing, ErrorDelayedRefMissingCloseBracket) {
       "  $setuphold(posedge clk, data, 10, 5, ntfr, , , dCLK[1, dD);\n"
       "endspecify\n"
       "endmodule\n");
-  // §31.9 owns the bit-select on a delayed_reference; Parser::Expect reports
-  // the missing ']' from Parser::ParseOptionalDelayedRef.
   EXPECT_TRUE(ReportedError(r.diags, "expected ']', got ','", 3, "31.9"));
 }
 
-// A.7.5.2 writes a timing_check_limit as an expression and $width's threshold
-// as a constant_expression, so a min:typ:max triple there is parenthesized;
-// $nochange's start_edge_offset and end_edge_offset are mintypmax_expressions
-// and take one bare.
 TEST(TimingCheckArgumentParsing, ParenthesizedLimitAndBareOffsetTriplesTaken) {
   auto r = Parse(
       "module m(input clk, data);\n"
@@ -362,8 +332,6 @@ TEST(TimingCheckArgumentParsing, ParenthesizedLimitAndBareOffsetTriplesTaken) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A bare triple standing as a limit, first or second, or as $width's
-// threshold, is reported where it starts.
 TEST(TimingCheckArgumentParsing, BareLimitAndThresholdTriplesRejected) {
   auto r = Parse(
       "module m(input clk, data);\n"

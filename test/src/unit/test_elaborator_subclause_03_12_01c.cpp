@@ -17,7 +17,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborates `srcs` together, each a compilation unit of its own.
 RtlirDesign* ElaborateUnits(const std::vector<std::string>& srcs,
                             ElabFixture& f, std::string_view top = "") {
   Elaborator elab(f.arena, f.diag,
@@ -27,9 +26,6 @@ RtlirDesign* ElaborateUnits(const std::vector<std::string>& srcs,
   return design;
 }
 
-// §3.12.1 with §3.13: each unit has a compilation-unit scope of its own, so a
-// typedef of one name in each is two types, and each module reads the one its
-// own unit declared, whichever unit the module instantiating it stands in.
 TEST(SeparateCompilationUnits, EachUnitsTypedefIsItsOwn) {
   ElabFixture f;
   auto* design = ElaborateUnits({"typedef logic [3:0] word_t;\n"
@@ -52,8 +48,6 @@ TEST(SeparateCompilationUnits, EachUnitsTypedefIsItsOwn) {
   EXPECT_EQ(b->width, 8u);
 }
 
-// §3.13: two units' scopes are two name spaces, so a variable of one name in
-// each is no redeclaration, and each unit's module reads its own.
 TEST(SeparateCompilationUnits, OneNameInTwoUnitsIsNoRedeclaration) {
   ElabFixture f;
   auto* design = ElaborateUnits({"int g;\n"
@@ -72,8 +66,6 @@ TEST(SeparateCompilationUnits, OneNameInTwoUnitsIsNoRedeclaration) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §3.12.1: a unit's declarations are accessible only within that unit, so a
-// module of another unit reading the name finds nothing it declares.
 TEST(SeparateCompilationUnits, AnotherUnitsVariableIsUnresolved) {
   ElabFixture f;
   ElaborateUnits({"int shared;\n"
@@ -99,9 +91,6 @@ TEST(SeparateCompilationUnits, AnotherUnitsNameUnderDollarUnitIsUndeclared) {
                             "undeclared identifier '$unit::g'", 3, "3.12.1"));
 }
 
-// §3.12.1: modules are visible in every unit, so one unit's module binds an
-// instance written in another, and §23.3.1's top-level modules are chosen
-// from the modules of every unit.
 TEST(SeparateCompilationUnits, ModulesOfEveryUnitBindAndRootTheDesign) {
   ElabFixture f;
   auto* design = ElaborateUnits({"module top;\n"
@@ -118,8 +107,6 @@ TEST(SeparateCompilationUnits, ModulesOfEveryUnitBindAndRootTheDesign) {
   EXPECT_NE(FindVar(design, "child", "z"), nullptr);
 }
 
-// §3.12.1: packages are visible in every unit, so one unit imports a package
-// another unit declared.
 TEST(SeparateCompilationUnits, PackageOfOneUnitImportedInAnother) {
   ElabFixture f;
   auto* design = ElaborateUnits({"package p;\n"
@@ -137,8 +124,6 @@ TEST(SeparateCompilationUnits, PackageOfOneUnitImportedInAnother) {
   EXPECT_EQ(v->width, 6u);
 }
 
-// A module instantiated from a module of its own unit stays in that unit's
-// scope, the scope already in force where the instance is elaborated.
 TEST(SeparateCompilationUnits, ModuleOfTheSameUnitKeepsItsScope) {
   ElabFixture f;
   auto* design = ElaborateUnits({"typedef logic [4:0] w_t;\n"
@@ -158,9 +143,6 @@ TEST(SeparateCompilationUnits, ModuleOfTheSameUnitKeepsItsScope) {
   EXPECT_EQ(x->width, 5u);
 }
 
-// §3.12.1: a task or function at compilation-unit scope is one of its unit's
-// declarations, so the names it reads are searched for in that unit alone, and
-// §23.9 reports one only another unit declares.
 TEST(SeparateCompilationUnits, UnitFunctionReadingAnotherUnitsVariable) {
   ElabFixture f;
   ElaborateUnits({"int only_a;\n"
@@ -173,10 +155,6 @@ TEST(SeparateCompilationUnits, UnitFunctionReadingAnotherUnitsVariable) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'only_a'", 2, "23.9"));
 }
 
-// §3.14.2.3 (printed page 60) makes it an error for some design elements of
-// the design to have a time unit and precision and others not. The second
-// unit's module takes its unit's own timeunit and timeprecision (rule c), so it
-// has both, while the first unit's module has neither.
 TEST(SeparateCompilationUnits, EachElementTakesItsOwnUnitsTimeScale) {
   ElabFixture f;
   ElaborateUnits({"module a; endmodule\n",
@@ -190,9 +168,6 @@ TEST(SeparateCompilationUnits, EachElementTakesItsOwnUnitsTimeScale) {
                             1, "3.14.2.3"));
 }
 
-// §24.6: an anonymous program's items share the name space of the scope the
-// program stands in, which is its own unit's compilation-unit scope, so a
-// function of one name in another unit collides with nothing.
 TEST(SeparateCompilationUnits, AnonymousProgramSharesOnlyItsOwnUnitsNames) {
   ElabFixture f;
   ElaborateUnits({"program;\n"
@@ -205,9 +180,6 @@ TEST(SeparateCompilationUnits, AnonymousProgramSharesOnlyItsOwnUnitsNames) {
   for (const auto& d : f.diag.Diagnostics()) EXPECT_NE(d.subclause, "24.6");
 }
 
-// §3.12.1: packages are visible in every unit, so a module of another unit
-// reads a package's parameter through the scope resolution operator: R is
-// p's K, 3, and sizes v.
 TEST(SeparateCompilationUnits, PackageItemOfOneUnitReachedByScopeResolution) {
   ElabFixture f;
   auto* design = ElaborateUnits({"package p;\n"
@@ -225,9 +197,6 @@ TEST(SeparateCompilationUnits, PackageItemOfOneUnitReachedByScopeResolution) {
   EXPECT_EQ(v->width, 3u);
 }
 
-// §3.12.1: primitives are visible in every unit, so a module of another unit
-// instantiates one, unnamed as §29.8 allows, and the instance is the
-// primitive's.
 TEST(SeparateCompilationUnits, PrimitiveOfOneUnitInstantiatedInAnother) {
   ElabFixture f;
   auto* design = ElaborateUnits({"primitive myudp(output q, input d, e);\n"
@@ -253,8 +222,6 @@ TEST(SeparateCompilationUnits, PrimitiveOfOneUnitInstantiatedInAnother) {
   EXPECT_EQ(top->udp_insts[0].decl->name, "myudp");
 }
 
-// §3.12.1: interfaces are visible in every unit, so a module of another unit
-// instantiates one.
 TEST(SeparateCompilationUnits, InterfaceOfOneUnitInstantiatedInAnother) {
   ElabFixture f;
   auto* design = ElaborateUnits({"interface ifc;\n"
@@ -274,8 +241,6 @@ TEST(SeparateCompilationUnits, InterfaceOfOneUnitInstantiatedInAnother) {
   EXPECT_TRUE(top->children[0].resolved->is_interface);
 }
 
-// §3.12.1: programs are visible in every unit, so a module of another unit
-// instantiates one.
 TEST(SeparateCompilationUnits, ProgramOfOneUnitInstantiatedInAnother) {
   ElabFixture f;
   auto* design = ElaborateUnits({"program prg;\n"
@@ -295,10 +260,6 @@ TEST(SeparateCompilationUnits, ProgramOfOneUnitInstantiatedInAnother) {
   EXPECT_TRUE(top->children[0].resolved->is_program);
 }
 
-// §3.13(c) puts a checker declared outside every design element in its unit's
-// compilation-unit scope, and §3.12.1 keeps that scope's declarations to the
-// unit, so a module of another unit instantiating it names nothing. The same
-// instance in the unit that declares the checker is accepted.
 TEST(SeparateCompilationUnits, CheckerOfAnotherUnitsScopeIsNotVisible) {
   ElabFixture f;
   ElaborateUnits({"checker chk(input logic x);\n"
@@ -325,12 +286,6 @@ TEST(SeparateCompilationUnits, CheckerOfAnotherUnitsScopeIsNotVisible) {
   EXPECT_FALSE(g.has_errors);
 }
 
-// §3.12.1 keeps a compilation-unit scope's declarations to its own unit, so a
-// module of another unit naming one of them names nothing it can reach: a
-// typedef or a class there is a type no declaration of the module's unit
-// precedes (§6.18), and a function or a parameter there is an unresolved name
-// (§23.9). Each unit's own declaration of the name is EachUnitsTypedefIsItsOwn
-// above and SeparateUnitsSim's cases in test_simulator_subclause_03_12_01b.cpp.
 TEST(SeparateCompilationUnits, AnotherUnitsTypedefIsNotAType) {
   ElabFixture f;
   ElaborateUnits({"typedef logic [3:0] t;\n"
@@ -358,8 +313,6 @@ TEST(SeparateCompilationUnits, AnotherUnitsClassIsNotAType) {
                             "6.18"));
 }
 
-// A function or a task of the other unit, each called as a statement, names
-// nothing. A function called inside an expression is #8872's.
 TEST(SeparateCompilationUnits, AnotherUnitsFunctionAndTaskAreUndeclared) {
   ElabFixture f;
   ElaborateUnits({"function void fn();\n"
@@ -391,9 +344,6 @@ TEST(SeparateCompilationUnits, AnotherUnitsParameterIsUnresolved) {
                             "23.9"));
 }
 
-// §3.12.1 with §26.2: where each file is a compilation unit of its own, a net
-// declaration assignment outside every design element is reported in the unit
-// that holds it.
 TEST(SeparateCompilationUnits, AUnitsNetDeclarationAssignmentIsReported) {
   ElabFixture f;
   ElaborateUnits({"module top;\n"
@@ -409,8 +359,6 @@ TEST(SeparateCompilationUnits, AUnitsNetDeclarationAssignmentIsReported) {
                             1, "3.12.1"));
 }
 
-// §3.12.1 with §10.4: a module's reference reaches the net of its own unit,
-// which a procedural assignment cannot write, where each file is a unit.
 TEST(SeparateCompilationUnits, ProceduralAssignmentToItsOwnUnitsNet) {
   ElabFixture f;
   ElaborateUnits({"module top;\n"

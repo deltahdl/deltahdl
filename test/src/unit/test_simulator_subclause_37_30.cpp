@@ -16,17 +16,6 @@
 namespace delta {
 namespace {
 
-// §37.30 Interface typespec: an interface typespec (vpiInterfaceTypespec) is a
-// typespec object that denotes a virtual interface or one of its modports.
-// These tests observe the production code that applies the clause's two
-// numbered "Details" - what vpiDefName reports for a modport versus an
-// interface typespec (detail 1) and where vpiParent leads for each (detail 2) -
-// together with the figure's vpiIsModPort/vpiName properties and the
-// vpiParamAssign relation, which the generic Get/GetStr/Handle/Iterate
-// machinery serves once the typespec's fields and children are populated.
-
-// The fixture installs a context so the public vpi_get/vpi_get_str/vpi_handle/
-// vpi_iterate entry points run their real dispatch over the test objects.
 class InterfaceTypespec : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -34,43 +23,32 @@ class InterfaceTypespec : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// §37.30: an interface typespec belongs to the typespec class (§37.25), so the
-// typespec-class predicate recognizes it.
 TEST_F(InterfaceTypespec, IsATypespec) {
   EXPECT_TRUE(VpiIsTypespecType(vpiInterfaceTypespec));
 }
 
-// D1: the vpiDefName of an interface typespec that represents a modport is the
-// modport identifier. Observed both through the helper and the public
-// vpi_get_str(vpiDefName) dispatch path.
 TEST_F(InterfaceTypespec, DefNameOfModportIsModportIdentifier) {
   VpiObject modport_ts;
   modport_ts.type = vpiInterfaceTypespec;
   modport_ts.is_modport = true;
-  modport_ts.def_name = "phy";  // the modport's identifier
+  modport_ts.def_name = "phy";
 
   EXPECT_STREQ(VpiInterfaceTypespecDefName(&modport_ts), "phy");
   EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&modport_ts)), "phy");
 }
 
-// D1: the vpiDefName of an interface typespec that represents an interface is
-// the identifier of the interface declaration - SBus in the figure's example,
-// where the typespec's own vpiName is the typedef name SB16.
 TEST_F(InterfaceTypespec, DefNameOfInterfaceIsInterfaceDeclarationIdentifier) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
   iface_ts.is_modport = false;
-  iface_ts.name = "SB16";      // the typedef name -> vpiName
-  iface_ts.def_name = "SBus";  // the interface declaration's identifier
+  iface_ts.name = "SB16";
+  iface_ts.def_name = "SBus";
 
   EXPECT_STREQ(VpiInterfaceTypespecDefName(&iface_ts), "SBus");
   EXPECT_STREQ(vpi_get_str(vpiDefName, VpiHandleOf(&iface_ts)), "SBus");
-  // The typedef name is the typespec's vpiName, distinct from the def name.
   EXPECT_STREQ(vpi_get_str(vpiName, VpiHandleOf(&iface_ts)), "SB16");
 }
 
-// D1 edge: the def-name helper only speaks for an interface typespec; any other
-// handle (or a null handle) reports no definition name through it.
 TEST_F(InterfaceTypespec, DefNameHelperOnlyForInterfaceTypespec) {
   VpiObject not_a_typespec;
   not_a_typespec.type = vpiStructTypespec;
@@ -80,21 +58,15 @@ TEST_F(InterfaceTypespec, DefNameHelperOnlyForInterfaceTypespec) {
   EXPECT_EQ(VpiInterfaceTypespecDefName(nullptr), nullptr);
 }
 
-// D1 edge: an interface typespec with no recorded definition name reports NULL
-// for vpiDefName rather than an empty string - the empty-name branch of the
-// def-name dispatch, distinct from the wrong-kind guard above.
 TEST_F(InterfaceTypespec, DefNameOfInterfaceTypespecWithoutRecordedNameIsNull) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
-  iface_ts.name = "SB16";  // has a vpiName, but no definition name recorded
+  iface_ts.name = "SB16";
 
   EXPECT_EQ(VpiInterfaceTypespecDefName(&iface_ts), nullptr);
   EXPECT_EQ(vpi_get_str(vpiDefName, VpiHandleOf(&iface_ts)), nullptr);
 }
 
-// D2: for an interface typespec that represents a modport, vpiParent returns
-// the interface typespec of the corresponding interface. Observed through the
-// helper and the public vpi_handle(vpiParent, ...) dispatch path.
 TEST_F(InterfaceTypespec, ParentOfModportIsItsInterfaceTypespec) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
@@ -110,8 +82,6 @@ TEST_F(InterfaceTypespec, ParentOfModportIsItsInterfaceTypespec) {
             &iface_ts);
 }
 
-// D2: for an interface typespec that represents an interface, vpiParent returns
-// NULL - even when some enclosing object is recorded as its parent pointer.
 TEST_F(InterfaceTypespec, ParentOfInterfaceIsNull) {
   VpiObject enclosing;
   enclosing.type = vpiModule;
@@ -119,15 +89,12 @@ TEST_F(InterfaceTypespec, ParentOfInterfaceIsNull) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
   iface_ts.is_modport = false;
-  iface_ts.parent =
-      &enclosing;  // an interface typespec still reports no parent
+  iface_ts.parent = &enclosing;
 
   EXPECT_EQ(VpiInterfaceTypespecParent(&iface_ts), nullptr);
   EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&iface_ts)), nullptr);
 }
 
-// D2 edge: the parent helper only speaks for an interface typespec; any other
-// handle (or a null handle) reports no parent through it.
 TEST_F(InterfaceTypespec, ParentHelperOnlyForInterfaceTypespec) {
   VpiObject other;
   other.type = vpiModule;
@@ -135,8 +102,6 @@ TEST_F(InterfaceTypespec, ParentHelperOnlyForInterfaceTypespec) {
   EXPECT_EQ(VpiInterfaceTypespecParent(nullptr), nullptr);
 }
 
-// Figure property: vpi_get(vpiIsModPort) reports TRUE for a modport interface
-// typespec and FALSE for one representing an interface.
 TEST_F(InterfaceTypespec, IsModPortProperty) {
   VpiObject modport_ts;
   modport_ts.type = vpiInterfaceTypespec;
@@ -150,17 +115,13 @@ TEST_F(InterfaceTypespec, IsModPortProperty) {
   EXPECT_EQ(vpi_get(vpiIsModPort, VpiHandleOf(&iface_ts)), 0);
 }
 
-// Figure relation: an interface typespec reaches its param assigns through the
-// vpiParamAssign relation - the typedef SB16's assigned parameter value of 16
-// in the figure's example is one such param assign, walked by
-// vpi_iterate/vpi_scan.
 TEST_F(InterfaceTypespec, ParamAssignIterationWalksParamAssigns) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
 
-  VpiObject pa_width;  // parameter WIDTH = 16
+  VpiObject pa_width;
   pa_width.type = vpiParamAssign;
-  VpiObject pa_other;  // a second parameter assignment
+  VpiObject pa_other;
   pa_other.type = vpiParamAssign;
   iface_ts.children = {&pa_width, &pa_other};
 
@@ -171,27 +132,19 @@ TEST_F(InterfaceTypespec, ParamAssignIterationWalksParamAssigns) {
   EXPECT_EQ(count, 2);
 }
 
-// Figure relation, empty input form: an interface typespec for a parameterless
-// interface (the typedef of an "interface SBus; ... endinterface" with no
-// parameter port list) has no param assigns, so the vpiParamAssign relation has
-// zero targets and vpi_iterate reports a null iterator rather than an empty
-// one. A non-param-assign child is present to confirm the walk filters by kind
-// rather than simply reporting whatever children exist.
 TEST_F(InterfaceTypespec, ParamAssignIterationOfParameterlessInterfaceIsNull) {
   VpiObject iface_ts;
   iface_ts.type = vpiInterfaceTypespec;
 
-  VpiObject unrelated;  // a child of some other kind, never a param assign
+  VpiObject unrelated;
   unrelated.type = vpiModport;
   iface_ts.children = {&unrelated};
 
   EXPECT_EQ(vpi_iterate(vpiParamAssign, VpiHandleOf(&iface_ts)), nullptr);
 }
 
-// §37.30 against designs read and run whole.
 class InterfaceTypespecsOfARun : public VpiDesignRun {
  protected:
-  // The integer value of `obj`, -1 where nothing is written.
   static int IntValueOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -200,8 +153,6 @@ class InterfaceTypespecsOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The name each param assign `typespec` reaches assigns, with the kind of
-  // what it assigns, in the order reached.
   static std::vector<std::pair<std::string, int>> Assigned(vpiHandle typespec) {
     std::vector<std::pair<std::string, int>> assigned;
     for (vpiHandle assign : ObjectsOf(vpiParamAssign, typespec)) {
@@ -227,10 +178,6 @@ constexpr const char* kSBus =
     "  SBus #(16) bus();\n"
     "endmodule\n";
 
-// §37.30 detail 3: a typedef of a virtual interface is an interface typespec
-// named after the typedef, reporting the interface's name, assigning the
-// parameter value it writes, 16, and reaching no parent (details 1 and 2), and
-// vpiTypedef of the module reaches it beside the array typedef (#7120).
 TEST_F(InterfaceTypespecsOfARun,
        AVirtualInterfaceTypedefIsAnInterfaceTypespec) {
   Run(kSBus);
@@ -247,9 +194,6 @@ TEST_F(InterfaceTypespecsOfARun,
   EXPECT_NE(Named(vpiTypedef, By("top"), "SBphy"), nullptr);
 }
 
-// §37.30 details 1 to 3: SBphy is an array typespec whose element is the
-// typespec of the modport phy, reporting the modport's name and reaching
-// through vpiParent an interface typespec of SBus, which assigns 32 (#7120).
 TEST_F(InterfaceTypespecsOfARun, AModportTypespecReachesItsInterfaces) {
   Run(kSBus);
   vpiHandle phy_array = Named(vpiTypedef, By("top"), "SBphy");
@@ -268,19 +212,12 @@ TEST_F(InterfaceTypespecsOfARun, AModportTypespecReachesItsInterfaces) {
   EXPECT_EQ(IntValueOf(vpi_handle(vpiRhs, kAssigns[0])), 32);
 }
 
-// §37.30 detail 3: a type given a type parameter by name is assigned as the
-// typespec of that type (#7120).
 TEST_F(InterfaceTypespecsOfARun, ATypeGivenByNameIsAssignedItsTypespec) {
   Run(kSBus);
   EXPECT_EQ(Assigned(Named(vpiTypedef, By("top"), "SBbyte")),
             (std::vector<std::pair<std::string, int>>{{"T", vpiByteTypespec}}));
 }
 
-// §37.30 detail 3 with §23.4: the parameter an ordered value assigns is the
-// one at its place in the interface the type names where it is written, an
-// interface the module declares nested in its body found ahead of the
-// compilation unit's, from the module's typedefs and from those of a class it
-// declares alike (#8264).
 TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedInterfacesParam) {
   Run("module top;\n"
       "  interface other #(parameter X = 0); endinterface\n"
@@ -297,8 +234,6 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedInterfacesParam) {
             (std::vector<std::pair<std::string, int>>{{"W", vpiConstant}}));
 }
 
-// ...and an interface the compilation unit declares, from a typedef a package
-// or the compilation unit writes (#8264).
 TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsAUnitInterfacesParam) {
   Run("interface ubus #(parameter N = 2); endinterface\n"
       "package pk; typedef virtual ubus #(7) vp_t; endpackage\n"
@@ -310,10 +245,6 @@ TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsAUnitInterfacesParam) {
             (std::vector<std::pair<std::string, int>>{{"N", vpiConstant}}));
 }
 
-// ...and, from the typedefs of a module itself declared nested, an interface
-// that module's declaration nests, hiding one of the same name its enclosing
-// module nests, or else one the enclosing module nests, the outer name space
-// being visible to it (§23.4) (#8266, #8267).
 TEST_F(InterfaceTypespecsOfARun, AnOrderedValueAssignsANestedHoldersParam) {
   Run("module top;\n"
       "  interface bus #(parameter W = 1); endinterface\n"

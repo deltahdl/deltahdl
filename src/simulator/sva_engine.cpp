@@ -170,16 +170,6 @@ AssertionSeverity DefaultConcurrentAssertActionSeverity() {
 
 Region ConcurrentAssertActionRegion() { return Region::kReactive; }
 
-// §16.14.4 (a restrict property is not verified in simulation) is carried live
-// by the parser and the elaborator, as sva_engine_queues.h says; no helper
-// stands for it here.
-
-// §16.14.5 (static concurrent assertions use `always` semantics) is carried
-// live: the elaborator lowers a simple clocked static concurrent assert into an
-// always_ff clocked process, so a fresh evaluation attempt begins at every
-// leading clock edge over the whole run. No pure helper is needed here; the
-// rule is observed end-to-end (test_simulator_subclause_16_14_05.cpp).
-
 bool RoseGclk(uint64_t prev_lsb, uint64_t cur_lsb) {
   return (prev_lsb & 1u) == 0u && (cur_lsb & 1u) == 1u;
 }
@@ -240,8 +230,6 @@ bool ControlAffectsDirectiveType(uint32_t directive_type_mask,
 
 bool EquivalentAssertControlForTask(std::string_view task_name,
                                     AssertControlInvocation& out) {
-  // §20.11: $asserton/$assertoff/$assertkill use assertion_type 15; the action
-  // control tasks use assertion_type 31. Both families use directive_type 7.
   constexpr uint32_t kStatusAssertionType = 15;
   constexpr uint32_t kActionAssertionType = 31;
   constexpr uint32_t kDirective = 7;
@@ -475,8 +463,6 @@ void AssertionControl::SetFailOn(std::string_view inst) {
 }
 
 void AssertionControl::ApplyControl(int control_type, std::string_view inst) {
-  // §20.11: Unlock is the only control that reaches a locked assertion; every
-  // other control_type is a no-op while the assertion is locked.
   if (control_type == static_cast<int>(AssertControlType::kUnlock)) {
     Unlock(inst);
     return;
@@ -667,8 +653,6 @@ void SvaEngine::ApplyDisableToDeferredAssertions(
 
 ExpectActionKind ResolveExpectAction(PropertyResult result,
                                      bool has_else_clause) {
-  // §16.17: a pending property keeps the process blocked; a resolved property
-  // selects which arm of the action block runs.
   switch (result) {
     case PropertyResult::kPending:
       return ExpectActionKind::kBlock;
@@ -683,14 +667,11 @@ ExpectActionKind ResolveExpectAction(PropertyResult result,
 }
 
 bool ExpectProcessRemainsBlocked(PropertyResult result) {
-  // §16.17: the process unblocks only once the property succeeds or fails.
   return result == PropertyResult::kPending;
 }
 
 bool ExpectClockingEventBeginsEvaluation(uint64_t activation_tick,
                                          uint64_t clocking_event_tick) {
-  // §16.17: the first evaluation is on the next clocking event after the expect
-  // executes, not on one coincident with activation.
   return clocking_event_tick > activation_tick;
 }
 

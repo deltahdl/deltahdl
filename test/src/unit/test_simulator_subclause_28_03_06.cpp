@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §28.3.6: when a terminal's width equals the instance-array length it is
-// distributed — each element connects to its own bit of the terminal. A row of
-// four `and` gates over 4-bit terminals therefore computes the bitwise AND, one
-// bit per element, rather than any whole-word reduction.
 TEST(GateArrayRuntime, NInputArrayDistributesPerBit) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -29,16 +25,10 @@ TEST(GateArrayRuntime, NInputArrayDistributesPerBit) {
   ASSERT_NE(net->resolved, nullptr);
   ASSERT_GT(net->resolved->value.nwords, 0u);
   const auto& w = net->resolved->value.words[0];
-  // 1100 & 1010 == 1000
   EXPECT_EQ(w.aval & 0xFu, 0x8u);
   EXPECT_EQ(w.bval & 0xFu, 0x0u);
 }
 
-// §28.3.6: a single-bit terminal is broadcast to every element of the array.
-// This is the LRM's own three-state array example — a scalar enable feeding a
-// row of buffers whose data and outputs are distributed. With the enable
-// asserted for conduction, every element passes its own data bit, so the output
-// word equals the input word.
 TEST(GateArrayRuntime, ScalarEnableBroadcastsAcrossThreeStateArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,17 +47,10 @@ TEST(GateArrayRuntime, ScalarEnableBroadcastsAcrossThreeStateArray) {
   ASSERT_NE(net->resolved, nullptr);
   ASSERT_GT(net->resolved->value.nwords, 0u);
   const auto& w = net->resolved->value.words[0];
-  // en == 0 conducts on every element, so out == in == 1011.
   EXPECT_EQ(w.aval & 0xFu, 0xBu);
   EXPECT_EQ(w.bval & 0xFu, 0x0u);
 }
 
-// §28.3.6: a distributed control terminal is likewise part-selected per element
-// — each buffer sees only its own enable bit, not a word-wide reduction of the
-// whole control vector. With enable 1010 a bufif0 row conducts on the bits
-// whose enable is 0 (bits 0 and 2), so those output bits follow their data
-// while the disabled bits are not driven to a logic 1. The word-reduced
-// (pre-fix) result would have turned the entire array off.
 TEST(GateArrayRuntime, DistributedEnableAppliesPerElementControl) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -85,25 +68,9 @@ TEST(GateArrayRuntime, DistributedEnableAppliesPerElementControl) {
   ASSERT_NE(net->resolved, nullptr);
   ASSERT_GT(net->resolved->value.nwords, 0u);
   const auto& w = net->resolved->value.words[0];
-  // Conducting bits (enable 0) are bits 0 and 2, each passing its data bit 1.
   EXPECT_EQ(w.aval & 0xFu, 0x5u);
 }
 
-// §28.3.6's Example 2 states that `bufif0 ar[3:0] (out, in, en);` and the four
-// separate declarations `bufif0 ar3 (out[3], in[3], en);` and so on are
-// the same apart from the indexed instance names, so an element of an array
-// answers a later change of its own input bit exactly as the separate
-// declaration would. The three cases above drive their inputs once and read the
-// settled value, which holds however the elements are woken.
-//
-// b alone changes at time 10 and a is held still, so a watcher armed on a
-// cannot carry it: 1100 & 1010 is 1000 and 1100 & 0101 is 0100. An array whose
-// elements stopped after their first evaluation reads 1000.
-//
-// A gate array reaches the same watch-list walk a UDP array does -- both expand
-// through ExpandInstanceArray, and the coroutine collects its reads with
-// CollectExprReads -- so this case and the §29.8 one stand over one collection
-// through two lowerings.
 TEST(GateArrayRuntime, DistributedTerminalChangeReevaluatesEachElement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -124,16 +91,10 @@ TEST(GateArrayRuntime, DistributedTerminalChangeReevaluatesEachElement) {
   ASSERT_NE(net->resolved, nullptr);
   ASSERT_GT(net->resolved->value.nwords, 0u);
   const auto& w = net->resolved->value.words[0];
-  // 1100 & 0101 == 0100
   EXPECT_EQ(w.aval & 0xFu, 0x4u);
   EXPECT_EQ(w.bval & 0xFu, 0x0u);
 }
 
-// §28.3.6 (printed page 833), Example 2: `driver`'s `bufif0 ar[3:0] (out, in,
-// en)` on the module's own vector ports and `driver_equiv`'s four buffers, each
-// on one bit-select of those ports, differ in nothing but the indexed instance
-// names, so the two drive the same values onto the nets the parent connects,
-// and both output z once the shared enable turns them off.
 TEST(GateArrayRuntime, ExampleTwoDriverAndDriverEquivAgree) {
   SimFixture f;
   auto out = RunCapture(
@@ -173,10 +134,6 @@ TEST(GateArrayRuntime, ExampleTwoDriverAndDriverEquivAgree) {
             "o1=zzzz o2=zzzz\n");
 }
 
-// §28.3.6: an array of xor gates inside a module, on the module's vector ports
-// (§23.2.2), takes each bit of the ports to its own instance, the LSB to the
-// right-hand index, and re-evaluates each instance when the parent changes an
-// input after time 0.
 TEST(GateArrayRuntime, ArrayOnASubmodulesVectorPortsDistributesPerBit) {
   SimFixture f;
   auto out = RunCapture(
@@ -199,9 +156,6 @@ TEST(GateArrayRuntime, ArrayOnASubmodulesVectorPortsDistributesPerBit) {
             "y=1110\n");
 }
 
-// §28.3.6 with §23.2.2: the array's range may be written with the module's
-// parameter, `not g[N-1:0] (y, a)` under `#(8)`, and still takes one bit of
-// each eight-bit port per instance.
 TEST(GateArrayRuntime, ArrayRangeFromAModuleParameterOnItsPorts) {
   SimFixture f;
   auto out = RunCapture(
@@ -223,9 +177,6 @@ TEST(GateArrayRuntime, ArrayRangeFromAModuleParameterOnItsPorts) {
   EXPECT_EQ(out, "y=00111100 n=4\n");
 }
 
-// §28.3.6: a single gate's input terminal may be any expression, a bit-select
-// of the module's input port or of a wire continuously assigned from it
-// included, and follows the port when the parent changes it.
 TEST(GateArrayRuntime, GateInputOnABitSelectOfAnInputPort) {
   SimFixture f;
   auto out = RunCapture(
@@ -252,9 +203,6 @@ TEST(GateArrayRuntime, GateInputOnABitSelectOfAnInputPort) {
             "y0=0 y1=1 y2=0 y3=1\n");
 }
 
-// §28.3.6: a single gate's output terminal may be a bit-select of the module's
-// vector output port, and each gate drives its own bit of the net the parent
-// connects.
 TEST(GateArrayRuntime, GateOutputOnABitSelectOfAnOutputPort) {
   SimFixture f;
   auto out = RunCapture(
@@ -278,12 +226,6 @@ TEST(GateArrayRuntime, GateOutputOnABitSelectOfAnOutputPort) {
             "y=01\n");
 }
 
-// §28.3.6 gives the least significant bit of a terminal wider than one
-// instance's to the instance of the array range's right-hand index, and the
-// next bits to the instances after it, whatever range the terminal was
-// declared with: a's least significant bit is a[3] and b's most significant
-// b[4]. Selected at its element's number as an index of the declared range,
-// a[0] went to instance [0] and b[0], out of range, besides.
 TEST(GateArrayRuntime, ATerminalsBitsFollowItsDeclaredRange) {
   SimFixture f;
   auto out = RunCapture(
@@ -300,11 +242,6 @@ TEST(GateArrayRuntime, ATerminalsBitsFollowItsDeclaredRange) {
   EXPECT_EQ(out, "0001 1000\n");
 }
 
-// A part-select, an indexed part-select or a concatenation as wide as the array
-// is shared out a bit per instance as a named vector is: each bufif1 takes one
-// bit of a[3:0] under one bit of c[3:0], and the outputs reach the bits of y
-// through the concatenation, y[3:2] taking its low two. Connected whole, every
-// instance drove all four bits under one control.
 TEST(GateArrayRuntime, SelectsAndConcatenationsAreSharedOutPerInstance) {
   SimFixture f;
   auto out = RunCapture(
@@ -323,11 +260,6 @@ TEST(GateArrayRuntime, SelectsAndConcatenationsAreSharedOutPerInstance) {
   EXPECT_EQ(out, "z10z 1001 1100\n");
 }
 
-// An input terminal is any expression, and one as wide as the array is shared
-// out a bit per instance like a named vector: the bitwise &, | and ^ of two
-// four-bit vectors, and the ~ of one, are four bits each. An operator the
-// width is not read through, a +, connects whole. Measured as nothing, each
-// operator terminal was connected whole to every instance.
 TEST(GateArrayRuntime, AnOperatorExpressionTerminalIsSharedOutPerInstance) {
   SimFixture f;
   auto out = RunCapture(
@@ -345,15 +277,6 @@ TEST(GateArrayRuntime, AnOperatorExpressionTerminalIsSharedOutPerInstance) {
   EXPECT_EQ(out, "z00z 0111 0110 1010 0000\n");
 }
 
-// Each instance takes its bit of a bitwise terminal as the operator over the
-// operands' bits, every operand first extended to the terminal's width
-// (§11.6.1): with 0 where the terminal is unsigned, as for c, the scalar s1,
-// and the part-select sc[1:0], which is unsigned whatever it selects from
-// (§11.8.1), and with the operand's sign bit where every operand is signed
-// (§11.8.2), as for sc, the signed scalar ss and the literal 2'sb10, inside a
-// ~ as at the top. An operand the width is not read through, the + on either
-// side, leaves its operation selected whole, read at the four bits it is
-// evaluated at: c + c is 0110 there and 10 alone.
 TEST(GateArrayRuntime, ABitwiseTerminalExtendsEachOperandToItsWidth) {
   SimFixture f;
   auto out = RunCapture(
@@ -381,12 +304,6 @@ TEST(GateArrayRuntime, ABitwiseTerminalExtendsEachOperandToItsWidth) {
   EXPECT_EQ(out, "0111 1111 0100 1011 1010 1111 0111 0100 0100\n");
 }
 
-// A literal terminal is measured by its bit length as any other expression is,
-// a sized literal's being its size (§5.7.1), so one as wide as the array is
-// shared out a bit per instance: g[k] buffers bit k of 4'b1100, h[k] bit k of
-// the concatenation, and k[k] bit k of 4'b10xz, a buf turning its z into x.
-// Measured as nothing, each literal was connected whole, and every instance
-// read its least significant bit: 0000 1111 xxxx.
 TEST(GateArrayRuntime, ALiteralTerminalIsSharedOutPerInstance) {
   SimFixture f;
   auto out = RunCapture(
@@ -401,13 +318,6 @@ TEST(GateArrayRuntime, ALiteralTerminalIsSharedOutPerInstance) {
   EXPECT_EQ(out, "1100 1001 10xx\n");
 }
 
-// A select with one index is as wide as what it selects: p[1] is a two-bit
-// subarray of the packed array p (§7.4.5) and mem[1] a two-bit element of the
-// unpacked array mem (§7.4.6), so each is shared out a bit per instance, g[k]
-// taking p[1][k] and h[k] mem[1][k]. A bit of the integer n, and one of the
-// parameter P, is one bit and connects to both instances of k and of q.
-// Measured as one bit, p[1] and mem[1] were connected whole, every instance
-// reading their least significant bit: 00 00.
 TEST(GateArrayRuntime, ASubarrayOrAnUnpackedElementIsSharedOutPerInstance) {
   SimFixture f;
   auto out = RunCapture(

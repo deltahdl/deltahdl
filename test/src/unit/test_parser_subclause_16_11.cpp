@@ -12,11 +12,6 @@ using namespace delta;
 namespace {
 
 TEST(SequenceMatchItem, SubroutineCallInSequenceParensParses) {
-  // §16.11 BNF (excerpt from Annex A.2.10): a sequence_expr may take the
-  // form ( sequence_expr {, sequence_match_item} ) [ sequence_abbrev ], and
-  // a sequence_match_item may itself be a subroutine_call. Confirm the
-  // parser accepts the textual shape — an attached system task in a
-  // comma-separated list following the sequence.
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, a;\n"
@@ -28,7 +23,6 @@ TEST(SequenceMatchItem, SubroutineCallInSequenceParensParses) {
 }
 
 TEST(SequenceMatchItem, OperatorAssignmentMatchItemParses) {
-  // §16.11 BNF: sequence_match_item ::= operator_assignment | ...
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, a;\n"
@@ -41,8 +35,6 @@ TEST(SequenceMatchItem, OperatorAssignmentMatchItemParses) {
 }
 
 TEST(SequenceMatchItem, IncOrDecExpressionMatchItemParses) {
-  // §16.11 BNF: sequence_match_item ::= ... | inc_or_dec_expression | ...
-  // The increment form must be accepted in the match-item slot.
   EXPECT_TRUE(
       ParseOk("module m;\n"
               "  logic clk, a;\n"
@@ -54,10 +46,6 @@ TEST(SequenceMatchItem, IncOrDecExpressionMatchItemParses) {
               "endmodule\n"));
 }
 
-// §16.11 with A.8.2: tf_call and method_call write their list of arguments
-// as optional, so a match item naming a subroutine with none, plainly,
-// through a package's scope or through a handle, is captured as the call it
-// is with an empty one.
 TEST(SequenceMatchItem, ACallWrittenWithNoArgumentsIsCapturedAsOne) {
   auto r = Parse(
       "package P;\n"

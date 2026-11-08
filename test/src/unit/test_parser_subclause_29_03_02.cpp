@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Parses a four-input `gate(out, a, b, c, d)` UDP whose only variation is the
-// `input` declaration style, then asserts the canonical a/b/c/d port list.
 void ExpectGateFourInputs(const std::string& input_decls) {
   auto r = Parse(
       "primitive gate(out, a, b, c, d);\n"
@@ -326,8 +324,6 @@ TEST(UdpPortDeclaration, OutputDeclMultipleNamesRejected) {
       "    0 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // The second name is where the output declaration stops being legal, so the
-  // report is the `;` Parser::ParseUdpOutputDecl expects after the one name.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got ','", 2, "29.3.2"));
 }
 
@@ -346,10 +342,6 @@ TEST(UdpPortDeclaration, RegDeclNotNamingOutputRejected) {
       r.diags, "UDP reg declaration shall name the output port", 3, "29.3.2"));
 }
 
-// §29.3.2: a sequential UDP must declare its output port reg. The rows are
-// A.5.3's `sequential_entry`, three fields separated by two colons, and the
-// output declaration says nothing about a reg, so the two disagree. The report
-// stands at the first row that says so.
 TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
   auto r = Parse(
       "primitive dff(q, d, clk);\n"
@@ -365,11 +357,6 @@ TEST(UdpPortDeclaration, SequentialUdpWithoutRegRejected) {
                             5, "29.3.2"));
 }
 
-// §29.3.2: a combinational UDP may hold no reg declaration. The rows are
-// A.5.3's `combinational_entry`, two fields separated by one colon, and the
-// output is declared reg, so the two disagree. The EXPECT_FALSE is what holds
-// the report to one per UDP: the second row breaks the rule exactly as the
-// first does, and a report per row would stand there too.
 TEST(UdpPortDeclaration, CombinationalUdpWithRegRejected) {
   auto r = Parse(
       "primitive c(output reg y, input a);\n"
@@ -386,9 +373,6 @@ TEST(UdpPortDeclaration, CombinationalUdpWithRegRejected) {
       "29.3.2"));
 }
 
-// §29.3.2: the same prohibition holds when the reg is written as a separate
-// declaration alongside a plain output declaration (the non-ANSI first form)
-// rather than inline as `output reg`.
 TEST(UdpPortDeclaration, CombinationalUdpWithSeparateRegRejected) {
   auto r = Parse(
       "primitive c(y, a);\n"
@@ -405,10 +389,6 @@ TEST(UdpPortDeclaration, CombinationalUdpWithSeparateRegRejected) {
       "29.3.2"));
 }
 
-// §29.3.2: the output port declaration is the keyword `output` followed by one
-// output port name. The lower bound of a single name is the rejecting
-// counterpart of OutputDeclMultipleNamesRejected: an output declaration
-// carrying no name is rejected.
 TEST(UdpPortDeclaration, OutputDeclWithoutNameRejected) {
   auto r = Parse(
       "primitive p(out, a);\n"
@@ -423,10 +403,6 @@ TEST(UdpPortDeclaration, OutputDeclWithoutNameRejected) {
       ReportedError(r.diags, "expected identifier, got ';'", 2, "29.3.2"));
 }
 
-// §29.3.2: the input port declaration is the keyword `input` followed by one or
-// more input port names. This is the negative of that rule -- an input
-// declaration with no name violates the at-least-one lower bound and is
-// rejected.
 TEST(UdpPortDeclaration, InputDeclWithoutNameRejected) {
   auto r = Parse(
       "primitive p(out, a);\n"
@@ -441,12 +417,6 @@ TEST(UdpPortDeclaration, InputDeclWithoutNameRejected) {
       ReportedError(r.diags, "expected identifier, got ';'", 3, "29.3.2"));
 }
 
-// The same missing reg as SequentialUdpWithoutRegRejected, written so that
-// nothing but the reg is wrong with the source. That case puts `?` in the
-// current-state field, and Table 29-1 bars `?` from an output field, so a
-// parser reading the row as combinational rejects it under §29.3.6 whether it
-// enforces §29.3.2 or not. `0` is legal in both fields, which leaves the
-// missing reg as the only thing to report.
 TEST(UdpPortDeclaration,
      SequentialTableWithoutRegRejectedWhenTheStateFieldIsALegalOutputSymbol) {
   auto r = Parse(
@@ -462,9 +432,6 @@ TEST(UdpPortDeclaration,
                             5, "29.3.2"));
 }
 
-// One missing reg is one mistake however many rows stand under it. Every row
-// here disagrees with the output declaration, so a report per row would stand
-// at lines 5, 6 and 7; the EXPECT_FALSE on line 6 is what fails then.
 TEST(UdpPortDeclaration,
      SequentialTableWithoutRegReportsAtTheFirstOffendingRow) {
   auto r = Parse(
@@ -485,10 +452,6 @@ TEST(UdpPortDeclaration,
                              6, "29.3.2"));
 }
 
-// §29.3.1 and §29.3.2: the non-ANSI header lists the ports and the
-// declarations after it declare them, so every name the list holds is a
-// declared port. Only the list's first name was ever checked, and `b` here
-// drew no report.
 TEST(UdpPortDeclaration, ListedPortNeverDeclaredRejected) {
   auto r = Parse(
       "primitive p1(q, a, b);\n"
@@ -504,9 +467,6 @@ TEST(UdpPortDeclaration, ListedPortNeverDeclaredRejected) {
       1, "29.3.2"));
 }
 
-// The other side of the rule: every declared port is one the list names, and
-// the table's input fields follow the list's order, so a declared input the
-// list leaves out has no field of its own.
 TEST(UdpPortDeclaration, DeclaredPortMissingFromTheListRejected) {
   auto r = Parse(
       "primitive p2(q, a);\n"
@@ -522,8 +482,6 @@ TEST(UdpPortDeclaration, DeclaredPortMissingFromTheListRejected) {
       "29.3.2"));
 }
 
-// A port is one entry of the list, so a name written twice stands for two
-// ports that one declaration cannot both be.
 TEST(UdpPortDeclaration, PortListedTwiceRejected) {
   auto r = Parse(
       "primitive p3(q, q, a);\n"

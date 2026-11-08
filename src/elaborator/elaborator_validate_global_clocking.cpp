@@ -1,11 +1,3 @@
-// The checks a design's global clocking is held to: §14.13 allows one global
-// clocking declaration per scope, §14.14 says where $global_clock may be
-// referenced, and §16.9.4 says which sampled value functions require a global
-// clocking and where the future ones may appear. They sit beside the rest of
-// the clocking checks in elaborator_validate_clocking.cpp and were split out
-// of it to keep both files inside the 1000-line limit
-// assert-no-oversized-source-files enforces.
-
 #include <vector>
 
 #include "common/diagnostic.h"
@@ -40,7 +32,6 @@ namespace {
 
 bool ExprRefsGlobalClock(const Expr* e);
 
-// Recurse into every scalar (single-child) sub-expression slot of `e`.
 bool AnyScalarChildRefsGlobalClock(const Expr* e) {
   for (const Expr* child : {e->lhs, e->rhs, e->condition, e->true_expr,
                             e->false_expr, e->base, e->index, e->index_end,
@@ -67,19 +58,6 @@ bool ExprRefsGlobalClock(const Expr* e) {
 
 const Expr* FindGlobalClockRefInStmt(const Stmt* s);
 
-// Recurse into every nested statement of `s`; returns the first descendant hit,
-// or nullptr. §14.14 says where a $global_clock reference refers and puts no
-// condition on where it stands, so every position a statement holds a statement
-// in is one it may be written in.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It visits every one of them and gives the visitor no way to stop, so
-// the search short-circuits by keeping the first hit in `found` and recursing
-// only while `found` is null. That skip is what the early return out of the old
-// list of slots did: without it the walk descends into every remaining subtree
-// after the answer is already known, and a hit found beneath a later child
-// would overwrite the one this function is required to return.
 const Expr* FindGlobalClockRefInSubStmts(const Stmt* s) {
   const Expr* found = nullptr;
   ForEachChildStmt(s, [&](Stmt* const& sub) {
@@ -89,27 +67,6 @@ const Expr* FindGlobalClockRefInSubStmts(const Stmt* s) {
   return found;
 }
 
-// Search the expressions `s` holds itself, as against those its nested
-// statements hold; returns the first hit, or nullptr. §14.14 has $global_clock
-// refer explicitly to the event expression of the effective global clocking
-// declaration and resolves that declaration for each reference by a
-// hierarchical lookup over the design, which reads nothing about where in a
-// statement the reference stands. So every position a statement holds an
-// expression in is one the rule reaches.
-//
-// ForEachChildExpr in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It visits every one of them and gives the visitor no way to stop, so
-// the search short-circuits the way FindGlobalClockRefInSubStmts above does:
-// the first hit is kept in `found`, and the visitor returns at once while
-// `found` is set. Without that the walk searches every remaining position after
-// the answer is known, and a hit in a later one overwrites the one this
-// function is required to return.
-//
-// The iff condition of an event control is searched alongside the signal.
-// A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
-// expression ]`, so both are expressions of one production, and §14.14 puts no
-// condition on which of them holds the reference.
 const Expr* FindGlobalClockRefInOwnExprs(const Stmt* s) {
   const Expr* found = nullptr;
   ForEachChildExpr(s, [&](Expr* const& e) {
@@ -125,7 +82,6 @@ const Expr* FindGlobalClockRefInStmt(const Stmt* s) {
   return FindGlobalClockRefInSubStmts(s);
 }
 
-// True when `decl` declares a global clocking block in this scope.
 bool DeclHasGlobalClocking(const ModuleDecl* decl) {
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kClockingBlock &&
@@ -136,16 +92,6 @@ bool DeclHasGlobalClocking(const ModuleDecl* decl) {
   return false;
 }
 
-// First $global_clock reference in a module item's slots, or nullptr.
-// A.6.5: `event_expression ::= [ edge_identifier ] expression [ iff expression
-// ]`, so an event carries two expressions and §14.14 states no condition on
-// which of them holds the reference. Reading the signal alone let `always
-// @(posedge clk iff $global_clock)` elaborate clean where the procedural
-// `initial @(posedge clk iff $global_clock)` is reported, the statement walk
-// having reached the field through ForEachChildExpr.
-//
-// It is a function of its own rather than a loop in the caller because the
-// caller is at the cognitive-complexity threshold etc/clang_tidy/src.yml sets.
 static const Expr* FindGlobalClockRefInSensitivity(
     const std::vector<EventExpr>& sensitivity) {
   for (const auto& ev : sensitivity) {
@@ -168,15 +114,8 @@ const Expr* FindGlobalClockRefInItem(const ModuleItem* item) {
   return ref;
 }
 
-// The GclkKindPredicate (declared in elaborator_validate_internal.h) that
-// accepts the whole family; a caller after the five future functions alone
-// passes IsGlobalClockingFutureFunction instead.
 bool AcceptAnyGclk(GlobalClockingSampledFunction) { return true; }
 
-// §16.9.4: recursively search `e` for the first global clocking sampled value
-// function call whose kind satisfies `match`; returns that node or nullptr. The
-// traversal is kept separate from the $global_clock search so the
-// §14.14/§16.9.4 rules report their own diagnostics.
 const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
   if (!e) return nullptr;
   if (e->kind == ExprKind::kSystemCall) {
@@ -202,20 +141,6 @@ const Expr* FindGclkFunctionRef(const Expr* e, GclkKindPredicate match) {
 const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match,
                                       bool include_property_slot);
 
-// Recurse into every nested statement of `s`; returns the first descendant
-// call whose kind satisfies `match`, or nullptr. §16.9.4 makes the global
-// clocking sampled value functions usable only where global clocking is defined
-// and puts no condition on where the call stands, so every position a statement
-// holds a statement in is one such a call may be written in.
-//
-// ForEachChildStmt in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It visits every one of them and gives the visitor no way to stop, so
-// the search short-circuits by keeping the first hit in `found` and recursing
-// only while `found` is null. That skip is what the early return out of the old
-// list of slots did: without it the walk descends into every remaining subtree
-// after the answer is already known, and a hit found beneath a later child
-// would overwrite the one this function is required to return.
 const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
                                           GclkKindPredicate match,
                                           bool include_property_slot) {
@@ -227,46 +152,10 @@ const Expr* FindGclkFunctionRefInSubStmts(const Stmt* s,
   return found;
 }
 
-// Search the expressions `s` holds itself, as against those its nested
-// statements hold; returns the first call whose kind satisfies `match`, or
-// nullptr. §16.9.4 makes the global clocking sampled value functions usable
-// only where global clocking is defined (§14.14) and states no condition on
-// where the call stands, so every position a statement holds an expression in
-// is one the rule reaches.
-//
-// ForEachChildExpr in elaborator_validate_internal.h states those positions,
-// once for the whole elaborator, which is why the list is not written out again
-// here. It visits every one of them and gives the visitor no way to stop, so
-// the search short-circuits the way FindGclkFunctionRefInSubStmts above does:
-// the first hit is kept in `found`, and the visitor returns at once while
-// `found` is set. Without that the walk searches every remaining position after
-// the answer is known, and a hit in a later one overwrites the one this
-// function is required to return.
-//
-// The iff condition of an event control is searched alongside the signal.
-// A.6.5 gives `event_expression ::= [ edge_identifier ] expression [ iff
-// expression ]`, so both are expressions of one production, and §16.9.4 puts no
-// condition on which of them holds the call.
-// The one expression a statement holds that §16.9.4 admits a future sampled
-// value function in, or nullptr where it holds none. The parser gives a
-// concurrent assertion's property_expr the shape of an immediate assert
-// statement and marks it (Stmt::is_concurrent_clocked, see
-// parser_assert.cpp), so `assert property (@clk $rising_gclk(req));` reaches
-// this walk as a statement whose assert_expr is the property. That expression
-// is the property slot; a caller searching the procedural positions alone
-// passes over it and searches everything else the statement holds, which
-// includes the action block, where the clause bars these functions outright:
-// they may not appear in assertion action blocks.
 const Expr* PropertySlotOfStmt(const Stmt* s) {
   return s->is_concurrent_clocked ? s->assert_expr : nullptr;
 }
 
-// The parser keeps a property of operators as a tree (Stmt::assert_property)
-// and a sequence of more than one cycle (Stmt::assert_sequence) apart from the
-// statement's expressions, leaving the property slot a placeholder, so the
-// calls those two hold are reached through the walks that read every
-// expression of each. They are the property slot as much as a boolean property
-// is, and are passed over where it is.
 const Expr* FindGclkFunctionRefInPropertyShapes(const Stmt* s,
                                                 GclkKindPredicate match) {
   const Expr* found = nullptr;
@@ -307,10 +196,6 @@ const Expr* FindGclkFunctionRefInStmt(const Stmt* s, GclkKindPredicate match,
 
 }  // namespace
 
-// First matching global clocking sampled value function reference in a module
-// item's slots, or nullptr. When `include_property_slot` is false the property
-// body expression is skipped, so only the procedural / general-expression
-// positions are searched (a future function is legal in a property_expr).
 const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
                                       GclkKindPredicate match,
                                       bool include_property_slot) {
@@ -330,9 +215,6 @@ const Expr* FindGclkFunctionRefInItem(const ModuleItem* item,
       return hit;
     }
   }
-  // A.6.5 gives an event two expressions, and §16.9.4 puts no condition on
-  // which of them a global clocking sampled value function is written in. See
-  // FindGlobalClockRefInItem above, which reads both for the same reason.
   for (const auto& ev : item->sensitivity) {
     if (const Expr* hit = FindGclkFunctionRef(ev.signal, match)) return hit;
     if (const Expr* hit = FindGclkFunctionRef(ev.iff_condition, match)) {
@@ -348,9 +230,6 @@ bool ModuleDeclaresGlobalClocking(const ModuleDecl* decl) {
 
 const std::vector<EventExpr>* ModuleGlobalClockingEvent(
     const ModuleDecl* decl) {
-  // §16.5.2: the event a $global_clock leading clocking event stands for. A
-  // declaration whose clocking event is absent names no event to stand for, so
-  // it is passed over as though the module declared no global clocking.
   for (const auto* item : decl->items) {
     if (item->kind == ModuleItemKind::kClockingBlock &&
         item->is_global_clocking && !item->clocking_event.empty()) {
@@ -361,11 +240,6 @@ const std::vector<EventExpr>* ModuleGlobalClockingEvent(
 }
 
 void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
-  // §14.14 lookup rules a) and b): the reference is legal when this scope, or
-  // any enclosing ancestor instance up to the top-level hierarchy block,
-  // declares a global clocking. global_clocking_in_scope_ (threaded through
-  // ElaborateModule) already folds in this cell's own declaration, so a single
-  // test covers both the local and the climbed-hierarchy cases.
   if (global_clocking_in_scope_) return;
 
   for (const auto* item : decl->items) {
@@ -381,15 +255,10 @@ void Elaborator::ValidateGlobalClockReference(const ModuleDecl* decl) {
 }
 
 void Elaborator::ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl) {
-  // §16.9.4: the global clocking sampled value functions may be used only if a
-  // global clocking is defined. The in-scope test mirrors the $global_clock
-  // reference rule: global_clocking_in_scope_ folds this cell's own declaration
-  // together with any inherited from an enclosing instance.
   if (global_clocking_in_scope_) return;
 
   for (const auto* item : decl->items) {
-    const Expr* ref = FindGclkFunctionRefInItem(item, AcceptAnyGclk,
-                                                /*include_property_slot=*/true);
+    const Expr* ref = FindGclkFunctionRefInItem(item, AcceptAnyGclk, true);
     if (ref) {
       diag_.Error(ref->range.start,
                   "a global clocking sampled value function requires a global "
@@ -401,19 +270,9 @@ void Elaborator::ValidateGclkRequiresGlobalClocking(const ModuleDecl* decl) {
 }
 
 void Elaborator::ValidateFutureGclkPlacement(const ModuleDecl* decl) {
-  // §16.9.4: the global clocking future sampled value functions ($future_gclk,
-  // $rising_gclk, $falling_gclk, $steady_gclk, $changing_gclk) may be invoked
-  // only in a property or sequence expression, so a use in procedural code, a
-  // continuous assignment, an initializer, or an event control is illegal. The
-  // walk below is told to pass over the property slots, which are the property
-  // body expression of a property declaration and the property a concurrent
-  // assertion carries as a marked assert statement, so what it reaches is the
-  // procedural positions alone. The past functions carry no such restriction
-  // and are left alone.
   for (const auto* item : decl->items) {
     const Expr* ref =
-        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
-                                  /*include_property_slot=*/false);
+        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction, false);
     if (ref) {
       diag_.Error(ref->range.start,
                   "a global clocking future sampled value function may appear "

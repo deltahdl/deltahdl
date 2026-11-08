@@ -7,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §25.6: when a port instance is an interface, each signal of the interface
-// becomes an available specify terminal with the direction the modport
-// restricts it to. A modport-input signal drives a module path source, so this
-// must elaborate cleanly. Input is built from real interface (§25.3.2) and
-// modport (§25.5) syntax so the direction actually comes from the modport.
 TEST(SpecifyInterfaceTerminal, ModportInputUsableAsPathSource) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -29,7 +24,6 @@ TEST(SpecifyInterfaceTerminal, ModportInputUsableAsPathSource) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.6: a modport-output signal is available as a module path destination.
 TEST(SpecifyInterfaceTerminal, ModportOutputUsableAsPathDestination) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -47,8 +41,6 @@ TEST(SpecifyInterfaceTerminal, ModportOutputUsableAsPathDestination) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.6: the modport restricts the terminal's direction, so a modport-output
-// signal cannot serve as a module path source.
 TEST(SpecifyInterfaceTerminal, ModportOutputRejectedAsPathSource) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -70,8 +62,6 @@ TEST(SpecifyInterfaceTerminal, ModportOutputRejectedAsPathSource) {
                             7, "25.6"));
 }
 
-// §25.6: conversely, a modport-input signal cannot serve as a module path
-// destination.
 TEST(SpecifyInterfaceTerminal, ModportInputRejectedAsPathDestination) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -93,10 +83,6 @@ TEST(SpecifyInterfaceTerminal, ModportInputRejectedAsPathDestination) {
                             7, "25.6"));
 }
 
-// §25.6: a modport-inout signal is restricted to no single direction, so — like
-// a module inout port — it is usable as both a source and a destination
-// terminal. Exercises the inout branch of the modport-direction rule, distinct
-// from the input-only and output-only branches above.
 TEST(SpecifyInterfaceTerminal, ModportInoutUsableAsEitherDirection) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -115,9 +101,6 @@ TEST(SpecifyInterfaceTerminal, ModportInoutUsableAsEitherDirection) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.6: an interface port with no modport carries the interface's default
-// direction, which restricts nothing, so its signal is usable in either path
-// role.
 TEST(SpecifyInterfaceTerminal, PlainInterfaceSignalUsableEitherDirection) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -134,8 +117,6 @@ TEST(SpecifyInterfaceTerminal, PlainInterfaceSignalUsableEitherDirection) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.6: an interface signal is equally available as a timing-check terminal,
-// regardless of the modport direction.
 TEST(SpecifyInterfaceTerminal, InterfaceSignalUsableAsTimingCheckTerminal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -153,8 +134,6 @@ TEST(SpecifyInterfaceTerminal, InterfaceSignalUsableAsTimingCheckTerminal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.6: a ref port cannot be a terminal, and this extends to an interface
-// signal reached through a ref modport member (path position).
 TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsPathTerminal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -175,8 +154,6 @@ TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsPathTerminal) {
                             7, "25.6"));
 }
 
-// §25.6: the ref-modport-member prohibition applies to timing-check terminals
-// too.
 TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsTimingTerminal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -197,8 +174,6 @@ TEST(SpecifyInterfaceTerminal, RefModportMemberRejectedAsTimingTerminal) {
                             7, "25.6"));
 }
 
-// §25.6: module inout ports can act as either an input (source) or an output
-// (destination) terminal, so both directions of use must elaborate cleanly.
 TEST(SpecifyInoutTerminal, InoutPortUsableAsEitherTerminal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -213,8 +188,6 @@ TEST(SpecifyInoutTerminal, InoutPortUsableAsEitherTerminal) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.6: a ref port cannot be used as a terminal in a specify block. Source
-// position of a module path.
 TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathSource) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -225,16 +198,12 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathSource) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // §25.6 states the prohibition once for both roles the specify block has, so
-  // the path-terminal site reports the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",
                             3, "25.6"));
 }
 
-// §25.6: a ref port cannot be used as a terminal in a specify block.
-// Destination position of a module path.
 TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathDestination) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -245,16 +214,12 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsPathDestination) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // §25.6 states the prohibition once for both roles the specify block has, so
-  // the path-terminal site reports the subclause the sentence is written in.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",
                             3, "25.6"));
 }
 
-// §25.6: a ref port cannot be used as a terminal in a specify block. Terminal
-// of a timing check.
 TEST(SpecifyRefTerminalRejected, RefPortRejectedAsTimingCheckTerminal) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -265,9 +230,6 @@ TEST(SpecifyRefTerminalRejected, RefPortRejectedAsTimingCheckTerminal) {
       "endmodule\n",
       f);
   ASSERT_NE(design, nullptr);
-  // §25.6 states the prohibition once for both roles the specify block has, so
-  // the timing-check terminal site reports the same subclause the path-terminal
-  // sites above do.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "ref port 'r' cannot be used as a "
                             "terminal in a specify block",

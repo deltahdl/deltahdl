@@ -11,10 +11,6 @@
 
 namespace {
 
-// §33.4.3: a localparam a configuration declares must be given a value, and
-// that value must be a literal, so an override naming one hands the instance
-// that literal itself. A six-character string is 48 bits, which a 32- or 64-bit
-// folded value would cut to its last characters.
 TEST(ConfigLocalparamLiteral, StringLocalparamReachesTheInstanceWhole) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -36,9 +32,6 @@ TEST(ConfigLocalparamLiteral, StringLocalparamReachesTheInstanceWhole) {
   EXPECT_EQ(ResolvedParam(child, "W"), 100);
 }
 
-// §33.4.3 with Syntax 33-4: a use clause's named_parameter_assignment may set a
-// type parameter, its value a data type, and the configured instance then
-// elaborates with that type (§6.20.3): a variable of type T is 16 bits wide.
 TEST(ConfigParamOverride, TypeParameterSetByNamedAssignment) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -54,7 +47,6 @@ TEST(ConfigParamOverride, TypeParameterSetByNamedAssignment) {
   EXPECT_EQ(VariableWidth(child, "v"), 16u);
 }
 
-// The configuration's assignment takes precedence over the instantiation's.
 TEST(ConfigParamOverride, TypeParameterOverrideBeatsTheInstantiation) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -70,8 +62,6 @@ TEST(ConfigParamOverride, TypeParameterOverrideBeatsTheInstantiation) {
   EXPECT_EQ(VariableWidth(child, "v"), 16u);
 }
 
-// §33.4.3: `.T()` returns the type parameter to its declared default, setting
-// the instantiation's `int` aside: v is a byte, 8 bits wide.
 TEST(ConfigParamOverride, EmptyTypeParameterAssignmentResetsToTheDefault) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -87,10 +77,6 @@ TEST(ConfigParamOverride, EmptyTypeParameterAssignmentResetsToTheDefault) {
   EXPECT_EQ(VariableWidth(child, "v"), 8u);
 }
 
-// §33.4.3 (printed page 940): a parameter identifier is looked up beginning in
-// the instance's parent scope, so `top.WIDTH` in the override of top.a1 is
-// top's WIDTH, whether top declares it in its parameter port list or in its
-// body.
 TEST(ConfigParamOverride, HierarchicalReferenceToTheParentsHeaderParameter) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -121,8 +107,6 @@ TEST(ConfigParamOverride, HierarchicalReferenceToTheParentsBodyParameter) {
   EXPECT_EQ(ResolvedParam(child, "W"), 16);
 }
 
-// §33.4.3 Example 4: the hierarchical `top4.S` is the parent's S even where the
-// configuration declares a localparam S of its own, which the bare `S` names.
 TEST(ConfigParamOverride, HierarchicalReferenceIsNotTheConfigsLocalparam) {
   ElabFixture f;
   auto* child = ConfigElabFirstChild(
@@ -139,8 +123,6 @@ TEST(ConfigParamOverride, HierarchicalReferenceIsNotTheConfigsLocalparam) {
   EXPECT_EQ(ResolvedParam(child, "W"), 16);
 }
 
-// An index in such a name may be a config localparam: `top.PARR[I]` with
-// `localparam I = 2` is the third element of top's parameter array.
 TEST(ConfigParamOverride, HierarchicalParameterArrayIndexedByALocalparam) {
   ElabFixture f;
   auto* child =
@@ -160,17 +142,12 @@ TEST(ConfigParamOverride, HierarchicalParameterArrayIndexedByALocalparam) {
   EXPECT_EQ(ResolvedParam(child, "W"), 30);
 }
 
-// Config-elaborates `src` through its first configuration and returns the
-// design's one top-level module.
 RtlirModule* ConfigElabTop(ElabFixture& f, const std::string& src) {
   auto* design = ConfigElab(f, src);
   if (!design || design->top_modules.size() != 1) return nullptr;
   return design->top_modules[0];
 }
 
-// §33.4.3 Example 3: an instance clause naming the top-level cell alone sets
-// that cell's own parameters, one declared in its parameter port list and one
-// declared in its body alike.
 TEST(ConfigParamOverride, InstanceClauseOnTheTopCellSetsAHeaderParameter) {
   ElabFixture f;
   auto* top = ConfigElabTop(f,
@@ -206,8 +183,6 @@ TEST(ConfigLocalparamLiteral, NonLiteralLocalparamRejected) {
       "  design top;\n"
       "endconfig\n",
       f, "top");
-  // The report stands at the localparam's own value on line 3, not at the
-  // 'config' keyword on line 2: it is the expression that is not a literal.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' localparam 'X' is not assigned a "
                             "literal value",
@@ -253,8 +228,6 @@ TEST(ConfigLocalparamLiteral, StringLiteralLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A real literal is as much a literal value as an integer or string, so a
-// config localparam set directly to one is accepted (§33.4.3).
 TEST(ConfigLocalparamLiteral, RealLiteralLocalparamAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -267,8 +240,6 @@ TEST(ConfigLocalparamLiteral, RealLiteralLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An unbased-unsized literal ('0/'1/'x/'z) is a literal value, so a config
-// localparam set directly to one is accepted (§33.4.3).
 TEST(ConfigLocalparamLiteral, UnbasedUnsizedLiteralLocalparamAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -281,8 +252,6 @@ TEST(ConfigLocalparamLiteral, UnbasedUnsizedLiteralLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A time literal (e.g. 5ns) is likewise a literal value and is accepted as a
-// config localparam initializer (§33.4.3).
 TEST(ConfigLocalparamLiteral, TimeLiteralLocalparamAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -311,12 +280,6 @@ TEST(ConfigParamOverride, HierIdentInExpressionRejected) {
                     4, "33.4.3"));
 }
 
-// §33.4.1 admits any number of instance clauses in one config and §33.4.3 lets
-// each carry its own overrides, so the report has to say which clause it is
-// about. Two clauses are written on separate lines and only the second is
-// illegal, because a config whose clauses share a line makes the clause's
-// position and the config's position the same number and would pass whether
-// the report moved or not.
 TEST(ConfigParamOverride, ReportStandsAtTheOffendingUseClause) {
   ElabFixture f;
   ElaborateSrc(
@@ -327,9 +290,6 @@ TEST(ConfigParamOverride, ReportStandsAtTheOffendingUseClause) {
       "  instance top.a2 use #(.W(top.WIDTH + 7));\n"
       "endconfig\n",
       f, "top");
-  // Line 5 is the second clause, whose override is the illegal one. Line 2 is
-  // the `config` keyword and line 4 the legal clause, so an assertion naming 5
-  // fails if the report stands at either.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "config 'c' override of parameter 'W' embeds a "
@@ -361,8 +321,6 @@ TEST(ConfigParamOverride, NonHierIdentInExpressionAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.3 with §6.20.2: a config localparam declared `bit [3:0]` holds its
-// literal converted to four bits, so 24 reaches the override as 8.
 TEST(ConfigLocalparamLiteral, DeclaredTypeConvertsTheLiteral) {
   ElabFixture f;
   auto* a1 = ConfigElabFirstChild(f,
@@ -378,8 +336,6 @@ TEST(ConfigLocalparamLiteral, DeclaredTypeConvertsTheLiteral) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 8);
 }
 
-// §33.4.3: a config localparam is given only a literal value, and a type is
-// none, so a `localparam type` in a config is reported.
 TEST(ConfigLocalparamLiteral, TypeLocalparamRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -436,9 +392,6 @@ TEST(ConfigParamOverride, IndexUsingConfigLocalparamAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §33.4.3 restricts only the indexes of a hierarchical name. A select on a
-// plain parameter of the parent resolves there like any other name, so its
-// index may name another parameter of the parent.
 TEST(ConfigParamOverride, IndexOfAPlainNameIsNotRestricted) {
   ElabFixture f;
   ElaborateSrc(
@@ -456,8 +409,6 @@ TEST(ConfigParamOverride, IndexOfAPlainNameIsNotRestricted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A package-scoped name (§26.3) is no hierarchical identifier, so it may stand
-// beside other terms in a config override.
 TEST(ConfigParamOverride, PackageScopedNameInALargerExpressionAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -488,9 +439,6 @@ TEST(ConfigParamOverride, HierRefThroughArrayOfInstancesRejected) {
                             4, "33.4.3"));
 }
 
-// No hierarchical reference may pass through a generate scope or an array of
-// instances. Whether a scope is a generate block is a fact about the design, so
-// `top.g.GW` is refused because top declares a generate block named g.
 TEST(ConfigParamOverride, HierRefThroughGenerateScopeRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -513,8 +461,6 @@ TEST(ConfigParamOverride, HierRefThroughGenerateScopeRejected) {
                             10, "33.4.3"));
 }
 
-// A reference not rooted at the design's top is resolved from the parent scope
-// of the configured instance, so `g.GW` reaches top's generate block g too.
 TEST(ConfigParamOverride, RelativeHierRefThroughGenerateScopeRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -534,7 +480,6 @@ TEST(ConfigParamOverride, RelativeHierRefThroughGenerateScopeRejected) {
                             "passes through a generate scope", 10, "33.4.3"));
 }
 
-// The same reference through a module instance names no generate scope.
 TEST(ConfigParamOverride, HierRefThroughModuleInstanceNotAGenerateScope) {
   ElabFixture f;
   ElaborateSrc(
@@ -582,9 +527,6 @@ TEST(ConfigParamOverride, SystemFunctionCallAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An override with empty parentheses requests a reset to the module default
-// and is a legal override; the parameter-override validator must accept it
-// rather than treating the absent expression as malformed (§33.4.3).
 TEST(ConfigParamOverride, EmptyParamOverrideAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -597,8 +539,6 @@ TEST(ConfigParamOverride, EmptyParamOverrideAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An empty override list requests a reset of every parameter to its module
-// default and is likewise a legal use clause (§33.4.3).
 TEST(ConfigParamOverride, EmptyParamListAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -611,9 +551,6 @@ TEST(ConfigParamOverride, EmptyParamListAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The literal-or-config-localparam restriction on index expressions applies to
-// every bound of a part-select, not only the first; an unknown identifier in
-// the upper/lower bound of a range select is rejected (§33.4.3).
 TEST(ConfigParamOverride, RangeSelectBoundNonLiteralRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -623,8 +560,6 @@ TEST(ConfigParamOverride, RangeSelectBoundNonLiteralRejected) {
       "  instance top.a1 use #(.W(top.PARAM[2:i]));\n"
       "endconfig\n",
       f, "top");
-  // The literal bound 2 draws no report, so naming 'i' says the upper bound was
-  // the one checked.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "config 'c' override of parameter 'W' uses index "
                             "identifier 'i' that is neither a literal nor a "
@@ -632,9 +567,6 @@ TEST(ConfigParamOverride, RangeSelectBoundNonLiteralRejected) {
                             4, "33.4.3"));
 }
 
-// The prohibition on calling a user-defined function reaches a call buried
-// inside a larger override expression, not only a call standing alone
-// (§33.4.3).
 TEST(ConfigParamOverride, NestedUserFunctionCallRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -651,8 +583,6 @@ TEST(ConfigParamOverride, NestedUserFunctionCallRejected) {
                             4, "33.4.3"));
 }
 
-// A configuration override applies the named value to the bound instance's
-// parameter (§33.4.3).
 TEST(ConfigParamApply, OverrideSetsInstanceParameter) {
   ElabFixture f;
   auto* a1 = ConfigElabFirstChild(
@@ -665,9 +595,6 @@ TEST(ConfigParamApply, OverrideSetsInstanceParameter) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 32);
 }
 
-// The override value may be a configuration localparam; it resolves against the
-// config's own localparam scope and its literal value reaches the bound
-// instance's parameter (§33.4.3).
 TEST(ConfigParamApply, OverrideUsingConfigLocalparamValue) {
   ElabFixture f;
   auto* a1 =
@@ -681,9 +608,6 @@ TEST(ConfigParamApply, OverrideUsingConfigLocalparamValue) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 24);
 }
 
-// The override value may name a parameter of the instance's parent; §33.4.3
-// resolves parameter identifiers starting in that parent scope, so the parent's
-// value is what the bound instance receives.
 TEST(ConfigParamApply, OverrideUsingParentParameterValue) {
   ElabFixture f;
   auto* a1 = ConfigElabFirstChild(
@@ -696,8 +620,6 @@ TEST(ConfigParamApply, OverrideUsingParentParameterValue) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 20);
 }
 
-// An override with empty parentheses returns just that parameter to its module
-// default, discarding the value the instantiation supplied (§33.4.3).
 TEST(ConfigParamApply, EmptyOverrideResetsParameterToDefault) {
   ElabFixture f;
   auto* a1 = ConfigElabFirstChild(
@@ -710,8 +632,6 @@ TEST(ConfigParamApply, EmptyOverrideResetsParameterToDefault) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 8);
 }
 
-// An empty override list returns every parameter to its module default,
-// discarding all values the instantiation supplied (§33.4.3).
 TEST(ConfigParamApply, EmptyListResetsAllParametersToDefault) {
   ElabFixture f;
   auto* a1 = ConfigElabFirstChild(
@@ -725,8 +645,6 @@ TEST(ConfigParamApply, EmptyListResetsAllParametersToDefault) {
   EXPECT_EQ(ResolvedParam(a1, "D"), 4);
 }
 
-// A configuration override of a parameter takes precedence over a defparam
-// targeting the same parameter at the same level of hierarchy (§33.4.3).
 TEST(ConfigParamApply, OverrideTakesPrecedenceOverDefparam) {
   ElabFixture f;
   auto* a1 = ConfigElabFirstChild(
@@ -739,16 +657,6 @@ TEST(ConfigParamApply, OverrideTakesPrecedenceOverDefparam) {
   EXPECT_EQ(ResolvedParam(a1, "W"), 32);
 }
 
-// §33.4.3 (printed page 940) has a use clause's `#(.P(5))` assign a value to
-// a parameter of the configured instance, and §6.20.4 (printed 128) puts a
-// local parameter beyond every instance parameter value assignment. §6.20.1
-// (printed 125-126) makes a `parameter` among the items of a module with a
-// parameter port list, even an empty one, a synonym for `localparam`, so P
-// here is one. The clause was applied and ignored in silence, P staying 2
-// with nothing reported; the report stands on line 4, the clause's own line,
-// and P keeps the value of its declaration. The wording is the one a defparam
-// on a local parameter draws (§23.10.1's report), with the configuration as
-// the actor.
 TEST(ConfigParamApply, UseClauseNamingABodyParameterUnderAPortListIsRejected) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(
@@ -766,10 +674,6 @@ TEST(ConfigParamApply, UseClauseNamingABodyParameterUnderAPortListIsRejected) {
   EXPECT_EQ(ResolvedParam(u, "P"), 2);
 }
 
-// The same clause on a module declared with no parameter port list names a
-// value parameter (§6.20.1), which §33.4.3's own examples override this way
-// (printed pages 940-943), so it is applied and nothing is reported: P reads
-// 5.
 TEST(ConfigParamApply, UseClauseOnABodyParameterOfAModuleWithoutAPortList) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(
@@ -782,13 +686,6 @@ TEST(ConfigParamApply, UseClauseOnABodyParameterOfAModuleWithoutAPortList) {
   EXPECT_EQ(ResolvedParam(u, "P"), 5);
 }
 
-// §33.4.3 (printed page 940): a parameter override from a configuration
-// takes precedence over a defparam on the same parameter, and `use #()`
-// returns every parameter of the instance to its module default (printed
-// 941). P is declared among the items of a module with no parameter port
-// list (§6.20.1, printed 125-126), so the instance's `.P(7)` is discarded and
-// the defparam's 9 is refused: P reads 2. The `#()` locked the parameter port
-// list's parameters alone, so the defparam made P 9.
 TEST(ConfigParamApply, EmptyListLocksABodyParameterAgainstADefparam) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(
@@ -801,8 +698,6 @@ TEST(ConfigParamApply, EmptyListLocksABodyParameterAgainstADefparam) {
   EXPECT_EQ(ResolvedParam(u, "P"), 2);
 }
 
-// The precedence is the named assignment's as well: `use #(.P(5))` on the
-// same body parameter holds 5 against `defparam u.P = 9`.
 TEST(ConfigParamApply, NamedUseClauseLocksABodyParameterAgainstADefparam) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(
@@ -815,10 +710,6 @@ TEST(ConfigParamApply, NamedUseClauseLocksABodyParameterAgainstADefparam) {
   EXPECT_EQ(ResolvedParam(u, "P"), 5);
 }
 
-// §33.4.3 (printed page 940) gives the configuration precedence where both
-// reference the same parameter, and in every other condition the defparam
-// works as §23.10.1 defines it: a body parameter the use clause does not
-// name is still the defparam's, so Q reads 9 beside the clause's P.
 TEST(ConfigParamApply, UseClauseLeavesAnUnnamedBodyParameterToADefparam) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(
@@ -832,14 +723,6 @@ TEST(ConfigParamApply, UseClauseLeavesAnUnnamedBodyParameterToADefparam) {
   EXPECT_EQ(ResolvedParam(u, "Q"), 9);
 }
 
-// §33.4.3 (printed page 940) has the use clause's parameter value assignment
-// name a parameter of the configured instance, by name alone, positional
-// notation being refused; §23.10.2.2 (printed 767) is the rule for the name,
-// which is the one the instantiated module specifies. A name no parameter of
-// c bears passed AssignableConfigParams as none of its local parameters and
-// was applied to nothing in silence, so `use #(.X(5), .P(7))` reported
-// nothing. The report is the one `c #(.X(5)) u()` draws, on line 4, the
-// clause's own line, and the clause's P still reads 7 beside it.
 TEST(ConfigParamApply, UseClauseNamingNoParameterOfTheModuleIsRejected) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(f,
@@ -854,10 +737,6 @@ TEST(ConfigParamApply, UseClauseNamingNoParameterOfTheModuleIsRejected) {
   EXPECT_EQ(ResolvedParam(u, "P"), 7);
 }
 
-// The same on a module with a parameter port list, whose parameters are the
-// port list's alone (§6.20.1, printed pages 125-126): X is no parameter of
-// c and is reported as above, W keeping its default. The known port-list
-// parameter passes as OverrideSetsInstanceParameter above reads it.
 TEST(ConfigParamApply, UseClauseNamingNoParameterOfAPortListIsRejected) {
   ElabFixture f;
   auto* u = ConfigElabFirstChild(

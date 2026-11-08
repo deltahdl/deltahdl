@@ -151,12 +151,6 @@ TEST(OperatorElaboration, WildcardNeqOnChandle) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §11.4.6 makes wildcard equality on class handles, interface class handles,
-// chandles or the literal null behave as logical equality, so ==? on class
-// handles is held to the rule §11.4.5 states for the logical equality operator:
-// one operand shall be assignment compatible with the other. Handles of
-// unrelated class types are not, so the comparison is rejected and the report
-// names §11.4.5.
 TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -176,8 +170,6 @@ TEST(OperatorElaboration, WildcardEqIncompatibleClassHandlesRejected) {
       "class handle comparison requires assignment compatible", 9, "11.4.5"));
 }
 
-// Wildcard inequality is the other operator §11.4.6 makes equivalent to its
-// logical counterpart, so it is rejected under §11.4.5 for the same reason.
 TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -197,9 +189,6 @@ TEST(OperatorElaboration, WildcardNeqIncompatibleClassHandlesRejected) {
       "class handle comparison requires assignment compatible", 9, "11.4.5"));
 }
 
-// §11.2.1 allows the case equality and wildcard equality operators in a
-// constant expression. A folded constant holds no x or z, so each answers as
-// == or != does, at any width.
 TEST(WildcardEqualityElaboration, CaseAndWildcardEqualityFold) {
   EvalFixture f;
   const struct {

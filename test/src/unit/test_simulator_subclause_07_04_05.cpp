@@ -71,8 +71,6 @@ TEST(ArrayIndexingAndSlicing, OutOfBoundsReturnsX) {
 }
 
 TEST(ArrayIndexingAndSlicing, UnknownIndexBitMakesIndexInvalid) {
-  // An index expression with any x or z bit makes the index invalid, just as
-  // an out-of-bounds index does; the read of the 4-state array then returns x.
   SimFixture f;
   MakeArray4(f, "arr");
 
@@ -86,9 +84,6 @@ TEST(ArrayIndexingAndSlicing, UnknownIndexBitMakesIndexInvalid) {
 }
 
 TEST(ArrayIndexingAndSlicing, IndexedPartSelectSizeIsConstantPositionVaries) {
-  // The size of a part-select is fixed by its constant width operand even when
-  // the starting position comes from a runtime variable: the same '+:' select
-  // yields a result of the constant width regardless of the variable base.
   SimFixture f;
 
   auto* vec = f.ctx.CreateVariable("vec", 32);
@@ -102,8 +97,6 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectSizeIsConstantPositionVaries) {
   EXPECT_TRUE(result.IsKnown());
   EXPECT_EQ(result.ToUint64(), 0xCCu);
 
-  // A different runtime position selects different bits but the width — the
-  // constant size of the part-select — is unchanged.
   pos->value = MakeLogic4VecVal(f.arena, 32, 16);
   auto moved =
       EvalExpr(MkPlusPartSelect(f.arena, "vec", "pos", 8), f.ctx, f.arena);
@@ -122,9 +115,6 @@ TEST(ArrayIndexingAndSlicing, ReadSliceConcat) {
 }
 
 TEST(ArrayIndexingAndSlicing, ExecutedOutOfBoundsWriteLeavesArrayUnchanged) {
-  // Driving an assignment whose index is out of bounds through the statement
-  // execution path performs no operation: the in-range element keeps the value
-  // it was given and the out-of-bounds element is never materialized.
   SimFixture f;
   auto* in_range = RunAndFindVar(
       "module t;\n"
@@ -141,9 +131,6 @@ TEST(ArrayIndexingAndSlicing, ExecutedOutOfBoundsWriteLeavesArrayUnchanged) {
 }
 
 TEST(ArrayIndexingAndSlicing, ExecutedUnknownIndexWriteIsNoop) {
-  // An index expression carrying an x or z bit is invalid, so the write must do
-  // nothing. In particular it must not fall through to a defined element (an x
-  // index can numerically collapse to 0) and overwrite it.
   SimFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -169,11 +156,6 @@ TEST(ArrayIndexingAndSlicing, ExecutedUnknownIndexWriteIsNoop) {
 }
 
 TEST(ArrayIndexingAndSlicing, SourceTwoStateArrayInvalidReadYieldsZero) {
-  // Table 7-1: reading an unpacked array of a 2-state integral type through an
-  // invalid (out-of-bounds) index yields a known '0, whereas a 4-state element
-  // type yields x. Here the 2-state-ness that selects the Table 7-1 row is
-  // produced by the `byte` declaration rather than hand-set on the array, and
-  // the out-of-bounds read is driven through the full pipeline.
   SimFixture f;
   auto* res = RunAndFindVar(
       "module t;\n"
@@ -192,11 +174,6 @@ TEST(ArrayIndexingAndSlicing, SourceTwoStateArrayInvalidReadYieldsZero) {
 }
 
 TEST(ArrayIndexingAndSlicing, SliceOfOneDimensionOfMultidimArray) {
-  // §7.4.5: a slice may apply to one dimension while other dimensions carry
-  // single index values. Here the outer dimension is indexed with a single
-  // value (A[1]) and the inner dimension is sliced ([0:1]); the result is the
-  // two addressed elements concatenated (element 0 in the low bits). The array
-  // is built from a real multidimensional declaration and driven end-to-end.
   auto v = RunAndGet(
       "module t;\n"
       "  int A[2][3];\n"
@@ -242,11 +219,6 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectPlus) {
 }
 
 TEST(ArrayIndexingAndSlicing, IndexedPartSelectWidthFromParameter) {
-  // §7.4.5: the part-select size is a constant expression, which §11.2.1 allows
-  // to be a parameter. Complementing the elaborator's acceptance of a parameter
-  // width, this drives the resolved width through the runtime part-select: the
-  // parameter W selects an 8-bit slice at the runtime position, yielding the
-  // same bits a literal 8 would.
   auto v = RunAndGet(
       "module t;\n"
       "  parameter W = 8;\n"
@@ -279,19 +251,6 @@ TEST(ArrayIndexingAndSlicing, IndexedPartSelectMinus) {
   EXPECT_EQ(v, 0xCCu);
 }
 
-// §7.4.5 gives an unpacked array the same three slice forms a vector has, and
-// its example `int i = bitvec[j +: k];` is the indexed one. The second operand
-// of an indexed form is the width, not the far end point, so `arr[2 +: 3]`
-// covers the three elements 2, 3 and 4 -- exactly what `arr[2:4]` covers. The
-// tests below state that equivalence rather than a bit pattern, because §7.4.5
-// also makes the slice of an unpacked array an unpacked array, and an
-// equivalence between two spellings of one range holds whichever way the read
-// is represented.
-//
-// A range and a width that coincide would hide the defect these cover: for
-// `arr[b +: w]`, reading the operands as two end points happens to give the
-// right elements whenever b + w - 1 equals max(b, w). b = 2 with w = 3 is the
-// smallest pair where the two readings part company.
 TEST(ArrayIndexingAndSlicing, IndexedPlusPartSelectCoversItsWidthInElements) {
   const char* src =
       "module t;\n"
@@ -310,8 +269,6 @@ TEST(ArrayIndexingAndSlicing, IndexedPlusPartSelectCoversItsWidthInElements) {
   EXPECT_EQ(RunAndGet(src, "indexed"), 0x504030u);
 }
 
-// §7.4.5: `-:` runs downward to the named position, so `arr[4 -: 3]` covers
-// elements 2, 3 and 4 -- the same three, addressed from the other end.
 TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectCoversItsWidthInElements) {
   const char* src =
       "module t;\n"
@@ -330,12 +287,6 @@ TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectCoversItsWidthInElements) {
   EXPECT_EQ(RunAndGet(src, "indexed"), 0x504030u);
 }
 
-// §7.4.5: a slice applies to one dimension while the others carry single index
-// values, and the indexed forms are available on that sliced dimension too.
-// This is a separate read path from the single-dimension one above, so the
-// width reading has to hold on it independently. A base of 2 with a width of 2
-// is the discriminating pair for `+:` here: read as end points it addresses the
-// single element 2.
 TEST(ArrayIndexingAndSlicing, IndexedPlusPartSelectOnMultidimCoversItsWidth) {
   const char* src =
       "module t;\n"
@@ -353,9 +304,6 @@ TEST(ArrayIndexingAndSlicing, IndexedPlusPartSelectOnMultidimCoversItsWidth) {
   EXPECT_EQ(RunAndGet(src, "indexed"), 0x0000004000000030ull);
 }
 
-// §7.4.5: the descending indexed form on a sliced inner dimension. A base of 4
-// with a width of 2 is the discriminating pair for `-:`: read as end points it
-// addresses three elements starting at 2 rather than the two ending at 4.
 TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectOnMultidimCoversItsWidth) {
   const char* src =
       "module t;\n"
@@ -373,17 +321,6 @@ TEST(ArrayIndexingAndSlicing, IndexedMinusPartSelectOnMultidimCoversItsWidth) {
   EXPECT_EQ(RunAndGet(src, "indexed"), 0x0000005000000040ull);
 }
 
-// §7.4.5: a slice name of an unpacked array is itself an unpacked array. The
-// clause's own example assigns a two-element slice to a two-element array:
-//
-//   bit signed [31:0] busA [7:0];   // unpacked array of 8 32-bit vectors
-//   int busB [1:0];                 // unpacked array of 2 integers
-//   busB = busA[7:6];               // select a 2-vector slice from busA
-//
-// so the destination holds the two elements the slice names, one each, rather
-// than the single value their concatenation would make. Both arrays are
-// written ascending here, so this case fixes the count and the values; which
-// end of each array a position counts from is what the cases below separate.
 TEST(ArrayIndexingAndSlicing, SliceAssignedToAnArrayFillsItsElements) {
   SimFixture f;
   RunModuleArray(f,
@@ -399,10 +336,6 @@ TEST(ArrayIndexingAndSlicing, SliceAssignedToAnArrayFillsItsElements) {
                  "busB", {0x60u, 0x70u});
 }
 
-// §7.4.5: the indexed form names the same unpacked array as the range form
-// covering the same run, so it fills the destination the same way. A base of 6
-// with a width of 2 discriminates: read as end points it would address five
-// elements starting at 2.
 TEST(ArrayIndexingAndSlicing, IndexedSliceAssignedToAnArrayFillsItsElements) {
   SimFixture f;
   RunModuleArray(f,
@@ -418,10 +351,6 @@ TEST(ArrayIndexingAndSlicing, IndexedSliceAssignedToAnArrayFillsItsElements) {
                  "busB", {0x60u, 0x70u});
 }
 
-// §7.4.5: a queue is the other destination that can hold the unpacked array a
-// slice names, and the count is what distinguishes an unpacked result from a
-// packed one: three elements make a queue of three, not a queue of one holding
-// their concatenation.
 TEST(ArrayIndexingAndSlicing, SliceAssignedToAQueueBecomesThatManyElements) {
   SimFixture f;
   ElaborateLowerRun(f,
@@ -443,18 +372,6 @@ TEST(ArrayIndexingAndSlicing, SliceAssignedToAQueueBecomesThatManyElements) {
   EXPECT_EQ(q->elements[2].ToUint64(), 0x40u);
 }
 
-// §7.4.5 with the declarations the clause itself gives its example:
-//
-//   bit signed [31:0] busA [7:0];
-//   int busB [1:0];
-//   busB = busA[7:6];
-//
-// `busA` descends, so the slice's first element is `busA[7]`; `busB` descends
-// too, so its first element is `busB[1]`, and the assignment leaves
-// `busB[1] == busA[7]`. Reversing both ends of a copy cancels out, so this
-// agrees with the ascending spelling above rather than discriminating against
-// it -- it holds the clause's own text to its own declarations, and guards the
-// direction handling from being applied at one end only.
 TEST(ArrayIndexingAndSlicing, ClauseExampleDescendingArraysPairByPosition) {
   SimFixture f;
   RunModuleArray(f,
@@ -470,11 +387,6 @@ TEST(ArrayIndexingAndSlicing, ClauseExampleDescendingArraysPairByPosition) {
                  "busB", {0x60u, 0x70u});
 }
 
-// §7.4.5: a slice name of an unpacked array is itself an unpacked array, and
-// one unpacked array is assigned to another by position, not by index. A
-// descending source names its highest-indexed element first, so that element
-// fills the ascending destination's lowest. Pairing by ascending index at both
-// ends would instead leave `dst[0] == src[0]`, which is the reverse of this.
 TEST(ArrayIndexingAndSlicing, DescendingSourceSliceFillsAscendingDestination) {
   SimFixture f;
   RunModuleArray(f,
@@ -490,9 +402,6 @@ TEST(ArrayIndexingAndSlicing, DescendingSourceSliceFillsAscendingDestination) {
                  "dst", {0x11u, 0x00u});
 }
 
-// §7.4.5, the same rule with the two directions exchanged: an ascending source
-// names its lowest-indexed element first, and a descending destination holds
-// its first element at its highest index, so `src[0]` lands in `dst[1]`.
 TEST(ArrayIndexingAndSlicing, AscendingSourceSliceFillsDescendingDestination) {
   SimFixture f;
   RunModuleArray(f,
@@ -508,10 +417,6 @@ TEST(ArrayIndexingAndSlicing, AscendingSourceSliceFillsDescendingDestination) {
                  "dst", {0xB0u, 0xA0u});
 }
 
-// §7.4.5: a slice may name the destination as well as the source, which is a
-// separate write path from assigning to the array as a whole. The window is cut
-// from a descending array, so its first position is its highest index and the
-// ascending source's first element lands there.
 TEST(ArrayIndexingAndSlicing,
      DescendingDestinationWindowTakesSliceInDeclaredOrder) {
   SimFixture f;
@@ -528,13 +433,6 @@ TEST(ArrayIndexingAndSlicing,
                  "dst", {0xB0u, 0xA0u});
 }
 
-// A right-hand side that is not itself a slice is taken as one packed value and
-// split into element-width fields. §7.4.5 reads a slice as the concatenation of
-// its elements with the lowest-indexed in the low bits, so the split has to put
-// the low field back at the lowest index -- which it must keep doing now that
-// the writer places elements by declared position rather than by index. The
-// destination descends, so the low field is the writer's last position, not its
-// first.
 TEST(ArrayIndexingAndSlicing,
      PackedRhsFillsDescendingWindowLowFieldAtLowIndex) {
   SimFixture f;
@@ -546,15 +444,6 @@ TEST(ArrayIndexingAndSlicing,
                  "dst", {0xA0u, 0xB0u});
 }
 
-// §7.4.5 (printed page 156): an indexed name selects one element of a packed or
-// unpacked array, stated with `bit [3:0] [7:0] j;` and `k = j[2]; // select a
-// single 8-bit element from j`. A module port carries packed dimensions the
-// same way a variable or a net does, so an index on a port declared with more
-// than one of them names an element and not a bit. The select sits inside the
-// instantiated module and the parent reads back what it drives, so
-// Lowerer::CreateChildModulePorts in src/simulator/lowerer_child.cpp is the
-// path that records the element width. 32'hDEADBEEF tells the two readings
-// apart: element 1 is 8'hBE, while bit 1 is 1.
 TEST(ArrayIndexingAndSlicing, PortSingleIndexSelectsAPackedElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -572,12 +461,6 @@ TEST(ArrayIndexingAndSlicing, PortSingleIndexSelectsAPackedElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEu);
 }
 
-// §7.4.5 with the indexed name on the left of the assignment, which is a
-// separate write path: `p[1] = 8'hAB` on `output bit [3:0][7:0] p` writes the
-// element at index 1, meaning bits 15 through 8. The other bits are the
-// two-state default of 0 that Table 6-7 gives a `bit` with no initializer, so
-// the connected 32-bit net reads 32'h0000_AB00. A bit-select write would leave
-// 32'h0000_0002 instead.
 TEST(ArrayIndexingAndSlicing, PortSingleIndexTargetWritesAPackedElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -593,12 +476,6 @@ TEST(ArrayIndexingAndSlicing, PortSingleIndexTargetWritesAPackedElement) {
   EXPECT_EQ(var->value.ToUint64(), 0x0000AB00u);
 }
 
-// §7.4.5 reaches a net declared with more than one packed dimension in the same
-// words, since a net is declared with packed dimensions exactly as a variable
-// is. Lowerer::RegisterModuleNets in src/simulator/lowerer_register.cpp has
-// recorded the element width for a net all along, and no other case reads it:
-// `w[1]` on `wire [3:0][7:0] w` holding 32'hDEADBEEF is 8'hBE rather than the 1
-// a bit select would give.
 TEST(ArrayIndexingAndSlicing, NetSingleIndexSelectsAPackedElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -613,47 +490,6 @@ TEST(ArrayIndexingAndSlicing, NetSingleIndexSelectsAPackedElement) {
   EXPECT_EQ(var->value.ToUint64(), 0xBEu);
 }
 
-// §7.4.5 makes a slice name of an unpacked array itself an unpacked array, and
-// §6.8 makes every element it names a storage element of its own: a variable
-// stands for a data storage element and keeps its value from one assignment to
-// the next. So `echo[0:1] = wave[0:1]` has to leave these two arrays four
-// variables and not two. CollectUnpackedSliceElements
-// (src/simulator/eval_select.cpp) answered each position of the run with the
-// source element variable's own Logic4Vec, and WriteUnpackedSliceElements
-// (src/simulator/statement_assign_core.cpp) stores what it is handed; a
-// Logic4Vec copies its `words` pointer rather than the words
-// (src/common/types.h), so the window and the source it was filled from ran on
-// one buffer per position.
-//
-// Eight bits on both sides is load-bearing. The writer resizes each element to
-// the destination's width, and ResizeToWidth answers its argument untouched
-// when the widths already agree -- which is precisely the shared case. A
-// destination of another width makes the resize build the value in a fresh
-// store and hides the sharing entirely.
-//
-// The copy is quiet where it is made, so the case writes one element of the
-// window afterwards and reads the source position that element was paired
-// with. It is a regression guard and discriminates against nothing today: the
-// store that would show the sharing is the 2-state coercion inside
-// WriteUnpackedSliceElements, which runs on `var->value` after the collected
-// vector has been put there, and it never runs on an array element at all --
-// CreateArrayElements (src/simulator/lowerer_var.cpp) leaves every leaf of a
-// one-dimensional array at Variable's 4-state default, so a `bit` array
-// element is not coerced even when it is written x directly. The writers
-// beside it decline for reasons of their own: WriteVar puts its own resized
-// value in the element's place before it coerces, WritePartSelect deposits
-// into a fresh extract of the target rather than through it, §13.5.1's
-// argument binding takes its own copy since #3564, and no member deposit
-// resolves against an indexed name, BuildLhsName having no select arm. Give
-// the array leaf its declared state-ness and the coercion above it becomes
-// live, which is the regression this stands against.
-//
-// ToUint64 cannot see the claim: it projects aval & ~bval, so a bit that is
-// already unknown reads as 0 through it and clearing that bit changes nothing
-// it reports. The assertions read words[0] instead. 8'b1z0x0011 is stored as
-// aval 0x93 with bval 0x50, an x digit being aval 1 with bval 1 and a z digit
-// aval 0 with bval 1, and the 2-state conversion of it would be aval 0x83 with
-// bval 0x00. echo[1] is what says the copy ran at all.
 TEST(ArrayIndexingAndSlicing, SliceWindowElementsGetTheirOwnWords) {
   SimFixture f;
   auto* source = RunAndFindVar(
@@ -681,28 +517,6 @@ TEST(ArrayIndexingAndSlicing, SliceWindowElementsGetTheirOwnWords) {
   EXPECT_EQ(paired->value.words[0].aval & 0xFFu, 0x5Au);
 }
 
-// The clause's other destination for a slice: `busB = busA[7:6]` names a whole
-// array on the left, so §7.4.5's run fills it as elements rather than as the
-// one value their concatenation would make. That path is TryArraySliceCopy
-// (src/simulator/statement_assign_pattern.cpp), and unlike the windowed writer
-// above it holds no copy of its own -- it stores straight into the
-// destination's elements what CollectUnpackedSliceElements handed it. The
-// collector is therefore the only place this shape can be made to own its
-// words, which is what this case stands over: a run answered with the source
-// elements' own Logic4Vecs left `limb[0]` and `trunk[0]` one storage element,
-// against §6.8, which gives each of the four a value it keeps from one
-// assignment to the next.
-//
-// Sixteen bits on both sides for the reason the eight above were: the writer
-// resizes to the destination's element width and a mismatch would allocate,
-// so equal widths are what leave the shared buffer in place to be seen.
-//
-// This is a regression guard on the same terms as the case above, no writer
-// left in the tree reaching an array leaf's words in place, and it is the only
-// one that covers this caller. 16'b1x0z000011110101 is stored as aval 0xC0F5
-// with bval 0x5000; the 2-state conversion of it would be aval 0x80F5 with
-// bval 0x0000, and a deposit into it would leave bval standing while aval
-// changed, so both words are read. limb[1] is what says the copy ran.
 TEST(ArrayIndexingAndSlicing, ArrayFilledFromASliceGetsItsOwnWords) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -729,12 +543,6 @@ TEST(ArrayIndexingAndSlicing, ArrayFilledFromASliceGetsItsOwnWords) {
   EXPECT_EQ(taken->value.words[0].bval & 0xFFFFu, 0x0000u);
 }
 
-// §7.4.5: a read of any unpacked array through an invalid index returns the
-// Table 7-1 value, and the table gives a 4-state integral element 'x. §7.4.5
-// has the slice's size constant and its position variable, so `a[i +: 2]`
-// running one past the end is the form the clause itself names rather than a
-// corner. The element spelling of this read answers the table correctly, and
-// the slice spelling answered '0 for every array whatever its element type.
 TEST(ArrayIndexingAndSlicing, SliceOfA4StateArrayReadsXForAMissingElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -754,8 +562,6 @@ TEST(ArrayIndexingAndSlicing, SliceOfA4StateArrayReadsXForAMissingElement) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx");
 }
 
-// The other row of the same table, which is the pair the fix has to keep
-// apart: a 2-state element type reads '0, and did before.
 TEST(ArrayIndexingAndSlicing, SliceOfA2StateArrayReadsZeroForAMissingElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -775,10 +581,6 @@ TEST(ArrayIndexingAndSlicing, SliceOfA2StateArrayReadsZeroForAMissingElement) {
   EXPECT_EQ(var->value.ToString(), "00000000");
 }
 
-// The other reader of the same run: a context expecting a single value takes
-// the slice as one packed value, and the missing element is the high half of
-// it. The element that is present pins the low half, so a result that came out
-// all-x could not pass.
 TEST(ArrayIndexingAndSlicing, PackedSliceReadIsXForAMissingElement) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -798,12 +600,6 @@ TEST(ArrayIndexingAndSlicing, PackedSliceReadIsXForAMissingElement) {
   EXPECT_EQ(var->value.ToString(), "xxxxxxxx00100010");
 }
 
-// §6.3.1: each bit of a 4-state vector may independently take any of the four
-// basic values, and a slice read as one packed value is a concatenation of such
-// vectors. The assembly took each element through ToUint64, which projects
-// `aval & ~bval`, and wrote the aval plane alone, so no element could carry an
-// x or a z out of it. ToUint64 cannot see the difference either -- it reads an
-// all-x element as 0 -- so the assertion is on ToString.
 TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsXAndZ) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -821,10 +617,6 @@ TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsXAndZ) {
   EXPECT_EQ(var->value.ToString(), "xxxxzzzz01011010");
 }
 
-// An element width that is not a divisor of 64 puts an element across the word
-// boundary, and the part above it was dropped: the shifted value was ORed into
-// the one word `bit_off / 64` names. Element 1 of a 40-bit array sits at result
-// bit 40, so its top sixteen bits belong in word 1, which was never written.
 TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsBitsAcrossAWordBoundary) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -844,12 +636,6 @@ TEST(ArrayIndexingAndSlicing, ArraySliceAsValueKeepsBitsAcrossAWordBoundary) {
   EXPECT_EQ(var->value.words[1].aval, 0x1122ull);
 }
 
-// A 64-bit element made the mask expression shift a uint64_t by 64, which is
-// undefined behaviour rather than a wide zero. What that produced on x86-64 --
-// a count taken modulo 64, a mask of 0, and every element reading as zero -- is
-// one platform's accident and not a specification; the assertion is written
-// against the value §7.4.5 requires, which the old assembly failed to produce
-// on any platform.
 TEST(ArrayIndexingAndSlicing, ArraySliceAsValueOfSixtyFourBitElements) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -869,15 +655,6 @@ TEST(ArrayIndexingAndSlicing, ArraySliceAsValueOfSixtyFourBitElements) {
   EXPECT_EQ(var->value.words[1].aval, 0x99AABBCCDDEEFF00ull);
 }
 
-// §7.4.5, Table 7-1: an unpacked structure read at an invalid index, out of
-// bounds or holding an x, gives each member the value the table gives its own
-// type -- x for a 4-state member, 0 for a 2-state one, whether written as a
-// keyword or through a typedef name, and a packed structure 0 only when every
-// member of it is 2-state -- and a member written with an initial assignment
-// (§7.2.2) its initializer. A member of an unpacked structure type is filled
-// the same way in turn. An unpacked union gives the value of its first
-// member's type, so the 2-state int makes every member of it read 0. An array
-// of a packed structure reads the vector's x.
 TEST(ArrayIndexingAndSlicing, InvalidIndexReadsAStructureMemberByMember) {
   SimFixture f;
   std::string out = RunCapture(

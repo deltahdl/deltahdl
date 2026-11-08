@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §16.6: an expression in a concurrent assertion shall not reference a chandle
-// variable. Built from real source (a chandle declared with the chandle
-// keyword, referenced in the property of a concurrent assert) and driven
-// through elaboration so the rejection is observed end-to-end, not via a
-// helper.
 TEST(ConcurrentAssertionBooleanExpr, ChandleInAssertPropertyRejectedEndToEnd) {
   ElabFixture f;
   Elaborate(
@@ -27,9 +22,6 @@ TEST(ConcurrentAssertionBooleanExpr, ChandleInAssertPropertyRejectedEndToEnd) {
       "concurrent assertion expression references chandle", 4, "16.6"));
 }
 
-// §16.6 negative sibling: the same concurrent assert with an ordinary
-// (non-chandle) variable in the chandle's place elaborates without error, so
-// the rejection keys on the chandle type rather than the assertion context.
 TEST(ConcurrentAssertionBooleanExpr, OrdinaryVariableInAssertPropertyAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -42,8 +34,6 @@ TEST(ConcurrentAssertionBooleanExpr, OrdinaryVariableInAssertPropertyAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.6 negative sibling: a chandle declared in the module but never named in
-// the concurrent assertion does not trip the rule.
 TEST(ConcurrentAssertionBooleanExpr, UnreferencedChandleDoesNotTripAssertRule) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -57,9 +47,6 @@ TEST(ConcurrentAssertionBooleanExpr, UnreferencedChandleDoesNotTripAssertRule) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.6: an expression in a concurrent assertion shall not reference a
-// non-static class property, and `h.v` through a module's class handle is one,
-// read here both directly and as the argument of a sampled value function.
 TEST(ConcurrentAssertionBooleanExpr, NonStaticClassPropertyRejectedEndToEnd) {
   ElabFixture f;
   Elaborate(
@@ -76,8 +63,6 @@ TEST(ConcurrentAssertionBooleanExpr, NonStaticClassPropertyRejectedEndToEnd) {
                             5, "16.6"));
 }
 
-// §16.6 names methods beside properties: a call of a non-static method
-// through the handle is as illegal as a read of a non-static property.
 TEST(ConcurrentAssertionBooleanExpr, NonStaticClassMethodRejectedEndToEnd) {
   ElabFixture f;
   Elaborate(
@@ -97,9 +82,6 @@ TEST(ConcurrentAssertionBooleanExpr, NonStaticClassMethodRejectedEndToEnd) {
                             8, "16.6"));
 }
 
-// §16.6 negative sibling: the prohibition is on non-static members, so a
-// static property, read through the handle or by the class scope, and one
-// inherited from a base class, are accepted.
 TEST(ConcurrentAssertionBooleanExpr, StaticClassPropertyAccepted) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -159,8 +141,6 @@ TEST(ConcurrentAssertionBooleanExpr,
 
 TEST(ConcurrentAssertionBooleanExpr,
      FunctionMustBeAutomaticOrStatelessAndHaveNoSideEffects) {
-  // §16.6 frames the lifetime rule as automatic OR stateless: either alone
-  // satisfies it, but a function with side effects is always disqualified.
   EXPECT_TRUE(FunctionEligibleInAssertionExpr(true, false, true));
   EXPECT_TRUE(FunctionEligibleInAssertionExpr(false, true, true));
   EXPECT_TRUE(FunctionEligibleInAssertionExpr(true, true, true));
@@ -168,8 +148,6 @@ TEST(ConcurrentAssertionBooleanExpr,
   EXPECT_FALSE(FunctionEligibleInAssertionExpr(true, true, false));
   EXPECT_FALSE(FunctionEligibleInAssertionExpr(true, false, false));
   EXPECT_FALSE(FunctionEligibleInAssertionExpr(false, true, false));
-  // Completes the 2x2x2 truth table: neither automatic nor stateless, and
-  // has side effects — disqualified on both axes.
   EXPECT_FALSE(FunctionEligibleInAssertionExpr(false, false, false));
 }
 
@@ -185,8 +163,6 @@ TEST(ConcurrentAssertionBooleanExpr,
       DisableConditionRefAllowed(DisableConditionRefKind::kMatchedMethod));
 }
 
-// §16.6: a function called in a concurrent assertion takes no output, inout
-// or ref argument; peek writes n back, while look's const ref is allowed.
 TEST(AssertionFunctionCalls, AFunctionWritingAnArgumentBackIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -211,9 +187,6 @@ TEST(AssertionFunctionCalls, AFunctionWritingAnArgumentBackIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 12, "16.6"));
 }
 
-// §16.6: a function called in a concurrent assertion is automatic or keeps
-// no state, and has no side effect: tally writes count, and keep holds n from
-// one call to the next, while clean is automatic and writes its own local.
 TEST(AssertionFunctionCalls, AFunctionWithStateOrASideEffectIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -246,8 +219,6 @@ TEST(AssertionFunctionCalls, AFunctionWithStateOrASideEffectIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 19, "16.6"));
 }
 
-// §16.6: an increment or decrement in a concurrent assertion expression is a
-// side effect; one in a match item assigning a local variable is allowed.
 TEST(AssertionFunctionCalls, AnIncrementInAnAssertionExpressionIsReported) {
   ElabFixture f;
   ElaborateSrc(

@@ -123,13 +123,6 @@ TEST(SignalMultiBlockSim, SharedClockBothBlocksTriggered) {
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
 }
 
-// §14.6: the shared synchronization event is keyed on the clocking expression,
-// so the sharing holds for a negedge clocking event just as for a posedge one.
-// The posedge form is covered above; every other positive shared-event test
-// uses posedge, and the negedge branch of the rule otherwise appears only in
-// its non-firing converse (SameClockSignalOppositeEdgesNotShared). Here two
-// blocks both on @(negedge clk) with distinct signals are fired by a single
-// falling edge, each sampling its own signal at the one shared event.
 TEST(SignalMultiBlockSim, SharedNegedgeClockBothBlocksTriggered) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -170,16 +163,10 @@ TEST(SignalMultiBlockSim, SharedNegedgeClockBothBlocksTriggered) {
   ScheduleNegedge(f, clk, 10);
   f.scheduler.Run();
 
-  // Both blocks synchronize on the one falling edge and sample their signals.
   EXPECT_EQ(cmgr.GetSampledValue("cb1", "sig_a"), 0x11u);
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
 }
 
-// §14.6: blocks sharing a clock share its synchronization event. The converse
-// edge of that rule is that the shared event is keyed to the specific clock --
-// a block driven by a different clock is not synchronized by it. Two blocks on
-// clk_a and one on clk_b: pulsing only clk_a samples the clk_a blocks while the
-// clk_b block stays unsampled, even though every block's watcher is attached.
 TEST(SignalMultiBlockSim, DifferentClockBlockNotSynchronized) {
   ClockingSimFixture f;
   auto* clk_a = f.ctx.CreateVariable("clk_a", 1);
@@ -236,20 +223,11 @@ TEST(SignalMultiBlockSim, DifferentClockBlockNotSynchronized) {
   SchedulePosedge(f, clk_a, 10);
   f.scheduler.Run();
 
-  // The two blocks sharing clk_a sample at its edge.
   EXPECT_EQ(cmgr.GetSampledValue("cb1", "sig_a"), 0x11u);
   EXPECT_EQ(cmgr.GetSampledValue("cb2", "sig_b"), 0x22u);
-  // The clk_b block was not synchronized by the clk_a edge, so its signal
-  // (nonzero, so 0 means unsampled) was never captured.
   EXPECT_EQ(cmgr.GetSampledValue("cb3", "sig_c"), 0u);
 }
 
-// §14.6 ties the shared synchronization event to the same clock, which the LRM
-// parenthesizes as the clocking expression -- i.e. the clocking event, edge
-// included, not merely the clock signal. Two blocks naming the same signal but
-// opposite edges therefore do NOT share a synchronization event: a posedge
-// fires only the posedge block. This pins that production keys the event on the
-// edge (CheckClockEdge), so same-signal/different-edge is a different event.
 TEST(SignalMultiBlockSim, SameClockSignalOppositeEdgesNotShared) {
   ClockingSimFixture f;
   auto* clk = f.ctx.CreateVariable("clk", 1);
@@ -290,11 +268,7 @@ TEST(SignalMultiBlockSim, SameClockSignalOppositeEdgesNotShared) {
   SchedulePosedge(f, clk, 10);
   f.scheduler.Run();
 
-  // The posedge block synchronizes on the rising edge and samples its signal.
   EXPECT_EQ(cmgr.GetSampledValue("cb_pos", "sig_p"), 0x44u);
-  // The negedge block, though it names the same clock signal, is a distinct
-  // clocking event and is not synchronized by the rising edge (nonzero signal,
-  // so 0 means unsampled).
   EXPECT_EQ(cmgr.GetSampledValue("cb_neg", "sig_n"), 0u);
 }
 

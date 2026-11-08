@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -70,11 +68,6 @@ TEST(TopLevelModules, DollarRootDisambiguatesFromLocalScope) {
   EXPECT_EQ(v->value.ToUint64(), 20u);
 }
 
-// §23.3.1 (printed page 740): $root names the top of the instantiation tree
-// outright, which tells a rooted path apart from a local one, the local one
-// otherwise winning. Inside A, `B.v` is A's own B and `$root.A_top.B.v` the B
-// beside A; the rooted name was stripped to `B.v` and read from A like the
-// local one.
 TEST(TopLevelModulesAndRoot, RootedPathReachesTheTopLevelInstanceNotTheLocal) {
   SimFixture f;
   EXPECT_EQ(
@@ -95,9 +88,6 @@ TEST(TopLevelModulesAndRoot, RootedPathReachesTheTopLevelInstanceNotTheLocal) {
       "local 2 rooted 3 full 2\n");
 }
 
-// The same from the other side: a write through the rooted name lands in the
-// top-level B and a bare one in A's own, and a net read through each name is
-// the net of the instance it names.
 TEST(TopLevelModulesAndRoot, RootedPathWritesAndNetsReachTheTopLevelInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module B #(parameter int P = 0);\n"
@@ -121,11 +111,6 @@ TEST(TopLevelModulesAndRoot, RootedPathWritesAndNetsReachTheTopLevelInstance) {
             "5 9\n7 4\n");
 }
 
-// §23.3.1 (printed page 740): each top-level module is instantiated once,
-// implicitly, under its own name as instance name, each such instance a scope
-// of its own (§23.9), so `int x` in t1 and in t2 are two variables. The two
-// tops' declarations were stored under one name, and each read the value the
-// other wrote: both xs read 2.
 TEST(TopLevelModulesAndRoot, ParallelTopsKeepTheirOwnDeclarations) {
   SimFixture f;
   auto* design = ElaborateSrcAllTops(

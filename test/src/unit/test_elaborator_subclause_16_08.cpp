@@ -8,10 +8,6 @@ using namespace delta;
 namespace {
 
 TEST(NamedSequenceDeclaration, ForwardInstantiationElaborates) {
-  // §16.8: a named sequence may be instantiated anywhere a sequence_expr
-  // may be written, including prior to its declaration. The elaborator
-  // pre-populates the registry before walking items so a forward reference
-  // resolves without error and without spurious cycle reports.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -64,9 +60,6 @@ TEST(NamedSequenceDeclaration, CyclicTwoSequencesIsError) {
 }
 
 TEST(NamedSequenceDeclaration, ThreeNodeCycleIsError) {
-  // §16.8 cyclic dependency: s1 -> s2 -> s3 -> s1. The DFS in
-  // PropertyRegistry::HasCyclicSequenceDependency must report a cycle for a
-  // ring of three named sequences, not just two.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -88,8 +81,6 @@ TEST(NamedSequenceDeclaration, ThreeNodeCycleIsError) {
 }
 
 TEST(NamedSequenceDeclaration, SequenceInInterfaceScopeElaborates) {
-  // §16.8 scope list: an interface is a permitted scope for a named
-  // sequence declaration; the elaborator should accept it without error.
   ElabFixture f;
   ElaborateSrc(
       "interface ifc;\n"
@@ -106,10 +97,6 @@ TEST(NamedSequenceDeclaration, SequenceInInterfaceScopeElaborates) {
 }
 
 TEST(NamedSequenceDeclaration, TooFewActualsForNonDefaultFormalsIsError) {
-  // §16.8: an instance shall provide an actual argument for each formal that
-  // has no default. Sequence s has two non-default formals but is instantiated
-  // with a single actual, so the instance is illegal. The instance is built
-  // from a real §9.4.2.4 event control so the rule is observed end-to-end.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -127,9 +114,6 @@ TEST(NamedSequenceDeclaration, TooFewActualsForNonDefaultFormalsIsError) {
 }
 
 TEST(NamedSequenceDeclaration, DefaultFormalAllowsOmittedActual) {
-  // §16.8: a formal with a declared default actual argument need not be
-  // supplied by the instance. Sequence s's second formal has a default, so a
-  // single actual for the first formal is sufficient and elaboration succeeds.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -145,9 +129,6 @@ TEST(NamedSequenceDeclaration, DefaultFormalAllowsOmittedActual) {
 }
 
 TEST(NamedSequenceDeclaration, TooManyActualsIsError) {
-  // §16.8: an instance cannot bind more positional actual arguments than the
-  // sequence has formal arguments. Sequence s has one formal but is
-  // instantiated with two actuals.
   ElabFixture f;
   ElaborateSrc(
       "module m;\n"
@@ -179,11 +160,6 @@ TEST(NamedSequenceDeclaration, SelfRecursiveSequenceIsError) {
       "cyclic dependency among named sequences involving \"sr\"", 3, "16.8"));
 }
 
-// §16.8: a formal referenced in a cycle delay range or a repetition bound
-// takes an actual that is an elaboration-time constant. The clause's own
-// delay_example: `a1` binds the constants 3 and 2 and `$`, and is legal;
-// `a2_illegal` binds the variables z and d to min and delay1, and each is
-// reported where the instance names it.
 TEST(NamedSequenceDeclaration, VariableActualForADelayOrRepetitionFormal) {
   ElabFixture f;
   ElaborateSrc(
@@ -211,8 +187,6 @@ TEST(NamedSequenceDeclaration, VariableActualForADelayOrRepetitionFormal) {
                             10, "16.8"));
 }
 
-// §16.8 negative sibling: a parameter is an elaboration-time constant, so
-// binding one where the delay_example's a2_illegal binds a variable is legal.
 TEST(NamedSequenceDeclaration, ParameterActualForADelayFormalIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -230,9 +204,6 @@ TEST(NamedSequenceDeclaration, ParameterActualForADelayFormalIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §16.8: an instance written in a formal's default actual is an edge of the
-// dependency digraph: s1 reaches s2 through the default of x, and s2
-// instantiates s1, so the two form a cycle.
 TEST(SequenceCycleElaboration, ACycleThroughAFormalsDefaultIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -252,9 +223,6 @@ TEST(SequenceCycleElaboration, ACycleThroughAFormalsDefaultIsReported) {
                             3, "16.8"));
 }
 
-// §16.8: a $ actual binds an untyped formal referenced only as a range's upper
-// bound or as an instance's actual: s1's n is typed, and s2 reads m as an
-// operand, while s3 uses k as the upper bound of ##[1:k].
 TEST(SequenceDollarActual, ATypedOrOperandFormalIsReported) {
   const char* const kReport =
       "shall be untyped and referenced only as the upper bound of a cycle "

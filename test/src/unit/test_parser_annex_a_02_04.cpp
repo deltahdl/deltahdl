@@ -126,9 +126,6 @@ TEST(DeclarationAssignmentParsing, TypeAssignmentComplexType) {
 }
 
 TEST(DeclarationAssignmentParsing, TypeAssignmentClassScopedType) {
-  // type_assignment's right side admits
-  // data_type_or_incomplete_class_scoped_type; exercise the class-scoped branch
-  // (`C::inner_t`) rather than a plain data type.
   auto r = Parse(
       "class C;\n"
       "  typedef int inner_t;\n"
@@ -322,8 +319,6 @@ TEST(DeclarationAssignmentParsing, SpecparamMissingEqualsIsError) {
       "module m;\n"
       "  specparam delay 5;\n"
       "endmodule\n");
-  // §6.20.5 owns the specparam declaration; A.2.4 states the assignment
-  // production alone.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '=', got integer literal", 2, "6.20.5"));
 }
@@ -332,19 +327,10 @@ TEST(DeclarationAssignmentParsing, DefparamMissingEqualsIsError) {
   auto r = Parse(
       "module child; parameter P = 1; endmodule\n"
       "module m; child c(); defparam c.P 5; endmodule\n");
-  // §23.10.1 owns the defparam statement; A.2.4 states the assignment
-  // production alone.
   EXPECT_TRUE(ReportedError(r.diags, "expected '=', got integer literal", 2,
                             "23.10.1"));
 }
 
-// A.2.4 writes both alternatives of pulse_control_specparam with the limit list
-// in parentheses, and §30.7.1's Syntax 30-7 prints the same production. The
-// worked example under that subclause ends `PATHPULSE$ = 3;`, but §1.10 makes
-// an example informative, so a limit written without the parentheses is
-// reported. It is still read, as the lone reject limit §30.7.1 lets serve as
-// the error limit too, which is why no error limit is expected. It was
-// accepted with no report.
 TEST(DeclarationAssignmentParsing, PulseControlSpecparamBareLimitIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -365,9 +351,6 @@ TEST(DeclarationAssignmentParsing, PulseControlSpecparamBareLimitIsReported) {
   EXPECT_EQ(sp->pathpulse_error, nullptr);
 }
 
-// A.2.4 writes dynamic_array_new's parenthesized part as `( expression )`, one
-// expression, so two expressions there, or none, are each reported. Both were
-// read as a call's argument list and accepted.
 TEST(DeclarationAssignmentParsing,
      DynamicArrayNewOfOtherThanOneInitIsReported) {
   auto r = Parse(
@@ -388,11 +371,6 @@ TEST(DeclarationAssignmentParsing,
   }
 }
 
-// A.2.4 makes a defparam's target a hierarchical_parameter_identifier, which
-// A.9.3 writes as names joined by `.`, the last with no select. An operation,
-// a call, a concatenation, a package scope, `$unit::` and a select after the
-// last name are none, and each is reported. Each was read as an expression,
-// and the elaborator gave it only the warning that its target was not found.
 TEST(DeclarationAssignmentParsing,
      DefparamTargetOfNoHierarchicalNameIsReported) {
   auto r = Parse(
@@ -414,9 +392,6 @@ TEST(DeclarationAssignmentParsing,
   }
 }
 
-// A hierarchical name is a defparam's target in each of its forms: a name
-// alone, names joined by `.`, a bit-select on a name before the last, and a
-// name under `$root .`.
 TEST(DeclarationAssignmentParsing, DefparamHierarchicalTargetsAreAccepted) {
   auto r = Parse(
       "module m;\n"

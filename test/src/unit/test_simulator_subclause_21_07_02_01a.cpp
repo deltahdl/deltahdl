@@ -6,9 +6,6 @@
 #include <string_view>
 #include <vector>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "common/types.h"
 #include "fixture_vcd_dump_run.h"
 #include "helpers_text_lines.h"
@@ -20,33 +17,14 @@
 namespace delta {
 namespace {
 
-// §21.7.2.1: the syntax of the 4-state VCD file (Syntax 21-20) plus the
-// subclause's prose rules about the file's contents (header first, absolute
-// times, real vs. binary value forms, %.16g reals, printable identifier
-// codes, no memory/strength/partial-vector/expression dumps, case-sensitive
-// data). Every rule governs the file the dumper writes, so each test drives
-// real SystemVerilog source -- declaring the dumped objects and invoking the
-// §21.7.1.2-§21.7.1.5 dump-control tasks -- through parse, elaboration,
-// lowering, and the scheduler with the driver's per-timestep recording loop
-// installed, then checks the file against the grammar.
 class VcdFileSyntaxSim : public VcdDumpRunTestBase {
  protected:
-  // Runs a single-module source through the full pipeline with the driver's
-  // dump loop (timestamp + changed values at the end of each time unit) and
-  // returns the dump file contents, mirroring the driver's registration
-  // sequence (header, module scope, one registration per model variable,
-  // $enddefinitions).
   std::string RunVcd(const std::string& src) {
     return RunVcdDump(
         src, {.scope = "t",
               .registration = VcdSignalRegistration::kContextFiltered});
   }
 };
-// ---- Token-level validator for Syntax 21-20 ----
-//
-// The productions of Syntax 21-20 are all white-space-insensitive (§21.7.2
-// established the file is free format), so validating the token stream
-// validates the file. Each helper checks one terminal class of the grammar.
 
 bool IsDeclKeyword(const std::string& t) {
   static const char* kws[] = {"$comment", "$date",      "$enddefinitions",
@@ -63,9 +41,6 @@ bool IsSimSectionKeyword(const std::string& t) {
          t == "$dumpvars";
 }
 
-// Consumes one value_change at toks[i]. Syntax 21-20 admits the scalar and
-// the b- and r-form vector changes and nothing else, so a token that opens
-// none of them is no simulation command at all. Returns "" on success.
 std::string ConsumeValueChange(const std::vector<std::string>& toks,
                                size_t& i) {
   bool handled = false;
@@ -74,8 +49,6 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
   return err;
 }
 
-// Checks a $scope command's body against scope_section ::= scope_type
-// scope_identifier. Returns "" when it conforms.
 std::string CheckScopeSection(const VcdDeclarationCommand& cmd) {
   if (cmd.body.size() != 2 || !IsScopeType(cmd.body[0])) {
     return std::string("$scope requires scope_type + scope_identifier");
@@ -83,8 +56,6 @@ std::string CheckScopeSection(const VcdDeclarationCommand& cmd) {
   return std::string();
 }
 
-// Checks a $var command's body against var_section ::= var_type size
-// identifier_code reference. Returns "" when it conforms.
 std::string CheckVarSection(const VcdDeclarationCommand& cmd) {
   if (cmd.body.size() != 4) {
     return std::string("$var body is not 4 elements");
@@ -104,18 +75,12 @@ std::string CheckVarSection(const VcdDeclarationCommand& cmd) {
   return std::string();
 }
 
-// Checks the body of one declaration_command against the section production
-// Syntax 21-20 gives for its keyword. Returns "" when it conforms.
 std::string CheckDeclarationBody(const VcdDeclarationCommand& cmd) {
   if (cmd.keyword == "$scope") return CheckScopeSection(cmd);
   if (cmd.keyword == "$var") return CheckVarSection(cmd);
   return std::string();
 }
 
-// Validates the whole token stream against Syntax 21-20:
-// value_change_dump_definitions ::= {declaration_command}{simulation_command}.
-// Returns "" when the file conforms, else a description of the first
-// violation.
 std::string ValidateVcd(const std::vector<std::string>& toks) {
   size_t i = 0;
   std::string err =
@@ -125,10 +90,6 @@ std::string ValidateVcd(const std::vector<std::string>& toks) {
                                    ConsumeValueChange);
 }
 
-// The tokens of the $var declaration whose reference is `name`
-// ($var var_type size identifier_code reference $end), or empty when the file
-// declares no such object. Keyed on the reference rather than on the
-// identifier code, which depends on registration order.
 std::vector<std::string> VarDeclFor(const std::string& content,
                                     std::string_view name) {
   for (const auto& line : AllLines(content)) {
@@ -138,13 +99,6 @@ std::vector<std::string> VarDeclFor(const std::string& content,
   return {};
 }
 
-// Syntax 21-20 (whole grammar): a run that exercises a scalar, a vector, and
-// a real variable through every checkpoint task of §21.7.1.2-§21.7.1.4 plus a
-// §21.7.1.5 size limit yields a file whose entire token stream conforms to
-// the value_change_dump_definitions production -- every declaration command
-// shape, every simulation command shape, and every value form. Because the
-// validator admits only the grammar's 4-state forms, its success also shows
-// no strength information entered the file (prose: strength is not dumped).
 TEST_F(VcdFileSyntaxSim, WholeFileConformsToDumpFileGrammar) {
   auto content = RunVcd(
       "module t;\n"
@@ -168,31 +122,14 @@ TEST_F(VcdFileSyntaxSim, WholeFileConformsToDumpFileGrammar) {
   auto toks = Tokens(content);
   ASSERT_FALSE(toks.empty());
   EXPECT_EQ(ValidateVcd(toks), "");
-  EXPECT_EQ(CountToken(toks, "$var"), 3u);  // a, r, v
+  EXPECT_EQ(CountToken(toks, "$var"), 3u);
   EXPECT_EQ(CountToken(toks, "$dumpvars"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpall"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpoff"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpon"), 1u);
-  EXPECT_EQ(CountToken(toks, "$comment"), 1u);  // the $dumplimit notice
+  EXPECT_EQ(CountToken(toks, "$comment"), 1u);
 }
 
-// Syntax 21-20 (var_type): "var_type ::= event | integer | parameter | real |
-// realtime | reg | supply0 | supply1 | time | tri | triand | trior | trireg |
-// tri0 | tri1 | wand | wire | wor", so a named event is declared under the
-// event keyword the grammar lists for it rather than under a net keyword.
-// §21.7.2.3: the size is the variable's number of bits, and §6.17: the event
-// data type is a handle to a synchronization object -- a handle is no number of
-// bits, so the size is 0.
-//
-// What no other case catches: WholeFileConformsToDumpFileGrammar validates
-// every $var body through CheckVarSection, which accepts any keyword
-// IsFourStateVarType (lib/cpp/test_models/model_vcd_token_grammar.h) admits,
-// and wire is one of the eighteen -- so `$var wire 0 " ev $end` conforms to the
-// shape while naming the wrong keyword. This case reads the keyword the
-// declared object is owed instead. The only other case that dumps an event,
-// VcdValueFormatE2E.EventTriggerDumpsScalarFormatMarker in
-// test/src/unit/test_simulator_subclause_21_07_02_02.cpp, asserts over the
-// value-change region alone and deliberately looks past the header.
 TEST_F(VcdFileSyntaxSim, NamedEventDeclaresEventVarType) {
   auto content = RunVcd(
       "module t;\n"
@@ -208,23 +145,9 @@ TEST_F(VcdFileSyntaxSim, NamedEventDeclaresEventVarType) {
   ASSERT_EQ(ev.size(), 6u) << content;
   EXPECT_EQ(ev[1], "event");
   EXPECT_EQ(ev[2], "0");
-  // Not vacuous: the logic variable declared beside the event carries a $var
-  // declaration too, so the run did produce a header to read.
   EXPECT_EQ(VarDeclFor(content, "clk").size(), 6u) << content;
 }
 
-// Syntax 21-20 (var_type) again, for the three keywords it lists that name a
-// type SystemVerilog kept from IEEE Std 1364-2005 rather than added to it.
-// §21.7.5's Table 21-11 tabulates none of reg, integer and time, and that is
-// the point: the table lends a SystemVerilog type an IEEE Std 1364-2005 type
-// to masquerade as, and these three are 1364-2005 types already, each with a
-// var_type keyword of its own in the list above. §21.7.2.3 gives wire to a net
-// and Table 6-8 makes all three variables, so none of them is a wire.
-//
-// §21.7.2.3 settles the size: it is the variable's number of bits. Table 6-8
-// gives reg a user-defined vector size, so a reg [7:0] declares 8 -- a width
-// chosen to differ from every size the other rows fix, so a keyword answered
-// with the wrong row's size is visible here.
 TEST_F(VcdFileSyntaxSim, RegVariableDeclaresRegVarType) {
   auto content = RunVcd(
       "module t;\n"
@@ -241,9 +164,6 @@ TEST_F(VcdFileSyntaxSim, RegVariableDeclaresRegVarType) {
   EXPECT_EQ(r[2], "8");
 }
 
-// Table 6-8 makes integer a 4-state, 32-bit signed integer type, so the
-// §21.7.2.3 size is 32 whatever the model stores the variable in. §21.7.2.3's
-// own example declares one this way: "$var integer 32 (2 index $end".
 TEST_F(VcdFileSyntaxSim, IntegerVariableDeclaresIntegerVarType) {
   auto content = RunVcd(
       "module t;\n"
@@ -260,9 +180,6 @@ TEST_F(VcdFileSyntaxSim, IntegerVariableDeclaresIntegerVarType) {
   EXPECT_EQ(i[2], "32");
 }
 
-// Table 6-8 makes time a 4-state, 64-bit unsigned integer type. time is the
-// one of the three whose keyword nothing else in the writer produces, so a
-// dumped time variable declared as anything at all is declared wrongly.
 TEST_F(VcdFileSyntaxSim, TimeVariableDeclaresTimeVarType) {
   auto content = RunVcd(
       "module t;\n"
@@ -279,15 +196,6 @@ TEST_F(VcdFileSyntaxSim, TimeVariableDeclaresTimeVarType) {
   EXPECT_EQ(tm[2], "64");
 }
 
-// The three cases above are each satisfied by declaring every dumped object
-// under the keyword its own declaration names, and that would take wire from
-// the objects §21.7.2.3 gives it to. A net declared beside them holds the
-// keyword still: the $var section gives a uwire net the var_type wire, and
-// §21.7.2.3's net mapping is what the wire keyword is for.
-// VcdLogicTypeMapping.ANetKeepsTheWireVarType in
-// test/src/unit/test_simulator_subclause_21_07_05b.cpp makes the same claim
-// against the Table 21-11 rows; this one makes it against the Syntax 21-20
-// keywords, which are the ones a net now stands among.
 TEST_F(VcdFileSyntaxSim, ANetDeclaredBesideThemKeepsTheWireVarType) {
   auto content = RunVcd(
       "module t;\n"
@@ -307,9 +215,6 @@ TEST_F(VcdFileSyntaxSim, ANetDeclaredBesideThemKeepsTheWireVarType) {
   auto w = VarDeclFor(content, "w");
   ASSERT_EQ(w.size(), 6u) << content;
   EXPECT_EQ(w[1], "wire");
-  // Not vacuous: the three variables beside the net are declared under their
-  // own keywords in the same file, so the run did exercise the mapping the net
-  // is being kept out of.
   auto r = VarDeclFor(content, "r");
   auto i = VarDeclFor(content, "i");
   auto tm = VarDeclFor(content, "tm");
@@ -321,10 +226,6 @@ TEST_F(VcdFileSyntaxSim, ANetDeclaredBesideThemKeepsTheWireVarType) {
   EXPECT_EQ(tm[1], "time");
 }
 
-// Top production: {declaration_command} precedes {simulation_command} -- the
-// last declaration keyword in the token stream sits before the first
-// checkpoint section or timestamp, and $enddefinitions appears exactly once,
-// after every $var.
 TEST_F(VcdFileSyntaxSim, DeclarationCommandsPrecedeSimulationCommands) {
   auto content = RunVcd(
       "module t;\n"
@@ -359,9 +260,6 @@ TEST_F(VcdFileSyntaxSim, DeclarationCommandsPrecedeSimulationCommands) {
   EXPECT_LT(last_var, end_defs);
 }
 
-// Prose: the file starts with header information (date, simulator version,
-// timescale), next come the scope and variable-type definitions, and the
-// value changes follow after those.
 TEST_F(VcdFileSyntaxSim, HeaderThenDefinitionsThenValueChanges) {
   auto content = RunVcd(
       "module t;\n"
@@ -389,9 +287,6 @@ TEST_F(VcdFileSyntaxSim, HeaderThenDefinitionsThenValueChanges) {
   EXPECT_LT(end_defs, first_time);
 }
 
-// scalar_value_change ::= value identifier_code with value ::= 0|1|x|X|z|Z: a
-// scalar driven through all four logic states from procedural assignments
-// records each state as its value character joined to the code.
 TEST_F(VcdFileSyntaxSim, ScalarChangesUseFourStateValueCharacters) {
   auto content = RunVcd(
       "module t;\n"
@@ -413,10 +308,6 @@ TEST_F(VcdFileSyntaxSim, ScalarChangesUseFourStateValueCharacters) {
   EXPECT_EQ(ValidateVcd(Tokens(content)), "");
 }
 
-// vector_value_change (b-form): a packed vector's changes are recorded as the
-// base letter b, binary_number digits drawn from the 4-state set (including x
-// and z digits), and the identifier code. Prose: value changes for all
-// non-real variables are specified in binary format.
 TEST_F(VcdFileSyntaxSim, VectorChangesUseBFormBinaryNumbers) {
   auto content = RunVcd(
       "module t;\n"
@@ -434,11 +325,6 @@ TEST_F(VcdFileSyntaxSim, VectorChangesUseBFormBinaryNumbers) {
   EXPECT_EQ(ValidateVcd(Tokens(content)), "");
 }
 
-// vector_value_change (r-form) + prose: a real variable's value changes are
-// specified by real numbers written with a %.16g format, so all 53 mantissa
-// bits of the IEEE Std 754 double survive; an application reading the value
-// back with a %g scanf() recovers the identical double. The $var declaration
-// for the variable uses the real var_type keyword.
 TEST_F(VcdFileSyntaxSim, RealChangesUseRFormPreservingFullPrecision) {
   auto content = RunVcd(
       "module t;\n"
@@ -453,25 +339,17 @@ TEST_F(VcdFileSyntaxSim, RealChangesUseRFormPreservingFullPrecision) {
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "r0 !"));
   ASSERT_TRUE(HasLine(lines, "r0.3333333333333333 !"));
-  // Application-program round trip: the decimal-to-double conversion behind
-  // scanf's %g family reads the dumped text back to exactly the double the
-  // simulation held. Requiring the parse to stop on the terminator keeps a
-  // field the conversion could not consume in full a failure.
   const char* const kDumped = "0.3333333333333333";
   char* end = nullptr;
   const double kBack = std::strtod(kDumped, &end);
   ASSERT_EQ(*end, '\0');
   EXPECT_EQ(kBack, 1.0 / 3.0);
-  // The real is never rendered in the binary b-form.
   for (const auto& l : lines) {
     EXPECT_FALSE(l.rfind("b", 0) == 0 && l.find(" !") != std::string::npos)
         << "real dumped as binary: " << l;
   }
 }
 
-// simulation_time ::= # decimal_number, and prose: the recorded time is the
-// absolute simulation time of the changes that follow, not a delta from the
-// previous timestamp.
 TEST_F(VcdFileSyntaxSim, SimulationTimesAreAbsoluteDecimals) {
   auto content = RunVcd(
       "module t;\n"
@@ -490,9 +368,6 @@ TEST_F(VcdFileSyntaxSim, SimulationTimesAreAbsoluteDecimals) {
   EXPECT_EQ(ValidateVcd(Tokens(content)), "");
 }
 
-// Prose: only the variables that change value during a time increment are
-// listed at that increment. Of two dumped scalars, the one that held its
-// value contributes no value change under the increment's timestamp.
 TEST_F(VcdFileSyntaxSim, OnlyChangedVariablesListedPerIncrement) {
   auto content = RunVcd(
       "module t;\n"
@@ -507,7 +382,6 @@ TEST_F(VcdFileSyntaxSim, OnlyChangedVariablesListedPerIncrement) {
       "  end\n"
       "endmodule\n");
   auto lines = AllLines(content);
-  // a -> '!', b -> '"'. Between #10 and #30 only a's change appears.
   size_t t10 = 0;
   size_t t30 = lines.size();
   for (size_t i = 0; i < lines.size(); ++i) {
@@ -521,15 +395,10 @@ TEST_F(VcdFileSyntaxSim, OnlyChangedVariablesListedPerIncrement) {
         << "unchanged variable listed at #10: " << lines[i];
   }
   EXPECT_TRUE(HasLine(lines, "1!"));
-  // b's high value is recorded only under its own increment.
   EXPECT_GT(t30, t10);
   EXPECT_TRUE(HasLine(lines, "1\""));
 }
 
-// identifier_code ::= {ASCII character} + prose: the generated codes are
-// composed of the printable characters ! through ~ (decimal 33 to 126). With
-// well under 94 dumped objects every code is also distinct, so each code
-// represents one variable.
 TEST_F(VcdFileSyntaxSim, IdentifierCodesArePrintableAndDistinct) {
   std::string src = "module t;\n";
   for (int i = 0; i < 40; ++i) {
@@ -561,10 +430,6 @@ TEST_F(VcdFileSyntaxSim, IdentifierCodesArePrintableAndDistinct) {
   EXPECT_EQ(unique.size(), codes.size());
 }
 
-// Prose: memories are not dumped. An unpacked array declared alongside a
-// packed vector contributes neither a $var declaration nor any value change
-// -- element writes included -- while the packed vector (the closest
-// accepted input) is still declared and dumped in full.
 TEST_F(VcdFileSyntaxSim, MemoriesAreNotDumped) {
   auto content = RunVcd(
       "module t;\n"
@@ -585,15 +450,10 @@ TEST_F(VcdFileSyntaxSim, MemoriesAreNotDumped) {
     EXPECT_EQ(tok.find("mem"), std::string::npos)
         << "memory reached the dump: " << tok;
   }
-  // The vector's change at #10 is recorded; the memory-element write is not.
   EXPECT_TRUE(HasLine(AllLines(content), "b10100101 !"));
   EXPECT_EQ(ValidateVcd(toks), "");
 }
 
-// Prose: memories are not dumped, in every memory shape the model can hold. A
-// dynamic array and an associative array declared beside a scalar contribute
-// no $var declaration and no value change -- element writes before and after
-// the checkpoint included -- while the scalar is dumped normally.
 TEST_F(VcdFileSyntaxSim, DynamicAndAssociativeArraysNotDumped) {
   auto content = RunVcd(
       "module t;\n"
@@ -622,11 +482,6 @@ TEST_F(VcdFileSyntaxSim, DynamicAndAssociativeArraysNotDumped) {
   EXPECT_EQ(ValidateVcd(toks), "");
 }
 
-// Prose: memories are not dumped -- the multidimensional unpacked array form.
-// A two-dimension array takes a different lowering path than a single-dim one
-// (per-dimension extents, doubly indexed element shadows), yet neither its
-// whole-array entry nor any m[i][j] leaf reaches the file, while the packed
-// vector beside it is dumped normally.
 TEST_F(VcdFileSyntaxSim, MultidimensionalArraysNotDumped) {
   auto content = RunVcd(
       "module t;\n"
@@ -651,11 +506,6 @@ TEST_F(VcdFileSyntaxSim, MultidimensionalArraysNotDumped) {
   EXPECT_EQ(ValidateVcd(toks), "");
 }
 
-// simulation_command ($dumpvars section) built from the §21.7.1.2 selection
-// form: when the task names an individual variable, the checkpoint section it
-// leaves in the file still follows the grammar and holds exactly the selected
-// object's value change -- the unselected variable contributes nothing inside
-// the $dumpvars ... $end span.
 TEST_F(VcdFileSyntaxSim, DumpvarsSelectionFormYieldsConformingSection) {
   auto content = RunVcd(
       "module t;\n"
@@ -671,7 +521,6 @@ TEST_F(VcdFileSyntaxSim, DumpvarsSelectionFormYieldsConformingSection) {
   auto toks = Tokens(content);
   ASSERT_FALSE(toks.empty());
   EXPECT_EQ(ValidateVcd(toks), "");
-  // The section between $dumpvars and its $end holds exactly a's record.
   size_t open = toks.size();
   for (size_t i = 0; i < toks.size(); ++i) {
     if (toks[i] == "$dumpvars") open = i;
@@ -682,15 +531,9 @@ TEST_F(VcdFileSyntaxSim, DumpvarsSelectionFormYieldsConformingSection) {
     body.push_back(toks[i]);
   }
   ASSERT_EQ(body.size(), 1u);
-  EXPECT_EQ(body[0], "0!");  // a -> '!'; b's '"' never appears in the section
+  EXPECT_EQ(body[0], "0!");
 }
 
-// $timescale body ::= time_number time_unit with time_number drawn from
-// {1, 10, 100} and time_unit from {s, ms, us, ns, ps, fs}: for each sampled
-// combination the header renders a $timescale section whose body is exactly
-// that pair, and the whole file still validates. The section's rendering is
-// the writer's own and does not depend on how the model was produced, so this
-// boundary sweep drives the writer directly.
 TEST_F(VcdFileSyntaxSim, TimescaleSectionMatchesTimeNumberTimeUnit) {
   const char* combos[] = {"1s", "10ms", "100us", "1ns", "10ps", "100fs"};
   for (const char* ts : combos) {
@@ -707,11 +550,6 @@ TEST_F(VcdFileSyntaxSim, TimescaleSectionMatchesTimeNumberTimeUnit) {
   }
 }
 
-// Prose: the format has no mechanism to dump part of a vector -- the entire
-// vector is dumped. A $dumpvars argument that selects a bit of the vector
-// (the closest rejected input) yields no narrower record: every change for
-// the vector is the full-width b-form and no scalar-form change for its code
-// ever appears.
 TEST_F(VcdFileSyntaxSim, PartOfVectorCannotBeDumped) {
   auto content = RunVcd(
       "module t;\n"
@@ -725,19 +563,13 @@ TEST_F(VcdFileSyntaxSim, PartOfVectorCannotBeDumped) {
   ASSERT_NE(content.find("$enddefinitions"), std::string::npos);
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b10100101 !"));
-  // No single-bit record for the vector's identifier code.
   EXPECT_FALSE(HasLine(lines, "0!"));
   EXPECT_FALSE(HasLine(lines, "1!"));
-  // No shortened form that would correspond to the 4-bit or 1-bit selection.
   EXPECT_FALSE(HasLine(lines, "b101 !"));
   EXPECT_FALSE(HasLine(lines, "b1 !"));
   EXPECT_EQ(ValidateVcd(Tokens(content)), "");
 }
 
-// Prose (second rejected shape): a range part-select of a vector -- the
-// closest input to the subclause's own bits-8-to-15 illustration -- also
-// cannot be dumped. Naming v[3:0] in $dumpvars produces no 4-bit record for
-// the 8-bit vector's code: every recorded change stays full width.
 TEST_F(VcdFileSyntaxSim, RangeOfVectorCannotBeDumped) {
   auto content = RunVcd(
       "module t;\n"
@@ -751,18 +583,12 @@ TEST_F(VcdFileSyntaxSim, RangeOfVectorCannotBeDumped) {
   ASSERT_NE(content.find("$enddefinitions"), std::string::npos);
   auto lines = AllLines(content);
   EXPECT_TRUE(HasLine(lines, "b10100101 !"));
-  // Neither the 4-bit selection (0101, shortened to b101) nor any scalar-form
-  // record appears for the vector's code.
   EXPECT_FALSE(HasLine(lines, "b101 !"));
   EXPECT_FALSE(HasLine(lines, "0!"));
   EXPECT_FALSE(HasLine(lines, "1!"));
   EXPECT_EQ(ValidateVcd(Tokens(content)), "");
 }
 
-// Prose: expressions such as a + b cannot be dumped. Naming an expression in
-// $dumpvars mints no new dumped object -- the file declares exactly the two
-// operand variables and every value change carries one of their two codes,
-// never a third code holding the sum.
 TEST_F(VcdFileSyntaxSim, ExpressionsCannotBeDumped) {
   auto content = RunVcd(
       "module t;\n"
@@ -778,7 +604,6 @@ TEST_F(VcdFileSyntaxSim, ExpressionsCannotBeDumped) {
   auto toks = Tokens(content);
   ASSERT_FALSE(toks.empty());
   EXPECT_EQ(CountToken(toks, "$var"), 2u);
-  // Every b-form change is attributed to a declared code.
   auto codes = CollectVarCodes(toks);
   std::set<std::string> declared(codes.begin(), codes.end());
   for (size_t i = 0; i + 1 < toks.size(); ++i) {
@@ -790,10 +615,6 @@ TEST_F(VcdFileSyntaxSim, ExpressionsCannotBeDumped) {
   EXPECT_EQ(ValidateVcd(toks), "");
 }
 
-// Prose: data in the VCD file are case sensitive. Two variables whose names
-// differ only in letter case are distinct dumped objects -- each keeps its
-// declared spelling in its $var reference and its own identifier code, and
-// their opposite values land on their respective codes.
 TEST_F(VcdFileSyntaxSim, FileDataAreCaseSensitive) {
   auto content = RunVcd(
       "module t;\n"
@@ -806,21 +627,15 @@ TEST_F(VcdFileSyntaxSim, FileDataAreCaseSensitive) {
       "    #10 begin AB = 1'b0; ab = 1'b1; end\n"
       "  end\n"
       "endmodule\n");
-  // Sorted registration: "AB" precedes "ab", so AB -> '!' and ab -> '"'.
   EXPECT_NE(content.find("$var reg 1 ! AB $end"), std::string::npos);
   EXPECT_NE(content.find("$var reg 1 \" ab $end"), std::string::npos);
   auto lines = AllLines(content);
-  EXPECT_TRUE(HasLine(lines, "1!"));   // AB's initial 1
-  EXPECT_TRUE(HasLine(lines, "0\""));  // ab's initial 0
-  EXPECT_TRUE(HasLine(lines, "0!"));   // AB's change
-  EXPECT_TRUE(HasLine(lines, "1\""));  // ab's change
+  EXPECT_TRUE(HasLine(lines, "1!"));
+  EXPECT_TRUE(HasLine(lines, "0\""));
+  EXPECT_TRUE(HasLine(lines, "0!"));
+  EXPECT_TRUE(HasLine(lines, "1\""));
 }
 
-// identifier_code charset boundary: past '~' (decimal 126) the generated code
-// wraps back to '!' rather than escaping the printable range -- the 95th
-// registered object's code is again drawn from the ! to ~ set. The charset of
-// a generated code does not depend on how the signal was produced, so this
-// boundary is exercised against the writer directly.
 TEST_F(VcdFileSyntaxSim, IdentifierCodesStayPrintablePastNinetyFour) {
   {
     VcdWriter vcd(tmp_path_);

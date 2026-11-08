@@ -21,8 +21,6 @@ namespace delta {
 
 namespace {
 
-// Appends the methods of `cls`, and of the classes nested in it, each inside
-// `cls` and the classes `around` holds.
 void AddClassMethods(const ClassDecl& cls, std::vector<const ClassDecl*> around,
                      std::vector<SubroutineSite>& out) {
   around.insert(around.begin(), &cls);
@@ -34,9 +32,6 @@ void AddClassMethods(const ClassDecl& cls, std::vector<const ClassDecl*> around,
   }
 }
 
-// The class whose handle `e` holds where it is a handle variable `names`
-// holds, or a property of a class type selected from one, h.next; empty for
-// anything else.
 std::string_view HandleClassOf(
     const Expr* e, const std::unordered_set<std::string_view>& names,
     const std::unordered_map<std::string_view, std::string_view>& types,
@@ -55,8 +50,6 @@ std::string_view HandleClassOf(
              : std::string_view();
 }
 
-// Whether a function the compilation unit, a module, interface, program,
-// checker or package declares under `name` returns a class handle.
 bool FunctionReturnsClass(std::string_view name, const CompilationUnit* unit) {
   std::vector<const std::vector<ModuleItem*>*> scopes{&unit->cu_items};
   for (const auto* group :
@@ -75,7 +68,6 @@ bool FunctionReturnsClass(std::string_view name, const CompilationUnit* unit) {
   return false;
 }
 
-// The properties `cls` and the classes it extends, up the chain, declare.
 std::vector<const ClassMember*> ChainProperties(const ClassDecl& cls,
                                                 const CompilationUnit* unit) {
   std::vector<const ClassMember*> out;
@@ -147,16 +139,12 @@ void AddSubroutineHandles(
   for (const FunctionArg& arg : site.sub->func_args) {
     add(arg.name, arg.data_type, arg.unpacked_dims.empty());
   }
-  // §13.4.1: a function's name is a variable of its return type in its body,
-  // `get_next = next;` in §8.13's LinkedPacket.
   if (site.sub->kind == ModuleItemKind::kFunctionDecl) {
     add(site.sub->name, site.sub->return_type,
         site.sub->return_array_dims.empty());
   }
 }
 
-// §8.4 over the subroutine bodies among `items` and `classes`, each with the
-// handle variables its scope and its own declarations give it.
 void ElaboratorClassRules::WalkSubroutinesForClassHandleOps(
     const std::vector<ModuleItem*>& items,
     const std::vector<const ClassDecl*>& classes) {
@@ -173,10 +161,6 @@ void ElaboratorClassRules::WalkSubroutinesForClassHandleOps(
   }
 }
 
-// §8.17 with §8.18: a subclass's constructor calls its base's, written or
-// inserted (§8.15), and a local constructor is visible in no subclass, so a
-// class extending one whose constructor is local is reported; NOTE 1 of §8.17
-// draws the consequence that such a class cannot be extended.
 void ElaboratorClassRules::ValidateLocalConstructorBases() {
   for (const ClassDecl* cls : AllClassDecls(unit_)) {
     const ClassDecl* base = FindBaseClass(cls, unit_);
@@ -193,8 +177,6 @@ void ElaboratorClassRules::ValidateLocalConstructorBases() {
   }
 }
 
-// §8.4 over the compilation unit's and each package's subroutines and
-// classes, read once, where a module's are read with each module.
 void ElaboratorClassRules::ValidateClassHandleOpsOutsideModules() {
   keyword_typed_params_.clear();
   WalkSubroutinesForClassHandleOps(

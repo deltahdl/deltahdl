@@ -9,19 +9,6 @@ using namespace delta;
 
 namespace {
 
-// These tests drive soft constraints (18.5.13) end to end: each source program
-// declares a class with a "soft expression_or_dist" constraint, calls
-// randomize() from an initial block, and copies results out to module variables
-// the harness reads. The parser captures the soft relation apart from the hard
-// ones and the simulator builds it into a discardable (kSoft) solver
-// constraint, so the behavior observed here is that of real elaborated source,
-// not a hand-built solver state. A soft constraint's behavior depends entirely
-// on how it is produced — the 'soft' keyword prefixing the relation — so every
-// observation is made from source syntax pushed through the full pipeline.
-
-// 18.5.13: a soft constraint that is jointly satisfiable with the active hard
-// constraints is honored just like a hard preference. The soft x == 50 sits
-// inside the hard range [40, 60], so the solver produces exactly 50.
 TEST(ConstraintSoft, SoftHonoredWhenCompatibleWithHard) {
   const char* src =
       "class C;\n"
@@ -42,9 +29,6 @@ TEST(ConstraintSoft, SoftHonoredWhenCompatibleWithHard) {
   EXPECT_EQ(RunAndGet(src, "rx"), 50u);
 }
 
-// 18.5.13: with no hard constraint to conflict with, a soft preference is
-// satisfiable and therefore honored. A block holding only a soft constraint
-// still reaches the solver (it is not treated as empty), so x is pinned to 42.
 TEST(ConstraintSoft, SoftAloneIsHonored) {
   const char* src =
       "class C;\n"
@@ -64,11 +48,6 @@ TEST(ConstraintSoft, SoftAloneIsHonored) {
   EXPECT_EQ(RunAndGet(src, "rx"), 42u);
 }
 
-// 18.5.13: a soft constraint that clashes with the hard ones is dropped,
-// counted as the constant 1 (true), and the solver solves what remains.
-// randomize() still succeeds and the discarded preference need not hold. Here
-// soft x == 50 conflicts with the hard range [10, 20], so the solver discards
-// it and returns an in-range value that is not the discarded preference.
 TEST(ConstraintSoft, ConflictingSoftDiscardedAndTreatedAsTrue) {
   const char* src =
       "class C;\n"
@@ -91,10 +70,6 @@ TEST(ConstraintSoft, ConflictingSoftDiscardedAndTreatedAsTrue) {
   EXPECT_NE(RunAndGet(src, "rx"), 50u);
 }
 
-// 18.5.13: unlike a soft constraint, a hard one is never relaxed by the solver;
-// when they cannot all hold, randomize() fails outright rather than relaxing
-// any of them. The two mutually exclusive hard equalities x == 10 and x == 20
-// can never both hold, so randomize() returns 0.
 TEST(ConstraintSoft, UnsatisfiableHardConstraintsFailSolve) {
   const char* src =
       "class C;\n"
@@ -111,11 +86,6 @@ TEST(ConstraintSoft, UnsatisfiableHardConstraintsFailSolve) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.5.13: soft constraints that cannot all hold together lose one or more of
-// their number so that the solver still reaches a solution (which one survives
-// is governed by the priorities of 18.5.13.1). The two mutually exclusive soft
-// equalities x == 10 and x == 20 cannot both hold, yet — unlike the hard case
-// above — randomize() succeeds and one of the two preferred values is produced.
 TEST(ConstraintSoft, ConflictingSoftConstraintsResolvedByDiscarding) {
   const char* src =
       "class C;\n"
@@ -136,13 +106,6 @@ TEST(ConstraintSoft, ConflictingSoftConstraintsResolvedByDiscarding) {
   EXPECT_TRUE(rx == 10u || rx == 20u);
 }
 
-// 18.5.13: once dropped, a soft constraint leaves the spread of solutions
-// untouched — it must neither pin the variable to its preferred value nor
-// remove any value the hard constraints still allow. The hard range confines x
-// to {0, 1} while the conflicting soft x == 2 is discarded. Across many
-// randomizations both feasible values still occur and the discarded preference
-// never does, so the discarded soft neither biases nor narrows the
-// distribution. Every solve also succeeds, since the hard range is satisfiable.
 TEST(ConstraintSoft, DiscardedSoftDoesNotBiasDistribution) {
   const char* src =
       "class C;\n"
@@ -177,13 +140,6 @@ TEST(ConstraintSoft, DiscardedSoftDoesNotBiasDistribution) {
   EXPECT_EQ(RunAndGet(src, "saw2"), 0u);
 }
 
-// 18.5.13 / Syntax 18-2: the operand of 'soft' is an expression_or_dist, i.e.
-// any constraint expression — not only a comparison. Here the soft preference
-// is a set-membership relation ('inside', 11.4.13), which lowers through a
-// different path than a comparison (a general predicate rather than a folded
-// bound). When it is jointly satisfiable with the hard range it is honored, so
-// across many solves x always lands inside the two-value soft set {42, 43} —
-// never elsewhere in the hard range [40, 45] — and both members occur.
 TEST(ConstraintSoft, SoftMembershipPreferenceHonored) {
   const char* src =
       "class C;\n"
@@ -218,11 +174,6 @@ TEST(ConstraintSoft, SoftMembershipPreferenceHonored) {
   EXPECT_EQ(RunAndGet(src, "saw43"), 1u);
 }
 
-// 18.5.13 / Syntax 18-2: an implication ('->') preceded by 'soft' is likewise a
-// valid soft constraint operand. With the antecedent held true by a hard
-// constraint (y == 1), the soft implication reduces to a preference for its
-// consequent (x == 7); being jointly satisfiable with the hard range on x it is
-// honored, so every solve drives x to 7 while y stays 1.
 TEST(ConstraintSoft, SoftImplicationPreferenceHonored) {
   const char* src =
       "class C;\n"
@@ -255,12 +206,6 @@ TEST(ConstraintSoft, SoftImplicationPreferenceHonored) {
   EXPECT_EQ(RunAndGet(src, "ally1"), 1u);
 }
 
-// 18.5.13 (consuming 18.5.3): a soft preference is honored within a domain
-// fixed by a hard distribution built from real 'dist' syntax. The hard dist
-// confines x to {5, 8}; the soft x == 5 is compatible with that set, so it is
-// honored and x resolves to 5 — the preferred, dist-legal value — rather than
-// being discarded. This drives the dependency's distribution syntax through the
-// full pipeline while observing this subclause's honor-when-satisfiable rule.
 TEST(ConstraintSoft, SoftPreferenceHonoredOverDistConstrainedDomain) {
   const char* src =
       "class C;\n"
@@ -281,11 +226,6 @@ TEST(ConstraintSoft, SoftPreferenceHonoredOverDistConstrainedDomain) {
   EXPECT_EQ(RunAndGet(src, "rx"), 5u);
 }
 
-// 18.5.13 / Syntax 18-2: the soft operand's expression_or_dist also admits the
-// dist alternative — 'soft' applied to a distribution (18.5.3 syntax). With no
-// hard constraint to conflict with, the soft distribution is satisfiable and
-// therefore honored: across many solves x is always drawn from the distribution
-// set {5, 8} and both weighted values occur.
 TEST(ConstraintSoft, SoftDistributionHonoredWhenSatisfiable) {
   const char* src =
       "class C;\n"
@@ -319,11 +259,6 @@ TEST(ConstraintSoft, SoftDistributionHonoredWhenSatisfiable) {
   EXPECT_EQ(RunAndGet(src, "saw8"), 1u);
 }
 
-// 18.5.13: a soft distribution that conflicts with the hard constraints is
-// discarded like any other soft constraint, so randomization still succeeds.
-// The hard x == 100 admits no value the distribution {5, 8} names, so the soft
-// dist is dropped and x resolves to the hard-required 100 rather than failing
-// the solve.
 TEST(ConstraintSoft, SoftDistributionDiscardedWhenConflicting) {
   const char* src =
       "class C;\n"

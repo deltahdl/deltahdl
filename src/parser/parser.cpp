@@ -27,18 +27,6 @@
 namespace delta {
 
 namespace {
-// Whether A.1.11 admits a ModuleItem of this kind as an anonymous_program_item.
-// The production is closed: task_declaration, function_declaration,
-// class_declaration, interface_class_declaration, covergroup_declaration,
-// class_constructor_declaration and the null item, and nothing else.
-//
-// Four ModuleItemKind values carry the six declarations, because
-// Parser::IsAtClassDecl reads `interface class` into a kClassDecl and
-// Parser::ParseFunctionDecl reads the `function C::new` of a
-// class_constructor_declaration into a kFunctionDecl. The null item produces no
-// ModuleItem at all: Parser::TryParseAnonymousProgram and
-// Parser::TryParsePackageBodyItem each consume a bare `;` before calling
-// Parser::ParseModuleItem, so it never reaches this predicate.
 bool IsAnonymousProgramItemKind(ModuleItemKind kind) {
   switch (kind) {
     case ModuleItemKind::kTaskDecl:
@@ -51,28 +39,12 @@ bool IsAnonymousProgramItemKind(ModuleItemKind kind) {
   }
 }
 
-// Reports every item Parser::ParseModuleItem appended to `items` at or after
-// `before` that A.1.11 does not admit in an anonymous program, drops it, and
-// marks each surviving item as declared in one. An anonymous program's body is
-// read by Parser::ParseModuleItem, which admits everything a module body may
-// hold, so this is what narrows the body to A.1.11's set.
-//
-// A rejected item is dropped rather than kept because §24.6 gives an anonymous
-// program's items the name space of the package or compilation-unit scope
-// holding it. Keeping one would declare in that scope a thing the source could
-// not legally declare there, and the elaborator would then read it as an
-// ordinary item of that package or compilation unit: an `initial` block nothing
-// runs, or a parameter that collides with one outside the program.
 void FilterAnonymousProgramItems(DiagEngine& diag,
                                  std::vector<ModuleItem*>& items,
                                  size_t before) {
   size_t kept = before;
   for (size_t i = before; i < items.size(); ++i) {
     ModuleItem* item = items[i];
-    // A.1.11's task_declaration and function_declaration do not reach the
-    // extern method-prototype form, and a prototype produces the same
-    // ModuleItemKind a definition does, so the kind cannot tell them apart.
-    // ModuleItem::is_extern is what does.
     if (!IsAnonymousProgramItemKind(item->kind) || item->is_extern) {
       diag.Error(item->loc, kAnonymousProgramItemsMessage, Subclause("A.1.11"));
       continue;
@@ -83,8 +55,6 @@ void FilterAnonymousProgramItems(DiagEngine& diag,
   items.resize(kept);
 }
 
-// Each top-level design element defaults to the "work" library unless one was
-// assigned during parsing. Apply that default to every element in a collection.
 template <typename Collection>
 void DefaultLibraryToWork(Collection& elements) {
   for (auto* element : elements) {
@@ -92,9 +62,6 @@ void DefaultLibraryToWork(Collection& elements) {
   }
 }
 
-// Snapshot of the compilation unit's timeunit/timeprecision state captured
-// before a compilation-unit-scope timeunit declaration is parsed, used to
-// detect mismatches and out-of-order declarations afterward.
 struct CuTimeunitSnapshot {
   bool was_unit_set = false;
   bool was_prec_set = false;
@@ -172,8 +139,6 @@ bool Parser::Check(TokenKind kind) {
 bool Parser::AtEnd() { return Check(TokenKind::kEof); }
 SourceLoc Parser::CurrentLoc() { return CurrentToken().loc; }
 
-// §3.12: every token passes here, so here the prefixes of scoped names are
-// recorded, for the elaborator to report one naming a package declared later.
 Token Parser::Consume() {
   Token tok = lexer_.Next();
   scope_prefixes_.Read(tok, known_types_);
@@ -277,7 +242,6 @@ void Parser::AttachAttrs(std::vector<ModuleItem*>& items, size_t before,
   if (attrs.empty()) return;
   for (size_t i = before; i < items.size(); ++i) {
     items[i]->attrs = attrs;
-    // §5.12: a class declared as an item keeps those written before it.
     if (items[i]->class_decl != nullptr) items[i]->class_decl->attrs = attrs;
   }
 }
@@ -347,8 +311,6 @@ CompilationUnit* Parser::ParseLibraryText() {
   return unit;
 }
 
-// Reads one file_path_spec, or reports its absence and returns a token of
-// kind kEof whose text is empty.
 Token Parser::ParseFilePathSpec() {
   auto tok = lexer_.NextFilePathSpec();
   if (tok.kind == TokenKind::kEof) {
@@ -360,14 +322,6 @@ Token Parser::ParseFilePathSpec() {
   return tok;
 }
 
-// Reads file_path_spec { , file_path_spec } into `paths` and returns the
-// position of a `-incdir` read where a path was due, or SourceLoc::None() when
-// none was. A.1.1 writes -incdir as a token of its own between a library's
-// file paths and its include directories, so no file_path_spec is spelled that
-// way, but the lexer reads a specification up to the next blank, comma or
-// semicolon and hands `-incdir` back as one all the same; the caller reports
-// it and reads the option's own list, rather than binding the library to a
-// file of that name.
 SourceLoc Parser::ParseFilePathSpecList(std::vector<std::string_view>& paths) {
   do {
     auto tok = ParseFilePathSpec();
@@ -377,9 +331,6 @@ SourceLoc Parser::ParseFilePathSpecList(std::vector<std::string_view>& paths) {
   return SourceLoc::None();
 }
 
-// Matches the `-incdir` that opens a library's include directories, a '-'
-// followed by the keyword. A '-' followed by anything else is left where it
-// stands for the semicolon check to report.
 bool Parser::MatchIncdirOption() {
   if (!Check(TokenKind::kMinus)) return false;
   auto saved = lexer_.SavePos();
@@ -393,8 +344,6 @@ LibraryDecl* Parser::ParseLibraryDecl() {
   auto* decl = arena_.Create<LibraryDecl>();
   decl->range.start = CurrentLoc();
   Expect(TokenKind::kKwLibrary, Subclause("33.3.1"));
-  // The library name view must outlive the throwaway SourceManager used to
-  // parse this map file, so copy it into the long-lived parser arena.
   decl->name =
       ArenaCopy(Expect(TokenKind::kIdentifier, Subclause("33.3.1")).text);
 
@@ -443,19 +392,10 @@ IncludeStmt* Parser::ParseLibraryIncludeStmt() {
 
 void Parser::ParseOutOfBlockConstraint(
     CompilationUnit* unit, const std::vector<ModuleItem*>* scope_items) {
-  // 18.5.1: external constraint block, declared outside its enclosing class
-  // with the class scope resolution operator. Record the class/name pair and
-  // its location so elaboration can pair it with a prototype and check its
-  // placement.
   SourceLoc loc = CurrentLoc();
-  // 18.5.10: an external constraint block may be qualified 'static'. Record
-  // whether the keyword is present so elaboration can check that it agrees with
-  // the completing prototype's qualification.
   bool is_static = Match(TokenKind::kKwStatic);
   Expect(TokenKind::kKwConstraint, Subclause("18.5.1"));
 
-  // 18.5.2: capture the dynamic override specifiers so elaboration can check
-  // that they match those on the completing constraint prototype.
   bool is_initial = false;
   bool is_extends = false;
   bool is_final = false;
@@ -473,9 +413,6 @@ void Parser::ParseOutOfBlockConstraint(
   Expect(TokenKind::kColonColon, Subclause("18.5.1"));
   std::string_view constraint_name = ExpectIdentifier(Subclause("18.5.1")).text;
   Expect(TokenKind::kLBrace, Subclause("18.5.1"));
-  // 18.5.1: capture the block's body so elaboration can complete the matching
-  // prototype with it. The body is scanned exactly like an in-class constraint
-  // block, into a member of its own that the block keeps whole.
   auto* body = arena_.Create<ClassMember>();
   body->kind = ClassMemberKind::kConstraint;
   ScanConstraintBodyRelations(body, false);
@@ -514,9 +451,6 @@ bool Parser::TryParseSecondaryTopLevel(CompilationUnit* unit) {
     ParseOutOfBlockConstraint(unit, nullptr);
     return true;
   }
-  // §3.12.1 with A.1.11: a covergroup_declaration is a
-  // package_or_generate_item_declaration, which a compilation unit holds
-  // outside every design element (§19.3).
   if (Check(TokenKind::kKwCovergroup)) {
     ParseCovergroupDecl(unit->cu_items);
     return true;
@@ -572,8 +506,6 @@ bool Parser::TryParsePrimaryTopLevel(CompilationUnit* unit) {
 
 namespace {
 
-// How many UDPs, modules, interfaces, programs and classes a compilation unit
-// holds.
 struct TopLevelSizes {
   size_t udps;
   size_t modules;
@@ -587,10 +519,6 @@ TopLevelSizes SizesOf(const CompilationUnit& unit) {
           unit.programs.size(), unit.classes.size()};
 }
 
-// §5.12: the attributes of the declaration `unit` gained since it held
-// `before`, which those written before it are given: a UDP's, a module's, an
-// interface's, a program's or a class's. Null for a package, whose record
-// keeps none, and for anything else.
 std::vector<Attribute>* AttributesOfNewest(CompilationUnit& unit,
                                            const TopLevelSizes& before) {
   if (unit.udps.size() > before.udps) return &unit.udps.back()->attrs;
@@ -611,9 +539,6 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   current_compilation_unit_ = unit;
   if (NoteItemAndMatchNull(unit->has_read_cu_item)) return;
   auto top_attrs = ParseAttributes();
-  // A.1.2's description writes { attribute_instance } before a package item
-  // and a bind directive, and no production writes one before `extern`: an
-  // extern declaration's stand after it, where ParseExternTopLevel reads them.
   if (Check(TokenKind::kKwExtern)) {
     if (!top_attrs.empty()) {
       diag_.Error(top_attrs.front().loc,
@@ -644,9 +569,6 @@ void Parser::ParseTopLevel(CompilationUnit* unit) {
   ReportUnexpectedTopLevelToken();
 }
 
-// A typedef, or a nettype declaration: §6.6.7 with §3.12.1 makes the second a
-// net declaration, which a compilation unit holds as a package does (A.1.2,
-// A.1.11, A.2.1.3).
 bool Parser::TryParseCuTypeDeclaration(CompilationUnit* unit) {
   if (Check(TokenKind::kKwTypedef)) {
     unit->cu_items.push_back(ParseTypedef());
@@ -659,10 +581,6 @@ bool Parser::TryParseCuTypeDeclaration(CompilationUnit* unit) {
   return false;
 }
 
-// The current token opens no top-level declaration. §14.7 names one such token
-// outright, forbidding a clocking block in a compilation unit's scope outside
-// every other declaration, so that rule is reported before the general §3.12.1
-// one, which says only that the token was not expected here.
 void Parser::ReportUnexpectedTopLevelToken() {
   if (AtClockingDecl()) {
     RejectClockingDecl(
@@ -681,9 +599,6 @@ bool Parser::TryParseCuImportOrExportDecl(CompilationUnit* unit) {
   if (kIsImport) {
     ParseImportDecl(items);
   } else {
-    // §H.9.2 lists compilation-unit scope among the scopes a DPI export can be
-    // declared in, and ParseExportDecl is what reads one wherever it stands,
-    // the package export declaration of §26.6 beside it.
     ParseExportDecl(items);
   }
   for (auto* item : items) unit->cu_items.push_back(item);
@@ -707,9 +622,6 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
     return true;
   }
 
-  // §18.5.10 lets an external constraint block open with `static`, and A.2.1.3
-  // lets a data declaration open with the same keyword as its lifetime, so the
-  // token after it decides which of the two this is.
   if (Check(TokenKind::kKwStatic) && StaticOpensConstraint()) {
     ParseOutOfBlockConstraint(unit, nullptr);
     return true;
@@ -738,9 +650,6 @@ bool Parser::TryParseCuScopeItem(CompilationUnit* unit) {
   return false;
 }
 
-// A.1.2 and A.5.1 write each extern form as `extern` and a header, and every
-// such header opens with its own { attribute_instance }, so the attribute
-// instances read after `extern` are the declaration's.
 void Parser::ParseExternTopLevel(CompilationUnit* unit) {
   SourceLoc extern_loc = CurrentLoc();
   Consume();
@@ -767,18 +676,11 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
     known_udps_.insert(udp->name);
     return;
   }
-  // A.1.6's extern_tf_declaration at compilation-unit scope, which A.1.2's
-  // description does not admit. Parser::ParseExternTfDeclaration reports it,
-  // no interface body being open, and reads the prototype so that the unit
-  // resumes after its ';'; the prototype itself is dropped, an interface
-  // being the one scope §25.7 defines it for.
   if (Check(TokenKind::kKwTask) || Check(TokenKind::kKwFunction) ||
       Check(TokenKind::kKwForkjoin)) {
     ParseExternTfDeclaration(extern_loc);
     return;
   }
-  // Nothing else follows `extern` in a compilation unit's scope. The unit
-  // resumes after the next ';'.
   diag_.Error(CurrentLoc(),
               "the token after 'extern' opens no module, interface, program or "
               "primitive header",
@@ -786,10 +688,6 @@ void Parser::ParseExternTopLevel(CompilationUnit* unit) {
   SkipToSemicolon(lexer_);
 }
 
-// A.1.2's `extern interface_nonansi_header`, `extern interface_ansi_header`
-// and the program pair, with `extern` already read and the parser standing at
-// `interface` or `program`: the header alone, which §23.5 has declare the
-// element's ports without defining it, read wherever it stands.
 ModuleDecl* Parser::ParseExternInterfaceOrProgramDecl() {
   TypeNameScope type_scope(*this);
   const bool kIsInterface = Check(TokenKind::kKwInterface);
@@ -809,10 +707,6 @@ ModuleDecl* Parser::ParseExternInterfaceOrProgramDecl() {
 }
 
 ModuleDecl* Parser::ParseExternModuleDecl() {
-  // §23.5's extern declaration carries the module's parameter port list, so a
-  // `parameter type` written there is registered exactly as the definition's
-  // own would be. Without the guard the extern header alone is enough to make
-  // the name a type for the definition that follows it.
   TypeNameScope type_scope(*this);
   auto* mod = arena_.Create<ModuleDecl>();
   mod->is_extern = true;
@@ -831,9 +725,6 @@ ModuleDecl* Parser::ParseExternModuleDecl() {
 
 ModuleDecl* Parser::ParseModuleDecl() {
   auto* mod = arena_.Create<ModuleDecl>();
-  // §23.9 makes a module a scope. The guard stands before the parameter port
-  // list is read, so a `parameter type` declared there is a type name in this
-  // module's body and in nothing after it.
   TypeNameScope type_scope(*this);
   auto loc = CurrentLoc();
   if (!Match(TokenKind::kKwMacromodule)) {
@@ -877,10 +768,6 @@ bool Parser::TryParsePackageBodyItem(std::vector<ModuleItem*>& items) {
 }
 
 PackageDecl* Parser::ParsePackageDecl() {
-  // §23.9 makes a package a scope, so a typedef in its body is not a type name
-  // after `endpackage`. What the body declared goes into package_types_ below
-  // instead, because §26.3 gives an importing scope those names without a
-  // package qualifier and ApplyImportedTypeNames is what hands them back.
   TypeNameScope type_scope(*this);
   auto* pkg = arena_.Create<PackageDecl>();
   pkg->range.start = CurrentLoc();
@@ -928,9 +815,6 @@ void Parser::ParseGenvarDecl(std::vector<ModuleItem*>& items) {
   do {
     auto* item = arena_.Create<ModuleItem>();
     item->kind = ModuleItemKind::kVarDecl;
-    // §27.4: a genvar has the shape of a variable declaration but does not
-    // exist at simulation time, so it is marked here rather than left
-    // indistinguishable from an ordinary variable.
     item->is_genvar = true;
     item->loc = CurrentLoc();
     item->name = Expect(TokenKind::kIdentifier, Subclause("27.4")).text;

@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §19.8.1: the formals of with function sample take the arguments of
-// sample(), which the coverpoints read: c.sample(3) hits hi.
 TEST(CovergroupInstanceSim, SampleArgumentsBindToSampleFormals) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"

@@ -12,30 +12,17 @@
 namespace delta {
 namespace {
 
-// The operands and the result of a wide operation as a little-endian sequence
-// of 64-bit limbs, which is the shape Logic4Vec already stores a value in
-// (common/types.h) and the shape the school arithmetic below works in.
 using Limbs = std::vector<uint64_t>;
 
 uint32_t LimbCount(uint32_t width) { return (width + 63) / 64; }
 
-// Every bit of the top limb that lies inside `width`, so a result can be cut
-// back to the width §11.6.1 settled: the arithmetic below carries into bits the
-// declaration does not have and none of them may read as set.
 uint64_t TopLimbMask(uint32_t width) {
   uint32_t bits = width % 64;
   return bits == 0 ? ~uint64_t{0} : (uint64_t{1} << bits) - 1;
 }
 
-// Every operand and result here is wider than one limb, EvalBinaryArith
-// handing over no narrower operation, so no sequence of limbs below is empty.
 void MaskToWidth(Limbs& v, uint32_t width) { v.back() &= TopLimbMask(width); }
 
-// The known bits of a value as limbs, its own width's worth and no more: the
-// top limb of its storage is cut to its width, so a value whose storage was
-// never masked above its declared width cannot leak into the extension below.
-// The limbs above a narrower value's, the power operator's self-determined
-// exponent, stay clear.
 Limbs KnownLimbs(const Logic4Vec& v, uint32_t width) {
   Limbs out(LimbCount(width), 0);
   for (uint32_t i = 0; i < out.size() && i < v.nwords; ++i) {
@@ -49,17 +36,12 @@ bool BitAt(const Limbs& v, uint32_t bit) {
   return ((v[bit / 64] >> (bit % 64)) & 1) != 0;
 }
 
-// §11.6.1: a signed operand narrower than the result extends by its sign where
-// an unsigned one extends with zeros. The value's own width is where its sign
-// bit is, which is not where the result's is.
 void SignExtendLimbs(Limbs& v, uint32_t from_width, uint32_t width) {
   if (from_width >= width || !BitAt(v, from_width - 1)) return;
   for (uint32_t bit = from_width; bit < width; ++bit)
     v[bit / 64] |= uint64_t{1} << (bit % 64);
 }
 
-// An operand as the limbs the result width asks for, extended into the bits it
-// does not have of its own.
 Limbs ToLimbs(const Logic4Vec& v, uint32_t width, bool is_signed) {
   Limbs out = KnownLimbs(v, width);
   if (is_signed) SignExtendLimbs(out, v.width, width);
@@ -76,9 +58,6 @@ Logic4Vec FromLimbs(const Limbs& v, uint32_t width, Arena& arena) {
   return out;
 }
 
-// The ripple carry §11.4.3's addition asks for, across limbs rather than
-// within one. Both operands are the result width's limbs, as every sequence
-// here is.
 void AddInto(Limbs& a, const Limbs& b) {
   uint64_t carry = 0;
   for (size_t i = 0; i < a.size(); ++i) {
@@ -91,9 +70,6 @@ void AddInto(Limbs& a, const Limbs& b) {
   }
 }
 
-// Two's complement: the bitwise complement plus one, which is what makes
-// subtraction an addition and what carries a negative value's sign into every
-// limb above it.
 Limbs Negate(const Limbs& v) {
   Limbs out(v.size(), 0);
   for (size_t i = 0; i < v.size(); ++i) out[i] = ~v[i];
@@ -112,8 +88,6 @@ bool IsZero(const Limbs& v) {
 
 bool IsNegative(const Limbs& v, uint32_t width) { return BitAt(v, width - 1); }
 
-// True when `a` is at least `b`, comparing from the most significant limb down,
-// which is the comparison the long division below steps on.
 bool AtLeast(const Limbs& a, const Limbs& b) {
   for (size_t i = a.size(); i-- > 0;) {
     if (a[i] != b[i]) return a[i] > b[i];
@@ -132,9 +106,6 @@ void ShiftLeftOne(Limbs& v) {
 
 void SubInto(Limbs& a, const Limbs& b) { AddInto(a, Negate(b)); }
 
-// A 64-by-64 product as its two halves. The language has no 128-bit integer to
-// take it in, so each operand is split at 32 bits and the four partial products
-// are recombined -- the same arithmetic a compiler extension would hide.
 struct Product64 {
   uint64_t lo = 0;
   uint64_t hi = 0;
@@ -157,10 +128,6 @@ Product64 Multiply64(uint64_t a, uint64_t b) {
   return out;
 }
 
-// The schoolbook product: every partial product placed at its own limb with the
-// half that does not fit carried into the next. Partial products whose place
-// lies above the result width are dropped, which is the truncation §11.6.1
-// already applies to the width.
 Limbs Multiply(const Limbs& a, const Limbs& b) {
   Limbs out(a.size(), 0);
   for (size_t i = 0; i < a.size(); ++i) {
@@ -178,10 +145,6 @@ Limbs Multiply(const Limbs& a, const Limbs& b) {
   return out;
 }
 
-// Binary long division: one shift and one conditional subtraction per bit of
-// the dividend, which needs no estimate of a quotient digit and so no case
-// analysis to get wrong. `width` bits is a bounded number of steps -- 128 for
-// the widths a declaration reaches in practice.
 struct DivResult {
   Limbs quotient;
   Limbs remainder;
@@ -200,10 +163,6 @@ DivResult DivMod(const Limbs& dividend, const Limbs& divisor, uint32_t width) {
   return out;
 }
 
-// §11.4.3: the power operator raises the base to the exponent's power, taken
-// here by squaring so the number of multiplications
-// follows the exponent's bit count rather than its value. Every product is
-// already truncated to the result width by Multiply.
 Limbs Power(const Limbs& base, const Limbs& exp, uint32_t width) {
   Limbs result(base.size(), 0);
   result[0] = 1;
@@ -219,9 +178,6 @@ Limbs Power(const Limbs& base, const Limbs& exp, uint32_t width) {
   return result;
 }
 
-// §11.4.3 gives division a quotient truncated toward zero and gives the
-// modulus the sign of the first operand, so both are taken on magnitudes and
-// the sign is applied afterwards.
 struct SignedDivision {
   Limbs magnitude;
   bool negative = false;
@@ -247,9 +203,6 @@ Limbs ApplySign(const SignedDivision& d, uint32_t width) {
   return out;
 }
 
-// §11.4.4's answer for a negative exponent, which the squaring above cannot
-// take: 1 where the base is 1, the base itself where it is -1 and the exponent
-// odd, and 0 for every other base.
 Limbs NegativeExponentResult(const Limbs& base, const Limbs& exp,
                              uint32_t width) {
   Limbs one(base.size(), 0);
@@ -283,20 +236,11 @@ Logic4Vec EvalWideArith(TokenKind op, const Logic4Vec& lhs,
       break;
     case TokenKind::kSlash:
     case TokenKind::kPercent:
-      // §11.4.3: a division or modulus by zero yields a result whose every bit
-      // is x.
       if (IsZero(b)) return MakeAllX(arena, spec.width);
       result = ApplySign(
           DivideMagnitudes(a, b, spec, op == TokenKind::kPercent), spec.width);
       break;
     default:
-      // TokenKind::kPower, the one arithmetic operator left, EvalBinaryArith
-      // handing over no other. §11.4.4: with an integer base and a negative
-      // exponent the result is 0, except that a base of 1 gives 1 and a base of
-      // -1 gives 1 or -1 by the exponent's parity. The squaring below reads the
-      // exponent's bits as a magnitude, which a negative exponent is not. A
-      // zero base under a negative exponent is x in every bit (§11.4.3, Table
-      // 11-4), as a division by zero is.
       b = ToLimbs(rhs, spec.width, spec.exponent_is_signed);
       if (spec.exponent_is_signed && IsNegative(b, spec.width)) {
         if (IsZero(a)) return MakeAllX(arena, spec.width);

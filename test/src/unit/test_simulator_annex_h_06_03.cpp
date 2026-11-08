@@ -11,26 +11,14 @@
 
 using namespace delta;
 
-// Annex H.6.3 (Output arguments): the initial value of a formal specified in
-// SystemVerilog as output is undetermined and implementation dependent, as
-// §35.5.1.2 has it. The cases check which directions hand the foreign code a
-// determined value on entry, and that a packed output, which crosses in its
-// canonical form, does not hand the foreign code the actual's words -- what
-// it finds there is this implementation's choice and not the caller's value.
-
 namespace {
 
-// §H.6.3: the foreign code finds a determined value on entry in an input and
-// an inout, the actual's, and none in an output.
 TEST(DpiOutputArguments, AnOutputsInitialValueIsUndetermined) {
   EXPECT_TRUE(DpiFormalIsDeterminedOnEntry(Direction::kInput));
   EXPECT_TRUE(DpiFormalIsDeterminedOnEntry(Direction::kInout));
   EXPECT_FALSE(DpiFormalIsDeterminedOnEntry(Direction::kOutput));
 }
 
-// §H.6.3: an imported function with a `bit [63:0]` output formal is not
-// handed the actual's words; the value it does find is the implementation's,
-// and what it writes is what the actual takes.
 TEST(DpiOutputArguments, APackedOutputDoesNotCarryTheActualIn) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -59,10 +47,8 @@ TEST(DpiOutputArguments, APackedOutputDoesNotCarryTheActualIn) {
       {SvLogicVecVal{0x12345678U, 0U}, SvLogicVecVal{0x9ABCDEF0U, 0U}}, 64,
       DataTypeKind::kBit)};
   rt.CallImportWithArgs("fill", actuals);
-  // The words the foreign function found were not the actual's...
   EXPECT_NE(seen_low, 0x12345678U);
   EXPECT_NE(seen_high, 0x9ABCDEF0U);
-  // ...and the actual now holds what it wrote.
   ASSERT_TRUE(actuals[0].IsWideVec());
   EXPECT_EQ(actuals[0].AsLogicVecWords()[0].aval, 0x11111111U);
   EXPECT_EQ(actuals[0].AsLogicVecWords()[1].aval, 0x22222222U);

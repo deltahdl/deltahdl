@@ -21,11 +21,6 @@ TEST(InterfaceClassInheritance, InterfaceExtendsInterface) {
              "endmodule\n"));
 }
 
-// Every report in this file stands at the offending class declaration, which is
-// the location ValidateInterfaceClassInheritance and
-// ValidateRegularClassInheritance in
-// src/elaborator/elaborator_validate_class_overrides.cpp pass as
-// cls->range.start.
 TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
   ElabFixture f;
   ElabOk(
@@ -42,10 +37,6 @@ TEST(InterfaceClassImplements, InterfaceImplementsInterfaceError) {
                             4, "8.26.2"));
 }
 
-// An interface class is barred from the 'implements' mechanism entirely: it may
-// not implement a regular class (nor a virtual class) any more than it may
-// implement another interface class. Inheritance for an interface class is
-// exclusively through 'extends' targeting interface classes.
 TEST(InterfaceClassImplements, InterfaceImplementsClassError) {
   ElabFixture f;
   ElabOk(
@@ -61,10 +52,6 @@ TEST(InterfaceClassImplements, InterfaceImplementsClassError) {
                             3, "8.26.2"));
 }
 
-// The "or virtual class" arm of the same prohibition: an interface class naming
-// a virtual class after 'implements' is rejected just as a regular-class target
-// is. The bar is on an interface class using 'implements' at all, so the target
-// being virtual rather than plain does not change the outcome.
 TEST(InterfaceClassImplements, InterfaceImplementsVirtualClassError) {
   ElabFixture f;
   ElabOk(
@@ -141,9 +128,6 @@ TEST(InterfaceClassImplements, SingleInterfaceImplementationOk) {
              "endmodule\n"));
 }
 
-// §8.26.2 with §26.3: `implements p::I` is checked against the package's
-// interface class, whose g the class implements, not the module's I, whose f
-// it does not...
 TEST(InterfaceClassImplements, ImplementsThroughAPackageIsThePackagesClass) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -157,7 +141,6 @@ TEST(InterfaceClassImplements, ImplementsThroughAPackageIsThePackagesClass) {
              "endmodule\n"));
 }
 
-// ...so implementing the module's f leaves the package's g unimplemented.
 TEST(InterfaceClassImplements,
      ImplementsThroughAPackageNeedsThePackagesMethod) {
   ElabFixture f;
@@ -230,12 +213,6 @@ TEST(InterfaceClassExtends, MultipleBaseInterfaceClasses) {
              "endmodule\n"));
 }
 
-// The rule that rejects this source is §8.26's requirement that an implementing
-// class supply every pure virtual method, not the §8.26.2 extends/implements
-// restriction the rest of this file covers: a non-virtual method is not an
-// implementation, so CheckInterfaceMethods in
-// src/elaborator/elaborator_validate_class_inheritance.cpp finds none and
-// reports under §8.26.
 TEST(InterfaceClassImplements, NonVirtualMethodDoesNotSatisfyInterface) {
   ElabFixture f;
   ElabOk(
@@ -313,11 +290,6 @@ TEST(InterfaceClassImplements, VirtualClassImplementsInterfaceOk) {
              "endmodule\n"));
 }
 
-// §8.26.2: the 'implements' target must be an interface class. A *virtual*
-// class is still a class, not an interface class, so naming one after
-// 'implements' is rejected exactly as a regular class would be — this covers
-// the "or virtual class" input form of that prohibition, which the plain-class
-// case above does not exercise.
 TEST(ExtendsVsImplementsRestrictions, ClassImplementsVirtualClassError) {
   ElabFixture f;
   ElabOk(
@@ -334,19 +306,6 @@ TEST(ExtendsVsImplementsRestrictions, ClassImplementsVirtualClassError) {
                             "8.26.2"));
 }
 
-// §8.26.2: naming a non-interface class after 'implements' breaks that
-// subclause and nothing else, so the report above is the only one the source
-// draws. §8.26 poses the obligation to provide an implementation for a pure
-// virtual method only where an interface class is implemented (printed page 209
-// of IEEE 1800-2023), and VBase is a virtual class, so a report saying C
-// fails to implement 'foo' "from interface 'VBase'" states something false
-// about the source and names a clause the source does not break.
-//
-// The assertion is about what was not reported, which ReportedError cannot say:
-// it answers whether some recorded error matches, and passes whether or not a
-// second one stands beside it. So the case above holds that the §8.26.2 report
-// is present and this one holds that the §8.26 report is absent; a fix that
-// suppressed both would satisfy only one of the two.
 TEST(ExtendsVsImplementsRestrictions,
      ImplementsNonInterfaceReportsOnlyTheImplementsRule) {
   ElabFixture f;
@@ -369,9 +328,6 @@ TEST(ExtendsVsImplementsRestrictions,
   EXPECT_FALSE(claimed_unimplemented);
 }
 
-// §8.26.2: the same prohibition applies when the implementing subject is itself
-// a virtual class — a virtual class may implement interface classes but not a
-// (non-interface) regular class.
 TEST(ExtendsVsImplementsRestrictions, VirtualClassImplementsNonInterfaceError) {
   ElabFixture f;
   ElabOk(
@@ -387,9 +343,6 @@ TEST(ExtendsVsImplementsRestrictions, VirtualClassImplementsNonInterfaceError) {
                             "8.26.2"));
 }
 
-// Like NonVirtualMethodDoesNotSatisfyInterface, the report here is §8.26's
-// unimplemented-prototype rule rather than the §8.26.2 restriction: the
-// inherited method is not virtual, so it does not discharge the prototype.
 TEST(InterfaceClassImplements, InheritedNonVirtualFromBaseDoesNotSatisfy) {
   ElabFixture f;
   ElabOk(
@@ -410,9 +363,6 @@ TEST(InterfaceClassImplements, InheritedNonVirtualFromBaseDoesNotSatisfy) {
                             "8.26"));
 }
 
-// A subclass that declares its own virtual method of the same name as a
-// non-virtual base method hides that base method, and the override is what
-// satisfies the implemented interface's pure virtual requirement.
 TEST(InterfaceClassImplements,
      OwnVirtualOverrideHidesNonVirtualBaseAndSatisfies) {
   EXPECT_TRUE(

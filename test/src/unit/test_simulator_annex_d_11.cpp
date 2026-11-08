@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Annex D.11: before any $scope runs, the interactive scope is the first
-// top-level module of the design.
 TEST(OptionalScopeSim, InitialScopeIsFirstTopModule) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -24,8 +22,6 @@ TEST(OptionalScopeSim, InitialScopeIsFirstTopModule) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t");
 }
 
-// Annex D.11: the argument is a complete hierarchical name; a dotted name that
-// reaches a named block is recorded in full.
 TEST(OptionalScopeSim, ScopeAcceptsHierarchicalName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -39,9 +35,6 @@ TEST(OptionalScopeSim, ScopeAcceptsHierarchicalName) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.blk");
 }
 
-// Annex D.11: a complete hierarchical name may descend several levels. $scope
-// records every component, so a name reaching a block nested inside another
-// named block is captured in full.
 TEST(OptionalScopeSim, ScopeAcceptsMultiLevelHierarchicalName) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -57,8 +50,6 @@ TEST(OptionalScopeSim, ScopeAcceptsMultiLevelHierarchicalName) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.outer.inner");
 }
 
-// Annex D.11: $scope specifies a single level of hierarchy, so the most recent
-// call determines the current interactive scope.
 TEST(OptionalScopeSim, LastScopeWins) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -73,10 +64,6 @@ TEST(OptionalScopeSim, LastScopeWins) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.blk");
 }
 
-// Annex D.11: the argument must give the full hierarchical name of a module, a
-// task, a function or a named block. An instance under the top, a task of the
-// top and a function of the instance are each such a name, and the last call's
-// scope is the one that stands.
 TEST(OptionalScopeSim, ScopeAcceptsAnInstanceATaskAndAFunction) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -98,7 +85,6 @@ TEST(OptionalScopeSim, ScopeAcceptsAnInstanceATaskAndAFunction) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.u1.f");
 }
 
-// A named fork is a named block as a named begin-end is.
 TEST(OptionalScopeSim, ScopeAcceptsANamedFork) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -113,9 +99,6 @@ TEST(OptionalScopeSim, ScopeAcceptsANamedFork) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.fk");
 }
 
-// Annex D.11 with §9.3.5: a label on a statement other than a begin-end or a
-// fork opens a named begin-end around the statement, a named block whose full
-// name $scope takes.
 TEST(OptionalScopeSim, ScopeAcceptsTheBeginALabelOpensAroundAStatement) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -132,8 +115,6 @@ TEST(OptionalScopeSim, ScopeAcceptsTheBeginALabelOpensAroundAStatement) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.lbl");
 }
 
-// §9.3.5: a label on a foreach loop names the implicit block the loop
-// creates, which $scope takes as it takes any named block.
 TEST(OptionalScopeSim, ScopeAcceptsTheBlockALabelNamesOnAForeachLoop) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -150,9 +131,6 @@ TEST(OptionalScopeSim, ScopeAcceptsTheBlockALabelNamesOnAForeachLoop) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t.lp");
 }
 
-// §9.3.5 opens a begin-end only around a procedural statement: the label of a
-// concurrent assertion written as a module item names the assertion, which is
-// none of the scopes $scope takes.
 TEST(OptionalScopeSim, AConcurrentAssertionItemsLabelNamesNoScope) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -171,9 +149,6 @@ TEST(OptionalScopeSim, AConcurrentAssertionItemsLabelNamesNoScope) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t");
 }
 
-// An argument that names no scope of the design -- a name nothing declares,
-// and a variable's -- is reported under D.11 and the scope stays where it
-// was. Any text was recorded as the scope.
 TEST(OptionalScopeSim, AnArgumentNamingNoScopeIsRejected) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,11 +174,6 @@ TEST(OptionalScopeSim, AnArgumentNamingNoScopeIsRejected) {
   EXPECT_EQ(f.ctx.InteractiveScope(), "t");
 }
 
-// Annex D.11 with §9.3.5: a label on an assertion written in a procedure opens
-// a named begin around it, whose full name the assertion shares. $scope given
-// that name makes the begin, a named block, the interactive scope, so the
-// cbInteractiveScopeChange callback (§38.36.3) is given the begin rather than
-// the assertion it holds.
 TEST_F(EventCallbacksOfARun, ScopeOnALabelledAssertionNotesItsBegin) {
   Armer() = [] { PlaceEventCallback(cbInteractiveScopeChange, nullptr); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"

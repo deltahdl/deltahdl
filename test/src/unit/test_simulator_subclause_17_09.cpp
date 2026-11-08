@@ -19,10 +19,6 @@ size_t Occurrences(const std::string& text, std::string_view needle) {
   return count;
 }
 
-// The stimulus both window checkers run under: posedges every 10 from 5, the
-// signals driven at negedges. A window opens at the posedge at 15 and closes
-// at 45 with the test expression true throughout; a second opens at 75, the
-// test expression falls at 95 and the window closes at 105.
 constexpr std::string_view kStimulus =
     "  logic clk = 0, rst = 0, s = 0, e = 0, t = 1;\n"
     "  always #5 clk = ~clk;\n"
@@ -37,13 +33,6 @@ constexpr std::string_view kStimulus =
     "    #20 $finish;\n"
     "  end\n";
 
-// §17.9: a checker that requires an expression to hold over each window
-// between two Boolean events: untyped event formals, the clock and reset
-// defaulting to $inferred_clock and $inferred_disable, a string formal, an
-// enumeration formal a generate if tests, default clocking and default
-// disable iff in the checker, and the window kept in checker variables an
-// always_comb and an always_ff drive. Its assertion holds over the first
-// window and fails at 95 in the second, and each cover reports both.
 TEST(ComplexChecker, ABooleanWindowCheckerRunsAsTheClauseDescribes) {
   SimFixture f;
   std::string out = RunCapture(
@@ -85,10 +74,6 @@ TEST(ComplexChecker, ABooleanWindowCheckerRunsAsTheClauseDescribes) {
   EXPECT_EQ(f.ctx.LastSeverityTime().ticks, 95u);
 }
 
-// §17.9: the same window over sequence events, read through `triggered` in
-// let declarations, the next window computed by a checker function called
-// on an always_ff's right-hand side, since a triggered status is reset
-// without an event and so belongs in no always_comb.
 TEST(ComplexChecker, ASequenceWindowCheckerRunsAsTheClauseDescribes) {
   SimFixture f;
   std::string out = RunCapture(

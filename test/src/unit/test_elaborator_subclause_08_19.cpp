@@ -176,8 +176,6 @@ TEST(ConstantClassPropertyElaboration, InstanceConstAssignInMethodError) {
                             "assignment to instance constant", 7, "8.19"));
 }
 
-// §8.19: an instance constant's assignment can only be done once in the
-// constructor. Two unconditional writes in new() are a double assignment.
 TEST(ConstantClassPropertyElaboration, InstanceConstDoubleAssignInCtorError) {
   ElabFixture f;
   ElabOk(
@@ -197,8 +195,6 @@ TEST(ConstantClassPropertyElaboration, InstanceConstDoubleAssignInCtorError) {
                             "8.19"));
 }
 
-// §8.19: choosing the single value across the branches of an if/else is one
-// dynamic write, not two, so it must not be flagged as a double assignment.
 TEST(ConstantClassPropertyElaboration, InstanceConstBranchedSingleAssignOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -235,20 +231,6 @@ TEST(ConstantClassPropertyElaboration, InstanceConstAssignInTaskError) {
                             "assignment to instance constant", 7, "8.19"));
 }
 
-// The seven cases below cover the child-statement links of Stmt that
-// WalkStmtsForConstClassProp in src/elaborator/elaborator_validate_classes.cpp
-// reaches for the first time now that it takes its list from ForEachChildStmt
-// in src/elaborator/elaborator_validate_internal.h. It had written out six of
-// the thirteen, so a write to a const class property standing in any of the
-// other seven was reported by nothing. §8.19 puts no condition on the statement
-// the assignment is written in, so each is the same rule the two cases above
-// state, moved into one more statement position. The report stands at the
-// offending assignment, which is the location Stmt::range.start gives.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
-// holds an assignment like any other statement position, and §9.3.2 makes the
-// arms of a fork run concurrently, which §8.19 says nothing about.
 TEST(ConstantClassPropertyElaboration, GlobalConstAssignInForkArmError) {
   ElabFixture f;
   ElabOk(
@@ -268,10 +250,6 @@ TEST(ConstantClassPropertyElaboration, GlobalConstAssignInForkArmError) {
                             "assignment to global constant", 5, "8.19"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so a
-// for header assigns to any variable in scope, the const class property among
-// them. The loop's control variable is declared above the loop, which leaves
-// the header's assignment as the only write in the source.
 TEST(ConstantClassPropertyElaboration,
      GlobalConstAssignInForInitializationError) {
   ElabFixture f;
@@ -291,9 +269,6 @@ TEST(ConstantClassPropertyElaboration,
                             "assignment to global constant", 5, "8.19"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, so a for step writes a
-// variable the same way the initialization does.
 TEST(ConstantClassPropertyElaboration, GlobalConstAssignInForStepError) {
   ElabFixture f;
   ElabOk(
@@ -312,10 +287,6 @@ TEST(ConstantClassPropertyElaboration, GlobalConstAssignInForStepError) {
                             "assignment to global constant", 5, "8.19"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// Which arm runs is decided when the design runs; §8.19 is a rule about the
-// source, so the write is illegal in either.
 TEST(ConstantClassPropertyElaboration,
      GlobalConstAssignInAssertionPassStmtError) {
   ElabFixture f;
@@ -352,10 +323,6 @@ TEST(ConstantClassPropertyElaboration,
                             "assignment to global constant", 4, "8.19"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. The weighted draw decides which item runs, and §8.19 holds whether
-// this one is drawn or not.
 TEST(ConstantClassPropertyElaboration, GlobalConstAssignInRandcaseItemError) {
   ElabFixture f;
   ElabOk(
@@ -375,11 +342,6 @@ TEST(ConstantClassPropertyElaboration, GlobalConstAssignInRandcaseItemError) {
                             "assignment to global constant", 5, "8.19"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp
-// puts them in RsProd::code_stmts, which Stmt::rs_productions reaches and no
-// other member of Stmt does.
 TEST(ConstantClassPropertyElaboration,
      GlobalConstAssignInRandsequenceCodeBlockError) {
   ElabFixture f;
@@ -400,10 +362,6 @@ TEST(ConstantClassPropertyElaboration,
                             "assignment to global constant", 5, "8.19"));
 }
 
-// §8.1 lets a class be declared wherever a data declaration may appear, and
-// §8.19's rules are on the property, not on the scope its class stands in, so
-// a class declared in a module, a package, a program, an interface or another
-// class is held to them as a class at file scope is.
 TEST(ConstantClassPropertyElaboration, ModuleClassGlobalConstAssignError) {
   ElabFixture f;
   ElabOk(
@@ -511,9 +469,6 @@ TEST(ConstantClassPropertyElaboration, ModuleClassInstanceConstInCtorOk) {
              "endmodule\n"));
 }
 
-// §8.19's rules are on the property whatever name an assignment reaches it
-// by: `this.k` inside the class, `h.k` through a handle and `C::k` through the
-// class scope resolution operator of §8.23 are the same property as `k`.
 TEST(ConstantClassPropertyElaboration, GlobalConstAssignThroughThisError) {
   ElabFixture f;
   ElabOk(
@@ -654,10 +609,6 @@ TEST(ConstantClassPropertyElaboration, NonConstPropertyAssignThroughHandleOk) {
              "endmodule\n"));
 }
 
-// §8.13 gives a derived class its base's properties, so a derived class's
-// method names the base's constant by its bare name and §8.19 still forbids
-// the write. The constructor that may assign an instance constant is the one
-// of the class declaring it, so the derived class's own constructor may not.
 TEST(ConstantClassPropertyElaboration,
      InheritedGlobalConstAssignInDerivedMethodError) {
   ElabFixture f;
@@ -719,9 +670,6 @@ TEST(ConstantClassPropertyElaboration, ShadowingPropertyOfInheritedConstOk) {
              "endmodule\n"));
 }
 
-// §8.19 holds for a write through a handle wherever the write stands, so a
-// subroutine body is held to it as an initial block is, with the handle's
-// class taken from a formal, a local or a property of the enclosing class.
 TEST(ConstantClassPropertyElaboration,
      GlobalConstAssignThroughFormalInOtherClassMethodError) {
   ElabFixture f;

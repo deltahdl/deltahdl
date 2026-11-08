@@ -136,8 +136,6 @@ TEST(Elaborator, DefaultTriregStrength_ZeroValue) {
   EXPECT_TRUE(found);
 }
 
-// The charge strength a named net of a named module was given, or 0 when the
-// module or the net is not in the design.
 uint32_t StrengthOfNet(const RtlirDesign* design, std::string_view module,
                        std::string_view net_name) {
   for (const auto* mod : design->top_modules) {
@@ -149,11 +147,6 @@ uint32_t StrengthOfNet(const RtlirDesign* design, std::string_view module,
   return 0;
 }
 
-// Annex E.3: the directive is a compiler directive, in force for the source
-// that follows it as E.1's companions of Clause 22 are, so a second directive
-// between two modules leaves the first module's trireg under the first
-// strength and gives the second module's the second. A strength read off the
-// compilation unit's last directive would give both 200.
 TEST(Elaborator, DefaultTriregStrength_EachModuleTakesTheDirectiveBeforeIt) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -165,15 +158,13 @@ TEST(Elaborator, DefaultTriregStrength_EachModuleTakesTheDirectiveBeforeIt) {
       "module b;\n"
       "  trireg cap;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(StrengthOfNet(design, "a", "cap"), 50u);
   EXPECT_EQ(StrengthOfNet(design, "b", "cap"), 200u);
 }
 
-// Annex E.3: a module declared before any directive is not under the one that
-// follows it, so its trireg keeps the strength a declaration without one gets.
 TEST(Elaborator, DefaultTriregStrength_AModuleBeforeTheDirectiveIsNotUnderIt) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -184,7 +175,7 @@ TEST(Elaborator, DefaultTriregStrength_AModuleBeforeTheDirectiveIsNotUnderIt) {
       "module b;\n"
       "  trireg cap;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(StrengthOfNet(design, "a", "cap"), 0u);

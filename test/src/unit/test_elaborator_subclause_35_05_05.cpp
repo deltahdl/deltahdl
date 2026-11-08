@@ -7,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §35.5.5: an exported function's result type is held to the same limits. A
-// function whose result is a permitted small value (int) can be exported
-// without error -- the export's result-type restriction is satisfied.
 TEST(DpiExportResult, ExportedFunctionWithSmallValueResultIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -22,8 +19,6 @@ TEST(DpiExportResult, ExportedFunctionWithSmallValueResultIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.5: a scalar bit result is a permitted small value, so exporting a
-// bit-returning function is well-formed.
 TEST(DpiExportResult, ExportedFunctionWithScalarBitResultIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -36,9 +31,6 @@ TEST(DpiExportResult, ExportedFunctionWithScalarBitResultIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.5: string is a permitted small-value result, and that permission
-// carries over to exported functions, so a string-returning function exports
-// without error.
 TEST(DpiExportResult, ExportedFunctionWithStringResultIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -51,8 +43,6 @@ TEST(DpiExportResult, ExportedFunctionWithStringResultIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.5: the scalar-only restriction on logic results applies to exported
-// functions too. A function returning a packed logic vector cannot be exported.
 TEST(DpiExportResult, ExportedFunctionWithPackedLogicResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -68,9 +58,6 @@ TEST(DpiExportResult, ExportedFunctionWithPackedLogicResultIsError) {
                             4, "35.5.5"));
 }
 
-// §35.5.5: function results are restricted to small values, and that
-// restriction carries over to exported functions. A packed bit vector is not a
-// scalar bit value, so exporting a function that returns one is an error.
 TEST(DpiExportResult, ExportedFunctionWithPackedBitResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -86,9 +73,6 @@ TEST(DpiExportResult, ExportedFunctionWithPackedBitResultIsError) {
                             4, "35.5.5"));
 }
 
-// §35.5.5: 'integer' is absent from the permitted result-type list (it is a
-// wide 4-state vector, allowed only as a formal argument under §35.5.6), so
-// exporting an integer-returning function is rejected.
 TEST(DpiExportResult, ExportedFunctionWithIntegerResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -104,9 +88,6 @@ TEST(DpiExportResult, ExportedFunctionWithIntegerResultIsError) {
                             4, "35.5.5"));
 }
 
-// §35.5.5 governs *function* results; a task has no result, so the
-// result-type restriction does not constrain an exported task. Exporting a task
-// remains well-formed.
 TEST(DpiExportResult, ExportedTaskIsNotSubjectToResultRestriction) {
   ElabFixture f;
   Elaborate(R"(
@@ -119,12 +100,6 @@ TEST(DpiExportResult, ExportedTaskIsNotSubjectToResultRestriction) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.5: a function's result type is limited to small values, and a typedef
-// name is not a type of its own. Parser::ParseDpiImport holds a result written
-// as a name as a kNamed type and ValidateDpiResultType in
-// src/parser/parser_dpi_validate.cpp passes every one of them, having no
-// typedef table to look the name up in, so the restriction reaches a typedef
-// only in the elaborator.
 TEST(DpiImportResult, ATypedefOfAPackedVectorAsResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -140,10 +115,6 @@ TEST(DpiImportResult, ATypedefOfAPackedVectorAsResultIsError) {
                             4, "35.5.5"));
 }
 
-// §35.5.5: a name that stands for a permitted type is permitted, so the
-// restriction has to be applied to the type a name reaches rather than to the
-// name. Without this case a check that reported every typedef result would
-// pass the rejection cases above it.
 TEST(DpiImportResult, ATypedefOfAPermittedTypeAsResultIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -156,9 +127,6 @@ TEST(DpiImportResult, ATypedefOfAPermittedTypeAsResultIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.5.5: a name standing for another name is followed to the end, so writing
-// a second typedef over the first does not put a wide vector past the
-// restriction. `bit [63:0]` is the type reached, and it is the type judged.
 TEST(DpiImportResult, ATypedefChainReachingAPackedVectorAsResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -175,9 +143,6 @@ TEST(DpiImportResult, ATypedefChainReachingAPackedVectorAsResultIsError) {
                             5, "35.5.5"));
 }
 
-// §35.5.5: an exported function's result type is held to the same limits. A
-// name reaches the export path the same way it reaches the import path, so the
-// type behind it decides there too.
 TEST(DpiExportResult, ExportedFunctionWithTypedefOfPackedVectorResultIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -194,8 +159,6 @@ TEST(DpiExportResult, ExportedFunctionWithTypedefOfPackedVectorResultIsError) {
                             5, "35.5.5"));
 }
 
-// §35.5.5: the export path follows a name to a permitted type as readily as to
-// a forbidden one, so a function returning a name for `int` still exports.
 TEST(DpiExportResult, ExportedFunctionWithTypedefOfIntResultIsOk) {
   ElabFixture f;
   Elaborate(R"(

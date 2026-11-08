@@ -54,8 +54,6 @@ void UnitScopeTables::Put(UnitScopeTables tables, Elaborator& e) {
 
 void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   auto& units = e.units_;
-  // §5.8: every time literal takes its scope's unit before anything evaluates
-  // it, each unit's against that unit's own declarations.
   if (units.units.empty()) {
     ScaleTimeLiterals(*e.unit_);
   } else {
@@ -71,10 +69,6 @@ void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
   auto all_typedefs = e.all_typedefs_;
   auto all_cu_param_scope = e.all_cu_param_scope_;
   auto all_td_array_dims = e.all_td_array_dims_;
-  // Each unit's own tables, registered from its own view. What registering
-  // reports was reported once already, over the merged view above. The unit's
-  // subroutines are then checked against them, which the merged view's would
-  // answer with every unit's names.
   for (size_t k = 0; k < units.views.size(); ++k) {
     Put(*kFresh, e);
     e.unit_ = units.views[k];
@@ -97,9 +91,6 @@ void UnitScopeTables::RunPreElaborationValidations(Elaborator& e) {
 
 namespace {
 
-// The unit's own entries of `from`, the ones under a bare name, added to `to`
-// under `scope`'s name; a package's or a class's entry, "p::t", is the same in
-// every unit and stands in `to` already.
 template <typename Value>
 void AddUnitScoped(std::unordered_map<std::string_view, Value>& to,
                    const std::unordered_map<std::string_view, Value>& from,

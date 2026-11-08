@@ -1,9 +1,3 @@
-// The parameters of a module's parameter port list (§6.20.1, §23.2.3) and the
-// value an instance's parameter value assignment (§23.10.2) or a
-// configuration's (§33.4.3) gives a parameter, moved out of
-// src/elaborator/elaborator_module.cpp, which holds the module's frame, at its
-// size limit.
-
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -45,8 +39,6 @@ const Elaborator::ParamOverride* FindParamOverride(
   return nullptr;
 }
 
-// §6.20.3: follow typedef and type-parameter substitutions to decide whether a
-// declared type ultimately names a class type.
 static bool ParamTypeResolvesToClass(
     const DataType& dtype, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names) {
@@ -61,20 +53,12 @@ static bool ParamTypeResolvesToClass(
   return false;
 }
 
-// The elaborator state needed to validate a type-parameter-typed value
-// parameter's assigned value, bundled to stay within the argument-count limit.
 struct TypeParamValueCtx {
   const TypedefMap& typedefs;
   const std::unordered_set<std::string_view>& class_names;
   DiagEngine& diag;
 };
 
-// §23.10.3: a value parameter whose declared type is one of this module's type
-// parameters, and which (after the instance override or default) resolved to a
-// class type, cannot be assigned an integral constant value. §23.10.3 states
-// the rule on this very construct -- evaluating the default of p is illegal
-// unless T is overridden to an integral type -- while §6.20.2 states only
-// general assignment compatibility.
 static void CheckTypeParamValueAssignable(const ModuleDecl* decl, size_t i,
                                           const Expr* pval,
                                           const ScopeMap& scope,
@@ -114,10 +98,6 @@ void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype) {
   }
 }
 
-// §6.20.2 with §6.18: a parameter declared with a typedef name standing for
-// a real type, `typedef shortreal sr_t; parameter sr_t P = 0.1`, is of that
-// real type, so the name is followed through `typedefs` to the type it ends
-// at; read off the name alone, P was folded as an integer and held 0.
 void PopulateParamTypeInfo(RtlirParamDecl& pd, const DataType& dtype,
                            const TypedefMap& typedefs, const ScopeMap& scope) {
   pd.has_decl_range = dtype.packed_dim_left != nullptr;
@@ -144,32 +124,16 @@ void RecordParamDeclRange(RtlirParamDecl& pd, const DataType& dtype,
 }
 
 bool ParamExpectsIntegerValue(const RtlirParamDecl& pd, const DataType& dtype) {
-  // §6.20.2: a value parameter is in an integer context — and so subject to the
-  // real-to-integer conversion of §6.12.1 — when it carries a packed range or
-  // an explicit non-real data type. A bare (untyped) parameter or one declared
-  // real takes a real value instead and is not converted here.
   return pd.has_decl_range ||
          (pd.has_decl_type && !IsRealType(dtype.kind) && !pd.decl_is_real);
 }
 
-// §6.20.2 (printed page 126): a parameter declared with neither type nor
-// range takes the type of its final value, and where that value is real the
-// parameter is real -- the clause's own `parameter r = 5.7`, which its
-// comment calls a real parameter. Its expression is real where it has a real
-// operand (HasRealOperand): a real literal, or a name standing for a real
-// parameter already resolved. Tried for a declared real type alone, `r` was
-// folded as an integer, which a real literal is not, and stayed unresolved,
-// reading 0.0 at the run.
 static bool TakesRealFromValue(const RtlirParamDecl& pd, const Expr* init,
                                const DataType& dtype) {
   return dtype.kind == DataTypeKind::kImplicit && !pd.has_decl_range &&
          !pd.has_decl_type && HasRealOperand(init);
 }
 
-// §6.12: a shortreal holds a single-precision value, so a parameter of that
-// type keeps its value rounded to one, and a constant derived from it reads
-// the rounded value: `localparam real D = S` under `parameter shortreal S =
-// 0.1` is 0.100000001490116, and `S == 0.1` is false.
 static double HeldAsDeclaredReal(const RtlirParamDecl& pd, double value) {
   return pd.decl_is_shortreal ? static_cast<double>(static_cast<float>(value))
                               : value;
@@ -188,14 +152,6 @@ bool TryFoldRealParamValue(RtlirParamDecl& pd, const Expr* init,
   return true;
 }
 
-// Records the characters of a §6.16 string parameter's value on its
-// declaration, so that a later fold can read the length §6.16.1's `len()`
-// returns. Does not touch resolved_value, which the §11.10 packed fold has
-// already written and which the rest of the elaborator reads. The characters
-// are copied into `arena` because resolved_string is a std::string_view and
-// outlives the std::string ConstEvalString returns. Returns false, having
-// changed nothing, when `init` is not a string literal, which is the answer a
-// caller replacing an already-recorded value needs.
 bool RecordStringParamChars(RtlirParamDecl& pd, const Expr* init,
                             Arena& arena) {
   auto chars = ConstEvalString(init);
@@ -206,11 +162,6 @@ bool RecordStringParamChars(RtlirParamDecl& pd, const Expr* init,
   return true;
 }
 
-// The same recording where the declared type decides whether it happens at all.
-// Does nothing for a parameter of any other declared type, because §5.13
-// associates `len()` with `string` alone, which is what leaves a string literal
-// initializing or overriding an integral parameter the §11.10 packed number
-// §11.10 makes it.
 void RecordStringParamValue(RtlirParamDecl& pd, const Expr* init,
                             const DataType* dtype, Arena& arena) {
   if (!dtype || dtype->kind != DataTypeKind::kString) return;
@@ -223,16 +174,8 @@ std::optional<double> RealOverrideValue(const Expr* expr,
   return ConstEvalReal(expr, scope);
 }
 
-// §6.12.1 (printed page 110): a real converts to an integer by rounding to the
-// nearest integer, never by truncation, a half rounded away from zero.
 int64_t RoundRealToInteger(double value) { return std::llround(value); }
 
-// §23.10 (printed page 764): an override value of a value parameter with a type
-// specification converts to the parameter's type, so one declared real takes
-// the value as a real and an integral one the real rounded (resolved_value,
-// already written); and of one declared with neither, a redefined value brings
-// its own type and range to the parameter, a real override making it real and
-// an integral one leaving it integral.
 void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real) {
   bool untyped = !pd.has_decl_range && !pd.has_decl_type;
   if (real && (pd.decl_is_real || untyped)) {
@@ -248,12 +191,6 @@ void ApplyOverrideRealness(RtlirParamDecl& pd, std::optional<double> real) {
 }
 
 int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
-  // §6.20.2: a parameter declared with an explicit range, or with an explicit
-  // (non-implicit) data type, keeps the sign and range of its declaration; a
-  // value override does not change them, so the incoming value is coerced into
-  // the declared width. A parameter with no range and only an implicit type
-  // (including a bare `signed`) instead takes its range from the final value
-  // assigned, so the override value passes through unchanged.
   bool has_fixed_width =
       pd.has_decl_range || (pd.has_decl_type && !pd.decl_type_implicit);
   if (!has_fixed_width) return value;
@@ -268,33 +205,12 @@ int64_t ConvertOverrideValue(int64_t value, const RtlirParamDecl& pd) {
   return static_cast<int64_t>(masked);
 }
 
-// Resolve the value of a parameter that has a default expression (pval) but no
-// instantiation override. Handles the §6.20.7 unbounded-parameter forms and the
-// §6.20.2 integer/real constant folding. refers_to_unbounded and
-// contains_dollar are precomputed by the caller because they require Elaborator
-// member helpers; has_param_type / param_type describe the optional declared
-// data type.
-// Fold a parameter's default expression into a concrete value: prefer an
-// integer constant, then (for integer-typed parameters) a real constant rounded
-// per §6.12.1. §11.6.1 (printed page 299): the default is the right-hand side
-// of an assignment to the parameter, so its context-determined operands are
-// sized by the declared width and the value is cut to it (FoldParamValue), as
-// a parameter among the items has its value folded; folded self-determined,
-// `parameter logic [95:0] X = 3 ** 50` in a port list raised 3 at 32 bits.
 static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
                                    const ScopeMap& scope, bool has_param_type,
                                    const DataType* param_type) {
   if (has_param_type && param_type != nullptr &&
       TryFoldRealParamValue(pd, pval, *param_type, scope))
     return;
-  // §6.20.2 (printed page 127): an integer-typed parameter set from a real
-  // expression is converted to an integer per §6.12.1 (round to nearest,
-  // ties away from zero), ahead of the integer fold as ResolveParamConstValue
-  // (elaborator_items_params.cpp) orders the two, since that fold reads a
-  // name standing for a real parameter as 0. An integral expression the
-  // integer fold declined -- `0 ** -1`, x under §11.4.3's Table 11-4
-  // (printed 276) -- was refolded as a real here, through std::pow(0, -1)
-  // and std::llround of the inf it makes, and stays unresolved now.
   std::optional<int64_t> val;
   if (!pd.is_type_param && has_param_type &&
       ParamExpectsIntegerValue(pd, *param_type))
@@ -303,39 +219,21 @@ static void FoldParamConstantValue(RtlirParamDecl& pd, const Expr* pval,
   if (val) {
     pd.resolved_value = *val;
     pd.is_resolved = true;
-    // §6.20.2 (printed page 126): the width and signedness of the default of
-    // a parameter port declared with neither type nor range, and the words
-    // above bit 63 of one declared wider, are recorded as a parameter among
-    // the items has them recorded (ResolveParamConstValue in
-    // elaborator_items_params.cpp), for the width the parameter is read at
-    // in the instance that keeps the default (ParamStorageShapeOf in
-    // const_eval_bits.cpp); an override records its own (ApplyParamOverride).
     RecordResolvedHighWords(pd, pval, scope);
   }
 }
 
-// §6.20: a parameter's default value expression together with the
-// classification of that expression and the parameter's declared type. These
-// fields describe a single domain object - the value being assigned to the
-// parameter - so they are bundled and passed together when resolving the
-// parameter's concrete value.
 struct ParamValueExpr {
-  const Expr* pval;          // the default value expression
-  std::string_view pname;    // name of the parameter receiving the value
-  bool refers_to_unbounded;  // §6.20.7: expr is an unbounded ($) parameter ref
-  bool contains_dollar;      // §6.20.7: expr contains a $ subexpression
-  bool has_param_type;       // parameter has an explicit declared data type
-  const DataType* param_type;  // §6.20.2: that declared type (null if none)
-  bool has_unpacked_dims;      // the port is declared with unpacked dimensions
-  // What a typedef name in param_type stands for.
+  const Expr* pval;
+  std::string_view pname;
+  bool refers_to_unbounded;
+  bool contains_dollar;
+  bool has_param_type;
+  const DataType* param_type;
+  bool has_unpacked_dims;
   const TypeShapeTables& tables;
 };
 
-// §6.20.7: an unbounded ($) parameter value, or a reference to another
-// unbounded parameter, makes this parameter unbounded too, and either one is
-// `$` assigned to the parameter, which its type has to permit. Returns true
-// when the value was recognized as unbounded (and pd updated), so the caller
-// can stop.
 static bool TryResolveUnboundedParamValue(RtlirParamDecl& pd,
                                           const ParamValueExpr& val,
                                           DiagEngine& diag) {
@@ -358,8 +256,6 @@ static void ResolveUnresolvedParamValue(RtlirParamDecl& pd,
     return;
   }
   if (val.contains_dollar) {
-    // §6.20.7: $ must be the entire, self-contained parameter value; it
-    // may not be combined with operators or selects in this context.
     diag.Error(val.pval->range.start,
                std::format("'$' may only be assigned to parameter '{}' "
                            "as a complete, self-contained expression",
@@ -370,19 +266,6 @@ static void ResolveUnresolvedParamValue(RtlirParamDecl& pd,
                          val.param_type);
 }
 
-// §11.6.1 (printed page 299) with §23.10.2 (printed 766): the override's
-// expression is the right-hand side of an assignment to the parameter, so
-// its context-determined operands are sized by the declared width as a
-// declaration's own value's are. The instantiation site folded it
-// self-determined, knowing nothing of the parameter it was for, so `c
-// #(.P(8'hAB << 8)) u()` over `parameter [15:0] P` gave P 0. The expression
-// is folded again here in the declared context, against the instantiating
-// module's parameters as `assigns` took them, and only where a
-// self-determined fold against that same scope reproduces the value the
-// site folded: the site's scope may hold a name -- a generate block's
-// parameter, a compilation unit's -- this one does not, under which a value
-// the source did not write would be read. Empty where the declaration fixes
-// no width, and where the fold does not reproduce the site's value.
 static std::optional<int64_t> ContextOverrideValue(
     const RtlirParamDecl& pd, const Elaborator::ParamOverride& ovr,
     const ScopeMap& scope) {
@@ -392,15 +275,6 @@ static std::optional<int64_t> ContextOverrideValue(
   return FoldParamValue(pd, ovr.value_expr, scope);
 }
 
-// Apply an instantiation override (if any) to a parameter, coercing the value
-// to the declared width per §6.20.2. Returns true when an override was applied.
-//
-// §6.16 is why `dtype` is here. A parameter declared string takes a value of
-// arbitrary length, which the coerced int64_t above cannot hold past eight
-// characters, so the override's own expression is folded a second time with the
-// characters as the answer. RecordStringParamValue does nothing unless `dtype`
-// is string, which is what keeps a string literal overriding an integral
-// parameter the §11.10 packed number it is there.
 bool ApplyParamOverride(RtlirParamDecl& pd,
                         const InstanceParamAssignments& assigns,
                         std::string_view pname, const DataType* dtype,
@@ -411,28 +285,8 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   pd.is_resolved = true;
   pd.from_override = true;
   ApplyOverrideRealness(pd, ovr->real);
-  // A real value is not refolded at the declared width: the real a real
-  // parameter holds is resolved_real, and an integral one's rounding is done.
   if (ovr->real) return true;
-  // §6.20.2 has the declared range survive the override, and the folded int64
-  // holds 64 bits of it, so the expression is kept for the simulator to
-  // evaluate at the declared width. ResetAllConfigParams (§33.4.3's `#()`)
-  // hands the declaration's own initializer back as the override, and that
-  // expression is written in the declaring module, not the instantiating one,
-  // which is what default_value already says of it.
   if (ovr->value_expr != pd.default_value) pd.override_expr = ovr->value_expr;
-  // §23.10.2 (printed page 766): the override's expression is written in the
-  // instantiating module, and its fold at elaboration reads the parameter's
-  // words above bit 63 nowhere else -- the instantiating module's
-  // registration, live from the item loop this instantiation is an item of,
-  // is the one the expression's names mean something in, and the child's own
-  // registration, under which the name is later read, cannot refold it. So
-  // the words are recorded now, against that registration's parameters,
-  // which `assigns` took from it: a parameter port is built while it is
-  // still live, and a parameter among the items after the child's own has
-  // replaced it. An expression that is the declaration's own initializer,
-  // handed back by ResetAllConfigParams, stands in the declaring module and
-  // is left to the refold there.
   if (pd.override_expr != nullptr) {
     if (auto in_context = ContextOverrideValue(pd, *ovr, assigns.scope))
       pd.resolved_value = ConvertOverrideValue(*in_context, pd);
@@ -444,13 +298,6 @@ bool ApplyParamOverride(RtlirParamDecl& pd,
   return true;
 }
 
-// What a parameter port declaration is built against, the name table it is
-// registered into, the types its module's type parameters were given as
-// written, and the arena a type parameter's type is kept in. They travel
-// together because a parameter port cannot be built without the first two nor
-// judged under §11.5.1 without the third, a type parameter port keeps its type
-// for §37.28 from the last two, and etc/clang_tidy/src.yml caps a function at
-// five parameters.
 struct ParamPortCtx {
   const TypedefMap& typedefs;
   const ScopeMap& scope;
@@ -459,11 +306,6 @@ struct ParamPortCtx {
   Arena& arena;
 };
 
-// §37.28 detail 2: the type the type parameter port at index `i` of `decl`
-// has for the instantiation being elaborated, as the assignment or default
-// wrote it, a typedef name left unresolved: the one ApplyChildTypeParams
-// published for it, or its default where nothing was published. Null where it
-// has neither.
 static const DataType* PortTypeParamType(const ModuleDecl* decl, size_t i,
                                          const ParamPortCtx& ctx) {
   auto written = ctx.written_types.find(decl->params[i].first);
@@ -477,19 +319,6 @@ static const DataType* PortTypeParamType(const ModuleDecl* decl, size_t i,
   return nullptr;
 }
 
-// Build the non-value identity/type fields of a parameter declaration (name,
-// localparam/type-param flags, declared-type info), and record a real-typed one
-// in `ctx.real_param_names`. Value resolution is handled separately because it
-// requires Elaborator member helpers.
-//
-// The registration is here rather than at the call site because §11.5.1 bars a
-// bit-select or part-select of a scalar, a real variable or a real parameter,
-// naming the parameter rather than the position the parameter was written in.
-// PopulateValueParamInfo in src/elaborator/elaborator_items.cpp records a real
-// parameter written in the module body into the same set, and
-// CheckRealSelectNode in src/elaborator/elaborator_validate.cpp reads it for
-// either position. A localparam port is recorded on the same terms, since
-// §6.20.2 makes it a value parameter.
 static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
                                           const ParamPortCtx& ctx,
                                           bool has_param_type) {
@@ -502,8 +331,6 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   pd.is_type_param = decl->type_param_names.count(pname) > 0;
   if (pd.is_type_param) pd.resolved_type = PortTypeParamType(decl, i, ctx);
   pd.is_localparam = decl->localparam_port_names.count(pname) > 0;
-  // A.2.1.1: a parameter port declared with unpacked dimensions is an array
-  // of values as a body parameter is (§6.20.1), and folds its bounds alike.
   auto dims = decl->param_port_unpacked_dims.find(pname);
   if (dims != decl->param_port_unpacked_dims.end()) {
     pd.unpacked_dims = &dims->second;
@@ -518,11 +345,6 @@ static RtlirParamDecl BuildParamDeclShell(const ModuleDecl* decl, size_t i,
   return pd;
 }
 
-// §10.8 (printed page 259) with §7.2.1: a parameter port declared with a
-// structure type whose value -- its own default or an instance's override --
-// is a positional pattern holds the packed structure the pattern builds, which
-// the integer fold, taking no pattern, left unresolved. An override's items
-// are written in the instantiating module and fold against its scope.
 void Elaborator::ResolvePackedStructParam(RtlirParamDecl& pd,
                                           const DataType* type,
                                           const Expr* default_value,
@@ -539,13 +361,6 @@ void Elaborator::ResolvePackedStructParam(RtlirParamDecl& pd,
   pd.is_resolved = true;
 }
 
-// §6.23: the type of the parameter port at index `i` of `decl`, where
-// `has_param_type` says it is a value parameter's written type, resolved in
-// place by `resolve`, `parameter type(W) V = -3` being a value parameter of
-// W's type. It is resolved as the port is reached, once the ports before it,
-// which the reference may name, are registered. A type parameter's entry is
-// its default type, which the type parameter's own path reads. The parser
-// made the declaration as a mutable object.
 static void ResolveParamPortTypeRef(
     const ModuleDecl* decl, size_t i, bool has_param_type,
     const std::function<void(DataType&)>& resolve) {
@@ -558,9 +373,6 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
   TypeParamValueCtx tp_ctx{typedefs_, class_names_, diag_};
   const TypedefMap kWrittenTypes = std::exchange(pending_type_param_types_, {});
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
-  // The instantiating module is the one registered here, from the item loop
-  // this instantiation is an item of, and its parameters are what the
-  // assignments' expressions name.
   const InstanceParamAssignments kAssigns{params, RegisteredModuleScope(),
                                           RegisteredModule()};
   for (size_t i = 0; i < decl->params.size(); ++i) {
@@ -590,40 +402,11 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
                          param_type,
                          decl->param_port_unpacked_dims.count(pname) != 0,
                          kShapeTables};
-      // §6.20.2 (printed page 126): the default is written in the declaring
-      // module, so this module is the one registered while it is folded, as
-      // it is for a parameter among the items: a real parameter port already
-      // built, `parameter real a = 1.5`, is read as the real it is by a
-      // later port's `parameter b = a * 2` from the registration alone, the
-      // scope holding one integer per name. The override above stands in
-      // the instantiating module and is folded under that one's
-      // registration, which is why the guard opens here and not around the
-      // loop.
       ParamRangeRegistryGuard default_guard(mod);
       ResolveUnresolvedParamValue(pd, val, scope, diag_);
-      // §6.20.2 (printed page 126): an untyped port whose default is real is
-      // a real parameter, recorded for §11.5.1 as BuildParamDeclShell records
-      // a port declared real.
       if (pd.is_real_value) real_param_names_.insert(pname);
     }
-    // Only where the value came from `pval`, the declaration's own initializer.
-    // An overridden parameter no longer has that value, and ApplyParamOverride
-    // has already recorded the characters of the one that replaced it.
-    //
-    // §6.16: registering this module is what lets a string parameter port
-    // written in terms of an earlier one read that one's characters, since
-    // ConstEvalString resolves a name against the registered module's
-    // parameters. It is opened around this call alone rather than around the
-    // loop, because ApplyParamOverride above folds an expression written in the
-    // instantiating parent, and the parent's registration -- live from the item
-    // loop this instantiation is an item of -- is the one that expression's
-    // names mean something in.
     if (pval && has_param_type && !pd.from_override) {
-      // §23.9 needs no scope installed beside this one. A parameter port list
-      // is processed before any of the module's items, so no generate block's
-      // parameter is in RtlirModule::params yet and no expression here stands
-      // in a block; ParamRangeRegistryGuard leaves the prefixes empty, which is
-      // what an expression among a module's own items wants.
       ParamRangeRegistryGuard param_range_guard(mod);
       RecordStringParamValue(pd, pval, param_type, arena_);
     }
@@ -633,9 +416,6 @@ void Elaborator::ElaborateParamPortList(const ModuleDecl* decl,
   }
 }
 
-// §23.10 (printed page 763) with §6.20.1 (printed 125): the parameter value
-// assignments a module's body parameters read, installed by
-// BodyParamAssignmentsGuard. Null unless a guard is live.
 static const InstanceParamAssignments* g_body_param_assignments = nullptr;
 
 BodyParamAssignmentsGuard::BodyParamAssignmentsGuard(
@@ -658,14 +438,6 @@ std::vector<std::string_view> OverridableParamNames(const ModuleDecl* decl) {
     if (decl->localparam_port_names.count(pname) > 0) continue;
     names.push_back(pname);
   }
-  // §6.20.1 (printed pages 125-126): with a parameter port list, even an
-  // empty one, `parameter` among the items is a synonym for `localparam`;
-  // without one the items are where the module's value parameters are
-  // declared, which §23.10.2's own example, `vdff` with `parameter size = 1,
-  // delay = 1;` in its body under `vdff #(10,15)` (printed 766), relies on.
-  // The override path read the parameter port list alone before, so that
-  // shape was refused as naming no parameter, and too many for an ordered
-  // list of none.
   if (decl->has_param_port_list) return names;
   for (const ModuleItem* item : decl->items) {
     if (item->kind != ModuleItemKind::kParamDecl || item->is_localparam)
@@ -675,10 +447,6 @@ std::vector<std::string_view> OverridableParamNames(const ModuleDecl* decl) {
   return names;
 }
 
-// The parameter declaration among `decl`'s items named `pname`, or null: a
-// `parameter` or `localparam`, value or type, written at the module's own
-// level. A generate block's, a task's or a function's is not among the items
-// and is none of these (§23.10.2, printed page 766).
 static const ModuleItem* BodyParamDecl(const ModuleDecl* decl,
                                        std::string_view pname) {
   for (const ModuleItem* item : decl->items) {
@@ -688,12 +456,6 @@ static const ModuleItem* BodyParamDecl(const ModuleDecl* decl,
   return nullptr;
 }
 
-// Whether `pname` is a type parameter `decl` declares among its items and an
-// instance's parameter value assignment may name: one OverridableParamNames
-// lists, so of a module declared with no parameter port list (§6.20.1,
-// printed pages 125-126), declared `parameter type` (§6.20.3, printed
-// 127-128). Parser::ParseTypeParamDecl (src/parser/parser_types.cpp) marks
-// such a declaration with a void data type, its default carried beside it.
 static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
   if (decl->has_param_port_list) return false;
   const ModuleItem* item = BodyParamDecl(decl, pname);
@@ -701,10 +463,6 @@ static bool IsBodyTypeParam(const ModuleDecl* decl, std::string_view pname) {
          item->data_type.kind == DataTypeKind::kVoid;
 }
 
-// Whether `pexpr` is an assignment pattern given to a parameter `decl`
-// declares with unpacked dimensions, in its parameter port list or among its
-// items: §6.20.1 (printed page 124) makes such a parameter's value an array,
-// written as an assignment pattern.
 static bool IsArrayParamPattern(const ModuleDecl* decl, std::string_view pname,
                                 const Expr* pexpr) {
   if (pexpr == nullptr || pexpr->kind != ExprKind::kAssignmentPattern)
@@ -714,8 +472,6 @@ static bool IsArrayParamPattern(const ModuleDecl* decl, std::string_view pname,
   return item != nullptr && !item->unpacked_dims.empty();
 }
 
-// The type a parameter of `decl` is declared with where that is a structure,
-// a union or a typedef name, or null.
 static const DataType* AggregateParamType(const ModuleDecl* decl,
                                           std::string_view pname) {
   const DataType* type = nullptr;
@@ -731,15 +487,6 @@ static const DataType* AggregateParamType(const ModuleDecl* decl,
   return aggregate ? type : nullptr;
 }
 
-// The value of an assignment to a body type parameter is a type, which no
-// fold answers, so it was dropped with the assignment, and `c #(.T(logic
-// [7:0])) u()` over `module c; parameter type T = int; T x;` left x 32 bits
-// wide. A parameter port list's type parameter takes its type from
-// ApplyChildTypeParams (elaborator_module_inst.cpp) instead. An array
-// parameter's value is an array, which no fold answers either, so `sub
-// #(.A('{5, 6}))` over `parameter int A[2] = '{1, 2}` left A at '{1, 2}; the
-// pattern is kept for ApplyParamOverride to record as the override's
-// expression.
 void PushInstParamAssignment(const ModuleDecl* child_decl,
                              std::string_view pname, const Expr* pexpr,
                              const ScopeMap& parent_scope,
@@ -749,11 +496,6 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
     child_params.push_back({pname, 0, pexpr});
     return;
   }
-  // §10.8 (printed page 259): an override of a parameter declared with an
-  // explicit type is an assignment-like context, so a pattern there takes the
-  // parameter's type -- a structure's or a union's, written inline or through
-  // a typedef -- and is kept for the declaration to fold at that type
-  // (ResolvePackedStructParam) rather than dropped unfolded.
   const DataType* aggregate =
       pexpr != nullptr && pexpr->kind == ExprKind::kAssignmentPattern
           ? AggregateParamType(child_decl, pname)
@@ -772,34 +514,12 @@ void PushInstParamAssignment(const ModuleDecl* child_decl,
   if (val) child_params.push_back({pname, *val, pexpr});
 }
 
-// Whether `pname` names a local parameter of `decl`, which §6.20.4 (printed
-// page 128) puts beyond a defparam and any instance parameter value
-// assignment: a localparam of the parameter port list, a `localparam` among
-// the items, or a `parameter` among the items of a module with a parameter
-// port list, even an empty one, which §6.20.1 (printed 125-126) makes a
-// synonym for `localparam`. False for a name no parameter of `decl` bears.
 static bool IsLocalParamOf(const ModuleDecl* decl, std::string_view pname) {
   if (decl->localparam_port_names.count(pname) > 0) return true;
   const ModuleItem* item = BodyParamDecl(decl, pname);
   return item != nullptr && (item->is_localparam || decl->has_param_port_list);
 }
 
-// Reports the use clause's assignment to `pname`, written at `loc`, where
-// no parameter of `child_decl` may take it, and says whether it did. A local
-// parameter's report is worded as DefparamOverrideAllowed
-// (elaborator_defparam.cpp) words a defparam's; such an assignment was
-// applied and ignored in silence before: `instance top.u use #(.P(5))` on
-// `module c #(parameter W = 1); parameter P = 2;` left P at 2 and said
-// nothing, ApplyBodyParamAssignment (elaborator_items_params.cpp) passing
-// over a local parameter as §6.20.4 has it, and ElaborateParamPortList
-// applying one to a localparam port outright. A name no parameter of the
-// module bears is reported as ResolveNamedInstParams
-// (elaborator_module_inst.cpp) reports `c #(.X(5)) u()`: §33.4.3 (printed
-// page 940) has the clause assign by name alone, and §23.10.2.2 (printed
-// 767) makes the name one the instantiated module specifies. Such a name
-// passed as none of the module's local parameters and was applied to
-// nothing in silence, `use #(.X(5))` on `module c; parameter P = 2;`
-// reporting nothing.
 static bool ConfigParamRefused(
     const ModuleDecl* child_decl,
     const std::unordered_set<std::string_view>& overridable,

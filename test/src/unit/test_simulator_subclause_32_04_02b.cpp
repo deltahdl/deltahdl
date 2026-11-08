@@ -13,20 +13,10 @@ using namespace delta;
 
 namespace {
 
-// §32.4.2 with the SDF format §32 annotates from (IEEE Std 1497): SETUP, HOLD
-// and SETUPHOLD write their data signal first, but RECOVERY, REMOVAL, RECREM,
-// SKEW, BIDIRECTSKEW and NOCHANGE write their reference signal first, in the
-// order the SystemVerilog check they annotate takes its events. Each case below
-// declares one check on two signals and annotates it from an entry naming the
-// same two signals in the SDF order; read the other way round, the entry names
-// a check with the two signals swapped, which the design does not declare, so
-// the value lands nowhere and the annotator warns.
 struct SdfReferenceFirstCheck : public ::testing::Test {
   SimFixture f;
   SpecifyManager mgr;
 
-  // Declares `check` in a module on RN, CK, CK2 and D, annotates `entry` onto
-  // it and returns the one check declared.
   const TimingCheckEntry& Annotate(const std::string& check,
                                    const std::string& entry) {
     auto* cu = RunModuleSource(

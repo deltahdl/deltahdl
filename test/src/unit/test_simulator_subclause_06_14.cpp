@@ -43,9 +43,6 @@ TEST(ChandleDataType, ChandleBooleanTestNull) {
 }
 
 TEST(ChandleDataType, ChandleBooleanTestNonNull) {
-  // §6.14: a chandle tested for a Boolean value yields 1 when it is not null.
-  // A non-null value only arises through DPI, so seed the lowered variable
-  // with a non-zero pointer value and observe the truthiness rule produce 1.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -90,8 +87,6 @@ TEST(ChandleDataType, ChandleCaseEqualityNullSim) {
 }
 
 TEST(ChandleDataType, ChandleInequalityNullSim) {
-  // §6.14: != is a valid chandle operator; a default (null) chandle compared
-  // for inequality against null yields false at run time.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -108,8 +103,6 @@ TEST(ChandleDataType, ChandleInequalityNullSim) {
 }
 
 TEST(ChandleDataType, ChandleCaseInequalityNullSim) {
-  // §6.14: !== on a chandle has the same semantics as !=; a null chandle is
-  // not case-unequal to null, so the test yields false.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"

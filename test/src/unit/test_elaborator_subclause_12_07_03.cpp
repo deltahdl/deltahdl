@@ -36,8 +36,6 @@ TEST(LoopStatementElaboration, ForeachMultiDimElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.3 — the number of loop variables shall not exceed the number of array
-// dimensions.
 TEST(LoopStatementElaboration, ForeachTooManyLoopVarsIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -68,7 +66,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarCountAtDimLimitOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.3 — foreach loop variables are read-only.
 TEST(LoopStatementElaboration, ForeachLoopVarAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -85,9 +82,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarAssignIsError) {
                             4, "12.7.3"));
 }
 
-// §12.7.3 declares the loop variable, so the assignment to it breaks the
-// read-only rule and nothing else: the name resolves, and no §23.9 report of
-// an undeclared identifier stands beside the read-only one.
 TEST(LoopStatementElaboration, ForeachLoopVarAssignIsNotAnUndeclaredName) {
   ElabFixture f;
   ElaborateSrc(
@@ -136,8 +130,6 @@ TEST(LoopStatementElaboration, ForeachAssignArrayElementOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.3 — the read-only rule applies regardless of the assignment form;
-// a nonblocking assignment to a loop variable is just as illegal.
 TEST(LoopStatementElaboration, ForeachLoopVarNonblockingAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -154,12 +146,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarNonblockingAssignIsError) {
                             4, "12.7.3"));
 }
 
-// §12.7.3 — a loop variable may not reuse the array's identifier.
-// §12.7.3 gives a loop variable over an associative array indexed by a
-// specific type that index type, and a class handle is a reference to an
-// object: a write to a member reached through the handle writes the object,
-// so the read-only rule is not touched. UVM's uvm_phase.svh writes
-// `pred.m_successors[begin_node] = 1;` inside `foreach (m_predecessors[pred])`.
 TEST(LoopStatementElaboration, ForeachLoopVarMemberWriteThroughHandleOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -196,12 +182,6 @@ TEST(LoopStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §12.7.1 has a for loop that declares its control variables create an
-// implicit block around itself, and §6.21 makes a variable declared in a block
-// local to it and the blocks nested below: an inner declaration of the loop
-// variable's name is another variable, and writes to that name inside its
-// scope are not writes to the loop variable. UVM's uvm_reg.svh writes
-// `for (int i = f.get_lsb_pos(); i < top; i++)` inside `foreach (m_fields[i])`.
 TEST(LoopStatementElaboration, ForeachLoopVarRedeclaredByInnerForLoopOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -233,8 +213,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarRedeclaredInInnerBlockOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A for loop whose initialization assigns without declaring writes the loop
-// variable itself.
 TEST(LoopStatementElaboration, ForeachLoopVarAssignedByInnerForInitIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -251,8 +229,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarAssignedByInnerForInitIsError) {
                             4, "12.7.3"));
 }
 
-// The inner for loop's variable is local to that loop: after it, the name is
-// the loop variable again.
 TEST(LoopStatementElaboration, ForeachLoopVarAssignedAfterInnerForLoopIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -272,7 +248,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarAssignedAfterInnerForLoopIsError) {
                             6, "12.7.3"));
 }
 
-// A bit-select of the loop variable itself is still a write to it.
 TEST(LoopStatementElaboration, ForeachLoopVarBitSelectAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -306,8 +281,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarSameNameAsArrayIsError) {
                             5, "12.7.3"));
 }
 
-// §12.7.3 — the identifier-clash rule covers every loop-variable slot, not
-// just the first one.
 TEST(LoopStatementElaboration, ForeachLaterLoopVarSameNameAsArrayIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -325,27 +298,6 @@ TEST(LoopStatementElaboration, ForeachLaterLoopVarSameNameAsArrayIsError) {
                             5, "12.7.3"));
 }
 
-// §12.7.3 makes a foreach loop variable read-only for the whole of the loop
-// body and caps the loop-variable count at the array's dimensionality, and it
-// puts no condition on which statement the foreach or the offending assignment
-// is written inside. So every member of Stmt that holds a statement is a
-// position both rules reach.
-//
-// CheckForeachVarsReadOnly and CheckForeachInStmt in
-// src/elaborator/elaborator_validate_funcchecks.cpp each enumerated nine of the
-// thirteen members, and now take the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h instead. The ten cases below
-// cover the four members neither walk reached: Stmt::assert_pass_stmt,
-// Stmt::assert_fail_stmt, Stmt::randcase_items and Stmt::rs_productions, the
-// last counted twice because a randsequence production holds statements in two
-// separate lists. Five hold the read-only rule to those positions and five hold
-// the dimension rule to them, because a walk can gain a member for one rule
-// without gaining it for the other.
-
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each, because a walk reaches one member without the other.
 TEST(LoopStatementElaboration,
      ForeachLoopVarAssignedInAnAssertionPassStatementIsError) {
   ElabFixture f;
@@ -378,9 +330,6 @@ TEST(LoopStatementElaboration,
                             4, "12.7.3"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
-// Stmt::randcase_items. §12.7.3 is a rule about the source, so it holds whether
-// the weighted draw would select the item or not.
 TEST(LoopStatementElaboration, ForeachLoopVarAssignedInARandcaseItemIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -395,10 +344,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarAssignedInARandcaseItemIsError) {
                             3, "12.7.3"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(LoopStatementElaboration,
      ForeachLoopVarAssignedInARandsequenceCodeBlockIsError) {
   ElabFixture f;
@@ -418,11 +363,6 @@ TEST(LoopStatementElaboration,
                             5, "12.7.3"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it. The other
-// production writes j, so the report this case reads is the weight block's.
 TEST(LoopStatementElaboration,
      ForeachLoopVarAssignedInARandsequenceWeightCodeBlockIsError) {
   ElabFixture f;
@@ -444,9 +384,6 @@ TEST(LoopStatementElaboration,
                             6, "12.7.3"));
 }
 
-// The dimension rule in the same four positions. Each source declares arr with
-// one dimension and writes two loop variables, so the report names the foreach
-// under test and nothing else in the source can produce it.
 TEST(LoopStatementElaboration,
      ForeachInAnAssertionPassStatementIsHeldToTheArrayDimensionCount) {
   ElabFixture f;
@@ -513,8 +450,6 @@ TEST(LoopStatementElaboration,
       5, "12.7.3"));
 }
 
-// The other production writes k with no foreach, so the report this case reads
-// is the weight block's.
 TEST(LoopStatementElaboration,
      ForeachInARandsequenceWeightCodeBlockIsHeldToTheArrayDimensionCount) {
   ElabFixture f;
@@ -536,10 +471,6 @@ TEST(LoopStatementElaboration,
       6, "12.7.3"));
 }
 
-// §12.7.3 caps a foreach's loop variables at its array's dimension count
-// wherever the array is declared. The arrays below are declared in a block, in
-// a function, as a function's formal and as a class property, and each foreach
-// names one loop variable more than its array has dimensions.
 TEST(LoopStatementElaboration, ForeachOverBlockLocalArrayCountsItsDimensions) {
   ElabFixture f;
   ElaborateSrc(
@@ -606,8 +537,6 @@ TEST(LoopStatementElaboration, ForeachOverClassPropertyCountsItsDimensions) {
       "12.7.3"));
 }
 
-// A class of the compilation unit, declared outside every module, has its
-// properties in scope in its methods as a module's class has.
 TEST(LoopStatementElaboration,
      ForeachOverAUnitClassPropertyCountsItsDimensions) {
   ElabFixture f;
@@ -626,9 +555,6 @@ TEST(LoopStatementElaboration,
       "12.7.3"));
 }
 
-// The array a foreach names is the declaration in scope where the loop stands:
-// the block's one-dimensional a hides the module's two-dimensional a, so two
-// loop variables are one too many.
 TEST(LoopStatementElaboration, ForeachCountsTheArrayItsBlockDeclares) {
   ElabFixture f;
   ElaborateSrc(
@@ -646,8 +572,6 @@ TEST(LoopStatementElaboration, ForeachCountsTheArrayItsBlockDeclares) {
       "12.7.3"));
 }
 
-// The other way round, the block's two-dimensional a takes two loop variables
-// though the module's a has one dimension.
 TEST(LoopStatementElaboration, ForeachOverBlockArrayHidingAModuleArrayOk) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -663,9 +587,6 @@ TEST(LoopStatementElaboration, ForeachOverBlockArrayHidingAModuleArrayOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An array of real has its unpacked dimensions alone, the element type having
-// no packed dimension, so §12.7.3's count is known from the declaration as it
-// is for an integral array.
 TEST(LoopStatementElaboration, ForeachOverRealArrayCountsItsDimensions) {
   ElabFixture f;
   ElaborateSrc(
@@ -680,10 +601,6 @@ TEST(LoopStatementElaboration, ForeachOverRealArrayCountsItsDimensions) {
       "12.7.3"));
 }
 
-// §12.7.3 treats a string as a dynamic array of bytes, so a string has one
-// dimension a loop variable walks, its characters, counted after the unpacked
-// dimensions of an array of strings: `s [2][3]` has three, and only a fourth
-// loop variable is one too many.
 TEST(LoopStatementElaboration, ForeachOverStringArrayCountsItsDimensions) {
   ElabFixture f;
   ElaborateSrc(
@@ -709,7 +626,6 @@ TEST(LoopStatementElaboration, ForeachOverStringArrayWalksItsCharacters) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A string variable or a string formal alone has the one dimension.
 TEST(LoopStatementElaboration, ForeachOverAStringWalksItsCharacters) {
   ElabFixture f;
   ElaborateSrc(
@@ -741,8 +657,6 @@ TEST(LoopStatementElaboration, ForeachOverAStringWithTwoLoopVariablesIsError) {
       "12.7.3"));
 }
 
-// An array of class handles has its unpacked dimensions alone too, a handle
-// being no packed array.
 TEST(LoopStatementElaboration, ForeachOverClassHandleArrayCountsItsDimensions) {
   ElabFixture f;
   ElaborateSrc(
@@ -758,9 +672,6 @@ TEST(LoopStatementElaboration, ForeachOverClassHandleArrayCountsItsDimensions) {
       "12.7.3"));
 }
 
-// §12.7.3's loop variables are read-only, and an increment or an assignment
-// operator written inside an expression writes its operand as surely as an
-// assignment statement does (§11.4.1, §11.4.2).
 TEST(LoopStatementElaboration, ForeachLoopVarWrittenInsideAnExpressionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -778,8 +689,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarWrittenInsideAnExpressionIsError) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), msg, 5, "12.7.3"));
 }
 
-// An increment written as a whole statement is reported once, not once as a
-// statement and again as an expression.
 TEST(LoopStatementElaboration, ForeachLoopVarIncrementStatementReportedOnce) {
   ElabFixture f;
   ElaborateSrc(
@@ -795,9 +704,6 @@ TEST(LoopStatementElaboration, ForeachLoopVarIncrementStatementReportedOnce) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// A subroutine writes the actual of an output, inout or ref formal (§13.5), so
-// passing a loop variable there breaks §12.7.3's read-only rule; an input or a
-// const ref formal only reads it.
 TEST(LoopStatementElaboration, ForeachLoopVarPassedToAWritingFormalIsError) {
   ElabFixture f;
   ElaborateSrc(

@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A module around the clause's property abc and one assert statement over
-// it, as test/src/e2e/assert_statement.sv is: clk rises at 5, 15, ..., 75;
-// in1 is high at 15 and in2 at 25, so the attempt of 15 fails at 25; in1
-// is high at 35 and in2 at 45, with rst 2 across 45; the run ends at 80.
 std::string AssertSource(const std::string& statement) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -36,9 +32,6 @@ std::string AssertSource(const std::string& statement) {
          "endmodule\n";
 }
 
-// §16.14.1: the pass statements run where the property is true and the
-// fail statements where it is false, and a disabled evaluation runs
-// neither: the attempt of 35 would fail at 45 and is disabled there.
 TEST(AssertStatementRun,
      PassAndFailStatementsFollowTheVerdictAndADisabledAttemptRunsNeither) {
   SimFixture f;
@@ -51,8 +44,6 @@ TEST(AssertStatementRun,
   EXPECT_EQ(f.ctx.FindVariable("fails")->value.ToUint64(), 1u);
 }
 
-// §16.14.1: with the else clause omitted the tool calls $error where the
-// property fails, once, at 25; a null pass statement is no action.
 TEST(AssertStatementRun, WithoutAnElseClauseTheToolReportsTheFailure) {
   SimFixture f;
   std::string out = RunCapture(
@@ -63,9 +54,6 @@ TEST(AssertStatementRun, WithoutAnElseClauseTheToolReportsTheFailure) {
   EXPECT_EQ(f.ctx.AssertionFailCount(), 1);
 }
 
-// §16.14.1: a null fail statement is no action too, and the else clause
-// it stands in is not omitted, so the tool reports nothing where the
-// property fails.
 TEST(AssertStatementRun, ANullFailStatementLeavesTheFailureUnreported) {
   SimFixture f;
   std::string out = RunCapture(
@@ -77,9 +65,6 @@ TEST(AssertStatementRun, ANullFailStatementLeavesTheFailureUnreported) {
   EXPECT_EQ(f.ctx.FindVariable("passes")->value.ToUint64(), 5u);
 }
 
-// §16.14.1: the action block may hold an immediate assertion, which runs
-// with the fail statement, in the Reactive region, where it reads the
-// value the variables then hold.
 TEST(AssertStatementRun, AnImmediateAssertionMayStandInTheActionBlock) {
   SimFixture f;
   std::string out = RunCapture(
@@ -90,9 +75,6 @@ TEST(AssertStatementRun, AnImmediateAssertionMayStandInTheActionBlock) {
   EXPECT_EQ(out, "immediate passed at 25\n$finish at time 80\n");
 }
 
-// §16.14.1: the pass and fail statements run in the Reactive region, after
-// the Active region of the tick, so a pass statement sees what an always
-// procedure wrote at the tick.
 TEST(AssertStatementRun, TheActionBlockRunsInTheReactiveRegion) {
   SimFixture f;
   auto* seen = RunAndFindVar(

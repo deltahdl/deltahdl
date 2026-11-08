@@ -18,23 +18,12 @@
 using namespace delta;
 
 namespace {
-// The first included list at this stage: all 102 of Table 22-1 stay reserved,
-// so none of them can occupy the identifier slot of a declaration. Sweeping the
-// table whole is what makes the inclusion, rather than a handful of its
-// entries, the thing being checked.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservesEveryVerilog1995Keyword) {
   ExpectKeywordTableIsReservedAtParse("1800-2009",
                                       kVerilog1995KeywordSweepAtParse);
 }
 
-// The second included list, with the leg that makes it an inclusion. Each of
-// Table 22-2's twenty-one entries is rejected here and accepted under
-// "1364-1995", where it is not yet a keyword -- so the rejection is this
-// version's list doing its work rather than an unrelated parse failure. The ten
-// configuration words carry a second accepting leg under the configuration-free
-// companion list, which drops exactly them: that is how this stage shows the
-// version inherits "1364-2001" whole rather than its reduced companion.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservesEveryVerilog2001Keyword) {
   ExpectKeywordTableIsReservedAtParse("1800-2009",
@@ -42,48 +31,23 @@ TEST(CompilerDirectiveParsing,
   ExpectConfigurationWordsNameVariablesAtParse();
 }
 
-// The third included list. Its one word cannot name a variable here, names one
-// under both lists the version it comes from is built on, and still opens the
-// net declaration it exists for -- inclusion is about the keyword role
-// surviving, not only about the identifier slot closing.
 TEST(CompilerDirectiveParsing, SystemVerilog2009ReservesTheVerilog2005Word) {
   ExpectKeywordTableIsReservedAtParse("1800-2009",
                                       kVerilog2005AddedKeywordSweep);
   ExpectUwireStillOpensNetDeclarations("1800-2009");
 }
 
-// The fourth included list swept whole in an identifier slot. Each entry is
-// rejected here and, under "1364-2005" -- the union of the three lists that one
-// is itself built on -- names a variable that is read back off the tree, so the
-// inclusion is traced to the fourth list rather than to anything earlier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservesEverySystemVerilog2005Keyword) {
   ExpectKeywordTableIsReservedAtParse("1800-2009",
                                       kSystemVerilog2005AddedKeywordSweep);
 }
 
-// Table 22-5 swept whole in an identifier slot, with the leg that makes each
-// entry an addition. The word cannot name a variable here, and under
-// "1800-2005" -- the union of everything this version includes -- the very same
-// declaration is built and read back off the tree. Any word for which both legs
-// hold is reserved by this version_specifier and by nothing it inherits.
 TEST(CompilerDirectiveParsing, SystemVerilog2009ReservesEveryWordItAdds) {
   ExpectKeywordTableIsReservedAtParse("1800-2009",
                                       kSystemVerilog2009AddedKeywordSweep);
 }
 
-// The identifier positions a variable declaration does not reach, for the four
-// lists this version *includes*. Being on this version's list has to stop a
-// word from naming anything at all, not just from naming a variable, so one
-// word from each included table is put in turn where a design element, a port,
-// an instance, a task, and a named block take their names -- five productions,
-// each reached by its own path. Every one is rejected.
-//
-// Table 22-5 is deliberately absent from the word list here. Its position axis
-// is carried by AddedWordsNameEntitiesUnderIncludedLists below, which runs
-// these same five templates plus three more against three added words and
-// asserts this same rejection alongside its accepting counterpart -- so listing
-// an added word here would be a strictly weaker copy of that.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009ReservedWordsFillNoIdentifierPosition) {
   ExpectWordsFillNoIdentifierPosition(
@@ -91,22 +55,11 @@ TEST(CompilerDirectiveParsing,
       {"design element", "port", "instance", "task", "named block"});
 }
 
-// The other side of the addition across the positions an identifier can occupy.
-// The sweep above closes the variable-declaration slot for every added word,
-// but it does not show the words free in any *other* position under the lists
-// this version includes. So the added words are put in each of eight positions
-// under "1800-2005", the union of everything this version includes, where they
-// are still ordinary identifiers -- a design element, a port, an instance, a
-// task, a function, a gate instance, a genvar, and a named block. Each case is
-// paired with the same source under this version, which reserves the word and
-// so admits none of them.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009AddedWordsNameEntitiesUnderIncludedLists) {
   ExpectWordsNameEntitiesUnder("1800-2005", "1800-2009",
                                {"until", "weak", "unique0"});
 
-  // Two of those positions read back, so the accepting legs are observed naming
-  // things rather than merely parsing.
   auto named_module =
       ParseWithPreprocessor(InSv2005("module until;\nendmodule\n"));
   ASSERT_NE(named_module.cu, nullptr);
@@ -123,12 +76,6 @@ TEST(CompilerDirectiveParsing,
   EXPECT_EQ(gate->gate_inst_name, "weak");
 }
 
-// The first of the keyword roles the additions exist for. `checker` and
-// `endchecker` bracket a design element of their own -- the only added word
-// pair that does -- and it lands in the compilation unit's own list of them,
-// separate from its modules. The checker's body is written with the assertion
-// vocabulary of the fourth included list, so the construct also shows the
-// inclusion and the addition working together.
 TEST(CompilerDirectiveParsing, SystemVerilog2009AddedCheckerOpensAnElement) {
   const std::string kSrc =
       "checker handshake (logic clk, logic req);\n"
@@ -148,21 +95,11 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedCheckerOpensAnElement) {
   ASSERT_EQ(r.cu->modules.size(), 1u);
   EXPECT_EQ(r.cu->modules[0]->name, "m");
 
-  // §3.12.1 owns the report: with `checker` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and
-  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto before = ParseWithPreprocessor(InSv2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));
 }
 
-// The `let` declaration, which is the added word with the widest position axis:
-// it may be written at the compilation unit's own scope, inside a design
-// element, inside a clocking block, and as a block item among statements. Each
-// is a production of its own and none of the others reaches it, so all four are
-// here. `untyped`, the other added word this construct admits, types -- or
-// rather declines to type -- a formal argument, and the declaration is read
-// back to show which formal was left untyped and which was not.
 TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
   const std::string kSrc =
       "let gain = 21;\n"
@@ -182,7 +119,6 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
 
-  // The compilation-unit scope form.
   bool cu_let_seen = false;
   for (auto* item : r.cu->cu_items) {
     if (item->kind == ModuleItemKind::kLetDecl && item->name == "gain") {
@@ -192,7 +128,6 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
   }
   EXPECT_TRUE(cu_let_seen);
 
-  // The design-element form, with the untyped formal alongside a typed one.
   auto& items = r.cu->modules[0]->items;
   auto* sum = FindItemByKind(items, ModuleItemKind::kLetDecl);
   ASSERT_NE(sum, nullptr);
@@ -203,8 +138,6 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
   EXPECT_EQ(sum->func_args[1].name, "y");
   EXPECT_EQ(sum->func_args[1].data_type.kind, DataTypeKind::kInt);
 
-  // The clocking-block form and the block-item form, each reached only through
-  // its own path.
   EXPECT_NE(FindItemByKind(items, ModuleItemKind::kClockingBlock), nullptr);
   auto* init = FindItemByKind(items, ModuleItemKind::kInitialBlock);
   ASSERT_NE(init, nullptr);
@@ -220,21 +153,11 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009AddedLetOpensDeclarations) {
   }
   EXPECT_TRUE(block_let_seen);
 
-  // §3.12.1 owns the report: with `let` an ordinary identifier the
-  // compilation-unit form on the first line heads nothing, and
-  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto before = ParseWithPreprocessor(InSv2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));
 }
 
-// The two remaining non-temporal additions, each of which lands as something
-// the tree distinguishes. `restrict` opens a module item of its own kind,
-// separate from the assert/assume/cover items the fourth included list already
-// offers; `unique0` is a case qualifier of its own, distinct from the `unique`
-// that list already has, and it qualifies the plain, the wildcard, and the
-// conditional forms alike; and `global` turns a clocking block into the single
-// one a design may have.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009AddedQualifierWordsOpenConstructs) {
   const std::string kSrc =
@@ -275,32 +198,11 @@ TEST(CompilerDirectiveParsing,
   }
   EXPECT_EQ(qualified, 3u);
 
-  // §6.8 owns the report. Everything above the global clocking block is
-  // written in words 1800-2005 already reserves, so the source survives to
-  // line 4, where `global` is an ordinary identifier and
-  // Parser::ParsePlainVarDecl reads it as a variable of an implicit type. The
-  // `clocking` after it is reserved by this list, so it stands where that
-  // declaration's semicolon belongs.
   auto before = ParseWithPreprocessor(InSv2005(kSrc));
   EXPECT_TRUE(ReportedError(before.diags, "expected ';', got 'clocking'",
                             LineInRegion(4), "6.8"));
 }
 
-// The bulk of Table 22-5 is temporal-property vocabulary, and its keyword role
-// is to build a property expression. Each of the sixteen operators is written
-// into a real property body under this version and the declaration is read back
-// off the tree. The bodies themselves are written with `property`/`endproperty`
-// and `assert property`, which come from the fourth included list -- the
-// addition is only usable because of the inclusion.
-//
-// There is no paired rejection under "1800-2005" here, and there cannot be one:
-// a property body is scanned to its closing keyword rather than parsed as an
-// expression, so it admits any sequence of tokens under any reserved word list
-// -- a body of pure punctuation is accepted too. The rejecting leg for these
-// sixteen words is therefore carried by the identifier-slot sweep above, which
-// is where reservation actually shows, and the version-sensitive half of the
-// role is carried by the test below, which uses the five of them the parser
-// really does read as operators.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009AddedTemporalWordsBuildPropertyExpressions) {
   struct Operator {
@@ -348,28 +250,6 @@ TEST(CompilerDirectiveParsing,
   }
 }
 
-// Reserving a temporal word is only half of it; the other half is that the word
-// stands for a particular operator rather than for "some property word". Five
-// of them carry an operand form the parser checks, and checking it is something
-// only a keyword gets: a bracketed tick count shall not be negative, a range
-// shall not run backwards, and an unbounded maximum is legal after the strong
-// operator of a pair but not after the weak one. Each bad form is rejected here
-// and accepted under "1800-2005", where the very same word is an ordinary
-// identifier and so no operand rule attaches to it -- which is exactly the
-// difference this version_specifier makes. The well-formed counterpart of each
-// is accepted here too, so the rejections are the operand rule rather than the
-// word being unusable, and three of those counterparts use a bracketed shape
-// the sweep above does not reach.
-//
-// Every bound below is an integer literal, and deliberately so. The operand is
-// a constant expression, so a parameter or a localparam may stand there too,
-// but the parser checks only the literal form and leaves a symbolic bound to
-// the stages that fold constants -- a parameter bound is accepted under this
-// version and under the included lists alike, even in the mixed form where the
-// other bound is the literal this rule rejects. Those forms therefore say
-// nothing about which words are reserved, and belong to the subclause defining
-// the operator rather than to this one. The constant forms are enumerated where
-// they actually resolve: at the elaborator and at a run.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009AddedTemporalWordsCarryTheirOwnOperandRules) {
   auto property_src = [](const char* body) {
@@ -384,11 +264,6 @@ TEST(CompilerDirectiveParsing,
            "endmodule\n";
   };
 
-  // Each row carries the report its own bad operand draws, because the five
-  // break three different rules: §16.12.10 states the tick count of both
-  // nexttime forms, §16.12.11 the boundedness of a strong always range, and
-  // §16.12.13 both the boundedness of a weak eventually range and the
-  // ordering of the bounds of any eventually range.
   struct Form {
     const char* word;
     const char* bad;
@@ -396,13 +271,6 @@ TEST(CompilerDirectiveParsing,
     const char* message;
     const char* subclause;
   };
-  // The last two rows are the pair that differs only in strength, and they are
-  // arranged so the table itself makes that comparison: the unbounded maximum
-  // is the strong operator's well-formed operand and the weak one's bad
-  // operand, the same source rejected on one row and accepted on the other.
-  // Each bad form writes a cycle delay before its operand, so that under the
-  // included lists, where the word is a name and its brackets a select of
-  // it, the body is still a sequence_expr.
   const Form kForms[] = {
       {"nexttime", "nexttime [-1] ##1 a", "nexttime [1] a",
        "nexttime index must be a non-negative integer constant expression",
@@ -419,8 +287,6 @@ TEST(CompilerDirectiveParsing,
   };
 
   for (const auto& f : kForms) {
-    // The report stands at the opening '[' of the operand, on the third line
-    // of the source property_src builds.
     auto rejected = ParseWithPreprocessor(InSv2009(property_src(f.bad)));
     EXPECT_TRUE(
         ReportedError(rejected.diags, f.message, LineInRegion(3), f.subclause))
@@ -432,56 +298,26 @@ TEST(CompilerDirectiveParsing,
   }
 }
 
-// Table 22-1 in its keyword role under this version: inclusion is not only
-// about what a word may no longer name. The gate primitives build structure,
-// the resolved net types and drive strengths are written out, and the
-// procedural statements build control flow -- all under a region opened for
-// this version_specifier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009IncludedVerilog1995WordsStillWork) {
   ExpectVerilog1995ConstructsParse("1800-2009");
 }
 
-// Including Table 22-2 means including the ten words a configuration is written
-// with, which is what separates it from the configuration-free companion list:
-// seven of them appear here and the declaration is built. Under that companion
-// list the very same source cannot be written, so the configuration exists here
-// because this version inherits the full list.
 TEST(CompilerDirectiveParsing, SystemVerilog2009IncludesTheConfigurationWords) {
   ExpectConfigurationWordsParse("1800-2009");
 }
 
-// The rest of Table 22-2 in its keyword role. `localparam` declares a constant,
-// `genvar`/`generate`/`endgenerate` build a loop generate construct,
-// `automatic` qualifies a subroutine, `signed` and `unsigned` qualify
-// declarations, and the four pulse-control words are specify items -- each the
-// construct its word exists to open, all still available under this version.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009IncludedVerilog2001WordsStillWork) {
   ExpectVerilog2001ConstructsParse("1800-2009");
 }
 
-// The fourth included list in its keyword role, which is the largest thing this
-// version inherits: the data types, the user-defined types, the inferred
-// processes, the design elements, and the verification vocabulary the added
-// temporal words are written inside of. All of it still works under a region
-// opened for this version_specifier.
 TEST(CompilerDirectiveParsing,
      SystemVerilog2009IncludedSystemVerilog2005WordsStillWork) {
   ExpectSystemVerilog2005ConstructsParse("1800-2009");
 }
 
-// The negative the five tables imply, at the stage where it shows: a word none
-// of them lists is an ordinary identifier under this version, so it names
-// things freely and opens nothing. Both halves are here -- the same word naming
-// a declaration and failing to be a data type -- because either one alone would
-// leave the other unchecked. Each word is one the next standard reserves, so
-// what is being bounded is this version's list and not the vocabulary at large.
 TEST(CompilerDirectiveParsing, SystemVerilog2009LeavesLaterWordsAsIdentifiers) {
-  // None of these opens a design element, so putting one at the head of a line
-  // leaves the region machinery -- which tracks design elements by a line's
-  // first word, without regard to the list in force -- out of the picture, and
-  // the only thing that can reject the source is the word not being a type.
   const char* const kLater[] = {"implements", "interconnect", "nettype",
                                 "soft"};
   for (const char* word : kLater) {
@@ -495,22 +331,12 @@ TEST(CompilerDirectiveParsing, SystemVerilog2009LeavesLaterWordsAsIdentifiers) {
 
     std::string as_type =
         std::string("module m;\n  ") + word + " [7:0] v;\nendmodule\n";
-    // §6.8 owns the report: the word is an ordinary identifier here, so
-    // Parser::ParsePlainVarDecl reads it as a variable of an implicit type and
-    // the packed dimension is where it expected the declaration to end.
     auto typed = ParseWithPreprocessor(InSv2009(as_type));
     EXPECT_TRUE(ReportedError(typed.diags, "expected ';', got '['",
                               LineInRegion(2), "6.8"))
         << word << " is not a data type under this version";
 
-    // The leg that makes each of these a *later* word rather than one this
-    // implementation simply does not know: the specifier for the standard after
-    // this one reserves it, so the very same declaration is refused there. That
-    // is what places the boundary of this version's list between the two.
     auto later = ParseWithPreprocessor(InSv2012(VarDecl(word)));
-    // The report names the word itself, which is what makes each entry of
-    // kLater separately covered: an assertion reading a fixed sentence here
-    // would be satisfied by any of the four.
     EXPECT_TRUE(ReportedError(
         later.diags, std::string("expected identifier, got '") + word + "'",
         LineInRegion(2), "6.8"))

@@ -1,52 +1,3 @@
-// §31.3.3's $setuphold, §31.3.4's $removal, §31.3.5's $recovery and §31.3.6's
-// $recrem, evaluated against a running design. ArmStabilityPair, declared in
-// simulator/timing_check_stability.h, is what WatchTimingChecks
-// (src/simulator/timing_check_driver.cpp) hands an entry of one of those four
-// kinds; simulator/timing_check_driver_internal.h holds what every Clause 31
-// driver shares -- §31.5's edge matching, the watcher that arms on an edge,
-// §31.2's report and §31.6's notifier.
-//
-// All four name a reference event and a data event, as §31.3.1's $setup and
-// §31.3.2's $hold do, and differ from those two in where the reference edge
-// stands. Table 31-4 makes $removal's reference_event the timecheck event and
-// its data_event the timestamp event, so a $removal window ends at the
-// reference edge. Table 31-5 makes $recovery's reference_event the timestamp
-// event and its data_event the timecheck event, so a $recovery window begins at
-// it. Table 31-3 and Table 31-6 give $setuphold and $recrem no fixed answer at
-// all: whichever of the reference and data events the simulation sees first
-// decides which is the timecheck event. Each of
-// those two therefore bounds a window on both sides of the reference edge and
-// carries one limit for each side.
-//
-// §31.3.3 and §31.3.6 state the two-sided pair as an equivalence, and that is
-// what decides which limit bounds which side. §31.3.3 has
-// `$setuphold(posedge clk, data, tSU, tHLD)` do what
-// `$setup(data, posedge clk, tSU)` and `$hold(posedge clk, data, tHLD)` do
-// together, so the setup
-// limit -- TimingCheckEntry::limit, the declaration's first -- bounds the side
-// before the reference edge and the hold limit TimingCheckEntry::limit2 the
-// side after it. §31.3.6 has `$recrem(posedge clear, posedge clk, tREC, tREM)`
-// do what `$removal(posedge clear, posedge clk, tREM)` and
-// `$recovery(posedge clear, posedge clk, tREC)` do together, so for $recrem the
-// two are the other way round: the removal limit TimingCheckEntry::limit2
-// bounds the side before the reference edge and the recovery limit
-// TimingCheckEntry::limit the side after it. Table 31-6 says the same thing in
-// the vocabulary Table 31-3 uses, giving $recrem's removal limit the sentence
-// Table 31-3 gives $setuphold's setup limit and its recovery limit the sentence
-// Table 31-3 gives the hold limit.
-//
-// The window arithmetic below restates §31.3.3 through §31.3.6 rather than
-// calling SpecifyManager::CheckSetupholdViolation,
-// SpecifyManager::CheckRemovalViolation,
-// SpecifyManager::CheckRecoveryViolation or
-// SpecifyManager::CheckRecremViolation, for the reason
-// simulator/timing_check_driver_internal.h gives: each of those selects a check
-// by the spelling of its signals, with no comparison of
-// TimingCheckEntry::inst_prefix, so with one check registered per module
-// instance a single call answers for every instance of the cell. A watcher
-// already knows which entry it was armed for, so it evaluates that entry and no
-// other.
-
 #include "simulator/timing_check_stability.h"
 
 #include <algorithm>
@@ -68,29 +19,17 @@
 namespace delta {
 namespace {
 
-// Which side of the reference edge a check found the data transition on, or
-// that it found no violation. §31.3.3 and §31.3.6 bound a window on both sides
-// of that edge and name each side after the limit bounding it, so the side is
-// what tells a $setuphold setup violation from a $setuphold hold one.
 enum class StabilitySide : uint8_t {
   kNone,
   kBefore,
   kAfter,
 };
 
-// Which of a check's two signals just made the transition it was written with.
-// §31.3 evaluates a check at its timecheck event, and Table 31-4 and Table 31-5
-// put that event on opposite signals, so which watcher fired is what decides
-// whether there is anything to evaluate.
 enum class StabilityEvent : uint8_t {
   kReference,
   kData,
 };
 
-// The two limits of a §31.3.3 or §31.3.6 check, each named for the side of the
-// reference edge it bounds rather than for the constraint that declared it. The
-// signed pair carries the same two limits as §31.9 wrote them, which is what a
-// check with negative-value handling in force is evaluated against.
 struct TwoSidedLimits {
   uint64_t before = 0;
   uint64_t after = 0;
@@ -98,14 +37,6 @@ struct TwoSidedLimits {
   int64_t signed_after = 0;
 };
 
-// $setuphold's setup limit bounds the side before the reference edge and its
-// hold limit the side after it; $recrem's removal limit bounds the side before
-// and its recovery limit the side after. A declaration writes setup before hold
-// and recovery before removal, so the two kinds fill TimingCheckEntry::limit
-// and TimingCheckEntry::limit2 in opposite orders and only $recrem's have to be
-// swapped here. §31.3.3's and §31.3.6's equivalences are what state the two
-// orders, and they are the orders SpecifyManager::CheckSetupholdViolation and
-// SpecifyManager::CheckRecremViolation select their limits in.
 TwoSidedLimits LimitsOf(const TimingCheckEntry& check) {
   if (check.kind == TimingCheckKind::kRecrem) {
     return TwoSidedLimits{check.limit2, check.limit, check.signed_limit2,
@@ -115,19 +46,6 @@ TwoSidedLimits LimitsOf(const TimingCheckEntry& check) {
                         check.signed_limit2};
 }
 
-// §31.3.3, with both limits positive and the data event occurring first: the
-// window runs from limit before the timecheck time to the timecheck time, and a
-// timestamp time after its beginning and at or before its end is a violation.
-// With the data event occurring second: the window runs from the timestamp time
-// to limit after it, and a timecheck time at or after its beginning and before
-// its end is a violation. §31.3.6 states both cases alike for $recrem.
-//
-// Either way the reference edge is the end point that is inside the violation
-// region, which is what makes both clauses' rule hold that reference and data
-// events at the same time are a violation. A simultaneous
-// pair is read against the before-side limit, which is where
-// SpecifyManager::CheckSetupholdViolation reads it. Both clauses state that a
-// check whose two limits are zero shall never issue a violation.
 bool TwoSidedWindowViolated(const TwoSidedLimits& limits, uint64_t ref_ticks,
                             uint64_t data_ticks) {
   if (limits.before == 0 && limits.after == 0) return false;
@@ -135,18 +53,6 @@ bool TwoSidedWindowViolated(const TwoSidedLimits& limits, uint64_t ref_ticks,
   return data_ticks - ref_ticks < limits.after;
 }
 
-// §31.9.1 requirement (a): a change of the signal strictly inside the violation
-// window, its end points excluded, triggers a timing violation, and a window
-// narrower than two units of simulation precision can trigger none. A negative
-// limit moves an end point across the reference edge
-// rather than bounding one side of it, so the window is the one open interval
-// the two signed limits mark out around the reference time and neither side is
-// answered on its own.
-//
-// Excluding both end points settles the second sentence as well. SimTime::ticks
-// counts in units of SimContext::GlobalPrecision, so a window narrower than two
-// of those units holds no tick strictly inside it and reports nothing whatever
-// the data transition does.
 bool NegativeWindowViolated(const TwoSidedLimits& limits, uint64_t ref_ticks,
                             uint64_t data_ticks) {
   const auto kRefTicks = static_cast<int64_t>(ref_ticks);
@@ -155,44 +61,16 @@ bool NegativeWindowViolated(const TwoSidedLimits& limits, uint64_t ref_ticks,
          kDataTicks < kRefTicks + limits.signed_after;
 }
 
-// §31.3.4: the window runs from limit before the timecheck time to the
-// timecheck time, a timestamp time strictly between those ends is a violation,
-// and neither end belongs to the violation region. Table 31-4 makes
-// the reference event the timecheck event and the data event the timestamp
-// event, so the window ends at the reference edge and the data transition is
-// what is placed inside it. When the limit is zero the check never issues a
-// violation, which the excluded end points already give.
 bool RemovalWindowViolated(uint64_t limit, uint64_t ref_ticks,
                            uint64_t data_ticks) {
   return data_ticks < ref_ticks && ref_ticks - data_ticks < limit;
 }
 
-// §31.3.5: the window runs from the timestamp time to limit after it, a
-// timecheck time at or after its beginning and before its end is a violation,
-// and the end alone is left out of the violation region. Table 31-5 makes
-// the reference event the timestamp event and the data event the timecheck
-// event, so the window begins at the reference edge. When the limit is zero the
-// check never issues a violation, which the excluded end is what gives.
 bool RecoveryWindowViolated(uint64_t limit, uint64_t ref_ticks,
                             uint64_t data_ticks) {
   return data_ticks >= ref_ticks && data_ticks - ref_ticks < limit;
 }
 
-// Whether one of §31.3.3's and §31.3.6's two-sided checks is violated, and on
-// which side of the reference edge.
-//
-// §31.9.4 has an invocation option that turns every timing check off, and these
-// are the two kinds whose verdict reads it:
-// SpecifyManager::CheckSetupholdViolation and
-// SpecifyManager::CheckRecremViolation both return false while
-// TimingCheckInvocationOptions::all_timing_checks_off is set, and
-// SpecifyManager::GetTimingCheckInvocationOptions is how a watcher reaches that
-// option. Whether §31.9's negative limits are honored at all is settled before
-// an entry ever reaches here: BuildTimingCheckUnderOptions
-// (src/simulator/specify_timing_check.cpp) sets
-// TimingCheckEntry::negative_timing_check_enabled only while §31.9.4's enabling
-// option is in force, and SpecifyManager::ApplyTimingCheckInvocationOptions
-// clears it again when that option goes away.
 StabilitySide TwoSidedSide(const SpecifyManager& mgr,
                            const TimingCheckEntry& check, uint64_t ref_ticks,
                            uint64_t data_ticks) {
@@ -208,11 +86,6 @@ StabilitySide TwoSidedSide(const SpecifyManager& mgr,
                                  : StabilitySide::kAfter;
 }
 
-// Whether the check `check` is violated by a data transition at `data_ticks`
-// against a reference transition at `ref_ticks`, and on which side of the
-// reference edge the data transition fell. §31.3.4 and §31.3.5 carry one limit
-// and bound one side apiece, so the side a violation of either falls on is
-// fixed by the clause rather than by the two times.
 StabilitySide ViolatedSide(const SpecifyManager& mgr,
                            const TimingCheckEntry& check, uint64_t ref_ticks,
                            uint64_t data_ticks) {
@@ -230,17 +103,6 @@ StabilitySide ViolatedSide(const SpecifyManager& mgr,
              : StabilitySide::kNone;
 }
 
-// Whether the event `event` is the check's timecheck event, which is the event
-// §31.3 evaluates a check at. Table 31-4 makes $removal's reference event the
-// timecheck event and Table 31-5 makes $recovery's data event the timecheck
-// event; Table 31-3 and Table 31-6 leave $setuphold's and $recrem's to
-// whichever of the two the simulation sees first, so for those two
-// either event closes a window.
-//
-// This is asked once per watcher when the check is armed, rather than of each
-// transition as it arrives, because the evaluation no longer runs inside the
-// commit that woke a watcher. A watcher whose event never closes a window
-// records its time and asks for nothing.
 bool ClosesWindow(TimingCheckKind kind, StabilityEvent event) {
   if (kind == TimingCheckKind::kRemoval) {
     return event == StabilityEvent::kReference;
@@ -251,8 +113,6 @@ bool ClosesWindow(TimingCheckKind kind, StabilityEvent event) {
   return true;
 }
 
-// The timestamp_condition and timecheck_condition of §31.3.3 and §31.3.6 as
-// they stood at one transition; both hold where the declaration left them out.
 struct EventConditions {
   bool timestamp = true;
   bool timecheck = true;
@@ -265,22 +125,6 @@ EventConditions ConditionsNow(const TimingCheckEntry& check, SimContext& ctx) {
                                   check.inst_prefix, ctx)};
 }
 
-// One §31.3 check between the two transitions it measures: which entry it is,
-// what its two signals are called, and when each of them last made the
-// transition the check was written with. Both signals are named under the
-// instance prefix the check was registered with, which is what every variable
-// of an instantiated module is named under.
-//
-// The entry is held as a position in SpecifyManager::GetTimingChecks rather
-// than as a pointer to it or a copy of it, for the reason ArmedCheck
-// (simulator/timing_check_driver_internal.h) gives: the vector is appended to
-// during the run, an append moves every element, and a copy would freeze a
-// limit that §32.4.2's TIMINGCHECK annotation exists to change.
-//
-// Both edge times are kept, where the StabilityWindow of §31.3.1 and §31.3.2
-// (src/simulator/timing_check_driver.cpp) keeps one. Table 31-3 and Table 31-6
-// leave which event is the timecheck to which of the two occurs first, so
-// neither signal is the one the other is always measured against.
 struct StabilityPair {
   ArmedCheck armed;
   std::string ref_signal;
@@ -289,25 +133,12 @@ struct StabilityPair {
   uint64_t ref_ticks = 0;
   bool has_data = false;
   uint64_t data_ticks = 0;
-  // Whether the check's timestamp_condition and timecheck_condition held when
-  // each signal last made its transition. §31.9.2 leaves which of the two a
-  // transition answers to until the window is known -- the timestamp is the
-  // event that transitions first and the timecheck the one that transitions
-  // second -- so both are read at the event and kept.
   EventConditions ref_conditions;
   EventConditions data_conditions;
 
-  // Whether an evaluation of this check is already scheduled for the slot
-  // running now. ScheduleTimingCheckEvaluation
-  // (simulator/timing_check_driver_internal.h) defers the comparison to
-  // Region::kPrePostponed, and a check whose two events both fall in one slot
-  // is evaluated once there rather than once per event.
   std::shared_ptr<bool> pending = std::make_shared<bool>(false);
 };
 
-// §31.3.3's two messages. The check stands for two constraints, and the clause
-// names each after its own limit: the setup limit bounds the window that ends
-// at the reference edge and the hold limit the window that begins at it.
 void ReportSetuphold(StabilitySide side, const StabilityPair& pair,
                      SimContext& ctx) {
   if (side == StabilitySide::kBefore) {
@@ -325,10 +156,6 @@ void ReportSetuphold(StabilitySide side, const StabilityPair& pair,
       "31.3.3", pair.armed.Entry().loc, ctx);
 }
 
-// §31.3.6's two messages, named for the two checks §31.3.6 makes $recrem
-// equivalent to: the removal limit bounds the window that ends at the reference
-// edge, as §31.3.4's own window does, and the recovery limit the window that
-// begins at it, as §31.3.5's does.
 void ReportRecrem(StabilitySide side, const StabilityPair& pair,
                   SimContext& ctx) {
   if (side == StabilitySide::kBefore) {
@@ -346,10 +173,6 @@ void ReportRecrem(StabilitySide side, const StabilityPair& pair,
       "31.3.6", pair.armed.Entry().loc, ctx);
 }
 
-// Reports the violation a check just detected, naming the signal that
-// transitioned inside the window and the signal whose edge bounds it. The four
-// kinds differ in which end of the window the reference edge is, which is why
-// the messages differ in more than the name of the check.
 void ReportViolation(TimingCheckKind kind, StabilitySide side,
                      const StabilityPair& pair, SimContext& ctx) {
   if (kind == TimingCheckKind::kSetuphold) {
@@ -375,15 +198,6 @@ void ReportViolation(TimingCheckKind kind, StabilitySide side,
       "31.3.5", pair.armed.Entry().loc, ctx);
 }
 
-// §31.9.2 (printed page 922): timestamp_condition goes with whichever delayed
-// signal moves first and timecheck_condition with the one that moves second.
-// A violation
-// before the reference edge has the data transition first and one after it the
-// reference transition first, so the side says which transition answers to
-// which condition; `$setuphold(clk, data, tsetup, thold, ntfr, , cond1)` is
-// then the clause's `$setup(data, clk &&& cond1, ...)` beside `$hold(clk, data
-// &&& cond1, ...)`. A condition that did not hold at its transition leaves that
-// transition no event of the check, and the window no violation.
 bool ConditionsAdmit(StabilitySide side, const StabilityPair& pair) {
   const EventConditions& first = side == StabilitySide::kBefore
                                      ? pair.data_conditions
@@ -394,12 +208,6 @@ bool ConditionsAdmit(StabilitySide side, const StabilityPair& pair) {
   return first.timestamp && second.timecheck;
 }
 
-// §31.9.1 and §31.9.3 (printed page 923): a negative check is evaluated on the
-// delayed copies of its two signals, so it detects a violation when the later
-// of the two delayed transitions arrives, and the notifier toggles then rather
-// than at the undelayed transition. The window the undelayed times are judged
-// against is the delayed one moved back by the two delays, which is why the
-// verdict itself is reached here.
 uint64_t DelayedDetectionTicks(const StabilityPair& pair) {
   const SpecifyManager& mgr = *pair.armed.mgr;
   return std::max(
@@ -407,18 +215,6 @@ uint64_t DelayedDetectionTicks(const StabilityPair& pair) {
       pair.data_ticks + mgr.TimingCheckSignalDelay(pair.data_signal));
 }
 
-// A §31.3 check whose timecheck event happened in the slot running now.
-// Reports a violation when the two signals' last transitions leave one inside
-// the window the other bounds.
-//
-// Nothing is evaluated until both signals have transitioned at least once:
-// §31.3 defines a window with respect to one transition and places the other
-// inside it, so before the first of each there is no window and nothing to
-// place.
-//
-// Whether the transition that asked for this closed a window was settled when
-// the check was armed, ClosesWindow being asked of the watcher rather than of
-// the transition.
 void EvaluateStabilityPair(const StabilityPair& pair, SimContext& ctx) {
   if (!pair.has_ref || !pair.has_data) return;
   const TimingCheckEntry& check = pair.armed.Entry();
@@ -448,23 +244,6 @@ void ArmStabilityPair(const SpecifyManager& mgr, std::size_t index,
                       SimContext& ctx) {
   auto pair = std::make_shared<StabilityPair>();
   pair->armed = ArmedCheck{&mgr, index};
-  // ArmTimingCheckEvents (simulator/timing_check_driver_internal.h) arms one
-  // watcher on the reference_event and one on the data_event, each gated by
-  // §31.5's edge_control_specifier and §31.7's `&&&` condition its own event
-  // was written with. Both events need that gate here, and not just the one a
-  // check is evaluated at, because §31.3.3's Table 31-3 and §31.3.6's Table
-  // 31-6 leave the timecheck event to whichever of the two the simulation sees
-  // first. A transition recorded in StabilityPair::ref_ticks or
-  // StabilityPair::data_ticks under a false condition would otherwise stand as
-  // the other side of every window the surviving event closes.
-  //
-  // Each watcher records its own time and asks for an evaluation only where
-  // ClosesWindow makes its event the timecheck event, which is what
-  // Scheduler::ExecuteTimeSlot then runs once the slot's active and reactive
-  // region sets are drained. Two events falling in one time slot are therefore
-  // both recorded before either is compared against the other, where a check
-  // evaluated inside the commit that woke a watcher saw only what had committed
-  // before it.
   const TimingCheckKind kKind = mgr.GetTimingChecks()[index].kind;
   const bool kRefCloses = ClosesWindow(kKind, StabilityEvent::kReference);
   const bool kDataCloses = ClosesWindow(kKind, StabilityEvent::kData);

@@ -19,8 +19,6 @@ using namespace delta;
 
 namespace {
 
-// Module m elaborated around the localparam declarations `items`, so that
-// each fold test below states the expressions it reads and their readings.
 RtlirDesign* ElaborateLocalparams(std::string_view items, ElabFixture& f) {
   std::string src = "module m;\n";
   src += items;
@@ -324,16 +322,6 @@ TEST(Elaboration, ContextWidthZeroReturnsSelfDetermined) {
   EXPECT_EQ(ContextWidth(&lit, 0, typedefs), 32u);
 }
 
-// §11.6.1's Table 11-21 (printed pages 299-300): a shift and a power are as
-// wide as their left operand, the right being self-determined, so the fold
-// cuts each to that width. `8'd2 ** 32'd8` is 256 cut to 8 bits, 0, and
-// `8'd1 << 32'd8` the same 256 cut the same way; `16'd1 << 32'd8` keeps its
-// 256 in 16 bits; `8'd255 << 96'd1` is 0x1FE cut to 8 bits, 0xFE. A fold
-// sized by the wider operand read 256, 256 and 510 from the first, second
-// and last. Each parameter is declared with neither type nor range, so its
-// value is self-determined (§6.20.2, printed 126): under `int` the 32-bit
-// target would size the left operand (§11.6.1, printed 299) and the four
-// would read 256, 256, 256 and 510.
 TEST(ExpressionBitLength, ShiftAndPowerFoldAtTheLeftOperandsWidth) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -348,12 +336,6 @@ TEST(ExpressionBitLength, ShiftAndPowerFoldAtTheLeftOperandsWidth) {
   EXPECT_EQ(ParamValue(design, "E"), 0xFE);
 }
 
-// §11.4.10 (printed page 284): the count is an unsigned number of whatever
-// size the right operand has, so a count of 2^64, whose one set bit lies
-// above the low word, is at least any width and leaves nothing of the left
-// operand -- 0 of `8'd1`, and the sign fill alone, 8'hFF read as -1, of the
-// signed `8'sh80` under `>>>`. A fold reading the count's low word shifted
-// by 0 and read 1 and -128.
 TEST(ExpressionBitLength, ShiftCountIsReadAcrossEveryWordOfTheRightOperand) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -364,19 +346,6 @@ TEST(ExpressionBitLength, ShiftCountIsReadAcrossEveryWordOfTheRightOperand) {
   EXPECT_EQ(ParamValue(design, "V"), -1);
 }
 
-// §11.8.1 (printed page 302): the sign of a self-determined operand is its
-// own and the result is unsigned only where an operand that is not
-// self-determined is, so a power is signed where its base is and a shift
-// where its left operand is (§11.4.10, printed 284). `-8'sd2 ** 32'sd3` is
-// (-2)^3 = -8 in 8 signed bits, `8'sd2 ** 8'd3` is 8, and `-8'sd2 ** 8'd3`
-// is -8 too: a fold that asked both operands read the base as the unsigned
-// 254, whose cube cut to 8 bits is 248. `-8'sd8 >> 1` is 8'hF8 shifted down
-// with a zero brought in, 8'h7C = 124, signed and positive; a fold reading
-// the sign-extended value at 32 bits shifted its fill into the field and
-// read 0xFFFFFFFC. R is declared with neither type nor range so that its
-// value is self-determined (§6.20.2, printed 126): under `int` the 32-bit
-// target sizes the shifted operand and the fill is in the field by right,
-// which ContextDeterminedOperandsAreSizedByTheTarget below reads.
 TEST(ExpressionBitLength, PowerAndShiftTakeTheLeftOperandsSignedness) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -391,20 +360,6 @@ TEST(ExpressionBitLength, PowerAndShiftTakeTheLeftOperandsSignedness) {
   EXPECT_EQ(ParamValue(design, "R"), 124);
 }
 
-// §11.6.1 (printed page 299) with §11.8.2 (printed 302): the right-hand side
-// of an assignment is context-determined, sized by the largest of its
-// operands and the left-hand side, and that size is propagated down to the
-// context-determined operands before the operator is applied. `8'hAB << 8`
-// assigned to a 16-bit target is 8'hAB extended to 16 bits, the count
-// self-determined (Table 11-21), then shifted: 0xAB00. `8'hFF + 8'h01` in
-// 16 bits keeps its carry, 0x100. `16'h1234 + 0` is 32 bits wide, the
-// unsized 0 being 32, and the sum 0x1234 is cut to the 8-bit target, 0x34
-// (§11.8.3, printed 303, and §6.20.2, printed 126). `-8'sd8 >> 1` in a
-// 32-bit signed target extends 8'hF8 by its sign to 0xFFFFFFF8 -- the
-// expression is signed, its one context-determined operand being signed
-// (§11.8.1, printed 302) -- and the logical shift brings a zero in above
-// it, 0x7FFFFFFC. Folded at the operands' own widths, the four read 0, 0,
-// 0x34 and 124.
 TEST(ExpressionBitLength, ContextDeterminedOperandsAreSizedByTheTarget) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -419,13 +374,6 @@ TEST(ExpressionBitLength, ContextDeterminedOperandsAreSizedByTheTarget) {
   EXPECT_EQ(ParamValue(design, "R"), 0x7FFFFFFC);
 }
 
-// §11.6.2 (printed page 300): the clause's own example. `(a + b) >> 1` over
-// 16-bit operands into a 16-bit target adds at 16 bits and loses the carry,
-// so 16'hFFFF + 16'h0001 is 0 and the shift reads 0; adding the unsized 0
-// makes the sum 32 bits wide, keeps the carry, and the shift reads 0x8000.
-// The condition of a conditional and the count of a shift are
-// self-determined (Table 11-21, printed 300), so the 16-bit target reaches
-// neither: 1'b1 stays one bit, and the count 1 sizes nothing.
 TEST(ExpressionBitLength, AddingAnUnsizedZeroWidensTheSumAsTheClauseSays) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -438,13 +386,6 @@ TEST(ExpressionBitLength, AddingAnUnsizedZeroWidensTheSumAsTheClauseSays) {
   EXPECT_EQ(ParamValue(design, "SEL"), 0x8000);
 }
 
-// §11.8.2 (printed page 303): the operands of a relational operator affect
-// each other as context-determined operands do and are sized to the larger
-// of the two, and to nothing outside -- Table 11-21 (printed 299) sizes them
-// to max(L(i), L(j)) and the operator's answer to one bit. So `8'hFF + 8'h01
-// > 8'h00` written in a 16-bit target adds at 8 bits, where the sum is 0,
-// and 0 > 0 is false: U takes the second arm, 2. Sized by the target, the
-// sum would be 0x100, the comparison true and U 1.
 TEST(ExpressionBitLength, ComparisonOperandsAreSizedToEachOtherAlone) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -455,15 +396,6 @@ TEST(ExpressionBitLength, ComparisonOperandsAreSizedToEachOtherAlone) {
   EXPECT_EQ(ParamValue(design, "T"), 1);
 }
 
-// §11.8.2 (printed page 303): an operand extended to the propagated size is
-// sign-extended if and only if the propagated type is signed, which §11.8.1
-// (printed 302) makes it where every context-determined operand is. Both
-// operands of `8'sh80 + 8'sd0` are signed, so 8'sh80 is extended by its sign
-// to the 16-bit target, 16'hFF80, and the sum read signed is -128. With an
-// unsigned operand beside it, `8'sh80 + 8'd0`, the expression is unsigned
-// and 8'sh80 is zero-extended, 16'h0080 = 128, whatever the target's own
-// signedness (§11.8.1: the type does not depend on the left-hand side). A
-// fold extending each operand by its own sign read -128 from both.
 TEST(ExpressionBitLength, SignedOperandsExtendBySignOnlyWhenAllAreSigned) {
   ElabFixture f;
   auto* design = ElaborateLocalparams(
@@ -474,10 +406,6 @@ TEST(ExpressionBitLength, SignedOperandsExtendBySignOnlyWhenAllAreSigned) {
   EXPECT_EQ(ParamValue(design, "M"), 128);
 }
 
-// Table 11-21 sizes a conditional expression by the longer of its two
-// expressions, and §11.8.1 makes it unsigned when either is. Folded, the
-// chosen 4-bit expression takes the conditional's 8 bits inside a
-// concatenation, and a signed one is read unsigned beside an unsigned one.
 TEST(ExpressionBitLengthElaboration, ConstantConditionalTakesBothBranchesType) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -493,8 +421,6 @@ TEST(ExpressionBitLengthElaboration, ConstantConditionalTakesBothBranchesType) {
   EXPECT_EQ(ParamValue(design, "R"), -1);
 }
 
-// An expression of the conditional that does not fold leaves the chosen one
-// folded as it stands; the conditional folds where the chosen one does.
 TEST(ExpressionBitLengthElaboration, ConstantConditionalWithAnUnfoldedBranch) {
   EvalFixture f;
   EXPECT_EQ(ConstEvalInt(ParseExprFrom("1 ? 5 : U", f)), 5);

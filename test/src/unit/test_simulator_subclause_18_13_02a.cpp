@@ -22,8 +22,6 @@ TEST(SysTask, UrandomRangeInBounds) {
   EXPECT_LE(val, 10u);
 }
 
-// With minval left out, the function returns a value between maxval and 0. The
-// single-argument form must yield a value bounded by zero.
 TEST(SysTask, UrandomRangeOmittedMinvalIsZero) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$urandom_range", {MkInt(f.arena, 7)});
@@ -33,9 +31,6 @@ TEST(SysTask, UrandomRangeOmittedMinvalIsZero) {
   }
 }
 
-// Edge case for the range claim: when maxval and minval coincide, the
-// half-open interval collapses and the only legal return value is the shared
-// boundary itself.
 TEST(SysTask, UrandomRangeEqualBoundsReturnsBoundary) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$urandom_range",
@@ -46,8 +41,6 @@ TEST(SysTask, UrandomRangeEqualBoundsReturnsBoundary) {
   }
 }
 
-// Edge case for the default-minval rule: a single-argument call with maxval=0
-// reduces to the degenerate [0,0] range, so the only legal return value is 0.
 TEST(SysTask, UrandomRangeZeroMaxvalReturnsZero) {
   SysTaskFixture f;
   auto* expr = MkSysCall(f.arena, "$urandom_range", {MkInt(f.arena, 0)});
@@ -57,12 +50,6 @@ TEST(SysTask, UrandomRangeZeroMaxvalReturnsZero) {
   }
 }
 
-// A maxval below minval has the two arguments swapped. Driven from real source
-// through the full pipeline with runtime (non-literal) operands: maxval=hi=5 is
-// passed smaller than minval=lo=20, so the effective range must widen to [5,20]
-// rather than collapsing. Every draw stays inside [5,20] (outside stays zero)
-// and some exceed the nominal maxval of 5 (wide is positive), proving the
-// reversal actually took effect and the upper bound became 20.
 TEST(SysTask, UrandomRangeReversedRuntimeBoundsWidenRange) {
   auto vals = RunSeededAndRead(
       "module t;\n"
@@ -89,12 +76,6 @@ TEST(SysTask, UrandomRangeReversedRuntimeBoundsWidenRange) {
   EXPECT_GT(vals[1], 0u);
 }
 
-// $urandom_range() returns an unsigned integer inside the range it is given.
-// The prototype types both arguments as int unsigned, so a range lying entirely
-// above 2^31 must be honored: were either bound or the result treated as a
-// signed int, the interval would appear inverted or the draw would fall outside
-// it. Driven from real source with runtime operands whose values exceed
-// INT_MAX, every draw stays within [3e9, 4e9].
 TEST(SysTask, UrandomRangeUnsignedRangeAboveIntMax) {
   auto vals = RunSeededAndRead(
       "module t;\n"
@@ -117,10 +98,6 @@ TEST(SysTask, UrandomRangeUnsignedRangeAboveIntMax) {
   EXPECT_EQ(vals[0], 0u);
 }
 
-// $urandom_range() is thread stable with no further action (see 18.14.2).
-// Forked children draw from independent, hierarchically seeded RNGs, so a
-// second run of the same program with the same parent state replays identical
-// per-thread values regardless of the scheduler's interleaving.
 TEST(SysTask, UrandomRangeIsThreadStable) {
   ExpectForkedUrandomRangeDrawsReplay();
 }

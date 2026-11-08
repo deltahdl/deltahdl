@@ -19,8 +19,6 @@ TEST_F(VerifyParseTest, CovergroupWithIff) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-// LRM 19.5: a coverpoint can carry an explicit set of named bins given by a
-// covergroup_range_list.
 TEST(CoverPointParsing, CoverpointWithExplicitBins) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -34,8 +32,6 @@ TEST(CoverPointParsing, CoverpointWithExplicitBins) {
   )"));
 }
 
-// LRM 19.5: the default specification defines a bin that catches the values
-// that do not lie within any of the defined bins.
 TEST(CoverPointParsing, CoverpointWithDefaultBin) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -49,8 +45,6 @@ TEST(CoverPointParsing, CoverpointWithDefaultBin) {
   )"));
 }
 
-// LRM 19.5: bins may be illegal_bins or ignore_bins; wildcard bins are also
-// admitted by the grammar.
 TEST(CoverPointParsing, CoverpointWithIllegalIgnoreWildcardBins) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -65,8 +59,6 @@ TEST(CoverPointParsing, CoverpointWithIllegalIgnoreWildcardBins) {
   )"));
 }
 
-// LRM 19.5: a coverage point specifies an integral or real expression to be
-// covered, not only a simple variable.
 TEST(CoverPointParsing, CoverpointOverExpression) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -77,8 +69,6 @@ TEST(CoverPointParsing, CoverpointOverExpression) {
   )"));
 }
 
-// LRM 19.5: a coverpoint may be labeled; the label becomes the name of the
-// coverage point.
 TEST(CoverPointParsing, LabeledCoverpoint) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -89,8 +79,6 @@ TEST(CoverPointParsing, LabeledCoverpoint) {
   )"));
 }
 
-// LRM 19.5 (Syntax 19-2, covergroup_value_range): a value range may be
-// open-ended using $ for the low or high bound.
 TEST(CoverPointParsing, CoverpointWithOpenEndedRangeBins) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -104,8 +92,6 @@ TEST(CoverPointParsing, CoverpointWithOpenEndedRangeBins) {
   )"));
 }
 
-// LRM 19.5 (Syntax 19-2, covergroup_value_range): a value range may be written
-// as a center with a +/- or +%- tolerance.
 TEST(CoverPointParsing, CoverpointWithToleranceRangeBins) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -119,8 +105,6 @@ TEST(CoverPointParsing, CoverpointWithToleranceRangeBins) {
   )"));
 }
 
-// LRM 19.5 (Syntax 19-2, bins_or_options): the default sequence form catches
-// transitions that do not lie within any defined transition bin.
 TEST(CoverPointParsing, CoverpointWithDefaultSequenceBin) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -134,8 +118,6 @@ TEST(CoverPointParsing, CoverpointWithDefaultSequenceBin) {
   )"));
 }
 
-// LRM 19.5 (Syntax 19-2, bins_or_options): a bin may be assigned a trans_list
-// describing one or more value-transition sequences.
 TEST(CoverPointParsing, CoverpointWithTransitionListBins) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -148,10 +130,6 @@ TEST(CoverPointParsing, CoverpointWithTransitionListBins) {
   )"));
 }
 
-// §19.5: an unlabelled coverpoint over a single variable takes the variable's
-// name, and the clause's own example marks a label equal to that name as
-// invalid; a later label differing from it, and a label naming the variable
-// an earlier coverpoint covers under another name, are accepted.
 TEST_F(VerifyParseTest, CoverpointLabelEqualToImplicitNameIsError) {
   Parse(R"(
     module m;
@@ -171,9 +149,6 @@ TEST_F(VerifyParseTest, CoverpointLabelEqualToImplicitNameIsError) {
                             5, "19.5"));
 }
 
-// §19.5 and §19.6: a coverpoint's name and a cross's name share the
-// covergroup's scope, so two labels alike, or a cross label equal to a
-// coverpoint's, each repeat a name already taken.
 TEST_F(VerifyParseTest, RepeatedCoverpointOrCrossLabelIsError) {
   Parse(R"(
     module m;

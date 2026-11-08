@@ -309,10 +309,6 @@ std::vector<GrammarForm> ProductionForms(GrammarProduction production) {
 
 namespace {
 
-// Whether a local-variable form -- ( t v; R ) or ( 1, v = e ) -- appears
-// anywhere in the sequence. §F.5.2's tight-satisfaction model does not cover
-// these forms (its slice rules reject them), so when one is present the §F.5.5
-// definitions, which do model local variables, are the applicable ones.
 bool SequenceUsesLocalVariables(const SequenceExpr& seq) {
   if (seq.kind == SequenceExpr::Kind::kLocalVarDecl ||
       seq.kind == SequenceExpr::Kind::kLocalVarSampling) {
@@ -330,15 +326,6 @@ bool SequenceUsesLocalVariables(const SequenceExpr& seq) {
 }  // namespace
 
 bool SequenceOperandSatisfiesNondegeneracyRequirement(const SequenceExpr& seq) {
-  // §F.3.2 imposes two conditions on the sequence operand of a strong/weak
-  // sequence property: it shall be nondegenerate, and it shall not be tightly
-  // satisfied by the empty word. §F.3.2 cites both §F.5.2 (the definitions
-  // without local variables) and §F.5.5 (the definitions with local variables)
-  // for these terms. When the operand carries a local variable, §F.5.2 cannot
-  // evaluate it, so the §F.5.5 definitions -- which generalize §F.5.2 -- apply:
-  // nondegeneracy is IsNondegenerateSequenceWithLocals, and tight satisfaction
-  // by the empty word is the empty word yielding some output context from the
-  // empty input context.
   if (SequenceUsesLocalVariables(seq)) {
     const bool kEmptyWordMatches =
         !TightSatisfactionOutputs(Word{}, seq, LocalContext{}).empty();

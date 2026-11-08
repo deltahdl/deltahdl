@@ -10,7 +10,6 @@ namespace delta {
 bool WeaklySatisfiesByFiniteWordWithLocals(
     const Word& word, const BooleanExpr& enabling,
     const LvAssertionStatement& assertion) {
-  // §F.5.6.2, by §F.5.3.2: w |=^- A iff w T^omega |= A.
   return NeutrallySatisfiesAssertionWithLocalsWithTail(word, LetterTop(),
                                                        enabling, assertion);
 }
@@ -18,7 +17,6 @@ bool WeaklySatisfiesByFiniteWordWithLocals(
 bool StronglySatisfiesByFiniteWordWithLocals(
     const Word& word, const BooleanExpr& enabling,
     const LvAssertionStatement& assertion) {
-  // §F.5.6.2, by §F.5.3.2: w |=^+ A iff w _|_^omega |= A.
   return NeutrallySatisfiesAssertionWithLocalsWithTail(word, LetterBottom(),
                                                        enabling, assertion);
 }
@@ -26,8 +24,6 @@ bool StronglySatisfiesByFiniteWordWithLocals(
 FiniteWordVerdict CheckFiniteWordWithLocals(
     const Word& word, const BooleanExpr& enabling,
     const LvAssertionStatement& assertion) {
-  // §F.5.6.2, by §F.5.3.2: ruling out failure, then strong, then neutral
-  // satisfaction picks out the one condition that holds.
   if (!WeaklySatisfiesByFiniteWordWithLocals(word, enabling, assertion)) {
     return FiniteWordVerdict::kFails;
   }
@@ -43,8 +39,6 @@ FiniteWordVerdict CheckFiniteWordWithLocals(
 bool FiniteWordVerdictConditionWithLocals(
     FiniteWordVerdict verdict, const Word& word, const BooleanExpr& enabling,
     const LvAssertionStatement& assertion) {
-  // §F.5.6.2, by §F.5.3.2: each verdict's condition as the subclause states
-  // it.
   switch (verdict) {
     case FiniteWordVerdict::kHoldsStrongly:
       return StronglySatisfiesByFiniteWordWithLocals(word, enabling, assertion);

@@ -50,10 +50,6 @@ TEST(Preprocessor, Timescale_InvalidUnit) {
                             "22.7"));
 }
 
-// The rule the report enforces is §22.7's, so the record it leaves says so
-// rather than leaving a reader of the run to recognize the wording. Reading the
-// clause back is what lets an assertion claim the preprocessor complained about
-// this rule rather than about any of the others `timescale carries.
 TEST(Preprocessor, Timescale_PrecisionLessPreciseThanUnitNames22_7) {
   PreprocFixture f;
   Preprocess("`timescale 1ns/1us\n", f);
@@ -122,8 +118,6 @@ TEST(Preprocessor, Timescale_InvalidMagnitude5) {
                             "22.7"));
 }
 
-// A time unit is a magnitude followed by a unit name: one with the magnitude
-// alone, or with the name alone, is not one.
 TEST(Preprocessor, Timescale_UnitMissingItsNameOrItsMagnitude) {
   for (const char* unit : {"1", "ns"}) {
     PreprocFixture f;
@@ -210,10 +204,6 @@ TEST(Preprocessor, Timescale_IllegalInsideDesignElement) {
                             "22.7"));
 }
 
-// The rule barring the directive inside a design element is not
-// module-specific: the directive is equally forbidden inside every
-// design-element kind. Exercise a distinct enclosing position (an interface) to
-// confirm the same rejection.
 TEST(Preprocessor, Timescale_IllegalInsideInterface) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -224,7 +214,6 @@ TEST(Preprocessor, Timescale_IllegalInsideInterface) {
                             "22.7"));
 }
 
-// A package is another design-element position the same prohibition covers.
 TEST(Preprocessor, Timescale_IllegalInsidePackage) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -234,8 +223,6 @@ TEST(Preprocessor, Timescale_IllegalInsidePackage) {
                             "22.7"));
 }
 
-// The accepting side of the same rule: once a design element closes, the
-// directive is back at compilation-unit scope and is legal again.
 TEST(Preprocessor, Timescale_LegalAfterDesignElementCloses) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -246,7 +233,6 @@ TEST(Preprocessor, Timescale_LegalAfterDesignElementCloses) {
   EXPECT_EQ(pp.CurrentTimescale().precision, TimeUnit::kPs);
 }
 
-// A program is another design-element position the prohibition covers.
 TEST(Preprocessor, Timescale_IllegalInsideProgram) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -256,8 +242,6 @@ TEST(Preprocessor, Timescale_IllegalInsideProgram) {
                             "22.7"));
 }
 
-// A checker is likewise a design element, so the directive is illegal inside
-// it.
 TEST(Preprocessor, Timescale_IllegalInsideChecker) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -267,7 +251,6 @@ TEST(Preprocessor, Timescale_IllegalInsideChecker) {
                             "22.7"));
 }
 
-// A primitive is a design element as well; the same rejection applies.
 TEST(Preprocessor, Timescale_IllegalInsidePrimitive) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -278,7 +261,6 @@ TEST(Preprocessor, Timescale_IllegalInsidePrimitive) {
                             "22.7"));
 }
 
-// A configuration is the final design-element kind this prohibition spans.
 TEST(Preprocessor, Timescale_IllegalInsideConfig) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -288,8 +270,6 @@ TEST(Preprocessor, Timescale_IllegalInsideConfig) {
                             "22.7"));
 }
 
-// The magnitude-set {1,10,100} constraint governs the precision argument in its
-// own right: a value outside the set is rejected in that position too.
 TEST(Preprocessor, Timescale_InvalidPrecisionMagnitude) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -298,7 +278,6 @@ TEST(Preprocessor, Timescale_InvalidPrecisionMagnitude) {
                             "invalid `timescale precision", 1, "22.7"));
 }
 
-// The largest legal magnitude, 100, is accepted in the precision argument.
 TEST(Preprocessor, Timescale_PrecisionMagnitude100) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -396,11 +375,6 @@ TEST(Preprocessor, Timescale_ResetallClearsTimescale) {
   EXPECT_FALSE(pp.HasTimescale());
 }
 
-// The `timescale in force at a header is recorded under the name the header
-// declares, whatever follows that name on the line: the end of the line with
-// the ports on the next, a tab before the ports, or the # of a parameter port
-// list. The first header puts a tab after the keyword's space, which is white
-// space before the name like any other.
 TEST(Preprocessor, Timescale_RecordedUnderTheHeadersName) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -422,10 +396,6 @@ TEST(Preprocessor, Timescale_RecordedUnderTheHeadersName) {
   }
 }
 
-// §22.7 sets the scale of every design element after the directive, a package
-// among them (§3.2), so a package's header is recorded too, marked as a
-// package's: packages have a name space of their own (§3.13), and a module of
-// the same name is another element.
 TEST(Preprocessor, Timescale_RecordedAtAPackagesHeader) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -447,8 +417,6 @@ TEST(Preprocessor, Timescale_RecordedAtAPackagesHeader) {
   EXPECT_EQ(list[1].timescale.unit, TimeUnit::kNs);
 }
 
-// A.1.2 lets attribute instances stand before a design element's keyword, and
-// the element they precede is still one §22.7's directive governs.
 TEST(Preprocessor, Timescale_RecordedAfterAnAttributeInstance) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -464,8 +432,6 @@ TEST(Preprocessor, Timescale_RecordedAfterAnAttributeInstance) {
   EXPECT_EQ(list[0].timescale.unit, TimeUnit::kUs);
 }
 
-// An attribute instance may run across lines, and the header after its close is
-// still the element the directive governs.
 TEST(Preprocessor, Timescale_RecordedAfterAnAttributeInstanceAcrossLines) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -480,8 +446,6 @@ TEST(Preprocessor, Timescale_RecordedAfterAnAttributeInstanceAcrossLines) {
   EXPECT_EQ(list[0].timescale.unit, TimeUnit::kUs);
 }
 
-// `(*)` opening a line is §9.4.2.2's event control, not an attribute instance,
-// so it leaves the header that follows on the line to be recorded.
 TEST(Preprocessor, Timescale_RecordedAfterAnEventControlOpeningTheLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -497,9 +461,6 @@ TEST(Preprocessor, Timescale_RecordedAfterAnEventControlOpeningTheLine) {
   EXPECT_EQ(list[1].module, "b");
 }
 
-// A header that shares its line with the end of an earlier element, whether or
-// not that end carries a label, is as much a header as one opening a line; and
-// once the last of them ends, labelled, a directive after it is outside them.
 TEST(Preprocessor, Timescale_RecordedAfterAnEarlierElementOnTheLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -519,8 +480,6 @@ TEST(Preprocessor, Timescale_RecordedAfterAnEarlierElementOnTheLine) {
   for (const auto& d : list) EXPECT_EQ(d.timescale.unit, TimeUnit::kUs);
 }
 
-// The second element on a line is open until its own end, so the directive
-// placed before that end is inside it.
 TEST(Preprocessor, Timescale_IllegalInsideASecondElementOnTheLine) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -532,11 +491,6 @@ TEST(Preprocessor, Timescale_IllegalInsideASecondElementOnTheLine) {
                             "22.7"));
 }
 
-// §5.3 makes any run of spaces, tabs or formfeeds a separator, and Syntax 23-2
-// with A.2.1.3 puts an optional lifetime, static or automatic, between a
-// header's keyword and its name, so every header below records the name it
-// declares. A tab or formfeed after the keyword, two spaces before automatic,
-// a tab after it, and static recorded no name or the lifetime as the name.
 TEST(Preprocessor, Timescale_RecordedPastAnyWhiteSpaceAndLifetime) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -559,8 +513,6 @@ TEST(Preprocessor, Timescale_RecordedPastAnyWhiteSpaceAndLifetime) {
   }
 }
 
-// The newline is a separator too, so a header whose keyword, and lifetime,
-// end their line declares the name on the line after. Nothing was recorded.
 TEST(Preprocessor, Timescale_RecordedForAHeaderSplitAcrossLines) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -577,8 +529,6 @@ TEST(Preprocessor, Timescale_RecordedForAHeaderSplitAcrossLines) {
   EXPECT_EQ(list[1].timescale.unit, TimeUnit::kUs);
 }
 
-// The element such a header opens is open until its end, so a directive
-// before that end is inside it. It was accepted.
 TEST(Preprocessor, Timescale_IllegalInsideAHeaderSplitAcrossLines) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

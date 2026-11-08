@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.4: a wildcard bin is not allowed on a coverpoint of a real type,
-// though an integral coverpoint may declare one.
 TEST(WildcardBins, WildcardBinOfRealCoverpointIsError) {
   ElabFixture f;
   ElaborateSrc(

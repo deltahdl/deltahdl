@@ -14,14 +14,11 @@ namespace delta {
 
 namespace {
 
-// Whether `a` stands before `b` in the one text they are both in.
 bool StandsBefore(SourceLoc a, SourceLoc b) {
   return a.file_id == b.file_id &&
          (a.line < b.line || (a.line == b.line && a.column < b.column));
 }
 
-// §40.4.1: the module of `unit` whose definition the pragma at `loc` is
-// written inside, null for none.
 ModuleDecl* ModuleHolding(const CompilationUnit& unit, SourceLoc loc) {
   for (ModuleDecl* mod : unit.modules) {
     if (!StandsBefore(loc, mod->range.start) &&
@@ -32,8 +29,6 @@ ModuleDecl* ModuleHolding(const CompilationUnit& unit, SourceLoc loc) {
   return nullptr;
 }
 
-// §40.4.1: the enumeration name a separate pragma, right after the bit range
-// of the declaration of `signal` in `mod`, gives that signal; empty for none.
 std::string_view SignalEnumOf(const ModuleDecl& mod, std::string_view signal) {
   for (const ModuleItem* item : mod.items) {
     const bool kSignal = item->kind == ModuleItemKind::kVarDecl ||
@@ -45,8 +40,6 @@ std::string_view SignalEnumOf(const ModuleDecl& mod, std::string_view signal) {
   return {};
 }
 
-// §40.4.6: the parameters of `mod` whose declaration a pragma tags with
-// `enum_name`, in declaration order.
 std::vector<std::string_view> StatesOf(const ModuleDecl& mod,
                                        std::string_view enum_name) {
   std::vector<std::string_view> states;
@@ -59,9 +52,6 @@ std::vector<std::string_view> StatesOf(const ModuleDecl& mod,
   return states;
 }
 
-// Give the module holding the pragma at `loc` in `unit` the FSM `fsm`, its
-// enumeration name taken from its one signal's declaration where its pragma
-// gave none, and its legal states from the parameters tagged with that name.
 void AddFsm(const CompilationUnit& unit, SourceLoc loc, FsmDecl fsm) {
   ModuleDecl* mod = ModuleHolding(unit, loc);
   if (mod == nullptr) return;

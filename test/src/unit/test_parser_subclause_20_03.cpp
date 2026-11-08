@@ -1,14 +1,3 @@
-// §20.3 Simulation time system functions — head clause. The head owns
-// Syntax 20-2: the single production
-//   time_function ::= $time | $stime | $realtime
-// naming exactly these three system function names as the ways to read the
-// current simulation time. The per-function return semantics ($time's 64-bit
-// rounded value, $stime's 32-bit truncation, $realtime's real result) live in
-// the descendant subclauses §20.3.1–§20.3.3 and are tested in their own files.
-// These tests observe the parser accepting each of the three grammar
-// alternatives as a system function call primary (ExprKind::kSystemCall),
-// carrying the corresponding callee name, in the bare argument-less form the
-// syntax shows and as an operand inside a larger expression.
 #include <gtest/gtest.h>
 
 #include "fixture_parser.h"
@@ -18,8 +7,6 @@
 using namespace delta;
 namespace {
 
-// Syntax 20-2, alternative 1: $time parses as a system call whose callee is
-// "$time", in the bare form (no parentheses) the grammar shows — no arguments.
 TEST(TimeFunctionSyntax, TimeAlternativeParses) {
   auto r = Parse(
       "module m;\n"
@@ -35,7 +22,6 @@ TEST(TimeFunctionSyntax, TimeAlternativeParses) {
   EXPECT_TRUE(rhs->args.empty());
 }
 
-// Syntax 20-2, alternative 2: $stime parses as a system call named "$stime".
 TEST(TimeFunctionSyntax, StimeAlternativeParses) {
   auto r = Parse(
       "module m;\n"
@@ -51,8 +37,6 @@ TEST(TimeFunctionSyntax, StimeAlternativeParses) {
   EXPECT_TRUE(rhs->args.empty());
 }
 
-// Syntax 20-2, alternative 3: $realtime parses as a system call named
-// "$realtime".
 TEST(TimeFunctionSyntax, RealtimeAlternativeParses) {
   auto r = Parse(
       "module m;\n"
@@ -68,10 +52,6 @@ TEST(TimeFunctionSyntax, RealtimeAlternativeParses) {
   EXPECT_TRUE(rhs->args.empty());
 }
 
-// Syntax 20-2: a time_function is a primary expression, so it may appear as an
-// operand of a larger expression rather than only as a bare right-hand side.
-// Here $time feeds an addition; the parser must place the system call as the
-// binary operator's left operand.
 TEST(TimeFunctionSyntax, TimeFunctionAsExpressionOperand) {
   auto r = Parse(
       "module m;\n"
@@ -88,10 +68,6 @@ TEST(TimeFunctionSyntax, TimeFunctionAsExpressionOperand) {
   EXPECT_EQ(rhs->lhs->callee, "$time");
 }
 
-// Syntax 20-2: a further syntactic position for the time_function primary — as
-// an argument of an enclosing system task call. The parser must nest the inner
-// $time system call inside the outer call's argument list rather than folding
-// the two together.
 TEST(TimeFunctionSyntax, TimeFunctionAsCallArgument) {
   auto r = Parse(
       "module m;\n"
@@ -108,11 +84,6 @@ TEST(TimeFunctionSyntax, TimeFunctionAsCallArgument) {
   EXPECT_EQ(call->args[0]->callee, "$time");
 }
 
-// Negative form for the production: the grammar requires the $-prefixed system
-// name. The closest non-matching input — a plain identifier spelled "stime"
-// with no leading $ (a legal, non-keyword identifier) — is an ordinary
-// reference (ExprKind::kIdentifier), not a time_function system call. This
-// shows the production is keyed on the $ form rather than the bare word.
 TEST(TimeFunctionSyntax, PlainIdentifierIsNotTimeFunction) {
   auto r = Parse(
       "module m;\n"

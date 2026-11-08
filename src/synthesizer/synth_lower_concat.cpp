@@ -14,16 +14,11 @@
 
 namespace delta {
 
-// The typedefs InferExprWidth resolves a named type against. The synthesizer
-// lowers an already elaborated module, whose named types have been resolved
-// into the widths its signals were recorded with, so nothing here has a
-// typedef to add.
 static const TypedefMap& NoTypedefs() {
   static const TypedefMap kNone;
   return kNone;
 }
 
-// The longer of two operand widths, and nothing where either operand has none.
 static std::optional<uint32_t> LongerOf(std::optional<uint32_t> a,
                                         std::optional<uint32_t> b) {
   if (!a || !b) return std::nullopt;
@@ -34,16 +29,11 @@ std::optional<uint32_t> SynthLower::ExprWidth(const Expr* expr) {
   if (!expr) return std::nullopt;
   switch (expr->kind) {
     case ExprKind::kIdentifier: {
-      // InferExprWidth answers 0 for a name, because it reads the expression
-      // and not the declaration. SynthLower recorded every declared width in
-      // MapPorts and every parameter's in MapParams, so the name is answered
-      // here.
       auto it = signal_widths_.find(expr->text);
       if (it == signal_widths_.end()) return std::nullopt;
       return it->second;
     }
     case ExprKind::kSelect: {
-      // §11.5.1: a select is as wide as the run of bits it addresses.
       SelectStorage storage = ResolveSelect(expr);
       if (storage.count > 0) return storage.count;
       int64_t width = VariableSelectWidth(expr);
@@ -67,24 +57,13 @@ std::optional<uint32_t> SynthLower::ExprWidth(const Expr* expr) {
 }
 
 std::optional<uint32_t> SynthLower::OperatorWidth(const Expr* expr) {
-  // The three operator kinds are sized here rather than by InferExprWidth,
-  // which answers 0 for a name, for the reason SynthLower::ExprWidth gives for
-  // an identifier: it would size `a | 4'b0000` from the literal alone. Each
-  // follows its row of §11.6.1 Table 11-21, and an operand that has no width
-  // leaves the whole without one.
   if (expr->kind == ExprKind::kUnary) {
-    // The reductions and `!` are one bit long, and `+`, `-` and `~` are as long
-    // as their operand.
     if (IsUnsignedResultUnaryOp(expr->op)) return 1;
     return ExprWidth(expr->lhs);
   }
   if (expr->kind == ExprKind::kTernary) {
-    // `i ? j : k` is as long as the longer of `j` and `k`.
     return LongerOf(ExprWidth(expr->true_expr), ExprWidth(expr->false_expr));
   }
-  // The comparisons and the logical operators are one bit long. A shift and
-  // `**` are as long as their left operand, and the other operators are as long
-  // as the longer of their two operands.
   if (IsCompareOp(expr->op) || IsLogicalOp(expr->op)) return 1;
   if (IsShiftOp(expr->op) || expr->op == TokenKind::kPower) {
     return ExprWidth(expr->lhs);
@@ -93,9 +72,6 @@ std::optional<uint32_t> SynthLower::OperatorWidth(const Expr* expr) {
 }
 
 std::optional<uint32_t> SynthLower::ElementsWidth(const Expr* expr) {
-  // §11.4.12: a concatenation's size is the sum of its operands' sizes, which
-  // makes every one of them needed, so one operand whose
-  // width is unknown leaves the whole unknown.
   uint32_t total = 0;
   for (const auto* element : expr->elements) {
     std::optional<uint32_t> width = ExprWidth(element);
@@ -106,9 +82,6 @@ std::optional<uint32_t> SynthLower::ElementsWidth(const Expr* expr) {
 }
 
 std::optional<uint32_t> SynthLower::ReplicateWidth(const Expr* expr) {
-  // §11.4.12.1: the multiplier is a constant expression that is not negative
-  // and holds no x or z, and the replication is that many copies of the
-  // concatenation it multiplies.
   std::optional<int64_t> count = ConstEvalInt(expr->repeat_count, scope_);
   if (!count || *count < 0) return std::nullopt;
   std::optional<uint32_t> inner = ElementsWidth(expr);
@@ -119,25 +92,12 @@ std::optional<uint32_t> SynthLower::ReplicateWidth(const Expr* expr) {
 void SynthLower::ReportExprUnlowered(const Expr* expr, std::string_view message,
                                      Subclause subclause) {
   lowering_incomplete_ = true;
-  // LowerContAssign and LowerAssignStmt ask for one bit at a time, so report
-  // an expression only the first time it arrives.
   if (reported_exprs_.insert(expr).second) {
     diag_.Error(expr->range.start, std::string(message), subclause);
   }
 }
 
 void SynthLower::ReportUnloweredTarget(const Expr* target) {
-  // An assignment whose target this cannot resolve used to leave no trace in
-  // the graph while the run reported success, so the netlist never drove a
-  // signal the design drives and nothing said which assignment went missing.
-  // SynthLower::LowerStmt says the same about a statement it has no lowering
-  // for, and the location is what names the assignment.
-  //
-  // No subclause of IEEE 1800-2023 forbids any of these targets: §11.5.1
-  // defines the select addressed by an expression, §11.5.2 the element of an
-  // unpacked array, §7.2.1 the member of a packed structure and §11.4.12 the
-  // concatenation on the left of an assignment. What the design met is a limit
-  // of this synthesizer, which is what Subclause::None() says.
   ReportExprUnlowered(target,
                       "assignment target has no lowering in the synthesizer "
                       "and would be dropped from the netlist",
@@ -146,19 +106,10 @@ void SynthLower::ReportUnloweredTarget(const Expr* target) {
 
 uint32_t SynthLower::LowerElementsBit(const Expr* expr, AigGraph& aig,
                                       uint32_t bit) {
-  // §11.4.12 gives the leftmost operand the most significant bits, which its
-  // example states by reading `{a, b[3:0], w, 3'b101}` as `{a, b[3], b[2],
-  // b[1], b[0], w, 1'b1, 1'b0, 1'b1}`. The operands are therefore walked from
-  // the last one written to the first, each covering the run of result bits
-  // its own width spans above the operands after it.
   uint32_t offset = 0;
   for (auto it = expr->elements.rbegin(); it != expr->elements.rend(); ++it) {
     uint32_t width = ExprWidth(*it).value_or(0);
     if (bit < offset + width) {
-      // §11.6.1 Table 11-21 marks the operands of a concatenation
-      // self-determined, and §11.8.1 rules that the sign and size of such an
-      // operand are its own. They are set for the operand in place of what an
-      // assignment around the concatenation propagated, and handed back after.
       uint32_t saved_width = propagated_width_;
       bool saved_signed = propagated_signed_;
       propagated_width_ = width;
@@ -170,9 +121,6 @@ uint32_t SynthLower::LowerElementsBit(const Expr* expr, AigGraph& aig,
     }
     offset += width;
   }
-  // A bit at or above the width of the whole concatenation carries nothing the
-  // design wrote, and §10.7 zero-fills a right-hand side narrower than its
-  // target.
   return AigGraph::kConstFalse;
 }
 
@@ -201,11 +149,6 @@ uint32_t SynthLower::LowerReplicateBit(const Expr* expr, AigGraph& aig,
   }
   if (bit >= *width) return AigGraph::kConstFalse;
 
-  // §11.4.12.1: the copies are identical, so the bit of the replication at
-  // `bit` is the bit of the concatenation being replicated at `bit` modulo its
-  // width. A multiplier of zero gives a width of zero, which the subclause
-  // treats as a replication of size zero that is left out, and every bit
-  // is answered above.
   uint32_t inner = ElementsWidth(expr).value_or(0);
   if (inner == 0) return AigGraph::kConstFalse;
   return LowerElementsBit(expr, aig, bit % inner);

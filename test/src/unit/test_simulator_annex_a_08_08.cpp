@@ -176,9 +176,6 @@ TEST(StringLiteralSim, EscapeSeqUnknownDropsBackslash) {
   EXPECT_EQ(v, 0x62u);
 }
 
-// Negative boundary of `\x one_to_two_digit_hex_number`: a `\x` with no hex
-// digit following does not match the hex alternative, so it falls back to
-// `\any_ASCII_character` and yields the literal 'x' (0x78).
 TEST(StringLiteralSim, EscapeSeqHexNoDigitYieldsLiteralX) {
   auto v = RunAndGet(
       "module t;\n"
@@ -189,9 +186,6 @@ TEST(StringLiteralSim, EscapeSeqHexNoDigitYieldsLiteralX) {
   EXPECT_EQ(v, 0x78u);
 }
 
-// Negative boundary of `\one_to_three_digit_octal_number`: '8' is not an octal
-// digit, so `\8` does not match the octal alternative and falls back to
-// `\any_ASCII_character`, yielding the literal '8' (0x38).
 TEST(StringLiteralSim, EscapeSeqNonOctalDigitYieldsLiteralDigit) {
   auto v = RunAndGet(
       "module t;\n"

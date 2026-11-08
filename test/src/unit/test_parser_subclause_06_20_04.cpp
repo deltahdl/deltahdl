@@ -162,10 +162,6 @@ TEST(LocalparamParsing, LocalparamSignedType) {
   EXPECT_TRUE(item->is_localparam);
 }
 
-// §6.20.4: in a parameter_port_list every declaration appearing between a
-// localparam keyword and the next parameter keyword is a local parameter;
-// any other declaration is a nonlocal parameter. The localparam grouping is
-// sticky, so a keywordless declaration inherits the preceding group.
 TEST(LocalparamParsing, PortListLocalparamGroupingIsSticky) {
   auto r = Parse(
       "module m #(parameter int A = 1, localparam int B = 2,\n"

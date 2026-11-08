@@ -140,16 +140,6 @@ TEST(ProceduralConcurrentAssertion, ClockInferenceRequiresAllThreeConditions) {
   EXPECT_FALSE(SatisfiesClockInferenceRequirements(false, false, false));
 }
 
-// §16.14.6 evaluates a concurrent assertion embedded in procedural code as it
-// would a standalone concurrent assertion. The property here carries no
-// clocking event of its own, so it takes the clocking of the procedure that
-// reaches it -- the posedge the always block waits on -- and `a` is false when
-// that edge arrives, so the assertion fails and §16.3's default report says so.
-//
-// The parser discarded the property before reading it, so what the executor
-// evaluated was nothing at all. The pair below is what says the property is
-// read: a case asserting only the failure passes on an evaluation that answers
-// false for every source, which is what a discarded property gives it.
 TEST(ProceduralConcurrentAssertionSim, FalseBooleanPropertyFailsAtTheEdge) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -166,9 +156,6 @@ TEST(ProceduralConcurrentAssertionSim, FalseBooleanPropertyFailsAtTheEdge) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "Assertion failed.");
 }
 
-// The other half of the pair: a property that holds reports nothing. This is
-// the case a discarded property cannot pass, the null it left behind being
-// evaluated as false at every edge.
 TEST(ProceduralConcurrentAssertionSim, TrueBooleanPropertyReportsNothing) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -184,18 +171,6 @@ TEST(ProceduralConcurrentAssertionSim, TrueBooleanPropertyReportsNothing) {
   EXPECT_EQ(f.ctx.LastSeverityMsg(), "");
 }
 
-// §16.5 evaluates concurrent assertions in the Observed region, and §16.14.6
-// evaluates an embedded one as it would a standalone one, so the region is the
-// same wherever the statement is written. §4.4 orders the Observed region after
-// the whole active region set, so a design that writes at the same clock edge
-// has written by the time the property is evaluated.
-//
-// `peek()` is what makes the region visible. §16.5.1's sampling covers the
-// variables a property names, and this one names none: a function call reads
-// `v` from within its body, where no sample stands, so the property reads the
-// live value and answers differently in the two regions. Evaluated where the
-// statement stands -- the Active region, in the middle of the write that
-// assigned the clock -- it read the 0 `v` still held and the assertion failed.
 TEST(ProceduralConcurrentAssertionSim, PropertyIsEvaluatedInTheObservedRegion) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -216,11 +191,6 @@ TEST(ProceduralConcurrentAssertionSim, PropertyIsEvaluatedInTheObservedRegion) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// The other half: the property is still evaluated, and still fails when what it
-// reads has not arrived. `v` is written a time step after the edge rather than
-// at it, so no region of the tick's own time slot sees the 1 and the assertion
-// takes its fail action. A property that stopped being evaluated at all, or one
-// answered true for everything, passes the case above and fails this.
 TEST(ProceduralConcurrentAssertionSim,
      PropertyStillFailsOnWhatTheTickCannotSee) {
   SimFixture f;
@@ -244,10 +214,6 @@ TEST(ProceduralConcurrentAssertionSim,
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// The form that already answered from the Observed region, asserted unchanged:
-// §16.14.5's static concurrent assertion is carried by a process the scheduler
-// resumes there, and it reads the same 1 the embedded form now reads. The pair
-// says the two spellings of one assertion agree.
 TEST(ProceduralConcurrentAssertionSim, StaticFormReadsTheSameValueAtTheEdge) {
   SimFixture f;
   auto* var = RunAndFindVar(

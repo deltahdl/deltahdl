@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -225,10 +223,6 @@ TEST(BidirectionalSwitchTerminals, Rtranif1RejectsUdnt) {
                             5, "28.8"));
 }
 
-// §4.9.6 / §28.8: a primitive output or inout terminal shall connect to a
-// 1-bit net (a scalar net or a bit-select of a vector net); tran/tranif1/
-// tranif0 may additionally connect to a user-defined net type, but not to a
-// whole multibit vector. Connecting a 4-bit vector is therefore an error.
 TEST(BidirectionalSwitchTerminals, TranRejectsWholeVector) {
   ElabFixture f;
   Elaborate(
@@ -237,10 +231,6 @@ TEST(BidirectionalSwitchTerminals, TranRejectsWholeVector) {
       "  tran t1(a, b);\n"
       "endmodule\n",
       f);
-  // The report that rejects this is the 1-bit terminal rule, which
-  // ValidatePrimitiveOutputTerminalWidths in
-  // src/elaborator/elaborator_gates.cpp emits under Subclause("4.9.6"); §28.8
-  // reports nothing for a plain tran whose terminals are both built-in nets.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "primitive output or inout terminal must be a "
                             "1-bit net or structural net expression (got "
@@ -311,12 +301,6 @@ TEST(BidirectionalSwitchUdnt, Tranif1RejectsUdntWithBuiltin) {
                             5, "28.8"));
 }
 
-// §28.8: the non-resistive enable switches (tranif0/tranif1), like the plain
-// tran device, may also connect nets of a user-defined net type when both
-// bidirectional terminals share the same nettype. This is the positive form
-// distinguishing them from the resistive rtranif variants (which admit only
-// scalar nets or bit-selects) and confirms the control input being a built-in
-// net does not trip the terminal nettype-compatibility check.
 TEST(BidirectionalSwitchUdnt, Tranif1AcceptsSameUdntOnBothSides) {
   ElabFixture f;
   auto* design = Elaborate(

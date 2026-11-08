@@ -23,10 +23,6 @@ TEST_F(VerifyParseTest, CovergroupWithBins) {
   ASSERT_EQ(unit->modules.size(), 1u);
 }
 
-// §19.5.1, §19.5.1.2 and §19.5.2 with A.2.11: each covergroup_value_range
-// form -- a `$` low or high bound, an absolute and a relative tolerance -- a
-// set_covergroup_expression, a goto repetition and a bin's own guard are held
-// on the tree with their parts.
 TEST_F(VerifyParseTest, BinsValueFormsTree) {
   auto* unit = Parse(R"(
     module m;

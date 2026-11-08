@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_simulator.h"
@@ -322,10 +320,6 @@ TEST(CaseInsideStatementSim, CaseInsideTolerancePlusPercentMinusOutOfRange) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §12.5.4: the set-membership comparison is evaluated in the order specified by
-// a priority-case statement. A priority-qualified case-inside acts on the first
-// matching item even when later items also match (mirrors the LRM example,
-// which qualifies a case-inside with priority).
 TEST(CaseInsideStatementSim, CaseInsidePriorityFirstMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -345,10 +339,6 @@ TEST(CaseInsideStatementSim, CaseInsidePriorityFirstMatch) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4: the set-membership comparison is evaluated in the order specified by
-// a unique-case statement. A unique-qualified case-inside selects the single
-// matching item through the unique evaluation path, with the inside operator
-// performing the comparison.
 TEST(CaseInsideStatementSim, CaseInsideUniqueSingleMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -368,11 +358,6 @@ TEST(CaseInsideStatementSim, CaseInsideUniqueSingleMatch) {
   EXPECT_EQ(var->value.ToUint64(), 20u);
 }
 
-// §12.5.4: the comparison uses asymmetric wildcard matching (11.4.6), so an
-// unknown (x or z) bit on the case_expression side that lands on a position the
-// case_item wildcards out is not compared and the item still matches. This
-// mirrors the LRM's case-inside example where pattern 'b0?0 matches selector
-// values including 'b0x0 and 'b0z0.
 TEST(CaseInsideStatementSim, CaseInsideWildcardMasksSelectorXBit) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -392,11 +377,6 @@ TEST(CaseInsideStatementSim, CaseInsideWildcardMasksSelectorXBit) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4: a single case_item's range_list may list several heterogeneous
-// elements (a wildcard value and a bracketed range here); the case_expression
-// is compared against each and the item matches when any comparison returns
-// 1'b1. This is the exact shape of the LRM case-inside example item
-// "3'b0?0, [4:7]", matched here through its range element.
 TEST(CaseInsideStatementSim, CaseInsideMixedValueAndRangeItem) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -416,10 +396,6 @@ TEST(CaseInsideStatementSim, CaseInsideMixedValueAndRangeItem) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4 C1: a case_item value need not be a literal. Here the item is a
-// parameter, so the right operand of the inside comparison is produced by
-// parameter elaboration rather than a literal token — a distinct value-source
-// path that must still be compared against the case_expression.
 TEST(CaseInsideStatementSim, CaseInsideValueFromParameter) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -440,9 +416,6 @@ TEST(CaseInsideStatementSim, CaseInsideValueFromParameter) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4 C1: the bounds of a case_item range may themselves be elaborated
-// constants (localparams here) rather than literals, exercising the range
-// comparison with bounds resolved through parameter elaboration.
 TEST(CaseInsideStatementSim, CaseInsideRangeBoundsFromLocalparam) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -463,12 +436,6 @@ TEST(CaseInsideStatementSim, CaseInsideRangeBoundsFromLocalparam) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4 C1 consuming the §11.4.13 inside-operator machinery end to end: a
-// case_item that names an unpacked array (built here from a real '{...}
-// initializer) is a set whose elements are each compared against the
-// case_expression, and the item matches when the value equals any element. The
-// array is created through real declaration syntax and driven through the full
-// pipeline, not hand-built.
 TEST(CaseInsideStatementSim, CaseInsideArraySetMemberMatches) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -489,9 +456,6 @@ TEST(CaseInsideStatementSim, CaseInsideArraySetMemberMatches) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §12.5.4 C1/§11.4.13: no element of the array set equals the case_expression,
-// so the item does not match and control falls to default. Confirms the array
-// set-member path also produces the no-match result, not just a match.
 TEST(CaseInsideStatementSim, CaseInsideArraySetMemberNoMatch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -512,9 +476,6 @@ TEST(CaseInsideStatementSim, CaseInsideArraySetMemberNoMatch) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §12.5.4 C5 negative form: the default clause is executed only when it is
-// given. With no matching item and no default present, none of the case_item
-// statements run and the target retains its prior value.
 TEST(CaseInsideStatementSim, CaseInsideNoMatchNoDefaultLeavesTargetUnchanged) {
   SimFixture f;
   auto* var = RunAndFindVar(

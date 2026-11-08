@@ -14,8 +14,6 @@ using namespace delta;
 
 namespace {
 
-// Build a covergroup whose only coverage item is a cross "xy" over coverpoints
-// "x" and "y" with two cross bins, <0,0> and <1,1>.
 CoverGroup* SetupCrossOnlyGroup(CoverageDB& db) {
   auto* g = db.CreateGroup("cg");
 
@@ -78,8 +76,6 @@ TEST(Coverage, GetInstCoverageMatchesGetCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetInstCoverage(g), CoverageDB::GetCoverage(g));
 }
 
-// LRM 19.8: stop() halts coverage collection so a subsequent sample() records
-// nothing, and start() resumes it.
 TEST(Coverage, StartStopControlsCollection) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -100,7 +96,6 @@ TEST(Coverage, StartStopControlsCollection) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
 }
 
-// LRM 19.8: set_inst_name() assigns the instance name procedurally.
 TEST(Coverage, SetInstNameStoresName) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -108,8 +103,6 @@ TEST(Coverage, SetInstNameStoresName) {
   EXPECT_EQ(g->options.name, "u_dut");
 }
 
-// LRM 19.8: the optional ref-int pair of get_coverage() reports the number of
-// covered bins and the number of coverage bins defined for the item.
 TEST(Coverage, GetCoverageReportsBinCounts) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -132,8 +125,6 @@ TEST(Coverage, GetCoverageReportsBinCounts) {
   EXPECT_EQ(total, 2);
 }
 
-// LRM 19.8: the optional ref-int pair of get_inst_coverage() reports, for a
-// coverpoint or cross, the numerator and denominator of the coverage value.
 TEST(Coverage, GetInstCoverageReportsBinCounts) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -157,9 +148,6 @@ TEST(Coverage, GetInstCoverageReportsBinCounts) {
   EXPECT_EQ(total, 2);
 }
 
-// LRM 19.8: when get_coverage()'s ref-int pair is read for a covergroup, the
-// counts aggregate the bins of all coverpoints and crosses. Here the only
-// coverage item is a cross, so its bins drive the reported totals.
 TEST(Coverage, GetCoverageAggregatesCrossBins) {
   CoverageDB db;
   auto* g = SetupCrossOnlyGroup(db);
@@ -173,8 +161,6 @@ TEST(Coverage, GetCoverageAggregatesCrossBins) {
   EXPECT_EQ(total, 2);
 }
 
-// LRM 19.8: get_inst_coverage()'s ref-int pair likewise aggregates cross bins;
-// covering both cross bins yields a full count and 100% coverage.
 TEST(Coverage, GetInstCoverageAggregatesCrossBins) {
   CoverageDB db;
   auto* g = SetupCrossOnlyGroup(db);
@@ -189,9 +175,6 @@ TEST(Coverage, GetInstCoverageAggregatesCrossBins) {
   EXPECT_EQ(total, 2);
 }
 
-// LRM 19.8: the no-argument form of get_coverage()/get_inst_coverage() may be
-// called directly on a coverpoint and returns that item's coverage as a
-// percentage; with one of two value bins covered the result is 50%.
 TEST(Coverage, GetCoverageOnCoverpointReturnsPercentage) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -210,9 +193,6 @@ TEST(Coverage, GetCoverageOnCoverpointReturnsPercentage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(cp), 50.0);
 }
 
-// LRM 19.8: the no-argument form may likewise be called directly on a cross and
-// returns the cross coverage as a percentage; with one of two cross bins hit
-// the result is 50%.
 TEST(Coverage, GetCoverageOnCrossReturnsPercentage) {
   CoverageDB db;
   auto* g = SetupCrossOnlyGroup(db);
@@ -223,11 +203,6 @@ TEST(Coverage, GetCoverageOnCrossReturnsPercentage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCrossCoverage(&g->crosses.front()), 50.0);
 }
 
-// LRM 19.8: get_coverage()/get_inst_coverage() may be called directly on a
-// coverpoint. Its optional ref-int pair then reports the numerator and the
-// denominator of the (unscaled) coverage value; with one of two value bins
-// covered these are 1 and 2, and the returned percentage is that ratio scaled
-// by 100.
 TEST(Coverage, GetCoverageOnCoverpointReportsNumeratorDenominator) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -249,14 +224,9 @@ TEST(Coverage, GetCoverageOnCoverpointReportsNumeratorDenominator) {
   EXPECT_EQ(covered, 1);
   EXPECT_EQ(total, 2);
   EXPECT_DOUBLE_EQ(cov, 50.0);
-  // The return value is the numerator/denominator ratio scaled by 100.
   EXPECT_DOUBLE_EQ(cov, 100.0 * covered / total);
 }
 
-// LRM 19.8: get_coverage()/get_inst_coverage() may likewise be called directly
-// on a cross. Its ref-int pair reports the numerator and denominator of the
-// cross coverage; with one of two cross bins hit these are 1 and 2 and the
-// returned percentage is their ratio scaled by 100.
 TEST(Coverage, GetCoverageOnCrossReportsNumeratorDenominator) {
   CoverageDB db;
   auto* g = SetupCrossOnlyGroup(db);
@@ -274,8 +244,6 @@ TEST(Coverage, GetCoverageOnCrossReportsNumeratorDenominator) {
   EXPECT_DOUBLE_EQ(cov, 100.0 * covered / total);
 }
 
-// LRM 19.8 edge case: get_coverage() on a covergroup with no coverage items
-// reports zero covered and zero defined bins, and 0% coverage.
 TEST(Coverage, GetCoverageEmptyGroupReportsZeroBins) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -287,8 +255,6 @@ TEST(Coverage, GetCoverageEmptyGroupReportsZeroBins) {
   EXPECT_EQ(total, 0);
 }
 
-// LRM 19.8 edge case: stop() leaves already-collected coverage intact while
-// discarding samples taken while stopped.
 TEST(Coverage, StopRetainsCollectedCoverage) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -303,8 +269,6 @@ TEST(Coverage, StopRetainsCollectedCoverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 50.0);
 }
 
-// LRM 19.8 edge case: a fresh instance collects coverage by default, with no
-// preceding start() call required.
 TEST(Coverage, DefaultGroupCollectsWithoutStart) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -319,8 +283,6 @@ TEST(Coverage, DefaultGroupCollectsWithoutStart) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
 }
 
-// LRM 19.8 edge case: a later set_inst_name() replaces an earlier instance
-// name.
 TEST(Coverage, SetInstNameOverwrites) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -329,11 +291,6 @@ TEST(Coverage, SetInstNameOverwrites) {
   EXPECT_EQ(g->options.name, "second");
 }
 
-// §19.3 and §19.8: `new` on a covergroup declared in a module builds an
-// instance with the declaration's coverpoint and bins, sample() counts the
-// coverpoint's value into them, and get_coverage() and get_inst_coverage()
-// report the instance, the latter's ref-int pair the covered and defined bins.
-// One of the two bins is hit, so each reads 50.
 TEST(CovergroupInstanceSim, SampleAndCoverageMethodsOnModuleInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -355,8 +312,6 @@ TEST(CovergroupInstanceSim, SampleAndCoverageMethodsOnModuleInstance) {
             "cov=50.00\ninst=50.00\nn=1 t=2\n");
 }
 
-// §19.8: stop() makes a triggered sample() record nothing until start()
-// resumes collection.
 TEST(CovergroupInstanceSim, StopAndStartControlCollection) {
   SimFixture f;
   EXPECT_EQ(
@@ -377,8 +332,6 @@ TEST(CovergroupInstanceSim, StopAndStartControlCollection) {
       "stopped=0.00\nstarted=50.00\n");
 }
 
-// §19.8: every coverpoint of an instance has get_inst_coverage(), whose
-// ref-int pair receives its covered and defined bins.
 TEST(CovergroupInstanceSim, CoverageMethodThroughCoverpoint) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -399,8 +352,6 @@ TEST(CovergroupInstanceSim, CoverageMethodThroughCoverpoint) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8: get_coverage() called on the covergroup type answers the coverage of
-// the type over its instances (§19.11.3), here the one instance's 50.
 TEST(CovergroupInstanceSim, TypeCoverageThroughScopeOperator) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -419,8 +370,6 @@ TEST(CovergroupInstanceSim, TypeCoverageThroughScopeOperator) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8: set_inst_name() sets the instance's name, which §19.10 makes its
-// option.name.
 TEST(CovergroupInstanceSim, SetInstNameSetsOptionName) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -437,8 +386,6 @@ TEST(CovergroupInstanceSim, SetInstNameSetsOptionName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §23.6: sample() and get_inst_coverage() reach the instance a
-// hierarchical name denotes, u1's and not u2's.
 TEST(CovergroupInstanceSim, MethodsReachInstanceThroughHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(
@@ -460,9 +407,6 @@ TEST(CovergroupInstanceSim, MethodsReachInstanceThroughHierarchicalName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §23.6: sample() called through a hierarchical name reads the
-// coverpoint expressions in the instance holding the covergroup, u1's v and
-// the interface instance's v, never the caller's v of 3.
 TEST(CovergroupInstanceSim, HierarchicalSampleReadsTheInstanceScope) {
   SimFixture f;
   EXPECT_EQ(
@@ -498,9 +442,6 @@ TEST(CovergroupInstanceSim, HierarchicalSampleReadsTheInstanceScope) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §23.6 and §27.4: a covergroup instance held in a loop generate
-// block instance or a named conditional generate block is reached from the
-// enclosing module by the block's hierarchical name.
 TEST(CovergroupInstanceSim, GenerateBlockInstanceReachedByHierarchicalName) {
   SimFixture f;
   EXPECT_EQ(
@@ -529,9 +470,6 @@ TEST(CovergroupInstanceSim, GenerateBlockInstanceReachedByHierarchicalName) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §23.6 and §23.8: a name starting at the top-level module reaches
-// the instance the bare name does, from the module itself and upward from an
-// instance it holds.
 TEST(CovergroupInstanceSim, TopRootedNameReachesInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -554,8 +492,6 @@ TEST(CovergroupInstanceSim, TopRootedNameReachesInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §25.9: an interface's covergroup instance is reached through a
-// virtual interface, in a class method and in the module.
 TEST(CovergroupInstanceSim, VirtualInterfaceReachesInstance) {
   SimFixture f;
   EXPECT_EQ(
@@ -587,8 +523,6 @@ TEST(CovergroupInstanceSim, VirtualInterfaceReachesInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §8.6: a covergroup method called on the handle a function
-// returns runs on the instance the handle refers to.
 TEST(CovergroupInstanceSim, MethodOnReturnedHandleReachesTheInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture(
@@ -609,8 +543,6 @@ TEST(CovergroupInstanceSim, MethodOnReturnedHandleReachesTheInstance) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 with §8.6 and §11.3.1: sample() called as a statement on the handle a
-// call returns evaluates that call once, as the expression form does.
 TEST(CovergroupInstanceSim, SampleStatementOnReturnedHandleCallsItOnce) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -631,10 +563,6 @@ TEST(CovergroupInstanceSim, SampleStatementOnReturnedHandleCallsItOnce) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §19.8 (printed page 611): get_coverage() called on a coverpoint through the
-// type, `cg::x::get_coverage(covered, total)`, counts that coverpoint's bins in
-// every instance, the clause's own example giving 6 for x's 2 and 4 bins, of
-// which cv1 has hit one. It answered cv1's whole covergroup, 2 of 5.
 TEST(CoverageMethodSim, ACoverpointsTypeCoverageCountsItsBinsInEveryInstance) {
   SimFixture f;
   auto out = RunCapture(
@@ -665,9 +593,6 @@ TEST(CoverageMethodSim, ACoverpointsTypeCoverageCountsItsBinsInEveryInstance) {
   EXPECT_EQ(out, "1/2 2/5 1/6 2/16\n");
 }
 
-// §19.8, Table 19-5: stop() on a coverpoint or a cross stops collecting its
-// coverage until start(), so the sample of 1 taken while cp is stopped counts
-// nowhere and the cross keeps only its (0, 0) bin. Both kept counting.
 TEST(CoverageMethodSim, StopOnACoverpointOrCrossStopsItsCollection) {
   SimFixture f;
   auto out = RunCapture(
@@ -695,12 +620,6 @@ TEST(CoverageMethodSim, StopOnACoverpointOrCrossStopsItsCollection) {
   EXPECT_EQ(out, "25.00 50.00 25.00\n");
 }
 
-// §19.8: stop() on a coverpoint of a real expression stops it as on an
-// integral one, so c1's hi bin stays uncovered; and get_coverage() through an
-// instance's coverpoint or cross, or through the type, `cg::ab::`, answers for
-// that item over every instance: ca's instance coverages of 100 and 50
-// average 75, ab's of 50 and 25 average 37.5, with 3 of the 8 cross bins of
-// the two instances covered.
 TEST(CoverageMethodSim, ARealCoverpointStopsAndCrossesReportTheirTypeCoverage) {
   SimFixture f;
   auto out = RunCapture(

@@ -11,17 +11,6 @@
 namespace delta {
 namespace {
 
-// §38.37.3 ("Registering multiple system tasks and system functions") gives at
-// least two ways to register several system tasks and system functions:
-// separate s_vpi_systf_data structures with one vpi_register_systf() call
-// apiece, which is the method §38.37.1 and §38.37.2 use, or a static array of
-// s_vpi_systf_data structures with one call per structure in it. Of the second
-// it adds the rule that makes the clause's own loop work: an array whose last
-// element is 0 lets the vpi_register_systf() calls run in a loop that stops at
-// that 0. These tests register the clause's own three-entry list both ways and
-// observe the tool answering each structure separately, stopping at the zero,
-// and refusing the zero as a registration.
-
 PLI_INT32 MyTaskCalltf(PLI_BYTE8*) { return 0; }
 PLI_INT32 MyTaskComptf(PLI_BYTE8*) { return 0; }
 PLI_INT32 MyIntFuncCalltf(PLI_BYTE8*) { return 0; }
@@ -30,10 +19,6 @@ PLI_INT32 MySizedFuncCalltf(PLI_BYTE8*) { return 0; }
 PLI_INT32 MySizedFuncComptf(PLI_BYTE8*) { return 0; }
 PLI_INT32 MySizedFuncSizetf(PLI_BYTE8*) { return 8; }
 
-// §38.37.3's example list: a system task, an integer system function and a
-// sized system function, with a zero final element ending the array. The
-// entries are returned rather than declared at namespace scope so that each
-// test walks a list no other test has registered from.
 struct SystfTestList {
   s_vpi_systf_data entries[4] = {};
 };
@@ -58,12 +43,9 @@ SystfTestList MakeSystfTestList() {
   list.entries[2].compiletf = &MySizedFuncComptf;
   list.entries[2].sizetf = &MySizedFuncSizetf;
 
-  // §38.37.3: the element set to 0 closes the list.
   return list;
 }
 
-// §38.37.3's loop: the vpi_register_systf() calls run in a loop that stops at
-// the 0, the 0 being read out of the type field of the final element.
 int RegisterFromList(SystfTestList& list) {
   int registered = 0;
   for (p_vpi_systf_data p = &list.entries[0]; p->type != 0; ++p) {
@@ -80,10 +62,6 @@ class VpiMultipleSystfRegistration : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.37.3, second method: one vpi_register_systf() call per structure in a
-// static array registers every one of them. Each structure keeps its own name,
-// type, return-value kind and routines, so the three registrations are three
-// different system tasks and functions rather than one overwritten three times.
 TEST_F(VpiMultipleSystfRegistration, StaticArrayRegistersEveryStructureInIt) {
   SystfTestList list = MakeSystfTestList();
 
@@ -101,10 +79,6 @@ TEST_F(VpiMultipleSystfRegistration, StaticArrayRegistersEveryStructureInIt) {
   EXPECT_EQ(vpi_ctx_.RegisteredSystfs()[2].sizetf, &MySizedFuncSizetf);
 }
 
-// §38.37.3: each call in the loop is a registration of its own, so each answers
-// with its own callback object and each object reads back the structure that
-// registered it. A tool that kept one record for the array would hand the same
-// handle back, or read the last structure out of every one of them.
 TEST_F(VpiMultipleSystfRegistration, EachStructureAnswersWithItsOwnCallback) {
   SystfTestList list = MakeSystfTestList();
 
@@ -124,9 +98,6 @@ TEST_F(VpiMultipleSystfRegistration, EachStructureAnswersWithItsOwnCallback) {
   EXPECT_EQ(read_back.sysfunctype, vpiIntFunc);
 }
 
-// §38.37.3: the zero final element ends the list. A loop that terminates on it
-// registers the three structures ahead of it and nothing else, so the element
-// itself leaves no nameless system task behind in the registry.
 TEST_F(VpiMultipleSystfRegistration, LoopStopsAtTheZeroFinalElement) {
   SystfTestList list = MakeSystfTestList();
 
@@ -139,12 +110,6 @@ TEST_F(VpiMultipleSystfRegistration, LoopStopsAtTheZeroFinalElement) {
   }
 }
 
-// §38.37.3: the zero is the end of the list rather than a structure to
-// register, which is what lets a loop use it as its terminating condition. A
-// loop written one element too long hands it to vpi_register_systf() anyway,
-// and the refusal is what keeps it out of the registry: §38.37.1 has the type
-// field hold one of the integer constants vpiSysTask and vpiSysFunc, and the
-// zeroed element carries neither.
 TEST_F(VpiMultipleSystfRegistration, ZeroFinalElementIsRefusedAsARegistration) {
   SystfTestList list = MakeSystfTestList();
 
@@ -158,10 +123,6 @@ TEST_F(VpiMultipleSystfRegistration, ZeroFinalElementIsRefusedAsARegistration) {
                "vpiSysTask or vpiSysFunc");
 }
 
-// §38.37.1 by way of §38.37.3: a type of neither vpiSysTask nor vpiSysFunc is
-// no more registrable than the zero terminator, whatever else the structure
-// carries. A well-formed name and a full set of routines do not make a record
-// whose type field names no kind of application into one.
 TEST_F(VpiMultipleSystfRegistration, TypeOutsideTheTwoConstantsIsRefused) {
   s_vpi_systf_data data = {};
   data.type = vpiSysFuncCall;
@@ -173,11 +134,6 @@ TEST_F(VpiMultipleSystfRegistration, TypeOutsideTheTwoConstantsIsRefused) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-// §38.37.3, first method: one s_vpi_systf_data structure of its own for each
-// system task and system function, and one vpi_register_systf() call for each
-// structure. Doing that with the same three applications leaves the registry
-// holding what the array method left, entry for entry - the two ways are two
-// ways of registering the same thing, not two different registrations.
 TEST_F(VpiMultipleSystfRegistration,
        SeparateStructuresRegisterWhatTheArrayDid) {
   SystfTestList list = MakeSystfTestList();

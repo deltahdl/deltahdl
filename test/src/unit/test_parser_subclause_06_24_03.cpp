@@ -29,9 +29,6 @@ TEST(BitStreamCastParsing, BitstreamCastIntToStruct) {
       "endmodule\n"));
 }
 
-// A.2.2.1 names a cast's target with a casting_type, which a packed range
-// written after logic is not, so the eight-bit target is named through a
-// typedef.
 TEST(BitStreamCastParsing, BitStreamCastFromStruct) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

@@ -275,13 +275,6 @@ TEST(StructDeclarationParsing, UnionSoftAloneOk) {
   EXPECT_FALSE(item->data_type.is_tagged);
 }
 
-// §26.3 (printed page 808) references a package's declaration through the
-// package scope resolution operator, and A.2.2.1 lets a member's data_type be
-// a type_identifier behind a package_scope. A package name is never one the
-// parser knows as a type, so `q::pair_t p` was read as a member named `q`
-// with `::` where its semicolon should stand; read as a data_type, the
-// member keeps the qualifier beside the name so the elaborator can look the
-// type up in q and not by the bare name.
 TEST(StructDeclarationParsing, MemberTypeBehindAPackageQualifierKeepsIt) {
   auto r = Parse(
       "module m;\n"
@@ -298,9 +291,6 @@ TEST(StructDeclarationParsing, MemberTypeBehindAPackageQualifierKeepsIt) {
   EXPECT_TRUE(members[1].scope_name.empty());
 }
 
-// §7.2 with §8.25: a member of a specialized class type keeps the
-// parameter_value_assignment it was written with, each declarator of the
-// member's list holding it, and a member written without one holds none.
 TEST(StructDeclarationParsing, StructMemberKeepsItsClassSpecialization) {
   auto r = Parse(
       "class B2; endclass\n"
@@ -320,8 +310,6 @@ TEST(StructDeclarationParsing, StructMemberKeepsItsClassSpecialization) {
   EXPECT_TRUE(members[2].type_params.empty());
 }
 
-// §7.2 closes a structure's member list with '}'. A list the module's end
-// reaches first is reported as missing it, and the module still ends there.
 TEST(StructDeclarationParsing, StructBodyLeftOpenEndsAtTheModuleEnd) {
   auto r = Parse(
       "module m;\n"
@@ -334,8 +322,6 @@ TEST(StructDeclarationParsing, StructBodyLeftOpenEndsAtTheModuleEnd) {
       ReportedError(r.diags, "expected '}', got 'endmodule'", 3, "7.2"));
 }
 
-// A structure with no '{' at all: the tag is reported, the missing brace is,
-// and the member list read from the ';' on stops at the module's end.
 TEST(StructDeclarationParsing, StructWithNoBodyEndsAtTheModuleEnd) {
   auto r = Parse(
       "module m;\n"
@@ -351,8 +337,6 @@ TEST(StructDeclarationParsing, StructWithNoBodyEndsAtTheModuleEnd) {
       ReportedError(r.diags, "expected '}', got 'endmodule'", 3, "7.2"));
 }
 
-// A union's member list left open inside a procedural block stops at the
-// block's 'end', which still closes the block.
 TEST(StructDeclarationParsing, UnionBodyLeftOpenEndsAtTheBlockEnd) {
   auto r = Parse(
       "module m;\n"

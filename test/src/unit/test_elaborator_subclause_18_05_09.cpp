@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.9: a solve...before ordering names random variables and nothing else.
-// Ordering two rand variables is within that rule and elaborates.
 TEST(SolveBeforeOrdering, RandVariablesAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -19,8 +17,6 @@ TEST(SolveBeforeOrdering, RandVariablesAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: a non-random (state) variable may not be ordered. Naming a plain
-// (non-rand) member in a solve...before list is an error.
 TEST(SolveBeforeOrdering, NonRandVariableRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -37,9 +33,6 @@ TEST(SolveBeforeOrdering, NonRandVariableRejected) {
                             4, "18.5.9"));
 }
 
-// 18.5.9: a solve...before ordering may not name a randc variable, which the
-// solver settles ahead of everything else anyway. Naming a randc member is an
-// error.
 TEST(SolveBeforeOrdering, RandcVariableRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -56,8 +49,6 @@ TEST(SolveBeforeOrdering, RandcVariableRejected) {
                             4, "18.5.9"));
 }
 
-// 18.5.9: the rule applies to the after-list as well as the before-list, so a
-// randc variable named after 'before' is equally an error.
 TEST(SolveBeforeOrdering, RandcVariableInAfterListRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -74,8 +65,6 @@ TEST(SolveBeforeOrdering, RandcVariableInAfterListRejected) {
                             4, "18.5.9"));
 }
 
-// 18.5.9: a variable named in a solve...before ordering is integral or real. A
-// real rand variable is allowed as an ordering variable.
 TEST(SolveBeforeOrdering, RealVariableAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -86,8 +75,6 @@ TEST(SolveBeforeOrdering, RealVariableAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: a variable named in a solve...before ordering is integral or real. A
-// rand object handle is neither, so ordering it is an error.
 TEST(SolveBeforeOrdering, ObjectHandleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -105,10 +92,6 @@ TEST(SolveBeforeOrdering, ObjectHandleRejected) {
                             5, "18.5.9"));
 }
 
-// 18.5.9: array.size is expressly allowed as an ordering variable, so an
-// array-method primary such as A.size() is accepted even though 'size' is not a
-// declared rand member. This is the elaboration-stage claim; the parser file
-// for this subclause carries the matching grammar case.
 TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedElaborates) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -119,8 +102,6 @@ TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedElaborates) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: the orderings may not depend on one another in a circle. 'solve a
-// before b' combined with 'solve b before a' forms a cycle and is an error.
 TEST(SolveBeforeOrdering, CircularDependencyRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -130,17 +111,11 @@ TEST(SolveBeforeOrdering, CircularDependencyRejected) {
              "endclass\n"
              "module m; endmodule\n",
              f));
-  // The report names no variable, so its line is what ties it to this source:
-  // SolveBeforeOrdering::report_loc is set from the first 'solve' keyword the
-  // class carries (elaborator_validate_class_constraints.cpp:522-525), and both
-  // orderings here stand on line 3.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "circular dependency in solve...before variable ordering", 3, "18.5.9"));
 }
 
-// 18.5.9: a longer cycle spanning three ordering statements is likewise an
-// error: a before b, b before c, c before a.
 TEST(SolveBeforeOrdering, ThreeNodeCircularDependencyRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -154,17 +129,11 @@ TEST(SolveBeforeOrdering, ThreeNodeCircularDependencyRejected) {
              "endclass\n"
              "module m; endmodule\n",
              f));
-  // Line 4 is 'solve a before b;', the first of the three orderings, which is
-  // the one SolveBeforeOrdering::report_loc keeps; the cycle is closed on
-  // line 6, so the line asserted here also says the report anchors on the
-  // first reference rather than on the closing one.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "circular dependency in solve...before variable ordering", 4, "18.5.9"));
 }
 
-// 18.5.9: a partial order with no cycle is legal. A chain a before b before c
-// elaborates.
 TEST(SolveBeforeOrdering, AcyclicChainAccepted) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -174,9 +143,6 @@ TEST(SolveBeforeOrdering, AcyclicChainAccepted) {
              "module m; endmodule\n"));
 }
 
-// 18.5.9: the no-circular-dependency rule also rejects the degenerate case
-// where a variable is ordered before itself — naming the same variable on both
-// sides of one solve statement is a self-cycle.
 TEST(SolveBeforeOrdering, SelfOrderingRejected) {
   ElabFixture f;
   EXPECT_FALSE(

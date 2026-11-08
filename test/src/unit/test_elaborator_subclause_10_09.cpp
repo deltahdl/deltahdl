@@ -87,9 +87,6 @@ TEST(AssignmentPatternElaboration, TypedPatternExpressionInPortIsAccepted) {
       "  sub u(.a(int'{42}));\n"
       "endmodule\n",
       f);
-  // §10.9: a typed pattern has a type of its own and stands wherever an
-  // expression may, a port connection at an instantiation among the places;
-  // only a port expression of a declaration is barred.
   EXPECT_EQ(FindDiag(f, "an assignment pattern cannot be connected"), nullptr);
 }
 
@@ -116,18 +113,12 @@ TEST(AssignmentPatternElaboration, ErrorNonConstantInConstantPattern) {
       "  localparam int arr [3] = '{x, 2, 3};\n"
       "endmodule\n",
       f);
-  // The rule reported is §6.20.4's, not §10.9's: the pattern's non-constant
-  // member is caught as a non-constant localparam initializer.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(),
                     "localparam 'arr' initializer is not a constant expression",
                     3, "6.20.4"));
 }
 
-// §10.9 footnote 37: the members of a constant assignment pattern shall be
-// constant expressions. A named parameter is a constant expression (11.2.1) and
-// resolves through a different const-eval path than a literal token, so the
-// accepting path is exercised here with parameter members.
 TEST(AssignmentPatternElaboration, ConstantPatternWithParameterMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -143,9 +134,6 @@ TEST(AssignmentPatternElaboration, ConstantPatternWithParameterMembers) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.9 footnote 37: a localparam is likewise a constant expression and is a
-// distinct constant form from both a literal and a parameter; the accepting
-// path is exercised here with localparam members.
 TEST(AssignmentPatternElaboration, ConstantPatternWithLocalparamMembers) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -201,21 +189,6 @@ TEST(AssignmentPatternElaboration, ErrorLhsPatternBitCountMismatch) {
       "10.9"));
 }
 
-// §10.9 says a left-hand-side assignment pattern is written in positional
-// notation and holds as many bits as the right-hand side supplies, and puts no
-// condition on where the assignment stands. Every position a statement holds a
-// statement in is therefore a position both rules are reported at.
-// WalkStmtsForLhsPatternKeys and WalkStmtsForLhsPatternWidths in
-// src/elaborator/elaborator_validate_matches.cpp had each written out six of
-// the thirteen child-statement links Stmt declares, so an assignment written in
-// any of the other seven was exempt from §10.9. Both walks now take the list
-// from ForEachChildStmt in src/elaborator/elaborator_validate_internal.h, and
-// the cases below cover one newly reached position each. The seven links make
-// eight positions because ForEachRandsequenceRuleStmt reaches a randsequence
-// production's two statement lists by different members.
-
-// §9.3.2's fork-join keeps its statements in Stmt::fork_stmts, a member neither
-// walk visited.
 TEST(AssignmentPatternElaboration, AKeyedLhsPatternInsideForkIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -232,9 +205,6 @@ TEST(AssignmentPatternElaboration, AKeyedLhsPatternInsideForkIsReported) {
       "LHS assignment pattern shall use positional notation only", 5, "10.9"));
 }
 
-// §12.7.1's for loop holds its initialization statements in Stmt::for_inits,
-// and A.6.8 gives a variable_assignment there whose left-hand side may be an
-// assignment pattern like any other.
 TEST(AssignmentPatternElaboration,
      AKeyedLhsPatternInAForInitializerIsReported) {
   ElabFixture f;
@@ -251,8 +221,6 @@ TEST(AssignmentPatternElaboration,
       "LHS assignment pattern shall use positional notation only", 5, "10.9"));
 }
 
-// Stmt::for_steps holds the same loop's step assignments, a member of its own
-// beside the initializers.
 TEST(AssignmentPatternElaboration, AKeyedLhsPatternInAForStepIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -268,10 +236,6 @@ TEST(AssignmentPatternElaboration, AKeyedLhsPatternInAForStepIsReported) {
       "LHS assignment pattern shall use positional notation only", 5, "10.9"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case and the
-// next cover one arm each.
 TEST(AssignmentPatternElaboration,
      AKeyedLhsPatternInAnAssertionPassStatementIsReported) {
   ElabFixture f;
@@ -304,9 +268,6 @@ TEST(AssignmentPatternElaboration,
       "LHS assignment pattern shall use positional notation only", 5, "10.9"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, kept in
-// Stmt::randcase_items. §10.9 is a rule about the source, so it holds whether
-// the weighted draw would select the item or not.
 TEST(AssignmentPatternElaboration, AKeyedLhsPatternInARandcaseItemIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -321,10 +282,6 @@ TEST(AssignmentPatternElaboration, AKeyedLhsPatternInARandcaseItemIsReported) {
       "LHS assignment pattern shall use positional notation only", 4, "10.9"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(AssignmentPatternElaboration,
      AKeyedLhsPatternInARandsequenceCodeBlockIsReported) {
   ElabFixture f;
@@ -344,10 +301,6 @@ TEST(AssignmentPatternElaboration,
       "LHS assignment pattern shall use positional notation only", 6, "10.9"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(AssignmentPatternElaboration,
      AKeyedLhsPatternInARandsequenceWeightCodeBlockIsReported) {
   ElabFixture f;
@@ -369,10 +322,6 @@ TEST(AssignmentPatternElaboration,
       "LHS assignment pattern shall use positional notation only", 7, "10.9"));
 }
 
-// The eight cases below put the bit-count rule of §10.9 at the same eight
-// positions. It is enforced by WalkStmtsForLhsPatternWidths, a second walk with
-// a list of its own, so a position covered for the keyed-notation rule says
-// nothing about whether this one reaches it.
 TEST(AssignmentPatternElaboration, AMissizedLhsPatternInsideForkIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -507,8 +456,6 @@ TEST(AssignmentPatternElaboration,
       "10.9"));
 }
 
-// §10.9 states the left-hand-side pattern rules wherever the assignment
-// stands: positional notation, and the bit count the right-hand side supplies.
 TEST(AssignmentPatternElaboration, LhsPatternRulesReachFunctionBodies) {
   ElabFixture f;
   ElaborateSrc(
@@ -529,8 +476,6 @@ TEST(AssignmentPatternElaboration, LhsPatternRulesReachFunctionBodies) {
       "10.9"));
 }
 
-// §10.8 makes a continuous assignment an assignment-like context, so a pattern
-// on its left-hand side is positional too.
 TEST(AssignmentPatternElaboration, KeyedLhsPatternInContAssignIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -544,9 +489,6 @@ TEST(AssignmentPatternElaboration, KeyedLhsPatternInContAssignIsError) {
       "LHS assignment pattern shall use positional notation only", 3, "10.9"));
 }
 
-// §10.9: an untyped pattern is one side of an assignment-like context only
-// when the other side has a self-determined type, which another untyped
-// pattern does not; a typed pattern gives the other side its type.
 TEST(AssignmentPatternElaboration, UntypedPatternOnBothSidesIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -567,9 +509,6 @@ TEST(AssignmentPatternElaboration, UntypedPatternOnBothSidesIsError) {
                              5, "10.9"));
 }
 
-// §10.9: the bit count a left-hand-side pattern needs is checked against a
-// right-hand side that is a name, a select of a vector or a call, whose widths
-// the declarations give.
 TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstNamedRhs) {
   ElabFixture f;
   ElaborateSrc(
@@ -598,11 +537,6 @@ TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstNamedRhs) {
   EXPECT_EQ(FindDiag(f, "but RHS supplies 4 bits"), nullptr);
 }
 
-// §10.9 (printed page 261): an unpacked array on the right of a positional
-// pattern supplies the bits of every element, so under `typedef byte U[3]`,
-// `U'{a, b, c} = A` takes A's three bytes and two items fall 8 bits short of
-// them, and a byte array of two by two supplies 32 bits. A queue's element
-// count is the run's to know, so the pattern it supplies is not sized here.
 TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstAnUnpackedArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -631,9 +565,6 @@ TEST(AssignmentPatternElaboration, LhsPatternBitCountAgainstAnUnpackedArray) {
   }
 }
 
-// §10.9 (printed page 261): each item of a typed left-hand-side pattern has
-// the bit count of the member of its type it stands for, so items whose widths
-// are swapped against the members are reported though their total agrees.
 TEST(AssignmentPatternElaboration, TypedLhsPatternItemWidthMismatchIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -652,9 +583,6 @@ TEST(AssignmentPatternElaboration, TypedLhsPatternItemWidthMismatchIsError) {
                              "LHS assignment pattern item has", 5, "10.9"));
 }
 
-// §10.9 lets an untyped pattern stand only as one side of an assignment-like
-// context (§10.8), and an if or ?: condition, a vector concatenation item and
-// a select index are none.
 TEST(AssignmentPatternElaboration,
      UntypedPatternInNonAssignmentPositionIsError) {
   ElabFixture f;
@@ -677,11 +605,6 @@ TEST(AssignmentPatternElaboration,
   }
 }
 
-// §10.9 (printed page 261) requires positional notation of an assignment
-// pattern used in a left-hand expression, and A.8.5 lets a target's element be
-// a pattern again, so a keyed pattern nested in a concatenation target or in a
-// pattern target is reported, in a procedural and in a continuous assignment,
-// and a positional one nested so is not (#8093).
 TEST(AssignmentPatternElaboration, NestedKeyedPatternInATargetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -708,9 +631,6 @@ TEST(AssignmentPatternElaboration, NestedKeyedPatternInATargetIsError) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kMessage, 10, "10.9"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a pattern
-// on the left-hand side of a procedural or a continuous assignment inside one
-// is positional.
 TEST(AssignmentPatternElaboration, LhsPatternInsideGenerateBlocksIsPositional) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "logic a, b;", "initial '{x: a, y: b} = 2'b0;"},

@@ -48,9 +48,6 @@ static bool TryParseQueueDim(const Expr* dim, RtlirVariable& var,
   if (!IsQueueDim(dim)) return false;
   var.is_queue = true;
   if (dim->rhs) {
-    // §7.10: the optional right bound is a constant_expression, which per
-    // §11.2.1 may name a parameter or localparam. Evaluate it in the enclosing
-    // parameter scope — just like a range dimension's bounds.
     auto max_val = ConstEvalInt(dim->rhs, scope);
     if (max_val) {
       auto max_size = QueueBoundMaxSize(*max_val);
@@ -69,9 +66,6 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var,
                              const ScopeMap& scope) {
   if (dim->kind != ExprKind::kBinary || dim->op != TokenKind::kColon)
     return false;
-  // §7.4.2: each bound is a constant_expression, which per §11.2.1 may name a
-  // parameter or localparam. Evaluate in the module's parameter scope so a
-  // dimension such as `[N-1:0]` resolves just as a packed dimension does.
   auto lval = ConstEvalInt(dim->lhs, scope);
   auto rval = ConstEvalInt(dim->rhs, scope);
   if (!lval || !rval) return false;
@@ -83,10 +77,6 @@ static bool TryParseRangeDim(const Expr* dim, RtlirVariable& var,
   return true;
 }
 
-// §6.11: the width each index type keyword denotes on its own. `bit`, `logic`
-// and `reg` are the one-bit types, and `time` is a 64-bit unsigned integer
-// type. A chandle holds a pointer, which a 64-bit key keeps (§6.14), and an
-// event is keyed by the identity of the object it refers to, an address too.
 static uint32_t AssocIndexWidth(std::string_view t) {
   if (t == "bit" || t == "logic" || t == "reg") return 1;
   if (t == "byte") return 8;
@@ -97,21 +87,11 @@ static uint32_t AssocIndexWidth(std::string_view t) {
   return 32;
 }
 
-// §6.11: the index types that are signed unless the declaration says
-// otherwise. `bit`, `logic`, `reg` and `time` are unsigned, as is a wildcard
-// index, whose value stays unsigned and self-determined (§7.8.4).
 static bool IsAssocIndexSigned(std::string_view t) {
   return t == "byte" || t == "shortint" || t == "int" || t == "integer" ||
          t == "longint";
 }
 
-// §7.8 makes the index type a data_type, and A.2.2.1 lets an
-// integer_vector_type carry packed dimensions, so the index of `int
-// aa[bit[3:0]]` is four bits wide rather than one. The width is the product of
-// the declared dimensions' sizes. Each bound is a constant_expression that
-// §11.2.1 lets name a parameter or localparam, so it is evaluated in the
-// enclosing parameter scope — just like a range dimension's bounds — and a
-// bound that does not fold leaves the width the keyword alone gives.
 static uint32_t AssocIndexWidth(const Expr* dim, const ScopeMap& scope) {
   if (dim->elements.empty()) return AssocIndexWidth(dim->text);
   uint32_t width = 1;
@@ -128,10 +108,6 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var,
                              const ScopeMap& scope) {
   if (dim->kind != ExprKind::kIdentifier) return false;
   auto t = dim->text;
-  // §7.8.5 admits an index type with equality defined, which §6.14 defines
-  // for a chandle and §15.5.5.3 for an event; their keys are unordered and
-  // kept in the order of their values, which §7.8.5 leaves arbitrary but
-  // stable.
   if (t == "string" || t == "int" || t == "integer" || t == "byte" ||
       t == "shortint" || t == "longint" || t == "bit" || t == "logic" ||
       t == "reg" || t == "time" || t == "chandle" || t == "event" || t == "*") {
@@ -139,15 +115,8 @@ static bool TryParseAssocDim(const Expr* dim, RtlirVariable& var,
     var.assoc_index_keyword = t;
     var.is_string_index = (t == "string");
     var.is_wildcard_index = (t == "*");
-    // §7.8.4 keys an entry off the index cast to the declared index width, so
-    // the packed dimensions the declaration wrote decide which values are one
-    // element: `aa[-1]` and `aa[15]` are the same entry under a `bit [3:0]`
-    // index and separate ones under a wider index type.
     var.assoc_index_width = AssocIndexWidth(dim, scope);
     var.is_index_signed = IsAssocIndexSigned(t);
-    // An index type is a data_type (§7.8), so it may carry the signing that
-    // A.2.2.1 allows on an integer type. That overrides the default: keys of
-    // a `byte unsigned` index order 0 to 255, not -128 to 127.
     if (dim->op == TokenKind::kKwUnsigned) var.is_index_signed = false;
     if (dim->op == TokenKind::kKwSigned) var.is_index_signed = true;
     return true;
@@ -175,9 +144,6 @@ static void ApplyUserDefinedAssocDim(
   if (it != typedefs.end()) {
     var.assoc_index_type_name = name;
     var.assoc_index_width = EvalTypeWidth(it->second, typedefs);
-    // A typedef'd integral index follows the signedness of its underlying
-    // type, so e.g. `bit signed [4:1]` orders signed and `bit [4:1]`
-    // orders unsigned (§7.8.4).
     var.is_index_signed = IsSignedType(it->second, typedefs);
   }
 }
@@ -185,9 +151,6 @@ static void ApplyUserDefinedAssocDim(
 static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
                                        DiagEngine& diag, SourceLoc loc,
                                        const ScopeMap& scope) {
-  // §7.4.2 / §11.2.1: the single-number `[size]` form is a constant integer
-  // expression and may be a parameter or localparam, so it is evaluated in the
-  // module's parameter scope.
   auto size_val = ConstEvalInt(dim, scope);
   if (!size_val) return;
   if (*size_val <= 0) {
@@ -198,10 +161,6 @@ static void ApplyConstSizedUnpackedDim(const Expr* dim, RtlirVariable& var,
   }
 }
 
-// §7.8 with §26.3 and §8.23: the name `typedefs` or `class_names` holds the
-// user-defined type the dimension `dim` names under, written bare or through a
-// package or class scope, `[p::idx_t]`; empty where it names none, as a
-// constant so named, `[p::N]`, does not.
 static std::string_view UserDefinedIndexName(
     const Expr* dim, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names) {
@@ -216,9 +175,6 @@ static std::string_view UserDefinedIndexName(
   return cls == class_names.end() ? std::string_view() : *cls;
 }
 
-// §7.8: a first dimension naming a typedef or class type makes the array
-// associative with that user-defined index type. Returns true when the
-// dimension was a user-defined associative index.
 static bool TryParseUserDefinedAssocDim(
     const Expr* dim, RtlirVariable& var, const TypedefMap& typedefs,
     const std::unordered_set<std::string_view>& class_names) {
@@ -229,11 +185,6 @@ static bool TryParseUserDefinedAssocDim(
   return true;
 }
 
-// A.2.5 with §6.23: an index written as a data_type an expression cannot
-// spell, `[enum {A, B}]`, or as a type reference, `[type(k)]`, is a type
-// reference whose type_value is the index type, once resolved. A named one is
-// a typedef's or a class's, `[P#(8)]`, applied as a name is; any other gives
-// the index its own width and signing, a string's keys being strings.
 static bool TryParseTypeRefAssocDim(const Expr* dim, RtlirVariable& var,
                                     const UnpackedDimContext& ctx) {
   if (dim->kind != ExprKind::kTypeRef || dim->type_value == nullptr) {
@@ -252,8 +203,6 @@ static bool TryParseTypeRefAssocDim(const Expr* dim, RtlirVariable& var,
   return true;
 }
 
-// §7.8 with §7.4 (printed pages 162 and 153): whether `dim` is an associative
-// dimension, parsed onto `var` where it is.
 static bool TryParseAnyAssocDim(const Expr* dim, RtlirVariable& var,
                                 const UnpackedDimContext& ctx) {
   return TryParseAssocDim(dim, var, ctx.scope) ||
@@ -262,10 +211,6 @@ static bool TryParseAnyAssocDim(const Expr* dim, RtlirVariable& var,
          TryParseTypeRefAssocDim(dim, var, ctx);
 }
 
-// §7.8 with §7.4: an associative array's element type may be an associative
-// array, `int m[string][int]`, the second of two dimensions being an
-// associative one; `var` then records that dimension's index type, the one
-// its elements have.
 static void RecordElementAssoc(const std::vector<Expr*>& dims,
                                RtlirVariable& var,
                                const UnpackedDimContext& ctx) {
@@ -292,9 +237,6 @@ void ComputeUnpackedDims(const std::vector<Expr*>& dims, RtlirVariable& var,
   ApplyConstSizedUnpackedDim(dim, var, ctx.diag, ctx.loc, ctx.scope);
 }
 
-// §6.9.2: vectored and scalared are optional advisory keywords for vector net
-// declarations, so a net declared with either keyword and no packed dimension
-// is not a vector net and the keyword has no declaration to advise about.
 static void ValidateVectoredScalaredNet(const DataType& dtype,
                                         const RtlirNet& net, DiagEngine& diag,
                                         SourceLoc loc) {
@@ -306,9 +248,6 @@ static void ValidateVectoredScalaredNet(const DataType& dtype,
   }
 }
 
-// §10.3.4 (printed page 251): a drive strength on a continuous assignment
-// applies only to a scalar net, and the supply0 and supply1 nets, of any width,
-// are excepted from those it applies to.
 static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
                                      DiagEngine& diag, SourceLoc loc) {
   if (dtype.drive_strength0 == 0 && dtype.drive_strength1 == 0) return;
@@ -325,39 +264,17 @@ static void ValidateNetDriveStrength(const DataType& dtype, const RtlirNet& net,
   }
 }
 
-// §6.3.2.2: a drive strength lets the statement that declares a net also place
-// a continuous assignment on it, which §6.3.2 states as the restriction it is
-// -- drive strength is used only where the net's declaring statement also
-// places a continuous assignment on it. The check is applied to the declaration
-// as elaborated rather than to a module's own item list, so that a net declared
-// inside a generate block is held to the rule the same as one declared beside
-// it. §27.5 leaves an unselected generate block unelaborated, so a declaration
-// there is never reached, which is the right answer: it declares no net for the
-// rule to speak about.
 void ValidateDriveStrengthHasAssignment(const ModuleItem* item,
                                         DiagEngine& diag) {
   if ((item->data_type.drive_strength0 != 0 ||
        item->data_type.drive_strength1 != 0) &&
       item->init_expr == nullptr) {
-    // §6.3.2 states this restriction: drive strength is used only where a net's
-    // declaring statement also places a continuous assignment on it. §10.3.4
-    // says only where a drive strength may be written and that it applies to
-    // scalar nets, and never requires a declaration carrying one to carry an
-    // assignment.
     diag.Error(item->loc,
                "drive strength on net declaration requires an assignment",
                Subclause("6.3.2"));
   }
 }
 
-// §10.3.1: build the continuous assignment that lowers a net declaration
-// assignment — an identifier LHS naming the net driven by the initializer, with
-// the net's width and the declaration's drive strengths and delays.
-//
-// §10.3.3 puts the declaration's delay here rather than on the net: with a
-// continuous assignment in a declaration, the delay belongs to the assignment
-// rather than being a net delay, so it is not added to the delay of the net's
-// other drivers.
 static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
                                               const RtlirNet& net,
                                               Arena& arena) {
@@ -378,10 +295,6 @@ static RtlirContAssign BuildNetDeclContAssign(const ModuleItem* item,
   return ca;
 }
 
-// §10.3.1: where a lowered net declaration assignment is emitted — the module
-// receiving the continuous assignment, the arena that allocates its LHS, the
-// table recording continuous-assignment driver targets, and the uwire nets
-// whose drivers §6.6.2 counts.
 struct NetDeclLowerSink {
   RtlirModule* mod;
   Arena& arena;
@@ -389,10 +302,6 @@ struct NetDeclLowerSink {
   UwireDrivers& uwire_drivers;
 };
 
-// §10.3.1: a net declaration assignment lowers to a continuous assignment of
-// the initializer to the net (illegal on interconnect nets). A uwire net is
-// entered among the nets whose drivers §6.6.2 counts whether or not its
-// declaration assigns it.
 static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
                                    NetDeclLowerSink sink, DiagEngine& diag) {
   if (net.net_type == NetType::kUwire) sink.uwire_drivers.Declare(net.name);
@@ -404,18 +313,12 @@ static void LowerNetDeclAssignment(const ModuleItem* item, const RtlirNet& net,
         Subclause("10.3.1"));
     return;
   }
-  // Under the net's own name, which carries the prefix of the generate block
-  // declaring it, as Elaborator::ValidateContAssignIdentLhs keys a target.
   sink.cont_assign_targets.emplace(net.name, item->loc);
-  // §6.6.2: the assignment drives every bit of the net.
   if (net.net_type == NetType::kUwire)
     sink.uwire_drivers.Record(item->name, net.name, {}, item->loc, diag);
   sink.mod->assigns.push_back(BuildNetDeclContAssign(item, net, sink.arena));
 }
 
-// The defaults a trireg declaration takes what it does not write from: the
-// module's default charge strength (Annex E.3) and default decay time (Annex
-// E.2), each the directive in force where the module was declared.
 struct TriregDefaults {
   uint32_t strength = 0;
   bool has_strength = false;
@@ -425,18 +328,11 @@ struct TriregDefaults {
   double decay_real = 0.0;
 };
 
-// §28.16.2.2: give the net the charge decay time its declaration writes as the
-// third delay -- a trireg net declaration's third delay is its charge decay
-// time -- or, where the declaration writes no third delay, the module's default
-// decay time. The third delay is evaluated in the module's parameter scope, so
-// a parameter or localparam decay time resolves and not just a bare literal.
 static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
                                  const TriregDefaults& defaults,
                                  const ScopeMap& scope, DiagEngine& diag) {
   if (item->net_delay_decay == nullptr) {
     if (!defaults.decay_infinite) {
-      // E.2 with §3.14.1: a real default is rounded at the module's precision
-      // as a real third delay is, so its exact value goes on beside the count.
       net.decay_ticks = defaults.decay_ticks;
       net.decay_is_real = defaults.decay_is_real;
       net.decay_real = defaults.decay_real;
@@ -447,65 +343,27 @@ static void ApplyTriregDecayTime(const ModuleItem* item, RtlirNet& net,
   auto decay_ticks = ConstEvalInt(item->net_delay_decay, scope);
   std::optional<double> decay_real;
   if (!decay_ticks) {
-    // A.2.2.3 writes delay_value over "unsigned_number | real_number |
-    // ps_identifier | time_literal | 1step", so a decay time with a decimal
-    // point is a form the grammar admits and ConstEvalInt does not fold.
-    // §3.14.1 says what it becomes: the time precision fixes how a delay value
-    // is rounded before simulation uses it, and with the precision equal to the
-    // time unit, delay values round to whole numbers. decay_ticks holds it
-    // rounded to the nearest whole count with ties away from zero -- the same
-    // std::llround §6.12.1 already gives an integer parameter set from a real
-    // -- and the value itself is kept beside it for the lowerer to round to the
-    // module's precision when it scales the time into the design's ticks.
-    //
-    // The fold is reached from here rather than from ConstEvalFull. A
-    // kRealLiteral case there would answer every ConstEvalInt caller in the
-    // elaborator, and several read a failure to fold as their answer: §14.3's
-    // fractional clocking skew is reported only because the integer fold fails
-    // first, and an array bound, a case-item key and a generate-case selector
-    // would each start accepting a real that rounds.
     if (auto real_ticks = ConstEvalReal(item->net_delay_decay, scope)) {
       decay_ticks = std::llround(*real_ticks);
       decay_real = real_ticks;
     }
   }
   if (!decay_ticks) {
-    // Report the fold that failed rather than substituting a decay time.
-    // RtlirNet::decays is left false, so the net holds its charge, and no
-    // decay time is any better a guess than another. The report is a warning
-    // rather than an error because A.2.2.3 writes delay3 over
-    // mintypmax_expression rather than constant_mintypmax_expression, so a
-    // third delay that constant folding does not reach is not thereby illegal.
     diag.Warning(item->net_delay_decay->range.start,
                  "trireg charge decay time does not fold to a constant, so the "
                  "net is left holding its charge",
                  Subclause("28.16.2.2"));
     return;
   }
-  // §28.16.2: the charge decay time is the delay from a trireg net's drivers
-  // turning off to its stored charge no longer being determinable, which has no
-  // negative value. ValidateItemDelaysNonNegative reports one; the store is
-  // skipped here so the cast cannot turn it into the enormous positive tick
-  // count an unsigned reading of it makes (#3378).
   if (*decay_ticks < 0) return;
   net.decay_ticks = static_cast<uint64_t>(*decay_ticks);
   if (decay_real) {
     net.decay_is_real = true;
     net.decay_real = *decay_real;
   }
-  // §28.16.2.2 gives the meaning of never decaying to a declaration with no
-  // third delay, so a declaration that wrote one decays whatever it wrote --
-  // zero included, which §28.16.2.1 makes the transition to x happening at
-  // once.
   net.decays = true;
 }
 
-// §10.3.1 / §28.16.2: apply the compilation unit's default trireg charge
-// strength and the declaration's charge decay time to a freshly built net.
-// Neither reaches a net that is not a trireg, because §28.16.2 gives the third
-// delay of a trireg declaration to the charge decay time in place of the delay
-// of a transition to z -- on every other net that delay is the turn-off delay
-// RecordNetDeclDelay below records.
 static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
                                    const TriregDefaults& defaults,
                                    const ScopeMap& scope, DiagEngine& diag) {
@@ -516,19 +374,6 @@ static void ApplyTriregNetDefaults(const ModuleItem* item, RtlirNet& net,
   ApplyTriregDecayTime(item, net, defaults, scope, diag);
 }
 
-// §28.16: record on the net the delay its declaration wrote, which is what
-// §10.3.3 calls a net delay, under which every value change another statement
-// applies to wireA waits ten time units before taking effect. A declaration
-// that also assigns the net writes no net delay, because the same subclause
-// rules that a delay in a declaration carrying a continuous assignment belongs
-// to that assignment and is not a net delay; BuildNetDeclContAssign puts that
-// one on the assignment instead.
-//
-// The third delay is left off a trireg, for which §28.16.2 rules that the first
-// two delays are those of a driver taking the trireg net to 1 and to 0, and
-// that the third is the charge decay time rather than the delay of a transition
-// to z -- ApplyTriregNetDefaults above reads that third delay into
-// RtlirNet::decay_ticks, and it is not a turn-off delay.
 static void RecordNetDeclDelay(const ModuleItem* item, RtlirNet& net) {
   if (item->init_expr != nullptr) return;
   net.delay_rise = item->net_delay;
@@ -563,15 +408,10 @@ FoundSignalDecl FindSignalDecl(std::string_view name, const RtlirModule* mod) {
 
 namespace {
 
-// How many indices a range covers, whichever way it runs.
 int64_t RangeSpan(int64_t left, int64_t right) {
   return (left >= right ? left - right : right - left) + 1;
 }
 
-// The product of every packed dimension inside the outermost one, so §7.4.1's
-// rule that the outermost range indexes elements rather than bits can be
-// detected. Nil when a bound does not fold, which is not a stride of one but an
-// unknown.
 std::optional<int64_t> InnerPackedStride(const DataType& dt,
                                          const ScopeMap& scope) {
   int64_t stride = 1;
@@ -604,15 +444,6 @@ PackedRange SignalDeclaredRange(std::string_view name, const RtlirModule* mod,
   return {*left, *right};
 }
 
-// §6.7.1 opens by saying which declarations it describes: net declarations
-// without assignments whose net type is no user-defined nettype. A net whose
-// net type is a user-defined nettype belongs to §6.7.2 instead, and that
-// subclause puts no restriction on the data type -- a net declared with a
-// nettype takes that nettype's data type and resolution function, if any,
-// whatever that data type is. Its own examples declare a nettype over an array
-// of reals and a net from it: `typedef real TR[5]; nettype TR wTR; wTR w5;`. So
-// the list of data types §6.7.1 admits is asked only of a net whose net type is
-// one of the built-in ones.
 static void ValidateNetDeclDataType(
     const ModuleItem* item,
     const std::unordered_set<std::string_view>& nettype_names,
@@ -626,17 +457,6 @@ static void ValidateNetDeclDataType(
   ValidateNetTypedefDims(item->data_type, tables, diag, item->loc);
 }
 
-// Records what a select written on this net may reach. §11.5.2 draws no
-// distinction between a net and a variable -- a select of an array element is
-// addressed as a net's or a variable's select is -- so the net gets the same
-// VarSelectShape a variable gets, and its dimensions go to net_array_info_ for
-// the one slice rule that reads them. They are kept out of var_array_info_
-// deliberately: that map is read by rules written about variables, and §7.6's
-// array assignment comparison reports a mismatch between `logic [7:0] v[4]` and
-// `wire [7:0] w[4]` when it sees one, because VarArrayInfo::elem_type holds the
-// net kind for a wire while §6.7.1 makes a net's default data type logic. What
-// elem_type should mean for a net is unread, so no rule that consults it is
-// given one.
 void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
                                      RtlirModule* mod) {
   RecordVarSelectShape(item, typedefs_, var_select_shapes_);
@@ -650,10 +470,6 @@ void Elaborator::RecordNetArrayShape(ModuleItem* item, const RtlirNet& net,
   TrackVarArrayInfo(item, dims, BuildParamScope(mod), net_array_info_);
 }
 
-// §20.6.2: $bits of a net array is width bits per element over every
-// dimension, so the dimensions RecordNetArrayShape folded into `infos` are
-// carried on the net itself, as a variable carries its own. A net declared
-// without an unpacked dimension has no entry there and keeps the zero count.
 static void CarryNetArrayDims(
     std::string_view name,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>& infos,
@@ -667,18 +483,6 @@ static void CarryNetArrayDims(
   }
 }
 
-// The type a net record carries beyond its width. §11.5.1: the width says how
-// many bits the net has, not which bit an index names, so the declared type
-// travels wherever it holds a packed dimension and the simulator addresses the
-// net over the range as written -- the same information SetVariableTypeInfo
-// carries for a variable declared beside it. §6.7.1 admits a packed structure
-// as a net's data type, its own example `wire struct packed {...} memsig`, and
-// §7.2.1 makes a member of one a window of the vector; a net of such a type,
-// or of a typedef name standing for one, carries the resolved aggregate so the
-// simulator lays its members out as it does a variable's. Without it
-// `w.opcode` on `wire instruction_t w` selected nothing of the net's bits. A
-// net with a use-site packed dimension or an unpacked one is an array of the
-// aggregate rather than one and keeps the width alone, as a port does.
 static const DataType* NetDeclaredType(const ModuleItem* item,
                                        const TypedefMap& typedefs,
                                        const ScopeMap& scope, Arena& arena) {
@@ -693,11 +497,6 @@ static const DataType* NetDeclaredType(const ModuleItem* item,
   return NamedPackedVectorType(item->data_type, typedefs, arena);
 }
 
-// §37.16 (figure): records on `net` the type and the unpacked dimensions its
-// declaration `item` wrote, and whether that declaration wrote a packed
-// dimension. An inline enum holds its base type's range where a dimension
-// written over a named type or a struct or union is held, so only those two
-// say the declaration wrote one.
 static void RecordWrittenNetType(const ModuleItem& item, RtlirNet& net) {
   net.written_type = &item.data_type;
   net.declared_unpacked_dims = &item.unpacked_dims;
@@ -706,15 +505,8 @@ static void RecordWrittenNetType(const ModuleItem& item, RtlirNet& net) {
 }
 
 void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
-  // §6.23: a net declared with a type_reference data type (e.g. `wire type(x)
-  // y`) resolves the referenced object's width/signedness before the net is
-  // built.
   ResolveTypeRef(item->data_type, item->loc, mod);
 
-  // §8.23: and `wire Cfg::beat_t w;` names a type declared in a class, which a
-  // net reaches by this path and not by ElaborateVarDecl's. It has to be
-  // resolved before var_types_ below records the kind and before EvalTypeWidth
-  // sizes the net, or the net is built zero bits wide and unsigned.
   ResolveClassScopedDeclType(item->data_type, typedefs_, unit_);
   ReportUnresolvedClassScopedType(item->data_type, item->loc, typedefs_, unit_,
                                   diag_);
@@ -726,16 +518,6 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       "net", diag_);
   net_names_.insert(item->name);
   var_types_[item->name] = item->data_type.kind;
-  // §7.4.2: an unpacked array may have any element data type, and an element of
-  // a net array is used as a scalar or vector net is. A net carrying an
-  // unpacked dimension is therefore neither a scalar nor a packed array for
-  // select legality, exactly as RegisterVarDeclNames already decides for a
-  // variable, because §11.5.2 makes an index on one an array element select
-  // rather than a bit-select. Testing only the packed dimension made
-  // `wire w [3:0]` a scalar, so every `w[1]` drew §11.5.1's scalar report. A
-  // net with no packed dimension of its own is a scalar only where its type
-  // carries none either: `wire addressT w` under `typedef logic [31:0]
-  // addressT`, a packed structure net and a nettype net are vectors.
   if (item->unpacked_dims.empty()) {
     if (item->data_type.packed_dim_left)
       packed_array_vars_.insert(item->name);
@@ -744,17 +526,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
   }
   RtlirNet net;
   net.name = ScopedName(item->name);
-  // §37.3.3: the declaration is where this net stands in the source text,
-  // and vpiLineNo and vpiFile report it once the net is an object.
   net.loc = item->loc;
 
   if (item->data_type.is_interconnect) interconnect_names_.insert(item->name);
   net.net_type = WrittenNetType(item->data_type);
-  // §6.20.2: a parameter is a constant, so it is legal in the packed dimension
-  // of a declaration and has to be folded for the range to have a size. The
-  // module's parameter scope is what carries the values, and without it a range
-  // naming one does not fold and the net falls back to a single bit. This is
-  // the same scope the variable declaration beside it folds against.
   net.width = EvalTypeWidth(item->data_type, typedefs_, BuildParamScope(mod));
   net.dtype = NetDeclaredType(item, typedefs_, BuildParamScope(mod), arena_);
   net.data_kind = ResolvedTypeKind(item->data_type, typedefs_);
@@ -771,17 +546,10 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
 
   if (item->data_type.charge_strength != 0 &&
       net.net_type != NetType::kTrireg) {
-    // §6.3.2.1 states the rule as prose, keeping the charge strength
-    // specification to trireg nets. §10.3 carries it only as footnote 16
-    // annotating the net_declaration production of Syntax 10-1. This site
-    // catches the declaration the parser cannot, where the strength is written
-    // on a trireg and a named type follows, so ApplyNetInfo copies the strength
-    // onto a type whose kind is no longer trireg.
     diag_.Error(item->loc, "charge strength can only be used with trireg nets",
                 Subclause("6.3.2.1"));
   }
 
-  // §6.3.2.2, stated beside its §6.3.2.1 sibling above.
   ValidateDriveStrengthHasAssignment(item, diag_);
 
   net.is_vectored = item->data_type.is_vectored;
@@ -816,11 +584,6 @@ void Elaborator::ElaborateNetDecl(ModuleItem* item, RtlirModule* mod) {
       item, net, {mod, arena_, cont_assign_targets_, uwire_drivers_}, diag_);
 }
 
-// §6.19 with A.2.1.3: `enum {d, e} u, w;` gives its one enumeration to every
-// variable of the list. EmitBareEnumMembers declares it once, from the first
-// declarator, under that declarator's name, so `list_enum_key` carries the
-// first's name to the rest; keyed by its own name, `w` named no enumeration
-// and its name() answered an empty string.
 static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
                             const TypedefMap& typedefs, Arena& arena,
                             std::string_view& list_enum_key) {
@@ -831,11 +594,6 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
     return;
   }
   if (item->data_type.kind != DataTypeKind::kNamed) return;
-  // §6.18: a typedef naming another typedef denotes the type that one names,
-  // so `typedef choice alias_t;` is the enumeration `choice` declares, and the
-  // enumeration is keyed by the typedef whose declaration writes it rather
-  // than by the name the variable was declared with. Each step follows one
-  // name, so the walk is bounded by the table as LastTypeInChain's is.
   const DataType* named = &item->data_type;
   const DataType* bound = FindNamedType(*named, typedefs);
   for (std::size_t steps = 0;
@@ -846,11 +604,6 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
     bound = FindNamedType(*named, typedefs);
   }
   if (bound != nullptr && bound->kind == DataTypeKind::kEnum) {
-    // §8.23 and §26.3: a typedef named through a scope, `C::e_t en` or
-    // `P::c_t v`, is the key "C::e_t" the design's typedef table holds it
-    // under, and the key the simulator registers the enumeration by
-    // (RtlirDesign::type_enums); the bare name alone named an enumeration of
-    // the module, which such a variable's is not.
     var.enum_type_name =
         named->scope_name.empty()
             ? named->type_name
@@ -861,11 +614,6 @@ static void SetEnumTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
 }
 
-// §26.3 with §7.2.1: a package-scoped name, `pk::rec_t`, denotes the
-// package's typedef, held under its "pk::rec_t" key, which
-// ResolvedAggregateType looks the name up by; looked up by the bare name it
-// denoted nothing, so the variable was sized but its members were never laid
-// out and every member write was dropped.
 static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
                               const TypedefMap& typedefs, const ScopeMap& scope,
                               Arena& arena) {
@@ -874,30 +622,9 @@ static void SetStructTypeInfo(const ModuleItem* item, RtlirVariable& var,
   if (aggregate != nullptr) var.dtype = aggregate;
 }
 
-// Records the declared-type information a variable carries beyond its raw
-// width: struct/union layout, a class handle's type name, an enum's type, and —
-// for any packed declaration — the type itself, since a width alone does not
-// say which bit an index addresses. §7.4.1: a packed multidimensional array
-// (e.g. `logic [1:0][7:0]`) needs the inner dimensions so the lowerer can
-// compute the outermost-element stride and a single-index select slices a whole
-// element rather than one bit. §11.5.1: a single packed dimension is equally
-// needed, because the declaration helps decide which bit an address reaches —
-// `logic [15:0] acc` and `logic [2:17] acc` are both sixteen bits wide and the
-// same index names a different bit of each, so the bounds as written have to
-// reach the lowerer. `scope` holds the parameters of the instance declaring
-// the variable, which an aggregate's member dimensions may name (§6.20).
 void Elaborator::SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,
                                      const ScopeMap& scope) {
   SetStructTypeInfo(item, var, typedefs_, scope, arena_);
-  // §8.23: `Outer::Inner in` declares a handle of the nested class, held under
-  // its qualified key; class_names_ holds the bare names of the classes the
-  // scopes declare and never a nested one, so the declaration was sized as a
-  // value and its `new` constructed nothing.
-  // §26.3: `p::C h` declares a handle of package p's class whether or not
-  // the scope imports p, and so does `p::bt h` under p's `typedef C bt`
-  // (§6.18); class_names_ holds the bare names that scope reaches, so without
-  // the import the declaration was sized as a value and its `new` constructed
-  // nothing.
   std::string_view nested = NestedClassKey(item->data_type, unit_, arena_);
   if (nested.empty()) {
     nested = PackageClassKey(item->data_type, typedefs_, unit_, arena_);
@@ -907,10 +634,6 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,
     var.class_data_type = &item->data_type;
   } else if (item->data_type.kind == DataTypeKind::kNamed &&
              class_names_.count(item->data_type.type_name)) {
-    // §26.7: `std::semaphore` and `std::mailbox` keep their scope, which
-    // names the built-in class past a class of the bare name the scope
-    // declares; std's other classes, process among them, are registered under
-    // their bare names and read by them.
     std::string_view type_name = item->data_type.type_name;
     bool std_sync = item->data_type.scope_name == "std" &&
                     (type_name == "semaphore" || type_name == "mailbox");
@@ -928,10 +651,6 @@ void Elaborator::SetVariableTypeInfo(const ModuleItem* item, RtlirVariable& var,
   }
 }
 
-// A variable `item` declared through the array typedef `typedef_name`, whose
-// dimensions it adopted in place of the name, still answers to that typedef:
-// §10.10.1's and §11.2.2's aggregate type-equivalence checks look its declared
-// type up, and an enumeration the typedef writes is the typedef's own (§6.19).
 void Elaborator::NameAdoptedArrayTypedef(const ModuleItem* item,
                                          std::string_view typedef_name,
                                          RtlirVariable& var) {

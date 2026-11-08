@@ -24,9 +24,6 @@ TEST(DataHidingParsing, ClassWithQualifiersLocalProtected) {
   EXPECT_TRUE(cls->members[1]->is_protected);
 }
 
-// Parser::TryConsumeAccessQualifier files every class-property qualifier
-// report under §8.3, the subclause listing the qualifiers a property
-// declaration may carry, so that is the subclause each of these names.
 TEST(DataHidingParsing, LocalAndProtectedError) {
   auto r = Parse(
       "class Packet;\n"
@@ -112,7 +109,6 @@ TEST(DataHidingParsing, ErrorDuplicateVirtual) {
       "class C;\n"
       "  virtual virtual function void f(); endfunction\n"
       "endclass\n");
-  // §8.3 owns the qualifier reports, as noted above LocalAndProtectedError.
   EXPECT_TRUE(
       ReportedError(r.diags, "duplicate 'virtual' qualifier", 2, "8.3"));
 }
@@ -129,10 +125,6 @@ TEST(DataHidingParsing, ConstProtectedProperty) {
   EXPECT_TRUE(m->is_protected);
 }
 
-// §8.18: there is no predefined ordering for member modifiers. This is the
-// reverse of ConstProtectedProperty — the access qualifier precedes const — and
-// must parse to the same combination of flags, exercising the qualifier loop in
-// the opposite order.
 TEST(DataHidingParsing, ProtectedConstProperty) {
   auto r = Parse(
       "class C;\n"
@@ -277,7 +269,6 @@ TEST(DataHidingParsing, ProtectedLocalError) {
       "class Packet;\n"
       "  protected local int x;\n"
       "endclass\n");
-  // §8.3 owns the qualifier reports, as noted above LocalAndProtectedError.
   EXPECT_TRUE(ReportedError(
       r.diags, "cannot combine 'local' and 'protected' qualifiers", 2, "8.3"));
 }
@@ -287,14 +278,9 @@ TEST(DataHidingParsing, DuplicateConstError) {
       "class C;\n"
       "  const const int X = 1;\n"
       "endclass\n");
-  // §8.3 owns the qualifier reports, as noted above LocalAndProtectedError.
   EXPECT_TRUE(ReportedError(r.diags, "duplicate 'const' qualifier", 2, "8.3"));
 }
 
-// §8.18: class parameters and class local parameters are public. The
-// 'localparam' keyword shares its leading word with the 'local' access
-// qualifier, but parameter declarations inside a class shall not be tagged
-// as access-restricted members.
 TEST(DataHidingParsing, ClassParametersArePublic) {
   auto r = Parse(
       "class C;\n"

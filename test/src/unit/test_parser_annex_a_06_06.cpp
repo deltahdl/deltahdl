@@ -14,12 +14,6 @@ using namespace delta;
 
 namespace {
 
-// §A.6.6 BNF:
-//   conditional_statement ::=
-//       [ unique_priority ] if ( cond_predicate ) statement_or_null
-//           { else if ( cond_predicate ) statement_or_null }
-//           [ else statement_or_null ]
-
 TEST(ConditionalStmtBnf, IfThenOnly) {
   auto r = Parse(
       "module m;\n"
@@ -54,8 +48,6 @@ TEST(ConditionalStmtBnf, IfThenElse) {
   ASSERT_NE(stmt->else_branch, nullptr);
 }
 
-// `{ else if ( cond_predicate ) statement_or_null }`: the iteration over
-// else-if forms a right-linear chain of nested kIf statements.
 TEST(ConditionalStmtBnf, ElseIfChainNests) {
   auto r = Parse(
       "module m;\n"
@@ -78,7 +70,6 @@ TEST(ConditionalStmtBnf, ElseIfChainNests) {
   ASSERT_NE(outer->else_branch->else_branch->else_branch, nullptr);
 }
 
-// statement_or_null permits a null body in either branch.
 TEST(ConditionalStmtBnf, ThenBranchIsNullStmt) {
   auto r = Parse(
       "module m;\n"
@@ -109,10 +100,6 @@ TEST(ConditionalStmtBnf, ElseBranchIsNullStmt) {
   ASSERT_NE(stmt->else_branch, nullptr);
   EXPECT_EQ(stmt->else_branch->kind, StmtKind::kNull);
 }
-
-// §A.6.6 BNF:
-//   unique_priority ::= unique | unique0 | priority
-// Each alternative attaches the corresponding CaseQualifier to the if.
 
 TEST(ConditionalStmtBnf, UniquePriorityUnique) {
   auto r = Parse(
@@ -153,12 +140,6 @@ TEST(ConditionalStmtBnf, UniquePriorityPriority) {
   EXPECT_EQ(stmt->qualifier, CaseQualifier::kPriority);
 }
 
-// §A.6.6 BNF:
-//   cond_predicate ::= expression_or_cond_pattern
-//                      { &&& expression_or_cond_pattern }
-//   expression_or_cond_pattern ::= expression | cond_pattern
-
-// First alternative of expression_or_cond_pattern: plain expression.
 TEST(ConditionalStmtBnf, CondPredicateBareExpression) {
   auto r = Parse(
       "module m;\n"
@@ -173,7 +154,6 @@ TEST(ConditionalStmtBnf, CondPredicateBareExpression) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
 }
 
-// `&&&` repetition is observed as a kBinary node with op == kAmpAmpAmp.
 TEST(ConditionalStmtBnf, CondPredicateTripleAmpJoinsTwoExpressions) {
   auto r = Parse(
       "module m;\n"
@@ -189,8 +169,6 @@ TEST(ConditionalStmtBnf, CondPredicateTripleAmpJoinsTwoExpressions) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-// `&&&` may repeat ({ ... } in the BNF). The associativity is irrelevant for
-// the syntactic claim; the test only observes that all conjuncts are accepted.
 TEST(ConditionalStmtBnf, CondPredicateTripleAmpRepeats) {
   auto r = Parse(
       "module m;\n"
@@ -206,9 +184,6 @@ TEST(ConditionalStmtBnf, CondPredicateTripleAmpRepeats) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-// §A.6.6 BNF:
-//   cond_pattern ::= expression matches pattern
-// Observed via a kBinary node with op == kKwMatches as the if condition.
 TEST(ConditionalStmtBnf, CondPatternMatchesPattern) {
   auto r = Parse(
       "module m;\n"
@@ -224,8 +199,6 @@ TEST(ConditionalStmtBnf, CondPatternMatchesPattern) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kKwMatches);
 }
 
-// expression_or_cond_pattern alternation joined by `&&&`: the second conjunct
-// is itself a cond_pattern. This exercises the disjunction inside the {…}.
 TEST(ConditionalStmtBnf, CondPredicateExpressionAmpAmpAmpCondPattern) {
   auto r = Parse(
       "module m;\n"
@@ -241,7 +214,6 @@ TEST(ConditionalStmtBnf, CondPredicateExpressionAmpAmpAmpCondPattern) {
   EXPECT_EQ(stmt->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-// Reverse order: cond_pattern then expression, both joined by `&&&`.
 TEST(ConditionalStmtBnf, CondPredicateCondPatternAmpAmpAmpExpression) {
   auto r = Parse(
       "module m;\n"
@@ -256,43 +228,32 @@ TEST(ConditionalStmtBnf, CondPredicateCondPatternAmpAmpAmpExpression) {
   EXPECT_EQ(stmt->condition->kind, ExprKind::kBinary);
 }
 
-// Negative test for the `if ( cond_predicate )` requirement: empty parens
-// are not a valid cond_predicate.
 TEST(ConditionalStmtBnf, EmptyCondPredicateIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial if () x = 1;\n"
       "endmodule\n");
-  // The empty parens leave `)` where an expression must start, and
-  // ParsePrimaryExpr files that report under §11.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 
-// The `(` after `if` is a literal terminal in the BNF.
 TEST(ConditionalStmtBnf, IfMissingLParenIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial if a) x = 1;\n"
       "endmodule\n");
-  // §12.4 owns the conditional statement; A.6.6 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected '(', got identifier", 2, "12.4"));
 }
 
-// The `)` after cond_predicate is a literal terminal in the BNF.
 TEST(ConditionalStmtBnf, IfMissingRParenIsRejected) {
   auto r = Parse(
       "module m;\n"
       "  initial if (a x = 1;\n"
       "endmodule\n");
-  // §12.4 owns the conditional statement; A.6.6 only states its BNF.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ')', got identifier", 2, "12.4"));
 }
 
-// The `{ else if ( cond_predicate ) statement_or_null }` element of the BNF
-// has no `[ unique_priority ]` slot — only the leading `if` may carry the
-// qualifier. A qualifier on a chained else-if violates the BNF.
 TEST(ConditionalStmtBnf, UniquePriorityRejectedOnElseIfBranch) {
   auto r = Parse(
       "module m;\n"
@@ -301,16 +262,12 @@ TEST(ConditionalStmtBnf, UniquePriorityRejectedOnElseIfBranch) {
       "    else unique if (b) x = 2;\n"
       "  end\n"
       "endmodule\n");
-  // §12.4.2 owns the violation-check qualifiers; A.6.6 only states the BNF
-  // slot they may occupy.
   EXPECT_TRUE(ReportedError(
       r.diags,
       "unique, unique0, or priority cannot appear on an else-if branch", 4,
       "12.4.2"));
 }
 
-// The `{ else if ... }` iteration matched exactly once produces a two-step
-// chain: outer if + one else-if + final else.
 TEST(ConditionalStmtBnf, SingleElseIfBranch) {
   auto r = Parse(
       "module m;\n"
@@ -329,8 +286,6 @@ TEST(ConditionalStmtBnf, SingleElseIfBranch) {
   EXPECT_EQ(outer->else_branch->else_branch, nullptr);
 }
 
-// With nested ifs and a single trailing else, the BNF's greedy structure
-// binds the else to the innermost still-open if.
 TEST(ConditionalStmtBnf, DanglingElseBindsToInnermostIf) {
   auto r = Parse(
       "module m;\n"
@@ -349,8 +304,6 @@ TEST(ConditionalStmtBnf, DanglingElseBindsToInnermostIf) {
   EXPECT_EQ(outer->else_branch, nullptr);
 }
 
-// Both expression_or_cond_pattern alternatives on each side of `&&&` may be
-// the cond_pattern alternative simultaneously.
 TEST(ConditionalStmtBnf, CondPredicateTwoCondPatternsAroundTripleAmp) {
   auto r = Parse(
       "module m;\n"
@@ -370,15 +323,6 @@ TEST(ConditionalStmtBnf, CondPredicateTwoCondPatternsAroundTripleAmp) {
   EXPECT_EQ(stmt->condition->rhs->op, TokenKind::kKwMatches);
 }
 
-// Covers the `&&&` branch of Parser::TryParseSpecialInfix in
-// src/parser/expr_parser.cpp. It assigned no range.start before this commit, so
-// a report standing at a `&&&` cond_predicate printed "<unknown location>"
-// instead of a file, line and column; §8.4 forbids the operator on class object
-// handles and reports at exactly this node. §12.4 writes a cond_predicate as
-// `expression_or_cond_pattern { &&& expression_or_cond_pattern }`, so the node
-// begins where its left operand begins: `a`, at column 15 of line 2.
-// ConditionalStmtBnf.CondPredicateTripleAmpJoinsTwoExpressions above parses the
-// same source and asks only for the kind and the operator.
 TEST(ConditionalStmtBnf, CondPredicateTripleAmpStartsAtItsLeftOperand) {
   auto r = Parse(
       "module m;\n"
@@ -394,11 +338,6 @@ TEST(ConditionalStmtBnf, CondPredicateTripleAmpStartsAtItsLeftOperand) {
   EXPECT_EQ(stmt->condition->range.start.column, 15u);
 }
 
-// A.8.3 writes a conditional expression as a cond_predicate, a `?` and two
-// expressions, and A.6.6 joins the predicate's clauses with `&&&`, so the `?`
-// after the last clause takes the whole predicate as its condition. The right
-// operand of `&&&` was read far enough to take the `?` in, which left the
-// assignment holding a `&&&` whose last clause was a conditional.
 TEST(ConditionalStmtBnf, AConditionalOperatorTakesTheWholeTripleAmpPredicate) {
   auto r = Parse(
       "module m;\n"
@@ -417,10 +356,6 @@ TEST(ConditionalStmtBnf, AConditionalOperatorTakesTheWholeTripleAmpPredicate) {
   EXPECT_EQ(stmt->rhs->condition->rhs->op, TokenKind::kGt);
 }
 
-// A cond_pattern is an expression, `matches` and a pattern (A.6.6), and an
-// implication is an expression (A.8.3), so `b -> c matches 3` matches the
-// whole implication. `matches` was read inside the implication's right
-// operand, which matched `c` alone.
 TEST(ConditionalStmtBnf, AMatchesClauseTakesAnImplicationWhole) {
   auto r = Parse(
       "module m;\n"
@@ -437,12 +372,6 @@ TEST(ConditionalStmtBnf, AMatchesClauseTakesAnImplicationWhole) {
   EXPECT_EQ(stmt->condition->lhs->op, TokenKind::kArrow);
 }
 
-// A.6.6 and A.8.3 give a cond_predicate two places, an if statement's
-// condition and a conditional operator's condition, and A.8.6 makes neither
-// `matches` nor `&&&` a binary operator. So each is reported where it stands
-// as a whole expression: an assignment's right-hand side, a loop's condition,
-// inside parentheses, even those of an if condition or before a `?`, and as
-// a conditional operator's arm.
 TEST(ConditionalStmtBnf, APredicateOutsideAConditionIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -467,10 +396,6 @@ TEST(ConditionalStmtBnf, APredicateOutsideAConditionIsReported) {
   EXPECT_EQ(r.diags.size(), 6u);
 }
 
-// The two places A.6.6 and A.8.3 give a cond_predicate take one with or
-// without `&&&`, after `if` and `else if` and before a `?`. A pattern-matching
-// case item's `&&&` filter is case_pattern_item's own form (A.6.7) and is
-// read there too.
 TEST(ConditionalStmtBnf, APredicateInAConditionIsAccepted) {
   auto r = Parse(
       "module m;\n"

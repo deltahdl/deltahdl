@@ -33,8 +33,6 @@ TEST(WaitOrderElaborator, WaitOrderWithElseElaborates) {
              "endmodule\n"));
 }
 
-// §15.5.4: wait_order waits for the events it lists to be triggered in order,
-// so each operand is an event, which a variable of type int is not.
 TEST(WaitOrderElaborator, WaitOrderOnAnIntOperandIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -49,9 +47,6 @@ TEST(WaitOrderElaborator, WaitOrderOnAnIntOperandIsReported) {
                             "15.5.4"));
 }
 
-// §15.5.4: an event and an event of a typedef of event are each a wait_order
-// operand. An element of an array of events is none: Syntax 15-2 writes the
-// operand as a hierarchical_identifier, whose last identifier takes no select.
 TEST(WaitOrderElaborator, WaitOrderOnEventsAndTypedefsElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(

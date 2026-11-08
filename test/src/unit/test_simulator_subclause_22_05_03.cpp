@@ -2,14 +2,6 @@
 
 #include "helpers_preprocess_and_get.h"
 
-// §22.5.3 `undefineall, observed after the full preprocess -> parse ->
-// elaborate -> simulate pipeline: the macros the directive removes are built
-// with the real `define syntax of §22.5.1 and the surviving value is read out
-// of the simulated design.
-
-// WITNESS is defined before the directive and never defined again, so the
-// `ifdef proves the removal happened; redefining VAL alone would not, since a
-// plain redefinition overwrites the old body anyway.
 TEST(UndefineAllSimulation, UndefineAllThenRedefineSimulatesNewValue) {
   auto result = PreprocessAndGet(
       "`define VAL 8'd10\n"
@@ -44,8 +36,6 @@ TEST(UndefineAllSimulation, UndefineAllExcludesConditionalFromSimulation) {
   EXPECT_EQ(result, 22u);
 }
 
-// A function-like macro is removed just like an object-like one, so the value
-// that reaches the simulation is the one defined after the directive.
 TEST(UndefineAllSimulation, UndefineAllRemovesFunctionLikeMacro) {
   auto result = PreprocessAndGet(
       "`define PICK(a, b) a\n"
@@ -64,9 +54,6 @@ TEST(UndefineAllSimulation, UndefineAllRemovesFunctionLikeMacro) {
   EXPECT_EQ(result, 77u);
 }
 
-// A macro carrying an argument default is removed whole, defaults included, so
-// the name no longer selects the wide branch and the later definition supplies
-// the value that reaches the simulation.
 TEST(UndefineAllSimulation, UndefineAllRemovesMacroWithArgumentDefaults) {
   auto result = PreprocessAndGet(
       "`define SCALE(a = 8'd5) a\n"
@@ -85,9 +72,6 @@ TEST(UndefineAllSimulation, UndefineAllRemovesMacroWithArgumentDefaults) {
   EXPECT_EQ(result, 88u);
 }
 
-// An escaped identifier is an equally valid macro name, and a macro held under
-// one is removed the same way. WITNESS proves the removal; the escaped name
-// then supplies the value through its later definition.
 TEST(UndefineAllSimulation, UndefineAllRemovesEscapedIdentifierMacro) {
   auto result = PreprocessAndGet(
       "`define \\VAL@ESC 8'd10\n"
@@ -106,8 +90,6 @@ TEST(UndefineAllSimulation, UndefineAllRemovesEscapedIdentifierMacro) {
   EXPECT_EQ(result, 23u);
 }
 
-// A `undefineall the conditional compiled away never runs, so the macro it
-// would have removed still drives the simulated value.
 TEST(UndefineAllSimulation, UndefineAllInFalseBranchLeavesMacroUsable) {
   auto result = PreprocessAndGet(
       "`define VAL 8'd44\n"
@@ -122,8 +104,6 @@ TEST(UndefineAllSimulation, UndefineAllInFalseBranchLeavesMacroUsable) {
   EXPECT_EQ(result, 44u);
 }
 
-// C2 end to end: the directive takes no arguments, so real source sharing its
-// line is not swallowed as one — it reaches the design and drives the result.
 TEST(UndefineAllSimulation, UndefineAllTrailingSameLineTextReachesTheDesign) {
   auto result = PreprocessAndGet(
       "`define VAL 8'd10\n"
@@ -135,8 +115,6 @@ TEST(UndefineAllSimulation, UndefineAllTrailingSameLineTextReachesTheDesign) {
   EXPECT_EQ(result, 12u);
 }
 
-// C3 end to end: the directive is legal inside a procedural block, and the
-// macro it removed there no longer selects the assignment.
 TEST(UndefineAllSimulation, UndefineAllInsideProceduralBlockRemovesMacro) {
   auto result = PreprocessAndGet(
       "`define USE_ALT\n"
@@ -155,8 +133,6 @@ TEST(UndefineAllSimulation, UndefineAllInsideProceduralBlockRemovesMacro) {
   EXPECT_EQ(result, 33u);
 }
 
-// `undefineall_saved is a macro usage rather than the directive, so the macro
-// it expands to supplies the value and the other macros survive.
 TEST(UndefineAllSimulation, LongerNameStartingWithUndefineallExpandsAsMacro) {
   auto result = PreprocessAndGet(
       "`define WIDTH 8\n"

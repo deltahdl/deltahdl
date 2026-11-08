@@ -1,9 +1,3 @@
-// §12.8 "Jump statements" — the elaboration-time rules for break, continue and
-// return, together with the one clause that gives two of them another meaning:
-// §18.17.6 "Aborting productions—break and return". Split out of
-// elaborator_validate_funcchecks.cpp, which keeps §12.7.3's foreach rules and
-// §13.4.3's constant-function rules.
-
 #include <format>
 #include <string_view>
 #include <vector>
@@ -20,50 +14,15 @@ namespace delta {
 
 namespace {
 
-// §18.17.6 lets break and return stand in any code block, the two differing in
-// which scope they leave. This is that scope, as the two clauses that give a
-// jump statement a meaning describe it: what encloses the statement being
-// walked.
 struct JumpScope {
-  // §12.8 confines continue and break to a loop. Counts the enclosing loops a
-  // jump reaches without crossing a fork-join boundary.
   int loop_depth = 0;
-  // §12.8: a continue or break inside a fork-join block may not control a loop
-  // outside it. Counts the enclosing fork-join blocks.
   int fork_depth = 0;
-  // §12.8 confines return to a subroutine. True when the walk started in a
-  // function or task body.
   bool in_subroutine = false;
-  // §18.17.6: inside a randsequence production code block, break leaves the
-  // randsequence block and return ends the generation of the current
-  // production. Neither needs the enclosing loop or the enclosing subroutine
-  // §12.8 asks for, so this term is what withholds those two reports. It stays
-  // set through a fork-join written inside the code block: §12.8's fork
-  // sentence is about controlling a loop outside the fork-join block, and the
-  // randsequence block a break leaves is not a loop.
   bool in_production_code_block = false;
 };
 
 void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag);
 
-// §12.8 — a break shall stand in a loop, and not in a fork-join block that
-// the loop it breaks encloses. §18.17.6 gives it a randsequence block to leave
-// instead where it stands in a production code block, so no loop is required
-// there; where that code block writes a loop of its own, §12.8 binds the break
-// to it, which is why `loop_depth` is still counted inside a production rather
-// than reset.
-//
-// A break in a production code block whose only enclosing loop stands outside
-// the randsequence block binds to the randsequence block and not to that loop.
-// §18.17.6 states without qualification that a break executed in a production
-// code block leaves the randsequence block, and the sentence about a loop
-// statement that defers to §12.8 is about a loop the code block itself writes.
-// Elaboration accepts the source on either reading, one clause finding a
-// production and the other a loop, so what fixes the reading is this comment
-// and
-// JumpStatementElaboration.BreakInARandsequenceProductionCodeBlockInsideAnOuterLoopOk
-// in test/src/unit/test_elaborator_subclause_12_08a.cpp; the randsequence
-// executor is where the difference is observable.
 void CheckBreakScope(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
   if (scope.loop_depth > 0 || scope.in_production_code_block) return;
   if (scope.fork_depth > 0) {
@@ -77,9 +36,6 @@ void CheckBreakScope(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
              Subclause("12.8"));
 }
 
-// §12.8 — the same two rules for continue, with no §18.17.6 term: that clause
-// names break and return and says nothing of continue, so a continue in a
-// production code block still has to stand in a loop.
 void CheckContinueScope(const Stmt* s, const JumpScope& scope,
                         DiagEngine& diag) {
   if (scope.loop_depth > 0) return;
@@ -94,8 +50,6 @@ void CheckContinueScope(const Stmt* s, const JumpScope& scope,
              Subclause("12.8"));
 }
 
-// Returns true when `s` is itself a jump leaf (break/continue/return) and
-// reports any §12.8 violation for it. Caller stops descending on true.
 bool CheckJumpLeaf(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
   switch (s->kind) {
     case StmtKind::kBreak:
@@ -105,9 +59,6 @@ bool CheckJumpLeaf(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
       CheckContinueScope(s, scope, diag);
       return true;
     case StmtKind::kReturn:
-      // §18.17.6: a return in a production code block aborts the production
-      // rather than a subroutine, so §12.8's subroutine requirement is not
-      // what governs it.
       if (!scope.in_subroutine && !scope.in_production_code_block) {
         diag.Error(s->range.start,
                    "return statement is only allowed inside a subroutine",
@@ -125,35 +76,12 @@ bool IsLoopStmtKind(StmtKind k) {
          k == StmtKind::kRepeat || k == StmtKind::kDoWhile;
 }
 
-// Recurses into every child statement of `s` carrying `scope` unchanged.
-//
-// The links come from ForEachChildStmt in elaborator_validate_internal.h,
-// which is the one list of the thirteen fields of Stmt that hold a
-// statement. This walk may take all thirteen from it even though four of them
-// stand in a scope of their own, because CheckJumpRules answers every
-// statement kind that fills those four before reaching here. Stmt::for_inits,
-// Stmt::for_steps and Stmt::for_body are filled by Parser::ParseForStmt in
-// src/parser/parser_stmt.cpp alone, Stmt::fork_stmts by Parser::ParseForkStmt
-// in src/parser/parser_stmt_block.cpp alone, and Stmt::rs_productions by
-// Parser::ParseRandsequenceStmt in src/parser/parser_verify.cpp alone. All
-// five are therefore empty at every statement that reaches this function, and
-// visiting them here changes nothing.
-//
-// Stmt::body is the one link that is not empty here. The five loop statements
-// of §12.7 other than for fill it and are answered above, but
-// Parser::ParseDelayStmt, Parser::ParseCycleDelayStmt,
-// Parser::ParseEventControlStmt and Parser::ParseWaitStmt fill it too, and
-// none of those four is a loop. §12.8 confines continue and break to a loop
-// without qualifying it by what a statement is waiting for, so
-// `initial #5 break;` is a break outside a loop and is reported as one.
 void CheckJumpRulesChildren(const Stmt* s, const JumpScope& scope,
                             DiagEngine& diag) {
   ForEachChildStmt(s,
                    [&](Stmt* const& sub) { CheckJumpRules(sub, scope, diag); });
 }
 
-// Walks one statement subtree enforcing §12.8's rules for break, continue and
-// return, and §18.17.6's exemption from two of them.
 void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
   if (!s) return;
 
@@ -177,16 +105,6 @@ void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
     return;
   }
 
-  // §18.17.6 gives break and return a meaning in a randsequence production
-  // code block that they have nowhere else, so the statements a randsequence
-  // statement holds are walked with that term set.
-  // Parser::ParseRandsequenceStmt in src/parser/parser_verify.cpp fills
-  // Stmt::rs_productions and no other child-statement link, so handing the
-  // whole of ForEachChildStmt the production scope reaches those statements and
-  // nothing besides. A.6.12 keeps them in two lists: an rs_prod may be an
-  // rs_code_block, whose statements the parser puts in RsProd::code_stmts, and
-  // an rs_rule admits a second rs_code_block after a weight_specification,
-  // whose statements go in RsRule::weight_code.
   if (s->kind == StmtKind::kRandsequence) {
     JumpScope production = scope;
     production.in_production_code_block = true;
@@ -197,9 +115,6 @@ void CheckJumpRules(const Stmt* s, const JumpScope& scope, DiagEngine& diag) {
   CheckJumpRulesChildren(s, scope, diag);
 }
 
-// §12.8: a return in a function that yields a value needs an expression, and
-// one whose type fits the function. The void-with-expression case is
-// reported elsewhere.
 void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
                                    const CheckedType& ret, const ReturnCtx& ctx,
                                    DiagEngine& diag) {
@@ -223,46 +138,17 @@ void CheckValueReturningFuncReturn(const Stmt* s, std::string_view func_name,
     }
     return;
   }
-  // §18.17.6 makes a return written in a randsequence production code block
-  // abort the generation of the current production rather than return from the
-  // enclosing function: return ends the generation of the current production.
-  // It is therefore not the function's return, and neither §12.8's demand that
-  // a return in a value-returning function carry an expression of the right
-  // type nor §13.4.1's that a nonvoid function's return carry an expression is
-  // about it. Stopping at the randsequence statement excludes exactly those
-  // statements: Parser::ParseRandsequenceStmt in src/parser/parser_verify.cpp
-  // fills Stmt::rs_productions and no other child-statement link, so nothing
-  // else is left unreached by stopping here.
   if (s->kind == StmtKind::kRandsequence) return;
 
-  // Every other link comes from ForEachChildStmt in
-  // elaborator_validate_internal.h, which is the one list of the fields of Stmt
-  // that hold a statement, read through ForEachChildInScope, which enters the
-  // declarations of a scope the statement opens.
   ForEachChildInScope(s, ctx, [&](const Stmt* sub, const ReturnCtx& inner) {
     CheckValueReturningFuncReturn(sub, func_name, ret, inner, diag);
   });
 }
 
-// §12.8 — applies the jump rules to a function/task body and, for a
-// value-returning function, also checks each return statement's expression.
-//
-// `outer` holds the names around the subroutine. Where `enum_check_reads_outer`
-// is set, §6.19.3's check, ValidateEnumReturns in
-// elaborator_validate_enum_assign.cpp, reports a name the function does not
-// declare returned from a function returning an enumeration, naming the cast it
-// needs. So such a function's returns read none of the names around it here,
-// and each is reported once. That check reads no class method, so a method's
-// returns read its class's properties whatever it returns.
 void CheckSubroutineJumpRules(const ModuleItem* item, const ReturnCtx& outer,
                               bool enum_check_reads_outer, DiagEngine& diag) {
   bool is_value_returning = false;
   if (item->kind == ModuleItemKind::kFunctionDecl) {
-    // §8.7: a class constructor has no return type, so a `return;` in one is
-    // the whole of what a return there can be. It reaches this walk as an
-    // ordinary kFunctionDecl whose return_type was never written, which is not
-    // kVoid either, so without this a constructor's return would be reported
-    // for lacking an expression it may not have.
     is_value_returning =
         item->name != "new" && item->return_type.kind != DataTypeKind::kVoid;
   }
@@ -288,12 +174,6 @@ void Elaborator::ValidateJumpStatements(const ModuleDecl* decl) {
   CheckJumpStatementsIn(decl->items);
 }
 
-// §12.8 names no enclosing declaration the rule is suspended in, so every body
-// a declaration owns is walked -- ForEachBodyOwningItem in
-// elaborator_validate_internal.h is the one list of those.
-//
-// The names around a subroutine are the ones SubroutineScopes gives it, and a
-// class method's are not left to §6.19.3's check, which reads no method.
 void Elaborator::CheckJumpStatementsIn(const std::vector<ModuleItem*>& items) {
   SubroutineScopes scopes(items, typedefs_, *unit_);
   ForEachBodyOwningItem(items, [&](const ModuleItem* item) {

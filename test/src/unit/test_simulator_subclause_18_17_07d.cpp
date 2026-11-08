@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// 18.17.7: data is passed to a production with the syntax of a task call and
-// its formal arguments are available throughout the production, so 200 runs
-// of the clause's gen(string s = "done") each receive a first word from add
-// or dec, a second from pop or push, and the default done from main, as the
-// design test/src/e2e/value_passing.sv runs it.
 TEST(ValuePassingRun, TheClausesGenReceivesEachWordAndItsDefault) {
   SimFixture f;
   std::string out = RunCapture(
@@ -44,15 +39,6 @@ TEST(ValuePassingRun, TheClausesGenReceivesEachWordAndItsDefault) {
   EXPECT_EQ(out, "1\n");
 }
 
-// 18.17.7: a production's return value is read in the code blocks of the
-// production that generated it through an implicit variable of its name,
-// an array indexed from 1 assigned in syntactic order when it appears more
-// than once, so in the clause's Example 1 value[1] and value[2] hold the two
-// values in order and operator one of the three strings, and in Example 2
-// B[1] is the count after the first B, C the count after the five repeated
-// Cs, B[2] the count after the second B, D[1] D(5) when cond is true and
-// D[2] D(20) when it is false, as the design test/src/e2e/value_passing.sv
-// runs it.
 TEST(ValuePassingRun, TheClausesExamplesReadTheirImplicitVariables) {
   SimFixture f;
   std::string out = RunCapture(
@@ -101,10 +87,6 @@ TEST(ValuePassingRun, TheClausesExamplesReadTheirImplicitVariables) {
   EXPECT_EQ(out, "1 1 2 1 1 1 1 1\n");
 }
 
-// 18.17.7: a whole sequence can be generated for later processing, so the
-// clause's GenQueue grammar fills a queue that starts at low, ends at high,
-// holds three or more items and every item within the bounds, as the design
-// test/src/e2e/value_passing.sv runs it.
 TEST(ValuePassingRun, TheClausesGenQueueGrammarFillsABoundedQueue) {
   SimFixture f;
   std::string out = RunCapture(

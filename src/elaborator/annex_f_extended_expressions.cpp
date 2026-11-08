@@ -13,8 +13,6 @@
 namespace delta {
 namespace {
 
-// Two letters are the same when they are of one kind and, for atom sets,
-// carry the same atoms.
 bool SameLetter(const Letter& lhs, const Letter& rhs) {
   return lhs.kind == rhs.kind &&
          (lhs.kind != Letter::Kind::kAtomSet || lhs.atoms == rhs.atoms);
@@ -32,7 +30,6 @@ ExtendedExpression AtomAsExtendedExpression(const std::string& name) {
 }
 
 ExtendedExpression PastGclkOfAtom(const std::string& name, bool initial) {
-  // §F.6.2: e[w^{j-1}] for j > 0, and the initial value at w^0.
   return
       [name, initial](const Word& word, std::size_t j) -> std::optional<bool> {
         if (j >= word.size()) {
@@ -47,7 +44,6 @@ ExtendedExpression PastGclkOfAtom(const std::string& name, bool initial) {
 }
 
 ExtendedExpression FutureGclkOfAtom(const std::string& name) {
-  // §F.6.3: e[w^{j+1}] where a following letter exists, undefined otherwise.
   return [name](const Word& word, std::size_t j) -> std::optional<bool> {
     const std::optional<std::size_t> kSource = FutureGclkSourceIndex(word, j);
     if (!kSource) {

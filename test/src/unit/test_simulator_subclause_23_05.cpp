@@ -42,11 +42,6 @@ TEST(ExternModuleSimulation, WildcardPortsFromExternSimulate) {
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-// §23.5 end-to-end via the §23.2.2 non-ANSI port dependency: the extern is
-// non-ANSI (port names only), `.*` brings those names onto the module, and the
-// module body supplies the directions with non-ANSI port declarations. Build
-// the whole thing from real syntax and drive it to runtime, observing the
-// combinational result of the extern-derived ports.
 TEST(ExternModuleSimulation, NonAnsiExternWildcardSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -68,10 +63,6 @@ TEST(ExternModuleSimulation, NonAnsiExternWildcardSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §23.5 end-to-end via the §23.2.3 parameterized-module dependency: the extern
-// carries a value parameter that sizes its ports; `.*` places that parameter
-// and those ports on the module. Simulate and observe the full parameterized
-// width.
 TEST(ExternModuleSimulation, ValueParameterizedExternWildcardSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -90,9 +81,6 @@ TEST(ExternModuleSimulation, ValueParameterizedExternWildcardSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0xAu);
 }
 
-// §23.5 end-to-end via the §23.2.3 dependency in its type-parameter form (a
-// distinct code path from a value parameter): a type parameter sizes the
-// extern's ports and `.*` imports it. Observe the byte-wide result at run time.
 TEST(ExternModuleSimulation, TypeParameterizedExternWildcardSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -111,9 +99,6 @@ TEST(ExternModuleSimulation, TypeParameterizedExternWildcardSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x5Au);
 }
 
-// §23.5 end-to-end via the §23.4 nested-module dependency: an extern module
-// declaration nested inside another module's body coexists with the actual
-// nested definition and does not disturb simulation of the instantiated child.
 TEST(ExternModuleSimulation, NestedExternModuleSimulates) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -131,9 +116,6 @@ TEST(ExternModuleSimulation, NestedExternModuleSimulates) {
   EXPECT_EQ(var->value.ToUint64(), 0x3Cu);
 }
 
-// §23.5 with §6.20.1: a parameter port the extern declaration writes with an
-// unpacked dimension is an array on the `.*` module too, its assignment
-// pattern default giving each element its value.
 TEST(ExternModuleSimulation, WildcardExternUnpackedParameterPortIsArray) {
   SimFixture f;
   auto* var = RunAndFindVar(

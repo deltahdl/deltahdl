@@ -9,10 +9,6 @@
 
 using namespace delta;
 
-// Verifies the token sequence for a named gate / switch / UDP instantiation of
-// the form  `head inst(p0, p1, ...);`  with `num_ports` identifier ports.
-// `head` is the leading token kind (a gate keyword such as TokenKind::kKwAnd,
-// or TokenKind::kIdentifier for a UDP instance).
 inline void ExpectNamedGateInstantiation(const std::vector<Token>& tokens,
                                          TokenKind head,
                                          std::size_t num_ports) {

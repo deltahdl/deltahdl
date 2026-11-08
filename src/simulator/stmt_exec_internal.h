@@ -21,94 +21,35 @@ struct Logic4Vec;
 class SimContext;
 class Arena;
 
-// Defined in stmt_exec_wait.cpp. Applies the §9.4.1 delay-control value
-// rules (unknown/high-impedance delay reads as zero; a negative delay is
-// reinterpreted as a two's-complement unsigned integer the width of a time
-// variable) to a delay expression's evaluated value. Shared so the
-// intra-assignment delay of a blocking assignment (§10.4.1) normalizes its
-// delay the same way a standalone delay-control statement does.
 uint64_t DelayTicksFromValue(const Logic4Vec& val);
 
-// Defined in stmt_exec_wait.cpp. Turns a delay expression's evaluated value
-// into the scheduler tick count that a delay control waits for, applying the
-// §3.14.1 time-value rounding rule: the delay is rounded to the time precision
-// of the design element that issues it (a real delay keeps only the fractional
-// digits its precision allows), then expressed in ticks of the design's global
-// precision. Shared so a standalone delay-control statement (§9.4.1) and the
-// intra-assignment delay of a blocking assignment (§10.4.1) round identically.
 uint64_t DelayValueToTicks(const Logic4Vec& val, const SimContext& ctx);
 
-// The same in the time unit `scale` gives, for a delay counted where no
-// instance is running: a net delay (§28.16) is evaluated as the net is created,
-// in the unit of the module declaring it (§22.7).
 uint64_t DelayValueToTicksIn(const Logic4Vec& val, const TimeScale& scale,
                              TimeUnit precision);
 
-// Defined in stmt_exec_wait.cpp. The ticks the delay expression `delay` waits:
-// §3.14.3 makes a step one unit of the global time precision, which is one tick
-// whatever time unit the issuing element counts in, so a delay written 1step
-// waits one tick, neither scaled nor rounded; any other delay is evaluated and
-// turned into ticks by DelayValueToTicks. Every delay outside a clocking block
-// comes through here, so the 1step form waits alike wherever it is written.
 uint64_t DelayExprToTicks(const Expr* delay, SimContext& ctx, Arena& arena);
 
-// The same in the time unit `scale` gives, through DelayValueToTicksIn.
 uint64_t DelayExprToTicksIn(const Expr* delay, const TimeScale& scale,
                             SimContext& ctx, Arena& arena);
 
-// Statement executors split out of stmt_exec.cpp into sibling translation
-// units. The dispatcher in stmt_exec.cpp calls these by name, so they have
-// external linkage and are declared here rather than as file-local statics.
-
-// Defined in stmt_exec_randsequence.cpp.
-// §18.16: the branch one execution of a randcase takes -- its weights
-// evaluated once each, a number drawn below their sum, the item whose
-// cumulative weight the number falls under -- or null when every weight is
-// zero, which is warned of here. Shared by ExecRandcase and the function-body
-// path in eval_function_body.cpp, which runs the branch as it runs any
-// statement of the body, so that a return in the branch is the function's.
 const Stmt* SelectRandcaseBranch(const Stmt* stmt, SimContext& ctx,
                                  Arena& arena);
 ExecTask ExecRandcase(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRandsequence(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in stmt_exec_wait.cpp.
-// §13.3 with §8.6: runs the body of an instance task enabled through a
-// handle, `h.t(...)`, whose frame SetupInstanceTaskCall (eval_instance_task.h)
-// has pushed, and tears the frame down when the body has completed. Defined in
-// stmt_exec_class_task.cpp.
 struct Expr;
 struct InstanceMethodInfo;
 ExecTask ExecInstanceTaskCall(const InstanceMethodInfo& call, const Expr* expr,
                               SimContext& ctx, Arena& arena);
-// A blocking assignment with no intra-assignment timing control, executed at
-// once. Inside a class method -- an instance task enabled through a handle
-// runs its body here -- the assignment takes the forms §8.10 and §8.11 give a
-// method over its class's properties, `x = v` for a property x, `this.x`,
-// `super.x` and a `new` resolved against a property, through
-// ExecFuncBlockingAssign; anywhere else it is ExecBlockingAssignImpl. Defined
-// in stmt_exec_class_task.cpp.
 StmtResult ExecImmediateBlockingAssign(const Stmt* stmt, SimContext& ctx,
                                        Arena& arena);
 
 ExecTask ExecWait(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §24.7 with §9.6.2 and §9.7: whether the running process was ended while it
-// ran, by $exit ending its program, a disable or kill(), so that it starts no
-// further statement, however deep in a task, loop or block the next one lies.
 bool CurrentProcessEnded(const SimContext& ctx);
-// Whether a loop in the running process goes on to its next iteration: not
-// once the run is stopping, nor once CurrentProcessEnded holds, where a loop
-// whose body no longer runs would otherwise go round without end.
 bool ProcessGoesOn(const SimContext& ctx);
-// §9.6.2's disable and §9.6.3's disable fork, defined in
-// stmt_exec_disable.cpp.
 StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx);
 StmtResult ExecDisableForkImpl(SimContext& ctx);
-// §9.7: a call statement through a process handle that suspends the calling
-// process -- `h.await()`, or `suspend()` on the running process itself -- and
-// its execution, which releases the receiver `held` holds, if any, once the
-// process is resolved and before it waits (§11.3.1). Defined in
-// stmt_exec_process.cpp.
 bool IsSuspendingProcessCall(const Expr* expr, SimContext& ctx, Arena& arena);
 ExecTask ExecSuspendingProcessCall(const Expr* expr, SimContext& ctx,
                                    Arena& arena, CallResultReceiverScope& held);
@@ -117,41 +58,16 @@ ExecTask ExecCycleDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecDelay(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecEventControl(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// Defined in stmt_exec_control.cpp.
 ExecTask ExecBlock(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §9.3.4: binds the hierarchical name of the variable `name` the running
-// statement declares -- the named blocks and task around it, `b1.cnt` or
-// `tk.inner.w`, under the instance's prefix -- so another process reaches it.
-// Answers the name bound, empty where no named block encloses the variable.
-// Defined in stmt_exec_control.cpp.
 std::string_view BindNamedBlockVariable(std::string_view name, SimContext& ctx);
-// The hierarchical path of the named scopes the running statement stands in,
-// from its innermost subroutine, under the instance's prefix -- `b1.f1` or
-// `tk.inner` -- recording each level's §21.7.2.3 scope kind on the way.
-// Defined in stmt_exec_control.cpp.
 std::string ActiveNamedScopePath(SimContext& ctx);
 ExecTask ExecIf(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecCase(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §12.5: the body of the item the case statement `stmt` selects, its case
-// expression evaluated once and the violations §12.5.3.1 defines for its
-// qualifier reported; nullptr where no item and no default matches. For a
-// pattern-matching case (§12.6.1), also the identifiers the selected item's
-// pattern bound, which its statement reads and which the executor creates in
-// a scope around it (InstallPatternBindings). Shared by the process executor
-// above and the function body's (§13.4), which runs the body synchronously.
 struct CaseSelection {
   const Stmt* body = nullptr;
   std::vector<PatternBinding> bindings;
 };
 CaseSelection SelectCaseItem(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §12.5 (printed page 321): the length every expression of a plain case,
-// casez or casex is evaluated at, the longest of the case expression's and
-// the items', and whether all of them are signed, which alone makes the
-// extension to that length a sign extension. §16.12.16 compares a case
-// property's expressions by the same rules. IncludeInCaseLength takes one
-// expression into the length, CaseOperandValue evaluates one at it, and
-// CaseExactMatch compares two so evaluated by case equality. Defined in
-// stmt_exec_case.cpp.
 struct CaseLength {
   uint32_t width = 0;
   bool all_signed = true;
@@ -165,42 +81,16 @@ ExecTask ExecForeach(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecForever(const Stmt* stmt, SimContext& ctx, Arena& arena);
 ExecTask ExecRepeat(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §12.7.2: how many times the repeat `stmt` runs its body, its count evaluated
-// here once, before the first iteration; nullopt for a forever, which has no
-// count. Shared by ExecRepeat and the function body's executor (§13.4), which
-// runs either loop synchronously.
 std::optional<uint64_t> LoopIterationLimit(const Stmt* stmt, SimContext& ctx,
                                            Arena& arena);
-// §12.7.2 and §9.4.5: the number of times a repeat count `count_val` gives,
-// none for a negative count or one holding an x or z bit, a real rounded to
-// the integer it converts to, and one beyond 64 bits saturated. Defined in
-// stmt_exec_control.cpp; the repeat loop and the repeat event control share
-// it.
 uint64_t RepeatIterationCount(const Logic4Vec& count_val);
 ExecTask ExecDoWhile(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §16.3 immediate assertion, including its deferred forms (defined in
-// stmt_exec_deferred.cpp); reached from the statement dispatcher.
 ExecTask ExecImmediateAssert(const Stmt* stmt, SimContext& ctx, Arena& arena);
-// §17.3: a checker instantiation reached in procedural code, which queues or
-// reports the static assertions of its procedural checker instance (defined
-// in stmt_exec_deferred.cpp).
 ExecTask ExecCheckerInstantiation(const Stmt* stmt, SimContext& ctx,
                                   Arena& arena);
-// §16.17: the expect statement, which blocks the process until the single
-// evaluation of its property it starts at the next clocking event succeeds
-// or fails, and runs its action block after the Observed region that
-// concluded it (expect_statement.cpp).
 ExecTask ExecExpect(const Stmt* stmt, SimContext& ctx, Arena& arena);
 
-// §10.3.2 with §8.9 and §26.3: the names whose change re-evaluates `expr` --
-// the variables it reads (CollectExprReads); as `C::n`, each static class
-// property it reads through the class scope operator, which is the class's
-// own storage and no variable, and which AnyChangeAwaiter arms on the class;
-// and, as `p.n`, each package variable it reads through the package scope,
-// the key its storage stands under. `assign w = C::s + 1;` collected `C` and
-// `s` alone, neither a variable, and was never evaluated again, as was
-// `assign w = p::g + 1;`. Defined in stmt_exec_wait.cpp.
 void CollectExprAndStaticReads(const Expr* expr, SimContext& ctx,
                                std::unordered_set<std::string>& reads);
 

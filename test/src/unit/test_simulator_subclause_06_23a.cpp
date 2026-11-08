@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23 — type(this) represents the type of the enclosing class. Inside a
-// method of class C, comparing type(this) against type(C) matches, so the
-// method takes the true branch. The class and the call are built from real
-// source syntax and driven through the full pipeline; the returned value is
-// observed at run time.
 TEST(TypeOfThisSim, MatchesEnclosingClass) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  function int check();\n"
@@ -35,9 +30,6 @@ TEST(TypeOfThisSim, MatchesEnclosingClass) {
             1u);
 }
 
-// §6.23 — type(this) is the enclosing class, so it does not match a different
-// class. Comparing type(this) in C against type(D) is false; the else branch
-// runs.
 TEST(TypeOfThisSim, DiffersFromOtherClass) {
   EXPECT_EQ(RunAndGet("class D;\n"
                       "endclass\n"
@@ -61,8 +53,6 @@ TEST(TypeOfThisSim, DiffersFromOtherClass) {
             2u);
 }
 
-// §6.23 — a class type reference never matches a built-in type reference, so
-// type(this) compared against type(int) is false.
 TEST(TypeOfThisSim, DiffersFromBuiltinType) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  function int check();\n"
@@ -84,8 +74,6 @@ TEST(TypeOfThisSim, DiffersFromBuiltinType) {
             2u);
 }
 
-// §6.23 — the inequality form negates the match, so type(this) != type(int) is
-// true inside a class method.
 TEST(TypeOfThisSim, InequalityWithBuiltinIsTrue) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  function int check();\n"
@@ -107,10 +95,6 @@ TEST(TypeOfThisSim, InequalityWithBuiltinIsTrue) {
             1u);
 }
 
-// §6.23/§8.11 — type(this) resolves to the enclosing class even in a static
-// method, where there is no instance handle: the class is the one whose method
-// body is executing. A static check() compares type(this) against type(C) and
-// matches.
 TEST(TypeOfThisSim, MatchesEnclosingClassInStaticMethod) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static function int check();\n"
@@ -130,9 +114,6 @@ TEST(TypeOfThisSim, MatchesEnclosingClassInStaticMethod) {
             1u);
 }
 
-// §6.23 with A.2.8: `var type(a) v;` among a block's items declares v with the
-// self-determined type of `a`, so v is the 32-bit signed int of `int a` and
-// holds -7, which a one-bit v would read as 1.
 TEST(TypeOfExprBlockVarSim, TakesTheIntTypeOfAModuleVariable) {
   EXPECT_EQ(RunAndGet("module t;\n"
                       "  int a = 3;\n"
@@ -146,8 +127,6 @@ TEST(TypeOfExprBlockVarSim, TakesTheIntTypeOfAModuleVariable) {
             0xFFFFFFF9u);
 }
 
-// §6.23: the type of `w`, `logic [11:0]`, gives x twelve bits, so all twelve
-// written ones survive and $bits(x) is 12.
 TEST(TypeOfExprBlockVarSim, TakesTheVectorTypeOfAModuleVariable) {
   const std::string kSrc =
       "module t;\n"
@@ -164,9 +143,6 @@ TEST(TypeOfExprBlockVarSim, TakesTheVectorTypeOfAModuleVariable) {
   EXPECT_EQ(RunAndGet(kSrc, "b"), 12u);
 }
 
-// §6.23 takes the type of the expression with the names in scope at the
-// declaration, so the block's own `shortint a` hides the module's 4-bit `a`:
-// z is 16 bits wide and signed, and holds -2.
 TEST(TypeOfExprBlockVarSim, TakesTheTypeOfAnEarlierBlockLocal) {
   const std::string kSrc =
       "module t;\n"
@@ -183,10 +159,6 @@ TEST(TypeOfExprBlockVarSim, TakesTheTypeOfAnEarlierBlockLocal) {
   EXPECT_EQ(RunAndGet(kSrc, "b"), 16u);
 }
 
-// §6.23 with §6.24.1: a type reference is a casting type, so `type(n)'(v)`
-// with `bit [3:0] n` keeps the low four bits of 16'hABCF, 15; `type(s)'`
-// with `byte s` makes 16'h00F0 the signed -16; and `type(bit [11:0])'` keeps
-// twelve bits, 12'hBCF.
 TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheReferencedType) {
   const std::string kSrc =
       "module t;\n"
@@ -205,11 +177,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheReferencedType) {
   EXPECT_EQ(RunAndGet(kSrc, "g"), 0xBCFu);
 }
 
-// §6.23 with §11.6.1 and §11.8.1: a type reference to an operation is the
-// operation's self-determined type, which the expression's form gives without
-// evaluating it, so with `bit [3:0] n` the cast to `type(n + n)` keeps the low
-// four bits of 16'hABCF, 15, and with `byte s` the cast to `type(s + s)` makes
-// 16'h00F0 the signed -16.
 TEST(TypeOfExprCastSim, CastToATypeReferenceOfAnOperationTakesItsSizeAndSign) {
   const std::string kSrc =
       "module t;\n"
@@ -225,10 +192,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceOfAnOperationTakesItsSizeAndSign) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xFFFFFFF0u);
 }
 
-// §6.23 with §11.3.4: an operation on 2-state operands only is 2-state, so a
-// cast to its type reads an x of the value as 0, while one 4-state operand, the
-// condition of a conditional among them, or a literal makes it 4-state and the
-// x stays. Each bit of r says whether the cast's result holds an unknown.
 TEST(TypeOfExprCastSim,
      CastToATypeReferenceOfAnOperationIs2StateOnlyFrom2State) {
   const std::string kSrc =
@@ -251,11 +214,6 @@ TEST(TypeOfExprCastSim,
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0x3Fu);
 }
 
-// §6.23 with §11.5.1 and §11.8.1: a select in the expression a type reference
-// names is as wide as the bits or elements it selects -- eight for `a[7:0]`
-// and for an element `p[1]` of a packed array of bytes, six for `a[i +: 6]`
-// and `a[9 -: 6]` -- unsigned, and 2-state where the selected variable is; an
-// element of an unpacked array of bytes is a byte.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASelectsType) {
   const std::string kSrc =
       "module t;\n"
@@ -290,8 +248,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASelectsType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §7.2: a member of a structure in the expression a type reference
-// names has its member's type, here eight unsigned 2-state bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAMembersType) {
   const std::string kSrc =
       "module t;\n"
@@ -313,8 +269,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAMembersType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §7.2: a member of a structure variable a block declares names no
-// scope, so the type operator takes it, here as eight bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsABlockVariablesMember) {
   const std::string kSrc =
       "module t;\n"
@@ -329,8 +283,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsABlockVariablesMember) {
   EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
 }
 
-// §6.23 with §11.4.12: a concatenation in the expression a type reference
-// names is as wide as its operands together, and 2-state where they all are.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAConcatenationsType) {
   const std::string kSrc =
       "module t;\n"
@@ -348,8 +300,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAConcatenationsType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §11.4.12.1: a replication in the expression a type reference
-// names is its count times as wide as its operands, and unsigned.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAReplicationsType) {
   const std::string kSrc =
       "module t;\n"
@@ -365,9 +315,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAReplicationsType) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
 }
 
-// §6.23 with §13.4: a function call in the expression a type reference names
-// has the function's return type, here a 2-state byte, and the function is
-// not called, so `calls` stays 0.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsACallsReturnType) {
   const std::string kSrc =
       "module t;\n"
@@ -390,10 +337,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsACallsReturnType) {
   EXPECT_EQ(RunAndGet(kSrc, "calls"), 0u);
 }
 
-// §6.23 with §6.24.1: a cast in the expression a type reference names has its
-// casting type -- a byte, eight bits for a size cast, a typedef's type, the
-// type a type reference names -- and a signing cast makes its operand's type
-// signed or unsigned.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAnInnerCastsType) {
   const std::string kSrc =
       "module t;\n"
@@ -423,9 +366,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAnInnerCastsType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §11.7 and §20.6.2: `$signed` and `$unsigned` in the expression a
-// type reference names are as wide and as 2- or 4-state as their argument,
-// signed or unsigned as each names, and `$bits` is a 32-bit integer.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASystemFunctionsType) {
   const std::string kSrc =
       "module t;\n"
@@ -449,8 +389,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsASystemFunctionsType) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §20.8.1: `$clog2` in the expression a type reference names is an
-// integer, 32 bits, as the other utility functions returning a count are.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsClog2AsAnInteger) {
   const std::string kSrc =
       "module t;\n"
@@ -462,8 +400,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsClog2AsAnInteger) {
   EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
 }
 
-// §6.23 with §20.7: an array query function in the expression a type
-// reference names returns an integer, 32 bits.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAnArrayQueryAsAnInteger) {
   const std::string kSrc =
       "module t;\n"
@@ -475,8 +411,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAnArrayQueryAsAnInteger) {
   EXPECT_EQ(RunAndGet(kSrc, "d"), 0xABCFu);
 }
 
-// §6.23 with §20.9: `$countones` in the expression a type reference names is
-// an int, 32 bits, and `$onehot` and `$isunknown` are one unsigned 2-state bit.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsBitVectorFunctionsTypes) {
   const std::string kSrc =
       "module t;\n"
@@ -497,8 +431,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsBitVectorFunctionsTypes) {
   EXPECT_EQ(RunAndGet(kSrc, "u"), 0u);
 }
 
-// §6.23 with §20.3: `$time` in the expression a type reference names is a
-// 64-bit time and `$stime` a 32-bit unsigned one.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsTimeFunctionsTypes) {
   const std::string kSrc =
       "module t;\n"
@@ -514,8 +446,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsTimeFunctionsTypes) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 0xF0u);
 }
 
-// §6.23 with §26.3 and §7.2: a member of a package's structure variable in the
-// expression a type reference names has its member's type, eight bits here.
 TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAPackageVariablesMember) {
   const std::string kSrc =
       "package pkg;\n"
@@ -530,11 +460,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceReadsAPackageVariablesMember) {
   EXPECT_EQ(RunAndGet(kSrc, "d"), 0xCFu);
 }
 
-// §6.23 with §6.24.1 and §6.11.3: a type reference to an integer atom type
-// written unsigned casts to that unsigned type, so -1 cast to `int unsigned`
-// compares above 0 and -1 cast to `byte unsigned` widens with zeros to 255,
-// while `shortint` written alone keeps its signed default and 16'hFFFF cast
-// to it compares below 0.
 TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheWrittenSigning) {
   const std::string kSrc =
       "module t;\n"
@@ -551,9 +476,6 @@ TEST(TypeOfExprCastSim, CastToATypeReferenceTakesTheWrittenSigning) {
   EXPECT_EQ(RunAndGet(kSrc, "n"), 1u);
 }
 
-// §6.23 with §8.11: `var static type(this) m_inst;` in a static method is a
-// handle of the method's class, so the singleton get() stores the object new()
-// makes and hands the same one back on the next call, with its val of 9.
 TEST(TypeOfExprCastSim, TypeOfThisMethodLocalIsAHandleOfTheClass) {
   const std::string kSrc =
       "module t;\n"
@@ -580,12 +502,6 @@ TEST(TypeOfExprCastSim, TypeOfThisMethodLocalIsAHandleOfTheClass) {
   EXPECT_EQ(RunAndGet(kSrc, "v"), 9u);
 }
 
-// §6.23 with §6.22.1: a type-reference comparison in a procedure is true
-// exactly when the types match -- a typedef renaming a built-in, a typedef of
-// that typedef, `bit signed [7:0]` against byte (§6.22.1(e)), `byte signed`
-// against byte, and two unpacked arrays of matching elements and bounds all
-// match; `bit signed [0:7]` does not match byte, its range not being [7:0].
-// Compared by name alone, every pair was 0.
 TEST(TypeOfExprCastSim, TypeReferenceEqualityMatchesTypesInAProcedure) {
   const std::string kSrc =
       "module t;\n"
@@ -607,12 +523,6 @@ TEST(TypeOfExprCastSim, TypeReferenceEqualityMatchesTypesInAProcedure) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b111110u);
 }
 
-// §6.23 with §26.2 and §3.12.1: a typedef or nettype of a package or of the
-// compilation unit may name its type by a type reference to a value, or a
-// typedef, its scope declares. a and b are the package's int, so -5 stands
-// whole in each; c is the unit's four bits, so 5'h1F keeps 15; and n, of the
-// unit's nettype, carries 4'hA. Left unresolved, each type was implicit, the
-// mark of a forward typedef, and one bit wide.
 TEST(TypeReferenceScopeSim, PackageAndUnitTypedefsOfATypeReference) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -643,10 +553,6 @@ TEST(TypeReferenceScopeSim, PackageAndUnitTypedefsOfATypeReference) {
       {{"a", 0xFFFFFFFBu}, {"b", 0xFFFFFFFBu}, {"c", 0xFu}, {"n", 0xAu}});
 }
 
-// §6.23 with §8.5 and §23.9: a class property's type reference to a name its
-// class does not declare reaches the scope around the class. w is the
-// module's int x and u its four-bit parameter P, so -5 stands whole in w and
-// 5'h1F keeps 15 in u, where a one-bit property held 1.
 TEST(TypeReferenceScopeSim, ModuleClassPropertiesOfTheModulesNames) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -671,14 +577,6 @@ TEST(TypeReferenceScopeSim, ModuleClassPropertiesOfTheModulesNames) {
   LowerRunAndCheck(f, design, {{"rw", 0xFFFFFFFBu}, {"ru", 0xFu}});
 }
 
-// §6.23 with A.2.7, A.2.8 and A.6.8: a class method's formal, a variable its
-// body declares and a for loop's variable may each take their type by a type
-// reference, which finds the class's property x before anything around the
-// class. y, v and i are each an int, so f(-5) adds -2 and -1 to -5 and returns
-// -8, where one-bit ones returned 1. A class nested in C reaches C's
-// properties the same way, so the inner object's z holds -5 for g to return.
-// `type(this)` names no property and nothing of the unit, and stands as
-// written for the method's evaluation (§8.11).
 TEST(TypeReferenceScopeSim, ClassMethodsAndNestedClassesOfTheClassesNames) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -715,11 +613,6 @@ TEST(TypeReferenceScopeSim, ClassMethodsAndNestedClassesOfTheClassesNames) {
   LowerRunAndCheck(f, design, {{"r1", 0xFFFFFFF8u}, {"r2", 0xFFFFFFFBu}});
 }
 
-// §6.23 with §26.2 and §3.12.1: a subroutine of a package or of the
-// compilation unit may type a formal, or a variable its body declares, by a
-// type reference to a value its scope declares, and a class of a package may
-// type a property so. y, v and w are the package's int and z and q the
-// unit's, so -5 stands whole in each, where a one-bit one held 1.
 TEST(TypeReferenceScopeSim, PackageAndUnitSubroutinesOfTheirScopesNames) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -760,14 +653,6 @@ TEST(TypeReferenceScopeSim, PackageAndUnitSubroutinesOfTheirScopesNames) {
                     {"r4", 0xFFFFFFFBu}});
 }
 
-// §6.23 with §6.20.2, §26.2 and §3.12.1: a parameter of a package or of the
-// compilation unit declared with neither type nor range takes its value's
-// type, whose names are the parameters its own scope declares ahead of it.
-// P's Q is the package's 32-bit 3 and UP's UQ the unit's int, so each sum is
-// 32 bits and every variable typed after P or UP holds -5 whole: through the
-// package's typedef, the unit's typedef, an import, a `p::` prefix and a
-// module's reference to the unit. Read among the module's names, where no Q or
-// UQ is declared, each sum took the 4 bits of its literal and held 4'hB.
 TEST(TypeReferenceScopeSim, UntypedParametersOfTheirScopesParameters) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -804,13 +689,6 @@ TEST(TypeReferenceScopeSim, UntypedParametersOfTheirScopesParameters) {
                     {"e", 0xFFFFFFFBu}});
 }
 
-// §6.23 with §6.20.2, §6.19 and §6.19.3: a parameter of a package or of the
-// compilation unit declared with neither type nor range whose value is an
-// enumeration constant takes the enumeration's type, an int by default. PE is
-// E1's, PF the F1 that `F[2]` generates, and UPE the unit's U1, so each typed
-// after them is 32 bits and holds -5 whole, through a typedef or a `p::`
-// prefix. Looked up among parameters alone, each constant added no width,
-// and each variable was one bit holding 1.
 TEST(TypeReferenceScopeSim, UntypedParametersOfEnumerationConstants) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -845,13 +723,6 @@ TEST(TypeReferenceScopeSim, UntypedParametersOfEnumerationConstants) {
                     {"d", 0xFFFFFFFBu}});
 }
 
-// §6.23 with §5.7.1: a type reference to a simple decimal number stands for a
-// signed type, and one to a based literal for a signed type only where its
-// base carries s. So a, of type(3), compares below 0 after -5, and b, of
-// type(4'sd1), widens its -1 to an int's -1, where c, of type(4'd1), widens
-// it to 15. A package's parameter of no type valued 3 is signed the same way,
-// and d, typed after it, compares below 0. Each literal was read unsigned,
-// and a and d compared above 0 while b widened to 15.
 TEST(TypeReferenceScopeSim, LiteralTypeReferencesTakeTheLiteralsSigning) {
   SimFixture f;
   auto* design = ElaborateSrc(

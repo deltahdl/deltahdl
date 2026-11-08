@@ -16,11 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §35.7: the exports a registry answers for are the ones some declaration
-// gave it. DpiRuntime.RegisterExportAndCall below makes the positive claim --
-// a registered name is found and its body runs; this one makes the negative,
-// which no other case states: a name no export declaration gave is not an
-// export of the design, however many others were registered.
 TEST(DpiRuntime, HasExportIsFalseForAnUndeclaredName) {
   DpiRuntime rt;
   DpiRtExport exp;
@@ -54,9 +49,6 @@ TEST(DpiRuntime, CallMissingExportReturnsZero) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-// §35.7: every export declaration designates a context function. The runtime
-// records that property unconditionally at registration, so a caller that
-// passes is_context=false still ends up with a context export.
 TEST(DpiRuntime, RegisteredExportIsAlwaysContext) {
   DpiRuntime rt;
   DpiRtExport exp;
@@ -70,11 +62,6 @@ TEST(DpiRuntime, RegisteredExportIsAlwaysContext) {
   EXPECT_TRUE(stored->is_context);
 }
 
-// §35.7: exporting a SystemVerilog function leaves its meaning and behavior on
-// the SystemVerilog side as they were; the only change is that foreign tasks
-// and functions in a DPI call chain can now call it. So a SystemVerilog call to
-// an exported function returns what the function returns, exactly as it would
-// without the export declaration.
 TEST(DpiExportedFunctionInADesign, ACallToAnExportedFunctionReturnsItsResult) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -91,10 +78,6 @@ TEST(DpiExportedFunctionInADesign, ACallToAnExportedFunctionReturnsItsResult) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// The same rule holds of the arguments a call passes: exporting the function
-// leaves the actual reaching the formal and the result computed from it. Five
-// is what the case above returns from a body that reads nothing, so this one
-// varies the actual to keep the answer out of the body.
 TEST(DpiExportedFunctionInADesign, AnExportedFunctionStillReadsItsArguments) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -111,10 +94,6 @@ TEST(DpiExportedFunctionInADesign, AnExportedFunctionStillReadsItsArguments) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// The C functions the designs below import, each calling an export the way C
-// code in a loaded library does: by its linkage name, found among the
-// process's global symbols, where the forwarders deltahdl generates for a
-// design's exports stand (§35.7, §H.8.2).
 template <typename Function>
 Function ExportNamed(const char* name) {
   return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
@@ -151,15 +130,11 @@ int IdOf(const char* path) {
   return sv_id();
 }
 
-// The value the design's variable `name` holds once the run is over, all ones
-// where the run holds no such variable.
 uint64_t VariableValue(SimFixture& f, std::string_view name) {
   auto* var = f.ctx.FindVariable(name);
   return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
 }
 
-// §35.7 with §35.5.3: a context import calls an exported function declared in
-// its own scope, by the export's name, with the C prototype §H.8.2 gives it.
 TEST(DpiExportCalledFromC, AContextImportCallsAnExportedFunction) {
   SimFixture f;
   RunWithImportsBound(
@@ -176,8 +151,6 @@ TEST(DpiExportCalledFromC, AContextImportCallsAnExportedFunction) {
   EXPECT_EQ(VariableValue(f, "r"), 61U);
 }
 
-// §35.4 with §35.7: a c_identifier gives an export its linkage name, an
-// escaped identifier's export included.
 TEST(DpiExportCalledFromC, AnExportIsCalledByItsCIdentifier) {
   SimFixture f;
   RunWithImportsBound(
@@ -193,8 +166,6 @@ TEST(DpiExportCalledFromC, AnExportIsCalledByItsCIdentifier) {
   EXPECT_EQ(VariableValue(f, "r"), 1008U);
 }
 
-// §H.8.2 with §H.10.2: an exported function called from C returns a bit by
-// value and fills an unpacked int output array through the pointer C passes.
 TEST(DpiExportCalledFromC, AnExportFillsAnOutputArray) {
   SimFixture f;
   RunWithImportsBound(
@@ -213,8 +184,6 @@ TEST(DpiExportCalledFromC, AnExportFillsAnOutputArray) {
   EXPECT_EQ(VariableValue(f, "r"), 401U);
 }
 
-// §35.8: an exported task may never be enabled from an imported function,
-// and the attempt is reported.
 TEST(DpiExportCalledFromC, AnExportedTaskFromAnImportedFunctionIsAnError) {
   SimFixture f;
   RunWithImportsBound(
@@ -233,8 +202,6 @@ TEST(DpiExportCalledFromC, AnExportedTaskFromAnImportedFunctionIsAnError) {
                             0, "35.8"));
 }
 
-// §35.5.3 with §H.9.3: svGetScopeFromName and svSetScope select the
-// instance whose export a call reaches.
 TEST(DpiExportCalledFromC, TheScopeSelectsTheInstancesExport) {
   SimFixture f;
   RunWithImportsBound(

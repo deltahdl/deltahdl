@@ -10,14 +10,8 @@
 #include "parser/ast_expr.h"
 #include "parser/ast_type.h"
 
-// §18.8: the checks a rand_mode() call naming a random variable is held to
-// at compile time, read from the call alone.
-
 namespace delta {
 
-// 18.8: the data member named *var_name* that *cls* or one of its base
-// classes declares, the most-derived declaration of the name deciding, as the
-// visibility a rand_mode() call resolves; null where none declares one.
 static const ClassMember* FindHierarchyProperty(const ClassDecl* cls,
                                                 std::string_view var_name,
                                                 const CompilationUnit* unit) {
@@ -30,11 +24,6 @@ static const ClassMember* FindHierarchyProperty(const ClassDecl* cls,
   return nullptr;
 }
 
-// Matches the named form obj.random_variable.rand_mode(...) of the call
-// `call`. On success returns the prefix member access (whose left side is
-// the object handle identifier and whose right side is the variable name), and
-// nullptr otherwise -- including for the no-name form obj.rand_mode(...), whose
-// receiver is a plain identifier rather than a member access.
 static const Expr* MatchNamedRandModePrefix(const Expr& call) {
   const Expr* callee = call.lhs;
   if (!callee || callee->kind != ExprKind::kMemberAccess) return nullptr;
@@ -51,11 +40,6 @@ static const Expr* MatchNamedRandModePrefix(const Expr& call) {
   return prefix;
 }
 
-// 18.8: the query form of rand_mode(), `call` written with no argument,
-// takes a singular variable only, so where the random variable `var` that
-// `prefix` names, obj.arr, is declared with an unpacked dimension the query has
-// to select one element of it by its index, obj.arr[2].rand_mode(); naming the
-// whole array is an error.
 static void CheckRandModeQueryIsSingular(const Expr* prefix, const Expr& call,
                                          const ClassMember& var,
                                          DiagEngine& diag) {
@@ -68,13 +52,6 @@ static void CheckRandModeQueryIsSingular(const Expr* prefix, const Expr& call,
              Subclause("18.8"));
 }
 
-// 18.8: a rand_mode() call is a compile-time error when the variable it names
-// is missing from the object's class hierarchy, or is there but neither rand
-// nor randc. This applies to the named form obj.random_variable.rand_mode(...);
-// the no-name form (which applies to every random variable) names nothing to
-// validate. The check resolves the object handle to its class type and stays
-// silent when that type is unknown, so the error is reported only when the
-// variable's absence (or non-random status) is certain.
 static void CheckNamedRandModeVariableExists(
     const Expr& call,
     const std::unordered_map<std::string_view, std::string_view>& var_types,
@@ -111,10 +88,6 @@ static void CheckNamedRandModeVariableExists(
   }
 }
 
-// Matches the member form obj.s.m.rand_mode(...) of the call `call`, naming
-// the member m of the structure s of the object obj. On success returns the
-// receiver, whose left side is the access obj.s and whose right side is the
-// member; nullptr otherwise.
 static const Expr* MatchRandModeMemberPath(const Expr& call) {
   const Expr* callee = call.lhs;
   if (callee == nullptr || callee->kind != ExprKind::kMemberAccess ||
@@ -131,13 +104,6 @@ static const Expr* MatchRandModeMemberPath(const Expr& call) {
   return path;
 }
 
-// 18.8: rand_mode() can name one member of a random variable that is an
-// unpacked structure, obj.s.m, and it is a compile-time error when the
-// structure declares no member m, or declares it neither rand nor randc.
-// The check reads the members of a structure whose type the declaration
-// writes out, and stays silent where the object's class or the structure's
-// type is unknown, or s is no random variable of it, which the named form's
-// own check reports.
 static void CheckRandModeStructMember(
     const Expr& call,
     const std::unordered_map<std::string_view, std::string_view>& var_types,

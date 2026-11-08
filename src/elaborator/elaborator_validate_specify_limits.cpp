@@ -20,10 +20,6 @@
 
 namespace delta {
 
-// §11.2.1's constant expressions a specify block's flag may name, as the
-// scope IsConstantExpr reads: the module's parameters, its localparams, and
-// the specparams of the block and of the module body. The value each maps to
-// is not read, the question being whether the name is a constant at all.
 static ScopeMap BuildSpecifyConstantScope(const ModuleDecl* mod,
                                           const ModuleItem* block) {
   ScopeMap scope;
@@ -39,12 +35,6 @@ static ScopeMap BuildSpecifyConstantScope(const ModuleDecl* mod,
   return scope;
 }
 
-// Whether a flag is a constant expression. A.7.5.2 writes the
-// remain_active_flag as a constant_mintypmax_expression, which A.8.3 spells
-// `constant_expression | constant_expression : constant_expression :
-// constant_expression`, so a triple is constant where its three members are;
-// IsConstantExpr answers for a constant_expression and does not read the
-// triple, which Parser::ParseMinTypMaxExpr records in lhs, condition and rhs.
 static bool IsConstantFlag(const Expr* flag, const ScopeMap& scope) {
   if (flag->kind != ExprKind::kMinTypMax) return IsConstantExpr(flag, scope);
   for (const Expr* member : {flag->lhs, flag->condition, flag->rhs}) {
@@ -53,18 +43,12 @@ static bool IsConstantFlag(const Expr* flag, const ScopeMap& scope) {
   return true;
 }
 
-// One of the two checks A.7.5.1 gives flags to, as its own subclause's table
-// describes it: the check, the system task the report names, and the
-// subclause whose table describes the flags, §31.4.2 for Table 31-8 and
-// §31.4.3 for Table 31-9.
 struct FlaggedTimingCheck {
   const SpecifyItem* si;
   std::string_view task;
   Subclause subclause;
 };
 
-// Reports one flag of `check` that is no constant expression, naming the check
-// and the flag; a flag left out is nothing to check.
 static void CheckTimingCheckFlag(const Expr* flag, std::string_view name,
                                  const FlaggedTimingCheck& check,
                                  const ScopeMap& scope, DiagEngine& diag) {
@@ -75,11 +59,6 @@ static void CheckTimingCheckFlag(const Expr* flag, std::string_view name,
       check.subclause);
 }
 
-// A.7.5.2 gives `event_based_flag ::= constant_expression` and
-// `remain_active_flag ::= constant_mintypmax_expression`, and Table 31-8 and
-// Table 31-9 describe each of $timeskew's and $fullskew's two flags as constant
-// expressions. A net or variable there is reported at the check under the
-// check's own subclause, the one whose table describes the flag.
 void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -101,11 +80,6 @@ void ValidateTimingCheckFlags(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// §31.2: timing check limit values, like module path delays, are constant
-// expressions that may include specparams. Every operand of a
-// timing_check_limit must therefore be a literal or a specparam declared in the
-// same specify block; a net or variable reference is not constant and is
-// rejected, exactly as for module-path delays.
 void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
   for (auto* item : mod->items) {
     if (item->kind != ModuleItemKind::kSpecifyBlock) continue;
@@ -120,19 +94,6 @@ void ValidateTimingCheckLimitOperands(const ModuleDecl* mod, DiagEngine& diag) {
   }
 }
 
-// §31.4.1, Table 31-7: folds one specify-block constant limit expression to a
-// signed integer so its sign can be checked. It resolves only the constant
-// forms a timing-check limit may legally take -- an integer literal, a
-// specparam reference (whose value expression is folded in turn), and unary or
-// binary arithmetic over them (§31.2 already confines limit operands to
-// literals and specparams). Anything it cannot fold -- an unknown identifier,
-// an unsupported operator, x/z, a real -- yields no value, so callers flag only
-// a limit that is provably negative. The depth guard stops a runaway recursion
-// should a specparam reference itself.
-//
-// The arithmetic such an expression may use. Anything else -- a division, a
-// shift, a comparison -- yields no value, leaving the limit unchecked rather
-// than wrongly reported.
 std::optional<int64_t> FoldSpecifyLimitBinary(TokenKind op, int64_t l,
                                               int64_t r) {
   switch (op) {
@@ -179,8 +140,6 @@ std::optional<int64_t> FoldSpecifyLimit(
   }
 }
 
-// §30.4.1: the specparam values a specify block declares, keyed by name, so a
-// limit expression that reads a specparam can be folded through to its value.
 static std::unordered_map<std::string_view, const Expr*> CollectSpecparamValues(
     const ModuleItem* item) {
   std::unordered_map<std::string_view, const Expr*> values;
@@ -192,27 +151,6 @@ static std::unordered_map<std::string_view, const Expr*> CollectSpecparamValues(
   return values;
 }
 
-// Pass: §31.3, §31.4 -- the timing checks whose limits are all non-negative
-// constant expressions. A limit that folds to a negative constant is rejected;
-// a limit that cannot be folded to a concrete integer is left alone, so only a
-// provably-negative limit is diagnosed.
-//
-//   $skew      §31.4.1, Table 31-7     $period    §31.4.5, Table 31-11
-//   $timeskew  §31.4.2, Table 31-8     $hold      §31.3.2, Table 31-2
-//   $fullskew  §31.4.3, Table 31-9     $removal   §31.3.4, Table 31-4
-//   $width     §31.4.4, Table 31-10    $recovery  §31.3.5, Table 31-5
-//   $setup     §31.3.1, Table 31-1
-//
-// $fullskew carries limit1 (the maximum delay by which the data event may
-// trail the reference event) and limit2 (the maximum delay by which the
-// reference event may trail the data event), and $width carries its limit (the
-// pulse width below which a violation is reported) and its optional threshold
-// (the glitch width below which no violation is reported). Both pairs live in
-// the timing check's limits list, so iterating the list checks each of them.
-// The remaining checks carry a single limit; the negative-limit forms belong
-// to $setuphold and $recrem, whose limits are signed and are not checked here.
-//
-// Report each of one timing check's limits that folds to a negative value.
 void ReportNegativeTimingCheckLimits(
     const SpecifyItem* si,
     const std::unordered_map<std::string_view, const Expr*>& specparam_values,
@@ -245,42 +183,27 @@ void ValidateTimingCheckLimitNonNegative(const ModuleDecl* mod,
   }
 }
 
-// §30.4.4.1, Table 30-1: the operators permitted in a state-dependent path
-// conditional expression -- bitwise, reduction, logical, and equality forms.
-// Arithmetic, relational, shift, case-equality, and wildcard-equality operators
-// are excluded and must be rejected.
 bool IsAllowedConditionOp(TokenKind op) {
   switch (op) {
-    case TokenKind::kTilde:       // bitwise negation
-    case TokenKind::kAmp:         // bitwise AND / reduction AND
-    case TokenKind::kPipe:        // bitwise OR / reduction OR
-    case TokenKind::kCaret:       // bitwise XOR / reduction XOR
-    case TokenKind::kCaretTilde:  // bitwise / reduction XNOR
-    case TokenKind::kTildeCaret:  // bitwise / reduction XNOR (alternate
-                                  // spelling)
-    case TokenKind::kTildeAmp:    // reduction NAND
-    case TokenKind::kTildePipe:   // reduction NOR
-    case TokenKind::kEqEq:        // logical equality
-    case TokenKind::kBangEq:      // logical inequality
-    case TokenKind::kAmpAmp:      // logical AND
-    case TokenKind::kPipePipe:    // logical OR
-    case TokenKind::kBang:        // logical NOT
+    case TokenKind::kTilde:
+    case TokenKind::kAmp:
+    case TokenKind::kPipe:
+    case TokenKind::kCaret:
+    case TokenKind::kCaretTilde:
+    case TokenKind::kTildeCaret:
+    case TokenKind::kTildeAmp:
+    case TokenKind::kTildePipe:
+    case TokenKind::kEqEq:
+    case TokenKind::kBangEq:
+    case TokenKind::kAmpAmp:
+    case TokenKind::kPipePipe:
+    case TokenKind::kBang:
       return true;
     default:
       return false;
   }
 }
 
-// §30.4.4.1 states its rule as Table 30-1, which lists the operators a
-// conditional expression may use, so the report names the operator it refused.
-// TokenKindName in src/lexer/keywords.cpp answers with the source spelling the
-// table lists, already quoted.
-//
-// The form is named too, because `&`, `|`, `^`, `~^` and `^~` are each both a
-// unary and a binary operator in that table, and the spelling alone leaves the
-// reader to work out which reading the elaborator took. A postfix increment or
-// decrement gets its own word rather than sharing "unary", since §11.4.2 makes
-// it a construct of its own and the node already says which it is.
 static std::string ConditionOpMessage(const Expr* e) {
   std::string_view form = e->kind == ExprKind::kPostfixUnary ? "postfix"
                           : e->kind == ExprKind::kUnary      ? "unary"
@@ -291,14 +214,6 @@ static std::string ConditionOpMessage(const Expr* e) {
       form, TokenKindName(e->op));
 }
 
-// §30.4.4.1: recursively validates a state-dependent path conditional
-// expression. Every operator must be one of the Table 30-1 forms, and every
-// identifier operand must be a permitted signal: an input or inout port (or a
-// bit-/part-select of one), a locally defined net or variable, or a compile-
-// time constant (specparam or literal). An output port is not among the
-// permitted operands. Unknown identifiers (module parameters) are left alone
-// so the check only flags what it can prove illegal.
-// The name a dotted operand is written with, `top.b` for `top.b`.
 static std::string DottedName(const Expr* e) {
   if (e == nullptr) return {};
   if (e->kind == ExprKind::kIdentifier) return std::string(e->text);
@@ -306,12 +221,6 @@ static std::string DottedName(const Expr* e) {
   return DottedName(e->lhs) + "." + DottedName(e->rhs);
 }
 
-// §30.4.4.1 (printed page 876): a condition's operands are scalar or vector
-// module input or inout ports, locally defined variables or nets, and
-// compile-time constants, with their selects, so a hierarchical name reaching
-// into another scope, `if (top.b)`, is none of them. A dotted name starting at
-// one of the module's own ports is the member of an interface port, and one
-// written with `::` names a package's constant, and neither is refused here.
 static void CheckConditionMemberOperand(const Expr* e, SourceLoc loc,
                                         const PortMap& port_map,
                                         DiagEngine& diag) {
@@ -331,9 +240,6 @@ static void CheckConditionMemberOperand(const Expr* e, SourceLoc loc,
              Subclause("30.4.4.1"));
 }
 
-// The expression forms a condition may not take, named for the report: A.8.4's
-// module_path_primary has none of them and Table 30-1 lists none as an
-// operator. Every other form answers empty.
 static std::string_view ForbiddenConditionForm(ExprKind kind) {
   switch (kind) {
     case ExprKind::kInside:
@@ -413,8 +319,6 @@ void CheckConditionExpr(const Expr* e, SourceLoc loc, const PortMap& port_map,
   }
 }
 
-// Validates the conditional expression of one state-dependent path declaration;
-// items without a condition (or non-path items) are ignored.
 void CheckItemConditionExpr(const SpecifyItem* si, const PortMap& port_map,
                             DiagEngine& diag) {
   if (si->kind != SpecifyItemKind::kPathDecl) return;
@@ -422,8 +326,6 @@ void CheckItemConditionExpr(const SpecifyItem* si, const PortMap& port_map,
   CheckConditionExpr(si->path.condition, si->loc, port_map, diag);
 }
 
-// Pass: enforce the §30.4.4.1 operand and operator rules on every state-
-// dependent path conditional expression.
 void ValidateConditionExprs(const ModuleDecl* mod, const PortMap& port_map,
                             DiagEngine& diag) {
   for (auto* item : mod->items) {
@@ -434,15 +336,6 @@ void ValidateConditionExprs(const ModuleDecl* mod, const PortMap& port_map,
   }
 }
 
-// §30.7.1: a path-specific PATHPULSE$in$out specparam names module-path input
-// and output terminals, which must obey the same direction rules as an ordinary
-// module path (§30.4.1): the input terminal shall be an input or inout port and
-// the output terminal an output or inout port. A terminal that is provably the
-// wrong direction (a declared port of the opposite direction) is rejected; an
-// unrecognized name is left alone, matching the conservative style of the other
-// specify checks. The bit-/part-select restriction of §30.7.1 needs no check
-// here: a select terminates the specparam identifier, so the parser never forms
-// such a PATHPULSE$ name. A non-path-specific PATHPULSE$ names no terminals.
 void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
                                 DiagEngine& diag) {
   if (si->kind != SpecifyItemKind::kSpecparam || !si->is_pathpulse) return;
@@ -467,8 +360,6 @@ void CheckPulseControlTerminals(const SpecifyItem* si, const PortMap& port_map,
   }
 }
 
-// Pass: enforce the §30.4.1 terminal-direction rules on every path-specific
-// PATHPULSE$ pulse-control specparam (§30.7.1).
 void ValidatePulseControlTerminals(const ModuleDecl* mod,
                                    const PortMap& port_map, DiagEngine& diag) {
   for (auto* item : mod->items) {
@@ -478,7 +369,5 @@ void ValidatePulseControlTerminals(const ModuleDecl* mod,
     }
   }
 }
-
-// Runs all specify-block validation passes for a single module/interface/
 
 }  // namespace delta

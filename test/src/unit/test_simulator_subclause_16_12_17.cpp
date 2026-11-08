@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The design of test/src/e2e/recursive_property.sv around one assertion:
-// clk rises at 5, 15, ..., 75 so that tick n is at 10n - 5; a and hold are
-// high at every tick but 6, done at 5, go at 2 and 7, s1 and ph1 at 1 and
-// 3, s2 at 2, ph2 never, abt at 3 and acc at 5. The clause's properties
-// are declared as it writes them.
 std::string RecursiveSource(const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -60,9 +55,6 @@ std::string RecursiveSource(const std::string& items) {
          "endmodule\n";
 }
 
-// The pass and fail counts of the assertion over `spec` at the ticks, and
-// then with the attempts in flight at the end of the run decided, in the
-// final blocks.
 struct Counts {
   uint64_t passes;
   uint64_t fails;
@@ -85,10 +77,6 @@ Counts CountsOfRecursive(const std::string& spec) {
   return counts;
 }
 
-// §16.12.17: prop_always(a) requires a at the attempt's tick and, a tick
-// later, prop_always(a) again, the instance expanded when it begins: the
-// attempts from 1 to 6 fail at 6, where a is low, and those from 7 and 8,
-// in flight at the end with a high at every tick they reached, hold.
 TEST(RecursiveProperty, ASelfInstanceUnrollsOneTickAtATime) {
   Counts counts = CountsOfRecursive("prop_always(a)");
   EXPECT_EQ(counts.passes, 0u);
@@ -97,10 +85,6 @@ TEST(RecursiveProperty, ASelfInstanceUnrollsOneTickAtATime) {
   EXPECT_EQ(counts.fails_at_end, 6u);
 }
 
-// §16.12.17: prop_weak_until(hold, done) requires hold at every tick up to
-// but not including the first where done holds, done never required: the
-// attempts from 1 to 5 hold at 5, the one from 6 fails with neither, and
-// those from 7 and 8 hold at the end.
 TEST(RecursiveProperty, AWeakUntilOfTwoFormalsLiftsTheRequirementAtQ) {
   Counts counts = CountsOfRecursive("prop_weak_until(hold, done)");
   EXPECT_EQ(counts.passes, 5u);
@@ -109,10 +93,6 @@ TEST(RecursiveProperty, AWeakUntilOfTwoFormalsLiftsTheRequirementAtQ) {
   EXPECT_EQ(counts.fails_at_end, 1u);
 }
 
-// §16.12.17: p1(go, a) applies prop_always(a) after go, the recursive
-// property instantiated from a property that is not itself recursive: the
-// attempt from 2 fails at 6, the one from 7 holds at the end, and the six
-// with go low hold at their tick.
 TEST(RecursiveProperty, ARecursiveInstanceStandsAsAConsequent) {
   Counts counts = CountsOfRecursive("p1(go, a)");
   EXPECT_EQ(counts.passes, 6u);
@@ -121,10 +101,6 @@ TEST(RecursiveProperty, ARecursiveInstanceStandsAsAConsequent) {
   EXPECT_EQ(counts.fails_at_end, 1u);
 }
 
-// §16.12.17: check_phase1 and check_phase2 are mutually recursive, each
-// instantiating the other a tick later: the attempt from 1 fails at 2,
-// where s2 holds and ph2 does not, the one from 3 holds at 4, where s2 is
-// low, and the six with s1 low hold at their tick.
 TEST(RecursiveProperty, MutuallyRecursivePropertiesAlternate) {
   Counts counts = CountsOfRecursive("check_phase1");
   EXPECT_EQ(counts.passes, 7u);
@@ -133,10 +109,6 @@ TEST(RecursiveProperty, MutuallyRecursivePropertiesAlternate) {
   EXPECT_EQ(counts.fails_at_end, 1u);
 }
 
-// §16.12.17: the abort operators may be used inside a recursive property;
-// p4 aborts p3 a tick after its a: the attempts from 1 and 2 are rejected
-// at 3, those from 3 and 4 accepted at 5, those from 5 and 6 fail at 6
-// with a low, and those from 7 and 8 hold at the end.
 TEST(RecursiveProperty, AbortsInsideTheRecursionDecideTheAttempt) {
   Counts counts = CountsOfRecursive("p3(a, acc, abt)");
   EXPECT_EQ(counts.passes, 2u);

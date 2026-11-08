@@ -50,9 +50,6 @@ TEST(AssignmentLikeContext, InputPortConnectionTypesStructLiteralFromPort) {
              "endmodule\n"));
 }
 
-// §10.8 with §6.18: a port declared through a typedef has the type the
-// typedef names, so a bare pattern on an input port of a structure typedef
-// takes its type from the port as it does from the structure written out.
 TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromStructTypedef) {
   EXPECT_TRUE(
       ElabOk("typedef struct { logic [7:0] a; logic [7:0] b; } pair_t;\n"
@@ -63,9 +60,6 @@ TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromStructTypedef) {
              "endmodule\n"));
 }
 
-// §10.8 with §6.18: a typedef carries its unpacked dimensions into the type it
-// names, so an input port of an array typedef is an unpacked array the
-// pattern takes its type from, though the port writes no dimension itself.
 TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromArrayTypedef) {
   EXPECT_TRUE(
       ElabOk("typedef logic [7:0] arr_t [2];\n"
@@ -76,8 +70,6 @@ TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromArrayTypedef) {
              "endmodule\n"));
 }
 
-// §6.18: a typedef renaming an array typedef names the same array, so the
-// dimensions written further along the chain make the port an array too.
 TEST(AssignmentLikeContext,
      InputPortConnectionTypesPatternThroughTypedefChain) {
   EXPECT_TRUE(
@@ -90,10 +82,6 @@ TEST(AssignmentLikeContext,
              "endmodule\n"));
 }
 
-// §10.8 with §10.9 and §7.4: a packed array is a type a pattern constructs,
-// so an input port with a packed dimension, written on the port or carried by
-// its typedef or by a typedef further along the chain, is one an untyped
-// pattern takes its type from.
 TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromPackedArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -112,11 +100,6 @@ TEST(AssignmentLikeContext, InputPortConnectionTypesPatternFromPackedArray) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §10.8 (printed pages 259-260): the default correspondence between a
-// `default:` value and the elements it covers is no assignment-like context,
-// so an untyped pattern there has no type, in a declaration, a procedural or
-// a continuous assignment and a subroutine alike. A typed pattern has its own,
-// and an index key's value is in such a context.
 TEST(AssignmentLikeContext, UntypedPatternAsDefaultValueRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -143,8 +126,6 @@ TEST(AssignmentLikeContext, UntypedPatternAsDefaultValueRejected) {
             3);
 }
 
-// §10.8: a typedef of a type no pattern can target leaves the port one the
-// pattern cannot be connected to.
 TEST(AssignmentLikeContext, PatternOnPortOfScalarTypedefRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -180,8 +161,6 @@ TEST(AssignmentLikeContext, InoutPortVariableConnectionRejected) {
       "  sub u(.p(v));\n"
       "endmodule\n",
       f);
-  // The rule that fires is §23.3.3.3, which forbids a variable on an inout port
-  // declared with a net type, rather than anything in §10.8.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' cannot be connected to inout port 'p'", 5, "23.3.3.3"));
@@ -197,18 +176,11 @@ TEST(AssignmentLikeContext, RefPortNetBindingRejected) {
       "  sub u(.p(w));\n"
       "endmodule\n",
       f);
-  // The rule that fires is §23.3.3.2, which requires a variable on a ref port,
-  // rather than anything in §10.8.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "net 'w' cannot be connected to ref port 'p'", 5,
                             "23.3.3.2"));
 }
 
-// §10.8 counts a connection to an output port among the assignment-like
-// contexts, and §10.9 lets a positional pattern of lvalues stand on the side
-// being assigned; a keyed pattern, an item that is no lvalue, a formal of no
-// type §10.9 has a pattern construct, as int is no array, and an inout port
-// each leave the pattern illegal.
 TEST(AssignmentLikeContext, PatternOnAggregateOutputPort) {
   ElabFixture f;
   ElaborateSrc(
@@ -242,8 +214,6 @@ TEST(AssignmentLikeContext, PatternOnAggregateOutputPort) {
   }
 }
 
-// §10.9: a typed pattern has a type of its own and is connected to a port as
-// any expression is.
 TEST(AssignmentLikeContext, TypedPatternOnInputPortAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -257,8 +227,6 @@ TEST(AssignmentLikeContext, TypedPatternOnInputPortAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.8 counts the actual of an output argument among the assignment-like
-// contexts, so a positional pattern of variables may be passed to one.
 TEST(AssignmentLikeContext, PatternOnOutputArgumentAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -278,9 +246,6 @@ TEST(AssignmentLikeContext, PatternOnOutputArgumentAccepted) {
                             "13.5"));
 }
 
-// §10.8 excludes passing to a ref argument from the assignment-like contexts,
-// and §13.5.2 has a ref argument refer to a variable, so a pattern or any
-// other expression that names no variable is reported there.
 TEST(AssignmentLikeContext, NonVariableOnRefArgumentRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -300,10 +265,6 @@ TEST(AssignmentLikeContext, NonVariableOnRefArgumentRejected) {
                              "13.5.2"));
 }
 
-// §10.8: an explicitly typed class parameter's value and a class
-// specialization's parameter override are assignment-like contexts, so a
-// pattern there is constant when its items are, of a structure type as of an
-// array type.
 TEST(AssignmentLikeContext, PatternClassParameterValues) {
   ElabFixture f;
   ElaborateSrc(

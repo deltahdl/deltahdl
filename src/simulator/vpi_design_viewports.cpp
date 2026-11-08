@@ -23,8 +23,6 @@ void RecordViewportGrants(
     if (kAccess == ViewportAccess::kNone) continue;
     auto target = ResolveViewport(*design->compilation_unit, viewport, sources);
     if (!target) continue;
-    // The name was resolved against the design element's declarations, so it
-    // names the same object in each instance of the element.
     WalkInstancePaths(
         design, [&](const RtlirModule* mod, const std::string& prefix) {
           if (mod->name != target->definition) return;

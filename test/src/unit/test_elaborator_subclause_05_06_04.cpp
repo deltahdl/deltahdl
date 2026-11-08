@@ -43,10 +43,6 @@ TEST(CompilerDirectiveElaboration, MacroFromOneElabInvisibleInAnother) {
   }
 
   ElabFixture f2;
-  // The macro being invisible here shows up as the preprocessor's own
-  // undefined-macro report, in Preprocessor::ExpandSingleInlineMacro in
-  // src/preprocessor/preprocessor_inline.cpp, so this case reaches its
-  // subject through a source that does not get through the preprocessor.
   ElaborateWithPreprocessorAllowingParseErrors(
       "module b;\n"
       "  parameter P = `ONLY_IN_FIRST;\n"

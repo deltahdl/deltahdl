@@ -21,16 +21,8 @@ namespace delta {
 
 namespace {
 
-// The names an extends clause may write: those that name a class or whose
-// meaning only elaboration settles, and those a typedef gives a type that is
-// no class.
 struct BaseNames {
-  // Every class's name, nested ones included; every type parameter's and
-  // parameter's, of a class or of a module, interface or program; and every
-  // typedef's to a named type or forward typedef's (§6.18), which may name a
-  // class.
   std::unordered_set<std::string_view> resolving;
-  // Every typedef's to a type that is no class, `typedef int T`.
   std::unordered_set<std::string_view> non_class_typedefs;
 
   void AddTypedef(std::string_view name, const DataType& type) {

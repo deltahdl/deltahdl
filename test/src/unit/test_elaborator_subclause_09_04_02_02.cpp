@@ -13,9 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Validates a freshly elaborated @* design (non-null, error-free, exactly one
-// process) and collects the identifier names that appear in that process's
-// implicit sensitivity list. Shared by the AlwaysStarElab sensitivity tests.
 void CollectSensitivityNames(RtlirDesign* design, ElabFixture& f,
                              std::unordered_set<std::string>& names) {
   ASSERT_NE(design, nullptr);
@@ -222,9 +219,6 @@ TEST(AlwaysStarElab, LhsIndexVarInSensitivity) {
   EXPECT_FALSE(names.count("y")) << "y (pure LHS) must not be in sensitivity";
 }
 
-// §9.4.2.2 adds a variable an assignment's left-hand side reads as an index,
-// and a concatenation left-hand side holds a select of its own in each target,
-// so `i` of `{y[i], z} = d` joins the list beside the right-hand side's `d`.
 TEST(AlwaysStarElab, ConcatenationLhsIndexInSensitivity) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -388,9 +382,6 @@ TEST(AlwaysStarElab, BlockLocalExcludedFromSensitivity) {
 }
 
 TEST(AlwaysStarElab, DelayControlOnlyVarExcludedFromSensitivity) {
-  // §9.4.2.2 exception 1: an identifier that appears only inside a timing
-  // control (here a #delay) is not added to the implicit @* sensitivity list,
-  // while a net/variable read by the controlled statement still is.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -410,8 +401,6 @@ TEST(AlwaysStarElab, DelayControlOnlyVarExcludedFromSensitivity) {
 }
 
 TEST(AlwaysStarElab, EventControlOnlySignalExcludedFromSensitivity) {
-  // §9.4.2.2 exception 1: an identifier that appears only inside an inner
-  // event control (@(clk)) is excluded from the implicit @* list.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -431,9 +420,6 @@ TEST(AlwaysStarElab, EventControlOnlySignalExcludedFromSensitivity) {
 }
 
 TEST(AlwaysStarElab, WaitConditionOnlyVarExcludedFromSensitivity) {
-  // §9.4.2.2 exception 1: an identifier that appears only in a wait condition
-  // is excluded from the implicit @* list; the controlled statement's read
-  // operands are still collected.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -483,9 +469,6 @@ TEST(AlwaysStarElab, AtStarAndAtStarParenEquivalent) {
 }
 
 TEST(AlwaysStarElab, RhsIndexVarInSensitivity) {
-  // §9.4.2.2: a variable used as the index of a right-hand-side select is a
-  // read appearing on the RHS, so it (and the selected vector) joins the
-  // implicit @* list; the pure-LHS target does not.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -504,9 +487,6 @@ TEST(AlwaysStarElab, RhsIndexVarInSensitivity) {
 }
 
 TEST(AlwaysStarElab, TimingControlSignalAlsoReadInSensitivity) {
-  // §9.4.2.2 exception 1 boundary: the exclusion applies only to identifiers
-  // that appear *exclusively* in timing controls. A signal used as a delay
-  // value and also read by the controlled statement is still included.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -521,8 +501,6 @@ TEST(AlwaysStarElab, TimingControlSignalAlsoReadInSensitivity) {
 }
 
 TEST(AlwaysStarElab, ConstantRhsProducesEmptySensitivity) {
-  // §9.4.2.2: the implicit list is exactly the set of read nets/variables. A
-  // body that reads nothing yields an empty list and is not an error.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -539,11 +517,6 @@ TEST(AlwaysStarElab, ConstantRhsProducesEmptySensitivity) {
 }
 
 TEST(AlwaysStarElab, ParameterReadExcludedFromSensitivity) {
-  // §9.4.2.2: the implicit list holds only nets and variables. A parameter read
-  // is a constant (a §11.2.1 constant form), so it is not a net or variable and
-  // is dropped, while a plain variable read in the same expression is kept.
-  // This takes the constant-name filtering path, distinct from a bare literal
-  // (which contributes no identifier at all).
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -561,9 +534,6 @@ TEST(AlwaysStarElab, ParameterReadExcludedFromSensitivity) {
 }
 
 TEST(AlwaysStarElab, LocalparamReadExcludedFromSensitivity) {
-  // §9.4.2.2: like a parameter, a localparam read is a constant and is excluded
-  // from the implicit list. Exercises the same constant-name filter reached via
-  // a localparam declaration rather than a parameter.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -580,10 +550,6 @@ TEST(AlwaysStarElab, LocalparamReadExcludedFromSensitivity) {
 }
 
 TEST(AlwaysStarElab, NetOperandInSensitivity) {
-  // §9.4.2.2 admits *nets* as well as variables. A wire read on the RHS joins
-  // the implicit list. The wire is produced by a continuous assignment (§10.3);
-  // that assignment's own read `a` belongs to the assign, not to this always
-  // block, so it does not enter the block's implicit list.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"

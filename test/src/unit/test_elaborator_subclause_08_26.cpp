@@ -17,9 +17,6 @@ TEST(InterfaceClassAllowedContent, InterfaceClassTypeAndParamOk) {
              "endmodule\n"));
 }
 
-// The report about a non-pure-virtual method stands at that method's own
-// `function` keyword; the reports about a disallowed member kind below stand at
-// the interface class declaration instead.
 TEST(InterfaceClassAllowedContent, InterfaceClassNonPureVirtualError) {
   ElabFixture f;
   ElabOk(
@@ -48,11 +45,6 @@ TEST(InterfaceClassAllowedContent, InterfaceClassDataMemberError) {
                             "shall not contain data members", 1, "8.26"));
 }
 
-// §8.26 (printed page 206) confines an interface class to pure virtual
-// methods, type declarations and parameter declarations, and Syntax 8-3 in
-// §8.26.1 (printed 208) gives interface_class_item no class_property
-// alternative, so a data member is barred whatever its qualifier: a static
-// one is no parameter, and §8.9's one storage never spans an `implements`.
 TEST(InterfaceClassAllowedContent, InterfaceClassStaticDataMemberError) {
   ElabFixture f;
   ElabOk(
@@ -68,9 +60,6 @@ TEST(InterfaceClassAllowedContent, InterfaceClassStaticDataMemberError) {
                             "shall not contain data members", 1, "8.26"));
 }
 
-// Syntax 8-3 (printed page 208): a `const` property is a class_property
-// (§8.4 with §6.20.6) and no parameter_declaration, so it is barred too; the
-// check exempted `const` beside `parameter` and accepted `const int x = 1;`.
 TEST(InterfaceClassAllowedContent, InterfaceClassConstDataMemberError) {
   ElabFixture f;
   ElabOk(
@@ -209,10 +198,6 @@ TEST(InterfaceClassAllowedContent, ParameterDeclarationOk) {
              "endmodule\n"));
 }
 
-// §8.26 forbids constraint blocks, covergroups and nested classes alike in an
-// interface class. The constraint-block and covergroup halves are stated again
-// by §8.26.9 and are covered in test_elaborator_subclause_08_26_09.cpp; the
-// nested-class half has no subclause of its own and is covered here.
 TEST(InterfaceClassAllowedContent, NestedClassError) {
   ElabFixture f;
   ElabOk(
@@ -259,8 +244,6 @@ TEST(InterfaceClassImplements, SubclassInheritsInterfaceImplementation) {
              "endmodule\n"));
 }
 
-// §8.26 C9: an interface-class-typed handle may reference an instance of a
-// class that declares (via 'implements') that it implements the interface.
 TEST(InterfaceClassHandleAssign, ImplementingClassAssignableToInterfaceHandle) {
   EXPECT_TRUE(
       ElabOk("interface class IC;\n"
@@ -279,15 +262,6 @@ TEST(InterfaceClassHandleAssign, ImplementingClassAssignableToInterfaceHandle) {
              "endmodule\n"));
 }
 
-// §8.26 C9: merely defining every pure-virtual method is not sufficient; a
-// class that does not declare 'implements' cannot be assigned to an
-// interface-class handle. The rule that rejects the assignment is the §8.4
-// handle-compatibility rule, which is the subclause
-// CheckClassHandleAssignCompatibility in
-// src/elaborator/elaborator_validate_class_handles.cpp passes: an implementing
-// class is what makes the interface type reachable from the object's type, so
-// the interface-class relationship is read through §8.4's compatibility test
-// rather than reported under §8.26 of its own.
 TEST(InterfaceClassHandleAssign,
      NonImplementingClassNotAssignableToInterfaceHandle) {
   ElabFixture f;
@@ -313,8 +287,6 @@ TEST(InterfaceClassHandleAssign,
       "8.4"));
 }
 
-// §8.26 C5: an interface class may inherit from another interface class via
-// 'extends'.
 TEST(InterfaceClassInheritance, InterfaceClassExtendsInterfaceClassOk) {
   EXPECT_TRUE(
       ElabOk("interface class IB;\n"
@@ -327,11 +299,6 @@ TEST(InterfaceClassInheritance, InterfaceClassExtendsInterfaceClassOk) {
              "endmodule\n"));
 }
 
-// §8.26 C5: an interface class shall not extend an ordinary (non-interface)
-// class. ValidateInterfaceClassInheritance in
-// src/elaborator/elaborator_validate_class_overrides.cpp reports this under
-// §8.26.2, which is where the standard states the extends/implements
-// restriction the rule enforces.
 TEST(InterfaceClassInheritance, InterfaceClassExtendsRegularClassError) {
   ElabFixture f;
   ElabOk(
@@ -347,10 +314,6 @@ TEST(InterfaceClassInheritance, InterfaceClassExtendsRegularClassError) {
                             "cannot extend non-interface class", 3, "8.26.2"));
 }
 
-// §8.1 lets a class be declared wherever a data declaration may appear, so the
-// three below write theirs inside a module. Every other case in this file
-// declares at compilation-unit scope, which is the placement that cannot tell a
-// rule enforced everywhere from a rule enforced at the top of a file.
 TEST(InterfaceClassAllowedContent, InterfaceClassInsideAModuleDataMemberError) {
   ElabFixture f;
   ElabOk(
@@ -381,9 +344,6 @@ TEST(InterfaceClassImplements,
                             "8.26"));
 }
 
-// The control the two above need: the same placement written correctly stays
-// legal, so neither error can be passing because a class inside a module is
-// rejected out of hand.
 TEST(InterfaceClassImplements, ImplementationInsideAModuleOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

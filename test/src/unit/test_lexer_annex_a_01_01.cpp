@@ -206,10 +206,6 @@ TEST(FilePathSpecLexing, ErrorCommaImmediate) {
       ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
 }
 
-// The rule a missing specification breaches belongs to §33.3.1, whose Syntax
-// 33-2 makes a file_path_spec obligatory in both library_declaration and
-// include_statement. It is the one lexer report that enforces no rule of
-// clause 5, since a library map file is not SystemVerilog source text.
 TEST(FilePathSpecLexing, MissingSpecificationNames33_3_1) {
   auto r = LexFilePathSpec(";");
   EXPECT_EQ(r.token.kind, TokenKind::kEof);

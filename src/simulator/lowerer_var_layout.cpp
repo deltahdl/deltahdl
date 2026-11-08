@@ -22,21 +22,12 @@
 
 namespace delta {
 
-// §26.3 (printed page 808) and §8.23: the name a nested member's layout is
-// registered under is the member's type as written, `q::pair_t` for `q::pair_t
-// p`, the "scope::name" spelling the design's type layouts key that typedef
-// by; the bare `pair_t` named another package's same-named typedef, or an
-// imported one, in the registered layouts. Arena-owned, as the layout's
-// string_view outlives this walk.
 static std::string_view NestedLayoutName(const StructMember& m, Arena& arena) {
   if (m.scope_name.empty()) return m.type_name;
   return *arena.Create<std::string>(std::string(m.scope_name) +
                                     "::" + std::string(m.type_name));
 }
 
-// §6.22.1: the bounds of a member's one packed dimension, which a type key of
-// a pattern compares with its own; left empty where the member writes none or
-// several, or where a bound does not fold.
 static void RecordDeclRange(const StructMember& m, StructFieldInfo& fi) {
   if (!m.extra_packed_dims.empty() || m.packed_dim_left == nullptr ||
       m.packed_dim_right == nullptr)
@@ -46,8 +37,6 @@ static void RecordDeclRange(const StructMember& m, StructFieldInfo& fi) {
   if (left && right) fi.decl_range = PackedRange{*left, *right};
 }
 
-// §7.4.1: the outermost packed dimension of a member of several, and the width
-// of one element of it, the member's width over the dimension's size.
 static void RecordOuterPackedDim(const StructMember& m, StructFieldInfo& fi) {
   if (m.extra_packed_dims.empty() || m.packed_dim_left == nullptr ||
       m.packed_dim_right == nullptr)
@@ -63,10 +52,6 @@ static void RecordOuterPackedDim(const StructMember& m, StructFieldInfo& fi) {
   fi.packed_elem_width = width / size;
 }
 
-// Builds the layout of a struct/union DataType: each field's bit offset (within
-// its own width frame) and width, recursing into aggregate members so a nested
-// member is reachable by its dotted path (§7.2.1). The result is arena-owned so
-// the registered top-level copy's nested pointers stay valid.
 static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
                                            uint32_t total_width,
                                            std::string_view type_name,
@@ -87,16 +72,9 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
       field_off = offset;
     }
     StructFieldInfo fi{m.name, field_off, fw, m.type_kind};
-    // §7.2.1 with §6.22.2 c): the member's signedness as the parser resolved
-    // it, the modifier where one was written and the kind's default where
-    // none was (ApplyMemberType in parser_aggregate_types.cpp).
     fi.is_signed = m.is_signed;
-    // §18.4: the members the type declares random, which a rand variable of
-    // an unpacked structure of it has randomized.
     fi.is_rand = m.is_rand;
     fi.is_randc = m.is_randc;
-    // §7.2 with §7.5 and §7.10: a dynamic array or queue member holds a handle
-    // to its elements, each EvalStructMemberWidth bits wide.
     if (IsDynamicArrayMember(m)) {
       fi.is_dynamic = true;
       fi.dyn_elem_width = EvalStructMemberWidth(m);
@@ -118,10 +96,6 @@ static StructTypeInfo* BuildStructTypeInfo(const DataType* dtype,
   return info;
 }
 
-// §7.2.1: the bit count of an aggregate declaration, which is the frame its
-// members' offsets are measured in. A packed struct is as wide as its members
-// together and a packed union as wide as its widest, which is the same sum
-// BuildStructTypeInfo walks below.
 static uint32_t AggregateTypeWidth(const DataType* dtype) {
   uint32_t total = 0;
   for (const auto& m : dtype->struct_members) {
@@ -147,9 +121,6 @@ void RegisterDesignTypeLayouts(const RtlirDesign* design, SimContext& ctx,
                                Arena& arena) {
   for (const auto& [name, dtype] : design->type_layouts)
     RegisterTypeLayout(name, dtype, ctx, arena);
-  // §26.3 with §8.4: the class a package variable is declared with is the
-  // other declared-type fact no module's lowering records, so it is recorded
-  // beside the layouts.
   RegisterPackageClassVariables(design, ctx, arena);
 }
 
@@ -166,13 +137,6 @@ EnumMemberInfo EnumMemberInfoOf(const RtlirEnumMember& m, uint32_t width,
   return info;
 }
 
-// §6.19.5 with §6.18: the enumeration behind each typedef name the design
-// records (RtlirDesign::type_enums), registered under the typedef's key, so
-// that a value declared with a class's "C::name" (§8.23) or a package's
-// "P::name" (§26.3) has members for the methods to walk. A bare name is left
-// to the module that declares or imports it: Lowerer::RegisterEnumTypes folds
-// that one against the module's own constants, which a member value may name,
-// while the design's copy folds against the compilation unit's alone.
 void RegisterDesignEnumTypes(const RtlirDesign* design, SimContext& ctx,
                              Arena& arena) {
   for (const auto& [name, dtype] : design->type_enums) {
@@ -201,8 +165,6 @@ bool HasFourStateMember(const StructTypeInfo& info) {
       });
 }
 
-// §6.8, Table 6-7: each 4-state member's window of `value`, the structure
-// `info` lays out from bit `base`, set to x.
 static void SetFourStateMembersToX(Logic4Vec& value, const StructTypeInfo& info,
                                    uint32_t base, Arena& arena) {
   for (const auto& f : info.fields) {
@@ -220,9 +182,6 @@ void MarkUnpackedStructStorage(std::string_view name, Variable* v,
   const StructTypeInfo* info = ctx.GetVariableStructType(name);
   if (info == nullptr || info->is_packed || !HasFourStateMember(*info)) return;
   v->is_4state = true;
-  // §7.3: an unpacked union starts at its first member's default, which the
-  // variable was already given by that member's type; only its storage keeps
-  // x and z for the 4-state members a later write names (§7.3.2).
   if (info->is_union) return;
   if (fill_defaults) SetFourStateMembersToX(v->value, *info, 0, ctx.GetArena());
 }

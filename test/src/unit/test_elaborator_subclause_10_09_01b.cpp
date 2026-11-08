@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §10.9: a typed pattern takes the type its prefix names, a typedef or a type
-// reference to a data type or a variable, in place of its context's, and
-// §10.9.1 counts its braces against that type's dimensions, unpacked and then
-// packed, as it counts an untyped pattern's against its target's.
 TEST(ArrayPatternElaboration, TypedPatternCountedAgainstItsPrefixType) {
   ElabFixture f;
   ElaborateSrc(
@@ -45,9 +41,6 @@ TEST(ArrayPatternElaboration, TypedPatternCountedAgainstItsPrefixType) {
   EXPECT_EQ(f.diag.ErrorCount(), 4u);
 }
 
-// §10.9.1: a typed pattern is counted wherever it is written, an operand of an
-// operator and a subroutine's return value among the places, since its type
-// comes from its prefix and not from an assignment it stands in.
 TEST(ArrayPatternElaboration, TypedPatternCountedOutsideAssignmentLikeContext) {
   ElabFixture f;
   ElaborateSrc(
@@ -71,9 +64,6 @@ TEST(ArrayPatternElaboration, TypedPatternCountedOutsideAssignmentLikeContext) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A typed pattern whose items match the type its prefix names elaborates, and
-// `type(h)` names the declaration that is visible where it is written: the
-// block's two-bit h, which hides the module's four-bit one.
 TEST(ArrayPatternElaboration, TypedPatternMatchingItsPrefixTypeOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -95,9 +85,6 @@ TEST(ArrayPatternElaboration, TypedPatternMatchingItsPrefixTypeOk) {
              "endmodule\n"));
 }
 
-// §26.3 makes `p::T` the typedef T of package p, so a pattern it prefixes is
-// counted against that typedef's dimensions, packed or, for an array typedef,
-// unpacked (§10.9, §10.9.1).
 TEST(ArrayPatternElaboration, TypedPatternWithPackageScopedPrefixCounted) {
   ElabFixture f;
   ElaborateSrc(
@@ -123,8 +110,6 @@ TEST(ArrayPatternElaboration, TypedPatternWithPackageScopedPrefixCounted) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// The `p` before `::` names the package, so a module variable that shares its
-// name has no part in the count: the pattern matches the package's two-bit T.
 TEST(ArrayPatternElaboration, PackageScopedPrefixIsNoVariableOfThatName) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -137,9 +122,6 @@ TEST(ArrayPatternElaboration, PackageScopedPrefixIsNoVariableOfThatName) {
              "endmodule\n"));
 }
 
-// §6.18: a typedef renaming an unpacked array typedef names that array, at any
-// distance along the chain, so a pattern it prefixes is counted against the
-// array's dimensions.
 TEST(ArrayPatternElaboration, TypedPatternThroughTypedefChainCounted) {
   ElabFixture f;
   ElaborateSrc(
@@ -163,9 +145,6 @@ TEST(ArrayPatternElaboration, TypedPatternThroughTypedefChainCounted) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §6.23 with §6.21: `type(x)` names the declaration visible where it is
-// written, a block's variable or a subroutine's formal hiding the module's,
-// and the pattern it prefixes is counted against that declaration's type.
 TEST(ArrayPatternElaboration, TypeReferenceToBlockOrFormalCounted) {
   ElabFixture f;
   ElaborateSrc(
@@ -191,7 +170,6 @@ TEST(ArrayPatternElaboration, TypeReferenceToBlockOrFormalCounted) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// Each prefix resolved as above elaborates when the items match its type.
 TEST(ArrayPatternElaboration, ResolvedPrefixTypesMatchingOk) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -212,9 +190,6 @@ TEST(ArrayPatternElaboration, ResolvedPrefixTypesMatchingOk) {
              "endmodule\n"));
 }
 
-// §6.23: `type(a_t)` stands for the type a_t names, and §7.4.4 keeps an array
-// typedef's unpacked dimensions with it, so a pattern the reference prefixes
-// is counted against them, a package's typedef `type(p::A)` among them.
 TEST(ArrayPatternElaboration, TypeReferenceToArrayTypedefCounted) {
   ElabFixture f;
   ElaborateSrc(
@@ -239,9 +214,6 @@ TEST(ArrayPatternElaboration, TypeReferenceToArrayTypedefCounted) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// A type reference to a typedef name written under packed dimensions of its own
-// stands for an array of that typedef, whose dimensions come before the
-// typedef's; one to a class's typedef stands for that typedef.
 TEST(ArrayPatternElaboration, TypeReferenceToTypedefMatchingOk) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -259,9 +231,6 @@ TEST(ArrayPatternElaboration, TypeReferenceToTypedefMatchingOk) {
              "endmodule\n"));
 }
 
-// §8.23 makes `C::A` the typedef A of class C, and §7.4.4 keeps an array
-// typedef's unpacked dimensions with it, so a pattern it prefixes is counted
-// against them.
 TEST(ArrayPatternElaboration, TypedPatternWithClassScopedPrefixCounted) {
   ElabFixture f;
   ElaborateSrc(

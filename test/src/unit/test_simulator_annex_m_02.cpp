@@ -9,10 +9,6 @@
 
 namespace {
 
-// §M.2 opens with the object types: the packages, interfaces, programs and
-// modports from 600, the variable kinds from 610 with the register aliases, and
-// the typespecs from 625, with vpiPackedArrayTypespec and the sequence,
-// property and event typespecs above 690 and vpiInterfaceTypespec at 906.
 TEST(SvVpiUserHeader, TheObjectTypesOfPackagesVariablesAndTypespecs) {
   EXPECT_EQ(vpiPackage, 600);
   EXPECT_EQ(vpiInterface, 601);
@@ -69,10 +65,6 @@ TEST(SvVpiUserHeader, TheObjectTypesOfPackagesVariablesAndTypespecs) {
   EXPECT_EQ(vpiInterfaceTypespec, 906);
 }
 
-// §M.2 continues the object types with the clocking blocks, class definitions
-// and constraints at 650, the statement and method-call kinds, the concurrent
-// and immediate assertions, the property and sequence kinds, the patterns, the
-// waits and disables, and the formals of sequences and properties.
 TEST(SvVpiUserHeader, TheObjectTypesOfBlocksAssertionsAndStatements) {
   EXPECT_EQ(vpiClockingBlock, 650);
   EXPECT_EQ(vpiClockingIODecl, 651);
@@ -122,10 +114,6 @@ TEST(SvVpiUserHeader, TheObjectTypesOfBlocksAssertionsAndStatements) {
   EXPECT_EQ(vpiPropFormalDecl, 699);
 }
 
-// §M.2 ends the object types with the nets, the array and logic nets aliasing
-// the base file's, the typed nets from 525 and 680, the break and continue
-// statements, the nettype declaration at 523, the constraint kinds and the let
-// declaration and expression above 900.
 TEST(SvVpiUserHeader, TheObjectTypesOfNetsConstraintsAndLets) {
   EXPECT_EQ(vpiArrayNet, vpiNetArray);
   EXPECT_EQ(vpiEnumNet, 680);
@@ -158,8 +146,6 @@ TEST(SvVpiUserHeader, TheObjectTypesOfNetsConstraintsAndLets) {
   EXPECT_EQ(vpiLetExpr, 904);
 }
 
-// §M.2 numbers the methods that traverse one-to-one relations from vpiActual at
-// 700 through vpiConstraintItem at 746.
 TEST(SvVpiUserHeader, TheMethodsTraversingOneToOneRelations) {
   EXPECT_EQ(vpiActual, 700);
   EXPECT_EQ(vpiTypedefAlias, 701);
@@ -182,11 +168,6 @@ TEST(SvVpiUserHeader, TheMethodsTraversingOneToOneRelations) {
   EXPECT_EQ(vpiConstraintItem, 746);
 }
 
-// §M.2 numbers the methods that traverse one-to-many relations from vpiTypedef
-// at 725 through vpiElement at 743, vpiInterfaceDecl being a deprecated
-// spelling of vpiVirtualInterfaceVar and vpiConcurrentAssertions of
-// vpiConcurrentAssertion, then vpiAssertion at 744 and, traversing both kinds
-// of relation, vpiInstance at 745.
 TEST(SvVpiUserHeader, TheMethodsTraversingOneToManyRelations) {
   EXPECT_EQ(vpiTypedef, 725);
   EXPECT_EQ(vpiImport, 726);
@@ -207,10 +188,6 @@ TEST(SvVpiUserHeader, TheMethodsTraversingOneToManyRelations) {
   EXPECT_EQ(vpiInstance, 745);
 }
 
-// §M.2 numbers the generic object properties from vpiTop at 600: the join,
-// access, array and rand types with their return values, the port types beside
-// the base file's vpiPort, and the constant-variable and struct-union-member
-// Booleans.
 TEST(SvVpiUserHeader,
      TheGenericObjectPropertiesOfScopesArraysAndRandomization) {
   EXPECT_EQ(vpiTop, 600);
@@ -244,10 +221,6 @@ TEST(SvVpiUserHeader,
   EXPECT_EQ(vpiStructUnionMember, 615);
 }
 
-// §M.2 continues the properties with the visibilities, the return values of
-// vpiConstType, the always types, the distribution types, the packed, tagged,
-// virtual and soft Booleans, vpiRef as a return value of vpiDirection, and the
-// class types.
 TEST(SvVpiUserHeader,
      TheGenericObjectPropertiesOfVisibilityConstantsAndClasses) {
   EXPECT_EQ(vpiVisibility, 620);
@@ -278,9 +251,6 @@ TEST(SvVpiUserHeader,
   EXPECT_EQ(vpiProcessClass, 4);
 }
 
-// §M.2 continues the properties with the method, clock-inferred, deferred,
-// final and cover-sequence Booleans, the qualifier bit flags, the skew edges,
-// the generic Boolean and the compatibility modes.
 TEST(SvVpiUserHeader, TheGenericObjectPropertiesOfMethodsQualifiersAndModes) {
   EXPECT_EQ(vpiMethod, 645);
   EXPECT_EQ(vpiIsClockInferred, 649);
@@ -305,9 +275,6 @@ TEST(SvVpiUserHeader, TheGenericObjectPropertiesOfMethodsQualifiersAndModes) {
   EXPECT_EQ(vpiMode1800v2009, 5);
 }
 
-// §M.2 ends the properties with the packed-array-member Boolean, the source
-// span from vpiStartLine at 661, the allocation scheme at 658 with its three
-// values, the object identifier, the DPI properties and the modport Boolean.
 TEST(SvVpiUserHeader, TheGenericObjectPropertiesOfLocationsAllocationAndDpi) {
   EXPECT_EQ(vpiPackedArrayMember, 655);
   EXPECT_EQ(vpiStartLine, 661);
@@ -328,12 +295,6 @@ TEST(SvVpiUserHeader, TheGenericObjectPropertiesOfLocationsAllocationAndDpi) {
   EXPECT_EQ(vpiIsModPort, 669);
 }
 
-// §M.2 numbers the operators from vpiImplyOp at 50 through vpiInsideOp at 95:
-// the implications, the followed-by, accept-on and reject-on operators from 83,
-// the temporal operators from 89, the cycle delays and sequence operators from
-// 53, the increments and decrements from 62, and the match, cast, iff,
-// wildcard, streaming, matched, triggered, pattern, if, composite, implies,
-// type and assignment operators.
 TEST(SvVpiUserHeader, TheOperators) {
   EXPECT_EQ(vpiImplyOp, 50);
   EXPECT_EQ(vpiNonOverlapImplyOp, 51);
@@ -383,15 +344,11 @@ TEST(SvVpiUserHeader, TheOperators) {
   EXPECT_EQ(vpiAssignmentOp, 82);
 }
 
-// §M.2 gives vpiOtherFunc as a return value of vpiFuncType and vpiValidUnknown
-// as a return value of the deprecated vpiValid.
 TEST(SvVpiUserHeader, TheTaskFunctionAndValidityProperties) {
   EXPECT_EQ(vpiOtherFunc, 6);
   EXPECT_EQ(vpiValidUnknown, 2);
 }
 
-// §M.2 numbers the callback reasons of threads, frames and size changes from
-// 600 and of class and transient objects from 700.
 TEST(SvVpiUserHeader, TheCallbackReasons) {
   EXPECT_EQ(cbStartOfThread, 600);
   EXPECT_EQ(cbEndOfThread, 601);
@@ -404,11 +361,6 @@ TEST(SvVpiUserHeader, TheCallbackReasons) {
   EXPECT_EQ(cbEndOfObject, 702);
 }
 
-// §M.2 numbers the coverage VPI within the 750 through 779 it reserves for it:
-// the control operations from 750, the coverage types from 760, the status
-// properties from 765 with vpiCoverMax kept beside vpiCoveredMax at 766, the
-// assertion and FSM status properties from 770 and the FSM handle types at 758
-// and 759.
 TEST(SvVpiUserHeader, TheCoverageVpi) {
   EXPECT_EQ(vpiCoverageStart, 750);
   EXPECT_EQ(vpiCoverageStop, 751);
@@ -436,9 +388,6 @@ TEST(SvVpiUserHeader, TheCoverageVpi) {
   EXPECT_EQ(vpiFsmHandle, 759);
 }
 
-// §M.2 numbers the assertion callback reasons from cbAssertionStart at 606, the
-// action reasons from 645, and the assertion system callback reasons from 615,
-// 631 and 651.
 TEST(SvVpiUserHeader, TheAssertionCallbackReasons) {
   EXPECT_EQ(cbAssertionStart, 606);
   EXPECT_EQ(cbAssertionSuccess, 607);
@@ -475,9 +424,6 @@ TEST(SvVpiUserHeader, TheAssertionCallbackReasons) {
   EXPECT_EQ(cbAssertionSysDisableVacuousAction, 656);
 }
 
-// §M.2 numbers the assertion control constants from vpiAssertionLock at 645 and
-// vpiAssertionDisable at 620 through the per-assertion action controls from 633
-// and the system action controls from 639.
 TEST(SvVpiUserHeader, TheAssertionControlConstants) {
   EXPECT_EQ(vpiAssertionLock, 645);
   EXPECT_EQ(vpiAssertionUnlock, 646);
@@ -509,9 +455,6 @@ TEST(SvVpiUserHeader, TheAssertionControlConstants) {
   EXPECT_EQ(vpiAssertionSysDisableVacuousAction, 644);
 }
 
-// §M.2 lays the step information out as a count of matched expressions, an
-// array of handles to them and the two states of the transition, and gives
-// the structure its pointer spelling.
 TEST(SvVpiUserHeader, TheAssertionStepInfoStructureIsAsTheAnnexLaysItOut) {
   s_vpi_assertion_step_info step = {};
   static_assert(
@@ -529,9 +472,6 @@ TEST(SvVpiUserHeader, TheAssertionStepInfoStructureIsAsTheAnnexLaysItOut) {
   EXPECT_EQ(step.matched_exprs, nullptr);
 }
 
-// §M.2 lays the attempt information out as a detail union of the failing
-// expression's handle and a pointer to the step information, then the time
-// the attempt was triggered, and gives the structure its pointer spelling.
 TEST(SvVpiUserHeader, TheAttemptInfoStructureIsAsTheAnnexLaysItOut) {
   s_vpi_attempt_info info = {};
   static_assert(std::is_same_v<decltype(info.detail.failExpr), vpiHandle>);
@@ -548,11 +488,6 @@ TEST(SvVpiUserHeader, TheAttemptInfoStructureIsAsTheAnnexLaysItOut) {
   EXPECT_EQ(info.attemptStartTime.low, 7u);
 }
 
-// §M.2 names the callback routine's type as a function type, not a pointer
-// type: a routine taking the reason, the callback time, the assertion, the
-// attempt information and the user data, and returning PLI_INT32. The
-// registration routine takes a pointer to that function type, the assertion,
-// the reason and the user data, and returns a handle.
 TEST(SvVpiUserHeader, TheCallbackTypeAndTheRegistrationRoutineAreAsDeclared) {
   static_assert(std::is_same_v<vpi_assertion_callback_func,
                                PLI_INT32(PLI_INT32, p_vpi_time, vpiHandle,
@@ -566,8 +501,6 @@ TEST(SvVpiUserHeader, TheCallbackTypeAndTheRegistrationRoutineAreAsDeclared) {
   EXPECT_EQ(routine, nullptr);
 }
 
-// The file the annex shows includes vpi_user.h, and its own guard is the
-// SV_VPI_USER_H the annex tests, so both marks are defined once it is read.
 TEST(SvVpiUserHeader, TheFileIncludesTheBaseFileUnderTheAnnexsGuard) {
 #if defined(SV_VPI_USER_H) && defined(VPI_USER_H)
   SUCCEED();
@@ -576,10 +509,6 @@ TEST(SvVpiUserHeader, TheFileIncludesTheBaseFileUnderTheAnnexsGuard) {
 #endif
 }
 
-// §37.10 tags the iteration from an instance to its nettype declarations
-// vpiNetTypedef, a name Annex M does not list; the file keeps it at a number
-// the annex leaves unused, so it collides with no object type or method the
-// annex numbers, and the declarations it reaches are of the annex's type.
 TEST(SvVpiUserHeader, TheNettypeIterationTagStandsApartFromTheAnnexsNumbers) {
   const int kAnnexObjectTypesAndMethodsNear711[] = {vpiActual,
                                                     vpiTypedefAlias,
@@ -603,9 +532,6 @@ TEST(SvVpiUserHeader, TheNettypeIterationTagStandsApartFromTheAnnexsNumbers) {
   EXPECT_NE(vpiNetTypedef, vpiNettypeDecl);
 }
 
-// Edge case: the listing documents vpiQualifier as carrying a bitwise OR of the
-// qualifier flags, so each flag (other than the "none" sentinel) must be a
-// single distinct bit and the flags must compose without overlapping.
 TEST(SvVpiUserConstants, QualifierFlagsComposeAsDistinctBits) {
   EXPECT_EQ(vpiNoQualifier, 0);
   const int kFlags[] = {vpiUniqueQualifier, vpiPriorityQualifier,
@@ -613,21 +539,16 @@ TEST(SvVpiUserConstants, QualifierFlagsComposeAsDistinctBits) {
                         vpiInsideQualifier};
   int combined = 0;
   for (int flag : kFlags) {
-    // Exactly one bit set (power of two).
     EXPECT_NE(flag, 0);
     EXPECT_EQ(flag & (flag - 1), 0);
-    // No bit shared with any flag seen so far.
     EXPECT_EQ(combined & flag, 0);
     combined |= flag;
   }
-  // All five flags OR-combine into a five-bit mask.
   EXPECT_EQ(combined, vpiUniqueQualifier | vpiPriorityQualifier |
                           vpiTaggedQualifier | vpiRandQualifier |
                           vpiInsideQualifier);
 }
 
-// Edge case: each enumerated property value-set the listing introduces must
-// assign a distinct selector to every member so the values are unambiguous.
 TEST(SvVpiUserConstants, EnumeratedPropertyValuesAreDistinct) {
   const int kClassKinds[] = {vpiMailboxClass, vpiSemaphoreClass,
                              vpiUserDefinedClass, vpiProcessClass};
@@ -646,7 +567,6 @@ TEST(SvVpiUserConstants, EnumeratedPropertyValuesAreDistinct) {
     }
   }
 
-  // vpiConstType return values, distribution kinds, and port-type values.
   EXPECT_NE(vpiOneStepConst, vpiUnboundedConst);
   EXPECT_NE(vpiUnboundedConst, vpiNullConst);
   EXPECT_NE(vpiOneStepConst, vpiNullConst);
@@ -654,9 +574,6 @@ TEST(SvVpiUserConstants, EnumeratedPropertyValuesAreDistinct) {
   EXPECT_NE(vpiInterfacePort, vpiModportPort);
 }
 
-// Edge case: the deprecated/alias spellings the listing defines must resolve to
-// the very same selector as their canonical counterparts, so production code
-// using either spelling is interchangeable.
 TEST(SvVpiUserConstants, AliasSpellingsResolveToCanonicalSelectors) {
   EXPECT_EQ(vpiConcurrentAssertions, vpiConcurrentAssertion);
   EXPECT_EQ(vpiConcurrentAssertions, 740);

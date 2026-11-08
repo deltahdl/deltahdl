@@ -344,9 +344,6 @@ TEST(LetExpansionSimulation, EndToEndLetParenthesizedPrecedence) {
 
 TEST(LetExpansionSimulation, EndToEndTypedFormalCastsActualToFormalWidth) {
   SimFixture f;
-  // §11.12 rule 2: the actual for a non-event typed formal is cast to the
-  // formal's type before it is substituted into the body. The 4-bit formal
-  // narrows 8'd255 to 4'hF, so the let body sees 15, not 255.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let low4(logic [3:0] x) = x;\n"
@@ -366,8 +363,6 @@ TEST(LetExpansionSimulation, EndToEndTypedFormalCastsActualToFormalWidth) {
 
 TEST(LetExpansionSimulation, EndToEndUntypedFormalDoesNotCastActual) {
   SimFixture f;
-  // §11.12: the cast applies only to typed formals. An untyped formal carries
-  // the full actual value through unchanged, so all 8 bits of 8'd255 survive.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let pass(x) = x;\n"
@@ -387,13 +382,6 @@ TEST(LetExpansionSimulation, EndToEndUntypedFormalDoesNotCastActual) {
 
 TEST(LetExpansionSimulation, EndToEndTwoStateFormalDrivesXZActualBitsToZero) {
   SimFixture f;
-  // §11.12 rule 2 / example e: the actual for a non-event typed formal is cast
-  // to the formal's type before substitution. A `bit` formal is 2-state, so
-  // every unknown (x) or high-impedance (z) bit of the actual becomes 0. Here
-  // the actual 8'b101010xz has x/z in its two low bits; after the cast they
-  // read as 0, leaving the fully-known value 8'b10101000 (0xA8). The result is
-  // held in a 4-state `logic` so the coercion is observable — a 2-state
-  // destination would mask it.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let low(bit [7:0] x) = x;\n"
@@ -437,9 +425,6 @@ TEST(LetExpansionSimulation, LetDeclarativeScopeIgnoresInstantiationVar) {
 
 TEST(LetExpansionSimulation, EndToEndLetNamedArgs) {
   SimFixture f;
-  // §11.12: expansion binds each actual to its formal. Here the actuals are
-  // supplied by name out of declaration order, so correct binding requires
-  // matching on formal name, not position: sub = a - b = 10 - 3 = 7.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let sub(a, b) = a - b;\n"
@@ -459,9 +444,6 @@ TEST(LetExpansionSimulation, EndToEndLetNamedArgs) {
 
 TEST(LetExpansionSimulation, EndToEndLetMixedPositionalAndNamedArgs) {
   SimFixture f;
-  // §11.12: a let call may mix a leading positional actual with trailing named
-  // actuals; each still binds to the intended formal. a=1 (positional), b=2,
-  // c=3 (named) → 1 + 2 + 3 = 6.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let f(a, b, c) = a + b + c;\n"
@@ -481,9 +463,6 @@ TEST(LetExpansionSimulation, EndToEndLetMixedPositionalAndNamedArgs) {
 
 TEST(LetExpansionSimulation, EndToEndLetNamedActualLeavesDefaultInPlace) {
   SimFixture f;
-  // §11.12: a default actual declared in the let fills any formal the call
-  // omits, including when the supplied actuals are named. Calling with only
-  // .a(5) leaves b at its default 10, so the body yields 15.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let f(a, b = 10) = a + b;\n"
@@ -503,10 +482,6 @@ TEST(LetExpansionSimulation, EndToEndLetNamedActualLeavesDefaultInPlace) {
 
 TEST(LetExpansionSimulation, EndToEndLetAllDefaultsCallOmitsAllActuals) {
   SimFixture f;
-  // §11.12: when every formal carries a default actual, a call that supplies no
-  // actuals at all binds each formal to its default. This is the boundary input
-  // form of the default rule — the call site is empty parens on a let that has
-  // formals, distinct from a no-formal let. Both defaults apply: 7 + 3 = 10.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let f(a = 7, b = 3) = a + b;\n"
@@ -526,11 +501,6 @@ TEST(LetExpansionSimulation, EndToEndLetAllDefaultsCallOmitsAllActuals) {
 
 TEST(LetExpansionSimulation, EndToEndLetBodyWithSampledValueCall) {
   SimFixture f;
-  // §11.12: a let body may contain sampled value function calls (§16.9.3,
-  // §16.9.4). This builds that dependency from real source — a let whose body
-  // is $sampled(x) — and drives it through the full pipeline rather than
-  // hand-building the call AST. Expanding and evaluating the call in the
-  // instantiation context yields the argument's value (99).
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let get_sampled(x) = $sampled(x);\n"
@@ -552,16 +522,6 @@ TEST(LetExpansionSimulation, EndToEndLetBodyWithSampledValueCall) {
 
 TEST(LetExpansionSimulation, EndToEndRecursiveLetInstantiationIsReported) {
   SimFixture f;
-  // §11.12: recursive let instantiations are not permitted. A let whose body
-  // instantiates itself is built from real source and driven through the full
-  // pipeline; the design elaborates (the self-reference is not resolved until
-  // expansion), and when the initial block evaluates the call, the simulator
-  // detects the recursion and reports it as an error rather than expanding it
-  // without bound. The report stands on the self-reference in the let body
-  // rather than on the instantiation in the initial block, because the outer
-  // call at line 5 expands without complaint and it is the inner call at
-  // line 2, reached while that expansion is under way, that finds the let
-  // already being expanded.
   auto* design = ElaborateSrc(
       "module t;\n"
       "  let r(x) = r(x) + 1;\n"
@@ -577,8 +537,6 @@ TEST(LetExpansionSimulation, EndToEndRecursiveLetInstantiationIsReported) {
                             "recursive instantiation of let", 2, "11.12"));
 }
 
-// §11.12: recursive let instantiations are not permitted, and the report that
-// stops the expansion names §11.12.
 TEST(LetExpansionSimulation, RecursiveInstantiationNames11_12) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -594,11 +552,6 @@ TEST(LetExpansionSimulation, RecursiveInstantiationNames11_12) {
                             "recursive instantiation of let", 2, "11.12"));
 }
 
-// §11.12: the report names its subclause in the field DiagEngine::Emit renders,
-// so spelling it in the sentence as well prints it twice to the user. The
-// field assertion above passes either way, because Diagnostic::message and
-// Diagnostic::subclause are separate strings and neither test reads the line
-// the two are composed into.
 TEST(LetExpansionSimulation, RecursiveInstantiationMessageHoldsNoSubclause) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -617,10 +570,6 @@ TEST(LetExpansionSimulation, RecursiveInstantiationMessageHoldsNoSubclause) {
   }
 }
 
-// §11.12 with §26.3: a let declared in a package is a declaration of the
-// package, so it is referenced by its bare name through a wildcard import --
-// with named and positional actuals, from the module and from a class method
-// -- and through the package scope from anywhere.
 TEST(LetDeclarationSim, PackageLetThroughImportScopeAndMethod) {
   SimFixture f;
   std::string out = RunCapture(
@@ -651,12 +600,6 @@ TEST(LetDeclarationSim, PackageLetThroughImportScopeAndMethod) {
   EXPECT_EQ(out, "1 0 1 14 15\n");
 }
 
-// §11.12 casts the actual of a typed formal to the formal's type, its own
-// example `let ones_match(bits x, y) = x == y;` naming the type through a
-// typedef, and `y` taking the type written before `x`. Cast to the two-state
-// `bit [15:0]`, 16'b1x is 16'b10, which differs from 16'b11, so the let is 0.
-// The typedef name was not followed to the type it stands for, the actuals
-// kept their x, and the equality was x.
 TEST(LetConstructSim, ATypedefNamedFormalCastsItsActual) {
   SimFixture f;
   std::string out = RunCapture(
@@ -673,11 +616,6 @@ TEST(LetConstructSim, ATypedefNamedFormalCastsItsActual) {
   EXPECT_EQ(out, "0 1\n");
 }
 
-// A signing or a packed dimension written before a let formal is an implicit
-// type, `logic` with them, so the formal is typed and §11.12 casts its actual
-// to it: 8'hFF is -1 as a one-bit signed logic, 1 as a one-bit unsigned one
-// and 15 in four bits, and `y` takes the signing written before it. A signing
-// alone left the formal untyped, and each actual stayed 255.
 TEST(LetConstructSim, AnImplicitTypeOfASigningAloneCastsItsActual) {
   SimFixture f;
   std::string out = RunCapture(
@@ -693,11 +631,6 @@ TEST(LetConstructSim, AnImplicitTypeOfASigningAloneCastsItsActual) {
   EXPECT_EQ(out, "-1 -1 1 15\n");
 }
 
-// A formal written `untyped` after a typed one is untyped, and so is one
-// written with no type after it: their actuals are substituted as written,
-// 8'hFF reading 255. A formal written with no type after a typed one takes
-// that type, 8'hFF cast to a one-bit signed logic reading -1. The keyword was
-// not recorded, and `y` of h took the signing written before it.
 TEST(LetConstructSim, AnUntypedFormalTakesNoTypeWrittenBeforeIt) {
   SimFixture f;
   std::string out = RunCapture(
@@ -712,9 +645,6 @@ TEST(LetConstructSim, AnUntypedFormalTakesNoTypeWrittenBeforeIt) {
   EXPECT_EQ(out, "255 -1 255\n");
 }
 
-// §11.12 lets a let be declared in a subroutine body and used there after its
-// declaration: `plus(7)` with the default `y = 4` is 11. The declaration was
-// never made known, and the call read 0.
 TEST(LetConstructSim, ALetDeclaredInATaskIsUsedThere) {
   SimFixture f;
   std::string out = RunCapture(
@@ -729,12 +659,6 @@ TEST(LetConstructSim, ALetDeclaredInATaskIsUsedThere) {
   EXPECT_EQ(out, "11 8\n");
 }
 
-// §11.12's example b: a let body is bound where the let is declared, so `y`
-// names the module's x even where it is used inside a block declaring an x
-// of its own, and `b = a | y` with a 0 gives 1. The block's x is written
-// `static` because §6.21 requires that on a static variable declared with an
-// initializer in a procedural block. deltahdl printed 0: the block's
-// declaration replaced the module's x, which the let then read.
 TEST(LetConstructSim, ExampleBsLetReadsItsDeclarationScopesX) {
   SimFixture f;
   std::string out = RunCapture(
@@ -755,8 +679,6 @@ TEST(LetConstructSim, ExampleBsLetReadsItsDeclarationScopesX) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §11.12 gives each let the scope declaring it: two tasks' lets of one name
-// are their own, and a function's let reads that function's formal.
 TEST(LetSim, BlockLetsAreTheirScopesAndSeeTheirScopesNames) {
   SimFixture f;
   EXPECT_EQ(
@@ -775,10 +697,6 @@ TEST(LetSim, BlockLetsAreTheirScopesAndSeeTheirScopesNames) {
       "1\n2\n6\n");
 }
 
-// §11.12 substitutes the actuals into the body: a call in an actual of a call
-// to the same let is no recursion, an untyped formal keeps its actual's sign,
-// a typed one takes its type -- an int is 32 bits, a byte signed -- and the
-// body is sized by the expression the instance stands in.
 TEST(LetSim, ActualsAreSubstitutedWithTheirTypes) {
   SimFixture f;
   EXPECT_EQ(
@@ -801,9 +719,6 @@ TEST(LetSim, ActualsAreSubstitutedWithTheirTypes) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §11.12 resolves a let's default in the scope declaring it, so a block's own
-// `b` does not stand in for the module's, and each instance of a let whose
-// body calls $past keeps a history of its own (§16.9.3).
 TEST(LetSim, DefaultsReadTheDeclaringScopeAndInstancesKeepTheirHistory) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module m;\n"
@@ -827,11 +742,6 @@ TEST(LetSim, DefaultsReadTheDeclaringScopeAndInstancesKeepTheirHistory) {
             "1\n0 1\n$finish at time 31\n");
 }
 
-// §11.12 gives a let the scope declaring it and §23.9 resolves a reference to
-// the innermost visible declaration: an instance reads its own module's let,
-// a block's let hides its module's within the block and no further, a name
-// the module declares no let of reaches the compilation unit's, and a fork's
-// let is read by the fork's own statements.
 TEST(LetSim, ReferencesReachTheInnermostVisibleLet) {
   SimFixture f;
   EXPECT_EQ(
@@ -853,9 +763,6 @@ TEST(LetSim, ReferencesReachTheInnermostVisibleLet) {
       "2\n1\n3\n1 7\n5\n");
 }
 
-// §11.12 with §9.3.1: an unnamed block inside a function or a task is a scope
-// of its own, so its let hides the module's within the block and the body
-// reads the module's again once the block ends.
 TEST(LetSim, ASubroutineBlocksLetEndsWithTheBlock) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -875,9 +782,6 @@ TEST(LetSim, ASubroutineBlocksLetEndsWithTheBlock) {
             "31\n4\n1\n");
 }
 
-// §6.23 with §11.12, rule 2: a compilation unit's let formal written `type(b)`
-// takes the type of the unit's byte `b`, so its actual is cast to a byte,
-// 16'h1FF to -1, rather than passed through as 511.
 TEST(LetSim, ACompilationUnitLetsTypeReferenceFormalCastsItsActual) {
   SimFixture f;
   EXPECT_EQ(RunCapture("byte b;\n"

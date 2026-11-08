@@ -92,10 +92,6 @@ TEST(ContinuousAssignSchedulingSim, EvaluatedAtTimeZeroForConstantPropagation) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// The time-zero constant propagation §4.9.1 describes is not limited to a
-// literal right-hand side: a parameter (§11.2.1) is equally a constant value,
-// and the continuous-assignment process must propagate it into the target at
-// time zero with no source-element change ever occurring.
 TEST(ContinuousAssignSchedulingSim, ParameterConstantPropagatedAtTimeZero) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -114,11 +110,6 @@ TEST(ContinuousAssignSchedulingSim, ParameterConstantPropagatedAtTimeZero) {
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// §4.9.1 closes by noting that the continuous-assignment process it describes
-// also covers the implicit continuous assignments inferred from port
-// connections (see §4.9.6). An input port connected to a constant outside
-// expression is therefore evaluated at time zero, just like any explicit
-// continuous assignment, propagating the constant into the local port net.
 TEST(ContinuousAssignSchedulingSim,
      ImplicitPortAssignmentPropagatesConstantAtTimeZero) {
   SimFixture f;
@@ -137,10 +128,6 @@ TEST(ContinuousAssignSchedulingSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// The implicit continuous assignment inferred from a port connection is a real
-// continuous-assignment process: it stays sensitive to the source elements of
-// the outside expression and re-evaluates with current values whenever they
-// change, exactly as the explicit form does.
 TEST(ContinuousAssignSchedulingSim,
      ImplicitPortAssignmentTracksSourceElements) {
   SimFixture f;
@@ -163,11 +150,6 @@ TEST(ContinuousAssignSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("u.p")->value.ToUint64(), 101u);
 }
 
-// An OUTPUT port connection is the other syntactic position from which §4.9.6
-// infers an implicit continuous assignment: the driving side is the child's
-// local port and the target is the outside net. §4.9.1 says this too is a
-// continuous-assignment process, so a constant driven onto the child output
-// reaches the parent net at time zero without any procedural activity.
 TEST(ContinuousAssignSchedulingSim,
      ImplicitOutputPortAssignmentPropagatesConstantAtTimeZero) {
   SimFixture f;
@@ -188,9 +170,6 @@ TEST(ContinuousAssignSchedulingSim,
   EXPECT_EQ(f.scheduler.CurrentTime().ticks, 0u);
 }
 
-// The implicit output-port continuous assignment is likewise sensitive to its
-// source: when the child recomputes its output net the parent connection
-// tracks the new value with current-value semantics.
 TEST(ContinuousAssignSchedulingSim,
      ImplicitOutputPortAssignmentTracksSourceElements) {
   SimFixture f;

@@ -17,40 +17,18 @@
 namespace delta {
 namespace {
 
-// §37.11 Instance arrays: the VPI instance-array object model. These tests
-// observe the production helpers in vpi.cpp (and the VpiContext::Handle path
-// they feed) that apply the clause's two numbered "Details".
-//
-// The diagram's structural one-to-many edges (instance array -> instance,
-// module array -> module, program array -> param assign, interface array ->
-// instance, primitive array -> primitive, the access-by-index and name/size
-// properties) are walked by the generic object-model machinery and the
-// vpi_handle_by_index()/vpi_handle_by_multi_index() routines owned by §38.19
-// and §38.20, so they carry no production rule of their own here. The two
-// details that do - the connection-list expr (detail 1) and the range
-// iteration/bounds (detail 2) - are exercised below, resting on the
-// instance-array/primitive- array grouping the diagram defines.
-
-// The instance-array grouping the diagram draws: module, interface, and program
-// arrays plus the instance-array supertype, and a primitive array (itself a
-// kind of instance array). A non-array object kind is not in the group.
 TEST(InstanceArrayModel, InstanceArrayTypeClassification) {
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiInstanceArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiModuleArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiInterfaceArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiProgramArray));
-  // A primitive array is itself a kind of instance array.
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiPrimitiveArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiGateArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiSwitchArray));
   EXPECT_TRUE(VpiIsInstanceArrayType(vpiUdpArray));
-  // A single module instance is not an array.
   EXPECT_FALSE(VpiIsInstanceArrayType(vpiModule));
 }
 
-// The primitive-array subgroup: a primitive array and the gate, switch, and udp
-// array forms drawn beneath it. A module array is an instance array but not a
-// primitive array.
 TEST(InstanceArrayModel, PrimitiveArrayTypeClassification) {
   EXPECT_TRUE(VpiIsPrimitiveArrayType(vpiPrimitiveArray));
   EXPECT_TRUE(VpiIsPrimitiveArrayType(vpiGateArray));
@@ -60,8 +38,6 @@ TEST(InstanceArrayModel, PrimitiveArrayTypeClassification) {
   EXPECT_FALSE(VpiIsPrimitiveArrayType(vpiModule));
 }
 
-// D1: the expr reached from an instance array is the operation object listing
-// the array's actual connections - the array's operation child.
 TEST(InstanceArrayModel, ConnectionsAreTheOperationChild) {
   VpiObject array;
   array.type = vpiModuleArray;
@@ -71,25 +47,20 @@ TEST(InstanceArrayModel, ConnectionsAreTheOperationChild) {
   array.children.push_back(&op);
 
   EXPECT_EQ(VpiInstanceArrayConnections(&array), &op);
-  // A null handle, and a handle that is not an instance array, reach none.
   EXPECT_EQ(VpiInstanceArrayConnections(nullptr), nullptr);
   VpiObject single_module;
   single_module.type = vpiModule;
   single_module.children.push_back(&op);
   EXPECT_EQ(VpiInstanceArrayConnections(&single_module), nullptr);
-  // An instance array with no operation child reaches none.
   VpiObject empty_array;
   empty_array.type = vpiModuleArray;
   EXPECT_EQ(VpiInstanceArrayConnections(&empty_array), nullptr);
 }
 
-// D1 (edge): the connection list is located by object kind, not by position, so
-// it is still reached when a non-operation child precedes it among the array's
-// children.
 TEST(InstanceArrayModel, ConnectionsSkipNonOperationChildren) {
   VpiObject array;
   array.type = vpiInterfaceArray;
-  VpiObject leading;  // a non-operation child encountered first
+  VpiObject leading;
   leading.type = vpiRange;
   VpiObject op;
   op.type = vpiOperation;
@@ -100,16 +71,12 @@ TEST(InstanceArrayModel, ConnectionsSkipNonOperationChildren) {
   EXPECT_EQ(VpiInstanceArrayConnections(&array), &op);
 }
 
-// D1: that expr shall be a simple expression object of type vpiOperation whose
-// vpiOpType is vpiListOp.
 TEST(InstanceArrayModel, ConnectionExprIsListOperation) {
   VpiObject list_op;
   list_op.type = vpiOperation;
   list_op.op_type = vpiListOp;
   EXPECT_TRUE(VpiInstanceArrayConnectionsIsListOp(&list_op));
 
-  // A different operation type does not satisfy the rule, and neither does a
-  // non-operation object or a null handle.
   VpiObject other_op;
   other_op.type = vpiOperation;
   other_op.op_type = vpiConcatOp;
@@ -120,8 +87,6 @@ TEST(InstanceArrayModel, ConnectionExprIsListOperation) {
   EXPECT_FALSE(VpiInstanceArrayConnectionsIsListOp(nullptr));
 }
 
-// D1: traversing vpiExpr through the public handle path returns the list
-// operation, and the object it returns satisfies the type/op-type rule.
 TEST(InstanceArrayPublic, HandleExprReturnsListOperation) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -139,7 +104,6 @@ TEST(InstanceArrayPublic, HandleExprReturnsListOperation) {
   EXPECT_EQ(ctx.Get(vpiOpType, expr), vpiListOp);
   EXPECT_TRUE(VpiInstanceArrayConnectionsIsListOp(expr));
 
-  // A single instance (not an array) does not divert vpiExpr to a list op.
   VpiObject single;
   single.type = vpiModule;
   single.children.push_back(&op);
@@ -148,9 +112,6 @@ TEST(InstanceArrayPublic, HandleExprReturnsListOperation) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D1 (edge): the detail applies to the whole instance-array group, so a
-// primitive array (a gate array here) also diverts vpiExpr to its list
-// operation through the public handle path, not only a module array.
 TEST(InstanceArrayPublic, HandleExprDivertsForPrimitiveArray) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -169,9 +130,6 @@ TEST(InstanceArrayPublic, HandleExprDivertsForPrimitiveArray) {
   SetGlobalVpiContext(nullptr);
 }
 
-// D2: vpi_iterate(vpiRange, instance_array) returns one range per declared
-// dimension, beginning with the leftmost range and iterating through the
-// rightmost. A dynamic/queue/associative dimension contributes an empty range.
 TEST(InstanceArrayModel, RangesRunLeftmostToRightmost) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims =
@@ -179,18 +137,14 @@ TEST(InstanceArrayModel, RangesRunLeftmostToRightmost) {
 
   std::vector<VpiRangeDesc> ranges = VpiInstanceArrayRanges(dims);
   ASSERT_EQ(ranges.size(), 2u);
-  // Leftmost dimension first.
   EXPECT_EQ(ranges[0].left_expr, &l0);
   EXPECT_EQ(ranges[0].right_expr, &r0);
   EXPECT_EQ(ranges[1].left_expr, &l1);
   EXPECT_EQ(ranges[1].right_expr, &r1);
 
-  // No dimensions -> no ranges.
   EXPECT_TRUE(VpiInstanceArrayRanges({}).empty());
 }
 
-// D2: vpiLeftRange/vpiRightRange return the bounds of the leftmost dimension of
-// a (possibly multidimensional) array.
 TEST(InstanceArrayModel, LeftRightRangeReportLeftmostDimension) {
   VpiObject l0, r0, l1, r1;
   std::vector<VpiArrayDimension> dims(2);
@@ -204,18 +158,14 @@ TEST(InstanceArrayModel, LeftRightRangeReportLeftmostDimension) {
   EXPECT_EQ(VpiInstanceArrayLeftRange(dims), &l0);
   EXPECT_EQ(VpiInstanceArrayRightRange(dims), &r0);
 
-  // An array with no dimensions reports NULL for both relations.
   EXPECT_EQ(VpiInstanceArrayLeftRange({}), nullptr);
   EXPECT_EQ(VpiInstanceArrayRightRange({}), nullptr);
 }
 
-// D2: a leftmost dimension that is an empty range (dynamic/queue/associative)
-// makes both bound relations report NULL, deferring to §37.22's empty-range
-// rule.
 TEST(InstanceArrayModel, EmptyLeftmostRangeReportsNullBounds) {
   VpiObject l1, r1;
   std::vector<VpiArrayDimension> dims(2);
-  dims[0].kind = VpiDimensionKind::kQueue;  // empty range
+  dims[0].kind = VpiDimensionKind::kQueue;
   dims[1].kind = VpiDimensionKind::kFixedUnpacked;
   dims[1].left_expr = &l1;
   dims[1].right_expr = &r1;
@@ -227,20 +177,6 @@ TEST(InstanceArrayModel, EmptyLeftmostRangeReportsNullBounds) {
   EXPECT_EQ(VpiInstanceArrayRightRange(dims), nullptr);
 }
 
-// -----------------------------------------------------------------------------
-// The class edges. §37.11 draws `instance array` in bold italic inside a dotted
-// enclosure holding the module, interface and program arrays, with `primitive
-// array` -- itself an enclosure over the gate, switch and udp arrays -- nested
-// among them. §37.4.1 makes each a grouping rather than an object, so
-// vpiInstanceArray and vpiPrimitiveArray are the two groups' names; matching
-// either against an object's own type, which is what the generic traversal
-// does, reached no array a design instantiates.
-// -----------------------------------------------------------------------------
-
-// §37.5 (figure, module <==> instance array): a module's instance arrays are
-// what the edge drawn to the class reaches. A primitive array is drawn inside
-// the same enclosure, so it comes back too; a module that is not an array does
-// not.
 TEST(InstanceArrayPublic, AModuleIteratesTheInstanceArraysItHolds) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -265,9 +201,6 @@ TEST(InstanceArrayPublic, AModuleIteratesTheInstanceArraysItHolds) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.11 (figure, primitive array): the nested enclosure names a group of its
-// own, so its edge reaches the gate, switch and udp arrays and not the module
-// array drawn beside them.
 TEST(InstanceArrayPublic, ThePrimitiveArrayEdgeReachesOnlyPrimitiveArrays) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -292,8 +225,6 @@ TEST(InstanceArrayPublic, ThePrimitiveArrayEdgeReachesOnlyPrimitiveArrays) {
   SetGlobalVpiContext(nullptr);
 }
 
-// §37.11: a module holding no array of either kind reaches none, which §38.23
-// reports as no iterator.
 TEST(InstanceArrayPublic, AModuleWithNoArraysIteratesToNone) {
   VpiContext ctx;
   SetGlobalVpiContext(&ctx);
@@ -311,8 +242,6 @@ TEST(InstanceArrayPublic, AModuleWithNoArraysIteratesToNone) {
   SetGlobalVpiContext(nullptr);
 }
 
-// The instance arrays of a run: those a design declares, built from the
-// elaborated design rather than by hand (#4932, #5070).
 class InstanceArraysOfARun : public VpiDesignRun {
  protected:
   static int IntOf(vpiHandle obj) {
@@ -322,15 +251,12 @@ class InstanceArraysOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // The first terminal of `prim`.
   static vpiHandle FirstTerm(vpiHandle prim) {
     vpiHandle it = vpi_iterate(vpiPrimTerm, prim);
     return it == nullptr ? nullptr : vpi_scan(it);
   }
 };
 
-// A module instance array is an object over its elements, sized and ranged as
-// declared and reaching each by its index, which each element reaches too.
 TEST_F(InstanceArraysOfARun, AModuleArrayIsAnObjectOverItsElements) {
   Run("module sub; endmodule\n"
       "module top; sub arr[2:4] (); endmodule\n");
@@ -348,7 +274,6 @@ TEST_F(InstanceArraysOfARun, AModuleArrayIsAnObjectOverItsElements) {
   EXPECT_EQ(IntOf(vpi_handle(vpiIndex, element)), 3);
 }
 
-// An interface instance array is an interface array.
 TEST_F(InstanceArraysOfARun, AnInterfaceArrayIsAnInterfaceArray) {
   Run("interface ifc; endinterface\n"
       "module top; ifc ifs[0:1] (); endmodule\n");
@@ -358,10 +283,6 @@ TEST_F(InstanceArraysOfARun, AnInterfaceArrayIsAnInterfaceArray) {
   EXPECT_EQ(vpi_get(vpiSize, ifs), 2);
 }
 
-// A gate instance array is a gate array over a gate per element, each reaching
-// its index, and an element's terminal on a vector as wide as the array is
-// that vector's bit the element takes, the rightmost element the least
-// significant (§28.3.6).
 TEST_F(InstanceArraysOfARun, AGateArrayIsAnObjectOverItsGates) {
   Run("module top; wire [3:0] y; logic [3:0] a, b;\n"
       "  and g[3:0] (y, a, b);\n"
@@ -383,7 +304,6 @@ TEST_F(InstanceArraysOfARun, AGateArrayIsAnObjectOverItsGates) {
             VpiObjectOf(vpi_handle_by_index(By("top.y"), 2)));
 }
 
-// The terminals of `prim`, in the order written.
 std::vector<vpiHandle> TermsOf(vpiHandle prim) {
   std::vector<vpiHandle> terms;
   vpiHandle it = vpi_iterate(vpiPrimTerm, prim);
@@ -393,16 +313,11 @@ std::vector<vpiHandle> TermsOf(vpiHandle prim) {
   return terms;
 }
 
-// The one primitive array `scope` declares.
 vpiHandle OnlyPrimitiveArray(vpiHandle scope) {
   vpiHandle it = vpi_iterate(vpiPrimitiveArray, scope);
   return it == nullptr ? nullptr : vpi_scan(it);
 }
 
-// §28.3.6: a scalar terminal connects to every element whole, and a terminal
-// as wide as the array gives each element its bit, a constant as a named
-// vector does: 2'b01 gives element 0 the constant 1 and element 1 the
-// constant 0. The constant was connected whole, both elements reading 2'b01.
 TEST_F(InstanceArraysOfARun, AGateArraysConstantTerminalIsSharedOutPerElement) {
   Run("module top; wire [1:0] y; logic c;\n"
       "  and g[1:0] (y, 2'b01, c);\n"
@@ -425,8 +340,6 @@ TEST_F(InstanceArraysOfARun, AGateArraysConstantTerminalIsSharedOutPerElement) {
             VpiObjectOf(By("top.c")));
 }
 
-// §28.3.5: a range whose two bounds are equal declares one instance, and its
-// one-bit terminals connect to it whole.
 TEST_F(InstanceArraysOfARun, AOneElementGateArrayTakesItsTerminalsWhole) {
   Run("module top; wire y; logic a, b;\n"
       "  and g[0:0] (y, a, b);\n"
@@ -439,8 +352,6 @@ TEST_F(InstanceArraysOfARun, AOneElementGateArrayTakesItsTerminalsWhole) {
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiExpr, out)), VpiObjectOf(By("top.y")));
 }
 
-// A gate array an instance below the top declares connects each element to
-// the bit of that instance's own vector.
 TEST_F(InstanceArraysOfARun, AGateArrayBelowTheTopTakesItsInstancesBits) {
   Run("module sub; wire [1:0] y; logic [1:0] a, b;\n"
       "  and g[1:0] (y, a, b);\n"
@@ -454,11 +365,6 @@ TEST_F(InstanceArraysOfARun, AGateArrayBelowTheTopTakesItsInstancesBits) {
             VpiObjectOf(vpi_handle_by_index(By("top.s.y"), 1)));
 }
 
-// §28.3.6: a select as wide as the array, of a packed subarray or of an
-// unpacked element, gives each element its bit, and the element's prim term
-// reaches it: g[k] p's net bit p[1][k], and h[k] bit k of the element mem[1].
-// The model gave every element the whole select, holding no bit objects of
-// its own, while the run connected each element to its bit.
 TEST_F(InstanceArraysOfARun, ASubarrayOrElementTerminalReachesEachElementsBit) {
   Run("module top; wire [1:0][1:0] p; logic [1:0] mem [0:1];\n"
       "  wire [1:0] y, z;\n"
@@ -492,11 +398,6 @@ TEST_F(InstanceArraysOfARun, ASubarrayOrElementTerminalReachesEachElementsBit) {
   }
 }
 
-// §28.3.6 with §11.4.10: a bitwise operator works a bit at a time, so the bit
-// element k connects to of `a & b` is a[k] & b[k], and of `~a` it is ~a[k]:
-// each element's prim term reaches an operation over the operands' net bits.
-// Built as a select of the whole operation, element 0 reached the net a whole,
-// an operand of it, and element 1 reached nothing.
 TEST_F(InstanceArraysOfARun, ABitwiseTerminalReachesAnOperationOfEachBit) {
   Run("module top; wire [1:0] a, b, y, z;\n"
       "  buf g[1:0] (y, a & b);\n"
@@ -531,7 +432,6 @@ TEST_F(InstanceArraysOfARun, ABitwiseTerminalReachesAnOperationOfEachBit) {
   }
 }
 
-// §37.11: an instance array of switches is a switch array over switches.
 TEST_F(InstanceArraysOfARun, ASwitchInstanceArrayIsASwitchArray) {
   Run("module top; wire [1:0] o; logic [1:0] i; logic c;\n"
       "  nmos m[1:0] (o, i, c);\n"
@@ -542,10 +442,6 @@ TEST_F(InstanceArraysOfARun, ASwitchInstanceArrayIsASwitchArray) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(array, 0)), vpiSwitch);
 }
 
-// §11.5.1 makes a read outside a vector's bounds legal, yielding x. A gate
-// array whose terminal is such a select still gives each element a prim term
-// per terminal, whatever the model has for the select itself, and the other
-// terminals reach what they connect.
 TEST_F(InstanceArraysOfARun, AnElementKeepsEveryTerminalOfAnOutOfRangeSelect) {
   Run("module top; wire [1:0] y; logic [1:0] v; logic c;\n"
       "  and g[1:0] (y, v[5], c);\n"
@@ -558,8 +454,6 @@ TEST_F(InstanceArraysOfARun, AnElementKeepsEveryTerminalOfAnOutOfRangeSelect) {
             VpiObjectOf(By("top.c")));
 }
 
-// The figure: an instance array reaches its elements through the `instance`
-// class, which groups the kinds an element is.
 TEST_F(InstanceArraysOfARun, AnInstanceArrayIteratesItsInstances) {
   Run("module sub; endmodule\n"
       "module top; sub arr[1:0] (); endmodule\n");
@@ -567,8 +461,6 @@ TEST_F(InstanceArraysOfARun, AnInstanceArrayIteratesItsInstances) {
             (std::vector<std::string>{"arr[0]", "arr[1]"}));
 }
 
-// The full name of what `assign` reaches through vpiLhs, and the value of
-// what it reaches through vpiRhs.
 struct AssignOf {
   std::string lhs;
   int rhs;
@@ -589,12 +481,6 @@ std::vector<AssignOf> ParamAssignsOf(vpiHandle array) {
   return assigns;
 }
 
-// The figure with §23.10.2: a module array reaches a param assign per
-// parameter value assignment its instantiation writes, assigning the
-// parameter of the leftmost element by name or, written in order, in the
-// order the module declares its parameters, a local parameter being none of
-// them (§6.20.4). `.Q()` assigns no value (§23.10.2.2) and is no param
-// assign.
 TEST_F(InstanceArraysOfARun, AModuleArrayReachesItsParamAssigns) {
   Run("module sub #(parameter int P = 1, parameter int Q = 2); endmodule\n"
       "module ord; parameter int A = 1; localparam int L = 3;\n"
@@ -610,7 +496,6 @@ TEST_F(InstanceArraysOfARun, AModuleArrayReachesItsParamAssigns) {
             (std::vector<AssignOf>{{"top.o[0].A", 7}, {"top.o[0].B", 8}}));
 }
 
-// The primitive array of `kind` that `scope` declares, null for none.
 vpiHandle PrimitiveArrayOfKind(vpiHandle scope, int kind) {
   vpiHandle it = vpi_iterate(vpiPrimitiveArray, scope);
   while (vpiHandle array = it == nullptr ? nullptr : vpi_scan(it)) {
@@ -619,10 +504,6 @@ vpiHandle PrimitiveArrayOfKind(vpiHandle scope, int kind) {
   return nullptr;
 }
 
-// The figure with §29.8: an array of UDP instances is a udp array over a udp
-// per element, each reaching its udp defn and the array, and the array
-// reaching the delay every element is instantiated with; a gate array reaches
-// its delay too, and a gate of no array reaches no primitive array.
 TEST_F(InstanceArraysOfARun, AUdpArrayIsAnObjectOverItsUdps) {
   Run("primitive my_and(o, a, b);\n"
       "  output o;\n"
@@ -668,9 +549,6 @@ TEST_F(InstanceArraysOfARun, AUdpArrayIsAnObjectOverItsUdps) {
   EXPECT_EQ(vpi_handle(vpiPrimitiveArray, lone), nullptr);
 }
 
-// Detail 2: an array of instances of two dimensions is one module array over
-// all its elements, reaching a range per dimension, leftmost first, and its
-// leftmost dimension's bounds through vpiLeftRange and vpiRightRange.
 TEST_F(InstanceArraysOfARun, AModuleArrayReachesARangePerDimension) {
   Run("module sub; endmodule\n"
       "module top; sub u[1:0][2:4] (); endmodule\n");
@@ -689,10 +567,6 @@ TEST_F(InstanceArraysOfARun, AModuleArrayReachesARangePerDimension) {
   EXPECT_EQ(IntOf(vpi_handle(vpiRightRange, u)), 0);
 }
 
-// Detail 1: an instance array reaches through vpiExpr a vpiListOp operation
-// whose operands are the connections the instantiation wrote to the array, as
-// written rather than as each element's share; a port it left unconnected adds
-// none.
 TEST_F(InstanceArraysOfARun, AnInstanceArrayReachesTheConnectionsWritten) {
   Run("module sub (input a, output o); assign o = a; endmodule\n"
       "module top; logic w; wire [1:0] y, z;\n"
@@ -713,9 +587,6 @@ TEST_F(InstanceArraysOfARun, AnInstanceArrayReachesTheConnectionsWritten) {
   EXPECT_EQ(ObjectsOf(vpiOperand, unconnected).size(), 1U);
 }
 
-// §38.19: an index select of an instance array names an element alone, never
-// the operation of its connections or a param assign, so an index no element
-// of `s[2:1]` stands at selects nothing.
 TEST_F(InstanceArraysOfARun, AnIndexSelectOfAnInstanceArrayNamesAnElement) {
   Run("module sub #(parameter int P = 1) (input a); endmodule\n"
       "module top; logic w;\n"
@@ -728,11 +599,6 @@ TEST_F(InstanceArraysOfARun, AnIndexSelectOfAnInstanceArrayNamesAnElement) {
   EXPECT_EQ(vpi_handle_by_index(s, 0), nullptr);
 }
 
-// The figure's access by index with §38.20: an element of a two-dimensional
-// array of instances is named by both its indices at once, u[1][3] by {1, 3},
-// and a pair naming no element names nothing. §38.19: one index names no
-// instance of such an array, while it names an element of a one-dimensional
-// one, by multiple index too.
 TEST_F(InstanceArraysOfARun, AnElementIsNamedByEveryIndex) {
   Run("module sub; endmodule\n"
       "module top; sub u[1:0][2:4] (); sub w[1:0] (); endmodule\n");
@@ -753,10 +619,6 @@ TEST_F(InstanceArraysOfARun, AnElementIsNamedByEveryIndex) {
             VpiObjectOf(By("top.w[1]")));
 }
 
-// The figure with §23.10.2 and §23.4: an array of a module declared nested in
-// the instantiating module's body assigns its ordered values to the parameters
-// that declaration declares, and an array an instance of a nested module
-// writes is reached from what its declaration writes (#8266).
 TEST_F(InstanceArraysOfARun, ANestedModulesArraysReachTheirParamAssigns) {
   Run("module sub #(parameter int P = 1); endmodule\n"
       "module top;\n"

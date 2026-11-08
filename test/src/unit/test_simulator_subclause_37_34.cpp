@@ -18,31 +18,6 @@
 namespace delta {
 namespace {
 
-// §37.34 Constraint, constraint ordering, distribution: the VPI object model
-// for a constraint, its constraint items (constraint orderings and constraint
-// expressions), and the distribution / dist-item objects. The diagram's bare
-// relation arrows (vpiParent to the class obj, the constraint-ordering
-// vpiSolveBefore/vpiSolveAfter edges to exprs, the dist-item vpiValueRange/
-// vpiWeight edges, the distribution<->dist-item link) carry no clause-specific
-// rule and are served by the generic object-model and §38 traversal routines.
-// This clause's own rules are the numbered Details, and the tests below observe
-// the production code that applies them:
-//   D1 - for a constraint, vpiAutomatic reflects the declaration keyword (not a
-//        lifetime); zero means it was declared static (the kVpiAutomatic
-//        dispatch, observed on a constraint object).
-//   D2 - the memory-allocation property is owned by §37.3.7 (delegated).
-//   D3 - a constraint's vpiAccessType is vpiExternAcc or zero, never a third
-//        value (the vpiAccessType dispatch with its constraint clamp).
-//   D4 - the vpiConstraint iteration returns constraints in declaration order
-//        (the ordered child walk of Iterate).
-//   D5 - the vpiConstraintItem iteration returns the constraint items in the
-//        order they occur (the VpiIsConstraintItemType grouping in Iterate).
-// The diagram also annotates the int/bool constraint and dist-item properties
-// (vpiVirtual, vpiIsConstraintEnabled, vpiDistType); these are field-backed
-// getters observed at the end.
-
-// The fixture installs a context so the public vpi_get/vpi_iterate/vpi_scan
-// entry points run their real dispatch.
 class ConstraintDistribution : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -56,23 +31,17 @@ class ConstraintDistribution : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// D5: a constraint's vpiConstraintItem iteration collects the constraint items
-// it groups - the constraint orderings and the kinds §37.38's constraint expr
-// class groups, an expression such as an operation among them - in the order
-// they occur, and nothing else. An attribute child is no constraint item and is
-// excluded, showing the grouping matches the constraint-item kinds rather than
-// every child (#5841).
 TEST_F(ConstraintDistribution, ConstraintItemIterationReturnsItemsInOrder) {
   VpiObject ordering;
-  ordering.type = vpiConstraintOrdering;  // a solve-before/after ordering
+  ordering.type = vpiConstraintOrdering;
   VpiObject not_item;
-  not_item.type = vpiAttribute;  // an attribute, no constraint item
+  not_item.type = vpiAttribute;
   VpiObject implication;
-  implication.type = vpiImplication;  // a constraint expression
+  implication.type = vpiImplication;
   VpiObject expr;
-  expr.type = vpiOperation;  // an expression, a constraint expression too
+  expr.type = vpiOperation;
   VpiObject var;
-  var.type = vpiIntVar;  // a name standing alone as a constraint expression
+  var.type = vpiIntVar;
 
   VpiObject constraint;
   constraint.type = vpiConstraint;
@@ -83,22 +52,18 @@ TEST_F(ConstraintDistribution, ConstraintItemIterationReturnsItemsInOrder) {
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 4u);                  // the non-item child is excluded
-  EXPECT_EQ(VpiObjectOf(seen[0]), &ordering);  // occurrence order is preserved
+  ASSERT_EQ(seen.size(), 4u);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &ordering);
   EXPECT_EQ(VpiObjectOf(seen[1]), &implication);
   EXPECT_EQ(VpiObjectOf(seen[2]), &expr);
   EXPECT_EQ(VpiObjectOf(seen[3]), &var);
 }
 
-// D4: the vpiConstraint iteration returns a class's constraints in syntactic
-// declaration order. The constraints are stored as children in that order, and
-// a non-constraint child is filtered out, so the iteration hands them back in
-// order.
 TEST_F(ConstraintDistribution, ConstraintIterationReturnsDeclarationOrder) {
   VpiObject c0;
   c0.type = vpiConstraint;
   VpiObject other;
-  other.type = vpiReg;  // a class member that is not a constraint
+  other.type = vpiReg;
   VpiObject c1;
   c1.type = vpiConstraint;
   VpiObject c2;
@@ -113,24 +78,18 @@ TEST_F(ConstraintDistribution, ConstraintIterationReturnsDeclarationOrder) {
   std::vector<vpiHandle> seen;
   while (vpiHandle h = vpi_scan(it)) seen.push_back(h);
 
-  ASSERT_EQ(seen.size(), 3u);            // the non-constraint child is excluded
-  EXPECT_EQ(VpiObjectOf(seen[0]), &c0);  // declaration order is preserved
+  ASSERT_EQ(seen.size(), 3u);
+  EXPECT_EQ(VpiObjectOf(seen[0]), &c0);
   EXPECT_EQ(VpiObjectOf(seen[1]), &c1);
   EXPECT_EQ(VpiObjectOf(seen[2]), &c2);
 }
 
-// D4 (second sentence): the position of a constraint declared extern is
-// determined by its prototype's position, so the vpiConstraint iteration must
-// hand back an extern constraint in its declaration-order slot rather than
-// reorder or drop it. Here the extern constraint (reporting vpiExternAcc, the
-// input form that distinguishes it from the ordinary declarations around it)
-// sits between two local constraints and comes back in that middle position.
 TEST_F(ConstraintDistribution, ExternConstraintKeepsPrototypePosition) {
   VpiObject c0;
-  c0.type = vpiConstraint;  // an ordinary in-class constraint
+  c0.type = vpiConstraint;
   VpiObject c_extern;
   c_extern.type = vpiConstraint;
-  c_extern.access_type = vpiExternAcc;  // declared extern; positioned by proto
+  c_extern.access_type = vpiExternAcc;
   VpiObject c2;
   c2.type = vpiConstraint;
 
@@ -145,18 +104,11 @@ TEST_F(ConstraintDistribution, ExternConstraintKeepsPrototypePosition) {
 
   ASSERT_EQ(seen.size(), 3u);
   EXPECT_EQ(VpiObjectOf(seen[0]), &c0);
-  EXPECT_EQ(VpiObjectOf(seen[1]),
-            &c_extern);  // the extern constraint holds its slot
+  EXPECT_EQ(VpiObjectOf(seen[1]), &c_extern);
   EXPECT_EQ(VpiObjectOf(seen[2]), &c2);
-  // Its extern-ness is what the ordering had to preserve past, confirmed here.
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&c_extern)), vpiExternAcc);
 }
 
-// D3: a constraint's vpiAccessType reports vpiExternAcc when it is declared
-// outside its enclosing class declaration and zero otherwise - never a third
-// value. A stored value that is neither collapses to zero. The clamp is
-// specific to constraints, so another object kind reports its stored access
-// type as-is.
 TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   VpiObject extern_constraint;
   extern_constraint.type = vpiConstraint;
@@ -169,39 +121,29 @@ TEST_F(ConstraintDistribution, AccessTypeIsExternAccOrZero) {
   local_constraint.access_type = 0;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&local_constraint)), 0);
 
-  // Any other stored value collapses to zero for a constraint.
   VpiObject odd_constraint;
   odd_constraint.type = vpiConstraint;
-  odd_constraint.access_type = 99;  // not vpiExternAcc
+  odd_constraint.access_type = 99;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&odd_constraint)), 0);
 
-  // The clamp is scoped to constraints: another object the property is drawn
-  // on keeps its own rule. §37.41 draws it on the task func enclosure, where a
-  // function reports the access it was declared with.
   VpiObject non_constraint;
   non_constraint.type = vpiFunction;
   non_constraint.access_type = 99;
   EXPECT_EQ(vpi_get(vpiAccessType, VpiHandleOf(&non_constraint)), 99);
 }
 
-// D1: for a constraint, vpiAutomatic reflects the keyword written on the
-// declaration rather than a storage lifetime. A constraint declared without the
-// automatic keyword (static) reports zero; one declared with it reports one.
 TEST_F(ConstraintDistribution, AutomaticReflectsKeywordNotLifetime) {
   VpiObject static_constraint;
   static_constraint.type = vpiConstraint;
-  static_constraint.automatic = false;  // declared static
+  static_constraint.automatic = false;
   EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&static_constraint)), 0);
 
   VpiObject automatic_constraint;
   automatic_constraint.type = vpiConstraint;
-  automatic_constraint.automatic = true;  // declared with the automatic keyword
+  automatic_constraint.automatic = true;
   EXPECT_EQ(vpi_get(vpiAutomatic, VpiHandleOf(&automatic_constraint)), 1);
 }
 
-// The diagram's int/bool constraint and dist-item properties: vpiVirtual and
-// vpiIsConstraintEnabled are field-backed Booleans on a constraint, and
-// vpiDistType is the int distribution kind a dist item carries.
 TEST_F(ConstraintDistribution, ScalarPropertiesAreReported) {
   VpiObject constraint;
   constraint.type = vpiConstraint;
@@ -221,11 +163,8 @@ TEST_F(ConstraintDistribution, ScalarPropertiesAreReported) {
   EXPECT_EQ(vpi_get(vpiDistType, VpiHandleOf(&dist_item)), vpiDivDist);
 }
 
-// A design run with a PLI application registered, whose class defns' and
-// class objects' constraints are read back from the model the run built.
 class ConstraintsOfARun : public VpiDesignRun {
  protected:
-  // The names of the constraints `ref` iterates, in the iteration's order.
   static std::vector<std::string> ConstraintNames(vpiHandle ref) {
     std::vector<std::string> names;
     vpiHandle it = vpi_iterate(vpiConstraint, ref);
@@ -237,13 +176,6 @@ class ConstraintsOfARun : public VpiDesignRun {
   }
 };
 
-// §37.31 with §37.34: a class defn iterates a constraint per constraint block
-// the class declares, in declaration order, an extern one in its prototype's
-// place (D4). Each is named after its block and full-named through the class,
-// reports vpiAutomatic 0 only where it was declared
-// static (D1, §18.5.10) and vpiExternAcc only where a prototype declares it
-// (D3, §18.5.1), and is enabled, as every constraint is at first (§18.9)
-// (#5839).
 TEST_F(ConstraintsOfARun, AClassDefnIteratesItsConstraints) {
   Run("module top;\n"
       "  class C; rand int x;\n"
@@ -270,13 +202,6 @@ TEST_F(ConstraintsOfARun, AClassDefnIteratesItsConstraints) {
   EXPECT_EQ(vpi_get(vpiIsConstraintEnabled, c), 1);
 }
 
-// §37.33 with §37.34: a class obj iterates a constraint per constraint block
-// of the class it was created with and the classes that class extends, the
-// base's first. Each reaches the class obj through vpiParent, and reports as
-// enabled what constraint_mode() last set on the object (§18.9), a static
-// block's state being the class's (§18.5.10). A call of constraint_mode
-// applied to a block is applied to that block's constraint of the object the
-// handle references (§37.42 detail 2) (#5838).
 TEST_F(ConstraintsOfARun, AClassObjIteratesItsConstraints) {
   Run("module top;\n"
       "  class B; rand int x; constraint b { x < 9; } endclass\n"
@@ -309,9 +234,6 @@ TEST_F(ConstraintsOfARun, AClassObjIteratesItsConstraints) {
   EXPECT_EQ(vpi_get(vpiType, prefix), vpiConstraint);
 }
 
-// §37.34: the figure draws a constraint's vpiParent to the class obj holding
-// it and from nowhere else, so a class defn's constraint, and one held by
-// nothing, reach none.
 TEST_F(ConstraintsOfARun, OnlyAClassObjsConstraintReachesAParent) {
   Run("module top; class C; rand int x; constraint c { x > 0; } endclass\n"
       "endmodule\n");
@@ -323,9 +245,6 @@ TEST_F(ConstraintsOfARun, OnlyAClassObjsConstraintReachesAParent) {
   EXPECT_EQ(vpi_handle(vpiParent, VpiHandleOf(&loose)), nullptr);
 }
 
-// §37.34 detail 5 with §18.5.1: a constraint an extern prototype declares
-// holds the items the external constraint block completing it writes, in
-// order (#7135).
 TEST_F(ConstraintsOfARun, AnExternConstraintHoldsItsBlocksItems) {
   Run("module top;\n"
       "  class C; rand int x; extern constraint e; endclass\n"
@@ -339,9 +258,6 @@ TEST_F(ConstraintsOfARun, AnExternConstraintHoldsItsBlocksItems) {
   EXPECT_EQ(vpi_get(vpiOpType, kItems[1]), vpiLtOp);
 }
 
-// §37.34 with §18.5.2: the pure constraint an abstract class declares is the
-// virtual one, an obligation every non-abstract class extending it fulfils,
-// and the constraint fulfilling it, like any other, is not (#7134).
 TEST_F(ConstraintsOfARun, APureConstraintIsVirtual) {
   Run("module top;\n"
       "  virtual class A; rand int x; pure constraint p; endclass\n"
@@ -355,8 +271,6 @@ TEST_F(ConstraintsOfARun, APureConstraintIsVirtual) {
   ASSERT_NE(fulfilling, nullptr);
   EXPECT_EQ(vpi_get(vpiVirtual, pure), 1);
   EXPECT_EQ(vpi_get(vpiVirtual, fulfilling), 0);
-  // No external constraint block completes a pure constraint, so it was not
-  // declared outside its class (D3).
   EXPECT_EQ(vpi_get(vpiAccessType, pure), 0);
 }
 

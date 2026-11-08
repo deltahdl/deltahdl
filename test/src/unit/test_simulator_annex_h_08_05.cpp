@@ -8,16 +8,6 @@
 
 using namespace delta;
 
-// Annex H.8.5 (Allocating actual arguments for SystemVerilog-specific
-// types): relevant only to calling an exported SystemVerilog subroutine
-// from C, where the caller is responsible for allocating every actual
-// passed by reference; static allocation requires knowledge of the data
-// type, and where the type involves SystemVerilog packed arrays a C array
-// of the canonical type, svLogicVecVal or svBitVecVal, is allocated and
-// initialized before being passed by reference to the export. The cases
-// check which actuals the caller allocates and the C declaration that
-// allocates each.
-
 namespace {
 
 DpiArg Formal(const char* name, DataTypeKind type, Direction direction,
@@ -30,9 +20,6 @@ DpiArg Formal(const char* name, DataTypeKind type, Direction direction,
   return formal;
 }
 
-// §H.8.5: the caller allocates an actual passed by reference -- an output
-// or inout of any type, an input packed array -- and not one passed by
-// value, which it hands over as it is.
 TEST(DpiExportActualAllocation, TheCallerAllocatesWhatIsPassedByReference) {
   EXPECT_TRUE(DpiCallerAllocatesExportActual(
       Formal("o", DataTypeKind::kInt, Direction::kOutput)));
@@ -46,11 +33,6 @@ TEST(DpiExportActualAllocation, TheCallerAllocatesWhatIsPassedByReference) {
       Formal("s", DataTypeKind::kString, Direction::kInput)));
 }
 
-// §H.8.5: a small type's actual is one C object of Table H.1's type, and a
-// packed array's is a C array of the canonical type with one element per
-// 32 bits -- svBitVecVal v[1] for bit [7:0], svLogicVecVal w[2] for logic
-// [39:0], svLogicVecVal t[2] for a time -- whatever the direction, the
-// const of an input being the export's to see and not the allocation's.
 TEST(DpiExportActualAllocation, APackedActualIsACArrayOfCanonicalChunks) {
   EXPECT_EQ(DpiCAllocationOfExportActual(
                 Formal("o", DataTypeKind::kInt, Direction::kOutput)),

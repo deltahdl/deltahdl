@@ -27,10 +27,6 @@
 namespace delta {
 namespace {
 
-// §38.36.3: the simulator executes a callback by invoking its cb_rtn and
-// passing a pointer to the s_cb_data structure, whose reason field holds the
-// reason for the callback. This recorder lets a test observe that contract
-// being applied.
 int g_invocations = 0;
 int g_seen_reason = 0;
 void* g_seen_user_data = nullptr;
@@ -48,13 +44,11 @@ int RecordingCb(s_cb_data* data) {
   return 0;
 }
 
-// §38.36.3 action callbacks: reasons that every VPI-compliant tool provides.
 const int kActionReasons[] = {
     cbEndOfCompile, cbStartOfSimulation, cbEndOfSimulation, cbError,
     cbPLIError,     cbTchkViolation,     cbSignal,
 };
 
-// §38.36.3 feature callbacks: optional, tool-specific reasons.
 const int kFeatureReasons[] = {
     cbStartOfSave,      cbEndOfSave,       cbStartOfRestart,
     cbEndOfRestart,     cbStartOfReset,    cbEndOfReset,
@@ -74,7 +68,6 @@ class VpiActionFeatureCallbacks : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Registers a callback for `reason`, placed on `on` where one is given.
   vpiHandle Register(int reason, VpiObject* on = nullptr) {
     s_cb_data cb = {};
     cb.reason = reason;
@@ -91,8 +84,6 @@ class VpiActionFeatureCallbacks : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.36.3: the listed action-related callbacks shall be defined. Registering
-// each one yields a callback handle and records the reason that was requested.
 TEST_F(VpiActionFeatureCallbacks, ActionReasonsAreDefinedAndRegister) {
   for (int reason : kActionReasons) {
     s_cb_data cb = {};
@@ -104,8 +95,6 @@ TEST_F(VpiActionFeatureCallbacks, ActionReasonsAreDefinedAndRegister) {
   }
 }
 
-// §38.36.3: the feature-related callback reasons are likewise registrable
-// through the same vpi_register_cb() mechanism.
 TEST_F(VpiActionFeatureCallbacks, FeatureReasonsAreDefinedAndRegister) {
   for (int reason : kFeatureReasons) {
     s_cb_data cb = {};
@@ -117,7 +106,6 @@ TEST_F(VpiActionFeatureCallbacks, FeatureReasonsAreDefinedAndRegister) {
   }
 }
 
-// §38.36.3: every action and feature reason denotes a distinct callback reason.
 TEST_F(VpiActionFeatureCallbacks, ReasonCodesAreDistinct) {
   std::set<int> seen;
   for (int reason : kActionReasons) seen.insert(reason);
@@ -126,9 +114,6 @@ TEST_F(VpiActionFeatureCallbacks, ReasonCodesAreDistinct) {
             std::size(kActionReasons) + std::size(kFeatureReasons));
 }
 
-// §38.36.3: the only fields that need to be set for an action or feature
-// callback are the reason, the callback routine, and (optionally) user_data.
-// Registration succeeds with the remaining fields left at their defaults.
 TEST_F(VpiActionFeatureCallbacks, MinimalFieldsSufficeForRegistration) {
   int payload = 0;
   s_cb_data cb = {};
@@ -147,8 +132,6 @@ TEST_F(VpiActionFeatureCallbacks, MinimalFieldsSufficeForRegistration) {
   EXPECT_EQ(stored.index, 0);
 }
 
-// §38.36.3: when the callback occurs, the application routine is passed a
-// pointer to an s_cb_data structure whose reason field holds the reason.
 TEST_F(VpiActionFeatureCallbacks, DispatchActionCallbackPassesReason) {
   Register(cbStartOfSimulation);
 
@@ -159,8 +142,6 @@ TEST_F(VpiActionFeatureCallbacks, DispatchActionCallbackPassesReason) {
   EXPECT_EQ(g_seen_reason, cbStartOfSimulation);
 }
 
-// §38.36.3: application data placed in user_data reaches the callback routine
-// unchanged, since the routine receives the structure supplied at registration.
 TEST_F(VpiActionFeatureCallbacks, ExecutingCallbackDeliversUserData) {
   int payload = 7;
   s_cb_data cb = {};
@@ -174,9 +155,6 @@ TEST_F(VpiActionFeatureCallbacks, ExecutingCallbackDeliversUserData) {
   EXPECT_EQ(g_seen_user_data, &payload);
 }
 
-// §38.36.3: to install a signal handler the application sets the reason to
-// cbSignal and the index field to the desired signal number; registration
-// preserves that signal number.
 TEST_F(VpiActionFeatureCallbacks, SignalCallbackPreservesSignalNumber) {
   s_cb_data cb = {};
   cb.reason = cbSignal;
@@ -190,8 +168,6 @@ TEST_F(VpiActionFeatureCallbacks, SignalCallbackPreservesSignalNumber) {
   EXPECT_EQ(stored.index, 15);
 }
 
-// §38.36.3: a raised signal calls the cbSignal callbacks whose index names it,
-// one with no routine to call excepted, and none asking for another signal.
 TEST_F(VpiActionFeatureCallbacks, ARaisedSignalCallsOnlyItsOwnCallbacks) {
   s_cb_data asked = {};
   asked.reason = cbSignal;
@@ -212,8 +188,6 @@ TEST_F(VpiActionFeatureCallbacks, ARaisedSignalCallsOnlyItsOwnCallbacks) {
   }
 }
 
-// §38.36.3: for a cbTchkViolation callback the obj field is a handle to the
-// timing check; the simulator supplies it when the callback is delivered.
 TEST_F(VpiActionFeatureCallbacks, TchkViolationDeliversTimingCheckHandle) {
   VpiObject timing_check;
   Register(cbTchkViolation);
@@ -224,8 +198,6 @@ TEST_F(VpiActionFeatureCallbacks, TchkViolationDeliversTimingCheckHandle) {
   EXPECT_EQ(g_seen_obj, &timing_check);
 }
 
-// §38.36.3 with §37.40, read off runs made by hand. In a run with no specify
-// manager a violation is reported against nothing.
 TEST_F(VpiActionFeatureCallbacks,
        TchkViolationOfARunWithNoChecksReachesNoTchk) {
   Register(cbTchkViolation);
@@ -235,10 +207,6 @@ TEST_F(VpiActionFeatureCallbacks,
   EXPECT_EQ(g_invocations, 0);
 }
 
-// Otherwise a violation is reported against the tchk the run's objects hold
-// for the check violated, a check declared by no source, as $sdf_annotate
-// registers one (§32.9), having one as well; a check added after the objects
-// were made, which no tchk stands for, is reported against nothing.
 TEST_F(VpiActionFeatureCallbacks, TchkViolationReachesTheTchkOfTheCheck) {
   SpecifyManager& specify = sim_ctx_.AcquireSpecifyManager();
   PathDelay path;
@@ -266,8 +234,6 @@ TEST_F(VpiActionFeatureCallbacks, TchkViolationReachesTheTchkOfTheCheck) {
   EXPECT_EQ(g_invocations, 1);
 }
 
-// §38.36.3: for a cbInteractiveScopeChange callback the obj field is a handle
-// to the new interactive scope.
 TEST_F(VpiActionFeatureCallbacks, InteractiveScopeChangeDeliversScopeHandle) {
   VpiObject scope;
   Register(cbInteractiveScopeChange);
@@ -278,8 +244,6 @@ TEST_F(VpiActionFeatureCallbacks, InteractiveScopeChangeDeliversScopeHandle) {
   EXPECT_EQ(g_seen_obj, &scope);
 }
 
-// §38.36.3: for a cbUnresolvedSystf callback user_data points to the name of
-// the unresolved task or system function.
 TEST_F(VpiActionFeatureCallbacks, UnresolvedSystfDeliversName) {
   const char* name = "$unknown_systf";
   Register(cbUnresolvedSystf);
@@ -291,8 +255,6 @@ TEST_F(VpiActionFeatureCallbacks, UnresolvedSystfDeliversName) {
   EXPECT_EQ(g_seen_user_data, name);
 }
 
-// §38.36.3: a reset delivers cbStartOfReset at the start of the operation and
-// cbEndOfReset after it has completed, in that order.
 TEST_F(VpiActionFeatureCallbacks, ResetDeliversStartThenEnd) {
   Register(cbEndOfReset);
   Register(cbStartOfReset);
@@ -305,11 +267,6 @@ TEST_F(VpiActionFeatureCallbacks, ResetDeliversStartThenEnd) {
   EXPECT_EQ(g_sequence[1], cbEndOfReset);
 }
 
-// §38.36.3: a restart removes every callback other than the restart callbacks
-// and then delivers cbStartOfRestart followed by cbEndOfRestart, so that the
-// only callbacks that exist across the restart are those two. This observes
-// both halves of the rule: several varied non-restart callbacks are all purged,
-// while the restart pair both survives and is delivered.
 TEST_F(VpiActionFeatureCallbacks,
        RestartPurgesOthersAndDeliversRestartCallbacks) {
   VpiObject watched;
@@ -326,15 +283,11 @@ TEST_F(VpiActionFeatureCallbacks,
 
   int fired = vpi_ctx_.DispatchRestart();
 
-  // Only the two restart callbacks are delivered, start before end.
   EXPECT_EQ(fired, 2);
   ASSERT_EQ(g_sequence.size(), 2u);
   EXPECT_EQ(g_sequence[0], cbStartOfRestart);
   EXPECT_EQ(g_sequence[1], cbEndOfRestart);
 
-  // After the restart, the surviving callbacks are exactly the restart pair:
-  // every other reason has been removed (RemoveCb clears the reason to -1), and
-  // both restart reasons remain present.
   std::multiset<int> survivors;
   for (const s_cb_data& cb : vpi_ctx_.RegisteredCallbacks()) {
     if (cb.reason != -1) survivors.insert(cb.reason);
@@ -343,10 +296,6 @@ TEST_F(VpiActionFeatureCallbacks,
   EXPECT_EQ(survivors, expected);
 }
 
-// §38.36.3: the reset callbacks occur around a reset, whether it is invoked
-// directly or through vpi_control(vpiReset, ...). This implementation is
-// without $reset, as Annex D.1 allows, so the vpi_control request fails
-// (§38.4) and neither reset callback is delivered.
 TEST_F(VpiActionFeatureCallbacks,
        ResetViaVpiControlFailsAndDeliversNoCallback) {
   Register(cbStartOfReset);
@@ -358,8 +307,6 @@ TEST_F(VpiActionFeatureCallbacks,
   EXPECT_TRUE(g_sequence.empty());
 }
 
-// §38.36.3 (edge case): dispatching a reason with no registered callback
-// invokes no application routine and reports zero deliveries.
 TEST_F(VpiActionFeatureCallbacks, DispatchWithNoMatchingCallbackFiresNothing) {
   Register(cbStartOfSimulation);
 
@@ -369,8 +316,6 @@ TEST_F(VpiActionFeatureCallbacks, DispatchWithNoMatchingCallbackFiresNothing) {
   EXPECT_EQ(g_invocations, 0);
 }
 
-// §38.36.3 (edge case): a callback removed before dispatch is not delivered, so
-// only the still-registered callback for the reason runs.
 TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
   vpiHandle removed = Register(cbStartOfSimulation);
   Register(cbStartOfSimulation);
@@ -383,21 +328,6 @@ TEST_F(VpiActionFeatureCallbacks, RemovedCallbackIsNotDispatched) {
   EXPECT_EQ(g_invocations, 1);
 }
 
-// -----------------------------------------------------------------------------
-// §38.36.3 separates the two kinds of reason it defines by whether they happen:
-// every VPI-compliant tool must deliver an action, while a feature may be
-// missing from some of them. Three of the action reasons are the tool's own
-// lifetime -- cbEndOfCompile, cbStartOfSimulation and cbEndOfSimulation -- and
-// no run delivered any of them. They could be registered, as the cases above
-// show, and then the tool compiled a design, ran it and finished without one
-// occurring.
-//
-// The cases below run a design and read back what arrived.
-// -----------------------------------------------------------------------------
-
-// The order the reasons arrived in, which is what the three cases are about:
-// each names a point in the tool's life, so what says they were delivered there
-// rather than together is the sequence.
 std::vector<int> g_action_order;
 
 int RecordEndOfCompile(s_cb_data*) {
@@ -456,10 +386,6 @@ TEST_F(VpiLifetimeCallbacksInARun, TheThreeLifetimeActionsOccurInOrder) {
   LowerAndRun(design, f);
   f.scheduler.EndSimulation();
 
-  // The order is the tool's life: the data structure is compiled, simulation
-  // starts, simulation ends. Asserting the sequence rather than three counts is
-  // what separates three callbacks delivered where they belong from three
-  // delivered together at whichever point a tool happened to fire them.
   EXPECT_EQ(g_action_order,
             (std::vector<int>{cbEndOfCompile, cbStartOfSimulation,
                               cbEndOfSimulation}));
@@ -480,14 +406,10 @@ TEST_F(VpiLifetimeCallbacksInARun, TheEndOfSimulationActionOccursAfterAFinish) {
   LowerAndRun(design, f);
   f.scheduler.EndSimulation();
 
-  // §38.36.3 gives cbEndOfSimulation two ways of being reached, the event queue
-  // running empty or a $finish system task executing, and the case above is the
-  // first of them. This is the second.
   ASSERT_FALSE(g_action_order.empty());
   EXPECT_EQ(g_action_order.back(), cbEndOfSimulation);
 }
 
-// The names cbUnresolvedSystf routines were given, in order.
 std::vector<std::string>& UnresolvedNames() {
   static std::vector<std::string> names;
   return names;
@@ -498,9 +420,6 @@ PLI_INT32 RecordUnresolvedName(p_cb_data cb) {
   return 0;
 }
 
-// §38.36.3: a cbUnresolvedSystf routine is called when a system task or
-// function no application registered and the tool does not provide is
-// encountered, its user_data pointing at the name (#5120).
 TEST(UnresolvedSystfOfARun, AnUnknownSystemTaskIsReportedToTheApplication) {
   UnresolvedNames().clear();
   VpiContext vpi;
@@ -522,7 +441,6 @@ TEST(UnresolvedSystfOfARun, AnUnknownSystemTaskIsReportedToTheApplication) {
                             1, "20.1"));
 }
 
-// The vpiTchkType of the timing check the last cbTchkViolation was given.
 int violated_tchk_type = 0;
 
 PLI_INT32 RecordViolatedCheck(p_cb_data cb) {
@@ -530,8 +448,6 @@ PLI_INT32 RecordViolatedCheck(p_cb_data cb) {
   return RecordEventDelivery(cb);
 }
 
-// §38.36.3: a cbTchkViolation is called as a timing check is violated, its
-// obj the timing check (#7483).
 TEST_F(EventCallbacksOfARun, ATchkViolationCallbackIsGivenTheCheck) {
   violated_tchk_type = 0;
   Armer() = [] {
@@ -554,10 +470,6 @@ TEST_F(EventCallbacksOfARun, ATchkViolationCallbackIsGivenTheCheck) {
   EXPECT_EQ(violated_tchk_type, vpiSetup);
 }
 
-// §38.36.3: cbStartOfReset and cbEndOfReset are called around a reset, and a
-// $reset the design invokes performs none: this implementation is without
-// $reset, as Annex D.1 allows, so the call is reported and neither callback
-// is called.
 TEST_F(EventCallbacksOfARun, ADirectResetCallsNoResetCallback) {
   Armer() = [] {
     PlaceEventCallback(cbStartOfReset, nullptr);
@@ -575,8 +487,6 @@ TEST_F(EventCallbacksOfARun, ADirectResetCallsNoResetCallback) {
   EXPECT_TRUE(EventDeliveries().empty());
 }
 
-// §38.36.3 with D.11: a $scope the design invokes changes the interactive
-// scope, which calls cbInteractiveScopeChange given the new scope (#7486).
 TEST_F(EventCallbacksOfARun, AScopeTaskCallsTheScopeChangeCallback) {
   Armer() = [] { PlaceEventCallback(cbInteractiveScopeChange, nullptr); };
   Run("module top; timeunit 1ns; timeprecision 1ns;\n"
@@ -590,9 +500,6 @@ TEST_F(EventCallbacksOfARun, AScopeTaskCallsTheScopeChangeCallback) {
   EXPECT_EQ(kChanges[0].now, 1u);
 }
 
-// §38.36.3 with §38.4: vpi_control(vpiSetInteractiveScope) changes the
-// interactive scope, which calls cbInteractiveScopeChange given the new scope
-// (#7486).
 TEST_F(EventCallbacksOfARun, SettingTheScopeCallsTheScopeChangeCallback) {
   Armer() = [] {
     PlaceEventCallback(cbInteractiveScopeChange, nullptr);
@@ -608,11 +515,8 @@ TEST_F(EventCallbacksOfARun, SettingTheScopeCallsTheScopeChangeCallback) {
   EXPECT_EQ(kChanges[0].obj, "blk");
 }
 
-// The cbSignal registration the case below makes, removed once it is over.
 vpiHandle signal_callback = nullptr;
 
-// §38.36.3: a cbSignal callback traps the signal its index names and is
-// called at the run's next safe point, after which the run goes on (#7484).
 TEST_F(EventCallbacksOfARun, ASignalCallbackIsCalledAndTheRunGoesOn) {
   Armer() = [] {
     PlaceEventCallback(cbStartOfReset, nullptr);
@@ -636,9 +540,6 @@ TEST_F(EventCallbacksOfARun, ASignalCallbackIsCalledAndTheRunGoesOn) {
   EXPECT_EQ(vpi_remove_cb(signal_callback), 1);
 }
 
-// §38.36.3: a trap is set once per signal and kept while a cbSignal asks for
-// it, records the signal rather than taking its action, and is not set for a
-// number that names no signal it can trap.
 TEST(VpiSignalTraps, ASignalIsTrappedWhileAskedFor) {
   VpiTrapSignal(0);
   VpiTrapSignal(SIGINT);
@@ -654,11 +555,6 @@ TEST(VpiSignalTraps, ASignalIsTrappedWhileAskedFor) {
   VpiReleaseSignal(0, {});
 }
 
-// §38.36.3: no trap is set for a number past the last signal one can record,
-// nor for a signal no process may catch, and releasing a signal never trapped
-// changes nothing: none of them is recorded as raised. The uncatchable signal
-// is 9, the number POSIX's kill utility gives SIGKILL; <csignal> names only
-// the signals the C standard defines.
 TEST(VpiSignalTraps, ASignalNoTrapCanHoldIsLeftAlone) {
   constexpr int kUncatchable = 9;
   VpiTrapSignal(65);
@@ -673,18 +569,13 @@ TEST(VpiSignalTraps, ASignalNoTrapCanHoldIsLeftAlone) {
 }  // namespace delta
 
 extern "C" {
-// Whether SIGABRT has reached the handler the case below installs ahead of
-// the trap.
 static volatile std::sig_atomic_t g_abort_handled = 0;
-static void NoteAbort(int /*signal*/) { g_abort_handled = 1; }
+static void NoteAbort(int) { g_abort_handled = 1; }
 }
 
 namespace delta {
 namespace {
 
-// §38.36.3: a cbSignal asking for another signal keeps no trap, so releasing
-// SIGABRT while one asks for SIGILL hands SIGABRT back to the handler it had
-// before it was trapped, which the next SIGABRT reaches in place of the trap.
 TEST(VpiSignalTraps, ReleasingASignalRestoresItsEarlierHandler) {
   std::signal(SIGABRT, &NoteAbort);
   VpiTrapSignal(SIGABRT);

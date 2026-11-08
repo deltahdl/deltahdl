@@ -373,8 +373,6 @@ TEST(LexicalConventionLexing, ConditionalOperatorTwoOperatorChars) {
   EXPECT_EQ(tokens[4].kind, TokenKind::kIdentifier);
 }
 
-// An operator whose first character may begin a longer one still lexes as
-// itself when that character ends the text.
 TEST(LexicalConventionLexing, OperatorEndingTheTextIsItself) {
   auto tokens = Lex("a ~");
   ASSERT_EQ(tokens.size(), 3u);
@@ -382,10 +380,6 @@ TEST(LexicalConventionLexing, OperatorEndingTheTextIsItself) {
   EXPECT_EQ(tokens[2].kind, TokenKind::kEof);
 }
 
-// Each of these characters begins a longer operator only with the right two
-// characters after it: `+/-`, `+%-`, `|->`, `#-#`, `#=#` and `<->`. With the
-// first of them but not the second, the character is an operator of its own
-// and so is the one after it.
 TEST(LexicalConventionLexing, PrefixOfALongerOperatorWithoutItsEndStandsAlone) {
   const struct {
     const char* src;

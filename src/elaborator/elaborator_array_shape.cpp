@@ -36,8 +36,6 @@ std::string_view ElementTypeIdentity(const DataType& dtype,
 
 namespace {
 
-// §7.4.2: a dimension written as a range [l:r] holds |l-r|+1 elements, and one
-// written as a size N holds N, the range [0:N-1].
 std::optional<uint32_t> DimSize(const Expr* dim, const ScopeMap& scope) {
   if (!dim) return std::nullopt;
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {

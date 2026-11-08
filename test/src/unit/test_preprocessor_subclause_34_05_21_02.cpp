@@ -1,73 +1,3 @@
-// §34.5.21 digest_method, Description.
-//
-// §34.5.21.2 says four things about the keyword §34.5.21.1 spells.
-//
-//   Written in an encrypting tool's input, the expression specifies the message
-//   digest algorithm that shall generate the digests of the data_block and
-//   key_block output that follows it, and the string is an identifier commonly
-//   associated with a specific algorithm.
-//
-//   Table 34-4 gives the identifiers the standard specifies, two of them
-//   required of every implementation and two optional. Further identifiers are
-//   admitted and left to the implementation.
-//
-//   It is unchanged in the output file, except where a digital signature is
-//   used, in which case it is encrypted with the key_method and placed in a
-//   key_block.
-//
-//   On the way back, it indicates the algorithm that shall generate the digest
-//   from the data_block.
-//
-// The table is carried by ProtectDigestAlgorithms, IsProtectDigestAlgorithm,
-// IsRequiredProtectDigestAlgorithm and ProtectDigestIsAvailable in
-// src/preprocessor/protect_digest.cpp, and the computation the identifier picks
-// out by ProtectMessageDigest in the same file. The digest an encrypting run
-// writes is produced by ProtectDigestBlockDirectives in
-// src/preprocessor/protect_digest_block.cpp; where the identifier goes in what
-// that run writes out is decided by AppendClearNames in
-// src/preprocessor/protect_envelope_output.cpp and by KeyBlockContentFor in
-// src/preprocessor/protect_key_block.cpp; and the identifier a reading
-// regenerates a digest under is read by Preprocessor::DigestMethodInEffect in
-// src/preprocessor/preprocessor_protect_in_effect.cpp.
-//
-// Which spelling puts which identifier in effect belongs to §34.5.21.1 and is
-// stated in test_preprocessor_subclause_34_05_21_01.cpp. What this file states
-// is what the identifier then does.
-//
-// One thing the identifier decides is what happens where this implementation
-// has no algorithm for it. §34.5.22.2 has the encrypting tool generate the
-// message digest with the algorithm the digest_method expression names, so a
-// region asking for a digest under such an identifier asked for a value this
-// tool cannot produce. ProtectDigestBlockDirectives writes no block there,
-// which is the right answer where it stands -- a digest is the value the named
-// algorithm produces or it is nothing -- and issue #3276 is the defect: it was
-// the whole answer, so the author was handed an envelope with nothing in it to
-// detect tampering with and nothing said about the absence.
-// ReportUnavailableDigestMethod in src/preprocessor/protect_processing.cpp is
-// the report, and the cases below it hold it to §34.5.22.2's request rather
-// than to the keyword: a region that named such an identifier without writing a
-// digest_block expression asked for nothing and is refused nothing.
-//
-// The report says the identifier is one the table does not require. Table 34-4
-// marks sha1 and md5 required and md2 and ripemd-160 optional, and
-// ProtectDigestIsAvailable in src/preprocessor/protect_digest.cpp answers yes
-// for exactly the two the table requires, so every identifier that draws the
-// report is one the table does not require.
-//
-// A second thing the identifier decides is what a region spelling it in a
-// spelling §34.5.21.1 does not define gets. §34.5.21.1 spells the expression
-// `digest_method = <string>`, and §22.5.1 makes a parenthesized pragma_value a
-// list of further pragma expressions rather than the one written thing a string
-// is, so a list names no algorithm. Issue #3277 is the defect:
-// TakeMethodKeywords in src/preprocessor/protect_region_lines.cpp read the
-// value through KeywordValueOnLine, which hands back whatever stood against the
-// '=', parentheses and all. AppendClearDigestNames wrote that list onto the
-// envelope, where it names no algorithm for a reader to regenerate the digest
-// under, and DigestPolicyFor in src/preprocessor/protect_processing.cpp took it
-// as the algorithm, so ProtectMessageDigest found none of that name and
-// ProtectDigestBlockDirectives wrote no digest block at all -- a region that
-// asked for a digest got an envelope with none.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -93,40 +23,24 @@ using namespace delta;
 
 namespace {
 
-// The identifier the regions below state. It is a row Table 34-4 marks
-// required, so a reader of the envelope can recompute what was written under
-// it, and it is not the identifier a text stating none is read under.
 constexpr std::string_view kStated = kMd5DigestMethod;
 static_assert(kStated != kDefaultDigestMethod,
               "a region stating the identifier the default already supplies "
               "produces the envelope of a region that stated nothing");
 
-// The keyword as it stands in a directive, for asking whether an envelope wrote
-// one. §34.4 tabulates digest_key_method as a separate name, and it does not
-// hold these characters, so a search for this one answers about this one.
 constexpr std::string_view kIdentifierKeyword = "digest_method";
 
-// The entity that provided the key a region's key blocks are encrypted under,
-// the name picking that key out, and the key itself.
 constexpr std::string_view kProvider = "meridian-trust";
 constexpr std::string_view kBlockKeyName = "wrapping-2027";
 constexpr std::string_view kBlockKey = "meridian-trust-wrapping-key";
 
-// The name a region gives the key its data are under. A name with no key held
-// for it is what sends a region to a key block rather than to a key of its
-// author's, which is the digital signature §34.5.21.2 states its exception for.
 constexpr std::string_view kDataKeyName = "design-2027";
 
-// The key an author encrypts with directly, for the envelope that carries no
-// key block and so is not signed.
 constexpr std::string_view kExchangeKey = "meridian-trust-author-key";
 
-// The design a region seals, and the text a digest is computed over where the
-// case computes one for itself.
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
 constexpr std::string_view kDigestedText = "the bytes a digest stands in for";
 
-// The key a hand-built digest block is sealed under.
 constexpr std::string_view kDigestKey = "seals-the-digest-of-this-region";
 
 std::string Writes(std::string_view keyword, std::string_view value) {
@@ -135,30 +49,17 @@ std::string Writes(std::string_view keyword, std::string_view value) {
   return text;
 }
 
-// A pragma_value written in the parenthesized spelling §22.5.1 defines. Its
-// subkeywords are names §34.4 tabulates nowhere, so what the list says is
-// beside the point and its spelling is the whole of what the cases reading it
-// ask about.
 constexpr std::string_view kAListOfExpressions =
     "(rounds=\"64\", salt=\"none\")";
 
-// The identifier's keyword with `value` written against it as it stands here.
-// Writes above puts quotation marks around what it is given, and a list inside
-// quotation marks is a string rather than a list.
 std::string WritesUnquoted(std::string_view value) {
   std::string text = "`pragma protect ";
   text.append(kIdentifierKeyword).append("=").append(value).append("\n");
   return text;
 }
 
-// The expression §34.5.22 makes a request for a digest. It stands ahead of the
-// region rather than inside it, §34.4 making the scope of the request lexical.
 std::string RequestsDigest() { return "`pragma protect digest_block\n"; }
 
-// A region whose keys travel in key blocks of its own, stating `described`
-// about itself. This is the digital signature §34.5.21.2 makes its exception
-// for: the region names a key the tool does not hold, so the tool makes one and
-// writes a block carrying it.
 std::string SignedRegion(const std::string& described) {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("key_keyowner", kProvider));
@@ -170,8 +71,6 @@ std::string SignedRegion(const std::string& described) {
   return text;
 }
 
-// A region encrypted under the author's own key, which carries no key block and
-// so is not signed.
 std::string UnsignedRegion(const std::string& described) {
   std::string text = "`pragma protect begin\n";
   text.append(described);
@@ -180,23 +79,12 @@ std::string UnsignedRegion(const std::string& described) {
   return text;
 }
 
-// The one key a reader of the signed envelopes holds: the one those envelopes'
-// key blocks are encrypted under.
 ProtectKeyList TheBlockKey() {
   ProtectKeyList keys;
   keys.Add(KeyOf(kProvider, kBlockKeyName, kBlockKey));
   return keys;
 }
 
-// Whether `envelope` carries a digest block this tool made, which is one
-// standing after the block it refers to. The request the source wrote stands
-// outside every region and is copied through in the clear, so a search of the
-// whole text finds that line and says nothing about whether a digest was
-// produced.
-//
-// The data block is found by the expression announcing it, which §34.5.15.1
-// spells as the keyword standing alone and §34.5.15.2 has speak for the next
-// line in the file (issue #3272).
 bool CarriesAGeneratedDigestBlock(const std::string& envelope) {
   size_t data = envelope.find("`pragma protect data_block\n");
   if (data == std::string::npos) return false;
@@ -204,10 +92,6 @@ bool CarriesAGeneratedDigestBlock(const std::string& envelope) {
          std::string::npos;
 }
 
-// The envelope this tool writes for a signed region stating `described`,
-// checked on the way out to be one: the design is gone, and the envelope
-// carries both a key block and a digest block. Without that check the cases
-// below would hold of an envelope that sealed nothing.
 std::string SignedEnvelope(const std::string& described) {
   std::string envelope = EncryptEnvelopes(
       RequestsDigest() + SignedRegion(described), {}, TheBlockKey());
@@ -218,8 +102,6 @@ std::string SignedEnvelope(const std::string& described) {
   return envelope;
 }
 
-// The envelope this tool writes for an unsigned region stating `described`,
-// checked the same way apart from the key block it does not have.
 std::string UnsignedEnvelope(const std::string& described) {
   std::string envelope = EncryptEnvelopes(
       RequestsDigest() + UnsignedRegion(described), kExchangeKey);
@@ -230,8 +112,6 @@ std::string UnsignedEnvelope(const std::string& described) {
   return envelope;
 }
 
-// A reading of `src` by a tool holding `keys`, with the preprocessor kept alive
-// so what the reading left in effect can be read off it.
 struct ReadUnderKeys {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -249,21 +129,13 @@ struct ReadUnderKeys {
     return config;
   }
 
-  // The identifier the reading would regenerate a digest under, reported beside
-  // whether a default put it there.
   ProtectKeywordValue Identifier() const {
     return ProtectDigestMethodInEffect(pp.ProtectKeywords());
   }
 
-  // How the digest block the reading last reached compared against the block it
-  // follows.
   ProtectDigestCheck DigestCheck() const { return pp.LastDigestBlockCheck(); }
 };
 
-// -- Table 34-4 -------------------------------------------------------------
-
-// §34.5.21.2: the standard specifies the values in Table 34-4. Four rows, in
-// the order the table lists them.
 TEST(ProtectDigestMethodTable, TheTableIsFourIdentifiersInTheOrderListed) {
   std::span<const ProtectDigestAlgorithm> rows = ProtectDigestAlgorithms();
   ASSERT_EQ(rows.size(), 4U);
@@ -273,16 +145,11 @@ TEST(ProtectDigestMethodTable, TheTableIsFourIdentifiersInTheOrderListed) {
   EXPECT_EQ(rows[3].identifier, "ripemd-160");
 }
 
-// The required/optional column is part of what the table says. These two rows
-// name algorithms any tool can be handed a digest under.
 TEST(ProtectDigestMethodTable, TheTableRequiresTheFirstTwoIdentifiers) {
   EXPECT_TRUE(IsRequiredProtectDigestAlgorithm("sha1"));
   EXPECT_TRUE(IsRequiredProtectDigestAlgorithm("md5"));
 }
 
-// The other two rows are tabulated without being required, which is a different
-// state from not being tabulated at all: a text using one has assumed something
-// about its reader rather than written something the standard does not name.
 TEST(ProtectDigestMethodTable, TheOtherTwoAreTabulatedWithoutBeingRequired) {
   EXPECT_TRUE(IsProtectDigestAlgorithm("md2"));
   EXPECT_FALSE(IsRequiredProtectDigestAlgorithm("md2"));
@@ -290,9 +157,6 @@ TEST(ProtectDigestMethodTable, TheOtherTwoAreTabulatedWithoutBeingRequired) {
   EXPECT_FALSE(IsRequiredProtectDigestAlgorithm("ripemd-160"));
 }
 
-// Each row names the published algorithm its identifier stands for, which is
-// the column that makes the identifier mean one computation rather than
-// whichever one a tool cared to attach the name to.
 TEST(ProtectDigestMethodTable, EachRowNamesThePublishedAlgorithm) {
   std::span<const ProtectDigestAlgorithm> rows = ProtectDigestAlgorithms();
   ASSERT_EQ(rows.size(), 4U);
@@ -303,36 +167,20 @@ TEST(ProtectDigestMethodTable, EachRowNamesThePublishedAlgorithm) {
             std::string_view::npos);
 }
 
-// §34.5.21.2 leaves further identifiers to the implementation, so a value
-// outside the table is one the standard does not decide rather than one it
-// forbids. What the table answers is whether the standard named it.
 TEST(ProtectDigestMethodTable, AnIdentifierOutsideTheTableIsNotTabulated) {
   EXPECT_FALSE(IsProtectDigestAlgorithm("sha256"));
 }
 
-// Being in the table and being computable here are two questions, and the
-// optional column is why. An identifier this run cannot compute is still one
-// the standard named, so a reading that answered both alike would take a
-// tabulated identifier for one it could produce a digest under.
 TEST(ProtectDigestMethodTable, BeingTabulatedIsNotBeingProvided) {
   EXPECT_TRUE(IsProtectDigestAlgorithm("md2"));
   EXPECT_FALSE(ProtectDigestIsAvailable("md2"));
   EXPECT_TRUE(ProtectDigestIsAvailable("sha1"));
 }
 
-// §34.5.21.2 settles no default, so what stands where a text wrote nothing is
-// this implementation's choice. It has to be an identifier the table requires:
-// a digest is written to be recomputed elsewhere, and a digest under an
-// identifier the reader need not provide is one the reader cannot check.
 TEST(ProtectDigestMethodTable, TheDefaultIsAnIdentifierTheTableRequires) {
   EXPECT_TRUE(IsRequiredProtectDigestAlgorithm(kDefaultDigestMethod));
 }
 
-// -- The identifier decides the computation ---------------------------------
-
-// §34.5.21.2: the identifier specifies the algorithm the digest is generated
-// with. Two identifiers are two algorithms, so one text digested under each
-// gives two values.
 TEST(ProtectDigestMethodEncryptionInput, TwoIdentifiersGiveTwoDigests) {
   std::string under_sha1;
   std::string under_md5;
@@ -341,9 +189,6 @@ TEST(ProtectDigestMethodEncryptionInput, TwoIdentifiersGiveTwoDigests) {
   EXPECT_NE(under_sha1, under_md5);
 }
 
-// An identifier this implementation provides no algorithm for produces no
-// digest rather than a digest under whichever algorithm was nearest to hand.
-// The value handed in is left as it stands, there being no result to give.
 TEST(ProtectDigestMethodEncryptionInput,
      AnIdentifierWithNoAlgorithmHereGivesNothing) {
   std::string digest = "what the caller brought";
@@ -351,9 +196,6 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_EQ(digest, "what the caller brought");
 }
 
-// The block an encrypting run writes for a digest is the identifier's digest:
-// one text written out under two identifiers gives two blocks. Without this the
-// identifier could be recorded everywhere it is written and used nowhere.
 TEST(ProtectDigestMethodEncryptionInput,
      TheBlockWrittenIsTheIdentifiersDigest) {
   ProtectDigestBlockPolicy policy;
@@ -369,10 +211,6 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_NE(under_sha1, under_md5);
 }
 
-// An identifier naming no algorithm available here leaves no digest block at
-// all, rather than one written short or written under another algorithm: a
-// reader recomputing such a digest would find it disagreeing with a block that
-// arrived exactly as it was sealed.
 TEST(ProtectDigestMethodEncryptionInput,
      AnIdentifierWithNoAlgorithmHereWritesNoBlock) {
   ProtectDigestBlockPolicy policy;
@@ -384,45 +222,26 @@ TEST(ProtectDigestMethodEncryptionInput,
             "");
 }
 
-// -- A digest asked for under an algorithm this tool has none for ------------
-
-// The designs the regions below seal. Two spellings, so that a case reading an
-// output for the region it wrote is reading for that region's own text.
 constexpr std::string_view kRequestedDesign = "module lattice_m; endmodule\n";
 constexpr std::string_view kUnrequestedDesign = "module trellis_m; endmodule\n";
 constexpr std::string_view kListingDesign = "module bezel_m; endmodule\n";
 
-// An identifier Table 34-4 does not list. §34.5.21.2 admits further identifiers
-// and leaves them to the implementation, and this implementation defines none,
-// so a value outside the table reaches an algorithm here no more than one of
-// the table's optional rows does.
 constexpr std::string_view kUnlistedIdentifier = "x-ferrule-fingerprint-64";
 
-// The report a region asking for a digest under an algorithm this
-// implementation has none for draws, up to the identifier that region named.
 constexpr std::string_view kNoSuchDigest =
     "asks for a message digest algorithm this implementation does not "
     "provide: ";
 
-// The half of Table 34-4 the report names in every case below, for the reason
-// the file's header gives: the identifiers this implementation provides are
-// exactly the ones the table requires, so an identifier that draws the report
-// at all is one the table did not require.
 constexpr std::string_view kTableLeavesItOptional =
     ", which IEEE 1800-2023 Table 34-4 does not require of every "
     "implementation";
 
-// The whole of that report for the identifier a region named.
 std::string AsksForDigestUnder(std::string_view identifier) {
   std::string message(kNoSuchDigest);
   message.append(identifier).append(kTableLeavesItOptional);
   return message;
 }
 
-// Envelope encryption over a source text an author wrote, with the reports the
-// run made kept beside the text it wrote out. The source is added to the
-// manager so that a report stands at the line of it the author wrote the
-// identifier on, that line being what the cases below name.
 struct DigestingRun {
   PreprocFixture f;
   std::string text;
@@ -432,18 +251,6 @@ struct DigestingRun {
                               f.mgr.AddFile("<test>", src))) {}
 };
 
-// §34.5.22.2 has the encrypting tool generate the digest under the algorithm
-// the digest_method pragma expression specifies, so a region asking for a
-// digest under md2 asked for md2's value and no other. Table 34-4 marks md2
-// optional and ProtectDigestIsAvailable answers no for it, so this tool has no
-// such value to write and the report is what says so. Issue #3276 is the defect
-// the case was written for: the envelope came back with no digest block in it
-// and the run said nothing, so the author held a file with nothing to detect
-// tampering with and no way to learn that.
-//
-// The identifier stands on the third line, the request on the first and the
-// closing expression on the fifth, so a report placed at either delimiter of
-// the region fails this.
 TEST(ProtectDigestMethodEncryptionInput,
      AnOptionalIdentifierAskedForIsReportedOnItsOwnLine) {
   std::string src = RequestsDigest();
@@ -458,16 +265,6 @@ TEST(ProtectDigestMethodEncryptionInput,
       << run.text;
 }
 
-// §34.5.21.2 leaves an identifier outside Table 34-4 to the implementation, and
-// this implementation defines none, so such a region asked for a value it
-// cannot be given either. The report says the table does not require the
-// identifier, which is what the table says of a value it never listed.
-//
-// §34.4 makes the scope of the keyword lexical, so the identifier written ahead
-// of the region is in effect inside it and states what that region's digest is
-// to be computed with. The report therefore stands on the first line, where the
-// author wrote it, rather than on the fourth or the sixth, where the region
-// opens and closes.
 TEST(ProtectDigestMethodEncryptionInput,
      AnUntabulatedIdentifierAskedForIsReported) {
   std::string src = Writes(kIdentifierKeyword, kUnlistedIdentifier);
@@ -483,18 +280,6 @@ TEST(ProtectDigestMethodEncryptionInput,
       << run.text;
 }
 
-// §34.5.21.2 governs what the identifier asks for, and md5 asks for something
-// this implementation provides: Table 34-4 requires it and
-// ProtectDigestIsAvailable answers yes. Such a region is refused nothing, so
-// the run reports nothing and the envelope carries the digest block the region
-// asked for.
-//
-// Both halves are asserted because the first alone is what issue #3276 already
-// satisfied: a tool that wrote no digest block and said nothing about it
-// reports no error. The block is the half that says the request was met.
-//
-// The identifier is md5 rather than sha1 so that it is not the identifier
-// kDefaultDigestMethod would have supplied had the region named none.
 TEST(ProtectDigestMethodEncryptionInput,
      AnAvailableIdentifierAskedForWritesItsBlockInSilence) {
   std::string src = "`pragma protect begin\n";
@@ -507,15 +292,6 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_TRUE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
 }
 
-// §34.5.22.2 makes the digest_block expression the request for a digest, so an
-// identifier written without one asks for nothing. This region names
-// ripemd-160, which Table 34-4 marks optional and ProtectDigestIsAvailable
-// answers no for, and it writes no digest_block expression: it was refused
-// nothing, so it is told nothing, and no digest block is written for it.
-//
-// This is what holds the report to the request rather than to the keyword.
-// Without it a report fired wherever the identifier was written would pass the
-// two reported cases above.
 TEST(ProtectDigestMethodEncryptionInput,
      AnIdentifierNamedWithoutARequestIsNotReported) {
   std::string src = "`pragma protect begin\n";
@@ -527,11 +303,6 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_FALSE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
 }
 
-// §34.5.21 fills the keyword's place from a default where the text named no
-// identifier, and TheDefaultIsAnIdentifierTheTableRequires above holds that
-// default to a row Table 34-4 requires. A region asking for a digest and naming
-// no identifier therefore asked for one this implementation provides: the run
-// reports nothing and the envelope carries the block.
 TEST(ProtectDigestMethodEncryptionInput,
      NoIdentifierAskedForWritesItsBlockUnderTheDefault) {
   std::string src = RequestsDigest();
@@ -543,14 +314,6 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_TRUE(CarriesAGeneratedDigestBlock(run.text)) << run.text;
 }
 
-// A list names no algorithm, so §34.5.21 leaves the default standing and the
-// region asked for the digest kDefaultDigestMethod computes. The block is
-// written and the run reports nothing.
-//
-// This is the half of issue #3277 that cost a region its digest. The list was
-// taken as the algorithm, ProtectMessageDigest found none of that name, and
-// ProtectDigestBlockDirectives wrote nothing, so the envelope came back with no
-// digest block in it.
 TEST(ProtectDigestMethodEncryptionInput,
      AListLeavesTheDefaultToComputeTheBlockUnder) {
   std::string src = "`pragma protect begin\n";
@@ -563,11 +326,6 @@ TEST(ProtectDigestMethodEncryptionInput,
   EXPECT_FALSE(run.f.diag.HasErrors()) << run.text;
 }
 
-// -- Unchanged in the output file -------------------------------------------
-
-// §34.5.21.2: the identifier is unchanged in the output file. An envelope
-// carrying no key block is not signed, so the exception does not arise and the
-// identifier stands in the clear, spelled as the region spelled it.
 TEST(ProtectDigestMethodEncryptionOutput, AnUnsignedEnvelopeStatesItAsWritten) {
   std::string envelope = UnsignedEnvelope(Writes(kIdentifierKeyword, kStated));
   std::string directive = "`pragma protect digest_method=\"";
@@ -575,32 +333,16 @@ TEST(ProtectDigestMethodEncryptionOutput, AnUnsignedEnvelopeStatesItAsWritten) {
   EXPECT_NE(envelope.find(directive), std::string::npos) << envelope;
 }
 
-// A region that stated no identifier has none to leave unchanged, so the
-// envelope states none. Without this the case above would hold of a tool that
-// wrote the keyword into every envelope it produced.
 TEST(ProtectDigestMethodEncryptionOutput, ARegionStatingNoneGetsNone) {
   std::string envelope = UnsignedEnvelope("");
   EXPECT_EQ(envelope.find(kIdentifierKeyword), std::string::npos) << envelope;
 }
 
-// A list names no algorithm either, so there is none to leave unchanged and the
-// envelope states none. The control for this is
-// AnUnsignedEnvelopeStatesItAsWritten above, which writes the same region with
-// the spelling §34.5.21.1 defines and reads the directive back off the
-// envelope.
-//
-// This is the half of issue #3277 that reached the envelope: the list was
-// written out as the identifier, where a reader regenerating the digest of the
-// data block would have found an expression naming no algorithm.
 TEST(ProtectDigestMethodEncryptionOutput, AListStatesNoAlgorithmOnTheEnvelope) {
   std::string envelope = UnsignedEnvelope(WritesUnquoted(kAListOfExpressions));
   EXPECT_EQ(envelope.find(kIdentifierKeyword), std::string::npos) << envelope;
 }
 
-// A list written after a string names no algorithm, so the identifier the
-// string named still stands and the envelope states it unchanged. An expression
-// naming no algorithm has no standing to take away the one named before it, and
-// the list reaches the envelope nowhere.
 TEST(ProtectDigestMethodEncryptionOutput,
      AListDoesNotUnstateTheAlgorithmBeforeIt) {
   std::string envelope = UnsignedEnvelope(Writes(kIdentifierKeyword, kStated) +
@@ -611,26 +353,11 @@ TEST(ProtectDigestMethodEncryptionOutput,
   EXPECT_EQ(envelope.find(kAListOfExpressions), std::string::npos) << envelope;
 }
 
-// §34.5.21.2's exception: where a digital signature is used the identifier is
-// encrypted with the key_method and placed in a key_block, so it stands nowhere
-// in the clear. A region whose keys travel in key blocks of its own is that
-// case.
 TEST(ProtectDigestMethodEncryptionOutput, ASignedEnvelopeKeepsItOutOfTheClear) {
   std::string envelope = SignedEnvelope(Writes(kIdentifierKeyword, kStated));
   EXPECT_EQ(envelope.find(kIdentifierKeyword), std::string::npos) << envelope;
 }
 
-// -- What a reading generates the digest under ------------------------------
-
-// The cases below read the identifier a reading was left holding, and so stop
-// where the envelope does: §34.5.31.2 has the reset this tool writes beneath an
-// envelope restore every protect pragma keyword, so a reading carried past it
-// reports the default whether the key block was opened or not.
-
-// The other half of the exception: the identifier the signed envelope kept out
-// of the clear is inside the key block, so a reader that opened the block has
-// it in effect. The value comes back as the region wrote it, without the
-// quotation marks §22.5.1 spelled it with.
 TEST(ProtectDigestMethodDecryptionInput, TheKeyBlockYieldsTheIdentifier) {
   ReadUnderKeys run(
       ThroughEndProtected(SignedEnvelope(Writes(kIdentifierKeyword, kStated))),
@@ -640,9 +367,6 @@ TEST(ProtectDigestMethodDecryptionInput, TheKeyBlockYieldsTheIdentifier) {
   EXPECT_EQ(run.Identifier().value, kStated);
 }
 
-// A reader that never opened the block never reaches the identifier, which is
-// what makes the case above about the block rather than about a value standing
-// in the envelope's clear text. The reading is left at the default.
 TEST(ProtectDigestMethodDecryptionInput, AReaderWithoutTheKeyReachesNone) {
   ReadUnderKeys run(
       ThroughEndProtected(SignedEnvelope(Writes(kIdentifierKeyword, kStated))),
@@ -650,31 +374,18 @@ TEST(ProtectDigestMethodDecryptionInput, AReaderWithoutTheKeyReachesNone) {
   EXPECT_TRUE(run.Identifier().defaulted);
 }
 
-// §34.5.21.2: on the way back the identifier indicates the algorithm the digest
-// is generated from the data block with. The digest of a block sealed under one
-// identifier and regenerated under the same one agrees with what the envelope
-// carried.
 TEST(ProtectDigestMethodDecryptionInput, TheDigestAgreesUnderTheStatedOne) {
   ReadUnderKeys run(SignedEnvelope(Writes(kIdentifierKeyword, kStated)),
                     TheBlockKey());
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
-// The same region with no identifier stated, read by the same tool: the digest
-// is generated under the default at both ends and agrees as well. Two readings
-// that agree for two different identifiers are what say the identifier was
-// carried rather than that one algorithm was used throughout.
 TEST(ProtectDigestMethodDecryptionInput, TheDigestAgreesUnderTheDefaultToo) {
   ReadUnderKeys run(ThroughEndProtected(SignedEnvelope("")), TheBlockKey());
   EXPECT_TRUE(run.Identifier().defaulted);
   EXPECT_EQ(run.DigestCheck(), ProtectDigestCheck::kMatched);
 }
 
-// An identifier Table 34-4 tabulates and this implementation does not provide,
-// stated in an envelope ahead of its digest block. The digest the block carries
-// opens under the key, and no digest of the data can be generated to compare it
-// with, so the comparison is one this reader cannot make rather than one that
-// found the data altered.
 TEST(ProtectDigestMethodDecryptionInput, AnUnprovidedOneRegeneratesNoDigest) {
   std::string envelope = UnsignedEnvelope("");
   size_t block = envelope.find("`pragma protect digest_block",
@@ -690,8 +401,6 @@ TEST(ProtectDigestMethodDecryptionInput, AnUnprovidedOneRegeneratesNoDigest) {
   EXPECT_EQ(pp.LastDigestBlockCheck(), ProtectDigestCheck::kUnreadable);
 }
 
-// The digest `digest` written in lowercase hex, the way FIPS 180-2 and RFC 1321
-// print their examples.
 std::string LowercaseHex(std::string_view digest) {
   constexpr std::string_view kNibbles = "0123456789abcdef";
   std::string hex;
@@ -703,9 +412,6 @@ std::string LowercaseHex(std::string_view digest) {
   return hex;
 }
 
-// Table 34-4 has sha1 compute the digest FIPS 180-2 defines, so it gives that
-// document's own examples: the one-block message of Appendix A.1 and the
-// two-block message of A.2.
 TEST(ProtectDigestAlgorithms, Sha1GivesFips1802sExamples) {
   EXPECT_EQ(LowercaseHex(Sha1Digest("abc")),
             "a9993e364706816aba3e25717850c26c9cd0d89d");
@@ -714,8 +420,6 @@ TEST(ProtectDigestAlgorithms, Sha1GivesFips1802sExamples) {
             "84983e441c3bd26ebaae4aa1f95129e5e54670f1");
 }
 
-// Table 34-4 has md5 compute the digest IETF RFC 1321 defines, so it gives the
-// test suite of that document's §A.5.
 TEST(ProtectDigestAlgorithms, Md5GivesRfc1321sExamples) {
   EXPECT_EQ(LowercaseHex(Md5Digest("")), "d41d8cd98f00b204e9800998ecf8427e");
   EXPECT_EQ(LowercaseHex(Md5Digest("abc")), "900150983cd24fb0d6963f7d28e17f72");

@@ -10,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §16.13.6: the actual for a formal of type sequence in an instance a
-// sequence body holds, the clause's `e2_with_arg(@(posedge sysclk) $rose(a)
-// ##1 b ##1 c)`, is read as a sequence carried by the identifier standing
-// in the argument's place, with the clock it opens with.
 TEST(SequenceMethodParsing, ASequenceActualInASequenceBodyIsReadAsASequence) {
   auto r = Parse(
       "module m;\n"
@@ -47,8 +43,6 @@ TEST(SequenceMethodParsing, ASequenceActualInASequenceBodyIsReadAsASequence) {
   EXPECT_EQ(actual->clock[0].signal->text, "sysclk");
 }
 
-// §16.13.6: an actual that is an expression, `e2_with_arg(ready)`, is kept
-// as the expression it is.
 TEST(SequenceMethodParsing, AnExpressionActualInASequenceBodyStaysOne) {
   auto r = Parse(
       "module m;\n"
@@ -75,9 +69,6 @@ TEST(SequenceMethodParsing, AnExpressionActualInASequenceBodyStaysOne) {
   EXPECT_EQ(actual->text, "ready");
 }
 
-// §16.13.6 with A.2.10: a method applied to a sequence named through an
-// instance, `u.s.triggered`, reads the sequence `s`, which the unit records so
-// that the sequence's monitor keeps the calls its match items attach.
 TEST(SequenceMethodParsing, AMethodThroughAnInstanceRecordsTheSequence) {
   auto r = Parse(
       "module t;\n"

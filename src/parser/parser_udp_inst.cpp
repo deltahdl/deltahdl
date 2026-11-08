@@ -1,7 +1,3 @@
-// §29.8: the instantiation of a user-defined primitive. Moved out of
-// parser_udp.cpp, which reached the size the assert-no-oversized-source-files
-// job fails at.
-
 #include <cstdint>
 #include <vector>
 
@@ -15,19 +11,6 @@
 
 namespace delta {
 
-// Whether the item at hand, which opens with a name the parser holds no
-// declaration for, is written in a form only a UDP instance takes. §29.3 lets
-// a UDP be declared anywhere, so its name may not be known yet. §29.8 gives
-// the instance a gate's drive strength, delay2 and optional name. A module
-// instance writes `#` only before the parentheses of a parameter value
-// assignment, and names its instance before any `(` (A.4.1.1), so a `(` after
-// the name, which opens a drive strength or an unnamed instance's terminals,
-// and a `#` with no `(` after it, which opens a delay, are a UDP's. So is a
-// `(` straight after a balanced `#( )`: there a module instance would write its
-// instance identifier, and an unnamed UDP instance opens its terminals. A `#(`
-// followed by a name is left to the module instance it may be, and
-// Elaborator::ReclassifyForwardUdpInstances turns it into a UDP instance where
-// the name proves to be one.
 bool Parser::AtUdpOnlyInstanceForm() {
   if (Check(TokenKind::kLParen)) return true;
   if (!Check(TokenKind::kHash)) return false;
@@ -42,14 +25,6 @@ bool Parser::AtUdpOnlyInstanceForm() {
   return udp_only;
 }
 
-// A.5.4's udp_instance, `[ name_of_instance ] ( output_terminal ,
-// input_terminal { , input_terminal } )`: two terminals at least, the first
-// a net_lvalue under A.3.3. The parser had read the terminal list as any list
-// of expressions and left both to elaboration, which reports the count for a
-// primitive it resolves and the output terminal for none; each is now reported
-// where the instance is read, the count under A.5.4 and the terminal under
-// §28.3 as a gate's is, since §29.8 has a UDP instance written the way a gate
-// instance is.
 ModuleItem* Parser::ParseOneUdpInstance(const Token& udp_tok, SourceLoc loc) {
   auto* item = arena_.Create<ModuleItem>();
   item->kind = ModuleItemKind::kUdpInst;

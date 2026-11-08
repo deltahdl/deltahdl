@@ -22,10 +22,6 @@ TEST(ClassParsing, ParameterizedClass) {
   EXPECT_EQ(cls->params[0].first, "DEPTH");
 }
 
-// §8.25 gives a class the parameter_port_list a module header takes, whose
-// param_assignment (A.2.1.1) may carry unpacked dimensions after the name, so
-// A is an array of two and B, the next assignment of the same declaration,
-// one of two by three.
 TEST(ClassParsing, ClassParamPortUnpackedDimensions) {
   auto r = Parse(
       "class C #(parameter int A[2] = '{1, 2}, B[2][3] = '{default: 0},\n"
@@ -352,14 +348,6 @@ TEST(ParameterizedClassParsing, StaticMemberInParameterizedClass) {
   ASSERT_GE(r.cu->classes[0]->members.size(), 2u);
 }
 
-// A.1.3's parameter_port_declaration opens with `parameter`, `localparam`,
-// `type` or a data type (printed page 1174 of IEEE 1800-2023), so the `T
-// = int` after the comma in `#(type KEY = int, T = int)` is no new declaration:
-// it is the second type_assignment of A.2.1.1's one type_parameter_declaration,
-// `type [ forward_type ] list_of_type_assignments` (printed pages 1181 and
-// 1184), and T is a type parameter as KEY is. Read as a value parameter
-// instead, T is not a type name in the body, and `T pool[KEY];` is reported
-// at `pool`.
 TEST(ParameterizedClassParsing, TypeGroupContinuesPastTheComma) {
   auto r = Parse(
       "class C #(type KEY = int, T = int);\n"
@@ -384,10 +372,6 @@ TEST(ParameterizedClassParsing, TypeGroupContinuesPastTheComma) {
   EXPECT_EQ(cls->members[0]->unpacked_dims[0]->text, "KEY");
 }
 
-// The type group ends where a parameter_port_declaration opens: at a data
-// type, the type parameter just declared included, since `T dflt = 0` is
-// A.1.3's `data_type list_of_param_assignments`, whose list the `U = 1` after
-// it then continues.
 TEST(ParameterizedClassParsing, TypeGroupEndsAtADataType) {
   auto r = Parse(
       "class C #(type T = int, T dflt = 0, U = 1, int W = 4);\n"

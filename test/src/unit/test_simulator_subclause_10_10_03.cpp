@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -81,16 +79,6 @@ TEST(UnpackedArrayConcatSim, VectorConcatInByteArrayConcat) {
   EXPECT_EQ(ba1->value.ToUint64(), 15u);
 }
 
-// §10.10.3, string element type, end-to-end through the §11.4.12 string-
-// concatenation dependency: because a complete unpacked array concatenation has
-// no self-determined type, a `{...}` written as an item of an outer unpacked
-// array concatenation is read as a self-determined STRING concatenation, not as
-// an (illegal) nested unpacked array concatenation. The nesting rule is exactly
-// what makes that reading unambiguous. Built from real string source and run:
-// the inner `{"x", S2}` fuses into ONE queue element ("xbb"), so the queue
-// holds two elements rather than three — the observable signature that the
-// inner braces were treated as a single self-determined string-concatenation
-// item.
 TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
   RunAndExpectStringQueue(
       "module t;\n"
@@ -105,21 +93,6 @@ TEST(UnpackedArrayConcatSim, StringConcatItemFusesIntoSingleElement) {
       "SQ", {"aa", "xbb"});
 }
 
-// §10.10.3's own example, run as written. It adds the two things the reduced
-// case above leaves out: the queue names itself as an item, so its existing
-// elements are expanded in place, and the braced item sits after that
-// expansion rather than at a fixed offset. The clause states the result
-// exactly -- '{"S1", "element 0", "element 1", "element 3 is S2"} -- so the
-// queue ends with four elements, the last of them the two strings inside the
-// inner braces joined into one.
-// One thing in the clause's source is written differently here, in the setup
-// rather than in the line under test, so that a failure can only be about the
-// concatenation: the clause declares the queue as
-// `typedef string T_SQ[$]; T_SQ SQ;` and it is declared directly instead. That
-// substitution produces the same starting queue and replaces a spelling with a
-// separate open defect of its own, so leaving it in would make this test fail
-// for a reason that has nothing to do with §10.10.3. The seeding assignment
-// pattern `SQ = '{"element 0", "element 1"};` is the clause's own.
 TEST(UnpackedArrayConcatSim, ClauseExampleExpandsQueueAndFusesBracedItem) {
   RunAndExpectStringQueue(
       "module t;\n"
@@ -135,13 +108,6 @@ TEST(UnpackedArrayConcatSim, ClauseExampleExpandsQueueAndFusesBracedItem) {
       "SQ", {"S1", "element 0", "element 1", "element 3 is S2"});
 }
 
-// Same rule at the declaration-initializer position — a distinct
-// assignment-like syntactic position that produces the input differently from a
-// procedural assignment. The string-literal items are built from real source
-// and the queue is read back from the simulated result: the nested string
-// concatenation
-// `{"x", "bb"}` again yields a single element, so the initialized queue has two
-// elements.
 TEST(UnpackedArrayConcatSim, StringConcatItemInDeclInitFusesIntoSingleElement) {
   RunAndExpectStringQueue(
       "module t;\n"
@@ -150,11 +116,6 @@ TEST(UnpackedArrayConcatSim, StringConcatItemInDeclInitFusesIntoSingleElement) {
       "SQ", {"aa", "xbb"});
 }
 
-// §10.10.3's own example, `SQ = {S1, SQ, T_SQ'{"element 3 is ", S2}}`: only a
-// plain inner brace pair is a string concatenation, and an item that is an
-// assignment pattern typed as an array of strings contributes each of its
-// elements. Read as the string concatenation "element 3 is S2", the item gave
-// one element where the pattern gives two.
 TEST(UnpackedArrayConcatSim, TypedPatternItemContributesEachElement) {
   RunAndExpectStringQueue(
       "module t;\n"
@@ -165,8 +126,6 @@ TEST(UnpackedArrayConcatSim, TypedPatternItemContributesEachElement) {
       "SQ", {"S1", "element 3 is ", "S2"});
 }
 
-// The same of a queue of integers, `{1, T_IQ'{2, 3}}`, and of a typed item
-// beside a named queue.
 TEST(UnpackedArrayConcatSim, TypedIntegerPatternItemContributesEachElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -182,12 +141,6 @@ TEST(UnpackedArrayConcatSim, TypedIntegerPatternItemContributesEachElement) {
   EXPECT_EQ(out, "4 2 3 9\n");
 }
 
-// §10.10.3's jagged array example: a queue whose elements are queues, given a
-// positional pattern, holds one element per item, and each item is that
-// element's queue -- the one-item concatenation {1}, the typed pattern
-// T_QI'{2,3,4} and the concatenation {5,6}. No inner queue was built, so every
-// element read 0 and jagged[1] was empty. The declaration initializer and the
-// procedural assignment take the same pattern.
 TEST(UnpackedArrayConcatSim, JaggedQueueOfQueuesBuildsEachInnerQueue) {
   SimFixture f;
   std::string out = RunCapture(

@@ -80,15 +80,11 @@ TEST(NetAliasLexing, AliasChainTokenSequence) {
 }
 
 TEST(ContinuousAssignLexing, AssignIsFullWordKeyword) {
-  // A longer identifier that merely starts with "assign" must lex as a
-  // single identifier, not as the kKwAssign keyword.
   auto r = LexOne("assigned");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }
 
 TEST(NetAliasLexing, AliasIsFullWordKeyword) {
-  // A longer identifier that merely starts with "alias" must lex as a
-  // single identifier, not as the kKwAlias keyword.
   auto r = LexOne("aliased");
   EXPECT_EQ(r.token.kind, TokenKind::kIdentifier);
 }

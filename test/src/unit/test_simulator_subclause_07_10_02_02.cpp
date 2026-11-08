@@ -9,16 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §7.10.2.2's insert() rules operate on a queue whose contents come from a
-// declaration + initializer (§7.10) and on an index taken from a variable of
-// the prototype's `integer` formal, so the behavior depends on how those inputs
-// are produced. Each test builds both from real source and drives them through
-// the full pipeline (parse, elaborate, lower, run), observing the production
-// insert() path (QueueInsertAt reached via TryEvalQueueMethodCall) apply each
-// rule.
-
-// Claim: insert(index, item) places item at the ordinal index position,
-// shifting the trailing elements up by one.
 TEST(QueueMethods, InsertAtIndexFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -28,7 +18,6 @@ TEST(QueueMethods, InsertAtIndexFromSource) {
       "q", {10u, 20u, 30u});
 }
 
-// Claim: index 0 inserts at the front of the queue.
 TEST(QueueMethods, InsertAtFrontFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -38,8 +27,6 @@ TEST(QueueMethods, InsertAtFrontFromSource) {
       "q", {10u, 20u, 30u});
 }
 
-// Claim: an index equal to the current size is in range and appends the item at
-// the end (only indices strictly greater than the size are rejected).
 TEST(QueueMethods, InsertAtEndFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -49,8 +36,6 @@ TEST(QueueMethods, InsertAtEndFromSource) {
       "q", {10u, 20u, 30u});
 }
 
-// Claim: inserting at index 0 into an empty queue (the queue is empty when no
-// initializer is given, per §7.10) yields a single-element queue.
 TEST(QueueMethods, InsertIntoEmptyQueueFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -60,8 +45,6 @@ TEST(QueueMethods, InsertIntoEmptyQueueFromSource) {
       "q", {42u});
 }
 
-// Claim (error path): an index greater than the current size leaves the queue
-// unchanged.
 TEST(QueueMethods, InsertOutOfRangeIsNoopFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -71,9 +54,6 @@ TEST(QueueMethods, InsertOutOfRangeIsNoopFromSource) {
       "q", {10u, 20u});
 }
 
-// Claim (error path): the smallest index that exceeds the current size (size+1)
-// is the exact off-by-one edge of the range guard and must leave the queue
-// unchanged, complementing the in-range append at index == size above.
 TEST(QueueMethods, InsertJustPastEndIsNoopFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -83,9 +63,6 @@ TEST(QueueMethods, InsertJustPastEndIsNoopFromSource) {
       "q", {10u, 20u});
 }
 
-// Claim (error path): a negative index leaves the queue unchanged. The index is
-// held in an `integer` variable, matching the prototype's signed 4-state
-// formal.
 TEST(QueueMethods, InsertNegativeIndexIsNoopFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -96,9 +73,6 @@ TEST(QueueMethods, InsertNegativeIndexIsNoopFromSource) {
       "q", {10u, 20u});
 }
 
-// Claim (error path): an index carrying x/z bits leaves the queue unchanged.
-// The prototype's index formal is `integer` (4-state) precisely so an unknown
-// value survives to the insert() call and can be detected.
 TEST(QueueMethods, InsertXzIndexIsNoopFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -109,9 +83,6 @@ TEST(QueueMethods, InsertXzIndexIsNoopFromSource) {
       "q", {10u, 20u});
 }
 
-// Element-type input form: insert() is defined for a queue of any element type
-// (item is `element_t`), not just int. Insert into a queue of packed 4-state
-// vectors and confirm the item lands at the index with neighbors in order.
 TEST(QueueMethods, InsertOnVectorQueueFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -130,11 +101,6 @@ TEST(QueueMethods, InsertOnVectorQueueFromSource) {
   EXPECT_EQ(q->elements[2].ToUint64(), 0xCCu);
 }
 
-// Item-value input form: "inserts the given item" must store the item
-// faithfully even when it carries unknown bits. Inserting an item with x/z bits
-// into a 4-state queue keeps those unknown bits in the stored element (the
-// known bits still read back), distinct from every case above where the item is
-// fully determined.
 TEST(QueueMethods, InsertPreservesUnknownItemBitsFromSource) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -148,17 +114,11 @@ TEST(QueueMethods, InsertPreservesUnknownItemBitsFromSource) {
   auto* q = f.ctx.FindQueue("q");
   ASSERT_NE(q, nullptr);
   ASSERT_EQ(q->elements.size(), 2u);
-  // The inserted element is not fully known: its low nibble carries x bits.
   EXPECT_FALSE(q->elements[0].IsKnown());
-  // The originally-present element is undisturbed and still fully known.
   EXPECT_TRUE(q->elements[1].IsKnown());
   EXPECT_EQ(q->elements[1].ToUint64(), 0x11u);
 }
 
-// Error-path input form: the rule rejects an index with x OR z bits. The x case
-// is covered above; this exercises the z variant. The index is held in an
-// `integer` (4-state) variable so the z value survives to the insert() call,
-// which must leave the queue unchanged.
 TEST(QueueMethods, InsertWithZIndexIsNoopFromSource) {
   RunAndExpectQueue(
       "module m;\n"
@@ -169,9 +129,6 @@ TEST(QueueMethods, InsertWithZIndexIsNoopFromSource) {
       "q", {10u, 20u});
 }
 
-// §7.10.2.2 with §7.4: where the queue's elements are fixed-size arrays,
-// insert() places the whole item at the index: '{7, 8, 9} becomes r[1],
-// between the two rows already present, which keep their values.
 TEST(QueueMethods, InsertsAnArrayElementIntoAQueueOfArrays) {
   SimFixture f;
   auto out = RunCapture(

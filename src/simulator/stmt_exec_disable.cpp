@@ -1,9 +1,3 @@
-// §9.6.2's disable statement and §9.6.3's disable fork: ending a named block,
-// a labeled statement, a task or a fork, in the process issuing the disable or
-// in another, and ending the processes a process spawned. Also §16.4.4's and
-// §16.14.6.4's flush of the deferred and procedural assertion queues a disable
-// of a procedure's outermost scope, or of one assertion, brings with it.
-
 #include <algorithm>
 #include <coroutine>
 #include <string>
@@ -29,17 +23,6 @@
 
 namespace delta {
 
-// §16.4.4: a disable of the outermost scope of a procedure holding a deferred
-// assertion queue flushes that queue beside §9.6.2's own activities, whether
-// or not the block is executing -- the clause's own example disables b2 from
-// another always block while b2 sits on its event control -- so the outermost
-// scope is looked up on its own rather than among the blocks a process is
-// inside. The queue alone is touched: §9.6.2 leaves a block that is not
-// executing unaffected, so the process keeps running. §16.14.6.4 has the same
-// disable flush the procedure's procedural assertion queue, its matured
-// attempts untouched, the procedure disabling its own outermost scope flushing
-// its own. Answers whether the target named any procedure's outermost scope,
-// so that a name answered here is not also taken for an assertion label.
 static bool FlushDeferredQueueOfOutermostScope(std::string_view target,
                                                const Process* current,
                                                SimContext& ctx) {
@@ -52,9 +35,6 @@ static bool FlushDeferredQueueOfOutermostScope(std::string_view target,
   return !procs.empty();
 }
 
-// §9.6.2: the label a disable names -- the name itself, or the last name of a
-// hierarchical one, `t.counter.cnt`, the block the named-scope registry holds
-// under its own label.
 static std::string_view DisableTargetLabel(const Expr* e) {
   while (e != nullptr && e->kind == ExprKind::kMemberAccess &&
          !e->is_scope_resolution) {
@@ -64,13 +44,6 @@ static std::string_view DisableTargetLabel(const Expr* e) {
                                                           : std::string_view{};
 }
 
-// §9.6.2: a disable from another process of a block, a labeled statement or a
-// task that `proc` itself stands in ends it where the process waits, and the
-// process goes on after it. The wait is abandoned -- its gate closed, so its
-// own wake resumes nothing -- and the statement waiting answers kDisable to
-// the one around it, which unwinds to the scope named as a disable the process
-// issued itself does. False where the process waits in no wait it can be
-// taken out of, which leaves it to be killed.
 static bool TryUnwindForDisable(Process* proc, std::string_view target,
                                 SimContext& ctx) {
   const auto& scopes = proc->saved_named_scopes;
@@ -98,13 +71,6 @@ static bool TryUnwindForDisable(Process* proc, std::string_view target,
   return true;
 }
 
-// §25.7.4 with §9.6.2: the instances the definitions a hierarchical disable
-// names run in, where the path names an extern forkjoin task: one module
-// instance's definition, `m1.a.Hit` for the task m1 defines through its port
-// `a`, or `s.Hit`, the interface instance's own task, every definition the
-// modules connected to it export. Each path is read from the calling instance
-// first and then from the top of the design; none for any other path. A
-// disable of such a path ends the calls running in those instances alone.
 static std::vector<std::string> DisabledDefinitionInstances(const Expr* e,
                                                             SimContext& ctx) {
   std::vector<std::string> instances;
@@ -144,8 +110,6 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
              kInstances.end();
     });
   } else {
-    // §9.6.2 with §23.8: of the processes inside a scope of the label, those
-    // inside the one block or task the name resolves to.
     procs = ProcessesInDisabledScope(stmt->expr, procs, ctx);
   }
   bool self_disable = false;
@@ -158,23 +122,11 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
     if (TryUnwindForDisable(proc, target, ctx)) continue;
 
     TerminateProcess(*proc, ctx);
-    // §16.4.4: applying a disable to the outermost scope of another procedure
-    // that has an active deferred assertion queue flushes that queue -- every
-    // pending (not-yet-matured) deferred immediate assertion report on it is
-    // cleared, in addition to the normal disable activities of §9.6.2. A
-    // pending report's scheduled Reactive/Postponed event is gated only on the
-    // process's deferred report generation (not on its active flag), so bumping
-    // that generation invalidates the reports this process queued earlier in
-    // the time step, mirroring FlushPendingDeferredReports for the disabled
-    // process (see §16.4.2). Reports that already matured have run and are
-    // unaffected.
     proc->deferred_report_generation++;
   }
 
   bool named_a_procedure_scope =
       FlushDeferredQueueOfOutermostScope(target, current, ctx);
-  // §38.36.1: a cbDisable callback is called after the block or task is
-  // disabled.
   GetGlobalVpiContext().NoteDisabled(stmt, ctx.ActiveInstancePrefix());
 
   if (self_disable) {
@@ -182,29 +134,14 @@ StmtResult ExecDisableImpl(const Stmt* stmt, SimContext& ctx) {
     return StmtResult::kDisable;
   }
 
-  // §16.4.4: a `disable <label>` that names no block, task, or process scope
-  // may instead name a specific deferred immediate assertion. Such a disable
-  // cancels only that assertion's still-pending reports and does not unwind the
-  // process (unlike disabling a scope). Record the label on the current
-  // process; each pending report queued by that assertion skips execution when
-  // its region runs (see ScheduleDeferredAction /
-  // ScheduleDeferredSeverityReport). Reports of other assertions, and any
-  // report that has already matured, are untouched.
   if (procs.empty() && !named_a_procedure_scope && current) {
     current->cancelled_deferred_labels.insert(std::string(target));
-    // §16.14.6.4: or a specific procedural concurrent assertion, whose
-    // pending instances alone are cleared.
     DisableProceduralAssertion(*current, target);
   }
 
   return StmtResult::kDone;
 }
 
-// §9.6.3: disable fork ends every descendant of `proc`, a descendant of a child
-// that has already finished among them. Each is ended as kill() ends a process
-// (TerminateProcess), so it is KILLED (§9.7), its awaits return, and it is
-// released from the join and wait-fork tallies of the fork that spawned it,
-// once, which is what brings `proc`'s own wait-fork tally back down.
 static void DisableDescendants(Process* proc, SimContext& ctx) {
   for (auto* child : proc->children) {
     TerminateProcess(*child, ctx);

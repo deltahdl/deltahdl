@@ -1,9 +1,6 @@
 #include "simulator/dpi_task_call.h"
 
 #include <pthread.h>
-// glibc declares pthread_t and pthread_attr_t in <bits/pthreadtypes.h>, which
-// misc-include-cleaner asks for as the declaring header (as in src/main.cpp);
-// Apple's SDK declares them in <pthread.h>'s own tree and has no such file.
 #if __has_include(<bits/pthreadtypes.h>)
 #include <bits/pthreadtypes.h>
 #endif
@@ -30,10 +27,6 @@ namespace delta {
 
 namespace {
 
-// What passes between an imported task's C code and the process that enabled
-// it: whose turn it is, the exported task the C code asks for and its
-// arguments, whether a disable ended that task, and whether the C code has
-// returned.
 struct DpiTaskChannel {
   std::mutex mutex;
   std::condition_variable turn_taken;
@@ -46,14 +39,10 @@ struct DpiTaskChannel {
   DpiImportCall* call = nullptr;
 };
 
-// The channel of the imported task whose C code the calling thread runs.
 thread_local DpiTaskChannel* g_channel = nullptr;
 
-// The C code may recurse as deeply as the run's own, which runs on a deep
-// stack (RunOnDeepStack in src/main.cpp).
 constexpr std::size_t kCallStackBytes = std::size_t{256} << 20U;
 
-// Passes the turn to the other thread and waits for it to come back.
 void PassTurn(DpiTaskChannel& channel, bool to_simulator) {
   std::unique_lock<std::mutex> lock(channel.mutex);
   channel.simulator_turn = to_simulator;
@@ -63,7 +52,6 @@ void PassTurn(DpiTaskChannel& channel, bool to_simulator) {
   });
 }
 
-// Waits for the C code to hand the turn over, with a request or its return.
 void AwaitSimulatorTurn(DpiTaskChannel& channel) {
   std::unique_lock<std::mutex> lock(channel.mutex);
   channel.turn_taken.wait(lock, [&channel] { return channel.simulator_turn; });
@@ -81,7 +69,6 @@ void* RunImportCall(void* raw) {
   return nullptr;
 }
 
-// Starts the C code of `channel`'s call on a thread of its own.
 bool StartImportCall(DpiTaskChannel& channel, pthread_t& thread) {
   pthread_attr_t attr;
   if (pthread_attr_init(&attr) != 0) return false;
@@ -92,8 +79,6 @@ bool StartImportCall(DpiTaskChannel& channel, pthread_t& thread) {
   return kStarted;
 }
 
-// The key of the subroutine keyed `key` from the root of the design, as the
-// running instance names it.
 std::string_view KeyFromRunningInstance(std::string_view key, SimContext& ctx) {
   const std::string kPrefix = ctx.ActiveInstancePrefix();
   if (!kPrefix.empty() && key.starts_with(kPrefix)) {
@@ -102,8 +87,6 @@ std::string_view KeyFromRunningInstance(std::string_view key, SimContext& ctx) {
   return key;
 }
 
-// §35.8: runs the exported task the C code asked for as a task enable of the
-// enabling process, so its timing controls suspend that process.
 ExecTask RunRequestedTask(DpiTaskChannel& channel, SimContext& ctx,
                           Arena& arena) {
   const DpiRtExport& exp = *channel.request;
@@ -137,8 +120,6 @@ ExecTask ExecDpiImportTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   channel.call = &call;
   pthread_t thread{};
   if (!StartImportCall(channel, thread)) {
-    // With no thread to run on, the C code runs here, as a call that consumes
-    // no time does.
     CallDpiImport(call);
     FinishDpiImportCall(call, ctx, arena);
     co_return StmtResult::kDone;
@@ -147,7 +128,6 @@ ExecTask ExecDpiImportTask(const Expr* expr, SimContext& ctx, Arena& arena) {
   AwaitSimulatorTurn(channel);
   while (!channel.finished) {
     StmtResult result = co_await RunRequestedTask(channel, ctx, arena);
-    // §35.9: a disable that ended the exported task returns 1 from it.
     channel.disabled = result == StmtResult::kDisable;
     disabled = disabled || channel.disabled;
     PassTurn(channel, false);
@@ -165,8 +145,6 @@ DpiArgValue RunExportedTaskFromC(const DpiRtExport& exp, std::string_view key,
   channel->request_key = key;
   channel->request_args = &args;
   PassTurn(*channel, true);
-  // §35.9: the C code learns of the disable through svIsDisabledState(),
-  // which reads the state of its own thread.
   if (channel->disabled) DpiSetCurrentDisabledState(true);
   return DpiArgValue::FromInt(0);
 }

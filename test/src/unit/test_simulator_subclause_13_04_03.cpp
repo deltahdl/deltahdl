@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §13.4.3: a constant function call is evaluated at elaboration time. The
-// resulting localparam value must be the one the running simulation sees. The
-// LRM clogb2 example folds clogb2(256) to 8; printing addr_width at run time
-// observes that folded value end-to-end.
 TEST(ConstantFunctionSim, Clogb2ResultReachesRuntime) {
   SimFixture f;
   std::string out = RunCapture(
@@ -27,9 +23,6 @@ TEST(ConstantFunctionSim, Clogb2ResultReachesRuntime) {
   EXPECT_EQ(out, "8\n");
 }
 
-// §13.4.3: the folded value is a genuine constant usable to size a vector. The
-// bit width of a signal declared [P-1:0] with P = double_val(4) must be 8,
-// observed at run time via $bits.
 TEST(ConstantFunctionSim, FoldedValueSizesRuntimeSignal) {
   SimFixture f;
   std::string out = RunCapture(
@@ -44,9 +37,6 @@ TEST(ConstantFunctionSim, FoldedValueSizesRuntimeSignal) {
   EXPECT_EQ(out, "8 8\n");
 }
 
-// §13.4.3 / §11.2.1: a constant function call folds in a packed-dimension
-// position, not only in a parameter initializer. `logic [calc(3)-1:0]` sizes
-// the vector to 6 bits (calc(3) = 6), observed at run time via $bits.
 TEST(ConstantFunctionSim, ConstFunctionCallInPackedDimension) {
   SimFixture f;
   std::string out = RunCapture(
@@ -60,12 +50,6 @@ TEST(ConstantFunctionSim, ConstFunctionCallInPackedDimension) {
   EXPECT_EQ(out, "6\n");
 }
 
-// §13.4.3: non-severity system task calls in a constant function are ignored
-// during its elaboration-time evaluation. Folding compute(4) to initialize P is
-// what makes "8" print; the $write inside the body must emit nothing, because
-// the constant-function evaluation silently skips it. (compute is never called
-// at run time, so the only place $write could fire is the elaboration-time
-// fold.) Exact "8\n" therefore confirms both the fold and the ignore.
 TEST(ConstantFunctionSim, SystemTaskInBodyProducesNoOutput) {
   SimFixture f;
   std::string out = RunCapture(

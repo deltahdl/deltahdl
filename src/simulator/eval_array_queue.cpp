@@ -50,8 +50,6 @@ static void PopQueueBack(QueueObject* q, Arena& arena, Logic4Vec& out) {
   }
 }
 
-// §7.10.2.4 and §7.10.2.5: pop_front() and pop_back() return the element they
-// remove, of the queue's element type (TakeElementSignedness).
 static bool DispatchQueueEval(std::string_view method, QueueObject* q,
                               Arena& arena, Logic4Vec& out) {
   if (method == "size") {
@@ -71,8 +69,6 @@ static bool DispatchQueueEval(std::string_view method, QueueObject* q,
   return false;
 }
 
-// The structure layout of the elements of the queue a method call is made
-// on, `q` of `q.push_back(...)`; null for a queue of any other elements.
 static const StructTypeInfo* QueueElementLayout(const Expr* call,
                                                 SimContext& ctx) {
   const Expr* access = call->lhs;
@@ -82,26 +78,10 @@ static const StructTypeInfo* QueueElementLayout(const Expr* call,
   return StructLayoutOfName(access->lhs->text, ctx);
 }
 
-// The value the push or insert `call` puts in the queue `q` for its item, the
-// last of its arguments, the element being given the identity `id`. §7.10.2
-// with §7.4: where each element of `q` is itself a queue, the argument is a
-// queue value, which is kept under the element's identity (ElementQueueFromItem
-// in eval_array_element_queue.h), and the element holds a placeholder. §10.9.2:
-// where the elements are structures, a pattern argument, `q.push_back('{1,
-// 10, 3})`, is packed by the structure's layout (EvalItemForLayout);
-// concatenated at its items' own widths it held the low bits of three 32-bit
-// values, and `q[1].green` read 0. The element owns its words: a variable's
-// value shares them with the variable, and a member write to it after the
-// push, depositing in place, reached the element too.
 static Logic4Vec PushedValue(QueueObject* q, const Expr* call, uint64_t id,
                              SimContext& ctx, Arena& arena) {
   const Expr* item = call->args.back();
-  // §15.5 with §7.10: an event pushed into a queue of events is the event
-  // itself, held by its identity (EventIdentityOf); pushed as its value, the
-  // element named no event and `@q[0]` waited on nothing.
   if (q->holds_events) return EventIdentityOf(item, ctx, arena);
-  // §15.3 and §15.4 with §7.10: a semaphore or mailbox handle pushed into a
-  // queue of them is recorded for `q[0].try_get()` to reach its object.
   if (q->holds_class_handles) RecordContainedSyncHandle(item, ctx, arena);
   if (!q->elements_are_queues) {
     return OwnRhsWords(
@@ -133,9 +113,6 @@ static void QueuePushFront(QueueObject* q, const Expr* expr, SimContext& ctx,
   ++q->generation;
 }
 
-// §7.10.2.2: insert(index, item) puts the item at `index`, built as a push
-// builds it (PushedValue), so that where each element is itself a queue, a
-// fixed-size array's elements among them, the item becomes its element queue.
 static void QueueInsertAt(QueueObject* q, const Expr* expr, SimContext& ctx,
                           Arena& arena) {
   auto idx_val = EvalExpr(expr->args[0], ctx, arena);
@@ -202,14 +179,6 @@ static bool IsQueueMutator(std::string_view method) {
          method == "delete";
 }
 
-// The four ordering methods §7.12.2 defines over an array: sort and rsort put
-// the elements in ascending and descending order, reverse and shuffle permute
-// them. Syntax 7-5 of §7.12 makes the argument list of an array method call
-// optional, so `q.sort` and `q.sort()` are the same call and both reach
-// TryExecQueuePropertyStmt below. The four are named here rather than every
-// method that dispatch declined being passed on, because that function also
-// serves `delete`, which DispatchQueueDelete has already handled with its
-// argument.
 static bool IsQueueOrderingMethod(std::string_view method) {
   return method == "sort" || method == "rsort" || method == "reverse" ||
          method == "shuffle";
@@ -219,16 +188,6 @@ void NotifyOwningVar(SimContext& ctx, std::string_view var_name) {
   if (auto* v = ctx.FindVariable(var_name)) v->NotifyWatchers();
 }
 
-// The queue the call `receiver.method(...)` is on, with the receiver
-// expression in `receiver`, the method in `method` and, for a property of an
-// object, the object in `owner`; null for a call of another shape or on a
-// receiver that names no queue. §7.10.2's methods are defined on the queue
-// whatever names it: a declared queue by its bare name, and, §8.5 putting no
-// restriction on a property's type, a property of an object -- the running
-// method's own by its bare name (§8.11), any object's through a handle,
-// `b.q.push_back(x)`, and a static one through `C::all.size()` (§8.9) --
-// which FindQueueOfBase resolves. Before it, only the bare name of a declared
-// queue was read here, so a queue property answered size 0 and kept nothing.
 struct QueueCall {
   QueueObject* queue = nullptr;
   const Expr* receiver = nullptr;
@@ -252,30 +211,18 @@ static QueueCall ResolveQueueCall(const Expr* expr, SimContext& ctx,
   call.method = access->rhs->text;
   bool writes =
       IsQueueMutator(call.method) || IsQueueOrderingMethod(call.method);
-  // §7.8.7 with §7.10: a method that changes the queue writes the element it
-  // is called on, so `aq["a"].push_back(3)` allocates aq["a"] where the array
-  // holds no such entry; a method that only reads it allocates nothing.
   if (access->lhs->kind == ExprKind::kSelect) {
     call.queue = ElementQueueOfSelect(access->lhs, ctx, arena, writes);
     if (call.queue != nullptr) return call;
   }
-  // §7.2 with §7.5: likewise a method that changes a dynamic member of a
-  // structure changes a copy the structure is given to hold.
   call.queue = ResolveStructDynMember(access->lhs, ctx, arena, writes);
   if (call.queue != nullptr) return call;
   call.queue = FindQueueOfBase(access->lhs, ctx, arena, &call.owner);
   return call;
 }
 
-// §7.12.2's ordering methods over the queue `q`, answering whether `prop`
-// names one of them.
 static bool OrderQueue(QueueObject* q, std::string_view prop, SimContext& ctx);
 
-// §7.12.2's ordering methods over the queue of `call`, whatever names it: a
-// declared one, the running method's property, or, §8.5, a property through
-// a handle, `h.q.sort()`, which read by a bare name was left in its order.
-// sort() and rsort() called with a with clause, `q.sort(x) with (x % 3)`,
-// order by the clause's value, which sorting by the elements' own ignored.
 static bool ExecQueueOrdering(const QueueCall& call, const Expr* expr,
                               SimContext& ctx, Arena& arena) {
   if (expr->with_expr != nullptr &&
@@ -318,9 +265,6 @@ bool TryExecQueueMethodStmt(const Expr* expr, SimContext& ctx, Arena& arena) {
   return false;
 }
 
-// §7.10.2.1 writes `Q.size` without parentheses, and the name on the left of
-// the dot is read as a call's receiver is: a declared queue, or the property
-// of the running method's object (§8.11).
 bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
                           SimContext& ctx, Arena& arena, Logic4Vec& out) {
   auto* q = FindQueueOfName(var_name, ctx);
@@ -329,9 +273,6 @@ bool TryEvalQueueProperty(std::string_view var_name, std::string_view prop,
   return DispatchQueueEval(prop, q, arena, out);
 }
 
-// §7.12.2 with §6.16: the order the elements of `q` take, ascending or
-// descending. A queue of strings, whose elements have no declared width, is
-// ordered lexicographically; by the packed value a shorter string came first.
 static std::vector<size_t> QueueSortOrder(const QueueObject& q,
                                           bool ascending) {
   const auto& elems = q.elements;
@@ -346,7 +287,6 @@ static std::vector<size_t> QueueSortOrder(const QueueObject& q,
     });
     return order;
   }
-  // §6.11: other elements are ordered by the element type's signedness.
   std::stable_sort(order.begin(), order.end(), [&](size_t a, size_t b) {
     return ascending ? OrdersBefore(elems[a], elems[b], q.is_signed)
                      : OrdersBefore(elems[b], elems[a], q.is_signed);

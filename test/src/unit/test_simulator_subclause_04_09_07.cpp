@@ -155,10 +155,6 @@ TEST(SubroutineArgSchedulingSim, CopyOutSupportsBlockingAssignLhsForms) {
   EXPECT_EQ(f.ctx.FindVariable("sibling")->value.ToUint64(), 7u);
 }
 
-// Copy-out to a part-select actual. Because the copy-out is a blocking
-// assignment, binding the output formal to a part-select of a wider vector must
-// update only the selected bits and leave the rest of the vector as it was --
-// exactly what a direct blocking assignment to that part-select would do.
 TEST(SubroutineArgSchedulingSim, CopyOutToPartSelectActualLikeBlockingAssign) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -180,10 +176,6 @@ TEST(SubroutineArgSchedulingSim, CopyOutToPartSelectActualLikeBlockingAssign) {
   EXPECT_EQ(f.ctx.FindVariable("vec")->value.ToUint64(), 0xFAu);
 }
 
-// Copy-out to a concatenation lvalue actual. A blocking assignment accepts a
-// concatenation on its left, distributing the source across the concatenated
-// targets; the copy-out, behaving the same way, must split the returned value
-// across the two variables bound by the concatenation.
 TEST(SubroutineArgSchedulingSim,
      CopyOutToConcatenationActualLikeBlockingAssign) {
   SimFixture f;
@@ -208,11 +200,6 @@ TEST(SubroutineArgSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("lo")->value.ToUint64(), 0x3u);
 }
 
-// A non-void function delivers two distinct results on return: its return
-// value, and the copy-out of any output argument. These travel through the
-// function-call evaluation path (not the task-call statement path), so the
-// copy-out is exercised here on that separate production path while confirming
-// it does not disturb the returned value.
 TEST(SubroutineArgSchedulingSim,
      OutputArgAndReturnValueBothDeliveredFromFunction) {
   SimFixture f;
@@ -238,9 +225,6 @@ TEST(SubroutineArgSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("ret")->value.ToUint64(), 200u);
 }
 
-// Because the copy-out is a blocking assignment, it adapts the value to the
-// width of the target the same way a direct blocking assignment would: an
-// output formal wider than the actual it is bound to truncates on return.
 TEST(SubroutineArgSchedulingSim,
      CopyOutTruncatesToTargetWidthLikeBlockingAssign) {
   SimFixture f;
@@ -263,13 +247,6 @@ TEST(SubroutineArgSchedulingSim,
   EXPECT_EQ(f.ctx.FindVariable("narrow")->value.ToUint64(), 0xFu);
 }
 
-// Negative form of the copy-out rule. By-value passing makes an input formal a
-// wholly independent local copy: the copy happens in on invocation, but nothing
-// copies out on return for an input direction. So mutating the formal inside
-// the subroutine must leave the caller's actual untouched even after the call
-// returns -- the opposite of the output-argument writeback exercised above, and
-// the boundary that distinguishes by-value input passing from
-// pass-by-reference.
 TEST(SubroutineArgSchedulingSim, InputFormalWriteDoesNotCopyOutToActual) {
   SimFixture f;
   auto* design = ElaborateSrc(

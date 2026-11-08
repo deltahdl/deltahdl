@@ -25,17 +25,6 @@
 namespace delta {
 namespace {
 
-// §37.3.3 (Object file and line properties) states that most objects carry two
-// location properties not drawn in the data model diagrams: vpiLineNo, read as
-// an integer through vpi_get(), and vpiFile, read as a string through
-// vpi_get_str(). They apply to every object that corresponds to something in
-// the source text, with one fixed set of exceptions - object kinds that have no
-// single source line or file: vpiCallback, vpiDelayTerm, vpiDelayDevice,
-// vpiInterModPath, vpiIterator, vpiTimeQueue, vpiGenScopeArray, and
-// vpiGenScope. (The `line directive of §22.12 may shift the reported values;
-// that effect is §22.12's to define, not §37.3.3's.) These tests drive the
-// production routines through the public C entry points, exactly as a PLI
-// program would, by installing a private context as the global one.
 class VpiFileAndLineProperty : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -44,8 +33,6 @@ class VpiFileAndLineProperty : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim: an object that corresponds to source text reports its source line
-// through vpi_get(vpiLineNo).
 TEST_F(VpiFileAndLineProperty, GetLineNoReturnsTheObjectsSourceLine) {
   VpiObject net;
   net.type = vpiNet;
@@ -54,8 +41,6 @@ TEST_F(VpiFileAndLineProperty, GetLineNoReturnsTheObjectsSourceLine) {
   EXPECT_EQ(vpi_get(vpiLineNo, VpiHandleOf(&net)), 42);
 }
 
-// Claim: an object that corresponds to source text reports its source file
-// through vpi_get_str(vpiFile).
 TEST_F(VpiFileAndLineProperty, GetStrFileReturnsTheObjectsSourceFile) {
   VpiObject reg;
   reg.type = vpiReg;
@@ -66,9 +51,6 @@ TEST_F(VpiFileAndLineProperty, GetStrFileReturnsTheObjectsSourceFile) {
   EXPECT_EQ(std::string(file), "design.sv");
 }
 
-// Claim (exception): vpiLineNo does not apply to the object kinds §37.3.3
-// lists, so vpi_get(vpiLineNo) on each of them is not a valid query and yields
-// vpiUndefined - even when a line was nonetheless stored on the object.
 TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoLineNo) {
   const int kExcepted[] = {vpiCallback,      vpiDelayTerm, vpiDelayDevice,
                            vpiInterModPath,  vpiIterator,  vpiTimeQueue,
@@ -76,16 +58,12 @@ TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoLineNo) {
   for (int type : kExcepted) {
     VpiObject obj;
     obj.type = type;
-    obj.line_no =
-        99;  // present in the model, but not a valid query for this kind
+    obj.line_no = 99;
     EXPECT_EQ(vpi_get(vpiLineNo, VpiHandleOf(&obj)), vpiUndefined)
         << "object type " << type << " must not report a vpiLineNo";
   }
 }
 
-// Claim (exception): vpiFile likewise does not apply to the listed kinds, so
-// vpi_get_str(vpiFile) yields null on each of them regardless of any file
-// string stored on the object.
 TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoFile) {
   const int kExcepted[] = {vpiCallback,      vpiDelayTerm, vpiDelayDevice,
                            vpiInterModPath,  vpiIterator,  vpiTimeQueue,
@@ -93,26 +71,13 @@ TEST_F(VpiFileAndLineProperty, ExceptedKindsHaveNoFile) {
   for (int type : kExcepted) {
     VpiObject obj;
     obj.type = type;
-    obj.file = "ignored.sv";  // stored, yet not reportable for this kind
+    obj.file = "ignored.sv";
     EXPECT_EQ(vpi_get_str(vpiFile, VpiHandleOf(&obj)), nullptr)
         << "object type " << type << " must not report a vpiFile";
     EXPECT_FALSE(VpiHasLocationProperties(type));
   }
 }
 
-// -----------------------------------------------------------------------------
-// §37.3.3 against a design. The cases above stamp a line and a file onto an
-// object by hand and read them back, which says what vpi_get() and
-// vpi_get_str() do with an object that carries them; it says nothing about an
-// object of an elaborated design carrying them at all. Nothing under src/ ever
-// wrote either property, so every net, variable and port of every design
-// answered zero and NULL, and the rule that the two properties apply to every
-// object standing for something in the source held for no object of any design.
-// -----------------------------------------------------------------------------
-
-// What the application read. A calltf is a plain C function with no return path
-// to the case that provoked it, and vpi_get_str hands back one buffer every
-// call reuses (§38.11), so the file is copied as it is read.
 int g_net_line = 0;
 std::string g_net_file;
 int g_var_line = 0;
@@ -156,9 +121,6 @@ void RegisterLocationProbe() {
   ASSERT_NE(vpi_register_systf(&data), nullptr);
 }
 
-// A design whose declarations stand on lines the case can name: the port on
-// line 1, the net on line 2 and the variable on line 3 of the instantiated
-// module, and a net of the top on line 6.
 void RunADesignOfLocatedDeclarations(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module m(input a);\n"
@@ -175,10 +137,6 @@ void RunADesignOfLocatedDeclarations(SimFixture& f) {
   LowerAndRun(design, f);
 }
 
-// A design joined from two source files as the preprocessor joins the sources
-// a command line names: the module m written on lines 3 and 7 to 9 of b.sv,
-// the top on lines 1 to 5 of a.sv, the joined text registered with the origin
-// of each of its lines, as a compile registers it.
 void RunAJoinedDesign(SimFixture& f) {
   const uint32_t kA = f.mgr.AddFile("a.sv", "");
   const uint32_t kB = f.mgr.AddFile("b.sv", "");
@@ -214,8 +172,6 @@ class VpiLocationInARun : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §37.3.3: a net corresponds to its declaration in the source text, so the
-// object the design built for it reports the line that declaration stands on.
 TEST_F(VpiLocationInARun, ADeclaredNetReportsItsOwnLine) {
   RegisterLocationProbe();
 
@@ -225,9 +181,6 @@ TEST_F(VpiLocationInARun, ADeclaredNetReportsItsOwnLine) {
   EXPECT_EQ(g_net_line, 2);
 }
 
-// §37.3.3: vpiFile is the other half of the same location, and it names the
-// file the declaration was read from rather than any identifier this tool
-// assigned it.
 TEST_F(VpiLocationInARun, ADeclaredNetReportsTheFileItWasDeclaredIn) {
   RegisterLocationProbe();
 
@@ -237,10 +190,6 @@ TEST_F(VpiLocationInARun, ADeclaredNetReportsTheFileItWasDeclaredIn) {
   EXPECT_EQ(g_net_file, "<test>");
 }
 
-// §37.3.3 applies to every object standing for something in the source, which a
-// variable declaration does as much as a net one. The two stand on different
-// lines, so a variable reporting the net's line would pass a case that only
-// asked whether some line came back.
 TEST_F(VpiLocationInARun, ADeclaredVariableReportsItsOwnLine) {
   RegisterLocationProbe();
 
@@ -250,8 +199,6 @@ TEST_F(VpiLocationInARun, ADeclaredVariableReportsItsOwnLine) {
   EXPECT_EQ(g_var_line, 3);
 }
 
-// §37.3.3: a port is written in the source text too, and this one stands in the
-// module header a line above the net and two above the variable.
 TEST_F(VpiLocationInARun, ADeclaredPortReportsItsOwnLine) {
   RegisterLocationProbe();
 
@@ -261,8 +208,6 @@ TEST_F(VpiLocationInARun, ADeclaredPortReportsItsOwnLine) {
   EXPECT_EQ(g_port_line, 1);
 }
 
-// §37.3.3: a declaration of the top module is reached under its bare name,
-// with no instance path over it, and reports its line the same way.
 TEST_F(VpiLocationInARun, ANetOfTheTopModuleReportsItsOwnLine) {
   RegisterLocationProbe();
 
@@ -272,9 +217,6 @@ TEST_F(VpiLocationInARun, ANetOfTheTopModuleReportsItsOwnLine) {
   EXPECT_EQ(g_top_net_line, 6);
 }
 
-// §37.3.3: the file and line an object reports are where its declaration was
-// written, which for a design read through the preprocessor is the source file
-// a line of the joined text came from, not the joined text itself.
 TEST_F(VpiLocationInARun, ADeclarationReportsTheFileItWasWrittenIn) {
   RegisterLocationProbe();
 
@@ -284,7 +226,6 @@ TEST_F(VpiLocationInARun, ADeclarationReportsTheFileItWasWrittenIn) {
   EXPECT_EQ(g_net_file, "b.sv");
 }
 
-// And the line is its line in that file, 7, where the joined text has it at 2.
 TEST_F(VpiLocationInARun, ADeclarationReportsItsLineInItsOwnFile) {
   RegisterLocationProbe();
 
@@ -294,8 +235,6 @@ TEST_F(VpiLocationInARun, ADeclarationReportsItsLineInItsOwnFile) {
   EXPECT_EQ(g_net_line, 7);
 }
 
-// A declaration of the other file reports that file's line, the top's net at
-// line 2 of a.sv where the joined text has it at 6.
 TEST_F(VpiLocationInARun, ADeclarationOfTheOtherFileReportsItsOwnLine) {
   RegisterLocationProbe();
 
@@ -305,14 +244,12 @@ TEST_F(VpiLocationInARun, ADeclarationOfTheOtherFileReportsItsOwnLine) {
   EXPECT_EQ(g_top_net_line, 2);
 }
 
-// The line and file of each call of `$where` its calltf was run for, read
-// off the call through vpiSysTfCall, in the order the calls ran.
 std::vector<std::pair<int, std::string>>& WhereCallLocations() {
   static std::vector<std::pair<int, std::string>> locations;
   return locations;
 }
 
-PLI_INT32 WhereCalltf(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 WhereCalltf(PLI_BYTE8*) {
   vpiHandle call = vpi_handle(vpiSysTfCall, nullptr);
   const char* file = vpi_get_str(vpiFile, call);
   WhereCallLocations().emplace_back(vpi_get(vpiLineNo, call),
@@ -320,10 +257,6 @@ PLI_INT32 WhereCalltf(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-// §37.3.3: a statement is written in the source text, so a system task call
-// reports the line and file it stands on, whether the design attach built its
-// object, as for one in an initial block, or the call built its own, as for
-// one in a task's body (#5110).
 TEST_F(VpiLocationInARun, ASystemTaskCallReportsItsOwnLineAndFile) {
   WhereCallLocations().clear();
   s_vpi_systf_data data = {};
@@ -349,11 +282,6 @@ TEST_F(VpiLocationInARun, ASystemTaskCallReportsItsOwnLineAndFile) {
                                       {4, "<test>"}, {2, "<test>"}}));
 }
 
-// §37.3.3 against a design: the objects a module's other constructs stand as
-// report the line they were written on -- a primitive (#7238), a continuous
-// assignment (#7237), a task (#7239), a class defn (#7240), a process
-// (#7235), a module path (#7241) and a timing check (#7242). None recorded
-// where it was written, so each answered line 0.
 class WrittenLinesOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -373,8 +301,6 @@ class WrittenLinesOfARun : public VpiDesignRun {
         "module top; reg a, b; wire o, y; m m1(a, b, o, y); endmodule\n");
   }
 
-  // The line of the first object of `type` the instance m1 reaches, -1 for
-  // none.
   static int LineOfFirst(int type) {
     vpiHandle it = vpi_iterate(type, By("top.m1"));
     vpiHandle obj = it == nullptr ? nullptr : vpi_scan(it);
@@ -410,10 +336,6 @@ TEST_F(WrittenLinesOfARun, ATimingCheckReportsTheLineItWasWrittenOn) {
   EXPECT_EQ(LineOfFirst(vpiTchk), 10);
 }
 
-// §37.3.3 against a design: a parameter reports the line it was written on,
-// whether it is declared among a module's items (#7236) or in the module's
-// parameter port list (#7243), a value or a type parameter, of a module or of
-// a package. None kept where it was written, so each answered line 0.
 class ParameterLinesOfARun : public VpiDesignRun {
  protected:
   void SetUp() override {
@@ -431,8 +353,6 @@ class ParameterLinesOfARun : public VpiDesignRun {
         "endmodule\n");
   }
 
-  // The line of the object of `type` named `name` that `scope` reaches, -1
-  // for none.
   static int LineOf(int type, const char* scope, std::string_view name) {
     vpiHandle obj = Named(type, By(scope), name);
     return obj == nullptr ? -1 : vpi_get(vpiLineNo, obj);

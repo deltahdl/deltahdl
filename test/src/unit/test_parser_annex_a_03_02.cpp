@@ -46,11 +46,6 @@ TEST(PrimitiveStrengthParsing, PullupStrength_Strength1Strength0) {
   EXPECT_EQ(g->drive_strength1, 5u);
 }
 
-// A.3.2 writes pullup_strength and pulldown_strength over A.2.2.2's strength0
-// and strength1, `supply0 | strong0 | pull0 | weak0` and `supply1 | strong1 |
-// pull1 | weak1`; highz0 and highz1 stand in drive_strength alone. The parser
-// read the pull strengths with the drive_strength's keywords, so each of the
-// five forms below was accepted silently.
 TEST(PrimitiveStrengthParsing, PullupStrength_Highz1Strong0) {
   auto r = Parse(
       "module m;\n"
@@ -297,8 +292,6 @@ TEST(PrimitiveStrengthParsing, Error_PulldownSingleStrength1) {
       "module m;\n"
       "  pulldown (strong1) pd1(out);\n"
       "endmodule\n");
-  // §28.3.2 owns the pull-gate strength rule; the report stands on the gate
-  // keyword.
   EXPECT_TRUE(ReportedError(r.diags,
                             "pulldown single-strength must be a strength0 "
                             "keyword",

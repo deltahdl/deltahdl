@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// $fatal at module-item level executes during elaboration and shall block
-// simulation from starting (§20.10.1).
 TEST(ElabSeverityTask, FatalBlocksSimulation) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -23,8 +21,6 @@ TEST(ElabSeverityTask, FatalBlocksSimulation) {
                             "20.10.1"));
 }
 
-// $warning at module-item level emits but does not block simulation
-// (§20.10.1).
 TEST(ElabSeverityTask, WarningDoesNotBlockSimulation) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -36,7 +32,6 @@ TEST(ElabSeverityTask, WarningDoesNotBlockSimulation) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// $info at module-item level emits but does not block simulation (§20.10.1).
 TEST(ElabSeverityTask, InfoDoesNotBlockSimulation) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -48,8 +43,6 @@ TEST(ElabSeverityTask, InfoDoesNotBlockSimulation) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// A design with no elaboration severity tasks shall have simulation_blocked
-// false (§20.10.1).
 TEST(ElabSeverityTask, NoTaskKeepsSimulationUnblocked) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -60,8 +53,6 @@ TEST(ElabSeverityTask, NoTaskKeepsSimulationUnblocked) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// §20.10.1 — list_of_arguments may only contain a formatting string and
-// constant expressions. A non-constant argument shall be rejected.
 TEST(ElabSeverityTask, NonConstantArgumentRejected) {
   ElabFixture ef;
   Elaborate(
@@ -75,8 +66,6 @@ TEST(ElabSeverityTask, NonConstantArgumentRejected) {
                             3, "20.10.1"));
 }
 
-// §20.10.1 — a parameter reference qualifies as a constant expression and is
-// accepted in the argument list.
 TEST(ElabSeverityTask, ConstantArgumentAccepted) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -89,9 +78,6 @@ TEST(ElabSeverityTask, ConstantArgumentAccepted) {
   EXPECT_FALSE(ef.has_errors);
 }
 
-// §20.10.1 — when a conditional generate construct selects the branch that
-// does NOT contain the task, the task does not execute and simulation
-// remains unblocked.
 TEST(ElabSeverityTask, GenerateIfFalseBranchSkipsTask) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -106,8 +92,6 @@ TEST(ElabSeverityTask, GenerateIfFalseBranchSkipsTask) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// §20.10.1 — when a conditional generate construct selects a branch that
-// contains $fatal, the task executes and simulation is blocked.
 TEST(ElabSeverityTask, GenerateIfTrueBranchExecutesFatal) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -125,8 +109,6 @@ TEST(ElabSeverityTask, GenerateIfTrueBranchExecutesFatal) {
                             4, "20.10.1"));
 }
 
-// §20.10.1 — $fatal in one generate branch and $info in another: only the
-// taken branch's task affects the design.
 TEST(ElabSeverityTask, GenerateIfElseExecutesOnlyTaken) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -143,9 +125,6 @@ TEST(ElabSeverityTask, GenerateIfElseExecutesOnlyTaken) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// §20.10.1 claim 11 — after $error executes, elaboration of subsequent items
-// continues. A net declared after the $error must still appear in the
-// elaborated model.
 TEST(ElabSeverityTask, ErrorDoesNotAbortElaboration) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -170,8 +149,6 @@ TEST(ElabSeverityTask, ErrorDoesNotAbortElaboration) {
                             "20.10.1"));
 }
 
-// §20.10.1 claim 13 — every elaboration severity task shall print a
-// tool-specific message that identifies the severity level.
 TEST(ElabSeverityTask, FatalMessageRecordsSeverityTag) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -222,9 +199,6 @@ TEST(ElabSeverityTask, InfoMessageRecordsSeverityTag) {
   EXPECT_EQ(design->last_elab_severity, "INFO");
 }
 
-// §20.10.1 claim 13 — the file/line of the elaboration severity task call
-// shall match `__FILE__`/`__LINE__` (per §22.13). The recorded SourceLoc
-// must carry the call-site file id and line number.
 TEST(ElabSeverityTask, MessageRecordsCallSiteFileAndLine) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -240,9 +214,6 @@ TEST(ElabSeverityTask, MessageRecordsCallSiteFileAndLine) {
                             "20.10.1"));
 }
 
-// §20.10.1 claim 13 — the message shall include the hierarchical name of
-// the scope in which the call is made. For a top module called `top` the
-// scope name is at least `top`.
 TEST(ElabSeverityTask, MessageRecordsHierarchicalScope) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -254,12 +225,6 @@ TEST(ElabSeverityTask, MessageRecordsHierarchicalScope) {
   EXPECT_EQ(design->last_elab_severity_scope, "top");
 }
 
-// §20.10.1 claim 13 — a call inside a generate-for block sits inside a
-// nested scope, so the hierarchical scope name is the module name joined to
-// the generate block's own name and index. The loop below is the first
-// generate construct in `top` and carries no name, so §27.6 names it
-// genblk1, and §27.4 indexes the instance by the value the genvar assumed,
-// which is 0. The scope is therefore `top.genblk1_0` and nothing else.
 TEST(ElabSeverityTask, GenerateScopeAppearsInMessageScope) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -273,9 +238,6 @@ TEST(ElabSeverityTask, GenerateScopeAppearsInMessageScope) {
   EXPECT_EQ(design->last_elab_severity_scope, "top.genblk1_0");
 }
 
-// §20.10.1 claim 14 — the tool-specific message shall include the
-// user-defined message if specified. The recorded message body must carry
-// the literal text the user supplied.
 TEST(ElabSeverityTask, MessageRecordsUserDefinedText) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -290,8 +252,6 @@ TEST(ElabSeverityTask, MessageRecordsUserDefinedText) {
       "elaboration ERROR in scope 'm': parameter out of range", 2, "20.10.1"));
 }
 
-// §20.10.1 claim 14 — when no user-defined message is supplied the message
-// body remains empty.
 TEST(ElabSeverityTask, NoUserMessageLeavesBodyEmpty) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -304,8 +264,6 @@ TEST(ElabSeverityTask, NoUserMessageLeavesBodyEmpty) {
   EXPECT_TRUE(design->last_elab_severity_msg.empty());
 }
 
-// §20.10.1 claim 14 — the user-defined message rule applies to $fatal too:
-// the supplied text after the finish_number must be recorded.
 TEST(ElabSeverityTask, FatalMessageRecordsUserDefinedText) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -320,9 +278,6 @@ TEST(ElabSeverityTask, FatalMessageRecordsUserDefinedText) {
                             "20.10.1"));
 }
 
-// §20.10.1 claim 3 — a generate-for loop with zero iterations does not
-// produce any surviving elaboration severity task call; simulation
-// therefore remains unblocked.
 TEST(ElabSeverityTask, GenerateForZeroIterationsSkipsTask) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -336,9 +291,6 @@ TEST(ElabSeverityTask, GenerateForZeroIterationsSkipsTask) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// §20.10.1 claim 3 — a generate-for loop that iterates at least once causes
-// the body's elaboration severity task to execute. Simulation must then be
-// blocked when the task is $fatal.
 TEST(ElabSeverityTask, GenerateForExecutesTaskOnIteration) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -355,9 +307,6 @@ TEST(ElabSeverityTask, GenerateForExecutesTaskOnIteration) {
                             3, "20.10.1"));
 }
 
-// §20.10.1 claim 5 — a compound constant expression built from parameter
-// references with a binary operator qualifies as a constant expression and
-// must be accepted.
 TEST(ElabSeverityTask, ConstantBinaryExpressionArgumentAccepted) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -371,9 +320,6 @@ TEST(ElabSeverityTask, ConstantBinaryExpressionArgumentAccepted) {
   EXPECT_FALSE(ef.has_errors);
 }
 
-// §20.10.1 claim 5 — the LRM calls out that constant function calls are
-// allowed in the argument list. $bits applied to a parameter is a
-// constant system function call, so it must be accepted.
 TEST(ElabSeverityTask, ConstantFunctionCallArgumentAccepted) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -386,9 +332,6 @@ TEST(ElabSeverityTask, ConstantFunctionCallArgumentAccepted) {
   EXPECT_FALSE(ef.has_errors);
 }
 
-// §20.10.1 claim 5 — the constant-argument rule applies uniformly to all
-// four severity tasks. A non-constant argument to $fatal must be rejected,
-// not only to $error.
 TEST(ElabSeverityTask, NonConstantArgInFatalRejected) {
   ElabFixture ef;
   Elaborate(
@@ -402,10 +345,6 @@ TEST(ElabSeverityTask, NonConstantArgInFatalRejected) {
                             3, "20.10.1"));
 }
 
-// §20.10.1 — a severity task called from inside a procedure becomes a
-// run-time severity task, so the elaborator must NOT treat it as an
-// elaboration severity task: an `initial $fatal` therefore leaves simulation
-// unblocked at elaboration (it would only fire if that process later runs).
 TEST(ElabSeverityTask, FatalInsideProcedureDoesNotBlockSimulation) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -419,10 +358,6 @@ TEST(ElabSeverityTask, FatalInsideProcedureDoesNotBlockSimulation) {
   EXPECT_TRUE(design->last_elab_severity.empty());
 }
 
-// §20.10.1 claim 5 — a bare integer literal is a constant expression per
-// §11.2.1 and takes a distinct constant-check path from a named reference
-// (immediate literal vs. scope lookup). It must be accepted in the argument
-// list.
 TEST(ElabSeverityTask, LiteralArgumentAccepted) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -435,9 +370,6 @@ TEST(ElabSeverityTask, LiteralArgumentAccepted) {
   EXPECT_EQ(design->last_elab_severity, "INFO");
 }
 
-// §20.10.1 — activation may be controlled by a generate-case (a conditional
-// generate construct per §27.5). When the selector picks the branch holding
-// $fatal, that task executes and blocks simulation.
 TEST(ElabSeverityTask, GenerateCaseSelectedBranchExecutesFatal) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -457,9 +389,6 @@ TEST(ElabSeverityTask, GenerateCaseSelectedBranchExecutesFatal) {
                             "20.10.1"));
 }
 
-// §20.10.1 — when the generate-case selector picks a branch that does not
-// hold $fatal, the $fatal in the unselected branch never executes and
-// simulation stays unblocked; only the taken branch's task runs.
 TEST(ElabSeverityTask, GenerateCaseUnselectedBranchSkipsTask) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -476,9 +405,6 @@ TEST(ElabSeverityTask, GenerateCaseUnselectedBranchSkipsTask) {
   EXPECT_EQ(design->last_elab_severity, "INFO");
 }
 
-// §20.10.1 claim 5 — a localparam is a constant expression per §11.2.1, so a
-// localparam reference is accepted in the argument list just like a
-// parameter.
 TEST(ElabSeverityTask, LocalparamArgumentAccepted) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -492,10 +418,6 @@ TEST(ElabSeverityTask, LocalparamArgumentAccepted) {
   EXPECT_EQ(design->last_elab_severity, "INFO");
 }
 
-// §20.10.1 claim 5 — a genvar is a constant expression per §11.2.1. The LRM's
-// own Example 2 passes the loop genvar to $info from inside a generate-for
-// (`$info("i = %0d branch generated", i)`). The genvar reference must be
-// accepted, not rejected as a non-constant, and the task must still execute.
 TEST(ElabSeverityTask, GenvarArgumentAcceptedInGenerateFor) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -511,9 +433,6 @@ TEST(ElabSeverityTask, GenvarArgumentAcceptedInGenerateFor) {
   EXPECT_FALSE(design->simulation_blocked);
 }
 
-// §20.10.1 claim 5 — the genvar remains usable inside a compound constant
-// expression in the argument list, and a $fatal that reaches it still blocks
-// simulation (proving the task executed rather than being rejected).
 TEST(ElabSeverityTask, GenvarInCompoundArgAcceptedAndFatalExecutes) {
   ElabFixture ef;
   auto* design = Elaborate(
@@ -524,8 +443,6 @@ TEST(ElabSeverityTask, GenvarInCompoundArgAcceptedAndFatalExecutes) {
       "endmodule\n",
       ef);
   ASSERT_NE(design, nullptr);
-  // The argument is accepted: the $fatal reports itself with the argument
-  // formatted, and no report says the argument is not constant.
   EXPECT_TRUE(ReportedError(ef.diag.Diagnostics(), "idx=1", 3, "20.10.1"));
   EXPECT_FALSE(ReportedError(ef.diag.Diagnostics(),
                              "argument to $fatal must be a constant expression",
@@ -533,9 +450,6 @@ TEST(ElabSeverityTask, GenvarInCompoundArgAcceptedAndFatalExecutes) {
   EXPECT_TRUE(design->simulation_blocked);
 }
 
-// §20.10.1 claim 5 — the genvar overlay must not leak out of the generate
-// body: a bare identifier that is neither a parameter nor an in-scope genvar
-// is still rejected at plain module-item level after a generate-for closes.
 TEST(ElabSeverityTask, NonConstantStillRejectedAfterGenerateFor) {
   ElabFixture ef;
   Elaborate(
@@ -552,8 +466,6 @@ TEST(ElabSeverityTask, NonConstantStillRejectedAfterGenerateFor) {
                             6, "20.10.1"));
 }
 
-// §20.10.1: each elaboration severity task reports with its own severity, so
-// $error and $fatal are errors while $warning and $info are not.
 TEST(ElabSeverityTask, ErrorAndFatalAreReportedAsErrors) {
   ElabFixture ef;
   Elaborate(
@@ -587,8 +499,6 @@ TEST(ElabSeverityTask, WarningAndInfoAreReportedAsWarnings) {
   EXPECT_FALSE(ef.diag.HasErrors());
 }
 
-// §20.10.1: the message list is formatted as $display formats it, each
-// specifier taking the value of the constant expression after the format.
 TEST(ElabSeverityTask, MessageFormatsItsConstantArguments) {
   ElabFixture ef;
   Elaborate(
@@ -602,8 +512,6 @@ TEST(ElabSeverityTask, MessageFormatsItsConstantArguments) {
                               "20.10.1"));
 }
 
-// §20.10.1 with §21.2.1.3: a %d without a field width is sized to the
-// argument's width, so a 4-bit parameter takes two columns.
 TEST(ElabSeverityTask, MessageSizesADecimalByTheArgumentsWidth) {
   ElabFixture ef;
   Elaborate(
@@ -617,7 +525,6 @@ TEST(ElabSeverityTask, MessageSizesADecimalByTheArgumentsWidth) {
                               "20.10.1"));
 }
 
-// §20.10.1 with §21.2.1: an argument wider than 64 bits is formatted whole.
 TEST(ElabSeverityTask, MessageFormatsAnArgumentWiderThanSixtyFourBits) {
   ElabFixture ef;
   Elaborate(

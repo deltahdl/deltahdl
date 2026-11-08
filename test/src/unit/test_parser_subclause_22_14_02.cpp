@@ -19,28 +19,15 @@ bool Parses1995(const std::string& body) {
   return ParseWithPreprocessorOk(In1995(body));
 }
 
-// A word Table 22-1 omits is an ordinary identifier, so it can name anything
-// an identifier names. Declarations are only the most obvious position: this
-// runs one word from a later standard through the module name, both port
-// names, a parameter, a net, a variable, a task, a named block, and an
-// instance name, and reads each back off the parsed tree. The `1364-2001`
-// version specifier gets the same treatment in the sibling file for §22.14.3.
 TEST(CompilerDirectiveParsing, Verilog1995FreedWordNamesDeclaredEntities) {
   ExpectFreedWordsNameDeclaredEntities("1364-1995");
 }
 
-// The same freed word as an expression operand and as the target of a
-// procedural assignment — positions that carry a value rather than introduce a
-// name, and so reach the parser by a different path than a declaration does.
-// The `1364-2001` version specifier gets the same treatment in the sibling
-// file for §22.14.3.
 TEST(CompilerDirectiveParsing,
      Verilog1995FreedWordIsAnOperandAndAssignmentTarget) {
   ExpectFreedWordIsAnOperandAndAssignmentTarget("1364-1995");
 }
 
-// Table 22-1 lists the gate primitives and drive strengths, and under this
-// list they still open a gate instantiation rather than name one.
 TEST(CompilerDirectiveParsing, Verilog1995GateKeywordsInstantiateGates) {
   auto r =
       ParseWithPreprocessor(In1995("module m;\n"
@@ -61,10 +48,6 @@ TEST(CompilerDirectiveParsing, Verilog1995GateKeywordsInstantiateGates) {
   EXPECT_NE(FindGateByKind(items, GateKind::kPmos), nullptr);
 }
 
-// The switch and transmission primitives. Table 22-1 lists eleven of them
-// beyond the logic gates above, each opening its own instantiation form, and
-// none is a word any later standard touched — so under this list they have to
-// behave exactly as they do under the default one.
 TEST(CompilerDirectiveParsing, Verilog1995SwitchPrimitivesInstantiate) {
   auto r =
       ParseWithPreprocessor(In1995("module m;\n"
@@ -98,9 +81,6 @@ TEST(CompilerDirectiveParsing, Verilog1995SwitchPrimitivesInstantiate) {
   }
 }
 
-// The logic gates and pull gates Table 22-1 lists that the instantiation test
-// above does not reach. Between the two, every gate primitive the 1995 list
-// reserves is observed opening an instantiation under that list.
 TEST(CompilerDirectiveParsing, RemainingVerilog1995GatesInstantiate) {
   auto r = ParseWithPreprocessor(
       In1995("module m;\n"
@@ -134,10 +114,6 @@ TEST(CompilerDirectiveParsing, RemainingVerilog1995GatesInstantiate) {
   }
 }
 
-// Table 22-1 reserves the strength words as well as the constructs they
-// modify: all eight drive strengths and all three charge strengths. They are a
-// separate syntactic position from the gate name itself, so they are worth
-// driving through the parser in that position rather than only as tokens.
 TEST(CompilerDirectiveParsing, Verilog1995StrengthKeywordsAreAccepted) {
   EXPECT_TRUE(
       Parses1995("module m;\n"
@@ -153,10 +129,6 @@ TEST(CompilerDirectiveParsing, Verilog1995StrengthKeywordsAreAccepted) {
                  "endmodule\n"));
 }
 
-// The event-control and branching words: an `always` procedure sensitive to a
-// `posedge`/`negedge` list joined by `or`, an `if`/`else` pair, a `forever`
-// loop, and a `wait`. Each is a Table 22-1 entry occupying a position none of
-// the declaration or instantiation tests above reaches.
 TEST(CompilerDirectiveParsing,
      Verilog1995EventAndBranchKeywordsOpenStatements) {
   auto r =
@@ -184,9 +156,6 @@ TEST(CompilerDirectiveParsing,
   EXPECT_NE(always_item->body->else_branch, nullptr);
 }
 
-// `function`/`endfunction`, `defparam`, `inout`, and the specify-block
-// `ifnone` — the last Table 22-1 words with a syntactic role none of the other
-// tests here exercises.
 TEST(CompilerDirectiveParsing, RemainingVerilog1995KeywordRolesAreAccepted) {
   auto r = ParseWithPreprocessor(
       In1995("module sub (inout wire b, input wire a, input wire e,\n"
@@ -222,8 +191,6 @@ TEST(CompilerDirectiveParsing, RemainingVerilog1995KeywordRolesAreAccepted) {
       HasItemKindNamed(top_items, ModuleItemKind::kFunctionDecl, "invert"));
 }
 
-// The net type keywords of Table 22-1, each one still introducing a net of its
-// own type. `scalared` and `vectored` ride along on the same declarations.
 TEST(CompilerDirectiveParsing, Verilog1995NetTypeKeywordsDeclareNets) {
   EXPECT_TRUE(
       Parses1995("module m;\n"
@@ -241,8 +208,6 @@ TEST(CompilerDirectiveParsing, Verilog1995NetTypeKeywordsDeclareNets) {
                  "endmodule\n"));
 }
 
-// `specify`, `endspecify`, `specparam`, and `edge` are all Table 22-1 words,
-// and the block they build is a §22.14.2-era construct in its own right.
 TEST(CompilerDirectiveParsing, Verilog1995SpecifyKeywordsOpenABlock) {
   auto r = ParseWithPreprocessor(
       In1995("macromodule m (input wire a, output wire y);\n"
@@ -257,8 +222,6 @@ TEST(CompilerDirectiveParsing, Verilog1995SpecifyKeywordsOpenABlock) {
   EXPECT_NE(FindSpecifyBlock(r.cu->modules[0]->items), nullptr);
 }
 
-// `primitive`/`table`/`endtable`/`endprimitive` — the user-defined primitive
-// keywords, which no later standard changed and which Table 22-1 lists.
 TEST(CompilerDirectiveParsing, Verilog1995PrimitiveKeywordsDeclareAUdp) {
   EXPECT_TRUE(
       Parses1995("primitive p (out, in);\n"
@@ -271,9 +234,6 @@ TEST(CompilerDirectiveParsing, Verilog1995PrimitiveKeywordsDeclareAUdp) {
                  "endprimitive\n"));
 }
 
-// The procedural keywords: the loops, the case forms, the parallel block, and
-// the assignment-control words. All are Table 22-1 entries, so all still open
-// statements under this list.
 TEST(CompilerDirectiveParsing, Verilog1995ProceduralKeywordsOpenStatements) {
   EXPECT_TRUE(
       Parses1995("module m;\n"
@@ -305,12 +265,6 @@ TEST(CompilerDirectiveParsing, Verilog1995ProceduralKeywordsOpenStatements) {
                  "endmodule\n"));
 }
 
-// The declaration kinds the other freed-word tests do not reach: an event, a
-// function, a gate instance name, and a specparam inside a specify block.
-// Each is a distinct declaration production, so a freed word has to survive
-// each one separately rather than only the net and variable forms. The
-// `1364-2001` version specifier gets the same treatment in the sibling file
-// for §22.14.3.
 TEST(CompilerDirectiveParsing,
      Verilog1995FreedWordNamesEveryOtherDeclarationKind) {
   auto r =
@@ -344,13 +298,6 @@ TEST(CompilerDirectiveParsing,
   EXPECT_NE(FindSpecifyBlock(items), nullptr);
 }
 
-// The constant-declaration keywords split across the list boundary: `parameter`
-// is a Table 22-1 word and still declares a constant, while `localparam`,
-// `genvar`, and `generate` arrived in a later standard and so carry no keyword
-// meaning here. Both halves matter — in the keyword position the later words
-// build no constant or genvar declaration but an ordinary data_declaration
-// naming them as its undeclared type, and in the identifier position they name
-// variables. That is what distinguishes "not reserved" from "not understood".
 TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
   EXPECT_TRUE(
       Parses1995("module m;\n"
@@ -358,16 +305,6 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
                  "  reg [P-1:0] v;\n"
                  "endmodule\n"));
 
-  // With the word an ordinary identifier, `localparam Q = 8;` is a
-  // data_declaration of Q whose type_identifier is called localparam, and not
-  // the parameter_declaration §6.20.2 gives the keyword. It is no
-  // instantiation either: A.4.1.1 writes `hierarchical_instance ::=
-  // name_of_instance ( [ list_of_port_connections ] )`, so a declarator that
-  // reaches `=` without a `(` cannot be one, while A.2.4 admits
-  // `variable_identifier = expression` as a variable_decl_assignment. §6.18
-  // refuses the type at elaboration, since nothing declares it; the parser's
-  // answer is the item, and the item is what says the word carried no keyword
-  // meaning here.
   auto as_localparam =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  localparam Q = 8;\n"
@@ -386,12 +323,6 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  genvar i;\n"
                                    "endmodule\n"));
-  // With the word an ordinary identifier, `genvar i` is a declaration of i
-  // whose type_identifier is called genvar, which is what a declaration of the
-  // word's own name would look like and not the genvar declaration §27.4 gives
-  // the keyword. §6.18 refuses it at elaboration, since nothing declares that
-  // type; the parser's answer is the item, and the item is what says the word
-  // carried no keyword meaning here.
   ASSERT_NE(as_genvar.cu, nullptr);
   EXPECT_FALSE(as_genvar.has_errors);
   auto* genvar_item = as_genvar.cu->modules[0]->items[0];
@@ -414,10 +345,6 @@ TEST(CompilerDirectiveParsing, ConstantKeywordsOutsideTheListAreIdentifiers) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kVarDecl, "generate"));
 }
 
-// The list names particular spellings, and the language distinguishes case, so
-// a word that differs from a listed one only in case falls outside the list and
-// is free to name something. This is the exclusivity rule at its narrowest
-// margin.
 TEST(CompilerDirectiveParsing, ReservedWordsAreMatchedCaseSensitively) {
   auto r =
       ParseWithPreprocessor(In1995("module MODULE;\n"
@@ -434,15 +361,7 @@ TEST(CompilerDirectiveParsing, ReservedWordsAreMatchedCaseSensitively) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kNetDecl, "Wire"));
 }
 
-// Negative: a word Table 22-1 lists is reserved, so it cannot be the
-// identifier in a declaration. This is the direct counterpart of the freed-word
-// tests above — the same syntactic slot, a word from the other side of the
-// list.
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAVariable) {
-  // §6.8 owns the report, not §22.14: the word stands where
-  // Parser::ParseVarDeclList in src/parser/parser_types.cpp reads the declared
-  // name of a variable, and the report names the word that stands there, so
-  // each of the two words below is separately covered.
   auto as_wire = ParseWithPreprocessor(In1995(VarDecl("wire")));
   EXPECT_TRUE(ReportedError(as_wire.diags, "expected identifier, got 'wire'",
                             LineInRegion(2), "6.8"));
@@ -453,23 +372,12 @@ TEST(CompilerDirectiveParsing, ReservedWordCannotNameAVariable) {
 }
 
 TEST(CompilerDirectiveParsing, ReservedWordCannotNameAModule) {
-  // §23.2.1 owns the report on the module name: the word stands where
-  // Parser::ParseModuleDecl in src/parser/parser.cpp reads it.
   auto r = ParseWithPreprocessor(In1995("module always;\nendmodule\n"));
   EXPECT_TRUE(ReportedError(r.diags, "expected identifier, got 'always'",
                             LineInRegion(1), "23.2.1"));
 }
 
-// Negative from the other direction: a word Table 22-1 omits is not reserved,
-// so it cannot act as a keyword either. `logic` as a data type is rejected
-// under this list, and `always_comb` as a process header becomes a variable
-// declaration naming it as a type, though both open the constructs their
-// keywords name under the default list.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog1995ListIsNotAKeyword) {
-  // §6.8 owns this report: with `logic` an ordinary identifier the packed
-  // dimension is where the declaration was meant to end, so
-  // Parser::ParsePlainVarDecl in src/parser/parser_items.cpp demands the
-  // semicolon.
   auto as_type =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  logic [7:0] v;\n"
@@ -481,15 +389,6 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog1995ListIsNotAKeyword) {
                               "  logic [7:0] v;\n"
                               "endmodule\n"));
 
-  // The other word is not rejected but re-read: with `always_comb` an ordinary
-  // identifier the line is a data_declaration of r whose type_identifier is
-  // called always_comb, and not the always_comb procedure §9.2.2.2 gives the
-  // keyword. A.4.1.1 writes `hierarchical_instance ::= name_of_instance (
-  // [ list_of_port_connections ] )`, so a declarator reaching `=` without a `(`
-  // is no instantiation either, and A.2.4 admits exactly this shape as a
-  // variable_decl_assignment. §6.18 refuses the undeclared type at elaboration;
-  // the item the parser records is what says the word carried no keyword
-  // meaning here, and the statement it would have headed is gone.
   auto as_process =
       ParseWithPreprocessor(In1995("module m;\n"
                                    "  reg r;\n"

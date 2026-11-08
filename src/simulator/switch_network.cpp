@@ -20,7 +20,7 @@ namespace delta {
 namespace {
 
 bool IsZWord(const Logic4Word& w) {
-  return (w.aval & 1) == 0 && (w.bval & 1) != 0;  // z = (aval=0, bval=1)
+  return (w.aval & 1) == 0 && (w.bval & 1) != 0;
 }
 
 Logic4Vec PrimaryDriver(const Net& net, const Variable& var) {
@@ -31,36 +31,13 @@ bool TerminalIsActivelyDriven(const Net& net, const Logic4Vec& drv) {
   return !net.drivers.empty() && !IsZWord(drv.words[0]);
 }
 
-// §28.13: tran, tranif0, and tranif1 are the nonresistive bidirectional pass
-// switches. The r-prefixed variants are resistive and reduce strength under the
-// separate rules of §28.14, so they are excluded here.
 bool IsNonresistiveBidir(BidirSwitchKind kind) {
   return kind == BidirSwitchKind::kTran || kind == BidirSwitchKind::kTranif0 ||
          kind == BidirSwitchKind::kTranif1;
 }
 
-// §28.13: a nonresistive bidirectional switch (tran, tranif0, tranif1) does not
-// affect the strength of a signal crossing between its terminals, except that a
-// supply strength is reduced to a strong strength -- exactly
-// ReduceNonresistive.
-//
-// §28.14: the resistive variants (rtran, rtranif0, rtranif1) instead knock
-// every strength level down one step per Table 28-8, exactly ReduceResistive --
-// the same reduction the resistive unidirectional switches apply. Selecting
-// between the two by switch flavor lets both share the strength-reduction
-// functions.
-//
-// §28.8: there shall be no strength reduction in bidirectional switches
-// connecting user-defined net types. Such a switch passes the source strength
-// unchanged regardless of whether it is a resistive (r-prefixed) variant, so
-// the user-defined-net case bypasses both the §28.13 and §28.14 reductions.
 void PassStrengthAcross(Net& dest, const Net& src, BidirSwitchKind kind,
                         bool user_defined_nets) {
-  // What the switch passes across is the strength the source net reports, which
-  // is one strength for the whole of the destination however the destination's
-  // own bits last resolved. Anything Net::Resolve recorded per bit there is
-  // therefore no longer the answer, and dropping it leaves Net::BitStrength
-  // reading the strength written here.
   dest.bit_strengths.clear();
   if (user_defined_nets) {
     dest.resolved_strength = src.resolved_strength;
@@ -85,11 +62,10 @@ void ResolveAmbiguousTerminal(Variable& terminal_var, const Logic4Vec& term_drv,
   uint8_t o_b = other_drv.words[0].bval & 1;
   uint8_t on_a = term_is_driven ? t_a : (other_is_driven ? o_a : t_a);
   uint8_t on_b = term_is_driven ? t_b : (other_is_driven ? o_b : t_b);
-  // Undriven "off" state is high-impedance z = (aval=0, bval=1).
   uint8_t off_a = term_is_driven ? t_a : 0;
   uint8_t off_b = term_is_driven ? t_b : 1;
   if ((on_a != off_a || on_b != off_b) && !term_is_driven) {
-    terminal_var.value.words[0].aval = 1;  // ambiguous -> x = (aval=1, bval=1)
+    terminal_var.value.words[0].aval = 1;
     terminal_var.value.words[0].bval = 1;
   }
 }
@@ -238,9 +214,6 @@ void ResolveBidirSwitchNetwork(std::vector<BidirSwitchInst>& switches, Arena&) {
 
 namespace {
 
-// Which group resolution is under way: whether one is, the member it is
-// resolving at the moment, and whether a net of a group was resolved from
-// outside while it ran, which a write a member's watchers made does.
 struct GroupGuard {
   bool active = false;
   bool dirty = false;
@@ -252,9 +225,6 @@ GroupGuard& Guard() {
   return guard;
 }
 
-// §28.8 and §4.9.5: a switch whose control is x or z joins nets of built-in
-// net types as though it were on and off both, and nets of user-defined net
-// types as though it were off.
 bool LinkConducts(const SwitchLink& link) {
   if (link.other == nullptr || link.sw == nullptr) return false;
   if (link.sw->state == BidirSwitchState::kOn) return true;
@@ -262,7 +232,6 @@ bool LinkConducts(const SwitchLink& link) {
          !link.sw->user_defined_nets;
 }
 
-// Every net a switch of any state joins `start` to, `start` first.
 std::vector<Net*> SwitchGroupOf(Net& start) {
   std::vector<Net*> members{&start};
   for (size_t i = 0; i < members.size(); ++i) {
@@ -278,11 +247,6 @@ std::vector<Net*> SwitchGroupOf(Net& start) {
 
 using BitPairs = std::vector<std::pair<uint32_t, uint32_t>>;
 
-// One net reached from a member across conducting switches: the index of the
-// net it was reached from, the switch it was reached across, and, where a
-// switch on the way joins single bits (SwitchLink::bit_map), the bits of the
-// member each is one with: a bit of the member, then the bit of `net`. None
-// where the way joins the nets whole.
 struct Reached {
   Net* net;
   size_t from;
@@ -290,8 +254,6 @@ struct Reached {
   std::optional<BitPairs> bits;
 };
 
-// The bits a way joins once it goes on across `link`: the bits it joined, each
-// carried on to the bit of the next net `link` joins it to.
 std::optional<BitPairs> ComposeBits(const std::optional<BitPairs>& bits,
                                     const SwitchLink& link) {
   if (link.bit_map == nullptr) return bits;
@@ -305,16 +267,11 @@ std::optional<BitPairs> ComposeBits(const std::optional<BitPairs>& bits,
   return composed;
 }
 
-// Whether a way back to the member joins each bit to itself alone, which is
-// the member's own sources and nothing a switch carries to it.
 bool JoinsBitsToThemselves(const BitPairs& bits) {
   return std::all_of(bits.begin(), bits.end(),
                      [](const auto& p) { return p.first == p.second; });
 }
 
-// Adds the net `link` joins `reached[i]` to, with the bits the way joins,
-// unless the way joins no bit, leads back to the member's own bits, or reaches
-// a net already reached by the same bits.
 void ReachAcross(std::vector<Reached>& reached, size_t i,
                  const SwitchLink& link, const Net& member) {
   std::optional<BitPairs> bits = ComposeBits(reached[i].bits, link);
@@ -329,15 +286,6 @@ void ReachAcross(std::vector<Reached>& reached, size_t i,
   if (!seen) reached.push_back({link.other, i, &link, std::move(bits)});
 }
 
-// §28.8: every conducting link is followed on from every net reached, the bits
-// a link joining single bits joins carried along (ComposeBits) -- a switch's
-// with a bit-select terminal, and those of §10.11's alias of bits and of an
-// inout port on a select or a concatenation of nets (§4.9.6), each of which
-// joins its nets as one network, so a switch beyond one reaches across it.
-// LowerBitAlias links every two nets sharing a bit directly, so a way across
-// two of its links brings only bits a direct link brings too, at the same
-// strength, and a built-in net type resolves two equal drivers as it resolves
-// one.
 std::vector<Reached> ReachAcrossConducting(Net& member) {
   std::vector<Reached> reached{{&member, 0, nullptr, std::nullopt}};
   for (size_t i = 0; i < reached.size(); ++i) {
@@ -358,9 +306,6 @@ Logic4Vec ConstantOf(uint32_t width, bool one, Arena& arena) {
   return v;
 }
 
-// What a net contributes to the nets joined to it: its drivers at their
-// strengths, the constant a supply0 or supply1 net (§28.15.3) or a tri0 or
-// tri1 net (§6.6.5) carries without one, and a trireg's stored charge.
 void OwnSources(const Net& net, Arena& arena, std::vector<Logic4Vec>& values,
                 std::vector<DriverStrength>& strengths) {
   values = net.drivers;
@@ -375,19 +320,12 @@ void OwnSources(const Net& net, Arena& arena, std::vector<Logic4Vec>& values,
   if (net.type == NetType::kSupply1) add(true, Strength::kSupply);
   if (net.type == NetType::kTri0) add(false, Strength::kPull);
   if (net.type == NetType::kTri1) add(true, Strength::kPull);
-  // §28.14 and §28.15.2: a trireg drives the charge its bits store at its
-  // charge strength, and a switch carries that on, reduced by Table 28-8 across
-  // a resistive one.
   if (net.type == NetType::kTrireg) {
     values.push_back(TriregStoredCharge(net, arena));
     strengths.push_back({net.charge_strength, net.charge_strength});
   }
 }
 
-// §28.13 and §28.14: a signal crossing tran, tranif0 or tranif1 keeps its
-// strength but for supply becoming strong, and one crossing rtran, rtranif0 or
-// rtranif1 is reduced by Table 28-8; §28.8 has no reduction across a switch
-// joining nets of user-defined net types.
 DriverStrength ReduceAcross(DriverStrength ds, const SwitchLink& link) {
   if (link.sw->user_defined_nets || link.sw->is_alias) return ds;
   Strength (*reduce)(Strength) = IsNonresistiveBidir(link.sw->kind)
@@ -396,10 +334,6 @@ DriverStrength ReduceAcross(DriverStrength ds, const SwitchLink& link) {
   return {reduce(ds.s0), reduce(ds.s1)};
 }
 
-// A driver's value as seen through a switch whose control is x or z: each 0
-// bit is L and each 1 bit H, the value or z (§4.9.5), which a driver spells
-// as x with the other side of its strength at the high-impedance level, so
-// the 0 bits, the 1 bits and the x bits travel as three drivers.
 void AppendThroughUnknown(Net& member, const Logic4Vec& v, DriverStrength ds,
                           Arena& arena) {
   Logic4Vec parts[3] = {MakeLogic4Vec(arena, v.width),
@@ -425,11 +359,6 @@ void AppendThroughUnknown(Net& member, const Logic4Vec& v, DriverStrength ds,
   }
 }
 
-// A source value as it lands on a member `width` bits wide: resized to it, or,
-// across a way joining single bits (Reached::bits) -- a bit alias (§10.11) or a
-// switch with a bit-select terminal (§28.8) -- each bit the way joins placed
-// at the member's bit it is one with and every other bit z, which drives
-// nothing.
 Logic4Vec ArrivingValue(const Logic4Vec& value,
                         const std::optional<BitPairs>& bits, uint32_t width,
                         Arena& arena) {
@@ -440,9 +369,6 @@ Logic4Vec ArrivingValue(const Logic4Vec& value,
   return v;
 }
 
-// The sources of `reached[j]` as they arrive at the member, reduced across
-// every switch on the way back and made L or H by one whose control is x or
-// z.
 void AppendReachedSources(Net& member, const std::vector<Reached>& reached,
                           size_t j, Arena& arena) {
   std::vector<Logic4Vec> values;
@@ -478,22 +404,12 @@ void GatherSwitchDrivers(Net& member, Arena& arena) {
   }
 }
 
-// Whether the net holds a value with nothing reaching it: a supply0, supply1,
-// tri0 or tri1 net its constant (§28.15.1, §28.15.3), and a trireg its charge
-// (§28.15.2) rather than the z of an undriven net.
 bool CarriesItsOwnSource(const Net& net) {
   return net.type == NetType::kSupply0 || net.type == NetType::kSupply1 ||
          net.type == NetType::kTri0 || net.type == NetType::kTri1 ||
          net.type == NetType::kTrireg;
 }
 
-// §6.6: a net no driver is connected to has the high-impedance value z, which
-// a net left with nothing reaching it across its switches is. §10.6.2: a force
-// overrides every driver of the net, so the bits a force holds keep its value
-// with no driver as with one -- a force on the whole net leaves no bit to set,
-// and the forced bits of a select are laid back over the z before any watcher
-// sees it. Set to z whatever was forced, `force a = 1` read z once the group
-// resolved again.
 void LeaveUndriven(Net& net, Arena& arena) {
   Variable& var = *net.resolved;
   if (var.WholeIsForced()) return;
@@ -531,14 +447,9 @@ void ResolveMember(Net& member, Arena& arena, Scheduler* sched) {
   std::vector<uint64_t> charge_before = member.charge_since;
   member.Resolve(arena, sched);
   Guard().resolving = nullptr;
-  // §28.16.2: a trireg bit entering or leaving the charge storage state changes
-  // the charge the trireg offers the nets joined to it (TriregStoredCharge),
-  // which they gathered before it resolved, so the group gathers again.
   if (member.charge_since != charge_before) Guard().dirty = true;
 }
 
-// Enough passes for a change a member's watchers made to settle; each pass
-// gathers every member's sources again before resolving any of them.
 constexpr int kMaxGroupPasses = 8;
 
 }  // namespace

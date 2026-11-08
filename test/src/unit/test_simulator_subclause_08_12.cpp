@@ -22,14 +22,12 @@ TEST(ClassAssignRenameSim, ShallowCopyCopiesRngState) {
   obj->rng_seed = 0xC0FFEEu;
   obj->rng_initialized = true;
   obj->rng.seed(obj->rng_seed);
-  // Advance the generator so its live state diverges from a freshly seeded one.
   (void)obj->rng();
   (void)obj->rng();
 
   auto* copy = obj->ShallowCopy(f.arena);
   EXPECT_EQ(copy->rng_seed, 0xC0FFEEu);
   EXPECT_TRUE(copy->rng_initialized);
-  // The copy resumes the source's generator state, not a fresh one.
   EXPECT_EQ(copy->rng, obj->rng);
 }
 
@@ -50,8 +48,6 @@ TEST(ClassAssignRenameSim, E2eShallowCopyDoesNotRerunFieldInitializer) {
       "  end\n"
       "endmodule\n",
       f);
-  // The shallow copy preserves the mutated value; the `x = 7` declaration
-  // initializer is not re-executed during the copy's allocation.
   LowerRunAndCheck(f, design, {{"result", 42u}});
 }
 
@@ -71,18 +67,11 @@ TEST(ClassAssignRenameSim, ShallowCopyPreservesDerivedType) {
   EXPECT_EQ(copy->GetProperty("x", f.arena).ToUint64(), 9u);
 }
 
-// §8.12 copies the class properties into the new object and §6.8 makes each of
-// them a data storage element, so the copy's properties are the copy's own
-// words. A map assignment carries the Logic4Vec words pointer rather than the
-// words, which leaves the two objects sharing one buffer per property.
 TEST(ClassAssignRenameSim, ShallowCopyGivesEachPropertyItsOwnWords) {
   SimFixture f;
   auto* type = MakeClassType(f, "P", {"lo", "hi"});
   auto [h, obj] = MakeObj(f, type);
   obj->SetProperty("lo", MakeLogic4VecVal(f.arena, 32, 0xDEADBEEFu));
-  // A property wider than one word, carrying a distinct pattern in each word
-  // and x bits in the high one: a copy that carried only word 0, or only the
-  // aval plane, answers differently from one that carries the whole value.
   Logic4Vec hi = MakeLogic4Vec(f.arena, 96);
   hi.words[0].aval = 0x0123456789ABCDEFull;
   hi.words[1].aval = 0x00000000FEEDFACEull;
@@ -99,10 +88,6 @@ TEST(ClassAssignRenameSim, ShallowCopyGivesEachPropertyItsOwnWords) {
   }
 }
 
-// The consequence of that sharing: DepositBitField writes through the words it
-// finds rather than replacing them, which is the write a packed-member
-// assignment to a property makes, so one buffer under two objects turns a
-// deposit into the copy into a deposit into the source as well.
 TEST(ClassAssignRenameSim, ShallowCopyPropertyDepositLeavesTheSourceIntact) {
   SimFixture f;
   auto* type = MakeClassType(f, "P", {"x"});
@@ -306,12 +291,6 @@ TEST(ClassAssignRenameSim, E2eShallowCopyMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 1u}, {"rb", 2u}, {"rc", 3u}});
 }
 
-// §8.12: a shallow copy duplicates all of the source's variables, and the LRM
-// names strings alongside integers and handles among them. This drives a real
-// `string`-typed property through the full pipeline (rather than a hand-packed
-// value): the string is carried into the copy, and because a string is a value
-// variable (not a shared object handle), rewriting the source afterward leaves
-// the copy's string unchanged.
 TEST(ClassAssignRenameSim, E2eShallowCopyCopiesStringProperty) {
   const char* src =
       "class C;\n"
@@ -334,13 +313,6 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCopiesStringProperty) {
   EXPECT_EQ(RunAndGet(src, "independent"), 1u);
 }
 
-// §8.12 (shallow copy, step 2): the internal states used for randomization are
-// copied to the new object. Among them is the rand_mode status of random
-// variables (§18.8). Disabling a variable's rand_mode on the source and then
-// shallow-copying must carry the disabled status into the copy, while an
-// independently constructed object still reports the default active status.
-// The mode is read back through the LRM query form, so this observes the copied
-// state directly rather than inferring it from a randomization outcome.
 TEST(ClassAssignRenameSim, E2eShallowCopyCopiesRandModeStatus) {
   const char* src =
       "class C;\n"
@@ -359,16 +331,10 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCopiesRandModeStatus) {
       "    fresh = p3.x.rand_mode();\n"
       "  end\n"
       "endmodule\n";
-  // The copy inherited the source's disabled rand_mode (0); a fresh object is
-  // still active (1), proving the 0 came from the copy rather than a default.
   EXPECT_EQ(RunAndGet(src, "copied"), 0u);
   EXPECT_EQ(RunAndGet(src, "fresh"), 1u);
 }
 
-// §8.12 (shallow copy, step 2): the constraint_mode status of constraints
-// (§18.9) is likewise part of the copied randomization state. Turning a named
-// block off on the source and shallow-copying carries the off status into the
-// copy, while a separately constructed object still reports the block active.
 TEST(ClassAssignRenameSim, E2eShallowCopyCopiesConstraintModeStatus) {
   const char* src =
       "class C;\n"
@@ -392,14 +358,6 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCopiesConstraintModeStatus) {
   EXPECT_EQ(RunAndGet(src, "fresh"), 1u);
 }
 
-// §8.12 (shallow copy, step 2): the cyclic state of randc variables (§18.4.2)
-// is among the copied randomization state, and it must be copied as an
-// independent per-object cycle rather than shared with the source -- each
-// object advances its own permutation. This state is internal (no source-level
-// query exposes it), so the copy operation is exercised directly, mirroring the
-// existing ShallowCopyCopiesRngState unit test. The independence check (a
-// mutation to the copy's history leaving the source's untouched) is the visible
-// proof that the fix clones the set rather than aliasing the shared handle.
 TEST(ClassAssignRenameSim, ShallowCopyCopiesRandcCyclicStateIndependently) {
   SimFixture f;
   auto* type = MakeClassType(f, "C", {"y"});
@@ -411,24 +369,16 @@ TEST(ClassAssignRenameSim, ShallowCopyCopiesRandcCyclicStateIndependently) {
 
   auto* copy = obj->ShallowCopy(f.arena);
 
-  // The in-progress permutation carried across to the copy.
   ASSERT_TRUE(copy->randc_history.count("y"));
   EXPECT_EQ(copy->randc_history["y"]->size(), 2u);
   EXPECT_TRUE(copy->randc_history["y"]->count(0));
   EXPECT_TRUE(copy->randc_history["y"]->count(1));
 
-  // Advancing the copy's cycle does not disturb the source's cycle: the two
-  // objects own independent cyclic state.
   copy->randc_history["y"]->insert(2);
   EXPECT_EQ(obj->randc_history["y"]->size(), 2u);
   EXPECT_FALSE(obj->randc_history["y"]->count(2));
 }
 
-// §8.12: the shallow-copy form `new src` may also appear as a declaration
-// initializer (`C c2 = new c1;`), a distinct syntactic position from the
-// procedural `c2 = new c1;` assignment and served by a separate runtime
-// dispatch path. Driving the decl-initializer form through the full pipeline
-// confirms that path copies the source object's properties too.
 TEST(ClassAssignRenameSim, E2eDeclInitShallowCopyCopiesProperties) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -451,16 +401,6 @@ TEST(ClassAssignRenameSim, E2eDeclInitShallowCopyCopiesProperties) {
   LowerRunAndCheck(f, design, {{"result", 55u}});
 }
 
-// §8.11 makes `this` a predefined object handle to the object the enclosing
-// subroutine was invoked on, and footnote 23 on A.2.4's class_new asks only
-// that a copy source's value be an object handle, so `new this` copies the
-// object the running method was called on.
-//
-// 42 is the value that discriminates. The declared default is 0 and the
-// constructor writes 7, so a run that copied returns 42, a run that constructed
-// returns 7, and a run that allocated without constructing returns 0. Reading
-// the copy through the method's own return value is what puts the copy inside
-// the invocation `this` belongs to.
 TEST(ClassAssignRenameSim, E2eNewThisCopiesTheInvokingObjectsProperties) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int x;\n"
@@ -486,11 +426,6 @@ TEST(ClassAssignRenameSim, E2eNewThisCopiesTheInvokingObjectsProperties) {
             42u);
 }
 
-// §8.12 step 3 assigns a handle to the new object, so the copy is a second
-// object rather than another name for the first. Writing through the copy and
-// reading both back is what separates the two: a run that returned the invoking
-// object's own handle instead of a copy leaves r1 at 99 rather than 10, and
-// passes E2eNewThisCopiesTheInvokingObjectsProperties either way.
 TEST(ClassAssignRenameSim, E2eNewThisCopyIsADistinctObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -517,13 +452,6 @@ TEST(ClassAssignRenameSim, E2eNewThisCopyIsADistinctObject) {
   LowerRunAndCheck(f, design, {{"r1", 10u}, {"r2", 99u}});
 }
 
-// A bare `this` is an expression wherever §8.11 admits the keyword, and the
-// shallow copy is one use of it among several. Returning it hands the caller
-// the invoking object's handle with no copy involved, so this case states what
-// EvalIdentifier in src/simulator/evaluation.cpp answers rather than what the
-// copy site does with the answer. It fails on a run that resolves the keyword
-// by looking for a property named "this", which no class declares: the value
-// handed back is not a handle, q holds no object, and 55 is not what comes out.
 TEST(ClassAssignRenameSim, E2eBareThisEvaluatesToTheInvokingObjectHandle) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int x;\n"
@@ -545,10 +473,6 @@ TEST(ClassAssignRenameSim, E2eBareThisEvaluatesToTheInvokingObjectHandle) {
             55u);
 }
 
-// §8.12: renaming (a plain handle copy that aliases the same object) likewise
-// has a declaration-initializer position (`C p2 = p1;`) distinct from the
-// procedural `p2 = p1;`. The decl-init copy shares the object, so a write
-// through the new name is visible through the original.
 TEST(ClassAssignRenameSim, E2eDeclInitHandleAssignmentAliasesObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -572,14 +496,6 @@ TEST(ClassAssignRenameSim, E2eDeclInitHandleAssignmentAliasesObject) {
   LowerRunAndCheck(f, design, {{"result", 77u}});
 }
 
-// §8.12 (shallow copy, step 2) via §18.4 randc: the cyclic state of a real
-// randc variable is copied into the new object. Built from live `randc` source
-// and driven through randomize() rather than a hand-populated history: a
-// four-value randc drawn three times leaves one value unconsumed in the current
-// permutation; the shallow copy carries that three-value history, so the copy's
-// next randomize() is forced to the single remaining value -- distinct from all
-// three the source already drew. Had the cyclic state not been copied, the copy
-// would start a fresh permutation and could repeat one of them.
 TEST(ClassAssignRenameSim, E2eShallowCopyCarriesRandcCyclicState) {
   const char* src =
       "class C;\n"
@@ -603,19 +519,9 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCarriesRandcCyclicState) {
       "    distinct = (d != a && d != b && d != c) ? 1 : 0;\n"
       "  end\n"
       "endmodule\n";
-  // The copy's draw completes the source's permutation: it is the one value the
-  // source had not yet drawn, so it differs from all three prior draws.
   EXPECT_EQ(RunAndGet(src, "distinct"), 1u);
 }
 
-// §8.12 (shallow copy, step 2) via §18.14 object stability: the RNG stream
-// state is copied into the new object. Built from live `rand` source: after the
-// source randomizes once (advancing its per-object stream), the shallow copy
-// captures the stream at that point. Randomizing the source and the copy once
-// more each then draws from the same captured state and yields the same value,
-// which holds only because the stream state carried across (and remains
-// independent -- the source advancing its own stream does not disturb the
-// copy).
 TEST(ClassAssignRenameSim, E2eShallowCopyCarriesRngStream) {
   const char* src =
       "class C;\n"
@@ -636,14 +542,9 @@ TEST(ClassAssignRenameSim, E2eShallowCopyCarriesRngStream) {
       "    same = (r1 == r2) ? 1 : 0;\n"
       "  end\n"
       "endmodule\n";
-  // Source and copy resume from the same copied stream state, so their next
-  // draws agree.
   EXPECT_EQ(RunAndGet(src, "same"), 1u);
 }
 
-// §8.12 (shallow copy, step 2) with §7.10: a queue property is copied to the
-// new object, which then holds elements of its own: a push on the copy grows
-// the copy to three and leaves the source at two.
 TEST(ClassAssignRenameSim, E2eShallowCopyCopiesQueueProperty) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int q[$];\n"

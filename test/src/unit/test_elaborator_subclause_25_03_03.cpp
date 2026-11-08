@@ -60,11 +60,6 @@ TEST(GenericInterfaceReference, PartialImplicitWithNamedGenericInterface) {
   EXPECT_NE(top->children[1].resolved, nullptr);
 }
 
-// §25.3.3 states that a generic interface is reached through a named port and
-// never through an implicit one. The port `interface a` of memMod is generic,
-// so the `.*` connection cannot reach it and the rejection is reported under
-// §25.3.3 rather than under §23.3.2.4, which states the rules for wildcard
-// named port connections generally and says nothing about a generic interface.
 TEST(GenericInterfaceReference, ImplicitOnlyCannotReferenceGenericInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -115,9 +110,6 @@ TEST(GenericInterfaceReference, FullExampleEndToEnd) {
   EXPECT_EQ(top->children[2].module_name, "cpuMod");
 }
 
-// §25.3.3's refusal of `.*` for a generic port is the one error the source
-// draws: the port it leaves unconnected is not reported again under
-// §23.3.3.4.
 TEST(GenericInterfaceReference, ImplicitGenericPortIsReportedOnce) {
   ElabFixture f;
   ElaborateSrc(
@@ -141,9 +133,6 @@ TEST(GenericInterfaceReference, ImplicitGenericPortIsReportedOnce) {
                              7, "23.3.3.4"));
 }
 
-// §25.3.3 bars every implicit connection from a generic interface port, and
-// the `.name` form of §23.3.2.3 is implicit as `.*` is: `.b` reaching the
-// generic port b of cpuMod is refused, while `.clk` beside it is not.
 TEST(GenericInterfaceReference, ImplicitNameCannotReferenceGenericInterface) {
   ElabFixture f;
   ElaborateSrc(
@@ -164,8 +153,6 @@ TEST(GenericInterfaceReference, ImplicitNameCannotReferenceGenericInterface) {
       3, "25.3.3"));
 }
 
-// A named port connection may reference a generic interface port, and `.b(b)`
-// says by name what `.b` leaves implicit, so it is accepted.
 TEST(GenericInterfaceReference, ExplicitNameReachesGenericInterface) {
   EXPECT_TRUE(
       ElabOk("interface simple_bus; logic req; endinterface\n"

@@ -9,9 +9,6 @@
 #include "parser/ast_module.h"
 #include "parser/ast_stmt.h"
 
-// The source writing the sequence_expr `body` in each place §16.8, §16.12
-// and §16.14 let one stand: a sequence a module declares, a property it
-// declares, an assertion it holds and a sequence a package declares.
 inline std::string InEverySequencePlace(const std::string& body) {
   return "module m;\n"
          "  sequence s; " +
@@ -31,16 +28,12 @@ inline std::string InEverySequencePlace(const std::string& body) {
          "endpackage\n";
 }
 
-// The sequence a property tree stands for, where its root is one.
 inline const delta::SeqLinearBody* TreeSequenceBody(
     const delta::PropertyExprNode* tree) {
   if (tree == nullptr || tree->sequence == nullptr) return nullptr;
   return &tree->sequence->seq_linear;
 }
 
-// The sequence an assertion statement stands for: the one it carries alone,
-// or, where its operands name clocks of their own and it is carried as a
-// tree, the tree's.
 inline const delta::SeqLinearBody* AssertionSequenceBody(
     const delta::Stmt* stmt) {
   if (stmt == nullptr) return nullptr;
@@ -50,8 +43,6 @@ inline const delta::SeqLinearBody* AssertionSequenceBody(
   return TreeSequenceBody(stmt->assert_property);
 }
 
-// The linear forms InEverySequencePlace's four places were read into, in its
-// order; null for a place that holds none.
 inline std::vector<const delta::SeqLinearBody*> SequenceBodiesInEveryPlace(
     const ParseResult& r) {
   using delta::ModuleItem;

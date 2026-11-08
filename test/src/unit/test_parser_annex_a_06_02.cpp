@@ -525,9 +525,6 @@ TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_DynamicArrayNew) {
   EXPECT_EQ(stmt->rhs->args.size(), 1u);
 }
 
-// blocking_assignment alt 3: the class_new right-hand side. Distinct from the
-// dynamic_array_new alt (which carries a bracketed size); class_new is a bare
-// `new` or `new ( arguments )`, so the parsed call has no bracketed size arg.
 TEST(ProceduralBlockSyntaxParsing, BlockingAssignment_ClassNew) {
   auto r = Parse(
       "module m;\n"
@@ -714,7 +711,6 @@ TEST(ProceduralBlockSyntaxParsing, ErrorForceMissingRhs) {
       "module m;\n"
       "  initial begin force a; end\n"
       "endmodule\n");
-  // §10.6.2 owns force and release; A.6.2 only states the production.
   EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "10.6.2"));
 }
 
@@ -723,20 +719,14 @@ TEST(ProceduralBlockSyntaxParsing, ErrorReleaseWithExtraRhs) {
       "module m;\n"
       "  initial begin release a = b; end\n"
       "endmodule\n");
-  // §10.6.2 owns force and release; A.6.2 only states the production.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got '='", 2, "10.6.2"));
 }
 
-// Negative form of the `assign variable_assignment` alternative: the assign
-// form of a procedural_continuous_assignment requires `lvalue = expression`, so
-// an assign with a bare lvalue and no right-hand side must be rejected.
 TEST(ProceduralBlockSyntaxParsing, ErrorProceduralAssignMissingRhs) {
   auto r = Parse(
       "module m;\n"
       "  initial begin assign a; end\n"
       "endmodule\n");
-  // §10.6.1 owns the procedural assign and deassign statements; A.6.2 only
-  // states the production.
   EXPECT_TRUE(ReportedError(r.diags, "expected '=', got ';'", 2, "10.6.1"));
 }
 
@@ -767,10 +757,6 @@ TEST(ProceduralBlockSyntaxParsing, InitialConstruct_EmptyBlock) {
   EXPECT_TRUE(item->body->stmts.empty());
 }
 
-// A.6.2 (printed page 1197) gives each of the four always keywords a statement,
-// which A.6.4 (printed page 1198) never writes as the null statement, with
-// attribute instances before it or not. A timing control after the keyword
-// opens a statement of its own, whose body may be null.
 TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_NullBodyIsError) {
   auto r = Parse(
       "module m;\n"
@@ -796,9 +782,6 @@ TEST(ProceduralBlockSyntaxParsing, AlwaysConstruct_NullBodyIsError) {
   }
 }
 
-// A.6.2 (printed page 1197) gives a final procedure a function_statement, which
-// A.6.4 (printed page 1198) makes a statement and so never null; the initial
-// procedure, whose body is a statement_or_null, may be.
 TEST(ProceduralBlockSyntaxParsing, FinalConstruct_NullBodyIsError) {
   auto r = Parse(
       "module m;\n"
@@ -816,10 +799,6 @@ TEST(ProceduralBlockSyntaxParsing, FinalConstruct_NullBodyIsError) {
   EXPECT_EQ(r.diags.size(), 2u);
 }
 
-// A.6.2 (printed page 1198) writes an assignment's right-hand side as an
-// expression, and A.8.3 (printed page 1210) gives the min:typ:max triple to
-// mintypmax_expression alone, which an expression reaches only as the
-// parenthesized primary.
 TEST(ProceduralBlockSyntaxParsing,
      AssignmentRhs_UnparenthesizedMinTypMaxIsError) {
   auto r = Parse(
@@ -842,9 +821,6 @@ TEST(ProceduralBlockSyntaxParsing,
   EXPECT_EQ(r.diags.size(), 3u);
 }
 
-// A.6.2 (printed page 1198) assigns a dynamic_array_new or a class_new to a
-// variable named with its selects alone, never to a concatenation, a streaming
-// concatenation or an assignment pattern, the other forms of variable_lvalue.
 TEST(ProceduralBlockSyntaxParsing,
      BlockingAssignment_NewToAggregateTargetIsError) {
   auto r = Parse(
@@ -871,9 +847,6 @@ TEST(ProceduralBlockSyntaxParsing,
   EXPECT_EQ(r.diags.size(), 4u);
 }
 
-// A.6.2 (printed page 1198) writes a dynamic_array_new's target as a
-// nonrange_variable_lvalue, whose selects hold no part-select or indexed
-// part-select, while a class_new's target takes any select.
 TEST(ProceduralBlockSyntaxParsing,
      BlockingAssignment_DynamicArrayNewToRangeIsError) {
   auto r = Parse(

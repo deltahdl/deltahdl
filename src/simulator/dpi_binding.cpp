@@ -25,10 +25,6 @@ namespace delta {
 
 namespace {
 
-// Gives `import` both forms of implementation, each calling `symbol` through
-// `trampoline`: the direction-aware one CallImportWithArgs enters, and the
-// input-only one a pure function's call is made through (§35.5.2), which
-// hands the C function a copy of the arguments to write into.
 void BindImport(DpiRtFunction& import, void* symbol, void* trampoline) {
   auto function = std::make_shared<const DpiCFunction>(
       DpiCFunction{import.args, import.return_type, import.is_task,
@@ -43,8 +39,6 @@ void BindImport(DpiRtFunction& import, void* symbol, void* trampoline) {
   };
 }
 
-// The design's exports the generated forwarders call into, in the order the
-// forwarder source gave them their indices, and where the run's reports go.
 struct DpiExportBinding {
   DpiRuntime* dpi = nullptr;
   std::vector<const DpiRtExport*> exports;
@@ -56,8 +50,6 @@ DpiExportBinding& ExportBinding() {
   return binding;
 }
 
-// §35.5.3, §35.8: reports a call of `exp` the runtime refused, by the rule it
-// broke. A call refused under §35.9 item d) was reported where it was refused.
 void ReportRefusedExportCall(DpiExportCallStatus status, const DpiRtExport& exp,
                              const DpiRuntime& dpi, DiagEngine& diag) {
   const std::string kExport(exp.sv_name);
@@ -87,10 +79,6 @@ void ReportRefusedExportCall(DpiExportCallStatus status, const DpiRtExport& exp,
   }
 }
 
-// §35.7 with §H.8.2: the entry point every forwarder calls. The arguments are
-// read out of the C objects the forwarder hands over, the export is called in
-// the chain's current scope, and its outputs and result are laid back out in
-// C's objects.
 void DpiExportEntry(int index, void** args, void* result) {
   DpiExportBinding& binding = ExportBinding();
   if (binding.dpi == nullptr || index < 0 ||
@@ -124,9 +112,6 @@ void DpiExportEntry(int index, void** args, void* result) {
   DpiStoreResultInCObject(kResult, returned, result);
 }
 
-// The exports of `dpi` foreign code can call, one per linkage name: the
-// instances of one module's export share the name, and the chain's scope picks
-// the instance a call reaches (§35.5.3).
 std::vector<const DpiRtExport*> CallableExports(DpiRuntime& dpi) {
   std::vector<const DpiRtExport*> exports;
   std::unordered_set<std::string_view> names;
@@ -176,8 +161,6 @@ void BindDpiImports(DpiRuntime& dpi, const DpiSymbolLookup& lookup,
                SharedLibrarySymbol(kCalls.handle, DpiCTrampolineName(i)));
   }
   if (exports.empty()) return;
-  // §35.7: the forwarders, global symbols now, call into the run through the
-  // entry point installed here.
   ExportBinding() = DpiExportBinding{&dpi, std::move(exports), &diag};
   auto* install = reinterpret_cast<void (*)(DpiCExportEntry)>(
       SharedLibrarySymbol(kCalls.handle, DpiCExportEntrySetterName()));

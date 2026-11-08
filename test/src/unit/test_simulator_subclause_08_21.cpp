@@ -10,11 +10,6 @@ using namespace delta;
 
 namespace {
 
-// 8.21: an abstract class may be extended into a further abstract class; its
-// pure virtual methods -- both the one inherited from the abstract base and the
-// one newly added -- remain unimplemented prototypes, which the lowerer records
-// as null vtable slots. Driven end-to-end so the lowerer, not the test, builds
-// the vtable.
 TEST(AbstractClassSimulation, AbstractExtendsAbstractVtable) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -90,13 +85,6 @@ TEST(AbstractClassSimulation, ConcreteSubclassOfAbstractBaseConstructed) {
             42u);
 }
 
-// 8.21: an abstract class's constructor is never invoked on its own -- it runs
-// only indirectly, reached by the constructor chain of an extended non-abstract
-// object. The abstract base here defines a real constructor that stores a
-// field; the concrete subclass reaches it with super.new (real 8.7/8.17
-// constructor and chaining syntax). The stored value surviving into the
-// constructed object shows the base constructor executed during the subclass's
-// indirect construction.
 TEST(AbstractClassSimulation, AbstractBaseConstructorRunsViaChaining) {
   EXPECT_EQ(RunAndGet("virtual class Base;\n"
                       "  int tag;\n"
@@ -125,9 +113,6 @@ TEST(AbstractClassSimulation, AbstractBaseConstructorRunsViaChaining) {
             7u);
 }
 
-// §8.21: an abstract class may not be instantiated directly. The elaborator
-// reports the construction from the source, and the run reports it again when
-// the 'new' executes, which leaves no object of the abstract class behind.
 TEST(AbstractClassSimulation, ConstructAbstractClassDirectlyError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -169,8 +154,6 @@ TEST(AbstractClassSimulation, EmptyBodyVirtualMethodIsCallable) {
             1u);
 }
 
-// §8.21: an object of an abstract class shall not be constructed directly, and
-// the report that rejects the construction names §8.21.
 TEST(AbstractClassSimulation, ConstructAbstractClassNames8_21) {
   SimFixture f;
   auto* design = ElaborateSrc(

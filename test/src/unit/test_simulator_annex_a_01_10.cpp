@@ -10,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Sets up a solver with two [0,100] variables x and y, a block fixing x to
-// `x_fixed_value`, and an implication block "x == 10 -> y < 20". Used by the
-// implication true/false-condition tests, which differ only in the fixed x
-// value and their final assertion.
 static void SetupImplicationSolver(ConstraintSolver& solver,
                                    int64_t x_fixed_value) {
   RandVariable vx;
@@ -71,10 +67,6 @@ TEST(ConstraintSolving, EmptyConstraintBlock) {
 }
 
 TEST(ConstraintSolving, ImplicationTrueCondition) {
-  // 18.5.5: the implication's short-form antecedent is the equality
-  // cond_var == cond_value (here x == 10). To make the antecedent TRUE so the
-  // consequent y < 20 is enforced, fix x to that same value 10; a different
-  // fixed value (e.g. 50) makes x == 10 false and leaves y unconstrained.
   ConstraintSolver solver(42);
   SetupImplicationSolver(solver, 10);
 
@@ -123,8 +115,6 @@ TEST(ConstraintSolving, ForeachAllPositive) {
   for (int i = 0; i < 3; ++i) {
     RandVariable v;
     v.name = "arr_" + std::to_string(i);
-    // 6.11.3: a bound below zero is a bound of a signed type, and the domain is
-    // ordered as the declared type reads it.
     v.is_signed = true;
     v.min_val = -10;
     v.max_val = 10;

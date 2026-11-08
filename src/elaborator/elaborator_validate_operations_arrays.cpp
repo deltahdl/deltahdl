@@ -21,8 +21,6 @@
 namespace delta {
 
 namespace {
-// Flags a single assignment-pattern item that names an array-typed identifier,
-// which is illegal as an element of a pattern targeting an unpacked array.
 void CheckArrayPatternIdentElem(
     const Expr* elem,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -36,10 +34,6 @@ void CheckArrayPatternIdentElem(
   }
 }
 
-// Scans every item of an assignment pattern targeting a one-dimensional
-// unpacked array, descending through a replication so its replicated element
-// is inspected too, and flags any array-typed item (§10.10.1: every element
-// item shall match the target's element type).
 void ScanArrayPatternElems(
     const Expr* pattern,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
@@ -69,9 +63,6 @@ void ElaboratorOperationRules::CheckArrayPatternElemTypeInAssign(
   ScanArrayPatternElems(s->rhs, var_array_info_, diag_);
 }
 
-// §10.10.1: the element-type rule also governs a pattern that initializes the
-// array in its declaration (`int A9[1:9] = '{A3, ...};`), an assignment-like
-// context the procedural walk above never reaches.
 void ElaboratorOperationRules::CheckArrayPatternElemTypeInInit(
     const ModuleItem* item) {
   if (!item->init_expr) return;
@@ -89,13 +80,6 @@ void ElaboratorOperationRules::WalkStmtsForArrayPatternElemType(const Stmt* s) {
       s->kind == StmtKind::kNonblockingAssign) {
     CheckArrayPatternElemTypeInAssign(s);
   }
-  // §10.9.1 requires every element of an assignment pattern targeting an
-  // unpacked array to match that array's element type, and conditions the rule
-  // on the assignment rather than on where it stands, so this descends every
-  // link ForEachChildStmt in elaborator_validate_internal.h names and names
-  // none itself. It wrote out six of the thirteen, so `A9 = '{A3, ...}` written
-  // in an assertion action block or in a randsequence production code block
-  // reached CheckArrayPatternElemTypeInAssign in neither.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForArrayPatternElemType(sub); });
 }
@@ -122,9 +106,6 @@ void ElaboratorOperationRules::CheckReplicateTargetingArrayInAssign(
               Subclause("10.10.1"));
 }
 
-// §10.10.1: unpacked array concatenations forbid replication. The ban holds
-// when the replication initializes the array in its declaration
-// (`int A9[1:9] = {9{1}};`), not only in a procedural assignment.
 void ElaboratorOperationRules::CheckReplicateTargetingArrayInit(
     const ModuleItem* item) {
   if (!item->init_expr) return;
@@ -142,11 +123,6 @@ void ElaboratorOperationRules::WalkStmtsForReplicateTargetingArray(
       s->kind == StmtKind::kNonblockingAssign) {
     CheckReplicateTargetingArrayInAssign(s);
   }
-  // §10.10.1 forbids a replication from targeting an unpacked array, and puts
-  // no condition on the statement the assignment is written in, so this
-  // descends every link ForEachChildStmt in elaborator_validate_internal.h
-  // names and names none itself. It wrote out six of the thirteen, so
-  // `A9 = {9{1}}` written in a fork arm or in a randcase item elaborated clean.
   ForEachChildStmt(s, [this](Stmt* const& sub) {
     WalkStmtsForReplicateTargetingArray(sub);
   });
@@ -164,11 +140,6 @@ void ElaboratorOperationRules::ValidateReplicateTargetingArray(
 
 namespace {
 
-// The addresses already supplied to an array reference: how many index selects
-// sit between a trailing range and the array's name, and that name. §11.5.2
-// writes an array access as the name followed by one integer expression per
-// addressed dimension, so this count says how many dimensions the range has
-// left to reach.
 struct AddressedDims {
   uint32_t count = 0;
   std::string_view array_name;
@@ -181,8 +152,6 @@ AddressedDims CountAddressedDims(const Expr* base) {
       addressed.array_name = cur->text;
       break;
     }
-    // Anything else leaves the name unset: the base is not a plain array
-    // reference and no dimension count can be read off it.
     if (cur->kind != ExprKind::kSelect) break;
     if (cur->index) ++addressed.count;
   }
@@ -191,41 +160,9 @@ AddressedDims CountAddressedDims(const Expr* base) {
 
 }  // namespace
 
-// §7.4.5 / §11.5.2 — a trailing range written after an array reference is one
-// of two different operations, and the number of dimensions already carrying an
-// address is what tells them apart.
-//
-// Address every dimension and a single element has been selected, so the range
-// selects contiguous bits of that element: a part-select, which §11.5.2 permits
-// once the addressing is complete — a bit-select or part-select of an array
-// element first selects the word, one address per dimension — and which §11.5.1
-// governs from there.
-//
-// Leave a dimension unaddressed and the range selects contiguous *elements* of
-// that dimension instead. §7.4.5 calls that a slice, and permits one: a slice
-// covers one dimension only, while the other dimensions may take single indices
-// in the expression. So an unaddressed dimension does not make the range
-// illegal.
-//
-// What a slice may not do is run against the dimension it slices. §11.5.1
-// requires the first index of a range to address a more significant bit than
-// the second, and §11.5.2 sends an array's ranges to that same rule. On a
-// dimension declared [0:7] the more significant element is the one with the
-// smaller index, so [0:3] slices the first four elements and [3:0] addresses
-// them backwards. That is what makes §11.5.2's own threed_array[14][1][3:0]
-// illegal on wire threed_array[0:255][0:255][0:7]: the third dimension counts
-// upward, and threed_array[14][1][0:7] slices that same dimension legally.
-//
-// The indexed forms need no test here. §11.5.1 fixes them to the declared
-// direction whichever way it runs — on logic [0:31] b_vect, b_vect[0 +: 8] is
-// b_vect[0:7] and b_vect[15 -: 8] is b_vect[8:15] — so an indexed range cannot
-// be written backwards.
 void ElaboratorOperationRules::CheckArrayElementPartSelectNode(const Expr* e) {
   AddressedDims addressed = CountAddressedDims(e->base);
   if (addressed.array_name.empty()) return;
-  // §11.5.2 states this rule of net and variable arrays alike, so a net array's
-  // dimensions are consulted as well. They are held in their own map because
-  // every other reader of var_array_info_ is a rule written about variables.
   const VarArrayInfo* found = nullptr;
   if (auto it = var_array_info_.find(addressed.array_name);
       it != var_array_info_.end()) {
@@ -237,13 +174,8 @@ void ElaboratorOperationRules::CheckArrayElementPartSelectNode(const Expr* e) {
   if (found == nullptr) return;
   const auto& info = *found;
   if (info.is_dynamic || info.is_assoc) return;
-  // Every dimension addressed: a part-select of the one element that addressing
-  // selected, which this rule does not reach.
   if (addressed.count >= info.num_unpacked_dims) return;
   if (e->is_part_select_plus || e->is_part_select_minus) return;
-  // A dimension whose bounds did not fold to constants contributed no entry, so
-  // a short vector no longer lines up with the declaration and the dimension
-  // being sliced cannot be identified.
   if (info.declared_dims.size() != info.num_unpacked_dims) return;
   auto first = ConstEvalInt(e->index);
   auto second = ConstEvalInt(e->index_end);
@@ -286,11 +218,6 @@ void ElaboratorOperationRules::WalkStmtsForArrayElementPartSelect(
   WalkExprForArrayElementPartSelect(s->expr);
   WalkExprForArrayElementPartSelect(s->condition);
   WalkExprForArrayElementPartSelect(s->assert_expr);
-  // §11.5.2 sends an array's trailing range to §11.5.1's ordering rule, which
-  // governs the range itself and not the statement holding it, so this descends
-  // every link ForEachChildStmt in elaborator_validate_internal.h names and
-  // names none itself. It wrote out six of the thirteen, so `r = A[1][1:0]`
-  // written in a fork arm or in an assertion action block was never looked at.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForArrayElementPartSelect(sub); });
 }
@@ -309,12 +236,6 @@ void ElaboratorOperationRules::ValidateArrayElementPartSelect(
   }
 }
 
-// §10.10.3 (printed page 266): inner braces in an unpacked array concatenation
-// are a vector or string concatenation, a self-determined item of whatever
-// width assigned to one element, since a complete unpacked array concatenation
-// has no self-determined type and cannot be an item. Braces holding an
-// unpacked array are therefore the nested unpacked array concatenation the
-// clause makes illegal.
 void ElaboratorOperationRules::CheckNestedArrayConcatItems(const Expr* concat) {
   for (const Expr* elem : concat->elements) {
     if (elem->kind != ExprKind::kConcatenation) continue;
@@ -338,22 +259,11 @@ void ElaboratorOperationRules::CheckArrayConcatNestingInAssign(const Stmt* s) {
   CheckNestedArrayConcatItems(s->rhs);
 }
 
-// Element types for which the literal `null` is a legal item in an unpacked
-// array concatenation. Kinds outside this set make a null item illegal.
-// `kNamed` is conservatively treated as legal because the named type could
-// be a class or interface class; the elem-type record does not carry the
-// resolved name, so we err on the permissive side rather than reject a
-// legitimate class array.
 static bool NullItemIsLegalForElemType(DataTypeKind k) {
   return k == DataTypeKind::kEvent || k == DataTypeKind::kChandle ||
          k == DataTypeKind::kVirtualInterface || k == DataTypeKind::kNamed;
 }
 
-// §10.10 (printed page 265): an item of an unpacked array concatenation is
-// assignment compatible with the target's elements or an array of them, or
-// `null` where the elements are of a type with a null value. A class handle
-// is assignment compatible with no element of an integral, real or string
-// type.
 void ElaboratorOperationRules::CheckArrayConcatItemTypes(
     const Expr* concat, const VarArrayInfo& info) {
   bool handle_elems = NullItemIsLegalForElemType(info.elem_type);
@@ -383,9 +293,6 @@ void ElaboratorOperationRules::CheckNullItemInArrayConcatAssign(const Stmt* s) {
   CheckArrayConcatItemTypes(s->rhs, it->second);
 }
 
-// §10.10.3 holds the concatenation that initializes an array in its
-// declaration as it holds one a procedure assigns, the initializer being an
-// assignment-like context the procedural walk never reaches.
 void ElaboratorOperationRules::CheckArrayConcatNestingInInit(
     const ModuleItem* item) {
   if (!item->init_expr) return;
@@ -403,13 +310,6 @@ void ElaboratorOperationRules::WalkStmtsForArrayConcatNesting(const Stmt* s) {
     CheckArrayConcatNestingInAssign(s);
     CheckNullItemInArrayConcatAssign(s);
   }
-  // §10.10.3 bars an unpacked array concatenation from being an item of
-  // another, and §10.10 admits `null` as an item only for the element types
-  // that have a null value; neither rule mentions the statement the assignment
-  // is written in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names none itself. It wrote out
-  // six of the thirteen, so `q = {null, null}` on a queue of ints written in a
-  // fork arm or in a randsequence production code block went unreported.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForArrayConcatNesting(sub); });
 }
@@ -426,10 +326,6 @@ void ElaboratorOperationRules::ValidateUnpackedArrayConcatNesting(
 
 namespace {
 
-// The variable_lvalue `e` assigns where it is an expression rather than a
-// statement: the operand of an increment or decrement, which §11.4.2 makes an
-// assignment, or the target of an assignment written within an expression
-// (A.8.3). Null where `e` assigns nothing.
 const Expr* AssignedOperand(const Expr* e) {
   switch (e->kind) {
     case ExprKind::kPostfixUnary:
@@ -446,10 +342,6 @@ const Expr* AssignedOperand(const Expr* e) {
   }
 }
 
-// Runs `fn` over every variable_lvalue the expressions of `s` assign, as
-// AssignedOperand finds them, other than the target of `s` itself, which a
-// compound assignment statement holds again as the left operand of the
-// operation on its right-hand side.
 template <typename Fn>
 void ForEachAssignedOperand(const Stmt* s, const Fn& fn) {
   auto visit = [&](const Expr* e) {
@@ -489,13 +381,6 @@ void ElaboratorOperationRules::WalkStmtsForSelectOnConcatLvalue(const Stmt* s) {
   }
   ForEachAssignedOperand(
       s, [this](const Expr* target) { CheckSelectOnConcatLvalue(target); });
-  // §11.4.12 bars a select of a concatenation as a net_lvalue, a
-  // variable_lvalue or any equivalent use, the left-hand side of an assignment
-  // among them, which is a rule about the lvalue and not about the statement
-  // holding it, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names, naming none itself. It wrote out six
-  // of the thirteen, so `{a, b}[2] = 1'b1` written in a fork arm or in a
-  // randcase item elaborated clean.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForSelectOnConcatLvalue(sub); });
 }
@@ -544,12 +429,6 @@ void ElaboratorOperationRules::WalkStmtsForReplicateLvalue(const Stmt* s) {
   }
   ForEachAssignedOperand(
       s, [this](const Expr* target) { CheckReplicateLvalue(target); });
-  // §11.4.12.1 keeps a replication off the left-hand side of an assignment, a
-  // rule about the lvalue and not about the statement the assignment stands in,
-  // so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names none itself. It wrote out
-  // six of the thirteen, so `{2{a}} = b` written in a fork arm or in an
-  // assertion action block reached CheckReplicateLvalue in neither.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForReplicateLvalue(sub); });
 }
@@ -580,14 +459,6 @@ static bool RepeatCountHasXZ(const Expr* e) {
 }
 
 namespace {
-// Validates the repeat count of a single replication: it must not contain x/z
-// and, when constant, must not be negative. The multiplier is a constant
-// expression, so it is evaluated in the module parameter scope — a parameter
-// or localparam multiplier resolves the same way a literal one does.
-// §11.4.12.2: whether a replication may be a string replication, one of its
-// operands being a string variable or a string literal (§11.4.12.2's own
-// example replicates "boo " by a variable n), which a non-constant multiplier
-// is allowed for.
 bool MayReplicateAString(
     const Expr* replicate,
     const std::unordered_map<std::string_view, DataTypeKind>& var_types) {
@@ -650,8 +521,6 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
                                          const ScopeMap& scope,
                                          DiagEngine& diag);
 
-// True when a concatenation is non-empty and every operand is a zero
-// replication, which leaves no positive-size operand to host them.
 static bool ConcatIsAllZeroReplicate(const Expr* concat,
                                      const ScopeMap& scope) {
   if (concat->elements.empty()) return false;
@@ -661,9 +530,6 @@ static bool ConcatIsAllZeroReplicate(const Expr* concat,
   return true;
 }
 
-// Handles the concatenation arm of CheckZeroReplicateStandalone: a
-// concatenation built entirely of zero replications is illegal, and any
-// non-zero-replication operand is recursed into.
 static void CheckZeroReplicateInConcat(const Expr* concat,
                                        const ScopeMap& scope,
                                        DiagEngine& diag) {
@@ -690,8 +556,6 @@ static void CheckZeroReplicateStandalone(const Expr* expr,
                "in the same concatenation",
                Subclause("11.4.12.1"));
   }
-  // A.8.1 writes a replication's body as a concatenation, so its operands
-  // stand beside one another as a concatenation's do.
   if (expr->kind == ExprKind::kConcatenation ||
       expr->kind == ExprKind::kReplicate) {
     CheckZeroReplicateInConcat(expr, scope, diag);
@@ -717,12 +581,6 @@ static void WalkStmtsForZeroReplicateStandalone(const Stmt* s,
   CheckZeroReplicateStandalone(s->expr, scope, diag);
   CheckZeroReplicateStandalone(s->condition, scope, diag);
   CheckZeroReplicateStandalone(s->assert_expr, scope, diag);
-  // §11.4.12.1 allows a zero replication only inside a concatenation holding an
-  // operand of positive size, and says nothing about the statement the
-  // replication is written in, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names none itself. It wrote out
-  // six of the thirteen, so `result = {0{a}}` written in a fork arm or in a
-  // randcase item was never looked at.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForZeroReplicateStandalone(sub, scope, diag);
   });
@@ -735,12 +593,6 @@ void ElaboratorOperationRules::WalkStmtsForReplicateMultiplier(const Stmt* s) {
   WalkExprForReplicateMultiplier(s->expr);
   WalkExprForReplicateMultiplier(s->condition);
   WalkExprForReplicateMultiplier(s->assert_expr);
-  // §11.4.12.1 requires a replication multiplier to be a constant expression
-  // that is neither negative nor x/z, a rule about the multiplier and not about
-  // the statement around it, so this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names and names none itself. It wrote out
-  // six of the thirteen, so `a = {1'bx{1'b0}}` written in a fork arm or in a
-  // randsequence production code block went unreported.
   ForEachChildStmt(
       s, [this](Stmt* const& sub) { WalkStmtsForReplicateMultiplier(sub); });
 }

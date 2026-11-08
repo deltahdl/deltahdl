@@ -8,13 +8,8 @@
 #include "simulator/eval_array_class_assoc.h"
 #include "simulator/eval_class_params.h"
 
-// §6.18 with §8.25 and §6.20.3: the type a class property's name stands for
-// within its class, ClassPropertyType.
-
 namespace delta {
 
-// The typedef `cls` declares under `name`, a `localparam type` of its body
-// included; null where it declares none.
 static const DataType* ClassTypedefNamed(const ClassDecl* cls,
                                          std::string_view name) {
   for (const ClassMember* m : cls->members) {
@@ -25,9 +20,6 @@ static const DataType* ClassTypedefNamed(const ClassDecl* cls,
   return nullptr;
 }
 
-// The type one step along from the name `cur`: what a type parameter of the
-// class is bound to, what a typedef of the class names, or the name with a
-// type parameter prefix replaced by the class it is bound to.
 static std::optional<DataType> NextAlong(const DataType& cur,
                                          const ClassDecl* cls,
                                          const TypedefMap& type_params) {
@@ -43,9 +35,6 @@ DataType ClassPropertyType(const DataType& type, const ClassDecl* cls,
   if (cls == nullptr || type.kind != DataTypeKind::kNamed ||
       type.packed_dim_left != nullptr || !type.extra_packed_dims.empty())
     return type;
-  // §8.25: a property declared as one of the class's own type parameters, `T
-  // x` or through `typedef T X;`, is sized by each specialization's actual
-  // (SizeTypeParamProperties), never by the default the declaration gives T.
   if (type.scope_name.empty() && !TypeParamNamedBy(cls, type.type_name).empty())
     return type;
   DataType cur = type;

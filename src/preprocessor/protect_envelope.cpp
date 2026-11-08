@@ -47,9 +47,6 @@ bool ProtectEnvelopeState::InProtectedRegion() const {
   return DepthOf(EnvelopeMode::kDecryption) > 0;
 }
 
-// The keywords waiting outside every region describe whichever envelope opens
-// next, so opening one takes them all and leaves nothing behind for the
-// envelope after it.
 bool ProtectEnvelopeState::Open(EnvelopeMode mode, SourceLoc loc) {
   if (mode == EnvelopeMode::kDecryption &&
       DepthOf(mode) >= kNestedDecryptionEnvelopeLimit) {
@@ -64,12 +61,6 @@ bool ProtectEnvelopeState::Open(EnvelopeMode mode, SourceLoc loc) {
   return true;
 }
 
-// A closing expression takes the most recent opening expression of its own
-// mode that has not already been closed. Searching back for the mode rather
-// than taking whatever is innermost is what lets one kind of envelope sit
-// inside the other without either one's closing expression claiming the
-// wrong opening. Where no such expression is open there is nothing for the
-// closing one to be associated with, so it closes no envelope.
 void ProtectEnvelopeState::Close(EnvelopeMode mode, SourceLoc loc) {
   auto it = std::find_if(open_envelopes_.rbegin(), open_envelopes_.rend(),
                          [mode](const ProtectedEnvelope& envelope) {
@@ -97,9 +88,6 @@ bool ProtectEnvelopeState::Apply(std::string_view keyword, SourceLoc loc) {
     Close(EnvelopeMode::kDecryption, loc);
     return true;
   }
-  // An expression written inside a region describes that region's content,
-  // and the region it is written inside is the innermost one still open.
-  // Outside every region it waits for the envelope it describes to open.
   if (open_envelopes_.empty()) {
     pending_envelope_keywords_.emplace_back(keyword);
   } else {

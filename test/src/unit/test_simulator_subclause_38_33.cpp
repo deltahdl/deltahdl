@@ -14,10 +14,6 @@
 namespace delta {
 namespace {
 
-// A cbEndOfRestart routine that re-establishes the user-data field, which
-// §38.33 says an application may do during or after such a callback. The
-// handle and the value it associates are file-scope so the routine, whose
-// signature the standard fixes, can reach them.
 VpiHandle g_restored_call = nullptr;
 int g_restored_value = 0;
 bool g_restore_ran = false;
@@ -37,9 +33,6 @@ class VpiPutUserDataSim : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Build a system task/function call-instance handle of the given type. The
-  // handle is a VpiObject*, so the test reads the storage location
-  // vpi_put_userdata() writes (obj->user_data) back directly.
   VpiHandle MakeCall(int type) {
     VpiHandle obj = vpi_ctx_.CreateModule("c", "c");
     obj->type = type;
@@ -52,9 +45,6 @@ class VpiPutUserDataSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.33 (Synopsis/Arguments + Returns): vpi_put_userdata() associates the
-// user-data value with a system function call instance's storage location and
-// returns 1 on success. The stored pointer is the one the application supplied.
 TEST_F(VpiPutUserDataSim, AssociatesUserDataWithFunctionCall) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
@@ -64,10 +54,6 @@ TEST_F(VpiPutUserDataSim, AssociatesUserDataWithFunctionCall) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.33 (Arguments, edge case): the user-data argument is just a value to be
-// associated, so a null value is legal data, not an error. Only the handle is
-// validated: putting a null user-data value on a valid call handle still
-// succeeds (returns 1), leaving the storage location holding that null value.
 TEST_F(VpiPutUserDataSim, NullUserDataValueStillSucceeds) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
 
@@ -76,8 +62,6 @@ TEST_F(VpiPutUserDataSim, NullUserDataValueStillSucceeds) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.33 (Returns + Arguments): a null handle has no storage location to write,
-// so the routine reports an error (§38.2) and returns 0.
 TEST_F(VpiPutUserDataSim, NullHandleIsAnError) {
   int marker = 0;
 
@@ -85,23 +69,15 @@ TEST_F(VpiPutUserDataSim, NullHandleIsAnError) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.33 (Returns + Arguments): the handle must name a system task/function
-// call instance. A handle of any other kind (here a module) is rejected with an
-// error and 0, and no association is made on it.
 TEST_F(VpiPutUserDataSim, NonCallHandleIsRejected) {
   VpiHandle module = MakeCall(kVpiModule);
   int marker = 0;
 
   EXPECT_EQ(vpi_put_userdata(VpiHandleOf(module), &marker), 0);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
-  // §38.14 reads the same storage, and a module has none to have been written.
-  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(module)),
-            nullptr);  // left unassociated
+  EXPECT_EQ(vpi_get_userdata(VpiHandleOf(module)), nullptr);
 }
 
-// §38.33 (the lone 'shall'): after a restart, a vpi_get_userdata() shall return
-// NULL. The user-data association placed before the restart is dropped, so the
-// storage location reads back null once the restart sequence has run.
 TEST_F(VpiPutUserDataSim, RestartClearsUserData) {
   VpiHandle call = MakeCall(vpiSysFuncCall);
   int marker = 0;
@@ -113,8 +89,6 @@ TEST_F(VpiPutUserDataSim, RestartClearsUserData) {
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.33 (the lone 'shall'): a reset clears the user-data association the same
-// way a restart does, so a vpi_get_userdata() after the reset yields null.
 TEST_F(VpiPutUserDataSim, ResetClearsUserData) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int marker = 0;
@@ -126,11 +100,6 @@ TEST_F(VpiPutUserDataSim, ResetClearsUserData) {
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), nullptr);
 }
 
-// §38.33's last sentence: the user-data field may be filled in again during or
-// after a cbEndOfRestart or cbEndOfReset callback. A restart clears the field
-// before those callbacks run, so a routine that sets it while one is being
-// delivered leaves it set afterwards rather than having its write dropped by
-// the clear.
 TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
   VpiHandle call = MakeCall(vpiSysTaskCall);
   int before_restart = 0;
@@ -144,8 +113,6 @@ TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
 
   vpi_ctx_.DispatchRestart();
 
-  // The value the callback put there is what a later read finds - not the one
-  // from before the restart, which the clear dropped, and not null.
   ASSERT_TRUE(g_restore_ran);
   EXPECT_EQ(vpi_get_userdata(VpiHandleOf(call)), &g_restored_value);
   EXPECT_NE(vpi_get_userdata(VpiHandleOf(call)), &before_restart);
@@ -153,9 +120,6 @@ TEST_F(VpiPutUserDataSim, TheFieldCanBeSetUpAgainFromAnEndOfRestartCallback) {
 
 using UserDataOfABuiltInCall = VpiDesignRun;
 
-// §38.33 with §38.37: only a call of a system task an application registered
-// has a user-data storage location; a built-in's call has none, so putting
-// user data on it fails with an error (#7471).
 TEST_F(UserDataOfABuiltInCall, PuttingItIsAnError) {
   Run("module top;\n"
       "  initial $display(\"x\");\n"

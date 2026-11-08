@@ -18,11 +18,6 @@ using namespace delta;
 
 namespace {
 
-// §31.9 (printed page 919): with the negative timing check option on,
-// $setuphold and $recrem may take negative values, and §31.9.4 (printed page
-// 923) names beside it an invocation option that turns every timing check off.
-// The command line had neither, so every run was the option-not-enabled case
-// and a negative limit was read as 0.
 TEST(NegativeTimingCheckSwitches, BothSwitchesAreRecognized) {
   CliOptions opts;
   EXPECT_TRUE(ParseCommandLine(
@@ -35,18 +30,12 @@ TEST(NegativeTimingCheckSwitches, BothSwitchesAreRecognized) {
   EXPECT_FALSE(none.no_timing_checks);
 }
 
-// Runs `src`, preprocessed so that its `timescale sets the precision the
-// delayed signals' delays are counted in, with the two §31.9.4 options set as a
-// run the switches selected is, before the design's checks are registered.
 std::string RunUnder(const std::string& src, TimingCheckInvocationOptions o,
                      SimFixture& f) {
   f.ctx.AcquireSpecifyManager().SetTimingCheckInvocationOptions(o);
   return PreprocessAndCapture(src, f);
 }
 
-// With the option, `$setuphold(posedge clk, d, -10, 20, n)` has its window
-// shifted after the reference edge, (clk + 10, clk + 20), ends excluded: d
-// changing 5 after clk is before it, 15 after is in it, 25 after is past it.
 TEST(NegativeTimingCheckSwitches, NegativeSetupShiftsTheWindowAfterTheEdge) {
   SimFixture f;
   EXPECT_EQ(RunUnder("module top(\n"
@@ -72,8 +61,6 @@ TEST(NegativeTimingCheckSwitches, NegativeSetupShiftsTheWindowAfterTheEdge) {
             "0\n1\n1\n");
 }
 
-// A negative hold limit shifts it before the edge: `20, -10` gives
-// (clk - 20, clk - 10), which d 15 before clk is in and 5 or 25 before is not.
 TEST(NegativeTimingCheckSwitches, NegativeHoldShiftsTheWindowBeforeTheEdge) {
   SimFixture f;
   EXPECT_EQ(RunUnder("module top(\n"
@@ -99,12 +86,6 @@ TEST(NegativeTimingCheckSwitches, NegativeHoldShiftsTheWindowBeforeTheEdge) {
             "1\n1\n1\n");
 }
 
-// §31.9.1 (printed page 922): the setup time of -7, the larger in magnitude,
-// gives dCLK a delay of 7 -- 7.1 on a 100 ps precision, the least delay that
-// leaves the adjusted setup limit one unit of precision -- so under the option
-// dclk rises 7.1 after clk, which $time reads as 27, and samples through dd the
-// d that changed 2 after clk. Without the option the two are copies and dclk
-// rises with clk.
 TEST(NegativeTimingCheckSwitches,
      DelayedReferenceLagsByTheLargestNegativeSetup) {
   const std::string kDesign =
@@ -128,8 +109,6 @@ TEST(NegativeTimingCheckSwitches,
   EXPECT_EQ(RunUnder(kDesign, {false, false}, off), "0 20\n");
 }
 
-// §31.9.4's other option turns every timing check off: the violation d makes
-// 2 before clk reports nothing and leaves the notifier where it was.
 TEST(NegativeTimingCheckSwitches, AllChecksOffReportsNothing) {
   SimFixture f;
   EXPECT_EQ(RunUnder("module top(\n"
@@ -149,9 +128,6 @@ TEST(NegativeTimingCheckSwitches, AllChecksOffReportsNothing) {
             "0\n");
 }
 
-// §31.3.3 (printed page 901): with a limit negative, a $setuphold's two limits
-// sum to more than one unit of simulation precision. -4 and 5 sum to 1 under a
-// 1 ns precision, which is not more.
 TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToOneUnitAreReported) {
   SimFixture f;
   RunUnder(
@@ -167,8 +143,6 @@ TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToOneUnitAreReported) {
                             "31.3.3"));
 }
 
-// The unit is the precision's, magnitude and all: -1 and 1.01 sum to one unit
-// of a 10 ps precision, which is ten of its 1 ps ticks, and is not more.
 TEST(NegativeTimingCheckSwitches, LimitSumIsCountedInUnitsOfTheFullPrecision) {
   SimFixture f;
   RunUnder(
@@ -184,7 +158,6 @@ TEST(NegativeTimingCheckSwitches, LimitSumIsCountedInUnitsOfTheFullPrecision) {
                             "31.3.3"));
 }
 
-// Two units are more than one, so -4 and 6 meet the restriction.
 TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToTwoUnitsAreAccepted) {
   SimFixture f;
   RunUnder(
@@ -198,8 +171,6 @@ TEST(NegativeTimingCheckSwitches, SetupholdLimitsSummingToTwoUnitsAreAccepted) {
   EXPECT_EQ(FindDiag(f, "in units of simulation precision"), nullptr);
 }
 
-// §31.3.6 (printed page 904) puts the same restriction on $recrem's recovery
-// and removal limits, which -10 and 5 break.
 TEST(NegativeTimingCheckSwitches, RecremLimitsSummingBelowOneUnitAreReported) {
   SimFixture f;
   RunUnder(
@@ -215,11 +186,6 @@ TEST(NegativeTimingCheckSwitches, RecremLimitsSummingBelowOneUnitAreReported) {
                             "31.3.6"));
 }
 
-// §31.9.1's Figure 31-6 (printed page 923) gives the delays of its three
-// checks' delayed signals on a 10 ps precision: 10.01 for cp, 0 for d, 20.02
-// for ti and 2.02 for te, the least delays that leave every adjusted limit at
-// least one unit of precision. Each delayed copy rises that long after the
-// original, which all rise at 100.
 TEST(NegativeTimingCheckSwitches,
      DelayedSignalsTakeTheLeastDelaysLeavingEveryLimitOneUnit) {
   SimFixture f;
@@ -244,10 +210,6 @@ TEST(NegativeTimingCheckSwitches,
       "dd 100.00\ndte 102.02\ndcp 110.01\ndti 120.02\n");
 }
 
-// §31.9.1 (printed page 921): a lags b by more than 10 in the first check and b
-// lags a by more than 10 in the second, which no delays satisfy. The run warns
-// and sets the least negative limit to 0, the first check's -10 where the two
-// tie, after which b lags a by 11 and a does not lag at all.
 TEST(NegativeTimingCheckSwitches,
      InconsistentLimitsWarnAndZeroTheLeastNegative) {
   SimFixture f;
@@ -269,11 +231,6 @@ TEST(NegativeTimingCheckSwitches,
                               "31.9.1"));
 }
 
-// §31.9.3 (printed page 923): the check is evaluated on the delayed signals, so
-// the notifier toggles when they violate. Under Figure 31-6's delays te
-// changing at 505, inside the (504, 508) window cp rising at 500 sets, reaches
-// the delayed te at 507.02, and the violation is detected when the delayed cp
-// rises at 510.01.
 TEST(NegativeTimingCheckSwitches, NotifierTogglesWhenTheDelayedSignalsViolate) {
   SimFixture f;
   EXPECT_EQ(RunUnder("`timescale 1ns/10ps\n"
@@ -295,12 +252,6 @@ TEST(NegativeTimingCheckSwitches, NotifierTogglesWhenTheDelayedSignalsViolate) {
             "510.01\n");
 }
 
-// §31.9.1 (printed page 921): every check naming a signal that has a delayed
-// copy is evaluated on that copy, a $setup with no negative limit of its own
-// among them. The $setuphold delays clk by 11 and e not at all, so the $setup
-// limit of 5 is adjusted to 16 and the check sees e change at 100 and the
-// delayed clk rise at 113, 13 apart and inside it. The notifier toggles then,
-// not at 102 when the undelayed clk rose.
 TEST(NegativeTimingCheckSwitches, SetupOnADelayedClockTogglesAtTheDelayedEdge) {
   SimFixture f;
   EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
@@ -321,10 +272,6 @@ TEST(NegativeTimingCheckSwitches, SetupOnADelayedClockTogglesAtTheDelayedEdge) {
             "113\n");
 }
 
-// The same delays adjust a $hold limit of 5 to 5 - 11, which is not positive,
-// so §31.9.1 sets it to 0 with a warning, and a $hold of limit 0 reports
-// nothing: e changing 2 after clk, a violation of the declared limit, toggles
-// no notifier.
 TEST(NegativeTimingCheckSwitches, HoldAdjustedBelowZeroIsZeroedWithAWarning) {
   SimFixture f;
   EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
@@ -348,10 +295,6 @@ TEST(NegativeTimingCheckSwitches, HoldAdjustedBelowZeroIsZeroedWithAWarning) {
                               "31.9.1"));
 }
 
-// $width watches one signal, whose edges are delayed alike, so its limit is
-// not adjusted, but it is evaluated on the delayed clk: the pulse from 100 to
-// 105 is too narrow, and the violation is seen at the delayed falling edge,
-// 116.
 TEST(NegativeTimingCheckSwitches, WidthOnADelayedClockReportsAtTheDelayedEdge) {
   SimFixture f;
   EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
@@ -371,10 +314,6 @@ TEST(NegativeTimingCheckSwitches, WidthOnADelayedClockReportsAtTheDelayedEdge) {
             "116\n");
 }
 
-// A $nochange's offsets move with the delays as a limit does, so on the
-// delayed clk, high from 111 to 131, its window still covers 100 to 120 and e
-// changing at 110 violates it; the violation is seen when the delayed clk
-// falls and closes the window, at 131.
 TEST(NegativeTimingCheckSwitches, NochangeOnADelayedClockReportsAtItsClose) {
   SimFixture f;
   EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
@@ -396,9 +335,6 @@ TEST(NegativeTimingCheckSwitches, NochangeOnADelayedClockReportsAtItsClose) {
             "131\n");
 }
 
-// §31.9.1 keeps $skew on the undelayed signals: e rising 5 after clk exceeds
-// the limit of 3 at 105, though the delayed clk, rising at 111, would put e
-// before it.
 TEST(NegativeTimingCheckSwitches, SkewKeepsTheUndelayedSignals) {
   SimFixture f;
   EXPECT_EQ(RunUnder("`timescale 1ns/1ns\n"
@@ -419,8 +355,6 @@ TEST(NegativeTimingCheckSwitches, SkewKeepsTheUndelayedSignals) {
             "105\n");
 }
 
-// The checks a run of `check` beside $setuphold(posedge clk, d, -10, 20) left
-// registered, under the option that delays clk by 11 and e not at all.
 SpecifyManager& ManagerWithClkDelayed(const std::string& check, SimFixture& f) {
   RunUnder(
       "`timescale 1ns/1ns\n"
@@ -437,7 +371,6 @@ SpecifyManager& ManagerWithClkDelayed(const std::string& check, SimFixture& f) {
   return *f.ctx.GetSpecifyManager();
 }
 
-// §32.4.2's TIMINGCHECK entry `entry`, annotated onto the top's checks.
 std::vector<std::string> AnnotateOntoTop(const std::string& entry,
                                          SpecifyManager& mgr) {
   SdfFile file;
@@ -457,9 +390,6 @@ const TimingCheckEntry& CheckOfKind(const SpecifyManager& mgr,
   return mgr.GetTimingChecks().front();
 }
 
-// §31.9.1 adjusts whatever limit the check carries, an annotated one as much as
-// a declared one: the $setup is evaluated on the delayed clk, so the annotated
-// 7 is applied as 7 + 11.
 TEST(NegativeTimingCheckSwitches, AnnotatedLimitOfADelayedCheckIsAdjusted) {
   SimFixture f;
   SpecifyManager& mgr = ManagerWithClkDelayed("$setup(e, posedge clk, 5);", f);
@@ -467,8 +397,6 @@ TEST(NegativeTimingCheckSwitches, AnnotatedLimitOfADelayedCheckIsAdjusted) {
   EXPECT_EQ(CheckOfKind(mgr, TimingCheckKind::kSetup).limit, 18u);
 }
 
-// An annotated $hold limit of 8 adjusts to 8 - 11, which is not positive, so it
-// is set to 0 and the annotation warns.
 TEST(NegativeTimingCheckSwitches, AnnotatedLimitAdjustedBelowZeroIsZeroed) {
   SimFixture f;
   SpecifyManager& mgr = ManagerWithClkDelayed("$hold(posedge clk, e, 5);", f);
@@ -480,8 +408,6 @@ TEST(NegativeTimingCheckSwitches, AnnotatedLimitAdjustedBelowZeroIsZeroed) {
             std::string::npos);
 }
 
-// $nochange's annotated offsets move as its declared ones do: the start offset
-// by 11 and the end offset by -11.
 TEST(NegativeTimingCheckSwitches, AnnotatedNochangeOffsetsAreMoved) {
   SimFixture f;
   SpecifyManager& mgr =

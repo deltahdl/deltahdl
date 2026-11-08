@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -35,11 +33,6 @@ TEST(GateArrayConnection, DistributeWidthElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.3.6: the connection rules are applied to each terminal independently, so
-// a single instance array may distribute one terminal (width == array length)
-// while broadcasting another (single-instance width). Here the output is
-// distributed across the four instances and the two inputs are broadcast to
-// each; the mix shall elaborate cleanly.
 TEST(GateArrayConnection, MixedBroadcastAndDistributePerTerminalElaborates) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -53,12 +46,6 @@ TEST(GateArrayConnection, MixedBroadcastAndDistributePerTerminalElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.3.6: the terminal-width comparison is made against the instance-array
-// length, which §28.3.5 lets be given by a constant expression rather than a
-// literal. A parameter-bounded range takes the parameter-resolution path (not
-// the direct-literal path) when the array length is computed, and the width
-// rule must still classify a same-width terminal as distributed. Here the range
-// is 0:N-1 with parameter N == 4, matching the 4-bit terminals.
 TEST(GateArrayConnection, ParameterizedArrayRangeDistributesAcrossInstances) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -72,11 +59,6 @@ TEST(GateArrayConnection, ParameterizedArrayRangeDistributesAcrossInstances) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.3.6: the same width comparison against a parameter-derived array length
-// must still flag a terminal that is neither single-instance width nor array
-// length. With parameter N == 4 the array has four instances, so a 2-bit output
-// has too few bits and is rejected — the error path reached through the
-// parameter-resolution route rather than a literal bound.
 TEST(GateArrayConnection, ParameterizedArrayRangeTooFewBitsIsError) {
   ElabFixture f;
   Elaborate(
@@ -108,10 +90,6 @@ TEST(GateArrayConnection, TooFewBitsOnArrayPortIsError) {
                             4, "28.3.6"));
 }
 
-// §28.3.6: the terminal-connection rules name *too many* bits as an error just
-// as they name too few. Four instances each need a 1-bit output, so a matching
-// terminal is 1 bit (broadcast) or 4 bits (distributed); an 8-bit terminal has
-// surplus bits that connect to no instance and shall be rejected.
 TEST(GateArrayConnection, TooManyBitsOnArrayPortIsError) {
   ElabFixture f;
   Elaborate(
@@ -121,19 +99,12 @@ TEST(GateArrayConnection, TooManyBitsOnArrayPortIsError) {
       "  and g[0:3](y, a, b);\n"
       "endmodule\n",
       f);
-  // One report covers both a terminal that is too narrow and one that is too
-  // wide, so this names the same message and line as
-  // GateArrayConnection.TooFewBitsOnArrayPortIsError; the source is what tells
-  // the two cases apart.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "gate or primitive array terminal width does not "
                             "match",
                             4, "28.3.6"));
 }
 
-// §28.3.6: an interconnect terminal connected to an instance array must have a
-// bit-length equal to the array length; it cannot be broadcast like an ordinary
-// scalar net.
 TEST(GateArrayConnection, ScalarInterconnectCannotBroadcastAcrossArray) {
   ElabFixture f;
   Elaborate(
@@ -162,10 +133,6 @@ TEST(GateArrayConnection, InterconnectWidthEqualToArrayLengthElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.3.6 makes a terminal with too many or too few bits for every instance an
-// error, a part-select's and a concatenation's as a named vector's: three bits
-// and two bits for four instances. Measured as named signals only, both were
-// passed over.
 TEST(GateArrayConnection, ASelectOrConcatenationOfTheWrongWidthIsReported) {
   ElabFixture f;
   Elaborate(
@@ -185,8 +152,6 @@ TEST(GateArrayConnection, ASelectOrConcatenationOfTheWrongWidthIsReported) {
   }
 }
 
-// An operator expression of the wrong width is reported as a named vector is:
-// ~s is three bits for four instances.
 TEST(GateArrayConnection, AnOperatorExpressionOfTheWrongWidthIsReported) {
   ElabFixture f;
   Elaborate(
@@ -202,9 +167,6 @@ TEST(GateArrayConnection, AnOperatorExpressionOfTheWrongWidthIsReported) {
                             4, "28.3.6"));
 }
 
-// A literal of the wrong width is reported as a named vector is: 2'b01 is two
-// bits for four instances, and an unsized 1 the 32 bits §5.7.1 gives it.
-// Measured as nothing, each was connected whole without a report.
 TEST(GateArrayConnection, ALiteralOfTheWrongWidthIsReported) {
   for (const char* literal : {"2'b01", "1"}) {
     ElabFixture f;
@@ -224,9 +186,6 @@ TEST(GateArrayConnection, ALiteralOfTheWrongWidthIsReported) {
   }
 }
 
-// A select with one index of a packed array with a further dimension is the
-// subarray it names (§7.4.5), here two bits for four instances. Measured as
-// one bit, it was connected to every instance without a report.
 TEST(GateArrayConnection, ASubarrayOfTheWrongWidthIsReported) {
   ElabFixture f;
   Elaborate(

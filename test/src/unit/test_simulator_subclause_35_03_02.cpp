@@ -11,42 +11,8 @@
 
 using namespace delta;
 
-// §35.3.2 "DPI foreign language layer". The foreign language layer is
-// invisible to SystemVerilog, and it is where the passing of actual arguments,
-// the foreign code's access to them, the representation of SystemVerilog types
-// and their translation to and from C-like types are specified (S1) — but that
-// specification is the foreign side's (Annex H), not something any
-// SystemVerilog pipeline stage carries. The clause has no BNF.
-//
-// Two of its "shall"s do face the SystemVerilog tool, and both land at the
-// simulator stage in DpiRuntime:
-//   S2  the compiler or simulator produces, or uses, whatever call protocol and
-//       argument passing the chosen foreign language layer needs; and
-//   S3  one SystemVerilog source, compiled to suit, works with any foreign
-//       language layer, whichever way that layer accesses data.
-//
-// DpiRuntime already realizes both: it carries out the argument-passing
-// mechanism the foreign side relies on to read and write its formals
-// (CallImportWithArgs' copy-in / copy-out across input, output, and inout
-// directions), and it lets one registered SystemVerilog import be driven
-// through either of two foreign data-access methods — the input-only protocol
-// (impl / CallImport) or the direction-aware protocol (arg_impl /
-// CallImportWithArgs). These tests observe that production code applying the
-// rules. They are deliberately the foreign-layer mirror of the DpiTwoLayers
-// tests in test_simulator_subclause_35_03.cpp: where those watch the
-// SystemVerilog side stay independent using only input reads, here the lever is
-// the argument-passing and access mechanism itself, including the output and
-// inout write-back path those never exercise. §35.3.1 has no test file of its
-// own, its sentences being the ones §35.3 and §35.3.2 state and these two files
-// assert; a third file restating them would cover one rule twice.
 namespace {
 
-// §35.3.2 / S2: the simulator generates and uses the argument-passing mechanism
-// the foreign layer needs to access an inout formal in both directions. The
-// runtime seeds the inout formal with the caller's actual so the foreign code
-// can read it, then copies the foreign-written value back out to the actual.
-// Both halves of the passing of actual arguments and the foreign code's access
-// to them are carried out by CallImportWithArgs here.
 TEST(DpiForeignLayer, RuntimeProvidesArgPassingForInoutFormalAccess) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -56,8 +22,6 @@ TEST(DpiForeignLayer, RuntimeProvidesArgPassingForInoutFormalAccess) {
   func.args = {DpiArg{}};
   func.args[0].direction = Direction::kInout;
   func.args[0].type = DataTypeKind::kInt;
-  // The foreign side reads the inout formal it was passed and writes an updated
-  // value into the same formal; the return value reports what it read.
   func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
     const int32_t kSeen = args[0].AsInt();
     args[0] = DpiArgValue::FromInt(kSeen + 100);
@@ -68,18 +32,10 @@ TEST(DpiForeignLayer, RuntimeProvidesArgPassingForInoutFormalAccess) {
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(5)};
   const DpiArgValue kResult = rt.CallImportWithArgs("sv_accumulate", actuals);
 
-  // The runtime passed the actual in (the foreign code read 5)...
   EXPECT_EQ(kResult.AsInt(), 5);
-  // ...and passed the foreign-written value back out to the actual.
   EXPECT_EQ(actuals[0].AsInt(), 105);
 }
 
-// §35.3.2 / S2 (output direction): the argument-passing mechanism the simulator
-// provides for an output formal does not hand the foreign code the caller's
-// actual — the foreign side accesses the formal only to write it, and the
-// runtime carries that written value back out. This is the output half of the
-// access mechanism the foreign language layer assumes, applied by
-// CallImportWithArgs.
 TEST(DpiForeignLayer, RuntimeProvidesArgPassingForOutputFormalAccess) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -89,8 +45,6 @@ TEST(DpiForeignLayer, RuntimeProvidesArgPassingForOutputFormalAccess) {
   func.args = {DpiArg{}};
   func.args[0].direction = Direction::kOutput;
   func.args[0].type = DataTypeKind::kInt;
-  // The foreign side records whatever it was handed for the output formal, then
-  // writes its own value. It must not have received the caller's actual.
   auto seen_seed = std::make_shared<int32_t>(-1);
   func.arg_impl = [seen_seed](std::vector<DpiArgValue>& args) -> DpiArgValue {
     *seen_seed = args[0].AsInt();
@@ -102,26 +56,16 @@ TEST(DpiForeignLayer, RuntimeProvidesArgPassingForOutputFormalAccess) {
   std::vector<DpiArgValue> actuals = {DpiArgValue::FromInt(12345)};
   rt.CallImportWithArgs("sv_produce", actuals);
 
-  // The foreign code never saw the caller's actual on the output formal...
   EXPECT_NE(*seen_seed, 12345);
-  // ...and the value it wrote was passed back out to the actual.
   EXPECT_EQ(actuals[0].AsInt(), 77);
 }
 
-// §35.3.2 / S3: the same SystemVerilog code is usable with different foreign
-// language layers, regardless of the data access method a specific layer
-// assumes. One registered SystemVerilog import name is provided two ways — once
-// behind the input-only foreign data-access method (impl, reached by
-// CallImport) and once behind the direction-aware method (arg_impl, reached by
-// CallImportWithArgs). The identical SystemVerilog-side call by sv_name is
-// usable with each foreign layer and yields the same result.
 TEST(DpiForeignLayer, SameSvCodeUsableWithDifferentForeignDataAccessMethods) {
   DpiRuntime rt_input_layer;
   DpiRtFunction input_layer;
   input_layer.c_name = "c_triple_input";
   input_layer.sv_name = "sv_triple";
   input_layer.return_type = DataTypeKind::kInt;
-  // Foreign layer whose data access method is the input-only protocol.
   input_layer.impl = [](const std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromInt(args[0].AsInt() * 3);
   };
@@ -135,7 +79,6 @@ TEST(DpiForeignLayer, SameSvCodeUsableWithDifferentForeignDataAccessMethods) {
   argpass_layer.args = {DpiArg{}};
   argpass_layer.args[0].direction = Direction::kInput;
   argpass_layer.args[0].type = DataTypeKind::kInt;
-  // Foreign layer whose data access method is the direction-aware protocol.
   argpass_layer.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
     return DpiArgValue::FromInt(args[0].AsInt() * 3);
   };
@@ -148,18 +91,9 @@ TEST(DpiForeignLayer, SameSvCodeUsableWithDifferentForeignDataAccessMethods) {
       rt_argpass_layer.CallImportWithArgs("sv_triple", actuals).AsInt();
 
   EXPECT_EQ(kViaInput, 42);
-  // Same SystemVerilog code, different foreign data access methods, same
-  // result.
   EXPECT_EQ(kViaInput, kViaArgpass);
 }
 
-// §35.3.2 / S3 (edge, write-back path): the reusability across foreign layers
-// holds even on the output/inout copy-out path. The same SystemVerilog import
-// description — same sv_name, same output-formal signature — is bound to two
-// different foreign layers that write the output formal by different internal
-// methods. The identical SystemVerilog-side call drives each, and the runtime's
-// copy-out makes each foreign layer's written value visible. The SystemVerilog
-// code does not change between the two foreign layers.
 TEST(DpiForeignLayer, SameSvCodeUsableAcrossForeignLayersOnWriteBackPath) {
   const auto kMakeWriter = [](int32_t produced) {
     DpiRtFunction func;
@@ -177,12 +111,12 @@ TEST(DpiForeignLayer, SameSvCodeUsableAcrossForeignLayersOnWriteBackPath) {
 
   DpiRuntime rt_layer_a;
   DpiRtFunction layer_a = kMakeWriter(8);
-  layer_a.c_name = "c_emit_const";  // one foreign data access method
+  layer_a.c_name = "c_emit_const";
   rt_layer_a.RegisterImport(layer_a);
 
   DpiRuntime rt_layer_b;
   DpiRtFunction layer_b = kMakeWriter(8);
-  layer_b.c_name = "c_emit_other";  // a different foreign data access method
+  layer_b.c_name = "c_emit_other";
   rt_layer_b.RegisterImport(layer_b);
 
   std::vector<DpiArgValue> actuals_a = {DpiArgValue::FromInt(0)};
@@ -190,21 +124,10 @@ TEST(DpiForeignLayer, SameSvCodeUsableAcrossForeignLayersOnWriteBackPath) {
   rt_layer_a.CallImportWithArgs("sv_emit", actuals_a);
   rt_layer_b.CallImportWithArgs("sv_emit", actuals_b);
 
-  // Identical SystemVerilog-side call against two foreign layers; the copy-out
-  // makes each layer's write visible and the result is the same either way.
   EXPECT_EQ(actuals_a[0].AsInt(), 8);
   EXPECT_EQ(actuals_a[0].AsInt(), actuals_b[0].AsInt());
 }
 
-// §35.3.2 / S2 (edge — full mechanism, all directions at once): a realistic
-// foreign call mixes input, output, and inout formals in one import. The
-// simulator must generate and use the whole argument-passing mechanism the
-// foreign layer relies on for that call: pass the input and the inout's initial
-// value in so the foreign code can read them, seed the output independently of
-// the actual, and copy the output and inout writes back out while leaving the
-// input actual alone. The earlier tests isolate one direction each; this one
-// exercises the full copy-in / copy-out loop of CallImportWithArgs in a single
-// call.
 TEST(DpiForeignLayer, MixedDirectionCallExercisesFullArgPassingMechanism) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -218,17 +141,15 @@ TEST(DpiForeignLayer, MixedDirectionCallExercisesFullArgPassingMechanism) {
   func.args[1].type = DataTypeKind::kInt;
   func.args[2].direction = Direction::kInout;
   func.args[2].type = DataTypeKind::kInt;
-  // Record what the foreign side was handed for the output formal so we can
-  // confirm the mechanism did not leak the caller's actual into it.
   auto seen_output_seed = std::make_shared<int32_t>(-1);
   func.arg_impl =
       [seen_output_seed](std::vector<DpiArgValue>& args) -> DpiArgValue {
     const int32_t kIn = args[0].AsInt();
     const int32_t kInoutInitial = args[2].AsInt();
     *seen_output_seed = args[1].AsInt();
-    args[1] = DpiArgValue::FromInt(kIn * kInoutInitial);  // write output
-    args[2] = DpiArgValue::FromInt(kInoutInitial + 1);    // update inout
-    return DpiArgValue::FromInt(kIn + kInoutInitial);     // result
+    args[1] = DpiArgValue::FromInt(kIn * kInoutInitial);
+    args[2] = DpiArgValue::FromInt(kInoutInitial + 1);
+    return DpiArgValue::FromInt(kIn + kInoutInitial);
   };
   rt.RegisterImport(func);
 
@@ -238,15 +159,10 @@ TEST(DpiForeignLayer, MixedDirectionCallExercisesFullArgPassingMechanism) {
                                       DpiArgValue::FromInt(10)};
   const DpiArgValue kResult = rt.CallImportWithArgs("sv_combine", actuals);
 
-  // The input and the inout's initial value were passed in (the result is
-  // computed from both).
   EXPECT_EQ(kResult.AsInt(), 16);
-  // The output formal was seeded independently of the caller's actual...
   EXPECT_NE(*seen_output_seed, kOutputSentinel);
-  // ...and the foreign-written output and inout values were copied back out.
   EXPECT_EQ(actuals[1].AsInt(), 60);
   EXPECT_EQ(actuals[2].AsInt(), 11);
-  // The input actual is not part of the copy-out and is left as passed.
   EXPECT_EQ(actuals[0].AsInt(), 6);
 }
 

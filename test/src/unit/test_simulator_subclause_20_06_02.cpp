@@ -17,9 +17,6 @@ using namespace delta;
 
 namespace {
 
-// §20.6.2: $bits returns a value whose type is integer; the simulator
-// constructs the result as a 32-bit Logic4Vec irrespective of how wide the
-// argument is.
 TEST(UtilitySystemTaskTest, BitsResultIsInteger) {
   SimFixture f;
   auto* var = f.ctx.CreateVariable("v", 7);
@@ -30,10 +27,6 @@ TEST(UtilitySystemTaskTest, BitsResultIsInteger) {
   EXPECT_EQ(result.ToUint64(), 7u);
 }
 
-// §20.6.2: $bits returns 0 when its argument is a dynamically sized
-// expression that is currently empty. Built from real source: an unelaborated
-// queue declared with no initializer holds zero elements, so its live
-// bit-stream size is 0.
 TEST(PrimarySim, BitsOfCurrentlyEmptyQueueReturnsZero) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -47,10 +40,6 @@ TEST(PrimarySim, BitsOfCurrentlyEmptyQueueReturnsZero) {
   EXPECT_EQ(n->value.ToUint64(), 0u);
 }
 
-// §20.6.2: for a non-empty dynamically sized expression, $bits reports the
-// live bit-stream size — the element count times the per-element width. Three
-// 32-bit ints in a queue give 96. The queue is populated from a real
-// assignment-pattern initializer (§7.10.1), not hand-built.
 TEST(PrimarySim, BitsOfNonEmptyQueueReportsLiveBitStreamSize) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -64,10 +53,6 @@ TEST(PrimarySim, BitsOfNonEmptyQueueReportsLiveBitStreamSize) {
   EXPECT_EQ(n->value.ToUint64(), 96u);
 }
 
-// §20.6.2 (NC2): a 4-state value counts as 1 bit. A 32-bit logic vector — even
-// holding all-x content — reports a bit-stream size of exactly 32, matching
-// its declared width, though the runtime may use wider storage for the x/z
-// encoding. Built from real source and driven through the full pipeline.
 TEST(PrimarySim, BitsOf4StateVectorEqualsDeclaredWidth) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -84,9 +69,6 @@ TEST(PrimarySim, BitsOf4StateVectorEqualsDeclaredWidth) {
   EXPECT_EQ(n->value.ToUint64(), 32u);
 }
 
-// §20.6.2 NC6: the packed struct {logic valid; bit [8:1] data;} has total
-// bit-stream width 9 (1 + 8). $bits on either the typedef or a variable of
-// that type shall report exactly that width.
 TEST(PrimarySim, BitsOfPackedStructTypedefMatchesMemberSum) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -113,9 +95,6 @@ TEST(PrimarySim, BitsOfPackedStructTypedefMatchesMemberSum) {
   EXPECT_EQ(w_var->value.ToUint64(), 9u);
 }
 
-// §20.6.2 (NC1 data_type form): $bits(data_type) accepts a ranged built-in
-// type and reports that packed vector's bit-stream size — 8 for logic [7:0].
-// This is a distinct argument form from a bare keyword or a struct typedef.
 TEST(PrimarySim, BitsOfRangedDataTypeArg) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -128,10 +107,6 @@ TEST(PrimarySim, BitsOfRangedDataTypeArg) {
   EXPECT_EQ(n->value.ToUint64(), 8u);
 }
 
-// §20.6.2: the dynamically sized-expression rule also holds for a dynamic
-// array (§7.5), a different source construct from a queue. Sized with a real
-// new[3] initializer, its live bit-stream size is 3 * 32 = 96 — driven through
-// the full pipeline, not hand-built.
 TEST(PrimarySim, BitsOfDynamicArrayFromNewReportsLiveBitStreamSize) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -145,11 +120,6 @@ TEST(PrimarySim, BitsOfDynamicArrayFromNewReportsLiveBitStreamSize) {
   EXPECT_EQ(n->value.ToUint64(), 96u);
 }
 
-// §20.6.2 (NC5): because $bits folds to an elaboration-time constant on a
-// fixed-size argument, it may define a parameter/localparam value — a code path
-// distinct from a packed-dimension range. Here a localparam takes its value
-// from $bits and then sizes a vector; reading $bits of that vector back at run
-// time observes the constant that flowed through the parameter (16).
 TEST(PrimarySim, BitsResultUsableAsLocalparamValue) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -164,17 +134,6 @@ TEST(PrimarySim, BitsResultUsableAsLocalparamValue) {
   EXPECT_EQ(n->value.ToUint64(), 16u);
 }
 
-// §20.6.2: $bits returns how many bits it takes to hold an expression as a bit
-// stream, and the 0 it also defines is kept for a dynamically sized expression
-// that is empty at the time, which BitsOfCurrentlyEmptyQueueReturnsZero above
-// covers. `byte` is fixed-size, so §6.11 Table 6-8's eight bits is the only
-// answer here.
-//
-// The declaration takes its type through a class scope prefix, and the class is
-// written inside the module. That resolution happens in the elaborator, but
-// EvalBits in src/simulator/eval_systask.cpp answers from the run-time value's
-// own width, so a width that survives elaboration can still be lost between
-// Lowerer::LowerVar and the read. This is the assertion that spans both.
 TEST(PrimarySim, BitsOfAModuleLocalClassScopedTypedefVariable) {
   SimFixture f;
   auto* n = RunAndFindVar(
@@ -191,12 +150,6 @@ TEST(PrimarySim, BitsOfAModuleLocalClassScopedTypedefVariable) {
   EXPECT_EQ(n->value.ToUint64(), 8u);
 }
 
-// §20.6.2 (printed page 629): $bits answers how many bits it takes to hold an
-// expression as a bit stream, which for a fixed-size unpacked array is every
-// element's: 16 for `logic [7:0] m [0:1]` and for the net array
-// `wire [7:0] w [0:1]`, 48 for `logic [7:0] md [2][3]`, 24 for its row md[1],
-// 128 for `int a [4]`. Read at run time the name was one element's worth, and
-// each answered its element's 8 or 32.
 TEST(PrimarySim, BitsOfFixedSizeUnpackedArraysCountEveryElement) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -211,11 +164,6 @@ TEST(PrimarySim, BitsOfFixedSizeUnpackedArraysCountEveryElement) {
             "16 16 48 24 128\n");
 }
 
-// §20.6.2 with §23.6: the same holds for an instance's array named through a
-// hierarchical reference -- 32 for u.mem, `logic [7:0] mem[2:5]`, 24 and 12
-// for u.m2, `logic [3:0] m2[2][3]`, and its row u.m2[1] -- and an instance's
-// queue counts its live elements, 96 for three ints. Each answered its
-// element's 8, 4 or 32.
 TEST(PrimarySim, BitsOfHierarchicallyNamedArraysCountEveryElement) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"
@@ -232,10 +180,6 @@ TEST(PrimarySim, BitsOfHierarchicallyNamedArraysCountEveryElement) {
             "32 24 12 96\n");
 }
 
-// §20.6.2 with §8.5: a class object's unpacked array property is sized the
-// same way -- 24 for `logic [7:0] data[1:3]` through a handle and bare in a
-// method, and 64 for a dynamic `int d[]` holding the two elements its new[]
-// gave it. Read as an expression each answered one element's 32 or 8.
 TEST(PrimarySim, BitsOfClassArrayPropertiesCountEveryElement) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -255,10 +199,6 @@ TEST(PrimarySim, BitsOfClassArrayPropertiesCountEveryElement) {
             "24 24 64\n");
 }
 
-// §20.6.2 with §8.23 and §26.3: a data type named through its class or package
-// is sized as the type it stands for -- 8 for class C's `typedef byte T`, as a
-// variable of it and a module typedef renaming it are, 16 for package p's
-// `typedef shortint T`, and 4 for the typedef of a class nested in a class.
 TEST(PrimarySim, BitsOfClassAndPackageScopedTypedefs) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -280,10 +220,6 @@ TEST(PrimarySim, BitsOfClassAndPackageScopedTypedefs) {
             "8 8 8 16 4\n");
 }
 
-// §20.6.2 with §7.4.4: a typedef that declares a fixed-size unpacked array
-// holds every element's bits -- `Bits [36:1]` 36, `B8 [8:1]` 8, a two-
-// dimensional `byte M [2][3]` 48, and `Bits BB [2]`, an array of it defined in
-// stages, 72 -- as a variable declared with the name does.
 TEST(PrimarySim, BitsOfAnUnpackedArrayTypedefName) {
   SimFixture f;
   std::string out = RunCapture(
@@ -300,8 +236,6 @@ TEST(PrimarySim, BitsOfAnUnpackedArrayTypedefName) {
   EXPECT_EQ(out, "36 36 8 48 72\n");
 }
 
-// §20.6.2: $bits of a data type named at run time is the type's width: an
-// integer type keyword's and a typedef's whose range a parameter sizes.
 TEST(BitsSim, ATypeNameAtRunTimeIsItsWidth) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -315,8 +249,6 @@ TEST(BitsSim, ATypeNameAtRunTimeIsItsWidth) {
             "10 30 32 8\n");
 }
 
-// §20.6.2: $bits determines its result without evaluating the expression it
-// encloses, so a call is sized by the function's return type and not made.
 TEST(BitsSim, ACallIsSizedWithoutBeingMade) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -336,10 +268,6 @@ TEST(BitsSim, ACallIsSizedWithoutBeingMade) {
             "32 12 0\n");
 }
 
-// §20.6.2 with §36.8.3: $bits determines its result without evaluating the
-// expression it encloses, so a call of a user system function is sized by
-// the width its registration gives the result and its calltf is not run
-// (#5128).
 TEST(BitsSim, AUserSystemFunctionIsSizedWithoutItsCalltfRunning) {
   static int calls = 0;
   calls = 0;

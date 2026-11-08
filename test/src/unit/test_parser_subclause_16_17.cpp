@@ -12,13 +12,6 @@ using namespace delta;
 
 namespace {
 
-// §16.17 / Syntax 16-20:
-//   expect_property_statement ::= expect ( property_spec ) action_block
-// The expect statement parses as a procedural statement: the `expect` keyword,
-// a parenthesized property spec, and an action block with an optional pass
-// statement and an optional else clause.
-
-// Action block carrying both a pass statement and an else (fail) clause.
 TEST(ExpectStatementParsing, PassAndElseClause) {
   auto r = Parse(
       "module m;\n"
@@ -35,8 +28,6 @@ TEST(ExpectStatementParsing, PassAndElseClause) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// The pass statement is optional: an action block may carry only the else
-// clause that runs on failure.
 TEST(ExpectStatementParsing, ElseClauseOnly) {
   auto r = Parse(
       "module m;\n"
@@ -53,8 +44,6 @@ TEST(ExpectStatementParsing, ElseClauseOnly) {
   EXPECT_NE(stmt->assert_fail_stmt, nullptr);
 }
 
-// The whole action block is optional: `expect ( property_spec ) ;` is a
-// complete statement with neither a pass statement nor an else clause.
 TEST(ExpectStatementParsing, NoActionBlock) {
   auto r = Parse(
       "module m;\n"
@@ -70,8 +59,6 @@ TEST(ExpectStatementParsing, NoActionBlock) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// The else clause is optional: an action block may carry only the pass
-// statement that runs when the property succeeds.
 TEST(ExpectStatementParsing, PassStatementOnly) {
   auto r = Parse(
       "module m;\n"
@@ -87,11 +74,6 @@ TEST(ExpectStatementParsing, PassStatementOnly) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// §16.17: the expect statement's argument may be a named property rather than
-// an inline property declaration. Here the parenthesized property_spec is a
-// reference to a property declared elsewhere in the module (a §16.12 named
-// property), and the expect still parses as an expect statement with a pass
-// action.
 TEST(ExpectStatementParsing, NamedPropertyArgument) {
   auto r = Parse(
       "module m;\n"
@@ -111,8 +93,6 @@ TEST(ExpectStatementParsing, NamedPropertyArgument) {
   EXPECT_EQ(stmt->assert_fail_stmt, nullptr);
 }
 
-// Error condition: §16.17's syntax parenthesizes the property spec. An expect
-// statement whose property is not wrapped in parentheses is rejected.
 TEST(ExpectStatementParsing, MissingParenthesesIsAnError) {
   auto r = Parse(
       "module m;\n"
@@ -123,9 +103,6 @@ TEST(ExpectStatementParsing, MissingParenthesesIsAnError) {
       ReportedError(r.diags, "expected '(', got identifier", 3, "16.17"));
 }
 
-// Walks a statement subtree and records every expect statement it contains, so
-// a test can confirm the expect parsed even when it is nested in a procedural
-// context such as an always body or a task body.
 void CollectExpects(Stmt* s, std::vector<Stmt*>& out) {
   if (!s) return;
   if (s->kind == StmtKind::kExpect) out.push_back(s);
@@ -140,10 +117,6 @@ void CollectExpects(Stmt* s, std::vector<Stmt*>& out) {
   CollectExpects(s->assert_fail_stmt, out);
 }
 
-// §16.17: the expect statement can appear anywhere a wait statement can appear.
-// The existing tests place it directly under an initial procedure; here it sits
-// inside an always procedure's timing-controlled body, another legal position
-// for a blocking statement.
 TEST(ExpectStatementParsing, AppearsInAlwaysProcedure) {
   auto r = Parse(
       "module m;\n"
@@ -162,10 +135,6 @@ TEST(ExpectStatementParsing, AppearsInAlwaysProcedure) {
   EXPECT_NE(expects[0]->assert_pass_stmt, nullptr);
 }
 
-// §16.17: because the expect statement is blocking, its property may refer to
-// automatic variables as well as static ones. This mirrors the LRM's task
-// automatic form, whose property compares a sampled value against the task's
-// automatic argument. The expect parses as a statement of the task body.
 TEST(ExpectStatementParsing, PropertyReferencesAutomaticVariables) {
   auto r = Parse(
       "module m;\n"

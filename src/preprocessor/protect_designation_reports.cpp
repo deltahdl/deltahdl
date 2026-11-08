@@ -15,7 +15,6 @@
 namespace delta {
 namespace {
 
-// Whether two of `values` that were written are the same value.
 bool RepeatsAValue(std::initializer_list<std::string_view> values) {
   std::vector<std::string_view> written;
   for (std::string_view value : values) {
@@ -30,10 +29,6 @@ bool RepeatsAValue(std::initializer_list<std::string_view> values) {
 
 }  // namespace
 
-// §34.5.10, §34.5.16 and §34.5.23: the values written against the names that
-// designate one entity's key are unique for that entity, so one value written
-// against two of them designates neither, and the encrypting run reports it as
-// a reading does.
 void ReportRepeatedDesignations(const RegionKeyReader& in_effect,
                                 DiagEngine* diag, SourceLoc opened) {
   const RegionKeyNames& names = in_effect.names;
@@ -64,9 +59,6 @@ void ReportRepeatedDesignations(const RegionKeyReader& in_effect,
   }
 }
 
-// §34.5.13, §34.5.19 and §34.5.26: a name given to one of an entity's keys and
-// a public key written beside it refer to the same key. It is only decided
-// where the run holds a key under each.
 void ReportDisagreeingDesignations(const RegionKeyNames& names,
                                    const ProtectKeyList& keys, DiagEngine* diag,
                                    SourceLoc opened) {

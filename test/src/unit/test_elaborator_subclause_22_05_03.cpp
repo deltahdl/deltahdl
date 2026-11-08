@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// WITNESS is never defined again, so the `ifdef is what proves the removal:
-// redefining WIDTH on its own would yield 32 even if the directive did nothing.
 TEST(UndefineAllElaboration, UndefineAllThenRedefineElaboratesNewValue) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -62,9 +60,6 @@ TEST(UndefineAllElaboration, UndefineAllExcludesConditionalFromElaboration) {
   EXPECT_TRUE(found);
 }
 
-// The directive sits inside the module body — §22.5.3 places no restriction on
-// where it appears — and the macro it removed no longer selects a branch, so
-// the design elaborates from the `else arm.
 TEST(UndefineAllElaboration, UndefineAllInsideDesignElementRemovesMacros) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -91,8 +86,6 @@ TEST(UndefineAllElaboration, UndefineAllInsideDesignElementRemovesMacros) {
   EXPECT_TRUE(found);
 }
 
-// A `undefineall in a branch the conditional excluded is not part of the
-// compilation unit, so the macro survives and still picks the wide parameter.
 TEST(UndefineAllElaboration, UndefineAllInFalseBranchLeavesMacroDefined) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

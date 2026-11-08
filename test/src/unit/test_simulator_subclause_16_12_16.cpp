@@ -14,109 +14,74 @@ using namespace delta;
 
 namespace {
 
-// §16.12.16: during the linear search the first item whose expression matches
-// the case expression is the property statement that is evaluated, and the
-// search terminates there. A later matching item with a different verdict is
-// therefore never reached.
 TEST(PropertyCase, FirstMatchingItemSelectedAndSearchTerminates) {
   std::vector<PropertyCaseBranch> branches = {
-      {/*selected=*/false, PropertyResult::kFail},
-      {/*selected=*/true, PropertyResult::kPass},
-      {/*selected=*/true, PropertyResult::kFail},
+      {false, PropertyResult::kFail},
+      {true, PropertyResult::kPass},
+      {true, PropertyResult::kFail},
   };
-  EXPECT_EQ(
-      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kFail),
-      PropertyResult::kPass);
+  EXPECT_EQ(EvalPropertyCase(branches, false, PropertyResult::kFail),
+            PropertyResult::kPass);
 }
 
-// §16.12.16: the verdict the case property returns is exactly that of the
-// selected item's property_expr, including a failing one.
 TEST(PropertyCase, SelectedItemVerdictPropagates) {
   std::vector<PropertyCaseBranch> branches = {
-      {/*selected=*/false, PropertyResult::kPass},
-      {/*selected=*/true, PropertyResult::kFail},
+      {false, PropertyResult::kPass},
+      {true, PropertyResult::kFail},
   };
-  EXPECT_EQ(
-      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kPass),
-      PropertyResult::kFail);
+  EXPECT_EQ(EvalPropertyCase(branches, false, PropertyResult::kPass),
+            PropertyResult::kFail);
 
   std::vector<PropertyCaseBranch> vacuous = {
-      {/*selected=*/true, PropertyResult::kVacuousPass},
+      {true, PropertyResult::kVacuousPass},
   };
-  EXPECT_EQ(
-      EvalPropertyCase(vacuous, /*has_default=*/false, PropertyResult::kFail),
-      PropertyResult::kVacuousPass);
+  EXPECT_EQ(EvalPropertyCase(vacuous, false, PropertyResult::kFail),
+            PropertyResult::kVacuousPass);
 
-  // An as-yet unresolved verdict from the selected item is carried through
-  // unchanged rather than normalized — the case result tracks the chosen item.
   std::vector<PropertyCaseBranch> pending = {
-      {/*selected=*/true, PropertyResult::kPending},
+      {true, PropertyResult::kPending},
   };
-  EXPECT_EQ(
-      EvalPropertyCase(pending, /*has_default=*/false, PropertyResult::kPass),
-      PropertyResult::kPending);
+  EXPECT_EQ(EvalPropertyCase(pending, false, PropertyResult::kPass),
+            PropertyResult::kPending);
 }
 
-// §16.12.16: if there is a default item it is ignored during the linear search.
-// A matching ordinary item is taken even though a default is present, so the
-// default verdict does not influence the result.
 TEST(PropertyCase, DefaultIgnoredDuringLinearSearch) {
   std::vector<PropertyCaseBranch> branches = {
-      {/*selected=*/false, PropertyResult::kFail},
-      {/*selected=*/true, PropertyResult::kPass},
+      {false, PropertyResult::kFail},
+      {true, PropertyResult::kPass},
   };
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
-                             /*default_result=*/PropertyResult::kFail),
+  EXPECT_EQ(EvalPropertyCase(branches, true, PropertyResult::kFail),
             PropertyResult::kPass);
 }
 
-// §16.12.16: if all comparisons fail and a default item is given, the default
-// item's property statement is executed and provides the verdict.
 TEST(PropertyCase, DefaultExecutedWhenAllComparisonsFail) {
   std::vector<PropertyCaseBranch> branches = {
-      {/*selected=*/false, PropertyResult::kPass},
-      {/*selected=*/false, PropertyResult::kPass},
+      {false, PropertyResult::kPass},
+      {false, PropertyResult::kPass},
   };
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
-                             /*default_result=*/PropertyResult::kFail),
+  EXPECT_EQ(EvalPropertyCase(branches, true, PropertyResult::kFail),
             PropertyResult::kFail);
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
-                             /*default_result=*/PropertyResult::kPass),
+  EXPECT_EQ(EvalPropertyCase(branches, true, PropertyResult::kPass),
             PropertyResult::kPass);
 }
 
-// §16.12.16: if the default item is not given and all comparisons fail, none of
-// the item property statements is evaluated and the case property succeeds
-// vacuously from that start point, returning true.
 TEST(PropertyCase, NoDefaultAllComparisonsFailSucceedsVacuously) {
   std::vector<PropertyCaseBranch> branches = {
-      {/*selected=*/false, PropertyResult::kFail},
-      {/*selected=*/false, PropertyResult::kFail},
+      {false, PropertyResult::kFail},
+      {false, PropertyResult::kFail},
   };
-  EXPECT_EQ(
-      EvalPropertyCase(branches, /*has_default=*/false, PropertyResult::kFail),
-      PropertyResult::kVacuousPass);
+  EXPECT_EQ(EvalPropertyCase(branches, false, PropertyResult::kFail),
+            PropertyResult::kVacuousPass);
 }
 
-// §16.12.16: the empty-ordinary-item boundary — a case property whose only item
-// is the default. With no ordinary items the linear search finds no match, so
-// the default item's property statement supplies the verdict.
 TEST(PropertyCase, EmptyItemListWithDefaultExecutesDefault) {
   std::vector<PropertyCaseBranch> branches;
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
-                             /*default_result=*/PropertyResult::kFail),
+  EXPECT_EQ(EvalPropertyCase(branches, true, PropertyResult::kFail),
             PropertyResult::kFail);
-  EXPECT_EQ(EvalPropertyCase(branches, /*has_default=*/true,
-                             /*default_result=*/PropertyResult::kPass),
+  EXPECT_EQ(EvalPropertyCase(branches, true, PropertyResult::kPass),
             PropertyResult::kPass);
 }
 
-// The design of test/src/e2e/case_property.sv around one assertion: clk
-// rises at 5, 15, ..., 75 so that tick n is at 10n - 5; delay is 0 at ticks
-// 1 and 2, 1 at 3 and 4, 2 at 5 and 6 and 3 at 7 and 8; a is high
-// throughout, b at 2, 3, 4 and 8, and sel_x is 2'bxx. Beyond that design,
-// minus_one is a signed 4-bit -1 and eight an unsigned 4-bit 8, for §12.5's
-// sizing.
 std::string CaseSource(const std::string& items) {
   return "module t;\n"
          "  logic clk = 0;\n"
@@ -138,8 +103,6 @@ std::string CaseSource(const std::string& items) {
          "endmodule\n";
 }
 
-// The pass and fail counts of the assertion over `spec`, its property the
-// case written in the design's terms.
 std::pair<uint64_t, uint64_t> CountsOf(const std::string& spec) {
   SimFixture f;
   auto* passes =
@@ -151,10 +114,6 @@ std::pair<uint64_t, uint64_t> CountsOf(const std::string& spec) {
           f.ctx.FindVariable("fails")->value.ToUint64()};
 }
 
-// §16.12.16: the clause's decoding of a variable delay, the item taking
-// delay's value at the attempt's tick and its sequence running from it:
-// `a && b` at 1 and 2, `a ##1 b` from 3 and 4, `a ##2 b` from 5 and 6 and
-// the default at 7 and 8, so 2, 3 and 6 pass and the other five fail.
 TEST(PropertyCase, TheItemSelectedAtTheTickRunsItsSequenceFromIt) {
   auto counts = CountsOf(
       "case (delay) 2'd0: a && b; 2'd1: a ##1 b; 2'd2: a ##2 b; "
@@ -163,10 +122,6 @@ TEST(PropertyCase, TheItemSelectedAtTheTickRunsItsSequenceFromIt) {
   EXPECT_EQ(counts.second, 5u);
 }
 
-// §16.12.16: the linear search ends at the first item matching, so the
-// item repeating 2'd1 never inverts the verdicts at 3 and 4, and the
-// default written first is ignored in the search: b holds at 2, 3 and 4
-// and !b at 5, 6 and 7, six passes.
 TEST(PropertyCase, TheSearchEndsAtTheFirstMatchAndPassesTheDefault) {
   auto counts = CountsOf(
       "case (delay) default: 0; 2'd0, 2'd1: b; 2'd1: !b; 2'd2, 2'd3: !b; "
@@ -175,17 +130,12 @@ TEST(PropertyCase, TheSearchEndsAtTheFirstMatchAndPassesTheDefault) {
   EXPECT_EQ(counts.second, 2u);
 }
 
-// §16.12.16: with no item for delay 1 or 2 and no default, the attempts
-// from 3 to 6 evaluate no item and succeed vacuously, beside b at 2 and !b
-// at 7.
 TEST(PropertyCase, NoMatchAndNoDefaultHoldsVacuously) {
   auto counts = CountsOf("case (delay) 2'd0: b; 2'd3: !b; endcase");
   EXPECT_EQ(counts.first, 6u);
   EXPECT_EQ(counts.second, 2u);
 }
 
-// §16.12.16: an item's property may be a case of its own, the default's
-// colon optional: b at 1 and 2, !b at 3 and 4 and a from 5.
 TEST(PropertyCase, AnItemsPropertyMayBeACase) {
   auto counts = CountsOf(
       "case (delay[1]) 1'b0: case (delay[0]) 1'b0: b; default !b; endcase; "
@@ -194,8 +144,6 @@ TEST(PropertyCase, AnItemsPropertyMayBeACase) {
   EXPECT_EQ(counts.second, 3u);
 }
 
-// §16.12.16 and §12.5: the case expression is compared with the items by
-// case equality, so sel_x, 2'bxx, matches the item 2'bxx and not 2'b00.
 TEST(PropertyCase, TheItemsAreComparedByCaseEquality) {
   auto counts =
       CountsOf("case (sel_x) 2'b00: 0; 2'bxx: 1; default: 0; endcase");
@@ -203,20 +151,12 @@ TEST(PropertyCase, TheItemsAreComparedByCaseEquality) {
   EXPECT_EQ(counts.second, 0u);
 }
 
-// §16.12.16, §12.5 and F.3.4.3.5: every expression of the case is evaluated
-// at the length of the longest, the item's 8 bits, so eight + eight is 16
-// there and matches 8'd16, where at its own 4 bits it would be 0 and fall to
-// the default.
 TEST(PropertyCase, TheExpressionsAreEvaluatedAtTheLongestLength) {
   auto counts = CountsOf("case (eight + eight) 8'd16: 1; default: 0; endcase");
   EXPECT_EQ(counts.first, 8u);
   EXPECT_EQ(counts.second, 0u);
 }
 
-// §12.5: one unsigned expression makes the whole case unsigned, so
-// minus_one is zero-extended to 8'b0000_1111 against every item and matches
-// neither 8'sb1111_1111 nor 8'd5, though it and the first item are both
-// signed; the default is selected.
 TEST(PropertyCase, AnUnsignedItemMakesEveryComparisonUnsigned) {
   auto counts = CountsOf(
       "case (minus_one) 8'sb1111_1111: 0; 8'd5: 0; default: 1; endcase");
@@ -224,8 +164,6 @@ TEST(PropertyCase, AnUnsignedItemMakesEveryComparisonUnsigned) {
   EXPECT_EQ(counts.second, 0u);
 }
 
-// §12.5: where every expression is signed the extension is by sign, so
-// minus_one extends to 8'sb1111_1111 and selects that item.
 TEST(PropertyCase, WhereEveryExpressionIsSignedTheExtensionIsBySign) {
   auto counts =
       CountsOf("case (minus_one) 8'sb1111_1111: 1; default: 0; endcase");

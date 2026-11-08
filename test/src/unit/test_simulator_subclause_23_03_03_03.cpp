@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -47,9 +46,6 @@ TEST(PortConnectionRulesForNetsSimulation,
 
 TEST(PortConnectionRulesForNetsSimulation,
      InputNetPortConnectedToExpressionReceivesComputedValue) {
-  // An input net port accepts any expression, not just a bare signal; the
-  // simulator evaluates the connection expression and drives the port with
-  // its computed value.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
@@ -97,9 +93,6 @@ TEST(PortConnectionRulesForNetsSimulation, OutputNetPortDrivesParentNet) {
 
 TEST(PortConnectionRulesForNetsSimulation,
      InputNetPortConnectedToParameterReceivesValue) {
-  // An input net port accepts any compatible expression, including a constant
-  // parameter reference. Built from a real parameter declaration and driven
-  // end-to-end, the elaborated constant reaches the port and its sink.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
@@ -117,8 +110,6 @@ TEST(PortConnectionRulesForNetsSimulation,
 
 TEST(PortConnectionRulesForNetsSimulation,
      InputNetPortConnectedToLocalparamReceivesValue) {
-  // A localparam constant is likewise carried across an input net port
-  // connection to its sink when driven through the full pipeline.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module child(input wire [7:0] a, output logic [7:0] b);\n"
@@ -150,14 +141,6 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xCDu);
 }
 
-// §23.3.3.3 connects an inout net port to a net, and §23.3.3.7 merges the
-// port's net and the connected net into one simulated net, so a continuous
-// assignment inside the child is one driver of the parent's net beside the
-// parent's own, and §6.6.1's wire resolution combines the two: the parent
-// drives the low nibble and leaves the high one at z, the child the reverse.
-// Written directly into the shared variable rather than joining the drivers,
-// the child's value would stand alone as 8'hFz or be overwritten by the
-// parent's 8'hz0; only the resolved 8'hF0 says both drivers reached the net.
 TEST(PortConnectionRulesForNetsSimulation,
      InoutNetPortDriverResolvesWithParentDriver) {
   SimFixture f;
@@ -176,15 +159,6 @@ TEST(PortConnectionRulesForNetsSimulation,
   EXPECT_EQ(var->value.ToUint64(), 0xF0u);
 }
 
-// §23.3.3.3 (printed page 747) with §9.4.2: an event control on a net wakes on
-// a change of its value, and a net whose driver resolves to the z it already
-// holds has not changed. The issue's probes -- the net driven through a
-// program's inout port (66) and a module's (66b) by `assign data = drv` with
-// drv z until 2 -- and the same net through an explicit and an implicit output
-// net port, and driven in the module itself, each wake only at 2. Each woke at
-// time 0 too, `data=z at 0`: the net's first z carried set bits above its
-// width, and an output net port started at 0 or x, which its connection copied
-// up before the port's own driver ran.
 TEST(PortConnectionRulesForNetsSimulation, NetDrivenToTheZItHoldsDoesNotWake) {
   const char* const kDrivers[] = {
       "program p(inout wire [7:0] data);\n"
@@ -236,11 +210,6 @@ TEST(PortConnectionRulesForNetsSimulation, NetDrivenToTheZItHoldsDoesNotWake) {
             "data=170 at 2\n");
 }
 
-// §23.3.3.3: a net port is a net, and one left unconnected has the value z --
-// an explicit `input wire` and an implicit `input` read z, and an output net
-// port its own drivers leave undriven gives the net above z -- where a variable
-// port (§23.3.3.2) reads its type's default x. The explicit `output wire` port
-// read 0 before its drivers ran.
 TEST(PortConnectionRulesForNetsSimulation, NetPortsStartAtHighZ) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub(input wire [3:0] i, input var logic [3:0] "
@@ -258,11 +227,6 @@ TEST(PortConnectionRulesForNetsSimulation, NetPortsStartAtHighZ) {
             "i=zzzz vi=xxxx ii=zzzz ow=zzzz\no=zzzz\n");
 }
 
-// §23.3.3.3 with §23.2.2.3: `input logic a`, which names a data type and no
-// port kind, is a net of the default net type, so left unconnected, whether
-// off the list or as `.a()`, it reads z as a declared wire does, beside the
-// tri0 and tri1 nets that pull to 0 and 1. Its data type keyword was read as
-// making it a variable, and it read x.
 TEST(PortConnectionRulesForNetsSimulation,
      AnInputNamingOnlyADataTypeIsANetReadingHighZ) {
   SimFixture f;

@@ -16,8 +16,6 @@ using namespace delta;
 namespace {
 
 TEST(SampledValueFunctions, RecognizesEveryProvidedFunction) {
-  // §16.9.3: the provided sampled value functions are $sampled, $rose, $fell,
-  // $stable, $changed, and $past.
   SampledValueFunction fn{};
   EXPECT_TRUE(ClassifySampledValueFunction("$sampled", fn));
   EXPECT_EQ(fn, SampledValueFunction::kSampled);
@@ -40,8 +38,6 @@ TEST(SampledValueFunctions, RejectsNonSampledValueNames) {
 }
 
 TEST(SampledValueFunctions, ValueChangeFunctionsAreRoseFellStableChanged) {
-  // §16.9.3: $rose, $fell, $stable, and $changed are the value change
-  // functions; $sampled and $past are not.
   EXPECT_TRUE(IsValueChangeFunction(SampledValueFunction::kRose));
   EXPECT_TRUE(IsValueChangeFunction(SampledValueFunction::kFell));
   EXPECT_TRUE(IsValueChangeFunction(SampledValueFunction::kStable));
@@ -51,8 +47,6 @@ TEST(SampledValueFunctions, ValueChangeFunctionsAreRoseFellStableChanged) {
 }
 
 TEST(SampledValueFunctions, OnlySampledOmitsTheClockingEvent) {
-  // §16.9.3: the clocking event is required for the semantics of $past, $rose,
-  // $stable, $changed, and $fell; $sampled does not use a clocking event.
   EXPECT_FALSE(
       SampledValueFunctionUsesClockingEvent(SampledValueFunction::kSampled));
   EXPECT_TRUE(
@@ -68,8 +62,6 @@ TEST(SampledValueFunctions, OnlySampledOmitsTheClockingEvent) {
 }
 
 TEST(SampledValueFunctions, ValueChangeResultsAreBoolean) {
-  // §16.9.3: the result of a value change function is true or false and may be
-  // used as a Boolean expression.
   EXPECT_TRUE(SampledValueFunctionResultIsBoolean(SampledValueFunction::kRose));
   EXPECT_TRUE(
       SampledValueFunctionResultIsBoolean(SampledValueFunction::kChanged));
@@ -80,24 +72,13 @@ TEST(SampledValueFunctions, ValueChangeResultsAreBoolean) {
 }
 
 TEST(SampledValueFunctions, LocalVariableAndMatchedAreRejectedInArguments) {
-  // §16.9.3: local variables and the sequence method `matched` are not allowed
-  // in the argument expressions passed to these functions.
-  EXPECT_TRUE(SampledValueArgumentIsLegal(
-      /*argument_uses_local_variable=*/false,
-      /*argument_uses_matched_method=*/false));
-  EXPECT_FALSE(SampledValueArgumentIsLegal(
-      /*argument_uses_local_variable=*/true,
-      /*argument_uses_matched_method=*/false));
-  EXPECT_FALSE(SampledValueArgumentIsLegal(
-      /*argument_uses_local_variable=*/false,
-      /*argument_uses_matched_method=*/true));
-  EXPECT_FALSE(SampledValueArgumentIsLegal(
-      /*argument_uses_local_variable=*/true,
-      /*argument_uses_matched_method=*/true));
+  EXPECT_TRUE(SampledValueArgumentIsLegal(false, false));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(true, false));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(false, true));
+  EXPECT_FALSE(SampledValueArgumentIsLegal(true, true));
 }
 
 TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
-  // §16.9.3: number_of_ticks shall be 1 or greater.
   EXPECT_FALSE(IsPastNumberOfTicksWellFormed(0));
   EXPECT_FALSE(IsPastNumberOfTicksWellFormed(-3));
   EXPECT_TRUE(IsPastNumberOfTicksWellFormed(1));
@@ -105,29 +86,19 @@ TEST(SampledValueFunctions, PastNumberOfTicksMustBeOneOrGreater) {
 }
 
 TEST(SampledValueFunctions, PastFallsBackToDefaultSampledValue) {
-  // §16.9.3: $past returns the default sampled value of expression1 when fewer
-  // than number_of_ticks qualifying strictly prior time steps exist.
-  EXPECT_TRUE(PastUsesDefaultSampledValue(/*number_of_ticks=*/1,
-                                          /*available_prior_ticks=*/0));
-  EXPECT_TRUE(PastUsesDefaultSampledValue(/*number_of_ticks=*/2,
-                                          /*available_prior_ticks=*/0));
-  EXPECT_TRUE(PastUsesDefaultSampledValue(/*number_of_ticks=*/2,
-                                          /*available_prior_ticks=*/1));
-  EXPECT_FALSE(PastUsesDefaultSampledValue(/*number_of_ticks=*/2,
-                                           /*available_prior_ticks=*/2));
-  EXPECT_FALSE(PastUsesDefaultSampledValue(/*number_of_ticks=*/1,
-                                           /*available_prior_ticks=*/5));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(1, 0));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(2, 0));
+  EXPECT_TRUE(PastUsesDefaultSampledValue(2, 1));
+  EXPECT_FALSE(PastUsesDefaultSampledValue(2, 2));
+  EXPECT_FALSE(PastUsesDefaultSampledValue(1, 5));
 }
 
 TEST(SampledValueFunctions, PastArgumentsHaveStandardDefaults) {
-  // §16.9.3: number_of_ticks defaults to 1 and expression2 defaults to 1'b1.
   EXPECT_EQ(kDefaultPastNumberOfTicks, 1);
   EXPECT_EQ(kDefaultPastGatingExpression, 1u);
 }
 
 TEST(SampledValueFunctions, AutomaticVariablesIllegalInClockAndGating) {
-  // §16.9.3: $past may refer to automatic variables in its sampled expression,
-  // but automatic variables are illegal in clocking events and in expression2.
   EXPECT_TRUE(PastArgumentMayReferenceAutomaticVariable(
       PastArgumentRole::kExpression1));
   EXPECT_FALSE(PastArgumentMayReferenceAutomaticVariable(
@@ -136,11 +107,6 @@ TEST(SampledValueFunctions, AutomaticVariablesIllegalInClockAndGating) {
       PastArgumentRole::kClockingEvent));
 }
 
-// §16.9.3: for a sampled value function other than $sampled whose clock is not
-// given as an argument, the clocking event is inferred by the five rules keyed
-// on the calling context. Each context resolves to its own inference source;
-// bullet one defers to the §16.13.3 clock flow rules, and the last falls back
-// to default clocking.
 TEST(SampledValueFunctions, ClockInferenceFollowsCallingContext) {
   EXPECT_EQ(InferSampledValueClockingEvent(
                 SampledValueClockContext::kAssertionSequenceOrProperty),
@@ -156,18 +122,12 @@ TEST(SampledValueFunctions, ClockInferenceFollowsCallingContext) {
             SampledValueClockInference::kFromDefaultClocking);
 }
 
-// §16.9.3 (negative form): in a disable condition or a clock expression, no
-// clocking event is inferred — the sampled value function shall be explicitly
-// clocked. This is the closest input the rule must reject rather than resolve.
 TEST(SampledValueFunctions, DisableConditionAndClockExprRequireExplicitClock) {
   EXPECT_EQ(InferSampledValueClockingEvent(
                 SampledValueClockContext::kDisableConditionOrClockExpression),
             SampledValueClockInference::kRequiresExplicitClock);
 }
 
-// §16.9.3: the argument expressions of a sampled value function read no local
-// variable and no matched: $stable(v) reads the local v of s, $rose(t.matched)
-// the matched of t; $stable(a) reads neither.
 TEST(SampledValueRules, ALocalOrMatchedInAnArgumentIsReported) {
   const char* const kReport =
       "may not reference a local variable or the sequence method matched";
@@ -191,9 +151,6 @@ TEST(SampledValueRules, ALocalOrMatchedInAnArgumentIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 11, "16.9.3"));
 }
 
-// §16.9.3: $past's number_of_ticks is an elaboration-time constant of 1 or
-// greater: the parameter Z folds to 0, the variable k folds to nothing, and
-// the parameter N folds to 2.
 TEST(SampledValueRules, APastNumberOfTicksIsAConstantOfOneOrMore) {
   ElabFixture f;
   ElaborateSrc(
@@ -222,8 +179,6 @@ TEST(SampledValueRules, APastNumberOfTicksIsAConstantOfOneOrMore) {
                              9, "16.9.3"));
 }
 
-// §16.9.3: an automatic variable may stand in $past's expression1 but not in
-// its expression2, the gating expression.
 TEST(SampledValueRules, AnAutomaticInPastsGateIsReported) {
   const char* const kReport =
       "an automatic variable may not stand in the clocking event or the "
@@ -248,10 +203,6 @@ TEST(SampledValueRules, AnAutomaticInPastsGateIsReported) {
                             7, "16.9.3"));
 }
 
-// §16.9.3: outside an assertion, a sampled value function with no clocking
-// event of its own takes the clock the procedure infers or the default
-// clocking; an initial procedure infers none, so with no default clocking
-// $rose there is illegal, and with one it is clocked by it.
 TEST(SampledValueRules, AnUnclockedCallWithNoneInferableIsReported) {
   const char* const kReport = "$rose has no clocking event";
   ElabFixture f;
@@ -277,8 +228,6 @@ TEST(SampledValueRules, AnUnclockedCallWithNoneInferableIsReported) {
   EXPECT_FALSE(ReportedError(g.diag.Diagnostics(), kReport, 5, "16.9.3"));
 }
 
-// §16.9.3: in a disable condition a sampled value function other than
-// $sampled gives its clocking event explicitly.
 TEST(SampledValueRules, AnUnclockedCallInADisableConditionIsReported) {
   const char* const kReport =
       "in a disable condition or a clocking event shall have its clocking "
@@ -301,8 +250,6 @@ TEST(SampledValueRules, AnUnclockedCallInADisableConditionIsReported) {
 constexpr const char* kTicksReport =
     "the number_of_ticks of $past shall be 1 or greater";
 
-// How many times the run reported on `line` that a $past's number_of_ticks
-// is under 1, which is once for each $past breaking the rule there.
 std::ptrdiff_t TicksReportsOn(const std::vector<Diagnostic>& diags,
                               uint32_t line) {
   return std::ranges::count_if(diags, [line](const Diagnostic& d) {
@@ -311,11 +258,6 @@ std::ptrdiff_t TicksReportsOn(const std::vector<Diagnostic>& diags,
   });
 }
 
-// §16.9.3 with §16.9.7: a $past written inside a group that `or` makes a
-// sequence of its own, standing as one operand of the chain around it, is held
-// to the rule as one written in the chain is: s1 writes it in the chain, s2
-// and the antecedent of a1 inside an `or` group, and s3 a well-formed one
-// there. Each breach is reported once.
 TEST(SampledValueRules, APastInsideAnOrGroupIsHeldToTheTicksRule) {
   ElabFixture f;
   ElaborateSrc(
@@ -341,12 +283,6 @@ TEST(SampledValueRules, APastInsideAnOrGroupIsHeldToTheTicksRule) {
   EXPECT_EQ(TicksReportsOn(f.diag.Diagnostics(), 12), 1);
 }
 
-// §16.9.3 with §16.8.1: a $past written in an actual of a sequence instance
-// that is itself a sequence, `s(a ##1 $past(b, 0))`, is held to the rule as
-// one written in the assertion is, once; a2's $past(b, 1) keeps it. a3's
-// actual is an expression, and the instance standing as the whole property
-// is that property's sequence as well as the expression read, which is one
-// breach and one report.
 TEST(SampledValueRules, APastInsideASequenceActualIsHeldToTheTicksRule) {
   ElabFixture f;
   ElaborateSrc(

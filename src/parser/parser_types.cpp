@@ -168,19 +168,11 @@ DataType Parser::ParseVirtualInterfaceType() {
   return dtype;
 }
 
-// A.2.2.1: the integer vector types are the ones written with a packed part;
-// every other data type either fixes its own width or has none to leave
-// unspecified, so only these can carry a packed dimension with no range.
 static bool TakesPackedPart(DataTypeKind kind) {
   return kind == DataTypeKind::kBit || kind == DataTypeKind::kLogic ||
          kind == DataTypeKind::kReg;
 }
 
-// §H.2: true when the parser stands at an empty bracket pair "[]" that `dtype`
-// may carry as a packed dimension whose range is left unspecified. The form is
-// admitted only where the standard grants it -- the formal arguments of a DPI
-// import declaration -- so elsewhere an empty pair is left for whoever parses
-// the unpacked dimensions that follow the declared name.
 bool Parser::AtUnsizedPackedDim(const DataType& dtype) {
   if (!in_dpi_import_formals_ || !TakesPackedPart(dtype.kind)) return false;
   if (!Check(TokenKind::kLBracket)) return false;
@@ -191,9 +183,6 @@ bool Parser::AtUnsizedPackedDim(const DataType& dtype) {
   return is_empty;
 }
 
-// §H.2: consume the empty bracket pair the caller has already confirmed and
-// record it as this type's unsized packed dimension. There are no bounds to
-// keep, so the flag is the whole of what the pair contributes.
 void Parser::TakeUnsizedPackedDim(DataType& dtype) {
   Consume();
   Consume();
@@ -207,15 +196,6 @@ void Parser::ParsePackedDims(DataType& dtype) {
     if (!Check(TokenKind::kLBracket)) return;
     Consume();
     dtype.packed_dim_left = ParseExpr();
-    // §7.4.1 states the rule both these calls enforce: every packed dimension
-    // of a packed array declaration takes a range specification [
-    // constant_expression : constant_expression ], and its NOTE rules out the
-    // single-number form "[8]" by name. Every packed dimension covers the first
-    // as squarely as the fifth, so the first names the clause the loop below
-    // already names rather than a second one. §6.9 has no rule to cite here. It
-    // defines a scalar and a vector and defers the form to §7.4, and this
-    // function parses the packed dimensions of a struct, union, enum, named
-    // type and port type, none of which is a vector.
     Expect(TokenKind::kColon, Subclause("7.4.1"));
     dtype.packed_dim_right = ParseExpr();
     Expect(TokenKind::kRBracket, Subclause("7.4.1"));
@@ -223,9 +203,6 @@ void Parser::ParsePackedDims(DataType& dtype) {
 
   while (Check(TokenKind::kLBracket)) {
     if (AtUnsizedPackedDim(dtype)) {
-      // A second empty pair belongs to the unpacked part, which is written
-      // after the declared name and parsed there. Only the first one can be
-      // this type's packed dimension, so stop rather than claim it.
       if (dtype.has_unsized_packed_dim) return;
       TakeUnsizedPackedDim(dtype);
       continue;
@@ -244,12 +221,6 @@ void Parser::ParsePackedDims(DataType& dtype) {
   }
 }
 
-// Parses one element of a parameter_value_assignment list. An ordered element
-// is a bare value; a named element is ".name(value)", whose formal name is
-// recorded on the value's DataType (§6.20 / Syntax 8-2). A.8.3 writes the
-// value as a param_expression: a data_type, a structure, a union or an
-// enumeration among them, which TryParseInlineAggregateType reads and
-// ParseDataType does not, or else a mintypmax_expression.
 DataType Parser::ParseOneTypeParam() {
   bool named = Match(TokenKind::kDot);
   std::string_view arg_name;
@@ -285,22 +256,9 @@ std::vector<DataType> Parser::ParseTypeParamList() {
 void Parser::ParseNetStrength(DataType& dtype) {
   if (dtype.kind == DataTypeKind::kTrireg) {
     dtype.charge_strength = ParseChargeStrength();
-    // §A.2.1.3 writes the two strengths as alternatives, `net_type
-    // [ drive_strength | charge_strength ]`, so a charge strength is the whole
-    // of the strength specification and nothing further belongs to it. Reading
-    // none is not the end of the specification, because §A.2.2.1 lists trireg
-    // among the net types and §6.3.2 restricts a drive strength only to a
-    // declaration that places a continuous assignment on the net. So fall
-    // through to the drive strength parse below, which ParseChargeStrength
-    // left the position for by restoring it.
     if (dtype.charge_strength != 0) return;
   } else {
     if (!dtype.is_net || !Check(TokenKind::kLParen)) return;
-    // §6.3.2.1: a charge strength belongs to trireg nets and no other net
-    // type. Read the specification here and report the rule it breaks,
-    // so the declarator list parses on and the report names the rule rather
-    // than the identifier the list did not find. The strength is not recorded
-    // on the type, because a net that may not carry one has none.
     SourceLoc charge_loc = CurrentLoc();
     if (ParseChargeStrength() != 0) {
       diag_.Error(charge_loc,
@@ -309,9 +267,6 @@ void Parser::ParseNetStrength(DataType& dtype) {
       return;
     }
   }
-  // Both paths above reach here with the position on whatever token they
-  // declined to read as a charge strength, which is a parenthesis on the
-  // non-trireg path and anything at all on the trireg one.
   if (!Check(TokenKind::kLParen)) return;
   auto saved = lexer_.SavePos();
   SourceLoc drive_loc = CurrentLoc();
@@ -319,9 +274,6 @@ void Parser::ParseNetStrength(DataType& dtype) {
   if (IsStrengthToken(CurrentToken().kind)) {
     ParseDriveStrength(dtype.drive_strength0, dtype.drive_strength1);
     Expect(TokenKind::kRParen, Subclause("6.3.2.2"));
-    // Syntax 6-2 in §6.7 gives a drive strength to a net type keyword alone. A
-    // nettype's name, which ParseVarDeclList hands here as the one named type
-    // that ever arrives, takes none.
     if (dtype.kind == DataTypeKind::kNamed) {
       diag_.Error(drive_loc,
                   "a net of a user-defined nettype takes no drive strength",
@@ -337,10 +289,6 @@ DataType Parser::ParseNamedType() {
   dtype.kind = DataTypeKind::kNamed;
   dtype.type_name = Consume().text;
 
-  // §6.7.2 / A.2.1.3: a user-defined nettype name takes a delay control here
-  // (e.g. `mynet #5 x;`), not a parameter value assignment. Leave the `#` for
-  // the net-delay parse in ParseVarDeclList; only a non-nettype named type
-  // (e.g. a parameterized class `C#(...)`) consumes `#(` as type parameters.
   bool assignment_written = false;
   if (Check(TokenKind::kHash) && known_nettypes_.count(dtype.type_name) == 0) {
     Consume();
@@ -391,12 +339,6 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
   if (Check(TokenKind::kIdentifier) &&
       (known_types_.count(CurrentToken().text) != 0 || AtScopedTypeName())) {
     auto inner = ParseNamedType();
-    // A.2.2.1 lets a type_identifier carry packed dimensions, and A.2.1.3
-    // places the whole data_type before the net's name, so `wire t [1:0] v;`
-    // is a net of the packed array of t (§7.4.4) that the variable path in
-    // ParseDataType reads the same way. The name of a net cannot follow its
-    // own unpacked dimension, so a bracket here is never the declarator's.
-    // §26.3 names a package's typedef through its scope, `wire pk::t v;`.
     ParsePackedDims(inner);
     ApplyNetInfo(inner, dtype);
     dtype = inner;
@@ -428,10 +370,6 @@ bool Parser::TryParseNetDataType(DataType& dtype, bool has_intervening) {
 
   auto inner_kind = TokenToTypeKind(CurrentToken().kind);
   if (inner_kind && !IsNetTypeToken(CurrentToken().kind)) {
-    // §6.3.2: trireg is a charge-storage net whose net-type kind carries
-    // distinct semantics, so keep kTrireg over the inner data type. Other nets
-    // adopt the inner data type kind so the §6.7.1 4-state check can inspect it
-    // (e.g. reject `wire bit` / `wire real`).
     if (dtype.kind != DataTypeKind::kTrireg) dtype.kind = *inner_kind;
     dtype.is_signed = IsDefaultSigned(*inner_kind);
     Consume();
@@ -445,9 +383,6 @@ bool Parser::AtDataTypeOrVoid() {
   }
   auto tk = CurrentToken().kind;
   switch (tk) {
-    // A.2.2.1 opens a data_type with struct_union, enum, `virtual` or a
-    // type_reference without any of the four reaching TokenToTypeKind, and
-    // ParseDataType takes a leading `const` and a leading `signing` as well.
     case TokenKind::kKwStruct:
     case TokenKind::kKwUnion:
     case TokenKind::kKwEnum:
@@ -461,26 +396,9 @@ bool Parser::AtDataTypeOrVoid() {
     default:
       break;
   }
-  // Every other data_type opens on one keyword, and TokenToTypeKind is the
-  // list ParseDataType reads to turn that keyword into a DataTypeKind. Asking
-  // it rather than restating it is what keeps the two from parting company.
   return TokenToTypeKind(tk).has_value();
 }
 
-// The data_type a declaration puts before its declarator. A.2.2.1 lets one be
-// a type_identifier behind a package_scope or a class_scope, and ParseDataType
-// reads an identifier as a named type only where known_types_ holds it, which
-// a package name never is: §8.5 puts no restriction on a class property's
-// data type and §26.3 names a package's declaration through the package scope
-// resolution operator, so `pk::sev_t s = pk::MED;` in a class body,
-// `pk::sev_t` as a method's return type and the same in a block item are one
-// data_type read one way. An unknown leading name followed by `::` and an
-// identifier is read through ParseNamedType, whose `::` walk and `#(...)`
-// parameters are what a known type name reaches through ParseDataType, unless
-// a `(` follows the scoped name: that is the `C::f(` of an out-of-block method
-// declaration (§8.24) whose class this parse does not know, not a type, and
-// it is left to ParseDataType and the name walk in ParseFuncName as is
-// everything else.
 DataType Parser::ParseDeclaredDataType() {
   bool scoped = false;
   if (Check(TokenKind::kIdentifier) &&
@@ -500,14 +418,6 @@ DataType Parser::ParseDeclaredDataType() {
   return dtype;
 }
 
-// §6.9.2 has vectored and scalared be advisory keywords of vector net
-// declarations, and Syntax 10-1 places them in net_declaration alone: the
-// variable declaration grammar of §6.8 admits neither. On a net the keyword is
-// recorded. After a variable's type it is reported under §6.9.2, the rule the
-// spelling breaks, and taken with the type so that the declarators after it
-// are parsed in step and the report is not the identifier the list did not
-// find: sv-tests' 6.9.2--vector_vectored_inv.sv writes `logic vectored` for a
-// vectored net, and the §6.8 report scored a correct rejection FAIL.
 void Parser::ParseVectoredScalared(DataType& dtype) {
   if (dtype.is_net) {
     dtype.is_vectored = Match(TokenKind::kKwVectored);
@@ -536,8 +446,6 @@ DataType Parser::ParseDataType() {
     return ParseVirtualInterfaceType();
   }
 
-  // ParseNamedType keeps `$unit` as the outermost scope of a type named
-  // through it.
   bool is_named = (Check(TokenKind::kIdentifier) &&
                    known_types_.count(CurrentToken().text) != 0) ||
                   ParserDataDeclHelpers::AtUnitScopedTypeName(*this);
@@ -597,8 +505,6 @@ void ParserDataDeclHelpers::ReadSigning(Parser& p, DataType& dtype) {
     return;
   }
   Token signing = p.Consume();
-  // ParseDataType keeps a net's own kind when no data type keyword followed
-  // the net type keyword, and takes the data type's kind when one did.
   bool net_alone = dtype.is_net && dtype.kind == dtype.net_keyword;
   if (net_alone || IsIntegerAtomKind(dtype.kind) ||
       IsIntegerVectorKind(dtype.kind)) {
@@ -622,7 +528,6 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       Consume();
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
-      // §7.10 writes the queue dimension as the `$` itself.
       dim->range.start = dollar_loc;
       dim->text = "$";
       if (Match(TokenKind::kColon)) {
@@ -637,7 +542,6 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       Consume();
       auto* dim = arena_.Create<Expr>();
       dim->kind = ExprKind::kIdentifier;
-      // §7.8.1 writes the wildcard index dimension as the `*` itself.
       dim->range.start = star_loc;
       dim->text = "*";
       dims.push_back(dim);
@@ -655,8 +559,6 @@ void Parser::ParseUnpackedDims(std::vector<Expr*>& dims) {
       auto* range = arena_.Create<Expr>();
       range->kind = ExprKind::kBinary;
       range->op = TokenKind::kColon;
-      // §7.4.2 writes the dimension as its first bound followed by the colon,
-      // so it begins where that bound begins.
       range->range.start = expr->range.start;
       range->lhs = expr;
       range->rhs = ParseExpr();
@@ -675,27 +577,16 @@ void Parser::ParseVarDeclList(std::vector<ModuleItem*>& items,
   Expr* nd3 = nullptr;
   bool nettype_named = dtype.kind == DataTypeKind::kNamed &&
                        known_nettypes_.count(dtype.type_name) != 0;
-  // §6.7 states the net declaration and §6.8 the variable declaration, and this
-  // list is one or the other according to the type that heads it.
   Subclause subclause(dtype.is_net ? "6.7" : "6.8");
   if (nettype_named) {
-    // Syntax 6-2 in §6.7 gives a nettype's net no strength of either kind, so
-    // one written anyway is read here as a net type keyword's would be, for
-    // ParseNetStrength to report rather than the declarator to stop at. The
-    // strength read is dropped with the copy: the net carries none.
     DataType as_net = dtype;
     as_net.is_net = true;
     ParseNetStrength(as_net);
   }
   if (dtype.is_net || nettype_named) {
     ParseGateDelay(nd1, nd2, nd3);
-    // §10.3.4 puts the drive strength before the delay on a net declaration as
-    // well as on an `assign`, so a strength standing here breaks the same rule.
-    // Parser::ParseNetStrength read the legal position, back in ParseDataType.
     ReportDriveStrengthAfterDelay(nd1);
   }
-  // §40.4.1 and §40.4.4: a pragma right after the bit range gives the signals
-  // declared here the enumeration name of the FSM they hold the state of.
   const std::string_view kFsmEnum = lexer_.ClaimFsmEnumPragma(CurrentLoc());
   bool first = true;
   do {
@@ -808,17 +699,11 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     ParseTypeParamDecl(items, loc, localparam);
     return;
   }
-  // A.2.2.1 lets the type stand behind a package or class scope, which
-  // ParseDeclaredDataType reads past known_types_, or be a type_reference,
-  // `localparam type(x) P = -5;` declaring a value parameter of x's type
-  // (§6.23).
   DataType dtype;
   if (!ParserDataDeclHelpers::ReadTypeReference(*this, dtype)) {
     dtype = ParseDeclaredDataType();
     ParseImplicitParamRange(dtype);
   }
-  // §40.4.6: a pragma right after the keyword or the bit width makes the
-  // parameters declared here the legal states of the FSM it names.
   const std::string_view kFsmEnum = lexer_.ClaimFsmEnumPragma(CurrentLoc());
 
   do {
@@ -833,8 +718,6 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
     if (Match(TokenKind::kEq)) {
       item->init_expr = ParseExpr();
     } else {
-      // §6.20.1 fn22: omitting the value is legal only in a
-      // parameter_port_list (a separate parse path), not here.
       diag_.Error(item->loc, "parameter declaration requires a default value",
                   Subclause("6.20.1"));
     }
@@ -843,10 +726,6 @@ void Parser::ParseParamDecl(std::vector<ModuleItem*>& items) {
   Expect(TokenKind::kSemicolon, Subclause("6.20.1"));
 }
 
-// §6.20.2 / §A.2.1.1: a value parameter may carry a packed range with no
-// explicit data type (e.g. `parameter [7:0] P`). ParseDataType does not consume
-// a bare leading range, so do it here. The type stays implicit -- it is not an
-// explicit `logic` -- and its width comes from the range.
 void Parser::ParseImplicitParamRange(DataType& dtype) {
   if (dtype.kind != DataTypeKind::kImplicit || !Check(TokenKind::kLBracket)) {
     return;
@@ -893,8 +772,6 @@ bool ParserDataDeclHelpers::AtTypeReference(Parser& p) {
 bool Parser::TryParseTypeRef(std::vector<ModuleItem*>& items) {
   DataType dtype;
   if (!ParserDataDeclHelpers::ReadTypeReference(*this, dtype)) return false;
-  // A.2.1.3 follows the data_type with a list_of_variable_decl_assignments, so
-  // §6.23's `var type(a+b) c, d;` declares both names of the one type.
   ParseVarDeclList(items, dtype);
   return true;
 }

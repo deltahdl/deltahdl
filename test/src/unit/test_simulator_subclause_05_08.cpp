@@ -64,10 +64,6 @@ TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitPs) {
   EXPECT_DOUBLE_EQ(v, 40.0);
 }
 
-// §5.8: the scaling to the current time unit applies to a fixed-point literal
-// just as to an integer one. Under the default ns unit, 2.5us scales up by 1000
-// to 2500.0 - exercising the fixed-point input form through a non-unit scale
-// factor (the plain FixedPointNs case is ns->ns, i.e. unscaled).
 TEST(TimeLiteralSimulation, FixedPointScaledToDefaultUnit) {
   auto v = RunAndGetReal(
       "module t;\n  realtime r;\n  initial r = 2.5us;\nendmodule\n", "r");
@@ -85,10 +81,6 @@ TEST(TimeLiteralSimulation, ScaledToExplicitTimeunitUs) {
   EXPECT_DOUBLE_EQ(v, 0.5);
 }
 
-// §5.8 scales a time literal to the current time unit, and §3.14.2.3 (printed
-// page 60) makes that unit's magnitude part of it: in a 10 ns unit, 20 ns is 2
-// units and 5 ns half of one. Scaled by the unit's power of ten alone, they
-// read 20.0 and 5.0.
 TEST(TimeLiteralSimulation, ScaledByTheMagnitudeOfTheUnit) {
   SimFixture f;
   EXPECT_EQ(
@@ -101,9 +93,6 @@ TEST(TimeLiteralSimulation, ScaledByTheMagnitudeOfTheUnit) {
       "2.0 0.5\n");
 }
 
-// A module that declares no unit takes the `timescale before its header, so
-// its #5ns waits 5 ns, which $realtime reads in its 1 us unit. Scaled as
-// though the unit were the 1 ns default, the delay was 5 us.
 TEST(TimeLiteralSimulation, ScaledToTheTimescaleBeforeTheModule) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us/1ns\n"
@@ -117,8 +106,6 @@ TEST(TimeLiteralSimulation, ScaledToTheTimescaleBeforeTheModule) {
             "0.005\n");
 }
 
-// Without a `timescale, a module that declares no unit takes the compilation
-// unit's.
 TEST(TimeLiteralSimulation, ScaledToTheCompilationUnitTimeunit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("timeunit 1us;\n"
@@ -129,8 +116,6 @@ TEST(TimeLiteralSimulation, ScaledToTheCompilationUnitTimeunit) {
             "0.500\n");
 }
 
-// A module nested in another (§23.4) that declares no unit takes the
-// enclosing one's.
 TEST(TimeLiteralSimulation, ScaledToTheEnclosingModuleUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("module top;\n"
@@ -144,9 +129,6 @@ TEST(TimeLiteralSimulation, ScaledToTheEnclosingModuleUnit) {
             "0.250\n");
 }
 
-// A package is a time scope of its own (§3.14.2.2): its function returns
-// 500 ns in the 1 us unit of the `timescale before it, whatever the unit of
-// the module that calls it.
 TEST(TimeLiteralSimulation, ScaledToThePackageUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("`timescale 1us/1ns\n"
@@ -163,8 +145,6 @@ TEST(TimeLiteralSimulation, ScaledToThePackageUnit) {
             "0.500\n");
 }
 
-// A literal written outside every design element stands in the
-// compilation-unit scope and takes its unit.
 TEST(TimeLiteralSimulation, ScaledToTheUnitOfTheCompilationUnitScope) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("timeunit 1us;\n"
@@ -178,8 +158,6 @@ TEST(TimeLiteralSimulation, ScaledToTheUnitOfTheCompilationUnitScope) {
             "0.500\n");
 }
 
-// §5.7.1 lets an underscore stand between the digits of the number, and it
-// adds nothing to the value: 1_500ps is 1.5 ns.
 TEST(TimeLiteralSimulation, UnderscoreBetweenDigitsIsIgnored) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("module t;\n"
@@ -189,10 +167,6 @@ TEST(TimeLiteralSimulation, UnderscoreBetweenDigitsIsIgnored) {
             "1.5\n");
 }
 
-// A parameter declared in a module's header belongs to the module, so a time
-// literal in its default takes the module's unit, though the timeunit is
-// declared only in the body that follows. Credited to the compilation-unit
-// scope around the header, 500 ns read 500.000.
 TEST(TimeLiteralSimulation, HeaderParameterDefaultTakesTheElementUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("module m #(parameter realtime P = 500ns);\n"
@@ -203,9 +177,6 @@ TEST(TimeLiteralSimulation, HeaderParameterDefaultTakesTheElementUnit) {
             "0.500\n");
 }
 
-// The same for a nested module, whose header stands inside the enclosing
-// module: its literal takes the nested module's own 1 us unit, not the 1 ns
-// one of the module around it.
 TEST(TimeLiteralSimulation, NestedHeaderParameterTakesItsOwnElementUnit) {
   SimFixture f;
   EXPECT_EQ(
@@ -221,8 +192,6 @@ TEST(TimeLiteralSimulation, NestedHeaderParameterTakesItsOwnElementUnit) {
       "0.500\n");
 }
 
-// §5.8 with §3.14.2.3: an interface that declares its own unit scales its
-// literals to it, not to the unit of the module that instantiates it.
 TEST(TimeLiteralSimulation, ScaledToTheInterfaceUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("interface i;\n"
@@ -237,7 +206,6 @@ TEST(TimeLiteralSimulation, ScaledToTheInterfaceUnit) {
             "0.250\n");
 }
 
-// The same for a program.
 TEST(TimeLiteralSimulation, ScaledToTheProgramUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("program p;\n"
@@ -252,8 +220,6 @@ TEST(TimeLiteralSimulation, ScaledToTheProgramUnit) {
             "0.250\n");
 }
 
-// A nested module that declares its own unit takes it rather than the unit
-// of the module around it.
 TEST(TimeLiteralSimulation, ScaledToTheNestedModulesOwnUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("module top;\n"
@@ -268,8 +234,6 @@ TEST(TimeLiteralSimulation, ScaledToTheNestedModulesOwnUnit) {
             "0.250\n");
 }
 
-// A class's method takes the unit of the scope the class is declared in, here
-// its package's, whatever the unit of the module that calls it.
 TEST(TimeLiteralSimulation, ClassMethodScaledToItsPackageUnit) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture("package p;\n"
@@ -288,10 +252,6 @@ TEST(TimeLiteralSimulation, ClassMethodScaledToItsPackageUnit) {
             "0.250\n");
 }
 
-// A checker declares no unit of its own and takes that of the scope it is
-// declared in, not of the one it is instantiated in: the compilation unit's
-// 1 us for one declared there, and the module's 1 us for one declared inside
-// a module, though the compilation unit's is 1 ns.
 TEST(TimeLiteralSimulation, CheckerScaledToTheScopeItIsDeclaredIn) {
   EXPECT_DOUBLE_EQ(RunAndGetReal("timeunit 1us;\n"
                                  "checker chk;\n"

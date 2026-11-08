@@ -19,9 +19,6 @@ OwnedMember FindMemberAndOwner(const ClassDecl* cls, std::string_view name,
   for (const auto* c = cls; c;) {
     for (const auto* m : c->members) {
       if (m->name == name) return {m, c};
-      // §8.18: a method member carries its name on the method item, not on the
-      // ClassMember, so match that too — the local/protected qualifiers live on
-      // the ClassMember and must govern method calls just as for data members.
       if (m->method != nullptr && m->method->name == name) return {m, c};
     }
     if (c->base_class.empty()) break;
@@ -67,9 +64,6 @@ const ClassDecl* FindNestedClass(const ClassDecl* cls, std::string_view name) {
   return nullptr;
 }
 
-// The identifiers of a `::` chain, left to right: `Outer::Inner` gives
-// {Outer, Inner} and `C` gives {C}. Empty where an operand is anything but an
-// identifier, a select or a parameterized class among them.
 static std::vector<std::string_view> ScopeChainNames(const Expr* prefix) {
   std::vector<std::string_view> names;
   const Expr* e = prefix;
@@ -103,11 +97,6 @@ std::vector<const ClassDecl*> ClassChainOfScopePrefix(
   return {};
 }
 
-// The class a bare name written inside the last class of `chain` resolves to
-// among the chain's classes: §8.23 (printed 201) reads it first in that class
-// -- the class itself, or one nested in it -- then in each enclosing class
-// outward, so `A` inside B nested in Outer is Outer's nested A. Null where no
-// class of the chain declares it, which leaves the enclosing scope's classes.
 static const ClassDecl* ClassAmongEnclosing(
     std::string_view name, const std::vector<const ClassDecl*>& chain) {
   for (auto it = chain.rbegin(); it != chain.rend(); ++it) {
@@ -117,8 +106,6 @@ static const ClassDecl* ClassAmongEnclosing(
   return nullptr;
 }
 
-// The names of a named type, outermost first: each outer prefix, the scope
-// and the type, so `A::B::C` gives {A, B, C} and `C` gives {C}.
 static std::vector<std::string_view> TypeChainNames(const DataType& dt) {
   std::vector<std::string_view> names = dt.outer_scope_names;
   if (!dt.scope_name.empty()) names.push_back(dt.scope_name);
@@ -126,9 +113,6 @@ static std::vector<std::string_view> TypeChainNames(const DataType& dt) {
   return names;
 }
 
-// The class `names` reaches, outermost first: the first read along `chain`
-// outward and then among the unit's classes, or as a package holding the class
-// the second gives, and each later name a class nested in the class so far.
 static const ClassDecl* ClassAlongNames(
     const std::vector<std::string_view>& names,
     const std::vector<const ClassDecl*>& chain, const CompilationUnit* unit) {

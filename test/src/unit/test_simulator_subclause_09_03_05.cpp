@@ -155,12 +155,6 @@ TEST(StatementLabelSimulation, LabeledBeginBlockWithLocalVar) {
   EXPECT_EQ(val, 21u);
 }
 
-// §9.3.5 — a statement label on a for loop that declares its loop variable
-// names the implicit block the loop creates (weave 12.7.3), and a labeled
-// statement can be disabled with the same behavior as disabling a named block
-// (weave 9.6.2). Disabling the loop by its own label therefore terminates the
-// whole loop — acting like a break — and execution resumes at the statement
-// following it.
 TEST(StatementLabelSimulation, DisableLabeledForLoopActsLikeBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -177,14 +171,9 @@ TEST(StatementLabelSimulation, DisableLabeledForLoopActsLikeBreak) {
       "  end\n"
       "endmodule\n",
       f);
-  // count reaches 3 (iterations i=0,1,2), then i=3 disables the loop before the
-  // increment; `after` proves execution resumed past the loop.
   LowerRunAndCheck(f, design, {{"count", 3u}, {"after", 1u}});
 }
 
-// §9.3.5 — the same rule for a foreach loop: its label names the loop's
-// implicit block, so disabling that label ends the entire foreach and resumes
-// after it.
 TEST(StatementLabelSimulation, DisableLabeledForeachActsLikeBreak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -205,12 +194,6 @@ TEST(StatementLabelSimulation, DisableLabeledForeachActsLikeBreak) {
   LowerRunAndCheck(f, design, {{"visited", 3u}, {"after", 1u}});
 }
 
-// §9.3.5 — a begin-end block is a statement, so a label before begin is
-// equivalent to a block name after it, and a labeled statement disables with
-// the same behavior as a named block (weave 9.6.2). Disabling the block by its
-// prefix label from inside terminates it, skipping the block's remaining
-// statements, and control resumes at the statement following the block. This
-// exercises the labeled begin-end disable path, distinct from the loop path.
 TEST(StatementLabelSimulation, DisableLabeledBeginBlockByPrefixLabel) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -229,15 +212,11 @@ TEST(StatementLabelSimulation, DisableLabeledBeginBlockByPrefixLabel) {
       "  end\n"
       "endmodule\n",
       f);
-  // The block runs up to the disable, then ends; not_reached stays 0 and after
-  // proves execution continued past the disabled block.
   LowerRunAndCheck(f, design,
                    {{"got_here", 1u}, {"not_reached", 0u}, {"after", 1u}});
 }
 
 TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
-  // Labeling a fork-join block creates its named scope without disturbing
-  // execution: the parent blocks on join and the spawned assignment lands.
   auto val = RunAndGet(
       "module t;\n"
       "  int result;\n"
@@ -251,9 +230,6 @@ TEST(StatementLabelSimulation, LabeledForkJoinExecutes) {
   EXPECT_EQ(val, 55u);
 }
 
-// §9.3.5 with §9.6.2: a statement label makes the statement one a disable
-// can name, as a named block is, so the disable from another process ends it
-// where it waits.
 TEST(StatementLabelSimulation, LabeledStatementDisabledFromAnotherProcess) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"

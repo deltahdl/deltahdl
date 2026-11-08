@@ -16,10 +16,6 @@ namespace {
 
 TEST(ParameterizedScopeResolutionElaboration,
      SpecificSpecializationAccessesTypeParamOk) {
-  // The scope resolution operator reaches a type parameter of the class, not
-  // only its value parameters. The explicit specialization supplies the actual
-  // type that the parameter name resolves to, here giving the variable the
-  // integer type.
   EXPECT_TRUE(
       ElabOk("class C #(type T = int);\n"
              "endclass\n"
@@ -70,8 +66,6 @@ TEST(ParameterizedScopeResolutionElaboration, MultipleSpecializationsAccessOk) {
              "endmodule\n"));
 }
 
-// The report stands at the unadorned prefix itself -- the site passes
-// `e->lhs->range.start`, the `C` of `C::q`.
 TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeOutsideIsError) {
   ElabFixture f;
   ElabOk(
@@ -107,10 +101,6 @@ TEST(ParameterizedScopeResolutionElaboration,
 
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInNestedExprIsError) {
-  // The prohibition on the bare parameterized-class name as a scope resolution
-  // prefix outside the class applies wherever the prefix appears, including as
-  // a subexpression of a larger expression, not only as the whole right-hand
-  // side.
   ElabFixture f;
   ElabOk(
       "class C #(int p = 1);\n"
@@ -128,9 +118,6 @@ TEST(ParameterizedScopeResolutionElaboration,
 
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInAlwaysCombIsError) {
-  // The same prohibition holds across procedural contexts; an always_comb block
-  // outside the class is still outside the class, so the unadorned prefix is
-  // illegal there too.
   ElabFixture f;
   ElabOk(
       "class C #(int p = 1);\n"
@@ -147,11 +134,6 @@ TEST(ParameterizedScopeResolutionElaboration,
 }
 
 TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {
-  // Within the parameterized class's own scope the unadorned name may prefix
-  // the scope resolution operator to name a member; the restriction that makes
-  // the bare name illegal applies only outside the class and its out-of-block
-  // declarations. Here it names a member rather than the default
-  // specialization.
   EXPECT_TRUE(
       ElabOk("class C #(int p = 1);\n"
              "  parameter int q = 5;\n"
@@ -163,18 +145,6 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInsideClassOk) {
              "endmodule\n"));
 }
 
-// §8.25.1: the explicit specialization form denotes a specific parameter in a
-// constant-expression position, so `C#(4)::p` initializing a localparam folds
-// to 4 and not to the class default of 1. §27.4 makes a generate block a scope
-// of its own and a further level of hierarchy once instantiated and says
-// nothing that would stop that at the boundary, so the same initializer written
-// inside a block folds to the same 4. The class default is written 1 so that a
-// fold answering the default misses.
-//
-// This fails while Elaborator::ProcessPendingGenerate in
-// src/elaborator/elaborator_generate.cpp opens no ParamClassRegistryGuard:
-// SpecializedParamClass in src/elaborator/const_eval_func.cpp finds no
-// registry, the access does not fold at all, and W is left unresolved.
 TEST(ParameterizedScopeResolutionElaboration,
      SpecializationParameterFoldsInsideAGenerateBlock) {
   ElabFixture f;
@@ -196,19 +166,6 @@ TEST(ParameterizedScopeResolutionElaboration,
   EXPECT_EQ(w->resolved_value, 4);
 }
 
-// The seven cases below cover the child-statement links of Stmt that
-// WalkStmtsForParamScope in src/elaborator/elaborator_validate_classes.cpp
-// reaches for the first time now that it takes its list from ForEachChildStmt
-// in src/elaborator/elaborator_validate_internal.h. It had written out six of
-// the thirteen, so the unadorned prefix standing in any of the other seven
-// reached CheckParamScopeExpr through no link and was left unreported. §8.25.1
-// requires the explicit specialization wherever the prefix is written outside
-// the class, and each case below is that one rule in one more statement
-// position. The report stands at the prefix itself, the `C` of `C::q`.
-
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword`, so a fork arm
-// holds the expression like any other statement position.
 TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInForkArmIsError) {
   ElabFixture f;
   ElabOk(
@@ -227,10 +184,6 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInForkArmIsError) {
       "used as scope resolution prefix for parameterized class", 7, "8.25.1"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`, so
-// the right-hand side of a header assignment is an ordinary expression. The
-// loop's control variable is declared above the loop, which leaves the header
-// as the only place the prefix is written.
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInForInitializationIsError) {
   ElabFixture f;
@@ -249,9 +202,6 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 7, "8.25.1"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment |
-// inc_or_dec_expression | function_subroutine_call`, so a for step carries an
-// expression the same way.
 TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInForStepIsError) {
   ElabFixture f;
   ElabOk(
@@ -269,10 +219,6 @@ TEST(ParameterizedScopeResolutionElaboration, UnadornedScopeInForStepIsError) {
       "used as scope resolution prefix for parameterized class", 7, "8.25.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm.
-// Whether the arm runs is settled when the design runs, and §8.25.1 is a rule
-// about how the prefix is written.
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInAssertionPassStmtIsError) {
   ElabFixture f;
@@ -307,10 +253,6 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 6, "8.25.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. The item is reported whether the weighted draw would select it or
-// not.
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInRandcaseItemIsError) {
   ElabFixture f;
@@ -332,11 +274,6 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 8, "8.25.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. Parser::ParseRsCodeBlockStmts in src/parser/parser_verify.cpp
-// puts them in RsProd::code_stmts, which Stmt::rs_productions reaches and no
-// other member of Stmt does.
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInRandsequenceCodeBlockIsError) {
   ElabFixture f;
@@ -358,12 +295,6 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 8, "8.25.1"));
 }
 
-// §8.25.1 (printed page 205 of IEEE 1800-2023) makes the unadorned name
-// of a parameterized class illegal as the prefix of the class scope resolution
-// operator outside the class and its out-of-block declarations, wherever it
-// stands: a module-level variable declaration's initializer, `int x = C::p;`,
-// is such a place, and it was passed over -- the check walked the procedural
-// statements and the continuous assignments alone.
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedScopeInAVariableDeclarationInitializerIsError) {
   ElabFixture f;
@@ -379,8 +310,6 @@ TEST(ParameterizedScopeResolutionElaboration,
       "used as scope resolution prefix for parameterized class", 4, "8.25.1"));
 }
 
-// §8.25.1: the explicit default specialization, `C#()::p`, is the form the
-// subclause gives for the same initializer, and is accepted.
 TEST(ParameterizedScopeResolutionElaboration,
      ExplicitDefaultSpecializationInAVariableDeclarationInitializerOk) {
   ElabFixture f;
@@ -394,12 +323,6 @@ TEST(ParameterizedScopeResolutionElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §8.25.1 makes the unadorned name of a parameterized class illegal before
-// `::` outside the class and its out-of-block declarations, wherever the
-// expression stands: a package's declaration or task, another class's method
-// or a nested class's, a module's subroutine. Inside the class itself, and in a
-// class nested in it, the unadorned name stays legal, as the explicit form
-// does everywhere.
 TEST(ParameterizedScopeResolutionElaboration,
      UnadornedPrefixOutsideTheClassIsAnError) {
   ElabFixture f;
@@ -437,12 +360,6 @@ TEST(ParameterizedScopeResolutionElaboration,
   }
 }
 
-// §8.25.1 holds a data type written behind the class scope operator to the
-// rule an expression is held to: outside the parameterized class, the classes
-// nested in it and its out-of-block declarations, C::T is illegal and
-// C#()::T or another specialization is required. The declarations are a
-// package's typedef, another class's property and argument, a module's
-// variable and a block's.
 TEST(ParameterizedScopeResolutionElaboration,
      ATypeBehindAnUnadornedPrefixOutsideTheClassIsAnError) {
   ElabFixture f;
@@ -478,13 +395,6 @@ TEST(ParameterizedScopeResolutionElaboration,
   }
 }
 
-// §8.25.1 (printed page 205) with §7.4.4: `C#(4)::t` is the typedef t of C's
-// specialization with p = 4, so a function's return type, its formal and its
-// body's variable written with a specialization each take that
-// specialization's element count, never the generic `[p]` folded against the
-// module's own p. Each took the class's generic dimension, looked up by the
-// key `C::t` whatever the specialization. A typedef with no unpacked
-// dimensions, `w`, gives the formal none.
 TEST(ParameterizedScopeResolutionElaboration,
      SubroutineDeclarationsTakeTheSpecializationsDimensions) {
   ElabFixture f;

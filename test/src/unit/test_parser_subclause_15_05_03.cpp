@@ -76,11 +76,6 @@ TEST(EventTriggeredParser, TriggeredMethodEventAlias) {
 }
 
 TEST(EventTriggeredParser, TriggeredMethodCallForm) {
-  // §15.5.3: the method prototype carries empty parentheses, so the
-  // parenthesized call form ev.triggered() is a legal invocation alongside the
-  // bare-member form. The wait condition parses as a call expression (its
-  // receiver being the event member access), distinct from the plain member
-  // access of ev.triggered.
   auto r = Parse(
       "module m;\n"
       "  event ev;\n"

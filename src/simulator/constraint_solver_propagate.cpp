@@ -14,28 +14,17 @@ namespace delta {
 
 namespace {
 
-// A comparison of one random variable against another, `var` under `cmp`
-// against `other`, the clause's y < p1.x read from either side.
 struct BinaryBound {
   std::string var;
   ConstraintKind cmp;
   std::string other;
 };
 
-// The active constraints the propagation reads: the comparisons of one
-// variable against another, and, by variable, the bounds against constants
-// and the set memberships.
 struct PropagationSet {
   std::vector<BinaryBound> binary;
   std::vector<const ConstraintExpr*> unary;
 };
 
-// Gathers the constraints of `c` into `out`: a soft constraint `honored`
-// answers for as its inner relation, a foreach as its instances below the
-// size drawn, a derived relation of two bare variables as the comparison
-// read from each, and a comparison against a constant, an equality or a
-// set membership as itself. An implication is left out, its consequent
-// holding only where its antecedent does, which the values alone decide.
 void CollectPropagated(
     const ConstraintExpr& c,
     const std::function<bool(const ConstraintExpr&)>& honored,
@@ -68,9 +57,6 @@ void CollectPropagated(
   }
 }
 
-// `dom` narrowed to the values `cmp` admits against some value of `other`:
-// below the largest of them under a less-than, above the smallest under a
-// greater-than, and between them under an equality.
 void NarrowByInterval(RandVariable& dom, ConstraintKind cmp,
                       const RandVariable& other) {
   ConstraintExpr bound;
@@ -95,8 +81,6 @@ void NarrowByInterval(RandVariable& dom, ConstraintKind cmp,
   dom = Narrowed(dom, bound);
 }
 
-// Narrows every interval by the comparisons between variables until none
-// changes, or a bounded number of rounds has run over a cycle of them.
 void PropagateIntervals(const PropagationSet& set,
                         std::unordered_map<std::string, RandVariable>& dom) {
   static constexpr int kMaxRounds = 64;
@@ -117,8 +101,6 @@ void PropagateIntervals(const PropagationSet& set,
   }
 }
 
-// The members of the set memberships over `name` that its interval admits,
-// `has_members` set where one holds it.
 std::vector<int64_t> AdmittedMembers(const PropagationSet& set,
                                      const std::string& name,
                                      const RandVariable& dom,
@@ -148,9 +130,6 @@ std::vector<int64_t> AdmittedMembers(const PropagationSet& set,
   return members;
 }
 
-// The interval of every active integral variable: a point at the value
-// already drawn or seeded, and otherwise its domain narrowed by the bounds
-// against constants.
 std::unordered_map<std::string, RandVariable> Intervals(
     const PropagationSet& set,
     const std::unordered_map<std::string, RandVariable>& variables,
@@ -182,8 +161,6 @@ std::unordered_map<std::string, RandVariable> Intervals(
   return dom;
 }
 
-// The constraints of every enabled block and of `extra` the propagation
-// reads.
 PropagationSet CollectPropagationSet(
     const std::vector<ConstraintBlock>& blocks,
     const std::vector<ConstraintExpr>& extra,
@@ -199,9 +176,6 @@ PropagationSet CollectPropagationSet(
   return set;
 }
 
-// The variables of `dom` still to draw, in a random order: those not yet
-// drawn, and neither randc, which are drawn from their own cycle, nor of an
-// enumeration, whose named values the interval does not read.
 std::vector<std::string> PendingInRandomOrder(
     const std::unordered_map<std::string, RandVariable>& dom,
     const std::unordered_map<std::string, int64_t>& values, std::mt19937& rng) {
@@ -217,9 +191,6 @@ std::vector<std::string> PendingInRandomOrder(
   return pending;
 }
 
-// A value of `name` within `interval`, one of the members a set membership
-// holds it to where one does, into `value`; false where the interval, or
-// the members within it, is empty.
 bool DrawInInterval(const PropagationSet& set, const std::string& name,
                     const RandVariable& interval, std::mt19937& rng,
                     int64_t& value) {

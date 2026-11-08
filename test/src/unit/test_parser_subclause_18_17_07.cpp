@@ -13,13 +13,6 @@ using namespace delta;
 
 namespace {
 
-// §18.17.7 governs value passing between randsequence productions: a production
-// may carry a data_type_or_void return type and a tf_port_list of formal
-// arguments. The grammar that admits these (rs_production) is owned by the
-// parent §18.17; what §18.17.7 requires here is that the return type and the
-// formal arguments be captured so the value-passing engine can act on them.
-// These parser tests observe that capture.
-
 const RsProduction* FindProd(const Stmt* stmt, std::string_view name) {
   for (const auto& p : stmt->rs_productions) {
     if (p.name == name) return &p;
@@ -33,11 +26,6 @@ const Stmt* RandseqStmt(ParseResult& r) {
   return stmt->kind == StmtKind::kRandsequence ? stmt : nullptr;
 }
 
-// Parses a randsequence whose production `v` declares `type_text` as its
-// return type, from a module carrying `decls` ahead of the initial block.
-// §18.17's Syntax 18-13 writes the optional data_type_or_void immediately
-// before the production identifier, so the cases below vary that text alone
-// and share the module, the statement and the rule around it.
 ParseResult ParseProductionReturnType(std::string_view decls,
                                       std::string_view type_text) {
   return Parse(std::string("module m;\n") + std::string(decls) +
@@ -52,10 +40,6 @@ ParseResult ParseProductionReturnType(std::string_view decls,
                "endmodule\n");
 }
 
-// The production named `v` in a run that accepted its source and recorded a
-// return type on it, or nullptr when the run reported something or recorded no
-// such production. Each case below then reads the one member of DataType that
-// says which data_type form of A.2.2.1 was parsed.
 const RsProduction* ProductionWithReturnType(ParseResult& r) {
   EXPECT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -67,9 +51,6 @@ const RsProduction* ProductionWithReturnType(ParseResult& r) {
   return v;
 }
 
-// §18.17.7: a production with no data_type_or_void and no tf_port_list assumes
-// a void return type and accepts no data — the parser records neither a return
-// type nor any formal arguments.
 TEST(RandseqValuePassingParse, PlainProductionHasNoTypeNoPorts) {
   auto r = Parse(
       "module m;\n"
@@ -91,8 +72,6 @@ TEST(RandseqValuePassingParse, PlainProductionHasNoTypeNoPorts) {
   EXPECT_TRUE(a->ports.empty());
 }
 
-// §18.17.7: an explicit 'void' return type is captured as such, distinguishing
-// it from a value-returning production.
 TEST(RandseqValuePassingParse, VoidReturnTypeCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -113,8 +92,6 @@ TEST(RandseqValuePassingParse, VoidReturnTypeCaptured) {
   EXPECT_EQ(top->return_type.kind, DataTypeKind::kVoid);
 }
 
-// §18.17.7: a non-void return type, including its packed dimensions, is parsed
-// and retained so the production's return value can be sized correctly.
 TEST(RandseqValuePassingParse, VectorReturnTypeCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -133,14 +110,10 @@ TEST(RandseqValuePassingParse, VectorReturnTypeCaptured) {
   ASSERT_NE(val, nullptr);
   EXPECT_TRUE(val->has_return_type);
   EXPECT_EQ(val->return_type.kind, DataTypeKind::kBit);
-  // The [7:0] packed dimension is retained on the return type.
   EXPECT_NE(val->return_type.packed_dim_left, nullptr);
   EXPECT_NE(val->return_type.packed_dim_right, nullptr);
 }
 
-// §18.17.7: a production that accepts data declares a tf_port_list. The formal
-// arguments — their names and declared types — are parsed and retained rather
-// than discarded.
 TEST(RandseqValuePassingParse, FormalArgumentListCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -166,8 +139,6 @@ TEST(RandseqValuePassingParse, FormalArgumentListCaptured) {
   EXPECT_EQ(compute->ports[1].data_type.kind, DataTypeKind::kBit);
 }
 
-// §18.17.7: a formal argument may declare a default value (gen's "done"-style
-// example). The default expression is retained on the formal.
 TEST(RandseqValuePassingParse, FormalArgumentDefaultCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -189,10 +160,6 @@ TEST(RandseqValuePassingParse, FormalArgumentDefaultCaptured) {
   EXPECT_NE(gen->ports[0].default_value, nullptr);
 }
 
-// §18.17.7: a production may carry both a non-void return type and a
-// tf_port_list at once (returning data requires a declared type; accepting data
-// requires formal arguments). Both are parsed and retained on the same
-// production.
 TEST(RandseqValuePassingParse, ReturnTypeAndPortsCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -217,8 +184,6 @@ TEST(RandseqValuePassingParse, ReturnTypeAndPortsCaptured) {
   EXPECT_EQ(gen->ports[0].data_type.kind, DataTypeKind::kBit);
 }
 
-// §18.17.7: a call site may pass more than one actual argument. Each is
-// captured in the production item's argument list, in order.
 TEST(RandseqValuePassingParse, MultipleCallSiteArgumentsCaptured) {
   auto r = Parse(
       "module m;\n"
@@ -242,10 +207,6 @@ TEST(RandseqValuePassingParse, MultipleCallSiteArgumentsCaptured) {
   ASSERT_EQ(item.item.args.size(), 3u);
 }
 
-// §18.17.7: defaults follow the task-prototype shape, so they are recorded per
-// formal rather than all-or-nothing. With only the trailing formal defaulted,
-// the parser retains a default on that formal alone and leaves the earlier one
-// without one.
 TEST(RandseqValuePassingParse, FormalArgumentDefaultAmongMultiple) {
   auto r = Parse(
       "module m;\n"
@@ -269,12 +230,6 @@ TEST(RandseqValuePassingParse, FormalArgumentDefaultAmongMultiple) {
   EXPECT_NE(combine->ports[1].default_value, nullptr);
 }
 
-// §18.17.7: the return type a production declares is a data_type_or_void, and
-// A.2.2.1 gives `data_type` a `[ class_scope | package_scope ] type_identifier
-// { packed_dimension }` alternative — a name A.2.1.3's typedef declared. No
-// keyword marks the type here, so the return type is recognized only from the
-// parser's record of which identifiers name types; the production's own
-// identifier is the one after it.
 TEST(RandseqValuePassingParse, TypedefNameReturnTypeCaptured) {
   auto r = ParseProductionReturnType("  typedef int word;\n", "word");
   const auto* v = ProductionWithReturnType(r);
@@ -283,15 +238,6 @@ TEST(RandseqValuePassingParse, TypedefNameReturnTypeCaptured) {
   EXPECT_EQ(v->return_type.type_name, "word");
 }
 
-// §18.17.7 with A.2.2.1: the type_identifier alternative carries `{
-// packed_dimension }`, so the name a typedef of a vector type declares is a
-// return type like any other. TypedefNameReturnTypeCaptured above uses `int`,
-// whose typedef needs no dimensions, and so leaves open whether a name standing
-// for a *vector* is recognized in return-type position at all -- the parser
-// reads the type only from its record of which identifiers name types, and the
-// simulator sizes the returned value from what lands here. #3473 is a
-// production returning such a name being stored in 32 bits rather than 4, and
-// this case says whether the parse is where that starts.
 TEST(RandseqValuePassingParse, VectorTypedefNameReturnTypeCaptured) {
   auto r = ParseProductionReturnType("  typedef bit [3:0] nib;\n", "nib");
   const auto* v = ProductionWithReturnType(r);
@@ -300,11 +246,6 @@ TEST(RandseqValuePassingParse, VectorTypedefNameReturnTypeCaptured) {
   EXPECT_EQ(v->return_type.type_name, "nib");
 }
 
-// §18.17.7 with A.2.2.1: `data_type ::= ... | enum [ enum_base_type ] {
-// enum_name_declaration { , enum_name_declaration } } { packed_dimension }`,
-// so an enumeration written out in place is a return type Syntax 18-13 admits.
-// Its members are what an enum return type carries beyond the keyword, so they
-// are read back rather than the kind alone.
 TEST(RandseqValuePassingParse, EnumReturnTypeCaptured) {
   auto r = ParseProductionReturnType("", "enum { RED, GREEN }");
   const auto* v = ProductionWithReturnType(r);
@@ -313,11 +254,6 @@ TEST(RandseqValuePassingParse, EnumReturnTypeCaptured) {
   EXPECT_EQ(v->return_type.enum_members.size(), 2u);
 }
 
-// §18.17.7 with A.2.2.1: `data_type ::= ... | struct_union [ packed [ signing ]
-// ] { struct_union_member { struct_union_member } } { packed_dimension }`, so a
-// structure written out in place is a return type Syntax 18-13 admits. Both
-// members and the packed qualifier are read back, because they are what the
-// return type has to carry for the value to be sized at all.
 TEST(RandseqValuePassingParse, StructReturnTypeCaptured) {
   auto r = ParseProductionReturnType(
       "", "struct packed { bit [3:0] lo; bit [3:0] hi; }");
@@ -328,12 +264,6 @@ TEST(RandseqValuePassingParse, StructReturnTypeCaptured) {
   EXPECT_EQ(v->return_type.struct_members.size(), 2u);
 }
 
-// §18.17.7 with A.2.2.1: `data_type ::= integer_vector_type [ signing ] {
-// packed_dimension }` and `integer_vector_type ::= bit | logic | reg`, so
-// `reg signed [7:0]` is a signed vector return type Syntax 18-13 admits. It is
-// written on `reg` because A.2.2.1 attaches the signing to a vector keyword: a
-// bare `signed [7:0]` is an implicit_data_type, which data_type_or_void does
-// not reach.
 TEST(RandseqValuePassingParse, RegSignedVectorReturnTypeCaptured) {
   auto r = ParseProductionReturnType("", "reg signed [7:0]");
   const auto* v = ProductionWithReturnType(r);
@@ -343,17 +273,6 @@ TEST(RandseqValuePassingParse, RegSignedVectorReturnTypeCaptured) {
   EXPECT_NE(v->return_type.packed_dim_left, nullptr);
 }
 
-// Syntax 18-13 writes `rs_production ::= [ data_type_or_void ]
-// rs_production_identifier ...`, and A.2.2.1 gives `data_type ::=
-// integer_vector_type [ signing ] { packed_dimension } | ...`, so a signing
-// follows a type keyword rather than standing alone. A bare one is an
-// implicit_data_type, reachable from data_type_or_implicit and from nothing in
-// Syntax 18-13.
-//
-// It parsed because Parser::AtDataTypeOrVoid answers for what
-// ParseFunctionReturnType can consume, and §13.4 gives a function a
-// function_data_type_or_implicit, which does admit an implicit type. A
-// production is not a function.
 TEST(RandseqValuePassingParse, BareSigningReturnTypeIsRejected) {
   auto r = ParseProductionReturnType("", "signed [7:0]");
   EXPECT_TRUE(ReportedError(r.diags,
@@ -362,10 +281,6 @@ TEST(RandseqValuePassingParse, BareSigningReturnTypeIsRejected) {
                             5, "18.17"));
 }
 
-// The same rule reached by the other token: a packed dimension with no type
-// keyword before it. It is a case of its own because AtDataTypeOrVoid answers
-// for `[` separately from the two signing keywords, and a check written over
-// the keywords alone would leave this one accepted.
 TEST(RandseqValuePassingParse, BarePackedDimensionReturnTypeIsRejected) {
   auto r = ParseProductionReturnType("", "[7:0]");
   EXPECT_TRUE(ReportedError(r.diags,

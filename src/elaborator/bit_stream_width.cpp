@@ -40,15 +40,9 @@ uint32_t FixedUnpackedElementCount(const std::vector<Expr*>& dims) {
 
 namespace {
 
-// The depth bounds a cyclic typedef.
 uint32_t BitStreamTypeWidthAt(const DataType& type, const TypedefMap& typedefs,
                               int depth);
 
-// One member's share of an unpacked structure's bit-stream size: its element
-// size times its unpacked element count, zero where either is not fixed. A
-// string is a dynamic array of bytes to a bit-stream cast (printed page 143),
-// so its size is never fixed; the 64 bits EvalStructMemberWidth gives it are
-// the simulator's storage for the string's handle.
 uint32_t MemberBitStreamWidth(const StructMember& m, const TypedefMap& typedefs,
                               int depth) {
   if (m.type_kind == DataTypeKind::kString) return 0;

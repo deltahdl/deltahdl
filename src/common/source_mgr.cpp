@@ -35,8 +35,6 @@ uint32_t SourceManager::AddPreprocessedFile(
 SourceLoc SourceManager::ResolveToOrigin(SourceLoc loc) const {
   if (loc.file_id == 0 || loc.file_id > files_.size()) return loc;
   const auto& origins = files_[loc.file_id - 1].line_origins;
-  // The last line of the text is the empty one after its final newline, which
-  // no source line wrote, so a position can stand one line past the table.
   if (loc.line == 0 || loc.line > origins.size()) return loc;
   const auto& origin = origins[loc.line - 1];
   if (origin.file_id == 0) return loc;
@@ -113,9 +111,6 @@ bool SourceManager::StandsInEnvelope(SourceLoc loc,
     return at.file_id == viewport.region_source &&
            at.line >= viewport.first_line && at.line <= viewport.last_line;
   };
-  // A region of a precompiled library record's text holds positions in the
-  // record as they stand, its sealed lines among them, which resolve to the
-  // record's protected copy.
   if (in_region(loc)) return true;
   const SourceLoc kAt = ResolveToOrigin(loc);
   if (kAt.file_id == 0) return false;

@@ -45,10 +45,6 @@ TEST(TernaryMatchesParsing, MatchesWithGuardInTernary) {
   EXPECT_EQ(stmt->rhs->condition->op, TokenKind::kAmpAmpAmp);
 }
 
-// §12.6.3: the predicate of a conditional expression may be a whole sequence of
-// matches clauses joined by `&&&`, not just one. A three-clause predicate must
-// parse into a left-associated `&&&` tree whose left operand is itself a `&&&`,
-// confirming the parser accepts more than two predicate clauses in a ternary.
 TEST(TernaryMatchesParsing, MatchesChainInTernary) {
   auto r = Parse(
       "module m;\n"
@@ -65,8 +61,6 @@ TEST(TernaryMatchesParsing, MatchesChainInTernary) {
   ASSERT_NE(stmt->rhs->condition, nullptr);
   EXPECT_EQ(stmt->rhs->condition->kind, ExprKind::kBinary);
   EXPECT_EQ(stmt->rhs->condition->op, TokenKind::kAmpAmpAmp);
-  // The left operand of the outermost `&&&` is itself a `&&&` chain, so the
-  // predicate holds three clauses rather than two.
   ASSERT_NE(stmt->rhs->condition->lhs, nullptr);
   EXPECT_EQ(stmt->rhs->condition->lhs->kind, ExprKind::kBinary);
   EXPECT_EQ(stmt->rhs->condition->lhs->op, TokenKind::kAmpAmpAmp);

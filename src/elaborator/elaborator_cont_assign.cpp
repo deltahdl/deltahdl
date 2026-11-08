@@ -28,25 +28,12 @@
 
 namespace delta {
 
-// §6.10 and §10.3.2 for an element of a continuous assignment's target that is
-// a whole name: an undeclared one is an implicit net, and a variable takes one
-// continuous assignment and no initializer.
-//
-// §27.4 makes each generate block a scope of its own, and each iteration of a
-// loop generate construct a block, so the targets are told apart by the
-// declaration the name binds rather than by how it is spelled: a `w` each
-// iteration declares is a variable of that iteration's and takes one
-// assignment there.
 void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
                                             ModuleItem* item,
                                             RtlirModule* mod) {
   MaybeCreateImplicitNet(name, item->loc, mod);
   std::string_view declared =
       DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
-  // §6.5 states the rule in full: multiple continuous assignments to any term
-  // in the expansion of a variable's longest static prefix are an error.
-  // §10.3.2 restates it and refers back, so the report cites §6.5. A uwire
-  // net's drivers are counted by bit (UwireDrivers).
   if (!cont_assign_targets_.emplace(declared, item->loc).second &&
       !NamesNet(name, item->loc)) {
     diag_.Error(item->loc,
@@ -55,11 +42,6 @@ void Elaborator::ValidateContAssignIdentLhs(std::string_view name,
   }
 }
 
-// §10.3.4 (printed page 251): a drive strength applies only to an assignment
-// to a scalar net other than one of type supply0 or supply1, so a target that
-// is a supply net or a select of one is excepted as the net is, and a select of
-// a vector net, a member of a net of a packed structure type or a concatenation
-// is no more a scalar net than a whole vector net is.
 void Elaborator::ValidateContAssignDriveStrength(ModuleItem* item,
                                                  RtlirModule* mod) {
   const Expr* lhs = item->assign_lhs;
@@ -99,8 +81,6 @@ void ValidateContAssignVarTarget(ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §5.12: `attrs` are the item's attributes, resolved once for every
-// assignment it splits into.
 RtlirContAssign BuildContAssignFor(
     ModuleItem* item, Expr* lhs, Expr* rhs, uint32_t width,
     const std::vector<ResolvedAttribute>& attrs) {
@@ -126,11 +106,6 @@ RtlirContAssign BuildContAssign(ModuleItem* item, RtlirModule* mod,
 
 }  // namespace
 
-// §11.5.1: the width of a select written as an element of a concatenation
-// left-hand side, which the clause keeps constant: the span its two indices
-// name for `[msb:lsb]`, the width expression for the two indexed forms, and one
-// bit for a bit-select. Zero where a bound does not fold, which is the answer
-// for an element this cannot size at all.
 uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope) {
   if (e->index == nullptr) return 0;
   if (e->index_end == nullptr) return 1;
@@ -146,17 +121,6 @@ uint32_t SelectLhsWidth(const Expr* e, const ScopeMap& scope) {
 
 namespace {
 
-// §11.4.1/§10.10: total bit width of a continuous-assignment concatenation
-// left-hand side (a nested concatenation sums its elements; identifiers reduce
-// to their declared width).
-//
-// A select element is sized by its own indices rather than by the signal it
-// selects from. LookupLhsWidth answers 0 for anything that is not a bare
-// identifier, and the emission below passes over an element of width 0, so
-// `assign {b, a[1:0]} = 3'b111;` emitted no assignment for `a` at all: the bits
-// reached neither a driver nor the net's storage, and `b` took its slice from
-// the wrong end of the value besides, the running offset never having advanced
-// past the element that was skipped.
 uint32_t ConcatLhsWidth(const Expr* e, const RtlirModule* mod,
                         const ScopeMap& scope) {
   if (e->kind == ExprKind::kSelect) return SelectLhsWidth(e, scope);
@@ -166,9 +130,6 @@ uint32_t ConcatLhsWidth(const Expr* e, const RtlirModule* mod,
   return total;
 }
 
-// `rhs[first:second]`. Both operands are indices of `rhs` in the range its
-// declaration was written with, which is what §11.5.1 resolves a select
-// against; the caller maps the bits it wants onto them.
 Expr* MakeRhsPartSelect(Expr* rhs, int64_t first, int64_t second,
                         Arena& arena) {
   auto* hi_lit = arena.Create<Expr>();
@@ -185,11 +146,6 @@ Expr* MakeRhsPartSelect(Expr* rhs, int64_t first, int64_t second,
   return sel;
 }
 
-// Recursion-invariant context for splitting a concatenation continuous-assign
-// lvalue (bundled to keep the helper within the parameter-count threshold).
-// `scope` folds the packed dimension of whatever signal the right-hand side
-// names, so a slice of one can be written in its declared range; `attrs` are
-// the item's resolved attributes, which each split assignment carries.
 struct ConcatContAssignCtx {
   ModuleItem* item;
   RtlirModule* mod;
@@ -198,10 +154,6 @@ struct ConcatContAssignCtx {
   const ScopeMap& scope;
 };
 
-// §11.5.1: the range a select on this right-hand side resolves against. A named
-// signal carries the packed dimension of its declaration; anything else -- a
-// literal, a concatenation, the widened expression below -- carries no
-// declaration of its own and is addressed as [`width`-1:0].
 PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
                            const ConcatContAssignCtx& cx) {
   if (rhs && rhs->kind == ExprKind::kIdentifier) {
@@ -210,23 +162,6 @@ PackedRange RhsSelectRange(const Expr* rhs, uint32_t width,
   return PackedRange::Implicit(width);
 }
 
-// §11.6.1 makes the whole target the context the right-hand side is evaluated
-// in, and §11.8.2 propagates that width down into the context-determined
-// operands of the expression. Splitting the assignment element by element takes
-// the context away, each emitted assignment carrying only the width of the
-// element it drives, so the expression under the slice is evaluated at the
-// width its own operands give it. §10.3.2's Example 2 is what that loses:
-// `assign {carry_out, sum_out} = ina + inb + carry_in;` has to add at five bits
-// for the carry to exist at all.
-//
-// The width is put back the way §11.6.2 puts it back -- adding an integer 0 to
-// an expression makes it evaluate at an integer's bit size -- with a zero of
-// the target's width rather than an integer's, so the addition is performed at
-// the width the concatenation gives it and at no other. The zero is signed so
-// that the widening does not change the type of what it widens: §11.8.1 makes a
-// result unsigned when any operand is unsigned, so an unsigned right-hand side
-// stays unsigned and zero-extends into the new bits, and a signed one stays
-// signed and sign-extends.
 Expr* MakeWidenedRhs(Expr* rhs, uint32_t width, Arena& arena) {
   std::string text = std::format("{}'sd0", width);
   auto* zero = arena.Create<Expr>();
@@ -242,22 +177,10 @@ Expr* MakeWidenedRhs(Expr* rhs, uint32_t width, Arena& arena) {
   return sum;
 }
 
-// §11.4.1: a continuous assignment to a concatenation drives each element from
-// its own slice of the right-hand side; the leftmost element takes the most
-// significant bits. Emit one assignment per (recursively flattened) element so
-// each whole-identifier target registers its own net driver.
 void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
                            Expr* rhs) {
   uint32_t hi = ConcatLhsWidth(lhs, cx.mod, cx.scope);
-  // Nothing to drive from, and nothing to drive into: a target whose elements
-  // are all of unknown width leaves no assignment to emit, and a source the
-  // parser never built leaves nothing to widen.
   if (hi == 0 || rhs == nullptr) return;
-  // A signal named as the whole right-hand side and already as wide as the
-  // target has nothing to widen: it has no operands of its own to evaluate, and
-  // its bits are the target's bits. It is left as it stands, so the select
-  // below goes on naming its bits in the range its declaration was written with
-  // -- the most significant bit of `wire [8:1] src` is src[8], not src[7].
   uint32_t named_width =
       rhs->kind == ExprKind::kIdentifier ? LookupLhsWidth(rhs, cx.mod) : 0;
   Expr* source = named_width >= hi ? rhs : MakeWidenedRhs(rhs, hi, cx.arena);
@@ -279,9 +202,6 @@ void EmitConcatContAssigns(const ConcatContAssignCtx& cx, Expr* lhs,
 
 }  // namespace
 
-// One element of a continuous assignment's target: the expression, the name
-// it is rooted at, how many selects stand between that name and the first
-// member access over it, and whether it holds a member access at all.
 struct ContTargetLeaf {
   const Expr* expr = nullptr;
   std::string_view root = {};
@@ -289,9 +209,6 @@ struct ContTargetLeaf {
   bool has_member = false;
 };
 
-// The element `e` of a target, walked down through its selects and member
-// accesses to the name it is rooted at; the root is empty where that is no
-// name.
 static ContTargetLeaf LeafOf(const Expr* e) {
   ContTargetLeaf leaf{.expr = e};
   while (e->kind == ExprKind::kSelect || e->kind == ExprKind::kMemberAccess) {
@@ -308,11 +225,6 @@ static ContTargetLeaf LeafOf(const Expr* e) {
   return leaf;
 }
 
-// §10.3 Syntax 10-1: a continuous assignment's target is a net_lvalue or a
-// variable_lvalue -- a name under constant selects and member accesses, a
-// concatenation of those, or an assignment pattern of them with or without a
-// type, whose keys §10.9's own rule reports. A.8.5 writes none of them in
-// parentheses. Collects its elements, answering false for any other form.
 static bool CollectContTargetLeaves(const Expr* e,
                                     std::vector<ContTargetLeaf>& out) {
   if (e->is_parenthesized) return false;
@@ -332,9 +244,6 @@ static bool CollectContTargetLeaves(const Expr* e,
   return true;
 }
 
-// Whether `name` is a parameter of `mod` that a reference standing in the
-// generate blocks `scopes` sees: §23.9 keeps a block's parameter from the
-// module and from the block's siblings.
 static bool NamesParameter(std::string_view name, const RtlirModule* mod,
                            const std::vector<std::string_view>& scopes) {
   for (const auto& p : mod->params) {
@@ -344,12 +253,6 @@ static bool NamesParameter(std::string_view name, const RtlirModule* mod,
   return false;
 }
 
-// A driven terminal is read as a continuous assignment's target is, since
-// A.8.5's net_lvalue gives the two their elements; a form the parser already
-// reported as no net_lvalue yields no element, or fewer. A terminal left empty
-// on a UDP instance written before its primitive's declaration is a null, and
-// yields none: Elaborator::ReclassifyForwardUdpInstances
-// (src/elaborator/elaborator_udp_inst.cpp) has already reported it.
 void ValidatePrimitiveDrivenTerminals(
     const ModuleItem* item, const RtlirModule* mod, const ScopeMap& scope,
     const std::vector<std::string_view>& gen_scopes, DiagEngine& diag) {
@@ -380,8 +283,6 @@ static size_t UnpackedDimsOfNet(std::string_view name, const RtlirModule* mod) {
   return 0;
 }
 
-// §10.3.2 (printed page 249): a variable a continuous assignment writes any
-// part of has no initializer. `declared` is the declaration `name` binds.
 static void ReportContTargetInitializer(
     const ModuleItem* item, std::string_view name, std::string_view declared,
     const std::unordered_set<std::string_view>& var_init_names,
@@ -394,14 +295,9 @@ static void ReportContTargetInitializer(
              Subclause("10.3.2"));
 }
 
-// The rules §10.3 and §10.3.2 state of one element of a continuous
-// assignment's target, and whether it is a variable, whose form (Syntax 10-1)
-// takes no drive strength and a delay_control alone.
 bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
                                         const ContTargetLeaf& leaf,
                                         const ScopeMap& scope) {
-  // §10.2 and §10.3: a continuous assignment drives a net or a variable, and a
-  // parameter is a constant (§6.20).
   if (NamesParameter(leaf.root, mod, gen_prefix_scopes_)) {
     diag_.Error(
         item->loc,
@@ -409,8 +305,6 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
         Subclause("10.3"));
     return false;
   }
-  // Table 10-1 (printed page 247): every select on the left-hand side of a
-  // continuous assignment is a constant one, however deep it stands.
   if (!SelectPathIsConstant(leaf.expr, scope)) {
     diag_.Error(item->loc,
                 "continuous assignment left-hand side requires a "
@@ -427,15 +321,9 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
                      {gen_prefix_scopes_, declared_names_},
                      scope},
                     diag_);
-  // A name reached through a member access may be an instance's or an
-  // interface's, which names no variable of this module, so only a name the
-  // target writes directly or through selects is judged as a variable here.
   bool is_net = NamesNet(leaf.root, item->loc);
   bool is_var = !is_net && !leaf.has_member;
   if (is_var) ValidateContAssignVarLeaf(item, leaf.root);
-  // §10.3.2: an assignment to a net of a user-defined nettype drives the whole
-  // net, so it may select an element of an array of such nets and nothing
-  // within the nettype's data type.
   if (nettype_net_names_.count(leaf.root) != 0 &&
       (leaf.has_member || leaf.selects > UnpackedDimsOfNet(leaf.root, mod))) {
     diag_.Error(item->loc,
@@ -443,10 +331,6 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
                 "drives the whole net and cannot index or select into it",
                 Subclause("10.3.2"));
   }
-  // A.6.1: a member of a variable this module declares is a variable_lvalue as
-  // the variable is, so the assignment takes the variable form all the same,
-  // and drives the variable as §10.3.2 reads it. §6.5 weighs the member as a
-  // term of its own, which a procedural assignment's name does not tell apart.
   bool is_var_member = !is_var && !is_net && var_types_.count(leaf.root) != 0;
   if (is_var_member) {
     ReportContTargetInitializer(
@@ -457,12 +341,6 @@ bool Elaborator::ValidateContAssignLeaf(ModuleItem* item, RtlirModule* mod,
   return is_var || is_var_member;
 }
 
-// §6.5 and §10.3.2 of a variable an element of a continuous assignment's
-// target writes. The module's procedural assignments were recorded before its
-// generate blocks are elaborated, so an assignment a block makes is weighed
-// against them here; a module's own is weighed by
-// Elaborator::ValidateMixedAssignments once all of them are known. A variable
-// a continuous assignment writes any part of has no initializer.
 void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
                                            std::string_view name) {
   std::string_view declared =
@@ -479,12 +357,9 @@ void Elaborator::ValidateContAssignVarLeaf(ModuleItem* item,
   ReportContTargetInitializer(item, name, declared, var_init_names_, diag_);
 }
 
-// Whether any element of a continuous assignment's target is a variable.
 bool Elaborator::ValidateContAssignLeaves(
     ModuleItem* item, RtlirModule* mod,
     const std::vector<ContTargetLeaf>& leaves) {
-  // §11.2.1 with §27.4: a select index may name a parameter, or the genvar of
-  // the loop generate block the assignment stands in.
   ScopeMap scope = BuildParamScope(mod);
   for (const auto& [name, value] : gen_const_scope_) scope[name] = value;
   bool any_var = false;
@@ -494,8 +369,6 @@ bool Elaborator::ValidateContAssignLeaves(
   return any_var;
 }
 
-// §28.3.2 with §10.3.4 (printed page 251): (highz0, highz1) is no drive
-// strength a net declaration, a continuous assignment or a gate may take.
 void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag) {
   if ((item->kind == ModuleItemKind::kNetDecl ||
        item->kind == ModuleItemKind::kContAssign ||
@@ -507,15 +380,6 @@ void CheckHighzStrengthPair(const ModuleItem* item, DiagEngine& diag) {
   }
 }
 
-// §27.2 (printed page 818) makes a generate block a collection of module items
-// and §27.3 has them act as the module's own would, so every rule
-// ValidateItemRules enforces of a module item reaches them, as do the strength
-// pair §10.3.4 forbids and the one-driver rules of §6.5, §10.3.2 and §10.6.2.
-// The module's own checks run before its generate blocks are elaborated, so
-// each item of a block is checked as the block is, in the scope of the block
-// instance, against the targets the module's items and the earlier items
-// recorded. Every table holds a variable under the declaration the name binds,
-// as ValidateContAssignIdentLhs records it.
 void Elaborator::ValidateGeneratedItem(const ModuleItem* item,
                                        const RtlirModule& mod) {
   CheckHighzStrengthPair(item, diag_);
@@ -523,8 +387,6 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item,
   if (!IsProceduralItemKind(item->kind)) return;
   std::unordered_map<std::string_view, SourceLoc> targets;
   CollectProcTargets({}, {item->body}, targets);
-  // §6.5 counts a procedural assign as a procedural assignment too. One
-  // naming a net is §10.6.1's to report, so it joins the variables alone.
   std::unordered_map<std::string_view, SourceLoc> assigned;
   CollectProcContAssignTargets({}, {item->body}, assigned);
   for (const auto& [name, loc] : assigned) {
@@ -554,12 +416,6 @@ void Elaborator::ValidateGeneratedItem(const ModuleItem* item,
   }
 }
 
-// §6.5 of a variable a procedural assignment writes. Among the module's own
-// items the weighing waits for ValidateMixedAssignments, which runs once all of
-// them are known; inside a generate block every continuous assignment the
-// module and the earlier items make is already recorded, so the assignment is
-// weighed against them here, and a force or release already applied to the
-// variable is weighed under §10.6.2.
 void Elaborator::RecordProcTarget(std::string_view name, SourceLoc loc) {
   std::string_view declared =
       DeclaredScopedName(name, gen_prefix_scopes_, declared_names_);
@@ -575,10 +431,6 @@ void Elaborator::RecordProcTarget(std::string_view name, SourceLoc loc) {
   proc_assign_targets_.emplace(declared, loc);
 }
 
-// §10.6.2 of the force or release already applied to `declared`, which an
-// assignment inside a generate block has just made a variable of mixed
-// continuous and procedural assignments; `name` is how that assignment wrote
-// the variable.
 void Elaborator::ReportForcesOverMixture(std::string_view declared,
                                          std::string_view name) {
   auto force = force_release_targets_.find(declared);
@@ -587,8 +439,6 @@ void Elaborator::ReportForcesOverMixture(std::string_view declared,
   }
 }
 
-// An n-output gate drives every terminal but its last (§28.4); every other
-// gate, and a UDP instance (§29.3), drives its first.
 std::span<Expr* const> PrimitiveOutputTerminals(const ModuleItem* item) {
   const std::vector<Expr*>& terminals = item->gate_terminals;
   if (terminals.empty()) return {};
@@ -598,9 +448,6 @@ std::span<Expr* const> PrimitiveOutputTerminals(const ModuleItem* item) {
   return {terminals.data(), n_output ? terminals.size() - 1 : 1};
 }
 
-// §10.3.2 (printed page 249): a variable may be driven by one primitive
-// output as by one continuous assignment, and one so driven takes neither an
-// initializer nor a procedural assignment.
 void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
   for (const Expr* terminal : PrimitiveOutputTerminals(item)) {
     std::string_view name = ExprIdent(terminal);
@@ -624,10 +471,6 @@ void Elaborator::RecordGateOutputDrivers(const ModuleItem* item) {
   }
 }
 
-// Whether an element of a target reaches a net through a member access taken
-// of a name that is no net of this module -- an instance's or an interface
-// port's -- whose declaration this module does not hold. A member of this
-// module's own net is part of that net.
 static bool ReachesAnotherScope(
     const std::vector<ContTargetLeaf>& leaves,
     const std::unordered_set<std::string_view>& net_names) {
@@ -636,10 +479,6 @@ static bool ReachesAnotherScope(
   });
 }
 
-// §11.4.14.3 (printed page 292): a streaming concatenation written as a target
-// unpacks the stream into variables, as A.8.5 writes the form among
-// variable_lvalue's alone, so a net among its stream expressions, a nested
-// streaming concatenation's or a concatenation's among them, is reported.
 static void ReportStreamTargetNets(
     const Expr* e, const std::unordered_set<std::string_view>& net_names,
     SourceLoc loc, DiagEngine& diag) {
@@ -668,15 +507,10 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3"));
     return;
   }
-  // A.8.5 writes a streaming concatenation among variable_lvalue's alone, so
-  // an assignment to one takes A.6.1's variable form.
   bool streaming = item->assign_lhs->kind == ExprKind::kStreamingConcat;
   if (streaming)
     ReportStreamTargetNets(item->assign_lhs, NetNamesAt(item->loc), item->loc,
                            diag_);
-  // A net reached through a member access of another scope's name is that
-  // scope's, whose declaration this module does not hold, so its strength goes
-  // unjudged.
   if (ValidateContAssignLeaves(item, mod, leaves) || streaming) {
     ValidateContAssignVarTarget(item, diag_);
   } else if ((item->drive_strength0 != 0 || item->drive_strength1 != 0) &&
@@ -692,7 +526,6 @@ void Elaborator::ElaborateContAssign(ModuleItem* item, RtlirModule* mod) {
                 Subclause("10.3.3"));
   }
   ValidateGetpatternContAssign(item, mod);
-  // §5.12: the attributes fold their values against the module's parameters.
   ScopeMap scope = BuildParamScope(mod);
   const std::vector<ResolvedAttribute> kAttrs =
       ResolveAttributes(item->attrs, diag_, scope);

@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.9: 'constraint_block_item ::= solve solve_before_list before
-// solve_before_list ;'. A solve...before ordering with a single variable on
-// each side is a well-formed constraint block item and parses without error.
 TEST(SolveBeforeOrdering, SingleVariableEachSideAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -23,8 +20,6 @@ TEST(SolveBeforeOrdering, SingleVariableEachSideAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: 'solve_before_list ::= constraint_primary { , constraint_primary }'.
-// Each side of the ordering may list several comma-separated variables.
 TEST(SolveBeforeOrdering, MultipleVariableListsAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -34,10 +29,6 @@ TEST(SolveBeforeOrdering, MultipleVariableListsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: an ordering may name array.size, with or without parentheses after
-// it, and a constraint_primary may carry that array built-in method call.
-// 'solve A.size() before n' parses. This is the parse-stage claim;
-// the elaborator file for this subclause carries the semantic case.
 TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedParses) {
   auto r = Parse(
       "class C;\n"
@@ -48,9 +39,6 @@ TEST(SolveBeforeOrdering, ArraySizeMethodAcceptedParses) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: 'constraint_primary ::= [ implicit_class_handle . | class_scope ]
-// hierarchical_identifier ...'. A primary qualified by an implicit class handle
-// (this.) is accepted.
 TEST(SolveBeforeOrdering, ImplicitClassHandleQualifierAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -61,9 +49,6 @@ TEST(SolveBeforeOrdering, ImplicitClassHandleQualifierAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: one constraint block can mix value constraints with ordering
-// constraints. A block mixing an inside constraint, an implication, and a
-// solve...before ordering parses as a whole.
 TEST(SolveBeforeOrdering, MixedValueAndOrderingConstraintsAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -78,9 +63,6 @@ TEST(SolveBeforeOrdering, MixedValueAndOrderingConstraintsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: more than one ordering statement may appear in a constraint block,
-// defining a partial order across several variables. The chained orderings
-// parse without error.
 TEST(SolveBeforeOrdering, ChainedOrderingStatementsAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -90,9 +72,6 @@ TEST(SolveBeforeOrdering, ChainedOrderingStatementsAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: 'constraint_primary ::= [ implicit_class_handle . | class_scope ]
-// hierarchical_identifier ...'. The other qualifier alternative — a class_scope
-// resolution operator ('::') — on an ordering primary is accepted.
 TEST(SolveBeforeOrdering, ClassScopeQualifierAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -103,10 +82,6 @@ TEST(SolveBeforeOrdering, ClassScopeQualifierAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9: 'constraint_primary ::= ... hierarchical_identifier select [ ( ) ]'.
-// The production admits an optional 'select' on the ordering primary, so an
-// ordering variable named through an element select — such as q[0] on an array
-// member — is a well-formed constraint_primary and parses.
 TEST(SolveBeforeOrdering, IndexedSelectPrimaryAccepted) {
   auto r = Parse(
       "class C;\n"
@@ -117,9 +92,6 @@ TEST(SolveBeforeOrdering, IndexedSelectPrimaryAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 18.5.9 with 18.5.8: an ordering primary of identifiers joined by '.' alone
-// keeps the handles it passes through, in order, which a joint solve reads
-// it by; a class_scope, a method call or a select leaves none.
 TEST(SolveBeforeOrdering, ADottedPrimaryKeepsItsHandles) {
   auto r = Parse(
       "class C;\n"

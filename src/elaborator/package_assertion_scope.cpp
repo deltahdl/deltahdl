@@ -22,8 +22,6 @@ bool IsSequenceOrProperty(const ModuleItem* item) {
          item->kind == ModuleItemKind::kPropertyDecl;
 }
 
-// Whether an expression reads `item` by its name: a sequence or property,
-// a parameter or variable, a function or a let.
 bool IsReadByName(const ModuleItem* item) {
   switch (item->kind) {
     case ModuleItemKind::kSequenceDecl:
@@ -38,7 +36,6 @@ bool IsReadByName(const ModuleItem* item) {
   }
 }
 
-// The names `pkg` declares that an expression in it reads.
 std::unordered_set<std::string_view> PackageNames(const PackageDecl* pkg) {
   std::unordered_set<std::string_view> own;
   for (const ModuleItem* item : pkg->items) {
@@ -47,8 +44,6 @@ std::unordered_set<std::string_view> PackageNames(const PackageDecl* pkg) {
   return own;
 }
 
-// Each call under `e` whose callee is one of `scoped`'s names made a call
-// through the path that stands for it, `pk::s2(x, y)` as the parser reads it.
 void ScopeCallees(Expr* e, const ActualsByFormal& scoped) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kCall) {
@@ -67,8 +62,6 @@ void ScopeCallees(Expr* e, const ActualsByFormal& scoped) {
   for (Expr* el : e->elements) ScopeCallees(el, scoped);
 }
 
-// `item`, a sequence or property of package `pkg`, with each name of `own`
-// it reads and does not bind itself made `pkg::name`.
 void ResolveInPackage(ModuleItem* item, std::string_view pkg,
                       const std::unordered_set<std::string_view>& own,
                       Arena& arena) {
@@ -109,8 +102,6 @@ void ResolvePackageAssertionNames(const CompilationUnit* unit, Arena& arena) {
                                      "::" + std::string(item->name)),
           item);
     }
-    // §16.13.4: a sequence the body names is a sequence there, as a module's
-    // property's is once the module's registry holds it.
     for (ModuleItem* item : pkg->items) {
       if (item->kind == ModuleItemKind::kPropertyDecl) {
         PromoteSequenceInstances(item->prop_body_tree, registry, arena);

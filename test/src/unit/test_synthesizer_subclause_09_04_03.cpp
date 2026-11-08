@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A wait statement written on the same line as the `always` it sits under is
-// still reported at the `wait`, since the report stands at the statement
-// rather than at the procedure holding it.
 TEST(LevelSensitiveEventSynthesis, RejectWaitInAlways) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -27,13 +24,6 @@ TEST(LevelSensitiveEventSynthesis, RejectWaitInAlways) {
                             "wait statement is not synthesizable", 4, "9.4.3"));
 }
 
-// A wait statement inside an initial procedure draws no §9.4.3 report at all.
-// SynthLower::CheckSynthesizable passes over the body of an initial or a final
-// procedure and reports the procedure itself under §9.2.1 when the module
-// describes no other hardware, so the `wait` below is never examined. The case
-// says which of the two reports the module gets, because asserting only that
-// something was reported reads as coverage of §9.4.3 that this source cannot
-// give.
 TEST(LevelSensitiveEventSynthesis,
      WaitInsideInitialProcedureDrawsTheProcedureReport) {
   SynthFixture f;
@@ -53,10 +43,6 @@ TEST(LevelSensitiveEventSynthesis,
   EXPECT_EQ(FindDiag(f, "wait statement is not synthesizable"), nullptr);
 }
 
-// Syntax 9-5 gives the wait statement a statement_or_null body, and a wait
-// written with the null one is rejected on its own account: the report comes
-// from the `wait` rather than from walking a body, which a source with no body
-// to walk is what shows.
 TEST(LevelSensitiveEventSynthesis, WaitWithNullBodyIsReportedAtTheWait) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,
@@ -73,9 +59,6 @@ TEST(LevelSensitiveEventSynthesis, WaitWithNullBodyIsReportedAtTheWait) {
                             "wait statement is not synthesizable", 4, "9.4.3"));
 }
 
-// §9.4.3: a wait statement blocks until a condition becomes true, which no
-// hardware does, and it is a different construct from the delay control of
-// §9.4.1. The report names it and stands at the `wait`.
 TEST(LevelSensitiveEventSynthesis, WaitStatementIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

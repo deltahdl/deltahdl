@@ -14,7 +14,6 @@ using namespace delta;
 
 namespace {
 
-// Builds an identifier-reference expression `name`.
 Expr* MakeIdentExpr(Arena& arena, const char* name) {
   auto* expr = arena.Create<Expr>();
   expr->kind = ExprKind::kIdentifier;
@@ -22,8 +21,6 @@ Expr* MakeIdentExpr(Arena& arena, const char* name) {
   return expr;
 }
 
-// Builds a blocking-assign statement `lhs_name = rhs_value;` where the RHS is
-// an integer literal.
 Stmt* MakeAssignStmt(Arena& arena, const char* lhs_name, uint64_t rhs_value) {
   auto* lhs = MakeIdentExpr(arena, lhs_name);
   auto* rhs = arena.Create<Expr>();
@@ -36,9 +33,6 @@ Stmt* MakeAssignStmt(Arena& arena, const char* lhs_name, uint64_t rhs_value) {
   return stmt;
 }
 
-// Compiles and runs `if (cond) out = then_val; else out = else_val;` wrapped in
-// a block against `f.ctx`. The condition is an identifier reference to `sel`.
-// Returns the compiled process so callers can re-run it after mutating inputs.
 CompiledProcess CompileIfElseAssignOut(CompiledSimFixture& f, uint64_t then_val,
                                        uint64_t else_val) {
   auto* cond = MakeIdentExpr(f.arena, "sel");
@@ -374,12 +368,6 @@ TEST(ConditionalStatementSim, BothBranchesNullNoEffect) {
   EXPECT_EQ(var->value.ToUint64(), 10u);
 }
 
-// End-to-end coverage of §12.4's true->then / false->else rule when the
-// cond_predicate is built from the §12.6 dependency's `&&&` conjunction. The
-// input is written as real source and driven through the full pipeline; the
-// observed value confirms the branch §12.4 selects for the predicate's result.
-// Here both operands are true, so the predicate is true and the then branch
-// runs.
 TEST(ConditionalStatementSim, TripleAndPredicateTrueTakesThenBranch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -397,9 +385,6 @@ TEST(ConditionalStatementSim, TripleAndPredicateTrueTakesThenBranch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Companion to the previous test: with one operand false the `&&&` predicate is
-// false, so §12.4 routes execution to the else branch. The differing value
-// discriminates the false path from the true path.
 TEST(ConditionalStatementSim, TripleAndPredicateFalseTakesElseBranch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -417,9 +402,6 @@ TEST(ConditionalStatementSim, TripleAndPredicateFalseTakesElseBranch) {
   EXPECT_EQ(var->value.ToUint64(), 99u);
 }
 
-// End-to-end coverage of §12.4's true->then rule when the cond_predicate is a
-// §12.6 cond_pattern (`expression matches pattern`). The operand equals the
-// constant pattern, so the match yields true and the then branch runs.
 TEST(ConditionalStatementSim, MatchesPredicateTrueTakesThenBranch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -436,9 +418,6 @@ TEST(ConditionalStatementSim, MatchesPredicateTrueTakesThenBranch) {
   EXPECT_EQ(var->value.ToUint64(), 42u);
 }
 
-// Companion to the previous test: the operand does not equal the constant
-// pattern, so the `matches` predicate is false and §12.4 executes the else
-// branch. The differing value discriminates the false path from the true path.
 TEST(ConditionalStatementSim, MatchesPredicateFalseTakesElseBranch) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -481,11 +460,6 @@ TEST(ConditionalStatementSim, CompiledIfXSkipsThenBranch) {
   EXPECT_EQ(out->value.ToUint64(), 99u);
 }
 
-// A bare (block-free) dangling else must bind to the closest preceding if that
-// lacks an else, i.e. the inner if here. With the outer condition true and the
-// inner condition false, the else associated with the inner if runs. Were the
-// else instead bound to the outer if, the outer-then (the inner if, which has
-// no else once the else is stolen away) would run and leave x untouched.
 TEST(ConditionalStatementSim, DanglingElseBindsInnerIfAtRuntime) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -504,10 +478,6 @@ TEST(ConditionalStatementSim, DanglingElseBindsInnerIfAtRuntime) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// Because the dangling else belongs to the inner if, a false outer condition
-// leaves the whole construct inert: the outer if has no else of its own, so
-// nothing executes and x keeps its prior value. A mistaken outer binding would
-// instead run the else and set x to 2.
 TEST(ConditionalStatementSim, DanglingElseInnerBindingLeavesOuterElseless) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -526,10 +496,6 @@ TEST(ConditionalStatementSim, DanglingElseInnerBindingLeavesOuterElseless) {
   EXPECT_EQ(var->value.ToUint64(), 9u);
 }
 
-// A begin-end block around the inner if forces the else to associate with the
-// outer if instead. With the outer condition false, that outer-bound else runs.
-// Without the block the else would belong to the inner if and a false outer
-// condition would execute nothing, leaving x at its prior value.
 TEST(ConditionalStatementSim, BeginEndForcesElseOntoOuterIfAtRuntime) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -562,10 +528,6 @@ TEST(ConditionalStatementSim, CompiledIfZRunsElseBranch) {
   EXPECT_EQ(out->value.ToUint64(), 11u);
 }
 
-// §12.4 takes an if's first branch when its condition is known and nonzero,
-// whatever its width. The function's condition has its only set bit at 100, so
-// it is true only when every word of it is read; a function body runs on its
-// own executor.
 TEST(ConditionalStatementSim, WideConditionInAFunctionReadsEveryWord) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -582,8 +544,6 @@ TEST(ConditionalStatementSim, WideConditionInAFunctionReadsEveryWord) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// A real -0.0 equals 0, so as an if's or a loop's condition it is false
-// (§12.4, §12.7.4), its set sign bit notwithstanding.
 TEST(ConditionalStatementSim, NegativeZeroRealConditionIsFalse) {
   SimFixture f;
   auto* var = RunAndFindVar(

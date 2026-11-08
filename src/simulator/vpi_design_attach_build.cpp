@@ -27,8 +27,6 @@ namespace delta {
 
 namespace {
 
-// A range bound as the integer it evaluates to, sign-extended where the bound
-// is signed so that a negative index stays negative.
 int64_t BoundValue(const Logic4Vec& v) {
   auto raw = v.ToUint64();
   if (!v.is_signed || v.width == 0 || v.width >= 64) {
@@ -38,7 +36,6 @@ int64_t BoundValue(const Logic4Vec& v) {
   return static_cast<int64_t>((raw ^ kSign) - kSign);
 }
 
-// §11.5.1: one packed range, evaluated in the scope the attach set.
 PackedRange EvaluatedRange(Expr* left, Expr* right, SimContext& ctx) {
   Arena& arena = ctx.GetArena();
   return {BoundValue(EvalExpr(left, ctx, arena)),
@@ -78,8 +75,6 @@ int VpiTypespecKind(DataTypeKind kind) {
       return vpiStructTypespec;
     case DataTypeKind::kUnion:
       return vpiUnionTypespec;
-    // §6.7.1: a net whose declaration writes a net type keyword and no data
-    // type is of the implicit data type logic.
     case DataTypeKind::kImplicit:
     case DataTypeKind::kLogic:
     case DataTypeKind::kReg:
@@ -155,9 +150,6 @@ PackedDims WrittenPackedDims(const DataType* type, SimContext& ctx) {
 std::optional<PackedDims> DeclaredPackedDims(const DataType* type,
                                              uint32_t width, SimContext& ctx) {
   PackedDims dims = WrittenPackedDims(type, ctx);
-  // §6.18: a typedef name stands for its type, `t3 a` under
-  // `typedef logic [2:0] t3;` for `logic [2:0] a`, so the range the typedef
-  // was declared with is the variable's.
   if (dims.empty() && type != nullptr && type->kind == DataTypeKind::kNamed) {
     if (auto range = ctx.FindTypeRange(type->type_name)) dims.push_back(*range);
   }

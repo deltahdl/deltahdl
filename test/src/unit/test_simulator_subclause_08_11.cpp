@@ -193,15 +193,6 @@ TEST(ClassSim, ThisMultipleProperties) {
   LowerRunAndCheck(f, design, {{"ra", 3u}, {"rb", 7u}});
 }
 
-// §9.4.2: a change to a data member of an object, to an element of an
-// aggregate or to the size of a dynamic array, read through a method or a
-// function, reevaluates the event expression. A class handle's own
-// bits never move, so the announcement is the whole of what a process reading
-// `obj.f` has to go on, and the clause draws no distinction between the
-// spellings the four cases below use. The reader is an event control on the
-// property, `@(obj.f)`: an always_comb reading `obj.f` is no reader here,
-// since §9.2.2.2.1 keeps references to class objects out of its sensitivity.
-// This one writes the property by its bare name inside a method.
 TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -223,7 +214,6 @@ TEST(ClassSim, UnqualifiedPropertyWriteInMethodWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §8.11's `this.f`, a different write site from the bare name above.
 TEST(ClassSim, ThisPropertyWriteInMethodWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -245,7 +235,6 @@ TEST(ClassSim, ThisPropertyWriteInMethodWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §8.15's `super.f`, which writes the parent slice through a third site again.
 TEST(ClassSim, SuperPropertyWriteInMethodWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -269,9 +258,6 @@ TEST(ClassSim, SuperPropertyWriteInMethodWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// The guard: the write spelled through the handle, which announced itself all
-// along. It pins the arm that worked, so the three above cannot be paid for by
-// moving the notification off it.
 TEST(ClassSim, HandlePropertyWriteWakesAnEventControlOnIt) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -292,9 +278,6 @@ TEST(ClassSim, HandlePropertyWriteWakesAnEventControlOnIt) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// The set the announcement answers is the variables designating the object, not
-// the one the statement named: §8.12 leaves `q` and `obj` denoting one object,
-// so a write through either is a change the other is watching.
 TEST(ClassSim, PropertyWriteThroughOneHandleWakesAnAliasOfTheSameObject) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -316,11 +299,6 @@ TEST(ClassSim, PropertyWriteThroughOneHandleWakesAnAliasOfTheSameObject) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §8.11 (printed page 187): an unqualified name in a method resolves in the
-// innermost scope, so a task's own `O d;` hides the property d, which `this.d`
-// alone reaches. The local, a class handle, was declared design-wide rather
-// than in the task's frame, so `d = new` and `d.n = 3` went to the property
-// while `d.get()` called through the null design-wide d.
 TEST(ClassSim, TaskLocalHandleHidesTheSameNamedProperty) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -349,9 +327,6 @@ TEST(ClassSim, TaskLocalHandleHidesTheSameNamedProperty) {
   EXPECT_EQ(var->value.ToUint64(), 31u);
 }
 
-// §8.11 with §7.2: `this.s` is the property s of the object the method runs on,
-// so `this.s.a` reads the member the bare `s.a` wrote, 17, as `h.s.a` does
-// from outside.
 TEST(ClassThisSim, ThisPathReadsAMemberOfAStructProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -373,11 +348,6 @@ TEST(ClassThisSim, ThisPathReadsAMemberOfAStructProperty) {
       "59 17\n");
 }
 
-// §8.11 with §8.5 and §7.4: inside a method, `kids[1]` names an element of
-// the object's own array of handles, and `kids[1].v = 7` writes the property
-// v of the object that element refers to, as `this.kids[0].v = 5` does
-// through `this` and `h.kids[1].v = 7` does from outside. Both writes inside
-// the methods were lost and the properties stayed 0.
 TEST(ClassThisSim, AMemberOfAnElementOfAHandleArrayPropertyIsWrittenInAMethod) {
   SimFixture f;
   auto out = RunCapture(

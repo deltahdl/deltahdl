@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Table 31-9 gives $fullskew a limit 1 and a limit 2 with different meanings,
-// so this covers the parser keeping them apart by source position. The bare
-// two-argument arity of the fullskew_timing_check production is covered by
-// FullskewTwoLimits in test_parser_annex_a_07_05_01.cpp.
 TEST(TimingCheckCommandParsing, FullskewLimit1AndLimit2InSourceOrder) {
   auto r = Parse(
       "module m;\n"
@@ -29,11 +25,6 @@ TEST(TimingCheckCommandParsing, FullskewLimit1AndLimit2InSourceOrder) {
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kNegedge);
   EXPECT_EQ(tc->data_terminal.name, "clk2");
   ASSERT_EQ(tc->limits.size(), 2u);
-  // The two limits carry distinct meanings by source position (§31.4.3): the
-  // first bounds how long the data event may trail the reference event, the
-  // second how long the reference event may trail the data event. Pin that the
-  // parser preserves source order -- first argument at index 0, second at index
-  // 1 -- so the two are not conflated or swapped downstream.
   ASSERT_NE(tc->limits[0], nullptr);
   ASSERT_NE(tc->limits[1], nullptr);
   EXPECT_EQ(tc->limits[0]->int_val, 4u);
@@ -89,8 +80,6 @@ TEST(TimingCheckCommandParsing, FullskewLimitsAreExpressions) {
 }
 
 TEST(TimingCheckCommandParsing, FullskewEventFlagWithoutRemainActiveFlag) {
-  // The optional nesting permits event_based_flag while remain_active_flag is
-  // omitted; the extended-arg parser must close out after the event flag.
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -107,10 +96,6 @@ TEST(TimingCheckCommandParsing, FullskewEventFlagWithoutRemainActiveFlag) {
 }
 
 TEST(TimingCheckCommandParsing, FullskewEmptyNotifierWithFlags) {
-  // Syntax 31-11 nests the optional arguments so the notifier may be elided
-  // with an empty placeholder while the event_based_flag and remain_active_flag
-  // still follow. The extended-arg parser must accept the empty notifier slot
-  // and continue on to capture both flags.
   auto r = Parse(
       "module m;\n"
       "specify\n"
@@ -145,8 +130,6 @@ TEST(TimingCheckCommandParsing, ErrorFullskewMissingBothLimits) {
       "  $fullskew(posedge clk1, negedge clk2);\n"
       "endspecify\n"
       "endmodule\n");
-  // With no limit at all the argument list stops matching at the separator, so
-  // the shared timing-check parser reports under §31.2 rather than §31.4.3.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 

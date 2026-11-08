@@ -9,12 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §25.3 with §23.3.3.5: each element of an array of interface instances is an
-// instance of its own, holding its own members and carrying the parameter
-// override its instantiation wrote, here shared with a scalar instance of the
-// same item. `vector[3].P` is 100, `plain` and the elements of `pv`,
-// instantiated with no override, keep the default 7, and a write to a member
-// of an element is read back.
 TEST(InterfaceInstanceArraySim, ElementsHoldMembersAndParameters) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface myif #(parameter P = 7); int x; "
@@ -36,11 +30,6 @@ TEST(InterfaceInstanceArraySim, ElementsHoldMembersAndParameters) {
             "P=100 P=7 P=7 x=12 x=3 x=5\n");
 }
 
-// §25.3: an interface port's actual may be a hierarchical reference to an
-// interface instance another module instance declares, `h.i`, which joins the
-// port to that instance's members. The writer, written before h, and the
-// reader, written after it, share h.i's storage, so the value one writes
-// through its port is the one the other reads through its own.
 TEST(InterfacePortHierRefSim, PortJoinsAnInstanceAnotherModuleDeclares) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
@@ -55,10 +44,6 @@ TEST(InterfacePortHierRefSim, PortJoinsAnInstanceAnotherModuleDeclares) {
             "x=9\n");
 }
 
-// §25.3 with §23.8: a port connected to the module's own interface instance
-// through a name starting at the module's name, `top.i`, shares that
-// instance's members as one connected to `i` does, so the value written
-// through the port is the one top reads (#7353).
 TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheModule) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
@@ -70,10 +55,6 @@ TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheModule) {
             "x=9\n");
 }
 
-// §25.3 with §23.6: an interface port connected in a module below the top
-// through a full path from the top, `top.i`, shares the top's instance's
-// members, so the value written through the port is the one top reads
-// (#7354).
 TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheTop) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
@@ -86,10 +67,6 @@ TEST(InterfacePortHierRefSim, PortJoinsTheInstanceNamedFromTheTop) {
             "x=9\n");
 }
 
-// §25.3 with §23.6: the instance a full path from the top names, `top.i`, is
-// joined to the port below the top whichever of the two the top declares
-// first, so with `mid m();` written ahead of `ifc i();` the value written
-// through the port is still the one top reads (#7356).
 TEST(InterfacePortHierRefSim, PortJoinsAnInstanceTheTopDeclaresLater) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface ifc; logic [7:0] a = 1; endinterface\n"
@@ -102,10 +79,6 @@ TEST(InterfacePortHierRefSim, PortJoinsAnInstanceTheTopDeclaresLater) {
             "x=9\n");
 }
 
-// §25.3 with §23.6: a module below the first top-level module may connect an
-// interface port to an instance of a later top through a full path from that
-// top, `t2.i`, which shares that instance's members, so the value written
-// through the port is the one t2's instance holds (#7355).
 TEST(InterfacePortHierRefSim, PortJoinsAnInstanceOfALaterTop) {
   SimFixture f;
   auto* design = ElaborateSrcAllTops(
@@ -118,10 +91,6 @@ TEST(InterfacePortHierRefSim, PortJoinsAnInstanceOfALaterTop) {
   LowerRunAndCheck(f, design, {{"t2.i.a", 9u}});
 }
 
-// §25.3 with §27.4: a module may pass its interface port on to an instance a
-// generate block of it holds, which passes it on again. The value the
-// innermost instance writes through its port is the one the interface the
-// outermost port is connected to holds (#7351).
 TEST(InterfacePortIntoGenerateBlockSim,
      PortReachesTheInterfaceThroughTheBlock) {
   SimFixture f;

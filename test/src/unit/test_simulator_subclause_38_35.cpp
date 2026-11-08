@@ -14,17 +14,9 @@
 namespace delta {
 namespace {
 
-// The vpi_put_value_array() tests read back element values that the routine
-// wrote into a static unpacked array built by the shared base fixture.
 using VpiPutValueArraySim = VpiValueArraySimBase;
 
-// §38.35: index_p carries one starting index per unpacked dimension, and the
-// elements are filled with the rightmost dimension varying fastest. For
-// a[2:0][3:5] started at a[1][4] the fill order is a[1][4], a[1][5], a[0][3],
-// a[0][4], a[0][5] - the example the standard gives.
 TEST_F(VpiPutValueArraySim, MultiDimensionFillFollowsFastestVaryingIndex) {
-  // Flat ordinals (rightmost fastest): a[1][4]=4, a[1][5]=5, a[0][3]=6,
-  // a[0][4]=7, a[0][5]=8.
   VpiHandle arr = MakeArray("m", {{2, 1, 0}, {3, 4, 5}}, 9, 8);
 
   PLI_INT32 ints[5] = {11, 12, 13, 14, 15};
@@ -34,24 +26,18 @@ TEST_F(VpiPutValueArraySim, MultiDimensionFillFollowsFastestVaryingIndex) {
   PLI_INT32 index[2] = {1, 4};
   vpi_put_value_array(VpiHandleOf(arr), &av, index, 5);
 
-  EXPECT_EQ(elems_[4]->value.words[0].aval, 11u);  // a[1][4]
-  EXPECT_EQ(elems_[5]->value.words[0].aval, 12u);  // a[1][5]
-  EXPECT_EQ(elems_[6]->value.words[0].aval, 13u);  // a[0][3]
-  EXPECT_EQ(elems_[7]->value.words[0].aval, 14u);  // a[0][4]
-  EXPECT_EQ(elems_[8]->value.words[0].aval, 15u);  // a[0][5]
-  // The earlier ordinals were never in the section. The elements are 8 bits
-  // wide, so their untouched initial-x value is masked to that width.
+  EXPECT_EQ(elems_[4]->value.words[0].aval, 11u);
+  EXPECT_EQ(elems_[5]->value.words[0].aval, 12u);
+  EXPECT_EQ(elems_[6]->value.words[0].aval, 13u);
+  EXPECT_EQ(elems_[7]->value.words[0].aval, 14u);
+  EXPECT_EQ(elems_[8]->value.words[0].aval, 15u);
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFu);
   EXPECT_EQ(elems_[3]->value.words[0].bval, 0xFFu);
 }
 
-// §38.35: in vpiRawFourStateVal format each element occupies ngroups*2 bytes -
-// an aval byte group followed by a bval byte group - and the bytes are loaded
-// least-significant first into the element's value.
 TEST_F(VpiPutValueArraySim, RawFourStateValDecodesAvalAndBval) {
-  VpiHandle arr = MakeArray("r", {{0, 1}}, 2, 8);  // ngroups = 1
+  VpiHandle arr = MakeArray("r", {{0, 1}}, 2, 8);
 
-  // element 0: aval 0xA5, bval 0x0F; element 1: aval 0x3C, bval 0x00.
   PLI_BYTE8 raw[4] = {
       static_cast<PLI_BYTE8>(0xA5), static_cast<PLI_BYTE8>(0x0F),
       static_cast<PLI_BYTE8>(0x3C), static_cast<PLI_BYTE8>(0x00)};
@@ -67,14 +53,11 @@ TEST_F(VpiPutValueArraySim, RawFourStateValDecodesAvalAndBval) {
   EXPECT_EQ(elems_[1]->value.words[0].bval, 0x00u);
 }
 
-// §38.35: if the vpiRawFourStateVal format is set for a 2-state array type, the
-// bvalbits group is ignored - the element keeps a known (bval 0) value.
 TEST_F(VpiPutValueArraySim, RawFourStateValIgnoresBvalForTwoStateArray) {
-  VpiHandle arr =
-      MakeArray("t", {{0}}, 1, 8, {vpiStaticArray, /*four_state=*/false});
+  VpiHandle arr = MakeArray("t", {{0}}, 1, 8, {vpiStaticArray, false});
 
   PLI_BYTE8 raw[2] = {static_cast<PLI_BYTE8>(0xF0),
-                      static_cast<PLI_BYTE8>(0xFF)};  // bval group all ones
+                      static_cast<PLI_BYTE8>(0xFF)};
   s_vpi_arrayvalue av = {};
   av.format = vpiRawFourStateVal;
   av.value.rawvals = raw;
@@ -82,14 +65,11 @@ TEST_F(VpiPutValueArraySim, RawFourStateValIgnoresBvalForTwoStateArray) {
   vpi_put_value_array(VpiHandleOf(arr), &av, index, 1);
 
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0xF0u);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00u);  // bvalbits ignored
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00u);
 }
 
-// §38.35: in vpiRawTwoStateVal format the bvalbits group is omitted (storage is
-// ngroups bytes per element). For a 4-state array the missing bval bits are
-// assumed to be 0.
 TEST_F(VpiPutValueArraySim, RawTwoStateValAssumesBvalZeroForFourStateArray) {
-  VpiHandle arr = MakeArray("w", {{0, 1}}, 2, 8);  // 4-state, ngroups = 1
+  VpiHandle arr = MakeArray("w", {{0, 1}}, 2, 8);
 
   PLI_BYTE8 raw[2] = {static_cast<PLI_BYTE8>(0x55),
                       static_cast<PLI_BYTE8>(0xAA)};
@@ -105,8 +85,6 @@ TEST_F(VpiPutValueArraySim, RawTwoStateValAssumesBvalZeroForFourStateArray) {
   EXPECT_EQ(elems_[1]->value.words[0].bval, 0x00u);
 }
 
-// §38.35: the vpiOneValue flag applies a single supplied element value to the
-// whole selected section, so only one element's data need be provided.
 TEST_F(VpiPutValueArraySim, OneValueBroadcastsSingleElement) {
   VpiHandle arr = MakeArray("o", {{0, 1, 2}}, 3, 32);
 
@@ -123,8 +101,6 @@ TEST_F(VpiPutValueArraySim, OneValueBroadcastsSingleElement) {
   EXPECT_EQ(elems_[2]->value.words[0].aval, 99u);
 }
 
-// §38.35: vpiPropagateOff is one of the flags the routine permits, so a put
-// carrying it succeeds and records no error.
 TEST_F(VpiPutValueArraySim, PropagateOffFlagIsAccepted) {
   VpiHandle arr = MakeArray("p", {{0, 1}}, 2, 32);
 
@@ -142,11 +118,6 @@ TEST_F(VpiPutValueArraySim, PropagateOffFlagIsAccepted) {
   EXPECT_EQ(elems_[1]->value.words[0].aval, 6u);
 }
 
-// §38.35: the flag inhibiting notification of the array's fanouts is what says
-// the notification happens without it - the routine tells whatever fans out of
-// the array that one or more values have changed. Every element the call wrote
-// is notified, and an element outside the section is not, nothing having
-// changed there.
 TEST_F(VpiPutValueArraySim, FanoutsOfTheWrittenElementsAreToldValuesChanged) {
   VpiHandle arr = MakeArray("n", {{0, 1, 2}}, 3, 32);
   int notified[3] = {0, 0, 0};
@@ -169,11 +140,6 @@ TEST_F(VpiPutValueArraySim, FanoutsOfTheWrittenElementsAreToldValuesChanged) {
   EXPECT_EQ(notified[2], 0);
 }
 
-// §38.35: vpiPropagateOff keeps the array's fanouts from being told that any of
-// its values changed, which is how it reduces the cost of updating large
-// numbers of elements. The values are written as they would be without the
-// flag; what the flag withholds is the notification, and it is withheld from
-// every element of the section rather than some of them.
 TEST_F(VpiPutValueArraySim, PropagateOffWithholdsThatNotificationFromThem) {
   VpiHandle arr = MakeArray("q", {{0, 1, 2}}, 3, 32);
   int notified = 0;
@@ -197,43 +163,35 @@ TEST_F(VpiPutValueArraySim, PropagateOffWithholdsThatNotificationFromThem) {
   EXPECT_EQ(elems_[2]->value.words[0].aval, 3u);
 }
 
-// §38.35: every format outside the supported set is unsupported and is an error
-// if specified; the array is left untouched.
 TEST_F(VpiPutValueArraySim, UnsupportedFormatIsError) {
   VpiHandle arr = MakeArray("u", {{0, 1}}, 2, 32);
 
   s_vpi_arrayvalue av = {};
-  av.format = vpiBinStrVal;  // a get-only string format, not allowed here
+  av.format = vpiBinStrVal;
   PLI_INT32 index[1] = {0};
   vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval,
-            0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: only vpiOneValue, vpiPropagateOff, and vpiNoDelay (the default) are
-// allowed. Any other flag bit makes the call an error and writes nothing.
 TEST_F(VpiPutValueArraySim, IllegalFlagIsError) {
   VpiHandle arr = MakeArray("f", {{0, 1}}, 2, 32);
 
   PLI_INT32 ints[2] = {1, 2};
   s_vpi_arrayvalue av = {};
   av.format = vpiIntVal;
-  av.flags = vpiUserAllocFlag;  // not one of the permitted flags
+  av.flags = vpiUserAllocFlag;
   av.value.integers = ints;
   PLI_INT32 index[1] = {0};
   vpi_put_value_array(VpiHandleOf(arr), &av, index, 2);
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval,
-            0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: the routine modifies only static unpacked arrays (vpiArrayType
-// vpiStaticArray). A non-static array is rejected and the array is unchanged.
 TEST_F(VpiPutValueArraySim, NonStaticArrayIsError) {
   VpiHandle arr = MakeArray("d", {{0, 1}}, 2, 32, {vpiDynamicArray});
 
@@ -246,18 +204,12 @@ TEST_F(VpiPutValueArraySim, NonStaticArrayIsError) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval,
-            0xFFFFFFFFu);  // unchanged (initial x masked to 32-bit width)
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: in the raw formats an element occupies ngroups = (elemBits + 7)/8
-// bytes per aval/bval group, and the bytes are loaded least-significant first -
-// byte 0 holds bits 0..7, byte 1 holds bits 8..15, and so on. A 16-bit element
-// spans two bytes per group, so the second byte must land in the high half.
 TEST_F(VpiPutValueArraySim, RawFourStateValLoadsBytesLeastSignificantFirst) {
-  VpiHandle arr = MakeArray("b", {{0}}, 1, 16);  // ngroups = 2
+  VpiHandle arr = MakeArray("b", {{0}}, 1, 16);
 
-  // aval group {0x34, 0x12} -> 0x1234; bval group {0x00, 0x00} -> 0.
   PLI_BYTE8 raw[4] = {
       static_cast<PLI_BYTE8>(0x34), static_cast<PLI_BYTE8>(0x12),
       static_cast<PLI_BYTE8>(0x00), static_cast<PLI_BYTE8>(0x00)};
@@ -271,14 +223,9 @@ TEST_F(VpiPutValueArraySim, RawFourStateValLoadsBytesLeastSignificantFirst) {
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x0000u);
 }
 
-// §38.35: when the object is a vpiArrayNet, the supplied values override the
-// resolved values of the named array net elements. The override write lands in
-// the element values just as it does for a reg array. (The persistence of the
-// override until a driver next changes is a property of net resolution, outside
-// this routine.)
 TEST_F(VpiPutValueArraySim, NetArrayTargetOverridesElementValues) {
   VpiHandle arr = MakeArray("n", {{0, 1, 2}}, 3, 32);
-  arr->type = vpiNetArray;  // present the array as a net array
+  arr->type = vpiNetArray;
 
   PLI_INT32 ints[2] = {44, 55};
   s_vpi_arrayvalue av = {};
@@ -291,12 +238,9 @@ TEST_F(VpiPutValueArraySim, NetArrayTargetOverridesElementValues) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
   EXPECT_EQ(elems_[1]->value.words[0].aval, 44u);
   EXPECT_EQ(elems_[2]->value.words[0].aval, 55u);
-  EXPECT_EQ(elems_[0]->value.words[0].bval,
-            0xFFFFFFFFu);  // outside section (initial x masked to 32-bit width)
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: the vpiShortIntVal format supplies one short per element through the
-// *shortints arm - appropriate for short/int/long-int element types.
 TEST_F(VpiPutValueArraySim, ShortIntValWritesShortsToElements) {
   VpiHandle arr = MakeArray("si", {{0, 1}}, 2, 16);
 
@@ -311,8 +255,6 @@ TEST_F(VpiPutValueArraySim, ShortIntValWritesShortsToElements) {
   EXPECT_EQ(elems_[1]->value.words[0].aval, 0x0304u);
 }
 
-// §38.35: the vpiLongIntVal format supplies one long (64-bit) per element
-// through the *longints arm - appropriate for long-int element types.
 TEST_F(VpiPutValueArraySim, LongIntValWritesLongsToElements) {
   VpiHandle arr = MakeArray("li", {{0}}, 1, 64);
 
@@ -326,8 +268,6 @@ TEST_F(VpiPutValueArraySim, LongIntValWritesLongsToElements) {
   EXPECT_EQ(elems_[0]->value.words[0].aval, 0x1122334455667788ull);
 }
 
-// §38.35: the vpiShortRealVal format supplies one float per element through the
-// *shortreals arm - appropriate for shortreal element types.
 TEST_F(VpiPutValueArraySim, ShortRealValWritesFloatsToElements) {
   VpiHandle arr = MakeArray("sr", {{0, 1}}, 2, 32);
 
@@ -342,8 +282,6 @@ TEST_F(VpiPutValueArraySim, ShortRealValWritesFloatsToElements) {
   EXPECT_EQ(elems_[1]->value.words[0].aval, 7u);
 }
 
-// §38.35: the vpiRealVal format (a get-value format reused here for arrays)
-// supplies one double per element through the *reals arm.
 TEST_F(VpiPutValueArraySim, RealValWritesRealsToElements) {
   VpiHandle arr = MakeArray("re", {{0, 1}}, 2, 64);
 
@@ -358,8 +296,6 @@ TEST_F(VpiPutValueArraySim, RealValWritesRealsToElements) {
   EXPECT_EQ(elems_[1]->value.words[0].aval, 9u);
 }
 
-// §38.35: the vpiTimeVal format supplies one time structure per element through
-// the *times arm; the high and low words combine into the element value.
 TEST_F(VpiPutValueArraySim, TimeValWritesTimeWordsToElements) {
   VpiHandle arr = MakeArray("tm", {{0}}, 1, 64);
 
@@ -375,8 +311,6 @@ TEST_F(VpiPutValueArraySim, TimeValWritesTimeWordsToElements) {
   EXPECT_EQ(elems_[0]->value.words[0].aval, (uint64_t{2} << 32) | 5u);
 }
 
-// §38.35: the vpiVectorVal format supplies aval/bval word groups per element
-// through the *vectors arm. On a 4-state element the bval bits are kept.
 TEST_F(VpiPutValueArraySim, VectorValWritesVecvalGroupsToElements) {
   VpiHandle arr = MakeArray("vv", {{0}}, 1, 16);
 
@@ -393,9 +327,6 @@ TEST_F(VpiPutValueArraySim, VectorValWritesVecvalGroupsToElements) {
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0x00F0u);
 }
 
-// §38.35 with §38.2: the routine is handed nothing to write with a null array
-// handle or a null value structure, and returns without touching the array or
-// recording an error.
 TEST_F(VpiPutValueArraySim, ANullHandleOrValueWritesNothing) {
   VpiHandle arr = MakeArray("nh", {{0}}, 1, 32);
   PLI_INT32 ints[1] = {7};
@@ -408,11 +339,9 @@ TEST_F(VpiPutValueArraySim, ANullHandleOrValueWritesNothing) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), 0);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.36.2 with §4.4.2.9: no value is written while a cbReadOnlySynch routine
-// runs, so the call is refused, the error recorded and the array unchanged.
 TEST_F(VpiPutValueArraySim, NoValueIsWrittenFromAReadOnlySynchCallback) {
   VpiHandle arr = MakeArray("ro", {{0}}, 1, 32);
   vpi_ctx_.SetAtReadOnlySynchTime(true);
@@ -425,14 +354,12 @@ TEST_F(VpiPutValueArraySim, NoValueIsWrittenFromAReadOnlySynchCallback) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: the routine modifies unpacked arrays alone, so a handle to a reg,
-// which is no array, is refused and the error recorded.
 TEST_F(VpiPutValueArraySim, AHandleToNoArrayIsError) {
   VpiHandle arr = MakeArray("na", {{0}}, 1, 32);
-  arr->type = vpiReg;  // present the object as a reg rather than an array
+  arr->type = vpiReg;
   PLI_INT32 ints[1] = {7};
   s_vpi_arrayvalue av = {};
   av.format = vpiIntVal;
@@ -442,12 +369,9 @@ TEST_F(VpiPutValueArraySim, AHandleToNoArrayIsError) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: index_p gives one starting index per unpacked dimension, so a call
-// with no index array, or on an array that records no dimension to index, has
-// no element to start from and is refused.
 TEST_F(VpiPutValueArraySim, NoStartingIndexIsError) {
   PLI_INT32 ints[1] = {7};
   s_vpi_arrayvalue av = {};
@@ -456,18 +380,16 @@ TEST_F(VpiPutValueArraySim, NoStartingIndexIsError) {
   s_vpi_error_info info = {};
 
   VpiHandle arr = MakeArray("mi", {{0}}, 1, 32);
-  vpi_put_value_array(VpiHandleOf(arr), &av, /*index_p=*/nullptr, 1);
+  vpi_put_value_array(VpiHandleOf(arr), &av, nullptr, 1);
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 
   VpiHandle undimensioned = MakeArray("ud", {}, 1, 32);
   PLI_INT32 index[1] = {0};
   vpi_put_value_array(VpiHandleOf(undimensioned), &av, index, 1);
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: a starting coordinate must name a declared element, so index 5 of
-// an array declared [0:1] is refused and nothing is written.
 TEST_F(VpiPutValueArraySim, OutOfRangeStartingIndexIsError) {
   VpiHandle arr = MakeArray("oo", {{0, 1}}, 2, 32);
   PLI_INT32 ints[1] = {7};
@@ -479,14 +401,10 @@ TEST_F(VpiPutValueArraySim, OutOfRangeStartingIndexIsError) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);  // still x
+  EXPECT_EQ(elems_[0]->value.words[0].bval, 0xFFFFFFFFu);
   EXPECT_EQ(elems_[1]->value.words[0].bval, 0xFFFFFFFFu);
 }
 
-// §38.35: the section is filled element by element from the start, and a
-// position with nothing to write is passed over: an element holding no
-// storage, and a position past the array's last element, where the section
-// runs off its end. The element between them is written all the same.
 TEST_F(VpiPutValueArraySim, PositionsWithNothingToWriteArePassedOver) {
   Variable* stored = sim_ctx_.CreateVariable("ps1", 32);
   VpiHandle arr = vpi_ctx_.CreateRegArray("ps", vpiStaticArray, {{0, 1, 2}},
@@ -504,11 +422,8 @@ TEST_F(VpiPutValueArraySim, PositionsWithNothingToWriteArePassedOver) {
   EXPECT_EQ(stored->value.words[0].bval, 0u);
 }
 
-// §38.35: the vpiVectorVal format on a 2-state array keeps the aval bits and
-// drops the bval bits, a 2-state element holding no unknown.
 TEST_F(VpiPutValueArraySim, VectorValOnATwoStateArrayDropsTheBvalBits) {
-  VpiHandle arr =
-      MakeArray("v2", {{0}}, 1, 16, {vpiStaticArray, /*four_state=*/false});
+  VpiHandle arr = MakeArray("v2", {{0}}, 1, 16, {vpiStaticArray, false});
   s_vpi_vecval vecs[1] = {};
   vecs[0].aval = 0x1234;
   vecs[0].bval = 0x00FF;
@@ -522,11 +437,6 @@ TEST_F(VpiPutValueArraySim, VectorValOnATwoStateArrayDropsTheBvalBits) {
   EXPECT_EQ(elems_[0]->value.words[0].bval, 0u);
 }
 
-// §38.35: in the raw formats an element occupies ngroups = (elemBits + 7)/8
-// bytes per group, so a 72-bit element takes nine, the ninth holding bits 64
-// to 71 in the element's second storage word. Only the first eight were read
-// and only the first word written, so the ninth byte was lost and bits 64 to
-// 71 kept the x they held.
 TEST_F(VpiPutValueArraySim, RawFormatsCarryAnElementWiderThan64Bits) {
   PLI_BYTE8 four[18] = {1, 2, 3, 4, 5, 6, 7, 8, 9,
                         0, 0, 0, 0, 0, 0, 0, 0, static_cast<PLI_BYTE8>(0x80)};
@@ -550,10 +460,6 @@ TEST_F(VpiPutValueArraySim, RawFormatsCarryAnElementWiderThan64Bits) {
   EXPECT_EQ(elems_[0]->value.words[1].bval, 0u);
 }
 
-// §38.35 takes vpiVectorVal over from vpi_put_value() (§38.34), whose
-// s_vpi_vecval repeats as often as the value needs: a 40-bit element is two
-// vecvals, so element 1 starts at vectors[2]. One vecval was read per element,
-// element 1 from vectors[1], which holds element 0's upper bits.
 TEST_F(VpiPutValueArraySim, VectorValCarriesAnElementWiderThan32Bits) {
   VpiHandle arr = MakeArray("v40", {{0, 1}}, 2, 40);
   s_vpi_vecval vecs[4] = {
@@ -570,9 +476,6 @@ TEST_F(VpiPutValueArraySim, VectorValCarriesAnElementWiderThan32Bits) {
   EXPECT_EQ(elems_[1]->value.words[0].bval, 0u);
 }
 
-// §38.35: the arrays the routine modifies hold no dynamic element, a string
-// variable being the standard's example, so an array of strings is refused,
-// the error recorded and no element written.
 TEST_F(VpiPutValueArraySim, AnArrayOfStringsIsRefused) {
   VpiHandle arr = MakeArray("st", {{0, 1}}, 2, 8);
   elems_[0]->is_string = true;
@@ -585,13 +488,11 @@ TEST_F(VpiPutValueArraySim, AnArrayOfStringsIsRefused) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  EXPECT_EQ(elems_[1]->value.words[0].bval, 0xFFu);  // still x
+  EXPECT_EQ(elems_[1]->value.words[0].bval, 0xFFu);
 }
 
 class ElementPutsOfARun : public VpiDesignRun {
  protected:
-  // Puts `first` and `second` into the elements of `name` from index 0, in
-  // `format`, through the arm `arm` names in the value union.
   template <typename T>
   static void PutTwo(const char* name, int format,
                      T* decltype(s_vpi_arrayvalue::value)::* arm, T first,
@@ -604,7 +505,6 @@ class ElementPutsOfARun : public VpiDesignRun {
     vpi_put_value_array(By(name), &av, &index, 2);
   }
 
-  // The element `index` of `name` read in `format`.
   static s_vpi_value Element(const char* name, int index, int format) {
     s_vpi_value value = {};
     value.format = format;
@@ -613,8 +513,6 @@ class ElementPutsOfARun : public VpiDesignRun {
   }
 };
 
-// §38.35: a real or shortreal element put in vpiRealVal or vpiShortRealVal
-// holds the floating-point value put (#7476).
 TEST_F(ElementPutsOfARun, ARealElementHoldsTheValuePut) {
   Run("module top; real r[2]; shortreal s[2]; initial $noop; endmodule\n");
   using Arms = decltype(s_vpi_arrayvalue::value);
@@ -626,8 +524,6 @@ TEST_F(ElementPutsOfARun, ARealElementHoldsTheValuePut) {
   }
 }
 
-// §38.35: a negative short or int put into a wider element keeps its sign
-// (#7477).
 TEST_F(ElementPutsOfARun, ANegativeValueKeepsItsSignInAWiderElement) {
   Run("module top; int i[2]; longint l[2]; initial $noop; endmodule\n");
   using Arms = decltype(s_vpi_arrayvalue::value);

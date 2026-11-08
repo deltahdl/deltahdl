@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The whole module written on one line still puts the report on that line,
-// which is the line the `final` keyword stands on.
 TEST(FinalProcedureSynthesis, RejectFinalBlock) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f, "module m; final begin end endmodule");
@@ -22,10 +20,6 @@ TEST(FinalProcedureSynthesis, RejectFinalBlock) {
                             "9.2.3"));
 }
 
-// §9.2.3: a final procedure occurs at the end of simulation time, so a module
-// whose only content is one has no hardware to synthesize. It is a different
-// construct from the initial procedure of §9.2.1 and reads differently, which
-// one shared sentence about "initial/final" could not do.
 TEST(FinalProcedureSynthesis, FinalProcedureIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

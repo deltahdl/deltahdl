@@ -106,10 +106,6 @@ TEST(ArrayReduction, AndReturnWidthMatchesElementType) {
   EXPECT_EQ(out.width, 8u);
 }
 
-// §7.12.3: when a with clause is present, the result takes the width of the
-// with expression, not the element width. Here the element is a single bit but
-// the with expression is 32 bits wide, so summing four ones must yield a
-// 32-bit 4 rather than overflowing a 1-bit result.
 TEST(ArrayReduction, WithClauseResultWidthMatchesExprWidth) {
   SimFixture f;
   MakeDynArrayW(f, "bits", {1, 1, 1, 1}, 1);
@@ -141,11 +137,6 @@ TEST(ArrayReduction, SumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("total")->value.ToUint64(), 60u);
 }
 
-// §10.10/§7.12.3 end-to-end: a dynamic array initialized with an unsized-
-// literal `{...}` concatenation (as opposed to a fixed array with an `'{...}`
-// assignment pattern) must elaborate, lower into a populated queue, and reduce
-// correctly. This is the exact full-pipeline seam the isolated reduction tests
-// (hand-built SimContext) and the fixed-array `'{...}` Integration tests miss.
 TEST(ArrayReduction, DynamicArrayConcatInitSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -227,11 +218,6 @@ TEST(ArrayReduction, XorIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("r")->value.ToUint64(), 0xF0u);
 }
 
-// §7.12.3 end-to-end: when a with clause is present the reduction operates on
-// the per-element value produced by the with expression, not the raw element.
-// Driven from real source through parse/elaborate/lower/run so the with clause
-// is exercised across the whole pipeline rather than a hand-built call node.
-// sum over (item + 10) of {1,2,3,4} reduces {11,12,13,14} to 50.
 TEST(ArrayReduction, WithClauseValueTransformSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -249,11 +235,6 @@ TEST(ArrayReduction, WithClauseValueTransformSumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 50u);
 }
 
-// §7.12.3 end-to-end: without a with clause the result takes the array element
-// type, so an 8-bit element sum that exceeds 255 wraps modulo the element
-// width. This mirrors the LRM's observation that a bare sum can overflow the
-// element width; the with-clause cast test below is the companion that avoids
-// it. 100+100+100 = 300, and 300 modulo 256 is 44.
 TEST(ArrayReduction, DefaultSumOverflowsElementWidthIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -271,11 +252,6 @@ TEST(ArrayReduction, DefaultSumOverflowsElementWidthIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 44u);
 }
 
-// §7.12.3 end-to-end: the width of the result matches the width of the with
-// expression, so casting the 8-bit element to int makes the sum a 32-bit value
-// that no longer overflows. This is the LRM's bit_arr.sum with (int'(item))
-// width-forcing example, driven through the full pipeline. Contrast the
-// bare-sum case above, which wraps at the element width.
 TEST(ArrayReduction, WithClauseCastForcesResultWidthIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -290,14 +266,9 @@ TEST(ArrayReduction, WithClauseCastForcesResultWidthIntegration) {
   Lowerer lowerer(f.ctx, f.arena, f.diag);
   lowerer.Lower(design);
   f.scheduler.Run();
-  // Reducing 32-bit values does not overflow: 100+100+100 = 300.
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 300u);
 }
 
-// §7.12.3 end-to-end: product reduces the with-expression values, not the raw
-// elements. Driven from source so the with clause is exercised through the full
-// pipeline. product over (item + 1) of {2,3,5} reduces {3,4,6} to 72 (vs. the
-// bare product 30), confirming the with values are what get multiplied.
 TEST(ArrayReduction, WithClauseValueTransformProductIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -315,8 +286,6 @@ TEST(ArrayReduction, WithClauseValueTransformProductIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 72u);
 }
 
-// §7.12.3 end-to-end: and() reduces the with-expression values. ANDing
-// (item + 1) of {6,3} reduces 7 & 4 to 4 (vs. the bare and 6 & 3 = 2).
 TEST(ArrayReduction, WithClauseValueTransformAndIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -334,8 +303,6 @@ TEST(ArrayReduction, WithClauseValueTransformAndIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 4u);
 }
 
-// §7.12.3 end-to-end: or() reduces the with-expression values. ORing
-// (item + 8) of {1,2,4} reduces 9 | 10 | 12 to 15 (vs. the bare or 1|2|4 = 7).
 TEST(ArrayReduction, WithClauseValueTransformOrIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -353,8 +320,6 @@ TEST(ArrayReduction, WithClauseValueTransformOrIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 15u);
 }
 
-// §7.12.3 end-to-end: xor() reduces the with-expression values. XORing
-// (item + 4) of {1,2,3,4} reduces 5 ^ 6 ^ 7 ^ 8 to 12 (vs. the bare xor 4).
 TEST(ArrayReduction, WithClauseValueTransformXorIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -372,10 +337,6 @@ TEST(ArrayReduction, WithClauseValueTransformXorIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 12u);
 }
 
-// §7.12.3 end-to-end: reduction methods apply to a queue, which is an unpacked
-// array of integral values just like a fixed or dynamic array. Built from real
-// queue source (§7.10 dependency) and driven through the full pipeline: summing
-// {10,20,30,40} yields 100.
 TEST(ArrayReduction, QueueReductionSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -393,8 +354,6 @@ TEST(ArrayReduction, QueueReductionSumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 100u);
 }
 
-// §7.12.3 end-to-end: a with clause on a queue reduction reduces the yielded
-// values. Over {1,2,3} the expression item+10 yields {11,12,13}, summing to 36.
 TEST(ArrayReduction, QueueReductionWithClauseIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -412,11 +371,6 @@ TEST(ArrayReduction, QueueReductionWithClauseIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 36u);
 }
 
-// §7.12.3 end-to-end: the with clause also applies when the reduction is
-// written as a parenthesized method call (arr.sum() with (e)), a distinct parse
-// from the bare member-access form above. Both route to the same value-reducing
-// fold; over {1,2,3,4} the expression item+10 yields {11,12,13,14}, summing
-// to 50.
 TEST(ArrayReduction, CallFormWithClauseSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -434,10 +388,6 @@ TEST(ArrayReduction, CallFormWithClauseSumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 50u);
 }
 
-// §7.12.3 end-to-end: reduction methods apply to an associative array, another
-// unpacked array of integral values. Built from real associative-array source
-// (§7.8 dependency), populated by element writes, and driven through the full
-// pipeline: summing the stored values {10,20,30} yields 60.
 TEST(ArrayReduction, AssociativeArrayReductionSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -460,9 +410,6 @@ TEST(ArrayReduction, AssociativeArrayReductionSumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 60u);
 }
 
-// §7.12.3 end-to-end: a with clause on an associative-array reduction reduces
-// the yielded values. Over stored {10,20,30} the expression item+1 yields
-// {11,21,31}, summing to 63.
 TEST(ArrayReduction, AssociativeArrayReductionWithClauseIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -485,12 +432,6 @@ TEST(ArrayReduction, AssociativeArrayReductionWithClauseIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 63u);
 }
 
-// §7.12.3 end-to-end: a reduction applies to a string-keyed associative array
-// as well — it is still an unpacked array of integral values, differing from
-// the int-keyed case only in how its key is produced (§7.8.2 dependency). The
-// reduction folds the stored element values regardless of the key type,
-// exercising the string-keyed collection path distinct from the int-keyed one.
-// Summing the stored values {5,7,9} yields 21.
 TEST(ArrayReduction, StringKeyedAssociativeArrayReductionSumIntegration) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -513,10 +454,6 @@ TEST(ArrayReduction, StringKeyedAssociativeArrayReductionSumIntegration) {
   EXPECT_EQ(f.ctx.FindVariable("y")->value.ToUint64(), 21u);
 }
 
-// §7.12.3: a reduction's with clause over a two-dimensional array sees each
-// element of the first dimension, a row, which a nested reduction reduces --
-// §7.12.3's own `m.sum with (item.sum with (item))`, 5 + 10 + 15 + 20 -- and a
-// row's product and first element are the row's own.
 TEST(ArrayReductionSim, NestedReductionOverTheRowsOfA2DArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -534,10 +471,6 @@ TEST(ArrayReductionSim, NestedReductionOverTheRowsOfA2DArray) {
   EXPECT_EQ(out, "50 2350\n");
 }
 
-// §7.12 with §6.11: the iterator of a reduction's with clause is a variable of
-// the element type, so over `int` elements `item < 0` holds for -3 and over
-// `bit [31:0]` ones it holds for none. The rows of a two-dimensional array are
-// iterated over the same way, each row's elements keeping their type.
 TEST(ArrayReductionSim, TheIteratorReadsWithTheElementTypesSignedness) {
   SimFixture f;
   auto out = RunCapture(
@@ -555,10 +488,6 @@ TEST(ArrayReductionSim, TheIteratorReadsWithTheElementTypesSignedness) {
   EXPECT_EQ(out, "1 2 0 2\n");
 }
 
-// §7.12.3 with §7.4.4: over a three-dimensional array each element of the
-// first dimension is a two-dimensional subarray, which a with clause can
-// reduce in turn (0 + 1 + ... + 7), select from (m[1][1][0] + m[2][1][0], 2 +
-// 6) and ask the index of, the first dimension's own indices 1 and 2.
 TEST(ArrayReductionSim, NestedReductionOverTheSubarraysOfA3DArray) {
   SimFixture f;
   auto out = RunCapture(
@@ -575,11 +504,6 @@ TEST(ArrayReductionSim, NestedReductionOverTheSubarraysOfA3DArray) {
   EXPECT_EQ(out, "28 8 3\n");
 }
 
-// §7.12.3 with §7.4.4: a select of a multidimensional array's leading
-// dimensions names a subarray, an unpacked array, which a reduction folds as
-// it folds a one-dimensional array -- by a constant or a variable index, with
-// or without a with clause, and on a subarray of a descending dimension. The
-// select named no array of its own name, so each answered 0.
 TEST(ArrayReductionSim, ReductionOnASubarraySelectFoldsItsElements) {
   SimFixture f;
   auto out = RunCapture(
@@ -598,11 +522,6 @@ TEST(ArrayReductionSim, ReductionOnASubarraySelectFoldsItsElements) {
   EXPECT_EQ(out, "15 120 0 11 30 3 7\n");
 }
 
-// §7.12.3 with §7.4.4 and §8.5: a class property may be a multidimensional
-// array, and a select of its leading dimension, `h.g[1]` through a handle or
-// `g[1]` bare in a method, names a subarray that each reduction folds by its
-// own operand: 7, 5 and 13 sum to 25, multiply to 455, and to 5, or and xor
-// to 15, and sum through `item * 2` to 50.
 TEST(ArrayReductionSim, ReductionOnASubarrayOfAClassPropertyFoldsItsElements) {
   SimFixture f;
   auto out = RunCapture(
@@ -624,10 +543,6 @@ TEST(ArrayReductionSim, ReductionOnASubarrayOfAClassPropertyFoldsItsElements) {
   EXPECT_EQ(out, "25 455 5 15 15 50 455\n");
 }
 
-// §7.12.3 with §6.11: a reduction without a with clause is of the array's
-// element type, so over signed elements -- a byte or an int fixed-size array,
-// a queue, an associative array, a subarray -- it is signed and -1 + -2 reads
-// -3. Built unsigned, the byte sums read 253 and the int sums 4294967293.
 TEST(ArrayReductionSim, ReductionOverSignedElementsIsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -648,10 +563,6 @@ TEST(ArrayReductionSim, ReductionOverSignedElementsIsSigned) {
   EXPECT_EQ(out, "-3 -3 -3 -3 -3 -3 4294967294\n");
 }
 
-// §7.12.3 with §6.11: a reduction with a with clause is of the with
-// expression's type, so `item` of an int array -- a queue's, an associative
-// array's, and `item.sum()` of each row of a two-dimensional one -- makes it a
-// signed int. Built unsigned, each read 4294967293 or 4294967294.
 TEST(ArrayReductionSim, ReductionWithASignedWithExpressionIsSigned) {
   SimFixture f;
   auto out = RunCapture(
@@ -669,12 +580,6 @@ TEST(ArrayReductionSim, ReductionWithASignedWithExpressionIsSigned) {
   EXPECT_EQ(out, "-3 -3 -2\n");
 }
 
-// §7.12.3 with §7.4 and §7.10: an element of an array whose elements are
-// queues or fixed-size arrays is an unpacked array, so a reduction on it folds
-// its values -- of a queue of fixed-size arrays, of a queue of queues, of an
-// associative array of queues or of fixed-size arrays, signed where the
-// element type is, and through a with clause. The select named no array of
-// its own name, so each answered 0.
 TEST(ArrayReductionSim, ReductionOnAnElementThatIsAnArrayFoldsItsValues) {
   SimFixture f;
   auto out = RunCapture(

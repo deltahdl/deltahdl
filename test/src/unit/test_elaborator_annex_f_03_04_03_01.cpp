@@ -13,13 +13,6 @@
 
 using namespace delta;
 
-// §F.3.4.3.1 reads a sequence written as a property by the statement it
-// stands in: strong(R) in a cover property or expect statement, weak(R) in an
-// assert property or assume property statement. The cases check which of the
-// two §F.3.2 forms each context yields, in both property models, and that the
-// two forms part on a word that begins the sequence without completing it,
-// which weak(R) accepts and strong(R) does not under §F.5.3.1.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
@@ -28,9 +21,6 @@ std::shared_ptr<const SequenceExpr> AThenB() {
   return SeqConcat(SeqBoolean(BoolAtom("a")), SeqBoolean(BoolAtom("b")));
 }
 
-// The cover property and expect statements read the sequence as strong(R); the
-// assert property and assume property statements, and the restrict property
-// statement that §F.3.4.1 makes an assume, read it as weak(R).
 TEST(DerivedSequentialProperty, TheStatementDecidesTheStrength) {
   EXPECT_TRUE(BareSequenceIsStrong(SequencePropertyContext::kCoverProperty));
   EXPECT_TRUE(BareSequenceIsStrong(SequencePropertyContext::kExpect));
@@ -40,8 +30,6 @@ TEST(DerivedSequentialProperty, TheStatementDecidesTheStrength) {
       BareSequenceIsStrong(SequencePropertyContext::kRestrictProperty));
 }
 
-// In the unclocked property model the derived property is the strong or the
-// weak form over the same sequence.
 TEST(DerivedSequentialProperty, UnclockedFormIsStrongOrWeakOfTheSequence) {
   auto r = AThenB();
   auto expect_form = [&](SequencePropertyContext context,
@@ -62,8 +50,6 @@ TEST(DerivedSequentialProperty, UnclockedFormIsStrongOrWeakOfTheSequence) {
               PropertyExpr::Kind::kWeak);
 }
 
-// In the clocked property model of §F.5.1.2 the same reading yields ClkStrong
-// or ClkWeak.
 TEST(DerivedSequentialProperty, ClockedFormIsStrongOrWeakOfTheSequence) {
   auto r = AThenB();
   EXPECT_TRUE(ClockedPropertyEqual(
@@ -79,10 +65,6 @@ TEST(DerivedSequentialProperty, ClockedFormIsStrongOrWeakOfTheSequence) {
       *ClkWeak(r)));
 }
 
-// The two readings part under §F.5.3.1 on a word that begins a ##1 b and stops
-// after a: the assert's weak(R) is satisfied, the cover's strong(R) is not,
-// and both are satisfied by a then b and neither by a word that cannot start
-// the sequence.
 TEST(DerivedSequentialProperty, TheTwoReadingsPartOnAnUnfinishedWord) {
   auto in_assert =
       PropOfBareSequence(AThenB(), SequencePropertyContext::kAssertProperty);

@@ -34,9 +34,6 @@ TEST(Elaborator, DelayMode_DefaultIsNone) {
   EXPECT_EQ(design->top_modules[0]->delay_mode, DelayModeDirective::kNone);
 }
 
-// E4-C1: the directive selects the distributed mode for *all* modules that
-// follow it, not just the first. A parent and the child it instantiates are
-// both elaborated under the directive, so both carry the distributed mode.
 TEST(Elaborator, DelayModeDistributed_AppliesToAllFollowingModules) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -58,8 +55,6 @@ TEST(Elaborator, DelayModeDistributed_AppliesToAllFollowingModules) {
             DelayModeDirective::kDistributed);
 }
 
-// The delay mode of the top module named `module`, or kNone where the design
-// has no top of that name.
 DelayModeDirective ModeOf(const RtlirDesign* design, std::string_view module) {
   for (const auto* mod : design->top_modules) {
     if (mod->name == module) return mod->delay_mode;
@@ -67,10 +62,6 @@ DelayModeDirective ModeOf(const RtlirDesign* design, std::string_view module) {
   return DelayModeDirective::kNone;
 }
 
-// E.4 applies the directive to the modules that follow it in the source, and
-// to no other: a module declared before the directive has no delay mode
-// whatever comes after its declaration, where every module used to take the
-// compilation unit's last directive.
 TEST(Elaborator, DelayModeDistributed_LeavesAModuleDeclaredBeforeItUnset) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -79,7 +70,7 @@ TEST(Elaborator, DelayModeDistributed_LeavesAModuleDeclaredBeforeItUnset) {
       "`delay_mode_distributed\n"
       "module later;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);
@@ -87,9 +78,6 @@ TEST(Elaborator, DelayModeDistributed_LeavesAModuleDeclaredBeforeItUnset) {
   EXPECT_EQ(ModeOf(design, "later"), DelayModeDirective::kDistributed);
 }
 
-// The same rule between two directives: a module declared under E.5's path
-// mode keeps it when E.4's directive follows its declaration, and the module
-// after that directive is the one in the distributed mode.
 TEST(Elaborator, DelayModeDistributed_ControlsOnlyTheModulesAfterIt) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -99,7 +87,7 @@ TEST(Elaborator, DelayModeDistributed_ControlsOnlyTheModulesAfterIt) {
       "`delay_mode_distributed\n"
       "module d;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   ASSERT_EQ(design->top_modules.size(), 2u);

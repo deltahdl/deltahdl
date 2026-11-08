@@ -39,10 +39,6 @@ TEST(LexicalConventionLexing, UnterminatedNewlineError) {
   EXPECT_TRUE(ReportedError(diags, "unterminated string literal", 1, "5.9"));
 }
 
-// A quoted string is contained in a single line unless the newline character is
-// immediately preceded by a backslash, so this source is one string literal
-// token rather than two lines. What the interpreted value of that continuation
-// sequence is belongs to 5.9.1 and is covered in the sibling file.
 TEST(LexicalConventionLexing, QuotedStringLineContinuation) {
   std::string src = "\"AB\\\nCD\"";
   auto tokens = Lex(src);
@@ -94,10 +90,6 @@ TEST(LexicalConventionLexing, EmptyTripleQuoted) {
   EXPECT_EQ(tokens[0].kind, TokenKind::kStringLiteral);
 }
 
-// §5.9 is what makes the closing quote obligatory: a string literal is a run of
-// characters inside one pair of double quotes, and Syntax 5-3 spells the pair
-// out. The rejection records that clause, and the triple-quoted form takes the
-// same one because §5.9 states both.
 TEST(LexicalConventionLexing, UnterminatedStringLiteralNames5_9) {
   auto diags = LexDiagnostics("\"never closed");
   EXPECT_TRUE(ReportedError(diags, "unterminated string literal", 1, "5.9"));
@@ -112,8 +104,6 @@ TEST(LexicalConventionLexing, MultipleStrings) {
   EXPECT_EQ(tokens[1].text, "\"def\"");
 }
 
-// A backslash that ends the text leaves a string literal unterminated, quoted
-// or triple-quoted alike: it escapes nothing, and no closing quote follows.
 TEST(LexicalConventionLexing, BackslashEndingTheTextLeavesTheStringOpen) {
   EXPECT_TRUE(ReportedError(LexDiagnostics("\"abc\\"),
                             "unterminated string literal", 1, "5.9"));
@@ -121,8 +111,6 @@ TEST(LexicalConventionLexing, BackslashEndingTheTextLeavesTheStringOpen) {
                             "unterminated triple-quoted string", 1, "5.9"));
 }
 
-// Two double quotes inside a triple-quoted string are two of its characters;
-// only three together close it.
 TEST(LexicalConventionLexing, TwoQuotesInsideATripleQuotedString) {
   auto tokens = Lex(R"("""a""b""")");
   ASSERT_EQ(tokens.size(), 2u);

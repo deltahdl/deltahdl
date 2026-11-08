@@ -12,10 +12,6 @@ namespace delta {
 
 namespace {
 
-// Whether two clocking events are identical: the same edge over the same
-// spelling of the signal, its whole path included (§23.6). §16.16.1 has two
-// clocks of one value that are
-// written differently be not identical.
 bool SameClock(const EventExpr& a, const EventExpr& b) {
   if (a.edge != b.edge) return false;
   if (a.signal == nullptr || b.signal == nullptr) {
@@ -35,8 +31,6 @@ void AddAll(std::vector<EventExpr>& set, const std::vector<EventExpr>& add) {
   for (const EventExpr& ev : add) AddOnce(set, ev);
 }
 
-// The set with `outer` for the inherited clock, the first event of a clock
-// written as a list being the one the operand begins on.
 std::vector<EventExpr> Inherited(const std::vector<EventExpr>& outer) {
   std::vector<EventExpr> set;
   if (!outer.empty()) set.push_back(outer[0]);
@@ -52,12 +46,6 @@ std::vector<EventExpr> InstanceClocks(const Expr* instance,
                                       const PropertyRegistry& registry,
                                       int depth);
 
-// The semantic leading clocks of a chain: the clock its first operand is
-// written under, else that of the named sequence the operand instantiates,
-// `s2 ##1 b` beginning where s2 does (§16.16.1's `m1 ##1 m2`), else
-// inherited; joined by those of the chains of an `and` or an `or` it is the
-// first operand of, `(@(posedge c1) a) and (@(posedge c2) b)` having two; a
-// chain writing no clock of its own takes the first chain's.
 std::vector<EventExpr> ChainClocks(const SeqLinearBody& body,
                                    const std::vector<EventExpr>& outer,
                                    const PropertyRegistry& registry,
@@ -80,8 +68,6 @@ std::vector<EventExpr> ChainClocks(const SeqLinearBody& body,
   return set;
 }
 
-// The semantic leading clock of a sequence: its own clock, else that of
-// the chain it is.
 std::vector<EventExpr> SequenceClocks(const ModuleItem* seq,
                                       const std::vector<EventExpr>& outer,
                                       const PropertyRegistry& registry,
@@ -91,8 +77,6 @@ std::vector<EventExpr> SequenceClocks(const ModuleItem* seq,
   return ChainClocks(seq->seq_linear, outer, registry, depth);
 }
 
-// An instance of a named property or sequence: the declaration's body, the
-// declaration's own clock standing for the inherited one where it has one.
 std::vector<EventExpr> InstanceClocks(const Expr* instance,
                                       const std::vector<EventExpr>& outer,
                                       const PropertyRegistry& registry,
@@ -113,8 +97,6 @@ std::vector<EventExpr> Clocks(const PropertyExprNode* node,
                               const std::vector<EventExpr>& outer,
                               const PropertyRegistry& registry, int depth) {
   if (node == nullptr) return Inherited(outer);
-  // §16.16.1: an operand written under a clocking event of its own has
-  // that clock for the inherited one.
   const std::vector<EventExpr>& incoming =
       node->clock.empty() ? outer : node->clock;
   std::vector<EventExpr> set;
@@ -144,7 +126,6 @@ std::vector<EventExpr> Clocks(const PropertyExprNode* node,
   }
 }
 
-// Whether every clock in `named` is identical to `clock`.
 bool AllIdentical(const std::vector<EventExpr>& named,
                   const std::vector<EventExpr>& clock) {
   for (const EventExpr& ev : named) {
@@ -153,8 +134,6 @@ bool AllIdentical(const std::vector<EventExpr>& named,
   return true;
 }
 
-// Whether a sequence's own clock and the clocks on its operands are all
-// identical to `clock`.
 bool SequenceNamesOnlyClock(const ModuleItem* seq,
                             const std::vector<EventExpr>& clock) {
   if (seq == nullptr) return true;
@@ -165,8 +144,6 @@ bool SequenceNamesOnlyClock(const ModuleItem* seq,
   return true;
 }
 
-// Whether the declaration an instance names, where it names one, is
-// clocked by `clock` alone.
 bool InstanceNamesOnlyClock(const Expr* instance,
                             const std::vector<EventExpr>& clock,
                             const PropertyRegistry& registry) {
@@ -186,8 +163,6 @@ std::vector<EventExpr> SemanticLeadingClocks(
   return Clocks(node, outer, registry, 0);
 }
 
-// The clock standing for the inherited one while DeterminedLeadingClock
-// asks whether a property names any: an event on a name no source declares.
 static const EventExpr& InheritedPlaceholder() {
   static const Expr kName = [] {
     Expr name;

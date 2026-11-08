@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 20-17: system_call ::= $system ( [ "terminal_command_line" ] ). The
-// callee name $system is lexed as a single system identifier token, and the
-// lexer stops that token at the opening parenthesis of the argument list.
 TEST(SystemCallLexing, NameStopsAtOpeningParen) {
   auto tokens = Lex("$system(\"ls\")");
   ASSERT_GE(tokens.size(), 3u);

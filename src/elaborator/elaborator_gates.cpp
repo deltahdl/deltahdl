@@ -78,8 +78,6 @@ static const char* DisallowedControlVariableKind(const Expr* term,
   return nullptr;
 }
 
-// A.3.4's pass_switchtype and pass_en_switchtype together: the switches §28.8
-// makes bidirectional.
 static bool IsBidirectionalSwitch(GateKind kind) {
   GateType type = GateTypeOf(kind);
   return type == GateType::kPassSwitch || type == GateType::kPassEnSwitch;
@@ -90,16 +88,10 @@ static bool IsResistiveBidirectionalSwitch(GateKind kind) {
           kind == GateKind::kRtranif1);
 }
 
-// A.3.4's pass_en_switchtype: the bidirectional switches with a control
-// terminal.
 static bool IsControlBidirectionalSwitch(GateKind kind) {
   return GateTypeOf(kind) == GateType::kPassEnSwitch;
 }
 
-// §6.6.2: a uwire net allows only a single driver, so it shall not be
-// connected to a bidirectional terminal of a bidirectional pass switch
-// (which is itself a potential driver). The first two terminals are the
-// bidirectional ones for every tran/tranif variant.
 static void CheckBidirUwireTerminals(const ModuleItem* item,
                                      const RtlirModule* mod, DiagEngine& diag) {
   const auto& terms = item->gate_terminals;
@@ -166,9 +158,6 @@ static void CheckBidirNettypeCompatibility(
                Subclause("28.8"));
     return;
   }
-  // §6.22.6: two nettypes are the same when they match -- a nettype matches
-  // itself and any renaming alias of it. Compare via the matching relation so
-  // that an alias and its source nettype are treated as one type here.
   if (n0->is_user_nettype && n1->is_user_nettype &&
       !NettypesMatch(n0->nettype_name, n1->nettype_name, nettype_canonical)) {
     diag.Error(item->loc,
@@ -202,10 +191,6 @@ void ValidateBidirectionalSwitchConnections(
   CheckBidirNettypeCompatibility(item, mod, diag, nettype_canonical);
 }
 
-// A.3.1 puts the driven terminals first: every output_terminal of an
-// n_output_gate_instance before its one input_terminal, the two
-// inout_terminals of a pass or pass-enable switch, and the one
-// output_terminal of everything else.
 static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
                                                         size_t nterms) {
   switch (GateTypeOf(kind)) {
@@ -222,32 +207,17 @@ static std::vector<size_t> OutputOrInoutTerminalIndices(GateKind kind,
   }
 }
 
-// Where a terminal is measured: the module, the constants its selects may
-// fold, and the declarations its names may bind (§23.9).
 struct TerminalScope {
   const RtlirModule* mod;
   const ScopeMap& scope;
   const ScopedDeclarations& names;
 };
 
-// §4.9.6 / §23.3.3: the elaboration-time bit width of a structural net
-// expression when it is used as a primitive (gate/switch) output or inout
-// terminal. A plain net identifier reports its declared width; a bit-select of
-// a net is one bit; a ranged part-select `[msb:lsb]` or indexed part-select
-// `[base +:/-: w]` reports its span when the bounds are constant; a
-// concatenation reports the sum of its parts. Returns 0 when the width cannot
-// be pinned down at elaboration (non-constant select bounds, or an expression
-// outside the structural-net-expression grammar), so the 1-bit rule is left
-// unenforced for that terminal rather than risk a false rejection.
 static uint32_t StructuralNetExprWidth(const Expr* t,
                                        const TerminalScope& where);
 
-// §28.3.1: the width a select contributes to a structural net expression. A
-// bare bit-select is one bit; an indexed part-select carries its own constant
-// width; a ranged part-select spans its two constant bounds. A bound that does
-// not fold leaves the width unmeasured.
 static uint32_t StructuralSelectWidth(const Expr* t, const ScopeMap& scope) {
-  if (!t->index_end) return 1;  // bit-select -> exactly one bit
+  if (!t->index_end) return 1;
   if (t->is_part_select_plus || t->is_part_select_minus) {
     auto width = ConstEvalInt(t->index_end, scope);
     if (width && *width > 0) return static_cast<uint32_t>(*width);
@@ -260,8 +230,6 @@ static uint32_t StructuralSelectWidth(const Expr* t, const ScopeMap& scope) {
   return static_cast<uint32_t>(span + 1);
 }
 
-// A concatenation is as wide as its parts together; an unmeasured part means
-// the whole is unknown.
 static uint32_t StructuralConcatWidth(const Expr* t,
                                       const TerminalScope& where) {
   uint32_t total = 0;
@@ -278,8 +246,6 @@ static uint32_t StructuralNetExprWidth(const Expr* t,
   if (!t) return 0;
   switch (t->kind) {
     case ExprKind::kIdentifier:
-      // §23.9: the innermost generate block declaring the name holds the net
-      // the terminal names, recorded under the block's prefix.
       return LookupNameWidth(
           DeclaredScopedName(t->text, where.names.scopes, where.names.declared),
           where.mod);
@@ -292,15 +258,6 @@ static uint32_t StructuralNetExprWidth(const Expr* t,
   }
 }
 
-// §29.8's `udp_instance ::= [ name_of_instance ] ( output_terminal ,
-// input_terminal { , input_terminal } )` production puts the output terminal
-// first, and §29.3.1 gives a UDP several input ports, exactly one output port
-// and no inout port, so index 0 is the whole answer.
-// OutputOrInoutTerminalIndices cannot answer it: Parser::ParseOneUdpInstance
-// (src/parser/parser_udp.cpp) never writes ModuleItem::gate_kind, so a
-// primitive instance carries the GateKind::kAnd its declaration at
-// src/parser/ast_module.h:302 defaults to, and the {0} that enumerator's
-// default arm returns says nothing about a primitive.
 static std::vector<size_t> UdpOutputTerminalIndices(size_t nterms) {
   return (nterms >= 1) ? std::vector<size_t>{0} : std::vector<size_t>{};
 }
@@ -317,25 +274,12 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
                                            const ScopeMap& scope,
                                            const ScopedDeclarations& names,
                                            DiagEngine& diag) {
-  // §4.9.6 states the rule this enforces for both kinds: primitive terminals,
-  // UDP terminals among them, are not module ports, and a primitive's output
-  // and inout terminals connect straight to 1-bit nets or 1-bit structural net
-  // expressions.
   if (!item || (item->kind != ModuleItemKind::kGateInst &&
                 item->kind != ModuleItemKind::kUdpInst)) {
     return;
   }
   const bool kIsUdp = item->kind == ModuleItemKind::kUdpInst;
 
-  // An instance array measures nothing here, for a primitive instance as for a
-  // gate instance. §28.3.6 makes a terminal wider than one bit the distributed
-  // connection -- each instance gets a part-select of the port expression as
-  // wide as the instance port -- so the single bit §4.9.6 requires is what one
-  // element connects to, and the whole terminal is not the width to measure.
-  // §29.8 keeps the terminal connection rules of §28.3.6 for an array of
-  // user-defined primitive instances, so the same reading holds for a kUdpInst
-  // item. CheckGateInstanceArrayTerminalWidths (src/elaborator/
-  // elaborator_items.cpp) is what checks these terminals instead.
   if (item->inst_range_left || item->inst_range_right) return;
 
   const auto& terms = item->gate_terminals;
@@ -344,11 +288,6 @@ void ValidatePrimitiveOutputTerminalWidths(const ModuleItem* item,
     if (!t) continue;
     uint32_t w = StructuralNetExprWidth(t, {mod, scope, names});
     if (w == 0 || w == 1) continue;
-    // A primitive instance is told about its output terminal alone, because
-    // §29.3.1 permits a UDP no inout terminal and exactly one output. A gate
-    // instance is told about both, because §28.3.6 puts the output and
-    // bidirectional terminals first together and several gate types connect a
-    // bidirectional one.
     const char* terminal = kIsUdp ? "user-defined primitive output terminal"
                                   : "primitive output or inout terminal";
     diag.Error(item->loc,
@@ -435,9 +374,6 @@ static Expr* BuildNInputGateExpr(Arena& arena, GateKind kind,
       break;
   }
   auto* chain = BuildBinaryChain(arena, op, inputs);
-  // §28.4: Table 28-3 reads a z input as x, so a logic gate drives 0, 1 or x.
-  // With one input the chain is the input alone, with no operator to read it
-  // so, and inverting it twice does, as a buf's `~~in` does (§28.5).
   if (inputs.size() == 1 && !invert) {
     chain = WrapInvert(arena, WrapInvert(arena, chain));
   }
@@ -471,11 +407,6 @@ static void ElaborateBufNotGate(ModuleItem* item, RtlirModule* mod,
   if (terms.size() < 2) return;
   auto* input = terms.back();
   for (size_t i = 0; i + 1 < terms.size(); ++i) {
-    // §28.5 Table 28-4: buf and not are non-tristate drivers, so a
-    // high-impedance (z) input yields an unknown (x) output rather than
-    // propagating z. A single inversion already maps z->x (and x->x), so not
-    // uses one complement and buf uses a double complement, which normalizes z
-    // to x while leaving 0/1/x unchanged.
     Expr* rhs = (kind == GateKind::kNot)
                     ? WrapInvert(arena, input)
                     : WrapInvert(arena, WrapInvert(arena, input));
@@ -498,13 +429,6 @@ static void ElaborateBufifNotifGate(ModuleItem* item, RtlirModule* mod,
   bool invert = (kind == GateKind::kNotif0 || kind == GateKind::kNotif1);
   bool conduct_on_one =
       (kind == GateKind::kBufif1 || kind == GateKind::kNotif1);
-  // §28.6 Table 28-5: when the gate conducts, the data input drives the
-  // output, but a high-impedance (z) data value cannot be transmitted and
-  // emerges as x -- an unambiguous x, distinct from the L/H strength-ambiguous
-  // results of an unknown control. Bitwise negation folds z to x while leaving
-  // 0, 1, and x unchanged, so notif's single inversion already normalizes the
-  // data, whereas a non-inverting bufif needs a double inversion to fold z to x
-  // without inverting the transmitted value.
   Expr* pass = invert ? WrapInvert(arena, data)
                       : WrapInvert(arena, WrapInvert(arena, data));
   Expr* hi_z = MakeHighZ(arena);
@@ -514,22 +438,12 @@ static void ElaborateBufifNotifGate(ModuleItem* item, RtlirModule* mod,
   ca.lhs = terms[0];
   ca.rhs = rhs;
   ca.width = LookupLhsWidth(ca.lhs, mod);
-  // §28.6 Table 28-5: with a control of x or z the gate's output is L or H
-  // rather than x, which §28.12.2 makes a range on one side of the strength
-  // scale. The conditional above yields the x; which side of the scale it
-  // stands on is decided by the control and by the value the gate would
-  // transmit, so both terminals travel with the assignment. `pass` rather than
-  // `data` is what a notif transmits, the inversion being part of what the gate
-  // passes.
   ca.three_state_ctrl = ctrl;
   ca.three_state_pass = pass;
   ApplyGateDelays(ca, item);
   mod->assigns.push_back(ca);
 }
 
-// One MOS switch (§28.7) from `data` to `out` under `ctrl`: conducting on a 1
-// of its control (nmos, rnmos) or a 0 (pmos, rpmos), and reducing the strength
-// it passes by §28.14 where resistive.
 struct MosSwitch {
   Expr* out;
   Expr* data;
@@ -544,9 +458,6 @@ static void EmitMosSwitch(const MosSwitch& sw, const ModuleItem* item,
       sw.conducts_on_one
           ? MakeTernary(arena, sw.ctrl, sw.data, MakeHighZ(arena))
           : MakeTernary(arena, sw.ctrl, MakeHighZ(arena), sw.data);
-  // §28.7 Table 28-6 (printed page 839): z data drives z whatever the control,
-  // where the conditional above, its control x or z, merges the z it passes
-  // with the z of the off state into x as §11.4.11 merges two arms.
   auto* data_is_z = arena.Create<Expr>();
   data_is_z->kind = ExprKind::kBinary;
   data_is_z->op = TokenKind::kEqEqEq;
@@ -559,10 +470,6 @@ static void EmitMosSwitch(const MosSwitch& sw, const ModuleItem* item,
   ca.from_nonresistive_switch = !sw.resistive;
   ca.from_resistive_switch = sw.resistive;
   ca.data_input = sw.data;
-  // §28.7 Table 28-6 (printed page 839): a MOS switch whose control is x or z
-  // passes a 0 as L and a 1 as H, as §28.6's three-state gates do, so its two
-  // terminals travel with the assignment the same way; what it passes is the
-  // data terminal itself.
   ca.three_state_ctrl = sw.ctrl;
   ca.three_state_pass = sw.data;
   ApplyGateDelays(ca, item);
@@ -596,11 +503,6 @@ static void ElaboratePullGate(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
-// §28.9 (printed page 841): a cmos switch is an nmos and a pmos sharing the
-// data input and the output, with a control each, and an rcmos an rnmos and an
-// rpmos. Built as one conditional over both controls, the switch merged its
-// data with the z of the half that was off into a strong x where Table 28-6
-// gives the other half's L or H.
 static void ElaborateCmosGate(ModuleItem* item, RtlirModule* mod,
                               Arena& arena) {
   auto& terms = item->gate_terminals;
@@ -641,11 +543,6 @@ static void ElaborateLogicOrOutputGate(ModuleItem* item, RtlirModule* mod,
   mod->assigns.push_back(ca);
 }
 
-// Elaborates one scalar gate or switch from the terminal list currently held on
-// `item` (a single instance, or one element of an expanded instance array).
-// §28.8: a bidirectional switch keeps its terminals and delays for the run to
-// join its two nets by. The two bidirectional terminals come first, and a
-// tranif0, tranif1, rtranif0 or rtranif1 has its control third.
 static void ElaborateBidirSwitch(ModuleItem* item, RtlirModule* mod) {
   auto& terms = item->gate_terminals;
   if (terms.size() < 2) return;
@@ -715,17 +612,6 @@ bool ExpandInstanceArray(
     ModuleItem* item, const RtlirModule* mod, Arena& arena,
     const ScopeMap& scope,
     const std::function<void(ModuleItem*)>& elaborate_element) {
-  // §28.3.5: the range sets the instance array's size, so how many primitives
-  // the declaration makes is read off the range and not off the terminals.
-  // Taken from the widest terminal it was neither of those things: an array all
-  // of whose terminals were single-bit collapsed to the one instance, however
-  // many the range declared, so every instance but the first went unbuilt - and
-  // one whose terminals were wider than the range made an instance per terminal
-  // bit, building instances the source never declared and driving the bits of
-  // the connection past the array's end from them.
-  // CheckGateInstanceArrayTerminalWidths (elaborator_items.cpp) reads the
-  // length the same way, so the count a terminal was measured against is the
-  // count of instances built.
   auto len = InstanceArrayLength(item, scope);
   if (!len) return false;
   uint32_t array_len = *len;
@@ -742,23 +628,8 @@ bool ExpandInstanceArray(
 
 void ElaborateGateInst(ModuleItem* item, RtlirModule* mod, Arena& arena,
                        const ScopeMap& scope) {
-  // The declaration is kept alongside the continuous assignments it is about to
-  // become, because §32.4.1 has an SDF DEVICE entry annotate the delay of the
-  // primitive instance itself and only the declaration still says which
-  // primitive that is. RtlirModule::gate_insts (src/elaborator/rtlir.h) states
-  // the rest. It is recorded here rather than in ElaborateOneGate so that an
-  // instance array is recorded once, as the one instantiation §28.3.6 declares
-  // it to be, rather than once per expanded element.
   mod->gate_insts.push_back(item);
 
-  // §28.3.5 and §28.3.6: an instance array is expanded into one scalar
-  // primitive per element the range declares, each connected by the rules
-  // §28.3.6 states - a terminal as wide as the array distributed a bit to each
-  // element, a narrower one connected whole to every element. Rebuilding each
-  // element from bit-selects reproduces the per-element connection for every
-  // gate family, including the control-driven three-state and MOS switches
-  // whose vector control would otherwise collapse to one scalar condition
-  // shared across the whole array.
   if (ExpandInstanceArray(item, mod, arena, scope,
                           [mod, &arena](ModuleItem* element) {
                             ElaborateOneGate(element, mod, arena);

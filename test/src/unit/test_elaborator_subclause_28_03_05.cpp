@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -119,8 +117,6 @@ TEST(GateArrayElaboration, ParameterTypedRangeBoundIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §28.3.5: a [lhi:rhi] range on a module instance name yields abs(lhi-rhi)+1
-// distinct instances, the same array-of-instances rule that governs gates.
 TEST(ModuleInstanceArrayElaboration, RangeExpandsToInstanceCount) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -134,8 +130,6 @@ TEST(ModuleInstanceArrayElaboration, RangeExpandsToInstanceCount) {
   EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
 }
 
-// §28.3.5: an instance identifier names one array with one range, so reusing
-// `u` for a second array is an illegal redeclaration.
 TEST(ModuleInstanceArrayElaboration, ReusedArrayInstanceNameRejected) {
   ElabFixture f;
   Elaborate(
@@ -145,16 +139,10 @@ TEST(ModuleInstanceArrayElaboration, ReusedArrayInstanceNameRejected) {
       "  child u [4:7] ();\n"
       "endmodule\n",
       f, "top");
-  // Two separate instantiation statements, so the rejection comes from the
-  // §23.9 name-space rule in Elaborator::ElaborateModuleInst rather than from
-  // the §28.3.5 check in CheckGateArrayNameUnique, which reads one gate
-  // declaration's comma-separated list.
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "redeclaration of 'u'", 4, "23.9"));
 }
 
-// §28.3.5: the range bounds are constant expressions (§11.2.1). End-to-end: a
-// parameter bound [N:0] with N=3 yields abs(N-0)+1 = 4 instances.
 TEST(ModuleInstanceArrayElaboration, ParameterBoundExpandsToInstanceCount) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -169,8 +157,6 @@ TEST(ModuleInstanceArrayElaboration, ParameterBoundExpandsToInstanceCount) {
   EXPECT_EQ(design->top_modules[0]->children.size(), 4u);
 }
 
-// §28.3.5 (negative): a range bound that is not a constant expression (a
-// variable) is rejected.
 TEST(ModuleInstanceArrayElaboration, NonConstantRangeBoundRejected) {
   ElabFixture f;
   Elaborate(

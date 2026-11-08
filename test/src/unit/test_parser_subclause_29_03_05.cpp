@@ -64,8 +64,6 @@ TEST(UdpZValues, ZSymbolInParenthesizedEdgeRejected) {
       ReportedError(r.diags, "UDP table row shall not contain z", 3, "29.3.5"));
 }
 
-// The z-scan flags either endpoint of a parenthesized edge; the case above
-// hits the closing endpoint, this one hits the starting endpoint.
 TEST(UdpZValues, ZSymbolAtStartOfParenthesizedEdgeRejected) {
   auto r = Parse(
       "primitive p(output reg q, input a, input b);\n"

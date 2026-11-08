@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// A backslash escape of an ordinary character is scanned as string content and
-// does not terminate the literal; the argument parses as one string.
 TEST(LexicalConventionParsing, StringWithNewlineEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -15,7 +13,6 @@ TEST(LexicalConventionParsing, StringWithNewlineEscape) {
               "endmodule"));
 }
 
-// An escaped double quote is content, so it must not close the string early.
 TEST(LexicalConventionParsing, StringWithQuoteEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -23,8 +20,6 @@ TEST(LexicalConventionParsing, StringWithQuoteEscape) {
               "endmodule"));
 }
 
-// An escaped backslash is consumed as a single unit, so the following quote is
-// the terminator rather than being treated as escaped.
 TEST(LexicalConventionParsing, StringWithBackslashEscape) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

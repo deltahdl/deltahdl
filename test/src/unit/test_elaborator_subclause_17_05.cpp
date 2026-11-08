@@ -9,15 +9,11 @@ using namespace delta;
 namespace {
 
 TEST(CheckerProcedures, OnlyInitialAlwaysAndFinalProceduresAreAllowed) {
-  // §17.5: the procedures allowed inside a checker body are the initial,
-  // always, and final procedures.
   EXPECT_TRUE(ProceduralBlockAllowedInChecker(ProceduralBlockKind::kInitial));
   EXPECT_TRUE(ProceduralBlockAllowedInChecker(ProceduralBlockKind::kFinal));
 }
 
 TEST(CheckerProcedures, InitialProcedureMayContainItsListedConstructs) {
-  // §17.5: an initial procedure in a checker may contain let declarations and
-  // immediate, deferred, and concurrent assertions.
   EXPECT_TRUE(
       CheckerInitialProcedureAllows(CheckerInitialContent::kLetDeclaration));
   EXPECT_TRUE(CheckerInitialProcedureAllows(
@@ -29,8 +25,6 @@ TEST(CheckerProcedures, InitialProcedureMayContainItsListedConstructs) {
 }
 
 TEST(CheckerProcedures, InitialProcedureTimingControlMustBeEventControl) {
-  // §17.5: the only timing control an initial procedure in a checker may use is
-  // an event control; delay- and wait-based timing controls are not allowed.
   EXPECT_TRUE(CheckerInitialProcedureAllows(
       CheckerInitialContent::kEventTimingControl));
   EXPECT_FALSE(CheckerInitialProcedureAllows(
@@ -40,8 +34,6 @@ TEST(CheckerProcedures, InitialProcedureTimingControlMustBeEventControl) {
 }
 
 TEST(CheckerProcedures, BlockingAssignmentLimitedToCombAndLatch) {
-  // §17.5: blocking assignments are allowed in always_comb and always_latch
-  // procedures only, not in always_ff.
   EXPECT_TRUE(
       CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kBlockingAssignment,
                                     CheckerAlwaysForm::kAlwaysComb));
@@ -54,7 +46,6 @@ TEST(CheckerProcedures, BlockingAssignmentLimitedToCombAndLatch) {
 }
 
 TEST(CheckerProcedures, TimingEventControlLimitedToAlwaysFf) {
-  // §17.5: timing event control is allowed in always_ff procedures only.
   EXPECT_TRUE(
       CheckerAlwaysStatementAllowed(CheckerAlwaysStatement::kTimingEventControl,
                                     CheckerAlwaysForm::kAlwaysFf));
@@ -67,9 +58,6 @@ TEST(CheckerProcedures, TimingEventControlLimitedToAlwaysFf) {
 }
 
 TEST(CheckerProcedures, UnconditionalAlwaysStatementsAllowedInEveryForm) {
-  // §17.5: nonblocking assignments, selection and loop statements, subroutine
-  // calls, the three assertion kinds, and let declarations are allowed in every
-  // checker always form.
   const CheckerAlwaysStatement kUnconditional[] = {
       CheckerAlwaysStatement::kNonblockingAssignment,
       CheckerAlwaysStatement::kSelectionStatement,
@@ -93,8 +81,6 @@ TEST(CheckerProcedures, UnconditionalAlwaysStatementsAllowedInEveryForm) {
 }
 
 TEST(CheckerProcedures, AlwaysFfSamplesEverythingButEventControl) {
-  // §17.5: except for the variables used in the event control, all other
-  // expressions in an always_ff procedure are sampled.
   EXPECT_TRUE(CheckerAlwaysExpressionIsSampled(
       CheckerAlwaysForm::kAlwaysFf, CheckerAlwaysExpressionPosition::kBody));
   EXPECT_FALSE(CheckerAlwaysExpressionIsSampled(
@@ -103,8 +89,6 @@ TEST(CheckerProcedures, AlwaysFfSamplesEverythingButEventControl) {
 }
 
 TEST(CheckerProcedures, CombAndLatchExpressionsAreNotImplicitlySampled) {
-  // §17.5: expressions in always_comb and always_latch procedures are not
-  // implicitly sampled; the assignments use the current values.
   for (auto pos : {CheckerAlwaysExpressionPosition::kBody,
                    CheckerAlwaysExpressionPosition::kEventControl}) {
     EXPECT_FALSE(
@@ -115,32 +99,17 @@ TEST(CheckerProcedures, CombAndLatchExpressionsAreNotImplicitlySampled) {
 }
 
 TEST(CheckerProcedures, ClockInferenceDefersToTheSharedInferenceRules) {
-  // §17.5: clock inference for checker procedures follows the rules in
-  // §16.14.6; those rules are owned there, not redefined here.
   EXPECT_TRUE(CheckerProcedureClockInferenceFollowsProceduralAssertionRules());
 }
 
 TEST(CheckerProcedures, FinalProcedureMatchesModuleSemantics) {
-  // §17.5: a final procedure may be specified within a checker in the same
-  // manner as in a module, runs once at the end of simulation for every
-  // instantiation, has no implied ordering with other final procedures, and is
-  // independent of the checker's instantiation context.
   EXPECT_TRUE(CheckerFinalProcedureIsAllowed());
   EXPECT_TRUE(CheckerFinalProcedureRunsOncePerInstantiation());
   EXPECT_FALSE(CheckerFinalProceduresHaveImpliedOrdering());
   EXPECT_FALSE(CheckerFinalProcedureDependsOnInstantiationContext());
 }
 
-// §17.5, real-source elaboration of the rule that a checker admits only the
-// always_comb/always_latch/always_ff forms. The predicate tests above model the
-// decision table; these drive an actual checker declaration through the parser
-// and elaborator so the production rejection/acceptance is observed on genuine
-// source rather than a hand-built enum.
-
 TEST(CheckerProcedures, GeneralAlwaysInCheckerBodyIsRejectedInElaboration) {
-  // §17.5: a general 'always' procedure is not one of the always forms a
-  // checker may contain, so the elaborator flags it. The checker is otherwise
-  // valid, isolating the general-always form as the sole cause of the error.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic d);\n"
@@ -155,10 +124,6 @@ TEST(CheckerProcedures, GeneralAlwaysInCheckerBodyIsRejectedInElaboration) {
 }
 
 TEST(CheckerProcedures, SpecializedAlwaysFormsInCheckerBodyElaborateCleanly) {
-  // §17.5: the three permitted always forms — always_comb, always_latch, and
-  // always_ff — are all accepted in a checker body. The same checker shape that
-  // was rejected with a general always elaborates without error once each
-  // procedure names an allowed form.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic en, input logic d);\n"
@@ -172,17 +137,7 @@ TEST(CheckerProcedures, SpecializedAlwaysFormsInCheckerBodyElaborateCleanly) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.5, real-source elaboration of the rule that a checker final procedure is
-// governed exactly as a module final procedure (§9.2.3): it admits any
-// construct a non-checker final admits and nothing more. These drive a real
-// checker final through the pipeline so the shared module-final validation is
-// observed firing (and not firing) inside a checker.
-
 TEST(CheckerProcedures, CheckerFinalRejectsConstructsAModuleFinalRejects) {
-  // §17.5: a checker final admits only what a non-checker final admits. A
-  // timing control is illegal in a module final (§9.2.3); placing one in a
-  // checker final must be rejected the same way, showing the checker context
-  // grants no exemption.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
@@ -190,17 +145,12 @@ TEST(CheckerProcedures, CheckerFinalRejectsConstructsAModuleFinalRejects) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  // The report names §9.2.3 rather than §17.5, which is the point of the case:
-  // the shared module-final validation is what fires inside the checker.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "final procedure shall not contain timing controls",
                             2, "9.2.3"));
 }
 
 TEST(CheckerProcedures, CheckerFinalAdmitsWhatAModuleFinalAdmits) {
-  // §17.5: the accepting side of the same equivalence — a checker final that
-  // holds only constructs a module final permits (here a simple display call)
-  // elaborates cleanly.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
@@ -211,23 +161,10 @@ TEST(CheckerProcedures, CheckerFinalAdmitsWhatAModuleFinalAdmits) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.5 lists the procedures a checker admits and the statements a checker
-// always procedure may hold. The following drive each admitted input form,
-// built from the real syntax of the dependency that supplies it, through the
-// full parse+elaborate pipeline so the acceptance is observed on production and
-// not just modeled in the decision table above. The general-always and final
-// negatives are already exercised by the rejection tests earlier in this file;
-// the remaining §17.5 restrictions (e.g. an initial timing control limited to
-// an event control) are not enforced by production and so are covered only by
-// the predicate model, not asserted as a runtime rejection here.
-
 TEST(CheckerProcedures, CheckerInitialProcedureElaborates) {
-  // §17.5: an initial procedure is one of the procedures a checker body admits.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
-      // §17.7.1: a checker variable takes no assignment in an initial
-      // procedure, though its declaration may initialize it.
       "  logic ok = 1'b0;\n"
       "  initial a0: assert (ok == 1'b0);\n"
       "endchecker\n",
@@ -237,17 +174,9 @@ TEST(CheckerProcedures, CheckerInitialProcedureElaborates) {
 }
 
 TEST(CheckerProcedures, CheckerInitialProcedureAdmitsEventControlTiming) {
-  // §17.5: an initial procedure in a checker may use a procedural timing
-  // control built from an event control (§9.4.2). The event control is the
-  // produced input here, so it is written as real source and elaborated in
-  // place.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk);\n"
-      // §17.5 lets the event control govern only what the initial procedure
-      // may hold, an assertion among them, and §17.7.1 forbids assigning a
-      // checker variable there, so the timing control gates an immediate
-      // assertion.
       "  initial @(posedge clk) a0: assert (clk);\n"
       "endchecker\n",
       f, "chk");
@@ -256,9 +185,6 @@ TEST(CheckerProcedures, CheckerInitialProcedureAdmitsEventControlTiming) {
 }
 
 TEST(CheckerProcedures, CheckerAlwaysProcedureAdmitsCaseSelection) {
-  // §17.5: a selection statement (§12.4/§12.5) is admitted in a checker always
-  // procedure. A case statement with a default keeps the always_comb purely
-  // combinational so only the selection form is under test.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic [1:0] sel, input logic a, input logic b);\n"
@@ -275,9 +201,6 @@ TEST(CheckerProcedures, CheckerAlwaysProcedureAdmitsCaseSelection) {
 }
 
 TEST(CheckerProcedures, CheckerAlwaysProcedureAdmitsLoopStatement) {
-  // §17.5: a loop statement (§12.7) is admitted in a checker always procedure.
-  // The for loop is built from real source and reduces its input
-  // combinationally.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic [3:0] d);\n"
@@ -293,9 +216,6 @@ TEST(CheckerProcedures, CheckerAlwaysProcedureAdmitsLoopStatement) {
 }
 
 TEST(CheckerProcedures, CheckerAlwaysProcedureAdmitsSubroutineCall) {
-  // §17.5: a subroutine call (Clause 13) is admitted in a checker always
-  // procedure. A system task call is invoked from an always_ff alongside the
-  // nonblocking update, exercising the call form from real source.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic d);\n"
@@ -310,18 +230,7 @@ TEST(CheckerProcedures, CheckerAlwaysProcedureAdmitsSubroutineCall) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §17.5 restricts two forms that production now enforces in the elaborator: a
-// blocking assignment is confined to always_comb/always_latch (not always_ff),
-// and an initial procedure's only timing control is an event control. These
-// drive the rejected form from real source; the accepting counterparts are the
-// nonblocking always_ff and the event-controlled initial exercised above.
-
 TEST(CheckerProcedures, BlockingAssignmentInCheckerAlwaysFfIsRejected) {
-  // §17.5: blocking assignments are allowed in always_comb and always_latch
-  // procedures only, so a blocking assignment in a checker always_ff is an
-  // error. The nonblocking form of the same procedure elaborates cleanly
-  // (SpecializedAlwaysFormsInCheckerBodyElaborateCleanly), isolating the
-  // blocking assignment as the cause.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic d);\n"
@@ -330,8 +239,6 @@ TEST(CheckerProcedures, BlockingAssignmentInCheckerAlwaysFfIsRejected) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  // The same source also draws the free-variable report of §17.7.1 on `q`; the
-  // one named here is the always_ff restriction the case is written for.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "a blocking assignment cannot appear in an "
                             "always_ff procedure of checker",
@@ -339,11 +246,6 @@ TEST(CheckerProcedures, BlockingAssignmentInCheckerAlwaysFfIsRejected) {
 }
 
 TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
-  // §17.5: an initial procedure in a checker may use only an event control for
-  // timing; a delay control is rejected. The event-controlled form of the same
-  // initial elaborates cleanly
-  // (CheckerInitialProcedureAdmitsEventControlTiming), isolating the delay as
-  // the cause.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk;\n"
@@ -352,9 +254,6 @@ TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
       "endchecker\n",
       f, "chk");
   ASSERT_NE(design, nullptr);
-  // The assignment also draws the §17.7.1 report that a checker variable is not
-  // assigned in an initial procedure; the delay control is what this case is
-  // written for.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "may use only an event control for timing; a delay, a cycle delay and a "
@@ -362,37 +261,8 @@ TEST(CheckerProcedures, CheckerInitialProcedureRejectsDelayTimingControl) {
       3, "17.5"));
 }
 
-// §17.5's two checker-procedure walks in
-// src/elaborator/elaborator_items_udp.cpp -- StmtContainsBlockingAssignment for
-// the always_ff restriction and StmtContainsNonEventTimingControl for the
-// initial procedure's timing control -- each wrote out six of the thirteen
-// child-statement links Stmt holds, and now take the list from ForEachChildStmt
-// in src/elaborator/elaborator_validate_internal.h. The cases below stand at
-// the positions each rule newly reaches.
-//
-// Four links get no case. §17.5 puts neither a randcase (§18.16) nor a
-// randsequence (A.6.12) on the list of what either procedure may contain, so no
-// conforming checker holds one and neither Stmt::randcase_items nor
-// Stmt::rs_productions carries a construct these two rules would report.
-// Stmt::for_inits and Stmt::for_steps hold no timing control: A.6.8 writes
-// `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration {, for_variable_declaration}` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`, and none of those forms carries a
-// delay_or_event_control or is a delay, cycle-delay or wait statement. Those
-// same two links are the ones StmtContainsBlockingAssignment skips on purpose,
-// and ForLoopHeaderInCheckerAlwaysFfIsNotABlockingAssignment below is what
-// holds the skip in place.
-
 TEST(CheckerProcedures,
      BlockingAssignmentInAlwaysFfAssertionPassActionIsRejected) {
-  // §17.5: blocking assignments are allowed in always_comb and always_latch
-  // procedures only, and A.6.10's `simple_immediate_assert_statement ::= assert
-  // ( expression ) action_block` with §16.3's `action_block ::=
-  // statement_or_null | [ statement ] else statement_or_null` puts a statement
-  // in the pass arm of an assertion §17.5 admits in the same procedure. The
-  // assertion is the only thing separating this from
-  // BlockingAssignmentInCheckerAlwaysFfIsRejected above.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic d);\n"
@@ -409,10 +279,6 @@ TEST(CheckerProcedures,
 
 TEST(CheckerProcedures,
      BlockingAssignmentInAlwaysFfAssertionFailActionIsRejected) {
-  // §17.5: the else arm of the same action block is the other statement
-  // position §16.3 gives it. The pass arm holds the nonblocking form the clause
-  // does admit in an always_ff, so the blocking assignment in the fail arm is
-  // the sole cause of the report.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic d);\n"
@@ -429,17 +295,6 @@ TEST(CheckerProcedures,
 
 TEST(CheckerProcedures,
      ForLoopHeaderInCheckerAlwaysFfIsNotABlockingAssignment) {
-  // §17.5 admits the loop statements of §12.7 in a checker always procedure
-  // with none of the always_comb/always_latch restriction it writes beside
-  // blocking assignments, and A.6.8 gives a for_initialization only a
-  // list_of_variable_assignments and a for_step_assignment only an
-  // operator_assignment, an inc_or_dec_expression or a
-  // function_subroutine_call. A.6.2 makes the assignment forms of both
-  // alternatives of blocking_assignment, so a rule reaching the header would
-  // leave an always_ff no for loop that initializes or steps anything. The
-  // header here is written in exactly those forms and the body assigns only
-  // with the nonblocking form, so any report at all is that rule reaching a
-  // position §17.5 does not put it in.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic clk, input logic [3:0] d);\n"
@@ -453,12 +308,6 @@ TEST(CheckerProcedures,
 }
 
 TEST(CheckerProcedures, DelayInCheckerInitialAssertionPassActionIsRejected) {
-  // §17.5: what an initial procedure in a checker may hold is limited to let
-  // declarations, the immediate, deferred and concurrent assertions, and
-  // procedural timing control statements whose control is an event control, so
-  // the pass arm §16.3 gives the immediate assertion it admits is a position
-  // the timing-control restriction reaches. The delay is the only timing
-  // control in the source.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic d);\n"
@@ -474,9 +323,6 @@ TEST(CheckerProcedures, DelayInCheckerInitialAssertionPassActionIsRejected) {
 }
 
 TEST(CheckerProcedures, DelayInCheckerInitialAssertionFailActionIsRejected) {
-  // §17.5: the else arm of the same action block. The pass arm holds a plain
-  // subroutine call, so the delay in the fail arm is the sole cause of the
-  // report.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "checker chk(input logic d);\n"
@@ -491,9 +337,6 @@ TEST(CheckerProcedures, DelayInCheckerInitialAssertionFailActionIsRejected) {
       2, "17.5"));
 }
 
-// §17.5: a checker's initial procedure holds let declarations, assertions and
-// event controls alone, so an if and a subroutine call are reported, while an
-// assertion's action block, the assertion's own, may hold a call.
 TEST(CheckerProcedures, AnInitialStatementOffTheListIsReported) {
   const char* const kReport =
       "this statement is none of those an initial procedure of checker 'chk' "
@@ -517,9 +360,6 @@ TEST(CheckerProcedures, AnInitialStatementOffTheListIsReported) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), kReport, 7, "17.5"));
 }
 
-// §17.5: a checker's always procedure holds none of the statements the clause
-// leaves off its list, a fork among them, though a nonblocking assignment and
-// a selection are on it.
 TEST(CheckerProcedures, AnAlwaysStatementOffTheListIsReported) {
   const char* const kReport =
       "this statement is none of those an always procedure of checker 'chk' "

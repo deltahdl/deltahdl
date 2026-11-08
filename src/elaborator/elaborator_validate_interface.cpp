@@ -51,9 +51,6 @@ std::string_view ResolveVifModport(const DataType& dt,
   return {};
 }
 
-// Extends the module-level virtual-interface type/modport maps with the
-// virtual-interface formal arguments of a task or function `item`, returning
-// the scoped maps used while walking that subroutine's body.
 std::pair<VifTypeMap, VifModportMap> BuildScopedVifMaps(
     const ModuleItem* item, const VifTypeMap& base_vifs,
     const VifModportMap& base_mps, const TypedefMap& typedefs) {
@@ -83,8 +80,6 @@ const ModuleDecl* FindInterfaceDeclByName(const CompilationUnit* unit,
   return nullptr;
 }
 
-// Extracts the clocking-block name addressed by member-access expression `e`
-// of the form `vif.block.signal` (the middle segment).
 std::string_view ResolveVifClockingBlockName(const Expr* e) {
   if (e->lhs->rhs && e->lhs->rhs->kind == ExprKind::kIdentifier) {
     return e->lhs->rhs->text;
@@ -93,16 +88,12 @@ std::string_view ResolveVifClockingBlockName(const Expr* e) {
   return {};
 }
 
-// Extracts the signal name addressed by member-access expression `e` of the
-// form `vif.block.signal` (the trailing segment).
 std::string_view ResolveVifClockingSignalName(const Expr* e) {
   if (e->rhs && e->rhs->kind == ExprKind::kIdentifier) return e->rhs->text;
   if (!e->text.empty()) return e->text;
   return {};
 }
 
-// Finds the named modport on `iface`, or nullptr when `modport_name` is empty
-// or no matching modport exists.
 const ModportDecl* FindVifModportDecl(const ModuleDecl* iface,
                                       std::string_view modport_name) {
   if (modport_name.empty()) return nullptr;
@@ -112,10 +103,6 @@ const ModportDecl* FindVifModportDecl(const ModuleDecl* iface,
   return nullptr;
 }
 
-// §27.5 with §23.6: whether the generate construct `it` has a block the source
-// named `name`, among its else alternatives and its case items, and so a scope
-// a hierarchical name, `vif.g.v` included, reaches through. A block §27.6
-// named is no such scope.
 bool GenerateConstructNamesBlock(const ModuleItem* it, std::string_view name) {
   if (it == nullptr) return false;
   if (!it->name_is_generated && it->name == name) return true;
@@ -126,9 +113,6 @@ bool GenerateConstructNamesBlock(const ModuleItem* it, std::string_view name) {
          GenerateConstructNamesBlock(it->gen_else, name);
 }
 
-// Locates the clocking-block item named `block_name` on `iface`, setting
-// `member_exists` when a var/net member or a named generate block of that name
-// is found instead.
 const ModuleItem* FindVifClockingBlockItem(const ModuleDecl* iface,
                                            std::string_view block_name,
                                            bool& member_exists) {
@@ -142,9 +126,6 @@ const ModuleItem* FindVifClockingBlockItem(const ModuleDecl* iface,
         it->name == block_name) {
       member_exists = true;
     }
-    // §25.9: every component of the instance a virtual interface represents is
-    // reached through it, and §25.3 lets an interface instantiate another, so
-    // `vo.in.v` reaches the instance `in` holds as `o.in.v` does.
     if (it->kind == ModuleItemKind::kModuleInst && it->inst_name == block_name)
       member_exists = true;
     if ((it->kind == ModuleItemKind::kGenerateIf ||
@@ -173,10 +154,6 @@ bool ClockingBlockHasSignal(const ModuleItem* cb_item,
   return false;
 }
 
-// Diagnoses a virtual-interface clocking-block access of the form
-// `vif.block.signal` for one resolved member-access expression `e`, where
-// `vif_it` is the entry that resolved the base identifier to its interface
-// type. Reports the same set of errors the inlined block did.
 void CheckResolvedVifClockingAccess(const Expr* e,
                                     const VifTypeMap::const_iterator& vif_it,
                                     const VifModportMap& vif_mps,
@@ -258,21 +235,11 @@ void WalkStmtsForVifClocking(const Stmt* s, const VifTypeMap& vifs,
   CheckVifClockingExpr(s->expr, vifs, vif_mps, unit, diag);
   CheckVifClockingExpr(s->condition, vifs, vif_mps, unit, diag);
   CheckVifClockingExpr(s->var_init, vifs, vif_mps, unit, diag);
-  // §25.9 states how a clocking block of an interface is reached through a
-  // virtual interface and names no statement those rules are suspended in, so
-  // this descends every link ForEachChildStmt in
-  // elaborator_validate_internal.h names, and names none itself. It wrote out
-  // six of the thirteen, so a `vif.cb.sig` naming something that is no clocking
-  // block of the interface went unreported in a fork arm or a randsequence
-  // production.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForVifClocking(sub, vifs, vif_mps, unit, diag);
   });
 }
 
-// Checks one assignment-pattern element `elem` of an array-of-virtual-interface
-// initializer against the declared element interface type `iface_type`, using
-// the elaborator's interface-instance and virtual-interface type maps.
 void CheckArrayOfVifInitElement(const Expr* elem, std::string_view iface_type,
                                 const VifTypeMap& interface_inst_types,
                                 const VifTypeMap& vi_var_interface_types,
@@ -336,13 +303,6 @@ void Elaborator::ValidateArrayOfVifInitStmt(const Stmt* s) {
 static void WalkStmtsForArrayOfVifInit(const Stmt* s, Elaborator* elab) {
   if (!s) return;
   elab->ValidateArrayOfVifInitStmt(s);
-  // §25.9 states which interface instances and virtual interfaces an
-  // array-of-virtual-interface initializer may name, and names no statement the
-  // declaration it initializes is exempt in, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names, and names none
-  // itself. It wrote out six of the thirteen, so an incompatible element in a
-  // declaration written in a fork arm or a randsequence code block was never
-  // checked.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtsForArrayOfVifInit(sub, elab); });
 }
@@ -380,12 +340,6 @@ using IfacePortTypeMap = std::unordered_map<std::string_view, std::string_view>;
 using IfacePortModportMap =
     std::unordered_map<std::string_view, std::string_view>;
 
-// Resolution environment for diagnosing interface-object/modport member access
-// (IEEE 1800 Clause 25 interfaces/modports and virtual interfaces). Bundles the
-// two name->type/modport scopes (interface ports and virtual interfaces) with
-// the compilation unit used for interface-declaration lookup and the diagnostic
-// sink. `vifs`/`vif_mps` are held by reference so a scoped copy can be
-// substituted for task/function bodies (see WithVifScopes).
 struct IfaceAccessContext {
   const IfacePortTypeMap& iface_ports;
   const IfacePortModportMap& port_mps;
@@ -394,8 +348,6 @@ struct IfaceAccessContext {
   const CompilationUnit* unit;
   DiagEngine& diag;
 
-  // Returns a copy of this context with the virtual-interface scopes replaced,
-  // used when walking a subroutine body with formal-argument-scoped maps.
   IfaceAccessContext WithVifScopes(const VifTypeMap& new_vifs,
                                    const VifModportMap& new_vif_mps) const {
     return IfaceAccessContext{iface_ports, port_mps, new_vifs,
@@ -456,10 +408,6 @@ const ModportDecl* FindModport(const ModuleDecl* iface,
   return nullptr;
 }
 
-// The modport, with the interface declaring it, that `base_name` of a
-// `base.member` access reaches: the modport an interface port or a virtual
-// interface of that name selects. False where the name is neither, or is one
-// that selects no modport its interface declares.
 struct ModportReach {
   std::string_view iface_type;
   std::string_view modport_name;
@@ -491,10 +439,6 @@ bool ReachModport(std::string_view base_name, const IfaceAccessContext& ctx,
   return reach.mp != nullptr;
 }
 
-// Diagnoses a `base.member` access expression `e` against the interface-port
-// and virtual-interface modport maps: if `base` resolves to a modport-scoped
-// interface and `member` is a modport-listable item not exposed by that
-// modport, reports the inaccessibility error.
 void CheckInterfaceObjectMemberAccess(const Expr* e,
                                       const IfaceAccessContext& ctx) {
   auto member_name = e->rhs->text;
@@ -513,7 +457,6 @@ void CheckInterfaceObjectMemberAccess(const Expr* e,
   }
 }
 
-// Whether the interface `iface` declares `name` a variable.
 bool DeclaresVariable(const ModuleDecl* iface, std::string_view name) {
   for (const auto* it : iface->items) {
     if (it->kind == ModuleItemKind::kVarDecl && it->name == name) return true;
@@ -521,12 +464,6 @@ bool DeclaresVariable(const ModuleDecl* iface, std::string_view name) {
   return false;
 }
 
-// §25.5 declares the items a modport lists with the directions it gives them
-// as if inside the module the interface is a port of, and §23.3.3.2 makes a
-// variable declared an input port no target of an assignment. So the target
-// `target` of an assignment, `i.a` or a select of it, `i.a[0]`, may not be a
-// variable the modport `i` reaches lists as an input. A net it lists as an
-// input falls under §23.3.3.1's coercion instead.
 void CheckModportInputTarget(const Expr* target,
                              const IfaceAccessContext& ctx) {
   while (target->kind == ExprKind::kSelect) target = target->base;
@@ -572,8 +509,6 @@ void CheckInterfaceObjectAccessExpr(const Expr* e,
   }
 }
 
-// Runs the interface-object-access check on every expression field carried
-// directly by statement `s`.
 void CheckInterfaceObjectAccessStmtExprs(const Stmt* s,
                                          const IfaceAccessContext& ctx) {
   if (s->kind == StmtKind::kBlockingAssign ||
@@ -591,24 +526,11 @@ void WalkStmtsForInterfaceObjectAccess(const Stmt* s,
                                        const IfaceAccessContext& ctx) {
   if (!s) return;
   CheckInterfaceObjectAccessStmtExprs(s, ctx);
-  // §25.5 restricts access to an interface object to what the selected modport
-  // lists, and §25.5.5 says the same of a clocking block, neither naming a
-  // statement the restriction is lifted in, so this descends every link
-  // ForEachChildStmt in elaborator_validate_internal.h names, and names none
-  // itself. WalkInterfaceObjectAccessChildStmts held that list and wrote out
-  // six of the thirteen, so an access to an unlisted member in a fork arm or an
-  // assertion action block was never reported. The helper existed only to hold
-  // the list, so it is gone along with the forward declaration of this function
-  // that the mutual recursion between the two needed.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForInterfaceObjectAccess(sub, ctx);
   });
 }
 
-// Runs the interface-object-access checks for one module item, using the
-// module-level interface-port and virtual-interface maps. Task/function bodies
-// are walked with their formal-argument-scoped maps, continuous assignments are
-// checked directly, and procedural blocks are walked with the module maps.
 void CheckInterfaceObjectAccessItem(const ModuleItem* item,
                                     const IfaceAccessContext& module_ctx,
                                     const TypedefMap& typedefs) {
@@ -660,10 +582,6 @@ void Elaborator::ValidateInterfaceObjectAccess(const ModuleDecl* decl) {
   }
 }
 
-// The interface instance and the modport a generic interface port reaches
-// through `conn`, the instantiation's connection to it: `ebus` or `ebus.mp`,
-// the instance one of `instances` names. The port's own `interface.mp` names
-// the modport ahead of the connection's.
 static bool GenericPortActual(
     const PortDecl& port, const Expr* conn,
     const std::unordered_map<std::string_view, std::string_view>& instances,
@@ -686,12 +604,6 @@ static bool GenericPortActual(
   return !modport.empty();
 }
 
-// §25.10: a modport restricts what a port connection reaches of an interface to
-// the objects the modport lists. A generic interface port, `interface.mp i`,
-// names no interface, so ValidateInterfaceObjectAccess, which reads the module
-// alone, cannot tell what `i.I` reaches; the instantiation connecting the port
-// can, and the module's body is checked against the connected interface's
-// modport here, as a named `ebus_i.mp` port's is there.
 void Elaborator::ValidateGenericPortModportAccess(const ModuleDecl* child,
                                                   const RtlirModuleInst& inst) {
   if (child == nullptr) return;
@@ -723,8 +635,6 @@ void Elaborator::ValidateGenericPortModportAccess(const ModuleDecl* child,
 void Elaborator::ValidateInterconnectContAssign(const ModuleItem* item) {
   if (item->kind != ModuleItemKind::kContAssign) return;
 
-  // §6.6.8 bars an interconnect from a continuous assignment wherever it is
-  // written in the target: whole, selected, or as an element.
   if (ExprUsesInterconnect(item->assign_lhs, interconnect_names_)) {
     diag_.Error(item->loc,
                 "interconnect net cannot be used in continuous assignment",

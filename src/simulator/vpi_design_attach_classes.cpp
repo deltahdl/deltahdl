@@ -31,28 +31,16 @@ namespace delta {
 
 namespace {
 
-// A class defn made for a class declaration, with the flat name of the scope
-// the declaration's expressions resolve their names in, and the table the
-// attributes elaboration resolved on it and its items are kept in (§37.83):
-// its module's, or the design's for a class outside every module.
 struct MadeClassDefn {
   const ClassDecl* decl;
   VpiObject* defn;
   std::string prefix;
   const RtlirNodeAttributes* attrs;
-  // §37.42: the module declaring the class, whose declarations a call written
-  // in it finds its callee among; null for a package's or the unit's class.
   const RtlirModule* mod = nullptr;
-  // §26.2: the package declaring the class, empty for none.
   std::string_view package = {};
-  // §27.4: the full name of the generate block instance declaring the class,
-  // which tells the defns of one declaration in each instance of the block
-  // apart; empty for a class declared outside every generate block.
   std::string block = {};
 };
 
-// §37.31: the class defn `decl` stands as, hung from the scope declaring it,
-// reporting its name and whether it is virtual.
 void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
                    const std::string& prefix, const VpiAttachBuild& build,
                    std::vector<MadeClassDefn>& made) {
@@ -67,7 +55,6 @@ void MakeClassDefn(VpiObject* scope, const ClassDecl* decl,
   made.push_back({decl, defn, prefix, nullptr});
 }
 
-// Whether a generate block of `mod` declares the class `decl`.
 bool DeclaredInGenerateBlock(const RtlirModule& mod, const ClassDecl* decl) {
   return std::ranges::any_of(mod.gen_block_classes,
                              [decl](const RtlirGenBlockClass& declared) {
@@ -75,9 +62,6 @@ bool DeclaredInGenerateBlock(const RtlirModule& mod, const ClassDecl* decl) {
                              });
 }
 
-// The class defns of the classes each module instance declares, and with
-// §37.12 and §37.85 one of each class a generate block declares under each
-// gen scope that is an instance of the block, full-named in it.
 void MakeInstanceClassDefns(const RtlirDesign& design,
                             const VpiObjectMap& objects,
                             const VpiAttachBuild& build,
@@ -105,7 +89,6 @@ void MakeInstanceClassDefns(const RtlirDesign& design,
       });
 }
 
-// The class defns of the classes each package declares.
 void MakePackageClassDefns(const RtlirDesign& design,
                            const VpiObjectMap& objects,
                            const VpiAttachBuild& build,
@@ -126,9 +109,6 @@ void MakePackageClassDefns(const RtlirDesign& design,
   }
 }
 
-// The class defns of each compilation unit's classes, each held by the scope
-// object of the unit declaring it (§3.12.1) and reached with a NULL reference
-// too. §37.10 detail 6: none is reached by name.
 void MakeUnitClassDefns(const RtlirDesign& design, const VpiObjectMap& objects,
                         const VpiAttachBuild& build,
                         std::vector<MadeClassDefn>& made) {
@@ -142,12 +122,6 @@ void MakeUnitClassDefns(const RtlirDesign& design, const VpiObjectMap& objects,
   }
 }
 
-// §37.31 with §8.23: the class defns of the classes the classes `made` holds
-// declare, each hung from the defn of the class declaring it, which reaches
-// it through vpiInternalScope, full-named through that class as its members
-// are (§37.10 detail 5), and standing where that class does. None is a class
-// of the compilation unit's own, which a NULL reference reaches. A class
-// nested in a nested class is made in turn, as `made` grows.
 void MakeNestedClassDefns(const VpiAttachBuild& build,
                           std::vector<MadeClassDefn>& made) {
   for (std::size_t i = 0; i < made.size(); ++i) {
@@ -167,8 +141,6 @@ void MakeNestedClassDefns(const VpiAttachBuild& build,
   }
 }
 
-// The package a qualified class name such as `pkg::Base` names, and the class
-// it names in it; an unqualified name names no package.
 struct ClassReference {
   std::string_view package;
   std::string_view name;
@@ -180,15 +152,8 @@ ClassReference SplitClassReference(std::string_view written) {
   return {written.substr(0, kColons), written.substr(kColons + 2)};
 }
 
-// How far out a class stands that is not the one a reference names.
 constexpr int kNotAround = std::numeric_limits<int>::max();
 
-// How far out from the scope `derived` is declared in `candidate` is the
-// class `ref` names: the package's class of that name where `ref` is
-// qualified, and otherwise a class of that name declared beside `derived` or,
-// with §27.4, around the generate block instances it is declared in, one
-// further out for each such instance or array of them passed; kNotAround
-// where `candidate` is none of these.
 int ScopesOutTo(const MadeClassDefn& candidate, const MadeClassDefn& derived,
                 const ClassReference& ref) {
   const VpiObject* scope = candidate.defn->parent;
@@ -212,9 +177,6 @@ int ScopesOutTo(const MadeClassDefn& candidate, const MadeClassDefn& derived,
   }
 }
 
-// §8.13: the class defn of the class `derived` extends, the nearest of those
-// declared beside it or around it or a package's it names, and otherwise one
-// of the compilation unit; null where the design declares none of that name.
 VpiObject* BaseClassDefn(const MadeClassDefn& derived,
                          const std::vector<MadeClassDefn>& made) {
   const ClassReference kRef{derived.decl->base_class_scope,
@@ -236,10 +198,6 @@ VpiObject* BaseClassDefn(const MadeClassDefn& derived,
   return nearest != nullptr ? nearest : in_unit;
 }
 
-// §37.31 details 5 and 6 with §8.13 and §8.17: the extends object of a derived
-// class, related to a class typespec of its base and holding the arguments its
-// constructor chaining passes; and the derived class among those its base's
-// vpiDerivedClasses iteration returns.
 void MakeExtends(const MadeClassDefn& derived,
                  const std::vector<MadeClassDefn>& made,
                  const VpiObjectMap& objects, SimContext& ctx,
@@ -254,7 +212,6 @@ void MakeExtends(const MadeClassDefn& derived,
   typespec->parent = extends;
   extends->children.push_back(typespec);
   static const std::vector<std::string_view> kNoGenBlocks;
-  // §37.42: a call an argument makes stands in the derived class.
   const VpiCallStand kStand{derived.defn, derived.mod, derived.package};
   const auto kExpression = [&](const Expr* expr) {
     return VpiGenBlockExpression(expr,
@@ -272,23 +229,16 @@ void MakeExtends(const MadeClassDefn& derived,
   if (base == nullptr) return;
   typespec->children.push_back(base);
   base->derived_classes.push_back(derived.defn);
-  // §37.32 detail 3: the parameter values the clause gives the base.
   const auto kBase = std::ranges::find(made, base, &MadeClassDefn::defn);
   VpiMakeExtendsParamAssigns(typespec, *derived.decl, *kBase->decl, kExpression,
                              build);
 }
 
-// §37.17 detail 24 and §37.41 detail 4: the visibility `member` was declared
-// with, 0 for a member declared neither local nor protected.
 int DeclaredVisibility(const ClassMember& member) {
   if (member.is_local) return vpiLocalVis;
   return member.is_protected ? vpiProtectedVis : 0;
 }
 
-// §37.17 with §6.18 and §8.3: the kind of variable a property of `type`
-// is, a class var where the type names a class or a typedef of one. A typedef
-// name resolves among the declarations of the package written before it, or
-// of `package`, the package declaring the class, empty for none (§26.3).
 int PropertyKind(const DataType& type, const RtlirDesign& design,
                  const std::vector<MadeClassDefn>& made,
                  std::string_view package) {
@@ -303,9 +253,6 @@ int PropertyKind(const DataType& type, const RtlirDesign& design,
   return VpiScopedTypeVariableKind(design, package, type);
 }
 
-// §37.25 detail 11: the type parameter of the class `owner` was made for
-// that `type` names, which, unresolved in the class defn, stands as the
-// typespec of a property declared with it; null where it names none.
 VpiObject* NamedTypeParameter(const MadeClassDefn& owner,
                               const DataType& type) {
   if (type.kind != DataTypeKind::kNamed || !type.scope_name.empty()) {
@@ -318,13 +265,6 @@ VpiObject* NamedTypeParameter(const MadeClassDefn& owner,
   return kFound == owner.defn->children.end() ? nullptr : *kFound;
 }
 
-// §37.31 detail 1 with §37.17: the variable a property of the class stands
-// as, static or automatic, of the kind its type takes, and where it declares
-// unpacked dimensions, whose indices the caller records, a named event array
-// for an array of events (§37.27) and an array var for any other. One declared
-// with a type parameter of the class reaches it as its typespec.
-// Detail 25 full-names a static property through its class defn, and gives an
-// automatic one no full name.
 VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
                         const RtlirDesign& design,
                         const std::vector<MadeClassDefn>& made,
@@ -342,8 +282,6 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
   var->parent = owner.defn;
   var->decl_facts.visibility = DeclaredVisibility(member);
   VpiRecordPropertyDecl(*var, member);
-  // §25.9 with §37.48: the interface whose clocking blocks a virtual interface
-  // property names, `vif.cb` in a method of the class.
   var->decl_facts.vif_interface =
       VpiVirtualInterfaceOf(design, &member.data_type, owner.mod);
   if (VpiObject* param = NamedTypeParameter(owner, member.data_type)) {
@@ -353,11 +291,6 @@ VpiObject* MakeProperty(const MadeClassDefn& owner, const ClassMember& member,
   return var;
 }
 
-// §37.31 detail 1 with §37.41: the task or function a method the class
-// declares stands as, a method of the class defn full-named through it
-// (detail 5), with the visibility it was declared with, virtual where it
-// was declared virtual or pure virtual (§8.20, §8.21), automatic, the one
-// lifetime §8.6 gives a method, and holding what any task or function holds.
 void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
                 const RtlirDesign& design, SimContext& ctx,
                 const VpiAttachBuild& build) {
@@ -372,11 +305,8 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
   method->decl_facts.visibility = DeclaredVisibility(member);
   method->is_virtual = member.is_virtual || member.is_pure_virtual;
   method->automatic = true;
-  // §37.3.3: where the method was written.
   VpiRecordWrittenLocation(method, item->loc, ctx);
   owner.defn->children.push_back(method);
-  // A width a module's class writes reads the parameters of the instance, as
-  // the module's own tasks and functions do.
   const bool kInstance = owner.mod != nullptr && !owner.prefix.empty();
   VpiMakeMethodContents(
       method, *item,
@@ -384,10 +314,6 @@ void MakeMethod(const MadeClassDefn& owner, const ClassMember& member,
       ctx, build);
 }
 
-// §37.31 detail 7 with §37.28: the parameter `name` of the class `owner` was
-// made for, hung from its class defn and full-named through it as its methods
-// are (§37.41 detail 5), a type parameter where `type` says so, and reporting
-// vpiLocalParam as `local` says.
 void MakeParameter(const MadeClassDefn& owner, std::string_view name, bool type,
                    bool local, const VpiAttachBuild& build) {
   VpiObject* param = build.alloc();
@@ -399,11 +325,6 @@ void MakeParameter(const MadeClassDefn& owner, std::string_view name, bool type,
   owner.defn->children.push_back(param);
 }
 
-// §37.31 detail 7: the parameters of the class `owner` was made for, those of
-// its parameter port list, local where the list declares them localparam, and
-// then those its body declares, every one of them local. A body's type
-// parameter is one the parser carries as a typedef where it is a localparam,
-// and as a parameter member of no data type where it is not.
 void MakeParameters(const MadeClassDefn& owner, const VpiAttachBuild& build) {
   const ClassDecl& decl = *owner.decl;
   for (const auto& param : decl.params) {
@@ -422,17 +343,12 @@ void MakeParameters(const MadeClassDefn& owner, const VpiAttachBuild& build) {
   }
 }
 
-// A property made as a class var, which reaches the class typespec it was
-// declared with once every class defn is made (§37.33 detail 5).
 struct ClassVarProperty {
   VpiObject* var;
   const ClassMember* member;
   const MadeClassDefn* owner;
 };
 
-// §37.31: the properties and methods of the class `owner` was made for, in
-// the order the class declares them; the properties made class vars are
-// returned. A parameter is no property of it.
 std::vector<ClassVarProperty> MakeMembers(
     const MadeClassDefn& owner, const RtlirDesign& design,
     const std::vector<MadeClassDefn>& made, SimContext& ctx,
@@ -452,15 +368,10 @@ std::vector<ClassVarProperty> MakeMembers(
   return class_vars;
 }
 
-// §37.31 with §37.34: the constraints of the class `owner` was made for, in
-// the order the class declares them (detail 4). A name in one finds the
-// properties of the class and of those it extends first, so they are made
-// once every class's extends object is.
 void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
                      SimContext& ctx, const VpiAttachBuild& build) {
   static const std::vector<std::string_view> kNoGenBlocks;
   VpiObject* scope = VpiClassNameScope(owner.defn, owner.defn->parent, build);
-  // §37.42: a call a constraint makes stands in the class.
   const VpiCallStand kStand{owner.defn, owner.mod, owner.package};
   for (const ClassMember* member : owner.decl->members) {
     if (member == nullptr || member->kind != ClassMemberKind::kConstraint) {
@@ -471,7 +382,6 @@ void MakeConstraints(const MadeClassDefn& owner, const VpiObjectMap& objects,
         {objects, owner.prefix, kNoGenBlocks, scope, ctx, owner.attrs, &kStand},
         build);
     owner.defn->children.push_back(constraint);
-    // §37.83: the attributes the constraint is written with.
     VpiAttachAttributes(constraint, VpiNodeAttributes(owner.attrs, member),
                         false, ctx, build);
   }
@@ -506,11 +416,6 @@ VpiObject* VpiNamedClassDefn(const VpiClassDefnObjects& defns,
 
 namespace {
 
-// §37.33 detail 5 and §37.32 detail 1: the class typespec the class var
-// `var` was declared with, the class type written `written`, whose class defn
-// is `defn`: the typespec of the class specialization `specialization` names,
-// where `defn` holds one, the type of a variable no class defn contains being
-// a specialization; and otherwise one of its own, reaching `defn`.
 void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
                                  VpiObject* defn,
                                  std::string_view specialization,
@@ -529,8 +434,6 @@ void AttachDeclaredClassTypespec(VpiObject* var, std::string_view written,
   var->children.push_back(typespec);
 }
 
-// The class type `type` names, `p::B` behind its package's scope, and the
-// class a typedef of one names (§6.18) as the design records it.
 std::string WrittenClassType(const DataType& type, const RtlirDesign& design) {
   std::string written =
       type.scope_name.empty()
@@ -555,9 +458,6 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
                                            SimContext& ctx,
                                            const VpiAttachBuild& build,
                                            VpiClassCallSites& sites) {
-  // §37.31: each class a design declares is a class defn, reached from the
-  // instance or package declaring it, or with a NULL reference for a class of
-  // the compilation unit. Nothing made one, so vpiClassDefn reached none.
   if (design == nullptr) return {};
   std::vector<MadeClassDefn> made;
   std::vector<ClassVarProperty> class_vars;
@@ -566,9 +466,7 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
   MakeUnitClassDefns(*design, objects, build, made);
   MakeNestedClassDefns(build, made);
   for (const MadeClassDefn& owner : made) {
-    // §37.3.3: where the class was written.
     VpiRecordWrittenLocation(owner.defn, owner.decl->range.start, ctx);
-    // §37.83: the attributes the class is written with.
     VpiAttachAttributes(owner.defn, VpiNodeAttributes(owner.attrs, owner.decl),
                         false, ctx, build);
     MakeParameters(owner, build);
@@ -589,9 +487,6 @@ VpiClassDefnObjects AttachClassDefinitions(const RtlirDesign* design,
         owner.defn;
     sites[owner.defn] = {owner.mod, owner.package};
   }
-  // §37.33 detail 5 with §37.31: a property of a class type, its class found
-  // from the scope declaring the class whose property it is. None was made,
-  // so vpiClassTypespec of such a property was null.
   for (const ClassVarProperty& property : class_vars) {
     const std::string kWritten =
         WrittenClassType(property.member->data_type, *design);
@@ -607,9 +502,6 @@ void AttachClassVarTypespecs(const RtlirDesign* design,
                              const VpiObjectMap& objects,
                              const VpiClassDefnObjects& defns, SimContext& ctx,
                              const VpiAttachBuild& build) {
-  // §37.33 detail 5: a class var reaches the class typespec it was declared
-  // with, whatever class the object it references was created as. None was
-  // made, so vpiClassTypespec of a class var was null.
   WalkInstancePaths(
       design, [&](const RtlirModule* mod, const std::string& prefix) {
         for (const RtlirVariable& var : VpiDeclaredVariables(*mod)) {

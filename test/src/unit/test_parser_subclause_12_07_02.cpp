@@ -8,8 +8,6 @@
 using namespace delta;
 namespace {
 
-// The repeated statement is an event control. The A.6.8 file carries the
-// assignment body of the same production.
 TEST(LoopSyntaxParsing, RepeatLoopWithEventControlBody) {
   auto r = Parse(
       "module m;\n"

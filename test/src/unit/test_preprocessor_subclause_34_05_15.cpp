@@ -1,48 +1,3 @@
-// §34.5.15, for the protect pragma keyword that carries an encrypted region's
-// data, read on the side that produces one.
-//
-// §34.5.15.2 states one condition on an encrypting tool's input, and it is the
-// whole of what this file covers:
-//
-//   It shall be an error if a data_block is found in an input file unless it
-//   is contained within a previously generated begin_protected-end_protected
-//   block, in which case it is ignored.
-//
-// What the rule costs an author is a design that leaves the tool unsealed with
-// nothing said about it. A block written where no previously generated block
-// encloses it is the block of no envelope -- there is nothing it could have
-// come out of, and no key that could open it -- so a tool that passed over it
-// in silence would copy those characters into its output as ordinary source
-// text and hand back a file whose author believes it carries an encrypted
-// model.
-//
-// The condition costs the report rather than the transformation. §34.5.15 says
-// nothing about stopping, and the rest of the file is ordinary source, so the
-// reading runs to the end of the input and the line is carried like any other.
-// Each case below therefore names the report rather than asking whether the
-// text came back.
-//
-// Every block below is written in the spelling §34.5.15.1 defines and placed
-// where §34.5.15.2 puts what that spelling announces: the keyword standing
-// alone on its directive, with the block on the line beneath it. The report is
-// made about the directive rather than about the line under it, that directive
-// being what §34.5.15 names.
-//
-// §34.5.15.1's syntax is covered in
-// test_preprocessor_subclause_34_05_15_01.cpp, on the reading that consumes the
-// directive, and §34.5.15.2's two remaining sentences in
-// test_preprocessor_subclause_34_05_15_02.cpp. This file is about where a block
-// may stand rather than how it is spelled, so it is the encrypting half of
-// §34.3 that is driven here: src/preprocessor/protect_input_line.cpp decides
-// whether a previously generated block contains a line, and reports the ones it
-// does not.
-//
-// §34.5.3.1's and §34.5.4.1's words are what delimit a previously generated
-// block, and §34.5.1.1's and §34.5.2.1's pair delimits a region to be
-// encrypted. Both pairs appear below, because the rule turns on the first pair
-// and not on the second: a block inside a region an author is about to seal is
-// still a block no earlier envelope produced.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -56,31 +11,17 @@ using namespace delta;
 
 namespace {
 
-// The characters each block below is written as. What they say is deliberately
-// not a value any coding scheme writes, so nothing here turns on the characters
-// being readable as a block: the rule is about where the expression stands.
-//
-// The two differ so that a text writing both can say which of them a report was
-// made about.
 constexpr std::string_view kFirstBlockCharacters = "NOTABLOCKOFANYENVELOPE";
 constexpr std::string_view kSecondBlockCharacters = "NORISTHISABLOCKOFANY";
 
-// One block as a tool reading a text meets it: §34.5.15.1's keyword standing
-// alone on its own directive, and §34.5.15.2's next line in the file carrying
-// `characters`.
 std::string BlockWriting(std::string_view characters) {
   std::string text = "`pragma protect data_block\n";
   text.append(characters).append("\n");
   return text;
 }
 
-// The design an author seals, which stands inside a region wherever one is
-// written below. Nothing of it survives an encrypted block, so finding these
-// characters in a produced text is finding a region that was not sealed.
 constexpr std::string_view kEncodingSealedDesign = "  initial result = 42;\n";
 
-// A previously generated protected block, delimited by the two words §34.5.3.1
-// and §34.5.4.1 define, holding `inside`.
 std::string SealedModel(std::string_view inside) {
   std::string text = "`pragma protect begin_protected\n";
   text.append(inside);
@@ -88,8 +29,6 @@ std::string SealedModel(std::string_view inside) {
   return text;
 }
 
-// An encryption region, delimited by the two words §34.5.1.1 and §34.5.2.1
-// define, holding `inside` and then the design.
 std::string Region(std::string_view inside) {
   std::string text = "`pragma protect begin\n";
   text.append(inside).append(kEncodingSealedDesign);
@@ -97,14 +36,6 @@ std::string Region(std::string_view inside) {
   return text;
 }
 
-// ---------------------------------------------------------------------------
-// ENCRYPTION INPUT: a block no previously generated block contains.
-// ---------------------------------------------------------------------------
-
-// The condition at its plainest: the expression standing in an input file with
-// no previously generated block anywhere in the text. There is no envelope for
-// it to be the block of, so it is reported, and the report stands on the line
-// the author wrote it on.
 TEST(ProtectDataBlockEncryptionInput, ABlockContainedByNothingIsReported) {
   std::string src = "module m;\n";
   src.append(BlockWriting(kFirstBlockCharacters));
@@ -115,10 +46,6 @@ TEST(ProtectDataBlockEncryptionInput, ABlockContainedByNothingIsReported) {
                             "34.5.15"));
 }
 
-// What the condition costs is the report rather than the transformation. The
-// text around the expression is ordinary source, so the reading runs to the end
-// of it and hands back what it was given character for character -- which is
-// what tells a report apart from a refusal to do the work.
 TEST(ProtectDataBlockEncryptionInput, TheReportedTextIsHandedBackUnchanged) {
   std::string src = "module m;\n";
   src.append(BlockWriting(kFirstBlockCharacters));
@@ -132,11 +59,6 @@ TEST(ProtectDataBlockEncryptionInput, TheReportedTextIsHandedBackUnchanged) {
                     2, "34.5.15"));
 }
 
-// The rule is stated of a block rather than of the first one, so a text writing
-// two of them outside every previously generated block has written two blocks
-// of no envelope. Each is reported where it stands: one report for the pair
-// would leave an author who fixed the line they were shown believing the file
-// was clean.
 TEST(ProtectDataBlockEncryptionInput, EachBlockContainedByNothingIsReported) {
   std::string src(BlockWriting(kFirstBlockCharacters));
   src.append(BlockWriting(kSecondBlockCharacters));
@@ -144,23 +66,11 @@ TEST(ProtectDataBlockEncryptionInput, EachBlockContainedByNothingIsReported) {
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously", 1,
                             "34.5.15"));
-  // The second expression stands on the third line, the block the first one
-  // announced having taken the second. §34.5.15.2 puts it there.
   EXPECT_TRUE(ReportedError(run.diag.Diagnostics(),
                             "data_block is written where no previously", 3,
                             "34.5.15"));
 }
 
-// The region an author is about to seal is not what contains a block for the
-// purpose of this rule. §34.5.15 names the previously generated
-// begin_protected-end_protected block and nothing else, so a block written
-// between the words that delimit a region to encrypt has still come out of no
-// envelope, and it is reported exactly as one written in the open is.
-//
-// This is the input the rule would be silently wrong about were the two pairs
-// of delimiters read as one thing: the region's own text goes into a block of
-// its own, so a reading that treated the enclosure as enough would produce an
-// envelope and say nothing.
 TEST(ProtectDataBlockEncryptionInput, ABlockInsideARegionToSealIsReportedToo) {
   std::string src = Region(BlockWriting(kFirstBlockCharacters));
   EncryptionRun run(src);
@@ -169,41 +79,21 @@ TEST(ProtectDataBlockEncryptionInput, ABlockInsideARegionToSealIsReportedToo) {
                             "34.5.15"));
 }
 
-// ---------------------------------------------------------------------------
-// ENCRYPTION INPUT: a block a previously generated block does contain.
-// ---------------------------------------------------------------------------
-
-// The other half of the same sentence, and the input every case above is read
-// against: the same expression, written inside the pair of words a previously
-// generated block is delimited by. It belongs to the envelope that block is,
-// so §34.5.15 has it ignored rather than objected to and the run reports
-// nothing at all.
 TEST(ProtectDataBlockEncryptionInput, ABlockASealedModelContainsIsIgnored) {
   EncryptionRun run(SealedModel(BlockWriting(kFirstBlockCharacters)));
   EXPECT_EQ(run.diag.ErrorCount(), 0U);
 }
 
-// The arrangement an author sealing an already-protected model writes: the
-// previously generated block stands inside the region being encrypted, and its
-// own block is contained by it. Nothing is reported, and the model travels into
-// the enclosing envelope as the bytes it is written with rather than staying
-// readable in the output.
 TEST(ProtectDataBlockEncryptionInput, ASealedModelInsideARegionCarriesItsOwn) {
   EncryptionRun run(Region(SealedModel(BlockWriting(kFirstBlockCharacters))));
   EXPECT_EQ(run.diag.ErrorCount(), 0U);
   EXPECT_FALSE(Holds(run.text, kFirstBlockCharacters));
 }
 
-// Where the containment stops. The word §34.5.4.1 defines ends the previously
-// generated block, so a block written past it is contained by nothing again --
-// and a reading that never came back out of the model would pass over this one
-// in the silence the case above is entitled to.
 TEST(ProtectDataBlockEncryptionInput, ABlockPastTheSealedModelIsReported) {
   std::string src(SealedModel(BlockWriting(kFirstBlockCharacters)));
   src.append(BlockWriting(kSecondBlockCharacters));
   EncryptionRun run(src);
-  // §34.5.15.2 has the block begin on the line after the keyword, so the
-  // expression the report is made about stands one line above its characters.
   EXPECT_TRUE(ReportedError(
       run.diag.Diagnostics(), "data_block is written where no previously",
       LineHolding(src, kSecondBlockCharacters) - 1, "34.5.15"));

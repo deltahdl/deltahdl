@@ -4,8 +4,6 @@
 
 namespace delta {
 
-// §11.6.1 Table 11-21: arithmetic and bitwise operators whose result width is
-// the maximum width of the two operands; both operands are context-determined.
 bool IsMaxWidthBinaryOp(TokenKind op) {
   switch (op) {
     case TokenKind::kPlus:
@@ -24,8 +22,6 @@ bool IsMaxWidthBinaryOp(TokenKind op) {
   }
 }
 
-// §11.6.1: shift and power operators whose result width is the left operand's
-// width; the left operand is context-determined, the right self-determined.
 bool IsLeftWidthBinaryOp(TokenKind op) {
   switch (op) {
     case TokenKind::kPower:
@@ -39,7 +35,6 @@ bool IsLeftWidthBinaryOp(TokenKind op) {
   }
 }
 
-// §11.6.1: the unary reduction operators, whose result is one bit.
 bool IsUnaryReductionOp(TokenKind op) {
   switch (op) {
     case TokenKind::kAmp:

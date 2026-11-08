@@ -22,14 +22,6 @@ namespace delta {
 SynthLower::SynthLower(Arena& arena, DiagEngine& diag)
     : arena_(arena), diag_(diag) {}
 
-// What a §11.4.3 arithmetic operator is called in Table 11-3, for the four this
-// synthesizer reports rather than lowers. An operator it lowers has no entry
-// and comes back with an empty message.
-//
-// The four are reported because an AIG holds two values per node and §11.4.3
-// rules that `a / b` and `a % b` yield x throughout when b is zero, which the
-// graph has no literal for. `a * b` and `a ** b` are here because no chain has
-// been written for them, not because of the x rule.
 static NonSynthRule NonSynthArithRule(TokenKind op) {
   switch (op) {
     case TokenKind::kStar:
@@ -51,14 +43,6 @@ static NonSynthRule NonSynthArithRule(TokenKind op) {
   }
 }
 
-// What an expression kind this synthesizer has no lowering for is called in
-// IEEE 1800-2023, and the subclause that defines it. A kind LowerExprBit lowers
-// has no entry and comes back with an empty message.
-//
-// Each is a construct the standard defines rather than a gap with no name, so
-// each names its own subclause as NonSynthArithRule does, rather than
-// Subclause::None(). Answering one of these with a constant contributes a bit
-// the design did not write, which is why the entry exists at all.
 NonSynthRule NonSynthExprRule(ExprKind kind) {
   switch (kind) {
     case ExprKind::kRealLiteral:
@@ -74,13 +58,6 @@ NonSynthRule NonSynthExprRule(ExprKind kind) {
           "a system task or system function has no lowering in the "
           "synthesizer",
           "5.6.3"};
-    // ExprKind::kMemberAccess has no entry here, and
-    // SynthLower::DottedNameRule in synth_lower_dotted_name.cpp answers for
-    // it instead. §23.7 states that a hierarchical name and a member select are
-    // written alike, as name components joined by periods, and that which one a
-    // dotted name is depends on what its first component names -- a scope, or a
-    // data object. That question is about the module the name was written in,
-    // which this free function cannot read.
     case ExprKind::kCall:
       return {"a function call has no lowering in the synthesizer", "13.4"};
     case ExprKind::kAssignmentPattern:
@@ -114,9 +91,6 @@ NonSynthRule NonSynthExprRule(ExprKind kind) {
   }
 }
 
-// The first initial or final procedure the module declares, or null when it
-// declares neither. Which one comes first decides where the report below
-// stands, so a module holding several is reported at one it actually holds.
 static const RtlirProcess* FirstInitialOrFinal(const RtlirModule* mod) {
   for (const auto& proc : mod->processes) {
     if (proc.kind == RtlirProcessKind::kInitial ||
@@ -127,10 +101,6 @@ static const RtlirProcess* FirstInitialOrFinal(const RtlirModule* mod) {
   return nullptr;
 }
 
-// Reject a procedure that describes no hardware, in the words of the subclause
-// that defines it. An initial procedure and a final procedure are separate
-// constructs of the standard, so one sentence covering both would leave a
-// reader unable to tell which of the two the module actually holds.
 static void ReportUnsynthesizableProcedure(const RtlirProcess& proc,
                                            DiagEngine& diag) {
   if (proc.kind == RtlirProcessKind::kFinal) {
@@ -142,8 +112,6 @@ static void ReportUnsynthesizableProcedure(const RtlirProcess& proc,
              Subclause("9.2.1"));
 }
 
-// True if any event-control term carries an edge qualifier (posedge/negedge/
-// edge) — i.e. the block is edge-sensitive (sequential) rather than level.
 static bool SensitivityHasEdge(const RtlirProcess& proc) {
   for (const auto& ev : proc.sensitivity) {
     if (ev.edge == Edge::kPosedge || ev.edge == Edge::kNegedge ||
@@ -153,9 +121,6 @@ static bool SensitivityHasEdge(const RtlirProcess& proc) {
   return false;
 }
 
-// True if any event-control term carries an `iff` qualifier (§9.4.2.3). A
-// level-sensitive `always` whose trigger is gated by `iff` only updates when
-// the guard holds, which synthesizes to a latch.
 static bool SensitivityHasIff(const RtlirProcess& proc) {
   for (const auto& ev : proc.sensitivity) {
     if (ev.iff_condition) return true;
@@ -180,10 +145,6 @@ bool SynthLower::CheckSynthesizable(const RtlirModule* mod) {
     }
     if (!CheckStmtSynthesizable(proc.body, mod)) return false;
   }
-  // An initial procedure executes once and a final procedure executes at the
-  // end of simulation time, so neither describes hardware. Either is tolerated
-  // (bypassed) when the module also describes synthesizable logic, but a
-  // module whose only content is one of them has nothing to synthesize.
   if (initial_final && !has_synth_content) {
     ReportUnsynthesizableProcedure(*initial_final, diag_);
     return false;
@@ -210,9 +171,6 @@ void SynthLower::ResetForModule(const RtlirModule* mod) {
   type_ref_compares_ = &mod->type_ref_compares;
   gen_prefix_ = {};
 
-  // The scope a select's index folds in. §6.20.2 makes a parameter a constant
-  // known at elaboration, and the elaborator has already resolved each one, so
-  // a bound written `[W-1:0]` and an index written `[W-1]` both fold here.
   param_scope_.clear();
   for (const auto& param : mod->params) {
     if (param.is_resolved) param_scope_[param.name] = param.resolved_value;
@@ -225,10 +183,6 @@ void SynthLower::RecordSignal(std::string_view name, uint32_t width,
   signal_widths_[name] = width;
   signal_signed_[name] = is_signed;
   signal_bits_[name].resize(width, AigGraph::kConstFalse);
-  // §11.5.1 resolves a select against the declaration of what it selects from,
-  // so the declared range is recorded beside the width. It is read once per
-  // signal rather than once per select, because SignalDeclaredRange searches
-  // the module's variables, nets and ports by name.
   signal_ranges_[name] = SignalDeclaredRange(name, mod, param_scope_);
 }
 
@@ -327,11 +281,6 @@ bool IsLogicalOp(TokenKind op) {
 }
 
 bool SynthLower::IsSignedExpr(const Expr* expr) {
-  // §11.8.1 rules the type of an expression off its operands, so an operator
-  // that carries a type out is answered from the operands it counts. §11.8.1
-  // also has a self-determined operand take its sign and size from itself
-  // alone, whatever the rest of the expression is, so a self-determined operand
-  // is not one of them.
   if (!expr) return false;
   switch (expr->kind) {
     case ExprKind::kIdentifier:
@@ -343,21 +292,11 @@ bool SynthLower::IsSignedExpr(const Expr* expr) {
       return IsSignedExpr(expr->lhs);
     case ExprKind::kBinary:
       if (IsCompareOp(expr->op) || IsLogicalOp(expr->op)) return false;
-      // §11.4.10 rules that a shift's right operand leaves the signedness of
-      // the result alone, and §11.6.1 Table 11-21 marks that operand
-      // self-determined, so the left operand alone answers for a shift.
       if (IsShiftOp(expr->op)) return IsSignedExpr(expr->lhs);
-      // §11.8.1: whatever the operator, the result is signed when every
-      // operand is signed and unsigned when any operand is unsigned.
       return IsSignedExpr(expr->lhs) && IsSignedExpr(expr->rhs);
     case ExprKind::kTernary:
-      // §11.6.1 Table 11-21 marks the condition of `i ? j : k`
-      // self-determined, so the two arms are the operands §11.8.1 counts.
       return IsSignedExpr(expr->true_expr) && IsSignedExpr(expr->false_expr);
     default:
-      // §11.8.1 rules concatenation results, bit-select results and part-select
-      // results unsigned regardless of their operands, and §5.7.1 states the
-      // unsized single-bit values `'0`, `'1`, `'x` and `'z` unsigned.
       return false;
   }
 }
@@ -366,15 +305,6 @@ uint32_t SynthLower::LowerIdentBit(std::string_view name, uint32_t bit) {
   return GetSignalBit(name, bit);
 }
 
-// §11.8.2: a context-determined operand is extended to the size of the
-// expression it stands in, by its sign where the type propagated down to it is
-// signed (§11.8.1 making the expression signed only where every operand is).
-// §11.6.1 Table 11-21 makes context-determined both operands of a binary
-// arithmetic or bitwise operator, the operand of unary `+`, `-` and `~`, and
-// both arms of `i ? j : k`. An identifier is extended here through
-// LowerExtendedOperandBit, so `a ^ s` with `s` a four-bit signed 4'b1000 in an
-// eight-bit signed context reads 8'hF8 where zeros read 8'h08. Every other
-// operand lowers to the context itself.
 uint32_t SynthLower::LowerContextOperandBit(const Expr* operand, AigGraph& aig,
                                             uint32_t bit) {
   if (operand != nullptr && operand->kind == ExprKind::kIdentifier &&
@@ -386,33 +316,17 @@ uint32_t SynthLower::LowerContextOperandBit(const Expr* operand, AigGraph& aig,
 const PatternBits& SynthLower::LiteralBits(const Expr* expr) {
   auto it = literal_bits_.find(expr);
   if (it != literal_bits_.end()) return it->second;
-  // TokenKind::kKwCase reads every digit as a value. The don't-care digits
-  // §12.5.1 defines belong to a case item's pattern, and a literal standing in
-  // an expression is not one.
   return literal_bits_
       .emplace(expr, ParsePatternLiteral(expr->text, TokenKind::kKwCase))
       .first->second;
 }
 
 uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
-  // §5.7.1 sizes an integer literal by its size constant, the literal's width
-  // in bits, which admits a literal wider than the 64 bits
-  // Expr::int_val holds: `128'h1_0000_0000_0000_0000` writes bit 64 and
-  // `80'd1208925819614629174706177` (2^80 + 1) bit 80, and
-  // Parser::ParseIntText folds the digits modulo 2^64, so int_val holds the
-  // value's low 64 bits and nothing of bit 64 or above. The digits are
-  // therefore what answers a literal, a based one digit by digit and a decimal
-  // one by ParsePatternLiteral's multiply-and-add fold.
   const PatternBits& bits = LiteralBits(expr);
   if (bits.has_digits) {
-    // §5.7.1 fills the positions above those the number's digits reached with
-    // zeros.
     return PatternBitValue(bits, bit) ? AigGraph::kConstTrue
                                       : AigGraph::kConstFalse;
   }
-  // A decimal literal carrying a don't-care digit writes no value, so what
-  // Parser::ParseIntText folded into Expr::int_val stands, and the positions
-  // above what that holds are the zeros §5.7.1 pads with.
   if (bit >= 64) return AigGraph::kConstFalse;
   return ((expr->int_val >> bit) & 1u) != 0 ? AigGraph::kConstTrue
                                             : AigGraph::kConstFalse;
@@ -420,11 +334,6 @@ uint32_t SynthLower::LowerLiteralBit(const Expr* expr, uint32_t bit) {
 
 uint32_t SynthLower::LowerAssignRhsBit(const Expr* rhs, AigGraph& aig,
                                        uint32_t bit) {
-  // §10.7: a right-hand side narrower than the assignment target is extended to
-  // the target width. For a bare signed identifier, the bits beyond its own
-  // width replicate its most-significant (sign) bit; unsigned identifiers and
-  // all other expression forms fall through to the default zero-fill that
-  // LowerExprBit already provides for out-of-range bits.
   if (rhs && rhs->kind == ExprKind::kIdentifier) {
     uint32_t rhs_width = SignalWidth(rhs->text);
     if (rhs_width > 0 && bit >= rhs_width && IsSignedSignal(rhs->text))
@@ -440,18 +349,8 @@ uint32_t FullAdderBit(AigGraph& aig, uint32_t a, uint32_t b, uint32_t& carry) {
   return sum;
 }
 
-// Build the chain again for each bit rather than keeping a memo of it.
-// AigGraph::AddAnd in src/synthesizer/aig.cpp hashes each pair of literals
-// through strash_ and hands back the node it already built for that pair, so
-// the graph an n-bit sum lowers to holds one chain however many times this runs
-// over it. Only the construction is quadratic in the operand width. A memo
-// would instead be state to invalidate every time LowerIfStmt or LowerCaseStmt
-// rewrites signal_bits_, because the same expression lowers to different
-// literals on the two sides of a branch.
 uint32_t SynthLower::LowerAddSubBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
-  // §11.4.3: `a - b` is `a + ~b + 1`, so subtraction is the same chain over the
-  // complemented right operand with a carry of one into bit 0.
   bool subtract = expr->op == TokenKind::kMinus;
   uint32_t carry = subtract ? AigGraph::kConstTrue : AigGraph::kConstFalse;
   uint32_t sum = AigGraph::kConstFalse;
@@ -472,9 +371,6 @@ bool SynthLower::ReportArithIfUnlowered(const Expr* expr) {
 
 uint32_t SynthLower::LowerLogicalBit(const Expr* expr, AigGraph& aig,
                                      uint32_t bit) {
-  // §11.4.7 yields `1'b1` or `1'b0` over the truth values of the two operands,
-  // and its Example 1 reads `alpha && beta` over the whole of `alpha` and
-  // `beta`. `a -> b` is `!a || b` and `a <-> b` is `(a -> b) && (b -> a)`.
   if (bit > 0) return AigGraph::kConstFalse;
   uint32_t l = LowerTruthValue(expr->lhs, aig, Subclause("11.4.7"));
   uint32_t r = LowerTruthValue(expr->rhs, aig, Subclause("11.4.7"));
@@ -492,7 +388,6 @@ uint32_t SynthLower::LowerLogicalBit(const Expr* expr, AigGraph& aig,
 
 uint32_t SynthLower::LowerBinaryBit(const Expr* expr, AigGraph& aig,
                                     uint32_t bit) {
-  // §11.4.5: a comparison is one unsigned bit, so the bits above it are zero.
   if (std::optional<bool> holds = TypeRefCompareHere(expr)) {
     return bit == 0 && *holds ? AigGraph::kConstTrue : AigGraph::kConstFalse;
   }
@@ -534,10 +429,6 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
     case ExprKind::kIntegerLiteral:
       return LowerLiteralBit(expr, bit);
     case ExprKind::kUnbasedUnsizedLiteral:
-      // §5.7.1 rules that the unsized unsigned single-bit values `'0`, `'1`,
-      // `'x` and `'z` set every bit of the value to the one written, so which
-      // position is asked for does not change the answer. Parser::MakeLiteral
-      // records `'1` as every bit of Expr::int_val set.
       return expr->int_val != 0 ? AigGraph::kConstTrue : AigGraph::kConstFalse;
     case ExprKind::kUnary:
       return LowerUnaryBit(expr, aig, bit);
@@ -550,9 +441,6 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
     case ExprKind::kReplicate:
       return LowerReplicateBit(expr, aig, bit);
     case ExprKind::kTernary: {
-      // §11.4.11 returns the first expression where the condition is true,
-      // which is where it is nonzero. §11.6.1 Table 11-21 makes both arms
-      // context-determined, so each is read extended to the propagated size.
       uint32_t sel =
           LowerTruthValue(expr->condition, aig, Subclause("11.4.11"));
       uint32_t t = LowerContextOperandBit(expr->true_expr, aig, bit);
@@ -575,10 +463,6 @@ uint32_t SynthLower::LowerExprBit(const Expr* expr, AigGraph& aig,
     case ExprKind::kTagged:
       break;
   }
-  // Every kind is named above, so a kind added to ExprKind in
-  // src/parser/ast_expr.h is a compile error here rather than an expression
-  // silently answering constant zero. That is the property whose absence let
-  // these fourteen through.
   NonSynthRule rule = expr->kind == ExprKind::kMemberAccess
                           ? DottedNameRule(expr)
                           : NonSynthExprRule(expr->kind);
@@ -599,14 +483,7 @@ void SynthLower::LowerContAssign(const RtlirContAssign& assign, AigGraph& aig) {
   }
   std::string_view name = assign.lhs->text;
   uint32_t width = assign.width > 0 ? assign.width : SignalWidth(name);
-  // §11.8.2: the size of the target propagates back down to the
-  // context-determined operands of the right-hand side. It is cleared again
-  // below so that an expression lowered outside an assignment, such as the
-  // condition of an if statement, is left self-determined.
   propagated_width_ = width;
-  // §11.8.2 propagates the type of the expression down with its size. §11.8.1
-  // rules that an expression's type is not affected by any left-hand side it
-  // is assigned to, so this reads the right-hand side rather than the target.
   propagated_signed_ = IsSignedExpr(assign.rhs);
   for (uint32_t b = 0; b < width; ++b) {
     SetSignalBit(name, b, LowerAssignRhsBit(assign.rhs, aig, b));
@@ -626,8 +503,6 @@ void SynthLower::LowerIfStmt(const Stmt* stmt, AigGraph& aig) {
   }
   auto else_bits = signal_bits_;
 
-  // §12.4 executes the first statement where the condition has a nonzero known
-  // value, and gives the condition no context to size it.
   uint32_t sel = LowerTruthValue(stmt->condition, aig, Subclause("12.4"));
   for (auto& [name, bits] : signal_bits_) {
     auto then_it = then_bits.find(name);
@@ -650,8 +525,6 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     }
   }
 
-  // §12.5 compares every bit of the case expression and the items, so one
-  // whose length is unknown leaves nothing to compare over.
   std::optional<uint32_t> width = CaseCompareWidth(stmt);
   if (!width) {
     ReportExprUnlowered(stmt->condition,
@@ -668,19 +541,8 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
   }
   auto result_bits = signal_bits_;
 
-  // §12.5.4 has case inside match each case_item_expression as the right
-  // operand of the inside operator, whose wildcard matching §11.4.6 makes
-  // asymmetric.
-  // §11.4.6 makes both the x and the z of that operand wildcards, which is the
-  // pair TokenKind::kKwCasex asks BuildPatternMatch to read out of an item's
-  // own digits. The asymmetry needs nothing further: the digits are read from
-  // the item, and a selector arrives as AIG literals carrying no x or z at all.
   TokenKind item_kind =
       stmt->case_inside ? TokenKind::kKwCasex : stmt->case_kind;
-  // §12.5 runs the first item in source order that matches. Each item's
-  // multiplexer wraps the result built so far, so the items are taken from the
-  // last back to the first, leaving the first one outermost: where two match,
-  // it decides.
   for (auto it = stmt->case_items.rbegin(); it != stmt->case_items.rend();
        ++it) {
     const CaseItem& ci = *it;
@@ -689,9 +551,6 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
     LowerStmt(ci.body, aig);
     auto case_bits = signal_bits_;
 
-    // §11.8.2 carries the case's common length and type down into the
-    // context-determined operands of the case expression and the items, in
-    // place of what the item's own body left, and they are handed back after.
     uint32_t saved_width = propagated_width_;
     bool saved_signed = propagated_signed_;
     propagated_width_ = *width;
@@ -709,11 +568,6 @@ void SynthLower::LowerCaseStmt(const Stmt* stmt, AigGraph& aig) {
   signal_bits_ = result_bits;
 }
 
-// True for a statement kind that leaves the graph alone because there is
-// nothing in it to lower, as opposed to one this synthesizer has not been
-// taught to lower. A null statement (§9.4) describes no behaviour at all, and
-// a declaration inside a block (§9.3.1) introduces a name whose storage
-// MapPorts has already reserved from the module's variable list.
 static bool LowersToNothing(StmtKind kind) {
   switch (kind) {
     case StmtKind::kNull:
@@ -725,23 +579,6 @@ static bool LowersToNothing(StmtKind kind) {
   }
 }
 
-// Lower `y++`, `++y`, `y--` and `--y` as the blocking assignment §11.4.2 rules
-// each one behaves as, and answer false for anything else so that LowerStmt
-// reports the statement rather than passing over it. The new value is built
-// over the operand's own width by a chain of FullAdderBit stages carrying one
-// into bit 0. `++` adds the constant zero to the operand, which makes the sum
-// `y + 1`. `--` adds the complement of the constant one, whose bit 0 is false
-// and whose every higher bit is true, which makes the sum `y + ~1 + 1`, and
-// that is `y - 1`. The addend is the one place the two directions differ.
-//
-// The postfix and prefix spellings lower alike here. They yield different
-// values as expressions, the operand's old value and its new one, but they
-// assign the same value, and an expression statement (§9.2) yields its value to
-// nobody.
-//
-// An operand that is not a whole variable, such as `y[0]++`, answers false,
-// because the chain reads and writes whole signals through GetSignalBit and
-// SetSignalBit.
 bool SynthLower::LowerIncDecStmt(const Expr* expr, AigGraph& aig) {
   if (expr->op != TokenKind::kPlusPlus && expr->op != TokenKind::kMinusMinus) {
     return false;
@@ -784,12 +621,6 @@ void SynthLower::LowerStmt(const Stmt* stmt, AigGraph& aig) {
     return;
   }
   if (LowersToNothing(stmt->kind)) return;
-  // Everything else is a statement CheckStmtSynthesizable let through and this
-  // function has no lowering for, which used to mean the statement and every
-  // statement nested in it left no trace in the graph while the run reported
-  // success. Say so instead. No subclause of IEEE 1800-2023 states this: it is
-  // a limit of this synthesizer rather than a rule the design broke, and the
-  // location is what tells the reader which statement went missing.
   lowering_incomplete_ = true;
   diag_.Error(stmt->range.start,
               "statement has no lowering in the synthesizer and would be "
@@ -808,8 +639,6 @@ void SynthLower::LowerAssignStmt(const Stmt* stmt, AigGraph& aig) {
     return;
   }
   uint32_t w = SignalWidth(stmt->lhs->text);
-  // §11.8.2, as in SynthLower::LowerContAssign: the target propagates its size
-  // down to the context-determined operands of the right-hand side.
   propagated_width_ = w;
   propagated_signed_ = IsSignedExpr(stmt->rhs);
   for (uint32_t b = 0; b < w; ++b) {
@@ -895,7 +724,6 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
         if (proc.is_star_sensitivity) {
           LowerAlwaysComb(proc, *aig);
         } else if (!SensitivityHasEdge(proc) && SensitivityHasIff(proc)) {
-          // §9.4.2.3: level-sensitive event control gated by `iff` → latch.
           LowerAlwaysLatch(proc, *aig);
         }
         break;
@@ -912,8 +740,6 @@ AigGraph* SynthLower::Lower(const RtlirModule* mod) {
 
   RestoreShadowedSignals();
   RegisterOutputs(*aig);
-  // A graph built over a statement that was passed over describes something
-  // other than the module, so answer with nothing rather than with that.
   if (lowering_incomplete_) return nullptr;
   return aig;
 }

@@ -11,8 +11,6 @@
 
 namespace delta {
 
-// The domain of `var` narrowed by the comparison `sub`, its bounds folded
-// as a comparison against a constant folds them before the draw.
 RandVariable Narrowed(const RandVariable& var, const ConstraintExpr& sub) {
   RandVariable narrowed = var;
   auto above = [&](int64_t c) {
@@ -63,9 +61,6 @@ void ConstraintSolver::RepairConstraints(
 }
 
 void ConstraintSolver::RepairConstraint(const ConstraintExpr& c) {
-  // 18.5.13: a soft constraint still honored is repaired as its inner
-  // relation; one discarded, by its priority or by a 'disable soft'
-  // directive, is true and repairs nothing.
   if (c.kind == ConstraintKind::kSoft) {
     if (SoftHonored(c)) RepairConstraint(*c.inner);
     return;
@@ -112,9 +107,6 @@ void ConstraintSolver::RepairConsequent(const ConstraintExpr& sub) {
   }
 }
 
-// The structured candidates of a variable's domain: 0, each power of two the
-// width holds and its two neighbours, the bounds, and, where the domain is
-// signed, the negatives of the powers.
 std::vector<int64_t> StructuredCandidates(const RandVariable& var) {
   std::vector<int64_t> out{0, var.min_val, var.max_val};
   for (uint32_t i = 0; i < var.width && i < 63; ++i) {
@@ -127,11 +119,6 @@ std::vector<int64_t> StructuredCandidates(const RandVariable& var) {
   return out;
 }
 
-// Whether the variable `name` is one a repair may write: one the solver
-// holds, active, integral and, 18.4.2, not randc, which is drawn from its
-// own cycle alone, and, 18.8, holding no state value, which is never
-// written, and, 18.5.9, one of the last ordered set while an ordered solve
-// repairs that set.
 bool ConstraintSolver::RepairMayWrite(const std::string& name) const {
   if (HoldsStateValue(name)) return false;
   if (!repair_scope_.empty() && repair_scope_.count(name) == 0) return false;
@@ -155,8 +142,6 @@ void ConstraintSolver::RepairFromCandidates(const ConstraintExpr& c) {
   values_[name] = satisfying[pick(rng_)];
 }
 
-// `dom` narrowed to the values `kind` admits against `value`, an equality
-// to that value alone.
 static void NarrowBy(RandVariable& dom, ConstraintKind kind, int64_t value) {
   ConstraintExpr bound;
   bound.kind = kind == ConstraintKind::kEqual ? ConstraintKind::kRange : kind;
@@ -165,9 +150,6 @@ static void NarrowBy(RandVariable& dom, ConstraintKind kind, int64_t value) {
   dom = Narrowed(dom, bound);
 }
 
-// 18.5.13: whether the soft constraint `c` is still honored, with an inner
-// relation, neither discarded by its priority nor by a 'disable soft'
-// directive.
 bool ConstraintSolver::SoftHonored(const ConstraintExpr& c) const {
   return c.inner != nullptr && dropped_soft_.count(&c) == 0 &&
          disabled_soft_.count(&c) == 0;
@@ -201,8 +183,6 @@ void ConstraintSolver::NarrowBoundAtValues(const ConstraintExpr& c,
   }
 }
 
-// The members of the set membership `c` held, or the members already held
-// that it admits as well.
 static void IntersectMembers(const ConstraintExpr& c,
                              std::vector<int64_t>& members, bool& has_members) {
   if (!has_members) {
@@ -249,7 +229,6 @@ void ConstraintSolver::NarrowAtValues(const ConstraintExpr& c,
   }
 }
 
-// The members of `members` within the domain `dom`.
 static std::vector<int64_t> WithinDomain(const std::vector<int64_t>& members,
                                          const RandVariable& dom) {
   std::vector<int64_t> admitted;
@@ -272,17 +251,7 @@ void ConstraintSolver::NarrowByActive(const std::string& name,
     NarrowAtValues(k, name, dom, members, has_members);
 }
 
-// The derived variable written from the others: drawn afresh from its
-// domain narrowed by every active constraint that bounds it at the values
-// drawn, the relation's own bound among them, so that a variable held
-// between two others, the clause's p1.x above y and below p2.x, is drawn
-// between them rather than under one bound alone, and one held to a set as
-// well from the members the bounds admit. A domain the bounds close is no
-// repair: the draw stands, to be tried again.
 void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
-  // 18.8: the derived variable held as a state value is never written; the
-  // variable it is derived from alone, where the relation bounds it the
-  // other way, is drawn within the relation instead.
   const std::string& name =
       RepairMayWrite(c.var_name) ? c.var_name : c.co_var_name;
   if (name.empty() || !RepairMayWrite(name)) return;
@@ -301,10 +270,6 @@ void ConstraintSolver::ApplyDerived(const ConstraintExpr& c) {
   values_[name] = admitted[pick(rng_)];
 }
 
-// 18.5.7.2: the value the element `name` of the sum `c`, folded without a
-// with clause, would have to hold for the fold to meet its bound exactly,
-// given the other elements below the size drawn: the bound less the sum of
-// the others, one past it under a strict comparison.
 static int64_t SumElementNeeded(
     const ConstraintExpr& c, const std::string& name,
     const std::unordered_map<std::string, int64_t>& values) {
@@ -321,10 +286,6 @@ static int64_t SumElementNeeded(
   return target - rest;
 }
 
-// How far the reduction `c` falls from its bound with the element `name` at
-// `candidate`, which is left written: 0 where the reduction holds, and the
-// distance of the fold from the bound otherwise, which a rewriting that
-// meets the bound with no one value lessens.
 int64_t ConstraintSolver::ReductionDistanceWith(const ConstraintExpr& c,
                                                 const std::string& name,
                                                 int64_t candidate) {
@@ -334,9 +295,6 @@ int64_t ConstraintSolver::ReductionDistanceWith(const ConstraintExpr& c,
   return fold > c.lo ? fold - c.lo : c.lo - fold;
 }
 
-// The values of the domain of `var` a rewriting may try: every one where
-// the domain holds no more than kScanDomain values, and the structured
-// candidates within it otherwise.
 static std::vector<int64_t> RewritingCandidates(const RandVariable& var) {
   static constexpr uint64_t kScanDomain = 4096;
   std::vector<int64_t> out;
@@ -356,12 +314,6 @@ static std::vector<int64_t> RewritingCandidates(const RandVariable& var) {
   return out;
 }
 
-// 18.5.7.2: rewrites the element `name` so that the reduction `c` holds: a
-// sum without a with clause to the value that meets the bound exactly, and
-// any reduction to one of the candidate values of the element's domain that
-// meet it, drawn at random among them; false where none does, the element
-// then left at the candidate that brings the fold nearest the bound, which
-// the elements rewritten after it carry on from.
 bool ConstraintSolver::RepairReductionElement(const ConstraintExpr& c,
                                               const std::string& name) {
   const RandVariable& var = variables_.find(name)->second;
@@ -393,10 +345,6 @@ bool ConstraintSolver::RepairReductionElement(const ConstraintExpr& c,
   return true;
 }
 
-// 18.5.7.2: a reduction that does not hold after the draw has its elements
-// below the size drawn rewritten one at a time, in index order, each
-// brought as near the bound as its domain allows, until one rewriting meets
-// it; the check that follows still decides.
 void ConstraintSolver::RepairReduction(const ConstraintExpr& c) {
   if (EvalConstraint(c)) return;
   size_t count = ClampCountToSize(c.reduce_vars.size(), c.size_var, values_);

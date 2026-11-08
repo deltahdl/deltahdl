@@ -18,9 +18,6 @@ TEST(RangeSystemFunctionParsing, IsUnboundedInConditional) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §20.6.3 BNF (Syntax 20-8): the argument may be a hierarchical_parameter_
-// identifier, not just a simple ps_parameter_identifier. A dotted reference to
-// a parameter inside an instantiated submodule shall parse cleanly here.
 TEST(RangeSystemFunctionParsing, IsUnboundedWithHierarchicalParam) {
   auto r = Parse(
       "module sub #(parameter int P = $);\n"

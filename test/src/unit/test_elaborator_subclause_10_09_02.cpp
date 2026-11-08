@@ -107,9 +107,6 @@ TEST(StructPatternValidation, InvalidMemberName) {
                             "10.9.2"));
 }
 
-// §10.9.2: a member name key resolves only against the top-level members of the
-// structure. A name that exists merely inside a substructure is not a valid key
-// and is rejected, rather than reaching into the nested member.
 TEST(StructPatternValidation, SubstructureMemberNotTopLevelKey) {
   ElabFixture f;
   ElaborateSrc(
@@ -245,8 +242,6 @@ TEST(StructPatternSimulation, StructTypeKeyedPattern) {
   EXPECT_EQ(var->value.ToUint64(), uint64_t{99} << 8);
 }
 
-// Syntax 10-5 lets a type key name a typedef, and §10.9.2 applies it to every
-// member of that type rather than reading it as a member name.
 TEST(StructPatternElaboration, TypedefTypeKeyCoversMembers) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -259,8 +254,6 @@ TEST(StructPatternElaboration, TypedefTypeKeyCoversMembers) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.9.2: a type key covers only the members whose type it matches, so a
-// member of another type, or an array of the key's type, is left uncovered.
 TEST(StructPatternElaboration, TypeKeyCoversOnlyMatchingMembers) {
   ElabFixture f;
   ElaborateSrc(
@@ -280,9 +273,6 @@ TEST(StructPatternElaboration, TypeKeyCoversOnlyMatchingMembers) {
                              4, "10.9.2"));
 }
 
-// §10.9.2's item count, member keys and coverage hold wherever the pattern
-// stands: assigned in a procedure, initializing a block's variable, typed, and
-// in a continuous assignment.
 TEST(StructPatternElaboration, RulesReachEveryStructurePattern) {
   ElabFixture f;
   ElaborateSrc(

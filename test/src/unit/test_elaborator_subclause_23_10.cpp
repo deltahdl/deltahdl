@@ -95,10 +95,6 @@ TEST(ParameterOverride, TypedUnrangedConvertsOverrideToDeclarationType) {
 }
 
 TEST(ParameterOverride, SignedUnrangedAdoptsOverrideRange) {
-  // §23.10: a value parameter with a (signed) type specification but no range
-  // specification takes its range from the final override value. The override
-  // is therefore not truncated to any declared width, and the parameter stays
-  // signed, so a negative override survives intact.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module child #(parameter signed P = 0)();\n"
@@ -114,11 +110,6 @@ TEST(ParameterOverride, SignedUnrangedAdoptsOverrideRange) {
   EXPECT_EQ(u0->params[0].resolved_value, -5);
 }
 
-// §23.10: the two kinds of overridable parameter constants are value parameters
-// and type parameters. A type parameter is overridden by an ordered instance
-// parameter value assignment; the child's body variable, declared with the type
-// parameter's type, adopts the width of the override type (int = 32) rather
-// than the declared default (byte = 8).
 TEST(ParameterOverride, TypeParameterOverriddenByOrderedInstanceAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -134,9 +125,6 @@ TEST(ParameterOverride, TypeParameterOverriddenByOrderedInstanceAssignment) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
-// §23.10: the same type-parameter override reached by a named instance
-// parameter value assignment. Without the override the variable would be 16
-// bits wide (shortint), so observing 32 bits confirms the override is applied.
 TEST(ParameterOverride, TypeParameterOverriddenByNamedInstanceAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -152,11 +140,6 @@ TEST(ParameterOverride, TypeParameterOverriddenByNamedInstanceAssignment) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
-// §23.10.2: an instance parameter value assignment overrides a type parameter
-// with a type, and §6.18's user-defined type name is one. The override names a
-// typedef declared in the instantiating module, so the child's variable is 16
-// bits wide (shortint). An override the elaborator does not carry into the
-// child leaves the declared default standing, which reads back as 8 (byte).
 TEST(ParameterOverride, TypeParameterOverriddenByTypedefNameInNamedAssignment) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -173,11 +156,6 @@ TEST(ParameterOverride, TypeParameterOverriddenByTypedefNameInNamedAssignment) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
-// §8.23: a type parameter assignment is one of the three contexts in which a
-// class may prefix the class scope resolution operator, so the type selected
-// out of the class is what the child's type parameter takes. The child's
-// variable is therefore 8 bits wide (byte); a dropped override reads back as
-// the declared default's 32 (int).
 TEST(ParameterOverride,
      TypeParameterOverriddenByClassScopedNameInNamedAssignment) {
   ElabFixture f;
@@ -197,11 +175,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
 }
 
-// §23.10.2: an ordered instance parameter value assignment overrides the same
-// type parameter by position rather than by name, and the two forms are matched
-// against the child's declaration separately. The §8.23 class-scoped override
-// therefore has to reach the child through the ordered form too, giving 8 bits
-// (byte) rather than the declared default's 32 (int).
 TEST(ParameterOverride,
      TypeParameterOverriddenByClassScopedNameInOrderedAssignment) {
   ElabFixture f;
@@ -221,10 +194,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
 }
 
-// §6.20.3: the value assigned to a type parameter is a data type, and a packed
-// vector is a data type that is neither a bare keyword nor a name. The child's
-// variable is 16 bits wide; an override understood only when it is a single
-// name leaves the declared default standing, which reads back as 8 (byte).
 TEST(ParameterOverride,
      TypeParameterOverriddenByPackedVectorInNamedAssignment) {
   ElabFixture f;
@@ -241,13 +210,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
-// §7.4.1 (printed page 153) allows more than one packed dimension on a vector
-// type and declares `bit [0:3] [7:0] packedArray;` as its example, so
-// `logic [3:0][7:0]` is a data type §6.20.3 lets a type parameter take. Its
-// width is the product of the two ranges, 32, which is what separates both
-// dimensions reaching the child from only the first doing so: an override
-// carrying `[3:0]` alone would read back as 4, and no override at all as 8
-// (byte).
 TEST(ParameterOverride,
      TypeParameterOverriddenByTwoPackedDimensionsInNamedAssignment) {
   ElabFixture f;
@@ -264,11 +226,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
-// §6.20.1: a type parameter with no default is an error only when no override
-// is supplied at instantiation. A §8.23 class-scoped override supplies one, so
-// the instantiation elaborates and the child's variable is 8 bits wide (byte).
-// An override dropped before that check is indistinguishable from no override
-// at all, and the design is rejected instead.
 TEST(ParameterOverride, TypeParameterWithoutDefaultTakesClassScopedOverride) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -303,11 +260,6 @@ TEST(ParameterOverride, SignedRangedKeepsDeclarationRangeAndSignedness) {
   EXPECT_EQ(u0->params[0].resolved_value, 1);
 }
 
-// §23.10: the value-parameter type/range override rules apply to a module
-// instance parameter value assignment, not only to a defparam. This exercises
-// the instantiation-override code path (which coerces the value to the declared
-// width) via an ordered assignment on a ranged, untyped parameter: 13 is
-// truncated to the declared 3-bit range, giving 5.
 TEST(ParameterOverride, RangedUntypedTruncatesOrderedInstanceOverride) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -324,9 +276,6 @@ TEST(ParameterOverride, RangedUntypedTruncatesOrderedInstanceOverride) {
   EXPECT_EQ(u0->params[0].resolved_value, 5);
 }
 
-// §23.10: the same override rules reached by a named instance parameter value
-// assignment on a typed, unranged parameter. The 33-bit override is converted
-// to the parameter's declared 32-bit int type, so only the low bit survives.
 TEST(ParameterOverride, TypedUnrangedConvertsNamedInstanceOverride) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -343,17 +292,6 @@ TEST(ParameterOverride, TypedUnrangedConvertsNamedInstanceOverride) {
   EXPECT_EQ(u0->params[0].resolved_value, 1);
 }
 
-// A type parameter overridden by a package-qualified type name. §26.3 (printed
-// page 808) references a package's declarations through the package name, and
-// §23.10 makes a type parameter overridable by a data type, so `pkg::word_t` is
-// a value this assignment may carry. It is the one override form that reaches
-// ResolveNamed in src/elaborator/type_eval.cpp still carrying its prefix:
-// ClassScopedOverrideToDataType in src/elaborator/elaborator_module_inst.cpp
-// resolves a class-scoped override itself and publishes the resolved type, and
-// hands on the unresolved scope_name plus type_name shape only when that lookup
-// finds nothing, which a package prefix always does.
-//
-// 16 is shortint, against the 8 of the byte default the override replaces.
 TEST(ParameterOverride, TypeParameterOverriddenByPackageScopedTypeName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -372,14 +310,6 @@ TEST(ParameterOverride, TypeParameterOverriddenByPackageScopedTypeName) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
-// §8.25 (printed page 204) states that a generic class is not itself a type,
-// only a concrete specialization is, and that two specializations are the same
-// type only when all their parameters are the same. So Buf#(byte) and
-// Buf#(shortint) name different types, and the elem_t of the first is a byte.
-// The width is read back because an override that dropped the #(byte) would
-// still name a type and so would be reported nowhere: the child's variable
-// would take the class's own default of int, 32 bits, or the child's declared
-// default of longint, 64.
 TEST(ParameterOverride,
      TypeParameterOverriddenByClassSpecializationScopedName) {
   ElabFixture f;
@@ -399,11 +329,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
 }
 
-// §23.10.2.1 assigns a parameter by position rather than by name, and
-// ResolvePositionalInstParams in src/elaborator/elaborator_module_inst.cpp
-// selects the override through a separate path from the named form. The
-// specialization has to survive that path too, giving 8 rather than the child's
-// declared default of 64.
 TEST(ParameterOverride,
      TypeParameterOverriddenByClassSpecializationInOrderedAssignment) {
   ElabFixture f;
@@ -423,10 +348,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
 }
 
-// A second argument to the same class, so that reaching 8 bits above cannot be
-// done by reading any one type and calling it the answer. §8.25 (printed page
-// 204) makes Buf#(shortint) a distinct type from Buf#(byte), and its elem_t is
-// 16 bits.
 TEST(ParameterOverride, TypeParameterOverriddenByASecondClassSpecialization) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -445,12 +366,6 @@ TEST(ParameterOverride, TypeParameterOverriddenByASecondClassSpecialization) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 16u);
 }
 
-// §8.25.1 (printed page 205) states that a parameterized class's default
-// specialization is the one written with an empty parameter override list, and
-// that outside the class the explicit specialization form is what a scope
-// resolution shall be written with. So Buf#()::elem_t names elem_t with T at
-// the int its declaration gives, 32 bits, and neither the child's declared
-// default of 64 nor a failure to name a type.
 TEST(ParameterOverride, TypeParameterOverriddenByDefaultClassSpecialization) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -469,13 +384,6 @@ TEST(ParameterOverride, TypeParameterOverriddenByDefaultClassSpecialization) {
   ExpectVariableWidth(SoleChildInstance(design), "data", 32u);
 }
 
-// §8.25.1 (printed page 205) states that a parameterized class may lack a
-// default specialization, since a class need not give its parameters defaults,
-// and that every specialization of such a class then overrides at least the
-// parameters without defaults. D#(4) overrides the only such parameter, so the
-// child's handle is declared from a concrete specialization and nothing is
-// reported. The companion below writes D unspecialized and is reported, so this
-// case cannot pass by nothing ever being reported here.
 TEST(ParameterOverride,
      BareClassSpecializationOverrideSuppliesTheClassParameter) {
   ElabFixture f;
@@ -494,10 +402,6 @@ TEST(ParameterOverride,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §8.25.1 makes the unadorned D illegal where D provides no default for p, the
-// LRM's own `D obj;` example. The override binds the child's P to D, so the
-// child's declaration is that example and is reported at the declaration rather
-// than passed over because the name written there is P.
 TEST(ParameterOverride, BareClassNameOverrideHasNoDefaultSpecialization) {
   ElabFixture f;
   ElaborateSrc(
@@ -516,11 +420,6 @@ TEST(ParameterOverride, BareClassNameOverrideHasNoDefaultSpecialization) {
                             "8.25"));
 }
 
-// §8.30.1 requires the type parameter of weak_reference to be a class type, and
-// §8.25 (printed page 204) makes weak_reference#(my_obj) and
-// weak_reference#(int) different types. This is the pair that turns on which
-// argument the specialization carries rather than on whether it carries one:
-// my_obj is a class, so nothing is reported.
 TEST(ParameterOverride, BareClassSpecializationOverrideCarriesItsArgument) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -537,9 +436,6 @@ TEST(ParameterOverride, BareClassSpecializationOverrideCarriesItsArgument) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The other half of that pair: int is not a class type, so §8.30.1 rejects the
-// same declaration. An override that dropped the argument would report neither
-// case, and one that dropped the class would report both.
 TEST(ParameterOverride,
      BareClassSpecializationOverrideRejectsANonClassArgument) {
   ElabFixture f;
@@ -556,15 +452,6 @@ TEST(ParameterOverride,
       "weak_reference needs a class type as its type parameter", 2, "8.30.1"));
 }
 
-// The specialization carries a named argument rather than the ordered one the
-// cases above write. ClassScopedOverrideToDataType in
-// src/elaborator/elaborator_module_inst.cpp substitutes the class parameters
-// for an override written on an instance, reaching the same substitution by a
-// route separate from the one a declaration takes in
-// test/src/unit/test_elaborator_subclause_08_25.cpp, so the case is written
-// here as well. T1 defaults to int, 32 bits, T2 to bit, 1 bit, and the child's
-// P to longint, 64, so an override that bound .T2(byte) by position, or that
-// dropped the specialization, cannot give 8.
 TEST(ParameterOverride,
      TypeParameterOverriddenByClassSpecializationWithNamedArgument) {
   ElabFixture f;
@@ -584,13 +471,6 @@ TEST(ParameterOverride,
   ExpectVariableWidth(SoleChildInstance(design), "data", 8u);
 }
 
-// The same named form with a name Buf does not declare.
-// ClassScopedOverrideToDataType in src/elaborator/elaborator_module_inst.cpp
-// reaches the substitution by a route separate from a declaration's, which is
-// why the case is written here as well as in
-// test/src/unit/test_elaborator_subclause_08_25.cpp. Without the rule the
-// child's P silently becomes bit, T2's declared default, rather than a report
-// naming the parameter that does not exist.
 TEST(ParameterOverride,
      NamedSpecializationArgumentNamingNoClassParameterIsReported) {
   ElabFixture f;
@@ -610,13 +490,6 @@ TEST(ParameterOverride,
                             "23.10.2.2"));
 }
 
-// A.4.1.1's ordered_parameter_assignment is a param_expression (printed page
-// 1194 of IEEE 1800-2023), which A.8.3 lets be a data_type, and a data
-// type an expression cannot spell -- A.2.2.1's signing after an integer type
-// (printed page 1182) -- reaches the child through the specialization the
-// override names. `int unsigned` on T2 makes elem_t unsigned where T2's
-// default, int, is signed; the width is 32 either way, so the signedness is
-// what says the written type arrived rather than the default.
 TEST(ParameterOverride,
      TypeParameterOverriddenBySignedIntegerTypeInASpecialization) {
   ElabFixture f;

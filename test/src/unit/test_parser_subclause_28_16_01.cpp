@@ -130,11 +130,6 @@ TEST(MinTypMaxDelayParsing, IdentifierExpressionsInTriple) {
               "endmodule\n"));
 }
 
-// §28.16.1 allows three delay slots (rise, fall, turn-off) for gate
-// primitives, and each slot may itself be a min:typ:max triple. A three-state
-// gate such as bufif0 exercises the turn-off (third) slot, which the two-slot
-// and UDP cases above cannot reach. Mirrors the bufif0 form shown in the
-// clause's own example.
 TEST(MinTypMaxDelayParsing, GateThreeSlotTurnOffTriple) {
   auto r = Parse(
       "module m;\n"
@@ -156,10 +151,6 @@ TEST(MinTypMaxDelayParsing, GateThreeSlotTurnOffTriple) {
   EXPECT_EQ(item->gate_delay_decay->kind, ExprKind::kMinTypMax);
 }
 
-// §28.16.1 requires the min:typ:max form to carry all three colon-separated
-// expressions. Once the first colon commits a delay to the triple form, the
-// parser requires the second colon and the maximum expression; an incomplete
-// "min:typ" without a maximum is rejected.
 TEST(MinTypMaxDelayParsing, IncompleteMinTypMaxIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -167,16 +158,9 @@ TEST(MinTypMaxDelayParsing, IncompleteMinTypMaxIsRejected) {
       "  assign #(1:2) y = a;\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // §11.11 states the mintypmax_expression itself, and
-  // Parser::ParseMinTypMaxExpr files the missing second colon there rather than
-  // under §28.16.1.
   EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ')'", 3, "11.11"));
 }
 
-// §28.16.1 extends the min:typ:max delay syntax to gate primitives, UDPs among
-// them. UDP-instance delays parse through the same delay path as gates, so each
-// rise/fall slot may itself be a min:typ:max triple (UDPs are limited to two
-// delays per the §29.8 dependency, so no turn-off slot here).
 TEST(MinTypMaxDelayParsing, UdpInstanceDelayTriples) {
   auto r = Parse(
       "primitive my_udp(output y, input a, input b);\n"

@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §10.4.2: a nonblocking assignment to an automatic variable is illegal, and a
-// function's locals are automatic in an automatic function.
 TEST(NonblockingAutomaticTarget, AutomaticFunctionLocalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -27,8 +25,6 @@ TEST(NonblockingAutomaticTarget, AutomaticFunctionLocalIsError) {
                             "10.4.2"));
 }
 
-// §8.6 makes every method of a class automatic, so its locals are automatic
-// whatever the declaration says.
 TEST(NonblockingAutomaticTarget, ClassMethodLocalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,8 +42,6 @@ TEST(NonblockingAutomaticTarget, ClassMethodLocalIsError) {
                             "10.4.2"));
 }
 
-// A static function's local is static, so writing it with a nonblocking
-// assignment is legal.
 TEST(NonblockingAutomaticTarget, StaticFunctionLocalElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -61,9 +55,6 @@ TEST(NonblockingAutomaticTarget, StaticFunctionLocalElaborates) {
   EXPECT_EQ(FindDiag(f, "in nonblocking assignment"), nullptr);
 }
 
-// §10.4.2 bars the write whatever part of the automatic variable the target
-// names: an element of a block's automatic array, a member of an automatic
-// structure, and the elements of a concatenation or a pattern.
 TEST(NonblockingAutomaticTarget, SelectMemberAndConcatenationAreErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,9 +83,6 @@ TEST(NonblockingAutomaticTarget, SelectMemberAndConcatenationAreErrors) {
   }
 }
 
-// A member written through a class or virtual interface handle belongs to the
-// object or interface the handle refers to, which outlives the call, and a
-// concatenation of module variables writes nothing automatic.
 TEST(NonblockingAutomaticTarget, WritesThroughHandlesElaborate) {
   ElabFixture f;
   ElaborateSrc(
@@ -116,8 +104,6 @@ TEST(NonblockingAutomaticTarget, WritesThroughHandlesElaborate) {
   EXPECT_EQ(FindDiag(f, "in nonblocking assignment"), nullptr);
 }
 
-// §12.7.1 (printed page 330) declares a loop variable written in a for-loop's
-// initialization with automatic lifetime.
 TEST(NonblockingAutomaticTarget, ForLoopVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -130,10 +116,6 @@ TEST(NonblockingAutomaticTarget, ForLoopVariableIsError) {
                             "6.21"));
 }
 
-// §23.9: a nested block's automatic variable is not what a name outside that
-// block reaches, so the module variable of the same name may be written with a
-// nonblocking assignment there -- after a begin-end block, a fork-join block
-// and a for-loop that each declare one.
 TEST(NonblockingAutomaticTarget, OuterVariableOfNestedBlockNameElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -152,9 +134,6 @@ TEST(NonblockingAutomaticTarget, OuterVariableOfNestedBlockNameElaborates) {
   EXPECT_EQ(FindDiag(f, "in nonblocking assignment"), nullptr);
 }
 
-// §10.4.2: a nonblocking assignment to an element of a dynamically sized array
-// is illegal, and §23.9 decides which array a name reaches: a task's own
-// fixed-size array is not the module's queue of the same name.
 TEST(NonblockingDynamicElement, LocalFixedArrayShadowingQueueElaborates) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,9 +145,6 @@ TEST(NonblockingDynamicElement, LocalFixedArrayShadowingQueueElaborates) {
   EXPECT_EQ(FindDiag(f, "element of dynamically sized array"), nullptr);
 }
 
-// §10.4.2: a class's queue property named in one of its methods is a
-// dynamically sized array whose element a nonblocking assignment may not
-// write.
 TEST(NonblockingDynamicElement, QueuePropertyInClassMethodIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -185,10 +161,6 @@ TEST(NonblockingDynamicElement, QueuePropertyInClassMethodIsError) {
       "6.21"));
 }
 
-// §10.4.2: an element of a dynamically sized array reached through a class
-// handle's property or a structure's member, inline or declared through a
-// typedef, is one a nonblocking assignment may not write; a fixed-size member
-// is not.
 TEST(NonblockingDynamicElement, ElementReachedThroughMemberIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -218,10 +190,6 @@ TEST(NonblockingDynamicElement, ElementReachedThroughMemberIsError) {
       "6.21"));
 }
 
-// §10.4.2 reaches a dynamically sized dimension wherever it stands among an
-// array's unpacked dimensions, the dimensions a typedef wrote included, and a
-// concatenation's elements; a select past the unpacked dimensions is a select
-// within an element.
 TEST(NonblockingDynamicElement, DynamicInnerDimensionIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -255,8 +223,6 @@ TEST(NonblockingDynamicElement, DynamicInnerDimensionIsError) {
   }
 }
 
-// §7.8: an associative array's index type may be a typedef, and a block may
-// declare one.
 TEST(NonblockingDynamicElement, LocalTypedefIndexedAssocIsError) {
   ElabFixture f;
   ElaborateSrc(

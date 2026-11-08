@@ -13,7 +13,6 @@ using namespace delta;
 
 namespace {
 
-// A formal of Example 4's import, named, typed and, for the vector, sized.
 DpiArg Formal(const char* name, DataTypeKind type, bool is_unsigned,
               uint32_t width = 0) {
   DpiArg formal;
@@ -25,9 +24,6 @@ DpiArg Formal(const char* name, DataTypeKind type, bool is_unsigned,
   return formal;
 }
 
-// §H.11.1: the C prototype of Example 4's f7 -- the two int unsigned formals
-// as unsigned int by value, the classical correspondence of Table H.1, and
-// the [W-1:0] formal as the canonical const svBitVecVal*.
 TEST(DpiTwoStateArguments, TheCHeaderOfF7IsTheExamples) {
   EXPECT_EQ(DpiCFunctionHeader("f7", DataTypeKind::kVoid,
                                {Formal("fbv1", DataTypeKind::kInt, true),
@@ -37,19 +33,11 @@ TEST(DpiTwoStateArguments, TheCHeaderOfF7IsTheExamples) {
             "svBitVecVal* fbv3)");
 }
 
-// §H.11.1: a DPI formal can be of a C-compatible type with an arbitrary
-// 2-state bit vector actual associated with it -- the 30-bit abv2 bound to
-// the int unsigned fbv2 is extended to the formal's 32 bits by the caller's
-// coercion, and the int abv1 bound to fbv1 needs none.
 TEST(DpiTwoStateArguments, AnArbitraryTwoStateVectorIsCoercedToTheCFormal) {
   EXPECT_EQ(DpiCoercionOfPackedActual(30, 32), DpiActualCoercion::kExtend);
   EXPECT_EQ(DpiCoercionOfPackedActual(32, 32), DpiActualCoercion::kNone);
 }
 
-// §H.11.1: the C-compatible technique holds a 2-state vector of up to 64
-// bits; a vector exceeding 64 bits requires the canonical technique, and
-// the 33-bit abv3 may take either, the C-compatible one being the more
-// efficient.
 TEST(DpiTwoStateArguments, TheCanonicalTechniqueIsRequiredBeyondSixtyFourBits) {
   EXPECT_TRUE(DpiCCompatibleFormalCanHoldTwoStateVector(33));
   EXPECT_TRUE(DpiCCompatibleFormalCanHoldTwoStateVector(64));
@@ -66,10 +54,6 @@ TEST(DpiTwoStateArguments, TheCanonicalTechniqueIsRequiredBeyondSixtyFourBits) {
                                   DpiTwoStateTechnique::kCCompatibleFormal));
 }
 
-// §H.11.1 under the runtime: f7 registered with the example's formals and
-// called with abv1, abv2 and abv3 -- the first two arriving as the C ints
-// the formals name and the 33-bit abv3 as two canonical chunks whose second
-// holds its top bit, which the 2-state svdpi utilities read.
 TEST(DpiTwoStateArguments, F7ReceivesTwoIntsAndACanonicalVector) {
   DpiRuntime rt;
   DpiRtFunction f7;

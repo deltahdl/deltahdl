@@ -20,14 +20,6 @@ constexpr std::string_view kChandleFormal =
     "let formal argument 'c' must be of type event or a type allowed in a "
     "Boolean expression";
 
-// §11.12 lists a sequential and a parallel block and a subroutine among the
-// scopes a let may be declared in, and its rules on a let's formals hold
-// wherever it is: a reference to an event formal stands where an
-// event_expression may be written, and a typed formal's type is event or one
-// §16.6 allows. A let a begin-end, a fork, a module's function, a class
-// method or a compilation unit's function declares is checked as a module's
-// own let is, and one whose event formal is the clocking event of a sampled
-// value call draws nothing.
 TEST(LetDeclElaboration, FormalsOfABlocksLetAreChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -73,8 +65,6 @@ TEST(LetDeclElaboration, FormalsOfABlocksLetAreChecked) {
       ReportedError(f.diag.Diagnostics(), "event formal", 17, "11.12"));
 }
 
-// §11.12 lists a package among the scopes a let may be declared in, and its
-// rules on a let's formals hold for a package's let as for a module's.
 TEST(LetDeclElaboration, FormalsOfAPackagesLetAreChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -92,10 +82,6 @@ TEST(LetDeclElaboration, FormalsOfAPackagesLetAreChecked) {
   EXPECT_FALSE(ReportedError(f.diag.Diagnostics(), "event formal", 4, "11.12"));
 }
 
-// §11.12, rule 2, for a let a begin-end, a fork or a function's body declares:
-// a call within the block, or within a block nested in it, names the block's
-// let ahead of the module's of the same name, and the block's let's default is
-// checked too. Outside the block the module's untyped `f` takes any actual.
 TEST(LetDeclElaboration, CallsToABlocksLetAreChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -132,13 +118,6 @@ TEST(LetDeclElaboration, CallsToABlocksLetAreChecked) {
                              12, "11.12"));
 }
 
-// §11.12, rule 2, with §3.12.1: a compilation unit's let is visible in a
-// module that declares nothing of its name, so a module's call to it is
-// checked, and its default, and a call the unit's own function writes, are
-// checked once. A module's function `g` hides the unit's let `g`, and an
-// unpacked array typedef the unit declares makes `p`'s formal an array of
-// three ints, which two are not (§7.6). The 40-bit structure is no actual for
-// an int, by assignment or by bit-stream cast (§6.24.3).
 TEST(LetDeclElaboration, CallsToACompilationUnitsLetAreChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -183,11 +162,6 @@ TEST(LetDeclElaboration, CallsToACompilationUnitsLetAreChecked) {
                              15, "11.12"));
 }
 
-// §11.12, rule 2, with §26.3: a package's let is reached by its scoped name,
-// through a wildcard import and through an explicit one, and its formals'
-// types are the package's: `t` is the package's typedef of int and `a_t` its
-// unpacked array of int, though the module imports neither by name. A
-// package's function, a class's method and the unit's function are no lets.
 TEST(LetDeclElaboration, CallsToAPackagesLetAreChecked) {
   ElabFixture f;
   ElaborateSrc(
@@ -233,10 +207,6 @@ TEST(LetDeclElaboration, CallsToAPackagesLetAreChecked) {
   }
 }
 
-// §6.23 with §11.12: a compilation unit's let formal written `type(ch)` takes
-// the type of the unit's `ch`, a chandle, which no let formal may take, and
-// one written `type(b)` takes a byte, so an unpacked array is no actual for
-// it.
 TEST(LetDeclElaboration, ACompilationUnitLetsTypeReferenceFormalIsResolved) {
   ElabFixture f;
   ElaborateSrc(
@@ -256,10 +226,6 @@ TEST(LetDeclElaboration, ACompilationUnitLetsTypeReferenceFormalIsResolved) {
                             7, "11.12"));
 }
 
-// §11.12 bars a hierarchical reference to a let. A package's let reached by
-// its scoped name (§26.3), and a class's static method (§8.23), are none,
-// though the module declares a let of the same name; a path through an
-// instance to the let its module declares still is one.
 TEST(LetElaboration, AScopedCallIsNoHierarchicalReference) {
   ElabFixture f;
   ElaborateSrc(

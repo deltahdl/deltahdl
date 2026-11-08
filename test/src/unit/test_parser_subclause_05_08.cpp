@@ -70,10 +70,6 @@ TEST(TimeLiteralParsing, TimeLiteralExprKind) {
 }
 
 TEST(TimeLiteralParsing, TimeLiteralRealVal) {
-  // 5.8: a time literal reads as a realtime value scaled to the current time
-  // unit. With the module time unit set to us, the literal 2.5us is in that
-  // same unit, so it is captured unscaled as 2.5. (Without an explicit timeunit
-  // the default unit is ns, which would scale 2.5us to 2500.)
   auto r = Parse(
       "module m;\n"
       "  timeunit 1us;\n"
@@ -98,9 +94,6 @@ TEST(TimeLiteralParsing, TimeLiteralTextIncludesUnit) {
   EXPECT_EQ(stmt->delay->text, "40ps");
 }
 
-// §5.8: the parser records each time literal with its time scope -- a module,
-// a package, or neither -- for the elaborator to scale once the `timescale
-// before each element is known.
 TEST(TimeLiteralParsing, EachLiteralIsRecordedWithItsTimeScope) {
   auto r = Parse(
       "function automatic realtime f(); return 1ns; endfunction\n"
@@ -121,10 +114,6 @@ TEST(TimeLiteralParsing, EachLiteralIsRecordedWithItsTimeScope) {
   EXPECT_EQ(sites[2].module, r.cu->modules[0]);
 }
 
-// A literal inside a design element goes with the element when one file's
-// declarations join another's (AppendCellDeclarations), and one outside every
-// element goes with the compilation-unit declarations
-// (AppendCompilationUnitDeclarations), so a unit read back alone keeps its own.
 TEST(TimeLiteralParsing, LiteralsTravelWithTheirDeclarations) {
   Expr in_module;
   Expr in_package;

@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's C over random p and q: p gates the soft q of c_1 without
-// appearing in it, and c_2 prefers p; the directive of c_3 is completed by
-// each case.
 const char* const kGatedHead =
     "class C;\n"
     "  rand bit p;\n"
@@ -18,11 +15,6 @@ const char* const kGatedHead =
     "  constraint c_1 { p -> soft q; }\n"
     "  constraint c_2 { soft p; }\n";
 
-// 18.5.13.2: 'disable soft' drops just the soft constraints that name the
-// variable directly. disable soft p discards c_2, where p appears, and not c_1,
-// which p only gates, so over 32 draws p comes up clear in some and q is set
-// whenever p is, as the design test/src/e2e/disabling_soft_constraints.sv runs
-// it.
 TEST(DisablingSoftConstraintsRun, TheGateOfASoftConsequentIsNoReference) {
   SimFixture f;
   std::string out = RunCapture(
@@ -45,9 +37,6 @@ TEST(DisablingSoftConstraintsRun, TheGateOfASoftConsequentIsNoReference) {
   EXPECT_EQ(out, "1 32\n");
 }
 
-// 18.5.13.2: disable soft q discards c_1, the soft constraint q appears in,
-// and leaves c_2, so p is set on every draw and q is drawn free, clear in
-// some.
 TEST(DisablingSoftConstraintsRun, ADirectiveOnTheConsequentDiscardsTheGated) {
   SimFixture f;
   std::string out =
@@ -70,9 +59,6 @@ TEST(DisablingSoftConstraintsRun, ADirectiveOnTheConsequentDiscardsTheGated) {
   EXPECT_EQ(out, "32 1\n");
 }
 
-// 18.5.13.2: the clause's A. The directive of A2 discards A1, the
-// lower-priority preference for 3, and not A3, declared after it, so x
-// takes 1 and 2, both over 32 draws.
 TEST(DisablingSoftConstraintsRun, TheClausesADrawsTheLaterMembership) {
   SimFixture f;
   std::string out = RunCapture(

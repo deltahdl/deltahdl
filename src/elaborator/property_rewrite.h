@@ -12,21 +12,10 @@
 
 namespace delta {
 
-// §16.12 head: the disable condition of a `disable iff` clause may use sampled
-// value functions (see §16.9.3). When a sampled value function other than
-// $sampled appears there, its clock argument shall be specified explicitly in
-// its actual argument list. This reports when the explicit clock is required.
 bool DisableConditionSampledValueRequiresExplicitClock(SampledValueFunction fn);
 
-// §16.12 head: legality of a sampled value function used inside a `disable iff`
-// disable condition, given whether its clock argument was explicitly supplied.
-// Only $sampled is well-formed without an explicit clock argument.
 bool DisableConditionSampledValueClockIsWellFormed(
     SampledValueFunction fn, bool clock_explicitly_specified);
-
-// §16.12 anchors property semantics on the flattened form produced by the
-// §F.4.1 rewriting algorithm. Both subclauses share one legality rule: a
-// flattened property that is not legal makes its source not legal.
 
 struct FlattenedProperty {
   std::string_view name;
@@ -40,88 +29,39 @@ class PropertyRegistry {
  public:
   void Register(const ModuleItem* decl);
 
-  // §26.3: `decl` registered under `name` too: "pk::name" for a package's
-  // declaration, and the bare name where the scope imports it. A name the
-  // registry already holds keeps its declaration, §26.3 having a declaration
-  // of the scope take the name over an import.
   void RegisterAs(std::string_view name, const ModuleItem* decl);
 
-  // §23.9: `decl`, declared in a generate block, registered under its name
-  // for the block's items, over a declaration of the enclosing scope of that
-  // name.
   void RegisterShadowing(const ModuleItem* decl);
 
   const ModuleItem* Find(std::string_view name) const;
 
-  // §16.8 and §16.12: the names of the declarations `decl` depends on, the
-  // instances its body writes and, beside them, the instances written in the
-  // default actual of one of its formals and those written in an actual
-  // argument of an instance of `decl` in a registered declaration's body.
   std::vector<std::string_view> DependencyRefs(const ModuleItem* decl) const;
 
-  // §16.8 and §16.12: the declaration an instance names, by its bare name,
-  // written as an identifier or called, or, §26.3, by "pk::name" where it is
-  // written through the package scope, `pk::s` or `pk::p(a, b)`, or, §23.6,
-  // by "u.name" where it is written through an interface instance, `u.s`;
-  // null where the registry holds none.
   const ModuleItem* FindInstance(const Expr* instance) const;
 
-  // §F.4.1 step 1 inlines callees recursively; this returns the total
-  // `disable iff` count after that inlining finishes.
   int FlattenedDisableIffCount(const ModuleItem* decl) const;
 
-  // §F.4.1.1 step 2: the actuals are taken as bound positionally, so the
-  // first actual_arg_count formals are bound in the instance and the rest
-  // take their declared defaults, of which each must have one.
   FlattenedProperty Flatten(std::string_view name,
                             std::size_t actual_arg_count) const;
 
-  // §F.4.1 closes by saying a rewritten property may be the top-level
-  // property of a concurrent assertion.
   static bool IsAcceptableAsTopLevelConcurrent(const FlattenedProperty& fp);
 
-  // §16.8: it is an error if a cyclic dependency among named sequences
-  // results from their instantiations. Returns true iff `decl` lies on a
-  // cycle in the directed graph whose edges are sequence-to-sequence
-  // instance references (including self-recursion).
   bool HasCyclicSequenceDependency(const ModuleItem* decl) const;
 
-  // §16.12.17 / §F.7: the dependency digraph has the named properties as its
-  // vertices and a property-to-property instantiation as each edge. A named
-  // property is recursive iff it is in a nontrivial strongly connected
-  // component — equivalently, iff it can be reached from itself by following
-  // those edges (covering both direct self-instantiation and mutual
-  // recursion).
   bool IsRecursiveProperty(const ModuleItem* decl) const;
 
-  // §F.7 RESTRICTION 1: returns true iff a recursive property can be reached in
-  // the dependency digraph from `decl`, including `decl` itself. This is the
-  // precise notion of "depends on a recursive property".
   bool ReachesRecursiveProperty(const ModuleItem* decl) const;
 
-  // §16.12.17 Restriction 3 / §F.7 RESTRICTION 3: every cycle of the dependency
-  // digraph shall have a positive weight sum. Edge weights are non-negative, so
-  // a cycle sums to zero exactly when all of its edges have weight zero.
-  // Returns true iff `decl` lies on such an all-zero-weight cycle — i.e. `decl`
-  // can be reached from itself by following only zero-weight (untimed) edges.
-  // This covers the direct self-loop and the mutually recursive case alike.
   bool IsOnZeroWeightCycle(const ModuleItem* decl) const;
 
  private:
   std::unordered_map<std::string_view, const ModuleItem*> by_name_;
-  // The dependencies DependencyRefs adds to a declaration's own, by the
-  // declaration's name.
   std::unordered_map<std::string_view, std::vector<std::string_view>>
       argument_refs_;
 
   void RecordArgumentRefs(const ModuleItem* decl);
 };
 
-// §16.8 and §16.12 with §23.9: while it lives, each property and sequence
-// declared among the generate block items `items`, wherever it stands, is
-// registered in `registry` under its name for the block's items, over a
-// declaration of the enclosing scope of that name; the enclosing scope's
-// registry is put back when it ends.
 class BlockDeclarationShadow {
  public:
   BlockDeclarationShadow(PropertyRegistry* registry,

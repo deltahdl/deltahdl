@@ -126,11 +126,6 @@ TEST(PackedArrayValidation, PackedDimElaboratesWidth) {
   EXPECT_EQ(mod->variables[0].width, 8u);
 }
 
-// §7.4.1 lets the bounds of every packed dimension of a packed array
-// declaration be any integer, positive, negative or zero, so long as no bit is
-// x or z, so it governs the first dimension exactly as it governs a later one.
-// These two cases put the x and the z in the first dimension;
-// XzInExtraPackedDim_Rejected puts one in a later dimension.
 TEST(PackedArrayValidation, XzInPackedDimLeft_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -191,11 +186,6 @@ TEST(PackedArrayValidation, PackedDimOnEnumBaseType_Allowed) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §7.4.1 with A.2.2.1: packed dimensions after an enumeration's body make a
-// packed array of the enumeration, written in the declaration or through a
-// typedef, and with no base type each element is an int (§6.19). An index on
-// either selects an element, which §11.5.1's rule on selecting a scalar does
-// not reach.
 TEST(PackedArrayValidation, AnEnumArrayWithNoBaseTypeTakesAnElementSelect) {
   ElabFixture f;
   ElaborateSrc(
@@ -212,9 +202,6 @@ TEST(PackedArrayValidation, AnEnumArrayWithNoBaseTypeTakesAnElementSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The report names the element types §7.4.1 lets a packed array be made of,
-// in the standard's own terms: Annex P keeps "aggregate" for unpacked
-// structures, unions and arrays, so a packed one is never called that.
 TEST(PackedArrayValidation, PackedDimOnReal_Rejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -333,8 +320,6 @@ TEST(PackedArrayValidation, SignedPackedArrayMarkedSigned) {
 }
 
 TEST(PackedArrayValidation, NegativeBoundsInPackedRange_Allowed) {
-  // Bounds in a packed range may be any integer, including negative
-  // values; width is determined by the absolute difference plus one.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -349,8 +334,6 @@ TEST(PackedArrayValidation, NegativeBoundsInPackedRange_Allowed) {
 }
 
 TEST(PackedArrayValidation, EqualBoundsInPackedRange_Allowed) {
-  // When both range bounds are equal, the packed array degenerates to a
-  // single bit — exercising the "equal to" case of the range rule.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -365,9 +348,6 @@ TEST(PackedArrayValidation, EqualBoundsInPackedRange_Allowed) {
 }
 
 TEST(PackedArrayValidation, PackedDimOnPackedStruct_Allowed) {
-  // The recursive half of the allowed-element-types rule: a packed
-  // structure may itself be the element type of an enclosing packed
-  // array dimension.
   ElabFixture f;
   ElaborateSrc(
       "module top;\n"
@@ -379,10 +359,6 @@ TEST(PackedArrayValidation, PackedDimOnPackedStruct_Allowed) {
 }
 
 TEST(PackedArrayValidation, PackedDimParameterBoundWidth) {
-  // Each packed-dimension bound is a constant expression that may be any
-  // integer value; a parameter is such a constant. `logic [W-1:0]` with W==8
-  // must elaborate to an 8-bit vector, i.e. the parameter bound is evaluated
-  // rather than ignored. (The literal-bound form is PackedDimElaboratesWidth.)
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -401,8 +377,6 @@ TEST(PackedArrayValidation, PackedDimParameterBoundWidth) {
 }
 
 TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
-  // A localparam bound is likewise a constant expression and takes the
-  // localparam evaluation path rather than the parameter one.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -420,13 +394,6 @@ TEST(PackedArrayValidation, PackedDimLocalparamBoundWidth) {
   EXPECT_EQ(x->width, 8u);
 }
 
-// §7.4.1: the integer types with predefined widths, byte, shortint, int,
-// longint, integer and time, take no declared packed array dimension. The
-// message on the report is what tells this rejection from the x-or-z rule
-// §7.4.1 states for a range bound, which the same bracketed dimension breaches
-// when its bounds rather than its type are at fault. This case reaches the
-// check through ElabOk, which preprocesses the source first, where
-// PackedDimOnInt_Rejected reaches it through ElaborateSrc.
 TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
   ElabFixture f;
   ElabOk(
@@ -440,12 +407,6 @@ TEST(PackedArrayValidation, PackedDimOnIntNames7_4_1) {
                             2, "7.4.1"));
 }
 
-// §7.4.4 lets packed dimensions be added in stages through a typedef, so the
-// element type of a packed dimension written after a typedef name is the type
-// the name stands for, followed through a chain of names, and §7.4.1 judges
-// that. A packed structure or soft union behind the name is a packed element; a
-// real, an unpacked structure or a class is not, and an int takes no packed
-// dimension at all.
 TEST(PackedArrayValidation, ElementTypeJudgedThroughTypedefNames) {
   ElabFixture f;
   ElaborateSrc(

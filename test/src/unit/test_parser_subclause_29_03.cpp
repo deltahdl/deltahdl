@@ -9,11 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §29.3: a UDP definition shall not appear between the module/program/
-// interface/package keyword pairs. Each of the four container positions is a
-// distinct syntactic input form and is witnessed separately: the module case
-// here, and the program/interface/package cases in the three tests near the end
-// of this file (built from their real dependency syntax).
 TEST(UdpTopLevelParsing, PrimitiveInsideModuleRejected) {
   auto r = Parse(
       "module m;\n"
@@ -21,9 +16,6 @@ TEST(UdpTopLevelParsing, PrimitiveInsideModuleRejected) {
       "    table 0 : 1; 1 : 0; endtable\n"
       "  endprimitive\n"
       "endmodule\n");
-  // Parser::TryParseSecondaryTopLevel is the only place `primitive` is
-  // recognized, so inside a module body it reaches the module_common_item
-  // fallback and is reported under §23.2.4.
   EXPECT_TRUE(
       ReportedError(r.diags, "unexpected token in module body", 2, "23.2.4"));
 }
@@ -72,14 +64,6 @@ TEST(UdpTopLevelParsing, AtLeast256UdpsAccepted) {
   EXPECT_EQ(r.cu->udps.size(), 300u);
 }
 
-// §29.3 head owns the `udp_declaration` production of Syntax 29-1, whose
-// alternatives go beyond the two forms §29.3.1 describes in prose. The
-// remaining alternatives -- the two `extern` prototype forms, the wildcard
-// `( .* )` header, and the optional `endprimitive : udp_identifier` end label
-// -- appear only in §29.3's syntax box, so they are witnessed here against the
-// head's own canonical parser test.
-
-// udp_declaration ::= ... | extern udp_ansi_declaration
 TEST(UdpTopLevelParsing, ExternAnsiPrototypeAccepted) {
   auto r = Parse("extern primitive inv(output out, input in);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -89,11 +73,9 @@ TEST(UdpTopLevelParsing, ExternAnsiPrototypeAccepted) {
   EXPECT_EQ(r.cu->udps[0]->output_name, "out");
   ASSERT_EQ(r.cu->udps[0]->input_names.size(), 1u);
   EXPECT_EQ(r.cu->udps[0]->input_names[0], "in");
-  // A prototype carries no state table.
   EXPECT_TRUE(r.cu->udps[0]->table.empty());
 }
 
-// udp_declaration ::= ... | extern udp_nonansi_declaration
 TEST(UdpTopLevelParsing, ExternNonAnsiPrototypeAccepted) {
   auto r = Parse("extern primitive inv(out, in);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -104,10 +86,6 @@ TEST(UdpTopLevelParsing, ExternNonAnsiPrototypeAccepted) {
   EXPECT_EQ(r.cu->udps[0]->input_names[0], "in");
 }
 
-// Second admitted output-declaration form inside the `extern
-// udp_ansi_declaration` alternative: `output reg`. This drives the reg branch
-// of the extern header path, which marks the prototype sequential -- a
-// different code path than the plain `output` form witnessed above.
 TEST(UdpTopLevelParsing, ExternAnsiSequentialPrototypeAccepted) {
   auto r = Parse("extern primitive dff(output reg q, input clk, input d);\n");
   ASSERT_NE(r.cu, nullptr);
@@ -120,8 +98,6 @@ TEST(UdpTopLevelParsing, ExternAnsiSequentialPrototypeAccepted) {
   EXPECT_EQ(r.cu->udps[0]->input_names[1], "d");
 }
 
-// udp_declaration ::= ... | { attribute_instance } primitive udp_identifier
-//                     ( .* ) ; { udp_port_declaration } udp_body endprimitive
 TEST(UdpTopLevelParsing, WildcardPortListHeaderAccepted) {
   auto r = Parse(
       "primitive inv(.*);\n"
@@ -137,8 +113,6 @@ TEST(UdpTopLevelParsing, WildcardPortListHeaderAccepted) {
   EXPECT_EQ(r.cu->udps[0]->input_names[0], "in");
 }
 
-// The `[ : udp_identifier ]` tail of udp_declaration: a matching end label is
-// accepted...
 TEST(UdpTopLevelParsing, MatchingEndprimitiveLabelAccepted) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -149,24 +123,15 @@ TEST(UdpTopLevelParsing, MatchingEndprimitiveLabelAccepted) {
   EXPECT_EQ(r.cu->udps.size(), 1u);
 }
 
-// ...and its negative form: an end label naming a different identifier than the
-// UDP is rejected.
 TEST(UdpTopLevelParsing, MismatchedEndprimitiveLabelRejected) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
       "  table 0 : 1; 1 : 0; endtable\n"
       "endprimitive : wrong\n");
-  // Parser::MatchEndLabel is shared by every named block and files the
-  // mismatch under §9.3.4.
   EXPECT_TRUE(ReportedError(r.diags, "end label 'wrong' does not match 'inv'",
                             3, "9.3.4"));
 }
 
-// §29.3 head: a UDP definition shall not appear between program/endprogram,
-// interface/endinterface, or package/endpackage (the module case is covered by
-// PrimitiveInsideModuleRejected). Each container position is built from the
-// real dependency syntax (§24.3 program, §25.3 interface, §26.2 package) rather
-// than assumed to share the module path.
 TEST(UdpTopLevelParsing, PrimitiveInsideProgramRejected) {
   auto r = Parse(
       "program p;\n"

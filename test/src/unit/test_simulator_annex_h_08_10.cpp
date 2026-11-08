@@ -19,11 +19,6 @@ using namespace delta;
 
 namespace {
 
-// §H.8.10 (item 1): when a string value is passed from SystemVerilog to C, the
-// simulator lays the characters out per C-string conventions, including a
-// trailing null terminator. The foreign function inspects the value as a C
-// string and confirms that strlen finds the full length, the byte one past the
-// end is a null, and every character matches the SystemVerilog source.
 TEST(DpiStringArguments, ImportInputStringDeliveredAsNullTerminatedCString) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -34,7 +29,6 @@ TEST(DpiStringArguments, ImportInputStringDeliveredAsNullTerminatedCString) {
   func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
     const std::string& sv = args[0].AsString();
     const char* c = sv.c_str();
-    // C-string view of the delivered value: length terminates at the null.
     EXPECT_EQ(std::strlen(c), sv.size());
     EXPECT_EQ(c[sv.size()], '\0');
     EXPECT_EQ(std::memcmp(c, "world", 5), 0);
@@ -47,9 +41,6 @@ TEST(DpiStringArguments, ImportInputStringDeliveredAsNullTerminatedCString) {
   EXPECT_EQ(result.AsInt(), 5);
 }
 
-// §H.8.10 (item 1, edge case): an empty SystemVerilog string still reaches C as
-// a valid null-terminated C string of length zero — the first byte is the
-// terminator.
 TEST(DpiStringArguments, ImportEmptyStringDeliveredAsNullTerminatedCString) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -70,10 +61,6 @@ TEST(DpiStringArguments, ImportEmptyStringDeliveredAsNullTerminatedCString) {
   EXPECT_EQ(result.AsInt(), 0);
 }
 
-// §H.8.10 (item 4, imported input): for an input mode string, changes the
-// foreign code makes to the pointer value it received are not propagated back
-// to SystemVerilog. The runtime passes inputs by value, so overwriting the
-// local copy leaves the caller's actual unchanged.
 TEST(DpiStringArguments, ImportInputStringPointerWriteNotPropagated) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -92,10 +79,6 @@ TEST(DpiStringArguments, ImportInputStringPointerWriteNotPropagated) {
   EXPECT_EQ(actuals[0].AsString(), "original");
 }
 
-// §H.8.10 (item 4, imported output): an output mode string does not arrive with
-// a meaningful value; the foreign code writes a valid string that SystemVerilog
-// then observes. The runtime seeds the output with an undetermined (empty)
-// value rather than the actual, and copies the foreign-written string back.
 TEST(DpiStringArguments, ImportOutputStringWrittenBackToActual) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -104,7 +87,6 @@ TEST(DpiStringArguments, ImportOutputStringWrittenBackToActual) {
   func.return_type = DataTypeKind::kVoid;
   func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kOutput}};
   func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
-    // The output arrives with no meaningful value, not the caller's actual.
     EXPECT_TRUE(args[0].AsString().empty());
     args[0] = DpiArgValue::FromString("produced");
     return DpiArgValue::FromInt(0);
@@ -116,11 +98,6 @@ TEST(DpiStringArguments, ImportOutputStringWrittenBackToActual) {
   EXPECT_EQ(actuals[0].AsString(), "produced");
 }
 
-// §H.8.10 (item 4, imported output, edge case): an output mode string carries
-// no meaningful value on arrival, so the caller's actual is not handed in. When
-// the foreign code writes nothing, the actual is left holding the undetermined
-// (empty) seed rather than its prior value — the original contents are
-// discarded regardless of any foreign write.
 TEST(DpiStringArguments,
      ImportOutputStringDiscardsActualWhenForeignWritesNothing) {
   DpiRuntime rt;
@@ -130,8 +107,6 @@ TEST(DpiStringArguments,
   func.return_type = DataTypeKind::kVoid;
   func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kOutput}};
   func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
-    // The output arrives empty, not carrying the caller's prior value, and the
-    // foreign code deliberately leaves it untouched.
     EXPECT_TRUE(args[0].AsString().empty());
     return DpiArgValue::FromInt(0);
   };
@@ -142,10 +117,6 @@ TEST(DpiStringArguments,
   EXPECT_TRUE(actuals[0].AsString().empty());
 }
 
-// §H.8.10 (item 4, imported inout): an inout mode string arrives with a valid
-// value the foreign code may read; when the foreign code supplies new contents,
-// SystemVerilog copies them into its own space. The runtime copies the actual
-// in and the foreign-written value back.
 TEST(DpiStringArguments, ImportInoutStringContentsCopiedBack) {
   DpiRuntime rt;
   DpiRtFunction func;
@@ -154,7 +125,6 @@ TEST(DpiStringArguments, ImportInoutStringContentsCopiedBack) {
   func.return_type = DataTypeKind::kVoid;
   func.args = {DpiArg{"s", DataTypeKind::kString, Direction::kInout}};
   func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
-    // The inout value arrives readable, then is replaced by new contents.
     EXPECT_EQ(args[0].AsString(), "before");
     args[0] = DpiArgValue::FromString("after");
     return DpiArgValue::FromInt(0);
@@ -166,10 +136,6 @@ TEST(DpiStringArguments, ImportInoutStringContentsCopiedBack) {
   EXPECT_EQ(actuals[0].AsString(), "after");
 }
 
-// §H.8.10 (item 1 + item 4, imported inout, edge case): an inout mode string is
-// also handed to C in the SystemVerilog-to-C direction, so it arrives as a
-// null-terminated C string. When the foreign code reads it but supplies no new
-// value, the copy-back leaves the actual carrying its original contents intact.
 TEST(DpiStringArguments,
      ImportInoutStringRoundTripsUnchangedWhenForeignLeavesItAlone) {
   DpiRuntime rt;
@@ -181,11 +147,9 @@ TEST(DpiStringArguments,
   func.arg_impl = [](std::vector<DpiArgValue>& args) -> DpiArgValue {
     const std::string& sv = args[0].AsString();
     const char* c = sv.c_str();
-    // The inbound inout value reads back as a null-terminated C string.
     EXPECT_EQ(std::strlen(c), sv.size());
     EXPECT_EQ(c[sv.size()], '\0');
     EXPECT_EQ(std::memcmp(c, "keep-me", 7), 0);
-    // No new value is supplied; the actual must survive the call unchanged.
     return DpiArgValue::FromInt(0);
   };
   rt.RegisterImport(func);
@@ -195,12 +159,6 @@ TEST(DpiStringArguments,
   EXPECT_EQ(actuals[0].AsString(), "keep-me");
 }
 
-// §H.8.10 as a statement about the C layer, in src/simulator/dpi_c_type.h:
-// the direction of a string argument applies to the pointer and not to the
-// characters, the side that provided a pointer owns the storage it refers
-// to and the other side shall not free it, a receiver never modifies the
-// characters, and a string to be kept beyond the call is copied.
-
 DpiArg StringFormal(Direction direction) {
   DpiArg formal;
   formal.name = "s";
@@ -209,9 +167,6 @@ DpiArg StringFormal(Direction direction) {
   return formal;
 }
 
-// §H.8.10: the direction mode applies to the const char* pointer, so an
-// input is a const char* and an output or inout a const char**, the
-// characters const under every mode.
 TEST(DpiStringArgumentRules, TheDirectionAppliesToThePointer) {
   EXPECT_EQ(DpiCTypeOfFormal(StringFormal(Direction::kInput), false),
             "const char*");
@@ -222,12 +177,6 @@ TEST(DpiStringArgumentRules, TheDirectionAppliesToThePointer) {
   EXPECT_FALSE(DpiStringCharactersMayBeModifiedByReceiver());
 }
 
-// §H.8.10: the storage a string pointer refers to is the provider's -- for
-// an import, SystemVerilog provides an input's and an inout's on arrival
-// and C provides an output's and an inout's it changed; for an export, C
-// provides an input's and an inout's on arrival and SystemVerilog provides
-// an output's and an inout's it changed -- and the other side shall not
-// free it.
 TEST(DpiStringArgumentRules, TheSideThatProvidedThePointerOwnsTheStorage) {
   EXPECT_EQ(
       DpiSideProvidingStringPointer(DpiStringPointerProvider::kImportInput),
@@ -253,7 +202,6 @@ TEST(DpiStringArgumentRules, TheSideThatProvidedThePointerOwnsTheStorage) {
   EXPECT_EQ(DpiSideProvidingStringPointer(
                 DpiStringPointerProvider::kExportInoutChanged),
             DpiMemorySide::kSystemVerilog);
-  // Only the provider frees what it provided.
   EXPECT_FALSE(DpiSideMayFree(
       DpiSideProvidingStringPointer(DpiStringPointerProvider::kImportInput),
       DpiMemorySide::kC));
@@ -265,11 +213,6 @@ TEST(DpiStringArgumentRules, TheSideThatProvidedThePointerOwnsTheStorage) {
       DpiMemorySide::kC));
 }
 
-// §H.8.10: no assumption holds about the lifetime of a string's storage
-// beyond the call, so a string to be kept is copied into memory the
-// keeping side owns -- C for an export's output or changed inout, and
-// SystemVerilog, which copies the contents of an import's changed inout
-// into its own memory.
 TEST(DpiStringArgumentRules, AStringToBeKeptIsCopiedByTheKeepingSide) {
   EXPECT_FALSE(DpiReferenceOutlivesTheCall());
   EXPECT_EQ(DpiSideCopyingString(DpiStringPointerProvider::kExportOutput),
@@ -282,8 +225,6 @@ TEST(DpiStringArgumentRules, AStringToBeKeptIsCopiedByTheKeepingSide) {
             DpiMemorySide::kSystemVerilog);
 }
 
-// The C functions the imports below are bound to, each taking or giving a
-// string as §H.8.10 has it cross.
 int LengthOfInput(const char* s) { return static_cast<int>(std::strlen(s)); }
 void PointOutputAtText(const char** o) { *o = "from C"; }
 void PointOutputAtNothing(const char** o) { *o = nullptr; }
@@ -298,12 +239,6 @@ void ShoutInout(const char** s) {
 }
 const char* ReturnText() { return "returned"; }
 
-// §H.8.10: an input string reaches C as a const char* to its characters laid
-// out as a C string; an output string's pointer is written by C and the
-// characters it names are copied back, none where it names nothing; an inout
-// arrives pointing at the string's characters and its new pointer's are
-// copied back; and a string result is the pointer C returns, its characters
-// copied likewise.
 TEST(DpiStringArguments, EachDirectionAndTheResultCrossAsCStrings) {
   DpiCBinding b;
   b.dpi.RegisterImport(
@@ -342,10 +277,6 @@ TEST(DpiStringArguments, EachDirectionAndTheResultCrossAsCStrings) {
   EXPECT_EQ(b.Call("return_text", none).AsString(), "returned");
 }
 
-// The C function the design below imports. It calls two exports by their
-// linkage names, one returning a string and one writing a string output, and
-// allocates and calls again before it copies the characters each handed it,
-// as C code may that copies a string only once it is done with the call.
 template <typename Function>
 Function ExportNamed(const char* name) {
   return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
@@ -376,9 +307,6 @@ uint64_t VariableValue(SimFixture& f, std::string_view name) {
   return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
 }
 
-// §H.8.10 with §H.8.9: an export's string result, and its string output,
-// reach C as the address of characters that are still there when C reads
-// them after making further calls -- SystemVerilog writes a valid address.
 TEST(DpiStringArguments, AnExportsStringResultAndOutputStayValidInC) {
   SimFixture f;
   RunWithImportsBound(

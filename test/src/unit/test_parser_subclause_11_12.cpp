@@ -155,9 +155,6 @@ TEST(LetDeclParsing, LetFormalType_MixedUntypedAndTyped) {
               "endmodule\n"));
 }
 
-// §11.12's formals take the type written before them, and `untyped` is how a
-// formal after a typed one is written untyped, so the keyword is recorded on
-// the formal that writes it and on no other.
 TEST(LetDeclParsing, AnUntypedFormalIsRecordedAsWrittenUntyped) {
   auto r = Parse(
       "module m;\n"
@@ -654,8 +651,6 @@ TEST(LetDeclParsing, ErrorMissingSemicolon) {
       "module m;\n"
       "  let f(x) = x\n"
       "endmodule\n");
-  // 'endmodule' is what stands at line 3 where the let declaration's semicolon
-  // belongs.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endmodule'", 3, "11.12"));
 }
@@ -674,8 +669,6 @@ TEST(LetDeclParsing, ErrorMissingBody) {
       "module m;\n"
       "  let f(x) = ;\n"
       "endmodule\n");
-  // §11.2 owns the primary the let body is missing; §11.12 has no report of
-  // its own for an absent expression.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 2, "11.2"));
 }
 

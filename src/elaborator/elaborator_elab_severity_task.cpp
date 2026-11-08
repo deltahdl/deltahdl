@@ -1,9 +1,3 @@
-// §20.10.1: the elaboration severity system tasks, $fatal, $error, $warning and
-// $info written as module items, which run while the design is elaborated.
-// Their message is formatted by the formatter $display uses (§21.2.1), the one
-// place the elaborator reaches into the simulator, since the clause gives the
-// two the same formatting.
-
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -28,13 +22,6 @@ namespace delta {
 
 namespace {
 
-// Syntax 20-11 in §20.10 writes finish_number ::= 0 | 1 | 2, and §20.10.1 gives
-// the elaboration severity system tasks the same syntax as the run-time ones,
-// so the first argument of an elaboration-time $fatal is an optional
-// finish_number held to that enumeration. A.1.4 writes it first whenever the
-// call has parentheses, so any other expression there is reported as well,
-// and is still not read as the message. Returns the index of the first
-// message-list argument: 1 when the call has a first argument, else 0.
 size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
                               DiagEngine& diag) {
   if (!is_fatal || expr->args.empty()) return 0;
@@ -50,8 +37,6 @@ size_t CheckFatalFinishNumber(const Expr* expr, bool is_fatal,
   return 1;
 }
 
-// Per §20.10.1, list_of_arguments may only contain a formatting string and
-// constant expressions, including constant function calls.
 void CheckElabTaskArgsConstant(const Expr* expr, size_t arg_start,
                                std::string_view name, const ScopeMap& scope,
                                DiagEngine& diag) {
@@ -69,8 +54,6 @@ void CheckElabTaskArgsConstant(const Expr* expr, size_t arg_start,
   }
 }
 
-// Compose the diagnostic scope name: the module name (if any) joined to the
-// trailing generate prefix with underscores trimmed, separated by a dot.
 std::string BuildElabTaskScopeName(const RtlirModule* mod,
                                    const std::string& gen_prefix) {
   std::string scope_name = mod ? std::string(mod->name) : std::string{};
@@ -85,8 +68,6 @@ std::string BuildElabTaskScopeName(const RtlirModule* mod,
   return scope_name;
 }
 
-// Map the elaboration system task name flags to the severity label embedded in
-// the emitted message.
 std::string ElabTaskSeverity(bool is_fatal, bool is_error, bool is_warning) {
   if (is_fatal) return "FATAL";
   if (is_error) return "ERROR";
@@ -94,8 +75,6 @@ std::string ElabTaskSeverity(bool is_fatal, bool is_error, bool is_warning) {
   return "INFO";
 }
 
-// Extract the optional user message: the leading string-literal argument of the
-// message list, with surrounding double quotes stripped.
 std::string ExtractElabTaskUserMsg(const Expr* expr, size_t arg_start) {
   std::string user_msg;
   if (arg_start < expr->args.size() &&
@@ -109,8 +88,6 @@ std::string ExtractElabTaskUserMsg(const Expr* expr, size_t arg_start) {
   return user_msg;
 }
 
-// One constant argument as the value $display formats (§21.2.1): its width,
-// its signedness and every word of its bits.
 Logic4Vec ConstArgValue(const ConstVal& v, Arena& arena) {
   Logic4Vec out =
       MakeLogic4VecVal(arena, v.width, static_cast<uint64_t>(v.value));
@@ -121,11 +98,6 @@ Logic4Vec ConstArgValue(const ConstVal& v, Arena& arena) {
   return out;
 }
 
-// §20.10.1: the message of an elaboration severity task, its list_of_arguments
-// formatted as $display formats them: a leading string literal is the format,
-// and each constant expression after it the value of the next specifier. An
-// argument that is not constant leaves the format as written, the call having
-// been reported by CheckElabTaskArgsConstant.
 std::string FormatElabTaskMessage(const Expr* expr, size_t arg_start,
                                   const ScopeMap& scope, Arena& arena) {
   std::string fmt = ExtractElabTaskUserMsg(expr, arg_start);
@@ -155,10 +127,6 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
   size_t arg_start = CheckFatalFinishNumber(expr, is_fatal, diag_);
 
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  // §11.2.1: a genvar is a constant expression. When this task sits inside a
-  // generate body, overlay the active generate bindings (genvar values and any
-  // generate-block localparams) so a genvar argument — as in §20.10.1
-  // Example 2 — is recognized as constant rather than wrongly rejected.
   for (const auto& [gname, gval] : gen_const_scope_) scope[gname] = gval;
   CheckElabTaskArgsConstant(expr, arg_start, name, scope, diag_);
 
@@ -171,11 +139,6 @@ void Elaborator::ValidateElabSystemTask(const ModuleItem* item,
                          : std::format("elaboration {} in scope '{}': {}",
                                        severity, scope_name, user_msg);
 
-  // Per §20.10.1, $fatal and $error block simulation; $warning and $info do
-  // not affect the rest of elaboration or simulation. All four shall emit a
-  // tool-specific message that names the call site (file/line carried by
-  // the DiagEngine, scope embedded in the message body), each with its own
-  // severity: an error for $fatal and $error, a warning otherwise.
   if (is_fatal || is_error) {
     diag_.Error(item->loc, message, Subclause("20.10.1"));
   } else {
@@ -194,7 +157,6 @@ void ReportConstFuncSeverity(const Expr* call, const ScopeMap& locals,
                              DiagEngine& diag, Arena& arena) {
   const bool kFatal = call->callee == "$fatal";
   const bool kError = call->callee == "$error";
-  // §20.10: $fatal's first argument, where it has any, is the finish number.
   const size_t kArgStart = kFatal ? 1 : 0;
   std::string message =
       std::format("elaboration {}: {}",

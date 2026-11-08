@@ -107,11 +107,6 @@ TEST(NettypeParsing, NettypeDeclWithScopedResolve) {
   EXPECT_EQ(item->nettype_resolve_scope->type_name, "pkg");
 }
 
-// §6.6.7's Syntax 6-1 writes the with clause as
-// `with [ package_scope | class_scope ] tf_identifier`, so the class name
-// before `::` is part of the clause and not decoration. A declaration that
-// records only `res` says the same thing as `with res;` and binds to whatever
-// plain function is named `res`.
 TEST(NettypeParsing, NettypeDeclWithClassScopedResolveKeepsTheClassName) {
   auto r = Parse(
       "module m;\n"
@@ -127,9 +122,6 @@ TEST(NettypeParsing, NettypeDeclWithClassScopedResolveKeepsTheClassName) {
   EXPECT_EQ(nt->nettype_resolve_func, "res");
 }
 
-// §6.6.7's Syntax 6-1 makes the package_scope or class_scope optional, so a
-// with clause naming a function alone has no qualifier to record. This fails
-// if the function name is written into the qualifier field.
 TEST(NettypeParsing, UnqualifiedWithClauseLeavesTheScopeEmpty) {
   auto r = Parse(
       "module m;\n"
@@ -206,9 +198,6 @@ TEST(NettypeParsing, NettypeNoResolveFunc) {
   EXPECT_TRUE(nt->nettype_resolve_func.empty());
 }
 
-// §6.6.7: an explicit data type is required for a user-defined nettype. A
-// declaration carrying only a single identifier (a name with no preceding data
-// type or source nettype) is not well formed and shall be rejected.
 TEST(NettypeParsing, NettypeRequiresExplicitDataType) {
   auto r = Parse(
       "module m;\n"

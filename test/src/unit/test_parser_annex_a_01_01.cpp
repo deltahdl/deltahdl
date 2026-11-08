@@ -73,8 +73,6 @@ TEST(LibraryText, ComprehensiveExample) {
 
 TEST(LibraryText, ErrorUnexpectedToken) {
   auto r = ParseLibrary("module m; endmodule\n");
-  // §33.3.1 owns the library_text production, so the report over a description
-  // that is none of its three alternatives is filed there.
   EXPECT_TRUE(ReportedError(r.diags,
                             "expected library declaration, include statement, "
                             "config declaration, or ';'",
@@ -367,8 +365,6 @@ TEST(LibraryText, MultipleIncludeStatements) {
 
 TEST(LibraryText, ErrorMissingSemicolon) {
   auto r = ParseLibrary("library lib /proj/*.v\n");
-  // The end of the source stands on line 2, the line the trailing newline
-  // opened, so that is where the missing ';' is reported.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "33.3.1"));
 }
 
@@ -386,16 +382,12 @@ TEST(LibraryText, ErrorMissingLibraryName) {
 
 TEST(LibraryText, ErrorIncludeNoPath) {
   auto r = ParseLibrary("include;\n");
-  // §33.3.2 gives the include statement, but the report over its missing path
-  // is filed under §33.3.1 with the rest of the file path specifications.
   EXPECT_TRUE(ReportedError(r.diags, "expected file path after 'include'", 1,
                             "33.3.1"));
 }
 
 TEST(LibraryText, ErrorIncludeMissingSemicolon) {
   auto r = ParseLibrary("include /proj/lib.map\n");
-  // The end of the source stands on line 2, the line the trailing newline
-  // opened, so that is where the missing ';' is reported.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got EOF", 2, "33.3.2"));
 }
 
@@ -405,9 +397,6 @@ TEST(LibraryText, ErrorTrailingCommaInFileList) {
       ReportedError(r.diags, "expected file path specification", 1, "33.3.1"));
 }
 
-// A.1.1 writes -incdir as a token of its own between a library's file paths
-// and its include directories, so a specification spelled that way is the
-// option standing where a path was due rather than a file the library holds.
 TEST(LibraryText, ErrorIncdirWhereFilePathWasDueIsRejected) {
   auto r = ParseLibrary("library lib -incdir /inc;\n");
   EXPECT_TRUE(ReportedError(
@@ -450,8 +439,6 @@ TEST(LibraryText, ErrorRepeatedIncdirIsRejected) {
   EXPECT_EQ(r.cu->libraries[0]->incdir_paths[1], "/j");
 }
 
-// A trailing comma leaves the list short by one entry rather than padded with
-// an empty path.
 TEST(LibraryText, TrailingCommaAddsNoEmptyFilePath) {
   auto r = ParseLibrary("library lib /a.v, ;\n");
   EXPECT_TRUE(

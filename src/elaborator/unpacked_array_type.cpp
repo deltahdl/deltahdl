@@ -19,8 +19,6 @@ namespace delta {
 
 namespace {
 
-// The longest run of typedef names WithTypedefDims reads through, past which
-// the names are taken to run in a cycle.
 constexpr int kMaxTypedefNames = 16;
 
 DataType NamedType(std::string_view scope, std::string_view name) {
@@ -31,8 +29,6 @@ DataType NamedType(std::string_view scope, std::string_view name) {
   return named;
 }
 
-// §7.4.2: the left and right bounds of the fixed-size dimension `dim`, a size
-// `[n]` being `[0:n-1]`.
 std::optional<std::pair<int64_t, int64_t>> FixedBounds(
     const Expr* dim, const ScopeMap& constants) {
   if (dim->kind == ExprKind::kBinary && dim->op == TokenKind::kColon) {
@@ -50,9 +46,6 @@ bool IsWildcard(const Expr* dim) {
   return dim->kind == ExprKind::kIdentifier && dim->text == "*";
 }
 
-// §6.22.1(f) with §7.8.1: two associative dimensions index alike where both
-// are wildcards, or where their index types match, a class matching only
-// itself (§6.22.1(d)).
 std::optional<bool> SameIndexType(const Expr* a, const Expr* b,
                                   const TypeMatcher& match) {
   if (IsWildcard(a) || IsWildcard(b)) return IsWildcard(a) && IsWildcard(b);

@@ -346,18 +346,12 @@ TEST(CompilationUnitPreprocessing,
   EXPECT_EQ(pp_b.find('8'), std::string::npos);
 }
 
-// Runs `src` through `pp` as one more source file, the way a driver hands it
-// each file of the command line in turn.
 static std::string PreprocessFile(const std::string& src, PreprocFixture& f,
                                   Preprocessor& pp) {
   auto fid = f.mgr.AddFile("<file>", src);
   return pp.Preprocess(fid);
 }
 
-// §3.12.1: where each file is a compilation unit of its own, the directives one
-// unit read do not affect another, so a macro the first file defines is
-// undefined in the second once a new unit begins between them. Without the
-// boundary the second file's usage would expand to 8.
 TEST(CompilationUnitPreprocessing, NewUnitUndefinesTheEarlierUnitsMacros) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -373,8 +367,6 @@ TEST(CompilationUnitPreprocessing, NewUnitUndefinesTheEarlierUnitsMacros) {
   EXPECT_EQ(out.find('8'), std::string::npos);
 }
 
-// §3.12.1: a macro the command line defines is given to every unit, so one the
-// first unit undefined is defined again in the next.
 TEST(CompilationUnitPreprocessing, CommandLineDefineReachesEveryUnit) {
   PreprocFixture f;
   PreprocConfig config;
@@ -387,9 +379,6 @@ TEST(CompilationUnitPreprocessing, CommandLineDefineReachesEveryUnit) {
   EXPECT_NE(out.find('4'), std::string::npos);
 }
 
-// §3.12.1 with §22.7 and §22.8: the time scale and default net type one unit
-// set are not in force in the next, while §3.14.3's global precision, the
-// finest of every unit's, keeps what the first unit contributed.
 TEST(CompilationUnitPreprocessing, NewUnitResetsDirectivesButKeepsPrecision) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -407,10 +396,6 @@ TEST(CompilationUnitPreprocessing, NewUnitResetsDirectivesButKeepsPrecision) {
   EXPECT_EQ(pp.GlobalPrecision(), TimeUnit::kPs);
 }
 
-// §3.12.1 with §22.7: a directive applies to all the text after it in its
-// compilation unit, so a `timescale the first file read governs a module the
-// second file of the unit declares, while a module of the next unit takes
-// none.
 TEST(CompilationUnitPreprocessing, TimescaleReachesTheUnitsLaterFile) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -429,8 +414,6 @@ TEST(CompilationUnitPreprocessing, TimescaleReachesTheUnitsLaterFile) {
   EXPECT_FALSE(list[2].has_timescale);
 }
 
-// The directive records of module a, declared after `directive` in one
-// compilation unit, and of module b, declared in the next unit.
 static std::vector<ModuleDirectives> RecordsAcrossUnits(
     const std::string& directive, PreprocFixture& f) {
   Preprocessor pp(f.mgr, f.diag, {});
@@ -440,10 +423,6 @@ static std::vector<ModuleDirectives> RecordsAcrossUnits(
   return pp.ModuleDirectivesList();
 }
 
-// §3.12.1 with §22.9: a directive of one compilation unit does not affect
-// another, so the next unit's module leaves its unconnected input ports
-// unpulled, while the module after `unconnected_drive in its own unit pulls
-// them.
 TEST(CompilationUnitPreprocessing, UnconnectedDriveStaysInItsUnit) {
   PreprocFixture f;
   auto list = RecordsAcrossUnits("`unconnected_drive pull1", f);
@@ -453,9 +432,6 @@ TEST(CompilationUnitPreprocessing, UnconnectedDriveStaysInItsUnit) {
   EXPECT_EQ(list[1].unconnected_drive, NetType::kWire);
 }
 
-// §3.12.1 with Annex E.2: the next unit's trireg nets keep the infinite decay
-// time, while those of the module after `default_decay_time in its own unit
-// take the time it names.
 TEST(CompilationUnitPreprocessing, DefaultDecayTimeStaysInItsUnit) {
   PreprocFixture f;
   auto list = RecordsAcrossUnits("`default_decay_time 100", f);
@@ -467,9 +443,6 @@ TEST(CompilationUnitPreprocessing, DefaultDecayTimeStaysInItsUnit) {
   EXPECT_EQ(list[1].decay_ticks, 0u);
 }
 
-// §3.12.1 with Annex E.3: the next unit's trireg nets keep the default charge
-// strength, while those of the module after `default_trireg_strength in its
-// own unit take the strength it names.
 TEST(CompilationUnitPreprocessing, DefaultTriregStrengthStaysInItsUnit) {
   PreprocFixture f;
   auto list = RecordsAcrossUnits("`default_trireg_strength 30", f);
@@ -480,9 +453,6 @@ TEST(CompilationUnitPreprocessing, DefaultTriregStrengthStaysInItsUnit) {
   EXPECT_FALSE(list[1].has_strength);
 }
 
-// §3.12.1 with Annex E.4 to E.7: the next unit's module keeps the delays as
-// written, while the module after each delay mode directive in its own unit
-// takes that directive's mode.
 TEST(CompilationUnitPreprocessing, DelayModeStaysInItsUnit) {
   struct Mode {
     const char* directive;
@@ -505,7 +475,6 @@ TEST(CompilationUnitPreprocessing, DelayModeStaysInItsUnit) {
   }
 }
 
-// A directory of this process's own holding the header h.svh with `text`.
 static fs::path WriteHeader(const std::string& text) {
   fs::path dir = fs::temp_directory_path() /
                  ("delta_test_cu_header_" + std::to_string(getpid()));
@@ -514,10 +483,6 @@ static fs::path WriteHeader(const std::string& text) {
   return dir;
 }
 
-// Preprocesses `srcs` with one preprocessor as the files of a run that makes
-// each file a compilation unit of its own, each file standing in `dir` so that
-// a quoted `include finds the header written there, and gives back each
-// unit's text.
 static std::vector<std::string> PreprocessUnits(
     const fs::path& dir, const std::vector<std::string>& srcs, ElabFixture& f) {
   Preprocessor pp(f.mgr, f.diag, {});
@@ -530,7 +495,6 @@ static std::vector<std::string> PreprocessUnits(
   return texts;
 }
 
-// Elaborates the units `texts` hold together, under the top module top.
 static RtlirDesign* ElaborateTexts(const std::vector<std::string>& texts,
                                    ElabFixture& f) {
   Elaborator elab(f.arena, f.diag,
@@ -540,9 +504,6 @@ static RtlirDesign* ElaborateTexts(const std::vector<std::string>& texts,
   return design;
 }
 
-// §3.12.1: the text an `include reads joins the compilation unit of the file
-// that includes it, so where each file is a unit of its own, a typedef the
-// header declares is no type a module of the other unit can name.
 TEST(CompilationUnitPreprocessing, HeaderOfOneUnitStaysOutOfAnother) {
   fs::path dir = WriteHeader("typedef logic [3:0] t;\n");
   ElabFixture f;
@@ -560,8 +521,6 @@ TEST(CompilationUnitPreprocessing, HeaderOfOneUnitStaysOutOfAnother) {
   fs::remove_all(dir);
 }
 
-// §3.12.1: the nearest allowed form, a module of the including file's own
-// unit, reads the header's typedef as a type of four bits.
 TEST(CompilationUnitPreprocessing, HeaderDeclaresInTheIncludingUnit) {
   fs::path dir = WriteHeader("typedef logic [3:0] t;\n");
   ElabFixture f;
@@ -581,9 +540,6 @@ TEST(CompilationUnitPreprocessing, HeaderDeclaresInTheIncludingUnit) {
   fs::remove_all(dir);
 }
 
-// §3.12.1 with §3.13: a header two units include declares its variable in
-// each unit's scope once, so neither unit holds a redeclaration and each
-// unit's module reads its own.
 TEST(CompilationUnitPreprocessing, HeaderOfTwoUnitsDeclaresInEachOnce) {
   fs::path dir = WriteHeader("int g;\n");
   ElabFixture f;
@@ -606,9 +562,6 @@ TEST(CompilationUnitPreprocessing, HeaderOfTwoUnitsDeclaresInEachOnce) {
   fs::remove_all(dir);
 }
 
-// §3.13: the nearest forbidden form, the header included twice by one unit,
-// declares its variable twice in that unit's scope, and the second is the
-// redeclaration.
 TEST(CompilationUnitPreprocessing, HeaderIncludedTwiceByOneUnitRedeclares) {
   fs::path dir = WriteHeader("int g;\n");
   ElabFixture f;
@@ -631,8 +584,6 @@ TEST(CompilationUnitPreprocessing, HeaderIncludedTwiceByOneUnitRedeclares) {
   fs::remove_all(dir);
 }
 
-// §3.12.1 with §22.11.1: a protect pragma keyword one unit wrote is back at its
-// default in the next.
 TEST(CompilationUnitPreprocessing, NewUnitRestoresPragmaKeywordDefaults) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});
@@ -642,9 +593,6 @@ TEST(CompilationUnitPreprocessing, NewUnitRestoresPragmaKeywordDefaults) {
   EXPECT_TRUE(pp.ProtectKeywords().ValueOf("author").defaulted);
 }
 
-// §3.12.1 with §22.14: a `begin_keywords region cannot run on into another
-// unit, so one still open when its unit ends never meets its `end_keywords
-// and is reported there.
 TEST(CompilationUnitPreprocessing, KeywordRegionOpenAtUnitEndIsReported) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

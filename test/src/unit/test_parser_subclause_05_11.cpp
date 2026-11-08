@@ -8,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §5.11 — an array literal is an array assignment pattern; it parses to an
-// assignment-pattern expression with one element per first-dimension entry.
 TEST(ArrayLiteralParsing, ArrayLiteralExprKind) {
   auto r = Parse(
       "module m;\n"
@@ -23,8 +21,6 @@ TEST(ArrayLiteralParsing, ArrayLiteralExprKind) {
   EXPECT_EQ(rhs->elements.size(), 3u);
 }
 
-// §5.11 — the nesting of braces follows the number of dimensions; a two-element
-// list for a 2-D array nests one assignment pattern per row.
 TEST(ArrayLiteralParsing, NestedBracesFollowDimensions) {
   auto r = Parse(
       "module m;\n"
@@ -40,7 +36,6 @@ TEST(ArrayLiteralParsing, NestedBracesFollowDimensions) {
   EXPECT_EQ(rhs->elements[1]->kind, ExprKind::kAssignmentPattern);
 }
 
-// §5.11 — the replication operator is allowed inside an array literal.
 TEST(ArrayLiteralParsing, ReplicationParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -49,8 +44,6 @@ TEST(ArrayLiteralParsing, ReplicationParses) {
               "endmodule\n"));
 }
 
-// §5.11 — replication operators may themselves be nested within an array
-// literal (the inner brace pair belongs to the inner replication).
 TEST(ArrayLiteralParsing, NestedReplicationParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -59,7 +52,6 @@ TEST(ArrayLiteralParsing, NestedReplicationParses) {
               "endmodule\n"));
 }
 
-// §5.11 — an array literal's type may be explicitly indicated with a prefix.
 TEST(ArrayLiteralParsing, TypePrefixedArrayLiteralParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -68,8 +60,6 @@ TEST(ArrayLiteralParsing, TypePrefixedArrayLiteralParses) {
               "endmodule\n"));
 }
 
-// §5.11 — an array literal may use an index as a key together with a default
-// key value.
 TEST(ArrayLiteralParsing, IndexAndDefaultKeyParses) {
   EXPECT_TRUE(
       ParseOk("module m;\n"
@@ -78,10 +68,6 @@ TEST(ArrayLiteralParsing, IndexAndDefaultKeyParses) {
               "endmodule\n"));
 }
 
-// §5.11 — a type-prefixed array literal is a pattern expression and may appear
-// as an expression operand (here a subroutine argument), not only as an
-// assignment/declaration target; the explicit prefix supplies its type where no
-// assignment-like context is present.
 TEST(ArrayLiteralParsing, TypePrefixedLiteralAsExpressionOperand) {
   EXPECT_TRUE(
       ParseOk("module m;\n"

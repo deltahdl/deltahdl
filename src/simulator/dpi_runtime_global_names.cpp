@@ -7,10 +7,6 @@
 namespace delta {
 
 namespace {
-// The run's registry as the C layer reaches it. Not thread-local, unlike the
-// §35.9 disable state in dpi_runtime.cpp: that state is one execution
-// context's and this is one run's, and a foreign routine calling back on any
-// thread is calling back into the same run.
 DpiRuntime* g_foreign_runtime = nullptr;
 }  // namespace
 
@@ -46,8 +42,6 @@ bool DpiRuntime::HasGlobalName(std::string_view global_name) const {
 }
 
 uint32_t DpiRuntime::GlobalNameCount() const {
-  // §35.4: one name space holds both kinds of declaration, so a linkage name an
-  // import and an export both resolve to is one symbol and is counted once.
   std::unordered_set<std::string_view> names;
   for (const auto& entry : import_global_index_) names.insert(entry.first);
   for (const auto& entry : export_global_index_) names.insert(entry.first);

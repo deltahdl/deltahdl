@@ -9,13 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5 creates bins automatically for a coverpoint of an integral expression
-// only, so a coverpoint of a real expression is left without bins unless it
-// declares an explicit `bins` of its own. The expression is real when it names
-// a real variable or a real covergroup formal, or when an operand of its
-// arithmetic is real; an explicit data type before the label decides the
-// coverpoint's type in place of the expression's. An ignore_bins item is not a
-// `bins` construct, and a comparison of real operands is integral.
 TEST(RealCoverpointBins, RealCoverpointWithoutBinsIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -46,11 +39,6 @@ TEST(RealCoverpointBins, RealCoverpointWithoutBinsIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
-// §19.5 and §19.6 hold of a covergroup embedded in a class (§19.4) as of one a
-// module declares. Its names are the class's properties and then the
-// declarations of the scope that declares the class: a real property, a real
-// variable of the enclosing module, and a name neither declares, wherever the
-// class stands -- at compilation-unit scope, in a package or in a module.
 TEST(RealCoverpointBins, EmbeddedCovergroupsAreCheckedLikeModuleOnes) {
   ElabFixture f;
   ElaborateSrc(
@@ -98,9 +86,6 @@ TEST(RealCoverpointBins, EmbeddedCovergroupsAreCheckedLikeModuleOnes) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.5: a data type written before a coverpoint's label is an integral type
-// or real, so a string or a class type there is an error. An integral type,
-// a packed vector type and a typedef of one are not.
 TEST(CoverpointTypes, DataTypeNeitherIntegralNorRealIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -128,9 +113,6 @@ TEST(CoverpointTypes, DataTypeNeitherIntegralNorRealIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5: a coverpoint covers an integral or real expression. A string and a
-// class handle are neither, with a data type written or without one; the
-// length of the string is integral.
 TEST(CoverpointTypes, ExpressionNeitherIntegralNorRealIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -157,8 +139,6 @@ TEST(CoverpointTypes, ExpressionNeitherIntegralNorRealIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §19.5 holds of a covergroup embedded in a class (§19.4) as well: a string
-// property or a string covergroup formal is no integral or real expression.
 TEST(CoverpointTypes, EmbeddedCoverpointOfAStringIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -182,8 +162,6 @@ TEST(CoverpointTypes, EmbeddedCoverpointOfAStringIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5 with §19.5.5: a default bin, a value one or a transition one, cannot
-// be explicitly ignored. A default bin declared with `bins` is legal.
 TEST(CoverpointBins, IgnoredDefaultBinIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -209,12 +187,6 @@ TEST(CoverpointBins, IgnoredDefaultBinIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5: a covergroup_expression reads as a variable only a constant or a
-// covergroup formal that is not ref. A module variable read in a range list,
-// a bin count, a transition or a `with` expression is an error, and so is a
-// ref formal, the one written after it with no direction taking its `ref`
-// (§13.3); a parameter, a const variable, a formal written before the ref
-// one, and `item` are not.
 TEST(CovergroupExpressionNames, NonConstantOrRefReadIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -252,11 +224,6 @@ TEST(CovergroupExpressionNames, NonConstantOrRefReadIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
-// §19.5: a function called in a covergroup_expression takes no ref argument,
-// keeps no state, and reads no variable outside it that is no constant, and a
-// system function called there is a constant one. An automatic function of an
-// input argument, one declared in the compilation unit among them, and $clog2
-// qualify.
 TEST(CovergroupExpressionCalls, RestrictedCallIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -306,9 +273,6 @@ TEST(CovergroupExpressionCalls, RestrictedCallIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
-// §19.5 with §8.19: an instance constant an embedded covergroup's bins read is
-// initialized in the constructor before the covergroup's `new`, and not in the
-// same looping statement as it; initialized first, it is legal.
 TEST(CovergroupExpressionNames, InstanceConstantInitializedLateIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -363,14 +327,6 @@ TEST(CovergroupExpressionNames, InstanceConstantInitializedLateIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5 with §8.19: a sequential block holding both the covergroup's `new`
-// and the initialization of an instance constant it reads is read in turn, a
-// fork-join_none holding both runs them together, and a conditional holding
-// both leaves the order open. The initialization may be written `this.lim`;
-// an assignment to another property or of `null` to the covergroup does
-// neither, a const property with an initializer is no instance constant, a
-// formal of sample() hides any property, and a constant left unassigned is
-// not initialized late.
 TEST(CovergroupExpressionNames, InstanceConstantInABlockOrForkIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -441,11 +397,6 @@ TEST(CovergroupExpressionNames, InstanceConstantInABlockOrForkIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.5: an embedded covergroup reads the properties and methods of its class
-// and the variables and functions of the scope declaring the class. A
-// property or a variable is no constant, a class parameter and a const
-// variable are, and a method or a function reading only its arguments may be
-// called; a cross of a property needs no coverpoint of it.
 TEST(CovergroupExpressionNames, EmbeddedCovergroupReadsItsClassAndScope) {
   ElabFixture f;
   ElaborateSrc(

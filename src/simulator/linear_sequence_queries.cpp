@@ -1,6 +1,3 @@
-// The queries the sequence monitor and the lowering make of a flattened
-// sequence, kept apart from the flattening itself.
-
 #include <cstddef>
 #include <functional>
 #include <vector>

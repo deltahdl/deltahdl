@@ -1,11 +1,3 @@
-// §20.14.1 $random — the system function that returns a new 32-bit signed
-// random number on each call. Its runtime behavior depends on how its seed is
-// produced: §20.14.1 states the seed shall be an integral variable whose value
-// is assigned prior to the call, and the seed selects the stream. These tests
-// therefore build the seed from a real declared-and-assigned `integer` variable
-// and drive the module through the full pipeline (parse → elaborate → lower →
-// run), reading back what $random prints through $display rather than
-// hand-building a system-call node and calling the evaluator in isolation.
 #include <gtest/gtest.h>
 
 #include <set>
@@ -19,10 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §20.14.1: $random returns a new number each time it is called, so a stream
-// seeded once and then advanced with the seedless form does not stay pinned to
-// a single value. The seed is a real declared-and-assigned integral variable,
-// as the clause requires.
 TEST(RandomFunction, AdvancesAcrossConsecutiveCalls) {
   SimFixture f;
   std::string out = RunCapture(
@@ -44,10 +32,6 @@ TEST(RandomFunction, AdvancesAcrossConsecutiveCalls) {
   EXPECT_GT(distinct.size(), 1u);
 }
 
-// §20.14.1: the bare (seedless) form is a complete call in its own right — the
-// optional seed is omitted entirely — and it draws from the current stream.
-// Called repeatedly with no seed argument at all, it still yields fresh numbers
-// that advance rather than repeating a single value.
 TEST(RandomFunction, SeedlessFormDrawsAdvancingValues) {
   SimFixture f;
   std::string out = RunCapture(
@@ -67,12 +51,6 @@ TEST(RandomFunction, SeedlessFormDrawsAdvancingValues) {
   EXPECT_GT(distinct.size(), 1u);
 }
 
-// §20.14.1: the random number is a signed integer; it can be positive or
-// negative, and it is 32 bits wide. Read back through a signed `integer` sink
-// and %0d, a run of draws yields both a negative value (leading '-') and a
-// non-negative value — which only holds if the result is interpreted as signed
-// — and at least one magnitude that overflows any narrower (<=16-bit) result,
-// which only holds if the draw is genuinely a wide 32-bit number.
 TEST(RandomFunction, ProducesSignedThirtyTwoBitValues) {
   SimFixture f;
   std::string src =
@@ -91,7 +69,7 @@ TEST(RandomFunction, ProducesSignedThirtyTwoBitValues) {
   std::string out = RunCapture(src, f);
   bool saw_negative = false;
   bool saw_nonnegative = false;
-  bool saw_wide = false;  // magnitude beyond a 16-bit result's range
+  bool saw_wide = false;
   for (const auto& line : Lines(out)) {
     if (line[0] == '-')
       saw_negative = true;
@@ -105,10 +83,6 @@ TEST(RandomFunction, ProducesSignedThirtyTwoBitValues) {
   EXPECT_TRUE(saw_wide);
 }
 
-// §20.14.1: the seed argument controls the numbers $random returns, so
-// different seeds generate different random streams. Two full-pipeline runs
-// that differ only in the value assigned to the seed variable produce different
-// output.
 TEST(RandomFunction, DifferentSeedsGiveDifferentStreams) {
   auto run_with_seed = [](const std::string& seed_value) {
     SimFixture f;
@@ -130,10 +104,6 @@ TEST(RandomFunction, DifferentSeedsGiveDifferentStreams) {
   EXPECT_NE(run_with_seed("1"), run_with_seed("2"));
 }
 
-// §20.14.1 (corollary): seeding controls the stream deterministically, so
-// re-asserting the same seed mid-run replays the identical sequence. The seed
-// value is assigned to the integral variable before each call, exactly as the
-// clause prescribes.
 TEST(RandomFunction, SameSeedReplaysStream) {
   SimFixture f;
   std::string out = RunCapture(
@@ -156,14 +126,10 @@ TEST(RandomFunction, SameSeedReplaysStream) {
       f);
   auto lines = Lines(out);
   ASSERT_EQ(lines.size(), 4u);
-  EXPECT_EQ(lines[0], lines[2]);  // first draw of each seeded stream matches
-  EXPECT_EQ(lines[1], lines[3]);  // second draw matches too
+  EXPECT_EQ(lines[0], lines[2]);
+  EXPECT_EQ(lines[1], lines[3]);
 }
 
-// §20.14.1: the seed is inout whatever variable it is: an instance property
-// read in its own method, a static property named through its class, and an
-// element of a queue each hold the new seed after the call, the one a module
-// variable seeded alike holds.
 TEST(RandomSim, TheSeedIsWrittenBackToAPropertyAndAQueueElement) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C;\n"

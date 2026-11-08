@@ -4,32 +4,10 @@
 
 #include "helpers_scheduler.h"
 
-// §6.19.5.3 Next()
-//
-// Prototype:  function enum next( int unsigned N = 1 );
-//
-// Normative rules owned by this subclause:
-//   C1  next() returns the Nth next enumeration value starting from the current
-//       value of the variable; the argument N defaults to 1 (the next member).
-//   C2  when advancing past the last member, the walk wraps to the first
-//   member. C3  when the current value is not a member of the enumeration,
-//   next()
-//       returns the enumeration's default initial value (Table 6-7, referenced
-//       but owned elsewhere).
-//
-// Which member is "next", where the walk wraps, and what counts as a member are
-// all decided by the enum declaration and by the value the variable currently
-// holds. That makes the behavior depend on how the input is produced, so these
-// tests build the enumeration and its current value from real source (§6.8
-// variable declarations, §6.19 enum declarations) and drive the whole pipeline,
-// reading back the value a call to next() yields.
-
 using namespace delta;
 
 namespace {
 
-// C1, default N: with no argument the walk advances exactly one member, from
-// the first member to the second.
 TEST(EnumNextMethod, DefaultAdvancesOneMember) {
   const char* src = R"(
 module m;
@@ -45,7 +23,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
-// C2: advancing one step past the last member wraps around to the first.
 TEST(EnumNextMethod, WrapsFromLastMember) {
   const char* src = R"(
 module m;
@@ -61,8 +38,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 0u);
 }
 
-// C1, N is a literal: two steps forward from the first member lands on the
-// third.
 TEST(EnumNextMethod, LiteralCountAdvancesN) {
   const char* src = R"(
 module m;
@@ -78,8 +53,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 2u);
 }
 
-// C2, N exceeds the member count: the step reduces modulo the size, so four
-// steps over three members advances a net one position.
 TEST(EnumNextMethod, CountLargerThanSizeWraps) {
   const char* src = R"(
 module m;
@@ -95,7 +68,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
-// C1, N is zero: a zero-length walk hands back the member already held.
 TEST(EnumNextMethod, ZeroCountReturnsCurrent) {
   const char* src = R"(
 module m;
@@ -111,8 +83,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
-// C1, N is a run-time variable: confirms the step count is read at call time
-// rather than requiring a compile-time constant.
 TEST(EnumNextMethod, CountFromVariable) {
   const char* src = R"(
 module m;
@@ -130,9 +100,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 2u);
 }
 
-// C1: the walk follows declaration order, not numeric ordering. With
-// non-contiguous explicit values, next() from the first member yields the
-// value of the second-declared member, not first-value-plus-one.
 TEST(EnumNextMethod, FollowsDeclarationOrderWithGaps) {
   const char* src = R"(
 module m;
@@ -148,8 +115,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 9u);
 }
 
-// C1, explicit 2-state packed base type (§6.19 enum_base_type): next() advances
-// to the following member's value under a sized bit base.
 TEST(EnumNextMethod, ExplicitBitBaseType) {
   const char* src = R"(
 module m;
@@ -165,8 +130,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 4u);
 }
 
-// C1, explicit 4-state base type: behavior is identical when the base type is
-// integer.
 TEST(EnumNextMethod, ExplicitIntegerBaseType) {
   const char* src = R"(
 module m;
@@ -182,12 +145,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 3u);
 }
 
-// C3: a value that is not a member of the enumeration is produced by casting an
-// out-of-range integer onto the enum type (§6.19.4 casting performs no validity
-// check). next() then returns the default initial value, which Table 6-7 makes
-// the base type's, 0 for the 2-state `int`. RED is given the value 1 so that
-// the default is no member, and a next() answering the first member instead
-// reads 1.
 TEST(EnumNextMethod, NonMemberValueReturnsDefault) {
   const char* src = R"(
 module m;
@@ -203,9 +160,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 0u);
 }
 
-// C3 over a 4-state base: an `integer` enumeration's default initial value is
-// x in every bit (Table 6-7), which a variable left at its default holds, no
-// member being x; next() returns that x rather than the first member.
 TEST(EnumNextMethod, NonMemberValueOfA4StateEnumReturnsX) {
   const char* src = R"(
 module m;
@@ -221,8 +175,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
-// C1, result used as an operand within a larger expression: the returned enum
-// value participates like any other value.
 TEST(EnumNextMethod, ResultAsExpressionOperand) {
   const char* src = R"(
 module m;
@@ -238,9 +190,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 104u);
 }
 
-// C1, result in a declaration-initializer position: one enum variable is seeded
-// from another's next(), exercising the method-call path during variable
-// initialization rather than a procedural assignment.
 TEST(EnumNextMethod, ResultAsDeclarationInitializer) {
   const char* src = R"(
 module m;
@@ -254,8 +203,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 3u);
 }
 
-// C1 + C2 together: iterating next() around a three-member enum four times from
-// the first member wraps once and lands on the second member.
 TEST(EnumNextMethod, IterativeWalkWraps) {
   const char* src = R"(
 module m;
@@ -274,11 +221,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 1u);
 }
 
-// §6.19.5.3 declares next() as `function enum next(int unsigned N = 1)`, so its
-// result is already a value of the enumeration type and needs no cast wherever
-// it is written. The module-item declaration covered above is one such place; a
-// declaration inside a procedure is another, and it is screened by a separate
-// path in the elaborator.
 TEST(EnumNextMethod, ResultAsProceduralDeclarationInitializer) {
   const char* src = R"(
 module m;
@@ -294,11 +236,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 3u);
 }
 
-// The third position a declaration can be written in, and the third path that
-// creates the variable: a local of a function body. next() has to find the
-// enumeration `a` was declared with here too. LOW is given the value 1 so that
-// no member of the enumeration is zero, and a next() that failed to find any
-// enumeration at all could not be mistaken for one that found this one.
 TEST(EnumNextMethod, ResultAsSubprogramLocalDeclarationInitializer) {
   const char* src = R"(
 module m;
@@ -315,10 +252,6 @@ endmodule
   EXPECT_EQ(RunAndGet(src, "r"), 3u);
 }
 
-// C1 with §6.19's 4-state members: `XX='x` is the second member of §6.19's own
-// example, so IDLE's next is XX, and a variable holding XX's value, x in every
-// bit, is at XX and steps to S1. Read as a number, 'x was IDLE's 0, and
-// IDLE's next was taken for IDLE.
 TEST(EnumNextMethod, StepsOntoAndFromAnXMember) {
   const char* src = R"(
 module m;

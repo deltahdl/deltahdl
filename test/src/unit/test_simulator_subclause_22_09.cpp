@@ -17,11 +17,6 @@ TEST(UnconnectedDriveSimulation, Pull1ModuleSimulatesCorrectly) {
   EXPECT_EQ(result, 10u);
 }
 
-// §22.9: while `unconnected_drive pull1 is active, a child's unconnected input
-// port is pulled high. Observe the pulled value reach the running design: the
-// child selects on its unconnected input and drives the parent-visible result,
-// which reads 1 only if the input was driven to 1 (an undriven input would
-// evaluate to x and select 0 instead).
 TEST(UnconnectedDriveSimulation, Pull1DrivesUnconnectedInputHighAtRuntime) {
   auto result = PreprocessAndGet(
       "`unconnected_drive pull1\n"
@@ -36,10 +31,6 @@ TEST(UnconnectedDriveSimulation, Pull1DrivesUnconnectedInputHighAtRuntime) {
   EXPECT_EQ(result, 1u);
 }
 
-// §22.9: while `unconnected_drive pull0 is active, the unconnected input is
-// pulled low. The child selects the nonzero arm only when its input is a known
-// 0, so a runtime result of 1 confirms the port was driven to 0 (an undriven x
-// input would select 0 here instead).
 TEST(UnconnectedDriveSimulation, Pull0DrivesUnconnectedInputLowAtRuntime) {
   auto result = PreprocessAndGet(
       "`unconnected_drive pull0\n"
@@ -54,7 +45,6 @@ TEST(UnconnectedDriveSimulation, Pull0DrivesUnconnectedInputLowAtRuntime) {
   EXPECT_EQ(result, 1u);
 }
 
-// A module `name` passing its unconnected-to-be input a to its output b.
 static std::string PassThrough(const std::string& name) {
   return "module " + name +
          "(input logic a, output logic b);\n"
@@ -62,9 +52,6 @@ static std::string PassThrough(const std::string& name) {
          "endmodule\n";
 }
 
-// §22.9: `unconnected_drive governs the module definitions that follow it, so
-// a `pull0` after the last module leaves sub's unconnected input pulled to 1.
-// The trailing directive governed every module, and b read 0.
 TEST(UnconnectedDriveSimulation, ATrailingDirectiveLeavesTheModulesBeforeIt) {
   SimFixture f;
   EXPECT_EQ(
@@ -79,11 +66,6 @@ TEST(UnconnectedDriveSimulation, ATrailingDirectiveLeavesTheModulesBeforeIt) {
       "1\n");
 }
 
-// §22.9 with §23.3.3.3: the drive in force at each child's definition is the
-// one its unconnected input takes, whatever is in force at the instantiating
-// t: sub1's pulls to 1, sub2's, under `nounconnected_drive, is an undriven net
-// reading z, and sub3's pulls to 0. The last directive governed all three,
-// which read x x x.
 TEST(UnconnectedDriveSimulation, EachChildTakesTheDriveAtItsDefinition) {
   SimFixture f;
   EXPECT_EQ(PreprocessAndCapture(

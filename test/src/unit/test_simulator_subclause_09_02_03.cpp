@@ -14,8 +14,6 @@ using namespace delta;
 
 namespace {
 
-// The variable the cbEndOfSimulation callback below reads, and the value it
-// found there when the callback ran.
 Variable* g_final_written = nullptr;
 uint64_t g_value_at_end_of_simulation = 0;
 
@@ -32,9 +30,6 @@ class FinalBeforeEndOfSimulation : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §9.2.3: a final procedure runs before the PLI callbacks that mark the end of
-// simulation, so the cbEndOfSimulation callback reads the 77 the final
-// procedure wrote rather than the 0 the run left.
 TEST_F(FinalBeforeEndOfSimulation, TheCallbackSeesWhatTheFinalProcedureWrote) {
   s_cb_data ended = {};
   ended.reason = cbEndOfSimulation;
@@ -218,11 +213,6 @@ TEST(FinalProcedureSimulation, TriggeredByFinish) {
 }
 
 TEST(FinalProcedureSimulation, FinalCallsUserFunction) {
-  // §9.2.3 end-to-end for the §13.4 dependency: a final procedure runs as a
-  // series of function calls, so a call to a user-defined function (built from
-  // real §13.4 declaration syntax) executes when the finals run. Observing the
-  // returned value confirms the function-legal statement was carried through
-  // the full pipeline and evaluated in the final procedure.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"

@@ -8,16 +8,11 @@ using namespace delta;
 
 namespace {
 
-// When a cross_identifier is used as a select_expression, only the
-// cross_identifier of the enclosing cross may be used; any other
-// cross_identifier shall be disallowed (LRM 19.6.1.2).
 TEST(CrossBinWithCovergroup, OnlyEnclosingCrossIdentifierIsLegal) {
   EXPECT_TRUE(CrossIdentifierSelectIsLegal("X", "X"));
   EXPECT_FALSE(CrossIdentifierSelectIsLegal("Y", "X"));
 }
 
-// The integer_covergroup_expression of a matches clause shall evaluate to a
-// positive integer; zero or a negative value is illegal (LRM 19.6.1.2).
 TEST(CrossBinWithCovergroup, MatchesCountShallBePositive) {
   EXPECT_TRUE(CrossMatchesCountIsLegal(1));
   EXPECT_TRUE(CrossMatchesCountIsLegal(127));
@@ -25,8 +20,6 @@ TEST(CrossBinWithCovergroup, MatchesCountShallBePositive) {
   EXPECT_FALSE(CrossMatchesCountIsLegal(-3));
 }
 
-// §19.6.1.2: a constant `matches` count is a positive integer, so zero and a
-// negative count are errors while one and `$` are not.
 TEST(CrossBinMatches, ConstantCountOfZeroOrLessIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -55,8 +48,6 @@ TEST(CrossBinMatches, ConstantCountOfZeroOrLessIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 2u);
 }
 
-// §19.6.1.2: a cross bin may select through the cross_identifier of its own
-// cross alone, so naming another cross of the covergroup is an error.
 TEST(CrossBinMatches, SelectingThroughAnotherCrossIsError) {
   ElabFixture f;
   ElaborateSrc(

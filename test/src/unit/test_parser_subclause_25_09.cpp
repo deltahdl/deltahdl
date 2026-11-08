@@ -47,9 +47,6 @@ TEST(InterfaceParsing, VirtualInterfaceWithModportNames) {
   EXPECT_EQ(item->data_type.modport_name, "target");
 }
 
-// Syntax 25-3 admits an optional parameter_value_assignment after the
-// interface_identifier. The parser must capture the #(...) override list on the
-// virtual-interface data_type, not just the bare type name.
 TEST(InterfaceParsing, VirtualInterfaceWithParamValueAssignment) {
   auto r = Parse(
       "module top;\n"
@@ -64,10 +61,6 @@ TEST(InterfaceParsing, VirtualInterfaceWithParamValueAssignment) {
   EXPECT_EQ(item->name, "vif");
 }
 
-// The optional parameter_value_assignment and the optional . modport_identifier
-// may both appear, in that order, on a single virtual-interface declaration
-// (e.g. the "virtual PBus #(16).phy v16_phy;" form shown in 25.9). The parser
-// must record both the override list and the selected modport.
 TEST(InterfaceParsing, VirtualInterfaceWithParamsAndModport) {
   auto r = Parse(
       "module top;\n"
@@ -184,13 +177,6 @@ TEST(InterfaceParsing, VirtualInterfaceInequalityExpression) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §25.9 lets a virtual interface be declared wherever a variable is, and
-// A.2.2.1 (printed page 1182) lists `virtual [interface] interface_identifier`
-// among data_type's alternatives, so a block item opening with `virtual` is a
-// data_declaration wherever A.2.8 places one: the locals of a task or function
-// body and the head of a seq_block. IsBlockVarDeclStartCore did not take the
-// keyword as opening a declaration, so the parser read the line as a statement
-// and reported it.
 TEST(InterfaceParsing, VirtualInterfaceFirstLocalOfTask) {
   auto r = Parse(
       "module m;\n"

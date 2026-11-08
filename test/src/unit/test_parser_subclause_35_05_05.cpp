@@ -36,9 +36,6 @@ TEST_F(AnnexHParseTest, DpiImportFunctionStringResultAccepted) {
   EXPECT_TRUE(items[0]->dpi_is_pure);
 }
 
-// §35.5.5: an imported function's declaration must write out its result type, a
-// data type or void. An omitted (implicit) return type -- legal for a native
-// function -- is rejected here.
 TEST(FunctionDeclParsing, DpiImportFunctionImplicitReturnTypeRejected) {
   auto r = Parse(
       "module m;\n"
@@ -51,8 +48,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionImplicitReturnTypeRejected) {
                             2, "35.5.5"));
 }
 
-// §35.5.5: chandle is one of the data types allowed for imported function
-// results, so a chandle-returning import parses without error.
 TEST(FunctionDeclParsing, DpiImportFunctionChandleResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -64,8 +59,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionChandleResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kChandle);
 }
 
-// §35.5.5: a scalar bit or logic value is a permitted result. A bare
-// (single-bit, unpacked) bit return type is accepted.
 TEST(FunctionDeclParsing, DpiImportFunctionScalarBitResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -77,8 +70,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionScalarBitResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kBit);
 }
 
-// §35.5.5: a scalar bit or logic value is a permitted result. The logic half of
-// that pair is accepted in its scalar (single-bit) form, just as scalar bit is.
 TEST(FunctionDeclParsing, DpiImportFunctionScalarLogicResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -90,9 +81,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionScalarLogicResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLogic);
 }
 
-// §35.5.5: real is one of the data types allowed for imported function
-// results, covering the floating-point category of the permitted small-value
-// list.
 TEST(FunctionDeclParsing, DpiImportFunctionRealResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -104,9 +92,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionRealResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kReal);
 }
 
-// §35.5.5: only the *scalar* form of logic is a permitted result. A packed
-// logic vector is rejected, mirroring the packed-bit case for the logic half of
-// the permitted bit/logic pair.
 TEST(FunctionDeclParsing, DpiImportFunctionPackedLogicResultRejected) {
   auto r = Parse(
       "module m;\n"
@@ -118,9 +103,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionPackedLogicResultRejected) {
       "35.5.5"));
 }
 
-// §35.5.5: the permitted result list excludes the wide 4-state 'time' type, so
-// a time-returning import is rejected -- a distinct exclusion from the integer
-// case.
 TEST(FunctionDeclParsing, DpiImportFunctionTimeResultRejected) {
   auto r = Parse(
       "module m;\n"
@@ -132,8 +114,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionTimeResultRejected) {
       "35.5.5"));
 }
 
-// §35.5.5: results are restricted to *small values*. A packed bit vector is not
-// a scalar bit value and is therefore not a permitted result type.
 TEST(FunctionDeclParsing, DpiImportFunctionPackedBitResultRejected) {
   auto r = Parse(
       "module m;\n"
@@ -145,10 +125,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionPackedBitResultRejected) {
       "35.5.5"));
 }
 
-// §35.5.5: only the *scalar* form of bit is permitted. A width-one packed
-// vector (bit [0:0]) carries a packed dimension and so is a one-bit vector, not
-// a scalar bit value -- this boundary case is rejected, just as a wider packed
-// vector is.
 TEST(FunctionDeclParsing, DpiImportFunctionWidthOnePackedBitResultRejected) {
   auto r = Parse(
       "module m;\n"
@@ -160,9 +136,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionWidthOnePackedBitResultRejected) {
       "35.5.5"));
 }
 
-// §35.5.5: the allowed result list excludes the wide 4-state 'integer' type
-// (permitted only as a formal argument under §35.5.6), so an integer-returning
-// import is rejected.
 TEST(FunctionDeclParsing, DpiImportFunctionIntegerResultRejected) {
   auto r = Parse(
       "module m;\n"
@@ -174,8 +147,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionIntegerResultRejected) {
       "35.5.5"));
 }
 
-// §35.5.5: 'byte' is one of the C-compatible integer types named in the
-// permitted small-value result list, so a byte-returning import parses cleanly.
 TEST(FunctionDeclParsing, DpiImportFunctionByteResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -187,8 +158,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionByteResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kByte);
 }
 
-// §35.5.5: 'shortint' is in the permitted small-value result list, so a
-// shortint-returning import is accepted.
 TEST(FunctionDeclParsing, DpiImportFunctionShortintResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -200,8 +169,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionShortintResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kShortint);
 }
 
-// §35.5.5: 'int' -- the 32-bit C-compatible integer -- is in the permitted
-// small-value result list, so an int-returning import is accepted.
 TEST(FunctionDeclParsing, DpiImportFunctionIntResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -213,8 +180,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionIntResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kInt);
 }
 
-// §35.5.5: 'longint' is the 64-bit member of the permitted small-value integer
-// result types, so a longint-returning import is accepted.
 TEST(FunctionDeclParsing, DpiImportFunctionLongintResultAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -226,9 +191,6 @@ TEST(FunctionDeclParsing, DpiImportFunctionLongintResultAccepted) {
   EXPECT_EQ(item->return_type.kind, DataTypeKind::kLongint);
 }
 
-// §35.5.5: 'shortreal' is the single-precision floating-point member of the
-// permitted small-value result list, distinct from 'real', so a
-// shortreal-returning import is accepted.
 TEST(FunctionDeclParsing, DpiImportFunctionShortrealResultAccepted) {
   auto r = Parse(
       "module m;\n"

@@ -35,9 +35,6 @@ TEST(CompilationUnitSim, MultipleCuScopeFunctionsResolvedAtRuntime) {
   EXPECT_EQ(val, 8u);
 }
 
-// §3.12.1 and §6.19: an enumeration a typedef declares at compilation-unit
-// scope declares its literals for the modules of the unit, so a module reads
-// MID as 1 and a class method of the unit compares against JUMBO.
 TEST(CompilationUnitSim, CuScopeEnumLiteralsResolveInModulesAndClasses) {
   auto val = RunAndGet(
       "typedef enum {LOW, MID, HIGH} level_t;\n"
@@ -57,22 +54,6 @@ TEST(CompilationUnitSim, CuScopeEnumLiteralsResolveInModulesAndClasses) {
   EXPECT_EQ(val, 11u);
 }
 
-// §3.12.1 (printed page 56) with §6.21 (printed 132-133): the
-// compilation-unit scope holds the declarations outside any other scope,
-// and a name a module's own scope does not declare is searched for there
-// next, so `int g;` written outside every module is one variable both
-// modules share: a's process writes 5 at time 0 through a unit-scope
-// function and top's reads it at time 1: 5. No lowerer path created the
-// unit's storage (CreateUnitDataVariables in lowerer_package_data.cpp), so
-// the write landed nowhere and the read answered nothing. The write goes
-// through a function of the unit because, when this case was written, the
-// elaborator's §23.9 check of a procedural assignment's target
-// (ValidateScopeRules in elaborator_scope_rules.cpp) knew the module's own
-// names and its imports' and not the unit's, so `initial g = 5` in a module
-// was reported as undeclared, which a subroutine body escapes; the case is
-// kept beside CuScopeVariableWrittenDirectlyByAModuleProcess below, which
-// writes without the function, so the unit function's write to the unit's
-// variable stays covered.
 TEST(CompilationUnitSim, CuScopeVariableSharedByTwoModules) {
   auto val = RunAndGet(
       "int g;\n"
@@ -91,15 +72,6 @@ TEST(CompilationUnitSim, CuScopeVariableSharedByTwoModules) {
   EXPECT_EQ(val, 5u);
 }
 
-// §3.12.1 (printed page 56) with §6.21 (printed 132-133): a module's own
-// procedural assignment writes the unit's variable, `initial g = 5;` in a
-// with no function between, and top reads 5 through it at time 1. The
-// elaborator reported the write as "undeclared identifier 'g'"
-// (ValidateScopeRules in elaborator_scope_rules.cpp admitted the module's
-// names and its imports' alone), so no such design reached the simulator;
-// the case above wrote through a unit function to get past it. The value
-// read is the write's and not the declaration's, which has none, so a run
-// whose write landed elsewhere reads 0.
 TEST(CompilationUnitSim, CuScopeVariableWrittenDirectlyByAModuleProcess) {
   auto val = RunAndGet(
       "int g;\n"
@@ -115,14 +87,6 @@ TEST(CompilationUnitSim, CuScopeVariableWrittenDirectlyByAModuleProcess) {
   EXPECT_EQ(val, 5u);
 }
 
-// §3.12.1 (printed page 56) with §6.10 (printed 108) and §10.3.2 (printed
-// 249): a module's continuous assignment drives the unit's variable, `assign
-// g = 5;` in a with no declaration of g in the module, and top reads 5
-// through it at time 1. The elaborator assumed an implicit net `g` of the
-// module for the target (MaybeCreateImplicitNet in elaborator_items.cpp knew
-// the module's own names alone), so the assignment drove that net and the
-// unit's variable, keyed under its bare name and registered as an imported
-// name, stayed 0 -- which a run whose driver lands elsewhere still reads.
 TEST(CompilationUnitSim, CuScopeVariableDrivenByAModuleContinuousAssignment) {
   auto val = RunAndGet(
       "int g;\n"
@@ -138,12 +102,6 @@ TEST(CompilationUnitSim, CuScopeVariableDrivenByAModuleContinuousAssignment) {
   EXPECT_EQ(val, 5u);
 }
 
-// §3.12.1 (printed page 56) with §26.2 (printed 808): a declaration
-// assignment of the compilation-unit scope is made before any initial or
-// always procedure starts, as a package's is, so `int g = 4;` outside every
-// module reads 4 in a process at time 0 and `$unit::g` names the same
-// variable: 4 * 10 + 4. With no storage for the unit's items neither read
-// answered.
 TEST(CompilationUnitSim, CuScopeVariableInitializedBeforeAnyProcess) {
   auto val = RunAndGet(
       "int g = 4;\n"
@@ -155,16 +113,6 @@ TEST(CompilationUnitSim, CuScopeVariableInitializedBeforeAnyProcess) {
   EXPECT_EQ(val, 44u);
 }
 
-// §3.12.1 (printed page 56) with §8.3 (printed 180): `C h;` outside every
-// module, after a unit-scope `class C`, is one handle variable of C the
-// unit's modules share, so `h = new` through a unit function constructs an
-// object of C into it and a module's `h.v` reads the property's initializer
-// 3. The unit's storage was sized 32 bits, half a handle, with no class
-// recorded under `h` (RegisterUnitClassVariables in lowerer_register.cpp
-// records the packages' alone before), so the `new` found no class to
-// construct and `h.v` read no object. The write goes through a unit
-// function for the reason CuScopeVariableSharedByTwoModules gives, and is
-// kept so a unit function's `new` into the unit's handle stays covered.
 TEST(CompilationUnitSim, CuScopeClassHandleConstructedThroughUnitFunction) {
   auto val = RunAndGet(
       "class C;\n"
@@ -185,14 +133,6 @@ TEST(CompilationUnitSim, CuScopeClassHandleConstructedThroughUnitFunction) {
   EXPECT_EQ(val, 3u);
 }
 
-// §3.12.1 (printed page 56) with §8.7 (printed 184) and §26.2 (printed
-// 808): the unit's declaration assignment `C h2 = new;` constructs the
-// object before any procedure starts, as a package's would, so a module
-// reads 3 through `h2.v` at time 0 with no write of its own. The
-// initializer was evaluated as an ordinary expression, which a bare `new`
-// is not, so nothing was constructed (ConstructDataClassInitializers in
-// lowerer_package_data.cpp makes the construction once the unit's classes
-// are lowered).
 TEST(CompilationUnitSim, CuScopeClassHandleConstructedByItsInitializer) {
   auto val = RunAndGet(
       "class C;\n"
@@ -207,14 +147,6 @@ TEST(CompilationUnitSim, CuScopeClassHandleConstructedByItsInitializer) {
   EXPECT_EQ(val, 3u);
 }
 
-// §3.12.1 (printed page 56) with §26.3 (printed 810): a wildcard import
-// written at compilation-unit scope makes a package's class visible to the
-// unit's own declarations, so `C h3 = new;` after `import p::*` is a handle
-// of p's C, constructed before any procedure starts, and a module reads 4
-// through it. The record of the class a unit variable holds is found
-// through the unit's imports when the unit declares no class of the name
-// (UnitScopeClassKey in lowerer_register.cpp); with none, the storage was
-// 32 bits and nothing was constructed.
 TEST(CompilationUnitSim, CuScopeHandleOfAWildcardImportedPackageClass) {
   auto val = RunAndGet(
       "package p;\n"
@@ -232,10 +164,6 @@ TEST(CompilationUnitSim, CuScopeHandleOfAWildcardImportedPackageClass) {
   EXPECT_EQ(val, 4u);
 }
 
-// A design whose package p declares `int K = 4` and a function f reading it,
-// followed by the unit-scope declarations `unit_decls` outside every module,
-// the last of which declares g, and a module top whose process reads g into
-// y at time 0; answers y.
 static uint64_t UnitInitializerRead(const std::string& unit_decls) {
   return RunAndGet(
       "package p;\n"
@@ -252,49 +180,26 @@ static uint64_t UnitInitializerRead(const std::string& unit_decls) {
       "y");
 }
 
-// §3.12.1 (printed page 56) with §26.3 (printed 810) and §26.2 (printed
-// 808): a wildcard import written at compilation-unit scope makes p's K
-// visible in the unit's scope, whose declaration assignment `int g = K;` is
-// made before any procedure starts, after p's own `int K = 4;`, so a module
-// reads 4 through g at time 0. The unit's imports were bound after the
-// unit's initializers had run (LowerCompilationUnitImports after
-// InitUnitDataVariables), so the initializer found no K and g read 0.
 TEST(CompilationUnitSim, CuScopeInitializerReadsAWildcardImportedVariable) {
   EXPECT_EQ(UnitInitializerRead("import p::*;\n"
                                 "int g = K;\n"),
             4u);
 }
 
-// The same through an explicit `import p::K;`, which §26.3 binds ahead of a
-// wildcard one (§26.5): `int g = K * 10 + 1;` reads 41; an unbound K read 0
-// and g 1.
 TEST(CompilationUnitSim, CuScopeInitializerReadsAnExplicitlyImportedVariable) {
   EXPECT_EQ(UnitInitializerRead("import p::K;\n"
                                 "int g = K * 10 + 1;\n"),
             41u);
 }
 
-// §3.12.1 with §26.2 (printed page 808): the unit's `int g = p::f();` calls
-// the package's function through the scope resolution operator (§26.3),
-// which reads the package's own K, initialized before the unit's items are,
-// so g holds 8 and a module reads 8. A K read before its initializer would
-// give 0, and a call resolved to nothing 0.
 TEST(CompilationUnitSim, CuScopeInitializerCallsAPackageFunction) {
   EXPECT_EQ(UnitInitializerRead("int g = p::f();\n"), 8u);
 }
 
-// A design whose compilation-unit scope declares `int g = 5;` ahead of the
-// modules `modules`, the last of which is the top; answers the variable
-// `var_name` once the run has ended, a hierarchical name for an instance's.
 static uint64_t UnitGRead(const std::string& modules, const char* var_name) {
   return RunAndGet("int g = 5;\n" + modules, var_name);
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): a reference is
-// resolved in the nearer scope first, the module's own declaration ahead of
-// the compilation unit's, so top's `int g = 7;` is the g its process reads:
-// 7. A resolution that reached the unit's storage under the shared name
-// read 5.
 TEST(CompilationUnitSim, CuScopeVariableShadowedByTheModulesOwnDeclaration) {
   EXPECT_EQ(UnitGRead("module top;\n"
                       "  int g = 7;\n"
@@ -305,11 +210,6 @@ TEST(CompilationUnitSim, CuScopeVariableShadowedByTheModulesOwnDeclaration) {
             7u);
 }
 
-// §3.12.1 (printed page 56) with §6.21 (printed 132-133): the unit's `int g
-// = 5;` outlives an instance's like-named declaration, a's `int g = 7;`
-// stored under the instance's own key, so top, which declares no g, reads
-// the unit's 5. An instance's declaration displacing the unit's storage
-// read 7.
 TEST(CompilationUnitSim, CuScopeVariableKeptByAnInstanceDeclaringTheName) {
   EXPECT_EQ(UnitGRead("module a;\n"
                       "  int g = 7;\n"
@@ -323,15 +223,6 @@ TEST(CompilationUnitSim, CuScopeVariableKeptByAnInstanceDeclaringTheName) {
             5u);
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): the top's `int g =
-// 7;` is the top's own, and an instance whose module declares no g reads
-// the unit's g, the enclosing scope's, so u.y is 5. The unit's storage
-// stood under the bare name the top's declaration is keyed by, so the top's
-// LowerVar (lowerer_var.cpp) replaced it, and the instance's bare reference,
-// which SimContext::FindVariable answers from the bare key, read the top's
-// 7. The unit's storage now stands under "$unit.g" and each instance is
-// bound to it under its own prefix (AliasUnitDataItems in
-// lowerer_package_data.cpp), the top's own declaration left to the top.
 TEST(CompilationUnitSim, CuScopeVariableReadByAnInstanceWhileTheTopDeclaresIt) {
   EXPECT_EQ(UnitGRead("module a;\n"
                       "  int y;\n"
@@ -345,14 +236,6 @@ TEST(CompilationUnitSim, CuScopeVariableReadByAnInstanceWhileTheTopDeclaresIt) {
             5u);
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761) and §23.3.3.2: a port
-// of the top named as the unit's variable is the top's own g, an
-// unconnected `input var int` reading its type's default 0 (Table 6-7), and
-// the instance below reads the unit's 5, so `g * 10 + u.y` at time 1 is 5.
-// The port's storage is created only where nothing answers the name
-// (CreatePortVariable in lowerer_register.cpp), and the unit's storage
-// under the bare name answered it, so the port was the unit's variable and
-// both read 5: 55.
 TEST(CompilationUnitSim, CuScopeVariableNamedAsAPortOfTheTopIsNotThePort) {
   EXPECT_EQ(UnitGRead("module a;\n"
                       "  int y;\n"
@@ -367,12 +250,6 @@ TEST(CompilationUnitSim, CuScopeVariableNamedAsAPortOfTheTopIsNotThePort) {
             5u);
 }
 
-// §3.12.1 (printed page 56) with §26.2 (printed 808): the unit's own
-// declaration assignment `int h = g + 1;` reads the unit's g whatever a
-// module declares, so top's `y = h` reads 6 beside the top's own g. The
-// unit's initializers are evaluated in a frame of the unit's own scope,
-// which resolves the bare name to "$unit.g"; a frame resolving it by the
-// bare key alone finds no g once the key is left to the top's declaration.
 TEST(CompilationUnitSim, CuScopeInitializerReadsTheUnitsOwnShadowedVariable) {
   EXPECT_EQ(UnitGRead("int h = g + 1;\n"
                       "module top;\n"
@@ -384,11 +261,6 @@ TEST(CompilationUnitSim, CuScopeInitializerReadsTheUnitsOwnShadowedVariable) {
             6u);
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): `$unit::g` names the
-// compilation-unit scope's g explicitly, past the top's own `int g = 7;`,
-// which the bare g resolves to, so `g * 10 + $unit::g` is 75. The prefix
-// was dropped by EvalIdentifier (evaluation.cpp), which read the
-// identifier's text alone, so both read the top's 7: 77.
 TEST(CompilationUnitSim, CuScopeVariableNamedThroughUnitPrefixPastTheTopsOwn) {
   EXPECT_EQ(UnitGRead("module top;\n"
                       "  int g = 7;\n"
@@ -399,12 +271,6 @@ TEST(CompilationUnitSim, CuScopeVariableNamedThroughUnitPrefixPastTheTopsOwn) {
             75u);
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): `$unit::g = 3` in the
-// top writes the unit's g, so the top's own g stays 7 and the instance a,
-// declaring no g, reads the unit's 3 at time 1: `g * 10 + u.y` at time 2
-// is 73. Resolved by the identifier's text (ResolveLhsVariable in
-// statement_assign.cpp), the write landed in the top's g and the instance
-// read the unit's untouched 5: 35.
 TEST(CompilationUnitSim,
      CuScopeVariableWrittenThroughUnitPrefixPastTheTopsOwn) {
   EXPECT_EQ(UnitGRead("module a;\n"
@@ -424,11 +290,6 @@ TEST(CompilationUnitSim,
             73u);
 }
 
-// §3.12.1 (printed page 56) with §13.5.1: a `$unit::g` actual is the
-// unit's g passed by value, so `twice($unit::g) * 10 + twice(g)` beside the
-// top's own g is 114; the actual read by its text was the top's 7: 154.
-// `$unit::g` where the module declares no g reads as the bare g does
-// (CuScopeVariableInitializedBeforeAnyProcess above).
 TEST(CompilationUnitSim, CuScopeVariableAsAnActualThroughUnitPrefix) {
   EXPECT_EQ(UnitGRead("function int twice(int v);\n"
                       "  return v * 2;\n"
@@ -442,14 +303,6 @@ TEST(CompilationUnitSim, CuScopeVariableAsAnActualThroughUnitPrefix) {
             114u);
 }
 
-// §3.12.1 (printed page 56) with §8.9 (printed 186): a static property of
-// the unit's own class C is initialized once, its `static int s = g * 10 +
-// 1;` an expression of the unit's scope, which declares g, so a module
-// reads 51 through `C::s`. The unit's classes are lowered before any
-// module is, and the initializer was evaluated in no frame, resolving g by
-// its bare key, which holds nothing once the unit's storage stands under
-// "$unit.g": s read 1. LowerClassDecl (lowerer_class.cpp) now evaluates the
-// initializer in a frame of the unit's scope.
 TEST(CompilationUnitSim, CuScopeClassStaticInitializerReadsTheUnitsVariable) {
   EXPECT_EQ(UnitGRead("class C;\n"
                       "  static int s = g * 10 + 1;\n"
@@ -462,10 +315,6 @@ TEST(CompilationUnitSim, CuScopeClassStaticInitializerReadsTheUnitsVariable) {
             51u);
 }
 
-// A design whose compilation-unit scope declares `int g = 5;` and then the
-// class `unit_class`, and whose top declares its own `int g = 7;`,
-// constructs a C and reads `read * 10 + g` into y; answers y, in which the
-// tens digit is what the class read and the units the top's own g.
 static uint64_t UnitClassReadBesideTheTopsG(const std::string& unit_class,
                                             const std::string& read) {
   return UnitGRead(unit_class +
@@ -483,14 +332,6 @@ static uint64_t UnitClassReadBesideTheTopsG(const std::string& unit_class,
                    "y");
 }
 
-// §3.12.1 (printed page 56) with §8.7 (printed 184) and §23.9 (printed
-// 761): the unit class's `int p = g;` is an expression of the class
-// declaration's scope, the unit's, whose g is 5 whatever the constructing
-// module declares, so `c.p * 10 + g` in a top with its own `int g = 7;` is
-// 57. The defaults were read in a frame of no package
-// (ConstructBaseThenDefaults in eval_class_new.cpp, as b0255e0e9 left a unit
-// class), which resolved g through the top's instance prefix to the top's
-// 7: 77.
 TEST(CompilationUnitSim, CuScopeClassPropertyInitializerReadsTheUnitsVariable) {
   EXPECT_EQ(UnitClassReadBesideTheTopsG("class C;\n"
                                         "  int p = g;\n"
@@ -499,12 +340,6 @@ TEST(CompilationUnitSim, CuScopeClassPropertyInitializerReadsTheUnitsVariable) {
             57u);
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): a method of the unit
-// class reads a bare g as the unit's 5, its body nested in the unit's scope
-// and never in the calling module's, so `c.get() * 10 + g` is 57 beside
-// the top's own g. The method's frame carried no scope (RecordClassPackage
-// in lowerer_class.cpp recorded a package alone), so the bare g resolved
-// through the calling instance's prefix to the top's 7: 77.
 TEST(CompilationUnitSim, CuScopeClassMethodReadsTheUnitsVariable) {
   EXPECT_EQ(UnitClassReadBesideTheTopsG("class C;\n"
                                         "  function int get();\n"
@@ -515,16 +350,6 @@ TEST(CompilationUnitSim, CuScopeClassMethodReadsTheUnitsVariable) {
             57u);
 }
 
-// §3.12.1 (printed page 56) with §13.5.2 (printed 349): a ref formal is the
-// actual variable itself, and `$unit::q` names the unit's queue past the
-// top's own `int q[$]`, so `push($unit::q)` appends to the unit's queue and
-// the by-value `qsize($unit::q)` copies that queue: 1 * 10 + the top's own
-// empty q, 10. Both binds resolved the actual by its text
-// (TryBindRefAggregateArg and TryBindArrayArg in eval_function_args.cpp),
-// so the push landed in the top's queue and both counted it: 11. The size
-// is read through a formal because `$unit::q.size()` is not parsed
-// (Parser::ParseSystemCall returns the prefixed identifier with no postfix
-// chain).
 TEST(CompilationUnitSim, CuScopeQueueBoundByReferenceThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("int q[$];\n"
                       "module top;\n"
@@ -545,11 +370,6 @@ TEST(CompilationUnitSim, CuScopeQueueBoundByReferenceThroughUnitPrefix) {
             10u);
 }
 
-// §3.12.1 (printed page 56) with §13.5.2 (printed 349): `set3($unit::g)`
-// binds the `ref int r` formal to the unit's g, so the write through the
-// formal leaves the top's own `int g = 7` alone: `g * 10 + $unit::g` is 73.
-// TryBindRefArg (eval_function_args.cpp) resolved the actual by its text,
-// which bound the top's g: 35.
 TEST(CompilationUnitSim, CuScopeVariableBoundByReferenceThroughUnitPrefix) {
   EXPECT_EQ(UnitGRead("module top;\n"
                       "  int g = 7;\n"
@@ -566,15 +386,6 @@ TEST(CompilationUnitSim, CuScopeVariableBoundByReferenceThroughUnitPrefix) {
             73u);
 }
 
-// §3.12.1 (printed page 56) with §6.16 (printed 112): `$unit::s = "abcde"`
-// writes the unit's `string s`, whose whole value a string assignment takes,
-// so a unit class method's `s.len()` reads 5 and the top's own `int s = 7`
-// stays 7: 57. The store asked the kind of the target by its text
-// (IsStringTarget in statement_assign_core.cpp), found the top's int, and
-// cut the value to the string's width: "e", 1, and 17. The length is read
-// through the class because `$unit::s.len()` is not parsed
-// (Parser::ParseSystemCall) and a unit function's frame carries no scope of
-// the unit's, so its bare s is the calling module's.
 TEST(CompilationUnitSim, CuScopeStringWrittenThroughUnitPrefixPastTheTopsInt) {
   EXPECT_EQ(RunAndGet("string s = \"x\";\n"
                       "class C;\n"
@@ -596,16 +407,6 @@ TEST(CompilationUnitSim, CuScopeStringWrittenThroughUnitPrefixPastTheTopsInt) {
             57u);
 }
 
-// §3.12.1 (printed page 56) with A.8.4 (printed 1211): `$unit::q.size()`
-// is the size method on the unit's queue, named explicitly past the top's
-// own `int q[$]`, so with the unit's q holding two elements and the top's
-// one, `$unit::q.size() * 10 + q.size()` is 21. Parser::ParseSystemCall
-// (expr_parser_calls.cpp) returned the prefixed identifier with no postfix
-// chain, so the statement was reported "expected ';'" at the `.`, and the
-// queue's receiver was read by its text (FindQueueOfBase in
-// eval_array_class_queue.cpp), which would have counted the top's: 11. The
-// earlier CuScopeQueueBoundByReferenceThroughUnitPrefix reads the size
-// through a by-value formal for that reason and is kept.
 TEST(CompilationUnitSim, CuScopeQueueSizeThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("int q[$] = '{1, 2};\n"
                       "module top;\n"
@@ -617,11 +418,6 @@ TEST(CompilationUnitSim, CuScopeQueueSizeThroughUnitPrefix) {
             21u);
 }
 
-// The same chain on a string (§6.16, printed 112): `$unit::s.len()` is the
-// length of the unit's "abcde", 5, beside the top's own "xy", 2: 52. Read
-// by the receiver's text (ExtractMethodCallParts in eval_expr.cpp, which
-// TryEvalStringMethodCall in eval_string.cpp fell to for a receiver that is
-// no package-scoped name), the top's answered both: 22.
 TEST(CompilationUnitSim, CuScopeStringLengthThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("string s = \"abcde\";\n"
                       "module top;\n"
@@ -633,11 +429,6 @@ TEST(CompilationUnitSim, CuScopeStringLengthThroughUnitPrefix) {
             52u);
 }
 
-// A.8.4's select on the prefixed identifier (§7.4.2, printed 154):
-// `$unit::arr[0]` is the first element of the unit's array, 7, beside the
-// top's own arr[0], 1: 71. Reported "expected ';'" at the `[` before, and
-// keyed by the text (ScopedOrBareTargetKey in eval_semaphore.cpp) the top's
-// element would have answered: 11.
 TEST(CompilationUnitSim, CuScopeArrayElementThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("int arr[2] = '{7, 8};\n"
                       "module top;\n"
@@ -649,9 +440,6 @@ TEST(CompilationUnitSim, CuScopeArrayElementThroughUnitPrefix) {
             71u);
 }
 
-// A design whose compilation-unit scope declares `string s = "unit";` and
-// then `unit_items`, and whose top declares its own `string s =
-// "modulestring";` and runs `body` in an initial procedure; answers y.
 static uint64_t UnitStringRead(const std::string& unit_items,
                                const std::string& body) {
   return RunAndGet("string s = \"unit\";\n" + unit_items +
@@ -665,12 +453,6 @@ static uint64_t UnitStringRead(const std::string& unit_items,
                    "y");
 }
 
-// §3.12.1 (printed page 56) with §23.9 (printed 761): a function declared
-// outside every module is nested in the compilation-unit scope and never in
-// its caller's, so its bare s is the unit's "unit" and `len_s()` from a top
-// declaring its own `string s = "modulestring"` is 4. Registered under no
-// scope (RegisterFreeCuFunctions in lowerer.cpp), the function's frame fell
-// through to the calling instance's names and read the top's: 12.
 TEST(CompilationUnitSim, CuScopeFunctionReadsTheUnitsVariable) {
   EXPECT_EQ(UnitStringRead("function int len_s();\n"
                            "  return s.len();\n"
@@ -679,8 +461,6 @@ TEST(CompilationUnitSim, CuScopeFunctionReadsTheUnitsVariable) {
             4u);
 }
 
-// The same for a task (§13.3, printed 337), whose output formal carries the
-// unit's length out: 4, where the caller's own s gave 12.
 TEST(CompilationUnitSim, CuScopeTaskReadsTheUnitsVariable) {
   EXPECT_EQ(UnitStringRead("task len_t(output int o);\n"
                            "  o = s.len();\n"
@@ -689,11 +469,6 @@ TEST(CompilationUnitSim, CuScopeTaskReadsTheUnitsVariable) {
             4u);
 }
 
-// §3.12.1 with §23.9: a unit function's `s = "x"` writes the unit's s, so
-// the top's own s keeps its 12 characters and the unit function len_s
-// afterwards reads 1: `s.len() * 100 + len_s()` is 1201. Resolved in the
-// caller's scope, the write shortened the top's s to "x" and len_s read it
-// too: 101.
 TEST(CompilationUnitSim, CuScopeFunctionWritesTheUnitsVariable) {
   EXPECT_EQ(UnitStringRead("function int len_s();\n"
                            "  return s.len();\n"
@@ -708,14 +483,6 @@ TEST(CompilationUnitSim, CuScopeFunctionWritesTheUnitsVariable) {
             1201u);
 }
 
-// §3.12.1 (printed page 56) with §13.5.1 (printed 348) and §7.2.1 (printed
-// 147): `f($unit::u)` copies the unit's `st u = '{8'h12, 8'h34}` into the
-// formal `st x`, whose members are st's two 8-bit fields, so `x.b` is
-// 8'h34 beside a top declaring its own u of another packed structure, mt,
-// with a 4-bit a and a 12-bit b. The formal's layout was taken from the
-// actual's storage by its text (TryBindIdentifierActualLayout in
-// eval_function_args.cpp), the top's mt, so x.b was the low 12 bits of the
-// unit's value, 12'h234.
 TEST(CompilationUnitSim, CuScopeStructActualThroughUnitPrefix) {
   EXPECT_EQ(
       RunAndGet("typedef struct packed { logic [7:0] a, b; } st;\n"
@@ -734,14 +501,6 @@ TEST(CompilationUnitSim, CuScopeStructActualThroughUnitPrefix) {
       0x34u);
 }
 
-// §3.12.1 (printed page 56) with §7.3.2 (printed 151) and §11.9 (printed
-// 304): the tag a by-value formal takes from `f($unit::u)` is the unit's
-// u's, Valid from its `tagged Valid 9` initializer, so `a.Valid` in the
-// body is consistent with it, reads the 9 copied in and raises nothing,
-// while the top's own u holds `tagged Invalid`. The tag was read from the
-// actual's storage by its text (ActualTag in eval_function_args.cpp), the
-// top's Invalid, and the read of a.Valid was reported inconsistent with it
-// at the body's line, which RunAndGet refuses.
 TEST(CompilationUnitSim, CuScopeTaggedUnionActualThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("typedef union tagged { void Invalid; int Valid; } u_t;\n"
                       "u_t u = tagged Valid 9;\n"
@@ -757,14 +516,6 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionActualThroughUnitPrefix) {
             9u);
 }
 
-// §3.12.1 (printed page 56) with §7.2.1 (printed 147): `$unit::u.b` reads
-// the member b of the unit's own `st2 u`, laid out as st2 lays it, a 4-bit
-// a above a 12-bit b, so the keyed pattern `'{b: 12'hBCD, a: 4'hA}` places
-// 12'hBCD in b beside a top declaring its own u of another packed
-// structure. The unit's storage was created under "$unit.u" with no layout
-// registered for it (CreateUnitDataVariables in lowerer_package_data.cpp),
-// so the member read resolved through no layout and answered 0, and the
-// pattern was concatenated in written order rather than placed by member.
 TEST(CompilationUnitSim, CuScopeStructVariableMemberReadThroughUnitPrefix) {
   EXPECT_EQ(RunAndGet("typedef struct packed { logic [3:0] a; logic [11:0] b; }"
                       " st2;\n"
@@ -779,10 +530,6 @@ TEST(CompilationUnitSim, CuScopeStructVariableMemberReadThroughUnitPrefix) {
             0xBCDu);
 }
 
-// A design whose unit declares a three-member tagged union type u_t and
-// `u_t u = tagged Valid 9;` on its first two lines, and a module top whose
-// items are `top_items`, from line 4 on; runs it in `f` and answers the
-// top's y, null where the design did not elaborate.
 static Variable* RunUnitTaggedUnion(const std::string& top_items,
                                     SimFixture& f) {
   auto* design = ElaborateSrc(
@@ -798,10 +545,6 @@ static Variable* RunUnitTaggedUnion(const std::string& top_items,
   return f.ctx.FindVariable("y");
 }
 
-// The top of the two tests below: its own `u_t u = tagged Other 3;`, so
-// that a tag read from the wrong storage reads apart, `int y`, and the
-// function f of one by-value u_t formal a returning a.Other on line 7,
-// followed by the initial statement `stmt` on line 9.
 static std::string TopWithItsOwnUnion(const std::string& stmt) {
   return "  u_t u = tagged Other 3;\n"
          "  int y;\n"
@@ -812,18 +555,6 @@ static std::string TopWithItsOwnUnion(const std::string& stmt) {
          stmt + "\n";
 }
 
-// §3.12.1 (printed page 56) with §7.3.2 (printed 151), §13.5.1 (printed
-// 348) and §11.9 (printed 304): `f($unit::u)` copies the unit's u, tag
-// included, into the formal a, so `a.Other` in the body is inconsistent
-// with the Valid the unit's initializer set and is reported at the body's
-// line, while the top's own u holds `tagged Other 3`, against which the
-// read would pass. The unit's initializer recorded no tag under "$unit.u"
-// (InitUnitDataVariables in lowerer_package_data.cpp), so the formal was
-// bound to an empty tag, the read went unchecked and y took the 9. The
-// subclause says the access is an error and not what it yields; deltahdl
-// yields the union's width of x (TryUnionTagMismatch in eval_expr.cpp), which
-// §6.11.2 converts to 0 on the way into f's 2-state int result and into y,
-// so y reads 0 where the unchecked read gave 9.
 TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
   SimFixture f;
   Variable* y = RunUnitTaggedUnion(TopWithItsOwnUnion("y = f($unit::u);"), f);
@@ -835,13 +566,6 @@ TEST(CompilationUnitSim, CuScopeTaggedUnionActualCarriesTheUnitsTag) {
                             7, "11.9"));
 }
 
-// The same tag read directly through the prefix (§3.12.1, printed page 56):
-// `$unit::u.Other` names the unit's u past the top's own, and §11.9
-// (printed 304) checks the read against the unit's Valid, reporting it at
-// the statement's line under the key the unit's storage stands by, and y
-// takes the 0 the refused read's x becomes in a 2-state int (§6.11.2). With
-// no layout and no tag registered under "$unit.u", the read resolved through
-// no member and answered 0 with nothing reported.
 TEST(CompilationUnitSim,
      CuScopeTaggedUnionMemberReadThroughUnitPrefixIsChecked) {
   SimFixture f;
@@ -856,12 +580,6 @@ TEST(CompilationUnitSim,
       9, "11.9"));
 }
 
-// §3.12.1 (printed page 56) with §7.2.1 (printed 147): a module declaring
-// no u reaches the unit's `st2 u` by its bare name, the one variable the
-// unit declares, so `u.b` reads the 12'hBCD its layout places in b, as
-// `$unit::u.b` does. The module's bare u was bound to the unit's storage
-// with none of its layout (AliasVariableKinds, then in lowerer_import.cpp),
-// so the read resolved through no member and answered 0.
 TEST(CompilationUnitSim, CuScopeStructVariableMemberReadByItsBareName) {
   EXPECT_EQ(RunAndGet("typedef struct packed { logic [3:0] a; logic [11:0] b; }"
                       " st2;\n"
@@ -874,15 +592,6 @@ TEST(CompilationUnitSim, CuScopeStructVariableMemberReadByItsBareName) {
             0xBCDu);
 }
 
-// §3.12.1 (printed page 56) with §11.9 (printed 304): the module's bare u
-// and `$unit::u` name the one unit variable, which has one tag, so after
-// the module's `u = tagged Other 3;` the read `$unit::u.Valid` is
-// inconsistent with Other and is reported at its line, naming the union by
-// the prefixed spelling the read used. The retag was recorded under the
-// module's bare name (TagKeyOfName in eval_member_path.cpp) while the read
-// asked under "$unit.u" and found the initializer's Valid there, so the 3
-// was read as Valid unreported; the refused read's x becomes 0 in the
-// 2-state y (§6.11.2), which reads apart from that 3.
 TEST(CompilationUnitSim, CuScopeTaggedUnionRetaggedByItsBareNameIsOneTag) {
   SimFixture f;
   Variable* y = RunUnitTaggedUnion(

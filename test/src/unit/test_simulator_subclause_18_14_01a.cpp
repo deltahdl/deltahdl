@@ -24,9 +24,6 @@ using namespace delta;
 
 namespace {
 
-// Elaborate, lower, and run a module whose single static initial block draws
-// one $urandom value, using an initialization RNG seeded with `seed`. Returns
-// the value the static process drew.
 uint64_t RunInitialUrandom(uint32_t seed) {
   SourceManager mgr;
   Arena arena;
@@ -52,31 +49,20 @@ uint64_t RunInitialUrandom(uint32_t seed) {
   return ctx.FindVariable("v")->value.ToUint64();
 }
 
-// Every module instance has an initialization RNG seeded with the default seed,
-// and static processes are created through an initialization RNG. The initial
-// block is a static process; it draws from a stream seeded out of the
-// initialization RNG, so replaying the run from the same initialization seed
-// reproduces the draw exactly.
 TEST(RandomStabilityProperties, StaticProcessReplaysUnderSameInitSeed) {
   EXPECT_EQ(RunInitialUrandom(7), RunInitialUrandom(7));
 }
 
-// A static process, when created, seeds its RNG with the next value of its
-// enclosing instance's initialization RNG. Reseeding the initialization RNG
-// reseeds that static process, so its draw shifts with the initialization seed.
 TEST(RandomStabilityProperties, StaticProcessTracksInitializationSeed) {
   EXPECT_NE(RunInitialUrandom(7), RunInitialUrandom(8));
 }
 
-// Every object has an RNG of its own serving all of its class's randomization
-// methods. Two objects allocated in sequence receive different seeds, so they
-// own distinct random streams.
 TEST(RandomStabilityProperties, DistinctObjectsGetIndependentSeeds) {
   SourceManager mgr;
   Arena arena;
   Scheduler scheduler(arena);
   DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/42);
+  SimContext ctx(scheduler, arena, diag, 42);
   auto* a = arena.Create<ClassObject>();
   auto* b = arena.Create<ClassObject>();
   ctx.AllocateClassObject(a);
@@ -84,11 +70,6 @@ TEST(RandomStabilityProperties, DistinctObjectsGetIndependentSeeds) {
   EXPECT_NE(a->rng_seed, b->rng_seed);
 }
 
-// An object built by a static declaration initializer has no active thread, so
-// its RNG takes its seed from the next random value of the initialization RNG.
-// With no current process the object seed is drawn from the initialization RNG,
-// so the first object built by two identically seeded contexts gets the same
-// seed, while a different initialization seed yields a different one.
 TEST(RandomStabilityProperties, StaticInitObjectSeededFromInitializationRng) {
   auto first_object_seed = [](uint32_t seed) {
     SourceManager mgr;
@@ -104,10 +85,6 @@ TEST(RandomStabilityProperties, StaticInitObjectSeededFromInitializationRng) {
   EXPECT_NE(first_object_seed(123), first_object_seed(124));
 }
 
-// Objects stay stable as long as objects and threads are created, and random
-// numbers drawn, in the same order as before. Allocating the same sequence of
-// objects from two identically seeded contexts yields the identical sequence of
-// per-object seeds.
 TEST(RandomStabilityProperties, ObjectSeedSequenceReplaysInSameOrder) {
   auto object_seeds = [](uint32_t seed) {
     SourceManager mgr;
@@ -126,10 +103,6 @@ TEST(RandomStabilityProperties, ObjectSeedSequenceReplaysInSameOrder) {
   EXPECT_EQ(object_seeds(2024), object_seeds(2024));
 }
 
-// §18.14.1 thread stability: each thread owns an independent RNG, so a
-// randomization draw made inside a forked child consumes no values from the
-// parent's stream. The parent's post-fork draw is therefore the same whether
-// or not the child drew at all.
 TEST(RandomStabilityProperties, ChildThreadDrawDoesNotAdvanceParentStream) {
   auto run = [](bool child_draws, uint64_t& parent_after) {
     std::string src = std::string(
@@ -147,38 +120,25 @@ TEST(RandomStabilityProperties, ChildThreadDrawDoesNotAdvanceParentStream) {
     parent_after = RunSeededAndRead(src, {"b"})[0];
   };
   uint64_t with_child = 0, without_child = 0;
-  run(/*child_draws=*/true, with_child);
-  run(/*child_draws=*/false, without_child);
+  run(true, with_child);
+  run(false, without_child);
   EXPECT_EQ(with_child, without_child);
 }
 
-// §18.14.1 hierarchical seeding: a newly created dynamic thread is seeded with
-// the next random value drawn from its parent. Reseeding the parent before the
-// fork changes the seed material the children inherit, so their draws shift.
 TEST(RandomStabilityProperties, DynamicThreadSeededFromParent) {
-  auto vals1 = RunParentSeededTwoForkUrandom(/*parent_seed=*/1);
-  auto vals2 = RunParentSeededTwoForkUrandom(/*parent_seed=*/2);
+  auto vals1 = RunParentSeededTwoForkUrandom(1);
+  auto vals2 = RunParentSeededTwoForkUrandom(2);
   EXPECT_NE(vals1[0], vals2[0]);
   EXPECT_NE(vals1[1], vals2[1]);
 }
 
-// §18.14.1 manual seeding: a noninitialization RNG (here the root thread's own
-// generator) can be manually seeded, and combined with hierarchical seeding a
-// single seed at the root thread defines the whole forked subtree. The
-// companion NE test proves a different root seed shifts the children; this is
-// the affirmative half -- reseeding the root identically reproduces every
-// child's draw, so one seed pins the subsystem completely.
 TEST(RandomStabilityProperties, SingleRootSeedDefinesForkedSubtree) {
-  auto a = RunParentSeededTwoForkUrandom(/*parent_seed=*/12345);
-  auto b = RunParentSeededTwoForkUrandom(/*parent_seed=*/12345);
+  auto a = RunParentSeededTwoForkUrandom(12345);
+  auto b = RunParentSeededTwoForkUrandom(12345);
   EXPECT_EQ(a[0], b[0]);
   EXPECT_EQ(a[1], b[1]);
 }
 
-// §18.14.1: each static process is seeded with the *next* value from the
-// enclosing initialization RNG, so two initial blocks in the same instance draw
-// from different streams and produce different values. Edge case for the static
-// branch of the initialization-RNG rule with more than one static process.
 TEST(RandomStabilityProperties, DistinctStaticProcessesGetDistinctStreams) {
   SimFixtureSeeded f;
   auto* design = ElaborateSrc(
@@ -198,9 +158,6 @@ TEST(RandomStabilityProperties, DistinctStaticProcessesGetDistinctStreams) {
   EXPECT_NE(a, b);
 }
 
-// §18.14.1 thread independence, breadth edge case: a fork that spawns many
-// children gives each its own stream, so all of their first draws differ
-// pairwise.
 TEST(RandomStabilityProperties, ManyForkedSiblingsGetDistinctStreams) {
   auto vals = RunFourForkedSiblingUrandom();
   auto a = vals[0];
@@ -215,10 +172,6 @@ TEST(RandomStabilityProperties, ManyForkedSiblingsGetDistinctStreams) {
   EXPECT_NE(c, d);
 }
 
-// §18.14.1 thread independence, depth edge case: independence holds across
-// nested forks. A draw made in a grandchild thread must not consume from an
-// ancestor's stream, so the outer thread's later draw is the same whether or
-// not the grandchild drew.
 TEST(RandomStabilityProperties, NestedForkPreservesAncestorStream) {
   auto run = [](bool grandchild_draws, uint64_t& outer_after) {
     std::string src = std::string(
@@ -243,21 +196,17 @@ TEST(RandomStabilityProperties, NestedForkPreservesAncestorStream) {
     outer_after = RunSeededAndRead(src, {"outer"})[0];
   };
   uint64_t with_draw = 0, without_draw = 0;
-  run(/*grandchild_draws=*/true, with_draw);
-  run(/*grandchild_draws=*/false, without_draw);
+  run(true, with_draw);
+  run(false, without_draw);
   EXPECT_EQ(with_draw, without_draw);
 }
 
-// §18.14.1: an object made with new takes the *next* value from the creating
-// thread. Edge case for two objects created by the same thread: their seeds are
-// the thread's successive stream values, so they are distinct and follow the
-// thread's own sequence.
 TEST(RandomStabilityProperties, ConsecutiveObjectsFollowCreatingThreadStream) {
   SourceManager mgr;
   Arena arena;
   Scheduler scheduler(arena);
   DiagEngine diag(mgr);
-  SimContext ctx(scheduler, arena, diag, /*seed=*/99);
+  SimContext ctx(scheduler, arena, diag, 99);
   auto* proc = arena.Create<Process>();
   proc->rng_seed = 777;
   ctx.SetCurrentProcess(proc);
@@ -273,14 +222,6 @@ TEST(RandomStabilityProperties, ConsecutiveObjectsFollowCreatingThreadStream) {
   EXPECT_NE(o1->rng_seed, o2->rng_seed);
 }
 
-// §18.14.1 object stability, real-source end-to-end: each object has an
-// independent RNG, and an object built with new is seeded from the next value
-// of the creating thread's stream. Two objects new'd in sequence by the same
-// initial thread therefore own distinct streams, so randomizing each yields
-// different draws. This drives the rule the way an object is actually produced
-// -- new plus randomize() through the full parse/elaborate/lower/run pipeline,
-// with randomize() consuming the per-object RNG -- rather than allocating a
-// ClassObject by hand.
 TEST(RandomStabilityProperties, NewObjectsRandomizeFromIndependentStreams) {
   const char* src =
       "class C;\n"
@@ -303,14 +244,6 @@ TEST(RandomStabilityProperties, NewObjectsRandomizeFromIndependentStreams) {
   EXPECT_NE(RunAndGet(src, "a"), RunAndGet(src, "b"));
 }
 
-// §18.14.1 manual seeding, object path, real-source end-to-end: all
-// noninitialization RNGs -- including a class object's own RNG -- can be
-// manually seeded. Reseeding the object with srandom() before randomize() pins
-// its stream to the given seed, so the drawn value reproduces under the same
-// manual seed and shifts under a different one, independent of the seed the
-// object first received at allocation. Built from the dependency's real
-// srandom() syntax and driven through parse/elaborate/lower/run, observing
-// SeedObjectRng feed the object stream that randomize() then consumes.
 TEST(RandomStabilityProperties, ManuallySeededObjectRngPinsRandomization) {
   auto draw = [](unsigned k) {
     std::string src =

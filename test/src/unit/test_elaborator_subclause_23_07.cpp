@@ -67,11 +67,6 @@ TEST(DottedNameElaboration, NestedStructMemberSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 rule a): the first component may resolve to an interface port as well
-// as to a data object. When it names an interface port, the dotted name is a
-// select of that port's member, not a hierarchical name. Production resolves
-// the port-rooted dotted name against the interface's declaration and accepts
-// the member select.
 TEST(DottedNameElaboration, InterfacePortIsMemberSelect) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -91,14 +86,6 @@ TEST(DottedNameElaboration, InterfacePortIsMemberSelect) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7: the distinguishing aspect between a member select and a hierarchical
-// name is what the first component names. An interface *port* name roots a
-// member select (rule a, covered above), but an interface *instance* is a
-// scope name, so a dotted name rooted at it is a hierarchical name (rule b).
-// This is the contrasting half of InterfacePortIsMemberSelect: the same
-// interface's member is reached, but through an instance rather than a port,
-// and production resolves it as a hierarchical reference into the instance
-// rather than a select of a data object.
 TEST(DottedNameElaboration, InterfaceInstanceScopeIsHierarchicalName) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -186,11 +173,6 @@ TEST(DottedNameElaboration, UnresolvedFirstComponentTreatedAsHierarchical) {
       "23.8"));
 }
 
-// §23.7: when the first component of a dotted name resolves to a name brought
-// into scope by a package import (an imported scope name), the dotted name is
-// resolved as a hierarchical name, as though it were prefixed by the package
-// the name was imported from. The imported root is therefore accepted as a
-// hierarchical reference rather than rejected as an unknown member select.
 TEST(DottedNameElaboration, ImportedScopeNameTreatedAsHierarchical) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -208,10 +190,6 @@ TEST(DottedNameElaboration, ImportedScopeNameTreatedAsHierarchical) {
   ASSERT_NE(design, nullptr);
 }
 
-// §23.7 rule a): the classification of a dotted name as a member select does
-// not depend on whether it appears as a source or a target. A dotted name
-// rooted at a struct data object on the left-hand side of an assignment is
-// still resolved as a member select, and elaboration accepts the write.
 TEST(DottedNameElaboration, StructMemberSelectAsAssignmentTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -225,10 +203,6 @@ TEST(DottedNameElaboration, StructMemberSelectAsAssignmentTarget) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 rule b): likewise, a dotted name rooted at a directly visible scope
-// name is resolved as a hierarchical name in target position. Assigning through
-// an instance-scoped hierarchical name elaborates without rejecting the name as
-// a member select.
 TEST(DottedNameElaboration, HierarchicalNameAsAssignmentTarget) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -244,11 +218,6 @@ TEST(DottedNameElaboration, HierarchicalNameAsAssignmentTarget) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 a) with §6.11 and §6.12: a dotted name whose first component is a
-// variable of an integral or a real type selects from that variable, and
-// neither type has a member or a built-in method, so a call through it, a
-// member read through it and a call through an element of an integral array
-// each name nothing.
 TEST(DottedNameElaboration, SelectThroughAnIntegralOrRealVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -273,8 +242,6 @@ TEST(DottedNameElaboration, SelectThroughAnIntegralOrRealVariableIsReported) {
   }
 }
 
-// §18.8: a random property of a class has rand_mode, an integral one among
-// them, so calling it is no select through an integral value.
 TEST(DottedNameElaboration, RandModeOfARandomIntegralPropertyIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -288,9 +255,6 @@ TEST(DottedNameElaboration, RandModeOfARandomIntegralPropertyIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 a) with §7.2: a dotted name whose first name is a variable of a
-// structure type is a member select, which names one of the members the type
-// declares.
 TEST(DottedNameElaboration, SelectOfAnUndeclaredStructMemberIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -306,9 +270,6 @@ TEST(DottedNameElaboration, SelectOfAnUndeclaredStructMemberIsReported) {
                             "23.7"));
 }
 
-// The member a select names is looked for in the type reached at that point:
-// an element of an array of structures, the inline structure a member is
-// declared with, and the union type a member is declared with by its name.
 TEST(DottedNameElaboration, SelectOfAnUndeclaredNestedMemberIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -328,10 +289,6 @@ TEST(DottedNameElaboration, SelectOfAnUndeclaredNestedMemberIsReported) {
                             "union 'u_t' has no member named 'c'", 7, "23.7"));
 }
 
-// The members declared reach as far as a select names them: an element of an
-// unpacked array of structures, a member of an inline structure and of a
-// union type, a structure variable of a package, and an element of a packed
-// array of packed structures, which no unpacked select reaches.
 TEST(DottedNameElaboration, SelectsOfDeclaredStructMembersAreAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -359,9 +316,6 @@ TEST(DottedNameElaboration, SelectsOfDeclaredStructMembersAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §27.5 makes a generate block a scope of its own: the type a variable or a
-// formal declared in it names is the block's typedef of that name, which
-// stands over the module's (§23.9), and else the module's.
 TEST(DottedNameElaboration, GenerateBlockSelectReadsTheBlocksTypedef) {
   ElabFixture f;
   ElaborateSrc(
@@ -387,10 +341,6 @@ TEST(DottedNameElaboration, GenerateBlockSelectReadsTheBlocksTypedef) {
                              "23.7"));
 }
 
-// §23.9 makes a task, a function and a begin-end block each a scope, whose
-// own typedef of a name stands over the module's (§6.18): the type a
-// variable declared there names is the scope's own, and else the type of the
-// scope around it, a block inside a function seeing the function's.
 TEST(DottedNameElaboration, SubroutineAndBlockSelectsReadTheirOwnTypedefs) {
   ElabFixture f;
   ElaborateSrc(
@@ -431,11 +381,6 @@ TEST(DottedNameElaboration, SubroutineAndBlockSelectsReadTheirOwnTypedefs) {
                             "23.7"));
 }
 
-// What follows a member declared with a class type is a property of the class
-// (§8), as what follows a property of a class handle is, and a random
-// structure property of a class has rand_mode (§18.8): none of them is a
-// member of the structure. Nor is a property of a structure type the class
-// declares for itself read as one.
 TEST(DottedNameElaboration, ClassMemberAndRandModeOfAStructAreAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -465,10 +410,6 @@ TEST(DottedNameElaboration, ClassMemberAndRandModeOfAStructAreAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 a) with §8.5: a property selected through a handle, h.x, is a value of
-// the property's type, so an integral one has no members, and a string and an
-// enumeration only their built-in methods (§6.16, §6.19.5), the enumeration
-// here a typedef of the class itself (#7722).
 TEST(DottedNameElaboration, AMemberOfAPropertyAHandleHoldsIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -491,9 +432,6 @@ TEST(DottedNameElaboration, AMemberOfAPropertyAHandleHoldsIsJudged) {
                             "built-in method of the enumeration", 7, "6.19.5"));
 }
 
-// §8.5 with §6.16, §6.19.5, §7.10 and §18.8: a property selected through a
-// handle takes the built-in methods of its type, an array property its
-// array's, and a random property rand_mode.
 TEST(DottedNameElaboration, ABuiltInMethodOfAPropertyAHandleHoldsIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -514,8 +452,6 @@ TEST(DottedNameElaboration, ABuiltInMethodOfAPropertyAHandleHoldsIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §8.5: a member through a property the handle's class lacks is reported once,
-// at the property, and not again as a member of a value of no known type.
 TEST(DottedNameElaboration, AMemberOfAnUndeclaredPropertyIsReportedOnce) {
   ElabFixture f;
   ElaborateSrc(
@@ -530,8 +466,6 @@ TEST(DottedNameElaboration, AMemberOfAnUndeclaredPropertyIsReportedOnce) {
   EXPECT_EQ(f.diag.ErrorCount(), 1U);
 }
 
-// §23.7 a) with Annex G: mailbox::num() and semaphore::try_get() return an
-// int, which has no members (#7727).
 TEST(DottedNameElaboration, AMemberOfAStdMethodsIntResultIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -551,9 +485,6 @@ TEST(DottedNameElaboration, AMemberOfAStdMethodsIntResultIsReported) {
   }
 }
 
-// §23.7 a) with §18.6.1 and §18.13.4: a class's built-in randomize() returns
-// an int, which has no members, and get_randstate() a string, which has only
-// the string's methods; a method the class lacks is reported as such (#7737).
 TEST(DottedNameElaboration, AMemberOfAClasssBuiltInMethodResultIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -578,9 +509,6 @@ TEST(DottedNameElaboration, AMemberOfAClasssBuiltInMethodResultIsJudged) {
   EXPECT_EQ(f.diag.ErrorCount(), 3U);
 }
 
-// §23.7 a) with §20.8.1 and §21.3.3: $clog2 returns an integer and an element
-// of the string $sformatf returns is a byte, neither of which has members,
-// and the string itself has only the string's methods (#7738).
 TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -603,9 +531,6 @@ TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsJudged) {
                             "23.7"));
 }
 
-// §21.3.3, §20.6.1 and §16.9.3: $sformatf and $typename return a string,
-// which has the string's methods, and $sampled returns its argument's type,
-// here a structure, whose members it has (#7738).
 TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -622,10 +547,6 @@ TEST(DottedNameElaboration, AMemberOfASystemFunctionsResultIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.7 a) with §7.2 and §8.5: a structure property selected through a handle,
-// h.st, is a structure of the property's type, written through a typedef of the
-// module or of the class itself, and a select names one of its members
-// (#7739).
 TEST(DottedNameElaboration, AMemberAStructurePropertyLacksIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -651,9 +572,6 @@ TEST(DottedNameElaboration, AMemberAStructurePropertyLacksIsReported) {
                             8, "23.7"));
 }
 
-// §7.2 and §8.5: a member a structure property selected through a handle
-// declares is selected, and a property of a class nested in the handle's
-// class (§8.23) is no structure.
 TEST(DottedNameElaboration, AMemberOfAStructurePropertyIsAccepted) {
   ElabFixture f;
   ElaborateSrc(
@@ -671,8 +589,6 @@ TEST(DottedNameElaboration, AMemberOfAStructurePropertyIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §7.2: a member through a member the structure lacks is reported once, at the
-// member it lacks.
 TEST(DottedNameElaboration, AMemberOfAnUndeclaredStructMemberIsReportedOnce) {
   ElabFixture f;
   ElaborateSrc(

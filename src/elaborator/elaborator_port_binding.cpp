@@ -79,18 +79,11 @@ Expr* MakeHighZExprIn(Arena& arena) {
   return expr;
 }
 
-// §23.3.3.3: an unconnected net input has the value 'z, and a port is a net
-// where §23.2.2.3 makes it one -- `input logic a`, which names a data type and
-// no port kind, among them -- which RtlirPort::net_type records whatever the
-// data type keyword.
 bool IsNetPort(const RtlirPort& port) {
   return !port.is_var && !port.is_interface_port &&
          port.net_type != NetType::kNone;
 }
 
-// Synthesized connection for an unconnected input port: a pull expression when
-// an unconnected drive is set, else high-Z for a net port, else nullptr.
-// Shared by the wildcard and trailing-input completion loops.
 Expr* DefaultInputConnection(Arena& arena, const RtlirPort& port, bool has_pull,
                              NetType drive) {
   if (has_pull) return MakePullExprIn(arena, drive);
@@ -98,8 +91,6 @@ Expr* DefaultInputConnection(Arena& arena, const RtlirPort& port, bool has_pull,
   return nullptr;
 }
 
-// True when `port_name` already appears among the instance's explicit port
-// connections; lets the completion loops skip already-bound ports.
 bool PortExplicitlyConnected(
     const std::vector<std::pair<std::string_view, Expr*>>& inst_ports,
     std::string_view port_name) {
@@ -118,7 +109,6 @@ Expr* Elaborator::MakeHighZExpr() { return MakeHighZExprIn(arena_); }
 
 namespace {
 
-// §23.3.x one identifier connection bound to a port, for the legality rules.
 struct IdentConnection {
   Direction direction;
   std::string_view conn_name;
@@ -126,8 +116,6 @@ struct IdentConnection {
   bool is_var;
 };
 
-// §23.3.2.3 implicit .name form: the connected signal shall have an equivalent
-// width and (for a net port) a non-dissimilar net type; both mismatches error.
 void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
                                     std::string_view port_name,
                                     const Expr* conn_expr,
@@ -138,12 +126,6 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
   NetType pnet = PortNetType(port_it->type_kind);
   if (pnet == NetType::kNone) return;
   NetType snet = FindSignalNetType(conn_expr->text, ctx.parent_mod);
-  // 23.3.2.3: the implicit .name form errors exactly where the explicit named
-  // connection would merely warn (23.3.3.7); equivalent net types are exempt.
-  // §23.3.3.7.1 exempts a connection to an interconnect net outright, and the
-  // name it was declared under is what still says so once an earlier connection
-  // has merged a concrete type into it -- see the wildcard form for the full
-  // reason.
   bool declared_interconnect =
       ctx.interconnect_names.count(conn_expr->text) != 0 ||
       port_it->is_interconnect;
@@ -157,8 +139,6 @@ void CheckImplicitNamedPortNetTypes(const PortBindCtx& ctx,
   }
 }
 
-// §23.3.3.7: an explicit named or ordered connection between dissimilar net
-// types warns. Applies only to the non-implicit identifier connection form.
 void CheckExplicitNamedPortNetTypes(const PortBindCtx& ctx, bool is_implicit,
                                     const Expr* conn_expr,
                                     const RtlirPort* port_it,
@@ -179,8 +159,6 @@ void CheckExplicitNamedPortNetTypes(const PortBindCtx& ctx, bool is_implicit,
   }
 }
 
-// Validates one interface port binding: it must be connected, name an interface
-// instance or interface port, and match the port's declared interface type.
 void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
                                     const RtlirPort& port,
                                     const RtlirModuleInst& inst) {
@@ -193,9 +171,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
     }
   }
   if (!conn) {
-    // §25.3.3 bars `.*` from reaching a generic interface port, and
-    // BindOneWildcardPort has already reported that for this port; the port is
-    // unconnected because of it, which is the one error the clause names.
     if (ctx.item->inst_wildcard && port.interface_type_name.empty()) return;
     ctx.diag.Error(ctx.item->loc,
                    std::format("interface port '{}' of module '{}' cannot be "
@@ -230,8 +205,6 @@ void CheckOneInterfacePortConnected(const PortBindCtx& ctx,
   }
 }
 
-// §23.3.3.2: true when `conn_name` resolves to an interconnect signal of the
-// instantiating module (a local interconnect net or interconnect port).
 bool ConnectsToInterconnect(
     std::string_view conn_name,
     const std::unordered_set<std::string_view>& interconnect_names,
@@ -242,8 +215,6 @@ bool ConnectsToInterconnect(
   return false;
 }
 
-// §23.3.x directional connection legality for an identifier connection bound to
-// a port; the four independent rules match the original inline sequence.
 void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
                                         const IdentConnection& conn) {
   DiagEngine& diag = ctx.diag;
@@ -269,10 +240,6 @@ void CheckDirectionalConnectionLegality(const PortBindCtx& ctx,
   }
 }
 
-// §23.3.3 assignment-compatibility check for an identifier connection to a
-// non-interface port, followed by the shared directional legality checks.
-// The data type kind the connected signal contributes: a variable's own kind,
-// or plain logic for a net. kImplicit means the name is neither.
 static DataTypeKind ConnectedSignalKind(const PortBindCtx& ctx,
                                         std::string_view name) {
   auto vt = ctx.var_types.find(name);
@@ -281,16 +248,6 @@ static DataTypeKind ConnectedSignalKind(const PortBindCtx& ctx,
   return DataTypeKind::kImplicit;
 }
 
-// §23.3.3: an explicit port connection shall be assignment compatible with the
-// port. §23.3.3.7/§6.6.7: a user-defined nettype net carries its own net-type
-// semantics, governed by the dissimilar net-type rules rather than by data-type
-// assignment compatibility, and its var_types entry is the meaningless kNamed
-// nettype reference, so it is skipped here. §6.22.2: a user-defined (typedef)
-// type's compatibility turns on its resolved structure, which the single
-// DataTypeKind does not carry, so a named type on either side defers rather
-// than raising a false incompatibility. §17.2: a checker's formal of type
-// event takes any event expression, a plain signal among them, which is no
-// assignment at all.
 static void CheckExplicitConnAssignCompatible(
     const PortBindCtx& ctx, const Expr* conn_expr, const RtlirPort& port,
     std::string_view binding_port_name) {
@@ -316,13 +273,6 @@ static void CheckExplicitConnAssignCompatible(
   }
 }
 
-// §23.3.3.2: a ref port shall be connected to an *equivalent* variable data
-// type -- a stricter requirement than the assignment compatibility used for
-// input/output ports. The net-vs-variable half of "variable" is checked in the
-// directional legality pass; here the type half is enforced for a variable
-// connection by comparing packed widths (the observable size dimension of
-// §6.22.2 equivalence). A net connection is skipped -- it is already rejected
-// as a non-variable -- as is an unresolved (zero) width.
 static void CheckExplicitRefPortEquivalence(
     const PortBindCtx& ctx, const Expr* conn_expr, const RtlirPort& port,
     std::string_view binding_port_name) {
@@ -351,7 +301,6 @@ void CheckExplicitIdentifierConnection(const PortBindCtx& ctx,
                            port.is_var});
 }
 
-// True when a replication operator appears anywhere in `e`.
 bool ConnectionHasReplication(const Expr* e) {
   if (!e) return false;
   if (e->kind == ExprKind::kReplicate) return true;
@@ -392,12 +341,6 @@ int NetTypeGroup(NetType t) {
   }
 }
 
-// §23.3.3.7 / Table 23-1: true when, for a dissimilar built-in net-type
-// connection, the internal (module-definition) net is the dominating net, so
-// the merged simulated net takes the internal type. False means the external
-// (instantiation) net type is used -- because it dominates or because neither
-// net dominates (in which case the external type is the default). Rows and
-// columns follow the same net-type grouping as the warning table above.
 bool DissimilarNetResultIsInternal(NetType internal, NetType external) {
   static constexpr bool kInternalWinsTable[9][9] = {
       {false, false, false, false, false, false, false, false, false},
@@ -416,8 +359,6 @@ bool DissimilarNetResultIsInternal(NetType internal, NetType external) {
   return kInternalWinsTable[ig][eg];
 }
 
-// §23.3.3.x: every ref port of the instantiated module shall have a connected
-// binding; emits an error for each that is left unconnected.
 void CheckRefPortsConnected(DiagEngine& diag,
                             const std::vector<RtlirPort>& child_ports,
                             const RtlirModuleInst& inst,
@@ -457,7 +398,6 @@ std::string_view ConnectedInterfaceName(const Expr* conn) {
   return {};
 }
 
-// Interface type named by `conn_name`; `found` reports whether it is known.
 std::string_view ResolveConnectedInterfaceType(const PortBindCtx& ctx,
                                                std::string_view conn_name,
                                                bool& found) {
@@ -489,8 +429,6 @@ void Elaborator::CheckPortModportConsistency(const PortBindScope& scope,
                                              const RtlirPortBinding& binding,
                                              const Expr* conn_expr,
                                              const RtlirPort* child_port) {
-  // §25.5: when a modport is selected in both the module header and the
-  // instance connection, both shall name the same modport.
   if (!child_port || !child_port->is_interface_port || !conn_expr ||
       conn_expr->kind != ExprKind::kMemberAccess || !conn_expr->lhs ||
       conn_expr->lhs->kind != ExprKind::kIdentifier || !conn_expr->rhs ||
@@ -519,18 +457,10 @@ void Elaborator::CheckPortModportConsistency(const PortBindScope& scope,
   }
 }
 
-// §23.3.2.3: the implicit `.name` form is the named connection `.name(name)`
-// without an implicit net declaration, so the name shall already be declared
-// in the instantiating scope. An interface instance is such a declaration
-// (§25.3.2 connects an interface port to one by name), and it is not among the
-// module's signals IsNameDeclared answers for, so the instance table is asked
-// beside it; the explicit form asks the same table before it creates a net.
 void Elaborator::PrepareExplicitConnNet(const PortBindScope& scope,
                                         const ExplicitPortBind& bind) {
   const Expr* conn_expr = bind.conn_expr;
   if (!conn_expr || conn_expr->kind != ExprKind::kIdentifier) return;
-  // §23.9: an interface instance a generate block declares is found from a
-  // connection written in that block by its own name.
   bool names_interface =
       !FindBlockInterface(conn_expr->text, gen_prefix_scopes_,
                           interface_inst_types_)
@@ -584,9 +514,6 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
   }
 
   const RtlirPort* port = bind.child_port;
-  // §23.3.2.2: a named connection's port_name shall be one the instantiated
-  // module's declaration gives, and §25.4 holds an interface to its port list
-  // the same way, so a name it does not declare is an error and binds nothing.
   if (!port) {
     diag_.Error(item->loc,
                 std::format("port '{}' not found on module '{}'",
@@ -594,8 +521,6 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
                 Subclause("23.3.2.2"));
     return false;
   }
-  // §25.3.3: the implicit `.name` form is no more a named port connection than
-  // `.*` is, so it shall not reference a generic interface port either.
   if (bind.is_implicit && port->is_interface_port &&
       port->interface_type_name.empty()) {
     diag_.Error(item->loc,
@@ -618,8 +543,6 @@ bool Elaborator::ResolveExplicitTarget(const PortBindScope& scope, size_t index,
   return true;
 }
 
-// §10.9 (printed page 260): a pattern on the left-hand side of an
-// assignment-like context is positional and each of its items an lvalue.
 static bool IsPositionalLvaluePattern(const Expr* pattern) {
   if (!pattern->pattern_keys.empty()) return false;
   return std::ranges::all_of(pattern->elements, [](const Expr* item) {
@@ -630,15 +553,6 @@ static bool IsPositionalLvaluePattern(const Expr* pattern) {
   });
 }
 
-// §10.8 (printed page 260): a port connection to an input or an output port is
-// an assignment-like context, so an untyped pattern may stand there when the
-// formal is of a type §10.9 has patterns construct -- a structure, a union, or
-// a packed or unpacked array, judged as the type a typedef names (§6.18) --
-// from which it takes its type, and on an output port, the side being
-// assigned, it is positional with lvalue items (§10.9). An inout or ref
-// connection is no such context. A typed pattern, `T'{...}`, has a type of its
-// own and is judged as any other expression is; §10.9 forbids one only in a
-// port expression of a declaration.
 static bool IllegalPatternPortConnection(const Expr* conn_expr,
                                          Direction direction,
                                          const RtlirPort* port) {
@@ -652,12 +566,6 @@ static bool IllegalPatternPortConnection(const Expr* conn_expr,
          !IsPositionalLvaluePattern(conn_expr);
 }
 
-// Validates a connection to a non-interface port: an identifier goes through
-// the net-type compatibility check, and any other expression through the
-// inout rule on the variables it reaches (CheckInoutConnectionParts). An
-// interface port may be connected either to a declared interface instance or
-// to a higher-level interface port (a hierarchical pass-down), so no
-// instance-name check is enforced here.
 static void CheckExplicitIdentifierOrInterfacePort(const PortBindCtx& ctx,
                                                    const Expr* conn_expr,
                                                    const RtlirPort* port,
@@ -704,30 +612,11 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
                 Subclause("10.8"));
   } else if (conn_expr && port &&
              port->unpacked_dim_sizes.size() == port->num_unpacked_dims) {
-    // §10.8 with §10.9.1: a connection is an assignment-like context with the
-    // port's type, so the braces of a pattern connected to a port match the
-    // port's dimensions, its unpacked ones and then the packed ones its header
-    // writes or its typedef carries (§7.4, §6.18). A port with a dimension that
-    // did not fold to a size has nothing to count against.
     ArrayPatternCheck{typedefs_, aggregate_typedef_names_, var_types_, diag_}
         .CheckSized(conn_expr, *port->declared_type, port->unpacked_dim_sizes,
                     conn_expr->range.start);
   }
 
-  // §23.3.3.2: an output (or inout) port connected to a variable implies a
-  // continuous assignment driving that variable, so a second output driving the
-  // same variable -- and, checked later against these recorded targets, any
-  // extra procedural or continuous assignment to it -- is illegal. The
-  // connection may be a single variable or a concatenation of them; a
-  // concatenation drives each of its variable elements, so record every one by
-  // walking into (possibly nested) concatenations. A net element is exempt
-  // (multiple drivers are permitted on a net, §23.3.3.3), and an interface-port
-  // by-reference connection is not a driver at all (§25.3), so neither is
-  // recorded.
-  // §23.3.3.2 (printed page 747): a ref port drives nothing either -- a
-  // reference to the port variable is a hierarchical reference to the variable
-  // its instantiation connects -- so the variable keeps its initializer and may
-  // be assigned on both sides, and is not recorded.
   if (conn_expr && binding.direction != Direction::kInput &&
       binding.direction != Direction::kRef &&
       (!port || !port->is_interface_port)) {
@@ -735,10 +624,6 @@ void Elaborator::CheckExplicitConnLegality(const PortBindScope& scope,
   }
 }
 
-// Record each variable an output or inout connection drives, walking into
-// (possibly nested) concatenations because a concatenation drives every one of
-// its elements. A net element is exempt: multiple drivers are permitted on a
-// net (§23.3.3.3).
 void Elaborator::RecordOutputPortDrivenVariables(const Expr* conn_expr,
                                                  SourceLoc loc) {
   std::vector<const Expr*> worklist{conn_expr};
@@ -814,13 +699,6 @@ void Elaborator::BindWildcardDeclaredPort(const PortBindScope& scope,
   NetType pnet = PortNetType(port.type_kind);
   if (pnet != NetType::kNone) {
     NetType snet = FindSignalNetType(port.name, parent_mod);
-    // §23.3.3.7.1: a port connection with an interconnect net merges the
-    // dominating and dominated nets into one, so no connection to one is a
-    // dissimilar-type conflict. The merge runs as each connection is bound and
-    // leaves the net holding the type merged so far, which means the second and
-    // later connections no longer see kInterconnect here -- asking the net what
-    // it is now would exempt only the first of them. The set of names declared
-    // interconnect is the question that stays answerable.
     bool declared_interconnect =
         interconnect_names_.count(port.name) != 0 || port.is_interconnect;
     if (snet != NetType::kNone && snet != pnet &&
@@ -864,11 +742,6 @@ void Elaborator::BindOneWildcardPort(const PortBindScope& scope,
 
   if (port.is_interface_port) {
     if (port.interface_type_name.empty()) {
-      // §25.3.3: only a named port, never an implicit one, may reference a
-      // generic interface. An empty interface_type_name is what makes the port
-      // generic, declared with the bare `interface` keyword. §23.3.2.4 states
-      // the rules for .* connections in general and says nothing about a
-      // generic interface port.
       diag_.Error(item->loc,
                   std::format("implicit .* port connection cannot reference "
                               "generic interface port '{}' of module '{}'",

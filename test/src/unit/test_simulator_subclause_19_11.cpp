@@ -42,10 +42,6 @@ TEST(Coverage, PointCoverageWithNoBinsIs100) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetPointCoverage(&cp), 100.0);
 }
 
-// LRM 19.11: Cg is the weighted average Σ(Wi×Ci)/Σ(Wi) of its items, so an
-// item's weight scales its contribution. The fully covered item has weight 3
-// and the empty item weight 1, giving (3*100 + 1*0)/4 = 75, not the unweighted
-// 50.
 TEST(Coverage, CovergroupCoverageIsItemWeightedAverage) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -69,10 +65,6 @@ TEST(Coverage, CovergroupCoverageIsItemWeightedAverage) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 75.0);
 }
 
-// LRM 19.11: the items averaged in Cg are the covergroup's coverpoints AND its
-// crosses. A covered cross of weight 3 and an uncovered coverpoint of weight 1
-// give (3*100 + 1*0)/4 = 75, so the cross contributes to the weighted average
-// like any other item.
 TEST(Coverage, CovergroupCoverageWeightsCrossItems) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -94,15 +86,11 @@ TEST(Coverage, CovergroupCoverageWeightsCrossItems) {
   cross.bins.push_back(cb);
   CoverageDB::AddCross(g, std::move(cross));
 
-  // Covers the cross bin; the coverpoint "z" is never sampled, so it stays 0%.
   db.Sample(g, {{"x", 0}, {"y", 0}});
 
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 75.0);
 }
 
-// LRM 19.11: an item excluded by its own coverage rules is dropped from both
-// the numerator and the denominator. With the uncovered item excluded, Cg is
-// the surviving item's 100% rather than the 50% it would average to.
 TEST(Coverage, ExcludedItemDropsFromBothNumeratorAndDenominator) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -125,8 +113,6 @@ TEST(Coverage, ExcludedItemDropsFromBothNumeratorAndDenominator) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
 }
 
-// LRM 19.11: the covergroup denominator Σ Wi is zero when every item weight is
-// zero.
 TEST(Coverage, AllItemWeightsZeroMakesDenominatorZero) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -142,9 +128,6 @@ TEST(Coverage, AllItemWeightsZeroMakesDenominatorZero) {
   EXPECT_TRUE(CoverageDB::CovergroupCoverageDenominatorZero(g));
 }
 
-// LRM 19.11: the covergroup denominator is also zero when every item is
-// excluded by its own coverage rules, since each excluded item contributes no
-// weight.
 TEST(Coverage, AllItemsExcludedMakesDenominatorZero) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -160,8 +143,6 @@ TEST(Coverage, AllItemsExcludedMakesDenominatorZero) {
   EXPECT_TRUE(CoverageDB::CovergroupCoverageDenominatorZero(g));
 }
 
-// LRM 19.11: the covergroup denominator is also zero when the covergroup
-// contains no coverpoints or crosses at all.
 TEST(Coverage, NoItemsMakesDenominatorZero) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -169,8 +150,6 @@ TEST(Coverage, NoItemsMakesDenominatorZero) {
   EXPECT_TRUE(CoverageDB::CovergroupCoverageDenominatorZero(g));
 }
 
-// LRM 19.11: a zero denominator with a zero covergroup weight reports a
-// coverage of 100.0 (an empty covergroup whose weight is zero).
 TEST(Coverage, ZeroDenominatorZeroWeightCovergroupReports100) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -179,9 +158,6 @@ TEST(Coverage, ZeroDenominatorZeroWeightCovergroupReports100) {
   EXPECT_DOUBLE_EQ(CoverageDB::GetCoverage(g), 100.0);
 }
 
-// LRM 19.11: when get_coverage is called with two arguments and the covergroup
-// denominator is zero, zero is assigned to both the numerator and the
-// denominator, even though the sole item has a covered bin.
 TEST(Coverage, ZeroDenominatorTwoArgFormReportsZeroCounts) {
   CoverageDB db;
   auto* g = db.CreateGroup("cg");
@@ -201,10 +177,6 @@ TEST(Coverage, ZeroDenominatorTwoArgFormReportsZeroCounts) {
   EXPECT_EQ(total, 0);
 }
 
-// LRM 19.11: $get_coverage shall return 100.0 for a design that has no
-// covergroup instances. Driven end to end through the real production dispatch:
-// an empty design's $get_coverage() system-function call resolves to the run's
-// live coverage database, which has no covergroup types and so reports 100.0.
 TEST(Coverage, GetCoverageSyscallNoInstancesReturns100) {
   const std::string kSrc =
       "module t;\n"
@@ -214,11 +186,6 @@ TEST(Coverage, GetCoverageSyscallNoInstancesReturns100) {
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 100.0);
 }
 
-// LRM 19.11: a covergroup whose own denominator is zero does not contribute to
-// the overall score. The overall coverage that $get_coverage reports skips the
-// empty covergroup, so it is the covered covergroup's 100%, not a 50% average
-// with the empty one. GetGlobalCoverage is the production routine $get_coverage
-// evaluates against the run's live database.
 TEST(Coverage, OverallCoverageSkipsZeroDenominatorCovergroups) {
   CoverageDB db;
   auto* good = db.CreateGroup("good");
@@ -234,10 +201,6 @@ TEST(Coverage, OverallCoverageSkipsZeroDenominatorCovergroups) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-// LRM 19.11: $get_coverage shall return 100.0 for a design in which every
-// covergroup has a weight of zero, even when a covergroup has covered bins.
-// Observed through GetGlobalCoverage, the routine the $get_coverage system
-// function evaluates.
 TEST(Coverage, OverallCoverageAllZeroWeightIs100) {
   CoverageDB db;
   auto* g = db.CreateGroup("g");
@@ -252,14 +215,6 @@ TEST(Coverage, OverallCoverageAllZeroWeightIs100) {
   EXPECT_DOUBLE_EQ(db.GetGlobalCoverage(), 100.0);
 }
 
-// LRM 19.11: a covergroup's coverage Cg is the weighted average of its items.
-// Driven end to end through the production coverage pipeline rather than a
-// hand-built database: $load_coverage_db (real §19.9 dependency syntax) loads a
-// prior run's snapshot so the live database holds one covergroup type whose two
-// equal-weight coverpoints are fully covered and fully uncovered; $get_coverage
-// then reports their average, 50, computed by the real coverage routine. A
-// single coverpoint would make Cg equal its own coverage and never exercise the
-// averaging — two items are needed to observe Σ(Wi·Ci)/Σ(Wi).
 TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
   std::string path = testing::TempDir() + "delta_cov_19_11_avg.txt";
   {
@@ -267,10 +222,10 @@ TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
     out << "CG cg 1\n"
         << "CP full\n"
         << "BIN b0 0 1\n"
-        << "BIN b1 1 1\n"  // coverpoint "full": both bins covered -> 100%
+        << "BIN b1 1 1\n"
         << "CP empty\n"
         << "BIN c0 0 0\n"
-        << "BIN c1 1 0\n";  // coverpoint "empty": neither bin covered -> 0%
+        << "BIN c1 1 0\n";
   }
   const std::string kSrc =
       "module t;\n"
@@ -285,13 +240,6 @@ TEST(Coverage, GetCoverageSyscallAveragesCoverpointItemsEndToEnd) {
   EXPECT_DOUBLE_EQ(RunAndGetReal(kSrc, "cov"), 50.0);
 }
 
-// §19.7.1 (Table 19-3 and the g1 example): with merge_instances set, a
-// covergroup type's coverage is the average of its coverpoints' merged
-// coverage weighted by their type_option.weight, set in the definition or
-// procedurally through the type: a, uncovered, weighs 3 and b, covered, 1, so
-// both types read (3 * 0 + 100) / 4; c, whose every value is ignored, has no
-// bin to weigh, and gz's one coverpoint weighs 0, so gz reads 0. Taken as the
-// union of their bins, gc and gp read 50.
 TEST(TypeCoverageSim,
      ACovergroupTypesCoverageWeighsItsItemsByTheirTypeWeights) {
   SimFixture f;

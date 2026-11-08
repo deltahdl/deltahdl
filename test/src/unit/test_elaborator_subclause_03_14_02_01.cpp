@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §3.14.2.1: a `timescale gives the elements after it the time unit and
-// precision they do not declare. Each case reads the time scale the elaborator
-// gave the module, which is what its delays are scaled by.
 TEST(TimescaleDirectiveElaboration,
      TimescaleSuppliesDefaultsToFollowingModule) {
   ElabFixture f;
@@ -29,9 +26,6 @@ TEST(TimescaleDirectiveElaboration,
   EXPECT_EQ(mod->timescale.prec_magnitude, 100);
 }
 
-// The directive supplies only the half the element does not declare: the
-// module's own `timeunit 1us;` stands, and the directive fills in the
-// precision it omitted.
 TEST(TimescaleDirectiveElaboration,
      TimescaleSuppliesPrecisionWhenElementDeclaresOnlyUnit) {
   ElabFixture f;
@@ -51,8 +45,6 @@ TEST(TimescaleDirectiveElaboration,
   EXPECT_EQ(mod->timescale.prec_magnitude, 10);
 }
 
-// The mirror form: the module's own `timeprecision 1ps;` stands, and the
-// directive supplies the unit.
 TEST(TimescaleDirectiveElaboration,
      TimescaleSuppliesUnitWhenElementDeclaresOnlyPrecision) {
   ElabFixture f;

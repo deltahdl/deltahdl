@@ -78,12 +78,6 @@ TEST(PreponedRegionSim, PreponedDoesNotReExecuteDuringIteration) {
 }
 
 TEST(PreponedRegionSim, PreponedPLIEventsExecuteInRegion) {
-  // §4.4.2.1's closing sentence weaves into §4.4.3.1: the Preponed region holds
-  // not only simulation sampling events but PLI callback events too. Drive a
-  // genuine EventKind::kPli event into Preponed alongside a sampling
-  // (kEvaluation) event and observe both run there. Unlike the Observed region
-  // -- which production rejects PLI events out of -- the Preponed region admits
-  // them, so the PLI event is not dropped and executes in scheduled order.
   Arena arena;
   Scheduler sched(arena);
   std::vector<std::string> order;
@@ -104,8 +98,6 @@ TEST(PreponedRegionSim, PreponedPLIEventsExecuteInRegion) {
   ASSERT_EQ(order.size(), 2u);
   EXPECT_EQ(order[0], "pli");
   EXPECT_EQ(order[1], "sim");
-  // The PLI event was accepted into Preponed, not diverted like a kPli event
-  // aimed at the Observed region would be.
   EXPECT_EQ(sched.IllegalObservedPliCount(), pli_before);
 }
 

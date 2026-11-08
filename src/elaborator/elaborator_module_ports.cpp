@@ -31,8 +31,6 @@
 
 namespace delta {
 
-// Diagnose repeated explicitly-named (.name) ports within a single non-ANSI
-// header.
 static void CheckDuplicateExplicitPortNames(const ModuleDecl* decl,
                                             DiagEngine& diag) {
   std::unordered_set<std::string_view> explicit_names;
@@ -47,8 +45,6 @@ static void CheckDuplicateExplicitPortNames(const ModuleDecl* decl,
   }
 }
 
-// Diagnose repeated ordinary port names in an ANSI header, tracked across the
-// run via ansi_port_names.
 static void CheckDuplicateAnsiPortNames(
     const ModuleDecl* decl,
     std::unordered_set<std::string_view>& ansi_port_names, DiagEngine& diag) {
@@ -62,9 +58,6 @@ static void CheckDuplicateAnsiPortNames(
   }
 }
 
-// Diagnose repeated port names: explicitly named (.name) ports in a non-ANSI
-// header, and ordinary port names in an ANSI header (tracked across the run via
-// ansi_port_names).
 static void CheckDuplicatePortNames(
     const ModuleDecl* decl,
     std::unordered_set<std::string_view>& ansi_port_names, DiagEngine& diag) {
@@ -75,15 +68,10 @@ static void CheckDuplicatePortNames(
   }
 }
 
-// §23.2.2: validate the contexts in which a port default value may appear —
-// input ports only, ANSI-style declarations only, and singular non-interconnect
-// types only.
 static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
                                      const TypedefMap& typedefs,
                                      DiagEngine& diag) {
   if (port.direction != Direction::kInput) {
-    // An output never reaches here: ValidatePortAssignment settles its
-    // expression as an initializer, so the direction is inout or ref.
     diag.Error(
         port.loc,
         std::format("default value on {} port '{}'; defaults are "
@@ -115,14 +103,6 @@ static void ValidatePortDefaultValue(const PortDecl& port, bool is_non_ansi,
   }
 }
 
-// §23.2.2.2's Syntax 23-4 writes `[ = constant_expression ]` behind a port's
-// identifier, and its footnote 2 says which port each reading belongs to: only
-// a variable output port may be initialized and only an input port may take a
-// default value, which A.10 item 2 repeats. On a variable output port the
-// expression is the port's initializer and is legal as written; on an output
-// that is a net it is an initialization of a port that is no variable, reported
-// here; on every other port it is the §23.2.2.4 default value
-// ValidatePortDefaultValue holds to the input port.
 static void ValidatePortAssignment(const PortDecl& port, bool port_is_var,
                                    bool is_non_ansi, const TypedefMap& typedefs,
                                    DiagEngine& diag) {
@@ -139,21 +119,11 @@ static void ValidatePortAssignment(const PortDecl& port, bool port_is_var,
              Subclause("23.2.2.2"));
 }
 
-// The address range and the element count of every unpacked dimension of a
-// port, and the number of dimensions the declaration wrote. The count is what
-// the declaration says rather than what folded, so a consumer reading fewer
-// ranges than dimensions knows a dimension went unrecorded rather than reading
-// the port as one that is not an array.
 static void ComputePortUnpackedDims(const PortDecl& port, RtlirPort& rp,
                                     const ScopeMap& scope,
                                     const TypeShapeTables& shapes,
                                     DiagEngine& diag) {
   for (auto* dim : port.unpacked_dims) {
-    // A dynamic array's `[]` (§7.5), a queue's `[$]` (§7.10) and an
-    // associative array's index (§7.8) declare no fixed size and no address
-    // range, so there is nothing here to fold and nothing to report. A.2.5
-    // makes each a variable_dimension, which a variable port may take; one on
-    // a net or interface port is reported by ValidateFixedSizePortDims.
     if (!IsFixedSizeUnpackedDim(dim, shapes)) continue;
     auto folded = FoldUnpackedDimBounds(dim, scope);
     if (!folded) {
@@ -170,9 +140,6 @@ static void ComputePortUnpackedDims(const PortDecl& port, RtlirPort& rp,
   rp.num_unpacked_dims = static_cast<uint32_t>(port.unpacked_dims.size());
 }
 
-// Reject port types that may never appear on a port (chandle, virtual
-// interface). Emits the diagnostic and returns true when the port must be
-// skipped.
 static bool RejectIllegalPortType(const PortDecl& port, DiagEngine& diag) {
   if (port.data_type.kind == DataTypeKind::kChandle) {
     diag.Error(port.loc, "chandle cannot be used as a port type",
@@ -187,8 +154,6 @@ static bool RejectIllegalPortType(const PortDecl& port, DiagEngine& diag) {
   return false;
 }
 
-// §23.2.2: diagnose a non-ANSI port that appears in the header but never gets a
-// direction declaration in the module body.
 static void DiagnoseMissingNonAnsiPortDirection(const PortDecl& port,
                                                 bool is_non_ansi,
                                                 DiagEngine& diag) {
@@ -202,15 +167,8 @@ static void DiagnoseMissingNonAnsiPortDirection(const PortDecl& port,
   }
 }
 
-// §23.2.2.1: validate the per-port type constraints that do not block building
-// the RtlirPort: interconnect ports may not be signed, inout ports may not
-// carry a variable data type, and a ref port is a variable whatever its
-// header spells -- §23.2.2.3 says so where it sets the default port kinds,
-// and Syntax 23-3 gives a non-ANSI ref declaration a variable_port_type alone.
 static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
                                         DiagEngine& diag) {
-  // Interconnect is an untyped generic connection, so it carries no signedness
-  // of its own.
   if (port.data_type.is_interconnect && port.data_type.is_signed) {
     diag.Error(port.loc,
                std::format("interconnect port '{}' shall not be declared "
@@ -234,20 +192,11 @@ static void DiagnosePortTypeConstraints(const PortDecl& port, bool port_is_var,
   }
 }
 
-// Which data types the §6.7.1 net rules admit for a net: item a of that clause
-// names a 4-state integral type and item b an unpacked aggregate of valid net
-// types, so an integral or aggregate data type is one a net may have. A checker
-// formal of any other type -- an event, a string, a real -- holds its actual as
-// a variable does (§17.2).
 static bool PortDataTypeIsJudgedByNetRules(const DataType& dtype) {
   return IsIntegralType(dtype.kind) || dtype.kind == DataTypeKind::kStruct ||
          dtype.kind == DataTypeKind::kUnion;
 }
 
-// State threaded into ElaborateOnePort that would otherwise be Elaborator
-// members; grouped so the helper can stay a free function (no header change).
-// The non-ANSI port-tracking sets and the type-lookup context together form the
-// elaboration state for one module's port list, so they travel as one object.
 struct PortElabContext {
   const TypedefMap& typedefs;
   const ScopeMap& param_scope;
@@ -255,25 +204,11 @@ struct PortElabContext {
   std::unordered_map<std::string_view, uint32_t>& partial_ports;
   std::unordered_set<std::string_view>& signed_ports;
   DiagEngine& diag;
-  // The arena the resolved aggregate type of a structure port is copied into,
-  // and the module the port's variable is declared on.
   Arena& arena;
   RtlirModule* mod;
-  // What tells an associative index naming a typedef or a class from a
-  // dimension's size naming a parameter (IsFixedSizeUnpackedDim).
   const TypeShapeTables& shapes;
 };
 
-// The resolved aggregate a structure or union port carries for its layout,
-// the one ResolvedAggregateType lays out for a body declaration of the same
-// type. §26.4 applies a header import before the port list, so a package's
-// structure resolves here as the module's own does. Null for a port
-// of any other type, and for the ports the layout is not for: a port with an
-// unpacked or a use-site packed dimension is an array of the aggregate rather
-// than one and keeps the width alone; a checker's formal is §17.2's, an
-// expression substituted at the instance rather than an object of the checker;
-// an explicitly named port is the expression it names; a non-ANSI port's body
-// declaration carries its own layout (§23.2.2.1).
 static const DataType* ResolvedPortAggregate(const ModuleDecl* decl,
                                              const PortDecl& port,
                                              const RtlirPort& rp,
@@ -289,50 +224,24 @@ static const DataType* ResolvedPortAggregate(const ModuleDecl* decl,
                                ctx.arena);
 }
 
-// §7.2.1 with §23.2.2.2: a variable port whose data type is a structure or a
-// union is a variable of that aggregate, and a member select of it,
-// `r.opcode`, names the run of the variable's bits the type lays the member
-// out at. The port record carries the port's width, and an ANSI port has no
-// body declaration to carry a layout either, so the simulator created the
-// port's storage with no members to select. The port therefore declares the
-// variable a body declaration of the same name declares for a non-ANSI port
-// (§23.2.2.1), carrying the resolved aggregate for its layout; the simulator
-// finds the storage already created under the port's name and keeps it as the
-// port.
 static void DeclareAggregatePortVariable(const PortDecl& port,
                                          const RtlirPort& rp,
                                          const DataType* aggregate,
                                          const PortElabContext& ctx) {
   RtlirVariable var;
   var.name = port.name;
-  // §37.3.3: the variable stands where the port declaration does.
   var.loc = port.loc;
   var.width = rp.width;
   var.is_4state = Is4stateType(port.data_type, ctx.typedefs);
   var.is_signed = IsSignedType(port.data_type, ctx.typedefs);
-  // §23.2.2.2, footnote 2: a variable output port's initializer is the value
-  // the variable holds before any procedure runs, as a declaration's is.
   var.init_expr = rp.init_value;
   var.elem_type_kind = port.data_type.kind;
   var.decl_kind = port.data_type.kind;
   var.dtype = aggregate;
-  // §37.17: the typespec the variable relates to is the type the port's
-  // header wrote, a typedef name kept as the name.
   var.written_type = &port.data_type;
   ctx.mod->variables.push_back(var);
 }
 
-// Gives a structure or union port the layout a member select of it resolves
-// against. §23.2.2.3 makes an input or inout port with no port kind a net of
-// the default net type, `input instruction_t a` among them, and §6.7.1 admits
-// a packed structure as a net's data type, its own example declaring `wire
-// struct packed {...} memsig`. Such a port is a net -- its drivers resolve
-// against each other and it carries a strength (§28.12) -- so it declares no
-// variable; the resolved aggregate travels on the port record instead, which
-// is the type the header declared, and the simulator lays the net's storage
-// out from it when it creates the port. A variable port declares the variable
-// above. Declaring a variable for the net port too would have made the port
-// the variable the simulator finds first, and a net no longer.
 static void LayOutAggregatePort(const ModuleDecl* decl, const PortDecl& port,
                                 RtlirPort& rp, const PortElabContext& ctx) {
   const DataType* aggregate = ResolvedPortAggregate(decl, port, rp, ctx);
@@ -344,17 +253,6 @@ static void LayOutAggregatePort(const ModuleDecl* decl, const PortDecl& port,
   rp.dtype = aggregate;
 }
 
-// §23.2.2.3: a port whose port kind was omitted is a net of the default net
-// type for input and inout, and for output when the data type was omitted or
-// written with the implicit_data_type syntax. Such a port is a net, and §6.7.1
-// restricts what data type a net may have, so the rule that governs a net
-// declaration reaches the port spelling too. A port that is a variable is
-// outside that rule and keeps every data type it could have.
-//
-// The rule is read off §23.2.2 "Port declarations", which is about the ports of
-// a module, an interface and a program. A checker's formal arguments are
-// §17.2's, where a formal may be left untyped altogether and nothing describes
-// one as a net, so a checker is not put under this rule here.
 static void ValidateNetPortDataType(const ModuleDecl* decl,
                                     const PortDecl& port, bool port_is_var,
                                     const PortElabContext& ctx) {
@@ -363,32 +261,21 @@ static void ValidateNetPortDataType(const ModuleDecl* decl,
   ValidateNetDataTypeIs4State(port.data_type, ctx.typedefs, ctx.diag, port.loc);
 }
 
-// Record the type information of a directioned non-ANSI port so the matching
-// body net/variable declaration can be reconciled later (§23.2.2.1). The
-// tracking sets are reference members of the context, so a const reference
-// still allows recording into them.
 static void TrackNonAnsiPortType(const ModuleDecl* decl, const PortDecl& port,
                                  const PortElabContext& ctx) {
   if (!decl->is_non_ansi_ports || port.name.empty() ||
       port.direction == Direction::kNone) {
     return;
   }
-  // §23.2.2.1: a declaration holding a variable type, `var` with an implicit
-  // type among them, declares the port completely.
   if (port.data_type.kind != DataTypeKind::kImplicit || port.has_explicit_var) {
     ctx.complete_ports.insert(port.name);
   } else {
     ctx.partial_ports[port.name] =
         EvalTypeWidth(port.data_type, ctx.typedefs, ctx.param_scope);
-    // §23.2.2.1: remember a `signed` port direction declaration so the
-    // matching net/variable declaration can be considered signed too.
     if (port.data_type.is_signed) ctx.signed_ports.insert(port.name);
   }
 }
 
-// The bits a port written as a select of a declared vector names, `a[7:4]` of
-// a non-ANSI header being four, or 0 where the port is no select whose bounds
-// fold.
 static uint32_t SelectPortWidth(const Expr* expr, const ScopeMap& scope) {
   if (expr->kind != ExprKind::kSelect) return 0;
   if (expr->index_end == nullptr) return 1;
@@ -402,32 +289,18 @@ static uint32_t SelectPortWidth(const Expr* expr, const ScopeMap& scope) {
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// Fill the base (non-interface) fields of an RtlirPort from its declaration.
 static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
                                     uint32_t width, const ScopeMap& scope,
                                     DiagEngine& diag) {
   RtlirPort rp;
   rp.name = port.name;
   rp.is_explicit_named = port.is_explicit_named;
-  // §5.12: the attributes written on the port, folded against the module's
-  // parameters.
   rp.attrs = ResolveAttributes(port.attrs, diag, scope);
-  // §23.2.2.1: a named port connection may reach an implicit port only when its
-  // port expression is a simple (or escaped) identifier, which serves as the
-  // port name. An implicit port written as a bit-select, part-select, or
-  // concatenation has no port name and must not be name-connectable. A
-  // concatenation already parses with no name; a select port otherwise retains
-  // its base identifier, so drop that name here to keep it order-only.
   if (!port.is_explicit_named && port.port_expr != nullptr) rp.name = {};
   rp.direction = port.direction;
   rp.type_kind = port.data_type.kind;
   rp.declared_type = &port.data_type;
   rp.width = width;
-  // §23.2.2.1 (printed page 732), Example 3: `split_ports (a[7:4], a[3:0])`
-  // makes the first port a's upper four bits and the second its lower four.
-  // Such a port is its select of the declared vector, four bits wide, and its
-  // connection is joined to that select (LowerPortBindings); taken as the whole
-  // of a, with no name to find storage by, it connected nothing.
   if (!port.is_explicit_named && port.port_expr != nullptr) {
     rp.port_expr = port.port_expr;
     if (uint32_t w = SelectPortWidth(port.port_expr, scope); w > 0) {
@@ -435,13 +308,6 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
       rp.width = w;
     }
   }
-  // §11.5.1: the width above says how many bits the port has, not which bit an
-  // index names. Carry the declared type wherever the port header holds a
-  // packed dimension, so a select on the port can be resolved over the range as
-  // written -- the same condition ElaborateNetDecl applies to a net's own
-  // declaration. `port` is an element of ModuleDecl::ports, which the parser
-  // fills and no elaboration step appends to, so the DataType outlives the
-  // RtlirPort built from it.
   if (port.data_type.packed_dim_left != nullptr ||
       !port.data_type.extra_packed_dims.empty()) {
     rp.dtype = &port.data_type;
@@ -449,15 +315,7 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   rp.is_signed = port.data_type.is_signed;
   rp.is_var = port_is_var;
   rp.is_interconnect = port.data_type.is_interconnect;
-  // §23.2.2.3: where a port names no net type, ElaborateOnePort puts the
-  // default net type in place of the wire WrittenNetType answers.
   if (!port_is_var) rp.net_type = WrittenNetType(port.data_type);
-  // Syntax 23-4's one `= constant_expression` is an initializer on a variable
-  // output port and a default value on an input port (§23.2.2.2, footnote 2),
-  // so each kind of port carries it in the field its readers look in: the
-  // instantiation that leaves an input unconnected reads default_value, and
-  // the simulator's port variable takes init_value; an output that is no
-  // variable was reported and carries neither.
   if (port.direction == Direction::kOutput) {
     if (port_is_var) rp.init_value = port.default_value;
   } else {
@@ -466,9 +324,6 @@ static RtlirPort BuildRtlirPortBase(const PortDecl& port, bool port_is_var,
   return rp;
 }
 
-// A.1.3: a non-ANSI port's port_reference selects with a constant_select, so
-// each index, bound and width the selects of its port expression `expr`
-// write, a concatenation's operands' among them, is a constant expression.
 static void ReportNonConstantPortSelects(const Expr* expr, SourceLoc loc,
                                          const ScopeMap& scope,
                                          DiagEngine& diag) {
@@ -490,16 +345,11 @@ static void ReportNonConstantPortSelects(const Expr* expr, SourceLoc loc,
   }
 }
 
-// Elaborate one port declaration into its RtlirPort: run the per-port
-// diagnostics, track non-ANSI type info, and build the base fields. The
-// interface-port flag is resolved by the caller because it needs FindModule.
 static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
                                   PortElabContext& ctx) {
   DiagnoseMissingNonAnsiPortDirection(port, decl->is_non_ansi_ports, ctx.diag);
   TrackNonAnsiPortType(decl, port, ctx);
 
-  // §17.2: a checker formal is no port, and one of a type §6.7.1 gives no
-  // net -- a string, a real, an event -- holds its actual as a variable does.
   bool port_is_var =
       (!port.data_type.is_net && !port.data_type.is_interconnect) ||
       (decl->decl_kind == ModuleDeclKind::kChecker &&
@@ -507,11 +357,6 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   if (port.default_value) {
     ValidatePortAssignment(port, port_is_var, decl->is_non_ansi_ports,
                            ctx.typedefs, ctx.diag);
-    // §23.2.2.4: a default value is a constant expression of the module
-    // that declares the port; a variable of its own is none, and left
-    // standing it would be read in the instantiating module instead. A
-    // checker's formal may default to $inferred_clock or $inferred_disable
-    // (§17.2), which are no constants.
     if (decl->decl_kind != ModuleDeclKind::kChecker &&
         !IsConstantExpr(port.default_value, ctx.param_scope)) {
       ctx.diag.Error(port.loc,
@@ -534,10 +379,6 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
       BuildRtlirPortBase(port, port_is_var, width, ctx.param_scope, ctx.diag);
   ComputePortUnpackedDims(port, rp, ctx.param_scope, ctx.shapes, ctx.diag);
   rp.data_kind = ResolvedTypeKind(port.data_type, ctx.typedefs);
-  // §23.2.2.3: a port whose port kind is omitted defaults to a net of the
-  // default net type, the one in force where the module is defined (§22.8). A
-  // module under `default_nettype none has no default net type to give, so its
-  // port keeps the wire; a checker's formals are no ports (§17.2).
   if (decl->decl_kind != ModuleDeclKind::kChecker && !port_is_var &&
       !port.data_type.is_interconnect &&
       port.data_type.net_keyword == DataTypeKind::kImplicit &&
@@ -548,11 +389,6 @@ static RtlirPort ElaborateOnePort(const ModuleDecl* decl, const PortDecl& port,
   return rp;
 }
 
-// A.1.3 and A.2.3 (printed page 1184): the name of a net port or of an
-// interface port takes unpacked_dimensions alone, each a constant range or
-// size, where a variable port's takes variable_dimensions, which add the
-// dynamic, associative and queue forms (A.2.5). A checker's formal is no port,
-// and takes variable_dimensions whatever its type (A.1.8).
 static void ValidateFixedSizePortDims(const ModuleDecl* decl,
                                       const PortDecl& port, const RtlirPort& rp,
                                       const PortElabContext& ctx) {
@@ -574,25 +410,13 @@ static void ValidateFixedSizePortDims(const ModuleDecl* decl,
       Subclause(decl->is_non_ansi_ports ? "A.2.3" : "A.1.3"));
 }
 
-// 23.2.2.4: a default input-port value is a constant expression evaluated in
-// the scope of the module where the port is defined, not in the scope of the
-// instantiating module. Fold it against this module's parameter scope (which
-// already includes the compilation-unit scope and any per-instance parameter
-// overrides) and capture the resolved constant as a literal, so it is not
-// re-resolved in the instantiating scope when later used as a port connection.
 static void FoldPortConstant(Arena& arena, const ScopeMap& scope, bool is_real,
                              Expr*& value) {
   if (value == nullptr) return;
-  // A literal is already scope-independent, so leave it untouched; this also
-  // avoids truncating a wide (>64-bit) literal through the 64-bit fold, a
-  // string literal of more than eight characters among them (§5.9). Only
-  // name-bearing expressions need to be pinned to the defining scope.
   if (value->kind == ExprKind::kIntegerLiteral ||
       value->kind == ExprKind::kStringLiteral) {
     return;
   }
-  // §6.12: a real port's default is folded as a real, so `R * 2.0` keeps the
-  // fraction an integer fold would drop.
   if (is_real) {
     auto r = ConstEvalReal(value, scope);
     if (!r) return;
@@ -607,8 +431,6 @@ static void FoldPortConstant(Arena& arena, const ScopeMap& scope, bool is_real,
   auto* lit = arena.Create<Expr>();
   lit->kind = ExprKind::kIntegerLiteral;
   lit->int_val = static_cast<uint64_t>(*v);
-  // §11.6.1: a value past 64 bits keeps every bit, written as a sized hex
-  // literal the simulator rebuilds whole from its digits (EvalIntLiteral).
   auto full = ConstEvalFull(value, scope);
   if (full && !full->high_words.empty()) {
     std::string text =
@@ -624,8 +446,6 @@ static void FoldPortConstant(Arena& arena, const ScopeMap& scope, bool is_real,
   value = lit;
 }
 
-// A variable output port's initializer is a constant_expression of the same
-// scope (§23.2.2.2), so it is folded the same way for the simulator to read.
 static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
                                  RtlirPort& rp) {
   bool is_real = rp.data_kind == DataTypeKind::kReal ||
@@ -635,15 +455,6 @@ static void FoldPortDefaultValue(Arena& arena, const ScopeMap& scope,
   FoldPortConstant(arena, scope, is_real, rp.init_value);
 }
 
-// §23.2.3: port declarations can be based on parameter declarations. In the
-// non-ANSI header style the parameters are ordinary module_items in the body
-// (e.g. `parameter MSB = 3; input [MSB:LSB] in;`), and those items are only
-// fully elaborated after the ports. Fold each body value parameter into the
-// port-sizing scope in declaration order so a port packed range that references
-// one resolves to the parameter's value rather than defaulting to a scalar.
-// Header (parameter_port_list) parameters are already in `scope` via
-// BuildParamScope; type parameters have no integer value and fall out because
-// their init expression does not fold to an integer.
 static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
                                         ScopeMap& scope) {
   for (const auto* item : decl->items) {
@@ -656,7 +467,6 @@ static void FoldBodyParamsIntoPortScope(const ModuleDecl* decl,
   }
 }
 
-// Whether the module's body declares `name` as a net or a variable of its own.
 static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
   return std::any_of(decl->items.begin(), decl->items.end(),
                      [&](const ModuleItem* item) {
@@ -666,34 +476,12 @@ static bool BodyDeclaresObject(const ModuleDecl* decl, std::string_view name) {
                      });
 }
 
-// The sets RegisterPortNetNames enters a port's name in.
 struct PortNetNameSets {
   std::unordered_set<std::string_view>& interconnects;
   std::unordered_set<std::string_view>& nets;
   UwireDrivers& uwire_drivers;
 };
 
-// §6.6.8: an interconnect port is a typeless/generic net, exactly like a
-// local interconnect declaration. Register its name so the assignment- and
-// expression-use checks -- which reject procedural/continuous/expression uses
-// of an interconnect net or port -- also fire for the port inside its own
-// module. A non-ANSI interconnect port already registers via its body net
-// declaration; this covers the ANSI `interconnect p` header form.
-//
-// §23.2.2.3: a port the clause makes a net of the default net type -- `output
-// b` with no port kind and no data type among them, the clause's own `mh8
-// (output x)` -- is likewise a net to every rule of its module that asks
-// whether a name is one, §10.4's rule that a procedural assignment's left-hand
-// side be a variable first. Left out of net_names_, `b <= a` in an always_ff
-// on such a port was accepted, the suite's
-// 14.3--clocking-block-signals-error.sv with it, while the same write to a
-// declared `wire w` was reported. A non-ANSI port the body declares again is
-// that declaration's object (§23.2.2.1), which registers itself if it is a
-// net, so only a non-ANSI port the body leaves undeclared registers here; a
-// checker's formal is §17.2's and no net.
-//
-// §6.6.2: a uwire port takes one driver inside its module as any uwire net
-// does, so it is entered among the nets whose drivers are counted.
 static void RegisterPortNetNames(const ModuleDecl* decl, const PortDecl& port,
                                  const RtlirPort& rp, PortNetNameSets sets) {
   if (port.name.empty()) return;
@@ -704,13 +492,6 @@ static void RegisterPortNetNames(const ModuleDecl* decl, const PortDecl& port,
   if (rp.net_type == NetType::kUwire) sets.uwire_drivers.Declare(port.name);
 }
 
-// §23.2.2.1 (printed page 733), Example 5: `renamed_concat(.a({b, c}), f,
-// .g(h[1]))` with `input b, c;` and `output [1:0] h;` in the body, where b, c
-// and h are no ports but the objects the ports a and g stand for. Each is
-// declared as its port declaration makes it -- a net of the default net type
-// for `input b`, a variable for `output reg h` -- unless the body declares it
-// again as a net or a variable, which then gives it its storage. Dropped, the
-// declarations left b, c and h undeclared inside the module.
 static void DeclarePortExprObjects(const ModuleDecl* decl, RtlirModule* mod,
                                    PortElabContext& ctx) {
   for (const PortDecl& obj : decl->port_expr_objects) {
@@ -734,16 +515,11 @@ static void DeclarePortExprObjects(const ModuleDecl* decl, RtlirModule* mod,
     var.is_signed = rp.is_signed;
     var.is_4state = Is4stateType(obj.data_type, ctx.typedefs);
     var.dtype = rp.dtype;
-    // §37.17: the typespec the variable relates to is the type its port
-    // declaration wrote, a typedef name kept as the name.
     var.written_type = &obj.data_type;
     mod->variables.push_back(var);
   }
 }
 
-// The direction of the object a port expression names first, `b` of
-// `{b, c}` and `h` of `h[1]`, as its body port declaration gives it;
-// Direction::kNone where the expression names none of them.
 static Direction PortExprDirection(const ModuleDecl* decl, const Expr* expr) {
   while (expr != nullptr && expr->kind == ExprKind::kSelect) expr = expr->base;
   if (expr == nullptr) return Direction::kNone;
@@ -758,13 +534,6 @@ static Direction PortExprDirection(const ModuleDecl* decl, const Expr* expr) {
   return Direction::kNone;
 }
 
-// §37.13: the port declarations no RtlirPort without an expression brings,
-// each an io decl of its own. A non-ANSI port written as an expression is none,
-// and the declarations it names are: those port_expr_objects holds, and the one
-// a select port takes its name and direction from, `input [1:0] a;` under
-// `a[1], a[0]`, once however many ports select it (§23.2.2.1). An ANSI port
-// written with an explicit name declares itself, its vpiExpr reaching the
-// object its expression names where that is a single name (§23.2.2.2).
 static void RecordPortExprDecls(const ModuleDecl* decl, RtlirModule* mod) {
   for (const PortDecl& obj : decl->port_expr_objects) {
     mod->port_expr_decls.push_back({obj.name, obj.direction, obj.name});
@@ -778,7 +547,6 @@ static void RecordPortExprDecls(const ModuleDecl* decl, RtlirModule* mod) {
            kNamesOne ? port.port_expr->text : std::string_view{}});
       continue;
     }
-    // `.p(e)` under `input e;` takes its direction from no declaration.
     if (port.direction == Direction::kNone) continue;
     const bool kRecorded = std::ranges::any_of(
         mod->port_expr_decls,
@@ -789,12 +557,6 @@ static void RecordPortExprDecls(const ModuleDecl* decl, RtlirModule* mod) {
   }
 }
 
-// §7.4 (printed page 153): a port's type is an array where it writes a packed
-// dimension, its first one being packed_dim_left, and §6.18 has a typedef carry
-// its packed and unpacked dimensions into the type it names, so a port declared
-// through one, or through a chain of names reaching one, is an array though no
-// dimension follows its name (§10.8 lets a pattern take its type from such a
-// port).
 static bool PortTypeIsArray(
     const DataType& dtype, const TypedefMap& typedefs,
     const std::unordered_map<std::string_view, std::vector<Expr*>>&
@@ -809,15 +571,6 @@ static bool PortTypeIsArray(
   });
 }
 
-// §6.23: each port of `decl` whose type is written as a type reference,
-// `input var type(x) a`, has it resolved in place by `resolve`, ahead of every
-// reader of the port's type, in ElaboratePorts and in the module's items, as
-// ElaborateVarDecl resolves a variable's in its item. The ports are resolved
-// in order, so a reference to an earlier port reads its resolved type. The
-// parser made the declaration as a mutable object. A.2.5 with A.1.3: a
-// variable port's associative index written as a type reference,
-// `input var int p [type(k)]`, is resolved the same way, its type made in
-// `arena`.
 static void ResolvePortTypeRefs(
     const ModuleDecl* decl,
     const std::function<void(DataType&, SourceLoc)>& resolve, Arena& arena) {
@@ -855,26 +608,16 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
     if (RejectIllegalPortType(port, diag_)) continue;
 
     RtlirPort rp = ElaborateOnePort(decl, port, ctx);
-    // §23.2.2.1: a port of a non-ANSI header written as an expression faces
-    // the way the body declares the objects it names, `.a({b, c})` and
-    // `{c, d}` under `input b, c, d;` being inputs.
     if (port.port_expr != nullptr && rp.direction == Direction::kNone) {
       rp.direction = PortExprDirection(decl, port.port_expr);
     }
     RegisterPortNetNames(decl, port, rp,
                          {interconnect_names_, net_names_, uwire_drivers_});
-    // §37.3.3: where the port declaration stands, which the port object
-    // reports through vpiLineNo and vpiFile.
     rp.loc = port.loc;
-    // §6.20.2: a real parameter's value is the registered module's, which a
-    // real default reads (ConstEvalReal).
     {
       ParamRangeRegistryGuard registry(mod);
       FoldPortDefaultValue(arena_, param_scope, rp);
     }
-    // §7.4.4: an array port written on a typedef name that writes unpacked
-    // dimensions of its own, `output mem_type ba [0:1]` under
-    // `typedef bsix mem_type [0:3]`, has arrays for its elements.
     rp.elem_type_is_unpacked_array =
         port.data_type.kind == DataTypeKind::kNamed &&
         !port.unpacked_dims.empty() &&
@@ -884,10 +627,6 @@ void Elaborator::ElaboratePorts(const ModuleDecl* decl, RtlirModule* mod) {
 
     if (port.is_interface_port) {
       rp.is_interface_port = true;
-      // §23.3.3.4: a named interface-type port (`bus_if p` / `bus_if.mp p`)
-      // records its required interface type so the connection check can reject
-      // an instance of a different type. A generic `interface p` port leaves
-      // type_name empty, so it keeps accepting any interface instance.
       rp.interface_type_name = port.data_type.type_name;
     } else if (port.direction == Direction::kNone &&
                port.data_type.kind == DataTypeKind::kNamed &&

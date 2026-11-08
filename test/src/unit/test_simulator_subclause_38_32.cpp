@@ -26,10 +26,6 @@ namespace {
 
 using VpiPutDelaysSim = VpiDelaysSimBase;
 
-// §38.32 shall #1 + the rule that the delays keep their source order:
-// vpi_put_delays() sets the object's delays from the caller-allocated da array,
-// one source value per delay (mtm and pulsere both off), in the order they
-// occur in the source.
 TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
   VpiHandle prim = MakeDelayObject(
       vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}, VpiDelayInfo{}});
@@ -44,8 +40,6 @@ TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
   delay.time_type = vpiScaledRealTime;
   vpi_put_delays(VpiHandleOf(prim), &delay);
 
-  // Read the stored delays back via vpi_get_delays() to confirm they landed in
-  // order.
   s_vpi_time out[3] = {};
   s_vpi_delay get = {};
   get.da = out;
@@ -57,16 +51,12 @@ TEST_F(VpiPutDelaysSim, SetsDelaysInSourceOrder) {
   EXPECT_DOUBLE_EQ(out[2].real, 33.0);
 }
 
-// §38.32 shall #2: the form of the source values is controlled by the delay
-// structure's time_type. A vpiSimTime put delivers the value as a 64-bit count
-// split across high/low; the routine reconstitutes the same magnitude a
-// vpiScaledRealTime put would have stored from the real field.
 TEST_F(VpiPutDelaysSim, TimeTypeControlsSourceFormat) {
   VpiHandle prim =
       MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}});
 
   s_vpi_time da[2] = {};
-  da[0].low = 7u;  // vpiSimTime: value lives in high/low, not real
+  da[0].low = 7u;
   da[1].low = 9u;
   s_vpi_delay delay = {};
   delay.da = da;
@@ -84,9 +74,6 @@ TEST_F(VpiPutDelaysSim, TimeTypeControlsSourceFormat) {
   EXPECT_DOUBLE_EQ(out[1].real, 9.0);
 }
 
-// §38.32 shall #3: if only the delay changes and not the pulse limits, the
-// pulse limits retain the values they had before. A delay-only put (pulsere
-// clear) overwrites the delay but leaves the stored reject/error limits intact.
 TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
   VpiDelayInfo seeded;
   seeded.delay = 1.0;
@@ -94,7 +81,6 @@ TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
   seeded.error = 80.0;
   VpiHandle path = MakeDelayObject(vpiModPath, {seeded});
 
-  // Put only the delay (pulsere_flag clear): one entry per delay.
   s_vpi_time da[1] = {};
   da[0].real = 99.0;
   s_vpi_delay delay = {};
@@ -103,7 +89,6 @@ TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
   delay.time_type = vpiScaledRealTime;
   vpi_put_delays(VpiHandleOf(path), &delay);
 
-  // Read back with pulsere set: delay updated, reject/error unchanged.
   s_vpi_time out[3] = {};
   s_vpi_delay get = {};
   get.da = out;
@@ -111,18 +96,15 @@ TEST_F(VpiPutDelaysSim, DelayOnlyPutPreservesPulseLimits) {
   get.time_type = vpiScaledRealTime;
   get.pulsere_flag = 1;
   vpi_get_delays(VpiHandleOf(path), &get);
-  EXPECT_DOUBLE_EQ(out[0].real, 99.0);  // delay altered
-  EXPECT_DOUBLE_EQ(out[1].real, 40.0);  // reject limit retained
-  EXPECT_DOUBLE_EQ(out[2].real, 80.0);  // error limit retained
+  EXPECT_DOUBLE_EQ(out[0].real, 99.0);
+  EXPECT_DOUBLE_EQ(out[1].real, 40.0);
+  EXPECT_DOUBLE_EQ(out[2].real, 80.0);
 }
 
-// §38.32 (Table 38-4, row 2): with mtm_flag set and pulsere_flag clear, each
-// delay is taken from three source entries - min, then typ, then max delay.
 TEST_F(VpiPutDelaysSim, MtmFlagConsumesMinTypMax) {
   VpiHandle prim =
       MakeDelayObject(vpiPrimitive, {VpiDelayInfo{}, VpiDelayInfo{}});
 
-  // Two delays, three entries each (min:typ:max) -> six entries.
   s_vpi_time da[6] = {};
   for (int i = 0; i < 6; ++i) da[i].real = static_cast<double>(i + 1);
   s_vpi_delay delay = {};
@@ -143,9 +125,6 @@ TEST_F(VpiPutDelaysSim, MtmFlagConsumesMinTypMax) {
     EXPECT_DOUBLE_EQ(out[i].real, static_cast<double>(i + 1)) << "entry " << i;
 }
 
-// §38.32 (Table 38-4, row 4): with both flags set each delay is taken from nine
-// source entries - min:typ:max of the delay, then of the reject limit, then of
-// the error limit, in that order.
 TEST_F(VpiPutDelaysSim, MtmAndPulsereConsumeNineElements) {
   VpiHandle path = MakeDelayObject(vpiModPath, {VpiDelayInfo{}});
 
@@ -171,9 +150,6 @@ TEST_F(VpiPutDelaysSim, MtmAndPulsereConsumeNineElements) {
     EXPECT_DOUBLE_EQ(out[i].real, static_cast<double>(i + 1)) << "entry " << i;
 }
 
-// §38.32: the legal number of delays is fixed by the object's category. A
-// primitive accepts 2 or 3; an illegal request (here 4) is rejected with an
-// error recorded (§38.2) and the stored delays left unchanged.
 TEST_F(VpiPutDelaysSim, IllegalNoOfDelaysIsRejected) {
   VpiDelayInfo seeded;
   seeded.delay = 5.0;
@@ -184,58 +160,50 @@ TEST_F(VpiPutDelaysSim, IllegalNoOfDelaysIsRejected) {
   for (int i = 0; i < 4; ++i) da[i].real = 1000.0;
   s_vpi_delay delay = {};
   delay.da = da;
-  delay.no_of_delays = 4;  // not 2 or 3 -> illegal for a primitive
+  delay.no_of_delays = 4;
   delay.time_type = vpiScaledRealTime;
   vpi_put_delays(VpiHandleOf(prim), &delay);
 
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 
-  // The stored delays were not altered by the rejected request.
   s_vpi_time out[3] = {};
   s_vpi_delay get = {};
   get.da = out;
   get.no_of_delays = 3;
   get.time_type = vpiScaledRealTime;
   vpi_get_delays(VpiHandleOf(prim), &get);
-  EXPECT_DOUBLE_EQ(out[0].real, 5.0);  // unchanged seed
+  EXPECT_DOUBLE_EQ(out[0].real, 5.0);
 }
 
-// §38.32 / §38.1: the structure and its da array are application-allocated, so
-// a null structure, a null da, or a null handle leaves nothing to do and must
-// be safe.
 TEST_F(VpiPutDelaysSim, NullArgumentsAreSafe) {
   VpiDelayInfo d;
   d.delay = 1.0;
   VpiHandle prim = MakeDelayObject(vpiPrimitive, {d, d});
 
-  vpi_put_delays(VpiHandleOf(prim), nullptr);  // null structure
+  vpi_put_delays(VpiHandleOf(prim), nullptr);
 
   s_vpi_delay no_array = {};
   no_array.no_of_delays = 2;
   no_array.time_type = vpiScaledRealTime;
-  vpi_put_delays(VpiHandleOf(prim), &no_array);  // null da
+  vpi_put_delays(VpiHandleOf(prim), &no_array);
 
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
   delay.da = da;
   delay.no_of_delays = 2;
   delay.time_type = vpiScaledRealTime;
-  vpi_put_delays(nullptr, &delay);  // null handle
+  vpi_put_delays(nullptr, &delay);
 
   SUCCEED();
 }
 
-// §38.32 (Table 38-4, row 3): with pulsere_flag set and mtm_flag clear, each
-// delay is taken from three source entries - the delay, the reject limit, and
-// the error limit. This exercises the pulse-limits-only layout branch on the
-// write path.
 TEST_F(VpiPutDelaysSim, PulsereOnlyPutConsumesDelayRejectError) {
   VpiHandle path = MakeDelayObject(vpiModPath, {VpiDelayInfo{}});
 
   s_vpi_time da[3] = {};
-  da[0].real = 10.0;  // delay
-  da[1].real = 4.0;   // reject limit
-  da[2].real = 8.0;   // error limit
+  da[0].real = 10.0;
+  da[1].real = 4.0;
+  da[2].real = 8.0;
   s_vpi_delay delay = {};
   delay.da = da;
   delay.no_of_delays = 1;
@@ -255,18 +223,13 @@ TEST_F(VpiPutDelaysSim, PulsereOnlyPutConsumesDelayRejectError) {
   EXPECT_DOUBLE_EQ(out[2].real, 8.0);
 }
 
-// §38.32 (N6, timing-check category): for a timing check the legal number of
-// delays must match the number of limits the check actually has. A matching
-// count is honored; a mismatching count is rejected with an error (§38.2) and
-// the stored limits are left unchanged.
 TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   VpiDelayInfo a;
   a.delay = 2.0;
   VpiDelayInfo b;
   b.delay = 4.0;
-  VpiHandle tchk = MakeDelayObject(vpiTchk, {a, b});  // two limits
+  VpiHandle tchk = MakeDelayObject(vpiTchk, {a, b});
 
-  // A count matching the limit count is accepted.
   s_vpi_time da[2] = {};
   da[0].real = 20.0;
   da[1].real = 40.0;
@@ -286,18 +249,16 @@ TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   EXPECT_DOUBLE_EQ(out[0].real, 20.0);
   EXPECT_DOUBLE_EQ(out[1].real, 40.0);
 
-  // A count that does not match the number of limits is rejected.
   vpi_ctx_.ResetErrorStatus();
   s_vpi_time bad[3] = {};
   for (int i = 0; i < 3; ++i) bad[i].real = 999.0;
   s_vpi_delay bad_delay = {};
   bad_delay.da = bad;
-  bad_delay.no_of_delays = 3;  // does not match the two limits
+  bad_delay.no_of_delays = 3;
   bad_delay.time_type = vpiScaledRealTime;
   vpi_put_delays(VpiHandleOf(tchk), &bad_delay);
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 
-  // The earlier values survive the rejected request.
   vpi_ctx_.ResetErrorStatus();
   s_vpi_time after[2] = {};
   s_vpi_delay after_get = {};
@@ -309,8 +270,6 @@ TEST_F(VpiPutDelaysSim, TimingCheckRequiresMatchingLimitCount) {
   EXPECT_DOUBLE_EQ(after[1].real, 40.0);
 }
 
-// §38.32 (N6, intermodule-path category): an intermodule path accepts 2 or 3
-// delays. A legal count is honored; the values land in source order.
 TEST_F(VpiPutDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   VpiHandle imp =
       MakeDelayObject(vpiInterModPath, {VpiDelayInfo{}, VpiDelayInfo{}});
@@ -335,28 +294,6 @@ TEST_F(VpiPutDelaysSim, IntermodulePathAcceptsTwoOrThree) {
   EXPECT_DOUBLE_EQ(out[1].real, 34.0);
 }
 
-// -----------------------------------------------------------------------------
-// §38.32's own example application:
-//
-//   void set_path_rise_fall_delays(path, rise, fall)
-//   vpiHandle path;
-//   double rise, fall;
-//   {
-//      static s_vpi_time path_da[2];
-//      static s_vpi_delay delay_s = {NULL, 2, vpiScaledRealTime};
-//      static p_vpi_delay delay_p = &delay_s;
-//      delay_s.da = path_da;
-//      path_da[0].real = rise;
-//      path_da[1].real = fall;
-//      vpi_put_delays(path, delay_p);
-//   }
-//
-// It takes a module path's handle and replaces that path's delays, and every
-// case above hands the routine an object it made itself. A module path a design
-// declared is the object the example is written for.
-// -----------------------------------------------------------------------------
-
-// What the application read back after writing.
 bool g_path_written = false;
 double g_rise_read_back = 0.0;
 double g_fall_read_back = 0.0;
@@ -369,8 +306,6 @@ PLI_INT32 SetPathRiseFallDelaysCalltf(PLI_BYTE8*) {
   vpiHandle path = vpi_scan(paths);
   if (path == nullptr) return 0;
 
-  // The example, with its own shape: two delays, scaled real time, the rise in
-  // da[0] and the fall in da[1].
   s_vpi_time path_da[2] = {};
   s_vpi_delay delay_s = {};
   delay_s.da = path_da;
@@ -381,9 +316,6 @@ PLI_INT32 SetPathRiseFallDelaysCalltf(PLI_BYTE8*) {
   vpi_put_delays(path, &delay_s);
   g_path_written = true;
 
-  // §38.32: the delays are ordered as vpi_get_delays() orders them, so reading
-  // the path back is what says the two routines agree about which delay is
-  // which.
   s_vpi_time read_da[2] = {};
   s_vpi_delay read_s = {};
   read_s.da = read_da;
@@ -436,17 +368,10 @@ TEST_F(VpiPutDelaysInARun, TheExampleReplacesTheDelaysOfADesignsModulePath) {
   LowerAndRun(design, f);
 
   ASSERT_TRUE(g_path_written);
-  // The path went in declared with one delay and comes back out carrying the
-  // two the application wrote, in the order it wrote them. Replaced rather than
-  // added to, which is what the example does and what an application reading
-  // the path back has to see.
   EXPECT_DOUBLE_EQ(g_rise_read_back, 11.0);
   EXPECT_DOUBLE_EQ(g_fall_read_back, 22.0);
 }
 
-// §38.32 with §37.3.4: the delays vpi_put_delays gives a continuous
-// assignment are those its next transitions take, 5 for the rise at 10 and 6
-// for the fall at 20 (#5109).
 TEST_F(ContAssignDelaysOfARun, PutDelaysAreTheOnesTheAssignmentTakes) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -456,8 +381,6 @@ TEST_F(ContAssignDelaysOfARun, PutDelaysAreTheOnesTheAssignmentTakes) {
   EXPECT_EQ(value.value.integer, 26);
 }
 
-// §38.32: a time_type of vpiSuppressTime carries no time in the source
-// entries, so the delays it sets are zero whatever the entries hold.
 TEST_F(VpiPutDelaysSim, SuppressTimeSetsNoTimeValue) {
   VpiDelayInfo d;
   d.delay = 7.0;
@@ -474,11 +397,6 @@ TEST_F(VpiPutDelaysSim, SuppressTimeSetsNoTimeValue) {
   EXPECT_DOUBLE_EQ(prim->delays[1].delay, 0.0);
 }
 
-// §37.14 detail 2 with §38.32: the delay routines do not apply to an interface
-// port, so a put to one is refused outright; a port of any other kind is
-// judged by its category, a module input port delay of a rise, a fall and a
-// turn-off, so a put of one to it is the error that rule gives. Neither
-// stores a delay.
 TEST_F(VpiPutDelaysSim, APortIsRefusedAsItsKindSays) {
   s_vpi_time da[2] = {};
   s_vpi_delay delay = {};
@@ -504,9 +422,6 @@ TEST_F(VpiPutDelaysSim, APortIsRefusedAsItsKindSays) {
   EXPECT_TRUE(port->delays.empty());
 }
 
-// §38.32 with §37.14: a port no instance connects inside, which has no net
-// for its module input port delay to stand on, keeps the delays it is given
-// all the same.
 TEST_F(VpiPutDelaysSim, APortWithNoLowerConnectionKeepsItsDelays) {
   VpiHandle port = MakeDelayObject(vpiPort, {});
   port->port_type = vpiPort;
@@ -523,8 +438,6 @@ TEST_F(VpiPutDelaysSim, APortWithNoLowerConnectionKeepsItsDelays) {
   EXPECT_DOUBLE_EQ(port->delays[1].delay, 6.0);
 }
 
-// §38.32: a continuous assignment no run made, which names no net to file
-// its delays under, keeps the delays it is given all the same.
 TEST_F(VpiPutDelaysSim, AnAssignmentNoRunMadeKeepsItsDelays) {
   VpiHandle assign = MakeDelayObject(vpiContAssign, {});
   s_vpi_time da[2] = {};
@@ -540,8 +453,7 @@ TEST_F(VpiPutDelaysSim, AnAssignmentNoRunMadeKeepsItsDelays) {
   EXPECT_DOUBLE_EQ(assign->delays[1].delay, 3.0);
 }
 
-// Puts a rise of 5 and a fall of 6 to the continuous assignment of `top.u`.
-PLI_INT32 PutChildAssignmentDelays(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PutChildAssignmentDelays(PLI_BYTE8*) {
   vpiHandle it =
       vpi_iterate(vpiContAssign, vpi_handle_by_name(VpiText("top.u"), nullptr));
   vpiHandle ca = it != nullptr ? vpi_scan(it) : nullptr;
@@ -559,10 +471,6 @@ PLI_INT32 PutChildAssignmentDelays(PLI_BYTE8* /*user_data*/) {
 
 class ChildAssignmentDelaysOfARun : public VpiDesignRun {};
 
-// §38.32 with §37.3.4: an assignment written with no delay in an instance takes
-// the rise and fall vpi_put_delays gives it, under the instance it stands in,
-// a turn-off not given being the smaller of the two: the child's net rises 5
-// after its operand at 10 and falls 6 after it at 20.
 TEST_F(ChildAssignmentDelaysOfARun, AnInstancesAssignmentTakesThePutDelays) {
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
@@ -585,7 +493,6 @@ TEST_F(ChildAssignmentDelaysOfARun, AnInstancesAssignmentTakesThePutDelays) {
   EXPECT_EQ(value.value.integer, 26);
 }
 
-// The port `name` of the instance `inst` names, or null where it has none.
 vpiHandle PortNamed(const char* inst, std::string_view name) {
   vpiHandle it =
       vpi_iterate(vpiPort, vpi_handle_by_name(VpiText(inst), nullptr));
@@ -599,7 +506,6 @@ vpiHandle PortNamed(const char* inst, std::string_view name) {
   return nullptr;
 }
 
-// Puts a rise of 4 and a fall of 6 to `obj`.
 void PutRiseOf4AndFallOf6(vpiHandle obj) {
   s_vpi_time times[2] = {};
   times[0].low = 4;
@@ -611,12 +517,12 @@ void PutRiseOf4AndFallOf6(vpiHandle obj) {
   vpi_put_delays(obj, &delay);
 }
 
-PLI_INT32 PutReceiverPortDelays(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PutReceiverPortDelays(PLI_BYTE8*) {
   PutRiseOf4AndFallOf6(PortNamed("top.r", "i"));
   return 0;
 }
 
-PLI_INT32 PutDriverToReceiverPathDelays(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PutDriverToReceiverPathDelays(PLI_BYTE8*) {
   PutRiseOf4AndFallOf6(vpi_handle_multi(
       vpiInterModPath, PortNamed("top.d", "o"), PortNamed("top.r", "i")));
   return 0;
@@ -624,7 +530,6 @@ PLI_INT32 PutDriverToReceiverPathDelays(PLI_BYTE8* /*user_data*/) {
 
 class PortDelaysOfARun : public VpiDesignRun {
  protected:
-  // Registers the system task `name` as running `calltf`.
   static void RegisterTask(const char* name, PLI_INT32 (*calltf)(PLI_BYTE8*)) {
     s_vpi_systf_data data = {};
     data.type = vpiSysTask;
@@ -633,7 +538,6 @@ class PortDelaysOfARun : public VpiDesignRun {
     ASSERT_NE(vpi_register_systf(&data), nullptr);
   }
 
-  // The integer value of the object `name` names.
   static int IntOf(const char* name) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -641,7 +545,6 @@ class PortDelaysOfARun : public VpiDesignRun {
     return value.value.integer;
   }
 
-  // A receiver noting when its input port's net last rose and fell.
   static constexpr const char* kReceiver =
       "module rcv(input i); timeunit 1ns; timeprecision 1ns;\n"
       "  int rose, fell;\n"
@@ -649,9 +552,6 @@ class PortDelaysOfARun : public VpiDesignRun {
       "endmodule\n";
 };
 
-// §38.32 with §37.14: a put of a rise of 4 and a fall of 6 to an instance's
-// input port records no error, and vpi_get_delays reads the two back from the
-// port in the order they were put (#7364).
 TEST_F(PortDelaysOfARun, APortTakesARiseAndFallAndReadsThemBack) {
   Run("module rcv(input i); endmodule\n"
       "module top; wire w; rcv r(w); endmodule\n");
@@ -678,10 +578,6 @@ TEST_F(PortDelaysOfARun, APortTakesARiseAndFallAndReadsThemBack) {
   EXPECT_EQ(out[1].low, 6u);
 }
 
-// §38.32 with §37.14 and §32.4.4: the rise and fall vpi_put_delays gives an
-// instance's input port are its module input port delay, the one its
-// connection then takes: the port's net rises 4 after the net above it does
-// at 10 and falls 6 after it does at 20 (#7384).
 TEST_F(PortDelaysOfARun, APortsPutDelaysAreTheOnesItsConnectionTakes) {
   RegisterTask("$port_delays", &PutReceiverPortDelays);
   Run(std::string(kReceiver) +
@@ -693,11 +589,6 @@ TEST_F(PortDelaysOfARun, APortsPutDelaysAreTheOnesItsConnectionTakes) {
   EXPECT_EQ(IntOf("top.r.fell"), 26);
 }
 
-// §38.32 with §37.37 and §32.4.4: the rise and fall vpi_put_delays gives the
-// intermodule path from one instance's output port to another's input port
-// are the interconnect delay that connection then takes: the input port's net
-// rises 4 after the output port drives a rise at 10 and falls 6 after the
-// fall at 20 (#6923).
 TEST_F(PortDelaysOfARun,
        AnIntermodulePathsPutDelaysAreTheOnesItsConnectionTakes) {
   RegisterTask("$path_delays", &PutDriverToReceiverPathDelays);
@@ -713,10 +604,6 @@ TEST_F(PortDelaysOfARun,
   EXPECT_EQ(IntOf("top.r.fell"), 26);
 }
 
-// §38.32 with §37.37 and §32.4.4: an intermodule path into an inout port
-// takes the delays vpi_put_delays gives it as well, in a design that calls no
-// $sdf_annotate: the inout port's net rises 4 after the output port drives a
-// rise at 10 and falls 6 after the fall at 20 (#7403).
 TEST_F(PortDelaysOfARun, AnIntermodulePathIntoAnInoutTakesItsPutDelays) {
   RegisterTask("$path_delays", &PutDriverToReceiverPathDelays);
   Run("module rcv(inout i); timeunit 1ns; timeprecision 1ns;\n"
@@ -736,9 +623,6 @@ TEST_F(PortDelaysOfARun, AnIntermodulePathIntoAnInoutTakesItsPutDelays) {
 
 using ScaledDelaysOfAGate = VpiDesignRun;
 
-// §38.10 and §38.32 with §38.34: a vpiScaledRealTime delay is in the timescale
-// of the object, here its module's 1ns, while the run keeps ticks of the
-// design's 1ps precision (#7472).
 TEST_F(ScaledDelaysOfAGate, ScaledDelaysAreInTheModulesUnit) {
   Run("module top; timeunit 1ns; timeprecision 1ps;\n"
       "  wire y; reg a;\n"
@@ -772,7 +656,6 @@ TEST_F(ScaledDelaysOfAGate, ScaledDelaysAreInTheModulesUnit) {
 
 class DelaysPutInARun : public PortDelaysOfARun {
  protected:
-  // Puts `count` delays of 2 on `obj`.
   static void PutTwos(vpiHandle obj, int count) {
     s_vpi_time times[2] = {};
     times[0].low = 2;
@@ -784,26 +667,23 @@ class DelaysPutInARun : public PortDelaysOfARun {
     vpi_put_delays(obj, &delay);
   }
 
-  static PLI_INT32 PutPathDelay(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 PutPathDelay(PLI_BYTE8*) {
     for (vpiHandle path : ObjectsOf(vpiModPath, By("top.c"))) PutTwos(path, 1);
     return 0;
   }
 
-  static PLI_INT32 PutPrimitiveDelays(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 PutPrimitiveDelays(PLI_BYTE8*) {
     PutTwos(By("top.g"), 2);
     PutTwos(By("top.u"), 2);
     return 0;
   }
 
-  static PLI_INT32 PutCheckLimit(PLI_BYTE8* /*user_data*/) {
+  static PLI_INT32 PutCheckLimit(PLI_BYTE8*) {
     for (vpiHandle check : ObjectsOf(vpiTchk, By("top"))) PutTwos(check, 1);
     return 0;
   }
 };
 
-// §38.32 with §30.4: the delay vpi_put_delays gives a module path is the one
-// its next transition takes, a rise at 10 reaching the output at 12 rather
-// than 15 (#7468).
 TEST_F(DelaysPutInARun, AModulePathTakesItsPutDelay) {
   RegisterTask("$path_put", &PutPathDelay);
   Run("module leaf(input a, output y); timeunit 1ns; timeprecision 1ns;\n"
@@ -819,8 +699,6 @@ TEST_F(DelaysPutInARun, AModulePathTakesItsPutDelay) {
   EXPECT_EQ(IntOf("top.rose"), 12);
 }
 
-// §38.32 with §28.16 and §29.8: the delays vpi_put_delays gives a gate and a
-// udp are the ones their next output transitions take (#7469).
 TEST_F(DelaysPutInARun, AGateAndAUdpTakeTheirPutDelays) {
   RegisterTask("$prim_put", &PutPrimitiveDelays);
   Run("primitive pass(output o, input i);\n"
@@ -838,10 +716,6 @@ TEST_F(DelaysPutInARun, AGateAndAUdpTakeTheirPutDelays) {
   EXPECT_EQ(IntOf("top.udp_rose"), 12);
 }
 
-// §38.32 with §31.3.1: the limit vpi_put_delays gives a $setup is the one its
-// next checks are judged against: with 2 in place of 5, a data change 3
-// before the clock edge is no violation, and one 1 before it still is
-// (#7470).
 TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
   RegisterTask("$limit_put", &PutCheckLimit);
   Run("module top(output logic d, output logic clk);\n"
@@ -859,12 +733,6 @@ TEST_F(DelaysPutInARun, ATimingCheckIsJudgedAgainstItsPutLimit) {
   EXPECT_EQ(IntOf("top.violations"), 1);
 }
 
-// §38.32 with §28.16 and §31.2, read off objects standing in no design. A gate
-// under the instance c given one delay files it with the primitive driving its
-// output below c, as its rise, its fall and its turn-off alike. A gate driving
-// nothing, one holding no delays, and one no run named file none. A timing
-// check's limits take its first two delays, and one holding none keeps its
-// own.
 TEST(RunDelaysOfObjects, AreFiledWhereTheRunKeepsThem) {
   SimFixture f;
   SpecifyManager& specify = f.ctx.AcquireSpecifyManager();

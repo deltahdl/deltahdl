@@ -14,9 +14,6 @@
 namespace delta {
 namespace {
 
-// The subclause defining the spelling of `keyword`'s value. §34.5.28 and
-// §34.5.29 write the same list, so what a report cites is the only thing that
-// separates one keyword's reports from the other's.
 std::string_view SyntaxSubclause(std::string_view keyword) {
   return keyword == kDecryptLicenseKeyword ? "34.5.28.1" : "34.5.29.1";
 }
@@ -25,8 +22,6 @@ std::string_view SyntaxSubclause(std::string_view keyword) {
 
 void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
                                 SourceLoc loc) {
-  // A refusal speaks for the envelope it was met in, so it lapses once the
-  // reading has left that envelope, whichever expression closed it.
   if (decryption_refused_depth_ >
       protect_envelopes_.DecryptionEnvelopeDepth()) {
     decryption_refused_depth_ = 0;
@@ -37,10 +32,6 @@ void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
   }
   ProtectLicense license =
       ParseProtectLicense(expr.value.empty() ? expr.value_list : expr.value);
-  // §34.5.28.1 and §34.5.29.1 write the value as a library, an entry and a
-  // feature, each against a string. A value written any other way names no
-  // library to load, so there is no entry function for the feature it asks
-  // about, and the expression states no licence for a tool to be held to.
   if (!license.stated) {
     diag_.Error(loc,
                 std::string("protect pragma ")
@@ -50,27 +41,13 @@ void Preprocessor::ApplyLicense(const PragmaKeywordExpression& expr,
                 Subclause(SyntaxSubclause(expr.keyword)));
     return;
   }
-  // §34.5.28.2 and §34.5.29.2 put their question on meeting the expression in
-  // an encrypted model, so a licence written in cleartext the tool is about to
-  // encrypt is asking nothing of this run. That is the ENCRYPTION INPUT case
-  // both subclauses open with: the expression is written inside a begin-end
-  // pair so that it is encrypted into the output the author ships, and it
-  // speaks to whoever reads that output rather than to whoever wrote it.
   if (!protect_envelopes_.InProtectedRegion()) return;
-  // §34.5.29.2 asks its question before the model is executed, which is the
-  // run's business once preprocessing is over.
   if (expr.keyword == kRuntimeLicenseKeyword) {
     runtime_licenses_.push_back({std::move(license), loc});
     return;
   }
-  // §34.5.28.2 asks before the decrypted text is processed, so
-  // RecoveredTextLicensed asked about this one off the recovered text's own
-  // lines before any of them was read. A licence that only a macro substituted
-  // while the text was processed is not one that could be asked about first.
 }
 
-// §34.5.28.2: the library is loaded, its entry function called with the
-// feature string, and the value it returns compared with the match value.
 bool Preprocessor::AskDecryptLicense(const ProtectLicense& license,
                                      SourceLoc loc) {
   ProtectLicenseAnswer answer;
@@ -86,11 +63,6 @@ bool Preprocessor::AskDecryptLicense(const ProtectLicense& license,
   return false;
 }
 
-// A model sealed inside this one carries licences of its own, which are asked
-// about when its own text is recovered, so the lines between its delimiters
-// are passed over here: `sealed_inside` counts how deep the reading stands in
-// them. Answers whether every licence the directive `body` writes, at line
-// `line_num` of `block_id`, was granted.
 bool Preprocessor::LicencesOfDirectiveGranted(std::string_view body,
                                               uint32_t block_id,
                                               uint32_t line_num,

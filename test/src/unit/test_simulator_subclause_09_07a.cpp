@@ -169,12 +169,6 @@ TEST(FineGrainProcessControlSimulation, KillTerminatesDescendants) {
   LowerRunAndCheck(f, design, {{"x", 0u}});
 }
 
-// §9.7: status() reports WAITING for a process blocked in a blocking statement.
-// A forked child parked on a delay is, from the parent's viewpoint, waiting in
-// a blocking statement, so querying its status() while it is parked yields
-// WAITING -- distinct from the RUNNING the parent (the process making the call)
-// would report for itself. The captured result is held in `w`, which the child
-// never touches, so the later delayed write does not clobber the observation.
 TEST(FineGrainProcessControlSimulation, StatusWaitingForBlockedProcess) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,12 +193,6 @@ TEST(FineGrainProcessControlSimulation, StatusWaitingForBlockedProcess) {
   LowerRunAndCheck(f, design, {{"w", 1u}});
 }
 
-// §9.7: calling kill() on a process already in the FINISHED state still reaps
-// its live descendant subprocesses. The child spawns a grandchild with
-// join_none and then finishes immediately; killing the now-finished child must
-// forcibly terminate the still-parked grandchild, so its delayed write never
-// runs and x stays 0. Without the descendant reap, the grandchild would fire
-// x = 99 at time 100.
 TEST(FineGrainProcessControlSimulation, KillOnFinishedProcessReapsDescendants) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -272,12 +260,6 @@ TEST(FineGrainProcessControlSimulation, SrandomMethodOnProcessHandle) {
   EXPECT_EQ(proc->rng_seed, 99u);
 }
 
-// §9.7: the process class prototype exposes get_randstate() and set_randstate()
-// as callable members of a process handle (their RNG semantics belong to
-// §18.13.4/§18.13.5). Capturing the current process's state through the process
-// method yields a non-empty string, and feeding it back through set_randstate()
-// on the process handle is accepted -- proving both prototype members dispatch
-// on a process, not just on a generic class handle.
 TEST(FineGrainProcessControlSimulation, RandStateMethodsOnProcessHandle) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -294,7 +276,6 @@ TEST(FineGrainProcessControlSimulation, RandStateMethodsOnProcessHandle) {
       f);
   LowerRunAndCheck(f, design, {{"len_ok", 1u}});
 
-  // get_randstate() through the process method materialized the process stream.
   auto* proc = f.ctx.FindProcessByHandle(1);
   ASSERT_NE(proc, nullptr);
   EXPECT_TRUE(proc->rng_initialized);
@@ -511,11 +492,6 @@ TEST(FineGrainProcessControlSimulation, ResumeOnFinalProcessIsError) {
                             "resume() acts only on a process", 5, "9.7"));
 }
 
-// §9.7: await(), like kill()/suspend()/resume(), acts only on a process begun
-// by an initial or always procedure or by a fork block within one. A process
-// obtained inside a final procedure is not one of those, so awaiting it is an
-// error. (This exercises await()'s own restricted-target check, a code path
-// distinct from the kill/suspend/resume forms above.)
 TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessIsError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -536,11 +512,6 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessIsError) {
                             "await() acts only on a process", 5, "9.7"));
 }
 
-// §9.7: kill() acts only on a process begun by an initial or always procedure
-// or by a fork block within one, and the call is what the report is about.
-// The design makes two kill() calls and only the one in the final block is
-// illegal, so a report carrying no location fails this and so does one that
-// names the legal call.
 TEST(FineGrainProcessControlSimulation,
      KillOnAFinalProcessIsReportedAtTheCall) {
   SimFixture f;
@@ -567,9 +538,6 @@ TEST(FineGrainProcessControlSimulation,
                             "kill() acts only on a process", 10, "9.7"));
 }
 
-// §9.7: kill(), await(), suspend() and resume() act only on a process begun by
-// an initial or always procedure or by a fork block within one.
-// Each of the four raises its own report, and each report names §9.7.
 TEST(FineGrainProcessControlSimulation, KillOnFinalProcessNames9_7) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -642,8 +610,6 @@ TEST(FineGrainProcessControlSimulation, AwaitOnFinalProcessNames9_7) {
                             "await() acts only on a process", 5, "9.7"));
 }
 
-// §9.7: it shall be an error to call await() on the current process, i.e. a
-// process cannot wait for its own termination. That report names §9.7 too.
 TEST(FineGrainProcessControlSimulation, AwaitOnSelfNames9_7) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -660,8 +626,6 @@ TEST(FineGrainProcessControlSimulation, AwaitOnSelfNames9_7) {
                             "cannot await its own termination", 4, "9.7"));
 }
 
-// §9.7: it shall be an error for a function to call suspend() on the current
-// process, i.e. a function cannot suspend its own execution.
 TEST(FineGrainProcessControlSimulation, FunctionSuspendingItselfNames9_7) {
   SimFixture f;
   auto* design = ElaborateSrc(

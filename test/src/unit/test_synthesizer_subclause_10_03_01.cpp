@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The headers are non-ANSI, since §23.2.2.1 bars declaring an ANSI port again;
-// a non-ANSI port declared without a net type may be declared again as a net,
-// here with a net declaration assignment.
 TEST(NetDeclAssignSynth, NetDeclAssignConstant) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

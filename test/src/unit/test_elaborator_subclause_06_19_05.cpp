@@ -7,10 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.19.5: an enumeration has the built-in methods §6.19.5.1 to §6.19.5.6 list
-// and no others, nor any member, so a call or select naming anything else
-// through an enumeration variable is reported, its type written as a typedef
-// name or in the declaration itself.
 TEST(EnumMethodElaboration, NameNoEnumMethodIsReported) {
   ElabFixture f;
   ElabOk(
@@ -59,8 +55,6 @@ TEST(EnumMethodElaboration, EveryEnumMethodIsAccepted) {
              "endmodule\n"));
 }
 
-// §18.8: a random property of a class, an enumeration among them, is named in
-// a call of its rand_mode by a method of the class.
 TEST(EnumMethodElaboration, RandModeOfAnEnumPropertyIsAccepted) {
   EXPECT_TRUE(
       ElabOk("class K;\n"
@@ -73,8 +67,6 @@ TEST(EnumMethodElaboration, RandModeOfAnEnumPropertyIsAccepted) {
              "endmodule\n"));
 }
 
-// §23.2.2: a port that is an enumeration is an enumeration variable of the
-// module.
 TEST(EnumMethodElaboration, PortsAreChecked) {
   ElabFixture f;
   ElabOk(
@@ -87,10 +79,6 @@ TEST(EnumMethodElaboration, PortsAreChecked) {
       "'foo' is not a built-in method of the enumeration 'e'", 2, "6.19.5"));
 }
 
-// §6.19.3: a named constant is a value of its enumeration, so a call naming
-// anything else through one is reported, whether a typedef, a variable or a
-// port declares the enumeration; a constant a range names, R[2], goes by the
-// numbered names §6.19.2 gives it, R0 and R1, not by R.
 TEST(EnumMethodElaboration, NameNoEnumMethodThroughAConstantIsReported) {
   ElabFixture f;
   ElabOk(
@@ -121,8 +109,6 @@ TEST(EnumMethodElaboration, NameNoEnumMethodThroughAConstantIsReported) {
       "6.19.5"));
 }
 
-// §6.19.2: each numbered constant a ranged member declares, R0 and R1 of
-// R[2] or S3 and S4 of S[3:4], is a value of its enumeration too.
 TEST(EnumMethodElaboration,
      NameNoEnumMethodThroughANumberedConstantIsReported) {
   ElabFixture f;
@@ -153,10 +139,6 @@ TEST(EnumMethodElaboration, EnumMethodsThroughAConstantAreAccepted) {
              "endmodule\n"));
 }
 
-// §6.19.5 with §13.4.1: the result of a call returning an enumeration has the
-// built-in methods of one and no others, whether the call is of a function of
-// the module, f(), of a method of the class a handle holds, k.get(), or of
-// process's status(), whose type is the enumeration state (§9.7).
 TEST(EnumMethodElaboration, MethodOfAnEnumerationACallReturnsIsReported) {
   ElabFixture f;
   ElabOk(
@@ -209,11 +191,6 @@ TEST(EnumMethodElaboration, MethodOfAnEnumerationACallReturnsIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 5u);
 }
 
-// §8.13 with §13.4.1: a method's return type is read in its class, where a
-// type parameter or a typedef the class or a class it extends declares hides
-// the module's type of the name, and an array typedef has the array methods;
-// a call by a name alone in a method calls the class's method first, and the
-// module's function where the class declares none.
 TEST(EnumMethodElaboration, ClassMethodResultTypesAreReadInTheClass) {
   ElabFixture f;
   ElabOk(
@@ -267,8 +244,6 @@ TEST(EnumMethodElaboration, ClassMethodResultTypesAreReadInTheClass) {
   EXPECT_EQ(f.diag.ErrorCount(), 3u);
 }
 
-// §G.6: a method process does not declare is reported as such, and its result
-// is checked no further.
 TEST(EnumMethodElaboration, UnknownProcessMethodResultIsLeftUnchecked) {
   ElabFixture f;
   ElabOk(

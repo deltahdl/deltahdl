@@ -39,30 +39,20 @@ bool SelectsNamedMember(const Expr* expr) {
 
 namespace {
 
-// A.8.4: a system function call is a primary a method is called on as a
-// subroutine call is, `$sformatf("%s", s).len()`.
 bool IsCall(const Expr* expr) {
   return expr->kind == ExprKind::kCall || expr->kind == ExprKind::kSystemCall;
 }
 
-// Whether `side`, the handle side of a member access, is a method call or a
-// member path down from one, `f()` or `f().p.q`: the object it denotes is the
-// one the call returned, which no name resolves. A path from a name is left to
-// the resolvers that own it, and a select on the way to the element paths.
 bool RootedAtCall(const Expr* side) {
   if (side == nullptr) return false;
   if (IsCall(side)) return true;
   return SelectsNamedMember(side) && RootedAtCall(side->lhs);
 }
 
-// Whether `expr` selects a named member, `.m`, of something RootedAtCall.
 bool SelectsMemberOfCallResult(const Expr* expr) {
   return SelectsNamedMember(expr) && RootedAtCall(expr->lhs);
 }
 
-// The call a method call's receiver starts at, through the members it selects
-// and the elements it indexes: `pk()` of `pk()`, `pk().kid` and `pk().a[1]`.
-// Null where the receiver starts at anything else, a name among them.
 const Expr* CallReceiverStartsAt(const Expr* side) {
   while (side != nullptr && !IsCall(side)) {
     if (SelectsNamedMember(side)) {
@@ -76,8 +66,6 @@ const Expr* CallReceiverStartsAt(const Expr* side) {
   return side;
 }
 
-// The method `name` of `obj` by the object's own type: a virtual one through
-// the vtable (§8.20), else the one the class or a base of it declares.
 ModuleItem* ResolveMethodOnObject(const ClassObject* obj, std::string_view name,
                                   const ClassTypeInfo** owner) {
   ModuleItem* method = obj->ResolveVirtualMethod(name, owner);
@@ -86,30 +74,6 @@ ModuleItem* ResolveMethodOnObject(const ClassObject* obj, std::string_view name,
   return method;
 }
 
-// §13.4.1's implicit variable for an aggregate return type has no storage of
-// its own: EvalFunctionCall and ExecClassMethod create it one element wide,
-// and a `return q` copies that variable's value, not q's elements, so the
-// elements a call returned reached the caller by no path at all. The callee's
-// queue or array lives in the callee's scope and goes with it, so the copy has
-// to be taken while the body runs, at the `return`, and handed over once the
-// call machinery has unwound. This register is that handover: one record per
-// running body, innermost last, which the body's `return` fills, and the
-// record the body that completed last left, which the evaluation that ran the
-// call takes. It is asked for only while such an evaluation is in progress,
-// so `x = fq()` copies nothing it did not before.
-//
-// The evaluation that ran the call is what takes the record because a body's
-// completion is the last thing the call does before its value comes back: the
-// bodies of the call's arguments and of the calls the body makes each complete
-// earlier and are overwritten, and a call answered without a body -- a DPI
-// import, a built-in -- completes none, which the reset before the call
-// leaves as no record.
-//
-// §7.3.2 (printed page 151) has a tagged union value carry its tag beside
-// the member's bits, and the tag a `return tagged M v` gives the implicit
-// variable (§13.4.1, printed 342) reaches the caller by the same handover:
-// the value comes back as a vector, which holds no tag, and the callee's
-// variable, whose tag table entry would, goes with the callee's scope.
 struct ReturnedRecord {
   std::optional<ReturnedAggregate> aggregate;
   std::string tag;
@@ -119,25 +83,15 @@ struct ReturnedAggregateRegister {
   std::vector<ReturnedRecord> bodies;
   ReturnedRecord completed;
   int evaluations = 0;
-  // The base a CallResultReceiverScope holds, and the aggregate its call
-  // returned.
   const Expr* held_base = nullptr;
   std::optional<ReturnedAggregate> held_aggregate;
 };
 
-// One register per thread, as eval_let.cpp keeps its expansion set: a body
-// never suspends (§13.4 lets a function consume no time), so the stack is
-// the running thread's own and needs no lock.
 ReturnedAggregateRegister& Register() {
   static thread_local ReturnedAggregateRegister reg;
   return reg;
 }
 
-// The queue, dynamic array or fixed-size unpacked array `returned` names,
-// its elements copied so the record outlives the callee's storage. A fixed
-// array of more than one unpacked dimension has no element list of the shape
-// a single index reads, so it records nothing, as does a name that is no
-// aggregate.
 std::optional<ReturnedAggregate> CaptureAggregate(const Expr* returned,
                                                   SimContext& ctx,
                                                   Arena& arena) {
@@ -168,9 +122,6 @@ std::optional<ReturnedAggregate> CaptureAggregate(const Expr* returned,
   return agg;
 }
 
-// §7.2 with §13.4.1: the layout of the structure the call `call` returns,
-// registered under the return type's name, or null where the call names no
-// declared function or its return type is no named structure.
 const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
                                              Arena& arena) {
   if (call->kind != ExprKind::kCall) return nullptr;
@@ -179,10 +130,6 @@ const StructTypeInfo* CallResultStructLayout(const Expr* call, SimContext& ctx,
   return ctx.FindStructType(func->return_type.type_name);
 }
 
-// §7.2: the member `expr->rhs` of the structure `value` laid out by
-// `layout`, its window read off the layout, and §6.11.2 converting the
-// unknowns of a 2-state member's window to zeros as a read of the member of a
-// variable does. False where there is no layout or it has no such member.
 bool ReadLayoutMember(const StructTypeInfo* layout, const Expr* expr,
                       const Logic4Vec& value, Arena& arena, Logic4Vec& out) {
   if (layout == nullptr) return false;
@@ -194,7 +141,6 @@ bool ReadLayoutMember(const StructTypeInfo* layout, const Expr* expr,
     return false;
   }
   out = ExtractBitField(arena, value, bit_offset, width);
-  // §7.2 with §6.16: a string member's bits are a handle to its text.
   if (kind == DataTypeKind::kString) {
     out = StringMemberText(out, arena);
     return true;
@@ -203,17 +149,12 @@ bool ReadLayoutMember(const StructTypeInfo* layout, const Expr* expr,
   return true;
 }
 
-// §7.2: the member `expr->rhs` of the structure `value` the call `expr->lhs`
-// returned. False where the call returns no named structure or the layout
-// has no such member.
 bool TryStructResultMember(const Expr* expr, const Logic4Vec& value,
                            SimContext& ctx, Arena& arena, Logic4Vec& out) {
   return ReadLayoutMember(CallResultStructLayout(expr->lhs, ctx, arena), expr,
                           value, arena, out);
 }
 
-// Whether `e` is a name or a chain of member selects of names, `h` or `d.c`,
-// which evaluates to the object it names and runs nothing.
 bool IsHandleNamePath(const Expr* e) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kIdentifier) return true;
@@ -222,10 +163,6 @@ bool IsHandleNamePath(const Expr* e) {
          IsHandleNamePath(e->lhs);
 }
 
-// Whether the call `call` runs the body of a declared subroutine: a module's
-// (FindSubroutineTarget), a method called through a handle a name path holds,
-// `k.get()`, or one of the running method's object called bare, `get()` --
-// and not an array method, `q.find(x) with (x > 1)`, or a built-in one.
 bool CallsDeclaredSubroutine(const Expr* call, SimContext& ctx, Arena& arena) {
   if (FindSubroutineTarget(call, ctx, arena).func != nullptr) return true;
   const ClassTypeInfo* owner = nullptr;
@@ -239,7 +176,6 @@ bool CallsDeclaredSubroutine(const Expr* call, SimContext& ctx, Arena& arena) {
     return obj != nullptr &&
            ResolveMethodOnObject(obj, access->rhs->text, &owner) != nullptr;
   }
-  // A bare call names its callee by its own text or by an identifier callee.
   std::string_view bare = access == nullptr ? std::string_view(call->text)
                           : access->kind == ExprKind::kIdentifier
                               ? std::string_view(access->text)
@@ -249,11 +185,6 @@ bool CallsDeclaredSubroutine(const Expr* call, SimContext& ctx, Arena& arena) {
          ResolveMethodOnObject(self, bare, &owner) != nullptr;
 }
 
-// §7.2 with §7.4.5, §7.12.1 and §13.4.1: the layout of an element of the
-// array the call `call` returns -- a declared function's, registered under
-// its return type's name, or an array method's, `sq.find(i) with (...)`,
-// whose result holds the elements of the array it is called on, laid out by
-// that array's element type. Null where neither answers.
 const StructTypeInfo* ElementLayoutOfCall(const Expr* call, SimContext& ctx,
                                           Arena& arena) {
   if (const StructTypeInfo* layout = CallResultStructLayout(call, ctx, arena))
@@ -266,11 +197,6 @@ const StructTypeInfo* ElementLayoutOfCall(const Expr* call, SimContext& ctx,
   return StructLayoutOfName(access->lhs->text, ctx);
 }
 
-// §7.2 with §7.4.5: `mk()[1].y` and `sq.find(i) with (i.x == 3) [0].y` read
-// the member of the structure the element select of an array-valued call
-// yields. The select on the call is evaluated as it is alone, `e = mk()[1]`,
-// and its member read off the element type's layout; left to the paths that
-// read a member through a named array's layout, it read 0.
 bool TryElementOfCallResultMember(const Expr* expr, SimContext& ctx,
                                   Arena& arena, Logic4Vec& out) {
   const Expr* sel = expr->lhs;
@@ -282,11 +208,6 @@ bool TryElementOfCallResultMember(const Expr* expr, SimContext& ctx,
   if (const StructTypeInfo* layout = ElementLayoutOfCall(sel->base, ctx, arena))
     return ReadLayoutMember(layout, expr, EvalExpr(sel, ctx, arena), arena,
                             out);
-  // §13.4.1: a declared function's return type named by a typedef the run
-  // records no layout under -- a module's `typedef s_t q_t[$]` -- lays its
-  // elements out as the variable the body returned does. The call runs once
-  // here, and a result with no such layout reads as the element of no layout
-  // read 0 before.
   if (!CallsDeclaredSubroutine(sel->base, ctx, arena)) return false;
   std::optional<ReturnedAggregate> returned;
   EvalWithReturnedAggregate(sel->base, ctx, arena, returned);
@@ -302,9 +223,6 @@ bool TryElementOfCallResultMember(const Expr* expr, SimContext& ctx,
   return true;
 }
 
-// §7.10.2.1 and §7.5.2: size() is the number of elements the queue or the
-// dynamic array holds, an `int`. No other method is answered on an aggregate
-// a call returned.
 bool TryReturnedAggregateMethod(const ReturnedAggregate& returned,
                                 std::string_view method, Arena& arena,
                                 Logic4Vec& out) {
@@ -398,9 +316,6 @@ void RecordReturnedVariableTag(const Expr* returned, SimContext& ctx) {
   auto& reg = Register();
   if (reg.evaluations == 0 || reg.bodies.empty()) return;
   if (returned == nullptr || returned->kind != ExprKind::kIdentifier) return;
-  // The layout gate keeps a tag left in the table under a bare name -- a
-  // local of an earlier call, a top-level object of the same name -- from
-  // being read as the tag of a variable that has none.
   const StructTypeInfo* layout = StructLayoutOfName(returned->text, ctx);
   if (layout == nullptr || !layout->is_union) return;
   std::string_view tag = ctx.GetVariableTag(TagKeyOfName(returned->text, ctx));
@@ -442,14 +357,6 @@ Logic4Vec EvalWithReturnedTag(const Expr* expr, SimContext& ctx, Arena& arena,
   return value;
 }
 
-// One step of the walk from an aggregate's layout to the member `seg` names
-// in it: the member's own layout, with `key` -- the tag key of the aggregate,
-// its storage key followed by the path so far -- extended by the member's
-// name. Null where `seg` names no member or a scalar one, and null where the
-// aggregate is a tagged union whose current tag is another member than
-// `seg`, since §11.9 (printed page 304) makes the write inconsistent with the
-// tag a run-time error that the store reports and declines, and a tag set
-// for a member never written would be read against nothing.
 static const StructTypeInfo* DescendToMember(const StructTypeInfo& layout,
                                              std::string_view seg,
                                              std::string& key,
@@ -465,13 +372,6 @@ static const StructTypeInfo* DescendToMember(const StructTypeInfo& layout,
   return field->nested;
 }
 
-// Whether the member access `lhs`, `s.u` or `s.p.u`, names a tagged union
-// member of a variable, and the key that member's tag stands under: the key
-// the variable's storage was created by (TagKeyOfName) followed by the
-// member path, "s.u" for a top-level s and "m.s.u" for one inside instance
-// m, the same shape the layout table gives a nested member's window by. A
-// path a scope resolution starts, a member of a class object and a member no
-// layout answers name no key.
 bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key) {
   if (lhs->kind != ExprKind::kMemberAccess || lhs->is_scope_resolution)
     return false;
@@ -493,15 +393,6 @@ bool TaggedUnionMemberKey(const Expr* lhs, SimContext& ctx, std::string& key) {
   return false;
 }
 
-// §7.3.2 (printed page 151) has a tagged union value carry its tag beside the
-// member's bits, whether the union is a variable or the member of one:
-// `s.u = tagged Valid 9` and `s.u = g()` give s's member u the tag Valid as
-// `u = tagged Valid 9` gives u, and §11.9 (printed 304) checks a later write
-// into that member, `s.u.Other = 3`, against it. The member store takes the
-// bits alone (WriteStructField sees no right-hand expression), so the tag is
-// set here, under the member's own key (TaggedUnionMemberKey), from the
-// member a `tagged M v` names or the one a call's body returned. Every other
-// member target, and every other right-hand side, is evaluated as it was.
 bool ElementTagKey(const Expr* select, SimContext& ctx, Arena& arena,
                    std::string& key) {
   if (select->kind != ExprKind::kSelect || select->base == nullptr ||
@@ -516,8 +407,6 @@ bool ElementTagKey(const Expr* select, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The key the tag of the target `lhs` stands under where it is a member of a
-// variable (TaggedUnionMemberKey) or an element of an array (ElementTagKey).
 static bool TaggedTargetKey(const Expr* lhs, SimContext& ctx, Arena& arena,
                             std::string& key) {
   if (lhs->kind == ExprKind::kSelect)
@@ -525,8 +414,6 @@ static bool TaggedTargetKey(const Expr* lhs, SimContext& ctx, Arena& arena,
   return TaggedUnionMemberKey(lhs, ctx, key);
 }
 
-// Whether the right-hand side of `stmt` carries a tag to its target: a
-// `tagged M v` naming its member, or a call whose body may return one.
 static bool RhsCarriesTag(const Stmt* stmt) {
   return stmt->rhs->kind == ExprKind::kCall ||
          (stmt->rhs->kind == ExprKind::kTagged && stmt->rhs->rhs != nullptr);
@@ -552,40 +439,15 @@ static Logic4Vec EvalRhsForTaggedMember(const Stmt* stmt, SimContext& ctx,
                                     LhsContextWidth(stmt->lhs, ctx, arena))
               : EvalRhsWithStructContext(stmt, ctx, arena);
   if (is_tagged) tag = std::string(stmt->rhs->rhs->text);
-  // The tag table keeps the view it is given, so the key is interned in the
-  // arena rather than left in a string that ends with this statement.
   if (!tag.empty()) ctx.SetVariableTag(*arena.Create<std::string>(key), tag);
   return value;
 }
 
-// §7.3.2 (printed page 151) has a tagged union value carry its tag beside
-// the member's bits, §13.4.1 (printed 342) gives the implicit variable of a
-// call the return type, tag included for `return tagged M v`, and §11.9
-// (printed 304) checks every later member read of the target against the
-// tag the assignment gave it. `u = g();` copied the bits alone: the store
-// path reads the tag off a `tagged` right-hand side and a call is none, so
-// `u.Valid` was checked against no tag and `u.Other` raised nothing. The tag
-// a call's body returned is taken by the same handover a formal's binding
-// takes it (EvalWithReturnedTag), and set where the `u = tagged M v` writer
-// sets it, for a target whose layout is a union; a structure target has no
-// tag, a select names no union of its own, and a member target that is a
-// tagged union of a variable's is EvalRhsForTaggedMember's.
 Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
                                      Arena& arena) {
   if (stmt->rhs == nullptr) return EvalRhsWithStructContext(stmt, ctx, arena);
-  // §11.4.14.3 with §11.4.14.1 (printed pages 291-292): the source of an
-  // unpack is a bit-stream, and one that names an unpacked aggregate -- a
-  // queue, a dynamic or a fixed-size array -- is the bit-stream cast of its
-  // elements, the first in the most significant bits, which
-  // PackBitStreamOperand builds as it does for $countones. Evaluated as a
-  // name, a queue answered its carrier alone, so `{<< 8 {h, l, c, d}} = pkt`
-  // of a 17-byte queue was reported "too few bits in stream": the suite's
-  // 11.4.14.4--dynamic_array_stream-sim.sv (#4365) and the queue source of
-  // #4042.
   if (stmt->lhs->kind == ExprKind::kStreamingConcat)
     return PackBitStreamOperand(stmt->rhs, ctx, arena);
-  // §7.3.2 with §7.4: an element of an array of tagged unions holds its tag
-  // as a member does, under the key ElementTagKey forms.
   if (stmt->lhs->kind == ExprKind::kMemberAccess ||
       stmt->lhs->kind == ExprKind::kSelect)
     return EvalRhsForTaggedMember(stmt, ctx, arena);
@@ -593,34 +455,23 @@ Logic4Vec EvalRhsCarryingReturnedTag(const Stmt* stmt, SimContext& ctx,
       stmt->lhs->kind != ExprKind::kIdentifier) {
     return EvalRhsWithStructContext(stmt, ctx, arena);
   }
-  // §11.6.1 sizes the call by the target as any right-hand side is, which a
-  // let instance's body takes (§11.12).
   std::string tag;
   Logic4Vec value = EvalWithReturnedTag(stmt->rhs, ctx, arena, tag,
                                         LhsContextWidth(stmt->lhs, ctx, arena));
   if (tag.empty()) return value;
   const StructTypeInfo* layout = StructLayoutOfName(stmt->lhs->text, ctx);
   if (layout == nullptr || !layout->is_union) return value;
-  // The tag table keeps the view it is given, so the key is interned in the
-  // arena rather than left in a string that ends with this statement.
   ctx.SetVariableTag(
       *arena.Create<std::string>(TagKeyOfName(stmt->lhs->text, ctx)), tag);
   return value;
 }
 
-// The assignment `stmt` of a call's result, and the context and arena it
-// is carried out in.
 struct CallResultAssign {
   const Stmt* stmt;
   SimContext& ctx;
   Arena& arena;
 };
 
-// Copies `returned` into the queue or dynamic array `q` the statement's
-// target names, as an assignment to it rebuilds its elements: each at the
-// element width, fresh element identities, and the change announced to the
-// watchers of `owner`, the object whose property it is, or of the name
-// (§9.4.2).
 static void CopyReturnedToQueue(const ReturnedAggregate& returned,
                                 QueueObject* q, ClassObject* owner,
                                 const CallResultAssign& a) {
@@ -633,9 +484,6 @@ static void CopyReturnedToQueue(const ReturnedAggregate& returned,
   AnnounceQueueChange(a.stmt->lhs, owner, a.ctx);
 }
 
-// Copies `returned` into the fixed-size array `dst` the statement's target
-// names, element for element from the left of each (§7.6); a different
-// number of elements is the §7.6 error, and nothing is written.
 static void CopyReturnedToArray(const ReturnedAggregate& returned,
                                 const ArrayInfo& dst,
                                 const CallResultAssign& a) {
@@ -675,8 +523,6 @@ bool TryCallResultArrayAssign(const Stmt* stmt, SimContext& ctx, Arena& arena) {
     return false;
   std::optional<ReturnedAggregate> returned;
   Logic4Vec value = EvalWithReturnedAggregate(stmt->rhs, ctx, arena, returned);
-  // A body that returned no aggregate hands out the one value, which a queue
-  // holds as its one element, as the queue assignment path makes it.
   if (!returned && q != nullptr) {
     returned.emplace();
     returned->elements.push_back(value);
@@ -712,17 +558,11 @@ bool TryEvalCallResultMember(const Expr* expr, SimContext& ctx, Arena& arena,
       TryElementOfCallResultMember(expr, ctx, arena, out))
     return true;
   if (!SelectsMemberOfCallResult(expr)) return false;
-  // The base side is evaluated once, running the call it starts at, and read
-  // as the structure the call's return type names ahead of the handle read: a
-  // structure's bits are no handle, and a class's name registers no layout.
   Logic4Vec value = EvalExpr(expr->lhs, ctx, arena);
   if (TryStructResultMember(expr, value, ctx, arena, out)) return true;
   ClassObject* obj = ctx.GetClassObject(value.ToUint64());
   if (obj == nullptr) return false;
   out = obj->GetProperty(expr->rhs->text, arena);
-  // §6.16: a string property's value is marked a string, as a call answering
-  // one marks its own, so a string method applied to it, f().s.len(), reads
-  // its text (TryEvalCallResultMethodCall) rather than taking it for a handle.
   if (PropertyIsString(obj->type, expr->rhs->text, ctx)) out.is_string = true;
   return true;
 }
@@ -740,33 +580,21 @@ bool TryEvalCallResultMethodCall(const Expr* expr, SimContext& ctx,
   if (returned) {
     return TryReturnedAggregateMethod(*returned, access->rhs->text, arena, out);
   }
-  // §6.16 with §13.4: the call answered a string -- a subroutine declared to
-  // return one (ExecClassMethod, EvalFunctionCall) or a string method that
-  // answers one (StringResult in eval_string.cpp) marks its value so -- and
-  // the method is one of the string type's, `h.get().len()` or
-  // `s.toupper().substr(0, 2)`, read off the value the call already produced.
-  // Read as a handle, the text named no object and the call answered nothing.
   if (handle.is_string &&
       TryEvalStringMethodOnValue(handle, expr, ctx, arena, out)) {
     return true;
   }
-  // §19.8: the call answered a covergroup handle, `pick().sample()`.
   if (TryEvalCovergroupMethodOnHandle(handle, expr, ctx, arena, out)) {
     return true;
   }
   InstanceMethodInfo info;
   info.obj = ctx.GetClassObject(handle.ToUint64());
-  // §8.4: a call through the null handle a call answered is reported, once,
-  // since this arm owns the receiver and no later one evaluates it again.
   if (info.obj == nullptr) {
     ReportNullHandleCall(access->rhs->text, access->rhs->range.start, ctx);
     return false;
   }
   info.method = ResolveMethodOnObject(info.obj, access->rhs->text, &info.owner);
   if (info.method == nullptr) return false;
-  // Run as a method called through a variable is: a static one in class scope
-  // (§8.10), an instance one with its defining class as the enclosing scope
-  // (§8.15).
   out = RunInstanceMethod(info, expr, ctx, arena);
   return true;
 }

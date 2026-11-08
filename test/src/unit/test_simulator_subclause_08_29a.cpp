@@ -146,12 +146,6 @@ TEST(ClassSim, GetReachabilityStronglyReachable) {
 }
 
 TEST(ClassSim, GetReachabilityWeaklyReachableViaWeakReference) {
-  // §8.29 defines an object as weakly reachable when it is not strongly
-  // reachable yet can still be reached by traversing a weak reference (the
-  // construct introduced in §8.30). The classifier shares the same weak
-  // reference registry the weak_reference methods rely on, so dropping the
-  // lone strong handle while a weak reference survives leaves the object in
-  // the weakly reachable level rather than unreachable.
   SimFixture f;
   auto* type = MakeClassType(f, "WeaklyHeld", {"x"});
   auto [handle, obj] = MakeObj(f, type);
@@ -165,10 +159,6 @@ TEST(ClassSim, GetReachabilityWeaklyReachableViaWeakReference) {
 }
 
 TEST(ClassSim, StrongReferenceDominatesWeakReference) {
-  // §8.29 qualifies the weakly reachable level as applying only when an object
-  // is *not* strongly reachable. An object that still owns a live strong handle
-  // stays strongly reachable even while a weak reference also points at it, so
-  // the strong classification must win over a coexisting weak reference.
   SimFixture f;
   auto* type = MakeClassType(f, "BothHeld", {"x"});
   auto [handle, obj] = MakeObj(f, type);
@@ -177,8 +167,6 @@ TEST(ClassSim, StrongReferenceDominatesWeakReference) {
   wr.referent_handle = handle;
   f.ctx.RegisterWeakReference(&wr);
 
-  // The creation reference count is still 1, so a strong reference coexists
-  // with the weak one.
   EXPECT_EQ(f.ctx.GetReachability(handle), Reachability::kStronglyReachable);
 }
 
@@ -230,35 +218,20 @@ TEST(ClassSim, CollectGarbagePreservesObjectWithPendingNba) {
 }
 
 TEST(ClassSim, CollectGarbagePreservesObjectPinnedByActiveThis) {
-  // §8.29 states that a newly created object is strongly reachable by the
-  // process that created it. The simulator models the receiver of the
-  // currently executing method with the `this` stack; the collector must treat
-  // an object on that stack as live even when no named handle references it
-  // yet. Collection runs only between processes in this build (never while a
-  // method is mid-execution), so the active-`this` pinning is the one strong
-  // reachability condition that cannot be reached from source and is exercised
-  // directly here.
   SimFixture f;
   auto* type = MakeClassType(f, "Receiver", {"x"});
   auto [handle, obj] = MakeObj(f, type);
 
-  // Nothing in any variable scope roots the object; only the active `this`
-  // keeps it reachable.
   f.ctx.PushThis(obj);
   f.ctx.CollectGarbage();
   EXPECT_NE(f.ctx.GetClassObject(handle), nullptr);
 
-  // After the method returns and the receiver leaves the `this` stack, the now
-  // unreferenced object becomes eligible for reclamation.
   f.ctx.PopThis();
   f.ctx.CollectGarbage();
   EXPECT_EQ(f.ctx.GetClassObject(handle), nullptr);
 }
 
 TEST(ClassSim, CollectGarbageReclaimsWeaklyReachableObject) {
-  // §8.29: a weak reference never keeps an object alive. Once the last strong
-  // handle is dropped the object is only weakly reachable, and garbage
-  // collection may then carry its state to unreachable and reclaim the memory.
   SimFixture f;
   auto* type = MakeClassType(f, "WeakOnly", {"x"});
   auto [handle, obj] = MakeObj(f, type);
@@ -374,21 +347,7 @@ TEST(ClassSim, E2eReassignToNewObjectOldHandleLost) {
   LowerRunAndCheck(f, design, {{"result", 0u}});
 }
 
-// --- §8.29 sole normative shall, observed through the full pipeline ---------
-//
-// The synthetic CollectGarbage tests above hand-build objects with MakeObj and
-// call the collector directly. §8.29's rule that the system reclaims every
-// object no longer in use depends on how the object is produced (a real `new`,
-// §8.4) and how it stops being used (a null assignment / leaving scope), so the
-// tests below build the object from source, run the design, and only then
-// observe the production collector applying strong-reachability to a live heap.
-// Root discovery relies on the lowerer registering class-handle variables
-// (lowerer_var.cpp), so no reachability metadata is stubbed here.
-
 namespace {
-// Counts objects still resident in the heap whose handle differs from `keep`.
-// Handles are allocated monotonically from 1, so a small window covers every
-// object a compact source program can create.
 int ResidentOthers(SimFixture& f, uint64_t keep) {
   int n = 0;
   for (uint64_t h = 1; h <= keep + 8; ++h) {
@@ -398,9 +357,6 @@ int ResidentOthers(SimFixture& f, uint64_t keep) {
 }
 }  // namespace
 
-// C1: an object whose only handle is dropped at run time (`dead = null`) is
-// reclaimed by the collector, while an object still referenced by a live
-// module variable survives. Both objects are built by real `new`.
 TEST(ClassSim, E2eGcReclaimsRuntimeDroppedObjectKeepsReferenced) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -431,20 +387,14 @@ TEST(ClassSim, E2eGcReclaimsRuntimeDroppedObjectKeepsReferenced) {
   ASSERT_NE(kept, kNullClassHandle);
   ASSERT_NE(f.ctx.GetClassObject(kept), nullptr);
 
-  // The run's collector ran at the end of the time slot the object was dropped
-  // in, so it is reclaimed already (#7218).
   EXPECT_EQ(ResidentOthers(f, kept), 0);
 
   f.ctx.CollectGarbage();
 
-  // The referenced object survives; the unused one is reclaimed.
   EXPECT_NE(f.ctx.GetClassObject(kept), nullptr);
   EXPECT_EQ(ResidentOthers(f, kept), 0);
 }
 
-// C2 (strong-reachability closure): an inner object reachable only through a
-// rooted outer object's non-static member is preserved by the collector, then
-// reclaimed once the outer root is dropped.
 TEST(ClassSim, E2eGcFollowsObjectReferenceChain) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -479,16 +429,11 @@ TEST(ClassSim, E2eGcFollowsObjectReferenceChain) {
   ASSERT_NE(inner_h, kNullClassHandle);
   ASSERT_NE(f.ctx.GetClassObject(inner_h), nullptr);
 
-  // Outer is rooted by module variable `o`; the collector keeps both it and
-  // the inner object reached only through outer's `inner` member.
   f.ctx.CollectGarbage();
   EXPECT_NE(f.ctx.GetClassObject(outer_h), nullptr);
   EXPECT_NE(f.ctx.GetClassObject(inner_h), nullptr);
 }
 
-// C1 transitive: dropping the outer root leaves the whole chain unreachable, so
-// the collector reclaims both the outer object and its formerly-referenced
-// inner object.
 TEST(ClassSim, E2eGcReclaimsWholeUnreachableChain) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -514,18 +459,12 @@ TEST(ClassSim, E2eGcReclaimsWholeUnreachableChain) {
   f.ctx.RunFinalBlocks();
 
   ASSERT_EQ(f.ctx.FindVariable("o")->value.ToUint64(), kNullClassHandle);
-  // Two objects were created and neither is rooted after `o = null`, so the
-  // run's collector has reclaimed both already (#7218).
   EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 0);
 
   f.ctx.CollectGarbage();
   EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 0);
 }
 
-// C1 input form: an object stops being used when its sole handle is reassigned
-// to a fresh `new` (distinct from the null-assignment drop above). The
-// superseded object is no longer reachable and is reclaimed, while the object
-// the module variable now names survives. Both objects are built by real `new`.
 TEST(ClassSim, E2eGcReclaimsObjectDroppedByReassignment) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -553,21 +492,16 @@ TEST(ClassSim, E2eGcReclaimsObjectDroppedByReassignment) {
   uint64_t current = p_var->value.ToUint64();
   ASSERT_NE(current, kNullClassHandle);
 
-  // The object created by the first `new` was unrooted when its time slot
-  // ended, so the run's collector has reclaimed it already (#7218).
   EXPECT_EQ(ResidentOthers(f, current), 0);
 
   f.ctx.CollectGarbage();
 
-  // The current object survives; the superseded one is reclaimed.
   EXPECT_NE(f.ctx.GetClassObject(current), nullptr);
   EXPECT_EQ(f.ctx.GetClassObject(current)->GetProperty("x", f.arena).ToUint64(),
             2u);
   EXPECT_EQ(ResidentOthers(f, current), 0);
 }
 
-// §8.29 and §8.30.1: a run's collector reclaims an object no handle refers to,
-// and clears the weak references to it, by the next time slot (#7218).
 TEST(ClassSim, ARunCollectsADroppedObjectAndClearsItsWeakReference) {
   SimFixture f;
   std::string out = RunCapture(
@@ -587,8 +521,6 @@ TEST(ClassSim, ARunCollectsADroppedObjectAndClearsItsWeakReference) {
   EXPECT_EQ(out, "1\n");
 }
 
-// §8.29: a local of a process suspended while another runs is a root
-// (#7219).
 TEST(ClassSim, ASuspendedProcesssLocalKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -602,8 +534,6 @@ TEST(ClassSim, ASuspendedProcesssLocalKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: what a fork branch carries from its parent's locals is a root, after
-// the parent has ended (#7219).
 TEST(ClassSim, AForkBranchsCarriedLocalKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -619,8 +549,6 @@ TEST(ClassSim, AForkBranchsCarriedLocalKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: the object a suspended class task runs on is a root, though no
-// variable refers to it any more (#7219).
 TEST(ClassSim, ASuspendedClassTasksThisKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -636,8 +564,6 @@ TEST(ClassSim, ASuspendedClassTasksThisKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: the caller's stack $monitor keeps to re-read its arguments is a root,
-// after the caller has ended (#7220).
 TEST(ClassSim, AMonitorsCallerKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -653,7 +579,6 @@ TEST(ClassSim, AMonitorsCallerKeepsItsObject) {
   EXPECT_EQ(out, "7 0\n7 1\n");
 }
 
-// §8.29: an element of a fixed unpacked array of handles is a root (#7221).
 TEST(ClassSim, AFixedArrayElementKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -667,7 +592,6 @@ TEST(ClassSim, AFixedArrayElementKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: the elements of a queue and of a dynamic array are roots (#7222).
 TEST(ClassSim, QueueAndDynamicArrayElementsKeepTheirObjects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -691,8 +615,6 @@ TEST(ClassSim, QueueAndDynamicArrayElementsKeepTheirObjects) {
   EXPECT_EQ(out, "7 7\n");
 }
 
-// §8.29: the values and the class-handle keys of an associative array are
-// roots (#7223).
 TEST(ClassSim, AssocArrayValuesAndKeysKeepTheirObjects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -714,7 +636,6 @@ TEST(ClassSim, AssocArrayValuesAndKeysKeepTheirObjects) {
   EXPECT_EQ(out, "7 7\n");
 }
 
-// §8.29: a static class property is a root (#7224).
 TEST(ClassSim, AStaticPropertyKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -728,7 +649,6 @@ TEST(ClassSim, AStaticPropertyKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: a message a mailbox holds is a root (#7225).
 TEST(ClassSim, AMailboxMessageKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -749,10 +669,6 @@ TEST(ClassSim, AMailboxMessageKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: a pending nonblocking assignment's value is a root until it runs; to
-// a class member, whose variable records no pending value, it is held only by
-// the assignment (#7227). Both objects are resident once the run is over, the
-// one the member now holds among them.
 TEST(ClassSim, APendingNonblockingAssignmentToAMemberKeepsItsObject) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -772,8 +688,6 @@ TEST(ClassSim, APendingNonblockingAssignmentToAMemberKeepsItsObject) {
   EXPECT_EQ(ResidentOthers(f, kNullClassHandle), 2);
 }
 
-// §8.29: the value a blocking assignment holds across its intra-assignment
-// delay is a root (#7227).
 TEST(ClassSim, ABlockingIntraAssignmentDelaysValueKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -789,8 +703,6 @@ TEST(ClassSim, ABlockingIntraAssignmentDelaysValueKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: the cell a ref formal bound to a class member writes is a root
-// (#7228).
 TEST(ClassSim, ARefCellBoundToAMemberKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(
@@ -806,9 +718,6 @@ TEST(ClassSim, ARefCellBoundToAMemberKeepsItsObject) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: of two nonblocking assignments pending on one class variable, each
-// value is a root until its own update; the later-scheduled one's object
-// survives the earlier one's update to null and the collections between.
 TEST(ClassSim, TwoPendingNonblockingAssignmentsToOneVariableKeepTheirObjects) {
   SimFixture f;
   std::string out = RunCapture(
@@ -825,8 +734,6 @@ TEST(ClassSim, TwoPendingNonblockingAssignmentsToOneVariableKeepTheirObjects) {
   EXPECT_EQ(out, "7\n");
 }
 
-// §8.29: an object a delayed nonblocking assignment stores in a property of
-// its own class's type is kept by the pending assignment, then by the property.
 TEST(ClassSim, ASelfTypedPropertySetByADelayedNonblockingKeepsItsObject) {
   SimFixture f;
   std::string out = RunCapture(

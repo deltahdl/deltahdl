@@ -23,39 +23,21 @@ struct SdfDelayValue {
   uint64_t typ_val = 0;
   uint64_t max_val = 0;
 
-  // §32.7: a value may be written with a leading minus sign, which is how an
-  // annotation that lowers what it reaches is spelled. The three fields above
-  // are the magnitudes exactly as the file wrote them, so a reader that never
-  // meets a negative value sees no difference; each of the three carries its
-  // own sign here, because the members of a min:typ:max triple are written
-  // independently of one another.
   bool min_negative = false;
   bool typ_negative = false;
   bool max_negative = false;
 
-  // §32.2 (printed page 924) leaves the file's format to IEEE 1497, whose
-  // values are real numbers: the magnitudes exactly as written, `2.5` beside
-  // the 3 the fields above round it to. Scaling into the design's precision
-  // reads these, so a fraction survives it. Zero where a value was set from an
-  // integer alone, which the fields above then answer for.
   double min_real = 0.0;
   double typ_real = 0.0;
   double max_real = 0.0;
 
-  // §32.5: written as empty parentheses, `()`, which holds the value it stands
-  // for rather than stating one.
   bool empty = false;
 
-  // §32.3: a member of the triple left out, as `1::3` leaves out its typical
-  // value; selecting it annotates nothing (SdfValueHeld).
   bool min_empty = false;
   bool typ_empty = false;
   bool max_empty = false;
 };
 
-// §32.5: one direction of an IOPATH written in the form that states pulse
-// limits, `(delay reject error)`, each of which may be left as empty
-// parentheses to hold what the path already carries.
 struct SdfIopathDirection {
   SdfDelayValue delay;
   bool delay_present = false;
@@ -67,12 +49,7 @@ struct SdfIopathDirection {
 
 struct SdfIopath {
   std::string src_port;
-  // §32.4.1: the edge the source port was written with, `(posedge clk)`, which
-  // names the edge-sensitive path with that edge; kNone where it carries none.
   SpecifyEdge src_edge = SpecifyEdge::kNone;
-  // False where the source was written with an SDF edge no module path
-  // declares -- 01, 10 or a transition to or from z -- so the entry names no
-  // path and is reported rather than annotated.
   bool src_edge_known = true;
   std::string dst_port;
   SdfDelayValue rise;
@@ -80,23 +57,12 @@ struct SdfIopath {
   SdfDelayValue turnoff;
   bool is_increment = false;
 
-  // §32.8 Table 32-4: the whole delay list in the order it was written. A
-  // module path carries twelve state transition delays and an entry may list
-  // one, two, three, six or twelve of them, and it is how many it listed that
-  // decides how they are spread over the twelve -- one value reaches every
-  // transition, two keep the rise and fall families apart, three add the
-  // turn-off family, six and twelve name the transitions outright. `rise`,
-  // `fall` and `turnoff` are the first three, kept for callers that only ever
-  // want those.
   std::vector<SdfDelayValue> values;
 
   std::string condition;
 
   bool is_ifnone = false;
 
-  // The form that writes each direction as `(delay reject error)`, with its
-  // directions in the order written; `values` then holds their delays, an
-  // empty one as a zero the annotator holds rather than writes.
   bool extended_form = false;
   std::vector<SdfIopathDirection> directions;
 };
@@ -122,25 +88,16 @@ struct SdfTimingCheck {
   SpecifyEdge ref_edge = SpecifyEdge::kNone;
   std::string data_port;
   SpecifyEdge data_edge = SpecifyEdge::kNone;
-  // §32.4.2: the §31.5 edge descriptor a signal's SDF transition edge, 01 or
-  // 1z, stands for, where its edge is SpecifyEdge::kEdge.
   std::vector<std::pair<char, char>> ref_edge_descriptors;
   std::vector<std::pair<char, char>> data_edge_descriptors;
 
   SdfDelayValue limit;
   SdfDelayValue limit2;
 
-  // §32.4.2: the condition each signal was written with, matched against the
-  // declared check's condition on that same signal; empty where it carries
-  // none. `condition` is the reference's, or the data signal's where the
-  // reference has none.
   std::string condition;
   std::string ref_condition;
   std::string data_condition;
 
-  // The keyword of a parenthesized construct the check carried after its
-  // values, SCOND or CCOND, which conditions the check in a way no declared
-  // check's condition is matched against; empty where it carried none.
   std::string trailing_construct;
 };
 
@@ -164,23 +121,11 @@ struct SdfInterconnect {
   SdfInterconnectKind kind = SdfInterconnectKind::kInterconnect;
   bool is_increment = false;
 
-  // §32.4.4: an interconnect delay carries twelve transition delays, filled in
-  // from the values the entry lists exactly the way a module path delay is, so
-  // an entry may list one, two, three, six or twelve of them. `rise` and `fall`
-  // are the first two, kept for callers that only ever want those; `values`
-  // holds the whole list in the order it was written.
   std::vector<SdfDelayValue> values;
 
-  // §32.4.4 with §32.5: each listed value as a direction, its delay with the
-  // reject and error limits a value written `((d) (r) (e))` states beside it.
   std::vector<SdfIopathDirection> directions;
 };
 
-// §32.4.1 Table 32-1: a DEVICE entry of a DELAY section. `port_instance` is the
-// optional operand naming what the delay lands on -- a module instance or one
-// of its outputs; when it is empty the entry carries no operand and reaches
-// every module output. The delay values follow the same rise/fall/turnoff shape
-// an IOPATH uses.
 struct SdfDevice {
   std::string port_instance;
   SdfDelayValue rise;
@@ -188,13 +133,6 @@ struct SdfDevice {
   SdfDelayValue turnoff;
   bool is_increment = false;
 
-  // §32.8: the whole delay list in the order it was written. A DEVICE delay may
-  // reach a specify path, which carries twelve state transition delays, or --
-  // where the outputs it reaches have no specify path -- a gate primitive,
-  // which carries three; how many values the entry listed decides both how the
-  // twelve are filled in and which of the values a three-delay target keeps.
-  // `rise`, `fall` and `turnoff` are the first three, kept for callers that
-  // only ever want those.
   std::vector<SdfDelayValue> values;
 };
 
@@ -206,16 +144,9 @@ struct SdfPulseLimit {
   bool has_error = false;
   bool is_percent = false;
 
-  // §32.7: which mode the DELAY section carrying this entry was written in. A
-  // pulse limit annotated in INCREMENT mode changes the limit the path already
-  // holds rather than stating it outright, so the section's mode has to travel
-  // with the entry the way it does for every other construct a section holds.
   bool is_increment = false;
 };
 
-// §32.5: which of a cell's parsed lists one construct was appended to. Every
-// construct a cell can carry is enumerated here, not just the ones a DELAY
-// section holds, because annotation runs over all of them in one order.
 enum class SdfCellEntryKind : uint8_t {
   kIopath,
   kPulseLimit,
@@ -243,20 +174,12 @@ struct SdfCell {
 
   std::vector<SdfDevice> devices;
 
-  // §32.5: annotation is an ordered process, so a cell keeps the order its
-  // constructs were written in. One construct's annotation may be changed by a
-  // later one that overwrites or modifies it, and the two need not be the same
-  // construct or even sit in the same section, so a single list spans every
-  // section of the cell rather than one list per section.
   std::vector<SdfCellEntryRef> entry_order;
 };
 
 struct SdfFile {
   std::string version;
   std::string design;
-  // The unit the file's values are in, in seconds, as its TIMESCALE header
-  // names it, `(TIMESCALE 100ps)` being 1e-10; zero where the file has no
-  // header, IEEE 1497 then putting its values in 1 ns.
   double timescale_seconds = 0.0;
   std::vector<SdfCell> cells;
 
@@ -303,10 +226,6 @@ SdfDelayValue ApplySdfScaling(SdfDelayValue value, SdfScaleType type,
 SdfFile ScaleSdfFile(const SdfFile& file, SdfScaleType type,
                      const SdfScaleFactors& factors);
 
-// §32.9: write one entry per individual annotation the file carries. The
-// region is read as AnnotateSdfToManager reads it; cells outside it are not
-// annotated and so contribute no entries. An empty region covers the whole
-// file.
 bool WriteSdfAnnotationLog(const SdfFile& file, std::string_view log_path,
                            std::string_view region_prefix = {},
                            std::string_view design_root = {});
@@ -327,43 +246,19 @@ ResolvedSdfAnnotateArgs ResolveSdfAnnotateArgs(
     std::string_view explicit_mtm_spec, std::string_view explicit_scale_factors,
     std::string_view explicit_scale_type, const SdfAnnotateConfig& config);
 
-// §32.9: read the keywords a configuration file supplies for the arguments
-// $sdf_annotate can also be given directly. Returns false when the named file
-// cannot be opened, leaving `out` as it was.
 bool ReadSdfAnnotateConfigFile(std::string_view path, SdfAnnotateConfig& out);
 
 bool ParseSdf(std::string_view input, SdfFile& out);
 
-// §32.9: read an SDF file named by the sdf_file argument of $sdf_annotate and
-// parse it. Returns false when the file cannot be opened or does not parse.
 bool ReadSdfFile(std::string_view path, SdfFile& out);
 
-// §32.9 Syntax 32-1: one $sdf_annotate call's operands, each already reduced
-// from its expression to the text it names. An operand left out of the call is
-// empty here, which is also how a call writes an operand it skips over on its
-// way to a later one.
 struct SdfAnnotateTaskArgs {
   std::string sdf_file;
   std::string module_instance;
 
-  // The name of the module the design was elaborated as, which every
-  // hierarchical name in the run is relative to. It is not an operand of
-  // §32.9's $sdf_annotate; it is here because an SDF instance path is written
-  // from the root while PathDelay::inst_prefix counts from below it, and only
-  // the root's own name says where one becomes the other.
   std::string design_root;
-  // The design's time precision in seconds, the tick an annotated delay is
-  // counted in, into which the file's values are scaled from its TIMESCALE;
-  // zero leaves them as the file wrote them.
   double precision_seconds = 0.0;
-  // §32.9: the instance prefix, in PathDelay::inst_prefix's spelling, of the
-  // region the annotation runs at -- the level module_instance names, else the
-  // instance of the module holding the call -- which cell paths are read from.
   std::string region_prefix;
-  // §32.9 with §27.5 and §23.6: the storage key, without its trailing `.`, of
-  // the instance a hierarchical path names where the two differ -- "gb_u" for
-  // "gb.u", an instance generate block gb holds -- and empty otherwise. Unset,
-  // every cell's path is taken as its instance's key.
   std::function<std::string_view(std::string_view)> instance_key_of_path;
   std::string config_file;
   std::string log_file;
@@ -372,22 +267,9 @@ struct SdfAnnotateTaskArgs {
   std::string scale_type;
 };
 
-// §32.8 Table 32-4: spread the delay values an SDF entry listed over the twelve
-// state transitions a specify path or an interconnect can carry, taking from
-// each value the min/typ/max member `mtm` selects. A file may list fewer than
-// twelve, and it is how many it listed that decides the spreading: one value
-// reaches every transition, and two, three and six each fill the transitions
-// they name outright and derive the rest. Twelve are taken as written.
 std::vector<uint64_t> ExpandSdfDelays(const std::vector<SdfDelayValue>& vals,
                                       SdfMtm mtm);
 
-// §32.8: map the same list for a construct that carries three state transition
-// delays rather than twelve, which is every construct but a specify path and an
-// interconnect -- a gate primitive or a continuous assignment among them. The
-// first three returned are the values the entry listed, any beyond the third
-// dropped; a list shorter than three is filled out the way a construct's own
-// short delay list is. The fourth is the delay to the x state, which is the
-// smallest of the three.
 std::array<uint64_t, 4> ReduceSdfDelaysToThree(
     const std::vector<SdfDelayValue>& vals, SdfMtm mtm);
 
@@ -395,57 +277,21 @@ struct SdfAnnotationResult {
   std::vector<std::string> warnings;
 };
 
-// §32.9: annotate each cell of `file` whose path lies in the region
-// `region_prefix` names (SdfCellPrefixInRegion), the whole design where it is
-// empty.
 SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          SpecifyManager& mgr, SdfMtm mtm,
                                          std::string_view region_prefix = {},
                                          std::string_view design_root = {});
 
-// §32.9: carry out one $sdf_annotate call. The named SDF file is read, the
-// configuration file's keywords are taken and then overridden by whichever of
-// mtm_spec / scale_factors / scale_type the call itself supplied, the values
-// are scaled, and what is left is annotated into the region module_instance
-// names. `tool_default` is the min/typ/max member the simulator picks when the
-// call leaves the choice to it (Table 32-5, TOOL_CONTROL).
-//
-// §32.6: `mgr` carries whatever earlier calls already annotated, so a run of
-// calls against one manager is how more than one SDF file is annotated: an
-// ABSOLUTE value overwrites what an earlier file left and an INCREMENT value
-// modifies it.
 SdfAnnotationResult RunSdfAnnotateTask(const SdfAnnotateTaskArgs& args,
                                        SpecifyManager& mgr,
                                        SdfMtm tool_default = SdfMtm::kTypical);
 
-// §32.9: the hierarchical name a module_instance operand writes, rebuilt as
-// text from its expression form. Array indices are permitted, so an indexed
-// instance keeps its index, with the index expression evaluated to the element
-// it selects.
 std::string SdfAnnotateScopeName(const Expr* e, SimContext& ctx, Arena& arena);
 
-// §32.9 (printed page 932): the instance prefix, in the spelling
-// PathDelay::inst_prefix carries (dividers as `.`, a trailing `.`, empty for
-// the top), of the instance an SDF cell's path `instance` names, read from the
-// region the annotation runs at -- `region_prefix`, in the same spelling -- or
-// nullopt where that instance lies outside the region. The annotation runs at
-// the hierarchy level of the instance the call names, so a path is read from
-// the region down, `(INSTANCE inner)` under the region m2 being m2.inner, and
-// one written from the top, its first level the top module's own name
-// `design_root`, names the instance that path reaches from there. An SDF path
-// divides its levels with `/` where a SystemVerilog name divides with `.`, and
-// either is read.
-//
-// An empty `design_root` answers empty for every cell: with no root the
-// annotator cannot tell a path from the top from one below the region, and
-// says only that the cell belongs to whatever the manager holds at the top.
 std::optional<std::string> SdfCellPrefixInRegion(std::string_view instance,
                                                  std::string_view region_prefix,
                                                  std::string_view design_root);
 
-// §32.9: run a parsed $sdf_annotate call against the SpecifyManager bound to
-// `ctx`. Returns false when the call names no SDF file or nothing is bound to
-// annotate into.
 bool EvalSdfAnnotateTask(const Expr* call, SimContext& ctx, Arena& arena);
 
 }  // namespace delta

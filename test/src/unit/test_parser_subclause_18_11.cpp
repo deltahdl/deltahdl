@@ -21,9 +21,6 @@ TEST(SubroutineCallExprParsing, VariableIdentifierList) {
   EXPECT_EQ(expr->kind, ExprKind::kCall);
 }
 
-// 18.11: randomize() accepts as arguments only names of the calling object's
-// properties, which A.8.2 writes as a variable_identifier_list, so an element
-// a select picks out of a property is no argument (#8060).
 TEST(SubroutineCallExprParsing, PropertySelectArgIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -35,7 +32,6 @@ TEST(SubroutineCallExprParsing, PropertySelectArgIsRejected) {
                             2, "18.11"));
 }
 
-// 18.11: an expression is no argument of randomize() written bare either.
 TEST(SubroutineCallExprParsing, ExpressionArgToTheBareFormIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -47,8 +43,6 @@ TEST(SubroutineCallExprParsing, ExpressionArgToTheBareFormIsRejected) {
                             2, "18.11"));
 }
 
-// 18.11: expressions are not allowed as randomize() arguments. An arithmetic
-// expression in the argument list is rejected.
 TEST(SubroutineCallExprParsing, ExpressionArgIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -60,8 +54,6 @@ TEST(SubroutineCallExprParsing, ExpressionArgIsRejected) {
                             2, "18.11"));
 }
 
-// 18.11: a literal constant is an expression, not a property name, so it is not
-// a valid randomize() argument.
 TEST(SubroutineCallExprParsing, LiteralArgIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -73,9 +65,6 @@ TEST(SubroutineCallExprParsing, LiteralArgIsRejected) {
                             2, "18.11"));
 }
 
-// 18.11: a function call yields a value through computation rather than naming
-// a property, so it is an expression and is not an acceptable randomize()
-// argument.
 TEST(SubroutineCallExprParsing, FunctionCallArgIsRejected) {
   auto r = Parse(
       "module m;\n"

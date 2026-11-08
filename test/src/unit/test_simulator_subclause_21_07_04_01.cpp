@@ -6,9 +6,6 @@
 #include <string>
 #include <vector>
 
-// Completes the CoverageDB type that sim_context.h only forward-declares;
-// included ahead of the fixtures so SimContext's inline constructor (whose
-// unwind path destroys the owned coverage database) is well-formed in this TU.
 #include "common/types.h"
 #include "fixture_vcd_dump_from_source.h"
 #include "fixture_vcd_dump_run.h"
@@ -22,31 +19,8 @@
 namespace delta {
 namespace {
 
-// §21.7.4.1: the syntax of the extended VCD file (Syntax 21-27) plus the
-// subclause's prose rules about the file's contents: a 4-state construct name
-// matching an extended construct is equivalent (unless preceded by *), the
-// header/definitions/value-change ordering with only changed ports listed per
-// increment, absolute simulation times, binary port values carrying strength
-// information, %.16g reals readable back with a %g scanf, whole-vector-only
-// dumps with no part-select or expression entries, and case-sensitive data.
-// Every rule governs the file the dumper writes, so each test drives real
-// SystemVerilog source -- declaring the dumped objects and invoking the
-// §21.7.3.x $dumpports task family, which marks the writer extended -- through
-// parse, elaboration, lowering, and the scheduler with the driver's
-// per-timestep recording loop installed, then checks the file against the
-// grammar. Only the port-form productions (the $var port node entries and the
-// p-value changes selected by SetExtendedPortNodes) are observed at the writer
-// stage directly: no production caller enables that form yet (wiring it into
-// the task path belongs to §21.7.4.2/§21.7.4.3), and the grammar of the
-// writer's own output does not depend on how a value reached the writer.
 class ExtendedVcdSyntaxSim : public VcdDumpRunTestBase {
  protected:
-  // Runs a single-module source through the full pipeline with the driver's
-  // dump loop (timestamp + changed values at the end of each time unit) and
-  // returns the dump file contents, mirroring the driver's registration
-  // sequence (header, module scope, the model's dumpable objects,
-  // $enddefinitions). `close_file` mirrors the driver's final step of handing
-  // the writer the end simulation time as the file is closed.
   std::string RunVcd(const std::string& src, bool close_file = false) {
     return RunVcdDump(src,
                       {.scope = "t",
@@ -54,19 +28,7 @@ class ExtendedVcdSyntaxSim : public VcdDumpRunTestBase {
                        .close_file = close_file});
   }
 };
-// ---- Token-level validator for Syntax 21-27 ----
-//
-// The productions are white-space-insensitive (§21.7.4 established the
-// extended file is free format), so validating the token stream validates the
-// file. The subclause's opening rule folds the 4-state vocabulary in: a
-// 4-state construct name that matches an extended construct is equivalent, so
-// wherever the extended file reuses a matching 4-state construct the 4-state
-// rendering is admitted alongside the extended one.
 
-// port_value state characters: the input (D U N Z d u), output (L H X T l h),
-// and unknown-direction (0 1 ? F A a B b C c f) alphabets, plus the x and z
-// the subclause's prose uses for a port's binary unknown/high-impedance
-// states.
 bool IsPortValueChars(const std::string& t) {
   if (t.empty()) return false;
   for (char c : t) {
@@ -77,7 +39,6 @@ bool IsPortValueChars(const std::string& t) {
 
 bool IsStrengthDigit(char c) { return c >= '0' && c <= '7'; }
 
-// size ::= 1 | vector_index, with vector_index ::= [msb_index:lsb_index].
 bool IsPortSize(const std::string& t) {
   if (t == "1") return true;
   if (t.size() < 5 || t.front() != '[' || t.back() != ']') return false;
@@ -87,13 +48,10 @@ bool IsPortSize(const std::string& t) {
          IsDecimal(t.substr(colon + 1, t.size() - colon - 2));
 }
 
-// identifier_code ::= < {integer}.
 bool IsPortIdentifierCode(const std::string& t) {
   return t.size() >= 2 && t[0] == '<' && IsDecimal(t.substr(1));
 }
 
-// declaration_keyword: the 4-state set the extended file shares by name
-// equivalence plus the extended-only $vcdclose.
 bool IsDeclKeyword(const std::string& t) {
   static const char* kws[] = {"$comment", "$date",      "$enddefinitions",
                               "$scope",   "$timescale", "$upscope",
@@ -104,19 +62,12 @@ bool IsDeclKeyword(const std::string& t) {
   return false;
 }
 
-// simulation_keyword ::= $dumpports | $dumpportsoff | $dumpportson |
-// $dumpportsall, plus the name-equivalent 4-state checkpoint keywords the
-// hybrid (non-port-form) extended file carries.
 bool IsSimSectionKeyword(const std::string& t) {
   return t == "$dumpports" || t == "$dumpportsoff" || t == "$dumpportson" ||
          t == "$dumpportsall" || t == "$dumpvars" || t == "$dumpall" ||
          t == "$dumpoff" || t == "$dumpon";
 }
 
-// Consumes one value_change at toks[i]. The 4-state scalar/b/r forms are
-// admitted by the name-equivalence rule; the extended form is the p-token
-// (value ::= p port_value 0_strength_component 1_strength_component) followed
-// by its < identifier code. Returns "" on success.
 std::string ConsumeValueChange(const std::vector<std::string>& toks,
                                size_t& i) {
   bool handled = false;
@@ -125,8 +76,6 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
 
   const std::string& t = toks[i];
   if (t[0] == 'p') {
-    // p, then one port_value state character per bit, then the two strength
-    // components; the < identifier code follows as its own token.
     if (t.size() < 4 || !IsStrengthDigit(t[t.size() - 2]) ||
         !IsStrengthDigit(t[t.size() - 1]) ||
         !IsPortValueChars(t.substr(1, t.size() - 3))) {
@@ -141,14 +90,10 @@ std::string ConsumeValueChange(const std::vector<std::string>& toks,
   return "token is not a simulation command: " + t;
 }
 
-// The declaration commands the header half of the file admits: every
-// declaration_keyword but $vcdclose, whose command_text is the final
-// simulation time and so cannot be written before the value changes.
 bool OpensHeaderDeclaration(const std::string& t) {
   return IsDeclKeyword(t) && t != "$vcdclose";
 }
 
-// scope_section ::= scope_type scope_identifier, and scope_type ::= module.
 std::string CheckScopeSection(const VcdDeclarationCommand& cmd) {
   if (cmd.body.size() != 2 || cmd.body[0] != "module") {
     return std::string(
@@ -157,8 +102,6 @@ std::string CheckScopeSection(const VcdDeclarationCommand& cmd) {
   return std::string();
 }
 
-// The size and identifier_code of an extended port $var: size ::= 1 |
-// vector_index and identifier_code ::= < {integer}.
 std::string CheckPortVarSizeAndCode(const VcdDeclarationCommand& cmd) {
   if (!IsPortSize(cmd.body[1])) {
     return "$var port size: " + cmd.body[1];
@@ -169,9 +112,6 @@ std::string CheckPortVarSizeAndCode(const VcdDeclarationCommand& cmd) {
   return std::string();
 }
 
-// The var_type and the size it governs: the extended port form carries a port
-// size and a < identifier code, while a name-equivalent 4-state $var construct
-// carries a decimal size.
 std::string CheckVarTypeAndSize(const VcdDeclarationCommand& cmd) {
   if (cmd.body[0] == "port") return CheckPortVarSizeAndCode(cmd);
   if (!IsFourStateVarType(cmd.body[0])) {
@@ -183,8 +123,6 @@ std::string CheckVarTypeAndSize(const VcdDeclarationCommand& cmd) {
   return std::string();
 }
 
-// var_section ::= var_type size identifier_code reference: the extended port
-// form, or a name-equivalent 4-state $var construct.
 std::string CheckVarSection(const VcdDeclarationCommand& cmd) {
   if (cmd.body.size() != 4) {
     return std::string("$var body is not 4 elements");
@@ -197,19 +135,12 @@ std::string CheckVarSection(const VcdDeclarationCommand& cmd) {
   return std::string();
 }
 
-// The per-keyword command_text shapes Syntax 21-27 defines beyond the ones
-// every dump file shares. Returns "" for a keyword whose body carries no
-// further shape of its own.
 std::string CheckDeclarationBody(const VcdDeclarationCommand& cmd) {
   if (cmd.keyword == "$scope") return CheckScopeSection(cmd);
   if (cmd.keyword == "$var") return CheckVarSection(cmd);
   return std::string();
 }
 
-// The $vcdclose declaration command, admitted at the tail of the simulation
-// commands: its command_text is close_text ::= final_simulation_time ::=
-// # decimal_number, which exists only once the value changes have all been
-// recorded.
 std::string ConsumeVcdCloseCommand(const std::vector<std::string>& toks,
                                    size_t& i, bool& handled) {
   if (toks[i] != "$vcdclose") return std::string();
@@ -223,10 +154,6 @@ std::string ConsumeVcdCloseCommand(const std::vector<std::string>& toks,
   return std::string();
 }
 
-// Validates the whole token stream against Syntax 21-27:
-// value_change_dump_definitions ::= {declaration_command}{simulation_command}.
-// Returns "" when the file conforms, else a description of the first
-// violation.
 std::string ValidateEvcd(const std::vector<std::string>& toks) {
   size_t i = 0;
   std::string err = ConsumeDeclarationCommands(toks, i, OpensHeaderDeclaration,
@@ -236,13 +163,6 @@ std::string ValidateEvcd(const std::vector<std::string>& toks) {
                                    ConsumeValueChange, ConsumeVcdCloseCommand);
 }
 
-// Syntax 21-27 (whole grammar): a run that exercises a scalar, a vector, and
-// a real through the entire $dumpports task family -- with the initial values
-// produced by declaration initializers and the later changes procedural,
-// including the x and z states -- plus the driver's closing step yields a
-// file whose entire token stream conforms to value_change_dump_definitions:
-// every declaration command shape, every simulation command shape, every
-// value form, and the extended-only $vcdclose declaration command.
 TEST_F(ExtendedVcdSyntaxSim, WholeFileConformsToExtendedDumpFileGrammar) {
   auto content = RunVcd(
       "module t;\n"
@@ -259,10 +179,8 @@ TEST_F(ExtendedVcdSyntaxSim, WholeFileConformsToExtendedDumpFileGrammar) {
       "    #10 a = 1'bz;\n"
       "  end\n"
       "endmodule\n",
-      /*close_file=*/true);
+      true);
   auto toks = Tokens(content);
-  // Non-vacuity anchors: all three objects are declared, every checkpoint
-  // task left its section, and the close command is present.
   ASSERT_EQ(CountToken(toks, "$var"), 3u);
   EXPECT_EQ(CountToken(toks, "$dumpall"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpoff"), 1u);
@@ -271,9 +189,6 @@ TEST_F(ExtendedVcdSyntaxSim, WholeFileConformsToExtendedDumpFileGrammar) {
   EXPECT_EQ(ValidateEvcd(toks), "");
 }
 
-// Top production: {declaration_command} precedes {simulation_command} -- the
-// node information all sits before $enddefinitions, which appears exactly
-// once, and every simulation-time command follows it.
 TEST_F(ExtendedVcdSyntaxSim, DeclarationCommandsPrecedeSimulationCommands) {
   auto content = RunVcd(
       "module t;\n"
@@ -287,20 +202,15 @@ TEST_F(ExtendedVcdSyntaxSim, DeclarationCommandsPrecedeSimulationCommands) {
   auto toks = Tokens(content);
   ASSERT_EQ(CountToken(toks, "$enddefinitions"), 1u);
   size_t end_defs = IndexOf(toks, "$enddefinitions");
-  // Every $var declaration precedes $enddefinitions ...
   for (size_t i = end_defs; i < toks.size(); ++i) {
     EXPECT_NE(toks[i], "$var") << "$var after $enddefinitions";
     EXPECT_NE(toks[i], "$scope") << "$scope after $enddefinitions";
   }
-  // ... and every simulation_time command follows it.
   for (size_t i = 0; i < end_defs; ++i) {
     EXPECT_NE(toks[i][0], '#') << "simulation time among declarations";
   }
 }
 
-// Prose: the file starts with header information (the date, the simulator's
-// version, and the timescale), next come the scope definitions of the dumped
-// ports, and the value changes at each time increment follow after those.
 TEST_F(ExtendedVcdSyntaxSim, HeaderThenPortDefinitionsThenValueChanges) {
   auto content = RunVcd(
       "module t;\n"
@@ -327,10 +237,6 @@ TEST_F(ExtendedVcdSyntaxSim, HeaderThenPortDefinitionsThenValueChanges) {
   EXPECT_LT(end_defs, first_time);
 }
 
-// Prose: only the ports that change value during a time increment are listed
-// under that increment's simulation time. Of two dumped vectors, the one that
-// held its value contributes nothing after the increment's timestamp; its
-// value appears only in the opening checkpoint.
 TEST_F(ExtendedVcdSyntaxSim, OnlyChangedPortsListedPerTimeIncrement) {
   auto content = RunVcd(
       "module t;\n"
@@ -341,20 +247,14 @@ TEST_F(ExtendedVcdSyntaxSim, OnlyChangedPortsListedPerTimeIncrement) {
       "    #10 moved = 8'h83;\n"
       "  end\n"
       "endmodule\n");
-  // moved -> '!', still -> '"' (name order). Both appear in the opening
-  // checkpoint ...
   EXPECT_NE(content.find("b10000001 !"), std::string::npos);
   EXPECT_NE(content.find("b10100101 \""), std::string::npos);
-  // ... but after #10 only the changed port is listed.
   size_t t10 = content.find("\n#10");
   ASSERT_NE(t10, std::string::npos);
   EXPECT_NE(content.find("b10000011 !", t10), std::string::npos);
   EXPECT_EQ(content.find("b10100101", t10), std::string::npos);
 }
 
-// Prose + simulation_time ::= # decimal_number: the time recorded is the
-// absolute simulation time of the changes that follow, not an increment from
-// the previous command.
 TEST_F(ExtendedVcdSyntaxSim, SimulationTimesRecordAbsoluteTime) {
   auto content = RunVcd(
       "module t;\n"
@@ -372,9 +272,6 @@ TEST_F(ExtendedVcdSyntaxSim, SimulationTimesRecordAbsoluteTime) {
   EXPECT_EQ(ValidateEvcd(Tokens(content)), "");
 }
 
-// Prose: value changes are specified in binary format by the 0, 1, x, and z
-// values. A scalar port driven through all four states from procedural
-// assignments records each state as its binary value character.
 TEST_F(ExtendedVcdSyntaxSim, ScalarChangesUseBinaryStateCharacters) {
   auto content = RunVcd(
       "module t;\n"
@@ -394,11 +291,6 @@ TEST_F(ExtendedVcdSyntaxSim, ScalarChangesUseBinaryStateCharacters) {
   EXPECT_EQ(ValidateEvcd(Tokens(content)), "");
 }
 
-// Prose: the same binary 0/1/x/z rule governs a multi-bit port, not just a
-// scalar -- the vector input form. A packed port assigned a value mixing all
-// four states records one b-form value change whose digits are drawn from
-// {0,1,x,z}, most significant bit first, with the unknown and high-impedance
-// bits carried literally as x and z rather than collapsed to a binary bit.
 TEST_F(ExtendedVcdSyntaxSim, VectorChangesUseBinaryStateCharactersWithXAndZ) {
   auto content = RunVcd(
       "module t;\n"
@@ -409,15 +301,10 @@ TEST_F(ExtendedVcdSyntaxSim, VectorChangesUseBinaryStateCharactersWithXAndZ) {
       "  end\n"
       "endmodule\n");
   auto lines = AllLines(content);
-  // The MSB is set, so no leading digit is dropped: every one of the eight
-  // bits -- including the x and z digits -- appears in the single value change.
   EXPECT_TRUE(HasLine(lines, "b10xz01zx !"));
   EXPECT_EQ(ValidateEvcd(Tokens(content)), "");
 }
 
-// Prose: a real number is dumped with a %.16g format so all 53 mantissa bits
-// of the IEEE Std 754 double survive, and an application program reading the
-// value back with a %g scanf() recovers the identical double.
 TEST_F(ExtendedVcdSyntaxSim, RealValuesUseFullPrecisionScanfReadableForm) {
   auto content = RunVcd(
       "module t;\n"
@@ -430,12 +317,7 @@ TEST_F(ExtendedVcdSyntaxSim, RealValuesUseFullPrecisionScanfReadableForm) {
       "endmodule\n");
   auto lines = AllLines(content);
   ASSERT_TRUE(HasLine(lines, "r0.3333333333333333 !"));
-  // A %g-style writer would have truncated to six significant digits.
   EXPECT_EQ(content.find("r0.333333 "), std::string::npos);
-  // Application-program round trip: the %g family of conversions -- strtod
-  // performs the same one a %lg scanf does, and reports where the field ended
-  // -- reads the dumped text back to exactly the double the simulation held,
-  // consuming the whole field.
   const char* const kDumped = "0.3333333333333333";
   char* field_end = nullptr;
   const double kBack = std::strtod(kDumped, &field_end);
@@ -443,11 +325,6 @@ TEST_F(ExtendedVcdSyntaxSim, RealValuesUseFullPrecisionScanfReadableForm) {
   EXPECT_EQ(kBack, 1.0 / 3.0);
 }
 
-// Prose: the %.16g rule holds however the real reached the dump -- the
-// declaration-initializer input form, distinct from the procedural assignment
-// above. A real whose value is fixed by its declaration initializer (§21.7.2.1
-// real declaration syntax) is captured in the opening checkpoint with the same
-// 16-significant-digit form, not a shortened default-%g rendering.
 TEST_F(ExtendedVcdSyntaxSim, RealFromDeclarationInitializerUsesFullPrecision) {
   auto content = RunVcd(
       "module t;\n"
@@ -458,21 +335,13 @@ TEST_F(ExtendedVcdSyntaxSim, RealFromDeclarationInitializerUsesFullPrecision) {
       "  end\n"
       "endmodule\n");
   auto lines = AllLines(content);
-  // The initializer-produced value is emitted with the full %.16g field
-  // (sixteen significant digits) that production applies ...
   char expected[64];
   std::snprintf(expected, sizeof(expected), "r%.16g !", 1.0 / 7.0);
   ASSERT_TRUE(HasLine(lines, expected));
-  // ... not truncated the way a default-precision %g writer would render it.
   EXPECT_EQ(content.find("r0.142857 "), std::string::npos);
   EXPECT_EQ(ValidateEvcd(Tokens(content)), "");
 }
 
-// Prose: the extended format supports no mechanism to dump part of a vector
-// -- the entire vector is dumped instead -- and expressions cannot be dumped.
-// A 16-bit port with its most significant bit set records full-width value
-// changes carrying every bit, and no sub-range selection or expression entry
-// appears anywhere in the file.
 TEST_F(ExtendedVcdSyntaxSim, WholeVectorDumpedNeverAPartSelect) {
   auto content = RunVcd(
       "module t;\n"
@@ -482,18 +351,12 @@ TEST_F(ExtendedVcdSyntaxSim, WholeVectorDumpedNeverAPartSelect) {
       "    #10 v = 16'h8003;\n"
       "  end\n"
       "endmodule\n");
-  // All 16 bits are present in both records; the MSB is set so no bit is
-  // dropped by leading-digit shortening.
   EXPECT_NE(content.find("b1000000000000001 !"), std::string::npos);
   EXPECT_NE(content.find("b1000000000000011 !"), std::string::npos);
-  // No [8:15]-style sub-range reference is ever emitted in this form.
   EXPECT_EQ(content.find('['), std::string::npos);
   EXPECT_EQ(ValidateEvcd(Tokens(content)), "");
 }
 
-// Prose: data in the extended VCD file are case sensitive. Two objects whose
-// names differ only in case are distinct: each gets its own $var declaration
-// and its own value records, and neither name is folded into the other.
 TEST_F(ExtendedVcdSyntaxSim, DataAreCaseSensitive) {
   auto content = RunVcd(
       "module t;\n"
@@ -504,7 +367,6 @@ TEST_F(ExtendedVcdSyntaxSim, DataAreCaseSensitive) {
       "    #10 siga = 1'b1;\n"
       "  end\n"
       "endmodule\n");
-  // sigA -> '!', siga -> '"' (name order: 'A' < 'a').
   EXPECT_NE(content.find("$var reg 1 ! sigA $end"), std::string::npos);
   EXPECT_NE(content.find("$var reg 1 \" siga $end"), std::string::npos);
   auto lines = AllLines(content);
@@ -513,13 +375,6 @@ TEST_F(ExtendedVcdSyntaxSim, DataAreCaseSensitive) {
   EXPECT_TRUE(HasLine(lines, "1\""));
 }
 
-// A 4-state VCD construct name that matches an extended VCD construct counts as
-// the same construct unless an * precedes it. The same design dumped through
-// the 4-state tasks ($dumpfile/$dumpvars -- the §21.7.2.1 dependency's real
-// syntax) and through $dumpports renders every shared declaration construct
-// identically: matching names carry the same meaning in both files. And since
-// no emitted construct name is *-prefixed, the equivalence holds for every
-// construct either file contains.
 TEST_F(ExtendedVcdSyntaxSim, MatchingFourStateConstructNamesAreEquivalent) {
   const char* body =
       "  logic a = 1'b0;\n"
@@ -538,10 +393,8 @@ TEST_F(ExtendedVcdSyntaxSim, MatchingFourStateConstructNamesAreEquivalent) {
       RunVcd(src("    $dumpfile(\"dump1.dump\");\n"
                  "    $dumpvars;\n"));
   auto extended = RunVcd(src("    $dumpports(, \"dump2.dump\");\n"));
-  // Anchor on real content so a failed run cannot compare equal vacuously.
   auto tokse = Tokens(extended);
   ASSERT_EQ(CountToken(tokse, "$var"), 2u);
-  // The shared construct names render identically in both files.
   auto shared_lines = [](const std::string& content) {
     std::vector<std::string> out;
     for (const auto& l : AllLines(content)) {
@@ -553,8 +406,6 @@ TEST_F(ExtendedVcdSyntaxSim, MatchingFourStateConstructNamesAreEquivalent) {
     return out;
   };
   EXPECT_EQ(shared_lines(extended), shared_lines(four_state));
-  // The exception's boundary: neither file carries a *-prefixed construct
-  // name, so the name equivalence applies to every construct present.
   for (const auto& t : tokse) {
     EXPECT_NE(t[0], '*') << "star-prefixed construct name: " << t;
   }
@@ -563,10 +414,6 @@ TEST_F(ExtendedVcdSyntaxSim, MatchingFourStateConstructNamesAreEquivalent) {
   }
 }
 
-// declaration_keyword includes the extended-only $vcdclose, whose
-// command_text is close_text ::= final_simulation_time ::= # decimal_number:
-// the driver's closing step leaves $vcdclose #<time> $end as the file's last
-// command.
 TEST_F(ExtendedVcdSyntaxSim, CloseCommandCarriesFinalSimulationTime) {
   auto content = RunVcd(
       "module t;\n"
@@ -576,51 +423,30 @@ TEST_F(ExtendedVcdSyntaxSim, CloseCommandCarriesFinalSimulationTime) {
       "    #10 a = 1'b1;\n"
       "  end\n"
       "endmodule\n",
-      /*close_file=*/true);
+      true);
   auto toks = Tokens(content);
   size_t close = IndexOf(toks, "$vcdclose");
   ASSERT_LT(close + 2, toks.size());
   EXPECT_EQ(toks[close + 1][0], '#');
   EXPECT_TRUE(IsDecimal(toks[close + 1].substr(1)));
   EXPECT_EQ(toks[close + 2], "$end");
-  // It is the last command of the file.
   EXPECT_EQ(close + 3, toks.size());
   EXPECT_EQ(ValidateEvcd(toks), "");
 }
 
-// Negative (the validator itself is not vacuous): each of the closest
-// non-conformant token streams -- an unterminated section, a fused command, a
-// non-decimal simulation time, a *-prefixed name, and an unknown keyword --
-// is rejected with a diagnosis, so the "" verdicts above are meaningful.
 TEST_F(ExtendedVcdSyntaxSim, ValidatorRejectsNonConformantStreams) {
   using V = std::vector<std::string>;
-  // The minimal conformant stream the corruptions perturb.
   EXPECT_EQ(ValidateEvcd(V{"$enddefinitions", "$end", "#10", "1!"}), "");
-  // Section opener with no closing $end.
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions"}), "");
-  // Two commands fused into one token.
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions$end", "#10", "1!"}), "");
-  // simulation_time must be # followed by decimal digits only.
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions", "$end", "#10ns", "1!"}), "");
-  // A *-prefixed name is not the equivalent construct.
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions", "$end", "#10", "*1!"}), "");
-  // An unknown keyword is neither a declaration nor a simulation command.
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions", "$end", "$dumpportsx", "$end"}),
             "");
-  // A p-form value must end in two strength digits and cite a < code.
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions", "$end", "p0", "<0"}), "");
   EXPECT_NE(ValidateEvcd(V{"$enddefinitions", "$end", "p066", "!"}), "");
 }
 
-// simulation_keyword ::= $dumpports | ... : in the port-form file the opening
-// checkpoint section is keyed $dumpports, not the 4-state $dumpvars (which
-// matches no extended construct name, so the equivalence rule cannot admit
-// it). The port form is exercised at the writer stage: no production caller
-// enables it yet, and the keyword choice is a property of the writer's own
-// output, independent of how the dumped values were produced. The whole
-// port-form file conforms to Syntax 21-27, covering the port productions the
-// hybrid runs above cannot reach ($var port node entries with 1 and [m:l]
-// sizes, < integer identifier codes, and p-form values).
 TEST_F(ExtendedVcdSyntaxSim, PortFormCheckpointUsesDumpportsKeyword) {
   {
     VcdWriter vcd(tmp_path_);
@@ -643,7 +469,6 @@ TEST_F(ExtendedVcdSyntaxSim, PortFormCheckpointUsesDumpportsKeyword) {
   auto toks = Tokens(content);
   EXPECT_EQ(CountToken(toks, "$dumpports"), 1u);
   EXPECT_EQ(CountToken(toks, "$dumpvars"), 0u);
-  // Non-vacuity anchors on the port-form section body and node entries.
   EXPECT_NE(content.find("$var port 1 <0 p0 $end"), std::string::npos);
   EXPECT_NE(content.find("$var port [3:0] <1 data $end"), std::string::npos);
   EXPECT_NE(content.find("p066 <0"), std::string::npos);
@@ -651,9 +476,6 @@ TEST_F(ExtendedVcdSyntaxSim, PortFormCheckpointUsesDumpportsKeyword) {
   EXPECT_EQ(ValidateEvcd(toks), "");
 }
 
-// simulation_keyword (continued): the checkpoint, suspend, and resume
-// sections of the port-form file are keyed $dumpportsall, $dumpportsoff, and
-// $dumpportson; none of the 4-state checkpoint keywords appears.
 TEST_F(ExtendedVcdSyntaxSim, PortFormControlSectionsUseDumpportsKeywords) {
   {
     VcdWriter vcd(tmp_path_);
@@ -677,11 +499,6 @@ TEST_F(ExtendedVcdSyntaxSim, PortFormControlSectionsUseDumpportsKeywords) {
   EXPECT_EQ(CountToken(toks, "$dumpon"), 0u);
 }
 
-// Prose: port value changes are specified in binary format by 0, 1, x, and z
-// AND include strength information -- value ::= p port_value
-// 0_strength_component 1_strength_component, each strength a digit 0-7. All
-// four binary states appear with both strength components: driven states at
-// strong (6) strength and the high-impedance state at highz (0).
 TEST_F(ExtendedVcdSyntaxSim, PortValuesCarryBinaryStateAndStrength) {
   {
     VcdWriter vcd(tmp_path_);
@@ -695,25 +512,20 @@ TEST_F(ExtendedVcdSyntaxSim, PortValuesCarryBinaryStateAndStrength) {
     p1->value = MakeScalar(arena_, 1, 0);
     vcd.RegisterSignal("p1", 1, p1);
     auto* px = arena_.Create<Variable>();
-    px->value = MakeScalar(arena_, 1, 1);  // x = (aval=1, bval=1)
+    px->value = MakeScalar(arena_, 1, 1);
     vcd.RegisterSignal("px", 1, px);
     auto* pz = arena_.Create<Variable>();
-    pz->value = MakeScalar(arena_, 0, 1);  // z = (aval=0, bval=1)
+    pz->value = MakeScalar(arena_, 0, 1);
     vcd.RegisterSignal("pz", 1, pz);
     vcd.EndDefinitions();
     vcd.WriteTimestamp(0);
     vcd.DumpAllValues();
   }
   auto toks = Tokens(ReadVcd());
-  // Each state carries its binary character plus the two strength digits.
   EXPECT_EQ(CountToken(toks, "p066"), 1u);
   EXPECT_EQ(CountToken(toks, "p166"), 1u);
-  // §21.7.4.3.1 spells unknown ? and three-state F on an object of unknown
-  // direction; x and z belong to no list the port_value is drawn from.
   EXPECT_EQ(CountToken(toks, "p?66"), 1u);
   EXPECT_EQ(CountToken(toks, "pF00"), 1u);
-  // Every strength component in the file is a strength digit 0-7 (the value
-  // tokens above end in their two components).
   for (const char* v : {"p066", "p166", "p?66", "pF00"}) {
     std::string t = v;
     EXPECT_TRUE(IsStrengthDigit(t[t.size() - 2]));
@@ -721,10 +533,6 @@ TEST_F(ExtendedVcdSyntaxSim, PortValuesCarryBinaryStateAndStrength) {
   }
 }
 
-// The body of the $version section, from the keyword to the $end that closes
-// it (§21.7.4.1: declaration_command ::= declaration_keyword [command_text]
-// $end, with version_section as the command_text). Empty when the file carries
-// no such section.
 std::string VersionSectionOf(const std::string& content) {
   auto start = content.find("$version");
   if (start == std::string::npos) return {};
@@ -733,21 +541,8 @@ std::string VersionSectionOf(const std::string& content) {
   return content.substr(start, end - start);
 }
 
-// §21.7.4.1 (Syntax 21-27): version_text ::= version_identifier
-// {dumpports_command}, and dumpports_command ::= $dumpports ( scope_identifier
-// , string_literal | variable | expression ). So an extended file's version
-// section names the writer and then lists the $dumpports commands that
-// produced it, which is what lets a reader of the file reconstruct the call.
-//
-// The commands come from the source, so every case here runs the source's own
-// tasks: a writer a test hands a header to has no call to reproduce, which is
-// why the cases above -- which select the extended form at the writer -- say
-// nothing about the version section.
 class ExtendedVcdVersionCommands : public VcdDumpFromSourceTestBase {
  protected:
-  // A design whose top module runs `tasks`, with two instances below it for a
-  // scope_list to name. Relative file names land in the scratch directory the
-  // fixture stands the run in.
   static std::string DesignCalling(const std::string& tasks) {
     return "module n;\n"
            "  logic [7:0] p;\n"
@@ -766,9 +561,6 @@ class ExtendedVcdVersionCommands : public VcdDumpFromSourceTestBase {
   }
 };
 
-// §21.7.4.1: the version section lists the call that produced the file, with
-// its arguments as the source wrote them -- the scope_identifier and the
-// string_literal naming the output.
 TEST_F(ExtendedVcdVersionCommands, VersionTextNamesTheDumpportsCall) {
   RunSource(DesignCalling("    $dumpports(k1, \"ports.vcd\");\n"));
   auto version = VersionSectionOf(DumpFile("ports.vcd"));
@@ -776,11 +568,6 @@ TEST_F(ExtendedVcdVersionCommands, VersionTextNamesTheDumpportsCall) {
   EXPECT_TRUE(Holds(version, "$dumpports(k1,\"ports.vcd\")")) << version;
 }
 
-// §21.7.4.1: {dumpports_command} is a repetition, and §21.7.3.1 lets a source
-// invoke $dumpports several times so long as they all execute at one
-// simulation time. Every one of them produced the file, so every one is
-// listed; a section carrying only the call that opened the file states one
-// command where the source issued two.
 TEST_F(ExtendedVcdVersionCommands, VersionTextListsEveryDumpportsCall) {
   RunSource(
       DesignCalling("    $dumpports(k1);\n"
@@ -791,9 +578,6 @@ TEST_F(ExtendedVcdVersionCommands, VersionTextListsEveryDumpportsCall) {
   EXPECT_TRUE(Holds(version, "$dumpports(k2)")) << version;
 }
 
-// §21.7.2.1 gives the 4-state file version_text ::= { ASCII_character } and no
-// dumpports commands, so a source's $dumpvars file carries none. Without this
-// case, writing the commands into both files satisfies the two above.
 TEST_F(ExtendedVcdVersionCommands, FourStateVersionTextCarriesNoDumpportsCall) {
   RunSource(
       DesignCalling("    $dumpfile(\"vars.vcd\");\n"

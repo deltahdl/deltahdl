@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -16,25 +14,6 @@
 using namespace delta;
 
 namespace {
-
-// This file covers the two rules of §28.13. The nmos, pmos and cmos switches
-// carry the data input's strength to the output unchanged, save that a supply
-// strength drops to strong; the tran, tranif0 and tranif1 switches leave the
-// strength across their bidirectional terminals unchanged, with the same
-// exception for supply.
-//
-// The ModelAndSimulator... cases claim more than the cases around them: at each
-// of the eight strength levels, ModelReduceNonresistive in
-// lib/cpp/test_models/model_strength.h and ReduceNonresistive in
-// src/common/types.h each produce the level §28.13 names. Both functions are
-// asserted against the clause, so a level where the two agree with each other
-// and not with §28.13 fails here.
-//
-// Issue #3417 is the defect those cases answer. The model's function was named
-// ReduceNonresistive as well, so every call written in this file passed a
-// Strength and reached the simulator's function in src/common/types.h. The
-// shared name is what made the model read as covered while nothing ever called
-// it.
 
 TEST(StrengthReductionNonresistive, SupplyReducesToStrong) {
   EXPECT_EQ(ReduceNonresistive(Strength::kSupply), Strength::kStrong);
@@ -68,16 +47,10 @@ TEST(StrengthReductionNonresistive, HighzPassesThrough) {
   EXPECT_EQ(ReduceNonresistive(Strength::kHighz), Strength::kHighz);
 }
 
-// ModelReduceNonresistive states §28.13's rule independently of the simulator.
-// Its StrengthLevel and the simulator's Strength in src/common/types.h carry
-// the same eight levels of §28.11's Table 28-7 at the same underlying values,
-// so a level converts by its number.
 Strength ToStrength(StrengthLevel level) {
   return static_cast<Strength>(static_cast<uint8_t>(level));
 }
 
-// One case per level of the strength scale. §28.13 reduces supply to strong and
-// passes every other level from the data input to the output unchanged.
 TEST(StrengthReductionNonresistive, ModelAndSimulatorReduceSupplyToStrong) {
   const StrengthLevel kInput = StrengthLevel::kSupply;
   const StrengthLevel kClause = StrengthLevel::kStrong;
@@ -134,11 +107,6 @@ TEST(StrengthReductionNonresistive, ModelAndSimulatorPassHighzUnchanged) {
   EXPECT_EQ(ReduceNonresistive(ToStrength(kInput)), ToStrength(kClause));
 }
 
-// The cases above pin the reduction table in isolation. The simulations below
-// drive a real switch so the rule is observed exactly as production applies it
-// during elaboration + lowering: a nonresistive switch (nmos/pmos/cmos) carries
-// the data input's strength to its output, and a supply-strength source is the
-// single case that is knocked down — to strong.
 TEST(StrengthReductionNonresistive, NmosForwardsNonSupplyStrengthUnchanged) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -208,10 +176,6 @@ TEST(StrengthReductionNonresistive, CmosReducesSupplySourceToStrong) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
 }
 
-// The "except" clause is a single case: for pmos and cmos too, any non-supply
-// data strength is passed to the output unchanged. These complete the
-// passthrough half of §28.13's first sentence for the two devices whose
-// supply-reduction is shown above.
 TEST(StrengthReductionNonresistive, PmosForwardsNonSupplyStrengthUnchanged) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -247,14 +211,6 @@ TEST(StrengthReductionNonresistive, CmosForwardsNonSupplyStrengthUnchanged) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
 }
 
-// §28.13, second sentence: the tran, tranif0, and tranif1 switches do not
-// affect signal strength across their bidirectional terminals, except that a
-// supply strength is reduced to a strong strength. Bidirectional switches are
-// resolved by the switch-network subsystem (they are not lowered into the
-// continuous-assignment path), so these observe the rule through that resolver.
-// Terminal a is driven to 1 with a chosen strength; terminal b is undriven, so
-// the conducting switch propagates a's value and strength onto b, and b's
-// resolved strength is what the rule produces on the far terminal.
 namespace {
 struct BidirStrengthResult {
   NetPair nets;
@@ -301,9 +257,6 @@ TEST(StrengthReductionNonresistive, Tranif0PassesStrongSourceUnchanged) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kStrong);
 }
 
-// Complete the device x behavior matrix for the second sentence: tranif0 also
-// knocks a supply source down to strong, and tranif1 passes a non-supply (pull)
-// source across untouched.
 TEST(StrengthReductionNonresistive, Tranif0ReducesSupplySourceToStrong) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif0, {0, 0}, Strength::kSupply);
@@ -318,9 +271,6 @@ TEST(StrengthReductionNonresistive, Tranif1PassesPullSourceUnchanged) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
-// Negative form: when the pass-enable control turns the switch off nothing
-// crosses the terminals, so no strength is imposed on the far net -- it keeps
-// its default high-impedance strength.
 TEST(StrengthReductionNonresistive, NonconductingTranif1LeavesFarNetStrength) {
   auto r =
       ResolveAcrossBidir(BidirSwitchKind::kTranif1, {0, 0}, Strength::kSupply);
@@ -328,10 +278,6 @@ TEST(StrengthReductionNonresistive, NonconductingTranif1LeavesFarNetStrength) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kHighz);
 }
 
-// The strength an nmos passes is its data input's, so when that strength
-// changes the switch passes the new one, though the value it passes is the
-// same 1 before and after: d is a weak 1 until en rises, and a strong 1 after.
-// Re-evaluated only on a change of value, the switch kept driving weak.
 TEST(StrengthReductionNonresistive, AStrengthChangeOfTheDataInputIsPassedOn) {
   SimFixture f;
   auto* design = ElaborateSrc(

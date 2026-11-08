@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A.5.3's symbol productions: current_state, next_state, output_symbol,
-// level_symbol and edge_symbol, and after them the cases asserting a symbol
-// rejected in a position its BNF does not admit it in.
-//
-// test/src/unit/test_parser_annex_a_05_03a.cpp holds the rest of A.5.3:
-// udp_body and the productions that give a table its entries. Its head says why
-// the coverage of one production set is in two files.
 TEST(UdpBodyGrammar, CurrentState_X) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -310,7 +303,6 @@ TEST(UdpBodyGrammar, EmptyTableError) {
       "  table\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.4 owns the table entries; A.5.3 only states the udp_body production.
   EXPECT_TRUE(ReportedError(
       r.diags, "UDP table shall contain at least one entry", 3, "29.3.4"));
 }
@@ -369,12 +361,6 @@ TEST(UdpBodyGrammar, NextState_AllValuesInOneUdp) {
   EXPECT_EQ(udp->table[3].output, '-');
 }
 
-// Error/edge cases for the symbol-position restrictions that §A.5.3's BNF
-// imposes. Each parses a table that violates one production and expects the
-// parser to flag it, observing the grammar rule being enforced.
-
-// combinational_entry's output is an output_symbol (0 1 x X); a level-only
-// symbol such as b is not a legal combinational output.
 TEST(UdpBodyGrammar, CombinationalOutputRejectsNonOutputSymbol) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -382,14 +368,11 @@ TEST(UdpBodyGrammar, CombinationalOutputRejectsNonOutputSymbol) {
       "    0 : b;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
   EXPECT_TRUE(ReportedError(
       r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
       "29.3.6"));
 }
 
-// The dash (no-change) is only legal as a next_state; a combinational
-// output_symbol may not be a dash.
 TEST(UdpBodyGrammar, CombinationalOutputRejectsDash) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -397,13 +380,11 @@ TEST(UdpBodyGrammar, CombinationalOutputRejectsDash) {
       "    0 : -;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
   EXPECT_TRUE(ReportedError(
       r.diags, "UDP output field shall be 0, 1, or x (- is sequential only)", 3,
       "29.3.6"));
 }
 
-// current_state is a level_symbol, so an edge symbol is not allowed there.
 TEST(UdpBodyGrammar, CurrentStateRejectsEdgeSymbol) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -411,13 +392,11 @@ TEST(UdpBodyGrammar, CurrentStateRejectsEdgeSymbol) {
       "    0 r : r : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
   EXPECT_TRUE(ReportedError(
       r.diags, "edge symbols shall not appear in the current-state field", 3,
       "29.3.6"));
 }
 
-// current_state is a level_symbol; the dash (no-change) is not a level_symbol.
 TEST(UdpBodyGrammar, CurrentStateRejectsDash) {
   auto r = Parse(
       "primitive p(output reg q, input d, en);\n"
@@ -425,13 +404,10 @@ TEST(UdpBodyGrammar, CurrentStateRejectsDash) {
       "    0 1 : - : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
   EXPECT_TRUE(ReportedError(
       r.diags, "- shall not appear in the current-state field", 3, "29.3.6"));
 }
 
-// Input fields are made of level/edge symbols; the dash is neither and may not
-// appear in the input list.
 TEST(UdpBodyGrammar, InputFieldRejectsDash) {
   auto r = Parse(
       "primitive p(output y, input a, b);\n"
@@ -439,13 +415,10 @@ TEST(UdpBodyGrammar, InputFieldRejectsDash) {
       "    - 1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
   EXPECT_TRUE(ReportedError(r.diags, "- shall not appear in a UDP input field",
                             3, "29.3.6"));
 }
 
-// A parenthesized edge_indicator's two endpoints are level_symbols; an edge
-// symbol inside the parentheses is not permitted.
 TEST(UdpBodyGrammar, ParenEdgeEndpointsRejectNonLevelSymbol) {
   auto r = Parse(
       "primitive p(output reg q, input d, clk);\n"
@@ -453,18 +426,11 @@ TEST(UdpBodyGrammar, ParenEdgeEndpointsRejectNonLevelSymbol) {
       "    0 (r0) : ? : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.6 owns the symbol tables A.5.3 names; the report is filed there.
   EXPECT_TRUE(ReportedError(
       r.diags, "parenthesized edge endpoints shall be level symbols", 3,
       "29.3.6"));
 }
 
-// level_input_list ::= level_symbol { level_symbol } and edge_input_list ::=
-// { level_symbol } edge_indicator { level_symbol }: an input field holds a
-// level_symbol, `0 | 1 | x | X | ? | b | B`, or an edge_symbol, `r | R | f |
-// F | p | P | n | N | *`, and nothing else. The parser took the first
-// character of whatever token stood there, so `2` and `a` were accepted
-// silently.
 TEST(UdpBodyGrammar, InputSymbolOutsideLevelAndEdgeIsRejected) {
   auto r = Parse(
       "primitive p(output q, input a, b);\n"
@@ -483,10 +449,6 @@ TEST(UdpBodyGrammar, InputSymbolOutsideLevelAndEdgeIsRejected) {
       ReportedError(r.diags, "UDP table row has 1 input field", 3, "29.3.4"));
 }
 
-// The symbols stand with no separator between them, so a run the lexer read
-// as one token is every character of it: `01` is the two levels 0 and 1, and
-// `x1` the levels x and 1. The parser had taken the first character alone and
-// reported the row one field short.
 TEST(UdpBodyGrammar, InputSymbolRunIsEveryCharacter) {
   auto r = Parse(
       "primitive p(output q, input a, b);\n"
@@ -508,9 +470,6 @@ TEST(UdpBodyGrammar, InputSymbolRunIsEveryCharacter) {
   EXPECT_EQ(r.cu->udps[0]->table[2].inputs[1], 'b');
 }
 
-// current_state ::= level_symbol and next_state ::= output_symbol | -, one
-// symbol each; a run of two in either field was read as its first character
-// with nothing said.
 TEST(UdpBodyGrammar, StateAndOutputFieldsAreOneSymbolEach) {
   auto r = Parse(
       "primitive p(output reg q, input a);\n"

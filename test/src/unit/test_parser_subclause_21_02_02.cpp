@@ -38,9 +38,6 @@ TEST(IoSystemTaskParsing, StrobebHexOctal) {
               "endmodule\n"));
 }
 
-// Syntax 21-2 surrounds ( list_of_arguments ) with brackets, marking the
-// argument-list parenthesization as optional. The parser must therefore accept
-// a bare strobe invocation with neither parentheses nor arguments.
 TEST(IoSystemTaskParsing, StrobeNoArgumentListOptional) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -53,10 +50,6 @@ TEST(IoSystemTaskParsing, StrobeNoArgumentListOptional) {
               "endmodule\n"));
 }
 
-// Syntax 21-2's optional group is ( list_of_arguments ); the parenthesized form
-// with an empty list is a distinct input form from both the bare (no-paren)
-// call and a call carrying arguments. The parser must accept the empty-paren
-// invocation for each strobe_task_name alternative.
 TEST(IoSystemTaskParsing, StrobeEmptyArgumentParens) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -69,9 +62,6 @@ TEST(IoSystemTaskParsing, StrobeEmptyArgumentParens) {
               "endmodule\n"));
 }
 
-// Negative form of Syntax 21-2: once the argument-list parenthesis is opened it
-// must be closed. A strobe call whose ( is never balanced by a ) is malformed
-// and the parser must report an error rather than accept it.
 TEST(IoSystemTaskParsing, StrobeUnbalancedArgumentParenRejected) {
   auto r = Parse(
       "module t;\n"
@@ -80,9 +70,6 @@ TEST(IoSystemTaskParsing, StrobeUnbalancedArgumentParenRejected) {
       "    $strobe(\"a=%b\", a;\n"
       "  end\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a system task call's argument list,
-  // so Parser::ParseSystemCall files the report under it rather than under
-  // §21.2.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 

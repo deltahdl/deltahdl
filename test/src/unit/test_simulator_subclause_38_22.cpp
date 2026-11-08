@@ -19,9 +19,6 @@ class VpiHandleMultiSim : public ::testing::Test {
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // An object of the requested kind, linked from both references. CreateModule
-  // allocates a context-owned VpiObject; the test then stamps the category it
-  // wants, the way the §37.37 delay tests build their handles.
   VpiHandle SharedObject(int type, VpiHandle ref1, VpiHandle ref2) {
     VpiHandle obj = vpi_ctx_.CreateModule("shared", "shared");
     obj->type = type;
@@ -38,10 +35,6 @@ class VpiHandleMultiSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.22 Returns: a vpiHandle, the handle of an object. The one object of a
-// many-to-one relationship is what comes back, not a container the application
-// has to open: the Related routines row leaves the one-to-many traversal to
-// vpi_iterate() and vpi_scan().
 TEST_F(VpiHandleMultiSim, ReturnsTheObjectBothReferencesReach) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod);
@@ -53,9 +46,6 @@ TEST_F(VpiHandleMultiSim, ReturnsTheObjectBothReferencesReach) {
             path);
 }
 
-// §38.22: the handle names the object itself, so what an application does to
-// the handle it does to the object. Delays written through the returned handle
-// are the delays the path holds.
 TEST_F(VpiHandleMultiSim, TheReturnedHandleIsTheObjectItself) {
   auto* mod = vpi_ctx_.CreateModule("d", "d");
   auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod);
@@ -85,10 +75,6 @@ TEST_F(VpiHandleMultiSim, TheReturnedHandleIsTheObjectItself) {
   EXPECT_DOUBLE_EQ(out[1].real, 6.0);
 }
 
-// §38.22 Synopsis: the routine gets the handle of the object at the one end of
-// a many-to-one relationship. An object only one of the references reaches
-// stands in a relationship with that one alone, so it is not what this routine
-// answers with.
 TEST_F(VpiHandleMultiSim, NoHandleForAnObjectOnlyOneReferenceReaches) {
   auto* mod1 = vpi_ctx_.CreateModule("m1", "m1");
   vpi_ctx_.CreatePort("p1", kVpiInput, mod1);
@@ -100,15 +86,11 @@ TEST_F(VpiHandleMultiSim, NoHandleForAnObjectOnlyOneReferenceReaches) {
             nullptr);
 }
 
-// §38.22 Arguments: the routine is given handles to reference objects. A
-// relationship needs both of its ends, so a missing reference names none.
 TEST_F(VpiHandleMultiSim, HandleMultiBothNullReturnsNull) {
   vpiHandle h = vpi_handle_multi(vpiPort, nullptr, nullptr);
   EXPECT_EQ(h, nullptr);
 }
 
-// §38.22: one reference standing on its own is not a many-to-one relationship
-// either, whatever the object it reaches.
 TEST_F(VpiHandleMultiSim, HandleMultiOneNullReturnsNull) {
   auto* mod = vpi_ctx_.CreateModule("solo", "solo");
   vpi_ctx_.CreatePort("p", kVpiInput, mod);
@@ -116,10 +98,6 @@ TEST_F(VpiHandleMultiSim, HandleMultiOneNullReturnsNull) {
   EXPECT_EQ(vpi_handle_multi(vpiPort, VpiHandleOf(mod), nullptr), nullptr);
 }
 
-// §38.22: for a vpiInterModPath request the two reference objects are the
-// output and input ports the path runs between, and they shall be of the same
-// size. A pair whose widths differ cannot name a valid intermodule path, so the
-// routine reports an error (§38.2) and returns no handle.
 TEST_F(VpiHandleMultiSim, InterModPathRejectsDifferentlySizedPorts) {
   auto* mod = vpi_ctx_.CreateModule("top2", "top2");
   auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod);
@@ -134,10 +112,6 @@ TEST_F(VpiHandleMultiSim, InterModPathRejectsDifferentlySizedPorts) {
   EXPECT_EQ(vpi_ctx_.LastError().level, kVpiError);
 }
 
-// §38.22: the same-size requirement is the sentence about ports of an
-// intermodule path. For any other object type the routine answers without
-// inspecting the references' sizes, so a size mismatch must not turn into an
-// error here.
 TEST_F(VpiHandleMultiSim, SizeMismatchIgnoredForNonInterModPathType) {
   auto* mod1 = vpi_ctx_.CreateModule("u1", "u1");
   mod1->size = 8;
@@ -151,9 +125,6 @@ TEST_F(VpiHandleMultiSim, SizeMismatchIgnoredForNonInterModPathType) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.22: ports of the same size are accepted even when they sit at different
-// levels of the hierarchy, which the subclause leaves unconstrained. The path
-// linked from both ports is reached and no error is raised.
 TEST_F(VpiHandleMultiSim, InterModPathAcceptsSameSizedPortsAcrossHierarchy) {
   auto* mod_a = vpi_ctx_.CreateModule("a", "top.a");
   auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod_a);
@@ -169,8 +140,6 @@ TEST_F(VpiHandleMultiSim, InterModPathAcceptsSameSizedPortsAcrossHierarchy) {
   EXPECT_EQ(vpi_ctx_.LastError().level, 0);
 }
 
-// §38.22: the object answered for is of the type the request named. A reference
-// pair sharing an object of some other kind has none of the kind asked for.
 TEST_F(VpiHandleMultiSim, NoHandleWhenTheSharedObjectIsOfAnotherType) {
   auto* mod = vpi_ctx_.CreateModule("t", "t");
   auto* out_port = vpi_ctx_.CreatePort("o", kVpiOutput, mod);

@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §25.3.3: a generic interface port names whatever instance is connected to
-// it, so memMod's `a.data = '1` fills sb's 16-bit data, and cpuMod reads sb's
-// addr and its localparam True through `interface.mp b` connected as sb.mp.
-// Before the port took its interface from the connected instance, the write
-// was lost and both reads gave 0 or x: `sum=1 true=0`, `data=x`.
 TEST(GenericInterfacePortSim, ReachesTheConnectedInstance) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface simple_bus #(DWIDTH = 8);\n"
@@ -39,11 +34,6 @@ TEST(GenericInterfacePortSim, ReachesTheConnectedInstance) {
             "sum=6 true=1\ndata=65535\n");
 }
 
-// §25.3.3 with §16.14: a concurrent assertion in a module reads the
-// connected instance's signals through a generic port, `m.req |=> m.gnt`
-// clocked on `m.clk`, and runs its action blocks: of the attempts before time
-// 98, the one whose req is not followed by gnt fails and nine pass. Before
-// this the assertion read nothing and never ran either block.
 TEST(GenericInterfacePortSim, AssertionSamplesThroughThePort) {
   SimFixture f;
   EXPECT_EQ(

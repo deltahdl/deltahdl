@@ -9,8 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 31-12: the full $width form carries a reference event, limit,
-// threshold and an optional notifier.
 TEST(TimingCheckCommandParsing, WidthFullForm) {
   auto r = Parse(
       "module m;\n"
@@ -22,13 +20,10 @@ TEST(TimingCheckCommandParsing, WidthFullForm) {
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
   EXPECT_EQ(tc->check_kind, TimingCheckKind::kWidth);
-  ASSERT_GE(tc->limits.size(), 2u);  // limit + threshold
+  ASSERT_GE(tc->limits.size(), 2u);
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// Syntax 31-12: the minimal form is just a controlled reference event and a
-// limit. With both threshold and notifier omitted the threshold defaults
-// (no second limit recorded) and the notifier stays empty.
 TEST(TimingCheckCommandParsing, WidthMinimalForm) {
   auto r = Parse(
       "module m;\n"
@@ -46,8 +41,6 @@ TEST(TimingCheckCommandParsing, WidthMinimalForm) {
   EXPECT_TRUE(tc->notifier.empty());
 }
 
-// $width derives its data event from the reference event, so no explicit data
-// signal is parsed.
 TEST(TimingCheckCommandParsing, WidthNoDataSignal) {
   auto r = Parse(
       "module m;\n"
@@ -63,10 +56,6 @@ TEST(TimingCheckCommandParsing, WidthNoDataSignal) {
   EXPECT_EQ(tc->data_edge, SpecifyEdge::kNone);
 }
 
-// A notifier cannot be supplied without a threshold: the first trailing
-// argument is always consumed as the threshold, even when it is an identifier
-// that would otherwise look like a notifier. This is the parser enforcing that
-// the threshold must be present when a notifier is required.
 TEST(TimingCheckCommandParsing, WidthThirdArgIsThresholdNotNotifier) {
   auto r = Parse(
       "module m;\n"
@@ -77,12 +66,10 @@ TEST(TimingCheckCommandParsing, WidthThirdArgIsThresholdNotNotifier) {
   EXPECT_FALSE(r.has_errors);
   auto* tc = GetSoleTimingCheck(r);
   ASSERT_NE(tc, nullptr);
-  ASSERT_EQ(tc->limits.size(), 2u);  // gate became the threshold
+  ASSERT_EQ(tc->limits.size(), 2u);
   EXPECT_TRUE(tc->notifier.empty());
 }
 
-// Illegal call from the LRM: a notifier with an empty threshold slot. Because
-// the threshold position must hold an expression, the empty slot is an error.
 TEST(TimingCheckCommandParsing, ErrorWidthNotifierWithoutThreshold) {
   auto r = Parse(
       "module m;\n"
@@ -90,13 +77,9 @@ TEST(TimingCheckCommandParsing, ErrorWidthNotifierWithoutThreshold) {
       "  $width(posedge clk, 20, , ntfr);\n"
       "endspecify\n"
       "endmodule\n");
-  // The threshold slot is parsed as an expression, so the empty slot is
-  // reported by the expression parser under §11.2.
   EXPECT_TRUE(ReportedError(r.diags, "expected expression", 3, "11.2"));
 }
 
-// A compilation error is required when the reference event is not an edge
-// specification, since the implicit data event is the opposite edge.
 TEST(TimingCheckCommandParsing, ErrorWidthReferenceMissingEdge) {
   auto r = Parse(
       "module m;\n"
@@ -109,9 +92,6 @@ TEST(TimingCheckCommandParsing, ErrorWidthReferenceMissingEdge) {
       "31.4.4"));
 }
 
-// Syntax 31-12 / edge requirement, negedge input form: a negedge reference is a
-// valid edge specification (as in the LRM's own $width example), so the check
-// parses cleanly and records the negedge on the reference event.
 TEST(TimingCheckCommandParsing, WidthNegedgeReferenceAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -127,9 +107,6 @@ TEST(TimingCheckCommandParsing, WidthNegedgeReferenceAccepted) {
   EXPECT_EQ(tc->ref_terminal.name, "clr");
 }
 
-// Syntax 31-12 / edge requirement, edge-control input form (§31.5): an
-// edge-control specifier with an explicit descriptor list also satisfies the
-// edge requirement, so the reference event parses and is marked as an edge.
 TEST(TimingCheckCommandParsing, WidthEdgeControlReferenceAccepted) {
   auto r = Parse(
       "module m;\n"
@@ -144,8 +121,6 @@ TEST(TimingCheckCommandParsing, WidthEdgeControlReferenceAccepted) {
   EXPECT_EQ(tc->ref_edge, SpecifyEdge::kEdge);
 }
 
-// Syntax 31-12 negative form: the timing_check_limit is a mandatory argument. A
-// $width call with only a reference event and no limit is rejected.
 TEST(TimingCheckCommandParsing, ErrorWidthMissingLimit) {
   auto r = Parse(
       "module m;\n"
@@ -153,8 +128,6 @@ TEST(TimingCheckCommandParsing, ErrorWidthMissingLimit) {
       "  $width(posedge clk);\n"
       "endspecify\n"
       "endmodule\n");
-  // The shared timing-check parser files the missing separator under §31.2, the
-  // system_timing_check production, rather than under §31.4.4.
   EXPECT_TRUE(ReportedError(r.diags, "expected ',', got ')'", 3, "31.2"));
 }
 

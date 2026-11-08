@@ -1,22 +1,5 @@
 #pragma once
 
-// The awaiters a suspended process resumes from, one per thing it can wait
-// for: DelayAwaiter for a §9.7 delay control, NamedEventAwaiter for a named
-// event (a §9.4.2.4 sequence event is an operand of EventAwaiter's in
-// awaiters_event_control.h), AnyChangeAwaiter
-// for a change on any of several named variables, InertialDelayAwaiter for a
-// §28 inertial delay a change can cancel, ForkJoinAwaiter and WaitForkAwaiter
-// for §9.3.2 fork-join completion, CycleDelayAwaiter for a §14.11 cycle delay,
-// ProcessAwaitAwaiter for another process finishing, SemaphoreGetAwaiter for a
-// §15.3 semaphore and MailboxPutAwaiter, MailboxGetAwaiter and
-// MailboxPeekAwaiter for a §15.4 mailbox.
-//
-// The awaiter for a §9.4.2 event control lives in
-// src/simulator/awaiters_event_control.h, which this header includes, so a
-// translation unit including this one still sees EventAwaiter, and its §9.4.5
-// intra-assignment repeat form's in src/simulator/repeat_event_awaiter.h.
-// AnyChangeAwaiter calls EventAwaiter::ResumeMaybeReactive from there.
-
 #include <algorithm>
 #include <coroutine>
 #include <cstdint>
@@ -47,10 +30,6 @@ struct DelayAwaiter {
   bool await_ready() const noexcept { return false; }
 
   void await_suspend(std::coroutine_handle<> h) {
-    // §9.4.1: a negative delay is an unsigned time value, up to the largest
-    // time, so the wake time may lie beyond the last time the simulation can
-    // reach; such a wake never comes, and nothing is scheduled for it. Added
-    // as it is, the time wrapped to one before the present.
     if (delay_ticks >
         std::numeric_limits<uint64_t>::max() - ctx.CurrentTime().ticks) {
       return;
@@ -62,10 +41,6 @@ struct DelayAwaiter {
     event->callback = [h, proc, &ctx = ctx]() mutable {
       if (proc && !proc->active) return;
 
-      // §9.7: this delay has elapsed, but the process is suspended. The wake is
-      // one-shot, so dropping it would strand the coroutine's continuation (h
-      // is the inner parked frame; Process::coro is an outer frame). Stash h so
-      // resume() can replay it, then return.
       if (proc && proc->is_suspended) {
         proc->pending_wake = h;
         return;
@@ -89,9 +64,6 @@ struct DelayAwaiter {
 struct NamedEventAwaiter {
   SimContext& ctx;
   std::string_view event_name;
-  // §6.17: the event itself where it is no variable of a scope but a class's
-  // event property (ClassEventVariable in class_event_property.h), which no
-  // name finds; null to find the event by `event_name`.
   Variable* event = nullptr;
 
   bool await_ready() const noexcept { return false; }
@@ -100,18 +72,10 @@ struct NamedEventAwaiter {
     auto* var = event != nullptr ? event : ctx.FindVariable(event_name);
     if (!var) return;
     auto* proc = ctx.CurrentProcess();
-    // §37.27 detail 1: the process waits on the event until it resumes.
     if (proc) proc->waiting_on_events.assign(1, var);
     auto* ctx_ptr = &ctx;
     var->AddWatcher([h, proc, ctx_ptr]() mutable {
-      // §9.7: a suspended process is desensitized to the event it waits on, so
-      // the trigger passes it by and the watcher stays for the next one, the
-      // one resume() resensitizes it to.
       if (proc && proc->is_suspended) return false;
-      // The watcher fires synchronously inside the triggering process's
-      // NotifyWatchers; set the current process to the waiter's own for the
-      // resume (so the post-resume flush point sees the right process) and
-      // restore it afterward (§9.4 / §12.4.2.1).
       auto* saved = ctx_ptr->CurrentProcess();
       if (proc) ctx_ptr->SetCurrentProcess(proc);
       h.resume();
@@ -125,28 +89,6 @@ struct NamedEventAwaiter {
   }
 };
 
-// Drops from `names` every name that designates no object, leaving a process's
-// watch list holding only the names a watcher can be armed on.
-//
-// §9.2.2.2.1 builds an implicit sensitivity list by expanding the longest
-// static prefix of every net or variable identifier or select expression the
-// block reads, and an expansion is an object of the design, so a name that
-// resolves to none of them is not on the list at all. Both awaiters below
-// already read it that way when they arm, by skipping such a name; this is
-// where the list itself comes to agree, which is what lets the `read_vars`
-// emptiness test at each loop that watches one answer the question it asks.
-//
-// A list left holding those names reads as though there were something to
-// watch, so the coroutine suspends on a set of watchers it never armed. Nothing
-// can resume it after that: the process is never scheduled again, and whatever
-// it drives holds the value of its last evaluation for the rest of the run with
-// no report of any kind. #3436 is one instance of that reaching the output.
-// Resuming such a suspension immediately is not the alternative, because each
-// of those loops evaluates and awaits without advancing time, so a suspension
-// that resumes itself spins for ever.
-//
-// §8.9: `C::n`, a static property of a class, designates the class's own
-// storage, which AnyChangeAwaiter arms on the class, so it is kept.
 inline bool NamesStaticProperty(SimContext& ctx, std::string_view name) {
   auto scope = name.rfind("::");
   if (scope == std::string_view::npos) return false;
@@ -167,58 +109,17 @@ inline void DropUnwatchableNames(SimContext& ctx,
 struct AnyChangeAwaiter {
   SimContext& ctx;
   const std::vector<std::string_view>& var_names;
-  // Optional guard shared with the awaiting coroutine, true once that coroutine
-  // has resumed for good. An ExecTask-based waiter (the wait statement) has its
-  // coroutine frame destroyed the instant it resumes to completion, by the
-  // awaiting temporary's destructor as control unwinds — so a stranded sibling
-  // watcher cannot even call h.done() safely (that would read a freed frame).
-  // Such waiters pass `finished`; every stranded watcher then removes itself by
-  // value without touching the handle. SimCoroutine waiters (always_comb /
-  // continuous assigns) keep their frame alive at final_suspend, so they leave
-  // this null and rely on the h.done() check below.
   std::shared_ptr<bool> finished = nullptr;
-  // §28.13 and §28.14: whether a change of a watched net's strength alone
-  // (Variable::strength_generation) resumes the coroutine, as it does the
-  // continuous assignment of a MOS or CMOS switch, which passes its data
-  // input's strength on. §9.4.2 has an event control wait for a change of
-  // value, so every other waiter leaves this false.
   bool strength_changes = false;
 
   bool await_ready() const noexcept { return false; }
 
-  // The object one watcher is armed on: the variable the awaited name resolved
-  // to, and whether that variable's `value` is where the object's observable
-  // state lives. It is one parameter rather than two because
-  // AttachChangeWatcher below is at the five-parameter limit
-  // readability-function-size in etc/clang_tidy/src.yml sets, and because the
-  // two answer one question together: they are what the arming site learned
-  // about the name, and the watcher body has no way to ask again (it holds no
-  // name, and a lookup per notification would be the wrong place for one).
   struct WatchedObject {
     Variable* var;
     bool value_backed;
     bool strength_changes;
   };
 
-  // The observable state of a watched variable as of one moment: the bits, and
-  // the tick SimContext::SetEventTriggered
-  // (src/simulator/sim_context_fileio.cpp:238-243) last stamped on it.
-  //
-  // The bits alone were not the state, and CI is what said so. A gate comparing
-  // only `value` failed LevelSensitiveSequenceSimulation, IpcSync and
-  // SequenceCompositionSim: a `-> ev` and a sequence endpoint report themselves
-  // through Variable::triggered_ticks (variable.h:71) and the event_triggered_
-  // map, leaving `value` bit-for-bit identical, so every wait on a trigger was
-  // told nothing had happened. IsEventTriggered
-  // (src/simulator/sim_context_fileio.cpp:245-252) reads that mark back by
-  // comparing it against the current tick, which is the definition of
-  // "triggered" the waiting condition itself evaluates.
-  //
-  // The snapshot is a Logic4Snapshot rather than a Logic4Vec copied from
-  // `value`, which would share the words `value` holds: a member assignment
-  // writes through those words rather than replacing them, so the baseline
-  // would move with the value it exists to be compared against and no change
-  // would ever be seen (#3358).
   struct ObservedState {
     Logic4Snapshot bits;
     uint64_t triggered_ticks = UINT64_MAX;
@@ -231,64 +132,6 @@ struct AnyChangeAwaiter {
     }
   };
 
-  // Whether the observable state of the object `name` designates lives in the
-  // `value` of the variable it resolves to. §9.4.2 reserves the event for a
-  // change in the expression's value, and for the objects below that
-  // value is held somewhere else entirely, so a comparison of `value` cannot
-  // answer the clause's question for them: it would answer "no change" to every
-  // notification about them. Those keep the unconditional resume the watcher
-  // has always given, and the process re-evaluates what it reads.
-  //
-  // A named event, and the synthetic `__seq_<name>` variable a sequence
-  // endpoint fires through (created with is_event by
-  // src/simulator/lowerer_register.cpp:164-171 and
-  // src/simulator/stmt_exec_wait.cpp:31-40), carry no value at all: their whole
-  // state is the trigger mark. EventAwaiter::await_suspend already answers this
-  // way, routing an is_event operand to AttachEventVarWatcher, which performs
-  // no value comparison; this agrees with it.
-  //
-  // It matters more here than anywhere else that they pass. `-> ev`
-  // (src/simulator/stmt_exec.cpp:96-98), its `->>` form (:118-120) and
-  // FireSequenceEndpoint (src/simulator/sequence_monitor.cpp:46-48) do not call
-  // NotifyWatchers at all: each moves `var->watchers` out, clears the vector
-  // and schedules every callback as a scheduler event, discarding what the
-  // callback returns. There is no re-arming on that path, so a watcher that
-  // declines is not merely silent -- it is destroyed, and the process it was to
-  // resume waits for the rest of the run. That is what run 34178441223 hit.
-  //
-  // A queue and a dynamic array keep their elements in a QueueObject and an
-  // associative array in an AssocArrayObject, both keyed by this same name
-  // (lowerer_var.cpp calls CreateQueue for `is_queue` and for `is_dynamic`, and
-  // CreateAssocArray for `is_assoc`). NotifyOwningVar
-  // (src/simulator/eval_array_queue.cpp:152-153) is the notifier this preserves
-  // for them: a queue's mutating methods notify the watchers of the variable
-  // owning the queue while that variable's `value` stands still. The case that
-  // reaches this awaiter is `wait (q[0] == 3)` woken by a `q.push_back(...)`
-  // elsewhere -- CollectSelectReads (src/elaborator/sensitivity.cpp:48-50) puts
-  // the select's base identifier `q` into the read set -- and `wait (q.size()
-  // != 0)`, whose receiver CollectMethodReceiverReads in
-  // src/simulator/stmt_exec_wait.cpp puts there, a call's callee being nothing
-  // CollectExprReads collects.
-  //
-  // A class handle's `value` is the handle, not the object: the kProperty arm
-  // of WriteResolvedField (src/simulator/statement_assign.cpp) writes the field
-  // into the ClassObject and then announces it, and so does the method-body
-  // writer in eval_function_body.cpp, both through
-  // SimContext::NotifyClassHandleWatchers, which notifies every variable
-  // designating the object rather than the one the statement happened to name
-  // -- `this` and `super` name none, and `C q = p;` leaves two naming one
-  // object. `wait (obj.f == 1)` arms on `obj`, CollectExprReads recursing
-  // through a member access into both sides of it.
-  //
-  // FindArrayInfo is deliberately not consulted. It registers a shape (extents
-  // and element width), not a store, and the two shapes it can name are already
-  // decided: a dynamic array's store is the QueueObject FindQueue returns, and
-  // a fixed unpacked array's elements are ordinary variables named `a[0]`,
-  // `a[1]` and so on (CollectVecElements in
-  // src/simulator/eval_array.cpp:132-140), each written and then notified
-  // through its own `value` by every writer that touches it. Exempting a name
-  // FindArrayInfo answers for would take the comparison away from value-backed
-  // variables, which is the opposite of what this is for.
   static bool StateLivesInValue(SimContext& ctx, const Variable& var,
                                 std::string_view name) {
     if (var.is_event) return false;
@@ -297,39 +140,6 @@ struct AnyChangeAwaiter {
            ctx.GetVariableClassType(name).empty();
   }
 
-  // Decides whether a notification on a watched variable is the change §9.4.2
-  // reserves the event for, and resyncs the per-watcher baseline either way.
-  // Named and shaped after EventAwaiter::EdgeGatePasses, which is the same gate
-  // for an edge: a notification that does not qualify leaves the watcher armed
-  // and the process suspended, and the baseline moves to the current state so
-  // the next notification is measured from where this one left the variable.
-  //
-  // Three ways to pass. A watcher armed on an object whose state is not in
-  // `value` passes unconditionally, for the reasons StateLivesInValue records.
-  // Otherwise the state has to have moved -- the bits, or the trigger mark, a
-  // `-> x` on a variable no is_event flag was set on being the case the mark
-  // catches and the kind test does not. And a variable standing triggered at
-  // this instant passes whatever the baseline says, because that is what
-  // IsEventTriggered reports to the condition the waiting process is about to
-  // re-evaluate, and because a second `-> ev` inside one time step leaves the
-  // mark where the first put it.
-  //
-  // Every other kind of variable goes through the comparison, and that is
-  // nearly all of them: a string keeps its bytes in `value`, a real its bit
-  // pattern, a net the value its drivers resolved to, and a forced variable
-  // writes both `forced_value` and `value` (WriteOwnedBits in
-  // src/simulator/statement_assign_decl.cpp:481-497), so all four are compared.
-  //
-  // The bit comparison is EventAwaiter::Logic4VecBitsEqual, the predicate
-  // EventAwaiter::CheckEdge's Edge::kNone arm and EvalCompoundTrigger already
-  // decide a change with -- differing nwords, or any differing aval/bval --
-  // rather than a third copy of it. CheckEdge itself reads var->prev_value, the
-  // shared field this awaiter must not consult, so calling it here would mean
-  // writing that field first the way AttachEdgeVarWatcher has to;
-  // Logic4VecBitsEqual takes both values as arguments and needs no such detour.
-  // awaiters_event_control.h is already included by this header and this
-  // awaiter already calls EventAwaiter::ResumeMaybeReactive, so no new
-  // dependency comes with it.
   static bool ChangeGatePasses(const WatchedObject& watched,
                                ObservedState& prev, uint64_t now_ticks) {
     if (!watched.value_backed) return true;
@@ -344,50 +154,6 @@ struct AnyChangeAwaiter {
     return moved || triggered_now;
   }
 
-  // Arms the change watcher one named variable carries for one suspension.
-  // Factored out of await_suspend for the reason
-  // EventAwaiter::AttachEventVarWatcher is factored out of its own: the watcher
-  // body is three guards deep inside a loop inside a lambda, which
-  // readability-function-cognitive-complexity in etc/clang_tidy/src.yml counts
-  // against the function holding it.
-  //
-  // `fin` and `consumed` answer different questions and both are needed. `fin`
-  // and h.done() ask whether the frame is still there; `consumed` asks whether
-  // this suspension is still the one the frame is waiting at. Neither asks what
-  // the value did, and until ChangeGatePasses was added below, nothing on the
-  // path from a writer to an always_comb did: a store depositing what the
-  // variable already held notified the watchers, and the watchers resumed the
-  // process. §9.4.2 (printed page 232, last line of the clause) says what that
-  // notification is worth: an implicit event with no edge is detected on any
-  // change in the expression's value, an edge event on its LSB alone, and a
-  // change in an operand that leaves the expression's result unchanged is no
-  // event at all. §9.2.2.2 (printed page 222) makes it observable, an
-  // always_comb inferring its sensitivity list from the expressions §9.2.2.2.1
-  // names and §9.4.2 governing what such a list detects:
-  // `always_comb begin b = a; runs = runs + 1; end` ran a third time for
-  // `a = 8'd5;` on a variable already holding 8'd5. The same design written
-  // `always @(a)` ran twice, because that path consults
-  // EventAwaiter::CheckEdge. One clause was getting two answers from two
-  // awaiters in one simulator; the gate below is the answer CheckEdge gives, so
-  // now they agree.
-  //
-  // The comparison belongs here rather than at the writers. NotifyWatchers() is
-  // called from twelve places in statement_assign_core.cpp alone and from more
-  // than forty across the assignment, nonblocking, streaming, net-resolution
-  // and continuous-assign paths, and a writer-side test would have to be
-  // remembered, and got right, at every one of them -- and at every one added
-  // later. That is the state #3522 recorded for WriteBitSelect's five callers.
-  // There is one place that knows what the awaiter was armed to detect, and it
-  // is the awaiter.
-  //
-  // `watched` carries what the arming site learned about the name: the variable
-  // it resolved to, and StateLivesInValue's answer for it. The watcher body
-  // holds no name and could not ask again.
-  // §9.7: a suspended process is desensitized to what it waits on, so a change
-  // wakes nothing while it is suspended; the wake `h` is kept for resume() to
-  // replay (DriveResumedProcess), which runs the wait again in the time step
-  // of the resume, so a condition that held by then lets the process go on.
-  // Returns whether the wake was kept.
   static bool KeepWakeWhileSuspended(Process* proc, std::coroutine_handle<> h) {
     if (proc == nullptr || !proc->is_suspended) return false;
     proc->pending_wake = h;
@@ -399,54 +165,17 @@ struct AnyChangeAwaiter {
                            const std::shared_ptr<bool>& consumed) {
     auto* ctx_ptr = &ctx;
     Variable* var = watched.var;
-    // Left in place: nothing below reads it, the baseline this watcher compares
-    // against being its own. It is the seed this path has always written into
-    // the shared field, and other readers of it -- RepeatEventAwaiter's edge
-    // operands keep their baseline there between notifications -- would be
-    // reading a different field's worth of history if it went away. Removing it
-    // is a change to them, not to this fix.
     var->prev_value.Capture(var->value);
-    // The baseline is per watcher and per suspension, not var->prev_value.
-    // variable.h documents that field as saying only what the last armed
-    // awaiter left there: every watcher on the variable that declines resyncs
-    // it, and no writer maintains it. Two always_comb procedures watching one
-    // signal would therefore starve each other through it, which is what two
-    // `always @(posedge clk)` blocks did before AttachEdgeVarWatcher took a
-    // copy of its own; this follows that function.
     ObservedState prev;
     prev.Capture(*var);
     var->AddWatcher([h, watched, prev, proc, ctx_ptr, fin, consumed]() mutable {
-      // A wait/@* re-suspension arms a fresh watcher on every awaited signal,
-      // but watchers are cleared only from the signal that actually fired.
-      // Watchers stranded on the other signals accumulate; once one of them
-      // resumes the coroutine to completion, the rest would resume an
-      // already-finished (or freed) frame -> undefined behavior / SEGFAULT.
-      // Drop any such watcher: by the shared guard when present (frame may
-      // already be freed), otherwise by the still-alive frame's done() flag.
       if (fin) {
         if (*fin) return true;
       } else if (h.done()) {
         return true;
       }
       if (proc && !proc->active) return true;
-      // A sibling variable armed by the same suspension already resumed this
-      // await, so the coroutine is now suspended somewhere else. Resuming it
-      // here would complete whatever await it moved to instead of this one:
-      // when that is a delay, the value takes effect at the change time rather
-      // than after the delay §28.16 gives it. Retire this stale watcher. The
-      // frame is still alive at this point, so done() above cannot tell the two
-      // suspension points apart.
       if (*consumed) return true;
-      // §9.4.2: the notification says the variable was written, not that its
-      // value changed -- and, for an object whose state is not in `value`, not
-      // even that, which is why the gate passes unconditionally for those. It
-      // sits after the two liveness guards, so a watcher on a dead frame or a
-      // stopped process is still dropped whatever the value did, and after the
-      // `consumed` guard, so a sibling that already resumed this suspension
-      // still retires this one. It sits before `*consumed = true`, because a
-      // watcher that declines has not consumed the suspension: it returns
-      // false, stays armed on this variable, and leaves the guard clear for
-      // whichever operand does change.
       if (!ChangeGatePasses(watched, prev, ctx_ptr->CurrentTime().ticks))
         return false;
       *consumed = true;
@@ -456,15 +185,6 @@ struct AnyChangeAwaiter {
     });
   }
 
-  // §9.4.3 with §8.6 and §8.11: a name no variable of the design answers may
-  // be a property of the running method's object -- `wait (go)` or `wait
-  // (this.go)` inside a class task, the reads then naming `go` and `this` --
-  // whose writes reach the object's own watchers through
-  // SimContext::NotifyClassHandleWatchers. The watcher wakes the process
-  // without comparing values, as the arm for a class-typed variable does: the
-  // wait statement re-evaluates its condition in the process's own context
-  // once resumed, and parks again if it is still false. A name that is
-  // neither `this` nor a property of that object arms nothing, as before.
   void AttachOwnPropertyWatcher(std::string_view name,
                                 std::coroutine_handle<> h, Process* proc,
                                 const std::shared_ptr<bool>& fin,
@@ -475,27 +195,6 @@ struct AnyChangeAwaiter {
     self->AddWatcher(WakeOnceWatcher(h, proc, fin, consumed));
   }
 
-  // §9.4.3 with §8.9: a static property of a class is the class's own
-  // storage, which no object's watchers see written, so a wait on one arms
-  // on the class, where ClassTypeInfo::NotifyStaticWatchers announces every
-  // write to that storage. The name is `C::n` as ExecWait in
-  // src/simulator/stmt_exec_wait.cpp collects a class-scoped read, or the
-  // bare name of a static property of the running method's class, which
-  // §8.10 lets a method name unqualified. It is asked before the own-property
-  // arm: inside an instance method ClassTypeInfo::FindProperty finds the
-  // static property too, and arming on the object there would miss every
-  // write made through `C::n` or from a static method. Answers whether it
-  // armed. Before this `wait (C::n == 2)` collected the names `C` and `n`,
-  // neither a variable nor a property of any object in hand, armed nothing
-  // and waited for ever. §26.3: a package's class is bound under `p::C`, and
-  // `p::C::all` is split at its last scope operator into that key and the
-  // member; split at the first, the class was looked for as `p`. §8.13
-  // (printed pages 189-190): the class armed on is the one declaring the
-  // property, C for `D::n` and `D::all` where D extends C and for the bare
-  // `n` of D's own static method (ClassTypeInfo::StaticPropertyDeclarer),
-  // which is the class every write to that one storage notifies; asked of
-  // D's own static_properties, which hold D's declarations alone, each armed
-  // nothing and waited for ever.
   bool AttachStaticPropertyWatcher(std::string_view name,
                                    std::coroutine_handle<> h, Process* proc,
                                    const std::shared_ptr<bool>& fin,
@@ -514,14 +213,6 @@ struct AnyChangeAwaiter {
     return true;
   }
 
-  // The watcher body the two class arms above share: it wakes the process
-  // without comparing values, as the arm for a class-typed variable does,
-  // since the wait statement re-evaluates its condition in the process's own
-  // context once resumed and parks again if it is still false. The liveness
-  // guards are those of AttachChangeWatcher: the shared `fin` when the frame
-  // may already be freed, else the frame's own done() flag, then the
-  // process, then the guard a sibling arm of the same suspension may have
-  // set.
   std::function<bool()> WakeOnceWatcher(std::coroutine_handle<> h,
                                         Process* proc,
                                         const std::shared_ptr<bool>& fin,
@@ -544,17 +235,8 @@ struct AnyChangeAwaiter {
   void await_suspend(std::coroutine_handle<> h) {
     auto* proc = ctx.CurrentProcess();
     auto fin = finished;
-    // Resumes this suspension at most once. Every watcher armed here shares one
-    // guard, so the first named variable to change retires the watchers armed
-    // on the others. The guard is created per suspension rather than held as a
-    // member: a coroutine that re-arms this awaiter after resuming needs a
-    // guard that is still clear, and the watchers of the earlier suspension
-    // need one that stays set.
     auto consumed = std::make_shared<bool>(false);
     for (auto name : var_names) {
-      // §23.9: a name the running method's class declares is the property,
-      // not a same-named variable of the enclosing module
-      // (NameDenotesVariable).
       auto* var =
           NameDenotesVariable(name, ctx) ? ctx.FindVariable(name) : nullptr;
       if (!var) {
@@ -562,9 +244,6 @@ struct AnyChangeAwaiter {
           AttachOwnPropertyWatcher(name, h, proc, fin, consumed);
         continue;
       }
-      // The name is in hand only here, and the decision it feeds is the same
-      // for every notification the watcher will see, so it is made once per
-      // name per suspension rather than in the watcher body.
       AttachChangeWatcher(
           {var, StateLivesInValue(ctx, *var, name), strength_changes}, h, proc,
           fin, consumed);
@@ -583,19 +262,11 @@ struct InertialDelayAwaiter {
 
   bool await_ready() const noexcept { return false; }
 
-  // Schedules the timeout event that, if it fires first, marks the delay as
-  // expired and resumes the coroutine. The shared `fired` guard ensures the
-  // timeout and the cancel watchers race for a single resume.
   void ScheduleTimeoutEvent(std::coroutine_handle<> h, Process* proc) {
     auto time = ctx.CurrentTime() + SimTime{delay_ticks};
     auto* event = ctx.GetScheduler().GetEventPool().Acquire();
     auto f = fired;
     auto e = expired;
-    // If an operand change wins the `fired` race first, this timeout becomes a
-    // no-op. Tag it with the same guard so the scheduler can drop the orphaned
-    // event without advancing time to it (IEEE 1800 §28 inertial delays). When
-    // this timeout fires legitimately, `fired` is still false as the scheduler
-    // reaches the slot (the callback below sets it), so the event stays live.
     event->superseded = f;
     event->callback = [h, proc, f, e, &ctx = ctx]() mutable {
       if (*f) return;
@@ -608,19 +279,6 @@ struct InertialDelayAwaiter {
     ctx.GetScheduler().ScheduleEvent(time, Region::kActive, event);
   }
 
-  // Arms cancel-on-change watchers on every named variable. The first change
-  // before the timeout wins the shared `fired` guard and resumes immediately,
-  // leaving `expired` false so await_resume reports the inertial cancellation.
-  // The change is written by another process, which is the current one when
-  // the watcher runs, so the waiting one is made current for the resume and
-  // the writer restored after it, as EventAwaiter::ResumeMaybeReactive does:
-  // resumed as the writer, a delayed assignment inside an instance
-  // re-evaluated its operands, and armed its next wait, under the writer's
-  // instance prefix -- the parent's `a` for the instance's input port `a` --
-  // and missed every later change of its own ports (§28.16, printed page 856,
-  // with §23.2.2); and left current once it suspended again, it made the
-  // writer, the port's own assignment, arm its next wait under the instance's
-  // prefix, so the port stopped following the parent.
   void ArmCancelWatchers(std::coroutine_handle<> h, Process* proc) {
     for (auto name : var_names) {
       auto* var = ctx.FindVariable(name);
@@ -652,10 +310,6 @@ struct InertialDelayAwaiter {
 struct ForkJoinState {
   uint32_t remaining = 0;
   std::coroutine_handle<> parent;
-  // The thread that issued the fork, captured so the active-process pointer
-  // can be restored when the parent resumes. Without this, the parent would
-  // re-enter with whichever child finished last as the current thread, and
-  // §18.14.2 thread stability of parent-side draws would be broken.
   Process* parent_proc = nullptr;
   bool join_any = false;
   bool resumed = false;
@@ -687,9 +341,6 @@ struct CycleDelayAwaiter {
 
   bool await_ready() const noexcept {
     if (cycles != 0) return false;
-    // §14.11: ##0 proceeds immediately only when there is no governing
-    // clocking block, or when that block's event has already occurred in the
-    // current time step.
     auto* mgr = ctx.GetClockingManager();
     if (!mgr) return true;
     auto block_name = mgr->DefaultClockingFor(ctx);
@@ -710,18 +361,12 @@ struct CycleDelayAwaiter {
     }
     auto* proc = ctx.CurrentProcess();
     if (cycles == 0) {
-      // §14.11: a ##0 whose clocking event has not yet occurred this time step
-      // suspends until that event fires, then proceeds.
       mgr->RegisterEdgeWait(block_name, [h, proc, &ctx = ctx]() {
         ResumeIn(h, proc, ctx);
         return false;
       });
       return;
     }
-    // §14.11: a ##N waits for N clocking block events, and one executed in the
-    // time step of an event waits a full cycle for its first, so an event of
-    // the step the wait began in is not one of the N. Counted, `@(cb); ##1`
-    // and two consecutive `##2` each ran one cycle short.
     SimTime start = ctx.CurrentTime();
     mgr->RegisterEdgeWait(
         block_name, [h, proc, start, remaining = cycles, &ctx = ctx]() mutable {
@@ -732,11 +377,6 @@ struct CycleDelayAwaiter {
         });
   }
 
-  // §9.7 with §14.11: resumes `h` as DelayAwaiter's event does, in the process
-  // that waited, whose `this` and scopes the coroutine resumes into. Resumed
-  // under whichever process the clocking event ran in, a class task's `##2;
-  // v = 3;` wrote `v` on no object. A process killed meanwhile is not resumed,
-  // and a suspended one keeps the wake to replay.
   static void ResumeIn(std::coroutine_handle<> h, Process* proc,
                        SimContext& ctx) {
     if (proc && !proc->active) return;
@@ -766,15 +406,6 @@ struct ProcessAwaitAwaiter {
   void await_resume() const noexcept {}
 };
 
-// §15.3.3 and §15.4.3 to §15.4.7: what resumes a process parked on a
-// semaphore's or a mailbox's waiter queue. The put() or get() that frees the
-// wait runs in another process, part way through its own statement, so the
-// waiter is resumed in the process that waited, as a cycle delay is
-// (CycleDelayAwaiter::ResumeIn), and the waking process is restored for the
-// rest of its statement. Resumed in the waker's, a class task's `s.get();`
-// went on to read `this.id` of no object. Without a context, as a test drives
-// an awaiter, the handle is resumed as it stands. §37.33 detail 3: the waiting
-// process records `object`, what it waits on, until it is resumed.
 inline std::function<void()> SyncWaiterResume(std::coroutine_handle<> h,
                                               SimContext* ctx,
                                               const void* object) {
@@ -806,17 +437,6 @@ struct SemaphoreGetAwaiter {
   void await_resume() const noexcept {}
 };
 
-// §15.4: a process that places a message into a full mailbox shall be
-// suspended until enough room becomes available in the queue. When there is
-// room the message is stored immediately and the process continues without
-// suspending (an unbounded mailbox, never being full, never suspends a
-// sender). When the mailbox is full the handle is parked on the put-waiter
-// queue; the runtime resumes it from WakePutWaiters() once a get/try_get
-// frees a slot, at which point the awaiter stores the deferred message.
-// §15.4.3: the message is the value the actual had when the call was
-// reached, so the awaiter owns a copy of its words rather than a view of the
-// variable's, which the process that frees the room may have rewritten by
-// then; the type it was placed with rides beside it for §15.4.5's check.
 struct MailboxPutAwaiter {
   MailboxObject& mbx;
   Logic4Snapshot msg;
@@ -833,24 +453,11 @@ struct MailboxPutAwaiter {
     mbx.put_waiters.push_back(SyncWaiterResume(h, ctx, &mbx));
   }
 
-  // await_resume runs on both the ready and the resumed paths. The message is
-  // already stored when it was placed in await_ready; store it now only when
-  // the put had blocked and the runtime has since freed room.
   void await_resume() {
     if (!placed) mbx.Put(msg.Get(), type);
   }
 };
 
-// §15.4.5: a process that retrieves a message from an empty mailbox blocks
-// until a message is placed in it. When a message is there it is removed at
-// once and the process continues without suspending; otherwise the handle is
-// parked on the get-waiter queue, which §15.4.5 keeps in arrival order, and
-// the put that places a message resumes it through WakeGetWaiters(), at which
-// point the awaiter removes the message it waited for. The message is left in
-// `msg` for the caller to store into the variable get() names, and `status`
-// says whether it was retrieved: a message whose type is not equivalent to
-// `expected` is not removed and the process does not wait for another, since
-// §15.4.5 has that generate a run-time error, which the caller reports.
 struct MailboxGetAwaiter {
   MailboxObject& mbx;
   MailboxMessageType expected;
@@ -873,13 +480,6 @@ struct MailboxGetAwaiter {
   }
 };
 
-// §15.4.7: a process that peeks an empty mailbox blocks until a message is
-// placed in it, as get() does, and copies the message without removing it,
-// which is why one placed message can unblock every peeking process and not
-// just one: WakeGetWaiters() resumes all of the peek-waiter queue before the
-// head of the get-waiter queue. The copy is left in `msg` and `status` says
-// whether it was made, a message of a type not equivalent to `expected`
-// being §15.4.7's run-time error rather than a copy.
 struct MailboxPeekAwaiter {
   MailboxObject& mbx;
   MailboxMessageType expected;

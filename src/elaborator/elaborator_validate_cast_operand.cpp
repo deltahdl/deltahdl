@@ -13,9 +13,6 @@ namespace delta {
 
 namespace {
 
-// §11.3.1: the operators whose result is real when an
-// operand is, the arithmetic ones. A relational, an equality or a logical
-// operator gives a one-bit result whatever its operands.
 constexpr std::array<TokenKind, 5> kRealPropagatingOps = {
     TokenKind::kPlus, TokenKind::kMinus, TokenKind::kStar, TokenKind::kSlash,
     TokenKind::kPower};
@@ -45,8 +42,6 @@ bool IsRealValued(
   if (e->kind == ExprKind::kIdentifier) {
     return IsRealType(VarKind(e, var_types));
   }
-  // An element of an array of reals (§7.4) is a real; var_types records the
-  // array under its element's kind.
   if (e->kind == ExprKind::kSelect) {
     auto it = var_types.find(ExprIdent(e->base));
     return it != var_types.end() && IsRealType(it->second);
@@ -63,10 +58,6 @@ bool IsRealValued(
   return false;
 }
 
-// §6.24.1 (printed page 140) requires the operand of a size or a signing cast
-// to be integral (§6.11.1). A real value is not, nor is a variable of a string,
-// chandle or event type, a class handle, an unpacked array or a variable of an
-// unpacked structure or union type.
 bool ElaboratorOperationRules::CastOperandIsNonIntegral(
     const Expr* operand) const {
   if (IsRealValued(operand, var_types_)) return true;
@@ -80,8 +71,6 @@ bool ElaboratorOperationRules::CastOperandIsNonIntegral(
       cast_unpacked_structs_.count(operand->text) != 0) {
     return true;
   }
-  // var_array_info_ records a variable only when it is declared with an
-  // unpacked dimension.
   return var_array_info_.count(operand->text) != 0;
 }
 

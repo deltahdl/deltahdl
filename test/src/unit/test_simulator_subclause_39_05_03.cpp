@@ -18,9 +18,6 @@ namespace {
 constexpr const char* kA = "top.a1";
 constexpr const char* kB = "top.a2";
 
-// §39.5.3: a deferred or procedural concurrent assertion may have pending,
-// not-yet-matured instances queued for it; the queue is observable and starts
-// empty.
 TEST(DeferredAssertionQueue, PendingInstancesAreQueuedAndCounted) {
   AssertionApi api;
   EXPECT_EQ(api.PendingAssertionReportCount(kA), 0u);
@@ -30,10 +27,6 @@ TEST(DeferredAssertionQueue, PendingInstancesAreQueuedAndCounted) {
   EXPECT_EQ(api.PendingAssertionReportCount(kA), 2u);
 }
 
-// §39.5.3 example: vpiAssertionDisable disables the starting of new attempts
-// without affecting existing attempts, so it does not interfere with current
-// attempts and therefore leaves already-queued pending reports untouched —
-// they may still mature and be reported.
 TEST(DeferredAssertionQueue, DisableLeavesPendingReportsToMature) {
   AssertionApi api;
   api.NoteAssertionAttemptStarted(kA, 10);
@@ -41,13 +34,10 @@ TEST(DeferredAssertionQueue, DisableLeavesPendingReportsToMature) {
 
   EXPECT_TRUE(api.Control(vpiAssertionDisable, kA));
 
-  // The pending instance is neither affected nor flushed.
   EXPECT_EQ(api.PendingAssertionReportCount(kA), 1u);
   EXPECT_FALSE(api.AssertionEnabled(kA));
 }
 
-// §39.5.3: flushing on a discard control is scoped to the assertion whose
-// attempts were discarded; other assertions' pending instances are untouched.
 TEST(DeferredAssertionQueue, ResetFlushOnlyTargetedAssertion) {
   AssertionApi api;
   api.QueuePendingAssertionReport(kA);
@@ -59,15 +49,12 @@ TEST(DeferredAssertionQueue, ResetFlushOnlyTargetedAssertion) {
   EXPECT_EQ(api.PendingAssertionReportCount(kB), 1u);
 }
 
-// §39.5.3: non-discard per-assertion controls do not interfere with current
-// attempts, so none of them affect or flush the pending queue.
 TEST(DeferredAssertionQueue, NonDiscardControlsDoNotFlush) {
   for (int control :
        {vpiAssertionEnable, vpiAssertionLock, vpiAssertionUnlock,
         vpiAssertionDisablePassAction, vpiAssertionEnablePassAction,
         vpiAssertionDisableFailAction, vpiAssertionEnableFailAction,
         vpiAssertionDisableVacuousAction, vpiAssertionEnableNonvacuousAction}) {
-    // A fresh instance per control keeps each case independent of the others.
     AssertionApi api;
     api.QueuePendingAssertionReport(kA);
     EXPECT_TRUE(api.Control(control, kA));
@@ -75,9 +62,6 @@ TEST(DeferredAssertionQueue, NonDiscardControlsDoNotFlush) {
   }
 }
 
-// §39.5.3: the system-wide discard controls (vpiAssertionSysReset / SysKill /
-// SysEnd) discard all attempts in progress, so each flushes the pending
-// instances of every assertion.
 TEST(DeferredAssertionQueue, SystemDiscardControlsFlushAllAssertions) {
   {
     AssertionApi api;
@@ -105,11 +89,6 @@ TEST(DeferredAssertionQueue, SystemDiscardControlsFlushAllAssertions) {
   }
 }
 
-// §39.5.3: none of the system-wide controls that leave attempts in progress
-// alone (e.g. vpiAssertionSysOff disables further starts but does not affect
-// executing attempts; lock/unlock/on and the action toggles likewise do not
-// discard) interfere with current attempts, so none of them flush the pending
-// queues of any assertion.
 TEST(DeferredAssertionQueue, SystemNonDiscardControlsDoNotFlush) {
   for (int control :
        {vpiAssertionSysOff, vpiAssertionSysOn, vpiAssertionSysLock,
@@ -117,8 +96,6 @@ TEST(DeferredAssertionQueue, SystemNonDiscardControlsDoNotFlush) {
         vpiAssertionSysEnablePassAction, vpiAssertionSysDisableFailAction,
         vpiAssertionSysEnableFailAction, vpiAssertionSysDisableVacuousAction,
         vpiAssertionSysEnableNonvacuousAction}) {
-    // A fresh instance per control keeps each case independent — in particular
-    // a prior SysLock must not bleed into the next control's case.
     AssertionApi api;
     api.QueuePendingAssertionReport(kA);
     api.QueuePendingAssertionReport(kB);
@@ -130,8 +107,6 @@ TEST(DeferredAssertionQueue, SystemNonDiscardControlsDoNotFlush) {
   }
 }
 
-// §39.5.3 edge: a discard control applied to an assertion that has no pending
-// instances queued is a harmless no-op — there is simply nothing to flush.
 TEST(DeferredAssertionQueue, ResetWithNoPendingReportsIsHarmless) {
   AssertionApi api;
   ASSERT_EQ(api.PendingAssertionReportCount(kA), 0u);
@@ -141,26 +116,15 @@ TEST(DeferredAssertionQueue, ResetWithNoPendingReportsIsHarmless) {
   EXPECT_EQ(api.PendingAssertionReportCount(kA), 0u);
 }
 
-// §39.5.3 edge: the flush is coupled to the discard actually happening. A
-// locked assertion rejects vpiAssertionReset before any attempt is discarded,
-// so its already-queued pending reports are left intact.
 TEST(DeferredAssertionQueue, RejectedDiscardControlDoesNotFlush) {
   AssertionApi api;
   api.QueuePendingAssertionReport(kA);
   ASSERT_TRUE(api.Control(vpiAssertionLock, kA));
 
-  // Reset is refused while locked, so nothing is discarded and nothing flushed.
   EXPECT_FALSE(api.Control(vpiAssertionReset, kA));
 
   EXPECT_EQ(api.PendingAssertionReportCount(kA), 1u);
 }
-
-// -----------------------------------------------------------------------------
-// §39.5.3 speaks of every VPI function, which is what an application calls
-// rather than what the model does underneath: the controls reach the queues
-// through vpi_control(), and the rule about which of them flush is a rule about
-// that routine's operations.
-// -----------------------------------------------------------------------------
 
 class DeferredAssertionQueueThroughVpiControl : public ::testing::Test {
  protected:
@@ -177,10 +141,6 @@ class DeferredAssertionQueueThroughVpiControl : public ::testing::Test {
   AssertionApi api_;
 };
 
-// §39.5.3: a function that throws away the attempts being evaluated also
-// empties these queues of every pending instance not yet matured, and
-// vpiAssertionReset is the clause's own example of one that does. Called on the
-// assertion's handle, it takes the attempt and the queued reports together.
 TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.NoteAssertionAttemptStarted(kA, 10);
@@ -193,10 +153,6 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, ResetFlushesWhatIsQueued) {
   EXPECT_EQ(api_.PendingAssertionReportCount(kA), 0u);
 }
 
-// §39.5.3: a function that leaves the current attempts alone leaves these
-// queues alone too - vpiAssertionDisable stops new attempts starting and leaves
-// the ones in progress, so the reports already queued can still mature and be
-// reported.
 TEST_F(DeferredAssertionQueueThroughVpiControl, DisableLeavesTheQueueStanding) {
   VpiHandle assertion = vpi_ctx_.CreateAssertion(kA, vpiAssert);
   api_.NoteAssertionAttemptStarted(kA, 10);
@@ -209,10 +165,6 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, DisableLeavesTheQueueStanding) {
   EXPECT_EQ(api_.PendingAssertionReportCount(kA), 1u);
 }
 
-// §39.5.3 over the whole system: the rule is about what a function does to
-// attempts, so the system controls divide the same way. Killing the system
-// discards every attempt in progress and flushes every queue with them; turning
-// it off stops assertions starting and leaves both where they were.
 TEST_F(DeferredAssertionQueueThroughVpiControl, TheSystemControlsDivideAlike) {
   api_.NoteAssertionAttemptStarted(kA, 10);
   api_.QueuePendingAssertionReport(kA);
@@ -229,15 +181,6 @@ TEST_F(DeferredAssertionQueueThroughVpiControl, TheSystemControlsDivideAlike) {
   EXPECT_EQ(api_.PendingAssertionReportCount(kB), 0u);
 }
 
-// -----------------------------------------------------------------------------
-// §39.5.3 in a run: the queues are the run's own, a deferred assertion's
-// pending reports and a procedural concurrent assertion's pending instances,
-// and a control reaches them through the handle the design's assertion has.
-// -----------------------------------------------------------------------------
-
-// Two deferred assertions, a1 and a2, that fail once each, their fail actions
-// subroutine calls counting the failures, the design calling $arm after both
-// have executed and before their reports mature in the Reactive region.
 constexpr const char* kDeferredFailing =
     "module top;\n"
     "  logic x = 0;\n"
@@ -251,8 +194,6 @@ constexpr const char* kDeferredFailing =
     "  end\n"
     "endmodule\n";
 
-// Calls vpi_control(`operation`) on the assertion `full_name` names, or on
-// the whole system where it names none.
 std::function<void()> Control(int operation, const char* full_name) {
   return [operation, full_name] {
     vpiHandle target = full_name == nullptr
@@ -262,9 +203,6 @@ std::function<void()> Control(int operation, const char* full_name) {
   };
 }
 
-// §39.5.3: vpiAssertionReset discards the deferred assertion's attempts, and
-// with them the report its failure queued, which never matures; the report
-// the assertion beside it queued in the same process matures (#7514).
 TEST_F(AssertionRun, ResetFlushesADeferredAssertionsQueuedReport) {
   ArmInTurn({Control(vpiAssertionReset, "top.a1")});
   Run(kDeferredFailing);
@@ -273,8 +211,6 @@ TEST_F(AssertionRun, ResetFlushesADeferredAssertionsQueuedReport) {
   EXPECT_EQ(IntOf("top.failed2"), 1);
 }
 
-// §39.5.3: vpiAssertionSysKill discards every attempt in progress, the
-// reports queued for them among them (#7514).
 TEST_F(AssertionRun, SysKillFlushesADeferredAssertionsQueuedReport) {
   ArmInTurn({Control(vpiAssertionSysKill, nullptr)});
   Run(kDeferredFailing);
@@ -283,8 +219,6 @@ TEST_F(AssertionRun, SysKillFlushesADeferredAssertionsQueuedReport) {
   EXPECT_EQ(IntOf("top.failed2"), 0);
 }
 
-// §39.5.3: vpiAssertionDisable leaves the attempts in progress, so the report
-// already queued matures and the fail action runs (#7514).
 TEST_F(AssertionRun, DisableLeavesADeferredAssertionsQueuedReport) {
   ArmInTurn({Control(vpiAssertionDisable, "top.a1")});
   Run(kDeferredFailing);
@@ -293,9 +227,6 @@ TEST_F(AssertionRun, DisableLeavesADeferredAssertionsQueuedReport) {
   EXPECT_EQ(IntOf("top.failed2"), 1);
 }
 
-// Two procedural concurrent assertions, c1 and c2, that fail at each of two
-// clock ticks, the procedure calling $arm after queuing their instances,
-// before they mature in the Observed region.
 constexpr const char* kProceduralFailing =
     "module top;\n"
     "  logic clk = 0, a = 0;\n"
@@ -312,10 +243,6 @@ constexpr const char* kProceduralFailing =
     "  end\n"
     "endmodule\n";
 
-// §39.5.3: vpiAssertionReset flushes the procedural assertion's pending
-// instance, which begins no attempt; the instance the procedure queues at the
-// next tick fails as before, and so does each of the assertion's beside it
-// in the same procedure (#7514).
 TEST_F(AssertionRun, ResetFlushesAProceduralAssertionsPendingInstance) {
   ArmInTurn({Control(vpiAssertionReset, "top.c1")});
   Run(kProceduralFailing);
@@ -324,7 +251,6 @@ TEST_F(AssertionRun, ResetFlushesAProceduralAssertionsPendingInstance) {
   EXPECT_EQ(IntOf("top.failed2"), 2);
 }
 
-// With no control every instance begins an attempt that fails.
 TEST_F(AssertionRun, WithNoControlEachPendingInstanceFails) {
   Run(kProceduralFailing);
 

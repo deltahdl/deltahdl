@@ -1,19 +1,3 @@
-// §25.9 "Virtual interfaces": the operations a virtual interface admits, and
-// the declarations that may name one. Holds the cases for the declaration
-// rules -- a virtual interface as a port, a union member or an interface item,
-// an unknown interface or modport, an interface that references objects
-// outside its body -- and for the operations themselves: which operators may
-// be applied, which operand may stand opposite one in a comparison, and which
-// right-hand side may be assigned to one, including the interface type,
-// modport and parameter-value matching that assignment compatibility rests on.
-//
-// The cases for the statement positions those operation rules reach -- the
-// seven child-statement links Elaborator::WalkStmtsForVirtualInterfaceOps in
-// src/elaborator/elaborator_validate_datatype_ops.cpp did not descend before
-// it took its list from ForEachChildStmt -- are in
-// test_elaborator_subclause_25_09b.cpp, which the 1000-line cap in
-// .github/workflows/deltahdl.yml separated this file from.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -200,10 +184,6 @@ TEST(VirtualInterfaceElaboration, ParameterValuesDifferAcrossVirtual_Error) {
                             5, "25.9"));
 }
 
-// A virtual interface's parameter override may be any constant expression, not
-// only a literal. When the override is a module parameter that resolves to the
-// same value as the other interface's override, the two are the same type and
-// the assignment is legal — exercising the override evaluated in module scope.
 TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterMatches_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -218,11 +198,6 @@ TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterMatches_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The same rule with a parameter-valued override that resolves to a different
-// value than the other side's literal override: the parameter values differ,
-// so the two virtual interfaces are not the same type and the assignment is
-// illegal. This only fires when the override is evaluated in the module's
-// parameter scope rather than an empty one.
 TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterDiffers_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -238,10 +213,6 @@ TEST(VirtualInterfaceElaboration, ParameterOverrideFromParameterDiffers_Error) {
                             5, "25.9"));
 }
 
-// The same parameter-match rule for the interface-instance source: when the
-// instance's parameter override is itself a module parameter, it resolves to
-// the same value as the virtual interface's override, so the assignment from
-// instance to virtual interface is legal.
 TEST(VirtualInterfaceElaboration,
      ParameterOverrideOnInstanceFromParameterMatches_Ok) {
   ElabFixture f;
@@ -257,10 +228,6 @@ TEST(VirtualInterfaceElaboration,
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// An instance whose parameter override is a module parameter resolving to a
-// value that differs from the virtual interface's override is not the same
-// type, so the assignment is illegal. This only fires when the instance
-// override is evaluated in the enclosing module's parameter scope.
 TEST(VirtualInterfaceElaboration,
      ParameterOverrideOnInstanceFromParameterDiffers_Error) {
   ElabFixture f;
@@ -391,9 +358,6 @@ TEST(VirtualInterfaceElaboration, EqualityDifferentType_Error) {
       "comparison between virtual interfaces of different types", 7, "25.9"));
 }
 
-// §25.9 restricts the operands of == / != on a virtual interface to another
-// virtual interface of the same type, an interface instance, or null. Comparing
-// a virtual interface against an integer literal is outside that whitelist.
 TEST(VirtualInterfaceElaboration, EqualityWithIntLiteral_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -411,8 +375,6 @@ TEST(VirtualInterfaceElaboration, EqualityWithIntLiteral_Error) {
                             5, "25.9"));
 }
 
-// A virtual interface compared for equality against a variable of an
-// incompatible data type (here an int) is likewise illegal.
 TEST(VirtualInterfaceElaboration, EqualityWithIntVariable_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -431,9 +393,6 @@ TEST(VirtualInterfaceElaboration, EqualityWithIntVariable_Error) {
                             6, "25.9"));
 }
 
-// The equality whitelist admits an interface instance only when it is of the
-// same interface type as the virtual interface. Comparing against an instance
-// of a different interface is illegal.
 TEST(VirtualInterfaceElaboration,
      EqualityWithInterfaceInstanceDifferentType_Error) {
   ElabFixture f;
@@ -724,10 +683,6 @@ TEST(VirtualInterfaceElaboration, PassAsTaskArgument_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §25.9 allows a virtual interface variable to be passed as an argument to a
-// function (the second of the three enumerated positions: tasks, functions,
-// methods). An interface instance is passed through to the function's virtual
-// interface formal and elaboration accepts it.
 TEST(VirtualInterfaceElaboration, PassAsFunctionArgument_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -743,8 +698,6 @@ TEST(VirtualInterfaceElaboration, PassAsFunctionArgument_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The third enumerated position: a class method may take a virtual interface
-// formal, and an interface instance is passed to it through an object handle.
 TEST(VirtualInterfaceElaboration, PassAsMethodArgument_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -765,10 +718,6 @@ TEST(VirtualInterfaceElaboration, PassAsMethodArgument_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// Two virtual interfaces of the same interface with identical parameter value
-// overrides are the same type, so assignment between them is legal. Covers the
-// matching-parameters path for a virtual-to-virtual assignment (the mismatch
-// path is exercised by ParameterValuesDifferAcrossVirtual_Error).
 TEST(VirtualInterfaceElaboration, ParameterValuesMatchAcrossVirtual_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -783,9 +732,6 @@ TEST(VirtualInterfaceElaboration, ParameterValuesMatchAcrossVirtual_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// The defparam restriction is scoped to the specific interface instance the
-// defparam targets. A defparam on a sibling instance must not block assigning
-// a different, untargeted interface instance to a virtual interface.
 TEST(VirtualInterfaceElaboration, DefparamOnSiblingInstanceAllowsAssign_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -802,8 +748,6 @@ TEST(VirtualInterfaceElaboration, DefparamOnSiblingInstanceAllowsAssign_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// An interface whose ports reference other interfaces cannot be used as the
-// type of a virtual interface.
 TEST(VirtualInterfaceElaboration, InterfaceWithInterfacePortAsVi_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -819,10 +763,6 @@ TEST(VirtualInterfaceElaboration, InterfaceWithInterfacePortAsVi_Error) {
                             3, "25.9"));
 }
 
-// §25.9: a virtual interface may not serve as a port, an interface item or a
-// union member. The report that rejects one declared as a port names the
-// subclause stating the rule, which lets a caller learn which rule was enforced
-// without matching the wording of the message.
 TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {
   ElabFixture f;
   ElaborateSrc(
@@ -834,12 +774,6 @@ TEST(VirtualInterfaceElaboration, PortTypeNames25_9) {
                             "virtual interface cannot be used", 2, "25.9"));
 }
 
-// §25.9 bars a component from a sensitivity list, and §9.2.2.2 gives an
-// always_comb an inferred sensitivity list holding the expressions §9.2.2.2.1
-// defines -- a list the tool derives is a sensitivity list, and the clause
-// draws no distinction. Naming the line of the always_comb is what makes this
-// discriminating: a report against the module or the declaration would satisfy
-// a bare HasErrors() and fail here.
 TEST(VirtualInterfaceElaboration,
      ComponentInInferredAlwaysCombSensitivity_Error) {
   ElabFixture f;
@@ -857,9 +791,6 @@ TEST(VirtualInterfaceElaboration,
       "25.9"));
 }
 
-// §9.2.2.3 gives always_latch the same inferred list. Separate from the case
-// above because the two kinds are one condition in the process builder and a
-// check written against always_comb alone would pass that case and fail this.
 TEST(VirtualInterfaceElaboration,
      ComponentInInferredAlwaysLatchSensitivity_Error) {
   ElabFixture f;
@@ -877,10 +808,6 @@ TEST(VirtualInterfaceElaboration,
       "25.9"));
 }
 
-// §9.2.2.2.2: always @* waits for a change on a signal of its inferred
-// sensitivity list. A third inferring kind, reached by is_star_sensitivity
-// rather than by the procedure kind, so a check keyed on the two kinds above
-// leaves it open.
 TEST(VirtualInterfaceElaboration, ComponentInStarSensitivityList_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -897,11 +824,6 @@ TEST(VirtualInterfaceElaboration, ComponentInStarSensitivityList_Error) {
       "25.9"));
 }
 
-// The other half of §25.9's sentence, over a procedure whose list is inferred:
-// the component is written rather than read, so it is in no sensitivity list
-// and the procedural use the clause allows stands. This is what keeps the
-// check off the permitted half, which ComponentInProceduralStatement_Ok above
-// guards for an initial block.
 TEST(VirtualInterfaceElaboration, ComponentWrittenInInferredProcedure_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(

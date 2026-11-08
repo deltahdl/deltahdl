@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -53,8 +51,6 @@ TEST(ConstExprElab, NonConstantParamDefaultWarns) {
   EXPECT_FALSE(design->top_modules[0]->params[0].is_resolved);
 }
 
-// The report stands at the declaration of the object, not at the class, and
-// §8.25 is where the rule about a specialization is stated.
 TEST(ConstExprElab, ClassParamWithoutDefaultRequiresSpecialization) {
   ElabFixture f;
   ElaborateSrc(
@@ -118,8 +114,6 @@ TEST(ConstExprElab, BodyParameterPromotedWithEmptyPortList) {
   EXPECT_TRUE(found);
 }
 
-// The report stands at the declaration of `child`, line 1, rather than at the
-// instantiation that left P without a value.
 TEST(ConstExprElab, PortListParameterWithoutDefaultRejectsMissingOverride) {
   ElabFixture f;
   ElaborateSrc(
@@ -176,12 +170,6 @@ TEST(ConstExprElab, NoDefaultParamBlocksTopElaboration) {
                             1, "6.20.1"));
 }
 
-// §6.20.1: in a list of parameter constants a parameter may depend on an
-// earlier one, and the list may interleave value and type parameters (the
-// clause's own example: N, then M depending on N, then a type parameter T, then
-// a value parameter x of that type). Driven through elaboration: M resolves to
-// N*16 even with a type parameter following it, and the type-parameter-typed
-// value parameter x resolves to its default.
 TEST(ConstExprElab, PortListMixedValueAndTypeDependencies) {
   ElabFixture f;
   auto* design = ElaborateSrc(

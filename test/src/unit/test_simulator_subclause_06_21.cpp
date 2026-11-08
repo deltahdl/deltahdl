@@ -141,11 +141,6 @@ TEST(ScopeAndLifetimeSimulation, DefaultLifetimeInAutoModuleIsAutomatic) {
 }
 
 TEST(ScopeAndLifetimeSimulation, UnnamedBlockVarVisibleToNestedBlock) {
-  // §6.21: a variable declared in an unnamed block is visible both to that
-  // block and to any nested block below it. Here `outer` is declared in the
-  // initial block and then read and written from an inner unnamed block; the
-  // write must land on that same variable, so the enclosing block observes 15
-  // (5 + 10), not the original 5.
   auto val = RunAndGet(
       "module t;\n"
       "  int observed;\n"
@@ -161,13 +156,6 @@ TEST(ScopeAndLifetimeSimulation, UnnamedBlockVarVisibleToNestedBlock) {
   EXPECT_EQ(val, 15u);
 }
 
-// §6.21: a variable explicitly declared static inside an automatic function
-// has a static lifetime, one copy kept between calls, and that copy is the
-// function's own -- §13.4.2 has a static subroutine's items belong to the
-// subroutine that declares them. Two classes each declaring a static method
-// bump() with a static local n are two functions and two copies. Two calls to
-// A::bump() and one to B::bump() discriminate: one copy under the name bump
-// reads 3 for B's call, and a copy each reads 1.
 TEST(ScopeAndLifetimeSimulation,
      StaticLocalOfOneClassMethodIsNotAnotherClasss) {
   auto val = RunAndGet(
@@ -191,12 +179,6 @@ TEST(ScopeAndLifetimeSimulation,
   EXPECT_EQ(val, 1u);
 }
 
-// §6.21 with §6.8: a variable of an automatic subroutine is created, and its
-// initializer run, on every entry to the block declaring it. In the class
-// method, `int j = 0;` starts each iteration at 0, so s sums i, 6; kept from
-// the iteration before, j accumulated to 0, 1, 3, 6 and s was 10. In the
-// automatic function, `int k = 1;` starts at 1, so s sums 1*i, 6 again,
-// where a kept k made 1, 2, 6 and 9.
 TEST(ScopeAndLifetimeSimulation, AutomaticLoopBodyLocalInitializedEachEntry) {
   const char* src =
       "class N;\n"
@@ -233,12 +215,6 @@ TEST(ScopeAndLifetimeSimulation, AutomaticLoopBodyLocalInitializedEachEntry) {
   EXPECT_EQ(RunAndGet(src, "rm"), 6u);
 }
 
-// §6.21 with §9.3.1: a variable declared in an unnamed block is the block's
-// own, visible there and in the blocks below it, and hides the module's
-// variable of the same name only inside the block. A static, an automatic and
-// an uninitialized declaration each write 0 to the block's x, and the
-// module's x reads its 1 after each block. Declared as the module's variable
-// itself, each block's write reached the module's x.
 TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksVariableLeavesTheModulesAlone) {
   const char* src =
       "module t;\n"
@@ -267,10 +243,6 @@ TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksVariableLeavesTheModulesAlone) {
   EXPECT_EQ(RunAndGet(src, "out_u"), 1u);
 }
 
-// §6.21: a variable a block declares without `automatic` in a static process
-// is static, one variable kept from one activation of the block to the next.
-// The repeat body's acc is set to 0 on the first pass alone and counts the
-// passes, so r reads 3; created afresh on each entry, acc read 0 and r 1.
 TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksStaticVariableKeepsItsValue) {
   auto val = RunAndGet(
       "module t;\n"
@@ -288,10 +260,6 @@ TEST(ScopeAndLifetimeSimulation, AnUnnamedBlocksStaticVariableKeepsItsValue) {
   EXPECT_EQ(val, 3u);
 }
 
-// §6.21 with §23.6: a named block's static variable is allocated before
-// simulation starts, so a write through its hierarchical name before the block
-// has run lands in the variable the block then reads. Made when the block
-// first ran, the write found no variable and r read 0.
 TEST(ScopeAndLifetimeSimulation, ANamedBlocksStaticVariableExistsBeforeItRuns) {
   auto val = RunAndGet(
       "module t;\n"
@@ -308,8 +276,6 @@ TEST(ScopeAndLifetimeSimulation, ANamedBlocksStaticVariableExistsBeforeItRuns) {
   EXPECT_EQ(val, 3u);
 }
 
-// The same for a named fork's variable, written from a sibling fork before
-// the fork declaring it has begun, as §23.6's mod_1 and mod_2 example does.
 TEST(ScopeAndLifetimeSimulation, ANamedForksStaticVariableExistsBeforeItRuns) {
   auto val = RunAndGet(
       "module t;\n"
@@ -329,9 +295,6 @@ TEST(ScopeAndLifetimeSimulation, ANamedForksStaticVariableExistsBeforeItRuns) {
   EXPECT_EQ(val, 5u);
 }
 
-// §6.21 with §9.3.4: two blocks labelled b, one in each of two named blocks,
-// declare two static variables. Kept in one frame under the label, the second
-// block's c was the first's, so d.b.c read 11 and a.b.c read 11 too.
 TEST(ScopeAndLifetimeSimulation, BlocksSharingALabelKeepVariablesOfTheirOwn) {
   const char* src =
       "module t;\n"
@@ -358,9 +321,6 @@ TEST(ScopeAndLifetimeSimulation, BlocksSharingALabelKeepVariablesOfTheirOwn) {
   EXPECT_EQ(RunAndGet(src, "rd"), 10u);
 }
 
-// §6.21: a class handle a block declares is static as an integral variable
-// is, so the object the first pass through blk made is the second pass's.
-// Made afresh on each entry, the handle read null again and r stayed 0.
 TEST(ScopeAndLifetimeSimulation, ABlocksClassHandleKeepsItsObjectAcrossPasses) {
   auto val = RunAndGet(
       "module t;\n"
@@ -378,9 +338,6 @@ TEST(ScopeAndLifetimeSimulation, ABlocksClassHandleKeepsItsObjectAcrossPasses) {
   EXPECT_EQ(val, 5u);
 }
 
-// §6.21 with §23.6: the handle a named block declares is there before the
-// block runs, so the object handed to inner.h from outside is the one the
-// block reads; replaced on entry, the block read null and r was 99.
 TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleExistsBeforeItRuns) {
   auto val = RunAndGet(
       "module t;\n"
@@ -400,9 +357,6 @@ TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleExistsBeforeItRuns) {
   EXPECT_EQ(val, 7u);
 }
 
-// §9.3.4 with §23.6: the handle is reached by its hierarchical name once its
-// block has run as well, so inner.h.v reads the object the block made; never
-// bound under inner.h, the read found nothing and r was 0.
 TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleIsReachedByItsPath) {
   auto val = RunAndGet(
       "module t;\n"
@@ -417,9 +371,6 @@ TEST(ScopeAndLifetimeSimulation, ANamedBlocksClassHandleIsReachedByItsPath) {
   EXPECT_EQ(val, 4u);
 }
 
-// A place a block declaring variables stands in: the source is `head`, the
-// declarations, `mid`, the statements and `tail`, within a module declaring
-// an int pass and a five-bit r.
 struct BlockPlace {
   const char* name;
   const char* head;
@@ -433,23 +384,17 @@ std::string InModule(const BlockPlace& place, const std::string& decls,
          decls + place.mid + body + place.tail + "endmodule\n";
 }
 
-// A fixed-size array, a two-dimensional one, a queue and an associative array,
-// each declared `lifetime` (empty or `automatic `).
 std::string AggregateDecls(const std::string& lifetime) {
   return "      " + lifetime + "int arr [3];\n      " + lifetime +
          "int m [2][3];\n      " + lifetime + "int q [$];\n      " + lifetime +
          "int aa [int];\n";
 }
 
-// A static declaration and an automatic one.
 constexpr std::array<const char*, 2> kLifetimes = {"", "automatic "};
 
 constexpr const char* kFill =
     "      arr[2] = 5; m[1][2] = 3; q.push_back(7); aa[4] = 9;\n";
 
-// The blocks entered once: a named begin-end block, a named fork, whose
-// declarations its branches share, and an unnamed begin-end block, all of an
-// initial procedure.
 constexpr std::array kBlocksEnteredOnce = {
     BlockPlace{"named begin block", "  initial begin\n    begin : nb\n", "",
                "    end\n  end\n"},
@@ -459,11 +404,6 @@ constexpr std::array kBlocksEnteredOnce = {
                "    end\n  end\n"},
 };
 
-// §6.21 with §7.4, §7.10 and §7.8: an aggregate a block declares is a variable
-// of the block with the dimensions its declaration writes, there from the
-// block's first statement. A named block's static variables are made before
-// any procedure starts, and the shape of each was lost on the way to the block
-// running: $size(arr) was 32, the array read as the int its element is.
 TEST(ScopeAndLifetimeSimulation, ABlocksAggregatesKeepTheirShape) {
   const std::string kBody =
       std::string(kFill) +
@@ -480,9 +420,6 @@ TEST(ScopeAndLifetimeSimulation, ABlocksAggregatesKeepTheirShape) {
   }
 }
 
-// The blocks entered twice: a named and an unnamed begin-end block and a named
-// fork repeated by an initial procedure, and a named and an unnamed begin-end
-// block of a static task called twice.
 constexpr std::array kBlocksEnteredTwice = {
     BlockPlace{"repeated named begin block",
                "  initial repeat (2) begin : nb\n", "", "  end\n"},
@@ -504,12 +441,6 @@ constexpr std::array kBlocksEnteredTwice = {
                "    end\n  endtask\n  initial begin tk(); tk(); end\n"},
 };
 
-// §6.21: a block's variable is static unless declared automatic, one variable
-// whose storage outlives the block, so the second entry finds the elements,
-// the queue's item and the associative array's entry the first left; an
-// automatic one is made afresh on each entry, its elements 0, its queue and
-// associative array empty, and its shape the same. Kept between entries only
-// as variables, the static aggregates lost their shape and their contents.
 TEST(ScopeAndLifetimeSimulation, ABlocksStaticAggregatesOutliveIt) {
   const std::string kStaticHolds =
       "      if (pass == 2) r = {$size(arr) == 3 && arr[2] == 5, $size(m, 2) "
@@ -532,10 +463,6 @@ TEST(ScopeAndLifetimeSimulation, ABlocksStaticAggregatesOutliveIt) {
   }
 }
 
-// §6.21 with §27.4: each generate block instance is a scope of its own, and
-// the static queue its named block declares is its own: the second entry in
-// each instance finds the one item that instance pushed. Shared, the second
-// instance's block found the first's two items and r[1] stayed 0.
 TEST(ScopeAndLifetimeSimulation, EachGenerateInstanceKeepsItsBlocksAggregates) {
   auto val = RunAndGet(
       "module t;\n"
@@ -552,12 +479,6 @@ TEST(ScopeAndLifetimeSimulation, EachGenerateInstanceKeepsItsBlocksAggregates) {
   EXPECT_EQ(val, 3u);
 }
 
-// §6.21 with §13.3.1: a block of an automatic task declares automatic
-// variables unless written static, so each call's named block starts with its
-// array's elements 0 and its queue and associative array empty, its shape the
-// same; written static, the queue is one for every call. The task runs at
-// once or after a delay, which runs its body as a process. Kept by the block's
-// frame, the automatic ones carried the first call's contents into the second.
 TEST(ScopeAndLifetimeSimulation, AnAutomaticTasksBlockAggregatesStartAfresh) {
   constexpr std::array<const char*, 2> kDelays = {"", "    #1;\n"};
   for (const char* delay : kDelays) {
@@ -586,11 +507,6 @@ TEST(ScopeAndLifetimeSimulation, AnAutomaticTasksBlockAggregatesStartAfresh) {
   }
 }
 
-// §6.21 with §13.4.2: a named block of a static function declares static
-// variables, kept from one call to the next as a static task's are, its
-// array's element, its queue's item and its associative array's entry there on
-// the second call. Kept under the function's frame, they were dropped when the
-// call returned and the function's own frame was kept in their place.
 TEST(ScopeAndLifetimeSimulation, AStaticFunctionsBlockAggregatesOutliveIt) {
   auto val = RunAndGet(
       "module t;\n"
@@ -614,10 +530,6 @@ TEST(ScopeAndLifetimeSimulation, AStaticFunctionsBlockAggregatesOutliveIt) {
   EXPECT_EQ(val, 0xFu);
 }
 
-// §6.21 with §9.3.4: each named block is a scope of its own, so two blocks of
-// one static task each declaring a queue `q` declare two queues, each keeping
-// its own items from call to call: after two calls the first holds two 1s and
-// the second two 2s. Shared, each held all four.
 TEST(ScopeAndLifetimeSimulation, TwoBlocksOfATaskKeepQueuesOfTheirOwn) {
   auto val = RunAndGet(
       "module t;\n"
@@ -642,10 +554,6 @@ TEST(ScopeAndLifetimeSimulation, TwoBlocksOfATaskKeepQueuesOfTheirOwn) {
   EXPECT_EQ(val, 3u);
 }
 
-// §6.21 with §6.8: a static variable a subroutine's named block declares with
-// an initializer is initialized once, before any procedure runs, and keeps
-// what each call leaves in it: 10 on the first call, 11 on the second, in a
-// task and in a function alike. Initialized on each call, it read 10 twice.
 TEST(ScopeAndLifetimeSimulation, ABlocksInitializedStaticIsInitializedOnce) {
   auto val = RunAndGet(
       "module t;\n"
@@ -672,11 +580,6 @@ TEST(ScopeAndLifetimeSimulation, ABlocksInitializedStaticIsInitializedOnce) {
   EXPECT_EQ(val, 0xFu);
 }
 
-// The function a place below declares: a named block holding an array, a
-// queue, an associative array and an int, all of the block's lifetime, and a
-// queue written static. On the second call it reports, one bit each, whether
-// the first call's element, item, entry and count are still there, and
-// whether the static queue holds the first call's item.
 std::string BlockAggregateFunction(const char* qualifier) {
   return std::string("  ") + qualifier +
          "function bit [4:0] f();\n"
@@ -695,14 +598,6 @@ std::string BlockAggregateFunction(const char* qualifier) {
          "  endfunction\n";
 }
 
-// §6.21 with §13.3.1 and §8.10: a subroutine declared in a package, an
-// interface, a program or the compilation unit is static, as one in a module
-// is, and one in a generate block, whether an if's or its else's, a case's arm
-// or a loop's, takes the lifetime of the module around it. So a static one's
-// named block's variables are static and the second call finds what the first
-// left in each of them, every bit set. In an automatic module, and in a
-// class's method, which is automatic, they start afresh on each call and only
-// the queue written static keeps its item.
 TEST(ScopeAndLifetimeSimulation,
      ABlocksAggregatesKeepTheirSubroutinesLifetime) {
   struct Place {

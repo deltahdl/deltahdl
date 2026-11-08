@@ -19,21 +19,11 @@ namespace delta {
 
 namespace {
 
-// The binding power of an edge no operator beside it can split: either edge
-// of a primary, and the left edge of a unary operation.
 constexpr int kUnsplit = std::numeric_limits<int>::max();
 
-// §11.4.11 with §11.3.2: the conditional operator binds its condition more
-// loosely than every binary operator but the implications, and its last
-// operand runs to the end of the expression. These are the powers the parser
-// reads it with.
 constexpr int kConditionalLeftPower = 1;
 constexpr int kConditionalRightPower = 0;
 
-// A rendered expression, with how tightly its text holds together at each
-// edge: the loosest binding power among the operators along that edge's spine
-// that stand outside parentheses. An operator written next to the text splits
-// it there unless that operator binds less tightly.
 struct Piece {
   std::string text;
   int left = kUnsplit;
@@ -42,36 +32,27 @@ struct Piece {
 
 std::optional<Piece> Render(const Expr* expr);
 
-// §37.59 detail 2: `operand` written left of an operator that binds it with
-// `power`, in parentheses where that operator would otherwise take part of it
-// away. Parenthesized, it is whole at both edges.
 Piece AsLeftOperand(const Piece& operand, int power) {
   if (power < operand.right) return operand;
   return Piece{VpiDecompileParenthesize(operand.text)};
 }
 
-// §37.59 detail 2: `operand` written right of an operator that binds it with
-// `power`, in parentheses where it would otherwise not be read whole.
 Piece AsRightOperand(const Piece& operand, int power) {
   if (operand.left >= power) return operand;
   return Piece{VpiDecompileParenthesize(operand.text)};
 }
 
-// The source spelling of an operator, which TokenKindName gives in quotes.
 std::string Spelling(TokenKind kind) {
   const std::string_view kName = TokenKindName(kind);
   if (kName.size() < 3 || kName.front() != '\'') return {};
   return std::string(kName.substr(1, kName.size() - 2));
 }
 
-// §11.3.2 (Table 11-2): the binding power of a unary operator, an increment
-// or decrement (§11.4.2) sharing the row of the other unary operators.
 int UnaryPower(TokenKind op) {
   const bool kStep = op == TokenKind::kPlusPlus || op == TokenKind::kMinusMinus;
   return PrefixBindingPower(kStep ? TokenKind::kPlus : op);
 }
 
-// §11.4: a unary operator before its operand.
 std::optional<Piece> RenderUnary(const Expr& expr) {
   const int kPower = UnaryPower(expr.op);
   const std::optional<Piece> kOperand = Render(expr.lhs);
@@ -81,7 +62,6 @@ std::optional<Piece> RenderUnary(const Expr& expr) {
                std::min(kPower, kInner.right)};
 }
 
-// §11.4.2: an increment or decrement after the variable it steps.
 std::optional<Piece> RenderPostfix(const Expr& expr) {
   const int kPower = UnaryPower(expr.op);
   return Render(expr.lhs).transform([&expr, kPower](const Piece& operand) {
@@ -91,7 +71,6 @@ std::optional<Piece> RenderPostfix(const Expr& expr) {
   });
 }
 
-// §11.4: a binary operator between its operands.
 std::optional<Piece> RenderBinary(const Expr& expr) {
   const std::pair<int, int> kPowers = InfixBindingPower(expr.op);
   const std::optional<Piece> kLhs = Render(expr.lhs);
@@ -104,8 +83,6 @@ std::optional<Piece> RenderBinary(const Expr& expr) {
                std::min(kPowers.second, kRight.right)};
 }
 
-// §11.4.11: the conditional operator, its two operators each one space from
-// the operands around them.
 std::optional<Piece> RenderConditional(const Expr& expr) {
   const std::optional<Piece> kCondition = Render(expr.condition);
   const std::optional<Piece> kFirst = Render(expr.true_expr);
@@ -117,9 +94,6 @@ std::optional<Piece> RenderConditional(const Expr& expr) {
       std::min(kConditionalLeftPower, kTest.left), kConditionalRightPower};
 }
 
-// The expressions of a list, comma separated, `names` naming those of them
-// bound by name (§13.5.4). An argument left out (§37.42 detail 8) is nothing
-// between its commas. Nothing where one of them cannot be rendered.
 std::optional<std::string> RenderList(
     const std::vector<Expr*>& exprs,
     const std::vector<std::string_view>& names) {
@@ -145,15 +119,12 @@ std::optional<std::string> RenderList(
 std::optional<std::string> RenderConstraintSet(
     const std::vector<ConstraintItem*>& items);
 
-// The text of `expr` alone, nothing where it cannot be rendered.
 std::optional<std::string> RenderText(const Expr* expr) {
   const std::optional<Piece> kPiece = Render(expr);
   if (!kPiece) return std::nullopt;
   return kPiece->text;
 }
 
-// §18.5.3 with §11.4.13: a dist_item's bracketed range, its two ends or a
-// centre and the tolerance about it.
 std::optional<std::string> RenderDistRange(const ConstraintDistItem& item) {
   const bool kAboutCentre = item.tolerance != nullptr;
   const std::optional<std::string> kLo = RenderText(item.lo);
@@ -165,8 +136,6 @@ std::optional<std::string> RenderDistRange(const ConstraintDistItem& item) {
   return "[" + *kLo + std::string(separator) + *kEnd + "]";
 }
 
-// §18.5.3: one dist_item, a value, a bracketed range or `default`, with the
-// weight it is written with.
 std::optional<std::string> RenderDistItem(const ConstraintDistItem& item) {
   std::optional<std::string> text = std::string("default");
   if (item.is_range) {
@@ -180,7 +149,6 @@ std::optional<std::string> RenderDistItem(const ConstraintDistItem& item) {
   return VpiDecompileJoin({*text, item.per_element ? ":=" : ":/", *kWeight});
 }
 
-// §18.5.3: an expression_or_dist, the dist_list braced after `dist`.
 std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
   std::optional<std::string> expr = RenderText(item.expr);
   if (!expr || !item.has_dist) return expr;
@@ -194,8 +162,6 @@ std::optional<std::string> RenderExpressionOrDist(const ConstraintItem& item) {
   return VpiDecompileJoin({*expr, "dist", "{" + list + "}"});
 }
 
-// §18.5.7.1: a foreach's array and its loop variables, a variable left out
-// standing as nothing between its commas.
 std::optional<std::string> RenderForeachHead(const ConstraintItem& item) {
   const std::optional<std::string> kArray = RenderText(item.expr);
   if (!kArray) return std::nullopt;
@@ -207,8 +173,6 @@ std::optional<std::string> RenderForeachHead(const ConstraintItem& item) {
   return VpiDecompileJoin({"foreach", VpiDecompileParenthesize(text + "]")});
 }
 
-// §18.5 (A.1.10): a solve-before ordering, its two lists of variables either
-// side of `before`.
 std::optional<std::string> RenderSolveBefore(const ConstraintItem& item) {
   const std::optional<std::string> kBefore = RenderList(item.exprs, {});
   const std::optional<std::string> kAfter = RenderList(item.after, {});
@@ -216,9 +180,6 @@ std::optional<std::string> RenderSolveBefore(const ConstraintItem& item) {
   return VpiDecompileJoin({"solve", *kBefore, "before", *kAfter});
 }
 
-// §18.5 (A.1.10): an item the source ends with a semicolon, an
-// expression_or_dist, a uniqueness constraint, a disable soft or a
-// solve-before.
 std::optional<std::string> RenderTerminatedItem(const ConstraintItem& item) {
   std::optional<std::string> text;
   switch (item.kind) {
@@ -242,9 +203,6 @@ std::optional<std::string> RenderTerminatedItem(const ConstraintItem& item) {
   return *text + ";";
 }
 
-// §18.5.5, §18.5.6 and §18.5.7.1: what an implication, an if-else or a foreach
-// writes before the constraint set it governs. An implication's antecedent
-// keeps the parentheses that stop the implication taking part of it away.
 std::optional<std::string> RenderGoverningHead(const ConstraintItem& item) {
   if (item.kind == ConstraintItemKind::kForeach) return RenderForeachHead(item);
   const std::optional<Piece> kExpr = Render(item.expr);
@@ -257,8 +215,6 @@ std::optional<std::string> RenderGoverningHead(const ConstraintItem& item) {
   return VpiDecompileJoin({kAntecedent.text, "->"});
 }
 
-// §18.5 (A.1.10): one constraint block item, terminated as the source
-// terminates it, or followed by the constraint sets it governs.
 std::optional<std::string> RenderConstraintItem(const ConstraintItem& item) {
   if (item.kind != ConstraintItemKind::kImplication &&
       item.kind != ConstraintItemKind::kIfElse &&
@@ -274,7 +230,6 @@ std::optional<std::string> RenderConstraintItem(const ConstraintItem& item) {
   return VpiDecompileJoin({*kHead, *kBody, "else", *kElse});
 }
 
-// §18.5: a constraint set or block, its items one space apart in braces.
 std::optional<std::string> RenderConstraintSet(
     const std::vector<ConstraintItem*>& items) {
   std::vector<std::string> rendered;
@@ -287,8 +242,6 @@ std::optional<std::string> RenderConstraintSet(
   return "{" + VpiDecompileJoin(rendered) + "}";
 }
 
-// §18.7: a randomize() call's inline constraint block after `with`, the
-// identifier list restricting it in the parentheses it is written in.
 std::optional<std::string> RenderInlineConstraint(const Expr& expr) {
   const ClassMember* block = expr.inline_constraint;
   if (!block->constraint_items_parsed) return std::nullopt;
@@ -305,8 +258,6 @@ std::optional<std::string> RenderInlineConstraint(const Expr& expr) {
        *kBlock});
 }
 
-// §13.5 and §20: a call, its arguments in parentheses after the name; a system
-// call written with none is its name alone.
 std::optional<Piece> RenderCall(const Expr& expr) {
   std::string callee(expr.callee);
   if (expr.kind == ExprKind::kCall) {
@@ -325,9 +276,6 @@ std::optional<Piece> RenderCall(const Expr& expr) {
     if (!kWith) return std::nullopt;
     return Piece{VpiDecompileJoin({text, *kWith})};
   }
-  // §7.12: an array manipulation method's with clause, its expression in the
-  // parentheses it is written in. A stream operand's bracketed range (A.8.1,
-  // §11.4.14.4) is held apart, in Expr::stream_range.
   if (expr.with_expr != nullptr) {
     const std::optional<Piece> kWith = Render(expr.with_expr);
     if (!kWith) return std::nullopt;
@@ -339,8 +287,6 @@ std::optional<Piece> RenderCall(const Expr& expr) {
   return Piece{text};
 }
 
-// §11.5.1 and §11.4.13: the separator between the two expressions of a part
-// select, or of a range in an inside expression's set.
 std::string_view RangeSeparator(const Expr& select) {
   if (select.is_part_select_plus) return "+:";
   if (select.is_part_select_minus) return "-:";
@@ -349,9 +295,6 @@ std::string_view RangeSeparator(const Expr& select) {
   return ":";
 }
 
-// §11.5.1: a bit select, part select or indexed part select after the
-// expression it selects into; and §11.4.13: a range of an inside expression's
-// set, which selects into nothing.
 std::optional<Piece> RenderSelect(const Expr& expr) {
   std::string text;
   if (expr.base != nullptr) {
@@ -370,7 +313,6 @@ std::optional<Piece> RenderSelect(const Expr& expr) {
   return Piece{text + "]"};
 }
 
-// §23.6 and §23.7: a member, or a name a scope resolves, after its prefix.
 std::optional<Piece> RenderMemberAccess(const Expr& expr) {
   const std::optional<Piece> kBase = Render(expr.lhs);
   const std::optional<Piece> kMember = Render(expr.rhs);
@@ -379,7 +321,6 @@ std::optional<Piece> RenderMemberAccess(const Expr& expr) {
                kMember->text};
 }
 
-// §11.4.12: a concatenation, or a replication with its multiplier first.
 std::optional<Piece> RenderConcatenation(const Expr& expr) {
   const std::optional<std::string> kElements = RenderList(expr.elements, {});
   if (!kElements) return std::nullopt;
@@ -391,9 +332,6 @@ std::optional<Piece> RenderConcatenation(const Expr& expr) {
   return Piece{"{" + kCount->text + "{" + *kElements + "}}"};
 }
 
-// §6.24.1: a cast, the type, size or signedness it casts to before the
-// apostrophe and the expression cast in parentheses after it. A size written
-// as more than a primary keeps the parentheses it needs.
 std::optional<Piece> RenderCast(const Expr& expr) {
   std::string target(expr.text);
   if (target.empty()) {
@@ -407,9 +345,6 @@ std::optional<Piece> RenderCast(const Expr& expr) {
   return Piece{target + "'" + VpiDecompileParenthesize(kValue->text)};
 }
 
-// §11.4.13: an inside expression, which binds its left operand as tightly as
-// §11.3.2 has the relational operators bind theirs, and whose braced set
-// nothing written after it can split.
 std::optional<Piece> RenderInside(const Expr& expr) {
   const int kPower = InfixBindingPower(TokenKind::kLt).first;
   const std::optional<Piece> kValue = Render(expr.lhs);
@@ -420,11 +355,6 @@ std::optional<Piece> RenderInside(const Expr& expr) {
                std::min(kPower, kLeft.left), kUnsplit};
 }
 
-// §11.4.14: a streaming concatenation, its operator and any slice size one
-// space apart before the braced expressions it streams. A.8.1 lets each
-// stream expression carry `with [ array_range_expression ]` after its operand
-// (§11.4.14.4), held in Expr::stream_range as a select with nothing before
-// it, which RenderSelect writes as its bracketed range alone.
 std::optional<Piece> RenderStream(const Expr& expr) {
   std::string head = Spelling(expr.op);
   if (expr.lhs != nullptr) {
@@ -447,8 +377,6 @@ std::optional<Piece> RenderStream(const Expr& expr) {
   return Piece{"{" + VpiDecompileJoin({head, "{" + elements + "}"}) + "}"};
 }
 
-// §11.11: a min:typ:max expression, its three expressions one space from the
-// colons between them, in the parentheses a primary writes it in.
 std::optional<Piece> RenderMinTypMax(const Expr& expr) {
   const std::optional<Piece> kMin = Render(expr.lhs);
   const std::optional<Piece> kTyp = Render(expr.condition);
@@ -458,8 +386,6 @@ std::optional<Piece> RenderMinTypMax(const Expr& expr) {
       VpiDecompileJoin({kMin->text, ":", kTyp->text, ":", kMax->text}))};
 }
 
-// §23.6 and §3.12.1: a name, with the `$root.` or `pkg::` it was written
-// under.
 std::string IdentifierText(const Expr& expr) {
   std::string text;
   if (expr.scope_prefix == "$root") {

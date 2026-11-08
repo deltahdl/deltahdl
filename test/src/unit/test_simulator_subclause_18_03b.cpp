@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's Bus and MyBus, and a PowerOfTwo writing the clause's 1 << n
-// form of the power-of-two constraint, around the statements of an initial
-// that holds a Bus bus, a MyBus mybus, a PowerOfTwo p2 and the ints ok,
-// aligned, ranged and met.
 std::string Design(const std::string& body) {
   return "class Bus;\n"
          "  rand bit [15:0] addr;\n"
@@ -51,13 +47,6 @@ std::string Design(const std::string& body) {
          "endmodule\n";
 }
 
-// §18.3: randomize() selects new values for all the random variables of
-// the object such that all of its constraints are satisfied, so each of 50
-// randomizations of the Bus succeeds with addr word aligned; MyBus inherits
-// the random variables and constraints of Bus and adds atype, whose
-// addr_range selects one of three ranges by implication, so each of 30
-// randomizations of it is word aligned and in the range its atype selects,
-// the values computed together.
 TEST(ConstrainedRandomConcepts, TheObjectAndItsExtensionMeetAllConstraints) {
   SimFixture f;
   std::string out = RunCapture(
@@ -77,11 +66,6 @@ TEST(ConstrainedRandomConcepts, TheObjectAndItsExtensionMeetAllConstraints) {
   EXPECT_EQ(out, "50 50\n30 30 30\n");
 }
 
-// §18.3: randomize() with declares additional constraints in line, the
-// clause's exercise_bus restricting atype to low, addr to 10 to 20 and
-// data to the powers of two, each met beside the object's own constraints;
-// the solver handles the power-of-two constraint written arithmetically
-// and as 1 << n over a 5-bit n.
 TEST(ConstrainedRandomConcepts, InLineConstraintsAndAlgebraAreSolved) {
   SimFixture f;
   std::string out = RunCapture(
@@ -101,10 +85,6 @@ TEST(ConstrainedRandomConcepts, InLineConstraintsAndAlgebraAreSolved) {
   EXPECT_EQ(out, "3 10\n");
 }
 
-// §18.3: the clause's exercise_bus is a task taking the MyBus as an
-// argument, and its three in-line randomizations through the formal meet
-// their constraints as through the handle itself: each randomize() answers
-// 1 and each check holds, met counting three through the output argument.
 TEST(ConstrainedRandomConcepts, TheExerciseBusTaskMeetsItsConstraints) {
   SimFixture f;
   std::string out = RunCapture(
@@ -151,9 +131,6 @@ TEST(ConstrainedRandomConcepts, TheExerciseBusTaskMeetsItsConstraints) {
   EXPECT_EQ(out, "1 1 1 1\n1 1 1\n1 1\nmet 3\n");
 }
 
-// §18.3: constraint_mode() disables a named constraint block, the clause's
-// exercise_illegal then randomizing with the low-order address bits forced
-// nonzero, and enables it again.
 TEST(ConstrainedRandomConcepts, ConstraintModeDisablesANamedBlock) {
   SimFixture f;
   std::string out = RunCapture(

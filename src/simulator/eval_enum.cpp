@@ -42,9 +42,6 @@ bool TryClassScopeEnumLiteral(std::string_view name, const ClassTypeInfo* cls,
   return false;
 }
 
-// §6.19: a member's value as the methods return it, a value of the
-// enumeration: as wide as its base type and signed where the base is, x and z
-// bits included.
 static Logic4Vec MemberValue(const EnumMemberInfo& m, const EnumTypeInfo& info,
                              Arena& arena) {
   Logic4Vec v = MakeLogic4VecVal(arena, info.width, m.value);
@@ -63,13 +60,6 @@ static Logic4Vec EnumLast(const EnumTypeInfo& info, Arena& arena) {
   return MemberValue(info.members.back(), info, arena);
 }
 
-// §6.19.5.3, §6.19.5.4 and §6.19.5.6 ask which member a value is, and §6.19
-// lets a member of a 4-state enumeration hold x or z, `XX='x`. So a value is
-// a member where every bit matches, x and z included, as `===` compares; read
-// as a number, `'x` was 0 and matched the member whose value is 0.
-// A member's value is kept as folded, -1 with every bit set, while a variable
-// of the enumeration holds the base type's bits alone, 8'hFF for a byte base,
-// so the value is compared in `width` bits.
 static bool IsMemberValue(const EnumMemberInfo& m, uint32_t width,
                           Logic4Word current) {
   uint64_t mask =
@@ -77,10 +67,6 @@ static bool IsMemberValue(const EnumMemberInfo& m, uint32_t width,
   return (m.value & mask) == current.aval && m.xz == current.bval;
 }
 
-// §6.19.5.3 and §6.19.5.4: what next() and prev() return for a value that is
-// no member, the enumeration's default initial value, which Table 6-7 makes
-// its base type's: all x for a 4-state base, all 0 for a 2-state one. Neither
-// need be a member; the first member was returned in its place.
 static Logic4Vec EnumDefault(const EnumTypeInfo& info, Arena& arena) {
   Logic4Vec v = MakeLogic4Vec(arena, info.width);
   if (!info.is_4state) return v;
@@ -192,13 +178,6 @@ static bool DispatchEnumMethod(std::string_view method,
   return false;
 }
 
-// §6.19.5 with §6.18: the enumeration a declared type names, resolved from
-// where the declaration stands outward -- the scope the type wrote, `P::c_t`
-// (§26.3); the declaring class, the classes enclosing it (§8.23) and the ones
-// it extends, under the "C::name" keys the design's typedefs are registered
-// by (RegisterDesignEnumTypes); the package the class is declared in; and the
-// bare name a module declares or imports. Null for a type that names no
-// registered enumeration.
 struct DeclScope {
   const ClassTypeInfo* cls = nullptr;
   std::string_view package;
@@ -250,22 +229,11 @@ void RecordVariableEnumType(std::string_view var_name, const DataType& type,
   ctx.SetVariableEnumType(var_name, info->type_name);
 }
 
-// §6.19.5.1 through §6.19.5.4 give first(), last(), next() and prev() the
-// enumeration's own type as their result, so a call written as `e.m()` with
-// `e` one of those calls is itself an enum method call on that type.
 static bool ReturnsTheEnumType(std::string_view method) {
   return method == "first" || method == "last" || method == "next" ||
          method == "prev";
 }
 
-// §8.7 with §6.20: the declared type of the property, static property or
-// parameter `name` of `cls` or of a class it extends, and the class declaring
-// it, or null where none declares it. The declaration is asked because the
-// value held is not: a stored member is a packed value (§5.9) carrying no
-// type.
-// A value parameter of the class's parameter port list is declared in the
-// header rather than among the members, with its type in
-// ClassDecl::param_types; a type parameter holds no value.
 static const DataType* HeaderParamDeclaredType(const ClassDecl* decl,
                                                std::string_view name) {
   if (decl->type_param_names.count(name) != 0) return nullptr;
@@ -287,9 +255,6 @@ static const DataType* ClassMemberDeclaredType(const ClassTypeInfo* cls,
     }
     for (const ClassMember* m : c->decl->members) {
       if (m->kind != ClassMemberKind::kProperty || m->name != name) continue;
-      // §7.4 and §7.8: a member declared with unpacked dimensions is an array
-      // of the enumeration, not a value of it, and `aa.first(i)` on it is
-      // the array's method (§7.8.4).
       if (!m->unpacked_dims.empty()) return nullptr;
       declarer = c;
       return &m->data_type;
@@ -304,18 +269,11 @@ static const EnumTypeInfo* EnumTypeOfClassMember(const ClassTypeInfo* cls,
   const ClassTypeInfo* declarer = nullptr;
   const DataType* type = ClassMemberDeclaredType(cls, name, declarer);
   if (type == nullptr) return nullptr;
-  // §6.19 with §8.5: an enumeration the property declares inline is
-  // registered under the property's own key (CollectClassEnumMembers in
-  // class_enum_members.cpp); it names no type to look up.
   if (type->kind == DataTypeKind::kEnum)
     return ctx.FindEnumType(ClassInlineEnumKey(declarer->name, name));
   return EnumTypeOfDeclaredType(*type, {declarer, {}}, ctx);
 }
 
-// §8.10 and §8.11: the class scope a bare name inside a method resolves
-// against -- the class whose static property it names, the running method's
-// class, or the object's own -- as EvalIdentifierClassScope (evaluation.cpp)
-// resolves it; null outside every method.
 static const ClassTypeInfo* BareNameClassScope(std::string_view name,
                                                SimContext& ctx) {
   const ClassTypeInfo* method_cls = ctx.CurrentMethodClass();
@@ -327,9 +285,6 @@ static const ClassTypeInfo* BareNameClassScope(std::string_view name,
   return self != nullptr ? self->type : nullptr;
 }
 
-// §6.19: the enumeration declaring the member literal `name`: one of the
-// class scope's, walking the classes enclosing it (§8.23), else one visible
-// where the literal is written.
 static const EnumTypeInfo* EnumTypeOfLiteral(std::string_view name,
                                              const ClassTypeInfo* cls,
                                              SimContext& ctx) {
@@ -340,11 +295,6 @@ static const EnumTypeInfo* EnumTypeOfLiteral(std::string_view name,
   return ctx.FindEnumTypeDeclaringMember(name, {});
 }
 
-// §23.9 (printed page 761): the enumeration a variable read by its bare name
-// was declared with. A variable an instance below the top declares is
-// recorded under the instance's prefix (Lowerer::RegisterEnumForCast), so the
-// running instance's is asked for first; a procedure's local, recorded under
-// the bare name, is asked for by that.
 static const EnumTypeInfo* VariableEnumTypeInScope(const std::string& key,
                                                    SimContext& ctx) {
   if (ctx.FindLocalVariable(key) == nullptr) {
@@ -354,14 +304,6 @@ static const EnumTypeInfo* VariableEnumTypeInScope(const std::string& key,
   return ctx.GetVariableEnumType(key);
 }
 
-// A bare name: the variable it denotes, when its declaration wrote an
-// enumeration (§23.9 has a variable of the name stand ahead of a class
-// scope's member), or the member literal the variable is, a module's or a
-// package's literal standing as a variable of the scope under its name
-// (BuildEnumMembers in src/elaborator/elaborator_typedef.cpp); else the
-// property, static property or parameter of the class scope a name inside a
-// method resolves against (§8.10, §8.11); else the literal of a class-scoped
-// enumeration (§8.23).
 static const EnumTypeInfo* EnumTypeOfName(const Expr* e, SimContext& ctx) {
   if (e->text == "this" || e->text == "super") return nullptr;
   std::string key = IdentifierLookupKey(e);
@@ -374,10 +316,6 @@ static const EnumTypeInfo* EnumTypeOfName(const Expr* e, SimContext& ctx) {
   return EnumTypeOfLiteral(e->text, cls, ctx);
 }
 
-// `C::se`, `C::LC`, `C::RED` (§8.9, §8.23, §8.25 through a specialization's
-// `C#(X)::LC`) and `P::pc`, `P::EC`, `P::RED` (§26.3): a class's member or
-// literal, or a package's variable, parameter or literal under the "P.name"
-// key the package's storage stands under.
 static const EnumTypeInfo* EnumTypeOfScopedName(std::string_view scope,
                                                 std::string_view member,
                                                 SimContext& ctx) {
@@ -390,10 +328,6 @@ static const EnumTypeInfo* EnumTypeOfScopedName(std::string_view scope,
   return ctx.FindEnumTypeDeclaringMember(member, scope);
 }
 
-// §13.4 with §8.9 and §26.3: the declared result type of the subroutine a
-// call names (DeclarationOfCallee), resolved where the subroutine is declared.
-// status() through a process handle answers `process::state` (§9.7), a method
-// of the built-in class, which declares no subroutine of the design.
 static const EnumTypeInfo* EnumTypeOfSubroutineResult(const Expr* callee,
                                                       SimContext& ctx,
                                                       Arena& arena) {
@@ -404,8 +338,6 @@ static const EnumTypeInfo* EnumTypeOfSubroutineResult(const Expr* callee,
   return EnumTypeOfDeclaredType(*decl.result, {decl.cls, decl.package}, ctx);
 }
 
-// A member select: `C::x` or `P::x` through a scope, else a member of the
-// class behind a handle, a chain of them, `this` or `super`.
 static const EnumTypeInfo* EnumTypeOfMemberAccess(const Expr* e,
                                                   SimContext& ctx,
                                                   Arena& arena) {
@@ -414,18 +346,12 @@ static const EnumTypeInfo* EnumTypeOfMemberAccess(const Expr* e,
     return nullptr;
   }
   if (!e->is_scope_resolution) {
-    // §6.19.5.7: `c.next` with no argument list is the call, and one of the
-    // enumeration's own type (§6.19.5.3), so `c.next.name` chains as
-    // `c.next().name()` does.
     if (ReturnsTheEnumType(e->rhs->text)) {
       if (const auto* info = EnumTypeOfExpr(e->lhs, ctx, arena)) return info;
     }
     if (const auto* info = EnumTypeOfClassMember(
             ClassBehindHandle(e->lhs, ctx, arena), e->rhs->text, ctx))
       return info;
-    // §23.6: a variable another module declares, reached by a hierarchical
-    // name, `t.c`, which is no select through a class handle; its storage
-    // carries the enumeration it was declared with.
     return ctx.GetStorageEnumType(
         ctx.FindVariable(HierarchicalReferenceName(e)));
   }
@@ -433,8 +359,6 @@ static const EnumTypeInfo* EnumTypeOfMemberAccess(const Expr* e,
   return EnumTypeOfScopedName(e->lhs->text, e->rhs->text, ctx);
 }
 
-// Whether the call `e` is one of the §6.19.5 methods that answer the
-// enumeration's own type, `x.next()`, whose result is of its receiver's type.
 static bool IsEnumTypedMethodCall(const Expr* e) {
   const Expr* callee = e->lhs;
   return callee != nullptr && callee->kind == ExprKind::kMemberAccess &&
@@ -443,12 +367,6 @@ static bool IsEnumTypedMethodCall(const Expr* e) {
          ReturnsTheEnumType(callee->rhs->text);
 }
 
-// §6.24.1 with A.8.4: a static cast is a primary of its casting type, so
-// `Cols'(2)` is an expression of the enumeration Cols and `C::e_t'(1)` of
-// the class-scoped one (§8.23). The casting type stands in the cast's rhs as
-// the parser read it, a name or a scoped name, or in the node's text for a
-// name the parser knew as a type when it read it (TryParseUserTypeCast) and
-// for a keyword type, `int'(x)`, which names no enumeration.
 static const EnumTypeInfo* EnumTypeOfCast(const Expr* e, SimContext& ctx) {
   const Expr* type_node = e->rhs;
   DataType type;
@@ -472,11 +390,6 @@ static const EnumTypeInfo* EnumTypeOfCast(const Expr* e, SimContext& ctx) {
   return EnumTypeOfDeclaredType(type, {ctx.CurrentMethodClass(), {}}, ctx);
 }
 
-// §7.4.1 and §7.4: a select of an array of an enumeration, packed or
-// unpacked, is of the enumeration where it selects one whole element, `v[1]`
-// of `enum bit [1:0] {A, B, C} [3:0] v`; a select narrower or wider than
-// one, a bit of a scalar enumeration's value or a slice of several elements,
-// is of no enumeration.
 static const EnumTypeInfo* EnumTypeOfElement(const Expr* e, SimContext& ctx,
                                              Arena& arena) {
   const EnumTypeInfo* info = EnumTypeOfExpr(e->base, ctx, arena);
@@ -484,9 +397,6 @@ static const EnumTypeInfo* EnumTypeOfElement(const Expr* e, SimContext& ctx,
   return EvalExpr(e, ctx, arena).width == info->width ? info : nullptr;
 }
 
-// The enumeration an expression carries, by the declaration behind it, as
-// deep as a chain of calls is written (`s.first().next().name()`); described
-// in evaluation.h.
 const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
                                    Arena& arena) {
   if (e == nullptr) return nullptr;
@@ -502,10 +412,6 @@ const EnumTypeInfo* EnumTypeOfExpr(const Expr* e, SimContext& ctx,
   return EnumTypeOfSubroutineResult(e->lhs, ctx, arena);
 }
 
-// The value the method starts from: the variable's own for a name denoting
-// one, and for any other receiver the value it evaluates to -- a property, a
-// literal, a call's result, evaluated through this same dispatch when it is a
-// chained method. Its x and z bits are kept, which a member may hold (§6.19).
 static Logic4Word LowWord(const Logic4Vec& v) {
   return v.nwords == 0 ? Logic4Word{} : v.words[0];
 }
@@ -520,17 +426,10 @@ static Logic4Word CurrentValueOfBase(const Expr* base, SimContext& ctx,
   return LowWord(EvalExpr(base, ctx, arena));
 }
 
-// The six method names of §6.19.5.1 through §6.19.5.6, asked before the
-// receiver is resolved, since resolving a receiver that is a handle path
-// reads the handle, which every other member select or method call has no
-// reason to do here.
 static bool IsEnumMethodName(std::string_view method) {
   return ReturnsTheEnumType(method) || method == "num" || method == "name";
 }
 
-// The method the member select `access` names, on the enumeration its
-// receiver carries, with the arguments of `call_expr` -- the call's, or none
-// where the select stands alone (§6.19.5.7).
 static bool TryEvalEnumMethod(const Expr* access, const Expr* call_expr,
                               SimContext& ctx, Arena& arena, Logic4Vec& out) {
   if (access == nullptr || access->kind != ExprKind::kMemberAccess ||

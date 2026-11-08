@@ -137,8 +137,6 @@ TEST(ProgramControlTasksSim, ExitDoesNotTerminateOtherProgramBlock) {
   EXPECT_EQ(v->value.ToUint64(), 33u);
 }
 
-// The bare statement form `$exit;` (no parentheses) must drive the same program
-// termination as `$exit();`: the following assignment never runs.
 TEST(ProgramControlTasksSim, ExitWithoutParensTerminatesProgramInitial) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -161,9 +159,6 @@ TEST(ProgramControlTasksSim, ExitWithoutParensTerminatesProgramInitial) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
-// A descendant thread forked from a module initial inherits the module's null
-// program-block identity, so a call to $exit from it is ignored and execution
-// continues after the join.
 TEST(ProgramControlTasksSim, ExitFromForkedDescendantInModuleIsIgnored) {
   SimFixture f;
   auto* v = RunAndFindVar(
@@ -182,10 +177,6 @@ TEST(ProgramControlTasksSim, ExitFromForkedDescendantInModuleIsIgnored) {
   EXPECT_EQ(v->value.ToUint64(), 44u);
 }
 
-// $exit reaching production through a task call chain (rather than a fork)
-// still counts as originating in the program's initial procedure: the task call
-// runs in the same thread, so the program is terminated and the post-call
-// assignment is skipped.
 TEST(ProgramControlTasksSim, ExitFromTaskCalledInProgramInitialTerminates) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -211,11 +202,6 @@ TEST(ProgramControlTasksSim, ExitFromTaskCalledInProgramInitialTerminates) {
   EXPECT_EQ(v->value.ToUint64(), 0u);
 }
 
-// §24.7: $exit reached inside a task that a program's initial called ends that
-// initial's process there, so neither the rest of the task nor the rest of the
-// initial runs. The task waits before the call, so the call does not end the
-// initial's time step and a check between the initial's own statements alone
-// cannot stop the task's next statement.
 TEST(ProgramControlTasksSim, ExitInsideProgramTaskEndsTheRestOfTheTask) {
   SimFixture f;
   EXPECT_EQ(
@@ -232,7 +218,6 @@ TEST(ProgramControlTasksSim, ExitInsideProgramTaskEndsTheRestOfTheTask) {
       "task exits at 3\n");
 }
 
-// §24.7 as above, with the task a class method called through a handle.
 TEST(ProgramControlTasksSim, ExitInsideClassTaskEndsTheRestOfTheTask) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class Q;\n"
@@ -254,9 +239,6 @@ TEST(ProgramControlTasksSim, ExitInsideClassTaskEndsTheRestOfTheTask) {
             "class task exits at 3\n");
 }
 
-// §24.7: $exit from a descendant thread of a program's initial ends every
-// initial of that program and their descendants, and with them the program,
-// so by §24.3 the run ends at that time: the final procedure reports 2.
 TEST(ProgramControlTasksSim, ExitFromForkChildEndsTheRunAtItsTime) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program p;\n"
@@ -276,8 +258,6 @@ TEST(ProgramControlTasksSim, ExitFromForkChildEndsTheRunAtItsTime) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 2u);
 }
 
-// §24.7 with §24.3: $exit inside a forever loop waiting on a design clock
-// ends the run at that clock edge, 25, not at the clock's next toggle.
 TEST(ProgramControlTasksSim, ExitInForeverLoopEndsTheRunAtTheEdge) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module top;\n"
@@ -300,9 +280,6 @@ TEST(ProgramControlTasksSim, ExitInForeverLoopEndsTheRunAtTheEdge) {
   EXPECT_EQ(f.ctx.CurrentTime().ticks, 25u);
 }
 
-// §24.7 with §20.2: a module initial's $exit is ignored while a program still
-// runs, so the module goes on past it, and the program's end at 30 ends the
-// run.
 TEST(ProgramControlTasksSim,
      ExitFromModuleInitialBesideRunningProgramIsIgnored) {
   SimFixture f;
@@ -322,8 +299,6 @@ TEST(ProgramControlTasksSim,
             "mod 3\nafter exit 13\nprog 30\n");
 }
 
-// §24.7 with §24.3: a program whose only initial ends at 2 ends the run there,
-// so a module initial that would call $exit at 3 never reaches it.
 TEST(ProgramControlTasksSim, ProgramEndBeforeModuleExitEndsTheRun) {
   SimFixture f;
   EXPECT_EQ(RunCapture("program pr;\n"
@@ -342,8 +317,6 @@ TEST(ProgramControlTasksSim, ProgramEndBeforeModuleExitEndsTheRun) {
             "prog 2\n");
 }
 
-// §24.7 with §20.2: with no program in the design, a module initial's $exit
-// is ignored, and every process runs as if it were absent.
 TEST(ProgramControlTasksSim, ExitWithNoProgramIsIgnored) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -358,9 +331,6 @@ TEST(ProgramControlTasksSim, ExitWithNoProgramIsIgnored) {
             "a\nb\nc\n");
 }
 
-// §24.7 with §24.3: $exit in p1 ends p1's initial, which the initial's own
-// running on to its end does not count out a second time, so p2's initial,
-// still waiting on its delay, is not taken for ended and assigns at 5.
 TEST(ProgramControlTasksSim, ExitLeavesAnotherProgramsDelayedInitialRunning) {
   SimFixture f;
   auto* v = RunAndFindVar(

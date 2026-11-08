@@ -7,48 +7,11 @@
 
 namespace {
 
-// §6.5 rules on printed page 91 that data is declared before it is used,
-// implicit nets aside, and two walks in
-// src/elaborator/elaborator_scope_rules_names.cpp answer that question of a
-// procedural assignment: CollectProcLocalNames gathers the names a procedural
-// block declares and CollectProcRhsIdents gathers the names its assignments
-// read, and Elaborator::ValidateUnresolvedReferences reports a read that
-// neither the block nor the module declares.
-//
-// Each walk wrote out nine of the thirteen child-statement links Stmt declares,
-// and both now take the list from ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h. The four links neither reached
-// are Stmt::assert_pass_stmt, Stmt::assert_fail_stmt, the body of a randcase
-// item, and the two statement lists Stmt::rs_productions holds --
-// RsProd::code_stmts and RsRule::weight_code, which ForEachRandsequenceRuleStmt
-// reaches by different members, so each of those is its own position and each
-// gets its own case below.
-//
-// The five cases here cover CollectProcLocalNames, whose omission cost a report
-// made wrongly rather than a report not made: a declaration the walk did not
-// see is absent from the set of block-local names, so the read of that name
-// resolves against nothing and is reported as unresolved under §23.9 although
-// §6.5 was satisfied where it stands. Each source declares a variable and reads
-// it in one newly reached position, and asserts the source is accepted, so each
-// fails if CollectProcRhsIdents is put on the shared list while
-// CollectProcLocalNames is left with its own. The rejecting counterparts, one
-// per position, stand in test/src/unit/test_elaborator_subclause_26_03b.cpp.
-//
-// An accepted source produces no report, so there is nothing here for
-// ReportedError in lib/cpp/test_helpers/helpers_reported_error.h to name.
-//
-// `stmt` is the whole statement of the initial procedure and may run to several
-// lines. `a` is declared in an unnamed begin-end, which §23.9 lists among the
-// elements defining a scope, and `r` is the module variable it is read into.
 bool ElaboratesWithBlockLocalIn(const std::string& stmt) {
   return ElabOk("module m;\n  int r;\n  initial\n    " + stmt +
                 "\nendmodule\n");
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// which the parser keeps in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt.
-// This case and the next cover one arm each.
 TEST(NetsAndVariables, BlockLocalReadInAnAssertionPassStmtIsAccepted) {
   EXPECT_TRUE(ElaboratesWithBlockLocalIn("assert (r) begin int a; r = a; end"));
 }
@@ -58,19 +21,11 @@ TEST(NetsAndVariables, BlockLocalReadInAnAssertionFailStmtIsAccepted) {
       ElaboratesWithBlockLocalIn("assert (r) else begin int a; r = a; end"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, whose
-// statement the parser keeps in the second member of a Stmt::randcase_items
-// entry. §6.5 is a rule about the source, so the declaration answers for the
-// read whether the weighted draw would select the item or not.
 TEST(NetsAndVariables, BlockLocalReadInARandcaseItemIsAccepted) {
   EXPECT_TRUE(ElaboratesWithBlockLocalIn(
       "randcase 1: begin int a; r = a; end endcase"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements. They are kept in RsProd::code_stmts, reached through
-// Stmt::rs_productions and through no other member of Stmt.
 TEST(NetsAndVariables, BlockLocalReadInARandsequenceCodeBlockIsAccepted) {
   EXPECT_TRUE(
       ElaboratesWithBlockLocalIn("begin\n"
@@ -80,10 +35,6 @@ TEST(NetsAndVariables, BlockLocalReadInARandsequenceCodeBlockIsAccepted) {
                                  "    end"));
 }
 
-// §18.17.1 lets a weight specification be followed by a code block of its own,
-// which the parser keeps in RsRule::weight_code. It is a second list under
-// Stmt::rs_productions, so a walk reaches it without reaching
-// RsProd::code_stmts and the case above does not answer for it.
 TEST(NetsAndVariables, BlockLocalReadInARandsequenceWeightCodeBlockIsAccepted) {
   EXPECT_TRUE(ElaboratesWithBlockLocalIn(
       "begin\n"
@@ -94,15 +45,6 @@ TEST(NetsAndVariables, BlockLocalReadInARandsequenceWeightCodeBlockIsAccepted) {
       "    end"));
 }
 
-// §23.7 calls `v.f` a dotted name and rules that a member select's first name
-// component matches a data object, which is what LhsBaseName answers for each
-// of the six checks that reduce an lvalue to its base. Its member arm followed
-// `base`, a field only a select carries, so it walked off the end of every
-// dotted name and answered nothing, and each caller reads nothing as "no base
-// to check". §6.5's rule against procedural and continuous assignments mixed
-// over the terms of one variable's longest static prefix expansion is the one
-// that makes that observable: the continuous assignment names `v` and the
-// procedural one names a member of it, which is a term in the same expansion.
 TEST(NetsAndVariables,
      MemberQualifiedProceduralTargetIsAWriteToItsBaseVariable) {
   ElabFixture f;
@@ -121,14 +63,6 @@ TEST(NetsAndVariables,
                             5, "6.5"));
 }
 
-// §23.7.1: a name with a package or class scope resolution prefix (::) always
-// resolves downwards, so the name before `::` is a package or a class rather
-// than a data object, and the walk ends there rather than returning it. A net
-// and a package can carry one name, which is what lets this case put the two
-// together: descending through the prefix would record `p::x = 1` as a
-// procedural write to the net `p` and draw §10.4's report of a net as a
-// procedural assignment's left-hand side over a statement that writes no net at
-// all.
 TEST(NetsAndVariables, PackageScopedAssignmentIsNotAWriteToThePrefixName) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -144,14 +78,6 @@ TEST(NetsAndVariables, PackageScopedAssignmentIsNotAWriteToThePrefixName) {
              f));
 }
 
-// §10.4 with §23.2.2.3 (printed page 735): an output port declared with no
-// port kind and no data type, `output b`, is a net of the default net type,
-// the clause's own `mh8 (output x)`, so `b <= a` inside an always_ff is a
-// procedural assignment whose left-hand side is no variable and is reported
-// as the write to a declared `wire w` above is. This is the suite's
-// 14.3--clocking-block-signals-error.sv (#2917), whose clocking block declares
-// `output b` as a clockvar and whose always_ff writes the port itself; the
-// port was known to the rule as no net and the write was accepted.
 TEST(NetsAndVariables, UntypedOutputPortIsANetAProcedureCannotWrite) {
   ElabFixture f;
   Elaborate(
@@ -176,12 +102,6 @@ TEST(NetsAndVariables, UntypedOutputPortIsANetAProcedureCannotWrite) {
       "net 'c' cannot be the target of a procedural assignment", 10, "10.4"));
 }
 
-// §23.2.2.3: an output port declared with an explicit data type and no port
-// kind, `output logic b`, is a variable, so the same always_ff write is the
-// ordinary procedural assignment §10.4 allows and nothing is reported. This is
-// the shape of the suite's passing 14.3--clocking-block-signals.sv, and the
-// discriminating half of the case above: a rule that took every output port
-// for a net would report it.
 TEST(NetsAndVariables, TypedOutputPortIsAVariableAProcedureMayWrite) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -191,11 +111,6 @@ TEST(NetsAndVariables, TypedOutputPortIsAVariableAProcedureMayWrite) {
              f));
 }
 
-// §6.5 (printed page 90): any number of continuous assignments, one or more,
-// may write a net, the single-assignment rule being stated of a variable's
-// longest static prefix alone. Two continuous assignments to one bit of a
-// vector net, or to one element of a wor array, are two drivers the net type
-// resolves, and were reported as overlapping elements.
 TEST(NetsAndVariables, NetSelectTakesSeveralContinuousAssignments) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -210,10 +125,6 @@ TEST(NetsAndVariables, NetSelectTakesSeveralContinuousAssignments) {
              f));
 }
 
-// §6.5: a procedural assignment written in a task or a function body writes
-// the variable as one in a process does, so a variable a continuous assignment
-// also writes is written by a mixture of the two; a subroutine's own formal or
-// local of the same name is not that variable.
 TEST(NetsAndVariables, SubroutineWriteMeetsContinuousAssignment) {
   ElabFixture f;
   ElaborateSrc(
@@ -236,9 +147,6 @@ TEST(NetsAndVariables, SubroutineWriteMeetsContinuousAssignment) {
                              7, "6.5"));
 }
 
-// §6.5 with §27.4: a generate block is a scope of its own, so a variable it
-// declares is another variable from the module's of the same name, and each
-// takes the one continuous assignment written to it.
 TEST(NetsAndVariables, AGenerateBlocksVariableIsNotTheModulesOfThatName) {
   ElabFixture f;
   ElaborateSrc(
@@ -254,9 +162,6 @@ TEST(NetsAndVariables, AGenerateBlocksVariableIsNotTheModulesOfThatName) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The module's variable is one variable however many iterations of a loop
-// generate construct write it, so a continuous assignment in every iteration
-// is more than one assignment to it.
 TEST(NetsAndVariables, EveryIterationAssigningTheModulesVariableIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -272,9 +177,6 @@ TEST(NetsAndVariables, EveryIterationAssigningTheModulesVariableIsReported) {
                             "6.5"));
 }
 
-// An iteration's own variable written by both kinds of assignment within the
-// iteration is reported as a mixture, and no iteration's continuous
-// assignment is counted against another's.
 TEST(NetsAndVariables, AnIterationsVariableTakesNoMixtureOfAssignments) {
   ElabFixture f;
   ElaborateSrc(
@@ -295,9 +197,6 @@ TEST(NetsAndVariables, AnIterationsVariableTakesNoMixtureOfAssignments) {
                              "6.5"));
 }
 
-// §6.5's own example of a structure: a continuous assignment to abc.C,
-// primitive outputs on abc.A[0] to abc.A[3] and a procedural write to abc.B,
-// each covering terms of abc that no other writer covers.
 constexpr const char* kAbcExampleHead =
     "module m(input logic clk, input logic sel);\n"
     "  struct {\n"
@@ -316,10 +215,6 @@ TEST(NetsAndVariables, SectionsStructExampleIsAccepted) {
   EXPECT_TRUE(ElabOk(std::string(kAbcExampleHead) + "endmodule\n"));
 }
 
-// Its two illegal additions. A second continuous assignment to abc.C is
-// reported. A procedural write to abc.A[7:3] is reported against the primitive
-// output on abc.A[3], which its part-select overlaps, and against none of the
-// outputs on abc.A[0] to abc.A[2], which it does not.
 TEST(NetsAndVariables, SectionsStructExampleAdditionsAreReported) {
   ElabFixture second;
   ElabOk(std::string(kAbcExampleHead) +
@@ -353,10 +248,6 @@ constexpr const char* kInverterUdp =
     "  endtable\n"
     "endprimitive\n";
 
-// A UDP's output terminal writes a variable as a gate's does. The UDP is a
-// continuous writer whether it drives the whole variable or one bit of it, so
-// a procedural write to the same terms, or a second primitive output on them,
-// is reported. A procedural write to another bit is accepted.
 TEST(NetsAndVariables, UdpOutputIsAContinuousWriterOfAVariable) {
   ElabFixture whole;
   ElabOk(std::string(kInverterUdp) +
@@ -403,11 +294,6 @@ TEST(NetsAndVariables, UdpOutputIsAContinuousWriterOfAVariable) {
                                                  "endmodule\n"));
 }
 
-// §6.5 counts a procedural assign statement (§10.6.1) as a procedural
-// assignment. Beside a continuous assignment to the same variable it is
-// reported, whether it stands in an initial procedure, in a generate block or
-// in a task, and whether the continuous assignment writes the whole variable
-// or a member of it. Standing alone it is accepted.
 TEST(NetsAndVariables, ProceduralAssignIsAProceduralWriter) {
   ElabFixture module_level;
   ElabOk(
@@ -468,9 +354,6 @@ TEST(NetsAndVariables, ProceduralAssignIsAProceduralWriter) {
              "endmodule\n"));
 }
 
-// §6.5 makes a force statement neither a continuous nor a procedural
-// assignment, so it adds no writer: beside one continuous assignment, beside
-// one to a bit of the variable, and beside procedural writes, it is accepted.
 TEST(NetsAndVariables, ForceIsNoWriterUnderTheRule) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

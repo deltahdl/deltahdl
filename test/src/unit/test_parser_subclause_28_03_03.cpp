@@ -69,9 +69,6 @@ TEST(DelayParsing, AndGateTwoValueDelay) {
 }
 
 TEST(DelayParsing, ThreeStateGateThreeValueDelayAccepted) {
-  // §28.3.3: a delay specification can carry up to three delay values
-  // depending on the gate type. A three-state gate is a delay3 gate, so its
-  // declaration accepts the rise/fall/turn-off triple without diagnostics.
   auto r = Parse(
       "module m;\n"
       "  wire y, a, en;\n"
@@ -90,9 +87,6 @@ TEST(DelayParsing, ThreeStateGateThreeValueDelayAccepted) {
 }
 
 TEST(DelayParsing, NOutputGateTwoValueDelayAccepted) {
-  // §28.3.3: the number of delay values allowed depends on the gate type. An
-  // n_output gate (buf/not) is a delay2 primitive, so its declaration accepts a
-  // rise/fall pair and exposes no third (turn-off) slot.
   auto r = Parse(
       "module m;\n"
       "  wire y, a;\n"
@@ -110,9 +104,6 @@ TEST(DelayParsing, NOutputGateTwoValueDelayAccepted) {
 }
 
 TEST(DelayParsing, MosSwitchThreeValueDelayAccepted) {
-  // §28.3.3: a MOS switch is a delay3 primitive, so — like a three-state gate —
-  // its declaration accepts the full rise/fall/turn-off delay triple. This
-  // exercises the delay on a switch declaration rather than a logic gate.
   auto r = Parse(
       "module m;\n"
       "  wire y, a, ctl;\n"

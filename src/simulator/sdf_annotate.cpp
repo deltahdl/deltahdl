@@ -1,18 +1,3 @@
-// Which cells an $sdf_annotate call reaches and the order one cell's
-// constructs are applied in. §32.9 has a module_instance operand name a level
-// of the design hierarchy, and SdfCellPrefixInRegion reads each cell's
-// instance path from that level down, keeping the cells at or below it and
-// working out the instance prefix their entries carry, which is what holds an
-// SDF record to the one module instance it names. §32.5 has annotation proceed
-// in order, so AnnotateSdfCell walks a cell's constructs as the file wrote
-// them, across its sections rather than within each, and AnnotateSdfCellEntry
-// hands each construct to the function for its kind.
-//
-// Those six functions annotate the constructs of §32.4 and §32.7 and stand in
-// simulator/sdf_annotate_entry.cpp, together with the §32.8 Table 32-4 delay
-// expansion each of them reads. They are declared below rather than in
-// simulator/sdf_parser.h because AnnotateSdfCellEntry is their only caller.
-
 #include <cstdint>
 #include <optional>
 #include <string>
@@ -24,8 +9,6 @@
 
 namespace delta {
 
-// §32.4, §32.7: one SDF construct apiece, defined in
-// simulator/sdf_annotate_entry.cpp.
 void AnnotateSdfIopathEntry(const SdfIopath& io, std::string_view inst_prefix,
                             SpecifyManager& mgr, SdfMtm mtm,
                             SdfAnnotationResult& result);
@@ -74,10 +57,6 @@ std::optional<std::string> SdfCellPrefixInRegion(std::string_view instance,
 
 namespace {
 
-// Builds the implicit construct ordering used when a cell does not carry an
-// explicit one, as a cell assembled in memory rather than parsed does not:
-// all iopaths, then pulse limits, then interconnects, devices, specparams and
-// timing checks.
 std::vector<SdfCellEntryRef> BuildDerivedSdfCellOrder(const SdfCell& cell) {
   std::vector<SdfCellEntryRef> derived;
   derived.reserve(cell.iopaths.size() + cell.pulse_limits.size() +
@@ -136,13 +115,6 @@ void AnnotateSdfCellEntry(const SdfCellSource& src,
   }
 }
 
-// §32.5: annotation is an ordered process, so a cell's constructs are applied
-// one after another in the order the file wrote them -- across the cell's
-// sections, not merely within each one. That is what lets a construct's
-// annotation be overwritten or modified by a later construct of a different
-// kind: a LABEL that reprices a specparam a module path delay expression reads
-// undoes an earlier IOPATH on that path, and an IOPATH written after the LABEL
-// undoes the LABEL's effect on that path instead.
 void AnnotateSdfCell(const SdfCellSource& src, SpecifyManager& mgr, SdfMtm mtm,
                      SdfAnnotationResult& result) {
   std::vector<SdfCellEntryRef> derived;
@@ -164,23 +136,12 @@ SdfAnnotationResult AnnotateSdfToManager(const SdfFile& file,
                                          std::string_view design_root) {
   SdfAnnotationResult result;
 
-  // §32.3: every piece of SDF data the annotator could not take in gets its own
-  // warning. The parser collects them as it goes; constructs that carry no
-  // SystemVerilog timing at all (the TIMINGENV section being the stock example)
-  // never reach this list, because those are to be dropped silently.
   for (const auto& kw : file.unannotatable) {
     result.warnings.push_back("SDF annotator: unable to annotate " + kw +
                               " construct");
   }
 
-  // §32.3: annotation is driven purely by what the file supplies. Nothing here
-  // walks the manager's existing values, so a timing value the file says
-  // nothing about keeps whatever it held before backannotation.
   for (const auto& cell : file.cells) {
-    // §32.9: the cell's instance path, read from the region down, says which
-    // instance of the cell the entries below annotate, and a cell it leaves
-    // outside the region is not annotated. Working it out once here keeps
-    // every entry of the cell reading the one answer.
     std::optional<std::string> prefix =
         SdfCellPrefixInRegion(cell.instance, region_prefix, design_root);
     if (!prefix.has_value()) continue;

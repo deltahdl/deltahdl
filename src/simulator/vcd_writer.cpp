@@ -18,18 +18,10 @@
 
 namespace delta {
 
-// Table 21-11 itself; the header states what the mapping is for. Every
-// unmapped kind falls through to kNet, and the lowerer has already reduced a
-// typed enum to its base kind and a packed struct to kBit, so neither reaches
-// a case of its own here.
 VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
       return VcdDataType::kBit;
-    // Table 21-11 gives logic the same row as bit -- reg, sized by the total
-    // packed dimension. It fell through to kNet before, which declared every
-    // dumped logic object as a wire: a var_type the table gives to no
-    // SystemVerilog data type, and one §21.7.2.3 reserves for a net.
     case DataTypeKind::kLogic:
       return VcdDataType::kLogic;
     case DataTypeKind::kByte:
@@ -42,20 +34,12 @@ VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
       return VcdDataType::kLongint;
     case DataTypeKind::kEnum:
       return VcdDataType::kEnum;
-    // Syntax 21-20 lists reg, integer and time among the var_type keywords, so
-    // each is declared as itself rather than masquerading as anything. Table
-    // 21-11 tabulates none of the three, and that is why: the table maps a
-    // SystemVerilog type onto an IEEE Std 1364-2005 type, and these three are
-    // 1364-2005 types already. Without a case each fell through to kNet and
-    // was declared wire, which §21.7.2.3 gives to a net.
     case DataTypeKind::kReg:
       return VcdDataType::kReg;
     case DataTypeKind::kInteger:
       return VcdDataType::kInteger;
     case DataTypeKind::kTime:
       return VcdDataType::kTime;
-    // §21.7.2.1 (Syntax 21-20) lists event among the var_type keywords, so an
-    // event is declared as one rather than taking the net default below.
     case DataTypeKind::kEvent:
       return VcdDataType::kEvent;
     default:
@@ -63,8 +47,6 @@ VcdDataType VcdDataTypeForDeclKind(DataTypeKind kind) {
   }
 }
 
-// §21.7.2.3: the $date section indicates the date on which the VCD file was
-// generated, so the header stamps the host clock at header-writing time.
 static std::string CurrentDateText() {
   std::time_t now = std::time(nullptr);
   std::tm tm_buf{};
@@ -81,9 +63,6 @@ VcdWriter::~VcdWriter() {
   if (ofs_.is_open()) ofs_.close();
 }
 
-// §21.7.4.1: hold the declaration commands in memory rather than writing them
-// straight out, so a $dumpports command issued after the file was opened still
-// reaches the version section it belongs in.
 void VcdWriter::BufferDeclarations() { buffer_decls_ = true; }
 
 void VcdWriter::AddVersionCommand(std::string_view text) {
@@ -102,10 +81,6 @@ void VcdWriter::FlushDeclarations() {
   for (const auto& command : version_commands_) {
     commands += "  " + command + "\n";
   }
-  // §21.7.4.1 (Syntax 21-27): version_text is the version identifier followed
-  // by the dumpports commands, and WriteHeader kept that place. A header that
-  // was never written leaves the offset at zero, where an insertion is still
-  // in bounds and puts the commands ahead of nothing.
   text.insert(version_commands_at_ <= text.size() ? version_commands_at_ : 0,
               commands);
   ofs_ << text;
@@ -116,19 +91,10 @@ void VcdWriter::WriteHeader(std::string_view timescale,
   if (!ofs_.is_open()) return;
   std::ostream& out = Out();
   out << "$date\n  " << CurrentDateText() << "\n$end\n";
-  // §21.7.2.3: the $version section names the VCD writer and the $dumpfile call
-  // that created the file. When the filename was supplied by a variable or an
-  // expression, the unevaluated literal is reproduced here rather than the
-  // resolved name.
   out << "$version\n  DeltaHDL 0.1.0\n";
   if (!dumpfile_literal.empty()) {
     out << "  $dumpfile(" << dumpfile_literal << ")\n";
   }
-  // §21.7.4.1 (Syntax 21-27): version_text is the version identifier followed
-  // by the dumpports commands, so a command written later belongs here, after
-  // what has just gone out and before the $end below. A buffered header
-  // remembers the offset; a header going straight to disk has nowhere to put a
-  // later command and keeps none.
   if (buffer_decls_) {
     version_commands_at_ = static_cast<size_t>(decl_buf_.tellp());
   }
@@ -137,10 +103,6 @@ void VcdWriter::WriteHeader(std::string_view timescale,
   header_written_ = true;
 }
 
-// §21.7.2.3: the scope_type keyword written in a $scope section indicates the
-// kind of scope -- module for a top-level module or module instance, task for
-// a task, function for a function, begin for a named sequential block, and
-// fork for a named parallel block.
 static const char* VcdScopeKeyword(VcdScopeKind kind) {
   switch (kind) {
     case VcdScopeKind::kTask:
@@ -177,17 +139,8 @@ void VcdWriter::HoldDecl(size_t begin, HeldDeclKind kind, size_t signal) {
       {begin, static_cast<size_t>(decl_buf_.tellp()), kind, signal});
 }
 
-// §21.7.1.2: $dumpvars names the variables to dump, and §21.7.2.3's $var
-// section gives the name and identifier code of each variable dumped, so a
-// variable no call listed is not declared. A $scope section declares the scope
-// holding dumped variables; one left holding none -- the sub-instance of
-// `$dumpvars(1, t)`, or t itself when only `t.u.deep` is listed and t has no
-// variable of its own dumped -- goes with them. A dump that no scope list
-// narrowed declares everything it registered.
 std::vector<bool> VcdWriter::KeptHeldDecls() const {
   std::vector<bool> keep(held_decls_.size(), true);
-  // The open $scope sections, innermost last, each with whether a $var kept
-  // so far sits somewhere inside it.
   std::vector<std::pair<size_t, bool>> open;
   auto mark_used = [&open]() {
     if (!open.empty()) open.back().second = true;
@@ -223,22 +176,11 @@ std::string VcdWriter::SelectedDeclarations(const std::string& text) const {
   return out;
 }
 
-// §21.7.2.3: choose the var_type keyword written in a $var declaration. Real
-// variables are dumped as real numbers. A net declared with net type uwire is
-// recorded as wire — uwire is not itself a var_type keyword — and this writer
-// renders every other binary-valued net as wire as well.
 static const char* VcdVarTypeKeyword(const VcdSignal& sig) {
   if (sig.var && sig.var->value.is_real) return "real";
   return "wire";
 }
 
-// §21.7.5 (Table 21-11): map a SystemVerilog data type to the 1364-2005
-// var_type keyword and the size it is dumped with. bit and logic keep the full
-// packed width passed in, Table 21-11 sizing them by every packed bit, which
-// also covers a packed array or structure collapsed to a single reg vector. The
-// fixed-width integer types and the default enum carry the size fixed by the
-// table regardless of the declared width. A net (kNet) keeps the §21.7.2.3
-// keyword and its own width.
 static const char* VcdDataTypeKeyword(VcdDataType type) {
   switch (type) {
     case VcdDataType::kBit:
@@ -246,23 +188,16 @@ static const char* VcdDataTypeKeyword(VcdDataType type) {
     case VcdDataType::kShortint:
     case VcdDataType::kLongint:
     case VcdDataType::kByte:
-    // §6.11.2: logic and reg name one and the same type, so an object declared
-    // with either carries the reg keyword Syntax 21-20 lists -- lent to logic
-    // by Table 21-11, and reg's own.
     case VcdDataType::kReg:
       return "reg";
     case VcdDataType::kInt:
     case VcdDataType::kEnum:
-    // Syntax 21-20's own keyword rather than the one Table 21-11 lends int.
-    // §21.7.2.3's example declares one: `$var integer 32 (2 index $end`.
     case VcdDataType::kInteger:
       return "integer";
     case VcdDataType::kTime:
       return "time";
     case VcdDataType::kReal:
       return "real";
-    // §21.7.2.1 (Syntax 21-20) lists event among the var_type keywords, so a
-    // named event carries its own rather than masquerading as anything.
     case VcdDataType::kEvent:
       return "event";
     case VcdDataType::kParameter:
@@ -277,12 +212,8 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   switch (type) {
     case VcdDataType::kInt:
     case VcdDataType::kEnum:
-    // Table 6-8: integer is a 32-bit signed integer.
     case VcdDataType::kInteger:
       return 32;
-    // Table 6-8: time is a 64-bit unsigned integer. Stated rather than left to
-    // the registered width so it stays 64 whatever storage the model gives a
-    // time variable, as the fixed widths above are.
     case VcdDataType::kTime:
       return 64;
     case VcdDataType::kShortint:
@@ -291,16 +222,10 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
       return 64;
     case VcdDataType::kByte:
       return 8;
-    // §21.7.2.3: the size is the variable's number of bits, and
-    // §6.17 gives an event no bits. The size is stated here rather than left
-    // to the registered width so it stays 0 if the storage an event is kept
-    // in ever gains one.
     case VcdDataType::kEvent:
       return 0;
     case VcdDataType::kBit:
     case VcdDataType::kLogic:
-    // Table 6-8 gives reg a user-defined vector size, so a reg keeps the
-    // width it was declared with, as bit and logic do.
     case VcdDataType::kReg:
     case VcdDataType::kReal:
     case VcdDataType::kParameter:
@@ -310,8 +235,6 @@ static uint32_t VcdDataTypeSize(VcdDataType type, uint32_t width) {
   return width;
 }
 
-// Copy the descriptive registration arguments (everything except the counter
-// state) into a fresh VcdSignal. No writer state is consulted or mutated.
 static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   VcdSignal sig;
   sig.name = spec.name;
@@ -322,34 +245,20 @@ static VcdSignal MakeVcdSignalFields(const VcdSignalSpec& spec) {
   sig.data_type = spec.data_type;
   sig.msb = spec.msb;
   sig.lsb = spec.lsb;
-  // §21.7.5: where this object's bits sit in its backing variable, and whether
-  // it is one member of an unpacked structure sharing that variable.
   sig.bit_offset = spec.bit_offset;
   sig.is_field = spec.is_field;
-  // §21.7.4.3: the net whose resolved strength answers the two strength
-  // components of a port value change, null when the object is not a net.
   sig.net = spec.net;
   sig.source_net = spec.source_net;
   return sig;
 }
 
-// Assign the per-signal identifier and port codes, advancing the writer's
-// counters as §21.7.4.2 requires (the port identifier code ascends one unit
-// per registration, in module-declaration order; the printable-ASCII
-// identifier wraps back to '!' once it passes '~').
 static void AssignVcdSignalCodes(VcdSignal& sig, char& next_ident,
                                  uint32_t& next_port_id) {
   sig.ident = next_ident++;
-  // §21.7.4.2: the identifier code of a port is an integer that ascends in
-  // one-unit increments for each port, in the order found in the module
-  // declaration. Each registration is one such port.
   sig.port_id = next_port_id++;
   if (next_ident > '~') next_ident = '!';
 }
 
-// Populate a VcdSignal from the registration arguments, advancing the writer's
-// identifier and port counters as §21.7.4.2 requires (the port identifier code
-// ascends one unit per registration, in module-declaration order).
 static VcdSignal MakeVcdSignal(const VcdSignalSpec& spec, char& next_ident,
                                uint32_t& next_port_id) {
   VcdSignal sig = MakeVcdSignalFields(spec);
@@ -357,9 +266,6 @@ static VcdSignal MakeVcdSignal(const VcdSignalSpec& spec, char& next_ident,
   return sig;
 }
 
-// §21.7.5 (Table 21-11): a SystemVerilog data type masquerades as a 1364-2005
-// type. A net keeps the §21.7.2.3 mapping (and a real object dumped through
-// that path is still detected by its value); a data type uses its table entry.
 static void WriteVarDecl(std::ostream& ofs, const VcdSignal& sig,
                          std::string_view name, uint32_t width) {
   const char* keyword = sig.data_type == VcdDataType::kNet
@@ -370,9 +276,6 @@ static void WriteVarDecl(std::ostream& ofs, const VcdSignal& sig,
       << " $end\n";
 }
 
-// Emit the $var declaration for a freshly registered signal, choosing the
-// extended-VCD port form (§21.7.4.2) when the writer is recording $dumpports
-// nodes and the standard data-type form (§21.7.5) otherwise.
 static void WriteSignalVarDecl(std::ostream& ofs, const VcdSignal& sig,
                                std::string_view name, uint32_t width,
                                bool port_nodes) {
@@ -384,13 +287,6 @@ static void WriteSignalVarDecl(std::ostream& ofs, const VcdSignal& sig,
 }
 
 void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
-  // §21.7.2.1: memories are not dumped in a VCD file. An unpacked-array
-  // element reaches the writer under its element-select name (for example
-  // mem[3]), so dropping any such registration keeps both its $var
-  // declaration and every later value change for it out of the file, while a
-  // packed vector -- registered under a bare identifier -- is still dumped in
-  // full. The skip happens before the identifier code is assigned, so the
-  // code sequence of the dumped objects is unaffected.
   if (spec.name.find('[') != std::string_view::npos) return;
   VcdSignal sig = MakeVcdSignal(spec, next_ident_, next_port_id_);
   signals_.push_back(sig);
@@ -404,8 +300,6 @@ void VcdWriter::RegisterSignal(const VcdSignalSpec& spec) {
 
 void VcdWriter::WriteComment(std::string_view text) {
   if (!ofs_.is_open()) return;
-  // The comment text -- one line or several -- sits between the $comment
-  // keyword and the $end that closes the section.
   Out() << "$comment\n  " << text << "\n$end\n";
 }
 
@@ -415,17 +309,14 @@ void VcdWriter::EndDefinitions() {
 }
 
 bool VcdWriter::AtSizeLimit() {
-  if (size_limit_ == 0) return false;  // no limit configured
-  if (limit_reached_) return true;     // already stopped
+  if (size_limit_ == 0) return false;
+  if (limit_reached_) return true;
   if (!ofs_.is_open()) return false;
   std::streampos pos = ofs_.tellp();
   if (pos == std::streampos(-1)) return false;
-  // Text still held is on its way to the file and counts toward its size.
   auto size = static_cast<uint64_t>(pos);
   if (buffer_decls_) size += static_cast<uint64_t>(decl_buf_.tellp());
   if (size < size_limit_) return false;
-  // The file has reached the requested byte count: note it in the dump via a
-  // §21.7.2.3 $comment section and stop recording any further value changes.
   WriteComment("Dump limit of " + std::to_string(size_limit_) +
                " bytes reached, dumping stopped.");
   limit_reached_ = true;
@@ -434,13 +325,8 @@ bool VcdWriter::AtSizeLimit() {
 
 void VcdWriter::WriteTimestamp(uint64_t time) {
   FlushDeclarations();
-  // §21.7.1.3: with the start gate armed, no simulation time is recorded until
-  // a $dumpvars checkpoint has started the dump.
   if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
   if (AtSizeLimit()) return;
-  // §21.7.2.4: one simulation_time command introduces all the records of its
-  // time unit; when a checkpoint already stamped this time, the value changes
-  // that follow belong to the same #<time> group and no marker is repeated.
   if (have_time_ && time == last_time_) return;
   Out() << "#" << time << "\n";
   last_time_ = time;
@@ -455,29 +341,19 @@ void VcdWriter::EnsureTimestamp(uint64_t time) {
   have_time_ = true;
 }
 
-// Maps a single 4-state logic bit, given its aval and bval components, to the
-// VCD value character: 0, 1, x, or z (§21.7.2.1).
 static char LogicBitToChar(bool aval, bool bval) {
   if (!bval && !aval) return '0';
   if (!bval && aval) return '1';
-  if (bval && aval) return 'x';  // x = (aval=1, bval=1)
-  return 'z';                    // z = (aval=0, bval=1)
+  if (bval && aval) return 'x';
+  return 'z';
 }
 
-// Table 21-8: a shortened vector value is reconstructed by left-extending it
-// according to its most significant retained digit. The values 0 and 1 extend
-// with 0, an x extends with x, and a z extends with z.
 static char VcdLeftExtendFill(char digit) {
   if (digit == 'x') return 'x';
   if (digit == 'z') return 'z';
   return '0';
 }
 
-// Returns the 4-state digit character for bit i of the signal's value, counting
-// from the signal's own least significant bit and treating bits beyond the
-// stored words as 0. §21.7.5: a structure member starts at bit_offset within
-// the structure's shared value, so the offset shifts the whole window; an
-// ordinary object leaves it at zero and reads its value directly.
 char VcdBitChar(const VcdSignal& sig, int32_t i) {
   uint32_t abs_bit = static_cast<uint32_t>(i) + sig.bit_offset;
   uint32_t word_idx = abs_bit / 64;
@@ -492,7 +368,6 @@ char VcdBitChar(const VcdSignal& sig, int32_t i) {
   return LogicBitToChar(a, b);
 }
 
-// The signal's current value as 4-state digits, most significant bit first.
 static std::string VcdSignalDigits(const VcdSignal& sig) {
   std::string digits;
   digits.reserve(sig.width);
@@ -504,47 +379,28 @@ static std::string VcdSignalDigits(const VcdSignal& sig) {
 
 void VcdWriter::WriteScalarChange(const VcdSignal& sig) {
   if (!sig.var) return;
-  // The aval/bval pair is read bit-wise so x=(1,1) stays distinct from
-  // z=(0,1); a numeric projection would collapse both to 0 and misreport x.
   Out() << VcdBitChar(sig, 0) << sig.ident << "\n";
 }
 
 void VcdWriter::WriteVectorChange(const VcdSignal& sig) {
   if (!sig.var) return;
-  // Build the full-width value with the most significant bit first.
   std::string digits = VcdSignalDigits(sig);
-  // §21.7.2.2: vectors are written in the shortest right-justified form. A
-  // leading digit is redundant when the left-extension rule applied to the
-  // digit that would replace it regenerates that leading digit, so drop such
-  // digits while always keeping at least one.
   size_t start = 0;
   while (start + 1 < digits.size() &&
          digits[start] == VcdLeftExtendFill(digits[start + 1])) {
     ++start;
   }
-  // No white space between the base letter and the value digits, and exactly
-  // one white space between the value digits and the identifier code.
   Out() << 'b' << (digits.c_str() + start) << ' ' << sig.ident << "\n";
 }
 
 void VcdWriter::WriteRealChange(const VcdSignal& sig) {
   if (!sig.var) return;
-  // The stored value is an IEEE Std 754 bit pattern, single precision when the
-  // §6.12 declared type is shortreal and double otherwise, which is what
-  // RealVecToDouble reads off the width. It is printed with %.16g so the full
-  // 53-bit mantissa of a double survives the round-trip through the dump file.
   double d = RealVecToDouble(sig.var->value);
   char buf[64];
   std::snprintf(buf, sizeof(buf), "%.16g", d);
   Out() << "r" << buf << " " << sig.ident << "\n";
 }
 
-// Record what this signal has just put in the file, which is what the
-// end-of-increment scan in HasValueChanged compares the object against.
-// §21.7.5: a structure member records its own slice, because its siblings share
-// the one backing variable and each of them detects its own next change; every
-// other object records the words of the variable behind it, copied so a later
-// part-select assignment into those words cannot move the record with them.
 static void RecordEmittedValue(VcdSignal& sig) {
   if (sig.is_field) {
     sig.prev_digits = VcdSignalDigits(sig);
@@ -557,12 +413,6 @@ static void RecordEmittedValue(VcdSignal& sig) {
 }
 
 void VcdWriter::WriteSignalChange(VcdSignal& sig) {
-  // §21.7.2.2: an event is dumped in the scalar format, but its value
-  // character carries no meaning -- only the identifier code matters, and the
-  // record is a marker that the event triggered during the current time step.
-  // So a marker is written only when the trigger stamp matches the time of the
-  // last recorded timestamp; an untriggered event contributes nothing to a
-  // checkpoint or to a per-timestep change scan.
   if (sig.var && sig.var->is_event) {
     if (sig.var->triggered_ticks == last_time_) {
       Out() << '1' << sig.ident << "\n";
@@ -572,30 +422,17 @@ void VcdWriter::WriteSignalChange(VcdSignal& sig) {
   if (sig.var && sig.var->value.is_real) {
     WriteRealChange(sig);
   } else if (port_nodes_) {
-    // §21.7.4.3: an extended VCD file produced by $dumpports records value
-    // changes in the port form (p<port_value> with strength components and the
-    // integer identifier code) rather than the 4-state form.
     WritePortValueChange(sig);
   } else if (sig.width == 1) {
     WriteScalarChange(sig);
   } else {
     WriteVectorChange(sig);
   }
-  // The file now holds this object's current value, so the record the next
-  // end-of-increment scan compares against is updated to match it.
   if (sig.var) RecordEmittedValue(sig);
 }
 
 void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
-  // §21.7.1.3 records every dumped variable as x at the suspend checkpoint,
-  // and §6.17 gives an event no state to record: it is a handle to a
-  // synchronization object rather than a value. WriteSignalChange says the
-  // same by writing nothing for an untriggered event, so the checkpoint keeps
-  // silent about one too rather than contradicting it.
   if (sig.data_type == VcdDataType::kEvent) return;
-  // §21.7.1.3: a real number has no unknown state and its VCD value form is
-  // the r-prefixed real (§21.7.2.1), so the suspend checkpoint records a real
-  // variable as r0 rather than an ill-formed bit-form x.
   if (sig.var && sig.var->value.is_real) {
     Out() << "r0 " << sig.ident << "\n";
   } else if (sig.width == 1) {
@@ -605,29 +442,15 @@ void VcdWriter::WriteSignalAllX(const VcdSignal& sig) {
   }
 }
 
-// §21.7.4.1 (Syntax 21-27): the simulation_keyword commands of an extended VCD
-// file are the $dumpports task family, so a writer emitting the port-form file
-// keys each checkpoint section with the extended keyword. Outside the port-node
-// form the 4-state keyword of Syntax 21-20 is kept -- including by the extended
-// file that reuses the 4-state machinery under the §21.7.4.1 construct-name
-// equivalence rule, since those matching names stay equivalent across formats.
 static const char* CheckpointKeyword(bool port_nodes, const char* four_state,
                                      const char* extended) {
   return port_nodes ? extended : four_state;
 }
 
 static bool HasValueChanged(const VcdSignal& sig) {
-  // §21.7.5: every member of an unpacked structure shares one backing
-  // variable, so a record of that variable's words cannot say which member
-  // moved -- the first member recorded would cover its siblings. A member
-  // therefore compares its own slice against the digits it last emitted,
-  // which makes each member's change detection independent.
   if (sig.is_field) {
     return !sig.has_prev_digits || VcdSignalDigits(sig) != sig.prev_digits;
   }
-  // Nothing has been written for this object yet, so there is no recorded
-  // value to compare against; report a change so the first scan writes the
-  // record (RecordEmittedValue) instead of reading through an unset array.
   if (!sig.has_prev_words) return true;
   const Logic4Vec& value = sig.var->value;
   if (sig.prev_words.size() < value.nwords) return true;
@@ -643,12 +466,7 @@ static bool HasValueChanged(const VcdSignal& sig) {
 void VcdWriter::DumpAllValues() {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
-  // §21.7.1.3: the $dumpvars checkpoint starts the value change dumping; from
-  // the end of this time unit onward, per-timestep changes are recorded.
   dump_started_ = true;
-  // §21.7.1.2: a $dumpvars with no arguments dumps every variable in the
-  // model, so the dump covers everything from here on however it was narrowed
-  // before.
   var_selection_ = VcdVarSelection::kEveryObjectByTask;
   Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
@@ -661,7 +479,7 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   FlushDeclarations();
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
-  dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
+  dump_started_ = true;
   NarrowSelectionToListed();
   Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
@@ -679,10 +497,6 @@ void VcdWriter::DumpSelectedValues(const std::vector<std::string_view>& names) {
   Out() << "$end\n";
 }
 
-// How many levels of hierarchy below the top module a registered signal sits:
-// the top module's own variables one, a child instance's two, and so on. The
-// registration names a signal by its path below the top module, so the count
-// is one more than the dots in that path.
 static uint64_t SignalDepth(std::string_view sig_name) {
   uint64_t depth = 1;
   for (char c : sig_name) {
@@ -691,15 +505,6 @@ static uint64_t SignalDepth(std::string_view sig_name) {
   return depth;
 }
 
-// §21.7.1.2: a scope argument is written from the top module down -- the
-// subclause's examples are "top", "top.mod1" and "top.mod2.net1" -- while a
-// registered signal is named by its path below the top module, whose own
-// variables are named by their bare names. So the top module's name comes off
-// the front of the argument before anything is matched against a signal:
-// "top" leaves the empty path, which every registered signal lies below, and
-// "top.mod1" leaves "mod1". An argument that does not begin with the top
-// module is left as it stands, which is what a source naming a scope
-// relatively writes.
 static std::string_view StripTopScope(std::string_view scope,
                                       std::string_view top_scope) {
   if (top_scope.empty()) return scope;
@@ -711,20 +516,8 @@ static std::string_view StripTopScope(std::string_view scope,
   return scope;
 }
 
-// §21.7.1.2: decide whether one scope name, with the top module already taken
-// off the front of it, selects one signal. A scope that exactly names the
-// signal is an individual variable and is always dumped -- the level count
-// does not apply to individual variables. Otherwise the scope names a module
-// instance: a signal lies beneath it when its hierarchical name begins with
-// "scope.". The level count bounds how far below the module to descend -- the
-// module's own variables sit one level down, a sub-instance's variables two,
-// and so on -- with 0 meaning every level below.
 static bool OneScopeSelectsSignal(std::string_view sig_name,
                                   std::string_view scope, uint64_t level) {
-  // The empty scope is the top module itself, which every registered signal
-  // lies below. §21.7.1.2 Example 2's `$dumpvars (0, top)` dumps top's own
-  // variables and those of every instance beneath it, and Example 1's
-  // `$dumpvars (1, top)` stops at top's own.
   if (scope.empty()) return level == 0 || SignalDepth(sig_name) <= level;
   if (sig_name == scope) return true;
   if (sig_name.size() <= scope.size() + 1 ||
@@ -748,7 +541,7 @@ void VcdWriter::DumpScopeSelectedValues(
     const std::vector<std::string_view>& names, uint64_t level) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
-  dump_started_ = true;  // §21.7.1.3: the checkpoint starts the dump
+  dump_started_ = true;
   NarrowSelectionToListed();
   Out() << CheckpointKeyword(port_nodes_, "$dumpvars", "$dumpports") << "\n";
   for (auto& sig : signals_) {
@@ -759,11 +552,6 @@ void VcdWriter::DumpScopeSelectedValues(
   Out() << "$end\n";
 }
 
-// §21.7.2.4: the illustrated file places each checkpoint section after the
-// simulation_time command of the time unit its task executed in (#500 then the
-// $dumpvars section, #535 then $dumpall, #1000 then $dumpoff, #2000 then
-// $dumpon). Each timed form re-checks the untimed form's emission conditions
-// first so a checkpoint that will not be emitted stamps no orphan time marker.
 void VcdWriter::DumpAllValues(uint64_t time) {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
@@ -801,9 +589,6 @@ void VcdWriter::DumpOn(uint64_t time) {
 void VcdWriter::DumpAll() {
   if (!ofs_.is_open() || !enabled_) return;
   if (AtSizeLimit()) return;
-  // §21.7.1.4: the checkpoint writes the present value of every selected
-  // variable, whether or not it changed during the current time step, and no
-  // value at all for an object no $dumpvars listed.
   Out() << CheckpointKeyword(port_nodes_, "$dumpall", "$dumpportsall") << "\n";
   for (auto& sig : signals_) {
     if (!DumpsObject(sig)) continue;
@@ -814,11 +599,8 @@ void VcdWriter::DumpAll() {
 
 void VcdWriter::DumpOff() {
   if (!ofs_.is_open()) return;
-  // The checkpoint records every selected variable as x, then dumping stops so
-  // that no value changes are recorded until $dumpon is executed.
   Out() << CheckpointKeyword(port_nodes_, "$dumpoff", "$dumpportsoff") << "\n";
   for (auto& sig : signals_) {
-    // §21.7.1.3: each selected variable is written with the value x.
     if (!DumpsObject(sig)) continue;
     WriteSignalAllX(sig);
   }
@@ -828,12 +610,9 @@ void VcdWriter::DumpOff() {
 
 void VcdWriter::DumpOn() {
   if (!ofs_.is_open()) return;
-  // Recording resumes and a checkpoint of each variable's value at this time is
-  // emitted so the dump reflects the current state.
   enabled_ = true;
   Out() << CheckpointKeyword(port_nodes_, "$dumpon", "$dumpportson") << "\n";
   for (auto& sig : signals_) {
-    // §21.7.1.3: the resumed dump covers the variables the dump covers.
     if (!DumpsObject(sig)) continue;
     WriteSignalChange(sig);
   }
@@ -843,27 +622,17 @@ void VcdWriter::DumpOn() {
 void VcdWriter::Flush() {
   FlushDeclarations();
   if (!ofs_.is_open()) return;
-  // Empty the stream's buffer into the file so its current contents are
-  // observable to an external reader. No dump command is written and the
-  // enabled state is left as it was, so dumping resumes seamlessly.
   ofs_.flush();
 }
 
 void VcdWriter::WriteVcdClose(uint64_t final_time) {
   FlushDeclarations();
   if (!ofs_.is_open() || !extended_) return;
-  // §21.7.3.6.1: the final keyword command of an extended VCD file marks the
-  // end simulation time at the moment the file is closed. The time is written
-  // as a value-change-style timestamp (#<time>), so the recorded end time
-  // stands on its own even when no signal changed at that time.
   Out() << "$vcdclose #" << final_time << " $end\n";
 }
 
 void VcdWriter::SchedulePortDumpStart(std::vector<std::string> scopes,
                                       uint64_t time) {
-  // §21.7.3.1: record the start so the end-of-timestep pass emits the opening
-  // checkpoint; a non-empty scope_list also becomes the standing selection
-  // filter for everything dumped from then on.
   port_start_pending_ = true;
   port_start_time_ = time;
   if (!port_start_scheduled_) {
@@ -872,10 +641,6 @@ void VcdWriter::SchedulePortDumpStart(std::vector<std::string> scopes,
     port_selection_active_ = !port_scopes_.empty();
     return;
   }
-  // §21.7.3.1: $dumpports may be invoked multiple times (all at one
-  // simulation time), each call adding its selection to the one dump this
-  // writer produces: named scopes union with those already listed, and a
-  // call with no scope_list widens the selection to every registered object.
   if (scopes.empty() || !port_selection_active_) {
     port_scopes_.clear();
     port_selection_active_ = false;
@@ -884,10 +649,6 @@ void VcdWriter::SchedulePortDumpStart(std::vector<std::string> scopes,
   for (auto& s : scopes) port_scopes_.push_back(std::move(s));
 }
 
-// §21.7.3.1: the scheduled $dumpports start fires once its execution time unit
-// has fully played out, so the opening checkpoint records the selected objects'
-// end-of-unit values. Level 1 bounds a named module scope to its own objects:
-// ports of instantiations below a listed scope are not dumped.
 void VcdWriter::EmitPendingPortStartCheckpoint() {
   port_start_pending_ = false;
   if (port_scopes_.empty()) {
@@ -904,25 +665,15 @@ void VcdWriter::DumpChangedValues(uint64_t) {
   FlushDeclarations();
   if (port_start_pending_) {
     EmitPendingPortStartCheckpoint();
-    // The checkpoint already reported every selected object at this time, so
-    // no separate change records are needed for this pass.
     return;
   }
-  // §21.7.1.3: while suspended by $dumpoff, and before an armed dump has been
-  // started by $dumpvars, no value changes are dumped.
   if (!ofs_.is_open() || !enabled_ || !dump_started_) return;
   if (AtSizeLimit()) return;
   std::vector<std::string_view> selected(port_scopes_.begin(),
                                          port_scopes_.end());
   for (auto& sig : signals_) {
     if (!sig.var) continue;
-    // §21.7.1.2: $dumpvars is what chooses the variables written to the dump
-    // file, so an object no call listed has no value change recorded for it
-    // either.
     if (!DumpsObject(sig)) continue;
-    // §21.7.3.1: a $dumpports scope_list keeps objects outside the listed
-    // module scopes -- including those of instantiations below a listed
-    // scope -- out of the recording.
     if (port_selection_active_ &&
         !ScopeSelectsSignal(sig.name, selected, 1, top_scope_)) {
       continue;

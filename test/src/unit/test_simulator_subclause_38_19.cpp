@@ -30,8 +30,6 @@ class VpiHandleByIndexSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §38.19 with §37.10: a module has no access by index, its ports being reached
-// by iteration, so an index matching a port's place names nothing (#7404).
 TEST_F(VpiHandleByIndexSim, AModulesIndexNamesNoPort) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
@@ -45,18 +43,13 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexNullParentReturnsNullptr) {
   EXPECT_EQ(result, nullptr);
 }
 
-// §38.19: an index that names no sub-object does not lead to a legal index
-// select expression, so the routine returns a null handle.
 TEST_F(VpiHandleByIndexSim, HandleByIndexOutOfRangeReturnsNullptr) {
-  auto* bus = vpi_ctx_.CreateNetObj("bus", /*net_ptr=*/nullptr, /*width=*/8);
+  auto* bus = vpi_ctx_.CreateNetObj("bus", nullptr, 8);
   vpi_ctx_.CreatePort("bus0", kVpiInput, bus);
   vpiHandle result = vpi_handle_by_index(VpiHandleOf(bus), 99);
   EXPECT_EQ(result, nullptr);
 }
 
-// §38.19: unless otherwise specified, calling vpi_handle_by_index() for a
-// protected reference object is an error - no handle is produced and the error
-// status is recorded for vpi_chk_error() (§38.2).
 TEST_F(VpiHandleByIndexSim, HandleByIndexProtectedObjectIsAnError) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
   vpi_ctx_.CreatePort("a", kVpiInput, mod);
@@ -70,22 +63,15 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexProtectedObjectIsAnError) {
   EXPECT_EQ(info.level, vpiError);
 }
 
-// §38.19: the reference object must have the access-by-index property. A
-// parameter offers no index-selected relationship, so even when it has a child
-// at the requested index the routine builds no index select and returns null.
 TEST_F(VpiHandleByIndexSim,
        HandleByIndexReferenceWithoutAccessByIndexReturnsNullptr) {
   auto* param = vpi_ctx_.CreateParameter("p", 0);
-  vpi_ctx_.CreatePort("a", kVpiInput, param);  // gives param a child at index 0
+  vpi_ctx_.CreatePort("a", kVpiInput, param);
 
   vpiHandle result = vpi_handle_by_index(VpiHandleOf(param), 0);
   EXPECT_EQ(result, nullptr);
 }
 
-// §38.19: the LRM names a reg array as a reference object whose index selects
-// an array element (obj is the array). A reg array carries the access-by-index
-// property, so selecting an in-range element index returns the handle to that
-// element - a distinct reference-object input form from the module/port case.
 TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsRegArrayElement) {
   Variable* e0 = sim_ctx_.CreateVariable("m0", 8);
   Variable* e1 = sim_ctx_.CreateVariable("m1", 8);
@@ -98,16 +84,9 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsRegArrayElement) {
   EXPECT_EQ(VpiObjectOf(result), array->children[1]);
   EXPECT_EQ(vpi_get(vpiType, result), vpiReg);
 
-  // An element index past the last array element names no sub-object, so the
-  // selection is not a legal index select expression and the handle is null.
   EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(array), 3), nullptr);
 }
 
-// §38.19: the LRM's first example names a net as a reference object whose index
-// selects one of the net's bits (obj is the net). A net carries the
-// access-by-index property, so selecting an in-range bit index returns the
-// handle to that bit - the net/bit reference-object input form, distinct from
-// the module/port and reg-array/element forms already covered.
 TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsNetBit) {
   VpiObject net;
   net.type = kVpiNet;
@@ -126,13 +105,9 @@ TEST_F(VpiHandleByIndexSim, HandleByIndexSelectsNetBit) {
   ASSERT_NE(result, nullptr);
   EXPECT_EQ(VpiObjectOf(result), &bit2);
 
-  // A bit index beyond the net width names no sub-object, so no legal index
-  // select is formed and the handle is null.
   EXPECT_EQ(vpi_handle_by_index(VpiHandleOf(&net), 4), nullptr);
 }
 
-// §38.19 with §37.17: an element of a queue lives in the run's store of the
-// queue and is made when first selected, so with no run there is none.
 TEST_F(VpiHandleByIndexSim, AQueueElementNeedsARun) {
   QueueObject queue;
   VpiObject array;
@@ -143,9 +118,6 @@ TEST_F(VpiHandleByIndexSim, AQueueElementNeedsARun) {
 
 class HandleByIndexOfARun : public VpiDesignRun {};
 
-// §38.19 with §37.46: a port connected to an expression reading a scalar net
-// hangs among the net's children as one of its loads, but is no sub-object an
-// index into the net selects, so the index names nothing there (#7360).
 TEST_F(HandleByIndexOfARun, AScalarNetsLoadPortIsNoIndexedSubobject) {
   Run("module ram(input a, input b); endmodule\n"
       "module top; wire a, trinet; ram r0(a, !trinet); endmodule\n");
@@ -155,10 +127,6 @@ TEST_F(HandleByIndexOfARun, AScalarNetsLoadPortIsNoIndexedSubobject) {
   EXPECT_EQ(vpi_handle_by_index(trinet, 1), nullptr);
 }
 
-// §38.19 with §37.46: the terminal of a gate driving a scalar net, and the
-// force of the net, hang among the net's children as its drivers, each with
-// the index of its place, 0 for the gate's output and the force alike, but
-// neither is a sub-object an index into the net selects, so 0 names nothing.
 TEST_F(HandleByIndexOfARun, AScalarNetsDriversAreNoIndexedSubobjects) {
   Run("module top; wire a, b, w, f; and g(w, a, b);\n"
       "  initial force f = 1'b1; endmodule\n");
@@ -170,10 +138,6 @@ TEST_F(HandleByIndexOfARun, AScalarNetsDriversAreNoIndexedSubobjects) {
   }
 }
 
-// §38.19 with §37.19: a var select of an array var hangs among the array's
-// children, but which element it stands for varies as its index does, so it
-// is no sub-object an index selects: into an array of elements 1 and 2, 0
-// names nothing, and 1 the element.
 TEST_F(HandleByIndexOfARun, AnArraysVarSelectIsNoIndexedSubobject) {
   Run("module top; int a[1:2]; int i; initial a[i] = 1; endmodule\n");
   vpiHandle a = By("top.a");
@@ -183,9 +147,6 @@ TEST_F(HandleByIndexOfARun, AnArraysVarSelectIsNoIndexedSubobject) {
   EXPECT_EQ(vpi_get(vpiType, vpi_handle_by_index(a, 1)), vpiIntVar);
 }
 
-// §38.19 with §37.10: a module instance that is no element of an instance
-// array has no access by index, so no index into it is a legal index select
-// and each names nothing, though the instance holds ports and nets (#7404).
 TEST_F(HandleByIndexOfARun,
        AnInstanceThatIsNoArrayElementHasNoIndexedSubobject) {
   Run("module ram(input a, input b); endmodule\n"
@@ -199,10 +160,6 @@ TEST_F(HandleByIndexOfARun,
   EXPECT_EQ(vpi_handle_by_multi_index(r0, 1, second), nullptr);
 }
 
-// §38.19 with §37.17 details 12 and 20: a packed struct var indexes its var
-// bits, so an index into it selects the bit of that index, and an index
-// beyond its bits, or into an unpacked struct, whose members carry no index,
-// selects nothing.
 TEST_F(HandleByIndexOfARun, APackedStructVarIndexesItsBits) {
   Run("module top; struct packed { logic [1:0] a; logic b; } ps;\n"
       "  struct { logic a; } us; initial $noop; endmodule\n");

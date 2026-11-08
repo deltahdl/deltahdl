@@ -10,10 +10,6 @@ namespace delta {
 
 namespace {
 
-// Gather every local variable name introduced anywhere in `sequence`: the name
-// bound by a declaration ( t v; R ) and the name written by a sampling
-// ( 1, v = e ). Together these are the local variables that §F.5.1 forbids an
-// event condition from depending upon.
 void CollectLocalVariableNames(const SequenceExpr& sequence,
                                std::set<std::string>& names) {
   switch (sequence.kind) {
@@ -46,7 +42,6 @@ void CollectLocalVariableNames(const SequenceExpr& sequence,
   }
 }
 
-// Gather the atomic-proposition names a Boolean condition reads.
 void CollectBooleanAtoms(const BooleanExpr& boolean,
                          std::set<std::string>& atoms) {
   switch (boolean.kind) {
@@ -65,7 +60,6 @@ void CollectBooleanAtoms(const BooleanExpr& boolean,
   }
 }
 
-// True iff some atom of an event condition names a local variable.
 bool EventConditionReadsLocal(const BooleanExpr& event,
                               const std::set<std::string>& locals) {
   std::set<std::string> atoms;
@@ -78,7 +72,6 @@ bool EventConditionReadsLocal(const BooleanExpr& event,
   return false;
 }
 
-// True iff no clock event anywhere in `sequence` reads a name in `locals`.
 bool AllClockEventsIndependent(const SequenceExpr& sequence,
                                const std::set<std::string>& locals) {
   switch (sequence.kind) {
@@ -114,23 +107,17 @@ std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
     const std::shared_ptr<const BooleanExpr>& clock) {
   switch (sequence.kind) {
     case SequenceExpr::Kind::kBoolean: {
-      // §F.5.1.1: T^s(b, c) = (!c[*0:$] ##1 c & b). The clock may tick any
-      // number of times before the cycle in which both the clock and b hold.
       auto wait = SeqZeroOrMoreRepeat(SeqBoolean(BoolNot(clock)));
       auto fire = SeqBoolean(BoolAnd(clock, sequence.boolean));
       return SeqConcat(wait, fire);
     }
     case SequenceExpr::Kind::kLocalVarSampling: {
-      // §F.5.1.1: T^s((1, v = e), c) = (T^s(1, c) ##0 (1, v = e)). The
-      // assignment is fused onto the clocked tick that 1 rewrites to.
       auto clocked_one =
           RewriteSequenceUnderClock(*SeqBoolean(BoolTrue()), clock);
       return SeqFusion(clocked_one,
                        SeqLocalVarSampling(sequence.local_var_name));
     }
     case SequenceExpr::Kind::kClock:
-      // §F.5.1.1: T^s((@(c2) r), c1) = T^s(r, c2). The inner clock c2
-      // supersedes the incoming clock c1.
       return RewriteSequenceUnderClock(*sequence.rhs, sequence.boolean);
     case SequenceExpr::Kind::kConcat:
       return SeqConcat(RewriteSequenceUnderClock(*sequence.lhs, clock),
@@ -155,8 +142,6 @@ std::shared_ptr<const SequenceExpr> RewriteSequenceUnderClock(
       return SeqZeroOrMoreRepeat(
           RewriteSequenceUnderClock(*sequence.lhs, clock));
     case SequenceExpr::Kind::kParen:
-      // Parentheses only group; the clock passes through to the inner
-      // sequence unchanged.
       return SeqParen(RewriteSequenceUnderClock(*sequence.lhs, clock));
     case SequenceExpr::Kind::kLocalVarDecl:
       return SeqLocalVarDecl(sequence.local_var_type, sequence.local_var_name,
@@ -179,15 +164,11 @@ std::shared_ptr<const SequenceExpr> RewriteClockedSequence(
       return SeqLocalVarDecl(sequence.local_var_type, sequence.local_var_name,
                              RewriteClockedSequence(*sequence.lhs));
     default:
-      // Already unclocked: nothing to rewrite.
       return std::make_shared<SequenceExpr>(sequence);
   }
 }
 
 bool ClockEventsAreLocalVariableIndependent(const SequenceExpr& sequence) {
-  // §F.5.1: the conditions in event controls must not depend on any local
-  // variable. Collect the sequence's local variables, then confirm that no
-  // @( c ) event condition reads one of them.
   std::set<std::string> locals;
   CollectLocalVariableNames(sequence, locals);
   return AllClockEventsIndependent(sequence, locals);

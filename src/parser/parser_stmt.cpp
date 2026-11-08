@@ -16,10 +16,6 @@
 
 namespace delta {
 
-// CPD-dedup helpers for the statements this file parses. The begin/fork block
-// name is not among them: it is Parser::MatchEndBlockLabel in
-// src/parser/parser_stmt_block.cpp, beside the two statements that ask for it
-// and shared with the generate block in src/parser/parser_generate.cpp.
 struct ParserStmtHelpers {
   static void ApplyStmtLabel(Parser& p, Stmt* stmt,
                              std::string_view prefix_label) {
@@ -45,9 +41,6 @@ struct ParserStmtHelpers {
     }
   }
 
-  // Syntax 12-2 and Syntax 12-3 give `unique_priority` a place in front of
-  // `if` and a case keyword and nowhere else, so a qualifier `qual_loc` holds
-  // before any other statement is reported there.
   static void ApplyStmtQualifierAndAttrs(Parser& p, Stmt* stmt,
                                          CaseQualifier qual, SourceLoc qual_loc,
                                          std::vector<Attribute>& attrs) {
@@ -64,39 +57,22 @@ struct ParserStmtHelpers {
     }
   }
 
-  // A.8.3: whether `e` is an inc_or_dec_expression, `x++` or `--x`.
   static bool IsIncOrDec(const Expr* e) {
     return (e->kind == ExprKind::kUnary ||
             e->kind == ExprKind::kPostfixUnary) &&
            (e->op == TokenKind::kPlusPlus || e->op == TokenKind::kMinusMinus);
   }
 
-  // A.8.2: whether `e` is written as a subroutine_call: with its argument
-  // list, or as a task or method enable by a name, a scoped or hierarchical
-  // name or a member select, any of them with the `with` clause or inline
-  // constraint it carries, as the call of a task, a void function or a method
-  // may be written (footnote 42 of A.10).
   static bool IsCallForm(const Expr* e) {
     return e->kind == ExprKind::kCall || e->kind == ExprKind::kSystemCall ||
            e->kind == ExprKind::kIdentifier ||
            e->kind == ExprKind::kMemberAccess;
   }
 
-  // A.6.4 with A.6.9: whether `e`, the expression of an expression statement,
-  // is a form a statement_item takes: a subroutine call or an
-  // inc_or_dec_expression.
   static bool IsStatementExpr(const Expr* e) {
     return IsCallForm(e) || IsIncOrDec(e);
   }
 
-  // One item of A.6.8's for_initialization, which is a list_of_variable_
-  // assignments, each `variable_lvalue = expression`, or for_variable_
-  // declarations, each `[ var ] data_type variable_identifier = expression
-  // { , variable_identifier = expression }`: every item assigns with '='.
-  // Parser::ParseAssignmentOrExprNoSemi reads that as a
-  // StmtKind::kBlockingAssign, and reads the bare `i` or the `i <= 0` neither
-  // form admits as an expression statement or a nonblocking assignment, which
-  // is reported at the item and kept as read.
   static Stmt* ParseForInitItem(Parser& p, const char* form) {
     SourceLoc loc = p.CurrentLoc();
     Stmt* init = p.ParseAssignmentOrExprNoSemi();
@@ -106,12 +82,6 @@ struct ParserStmtHelpers {
     return init;
   }
 
-  // Syntax 12-5's for_variable_declaration opens with `var` or a data_type: a
-  // type keyword, a type reference, a name this scope knows as a type, or a
-  // type name behind a package scope (A.2.2.1), which a package name never is
-  // a known type for.
-  // The last is told from an assignment to a package's variable, `pkg::v = 0`,
-  // by what follows the scoped name, as a block item is.
   static bool AtForLocalDecl(Parser& p) {
     if (p.Check(TokenKind::kKwVar) || p.Check(TokenKind::kKwType) ||
         IsDataTypeKeyword(p.CurrentToken().kind))
@@ -121,19 +91,9 @@ struct ParserStmtHelpers {
     return p.AtScopedTypeName() && !p.IsScopedCallOrAssignStmt();
   }
 
-  // A.6.8's for_variable_declaration names its data type once, before a
-  // comma-separated list of `variable_identifier = expression`, and a later
-  // for_variable_declaration of the same initialization names its own. An item
-  // after the first that brings neither `var` nor a data type is therefore a
-  // further variable of the declaration before it, and takes that data type:
-  // Parser::ParseDeclaredDataType consumes nothing at such an item's identifier
-  // and answers DataTypeKind::kImplicit, which every reader of
-  // Stmt::for_init_types takes for an assignment rather than a declaration.
   static void ParseForLocalDeclInits(Parser& p, Stmt* stmt) {
     do {
       bool has_var = p.Match(TokenKind::kKwVar);
-      // A.2.2.1 counts a type_reference among the data types, which the loop
-      // variable, a variable, writes after `var` (§6.23).
       DataType type;
       if (!ParserDataDeclHelpers::ReadKeyedTypeReference(p, type, has_var,
                                                          false)) {
@@ -157,9 +117,6 @@ struct ParserStmtHelpers {
     do {
       if (p.Check(TokenKind::kKwVar) ||
           IsDataTypeKeyword(p.CurrentToken().kind)) {
-        // The first control variable was a plain assignment, so a later item
-        // attempting a local declaration mixes declared and non-declared
-        // control variables, which is not allowed.
         p.diag_.Error(
             p.CurrentLoc(),
             "this for-loop initialization mixes a locally declared control "
@@ -179,13 +136,6 @@ struct ParserStmtHelpers {
     p.Expect(TokenKind::kSemicolon, Subclause("12.7.1"));
   }
 
-  // Whether a statement read from a for loop's third header position has one
-  // of the three forms A.6.8 gives for_step_assignment: an
-  // operator_assignment, which Parser::ParseAssignmentOrExprNoSemi records as
-  // a StmtKind::kBlockingAssign for every assignment_operator; an
-  // inc_or_dec_expression; or a function_subroutine_call, which A.8.2 writes
-  // as a statement's call is, a name or a member select alone among them. A
-  // nonblocking assignment and any other expression are neither.
   static bool IsForStepAssignment(const Stmt* step) {
     if (step->kind == StmtKind::kBlockingAssign) return true;
     return step->kind == StmtKind::kExprStmt && step->expr != nullptr &&
@@ -204,11 +154,6 @@ struct ParserStmtHelpers {
     return step;
   }
 
-  // A.6.2 (printed page 1198) writes an assignment's right-hand side as an
-  // expression, and A.8.3 (printed page 1210) gives the min:typ:max triple to
-  // mintypmax_expression alone, which an expression reaches only as A.8.4's
-  // parenthesized primary. The triple is read whole, so the statement's `;` is
-  // where the parse goes on.
   static Expr* ParseAssignedExpr(Parser& p) {
     Expr* rhs = p.ParseMinTypMaxExpr();
     if (rhs->kind == ExprKind::kMinTypMax && !rhs->is_parenthesized) {
@@ -220,9 +165,6 @@ struct ParserStmtHelpers {
     return rhs;
   }
 
-  // A.6.2 (printed page 1198) writes the target of every procedural
-  // assignment as a variable_lvalue, and a force's or a release's as that or a
-  // net_lvalue.
   static void CheckLvalueForm(Parser& p, const Expr* target) {
     if (HasLvalueForm(target)) return;
     p.diag_.Error(target->range.start,
@@ -230,7 +172,6 @@ struct ParserStmtHelpers {
                   Subclause("A.8.5"));
   }
 
-  // Whether the parse stands at `new [`, the dynamic_array_new of A.2.4.
   static bool AtDynamicArrayNew(Parser& p) {
     if (!p.Check(TokenKind::kKwNew)) return false;
     auto saved = p.lexer_.SavePos();
@@ -240,12 +181,6 @@ struct ParserStmtHelpers {
     return sized;
   }
 
-  // A.6.2 (printed page 1198) admits a `new` as the whole right-hand side of a
-  // blocking assignment in two forms: a dynamic_array_new assigned to a
-  // nonrange_variable_lvalue, a name whose selects hold no part-select, and a
-  // class_new assigned to a name under any select. Neither is a concatenation,
-  // a streaming concatenation or an assignment pattern. A target of no
-  // variable_lvalue form at all is left to CheckLvalueForm's report.
   static void CheckNewTarget(Parser& p, const Stmt* stmt, bool dynamic_new) {
     if (!IsNewExpr(stmt->rhs)) return;
     if (!IsNamedLvalue(stmt->lhs)) {
@@ -268,12 +203,6 @@ struct ParserStmtHelpers {
     }
   }
 
-  // A.6.5's event_control after its `@`: `*`, `( * )`, a parenthesized
-  // event_expression, or the name Parser::ParseNamedClockingEvent reads, kept
-  // on `stmt` as an event control statement keeps it. A delay_or_event_control
-  // holds one after an assignment operator and after `->>`, directly or after
-  // a repeat count, and every form is read in each place. `subclause` is the
-  // rule the closing parenthesis is expected under.
   static void ParseEventControlAfterAt(Parser& p, Stmt* stmt,
                                        Subclause subclause) {
     if (p.Match(TokenKind::kStar)) {
@@ -290,9 +219,6 @@ struct ParserStmtHelpers {
     }
   }
 
-  // A.6.5 writes an event trigger's operand, after `->` or `->>`, as a
-  // hierarchical_event_identifier and a nonrange_select, the bit-selects and
-  // member selects A.8.4 writes after it. Reads the operand into `s`.
   static void ParseEventTriggerOperand(Parser& p, Stmt* s) {
     s->expr = p.ParseExpr();
     if (IsHierarchicalName(s->expr, true)) return;
@@ -302,11 +228,6 @@ struct ParserStmtHelpers {
                   Subclause("A.6.5"));
   }
 
-  // The first of a case item's expressions: under `inside` a range_list's
-  // value_range, and under `matches` a case_pattern_item's pattern with its
-  // optional `&&&` filter (A.6.7). Those two are read through ParseExprBp,
-  // which leaves the `&&&` unreported where Parser::ParseExpr would report
-  // it, with a pattern open around the pattern.
   static Expr* ParseCaseItemHead(Parser& p, bool inside, bool matches) {
     if (inside) return p.ParseInsideValueRange();
     if (!matches) return p.ParseExpr();
@@ -317,16 +238,10 @@ struct ParserStmtHelpers {
     return head;
   }
 
-  // Whether `e` is the operator `op` written bare. One in parentheses was
-  // reported where it stands, by Parser::ParseExpr.
   static bool IsBarePredicate(const Expr* e, TokenKind op) {
     return e->kind == ExprKind::kBinary && e->op == op && !e->is_parenthesized;
   }
 
-  // A.6.7 writes a case_pattern_item as a pattern and at most one `&&&`
-  // filter, which is an expression, and neither `&&&` nor `matches` is a
-  // binary operator (A.8.6). So no `matches` follows the pattern, and the
-  // filter holds neither a second `&&&` nor a `matches`.
   static void CheckCasePatternHead(Parser& p, const Expr* head) {
     const Expr* pattern = head;
     while (IsBarePredicate(pattern, TokenKind::kAmpAmpAmp))
@@ -347,7 +262,6 @@ struct ParserStmtHelpers {
     }
   }
 
-  // A.6.5's `repeat ( expression ) event_control`, its `repeat` already read.
   static void ParseRepeatEventControl(Parser& p, Stmt* stmt,
                                       Subclause subclause) {
     p.Expect(TokenKind::kLParen, subclause);
@@ -377,9 +291,6 @@ Stmt* Parser::ParseStmt() {
   auto attrs = ParseAttributes();
 
   if (Match(TokenKind::kSemicolon)) {
-    // A.6.4 writes statement_or_null's null form as attribute instances and
-    // a semicolon, and the label belongs to a statement, whose statement_item
-    // is never a bare semicolon.
     if (!prefix_label.empty()) {
       diag_.Error(label_loc,
                   "a null statement takes attribute instances and no label",
@@ -408,10 +319,6 @@ Stmt* Parser::ParseStmt() {
 }
 
 Stmt* Parser::ParseStmtBody(std::string_view prefix_label) {
-  // §14.7: a clocking block is a declaration inside a module, interface,
-  // checker or program, never a statement, so one standing where a statement
-  // belongs is rejected before the switch rather than read as an expression.
-  // The three positions the sentence names are the ones that reach here.
   if (AtClockingDecl()) {
     RejectClockingDecl(
         "a clocking block cannot stand as a statement of a function, a task or "
@@ -507,8 +414,6 @@ Stmt* Parser::ParseNbEventTriggerStmt() {
   s->range.start = CurrentLoc();
   Consume();
 
-  // delay_or_event_control = delay_control | event_control
-  //                       | repeat ( expression ) event_control
   if (Check(TokenKind::kHash)) {
     Consume();
     if (Check(TokenKind::kLParen)) {
@@ -534,8 +439,6 @@ Stmt* Parser::ParseIfStmt() {
   stmt->range.start = CurrentLoc();
   Expect(TokenKind::kKwIf, Subclause("12.4"));
   Expect(TokenKind::kLParen, Subclause("12.4"));
-  // A.6.6: the condition is a cond_predicate, which Parser::ParseExpr reports
-  // wherever else its `matches` or `&&&` stands.
   stmt->condition = ParseExprBp(0);
   SkipUnparenthesizedAssignInExpr();
   Expect(TokenKind::kRParen, Subclause("12.4"));
@@ -590,9 +493,6 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
       seen_default = true;
     }
   }
-  // Syntax 12-3 writes each case form with `case_item { case_item }`, the
-  // pattern and inside items alike, so at least one item, default among them,
-  // stands before endcase.
   if (stmt->case_items.empty()) {
     diag_.Error(CurrentLoc(),
                 "case statement shall have at least one case item",
@@ -602,10 +502,6 @@ Stmt* Parser::ParseCaseStmt(TokenKind case_kind) {
   return stmt;
 }
 
-// Syntax 12-3: a case_item lists case_item_expressions, a case_inside_item a
-// range_list, and a case_pattern_item (`matches`) one pattern, so a comma after
-// that pattern is reported; the list is still read so the item's colon is
-// found.
 CaseItem Parser::ParseCaseItem(bool inside, bool matches) {
   CaseItem item;
   if (Match(TokenKind::kKwDefault)) {
@@ -638,10 +534,6 @@ Stmt* Parser::ParseForStmt() {
   if (Check(TokenKind::kSemicolon)) {
     Consume();
   } else if (ParserStmtHelpers::AtForLocalDecl(*this)) {
-    // for_variable_declaration ::= [ var ] data_type variable_identifier = ...
-    // (Syntax 12-5). data_type may be a user-defined (named) type, so a leading
-    // identifier that names a known type begins a local declaration rather than
-    // a plain assignment.
     ParserStmtHelpers::ParseForLocalDeclInits(*this, stmt);
   } else {
     ParserStmtHelpers::ParseForPlainInits(*this, stmt);
@@ -715,8 +607,6 @@ Stmt* Parser::ParseDisableStmt() {
 
   stmt->kind = StmtKind::kDisable;
   stmt->expr = ParseExpr();
-  // A.6.5: the target is a hierarchical_task_identifier or a
-  // hierarchical_block_identifier, each an A.9.3 hierarchical_identifier.
   if (!IsHierarchicalName(stmt->expr, false)) {
     diag_.Error(stmt->expr->range.start,
                 "a disable statement names a task or a block, which is a "
@@ -789,11 +679,7 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   } else {
     stmt->kind = StmtKind::kExprStmt;
     stmt->expr = ParseInfixBp(lhs_expr, 0);
-    // A.8.1 writes a with range after the operand of a stream expression alone.
     if (WithOpensRange(lexer_)) ParseWithClauseRange(false);
-    // A.6.9: a subroutine call statement is a call, and a `new` is no call:
-    // §8.7 calls a constructor from the right-hand side of an assignment or
-    // as `super.new`.
     if (IsNewExpr(stmt->expr)) {
       diag_.Error(stmt->expr->range.start,
                   "'new' is no subroutine call; a constructor is called from "
@@ -807,13 +693,6 @@ Stmt* Parser::ParseAssignmentOrExprNoSemi() {
   return stmt;
 }
 
-// A.6.9's second subroutine_call_statement, `void ' ( function_subroutine_call
-// ) ;`, which §13.4.1 has discard a nonvoid function's return value without
-// the warning a bare call draws. The cast wraps a function_subroutine_call
-// and nothing else, so what stands inside the parentheses is read as an
-// expression and reported under A.6.9 where it is no call; the statement is
-// recorded as the expression statement over a `void` cast that the
-// elaborator reads.
 Stmt* Parser::ParseVoidCastCallStmt() {
   auto* stmt = arena_.Create<Stmt>();
   stmt->kind = StmtKind::kExprStmt;
@@ -822,8 +701,6 @@ Stmt* Parser::ParseVoidCastCallStmt() {
   Expect(TokenKind::kApostrophe, Subclause("A.6.9"));
   Expect(TokenKind::kLParen, Subclause("A.6.9"));
   Expr* call = ParseExpr();
-  // Whether a name or a member select alone names a function is the
-  // elaborator's question.
   if (!ParserStmtHelpers::IsCallForm(call)) {
     diag_.Error(call->range.start,
                 "a void cast discards a function call's return value; "
@@ -851,8 +728,6 @@ Stmt* Parser::ParseAssignmentOrExprStmt() {
     stmt = ParseVoidCastCallStmt();
   } else {
     stmt = ParseAssignmentOrExprNoSemi();
-    // A.6.4: no statement_item is an expression followed by `;` but a call
-    // or an increment or decrement, so `x + 1;` and `a == b;` are none.
     if (stmt->kind == StmtKind::kExprStmt &&
         !ParserStmtHelpers::IsStatementExpr(stmt->expr)) {
       diag_.Error(stmt->expr->range.start,

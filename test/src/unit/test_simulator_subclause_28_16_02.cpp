@@ -23,7 +23,7 @@ TEST(TriregResolution, TriregRetainsPrevValue) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv.words[0].aval = uint64_t{0};
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.Resolve(arena);
@@ -39,7 +39,7 @@ TEST(TriregResolution, InCapacitiveStateWhenAllDriversZ) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv.words[0].aval = uint64_t{0};
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   EXPECT_TRUE(net.InCapacitiveState());
@@ -66,7 +66,7 @@ TEST(TriregResolution, NotInCapacitiveStateForNonTrireg) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv.words[0].aval = uint64_t{0};
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   EXPECT_FALSE(net.InCapacitiveState());
@@ -81,7 +81,7 @@ TEST(TriregResolution, MixedZAndDrivenResolvesToDriven) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv.words[0].aval = uint64_t{0};
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 99));
@@ -98,7 +98,7 @@ TEST(TriregResolution, NotInCapacitiveStateWhenAnyDriverNonZ) {
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv.words[0].aval = uint64_t{0};
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.drivers.push_back(MakeLogic4VecVal(arena, 8, 1));
@@ -109,26 +109,23 @@ TEST(TriregResolution, RetainsXStateWhenDriversTurnOff) {
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4Vec(arena, 8);
-  var->value.words[0].aval = 0xFF;  // held x = (aval=1, bval=1)
+  var->value.words[0].aval = 0xFF;
   var->value.words[0].bval = 0xFF;
   Net net;
   net.type = NetType::kTrireg;
   net.resolved = var;
 
   auto z_drv = MakeLogic4Vec(arena, 8);
-  z_drv.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv.words[0].aval = uint64_t{0};
   z_drv.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv);
   net.Resolve(arena);
 
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // retained x
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
 TEST(TriregResolution, RetainsPrevValueWhenAllOfMultipleDriversTurnOff) {
-  // §28.16.2: when the drivers of a trireg transition to off (z), the net keeps
-  // the last 1/0/x value it held and z never propagates onto it. Exercise the
-  // multi-driver case where every driver has turned off simultaneously.
   Arena arena;
   auto* var = arena.Create<Variable>();
   var->value = MakeLogic4VecVal(arena, 8, 73);
@@ -137,10 +134,10 @@ TEST(TriregResolution, RetainsPrevValueWhenAllOfMultipleDriversTurnOff) {
   net.resolved = var;
 
   auto z_drv_a = MakeLogic4Vec(arena, 8);
-  z_drv_a.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv_a.words[0].aval = uint64_t{0};
   z_drv_a.words[0].bval = ~uint64_t{0};
   auto z_drv_b = MakeLogic4Vec(arena, 8);
-  z_drv_b.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_drv_b.words[0].aval = uint64_t{0};
   z_drv_b.words[0].bval = ~uint64_t{0};
   net.drivers.push_back(z_drv_a);
   net.drivers.push_back(z_drv_b);
@@ -150,21 +147,17 @@ TEST(TriregResolution, RetainsPrevValueWhenAllOfMultipleDriversTurnOff) {
 }
 
 TEST(TriregResolution, HoldsInitialZStateWhenUndriven) {
-  // §28.16.2: a trireg can hold a z logic state when z is the initial logic
-  // state of the net. With no drivers present nothing charges the storage
-  // node, so the initial z persists.
   Arena arena;
   auto* var = arena.Create<Variable>();
   auto z_val = MakeLogic4Vec(arena, 8);
-  z_val.words[0].aval = uint64_t{0};  // z = (aval=0, bval=1)
+  z_val.words[0].aval = uint64_t{0};
   z_val.words[0].bval = ~uint64_t{0};
   var->value = z_val;
   Net net;
   net.type = NetType::kTrireg;
   net.resolved = var;
-  // No drivers added: the trireg is undriven from elaboration onward.
   net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);  // held z = (aval=0, bval=1)
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0u);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
@@ -177,27 +170,14 @@ TEST(TriregResolution, XDriverResolvesLikeWire) {
   net.resolved = var;
 
   auto x_drv = MakeLogic4Vec(arena, 8);
-  x_drv.words[0].aval = 0xFF;  // x = (aval=1, bval=1)
+  x_drv.words[0].aval = 0xFF;
   x_drv.words[0].bval = 0xFF;
   net.drivers.push_back(x_drv);
   net.Resolve(arena);
-  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);  // x driver passes through
+  EXPECT_EQ(var->value.words[0].aval & 0xFF, 0xFFu);
   EXPECT_EQ(var->value.words[0].bval & 0xFF, 0xFFu);
 }
 
-// ---------------------------------------------------------------------------
-// End-to-end observations of §28.16.2's own rules, with every input built from
-// real source and driven through parse -> elaborate -> lower -> run. The net's
-// resolved value/state is read back from the SimContext, so the rule is
-// observed exactly as production resolves the trireg during a run rather than
-// through a hand-built Net or a hand-set is_forced flag.
-// ---------------------------------------------------------------------------
-
-// §28.16.2: a trireg can hold a z logic state when the net is forced to z with
-// a force statement (see §10.6.2). Drive the trireg to 1, then force it to z
-// from real force syntax; the forced z persists on the net even though a driver
-// is present. This is the only path (besides an initial z) by which z reaches a
-// trireg, since a released driver would otherwise leave the last 1/0/x held.
 TEST(TriregChargeDecayRuntime, ForceHoldsZLogicState) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -206,9 +186,9 @@ TEST(TriregChargeDecayRuntime, ForceHoldsZLogicState) {
       "  trireg cap;\n"
       "  assign cap = en ? 1'b1 : 1'bz;\n"
       "  initial begin\n"
-      "    en = 1'b1;\n"  // drive cap to 1
+      "    en = 1'b1;\n"
       "    #1;\n"
-      "    force cap = 1'bz;\n"  // §10.6.2: force the trireg to z
+      "    force cap = 1'bz;\n"
       "    #1;\n"
       "  end\n"
       "endmodule\n",
@@ -221,15 +201,10 @@ TEST(TriregChargeDecayRuntime, ForceHoldsZLogicState) {
   ASSERT_NE(net, nullptr);
   ASSERT_NE(net->resolved, nullptr);
   EXPECT_TRUE(net->resolved->is_forced);
-  EXPECT_EQ(net->resolved->value.words[0].aval & 1u,
-            0u);  // z = (aval=0,bval=1)
+  EXPECT_EQ(net->resolved->value.words[0].aval & 1u, 0u);
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 1u);
 }
 
-// §28.16.2: the z held above is purely an effect of the force. Releasing the
-// force (§10.6.2) returns the trireg to ordinary resolution: with a driver
-// still supplying 1, the net follows that driver and no longer holds z --
-// confirming z does not otherwise propagate onto a trireg.
 TEST(TriregChargeDecayRuntime, ReleasingForceDropsHeldZAndFollowsDriver) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -241,7 +216,7 @@ TEST(TriregChargeDecayRuntime, ReleasingForceDropsHeldZAndFollowsDriver) {
       "    en = 1'b1;\n"
       "    force cap = 1'bz;\n"
       "    #1;\n"
-      "    release cap;\n"  // §10.6.2: drop the forced z
+      "    release cap;\n"
       "    #1;\n"
       "  end\n"
       "endmodule\n",
@@ -254,20 +229,11 @@ TEST(TriregChargeDecayRuntime, ReleasingForceDropsHeldZAndFollowsDriver) {
   ASSERT_NE(net, nullptr);
   ASSERT_NE(net->resolved, nullptr);
   EXPECT_FALSE(net->resolved->is_forced);
-  EXPECT_FALSE(net->InCapacitiveState());  // driver 1 is active again
-  EXPECT_EQ(net->resolved->value.words[0].aval & 1u, 1u);  // follows driver = 1
+  EXPECT_FALSE(net->InCapacitiveState());
+  EXPECT_EQ(net->resolved->value.words[0].aval & 1u, 1u);
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 0u);
 }
 
-// §28.16.2.1: the charge decay process ends when the charge decay time has
-// passed and the trireg net goes from 1 or 0 to x. A charge decay time of zero
-// is that transition happening at once, so a trireg written `#(0, 0, 0)` loses
-// its charge the moment its drivers turn off.
-//
-// It held the charge for the whole run instead, RtlirNet::decay_ticks recording
-// a net that does not decay as zero and the scheduler reading the count alone.
-// A trireg with a positive decay time cannot fail this: the decay is scheduled
-// either way and only the moment differs.
 TEST(TriregChargeDecayRuntime, ZeroDecayTimeDecaysWhenDriversTurnOff) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -289,22 +255,9 @@ TEST(TriregChargeDecayRuntime, ZeroDecayTimeDecaysWhenDriversTurnOff) {
   auto* net = f.ctx.FindNet("cap");
   ASSERT_NE(net, nullptr);
   ASSERT_NE(net->resolved, nullptr);
-  // x is (aval 1, bval 1).
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 1u);
 }
 
-// The other half: §28.16.2.2 gives a declaration with no third delay the
-// meaning of never decaying, so the same source keeps its charge. Without this
-// the case above is satisfied by a trireg that decays whatever it was declared
-// with, which is the opposite defect.
-//
-// The declaration writes `#(0, 0)` rather than a single delay, so that it
-// differs from the case above in the third delay alone. The two zeros also
-// have to be zero: §28.16.2 gives the first two delays of a trireg to the
-// transitions to 1 and to 0, which the net's own transitions wait (Net::delay),
-// and a delay longer than this run leaves the trireg at its initial x
-// with no charge to hold. That reads as a decay while the net was never
-// charged at all, and it is what `trireg #50` asserted here.
 TEST(TriregChargeDecayRuntime, AbsentThirdDelayHoldsTheChargeAfterTurnOff) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -330,11 +283,6 @@ TEST(TriregChargeDecayRuntime, AbsentThirdDelayHoldsTheChargeAfterTurnOff) {
   EXPECT_EQ(net->resolved->value.words[0].bval & 1u, 0u);
 }
 
-// A trireg's drivers turning off is what puts it in the charge storage state,
-// and a signal reaching it through a bidirectional pass switch (§28.8) drives
-// it as one of its own drivers would: a strong 1 through a tran lands in the
-// trireg as a strong 1. Deciding the state from the trireg's own drivers
-// alone, it was held storing its initial charge and the 1 never arrived.
 TEST(TriregChargeStorage, SignalThroughASwitchDrivesTheTrireg) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -354,9 +302,6 @@ TEST(TriregChargeStorage, SignalThroughASwitchDrivesTheTrireg) {
   EXPECT_EQ(t->resolved_strength.s1_hi, Strength::kStrong);
 }
 
-// A trireg joined by a switch to a net nothing drives has nothing reaching it
-// and stays in the charge storage state, holding its initial x at its charge
-// strength, rather than being left at the high impedance of an undriven wire.
 TEST(TriregChargeStorage, TriregNothingReachesThroughASwitchHoldsItsCharge) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -376,10 +321,6 @@ TEST(TriregChargeStorage, TriregNothingReachesThroughASwitchHoldsItsCharge) {
   EXPECT_EQ(t->resolved_strength.s1_hi, Strength::kMedium);
 }
 
-// §28.12 resolves each bit of a net on its own, so a bit whose drivers turn off
-// keeps its charge while another bit of the trireg is still driven: bit 0
-// keeps the 1 it was driven to. Deciding the charge storage state for the
-// whole net, bit 0 read z while bit 1 was driven.
 TEST(TriregChargeStorage, ABitWhoseDriversTurnOffAloneKeepsItsCharge) {
   SimFixture f;
   auto out = RunCapture(
@@ -397,8 +338,6 @@ TEST(TriregChargeStorage, ABitWhoseDriversTurnOffAloneKeepsItsCharge) {
   EXPECT_EQ(out, "11\n");
 }
 
-// The bit that keeps its charge alone also decays alone: with a decay time of
-// 5, bit 0 moves to x at 15 while the driven bit 1 keeps its 1.
 TEST(TriregChargeStorage, ABitHoldingChargeAloneDecaysAlone) {
   SimFixture f;
   auto out = RunCapture(

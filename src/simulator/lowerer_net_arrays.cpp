@@ -15,8 +15,6 @@ namespace delta {
 
 namespace {
 
-// One net array whose element nets are being made: its declaration, and the
-// time scale, run and arena to make them in.
 struct NetArraySite {
   const RtlirNet& net;
   const TimeScale& scale;
@@ -24,9 +22,6 @@ struct NetArraySite {
   Arena& arena;
 };
 
-// The element nets beneath dimension `depth` of the array, or of the subarray
-// of it, named `prefix`: one net per address of the last dimension, and a
-// subarray per address of every other, named after it, `n[1][5]`.
 void CreateNetArrayLeaves(const std::string& prefix, std::size_t depth,
                           const NetArraySite& site) {
   const RtlirUnpackedDim& dim = site.net.unpacked_dims[depth];
@@ -59,8 +54,6 @@ void CreateNetArrayElements(std::string_view name, const RtlirNet& net,
   info.size = outer.Size();
   info.elem_width = net.width;
   info.is_descending = outer.left > outer.right;
-  // §7.4.5: every dimension of a multidimensional array, outermost first, as
-  // a multidimensional array var records them (TryCreateMultiDimArray).
   if (net.unpacked_dims.size() > 1) {
     for (const RtlirUnpackedDim& dim : net.unpacked_dims) {
       info.dim_los.push_back(static_cast<uint32_t>(dim.Low()));

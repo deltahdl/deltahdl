@@ -20,13 +20,6 @@
 
 namespace delta {
 
-// §21.5.3: an associative array's keys are sparse, so a plain sequential read
-// could not place its words. Each entry is written with an @-address ahead of
-// its value. The keys are integral (§21.4.1) and emitted in ascending order as
-// hexadecimal, matching the @-address form $readmem parses. The address is the
-// whole index (§7.8.4) at the index type's width and signedness, as an index
-// variable of that type holds it, and a wildcard index, whose key keeps its
-// self-determined value and is never negative (§7.8.1), at its own width.
 static void WriteAssocMem(std::ofstream& ofs, bool is_hex,
                           const AssocArrayObject* aa, Arena& arena) {
   for (const auto& entry : aa->int_data) {
@@ -38,20 +31,12 @@ static void WriteAssocMem(std::ofstream& ofs, bool is_hex,
   }
 }
 
-// §21.5: the $writememb / $writememh call under evaluation. The system-task
-// expression carries the file/memory operands plus the optional start_addr /
-// finish_addr arguments, and ctx / arena are the evaluation environment those
-// argument expressions are resolved against. These three always travel together
-// across the array-shape writers, so they ride as one entity.
 struct WritememEval {
   const Expr* expr;
   SimContext& ctx;
   Arena& arena;
 };
 
-// §21.5: resolves the optional start_addr (arg 2) / finish_addr (arg 3) that
-// bound which element indices a $writemem writes. An absent argument falls back
-// to the array's own low / high bound.
 static void ResolveWritememRange(const WritememEval& eval, int64_t arr_lo,
                                  int64_t arr_hi, int64_t& start_addr,
                                  int64_t& finish_addr) {
@@ -68,9 +53,6 @@ static void ResolveWritememRange(const WritememEval& eval, int64_t arr_lo,
                  : arr_hi;
 }
 
-// §21.5: writes the address range [start, finish] (descending when finish is
-// below start) by handing each in-bounds address to `emit`. An address outside
-// [arr_lo, arr_hi] is skipped; the loop always covers through `finish`.
 template <class EmitFn>
 static void WriteMemAddressRange(int64_t start_addr, int64_t finish_addr,
                                  int64_t arr_lo, int64_t arr_hi, EmitFn emit) {
@@ -81,16 +63,6 @@ static void WriteMemAddressRange(int64_t start_addr, int64_t finish_addr,
   }
 }
 
-// §21.5: $writememb / $writememh dump a memory array's words to a file in a
-// form the matching $readmemb / $readmemh can load back. Each word is written
-// on its own line in binary ($writememb) or hexadecimal ($writememh).
-// §21.5.3 fixes whether @-address specifiers accompany the words: an unpacked
-// or dynamic array is written as a bare sequence (a sequential read reloads
-// it), while an associative array prefixes every entry with its @-address.
-// §21.5.3: writes a dynamic array or queue as a bare sequence of words with no
-// @-address specifiers, exactly like a fixed unpacked array, so a sequential
-// $readmem reloads it. The optional start_addr / finish_addr bound the element
-// indices that are written.
 template <class EmitFn>
 static void WriteMemQueue(const WritememEval& eval, const QueueObject* q,
                           EmitFn emit) {
@@ -105,13 +77,6 @@ static void WriteMemQueue(const WritememEval& eval, const QueueObject* q,
       [&](int64_t addr) { emit(q->elements[static_cast<size_t>(addr)]); });
 }
 
-// §21.5: writes a fixed unpacked array as a bare sequence of words. The
-// optional start_addr / finish_addr bound the range that is written; a finish
-// below start emits the words in descending address order. Every registration
-// of a one-dimensional array creates a variable for each address in
-// [arr_lo, arr_hi] under the key built here, the address's 32 bits as
-// ArrayElementKey names it, so each lookup finds one, `[-1:0]`'s
-// 4294967296 included.
 template <class EmitFn>
 static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
                           const ArrayInfo* ai, EmitFn emit) {
@@ -129,12 +94,6 @@ static void WriteMemArray(const WritememEval& eval, const std::string& mem_name,
       });
 }
 
-// §21.4.3: emits every element beneath one already-subscripted prefix of a
-// multidimensional array, walking the remaining dimensions in row-major order —
-// each dimension's entries from low to high address, the lowest (rightmost-
-// declared) dimension varying most rapidly — so the dump mirrors the file
-// organization the matching $readmem load expects. Each index is named by its
-// 32 bits, as the leaves were made, so every leaf is found.
 template <class EmitFn>
 static void EmitMultiDimSubwords(SimContext& ctx, const std::string& prefix,
                                  const ArrayInfo* ai, size_t d, EmitFn& emit) {
@@ -149,11 +108,6 @@ static void EmitMultiDimSubwords(SimContext& ctx, const std::string& prefix,
   }
 }
 
-// §21.4.3: $writememb / $writememh work with multidimensional unpacked arrays,
-// writing the words in the same row-major organization §21.4.3 defines for the
-// load file. The optional start_addr / finish_addr bound the highest
-// dimension's words, matching the read side where addresses name only
-// highest-dimension words.
 template <class EmitFn>
 static void WriteMemMultiDim(const WritememEval& eval,
                              const std::string& mem_name, const ArrayInfo* ai,
@@ -173,9 +127,6 @@ static void WriteMemMultiDim(const WritememEval& eval,
       });
 }
 
-// §21.5 with §8.5: the words of an unpacked array property of a class
-// object, named bare inside one of its methods or through a handle or `this`,
-// in the address window the task's arguments give.
 template <class EmitFn>
 static void WriteMemClassArray(const WritememEval& eval,
                                const ClassArrayRef& ref, EmitFn emit) {
@@ -190,11 +141,6 @@ static void WriteMemClassArray(const WritememEval& eval,
       });
 }
 
-// §21.5: write the words of the queue or the fixed or dynamic unpacked array
-// `mem_name` names; EvalWritemem has already found it to be one. §21.4.3: a
-// multidimensional unpacked array's elements are named with one subscript per
-// dimension, so it takes the row-major walk rather than the single-subscript
-// address loop.
 template <class EmitFn>
 static void WriteMemContainer(const WritememEval& eval,
                               const std::string& mem_name, EmitFn emit) {
@@ -211,10 +157,6 @@ static void WriteMemContainer(const WritememEval& eval,
   }
 }
 
-// §21.5: the memory is named by an identifier, bare, hierarchical (§23.6) or
-// qualified by the package declaring it (§26.3); false for any other form of
-// `mem`. A package's data is held under "pkg.name", the path FlattenHierPath
-// gives `pkg::name`.
 static bool MemoryName(const Expr* mem, std::string& name) {
   if (mem->kind == ExprKind::kIdentifier) {
     name = std::string(mem->text);
@@ -227,16 +169,11 @@ static bool MemoryName(const Expr* mem, std::string& name) {
   return false;
 }
 
-// §21.5 with §7.4: whether `name` names an unpacked array the task can dump --
-// an associative array, a queue or dynamic array, or a fixed-size array.
 static bool NamesUnpackedArray(SimContext& ctx, const std::string& name) {
   return ctx.FindAssocArray(name) != nullptr ||
          ctx.FindQueue(name) != nullptr || ctx.FindArrayInfo(name) != nullptr;
 }
 
-// §21.5: the memory a $writemem call dumps -- a class's array property, or
-// the container its memory_name names, with the associative array that name
-// denotes when it is one.
 struct WritememTarget {
   ClassArrayRef class_array;
   bool is_class_array = false;
@@ -244,10 +181,6 @@ struct WritememTarget {
   const AssocArrayObject* aa = nullptr;
 };
 
-// Resolves the memory_name operand of `eval.expr` into `target`, reporting
-// and returning false when it names nothing the task can dump. Both checks run
-// before the file is opened, so an illegal call leaves any existing file as
-// it was.
 static bool ResolveWritememTarget(const WritememEval& eval, bool is_hex,
                                   WritememTarget& target) {
   const Expr* mem = eval.expr->args[1];
@@ -255,8 +188,6 @@ static bool ResolveWritememTarget(const WritememEval& eval, bool is_hex,
   std::string task = "$writemem" + std::string(is_hex ? "h" : "b");
   target.is_class_array =
       ResolveClassArray(mem, ctx, eval.arena, target.class_array);
-  // §21.5: the tasks dump a memory array (§7.4.3), so a memory_name naming
-  // anything else -- a plain variable, a literal -- is reported.
   bool names_memory =
       target.is_class_array || (MemoryName(mem, target.mem_name) &&
                                 NamesUnpackedArray(ctx, target.mem_name));
@@ -266,9 +197,6 @@ static bool ResolveWritememTarget(const WritememEval& eval, bool is_hex,
                         Subclause("21.5"));
     return false;
   }
-  // §21.5.3: an associative array is a legal $writemem argument only when its
-  // index type is integral (see §21.4.1) — a string-keyed array has no numeric
-  // @-address form.
   target.aa = ctx.FindAssocArray(target.mem_name);
   if (target.aa != nullptr && target.aa->is_string_key) {
     ctx.GetDiag().Error(
@@ -282,9 +210,6 @@ static bool ResolveWritememTarget(const WritememEval& eval, bool is_hex,
 
 Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                        bool is_hex) {
-  // §21.5's syntax: a filename and a memory_name, each required. A call short
-  // of both names no memory to dump, or no file to dump it to, and is reported
-  // rather than left doing nothing.
   if (expr->args.size() < 2) {
     ctx.GetDiag().Error(expr->range.start,
                         std::string(is_hex ? "$writememh" : "$writememb") +
@@ -293,9 +218,6 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
                         Subclause("21.5"));
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  // §21.5: the filename operand takes the same forms as the §21.4 read side —
-  // a string literal, a string-typed value, or an integral value whose packed
-  // bytes spell the name; EvalStringArg covers all three.
   std::string filename = EvalStringArg(expr->args[0], ctx, arena);
 
   WritememEval eval{expr, ctx, arena};
@@ -304,8 +226,6 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  // §21.5: an existing file is overwritten; there is no append mode, so open
-  // with truncation and discard any prior contents.
   std::ofstream ofs(filename, std::ios::out | std::ios::trunc);
   if (!ofs.is_open()) {
     std::cerr << "WARNING: $writemem" << (is_hex ? "h" : "b")
@@ -313,15 +233,10 @@ Logic4Vec EvalWritemem(const Expr* expr, SimContext& ctx, Arena& arena,
     return MakeLogic4VecVal(arena, 1, 0);
   }
 
-  // Render one word in the radix the companion read task expects. FormatArg
-  // carries arbitrary widths and preserves x/z bits, so the output stays
-  // readable for vectors wider than a machine word.
   auto emit = [&](const Logic4Vec& v) {
     ofs << FormatArg(v, is_hex ? 'h' : 'b') << "\n";
   };
 
-  // §21.5.3: an associative array's keys are sparse, so its words carry an
-  // @-address prefix; the keys are emitted in ascending order.
   if (target.aa != nullptr) {
     WriteAssocMem(ofs, is_hex, target.aa, arena);
     return MakeLogic4VecVal(arena, 1, 0);

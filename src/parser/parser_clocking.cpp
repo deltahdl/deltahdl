@@ -13,10 +13,6 @@ namespace delta {
 
 namespace {
 
-// §14.4: the input/output skews parsed for one clocking_item, together with the
-// resolved port direction. Bundled so the per-signal builder stays under the
-// parameter limit. The output skew fields are only meaningful when the
-// direction is not output-only.
 struct ClockingItemSkew {
   Direction direction = Direction::kNone;
   Edge in_edge = Edge::kNone;
@@ -25,8 +21,6 @@ struct ClockingItemSkew {
   Expr* out_delay = nullptr;
 };
 
-// Builds a single clocking signal declaration from the resolved direction/skew
-// and the parsed signal name plus optional hierarchical expression.
 ClockingSignalDecl MakeClockingSignal(const ClockingItemSkew& skew,
                                       std::string_view name, Expr* hier_expr) {
   ClockingSignalDecl sig;
@@ -57,8 +51,6 @@ void Parser::ParseClockingSkew(Edge& edge, Expr*& delay) {
   if (Check(TokenKind::kHash)) {
     Consume();
 
-    // A.6.5's delay_control is `# delay_value` or `# ( mintypmax_expression )`;
-    // the second is read as the parenthesized primary it is.
     if (Check(TokenKind::kLParen)) {
       delay = ParsePrimaryExpr();
     } else {
@@ -72,18 +64,6 @@ ModuleItem* Parser::ParseClockingDecl() {
   item->kind = ModuleItemKind::kClockingBlock;
   item->loc = CurrentLoc();
 
-  // §14.7: the bodies that may hold a clocking block are those of a module, an
-  // interface, a checker and a program, and a package body may not.
-  //
-  // An anonymous program in the package is no exception, whatever its keyword
-  // suggests. §24.6 has an anonymous program in a package declare items for
-  // the program-wide space while opening no scope of its own, its items sharing
-  // one name space with the package or compilation-unit scope that holds it
-  // -- so a clocking block written in one is in the package's scope, which is
-  // what this prohibits. The guard that held the report back read that clause
-  // backwards, and A.1.11 keeps clocking_declaration out of
-  // anonymous_program_item as well, so such a source now draws both reports
-  // rather than only the grammar's.
   if (package_body_depth_ > 0) {
     diag_.Error(item->loc, "a package body cannot hold a clocking block",
                 Subclause("14.7"));
@@ -118,9 +98,6 @@ ModuleItem* Parser::ParseClockingDecl() {
     item->clocking_event = ParseEventList();
     Expect(TokenKind::kRParen, Subclause("14.3"));
   } else {
-    // A.6.5: without parentheses the clocking event is a name alone, read as
-    // the event control statement reads it, so an expression written there
-    // leaves its operator or argument list where the semicolon belongs.
     item->clocking_event.push_back(ParseNamedClockingEvent());
   }
 
@@ -133,10 +110,6 @@ ModuleItem* Parser::ParseClockingDecl() {
   return item;
 }
 
-// True when the next tokens open a clocking_declaration (Syntax 14-1): the bare
-// `clocking` keyword, or `default` or `global` followed by it. Both `default`
-// and `global` open other declarations as well, so deciding needs the token
-// behind them; the lexer position is restored either way.
 bool Parser::AtClockingDecl() {
   if (Check(TokenKind::kKwClocking)) return true;
   if (!Check(TokenKind::kKwDefault) && !Check(TokenKind::kKwGlobal)) {
@@ -149,13 +122,6 @@ bool Parser::AtClockingDecl() {
   return is_clocking;
 }
 
-// §14.7 rules that a clocking block belongs only in a module, an interface, a
-// checker or a program, and that no clocking block may contain another. Reports
-// `message` at the `clocking` keyword, then reads the declaration with
-// Parser::ParseClockingDecl and discards it, so the enclosing body resumes
-// after `endclocking` instead of reporting the same tokens again under whatever
-// rule its own fallback happens to name. `message` states where the block was
-// found, which differs at every call site.
 void Parser::RejectClockingDecl(std::string_view message) {
   diag_.Error(CurrentLoc(), std::string(message), Subclause("14.7"));
   ParseClockingDecl();
@@ -169,9 +135,6 @@ void Parser::ParseClockingItemList(ModuleItem* item) {
     }
     auto before = lexer_.SavePos().pos;
     ParseClockingItem(item);
-    // Guard against a non-clocking_item token (e.g. a missing endclocking, so
-    // the enclosing endmodule lands here): ParseClockingItem consumes nothing,
-    // so stop and let the caller's Expect report the missing endclocking.
     if (lexer_.SavePos().pos == before) break;
   }
 }
@@ -196,11 +159,6 @@ Direction Parser::ParseClockingDirection(Edge& in_edge, Expr*& in_delay,
   return Direction::kNone;
 }
 
-// One direction of a default_skew: the `input` or `output` keyword has been
-// read, and A.6.11 writes a clocking_skew behind it -- `edge_identifier [
-// delay_control ] | delay_control` -- so a direction followed by neither an
-// edge nor a delay names no skew, and is reported at the keyword. `direction`
-// is the keyword's own text, for the report.
 void Parser::ParseClockingDefaultSkew(const Token& direction, Edge& edge,
                                       Expr*& delay) {
   ParseClockingSkew(edge, delay);
@@ -211,16 +169,8 @@ void Parser::ParseClockingDefaultSkew(const Token& direction, Edge& edge,
               Subclause("A.6.11"));
 }
 
-// The `default input/output skew` alternative of a clocking_item, which sets
-// the block-wide skews rather than declaring a signal. A.6.11 writes it as
-// `default_skew ::= input clocking_skew | output clocking_skew | input
-// clocking_skew output clocking_skew`: at least one direction, each with its
-// skew, and the input skew before the output skew. §14.3 says what it is for:
-// it gives one skew to every signal of the block at once, so a `default` item
-// that specifies no skew has nothing to set, and was taken silently before as
-// a block that set neither default.
 void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
-  auto default_tok = Consume();  // 'default'
+  auto default_tok = Consume();
   bool has_direction = false;
   if (Check(TokenKind::kKwInput)) {
     has_direction = true;
@@ -248,11 +198,6 @@ void Parser::ParseClockingDefaultSkews(ModuleItem* item) {
   Expect(TokenKind::kSemicolon, Subclause("14.4"));
 }
 
-// §16.16(b1,b2): a property or sequence declared inside a clocking block takes
-// the block's clocking event as its leading clock. It may therefore neither
-// carry its own explicit leading clocking event (b1) nor be multiclocked (b2).
-// A declaration is multiclocked when it contains a non-leading clocking event
-// or more than one; a single leading event is the b1 case.
 void Parser::CheckClockingBlockDecl(const ModuleItem* decl,
                                     std::string_view kind) {
   if (decl == nullptr) return;
@@ -279,9 +224,6 @@ void Parser::ParseClockingItem(ModuleItem* item) {
     return;
   }
 
-  // The assertion-item alternative of clocking_item may be preceded by
-  // attribute instances. Consume them here; they apply to the
-  // property/sequence/let declaration that follows.
   bool had_attributes = false;
   if (Check(TokenKind::kAttrStart)) {
     ParseAttributes();
@@ -328,20 +270,6 @@ void Parser::ParseClockingItem(ModuleItem* item) {
   Expect(TokenKind::kSemicolon, Subclause("14.3"));
 }
 
-// A.9.3: `hierarchical_identifier ::= [ $root . ] { identifier
-// constant_bit_select . } identifier`, so one is a chain of identifiers joined
-// by `.`, any but the last of which may carry bit-selects, and a bit-select is
-// never a range. `a`, `top.a` and `bus[1].a` are hierarchical identifiers;
-// `a + b`, `f(x)`, `bus[1]` and `bus[1:0].a` are not.
-//
-// The `::` form is not one. A.9.3 joins the components with `.` alone, and a
-// name reached through a class or package scope, `$unit::` among them, is a
-// ps_identifier, which A.6.5 does not admit where it writes this.
-//
-// The walk runs from the last identifier to the first: past the trailing
-// bit-selects where they are admitted, then past each `.` and the bit-selects
-// before it. A member access is built with its member name as an identifier
-// (Parser::MakeMemberAccess), so only its scope needs asking about.
 static bool IsBitSelect(const Expr* e) {
   return e->kind == ExprKind::kSelect && e->index_end == nullptr;
 }
@@ -355,17 +283,6 @@ bool IsHierarchicalName(const Expr* e, bool trailing_select) {
   return e->kind == ExprKind::kIdentifier && e->scope_prefix != "$unit";
 }
 
-// A.6.5 writes `wait_order ( hierarchical_identifier { ,
-// hierarchical_identifier } ) action_block`, so an operand that is not one is
-// outside the grammar. It is parsed as an expression and then judged, rather
-// than parsed as a name: the identifier still needs the SourceRange a later
-// report stands at, the elaborator already reads Stmt::wait_order_events as
-// expressions, and an operand read with a narrower parse would leave whatever
-// followed it unread.
-//
-// Every rule downstream is what this is for. ForEachChildExpr hands
-// wait_order_events to every walker converted onto it, and the reason no case
-// covers a subroutine call there is that A.6.5 admits none.
 Expr* Parser::ParseWaitOrderOperand() {
   Expr* e = ParseExpr();
   if (e != nullptr && !IsHierarchicalName(e, false)) {

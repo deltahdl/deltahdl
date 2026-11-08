@@ -55,12 +55,6 @@ bool LibraryExcludedBySelectedList(std::string_view library,
 
 namespace {
 
-// Returns the cell named use_cell that target_lib holds, or nullptr when that
-// library holds no such cell. §33.2.1: a cell is a design element written into
-// a library under that element's own name, and §3.2 counts a module, an
-// interface, a program and a checker each as a design element, so all four
-// kinds are searched. An extern module declaration names a cell without
-// defining one, so it is not a cell here.
 ModuleDecl* FindCellInLibrary(std::string_view target_lib,
                               std::string_view use_cell,
                               CompilationUnit* unit) {
@@ -75,18 +69,6 @@ ModuleDecl* FindCellInLibrary(std::string_view target_lib,
   return nullptr;
 }
 
-// §33.4.1.3, §33.4.2: when the instance currently being elaborated is the one
-// an expansion clause selected, the clause settles what that instance binds.
-// Returns nullopt when no instance use override applies (so normal resolution
-// should continue), or the override result (which may be nullptr if the named
-// cell does not exist).
-//
-// What the instantiation declares is not consulted. §33.4.1.6's note has the
-// binding statement create situations where the unbound instance's module name
-// and the cell name it is bound to differ, and §33.4.2 makes that the ordinary
-// case for a delegation: the design statement of the configuration an instance
-// is handed to specifies the actual binding for that instance, whatever name
-// the instantiation was written with.
 std::optional<ModuleDecl*> FindInstanceUseOverride(
     const std::string& current_inst_path,
     const std::vector<std::tuple<std::string, std::string, std::string>>&
@@ -100,9 +82,6 @@ std::optional<ModuleDecl*> FindInstanceUseOverride(
   return std::nullopt;
 }
 
-// Appends every declaration in `decls` whose name matches `name` to
-// `candidates`. An extern program or interface header (Syntax 24-1, Syntax
-// 25-1) is a prototype as §23.5 describes, defining nothing to instantiate.
 template <typename Decls>
 static void AppendNamedDecls(const Decls& decls, std::string_view name,
                              std::vector<ModuleDecl*>& candidates) {
@@ -111,8 +90,6 @@ static void AppendNamedDecls(const Decls& decls, std::string_view name,
   }
 }
 
-// Partitions modules named `name` into the non-extern candidates and the first
-// extern declaration encountered.
 void CollectModuleCandidates(std::string_view name, CompilationUnit* unit,
                              std::vector<ModuleDecl*>& candidates,
                              ModuleDecl*& extern_decl) {
@@ -129,7 +106,6 @@ void CollectModuleCandidates(std::string_view name, CompilationUnit* unit,
   AppendNamedDecls(unit->checkers, name, candidates);
 }
 
-// Returns the candidates whose library appears in `liblist`, preserving order.
 std::vector<ModuleDecl*> FilterCandidatesByLibrary(
     const std::vector<ModuleDecl*>& candidates,
     const std::vector<std::string>& liblist) {
@@ -146,9 +122,6 @@ std::vector<ModuleDecl*> FilterCandidatesByLibrary(
   return filtered;
 }
 
-// Selects the candidate whose library ranks earliest in `order` (libraries not
-// listed rank last). On ties the earlier candidate wins. `candidates` must be
-// non-empty.
 ModuleDecl* PickByLibraryOrder(const std::vector<ModuleDecl*>& candidates,
                                const std::vector<std::string>& order) {
   ModuleDecl* best = candidates.front();
@@ -163,8 +136,6 @@ ModuleDecl* PickByLibraryOrder(const std::vector<ModuleDecl*>& candidates,
   return best;
 }
 
-// Resolves `name` to a program, interface, or checker (in that order) when no
-// module matched, returning nullptr if none exists.
 ModuleDecl* FindNonModuleDesign(std::string_view name, CompilationUnit* unit) {
   auto pit = std::find_if(
       unit->programs.begin(), unit->programs.end(),
@@ -183,11 +154,6 @@ ModuleDecl* FindNonModuleDesign(std::string_view name, CompilationUnit* unit) {
   return nullptr;
 }
 
-// Records one constant a package declares in the compilation-unit parameter
-// scope under its fully qualified "package.name" key, which is the spelling
-// §26.3's package scope resolution operator reads and A.8.4 admits for a
-// parameter and an enum identifier alike. The key is arena-allocated because
-// ScopeMap keys are string_views.
 void RecordPackageConstant(std::string_view pkg_name, std::string_view name,
                            int64_t value, ScopeMap& cu_param_scope,
                            Arena& arena) {
@@ -196,11 +162,6 @@ void RecordPackageConstant(std::string_view pkg_name, std::string_view name,
   cu_param_scope[*qname] = value;
 }
 
-// The constants one package has declared so far, as registration walks its
-// items: `values` is the compilation-unit scope with the package's own
-// parameters and enumeration constants layered over it under their bare names,
-// which §6.20.1 lets a later declaration read, and `cu_param_scope` is where
-// each is recorded under its qualified key.
 struct PackageRegistration {
   const PackageDecl& pkg;
   ScopeMap values;
@@ -208,18 +169,6 @@ struct PackageRegistration {
   Arena& arena;
 };
 
-// Records a single package value parameter, if it is a value parameter with a
-// constant-evaluable initializer. The initializer is folded against the
-// package's own constants, because §6.19 declares an enumeration's members as
-// constants of the scope the enumeration stands in and §6.20.1 lets a
-// parameter read an earlier one: `parameter R = (DEEP | SHALLOW);` names two
-// members of an enumeration the package declared, and folding it against the
-// compilation-unit scope alone left R unrecorded and `pkg::R` unresolved. It
-// is folded at the width the declaration fixes (FoldDeclaredParamValue), as
-// a module's parameter is, so `parameter logic [11:0] W = '1` records 4095
-// and not the 1 the literal is self-determined (§5.7.1, §6.20.2). A type
-// written as one of the package's typedef names is read under the package's
-// scope (InPackageScope), the key RegisterPackageTypedefs records it under.
 void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
   if (item->kind != ModuleItemKind::kParamDecl || !item->init_expr) return;
   const DataType kType = InPackageScope(item->data_type, reg.pkg);
@@ -235,13 +184,6 @@ void RegisterOnePackageParam(ModuleItem* item, PackageRegistration& reg) {
                      reading);
 }
 
-// Records each package's value parameters and enumeration constants in the
-// compilation-unit parameter scope under their fully qualified "package.name"
-// key (§26.3), each folded against what the package declared before it and,
-// §26.3 letting a package import another, against what an earlier import of
-// the package brings in by bare name: `import base::K; parameter int KK = K;`
-// folds KK to base's K, which the packages' order in the unit has already
-// recorded, since §26.3 compiles a package ahead of the scopes importing it.
 void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
                            Arena& arena) {
   for (auto* pkg : unit->packages) {
@@ -256,10 +198,6 @@ void RegisterPackageParams(CompilationUnit* unit, ScopeMap& cu_param_scope,
   }
 }
 
-// Records one typedef under the "Scope::name" key ResolveNamed in
-// src/elaborator/type_eval.cpp looks a prefixed name up by. The key is
-// arena-allocated because TypedefMap keys are string_views, which a local
-// string would leave dangling. Returns the key.
 std::string_view RegisterScopedTypedef(std::string_view scope_name,
                                        std::string_view type_name,
                                        const DataType& dtype,
@@ -270,17 +208,6 @@ std::string_view RegisterScopedTypedef(std::string_view scope_name,
   return *qname;
 }
 
-// Records each package's typedefs under their qualified key. §26.3 references a
-// package's declarations through the package name, as its example on printed
-// page 808 does in `ComplexPkg::Complex cout = ComplexPkg::mul(a, b);`, and it
-// does so whether or not the package was imported. RegisterImportItem in
-// src/elaborator/elaborator_module.cpp enters an imported typedef under its
-// bare name, which is the separate spelling an import makes legal. §7.4.4
-// keeps an array typedef's unpacked dimensions with the type, and they are
-// recorded in `td_array_dims` under the same key, so `p::A'{...}` is counted
-// against them (§10.9.1). A member of a structure or union written as the
-// name of a typedef the package declares before it is recorded behind the
-// package's name, as the typedef's own name is (PackageTypedefType, §23.9).
 void RegisterPackageTypedefs(
     CompilationUnit* unit, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
@@ -297,12 +224,6 @@ void RegisterPackageTypedefs(
   }
 }
 
-// §7.4.4 with §26.2: a package's array written on one of the package's own
-// typedef names that writes unpacked dimensions too, `mem_type ba [0:7]`
-// under `typedef bsix mem_type [0:3]`, has an array for its element, which
-// its type is marked as (DataType::names_unpacked_array) for the simulator,
-// which shapes a package's arrays from the items themselves
-// (PackageArrayShape in src/simulator/lowerer_package_data.cpp).
 static void MarkPackageStagedArrays(CompilationUnit* unit) {
   for (auto* pkg : unit->packages) {
     std::unordered_set<std::string_view> array_typedefs;
@@ -322,10 +243,6 @@ static void MarkPackageStagedArrays(CompilationUnit* unit) {
   }
 }
 
-// Records each class's typedefs under their qualified key. §8.23 makes a type
-// declared inside a class scope public and reachable from outside the class,
-// through the class name. The reach over unit->classes is the one
-// RegisterClassParams already has for the same clause's parameters.
 void RegisterClassTypedefs(
     CompilationUnit* unit, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
@@ -336,9 +253,6 @@ void RegisterClassTypedefs(
   }
 }
 
-// Inserts the built-in class names that always live in the compilation-unit
-// scope: the classes of the std package, which §G.1 lists and
-// src/elaborator/std_package.h writes down (§6.14, §26.7).
 void RegisterBuiltinClassNames(
     std::unordered_set<std::string_view>& class_names) {
   for (const StdPackageEntry& entry : StdPackageContents()) {
@@ -348,11 +262,6 @@ void RegisterBuiltinClassNames(
   }
 }
 
-// The compilation-unit scope (§26.3, §6.14): the set of elaborator name spaces
-// that compilation-unit items populate -- visible names, typedefs, the
-// class/parameterized-class name sets, and the constant parameter scope. These
-// containers are members of the Elaborator that are filled together while
-// classifying each compilation-unit item, so they travel as one entity.
 struct CuScope {
   std::unordered_set<std::string_view>& names;
   TypedefMap& typedefs;
@@ -364,20 +273,11 @@ struct CuScope {
   Arena& arena;
 };
 
-// Classifies one compilation-unit item, recording it in the appropriate
-// elaborator scope structures (names, typedefs, class/parameterized-class sets,
-// or the constant parameter scope).
 void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   if (!item->name.empty()) scope.names.insert(item->name);
-  // §6.19: an enumeration declared here, by a typedef or directly as a data
-  // declaration's type, declares its members as constants of the
-  // compilation-unit scope, which a later parameter declaration may read.
   BindEnumConstantsOfItem(item, scope.param_scope, scope.arena);
   if (item->kind == ModuleItemKind::kTypedef) {
     scope.typedefs[item->name] = item->typedef_type;
-    // §6.18: a compilation-unit typedef never runs Elaborator::ElaborateTypedef
-    // (see Elaborator::ValidateCuTypedefs), so the dimensions that make its
-    // name stand for an aggregate are recorded here instead.
     if (!item->unpacked_dims.empty())
       scope.aggregate_typedefs.insert(item->name);
   } else if (item->kind == ModuleItemKind::kClassDecl && item->class_decl) {
@@ -385,19 +285,6 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
     if (!item->class_decl->params.empty())
       scope.parameterized_classes.insert(item->class_decl->name);
   } else if (item->kind == ModuleItemKind::kParamDecl && item->init_expr) {
-    // §6.20.4 lets a local parameter be declared in compilation-unit scope, and
-    // rules that `parameter` written there means `localparam`, so the
-    // initializer must be a constant expression however it was spelled. Report
-    // the breach rather than only leaving the name out of the scope: a name
-    // with no value makes every later expression reading it non-constant too,
-    // and the report those produce stands at a different declaration and names
-    // a different parameter.
-    //
-    // The report asks IsConstantExpr while the scope keeps the fold, because
-    // the two answer different questions: an initializer this elaborator
-    // cannot fold to an integer is not thereby a non-constant expression, and
-    // a real-valued one folds to neither. The fold is at the width the
-    // declaration fixes (FoldDeclaredParamValue), as a package's is.
     if (!IsConstantExpr(item->init_expr, scope.param_scope)) {
       scope.diag.Error(item->loc,
                        std::format("localparam '{}' initializer is not a "
@@ -416,11 +303,6 @@ void ClassifyCuScopeItem(ModuleItem* item, CuScope& scope) {
   }
 }
 
-// §3.12.1 with A.2.2.1: `$unit::T` names the compilation unit's own T even
-// where a module declares a T of its own, so a typedef or nettype of the unit
-// is recorded under its "$unit::" key as well, as a package's are under "P::":
-// a typedef by RegisterScopedTypedef, its unpacked dimensions with it, and a
-// nettype by CopyNettype, as the same nettype as its bare name.
 static void RegisterUnitScopedType(
     const ModuleItem& item, TypedefMap& typedefs,
     std::unordered_map<std::string_view, std::vector<Expr*>>& td_array_dims,
@@ -436,13 +318,6 @@ static void RegisterUnitScopedType(
   }
 }
 
-// Records each class a package declares in the class-name set under its
-// "P::C" key, the name §26.3 reaches it by whether or not the package is
-// imported, as RegisterPackageTypedefs records a package's typedefs. An import
-// gives the class its bare name besides (RegisterImportItem in
-// src/elaborator/elaborator_import.cpp). A class of the compilation unit is
-// recorded under "$unit::C", the name §3.12.1 reaches it by where a local
-// declaration hides its bare one.
 static void RegisterScopedClassNames(
     const CompilationUnit* unit,
     std::unordered_set<std::string_view>& class_names, Arena& arena) {
@@ -459,8 +334,6 @@ static void RegisterScopedClassNames(
   for (const auto* cls : unit->classes) record("$unit", cls->name);
 }
 
-// Records each compilation-unit class declaration in the class-name and scope
-// sets, flagging parameterized classes (§8.25).
 void RegisterCuClasses(
     CompilationUnit* unit, std::unordered_set<std::string_view>& class_names,
     std::unordered_set<std::string_view>& cu_scope_names,
@@ -472,11 +345,6 @@ void RegisterCuClasses(
   }
 }
 
-// §24.6: every name an anonymous program declares, whichever scope the program
-// stands in. An anonymous program in a package (Clause 26) or a
-// compilation-unit scope (§3.12.1) declares items of the program-wide space
-// without opening a new scope, and that space is one space however a
-// declaration entered it, so the two lists fill one set.
 void RegisterAnonymousProgramNames(
     CompilationUnit* unit, std::unordered_set<std::string_view>& names) {
   for (const auto* item : unit->cu_items) {
@@ -487,23 +355,11 @@ void RegisterAnonymousProgramNames(
       if (item->from_anonymous_program) names.insert(item->name);
     }
   }
-  // An item the parser left unnamed is dropped here rather than tested for at
-  // each insertion, because an empty name in this set matches every reference
-  // position that is itself empty -- a declaration written with no type name
-  // carries an empty DataType::type_name, and every such declaration would
-  // then be read as naming an anonymous program's class.
   names.erase(std::string_view{});
 }
 
 }  // namespace
 
-// §8.13: the typedefs `cls` inherits, each under the key of the base class
-// declaring it, entered from the farthest base in so that the nearest base's
-// hides a farther one's of the same name.
-// Elaborator::RunPreElaborationValidations has BreakClassInheritanceCycles
-// drop the extends clause closing any cycle before RegisterCuScopeItems, or a
-// module's walk after it, keys a class's typedefs, so the walk reaches a class
-// with no base.
 static TypedefScopes InheritedTypedefScopes(const ClassDecl* cls,
                                             const CompilationUnit* unit) {
   std::vector<const ClassDecl*> bases;
@@ -544,8 +400,6 @@ void RegisterClassTypedefKeys(const ClassDecl* cls, std::string_view scope,
 
 UdpDecl* FindUdpInLibrary(std::string_view library, std::string_view cell,
                           CompilationUnit* unit) {
-  // The definition, where one follows or precedes an extern prototype of the
-  // primitive (Syntax 29-1), else the prototype.
   UdpDecl* prototype = nullptr;
   for (auto* udp : unit->udps) {
     if (udp->library != library || udp->name != cell) continue;
@@ -564,10 +418,6 @@ bool CellUseOverrideApplies(std::string_view src_lib, std::string_view name,
 
 void Elaborator::RegisterCuScopeItems() {
   RegisterBuiltinClassNames(class_names_);
-  // §6.20.2: a compilation-unit, package or class parameter whose type is a
-  // typedef name is converted to the type the name stands for, which the fold
-  // (FoldDeclaredParamValue) reads from the table this installs, as a
-  // module's items read it under Elaborator::ElaborateItems.
   TypedefRegistryGuard typedef_guard(&typedefs_, &aggregate_typedef_names_,
                                      &type_ref_compare_);
   CuScope cu_scope{cu_scope_names_,
@@ -578,20 +428,8 @@ void Elaborator::RegisterCuScopeItems() {
                    cu_param_scope_,
                    diag_,
                    arena_};
-  // §26.2 (printed page 808) bars a package from referring to the
-  // compilation unit's items, while §26.3 lets the unit's own parameters
-  // reference a package's, so the packages' typedefs and parameters are
-  // registered ahead of the walk that folds the unit's: `parameter int X =
-  // p::P` reads the "p.P" key RegisterPackageParams records. The types the
-  // packages' and the unit's declarations write as type references are
-  // resolved first, so the typedefs record the types they name (§6.23).
   ResolveUnitScopeTypeRefs(unit_, arena_, unit_scope_type_refs_);
   RegisterPackageTypedefs(unit_, typedefs_, td_array_dims_, arena_);
-  // §6.6.7 with A.2.1.3 and A.2.2.1: a nettype's data type or renamed source
-  // may be written through a package, `nettype P::T n;` or `nettype P::nt
-  // alias;`, and may name a typedef, a class or a nettype P declares, so P's
-  // nettypes and classes are recorded under their "P::" keys as its typedefs
-  // are.
   RegisterPackageNettypes(
       unit_, typedefs_,
       {nettype_names_, nettype_resolve_funcs_, nettype_canonical_}, arena_);
@@ -600,17 +438,8 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterPackageParams(unit_, cu_param_scope_, arena_);
   for (auto* item : unit_->cu_items) {
     ClassifyCuScopeItem(item, cu_scope);
-    // §7.4.4 (printed page 155) with §6.18: a typedef's unpacked dimensions
-    // belong to the type it names, so `ie_t x;` in a module under a
-    // compilation-unit `typedef bit ie_t[int];` is an associative array. A
-    // compilation-unit typedef is registered here and never elaborated, so
-    // the record AdoptTypedefArrayDims (elaborator_decls_var.cpp) reads was
-    // filled for a module's typedefs alone, and the declaration was a single
-    // bit whose `x[5]` was reported as a select of a scalar.
     if (item->kind == ModuleItemKind::kTypedef && !item->unpacked_dims.empty())
       td_array_dims_[item->name] = item->unpacked_dims;
-    // §6.6.7 with §3.12.1: a compilation-unit nettype is a type the modules
-    // after it declare nets of, as a module's own nettype is to that module.
     if (item->kind == ModuleItemKind::kNettypeDecl) {
       typedefs_[item->name] = item->typedef_type;
       nettype_names_.insert(item->name);
@@ -623,29 +452,14 @@ void Elaborator::RegisterCuScopeItems() {
   RegisterCuClasses(unit_, class_names_, cu_scope_names_,
                     parameterized_class_names_);
   RegisterAnonymousProgramNames(unit_, anonymous_program_names_);
-  // The classes' typedefs are registered ahead of their parameters, whose
-  // values are converted to the types those name.
   RegisterClassTypedefs(unit_, typedefs_, td_array_dims_, arena_);
   RegisterClassParams(unit_, cu_param_scope_, arena_, diag_);
-  // §13.3 with §7.2.1: after the two typedef registrations above, which are
-  // what give the table the "pkg::T" and "Class::T" names a formal's member
-  // may be written with; a package's and a compilation-unit class's
-  // subroutines are reached by no module's item walk
-  // (elaborator_items_formals.cpp).
   ResolveUnitScopeFormalTypes(unit_, typedefs_, arena_);
-  // Seed the unions ItemElaborationStateSaver folds each module's entries into.
-  // A compilation unit with no module to elaborate never reaches that fold, and
-  // the passes reading the unions afterwards still have to see what the
-  // compilation unit itself declared (§3.12.1).
   all_typedefs_ = typedefs_;
   all_cu_param_scope_ = cu_param_scope_;
   all_td_array_dims_ = td_array_dims_;
 }
 
-// §33.4.1.4: a cell clause naming a library applies to an instance bound to,
-// or being considered for binding to, that library's cell, which is the cell
-// the search the configuration's lists direct arrives at, `found`. One naming
-// no library applies to every instance of the cell.
 static bool CellClauseSelects(std::string_view src_lib,
                               const ModuleDecl* found) {
   return src_lib.empty() || (found != nullptr && found->library == src_lib);
@@ -659,7 +473,6 @@ std::optional<ModuleDecl*> Elaborator::ResolveCellUseOverride(
 
   if (!CellClauseSelects(ov.src_lib, found)) return std::nullopt;
 
-  // An omitted target library is inherited from the parent cell (§33.4.1.6).
   std::string_view target_lib = ov.use_lib.empty()
                                     ? std::string_view(current_library_)
                                     : std::string_view(ov.use_lib);
@@ -670,7 +483,6 @@ std::optional<ModuleDecl*> Elaborator::ResolveInstanceBindOverride() const {
   if (config_inst_path_.empty()) return std::nullopt;
   for (const auto& [path, ulib, ucell] : instance_bind_overrides_) {
     if (path != config_inst_path_) continue;
-    // An omitted target library is inherited from the parent cell (§33.4.1.6).
     std::string_view target_lib = ulib.empty()
                                       ? std::string_view(current_library_)
                                       : std::string_view(ulib);
@@ -712,9 +524,6 @@ ElaboratorData::UseTargetInForce(CompilationUnit* unit, const std::string& path,
   return std::nullopt;
 }
 
-// The list of the rule in `overrides` nearest above or at `inst_path`, a later
-// rule of one path standing ahead of an earlier one, with the length of the
-// path it names; null and 0 where none is at or above it.
 static std::pair<const std::vector<std::string>*, size_t> NearestLiblistRule(
     const std::string& inst_path,
     const std::vector<std::pair<std::string, std::vector<std::string>>>&
@@ -735,7 +544,6 @@ static std::pair<const std::vector<std::string>*, size_t> NearestLiblistRule(
   return {inherited, best_match_len};
 }
 
-// The list of an instance clause naming the instance at `inst_path` itself.
 static const std::vector<std::string>* OwnInstanceLiblist(
     const std::string& inst_path,
     const std::vector<std::pair<std::string, std::vector<std::string>>>&
@@ -777,7 +585,6 @@ bool ElaboratorData::ReportConfigRuleBindingNothing(CompilationUnit* unit,
     libs = &library_order_;
     which = "default library list";
   }
-  // §33.4.1.5: an empty list, or none, leaves the parent cell's library.
   const std::vector<std::string> kParentLibrary{current_library_};
   if (in_config_elaboration_ && !current_library_.empty() &&
       (libs == nullptr || libs->empty())) {
@@ -809,9 +616,6 @@ std::string HierInstancePath(std::string_view parent, const HierPath& gen_steps,
   return path;
 }
 
-// Chooses among `candidates` using the global library order, applying strict
-// library-order filtering. Returns nullptr when no candidate survives
-// filtering.
 static ModuleDecl* PickCandidateByGlobalOrder(
     std::vector<ModuleDecl*> candidates,
     const std::vector<std::string>& library_order, bool library_order_strict) {
@@ -825,11 +629,6 @@ static ModuleDecl* PickCandidateByGlobalOrder(
 
 const std::vector<std::string>* ElaboratorData::SelectedLiblist(
     std::string_view name) const {
-  // §33.4.1.3, §33.4.1.4, §33.4.1.5: an instance clause naming this instance
-  // selects it most specifically; a cell clause selects every instance of its
-  // cell, so it replaces a list the instance would inherit; failing both, the
-  // list the nearest instance above was given is inherited, whichever kind of
-  // clause gave it there.
   if (const auto* own =
           OwnInstanceLiblist(config_inst_path_, instance_liblist_overrides_)) {
     return own;
@@ -852,20 +651,10 @@ ModuleDecl* Elaborator::FindModule(std::string_view name) const {
     return *hit;
   }
 
-  // §33.4.1.6: an instance selection is more specific than a cell selection, so
-  // a plain instance use binding is applied before any cell-clause use.
   if (auto hit = ResolveInstanceBindOverride(); hit.has_value()) {
     return *hit;
   }
 
-  // §33.6.3: a cell selection clause's use expansion binds every cell of the
-  // selected name to the one library.cell it names, whatever library the
-  // search would have taken it from: a configuration may name a cell in a
-  // library its own default clause leaves off the list, and that cell is
-  // still what the name binds, because naming a description is not asking for
-  // a search that a library list could exclude it from. The search still runs
-  // first, since a clause naming a library selects only the instances it
-  // arrives at that library's cell for (§33.4.1.4).
   ModuleDecl* found = SearchModule(name);
   if (auto hit = ResolveCellUseOverride(name, found); hit.has_value()) {
     return *hit;
@@ -879,9 +668,6 @@ ModuleDecl* Elaborator::SearchModule(std::string_view name) const {
   CollectModuleCandidates(name, unit_, candidates, extern_decl);
 
   const std::vector<std::string>* override_liblist = SelectedLiblist(name);
-  // §33.4.1.5: under a configuration, a selected list that is empty, and the
-  // absence of any list, both leave the single library holding the parent
-  // cell.
   const std::vector<std::string> kParentLibrary{current_library_};
   if (in_config_elaboration_ && !current_library_.empty() &&
       (override_liblist != nullptr
@@ -891,22 +677,8 @@ ModuleDecl* Elaborator::SearchModule(std::string_view name) const {
     override_liblist = &kParentLibrary;
   }
 
-  // §33.6.2: a library the default clause's list leaves out is not searched at
-  // all, so a description held only there is not used. Filtering against that
-  // list can therefore empty a candidate set that was not empty, and a name
-  // whose every description the list excluded has reached no cell -- the
-  // last-resort search below consults no list and would otherwise hand back
-  // exactly the description the list excluded.
-  //
-  // The exclusion is the default clause's own, so it holds however the search
-  // for this name proceeded. A cell clause or an instance clause naming a
-  // narrower list decides which of the libraries still in play answers, and
-  // finding nothing in that narrower list leaves the name unanswered; it does
-  // not put back the libraries the default clause left out.
   bool selected_list_governed =
       SelectedLibraryListInForce(library_order_, library_order_strict_);
-  // A selected list is the whole of the search: a cell held only by a library
-  // outside it is not found, whatever kind of design element it is.
   if (override_liblist != nullptr) {
     candidates = FilterCandidatesByLibrary(candidates, *override_liblist);
     if (!candidates.empty()) {
@@ -933,7 +705,6 @@ ModuleDecl* Elaborator::FindDesignCell(std::string_view library,
 ModuleDecl* Elaborator::FindModuleInScope(std::string_view name) const {
   auto it = nested_module_decls_.find(name);
   if (it != nested_module_decls_.end()) return it->second;
-  // §23.4: then the outer name space's, which the scope's own hide.
   auto outer = enclosing_nested_decls_.find(name);
   if (outer != enclosing_nested_decls_.end()) return outer->second;
   return FindModule(name);

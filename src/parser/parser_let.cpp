@@ -8,12 +8,6 @@
 
 namespace delta {
 
-// A.2.12's let_port_item: attribute instances, a let_formal_type, the
-// formal's name, its variable dimensions and an optional default. A.2.12
-// writes let_formal_type as a data_type_or_implicit or `untyped`, and A.2.2.1
-// lets that be a type_reference (§6.23), an inline struct, union or enum, or
-// an implicit type of packed dimensions alone. None of them opens with
-// `const`, so a `const` there is reported and the type after it read on.
 FunctionArg Parser::ParseLetArg() {
   FunctionArg arg;
   ParseAttributes();

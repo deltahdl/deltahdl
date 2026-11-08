@@ -1,15 +1,3 @@
-// IEEE 1800-2023 Annex G.1 (Std package -- General).
-//
-// Section G.1 says what the built-in standard package contains: the semaphore
-// class, the mailbox class, the randomize function, the process class and the
-// weak reference class. src/elaborator/std_package.h writes that list down
-// once, and the compilation-unit scope registers the std package's class names
-// from it. These tests observe the list -- its five members, their names and
-// kinds in the subclause's order, and the lookup of a member by name -- and
-// that each member the list names is provided out of the std package at
-// elaboration without a user definition, where a name the list does not hold
-// is not.
-
 #include <gtest/gtest.h>
 
 #include <optional>
@@ -23,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §G.1 lists five members, four classes and the randomize function, in the
-// order semaphore, mailbox, randomize, process, weak reference.
 TEST(StdPackageContents, TheAnnexListsFiveMembersInOrder) {
   const auto& contents = StdPackageContents();
   ASSERT_EQ(contents.size(), 5u);
@@ -45,8 +31,6 @@ TEST(StdPackageContents, TheAnnexListsFiveMembersInOrder) {
   EXPECT_EQ(contents[4].kind, StdPackageMemberKind::kClass);
 }
 
-// Each member answers to its name and kind, and a name the std package does
-// not hold denotes no member.
 TEST(StdPackageContents, AMemberIsFoundByItsName) {
   for (const StdPackageEntry& entry : StdPackageContents()) {
     EXPECT_EQ(StdPackageMemberName(entry.member), entry.name);
@@ -58,8 +42,6 @@ TEST(StdPackageContents, AMemberIsFoundByItsName) {
   EXPECT_EQ(StdPackageMemberNamed(""), std::nullopt);
 }
 
-// The four classes the list names resolve without a user definition, and the
-// randomize function is called through the std package, in one design.
 TEST(StdPackageContents, EveryMemberIsProvidedWithoutAUserDefinition) {
   EXPECT_TRUE(
       ElabOk("class my_obj;\n"
@@ -78,9 +60,6 @@ TEST(StdPackageContents, EveryMemberIsProvidedWithoutAUserDefinition) {
              "endmodule\n"));
 }
 
-// A class name the list does not hold is not provided by the std package: a
-// variable of that type is rejected under §6.18, no declaration preceding the
-// reference, where the same declaration of a listed class is accepted.
 TEST(StdPackageContents, ANameOutsideTheListIsNotProvided) {
   EXPECT_TRUE(
       ElabOk("module m;\n"

@@ -12,13 +12,6 @@ namespace {
 const char* const kNoClockReport =
     "concurrent assertion has no leading clocking event";
 
-// §16.16 (d) with §F.4.1: the leading clock is the property's once each
-// formal stands replaced by its actual, so an instance whose body is a
-// sequence formal, a property formal or an untyped formal, given an actual
-// that opens with its clocking event, is on that event, in a module, an
-// interface and a program, written with `@(...)` and with `@name`; one given
-// an instance of a property declared with a clock, `pp(pc(a))`, is on that
-// clock.
 TEST(ClockedActualElaboration, AClockedActualGivesTheInstanceItsClock) {
   ElabFixture f;
   Elaborate(
@@ -52,9 +45,6 @@ TEST(ClockedActualElaboration, AClockedActualGivesTheInstanceItsClock) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-// §16.16 (d): with no default clocking, the same instances given an
-// unclocked actual have no leading clocking event, and one given an actual
-// whose two sequences open on two clocks has no unique one.
 TEST(ClockedActualElaboration, AnUnclockedOrTwiceClockedActualIsReported) {
   ElabFixture f;
   Elaborate(
@@ -75,10 +65,6 @@ TEST(ClockedActualElaboration, AnUnclockedOrTwiceClockedActualIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 9, "16.16"));
 }
 
-// §16.16 (d) with §17.3: a checker that asserts, assumes or covers its
-// property or sequence formal is on the clock of the actual its instance
-// gives, `@(posedge clk) a`, `@($global_clock) a` or `@$global_clock a`,
-// the last two resolved in the checker (§14.14).
 TEST(ClockedActualElaboration, ACheckerFormalTakesItsActualsClock) {
   ElabFixture f;
   Elaborate(
@@ -97,8 +83,6 @@ TEST(ClockedActualElaboration, ACheckerFormalTakesItsActualsClock) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-// §16.16 (d): with no default clocking in the checker, its assertion of a
-// formal given an unclocked actual has no leading clocking event.
 TEST(ClockedActualElaboration, ACheckerFormalGivenAnUnclockedActualIsReported) {
   ElabFixture f;
   Elaborate(
@@ -115,13 +99,6 @@ TEST(ClockedActualElaboration, ACheckerFormalGivenAnUnclockedActualIsReported) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), kNoClockReport, 3, "16.16"));
 }
 
-// §16.16 (f) holds every concurrent assertion statement of §16.14 to a
-// leading clocking event: with no default clocking, `restrict property`,
-// `assume property` and `cover sequence` of an unclocked spec or of an
-// instance of an unclocked property are reported beside their clocked forms
-// accepted. So are the clause's a5 and a6, whose q6 = q1 and q5 has the
-// semantic leading clocks {inherited, negedge clk} (§16.16.1), no one clock;
-// the instance of q5 alone is accepted.
 TEST(DeterminedClockElaboration, EveryStatementKindNeedsALeadingClock) {
   ElabFixture f;
   Elaborate(
@@ -151,13 +128,6 @@ TEST(DeterminedClockElaboration, EveryStatementKindNeedsALeadingClock) {
   EXPECT_EQ(f.diag.ErrorCount(), 6u);
 }
 
-// §16.16 (f) with §16.16.1: an instance's leading clock is the unique one its
-// body determines once flattened. Over s2, clocked on negedge clk, `not s2`
-// (the clause's p2), `s2 and s2`, `s2 or s2`, `accept_on(a) s2`,
-// `reject_on(a) s2`, an instance of a property whose body is s2 and `not`
-// over one, the sequences `s2 ##1 b`, `s2 ##0 b` and `(s2)` under cover
-// property and cover sequence, the property `(s2)`, `s2 |-> a`, `s2 |=> a`
-// and s2 alone each determine negedge clk, so no statement is reported.
 TEST(DeterminedClockElaboration, ABodyOverAClockedSequenceDeterminesItsClock) {
   ElabFixture f;
   Elaborate(
@@ -199,9 +169,6 @@ TEST(DeterminedClockElaboration, ABodyOverAClockedSequenceDeterminesItsClock) {
   EXPECT_TRUE(f.diag.Diagnostics().empty());
 }
 
-// §16.16 (f): the same shapes over su, which no clock is written for, leave
-// the clock to be inherited, so each statement instancing one, with no
-// default clocking, is reported.
 TEST(DeterminedClockElaboration, ABodyOverAnUnclockedSequenceIsReported) {
   ElabFixture f;
   Elaborate(
@@ -247,9 +214,6 @@ TEST(DeterminedClockElaboration, ABodyOverAnUnclockedSequenceIsReported) {
   EXPECT_EQ(f.diag.ErrorCount(), 17u);
 }
 
-// §16.16 (f) with §16.16.1: strong(m) and weak(m) take the unique clock of
-// m, so a property whose body is strong(s2) or weak(s2) is on s2's negedge
-// clk, and its assertion draws no report of a missing leading clock.
 TEST(DeterminedClockElaboration, AStrongOrWeakBodyTakesItsSequencesClock) {
   ElabFixture f;
   Elaborate(
@@ -266,15 +230,6 @@ TEST(DeterminedClockElaboration, AStrongOrWeakBodyTakesItsSequencesClock) {
   EXPECT_EQ(f.diag.ErrorCount(), 0u);
 }
 
-// §16.16 (f) wherever a concurrent assertion is written: in an interface,
-// whose `not s2` is on s2's clock, a program, a checker, a generate if block
-// and a generate for block, each declaring its own clocked property or
-// sequence, the blocks also instancing the module's, an instance of a
-// clocked property is accepted and an unclocked spec reported. A property
-// and a sequence the compilation unit declares, a package's property named
-// `pk::pq` and one imported are accepted. In an initial procedure and in
-// `always @(a)`, which infer no clock (§16.14.6), the instance is accepted
-// and the unclocked spec reported under that subclause.
 TEST(DeterminedClockElaboration, EachPlaceLooksTheDeclarationUp) {
   ElabFixture f;
   Elaborate(

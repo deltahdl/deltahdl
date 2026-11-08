@@ -34,9 +34,6 @@ TEST(LoopSyntaxParsing, ForCommaSeparatedUntypedInit) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 12.7.1: a for-loop may leave for_initialization empty and steer itself with
-// a variable that an earlier declaration introduced. The A.6.8 file carries
-// the bare production case.
 TEST(LoopSyntaxParsing, ForEmptyInitWithLoopVariableDeclaredPriorToLoop) {
   auto r = Parse(
       "module m;\n"
@@ -64,9 +61,6 @@ TEST(LoopSyntaxParsing, ForEmptyCondition) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// 12.7.1 c): for_step normally modifies the loop-control variable, but it is
-// optional, and the body may do that work instead. The A.6.8 file carries the
-// bare production case.
 TEST(LoopSyntaxParsing, ForEmptyStepWithLoopVariableModifiedInBody) {
   auto r = Parse(
       "module m;\n"
@@ -79,8 +73,6 @@ TEST(LoopSyntaxParsing, ForEmptyStepWithLoopVariableModifiedInBody) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// A for-loop step may be a function/subroutine call, not only an assignment
-// or an increment/decrement expression.
 TEST(LoopSyntaxParsing, ForFunctionCallStep) {
   auto r = Parse(
       "module m;\n"
@@ -123,10 +115,6 @@ TEST(LoopSyntaxParsing, ForAllComponentsEmpty) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §12.7.1's for_variable_declaration names a data type once and then one or
-// more `variable_identifier = expression`, so a declarator after the comma
-// that brings no data type of its own declares a variable of the one before
-// it, and one that does starts a declaration of its own type.
 TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePrecedingType) {
   auto r = Parse(
       "module m;\n"
@@ -146,8 +134,6 @@ TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePrecedingType) {
   EXPECT_EQ(stmt->for_init_types[3].kind, DataTypeKind::kByte);
 }
 
-// The preceding declarator's whole data type is taken, its packed dimension
-// with it.
 TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePackedDimension) {
   auto r = Parse(
       "module m;\n"
@@ -164,10 +150,6 @@ TEST(LoopSyntaxParsing, ForDeclaratorWithoutTypeTakesThePackedDimension) {
   EXPECT_NE(stmt->for_init_types[1].packed_dim_left, nullptr);
 }
 
-// Syntax 12-5 lets a for loop declare its variable with any data_type, a type
-// name behind a package scope among them (A.2.2.1), so `pkg::word_t i = 0`
-// declares i of the package's type. An assignment to a package's variable,
-// `pkg::v = 0`, declares nothing and stays a plain initialization.
 TEST(LoopSyntaxParsing, ForInitWithPackageScopedTypeDeclares) {
   auto r = Parse(
       "package pkg; typedef int word_t; int v; endpackage\n"

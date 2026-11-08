@@ -14,9 +14,6 @@
 
 namespace delta {
 
-// 18.4.2: a randc variable takes the next value of its permutation once per
-// randomize(), whatever the attempts the other variables take, so the value
-// is drawn once into `drawn` and answered from there across them.
 std::function<int64_t(RandVariable&)> ConstraintSolver::RandcOncePerSolve(
     std::unordered_map<std::string, int64_t>& drawn,
     const std::vector<ConstraintExpr>& extra) {
@@ -30,9 +27,6 @@ std::function<int64_t(RandVariable&)> ConstraintSolver::RandcOncePerSolve(
   };
 }
 
-// 18.4.2: after an attempt found no solution, a randc value one of the
-// constraints naming it refuses is passed over for the next of its
-// permutation, and one every such constraint admits is kept.
 void ConstraintSolver::PruneRefusedRandcValues(
     std::unordered_map<std::string, int64_t>& drawn,
     const std::vector<ConstraintExpr>& extra) const {
@@ -42,8 +36,6 @@ void ConstraintSolver::PruneRefusedRandcValues(
   }
 }
 
-// The variables the constraint `c` names, as the variable it constrains,
-// among the ones it references, or in a constraint it guards.
 static void CollectNamed(const ConstraintExpr& c,
                          std::vector<std::string>& out) {
   if (!c.var_name.empty()) out.push_back(c.var_name);
@@ -52,8 +44,6 @@ static void CollectNamed(const ConstraintExpr& c,
   for (const auto& sub : c.else_constraints) CollectNamed(sub, out);
 }
 
-// Whether the constraint `c` names the variable `name`, as the variable it
-// constrains, among the ones it references, or in a constraint it guards.
 static bool ConstraintNames(const ConstraintExpr& c, const std::string& name) {
   if (c.var_name == name) return true;
   if (std::find(c.ref_vars.begin(), c.ref_vars.end(), name) !=
@@ -86,13 +76,8 @@ bool ConstraintSolver::RandcValueAdmissible(
   return true;
 }
 
-// The most values a variable's admissible values are enumerated over; a
-// wider domain is drawn by GenerateRandValue alone.
 constexpr uint64_t kMaxEnumeratedDomain = 4096;
 
-// The values of `var`'s domain, its enum's named constants where it is
-// confined to them, into `out`; false for a real variable or a domain too
-// wide to enumerate.
 static bool EnumeratedDomain(const RandVariable& var,
                              std::vector<int64_t>& out) {
   bool enum_domain = !var.enum_values.empty() && var.apply_enum_restriction;
@@ -149,8 +134,6 @@ std::vector<int64_t> ConstraintSolver::AdmittedValues(
 bool ConstraintSolver::OwnAdmissibleValues(
     const RandVariable& var, const std::vector<ConstraintExpr>& extra,
     bool need_custom, std::vector<int64_t>& out) {
-  // The domain is judged first, as the constraints a wide one is held to are
-  // never enumerated.
   std::vector<int64_t> domain;
   if (!EnumeratedDomain(var, domain)) return false;
   std::vector<const ConstraintExpr*> own;
@@ -179,17 +162,13 @@ bool ConstraintSolver::DrawAdmissibleRandc(
       var.shared_randc_state ? *var.shared_randc_state : var.randc_history;
   std::vector<int64_t>& began =
       var.shared_randc_domain ? *var.shared_randc_domain : var.randc_domain;
-  if (!OwnAdmissibleValues(var, extra, /*need_custom=*/false, admissible)) {
-    // Constraints that no longer narrow the variable alone end the
-    // permutation they began.
+  if (!OwnAdmissibleValues(var, extra, false, admissible)) {
     if (!began.empty()) {
       history.clear();
       began.clear();
     }
     return false;
   }
-  // Constraints admitting other values than when the permutation began have
-  // changed, so the permutation is recomputed.
   if (began != admissible) {
     history.clear();
     began = admissible;
@@ -198,7 +177,6 @@ bool ConstraintSolver::DrawAdmissibleRandc(
   for (int64_t v : admissible) {
     if (history.count(v) == 0) fresh.push_back(v);
   }
-  // Every admissible value has been taken: the next permutation begins.
   if (fresh.empty()) {
     history.clear();
     fresh = admissible;
@@ -220,7 +198,7 @@ void ConstraintSolver::SeedEnumerableVariables(
     auto it = enumerated.find(name);
     if (it == enumerated.end()) {
       std::vector<int64_t> admissible;
-      OwnAdmissibleValues(var, extra, /*need_custom=*/true, admissible);
+      OwnAdmissibleValues(var, extra, true, admissible);
       it = enumerated.emplace(name, std::move(admissible)).first;
     }
     if (it->second.empty()) continue;

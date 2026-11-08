@@ -1,22 +1,3 @@
-// Tests for IEEE 1800-2023 §40.3.2.2 "$coverage_get_max".
-//
-// $coverage_get_max(coverage_type, scope_def, modules_or_instance) obtains the
-// value representing 100% coverage for the given coverage type over the named
-// portion of the hierarchy. That value is the sum of all coverable items of the
-// type; it shall remain constant across the duration of the simulation. The
-// integer result is one of the §40.3.1 status values (`SV_COV_ERROR for bad
-// arguments, `SV_COV_NOCOV when no coverage is available for the type,
-// `SV_COV_OVERFLOW when the count cannot be represented) or a positive maximum
-// coverage number.
-//
-// Each test drives a real $coverage_get_max system-function call through the
-// simulator's expression evaluator (EvalExpr -> EvalVerifSysCall ->
-// EvalCoverageGetMax), so the reported value is produced by the production
-// evaluation path, not by invoking the model directly. The coverable-item count
-// a scope holds is the one piece of state a real coverage engine would supply;
-// the tests prime it the way that engine would. The scope is specified per
-// $coverage_control() (§40.3.2.1).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -34,27 +15,21 @@ using namespace delta;
 
 namespace {
 
-// §40.3.1 coverage-type constants (first argument).
 constexpr int kAssertion = 20;
 constexpr int kToggle = 23;
 
-// §40.3.1 control constants used to change the collection state.
 constexpr int kStart = 0;
 constexpr int kReset = 2;
 
-// §40.3.1 status values that $coverage_get_max can report, as signed integers.
 constexpr int kError = static_cast<int>(CoverageStatus::kError);
 constexpr int kNoCov = static_cast<int>(CoverageStatus::kNoCoverage);
 constexpr int kOverflow = static_cast<int>(CoverageStatus::kOverflow);
 
-// §40.3.1 scope-definition constants (second argument).
 constexpr int kModule = 10;
 constexpr int kHier = 11;
 
 constexpr std::string_view kScope = "$root.tb.unit1";
 
-// Evaluates $coverage_get_max(coverage_type, scope_def, scope) through the
-// production evaluator and returns the reported value as a signed integer.
 int RunGetMax(SimFixture& f, int coverage_type, int scope_def,
               std::string_view scope) {
   auto* call = MkSysCall(f.arena, "$coverage_get_max",
@@ -64,8 +39,6 @@ int RunGetMax(SimFixture& f, int coverage_type, int scope_def,
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
 }
 
-// Drives a $coverage_control action over a scope through the production
-// evaluator so the collection state can be changed between get_max calls.
 void RunControl(SimFixture& f, int control, std::string_view scope) {
   auto* call = MkSysCall(
       f.arena, "$coverage_control",
@@ -78,8 +51,6 @@ CoverageControlState& Cov(SimFixture& f) {
   return f.ctx.GetCoverageControlState();
 }
 
-// +pos_num: with coverable items of the requested type, get_max returns their
-// sum, and the coverage_type argument selects which count is reported.
 TEST(CoverageGetMax, ReportsSumOfCoverableItemsPerType) {
   SimFixture f;
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
@@ -89,25 +60,18 @@ TEST(CoverageGetMax, ReportsSumOfCoverableItemsPerType) {
   EXPECT_EQ(RunGetMax(f, kAssertion, kHier, kScope), 5);
 }
 
-// 0 (`SV_COV_NOCOV): a scope that exists but holds no coverable items of the
-// requested type reports that no coverage is available for that type.
 TEST(CoverageGetMax, NoCoverableItemsReportsNoCoverage) {
   SimFixture f;
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
 
-  // The toggle items do not make assertion coverage available.
   EXPECT_EQ(RunGetMax(f, kAssertion, kHier, kScope), kNoCov);
 }
 
-// -1 (`SV_COV_ERROR): a scope the design does not contain is a bad argument and
-// reports an error.
 TEST(CoverageGetMax, UnknownScopeIsBadArgument) {
   SimFixture f;
   EXPECT_EQ(RunGetMax(f, kToggle, kHier, "$root.tb.nonesuch"), kError);
 }
 
-// -2 (`SV_COV_OVERFLOW): a maximum coverage count too large to represent as an
-// integer overflows.
 TEST(CoverageGetMax, CountExceedingIntegerRangeOverflows) {
   SimFixture f;
   Cov(f).SetCoverableItems(
@@ -117,9 +81,6 @@ TEST(CoverageGetMax, CountExceedingIntegerRangeOverflows) {
   EXPECT_EQ(RunGetMax(f, kToggle, kHier, kScope), kOverflow);
 }
 
-// shall: the value representing 100% coverage remains constant across the
-// simulation. Starting and then resetting collection changes the collection
-// state but not the maximum coverage number.
 TEST(CoverageGetMax, MaximumStaysConstantAcrossCollectionChanges) {
   SimFixture f;
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
@@ -135,8 +96,6 @@ TEST(CoverageGetMax, MaximumStaysConstantAcrossCollectionChanges) {
   EXPECT_EQ(kAfter, kBefore);
 }
 
-// -1 (`SV_COV_ERROR) edge: a call with no arguments cannot name a coverage type
-// and is a bad argument.
 TEST(CoverageGetMax, MissingArgumentsIsBadArgument) {
   SimFixture f;
   auto* call = MkSysCall(f.arena, "$coverage_get_max", {});
@@ -144,11 +103,6 @@ TEST(CoverageGetMax, MissingArgumentsIsBadArgument) {
             kError);
 }
 
-// §40.3.2.1 Table 40-2 for the maximum as well: what represents 100% coverage
-// of a hierarchy is the coverable items of everything in it, so the same scope
-// under the two scope definitions reports two different maxima - and a coverage
-// percentage taken over a hierarchy is only right when both halves of it are
-// read the same way.
 TEST(CoverageGetMax, TheScopeDefinitionDecidesWhatIsSummed) {
   SimFixture f;
   Cov(f).SetCoverableItems("top.dut", kToggle, 8);
@@ -158,14 +112,6 @@ TEST(CoverageGetMax, TheScopeDefinitionDecidesWhatIsSummed) {
   EXPECT_EQ(RunGetMax(f, kToggle, kModule, "top.dut"), 8);
 }
 
-// §40.3.2.1 Table 40-2's definition-name column, which is what §40.3.2.2 means
-// by a sum over the hierarchy or hierarchies named: a string that is not an
-// instance path names a module definition, and 100% coverage of it is then the
-// coverable items of every instance of that module. Under `SV_COV_HIER the sum
-// takes in everything beneath those instances; under `SV_COV_MODULE it is the
-// instances alone, with nothing beneath them. The two answers differ here by
-// exactly what the child instance holds, and neither counts the instance of
-// another module.
 TEST(CoverageGetMax, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
   SimFixture f;
   Cov(f).SetCoverableItems("top.u1", kToggle, 3);
@@ -180,12 +126,6 @@ TEST(CoverageGetMax, ADefinitionNameSumsOverEveryInstanceOfThatModule) {
   EXPECT_EQ(RunGetMax(f, kToggle, kModule, "other"), 7);
 }
 
-// Table 40-2's note names instances by hierarchical path, and lets a path that
-// refers to an instance of the current context leave out every `.` - so one
-// string can read either way, and a string the design registered a scope under
-// is that scope. Here the maximum reported for "leaf" is the instance called
-// leaf, not the sum over the instances of a module definition that happens to
-// share the name.
 TEST(CoverageGetMax, AStringNamingAnInstanceIsReadAsThatInstance) {
   SimFixture f;
   Cov(f).SetCoverableItems("leaf", kToggle, 2);
@@ -195,9 +135,6 @@ TEST(CoverageGetMax, AStringNamingAnInstanceIsReadAsThatInstance) {
   EXPECT_EQ(RunGetMax(f, kToggle, kModule, "leaf"), 2);
 }
 
-// -1 (`SV_COV_ERROR): a call whose scope argument is missing names no scope at
-// all, and the empty string it leaves behind is not the definition name shared
-// by every instance the design registered no definition for.
 TEST(CoverageGetMax, AMissingScopeNamesNothingAndIsABadArgument) {
   SimFixture f;
   Cov(f).SetCoverableItems(std::string(kScope), kToggle, 48);
@@ -209,10 +146,6 @@ TEST(CoverageGetMax, AMissingScopeNamesNothingAndIsABadArgument) {
             kError);
 }
 
-// -1 (`SV_COV_ERROR) is a signed result: printed directly it reads -1, and
-// a test of it against zero finds it below, as the negative status values of
-// §40.3.1 are meant to be found. The query names an instance the design lacks,
-// for each of the three functions that take a scope (#4668).
 TEST(CoverageGetMax, AFailedQueryIsANegativeInteger) {
   SimFixture f;
   const std::string kOut = PreprocessAndCapture(
@@ -233,10 +166,6 @@ TEST(CoverageGetMax, AFailedQueryIsANegativeInteger) {
   EXPECT_EQ(kOut, "-1\n-1\n-1\n1\n");
 }
 
-// §40.3.2.1 with §40.3.2.2: an instance the design elaborates is a scope the
-// queries take by name, offering the statements its procedure holds - the
-// block, the three assignments and the $display - in full, while a name the
-// design lacks is still a bad argument (#4662, #7528).
 TEST(CoverageGetMax, AnInstanceOfTheDesignIsAScopeTheQueriesName) {
   SimFixture f;
   const std::string kOut = PreprocessAndCapture(
@@ -256,9 +185,6 @@ TEST(CoverageGetMax, AnInstanceOfTheDesignIsAScopeTheQueriesName) {
   EXPECT_EQ(kOut, "5 -1 1\n");
 }
 
-// §40.3.2.1 Table 40-2: a module definition name reaches every instance of
-// that module the design holds, so a query naming the child's definition
-// finds a scope where no instance is called by that name (#4662).
 TEST(CoverageGetMax, ADefinitionNameOfTheDesignReachesItsInstances) {
   SimFixture f;
   const std::string kOut = PreprocessAndCapture(

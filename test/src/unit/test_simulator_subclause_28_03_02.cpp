@@ -10,8 +10,6 @@ using namespace delta;
 
 namespace {
 
-// Runs an `and` gate with the given initial input assignments and strength
-// spec, then verifies the resolved value's low aval/bval bits on net `y`.
 void RunAndCheckResolvedWord(const std::string& initial_line,
                              const std::string& gate_line, uint32_t expect_aval,
                              uint32_t expect_bval) {
@@ -34,14 +32,12 @@ void RunAndCheckResolvedWord(const std::string& initial_line,
 
 TEST(HighzStrengthOutput, Highz1ProducesZWhenGateComputesOne) {
   RunAndCheckResolvedWord("  initial begin a = 1'b1; b = 1'b1; end\n",
-                          "  and (strong0, highz1) g1(y, a, b);\n", 0u,
-                          1u);  // z = (aval=0, bval=1)
+                          "  and (strong0, highz1) g1(y, a, b);\n", 0u, 1u);
 }
 
 TEST(HighzStrengthOutput, Highz0ProducesZWhenGateComputesZero) {
   RunAndCheckResolvedWord("  initial begin a = 1'b0; b = 1'b1; end\n",
-                          "  and (highz0, strong1) g1(y, a, b);\n", 0u,
-                          1u);  // z = (aval=0, bval=1)
+                          "  and (highz0, strong1) g1(y, a, b);\n", 0u, 1u);
 }
 
 TEST(HighzStrengthOutput, Highz1DoesNotAffectZeroOutput) {
@@ -49,8 +45,6 @@ TEST(HighzStrengthOutput, Highz1DoesNotAffectZeroOutput) {
                           "  and (strong0, highz1) g1(y, a, b);\n", 0u, 0u);
 }
 
-// Symmetric negative form: highz0 rewrites only logic-0 outputs, so a gate that
-// computes a 1 must keep its 1 (aval=1, bval=0) even when strength0 is highz0.
 TEST(HighzStrengthOutput, Highz0DoesNotAffectOneOutput) {
   RunAndCheckResolvedWord("  initial begin a = 1'b1; b = 1'b1; end\n",
                           "  and (highz0, strong1) g1(y, a, b);\n", 1u, 0u);
@@ -75,9 +69,6 @@ TEST(Strength01Semantics, Strength0AndStrength1ReachNetDriver) {
   EXPECT_EQ(net->driver_strengths[0].s1, Strength::kSupply);
 }
 
-// A second point in the strength0/strength1 keyword-to-level mapping: weak0 and
-// strong1 must reach the driver as the weak and strong runtime strengths,
-// exercising a different code path than the pull/supply case above.
 TEST(Strength01Semantics, WeakAndStrongStrengthsReachNetDriver) {
   SimFixture f;
   auto* design = ElaborateSrc(

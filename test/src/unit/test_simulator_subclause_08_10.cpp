@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §8.10: a static method behaves like a regular subroutine that can be called
-// with no class instantiation. Here no object of Util is ever constructed, yet
-// the scope-resolved call runs and yields a computed result.
 TEST(StaticMethodSimulation, StaticMethodCallableWithoutAnyInstance) {
   EXPECT_EQ(RunAndGet("class Util;\n"
                       "  static function int add(int a, int b);\n"
@@ -27,9 +24,6 @@ TEST(StaticMethodSimulation, StaticMethodCallableWithoutAnyInstance) {
             42u);
 }
 
-// §8.10: a static method may directly access static class properties. The
-// static property carries a §8.9 inline initializer, so the value observed
-// through the static method is the one produced by that declaration.
 TEST(StaticMethodSimulation, StaticMethodReadsInlineInitializedStaticProperty) {
   EXPECT_EQ(RunAndGet("class id;\n"
                       "  static int current = 100;\n"
@@ -47,9 +41,6 @@ TEST(StaticMethodSimulation, StaticMethodReadsInlineInitializedStaticProperty) {
             100u);
 }
 
-// §8.10: the static-method form applies to tasks as well as functions. A
-// static task, called without an instance, writes shared static state that a
-// static function then reads back.
 TEST(StaticMethodSimulation, StaticTaskModifiesStaticProperty) {
   EXPECT_EQ(RunAndGet("class Counter;\n"
                       "  static int count;\n"
@@ -137,12 +128,6 @@ TEST(StaticMethodSimulation, StaticMethodSharedAcrossInstances) {
             3u);
 }
 
-// §8.10: a static method is called with no object of its class, and §8.21 has
-// an abstract class that can never have one; a wildcard import in the
-// compilation-unit scope (§3.12.1, §26.3) makes the package's class visible to
-// the module by its bare name. The call through the class scope resolution
-// operator yields the method's 7, where a lookup that misses the class yields
-// the zero of an unresolved call.
 TEST(StaticMethodSimulation, AbstractPackageClassStaticMethodCalledByBareName) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  virtual class base_t;\n"
@@ -162,11 +147,6 @@ TEST(StaticMethodSimulation, AbstractPackageClassStaticMethodCalledByBareName) {
             7u);
 }
 
-// §8.10: a static method reads and writes the static properties of its class,
-// of which §8.9 keeps one copy. The class is named by its bare name through the
-// module's import and by `p::cnt_t` through the package scope resolution
-// operator of §26.3; both calls reach the one copy of `total`, so the second
-// answers 38, where a class lowered once per spelling would answer 34.
 TEST(StaticMethodSimulation, PackageClassStaticMethodSharesOneStaticProperty) {
   EXPECT_EQ(RunAndGet("package p;\n"
                       "  class cnt_t;\n"
@@ -189,15 +169,6 @@ TEST(StaticMethodSimulation, PackageClassStaticMethodSharesOneStaticProperty) {
             38u);
 }
 
-// §8.10 with §13.3: a static task runs in class scope with no `this`, and a
-// delay in its body suspends the enabling process as any task's does, so the
-// static property it writes after `#3` is read at time 3 and the enabling
-// process goes on after it. A static task named through the class scope,
-// `Counter::run()`, and through a handle, `h.run()`, are the same call
-// (§8.10). Before the fix the call fell to the synchronous function path,
-// which drops a delay, so the write landed at time 0 or not at all: the
-// result reads the time of the write and the property, 3 * 100 + 6 + 3 * 10
-// + 6 for the two calls.
 TEST(StaticMethodSimulation, StaticTaskWithADelayConsumesTime) {
   EXPECT_EQ(RunAndGet("class Counter;\n"
                       "  static int s;\n"
@@ -221,9 +192,6 @@ TEST(StaticMethodSimulation, StaticTaskWithADelayConsumesTime) {
             102u);
 }
 
-// §8.10 with §9.3.2: a fork inside a static task, its branches writing a
-// static property after `#3` and the task's own local after `#1`, joined
-// before the task reads both at time 3 -- the Clause 9 discovery's probe 84.
 TEST(StaticMethodSimulation, StaticTaskForksAndJoins) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  static int s;\n"
@@ -248,11 +216,6 @@ TEST(StaticMethodSimulation, StaticTaskForksAndJoins) {
             6093u);
 }
 
-// §8.10 (printed pages 186-187): a static method has no `this`, even when an
-// instance method of another class calls it. The caller's object stayed in
-// force instead, and a process the static method forked inherited it, so
-// `pool.push_back(e)` on the static queue was taken as a method called
-// through a property handle of R and reported a null handle under §8.4.
 TEST(StaticMethodSimulation, ForkOfAStaticMethodCalledFromAnObjectHasNoThis) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -307,10 +270,6 @@ TEST(StaticMethodSimulation, ForkOfAStaticMethodCalledFromAnObjectHasNoThis) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// §8.10 with §13.4.2 and §26.2: a class a package declares has one
-// declaration, so a static local of its method is one variable whatever
-// instance calls the method: u1's call, u2's and the top's count to 3. Kept
-// per calling instance, each counted its own and the top read 1.
 TEST(StaticMethodSimulation,
      PackageClassMethodStaticLocalSharedByEveryInstance) {
   auto val = RunAndGet(
@@ -334,8 +293,6 @@ TEST(StaticMethodSimulation,
   EXPECT_EQ(val, 3u);
 }
 
-// The same for a task of a class the compilation unit declares (§3.12.1),
-// which runs as a coroutine rather than through the function evaluator.
 TEST(StaticMethodSimulation, UnitClassTaskStaticLocalSharedByEveryInstance) {
   auto val = RunAndGet(
       "class C;\n"
@@ -356,9 +313,6 @@ TEST(StaticMethodSimulation, UnitClassTaskStaticLocalSharedByEveryInstance) {
   EXPECT_EQ(val, 3u);
 }
 
-// §8.3 with §13.4.2: two classes are two types, so A's task count and B's
-// task count each keep their own static n, A's counting from 0 and B's from
-// 10. Kept under the bare name count, B's declaration found A's n.
 TEST(StaticMethodSimulation, SameNamedTasksOfTwoClassesKeepTheirOwnStatics) {
   const char* src =
       "class A;\n"

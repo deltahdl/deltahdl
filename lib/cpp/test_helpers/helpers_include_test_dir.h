@@ -6,9 +6,6 @@
 #include <fstream>
 #include <string>
 
-// A scratch directory under the system temp path used by `include tests. The
-// directory is created on construction and removed on destruction; WriteFile
-// places a file (creating parent directories) relative to it.
 struct IncludeTestDir {
   std::filesystem::path dir;
   IncludeTestDir() {

@@ -1,32 +1,3 @@
-// §34.5.14.2 data_decrypt_key, Description.
-//
-// The subclause says three things about the keyword §34.5.14.1 spells.
-//
-//   Written in an encrypting tool's input, it says the next line holds the
-//   encoded value of the key that will decrypt the data_block, and it should
-//   only be used where digital signatures are. An author generates a key, seals
-//   the cleartext with it, and stores that as the data_block; the data_method
-//   and this key are then encrypted under the key_method and stored as the
-//   contents of the key_block, the data_block itself not being re-encrypted.
-//
-//   In a tool's output the key is part of the encrypted content of the
-//   key_block, encoded as the encoding pragma expression states.
-//
-//   On the way back, a tool that finds a digital signature was in use decrypts
-//   the key_block to find the data_decrypt_key and the data_method, and those
-//   in turn decrypt the data_block.
-//
-// The last two are what a run can be held to, and they are one claim seen from
-// each side: the key that opens a region's data travels inside the region's key
-// block rather than beside it. §34.5.27 covers what a key block is and when a
-// region gets one; what is left here is that the key inside it is the one the
-// data block is opened with, which is why a reading that cannot open the key
-// block cannot open the data either.
-//
-// A region reaches that arrangement by designating a key for its key block and
-// naming none for its data directly (§34.5.23 and §34.5.25 write the
-// designation), which is the shape the cases below build.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -46,24 +17,16 @@ using namespace delta;
 
 namespace {
 
-// The entity that provided the key a region's key block is under, the name
-// picking that key out, and the key itself.
 constexpr std::string_view kProvider = "cerulean-vault";
 constexpr std::string_view kBlockKeyName = "wrapping-2026";
 constexpr std::string_view kBlockKey = "cerulean-vault-wrapping-key";
 
-// The name a region gives the key its data are under. It is designated but no
-// key is held for it directly, which is what sends the region to a key block.
 constexpr std::string_view kDataKeyName = "data-2026";
 
-// A key of another entity, for the reading that holds keys and none of them the
-// one the block is under. A reading holding nothing at all would fail for want
-// of any key rather than for want of this one.
 constexpr std::string_view kOtherProvider = "someone-else";
 constexpr std::string_view kOtherKeyName = "theirs-2026";
 constexpr std::string_view kOtherKey = "someone-elses-key";
 
-// The design a region seals.
 constexpr std::string_view kSealedDesign = "module sealed_m; endmodule\n";
 
 std::string Writes(std::string_view keyword, std::string_view value) {
@@ -72,9 +35,6 @@ std::string Writes(std::string_view keyword, std::string_view value) {
   return text;
 }
 
-// A region designating the key its key block is under and naming the key its
-// data are under, with the design between the delimiters of §34.5.1 and
-// §34.5.2.
 std::string RegionUnderAKeyBlock() {
   std::string text = "`pragma protect begin\n";
   text.append(Writes("key_keyowner", kProvider));
@@ -97,9 +57,6 @@ ProtectKeyList SomeoneElsesKey() {
   return keys;
 }
 
-// The envelope this tool writes for that region, checked on the way out to be
-// one that carries a key block: without it the cases below would be about a
-// region sealed some other way.
 std::string EnvelopeWithAKeyBlock() {
   std::string envelope =
       EncryptEnvelopes(RegionUnderAKeyBlock(), {}, TheBlockKey());
@@ -109,18 +66,10 @@ std::string EnvelopeWithAKeyBlock() {
   return envelope;
 }
 
-// The 1-based line of `envelope` its data block is written on, which is the
-// line a report about that block stands at. §34.5.15.1 spells the announcing
-// expression as the keyword standing alone and §34.5.15.2 has the block begin
-// on the next line in the file, so the block is written one line below it
-// (issue #3272).
 uint32_t TheWrappedBlocksLine(std::string_view envelope) {
   return LineHolding(envelope, "`pragma protect data_block\n") + 1;
 }
 
-// §34.5.14.2: the key is part of the encrypted content of the key block, so it
-// does not stand in the envelope as a directive of its own. An envelope writing
-// it in the clear would be handing out the key that opens its own data.
 TEST(ProtectDataDecryptKeyDescription, TheKeyIsNotWrittenInTheClear) {
   std::string envelope = EnvelopeWithAKeyBlock();
   EXPECT_EQ(envelope.find("`pragma protect data_decrypt_key"),
@@ -128,9 +77,6 @@ TEST(ProtectDataDecryptKeyDescription, TheKeyIsNotWrittenInTheClear) {
       << envelope;
 }
 
-// §34.5.14.2: a reading decrypts the key block to find the key, and that key
-// decrypts the data block. Holding the key the block is under is what opens
-// both, and the design comes back.
 TEST(ProtectDataDecryptKeyDescription, TheKeyInsideTheBlockOpensTheData) {
   PreprocFixture f;
   PreprocConfig config;
@@ -140,10 +86,6 @@ TEST(ProtectDataDecryptKeyDescription, TheKeyInsideTheBlockOpensTheData) {
   EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
 }
 
-// The same envelope read by a tool holding a key of another entity and none of
-// the one the block is under. The key block stays shut, so the data stays shut
-// with it -- which is what makes the case above about the key inside the block
-// rather than about a region that opens for anyone.
 TEST(ProtectDataDecryptKeyDescription, WithoutTheBlocksKeyTheDataStaysShut) {
   std::string envelope = EnvelopeWithAKeyBlock();
   PreprocFixture f;
@@ -158,14 +100,6 @@ TEST(ProtectDataDecryptKeyDescription, WithoutTheBlocksKeyTheDataStaysShut) {
       << read;
 }
 
-// §34.5.14.2 (printed page 959): the decrypting tool decrypts the key_block to
-// recover the data_decrypt_key and data_method, which then decrypt the
-// data_block. A region naming its data's key under the same entity its key
-// block is under writes that name into the block beside the key, and a reader
-// holding only the block's key -- a list for that entity without the data's
-// name in it -- takes the key from the block rather than being told the name is
-// not in its list: §34.5.12.2 makes that an error of the encryption input, and
-// the reader was stopped at the block written to let it in.
 TEST(ProtectDataDecryptKeyDescription,
      TheNameInsideTheBlockNeedsNoKeyOfItsOwn) {
   std::string region = "`pragma protect begin\n";
@@ -186,9 +120,6 @@ TEST(ProtectDataDecryptKeyDescription,
   EXPECT_NE(read.find(kSealedDesign), std::string::npos) << read;
 }
 
-// The line of `envelope` beneath the expression `keyword` writes standing
-// alone, which is where §34.5.15 and §34.5.22 put a block, the search starting
-// at `from`.
 std::string LineBeneath(std::string_view envelope, std::string_view keyword,
                         size_t from = 0) {
   std::string opening = "`pragma protect ";
@@ -200,9 +131,6 @@ std::string LineBeneath(std::string_view envelope, std::string_view keyword,
       envelope.substr(starts, envelope.find('\n', starts) - starts));
 }
 
-// §34.5.14.2 lets the author make the key that opens the data and write it on
-// the line beneath the keyword: the data block is encrypted under that key and
-// the key block carries it, and neither line goes into the data block.
 TEST(ProtectDataDecryptKeyDescription, AKeyTheAuthorMadeSealsTheData) {
   constexpr std::string_view kAuthorsKey = "the-authors-own-data-key";
   std::string region = "`pragma protect begin\n";
@@ -222,9 +150,6 @@ TEST(ProtectDataDecryptKeyDescription, AKeyTheAuthorMadeSealsTheData) {
   EXPECT_EQ(recovered.find("data_decrypt_key"), std::string::npos) << recovered;
 }
 
-// A line beneath the keyword that the scheme in effect never wrote carries no
-// key, so the region is not sealed under its characters: a key is made for it
-// as for a region that supplied none.
 TEST(ProtectDataDecryptKeyDescription, ALineTheSchemeNeverWroteIsNoKey) {
   std::string region = "`pragma protect begin\n";
   region.append(Writes("key_keyowner", kProvider));

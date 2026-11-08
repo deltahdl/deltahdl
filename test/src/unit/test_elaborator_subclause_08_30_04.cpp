@@ -6,9 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §8.30.4: the void clear() call elaborates cleanly. The referent value and any
-// following get() do not exercise a distinct elaborator path for clear(), so a
-// single accepting form covers elaboration of the clear() call.
 TEST(ClassConstraintElaboration, WeakRefClearCallOk) {
   EXPECT_TRUE(
       ElabOk("class obj;\n"

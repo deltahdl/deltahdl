@@ -132,12 +132,6 @@ TEST(TypeParameterParsing, TypeParamForwardStructBody) {
   EXPECT_EQ(r.cu->modules[0]->items[0]->name, "S");
 }
 
-// A.1.3's parameter_port_declaration opens with `parameter`, `localparam`,
-// `type` or a data type (printed page 1174 of IEEE 1800-2023), so `B =
-// logic` after the comma continues A.2.1.1's `type list_of_type_assignments`
-// (printed pages 1181 and 1184) rather than opening a value parameter: B is a
-// type parameter, and `B x;` in the body declares x. The same holds under the
-// `parameter` keyword.
 TEST(TypeParameterParsing, PortListTypeGroupContinuesPastTheComma) {
   auto r = Parse(
       "module m #(type A = int, B = logic);\n"
@@ -165,9 +159,6 @@ TEST(TypeParameterParsing, PortListTypeGroupContinuesPastTheComma) {
   EXPECT_EQ(y->data_type.type_name, "Q");
 }
 
-// A value group is still continued the same way: `B = 2` after
-// `parameter int A = 1` is the second param_assignment of that declaration,
-// and `C = 3` after `localparam type L = int` is a localparam type.
 TEST(TypeParameterParsing, ValueGroupAfterATypeGroupContinuesAsValues) {
   auto r = Parse(
       "module m #(type T = int, parameter int A = 1, B = 2);\n"
@@ -183,11 +174,6 @@ TEST(TypeParameterParsing, ValueGroupAfterATypeGroupContinuesAsValues) {
   EXPECT_FALSE(m->type_param_names.count("B"));
 }
 
-// §6.20.3 with §8.25: a type parameter declared in a class body of a class
-// with a parameter port list cannot be overridden, so it names the one type
-// its default does in each specialization and is carried as a class typedef
-// of that type: `localparam type U = T;` is a typedef U of T. Carried as a
-// value parameter, the type it named was dropped.
 TEST(TypeParameterParsing, ClassBodyLocalTypeParamIsATypedefOfItsType) {
   auto r = Parse(
       "class C #(type T = int);\n"

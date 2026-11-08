@@ -16,19 +16,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23 with §26.3 and §3.12.1: a type reference to an expression stands for
-// the expression's self-determined type whatever scope its names come from: a
-// package, named through `p::` or made visible by an explicit or a wildcard
-// import, or the compilation unit, named through `$unit::` or written bare,
-// where a name the enclosing design element declares hides the unit's own
-// (§3.12.1). Two such references compared match by §6.22.1, and a declaration
-// written with one takes the type.
-//
-// Each case runs twice, once with the package and the unit declaring their
-// values as bytes and once as `logic [3:0]` vectors, with their arrays, packed
-// elements and structure member sized to differ alike, so a case answers one
-// way in the first and the other way in the second wherever the value's type
-// decides it.
 struct OutsideValues {
   const char* scalar;
   const char* array_size;
@@ -39,11 +26,6 @@ struct OutsideValues {
 constexpr OutsideValues kByteValues{"byte", "2", "[7:0]", "[4:0]"};
 constexpr OutsideValues kNibbleValues{"logic [3:0]", "3", "[3:0]", "[2:0]"};
 
-// A package declaring a variable, a value parameter, an enumeration with its
-// constants, a variable of the name the host also declares, an unpacked
-// array, a packed array, a structure and a function; and the compilation
-// unit's variable, value parameter, a variable the host's own hides, and a
-// variable the host's typedef of the name hides.
 std::string OutsideTheHost(const OutsideValues& values) {
   return std::format(
       "package p;\n"
@@ -64,19 +46,11 @@ std::string OutsideTheHost(const OutsideValues& values) {
       values.scalar, values.array_size, values.element, values.field);
 }
 
-// The two ways the host makes the package's v, P and E1 visible bare: an
-// explicit import of each, and a wildcard import, under which the host's own
-// n still hides the package's (§26.3).
 constexpr std::array<const char*, 2> kImports = {
     "  import p::v;\n  import p::P;\n  import p::E1;\n", "  import p::*;\n"};
 
-// What holds the expressions: a design element's items, a checker's, which
-// take no parameter (§17.2) and whose procedure is an always_comb (§17.5), or
-// a subroutine's statements.
 enum class Scope : std::uint8_t { kDesignElement, kChecker, kSubroutine };
 
-// `text` holds the host's declarations at `{0}` and what the case writes at
-// `{1}`; `result` names the r the case sets.
 struct Place {
   const char* name;
   const char* text;
@@ -117,9 +91,6 @@ constexpr std::array kPlaces = {
           "r", Scope::kSubroutine},
 };
 
-// Where the expression stands: a procedural if's condition, a continuous
-// assignment's right-hand side, a generate if's condition (§27.5), a
-// localparam's value (§6.20.4), or a variable declaration's type.
 enum class Context : std::uint8_t {
   kProceduralIf,
   kContinuousAssignment,
@@ -128,8 +99,6 @@ enum class Context : std::uint8_t {
   kDeclaration
 };
 
-// A subroutine holds neither a continuous assignment nor a generate construct,
-// and a checker no parameter.
 bool Admits(Scope scope, Context context) {
   if (scope == Scope::kSubroutine) {
     return context != Context::kContinuousAssignment &&
@@ -138,9 +107,6 @@ bool Admits(Scope scope, Context context) {
   return scope != Scope::kChecker || context != Context::kParameter;
 }
 
-// What sets r's bit `count - 1 - k` to the outcome of tests[k], written in
-// `context` in a host of `scope`, a parameter declared with
-// `parameter_keyword`.
 std::string Writing(std::span<const std::string> tests, Context context,
                     Scope scope,
                     std::string_view parameter_keyword = "localparam") {
@@ -185,9 +151,6 @@ std::string Writing(std::span<const std::string> tests, Context context,
   return std::format("{}  assign r = {{{}}};\n", items, listed);
 }
 
-// A set of tests, any declarations they read, and the value r takes from them
-// under the byte values and under the nibble values, the first test its most
-// significant bit.
 struct Battery {
   std::string declarations;
   std::vector<std::string> tests;
@@ -201,9 +164,6 @@ struct Battery {
   }
 };
 
-// The source of a design whose host, at `place`, makes the package's names
-// visible by `imports`, declares a 2-state a, its own n and h, an unpacked
-// array type, a typedef T and r, and holds `written`.
 std::string Design(const Place& place, const OutsideValues& values,
                    std::string_view imports, size_t count,
                    const std::string& written) {
@@ -235,14 +195,6 @@ void ExpectAtEveryPlace(const Battery& battery, Context context) {
   }
 }
 
-// A comparison of type references, and whether it holds under the byte values
-// and under the nibble values. By §11.6.1, §11.8.1 and §11.3.4, `x + 1'b0` is
-// as wide as x, unsigned, and 4-state for the literal; a concatenation is
-// unsigned and as wide as its operands together; a part-select is unsigned and
-// of its vector's state; an enumeration constant in an operation is its base
-// type. By §6.22.1, a variable's type matches the type it is declared with, an
-// unpacked array matches a typedef of the same element and bounds, and a
-// constant's matches its enumeration's.
 struct Compared {
   const char* text;
   bool under_bytes;
@@ -250,9 +202,6 @@ struct Compared {
 };
 
 constexpr std::array kCompared = {
-    // A package's variable, value parameter and enumeration constant, named
-    // through the package, alone and in an operation, a concatenation and a
-    // part-select.
     Compared{"type(p::v + 1'b0) == type(logic [7:0])", true, false},
     Compared{"type(p::v + 1'b0) == type(logic [3:0])", false, true},
     Compared{"type(p::v) == type(byte)", true, false},
@@ -262,15 +211,11 @@ constexpr std::array kCompared = {
     Compared{"type(p::P) == type(logic [3:0])", false, true},
     Compared{"type(p::E1) == type(p::e_t)", true, true},
     Compared{"type(p::E1 + 1'b0) == type(logic [7:0])", true, false},
-    // The same names imported and written bare.
     Compared{"type(v + 1'b0) == type(logic [7:0])", true, false},
     Compared{"type(v[3:0]) == type(logic [3:0])", false, true},
     Compared{"type(P) == type(byte)", true, false},
     Compared{"type(E1 + 1'b0) == type(logic [3:0])", false, true},
     Compared{"type(E1) == type(p::e_t)", true, true},
-    // The compilation unit's variable and value parameter, through $unit and
-    // bare; the host's own h hides the unit's, which $unit still names, alone
-    // and in an operation, and the host's typedef T hides the unit's T.
     Compared{"type($unit::g + 1'b0) == type(logic [7:0])", true, false},
     Compared{"type($unit::g) == type(logic [3:0])", false, true},
     Compared{"type(g) == type(byte)", true, false},
@@ -282,13 +227,9 @@ constexpr std::array kCompared = {
     Compared{"type($unit::h) == type(byte)", true, false},
     Compared{"type($unit::h) == type(logic [3:0])", false, true},
     Compared{"type(T) == type(int)", true, true},
-    // A package's unpacked array, an element of its packed array and a member
-    // of its structure.
     Compared{"type(p::arr) == type(i2_t)", true, false},
     Compared{"type(p::pw[0]) == type(bit [7:0])", true, false},
     Compared{"type(p::s.f) == type(logic [4:0])", true, false},
-    // The host's own n beside the package's, and a call of the package's
-    // function.
     Compared{"type(n + 1'b0) == type(logic [15:0])", true, true},
     Compared{"type(p::n) != type(n)", true, true},
     Compared{"type(p::pf()) == type(byte)", true, false},
@@ -318,12 +259,6 @@ TEST(ScopeValueTypeRefSim, ComparisonSetsAParameter) {
   ExpectAtEveryPlace(ComparisonBattery(), Context::kParameter);
 }
 
-// §6.23: a type reference never evaluates its operand, so a parameter
-// comparing the types of the compilation unit's g, of an operation on g with
-// an x literal, or of an x literal alone takes the elaborator's answer though
-// g, a logic [3:0] under the nibble values, holds x. Taken as a value with
-// unknown bits, the parameter was evaluated again at run time, where a
-// comparison of a name with a type's text gave 0 and one of two expressions 1.
 TEST(ScopeValueTypeRefSim, AParameterNeverEvaluatesTheOperandsUnknownBits) {
   Battery battery;
   battery.Add("type(g) == type(logic [3:0])", false, true);
@@ -334,12 +269,6 @@ TEST(ScopeValueTypeRefSim, AParameterNeverEvaluatesTheOperandsUnknownBits) {
   ExpectAtEveryPlace(battery, Context::kParameter);
 }
 
-// A variable declared with `var type(operand)`, and a probe of it, `{0}` its
-// name, that holds under the byte values and under the nibble values as
-// listed. A probe reads the declared width with $bits (§20.6.2) or the number
-// of elements with $size (§20.7), and the state through the variable's
-// initial value (§6.8): x in a 4-state variable, which $isunknown (§20.9)
-// reports, and 0 in a 2-state one.
 struct Declared {
   const char* operand;
   const char* probe;
@@ -374,8 +303,6 @@ constexpr std::array kDeclared = {
     Declared{"g", "$bits({0}) == 8", true, false},
 };
 
-// After `declarations`, a variable d<k> declared with `var type(operand)` for
-// each of `declared`, and its probe.
 Battery DeclarationBattery(std::string declarations,
                            std::span<const Declared> declared) {
   Battery battery;
@@ -394,29 +321,6 @@ TEST(ScopeValueTypeRefSim, DeclarationTakesTheValuesType) {
   ExpectAtEveryPlace(DeclarationBattery("", kDeclared), Context::kDeclaration);
 }
 
-// §6.23 with §23.9: a name a procedure declares -- a variable of a begin-end
-// or fork-join block, a formal of a task or function, or a for loop's
-// variable -- hides the module's name it shares within the procedure, and a
-// type reference to an expression written there types the expression by the
-// procedure's names: compared, it matches by §6.22.1, and a declaration
-// written with it takes the type. The module declares an int x, an int array
-// m of five elements and a 4-bit a, which the procedure's own x, m and a hide,
-// and a shortint n, which no name of the procedure hides. Typed by the
-// module's names, an expression over the procedure's names had no type, so a
-// declaration was one logic bit, and one over a hidden name took the module's
-// type.
-//
-// `text` holds the module's declarations at `{0}`, the procedure's names at
-// `{1}` and what the case writes at `{2}`; `result` names the r the case sets.
-// The procedure's names are declared in the block the case is written in, or
-// in the initial block, task or function enclosing a nested begin-end or a
-// fork-join the case is written in. An interface's and a program's initial
-// block hold the case as a module's does, and so does the method of a class
-// any of them, or a generate block, declares (§8.26), whose names hide the
-// host's as a subroutine's do. A package's or the compilation unit's task or
-// function, and the method of a class either declares, hide the package's or
-// the unit's names the same way (§26.2, §3.12.1); such a procedure belongs to
-// no instance, so each comparison in it holds or fails for every caller.
 struct Procedure {
   const char* name;
   const char* text;
@@ -523,22 +427,16 @@ constexpr std::array kProcedures = {
         "$unit.r"},
 };
 
-// The procedure's own names: an int a and a byte b, a byte x over the
-// module's int x, a structure s, a vector w, an unpacked array q, a string, a
-// queue, a variable of an enumeration, an int m [2][3] over the module's
-// int m [5], a vector v, and en, declared by the type of e.next().
 constexpr const char* kProcedureNames =
     "    int a;\n    byte b;\n    byte x;\n    s_t s;\n    logic [7:0] w;\n"
     "    shortint q [3];\n    string str;\n    int dq [$];\n    e_t e;\n"
     "    int m [2][3];\n    logic [7:0] v;\n    var type(e.next()) en;\n";
 
-// A test and whether it holds.
 struct Holds {
   const char* text;
   bool holds;
 };
 
-// Each of `tests`, the first r's most significant bit.
 Battery HoldsBattery(std::span<const Holds> tests) {
   Battery battery;
   for (const Holds& test : tests)
@@ -546,10 +444,6 @@ Battery HoldsBattery(std::span<const Holds> tests) {
   return battery;
 }
 
-// Runs `battery` written in `context`, a parameter declared with
-// `parameter_keyword`, in each of kProcedures declaring `names`, in a host
-// declaring the names the procedure's hide, n and the types the tests name,
-// and expects r to be what the battery gives.
 void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
                             Context context,
                             std::string_view parameter_keyword = "localparam") {
@@ -571,14 +465,6 @@ void ExpectInEveryProcedure(std::string_view names, const Battery& battery,
   }
 }
 
-// By §11.6.1, §11.8.1 and §11.3.4, `a + b` of an int and a byte is a signed
-// 2-state 32-bit vector, which matches int and neither logic [31:0] nor the
-// unsigned bit [31:0] (§6.22.1(e));
-// `x + 1'b0` is as wide as the byte x, unsigned and 4-state; a member, a
-// part-select and an element of an unpacked array are of the type they are
-// declared with; len and size give an int (§6.16.1, §7.10.2.1) and next the
-// enumeration (§6.19.5.3); an element of m [2][3] is an int [3]; and
-// logic [0:7] does not match logic [7:0], their bounds differing (§6.22.1(f)).
 constexpr std::array kProcedureCompared = {
     Holds{"type(a + b) == type(int)", true},
     Holds{"type(a + b) == type(logic [31:0])", false},
@@ -607,16 +493,11 @@ TEST(ProceduralNameTypeRefSim, ComparisonInAProceduralIf) {
                          Context::kProceduralIf);
 }
 
-// Written as the right-hand side of the procedural assignment `r = {...}`.
 TEST(ProceduralNameTypeRefSim, ComparisonInAnAssignment) {
   ExpectInEveryProcedure(kProcedureNames, HoldsBattery(kProcedureCompared),
                          Context::kDeclaration);
 }
 
-// §6.20.4 with §6.23: a parameter the procedure declares, compared over the
-// procedure's own logic [3:0] x, is decided at elaboration: `x + 4'bx` is four
-// 4-state bits, matching logic [3:0] and not logic [7:0], though x holds x
-// when the procedure runs. Typed by the module's int x, the first was 0.
 constexpr std::array kProcedureParameters = {
     Holds{"type(x + 4'bx) == type(logic [3:0])", true},
     Holds{"type(x + 4'bx) == type(logic [7:0])", false},
@@ -634,16 +515,11 @@ TEST(ProceduralNameTypeRefSim, ComparisonSetsALocalParameter) {
                          Context::kParameter);
 }
 
-// The same, the procedure's parameter declared with the keyword parameter.
 TEST(ProceduralNameTypeRefSim, ComparisonSetsAParameter) {
   ExpectInEveryProcedure(kParameterNames, HoldsBattery(kProcedureParameters),
                          Context::kParameter, "parameter");
 }
 
-// Each declaration's width, and its state through its initial value (§6.8):
-// x in a 4-state variable, which $isunknown (§20.9) reports, and 0 in a
-// 2-state one. m[0] is three ints, which $size counts (§20.7). A bare name the
-// procedure declares, and a module name it does not hide, keep their types.
 constexpr std::array kProcedureDeclared = {
     Declared{"a + b", "$bits({0}) == 32 && !$isunknown({0})", true, true},
     Declared{"x + 1'b0", "$bits({0}) == 8 && $isunknown({0})", true, true},
@@ -665,10 +541,6 @@ TEST(ProceduralNameTypeRefSim, DeclarationTakesTheProceduresNames) {
                          Context::kDeclaration);
 }
 
-// A task's byte formal x and a function's shortint formal x hide the module's
-// int x, and a for loop's byte k the module's int k: `x + 4'bx` and
-// `x + 1'b0` are as wide as the formal, in a local parameter, a declaration,
-// a case item and a return, and `k + 1'b0` as wide as the loop's k.
 TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesHideTheModulesNames) {
   const std::string kSrc =
       "module t;\n"
@@ -703,11 +575,6 @@ TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesHideTheModulesNames) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1101'1110u);
 }
 
-// A task's formals w, q, str, dq and e, a function's shortint x and string
-// str, and a for loop's logic [7:0] w hide the module's ints of those names: a
-// part-select, an element, len(), size() and next() over them are of the
-// types §6.23 gives the block's own variables, whether compared or declaring
-// a variable, and a declaration by e.next() is of the enumeration itself.
 TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesTypeSelectsAndMethods) {
   const std::string kSrc =
       "module t;\n"
@@ -752,13 +619,6 @@ TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesTypeSelectsAndMethods) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1111'1111'0110'1101u);
 }
 
-// Formals and for loop variables that hide nothing type an expression as a
-// block's variables do: `a + b` of an int and a byte formal is an int; a
-// structure formal's member and an element of an int [2][3] formal, which
-// hides the module's int m [5], are of the types they are declared with; and
-// an int loop variable of a task, a function and a fork-join makes `i + 1'b0`
-// 32 4-state bits. Typed by the module's names, `a + b` and `i + 1'b0` had no
-// type, so a declaration was one logic bit, and m[0] was an int.
 TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesTypeAnExpression) {
   const std::string kSrc =
       "module t;\n"
@@ -811,14 +671,6 @@ TEST(ProceduralNameTypeRefSim, FormalsAndLoopVariablesTypeAnExpression) {
   EXPECT_EQ(RunAndGet(kSrc, "r"), 0b1101'1111'1011'1110u);
 }
 
-// §6.21 with §23.9: the latest declaration of a name in scope is the one a
-// type reference reads. A nested block's logic [3:0] x hides a task's byte
-// formal x, and its logic [3:0] y the initial block's byte y, which hides the
-// module's int y; a for loop's byte j hides an enclosing block's int j. Within
-// the inner scope an expression over the name is as wide as the inner
-// declaration, and after it the outer declaration's type is back. Read from
-// the outermost declaration, the inner scope's `x + 1'b0` was 8 bits and
-// `j + 1'b0` 32.
 TEST(ProceduralNameTypeRefSim, TheInnermostDeclarationHidesTheOuter) {
   const std::string kSrc =
       "module t;\n"

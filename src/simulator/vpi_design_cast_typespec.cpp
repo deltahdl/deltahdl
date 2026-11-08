@@ -27,8 +27,6 @@ namespace delta {
 
 namespace {
 
-// §6.24.1 with §37.25: the typespec kind of each built-in type a cast names by
-// keyword.
 constexpr std::array<std::pair<std::string_view, int>, 13> kKeywordTypespecs = {
     {{"bit", vpiBitTypespec},
      {"logic", vpiLogicTypespec},
@@ -44,8 +42,6 @@ constexpr std::array<std::pair<std::string_view, int>, 13> kKeywordTypespecs = {
      {"shortreal", vpiShortRealTypespec},
      {"string", vpiStringTypespec}}};
 
-// The typespec of the typedef named `name` that `scope` declares, or of the
-// type a type parameter so named stands for (§6.20.3); null for none.
 VpiObject* TypedefIn(const VpiObject& scope, std::string_view name) {
   for (VpiObject* child : scope.children) {
     if (!VpiIsTypespecType(child->type) || child->name != name) continue;
@@ -54,9 +50,6 @@ VpiObject* TypedefIn(const VpiObject& scope, std::string_view name) {
   return nullptr;
 }
 
-// The scopes a name a cast written where `build` stands names is looked for
-// in, innermost first: the one it is written in and each around it out to its
-// instance.
 std::vector<const VpiObject*> ScopesOutToInstance(const AssignBuild& build) {
   std::vector<const VpiObject*> scopes;
   for (const VpiObject* at =
@@ -68,11 +61,6 @@ std::vector<const VpiObject*> ScopesOutToInstance(const AssignBuild& build) {
   return scopes;
 }
 
-// §26.3 with §3.12.1: the typespec of the typedef or type parameter `name`
-// that a cast written where `build` stands names: one the scope it is written
-// in declares, or a scope around it out to its instance, then one a package
-// the instance's module imports declares, then one the compilation unit
-// declares; null for none.
 VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
   for (const VpiObject* at : ScopesOutToInstance(build)) {
     if (VpiObject* found = TypedefIn(*at, name)) return found;
@@ -81,11 +69,6 @@ VpiObject* TypedefVisible(std::string_view name, const AssignBuild& build) {
                                   build.names.unit_typespecs);
 }
 
-// §26.3 with §8.23: the typespec of the typedef `name` that a cast written
-// where `build` stands names behind the scope `scope`, pk::t or C::t: a
-// package's, among the typespecs AttachTypespecs answered under the package's
-// name and "::", or a class's, among those the class defn of a class a scope
-// around the cast declares holds; null for none.
 VpiObject* ScopedTypespec(std::string_view scope, std::string_view name,
                           const AssignBuild& build) {
   if (VpiObject* packaged = VpiPackageOrUnitTypespec(
@@ -102,11 +85,6 @@ VpiObject* ScopedTypespec(std::string_view scope, std::string_view name,
   return nullptr;
 }
 
-// §37.25 details 8 and 10: the typespec of the packed dimensions `packed`,
-// outermost first and at least one, written after the name of the type
-// `named` is the typespec of: a typespec of those dimensions over it, which
-// ranges over them and, where they make one of its own kind, a bit or logic
-// typespec or a packed array, over its ranges after them.
 VpiObject* DimensionedTypespec(const PackedDims& packed, VpiObject* named,
                                const AssignBuild& build) {
   std::vector<VpiTypespecDim> dims;
@@ -126,8 +104,6 @@ VpiObject* DimensionedTypespec(const PackedDims& packed, VpiObject* named,
   return typespec;
 }
 
-// §6.11 Table 6-8 with §37.25: the typespec kind of the built-in type a
-// variable of each kind is declared with.
 constexpr std::array<std::pair<int, int>, 10> kVariableTypespecs = {
     {{vpiBitVar, vpiBitTypespec},
      {vpiByteVar, vpiByteTypespec},
@@ -140,8 +116,6 @@ constexpr std::array<std::pair<int, int>, 10> kVariableTypespecs = {
      {vpiShortRealVar, vpiShortRealTypespec},
      {vpiStringVar, vpiStringTypespec}}};
 
-// The typespec kind of `operand`'s type: its built-in type's where it is a
-// variable of one, and a logic vector's otherwise.
 int OperandTypespecKind(const VpiObject& operand) {
   for (const auto& [var, kind] : kVariableTypespecs) {
     if (operand.type == var) return kind;
@@ -151,9 +125,6 @@ int OperandTypespecKind(const VpiObject& operand) {
 
 bool IsTwoState(VpiObject& expr);
 
-// §7.4 with §7.10 and §7.8: whether the elements of the unpacked array `array`
-// are 2-state: a queue's, a dynamic array's or an associative array's as the
-// run's store for them records, and a fixed array's as its elements are.
 bool ElementsAreTwoState(const VpiObject& array) {
   if (array.queue != nullptr) return !array.queue->is_4state;
   if (array.assoc != nullptr) return !array.assoc->is_4state;
@@ -162,13 +133,6 @@ bool ElementsAreTwoState(const VpiObject& array) {
   });
 }
 
-// §6.11 and §11.8.1: whether `expr` is 2-state. A variable of a built-in type
-// is as its type is, and one of a structure, union, enumeration or packed
-// array of them as the run's storage for it records (§7.2.1, §7.3.1, §6.19,
-// §7.4.1), or, for a task's or function's variable, which has none, as its
-// declaration does; a bit, a select or an element as what it selects from, an
-// unpacked array as its elements, and an operation when every operand is; a
-// literal and any other expression are taken as 4-state.
 bool IsTwoState(VpiObject& expr) {
   if (expr.type == vpiOperation) {
     const std::vector<VpiHandle> kOperands = VpiOperationOperands(&expr);
@@ -207,10 +171,6 @@ bool IsTwoState(VpiObject& expr) {
   }
 }
 
-// `made`, the object the model builds for `expr`, or where it builds none, as
-// for a logical equivalence (§11.4.7), which no operation type names, a
-// stand-in as wide and as signed as its value where the source wrote it, of a
-// nature IsTwoState takes as 4-state.
 VpiObject& ObjectOrStandIn(VpiObject* made, const Expr* expr,
                            const AssignBuild& build) {
   if (made != nullptr) return *made;
@@ -221,8 +181,6 @@ VpiObject& ObjectOrStandIn(VpiObject* made, const Expr* expr,
   return *stand_in;
 }
 
-// §6.24.1 with §11.8.1: a vector typespec `size` bits wide, of the 2- or
-// 4-state nature and the signedness of `like`.
 VpiObject* VectorTypespec(VpiObject& like, int size, const AssignBuild& build) {
   VpiObject* typespec = build.alloc();
   typespec->type = IsTwoState(like) ? vpiBitTypespec : vpiLogicTypespec;
@@ -231,11 +189,6 @@ VpiObject* VectorTypespec(VpiObject& like, int size, const AssignBuild& build) {
   return typespec;
 }
 
-// §6.23: the typespec of the type of `expr`, an expression a type reference
-// writes where `build` stands: the typespec its object relates to, for a
-// variable that of the type it was declared with (§37.17), and otherwise that
-// of its self-determined type, a vector of its 2- or 4-state nature, width and
-// signedness, as an operation's is (§11.8.1).
 VpiObject* ExpressionTypespec(const Expr& expr, const AssignBuild& build) {
   VpiObject& typed =
       ObjectOrStandIn(ExpressionObject(&expr, build), &expr, build);
@@ -245,13 +198,6 @@ VpiObject* ExpressionTypespec(const Expr& expr, const AssignBuild& build) {
   return VectorTypespec(typed, typed.size, build);
 }
 
-// §6.23: the typespec of the type the type reference `ref` refers to, where
-// it is written as `build` stands: of a data type it writes, the typedef or
-// type parameter a name finds there (TypedefVisible), or behind a package or
-// a class (ScopedTypespec), with any packed dimensions written after it
-// (DimensionedTypespec), or a built-in type over the packed dimensions
-// written; of an expression it writes, the expression's type
-// (ExpressionTypespec).
 VpiObject* TypeRefTypespec(const Expr& ref, const AssignBuild& build) {
   const DataType* written = ref.type_value;
   if (written == nullptr) return ExpressionTypespec(*ref.lhs, build);
@@ -268,11 +214,6 @@ VpiObject* TypeRefTypespec(const Expr& ref, const AssignBuild& build) {
   return DimensionedTypespec(kPacked, named, build);
 }
 
-// The typespec `cast` names, where it is written as `build` stands: a typedef
-// or type parameter visible there (TypedefVisible), one a package or a class
-// declares where the cast names it through the package or class, pk::t or C::t
-// (ScopedTypespec), the type a type reference refers to (§6.23), or a
-// built-in type a keyword names; null where it names none of them.
 VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
   if (cast.text.empty() && cast.rhs->kind == ExprKind::kTypeRef) {
     return TypeRefTypespec(*cast.rhs, build);
@@ -280,7 +221,6 @@ VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
   if (cast.text.empty() && cast.rhs->kind == ExprKind::kMemberAccess) {
     return ScopedTypespec(cast.rhs->lhs->text, cast.rhs->rhs->text, build);
   }
-  // The type is named as text or as an identifier, as the parser read it.
   const std::string_view kName = !cast.text.empty() ? cast.text
                                  : cast.rhs->kind == ExprKind::kIdentifier
                                      ? cast.rhs->text
@@ -295,23 +235,14 @@ VpiObject* NamedTypespec(const Expr& cast, const AssignBuild& build) {
   return typespec;
 }
 
-// What the cast operation `op`, written as `cast`, casts: its operand's
-// object, or ObjectOrStandIn's stand-in where the model builds none.
 VpiObject& CastOperand(VpiObject& op, const Expr& cast,
                        const AssignBuild& build) {
   return ObjectOrStandIn(op.children.empty() ? nullptr : op.children.front(),
                          cast.lhs, build);
 }
 
-// §6.24.1: the typespec a cast naming no type makes from `operand`, what it
-// casts. A size cast's is a vector of the operand's 2- or 4-state nature and
-// signedness, as wide as the constant it is written with; a signing cast's is
-// the operand's type of the signedness it names; and a const cast's is the
-// operand's type. Null for any other cast.
 VpiObject* OperandTypespec(const Expr& cast, VpiObject& operand,
                            const AssignBuild& build) {
-  // A size cast's width is an expression the model has an object for, which
-  // a type the cast names is not.
   if (cast.text.empty() && ExpressionObject(cast.rhs, build) != nullptr) {
     return VectorTypespec(
         operand, static_cast<int>(ConstantWhereWritten(cast.rhs, build)),

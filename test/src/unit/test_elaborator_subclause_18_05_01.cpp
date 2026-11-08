@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// 18.5.1: the explicit prototype form ('extern constraint name;') needs an
-// external constraint block to complete it, and is an error without one.
 TEST(ExternalConstraintBlocks, ExplicitPrototypeWithoutBlockRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -30,8 +28,6 @@ TEST(ExternalConstraintBlocks, ExplicitPrototypeWithoutBlockRejected) {
       3, "18.5.1"));
 }
 
-// 18.5.1: a prototype completed by two or more external constraint blocks is an
-// error.
 TEST(ExternalConstraintBlocks, MultipleBlocksForPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -51,8 +47,6 @@ TEST(ExternalConstraintBlocks, MultipleBlocksForPrototypeRejected) {
                             3, "18.5.1"));
 }
 
-// 18.5.1: an external constraint block belongs after its class's declaration,
-// so a block placed before the class is an error.
 TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -70,9 +64,6 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassRejected) {
                             1, "18.5.1"));
 }
 
-// 18.5.1: the block comes after its class in the scope that declares both, a
-// package included, so a block placed ahead of its class inside a package is an
-// error there too.
 TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -92,8 +83,6 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassInPackageRejected) {
                             2, "18.5.1"));
 }
 
-// 18.5.1: the block belongs to the scope that declares its class, so a block
-// naming a class that its scope never declares is an error.
 TEST(ExternalConstraintBlocks, BlockForUndeclaredClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -107,8 +96,6 @@ TEST(ExternalConstraintBlocks, BlockForUndeclaredClassRejected) {
                             1, "18.5.1"));
 }
 
-// 18.5.1: a block in one package does not complete a class another package
-// declares; the package holding the block declares no such class.
 TEST(ExternalConstraintBlocks, BlockForOtherPackagesClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -130,7 +117,6 @@ TEST(ExternalConstraintBlocks, BlockForOtherPackagesClassRejected) {
                             8, "18.5.1"));
 }
 
-// 18.5.1: inside a module the block likewise comes after its class.
 TEST(ExternalConstraintBlocks, BlockBeforeClassInModuleRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -148,8 +134,6 @@ TEST(ExternalConstraintBlocks, BlockBeforeClassInModuleRejected) {
                             2, "18.5.1"));
 }
 
-// 18.5.1: a block in a module does not complete a class of the compilation
-// unit; the module declares no class of that name.
 TEST(ExternalConstraintBlocks, BlockInModuleForUnitClassRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -167,8 +151,6 @@ TEST(ExternalConstraintBlocks, BlockInModuleForUnitClassRejected) {
                             6, "18.5.1"));
 }
 
-// 18.5.1: an explicit prototype needs its block wherever its class stands, a
-// class of a package or of a module as much as one of the compilation unit.
 TEST(ExternalConstraintBlocks,
      ExplicitPrototypeInPackageOrModuleClassNeedsBlock) {
   ElabFixture f;
@@ -196,8 +178,6 @@ TEST(ExternalConstraintBlocks,
                             10, "18.5.1"));
 }
 
-// 18.5.1: a class in a generate block is held to the same rule, whichever
-// generate construct holds it: an if's else branch, a loop or a case item.
 TEST(ExternalConstraintBlocks, ExplicitPrototypeInGenerateClassNeedsBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -239,9 +219,6 @@ TEST(ExternalConstraintBlocks, ExplicitPrototypeInGenerateClassNeedsBlock) {
                             19, "18.5.1"));
 }
 
-// 18.5.1: a block completes the class of its own scope only, so the block a
-// package gives its C leaves the explicit prototype of the compilation unit's
-// C without one.
 TEST(ExternalConstraintBlocks, OtherScopesBlockDoesNotCompleteThePrototype) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -265,9 +242,6 @@ TEST(ExternalConstraintBlocks, OtherScopesBlockDoesNotCompleteThePrototype) {
                             3, "18.5.1"));
 }
 
-// 18.5.1, 18.5.2 and 18.5.10: two classes named C in two scopes each take
-// their own block, so neither prototype counts as completed twice, and the
-// static qualifier of one pair is not held against the other's.
 TEST(ExternalConstraintBlocks, SameNamedClassesInTwoScopesEachTakeTheirBlock) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -288,8 +262,6 @@ TEST(ExternalConstraintBlocks, SameNamedClassesInTwoScopesEachTakeTheirBlock) {
              f));
 }
 
-// 18.5.2: a pure constraint conflicts with a block of its own class only, not
-// with the block another scope gives a class of the same name.
 TEST(ExternalConstraintBlocks, PureConstraintIgnoresOtherScopesBlock) {
   ElabFixture f;
   EXPECT_TRUE(
@@ -308,9 +280,6 @@ TEST(ExternalConstraintBlocks, PureConstraintIgnoresOtherScopesBlock) {
              f));
 }
 
-// 18.5.1: the completed prototype is the block's body, so the rules on what a
-// constraint holds reach a block written outside the class; here 18.5.4's ban
-// on a randc member of a unique group.
 TEST(ExternalConstraintBlocks, BlockBodyIsCheckedLikeAnInClassBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -329,8 +298,6 @@ TEST(ExternalConstraintBlocks, BlockBodyIsCheckedLikeAnInClassBlock) {
       "18.5.4"));
 }
 
-// 18.5.1: a class declaration holding both a prototype and a constraint block
-// of one name is an error. Here the prototype is the implicit form.
 TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -342,19 +309,12 @@ TEST(ExternalConstraintBlocks, BlockSameNameAsPrototypeRejected) {
              "module m;\n"
              "endmodule\n",
              f));
-  // The rule that rejects this source is the constraint-name uniqueness rule of
-  // 18.5, reported by ClassConstraintValidator::ValidateOneClassConstraintNames
-  // in src/elaborator/elaborator_validate_class_constraints.cpp under
-  // Subclause("18.5"), not one of the 18.5.1 completion reports.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "constraint block name 'proto1' is not unique within class 'C'", 4,
       "18.5"));
 }
 
-// 18.5.1: the same-name-as-a-prototype rule holds for either prototype form, so
-// an in-class block sharing the name of an explicit ('extern') prototype in the
-// same class is likewise an error.
 TEST(ExternalConstraintBlocks, BlockSameNameAsExplicitPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -366,17 +326,12 @@ TEST(ExternalConstraintBlocks, BlockSameNameAsExplicitPrototypeRejected) {
              "module m;\n"
              "endmodule\n",
              f));
-  // As in BlockSameNameAsPrototypeRejected, the same-name rule is reported
-  // under Subclause("18.5"). The explicit prototype is separately reported
-  // under 18.5.1 for having no external block, which is a different claim.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "constraint block name 'proto2' is not unique within class 'C'", 4,
       "18.5"));
 }
 
-// 18.5.1: the "more than one external block" error applies to either prototype
-// form, so the implicit form with two completing blocks is also an error.
 TEST(ExternalConstraintBlocks, MultipleBlocksForImplicitPrototypeRejected) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -396,8 +351,6 @@ TEST(ExternalConstraintBlocks, MultipleBlocksForImplicitPrototypeRejected) {
                             3, "18.5.1"));
 }
 
-// 18.5.1: completion is matched per class, so the same prototype name in two
-// different classes, each completed by its own scope-resolved block, is legal.
 TEST(ExternalConstraintBlocks, SameNamePrototypeInDistinctClassesAccepted) {
   EXPECT_TRUE(
       ElabOk("class A;\n"
@@ -414,8 +367,6 @@ TEST(ExternalConstraintBlocks, SameNamePrototypeInDistinctClassesAccepted) {
              "endmodule\n"));
 }
 
-// 18.5.1: a class may carry several prototypes, each completed by its own
-// external constraint block.
 TEST(ExternalConstraintBlocks,
      MultipleDistinctPrototypesEachCompletedAccepted) {
   EXPECT_TRUE(
@@ -430,11 +381,6 @@ TEST(ExternalConstraintBlocks,
              "endmodule\n"));
 }
 
-// 18.5.1: completion is matched per class. An external block that completes a
-// same-named prototype in a different class does not satisfy this class's
-// explicit prototype, so the unmatched explicit prototype is still an error.
-// Here only B::p is provided, leaving A's explicit prototype 'p' without a
-// block despite a constraint of the same name existing for B.
 TEST(ExternalConstraintBlocks, ExplicitPrototypeNotSatisfiedByOtherClassBlock) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -457,10 +403,6 @@ TEST(ExternalConstraintBlocks, ExplicitPrototypeNotSatisfiedByOtherClassBlock) {
       3, "18.5.1"));
 }
 
-// Parse and elaborate 'src', then return the named constraint member of the
-// named class from the elaborated compilation unit, or nullptr. Completion of
-// external constraint blocks runs during elaboration, so the member returned
-// reflects any relations attached by that completion.
 const ClassMember* ElaborateAndFindConstraint(ElabFixture& f,
                                               const std::string& src,
                                               std::string_view cls_name,
@@ -483,10 +425,6 @@ const ClassMember* ElaborateAndFindConstraint(ElabFixture& f,
   return nullptr;
 }
 
-// 18.5.1: an external constraint block completes its prototype. After
-// elaboration the prototype member carries the relations written in the
-// external block, so at randomization the completed constraint restricts the
-// variable rather than being ignored.
 TEST(ExternalConstraintBlocks, ExternalBlockCompletesPrototypeRelations) {
   ElabFixture f;
   const ClassMember* proto =
@@ -502,13 +440,9 @@ TEST(ExternalConstraintBlocks, ExternalBlockCompletesPrototypeRelations) {
   ASSERT_FALSE(f.has_errors);
   ASSERT_NE(proto, nullptr);
   EXPECT_TRUE(proto->is_constraint_prototype);
-  // Completion copies the external block's single relation onto the prototype,
-  // which parsed with an empty body.
   EXPECT_EQ(proto->constraint_exprs.size(), 1u);
 }
 
-// 18.5.1: a prototype completed by a multi-relation external block receives
-// every relation of that block.
 TEST(ExternalConstraintBlocks,
      MultiRelationExternalBlockFullyCompletesPrototype) {
   ElabFixture f;
@@ -527,9 +461,6 @@ TEST(ExternalConstraintBlocks,
   EXPECT_EQ(proto->constraint_exprs.size(), 2u);
 }
 
-// 18.5.1: an implicit prototype with no external constraint block is completed
-// by nothing; its relation set stays empty, so it behaves as an empty
-// constraint that has no effect on randomization (equivalent to constant 1).
 TEST(ExternalConstraintBlocks, UncompletedImplicitPrototypeHasNoRelations) {
   ElabFixture f;
   const ClassMember* proto = ElaborateAndFindConstraint(f,

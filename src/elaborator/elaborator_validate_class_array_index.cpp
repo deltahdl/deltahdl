@@ -25,31 +25,17 @@ static bool IsLiteralExpr(ExprKind kind) {
          kind == ExprKind::kUnbasedUnsizedLiteral;
 }
 
-// §7.8.3: resolving a class-indexed select requires the elaboration context
-// that describes the visible class-indexed associative arrays and class types
-// of the enclosing scope. These values always travel together as one unit, so
-// they are bundled into a single context object passed through the recursive
-// walk. local_classes maps the names of classes declared inside the enclosing
-// module to their declarations, which are not visible through unit->classes.
 struct ClassIndexCtx {
   const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
       var_array_info;
   const std::unordered_map<std::string_view, std::string_view>& class_var_types;
   const std::unordered_set<std::string_view>& class_names;
   const std::unordered_map<std::string_view, const ClassDecl*>& local_classes;
-  // The declarations that type an index expression (KindOfValue), the type
-  // kind of every declared variable among them. Used to reject a value of no
-  // class (e.g. an int or a string) used as a class index, which
-  // class_var_types alone cannot see because it holds only class handles.
   const ValueScope& values;
   const CompilationUnit* unit;
   DiagEngine& diag;
 };
 
-// Resolves a class name to its declaration, preferring a class declared inside
-// the enclosing module (which FindClassDecl does not see, as those live in the
-// module rather than in unit->classes) before falling back to compilation-unit
-// scope.
 static const ClassDecl* FindClassDeclScoped(std::string_view name,
                                             const ClassIndexCtx& ctx) {
   auto it = ctx.local_classes.find(name);
@@ -57,9 +43,6 @@ static const ClassDecl* FindClassDeclScoped(std::string_view name,
   return FindClassDecl(name, ctx.unit);
 }
 
-// §7.8.3: true when class *a* is *b* or is derived (directly or transitively)
-// from *b*. Walks the base-class chain consulting both module-local and
-// compilation-unit class scopes so a class declared inside the module resolves.
 static bool IsClassDerivedFromScoped(std::string_view a, std::string_view b,
                                      const ClassIndexCtx& ctx) {
   if (a == b) return true;
@@ -72,13 +55,6 @@ static bool IsClassDerivedFromScoped(std::string_view a, std::string_view b,
   return false;
 }
 
-// §7.8.3: an associative array declared with a class index may only be
-// indexed by an object of that class or a class derived from it; a null
-// handle is also valid. Any other index expression is a type error.
-//
-// Returns true when the index expression of a class-indexed associative array
-// select is an illegal index (a literal, or an identifier whose class type is
-// not the index class or a class derived from it).
 static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
                                 const ClassIndexCtx& ctx) {
   bool is_null = idx->kind == ExprKind::kIdentifier && idx->text == "null";
@@ -87,27 +63,17 @@ static bool IsIllegalClassIndex(const Expr* idx, std::string_view index_class,
   if (idx->kind == ExprKind::kIdentifier) {
     auto vt = ctx.class_var_types.find(idx->text);
     if (vt != ctx.class_var_types.end()) {
-      // A class handle is legal only when its class is the index class or a
-      // class derived from it; any other class is illegal.
       return !IsClassDerivedFromScoped(vt->second, index_class, ctx);
     }
-    // Not a class-typed variable. A declared variable of a concrete non-class
-    // type (an integral, string, real, etc. value, kind != kNamed) is of any
-    // other type and is therefore an illegal class index.
     auto gt = ctx.values.var_types.find(idx->text);
     return gt != ctx.values.var_types.end() &&
            gt->second != DataTypeKind::kNamed;
   }
-  // Any other expression whose value is integral, real or a string is no
-  // object of any class.
   ValueKind kind = KindOfValue(idx, ctx.values);
   return kind == ValueKind::kIntegral || kind == ValueKind::kReal ||
          kind == ValueKind::kString;
 }
 
-// Validates a single select node against the class-index rule, emitting a
-// diagnostic when its index expression is illegal. Non-select nodes are
-// ignored.
 static void CheckClassIndexSelectNode(const Expr* e, const ClassIndexCtx& ctx) {
   if (e->kind != ExprKind::kSelect || !e->base || !e->index ||
       e->base->kind != ExprKind::kIdentifier) {
@@ -144,8 +110,6 @@ static void CheckClassIndexSelectExpr(const Expr* e, const ClassIndexCtx& ctx) {
   }
 }
 
-// Checks every expression directly attached to a statement node against the
-// class-index rule (excluding nested sub-statements).
 static void CheckStmtExprsForClassIndexSelect(const Stmt* s,
                                               const ClassIndexCtx& ctx) {
   CheckClassIndexSelectExpr(s->lhs, ctx);
@@ -158,21 +122,10 @@ static void WalkStmtsForClassIndexSelect(const Stmt* s,
                                          const ClassIndexCtx& ctx) {
   if (!s) return;
   CheckStmtExprsForClassIndexSelect(s, ctx);
-  // §7.8.3 requires an object of the index class, or of a class derived from
-  // it, wherever such an array is indexed, and names no statement the
-  // requirement is suspended in. This walk therefore names no statement link
-  // itself: the list comes from ForEachChildStmt in
-  // elaborator_validate_internal.h, which states all thirteen links of Stmt in
-  // one place. The six written out here reached neither a fork arm
-  // (`fork x = data[7]; join`) nor a randcase item, so an illegal class index
-  // written in either elaborated clean.
   ForEachChildStmt(
       s, [&](Stmt* const& sub) { WalkStmtsForClassIndexSelect(sub, ctx); });
 }
 
-// Collects the classes declared directly inside a module, keyed by name. These
-// module-local classes are not reachable through unit->classes, so the §7.8.3
-// derivation walk needs them gathered separately to resolve a base class.
 static std::unordered_map<std::string_view, const ClassDecl*>
 CollectModuleLocalClasses(const ModuleDecl* decl) {
   std::unordered_map<std::string_view, const ClassDecl*> local_classes;
@@ -216,24 +169,11 @@ void Elaborator::ValidateClassIndexSelect(const ModuleDecl* decl) {
   }
 }
 
-// §7.8.2: an associative array declared with a string index may only be
-// indexed by a string or a string literal of any length. Any other index
-// expression type is a type check error. An empty string literal is a string
-// literal and therefore valid.
-//
-// Returns true when the index of a string-indexed associative array select is
-// an illegal index (a non-string literal, an identifier of a non-string type,
-// or any other expression whose value is integral, real, or one of the kinds
-// ValueKind::kOther stands for). A string literal of any length, including "",
-// is valid.
 static bool IsIllegalStringIndex(const Expr* idx, const ValueScope& values) {
   if (idx->kind == ExprKind::kStringLiteral) {
-    // A string literal of any length, including "", is a valid index.
     return false;
   }
   if (IsLiteralExpr(idx->kind)) {
-    // Any other literal (integer, real, time, unbased-unsized) is a
-    // different type.
     return true;
   }
   if (idx->kind == ExprKind::kIdentifier) {
@@ -245,16 +185,11 @@ static bool IsIllegalStringIndex(const Expr* idx, const ValueScope& values) {
          kind == ValueKind::kOther;
 }
 
-// Validates a single select node against the string-index rule, emitting a
-// diagnostic when its index expression is illegal. Non-select nodes and slice
-// selects are ignored.
 static void CheckStringIndexSelectNode(
     const Expr* e,
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,
     const ValueScope& values, DiagEngine& diag) {
-  // Plain element selects only; a slice on an associative array is reported
-  // separately, so skip it here to avoid a second diagnostic on one site.
   if (e->kind != ExprKind::kSelect || !e->base || !e->index ||
       e->base->kind != ExprKind::kIdentifier || IsSliceSelect(e)) {
     return;
@@ -302,14 +237,6 @@ static void WalkStmtsForStringIndexSelect(
   CheckStringIndexSelectExpr(s->rhs, var_array_info, values, diag);
   CheckStringIndexSelectExpr(s->expr, var_array_info, values, diag);
   CheckStringIndexSelectExpr(s->condition, var_array_info, values, diag);
-  // §7.8.2 requires a string or a string literal wherever such an array is
-  // indexed, and names no statement the requirement is suspended in. This walk
-  // therefore names no statement link itself: the list comes from
-  // ForEachChildStmt in elaborator_validate_internal.h, which states all
-  // thirteen links of Stmt in one place. The six written out here reached
-  // neither a for-loop initialization (`for (x = aa[7]; ...)`) nor the else
-  // action of an immediate assertion, so an integer index written in either
-  // went unreported.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForStringIndexSelect(sub, var_array_info, values, diag);
   });
@@ -342,10 +269,6 @@ void Elaborator::ValidateStringIndexSelect(const ModuleDecl* decl) {
   }
 }
 
-// §7.8.4: indexing an integral-index associative array casts the index
-// expression to the index type, but an implicit cast from a real or shortreal
-// expression is illegal. Flag any element select on such an array whose index
-// is a nonintegral (real) expression.
 static void CheckIntegralIndexSelectExpr(
     const Expr* e, const std::unordered_set<std::string_view>& integral_names,
     const ValueScope& values, DiagEngine& diag) {
@@ -380,21 +303,11 @@ static void WalkStmtsForIntegralIndexSelect(
   CheckIntegralIndexSelectExpr(s->rhs, integral_names, values, diag);
   CheckIntegralIndexSelectExpr(s->expr, integral_names, values, diag);
   CheckIntegralIndexSelectExpr(s->condition, integral_names, values, diag);
-  // §7.8.4 forbids an implicit cast from a real or shortreal expression to the
-  // index type wherever such an array is indexed, and names no statement the
-  // prohibition is suspended in. This walk therefore names no statement link
-  // itself: the list comes from ForEachChildStmt in
-  // elaborator_validate_internal.h, which states all thirteen links of Stmt in
-  // one place. The six written out here reached neither a randsequence
-  // production code block nor a for-loop step, so `x = map[r]` written in
-  // either was never looked at.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     WalkStmtsForIntegralIndexSelect(sub, integral_names, values, diag);
   });
 }
 
-// Returns true when an associative-array index type spelled `t` denotes an
-// integral type: a builtin integral keyword, or a typedef resolving to one.
 static bool IsIntegralIndexType(std::string_view t,
                                 const TypedefMap& typedefs) {
   bool is_builtin = t == "int" || t == "integer" || t == "byte" ||
@@ -404,8 +317,6 @@ static bool IsIntegralIndexType(std::string_view t,
   return it != typedefs.end() && IsIntegralType(it->second.kind);
 }
 
-// Collects the names of every associative array whose index type is integral
-// (and is neither string-, wildcard-, nor class-indexed).
 static std::unordered_set<std::string_view> CollectIntegralIndexNames(
     const std::unordered_map<std::string_view, Elaborator::VarArrayInfo>&
         var_array_info,

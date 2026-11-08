@@ -1,22 +1,3 @@
-// §21.5.2 Writing 2-state types — $writememb / $writememh can dump unpacked
-// arrays whose element type is a 2-state type (such as int) or an enumerated
-// type. For an enumerated element type, the value placed in the file is the
-// enum member's ordinal value — its underlying integer value per §6.19 — never
-// the member's name or its declaration position.
-//
-// Both rules are runtime rules whose behavior depends on how the memory
-// operand is produced: the element's 2-state type (int / byte / shortint /
-// longint / bit vector), the §6.19 enum declaration supplying the ordinal
-// values, and the container declaring the array (fixed unpacked array, queue,
-// dynamic array). These tests therefore declare each source memory with real
-// syntax and drive the module through the full pipeline (parse -> elaborate ->
-// lower -> run), observing the dumped file text and the round trip through the
-// matching read task, rather than hand-building array state on a bare context.
-//
-// Not exercised here: an anonymous (inline) enum declaration — its member
-// constants evaluate to 0 even in a plain $display, an upstream §6.19 defect
-// that never reaches the write task. Typedef'd enums carry their ordinals
-// correctly and are the forms used below.
 #include <gtest/gtest.h>
 
 #include <cstdio>
@@ -29,10 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §21.5.2: an unpacked array of int — the subclause's own example type — is
-// dumped one word per line as a plain number at the type's full 32-bit width.
-// A negative value and a value with the sign bit set are just their two's-
-// complement bit patterns, and the dump reloads through $readmemh unchanged.
 TEST(WritememTwoStateSim, IntArrayWrittenAsPlainNumbers) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t210502_int.mem";
@@ -57,9 +34,6 @@ TEST(WritememTwoStateSim, IntArrayWrittenAsPlainNumbers) {
   std::remove(path.c_str());
 }
 
-// §21.5.2: the rule admits every 2-state integer atom type, and each is
-// written at its own type width — byte as two hex digits, shortint as four,
-// longint as sixteen (with every machine word of the 64-bit value present).
 TEST(WritememTwoStateSim, NarrowAndWideIntegerTypesWrittenAtTypeWidth) {
   SimFixture f;
   std::string path_b = "/tmp/deltahdl_t210502_byte.mem";
@@ -100,8 +74,6 @@ TEST(WritememTwoStateSim, NarrowAndWideIntegerTypesWrittenAtTypeWidth) {
   std::remove(path_l.c_str());
 }
 
-// §21.5.2: a bit-vector element type is 2-state too, and the binary task
-// writes it one 0/1 digit per bit — the form $readmemb loads back intact.
 TEST(WritememTwoStateSim, BitVectorArrayWrittenPerBitByWritememb) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t210502_bits.mem";
@@ -126,10 +98,6 @@ TEST(WritememTwoStateSim, BitVectorArrayWrittenPerBitByWritememb) {
   std::remove(path.c_str());
 }
 
-// §21.5.2 negative boundary: a 2-state word cannot hold an unknown or
-// high-impedance bit, so no x or z token can ever appear in the dump — the
-// nearest would-be-rejected input. A default-initialized int array (which a
-// 4-state type would dump as x words) writes plain zero words in both radices.
 TEST(WritememTwoStateSim, DefaultTwoStateArrayWritesZerosNeverFourStateDigits) {
   SimFixture f;
   std::string path_h = "/tmp/deltahdl_t210502_zh.mem";
@@ -155,8 +123,6 @@ TEST(WritememTwoStateSim, DefaultTwoStateArrayWritesZerosNeverFourStateDigits) {
   std::remove(path_b.c_str());
 }
 
-// §21.5.2: a 2-state element wider than one machine word (bit [71:0]) is still
-// one number per line; the high machine word survives the dump and the reload.
 TEST(WritememTwoStateSim, WideTwoStateElementWrittenWhole) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t210502_wide.mem";
@@ -181,10 +147,6 @@ TEST(WritememTwoStateSim, WideTwoStateElementWrittenWhole) {
   std::remove(path.c_str());
 }
 
-// §21.5.2: the 2-state admission is container-independent — a queue of int
-// (populated by push_back) and a dynamic array of int (sized by new[]) each
-// dump one plain word per line exactly like a fixed array, and each file
-// reloads through $readmemh.
 TEST(WritememTwoStateSim, TwoStateQueueAndDynamicArrayWritten) {
   SimFixture f;
   std::string path_q = "/tmp/deltahdl_t210502_q.mem";
@@ -217,11 +179,6 @@ TEST(WritememTwoStateSim, TwoStateQueueAndDynamicArrayWritten) {
   std::remove(path_d.c_str());
 }
 
-// §21.5.2: for an enumerated element type, the file holds each element's
-// ordinal value per §6.19. The members carry explicit values 2 / 5 / 9 —
-// deliberately not their 0 / 1 / 2 declaration positions — so the dump proves
-// the value written is the member's underlying integer, not its position and
-// not its name, and the file reloads into an array of the same enum type.
 TEST(WritememTwoStateSim, EnumArrayWritesOrdinalValues) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t210502_enum.mem";
@@ -243,16 +200,10 @@ TEST(WritememTwoStateSim, EnumArrayWritesOrdinalValues) {
           "endmodule\n",
       f);
   EXPECT_EQ(out, "5 2 9\n");
-  // Ordinal values 5, 2, 9 at the int base width — no member names, no
-  // declaration positions.
   EXPECT_EQ(SlurpFile(path), "00000005\n00000002\n00000009\n");
   std::remove(path.c_str());
 }
 
-// §21.5.2: when the §6.19 declaration gives no explicit values, the members'
-// ordinals are the auto-assigned 0, 1, 2, ... — the elements are stored in
-// reverse member order here, so the file order (2, 0, 1) tracks the element
-// values, not the element indices.
 TEST(WritememTwoStateSim, EnumAutoOrdinalsFollowDeclarationOrder) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t210502_auto.mem";
@@ -278,9 +229,6 @@ TEST(WritememTwoStateSim, EnumAutoOrdinalsFollowDeclarationOrder) {
   std::remove(path.c_str());
 }
 
-// §21.5.2: the ordinal-value rule holds for the binary task too — $writememb
-// writes each enum element's ordinal as its full-width bit pattern, and the
-// dump reloads through $readmemb into an array of the same enum type.
 TEST(WritememTwoStateSim, EnumArrayWritemembWritesOrdinalBits) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_t210502_enumb.mem";

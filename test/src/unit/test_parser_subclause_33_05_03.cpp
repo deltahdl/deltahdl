@@ -37,10 +37,6 @@ TEST(SeparateCompilationTool, SaveRejectsUnparseableSource) {
       "module broken; this is not legal SystemVerilog\n", "rtlLib", path));
 }
 
-// The compiled form has to land somewhere in the filesystem; if the chosen
-// location cannot hold it (here, a parent directory that does not exist), the
-// save reports failure rather than silently discarding the cell. The source is
-// well-formed so the failure is attributable to the location, not the parse.
 TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
   ScratchDir tmp;
   auto path = tmp.dir / "missing_subdir" / "rtlLib.dpl";
@@ -52,17 +48,6 @@ TEST(SeparateCompilationTool, SaveFailsWhenLocationUnwritable) {
   EXPECT_FALSE(fs::exists(path, ec));
 }
 
-// Every cell kind, which §33.2.1 makes every design element §3.2 defines, a
-// cell being a design element in the §3.2 sense, and §3.2 names a module,
-// program, interface, checker, package, primitive and configuration. The
-// checker is declared here because it is a cell like the other six and was
-// reaching no loaded unit at all, which left this case asserting six of the
-// seven kinds its name claims.
-//
-// The library tag is asserted for each kind alongside the count. A bind reaches
-// a cell by library name as well as by cell name, so a declaration that arrived
-// untagged is a declaration no design can instantiate, and the count alone does
-// not tell the two apart.
 TEST(SeparateCompilationTool, AllCellKindsRoundTrip) {
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -175,13 +160,6 @@ TEST(SeparateCompilationTool, LoadFailsOnTruncatedChunk) {
   EXPECT_FALSE(PrecompiledLibrary::Load(path, target, mgr, arena, diag));
 }
 
-// §33.3.1 (printed page 937): when several cells of one name map to one
-// library, the last one met is the one written to it, meeting a cell again
-// after it was compiled counting as recompiling it. The adder a second compile
-// writes, with a parameter W the first lacked, is the one the library holds,
-// and top keeps its one definition beside it; the same name in another library
-// is another cell and stays. Both adders were loaded side by side, which the
-// bind refused as a duplicate definition.
 TEST(SeparateCompilationTool, RecompiledCellReplacesTheEarlierOne) {
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -209,10 +187,6 @@ TEST(SeparateCompilationTool, RecompiledCellReplacesTheEarlierOne) {
   EXPECT_EQ(adders_in_l, 1);
 }
 
-// The names a compile would write into the library's definitions name space,
-// in order, which is what lets one invocation that compiles two files warn
-// that a name comes twice (§33.3.1: one compiler invocation mapping several
-// modules of one name to one library draws a warning).
 TEST(SeparateCompilationTool, CellNamesListsTheDefinitions) {
   auto names = PrecompiledLibrary::CellNames(
       "module adder; endmodule\n"
@@ -225,11 +199,6 @@ TEST(SeparateCompilationTool, CellNamesListsTheDefinitions) {
   EXPECT_EQ(names[2], "bus");
 }
 
-// §33.5.4 has the binding run read no source description, and §3.14.2.3 and
-// §22 give a design element the `timescale and `default_nettype in force at its
-// header, so a record carries the directive state the compile recorded and a
-// load applies it, with the modules `celldefine marked (§22.10). The test fails
-// on a record holding the text alone, which loads the module with none of it.
 TEST(SeparateCompilationTool, LoadAppliesTheRecordedDirectiveState) {
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -263,10 +232,6 @@ TEST(SeparateCompilationTool, LoadAppliesTheRecordedDirectiveState) {
   EXPECT_TRUE(mod->is_cell);
 }
 
-// Annex E.2 with §3.14.1: a real `default_decay_time is rounded at the time
-// precision of the module it governs, which the binding run knows and the
-// compile's preprocessor does not, so a record carries the exact value and
-// that it was written as a real beside the rounded count.
 TEST(SeparateCompilationTool, LoadKeepsARealDefaultDecayTimeExact) {
   ScratchDir tmp;
   auto path = tmp.dir / "rtlLib.dpl";
@@ -294,12 +259,6 @@ TEST(SeparateCompilationTool, LoadKeepsARealDefaultDecayTimeExact) {
   EXPECT_EQ(mod->default_decay_time_real, 2.5);
 }
 
-// A record cut short inside a module's directive state is no record, wherever
-// the cut falls, the two fields a record carries last for each module among
-// them: 17 bytes off cuts into the real decay time's exact value, and 25 off
-// leaves out whether it was written as a real. With one module and no cells,
-// licences, protected lines or viewports, four counts of four bytes follow
-// those fields.
 TEST(SeparateCompilationTool, LoadFailsOnARecordCutInsideTheDecayTime) {
   for (std::uintmax_t cut : {17U, 25U}) {
     ScratchDir tmp;

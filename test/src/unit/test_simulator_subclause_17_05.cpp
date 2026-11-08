@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The source both cases share: the module raises b with a blocking
-// assignment at every posedge of clk, 5, 15, 25 and 35, and hands it to the
-// checker whose body is `body`, the run ending at `end`.
 std::string CheckerOverB(const std::string& body, int end) {
   return "checker chk(int b, logic clk);\n" + body +
          "endchecker\n"
@@ -26,10 +23,6 @@ std::string CheckerOverB(const std::string& body, int end) {
          "endmodule\n";
 }
 
-// §17.5: an expression of a checker's always_ff other than its event control
-// reads sampled values, while an always_comb and a continuous assignment of
-// the checker read current ones. At the posedge at 35 the module raises b to
-// 4, so z takes the sampled 3 and v and x the 4. z took the 4 as well.
 TEST(CheckerProcedures, AlwaysFfReadsSampledValues) {
   SimFixture f;
   auto* z = RunAndFindVar(CheckerOverB("  int z, v, x;\n"
@@ -44,9 +37,6 @@ TEST(CheckerProcedures, AlwaysFfReadsSampledValues) {
   EXPECT_EQ(f.ctx.FindVariable("c.x")->value.ToUint64(), 4u);
 }
 
-// §17.5: the condition of an immediate assertion in a checker's always_ff is
-// an expression of it too, so at 5, 15 and 25 it tests the sampled 0, 1 and
-// 2, holding twice. It tested the current 1, 2 and 3, holding once.
 TEST(CheckerProcedures, AlwaysFfImmediateAssertionReadsSampledValues) {
   SimFixture f;
   auto* pass = RunAndFindVar(

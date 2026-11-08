@@ -21,15 +21,8 @@ namespace delta {
 
 namespace {
 
-// The packed dimensions a type writes, each a left and a right bound, outermost
-// first.
 using PackedDims = std::vector<std::pair<Expr*, Expr*>>;
 
-// §6.11 and §6.12 name the integral and real types the standard defines, each
-// of which a type actual may be written as; the keyword each such kind is
-// spelled by in a specialization's key, whatever name the type carries. Empty
-// for a kind no type actual is written as -- a net type, a void -- and for the
-// named and inline aggregate kinds, which TypeActualKey spells for itself.
 std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kLogic:
@@ -69,15 +62,6 @@ std::string_view BuiltinTypeKeyword(DataTypeKind kind) {
   }
 }
 
-// §6.18 with §6.22.1: the built-in type at the end of the chain of typedefs
-// the name `type` writes, `int` for `word_t` under `typedef int word_t;`.
-// Null where `type` names no typedef, where the chain ends at no built-in
-// type -- a class, an enum, a struct -- and where a step on it writes a
-// parameter list or declares unpacked dimensions, `typedef int iq_t[$];`
-// standing for a queue of int rather than for int. Each packed dimension a
-// step writes is appended to `dims`, the use-site's ahead of the typedef's,
-// since §7.4.4 stacks a dimension written where the name is used outside the
-// ones the typedef carries.
 const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx,
                                      PackedDims& dims) {
   const DataType* step = &type;
@@ -97,10 +81,6 @@ const DataType* BuiltinTypedefTarget(const DataType& type, SimContext& ctx,
   return nullptr;
 }
 
-// §6.11 (printed page 109): whether the integral built-in `kind` is
-// 4-state, and the width it is predefined to have, 0 for bit, logic and reg,
-// which take theirs from their packed dimensions; §6.11.2 makes logic and reg
-// one type. Nullopt for a kind that is no integral built-in type.
 std::optional<std::pair<bool, uint32_t>> IntegralKindForm(DataTypeKind kind) {
   switch (kind) {
     case DataTypeKind::kBit:
@@ -125,11 +105,6 @@ std::optional<std::pair<bool, uint32_t>> IntegralKindForm(DataTypeKind kind) {
   }
 }
 
-// §7.4.1 with §6.22.1: the bounds of the packed dimensions `dims` lists,
-// outermost first, each spelled "[left:right]". Nullopt where a bound cannot be
-// folded here or the bounds do not account for the `width` bits the type was
-// sized with, as RecordPackedRange (lowerer_register.cpp) declines such bounds
-// for a variable; the caller then spells the type by its width alone.
 std::optional<std::string> PackedBoundsKey(const PackedDims& dims,
                                            uint32_t width, SimContext& ctx) {
   std::string key;
@@ -148,16 +123,6 @@ std::optional<std::string> PackedBoundsKey(const PackedDims& dims,
   return key;
 }
 
-// §6.22.1 (printed page 135): an integral built-in type spelled by what makes
-// two such types match -- 2- or 4-state, signed or not, and the bounds of each
-// packed dimension -- as the simple bit vector it matches, rule e) spelling a
-// type with a predefined width as the vector ranged [width-1:0] and rule g)
-// taking the signing a type ends with, however written. So `byte` and `bit
-// signed [7:0]` are both "bit signed[7:0]", `integer` and `logic signed
-// [31:0]` both "logic signed[31:0]", and `bit [2:0]` and `bit [3:1]`, which
-// rule f) keeps apart by their bounds, two keys. A scalar is the vector ranged
-// [0:0], and a type nothing sizes is spelled with no bounds. `form` is the
-// state and predefined width IntegralKindForm answers for `builtin`'s kind.
 std::string IntegralTypeKey(const DataType& builtin,
                             std::pair<bool, uint32_t> form,
                             const PackedDims& dims, uint32_t width,

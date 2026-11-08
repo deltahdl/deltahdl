@@ -250,10 +250,6 @@ TEST(EvalSteps, SignedComparisonResultZeroExtendedNotSignExtended) {
 }
 
 TEST(EvalSteps, SignedRelationalOperandsSignExtendToSharedWidth) {
-  // §11.8.2: a relational operator's operands mutually determine a shared
-  // width (the larger of the two) and each is sign-extended when its declared
-  // type is signed, independent of the surrounding context. The 4-bit -1 must
-  // sign-extend to stay negative rather than reading as 15 in the comparison.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -268,14 +264,10 @@ TEST(EvalSteps, SignedRelationalOperandsSignExtendToSharedWidth) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // -1 < 5 is true; a zero-extended operand would compare 15 < 5 (false).
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
 TEST(EvalSteps, SignedEqualityOperandsSignExtendToSharedWidth) {
-  // §11.8.2: an equality operator's operands mutually determine the larger
-  // width and sign-extend when signed. The narrow -1 must sign-extend to the
-  // wider -1 to compare equal.
   SimFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -290,7 +282,6 @@ TEST(EvalSteps, SignedEqualityOperandsSignExtendToSharedWidth) {
       "endmodule\n",
       f, "result");
   ASSERT_NE(var, nullptr);
-  // Both are -1; a zero-extended narrow operand (0x0F) would differ from 0xFF.
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
@@ -344,11 +335,6 @@ TEST(EvalSteps, MixedSignedAndUnsignedOperandUsesUnsignedExtension) {
 }
 
 TEST(EvalSteps, IntegerContextOperandConvertedToRealForRealResultOperator) {
-  // §11.8.2 exception 1: when an operator's result type is real, a
-  // context-determined operand that is not real is treated as self-determined
-  // and converted to real just before the operator is applied. Here the int
-  // operand of `+` is promoted to real, driven from real source declarations
-  // through the full pipeline.
   double result = RunAndGetReal(
       "module t;\n"
       "  int i;\n"
@@ -361,15 +347,10 @@ TEST(EvalSteps, IntegerContextOperandConvertedToRealForRealResultOperator) {
       "  end\n"
       "endmodule\n",
       "result");
-  // Integer addition would drop the fractional part; 255.5 confirms i became
-  // real before the operator was applied.
   EXPECT_DOUBLE_EQ(result, 255.5);
 }
 
 TEST(EvalSteps, RelationalWithRealOperandComparesInRealAndYieldsOneBit) {
-  // §11.8.2 exception 2: relational operands affect each other, so a real
-  // operand pulls its integer partner into a real comparison, while the result
-  // is a 1-bit unsigned value. Built from real/int declarations end-to-end.
   uint64_t result = RunAndGet(
       "module t;\n"
       "  real r;\n"
@@ -382,7 +363,6 @@ TEST(EvalSteps, RelationalWithRealOperandComparesInRealAndYieldsOneBit) {
       "  end\n"
       "endmodule\n",
       "result");
-  // 3.5 > 3 is true; a truncated integer comparison (3 > 3) would be false.
   EXPECT_EQ(result, 1u);
 }
 
@@ -403,10 +383,6 @@ TEST(EvalSteps, UnsignedOperandZeroExtendsInWiderContext) {
 }
 
 TEST(EvalSteps, SignedParameterOperandSignExtendsInWiderContext) {
-  // §11.8.2: when propagation reaches a simple operand (11.5) it is converted
-  // to the propagated width and sign-extended only when signed. Here the simple
-  // operand is a signed parameter rather than a variable or literal, built from
-  // real parameter syntax and evaluated end-to-end.
   uint64_t r = RunAndGet(
       "module t;\n"
       "  parameter signed [3:0] P = -4'sd1;\n"
@@ -414,15 +390,10 @@ TEST(EvalSteps, SignedParameterOperandSignExtendsInWiderContext) {
       "  initial r = P + P;\n"
       "endmodule\n",
       "r");
-  // -1 + -1 = -2 -> 0xFE; treating P as unsigned would give 15 + 15 = 0x1E.
   EXPECT_EQ(r, 0xFEu);
 }
 
 TEST(EvalSteps, RealEqualityOperandPullsIntegerPartnerIntoRealCompare) {
-  // §11.8.2 exception 2: an equality operand that is real makes the comparison
-  // happen in the real domain (the integer partner is converted), while the
-  // result stays a 1-bit unsigned value. This exercises the equality path,
-  // distinct from the relational path, built from real/int declarations.
   uint64_t result = RunAndGet(
       "module t;\n"
       "  real r;\n"
@@ -435,18 +406,9 @@ TEST(EvalSteps, RealEqualityOperandPullsIntegerPartnerIntoRealCompare) {
       "  end\n"
       "endmodule\n",
       "result");
-  // 2.5 != 2 is true; a truncated integer comparison (2 != 2) would be false.
   EXPECT_EQ(result, 1u);
 }
 
-// §11.8.1 makes an expression unsigned where any context-determined operand is,
-// and §11.8.2 propagates that type down with the size, so a signed operand
-// beneath an unsigned one is extended by zero before its own operator runs:
-// through an operator of either width class, a unary minus and a
-// conditional's results. Operands that are all signed keep sign extension; a
-// comparison, a logical or reduction operator, a concatenation and a
-// part-select are unsigned, an enumeration name leaves the value's own sign to
-// decide, and a real operand is converted with its sign.
 TEST(ExpressionTypePropagationSim, UnsignedOperandPropagatesItsTypeDown) {
   SimFixture f;
   EXPECT_EQ(

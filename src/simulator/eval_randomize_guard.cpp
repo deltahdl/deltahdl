@@ -18,9 +18,6 @@ namespace delta {
 
 namespace {
 
-// 18.5.12: whether the property `name` of the class `type`, or of one it
-// inherits from, is declared of a class type, so the value it holds is an
-// object handle.
 bool IsClassTypedProperty(const ClassTypeInfo* type, std::string_view name,
                           SimContext& ctx) {
   for (const auto* lvl = type; lvl != nullptr; lvl = lvl->parent) {
@@ -35,10 +32,6 @@ bool IsClassTypedProperty(const ClassTypeInfo* type, std::string_view name,
 bool HandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
                  uint64_t& out);
 
-// The handle the member access `h` names, `g.h` over the handle expression
-// `g`, read into `out`: a class-typed property of the object `g` names, or
-// of `owner` where `g` is this. Answers false where it names no handle,
-// and where `g` is null, which the dereference of `g` reports.
 bool MemberHandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
                        uint64_t& out) {
   if (h->lhs == nullptr || h->rhs == nullptr ||
@@ -56,11 +49,6 @@ bool MemberHandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
   return true;
 }
 
-// The handle the expression `h` names, read into `out`: a class-typed
-// property of `owner`, bare or as this.h; a class-typed variable; or a
-// class-typed property of the object a handle expression names, `g.h`.
-// Answers false where `h` names no handle, and where it is reached through
-// a null handle, which the dereference of that handle reports.
 bool HandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
                  uint64_t& out) {
   if (h == nullptr) return false;
@@ -78,8 +66,6 @@ bool HandleValue(const Expr* h, ClassObject* owner, RandomizeCtx& rc,
   return true;
 }
 
-// 18.5.12: whether evaluating `e` reads a member through a null handle, the
-// evaluation error a guard exists to sift away.
 bool DereferencesNull(const Expr* e, ClassObject* owner, RandomizeCtx& rc) {
   if (e == nullptr) return false;
   if (e->kind == ExprKind::kMemberAccess && !e->is_scope_resolution) {
@@ -100,10 +86,6 @@ bool DereferencesNull(const Expr* e, ClassObject* owner, RandomizeCtx& rc) {
   return false;
 }
 
-// 18.5.12: the four-state value of the guard subexpression `e`, free of
-// random variables: ERROR where it reads through a null handle, and
-// otherwise the truth of its value over the state variables, evaluated in
-// the scope of the object whose constraint it guards.
 GuardValue EvalGuardLeaf(const Expr* e, ClassObject* owner, RandomizeCtx& rc) {
   if (DereferencesNull(e, owner, rc)) return GuardValue::kError;
   rc.ctx.PushScope();
@@ -116,11 +98,6 @@ GuardValue EvalGuardLeaf(const Expr* e, ClassObject* owner, RandomizeCtx& rc) {
   return value.IsTruthy() ? GuardValue::kTrue : GuardValue::kFalse;
 }
 
-// 18.5.12: the guard predicate of the antecedent `e`: a conjunction,
-// disjunction or negation over the predicates of its operands, and any
-// other expression a leaf, RANDOM where it involves a random variable, which
-// cannot be evaluated before the solve, and otherwise evaluated over the
-// state when the guard is resolved, which is after pre_randomize() has run.
 GuardPredicate BuildGuardPredicate(
     const Expr* e, const std::function<bool(const Expr*)>& refs_rand,
     ClassObject* owner, RandomizeCtx& rc) {

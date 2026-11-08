@@ -70,16 +70,11 @@ TEST(CycleDelaySim, ZeroDelaySuspendsUntilEventThenProceeds) {
   block.clock_edge = Edge::kPosedge;
   cmgr.Register(block);
 
-  // §14.11: with no clocking block event yet in the current time step, a ##0
-  // cycle delay must suspend the calling process.
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{0}));
 
-  // Once the event has occurred in the current step, a ##0 continues without
-  // suspension at that step...
   cmgr.MarkBlockEventTime("cb", SimTime{7});
   EXPECT_TRUE(cmgr.DidBlockEventOccurAt("cb", SimTime{7}));
   EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{7}));
-  // ...but a later time step has not yet seen its own clocking event.
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{8}));
 }
 
@@ -91,18 +86,14 @@ TEST(CycleDelaySim, ZeroDelayEventTimeTracksMostRecentStep) {
   block.clock_edge = Edge::kPosedge;
   cmgr.Register(block);
 
-  // §14.11: a ##0 continues only at the exact step whose clocking event fired.
   cmgr.MarkBlockEventTime("cb", SimTime{4});
   EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{4}));
 
-  // A later clocking event advances the recorded step; the earlier step no
-  // longer counts as having a coincident event, so a ##0 there would suspend.
   cmgr.MarkBlockEventTime("cb", SimTime{9});
   EXPECT_FALSE(cmgr.DidBlockEventOccurAt("cb", SimTime{4}));
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{4}));
   EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{9}));
 
-  // A block that has never seen an event has no coincident step at all.
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("absent", SimTime{9}));
 }
 
@@ -126,16 +117,11 @@ TEST(CycleDelaySim, ZeroDelayEventTimeRecordedFromClockWatcher) {
   cmgr.Attach(f.ctx, f.scheduler);
   f.scheduler.Run();
 
-  // The clocking block event fired at time 10, so a ##0 evaluated at that step
-  // proceeds, while one evaluated at an earlier step would have suspended.
   EXPECT_TRUE(cmgr.DidBlockEventOccurAt("cb", SimTime{10}));
   EXPECT_TRUE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{10}));
   EXPECT_FALSE(cmgr.ZeroCycleDelayProceeds("cb", SimTime{5}));
 }
 
-// §14.11 with §8.6: a class task resumed from a cycle delay still runs on the
-// object it was called on, so the property written after `##2` is that
-// object's.
 TEST(CycleDelaySim, ClassTaskResumedFromACycleDelayWritesItsObject) {
   auto v = RunAndGet(
       "module t;\n"
@@ -159,12 +145,6 @@ TEST(CycleDelaySim, ClassTaskResumedFromACycleDelayWritesItsObject) {
   EXPECT_EQ(v, 315u);
 }
 
-// §14.11 (printed page 361) with §9.2 and §9.3.2: a cycle delay is a blocking
-// wait like any other, so a process may take any number of them in sequence,
-// in a loop or in parallel fork branches and run on. A resumed process
-// registered its next wait while the waits were being called, which grew the
-// table under the loop, and a wait kept after it resumed counted on freed
-// memory: each of these crashed the run or stopped it short.
 TEST(CycleDelaySim, SequentialLoopedAndForkedCycleDelaysRunOn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -189,11 +169,6 @@ TEST(CycleDelaySim, SequentialLoopedAndForkedCycleDelaysRunOn) {
   EXPECT_EQ(out, "5 15 25 55 n=3\n$finish at time 57\n");
 }
 
-// §14.11: `##N` waits for N clocking block events, and one executed in the
-// time step of an event -- after `@(cb)`, after the edge's own `@(posedge
-// clk)`, or straight after another cycle delay resumed by that event -- waits
-// a full cycle for the first of them. Each counted the event of its own time
-// step and returned a cycle early: 5, 5 and 25 in place of 15, 15 and 35.
 TEST(CycleDelaySim, CycleDelayDoesNotCountTheEventOfItsOwnTimeStep) {
   SimFixture f;
   std::string out = RunCapture(
@@ -214,11 +189,6 @@ TEST(CycleDelaySim, CycleDelayDoesNotCountTheEventOfItsOwnTimeStep) {
   EXPECT_EQ(out, "15 15 55 75\n$finish at time 75\n");
 }
 
-// §14.11 (printed page 361): `##0` suspends until the clocking block event
-// when that event has not yet occurred in the current time step and runs on
-// when it has, and `##(n)` with n at 0 is the same wait. So the first `##0`
-// waits for the edge at 5, the second, in that step, does not, and one at 7
-// waits for 15. A zero count was skipped, and each ran on at once: 0, 0, 7.
 TEST(CycleDelaySim, ZeroCycleDelayWaitsForTheEventOfItsStep) {
   SimFixture f;
   std::string out = RunCapture(

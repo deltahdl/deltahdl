@@ -306,8 +306,6 @@ TEST(UdpDeclGrammar, EndLabelMismatchIsError) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive : wrong_name\n");
-  // Parser::MatchEndLabel is shared by every block end label and files its
-  // report under §9.3.4, not under the UDP subclauses.
   EXPECT_TRUE(ReportedError(
       r.diags, "end label 'wrong_name' does not match 'inv'", 6, "9.3.4"));
 }
@@ -361,8 +359,6 @@ TEST(UdpDeclGrammar, AttributeOnWildcardUdp) {
   EXPECT_EQ(r.cu->udps[0]->name, "inv");
 }
 
-// `extern udp_ansi_declaration` and its non-ANSI pair put the declaration's
-// attribute instances after `extern`, at the head of the header.
 TEST(UdpDeclGrammar, AttributeOnExternUdp) {
   auto r = Parse(
       "extern (* custom_attr *)\n"
@@ -377,9 +373,6 @@ TEST(UdpDeclGrammar, AttributeOnExternUdp) {
   EXPECT_EQ(r.cu->udps[1]->attrs.size(), 1u);
 }
 
-// Every udp_nonansi_declaration / udp_ansi_declaration header ends with a
-// semicolon after the closing parenthesis of its port list. Dropping it must
-// be diagnosed by the declaration parser.
 TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
   auto r = Parse(
       "primitive inv(output out, input in)\n"
@@ -388,15 +381,9 @@ TEST(UdpDeclGrammar, MissingSemicolonAfterPortListIsError) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // §29.3.1 owns the UDP header, so Parser::ParseUdpAnsiHeader files the
-  // missing semicolon there rather than under A.5.1.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'table'", 2, "29.3.1"));
 }
 
-// Every alternative of the A.5.1 udp_declaration production ends in the
-// endprimitive keyword, so a udp_body that reaches end-of-input without one
-// matches no alternative and must be diagnosed. The clause 29.3.1 file carries
-// the same requirement stated as UDP definition prose.
 TEST(UdpDeclGrammar, MissingEndprimitiveInUdpDeclarationProductionIsError) {
   auto r = Parse(
       "primitive inv(output out, input in);\n"
@@ -404,19 +391,10 @@ TEST(UdpDeclGrammar, MissingEndprimitiveInUdpDeclarationProductionIsError) {
       "    0 : 1;\n"
       "    1 : 0;\n"
       "  endtable\n");
-  // §29.3 owns udp_declaration, so Parser::ParseUdpDecl files the missing
-  // endprimitive there, and the source ends before one arrives.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endprimitive', got EOF", 6, "29.3"));
 }
 
-// Every alternative of udp_declaration names the UDP by a udp_identifier,
-// which A.9.3 spells `simple_identifier | escaped_identifier`, in the header
-// and again in the `[ : udp_identifier ]` after endprimitive; the parser looked
-// for a simple identifier in the header of the definition and of the extern
-// declaration alike, so a UDP with an escaped name was reported as a missing
-// identifier. §5.6.1 ends an escaped identifier at white space, so each below
-// is followed by a space.
 TEST(UdpDeclGrammar, EscapedUdpIdentifier) {
   auto r = Parse(
       "extern primitive \\inv-1 (output q, input a);\n"

@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -46,10 +44,6 @@ TEST(AttributeInstanceElaboration, MultipleAttrSpecsResolveInOrder) {
   EXPECT_EQ(m.attrs[1].name, "parallel_case");
 }
 
-// The value elaboration resolved for the attribute `name` carried by a
-// variable of `mod`. An attr_spec's value is a constant expression, so what a
-// test about one reads back is the number that expression folded to, wherever
-// in the module the attributed declaration sits.
 void ExpectVariableAttrValue(const RtlirModule& mod, std::string_view name,
                              int64_t value) {
   bool found = false;
@@ -81,9 +75,6 @@ TEST(AttributeInstanceElaboration, AttrValueConstantExpressionCrossLink) {
   ExpectVariableAttrValue(m, "weight", 8);
 }
 
-// §A.9.1 attr_spec admits a constant_expression as its value. A localparam
-// reference is a distinct constant form from a literal or a parameter and is
-// resolved along its own elaboration path, so it needs its own input-form test.
 TEST(AttributeInstanceElaboration, AttrValueLocalparamConstantResolves) {
   ElabFixture f;
   auto* design = ElaborateSrc(

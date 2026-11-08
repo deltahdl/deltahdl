@@ -8,18 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A.5.3's udp_body and the productions under it that give a table its entries:
-// combinational_body and combinational_entry, sequential_body with and without
-// an initial statement, udp_initial_statement and init_val, sequential_entry,
-// and the input lists -- seq_input_list, level_input_list, edge_input_list and
-// edge_indicator.
-//
-// test/src/unit/test_parser_annex_a_05_03b.cpp holds the rest of A.5.3: the
-// symbols a field may hold, and the positions its BNF does not admit each in.
-// The two files share the suite UdpBodyGrammar because they cover one
-// production set, and they are two files because the one they were in reached
-// the 1000-line maximum assert-no-oversized-source-files fails at.
-
 TEST(UdpBodyGrammar, UdpBody_CombinationalAlternative) {
   auto r = Parse(
       "primitive and_gate(output y, input a, b);\n"
@@ -558,10 +546,6 @@ TEST(UdpBodyGrammar, EdgeIndicator_SimParen01) {
   EXPECT_EQ(eval.EvaluateWithEdge({'0', '1'}, 1, '0'), '0');
 }
 
-// udp_body ::= combinational_body | sequential_body, and only sequential_body
-// opens with `[ udp_initial_statement ]`; combinational_body opens with
-// `table`. §29.4 has the statement set the output's starting value in a
-// sequential UDP. One written in a combinational UDP was accepted silently.
 TEST(UdpBodyGrammar, InitialStatementInCombinationalBodyIsRejected) {
   auto r = Parse(
       "primitive inv(output q, input a);\n"

@@ -32,12 +32,6 @@ namespace delta {
 
 namespace {
 
-// DPLIB006 records carry the directive state, the runtime licences, the
-// protected lines and the envelopes' viewports beside the text; a DPLIB005
-// file, whose directive state held a real default decay time rounded alone, a
-// DPLIB004 file, which held no viewports either, a DPLIB003 file, which held
-// no protected lines either, a DPLIB002 file, which held no licences either,
-// and a DPLIB001 file, which held the text alone, are not read.
 constexpr char kMagic[] = "DPLIB006";
 constexpr std::streamsize kMagicLen = 8;
 
@@ -97,9 +91,6 @@ bool ReadString(std::ifstream& is, std::string& s) {
   return ReadU32(is, len) && ReadBytes(is, s, len);
 }
 
-// One design element's directive state, field by field in declaration order.
-// The enumerations are written as their underlying values, which is what
-// ReadModuleDirectives casts them back from.
 void WriteModuleDirectives(std::ofstream& os, const ModuleDirectives& d) {
   WriteString(os, d.module);
   WriteU64(os, d.decay_ticks);
@@ -119,8 +110,6 @@ void WriteModuleDirectives(std::ofstream& os, const ModuleDirectives& d) {
   WriteU64(os, std::bit_cast<uint64_t>(d.decay_real));
 }
 
-// The values ReadModuleDirectives reads one field of a record into before it is
-// converted to the field's own type.
 struct DirectiveBytes {
   uint8_t decay_infinite = 0;
   uint8_t has_strength = 0;
@@ -166,9 +155,6 @@ bool ReadModuleDirectives(std::ifstream& is, ModuleDirectives& d) {
   return true;
 }
 
-// One runtime licence, part by part. Only licences the reading found stated
-// are recorded (Preprocessor::ApplyLicense), so `stated` is not written and is
-// restored by ReadRuntimeLicense.
 void WriteRuntimeLicense(std::ofstream& os, const ProtectLicense& license) {
   WriteString(os, license.library);
   WriteString(os, license.entry);
@@ -225,9 +211,6 @@ void WriteDirectives(std::ofstream& os, const PrecompiledDirectives& d) {
   }
 }
 
-// Reads a count and that many entries into `out`, each with `read_one`. Each
-// entry is read before it is kept, so a damaged count ends the read at the
-// stream's end rather than asking for room for entries that are not there.
 template <typename T, typename ReadOne>
 bool ReadList(std::ifstream& is, std::vector<T>& out, ReadOne read_one) {
   uint32_t count = 0;
@@ -248,9 +231,6 @@ bool ReadDirectives(std::ifstream& is, PrecompiledDirectives& d) {
          ReadList(is, d.viewports, ReadViewport);
 }
 
-// Parses `source`, the preprocessor's output, with every report suppressed, and
-// answers the unit it parsed to, or null where it does not parse. The report
-// of a parse error is the business of the caller that has the source's path.
 const CompilationUnit* ParseSilently(std::string_view source,
                                      SourceManager& mgr, Arena& arena) {
   DiagEngine diag(mgr);
@@ -269,11 +249,6 @@ bool ParsesCleanly(std::string_view source) {
   return ParseSilently(source, mgr, arena) != nullptr;
 }
 
-// Appends one (library, source) record to the file at `path`, opening the file
-// with the format marker when the record is its first. Returns true only once
-// every byte has reached the filesystem: a caller told the write succeeded can
-// take the record to be there, which is what a form the next invocation of the
-// tool will read has to mean.
 bool AppendRecord(std::string_view source, std::string_view library,
                   const std::filesystem::path& path, bool first,
                   const PrecompiledDirectives& directives) {
@@ -288,11 +263,6 @@ bool AppendRecord(std::string_view source, std::string_view library,
   return os.good();
 }
 
-// Puts the file back to the length it had before an append that did not
-// finish. The cells already written are the ones earlier compiles put there,
-// and a half-written record following them would cost every one of them its
-// readability, so the remnant goes rather than the library. A file the failed
-// append itself created had no length to go back to and is removed.
 void DiscardPartialRecord(const std::filesystem::path& path,
                           std::uintmax_t previous_size) {
   std::error_code ec;
@@ -303,11 +273,6 @@ void DiscardPartialRecord(const std::filesystem::path& path,
   std::filesystem::resize_file(path, previous_size, ec);
 }
 
-// Records which library the record's declarations were compiled into, on every
-// kind of declaration AppendCellDeclarations moves. The two lists have to
-// agree: a cell reaches a bind through FindNamedInLibrary, which matches on the
-// library name as well as the cell name, so a declaration moved onto the target
-// without a library tag is a declaration no bind can name.
 void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
   auto* buf = static_cast<char*>(arena.Allocate(library.size(), 1));
   std::copy_n(library.data(), library.size(), buf);
@@ -321,23 +286,17 @@ void TagCells(CompilationUnit& cu, std::string_view library, Arena& arena) {
   for (auto* c : cu.configs) c->library = view;
 }
 
-// One record as the file holds it: the library its cells were compiled into,
-// the preprocessed text and the directive state recorded beside it.
 struct Record {
   std::string library;
   std::string source;
   PrecompiledDirectives directives;
 };
 
-// Reads a single record from the stream. Returns false on any read failure.
 bool ReadRecord(std::ifstream& is, Record& record) {
   return ReadString(is, record.library) && ReadString(is, record.source) &&
          ReadDirectives(is, record.directives);
 }
 
-// Bundles the destination compilation unit together with the shared parsing
-// infrastructure (source manager, arena, diagnostics) that a load pass writes
-// into. These travel together through PrecompiledLibrary::Load and LoadRecord.
 struct LoadContext {
   CompilationUnit& target;
   SourceManager& mgr;
@@ -345,9 +304,6 @@ struct LoadContext {
   DiagEngine& diag;
 };
 
-// Whether `viewport` describes an envelope of `cell`'s code, the two standing
-// in one record's text: one that declared the cell and names an item through
-// it, or one standing inside the cell, whose bare names name the cell's items.
 bool EnvelopeOfCell(const EnvelopeViewport& viewport, const ModuleDecl& cell) {
   if (viewport.region_source == 0 ||
       cell.range.start.file_id != viewport.region_source) {
@@ -362,8 +318,6 @@ bool EnvelopeOfCell(const EnvelopeViewport& viewport, const ModuleDecl& cell) {
          viewport.last_line <= cell.range.end.line;
 }
 
-// Drops the viewports of envelopes of the cells of `library` a later record
-// declares again, `definitions`, while `target` still holds them.
 void DropReplacedViewports(
     const CompilationUnit& target, std::string_view library,
     const std::unordered_set<std::string_view>& definitions,
@@ -393,18 +347,6 @@ void DropCells(std::vector<Decl*>& cells, std::string_view library,
   });
 }
 
-// §33.3.1 (printed page 937): when two or more cells of one name map to one
-// library, the one encountered last is what the library keeps. The rule
-// serves separate compilation, where a cell met again after it was compiled
-// is taken to be that cell recompiled. Each record is a later encounter
-// than every record before it, so a cell it declares replaces whatever cell of
-// that name the library already holds -- in the one namespace modules,
-// interfaces, programs, checkers, primitives and configurations share, and
-// among packages in theirs. Kept side by side, the two were one definition too
-// many for the bind.
-//
-// A viewport of an envelope of a replaced cell's code (§34.5.32) named code the
-// library no longer keeps, and goes with the cell.
 void ReplaceRecompiledCells(CompilationUnit& target, const CompilationUnit& cu,
                             std::string_view library, SourceManager& mgr) {
   std::unordered_set<std::string_view> definitions;
@@ -426,10 +368,6 @@ void ReplaceRecompiledCells(CompilationUnit& target, const CompilationUnit& cu,
   DropCells(target.packages, library, packages);
 }
 
-// Registers one record's text under `path`. Where lines of it came out of a
-// decryption envelope, the text is registered beside a copy marked protected
-// and those lines take their origin from the copy, so a position on one
-// resolves to protected code (§37.3.6) at the same path and line as before.
 uint32_t RegisterRecordText(const std::filesystem::path& path, Record& record,
                             SourceManager& mgr) {
   const std::vector<uint32_t>& sealed = record.directives.protected_lines;
@@ -447,9 +385,6 @@ uint32_t RegisterRecordText(const std::filesystem::path& path, Record& record,
                                  std::move(origins));
 }
 
-// §34.5.32: the viewports of the envelopes a record's text came out of, each
-// envelope restated as the lines of `fid`, the record's registered text, and
-// each viewport standing where its pragma expression stood in it.
 void AddRecordViewports(const Record& record, uint32_t fid,
                         SourceManager& mgr) {
   for (const PrecompiledViewport& kept : record.directives.viewports) {
@@ -464,9 +399,6 @@ void AddRecordViewports(const Record& record, uint32_t fid,
   }
 }
 
-// Parses one record's source into the target compilation unit, applying the
-// directive state it recorded and tagging cells with the record's library name.
-// Returns false on parse failure.
 bool LoadRecord(const std::filesystem::path& path, Record& record,
                 LoadContext& ctx) {
   uint32_t fid = RegisterRecordText(path, record, ctx.mgr);
@@ -486,8 +418,6 @@ bool LoadRecord(const std::filesystem::path& path, Record& record,
   return true;
 }
 
-// Opens the file at `path` for reading its records, past the format marker;
-// false where it is not a file this tool wrote.
 bool OpenRecords(const std::filesystem::path& path, std::ifstream& is) {
   is.open(path, std::ios::binary);
   if (!is.good()) return false;
@@ -501,9 +431,6 @@ bool OpenRecords(const std::filesystem::path& path, std::ifstream& is) {
 bool PrecompiledLibrary::Save(std::string_view source, std::string_view library,
                               const std::filesystem::path& path,
                               const PrecompiledDirectives& directives) {
-  // A compile puts cells into a library. One asked to compile under no library
-  // name has none to put them in, and the cells it wrote would answer to no
-  // library when something later came looking for them there.
   if (library.empty()) return false;
   if (!ParsesCleanly(source)) return false;
 

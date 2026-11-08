@@ -10,12 +10,6 @@ using namespace delta;
 
 namespace {
 
-// The design of test/src/e2e/clock_flow.sv around one assertion: clk0
-// rises at 5, 15, ..., 75 so that tick n of it is at 10n - 5, clk1 at 12,
-// 27, 45, 57 and 72, reading the counter as 2, 3, 5, 6 and 8; x is high at
-// 1 and 4, y at 2 and 5, z at 3, w at 1, x2 at 2, y2 at 3, z2 at 4, v at
-// 5, w3, x3 and y3 at 6, z3 at 7, xi at 1, yd and zi at 2 and xj at 1 and
-// 4; s_d is declared on clk1.
 std::string ClockFlowSource(const std::string& items) {
   return "module t;\n"
          "  logic clk0 = 0;\n"
@@ -56,8 +50,6 @@ std::string ClockFlowSource(const std::string& items) {
          "endmodule\n";
 }
 
-// The pass and fail counts of the assertion whose whole property_spec is
-// `spec`, and the sum of the times of its failures.
 struct FlowCounts {
   uint64_t passes;
   uint64_t fails;
@@ -78,9 +70,6 @@ FlowCounts CountsOfFlow(const std::string& spec) {
           fail_sum->value.ToUint64()};
 }
 
-// §16.13.3: the clock flows across |=> into the consequent, so naming it
-// there again changes nothing: both read y a tick of clk0 after x and z at
-// the tick of clk1 after that, holding from 5 and failing from 35, at 57.
 TEST(ClockFlow, TheClockFlowsAcrossTheImplication) {
   FlowCounts written = CountsOfFlow(
       "@(posedge clk0) x |=> @(posedge clk0) y ##1 @(posedge clk1) z");
@@ -94,8 +83,6 @@ TEST(ClockFlow, TheClockFlowsAcrossTheImplication) {
   EXPECT_EQ(implied.fail_sum, 57u);
 }
 
-// §16.13.3: clock flow makes concatenation and implication adjoint, x ##1
-// y |=> z reading as x |=> y |=> z, z on clk1 in both.
 TEST(ClockFlow, ConcatenationAndImplicationAreAdjoint) {
   FlowCounts concat =
       CountsOfFlow("@(posedge clk0) x ##1 y |=> @(posedge clk1) z");
@@ -109,9 +96,6 @@ TEST(ClockFlow, ConcatenationAndImplicationAreAdjoint) {
   EXPECT_EQ(nested.fail_sum, 57u);
 }
 
-// §16.13.3: a clock named inside parentheses flows into them and no
-// further, so z2 is on clk0 and read at 35, the tick after y2's at 27,
-// where it holds; read on clk1, at 45, it would not.
 TEST(ClockFlow, AClockInParenthesesFlowsNoFurther) {
   FlowCounts counts =
       CountsOfFlow("@(posedge clk0) w ##1 (x2 ##1 @(posedge clk1) y2) |=> z2");
@@ -119,9 +103,6 @@ TEST(ClockFlow, AClockInParenthesesFlowsNoFurther) {
   EXPECT_EQ(counts.fails, 0u);
 }
 
-// §16.13.3: the clock distributes to both operands of an and, the clock
-// named in the first flowing no further than its parentheses, so z3 is
-// read on clk0 at 65, where it holds; on clk1, at 57, it would not.
 TEST(ClockFlow, TheClockDistributesToTheOperandsOfAnAnd) {
   FlowCounts counts = CountsOfFlow(
       "@(posedge clk0) v |=> (w3 ##1 @(posedge clk1) x3) and (y3 ##1 z3)");
@@ -129,18 +110,12 @@ TEST(ClockFlow, TheClockDistributesToTheOperandsOfAnAnd) {
   EXPECT_EQ(counts.fails, 0u);
 }
 
-// §16.13.3: the clock of a sequence's declaration flows no further than an
-// instance of it: s_d reads yd on clk1, at 12, and zi after it is on clk0,
-// read at 15, where it holds; on clk1, at 27, it would not.
 TEST(ClockFlow, AClockInAnInstanceFlowsNoFurther) {
   FlowCounts counts = CountsOfFlow("@(posedge clk0) xi |=> s_d ##1 zi");
   EXPECT_EQ(counts.passes, 8u);
   EXPECT_EQ(counts.fails, 0u);
 }
 
-// §16.13.3: of two clocking events juxtaposed the second nullifies the
-// first, so the property is on clk0, holding at 5 and 35 and failing at
-// the six other ticks of clk0; on clk1 it would have five attempts.
 TEST(ClockFlow, TheSecondOfTwoClocksJuxtaposedNullifiesTheFirst) {
   FlowCounts counts = CountsOfFlow("@(posedge clk1) @(posedge clk0) xj");
   EXPECT_EQ(counts.passes, 2u);

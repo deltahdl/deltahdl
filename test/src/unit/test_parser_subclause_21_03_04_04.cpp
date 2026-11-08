@@ -31,8 +31,6 @@ TEST(IoSystemTaskParsing, FreadWithStartCount) {
               "endmodule\n"));
 }
 
-// §21.3.4.4 example list: start alone, and count alone with start omitted
-// via an empty argument slot.
 TEST(IoSystemTaskParsing, FreadStartOnlyAndOmittedStartForms) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -46,7 +44,6 @@ TEST(IoSystemTaskParsing, FreadStartOnlyAndOmittedStartForms) {
               "endmodule\n"));
 }
 
-// §21.3.4.4: the returned count makes $fread usable inside an expression.
 TEST(IoSystemTaskParsing, FreadAsExpressionOperand) {
   EXPECT_TRUE(
       ParseOk("module t;\n"
@@ -66,9 +63,6 @@ TEST(IoSystemTaskParsing, FreadUnterminatedCallRejected) {
       "  reg [7:0] mem [0:255];\n"
       "  initial $fread(mem, fd;\n"
       "endmodule\n");
-  // §13.5 owns the closing parenthesis of a system task call's argument list,
-  // so Parser::ParseSystemCall files the report under it rather than under
-  // §21.3.4.4.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 4, "13.5"));
 }
 

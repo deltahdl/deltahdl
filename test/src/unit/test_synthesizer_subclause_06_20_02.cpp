@@ -6,17 +6,6 @@
 
 namespace {
 
-// §6.20.2 reads a parameter declared with a type or a range at that width and
-// signedness, whatever value it took, and reads a parameter declared with
-// neither at the width and signedness of its final value. Each case fails on a
-// lowering that reads a parameter operand as constant zero. The two sign
-// extensions, each the right-hand side of an assignment to a wider target,
-// also fail on one that reads the parameter unsigned. The select
-// fails on one that numbers the parameter's bits from zero rather than by the
-// range it was declared with. The packed array of two dimensions is read whole,
-// at the eight bits its dimensions multiply to. The last case fails on one
-// that reads the value from its low 64 bits alone.
-
 TEST(ParameterWidthSynthesis, DeclaredSignedRangeSignExtendsTheValue) {
   ExpectInputSweep(
       "module m(output logic [7:0] y);\n"

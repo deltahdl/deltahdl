@@ -109,10 +109,6 @@ TEST(SystemNameParsing, SystemFunctionWithDataTypeArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §5.6.3 Syntax 5-1, second call form: `( data_type [ , expression ] )`. The
-// case above covers the data-type-only variant; this covers the variant that
-// carries the optional trailing expression after the data type, exercising the
-// distinct grammar branch that admits both a type and a value operand.
 TEST(SystemNameParsing, SystemFunctionWithDataTypeAndExprArg) {
   auto r = Parse(
       "module m;\n"

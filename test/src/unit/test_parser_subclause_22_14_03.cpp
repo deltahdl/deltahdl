@@ -19,20 +19,10 @@ bool Parses2001(const std::string& body) {
   return ParseWithPreprocessorOk(In2001(body));
 }
 
-// Every word Table 22-2 lists is reserved under this version, so none of them
-// can occupy the identifier slot of a declaration. The 1364-1995 leg is what
-// makes each one an *addition* rather than an inheritance: the same
-// declaration, the same word, and the list this version builds on accepts it.
-// Run through real source so the rejection is the reserved word list's doing
-// and not some unrelated parse failure.
 TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
   for (const char* word : kVerilog2001AddedKeywords) {
     std::string decl =
         std::string("module m;\n  reg [7:0] ") + word + ";\nendmodule\n";
-    // §6.8 owns the report: the word stands where Parser::ParseVarDeclList
-    // reads the declared name of a variable. The report names the word it
-    // found, so each entry of the table is covered by its own sentence rather
-    // than by one the whole table shares.
     auto r = ParseWithPreprocessor(In2001(decl));
     EXPECT_TRUE(ReportedError(
         r.diags, std::string("expected identifier, got '") + word + "'",
@@ -43,12 +33,6 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionsCannotNameAVariable) {
   }
 }
 
-// The negative form of the inclusion half, swept over the whole inherited
-// list. The role tests below show those words still opening the constructs
-// they always did; this shows the other side of the same claim, that none of
-// them has been freed to name something. Sweeping all 102 is what makes the
-// inherited table, rather than the handful of its entries a role test happens
-// to reach, the thing being checked.
 TEST(CompilerDirectiveParsing, InheritedKeywordsCannotNameAVariable) {
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
   for (const char* word : kVerilog1995Keywords) {
@@ -62,11 +46,6 @@ TEST(CompilerDirectiveParsing, InheritedKeywordsCannotNameAVariable) {
   }
 }
 
-// The constant-declaration keywords this version adds, each doing its own job.
-// `localparam` declares a constant, `genvar`/`generate`/`endgenerate` build a
-// loop generate construct, and `automatic` qualifies a function. Under the
-// list this version extends none of these is a keyword at all, so this is the
-// clearest place the addition shows up as behaviour rather than as a token.
 TEST(CompilerDirectiveParsing, Verilog2001ConstantKeywordsDeclareConstants) {
   auto r = ParseWithPreprocessor(
       In2001("module m;\n"
@@ -105,10 +84,6 @@ TEST(CompilerDirectiveParsing, Verilog2001ConstantKeywordsDeclareConstants) {
       HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "widthof"));
 }
 
-// `signed` and `unsigned` are additions of this version, and they are
-// modifiers rather than declaration openers -- a separate syntactic position
-// from the constant keywords above. Here they qualify a port, a parameter, a
-// net, a variable, and a function return type.
 TEST(CompilerDirectiveParsing, SignedAndUnsignedQualifyDeclarations) {
   auto r = ParseWithPreprocessor(
       In2001("module m (input wire signed [7:0] a,\n"
@@ -128,8 +103,6 @@ TEST(CompilerDirectiveParsing, SignedAndUnsignedQualifyDeclarations) {
                                ModuleItemKind::kFunctionDecl, "neg"));
 }
 
-// `automatic` on a task as well as on a function -- the other declaration this
-// addition qualifies.
 TEST(CompilerDirectiveParsing, AutomaticQualifiesTasksAndFunctions) {
   auto r =
       ParseWithPreprocessor(In2001("module m;\n"
@@ -150,9 +123,6 @@ TEST(CompilerDirectiveParsing, AutomaticQualifiesTasksAndFunctions) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "twice"));
 }
 
-// The pulse-control additions occupy a position none of the other tests
-// reaches: they are specify block items, so they only have a keyword role
-// inside a specify block that Table 22-1's own words open.
 TEST(CompilerDirectiveParsing, PulseControlKeywordsOpenSpecifyItems) {
   auto r =
       ParseWithPreprocessor(In2001("module m (input wire a, output wire y);\n"
@@ -170,10 +140,6 @@ TEST(CompilerDirectiveParsing, PulseControlKeywordsOpenSpecifyItems) {
   EXPECT_NE(FindSpecifyBlock(r.cu->modules[0]->items), nullptr);
 }
 
-// The inclusion half at this stage: the words carried over from the earlier
-// list still open the constructs they always did -- gate and switch
-// primitives, drive and charge strengths, the net types, a specify block, a
-// user-defined primitive, and the procedural statements.
 TEST(CompilerDirectiveParsing, Verilog1995KeywordRolesSurviveUnder2001) {
   auto r = ParseWithPreprocessor(
       In2001("module m;\n"
@@ -227,8 +193,6 @@ TEST(CompilerDirectiveParsing, Verilog1995KeywordRolesSurviveUnder2001) {
   EXPECT_EQ(always_item->sensitivity[1].edge, Edge::kNegedge);
 }
 
-// The specify, specparam, and user-defined primitive keywords of the inherited
-// list, which the combined statement test above does not reach.
 TEST(CompilerDirectiveParsing, InheritedSpecifyAndPrimitiveKeywordsParse) {
   EXPECT_TRUE(
       Parses2001("macromodule m (input wire a, output wire y);\n"
@@ -249,31 +213,15 @@ TEST(CompilerDirectiveParsing, InheritedSpecifyAndPrimitiveKeywordsParse) {
                  "endprimitive\n"));
 }
 
-// A word neither table lists is an ordinary identifier, so it can name
-// anything an identifier names. Declarations are only the most obvious
-// position: this runs words from later standards through the module name, both
-// port names, a parameter, a net, a variable, a task, a named block, and an
-// instance name, and reads each back off the parsed tree. The `1364-1995`
-// version specifier gets the same treatment in the sibling file for §22.14.2.
 TEST(CompilerDirectiveParsing, Verilog2001FreedWordNamesDeclaredEntities) {
   ExpectFreedWordsNameDeclaredEntities("1364-2001");
 }
 
-// The same freed word as an expression operand and as the target of a
-// procedural assignment -- positions that carry a value rather than introduce
-// a name, and so reach the parser by a different path than a declaration does.
-// The `1364-1995` version specifier gets the same treatment in the sibling
-// file for §22.14.2.
 TEST(CompilerDirectiveParsing,
      Verilog2001FreedWordIsAnOperandAndAssignmentTarget) {
   ExpectFreedWordIsAnOperandAndAssignmentTarget("1364-2001");
 }
 
-// The declaration kinds the other freed-word test does not reach: an event, a
-// function, and a gate instance name. Each is a distinct declaration
-// production, so a freed word has to survive each one separately. The
-// `1364-1995` version specifier gets the same treatment in the sibling file
-// for §22.14.2.
 TEST(CompilerDirectiveParsing,
      Verilog2001FreedWordNamesEveryOtherDeclarationKind) {
   auto r =
@@ -302,18 +250,7 @@ TEST(CompilerDirectiveParsing,
   EXPECT_EQ(gate->gate_inst_name, "interface");
 }
 
-// The negative from the other direction: a word neither table lists is not
-// reserved, so it carries no keyword meaning either. `uwire` is the sharpest
-// case -- it is the sole word the very next version adds, so it is the closest
-// reserved word to this list without being in it. Each case is paired with the
-// same source outside the region, which is what shows the region and not some
-// unrelated limitation decides the reading.
 TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
-  // With the word an ordinary identifier, `uwire w` declares w of a type called
-  // uwire rather than opening a net of that type, and §6.18 is what refuses it
-  // at elaboration, since nothing declares such a type. The parser records the
-  // declaration and the type name it rests on, which is what says the word
-  // carried no keyword meaning here.
   auto as_net =
       ParseWithPreprocessor(In2001("module m;\n  uwire w;\n"
                                    "endmodule\n"));
@@ -324,9 +261,6 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
   EXPECT_TRUE(as_net_item->type_name_undeclared_at_parse);
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
-  // §6.8 owns this one instead: a packed dimension is where the declaration
-  // was meant to end, so Parser::ParsePlainVarDecl in
-  // src/parser/parser_items.cpp demands the semicolon.
   auto as_type =
       ParseWithPreprocessor(In2001("module m;\n  logic [7:0] v;\n"
                                    "endmodule\n"));
@@ -335,16 +269,6 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n  logic [7:0] v;\nendmodule\n"));
 
-  // The word being an ordinary identifier, `always_comb r = 1'b0;` opens no
-  // process: it declares r of a type called always_comb, which is A.2.4's
-  // `variable_decl_assignment ::= variable_identifier { variable_dimension }
-  // [ = expression ]`. It cannot be an instantiation either, because A.4.1.1
-  // gives `hierarchical_instance ::= name_of_instance ( [ list_of_port_
-  // connections ] )` and §23.3.2 states in prose that every module
-  // instantiation needs the parentheses, while this source holds no `(`. §6.18
-  // is what refuses the type name, at elaboration, since nothing declares it.
-  // The paired source outside the region is the same three lines read as the
-  // process the word opens where it is a keyword.
   auto as_process =
       ParseWithPreprocessor(In2001("module m;\n"
                                    "  reg r;\n"
@@ -367,11 +291,7 @@ TEST(CompilerDirectiveParsing, WordOutsideVerilog2001ListIsNotAKeyword) {
       HasAlwaysOfKind(outside.cu->modules[0]->items, AlwaysKind::kAlwaysComb));
 }
 
-// A word this version reserves cannot name a module or an instance either --
-// the same rule in the two positions the variable sweep above does not cover.
 TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
-  // §23.2.1 owns the report on the module name: the word stands where
-  // Parser::ParseModuleDecl reads it.
   auto as_module =
       ParseWithPreprocessor(In2001("module generate;\n"
                                    "endmodule\n"));
@@ -380,10 +300,6 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
                             LineInRegion(1), "23.2.1"));
   EXPECT_TRUE(ParseWithPreprocessorOk(In1995("module generate;\nendmodule\n")));
 
-  // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
-  // is recognized by the identifier that follows the module name, so
-  // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
-  // instead and that demands a semicolon in src/parser/parser_items.cpp.
   auto as_instance =
       ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
                                    "module top;\n  sub localparam ();\n"
@@ -392,10 +308,6 @@ TEST(CompilerDirectiveParsing, Verilog2001AdditionCannotNameAModule) {
                             LineInRegion(4), "6.8"));
 }
 
-// The tables name particular spellings, and the language distinguishes case,
-// so a word differing from a listed one only in case falls outside the list and
-// is free to name something. This is the exclusivity rule at its narrowest
-// margin, in the positions where it matters most.
 TEST(CompilerDirectiveParsing, Verilog2001WordsAreMatchedCaseSensitively) {
   auto r =
       ParseWithPreprocessor(In2001("module GENERATE;\n"

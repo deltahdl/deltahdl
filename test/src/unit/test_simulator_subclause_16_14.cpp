@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A module around one or more concurrent assertion statements, as
-// test/src/e2e/concurrent_assertion_statements.sv is: clk rises at 5, 15,
-// 25 and 35, and a is low across the tick at 15 alone; the run ends at 40.
 std::string AssertionSource(const std::string& items,
                             const std::string& before = "") {
   return before +
@@ -33,9 +30,6 @@ std::string RunAssertions(const std::string& items,
   return RunCapture(AssertionSource(items, before), f);
 }
 
-// §16.14: a named statement's name is a level of the hierarchical name its
-// action block reports through %m, and an unnamed statement creates no
-// scope, so %m there names the module alone.
 TEST(ConcurrentAssertionStatements,
      ANamedStatementIsAScopeAndAnUnnamedOneIsNot) {
   std::string out = RunAssertions(
@@ -47,10 +41,6 @@ TEST(ConcurrentAssertionStatements,
   EXPECT_NE(out.find("t unnamed failed at 15\n"), std::string::npos);
 }
 
-// §16.14: the five statement kinds: assert and assume execute their fail
-// statements where the property is false, cover property and cover
-// sequence their pass statements where it holds or the sequence matches,
-// and restrict property nothing.
 TEST(ConcurrentAssertionStatements, TheFiveStatementKinds) {
   std::string out = RunAssertions(
       "  m_assert: assert property (@(posedge clk) a)\n"
@@ -69,8 +59,6 @@ TEST(ConcurrentAssertionStatements, TheFiveStatementKinds) {
   EXPECT_EQ(out.find("m_restrict"), std::string::npos);
 }
 
-// §16.14: a property on its own is never evaluated: one declared and never
-// used in an assertion statement, false at every tick, reports nothing.
 TEST(ConcurrentAssertionStatements, APropertyOnItsOwnIsNeverEvaluated) {
   std::string out = RunAssertions(
       "  property idle;\n"
@@ -81,9 +69,6 @@ TEST(ConcurrentAssertionStatements, APropertyOnItsOwnIsNeverEvaluated) {
   EXPECT_EQ(out, "t.m_used failed at 15\n$finish at time 40\n");
 }
 
-// §16.14: a concurrent assertion statement may stand in a generate block,
-// an always procedure, an interface and a checker, each a scope of the
-// hierarchical name its action block reports.
 TEST(ConcurrentAssertionStatements,
      AStatementStandsInAGenerateBlockAProcedureAnInterfaceAndAChecker) {
   std::string out = RunAssertions(
@@ -113,8 +98,6 @@ TEST(ConcurrentAssertionStatements,
   EXPECT_NE(out.find("t.u_chk.chk_named failed at 15\n"), std::string::npos);
 }
 
-// §16.14: a concurrent assertion statement may stand in a program, a scope
-// of the hierarchical name its action block reports.
 TEST(ConcurrentAssertionStatements, AStatementStandsInAProgram) {
   std::string out = RunAssertions(
       "  program prog;\n"
@@ -124,9 +107,6 @@ TEST(ConcurrentAssertionStatements, AStatementStandsInAProgram) {
   EXPECT_EQ(out, "t.prog.pr_named failed at 15\n$finish at time 40\n");
 }
 
-// §21.2.1.5 by way of §16.14: the label a procedure stands inside is that
-// procedure's level alone, so a statement of the module reports none of
-// another process's labels.
 TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
   std::string out = RunAssertions(
       "  initial begin : waiting\n"
@@ -137,11 +117,6 @@ TEST(ConcurrentAssertionStatements, ALabelOfOneProcessIsNotReportedByAnother) {
   EXPECT_EQ(out, "t.m_named failed at 15\n$finish at time 40\n");
 }
 
-// §16.14 and §27: a static concurrent assertion in a generate loop is
-// attempted at every tick of its clock, as one at module level is, whether the
-// clock is written on it, taken from the default clocking (§14.12), or the
-// operand is indexed by the genvar. a is low at the rises of 25, 45 and 55
-// alone, so each of the four fails three times.
 TEST(ConcurrentAssertionStatements, AStatementInAGenerateLoopIsAttempted) {
   SimFixture f;
   std::string out = RunCapture(
@@ -173,9 +148,6 @@ TEST(ConcurrentAssertionStatements, AStatementInAGenerateLoopIsAttempted) {
   EXPECT_EQ(out, "f0=3 f1=3 f2=3 f3=3\n");
 }
 
-// Each iteration of a generate loop holds an assertion of its own, reading its
-// own bit of v: bit 0 is low at three rises, bit 1 at the first five and bit 2
-// never, so the three instances fail three, five and no times.
 TEST(ConcurrentAssertionStatements,
      EachGenerateIterationIsAnAssertionOfItsOwn) {
   SimFixture f;
@@ -197,12 +169,6 @@ TEST(ConcurrentAssertionStatements,
   EXPECT_EQ(out, "f0=3 f1=5 f2=0\n");
 }
 
-// §16.14: a concurrent assertion is a module item whatever the module's ports
-// are, so one reading an interface through a modport port or a port of the
-// interface's type, its clock the interface's own port, is attempted at every
-// tick. req is high at the rises of 15 and 45 and gnt at 25 alone, so the
-// attempt of 15 passes, that of 45 fails at 55 and the other eight pass
-// vacuously.
 TEST(ConcurrentAssertionStatements, AStatementReadsThroughAnInterfacePort) {
   SimFixture f;
   std::string out = RunCapture(

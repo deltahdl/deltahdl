@@ -1,8 +1,3 @@
-// Annex H.14.2: the SV3.1a-style packed data functions svdpi_sv31a.h declares.
-// This simulator's actual representation of a packed array is the canonical
-// one, so the translation functions copy chunks as they are and the select
-// functions delegate to the canonical utilities of §H.11.5 over the same
-// layout, an svLogicVec32's c and d being the aval and bval of a chunk.
 #include "simulator/svdpi_sv31a.h"
 
 #include <cstdint>
@@ -89,7 +84,6 @@ svBitVec32 svGet32Bits(svBitPackedArrRef s, int i) {
 }
 
 uint64_t svGet64Bits(svBitPackedArrRef s, int i) {
-  // Two 32-bit part-selects, the upper one starting 32 bits above the lower.
   const uint64_t kLow = svGetBits(s, i, 32);
   const uint64_t kHigh = svGetBits(s, i + 32, 32);
   return (kHigh << 32) | kLow;

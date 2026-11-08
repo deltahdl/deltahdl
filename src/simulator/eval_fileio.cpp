@@ -23,13 +23,6 @@ static uint32_t FdFromArg(const Expr* arg, SimContext& ctx, Arena& arena) {
   return static_cast<uint32_t>(EvalExpr(arg, ctx, arena).ToUint64());
 }
 
-// §21.3.4: a file descriptor may be read from only when it was opened with a
-// read or read-update type. Returning a null handle for a write/append channel
-// makes each read function fall through to its normal failure result.
-// §21.3.7: the refusal is an error of the most recent operation on the
-// descriptor, so it is recorded for $ferror to report; a permitted read
-// attempt supersedes any earlier recorded failure (end-of-file is a separate
-// condition, not an error).
 static FILE* ReadableHandle(uint32_t fd, SimContext& ctx) {
   if (!ctx.IsFdReadable(fd)) {
     ctx.SetFileIoError(fd, EBADF, "file descriptor is not open for reading");
@@ -40,9 +33,6 @@ static FILE* ReadableHandle(uint32_t fd, SimContext& ctx) {
   return fp;
 }
 
-// §21.3.4.2: characters are read until the variable is filled, a newline is
-// read (the newline itself is kept), or end-of-file is reached. A string
-// destination resizes to the line, so it never fills.
 static std::string ReadFgetsLine(FILE* fp, bool string_dest,
                                  uint32_t capacity) {
   std::string line;
@@ -62,19 +52,11 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
-  // §21.3.4.2: the destination variable bounds how much one line can hold. A
-  // packed destination's capacity is its number of whole bytes -- a
-  // most-significant partial byte (a width that is not a multiple of eight)
-  // does not count toward the size. A string destination resizes to the line,
-  // so it never fills: only a newline or end-of-file ends its read.
   const Expr* dest = expr->args[0];
   Variable* var = nullptr;
   if (dest->kind == ExprKind::kIdentifier) var = ctx.FindVariable(dest->text);
   bool string_dest = var != nullptr && ctx.IsStringVariable(dest->text);
   uint32_t capacity = var ? var->value.width / 8 : 0;
-  // §21.3.4.2 with §8.5: any other variable -- a class property through a
-  // handle or bare in a method, an element or a field -- is sized from the
-  // value it holds, and the line is stored as an assignment to it would be.
   bool assign_dest = var == nullptr;
   if (assign_dest) {
     Logic4Vec held = EvalExpr(dest, ctx, arena);
@@ -85,8 +67,6 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   std::string line = ReadFgetsLine(fp, string_dest, capacity);
 
-  // §21.3.4.2: a read that returns no characters (error/EOF) yields a count of
-  // zero; otherwise the count of characters read is returned.
   if (line.empty()) return MakeLogic4VecVal(arena, 32, 0);
 
   uint32_t width = string_dest ? static_cast<uint32_t>(line.size()) * 8
@@ -98,11 +78,6 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
     return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
   }
   var->value = value;
-  // §9.4.2: an implicit event with no edge is detected on any change in the
-  // expression's value, and the clause names no writer whose change is
-  // exempt. A system task that writes one of its arguments has written a user
-  // variable, and Variable::NotifyWatchers is the only route by which a
-  // process parked on it resumes.
   var->NotifyWatchers();
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(line.size()));
 }
@@ -110,9 +85,6 @@ static Logic4Vec EvalFgets(const Expr* expr, SimContext& ctx, Arena& arena) {
 static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
-  // §21.3.4.1: the next $fgetc on a descriptor returns what $ungetc pushed
-  // onto it, a character in the descriptor's buffer rather than the file, so
-  // it is answered even where the file itself may not be read.
   std::string& pushed = ctx.FdPushback(fd);
   if (!pushed.empty()) {
     auto ch = static_cast<unsigned char>(pushed.back());
@@ -120,10 +92,6 @@ static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
     ctx.ClearFileIoError(fd);
     return MakeLogic4VecVal(arena, 32, ch);
   }
-  // §21.3.4: only a descriptor opened with a read or read-update type may be
-  // read. Consulting the readability gate (rather than the raw handle) matters
-  // when the host stream could deliver data anyway -- e.g. a "w+" or "a+" file
-  // holding data -- where the standard still requires the read to fail.
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
 
@@ -133,14 +101,10 @@ static Logic4Vec EvalFgetc(const Expr* expr, SimContext& ctx, Arena& arena) {
 }
 
 static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
-  // §21.3.6: with no argument every open file is flushed.
   if (expr->args.empty()) {
     std::fflush(nullptr);
     return MakeLogic4VecVal(arena, 1, 0);
   }
-  // §21.3.6: the single argument is either a multi-channel descriptor, whose
-  // every selected channel is flushed, or a single file descriptor. A real fd
-  // carries the reserved high bit; anything else is treated as an mcd.
   uint32_t descriptor = FdFromArg(expr->args[0], ctx, arena);
   if ((descriptor & SimContext::kFdMsb) != 0) {
     if (FILE* fp = ctx.GetFileHandle(descriptor)) std::fflush(fp);
@@ -150,13 +114,6 @@ static Logic4Vec EvalFflush(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 1, 0);
 }
 
-// §21.3.8: $feof yields nonzero only when end-of-file has previously been
-// detected by a read on the descriptor -- being positioned at the last byte is
-// not enough; a read must first come up short. The detection lives either in
-// the host stream's end-of-file indicator (raised by the direct reads) or in
-// the per-descriptor record a buffered $fscanf leaves behind. A missing
-// argument or a descriptor that is not open reads as end-of-file, which keeps
-// a `while (!$feof(fd))` loop from spinning forever after a failed $fopen.
 static Logic4Vec EvalFeof(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 1);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
@@ -170,12 +127,6 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 32, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
 
-  // §21.3.7: report the error of the most recent file I/O operation on this
-  // descriptor. Failures the simulator itself detects (a refused read, a bad
-  // reposition, an invalid descriptor) never touch the host stream, so the
-  // recorded per-descriptor status is consulted first; the host stream's error
-  // indicator remains as a fallback for host-detected failures on operations
-  // that do not record their outcome individually.
   int32_t code = 0;
   std::string msg;
   if (const auto* err = ctx.GetFileIoError(fd)) {
@@ -186,11 +137,6 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
     msg = std::strerror(code);
   }
 
-  // §21.3.7: the str argument receives the textual description. When the most
-  // recent operation did not fail, the returned code is zero and str is
-  // cleared rather than left holding a stale value. A string-typed destination
-  // takes the description's own length; a packed destination (the standard
-  // suggests at least 640 bits) is coerced to its declared width.
   if (expr->args.size() >= 2 && expr->args[1]->kind == ExprKind::kIdentifier) {
     auto* var = ctx.FindVariable(expr->args[1]->text);
     if (var) {
@@ -204,10 +150,6 @@ static Logic4Vec EvalFerror(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint32_t>(code));
 }
 
-// §21.3.5: the new position is the signed distance "offset" from the chosen
-// origin. The argument is read as a signed quantity of its own width, so a
-// narrow negative value (e.g. a 32-bit -2) seeks backward rather than being
-// zero-extended into a huge forward offset.
 static long SignedOffset(const Logic4Vec& vec) {
   uint64_t raw = vec.ToUint64();
   uint32_t width = vec.width;
@@ -218,9 +160,6 @@ static long SignedOffset(const Logic4Vec& vec) {
   return static_cast<long>(raw);
 }
 
-// §21.3.5 + §21.3.7: a reposition or position query that fails yields -1 and
-// records the failure so $ferror can describe it; one that succeeds erases any
-// earlier record for the descriptor.
 static Logic4Vec PositioningFailure(uint32_t fd, int32_t code, const char* what,
                                     SimContext& ctx, Arena& arena) {
   ctx.SetFileIoError(fd, code, what);
@@ -231,7 +170,6 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
-  // §21.3.5: a failed reposition reports the error code -1.
   if (!fp) {
     return PositioningFailure(
         fd, EBADF, "reposition on an invalid file descriptor", ctx, arena);
@@ -239,10 +177,6 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
 
   long offset = SignedOffset(EvalExpr(expr->args[1], ctx, arena));
 
-  // §21.3.5: the operation argument selects the origin -- 0 is the start of
-  // the file, 1 the current position, and 2 the end of file. Map these to the
-  // host's seek constants explicitly rather than assuming the platform's
-  // SEEK_* macros share those numeric values.
   auto operation =
       static_cast<int>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
   int whence = SEEK_SET;
@@ -255,19 +189,12 @@ static Logic4Vec EvalFseek(const Expr* expr, SimContext& ctx, Arena& arena) {
                               arena);
   }
 
-  // §21.3.5: a successful $fseek cancels any $ungetc push-back; the host's
-  // std::fseek discards pushed-back characters for the stream as required.
   int result = std::fseek(fp, offset, whence);
   if (result != 0) {
     return PositioningFailure(fd, errno != 0 ? errno : EIO,
                               std::strerror(errno), ctx, arena);
   }
   ctx.ClearFileIoError(fd);
-  // §21.3.8: repositioning makes the descriptor readable again -- the host
-  // fseek clears the stream's end-of-file indicator, and the simulator's own
-  // detection record is erased to match. The push back of a descriptor not
-  // open for reading is held here rather than in the host stream, so it is
-  // cancelled here too.
   ctx.SetFdEofDetected(fd, false);
   ctx.FdPushback(fd).clear();
   return MakeLogic4VecVal(arena, 64, 0);
@@ -277,8 +204,6 @@ static Logic4Vec EvalFtell(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
-  // §21.3.5: when the position cannot be obtained, $ftell yields EOF (-1) and
-  // the cause is queryable through $ferror.
   if (!fp) {
     return PositioningFailure(
         fd, EBADF, "position query on an invalid file descriptor", ctx, arena);
@@ -296,9 +221,6 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.empty()) return MakeLogic4VecVal(arena, 64, 0);
   uint32_t fd = FdFromArg(expr->args[0], ctx, arena);
   FILE* fp = ctx.GetFileHandle(fd);
-  // §21.3.5: $rewind is equivalent to $fseek(fd, 0, 0) and, like $fseek,
-  // reports -1 when the reposition fails. The host reposition also discards
-  // any $ungetc push-back, satisfying the cancellation requirement.
   if (!fp) {
     return PositioningFailure(
         fd, EBADF, "reposition on an invalid file descriptor", ctx, arena);
@@ -309,21 +231,11 @@ static Logic4Vec EvalRewind(const Expr* expr, SimContext& ctx, Arena& arena) {
                               std::strerror(errno), ctx, arena);
   }
   ctx.ClearFileIoError(fd);
-  // §21.3.8: as with $fseek, a successful rewind erases both the host end-of-
-  // file indicator and the simulator's own detection record, and cancels the
-  // push back held for a descriptor not open for reading.
   ctx.SetFdEofDetected(fd, false);
   ctx.FdPushback(fd).clear();
   return MakeLogic4VecVal(arena, 64, 0);
 }
 
-// §21.3.4.1: a push back onto a descriptor that is open but not for reading,
-// "w", "a" or STDOUT. It reads nothing, so §21.3.4's rule that only the r and
-// r+ types may be read does not refuse it, but the host stream of such a file
-// refuses one on some C libraries, so the character is held in the context,
-// where $fgetc finds it. Pushing EOF itself, as the host library refuses it,
-// or onto a descriptor with no open file, fails with EOF and a cause for
-// $ferror (§21.3.7).
 static Logic4Vec PushBackOntoUnreadableFd(int ch, uint32_t fd, SimContext& ctx,
                                           Arena& arena) {
   if (ctx.GetFileHandle(fd) == nullptr) {
@@ -348,25 +260,13 @@ static Logic4Vec EvalUngetc(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (!ctx.IsFdReadable(fd)) {
     return PushBackOntoUnreadableFd(ch, fd, ctx, arena);
   }
-  // A descriptor open for reading keeps the pushed character in its host
-  // stream, where $fgets, $fscanf and $fread see it as well as $fgetc.
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
-  // §21.3.4.1: the result of a push back is zero on success and EOF when the
-  // character could not be pushed onto the descriptor. The host library returns
-  // the pushed character (not zero) on success, so normalize the codes here.
   int result = std::ungetc(ch, fp);
   if (result == EOF) {
-    // §21.3.4.1: a failed push back is an error $ferror must be able to
-    // describe. A refused host push back does not raise the stream's error
-    // indicator, so without an explicit record the failure would be invisible
-    // to the §21.3.7 report.
     ctx.SetFileIoError(fd, EINVAL, "character push back was refused");
     return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   }
-  // §21.3.8: a successful push back puts a character in front of the read
-  // position -- the host ungetc clears the stream's end-of-file indicator, and
-  // the simulator's own detection record is erased to match.
   ctx.SetFdEofDetected(fd, false);
   return MakeLogic4VecVal(arena, 32, 0);
 }
@@ -380,9 +280,6 @@ static std::string ReadFileContent(FILE* fp) {
   return content;
 }
 
-// §21.3.4.3: the control string is parsed as ASCII, so a four-state value with
-// any unknown bit (x or z) cannot be interpreted. Only a non-literal argument
-// can carry such bits; a string literal never does.
 static bool ScanArgHasUnknownBits(const Expr* arg, SimContext& ctx,
                                   Arena& arena) {
   if (!arg || arg->kind == ExprKind::kStringLiteral) return false;
@@ -393,9 +290,6 @@ static bool ScanArgHasUnknownBits(const Expr* arg, SimContext& ctx,
   return false;
 }
 
-// §21.3.4.3: leading white space in front of an input field is ignored. The
-// set covers blanks, tabs, newlines, and formfeeds (plus the related vertical
-// tab and carriage return).
 static bool IsScanSpace(char c) {
   return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' ||
          c == '\v';
@@ -404,8 +298,6 @@ static bool IsScanSpace(char c) {
 static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 3) return MakeLogic4VecVal(arena, 32, 0);
 
-  // §21.3.4.3: an unknown bit (x or z) in the format string makes the function
-  // report EOF (-1).
   if (ScanArgHasUnknownBits(expr->args[1], ctx, arena)) {
     return MakeLogic4VecVal(arena, 32, 0xFFFFFFFF);
   }
@@ -418,10 +310,6 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   std::string input = ReadFileContent(fp);
   std::fseek(fp, start, SEEK_SET);
 
-  // §21.3.4.3: the format can be an expression -- a string literal, a string
-  // data type, or an integral data type whose content is the control string.
-  // Resolving the argument's value (rather than its source text) lets a
-  // variable-held control string drive the scan.
   std::string fmt = ResolveFormatArg(expr->args[1], ctx, arena);
   size_t consumed = 0;
   bool hit_end = false;
@@ -434,19 +322,10 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
                   &hit_end};
   uint32_t matched = RunScanf(req, ctx, arena);
 
-  // §21.3.4.3: leave the descriptor positioned just past the consumed input so
-  // a later read continues where the scan stopped.
   std::fseek(fp, start + static_cast<long>(consumed), SEEK_SET);
 
-  // §21.3.8: that reposition clears the host stream's end-of-file indicator,
-  // so a scan that ran against the end of its input would otherwise leave no
-  // trace for $feof. Record (or erase) the detection in the simulator's own
-  // per-descriptor state, which $feof consults alongside the host indicator.
   ctx.SetFdEofDetected(fd, hit_end);
 
-  // §21.3.4.3: a return of zero means an input character failed to match the
-  // control string, whereas EOF (-1) is reported when the input runs out before
-  // any field could be converted.
   if (matched == 0) {
     size_t p = consumed;
     while (p < input.size() && IsScanSpace(input[p])) ++p;
@@ -455,23 +334,13 @@ static Logic4Vec EvalFscanf(const Expr* expr, SimContext& ctx, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, matched);
 }
 
-// §21.3.4.4: pack the bytes of one memory word big-endian -- the first byte
-// read occupies the most significant byte position of the element. When the
-// file runs out before a full word is read, the bytes that were read still sit
-// in the most significant positions, so the partial value is shifted up to
-// align. The loaded data are 2-value (each set bit becomes 1, each clear bit 0;
-// x and z can never be read), which MakeLogic4VecVal yields directly.
 static Logic4Vec PackWordBigEndian(Arena& arena, const uint8_t* buf,
                                    size_t nread, uint32_t bytes_per_word,
                                    uint32_t width) {
   Logic4Vec vec = MakeLogic4Vec(arena, width);
   for (size_t i = 0; i < nread; ++i) {
-    // Byte i of the word sits 8*(bytes_per_word-1-i) bits above bit 0, so the
-    // first byte read lands in the most significant byte position even when
-    // the element is wider than 64 bits. A byte offset is always a multiple
-    // of 8, so a byte never straddles a 64-bit word boundary.
     uint32_t off = 8 * (bytes_per_word - 1 - static_cast<uint32_t>(i));
-    if (off >= width) continue;  // byte lies wholly above the element width
+    if (off >= width) continue;
     uint64_t byte = buf[i];
     if (width - off < 8) byte &= (uint64_t{1} << (width - off)) - 1;
     vec.words[off / 64].aval |= byte << (off % 64);
@@ -479,10 +348,6 @@ static Logic4Vec PackWordBigEndian(Arena& arena, const uint8_t* buf,
   return vec;
 }
 
-// §21.3.4.4: an unpacked struct is read as though a separate $fread were
-// performed on each member in declaration order; an unpacked union reads only
-// its first member. Each member therefore takes its own whole number of bytes.
-// Loads into var and returns the count of bytes read.
 static Logic4Vec FreadUnpackedStruct(const StructTypeInfo* sinfo, Variable* var,
                                      FILE* fp, Arena& arena) {
   size_t count = sinfo->is_union ? 1 : sinfo->fields.size();
@@ -496,21 +361,14 @@ static Logic4Vec FreadUnpackedStruct(const StructTypeInfo* sinfo, Variable* var,
     Logic4Vec fv = PackWordBigEndian(arena, fbuf, fread_n, fbytes, fld.width);
     delete[] fbuf;
 
-    // Deposit the member's freshly read bits in place; DepositBitField is
-    // multi-word safe, so wide members and wide structs both load intact.
     DepositBitField(var->value, fld.bit_offset, fv, fld.width);
     total_bytes += fread_n;
-    if (fread_n < fbytes) break;  // file ran out mid-member
+    if (fread_n < fbytes) break;
   }
-  // One notification for the one variable the members were deposited into,
-  // rather than one per member: a watcher re-evaluates its expression rather
-  // than reading a delta, and the call is one $fread.
   var->NotifyWatchers();
   return MakeLogic4VecVal(arena, 32, total_bytes);
 }
 
-// Integral-variable variant: $fread(integral_var, fd). Any start/count
-// arguments are ignored when loading a single packed value.
 static Logic4Vec FreadIntegralVar(Variable* var, FILE* fp, Arena& arena) {
   uint32_t nbytes = (var->value.width + 7) / 8;
   if (nbytes == 0) nbytes = 1;
@@ -522,9 +380,6 @@ static Logic4Vec FreadIntegralVar(Variable* var, FILE* fp, Arena& arena) {
   return MakeLogic4VecVal(arena, 32, static_cast<uint64_t>(nread));
 }
 
-// §21.3.4.4: start, when present, is the address of the first element loaded;
-// otherwise the lowest-numbered location is used. The omitted-start form
-// (`, ,`) reaches here as a null third argument and likewise defaults.
 static int64_t FreadStartAddr(const Expr* expr, int64_t low_addr,
                               SimContext& ctx, Arena& arena) {
   bool has_start = expr->args.size() >= 3 && expr->args[2] != nullptr;
@@ -532,9 +387,6 @@ static int64_t FreadStartAddr(const Expr* expr, int64_t low_addr,
   return static_cast<int64_t>(EvalExpr(expr->args[2], ctx, arena).ToUint64());
 }
 
-// §21.3.4.4: count, when present, caps how many locations are loaded; otherwise
-// the memory is filled with whatever data are available. has_count reports
-// whether a cap was supplied; the returned value is the cap (0 when absent).
 static uint64_t FreadMaxWords(const Expr* expr, bool& has_count,
                               SimContext& ctx, Arena& arena) {
   has_count = expr->args.size() >= 4 && expr->args[3] != nullptr;
@@ -542,9 +394,6 @@ static uint64_t FreadMaxWords(const Expr* expr, bool& has_count,
   return EvalExpr(expr->args[3], ctx, arena).ToUint64();
 }
 
-// §21.3.4.4: the destination memory is an unpacked array; these fields describe
-// it once for the load loop -- its element name prefix, its address bounds, and
-// the per-word byte count derived from the element width.
 struct FreadMemory {
   std::string mem_name;
   int64_t low_addr;
@@ -552,19 +401,12 @@ struct FreadMemory {
   uint32_t bytes_per_word;
 };
 
-// §21.3.4.4: the optional start/count operands bound the load. start_addr is
-// the address of the first element loaded; has_count/max_words cap how many
-// locations are filled (max_words is meaningful only when has_count is true).
 struct FreadWindow {
   int64_t start_addr;
   bool has_count;
   uint64_t max_words;
 };
 
-// §21.3.4.4: load consecutive words toward the highest address (increasing
-// index), regardless of the array's declared direction, until the memory is
-// full, the count is reached, or the file is exhausted. Returns the total
-// number of bytes read.
 static uint64_t FreadLoadWords(const FreadMemory& mem, const FreadWindow& win,
                                FILE* fp, SimContext& ctx, Arena& arena) {
   uint64_t total_bytes = 0;
@@ -584,23 +426,18 @@ static uint64_t FreadLoadWords(const FreadMemory& mem, const FreadWindow& win,
     }
     total_bytes += nread;
     ++words_done;
-    if (nread < mem.bytes_per_word) break;  // file ran out mid-word
+    if (nread < mem.bytes_per_word) break;
   }
   delete[] buf;
   return total_bytes;
 }
 
-// Memory variant: $fread(mem, fd [, start [, count]]), including the
-// $fread(mem, fd, , count) form whose start argument is omitted (a null arg).
 static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
                                   FILE* fp, SimContext& ctx, Arena& arena) {
   const Expr* dst = expr->args[0];
   std::string mem_name(dst->text);
   int64_t low_addr = ai->lo;
   int64_t high_addr = ai->lo + static_cast<int64_t>(ai->size) - 1;
-  // §21.3.4.4: the data are read byte by byte; the number of bytes that fill a
-  // word is the word width rounded up to a whole number of bytes (an 8-bit word
-  // uses one byte, a 9-bit word two).
   uint32_t elem_width = ai->elem_width;
   uint32_t bytes_per_word = (elem_width + 7) / 8;
   if (bytes_per_word == 0) bytes_per_word = 1;
@@ -615,14 +452,6 @@ static Logic4Vec FreadMemoryArray(const Expr* expr, const ArrayInfo* ai,
   return MakeLogic4VecVal(arena, 32, total_bytes);
 }
 
-// §21.3.4.4: the non-array destination forms. A non-packed struct/union reads
-// member by member; anything else (including a packed aggregate, which is not
-// handled by the struct form) loads the whole value at once via the
-// integral-variable form. §23.9: the destination resolves within the running
-// instance, so its layout is asked for by the key that instance's storage was
-// created under; asked by the bare name, an unpacked union of an instantiated
-// module found no layout and was loaded whole, two bytes into a union whose
-// first member takes one.
 static Logic4Vec FreadNonArray(const Expr* dst, FILE* fp, SimContext& ctx,
                                Arena& arena) {
   const StructTypeInfo* sinfo = (dst->kind == ExprKind::kIdentifier)
@@ -643,15 +472,11 @@ static Logic4Vec FreadNonArray(const Expr* dst, FILE* fp, SimContext& ctx,
 
 static Logic4Vec EvalFread(const Expr* expr, SimContext& ctx, Arena& arena) {
   if (expr->args.size() < 2) return MakeLogic4VecVal(arena, 32, 0);
-  // §21.3.4.4: the file descriptor is the second argument in every form.
   uint32_t fd = FdFromArg(expr->args[1], ctx, arena);
   FILE* fp = ReadableHandle(fd, ctx);
   if (!fp) return MakeLogic4VecVal(arena, 32, 0);
 
   const Expr* dst = expr->args[0];
-  // §21.3.4.4: a destination that names an unpacked array selects the memory
-  // form; anything else is the integral-variable form, which the standard
-  // defines as the one applied for all packed data.
   const ArrayInfo* ai = (dst->kind == ExprKind::kIdentifier)
                             ? ctx.FindArrayInfo(dst->text)
                             : nullptr;

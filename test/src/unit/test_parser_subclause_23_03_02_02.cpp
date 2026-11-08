@@ -63,41 +63,24 @@ TEST(ModuleInstantiationGrammar, NamedPortEmptyConnection) {
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortNameCannotBeBitSelect) {
-  // §23.3.2.2: the port name (left of the connection) shall be the plain name
-  // declared on the module; it cannot be a bit-select, part-select, or
-  // concatenation. The parser only accepts a port identifier after the dot, so
-  // a bit-select on the port-name side fails to parse.
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a[0](x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // `.a` closes as an implicit named connection, so the `[` stands where the
-  // connection list's closing parenthesis belongs, which §23.3.2 expects.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '['", 2, "23.3.2"));
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortNameCannotBePartSelect) {
-  // §23.3.2.2 names three illegal forms for the port name (left of the
-  // connection): bit-select, part-select, and concatenation. The bit-select
-  // case has its own test; this covers the part-select form. Only a plain port
-  // identifier is accepted after the dot, so a range select fails to parse.
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.a[1:0](x));\n"
       "endmodule\n");
   ASSERT_NE(r.cu, nullptr);
-  // As with the bit-select, `.a` closes first and the `[` stands where
-  // §23.3.2 expects the connection list to close.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got '['", 2, "23.3.2"));
 }
 
 TEST(ModuleInstantiationGrammar, NamedPortNameCannotBeConcatenation) {
-  // §23.3.2.2: the third illegal port-name form (alongside bit-select and
-  // part-select) is a concatenation of ports. Only a plain identifier is
-  // accepted after the dot, so a concatenation on the port-name side -- as
-  // opposed to a concatenation used as the port *expression*, which is legal --
-  // fails to parse.
   auto r = Parse(
       "module top;\n"
       "  sub u1 (.{a, b}(x));\n"

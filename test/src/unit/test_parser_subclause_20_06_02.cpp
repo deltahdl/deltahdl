@@ -33,8 +33,6 @@ TEST(PrimaryParsing, ConstantPrimaryTypeReference) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §20.6.2 BNF: the size_function alternative that takes a data_type as its
-// sole argument shall be accepted by the parser (NC4, data_type form).
 TEST(SubroutineCallExprParsing, SystemTfCallBitsDataTypeArg) {
   auto r = Parse(
       "module m;\n"
@@ -44,9 +42,6 @@ TEST(SubroutineCallExprParsing, SystemTfCallBitsDataTypeArg) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §20.6.2 BNF: the data_type argument form also admits a ranged built-in type,
-// e.g. $bits(logic [7:0]) — a distinct syntactic argument from a bare type
-// keyword. The parser shall accept it.
 TEST(SubroutineCallExprParsing, SystemTfCallBitsRangedDataTypeArg) {
   auto r = Parse(
       "module m;\n"

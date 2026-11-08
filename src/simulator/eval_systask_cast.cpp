@@ -14,18 +14,6 @@
 
 namespace delta {
 
-// §6.24.2's $cast, moved out of eval_systask.cpp, which stood at the size the
-// assert-no-oversized-source-files job fails at: the dynamic cast of a value
-// into an enumeration, of a handle into a class variable, or of any other
-// value into its destination, answering whether it took.
-
-// §6.24.2: the cast succeeded, so the destination takes the value. A variable
-// of the run's tables is written here; any other destination -- a class
-// property named bare inside a method or through a handle (§8.3, §8.11) --
-// is written as a blocking assignment to it writes it, since a property is
-// held on its object and no variable of its name exists to find. Written by
-// the name alone, `$cast(c, 1)` on a property `c` answered 1 and stored
-// nothing.
 static Logic4Vec CastAssignSuccess(const Expr* dest, uint64_t src_val,
                                    SimContext& ctx, Arena& arena) {
   auto* var = dest->kind == ExprKind::kIdentifier &&
@@ -34,7 +22,6 @@ static Logic4Vec CastAssignSuccess(const Expr* dest, uint64_t src_val,
                   : nullptr;
   if (var) {
     var->value = MakeLogic4VecVal(arena, var->value.width, src_val);
-    // §9.4.2 again: §6.24.1's $cast has written a user variable.
     var->NotifyWatchers();
   } else {
     PerformBlockingAssign(dest, MakeLogic4VecVal(arena, 32, src_val), ctx,
@@ -43,9 +30,6 @@ static Logic4Vec CastAssignSuccess(const Expr* dest, uint64_t src_val,
   return MakeLogic4VecVal(arena, 32, 1);
 }
 
-// §6.24.2: a destination of an enumeration type, wherever it is declared
-// (EnumTypeOfExpr), takes the value when it is a member and is left as it was
-// otherwise, the call answering whether it was.
 static bool TryCastEnum(const Expr* dest, uint64_t src_val, SimContext& ctx,
                         Arena& arena, Logic4Vec& out) {
   const auto* enum_info = EnumTypeOfExpr(dest, ctx, arena);
@@ -64,9 +48,6 @@ static bool AreCastCompatible(const ClassTypeInfo* a, const ClassTypeInfo* b) {
   return a->IsA(b) || b->IsA(a) || a->is_interface || b->is_interface;
 }
 
-// Static-type screen for a $cast to a class handle: if the source expression
-// names a typed class variable whose declared type is not cast-compatible with
-// the destination type, the cast fails outright.
 static bool SrcClassTypeIncompatible(const Expr* src_expr,
                                      const ClassTypeInfo* dest_type,
                                      SimContext& ctx) {
@@ -80,9 +61,6 @@ static bool SrcClassTypeIncompatible(const Expr* src_expr,
   return src_type && !AreCastCompatible(src_type, dest_type);
 }
 
-// §6.24.1 $cast: one dynamic cast request names a destination variable
-// (dest_name) and the source it is cast from (its run-time handle src_val and
-// the originating expression src_expr used for the static-type screen).
 struct CastRequest {
   std::string_view dest_name;
   const Expr* dest;
@@ -125,11 +103,6 @@ Logic4Vec EvalCastSysFunc(const Expr* expr, SimContext& ctx, Arena& arena) {
   auto* dest_expr = expr->args[0];
   auto src = EvalExpr(expr->args[1], ctx, arena);
   uint64_t src_val = src.ToUint64();
-  // §6.24.2: the destination is a variable or a class property, named bare or
-  // through a handle, or one element of an array of them, which the cast
-  // writes as an assignment to the select writes it; a class handle
-  // destination is screened by the class its variable is declared with, which
-  // a bare name alone records.
   if (dest_expr->kind != ExprKind::kIdentifier &&
       dest_expr->kind != ExprKind::kMemberAccess &&
       dest_expr->kind != ExprKind::kSelect) {

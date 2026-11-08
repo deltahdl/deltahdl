@@ -15,9 +15,6 @@
 
 using namespace delta;
 
-// NettypeDataKind, UserNettype, and the resolution helpers exercised below
-// are production declarations from simulator/net.h (§6.6.7).
-
 static Variable* MakeVar(Arena& arena, uint32_t width) {
   auto* v = arena.Create<Variable>();
   v->value = MakeLogic4Vec(arena, width);
@@ -190,8 +187,6 @@ TEST(UserDefinedNettype, AtomicNetResolvedAsWhole) {
 }
 
 TEST(UserDefinedNettype, ForceOverridesResolvedValue) {
-  // §6.6.7: a force overrides the value of a user-defined nettype net. Net
-  // resolution leaves a forced net untouched -- observed through Net::Resolve.
   Arena arena;
   auto* var = MakeVar(arena, 8);
   Net net;
@@ -210,8 +205,6 @@ TEST(UserDefinedNettype, ForceOverridesResolvedValue) {
 }
 
 TEST(UserDefinedNettype, ReleaseRestoresResolvedValue) {
-  // §6.6.7: once a forced nettype net is released, resolution again drives it,
-  // returning the net to its resolved value -- observed through Net::Resolve.
   Arena arena;
   auto* var = MakeVar(arena, 8);
   Net net;
@@ -270,11 +263,6 @@ TEST(UserDefinedNettype, ResolutionWithThreeDrivers) {
   EXPECT_EQ(var->value.words[0].aval & 1, 1u);
 }
 
-// §6.6.7: a net of a nettype declared with a resolution function takes the
-// value the function returns for its drivers, handed to it as a dynamic
-// array -- the sum 3 + 4 of an int nettype's two drivers, a struct nettype's
-// value built from the driver count, 40 + 2, and its first driver whole.
-// Resolved as a built-in net, each read x or its drivers' combined bits.
 TEST(UserNettypeSim, ResolutionFunctionGivesTheNetItsValue) {
   SimFixture f;
   EXPECT_EQ(
@@ -316,12 +304,6 @@ TEST(UserNettypeSim, ResolutionFunctionGivesTheNetItsValue) {
       "7 42 1 5\n");
 }
 
-// §6.6.7 with §8.25: a nettype's data type may be a structure a parameterized
-// class declares, named through a typedef of a specialization, as §6.6.7's
-// own `nettype MyBaseT::S` does. The net is of that structure as the
-// specialization binds it -- 96 bits under Base#(32), with a 32-bit data
-// member, and a 64-bit data member under Base#(64) -- and its members read
-// what the driver gives them.
 TEST(UserNettypeSim, ClassStructThroughATypedefOfASpecialization) {
   SimFixture f;
   EXPECT_EQ(
@@ -351,14 +333,6 @@ TEST(UserNettypeSim, ClassStructThroughATypedefOfASpecialization) {
       "96 64 32 5 2.500000 100000003\n");
 }
 
-// §6.6.7 lets a nettype resolve through a class's static method, named in the
-// with clause through the class: by its own name, `with C::res`, through the
-// package declaring it, and through a typedef of a specialization, as §6.6.7's
-// own `with MyBaseT::Tsum` does. Each net takes what its method returns for
-// its two drivers: C::res ORs them, 0f | f0 = ff; P::Q::res sums them, 3 + 4 =
-// 7; and Base#(32)'s Tsum adds its own parameter to their sum, 32 + 1 + 2 = 35,
-// where the generic class's default would leave 4. A resolution call that
-// finds no function reads none of these (#7594).
 TEST(UserNettypeSim, ResolutionThroughAClassStaticMethod) {
   SimFixture f;
   EXPECT_EQ(
@@ -405,10 +379,6 @@ TEST(UserNettypeSim, ResolutionThroughAClassStaticMethod) {
       "ff 7 35\n");
 }
 
-// A nettype renaming a package's nettype through the package is that nettype,
-// so a net of it resolves through the package's function: P's pres ANDs the
-// two drivers, 3 & 5 = 1, where the module's own nt, which mres resolves,
-// would OR them to 7 (#7597).
 TEST(UserNettypeSim, RenamedPackageNettypeResolvesThroughThePackagesFunction) {
   SimFixture f;
   EXPECT_EQ(
@@ -440,10 +410,6 @@ TEST(UserNettypeSim, RenamedPackageNettypeResolvesThroughThePackagesFunction) {
       "1\n");
 }
 
-// A declaration naming a package's nettype through the package declares a net
-// of that nettype, imported or not: P::nt n resolves its two drivers through
-// P's pres, 3 & 5 = 1, where a variable of P's data type could take no second
-// continuous assignment (#7600).
 TEST(UserNettypeSim, NetOfAPackageScopedNettypeResolvesThroughThePackagesFunc) {
   SimFixture f;
   EXPECT_EQ(
@@ -468,10 +434,6 @@ TEST(UserNettypeSim, NetOfAPackageScopedNettypeResolvesThroughThePackagesFunc) {
       "1\n");
 }
 
-// A net declared through `$unit ::` is of the compilation unit's nettype though
-// the module declares one of the same name: n resolves through the unit's
-// ures, 3 & 5 = 1, and not through the module's mres, which would give 7
-// (#7600).
 TEST(UserNettypeSim, NetOfAUnitScopedNettypeResolvesThroughTheUnitsFunc) {
   SimFixture f;
   EXPECT_EQ(

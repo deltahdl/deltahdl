@@ -10,9 +10,6 @@ using namespace delta;
 
 namespace {
 
-// §6.6.7 judges the data type of a nettype wherever the nettype is declared:
-// in a package, in the compilation unit, in a procedural block and in a class,
-// as among a module's own items.
 ::testing::AssertionResult NettypeReported(const std::string& src,
                                            uint32_t line) {
   ElabFixture f;
@@ -88,8 +85,6 @@ TEST(NettypeDataTypePlaces, BlockAndClassNettype) {
              "endmodule\n"));
 }
 
-// A covergroup is a type of its own (§19.3), named by no item of the clause's
-// list, whichever of these places names it.
 TEST(NettypeDataTypePlaces, CovergroupNamedFromEachPlace) {
   EXPECT_TRUE(
       NettypeReported("package p;\n"

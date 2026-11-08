@@ -23,37 +23,16 @@
 
 namespace delta {
 
-// §23.9 (printed page 761): the scope stack SimContext keeps for the
-// subroutine bodies and the blocks a process is running -- pushing and
-// marking a frame, the variables and type actuals a frame binds, the walk
-// a bare name is looked up by, a static subroutine's retained frame and the
-// stack of subroutine names -- kept apart from sim_context.cpp, which had
-// grown past the line cap.
-
 void ScopeStack::PushScope(std::string_view package) {
   scope_stack_.push_back(Scope{{}, {}, {}, {}, package, {}, false, {}, {}, {}});
 }
 
-// §23.9 with §26.2: the innermost frame -- a subroutine's, pushed by the
-// caller before the actuals are bound -- becomes the frame PackageFrame
-// stops at, and is given the package whose names the body reads by their
-// bare names, none for an empty name. Both are set once the actuals are in
-// place, so that a caller's actual spelt like a package variable still reads
-// the caller's, its own import included.
 void ScopeStack::EnterSubroutineScope(std::string_view package) {
   if (scope_stack_.empty()) return;
   scope_stack_.back().is_subroutine = true;
   if (!package.empty()) scope_stack_.back().package = package;
 }
 
-// §26.3 with §13.3: a task's frame is pushed by PushTaskCallScope
-// (eval_function.cpp) with no package and the actuals are bound into it in
-// the caller's scope, so the package whose names the body reads bare -- the
-// task's own, or the key its body imports are recorded under
-// (LowerSubroutineBodyImports in lowerer_import.cpp) -- is set once
-// SetupTaskCall has bound them, which is why ExecInlineTaskCall
-// (stmt_exec.cpp) passes its result through here; a function's frame is
-// given it by EvalFunctionCall before its default actuals are read.
 const ModuleItem* SimContext::EnterSubroutinePackage(const ModuleItem* func) {
   if (func != nullptr) EnterSubroutineScope(SubroutinePackage(func));
   return func;
@@ -98,16 +77,6 @@ const std::string_view* ScopeStack::FindLocalClassType(
   return nullptr;
 }
 
-// §26.3 with §23.9: the frame whose package a bare name is read through is
-// the innermost one naming a package -- a package subroutine's own, or the
-// key a module subroutine's body imports are recorded under
-// (LowerSubroutineBodyImports in lowerer_import.cpp) -- and the search ends
-// at the innermost subroutine frame, since a subroutine's body is a scope
-// nested in the module or package declaring it and not in its caller's body.
-// A block, fork or loop frame inside the body is walked past to the body's
-// own frame; a callee whose frame names no package sees none of its
-// caller's, where walking on had it read the caller's import. Null where no
-// frame supplies a package, a module process's block frames included.
 const Scope* ScopeStack::PackageFrame() const {
   for (auto it = scope_stack_.rbegin(); it != scope_stack_.rend(); ++it) {
     if (!it->package.empty()) return &*it;
@@ -137,8 +106,6 @@ std::vector<Scope> ScopeStack::SwapScopeStack(std::vector<Scope> new_stack) {
 }
 
 std::string_view SimContext::StaticFrameKey(std::string_view name) {
-  // §13.4.2: a package's or the compilation unit's subroutine keeps its
-  // frames, and those of the blocks in its body, under its owner's name.
   const std::vector<FrameOwnerEntry>& owners =
       current_process_ != nullptr ? current_process_->frame_owners
                                   : processless_frame_owners_;
@@ -146,8 +113,6 @@ std::string_view SimContext::StaticFrameKey(std::string_view name) {
     return *arena_.Create<std::string>(std::string(owners.back().owner) +
                                        "::" + std::string(name));
   }
-  // §27.4: a frame is kept under the module instance and the generate block
-  // instance declaring what the frame is of.
   std::string key(ActiveGenBlockPrefix());
   if (current_process_ != nullptr) key.insert(0, current_process_->inst_prefix);
   if (key.empty()) return name;
@@ -155,11 +120,6 @@ std::string_view SimContext::StaticFrameKey(std::string_view name) {
 }
 
 std::string_view SimContext::ActiveGenBlockPrefix() const {
-  // §27.4: each generate block instance is a scope of its own, so what the
-  // running process declares belongs to the block instance it is declared in:
-  // the process's own block for its procedural code, and for a subroutine's
-  // body the block declaring the subroutine, none for one the module declares
-  // (FrameOwnerEntry::gen_depth).
   if (current_process_ == nullptr) return {};
   return GenBlockPrefixOf(*current_process_);
 }
@@ -209,9 +169,6 @@ std::string_view SimContext::GenBlockPrefixOf(const Process& proc) {
 }
 
 void SimContext::PushStaticScope(std::string_view func_name) {
-  // §13.4.2's static frame carries the variables the function declared static;
-  // the three maps beside them start empty, a queue or associative array of the
-  // call being the call's own and a shape with it.
   scope_stack_.push_back(Scope{static_frames_[StaticFrameKey(func_name)],
                                {},
                                {},
@@ -233,16 +190,6 @@ void SimContext::PopStaticScope(std::string_view func_name) {
   }
 }
 
-// §23.9 (printed page 761): a name referenced directly within a task or
-// function is declared in it or in a scope higher in the same branch of the
-// name tree, so the frames its body sees end at the body's own frame, the
-// innermost one EnterSubroutineScope marked; a begin-end, fork or loop frame
-// inside the body is walked past to it, and a module process's block frames,
-// under no subroutine, are all visible. Walked to the bottom of the stack,
-// every lookup below read the callers' locals as the callee's own:
-// uvm_coreservice_t::set(cs), its `inst = cs` run under a caller holding a
-// local named inst, stored the handle in that local, and
-// uvm_coreservice_t::get() on the next call found the class's inst null.
 std::vector<Scope>::const_reverse_iterator ScopeStack::VisibleFramesEnd()
     const {
   for (auto it = scope_stack_.crbegin(); it != scope_stack_.crend(); ++it) {
@@ -287,9 +234,6 @@ Variable* SimContext::CreateLocalVariable(std::string_view name, uint32_t width,
                                           bool is_signed) {
   auto* var = arena_.Create<Variable>();
   var->value = MakeLogic4VecVal(arena_, width, 0);
-  // The declaration's signedness belongs both to the object and to the value
-  // standing in it: reads go through the variable's flag, while a value taken
-  // straight out of the cell carries its own.
   var->is_signed = is_signed;
   var->value.is_signed = is_signed;
   if (!scope_stack_.empty()) {

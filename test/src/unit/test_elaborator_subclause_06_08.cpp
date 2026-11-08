@@ -1,10 +1,3 @@
-// Tests for §6.8 "Variable declarations". The subclause states what a variable
-// is, gives Syntax 6-3, and carries three footnotes that restrict what a
-// declaration may say: footnote 14 forbids the automatic keyword outside a
-// procedural context, footnote 17 requires the packed keyword beside a packed
-// dimension, and footnote 18 requires a net or var keyword before a
-// type_reference.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -14,9 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §6.20.6, not §6.8, is what a const without an initializer breaches: §6.8
-// says only that a variable may be declared with an initializer, while §6.20.6
-// "Const constants" is where the requirement to initialize one lives.
 TEST(VarDecl, ConstWithoutInitializerIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -93,11 +83,6 @@ TEST(VarDecl, MultipleVarsInOneStatement) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 3u);
-  // §6.8: each variable_decl_assignment names a simple variable_identifier, so
-  // a single declaration of "a, b, c" elaborates to three variables whose
-  // stored names are the bare identifiers. The "t.a" hierarchical path name
-  // (§23.6) is a separate concept from the declared name and is not what is
-  // recorded here.
   EXPECT_EQ(mod->variables[0].name, "a");
   EXPECT_EQ(mod->variables[1].name, "b");
   EXPECT_EQ(mod->variables[2].name, "c");
@@ -117,15 +102,8 @@ TEST(VarDecl, VarImplicitElaboratesAsLogic) {
   EXPECT_TRUE(mod->variables[0].is_4state);
 }
 
-// §6.8 footnote 14 to Syntax 6-3: the automatic keyword is illegal in a
-// data_declaration outside a procedural context. A package-level variable
-// declaration is such a data_declaration. The report naming §6.8 is the
-// parser's, raised in Parser::ParseDataDeclItem where the keyword is read,
-// which ElaborateSrc leaves in the fixture's engine.
 TEST(VarDecl, AutomaticInPackageIsError) {
   ElabFixture f;
-  // §6.8's rule against a lifetime keyword here is the parser's, so the source
-  // does not parse and the permissive helper says that is meant.
   ElaborateSrcAllowingParseErrors(
       "package p;\n"
       "  automatic int x;\n"
@@ -156,9 +134,6 @@ TEST(VarDecl, AutomaticInProceduralBlockOk) {
              "endmodule\n"));
 }
 
-// §7.2 footnote 17 to Syntax 7-1, not §6.8 footnote 17, is what the report
-// names: §7.2 states the rule in the form the elaborator implements, adding
-// that a packed dimension on a union may take soft instead of packed.
 TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -171,7 +146,6 @@ TEST(VarDecl, StructPackedDimWithoutPackedKeywordIsError) {
       "packed dimension on struct requires the packed keyword", 2, "7.2"));
 }
 
-// The union half of the same §7.2 footnote 17.
 TEST(VarDecl, UnionPackedDimWithoutPackedKeywordIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -223,9 +197,6 @@ TEST(VarDecl, TypeRefInVarDeclWithVarOk) {
 }
 
 TEST(VarDecl, IntegerAtomTypesAreSignedByDefault) {
-  // §6.8: only signed types retain the significance of the sign; byte,
-  // shortint, int, integer, and longint are signed by default, while vector
-  // types (bit/logic/reg) are unsigned unless explicitly declared signed.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -241,12 +212,12 @@ TEST(VarDecl, IntegerAtomTypesAreSignedByDefault) {
   EXPECT_FALSE(f.has_errors);
   auto* mod = design->top_modules[0];
   ASSERT_GE(mod->variables.size(), 6u);
-  EXPECT_TRUE(mod->variables[0].is_signed);   // byte
-  EXPECT_TRUE(mod->variables[1].is_signed);   // shortint
-  EXPECT_TRUE(mod->variables[2].is_signed);   // int
-  EXPECT_TRUE(mod->variables[3].is_signed);   // integer
-  EXPECT_TRUE(mod->variables[4].is_signed);   // longint
-  EXPECT_FALSE(mod->variables[5].is_signed);  // bit -> unsigned by default
+  EXPECT_TRUE(mod->variables[0].is_signed);
+  EXPECT_TRUE(mod->variables[1].is_signed);
+  EXPECT_TRUE(mod->variables[2].is_signed);
+  EXPECT_TRUE(mod->variables[3].is_signed);
+  EXPECT_TRUE(mod->variables[4].is_signed);
+  EXPECT_FALSE(mod->variables[5].is_signed);
 }
 
 TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
@@ -267,10 +238,6 @@ TEST(VarDecl, VarBytePrefixEquivalentToBareByte) {
 }
 
 TEST(VarDecl, VarSigningOnlyElaboratesAsSignedLogic) {
-  // §6.8: with the var keyword and only signing/range specified, the data type
-  // is implicitly logic. `var signed [7:0]` therefore elaborates to a 4-state
-  // (logic) 8-bit variable that also carries the signed qualifier -- the range-
-  // only form (VarRangeOnlyEquivalentToVarLogic) stays unsigned by contrast.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -304,19 +271,6 @@ TEST(VarDecl, VarRangeOnlyEquivalentToVarLogic) {
   EXPECT_EQ(mod->variables[0].is_signed, mod->variables[1].is_signed);
 }
 
-// §6.8 on the initial value a static variable may take: it need not be a simple
-// constant and may be a run-time expression, dynamic memory allocation
-// included, so a static class handle or mailbox may be created by calling its
-// new method (§15.4.1), and a static variable may start at a random value from
-// $urandom.
-//
-// The three tests below hold that for a static variable declared inside a
-// subroutine, which is where the elaborator used to require a constant
-// expression. Nothing narrows §6.8 there: §6.21 constrains only when the
-// initialization runs, once at the beginning of simulation, and §13.4.2
-// covers storage and reentrancy.
-
-// $urandom is the example §6.8 names, so this is the standard's own case.
 TEST(StaticVariableInitializers, SubroutineStaticTakesASystemCallInitializer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -331,11 +285,6 @@ TEST(StaticVariableInitializers, SubroutineStaticTakesASystemCallInitializer) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A parameter reference is a constant expression by §11.2.1, so this source
-// was legal even under the rule the elaborator used to state. It was rejected
-// anyway, because the constancy test was called without a scope and so
-// answered false for every identifier. Keeping the case distinguishes a
-// literal from a constant expression, which a literal initializer cannot.
 TEST(StaticVariableInitializers, SubroutineStaticTakesAParameterInitializer) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -351,8 +300,6 @@ TEST(StaticVariableInitializers, SubroutineStaticTakesAParameterInitializer) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// An argument of an automatic function has no value until the call, so this
-// is a run-time expression in the plainest sense, and §6.8 admits it.
 TEST(StaticVariableInitializers,
      SubroutineStaticTakesARunTimeExpressionInitializer) {
   ElabFixture f;

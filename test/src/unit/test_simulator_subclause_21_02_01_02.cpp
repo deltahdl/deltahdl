@@ -10,118 +10,84 @@ using namespace delta;
 
 namespace {
 
-// §21.2.1.2 (C4): a decimal value narrower than the field is left-padded with
-// spaces. LRM example: "%3d" of 5 displays ":  5:".
 TEST(SizeOfDisplayedData, DecimalPaddedWithLeadingSpaces) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 5)};
   EXPECT_EQ(FormatDisplay("%3d", vals), "  5");
 }
 
-// §21.2.1.2 (C4): a value wider than the field expands to hold the converted
-// result; no truncation occurs. LRM example: "%3d" of 1234 displays ":1234:".
 TEST(SizeOfDisplayedData, DecimalWiderThanFieldExpands) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 1234)};
   EXPECT_EQ(FormatDisplay("%3d", vals), "1234");
 }
 
-// §21.2.1.2 (C4): hexadecimal padding uses leading zeros rather than spaces.
-// LRM example: "%3h" of 'h5 displays ":005:".
 TEST(SizeOfDisplayedData, HexPaddedWithLeadingZeros) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 5)};
   EXPECT_EQ(FormatDisplay("%3h", vals), "005");
 }
 
-// §21.2.1.2 (C4): string values, like decimal, are expanded with leading
-// spaces. LRM example: "%3s" of "a" displays ":  a:".
 TEST(SizeOfDisplayedData, StringPaddedWithLeadingSpaces) {
   Arena arena;
-  // An 8-bit value carrying the single ASCII byte 0x61, which is "a".
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 8, 0x61)};
   EXPECT_EQ(FormatDisplay("%3s", vals), "  a");
 }
 
-// §21.2.1.2 (C4): binary padding, like the other non-decimal radices, uses
-// leading zeros.
 TEST(SizeOfDisplayedData, BinaryPaddedWithLeadingZeros) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 4, 0b101)};
   EXPECT_EQ(FormatDisplay("%5b", vals), "00101");
 }
 
-// §21.2.1.2 (C3): a width of zero on binary trims to the significant bits.
 TEST(SizeOfDisplayedData, ZeroWidthBinaryUsesMinimumWidth) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 4, 0b0010)};
   EXPECT_EQ(FormatDisplay("%0b", vals), "10");
 }
 
-// §21.2.1.2 (C4): octal is one of the radices that pads with leading zeros.
-// The octal rendering of 8 is "10"; in a four-column field it becomes "0010".
 TEST(SizeOfDisplayedData, OctalPaddedWithLeadingZeros) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 8)};
   EXPECT_EQ(FormatDisplay("%4o", vals), "0010");
 }
 
-// §21.2.1.2 (C3): a zero width on octal selects the minimum width, dropping the
-// leading zeros that the auto-sized rendering would otherwise show.
 TEST(SizeOfDisplayedData, OctalWidthZeroUsesMinimumWidth) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 8)};
   EXPECT_EQ(FormatDisplay("%0o", vals), "10");
 }
 
-// §21.2.1.2 (C3): the field width may run to several digits. A width of ten on
-// a single-digit decimal value yields nine leading spaces.
 TEST(SizeOfDisplayedData, MultiDigitFieldWidthIsParsed) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 5)};
   EXPECT_EQ(FormatDisplay("%10d", vals), "         5");
 }
 
-// §21.2.1.2 (C4) edge: when the converted value is exactly as wide as the
-// field, it is neither padded nor expanded.
 TEST(SizeOfDisplayedData, ValueExactlyFillsField) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 100)};
   EXPECT_EQ(FormatDisplay("%3d", vals), "100");
 }
 
-// §21.2.1.2 (C3) edge: the minimum-width binary rendering of an all-zero value
-// keeps a single digit rather than collapsing to an empty string.
 TEST(SizeOfDisplayedData, ZeroValueBinaryUsesMinimumWidth) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 4, 0)};
   EXPECT_EQ(FormatDisplay("%0b", vals), "0");
 }
 
-// §21.2.1.2 (C4): string values, like decimal ones, expand past a too-small
-// field instead of being truncated. Examples-table row: "%3s" of "abcdef"
-// displays all six characters.
 TEST(SizeOfDisplayedData, StringWiderThanFieldExpands) {
   Arena arena;
-  // Six ASCII bytes packed MSB-first: "abcdef".
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 48, 0x616263646566ULL)};
   EXPECT_EQ(FormatDisplay("%3s", vals), "abcdef");
 }
 
-// §21.2.1.2 (C4): the zero-padded radices also expand rather than truncate.
-// Examples-table row: "%3h" of 'h1234 displays all four hex digits.
 TEST(SizeOfDisplayedData, HexWiderThanFieldExpands) {
   Arena arena;
   std::vector<Logic4Vec> vals{MakeLogic4VecVal(arena, 32, 0x1234)};
   EXPECT_EQ(FormatDisplay("%3h", vals), "1234");
 }
 
-// §21.2.1.2 (C1/C2): the LRM's printval example, driven end to end. A 12-bit
-// expression auto-sizes to four decimal columns (its largest value is 4095)
-// and three hex columns (fff); decimal replaces the suppressed leading zeros
-// with spaces while hex keeps its leading zero. The %0 form of each collapses
-// to the minimum width. The field comes from the declared width of r1, so the
-// declaration is real source run through the whole pipeline.
 TEST(SizeOfDisplayedData, AutoSizedTwelveBitDecimalAndHexFields) {
   SimFixture f;
   std::string out = RunCapture(
@@ -137,9 +103,6 @@ TEST(SizeOfDisplayedData, AutoSizedTwelveBitDecimalAndHexFields) {
   EXPECT_EQ(out, ":  10: :00a:\n:10: :a:\n");
 }
 
-// §21.2.1.2 (C1): the Examples table's first row. A 32-bit unsigned value can
-// reach 4294967295, so its automatic decimal field is ten columns and 10
-// arrives right-justified behind eight spaces.
 TEST(SizeOfDisplayedData, AutoSizedDecimalThirtyTwoBitField) {
   SimFixture f;
   std::string out = RunCapture(
@@ -154,9 +117,6 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalThirtyTwoBitField) {
   EXPECT_EQ(out, ":        10:\n");
 }
 
-// §21.2.1.2 (C1): the widest admitted operand -- a 64-bit unsigned value can
-// reach a twenty-digit numeral, so its automatic decimal field is twenty
-// columns, exercising the upper bound of the field computation.
 TEST(SizeOfDisplayedData, AutoSizedSixtyFourBitDecimalField) {
   SimFixture f;
   std::string out = RunCapture(
@@ -171,13 +131,6 @@ TEST(SizeOfDisplayedData, AutoSizedSixtyFourBitDecimalField) {
   EXPECT_EQ(out, ":                  10:\n");
 }
 
-// §21.2.1.2 with §21.2.1.1: a decimal renders the whole value, and the
-// automatically sized field holds the largest value the width admits: the
-// 96-bit 96'h00000003_00000002_00000001 is 55340232229718589441, twenty
-// digits, in the 29-column field 2^96 - 1 needs. Read through a 64-bit word,
-// it printed its low 64 bits, 8589934593, in a 20-column field: the suite's
-// 11.4.14.3--unpack_stream-sim.sv (#4363). A value that fits 64 bits cannot
-// tell the two renderings apart.
 TEST(SizeOfDisplayedData, AutoSizedNinetySixBitDecimalRendersEveryWord) {
   SimFixture f;
   std::string out = RunCapture(
@@ -195,11 +148,6 @@ TEST(SizeOfDisplayedData, AutoSizedNinetySixBitDecimalRendersEveryWord) {
             ":55340232229718589441:\n");
 }
 
-// §21.2.1.2 (C1) with §21.2.1.1: a signed 96-bit value holding -1 renders as
-// -1, its magnitude the two's complement within its own width, in a
-// 30-column field: the 29 digits of 2^95 and the sign column. Sign-extended
-// from its low 64 bits alone, -1 happened to read right while a 96-bit -2^70
-// did not; the field width is what tells the widths apart here.
 TEST(SizeOfDisplayedData, AutoSizedSignedNinetySixBitDecimalField) {
   SimFixture f;
   std::string out = RunCapture(
@@ -218,10 +166,6 @@ TEST(SizeOfDisplayedData, AutoSizedSignedNinetySixBitDecimalField) {
             ":-1180591620717411303424:\n");
 }
 
-// §21.2.1.2 (C1): the `int` keyword type is a signed 32-bit operand, so its
-// automatic decimal field is eleven columns (ten digits plus the sign of the
-// most negative value) -- one wider than the unsigned 32-bit field, which
-// makes the signed/unsigned distinction observable from the declared type.
 TEST(SizeOfDisplayedData, AutoSizedIntTypeUsesSignedField) {
   SimFixture f;
   std::string out = RunCapture(
@@ -236,9 +180,6 @@ TEST(SizeOfDisplayedData, AutoSizedIntTypeUsesSignedField) {
   EXPECT_EQ(out, ":         42:\n");
 }
 
-// §21.2.1.2 (C1): the sizing rules govern values written by the write family
-// as well -- $write auto-sizes exactly as $display does, differing only in
-// the absent trailing newline. This drives the other §21.2.1 task position.
 TEST(SizeOfDisplayedData, WriteTaskAutoSizesLikeDisplay) {
   SimFixture f;
   std::string out = RunCapture(
@@ -253,10 +194,6 @@ TEST(SizeOfDisplayedData, WriteTaskAutoSizesLikeDisplay) {
   EXPECT_EQ(out, ":  5:");
 }
 
-// §21.2.1.2 (C1): a signed expression's largest printable value is its most
-// negative one, which carries a sign. An 8-bit signed field is therefore four
-// columns (-128); both a positive and a negative value land right-justified
-// in that same field. The signedness comes from the real declaration.
 TEST(SizeOfDisplayedData, AutoSizedDecimalSignedCountsSignColumn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -273,9 +210,6 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalSignedCountsSignColumn) {
   EXPECT_EQ(out, ":  10:\n:  -5:\n");
 }
 
-// §21.2.1.2 (C2): in the non-decimal radices the automatic sizing keeps every
-// leading zero, driven from a real 8-bit declaration: two hex digits, three
-// octal digits, eight binary digits.
 TEST(SizeOfDisplayedData, AutoSizedOtherRadicesKeepLeadingZeros) {
   SimFixture f;
   std::string out = RunCapture(
@@ -290,9 +224,6 @@ TEST(SizeOfDisplayedData, AutoSizedOtherRadicesKeepLeadingZeros) {
   EXPECT_EQ(out, ":0a: :012: :00001010:\n");
 }
 
-// §21.2.1.2 (C1): a bare expression argument is sized automatically as well --
-// the default decimal rendering of §21.2.1.1 takes the same fixed-width field
-// an explicit %d would, so an 8-bit value prints in three columns.
 TEST(SizeOfDisplayedData, BareArgumentDefaultDecimalIsAutoSized) {
   SimFixture f;
   std::string out = RunCapture(
@@ -307,9 +238,6 @@ TEST(SizeOfDisplayedData, BareArgumentDefaultDecimalIsAutoSized) {
   EXPECT_EQ(out, " 42\n");
 }
 
-// §21.2.1.2 (C1 x §21.2.1.3): a value carrying unknown bits still occupies the
-// automatically sized decimal field -- the single status character of a 12-bit
-// all-x value sits right-justified in the four-column field.
 TEST(SizeOfDisplayedData, AutoSizedFieldHoldsUnknownStatusChar) {
   SimFixture f;
   std::string out = RunCapture(
@@ -321,11 +249,6 @@ TEST(SizeOfDisplayedData, AutoSizedFieldHoldsUnknownStatusChar) {
   EXPECT_EQ(out, ":   x:\n");
 }
 
-// §21.2.1.2 (C1 x §6.11.3): a function call is an expression argument like any
-// other, so its automatic decimal field comes from the return type. §6.11.3
-// makes `integer` signed, so the field is eleven columns (ten digits plus the
-// sign of the most negative value) -- the same field the identically typed
-// declaration in AutoSizedIntTypeUsesSignedField gets.
 TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFunctionReturn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -341,9 +264,6 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFunctionReturn) {
   EXPECT_EQ(out, ":         30:\n");
 }
 
-// §21.2.1.2 (C1 x §6.11.3): the signedness of a signed function return governs
-// the numeral as well as the field. The same 32 bits rendered unsigned read
-// 4294967291, so this pins -5 and not merely its eleven-column placement.
 TEST(SizeOfDisplayedData, AutoSizedDecimalNegativeIntegerFunctionReturn) {
   SimFixture f;
   std::string out = RunCapture(
@@ -359,10 +279,6 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalNegativeIntegerFunctionReturn) {
   EXPECT_EQ(out, ":         -5:\n");
 }
 
-// §21.2.1.2 (C1): the control on the two above -- a function whose return type
-// is an unsigned 8-bit vector keeps the three-column field its largest
-// possible value (255) requires. A return marked signed regardless of its
-// declared type would widen this to four.
 TEST(SizeOfDisplayedData,
      AutoSizedDecimalUnsignedFunctionReturnKeepsNarrowField) {
   SimFixture f;
@@ -379,10 +295,6 @@ TEST(SizeOfDisplayedData,
   EXPECT_EQ(out, ": 30:\n");
 }
 
-// §21.2.1.2 (C1 x §5.7.1 x §6.11.3): two arguments of one type take one field.
-// An unsized decimal literal expression is signed 32-bit by §5.7.1 and an
-// `integer` function result is signed 32-bit by §6.11.3, so `add(2, 3)` and
-// `2 + 3` are the same expression type and must be sized alike.
 TEST(SizeOfDisplayedData,
      AutoSizedDecimalFunctionReturnMatchesLiteralExpression) {
   SimFixture f;
@@ -399,10 +311,6 @@ TEST(SizeOfDisplayedData,
   EXPECT_EQ(out, ":          5::          5:\n");
 }
 
-// §21.2.1.2 (C1 x §6.11.3): the formals carry their declared signedness too,
-// not just the return variable. A signed `integer` formal holding -6 divides
-// to -3; an unsigned formal would take the unsigned division path and produce
-// a large positive quotient in a ten-column field instead.
 TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFormalIsSigned) {
   SimFixture f;
   std::string out = RunCapture(
@@ -418,11 +326,6 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalIntegerFormalIsSigned) {
   EXPECT_EQ(out, ":         -3:\n");
 }
 
-// §21.2.1.2 sizes an expression argument automatically, and the width it picks
-// reads the same signedness flag the arithmetic does: a signed 32-bit value is
-// given eleven columns, one of them the sign. A for-init int loop variable
-// created from its width alone was unsigned, so the same call printed the ten
-// columns of 4294967293 with no padding at all. §6.11.3 makes int signed.
 TEST(SizeOfDisplayedData, AutoSizedDecimalForInitLoopVariableIsSigned) {
   SimFixture f;
   std::string out = RunCapture(
@@ -435,9 +338,6 @@ TEST(SizeOfDisplayedData, AutoSizedDecimalForInitLoopVariableIsSigned) {
   EXPECT_EQ(out, ":         -3:\n");
 }
 
-// §21.2.1.2 with §21.2.1.3: a field width of 0 keeps every significant digit
-// of a value however wide it is; a value wider than 64 bits loses no digit
-// above bit 63 under %0h or %0o.
 TEST(SizeOfDisplayedData, ZeroWidthHexAndOctalKeepDigitsAboveBit63) {
   SimFixture f;
   std::string out = RunCapture(

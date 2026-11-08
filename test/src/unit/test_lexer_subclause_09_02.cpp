@@ -13,8 +13,6 @@ TEST(StructuredProcedureLexing, FinalKeyword) {
   EXPECT_EQ(r.token.text, "final");
 }
 
-// §9.2 enumerates six construct keywords; each must be recognized as its own
-// keyword token, not just as "some non-identifier." One test per keyword form.
 TEST(StructuredProcedureLexing, InitialKeyword) {
   auto r = LexOne("initial ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwInitial);
@@ -45,11 +43,6 @@ TEST(StructuredProcedureLexing, AlwaysFFKeyword) {
   EXPECT_EQ(r.token.text, "always_ff");
 }
 
-// §5.6 rules that a keyword may not be used as a user-defined identifier, and
-// §9.2 makes these six the keywords of the structured procedures. Each source
-// is paired with the one TokenKind §9.2 gives it, so the test fails when a
-// keyword lexes as an identifier and equally when it lexes as another keyword:
-// a table mapping all six onto one enumerator goes red here.
 TEST(StructuredProcedureLexing, KeywordsAreNotIdentifiers) {
   struct KeywordCase {
     const char* text;

@@ -126,11 +126,6 @@ TEST(ForceReleaseElaboration, ForcePartSelectUserNettypeNetIsError) {
                             "nettype is not a legal force LHS", 4, "10.6.2"));
 }
 
-// §10.6.2 (printed page 257): force and release may not be applied to a
-// variable assigned by a mixture of continuous and procedural assignments. §6.5
-// rejects the mixture itself and its report stands at the continuous assignment
-// on line 3, so naming that report proves nothing about the force; this names
-// §10.6.2's own, at the force on line 6.
 TEST(ForceReleaseElaboration, ForceOnAMixedAssignmentVariableNamesItsOwnRule) {
   ElabFixture f;
   ElaborateSrc(
@@ -150,10 +145,6 @@ TEST(ForceReleaseElaboration, ForceOnAMixedAssignmentVariableNamesItsOwnRule) {
 
 TEST(ForceReleaseElaboration,
      ForceOnAVariableWithOnlyAContinuousAssignmentIsAccepted) {
-  // §6.5 (printed page 91): a force statement counts as neither a continuous
-  // nor a procedural assignment. So a lone force beside a continuous assignment
-  // is no mixture, and this is what stops the rule from rejecting every force
-  // on a continuously assigned variable.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -168,8 +159,6 @@ TEST(ForceReleaseElaboration,
 
 TEST(ForceReleaseElaboration,
      ForceOnAVariableWithOnlyProceduralAssignmentsIsAccepted) {
-  // The other edge of the same rule: procedural assignments alone are no
-  // mixture either, so the force stands.
   ElabFixture f;
   auto* design = ElaborateSrc(
       "module m;\n"
@@ -199,12 +188,6 @@ TEST(ForceReleaseElaboration, ForceConcatWithBitSelectVariableIsError) {
       "10.6.2"));
 }
 
-// §10.6.2 bars a bit-select or part-select of a variable, which §11.5.1 makes
-// a select of a vector's bits. An address for each unpacked dimension of an
-// array, a queue or an associative array selects an element (§11.5.2), a
-// singular variable of the element type, so lines 5 to 8 name a legal target.
-// A bit of such an element and a bit of a structure's vector member are
-// bit-selects of a variable.
 TEST(ForceReleaseElaboration, ForceOfAnArrayElementIsNoBitSelect) {
   ElabFixture f;
   ElaborateSrc(
@@ -233,13 +216,6 @@ TEST(ForceReleaseElaboration, ForceOfAnArrayElementIsNoBitSelect) {
   }
 }
 
-// §10.6.2 lets a force name a singular variable, and §6.4 makes an unpacked
-// array, structure or union an aggregate instead, so a force is reported on
-// the whole of one, on a slice of an array, on a sub-array of a
-// multidimensional one and on an element whose type is a structure. None of
-// them selects a vector's bits (§11.5.1), so the report names the aggregate
-// rather than a bit-select. A member of a structure is a variable of the
-// member's type, and `s.a` is an int.
 TEST(ForceReleaseElaboration, ForceOfAnUnpackedAggregateIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -271,9 +247,6 @@ TEST(ForceReleaseElaboration, ForceOfAnUnpackedAggregateIsReported) {
                              "10.6.2"));
 }
 
-// §10.6.2 admits a constant bit-select of a vector net as a force target, and a
-// constant expression per §11.2.1 is not only a literal but also a parameter. A
-// parameter-indexed net bit-select is therefore a legal force LHS.
 TEST(ForceReleaseElaboration, ForceParamBitSelectNetElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -287,8 +260,6 @@ TEST(ForceReleaseElaboration, ForceParamBitSelectNetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A localparam is another §11.2.1 constant form, so a localparam-bounded
-// part-select of a vector net is likewise a legal force LHS.
 TEST(ForceReleaseElaboration, ForceLocalparamPartSelectNetElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -303,9 +274,6 @@ TEST(ForceReleaseElaboration, ForceLocalparamPartSelectNetElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The concatenation form admits any of the individual legal LHS elements. A
-// concatenation mixing a whole net with a constant bit-select of a vector net
-// is accepted, exercising the accept path through the concatenation recursion.
 TEST(ForceReleaseElaboration, ForceConcatWithNetBitSelectElaborates) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -319,8 +287,6 @@ TEST(ForceReleaseElaboration, ForceConcatWithNetBitSelectElaborates) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.6.2 names both statements, so a check reading only StmtKind::kForce
-// leaves this red while the force case above passes.
 TEST(ForceReleaseElaboration,
      ReleaseOnAMixedAssignmentVariableNamesItsOwnRule) {
   ElabFixture f;
@@ -339,10 +305,6 @@ TEST(ForceReleaseElaboration,
                             "10.6.2"));
 }
 
-// §10.6.2's rule on what a force may name is decided by the expression, not by
-// where the statement stands, and §18.16 makes each randcase_item's body a
-// statement_or_null. ForceBitSelectVariableLhsIsError above writes the same
-// force in a begin-end block and expects the same report.
 TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandcaseArmIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -359,8 +321,6 @@ TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandcaseArmIsError) {
       "10.6.2"));
 }
 
-// The regression against a walk that reports on every force it newly reaches:
-// forcing a whole variable in a randcase arm is what §10.6.2 allows.
 TEST(ForceReleaseElaboration, ForceOfAWholeVariableInARandcaseArmIsAccepted) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -375,10 +335,6 @@ TEST(ForceReleaseElaboration, ForceOfAWholeVariableInARandcaseArmIsAccepted) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a force in a randsequence production's code block is the same force
-// ForceBitSelectVariableLhsIsError above writes in a begin-end block, and
-// §10.6.2 rules on it the same way.
 TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandsequenceIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -397,11 +353,6 @@ TEST(ForceReleaseElaboration, ForceBitSelectVariableLhsInARandsequenceIsError) {
       "10.6.2"));
 }
 
-// §10.6.2's rule against forcing a variable assigned by both a continuous and
-// a procedural assignment holds wherever the force stands, and §18.16 makes
-// each randcase_item's body a statement_or_null.
-// ForceOnAMixedAssignmentVariableNamesItsOwnRule above writes the same force in
-// a begin-end block and expects the same report.
 TEST(ForceReleaseElaboration,
      ForceInARandcaseArmOverAMixedlyAssignedVariableIsRejected) {
   ElabFixture f;
@@ -422,13 +373,6 @@ TEST(ForceReleaseElaboration,
                             "10.6.2"));
 }
 
-// §10.6.2: force and release may not be applied to a variable assigned by a
-// mixture of continuous and procedural assignments. The mixture and the force
-// are both written as member-qualified names here, so the case rests on the
-// reduction of a dotted lvalue to the data object it writes -- §23.7's first
-// name component -- which the walk behind CollectProcTargets and
-// CollectForceReleaseTargets answered as nothing for every dotted name until it
-// followed the field the parser fills.
 TEST(ForceReleaseElaboration, ForceOverAMemberQualifiedMixedTargetIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -448,8 +392,6 @@ TEST(ForceReleaseElaboration, ForceOverAMemberQualifiedMixedTargetIsReported) {
                             7, "10.6.2"));
 }
 
-// §10.6.2 (printed page 257) admits a constant bit-select or part-select of a
-// vector net as a force target, and no other select of one.
 TEST(ForceReleaseElaboration, ForceNonConstantSelectOfNetIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -473,8 +415,6 @@ TEST(ForceReleaseElaboration, ForceNonConstantSelectOfNetIsError) {
                              6, "10.6.2"));
 }
 
-// §10.6.2 states the force target rules wherever the force stands, the body of
-// a task or a function included.
 TEST(ForceReleaseElaboration, ForceTargetRulesReachSubroutineBodies) {
   ElabFixture f;
   ElaborateSrc(
@@ -492,10 +432,6 @@ TEST(ForceReleaseElaboration, ForceTargetRulesReachSubroutineBodies) {
   }
 }
 
-// §10.6.2 bounds a force's target to variables and nets, and §6.20 and §6.19
-// make a parameter, a localparam, a specparam and a name an enumeration
-// declares constants, none of them either. Each is reported, an element of a
-// concatenation as a target of its own, and the variable `q` is not.
 TEST(ForceReleaseElaboration, ForceOfAConstantIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -526,8 +462,6 @@ TEST(ForceReleaseElaboration, ForceOfAConstantIsReported) {
       ReportedError(f.diag.Diagnostics(), "force of constant", 11, "10.6.2"));
 }
 
-// §27.2 makes a generate block a collection of module items, so a select of
-// a variable is no force target inside one, and the whole variable is.
 TEST(ForceReleaseElaboration, ForceLhsInsideGenerateBlocksIsChecked) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "logic [3:0] v;", "initial force v[0] = 1;"},
@@ -537,11 +471,6 @@ TEST(ForceReleaseElaboration, ForceLhsInsideGenerateBlocksIsChecked) {
       {"", "logic [3:0] v;", "initial force v = 1;"}));
 }
 
-// §27.2 makes a generate block a collection of module items, so a force or a
-// release is barred over a variable the module's items and the block's mix
-// continuous and procedural assignments to, whichever comes first, of the
-// module's variable and of the block's own; over one only procedurally
-// assigned it stays allowed.
 TEST(ForceReleaseElaboration,
      ForceOverMixedAssignmentsInsideGenerateBlocksIsRejected) {
   {

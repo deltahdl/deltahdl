@@ -42,9 +42,6 @@ TEST(GenerateBlockNaming, SecondUnnamedConstructIsGenblk2) {
   EXPECT_EQ(m->items[1]->name, "genblk2");
 }
 
-// §27.6: only generate constructs are counted. An ordinary declaration sitting
-// between two generate constructs does not consume a number, so the second
-// construct is genblk2 (not genblk3) despite the intervening item.
 TEST(GenerateBlockNaming, NonGenerateItemsDoNotConsumeNumbers) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -106,9 +103,6 @@ TEST(GenerateBlockNaming, CollisionResolvedByLeadingZero) {
   ExpectFirstTwoGenerateIfNames(*r.cu->modules[0], "genblk1", "genblk02");
 }
 
-// §27.6: the naming scheme applies to every generate construct, not just the
-// if-generate. An unnamed loop generate is numbered and named genblk<n> the
-// same way (the LRM example's genblk4 is an unnamed for-generate).
 TEST(GenerateBlockNaming, UnnamedForGenerateGetsGenblkName) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -123,8 +117,6 @@ TEST(GenerateBlockNaming, UnnamedForGenerateGetsGenblkName) {
   EXPECT_EQ(m->items[0]->name, "genblk1");
 }
 
-// §27.6: the running number spans generate constructs of different kinds in the
-// same scope -- an if-generate followed by a for-generate is numbered 1 then 2.
 TEST(GenerateBlockNaming, MixedConstructKindsNumberSequentially) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -144,9 +136,6 @@ TEST(GenerateBlockNaming, MixedConstructKindsNumberSequentially) {
   EXPECT_EQ(m->items[1]->name, "genblk2");
 }
 
-// §27.6: the naming scheme applies to a case generate construct too. An
-// unnamed case-generate is numbered and named genblk<n> like the if and for
-// forms (the third generate-construct kind).
 TEST(GenerateBlockNaming, UnnamedCaseGenerateGetsGenblkName) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -166,10 +155,6 @@ TEST(GenerateBlockNaming, UnnamedCaseGenerateGetsGenblkName) {
   EXPECT_EQ(m->items[0]->name, "genblk1");
 }
 
-// §27.6: the conflicting explicitly declared name is any declaration in the
-// scope, not only a parameter. A net/variable named genblk1 forces the first
-// unnamed construct to genblk01 -- the same leading-zero resolution driven by a
-// declaration collected through a different path than the parameter case.
 TEST(GenerateBlockNaming, NameConflictWithDeclaredNetResolvedByLeadingZero) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -188,9 +173,6 @@ TEST(GenerateBlockNaming, NameConflictWithDeclaredNetResolvedByLeadingZero) {
   EXPECT_EQ(gen->name, "genblk01");
 }
 
-// §27.6: leading zeros keep being prepended until the generated name no
-// longer clashes. When both genblk2 and genblk02 are already taken, the
-// second construct must fall through to genblk002.
 TEST(GenerateBlockNaming, RepeatedCollisionAddsMoreLeadingZeros) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -215,17 +197,6 @@ TEST(GenerateBlockNaming, RepeatedCollisionAddsMoreLeadingZeros) {
   EXPECT_EQ(second->name, "genblk002");
 }
 
-// §27.6: the generate constructs of a scope are numbered in textual order, the
-// first 1 and each later one 1 more than the one before it. A construct
-// carrying an explicit name takes its number all the same, which is what the
-// standard's own example records when it names the construct written after
-// `begin : g1` genblk4 rather than genblk3. The name reaches the elaborated
-// declarations through the loop generate block's prefix
-// `<enclosing><block-name>_<genvar-value>_`, so the second construct's `b` is
-// named genblk2_4_b and not genblk1_4_b.
-//
-// The loop runs over 4 and 5 so that no index equals the storage offset of the
-// variable it produces.
 TEST(GenerateBlockNaming, NamedLoopConstructConsumesNumberForNextBlock) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -245,15 +216,6 @@ TEST(GenerateBlockNaming, NamedLoopConstructConsumesNumberForNextBlock) {
   EXPECT_EQ(mod->variables[3].name, "genblk2_5_b");
 }
 
-// §27.6: a name that would clash with an explicitly declared one takes leading
-// zeros before its number until it no longer clashes. The parameter genblk1 is
-// one of the explicitly declared names Elaborator::AssignGenerateBlockNames
-// seeds the conflict set with, so the sole construct in the scope -- number 1
-// -- is named genblk01, and its declarations are elaborated under that name
-// rather than under genblk1.
-//
-// The loop runs over 4 and 5 so that no index equals the storage offset of the
-// variable it produces.
 TEST(GenerateBlockNaming, LeadingZeroNameAppliesToBlockDeclarations) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -269,17 +231,6 @@ TEST(GenerateBlockNaming, LeadingZeroNameAppliesToBlockDeclarations) {
   EXPECT_EQ(mod->variables[1].name, "genblk01_5_x");
 }
 
-// §27.6 numbers the constructs scope by scope, and §27.4 rules that a generate
-// block forms a scope of its own and a further level of hierarchy once
-// instantiated, so the count starts again inside one: §27.6 writes the first
-// nested construct of a block named g1 as top.g1[0].genblk1. The inner
-// construct here is therefore genblk1 and not genblk2, even though the outer
-// construct took number 1 in the module's scope. Each instance of the outer
-// block contributes its own index to the prefix, so the inner block's `y` is
-// named <outer>_<outer index>_genblk1_<inner index>_y.
-//
-// Both loops run over 4 and 5 so that no index equals the storage offset of the
-// variable it produces.
 TEST(GenerateBlockNaming, NestedConstructNumberingRestartsInBlockScope) {
   auto r = RunGenerateElaboration(
       "module top;\n"
@@ -298,10 +249,6 @@ TEST(GenerateBlockNaming, NestedConstructNumberingRestartsInBlockScope) {
   EXPECT_EQ(mod->variables[3].name, "outer_5_genblk1_5_y");
 }
 
-// §27.6 names the one unnamed generate block below genblk1, and that is the
-// only way a genblk<n> name comes to exist, so `genblk2` names nothing and
-// §23.8 reports a first name no declaration gives. The test fails on an
-// elaborator that admits every name of the genblk<n> form as a first name.
 TEST(GenerateBlockNaming, GenblkNameNoConstructIsGivenIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -318,10 +265,6 @@ TEST(GenerateBlockNaming, GenblkNameNoConstructIsGivenIsReported) {
                             5, "23.8"));
 }
 
-// The name §27.6 does give, genblk1, is one the elaborator knows, so §23.8
-// does not call it a name that resolves to nothing. §27.6 gives it only for
-// interfaces such as VPI, and it is no name a hierarchical name may use, so
-// the reference is reported for reaching into an unnamed block instead.
 TEST(GenerateBlockNaming, GenblkNameAConstructIsGivenIsReportedAsUnnamed) {
   ElabFixture f;
   ElaborateSrc(
@@ -342,11 +285,6 @@ TEST(GenerateBlockNaming, GenblkNameAConstructIsGivenIsReportedAsUnnamed) {
                             5, "27.6"));
 }
 
-// §27.4 and §27.5 let no hierarchical name reach the declarations of a block
-// the source leaves unnamed, and §27.6 adds that the genblk<n> name it gives
-// one is no name a hierarchical name may use: neither the conditional block nor
-// the loop block below is reachable through it, whether the path starts at the
-// block's name or at the module's.
 TEST(GenerateBlockNaming, ReachingIntoAnUnnamedBlockIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -373,11 +311,6 @@ TEST(GenerateBlockNaming, ReachingIntoAnUnnamedBlockIsReported) {
       ReportedError(f.diag.Diagnostics(), conditional_report, 9, "27.6"));
 }
 
-// Each block §27.6 names is held to the rule however its construct holds it:
-// the else block beside a named then-block, a case item's block, and the
-// block of an if-generate directly nested in another's, which §27.5 makes the
-// outer construct's own. The blocks the source names, named and d, stay
-// reachable through their names.
 TEST(GenerateBlockNaming, EveryUnnamedBlockOfAConstructIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -403,12 +336,6 @@ TEST(GenerateBlockNaming, EveryUnnamedBlockOfAConstructIsReported) {
   }
 }
 
-// The genblk<n> name of a block in another module is no name a hierarchical
-// name may use either (§27.6), so §23.8 finds no declaration for the first
-// name genblk3, though `other` does have a third unnamed construct. Neither
-// module instantiates the other, so both are elaborated as tops, which the
-// auto_top argument asks for: with the last module as the one named top,
-// `top` is never elaborated and its reference never checked.
 TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsReported) {
   ElabFixture f;
   ElaborateWithPreprocessor(
@@ -430,8 +357,6 @@ TEST(GenerateBlockNaming, GenblkNameOfAnotherModuleIsReported) {
                             2, "23.8"));
 }
 
-// §27.4 makes a loop's unnamed block reachable by no user-chosen name, and
-// `g` is declared nowhere, so §23.8 reports the first name.
 TEST(GenerateBlockNaming, UserNameOnAnUnnamedLoopBlockIsReported) {
   ElabFixture f;
   ElaborateSrc(

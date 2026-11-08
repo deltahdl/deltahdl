@@ -17,14 +17,10 @@ namespace delta {
 
 namespace {
 
-// Whether a value of kind `kind` is known to be neither integral nor real: a
-// string, or a class handle, chandle, event or unpacked aggregate.
 bool NeitherIntegralNorReal(ValueKind kind) {
   return kind == ValueKind::kString || kind == ValueKind::kOther;
 }
 
-// The kind of value `e` gives in a coverpoint of `cg`: a formal of `cg` by the
-// type it is declared with, and any other expression as `ctx` answers.
 ValueKind KindIn(const Expr* e, const CovergroupDecl& cg,
                  const CovergroupContext& ctx) {
   if (e->kind == ExprKind::kIdentifier) {
@@ -35,7 +31,6 @@ ValueKind KindIn(const Expr* e, const CovergroupDecl& cg,
   return ctx.value_kind(e);
 }
 
-// §19.5: a data type written for a coverpoint is an integral type or real.
 void CheckDataType(const CoverPointDecl& cp, const CovergroupContext& ctx,
                    DiagEngine& diag) {
   if (!cp.has_data_type ||
@@ -49,7 +44,6 @@ void CheckDataType(const CoverPointDecl& cp, const CovergroupContext& ctx,
              Subclause("19.5"));
 }
 
-// §19.5: a coverpoint covers an integral or real expression.
 void CheckExpression(const CoverPointDecl& cp, const CovergroupDecl& cg,
                      const CovergroupContext& ctx, DiagEngine& diag) {
   if (!NeitherIntegralNorReal(KindIn(cp.expr, cg, ctx))) return;
@@ -59,7 +53,6 @@ void CheckExpression(const CoverPointDecl& cp, const CovergroupDecl& cg,
              Subclause("19.5"));
 }
 
-// §19.5 with §19.5.5: a default bin cannot be explicitly ignored.
 void CheckIgnoredDefault(const BinsOrOptions& bins, DiagEngine& diag) {
   if (bins.keyword != BinsKeyword::kIgnoreBins ||
       (bins.kind != BinsOrOptionsKind::kDefault &&
@@ -72,7 +65,6 @@ void CheckIgnoredDefault(const BinsOrOptions& bins, DiagEngine& diag) {
       Subclause("19.5"));
 }
 
-// §19.5.1: a fixed number of bins is given by a positive integral expression.
 void CheckBinCount(const BinsOrOptions& bins, DiagEngine& diag) {
   if (bins.array_size == nullptr) return;
   std::optional<int64_t> count = ConstEvalInt(bins.array_size);
@@ -84,9 +76,6 @@ void CheckBinCount(const BinsOrOptions& bins, DiagEngine& diag) {
              Subclause("19.5.1"));
 }
 
-// §19.5.1.1: the coverpoint a bin names before `with` is the one holding the
-// bin, and the `with` expression gives a value assignment compatible with an
-// integral type.
 void CheckWith(const BinsOrOptions& bins, const CoverPointDecl& cp,
                const CovergroupDecl& cg, const CovergroupContext& ctx,
                DiagEngine& diag) {

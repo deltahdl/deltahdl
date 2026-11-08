@@ -14,8 +14,6 @@ namespace delta {
 
 namespace {
 
-// The Annex K constant of a drive strength as the parser holds it, from 1 for
-// highz up to 5 for supply, and zero where none was written.
 int VpiDriveStrengthConstant(uint8_t written) {
   switch (written) {
     case 1:
@@ -33,13 +31,6 @@ int VpiDriveStrengthConstant(uint8_t written) {
   }
 }
 
-// §37.16 (figure): what the declaration of `net` writes that `obj` answers:
-// whether it wrote the scalared or the vectored keyword, through
-// vpiExplicitScalared and vpiExplicitVectored and, a vectored net not being
-// expanded into its bits, vpiExpanded; and the drive strengths of its net
-// declaration assignment through vpiStrength0 and vpiStrength1. A net §6.10
-// declared implicitly reports vpiImplicitDecl and, by §37.16 detail 9, line 0
-// of the file RecordDeclarationSourceLocations read off its first reference.
 void RecordNetDeclaration(const RtlirNet& net, VpiObject& obj) {
   obj.is_scalared = net.is_scalared;
   obj.is_vectored = net.is_vectored;
@@ -71,7 +62,7 @@ void RecordNetDeclarationFacts(const RtlirDesign* design,
                                const VpiObjectMap& objects) {
   ForEachDeclaredNetObject(
       design, objects,
-      [](const RtlirNet& net, VpiObject& obj, const std::string& /*prefix*/) {
+      [](const RtlirNet& net, VpiObject& obj, const std::string&) {
         RecordNetDeclaration(net, obj);
       });
 }

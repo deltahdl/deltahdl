@@ -98,12 +98,6 @@ TEST(ObjectMethodSim, MethodCallModifiesProperty) {
   LowerRunAndCheck(f, design, {{"result", 17u}});
 }
 
-// §8.6: the lifetime of a class method shall be automatic. A method's local
-// variable therefore gets fresh storage on every call and does not carry a
-// value over from one invocation to the next. Each call to step() reads its
-// local as its default and returns 1; a static lifetime would instead
-// accumulate (1, 2, 3), so all-ones discriminates the required automatic
-// lifetime being applied at run time.
 TEST(ObjectMethodSim, ClassMethodLifetimeIsAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -158,10 +152,6 @@ TEST(ObjectMethodSim, MultipleMethodsSameObject) {
   LowerRunAndCheck(f, design, {{"rx", 3u}, {"ry", 4u}});
 }
 
-// §8.6: the automatic-lifetime rule applies to class tasks as well as
-// functions. A task local variable is re-created per call and does not persist,
-// so repeated calls each observe the fresh default (a static lifetime would
-// instead accumulate 1, 2, 3).
 TEST(ObjectMethodSim, TaskMethodLifetimeIsAutomatic) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -190,13 +180,6 @@ TEST(ObjectMethodSim, TaskMethodLifetimeIsAutomatic) {
   LowerRunAndCheck(f, design, {{"a", 1u}, {"b", 1u}, {"c", 1u}});
 }
 
-// §8.6 with §23.9: a bare name inside a method resolves against the class
-// scope before the scope enclosing the class, so `sum = 5` and the loop
-// variable `i` of a method write the object's properties even when the
-// instantiating module declares variables of the same names; the module's
-// stay 0. Before the fix the method wrote the module's `sum` and `i` and the
-// properties stayed 0 -- the result reads h.sum * 1000 + h.i * 100 + t.sum
-// * 10 + t.i, 5300 rather than 53.
 TEST(ObjectMethodSim, BarePropertyNameBeatsTheModulesSameNamedVariable) {
   EXPECT_EQ(RunAndGet("class C;\n"
                       "  int sum, i;\n"
@@ -219,9 +202,6 @@ TEST(ObjectMethodSim, BarePropertyNameBeatsTheModulesSameNamedVariable) {
             5300u);
 }
 
-// §8.6 with §23.9, the read side and the local that shadows both: a method
-// reading its bare `tag` reads the property (7), not the module's `tag` (9),
-// and a method declaring its own `tag` local reads that (4) before either.
 TEST(ObjectMethodSim,
      BarePropertyReadBeatsTheModulesVariableAndALocalBeatsBoth) {
   EXPECT_EQ(RunAndGet("class C;\n"
@@ -245,14 +225,6 @@ TEST(ObjectMethodSim,
             74u);
 }
 
-// §8.4 and §8.6 with §24.3: a program is a scope that admits a data
-// declaration, so `Cnt c = new(20)` as a program item holds an ordinary
-// object and `c.inc()` in the program's initial runs on it. The object is
-// created under the instance's name, `pr.c`, while the initial names it `c`;
-// the declared class was on file under the instance's name alone, so the
-// call found no class for `c`, ran nothing and answered 0 -- the result read
-// 20 (the constructor's value, which the bare property read reached) rather
-// than 2121, the 21 the call returns beside the 21 it left in the property.
 TEST(ObjectMethodSim, MethodCalledOnAClassVariableAProgramDeclares) {
   EXPECT_EQ(RunAndGet("class Cnt;\n"
                       "  int v;\n"
@@ -271,13 +243,6 @@ TEST(ObjectMethodSim, MethodCalledOnAClassVariableAProgramDeclares) {
             2121u);
 }
 
-// §8.4 and §8.6 with §27.4: each instance of a loop generate block declares
-// its own `Cnt c = new(5)`, created under the block's name, `blk[0].c` and
-// `blk[1].c`, and the initial of each block names its own as `c`. Block 1
-// increments its object before both blocks read theirs at #1, so the result
-// packs 5 from block 0 and 6 from block 1 as 605: the call ran on no object
-// and answered 0 for both, and one object shared by the two blocks would
-// read 606.
 TEST(ObjectMethodSim, MethodCalledOnAClassVariableAGenerateBlockDeclares) {
   EXPECT_EQ(RunAndGet("class Cnt;\n"
                       "  int v;\n"
@@ -302,13 +267,6 @@ TEST(ObjectMethodSim, MethodCalledOnAClassVariableAGenerateBlockDeclares) {
             605u);
 }
 
-// §8.4 and §8.6 with §25.3: an interface item may be a class variable, and
-// §8.5 reaches its property through the instance path, `i.c.v` from the
-// module. The interface's own initial calls `c.inc()` on the object created
-// as `i.c` and keeps the 13 it returns in `i.r`; the module then reads `i.r`
-// and `i.c.v` at #1, 1313. The call answered 0 as the program's did, and the
-// property read split `i.c.v` at its first dot, `i` -- an instance, not a
-// variable -- against `c.v`, and read 0 where the split at `i.c` reads 13.
 TEST(ObjectMethodSim,
      MethodCalledOnAClassVariableAnInterfaceDeclaresAndItsPropertyRead) {
   EXPECT_EQ(RunAndGet("class Cnt;\n"
@@ -330,15 +288,6 @@ TEST(ObjectMethodSim,
             1313u);
 }
 
-// §8.6 (printed page 183) calls an object's method through its handle, §13.3
-// (printed 337) declares a method's formal with any data_type, and §7.2.1
-// (printed 147) lays an inline union out member by member, `pair_t Add`
-// naming a typedef of a structure the module declares. A class's methods
-// are reached by no item walk, so the elaborator resolved a formal's
-// typedef-named members for the module's own subroutines alone: C's f was
-// sized as if Add were a scalar, its layout gave Add no members to place
-// `'{3, 4}` by or to read `a.Add.a` through, and `h.f(tagged Add '{3, 4})`
-// answered 0 where §10.9.2 (printed 263) places 3 into a and 4 into b, 34.
 TEST(ObjectMethodSim,
      ModuleClassMethodInlineUnionFormalReadsANestedTypedefMember) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -360,11 +309,6 @@ TEST(ObjectMethodSim,
             34u);
 }
 
-// §26.2 (printed page 808) with §8.6 (printed 183): a package's class sees
-// the package's typedefs, and its method is called through a handle a
-// module's procedure declares after `import p::*;`. The package's classes
-// were reached by no item walk either, so `q.sum(tagged Pt '{5, 6})` read 0
-// from the same shape of body where §7.2.1 places 5 and 6, 56.
 TEST(ObjectMethodSim,
      PackageClassMethodInlineUnionFormalReadsANestedTypedefMember) {
   EXPECT_EQ(RunAndGet("package p;\n"
@@ -388,12 +332,6 @@ TEST(ObjectMethodSim,
             56u);
 }
 
-// §3.12.1 with §8.23 (printed page 200): a class declared outside every
-// design element stands in the compilation-unit scope, and a typedef the
-// class's own body declares stands by its bare name inside the class, so the
-// member `duo_t Two` names the class's typedef, which the unit's table does
-// not hold: a resolution reading that table alone would find no duo_t.
-// `k.m(tagged Two '{7, 8})` reads 78 where the unresolved member read 0.
 TEST(ObjectMethodSim,
      UnitClassMethodInlineUnionFormalReadsAClassTypedefMember) {
   EXPECT_EQ(RunAndGet("class K;\n"
@@ -415,16 +353,6 @@ TEST(ObjectMethodSim,
             78u);
 }
 
-// §6.18 (printed page 118) has a user-defined type's declaration precede
-// every reference to its name, and lets a forward typedef stand for a
-// definition the same scope gives before or after the reference, so a
-// class written between `typedef struct pair_t;` and the structure's
-// definition names pair_t lawfully in a method's formal, which §23.9
-// (printed 761) resolves outward from the class to the module's typedef.
-// The class's methods were resolved against the typedefs as they stood at
-// the class, where the forward name held a placeholder with no members, so
-// C's f was sized as if A were a scalar and `h.f(tagged A '{3, 4})` read 0
-// where §7.2.1 places 3 into a and 4 into b, 34.
 TEST(ObjectMethodSim,
      ModuleClassMethodFormalReadsATypedefDefinedBelowTheClass) {
   EXPECT_EQ(RunAndGet("module t;\n"
@@ -447,14 +375,6 @@ TEST(ObjectMethodSim,
             34u);
 }
 
-// §8.6 (printed page 183 of the LRM): an object's methods are accessed by
-// qualifying the method name with a handle to the object, and §7.4.2
-// (printed 153-154) and §7.10 (printed 169) make each element of an array or
-// a queue declared with a class's name such a handle. The three tests below
-// share the class and read its get() -- 7, the property's initializer -- or
-// the property run() wrote; a call that reached no method ran nothing and
-// read 0. Before this only an associative array's element had a dispatch
-// (TryEvalAssocElementMethodCall in eval_assoc_class_handles.cpp).
 static std::string ElementMethodDesign(std::string_view rest) {
   return "class C;\n"
          "  int v = 7;\n"
@@ -477,7 +397,6 @@ TEST(ObjectMethodSim, MethodCalledThroughAnElementOfADeclaredArrayRuns) {
             7u);
 }
 
-// A queue's element, pushed as a handle and called through `q[0]`.
 TEST(ObjectMethodSim, MethodCalledThroughAQueueElementRuns) {
   EXPECT_EQ(RunAndGet(ElementMethodDesign("module t;\n"
                                           "  C q[$];\n"
@@ -492,8 +411,6 @@ TEST(ObjectMethodSim, MethodCalledThroughAQueueElementRuns) {
             7u);
 }
 
-// A task enabled through the element as a statement: run() adds one to the
-// object's v, which get() then reads as 8.
 TEST(ObjectMethodSim, TaskEnabledThroughAnElementOfADeclaredArrayRuns) {
   EXPECT_EQ(RunAndGet(ElementMethodDesign("module t;\n"
                                           "  C arr[2];\n"
@@ -508,13 +425,6 @@ TEST(ObjectMethodSim, TaskEnabledThroughAnElementOfADeclaredArrayRuns) {
             8u);
 }
 
-// §8.6 (printed page 183): a method is accessed through any handle to its
-// object, and a property of a class type is one (§8.4), so `h.kid.get()`
-// runs get() on the C that H's `kid` holds, and `arr[0].kid.get()` on the
-// one an element's object holds. The method-call evaluator's receivers were
-// a variable, `p::h`, a call's result and a container's element
-// (TryDispatchMethodOrLet in eval_function.cpp), so a chained property
-// receiver reached no arm and the call read 0.
 TEST(ObjectMethodSim, MethodCalledThroughAChainedPropertyReceiverRuns) {
   EXPECT_EQ(RunAndGet(ElementMethodDesign("class H;\n"
                                           "  C kid = new;\n"
@@ -544,9 +454,6 @@ TEST(ObjectMethodSim, MethodCalledThroughAnElementsPropertyReceiverRuns) {
             7u);
 }
 
-// An element of a property that is an array of handles, `h.kids[1]`, is a
-// handle to the object it holds (§7.4 with §8.4): run() adds one to that
-// object's v alone, so get() reads 8 through kids[1] and 7 through kids[0].
 TEST(ObjectMethodSim, MethodCalledThroughAnElementOfAnArrayPropertyRuns) {
   EXPECT_EQ(RunAndGet(ElementMethodDesign("class H;\n"
                                           "  C kids[2];\n"
@@ -566,10 +473,6 @@ TEST(ObjectMethodSim, MethodCalledThroughAnElementOfAnArrayPropertyRuns) {
             87u);
 }
 
-// A call's result as the receiver, `h.get_kid().get()`, which
-// TryEvalCallResultMethodCall (eval_call_result.cpp) served already; pinned
-// beside the chained property so the two receivers stay served by one arm
-// each and neither evaluates the call twice.
 TEST(ObjectMethodSim, MethodCalledThroughACallResultReceiverRuns) {
   EXPECT_EQ(RunAndGet(ElementMethodDesign(
                           "class H;\n"
@@ -585,12 +488,6 @@ TEST(ObjectMethodSim, MethodCalledThroughACallResultReceiverRuns) {
             7u);
 }
 
-// §8.6 with §13.4.1 and §11.3.1: a method called as a statement on the value
-// a call returns runs once on that value, and the call that yields it is an
-// operand evaluated once, as in the expression `void'(pk().get())`. The
-// statement path asks first whether the method is a task it enables through
-// the object, and that question evaluated the call once more before the
-// expression evaluator took it.
 static std::string CallResultReceiverDesign(std::string_view body) {
   return ElementMethodDesign(
       "module t;\n"
@@ -636,13 +533,6 @@ TEST(ObjectMethodSim, QueueMethodStatementOnACallResultEvaluatesItOnce) {
             107u);
 }
 
-// §8.6 with §11.3.1: a method called through a member of a call's result,
-// `pk().kid.get()`, or through an element of one, `pk().a[1].get()`, runs on
-// the object that member or element holds, and the call is an operand
-// evaluated once, in an expression and in a statement alike. Each arm that
-// asked whether the receiver was a process, a class array or a semaphore
-// evaluated the call again: three runs in an expression and up to five in a
-// statement. The run() calls each add one to the v of the object they reach.
 static std::string MemberOfCallResultDesign(std::string_view body) {
   return ElementMethodDesign(
       "class K;\n"
@@ -679,12 +569,6 @@ TEST(ObjectMethodSim,
             488u);
 }
 
-// §8.6 with §11.3.1 and §13.4: the value a call yields for one evaluation is
-// that evaluation's alone, so where the method it reaches recurses into the
-// same expression, `depth(n)` calling `pk().kid.step(n - 1)` which calls
-// depth again, each level runs pk() once of its own: three levels, three
-// runs. A value held across the method's body answered the inner levels with
-// the outer one's and ran pk() once in all.
 TEST(ObjectMethodSim, ARecursiveEvaluationOfTheSameReceiverRunsItsOwnCall) {
   EXPECT_EQ(
       RunAndGet("module t;\n"

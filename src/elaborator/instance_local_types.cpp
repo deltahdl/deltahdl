@@ -52,9 +52,6 @@ static const ModuleDecl* DeclNamed(const std::vector<ModuleDecl*>& decls,
   return nullptr;
 }
 
-// The module or interface the instance `name` of the scanned module
-// instantiates. Each instance of either is a scope of its own, and so declares
-// types of its own (§6.22.1).
 static const ModuleDecl* ModuleOfInstance(std::string_view name,
                                           const InstanceScan& scan) {
   for (const ModuleItem* item : scan.decl->items) {
@@ -68,8 +65,6 @@ static const ModuleDecl* ModuleOfInstance(std::string_view name,
   return nullptr;
 }
 
-// Whether `dtype`, written in `mod`, is a type `mod` declares, by a typedef,
-// as a class or in place, of a kind no other type is equivalent to.
 static bool IsOwnStrictType(const DataType& dtype, const ModuleDecl* mod) {
   const DataType* type = &dtype;
   if (dtype.kind == DataTypeKind::kNamed) {
@@ -85,7 +80,6 @@ static bool IsOwnStrictType(const DataType& dtype, const ModuleDecl* mod) {
          !type->is_packed;
 }
 
-// The `inst.var` that `e` is, or null.
 static const Expr* InstanceMember(const Expr* e) {
   if (e->kind != ExprKind::kMemberAccess || e->is_scope_resolution ||
       e->lhs->kind != ExprKind::kIdentifier) {

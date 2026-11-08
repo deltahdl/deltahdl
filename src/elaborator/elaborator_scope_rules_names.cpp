@@ -26,12 +26,6 @@ namespace delta {
 
 namespace {
 
-// A built-in data-type keyword (logic, bit, int, ...) parsed in expression
-// position — e.g. the type argument of `$bits(logic [7:0])` — is materialized
-// as a `kIdentifier` node carrying the keyword text (see
-// ParseCastOrTypedPattern). Such a node is a type reference, not a value read,
-// so it must never be checked against the value namespace. Mirrors
-// IsCastTypeToken in the expression parser.
 bool IsBuiltinTypeKeyword(std::string_view name) {
   static constexpr std::string_view kTypeKeywords[] = {
       "logic",   "bit",      "byte",   "int",       "shortint", "longint",
@@ -43,17 +37,6 @@ bool IsBuiltinTypeKeyword(std::string_view name) {
   return false;
 }
 
-// True for a call whose arguments name something other than a value the
-// enclosing scope declares, so that none of them is checked against it:
-//
-//   - an array manipulation method carrying a `with` clause. §7.12 gives
-//     `q.sum(x) with (x * 10)` the iterator name `x` through that argument, and
-//     §7.12.4 lets a second argument rename the index method, so both are
-//     declared at the call rather than read from the module.
-//   - randomize(). §18.11 makes the arguments the whole set of random variables
-//     of the calling object, so each names a property of the object's class.
-//     Recognized in both the bare and the method-call form, as
-//     Parser::CheckRandomizeArgList recognizes it.
 bool CallArgsNameNoValue(const Expr* e) {
   if (e->kind != ExprKind::kCall) return false;
   if (e->with_expr != nullptr) return true;
@@ -62,12 +45,6 @@ bool CallArgsNameNoValue(const Expr* e) {
          e->lhs->rhs != nullptr && e->lhs->rhs->text == "randomize";
 }
 
-// §40.3.2.1 Table 40-2: the argument of a coverage system function that says
-// which hierarchy it acts on may be an instance written as a hierarchical
-// path, and a path naming an instance of the current scope needs no dot, so a
-// bare identifier there names an instance rather than a value. That argument
-// is the fourth of $coverage_control and the third of $coverage_get_max and
-// $coverage_get, which take their scope as $coverage_control does.
 bool ArgNamesCoverageScope(const Expr* e, std::size_t index) {
   if (e->kind != ExprKind::kSystemCall) return false;
   if (e->callee == "$coverage_control") return index == 3;
@@ -75,42 +52,11 @@ bool ArgNamesCoverageScope(const Expr* e, std::size_t index) {
          index == 2;
 }
 
-// §18.17.7: a production yields a readable value only where it declares a
-// non-void return type. A production written with no return type takes void as
-// its return type, so it declares no implicit variable at all and a read of its
-// name resolves against nothing.
 bool ProductionDeclaresReturnValue(const RsProduction& production) {
   return production.has_return_type &&
          production.return_type.kind != DataTypeKind::kVoid;
 }
 
-// §26.5 / Table 26-1: the enumeration constants declared inside a package's
-// enum become directly visible through a wildcard import just like any other
-// package declaration (the FALSE/TRUE members of the clause's example package
-// p). Each member name is registered so that a name supplied by two
-// wildcard-imported packages is detected as ambiguous, not just the enum type
-// name itself. `origin` is the package declaring the enumeration.
-//
-// §6.19 has an enumerated type declare its literals as named constants of the
-// scope holding the enum, and §23.9 lists no structure or union among the
-// elements that define a scope, so an enum written as the type of a member of
-// a structure or union (§7.2's struct_union_member takes any data_type, the
-// enum form of Syntax 6-5 among them) declares its literals in the package as
-// an enum written at the top of the declaration does. The member's type is
-// held by StructMember::nested_type, and a structure nested in a member is
-// descended into the same way; a member of a named type declares nothing.
-//
-// §6.19.2's Table 6-10 has a `name[N]` member generate name0 through nameN-1
-// and a `name[N:M]` member nameN through nameM, the written name itself naming
-// no constant, so each generated name is a name the package provides and the
-// written one is not: `p1::VAL` for `VAL[3]` names nothing p1 declares, and
-// `p2::VAL2` through p2's `export p1::*` names p1's constant. The bounds are
-// folded against no scope, this walk running on the syntax tree alone with
-// the package's parameters registered elsewhere (RegisterPackageParams in
-// elaborator_resolve.cpp); a bound naming a parameter does not fold, and
-// EnumMemberDeclaredNames then keeps the written name, which can only
-// suppress a report, never raise one. The generated names are spelled by no
-// declaration, which is why ProvidedNames owns its keys.
 void AddEnumMemberNames(const DataType& type, std::string_view origin,
                         ProvidedNames& names) {
   const ScopeMap kNoScope;
@@ -127,13 +73,6 @@ void AddEnumMemberNames(const DataType& type, std::string_view origin,
   }
 }
 
-// The names one package item of `pkg` makes directly visible: its own name,
-// the name of a class it declares, and any enumeration constants it brings,
-// which may sit on a typedef's type, on a bare enum data declaration, or on a
-// member of a structure or union either of those writes inline. Each is
-// declared by `pkg`. A name already in the map keeps its first origin: the
-// package's own items are added ahead of what its exports hand on, and §26.3
-// has a declaration of the scope take the name over an import.
 void AddPackageItemNames(const PackageDecl* pkg, const ModuleItem* pi,
                          ProvidedNames& names) {
   if (!pi->name.empty()) names.emplace(pi->name, pkg->name);
@@ -141,8 +80,6 @@ void AddPackageItemNames(const PackageDecl* pkg, const ModuleItem* pi,
       !pi->class_decl->name.empty()) {
     names.emplace(pi->class_decl->name, pkg->name);
   }
-  // §26.2: a checker the package declares is held as a nested declaration,
-  // by the checker's own name.
   if (pi->kind == ModuleItemKind::kNestedModuleDecl) {
     names.emplace(pi->nested_module_decl->name, pkg->name);
   }
@@ -162,13 +99,6 @@ void AddPackageProvidedNames(const CompilationUnit* unit,
                              const PackageDecl* pkg, ProvidedNames& names,
                              std::unordered_set<const PackageDecl*>& visited);
 
-// The package declaring `name` as the package `src_name` provides it, which is
-// what an explicit import or export of `src_name::name` reaches (§26.6: p2's
-// `import p1::x; export p1::*;` makes p1::x and p2::x one declaration). The
-// source package's provided names are gathered afresh over a copy of
-// `visited`, so a source already on the chain, which a cycle of exports makes,
-// contributes nothing and the name is taken as the source's own; so is a name
-// the source does not provide, which the source itself is reported for.
 std::string_view DeclaringPackageOf(
     const CompilationUnit* unit, std::string_view src_name,
     std::string_view name,
@@ -182,12 +112,6 @@ std::string_view DeclaringPackageOf(
   return it == provided.end() ? src_name : it->second;
 }
 
-// The names `pkg` imports from the package `src_name`, which an export of
-// that package hands on (§26.6): the one name of each explicit import, and for
-// a wildcard import the candidates the package actually imported, those its
-// own declarations write (§26.3, PackageReferencedNames). Taken whole, a
-// candidate p4 never referenced was handed on beside p7's own declaration of
-// the name, and a module importing both was told the name was ambiguous.
 void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
                           std::string_view src_name, ProvidedNames& names,
                           std::unordered_set<const PackageDecl*>& visited) {
@@ -210,11 +134,6 @@ void AddImportedNamesFrom(const CompilationUnit* unit, const PackageDecl* pkg,
   }
 }
 
-// §26.6: by default what a package imports is not visible through an import
-// of that package, so an import item of `pkg` adds no name of its own here;
-// an export declaration is what hands an imported name on. `export *::*`
-// hands on every import of the package, `export src::*` those from one
-// package, and `export src::name` the one name.
 void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
                       ProvidedNames& names,
                       std::unordered_set<const PackageDecl*>& visited) {
@@ -236,10 +155,6 @@ void AddExportedNames(const CompilationUnit* unit, const PackageDecl* pkg,
   }
 }
 
-// The names `pkg` makes directly visible to a scope that imports it by
-// wildcard: its own declarations, and what its exports hand on of its
-// imports. A package reached twice along a chain of exports adds its names
-// once, which is also what ends a cycle of exports.
 void AddPackageProvidedNames(const CompilationUnit* unit,
                              const PackageDecl* pkg, ProvidedNames& names,
                              std::unordered_set<const PackageDecl*>& visited) {
@@ -248,14 +163,6 @@ void AddPackageProvidedNames(const CompilationUnit* unit,
   AddExportedNames(unit, pkg, names, visited);
 }
 
-// §21.2's display and write tasks, §21.2.3's strobe and monitor tasks, the
-// file forms §21.3 gives each of them, and §20.10's severity tasks. Every
-// argument of one is a value read as an assignment's right side is, so a bare
-// identifier among them that names no declaration is §23.9's unresolved
-// reference; `$display("%0d", x)` read an undeclared x with nothing said. The
-// tasks that take a scope or a definition name, $dumpvars and the assertion
-// control tasks of §20.11 among them, are not here, an argument of theirs
-// naming no value.
 bool IsValueListSystemTask(const Expr* call) {
   static constexpr std::string_view kTasks[] = {
       "$display",   "$displayb",  "$displayo",  "$displayh",  "$write",
@@ -280,18 +187,6 @@ bool ArgNamesDesignElement(const Expr* e) {
          (e->callee == "$timeunit" || e->callee == "$timeprecision");
 }
 
-// §18.17.7: the names a randsequence statement declares for its own code blocks
-// to read. A rule implicitly declares a variable for each of its productions
-// that returns a value, carrying that production's name; and a production opens
-// a scope covering all its rules and code blocks, which is what makes a
-// production's formal arguments readable throughout it.
-//
-// Collected flat over the whole statement, as every other name here is. The
-// clause scopes an implicit variable to the rules that name its production --
-// the same name is a scalar in one rule of §18.17.7's Example 2 and a 1..3
-// array in another -- and it scopes a formal to its own production. A name that
-// outlives either boundary can only suppress a report, never raise one, which
-// is the trade the collection above is already written to.
 void CollectRandsequenceDeclaredNames(
     const Stmt* s, std::unordered_set<std::string_view>& names) {
   for (const auto& production : s->rs_productions) {
@@ -313,28 +208,6 @@ void PopulatePackageProvidedNames(const CompilationUnit* unit,
   AddPackageProvidedNames(unit, pkg, names, visited);
 }
 
-// The operands of `e` that a value read could name. Three kinds of node hold an
-// identifier-shaped child that names something other than a value, and each is
-// left out:
-//
-//   - the callee of a call, which Parser::ParseCallExpr writes into lhs. §23.9
-//     has the search for a task, function, named block or generate block go
-//     on into higher-level modules until it succeeds, so a callee is not held
-//     to the module boundary a variable read is held to.
-//   - the slice size or type of a §11.4.14.2 streaming concatenation, which
-//     Parser::ParseStreamingConcat writes into lhs. `{<< byte {a}}` puts the
-//     byte there as an identifier node, and it names a width rather than a
-//     value.
-//   - the member name of a §7.3.2 tagged union expression, which
-//     Parser::ParseTaggedExpr writes into rhs. `tagged Valid x` names a member
-//     of the union type there, not a declaration of the enclosing scope.
-//
-// Expr::with_expr is left out whatever the node is. §7.12.1 binds the iterator
-// name an array method's `with` clause reads -- `q.sum() with (item)` declares
-// `item` at the call -- and §18.7 resolves the names of an inline constraint
-// block against the object being randomized, so neither is a name the enclosing
-// module declares. Expr::stream_range, the range of a stream operand
-// (§11.4.14.4), binds no name and is collected like any other operand.
 static void CollectBareIdentOperands(const Expr* e,
                                      std::vector<const Expr*>& out) {
   bool lhs_names_no_value =
@@ -357,22 +230,10 @@ static void CollectBareIdentOperands(const Expr* e,
   for (const auto* el : e->elements) CollectBareIdents(el, out);
 }
 
-// Collects standalone identifier operands of `e`, deliberately NOT descending
-// into member-access subtrees (so the base of `a.b`, `s.field`, `$root.x`, or
-// `pkg::x` is never collected) and skipping scope-prefixed identifiers. Only
-// the plain `kIdentifier` reads that must resolve to a local declaration
-// survive.
 void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
   if (!e) return;
   if (e->kind == ExprKind::kMemberAccess) return;
   if (e->kind == ExprKind::kIdentifier) {
-    // `null` (§6.24.1) and the `$` of an open range or a queue's last index
-    // (§7.10.1) parse as identifier-shaped nodes and name no declaration, so
-    // neither is a read this can find a declaration for. Nor is a §12.6
-    // pattern's `. variable_identifier`, which declares the variable it names
-    // (Expr::is_pattern_binding), nor its wildcard `.*`, which names nothing;
-    // either is reached here through a matches condition, whose pattern side
-    // is the expression's right operand.
     if (e->scope_prefix.empty() && !IsBuiltinTypeKeyword(e->text) &&
         e->text != "null" && e->text != "$" && e->text != ".*" &&
         !e->is_pattern_binding) {
@@ -383,11 +244,6 @@ void CollectBareIdents(const Expr* e, std::vector<const Expr*>& out) {
   CollectBareIdentOperands(e, out);
 }
 
-// The packages a module imports by wildcard. §26.3 makes every name such a
-// package declares directly visible, so a bare read of one resolves, and the
-// module's own symbol table does not enumerate them. Each name is looked up in
-// these packages rather than the module skipped whole, because skipping
-// silences the check on every other name of the module too.
 std::vector<std::string_view> WildcardImportedPackages(const RtlirModule* mod) {
   std::vector<std::string_view> pkgs;
   for (const auto& imp : mod->imports) {
@@ -400,9 +256,6 @@ static void CollectGenerateBodyNames(
     const std::vector<ModuleItem*>& items,
     std::unordered_set<std::string_view>& names);
 
-// The names one generate construct declares: the label of each of its blocks,
-// the loop variable §27.4 makes an implicit localparam of each generated block,
-// and the name of every item declared inside one.
 static void CollectOneGenerateNames(
     const ModuleItem* item, std::unordered_set<std::string_view>& names) {
   const Stmt* init = item->gen_init;
@@ -420,12 +273,6 @@ static void CollectOneGenerateNames(
   }
 }
 
-// Over-approximated set of the names a module's generate constructs declare,
-// and of its genvars. §23.9 makes a generate block a scope of its own, so the
-// elaborated module's symbol table does not list what one declares, and a flat
-// set holds names that are declared per block rather than module-wide.
-// Over-approximating is safe for the reason CollectProcLocalNames records: a
-// name in the set can only suppress a diagnostic, never raise one.
 static void CollectGenerateBodyNames(
     const std::vector<ModuleItem*>& items,
     std::unordered_set<std::string_view>& names) {
@@ -439,8 +286,6 @@ static void CollectGenerateBodyNames(
   }
 }
 
-// The same over a module's own items, where only a genvar and what a generate
-// construct declares are names the module's symbol table does not already list.
 void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
                                 std::unordered_set<std::string_view>& names) {
   for (const auto* item : items) {
@@ -453,11 +298,6 @@ void CollectModuleGenerateNames(const std::vector<ModuleItem*>& items,
   }
 }
 
-// §12.6: a pattern of the form `. variable_identifier` declares a new
-// variable, and a pattern stands to the right of every `matches` operator in
-// an expression -- an if's condition (§12.6.2), a conditional operator's first
-// operand (§12.6.3), or a `matches` written anywhere else an expression is.
-// Collects the names the patterns under `e` bind.
 static void CollectMatchesBindings(
     const Expr* e, std::unordered_set<std::string_view>& names) {
   if (e == nullptr) return;
@@ -471,9 +311,6 @@ static void CollectMatchesBindings(
   });
 }
 
-// §12.6.1: the patterns of a `case ... matches` item, each binding variables
-// the item's statement reads. A case that is not `matches` compares values
-// and binds nothing.
 static void CollectCaseItemBindings(
     const CaseItem& ci, std::unordered_set<std::string_view>& names) {
   for (const Expr* p : ci.patterns) {
@@ -487,22 +324,11 @@ static void CollectCaseMatchesBindings(
   for (const auto& ci : s->case_items) CollectCaseItemBindings(ci, names);
 }
 
-// The generated names of a `name[N]` enumeration member are spelled by no
-// declaration (§6.19.2), so they are kept here, once each, for the
-// string_views a name set holds.
 static std::string_view PersistentName(std::string name) {
   static std::unordered_set<std::string> pool;
   return *pool.insert(std::move(name)).first;
 }
 
-// §6.19 declares an enumeration's members as constants of the scope the
-// enumeration is written in, and A.2.8 admits a type_declaration among a
-// block's items, so `typedef enum {p, q} e_t;` in a begin-end block declares
-// p and q in that block (§23.9), as it would in a module. Collects them, and
-// those of an enumeration written as a member's type of a structure or union
-// the typedef declares. A.2.8 admits a data_declaration there too, so the
-// inline enumeration of `enum {r, s} y;` declares r and s in the block alike.
-// Their bounds fold against no scope, as AddEnumMemberNames' do.
 static void CollectBlockEnumMemberNames(
     const Stmt* s, std::unordered_set<std::string_view>& names) {
   const ScopeMap kNoScope;
@@ -523,9 +349,6 @@ static void CollectBlockEnumMemberNames(
   ForEachEnumTypeOfItem(s->decl_item, collect);
 }
 
-// §11.12 lists a sequential and a parallel block among the scopes a let may be
-// declared in, and the parser keeps such a let as a kBlockItemDecl statement
-// over the let's item (Parser::ParseBlockVarDecls).
 static void CollectBlockLetName(const Stmt* s,
                                 std::unordered_set<std::string_view>& names) {
   if (s->kind == StmtKind::kBlockItemDecl &&
@@ -533,27 +356,11 @@ static void CollectBlockLetName(const Stmt* s,
     names.insert(s->decl_item->name);
 }
 
-// Over-approximated set of names that are local to a procedural block: block
-// (begin/end) variable declarations, for-loop control variables, foreach index
-// variables, the two kinds of name §18.17.7 gives a randsequence statement,
-// the variables §12.6's patterns bind, and, with `with_lets_and_enum_members`,
-// the lets a block declares (§11.12) and the members of an enumeration a
-// block's typedef declares, which name no variable. Collected flat across the
-// whole block tree without tracking scope boundaries — that can only ever
-// SUPPRESS a diagnostic, never raise one, so a missed boundary is always safe.
-// `with_for_headers` says whether the variables a for loop's initialization
-// declares are among them, and `with_bindings` whether the variables a
-// pattern binds are: CollectProcRhsIdents gives those the scopes §12.6.1 to
-// §12.6.3 define instead.
 static void CollectLocalNames(const Stmt* s,
                               std::unordered_set<std::string_view>& names,
                               bool with_for_headers, bool with_bindings,
                               bool with_lets_and_enum_members) {
   if (!s) return;
-  // §12.6's patterns: those of a `case ... matches` item (§12.6.1), and those
-  // under a `matches` operator in the positions CollectProcRhsIdents below
-  // reads -- the statement's condition, an assignment's right side and a
-  // display task's arguments.
   if (with_bindings) {
     CollectCaseMatchesBindings(s, names);
     CollectMatchesBindings(s->condition, names);
@@ -568,13 +375,6 @@ static void CollectLocalNames(const Stmt* s,
     CollectBlockEnumMemberNames(s, names);
   }
   for (auto v : s->foreach_vars) names.insert(v);
-  // A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...`,
-  // and the target of one such assignment is an expression rather than a
-  // statement, so the variable it names is read here and not through the
-  // descent below. §12.7.1 makes a variable the initialization declares a
-  // local of the implicit block around the loop, so without
-  // `with_for_headers` it is left out as no name of the block the loop stands
-  // in; CollectProcRhsIdents admits it while that one loop is walked.
   for (size_t k = 0; k < s->for_inits.size(); ++k) {
     const Stmt* fi = s->for_inits[k];
     if (!with_for_headers && k < s->for_init_types.size() &&
@@ -585,25 +385,6 @@ static void CollectLocalNames(const Stmt* s,
     }
   }
   CollectRandsequenceDeclaredNames(s, names);
-  // §6.5 rules that data is declared before it is used, implicit nets aside,
-  // and puts no condition on the statement the declaration stands in, so every
-  // position a statement holds a statement in is a position this collection
-  // reaches. ForEachChildStmt in elaborator_validate_internal.h states those
-  // positions once for the whole elaborator, which is why the list is not
-  // written out again here. The visitor takes `Stmt* const&` because `s` is a
-  // `const Stmt*`, which is how ForEachChildStmt lets a walk that only reads
-  // the tree share its list with the walks that rewrite it.
-  //
-  // The list written out here before was nine of the thirteen links, missing
-  // Stmt::assert_pass_stmt, Stmt::assert_fail_stmt, the body of a randcase
-  // item, and the two statement lists Stmt::rs_productions holds. That
-  // omission cost a report made wrongly rather than a report not made: a name
-  // declared in one of those positions was absent from `names`, so the read of
-  // it that CollectProcRhsIdents below hands to ReportUnresolvedRefs resolves
-  // against nothing and is reported under §23.9 as unresolved. Nothing
-  // observed the false positive because CollectProcRhsIdents was short by the
-  // same four links and never collected the read either, which is why the two
-  // halves of the check are put on this list together.
   ForEachChildStmt(s, [&](Stmt* const& sub) {
     CollectLocalNames(sub, names, with_for_headers, with_bindings,
                       with_lets_and_enum_members);
@@ -631,11 +412,6 @@ std::unordered_set<std::string_view> MatchesBindingsOf(const Expr* e) {
   return names;
 }
 
-// §12.6.2 and §12.6.3: the reads in `e` of a variable a pattern of `e` binds,
-// standing where the binding is in scope, put in `bound`. A pattern's
-// identifiers are in scope in the clauses of its predicate after it, joined by
-// `&&&`, and in a conditional expression's second operand, but not its third.
-// `in_scope` holds the variables bound around `e`.
 static void MarkBoundReads(const Expr* e,
                            const std::unordered_set<std::string_view>& in_scope,
                            std::unordered_set<const Expr*>& bound) {
@@ -663,21 +439,6 @@ static void MarkBoundReads(const Expr* e,
       e, [&](const Expr* child) { MarkBoundReads(child, in_scope, bound); });
 }
 
-// Collects the bare identifier reads of every procedural blocking/nonblocking
-// assignment's right side, dropping the ones a block-local declaration names.
-// The caller then rejects any that resolve to no declaration.
-//
-// CollectBareIdents is what walks each right side, so a read written inside a
-// larger expression is reached under the same guards a continuous assignment's
-// whole right side is already walked under: no descent into a member access, so
-// the base of `a.b`, `pkg::x` and a `with` clause hanging off one is never
-// collected, and no scope-prefixed name, builtin type keyword, `null` or `$`.
-// Those guards are what keep this free of false positives; an earlier version
-// took the right side only when the whole of it was one identifier, which left
-// `r = v + 0;` unchecked.
-// The reads among `refs` that no name declares: none of `locals`, and none of
-// the variables a pattern of `exprs`, the expressions they were read from,
-// binds where the read stands.
 static void KeepUndeclaredReads(
     const std::vector<const Expr*>& refs,
     std::initializer_list<const Expr*> exprs,
@@ -690,8 +451,6 @@ static void KeepUndeclaredReads(
   }
 }
 
-// CollectProcRhsIdents over `s` with the variables `bound` names in scope
-// beside `locals`.
 static void CollectBoundProcRhsIdents(
     const Stmt* s, const std::unordered_set<std::string_view>& locals,
     const std::unordered_set<std::string_view>& bound,
@@ -720,26 +479,6 @@ static void CollectProcRhsIdentsIn(
   }
   std::vector<const Expr*> refs;
   CollectBareIdents(read, refs);
-  // §23.9 and §6.5 say nothing about the position a read stands in, and an
-  // assignment's right side is one of several a statement evaluates: the
-  // condition of an if, a while, a repeat, a do-while or a wait and the
-  // selector of a case (Stmt::condition), a for loop's condition, a case
-  // item's pattern (a value the selector is compared with, §12.5 -- unless the
-  // case is §12.6's `matches`, whose patterns declare rather than read), and
-  // the expressions a randsequence statement holds outside its code blocks: an
-  // rs_if_else condition, an rs_case expression and its arms, a rule's weight,
-  // a rand join's expression and a production item's actual arguments
-  // (ForEachRandsequenceExpr in elaborator_validate_internal.h), and a return
-  // statement's expression, the value §13.4.1 has the function return, read
-  // above in place of a right side. Left to the
-  // right side alone, `if (undeclared) x = 1;` elaborated clean. §9.4.2 has an
-  // event control's expressions name the nets and variables it waits on, and
-  // its iff guard is read as a condition, so both are reads too:
-  // `@(posedge nosuch)` elaborated clean. A block's declaration of a variable
-  // whose type is §6.23's type reference reads the reference's operand as an
-  // expression does, so `var type(nosuch) w;` among a block's items is a read
-  // too. A statement's delay, disable target, initializer and assertion are
-  // not read here.
   CollectBareIdents(s->condition, refs);
   CollectBareIdents(s->var_decl_type.type_ref_expr, refs);
   CollectBareIdents(s->for_cond, refs);
@@ -755,28 +494,6 @@ static void CollectProcRhsIdentsIn(
   ForEachRandsequenceExpr(s,
                           [&](Expr* const& e) { CollectBareIdents(e, refs); });
   KeepUndeclaredReads(refs, {read, s->condition, s->for_cond}, locals, out);
-  // §6.5's declared-before-use rule is broken by the assignment wherever the
-  // assignment stands, and §26.3 makes an identifier a package supplies
-  // visible in the current scope with no package name qualifier wherever the
-  // read of it stands, so every position a statement holds a statement in is a
-  // position one of these reads is written in. ForEachChildStmt in
-  // elaborator_validate_internal.h states those positions once for the whole
-  // elaborator, which is why the list is not written out again here.
-  //
-  // The list written out here before was the same nine links
-  // CollectProcLocalNames above wrote out, missing the same four. That
-  // omission cost a report not made: an assignment whose right side read a
-  // name nothing declares was never collected when it stood in an immediate
-  // assertion's pass statement, in its fail statement, in a randcase item, or
-  // in either code block of a randsequence production, so §23.9's "reference to
-  // unresolved identifier" was never reported for it and the source elaborated
-  // clean.
-  //
-  // §12.6.2 and §12.6.1: the variables an if statement's predicate binds are
-  // in scope in its true arm and not its false arm, and those a case item's
-  // pattern binds in that item's statement alone, so each child is walked
-  // with the names in scope where it stands (ForEachChildStmtWithBindings,
-  // which takes every other position from ForEachChildStmt).
   ForEachChildStmtWithBindings(
       s,
       [&](const Stmt* sub, const std::unordered_set<std::string_view>& bound) {
@@ -821,10 +538,6 @@ void CollectProcRhsIdents(const Stmt* s,
                           const std::unordered_set<std::string_view>& locals,
                           std::vector<const Expr*>& out) {
   if (!s) return;
-  // §12.7.1: the variables a for loop's initialization declares are locals of
-  // the implicit block around the loop, visible in its initialization,
-  // condition, step and body and nowhere after it, so they join the locals
-  // for this statement's walk alone.
   std::vector<std::string_view> header = ForHeaderDeclaredNames(s);
   if (!header.empty()) {
     std::unordered_set<std::string_view> inner = locals;
@@ -835,9 +548,6 @@ void CollectProcRhsIdents(const Stmt* s,
   CollectProcRhsIdentsIn(s, locals, out);
 }
 
-// The names a subroutine's body may read without the module declaring them:
-// §13.3 makes each formal argument a declaration of the subroutine, §13.4.1
-// makes a function's own name a variable of it, and a body may declare its own.
 void CollectSubroutineLocalNames(const ModuleItem* item,
                                  std::unordered_set<std::string_view>& names) {
   if (!item->name.empty()) names.insert(item->name);

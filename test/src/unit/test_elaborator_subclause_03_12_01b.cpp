@@ -17,15 +17,6 @@ using namespace delta;
 
 namespace {
 
-// §3.12.1 (printed page 56) with §6.21 (printed 132): `int g;` outside every
-// module is a variable of the compilation-unit scope, which is searched for a
-// name the module's own scope does not declare, and §6.21 gives it a static
-// lifetime a module's procedure may write into, so `initial g = 5;` and an
-// always block's `g <= g + 1;` name nothing undeclared. Both were reported as
-// "undeclared identifier 'g'" by ValidateScopeRules
-// (elaborator_scope_rules.cpp), which admitted the module's own names and its
-// imports' alone while the read side admitted the unit's; the unit's variables
-// were written through a unit function until now.
 TEST(CompilationUnitScopeWrites, UnitVariableWrittenByAModuleProcedure) {
   EXPECT_TRUE(
       ElabOk("int g;\n"
@@ -36,13 +27,6 @@ TEST(CompilationUnitScopeWrites, UnitVariableWrittenByAModuleProcedure) {
              "endmodule\n"));
 }
 
-// §23.9 (printed page 761): a task declared in the module is a scope nested in
-// the module's, and a name its body writes that neither declares is searched
-// for in the compilation-unit scope next (§3.12.1), so a module task's `g = 7`
-// is as clean as a process's. A subroutine body never went through
-// ValidateScopeRules, which is what let 7222ce9fe's test write the unit's
-// variable through a unit function; this case holds the task's write clean
-// whichever check it comes to go through.
 TEST(CompilationUnitScopeWrites, UnitVariableWrittenByAModuleTask) {
   EXPECT_TRUE(
       ElabOk("int g;\n"
@@ -52,10 +36,6 @@ TEST(CompilationUnitScopeWrites, UnitVariableWrittenByAModuleTask) {
              "endmodule\n"));
 }
 
-// §23.9 (printed page 761): a name declared in no scope the reference can
-// reach is still reported at the assignment's line. The unit declares `g` and
-// the module writes `h`, so a check that admitted every write once the unit
-// declared anything would let this through.
 TEST(CompilationUnitScopeWrites, WriteToANameDeclaredNowhereIsStillReported) {
   ElabFixture f;
   EXPECT_FALSE(
@@ -68,12 +48,6 @@ TEST(CompilationUnitScopeWrites, WriteToANameDeclaredNowhereIsStillReported) {
                             3, "23.9"));
 }
 
-// §3.12.1 (printed page 56): the module's own scope is searched before the
-// compilation-unit scope, so a module declaring its own `int g` beside the
-// unit's writes the module's, which the elaborated module holds as a variable
-// of its own, and the write is clean. Whether the simulator's storage keeps
-// the two apart is task #400's question, so this case reads the elaborator's
-// side alone.
 TEST(CompilationUnitScopeWrites, ModuleVariableShadowingTheUnitsIsTheModules) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -88,15 +62,6 @@ TEST(CompilationUnitScopeWrites, ModuleVariableShadowingTheUnitsIsTheModules) {
   EXPECT_NE(FindVar(design, "m", "g"), nullptr);
 }
 
-// §3.12.1 (printed page 56) with §6.10 (printed 108) and §10.3.2 (printed
-// 249): an implicit net is assumed for a continuous assignment's target only
-// where no scope the assignment can directly reference declares the name, and
-// the compilation-unit scope is searched for a name the module's own scope
-// does not declare, so `assign g = 1;` in a module drives the unit's `int g`,
-// a variable §10.3.2 lets one continuous assignment drive.
-// MaybeCreateImplicitNet (elaborator_items.cpp) asked the module's variables,
-// nets, ports and parameters alone, so the module gained an implicit net `g`
-// shadowing the unit's variable, and the assignment drove that net.
 TEST(CompilationUnitScopeWrites, UnitVariableDrivenByAContinuousAssignment) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -110,11 +75,6 @@ TEST(CompilationUnitScopeWrites, UnitVariableDrivenByAContinuousAssignment) {
   EXPECT_EQ(FindNet(design, "m", "g"), nullptr);
 }
 
-// §6.10 (printed page 108): a continuous assignment's target declared in no
-// scope the module can reach is still an implicit scalar net of the module,
-// so with the unit declaring `g` and nothing declaring `h`, `assign h = 1;`
-// gets the net as before. A check that admitted every target once the unit
-// declared anything would make no net here.
 TEST(CompilationUnitScopeWrites, NameDeclaredNowhereStillGetsAnImplicitNet) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -128,9 +88,6 @@ TEST(CompilationUnitScopeWrites, NameDeclaredNowhereStillGetsAnImplicitNet) {
   EXPECT_NE(FindNet(design, "m", "h"), nullptr);
 }
 
-// §3.12.1 (printed pages 56-57): a reference searches only the part of the
-// compilation-unit scope written before it, and a name other than a task's or
-// a function's has to be declared in the unit before it is referenced.
 TEST(CompilationUnitScopeOrder, UnitTaskReadsUnitVariableDeclaredAfterIt) {
   ElabFixture f;
   ElaborateSrc(
@@ -178,9 +135,6 @@ TEST(CompilationUnitScopeOrder, ModuleReadsUnitNetDeclaredAfterIt) {
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(), "'w'", 3, "23.9"));
 }
 
-// §6.10 (printed page 108): with the unit's `g` written after the module, the
-// assignment's target is declared nowhere the module can reach, so it is the
-// module's implicit net.
 TEST(CompilationUnitScopeOrder,
      AssignTargetDeclaredLaterInUnitGetsImplicitNet) {
   ElabFixture f;
@@ -194,9 +148,6 @@ TEST(CompilationUnitScopeOrder,
   EXPECT_NE(FindNet(design, "m", "g"), nullptr);
 }
 
-// §3.12.1: `$unit::b` selects a declaration of the unit and refers forward no
-// more than `b` does, and a `$unit::` name the unit declares nowhere names
-// nothing.
 TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -232,8 +183,6 @@ TEST(CompilationUnitScopeOrder, UnitScopedReferencesToEarlierDataAndAnyTaskOk) {
              "task later_task; endtask\n"));
 }
 
-// §3.12.1: an import written at compilation-unit scope is part of the scope
-// the references after it search, and no reference before it.
 TEST(CompilationUnitScopeOrder, UnitImportAfterModuleDoesNotReachIt) {
   ElabFixture f;
   ElaborateSrc(
@@ -257,9 +206,6 @@ TEST(CompilationUnitScopeOrder, UnitImportBeforeModuleReachesIt) {
              "endmodule\n"));
 }
 
-// §3.12.1 with §23.9: a unit variable written after the module is out of the
-// module's reach, but a name the module declares itself is the module's own,
-// whatever kind of declaration gives it and whatever the unit writes later.
 TEST(CompilationUnitScopeOrder, ModuleVariableShadowsALaterUnitVariable) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -280,8 +226,6 @@ TEST(CompilationUnitScopeOrder, ModuleParameterShadowsALaterUnitVariable) {
              "int x;\n"));
 }
 
-// §3.12.1: only a unit variable or net written later is out of reach; a later
-// unit function of the name a module variable has leaves the read alone.
 TEST(CompilationUnitScopeOrder, ModuleVariableNamedLikeALaterUnitFunction) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -292,8 +236,6 @@ TEST(CompilationUnitScopeOrder, ModuleVariableNamedLikeALaterUnitFunction) {
              "function int f(); return 1; endfunction\n"));
 }
 
-// §3.12.1 lets a unit task or function be named before it is written, and a
-// function or a DPI import (§35.5.4) is one as much as a task is.
 TEST(CompilationUnitScopeOrder, UnitScopedCallsToLaterFunctionAndImportOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -307,9 +249,6 @@ TEST(CompilationUnitScopeOrder, UnitScopedCallsToLaterFunctionAndImportOk) {
              "import \"DPI-C\" function int c_add(int a);\n"));
 }
 
-// §3.12.1 with §6.19: an enumeration member declares a name of the scope its
-// type stands in, so `$unit::GREEN` names the unit's member once it is
-// written, and refers forward to it before.
 TEST(CompilationUnitScopeOrder, UnitScopedReferenceToEarlierEnumMemberOk) {
   EXPECT_TRUE(
       ElabOk("typedef enum {RED, GREEN} color_t;\n"
@@ -333,8 +272,6 @@ TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterEnumMember) {
                             "3.12.1"));
 }
 
-// §3.12.1 with §8.23: `$unit::C::K` heads with the unit's class C, which is
-// reached once it is written and refers forward to it before.
 TEST(CompilationUnitScopeOrder, UnitScopedReferenceToEarlierClassNotReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -361,11 +298,6 @@ TEST(CompilationUnitScopeOrder, UnitScopedReferenceToLaterClass) {
                             "3.12.1"));
 }
 
-// §3.12.1 (printed page 56) with §7.4.4: `$unit::t` names the unit's array
-// typedef past the module's own t, so a function's formal, its return type and
-// its body's variable written with it each take the unit's two elements. Each
-// took the module's three, the typedef's dimensions being looked up by the
-// bare name.
 TEST(CompilationUnitScopeTypes, UnitScopedArrayTypedefKeepsTheUnitsDimensions) {
   ElabFixture f;
   const RtlirDesign* design = ElaborateSrc(
@@ -388,11 +320,6 @@ TEST(CompilationUnitScopeTypes, UnitScopedArrayTypedefKeepsTheUnitsDimensions) {
   EXPECT_EQ(LiteralElementCount(g->func_body_stmts[0]->var_unpacked_dims), 2u);
 }
 
-// §3.12.1 (printed page 57) with §3.13 (e) and §7.4.4: the module's own
-// structure typedef t hides the unit's array typedef t, so a variable, a
-// function's formal, its return type and its body's variable written t are
-// each one structure. The module's typedef, written with no unpacked
-// dimensions, left the unit's two in the dimension table, and each took them.
 TEST(CompilationUnitScopeTypes, ModuleTypedefHidesTheUnitsArrayDimensions) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
@@ -419,11 +346,6 @@ TEST(CompilationUnitScopeTypes, ModuleTypedefHidesTheUnitsArrayDimensions) {
   EXPECT_TRUE(fn->func_body_stmts[0]->var_unpacked_dims.empty());
 }
 
-// §3.12.1 with §3.13 (e): a class the module declares hides the unit's typedef
-// of its name, so a variable, a function's formal and its body's variable
-// written t are each a handle of the class. The unit's entries stayed in the
-// type tables, which never consult the class names, and each was declared an
-// array of two ints.
 TEST(CompilationUnitScopeTypes, ModuleClassHidesTheUnitsArrayTypedef) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(
@@ -451,12 +373,6 @@ TEST(CompilationUnitScopeTypes, ModuleClassHidesTheUnitsArrayTypedef) {
   EXPECT_TRUE(g->func_body_stmts[0]->var_unpacked_dims.empty());
 }
 
-// §3.12.1 (printed page 56): a hierarchical name a compilation-unit function
-// writes, headed by a name the unit neither declares nor imports, is a full
-// path from $root and is never searched for from the caller. u is an instance
-// of top, which calls f, and no top-level instance named u stands at $root, so
-// `u.x` names nothing; the same written as the full path `top.u.x` is
-// accepted.
 TEST(CompilationUnitHierNames, AnInstanceOfTheCallerIsNotReachedFromRoot) {
   ElabFixture f;
   ElaborateSrc(
@@ -478,8 +394,6 @@ TEST(CompilationUnitHierNames, AnInstanceOfTheCallerIsNotReachedFromRoot) {
                             2, "3.12.1"));
 }
 
-// A name the unit imports heads no path from $root: `s.a` reads a member of
-// the structure p declares and the unit imports.
 TEST(CompilationUnitHierNames, ANameTheUnitImportsIsNoPathFromRoot) {
   EXPECT_TRUE(
       ElabOk("package p;\n"
@@ -511,12 +425,6 @@ TEST(CompilationUnitHierNames, AFullPathFromTheTopIsAccepted) {
              "endmodule\n"));
 }
 
-// §3.12.1 (printed page 57): other than a task's or a function's name, a
-// reference names only what the compilation unit has already declared. An
-// enumeration constant and a parameter written in the unit after the module
-// reading them are no names the module reaches, each read reported as
-// unresolved; a type and a class written after are §6.18's type declared after
-// its reference.
 TEST(CompilationUnitScopeOrder, EnumConstantDeclaredLaterInUnitIsUnresolved) {
   ElabFixture f;
   ElaborateSrc(
@@ -567,9 +475,6 @@ TEST(CompilationUnitScopeOrder, ClassDeclaredLaterInUnitIsReported) {
                             "6.18"));
 }
 
-// The nearest allowed forms: the constants written in the unit before the
-// module, and a module, or the module enclosing it, declaring its own of the
-// name, as a header parameter or an item, whatever the unit writes later.
 TEST(CompilationUnitScopeOrder, UnitConstantsDeclaredBeforeTheModuleResolve) {
   EXPECT_TRUE(
       ElabOk("typedef enum {RED, GREEN} color_t;\n"
@@ -604,11 +509,6 @@ TEST(CompilationUnitScopeOrder, ModulesOwnConstantsShadowLaterUnitConstants) {
              "localparam int W = 8;\n"));
 }
 
-// A port of the module, ANSI or not, of a later unit parameter's name is what
-// the module's read of the name reaches, and so is an enumeration constant the
-// module declares of a later unit enumeration constant's name: the unit's,
-// written after the module, is no constant of the module at all, leaving the
-// module's own the one of its name there.
 TEST(CompilationUnitScopeOrder,
      ModulesOwnPortAndEnumConstantShadowLaterUnitOnes) {
   EXPECT_TRUE(
@@ -643,9 +543,6 @@ TEST(CompilationUnitScopeOrder,
             1);
 }
 
-// ModuleDeclaresName, which the check above asks before it reports a read of a
-// later unit constant, answers for the module's own header parameters, ports,
-// items and the enumeration constants its items declare, and for nothing else.
 TEST(CompilationUnitScopeOrder, ModuleDeclaresNameReadsTheModulesOwnNames) {
   auto r = Parse(
       "module m #(parameter int P = 1)(input int q);\n"

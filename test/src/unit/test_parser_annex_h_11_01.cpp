@@ -9,12 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §H.11.1, the SystemVerilog side of Example 4: a parameter W of 33, an int,
-// a bit [29:0] and a bit [W-1:0], and an import f7 handling 2-state packed
-// arguments two ways -- two int unsigned formals the int and the 30-bit
-// vector are associated with, and a [W-1:0] formal the 33-bit vector is
-// passed to as a canonical vector -- called with the three from an initial
-// block.
 class ExampleFourParsing : public ::testing::Test {
  protected:
   ParseResult r_ = Parse(
@@ -37,8 +31,6 @@ TEST_F(ExampleFourParsing, TheSystemVerilogSideParses) {
   ASSERT_EQ(r_.cu->modules.size(), 1u);
 }
 
-// The import f7: two int unsigned inputs and a third input whose packed
-// range is written in terms of the parameter.
 TEST_F(ExampleFourParsing, TheImportTakesTwoUnsignedIntsAndAPackedVector) {
   ASSERT_NE(r_.cu, nullptr);
   const ModuleItem* f7 =

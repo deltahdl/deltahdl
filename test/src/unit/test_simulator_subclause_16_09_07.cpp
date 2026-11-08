@@ -37,24 +37,14 @@ TEST(SvaEngine, SequenceOperatorOr) {
   EXPECT_FALSE(EvalSequenceOr(false, false));
 }
 
-// §16.9.7: the match set of `a or b` is the union of the two operands' match
-// sets, with each composite match ending where its originating operand match
-// ends. This reproduces Figure 16-11 for `(te1 ##[1:5] te2) or (te3 ##2 te4 ##2
-// te5)`: the first operand matches at ticks 9, 10, 11, 12, and 13, and the
-// second matches at tick 12. The composite therefore has one match at each of
-// ticks 9, 10, 11, and 13 and two matches at tick 12 — operand matches are not
-// merged, so the coincident tick appears twice.
 TEST(SvaEngine, SequenceOrIsUnionOfOperandMatches) {
   auto u = EvalSequenceOrMatches({9, 10, 11, 12, 13}, {12});
   EXPECT_TRUE(u.matched);
   std::vector<uint32_t> expected{9, 10, 11, 12, 13, 12};
   EXPECT_EQ(u.end_times, expected);
-  // The defining feature of the figure: tick 12 carries two composite matches.
   EXPECT_EQ(std::count(u.end_times.begin(), u.end_times.end(), 12u), 2);
 }
 
-// §16.9.7: a match of either operand alone is a match of the composite, ending
-// at that operand's own end time.
 TEST(SvaEngine, SequenceOrMatchesWhenOnlyOneOperandMatches) {
   auto only_a = EvalSequenceOrMatches({7}, {});
   EXPECT_TRUE(only_a.matched);
@@ -65,20 +55,12 @@ TEST(SvaEngine, SequenceOrMatchesWhenOnlyOneOperandMatches) {
   EXPECT_EQ(only_b.end_times, std::vector<uint32_t>{4});
 }
 
-// §16.9.7: with neither operand matching, the composite has no match.
 TEST(SvaEngine, SequenceOrHasNoMatchWhenNeitherOperandMatches) {
   auto u = EvalSequenceOrMatches({}, {});
   EXPECT_FALSE(u.matched);
   EXPECT_TRUE(u.end_times.empty());
 }
 
-// --- Live cases: the linear sequence monitor over real source ---
-
-// §16.9.7, Figure 16-9: with sampled expressions as operands, te1 or te2
-// matches at each tick at least one of them is true. te1 at ticks 1, 3, 6,
-// 8, 11, 12 and 14 and te2 at 1, 2, 4, 5, 8, 9, 10 and 14 leave 7 and 13 as
-// the ticks neither holds at, so the end point is reached at the twelve
-// others, last at the tick at 135.
 TEST(SequenceOr, BooleanOperandsMatchWhereEitherHolds) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -93,11 +75,6 @@ TEST(SequenceOr, BooleanOperandsMatchWhereEitherHolds) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 135u);
 }
 
-// §16.9.7, Figure 16-10: each match of either operand is a match of the
-// composite, ending where the operand's match ends. te1 at ticks 1, 2 and 8,
-// te2 at 10, 12 and 14, te3 at 2, 3 and 8, te4 at 10 and te5 at 12: from tick
-// 8, te1 ##2 te2 ends at 10 and te3 ##2 te4 ##2 te5 at 12, so the or ends at
-// both, the ticks at 95 and 115.
 TEST(SequenceOr, EachOperandMatchIsAMatch) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -110,10 +87,6 @@ TEST(SequenceOr, EachOperandMatchIsAMatch) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 115u);
 }
 
-// §16.9.7, Figure 16-11: with te2 at 9 to 13, te1 ##[1:5] te2 has five
-// matches from tick 8, ending at 9 to 13, and te3 ##2 te4 ##2 te5 one at
-// 12, so the or's matches are the union, ending at each tick from 9 to 13
-// and twice at 12; the end point is reached five times, last at 125.
 TEST(SequenceOr, RangeOperandEndsAtEachOfItsTicks) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -126,9 +99,6 @@ TEST(SequenceOr, RangeOperandEndsAtEachOfItsTicks) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 125u);
 }
 
-// §16.9.7: one operand matching is enough. With te3, te4 and te5 never high
-// the or ends where te1 ##2 te2 does, at 10; with te2 never high, where
-// te3 ##2 te4 ##2 te5 does, at 12.
 TEST(SequenceOr, OneOperandMatchingAloneIsAMatch) {
   const std::string kBody = "(te1 ##2 te2) or (te3 ##2 te4 ##2 te5)";
   SimFixture f;
@@ -148,10 +118,6 @@ TEST(SequenceOr, OneOperandMatchingAloneIsAMatch) {
   EXPECT_EQ(g.ctx.FindVariable("last")->value.ToUint64(), 115u);
 }
 
-// §16.9.7 and §16.7: an or written as a group is one operand of the chain
-// around it, the chain going on from each operand's match. From tick 2 the
-// group begins at 3, where te4 ends at 3 and te2 ##1 te3 at 4, so te5 is
-// read at 4 and at 5, and the sequence ends at both, the ticks at 35 and 45.
 TEST(SequenceOr, AGroupIsOneOperandOfTheChainAroundIt) {
   SimFixture f;
   auto* hits = RunAndFindVar(
@@ -163,8 +129,6 @@ TEST(SequenceOr, AGroupIsOneOperandOfTheChainAroundIt) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
-// §16.8: an instance of a named sequence whose body is an or, as one operand
-// of a chain, matches as the group of the case above does.
 TEST(SequenceOr, AnInstanceIsOneOperandOfTheChainAroundIt) {
   SimFixture f;
   auto* hits =
@@ -179,11 +143,6 @@ TEST(SequenceOr, AnInstanceIsOneOperandOfTheChainAroundIt) {
   EXPECT_EQ(f.ctx.FindVariable("last")->value.ToUint64(), 45u);
 }
 
-// §16.8 and §16.9.7: an instance's actual stands for its formal inside a
-// grouped or of the body too. With te4 bound to x and high at 3, the group
-// begun at 3 ends there through x and at 4 through te2 ##1 te3, so te5 is
-// read at 4 and at 5, the ticks at 35 and 45; a formal left unbound would
-// end the group at 4 alone.
 TEST(SequenceOr, AFormalInsideAGroupTakesItsActual) {
   SimFixture f;
   auto* hits =

@@ -14,9 +14,6 @@
 namespace delta {
 namespace {
 
-// §38.37.1: file-scope capture for the systf callback applications. The
-// invocation helper passes the registration's user_data field as the single
-// PLI_BYTE8 * argument, so each stub records the pointer it received.
 const char* g_seen_arg = nullptr;
 int g_call_count = 0;
 
@@ -32,11 +29,6 @@ PLI_INT32 SizetfReturning17(PLI_BYTE8* arg) {
   return 17;
 }
 
-// -----------------------------------------------------------------------------
-// §38.37.1 tfname rule: the name shall begin with '$' and be followed by one or
-// more characters legal in a SystemVerilog simple identifier.
-// -----------------------------------------------------------------------------
-
 TEST(VpiSystfCallbacksSim, NameRuleAcceptsWellFormedNames) {
   EXPECT_TRUE(VpiSystfNameIsValid("$measure"));
   EXPECT_TRUE(VpiSystfNameIsValid("$a"));
@@ -44,8 +36,6 @@ TEST(VpiSystfCallbacksSim, NameRuleAcceptsWellFormedNames) {
 }
 
 TEST(VpiSystfCallbacksSim, NameRuleRejectsMissingOrBareDollar) {
-  // At least one character must follow the '$': a null pointer, the empty
-  // string, a bare "$", and a name with no leading '$' all fail.
   EXPECT_FALSE(VpiSystfNameIsValid(nullptr));
   EXPECT_FALSE(VpiSystfNameIsValid(""));
   EXPECT_FALSE(VpiSystfNameIsValid("$"));
@@ -57,10 +47,6 @@ TEST(VpiSystfCallbacksSim, NameRuleRejectsIllegalTrailingCharacters) {
   EXPECT_FALSE(VpiSystfNameIsValid("$has space"));
   EXPECT_FALSE(VpiSystfNameIsValid("$dot.name"));
 }
-
-// -----------------------------------------------------------------------------
-// §38.37.1: RegisterSystf applies the tfname rule when registering.
-// -----------------------------------------------------------------------------
 
 class VpiSystfCallbacksRegistration : public ::testing::Test {
  protected:
@@ -89,9 +75,6 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsIllegalCharacterName) {
 }
 
 TEST_F(VpiSystfCallbacksRegistration, RejectsNullName) {
-  // A registration carrying no tfname has no name of a '$' and at least one
-  // character after it at all, so the registration is refused (no callback
-  // object, nothing stored).
   s_vpi_systf_data data = {};
   data.type = vpiSysTask;
   data.tfname = nullptr;
@@ -110,12 +93,6 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsWellFormedName) {
   EXPECT_STREQ(vpi_ctx_.RegisteredSystfs()[0].tfname, "$good_name");
 }
 
-// §38.37.1: a name may be as long as a SystemVerilog identifier may and no
-// longer. §5.6 sets that for an identifier -- an implementation may cap it,
-// though at no fewer than 1024 characters -- and this tool's cap is
-// kMaxIdentifierLength, the one src/lexer/lexer.cpp measures an identifier
-// against. A name of exactly that length is the longest the rule admits, so the
-// registration stands.
 TEST_F(VpiSystfCallbacksRegistration, AcceptsANameAtTheIdentifierMaximum) {
   std::string name = "$" + std::string(kMaxIdentifierLength - 1, 'a');
   s_vpi_systf_data data = {};
@@ -128,11 +105,6 @@ TEST_F(VpiSystfCallbacksRegistration, AcceptsANameAtTheIdentifierMaximum) {
             kMaxIdentifierLength);
 }
 
-// §38.37.1 with one character more: the name is past the maximum, so the
-// registration is refused -- no callback object, nothing stored -- and §5.6's
-// required error report is what vpi_chk_error reads back. Every character of
-// this name is one §38.37.1 calls legal, so length is the only thing that can
-// have refused it.
 TEST_F(VpiSystfCallbacksRegistration, RejectsANameBeyondTheIdentifierMaximum) {
   std::string name = "$" + std::string(kMaxIdentifierLength, 'a');
   s_vpi_systf_data data = {};
@@ -148,10 +120,6 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsANameBeyondTheIdentifierMaximum) {
                "system task or function name exceeds the maximum identifier "
                "length");
 }
-
-// -----------------------------------------------------------------------------
-// §38.37.1 type field: registers the application as a system task or function.
-// -----------------------------------------------------------------------------
 
 TEST_F(VpiSystfCallbacksRegistration, TypeFieldStoresTaskOrFunc) {
   s_vpi_systf_data task = {};
@@ -171,11 +139,6 @@ TEST_F(VpiSystfCallbacksRegistration, TypeFieldStoresTaskOrFunc) {
   EXPECT_EQ(vpi_ctx_.RegisteredSystfs()[1].type, vpiSysFunc);
 }
 
-// -----------------------------------------------------------------------------
-// §38.37.1 sysfunctype field: names the return-value kind of a system function,
-// and is meaningful only when the type is vpiSysFunc.
-// -----------------------------------------------------------------------------
-
 TEST(VpiSystfCallbacksSim, ReturnTypeReportedForSystemFunction) {
   s_vpi_systf_data func = {};
   func.type = kVpiSysFunc;
@@ -185,19 +148,12 @@ TEST(VpiSystfCallbacksSim, ReturnTypeReportedForSystemFunction) {
 }
 
 TEST(VpiSystfCallbacksSim, ReturnTypeNotReportedForSystemTask) {
-  // sysfunctype shall only be used when type is vpiSysFunc, so a task reports
-  // no return-value kind even if the field happens to be populated.
   s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.sysfunctype = kVpiIntFunc;
 
   EXPECT_EQ(VpiSystfReturnType(task), 0);
 }
-
-// -----------------------------------------------------------------------------
-// §38.37.1 sizetf rule: called only for a sized system function; absent sizetf
-// makes a sized function 32 bits wide.
-// -----------------------------------------------------------------------------
 
 TEST(VpiSystfCallbacksSim, SizetfCalledOnlyForSizedFunction) {
   s_vpi_systf_data sized = {};
@@ -215,8 +171,6 @@ TEST(VpiSystfCallbacksSim, SizetfCalledOnlyForSizedFunction) {
   int_func.sysfunctype = kVpiIntFunc;
   EXPECT_FALSE(VpiSystfSizetfIsCalled(int_func));
 
-  // A system task never calls sizetf, even if a sized kind is left in the
-  // field.
   s_vpi_systf_data task = {};
   task.type = kVpiSysTask;
   task.sysfunctype = kVpiSizedFunc;
@@ -236,7 +190,6 @@ TEST(VpiSystfCallbacksSim, SizedFunctionWithSizetfUsesItsWidth) {
 
   EXPECT_EQ(VpiSystfResultSizeBits(sized), 17);
   EXPECT_EQ(g_call_count, 1);
-  // The sizetf received user_data as its single PLI_BYTE8 * argument.
   EXPECT_EQ(g_seen_arg, reinterpret_cast<const char*>(&payload));
 }
 
@@ -250,8 +203,6 @@ TEST(VpiSystfCallbacksSim, SizedFunctionWithoutSizetfDefaultsTo32) {
 }
 
 TEST(VpiSystfCallbacksSim, SignedSizedFunctionWithoutSizetfDefaultsTo32) {
-  // The default-width rule names both sized kinds, so a vpiSizedSignedFunc with
-  // no sizetf application reports 32 bits just as the unsigned sized kind does.
   s_vpi_systf_data sized_signed = {};
   sized_signed.type = kVpiSysFunc;
   sized_signed.sysfunctype = kVpiSizedSignedFunc;
@@ -263,8 +214,6 @@ TEST(VpiSystfCallbacksSim, SignedSizedFunctionWithoutSizetfDefaultsTo32) {
 TEST(VpiSystfCallbacksSim, NonSizedFunctionDoesNotCallSizetf) {
   g_call_count = 0;
 
-  // sizetf is provided but the function is not a sized kind, so it must not be
-  // called; the width falls through to the default.
   s_vpi_systf_data int_func = {};
   int_func.type = kVpiSysFunc;
   int_func.sysfunctype = kVpiIntFunc;
@@ -273,12 +222,6 @@ TEST(VpiSystfCallbacksSim, NonSizedFunctionDoesNotCallSizetf) {
   EXPECT_EQ(VpiSystfResultSizeBits(int_func), 32);
   EXPECT_EQ(g_call_count, 0);
 }
-
-// -----------------------------------------------------------------------------
-// §38.37.1 callback applications: user_data is the only argument (PLI_BYTE8 *),
-// a null field is skipped, and compiletf/sizetf fire at build while calltf
-// fires each invocation.
-// -----------------------------------------------------------------------------
 
 TEST(VpiSystfCallbacksSim, InvokePassesUserDataAsSingleArgument) {
   g_seen_arg = nullptr;
@@ -294,19 +237,16 @@ TEST(VpiSystfCallbacksSim, InvokePassesUserDataAsSingleArgument) {
 
 TEST(VpiSystfCallbacksSim, InvokeSkipsNullCallback) {
   int payload = 0;
-  // One or more of the routine fields may be left null when not needed.
   EXPECT_EQ(VpiSystfInvoke(nullptr, reinterpret_cast<PLI_BYTE8*>(&payload)), 0);
 }
 
 TEST(VpiSystfCallbacksSim, CallbackFiringTimes) {
-  // compiletf and sizetf fire while the data structure is compiled/built.
   EXPECT_TRUE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCompiletf));
   EXPECT_TRUE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kSizetf));
-  // calltf fires each time the task/function is invoked during execution.
   EXPECT_FALSE(VpiSystfCallbackFiresAtBuild(VpiSystfCallback::kCalltf));
 }
 
-PLI_INT32 PutHighOneLowFive(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PutHighOneLowFive(PLI_BYTE8*) {
   s_vpi_time time = {};
   time.type = vpiSimTime;
   time.high = 1;
@@ -318,7 +258,7 @@ PLI_INT32 PutHighOneLowFive(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-PLI_INT32 PutAllOnes(PLI_BYTE8* /*user_data*/) {
+PLI_INT32 PutAllOnes(PLI_BYTE8*) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
   value.value.integer = -1;
@@ -326,7 +266,7 @@ PLI_INT32 PutAllOnes(PLI_BYTE8* /*user_data*/) {
   return 0;
 }
 
-PLI_INT32 EightBits(PLI_BYTE8* /*user_data*/) { return 8; }
+PLI_INT32 EightBits(PLI_BYTE8*) { return 8; }
 
 class SystemFunctionResultsOfARun : public VpiDesignRun {
  protected:
@@ -351,8 +291,6 @@ class SystemFunctionResultsOfARun : public VpiDesignRun {
   }
 };
 
-// §38.37.1 with Annex K.2 and §6.11: a vpiTimeFunc returns a time, 64 bits
-// wide, so the high word its calltf puts reaches the design (#5129).
 TEST_F(SystemFunctionResultsOfARun, ATimeFunctionReturnsSixtyFourBits) {
   RegisterFunction("$user_time", vpiTimeFunc, &PutHighOneLowFive);
   Run("module top; time t; initial t = $user_time(); endmodule\n");
@@ -364,8 +302,6 @@ TEST_F(SystemFunctionResultsOfARun, ATimeFunctionReturnsSixtyFourBits) {
   EXPECT_EQ(value.value.time->low, 5u);
 }
 
-// §38.37.1 with Annex K.2: a vpiSizedSignedFunc returns a signed value, so
-// eight 1 bits are -1 to the design where a vpiSizedFunc's are 255 (#5130).
 TEST_F(SystemFunctionResultsOfARun, ASizedSignedFunctionReturnsASignedValue) {
   RegisterFunction("$user_s8", vpiSizedSignedFunc, &PutAllOnes, &EightBits);
   RegisterFunction("$user_u8", vpiSizedFunc, &PutAllOnes, &EightBits);
@@ -376,8 +312,6 @@ TEST_F(SystemFunctionResultsOfARun, ASizedSignedFunctionReturnsASignedValue) {
   EXPECT_EQ(VectorOf("top.u").aval, 0xFFu);
 }
 
-// §38.37.1: a system function's sysfunctype is one of the five function
-// types, and a registration carrying any other is refused (#7487).
 TEST_F(VpiSystfCallbacksRegistration, RejectsAFunctionOfNoFunctionType) {
   for (const int kFuncType : {0, 99}) {
     s_vpi_systf_data func = {};
@@ -390,8 +324,6 @@ TEST_F(VpiSystfCallbacksRegistration, RejectsAFunctionOfNoFunctionType) {
   EXPECT_TRUE(vpi_ctx_.RegisteredSystfs().empty());
 }
 
-// §38.37.1: a system task has no use for sysfunctype, so a task registered
-// with none of the five is accepted (#7487).
 TEST_F(VpiSystfCallbacksRegistration, AcceptsATaskOfNoFunctionType) {
   s_vpi_systf_data task = {};
   task.type = vpiSysTask;

@@ -11,8 +11,6 @@ using namespace delta;
 
 namespace {
 
-// The file names a specification loads, in order: its bootstrap entries and
-// then its -sv_lib values, each once, with the platform's extension.
 std::vector<std::string> FilesLoaded(
     const std::vector<std::string>& bootstrap_entries,
     const std::vector<std::string>& lib_switch_values) {
@@ -20,13 +18,8 @@ std::vector<std::string> FilesLoaded(
       ForeignCodeLoadOrder(bootstrap_entries, lib_switch_values));
 }
 
-// The extension the application appends, so that the examples' `.so` and
-// `.ext` stand for the platform's own.
 std::string Ext() { return std::string(ForeignCodeSharedLibraryExtension()); }
 
-// §J.4.2 a): with the root set by -sv_root to /home/user, the bootstrap file
-// of Figure J.2 and its switch list are equivalent, both loading the four
-// libraries under /home/user in the order they are named.
 TEST(ForeignCodeExamples, ABootstrapFileAndASwitchListAreEquivalent) {
   const std::vector<std::string> kFiles = {
       "/home/user/myclibs/lib1" + Ext(), "/home/user/myclibs/lib3" + Ext(),
@@ -50,9 +43,6 @@ TEST(ForeignCodeExamples, ABootstrapFileAndASwitchListAreEquivalent) {
   EXPECT_EQ(kByFile, kBySwitches);
 }
 
-// §J.4.2 b): the switches of Figure J.3 load svLibrary1 and svLibrary2 from
-// the working directory, named before any -sv_root, svLibrary3 from the
-// root the first -sv_root gave and svLibrary4 from the root the second gave.
 TEST(ForeignCodeExamples, SvLibAndSvRootCombineInOrder) {
   CliOptions opts;
   ASSERT_TRUE(ParseCommandLine(
@@ -68,11 +58,6 @@ TEST(ForeignCodeExamples, SvLibAndSvRootCombineInOrder) {
   EXPECT_EQ(FilesLoaded({}, opts.sv_libs), kFiles);
 }
 
-// §J.4.2 c): with the switches and bootstrap files of Figure J.4, the entries
-// of bootstrap1 resolve against /home/usr1, the root in force when its
-// -sv_liblist was processed, and those of bootstrap2 against /home/usr2, the
-// root in force when its own was, its absolute entry /common/libx left as it
-// is -- so that the five files load in the order the files name them.
 TEST(ForeignCodeExamples, SvRootAndBootstrapFilesMix) {
   CliOptions opts;
   ASSERT_TRUE(ParseCommandLine(
@@ -84,8 +69,6 @@ TEST(ForeignCodeExamples, SvRootAndBootstrapFilesMix) {
   EXPECT_EQ(opts.sv_liblists[0].root, "/home/usr1");
   EXPECT_EQ(opts.sv_liblists[1].path, "/home/mine/bootstrap2");
   EXPECT_EQ(opts.sv_liblists[1].root, "/home/usr2");
-  // §J.4.1 a) has the first line contain #!SV_LIBRARIES, which is what the
-  // figure's header stands for.
   const ForeignCodeBootstrap kBootstrap1 =
       ParseForeignCodeBootstrap("#!SV_LIBRARIES\n lib1\n lib2\n");
   const ForeignCodeBootstrap kBootstrap2 = ParseForeignCodeBootstrap(
@@ -105,8 +88,6 @@ TEST(ForeignCodeExamples, SvRootAndBootstrapFilesMix) {
   EXPECT_EQ(FilesLoaded(entries, opts.sv_libs), kFiles);
 }
 
-// §J.4.2 c) with §J.3: the root a -sv_liblist keeps is the working directory
-// while no -sv_root preceded it, and the entries of its file resolve there.
 TEST(ForeignCodeExamples, ABootstrapFileBeforeAnySvRootResolvesAtTheCwd) {
   CliOptions opts;
   ASSERT_TRUE(

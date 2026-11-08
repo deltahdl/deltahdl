@@ -24,10 +24,6 @@
 
 namespace delta {
 
-// 18.5.7: iterative constraints, which constrain an arrayed variable through
-// a loop variable and an indexing expression -- a foreach iterative constraint
-// (18.5.7.1) -- or through an array reduction method (18.5.7.2).
-
 Expr* RewriteExpr(const Expr* e, const ExprRewrite& rewrite, Arena& arena) {
   if (e == nullptr) return nullptr;
   if (Expr* replaced = rewrite(e)) return replaced;
@@ -59,10 +55,6 @@ Expr* IdentifierExpr(std::string_view text, const Expr* like, Arena& arena) {
 
 namespace {
 
-// The substitution one instance of a foreach constraint_set makes: the loop
-// variable stands for `index`, and a select of `array` at the loop variable,
-// or at any index expression free of names that reads as one of the `count`
-// indexes from `lo`, names the element at that index.
 struct ForeachInstance {
   std::string_view loop_var;
   std::string_view array;
@@ -74,7 +66,6 @@ struct ForeachInstance {
 
 Expr* Instance(const Expr* e, const ForeachInstance& inst);
 
-// A decimal literal of `value`, which the loop variable's index is.
 Expr* IndexLiteral(int64_t value, const Expr* like, Arena& arena) {
   std::string text = std::to_string(value);
   auto* literal = arena.Create<Expr>();
@@ -85,7 +76,6 @@ Expr* IndexLiteral(int64_t value, const Expr* like, Arena& arena) {
   return literal;
 }
 
-// Whether `e` is a single-index select of the iterated array.
 bool SelectsArray(const Expr* e, const ForeachInstance& inst) {
   if (e->kind != ExprKind::kSelect || e->index_end != nullptr ||
       e->base == nullptr || e->index == nullptr) {
@@ -93,13 +83,10 @@ bool SelectsArray(const Expr* e, const ForeachInstance& inst) {
   }
   if (e->base->kind == ExprKind::kIdentifier)
     return e->base->text == inst.array;
-  // §18.4: a member of a structure, `h1.data`, by its dotted path.
   return e->base->kind == ExprKind::kMemberAccess &&
          HierarchicalReferenceName(e->base) == inst.array;
 }
 
-// Whether `e` is written over literals alone, so that it reads the same
-// whatever is in scope: a literal, or an operator over such operands.
 bool IsLiteralExpr(const Expr* e) {
   if (e->kind == ExprKind::kIntegerLiteral) return true;
   if (e->kind != ExprKind::kBinary && e->kind != ExprKind::kUnary) return false;
@@ -107,12 +94,6 @@ bool IsLiteralExpr(const Expr* e) {
          (e->rhs == nullptr || IsLiteralExpr(e->rhs));
 }
 
-// 18.5.7.1: a select of the iterated array whose instanced index reads as
-// one of its elements -- `A[i]` and the clause's `A[k+1]` -- as the
-// identifier of that element's key, which the trial binds to the element's
-// variable; null for a select at an index over a name, a state variable's
-// or another array's, which the trial reads against the elements it binds,
-// or at one beyond the elements, which reads the element type's default.
 Expr* ElementSelect(const Expr* e, const ForeachInstance& inst) {
   Expr* index = Instance(e->index, inst);
   if (!IsLiteralExpr(index)) return nullptr;
@@ -124,9 +105,6 @@ Expr* ElementSelect(const Expr* e, const ForeachInstance& inst) {
   return IdentifierExpr(ClassArrayElementKey(inst.array, at), e, inst.rc.arena);
 }
 
-// 18.5.7.1: `e` as one instance of the constraint_set reads it: the loop
-// variable as the index, a select of the array at an element's index as the
-// element's variable, and anything else as written over instanced operands.
 Expr* Instance(const Expr* e, const ForeachInstance& inst) {
   return RewriteExpr(
       e,
@@ -138,12 +116,6 @@ Expr* Instance(const Expr* e, const ForeachInstance& inst) {
       inst.rc.arena);
 }
 
-// 18.5.7.1: the relations `ref` instances over `count` elements of the array
-// it iterates from the index `lo`, a select of `array` at an element's index
-// read as the element's variable, one instance of each relation of the
-// constraint_set per element in index order, built once per class and count
-// and kept on the class. A header naming more than one loop variable
-// iterates a dimension the object does not model, and instances nothing.
 const std::vector<Expr*>& ForeachInstances(const ConstraintForeachRef& ref,
                                            std::string_view array, int64_t lo,
                                            uint32_t count, RandomizeCtx& rc) {
@@ -165,9 +137,6 @@ const std::vector<Expr*>& ForeachInstances(const ConstraintForeachRef& ref,
   return cached.relations;
 }
 
-// §18.5.7.1: the leaf key, `m[1][2]`, a select chain of the array `array`
-// of `dims` unpacked dimensions reads where every index is written over
-// literals; empty for any other expression.
 std::string LeafKey(const Expr* e, std::string_view array, size_t dims,
                     RandomizeCtx& rc) {
   std::vector<const Expr*> indices;
@@ -191,10 +160,6 @@ std::string LeafKey(const Expr* e, std::string_view array, size_t dims,
   return key;
 }
 
-// §18.5.7.1: every combination of the indices the dimensions of an array
-// the header of `ref` names declare, each from its low bound `los` and of
-// its size `sizes`, outermost first, extending `index`, into `out`; a
-// dimension the header leaves unnamed is not iterated.
 void IndexCombinations(const ConstraintForeachRef& ref,
                        const std::vector<uint32_t>& los,
                        const std::vector<uint32_t>& sizes,
@@ -213,8 +178,6 @@ void IndexCombinations(const ConstraintForeachRef& ref,
   }
 }
 
-// The loop variable of `ref` the identifier `n` names, read as its index in
-// `index`; null for any other expression.
 Expr* LoopIndexLiteral(const Expr* n, const ConstraintForeachRef& ref,
                        const std::vector<int64_t>& index, Arena& arena) {
   if (n->kind != ExprKind::kIdentifier) return nullptr;
@@ -225,11 +188,6 @@ Expr* LoopIndexLiteral(const Expr* n, const ConstraintForeachRef& ref,
   return nullptr;
 }
 
-// §18.5.7.1: the relations of `ref`, whose header names a loop variable for
-// each of several dimensions of the array property `array`, instanced once
-// per combination of the indices those dimensions declare, each loop
-// variable read as its index and each select of a leaf element as the
-// element's variable, appended to `out`.
 void AppendMultiForeachInstances(const ConstraintForeachRef& ref,
                                  const ClassTypeInfo::PropertyInfo& array,
                                  RandomizeCtx& rc, std::vector<Expr*>& out) {
@@ -252,11 +210,6 @@ void AppendMultiForeachInstances(const ConstraintForeachRef& ref,
   }
 }
 
-// §18.7 with §18.5.7.1: the relations of `ref`, whose header names a loop
-// variable for each of several dimensions of the array `info` of the scope
-// containing an inline constraint's call, instanced once per combination of
-// the indices those dimensions declare, each loop variable read as its index
-// and the elements read as state, appended to `out`.
 void AppendStateMultiForeachInstances(const ConstraintForeachRef& ref,
                                       const ArrayInfo& info, RandomizeCtx& rc,
                                       std::vector<Expr*>& out) {
@@ -272,11 +225,6 @@ void AppendStateMultiForeachInstances(const ConstraintForeachRef& ref,
   }
 }
 
-// 18.5.7.1: the elements of the array `array` a foreach iterates: the rand
-// element variables where the member is random, else the elements the
-// object holds; `size_var` names the variable holding a dynamic array's
-// size where a randomize() solves it, and stays empty where the size is a
-// fact about the object.
 struct IteratedElements {
   int64_t lo = 0;
   uint32_t count = 0;
@@ -297,10 +245,6 @@ IteratedElements ElementsOf(const ClassTypeInfo::PropertyInfo& array,
   return out;
 }
 
-// §18.4: the key the associative array element `ri` of the array `array` is
-// held under, as a literal standing where `like` does: a string literal for
-// a string index, and an integer one otherwise, an int where the key fits
-// in 64 bits and, §7.8.4, a literal of every word of it where it does not.
 Expr* AssocKeyLiteral(const RandInfo& ri, std::string_view array,
                       const Expr* like, Arena& arena) {
   bool string_key =
@@ -318,10 +262,6 @@ Expr* AssocKeyLiteral(const RandInfo& ri, std::string_view array,
   return literal;
 }
 
-// §18.4 with §18.5.7.1: `n` as the instance of a foreach over an associative
-// array for the element `ri` reads it: the select of the array at the loop
-// variable as the element's variable, and the loop variable as its key; null
-// for any other expression.
 Expr* AssocInstance(const Expr* n, const RandInfo& ri,
                     const ConstraintForeachRef& ref, Arena& arena) {
   std::string_view var = ref.loop_vars[0];
@@ -336,9 +276,6 @@ Expr* AssocInstance(const Expr* n, const RandInfo& ri,
   return nullptr;
 }
 
-// §18.4 with §18.5.7.1: the relations of `ref`, a foreach over the rand
-// associative array it names, instanced once per key the array holds,
-// appended to `out`; false where the array holds no element of the solve.
 bool AppendAssocForeachInstances(const ConstraintForeachRef& ref,
                                  std::vector<RandInfo>& rands, RandomizeCtx& rc,
                                  std::vector<Expr*>& out) {
@@ -356,10 +293,6 @@ bool AppendAssocForeachInstances(const ConstraintForeachRef& ref,
   return any;
 }
 
-// §18.4 with §18.5.7.1: the elements of the rand dynamic array member of a
-// rand structure a foreach over its member name `name` iterates, `h1.data`
-// for `data`, the path received in `path`; false where no element of the
-// solve is one.
 bool StructDynamicElements(std::string_view name, std::vector<RandInfo>& rands,
                            IteratedElements& out, std::string_view& path) {
   uint32_t count = 0;
@@ -378,9 +311,6 @@ bool StructDynamicElements(std::string_view name, std::vector<RandInfo>& rands,
   return count > 0;
 }
 
-// §18.4 with §18.5.7.1: the elements of the rand queue `name`, the element
-// variables AddDynamicArrayVariables made for it from index 0, and the size
-// variable where a randomize() solves its size; false where it made none.
 bool QueueElements(std::string_view name, std::vector<RandInfo>& rands,
                    IteratedElements& out) {
   uint32_t count = 0;
@@ -395,11 +325,6 @@ bool QueueElements(std::string_view name, std::vector<RandInfo>& rands,
   return true;
 }
 
-// §18.7 with §18.5.7.1: the elements of an array no property of the object
-// names, one of the scope containing an inline constraint's call, which a
-// foreach iterates as state: a fixed array of one unpacked dimension from
-// its low index, or a queue or dynamic array from 0. False for any other
-// name.
 bool StateArrayElements(std::string_view name, RandomizeCtx& rc,
                         IteratedElements& out) {
   if (const QueueObject* queue = rc.ctx.FindQueue(name)) {
@@ -414,10 +339,6 @@ bool StateArrayElements(std::string_view name, RandomizeCtx& rc,
   return true;
 }
 
-// §18.5.7.1: the text of a string a foreach iterates, a dynamic array of
-// bytes indexed from 0: the object's string property `name`, or, §18.7, a
-// string of the scope containing an inline constraint's call. False where
-// `name` is no string.
 bool StringText(std::string_view name, RandomizeCtx& rc, std::string& out) {
   const auto* prop = rc.obj->type->FindProperty(name);
   if (prop != nullptr && prop->is_string) {
@@ -433,9 +354,6 @@ bool StringText(std::string_view name, RandomizeCtx& rc, std::string& out) {
 Expr* CharacterInstance(const Expr* e, const ForeachInstance& inst,
                         const std::string& text);
 
-// §18.5.7.1: a select of the iterated string whose instanced index reads as
-// a literal, as the value of the character there, the state value it is, or
-// 0 past the end (§6.16); null for an index over a name.
 Expr* CharacterSelect(const Expr* e, const ForeachInstance& inst,
                       const std::string& text) {
   Expr* index = CharacterInstance(e->index, inst, text);
@@ -446,9 +364,6 @@ Expr* CharacterSelect(const Expr* e, const ForeachInstance& inst,
   return IndexLiteral(kChar, e, inst.rc.arena);
 }
 
-// §18.5.7.1: `e` as one instance of a constraint_set iterating a string reads
-// it: the loop variable as the index and a select of the string as the
-// character's value.
 Expr* CharacterInstance(const Expr* e, const ForeachInstance& inst,
                         const std::string& text) {
   return RewriteExpr(
@@ -461,9 +376,6 @@ Expr* CharacterInstance(const Expr* e, const ForeachInstance& inst,
       inst.rc.arena);
 }
 
-// §18.5.7.1: the relations of `ref` instanced over the characters of `text`,
-// made for each randomize() call afresh, since the string's characters are
-// state values that change between calls.
 std::vector<Expr*> StringForeachInstances(const ConstraintForeachRef& ref,
                                           const std::string& text,
                                           RandomizeCtx& rc) {
@@ -478,8 +390,6 @@ std::vector<Expr*> StringForeachInstances(const ConstraintForeachRef& ref,
   return out;
 }
 
-// 18.5.7.2: the operand a reduction method named `method` joins the elements
-// by; false for a name that is no reduction method.
 bool ReductionOp(std::string_view method, ArrayReductionOp& out) {
   if (method == "sum") {
     out = ArrayReductionOp::kSum;
@@ -497,7 +407,6 @@ bool ReductionOp(std::string_view method, ArrayReductionOp& out) {
   return true;
 }
 
-// The element variables of the rand array member `array`, in index order.
 std::vector<std::string> ElementNames(std::string_view array,
                                       std::vector<RandInfo>& rands) {
   std::vector<std::string> names;
@@ -508,17 +417,12 @@ std::vector<std::string> ElementNames(std::string_view array,
   return names;
 }
 
-// Whether every argument of the call `e` is an identifier, which is what
-// the iterator arguments of an array method call are (7.12).
 bool ArgsAreIteratorNames(const Expr* e) {
   return std::all_of(e->args.begin(), e->args.end(), [](const Expr* arg) {
     return arg != nullptr && arg->kind == ExprKind::kIdentifier;
   });
 }
 
-// 18.5.7.2: `e` as a reduction method called on a rand array member, with a
-// with clause or without one, filling the method's operand and the element
-// variables; false for any other expression.
 bool ReductionCall(const Expr* e, std::vector<RandInfo>& rands,
                    ArrayReductionOp& op, std::vector<std::string>& elements) {
   if (e == nullptr || e->kind != ExprKind::kCall || !ArgsAreIteratorNames(e) ||
@@ -533,8 +437,6 @@ bool ReductionCall(const Expr* e, std::vector<RandInfo>& rands,
   return !elements.empty();
 }
 
-// The value `e`, free of random variables, takes in the object's scope, in
-// the signed reading its own signedness gives it.
 int64_t BoundValue(const Expr* e, RandomizeCtx& rc) {
   ConstraintEvalScope scope(rc.obj, rc.ctx);
   Logic4Vec value = EvalExpr(e, rc.ctx, rc.arena);
@@ -542,13 +444,6 @@ int64_t BoundValue(const Expr* e, RandomizeCtx& rc) {
                          : static_cast<int64_t>(value.ToUint64());
 }
 
-// 18.5.7.2: the with clause of the reduction call `call` as the function of
-// an element's value the solver folds, the iterator bound to the value in
-// the element type `elem` declares and the expression evaluated in the
-// object's scope, through one local made here and bound per evaluation, a
-// fold being evaluated some hundred times per solve. `result` receives the
-// value the clause maps the element type's zero to, whose width and
-// signedness are the clause's expression's, which the fold is held to.
 std::function<int64_t(int64_t)> WithFunction(const Expr* call,
                                              const RandVariable& elem,
                                              RandomizeCtx& rc,
@@ -600,9 +495,6 @@ bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   out.reduce_op = op;
   out.reduce_cmp = cmp;
   out.lo = BoundValue(other, rc);
-  // 18.5.7.2: the result is of the element type, or, where the call carries
-  // a with clause, of the type of the clause's expression, so the fold is
-  // held to that type's width.
   const RandInfo* elem = FindRand(rands, elements.front());
   out.reduce_width = elem != nullptr ? elem->var.width : 32;
   const Expr* call = call_on_left ? rel->lhs : rel->rhs;
@@ -613,8 +505,6 @@ bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   }
   out.reduce_vars = elements;
   out.ref_vars = std::move(elements);
-  // 18.5.7.2: over a dynamic array whose size is solved, the elements below
-  // the size drawn, the size constraints being solved first.
   std::string size_var =
       ClassArraySizeKey(elem != nullptr ? elem->array_base : std::string());
   if (FindRand(rands, size_var) != nullptr) {
@@ -624,9 +514,6 @@ bool TryArrayReductionConstraint(const Expr* rel, std::vector<RandInfo>& rands,
   return true;
 }
 
-// One foreach constraint being built into a block: its relations instanced
-// over the elements, `rel_count` of them per element in index order, the
-// elements iterated, and whether a relation folds its variable's domain.
 struct ForeachBuild {
   const std::vector<Expr*>& instances;
   size_t rel_count;
@@ -634,10 +521,6 @@ struct ForeachBuild {
   bool fold;
 };
 
-// 18.5.7.1: the relation at `rel` of a foreach constraint_set over a dynamic
-// array whose size is solved, as the solver's foreach over its instances in
-// index order, of which the ones below the size drawn are imposed, the size
-// being a state variable there.
 ConstraintExpr SizedForeach(const ForeachBuild& build, size_t rel,
                             std::vector<RandInfo>& rands, RandomizeCtx& rc) {
   ConstraintExpr ce;
@@ -655,28 +538,20 @@ ConstraintExpr SizedForeach(const ForeachBuild& build, size_t rel,
 
 namespace {
 
-// Each relation of `instances`, translated into `block`.
 void AddInstances(const std::vector<Expr*>& instances,
                   std::vector<RandInfo>& rands, RandomizeCtx& rc,
                   ConstraintBlock& block) {
   for (const Expr* rel : instances) {
     block.constraints.push_back(
-        TranslateRelation(rel, rands, rc, /*fold=*/block.enabled));
+        TranslateRelation(rel, rands, rc, block.enabled));
   }
 }
 
-// The elements a foreach over an array of one dimension iterates, and the
-// name a select of whose elements reads an element variable of the solve,
-// empty for an array of state.
 struct Iterated {
   IteratedElements elems;
   std::string_view element_array;
 };
 
-// The elements the foreach `ref` iterates over the array property `array`,
-// or, where `array` is null, over a rand queue or, §18.7, an array of the
-// scope containing an inline constraint's call, into `out`; false where it
-// names none of them.
 bool IteratedOf(const ConstraintForeachRef& ref,
                 const ClassTypeInfo::PropertyInfo* array,
                 std::vector<RandInfo>& rands, RandomizeCtx& rc, Iterated& out) {
@@ -696,7 +571,6 @@ bool IteratedOf(const ConstraintForeachRef& ref,
   return StateArrayElements(ref.array_name, rc, out.elems);
 }
 
-// 18.5.7.1: the foreach constraint `ref` built into `block`.
 void AddForeachConstraint(const ConstraintForeachRef& ref,
                           std::vector<RandInfo>& rands, RandomizeCtx& rc,
                           ConstraintBlock& block) {

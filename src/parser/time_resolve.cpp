@@ -37,7 +37,6 @@ bool TryParseTimeMagnitudeAndUnit(std::string_view text, int& magnitude,
 
 namespace {
 
-// The finest precision found so far, as its order: 10ps is -11.
 struct FinestOrder {
   int order = 0;
   bool found = false;
@@ -67,8 +66,6 @@ static void CollectModulePrecisions(const ModuleDecl* mod,
   }
 }
 
-// §3.14.3: the finest of every precision the unit declares, `preproc` holding
-// that of the `timescale directives where any was read.
 static FinestOrder CollectGlobalPrecision(const CompilationUnit* cu,
                                           const FinestOrder& preproc) {
   FinestOrder finest = preproc;
@@ -102,7 +99,6 @@ TimeUnit ComputeGlobalTimePrecision(const CompilationUnit* cu,
   if (has_preproc_global_precision) preproc.Update(preproc_global_precision, 1);
   FinestOrder finest = CollectGlobalPrecision(cu, preproc);
   if (!finest.found) return TimeUnit::kNs;
-  // The unit of an order is the power of 1000 at or below it: -11 is ps.
   return static_cast<TimeUnit>(finest.order - (finest.order % 3 + 3) % 3);
 }
 

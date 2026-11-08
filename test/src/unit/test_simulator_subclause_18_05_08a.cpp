@@ -6,29 +6,12 @@ using namespace delta;
 
 namespace {
 
-// These tests drive 18.5.8 (global constraints) end to end. Each program
-// elaborates real classes, constructs a tree of rand objects, calls
-// randomize(), and copies the outcome into module variables the harness reads,
-// so the behavior observed is that of parse/elaborate/run applying the rule
-// through the production randomize() path (eval_randomize.cpp) rather than a
-// hand-built solver state. 18.4 supplies the rand data-member and rand
-// class-handle declarations the rule operates on and 18.8 supplies the
-// rand_mode() state that makes a member a state variable.
-
-// 18.5.8: a rand object member has its own constraints and random variables
-// solved in the same pass as those of the object holding it; a constraint
-// expression that relates random variables from different objects is a global
-// constraint. This models the ordered-tree example: class B holds a heap value
-// v (inherited from leaf class A) and two rand subtree objects left and right,
-// with the global constraints left.v <= v and right.v > v. A single randomize()
-// of b solves b and both children as one whole, so both global constraints hold
-// at once -- which per-object sequential solving could not guarantee.
 TEST(GlobalConstraint, ActiveSubtreeValuesSolvedSimultaneously) {
   const char* src =
-      "class A;\n"  // leaf node
+      "class A;\n"
       "  rand bit [7:0] v;\n"
       "endclass\n"
-      "class B extends A;\n"  // heap node
+      "class B extends A;\n"
       "  rand A left;\n"
       "  rand A right;\n"
       "  constraint heapcond { left.v <= v; right.v > v; }\n"
@@ -56,17 +39,6 @@ TEST(GlobalConstraint, ActiveSubtreeValuesSolvedSimultaneously) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5.8 rule a: the set of objects randomized as a whole is built recursively
-// -- starting from the object that invoked randomize(), it reaches every rand,
-// active object contained within it, and so on down the tree. Rule b then
-// selects the active constraints of every object in that set. Top contains mid,
-// which contains a leaf; the leaf carries its own constraint (v >= 30), mid a
-// global constraint (its value exceeds the leaf's), and Top a global constraint
-// (its value exceeds mid's). A single randomize() of Top solves all three
-// objects at once, so the grandchild's own constraint holds (leaf.v >= 30 --
-// which requires the leaf to have been reached recursively and actively solved,
-// not left at its default 0) while both cross-object global constraints order
-// the tree leaf.v < mid.v < top.v.
 TEST(GlobalConstraint,
      RecursivelyReachedObjectsAndTheirConstraintsSolvedJointly) {
   const char* src =
@@ -110,14 +82,6 @@ TEST(GlobalConstraint,
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5.8 rule c: only the active random variables are randomized; every other
-// variable reference is treated as a state variable whose current value is used
-// as a constant. Here the leaf value child.v is made inactive with rand_mode(0)
-// (18.8) after being set to 8, so it is a state variable, while the enclosing
-// node value c is still active. The global constraint child.v <= c is therefore
-// solved against the fixed constant 8: child.v keeps 8 and c is drawn to
-// satisfy c >= 8, proving the held value participates in the global constraint
-// as a constant rather than being randomized.
 TEST(GlobalConstraint, InactiveMemberIsStateConstantInGlobalConstraint) {
   const char* src =
       "class Leaf;\n"
@@ -138,9 +102,9 @@ TEST(GlobalConstraint, InactiveMemberIsStateConstantInGlobalConstraint) {
       "  int good;\n"
       "  initial begin\n"
       "    static Node n = new;\n"
-      "    static Leaf lc = n.child;\n"  // alias the leaf handle
+      "    static Leaf lc = n.child;\n"
       "    lc.v = 8;\n"
-      "    lc.v.rand_mode(0);\n"  // child.v held as a state constant
+      "    lc.v.rand_mode(0);\n"
       "    ok = n.randomize();\n"
       "    cv = n.c;\n"
       "    chv = lc.v;\n"
@@ -150,13 +114,6 @@ TEST(GlobalConstraint, InactiveMemberIsStateConstantInGlobalConstraint) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5.8 rule c: because an inactive member contributes its current value as a
-// binding constant rather than being randomized, a global constraint relating
-// an active variable to it can become unsatisfiable. child.v is held at 0 while
-// c is constrained to [5, 10], so child.v > c has no solution and randomize()
-// returns 0 -- confirming the held value is a binding constant in the global
-// constraint, not an ignored term. On the failed call the values are retained,
-// so child.v is still its held 0.
 TEST(GlobalConstraint,
      InactiveStateConstantCanMakeGlobalConstraintUnsatisfiable) {
   const char* src =
@@ -176,11 +133,10 @@ TEST(GlobalConstraint,
       "  int chv;\n"
       "  initial begin\n"
       "    static Node n = new;\n"
-      "    static Leaf lc = n.child;\n"  // alias the leaf handle
+      "    static Leaf lc = n.child;\n"
       "    lc.v = 0;\n"
-      "    lc.v.rand_mode(0);\n"   // held at 0
-      "    ok = n.randomize();\n"  // child.v(0) > c is impossible for c in
-                                   // [5,10]
+      "    lc.v.rand_mode(0);\n"
+      "    ok = n.randomize();\n"
       "    chv = lc.v;\n"
       "  end\n"
       "endmodule\n";
@@ -188,15 +144,6 @@ TEST(GlobalConstraint,
   EXPECT_EQ(RunAndGet(src, "chv"), 0u);
 }
 
-// 18.5.8 rule a: an object is part of the active random set only if the handle
-// naming it is itself active. Here Node holds two rand leaf handles a and b;
-// disabling b with rand_mode(0) (18.8) removes b's object from the set, so b is
-// not randomized and its value is a state variable. The global constraint
-// c >= b.v is therefore solved against b's held current value 240 (c is drawn
-// >= 240), while a stays active and part of the whole. The second active object
-// a is what keeps the set larger than the root, exercising the joint solve.
-// Input form: a rand class-handle member made inactive at the object level
-// (distinct from disabling a scalar random variable).
 TEST(GlobalConstraint, InactiveObjectHandleExcludesItsObjectFromActiveSet) {
   const char* src =
       "class Leaf;\n"
@@ -221,7 +168,7 @@ TEST(GlobalConstraint, InactiveObjectHandleExcludesItsObjectFromActiveSet) {
       "    static Node n = new;\n"
       "    static Leaf lb = n.b;\n"
       "    lb.v = 240;\n"
-      "    n.b.rand_mode(0);\n"  // remove object b from the active set
+      "    n.b.rand_mode(0);\n"
       "    ok = n.randomize();\n"
       "    cv = n.c;\n"
       "    bv = lb.v;\n"
@@ -231,14 +178,6 @@ TEST(GlobalConstraint, InactiveObjectHandleExcludesItsObjectFromActiveSet) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5.8 rule c: a variable reference that is not one of the active random
-// variables is a state variable whose current value is a constant. A plain
-// (non-rand) data member is never an active random variable, so a global
-// constraint that reaches it uses its current value. child.s is a non-rand
-// member set to 250, and c >= child.s solves c to be at least 250 while child.s
-// keeps its value. This is a different input form from a rand variable turned
-// off by rand_mode(): the member is a state variable by declaration, not by
-// mode.
 TEST(GlobalConstraint, NonRandMemberIsStateVariableInGlobalConstraint) {
   const char* src =
       "class Leaf;\n"
@@ -271,14 +210,6 @@ TEST(GlobalConstraint, NonRandMemberIsStateVariableInGlobalConstraint) {
   EXPECT_EQ(RunAndGet(src, "good"), 1u);
 }
 
-// 18.5.8 rule b: only the active constraints of the active random objects are
-// applied. A constraint turned off with constraint_mode(0) (18.9) is not
-// active, so it is excluded and does not constrain the solve. The global
-// constraint k is self-contradictory (child.v > c and c > child.v cannot both
-// hold), so with k active randomize() fails (n0), but after k is disabled the
-// same randomize() succeeds (n1) -- observing that the disabled constraint is
-// dropped from the active set. Input form: a global constraint disabled through
-// constraint_mode().
 TEST(GlobalConstraint, DisabledConstraintIsExcludedFromActiveConstraints) {
   const char* src =
       "class Leaf;\n"
@@ -298,9 +229,9 @@ TEST(GlobalConstraint, DisabledConstraintIsExcludedFromActiveConstraints) {
       "  initial begin\n"
       "    static Node n0 = new;\n"
       "    static Node n1 = new;\n"
-      "    ok0 = n0.randomize();\n"     // k active -> contradictory -> fails
-      "    n1.k.constraint_mode(0);\n"  // disable the global constraint
-      "    ok1 = n1.randomize();\n"     // k excluded -> succeeds
+      "    ok0 = n0.randomize();\n"
+      "    n1.k.constraint_mode(0);\n"
+      "    ok1 = n1.randomize();\n"
       "  end\n"
       "endmodule\n";
   EXPECT_EQ(RunAndGet(src, "ok0"), 0u);

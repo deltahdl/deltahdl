@@ -20,7 +20,6 @@
 
 namespace delta {
 
-// §23.9/§24.3: true when a lexically enclosing scope declares `name`.
 static bool NameInEnclosingScope(
     const std::vector<std::unordered_set<std::string_view>>& scopes,
     std::string_view name) {
@@ -44,37 +43,14 @@ bool Elaborator::IsNameInModuleScope(std::string_view name) const {
   if (func_decls_.count(name)) return true;
   if (interface_inst_types_.count(name)) return true;
   if (checker_inst_names_.count(name)) return true;
-  // §23.9/§24.3: a lexically nested module/program/interface also sees names
-  // declared in the scopes that textually enclose it.
   if (NameInEnclosingScope(enclosing_scope_names_, name)) return true;
   return false;
 }
 
-// §23.4: the enclosing chain alone, which is what an implicit net of a nested
-// module asks -- whether the name it stands for is an outer module's, the
-// module's own declarations having already been searched and found wanting.
 bool Elaborator::IsNameInEnclosingScope(std::string_view name) const {
   return NameInEnclosingScope(enclosing_scope_names_, name);
 }
 
-// §23.4 makes the enclosing module's names visible inside a module declared
-// and instantiated in it, and §6.10 makes an identifier on the left of a
-// continuous assignment an implicit net of the assignment's own scope unless
-// it was declared previously in that scope or in one the scope can directly
-// reference. The reference stands in the nested declaration's text, so the
-// names that count are those the enclosing module declared above that text:
-// `module M; assign w = 1'b1; endmodule wire w; M m();` gives M an implicit w
-// of its own and leaves the outer w undriven, exactly as `assign w = 1'b1;
-// wire w;` in one scope makes the second a redeclaration. The snapshot
-// ElaborateItems recorded when its loop reached the declaration is therefore
-// the one handed on, whether the instance is written below the declaration or
-// implied at the end of the items by InstantiateImplicitNestedModules. An
-// instance written above its declaration is reached before any snapshot is
-// taken; the names declared so far stand in for it, joined with the names the
-// text declares above the declaration, which RecordNestedDeclNamesAbove read
-// before any item was elaborated: `M m(); wire w; module M; assign w = 1'b1;
-// endmodule` has w declared previously to M's assignment, though not to the
-// instance, so M's assignment drives the outer w.
 std::unordered_map<std::string_view, ModuleDecl*>
 ElaboratorData::NestedDeclsSeenInside() const {
   std::unordered_map<std::string_view, ModuleDecl*> seen =
@@ -99,9 +75,6 @@ void ElaboratorData::BeginNestedDeclScope(
     has_pending_enclosing_scope_ = true;
     return;
   }
-  // The recorded names are owned strings (a ranged enumeration member's
-  // constants are spelled by no text); nested_decl_names_above_ keeps them for
-  // as long as the elaborator lives, so views into them are handed on.
   auto above = nested_decl_names_above_.find(nested);
   if (above != nested_decl_names_above_.end()) {
     for (const std::string& name : above->second) at_instance.emplace(name);
@@ -110,20 +83,6 @@ void ElaboratorData::BeginNestedDeclScope(
   has_pending_enclosing_scope_ = true;
 }
 
-// §6.19 declares an enumeration's literals as named constants of the scope
-// holding the enumeration, and §7.2 with §23.9 has one written as the type of
-// a structure or union member declare them in the same scope, the structure
-// being no scope of its own. The names one such member declares: its written
-// name, or for a `name[N]` or `name[N:M]` member the constants Table 6-10 of
-// §6.19.2 (printed page 121) generates from it, name0 through nameN-1 or
-// nameN through nameM, which EnumMemberDeclaredNames spells out; the member's
-// written name itself declares nothing then. The generated names are owned by
-// no text, so `names` owns its strings. The bounds are folded against no
-// scope, this walk running on the syntax tree before any item is elaborated;
-// a bound naming a parameter does not fold, and the written name is then kept
-// in place of the constants. Before, a ranged member was left out altogether,
-// and `M m(); enum {C[2] = 5} e; wire [7:0] v; module M; assign v = C1;`
-// reported C1 undeclared in M.
 static void AddEnumMemberNames(const EnumMember& member,
                                std::unordered_set<std::string>& names) {
   const ScopeMap kNoScope;
@@ -132,15 +91,6 @@ static void AddEnumMemberNames(const EnumMember& member,
   }
 }
 
-// The names `item` declares as the text alone shows them: the declared name
-// of a net, variable, parameter, typedef, class, subroutine, let, property,
-// sequence, covergroup, clocking block or nettype, the label of a generate
-// block or an assertion, an instance's name and a gate instance's name; the
-// constants of each enumeration the item writes inline, which A.2.1.3 has
-// the first declarator of a declaration list introduce once; and the
-// identifier on the left of a continuous assignment, which §6.10 declares as
-// an implicit net of the scope where it was not declared before and which is
-// already among the names where it was.
 static void AddItemDeclaredNames(const ModuleItem* item,
                                  std::unordered_set<std::string>& names) {
   if (!item->name.empty()) names.emplace(item->name);
@@ -160,15 +110,6 @@ static void AddItemDeclaredNames(const ModuleItem* item,
   }
 }
 
-// §6.10 counts a name as declared previously by the text above the nested
-// declaration, and an instance written above that declaration is elaborated
-// before the item loop reaches it, so the names the items above each nested
-// declaration declare are read from the text first, for BeginNestedDeclScope
-// to join with the names declared so far at such an instance. The text is the
-// same each time the enclosing module is elaborated, so the first recording
-// for a declaration is kept: the strings it owns are what the views
-// BeginNestedDeclScope hands on point into, and a second elaboration of the
-// enclosing module must not free them.
 void ElaboratorData::RecordNestedDeclNamesAbove(
     const std::vector<ModuleItem*>& items) {
   std::unordered_set<std::string> above;
@@ -201,8 +142,6 @@ std::unordered_set<std::string_view> Elaborator::CaptureCurrentScopeNames()
   for (const auto& [name, width] : non_ansi_partial_ports_) scope.insert(name);
   for (const auto& [name, type] : interface_inst_types_) scope.insert(name);
   for (const auto& [name, type] : typedefs_) scope.insert(name);
-  // §14.3 with §23.9: a clocking block's name is declared in its scope, so a
-  // checker declared there names it as a clocking event (§17.2, §14.10).
   for (const auto& [name, signals] : clocking_signals_) scope.insert(name);
   return scope;
 }
@@ -240,26 +179,16 @@ void ScanForwardScopePrefix(const ModuleDecl* decl, std::string_view scope,
   }
 }
 
-// The declared type of a module item, paired with the word §6.18's report uses
-// for the construct that declares it.
 struct ScopePrefixedType {
   const DataType* type = nullptr;
   std::string_view construct;
 };
 
-// Parser::ParseNamedType records a class scope resolution prefix in
-// DataType::scope_name whatever declares the type, so it reaches a typedef
-// (Parser::ParseTypedef), a type parameter assignment
-// (Parser::ParseTypeParamDecl) and a variable declaration
-// (Parser::ParseVarDeclList) alike. Returns a null `type` for an item that
-// declares no such type.
 ScopePrefixedType ScopePrefixedTypeOfItem(const ModuleItem* item) {
   switch (item->kind) {
     case ModuleItemKind::kTypedef:
       return {&item->typedef_type, "a typedef"};
     case ModuleItemKind::kParamDecl:
-      // Parser::ParseTypeParamDecl marks a type parameter by setting
-      // data_type.kind to kVoid and stores the assigned type in typedef_type.
       if (item->data_type.kind != DataTypeKind::kVoid) return {};
       return {&item->typedef_type, "a type parameter assignment"};
     case ModuleItemKind::kVarDecl:
@@ -271,13 +200,6 @@ ScopePrefixedType ScopePrefixedTypeOfItem(const ModuleItem* item) {
 
 }  // namespace
 
-// §6.18 (printed page 118) has a forward typedef's definition resolved within
-// the same local scope or generate block, and §27.5 (printed 824) makes each
-// generate block a scope of its own, so every block's items are walked as
-// their own list: a forward typedef in a block is resolved by a definition of
-// that block alone, and one in the module by the module's items alone. The
-// module's items were the only list walked, so a block's `typedef struct
-// pair_t;` with no definition in the block was never reported.
 void ElaboratorClassRules::ValidateForwardTypedefsInScope(
     const std::vector<ModuleItem*>& items) {
   for (const auto* item : items) {

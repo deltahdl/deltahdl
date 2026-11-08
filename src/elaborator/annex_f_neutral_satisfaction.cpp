@@ -180,7 +180,6 @@ std::shared_ptr<const AssertionStatement> AssertionWithClockedTop(
 
 namespace {
 
-// §F.5.3.1: w |= strong(R) iff there exists 0 <= j < |w| with w^{0,j} |= R.
 bool StrongHolds(const Word& word, const SequenceExpr& seq) {
   for (std::size_t j = 0; j < word.size(); ++j) {
     if (TightlySatisfies(PrefixInclusive(word, j), seq)) {
@@ -192,8 +191,6 @@ bool StrongHolds(const Word& word, const SequenceExpr& seq) {
 
 bool Satisfies(const Word& word, const PropertyExpr& property);
 
-// §F.5.3.1: w |= weak(R) iff for every 0 <= j < |w|, w^{0,j} T^omega |=
-// strong(R).
 bool WeakHolds(const Word& word, const SequenceExpr& seq) {
   const std::size_t kReach = SequenceReach(seq);
   for (std::size_t j = 0; j < word.size(); ++j) {
@@ -206,8 +203,6 @@ bool WeakHolds(const Word& word, const SequenceExpr& seq) {
   return true;
 }
 
-// §F.5.3.1: w |= ( R |-> P ) iff for every 0 <= j < |w| with w-bar^{0,j} |= R,
-// w^{j.} |= P.
 bool ImplicationHolds(const Word& word, const PropertyExpr& property) {
   if (!property.sequence || !property.lhs) {
     return false;
@@ -222,8 +217,6 @@ bool ImplicationHolds(const Word& word, const PropertyExpr& property) {
   return true;
 }
 
-// §F.5.3.1 (until): w^{i.} |= P1 holds for every 0 <= i < count, where count is
-// either the release index j or |w| for the "for all i" branch.
 bool UntilLhsHoldsThrough(const Word& word, const PropertyExpr& lhs,
                           std::size_t count) {
   for (std::size_t i = 0; i < count; ++i) {
@@ -234,8 +227,6 @@ bool UntilLhsHoldsThrough(const Word& word, const PropertyExpr& lhs,
   return true;
 }
 
-// §F.5.3.1 (until): some 0 <= j < |w| has w^{j.} |= P2 with w^{i.} |= P1 for
-// all 0 <= i < j.
 bool UntilReleasedAtSomeIndex(const Word& word, const PropertyExpr& property) {
   for (std::size_t j = 0; j < word.size(); ++j) {
     if (Satisfies(Suffix(word, j), *property.rhs) &&
@@ -246,8 +237,6 @@ bool UntilReleasedAtSomeIndex(const Word& word, const PropertyExpr& property) {
   return false;
 }
 
-// §F.5.3.1: w |= ( P1 until P2 ) iff some 0 <= j < |w| has w^{j.} |= P2 with
-// w^{i.} |= P1 for all 0 <= i < j, or w^{i.} |= P1 for all i.
 bool UntilHolds(const Word& word, const PropertyExpr& property) {
   if (!property.lhs || !property.rhs) {
     return false;
@@ -256,8 +245,6 @@ bool UntilHolds(const Word& word, const PropertyExpr& property) {
          UntilLhsHoldsThrough(word, *property.lhs, word.size());
 }
 
-// §F.5.3.1: w |= ( accept_on (b) P ) iff w |= P, or for some 0 <= i < |w| with
-// w^i |= b, w^{0,i-1} T^omega |= P.
 bool AcceptOnHolds(const Word& word, const PropertyExpr& property) {
   if (!property.boolean || !property.lhs) {
     return false;
@@ -281,34 +268,22 @@ bool AcceptOnHolds(const Word& word, const PropertyExpr& property) {
 bool Satisfies(const Word& word, const PropertyExpr& property) {
   switch (property.kind) {
     case PropertyExpr::Kind::kParen:
-      // §F.5.3.1: w |= ( P ) iff w |= P.
       return property.lhs && Satisfies(word, *property.lhs);
     case PropertyExpr::Kind::kNot:
-      // §F.5.3.1: w |= not P iff w-bar does not satisfy P. The word is
-      // complemented and the verdict negated, both: over a word of letters in
-      // 2^P the complement is the word itself and not P is the negation of P,
-      // which is the subclause's remark that not b holds where !b does, and
-      // over T and _|_ the swap is what keeps T satisfying every property.
       return property.lhs && !Satisfies(ComplementWord(word), *property.lhs);
     case PropertyExpr::Kind::kStrong:
-      // §F.5.3.1: w |= strong(R) iff some w^{0,j} tightly satisfies R.
       return property.sequence && StrongHolds(word, *property.sequence);
     case PropertyExpr::Kind::kWeak:
-      // §F.5.3.1: w |= weak(R) iff every T^omega-completed prefix satisfies
-      // strong(R).
       return property.sequence && WeakHolds(word, *property.sequence);
     case PropertyExpr::Kind::kImplication:
       return ImplicationHolds(word, property);
     case PropertyExpr::Kind::kOr:
-      // §F.5.3.1: w |= ( P1 or P2 ) iff w |= P1 or w |= P2.
       return (property.lhs && Satisfies(word, *property.lhs)) ||
              (property.rhs && Satisfies(word, *property.rhs));
     case PropertyExpr::Kind::kAnd:
-      // §F.5.3.1: w |= ( P1 and P2 ) iff w |= P1 and w |= P2.
       return property.lhs && property.rhs && Satisfies(word, *property.lhs) &&
              Satisfies(word, *property.rhs);
     case PropertyExpr::Kind::kNexttime:
-      // §F.5.3.1: w |= ( nexttime P ) iff |w| = 0 or w^{1.} |= P.
       return word.empty() ||
              (property.lhs && Satisfies(Suffix(word, 1), *property.lhs));
     case PropertyExpr::Kind::kUntil:
@@ -319,12 +294,6 @@ bool Satisfies(const Word& word, const PropertyExpr& property) {
   return false;
 }
 
-// Maps a §F.5.1.2 ClockedProperty that no longer contains a clock or
-// sync_accept_on form -- i.e. the output of T^p -- onto the §F.5.3.1
-// PropertyExpr the unclocked evaluator understands. A bare Boolean in property
-// position (emitted by the nexttime and until rules of T^p for the clock c) is
-// read as strong(b): a Boolean is a length-one sequence, and strong(b) and
-// weak(b) coincide on it, both holding exactly when the first letter models b.
 std::shared_ptr<const PropertyExpr> BridgeClockedProperty(
     const ClockedProperty& q) {
   switch (q.kind) {
@@ -354,23 +323,15 @@ std::shared_ptr<const PropertyExpr> BridgeClockedProperty(
     case ClockedProperty::Kind::kClock:
     case ClockedProperty::Kind::kSyncAcceptOn:
     case ClockedProperty::Kind::kDisableIff:
-      // T^p eliminates the clock and sync_accept_on forms, and disable iff is a
-      // top-level form that never appears inside a property Q, so these are not
-      // reachable from a T^p result. Fall through to a benign leaf.
       break;
   }
   return PropStrong(SeqBoolean(BoolTrue()));
 }
 
-// §F.5.3.1: the unclocked property that decides w |= Q, namely T^p(Q, 1)
-// bridged into a PropertyExpr.
 std::shared_ptr<const PropertyExpr> UnclockProperty(const ClockedProperty& q) {
   return UnclockedPropertyOf(q, BoolTrue());
 }
 
-// Lifts an unclocked property P into the §F.5.1.2 ClockedProperty model so an
-// explicit clock @( c ) can be pushed onto it by T^p. The forms correspond
-// one-to-one; a parenthesis is transparent, matching w |= ( P ) iff w |= P.
 std::shared_ptr<const ClockedProperty> LiftProperty(const PropertyExpr& p) {
   switch (p.kind) {
     case PropertyExpr::Kind::kStrong:
@@ -397,9 +358,6 @@ std::shared_ptr<const ClockedProperty> LiftProperty(const PropertyExpr& p) {
   return ClkStrong(SeqBoolean(BoolTrue()));
 }
 
-// Reduces a clocked top-level property U to the unclocked top-level property
-// that decides it: each form mirrors its T counterpart with the unclocked
-// property T^p(Q, 1) in place of P.
 std::shared_ptr<const TopLevelProperty> UnclockTopLevel(
     const ClockedTopLevelProperty& u) {
   switch (u.kind) {
@@ -413,9 +371,6 @@ std::shared_ptr<const TopLevelProperty> UnclockTopLevel(
   return TopProperty(PropStrong(SeqBoolean(BoolTrue())));
 }
 
-// Reduces @( c ) T to the unclocked top-level property that decides it. The
-// clock c is pushed onto the guarded property via T^p(., c); the disable iff
-// guard and parentheses carry through unchanged.
 std::shared_ptr<const TopLevelProperty> UnclockTopLevelUnderClock(
     const TopLevelProperty& t,
     const std::shared_ptr<const BooleanExpr>& clock) {
@@ -433,8 +388,6 @@ std::shared_ptr<const TopLevelProperty> UnclockTopLevelUnderClock(
   return TopProperty(PropStrong(SeqBoolean(BoolTrue())));
 }
 
-// The unclocked top-level property an assertion statement evaluates at each
-// activation point: @( c ) T resolved under its clock, or U reduced.
 std::shared_ptr<const TopLevelProperty> AssertionBody(
     const AssertionStatement& a) {
   if (a.form == AssertionStatement::Form::kExplicitClock) {
@@ -443,8 +396,6 @@ std::shared_ptr<const TopLevelProperty> AssertionBody(
   return UnclockTopLevel(*a.clocked_top);
 }
 
-// §F.5.3.1: the activation sequence !c [*0:$] ##1 c. The initial forms fire at
-// the first index whose prefix tightly satisfies it, i.e. the first clock tick.
 std::shared_ptr<const SequenceExpr> FirstClockTickSequence(
     const std::shared_ptr<const BooleanExpr>& clock) {
   return SeqConcat(SeqZeroOrMoreRepeat(SeqBoolean(BoolNot(clock))),
@@ -487,8 +438,6 @@ bool ActivationPointEnabled(std::size_t i, const Word& complement,
 
 namespace {
 
-// The reach of the body an assertion statement evaluates: that of the property
-// under its guard and parentheses.
 std::size_t TopLevelReach(const TopLevelProperty& top) {
   if (top.kind == TopLevelProperty::Kind::kParen) {
     return top.inner ? TopLevelReach(*top.inner) : 0;
@@ -496,13 +445,6 @@ std::size_t TopLevelReach(const TopLevelProperty& top) {
   return top.property ? PropertyReach(*top.property) : 0;
 }
 
-// §F.5.3.1: the scan over activation points both assertion relations share.
-// The points 0 .. count-1 are tried in order against `complement`, and the
-// body of the assertion statement is evaluated on the suffix `suffix` gives
-// for each enabled one. An assert or assume statement requires that the body
-// pass or be disabled (i.e. not fail) at every enabled activation point,
-// assume statements sharing the assert definition; a cover statement holds
-// when the body passes at some enabled activation point.
 template <typename SuffixFn>
 bool HoldsAtActivationPoints(std::size_t count, const Word& complement,
                              const BooleanExpr& enabling,
@@ -525,8 +467,6 @@ bool HoldsAtActivationPoints(std::size_t count, const Word& complement,
       return false;
     }
   }
-  // No enabled activation falsified an assert/assume statement, so it holds; a
-  // cover statement with no satisfying activation does not.
   return !kCover;
 }
 
@@ -539,12 +479,8 @@ bool NeutrallySatisfies(const Word& word, const PropertyExpr& property) {
 bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top) {
   switch (top.kind) {
     case TopLevelProperty::Kind::kProperty:
-      // §F.5.3.1: for T = P, w |= T iff w |= P.
       return top.property && Satisfies(word, *top.property);
     case TopLevelProperty::Kind::kDisableIff: {
-      // §F.5.3.1: for T = disable iff (b) P, w |= T iff either w |= P and no
-      // letter of w satisfies b, or some letter satisfies b and
-      // w^{0,i-1} _|_^omega |= P for i the least index with w^i |= b.
       if (!top.disable_condition || !top.property) {
         return false;
       }
@@ -558,7 +494,6 @@ bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top) {
       return Satisfies(kCompleted, *top.property);
     }
     case TopLevelProperty::Kind::kParen:
-      // §F.5.3.1: w |= ( T ) iff w |= T.
       return top.inner && NeutrallySatisfiesTopLevel(word, *top.inner);
   }
   return false;
@@ -567,72 +502,56 @@ bool NeutrallySatisfiesTopLevel(const Word& word, const TopLevelProperty& top) {
 bool DisablesTopLevel(const Word& word, const TopLevelProperty& top) {
   switch (top.kind) {
     case TopLevelProperty::Kind::kProperty:
-      // §F.5.3.1: for T = P, w |=^d T never holds.
       return false;
     case TopLevelProperty::Kind::kDisableIff:
-      // §F.5.3.1: for T = disable iff (b) P, w |=^d T iff some letter of w
-      // satisfies b and both w^{0,i-1} T^omega |= P and w^{0,i-1} _|_^omega
-      // |/= P for i the least index with w^i |= b.
       return DisableIffShape(word, top, [](const Word& w, const auto& p) {
         return Satisfies(w, p);
       });
     case TopLevelProperty::Kind::kParen:
-      // §F.5.3.1: w |=^d ( T ) iff w |=^d T.
       return top.inner && DisablesTopLevel(word, *top.inner);
   }
   return false;
 }
 
 bool PassesTopLevel(const Word& word, const TopLevelProperty& top) {
-  // §F.5.3.1: T passes on w when w |= T.
   return NeutrallySatisfiesTopLevel(word, top);
 }
 
 bool IsDisabledTopLevel(const Word& word, const TopLevelProperty& top) {
-  // §F.5.3.1: T is disabled on w when w |=^d T.
   return DisablesTopLevel(word, top);
 }
 
 bool FailsTopLevel(const Word& word, const TopLevelProperty& top) {
-  // §F.5.3.1: T fails on w when it neither passes nor is disabled on w. Pass
-  // and disabled are mutually exclusive, so failure is their joint negation.
   return !PassesTopLevel(word, top) && !IsDisabledTopLevel(word, top);
 }
 
 bool NeutrallySatisfiesClockedProperty(const Word& word,
                                        const ClockedProperty& q) {
-  // §F.5.3.1: w |= Q iff w |= T^p(Q, 1).
   return Satisfies(word, *UnclockProperty(q));
 }
 
 bool NeutrallySatisfiesTopLevelClocked(const Word& word,
                                        const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: the U rules mirror the T rules with Q for P. Reduce U to the
-  // deciding unclocked top-level property and apply the T satisfaction.
   return NeutrallySatisfiesTopLevel(word, *UnclockTopLevel(top));
 }
 
 bool DisablesTopLevelClocked(const Word& word,
                              const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: likewise for w |=^d U.
   return DisablesTopLevel(word, *UnclockTopLevel(top));
 }
 
 bool PassesTopLevelClocked(const Word& word,
                            const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: U passes on w when w |= U.
   return NeutrallySatisfiesTopLevelClocked(word, top);
 }
 
 bool IsDisabledTopLevelClocked(const Word& word,
                                const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: U is disabled on w when w |=^d U.
   return DisablesTopLevelClocked(word, top);
 }
 
 bool FailsTopLevelClocked(const Word& word,
                           const ClockedTopLevelProperty& top) {
-  // §F.5.3.1: U fails on w when it neither passes nor is disabled on w.
   return !PassesTopLevelClocked(word, top) &&
          !IsDisabledTopLevelClocked(word, top);
 }
@@ -648,10 +567,6 @@ bool NeutrallySatisfiesAssertionWithTail(const Word& word, const Letter& tail,
                                          const BooleanExpr& enabling,
                                          const AssertionStatement& assertion) {
   const std::size_t kReach = TopLevelReach(*AssertionBody(assertion));
-  // The complement of w tail^omega is w-bar followed by the complement of the
-  // tail forever; the point at index |w| stands for every point in the tail,
-  // since the always forms read the letter alone and the initial forms fire
-  // at the first clock tick, which the prefix through |w| decides.
   Word complement = ComplementWord(word);
   complement.push_back(ComplementLetter(tail));
   return HoldsAtActivationPoints(
@@ -663,7 +578,6 @@ bool NeutrallySatisfiesAssertionWithTail(const Word& word, const Letter& tail,
 
 bool WordIsFeasible(const Word& word,
                     const std::vector<EnabledAssertion>& assumptions) {
-  // §F.5.3.1: a word is feasible iff every assumption is satisfied on it.
   for (const EnabledAssertion& assumption : assumptions) {
     if (!NeutrallySatisfiesAssertion(word, *assumption.enabling,
                                      assumption.statement)) {
@@ -676,8 +590,6 @@ bool WordIsFeasible(const Word& word,
 bool AssertSatisfiedOnWordSet(
     const EnabledAssertion& assertion, const std::vector<Word>& words,
     const std::vector<EnabledAssertion>& assumptions) {
-  // §F.5.3.1: an assert statement is satisfied on the set iff it is satisfied
-  // on each feasible word.
   for (const Word& word : words) {
     if (WordIsFeasible(word, assumptions) &&
         !NeutrallySatisfiesAssertion(word, *assertion.enabling,
@@ -691,8 +603,6 @@ bool AssertSatisfiedOnWordSet(
 bool CoverSatisfiedOnWordSet(const EnabledAssertion& assertion,
                              const std::vector<Word>& words,
                              const std::vector<EnabledAssertion>& assumptions) {
-  // §F.5.3.1: a cover statement is satisfied on the set iff it is satisfied on
-  // at least one feasible word.
   for (const Word& word : words) {
     if (WordIsFeasible(word, assumptions) &&
         NeutrallySatisfiesAssertion(word, *assertion.enabling,
@@ -706,8 +616,6 @@ bool CoverSatisfiedOnWordSet(const EnabledAssertion& assertion,
 bool HoldsGloballyOnWordSet(const EnabledAssertion& assertion,
                             const std::vector<Word>& words,
                             const std::vector<EnabledAssertion>& assumptions) {
-  // §F.5.3.1: an assertion statement holds globally on the set iff it is
-  // satisfied on every feasible word.
   for (const Word& word : words) {
     if (WordIsFeasible(word, assumptions) &&
         !NeutrallySatisfiesAssertion(word, *assertion.enabling,

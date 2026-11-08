@@ -20,7 +20,6 @@ using namespace delta;
 
 namespace {
 
-// Checks that the queue named "arr" holds exactly the expected element values.
 void ExpectQueueValues(SimFixture& f, const std::vector<uint64_t>& expected) {
   auto* q = f.ctx.FindQueue("arr");
   ASSERT_NE(q, nullptr);
@@ -30,8 +29,6 @@ void ExpectQueueValues(SimFixture& f, const std::vector<uint64_t>& expected) {
   }
 }
 
-// Registers a 3-element fixed array "arr", seeds its elements with `in`, runs
-// the ordering property `op`, then checks the elements against `expected`.
 void RunFixedArray3(SimFixture& f, const char* op,
                     const std::array<uint64_t, 3>& in,
                     const std::array<uint64_t, 3>& expected) {
@@ -41,10 +38,6 @@ void RunFixedArray3(SimFixture& f, const char* op,
   info.elem_width = 32;
   info.is_dynamic = false;
   f.ctx.RegisterArray("arr", info);
-  // SimContext::variables_ is keyed by std::string_view, so the name backing
-  // each element variable must outlive the context use below. Keep the three
-  // element names in a stable container rather than recreating transient
-  // std::strings (whose freed buffers would leave the map keys dangling).
   std::array<std::string, 3> names{"arr[0]", "arr[1]", "arr[2]"};
   for (uint32_t i = 0; i < 3; ++i) {
     MakeVar(f, names[i], 32, 0);
@@ -182,20 +175,6 @@ TEST(ArrayOrdering, ShuffleSingleElement) {
   EXPECT_EQ(q->elements[0].ToUint64(), 42u);
 }
 
-// ---------------------------------------------------------------------------
-// §7.12.2 end-to-end: the ordering methods reorder an array produced by
-// ordinary declaration/initializer syntax, driven through the full pipeline
-// (parse, elaborate, lower, run). The synthetic cases above hand-register an
-// array and invoke the executor directly; these prove the same production
-// paths fire when the receiver is a real declared array and the method appears
-// as a procedural statement. A dynamically sized array (int a[]) exercises the
-// "dynamically sized" input form and a fixed-bound array the "fixed" form;
-// §7.12.2 names both. A dynamic array is queue-backed, so its elements are
-// read back through the queue after the run.
-// ---------------------------------------------------------------------------
-
-// Runs `src` to completion and returns the elements of the queue-backed array
-// `name` as unsigned values.
 std::vector<uint64_t> RunAndReadElems(SimFixture& f, const char* src,
                                       const char* name) {
   auto* design = ElaborateSrc(src, f);
@@ -243,8 +222,6 @@ TEST(ArrayOrderingE2E, ReverseReordersDeclaredArray) {
   EXPECT_EQ(got, (std::vector<uint64_t>{30u, 20u, 10u}));
 }
 
-// §7.12.2: shuffle() randomizes the order without adding or dropping elements,
-// so a full run must leave the same multiset of values behind.
 TEST(ArrayOrderingE2E, ShufflePreservesMultisetOfDeclaredArray) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -257,10 +234,6 @@ TEST(ArrayOrderingE2E, ShufflePreservesMultisetOfDeclaredArray) {
   EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u, 40u, 50u}));
 }
 
-// §7.12.2: with an optional with clause, sort() orders by the expression value
-// rather than the element value. Ascending on key (10 - item) inverts the
-// natural element order, so the result confirms the with expression governs
-// the sort when it is written in real source and evaluated at run time.
 TEST(ArrayOrderingE2E, SortWithExpressionOrdersByKeyNotElement) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -272,9 +245,6 @@ TEST(ArrayOrderingE2E, SortWithExpressionOrdersByKeyNotElement) {
   EXPECT_EQ(got, (std::vector<uint64_t>{3u, 2u, 1u}));
 }
 
-// §7.12.2: rsort() applies the same optional with-clause key but ranks it in
-// descending order. On key (10 - item) the descending key order recovers the
-// natural ascending element order.
 TEST(ArrayOrderingE2E, RsortWithExpressionOrdersByKeyNotElement) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -286,9 +256,6 @@ TEST(ArrayOrderingE2E, RsortWithExpressionOrdersByKeyNotElement) {
   EXPECT_EQ(got, (std::vector<uint64_t>{1u, 2u, 3u}));
 }
 
-// §7.12.2: the "fixed ... sized" input form. A fixed-bound unpacked array is
-// sorted in place; reading the elements back after the run observes the
-// reorder through the ordinary element-select path.
 TEST(ArrayOrderingE2E, SortReordersDeclaredFixedArray) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -309,13 +276,6 @@ TEST(ArrayOrderingE2E, SortReordersDeclaredFixedArray) {
   EXPECT_EQ(f.ctx.FindVariable("a1")->value.ToUint64(), 20u);
   EXPECT_EQ(f.ctx.FindVariable("a2")->value.ToUint64(), 30u);
 }
-
-// §7.12.2: a queue ([$]) is a dynamically sized unpacked array, so the ordering
-// methods apply to it too. The array cases above route through the fixed/
-// dynamic-array executor; a queue is reordered by a separate production path
-// (the queue property dispatch), so it is observed independently here. These
-// use the no-parenthesis property form the LRM examples themselves show
-// (e.g. q.sort), driven from a real queue declaration and initializer.
 
 TEST(ArrayOrderingE2E, SortAscendingReordersDeclaredQueue) {
   SimFixture f;
@@ -362,10 +322,6 @@ TEST(ArrayOrderingE2E, ShufflePreservesMultisetOfDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u, 40u, 50u}));
 }
 
-// §7.12.2: the with-clause ordering key must apply to the parenthesis-free
-// member form too (the LRM writes `c.sort with (...)`). Ascending on key
-// (10 - item) inverts the natural element order, proving the with expression —
-// not the raw element value — drives the sort even without parentheses.
 TEST(ArrayOrderingE2E, SortWithExpressionNoParenMemberFormOnArray) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -377,8 +333,6 @@ TEST(ArrayOrderingE2E, SortWithExpressionNoParenMemberFormOnArray) {
   EXPECT_EQ(got, (std::vector<uint64_t>{3u, 2u, 1u}));
 }
 
-// §7.12.2: the with-clause key must also apply when the receiver is a queue,
-// which reaches evaluation through a distinct path than fixed/dynamic arrays.
 TEST(ArrayOrderingE2E, SortWithExpressionOnDeclaredQueue) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -390,8 +344,6 @@ TEST(ArrayOrderingE2E, SortWithExpressionOnDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{3u, 2u, 1u}));
 }
 
-// §7.12.2: rsort() ranks the same with-clause key in descending order; on a
-// queue, key (10 - item) descending recovers ascending element order.
 TEST(ArrayOrderingE2E, RsortWithExpressionOnDeclaredQueue) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -403,17 +355,6 @@ TEST(ArrayOrderingE2E, RsortWithExpressionOnDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{1u, 2u, 3u}));
 }
 
-// ---------------------------------------------------------------------------
-// §7.12 Syntax 7-5 writes the argument list of an array method call as
-// optional, so `q.sort` and `q.sort()` are one call, and §7.12.2 gives that one
-// call the same effect on a queue whichever way it is spelled. The two
-// spellings reach evaluation through different productions -- a call
-// expression and a member reference -- so each is stated on its own, and the
-// pair is what says they are one call rather than two methods.
-// ---------------------------------------------------------------------------
-
-// §7.12 Syntax 7-5 with §7.12.2: sort() written with its (empty) argument list
-// orders the queue in ascending order.
 TEST(ArrayOrderingE2E, SortCallWithParensReordersDeclaredQueue) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -425,10 +366,6 @@ TEST(ArrayOrderingE2E, SortCallWithParensReordersDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u}));
 }
 
-// §7.12 Syntax 7-5 with §7.12.2: the same sort() call written without the
-// argument list orders the same queue the same way. Paired with the
-// parenthesized case above, this is the claim that Syntax 7-5's optional
-// argument list leaves one call with one effect.
 TEST(ArrayOrderingE2E, SortCallWithoutParensReordersDeclaredQueue) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -440,8 +377,6 @@ TEST(ArrayOrderingE2E, SortCallWithoutParensReordersDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u}));
 }
 
-// §7.12 Syntax 7-5 with §7.12.2: reverse() written with its (empty) argument
-// list reverses the order of the queue's elements.
 TEST(ArrayOrderingE2E, ReverseCallWithParensReordersDeclaredQueue) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -453,10 +388,6 @@ TEST(ArrayOrderingE2E, ReverseCallWithParensReordersDeclaredQueue) {
   EXPECT_EQ(got, (std::vector<uint64_t>{30u, 20u, 10u}));
 }
 
-// §7.12 Syntax 7-5 with §7.12.2: shuffle() written with its (empty) argument
-// list randomizes the order of the queue's elements and neither adds nor drops
-// one, so the multiset of values is what holds for every permutation the draw
-// could produce.
 TEST(ArrayOrderingE2E, ShuffleCallWithParensPreservesQueueMultiset) {
   SimFixture f;
   auto got = RunAndReadElems(f,
@@ -469,9 +400,6 @@ TEST(ArrayOrderingE2E, ShuffleCallWithParensPreservesQueueMultiset) {
   EXPECT_EQ(got, (std::vector<uint64_t>{10u, 20u, 30u, 40u, 50u}));
 }
 
-// §7.12.2: specifying a with clause on reverse() is an error, and the report
-// it raises names §7.12.2 -- the subclause that says so of both reverse() and
-// shuffle().
 TEST(ArrayOrdering, ReverseWithClauseErrorNames7_12_2) {
   SimFixture f;
   MakeDynArray(f, "arr", {3, 1, 2});
@@ -482,23 +410,6 @@ TEST(ArrayOrdering, ReverseWithClauseErrorNames7_12_2) {
                             "does not accept a 'with' clause", 0, "7.12.2"));
 }
 
-// ---------------------------------------------------------------------------
-// §7.10.3 over the §7.12.2 ordering methods, on a dynamic array. §7.12.2 gives
-// sort(), rsort(), reverse() and shuffle() to any unpacked array, and none of
-// them removes an element. §7.10.3 therefore keeps every outstanding element
-// reference valid across one, and a valid reference stays attached to the
-// element it was taken on rather than to the index that element sat at. A
-// dynamic array is backed by the same QueueObject a queue is, and a `ref`
-// argument is recorded against the identity of the element it was taken on, so
-// an ordering method that moves the values without moving those identities
-// makes a later write through the reference land on whichever element moved
-// into the old index -- a different element from the one the reference names.
-// ---------------------------------------------------------------------------
-
-// §7.10.3 with §7.12.2: sort() removes nothing, so the reference taken on the
-// element holding 30 stays valid and follows that element to the back, where
-// sorting {30, 10, 20} puts it. The write of 99 has to land there rather than
-// at index 0, the index the reference was taken at.
 TEST(ArrayOrdering, SortLeavesDynArrayRefFollowingItsElement) {
   SimFixture f;
   MakeDynArray(f, "arr", {30, 10, 20});
@@ -508,9 +419,6 @@ TEST(ArrayOrdering, SortLeavesDynArrayRefFollowingItsElement) {
   ExpectQueueValues(f, {10u, 20u, 99u});
 }
 
-// §7.10.3 with §7.12.2: reverse() removes nothing either, and it moves the
-// element holding 30 from the front of {30, 10, 20} to the back. The reference
-// taken on that element follows it, so the write of 99 lands at the back.
 TEST(ArrayOrdering, ReverseLeavesDynArrayRefFollowingItsElement) {
   SimFixture f;
   MakeDynArray(f, "arr", {30, 10, 20});
@@ -520,12 +428,6 @@ TEST(ArrayOrdering, ReverseLeavesDynArrayRefFollowingItsElement) {
   ExpectQueueValues(f, {20u, 10u, 99u});
 }
 
-// §7.10.3 with §7.12.2: shuffle() removes nothing, so the reference taken on
-// the element holding 30 stays valid and the write of 99 replaces that element
-// wherever the permutation put it. The permutation is not predictable, so the
-// claim is stated as what holds for every one of them: 99 is in the array once
-// and 30, the value the reference was taken on, is gone. A write that landed on
-// whichever element moved into index 0 would leave 30 behind.
 TEST(ArrayOrdering, ShuffleLeavesDynArrayRefValid) {
   SimFixture f;
   MakeDynArray(f, "arr", {30, 10, 20});
@@ -544,10 +446,6 @@ TEST(ArrayOrdering, ShuffleLeavesDynArrayRefValid) {
   EXPECT_EQ(kept, 0u);
 }
 
-// §7.12 with §7.2: the iterator of a with clause over an array of structures
-// holds a structure, so `item.red` is its member -- sort orders a fixed array
-// and a queue by it, find keeps the elements whose member matches, and sum
-// adds the members.
 TEST(ArrayOrderingSim, WithClauseReadsAMemberOfAStructElement) {
   SimFixture f;
   std::string out = RunCapture(
@@ -570,9 +468,6 @@ TEST(ArrayOrderingSim, WithClauseReadsAMemberOfAStructElement) {
   EXPECT_EQ(out, "1 2 3 5 1 2 6\n");
 }
 
-// §7.12.2 with §6.16: sort and rsort order a queue of strings
-// lexicographically -- apple, fig, pear -- and not by the packed value that
-// puts a shorter string first.
 TEST(ArrayOrderingSim, SortOrdersAStringQueueLexicographically) {
   SimFixture f;
   std::string out = RunCapture(
@@ -589,8 +484,6 @@ TEST(ArrayOrderingSim, SortOrdersAStringQueueLexicographically) {
   EXPECT_EQ(out, "apple fig pear pear fig apple\n");
 }
 
-// §7.12.2 with §6.16: sort and rsort reorder a fixed-size or dynamic array
-// of strings, each element keeping its text.
 TEST(ArrayOrderingSim, SortKeepsTheStringsOfAnArray) {
   SimFixture f;
   std::string out = RunCapture(
@@ -607,10 +500,6 @@ TEST(ArrayOrderingSim, SortKeepsTheStringsOfAnArray) {
   EXPECT_EQ(out, "apple fig pear pear fig apple\n");
 }
 
-// §7.12.2 with §6.11: sort() and rsort() order the elements of a signed type
-// as signed numbers, -3 below 5, in a queue, a dynamic array and a fixed-size
-// array alike, and the elements of an unsigned type as unsigned ones, -3
-// written into a `bit [31:0]` element then being 4294967293, above 5.
 TEST(ArrayOrderingSim, SortAndRsortOrderByTheElementTypesSignedness) {
   SimFixture f;
   auto out = RunCapture(
@@ -630,9 +519,6 @@ TEST(ArrayOrderingSim, SortAndRsortOrderByTheElementTypesSignedness) {
   EXPECT_EQ(out, "-3 -3 -3 5\n5 5 5 4294967293\n");
 }
 
-// §7.12.2: with a with clause, sort() and rsort() order by the clause's value,
-// as signed where the expression is signed -- the iterator reading as the
-// element type -- and as unsigned where it is not.
 TEST(ArrayOrderingSim, SortWithAClauseOrdersByTheClausesSignedness) {
   SimFixture f;
   auto out = RunCapture(
@@ -653,11 +539,6 @@ TEST(ArrayOrderingSim, SortWithAClauseOrdersByTheClausesSignedness) {
   EXPECT_EQ(out, "-3 -3 5 5\n");
 }
 
-// §7.12.2 with §7.12: sort() and rsort() take a with clause in either
-// spelling, the call `dq.sort(x) with (x % 3)` as the member access `dm.sort
-// with (item % 3)`, and order a queue by its value: 9, 4, 5 and 2 have the
-// keys 0, 1, 2 and 2, the equal keys keeping their order. The call spelling
-// on a queue sorted by the elements' own values, '{2, 4, 5, 9}.
 TEST(ArrayOrderingSim, TheCallSpellingOrdersAQueueByItsWithClause) {
   SimFixture f;
   auto out = RunCapture(
@@ -676,12 +557,6 @@ TEST(ArrayOrderingSim, TheCallSpellingOrdersAQueueByItsWithClause) {
   EXPECT_EQ(out, "'{9, 4, 5, 2} '{5, 2, 4, 9} '{9, 4, 5, 2}\n");
 }
 
-// §7.12.2 with §8.5: the ordering methods reorder any fixed-size or dynamic
-// array, and a class property may be one, so sort(), rsort() bare in a method,
-// reverse() and sort() with a with clause reorder a fixed-size int property --
-// -2 % 3 is -2, below 9 % 3, 4 % 3 and 5 % 3 -- and sort() a dynamic byte
-// property by signed value and a string property lexicographically. Each call
-// left the property's elements where they were.
 TEST(ArrayOrderingSim, OrderingMethodsReorderAClassArrayProperty) {
   SimFixture f;
   auto out = RunCapture(
@@ -720,10 +595,6 @@ TEST(ArrayOrderingSim, OrderingMethodsReorderAClassArrayProperty) {
             "-2 4 5 9\n9 5 4 -2\n-2 4 5 9\n-2 9 4 5\n-1 2 3 apple fig pear\n");
 }
 
-// §7.12.2 with §8.5: shuffle() randomizes the order of a class property's
-// elements: over 16 calls on eight elements 0 to 7, some call moves the first
-// or the last, and each leaves the same eight values, which sort() puts back
-// in place. A shuffle that does nothing moves none in any call.
 TEST(ArrayOrderingSim, ShuffleReordersAClassArrayPropertysOwnElements) {
   SimFixture f;
   auto out = RunCapture(

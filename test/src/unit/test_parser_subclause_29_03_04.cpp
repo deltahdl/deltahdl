@@ -28,8 +28,6 @@ TEST(UdpStateTable, MissingEndtableKeywordRejected) {
       "  table\n"
       "    0 : 1;\n"
       "    1 : 0;\n");
-  // The source ends after line 4's newline, so the EOF token the `endtable`
-  // expectation reports against stands at line 5, column 1.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected 'endtable', got EOF", 5, "29.3.4"));
 }
@@ -42,7 +40,6 @@ TEST(UdpStateTable, RowMissingSemicolonRejected) {
       "    1 : 0;\n"
       "  endtable\n"
       "endprimitive\n");
-  // The row's missing `;` is reported against the first token of the next row.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got integer literal", 4, "29.3.4"));
 }
@@ -70,10 +67,6 @@ TEST(UdpStateTable, InputFieldOrderFollowsHeaderPortList) {
 }
 
 TEST(UdpStateTable, InputFieldOrderIgnoresPortDeclarationOrder) {
-  // §29.3.4: a row's input fields follow the header port-list order, which is
-  // independent of the order the input ports are declared. Here the port list
-  // is (q, a, b, c) but the declarations appear as c, b, a; the table fields
-  // must still bind to a, b, c.
   auto r = Parse(
       "primitive gate(q, a, b, c);\n"
       "  output q;\n"
@@ -178,7 +171,6 @@ TEST(UdpStateTable, DuplicateInputsWithDifferentOutputsRejected) {
       "    0 1 : 1;\n"
       "  endtable\n"
       "endprimitive\n");
-  // Parser::ValidateUdpTable reports at the later of the two rows.
   EXPECT_TRUE(ReportedError(r.diags,
                             "UDP table rows covering the same combination of "
                             "inputs shall not specify different outputs",
@@ -200,8 +192,6 @@ TEST(UdpStateTable, SequentialDuplicateInputsWithDifferentOutputsRejected) {
 }
 
 TEST(UdpStateTable, OverlappingRowsWithDifferentOutputsRejected) {
-  // One combination of inputs, edges counted, may not give two different
-  // outputs: the `?` row covers a = b = 1, which the row above it gives 1.
   auto r = Parse(
       "primitive p (y, a, b);\n"
       "  output y;\n"
@@ -231,7 +221,6 @@ TEST(UdpStateTable, OverlappingRowsWithTheSameOutputAccepted) {
 }
 
 TEST(UdpStateTable, OverlappingEdgeRowsWithDifferentOutputsRejected) {
-  // p covers (0x), the transition the second row names.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
       "  table\n"
@@ -246,8 +235,6 @@ TEST(UdpStateTable, OverlappingEdgeRowsWithDifferentOutputsRejected) {
 }
 
 TEST(UdpStateTable, NoChangeOutputConflictsWithAnotherStateRejected) {
-  // "-" is the current state, so under a current state of 0 the first row
-  // gives 0 where the second gives 1.
   auto r = Parse(
       "primitive seq(output reg q, input d, input clk);\n"
       "  table\n"
@@ -274,8 +261,6 @@ TEST(UdpStateTable, NoChangeOutputMatchingTheStateAccepted) {
 }
 
 TEST(UdpStateTable, LevelRowBesideEdgeRowWithAnotherOutputAccepted) {
-  // A level row and an edge row are not the same combination once edges are
-  // counted; §29.9 settles which of the two applies.
   auto r = Parse(
       "primitive latch(output reg q, input d, input en);\n"
       "  table\n"
@@ -287,8 +272,6 @@ TEST(UdpStateTable, LevelRowBesideEdgeRowWithAnotherOutputAccepted) {
 }
 
 TEST(UdpStateTable, JkEdgeFlipFlopMixingLevelAndEdgeRowsAccepted) {
-  // §29.9's jk_edge_ff mixes level rows over the preset and clear with edge
-  // rows over the clock, j and k, none of them in conflict.
   auto r = Parse(
       "primitive jk_edge_ff (q, clock, j, k, preset, clear);\n"
       "  output q; reg q;\n"
@@ -313,8 +296,6 @@ TEST(UdpStateTable, JkEdgeFlipFlopMixingLevelAndEdgeRowsAccepted) {
 }
 
 TEST(UdpStateTable, RowWithTwoInputTransitionsRejected) {
-  // §29.3.4 permits at most one input transition per row; the LRM gives
-  // "(01) (10) 0 : 0 : 1 ;" as an illegal example because two fields change.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b, input c);\n"
       "  table\n"
@@ -351,10 +332,6 @@ TEST(UdpStateTable, IdenticalDuplicateRowsNotFlagged) {
 }
 
 TEST(UdpStateTable, RowWithTwoShorthandEdgesRejected) {
-  // §29.3.4 caps a row at one input transition however the edge is spelled.
-  // Here both transitions use the shorthand letter form (r, f) instead of the
-  // parenthesized (vw) form, so the row still names two transitions and is
-  // rejected on the same at-most-one-transition rule.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
       "  table\n"
@@ -367,9 +344,6 @@ TEST(UdpStateTable, RowWithTwoShorthandEdgesRejected) {
 }
 
 TEST(UdpStateTable, SequentialAllXInputsWithXOutputAccepted) {
-  // The all-x-inputs rule also governs sequential rows, which carry an extra
-  // current-state field between the inputs and the output. An all-x input row
-  // whose output is x is well formed.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
       "  table\n"
@@ -381,8 +355,6 @@ TEST(UdpStateTable, SequentialAllXInputsWithXOutputAccepted) {
 }
 
 TEST(UdpStateTable, SequentialAllXInputsWithNonXOutputRejected) {
-  // Same sequential row shape, but the output is 1 while every input field is
-  // x; the all-x rule requires the output to be x, so this is rejected.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
       "  table\n"
@@ -395,9 +367,6 @@ TEST(UdpStateTable, SequentialAllXInputsWithNonXOutputRejected) {
 }
 
 TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
-  // The duplicate-row rule compares the whole input combination, edges
-  // included. Two rows sharing the same rising-edge transition and level inputs
-  // but naming different outputs collide and are rejected.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
       "  table\n"
@@ -412,10 +381,6 @@ TEST(UdpStateTable, DuplicateEdgeInputsWithDifferentOutputsRejected) {
 }
 
 TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {
-  // Counterpart to the edge-collision case: rows with an identical edge
-  // combination that also agree on the output are consistent, so the
-  // duplicate-row rule does not fire. This shows the collision above is driven
-  // by the differing output, not merely by the repeated edge.
   auto r = Parse(
       "primitive seq(output reg q, input a, input b);\n"
       "  table\n"
@@ -428,11 +393,6 @@ TEST(UdpStateTable, DuplicateEdgeRowsWithSameOutputNotFlagged) {
 }
 
 TEST(UdpStateTable, AllXInputsWithOneOutputNames29_3_4) {
-  // §29.3.4: a row giving x for every input must give x as its output. The
-  // report names that subclause, so a case can tell this rejection from the
-  // several other rules a UDP table row breaks in the same way -- a row of the
-  // wrong width, a row holding z, a row whose output symbol is illegal.
-  // has_errors is the same value for all of them.
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
       "  table\n"
@@ -444,12 +404,6 @@ TEST(UdpStateTable, AllXInputsWithOneOutputNames29_3_4) {
       "29.3.4"));
 }
 
-// The pair for the case above. §29.3.4, Syntax 29-1: every table_entry ends
-// with a semicolon, and this row omits it, so the run is rejected by
-// Parser::Expect rather than by one of parser_udp.cpp's own reports. The
-// sentence it writes, `expected ';', got integer literal`, names no rule; the
-// subclause puts the token-level rejection and the rule-level one above on the
-// same clause of the standard.
 TEST(UdpStateTable, MalformedRowNames29_3_4) {
   auto r = Parse(
       "primitive p(output y, input a);\n"
@@ -461,19 +415,6 @@ TEST(UdpStateTable, MalformedRowNames29_3_4) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ';'", 4, "29.3.4"));
 }
 
-// §29.3.4: a combinational UDP's row has a field for each input and one for the
-// output, and the input fields follow the order of the port list in the UDP's
-// header. A row of two input fields under a header naming three inputs leaves
-// one input with no field at all, so the row describes no combination of this
-// UDP's inputs. The report stands on the row's own line rather than the
-// header's, so this case tells it from the header rejections §29.3.1 writes at
-// line 1, and from AllXInputsWithOneOutputNames29_3_4 above, which names the
-// same subclause for a different rule.
-//
-// Before this check the row was kept as written: UdpRowMatchesLevels
-// (src/simulator/udp_eval.cpp) compares the field count against the input
-// count and answers no match, so the primitive drove x for the whole run and
-// nothing said why.
 TEST(UdpStateTable, RowWithFewerFieldsThanInputsRejected) {
   auto r = Parse(
       "primitive p(output y, input a, input b, input c);\n"
@@ -487,15 +428,6 @@ TEST(UdpStateTable, RowWithFewerFieldsThanInputsRejected) {
       4, "29.3.4"));
 }
 
-// The other side of the rule above. A row of three input fields under a header
-// naming two inputs writes a field no port receives: the output symbol is the
-// one past the colon, so the surplus is an input field and the row is again
-// one that describes no combination of the declared inputs. The row is
-// sequential, so the case also fixes that the count is over the input fields
-// alone: the current-state field between the colons is the extra field §29.3.4
-// puts between the inputs and the output, and belongs to no input port. A count
-// that took it in would report `3` for the row this case accepts below and `4`
-// here.
 TEST(UdpStateTable, SequentialRowWithMoreFieldsThanInputsRejected) {
   auto r = Parse(
       "primitive p(output reg q, input d, input clk);\n"
@@ -508,11 +440,6 @@ TEST(UdpStateTable, SequentialRowWithMoreFieldsThanInputsRejected) {
       3, "29.3.4"));
 }
 
-// The pair for the case above: a sequential row whose input fields number the
-// header's inputs is accepted, with the current-state field standing between
-// the colons and counted for no input. The edge is written in the (01) form so
-// that a count over the characters of the row rather than its fields reads
-// four here and would reject the row.
 TEST(UdpStateTable, SequentialRowWidthCountsInputFieldsOnly) {
   auto r = Parse(
       "primitive p(output reg q, input d, input clk);\n"
@@ -525,12 +452,6 @@ TEST(UdpStateTable, SequentialRowWidthCountsInputFieldsOnly) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §29.3.4 takes the field order straight from the port list in the UDP's
-// header, and in the udp_nonansi_declaration form of §29.3.1 that list names
-// ports the declarations after it describe. The input count a row is held to is
-// therefore the count of those declarations, two here, which the row of one
-// field falls short of. The header line is not where the report stands: it
-// stands on the row.
 TEST(UdpStateTable, NonAnsiRowWidthIsReadOffTheInputDeclarations) {
   auto r = Parse(
       "primitive p(y, a, b);\n"
@@ -545,11 +466,6 @@ TEST(UdpStateTable, NonAnsiRowWidthIsReadOffTheInputDeclarations) {
       5, "29.3.4"));
 }
 
-// One port list read wrong is one mistake, however many rows stand under it,
-// so a table whose every row disagrees draws one report and not one per row.
-// The report stands on the first such row. The third row is of a different
-// wrong width from the first two, so an implementation reporting once per
-// distinct width counts two here rather than one.
 TEST(UdpStateTable, RowWidthIsReportedOncePerTable) {
   auto r = Parse(
       "primitive p(output y, input a, input b);\n"
@@ -569,10 +485,6 @@ TEST(UdpStateTable, RowWidthIsReportedOncePerTable) {
   EXPECT_EQ(width_reports, 1);
 }
 
-// §29.3.1 rejects a header naming no input port, and every row under such a
-// header disagrees with a port list that is not there. The row draws no
-// second report: the count it would name is the one the header report already
-// names, and the header's line is where the mistake stands.
 TEST(UdpStateTable, RowWidthIsNotReportedUnderAHeaderWithNoInputs) {
   auto r = Parse(
       "primitive p(output y);\n"
@@ -589,12 +501,6 @@ TEST(UdpStateTable, RowWidthIsNotReportedUnderAHeaderWithNoInputs) {
   EXPECT_EQ(width_reports, 0);
 }
 
-// §29.3.4 (printed page 863) with Syntax 29-1 (printed page 861): a
-// combinational_entry is a level_input_list and one output symbol, a row giving
-// the output for one combination of input values, and only a sequential entry
-// adds room for a single input transition. A row with one field after its colon
-// therefore holds no `(01)`, and one was taken without a report and the
-// primitive run as if edge-sensitive.
 TEST(UdpStateTable, EdgeIndicatorInCombinationalRowRejected) {
   auto r = Parse(
       "primitive p (y, a, b);\n"
@@ -611,7 +517,6 @@ TEST(UdpStateTable, EdgeIndicatorInCombinationalRowRejected) {
                             5, "29.3.4"));
 }
 
-// The same for an edge_symbol: `r` is Table 29-1's (01).
 TEST(UdpStateTable, EdgeSymbolInCombinationalRowRejected) {
   auto r = Parse(
       "primitive p (y, a, b);\n"

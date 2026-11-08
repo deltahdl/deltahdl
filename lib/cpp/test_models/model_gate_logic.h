@@ -8,8 +8,6 @@
 
 using delta::GateKind;
 
-// --- Logic gate evaluation helpers (§28.4, §28.5) ---
-
 inline Val4 InvertVal4(Val4 v);
 inline Val4 NormalizeInput(Val4 v);
 inline Val4 EvalAnd(Val4 a, Val4 b);
@@ -21,7 +19,6 @@ inline void CheckInversion(GateKind base, GateKind inverted);
 inline uint64_t ComputeGateDelay(uint64_t d_rise, uint64_t d_fall, Val4 from,
                                  Val4 to);
 
-// --- Implementations ---
 inline Val4 InvertVal4(Val4 v) {
   switch (v) {
     case Val4::kV0:

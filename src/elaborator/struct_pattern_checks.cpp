@@ -23,8 +23,6 @@ namespace delta {
 
 namespace {
 
-// §10.9.2 (printed page 264): every member is covered by a member key, a type
-// key whose type matches the member's, or `default:`.
 void CheckPatternCoverage(const std::vector<StructMember>& members,
                           const std::unordered_set<std::string_view>& seen,
                           const std::vector<std::string_view>& type_keys,
@@ -43,9 +41,6 @@ void CheckPatternCoverage(const std::vector<StructMember>& members,
   }
 }
 
-// §10.9 gives `structure_pattern_key ::= member_identifier |
-// assignment_pattern_key`, so every key of a structure pattern is a name -- a
-// member's, `default`, or a type's -- and the key's text is that name.
 void CheckPatternKeys(const Expr* pattern,
                       const std::vector<StructMember>& members,
                       const StructPatternTarget& target) {
@@ -95,8 +90,6 @@ void CheckStructPattern(const Expr* pattern,
     CheckPatternKeys(pattern, members, target);
     return;
   }
-  // §5.10 (printed page 84): a replication sets the values for the exact
-  // number of members, its multiplier times its items.
   if (PatternReplication(pattern) != nullptr) {
     auto count = PositionalItemCount(pattern);
     if (count && *count != static_cast<int64_t>(members.size())) {
@@ -123,7 +116,6 @@ void CheckStructPatternFor(const Expr* value, const DataType* target_type,
   const std::vector<StructMember>* members = nullptr;
   if (value->kind == ExprKind::kCast &&
       value->lhs->kind == ExprKind::kAssignmentPattern) {
-    // A typed pattern takes the type its prefix names (§10.9).
     pattern = value->lhs;
     auto it = target.typedefs.find(value->text);
     if (it != target.typedefs.end())
@@ -160,11 +152,6 @@ std::optional<int64_t> FoldPackedStructPattern(const Expr* pattern,
 
 void Elaborator::ValidateStructInitPattern(const ModuleItem* item) {
   if (!item->init_expr) return;
-  // §10.9.1 with §5.10: a declaration with unpacked dimensions is initialized
-  // by an array pattern whose elements are the structures, so the structure's
-  // member count says nothing about how many elements that pattern lists;
-  // reading it as a structure pattern rejected `'{'{0, 1}, '{2, 3}, '{4, 5}}`
-  // for a three-element array of a two-member structure.
   if (!item->unpacked_dims.empty()) return;
   CheckStructPatternFor(item->init_expr, &item->data_type,
                         {typedefs_, item->loc, diag_});

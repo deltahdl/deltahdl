@@ -106,13 +106,6 @@ TEST(FileReadFunctions, FscanfReadsFormatted) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4: a descriptor may be read from only when its file was opened with a
-// read ("r"/"rb") or read-update ("r+"/"r+b"/"rb+") type. Whether a given fd is
-// readable is decided entirely by how the descriptor was produced -- the type
-// argument of the §21.3.1 $fopen that created it -- so these tests build the
-// descriptor from real $fopen source syntax and drive the whole pipeline,
-// observing each read function's failure result through $display.
-
 TEST(FileReadFunctions, FgetcOnWriteOnlyFdReturnsEof) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_w_fgetc.txt";
@@ -134,10 +127,6 @@ TEST(FileReadFunctions, FgetcOnWriteOnlyFdReturnsEof) {
 }
 
 TEST(FileReadFunctions, FgetcOnUpdateTypeWithDataStillRejected) {
-  // "w+" opens for update, so the host stream really can deliver the byte just
-  // written once the position is rewound -- yet §21.3.4 authorizes reading only
-  // for the "r"/"r+" families, so the read must still fail. This is the case
-  // that distinguishes the standard's gate from mere host-stream behavior.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_wplus_data.txt";
   std::string out = RunCapture(
@@ -160,8 +149,6 @@ TEST(FileReadFunctions, FgetcOnUpdateTypeWithDataStillRejected) {
 }
 
 TEST(FileReadFunctions, FgetcOnAppendUpdateTypeRejected) {
-  // "a+" also permits host-level reading (from the start of the file), but is
-  // not an "r"/"r+" family type, so the read is refused.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_aplus.txt";
   SeedFile(tmp, "Q");
@@ -204,12 +191,6 @@ TEST(FileReadFunctions, FgetsOnWriteOnlyFdReturnsZeroAndLeavesDest) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1 has $ungetc put the character in the descriptor's buffer, leave
-// the file unchanged and the next $fgetc on the descriptor return it; §21.3.4
-// limits reading the file to the r and r+ types, which a push back does not
-// do. So on a "w" descriptor the push back answers 0 and the next $fgetc 72,
-// the one after it EOF, since the file itself still cannot be read, and the
-// file stays empty.
 TEST(FileReadFunctions, UngetcOnWriteOnlyFdIsReturnedByNextFgetc) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_w_ungetc.txt";
@@ -233,10 +214,6 @@ TEST(FileReadFunctions, UngetcOnWriteOnlyFdIsReturnedByNextFgetc) {
   std::remove(tmp.c_str());
 }
 
-// §21.3.4.1 puts the pushed character in the buffer of the descriptor, and
-// $fclose ends that descriptor (§21.3.1), so a descriptor $fopen hands out
-// again for the same slot starts with nothing pushed back: its first $fgetc
-// on a "w" file is EOF, not the character pushed onto the closed one.
 TEST(FileReadFunctions, FcloseDropsAWriteOnlyFdsPushBack) {
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_w_ungetc_close.txt";
@@ -306,8 +283,6 @@ TEST(FileReadFunctions, FreadOnWriteOnlyFdReturnsZeroAndLeavesDest) {
 }
 
 TEST(FileReadFunctions, FreadMemoryFormOnWriteOnlyFdRejected) {
-  // The gate covers the memory form of $fread as well: no bytes are consumed
-  // and the destination words keep their prior contents.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_w_fread_mem.txt";
   std::string out = RunCapture(
@@ -330,9 +305,6 @@ TEST(FileReadFunctions, FreadMemoryFormOnWriteOnlyFdRejected) {
 }
 
 TEST(FileReadFunctions, FgetsAndFreadAllowedOnReadTypeFd) {
-  // Accepting side of the gate for $fgets and $fread: on an "r" descriptor the
-  // line read returns its character count and, after a rewind, the binary read
-  // fills the packed destination big-endian first.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_r_fgets_fread.txt";
   SeedFile(tmp, "HI\n");
@@ -358,8 +330,6 @@ TEST(FileReadFunctions, FgetsAndFreadAllowedOnReadTypeFd) {
 }
 
 TEST(FileReadFunctions, FscanfAllowedOnReadTypeFd) {
-  // Accepting side of the gate for $fscanf: a conversion on an "r" descriptor
-  // proceeds and reports the matched-field count.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_r_fscanf.txt";
   SeedFile(tmp, "42");
@@ -381,8 +351,6 @@ TEST(FileReadFunctions, FscanfAllowedOnReadTypeFd) {
 }
 
 TEST(FileReadFunctions, UngetcAllowedOnReadTypeFd) {
-  // Accepting side of the gate for $ungetc: the push back on an "r" descriptor
-  // reports success and the pushed character is what the next read delivers.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_r_ungetc.txt";
   SeedFile(tmp, "XY");
@@ -406,7 +374,6 @@ TEST(FileReadFunctions, UngetcAllowedOnReadTypeFd) {
 }
 
 TEST(FileReadFunctions, ReadTypeFamilyAllowsReading) {
-  // Both spellings of the read type ("r" and the binary "rb") authorize reads.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_r_family.txt";
   SeedFile(tmp, "Q");
@@ -433,8 +400,6 @@ TEST(FileReadFunctions, ReadTypeFamilyAllowsReading) {
 }
 
 TEST(FileReadFunctions, ReadUpdateTypeFamilyAllowsReading) {
-  // The read-update family ("r+" and its binary spelling "rb+") likewise
-  // authorizes reads.
   SysTaskFixture f;
   std::string tmp = "/tmp/deltahdl_2134_rplus_family.txt";
   SeedFile(tmp, "Q");
@@ -461,8 +426,6 @@ TEST(FileReadFunctions, ReadUpdateTypeFamilyAllowsReading) {
 }
 
 TEST(FileReadFunctions, ReadRejectedOnStandardOutputDescriptor) {
-  // STDOUT (32'h8000_0001) is pre-opened for append, not reading; a read on
-  // its reserved descriptor reports end-of-file rather than touch the stream.
   SysTaskFixture f;
   std::string out = RunCapture(
       "module t;\n"

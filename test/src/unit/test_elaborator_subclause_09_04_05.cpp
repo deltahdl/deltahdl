@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -7,12 +5,6 @@
 using namespace delta;
 
 namespace {
-
-// Section 9.4.5 — intra-assignment timing controls. At the elaboration stage
-// the only thing to confirm is that the intra-assignment delay, event, and
-// repeat-event forms (applicable to both blocking and nonblocking assignments)
-// elaborate cleanly into a design. The behavioural rules are observed at the
-// simulation stage in test_simulator_subclause_09_04_05.cpp.
 
 TEST(IntraAssignTimingElaboration, BlockingIntraDelayElaborates) {
   ElabFixture f;

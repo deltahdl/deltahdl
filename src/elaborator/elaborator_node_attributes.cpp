@@ -21,10 +21,6 @@ namespace delta {
 
 namespace {
 
-// Whether an item of `kind` keeps the attributes it is written with nowhere
-// but RtlirModule::node_attrs. A net's, a variable's, a specparam's (on the
-// variable it is lowered as), an instance's, a continuous assignment's and a
-// procedure's are kept on their own records.
 bool KeepsNodeAttributes(ModuleItemKind kind) {
   switch (kind) {
     case ModuleItemKind::kFunctionDecl:
@@ -45,9 +41,6 @@ bool KeepsNodeAttributes(ModuleItemKind kind) {
   }
 }
 
-// §8.25 with §6.20: a class's value parameters and its local parameters are
-// constants within the class, entered over the scope around it. A type
-// parameter names a type and no value.
 void LayerClassParams(const ClassDecl& decl, ConstantScope& scope) {
   for (const auto& [name, value] : decl.params) {
     if (decl.type_param_names.count(name) == 0) scope.Declare(name, value);
@@ -59,10 +52,6 @@ void LayerClassParams(const ClassDecl& decl, ConstantScope& scope) {
   }
 }
 
-// What resolving attributes works with: where they are kept, where a
-// duplicate is reported, and the constants in force, built from the module's
-// parameters the first time an attribute, a class or a declaration asks for
-// them.
 struct NodeAttributeRecord {
   RtlirNodeAttributes& table;
   DiagEngine& diag;
@@ -84,18 +73,12 @@ struct NodeAttributeRecord {
         ResolveAttributes(attrs, diag, in_force.fold, in_force.constants);
   }
 
-  // §11.3 with §5.12: an operator written with attributes, and those the
-  // expressions it holds are written with.
   void RecordExpr(const Expr* expr) {
     if (expr == nullptr) return;
     Record(expr, expr->attrs);
     ForEachExprChild(expr, [this](const Expr* sub) { RecordExpr(sub); });
   }
 
-  // §12.1 with §5.12: a statement written with attributes, and those the
-  // statements and expressions it holds are written with. A parameter a
-  // subroutine or a block declares is a constant of the statements after it
-  // there, and of none outside the block.
   void RecordStmt(const Stmt* stmt) {
     if (stmt == nullptr) return;
     Record(stmt, stmt->attrs);
@@ -107,8 +90,6 @@ struct NodeAttributeRecord {
     if (outer.has_value()) scope = std::move(outer);
   }
 
-  // §18.5 with §5.12: the operators the constraint item `item` and the items
-  // it holds are written with.
   void RecordConstraintItem(const ConstraintItem* item) {
     if (item == nullptr) return;
     RecordExpr(item->expr);
@@ -124,10 +105,6 @@ struct NodeAttributeRecord {
     for (const ConstraintItem* sub : item->else_body) RecordConstraintItem(sub);
   }
 
-  // §8.3 with §5.12: a class written with attributes, its items written with
-  // them, and the operators its extends arguments and constraints are. The
-  // class's own attributes stand before it; the rest stand inside it, where
-  // its parameters are constants as well.
   void RecordClass(const ClassDecl* decl) {
     if (decl == nullptr) return;
     Record(decl, decl->attrs);
@@ -145,8 +122,6 @@ struct NodeAttributeRecord {
     scope = std::move(outer);
   }
 
-  // §9.4.2 with §5.12: the operators the event expressions `events` are
-  // written with.
   void RecordEvents(const std::vector<EventExpr>& events) {
     for (const EventExpr& event : events) {
       RecordExpr(event.signal);
@@ -154,8 +129,6 @@ struct NodeAttributeRecord {
     }
   }
 
-  // §16.12 with §5.12: the operators a property expression's Boolean leaves,
-  // ranges, case values and clocks are written with, and its operands'.
   void RecordProperty(const PropertyExprNode* node) {
     if (node == nullptr) return;
     RecordExpr(node->boolean);
@@ -170,16 +143,12 @@ struct NodeAttributeRecord {
     }
   }
 
-  // §16.12 with §5.12: the operators the property `item` declares or asserts
-  // is written with: its clock, its disable condition and its body.
   void RecordPropertyItem(const ModuleItem& item) {
     RecordEvents(item.prop_clock);
     RecordExpr(item.prop_disable_iff);
     RecordProperty(item.prop_body_tree);
   }
 
-  // §14.3 with §5.12: the operators a clocking block's event and signals are
-  // written with.
   void RecordClocking(const ModuleItem& item) {
     RecordEvents(item.clocking_event);
     for (const ClockingSignalDecl& signal : item.clocking_signals) {

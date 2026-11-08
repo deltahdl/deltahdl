@@ -1,12 +1,3 @@
-// The block item declarations of IEEE 1800-2023 A.2.8, which A.6.3's seq_block
-// and par_block and A.2.6's and A.2.7's subroutine bodies open with: the
-// predicate that decides whether a block item is a declaration or a statement,
-// and the parse of the declaration it admits. These reach the rest of the
-// statement parser through Parser::IsBlockVarDeclStart and
-// Parser::ParseBlockVarDecls only, both declared in src/parser/parser.h. The
-// group moved out of parser_stmt.cpp when the scoped-type predicate took that
-// file past the limit assert-no-oversized-source-files enforces.
-
 #include <algorithm>
 #include <string>
 #include <utility>
@@ -28,8 +19,6 @@ namespace delta {
 
 namespace {
 
-// Where A.2.1.3 places a data_declaration qualifier among the three it opens
-// one with, or -1 for a token that is none of them.
 int QualifierRank(TokenKind kind) {
   switch (kind) {
     case TokenKind::kKwConst:
@@ -101,17 +90,6 @@ bool Parser::IsBlockVarDeclStart() {
   return result;
 }
 
-// The keywords that open a block-item declaration outright, with nothing
-// after them to look at: a lifetime, a parameter, `const`, a typedef, a
-// nettype -- A.2.1.3 counts a nettype_declaration among data_declaration's
-// forms, and A.2.8 makes each a block item -- an import, a let, an aggregate
-// or enum type, `var`, a type reference -- which A.2.2.1 makes a data_type
-// and no statement opens with -- and `virtual` -- A.2.2.1 lists `virtual
-// [interface] interface_identifier` among data_type's alternatives, so a
-// block item opening with it is a §25.9 virtual interface declaration
-// wherever A.2.8 places one, the locals of a task or function body and the
-// head of a seq_block; no statement opens with the keyword, and
-// ParseDataType reads the type from it.
 static bool OpensBlockDeclOutright(TokenKind tk) {
   switch (tk) {
     case TokenKind::kKwAutomatic:
@@ -146,29 +124,13 @@ bool Parser::IsBlockVarDeclStartCore() {
     lexer_.RestorePos(saved);
     return is_decl;
   }
-  // `$unit::T v;` declares v of the compilation unit's T, where `$unit::x = 1;`
-  // and `$unit::f();` are statements.
   if (ParserDataDeclHelpers::AtUnitScopedTypeName(*this))
     return !IsScopedCallOrAssignStmt();
   if (!Check(TokenKind::kIdentifier)) return false;
-  // §17.3: `pkg::chk c(a);` is a checker instantiation, which no
-  // data_declaration spells: a declarator takes no port-connection list.
   if (AtCheckerInstantiationStmt()) return false;
-  // A.2.2.1 lets a data_type be a type_identifier behind a package_scope or a
-  // class_scope, and A.2.8 admits any data_declaration as a block item, so an
-  // identifier followed by `::` opens a declaration whether or not the leading
-  // name is one this scope knows as a type: a package name never is, and
-  // ParseImplicitTypeOrInst reads the module-level `pkg::t v;` the same way.
-  // Only a bare name is held to known_types_; a bare unknown identifier at the
-  // head of a block item is a statement, and the undeclared-type reading
-  // LooksLikeUndeclaredTypeDecl explains belongs to the module-level path
-  // alone, where no statement can stand.
   if (known_types_.count(CurrentToken().text) == 0 && !AtScopedTypeName()) {
     return false;
   }
-  // A leading known type name usually begins a declaration (`Type v;`,
-  // `pkg::Type v;`), but a scoped call or assignment is a statement, not a
-  // declaration (§8.10/§8.23).
   return !IsScopedCallOrAssignStmt();
 }
 
@@ -180,14 +142,6 @@ bool Parser::AtScopedTypeName() {
   return scoped;
 }
 
-// A.2.2.1's class_type (printed page 1183) lets a parameter_value_assignment
-// follow the class identifier before each `::`, and §8.25.1 (printed page 205)
-// has a use of the class scope resolution operator outside a parameterized
-// class name its specialization, so `C#(bit)::set(1);` is the same statement as
-// `C::set(1);` and is told from the declaration `C#(bit) v;` by what follows
-// the `#(...)`. The walk below skips the group at each name; before it did,
-// the walk stopped at `#`, took the line for a declaration, and ParseNamedType
-// met the call's `(` where §6.8 puts a variable name.
 bool Parser::IsScopedCallOrAssignStmt() {
   auto saved = lexer_.SavePos();
   auto skip_param_values = [this] {
@@ -200,7 +154,7 @@ bool Parser::IsScopedCallOrAssignStmt() {
       lexer_.RestorePos(at_hash);
     }
   };
-  Consume();  // the known type name
+  Consume();
   skip_param_values();
   if (Match(TokenKind::kColonColon)) {
     while (CheckIdentifier()) {
@@ -209,26 +163,7 @@ bool Parser::IsScopedCallOrAssignStmt() {
       if (!Match(TokenKind::kColonColon)) break;
     }
   }
-  // A.2.2.1 lets packed dimensions follow the type_identifier, so what decides
-  // is the token after any `[...]` groups: `pkg::t [1:0] w;` reaches a variable
-  // name there and `pkg::arr[0] = 4;` an assignment operator.
   SkipBracketedDims();
-  // A type name reached here either bare or after a `::` scope path. If it is
-  // immediately followed by a call `(`, an assignment operator, the `'{` that
-  // opens a §10.9 assignment pattern, a `.` member select or a `++`/`--`, it is
-  // a statement rather than a declaration: no data_declaration puts any of
-  // those after its type's dimensions, and A.2.2.1's one `.` inside a data_type
-  // follows `virtual interface`, a keyword and not an identifier. The
-  // bare-assignment case covers an embedded covergroup
-  // (§19.4): `covergroup cg ... endgroup` implicitly declares both the type
-  // `cg` and a variable `cg`, so `cg = new;` is an assignment to that variable,
-  // not the start of a `cg <name>` declaration. The `'{` case covers §10.9's
-  // assignment_pattern_expression, whose type is written as a prefix before the
-  // pattern -- `pair_t'{a, b} = 16'hABCD;` -- so the operator this list is
-  // otherwise looking for stands behind the pattern rather than behind the
-  // name. It cannot be a declaration: §6.8 continues a data_declaration with a
-  // list_of_variable_decl_assignments, which A.2.3 begins with a
-  // variable_identifier, so no declaration puts a `'{` after its type.
   bool is_stmt =
       Check(TokenKind::kLParen) || Check(TokenKind::kEq) ||
       Check(TokenKind::kLtEq) || Check(TokenKind::kApostropheLBrace) ||
@@ -243,20 +178,9 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
                                 const std::vector<Attribute>& attrs) {
   const DataDeclQualifiers kQuals =
       ParserDataDeclHelpers::ReadQualifiers(*this);
-  // An inline enum, struct or union type is read here, as ParseDataType
-  // leaves its keyword unread and OpensBlockDeclOutright hands the block item
-  // back on that keyword. A type reference is read here as well (§6.23), which
-  // ParseDataType does not read either. The scoped form
-  // IsBlockVarDeclStartCore admitted is what ParseDeclaredDataType reads past
-  // known_types_, which never holds a package name.
   DataType dtype;
   bool is_type_ref = Check(TokenKind::kKwType);
   if (is_type_ref) {
-    // Footnote 18 of §6.8's Syntax 6-3, which §6.23 repeats, has a type
-    // reference in a variable declaration preceded by `var`, and the report
-    // is the one Parser::ParseTypedItemOrInst files at module level. The
-    // declaration is read in full either way, so its declarators draw no
-    // report of their own.
     if (!kQuals.has_var) {
       diag_.Error(CurrentLoc(),
                   "type_reference in a variable declaration must be "
@@ -300,9 +224,6 @@ void Parser::ParseBlockDataDecl(std::vector<Stmt*>& stmts,
 
 namespace {
 
-// A let, typedef, nettype or import among a block's items, carried as a
-// kBlockItemDecl statement over the ModuleItem its parse returned, starting
-// at `loc`.
 Stmt* BlockItemDeclStmt(Arena& arena, ModuleItem* item, SourceLoc loc,
                         std::vector<Attribute> attrs) {
   auto* s = arena.Create<Stmt>();
@@ -359,8 +280,6 @@ void Parser::ParseBlockVarDecls(std::vector<Stmt*>& stmts) {
       s->var_name = param->name;
       s->var_init = param->init_expr;
       s->var_is_param = true;
-      // §23.10.1: the declaration says whether a defparam may redefine it, a
-      // localparam or a type parameter being refused one.
       s->decl_item = param;
       s->attrs = attrs;
       stmts.push_back(s);

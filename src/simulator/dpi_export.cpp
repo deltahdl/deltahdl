@@ -34,11 +34,6 @@ std::string DpiInstanceScopeName(std::string_view prefix,
 
 namespace {
 
-// What runs the export registered `index`th with `dpi`, whose subroutine is
-// keyed `key`. The formals are read at the call, ResolveDpiFormalTypes having
-// resolved them in place once the design is lowered, so the export is named by
-// its position rather than copied. §35.8: a task may consume time, so the
-// process that enabled the calling import runs it (RunExportedTaskFromC).
 DpiRtArgCallback ExportImplementation(DpiRuntime& dpi, SimContext& ctx,
                                       size_t index, std::string_view key,
                                       bool is_task) {
@@ -65,12 +60,9 @@ void RegisterModuleDpiExports(const RtlirModule* mod, std::string_view prefix,
     DpiRuntime& dpi = ctx.AcquireDpiRuntime();
     DpiRtExport exp;
     exp.sv_name = item->name;
-    // §35.4: a declaration that gives no global name takes the SystemVerilog
-    // name of the subroutine as its global name.
     exp.c_name = item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
     exp.scope_name = DpiInstanceScopeName(prefix, ctx);
     exp.is_task = item->dpi_is_task;
-    // §H.9.3: svGetScopeFromName finds the instance by this name.
     DpiRegisterScope(exp.scope_name);
     if (subroutine != nullptr) {
       exp.return_type =

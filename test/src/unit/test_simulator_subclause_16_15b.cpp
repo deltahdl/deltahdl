@@ -8,13 +8,6 @@ using namespace delta;
 
 namespace {
 
-// A design around the modules given, as test/src/e2e/disable_iff_resolution.sv
-// is: the top t drives a 1, b 0, clk rising at 5, 15, 25 and 35, rst 1
-// across the tick of 15 and rst1 across the tick of 35, and instantiates
-// `instances`; the run ends at 40. Every attempt of a |=> b fails at the
-// tick after its own unless its disable condition holds at either, so the
-// times an assertion fails at say which condition it took: 15 and 25 for
-// rst1, 35 for rst, and all three for none.
 std::string Design(const std::string& modules, const std::string& instances) {
   return modules +
          "module t;\n"
@@ -48,11 +41,6 @@ const char* const kWithDefault =
     "    else $display(\"a4 failed at %0d\", $time);\n"
     "endmodule\n";
 
-// §16.15 rules (a) and (b): the clause's a1 names rst1 in its own clause
-// and a2 has it from p1, so the default rst is ignored for both and they
-// fail at 15 and 25; a3 has no clause and infers rst, failing at 35 alone;
-// a4 names 1'b0, the one way to cancel the default, and fails at every
-// tick.
 TEST(DisableIffResolutionRun, AnOwnClauseWinsAndTheDefaultIsInferredOtherwise) {
   SimFixture f;
   std::string out =
@@ -65,9 +53,6 @@ TEST(DisableIffResolutionRun, AnOwnClauseWinsAndTheDefaultIsInferredOtherwise) {
             "a3 failed at 35\na4 failed at 35\n$finish at time 40\n");
 }
 
-// §16.15 rule (c): with no default disable iff, the clause's a5 and a6 take
-// the rst their own clause and p2 name, failing at 35, and a7 has no
-// disable condition, failing at every tick.
 TEST(DisableIffResolutionRun, WithoutADefaultNoConditionIsInferred) {
   SimFixture f;
   std::string out = RunCapture(
@@ -91,11 +76,6 @@ TEST(DisableIffResolutionRun, WithoutADefaultNoConditionIsInferred) {
             "$finish at time 40\n");
 }
 
-// §16.15: the default extends to a nested module declaration, whose own
-// default, where it declares one, overrides it, and its effect is
-// independent of its position in the scope: m1 declares rst1 after its
-// assertion, m2 declares none and inherits rst1, and m3 declares rst, so
-// a_m1 and a_m2 fail at 15 and 25 and a_m3 at 35.
 TEST(DisableIffResolutionRun, ANestedDeclarationInheritsOrOverridesTheDefault) {
   SimFixture f;
   std::string out =
@@ -121,11 +101,6 @@ TEST(DisableIffResolutionRun, ANestedDeclarationInheritsOrOverridesTheDefault) {
             "a_m3 failed at 35\n$finish at time 40\n");
 }
 
-// §16.15: the scope of a default disable iff does not extend into an
-// instance of a module declared elsewhere, so the assertion of `leaf`,
-// instantiated in m1 under its default rst1, has no disable condition and
-// fails at every tick; and a generate block with a default of its own
-// applies it within the block, so a_gen takes rst and fails at 35.
 TEST(DisableIffResolutionRun,
      TheDefaultStopsAtAnInstanceAndAGenerateBlockMayOverrideIt) {
   SimFixture f;

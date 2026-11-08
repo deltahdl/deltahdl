@@ -32,9 +32,6 @@ TEST(PackageScopeReference, PackageScopeInExpression) {
   EXPECT_EQ(rhs->kind, ExprKind::kMemberAccess);
 }
 
-// A §26.3 package-scoped subroutine call is accepted by the grammar; the
-// elaborator file for this subclause carries the case that the same call
-// resolves to the package's function declaration.
 TEST(PackageScopeReference, PackageScopedFunctionCallParses) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -250,13 +247,6 @@ TEST(PackageImport, PackagePrecedesImport) {
       HasItemOfKind(r.cu->modules[0]->items, ModuleItemKind::kImportDecl));
 }
 
-// §26.3 names a package's type through the package scope resolution operator
-// and A.2.2.1's data_type lets a type_identifier stand behind a package_scope,
-// which A.2.7's tf_port_item and §23.2.2.2's ANSI port declaration both take
-// as their data type. ParseFunctionArg and ParseAnsiPortDataType read the type
-// through ParseDataType, which takes an unknown identifier as an implicit type
-// without consuming it, so `p` became the formal's or the port's name and the
-// `::` drew "expected ')'".
 TEST(PackageScopeReference, PackageScopedTypeAsASubroutineFormalType) {
   auto r = Parse(
       "module t;\n"

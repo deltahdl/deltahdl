@@ -53,22 +53,6 @@ TEST(CasexStatementSynth, AlwaysCombCasexStmt) {
   EXPECT_EQ(aig->outputs.size(), 2);
 }
 
-// The test fails on a synthesizer that answers `AigGraph::kConstTrue` at bit 0
-// of `y`, which is what this module lowers to today. §12.5.1 makes only `z` and
-// `?` don't-care under `casez`, so bit 64 of the pattern is compared rather
-// than ignored, and `SynthLower::MapPorts` in src/synthesizer/synth_lower.cpp
-// resizes an undriven variable's bits to `AigGraph::kConstFalse`, so the
-// constant-zero `sel` must not match a pattern with that bit set.
-// `SetDigitValueBits` in src/synthesizer/synth_pattern.cpp stops at bit 64, so
-// the pattern reads as all zeros, the case item matches, and `y` carries
-// `AigGraph::kConstTrue`.
-//
-// The case names `aig->outputs[0]` rather than driving the netlist with
-// `EvalAigOutputs`, because `sel` is a variable and not a port, so the netlist
-// has no input to drive and its one output bit is an exact literal.
-// `EvalAigOutputs` in lib/cpp/test_helpers/helpers_aig_eval.h packs outputs
-// into a `uint64_t`, so it cannot describe a netlist with more than 64 output
-// bits either.
 TEST(CasezStatementSynth,
      CasezPatternBitAboveSixtyThreeIsMatchedRatherThanIgnored) {
   SynthFixture f;
@@ -89,15 +73,6 @@ TEST(CasezStatementSynth,
   EXPECT_EQ(aig->outputs[0], AigGraph::kConstFalse);
 }
 
-// The test fails on a lowering that reads a case item's pattern out of the
-// per-digit decoding whatever base the pattern was written with. A decimal
-// literal writes no per-digit bits, so such a lowering compares the selector
-// against zero rather than against the value: `4'd3` selects the item at
-// `sel == 0` and not at `sel == 3`. §12.5.1 rules that under casez only a z or
-// a ? digit is don't-care, and a decimal literal holding neither is compared
-// whole, which is the §11.4.5 comparison of the selector against its value.
-// The cases above are written with a binary base, so each of their digits
-// carries its own bit and none of them reaches this.
 TEST(CasezStatementSynth, CasezAgainstADecimalPatternComparesItsValue) {
   ExpectInputSweep(
       "module m(input [3:0] sel, output logic y);\n"
@@ -111,10 +86,6 @@ TEST(CasezStatementSynth, CasezAgainstADecimalPatternComparesItsValue) {
       16, [](uint64_t sel) { return sel == 3 ? uint64_t{1} : uint64_t{0}; });
 }
 
-// §12.5 runs the first item in source order that matches, so where `2'b1?`
-// and `2'b11` both match sel = 3 the earlier item drives y. Built innermost
-// first, the netlist let the later item's multiplexer wrap the earlier one
-// and gave 2 there.
 TEST(CasezStatementSynth, FirstMatchingItemWins) {
   ExpectInputSweep(
       "module m(input logic [1:0] sel, output logic [1:0] y);\n"

@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -50,7 +48,6 @@ TEST(StrengthLevel, StrengthValPacksBothSidesIndependently) {
   EXPECT_EQ(sv.s1, 7);
 }
 
-// §28.11: the four driving strengths are supply, strong, pull, and weak.
 TEST(StrengthClassification, DrivingStrengthsAreSupplyStrongPullWeak) {
   EXPECT_TRUE(IsDrivingStrength(Strength::kSupply));
   EXPECT_TRUE(IsDrivingStrength(Strength::kStrong));
@@ -64,7 +61,6 @@ TEST(StrengthClassification, ChargeStorageStrengthsAreNotDriving) {
   EXPECT_FALSE(IsDrivingStrength(Strength::kSmall));
 }
 
-// §28.11: the three charge storage strengths are large, medium, and small.
 TEST(StrengthClassification, ChargeStorageStrengthsAreLargeMediumSmall) {
   EXPECT_TRUE(IsChargeStorageStrength(Strength::kLarge));
   EXPECT_TRUE(IsChargeStorageStrength(Strength::kMedium));
@@ -78,7 +74,6 @@ TEST(StrengthClassification, DrivingStrengthsAreNotChargeStorage) {
   EXPECT_FALSE(IsChargeStorageStrength(Strength::kWeak));
 }
 
-// §28.11: highz is neither a driving nor a charge storage strength.
 TEST(StrengthClassification, HighzIsNeitherDrivingNorChargeStorage) {
   EXPECT_FALSE(IsDrivingStrength(Strength::kHighz));
   EXPECT_FALSE(IsChargeStorageStrength(Strength::kHighz));

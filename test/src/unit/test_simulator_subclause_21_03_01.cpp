@@ -20,18 +20,12 @@
 using namespace delta;
 namespace {
 
-// Drives a whole module through parse -> elaborate -> lower -> run, so $fopen /
-// $fclose fire from real source exactly as a user design would trigger them,
-// with the descriptor and filename produced by genuine declarations/assignments
-// rather than a hand-built system-call node.
 static void RunFullSource(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
   LowerAndRun(design, f);
 }
 
-// Same, but captures everything the run writes to stdout so a $display-observed
-// outcome (e.g. an open-failure branch) can be checked.
 static std::string RunFullSourceCapture(const std::string& src, SimFixture& f) {
   std::ostringstream captured;
   std::streambuf* old_buf = std::cout.rdbuf(captured.rdbuf());
@@ -62,8 +56,6 @@ TEST(IoSystemTaskTest, FopenFclose) {
   std::remove(tmp_path.c_str());
 }
 
-// §21.3.1: an fd has its MSB set so the I/O runtime can distinguish it from
-// a multichannel descriptor.
 TEST(IoSystemTaskTest, FopenFdHasMsbSet) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_msb.txt";
@@ -79,8 +71,6 @@ TEST(IoSystemTaskTest, FopenFdHasMsbSet) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: omitting the type argument requests a multichannel descriptor; its
-// MSB is reserved (always clear) and its bit-0 channel is reserved for stdout.
 TEST(IoSystemTaskTest, FopenMcdHasMsbClearAndNonZero) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_mcd.txt";
@@ -90,7 +80,7 @@ TEST(IoSystemTaskTest, FopenMcdHasMsbClearAndNonZero) {
   auto mcd = static_cast<uint32_t>(mcd_val.ToUint64());
   EXPECT_NE(mcd, 0u);
   EXPECT_EQ(mcd & 0x80000000u, 0u);
-  EXPECT_EQ(mcd & 0x1u, 0u);  // bit 0 belongs to stdout
+  EXPECT_EQ(mcd & 0x1u, 0u);
 
   auto* close_expr =
       MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, mcd_val.ToUint64())});
@@ -98,7 +88,6 @@ TEST(IoSystemTaskTest, FopenMcdHasMsbClearAndNonZero) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: $fopen shall reuse channels that have been closed.
 TEST(IoSystemTaskTest, FopenReusesClosedChannel) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_reuse.txt";
@@ -123,7 +112,6 @@ TEST(IoSystemTaskTest, FopenReusesClosedChannel) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: STDIN/STDOUT/STDERR are reserved with the documented fd values.
 TEST(IoSystemTaskTest, ReservedStdioConstants) {
   EXPECT_EQ(SimContext::kStdinFd, 0x80000000u);
   EXPECT_EQ(SimContext::kStdoutFd, 0x80000001u);
@@ -135,8 +123,6 @@ TEST(IoSystemTaskTest, ReservedStdioConstants) {
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdinFd), nullptr);
 }
 
-// §21.3.1: $fclose on an mcd closes every file selected by its set bits, and
-// further attempts to access the channel after close are inert.
 TEST(IoSystemTaskTest, FcloseClearsMcdChannel) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fclose_mcd.txt";
@@ -152,8 +138,6 @@ TEST(IoSystemTaskTest, FcloseClearsMcdChannel) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: the "b" in mode strings only distinguishes binary from text on
-// systems that make that distinction; $fopen must accept the binary forms.
 TEST(IoSystemTaskTest, FopenAcceptsBinaryModeSuffix) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_binary.bin";
@@ -180,9 +164,6 @@ TEST(IoSystemTaskTest, FopenAcceptsBinaryModeSuffix) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: after $fclose, no further I/O on the closed fd is allowed.
-// $fdisplay through a stale fd must not crash and must not write — the
-// runtime drops the request because the descriptor is unmapped.
 TEST(IoSystemTaskTest, NoWritesAfterFcloseOnFd) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_no_writes_after_close.txt";
@@ -209,10 +190,6 @@ TEST(IoSystemTaskTest, NoWritesAfterFcloseOnFd) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: $fopen at simulator level must accept every type string listed
-// in Table 21-6, returning a usable fd (non-zero) in each case. This goes
-// past the parser-level acceptance check by exercising the runtime mode
-// translation that sits between Verilog source and libc.
 TEST(IoSystemTaskTest, FopenAcceptsEveryDocumentedModeAtRuntime) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_all_modes.txt";
@@ -236,9 +213,6 @@ TEST(IoSystemTaskTest, FopenAcceptsEveryDocumentedModeAtRuntime) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: $fopen returns a 32-bit value. The value-width width invariant is
-// observable at the simulator boundary where the runtime hands back a result
-// of fixed 32-bit packed-array width.
 TEST(IoSystemTaskTest, FopenReturnValueIsThirtyTwoBits) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_width.txt";
@@ -262,21 +236,14 @@ TEST(IoSystemTaskTest, FopenReturnValueIsThirtyTwoBits) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: STDOUT is pre-opened for output. Writing to the reserved STDOUT fd
-// must succeed (the descriptor is mapped to a non-null FILE*); this directly
-// observes the guarantee that STDOUT and STDERR come already open for append at
-// the simulator layer that produces the mapping.
 TEST(IoSystemTaskTest, StdoutFdIsWritable) {
   SimFixture f;
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdoutFd), nullptr);
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStderrFd), nullptr);
-  // $fdisplay to STDOUT must not crash and must not allocate a new fd slot.
   EvalExpr(MakeSysCall(
                f.arena, "$fdisplay",
                {MakeInt(f.arena, SimContext::kStdoutFd), MkStr(f.arena, "")}),
            f.ctx, f.arena);
-  // Reopening STDOUT-adjacent slots after writing must still succeed: the
-  // reserved descriptors do not consume the user-allocatable channel range.
   std::string path = "/tmp/deltahdl_test_stdout_writable.txt";
   auto fd =
       EvalExpr(MakeSysCall(f.arena, "$fopen",
@@ -292,9 +259,6 @@ TEST(IoSystemTaskTest, StdoutFdIsWritable) {
   std::remove(path.c_str());
 }
 
-// §21.3.1: closing a reserved STDIN/STDOUT/STDERR fd must not invalidate the
-// underlying libc stream. The runtime must continue to resolve those reserved
-// fds to a non-null FILE* after the user attempts $fclose on them.
 TEST(IoSystemTaskTest, FcloseDoesNotInvalidateReservedStdio) {
   SimFixture f;
   EvalExpr(MakeSysCall(f.arena, "$fclose",
@@ -311,10 +275,6 @@ TEST(IoSystemTaskTest, FcloseDoesNotInvalidateReservedStdio) {
   EXPECT_NE(f.ctx.GetFileHandle(SimContext::kStdinFd), nullptr);
 }
 
-// §21.3.1: filename and type may be supplied as an integral value whose bytes
-// encode the characters of the string, not only as a string literal. The
-// runtime decodes the byte-packed Logic4Vec value of the variable to recover
-// the path / mode at $fopen time.
 TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
   SimFixture f;
   const std::string kPath = "/tmp/x";
@@ -345,9 +305,6 @@ TEST(IoSystemTaskTest, FopenAcceptsIntegralCharacterStringForFilename) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.1: $fopen failure returns 0 for every read-style type string that
-// requires the file to already exist. Exercising each read variant separately
-// observes the parenthetical enumeration in the failure clause.
 TEST(IoSystemTaskTest, FopenReturnsZeroForMissingReadTargets) {
   SimFixture f;
   for (const char* mode : {"r", "rb", "r+", "r+b", "rb+"}) {
@@ -361,9 +318,6 @@ TEST(IoSystemTaskTest, FopenReturnsZeroForMissingReadTargets) {
   }
 }
 
-// §21.3.1: the LSB (bit 0) of a multichannel descriptor always refers to the
-// standard output. The runtime pre-wires channel 0 to stdout, so resolving an
-// mcd whose only set bit is bit 0 yields exactly the process stdout stream.
 TEST(IoSystemTaskTest, McdBitZeroIsStandardOutput) {
   SimFixture f;
   auto channel0 = f.ctx.GetMcdFiles(0x1u);
@@ -371,10 +325,6 @@ TEST(IoSystemTaskTest, McdBitZeroIsStandardOutput) {
   EXPECT_EQ(channel0.front(), stdout);
 }
 
-// §21.3.1: output is directed to two or more files opened with multichannel
-// descriptors by bitwise OR-ing their mcds together. Observed here at the
-// descriptor-resolution level that §21.3.1 owns: the OR of two single-channel
-// mcds selects both underlying files, independent of any file-output task.
 TEST(IoSystemTaskTest, OrCombinedMcdSelectsBothChannels) {
   SimFixture f;
   std::string path_a = "/tmp/deltahdl_test_or_mcd_a.txt";
@@ -394,7 +344,6 @@ TEST(IoSystemTaskTest, OrCombinedMcdSelectsBothChannels) {
   ASSERT_EQ(only_a.size(), 1u);
   ASSERT_EQ(only_b.size(), 1u);
 
-  // The OR of the two descriptors selects both channels at once.
   auto both = f.ctx.GetMcdFiles(mcd_a | mcd_b);
   ASSERT_EQ(both.size(), 2u);
   EXPECT_NE(both[0], nullptr);
@@ -409,9 +358,6 @@ TEST(IoSystemTaskTest, OrCombinedMcdSelectsBothChannels) {
   std::remove(path_b.c_str());
 }
 
-// §21.3.1: an mcd returned by $fopen is a 32-bit value in which a single bit is
-// set, indicating the one channel just opened. Opening one file must light
-// exactly one channel bit (and never bit 0, which is reserved for stdout).
 TEST(IoSystemTaskTest, FreshMcdHasExactlyOneChannelBitSet) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_fopen_single_bit.txt";
@@ -420,22 +366,13 @@ TEST(IoSystemTaskTest, FreshMcdHasExactlyOneChannelBitSet) {
                f.ctx, f.arena)
           .ToUint64());
   EXPECT_EQ(__builtin_popcount(mcd), 1) << "mcd=" << mcd;
-  EXPECT_EQ(mcd & 0x1u, 0u);  // bit 0 is reserved for stdout, never allocated
+  EXPECT_EQ(mcd & 0x1u, 0u);
 
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, mcd)}), f.ctx,
            f.arena);
   std::remove(path.c_str());
 }
 
-// §21.3.1: $fmonitor / $fstrobe operations attached to a descriptor are
-// implicitly cancelled when $fclose closes that descriptor. The descriptor
-// becomes unmapped, so any later write through it is dropped.
-//
-// Written with %0d rather than %d because what is under test is which writes
-// reach the file, not how the value is rendered. §21.2.1.2 pads %d to the
-// width of the largest value the expression can hold; %0d is the minimum-width
-// form, with no leading spaces or zeros, which keeps the expected string
-// independent of that width.
 TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
   SimFixture f;
   std::string path = "/tmp/deltahdl_test_cancel_on_close.txt";
@@ -450,7 +387,6 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
                        {MakeInt(f.arena, fd), MkStr(f.arena, "m=%0d"),
                         MakeInt(f.arena, 1)}),
            f.ctx, f.arena);
-  // §21.2.3: the monitor writes its list at the end of the time step.
   f.scheduler.Run();
   EvalExpr(MakeSysCall(f.arena, "$fclose", {MakeInt(f.arena, fd)}), f.ctx,
            f.arena);
@@ -472,15 +408,6 @@ TEST(IoSystemTaskTest, FmonitorAndFstrobeCancelledOnClose) {
   std::remove(path.c_str());
 }
 
-// ---------------------------------------------------------------------------
-// §21.3.1 end-to-end: the descriptor and filename are produced by real source
-// syntax and driven through the full parse/elaborate/lower/run pipeline. The
-// $fopen result is consumed by a file-output task so the roundtrip is visible
-// in the file the run actually wrote.
-// ---------------------------------------------------------------------------
-
-// §21.3.1: the fd form ($fopen with a type argument) opens a writable file and
-// $fclose flushes and closes it. Input form: filename as a string literal.
 TEST(IoSystemTaskTest, FdOpenWriteCloseRoundTripFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_fd_roundtrip.txt";
@@ -501,8 +428,6 @@ TEST(IoSystemTaskTest, FdOpenWriteCloseRoundTripFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.1: the mcd form ($fopen with only a filename) opens a channel and
-// $fclose closes it. Input form: filename as a string literal, no type.
 TEST(IoSystemTaskTest, McdOpenDisplayCloseRoundTripFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_mcd_roundtrip.txt";
@@ -523,8 +448,6 @@ TEST(IoSystemTaskTest, McdOpenDisplayCloseRoundTripFromSource) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.1 input form: the filename may be supplied as a string-data-type
-// variable, not only as a literal. Built from real `string` source syntax.
 TEST(IoSystemTaskTest, FilenameFromStringDataTypeVariable) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_strname.txt";
@@ -547,14 +470,10 @@ TEST(IoSystemTaskTest, FilenameFromStringDataTypeVariable) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.1 input form: the filename may be an integral value whose bytes encode
-// the characters. Built from a real packed-vector declaration holding the path.
 TEST(IoSystemTaskTest, FilenameFromPackedIntegralVariable) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_intname.txt";
   std::remove(kPath.c_str());
-  // A 32-byte packed vector comfortably holds the path; the leading bytes are
-  // zero and are ignored when the runtime decodes the characters.
   RunFullSource(
       "module t;\n"
       "  bit [8*32:1] path;\n"
@@ -573,8 +492,6 @@ TEST(IoSystemTaskTest, FilenameFromPackedIntegralVariable) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.1 input form: the type argument may also be supplied as a
-// string-data-type variable rather than a literal; it still selects the mode.
 TEST(IoSystemTaskTest, TypeFromStringDataTypeVariable) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_modevar.txt";
@@ -597,8 +514,6 @@ TEST(IoSystemTaskTest, TypeFromStringDataTypeVariable) {
   std::remove(kPath.c_str());
 }
 
-// §21.3.1 negative form: opening a nonexistent file with a read-only type
-// returns 0. Driven from source so the failure value flows through the branch.
 TEST(IoSystemTaskTest, MissingReadTargetReturnsZeroFromSource) {
   SimFixture f;
   std::string out = RunFullSourceCapture(
@@ -614,9 +529,6 @@ TEST(IoSystemTaskTest, MissingReadTargetReturnsZeroFromSource) {
   EXPECT_EQ(out, "open-failed\n");
 }
 
-// §21.3.1: $fopen shall reuse a channel that has been closed. Two opens of the
-// same path around a $fclose yield the same descriptor value; observed from
-// source by comparing the two returned descriptors.
 TEST(IoSystemTaskTest, ClosedChannelReusedFromSource) {
   SimFixture f;
   const std::string kPath = "/tmp/deltahdl_e2e_reuse.txt";

@@ -1,18 +1,3 @@
-// Tests for IEEE 1800-2023 clause 7.9.2 -- the delete() associative array
-// method. delete(index) removes the single entry stored under that index;
-// delete() with no argument (and the parenless property form `aa.delete;`)
-// removes every entry; deleting an index that is not present is a silent no-op
-// that issues no warning. Every one of those behaviors acts on entries that
-// were produced by prior indexed writes (clause 7.8, this pass's dependency)
-// and, for delete(index), on an index value passed by value (clause 13.5.1),
-// so each test builds the array from real declaration + indexed-assignment
-// source and drives it through parse -> elaborate -> lower -> run, observing
-// the surviving contents through a witness variable (num()/exists()/an element
-// read) rather than hand-building the array object. Because delete() returns
-// void, the effect is always read back from real source after the deletion.
-// The index type is supplied through each dependency's real key syntax:
-// integral keys (7.8.4) and string keys (7.8.2).
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -26,10 +11,6 @@ using namespace delta;
 
 namespace {
 
-// Drives real source through the full pipeline and reports how many warnings
-// the run produced. Used to observe the clause 7.9.2 rule that deleting an
-// absent index issues no warning: the count must stay at zero across such a
-// delete. Mirrors RunAndGet but exposes the fixture's diagnostic tally.
 uint32_t RunAndCountWarnings(const std::string& src) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
@@ -42,8 +23,6 @@ uint32_t RunAndCountWarnings(const std::string& src) {
   return f.diag.WarningCount();
 }
 
-// delete(index) on an integral-keyed array removes just the named entry: after
-// deleting one of two keys, num() reports a single surviving entry.
 TEST(AssocArrayDeleteMethod, IntKeyByIndexRemovesOneEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -60,8 +39,6 @@ TEST(AssocArrayDeleteMethod, IntKeyByIndexRemovesOneEntry) {
   EXPECT_EQ(v, 1u);
 }
 
-// delete(index) removes the *targeted* entry and no other: the untouched key
-// still yields its stored value after the deletion.
 TEST(AssocArrayDeleteMethod, IntKeyByIndexKeepsOtherEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -78,7 +55,6 @@ TEST(AssocArrayDeleteMethod, IntKeyByIndexKeepsOtherEntry) {
   EXPECT_EQ(v, 200u);
 }
 
-// After delete(index), the deleted key no longer exists: exists() returns 0.
 TEST(AssocArrayDeleteMethod, IntKeyByIndexDeletedKeyNoLongerExists) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -95,7 +71,6 @@ TEST(AssocArrayDeleteMethod, IntKeyByIndexDeletedKeyNoLongerExists) {
   EXPECT_EQ(v, 0u);
 }
 
-// delete() with no argument removes every entry of an integral-keyed array.
 TEST(AssocArrayDeleteMethod, IntKeyNoArgRemovesAllEntries) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -112,7 +87,6 @@ TEST(AssocArrayDeleteMethod, IntKeyNoArgRemovesAllEntries) {
   EXPECT_EQ(v, 0u);
 }
 
-// The parenless property form `aa.delete;` also removes every entry.
 TEST(AssocArrayDeleteMethod, IntKeyPropertySyntaxRemovesAllEntries) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -129,8 +103,6 @@ TEST(AssocArrayDeleteMethod, IntKeyPropertySyntaxRemovesAllEntries) {
   EXPECT_EQ(v, 0u);
 }
 
-// A narrow integral index type (dependency 7.8.4) still selects the right entry
-// to delete: after deleting key 200, only key 50 survives.
 TEST(AssocArrayDeleteMethod, NarrowIndexByIndexRemovesOneEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -147,8 +119,6 @@ TEST(AssocArrayDeleteMethod, NarrowIndexByIndexRemovesOneEntry) {
   EXPECT_EQ(v, 1u);
 }
 
-// String-keyed (dependency 7.8.2): delete(index) removes just the named key,
-// leaving the other entry countable.
 TEST(AssocArrayDeleteMethod, StringKeyByIndexRemovesOneEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -165,7 +135,6 @@ TEST(AssocArrayDeleteMethod, StringKeyByIndexRemovesOneEntry) {
   EXPECT_EQ(v, 1u);
 }
 
-// String-keyed delete(index) leaves the non-targeted key's value intact.
 TEST(AssocArrayDeleteMethod, StringKeyByIndexKeepsOtherEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -182,7 +151,6 @@ TEST(AssocArrayDeleteMethod, StringKeyByIndexKeepsOtherEntry) {
   EXPECT_EQ(v, 2u);
 }
 
-// String-keyed delete() with no argument removes every entry.
 TEST(AssocArrayDeleteMethod, StringKeyNoArgRemovesAllEntries) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -199,8 +167,6 @@ TEST(AssocArrayDeleteMethod, StringKeyNoArgRemovesAllEntries) {
   EXPECT_EQ(v, 0u);
 }
 
-// The clause 7.9.2 worked example, delete-by-key half: a string-keyed map with
-// three entries, after map.delete("sad"), retains two entries.
 TEST(AssocArrayDeleteMethod, WorkedExampleDeleteByKeyLeavesTwo) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -218,8 +184,6 @@ TEST(AssocArrayDeleteMethod, WorkedExampleDeleteByKeyLeavesTwo) {
   EXPECT_EQ(v, 2u);
 }
 
-// The clause 7.9.2 worked example, delete-all half: after the parenless
-// map.delete;, the map is empty.
 TEST(AssocArrayDeleteMethod, WorkedExampleDeleteAllEmptiesMap) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -237,8 +201,6 @@ TEST(AssocArrayDeleteMethod, WorkedExampleDeleteAllEmptiesMap) {
   EXPECT_EQ(v, 0u);
 }
 
-// Deleting a key that is not present is a no-op on the contents: the existing
-// entries survive untouched.
 TEST(AssocArrayDeleteMethod, MissingIntKeyLeavesContentsUnchanged) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -254,11 +216,6 @@ TEST(AssocArrayDeleteMethod, MissingIntKeyLeavesContentsUnchanged) {
   EXPECT_EQ(v, 1u);
 }
 
-// The index argument is passed by value (dependency 13.5.1): when the key to
-// delete is supplied through a real integral variable rather than a literal,
-// delete() still removes exactly that entry. The variable is declared and
-// assigned from source and consumed as the actual argument, driving the
-// by-value argument path end to end.
 TEST(AssocArrayDeleteMethod, IntKeyByVariableIndexRemovesTargetedEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -277,9 +234,6 @@ TEST(AssocArrayDeleteMethod, IntKeyByVariableIndexRemovesTargetedEntry) {
   EXPECT_EQ(v, 0u);
 }
 
-// The same by-value argument path (dependency 13.5.1) with a string key
-// supplied through a string variable: after the delete, only the untouched
-// entry remains.
 TEST(AssocArrayDeleteMethod, StringKeyByVariableIndexRemovesTargetedEntry) {
   uint64_t v = RunAndGet(
       "module t;\n"
@@ -298,10 +252,6 @@ TEST(AssocArrayDeleteMethod, StringKeyByVariableIndexRemovesTargetedEntry) {
   EXPECT_EQ(v, 1u);
 }
 
-// §7.9.2: deleting an integral index that does not exist issues no warning.
-// Isolated differentially: the same module without the delete and with the
-// missing-key delete must emit the identical (zero) warning count, so the
-// no-op delete contributes nothing to the diagnostic tally.
 TEST(AssocArrayDeleteMethod, MissingIntKeyIssuesNoWarning) {
   uint32_t baseline = RunAndCountWarnings(
       "module t;\n"
@@ -322,8 +272,6 @@ TEST(AssocArrayDeleteMethod, MissingIntKeyIssuesNoWarning) {
   EXPECT_EQ(with_delete, 0u);
 }
 
-// §7.9.2: deleting a string index that does not exist likewise issues no
-// warning, isolated the same differential way.
 TEST(AssocArrayDeleteMethod, MissingStringKeyIssuesNoWarning) {
   uint32_t baseline = RunAndCountWarnings(
       "module t;\n"
@@ -344,12 +292,6 @@ TEST(AssocArrayDeleteMethod, MissingStringKeyIssuesNoWarning) {
   EXPECT_EQ(with_delete, 0u);
 }
 
-// §7.9.2 with §8.5: delete on a property that is an associative array of
-// class handles, called in a task of the class, is the array's method -- as
-// UVM's uvm_objection::wait_for ends with `m_events.delete(obj)` -- so the
-// entry goes and nothing is reported. Taken for a call through a class handle
-// of the element's class, the property read as a null handle and §8.4's error
-// was raised, though the array's delete then ran as well.
 TEST(AssocArrayDeleteMethod,
      DeleteOnAHandleArrayPropertyInATaskReportsNothing) {
   SimFixture f;

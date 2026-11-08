@@ -34,11 +34,6 @@ namespace delta {
 
 namespace {
 
-// §16.6: an expression appearing in a concurrent assertion shall not reference
-// a variable of chandle type. A concurrent assertion statement
-// (assert/assume/cover/restrict property) keeps its property_spec expression in
-// assert_expr, or, for the simple clocked boolean form, in the immediate body
-// statement's assert_expr. Reports the first chandle reference once.
 void CheckConcurrentAssertionNoChandle(const ModuleItem* item,
                                        const RtlirModule* mod,
                                        DiagEngine& diag) {
@@ -58,9 +53,6 @@ void CheckConcurrentAssertionNoChandle(const ModuleItem* item,
   }
 }
 
-// §16.6: an expression appearing in a concurrent assertion shall not reference
-// a non-static class property or method. Reads the same two bodies the chandle
-// check reads and reports the first `h.m` once.
 void CheckConcurrentAssertionNoNonStaticMember(const ModuleItem* item,
                                                const RtlirModule* mod,
                                                const CompilationUnit* unit,
@@ -82,23 +74,10 @@ void CheckConcurrentAssertionNoNonStaticMember(const ModuleItem* item,
   }
 }
 
-bool IsStaticDeferredAssertion(const ModuleItem* item) {  // §16.4.3
+bool IsStaticDeferredAssertion(const ModuleItem* item) {
   return item->body != nullptr && item->body->is_deferred;
 }
 
-// §16.12.1: an instance of a named property can be used as a property_spec,
-// and the assertion is then legal provided the property's body, substituted in
-// place of the instance, is a legal property_spec. The parser records the name
-// of an argument-less instance in prop_instance_name (see
-// Parser::TryParsePropertyInstanceSpec); this makes the substitution when the
-// body is the clocked boolean form the parser captured, giving `item` the
-// clock and body an assertion written in that form has, so the caller lowers
-// it to the same process. The property may name no formals, since an instance
-// without arguments binds none; §16.12.1 puts substitution of actuals for
-// formals ahead of the check, and there are none to substitute.
-//
-// §16.13: `ev` appended to `clock` unless an event of the same edge over a
-// signal of the same spelling, its whole path included (§23.6), is there.
 void AppendClockOnce(std::vector<EventExpr>& clock, const EventExpr& ev) {
   if (ev.signal == nullptr) return;
   for (const EventExpr& have : clock) {
@@ -114,9 +93,6 @@ void CollectBodyClocks(const SeqLinearBody& body,
 void AppendInstanceClockEvents(EventExpr ev, const ActualsByFormal& actuals,
                                std::vector<EventExpr>& out);
 
-// §16.13.3 with §16.8.1: an operand instantiating a named sequence brings the
-// clock the sequence is declared with, the instance's actuals in its formals'
-// places, and the clocks its body names.
 void CollectInstanceSequenceClocks(const Expr* operand,
                                    const PropertyRegistry& registry,
                                    std::vector<EventExpr>& out, int depth) {
@@ -139,9 +115,6 @@ void CollectBodiesClocks(const std::vector<SeqLinearBody>& bodies,
   }
 }
 
-// §16.13.1: the clocks the operands of a sequence body name, the bodies of
-// the sequences it instantiates walked too, to a depth that reads a body
-// once.
 void CollectBodyClocks(const SeqLinearBody& body,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth) {
@@ -162,12 +135,6 @@ void CollectTreeClocks(const PropertyExprNode* node,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth);
 
-// §16.13.2 by way of §16.8.1: the events of an instantiated property's
-// declared clock with the actual in the formal's place, for the process to
-// wake on, each appended to `out` once: an event actual supplies its events,
-// each with its edge, its signal and its own guard, and any other stands as
-// the signal under the edge the clock wrote. The clock's own guard, which the
-// evaluation applies, is not needed to wake.
 void AppendInstanceClockEvents(EventExpr ev, const ActualsByFormal& actuals,
                                std::vector<EventExpr>& out) {
   if (ev.signal != nullptr && ev.signal->kind == ExprKind::kIdentifier) {
@@ -183,9 +150,6 @@ void AppendInstanceClockEvents(EventExpr ev, const ActualsByFormal& actuals,
   AppendClockOnce(out, ev);
 }
 
-// §16.13: the clocks an instance among the tree's booleans brings: those of
-// the body of the property it instantiates and of the sequences and
-// properties it takes as actuals.
 void CollectInstanceClocks(const Expr* instance,
                            const PropertyRegistry& registry,
                            std::vector<EventExpr>& out, int depth) {
@@ -193,8 +157,6 @@ void CollectInstanceClocks(const Expr* instance,
   const ModuleItem* decl =
       InstantiatedDecl(instance, ModuleItemKind::kPropertyDecl, registry);
   if (decl != nullptr) {
-    // §16.13.2: a property declared with a clock is evaluated on it, the
-    // actuals in the formals' places.
     ActualsByFormal actuals = BindActualsWithDefaults(
         decl->prop_formals, decl->prop_formal_defaults, instance);
     for (const EventExpr& ev : decl->prop_clock) {
@@ -210,15 +172,10 @@ void CollectInstanceClocks(const Expr* instance,
   }
 }
 
-// §16.13: the clocks the sequences of the tree name, those of the bodies of
-// the properties it instantiates and of the sequences and properties its
-// instances take as actuals included, for the assertion's process to wake
-// on beside its leading clock.
 void CollectTreeClocks(const PropertyExprNode* node,
                        const PropertyRegistry& registry,
                        std::vector<EventExpr>& out, int depth) {
   if (node == nullptr) return;
-  // §16.13.2: an operand's own clock.
   for (const EventExpr& ev : node->clock) AppendClockOnce(out, ev);
   if (node->sequence != nullptr) {
     CollectBodyClocks(node->sequence->seq_linear, registry, out, depth);
@@ -229,12 +186,6 @@ void CollectTreeClocks(const PropertyExprNode* node,
   }
 }
 
-// The statement the elaborator makes for an assertion whose spec is an
-// instance of a named sequence or property: the parser's kinds for the
-// assert, assume and cover directives, a cover of either category running
-// no fail statement and reporting no failure, a cover sequence marked for
-// §16.14.3's results, and, §16.14, the item's label as a level of the name
-// its action block reports, as the parser gives a body it makes itself.
 Stmt* NewInstanceStmt(const ModuleItem* item, Arena& arena) {
   auto* stmt = arena.Create<Stmt>();
   switch (item->kind) {
@@ -255,10 +206,6 @@ Stmt* NewInstanceStmt(const ModuleItem* item, Arena& arena) {
   return stmt;
 }
 
-// §16.12.2: the statement `stmt` is given the sequential property the
-// instance `instance` of a named sequence is, its sequence_expr read as
-// strong in a cover, where no sequence operator is written, and as the
-// statement was marked otherwise.
 void GiveSequenceProperty(Stmt* stmt, Expr* instance, Arena& arena) {
   stmt->assert_property = arena.Create<PropertyExprNode>();
   stmt->assert_property->kind = PropertyExprNode::Kind::kSequence;
@@ -267,14 +214,9 @@ void GiveSequenceProperty(Stmt* stmt, Expr* instance, Arena& arena) {
       stmt->kind == StmtKind::kCoverImmediate || stmt->assert_strong;
 }
 
-// §16.13.4: an instance of a named sequence standing as the whole
-// property_spec, `assert property (mult_s)`, is the sequential property the
-// sequence is, evaluated on the clock the sequence is declared with.
 bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
                                 const PropertyRegistry& registry,
                                 Arena& arena) {
-  // §16.16: a sequence declared with no clock leaves the statement its
-  // clock to determine, the default clocking's or none.
   auto* stmt = NewInstanceStmt(item, arena);
   stmt->assert_expr = item->assert_expr;
   GiveSequenceProperty(stmt, item->assert_expr, arena);
@@ -287,11 +229,6 @@ bool SubstituteSequenceInstance(ModuleItem* item, const ModuleItem* decl,
   return true;
 }
 
-// The body the statement of the instance `instance` of `decl` carries: the
-// boolean with the actuals substituted where the body is the clocked
-// boolean form and the boolean reads every actual (TakesBooleanSubstitution),
-// and otherwise, §16.12.17, a tree whose root is the instance, expanded at
-// the run, its recursion included, with the actuals substituted there.
 void GiveInstanceBody(Stmt* stmt, Expr* instance, const ModuleItem* decl,
                       const ActualsByFormal& actuals, Arena& arena) {
   if (TakesBooleanSubstitution(instance, decl)) {
@@ -304,10 +241,6 @@ void GiveInstanceBody(Stmt* stmt, Expr* instance, const ModuleItem* decl,
   stmt->assert_property->boolean = instance;
 }
 
-// Whether the instance `item` of `decl` is one this tool evaluates, which
-// needs `decl` to be a property whose body it reads and a clock, the
-// property's own or the one flowing from its body; each want is reported
-// under the rule Parser::WarnUnevaluatedConcurrentAssertion states.
 bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
                                  DiagEngine& diag) {
   std::string name(item->prop_instance_name);
@@ -321,18 +254,9 @@ bool PropertyInstanceIsEvaluated(const ModuleItem* item, const ModuleItem* decl,
                  Subclause("16.14"));
     return false;
   }
-  // §16.16: a property declared with no clock, and none flowing into it,
-  // leaves the statement its clock to determine.
   return true;
 }
 
-// The rewrite is made on `item`, which every instance of the module shares,
-// and it is made once: the property declaration is the same for every
-// instance, so the second instance finds the body already there. Reports the
-// assertion unevaluated, under the rule
-// Parser::WarnUnevaluatedConcurrentAssertion states, when the name is no
-// property's or the body is not that form; the parser left the report to here
-// because it could not tell the two apart.
 void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                                 const PropertyRegistry& registry,
                                 const InferredAtInstance& inferred,
@@ -341,13 +265,7 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   const ModuleItem* decl = registry.Find(item->prop_instance_name);
   std::string name(item->prop_instance_name);
   if (decl != nullptr) NameInstanceByKey(item, arena);
-  // §16.14.7: the instance is the top-level property expression of the
-  // assertion statement, so the inferred functions among the defaults are
-  // replaced by what is inferred at the statement, the default clocking and
-  // the default disable iff in scope.
   FillInferredDefaults(item->assert_expr, decl, inferred, arena, &diag);
-  // A name declaring no property leaves the spec no instance of one, which
-  // §37.50 reaches as a property spec rather than a property inst.
   if (decl == nullptr || decl->kind != ModuleItemKind::kPropertyDecl) {
     item->prop_instance_name = {};
   }
@@ -360,12 +278,6 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
     return;
   }
   if (!PropertyInstanceIsEvaluated(item, decl, diag)) return;
-  // §16.12 and §16.8: the actual arguments of the instance are bound to the
-  // formals by position, and §F.4.1's rewriting substitutes each for the
-  // references to its formal in the clock, the disable condition and the
-  // boolean. A formal left to its default actual, which this tool does not
-  // keep, leaves the assertion unevaluated; the count of actuals against
-  // formals is validated where §16.8's rules are.
   ActualsByFormal actuals;
   const std::vector<Expr*>& args = item->assert_expr->args;
   for (size_t i = 0; i < decl->prop_formals.size(); ++i) {
@@ -378,8 +290,6 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
                    Subclause("16.14"));
       return;
     }
-    // §16.12 with §16.8: an untyped formal's actual is cast to its own
-    // self-determined type before it stands for the formal.
     actuals[decl->prop_formals[i]] =
         CastUntypedActual(args[i], decl->prop_formal_type_kw[i], arena);
   }
@@ -390,21 +300,10 @@ void SubstitutePropertyInstance(ModuleItem* item, Arena& arena,
   stmt->is_concurrent_clocked = true;
   stmt->assert_pass_stmt = item->assert_pass_stmt;
   stmt->assert_fail_stmt = item->assert_fail_stmt;
-  // §16.13.3, §16.13.4 and §16.16: the clock the property is declared with
-  // or that flows into its body, `mult_p2` being on `mult_s`'s; the leading
-  // clock once its formals stand replaced by their actuals,
-  // `r(@(posedge clk) a)` on posedge clk; or the one §16.16.1 determines
-  // from its body, `not s2` on s2's.
   item->sensitivity = PropertyInstanceClock(decl, actuals, registry, arena);
   item->body = stmt;
 }
 
-// §16.12.1 and §16.12.17: a clocked assertion whose boolean is an instance
-// of a named property whose body is a tree, `@(posedge clk) prop_always(a)`,
-// which the parser read as a boolean because a call and a variable's name
-// read the same. The statement is given the instance as the root of a tree
-// so that the evaluator expands it, its recursion included; a `not` before
-// the instance negates the tree.
 void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
                                     const PropertyRegistry& registry,
                                     const InferredAtInstance& inferred) {
@@ -420,8 +319,6 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
   }
   const ModuleItem* decl = registry.FindInstance(instance);
   if (decl != nullptr && decl->kind == ModuleItemKind::kSequenceDecl) {
-    // §16.12.2 and §16.13.4: `@(negedge clk) s2` is the sequential property
-    // the sequence s2 is, evaluated on the clock written.
     GiveSequenceProperty(stmt, instance, arena);
     return;
   }
@@ -429,14 +326,9 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
       decl->prop_body_tree == nullptr) {
     return;
   }
-  // §16.14.7: the clocking event the assertion opens with is what is
-  // inferred at the instance, and the default disable iff in scope.
   InferredAtInstance here = inferred;
   here.clock = item->sensitivity;
   FillInferredDefaults(instance, decl, here, arena);
-  // §16.12.18: an instance of the clocked boolean form is left as the
-  // boolean it was read as unless an actual is one the boolean does not
-  // read.
   if (TakesBooleanSubstitution(instance, decl)) return;
   auto* root = arena.Create<PropertyExprNode>();
   root->boolean = stmt->assert_expr;
@@ -447,8 +339,6 @@ void PromotePropertyInstanceBoolean(ModuleItem* item, Arena& arena,
     root = whole;
   }
   stmt->assert_property = root;
-  // §16.15: the disable iff clause the property declares is the instance's
-  // own, the actuals in the formals' places, ahead of any default.
   if (stmt->assert_disable_iff == nullptr) {
     stmt->assert_disable_iff = SubstituteFormals(
         decl->prop_disable_iff,
@@ -477,35 +367,20 @@ void Elaborator::ElaborateSequenceDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->assertion_item_decls.push_back(
       RtlirAssertionItemDecl{item, {}, {}, nullptr});
   item->seq_triggered_unread = !unit_->triggered_names.contains(item->name);
-  // §16.8: a cyclic dependency among named sequences is an error. All sequence
-  // decls are registered before elaboration (see ElaborateModule), so this DFS
-  // sees the full graph regardless of declaration order.
   if (property_registry_.HasCyclicSequenceDependency(item)) {
     diag_.Error(item->loc,
                 "cyclic dependency among named sequences involving \"" +
                     std::string(item->name) + "\"",
                 Subclause("16.8"));
   }
-  // §16.10: a formal-argument name may not be redeclared as a body local.
   ValidateNoFormalShadowedByBodyLocal(item);
   ValidateClockingBlock(item, mod);
-  // §16.13.1 and Annex F.3.2: the rules on clocks are applied under the
-  // sequence's own leading clock; one that inherits its clock from where it
-  // is instantiated is not, the clock in force not being known here.
   if (!item->seq_clock.empty()) {
     ValidateMulticlockSequence(item, item->seq_clock, item->loc,
                                property_registry_, diag_);
   }
 }
 
-// §16.12.1: an instance of a named property used as a property_expr operand of
-// any property-building operator must, once substituted, yield a legal
-// property_expr. A disable iff clause makes the flattened body a property_spec,
-// which is not a legal operand -- so such a property may not carry a disable
-// iff clause when it appears as an operand. The parser records the instances
-// that stand as the operand of a prefix or infix property operator (not,
-// s_nexttime, s_eventually, s_always, and the right operand of
-// s_until/s_until_with) in prop_negated_instance_refs.
 void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
   for (auto operand_ref : item->prop_negated_instance_refs) {
     const ModuleItem* callee = property_registry_.Find(operand_ref);
@@ -523,11 +398,6 @@ void Elaborator::CheckPropertyOperandInstances(const ModuleItem* item) {
   }
 }
 
-// §16.12.1 with §16.12: the first operand of a property-building operator in
-// the tree under `node` that instantiates a named property carrying a disable
-// iff clause, its own or one flattened in from a property it instantiates, as
-// the property's name; empty where there is none. The root is no operand, so
-// an instance standing as the whole property_spec is legal and not reported.
 static std::string_view DisableIffOperand(const PropertyExprNode* node,
                                           const PropertyRegistry& registry,
                                           int depth) {
@@ -549,9 +419,6 @@ static std::string_view DisableIffOperand(const PropertyExprNode* node,
   return {};
 }
 
-// §16.12.1: reports DisableIffOperand's find in `root` at `loc`, naming the
-// declaration it stands in where `in` names one. A name the parser's scan
-// already reported as the operand of a prefix operator is skipped.
 static void ReportDisableIffOperand(const PropertyExprNode* root,
                                     const PropertyRegistry& registry,
                                     SourceLoc loc, const ModuleItem* in,
@@ -586,14 +453,10 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   mod->property_decls.push_back(item);
   mod->assertion_item_decls.push_back(
       RtlirAssertionItemDecl{item, {}, {}, nullptr});
-  // §16.12.22: the sequences the body uses as properties and as antecedents
-  // are checked where the body is declared, once for every instance.
   ValidateSequenceDegeneracy(item->prop_body_tree, item->loc,
                              property_registry_, diag_);
   ValidateMulticlockSequences(item->prop_body_tree, item->prop_clock, item->loc,
                               property_registry_, diag_);
-  // §16.12: nesting of disable iff (explicitly or via property instantiation)
-  // is forbidden; the §F.4.1 flattened count catches both.
   if (property_registry_.FlattenedDisableIffCount(item) > 1) {
     diag_.Error(item->loc,
                 "property \"" + std::string(item->name) +
@@ -603,15 +466,11 @@ void Elaborator::ElaboratePropertyDeclItem(ModuleItem* item, RtlirModule* mod) {
   CheckPropertyOperandInstances(item);
   ReportDisableIffOperand(item->prop_body_tree, property_registry_, item->loc,
                           item, diag_);
-  // §16.10: a formal-argument name may not be redeclared as a body local.
   ValidateNoFormalShadowedByBodyLocal(item);
-  // §16.12.17 / §F.7: enforce the restrictions on recursive properties.
   ValidateRecursiveProperty(item);
   ValidateClockingBlock(item, mod);
 }
 
-// §16.16 (f): the report on a concurrent assertion statement at `loc` for
-// which no leading clocking event is written, inferred or determined.
 static void ReportNoLeadingClock(SourceLoc loc, DiagEngine& diag) {
   diag.Error(loc,
              "concurrent assertion has no leading clocking event: none is "
@@ -621,17 +480,8 @@ static void ReportNoLeadingClock(SourceLoc loc, DiagEngine& diag) {
              Subclause("16.16"));
 }
 
-// §16.16: the leading clocking event of a static concurrent assertion
-// statement: (d) the one its spec opens with, or the one the instance its
-// maximal property is determines, its declaration's or the one flowing into
-// it; (a) else the default clocking event, as though written as the leading
-// clocking event; (f) else none applies, and the statement is illegal, its
-// maximal property being no instance for which a unique leading clocking
-// event is determined.
 void Elaborator::ResolveStaticAssertionClock(
     ModuleItem* item, const std::vector<EventExpr>& default_clock) {
-  // §16.4.3: a deferred immediate assertion outside procedural code stands
-  // for an always_comb procedure and has no clock to resolve.
   if (item->body == nullptr || item->body->is_deferred) return;
   if (item->sensitivity.empty()) {
     item->sensitivity = default_clock;
@@ -644,9 +494,6 @@ void Elaborator::ResolveStaticAssertionClock(
     item->body = nullptr;
     return;
   }
-  // §16.16 (e) and §16.16.1: a multiclocked maximal property needs a unique
-  // semantic leading clock under the clock flowing in, the clause's a1
-  // naming two.
   if (!HasUniqueSemanticLeadingClock(item->body->assert_property,
                                      item->sensitivity, property_registry_)) {
     diag_.Error(item->loc, "the property has no unique semantic leading clock",
@@ -655,9 +502,6 @@ void Elaborator::ResolveStaticAssertionClock(
   }
 }
 
-// §16.14.7, §16.15 and §16.16 (a): the clock and the disable condition an
-// assertion `mod` writes takes where it names none, the default clocking's
-// event and the default disable iff's condition.
 static InferredAtInstance InferredAt(const RtlirModule* mod) {
   InferredAtInstance inferred;
   inferred.clock = DefaultClockingEvent(mod);
@@ -665,11 +509,6 @@ static InferredAtInstance InferredAt(const RtlirModule* mod) {
   return inferred;
 }
 
-// §16.14.4: a restrict property is not verified in simulation, so it draws no
-// report and runs no process. §37.50 reaches its clock and its property spec
-// all the same, resolved as an assert property's are: its instance substituted
-// (§16.12.1), the default disable condition taken (§16.15) and the default
-// clocking's event where it writes no clock (§16.16 (a)).
 static void ElaborateRestrictPropertyItem(ModuleItem* item,
                                           const RtlirModule* mod, Arena& arena,
                                           const PropertyRegistry& registry,
@@ -688,17 +527,10 @@ static void ElaborateRestrictPropertyItem(ModuleItem* item,
     body->assert_clock_inferred = !kInferred.clock.empty();
     body->assert_clock_from_default_clocking = body->assert_clock_inferred;
   }
-  // §16.16 (f) holds every concurrent assertion statement of §16.14, a
-  // restrict property among them, to having a leading clocking event.
   if (item->sensitivity.empty()) ReportNoLeadingClock(item->loc, diag);
   if (body->assert_clock.empty()) body->assert_clock = item->sensitivity;
 }
 
-// §14.14: the assertion `item`, an instance whose actuals write
-// $global_clock, with each such actual waiting on `global_event`, the event
-// of this instance of the module. The item is shared by every instance, and
-// §14.14 rule b) can give two of them different events, so the rewrite is
-// made on a copy, made before SubstitutePropertyInstance gives it a body.
 static ModuleItem* GlobalClockInstanceActuals(
     ModuleItem* item, const std::vector<EventExpr>* global_event,
     Arena& arena) {
@@ -714,10 +546,6 @@ static ModuleItem* GlobalClockInstanceActuals(
   return copy;
 }
 
-// §16.5.2 and §14.14: the leading clock of the assertion `item` that `mod`
-// last recorded, where it is $global_clock, as this instance resolves it, the
-// event of `global_event`. The item, which every instance of the module
-// shares, keeps the clock as written.
 static void RecordGlobalLeadingClock(const ModuleItem* item, RtlirModule* mod,
                                      const std::vector<EventExpr>* global_event,
                                      Arena& arena) {
@@ -740,10 +568,6 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   InferredAtInstance inferred = InferredAt(mod);
   SubstitutePropertyInstance(item, arena_, property_registry_, inferred, diag_);
   PromotePropertyInstanceBoolean(item, arena_, property_registry_, inferred);
-  // §16.15: an assertion without a disable iff clause of its own, in the
-  // spec or in the property it instantiates, within the scope of a default
-  // disable iff declaration takes its condition; with none, none is
-  // inferred.
   if (item->body != nullptr && item->body->assert_disable_iff == nullptr) {
     item->body->assert_disable_iff = inferred.disable;
   }
@@ -757,15 +581,10 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   if (item->body != nullptr) {
     ReportDisableIffOperand(item->body->assert_property, property_registry_,
                             item->loc, nullptr, diag_);
-    // §16.12.22: the sequences the property_spec uses as properties and as
-    // antecedents, a sequential property standing as the whole spec included.
     ValidateSequenceDegeneracy(item->body->assert_property, item->loc,
                                property_registry_, diag_);
     ValidateSequenceUsedAsProperty(item->body->assert_sequence, item->loc,
                                    property_registry_, diag_);
-    // §16.13: the statement keeps the leading clock, and the process wakes
-    // on the clocks the sequences name beside it; the item is shared by
-    // every instance of the module, so each clock is added once.
     if (item->body->assert_clock.empty()) {
       item->body->assert_clock = item->sensitivity;
     }
@@ -773,8 +592,6 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
     CollectTreeClocks(item->body->assert_property, property_registry_, named,
                       0);
     for (const EventExpr& ev : named) AppendClockOnce(item->sensitivity, ev);
-    // §16.13.1: the rules on the sequences built of subsequences on
-    // different clocks, under the leading clock.
     ValidateMulticlockSequences(item->body->assert_property,
                                 item->body->assert_clock, item->loc,
                                 property_registry_, diag_);
@@ -782,51 +599,19 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
                                item->body->assert_clock, item->loc,
                                property_registry_, diag_);
   }
-  // §16.5.2: `assert property(@$global_clock a);` under a
-  // `global clocking @clk; endclocking` declaration is logically equivalent to
-  // `assert property(@clk a);`, so the assertion's leading clocking event is
-  // the event that declaration names. AddStaticAssertionProcess substitutes it
-  // onto the process rather than onto `item`, which the one ModuleDecl the
-  // parser built for the module holds: §14.14 rule b) can give two instances
-  // of that module different events, and a rewrite made on `item` would give
-  // both whichever instance was elaborated first.
   const ProcessBuildEnv kEnv{arena_, diag_, &inference_funcs_, &const_names_,
                              module_global_clocking_event_};
-  // §16.4.3: a module-item deferred immediate assertion is a static deferred
-  // assertion, modeled as an implicit always_comb procedure.
   if (IsStaticDeferredAssertion(item)) {
     AddStaticAssertionProcess(RtlirProcessKind::kAlwaysComb, item, mod, kEnv);
     return;
   }
-  // §16.14.5: a static concurrent assertion outside procedural code uses
-  // `always` semantics. The parser captures the simple clocked boolean form as
-  // a leading clock in item->sensitivity plus an immediate-assert body in
-  // item->body; model it as a clocked process so the property is checked at
-  // each leading clock edge.
   if (item->body != nullptr && !item->sensitivity.empty()) {
     AddStaticAssertionProcess(RtlirProcessKind::kAlwaysFF, item, mod, kEnv);
-    // §16.5: the process just added carries a concurrent assertion's property.
-    // The mark is taken from the statement the parser built for that property
-    // rather than set outright, so the one place that decides what a concurrent
-    // assertion body is stays in the parser.
     mod->processes.back().is_concurrent_clocked =
         item->body->is_concurrent_clocked;
-    // §16.9.4: the five future sampled value functions read a value sampled at
-    // the next global clock tick, so an attempt of a property naming one cannot
-    // be answered at the assertion clock's own tick. The clause says where it
-    // is answered instead -- the action block of an assertion with global
-    // clocking future sampled value functions runs only at the global clocking
-    // tick after the attempt's last assertion clock tick -- so the process
-    // carries that event and waits for it before it evaluates. A property
-    // naming none carries nothing and is evaluated where it always was.
-    //
-    // §16.9.4 also requires a global clocking declaration for any of the ten
-    // functions, and ValidateGclkRequiresGlobalClocking reports a text that
-    // names one without; where that report has been made there is no event to
-    // carry, and the assertion is left alone rather than parked forever.
     if (module_global_clocking_event_ != nullptr &&
-        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction,
-                                  /*include_property_slot=*/true) != nullptr) {
+        FindGclkFunctionRefInItem(item, IsGlobalClockingFutureFunction, true) !=
+            nullptr) {
       mod->processes.back().gclk_future_event = *module_global_clocking_event_;
     }
     return;
@@ -834,12 +619,6 @@ void Elaborator::ElaborateAssertPropertyItem(ModuleItem* item,
   ValidateClockingBlock(item, mod);
 }
 
-// §14.3: a clocking block is a declaration the run needs, not only one
-// elaboration checks. Lowerer::LowerClockingBlocks registers it with the
-// ClockingManager, which is what makes §14.16's synchronous drive and
-// §14.10's clocking block event reach anything. §16.16 (b): the block's
-// declarations are the module's for the run to expand, clocked by the block
-// and named through it.
 static void RecordClockingBlock(ModuleItem* item, RtlirModule* mod) {
   mod->clocking_blocks.push_back(item);
   for (ModuleItem* decl : item->clocking_decls) {
@@ -853,9 +632,6 @@ static void RecordClockingBlock(ModuleItem* item, RtlirModule* mod) {
   }
 }
 
-// §16.14 and §16.4 with §37.49: whether `kind` is an assertion a module body
-// writes directly, a concurrent one or the deferred immediate one the parser
-// wraps as an item.
 static bool IsAssertionItem(ModuleItemKind kind) {
   switch (kind) {
     case ModuleItemKind::kAssertProperty:
@@ -870,7 +646,6 @@ static bool IsAssertionItem(ModuleItemKind kind) {
 }
 
 bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
-  // §37.49: the run makes each an object of its instance.
   if (mod != nullptr && IsAssertionItem(item->kind)) {
     RtlirAssertion assertion;
     assertion.item = item;
@@ -888,8 +663,6 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       break;
     case ModuleItemKind::kCoverProperty:
     case ModuleItemKind::kCoverSequence:
-      // §16.14.3: a cover statement's optional pass statement shall not include
-      // any concurrent assert, assume, or cover statement.
       if (FindConcurrentAssertionInPassStmt(item->assert_pass_stmt) !=
           nullptr) {
         diag_.Error(item->loc,
@@ -897,15 +670,9 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
                     "concurrent assert, assume, or cover statement",
                     Subclause("16.14.3"));
       }
-      // Annex F.5.3.1 defines a cover property statement's satisfaction over
-      // the words an assert property statement's is, so a cover property in
-      // the clocked boolean form is a process as an assert property is; a
-      // cover sequence has no body and takes the path's validation alone.
       ElaborateAssertPropertyItem(item, mod);
       break;
     case ModuleItemKind::kAssumeProperty:
-      // Annex F.5.3.1 defines an assume property statement's satisfaction as
-      // the assert property statement's, so it takes the same path.
       ElaborateAssertPropertyItem(item, mod);
       break;
     case ModuleItemKind::kRestrictProperty:
@@ -918,9 +685,6 @@ bool Elaborator::ElaborateAssertionItem(ModuleItem* item, RtlirModule* mod) {
       if (mod != nullptr) RecordClockingBlock(item, mod);
       return true;
     default:
-      // §23.10.4 kDefparam, kExportDecl, kNestedModuleDecl, and any remaining
-      // kind are no-ops at behavioral elaboration; kDefaultDisableIff was read
-      // ahead of the items, its effect being independent of its position.
       return true;
   }
   RecordGlobalLeadingClock(item, mod, module_global_clocking_event_, arena_);

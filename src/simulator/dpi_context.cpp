@@ -11,8 +11,6 @@
 namespace delta {
 
 DpiContextNotion DpiContextNotionOf(DpiContextUser user) {
-  // §H.9.1: an import is a proxy for a native subroutine and follows the same
-  // model, so both have DPI context; only a VPI function has VPI context.
   return user == DpiContextUser::kVpiFunction ? DpiContextNotion::kVpiContext
                                               : DpiContextNotion::kDpiContext;
 }
@@ -24,9 +22,7 @@ DpiContextSite DpiContextSiteOf(DpiContextNotion notion) {
 }
 
 std::string_view DpiContextOfSubroutine(std::string_view declaration_scope,
-                                        std::string_view /*call_site_scope*/) {
-  // §H.9.1: a native or imported subroutine executes in the context of its
-  // surrounding declarative scope rather than that of its call site.
+                                        std::string_view) {
   return declaration_scope;
 }
 
@@ -49,8 +45,6 @@ std::string_view DpiContextOfExportCalledFromImport(
 
 uint32_t DpiExportInstanceCount(
     const std::vector<std::string_view>& importing_scopes) {
-  // §H.9.1: one instance per instantiated scope; two imports declared in one
-  // scope share the instance that scope's context reflects.
   std::vector<std::string_view> distinct(importing_scopes);
   std::sort(distinct.begin(), distinct.end());
   distinct.erase(std::unique(distinct.begin(), distinct.end()), distinct.end());
@@ -65,8 +59,6 @@ std::array<DpiDeclarativeScope, 6> DpiDeclarativeScopes() {
 }
 
 std::string_view DpiContextOfQualifiedName(std::string_view qualified_name) {
-  // §H.9.2: minus the subroutine name itself, which follows the last of the
-  // hierarchical dot and the package's scope resolution operator.
   const size_t kDot = qualified_name.rfind('.');
   const size_t kColons = qualified_name.rfind("::");
   if (kDot == std::string_view::npos && kColons == std::string_view::npos) {
@@ -110,8 +102,6 @@ bool DpiUserKeyGenerationIsSafe(DpiUserKeyOrigin origin) {
 bool DpiUserDataStorageIsSharedAcrossContexts() { return false; }
 
 uint32_t DpiPutUserDataCallsSharingAnAreaAcross(uint32_t context_count) {
-  // §H.9.3: one call per context, the pointer being stored individually for
-  // each of the contexts in question.
   return context_count;
 }
 

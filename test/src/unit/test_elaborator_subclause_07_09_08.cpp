@@ -7,8 +7,6 @@ using namespace delta;
 
 namespace {
 
-// §7.9.8 — an integral argument matches an integral index type and is therefore
-// assignment compatible; elaboration accepts it.
 TEST(AssocTraversalArgElaboration, IntegralArgOnIntegralIndexOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -18,10 +16,6 @@ TEST(AssocTraversalArgElaboration, IntegralArgOnIntegralIndexOk) {
              "endmodule\n"));
 }
 
-// §7.9.8 — a narrower integral argument is still assignment compatible with an
-// integral index. The truncation it produces is a run-time effect, so
-// elaboration must not reject it (the LRM's own example pairs an int index with
-// a byte argument).
 TEST(AssocTraversalArgElaboration, NarrowIntegralArgOnIntegralIndexOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -32,8 +26,6 @@ TEST(AssocTraversalArgElaboration, NarrowIntegralArgOnIntegralIndexOk) {
              "endmodule\n"));
 }
 
-// §7.9.8 — a string argument matches a string index type and is assignment
-// compatible; elaboration accepts it.
 TEST(AssocTraversalArgElaboration, StringArgOnStringIndexOk) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -43,11 +35,6 @@ TEST(AssocTraversalArgElaboration, StringArgOnStringIndexOk) {
              "endmodule\n"));
 }
 
-// §7.9.8 — a string argument is not assignment compatible with an integral
-// index type; elaboration must reject the traversal call. The int result is
-// captured in an int variable so the only type conflict elaboration can see is
-// the string argument against the int index type -- isolating this rule from
-// any return-value assignment check.
 TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -65,8 +52,6 @@ TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexRejected) {
                             5, "7.9.8"));
 }
 
-// §7.9.8 — an integral argument is not assignment compatible with a string
-// index type; elaboration must reject the traversal call.
 TEST(AssocTraversalArgElaboration, IntegralArgOnStringIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -83,10 +68,6 @@ TEST(AssocTraversalArgElaboration, IntegralArgOnStringIndexRejected) {
                             4, "7.9.8"));
 }
 
-// §7.9.8 — the assignment-compatibility rule applies to every traversal method,
-// not just first()/last(); next() with a mismatched argument is also rejected.
-// The int result is captured in an int variable so the sole type conflict is
-// the string argument against the int index type.
 TEST(AssocTraversalArgElaboration, NextStringArgOnIntegralIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -104,7 +85,6 @@ TEST(AssocTraversalArgElaboration, NextStringArgOnIntegralIndexRejected) {
                             5, "7.9.8"));
 }
 
-// §7.9.8 — likewise prev() with a mismatched argument is rejected.
 TEST(AssocTraversalArgElaboration, PrevIntegralArgOnStringIndexRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -121,11 +101,6 @@ TEST(AssocTraversalArgElaboration, PrevIntegralArgOnStringIndexRejected) {
                             4, "7.9.8"));
 }
 
-// §7.9.8 — the rule applies wherever a traversal call appears, not only on the
-// right-hand side of an assignment. Here the call sits in an if condition (the
-// same position the clause's own do/while traversal examples use); its integral
-// result is a valid boolean, so the only conflict elaboration can flag is the
-// string argument against the int index type.
 TEST(AssocTraversalArgElaboration,
      ConditionPositionStringArgOnIntegralIndexRejected) {
   ElabFixture f;
@@ -144,14 +119,6 @@ TEST(AssocTraversalArgElaboration,
                             5, "7.9.8"));
 }
 
-// §7.9.8 requires a traversal method's argument to be assignment compatible
-// with the associative array's index type, and conditions the rule on the two
-// types rather than on the statement the call is written in.
-// WalkStmtsForTraversalArgType wrote out six of the thirteen statement links
-// ForEachChildStmt in src/elaborator/elaborator_validate_internal.h states, so
-// each source below elaborated clean while the same `status = aa.first(s);`
-// one level up was reported. The seven cases write it in the seven links the
-// walk did not read.
 TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexInForkArmRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -173,9 +140,6 @@ TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexInForkArmRejected) {
                             7, "7.9.8"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments | ...` and
-// A.6.2 gives `variable_assignment ::= variable_lvalue = expression`, so a
-// traversal call may stand in the expression of a for-loop initialization.
 TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexInForInitRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -194,7 +158,6 @@ TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexInForInitRejected) {
                             6, "7.9.8"));
 }
 
-// A.6.8 gives `for_step_assignment ::= operator_assignment | ...`.
 TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexInForStepRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -213,9 +176,6 @@ TEST(AssocTraversalArgElaboration, StringArgOnIntegralIndexInForStepRejected) {
                             6, "7.9.8"));
 }
 
-// A.6.10 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, which is Stmt::assert_pass_stmt here and
-// Stmt::assert_fail_stmt below.
 TEST(AssocTraversalArgElaboration,
      StringArgOnIntegralIndexInAssertPassRejected) {
   ElabFixture f;
@@ -252,7 +212,6 @@ TEST(AssocTraversalArgElaboration,
                             5, "7.9.8"));
 }
 
-// §18.16 and A.6.7 give `randcase_item ::= expression : statement_or_null`.
 TEST(AssocTraversalArgElaboration,
      StringArgOnIntegralIndexInRandcaseItemRejected) {
   ElabFixture f;
@@ -275,8 +234,6 @@ TEST(AssocTraversalArgElaboration,
                             7, "7.9.8"));
 }
 
-// §18.17 and A.6.12 give `rs_code_block ::= { { data_declaration } {
-// statement_or_null } }`.
 TEST(AssocTraversalArgElaboration,
      StringArgOnIntegralIndexInRandsequenceCodeBlockRejected) {
   ElabFixture f;

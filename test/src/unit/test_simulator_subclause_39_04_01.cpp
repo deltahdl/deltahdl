@@ -19,7 +19,6 @@
 namespace delta {
 namespace {
 
-// The fourteen reasons §39.4.1 lists for placing an assertion system callback.
 constexpr int kSysReasons[] = {cbAssertionSysInitialized,
                                cbAssertionSysLock,
                                cbAssertionSysUnlock,
@@ -35,9 +34,6 @@ constexpr int kSysReasons[] = {cbAssertionSysInitialized,
                                cbAssertionSysEnableNonvacuousAction,
                                cbAssertionSysDisableVacuousAction};
 
-// §39.4.1: each value listed for the reason element of s_cb_data is a defined,
-// distinct assertion-system callback reason that production code recognizes as
-// such.
 TEST(AssertionSysCallback, ReasonConstantsDefinedDistinctAndRecognized) {
   for (size_t i = 0; i < std::size(kSysReasons); ++i) {
     EXPECT_TRUE(AssertionApi::IsAssertionSysCallbackReason(kSysReasons[i]));
@@ -47,24 +43,16 @@ TEST(AssertionSysCallback, ReasonConstantsDefinedDistinctAndRecognized) {
   }
 }
 
-// §39.4.1: the assertion-system callback reasons are distinct from the
-// per-assertion callback reasons of §39.4.2 and from unrelated VPI callback
-// reasons; none of those name an assertion system callback.
 TEST(AssertionSysCallback, NonSystemReasonsNotRecognized) {
-  // Per-assertion callback reasons (§39.4.2) are not system reasons.
   EXPECT_FALSE(AssertionApi::IsAssertionSysCallbackReason(cbAssertionStart));
   EXPECT_FALSE(AssertionApi::IsAssertionSysCallbackReason(cbAssertionSuccess));
   EXPECT_FALSE(AssertionApi::IsAssertionSysCallbackReason(cbAssertionDisable));
   EXPECT_FALSE(
       AssertionApi::IsAssertionSysCallbackReason(cbAssertionDisablePassAction));
-  // An ordinary simulation callback reason is not an assertion system reason.
   EXPECT_FALSE(AssertionApi::IsAssertionSysCallbackReason(cbEndOfSimulation));
-  // A vpi_control() system-control constant is not a callback reason.
   EXPECT_FALSE(AssertionApi::IsAssertionSysCallbackReason(vpiAssertionSysOff));
 }
 
-// §38.36 provides the generic vpi_register_cb()/s_cb_data machinery; this
-// fixture exercises it with the §39.4.1 assertion-system reasons.
 class AssertionSysCallbackPlacement : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -90,9 +78,6 @@ int RecordSysCb(s_cb_data* data) {
 }
 }  // namespace
 
-// §39.4.1: an assertion system callback is placed with vpi_register_cb(),
-// setting cb_rtn to the routine and the reason element to one of the listed
-// assertion-system reasons. The placement returns a callback handle.
 TEST_F(AssertionSysCallbackPlacement, RegisterByEverySysReasonReturnsHandle) {
   for (int reason : kSysReasons) {
     ASSERT_TRUE(AssertionApi::IsAssertionSysCallbackReason(reason));
@@ -105,9 +90,6 @@ TEST_F(AssertionSysCallbackPlacement, RegisterByEverySysReasonReturnsHandle) {
   }
 }
 
-// §39.4.1: the routine invoked follows the normal VPI callback prototype and is
-// passed an s_cb_data containing the callback reason and any user data provided
-// to the vpi_register_cb() call.
 TEST_F(AssertionSysCallbackPlacement, DeliveryCarriesReasonAndUserData) {
   int payload = 99;
   s_cb_data cb = {};
@@ -124,20 +106,14 @@ TEST_F(AssertionSysCallbackPlacement, DeliveryCarriesReasonAndUserData) {
   EXPECT_EQ(g_seen_user_data, &payload);
 }
 
-// §39.4.1: the user data a callback carries may be none at all. A system
-// callback registered without a user_data pointer is still delivered, and the
-// s_cb_data its routine receives carries a null user_data beside the reason.
 TEST_F(AssertionSysCallbackPlacement,
        DeliveryCarriesNullUserDataWhenNoneGiven) {
   s_cb_data cb = {};
   cb.reason = cbAssertionSysInitialized;
   cb.cb_rtn = &RecordSysCb;
-  // user_data is left at its default null: the registration provides none.
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  // Seed the observation with a sentinel so a delivered null is distinguishable
-  // from the routine never having run.
   int sentinel = 0;
   g_seen_reason = 0;
   g_seen_user_data = &sentinel;
@@ -146,9 +122,6 @@ TEST_F(AssertionSysCallbackPlacement,
   EXPECT_EQ(g_seen_user_data, nullptr);
 }
 
-// §39.4.1: because each assertion-system reason is distinct, a callback placed
-// for one system reason is delivered only for that reason. Dispatching a
-// different system reason does not invoke it; dispatching its own reason does.
 TEST_F(AssertionSysCallbackPlacement, DeliveryIsSelectiveByReason) {
   s_cb_data cb = {};
   cb.reason = cbAssertionSysEnd;
@@ -156,21 +129,16 @@ TEST_F(AssertionSysCallbackPlacement, DeliveryIsSelectiveByReason) {
   vpiHandle h = vpi_register_cb(&cb);
   ASSERT_NE(h, nullptr);
 
-  // A different assertion-system reason matches no registered callback.
   g_seen_reason = 0;
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbAssertionSysReset), 0);
   EXPECT_EQ(g_seen_reason, 0);
 
-  // The reason it was placed for delivers exactly once.
   EXPECT_EQ(vpi_ctx_.DispatchCallbacks(cbAssertionSysEnd), 1);
   EXPECT_EQ(g_seen_reason, cbAssertionSysEnd);
 }
 
-// The reason `$arm` records when a case uses it as a mark of the design's own
-// progress.
 constexpr int kDesignRan = -1;
 
-// The reasons recorded, in order.
 std::vector<int> RecordedReasons() {
   std::vector<int> reasons;
   for (const AssertionCall& call : AssertionCalls()) {
@@ -179,11 +147,6 @@ std::vector<int> RecordedReasons() {
   return reasons;
 }
 
-// §39.4.1: the assertion system initializes and then becomes active as the
-// run starts, by default, so cbAssertionSysInitialized is called and then
-// cbAssertionSysOn before anything of the design runs; once the run has
-// ended, its final procedures with it, cbAssertionSysEnd is called (#7510,
-// #7511, #7512).
 TEST_F(AssertionRun, TheAssertionSystemStartsAndEndsWithTheRun) {
   for (int reason :
        {cbAssertionSysInitialized, cbAssertionSysOn, cbAssertionSysEnd}) {
@@ -205,10 +168,6 @@ TEST_F(AssertionRun, TheAssertionSystemStartsAndEndsWithTheRun) {
                               kDesignRan, kDesignRan, cbAssertionSysEnd}));
 }
 
-// §39.4.1: an application may hold the assertion system back from starting
-// with the run through a system control action; turned off before the run,
-// it initializes but does not become active, so cbAssertionSysOn is not
-// called (#7511).
 TEST_F(AssertionRun, AnAssertionSystemTurnedOffBeforeTheRunDoesNotStart) {
   for (int reason : {cbAssertionSysInitialized, cbAssertionSysOn}) {
     ASSERT_NE(WatchAssertionSystem(reason), nullptr);
@@ -222,9 +181,6 @@ TEST_F(AssertionRun, AnAssertionSystemTurnedOffBeforeTheRunDoesNotStart) {
   EXPECT_EQ(RecordedReasons(), (std::vector<int>{cbAssertionSysInitialized}));
 }
 
-// §39.4.1 with §39.5.1: an assertion system an application ended during the
-// run has had its cbAssertionSysEnd already, and the end of the run calls no
-// second one (#7512).
 TEST_F(AssertionRun, AnAssertionSystemEndedDuringTheRunEndsOnce) {
   ASSERT_NE(WatchAssertionSystem(cbAssertionSysEnd), nullptr);
   AssertionArmer() = [] {

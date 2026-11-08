@@ -127,8 +127,6 @@ TEST(AssertionApiParsing, AssertionControlSequence) {
   )"));
 }
 
-// §20.11 (Syntax 20-12): the remaining assert_action_task names and a fully
-// argumented $assertcontrol parse as system task calls.
 TEST(AssertionApiParsing, AssertActionTasksAndAssertControl) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -143,8 +141,6 @@ TEST(AssertionApiParsing, AssertActionTasksAndAssertControl) {
   )"));
 }
 
-// §20.11 (Syntax 20-12): assert_task names ($asserton, $assertoff, $assertkill)
-// are classified as the assert_task category.
 TEST(AssertionControlGrammar, ClassifiesAssertTask) {
   EXPECT_EQ(ClassifyAssertionControlTask("$asserton"),
             AssertionControlTaskCategory::kAssertTask);
@@ -154,8 +150,6 @@ TEST(AssertionControlGrammar, ClassifiesAssertTask) {
             AssertionControlTaskCategory::kAssertTask);
 }
 
-// §20.11 (Syntax 20-12): the six action control tasks are classified as the
-// assert_action_task category.
 TEST(AssertionControlGrammar, ClassifiesAssertActionTask) {
   EXPECT_EQ(ClassifyAssertionControlTask("$assertpasson"),
             AssertionControlTaskCategory::kAssertActionTask);
@@ -163,8 +157,6 @@ TEST(AssertionControlGrammar, ClassifiesAssertActionTask) {
             AssertionControlTaskCategory::kAssertActionTask);
 }
 
-// §20.11 (Syntax 20-12): $assertcontrol is its own category, and an unrelated
-// system task is not an assertion control task.
 TEST(AssertionControlGrammar, ClassifiesAssertControlAndRejectsOthers) {
   EXPECT_EQ(ClassifyAssertionControlTask("$assertcontrol"),
             AssertionControlTaskCategory::kAssertControl);
@@ -172,8 +164,6 @@ TEST(AssertionControlGrammar, ClassifiesAssertControlAndRejectsOthers) {
   EXPECT_FALSE(IsAssertionControlTaskName("$display"));
 }
 
-// §20.11 (Syntax 20-12): list_of_scopes_or_assertions is a comma-separated
-// list, so an assert_task may name several scopes after the levels argument.
 TEST(AssertionApiParsing, AssertTaskWithScopeList) {
   EXPECT_TRUE(ParseOk(R"(
     module m;
@@ -183,8 +173,6 @@ TEST(AssertionApiParsing, AssertTaskWithScopeList) {
   )"));
 }
 
-// §20.11 (Syntax 20-12): scope_or_assertion is a hierarchical_identifier, so a
-// dotted name is accepted in the scope list of $assertcontrol.
 TEST(AssertionApiParsing, AssertControlWithHierarchicalScope) {
   EXPECT_TRUE(ParseOk(R"(
     module m;

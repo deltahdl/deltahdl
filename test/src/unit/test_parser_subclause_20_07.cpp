@@ -113,8 +113,6 @@ TEST(UtilitySystemTaskParsing, ArrayUnpackedDimensionsFunction) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// array_dimensions_function ( data_type ): the first argument may be a data
-// type rather than an array expression.
 TEST(UtilitySystemTaskParsing, ArrayDimensionsOfDataType) {
   auto r = Parse(
       "module m;\n"
@@ -127,7 +125,6 @@ TEST(UtilitySystemTaskParsing, ArrayDimensionsOfDataType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// array_dimension_function ( data_type ): a single-name data type as argument.
 TEST(UtilitySystemTaskParsing, ArrayLeftOfDataType) {
   auto r = Parse(
       "module m;\n"
@@ -140,8 +137,6 @@ TEST(UtilitySystemTaskParsing, ArrayLeftOfDataType) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// array_dimension_function ( data_type , dimension_expression ): a data type
-// argument paired with an explicit dimension expression.
 TEST(UtilitySystemTaskParsing, ArraySizeOfDataTypeWithDimArg) {
   auto r = Parse(
       "module m;\n"

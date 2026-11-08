@@ -29,8 +29,6 @@
 namespace delta {
 namespace {
 
-// The self-determined width, signing and state of an operand, or for a real
-// operand the real kind it is, kImplicit for any other.
 struct Shape {
   uint32_t width = 0;
   bool is_signed = false;
@@ -38,8 +36,6 @@ struct Shape {
   DataTypeKind real_kind = DataTypeKind::kImplicit;
 };
 
-// How many typedef names a select follows to the packed dimensions a type is
-// written with before a cyclic chain is given up on.
 constexpr int kMaxNameHops = 16;
 
 bool IsReal(const Shape& shape) {
@@ -48,7 +44,6 @@ bool IsReal(const Shape& shape) {
 
 Shape OneBit(bool four_state) { return {1, false, four_state}; }
 
-// §11.3.1: real where either operand is, else shortreal where either is.
 DataTypeKind RealOfEither(const Shape& a, const Shape& b) {
   if (a.real_kind == DataTypeKind::kReal || b.real_kind == DataTypeKind::kReal)
     return DataTypeKind::kReal;
@@ -56,14 +51,11 @@ DataTypeKind RealOfEither(const Shape& a, const Shape& b) {
   return DataTypeKind::kImplicit;
 }
 
-// §11.6.1 with §11.8.1: as wide as the wider operand, signed where both are,
-// 4-state where either is.
 Shape Widest(const Shape& a, const Shape& b) {
   return {std::max(a.width, b.width), a.is_signed && b.is_signed,
           a.four_state || b.four_state, RealOfEither(a, b)};
 }
 
-// §11.6.1: a shift or a power is its left operand's width and signing.
 Shape LeftSized(const Shape& left, const Shape& right) {
   return {left.width, left.is_signed, left.four_state || right.four_state,
           RealOfEither(left, right)};
@@ -83,8 +75,6 @@ DataType TypeOfShape(const Shape& shape, Arena& arena) {
   return VectorType(shape.width, shape.is_signed, shape.four_state, arena);
 }
 
-// The shape of a value of `type`; nothing for a type that is neither
-// integral nor real, an unpacked structure, a string or a class among them.
 std::optional<Shape> ShapeOf(const DataType& type, const ExprTypeScope& scope) {
   DataTypeKind kind = ResolvedTypeKind(type, scope.typedefs);
   if (kind == DataTypeKind::kShortreal) return Shape{0, true, false, kind};
@@ -117,8 +107,6 @@ std::optional<DeclaredValue> AsValue(std::optional<DataType> type) {
 std::optional<DeclaredValue> ValueOf(const Expr* expr,
                                      const ExprTypeScope& scope);
 
-// The number of elements a part-select names: the count its `+:` or `-:`
-// writes, or the span between the bounds of `[left:right]`.
 std::optional<uint32_t> SelectedCount(const Expr* select,
                                       const ScopeMap& constants) {
   if (select->is_part_select_plus || select->is_part_select_minus) {
@@ -132,10 +120,6 @@ std::optional<uint32_t> SelectedCount(const Expr* select,
   return static_cast<uint32_t>(std::abs(*left - *right) + 1);
 }
 
-// The type that writes the packed dimensions a select of a value of `type`
-// addresses: `type` itself, or the type a typedef name it is written with
-// stands for. Null where none writes one, as for an integer atom type, a
-// scalar, a structure and an enumeration, whose dimension is its base's.
 const DataType* PackedArrayType(const DataType& type,
                                 const TypedefMap& typedefs) {
   const DataType* at = &type;
@@ -148,9 +132,6 @@ const DataType* PackedArrayType(const DataType& type,
   return nullptr;
 }
 
-// §7.4.1: the element of the packed array `array`, its outermost dimension
-// gone. An element of a bit, logic or reg array is unsigned whatever the
-// array's signing; one of a named type keeps the type's.
 DataType PackedElement(const DataType& array) {
   DataType element = array;
   element.packed_dim_left = nullptr;
@@ -168,8 +149,6 @@ DataType PackedElement(const DataType& array) {
   return element;
 }
 
-// §11.5.1: a part-select of a packed array, as many of its elements as it
-// names, an unsigned vector of their bits.
 std::optional<DataType> PackedPart(const DataType& array, const Expr* select,
                                    const ExprTypeScope& scope) {
   std::optional<uint32_t> count = SelectedCount(select, scope.constants);
@@ -179,9 +158,6 @@ std::optional<DataType> PackedPart(const DataType& array, const Expr* select,
                      scope.arena);
 }
 
-// §11.5.1: a select of an integral value written with no packed dimension of
-// its own -- an integer atom, a scalar, a structure or an enumeration --
-// which addresses its bits.
 std::optional<DataType> SelectedBits(const DataType& type, const Expr* select,
                                      const ExprTypeScope& scope) {
   std::optional<Shape> whole = ShapeOf(type, scope);
@@ -219,8 +195,6 @@ DeclaredValue UnderDims(DataType type, const std::vector<Expr*>& dims,
 
 namespace {
 
-// §7.4.5: an element of an unpacked array is of the array's dimensions after
-// the first, the outermost of which makes the kind of array it is in turn.
 void DropOutermostDim(DeclaredValue& value, const ExprTypeScope& scope) {
   --value.unpacked_dims;
   if (value.dims.empty()) return;
@@ -230,15 +204,10 @@ void DropOutermostDim(DeclaredValue& value, const ExprTypeScope& scope) {
   value.index_type = IndexDimType(value.dims.front());
 }
 
-// §7.4.2 with §11.5.1: a select of the value `select` writes its base. An
-// unpacked array's element is the array's type with one dimension fewer; a
-// slice of one is an unpacked array still, of bounds §6.22.1(f) would match
-// it by that no clause states.
 std::optional<DeclaredValue> SelectedValue(const Expr* select,
                                            const ExprTypeScope& scope) {
   if (select->base == nullptr) return std::nullopt;
   std::optional<DeclaredValue> base = ValueOf(select->base, scope);
-  // §6.23: an element of a dynamic object is no operand of a type reference.
   if (!base || base->outermost != UnpackedKind::kFixed) return std::nullopt;
   if (base->unpacked_dims == 0)
     return AsValue(PackedSelectType(base->type, select, scope));
@@ -247,8 +216,6 @@ std::optional<DeclaredValue> SelectedValue(const Expr* select,
   return base;
 }
 
-// §8.5 and §8.6: the member `name` of the class a handle of `handle` refers
-// to, a property or a function's result.
 std::optional<DeclaredValue> ClassMemberValue(const DataType& handle,
                                               std::string_view name,
                                               const ExprTypeScope& scope) {
@@ -258,8 +225,6 @@ std::optional<DeclaredValue> ClassMemberValue(const DataType& handle,
   return UnderDims(std::move(member->element), member->dims, scope);
 }
 
-// §26.3 and §3.12.1: the value `name`, written behind the scope `prefix`,
-// stands for, where the scope reaches one.
 std::optional<DeclaredValue> ValueBehindScope(std::string_view prefix,
                                               std::string_view name,
                                               const ExprTypeScope& scope) {
@@ -267,15 +232,9 @@ std::optional<DeclaredValue> ValueBehindScope(std::string_view prefix,
   return scope.scoped_value(prefix, name);
 }
 
-// §7.2 and §8.5: the member a member select names, of the type it is
-// declared with and the unpacked dimensions it writes, a structure's or
-// union's or a class's through a handle; and a value a package declares,
-// named behind its scope, `p::v` (§26.3). Nothing for a scope that declares
-// no value of the name, and for a base that is none of those.
 std::optional<DeclaredValue> MemberValue(const Expr* access,
                                          const ExprTypeScope& scope) {
   if (access->rhs == nullptr) return std::nullopt;
-  // A scope written as other than a name alone, `p::C::v`, names no package.
   if (access->is_scope_resolution)
     return ValueBehindScope(access->lhs->text, access->rhs->text, scope);
   std::optional<DeclaredValue> base = ValueOf(access->lhs, scope);
@@ -290,8 +249,6 @@ std::optional<DeclaredValue> MemberValue(const Expr* access,
   return UnderDims(MemberWrittenType(*member), member->unpacked_dims, scope);
 }
 
-// §6.16.1 to §6.16.10: the type each string method that gives a value gives,
-// by the name of the type.
 using TypeNameByMethod = std::pair<std::string_view, std::string_view>;
 constexpr std::array<TypeNameByMethod, 12> kStringMethodTypes = {
     {{"len", "int"},
@@ -307,22 +264,17 @@ constexpr std::array<TypeNameByMethod, 12> kStringMethodTypes = {
      {"atobin", "integer"},
      {"atoreal", "real"}}};
 
-// §6.19.5.1 to §6.19.5.4: the methods that give a value of the enumeration.
 constexpr std::array<std::string_view, 4> kEnumerationSteps = {"first", "last",
                                                                "next", "prev"};
 
-// §7.9.1 to §7.9.7: the methods of an associative array that give an int.
 constexpr std::array<std::string_view, 7> kAssociativeIntMethods = {
     "num", "size", "exists", "first", "last", "next", "prev"};
 
-// §7.12.1: the array locator methods that give a queue of the array's
-// elements, and those that give a queue of their indexes.
 constexpr std::array<std::string_view, 6> kElementLocators = {
     "find", "find_first", "find_last", "min", "max", "unique"};
 constexpr std::array<std::string_view, 4> kIndexLocators = {
     "find_index", "find_first_index", "find_last_index", "unique_index"};
 
-// §7.12.3: the array reduction methods.
 constexpr std::array<std::string_view, 5> kReductionMethods = {
     "sum", "product", "and", "or", "xor"};
 
@@ -342,8 +294,6 @@ std::optional<DataType> EnumerationMethodType(const DataType& enumeration,
   return std::nullopt;
 }
 
-// §7.5.2, §7.10.2.1 and §7.9.1 to §7.9.7: whether `method` of an array whose
-// outermost dimension makes an array of kind `kind` gives an int.
 bool GivesAnInt(UnpackedKind kind, std::string_view method) {
   if (kind == UnpackedKind::kAssociative) {
     return std::ranges::find(kAssociativeIntMethods, method) !=
@@ -352,8 +302,6 @@ bool GivesAnInt(UnpackedKind kind, std::string_view method) {
   return kind != UnpackedKind::kFixed && method == "size";
 }
 
-// §7.12: the iterator a with clause reads, named by the method's argument, or
-// item where the method is written with none.
 std::string_view IteratorName(const Expr* host) {
   if (host->kind == ExprKind::kCall && !host->args.empty() &&
       host->args.front() != nullptr &&
@@ -363,9 +311,6 @@ std::string_view IteratorName(const Expr* host) {
   return "item";
 }
 
-// §7.12.3: the type of the with clause of `host`, a reduction of `array`, in
-// which the iterator stands for an element of the array, and its index method
-// gives an int, or an associative array's index type (§7.12.4).
 std::optional<DataType> WithClauseType(const Expr* host,
                                        const DeclaredValue& array,
                                        const ExprTypeScope& scope) {
@@ -384,8 +329,6 @@ std::optional<DataType> WithClauseType(const Expr* host,
   return ExprSelfType(host->with_expr, within);
 }
 
-// §7.12.3: a reduction gives the array's element type, or the type of its with
-// clause's expression where one is written.
 std::optional<DataType> ReductionType(const Expr* host,
                                       const DeclaredValue& array,
                                       const ExprTypeScope& scope) {
@@ -401,8 +344,6 @@ std::optional<DataType> ArrayMethodType(const Expr* host,
   if (std::ranges::find(kReductionMethods, method) != kReductionMethods.end())
     return ReductionType(host, array, scope);
   if (GivesAnInt(array.outermost, method)) return TypeNameToDataType("int");
-  // §7.10.2.4 and §7.10.2.5: a queue's pop_front and pop_back give an
-  // element of the queue.
   bool pops = method == "pop_front" || method == "pop_back";
   if (!pops || array.outermost != UnpackedKind::kQueue ||
       array.unpacked_dims != 1) {
@@ -411,18 +352,12 @@ std::optional<DataType> ArrayMethodType(const Expr* host,
   return array.type;
 }
 
-// Whether `receiver` names the iterator of the with clause `scope` reads.
 bool IsIterator(const Expr* receiver, const ExprTypeScope& scope) {
   return !scope.iterator.empty() && receiver != nullptr &&
          receiver->kind == ExprKind::kIdentifier &&
          receiver->text == scope.iterator;
 }
 
-// The type a call of a built-in method gives, `host` being the call, or the
-// member access naming the method where the call leaves out its parentheses
-// (§5.13): by the method's name and the value it is called on, a string, an
-// enumeration or an array. Nothing for a method that gives no value, and for
-// a value it is no method of.
 std::optional<DataType> BuiltinMethodType(const Expr* host,
                                           const ExprTypeScope& scope) {
   const Expr* member = BuiltinMethodMember(host);
@@ -441,8 +376,6 @@ std::optional<DataType> BuiltinMethodType(const Expr* host,
   return std::nullopt;
 }
 
-// §7.10: a queue, `[$]` its own dimension, outermost, of elements of
-// `element` under the dimensions `inner`, the `$` made in `arena`.
 UnpackedArrayType QueueOf(DataType element, std::span<Expr* const> inner,
                           Arena& arena) {
   auto* queue = arena.Create<Expr>();
@@ -453,10 +386,6 @@ UnpackedArrayType QueueOf(DataType element, std::span<Expr* const> inner,
   return UnpackedArrayType{std::move(element), std::move(dims)};
 }
 
-// §7.12.1: the queue an array locator method's call `host` gives, of the
-// array's elements or of an index of one: an int, or an associative array's
-// index type. Nothing where `host` calls no locator method, and for an array
-// whose dimensions, or whose index type, are not recorded.
 std::optional<UnpackedArrayType> LocatorType(const Expr* host,
                                              const ExprTypeScope& scope) {
   const Expr* member = BuiltinMethodMember(host);
@@ -482,8 +411,6 @@ std::optional<UnpackedArrayType> LocatorType(const Expr* host,
   return QueueOf(*array->index_type, {}, scope.arena);
 }
 
-// A `.` selects a member of a structure or union, or else, without
-// parentheses, calls a built-in method.
 std::optional<DeclaredValue> MemberOrMethodValue(const Expr* access,
                                                  const ExprTypeScope& scope) {
   if (std::optional<DeclaredValue> member = MemberValue(access, scope))
@@ -508,8 +435,6 @@ std::optional<DeclaredValue> ValueOf(const Expr* expr,
   }
 }
 
-// A call of a built-in method, of a class's method through a handle (§8.6),
-// or of a function the scope declares.
 std::optional<DataType> CallType(const Expr* call, const ExprTypeScope& scope) {
   if (std::optional<DataType> builtin = BuiltinMethodType(call, scope))
     return builtin;
@@ -523,8 +448,6 @@ std::optional<DataType> CallType(const Expr* call, const ExprTypeScope& scope) {
   return scope.call_returns(call);
 }
 
-// A name, a select or a member: the value's type, nothing for an unpacked
-// array.
 std::optional<DataType> WholeValueType(const Expr* expr,
                                        const ExprTypeScope& scope) {
   std::optional<DeclaredValue> value = ValueOf(expr, scope);
@@ -532,8 +455,6 @@ std::optional<DataType> WholeValueType(const Expr* expr,
   return std::move(value->type);
 }
 
-// §6.24.1 and §11.7: the operand `operand` with the signing a signing cast,
-// $signed or $unsigned names.
 std::optional<DataType> Resigned(const Expr* operand, bool is_signed,
                                  const ExprTypeScope& scope) {
   std::optional<Shape> shape = OperandShape(operand, scope);
@@ -542,7 +463,6 @@ std::optional<DataType> Resigned(const Expr* operand, bool is_signed,
   return TypeOfShape(*shape, scope.arena);
 }
 
-// §6.24.1: a size cast, its operand's signing and state at the size it names.
 std::optional<DataType> SizeCastType(const Expr* cast,
                                      const ExprTypeScope& scope) {
   std::optional<int64_t> size = ConstEvalInt(cast->rhs, scope.constants);
@@ -553,15 +473,11 @@ std::optional<DataType> SizeCastType(const Expr* cast,
       scope.arena);
 }
 
-// Whether `name` is a type: a built-in keyword or a typedef of the scope.
 bool IsTypeName(std::string_view name, const TypedefMap& typedefs) {
   return TypeNameToDataType(name).kind != DataTypeKind::kNamed ||
          typedefs.contains(name);
 }
 
-// §6.24.1: a cast whose casting type the parser kept as an expression: a type
-// reference, a name, a package's or class's typedef behind its scope, or a
-// size.
 std::optional<DataType> CastToWrittenType(const Expr* cast,
                                           const ExprTypeScope& scope) {
   const Expr* target = cast->rhs;
@@ -582,7 +498,6 @@ std::optional<DataType> CastToWrittenType(const Expr* cast,
   return SizeCastType(cast, scope);
 }
 
-// §6.24.1: the type a cast converts its operand to.
 std::optional<DataType> CastType(const Expr* cast, const ExprTypeScope& scope) {
   if (cast->text == "signed" || cast->text == "unsigned")
     return Resigned(cast->lhs, cast->text == "signed", scope);
@@ -622,7 +537,6 @@ std::optional<DataType> SystemCallType(const Expr* call,
   return std::nullopt;
 }
 
-// §5.9: eight bits a character, an empty string being one character wide.
 DataType StringLiteralType(const Expr* literal, Arena& arena) {
   std::optional<std::string> characters = ConstEvalString(literal);
   size_t count = characters ? std::max<size_t>(characters->size(), 1) : 1;
@@ -655,8 +569,6 @@ std::optional<DataType> BinaryType(const Expr* binary,
                      scope.arena);
 }
 
-// §11.4.11: as wide as the wider result, signed where both are, 4-state where
-// the condition or a result is.
 std::optional<DataType> ConditionalType(const Expr* conditional,
                                         const ExprTypeScope& scope) {
   std::optional<Shape> condition = OperandShape(conditional->condition, scope);
@@ -668,7 +580,6 @@ std::optional<DataType> ConditionalType(const Expr* conditional,
   return TypeOfShape(result, scope.arena);
 }
 
-// §11.4.12: the operands of a concatenation side by side, unsigned.
 std::optional<Shape> JoinedShape(const std::vector<Expr*>& operands,
                                  const ExprTypeScope& scope) {
   Shape joined;
@@ -689,7 +600,6 @@ std::optional<DataType> ConcatenationType(const Expr* concatenation,
   return TypeOfShape(*joined, scope.arena);
 }
 
-// §11.4.12.1: the count of copies of the operands' concatenation.
 std::optional<DataType> ReplicationType(const Expr* replication,
                                         const ExprTypeScope& scope) {
   std::optional<int64_t> count =
@@ -700,9 +610,6 @@ std::optional<DataType> ReplicationType(const Expr* replication,
   return TypeOfShape(*joined, scope.arena);
 }
 
-// Whether an item of a set membership's range list is 4-state, a range
-// `[low:high]` being so where either bound is; nothing for an item the scope
-// does not type.
 std::optional<bool> RangeItemFourState(const Expr* item,
                                        const ExprTypeScope& scope) {
   if (item->kind == ExprKind::kSelect && item->base == nullptr) {
@@ -716,7 +623,6 @@ std::optional<bool> RangeItemFourState(const Expr* item,
   return shape->four_state;
 }
 
-// §11.4.13: one unsigned bit, 4-state where an operand is.
 std::optional<DataType> InsideType(const Expr* inside,
                                    const ExprTypeScope& scope) {
   std::optional<Shape> tested = OperandShape(inside->lhs, scope);
@@ -730,8 +636,6 @@ std::optional<DataType> InsideType(const Expr* inside,
   return TypeOfShape(OneBit(four_state), scope.arena);
 }
 
-// §5.7.1: as wide as its size, signed where decimal or written with the s
-// designator, 4-state.
 DataType IntegerLiteralType(const Expr* literal, Arena& arena) {
   return TypeOfShape(
       {ConstLiteralWidth(literal), IsSignedLiteral(literal->text), true},

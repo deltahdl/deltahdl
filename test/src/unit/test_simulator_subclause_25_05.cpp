@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §25.5 (printed page 787): a connection may name a modport of the interface
-// instance, named hierarchically from that instance, and the port then reaches
-// that instance's own members. A program reading the modport's input through a
-// `Bus.tb` port sees the value the module placed on `s.q`. The program's
-// initial waits past the module's read at 3, since its end would end the run
-// (§24.3).
 TEST(ModportConnectionSim, ProgramReadsModportInputThroughSelectedConnection) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface Bus;\n"
@@ -37,8 +31,6 @@ TEST(ModportConnectionSim, ProgramReadsModportInputThroughSelectedConnection) {
             "prog q=61 at 2\ntop d=1\n");
 }
 
-// The same connection into a module: the read of the modport's input and the
-// write of its output both land on the one instance `s`.
 TEST(ModportConnectionSim, ModuleReadsAndWritesThroughSelectedConnection) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface Bus;\n"
@@ -61,9 +53,6 @@ TEST(ModportConnectionSim, ModuleReadsAndWritesThroughSelectedConnection) {
             "sub q=61 at 2\ntop d=1\n");
 }
 
-// §25.5's own example on printed page 787: plain `i2 i` ports connected as
-// `.i(i.initiator)` and `.i(i.target)` share the one instance `i`, so what
-// each module writes the other reads.
 TEST(ModportConnectionSim, TwoModportsOfOneInstanceShareItsMembers) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface i2;\n"
@@ -89,13 +78,6 @@ TEST(ModportConnectionSim, TwoModportsOfOneInstanceShareItsMembers) {
             "m x=9\ns y=5\ntop x=9 y=5\n");
 }
 
-// §25.5.5 and §25.9.1 (printed pages 791-792 and 803) with §14: a clocking
-// block is a member of the interface declaring it, sampled and driven at its
-// event through every name denoting the instance -- the instance's own path,
-// `b1.sb.req <= 1`; a class property of the clocking modport's virtual
-// interface type, `@(vif.sb)` and `vif.sb.a`; and a formal of that type,
-// `wait (s.sb.gnt == 1)`. The drive through the path was dropped, the read
-// through the virtual interface gave 0, and the wait never woke.
 TEST(ModportConnectionSim,
      InterfaceClockingBlockThroughEveryNameOfTheInstance) {
   SimFixture f;

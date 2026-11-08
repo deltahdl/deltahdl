@@ -1,21 +1,3 @@
-// Tests for IEEE 1800-2023 §33.3.3 "Mapping source files to libraries".
-//
-// The subclause owns two declarative rules, both applied at the parser stage by
-// LibraryMap (src/parser/library_map.cpp):
-//   - For each cell definition encountered during parsing, the name of the
-//     source file being parsed is compared against the file path specifications
-//     of the library declarations drawn from all of the library map files in
-//     use (LibraryMap::TagCompilationUnit -> LibraryForFile).
-//   - The cell is mapped into the library whose file path specification matches
-//     the source file name (each cell's `library` tag is set to that library).
-//
-// The rule consumes constructs supplied by this pass's dependencies: the
-// library declarations come from a real lib.map (§33.3.1) that may pull in
-// further declarations via `include` (§33.3.2), and the cells come from real
-// SystemVerilog source parsed by Parser::Parse(). Each test therefore builds
-// both inputs from source on disk / in memory and drives them through the full
-// parse-then-tag pipeline rather than hand-constructing AST nodes.
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -35,15 +17,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-// Owns a unique scratch directory so both the lib.map and the source files a
-// test names live on disk; the resolver anchors relative library specs to the
-// map file's canonical directory, so the directory is canonicalized to keep the
-// paths asserted on aligned with the loader's view.
-
-// Parses real SystemVerilog source into a CompilationUnit and keeps the backing
-// SourceManager/Arena/DiagEngine alive so the parsed cells can be tagged and
-// inspected. Stands in for the cells parsing meets, which §33.3.3 maps to
-// libraries.
 struct ParsedSource {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -59,10 +32,6 @@ struct ParsedSource {
   }
 };
 
-// Every cell definition parsing meets: every kind of design element the parser
-// can produce -- module, interface, program, checker, primitive (UDP), package,
-// and config -- is compared against the mapping and tagged with the matching
-// library, not just the module the example shows.
 TEST(MapSourceFilesToLibraries, MapsEveryCellKindEncounteredDuringParsing) {
   ScratchDir tmp;
   auto map_file = tmp.Write("lib.map", "library L *.sv;\n");
@@ -101,10 +70,6 @@ TEST(MapSourceFilesToLibraries, MapsEveryCellKindEncounteredDuringParsing) {
   EXPECT_EQ(parsed.cu->configs[0]->library, "L");
 }
 
-// Across every library map file in use: the comparison spans declarations
-// pulled in from an included map file, not only the root map. A cell whose
-// source matches a spec declared in the included file is mapped into that
-// included library.
 TEST(MapSourceFilesToLibraries, MapsCellUsingDeclarationFromIncludedMapFile) {
   ScratchDir tmp;
   tmp.Write("sub.map", "library subLib *.sv;\n");
@@ -124,12 +89,6 @@ TEST(MapSourceFilesToLibraries, MapsCellUsingDeclarationFromIncludedMapFile) {
   EXPECT_EQ(parsed.cu->modules[0]->library, "subLib");
 }
 
-// Across every library map file in use: the map information may be supplied as
-// several independent files named for one invocation, read in turn, rather than
-// gathered through an include. Two lib.map files loaded in sequence stand in
-// for two files named at invocation; a cell whose source matches a declaration
-// contributed by the second file is mapped into that file's library, confirming
-// the comparison spans every loaded map file, not just the first.
 TEST(MapSourceFilesToLibraries,
      MapsCellUsingDeclarationFromSeparatelyLoadedMapFile) {
   ScratchDir tmp;
@@ -149,9 +108,6 @@ TEST(MapSourceFilesToLibraries,
   EXPECT_EQ(parsed.cu->modules[0]->library, "beta");
 }
 
-// The comparison is against the source file name of each unit independently:
-// two source files matching two different declarations are mapped into their
-// respective libraries when tagged with their own paths.
 TEST(MapSourceFilesToLibraries, MapsEachSourceFileByItsOwnName) {
   ScratchDir tmp;
   auto map_file = tmp.Write("lib.map",

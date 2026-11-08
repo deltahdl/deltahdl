@@ -11,12 +11,6 @@
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_user.h"
 
-// Annex H.13 functions under test. They belong to the DPI C layer (svdpi.cpp)
-// and are declared in svdpi.h, which this translation unit does not include:
-// its svScope is a pointer to non-const, and the scopes this test registers are
-// const. H.13 makes svTimeVal the same structure as s_vpi_time in every
-// respect, so the layout-identical s_vpi_time stands in for svTimeVal across
-// the C ABI; driving svGetTime through it also exercises that equivalence.
 extern "C" {
 int svGetTime(const void* scope, s_vpi_time* time);
 int svGetTimeUnit(const void* scope, int32_t* time_unit);
@@ -26,10 +20,6 @@ int svGetTimePrecision(const void* scope, int32_t* time_precision);
 namespace delta {
 namespace {
 
-// svdpi.h encodes the requested time form in svTimeVal.type as
-// sv_scaled_real_time and sv_sim_time, which Annex I defines as the
-// vpiScaledRealTime and vpiSimTime of Annex K; §K.2 numbers those 1 and 2, and
-// the two headers agree, so the request is written with vpi.h's names.
 constexpr int kSvScaledRealTime = vpiScaledRealTime;
 constexpr int kSvSimTime = vpiSimTime;
 
@@ -41,8 +31,6 @@ class SvGetTimeSim : public ::testing::Test {
   }
   void TearDown() override { SetGlobalVpiContext(nullptr); }
 
-  // Advance the simulation clock to `t` by draining a no-op event scheduled
-  // there; after Run() the scheduler's current time is that slot.
   void AdvanceTo(uint64_t t) {
     auto* ev = scheduler_.GetEventPool().Acquire();
     ev->callback = []() {};
@@ -55,10 +43,6 @@ class SvGetTimeSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §H.13: svGetTime retrieves the current simulation time. With a null scope the
-// time is read in the simulation time unit; a sim-time request delivers the
-// full 64-bit count split across the high and low halves. Reaching the current
-// scheduler time through svGetTime is the rule being applied.
 TEST_F(SvGetTimeSim, NullScopeRetrievesCurrentSimulationTime) {
   const uint64_t kTicks = (static_cast<uint64_t>(3) << 32) | 5u;
   AdvanceTo(kTicks);
@@ -70,10 +54,6 @@ TEST_F(SvGetTimeSim, NullScopeRetrievesCurrentSimulationTime) {
   EXPECT_EQ(t.low, 5u);
 }
 
-// §H.13: the type field of the svTimeVal shall select whether scaled real or
-// simulation time is delivered. At the same instant a sim-time request fills
-// high/low and leaves real zero, while a scaled-real request fills real and
-// leaves high/low zero.
 TEST_F(SvGetTimeSim, TypeFieldSelectsSimVersusScaledReal) {
   AdvanceTo(7);
 
@@ -90,12 +70,8 @@ TEST_F(SvGetTimeSim, TypeFieldSelectsSimVersusScaledReal) {
   EXPECT_EQ(as_real.low, 0u);
 }
 
-// §H.13: calling svGetTime with a null scope retrieves the current time scaled
-// to the simulation time unit. With the simulation counting picoseconds and no
-// per-scope timescale applied, the scaled-real result equals the raw count
-// rather than being rescaled to any object's unit.
 TEST_F(SvGetTimeSim, NullScopeScalesToSimulationTimeUnit) {
-  vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
+  vpi_ctx_.SetSimTimeUnit(-12);
   AdvanceTo(1000);
 
   s_vpi_time t = {};
@@ -104,37 +80,26 @@ TEST_F(SvGetTimeSim, NullScopeScalesToSimulationTimeUnit) {
   EXPECT_DOUBLE_EQ(t.real, 1000.0);
 }
 
-// §H.13: svGetTimeUnit with a null scope retrieves the simulation time unit,
-// and the value it returns is equivalent to vpi_get(vpiTimeUnit) for the
-// design.
 TEST_F(SvGetTimeSim, TimeUnitMatchesVpiGetForNullScope) {
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -9;
 
-  int32_t unit = 12345;  // sentinel; overwritten on success
+  int32_t unit = 12345;
   EXPECT_EQ(svGetTimeUnit(nullptr, &unit), 0);
   EXPECT_EQ(unit, vpi_get(vpiTimeUnit, nullptr));
 }
 
-// §H.13: svGetTimePrecision with a null scope behaves likewise, returning a
-// value equivalent to vpi_get(vpiTimePrecision) for the design.
 TEST_F(SvGetTimeSim, TimePrecisionMatchesVpiGetForNullScope) {
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -12;
 
-  int32_t prec = 999;  // sentinel; overwritten on success
+  int32_t prec = 999;
   EXPECT_EQ(svGetTimePrecision(nullptr, &prec), 0);
   EXPECT_EQ(prec, vpi_get(vpiTimePrecision, nullptr));
 }
 
-// §H.13: svGetTime is defined to scale to the time unit of the instance scope
-// associated with the supplied svScope; the null-scope case is the special form
-// that uses the simulation time unit. A registered scope with no timescale
-// bound reads the same design-wide simulation time the null scope does, so the
-// non-null path is accepted and routed to the shared time source rather than
-// rejected.
 TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
   AdvanceTo(42);
 
@@ -154,11 +119,6 @@ TEST_F(SvGetTimeSim, NonNullScopeRetrievesCurrentSimulationTime) {
   EXPECT_EQ(with_scope.low, null_scope.low);
 }
 
-// §H.13: svGetTimeUnit and svGetTimePrecision are likewise defined per the
-// instance scope associated with an svScope, with the null scope as the
-// simulation-time-unit special form. A registered scope with no timescale
-// bound yields the same unit and precision the null scope does; exercising the
-// non-null path confirms both routines honor the scope argument.
 TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
@@ -180,17 +140,11 @@ TEST_F(SvGetTimeSim, NonNullScopeUnitAndPrecisionMatchNullScope) {
   EXPECT_EQ(prec_scoped, prec_null);
 }
 
-// §H.13: svGetTime retrieves the current time scaled to the time unit of the
-// instance scope associated with the svScope, and svGetTimeUnit and
-// svGetTimePrecision the unit and precision of that scope. A registered scope
-// bound to a nanosecond unit and a picosecond precision, in a simulation
-// counting picoseconds, reads 2500 ps as 2.5 ns, and reports -9 and -12 where
-// the NULL scope reports the simulation's own.
 TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
   VpiHandle top = vpi_ctx_.CreateModule("top", "top");
   ASSERT_NE(top, nullptr);
   top->time_precision = -12;
-  vpi_ctx_.SetSimTimeUnit(-12);  // simulation counts in 1 ps
+  vpi_ctx_.SetSimTimeUnit(-12);
   AdvanceTo(2500);
 
   const DpiScope* scope = DpiRegisterScope("top.u_ns_h_13");
@@ -218,8 +172,6 @@ TEST_F(SvGetTimeSim, AScopeWithATimescaleScalesToItsOwnUnit) {
   EXPECT_EQ(sim_unit, -12);
 }
 
-// §H.13: the simulation-time form is the raw count whatever the scope, and a
-// registered scope with no timescale bound reads as the NULL scope does.
 TEST_F(SvGetTimeSim, AScopeWithoutATimescaleReadsAsTheNullScope) {
   vpi_ctx_.SetSimTimeUnit(-12);
   AdvanceTo(7);
@@ -245,8 +197,6 @@ TEST_F(SvGetTimeSim, AScopeWithoutATimescaleReadsAsTheNullScope) {
   EXPECT_EQ(prec, -12);
 }
 
-// §H.13 / Annex I: each routine reports failure when there is nowhere to write
-// the result, returning -1 rather than touching unowned memory.
 TEST_F(SvGetTimeSim, NullDestinationReturnsError) {
   AdvanceTo(4);
   EXPECT_EQ(svGetTime(nullptr, nullptr), -1);

@@ -6,20 +6,6 @@ using namespace delta;
 
 namespace {
 
-// These tests drive the uniqueness constraint (18.5.4) end to end: each source
-// program declares a class with a "unique { range_list }" constraint, calls
-// randomize() from an initial block, and copies results out to module variables
-// the harness reads. The parser captures the range_list group and the simulator
-// builds it into a kUnique solver constraint, so the behavior observed here is
-// that of real elaborated source, not a hand-built solver state. The uniqueness
-// property is observed by drawing many samples in a source loop and checking no
-// two members ever coincide; the illegal-group and no-effect rules are observed
-// from a single deterministic randomize() call.
-
-// 18.5.4: after randomization, every member of a unique group holds a value no
-// other member holds. With three members confined to a domain that barely fits
-// three distinct values, every solve yields three different values, so no pair
-// is ever equal across many draws.
 TEST(ConstraintUnique, MembersGetDistinctValues) {
   const char* src =
       "class C;\n"
@@ -47,9 +33,6 @@ TEST(ConstraintUnique, MembersGetDistinctValues) {
   EXPECT_EQ(RunAndGet(src, "alldiff"), 1u);
 }
 
-// 18.5.4: when the domain is too small to give every member a distinct value,
-// the uniqueness constraint cannot be satisfied and randomization fails. Three
-// members over a two-value domain have no distinct assignment.
 TEST(ConstraintUnique, OverConstrainedGroupFails) {
   const char* src =
       "class C;\n"
@@ -73,9 +56,6 @@ TEST(ConstraintUnique, OverConstrainedGroupFails) {
   EXPECT_EQ(RunAndGet(src, "ok"), 0u);
 }
 
-// 18.5.4: a group of fewer than two members makes the unique constraint a no-op
-// that can never contradict anything. A single member alongside an equality
-// that pins it still solves, and the pinned value is produced.
 TEST(ConstraintUnique, SingleMemberHasNoEffect) {
   const char* src =
       "class C;\n"
@@ -95,10 +75,6 @@ TEST(ConstraintUnique, SingleMemberHasNoEffect) {
   EXPECT_EQ(RunAndGet(src, "ra"), 4u);
 }
 
-// 18.5.4 with 18.7: an inline uniqueness group applies to the object
-// randomize() is called on wherever the handle is declared; called through a
-// handle local to a method of another class, the group of two rand members
-// solves.
 TEST(ConstraintUnique, InlineRandGroupThroughMethodHandleSolves) {
   const char* src =
       "class C;\n"
@@ -122,10 +98,6 @@ TEST(ConstraintUnique, InlineRandGroupThroughMethodHandleSolves) {
   EXPECT_EQ(RunAndGet(src, "ok"), 1u);
 }
 
-// 18.5.4: a uniqueness group's members must all have equivalent types. A byte
-// and an int differ in width and so are not of equivalent type; the group is
-// illegal and randomization fails. The int is given by a typedef name, whose
-// type the elaborator leaves to the solve, which finds the two inequivalent.
 TEST(ConstraintUnique, InequivalentTypeMembersFail) {
   const char* src =
       "typedef int int_t;\n"

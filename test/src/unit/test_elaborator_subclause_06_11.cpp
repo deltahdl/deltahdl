@@ -6,11 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §6.11 / Table 6-8 assigns each integer data-type keyword a default
-// bit width. The state-ness column is owned by 6.11.2 and the signedness
-// column by 6.11.3; the width column is the property Table 6-8 alone fixes,
-// so it is observed here from real declarations driven through elaboration.
-
 TEST(IntegerDataTypes, FixedWidthIntegerTypesTakeTabulatedWidth) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -71,10 +66,6 @@ TEST(IntegerDataTypes, UserDefinedWidthTypesTakeDeclaredVectorSize) {
   EXPECT_EQ(mod->variables[2].width, 32u) << "reg [31:0]";
 }
 
-// Table 6-8 calls the bit/logic/reg width a "user-defined vector size", so the
-// bound is a constant expression. A parameter bound takes a different
-// evaluation path than a literal (it must be resolved in the module's
-// parameter scope), so it is exercised as its own input form here.
 TEST(IntegerDataTypes, UserDefinedWidthFromParameterVectorSize) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -94,9 +85,6 @@ TEST(IntegerDataTypes, UserDefinedWidthFromParameterVectorSize) {
   EXPECT_EQ(mod->variables[2].width, 16u) << "reg [P-1:0]";
 }
 
-// A localparam bound is the second constant-expression input form for the
-// user-defined vector size; it resolves through the same parameter scope but
-// via a distinct declaration keyword.
 TEST(IntegerDataTypes, UserDefinedWidthFromLocalparamVectorSize) {
   ElabFixture f;
   auto* design = ElaborateSrc(

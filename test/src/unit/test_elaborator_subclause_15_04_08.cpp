@@ -37,8 +37,6 @@ TEST(MailboxTryPeekElaborator, TryPeekResultAssigned) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.8: try_peek() copies the message into its argument, which shall be
-// a valid left-hand expression.
 TEST(MailboxTryPeekElaborator, TryPeekIntoALiteralIsReported) {
   ElabFixture f;
   ElaborateSrc(

@@ -90,8 +90,6 @@ TEST(Precedence, CompareAndLogicalWithParentheses) {
 }
 
 TEST(Precedence, SameRowEqualPrecedence) {
-  // Division and modulus share a Table 11-2 row, so neither binds tighter than
-  // the other; they evaluate left to right, nesting the divide under the mod.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a / b % c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -109,8 +107,6 @@ TEST(Precedence, EquivalenceRightAssoc) {
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
   EXPECT_EQ(rhs->op, TokenKind::kLtDashGt);
-  // Equivalence associates right to left: the trailing operand nests on the
-  // right rather than folding the left pair first.
   ASSERT_NE(rhs->rhs, nullptr);
   EXPECT_EQ(rhs->rhs->op, TokenKind::kLtDashGt);
 }
@@ -123,16 +119,12 @@ TEST(Precedence, ConditionalRightAssoc) {
       "endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kTernary);
-  // The conditional operator associates right to left, so the trailing
-  // conditional nests inside the false branch rather than the condition.
   EXPECT_EQ(rhs->condition->kind, ExprKind::kIdentifier);
   ASSERT_NE(rhs->false_expr, nullptr);
   EXPECT_EQ(rhs->false_expr->kind, ExprKind::kTernary);
 }
 
 TEST(Precedence, PowerLeftAssoc) {
-  // Exponentiation is a single precedence row and, like the other binary
-  // operators, associates left to right; the left pair folds first.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a ** b ** c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -143,9 +135,6 @@ TEST(Precedence, PowerLeftAssoc) {
 }
 
 TEST(Precedence, RelationalHigherThanEquality) {
-  // The relational row sits one tier above the equality row, so the comparison
-  // folds into the right operand of the equality rather than the other way
-  // around.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a == b < c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -157,8 +146,6 @@ TEST(Precedence, RelationalHigherThanEquality) {
 }
 
 TEST(Precedence, RelationalLeftAssoc) {
-  // Relational operators share one precedence row and associate left to right,
-  // so the leading pair folds first.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a < b < c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -169,10 +156,6 @@ TEST(Precedence, RelationalLeftAssoc) {
 }
 
 TEST(Precedence, PostfixSelectHigherThanUnary) {
-  // The parenthesis/select/member/scope tier is the highest-precedence row,
-  // sitting above the unary operators. A bit-select therefore binds to its
-  // operand before the unary negation applies: the select nests as the unary's
-  // operand rather than the unary nesting inside the select's base.
   auto* rhs = ParsePrecedenceRhs(
       "module m;\n"
       "  logic [3:0] a;\n"
@@ -188,10 +171,6 @@ TEST(Precedence, PostfixSelectHigherThanUnary) {
 }
 
 TEST(Precedence, UnaryHigherThanPower) {
-  // Unary operators occupy the tier directly above exponentiation, so the unary
-  // minus applies to its operand before the power operator combines the pair;
-  // the negation nests as the left operand rather than wrapping the whole
-  // exponentiation.
   auto* rhs = ParsePrecedenceRhs("module m; initial x = -a ** b; endmodule\n");
   ASSERT_NE(rhs, nullptr);
   EXPECT_EQ(rhs->kind, ExprKind::kBinary);
@@ -202,8 +181,6 @@ TEST(Precedence, UnaryHigherThanPower) {
 }
 
 TEST(Precedence, PowerHigherThanMultiply) {
-  // Exponentiation is one tier above the multiplicative operators, so the power
-  // folds into the right operand of the multiply.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a * b ** c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -213,8 +190,6 @@ TEST(Precedence, PowerHigherThanMultiply) {
 }
 
 TEST(Precedence, AdditiveHigherThanShift) {
-  // The additive operators bind tighter than the shift operators, so the sum
-  // nests as the shift's left operand.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a + b << c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -224,8 +199,6 @@ TEST(Precedence, AdditiveHigherThanShift) {
 }
 
 TEST(Precedence, BitwiseAndHigherThanXor) {
-  // Bitwise AND sits above bitwise XOR, so the AND folds into the left operand
-  // of the XOR.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a & b ^ c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -235,8 +208,6 @@ TEST(Precedence, BitwiseAndHigherThanXor) {
 }
 
 TEST(Precedence, XorHigherThanOr) {
-  // Bitwise XOR sits above bitwise OR, so the XOR folds into the left operand
-  // of the OR.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a ^ b | c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -246,8 +217,6 @@ TEST(Precedence, XorHigherThanOr) {
 }
 
 TEST(Precedence, BitwiseOrHigherThanLogicalAnd) {
-  // Bitwise OR binds tighter than the logical AND, so the OR nests as the
-  // logical AND's left operand.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a | b && c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -257,8 +226,6 @@ TEST(Precedence, BitwiseOrHigherThanLogicalAnd) {
 }
 
 TEST(Precedence, LogicalAndHigherThanLogicalOr) {
-  // Logical AND sits one tier above logical OR, so the AND folds into the left
-  // operand of the OR.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a && b || c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -268,8 +235,6 @@ TEST(Precedence, LogicalAndHigherThanLogicalOr) {
 }
 
 TEST(Precedence, ConditionalHigherThanImplication) {
-  // The conditional operator binds tighter than the implication operator, so
-  // the conditional nests as the implication's right operand.
   auto* rhs = ParsePrecedenceRhs(
       "module m;\n"
       "  logic a, b, c, d, e;\n"
@@ -283,8 +248,6 @@ TEST(Precedence, ConditionalHigherThanImplication) {
 }
 
 TEST(Precedence, ShiftLeftAssoc) {
-  // Shift operators share one row and associate left to right, so the leading
-  // pair folds first.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a << b >> c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -294,7 +257,6 @@ TEST(Precedence, ShiftLeftAssoc) {
 }
 
 TEST(Precedence, EqualityLeftAssoc) {
-  // Equality operators share one row and associate left to right.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a == b != c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -304,7 +266,6 @@ TEST(Precedence, EqualityLeftAssoc) {
 }
 
 TEST(Precedence, BitwiseAndLeftAssoc) {
-  // Binary bitwise AND associates left to right.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a & b & c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -315,7 +276,6 @@ TEST(Precedence, BitwiseAndLeftAssoc) {
 }
 
 TEST(Precedence, BitwiseXorLeftAssoc) {
-  // Binary bitwise XOR associates left to right.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a ^ b ^ c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -326,7 +286,6 @@ TEST(Precedence, BitwiseXorLeftAssoc) {
 }
 
 TEST(Precedence, BitwiseOrLeftAssoc) {
-  // Binary bitwise OR associates left to right.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a | b | c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -337,7 +296,6 @@ TEST(Precedence, BitwiseOrLeftAssoc) {
 }
 
 TEST(Precedence, LogicalAndLeftAssoc) {
-  // Logical AND associates left to right.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a && b && c; endmodule\n");
   ASSERT_NE(rhs, nullptr);
@@ -348,7 +306,6 @@ TEST(Precedence, LogicalAndLeftAssoc) {
 }
 
 TEST(Precedence, LogicalOrLeftAssoc) {
-  // Logical OR associates left to right.
   auto* rhs =
       ParsePrecedenceRhs("module m; initial x = a || b || c; endmodule\n");
   ASSERT_NE(rhs, nullptr);

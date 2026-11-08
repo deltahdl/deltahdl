@@ -19,18 +19,6 @@
 namespace delta {
 namespace {
 
-// §37.40 Timing check: the object model diagram for a timing check (the "tchk"
-// node) and its event terms (the "tchk term" node). The subclause carries two
-// numbered Details. Detail 1 fixes what the vpiTchkRefTerm and vpiTchkDataTerm
-// relations denote - the reference (or controlled-reference) event and the data
-// event, the latter only when the check has one. Detail 2 fixes the types the
-// vpiExpr iteration over a tchk returns - vpiTchkTerm for the event arguments
-// and the natural expression type for every other argument. These tests observe
-// the production code that applies those two rules through the public
-// vpi_handle and vpi_iterate dispatch.
-
-// The fixture installs a context so the public vpi_handle/vpi_iterate entry
-// points run their real dispatch over the test objects.
 class TimingCheck : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -38,14 +26,10 @@ class TimingCheck : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Detail 1: vpiTchkRefTerm reaches the timing check's reference (or
-// controlled-reference) event term and vpiTchkDataTerm reaches its data event
-// term. Both terms are tchk term objects, whose own type differs from the
-// relation enum, so the relations resolve to the check's designated terms.
 TEST_F(TimingCheck, RefAndDataTermsAreReached) {
-  VpiObject ref_term;  // the reference / controlled-reference event
+  VpiObject ref_term;
   ref_term.type = vpiTchkTerm;
-  VpiObject data_term;  // the data event
+  VpiObject data_term;
   data_term.type = vpiTchkTerm;
 
   VpiObject tchk;
@@ -60,14 +44,10 @@ TEST_F(TimingCheck, RefAndDataTermsAreReached) {
   EXPECT_EQ(reached_ref, &ref_term);
   EXPECT_EQ(reached_data, &data_term);
 
-  // The handles returned for the events have the tchk term type.
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_ref)), vpiTchkTerm);
   EXPECT_EQ(vpi_get(vpiType, VpiHandleOf(reached_data)), vpiTchkTerm);
 }
 
-// Detail 1 (the data event being optional): a timing check that has no data
-// event reports NULL for vpiTchkDataTerm, while its reference term is still
-// reached.
 TEST_F(TimingCheck, DataTermIsNullWhenCheckHasNoDataEvent) {
   VpiObject ref_term;
   ref_term.type = vpiTchkTerm;
@@ -75,17 +55,12 @@ TEST_F(TimingCheck, DataTermIsNullWhenCheckHasNoDataEvent) {
   VpiObject tchk;
   tchk.type = vpiTchk;
   tchk.tchk_ref_term = &ref_term;
-  // tchk_data_term left null: this check has no data event.
 
   EXPECT_EQ(VpiObjectOf(vpi_handle(vpiTchkRefTerm, VpiHandleOf(&tchk))),
             &ref_term);
   EXPECT_EQ(vpi_handle(vpiTchkDataTerm, VpiHandleOf(&tchk)), nullptr);
 }
 
-// Detail 1 (scope): the vpiTchkRefTerm/vpiTchkDataTerm relations are specific
-// to a timing check. On an object that is not a tchk, asking for them does not
-// reach a stray tchk term, so the relations report NULL even when the object
-// carries a tchk term child.
 TEST_F(TimingCheck, TermRelationsApplyOnlyToTimingChecks) {
   VpiObject stray_term;
   stray_term.type = vpiTchkTerm;
@@ -98,21 +73,16 @@ TEST_F(TimingCheck, TermRelationsApplyOnlyToTimingChecks) {
   EXPECT_EQ(vpi_handle(vpiTchkDataTerm, VpiHandleOf(&not_a_tchk)), nullptr);
 }
 
-// Detail 2: iterating vpiExpr over a timing check returns its arguments in
-// the order they were written - the reference, controlled-reference and data
-// events as tchk term handles, and every other argument, the notifier among
-// them, with the type of its expression. A child of the check that is no
-// argument of it is not reached.
 TEST_F(TimingCheck, ExprIterationReturnsTheArgumentsInOrder) {
-  VpiObject ref_term;  // a reference event -> vpiTchkTerm
+  VpiObject ref_term;
   ref_term.type = vpiTchkTerm;
-  VpiObject data_term;  // a data event -> vpiTchkTerm
+  VpiObject data_term;
   data_term.type = vpiTchkTerm;
-  VpiObject limit;  // a limit argument expression -> its own expr type
+  VpiObject limit;
   limit.type = vpiOperation;
-  VpiObject notifier;  // the notifier, a variable named as an argument
+  VpiObject notifier;
   notifier.type = vpiReg;
-  VpiObject stray;  // a child the check holds that is none of its arguments
+  VpiObject stray;
   stray.type = vpiConstant;
 
   VpiObject tchk;
@@ -130,9 +100,6 @@ TEST_F(TimingCheck, ExprIterationReturnsTheArgumentsInOrder) {
                                               &notifier}));
 }
 
-// Detail 2 (edge): a timing check with no arguments has nothing for the
-// vpiExpr iteration to walk, whatever children it holds, so vpi_iterate
-// reports a null handle rather than an iterator that scans to nothing.
 TEST_F(TimingCheck, ExprIterationIsNullWhenNoArguments) {
   VpiObject term;
   term.type = vpiTchkTerm;
@@ -144,8 +111,6 @@ TEST_F(TimingCheck, ExprIterationIsNullWhenNoArguments) {
   EXPECT_EQ(vpi_iterate(vpiExpr, VpiHandleOf(&tchk)), nullptr);
 }
 
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 int g_tchks_seen = 0;
 int g_tchk_type = 0;
 std::string g_ref_term_name;
@@ -154,14 +119,12 @@ int g_ref_term_edge = -1;
 std::string g_notifier_name;
 int g_limit = -1;
 
-// The name an object reports, or the empty string where it reports none.
 std::string NameOf(vpiHandle obj) {
   if (obj == nullptr) return std::string();
   const char* name = vpi_get_str(vpiName, obj);
   return name == nullptr ? std::string() : std::string(name);
 }
 
-// The figure's "-> limit", retrieved the way the diagram says it is.
 int LimitOf(vpiHandle tchk) {
   s_vpi_delay delays = {};
   s_vpi_time times[1] = {};
@@ -193,10 +156,6 @@ PLI_INT32 ProbeTimingChecksCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// §37.40 against a design. Every property and relation the figure draws is
-// drawn on a tchk, and no pass built one, so a module's vpiTchk iteration
-// reached none of the checks its specify block declared and the whole of the
-// subclause answered for objects a test had made.
 TEST(TimingCheckDesign, ADeclaredTimingCheckIsATchkObject) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
@@ -232,27 +191,16 @@ TEST(TimingCheckDesign, ADeclaredTimingCheckIsATchkObject) {
   LowerAndRun(design, f);
 
   EXPECT_EQ(g_tchks_seen, 1);
-  // The figure's "-> tchk type" property, which is §31.2's $setup.
   EXPECT_EQ(g_tchk_type, vpiSetup);
-  // Detail 1: the reference event of $setup is its second argument and the data
-  // event its first.
   EXPECT_EQ(g_ref_term_name, "clk");
   EXPECT_EQ(g_data_term_name, "d");
-  // The tchk term's "-> edge" property: the reference event was written
-  // posedge.
   EXPECT_EQ(g_ref_term_edge, vpiPosedge);
-  // The figure's vpiTchkNotifier relation.
   EXPECT_EQ(g_notifier_name, "notifier");
-  // The figure's "-> limit", retrieved with vpi_get_delays().
   EXPECT_EQ(g_limit, 5);
 }
 
 class TimingChecksOfARun : public VpiDesignRun {};
 
-// §37.40 (figure): a tchk reports which of §31.2's checks it is through
-// vpiTchkType, one constant per check. Detail 1: a check with no data event,
-// as $width has, reaches no data term, and its reference term carries the edge
-// it was written with. A check written without a notifier reaches none.
 TEST_F(TimingChecksOfARun, EveryCheckKindReportsItsTchkType) {
   Run("module m(input clk, input d);\n"
       "  specify\n"
@@ -293,7 +241,6 @@ TEST_F(TimingChecksOfARun, EveryCheckKindReportsItsTchkType) {
   EXPECT_EQ(vpi_get(vpiEdge, ref), vpiNegedge);
 }
 
-// The objects of `type` `ref` reaches, counted.
 int CountOf(int type, vpiHandle ref) {
   int count = 0;
   vpiHandle it = vpi_iterate(type, ref);
@@ -302,9 +249,6 @@ int CountOf(int type, vpiHandle ref) {
   return count;
 }
 
-// §37.39 and §37.40 with §30.3 and §31.1: a specify block belongs to the module
-// declaring it, a top module among them, so the top reaches its own path and
-// check while the instance it holds reaches the instance's.
 TEST_F(TimingChecksOfARun, ATopModulesSpecifyBlockHangsFromTheTop) {
   Run("module leaf(input c, output e);\n"
       "  assign e = c;\n"
@@ -321,7 +265,6 @@ TEST_F(TimingChecksOfARun, ATopModulesSpecifyBlockHangsFromTheTop) {
   EXPECT_EQ(CountOf(vpiTchk, By("top.u")), 1);
 }
 
-// The tchk of `type` the instance `inst` declares; null for none.
 vpiHandle CheckOfType(int type, vpiHandle inst) {
   vpiHandle it = vpi_iterate(vpiTchk, inst);
   if (it == nullptr) return nullptr;
@@ -331,10 +274,6 @@ vpiHandle CheckOfType(int type, vpiHandle inst) {
   return nullptr;
 }
 
-// §37.40 (figure): a tchk term reaches the signal its event names as its
-// expression, a select of it where the event names one, and through
-// vpiCondition the `&&&` condition the event was written with (§31.7), which
-// an event written without one does not have.
 TEST_F(TimingChecksOfARun, ATchkTermReachesItsExpressionAndCondition) {
   Run("module m(input clk, input en, input [3:0] bus);\n"
       "  specify\n"
@@ -357,14 +296,10 @@ TEST_F(TimingChecksOfARun, ATchkTermReachesItsExpressionAndCondition) {
   EXPECT_EQ(vpi_get(vpiType, selected), vpiPartSelect);
   EXPECT_EQ(NameOf(vpi_handle(vpiParent, selected)), "bus");
   EXPECT_EQ(vpi_handle(vpiCondition, data), nullptr);
-  // Neither draws the other's relations: a check has no condition of its own,
-  // and a term no notifier.
   EXPECT_EQ(vpi_handle(vpiCondition, hold), nullptr);
   EXPECT_EQ(vpi_handle(vpiTchkNotifier, ref), nullptr);
 }
 
-// The `count` delays vpi_get_delays reads off `tchk` in ticks, or none where it
-// refuses that count.
 std::vector<int> DelaysOf(vpiHandle tchk, int count) {
   s_vpi_time times[2] = {};
   s_vpi_delay delays = {};
@@ -380,10 +315,6 @@ std::vector<int> DelaysOf(vpiHandle tchk, int count) {
   return read;
 }
 
-// §37.40 (figure) with §38.10: a check's limits are read with
-// vpi_get_delays, as many as the check has (§31.2) - two for $setuphold, its
-// setup limit and its hold limit, and one for $width, whose threshold is no
-// limit of it (§31.4.4).
 TEST_F(TimingChecksOfARun, EveryLimitOfACheckIsADelay) {
   Run("module m(input clk, input d);\n"
       "  specify\n"
@@ -402,7 +333,6 @@ TEST_F(TimingChecksOfARun, EveryLimitOfACheckIsADelay) {
   EXPECT_TRUE(DelaysOf(width, 2).empty());
 }
 
-// Whether vpi_get_delays refuses to read `count` delays off `tchk`.
 bool RefusesDelays(vpiHandle tchk, int count) {
   s_vpi_time times[2] = {};
   s_vpi_delay delays = {};
@@ -414,9 +344,6 @@ bool RefusesDelays(vpiHandle tchk, int count) {
   return vpi_chk_error(&info) != 0;
 }
 
-// §37.40 (figure) with §38.10: a $nochange is written with no limit, its two
-// edge offsets being none (§31.4.6), so vpi_get_delays refuses every count
-// for it, none included, while a check of one limit is read with one alone.
 TEST_F(TimingChecksOfARun, ANochangeHasNoDelaysToRead) {
   Run("module m(input clk, input d);\n"
       "  specify\n"
@@ -436,16 +363,11 @@ TEST_F(TimingChecksOfARun, ANochangeHasNoDelaysToRead) {
   EXPECT_FALSE(RefusesDelays(hold, 1));
 }
 
-// The vpiEdge of the term `relation` reaches off `tchk`; -1 for none.
 int EdgeOf(int relation, vpiHandle tchk) {
   vpiHandle term = vpi_handle(relation, tchk);
   return term == nullptr ? -1 : vpi_get(vpiEdge, term);
 }
 
-// §37.40 (figure) with §31.5: a tchk term whose event was written with an
-// edge-control specifier reports through vpiEdge the transitions its list
-// names and no others, one vpiEdge bit each, a z standing for x; an event
-// written with a bare edge names every transition.
 TEST_F(TimingChecksOfARun, ATchkTermReportsTheTransitionsItsEventLists) {
   Run("module m(input clk, input d);\n"
       "  specify\n"
@@ -468,8 +390,6 @@ TEST_F(TimingChecksOfARun, ATchkTermReportsTheTransitionsItsEventLists) {
   EXPECT_EQ(EdgeOf(vpiTchkRefTerm, width), vpiEdgex1 | vpiEdge1x);
 }
 
-// What `tchk`'s vpiExpr iteration returns, in order: the type of each, with
-// the name it reports, or for a constant the value it holds.
 std::vector<std::pair<int, std::string>> ArgumentsOf(vpiHandle tchk) {
   std::vector<std::pair<int, std::string>> found;
   vpiHandle it = vpi_iterate(vpiExpr, tchk);
@@ -488,11 +408,6 @@ std::vector<std::pair<int, std::string>> ArgumentsOf(vpiHandle tchk) {
   return found;
 }
 
-// §37.40 detail 2: a check's vpiExpr iteration returns each of its arguments
-// in the order written - its events as tchk terms, $setup naming its data
-// event first (§31.3.1), and its limits, its notifier and what $setuphold
-// writes behind the notifier as the expressions they are, a variable named
-// being that variable. An argument left out is none.
 TEST_F(TimingChecksOfARun, ACheckIteratesEveryArgumentAsWritten) {
   Run("module m(input clk, input d, input en);\n"
       "  reg ntfr, dclk, dd;\n"
@@ -521,9 +436,6 @@ TEST_F(TimingChecksOfARun, ACheckIteratesEveryArgumentAsWritten) {
                               {kReg, "dd"}}));
 }
 
-// §37.40 (figure) and detail 2: an event naming one bit of a vector has that
-// bit for its term's expression, and a delayed signal written as one bit of a
-// vector is that bit among the check's arguments.
 TEST_F(TimingChecksOfARun, ABitOfAVectorIsATermsAndADelayedSignalsExpression) {
   Run("module m(input clk, input [1:0] d);\n"
       "  reg ntfr, dclk; reg [1:0] dd;\n"
@@ -543,9 +455,6 @@ TEST_F(TimingChecksOfARun, ABitOfAVectorIsATermsAndADelayedSignalsExpression) {
   EXPECT_EQ(kArgs.back().second, "dd[1]");
 }
 
-// §37.40 (figure) with A.7.3: an event naming a member of an interface port,
-// `b.clk`, has that member for its expression, the signal of the interface
-// instance the port is bound to.
 TEST_F(TimingChecksOfARun, AnInterfacePortMemberIsATermsExpression) {
   Run("interface bus;\n"
       "  logic clk, d;\n"
@@ -564,8 +473,6 @@ TEST_F(TimingChecksOfARun, AnInterfacePortMemberIsATermsExpression) {
             "d");
 }
 
-// A path or check filed under the empty prefix belongs to the first top the
-// run lowered; with no top lowered there is no module for it to hang from.
 TEST(TimingCheckDesign, AnEntryOfNoLoweredTopHangsFromNothing) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);

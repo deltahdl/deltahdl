@@ -25,15 +25,6 @@
 
 namespace delta {
 
-// §23.6 with §8.5: the first dot of `h.p` parts the handle from the property,
-// but a handle reached by a hierarchical path -- `i.c.v` for the class
-// variable `c` an interface instance `i` declares -- has the instance path
-// ahead of the handle's name, and the first dot puts `i`, which names no
-// variable, on the handle side. Where the first segment names no variable, the
-// split moves to the first dot after which the path so far names one, so the
-// handle side is the instance-qualified variable and the property side what
-// remains. A path no prefix of which names a variable keeps the first-dot
-// split, and one with no dot answers npos.
 size_t MemberPathSplit(const std::string& path, SimContext& ctx) {
   size_t first = path.find('.');
   if (first == std::string::npos) return first;
@@ -49,8 +40,6 @@ size_t MemberPathSplit(const std::string& path, SimContext& ctx) {
 static const StructTypeInfo* StructLayoutOfWholeName(std::string_view name,
                                                      SimContext& ctx) {
   if (const Variable* local = ctx.FindLocalVariable(name)) {
-    // §12.6: a pattern identifier bound to a structure member carries the
-    // member's layout itself, which no type name registers.
     if (local->local_layout != nullptr) return local->local_layout;
     return ctx.GetVariableStructType(name);
   }
@@ -65,31 +54,12 @@ const StructTypeInfo* StructLayoutOfName(std::string_view name,
                                          SimContext& ctx) {
   if (const StructTypeInfo* info = StructLayoutOfWholeName(name, ctx))
     return info;
-  // §7.4.2 with §7.2: an element of an unpacked array of structures, the
-  // variable `c[1]` of `c_t c[3]`, has the array's element layout, which the
-  // array registers under its own name.
   if (name.empty() || name.back() != ']') return nullptr;
   auto open = name.find('[');
   if (open == std::string_view::npos || open == 0) return nullptr;
   return StructLayoutOfWholeName(name.substr(0, open), ctx);
 }
 
-// §11.9 (printed page 304) with §3.12.1 (printed 56) and §26.3 (printed
-// 810): a tagged union variable has one tag, whichever name it is written or
-// read by, and the tag table (SimContext::var_tags_) keys it by name with no
-// alias of its own, so an alias of a variable -- a module's bare `u` bound to
-// the unit's "$unit.u" by AliasUnitDataItems, or an import's name bound to
-// "pk.u" -- resolves to the key its storage stands under: the key its layout
-// is registered by (StructTypeInfo::type_name, which the builder spells as
-// the registration's key), where that key names the same variable as `key`
-// does. A module's own declaration registers its layout under its storage
-// key (RegisterAggregateLayout), so its key answers itself, and a package's
-// or the unit's variable is given a registration under its own key when it
-// is first aliased (AliasLayout in lowerer_alias_kinds.cpp); a name bound to
-// a typedef's registration, which names no variable, keeps its key. Under
-// the alias's own key, `u = tagged Other 3;` in a module declaring no u
-// recorded Other under "u" while `$unit::u.Valid` read the initializer's
-// Valid under "$unit.u" and passed a read the subclause reports.
 static std::string StorageKeyOfLayout(const std::string& key, SimContext& ctx) {
   const StructTypeInfo* info = ctx.GetVariableStructType(key);
   if (info == nullptr || info->type_name == key) return key;
@@ -141,13 +111,6 @@ const StructTypeInfo* TaggedMemberLayout(const StructTypeInfo& sinfo,
   return nullptr;
 }
 
-// The class whose static property the bare name `name` reads inside a method
-// (§8.10 for a static method, §8.23 for a nested class's), or the class the
-// scope `C::name` or `p::C::name` names; null for a name a local shadows or
-// a base of another shape. §8.13 (printed pages 189-190): the class answered
-// is the one declaring the property, C for `D::m_inst` where D extends C
-// (ClassTypeInfo::StaticPropertyDeclarer), whose one storage holds the
-// handle; asked of D's own static_properties, `D::m_inst.k` read x.
 static const ClassTypeInfo* StaticPropertyClassOf(const Expr* base,
                                                   SimContext& ctx, Arena& arena,
                                                   std::string_view& name) {
@@ -186,10 +149,6 @@ ClassObject* StaticPropertyObject(const StaticPropertyRef& ref, SimContext& ctx,
   if (prop != nullptr && prop->IsArray()) return nullptr;
   *declared_key = PropertyClassName(nullptr, ref.owner, ref.name, ctx);
   const ClassTypeInfo* declared = ctx.FindClassType(*declared_key);
-  // §9.7 with §26.7: a built-in class's handle, `static process p`, numbers
-  // no ClassObject of the run and is the built-in method paths' to read; the
-  // built-in class is the one registered with no declaration of its own
-  // (RegisterProcessClassType in eval_process_methods.cpp).
   if (declared == nullptr || declared->decl == nullptr) return nullptr;
   return ctx.GetClassObject(ref.slot->ToUint64());
 }
@@ -225,9 +184,6 @@ bool TryStaticHandleMember(const Expr* expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// The node a chain of member accesses starts from and the member path the
-// chain names, `m` and `s.v` for `m.s.v`; `access` itself where it selects no
-// member.
 static const Expr* MemberChainRoot(const Expr* access, std::string& path) {
   path.clear();
   const Expr* e = access;
@@ -241,9 +197,6 @@ static const Expr* MemberChainRoot(const Expr* access, std::string& path) {
   return e;
 }
 
-// The root variable's name and the member path a chain of member accesses
-// names, `m` and `s.v` for `m.s.v`; false where the chain does not end at a
-// plain identifier.
 static bool MemberChainPath(const Expr* access, std::string_view& root,
                             std::string& path) {
   const Expr* e = MemberChainRoot(access, path);
@@ -253,9 +206,6 @@ static bool MemberChainPath(const Expr* access, std::string_view& root,
   return true;
 }
 
-// As MemberChainPath, and §26.3: a chain may also start from a variable a
-// package declares, `pkg::v.f`, which is stored under `pkg.v`
-// (PackageDataKey in lowerer_package_data.cpp), the name this gives for it.
 static bool MemberChainKey(const Expr* access, std::string& key,
                            std::string& path) {
   const Expr* e = MemberChainRoot(access, path);
@@ -269,8 +219,6 @@ static bool MemberChainKey(const Expr* access, std::string& key,
   return true;
 }
 
-// §8.5: the structure layout of the property `name` the class of `obj`
-// declares or inherits, null where its type names no structure.
 static const StructTypeInfo* PropertyStructLayout(const ClassObject* obj,
                                                   std::string_view name,
                                                   SimContext& ctx) {
@@ -283,10 +231,6 @@ static const StructTypeInfo* PropertyStructLayout(const ClassObject* obj,
   return nullptr;
 }
 
-// The structure a member path starts from: the root variable's, or, §8.5,
-// the one a class property holds, reached through a handle variable or
-// `this` with the property as the path's first member, or named bare in a
-// method. The path is left as the part inside the structure.
 struct StructRoot {
   Logic4Vec* value = nullptr;
   Variable* var = nullptr;
@@ -300,10 +244,6 @@ static bool PropertyRoot(ClassObject* obj, std::string_view prop,
   if (it == obj->properties.end()) return false;
   root.info = PropertyStructLayout(obj, prop, ctx);
   if (root.info == nullptr) return false;
-  // A property its collector could not size holds the 32-bit carrier until a
-  // member write widens it to its layout; an element of an array member may
-  // stand above the carrier, so the value is widened here as that write
-  // widens it, keeping the bits it holds.
   if (it->second.width < root.info->total_width) {
     Logic4Vec wide = MakeLogic4Vec(ctx.GetArena(), root.info->total_width);
     DepositBitField(wide, 0, it->second, it->second.width);
@@ -338,10 +278,6 @@ static bool FindStructRoot(std::string_view name, std::string& path,
   return var == nullptr && PropertyRoot(ctx.CurrentThis(), name, ctx, root);
 }
 
-// §7.4.2 with §7.2: an element of a multidimensional unpacked array of
-// structures, `c[x][y]`, has the layout the array registers under its own
-// name, whatever the indices before the last one are. `base` is the select
-// the last index is applied to; null where the chain starts from no name.
 static const StructTypeInfo* SelectChainElementLayout(const Expr* base,
                                                       SimContext& ctx) {
   const Expr* root = base;
@@ -360,9 +296,6 @@ const StructTypeInfo* ContainerElementLayout(const Expr* base,
     return SelectChainElementLayout(base, ctx);
   }
   if (base->kind == ExprKind::kIdentifier) {
-    // §8.11 with §23.9: in a method a property of the object is found ahead
-    // of a variable of the module the class is declared in; a local of the
-    // method shadows both.
     const ClassObject* self = ctx.CurrentThis();
     if (self != nullptr && ctx.FindLocalVariable(base->text) == nullptr) {
       if (const StructTypeInfo* info =
@@ -410,7 +343,6 @@ const StructTypeInfo* StructLayoutOfOperand(const Expr* e, SimContext& ctx) {
   std::string path;
   if (e->kind != ExprKind::kMemberAccess || !MemberChainPath(e, name, path))
     return nullptr;
-  // §8.5: a class property holding a structure, `p.h` or `this.h`.
   if (path.find('.') == std::string::npos) {
     Variable* var = ctx.FindVariable(name);
     ClassObject* obj = name == "this" ? ctx.CurrentThis() : nullptr;
@@ -492,14 +424,12 @@ bool ResolveStructArrayElement(const Expr* select, SimContext& ctx,
   int64_t pos = field->elem_left <= field->elem_right ? i - field->elem_left
                                                       : field->elem_left - i;
   if (pos < 0 || pos >= static_cast<int64_t>(field->elem_count)) return true;
-  // The leftmost element stands in the member's most significant bits.
   out.bit_offset =
       offset + (field->elem_count - 1 - static_cast<uint32_t>(pos)) * out.width;
   out.in_range = true;
   return true;
 }
 
-// §6.11.2 with §6.12 and §6.16: the member types whose Table 7-1 value is '0.
 constexpr std::array kTwoStateMemberKinds = {
     DataTypeKind::kBit,    DataTypeKind::kByte,     DataTypeKind::kShortint,
     DataTypeKind::kInt,    DataTypeKind::kLongint,  DataTypeKind::kShortreal,
@@ -523,9 +453,6 @@ static bool LayoutIsTwoState(const StructTypeInfo& layout, SimContext& ctx) {
   });
 }
 
-// Clears the members of `layout`, laid at `base` in `value`, whose type is
-// 2-state, descending into a member of an unpacked aggregate type; of a union
-// only the first member counts.
 static void ClearTwoStateMembers(Logic4Vec& value, const StructTypeInfo& layout,
                                  uint32_t base, SimContext& ctx, Arena& arena) {
   size_t count = layout.is_union ? 1 : layout.fields.size();
@@ -564,7 +491,6 @@ bool TryContainerElementMember(const Expr* expr, SimContext& ctx, Arena& arena,
   Logic4Vec element = EvalExpr(select, ctx, arena);
   if (element.width < info->total_width) return false;
   out = ExtractBitField(arena, element, offset, field->width);
-  // §7.2 with §6.16: a string member's bits are a handle to its text.
   if (field->type_kind == DataTypeKind::kString) {
     out = StringMemberText(out, arena);
     return true;

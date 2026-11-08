@@ -9,12 +9,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 31-3 writes `$setup(data_event, reference_event, timing_check_limit)`,
-// so a $setup's second argument is its reference event and an edge control
-// specifier written there reaches ref_edge and ref_edge_descriptors. Syntax
-// 31-4 writes `$hold(reference_event, data_event, ...)`, so the $hold cases
-// below decorate their first argument to reach the same two fields.
-
 TEST(EdgeControlSpecifierParsing, EdgeKeywordNoBrackets) {
   auto r = Parse(
       "module m;\n"
@@ -233,10 +227,6 @@ TEST(EdgeControlSpecifierParsing, DescriptorDoubleZeroError) {
   EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"));
 }
 
-// In the split-token edge_descriptor form (zero_or_one followed by z_or_x), the
-// leading digit must be trailed by an x/X/z/Z. A bare 0 or 1 is an incomplete
-// edge_descriptor and is rejected. Here the lone 1 has no z_or_x after it, so
-// the parser flags it while still recovering to record the following 10.
 TEST(EdgeControlSpecifierParsing, ZeroOrOneWithoutZorXIsError) {
   auto r = Parse(
       "module m;\n"
@@ -247,9 +237,6 @@ TEST(EdgeControlSpecifierParsing, ZeroOrOneWithoutZorXIsError) {
   EXPECT_TRUE(ReportedError(r.diags, "invalid edge_descriptor", 3, "31.5"));
 }
 
-// z_or_x admits uppercase X and Z. In the z_or_x zero_or_one form (e.g. X0)
-// the descriptor lexes as a single identifier token, exercising the two-char
-// path rather than the split path that DescriptorUppercaseToXZ covers.
 TEST(EdgeControlSpecifierParsing, DescriptorUppercaseFromXZ) {
   auto r = Parse(
       "module m;\n"
@@ -267,10 +254,6 @@ TEST(EdgeControlSpecifierParsing, DescriptorUppercaseFromXZ) {
   EXPECT_EQ(tc->ref_edge_descriptors[1].second, '1');
 }
 
-// The zero_or_one z_or_x form with a lowercase z half (e.g. 0z) lexes as an
-// integer token followed by an identifier token, so it drives the split path
-// rather than the single-token path that DescriptorsZTransitions (z0/z1)
-// exercises. Both zero_or_one leading values are covered here.
 TEST(EdgeControlSpecifierParsing, SplitFormLowercaseZ) {
   auto r = Parse(
       "module m;\n"
@@ -288,8 +271,6 @@ TEST(EdgeControlSpecifierParsing, SplitFormLowercaseZ) {
   EXPECT_EQ(tc->ref_edge_descriptors[1].second, 'z');
 }
 
-// A space inserted between the two halves of the zero_or_one z_or_x form is
-// an embedded space, which Syntax 31-15 forbids.
 TEST(EdgeControlSpecifierParsing, SplitFormEmbeddedSpaceRejected) {
   auto r = Parse(
       "module m;\n"

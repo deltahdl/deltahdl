@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.5.6: illegal transition bins cannot specify a sequence of
-// unbounded or undetermined varying length, so a goto or a nonconsecutive
-// repetition is an error in one, while a consecutive repetition over a bounded
-// range and a plain transition are accepted, as is either in a `bins`.
 TEST_F(VerifyParseTest, IllegalTransitionOfUnboundedLengthIsError) {
   Parse(R"(
     module m;

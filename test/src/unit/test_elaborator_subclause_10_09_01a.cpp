@@ -43,11 +43,6 @@ TEST(ArrayLiteralElaboration, SizeMismatchError) {
                             2, "10.9.1"));
 }
 
-// The flat pattern for an array of structures breaks §5.10, which has the
-// braces of a structure literal nest to reflect the structure, and the §10.9.1
-// element count is only a consequence of the flat form, one that would not
-// arise for `'{0, 0}`; so the pattern is reported under §5.10 and the count
-// says nothing.
 TEST(ArrayLiteralElaboration, FlatInitIllegal) {
   ElabFixture f;
   ElaborateSrc(
@@ -130,10 +125,6 @@ TEST(ArrayLiteralElaboration, KeyedPatternUncoveredElementError) {
                             2, "10.9.1"));
 }
 
-// §10.9.1: an item is evaluated in the assignment context of its element, so a
-// value that fits the element needs no size warning even when the literal's
-// self-determined width differs. A plain integer narrowing into a 1-bit element
-// elaborates cleanly.
 TEST(ArrayLiteralElaboration, BitElementNoSizeWarning) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -141,21 +132,6 @@ TEST(ArrayLiteralElaboration, BitElementNoSizeWarning) {
              "endmodule\n"));
 }
 
-// §10.9.1 requires every element of an assignment pattern targeting an
-// unpacked array to be of the array's element type, and conditions that on the
-// assignment rather than on the statement the assignment is written in. An
-// array-typed item is illegal wherever the assignment stands.
-//
-// ElaboratorOperationRules::WalkStmtsForArrayPatternElemType in
-// src/elaborator/elaborator_validate_operations_arrays.cpp reached six of the
-// thirteen statement links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states. The seven cases here
-// each put `A2 = '{A3, A3}` in one of the seven positions it did not read,
-// every one of which elaborated clean beforehand.
-//
-// A.6.3 gives `par_block ::= fork [ : block_identifier ] {
-// block_item_declaration } { statement_or_null } join_keyword [ :
-// block_identifier ]`, so a fork arm is a statement position like any other.
 TEST(ArrayLiteralElaboration, ArrayItemInPatternInAForkArmNames10_9_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -175,10 +151,6 @@ TEST(ArrayLiteralElaboration, ArrayItemInPatternInAForkArmNames10_9_1) {
                             "10.9.1"));
 }
 
-// §16.3 gives `action_block ::= statement_or_null | [ statement ] else
-// statement_or_null`, so an immediate assertion holds a statement in each arm,
-// kept in Stmt::assert_pass_stmt and Stmt::assert_fail_stmt. This case covers
-// the pass arm and the one below it the fail arm.
 TEST(ArrayLiteralElaboration,
      ArrayItemInPatternInAnAssertionPassStatementNames10_9_1) {
   ElabFixture f;
@@ -213,10 +185,6 @@ TEST(ArrayLiteralElaboration,
                             "10.9.1"));
 }
 
-// §18.16 gives `randcase_item ::= expression : statement_or_null`, so a
-// randcase holds a statement per item, kept in Stmt::randcase_items. The rule
-// is a static one, so it holds whether the weighted draw would select the item
-// or not.
 TEST(ArrayLiteralElaboration, ArrayItemInPatternInARandcaseItemNames10_9_1) {
   ElabFixture f;
   ElaborateSrc(
@@ -232,10 +200,6 @@ TEST(ArrayLiteralElaboration, ArrayItemInPatternInARandcaseItemNames10_9_1) {
                             "10.9.1"));
 }
 
-// A.6.12 gives `rs_code_block ::= { { data_declaration } { statement_or_null }
-// }`, so a randsequence production's code block holds ordinary procedural
-// statements, kept in RsProd::code_stmts and reached through
-// Stmt::rs_productions.
 TEST(ArrayLiteralElaboration,
      ArrayItemInPatternInARandsequenceCodeBlockNames10_9_1) {
   ElabFixture f;
@@ -256,14 +220,6 @@ TEST(ArrayLiteralElaboration,
                             "10.9.1"));
 }
 
-// A.6.8 gives `for_initialization ::= list_of_variable_assignments |
-// for_variable_declaration { , for_variable_declaration }` and
-// `for_step_assignment ::= operator_assignment | inc_or_dec_expression |
-// function_subroutine_call`. A.6.2 gives `variable_assignment ::=
-// variable_lvalue = expression` and `operator_assignment ::= variable_lvalue
-// assignment_operator expression`, whose assignment_operator includes `=`, so
-// an assignment stands at each of the two positions: this case writes one at
-// the initialization and the case below it writes one at the step.
 TEST(ArrayLiteralElaboration,
      ArrayItemInPatternInAForLoopInitializationNames10_9_1) {
   ElabFixture f;
@@ -297,12 +253,6 @@ TEST(ArrayLiteralElaboration, ArrayItemInPatternInAForLoopStepNames10_9_1) {
                             "10.9.1"));
 }
 
-// §10.9.1's type key covers each field whose type matches its type, so a key
-// naming a type the elements are not declared with covers nothing: this pattern
-// names no element by index, carries no default and matches none by type, which
-// the requirement that one of these rules cover every element forbids. The
-// coverage check counted any type keyword as covering the whole array and let
-// it through, and the simulator then invented a value for all three.
 TEST(ArrayLiteralElaboration, TypeKeyThatCannotMatchDoesNotCoverTheArray) {
   ElabFixture f;
   ElaborateSrc(
@@ -315,11 +265,6 @@ TEST(ArrayLiteralElaboration, TypeKeyThatCannotMatchDoesNotCoverTheArray) {
                             2, "10.9.1"));
 }
 
-// The guard on the other direction, beside TypeKeyArrayOk above: a key that
-// does match the element type covers every element, and this must stay
-// accepted -- it is what keeps the repair from reading every type key as
-// covering nothing. §6.22.1 has `byte` match `bit signed [7:0]`, a 2-state
-// signed vector of its width over [7:0].
 TEST(ArrayLiteralElaboration, TypeKeyMatchingTheElementTypeCoversTheArray) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -328,10 +273,6 @@ TEST(ArrayLiteralElaboration, TypeKeyMatchingTheElementTypeCoversTheArray) {
              "endmodule\n"));
 }
 
-// §10.9.1 descends into each subarray of the array, applying the same rules and
-// the type and default keys, so a key matching the leaf element type covers a
-// multidimensional array at every level. The check must ask the element type
-// rather than a subarray's, or this legal source starts failing.
 TEST(ArrayLiteralElaboration, TypeKeyCoversEveryDimensionOfAMultidimArray) {
   EXPECT_TRUE(
       ElabOk("module t;\n"
@@ -339,8 +280,6 @@ TEST(ArrayLiteralElaboration, TypeKeyCoversEveryDimensionOfAMultidimArray) {
              "endmodule\n"));
 }
 
-// Syntax 10-5 lets a type key name a typedef, and §10.9.1 applies it to every
-// element of that type, so it is no index key and covers the array.
 TEST(ArrayPatternElaboration, TypedefTypeKeyCoversElements) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -353,8 +292,6 @@ TEST(ArrayPatternElaboration, TypedefTypeKeyCoversElements) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.9.1 applies a type key to the elements whose type matches it by §6.22.1:
-// a typedef of int matches int, and logic does not match logic [7:0].
 TEST(ArrayPatternElaboration, TypeKeyMatchesByFullType) {
   ElabFixture f;
   ElaborateSrc(
@@ -372,8 +309,6 @@ TEST(ArrayPatternElaboration, TypeKeyMatchesByFullType) {
                             4, "10.9.1"));
 }
 
-// §10.9.1: the braces match the dimensions, each nested pattern holding as
-// many items as the dimension it stands for.
 TEST(ArrayPatternElaboration, NestedPatternCountedAgainstItsDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -387,8 +322,6 @@ TEST(ArrayPatternElaboration, NestedPatternCountedAgainstItsDimension) {
                             2, "10.9.1"));
 }
 
-// §10.9.1: a type key that matches no element of an array of structures
-// descends into each and covers the element whose members it all matches.
 TEST(ArrayPatternElaboration, TypeKeyCoversStructureElementsByMembers) {
   ElabFixture f;
   ElaborateSrc(
@@ -407,9 +340,6 @@ TEST(ArrayPatternElaboration, TypeKeyCoversStructureElementsByMembers) {
                             5, "10.9.1"));
 }
 
-// §10.9.1 with §7.4: the braces match the array's dimensions, the packed ones
-// among them, so a positional pattern initializing a packed array supplies one
-// item per element of its packed dimension.
 TEST(ArrayPatternElaboration, PackedVariableInitCountedAgainstPackedDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -434,8 +364,6 @@ TEST(ArrayPatternElaboration, PackedPatternsMatchingTheirDimensionsElaborate) {
              "endmodule\n"));
 }
 
-// §10.9.1: a nested pattern stands for the next dimension in, which past the
-// outer packed dimension of `w` is its inner packed one of four elements.
 TEST(ArrayPatternElaboration, NestedPatternCountedAgainstInnerPackedDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -449,8 +377,6 @@ TEST(ArrayPatternElaboration, NestedPatternCountedAgainstInnerPackedDimension) {
                             2, "10.9.1"));
 }
 
-// §10.9.1 with §7.4: past an array's unpacked dimensions its braces go on into
-// the packed dimensions of the element type.
 TEST(ArrayPatternElaboration, ElementPatternCountedAgainstPackedDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -464,8 +390,6 @@ TEST(ArrayPatternElaboration, ElementPatternCountedAgainstPackedDimension) {
                             2, "10.9.1"));
 }
 
-// §10.9.1 holds a procedure's pattern to its target as a declaration's, a
-// packed array assigned by name and one a block declares alike.
 TEST(ArrayPatternElaboration, ProceduralPatternCountedAgainstPackedDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -487,8 +411,6 @@ TEST(ArrayPatternElaboration, ProceduralPatternCountedAgainstPackedDimension) {
                             5, "10.9.1"));
 }
 
-// §6.18 with §7.4: a typedef carries its packed dimensions into the type it
-// names, inside those the declaration writes on it.
 TEST(ArrayPatternElaboration, TypedefPackedDimensionsCounted) {
   ElabFixture f;
   ElaborateSrc(
@@ -508,9 +430,6 @@ TEST(ArrayPatternElaboration, TypedefPackedDimensionsCounted) {
                             4, "10.9.1"));
 }
 
-// §7.4: the unpacked dimensions of a typedef are outside its packed ones, so a
-// pattern for `row_t` stands for its two rows, not for the four bits of each,
-// whether a block declares the variable or the module declares an array of it.
 TEST(ArrayPatternElaboration, TypedefUnpackedDimensionsComeBeforePackedOnes) {
   EXPECT_TRUE(
       ElabOk("module m;\n"
@@ -522,8 +441,6 @@ TEST(ArrayPatternElaboration, TypedefUnpackedDimensionsComeBeforePackedOnes) {
              "endmodule\n"));
 }
 
-// §7.4 with §26.3: the packed dimensions written on a type named through its
-// package are counted whether or not the name resolves in the module's scope.
 TEST(ArrayPatternElaboration, PackageScopedTypePackedDimensionCounted) {
   ElabFixture f;
   ElaborateSrc(
@@ -542,8 +459,6 @@ TEST(ArrayPatternElaboration, PackageScopedTypePackedDimensionCounted) {
                             6, "10.9.1"));
 }
 
-// §10.9.1: a keyed pattern for a packed array covers each element by index,
-// type or default as one for an unpacked array does.
 TEST(ArrayPatternElaboration, KeyedPackedPatternUncoveredElementError) {
   ElabFixture f;
   ElaborateSrc(
@@ -556,11 +471,6 @@ TEST(ArrayPatternElaboration, KeyedPackedPatternUncoveredElementError) {
                             2, "10.9.1"));
 }
 
-// §10.8 makes a port connection an assignment-like context, so a pattern
-// connected to a packed array port supplies an item per element of its packed
-// dimension. A port with an unpacked dimension as well is matched from that
-// dimension first, so its four packed bits are not what a connection to it is
-// counted against.
 TEST(ArrayPatternElaboration, PortConnectionCountedAgainstPackedDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -583,9 +493,6 @@ TEST(ArrayPatternElaboration, PortConnectionCountedAgainstPackedDimension) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §10.8 counts a continuous assignment and a net declaration assignment among
-// the assignment-like contexts, so §10.9.1 holds a pattern there to its
-// target's dimensions, unpacked and packed, as it does an initializer.
 TEST(ArrayPatternElaboration, ContinuousAssignmentPatternCountedAgainstTarget) {
   ElabFixture f;
   ElaborateSrc(
@@ -628,9 +535,6 @@ TEST(ArrayPatternElaboration, ContinuousAssignmentPatternMatchingTargetOk) {
              "endmodule\n"));
 }
 
-// §6.18 with §7.4: a port declared through a packed array typedef has the
-// typedef's packed dimensions, so a pattern connected to it is counted against
-// them as against dimensions the port header writes out.
 TEST(ArrayPatternElaboration, PortOfPackedTypedefCountedAgainstItsDimension) {
   ElabFixture f;
   ElaborateSrc(
@@ -650,10 +554,6 @@ TEST(ArrayPatternElaboration, PortOfPackedTypedefCountedAgainstItsDimension) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §10.9.1: a pattern connected to a port with unpacked dimensions stands for
-// those first, and a nested pattern for the packed ones inside them. A dynamic
-// array port (§7.5) has no size to count against, and its connection elaborates
-// past the check.
 TEST(ArrayPatternElaboration, PortWithUnpackedDimensionsCountedAgainstThem) {
   ElabFixture f;
   ElaborateSrc(

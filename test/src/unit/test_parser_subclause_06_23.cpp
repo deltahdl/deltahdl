@@ -491,12 +491,6 @@ TEST(TypeOperatorParsing, TypeRefAssignmentPatternCast) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §8.23 lists the type operator among the contexts in which a class scope
-// resolution may prefix a type name, so `type(Frame::payload_t)` names the
-// typedef of class Frame. This pins both halves of that name on the kTypeRef
-// node: text holds payload_t and scope_prefix holds Frame, so dropping the
-// prefix no longer leaves `type(Frame::payload_t)` and `type(payload_t)`
-// indistinguishable in the AST.
 TEST(TypeOperatorParsing, TypeRefScopedTypeRetainsClassPrefix) {
   auto r = Parse(
       "class Frame;\n"
@@ -516,28 +510,18 @@ TEST(TypeOperatorParsing, TypeRefScopedTypeRetainsClassPrefix) {
   EXPECT_EQ(rhs->scope_prefix, "Frame");
 }
 
-// §6.23 — a type reference used as the data type of a variable declaration
-// shall be preceded by the `var` keyword. This is the rejecting counterpart to
-// the accepting `var type(a) b;` forms above: a bare `type(a) b;` omits the
-// required keyword and the parser reports an error.
 TEST(TypeOperatorParsing, VarTypeRefWithoutVarKeywordRejected) {
   auto r = Parse(
       "module t;\n"
       "  int a;\n"
       "  type(a) b;\n"
       "endmodule\n");
-  // §6.8 states the data_declaration the `var` keyword belongs to, and that is
-  // where Parser::ParseTypedItemOrInst files the report.
   EXPECT_TRUE(ReportedError(r.diags,
                             "type_reference in a variable declaration must be "
                             "preceded by the 'var' keyword",
                             3, "6.8"));
 }
 
-// §6.23's first example declares two names of one type reference, `var
-// type(a+b) c, d;`, and A.2.1.3 follows the data_type with a whole
-// list_of_variable_decl_assignments, so each name, and an initializer, is read
-// with the type reference as its data type.
 TEST(TypeOperatorParsing, VarTypeRefDeclaresEveryNameOfItsList) {
   auto r = Parse(
       "module t;\n"
@@ -561,9 +545,6 @@ TEST(TypeOperatorParsing, VarTypeRefDeclaresEveryNameOfItsList) {
   EXPECT_EQ(items[4]->init_expr->kind, ExprKind::kIntegerLiteral);
 }
 
-// §6.23 lists casts among the uses of a type reference, `c = type(i+3)'(v);`,
-// so the `'(` after the reference opens a cast whose casting type is the
-// reference and whose operand is the parenthesized expression.
 TEST(TypeOperatorParsing, TypeRefCastTakesAParenthesizedOperand) {
   auto r = Parse(
       "module t;\n"
@@ -586,10 +567,6 @@ TEST(TypeOperatorParsing, TypeRefCastTakesAParenthesizedOperand) {
   EXPECT_EQ(cast->lhs->kind, ExprKind::kSelect);
 }
 
-// A.2.8 admits a data_declaration as a block item, and A.2.2.1 makes a
-// type_reference one of its data types, so `var type(a) v = 7;` in an initial
-// block and §6.23's `static type(this) m_inst;`, written with the `var` the
-// clause requires, each declare a variable whose type is the reference.
 TEST(TypeOperatorParsing, BlockItemVarTypeRefDeclarations) {
   auto r = Parse(
       "class registry;\n"
@@ -627,10 +604,6 @@ TEST(TypeOperatorParsing, BlockItemVarTypeRefDeclarations) {
   }
 }
 
-// The block-item counterpart of VarTypeRefWithoutVarKeywordRejected: a type
-// reference without `var`, as §6.23's registry example writes `static
-// type(this) m_inst;`, breaks footnote 18 of §6.8's Syntax 6-3, and the
-// declaration draws that one report and nothing else.
 TEST(TypeOperatorParsing, BlockItemTypeRefWithoutVarReportsOnce) {
   auto r = Parse(
       "class registry;\n"

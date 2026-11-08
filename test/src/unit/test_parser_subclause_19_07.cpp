@@ -22,7 +22,6 @@ TEST_F(VerifyParseTest, CovergroupWithOption) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7: distinct covergroup-level options may each be assigned once.
 TEST_F(VerifyParseTest, DistinctCovergroupOptionsAccepted) {
   Parse(R"(
     module m;
@@ -37,8 +36,6 @@ TEST_F(VerifyParseTest, DistinctCovergroupOptionsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7: specifying a value for the same option more than once within the same
-// covergroup definition is an error.
 TEST_F(VerifyParseTest, DuplicateCovergroupOptionIsError) {
   Parse(R"(
     module m;
@@ -55,8 +52,6 @@ TEST_F(VerifyParseTest, DuplicateCovergroupOptionIsError) {
                             5, "19.7"));
 }
 
-// §19.7: the repeat is detected even when other, distinct option assignments
-// separate the two assignments of the same option.
 TEST_F(VerifyParseTest, NonAdjacentDuplicateCovergroupOptionIsError) {
   Parse(R"(
     module m;
@@ -74,8 +69,6 @@ TEST_F(VerifyParseTest, NonAdjacentDuplicateCovergroupOptionIsError) {
                             6, "19.7"));
 }
 
-// §19.7: the same member name assigned once through `option` and once through
-// `type_option` names two different options, so it is not a repeat.
 TEST_F(VerifyParseTest, InstanceAndTypeOptionSameMemberAccepted) {
   Parse(R"(
     module m;
@@ -89,8 +82,6 @@ TEST_F(VerifyParseTest, InstanceAndTypeOptionSameMemberAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7: an option repeated at the covergroup level in the same definition is
-// an error even for a type_option.
 TEST_F(VerifyParseTest, DuplicateTypeOptionIsError) {
   Parse(R"(
     module m;
@@ -107,9 +98,6 @@ TEST_F(VerifyParseTest, DuplicateTypeOptionIsError) {
                             5, "19.7"));
 }
 
-// §19.7: the option value is an expression. The LRM's own example initializes
-// option.weight from a covergroup formal argument, so an identifier value that
-// names a formal (declared with the §19.3 formal-list syntax) must be accepted.
 TEST_F(VerifyParseTest, OptionValueMayBeCovergroupFormal) {
   Parse(R"(
     module m;
@@ -123,9 +111,6 @@ TEST_F(VerifyParseTest, OptionValueMayBeCovergroupFormal) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7: the same-option-twice error is scoped to a single syntactic level. The
-// same option assigned once at the covergroup level and once inside a
-// coverpoint body names two distinct option instances, so it is not a repeat.
 TEST_F(VerifyParseTest, SameOptionAtCovergroupAndCoverpointAccepted) {
   Parse(R"(
     module m;
@@ -140,9 +125,6 @@ TEST_F(VerifyParseTest, SameOptionAtCovergroupAndCoverpointAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7: a covergroup may be declared as a class member; the option-assignment
-// syntax and the distinct-options acceptance hold in that syntactic position
-// too.
 TEST_F(VerifyParseTest, ClassEmbeddedCovergroupDistinctOptionsAccepted) {
   Parse(R"(
     class c;
@@ -156,8 +138,6 @@ TEST_F(VerifyParseTest, ClassEmbeddedCovergroupDistinctOptionsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7: the same-option-twice rule applies to a class-embedded covergroup as
-// well as one declared at module scope.
 TEST_F(VerifyParseTest, ClassEmbeddedCovergroupDuplicateOptionIsError) {
   Parse(R"(
     class c;
@@ -174,8 +154,6 @@ TEST_F(VerifyParseTest, ClassEmbeddedCovergroupDuplicateOptionIsError) {
                             5, "19.7"));
 }
 
-// §19.7: the clocking event on a covergroup header is optional; the duplicate
-// option is still diagnosed when the header names no event.
 TEST_F(VerifyParseTest, DuplicateOptionWithoutClockingEventIsError) {
   Parse(R"(
     module m;
@@ -192,9 +170,6 @@ TEST_F(VerifyParseTest, DuplicateOptionWithoutClockingEventIsError) {
                             5, "19.7"));
 }
 
-// §19.7: the duplicate-option diagnosis also holds for a covergroup that
-// overrides its sample method, whose option values are scanned on a different
-// path than an ordinary covergroup's.
 TEST_F(VerifyParseTest, DuplicateOptionWithCustomSampleMethodIsError) {
   Parse(R"(
     module m;
@@ -211,9 +186,6 @@ TEST_F(VerifyParseTest, DuplicateOptionWithCustomSampleMethodIsError) {
                             5, "19.7"));
 }
 
-// §19.7, Table 19-2: options allowed at the coverpoint level (weight, goal,
-// comment, at_least, auto_bin_max, detect_overlap) are accepted inside a
-// coverpoint body.
 TEST_F(VerifyParseTest, CoverpointLevelAllowedOptionsAccepted) {
   Parse(R"(
     module m;
@@ -229,8 +201,6 @@ TEST_F(VerifyParseTest, CoverpointLevelAllowedOptionsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7, Table 19-2: a covergroup-only option (per_instance) may not be
-// specified at the coverpoint level.
 TEST_F(VerifyParseTest, PerInstanceAtCoverpointLevelIsError) {
   Parse(R"(
     module m;
@@ -247,8 +217,6 @@ TEST_F(VerifyParseTest, PerInstanceAtCoverpointLevelIsError) {
                             5, "19.7"));
 }
 
-// §19.7, Table 19-2: a cross-only option (cross_num_print_missing) may not be
-// specified at the coverpoint level.
 TEST_F(VerifyParseTest, CrossOnlyOptionAtCoverpointLevelIsError) {
   Parse(R"(
     module m;
@@ -265,9 +233,6 @@ TEST_F(VerifyParseTest, CrossOnlyOptionAtCoverpointLevelIsError) {
                             5, "19.7"));
 }
 
-// §19.7, Table 19-2: options allowed at the cross level (weight, goal, comment,
-// at_least, cross_num_print_missing, cross_retain_auto_bins) are accepted
-// inside a cross body.
 TEST_F(VerifyParseTest, CrossLevelAllowedOptionsAccepted) {
   Parse(R"(
     module m;
@@ -285,8 +250,6 @@ TEST_F(VerifyParseTest, CrossLevelAllowedOptionsAccepted) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// §19.7, Table 19-2: a coverpoint-only option (auto_bin_max) may not be
-// specified at the cross level.
 TEST_F(VerifyParseTest, AutoBinMaxAtCrossLevelIsError) {
   Parse(R"(
     module m;
@@ -305,8 +268,6 @@ TEST_F(VerifyParseTest, AutoBinMaxAtCrossLevelIsError) {
                             7, "19.7"));
 }
 
-// §19.7, Table 19-2: a covergroup-only option (get_inst_coverage) may not be
-// specified at the cross level.
 TEST_F(VerifyParseTest, GetInstCoverageAtCrossLevelIsError) {
   Parse(R"(
     module m;
@@ -325,11 +286,6 @@ TEST_F(VerifyParseTest, GetInstCoverageAtCrossLevelIsError) {
                             7, "19.7"));
 }
 
-// §19.7.1: a type option is set with a constant expression, and a covergroup
-// formal takes its value only when an instance is built, so a type option
-// naming one -- at the covergroup, coverpoint or cross level, and as an
-// operand or a function's argument -- is an error; an instance option may name
-// it.
 TEST_F(VerifyParseTest, TypeOptionNamingCovergroupFormalIsError) {
   Parse(R"(
     module m;

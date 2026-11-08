@@ -12,9 +12,6 @@
 
 namespace {
 
-// Evaluates the `triggered` method of a named event under a fresh SimFixture.
-// The event `ev` is created and optionally marked as triggered, then the
-// member-access expression `ev.triggered` is evaluated and its result returned.
 static Logic4Vec EvalEvTriggered(bool set_triggered) {
   SimFixture f;
   auto* ev = f.ctx.CreateVariable("ev", 1);
@@ -51,9 +48,7 @@ TEST(IpcSync, NonblockingTriggerSetsTriggeredState) {
 }
 
 TEST(IpcSync, TriggeredMethodYieldsSingleBit) {
-  // §15.5.3: triggered is prototyped as a bit-valued method, so the evaluated
-  // result is a single-bit quantity regardless of the event's triggered state.
-  auto result = EvalEvTriggered(/*set_triggered=*/true);
+  auto result = EvalEvTriggered(true);
   EXPECT_EQ(result.width, 1u);
 }
 
@@ -95,9 +90,6 @@ TEST(IpcSync, WaitTriggeredUnblocksInFork) {
 }
 
 TEST(IpcSync, WaitTriggeredUnblocksWhenWaitPrecedesSameTimeTrigger) {
-  // §15.5.3: a process waiting on the triggered state unblocks regardless of
-  // execution order at the same simulation time. Here the waiting branch runs
-  // and blocks first, then the trigger fires later in the same step.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -139,9 +131,6 @@ TEST(IpcSync, WaitTriggeredUnblocksWhenTriggerAfterWait) {
 TEST(IpcSync, NullEventTriggeredReturnsFalse) {
   SimFixture f;
   f.ctx.NullifyEventVariable("ev");
-  // §15.5.3: a null named event's triggered method is false even if a trigger
-  // tick happens to match the current time step, so record one to prove the
-  // null case is handled distinctly from the merely-never-triggered case.
   f.ctx.SetEventTriggered("ev");
 
   auto* access = f.arena.Create<Expr>();
@@ -172,9 +161,6 @@ TEST(IpcSync, WaitTriggeredWithBodyStatement) {
 }
 
 TEST(IpcSync, TriggeredStateClearsAfterTimeAdvances) {
-  // §15.5.3: the triggered state holds for the whole time step in which the
-  // event fired and then clears once simulation time advances. Reading it in
-  // the same step yields 1; reading it after a delay yields 0.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -205,9 +191,6 @@ TEST(IpcSync, TriggeredStateClearsAfterTimeAdvances) {
 }
 
 TEST(IpcSync, WaitOnNullEventTriggeredNeverUnblocks) {
-  // §15.5.3: the triggered method of a null named event is always false, so a
-  // process waiting on it has no condition that can ever hold and must remain
-  // blocked. The value set before the wait therefore survives to end of sim.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -226,9 +209,6 @@ TEST(IpcSync, WaitOnNullEventTriggeredNeverUnblocks) {
 }
 
 TEST(IpcSync, TriggeredStatePersistsAcrossSuccessiveWaitsInSameStep) {
-  // §15.5.3: the triggered state holds for the whole time step in which the
-  // event fired, so more than one wait evaluated within that same step observes
-  // it and unblocks. Both waits clear at time 0 with no time advance between.
   LowerFixture f;
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -260,9 +240,6 @@ TEST(IpcSync, TriggeredStatePersistsAcrossSuccessiveWaitsInSameStep) {
 }
 
 TEST(IpcSync, TriggeredCallFormEvaluatesTrueWhenTriggered) {
-  // §15.5.3: the method is prototyped `function bit triggered()`, so invoking
-  // it with explicit empty parentheses is equivalent to the bare-member form.
-  // After the event fires in this step, ev.triggered() reads back true.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -280,8 +257,6 @@ TEST(IpcSync, TriggeredCallFormEvaluatesTrueWhenTriggered) {
 }
 
 TEST(IpcSync, TriggeredCallFormEvaluatesFalseWhenNotTriggered) {
-  // §15.5.3: with no trigger in the current step, the call form yields 1'b0
-  // just as the bare-member form does, so the else branch runs.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -298,9 +273,6 @@ TEST(IpcSync, TriggeredCallFormEvaluatesFalseWhenNotTriggered) {
 }
 
 TEST(IpcSync, TriggeredCallFormOnNullEventReturnsFalse) {
-  // §15.5.3: the triggered method of a null named event returns false. This
-  // must hold for the parenthesized call form as well as the bare-member form,
-  // so a procedural read of ev.triggered() on a null event assigns 0.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -317,11 +289,6 @@ TEST(IpcSync, TriggeredCallFormOnNullEventReturnsFalse) {
 }
 
 TEST(IpcSync, TriggeredStateVisibleThroughEventAlias) {
-  // §15.5.3: the triggered state is a property of the underlying named-event
-  // synchronization object, not of the name used to reach it. The example
-  // introduces an alias (event done_too = done) to make this point. Triggering
-  // `done` and reading `done_too.triggered` in the same step observes the state
-  // through the alias, so the if-branch runs.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -340,11 +307,6 @@ TEST(IpcSync, TriggeredStateVisibleThroughEventAlias) {
 }
 
 TEST(IpcSync, NonblockingTriggerEndToEndSetsTriggeredState) {
-  // §15.5.3: the persistent triggered state records that the event fired in the
-  // current step regardless of which trigger operator produced it. Here the
-  // event is fired with the §15.5.1 nonblocking trigger ->>, whose effect lands
-  // in the nonblocking region of the same step; a sibling wait on the triggered
-  // state then unblocks and runs the following assignment.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -362,11 +324,6 @@ TEST(IpcSync, NonblockingTriggerEndToEndSetsTriggeredState) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.3 with §6.17: `triggered` on a class's event property is 1 in the time
-// step of its trigger, read in a method of the class right after `-> e` and
-// through the handle by a wait on `s.e.triggered` in a sibling branch, which
-// the trigger at 1 satisfies: 1 and 1, read as 11. Found by no name, the
-// method read 0 and the wait was never satisfied.
 TEST(NamedEventSim, TriggeredOnAClassEventProperty) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -393,11 +350,6 @@ TEST(NamedEventSim, TriggeredOnAClassEventProperty) {
   EXPECT_EQ(var->value.ToUint64(), 11u);
 }
 
-// §15.5.3 with §9.4.2 and §13.5.5: `triggered` is a method of no arguments,
-// written with or without `()`, and an event expression holding it is
-// reevaluated when its event prefix is triggered. Both spellings wake at the
-// trigger at 3, read as 33. The spelling without `()` named no variable and
-// armed on nothing, so that process waited for the rest of the run.
 TEST(NamedEventSim, EventControlOnTriggeredWakesWithOrWithoutParentheses) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -414,8 +366,6 @@ TEST(NamedEventSim, EventControlOnTriggeredWakesWithOrWithoutParentheses) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §15.5.3 with §9.4.2: the rise of `triggered` at the trigger is a posedge of
-// the expression, in either spelling: 3 and 3, read as 33.
 TEST(NamedEventSim, PosedgeOfTriggeredWakesAtTheTrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -432,8 +382,6 @@ TEST(NamedEventSim, PosedgeOfTriggeredWakesAtTheTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 33u);
 }
 
-// §15.5.3 with §9.4.2.1: `triggered` as one operand of an `or` wakes the
-// process when its event is triggered, with the other operand untouched.
 TEST(NamedEventSim, TriggeredAsOneOperandOfAnOrWakesAtTheTrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -449,8 +397,6 @@ TEST(NamedEventSim, TriggeredAsOneOperandOfAnOrWakesAtTheTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 4u);
 }
 
-// §15.5.3 with §23.6: the event prefix may be a hierarchical name, here a
-// child instance's event triggered by the child at 5.
 TEST(NamedEventSim, TriggeredOfAHierarchicalEventWakesAtTheTrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -468,8 +414,6 @@ TEST(NamedEventSim, TriggeredOfAHierarchicalEventWakesAtTheTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §15.5.3 with §6.17: the event prefix may be a class's event property,
-// reached through a handle and triggered through it at 2.
 TEST(NamedEventSim, TriggeredOfAClassEventPropertyWakesAtTheTrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -485,10 +429,6 @@ TEST(NamedEventSim, TriggeredOfAClassEventPropertyWakesAtTheTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 2u);
 }
 
-// §15.5.3 with §15.5.1: a nonblocking trigger sets the triggered state in the
-// NBA region, so the woken process reads the value the triggering process
-// went on to write after `->> e` in the Active region: 2, at time 3, read as
-// 32.
 TEST(NamedEventSim, NonblockingTriggerWakesTriggeredAfterTheActiveRegion) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -503,10 +443,6 @@ TEST(NamedEventSim, NonblockingTriggerWakesTriggeredAfterTheActiveRegion) {
   EXPECT_EQ(var->value.ToUint64(), 32u);
 }
 
-// §15.5.3: the return of `triggered` to 0 as time advances changes no operand
-// of the expression, so a negedge of it never occurs; nor does an event
-// control armed after the trigger in the same time step see a change, and a
-// null event is never triggered at all. None of the three processes runs.
 TEST(NamedEventSim, TriggeredWakesNoProcessWithoutAFreshTrigger) {
   SimFixture f;
   auto* var = RunAndFindVar(

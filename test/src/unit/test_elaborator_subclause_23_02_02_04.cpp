@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -11,18 +10,11 @@ TEST(DefaultPortValueElaboration, InputPortWithDefaultElaborates) {
   EXPECT_TRUE(ElabOk("module m(input logic a = 1'b0); endmodule", f));
 }
 
-// §23.2.2.2's Syntax 23-4 writes `[ = constant_expression ]` behind a
-// variable port's identifier, and its footnote 2 lets only a variable output
-// port be initialized and only an input port take a default: on a variable
-// output port the expression is the port's initializer, not a §23.2.2.4
-// default, and is legal.
 TEST(DefaultPortValueElaboration, VariableOutputPortWithInitializerElaborates) {
   ElabFixture f;
   EXPECT_TRUE(ElabOk("module m(output logic q = 1'b0); endmodule", f));
 }
 
-// The same footnote's other half: an output port that is a net is no variable
-// output port, so it can be neither initialized nor given a default.
 TEST(DefaultPortValueElaboration, NetOutputPortWithInitializerIsError) {
   ElabFixture f;
   ElaborateSrc("module m(output wire q = 1'b0); endmodule", f, "m");
@@ -41,10 +33,6 @@ TEST(DefaultPortValueElaboration, InterconnectPortWithDefaultIsError) {
 }
 
 TEST(DefaultPortValueElaboration, InoutPortWithDefaultIsError) {
-  // §23.2.2.4: a default value is permitted only on an input port. `output` is
-  // covered separately; this exercises the `inout` form of the non-input
-  // negative. A net data type (wire) is used so the sole diagnostic is the
-  // direction rule, not the unrelated "variable on inout port" constraint.
   ElabFixture f;
   ElaborateSrc("module m(inout wire logic [7:0] p = 8'h00); endmodule", f, "m");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -52,8 +40,6 @@ TEST(DefaultPortValueElaboration, InoutPortWithDefaultIsError) {
 }
 
 TEST(DefaultPortValueElaboration, RefPortWithDefaultIsError) {
-  // §23.2.2.4: the `ref` form of the non-input negative. A ref port is always a
-  // singular variable, so the direction rule is the only requirement it trips.
   ElabFixture f;
   ElaborateSrc("module m(ref logic [7:0] p = 8'h00); endmodule", f, "m");
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
@@ -84,11 +70,6 @@ TEST(DefaultPortValueElaboration, OmittedInputUsesDefaultNamedConn) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §23.2.2.4: a default value is a constant expression of the module that
-// declares the port, so one reading that module's variable is reported, at
-// the port, an integral or a real one alike, while defaults built from its
-// parameters, a localparam of its body, a package's parameter, an enumeration
-// literal and a constant system function are all constant and are not.
 TEST(DefaultPortValueElaboration, NonConstantDefaultIsReported) {
   ElabFixture f;
   ElaborateSrc(
@@ -126,9 +107,6 @@ TEST(DefaultPortValueElaboration, NonConstantDefaultIsReported) {
   }
 }
 
-// §23.2.2.4: a default value may be given only in ANSI-style declarations, so
-// one written behind a non-ANSI input port's body declaration is reported, at
-// the port's place in the header.
 TEST(DefaultPortValueElaboration, NonAnsiPortDefaultIsError) {
   ElabFixture f;
   ElaborateSrc(

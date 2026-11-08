@@ -20,12 +20,6 @@ namespace {
 constexpr std::string_view kNotCastCompatible =
     "is not cast compatible with the type of formal";
 
-// §8.13 with §8.23: a class inherits the members of the class it extends, so
-// `E::t` is C's array of two ints, and E's own `et`, written with `t`, is the
-// same type, as is the typedef of a class nested in E. A class behind its
-// package's name is extended too, and §8.26.2 has an interface class inherit
-// the types of every interface class it extends. Each array is reported for
-// three ints, and three bytes for an int.
 TEST(LetActualClassScopeElaboration, ATypeADerivedClassInheritsIsFollowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -72,11 +66,6 @@ TEST(LetActualClassScopeElaboration, ATypeADerivedClassInheritsIsFollowed) {
   }
 }
 
-// §8.13 with §8.25: the class a class extends is a class_type (A.2.2.1),
-// which a typedef naming the class may stand for, and which may be a class
-// nested in another, written behind that class's name. Either way it is
-// followed, so `G::t`, C's array of two ints, and `H::i_t`, Inner's, are
-// each reported for three ints.
 TEST(LetActualClassScopeElaboration, ABaseThroughATypedefOrAClassIsFollowed) {
   ElabFixture f;
   ElaborateSrc(
@@ -106,11 +95,6 @@ TEST(LetActualClassScopeElaboration, ABaseThroughATypedefOrAClassIsFollowed) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 18, "11.12"));
 }
 
-// §8.13: a base written through a chain of typedef names, 31 long here, is
-// followed to its class; one of 32, which may run through a name twice, is
-// not, nor is a base nothing declares. A class whose base is not found has
-// no frame, so the calls passing what it declares or inherits are left
-// unjudged.
 TEST(LetActualClassScopeElaboration, ABaseIsFollowedThroughTypedefsToABound) {
   std::string src = "class C;\n  typedef int t [2];\nendclass\ntypedef C c0;\n";
   for (int i = 1; i < 32; ++i)
@@ -137,15 +121,6 @@ TEST(LetActualClassScopeElaboration, ABaseIsFollowedThroughTypedefsToABound) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 47, "11.12"));
 }
 
-// §8.25.1: `P#()::ks_t` is the typedef of P's default specialization, a
-// structure of one 16-bit member, and `P#(4)::ks_t` that of P#(4), of one
-// 32-bit member, so an int is reported for the first and fits the second by
-// bit-stream cast (§6.24.3). A name a specialization's typedef stands for is
-// looked up where it was written: `ut` and `N`, written in P, in P, where
-// `N` is P's nested class and `ut` the compilation unit's int; `T`'s default
-// int in P's header; and the `N` the argument of `P#(2, N)` gives T at the
-// call, m's class. So an array of three ints is no `pt` or `tt`, an int no
-// handle, and m's N no handle of P's N, which is no class related to it.
 TEST(LetActualClassScopeElaboration, ATypeOfASpecializationIsJudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -190,10 +165,6 @@ TEST(LetActualClassScopeElaboration, ATypeOfASpecializationIsJudged) {
   }
 }
 
-// §8.25.1: a name written in a class with parameters is looked up in the
-// class, which a variable of the class's name hides where the
-// specialization is written, so there the prefix names no class and the
-// type `pt` stands for is left unjudged.
 TEST(LetActualClassScopeElaboration, ASpecializationOfAHiddenClassIsUnjudged) {
   ElabFixture f;
   ElaborateSrc(
@@ -212,10 +183,6 @@ TEST(LetActualClassScopeElaboration, ASpecializationOfAHiddenClassIsUnjudged) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 9, "11.12"));
 }
 
-// §6.7.1: a net declared with no data type, or with only a range, is of the
-// implicit type logic: `d`, of one bit, fits an int formal, and `v`, of 64
-// bits, an array of two ints by bit-stream cast (§6.24.3), while `v8`, of 8
-// bits, fits no such array.
 TEST(LetActualNetTypeElaboration, ANetDeclaredWithNoDataTypeIsLogic) {
   ElabFixture f;
   ElaborateSrc(
@@ -235,12 +202,6 @@ TEST(LetActualNetTypeElaboration, ANetDeclaredWithNoDataTypeIsLogic) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 8, "11.12"));
 }
 
-// §6.10: a name a continuous assignment's target, a primitive's or a UDP's
-// terminal list, an instance's port connections or an alias writes alone, and
-// that nothing declares, is an implicit scalar net, a 1-bit logic, which no
-// array of two ints takes; an int formal takes it. A terminal naming the
-// declared net `d`, a literal terminal and an empty port connection declare
-// nothing.
 TEST(LetActualImplicitNetElaboration, AnImplicitNetIsJudgedAsAScalar) {
   ElabFixture f;
   ElaborateSrc(
@@ -281,9 +242,6 @@ TEST(LetActualImplicitNetElaboration, AnImplicitNetIsJudgedAsAScalar) {
       ReportedError(f.diag.Diagnostics(), kNotCastCompatible, 26, "11.12"));
 }
 
-// §22.8: under `default_nettype none no implicit net is assumed, so the
-// target of the continuous assignment is an error and declares nothing, and
-// the call passing it is left to that report.
 TEST(LetActualImplicitNetElaboration, NoImplicitNetUnderDefaultNettypeNone) {
   ElabFixture f;
   auto fid = f.mgr.AddFile("<test>",

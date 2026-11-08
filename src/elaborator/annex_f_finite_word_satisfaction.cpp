@@ -8,7 +8,6 @@ namespace delta {
 
 bool WeaklySatisfiesByFiniteWord(const Word& word, const BooleanExpr& enabling,
                                  const AssertionStatement& assertion) {
-  // §F.5.3.2: w |=^- A iff w T^omega |= A.
   return NeutrallySatisfiesAssertionWithTail(word, LetterTop(), enabling,
                                              assertion);
 }
@@ -16,33 +15,27 @@ bool WeaklySatisfiesByFiniteWord(const Word& word, const BooleanExpr& enabling,
 bool StronglySatisfiesByFiniteWord(const Word& word,
                                    const BooleanExpr& enabling,
                                    const AssertionStatement& assertion) {
-  // §F.5.3.2: w |=^+ A iff w _|_^omega |= A.
   return NeutrallySatisfiesAssertionWithTail(word, LetterBottom(), enabling,
                                              assertion);
 }
 
 FiniteWordVerdict CheckFiniteWord(const Word& word, const BooleanExpr& enabling,
                                   const AssertionStatement& assertion) {
-  // §F.5.3.2: the verdict a tool should return. Because w |=^+ A implies w |=
-  // A, which implies w |=^- A, ruling out failure, then strong, then neutral
-  // satisfaction picks out exactly one of the four conditions the standard
-  // lists.
   if (!WeaklySatisfiesByFiniteWord(word, enabling, assertion)) {
-    return FiniteWordVerdict::kFails;  // not (w |=^- A)
+    return FiniteWordVerdict::kFails;
   }
   if (StronglySatisfiesByFiniteWord(word, enabling, assertion)) {
-    return FiniteWordVerdict::kHoldsStrongly;  // w |=^+ A
+    return FiniteWordVerdict::kHoldsStrongly;
   }
   if (NeutrallySatisfiesAssertion(word, enabling, assertion)) {
-    return FiniteWordVerdict::kHolds;  // w |= A and not w |=^+ A
+    return FiniteWordVerdict::kHolds;
   }
-  return FiniteWordVerdict::kPending;  // w |=^- A and not w |= A
+  return FiniteWordVerdict::kPending;
 }
 
 bool FiniteWordVerdictCondition(FiniteWordVerdict verdict, const Word& word,
                                 const BooleanExpr& enabling,
                                 const AssertionStatement& assertion) {
-  // §F.5.3.2: each verdict's condition as the subclause states it.
   switch (verdict) {
     case FiniteWordVerdict::kHoldsStrongly:
       return StronglySatisfiesByFiniteWord(word, enabling, assertion);
@@ -59,7 +52,6 @@ bool FiniteWordVerdictCondition(FiniteWordVerdict verdict, const Word& word,
 }
 
 const char* FiniteWordVerdictLabel(FiniteWordVerdict verdict) {
-  // §F.5.3.2: the four strings a tool should report.
   switch (verdict) {
     case FiniteWordVerdict::kHoldsStrongly:
       return "Holds strongly";

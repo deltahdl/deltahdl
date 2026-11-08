@@ -23,8 +23,6 @@ namespace delta {
 
 namespace {
 
-// A net standing apart from the design that resolves what one side of the
-// link passes to the other, of the type and width of the net it stands for.
 struct ScratchNet {
   Net net;
   Variable resolved;
@@ -37,18 +35,12 @@ struct ScratchNet {
   }
 };
 
-// One link: the driver it holds on each net, allocated when it first carries
-// something, and what each direction resolves.
 struct InoutPortLink {
   InoutPortLinkEnds ends;
   ContAssignDriver to_outer;
   ContAssignDriver to_inner;
-  // `outer`'s drivers as they have reached the port, each across the delay
-  // from the source it stands for, the link's own driver held at high
-  // impedance.
   ScratchNet toward_inner;
   std::vector<std::shared_ptr<InterconnectSchedule>> per_driver;
-  // `inner`'s drivers but the link's own.
   ScratchNet toward_outer;
 
   InoutPortLink(InoutPortLinkEnds e, Arena& arena)
@@ -63,16 +55,10 @@ struct InoutPortLink {
   }
 };
 
-// Whether `slot` of the net `drv` writes is the link's own driver there.
 bool IsOwnSlot(const ContAssignDriver& drv, std::size_t slot) {
   return !drv.first && drv.driver_idx == slot;
 }
 
-// §28.12: a value passes through a port at the strengths it has, which are
-// what the net it is resolved on reports, a range of §28.12.2 down to its
-// lower end; a side the resolution reports at high impedance, as a net that
-// computes no strength reports both, keeps the driver's default, so that the
-// value still reaches the other net.
 DriverStrength PassedStrength(const NetStrength& s) {
   DriverStrength out;
   if (s.s0_hi != Strength::kHighz) out.s0 = s.s0_hi;
@@ -82,9 +68,6 @@ DriverStrength PassedStrength(const NetStrength& s) {
   return out;
 }
 
-// Writes what `from` resolved to into the link's driver `drv`, the slot
-// added first where the link has none on that net yet, so the net's
-// listeners, the link's own among them, already know it for the link's own.
 void Commit(ContAssignDriver& drv, const ScratchNet& from, SimContext& ctx) {
   Arena& arena = ctx.GetArena();
   if (drv.first) {
@@ -99,7 +82,6 @@ void Commit(ContAssignDriver& drv, const ScratchNet& from, SimContext& ctx) {
       &ctx.GetScheduler(), arena);
 }
 
-// Toward the connection: `inner`'s drivers but the link's own, at once.
 void CarryOut(InoutPortLink& link, std::size_t slot, SimContext& ctx) {
   if (IsOwnSlot(link.to_inner, slot)) return;
   Arena& arena = ctx.GetArena();
@@ -114,8 +96,6 @@ void CarryOut(InoutPortLink& link, std::size_t slot, SimContext& ctx) {
   Commit(link.to_outer, link.toward_outer, ctx);
 }
 
-// The shadow's slots up to `slot`, each new one starting at high impedance,
-// which a driver held until its first write.
 void GrowShadow(InoutPortLink& link, std::size_t slot, Arena& arena) {
   Net& shadow = link.toward_inner.net;
   while (shadow.drivers.size() <= slot) {
@@ -126,11 +106,6 @@ void GrowShadow(InoutPortLink& link, std::size_t slot, Arena& arena) {
   }
 }
 
-// Toward the port: a write of `outer`'s driver `slot`, carried across the
-// delay annotated to the port from the source the driver stands for, or, for
-// one standing for no port, from the connection. ApplyContAssignToNet records
-// the slot's port before it tells a listener, and Lowerer::Lower acquires the
-// manager before anything runs.
 void CarryIn(const std::shared_ptr<InoutPortLink>& link, std::size_t slot,
              SimContext& ctx) {
   if (IsOwnSlot(link->to_outer, slot)) return;
@@ -159,9 +134,6 @@ void CarryIn(const std::shared_ptr<InoutPortLink>& link, std::size_t slot,
 }  // namespace
 
 void LinkInoutPortNets(InoutPortLinkEnds ends, SimContext& ctx) {
-  // §23.3.3.7.1: an interconnect port's net is merged with the net connected
-  // to it and so is of that net's type, which a join gives it by sharing the
-  // net and two linked nets by the inner taking the outer's type.
   if (ends.inner.type == NetType::kInterconnect)
     ends.inner.type = ends.outer.type;
   auto link = std::make_shared<InoutPortLink>(std::move(ends), ctx.GetArena());

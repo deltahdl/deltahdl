@@ -82,9 +82,6 @@ bool GlobalClockingFutureFunctionAllowedIn(GlobalClockingFunctionPlace place) {
 }
 
 bool GlobalClockingPastFunctionAllowedIn(GlobalClockingFunctionPlace place) {
-  // §16.9.4: past functions carry the ordinary sampled-value usability, which
-  // includes property and sequence expressions as well as general procedural
-  // code and action blocks.
   switch (place) {
     case GlobalClockingFunctionPlace::kPropertyExpr:
     case GlobalClockingFunctionPlace::kSequenceExpr:

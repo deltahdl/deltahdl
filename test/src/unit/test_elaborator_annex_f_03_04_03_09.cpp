@@ -13,20 +13,6 @@
 
 using namespace delta;
 
-// §F.3.4.3.9 unfolds the bounded temporal operators into the §F.3.2 nexttime,
-// implication, not, or and and over the §F.3.4.3.8 always and s_eventually:
-// (s_nexttime p) is (not nexttime not p), (nexttime[0] p) is (1 |-> p),
-// (nexttime[m] p) is (nexttime (nexttime[m-1] p)), (s_nexttime[m] p) is
-// (not nexttime[m] not p), eventually[m:n] is the or of nexttime[m] through
-// nexttime[n], always[m:n] their and, (always[m:$] p) is
-// (nexttime[m] always p), (s_eventually[m:n] p) is (not always[m:n] not p),
-// (s_eventually[m:$] p) is (s_nexttime[m] s_eventually p), and
-// (s_always[m:n] p) is (not eventually[m:n] not p). The cases check that
-// each factory builds the tree its identity names in both property models
-// and that, under §F.5.3.1, the weak forms hold where the word ends before
-// the letter they name while the strong forms need that letter, and that a
-// clock counts ticks rather than letters.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
@@ -35,7 +21,6 @@ std::shared_ptr<const SequenceExpr> Atom(const std::string& name) {
   return SeqBoolean(BoolAtom(name));
 }
 
-// (s_nexttime p) is the negation of the nexttime over the negation of p.
 TEST(DerivedBoundedTemporalOperators, SNexttimeNegatesTheNexttimeOfNotP) {
   auto p = PropStrong(Atom("a"));
   auto form = PropSNexttime(p);
@@ -47,10 +32,6 @@ TEST(DerivedBoundedTemporalOperators, SNexttimeNegatesTheNexttimeOfNotP) {
   EXPECT_EQ(form->lhs->lhs->lhs, p);
 }
 
-// (nexttime[0] p) is the implication whose antecedent is the sequence 1 and
-// whose consequent is p, and (nexttime[m] p) wraps that in m nexttimes, so
-// nexttime[2] is nexttime over nexttime over the implication rather than
-// over p itself.
 TEST(DerivedBoundedTemporalOperators, NexttimeCountIsNexttimesOverOneImpliesP) {
   auto p = PropStrong(Atom("a"));
   auto zero = PropNexttimeExactly(p, 0);
@@ -67,7 +48,6 @@ TEST(DerivedBoundedTemporalOperators, NexttimeCountIsNexttimesOverOneImpliesP) {
   EXPECT_EQ(two->lhs->lhs->lhs, p);
 }
 
-// (s_nexttime[m] p) is the negation of nexttime[m] over the negation of p.
 TEST(DerivedBoundedTemporalOperators, SNexttimeCountNegatesTheCountOfNotP) {
   auto p = PropStrong(Atom("a"));
   auto form = PropSNexttimeExactly(p, 1);
@@ -81,9 +61,6 @@ TEST(DerivedBoundedTemporalOperators, SNexttimeCountNegatesTheCountOfNotP) {
   EXPECT_EQ(form->lhs->lhs->lhs->lhs, p);
 }
 
-// eventually[m:m] and always[m:m] are nexttime[m] alone; a wider range is
-// the or, or the and, of the narrower range with nexttime[n], so [0:2]
-// is (([0] or [1]) or [2]) and (([0] and [1]) and [2]).
 TEST(DerivedBoundedTemporalOperators, RangesFoldTheCountsFromTheLeft) {
   auto p = PropStrong(Atom("a"));
   auto meeting = PropEventuallyRange(p, 1, 1);
@@ -117,10 +94,6 @@ TEST(DerivedBoundedTemporalOperators, RangesFoldTheCountsFromTheLeft) {
   EXPECT_EQ(always->rhs->kind, PropertyExpr::Kind::kNexttime);
 }
 
-// (always[m:$] p) is nexttime[m] over the §F.3.4.3.8 always, whose left
-// operand is p; (s_eventually[m:n] p) and (s_always[m:n] p) negate the
-// opposite range over not p; and (s_eventually[m:$] p) is s_nexttime[m]
-// over the §F.3.4.3.8 s_eventually.
 TEST(DerivedBoundedTemporalOperators,
      TheUnboundedAndStrongFormsAreTheStatedTrees) {
   auto p = PropStrong(Atom("a"));
@@ -174,10 +147,6 @@ TEST(DerivedBoundedTemporalOperators,
   EXPECT_EQ(node->lhs->lhs, p);
 }
 
-// The clocked forms are the same trees over the clocked primitives, with the
-// antecedent of nexttime[0] the bare Boolean sequence 1; nexttime[2] q is
-// not two nexttimes over q itself, and the eventually range is not the
-// always range.
 TEST(DerivedBoundedTemporalOperators, ClockedFormsAreTheStatedTrees) {
   auto q = ClkStrong(Atom("a"));
   auto one = SeqBoolean(BoolTrue());
@@ -219,14 +188,6 @@ TEST(DerivedBoundedTemporalOperators, ClockedFormsAreTheStatedTrees) {
                     ClkNexttime(ClkImplication(one, ClkNot(q)))))));
 }
 
-// Under §F.5.3.1, nexttime[1] strong(a) holds on a lone letter, because the
-// (1 |-> p) at the base of the identity holds on the empty suffix where the
-// bare nexttime strong(a) of §F.3.2, judging strong(a) there, does not; the
-// strong forms s_nexttime and s_nexttime[1] fail on the lone letter; and all
-// four need a on the second letter where there is one. nexttime[0] strong(a)
-// needs a on the first letter and holds on the empty word; nexttime[2]
-// strong(a) needs a on the third letter and holds on a word of two, where
-// s_nexttime[2] fails.
 TEST(DerivedBoundedTemporalOperators, TheStrongNexttimesNeedTheLetterTheyName) {
   auto p = PropStrong(Atom("a"));
   auto bare = PropNexttime(p);
@@ -264,10 +225,6 @@ TEST(DerivedBoundedTemporalOperators, TheStrongNexttimesNeedTheLetterTheyName) {
   EXPECT_FALSE(NeutrallySatisfies(kTwoLetters, *strong_two));
 }
 
-// eventually[1:2] strong(a) holds where a is on the second or third letter
-// and, being weak, where the word has no third letter; s_eventually[1:2]
-// needs the a. always[1:2] strong(a) needs a on both letters where both are
-// there and holds where the third is missing; s_always[1:2] fails there.
 TEST(DerivedBoundedTemporalOperators, TheRangesNameTheLettersTheySpan) {
   auto p = PropStrong(Atom("a"));
   auto eventually = PropEventuallyRange(p, 1, 2);
@@ -298,10 +255,6 @@ TEST(DerivedBoundedTemporalOperators, TheRangesNameTheLettersTheySpan) {
   EXPECT_FALSE(NeutrallySatisfies(kNoThirdLetter, *s_always));
 }
 
-// always[1:$] strong(a) needs a from the second letter on and holds on a lone
-// letter; s_eventually[1:$] strong(a) needs a on some letter after the first
-// and fails on a lone letter, on a word without a, and where a is only on
-// the first letter.
 TEST(DerivedBoundedTemporalOperators, TheUnboundedFormsStartAtTheCount) {
   auto p = PropStrong(Atom("a"));
   auto always = PropAlwaysAtLeast(p, 1);
@@ -321,10 +274,6 @@ TEST(DerivedBoundedTemporalOperators, TheUnboundedFormsStartAtTheCount) {
   EXPECT_FALSE(NeutrallySatisfies(kLoneLetter, *s_eventually));
 }
 
-// In the clocked model under @(clk), nexttime[1] strong(a) is judged at the
-// second tick, so a on an unclocked letter between the ticks does not count,
-// and where the word ends before a second tick the weak nexttime[1] holds
-// and s_nexttime[1] fails.
 TEST(DerivedBoundedTemporalOperators, UnderAClockTheCountIsInTicks) {
   auto clk = BoolAtom("clk");
   auto weak = ClkClock(clk, ClkNexttimeExactly(ClkStrong(Atom("a")), 1));

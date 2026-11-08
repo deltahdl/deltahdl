@@ -73,10 +73,6 @@ TEST(ModuleHeaderDefinition, ModuleEndLabelElaborates) {
   EXPECT_TRUE(ElabOk("module m; endmodule : m\n"));
 }
 
-// In the non-ANSI header style the port characteristic declarations are
-// written separately inside the module. §23.2.1 states these are local
-// definitions within the module, so the elaborator must resolve them into the
-// module's own ports rather than leaving them dangling or external.
 TEST(ModuleHeaderDefinition, NonAnsiPortDeclarationsAreLocalToModule) {
   ElabFixture f;
   auto* design = ElaborateSrc(

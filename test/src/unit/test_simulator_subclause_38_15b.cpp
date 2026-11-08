@@ -19,14 +19,12 @@ namespace {
 
 class ExpressionValuesOfARun : public VpiDesignRun {
  protected:
-  // The right side of the continuous assignment `scope` holds.
   static vpiHandle RhsIn(const char* scope) {
     vpiHandle it = vpi_iterate(vpiContAssign, By(scope));
     if (it == nullptr) return nullptr;
     return vpi_handle(vpiRhs, vpi_scan(it));
   }
 
-  // The integer value of an object, or -1 where the routine fills none.
   static int IntOf(vpiHandle obj) {
     s_vpi_value value = {};
     value.format = vpiIntVal;
@@ -36,10 +34,6 @@ class ExpressionValuesOfARun : public VpiDesignRun {
   }
 };
 
-// §38.15 with §37.3.5: an operation is an expression vpi_get_value can read,
-// its value the expression evaluated, its names read where the source wrote
-// them -- in the top, and in a child instance whose port names the same as a
-// variable of the top. The operation held no storage and gave no value.
 TEST_F(ExpressionValuesOfARun, AnOperationReadsAsItsExpressionEvaluates) {
   Run("module child(input logic [7:0] a); logic [7:0] b = 30;\n"
       "  wire [7:0] y; assign y = a + b;\n"
@@ -56,11 +50,6 @@ TEST_F(ExpressionValuesOfARun, AnOperationReadsAsItsExpressionEvaluates) {
   EXPECT_EQ(IntOf(child), 31);
 }
 
-// §37.17 detail 26 with §37.3.5: a select whose index is an operation stands
-// for the element the operation's value names, m[2] for `m[i + 1]` with i 1,
-// read and written alike. The index's value was taken from storage the
-// operation does not have, so the select named no element: it read x and a
-// put to it wrote nothing.
 TEST_F(ExpressionValuesOfARun, ASelectIndexedByAnOperationNamesItsElement) {
   Run("module top; logic [3:0][7:0] m = 32'h44332211; integer i = 1;\n"
       "  wire [7:0] y; assign y = m[i + 1];\n"
@@ -75,11 +64,6 @@ TEST_F(ExpressionValuesOfARun, ASelectIndexedByAnOperationNamesItsElement) {
   EXPECT_EQ(IntOf(By("top.m")), 0x44552211);
 }
 
-// §38.15 with §37.3.5: a function call and a system function call are
-// expressions vpi_get_value reads by evaluating them, as is a select whose
-// index is a call: f(5) is 10, $clog2(5) is 3, and m[f(i)] with f(1) 2 is
-// m[2]. The calls held no storage and gave no value, and the select named no
-// element.
 TEST_F(ExpressionValuesOfARun, ACallReadsAsItsCallEvaluates) {
   Run("module top; logic [7:0] a = 5; logic [3:0][7:0] m = 32'h44332211;\n"
       "  integer i = 1; wire [7:0] y; wire [31:0] z; wire [7:0] w;\n"
@@ -105,10 +89,6 @@ TEST_F(ExpressionValuesOfARun, ACallReadsAsItsCallEvaluates) {
   EXPECT_EQ(IntOf(select), 0x33);
 }
 
-// §11.5.1 with §37.17 detail 26: a select whose index holds x, or names no
-// element of the dimension it indexes, selects nothing, and reads x in each of
-// its bits out of a 4-state vector and 0 out of a 2-state one, all 64 of them
-// for an element as wide as a word; a value put to it is written nowhere.
 TEST_F(ExpressionValuesOfARun, ASelectNamingNoElementReadsItsVectorsDefault) {
   Run("module top; logic [3:0][7:0] m = 32'h44332211; integer i = 'x;\n"
       "  bit [3:0][7:0] b = 32'h44332211; integer j = 9;\n"
@@ -140,11 +120,6 @@ TEST_F(ExpressionValuesOfARun, ASelectNamingNoElementReadsItsVectorsDefault) {
   EXPECT_EQ(IntOf(By("top.m")), 0x44332211);
 }
 
-// §27.4 with §37.17 detail 26: a select written in a loop generate block
-// whose index is the loop's genvar stands for the element the genvar names in
-// the block instance, m[2] for g 2. The loop makes one instance, a
-// continuous assignment in a block being one VPI object for every instance
-// of it (#5694).
 TEST_F(ExpressionValuesOfARun, AGenvarIndexedSelectNamesItsBlocksElement) {
   Run("module top; logic [3:0][7:0] m = 32'h44332211;\n"
       "  for (genvar g = 2; g < 3; g++) begin : gb\n"
@@ -156,8 +131,6 @@ TEST_F(ExpressionValuesOfARun, AGenvarIndexedSelectNamesItsBlocksElement) {
   EXPECT_EQ(IntOf(select), 0x33);
 }
 
-// Whether VpiPutValueBits takes a value of `format` whose text is `text` at
-// `width`, the words it decodes it into left in `words`.
 bool DecodesText(int format, std::string text, uint32_t width,
                  std::vector<Logic4Word>& words) {
   s_vpi_value value = {};
@@ -166,23 +139,17 @@ bool DecodesText(int format, std::string text, uint32_t width,
   return VpiPutValueBits(value, width, words);
 }
 
-// Whether VpiPutValueBits refuses a value of `format` whose text is `text`.
 bool RefusesText(int format, std::string text) {
   std::vector<Logic4Word> words;
   return !DecodesText(format, std::move(text), 8, words);
 }
 
-// The low word a value of `format` whose text is `text` decodes into at
-// `width`; all ones where it is refused.
 uint64_t LowWordOfText(int format, std::string text, uint32_t width) {
   std::vector<Logic4Word> words;
   return DecodesText(format, std::move(text), width, words) ? words[0].aval
                                                             : ~uint64_t{0};
 }
 
-// Table 38-3 (vpiDecStrVal): a minus sign makes the number negative in two's
-// complement across every word, the carry crossing into the next word where a
-// word's negation is 0.
 TEST(PutValueDecoding, ADecimalNegationCarriesAcrossWords) {
   std::vector<Logic4Word> words;
   ASSERT_TRUE(DecodesText(vpiDecStrVal, "-1", 128, words));
@@ -193,8 +160,6 @@ TEST(PutValueDecoding, ADecimalNegationCarriesAcrossWords) {
   EXPECT_EQ(words[1].aval, ~uint64_t{0});
 }
 
-// Table 38-3 (vpiIntVal): a non-negative integer leaves the words above its
-// own 0.
 TEST(PutValueDecoding, APositiveIntegerLeavesTheHighWordsClear) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -205,9 +170,6 @@ TEST(PutValueDecoding, APositiveIntegerLeavesTheHighWordsClear) {
   EXPECT_EQ(words[1].aval, 0u);
 }
 
-// Table 38-3: a character that is no digit of the format's base is refused,
-// whether it is a digit of a larger base or no digit at all; and a decimal
-// string must hold at least one digit.
 TEST(PutValueDecoding, ACharacterOutsideTheBaseIsRefused) {
   EXPECT_TRUE(RefusesText(vpiBinStrVal, "2"));
   EXPECT_TRUE(RefusesText(vpiHexStrVal, "#"));
@@ -219,9 +181,6 @@ TEST(PutValueDecoding, ACharacterOutsideTheBaseIsRefused) {
   EXPECT_TRUE(RefusesText(vpiDecStrVal, "1a"));
 }
 
-// Table 38-3: digits and characters are taken from the right, and those past
-// the object's width are dropped, a digit or character cut where the width
-// ends inside it.
 TEST(PutValueDecoding, TextPastTheWidthIsDropped) {
   EXPECT_EQ(LowWordOfText(vpiBinStrVal, "101", 2), 1u);
   EXPECT_EQ(LowWordOfText(vpiHexStrVal, "F", 2), 3u);
@@ -229,8 +188,6 @@ TEST(PutValueDecoding, TextPastTheWidthIsDropped) {
   EXPECT_EQ(LowWordOfText(vpiStringVal, "A", 4), 0x1u);
 }
 
-// Figure 38-8: a scalar or a strength's logic value in bit 0 -- 0 as (0, 0),
-// x as (1, 1) and z as (0, 1).
 TEST(PutValueDecoding, ScalarAndStrengthLogicTakeTheirEncoding) {
   const struct {
     int scalar;
@@ -255,8 +212,6 @@ TEST(PutValueDecoding, ScalarAndStrengthLogicTakeTheirEncoding) {
   EXPECT_EQ(words[0].bval, 1u);
 }
 
-// A value whose pointer member is null, a zero width, and a format no put
-// takes are refused.
 TEST(PutValueDecoding, NullPointersZeroWidthAndOtherFormatsAreRefused) {
   std::vector<Logic4Word> words;
   for (int format : {vpiBinStrVal, vpiTimeVal, vpiVectorVal, vpiStrengthVal}) {
@@ -271,7 +226,6 @@ TEST(PutValueDecoding, NullPointersZeroWidthAndOtherFormatsAreRefused) {
   EXPECT_FALSE(VpiPutValueBits(value, 8, words));
 }
 
-// A write that runs past the object's storage stops at its end.
 TEST(PutValueDecoding, AWritePastTheStorageStopsAtItsEnd) {
   Arena arena;
   Variable storage;
@@ -284,9 +238,6 @@ TEST(PutValueDecoding, AWritePastTheStorageStopsAtItsEnd) {
   EXPECT_EQ(storage.value.words[0].aval, uint64_t{0xF} << 60);
 }
 
-// §38.15 with §27.4: a variable a named block in a generate block declares
-// reads the value the block wrote to it, and each instance of a loop generate
-// block reads its own (#5783).
 TEST_F(ExpressionValuesOfARun,
        ANamedBlocksVariableInAGenerateBlockReadsItsValue) {
   Run("module top;\n"
@@ -317,8 +268,6 @@ class ValuesByTypeOfARun : public VpiDesignRun {
   }
 };
 
-// §38.15: vpiObjTypeVal reads an integer variable as vpiIntVal and a time
-// variable as vpiTimeVal in vpiSimTime, the formats their types name (#7459).
 TEST_F(ValuesByTypeOfARun, AnIntegerAndATimeVariableReadAsTheirTypes) {
   Run("module top;\n"
       "  integer i = 5;\n"
@@ -335,8 +284,6 @@ TEST_F(ValuesByTypeOfARun, AnIntegerAndATimeVariableReadAsTheirTypes) {
   EXPECT_EQ(kTime.value.time->low, 7u);
 }
 
-// §38.15 Table 38-3: a signed object's negative value reads as negative in
-// vpiIntVal and vpiRealVal, and an unsigned one's all-ones as positive (#7460).
 TEST_F(ValuesByTypeOfARun, ASignedValueKeepsItsSign) {
   Run("module top;\n"
       "  byte b = -1;\n"
@@ -352,9 +299,6 @@ TEST_F(ValuesByTypeOfARun, ASignedValueKeepsItsSign) {
   EXPECT_DOUBLE_EQ(Read("top.u", vpiRealVal).value.real, 255.0);
 }
 
-// §38.15: an int variable is an integer, so vpiObjTypeVal reads it as
-// vpiIntVal too, and Table 38-3 has a longint, signed and 64 bits wide, keep
-// its sign in vpiIntVal (#7850).
 TEST_F(ValuesByTypeOfARun, AnIntReadsAsAnIntegerAndALongintKeepsItsSign) {
   Run("module top;\n"
       "  int k = -7;\n"
@@ -367,8 +311,6 @@ TEST_F(ValuesByTypeOfARun, AnIntReadsAsAnIntegerAndALongintKeepsItsSign) {
   EXPECT_EQ(Read("top.q", vpiIntVal).value.integer, -5);
 }
 
-// Table 38-3: a signed value of no width holds no bit to take a sign from and
-// reads as the integer 0 (#7850).
 TEST(KnownIntegerValues, ASignedValueOfNoWidthReadsAsZero) {
   Logic4Vec empty;
   empty.is_signed = true;

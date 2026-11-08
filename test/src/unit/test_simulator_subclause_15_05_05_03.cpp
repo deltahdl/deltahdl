@@ -74,8 +74,6 @@ TEST(IpcSync, NullEventEqualsNull) {
 }
 
 TEST(IpcSync, DistinctEventsCompareUnequal) {
-  // §15.5.5.3: inequality (!=) of two distinct event variables yields true,
-  // exercising the event-versus-event branch of the != operator.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -92,8 +90,6 @@ TEST(IpcSync, DistinctEventsCompareUnequal) {
 }
 
 TEST(IpcSync, MergedEventsCompareNotUnequal) {
-  // §15.5.5.3: inequality (!=) of two merged event variables yields false,
-  // confirming != is the complement of == on the event-versus-event path.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -144,7 +140,6 @@ TEST(IpcSync, CaseInequalitySameSemanticsAsNeqForEvents) {
 }
 
 TEST(IpcSync, CaseEqualityDistinctEventsCompareFalse) {
-  // §15.5.5.3: === mirrors == for events, so two distinct events compare false.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -161,7 +156,6 @@ TEST(IpcSync, CaseEqualityDistinctEventsCompareFalse) {
 }
 
 TEST(IpcSync, CaseEqualityNullEventComparesNull) {
-  // §15.5.5.3: === may compare an event against null; a null event yields true.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -178,7 +172,6 @@ TEST(IpcSync, CaseEqualityNullEventComparesNull) {
 }
 
 TEST(IpcSync, CaseInequalityMergedEventsCompareFalse) {
-  // §15.5.5.3: !== mirrors != for events, so two merged events compare false.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -196,8 +189,6 @@ TEST(IpcSync, CaseInequalityMergedEventsCompareFalse) {
 }
 
 TEST(IpcSync, CaseInequalityNonNullEventComparesNull) {
-  // §15.5.5.3: !== may compare an event against null; a non-null event yields
-  // true.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -214,8 +205,6 @@ TEST(IpcSync, CaseInequalityNonNullEventComparesNull) {
 }
 
 TEST(IpcSync, NonNullEventDoesNotEqualNull) {
-  // §15.5.5.3: == against null on a live (non-null) event yields false,
-  // exercising the null-comparison branch with is_null_event false under ==.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -232,8 +221,6 @@ TEST(IpcSync, NonNullEventDoesNotEqualNull) {
 }
 
 TEST(IpcSync, NullEventNotEqualNullIsFalse) {
-  // §15.5.5.3: != against null on a null event yields false, exercising the
-  // null-comparison branch with is_null_event true under !=.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -250,7 +237,6 @@ TEST(IpcSync, NullEventNotEqualNullIsFalse) {
 }
 
 TEST(IpcSync, CaseEqualityNonNullEventDoesNotEqualNull) {
-  // §15.5.5.3: === mirrors ==, so a live event compared to null yields false.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -267,7 +253,6 @@ TEST(IpcSync, CaseEqualityNonNullEventDoesNotEqualNull) {
 }
 
 TEST(IpcSync, CaseInequalityNullEventComparesNullFalse) {
-  // §15.5.5.3: !== mirrors !=, so a null event compared to null yields false.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"
@@ -284,9 +269,6 @@ TEST(IpcSync, CaseInequalityNullEventComparesNullFalse) {
 }
 
 TEST(IpcSync, NullOnLeftComparesEventOnRight) {
-  // §15.5.5.3: an event may be compared against null with null appearing as the
-  // left-hand operand as well; here a null event on the right yields true,
-  // exercising the null-versus-event operand ordering of the == operator.
   LowerFixture f;
   auto* var = RunAndFindVar(
       "module t;\n"

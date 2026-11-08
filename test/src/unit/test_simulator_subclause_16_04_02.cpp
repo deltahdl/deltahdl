@@ -12,21 +12,6 @@
 #include "simulator/sim_context.h"
 #include "simulator/sva_engine_queues.h"
 
-// §16.4.2 "Deferred assertion flush points" defines when a process reaches a
-// deferred assertion flush point: (1) it resumes after suspending on an event
-// control or wait; (2) an always_comb/always_latch procedure re-runs because a
-// dependent signal changed; (3) its outermost scope is disabled (see §16.4.4).
-// Reaching such a point clears the process's still-pending (not-yet-matured)
-// deferred immediate assertion reports.
-//
-// The first group of tests exercises the classification predicate and the
-// queue-flush helper directly. The second group drives real SystemVerilog
-// through parse/elaborate/lower/run and observes the live path (stmt_exec.cpp
-// scheduling a deferred report, and the flush at each resume/re-trigger site)
-// clearing -- or, once matured, keeping -- a report queued by a real
-// `assert #0` built on the dependency constructs (event control, wait,
-// always_comb).
-
 using namespace delta;
 
 namespace {
@@ -39,11 +24,6 @@ struct FlushPointFixture {
   SimContext ctx{scheduler, arena, diag};
   SvaEngine engine;
 };
-
-// The classification predicate IsDeferredFlushPoint(reason) is exercised
-// through the queue-flush tests below: OnDeferredFlushPoint clears the pending
-// reports only when the predicate accepts the reason, so each reason's
-// true/false classification is observed together with its flushing effect.
 
 TEST(DeferredFlushPoints, EventResumeClearsNonMaturedQueue) {
   FlushPointFixture f;
@@ -115,27 +95,6 @@ TEST(DeferredFlushPoints, FlushOnEmptyQueueIsSafeNoOp) {
   EXPECT_EQ(f.engine.GetDeferredReportQueue("nonexistent").Size(), 0u);
 }
 
-// --- Real-source tests: the live deferred-report path and its flush points ---
-//
-// Every fail action below is a single subroutine call, because §16.4 requires
-// each pass or fail statement present in a deferred assertion's action_block to
-// be a single subroutine call -- an assignment is not one. The observed (#0)
-// forms call a void function that records the report in a flag, which §16.4
-// schedules in the Reactive region. A final deferred assertion cannot use that
-// vehicle: §16.4 requires its subroutine to be one that is legal to call in the
-// Postponed region, and §4.4.2.9 says of that region that no net or variable
-// may be written there, so the final test reports through $error and observes
-// it with LastSeverity().
-
-// §16.4.2 (bullet 2): an always_comb procedure that queues a deferred report
-// and is then re-run by a dependent-signal transition in the same time step
-// reaches a flush point on resume. Here the first evaluation sees a==1 && b==1
-// so `assert #0 (!(a && b))` fails and its else action (set_flag()) is queued
-// as a pending report. The nonblocking update `b <= 0` re-triggers the
-// procedure within the time step; on resume the pending report is flushed
-// before its Reactive region runs, and the re-evaluation (a==1, b==0) passes,
-// so nothing executes and flag stays 0. Without the flush the stale report
-// would run and set flag to 1.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -161,12 +120,6 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDeferredReport) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §16.4.2 (bullet 2, always_latch): the flush point applies to always_latch
-// procedures as well as always_comb -- both resume on a dependent-signal
-// transition. The first evaluation sees en==1 so `assert #0 (!en)` fails and
-// queues its else action; the nonblocking `en <= 0` re-triggers the procedure
-// in the same time step, flushing the pending report before its Reactive
-// region, and the re-evaluation (en==0) passes, so flag stays 0.
 TEST(DeferredFlushPointsLive, AlwaysLatchRetriggerFlushesDeferredReport) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -190,12 +143,6 @@ TEST(DeferredFlushPointsLive, AlwaysLatchRetriggerFlushesDeferredReport) {
   EXPECT_EQ(var->value.ToUint64(), 0u);
 }
 
-// §16.4.2 (contrast to the above): when the always_comb settles without a
-// re-triggering transition, no flush point intervenes between queuing the
-// report and its Reactive region, so the deferred report is executed. The block
-// evaluates once with a==0, `assert #0 (a)` fails, and its else action runs in
-// the Reactive region, setting flag to 1. This confirms the flush -- not a
-// dropped report path -- is what suppresses the report in the re-trigger case.
 TEST(DeferredFlushPointsLive, SettledAlwaysCombDeferredReportExecutes) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -216,11 +163,6 @@ TEST(DeferredFlushPointsLive, SettledAlwaysCombDeferredReportExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §16.4.2 (bullet 1, event control): a process that queues a deferred report
-// and then suspends on an event control reaches a flush point when it resumes
-// in the same time step. The other initial triggers `e` at time 0, so the
-// process resumes before the Reactive region, the report queued by the failing
-// `assert #0 (0)` is flushed, and flag stays 0.
 TEST(DeferredFlushPointsLive, EventControlResumeFlushesDeferredReport) {
   SimFixture f;
   auto* flag = RunAndFindVar(
@@ -246,11 +188,6 @@ TEST(DeferredFlushPointsLive, EventControlResumeFlushesDeferredReport) {
   EXPECT_EQ(x->value.ToUint64(), 3u);
 }
 
-// §16.4.2 (maturation boundary): a report matures at the end of the time step
-// in which it was queued and can no longer be flushed. Here the report is
-// queued at time 0 and executes in the Reactive region of time 0 (setting flag
-// to 1); the process only resumes from `@e` at time 1, so the flush on that
-// later resume finds nothing to clear and the already-executed report stands.
 TEST(DeferredFlushPointsLive, MaturedDeferredReportSurvivesLaterEventResume) {
   SimFixture f;
   auto* flag = RunAndFindVar(
@@ -273,10 +210,6 @@ TEST(DeferredFlushPointsLive, MaturedDeferredReportSurvivesLaterEventResume) {
   EXPECT_EQ(flag->value.ToUint64(), 1u);
 }
 
-// §16.4.2 (bullet 1, wait): resuming after suspending on a wait statement is
-// likewise a flush point. The report queued by the failing `assert #0 (0)` is
-// flushed when `wait (ready)` resumes at time 0 (the other initial drives
-// ready high), so flag stays 0.
 TEST(DeferredFlushPointsLive, WaitResumeFlushesDeferredReport) {
   SimFixture f;
   auto* flag = RunAndFindVar(
@@ -303,10 +236,6 @@ TEST(DeferredFlushPointsLive, WaitResumeFlushesDeferredReport) {
   EXPECT_EQ(x->value.ToUint64(), 3u);
 }
 
-// §16.4.2 (bullet 1, wait) with A.6.5: `wait_order` is a wait statement, so a
-// process resuming after suspending on one is at a flush point. The report the
-// failing `assert #0 (0)` queues is flushed when `wait_order (a)` resumes on
-// the other initial's `#0 -> a`, so flag stays 0 and x is set to 5.
 TEST(DeferredFlushPointsLive, WaitOrderResumeFlushesDeferredReport) {
   SimFixture f;
   auto* flag = RunAndFindVar(
@@ -330,11 +259,6 @@ TEST(DeferredFlushPointsLive, WaitOrderResumeFlushesDeferredReport) {
   EXPECT_EQ(x->value.ToUint64(), 5u);
 }
 
-// §16.4.2 (default $error is also a pending report): the flush applies to the
-// implicit $error a failing deferred assert emits when it has no else clause.
-// The always_comb queues the default report on its first (a==1,b==1)
-// evaluation; the `b <= 0` re-trigger flushes it before the Reactive region, so
-// no severity is ever emitted.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDefaultErrorReport) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -359,15 +283,6 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesDefaultErrorReport) {
   EXPECT_EQ(f.ctx.LastSeverity(), "");
 }
 
-// §16.4.2 (report-kind input form -- final deferred): a final deferred
-// assertion's report is pending until the Postponed region, so it too is
-// flushed when the process reaches a flush point first. The always_comb queues
-// the final report on its (a==1,b==1) evaluation; the `b <= 0` re-trigger
-// flushes it before the Postponed region and the re-evaluation passes, so the
-// else action never runs and no severity is ever emitted. This exercises the
-// Postponed-region guard, distinct from the Reactive-region path taken by
-// observed (#0) reports. The report is an explicit $error rather than the
-// default one, which is what separates this from the default-report test above.
 TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -392,11 +307,6 @@ TEST(DeferredFlushPointsLive, AlwaysCombRetriggerFlushesFinalDeferredReport) {
   EXPECT_EQ(f.ctx.LastSeverity(), "");
 }
 
-// §16.4.2 (negative form): a flush point on a wait is reached only when the
-// process actually suspends. A `wait` whose condition already holds does not
-// suspend, so it is not a flush point; the report queued by the failing
-// `assert #0 (0)` is not cleared and executes in the Reactive region, setting
-// flag to 1 (and the following x=3 still runs, confirming no suspension).
 TEST(DeferredFlushPointsLive, WaitAlreadyTrueDoesNotFlushDeferredReport) {
   SimFixture f;
   auto* flag = RunAndFindVar(
@@ -418,12 +328,6 @@ TEST(DeferredFlushPointsLive, WaitAlreadyTrueDoesNotFlushDeferredReport) {
   EXPECT_EQ(x->value.ToUint64(), 3u);
 }
 
-// §16.4.2 (per-process scope): a flush point is a property of the process that
-// reaches it -- only that process's pending reports are cleared. Process pA
-// queues a report and then resumes from `@e` in the same time step (a flush
-// point), so its report is flushed and flag_a stays 0. Process pB queues its
-// own report but never reaches a flush point, so pB's report matures and runs,
-// setting flag_b to 1. This confirms pA's flush does not reach pB's queue.
 TEST(DeferredFlushPointsLive, PerProcessFlushDoesNotClearOtherProcessReport) {
   SimFixture f;
   auto* flag_a = RunAndFindVar(
@@ -452,12 +356,6 @@ TEST(DeferredFlushPointsLive, PerProcessFlushDoesNotClearOtherProcessReport) {
   EXPECT_EQ(flag_b->value.ToUint64(), 1u);
 }
 
-// §6.24.2: an action block is a third place a $cast task statement can be
-// written, and the clause's run-time error for an invalid assignment is owed
-// there too. The assertion fails and no flush point intervenes, so the action
-// runs in the Reactive region through the executor this file's live tests
-// drive, which is a different one from the coroutine executor that runs a
-// $cast written straight in the initial block.
 TEST(DeferredFlushPointsLive, CastTaskInActionBlockRaisesRuntimeError) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -477,15 +375,6 @@ TEST(DeferredFlushPointsLive, CastTaskInActionBlockRaisesRuntimeError) {
                             6, "6.24.2"));
 }
 
-// §16.4.2's cover example: a deferred cover point queued by an evaluation the
-// always_comb's re-run supersedes is flushed with the rest of the queue and is
-// not reported as covered in that time step. The simple cover beside it is
-// credited by the transitional values, as the clause says it is. The initial
-// block writes a in the Active region of time 1 and b from the Inactive
-// region, so the always_comb, which saw the two equal at time 0, sees b
-// lagging once before it sees them equal again: the simple cover is evaluated
-// three times and succeeds once, the deferred one twice, its succeeding
-// evaluation flushed, and never.
 TEST(DeferredFlushPointsLive, FlushedDeferredCoverIsNotCountedAsCovered) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -513,19 +402,6 @@ TEST(DeferredFlushPointsLive, FlushedDeferredCoverIsNotCountedAsCovered) {
   EXPECT_EQ(results[1].succeeded, 0u);
 }
 
-// §16.4.2's argument evaluation example: an action block's subroutine
-// arguments are evaluated on every failure, even one whose report is later
-// flushed, so a function called in an argument runs each time, and the simple
-// immediate assertion inside it reports on the call. The block fails a1 and a2
-// with opcode at 64 and then, re-run by the Inactive region's write of 0, with
-// 0: "Opcode error." prints once, from the evaluation of error_type(64), and
-// the one report that matures carries the 0 of the second failure. §9.2.2.2.1
-// keeps an action block's expressions out of the always_comb's sensitivity,
-// so the block reads opcode outside them to be re-run by its change, and
-// opcode is written before my_cond so that the failing pass sees 64 whether
-// the block runs at each write or once after both (§4.7). The block and the
-// initial block each say where they are, so a failure names the pass that
-// went missing rather than only the report that did.
 TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
   SimFixture f;
   std::string out = RunCapture(
@@ -563,11 +439,6 @@ TEST(DeferredFlushPointsLive, ActionBlockArgumentsAreEvaluatedOnEveryFailure) {
             "[1] INFO t.b1.a1 (<test>:13): Error on operation of type 0\n");
 }
 
-// The same example with the function's formal named apart from the module's
-// opcode. §13.3.2 gives a static function's formal static storage, so a formal
-// named after the variable the block reads shares nothing with it but the
-// name; the two cases are expected to read alike, and one failing alone names
-// the formal's storage as what the report's argument reached.
 TEST(DeferredFlushPointsLive,
      ActionBlockArgumentsAreEvaluatedOnEveryFailureWithAFormalNamedApart) {
   SimFixture f;

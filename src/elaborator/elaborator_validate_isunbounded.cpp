@@ -1,5 +1,3 @@
-// §20.6.3: the argument of $isunbounded is the name of a parameter.
-
 #include <algorithm>
 #include <cstddef>
 #include <string_view>
@@ -19,16 +17,12 @@ namespace {
 
 using ParamNames = std::unordered_set<std::string_view>;
 
-// What the §20.6.3 walk reads besides the expression in hand: the parameters
-// the module declares, the instance whose children a hierarchical name is read
-// down, and where the reports go.
 struct IsunboundedCtx {
   ParamNames params;
   const RtlirModule* mod;
   DiagEngine& diag;
 };
 
-// The instance below `scope` named `name`, or null where `scope` holds none.
 const RtlirModule* ChildInstance(const RtlirModule* scope,
                                  std::string_view name) {
   for (const RtlirModuleInst& child : scope->children) {
@@ -37,13 +31,6 @@ const RtlirModule* ChildInstance(const RtlirModule* scope,
   return nullptr;
 }
 
-// Syntax 20-8's hierarchical_parameter_identifier: whether the hierarchical
-// name `path`, read down the instances below `mod`, may name a parameter. It
-// does where it ends at a parameter of the instance it reaches, and may where
-// it reaches no instance this walk follows -- one starting above `mod`, one
-// through a generate block, or one through a select of an instance array --
-// which §23.8's checks resolve. A name that reaches an instance and ends at
-// something else names no parameter.
 bool MayNameHierParameter(const Expr* path, const RtlirModule* mod) {
   std::vector<std::string_view> names;
   const Expr* e = path;
@@ -62,9 +49,6 @@ bool MayNameHierParameter(const Expr* path, const RtlirModule* mod) {
   });
 }
 
-// §20.6.3: a call of $isunbounded whose argument is not a name the module
-// declares as a parameter, one a scope qualifies (`pkg::P`), nor a
-// hierarchical name that may reach one (`s.P`), is an error.
 void CheckIsunboundedExpr(const Expr* e, const IsunboundedCtx& ctx) {
   if (e == nullptr) return;
   if (e->kind == ExprKind::kSystemCall && e->callee == "$isunbounded" &&
@@ -86,8 +70,6 @@ void CheckIsunboundedExpr(const Expr* e, const IsunboundedCtx& ctx) {
       e, [&](const Expr* child) { CheckIsunboundedExpr(child, ctx); });
 }
 
-// §20.6.3 names no position the call may stand in, so every expression a
-// statement holds is one it is owed at.
 void CheckIsunboundedStmt(const Stmt* s, const IsunboundedCtx& ctx) {
   if (s == nullptr) return;
   for (const Expr* e :

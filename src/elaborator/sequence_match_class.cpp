@@ -21,8 +21,6 @@ namespace {
 constexpr uint64_t kInfinite = UINT64_MAX;
 constexpr int kMaxInstanceDepth = 16;
 
-// The lengths, in ticks, the matches of a sequence can have, from `lo` to
-// `hi`, kInfinite where unbounded; `none` where it admits no match.
 struct LengthRange {
   uint64_t lo = 0;
   uint64_t hi = 0;
@@ -45,10 +43,6 @@ uint64_t Multiply(uint64_t a, uint64_t b) {
 LengthRange RangeOfBody(const SeqLinearBody& body,
                         const PropertyRegistry& registry, int depth);
 
-// §16.9.2: the lengths an operand's repetition gives it, each repetition of
-// a boolean one tick: `[*min:max]` from min to max ticks, a goto or
-// nonconsecutive repetition at least min ticks with no bound above, and an
-// operand with none one tick.
 LengthRange RangeOfRepetition(const SeqRepetition& rep, LengthRange one) {
   if (rep.kind == SeqRepetition::Kind::kNone) return one;
   uint64_t max = rep.max == SeqCycleDelay::kUnbounded ? kInfinite : rep.max;
@@ -57,8 +51,6 @@ LengthRange RangeOfRepetition(const SeqRepetition& rep, LengthRange one) {
   return {Multiply(rep.min, one.lo), Multiply(max, one.hi), false};
 }
 
-// One operand: an instance of a named sequence is the declaration's body,
-// any other operand a boolean, one tick.
 LengthRange RangeOfOperand(const Expr* operand,
                            const PropertyRegistry& registry, int depth) {
   LengthRange one{1, 1, false};
@@ -77,11 +69,6 @@ LengthRange RangeOfOperand(const Expr* operand,
   return RangeOfBody(decl->seq_linear, registry, depth + 1);
 }
 
-// §16.7 and §16.9.2.1: the operand appended to the chain `total` after the
-// delay `delay`: `##0` fuses the two, which an operand admitting only the
-// empty match cannot join, and an operand admitting the empty match joins
-// only by its nonempty matches; `##n` for n at least 1 adds n - 1 ticks
-// between them.
 LengthRange Append(LengthRange total, const SeqCycleDelay& delay,
                    LengthRange operand) {
   if (total.none || operand.none) return NoMatch();
@@ -99,8 +86,6 @@ LengthRange Append(LengthRange total, const SeqCycleDelay& delay,
           Add(Add(total.hi, gap_hi), operand.hi), false};
 }
 
-// The chain of one body: its operands under their delays, a leading delay
-// standing for a true boolean before it.
 LengthRange RangeOfChain(const SeqLinearBody& body,
                          const PropertyRegistry& registry, int depth) {
   LengthRange total{0, 0, false};
@@ -118,9 +103,6 @@ LengthRange RangeOfChain(const SeqLinearBody& body,
   return total;
 }
 
-// §16.9.6: the operands of an intersect match over the same ticks, so the
-// lengths are those they have in common; §16.9.5: an and ends at the later
-// end point, so the lengths are the longer's.
 LengthRange Intersect(LengthRange a, LengthRange b) {
   if (a.none || b.none) return NoMatch();
   LengthRange out{std::max(a.lo, b.lo), std::min(a.hi, b.hi), false};
@@ -133,7 +115,6 @@ LengthRange Conjoin(LengthRange a, LengthRange b) {
   return {std::max(a.lo, b.lo), std::max(a.hi, b.hi), false};
 }
 
-// §16.9.7: an or matches where either operand does.
 LengthRange Alternate(LengthRange a, LengthRange b) {
   if (a.none) return b;
   if (b.none) return a;
@@ -173,7 +154,6 @@ SequenceMatchClass ClassOfRange(LengthRange range) {
   return SequenceMatchClass::kAdmitsAtLeastOneNonempty;
 }
 
-// What the class breaches in the context, as the report says it.
 std::string_view Where(SequenceUsageContext ctx) {
   switch (ctx) {
     case SequenceUsageContext::kAsProperty:

@@ -55,9 +55,6 @@ TEST(DesignBuildingBlockParsing, EarlierTimescaleFinerPrecision) {
   EXPECT_EQ(gp, TimeUnit::kFs);
 }
 
-// §3.14.3: the global precision is the finest precision written anywhere in
-// the design, and a `resetall (§22.3) returns only the directive state for the
-// text after it; the `timescale read before it is still part of the design.
 TEST(Preprocessor, GlobalPrecisionKeptAcrossResetall) {
   PreprocFixture f;
   Preprocessor pp(f.mgr, f.diag, {});

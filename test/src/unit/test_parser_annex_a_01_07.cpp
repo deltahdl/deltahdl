@@ -12,21 +12,12 @@ using namespace delta;
 
 namespace {
 
-// Return the body items of the first program declaration in the parse result.
-// Program bodies are parsed through the shared module-item parse path
-// (Parser::ParseProgramDecl -> ParseModuleItem), so the A.1.7 program-item
-// grammar is observed by checking the kinds recorded for each accepted
-// construct, mirroring the approach used for interface items (A.1.6).
 const std::vector<ModuleItem*>& ProgItems(ParseResult& r) {
   static const std::vector<ModuleItem*> kEmpty;
   if (!r.cu || r.cu->programs.empty()) return kEmpty;
   return r.cu->programs[0]->items;
 }
 
-// --- program_item ::= port_declaration ; | non_port_program_item ---
-// The first alternative is a non-ANSI port declaration appearing in the program
-// body. The body parse path applies the port-declaration grammar and back-fills
-// the direction of the matching entry in the program's port list.
 TEST(ProgramItem, NonAnsiPortDeclaration) {
   auto r = Parse(
       "program p(a);\n"
@@ -40,27 +31,16 @@ TEST(ProgramItem, NonAnsiPortDeclaration) {
   EXPECT_EQ(r.cu->programs[0]->ports[0].direction, Direction::kInput);
 }
 
-// program_item's first alternative requires a trailing semicolon after the
-// port_declaration (it is the literal ';' in `program_item ::= port_declaration
-// ;`). A body port declaration that omits it is rejected.
 TEST(ProgramItem, NonAnsiPortDeclarationMissingSemicolonIsError) {
   auto r = Parse(
       "program p(a);\n"
       "  input a\n"
       "endprogram\n");
   ASSERT_NE(r.cu, nullptr);
-  // A program body reads its non-ANSI port declarations through
-  // Parser::ParseNonAnsiPortDecls, which files the missing ';' under §23.2.2.1
-  // with the module form it shares. `endprogram` stands where the ';' belongs,
-  // on line 3.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected ';', got 'endprogram'", 3, "23.2.2.1"));
 }
 
-// program_item ::= port_declaration ; | non_port_program_item — both top-level
-// alternatives may appear within a single program body; the parse path
-// dispatches each in turn (the port declaration back-fills the port direction
-// while the non-port items are recorded as body items).
 TEST(ProgramItem, PortDeclarationAndNonPortItemsCoexist) {
   auto r = Parse(
       "program p(a);\n"
@@ -78,9 +58,6 @@ TEST(ProgramItem, PortDeclarationAndNonPortItemsCoexist) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kInitialBlock));
 }
 
-// A.1.2's ( .* ) form of program_declaration holds { program_item } as well, so
-// its body declares the directions of the ports the extern declaration lists,
-// as §23.5 shows for a module.
 TEST(ProgramItem, WildcardHeaderBodyPortDeclaration) {
   auto r = Parse(
       "extern program p(a);\n"
@@ -95,7 +72,6 @@ TEST(ProgramItem, WildcardHeaderBodyPortDeclaration) {
   EXPECT_EQ(r.cu->programs[1]->ports[0].direction, Direction::kInput);
 }
 
-// A.1.3 opens every port_declaration with { attribute_instance }.
 TEST(ProgramItem, AttributedNonAnsiPortDeclaration) {
   auto r = Parse(
       "program p(a);\n"
@@ -110,16 +86,6 @@ TEST(ProgramItem, AttributedNonAnsiPortDeclaration) {
   EXPECT_EQ(r.cu->programs[0]->ports[0].attrs[0].name, "keep");
 }
 
-// --- non_port_program_item ---
-// non_port_program_item ::=
-//     { attribute_instance } continuous_assign
-//   | { attribute_instance } module_or_generate_item_declaration
-//   | { attribute_instance } initial_construct
-//   | { attribute_instance } final_construct
-//   | { attribute_instance } concurrent_assertion_item
-//   | timeunits_declaration
-//   | program_generate_item
-
 TEST(NonPortProgramItem, ContinuousAssign) {
   auto r = Parse(
       "program p;\n"
@@ -131,9 +97,6 @@ TEST(NonPortProgramItem, ContinuousAssign) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kContAssign));
 }
 
-// module_or_generate_item_declaration covers the declaration constructs shared
-// with modules (parameters, genvars, clocking, etc.); a parameter declaration
-// is a representative of that alternative.
 TEST(NonPortProgramItem, ModuleOrGenerateItemDeclaration) {
   auto r = Parse(
       "program p;\n"
@@ -164,8 +127,6 @@ TEST(NonPortProgramItem, FinalConstruct) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kFinalBlock));
 }
 
-// concurrent_assertion_item is admitted as a program item; it is recorded as an
-// assert-property item.
 TEST(NonPortProgramItem, ConcurrentAssertionItem) {
   auto r = Parse(
       "program p;\n"
@@ -176,9 +137,6 @@ TEST(NonPortProgramItem, ConcurrentAssertionItem) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kAssertProperty));
 }
 
-// timeunits_declaration is the only non_port_program_item alternative without a
-// leading attribute_instance; the body parse path records it on the program
-// declaration rather than as an item.
 TEST(NonPortProgramItem, TimeunitsDeclaration) {
   auto r = Parse(
       "program p;\n"
@@ -190,9 +148,6 @@ TEST(NonPortProgramItem, TimeunitsDeclaration) {
   EXPECT_TRUE(r.cu->programs[0]->has_timeunit);
 }
 
-// A port_declaration is a program_item, so a timeunits_declaration after one is
-// a non_port_program_item, which footnote 3 of A.10 admits only as a matching
-// repeat of an earlier one.
 TEST(NonPortProgramItem, TimeunitsAfterPortDeclarationRejected) {
   auto r = Parse(
       "program p(a);\n"
@@ -215,8 +170,6 @@ TEST(NonPortProgramItem, TimeunitsBeforePortDeclarationAccepted) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// The first five alternatives permit a leading run of attribute_instances; the
-// shared parse path collects them and attaches them to the resulting item.
 TEST(NonPortProgramItem, AttributeInstancePrefix) {
   auto r = Parse(
       "program p;\n"
@@ -229,13 +182,6 @@ TEST(NonPortProgramItem, AttributeInstancePrefix) {
   ASSERT_EQ(item->attrs.size(), 1u);
   EXPECT_EQ(item->attrs[0].name, "keep");
 }
-
-// --- program_generate_item ---
-// program_generate_item ::=
-//     loop_generate_construct
-//   | conditional_generate_construct
-//   | generate_region
-//   | elaboration_severity_system_task
 
 TEST(ProgramGenerateItem, LoopGenerateConstruct) {
   auto r = Parse(
@@ -273,9 +219,6 @@ TEST(ProgramGenerateItem, ConditionalGenerateConstructCase) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kGenerateCase));
 }
 
-// A generate_region flattens its contained generate items into the enclosing
-// item list; observing the inner item confirms the generate/endgenerate region
-// was parsed as a program item.
 TEST(ProgramGenerateItem, GenerateRegion) {
   auto r = Parse(
       "program p;\n"
@@ -298,9 +241,6 @@ TEST(ProgramGenerateItem, ElaborationSeveritySystemTask) {
   EXPECT_TRUE(HasItemOfKind(ProgItems(r), ModuleItemKind::kElabSystemTask));
 }
 
-// non_port_program_item writes no { attribute_instance } before a
-// program_generate_item, and a program reaches its generate constructs and
-// elaboration system tasks through that item alone.
 TEST(ProgramGenerateItem, AttributeBeforeAProgramGenerateItemRejected) {
   auto r = Parse(
       "program p;\n"
@@ -319,14 +259,6 @@ TEST(ProgramGenerateItem, AttributeBeforeAProgramGenerateItemRejected) {
   EXPECT_TRUE(ReportedError(
       r.diags, "a generate region takes no attribute instance", 6, "A.1.7"));
 }
-
-// --- non_port_program_item admits no specify_block or specparam_declaration
-// ---
-// A.1.4's non_port_module_item lists specify_block and
-// { attribute_instance } specparam_declaration; non_port_program_item lists
-// neither, and §30.3 places the specify block inside a module while §6.20.5 has
-// a specparam declared inside a module or a specify block. Each was accepted in
-// a program body silently and recorded as an item of it.
 
 TEST(NonPortProgramItem, ErrorSpecifyBlockInProgramIsRejected) {
   auto r = Parse(
@@ -355,14 +287,6 @@ TEST(NonPortProgramItem, ErrorSpecparamInProgramIsRejected) {
       "specparam declaration must appear inside a module or a specify block", 2,
       "6.20.5"));
 }
-
-// --- non_port_program_item admits no net_alias, bind_directive or
-// parameter_override ---
-// A.1.4's module_common_item lists net_alias and bind_directive and its
-// module_or_generate_item lists parameter_override; non_port_program_item lists
-// none of the three. Each was accepted in a program body silently and recorded
-// as an item of it; each is now reported under A.1.7 at its keyword and still
-// read, so that the body resumes after it.
 
 TEST(NonPortProgramItem, ErrorNetAliasInProgramIsRejected) {
   auto r = Parse(
@@ -396,13 +320,6 @@ TEST(NonPortProgramItem, ErrorDefparamInProgramIsRejected) {
       r.diags, "a defparam statement is not an item of a program", 2, "A.1.7"));
 }
 
-// --- non_port_program_item admits a concurrent_assertion_item and not
-// A.1.4's assertion_item ---
-// assertion_item's other alternative is A.6.10's
-// deferred_immediate_assertion_item, and §16.4.3 treats a deferred assertion
-// outside procedural code as though an always_comb procedure held it, which
-// §24.3 has a program not contain. Both deferral forms were accepted in a
-// program body silently.
 TEST(NonPortProgramItem, ErrorDeferredImmediateAssertionInProgramIsRejected) {
   auto r = Parse(
       "program p;\n"
@@ -417,11 +334,6 @@ TEST(NonPortProgramItem, ErrorDeferredImmediateAssertionInProgramIsRejected) {
       "A.1.7"));
 }
 
-// non_port_program_item reaches no interface_declaration or
-// program_declaration, whose extern forms A.1.2 makes alternatives of both,
-// and §24.3 keeps declarations of interfaces and other programs out of a
-// program. Each is read as the declaration it is, not as A.1.6's extern task
-// or function prototype.
 TEST(NonPortProgramItem, ErrorExternInterfaceOrProgramDeclarationIsRejected) {
   auto r = Parse(
       "program t;\n"
@@ -435,10 +347,6 @@ TEST(NonPortProgramItem, ErrorExternInterfaceOrProgramDeclarationIsRejected) {
   for (const auto& diag : r.diags) EXPECT_NE(diag.subclause, "A.1.6");
 }
 
-// A concurrent_assertion_item reaches A.4.1.4's checker_instantiation, and
-// §17.3 lets a checker be instantiated in any place a concurrent assertion can
-// stand; the parser reported every instantiation in a program under §24.3, the
-// checker's with the module's it forbids.
 TEST(NonPortProgramItem, ConcurrentAssertionItemCheckerInstantiation) {
   auto r = Parse(
       "checker chk(input logic a);\n"
@@ -453,9 +361,6 @@ TEST(NonPortProgramItem, ConcurrentAssertionItemCheckerInstantiation) {
       HasItemOfKind(r.cu->programs[0]->items, ModuleItemKind::kModuleInst));
 }
 
-// A.4.1.4 names the checker by a ps_checker_identifier, `[ package_scope ]
-// checker_identifier`, where the module, interface and program instantiations
-// §24.3 forbids name their cell by an identifier alone.
 TEST(NonPortProgramItem, PackageScopedCheckerInstantiation) {
   EXPECT_TRUE(
       ParseOk("package pkg;\n"
@@ -467,9 +372,6 @@ TEST(NonPortProgramItem, PackageScopedCheckerInstantiation) {
               "endprogram\n"));
 }
 
-// §24.3's report on an instantiation is made for a cell the parse has seen
-// declared as a module, an interface or a program; a cell declared after the
-// program, or in another file, is the elaborator's to report.
 TEST(NonPortProgramItem, InstantiationOfCellDeclaredLaterIsLeftToElaboration) {
   auto r = Parse(
       "program p;\n"
@@ -480,8 +382,6 @@ TEST(NonPortProgramItem, InstantiationOfCellDeclaredLaterIsLeftToElaboration) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Footnote 5 to program_generate_item: a program_generate_item may hold no item
-// that a program_declaration would refuse outside one.
 TEST(ProgramGenerateItem, AdmitsProgramItemsOnly) {
   auto r = Parse(
       "program p;\n"

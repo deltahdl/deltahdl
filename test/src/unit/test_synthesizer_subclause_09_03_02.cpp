@@ -8,11 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §9.3.2: the fork-join parallel block creates a concurrent process from each
-// of its statements, and a process is not a piece of combinational or
-// sequential logic. The report calls the construct what the subclause calls it
-// and stands at the `fork`, so a design holding several rejected constructs
-// says which one failed and on which line.
 TEST(ParallelBlockSynthesis, ForkJoinIsRejectedByName) {
   SynthFixture f;
   auto* mod = ElaborateSrc(f,

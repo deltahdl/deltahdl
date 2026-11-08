@@ -45,12 +45,6 @@ TEST(ClassParsing, WeakReferenceAsFunctionArg) {
               "endmodule\n"));
 }
 
-// §8.30.1 (printed page 217 of IEEE 1800-2023) has a variable declared of
-// type weak_reference#(T), and §8.30.2's example (printed 218) declares two of
-// them at module scope with the `#` written against the class name. §6.8
-// continues a data_declaration with a list of declarators, so the two names
-// share one declared type, each carrying the class name and its one type
-// argument.
 TEST(ClassParsing, WeakReferenceModuleScopeDeclaratorList) {
   auto r = Parse(
       "class obj;\n"
@@ -77,11 +71,6 @@ TEST(ClassParsing, WeakReferenceModuleScopeDeclaratorList) {
   }
 }
 
-// §8.30.1 (printed 218) puts the weak_reference class in the built-in std
-// package of §26.7 (printed 816), and §26.3 reaches a package's declaration
-// through the package scope resolution operator, so `std::weak_reference#(obj)`
-// at module scope declares a variable of the same class as the bare name, with
-// the package recorded as its scope.
 TEST(ClassParsing, WeakReferenceStdScopedAtModuleScope) {
   auto r = Parse(
       "class obj;\n"
@@ -102,9 +91,6 @@ TEST(ClassParsing, WeakReferenceStdScopedAtModuleScope) {
   EXPECT_EQ(item->data_type.type_params[0].type_name, "obj");
 }
 
-// The same package-scoped form as a block item: A.2.8 admits a data_declaration
-// among the block items of a sequential block, and A.2.2.1 lets its data_type
-// be a type_identifier behind a package_scope.
 TEST(ClassParsing, WeakReferenceStdScopedInProceduralBlock) {
   auto r = Parse(
       "class obj;\n"
@@ -132,8 +118,6 @@ TEST(ClassParsing, WeakReferenceStdScopedInProceduralBlock) {
   EXPECT_EQ(decl->var_decl_type.type_params[0].type_name, "obj");
 }
 
-// The bare class name with the `#` written against it, as §8.30.2's example
-// spells it, declares a block item the same way the spaced form does.
 TEST(ClassParsing, WeakReferenceTightHashInProceduralBlock) {
   auto r = Parse(
       "class obj;\n"
@@ -160,13 +144,6 @@ TEST(ClassParsing, WeakReferenceTightHashInProceduralBlock) {
   EXPECT_EQ(decl->var_decl_type.type_params[0].type_name, "obj");
 }
 
-// §8.30.2's example names its two references weak1 and weak2, but §5.6
-// (printed 74) forbids a keyword as a user-defined identifier and Table B.1
-// (printed 1220) reserves weak1 as one of the drive strengths of A.1.11, so
-// the example as written is not a declaration: §6.8 puts a variable name
-// after the type, and the keyword is reported there, whichever way the class
-// is named. §5.6.1 has an escaped keyword read as an identifier, and the
-// declaration then goes through.
 TEST(ClassParsing, WeakReferenceReservedWeak1IsNotADeclarator) {
   auto bare = Parse(
       "class obj;\n"

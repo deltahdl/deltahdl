@@ -12,8 +12,6 @@
 
 using namespace delta;
 
-// Plain-data copy of a recognized §40.4.1 FSM pragma so that assertions do not
-// depend on string_views that point into a transient SourceManager.
 struct FsmPragmaInfo {
   std::string form;
   std::string signal;
@@ -52,20 +50,11 @@ inline std::vector<std::string> CollectIdentifiers(const std::string& src) {
   return out;
 }
 
-// Whether `loc` stands after `other` in the same source.
 inline bool IsAfter(SourceLoc loc, SourceLoc other) {
   return loc.line > other.line ||
          (loc.line == other.line && loc.column > other.column);
 }
 
-// Where the enum-only FSM pragma at `index` among a lexed source's enum-only
-// pragmas stands. §40.4.4 through §40.4.6 each place that pragma against
-// something - a signal declaration, a multi-signal one, a parameter - and say
-// what follows it, so its location is what a case reads to apply the rule to
-// the source it wrote rather than to a list of names it already knew. The index
-// is there because §40.4.8's figure writes one module carrying three of these
-// pragmas, one for each rule, so which of them a rule is read off is a choice
-// rather than always the first.
 inline SourceLoc EnumPragmaLocAt(const Lexer& lexer, size_t index) {
   size_t seen = 0;
   for (const auto& p : lexer.FsmStatePragmas()) {
@@ -80,10 +69,6 @@ inline SourceLoc EnumPragmaLocAt(const Lexer& lexer, size_t index) {
   return SourceLoc();
 }
 
-// The names declared after the enum-only pragma at `index` of `src`, in order,
-// as far as the semicolon that ends the declaration the pragma sits in.
-// §40.4.5's first and next signal and §40.4.6's possible states are read from
-// this list.
 inline std::vector<std::string> NamesFollowingEnumPragma(const std::string& src,
                                                          size_t index = 0) {
   SourceManager mgr;
@@ -109,10 +94,6 @@ inline std::vector<std::string> NamesFollowingEnumPragma(const std::string& src,
   return names;
 }
 
-// The kind of the last token standing before the enum-only pragma at `index` of
-// `src`, which is what §40.4.6's placement rule is about: the pragma goes
-// immediately after the `parameter` keyword, or immediately after the bit width
-// where one is used.
 inline TokenKind KindBeforeEnumPragma(const std::string& src,
                                       size_t index = 0) {
   SourceManager mgr;

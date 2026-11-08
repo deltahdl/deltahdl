@@ -1,10 +1,3 @@
-// Tests for §3.13 (e)'s module name space as it reaches a typedef's unpacked
-// dimensions. A typedef an interface declares is a name of the interface
-// alone, so a module elaborated after it that declares a typedef of the same
-// name with no unpacked dimensions takes none of the interface's, for any
-// declaration written with that name. §3.13 (f)'s block name space does the
-// same for a generate block's typedef or class within the module.
-
 #include <gtest/gtest.h>
 
 #include <string_view>
@@ -17,10 +10,6 @@
 
 namespace {
 
-// The interface's array typedef `t` is elaborated before the module `m`
-// connected to it, which declares a structure typedef `t` of its own and,
-// after it, a variable, a generate block's variable and a function's formal,
-// return type and procedural variable, each written with that name.
 const char* const kSrc =
     "interface ifc;\n"
     "  typedef int t [2];\n"
@@ -42,8 +31,6 @@ const char* const kSrc =
     "  m u (i);\n"
     "endmodule\n";
 
-// The variable of `m` whose hierarchical name ends with `suffix`, the name a
-// generate block's variable is recorded by.
 const RtlirVariable* FindVarEndingWith(const RtlirModule* m,
                                        std::string_view suffix) {
   for (const RtlirVariable& var : m->variables) {
@@ -61,8 +48,6 @@ TEST(ModuleNameSpaceTypedefDims, VariableTakesNoneOfAnInterfacesDimensions) {
   EXPECT_EQ(v->unpacked_size, 0u);
 }
 
-// A conditional generate's body is elaborated after every module has been, in
-// the scope of the module it was written in.
 TEST(ModuleNameSpaceTypedefDims, GenerateBlockVariableTakesNoneOfThem) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(kSrc, f, "top");
@@ -88,10 +73,6 @@ TEST(ModuleNameSpaceTypedefDims, SubroutineDeclarationsTakeNoneOfThem) {
   EXPECT_TRUE(fn->func_body_stmts[0]->var_unpacked_dims.empty());
 }
 
-// The module's array typedef `t`, hidden within the nested block `h` by a
-// structure typedef and within the nested block `k` by a class, each written
-// with no unpacked dimensions, and in force again for `g`'s variable after
-// both blocks and for the module's own variable.
 const char* const kBlockSrc =
     "module m;\n"
     "  typedef int t [2];\n"
@@ -111,9 +92,6 @@ const char* const kBlockSrc =
     "  t mv;\n"
     "endmodule\n";
 
-// §3.13 (f) with §27.5: a generate block's typedef stands over the module's
-// for the block's items. The block's typedef left the module's two dimensions
-// in the dimension table, and the block's variable took them.
 TEST(BlockNameSpaceTypedefDims, BlockTypedefHidesTheModulesDimensions) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(kBlockSrc, f, "m");
@@ -125,8 +103,6 @@ TEST(BlockNameSpaceTypedefDims, BlockTypedefHidesTheModulesDimensions) {
   EXPECT_EQ(hv->unpacked_size, 0u);
 }
 
-// §3.13 (f) with §3.12.1: a generate block's class hides the module's typedef
-// of its name, so the block's variable written with it is a handle.
 TEST(BlockNameSpaceTypedefDims, BlockClassHidesTheModulesArrayTypedef) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(kBlockSrc, f, "m");
@@ -138,8 +114,6 @@ TEST(BlockNameSpaceTypedefDims, BlockClassHidesTheModulesArrayTypedef) {
   EXPECT_EQ(kv->unpacked_size, 0u);
 }
 
-// The hiding ends with the block: the enclosing block's variable written after
-// the nested blocks, and the module's, keep the module's two elements.
 TEST(BlockNameSpaceTypedefDims, EnclosingScopesKeepTheirDimensionsAfterIt) {
   ElabFixture f;
   RtlirDesign* design = ElaborateSrc(kBlockSrc, f, "m");

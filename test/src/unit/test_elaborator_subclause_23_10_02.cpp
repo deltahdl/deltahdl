@@ -11,14 +11,6 @@ using namespace delta;
 
 namespace {
 
-// §23.10.2: module instance parameter value assignment supplies values to the
-// parameters specified in a module's definition. A parameter declared inside a
-// named block, task, or function is not part of that overridable surface; such
-// a parameter can only be redefined directly with a defparam statement, never
-// by an ordered or named instance parameter value assignment. The tests below
-// confirm that the elaborator's override surface is the module's own parameters
-// and excludes parameters nested inside a function, task, or named block.
-
 TEST(ModuleInstanceParameterValueAssignment,
      FunctionLocalParameterIsNotOverridableByInstanceAssignment) {
   ElabFixture f;
@@ -37,8 +29,6 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_FALSE(f.has_errors);
   auto* u0 = design->top_modules[0]->children[0].resolved;
   ASSERT_NE(u0, nullptr);
-  // Only the module parameter W is part of the override surface; the function's
-  // INNER parameter is not exposed to instance parameter value assignment.
   ASSERT_EQ(u0->params.size(), 1u);
   EXPECT_EQ(u0->params[0].name, "W");
   EXPECT_EQ(u0->params[0].resolved_value, 8);
@@ -69,12 +59,6 @@ TEST(ModuleInstanceParameterValueAssignment,
 TEST(ModuleInstanceParameterValueAssignment,
      NamedAssignmentCannotTargetTaskLocalParameter) {
   ElabFixture f;
-  // The error-path counterpart for the task site: a parameter declared inside a
-  // task is not part of the module's overridable surface, so a named instance
-  // parameter value assignment aimed at it is rejected. Such a parameter can
-  // only be redefined directly by a defparam statement. ResolveNamedInstParams
-  // files the rejection under §23.10.2.2, the subclause for the named form of
-  // the assignment.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  task automatic t();\n"
@@ -93,11 +77,6 @@ TEST(ModuleInstanceParameterValueAssignment,
 TEST(ModuleInstanceParameterValueAssignment,
      NestedParameterDoesNotEnlargeOrderedAssignmentSurface) {
   ElabFixture f;
-  // The module exposes a single overridable parameter (W). A function-local
-  // parameter must not count toward the ordered list, so a second positional
-  // value has no parameter to bind to and is rejected.
-  // ResolvePositionalInstParams files the rejection under §23.10.2.1, the
-  // subclause for the ordered form of the assignment.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  function automatic int g();\n"
@@ -118,11 +97,6 @@ TEST(ModuleInstanceParameterValueAssignment,
 TEST(ModuleInstanceParameterValueAssignment,
      NamedAssignmentCannotTargetFunctionLocalParameter) {
   ElabFixture f;
-  // A parameter declared inside a function is not part of the module's
-  // overridable surface. A named instance parameter value assignment that tries
-  // to reach it by name is rejected; such a parameter can only be redefined
-  // directly by a defparam statement. ResolveNamedInstParams files the
-  // rejection under §23.10.2.2, the subclause for the named form.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  function automatic int g();\n"
@@ -142,11 +116,6 @@ TEST(ModuleInstanceParameterValueAssignment,
 TEST(ModuleInstanceParameterValueAssignment,
      NamedBlockLocalParameterIsNotOverridableByInstanceAssignment) {
   ElabFixture f;
-  // §23.10.2 names three declaration sites -- a named block, a task, or a
-  // function -- whose parameters can only be redefined by a defparam statement,
-  // never by an instance parameter value assignment. A parameter declared in a
-  // named begin-end block is therefore not part of the module's override
-  // surface, which stays limited to the module's own parameter W.
   auto* design = ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  initial begin : blk\n"
@@ -169,11 +138,6 @@ TEST(ModuleInstanceParameterValueAssignment,
 TEST(ModuleInstanceParameterValueAssignment,
      NamedAssignmentCannotTargetNamedBlockLocalParameter) {
   ElabFixture f;
-  // The error-path counterpart for the named-block site: a named instance
-  // parameter value assignment that tries to reach a block-local parameter is
-  // rejected, because that parameter can only be redefined by defparam.
-  // ResolveNamedInstParams files the rejection under §23.10.2.2, the subclause
-  // for the named form.
   ElaborateSrc(
       "module child #(parameter int W = 4)();\n"
       "  initial begin : blk\n"
@@ -189,11 +153,6 @@ TEST(ModuleInstanceParameterValueAssignment,
                             "23.10.2.2"));
 }
 
-// §23.10.2 also notes that when a parameter's value depends on a second
-// parameter, redefining the second parameter updates the first as well (see
-// §23.10.3, Parameter dependence). The elaborator re-evaluates a dependent
-// parameter against the overridden value of the parameter it references, so an
-// instance parameter value assignment to the source parameter flows through.
 TEST(ModuleInstanceParameterValueAssignment,
      RedefiningSourceParameterUpdatesDependentParameter) {
   ElabFixture f;
@@ -216,14 +175,6 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_EQ(u0->params[1].resolved_value, 50);
 }
 
-// §6.16 rules that for the string data type nothing is truncated, and §23.10.2
-// puts an overridden parameter's value under that rule as much as a declared
-// one. "configured" is ten characters, which is past both the eight
-// RtlirParamDecl::resolved_value can hold and the four the 32-bit lowering
-// keeps, so this asserts the characters reached the elaborated parameter rather
-// than that some wider number did. is_string_value is asserted beside them
-// because it is what every later reader consults before touching
-// resolved_string.
 TEST(ModuleInstanceParameterValueAssignment,
      StringParameterOverrideReplacesEveryCharacter) {
   ElabFixture f;
@@ -244,13 +195,6 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_EQ(u0->params[0].resolved_string, "configured");
 }
 
-// §6.16.1's len() over an overridden parameter, which does not follow from the
-// characters being stored. StringParamLength reads resolved_string only after
-// is_string_value passes, so an override that carried the characters without
-// setting the flag leaves len() unfolded and `N` at its unresolved 0. Ten is
-// also unreachable from the packed value of "configured", which §11.10 makes
-// wider than the 64 bits resolved_value holds, and from the five characters of
-// the declaration's own default.
 TEST(ModuleInstanceParameterValueAssignment,
      LenOfAnOverriddenStringParameterFoldsToTheOverridesCharacterCount) {
   ElabFixture f;
@@ -274,7 +218,6 @@ TEST(ModuleInstanceParameterValueAssignment,
   EXPECT_EQ(n->resolved_value, 10);
 }
 
-// The resolved value of the parameter `name` of the top module's only child.
 int64_t ChildParam(const RtlirDesign* design, std::string_view name) {
   if (design == nullptr || design->top_modules.empty() ||
       design->top_modules[0]->children.empty()) {
@@ -288,9 +231,6 @@ int64_t ChildParam(const RtlirDesign* design, std::string_view name) {
   return -1;
 }
 
-// A.2.1.1's param_assignment gives a parameter unpacked dimensions, and an
-// element of such a parameter array is a constant expression (§11.2.1) an
-// instance's parameter value assignment may be written with.
 TEST(ModuleInstanceParameterValueAssignment, ElementOfAParameterArray) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -304,8 +244,6 @@ TEST(ModuleInstanceParameterValueAssignment, ElementOfAParameterArray) {
   EXPECT_EQ(ChildParam(design, "W"), 30);
 }
 
-// The same with the array declared over a range of its own, [1:3], whose
-// element 1 is the pattern's first.
 TEST(ModuleInstanceParameterValueAssignment, ElementOfARangedParameterArray) {
   ElabFixture f;
   auto* design = ElaborateSrc(

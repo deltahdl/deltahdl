@@ -6,10 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Syntax 21-4: file_open_function permits both the multi-channel-descriptor
-// form (no type argument) and the file-descriptor form (with type argument);
-// file_close_task accepts either kind of descriptor.
-
 TEST(IoSystemTaskParsing, FopenFcloseCall) {
   EXPECT_TRUE(
       ParseOk("module t;\n"

@@ -16,44 +16,12 @@
 
 using namespace delta;
 
-// Sweeps over the identifier positions of model_identifier_positions.h, for a
-// test whose subject is what a `begin_keywords version_specifier reserves.
-// Both sweeps take the positions to cover as a list of names; an empty list
-// covers every position.
-
-// The report a word the version in force reserves draws in one position, and
-// the line of that position's own template the report stands at. A sweep that
-// asserted only that something was reported would hold when a different rule
-// fired and hold when the source never reached the position at all, so each
-// position is answered for by the report its own production emits.
 struct PositionReport {
   const char* message;
   uint32_t body_line;
   const char* subclause;
 };
 
-// Which report each position of kIdentifierPositions draws, traced through the
-// parser. Five of the eight put the word where an identifier is demanded and
-// draw "expected identifier, got " from the Expect or ExpectIdentifier call
-// that reads the name: Parser::ParseModuleDecl in src/parser/parser.cpp
-// under §23.2.1, Parser::ParsePortDecl in src/parser/parser_port.cpp under
-// §23.2.2.2, Parser::ParseTaskDecl in src/parser/parser_declaration.cpp
-// under §13.3, Parser::ParseFuncName in src/parser/parser_declaration.cpp
-// under §13.4, Parser::ParseGenvarDecl in src/parser/parser.cpp under
-// §27.4, and Parser::ParseBlockStmt in src/parser/parser_stmt.cpp under
-// §9.3.4. The tail of that sentence is left off, because a port whose word is
-// itself a data type -- "input wire logic" -- is read as the type and the
-// report then stands at the comma rather than at the word.
-//
-// The other two are reached by no identifier slot at all. A gate instance name
-// is optional, so ParseGateInstanceTail in src/parser/parser_toplevel.cpp,
-// reached from the call in Parser::ParseOneGateInstance in that same file, is
-// told there is no identifier, takes the instance to be unnamed and demands
-// the terminal list under §28.3.6. A module instantiation is recognized by the
-// identifier that follows the module name, so Parser::ParseImplicitTypeOrInst
-// hands "ch" to Parser::ParsePlainVarDecl in src/parser/parser_items.cpp
-// instead, which reads it as a variable declaration of an implicit type and
-// demands the semicolon under §6.8.
 inline PositionReport ReportForPosition(const IdentifierPosition& p) {
   const std::string_view kWhat(p.what);
   if (kWhat == "design element") {
@@ -70,9 +38,6 @@ inline PositionReport ReportForPosition(const IdentifierPosition& p) {
   return {"", 0, ""};
 }
 
-// Every word of `words` put into each covered position and rejected under
-// `spec`. A word the specifier reserves cannot name anything, so no position
-// admits it.
 inline void ExpectWordsFillNoIdentifierPosition(
     const char* spec, std::initializer_list<const char*> words,
     std::initializer_list<std::string_view> positions = {}) {
@@ -80,12 +45,6 @@ inline void ExpectWordsFillNoIdentifierPosition(
     if (positions.size() != 0 && !PositionIsOneOf(p, positions)) continue;
     const PositionReport kRep = ReportForPosition(p);
     for (const char* word : words) {
-      // Every message here stops before the token the report names, for the
-      // reason given above ReportForPosition: a word that is itself a data
-      // type is read as the type in some of these positions, and the report
-      // then stands at the punctuation that follows rather than at the word.
-      // So the word under test is told apart by the failure message rather
-      // than by the report.
       auto r = ParseWithPreprocessor(In(spec, AtPosition(p, word)));
       EXPECT_TRUE(ReportedError(r.diags, kRep.message,
                                 LineInRegion(kRep.body_line), kRep.subclause))
@@ -94,11 +53,6 @@ inline void ExpectWordsFillNoIdentifierPosition(
   }
 }
 
-// The accepting counterpart, which is what keeps the rejections above from
-// being blamed on the positions themselves: the same sources under `earlier`,
-// a specifier whose list leaves these words free, are accepted. Pairing the
-// two legs per position is the whole claim -- the word is reserved *here* and
-// an ordinary identifier *there*.
 inline void ExpectWordsNameEntitiesUnder(
     const char* earlier, const char* spec,
     std::initializer_list<const char*> words,
@@ -119,9 +73,6 @@ inline void ExpectWordsNameEntitiesUnder(
   }
 }
 
-// `word` names a design element under `spec`: the module declaration parses and
-// the name is read back off it. This is the "design element" position of
-// kIdentifierPositions on its accepting side.
 inline void ExpectUnlistedWordNamesDesignElement(const char* spec,
                                                  const char* word) {
   std::string as_module = std::string("module ") + word + ";\nendmodule\n";
@@ -132,10 +83,6 @@ inline void ExpectUnlistedWordNamesDesignElement(const char* spec,
   EXPECT_EQ(named_module.cu->modules[0]->name, word);
 }
 
-// `word` names a port under `spec`: the port declaration parses, the word is
-// referred to again in the continuous assignment below it, and the name is read
-// back off the port list. This is the "port" position of kIdentifierPositions
-// on its accepting side.
 inline void ExpectUnlistedWordNamesPort(const char* spec, const char* word) {
   std::string as_port = std::string("module m (input wire ") + word +
                         ", output wire y);\n  assign y = " + word +
@@ -147,9 +94,6 @@ inline void ExpectUnlistedWordNamesPort(const char* spec, const char* word) {
   EXPECT_EQ(named_port.cu->modules[0]->ports[0].name, word);
 }
 
-// `word` names a module instance under `spec`: the instantiation parses and the
-// instance name is read back off the item the parser built for it. This is the
-// "instance" position of kIdentifierPositions on its accepting side.
 inline void ExpectUnlistedWordNamesInstance(const char* spec,
                                             const char* word) {
   std::string as_instance = std::string(
@@ -170,10 +114,6 @@ inline void ExpectUnlistedWordNamesInstance(const char* spec,
   EXPECT_EQ(inst->inst_name, word);
 }
 
-// `word` names a task and a named block under `spec`, the two positions of
-// kIdentifierPositions whose acceptance is answered for by the parse alone: the
-// task declaration is followed by a call spelling the same word, and the block
-// label is the word by itself.
 inline void ExpectUnlistedWordNamesTaskAndBlock(const char* spec,
                                                 const char* word) {
   std::string as_task = std::string("module m;\n  reg [7:0] r;\n  task ") +
@@ -187,16 +127,6 @@ inline void ExpectUnlistedWordNamesTaskAndBlock(const char* spec,
   EXPECT_TRUE(ParseWithPreprocessorOk(In(spec, as_block))) << word;
 }
 
-// Every word of `words` accepted in each of five identifier positions under
-// `spec` -- design element, port, instance, task and named block -- with three
-// of the five read back off the parsed tree.
-//
-// This is the accepting side of the bound a version's reserved word list sets:
-// a word the list does not hold names each of these entities and the source
-// parses, so a rejection recorded for a listed word belongs to the list rather
-// than to anything about the position. Reading the name back off the tree is
-// what shows the word named the entity rather than merely getting past the
-// parser.
 inline void ExpectUnlistedWordsNameEveryEntity(
     const char* spec, std::initializer_list<const char*> words) {
   for (const char* word : words) {

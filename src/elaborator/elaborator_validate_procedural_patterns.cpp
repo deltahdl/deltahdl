@@ -20,8 +20,6 @@
 
 namespace delta {
 
-// Whether a block the walk is inside declares `name`, which hides the module's
-// declaration of it for the rest of that block (§6.21, §23.9).
 static bool IsBlockDeclared(
     const std::vector<std::pair<std::string_view, bool>>& decls,
     std::string_view name) {
@@ -29,12 +27,6 @@ static bool IsBlockDeclared(
       decls, [name](const auto& decl) { return decl.first == name; });
 }
 
-// §5.10 with §5.11 and §10.9.1 holds a pattern to its array wherever it is
-// written: assigned by a procedure to the module's array, `abarr = '{...}`, or
-// initializing an array a block declares, a packed array (§7.4) among them.
-// Only the module-level declaration's initializer was checked, so a flat
-// pattern for an array of structures and a pattern of the wrong element count
-// went through in both places.
 void ElaboratorOperationRules::WalkStmtsForProceduralArrayPattern(
     const Stmt* s) {
   if (s == nullptr) return;
@@ -63,10 +55,6 @@ void ElaboratorOperationRules::WalkStmtsForProceduralArrayPattern(
 }
 
 namespace {
-// What a typed pattern's prefix is resolved in: the typedefs in scope, with the
-// unpacked dimensions recorded for each array typedef, the module's variables
-// and nets, and inside a process or a subroutine the declarations its
-// statements see.
 struct TypedPatternScope {
   const ArrayPatternCheck& check;
   const TypedefMap& typedefs;
@@ -75,20 +63,12 @@ struct TypedPatternScope {
   const BodyDeclScopes* body;
 };
 
-// The array type a typed pattern's prefix names: the type of its elements and
-// its unpacked dimensions, outermost first, which ArrayPatternCheck follows
-// into the packed dimensions of that element type.
 struct PrefixArrayType {
   const DataType* elem;
   std::vector<Expr*> unpacked_dims;
 };
 }  // namespace
 
-// §6.18: a typedef renaming another names the same type, so the unpacked
-// dimensions an array typedef keeps (§7.4.4) are those recorded for the first
-// name along the chain that has any, and that typedef's entry is the element
-// type. Nothing for a name, or a chain, that no typedef in scope resolves, an
-// integer atom type among them, which has no dimensions to count against.
 static std::optional<PrefixArrayType> TypedefPrefixType(
     std::string_view name, const TypedPatternScope& scope) {
   DataType named;
@@ -105,10 +85,6 @@ static std::optional<PrefixArrayType> TypedefPrefixType(
   return PrefixArrayType{&scope.typedefs.find(name)->second, {}};
 }
 
-// §6.23: `type(x)` stands for the type x is declared with, the declaration
-// being the one visible where the reference is written -- a block's variable
-// or a subroutine's formal, which hides the module's (§6.21), and otherwise
-// the module's variable or net.
 static std::optional<PrefixArrayType> TypeRefExprType(
     const Expr* ref, const TypedPatternScope& scope) {
   std::string_view name = ExprIdent(ref->lhs);
@@ -121,19 +97,11 @@ static std::optional<PrefixArrayType> TypeRefExprType(
   return PrefixArrayType{&it->second->data_type, it->second->unpacked_dims};
 }
 
-// §26.3: the key RegisterScopedTypedef records a typedef behind a package's
-// or a class's scope under, "p::T" for `p::T`. A bare name gives a key no
-// typedef has.
 static std::string ScopedTypedefKey(const Expr* scoped) {
   return std::string(ExprIdent(scoped->lhs)) +
          "::" + std::string(ExprIdent(scoped->rhs));
 }
 
-// §6.23 with §7.4.4: a data type `type(...)` encloses. A typedef's name
-// written alone there is that typedef, unpacked dimensions included, as the
-// name prefixing the pattern itself is. A type written out, a name under
-// packed dimensions of its own, or a name behind a class's scope is the element
-// type with no unpacked dimension.
 static std::optional<PrefixArrayType> TypeValuePrefixType(
     const DataType* written, const TypedPatternScope& scope) {
   if (written->kind == DataTypeKind::kNamed &&
@@ -142,11 +110,6 @@ static std::optional<PrefixArrayType> TypeValuePrefixType(
   return PrefixArrayType{written, {}};
 }
 
-// §10.9: the type a typed pattern's prefix names. A name the parser knew as a
-// type is the cast's own text. A prefix the parser read as an expression is a
-// scope resolution, `p::T`, whose name before `::` is a package or a class
-// and never a variable (§26.3). `type(...)` encloses a data type, or an
-// expression, which a package's typedef `type(p::T)` is read as.
 static std::optional<PrefixArrayType> PrefixType(
     const Expr* cast, const TypedPatternScope& scope) {
   const Expr* ref = cast->rhs;
@@ -160,11 +123,6 @@ static std::optional<PrefixArrayType> PrefixType(
   return TypeRefExprType(ref, scope);
 }
 
-// §10.9 with §10.9.1: a typed pattern, `T'{...}` or `type(x)'{...}`, parses as
-// a cast wrapping the pattern and takes the type its prefix names in place of
-// its context's, so its braces are counted against that type's dimensions
-// wherever it is written -- an operand or a subroutine's return value as much
-// as the right-hand side of an assignment.
 static void CheckTypedArrayPatternsIn(const Expr* e,
                                       const TypedPatternScope& scope) {
   if (e == nullptr) return;
@@ -180,8 +138,6 @@ static void CheckTypedArrayPatternsIn(const Expr* e,
   });
 }
 
-// The typed patterns a process's or a subroutine's statements write, each
-// resolved among the declarations in view where it stands.
 static void CheckProceduralTypedArrayPatterns(
     const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
     TypedPatternScope scope) {
@@ -196,10 +152,6 @@ static void CheckProceduralTypedArrayPatterns(
   }
 }
 
-// The typed patterns one module item writes: in its own expressions -- a
-// declaration's initializer, both sides of a continuous assignment, an
-// instance's port connections -- and in a process's or a subroutine's
-// statements.
 static void CheckItemTypedArrayPatterns(const ModuleItem* item,
                                         const TypedPatternScope& scope) {
   CheckTypedArrayPatternsIn(item->init_expr, scope);
@@ -215,9 +167,6 @@ static void CheckItemTypedArrayPatterns(const ModuleItem* item,
 
 using StructTargetTypes = std::unordered_map<std::string_view, const DataType*>;
 
-// The type a procedural assignment's target is declared with where the target
-// names a whole variable that is no array: a name the body declares, which
-// hides the module's, or a module variable of `module_types`.
 static const DataType* WholeTargetType(const Expr* lhs,
                                        const BodyDeclScopes& scopes,
                                        const StructTargetTypes& module_types) {
@@ -228,10 +177,6 @@ static const DataType* WholeTargetType(const Expr* lhs,
   return it == module_types.end() ? nullptr : it->second;
 }
 
-// §10.9.2 (printed pages 263-264) holds a structure pattern to its structure
-// wherever it is written -- a typed pattern to the type its prefix names, and
-// an untyped one to the variable it is assigned to or initializes -- and not
-// only where a module-level declaration is initialized.
 static void CheckProceduralStructPatterns(
     const std::vector<FunctionArg>& formals, const std::vector<Stmt*>& body,
     const StructTargetTypes& module_types, const TypedefMap& typedefs,
@@ -255,9 +200,6 @@ static void CheckProceduralStructPatterns(
   }
 }
 
-// The structure patterns one item writes: in a process's or a subroutine's
-// statements, and on the right of a continuous assignment, whose target no
-// block declaration hides.
 static void CheckItemStructPatterns(const ModuleItem* item,
                                     const StructTargetTypes& targets,
                                     const TypedefMap& typedefs,
@@ -273,10 +215,6 @@ static void CheckItemStructPatterns(const ModuleItem* item,
                         {typedefs, item->assign_rhs->range.start, diag});
 }
 
-// §10.8 counts a continuous assignment and a net declaration assignment among
-// the assignment-like contexts, so §10.9.1 holds the pattern each drives to the
-// dimensions of its target: the variable or net its left-hand side names
-// whole, or the net it declares.
 void ElaboratorOperationRules::CheckContinuousArrayPattern(
     const ModuleItem* item) {
   const ArrayPatternCheck kCheck{typedefs_, aggregate_typedef_names_,
@@ -294,8 +232,6 @@ void ElaboratorOperationRules::CheckContinuousArrayPattern(
                it->second->unpacked_dims, item->assign_rhs->range.start);
 }
 
-// A subroutine's formals hide the module's declarations of their names in its
-// body as a block's declarations do.
 void ElaboratorOperationRules::ValidateProceduralArrayPatterns(
     const ModuleDecl* decl) {
   pattern_target_arrays_.clear();

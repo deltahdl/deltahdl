@@ -31,50 +31,27 @@
 
 namespace delta {
 
-// The root an actual is written on: the base of a select chain, else the
-// actual itself.
 static const Expr* SelectRoot(const Expr* actual) {
   while (actual && actual->kind == ExprKind::kSelect) actual = actual->base;
   return actual;
 }
 
-// Whether the formal's value is carried back into the actual when the
-// subroutine returns. §13.5.2 (printed page 349) has an output or inout formal
-// copied to its actual then, and lists a class property and a member of an
-// unpacked structure among what may be passed by reference. Neither of those
-// is a variable of its own -- a property is a field of its object and a
-// member a window of the structure's variable -- so there is nothing for the
-// ref binds to alias and the formal took BindValueArg's copy: `add(s.b, 20)`
-// and `add(h.v, 5)` left 5 and 60 standing. The copy is carried back into the
-// member or property here, through the assignment the actual takes as a
-// target, exactly as a queue or associative-array element's is by
-// WritebackQueueRefs and WritebackAssocRefs. A ref actual rooted anywhere
-// else is either aliased, and needs no copy-out, or is no target at all; a
-// const ref formal (printed page 350) is read only.
 static bool CopiesOutOnReturn(const FunctionArg& formal, const Expr* actual) {
   if (formal.direction == Direction::kOutput ||
       formal.direction == Direction::kInout) {
     return true;
   }
   if (formal.direction != Direction::kRef || formal.is_const) return false;
-  // A formal declared with unpacked dimensions is an aggregate, which the
-  // copy BindValueArg makes of a member or property does not stand for.
   if (!formal.unpacked_dims.empty()) return false;
   const Expr* root = SelectRoot(actual);
   return root != nullptr && root->kind == ExprKind::kMemberAccess;
 }
 
-// One element of an output or inout formal declared with an unpacked
-// dimension, and the caller's element variable it is copied into.
 struct ElementWriteback {
   std::string target;
   Logic4Vec value;
 };
 
-// An output or inout array formal whose contents go back to an actual that
-// holds its elements in an object rather than in variables: the formal's own
-// associative array or queue, or, for a fixed-size formal bound to a dynamic
-// array or queue, its element values from the left.
 struct AggregateWriteback {
   const Expr* actual = nullptr;
   const AssocArrayObject* assoc = nullptr;
@@ -82,15 +59,11 @@ struct AggregateWriteback {
   std::vector<Logic4Vec> elements;
 };
 
-// The tag an output, inout or ref formal of tagged union type holds when the
-// subroutine returns, and the actual it is carried back to.
 struct TagWriteback {
   std::string_view actual;
   std::string tag;
 };
 
-// Everything a return copies into the caller: whole actuals assigned as
-// targets, element variables, union tags and aggregates.
 struct CallerWrites {
   std::vector<std::pair<const Expr*, Logic4Vec>> values;
   std::vector<ElementWriteback> elements;
@@ -102,8 +75,6 @@ struct CallerWrites {
   }
 };
 
-// Runs `read` with the callee's scope, the top of the stack, taken off and put
-// back after, so a name the caller wrote is read as the caller's.
 template <typename Read>
 static void WithCalleeScopeOff(SimContext& ctx, Read read) {
   std::vector<Scope> stack = ctx.SwapScopeStack({});
@@ -116,11 +87,6 @@ static void WithCalleeScopeOff(SimContext& ctx, Read read) {
   ctx.SwapScopeStack(std::move(stack));
 }
 
-// An actual that is no declared fixed-size array -- a queue, or a property
-// reached through a handle or by its bare name in a method, which holds its
-// elements on the object -- takes them back by position (AssignAggregate).
-// Otherwise `actual_info` receives the declared array's shape, read with the
-// callee's scope off.
 static bool TakesElementsByPosition(const Expr* actual, SimContext& ctx,
                                     const ArrayInfo*& actual_info) {
   actual_info = nullptr;
@@ -134,29 +100,6 @@ static bool TakesElementsByPosition(const Expr* actual, SimContext& ctx,
   return by_position;
 }
 
-// §13.3 (printed page 337) writes mytask4's `output [3:0][7:0] y[1:0]`, a
-// formal with an unpacked dimension, and §13.5 (printed page 348) has the
-// return pass the values of the output and inout formals to the variables of
-// the call. TryBindArrayArg materializes such a formal as one variable per
-// element, `yo[0]` and `yo[1]`, with the shape recorded in the callee's scope
-// and no variable of the formal's own name -- which was the one name the
-// copy-out looked up, so every element of the actual kept its x. The elements
-// are gathered here, while the callee's scope still holds the shape and the
-// element variables; the actual is the identifier TryBindArrayArg bound the
-// formal from, whose elements are the `y[idx]` variables CreateArrayElements
-// (lowerer_var.cpp) declares. Each value takes its own words, as the copy in
-// did: the formal's variable goes with the call, and the caller's element is
-// what keeps the value.
-//
-// §7.7 (printed page 162) lets the actual have another range than the
-// formal, or be a dynamic array or queue, and §7.6 pairs the elements left to
-// right, so the formal's k-th element from the left goes to the actual's
-// k-th: to the element variable at that position of the actual's own bounds,
-// or into the actual's queue (AggregateWriteback::elements). A
-// multidimensional formal holds its elements as the leaves `a[i][j]`, which
-// the copy-out named one index deep and so never found, leaving the actual
-// as it was; every leaf is now named at its position on both sides
-// (ArrayElementSuffixAt).
 static void CollectElementWritebacks(const FunctionArg& formal,
                                      const Expr* actual, SimContext& ctx,
                                      Arena& arena, CallerWrites& out) {
@@ -169,9 +112,6 @@ static void CollectElementWritebacks(const FunctionArg& formal,
   if (info == nullptr) return;
   const ArrayInfo* actual_info = nullptr;
   bool by_position = TakesElementsByPosition(actual, ctx, actual_info);
-  // The actual's own bounds, where it declares as many elements as the
-  // formal in every dimension; otherwise the formal's, as the copy-out has
-  // always named them.
   bool same_sizes = actual_info != nullptr && actual_info->size == info->size &&
                     actual_info->dim_sizes == info->dim_sizes;
   const ArrayInfo& target = same_sizes ? *actual_info : *info;
@@ -193,15 +133,6 @@ static void CollectElementWritebacks(const FunctionArg& formal,
   if (by_position) out.aggregates.push_back(std::move(to_queue));
 }
 
-// §7.7 (printed page 162) makes the rules of array argument passing by value
-// those of array assignment, and §13.5 (printed 348) copies an
-// output or inout formal to its actual on return, so a dynamic array, queue or
-// associative array formal goes back whole: `mk(d)` with `output int arr[]`
-// sized by `new[3]` leaves d of size 3. Such a formal holds its elements in the
-// callee frame's own QueueObject or AssocArrayObject rather than in a variable
-// of its name, so the copy-out found no variable and nothing reached the
-// actual. Only the callee's own frame is read, so an actual named like the
-// formal is not taken for it. False where the formal holds no such object.
 static bool CollectAggregateWriteback(const FunctionArg& formal,
                                       const Expr* actual, SimContext& ctx,
                                       std::vector<AggregateWriteback>& out) {
@@ -222,10 +153,6 @@ static bool CollectAggregateWriteback(const FunctionArg& formal,
   return true;
 }
 
-// §7.6 (printed page 160) assigns an array to a fixed or dynamic array
-// property element by element from the left, a dynamic one first resized to
-// the source's size (§7.5.1); a fixed one takes as many as it holds. An
-// actual that names no such property keeps what it held.
 static void AssignClassArray(const Expr* actual,
                              const std::vector<Logic4Vec>& src, SimContext& ctx,
                              Arena& arena) {
@@ -241,10 +168,6 @@ static void AssignClassArray(const Expr* actual,
     StoreClassArrayElement(ref, ElementIndexAt(shape, k), src[k], ctx, arena);
 }
 
-// Replaces the contents of the associative array or queue the actual names,
-// in the caller's scope, with the formal's, each element taking its own words,
-// and tells §9.4.2's watchers of the actual that it changed. An actual that
-// names neither keeps what it held.
 static void AssignAggregate(const AggregateWriteback& write, SimContext& ctx,
                             Arena& arena) {
   ClassObject* owner = nullptr;
@@ -279,18 +202,6 @@ static void AssignAggregate(const AggregateWriteback& write, SimContext& ctx,
   AnnounceQueueChange(write.actual, owner, ctx);
 }
 
-// §7.3.2 (printed page 151): a tagged union's value is its tag beside the
-// member value, so the value §13.5 (printed 348) passes from an output or
-// inout formal to the caller's variable on return carries the tag: after
-// `retag(u)` with `output u_t o` assigned `tagged Valid 4` inside, the actual
-// holds Valid. The bits alone were copied out, so `u.Valid` of the caller was
-// reported against the tag the actual held before the call. A ref formal
-// aliases the actual's variable but not its tag entry -- TagKeyOfName answers
-// the formal's bare name for a local, the alias included -- so a retag
-// through a non-const ref formal is carried back the same way. The formal's
-// tag stands under its bare name, the key the bind wrote it by
-// (CopyUnionTagIn in eval_function_args.cpp), and only a formal with a union
-// layout on file has one to carry.
 static bool CarriesTagOut(const FunctionArg& formal) {
   if (formal.direction == Direction::kOutput ||
       formal.direction == Direction::kInout) {
@@ -311,18 +222,6 @@ static void CollectTagWriteback(const FunctionArg& formal, const Expr* actual,
   out.push_back({actual->text, std::string(ctx.GetVariableTag(formal.name))});
 }
 
-// The actual is an expression of the caller's, so it is assigned with the
-// callee's scope, the top of the stack at this point, taken off the stack and
-// put back after: an actual spelled like the formal would otherwise resolve
-// to the formal and the caller's variable never change. An element of an
-// array actual is a variable of the caller's, named rather than written as an
-// expression, and is stored into as §11.4.1's compound operators store into a
-// variable: sized to it, coerced where it is 2-state, declined while it is
-// forced, its watchers told. A tag is recorded under the key the actual's
-// storage was created by, resolved in the caller's scope as the value's
-// target is (TagKeyOfName), and the key is interned in the arena: the tag
-// table keeps the view it is given, and a key that went with this call
-// would be read against freed memory by every later access of the actual.
 static void AssignInCallerScope(const CallerWrites& writes, SimContext& ctx,
                                 Arena& arena) {
   WithCalleeScopeOff(ctx, [&] {
@@ -341,9 +240,6 @@ static void AssignInCallerScope(const CallerWrites& writes, SimContext& ctx,
   });
 }
 
-// §13.5.2: the ref cells the call's property actuals held
-// (TryBindRefPropertyArg in eval_function_args.cpp) are released once the
-// copy-out has run, each actual read in the caller's scope as at the bind.
 static void ReleaseRefPropertyCells(const ModuleItem* func, const Expr* expr,
                                     SimContext& ctx, Arena& arena) {
   std::vector<const Expr*> actuals;
@@ -355,8 +251,6 @@ static void ReleaseRefPropertyCells(const ModuleItem* func, const Expr* expr,
       actuals.push_back(expr->args[static_cast<size_t>(ai)]);
     }
   }
-  // A call with no such formal leaves the scope stack alone, which may hold
-  // no callee scope to set aside.
   if (actuals.empty()) return;
   WithCalleeScopeOff(ctx, [&] {
     for (const Expr* actual : actuals) {
@@ -368,13 +262,6 @@ static void ReleaseRefPropertyCells(const ModuleItem* func, const Expr* expr,
   });
 }
 
-// §13.5.2: an output or inout formal is copied to its actual when the
-// subroutine returns, and so is a ref formal bound to a member or property
-// (CopiesOutOnReturn). A formal with no variable of its own name is one
-// TryBindArrayArg spread over per-element variables, copied out element by
-// element (CollectElementWritebacks). A tagged union formal's tag goes back
-// with its value (CollectTagWriteback), before CopiesOutOnReturn declines the
-// aliased ref formal whose tag entry is its own.
 Logic4Vec EvalDefaultInDeclScope(const Expr* default_value, SimContext& ctx,
                                  Arena& arena) {
   std::optional<InstancePrefixOverride> in_callee;
@@ -384,12 +271,6 @@ Logic4Vec EvalDefaultInDeclScope(const Expr* default_value, SimContext& ctx,
   return EvalExpr(default_value, ctx, arena);
 }
 
-// §15.5 with §13.5.1: an event output or inout formal hands the caller's
-// actual the synchronization object the formal names on return, so after
-// `getev(f)`, whose body writes `ev = e`, f and e are one event. The actual
-// is rebound in the caller's scope: a local of it in its frame, any other
-// name in the run's tables. False for any other formal or actual, which the
-// value copy serves. Copied as a value, f stayed an event of its own.
 static bool TryWritebackEventFormal(const FunctionArg& formal,
                                     const Expr* actual, Variable* local,
                                     SimContext& ctx) {
@@ -406,9 +287,6 @@ static bool TryWritebackEventFormal(const FunctionArg& formal,
   return true;
 }
 
-// The value `value` a formal's local holds on return, collected for the
-// actual it was bound from, or, where the call passed none, for the target the
-// formal's default names (§13.5.3), which is written in the callee's scope.
 static void CollectValueWriteback(const FunctionArg& formal, const Expr* actual,
                                   const Logic4Vec& value, CallerWrites& writes,
                                   CallerWrites& default_writes) {
@@ -443,8 +321,6 @@ void WritebackOutputArgs(const ModuleItem* func, const Expr* expr,
   if (!writes.Empty()) AssignInCallerScope(writes, ctx, arena);
   ReleaseRefPropertyCells(func, expr, ctx, arena);
   if (default_writes.Empty()) return;
-  // §13.5.3: a default names its target in the scope of the declaration, the
-  // instance the process stands in for the call, not the caller's.
   std::optional<InstancePrefixOverride> in_callee;
   if (const Process* proc = ctx.CurrentProcess()) {
     in_callee.emplace(ctx.InstancePrefixOverride(), proc->inst_prefix);

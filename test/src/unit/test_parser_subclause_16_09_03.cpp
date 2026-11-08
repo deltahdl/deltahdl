@@ -37,10 +37,6 @@ TEST(AssertionParsing, PastFunctionWithTicks) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: number_of_ticks shall be an elaboration-time constant expression. A
-// parameter is a constant expression (§11.2.1), a distinct input form from a
-// bare literal, and takes a different expression-parse path in the tick-count
-// position of $past.
 TEST(AssertionParsing, PastTicksAsParameter) {
   auto r = Parse(
       "module m;\n"
@@ -51,8 +47,6 @@ TEST(AssertionParsing, PastTicksAsParameter) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: a localparam is likewise a constant expression (§11.2.1) admitted in
-// the number_of_ticks position of $past.
 TEST(AssertionParsing, PastTicksAsLocalparam) {
   auto r = Parse(
       "module m;\n"
@@ -63,9 +57,6 @@ TEST(AssertionParsing, PastTicksAsLocalparam) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: when intermediate optional arguments between two arguments are not
-// needed, a comma is placed for each omitted argument, e.g. $past(in1, ,
-// enable) omits number_of_ticks while supplying expression2.
 TEST(AssertionParsing, PastOmittedMiddleArgument) {
   auto r = Parse(
       "module m;\n"
@@ -75,8 +66,6 @@ TEST(AssertionParsing, PastOmittedMiddleArgument) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: the clocking event may be supplied explicitly as an argument to a
-// sampled value function, e.g. $rose(req, @(posedge fclk)).
 TEST(AssertionParsing, RoseWithExplicitClockingEvent) {
   auto r = Parse(
       "module m;\n"
@@ -87,9 +76,6 @@ TEST(AssertionParsing, RoseWithExplicitClockingEvent) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: the sampled value functions are not limited to assertions; a value
-// change function such as $rose may appear as an ordinary expression in
-// procedural code.
 TEST(AssertionParsing, RoseInProceduralAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -99,8 +85,6 @@ TEST(AssertionParsing, RoseInProceduralAssignment) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: $past may likewise be used in any SystemVerilog expression, e.g. in
-// a procedural nonblocking assignment.
 TEST(AssertionParsing, PastInProceduralAssignment) {
   auto r = Parse(
       "module m;\n"
@@ -110,9 +94,6 @@ TEST(AssertionParsing, PastInProceduralAssignment) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §16.9.3: the clocking event a value change function is given is the one its
-// argument is sampled at, so the call keeps it, written in parentheses with an
-// edge or, §9.4 Syntax 9-4, as a bare name.
 TEST(AssertionParsing, ValueChangeFunctionKeepsItsParenthesisedClock) {
   auto r = Parse(
       "module m;\n"

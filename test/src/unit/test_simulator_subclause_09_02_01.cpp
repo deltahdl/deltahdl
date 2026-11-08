@@ -109,11 +109,6 @@ TEST(InitialProcedureSimulation, InitialWithDelayCeases) {
 }
 
 TEST(InitialProcedureSimulation, DoesNotRerunWhenReferencedSignalChanges) {
-  // An initial procedure runs a single time and stays finished afterward. Even
-  // when a variable it read is driven again later in the run, the completed
-  // procedure must not be resumed. If it were wrongly resensitized like an
-  // always block, the running total below would advance past its time-zero
-  // value once trig changes at time 5.
   auto val = RunAndGet(
       "module m;\n"
       "  logic [31:0] runs;\n"
@@ -133,13 +128,6 @@ TEST(InitialProcedureSimulation, DoesNotRerunWhenReferencedSignalChanges) {
 }
 
 TEST(InitialProcedureSimulation, IteratingBodyRunsOnceThenCeases) {
-  // §9.2.1 example 1 form: an initial whose body performs iterative
-  // initialization (a for-loop over a memory-like accumulation). The whole
-  // procedure — loop included — executes a single time and then its activity
-  // ceases. The second initial perturbs `step` after the first has finished; if
-  // the finished procedure were wrongly restarted, `total` would be recomputed
-  // with step==100 (or keep accumulating) instead of staying at the single-pass
-  // total of 4 (four iterations of +1).
   auto val = RunAndGet(
       "module m;\n"
       "  logic [31:0] total;\n"
@@ -160,12 +148,6 @@ TEST(InitialProcedureSimulation, IteratingBodyRunsOnceThenCeases) {
 }
 
 TEST(InitialProcedureSimulation, WaveformStimulusCeasesAtLastPattern) {
-  // §9.2.1 example 2 form: an initial used to drive a stimulus waveform as a
-  // sequence of delayed assignments. The procedure marches through each pattern
-  // exactly once and its activity ceases once the last pattern has been driven;
-  // it does not loop back like an always procedure. Sampling well after the
-  // final delay (finish at time 100, last pattern applied at time 40) must show
-  // the last pattern still held.
   auto val = RunAndGet(
       "module m;\n"
       "  logic [5:0] inputs;\n"

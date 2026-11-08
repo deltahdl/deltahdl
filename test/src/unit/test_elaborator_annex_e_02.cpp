@@ -135,12 +135,6 @@ TEST(Elaborator, DefaultDecayTime_LaterOverridesAtElabLevel) {
   EXPECT_TRUE(found);
 }
 
-// C1 (real_constant) x C3: a real-valued directive still drives the decay time
-// applied to a trireg. E.2 admits a real_constant and gives no conversion of
-// its own, so §3.14.1 settles what it becomes -- the time precision fixes how a
-// delay value is rounded before simulation uses it, and where the precision
-// equals the time unit, delay values round to whole numbers. The count is
-// rounded and not truncated, so 3.5 is a decay time of 4.
 TEST(Elaborator, DefaultDecayTime_RealArgumentAppliesToTrireg) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -184,8 +178,6 @@ TEST(Elaborator, DefaultDecayTime_AppliesToAllTriregNets) {
   EXPECT_EQ(count, 2);
 }
 
-// The decay time a named net of a named module was given, or 0 with `decays`
-// false when the module or the net is not in the design.
 struct DecayOf {
   uint64_t ticks = 0;
   bool decays = false;
@@ -205,11 +197,6 @@ DecayOf DecayOfNet(const RtlirDesign* design, std::string_view module,
   return {};
 }
 
-// Annex E.2: the directive applies to the trireg nets of the modules that
-// follow it in the source, so a second directive between two modules leaves
-// the first module's net under the first value and gives the second module's
-// net the second value. A default read off the compilation unit's last
-// directive would give both nets 200.
 TEST(Elaborator, DefaultDecayTime_EachModuleTakesTheDirectiveBeforeIt) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -221,17 +208,13 @@ TEST(Elaborator, DefaultDecayTime_EachModuleTakesTheDirectiveBeforeIt) {
       "module b;\n"
       "  trireg cap;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_EQ(DecayOfNet(design, "a", "cap").ticks, 50u);
   EXPECT_EQ(DecayOfNet(design, "b", "cap").ticks, 200u);
 }
 
-// Annex E.2: a module declared before any directive has trireg nets with no
-// decay time, the state E.2's infinite names, whatever directive follows it;
-// and an infinite directive between two finite ones puts the module after it
-// back under no decay.
 TEST(Elaborator, DefaultDecayTime_AModuleBeforeTheDirectiveIsNotUnderIt) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -246,7 +229,7 @@ TEST(Elaborator, DefaultDecayTime_AModuleBeforeTheDirectiveIsNotUnderIt) {
       "module c;\n"
       "  trireg cap;\n"
       "endmodule\n",
-      f, "", /*auto_top=*/true);
+      f, "", true);
   ASSERT_NE(design, nullptr);
   EXPECT_FALSE(f.has_errors);
   EXPECT_FALSE(DecayOfNet(design, "a", "cap").decays);
@@ -255,12 +238,6 @@ TEST(Elaborator, DefaultDecayTime_AModuleBeforeTheDirectiveIsNotUnderIt) {
   EXPECT_FALSE(DecayOfNet(design, "c", "cap").decays);
 }
 
-// Annex E.2 with §3.14.1: a delay value is rounded at the time precision of the
-// module it is written for, and a real decay time is no exception, whichever of
-// E.2's directive and a trireg's third delay (§28.16.2.2) writes it. Under
-// 1ns/100ps, 2.5 is 2.5 ns, so the default reaches the net as the real 2.5 the
-// lowerer rounds at the precision, as the third delay does, rather than as the
-// 3 whole units of a rounding made before any precision is known.
 TEST(Elaborator, DefaultDecayTime_RealArgumentReachesTheNetUnrounded) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(
@@ -282,8 +259,6 @@ TEST(Elaborator, DefaultDecayTime_RealArgumentReachesTheNetUnrounded) {
   EXPECT_EQ(kByDefault.real, kDeclared.real);
 }
 
-// An integer argument stays the whole count it was written as, as an integer
-// third delay does, so nothing is rounded twice.
 TEST(Elaborator, DefaultDecayTime_IntegerArgumentReachesTheNetAsACount) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(

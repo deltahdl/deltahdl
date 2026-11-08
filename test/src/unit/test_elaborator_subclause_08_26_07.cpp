@@ -44,8 +44,6 @@ TEST(InterfaceClassPartialImplementation, ConcreteClassCompletesPartialOk) {
              "endmodule\n"));
 }
 
-// §8.26.7: a virtual class that implements an interface class but neither
-// implements the prototype nor re-declares it as pure virtual is illegal.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassNeitherImplNorRedeclarePureError) {
   ElabFixture f;
@@ -64,8 +62,6 @@ TEST(InterfaceClassPartialImplementation,
       "8.26.7"));
 }
 
-// §8.26.7: re-declaring every prototype with the pure qualifier (and providing
-// no implementation) discharges the obligation for a virtual class.
 TEST(InterfaceClassPartialImplementation, VirtualClassRedeclaresAllPureOk) {
   EXPECT_TRUE(
       ElabOk("interface class IntfClass;\n"
@@ -80,8 +76,6 @@ TEST(InterfaceClassPartialImplementation, VirtualClassRedeclaresAllPureOk) {
              "endmodule\n"));
 }
 
-// §8.26.7: implementing one prototype but leaving another neither implemented
-// nor re-declared pure is illegal even though the class is virtual.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassPartialLeavesPrototypeUnaddressedError) {
   ElabFixture f;
@@ -104,10 +98,6 @@ TEST(InterfaceClassPartialImplementation,
       "8.26.7"));
 }
 
-// §8.26.7: the prototype obligation may be discharged by a virtual method
-// implementation inherited from a base class (parent §8.26 "define or
-// inherit"), so no re-declaration is needed in the implementing virtual class
-// itself.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassInheritedImplDischargesObligationOk) {
   EXPECT_TRUE(
@@ -125,9 +115,6 @@ TEST(InterfaceClassPartialImplementation,
              "endmodule\n"));
 }
 
-// §8.26.7: the obligation may also be discharged by a pure virtual prototype
-// inherited from a base class — inheriting a pure prototype counts the same as
-// re-declaring one in the implementing virtual class itself.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassInheritsPureBasePrototypeOk) {
   EXPECT_TRUE(
@@ -143,9 +130,6 @@ TEST(InterfaceClassPartialImplementation,
              "endmodule\n"));
 }
 
-// §8.26.7: implementing an interface class that extends another interface class
-// carries the obligation for the inherited prototypes too; addressing every
-// prototype (own and inherited) is legal.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassImplementsExtendedInterfaceAddressesAllOk) {
   EXPECT_TRUE(
@@ -163,9 +147,6 @@ TEST(InterfaceClassPartialImplementation,
              "endmodule\n"));
 }
 
-// §8.26.7: a prototype inherited by the implemented interface through `extends`
-// that is left neither implemented nor re-declared pure is illegal, just like a
-// directly declared one.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassImplementsExtendedInterfaceMissingInheritedError) {
   ElabFixture f;
@@ -188,11 +169,6 @@ TEST(InterfaceClassPartialImplementation,
       "8.26.7"));
 }
 
-// A concrete class leaves the partial-implementation clause behind: what it
-// breaks is the parent §8.26 obligation to define or inherit an implementation
-// of every prototype, and CheckInterfaceMethods in
-// src/elaborator/elaborator_validate_class_inheritance.cpp reports it under
-// "8.26" at the concrete class's own declaration.
 TEST(InterfaceClassPartialImplementation,
      ConcreteClassFailsToCompletePartialError) {
   ElabFixture f;
@@ -326,9 +302,6 @@ TEST(InterfaceClassPartialImplementation, VirtualClassAllMethodsImplOk) {
              "endmodule\n"));
 }
 
-// §8.1 lets a class be declared wherever a data declaration may appear, and the
-// partial-implementation obligation follows the class rather than the scope it
-// is written in. The pair below varies only that scope.
 TEST(InterfaceClassPartialImplementation,
      VirtualClassInsideAModuleLeavingAPrototypeUnaddressedError) {
   ElabFixture f;

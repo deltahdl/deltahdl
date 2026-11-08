@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The Uniform of test/src/e2e/rand_modifier.sv, an unconstrained rand bit
-// [7:0] y beside a rand real v held to 0.0 to 2.0, randomized 2048 times
-// by an initial running `body` after each call and printing what it
-// counted.
 std::string Design(const std::string& body, const std::string& print) {
   return "class Uniform;\n"
          "  rand bit [7:0] y;\n"
@@ -32,11 +28,6 @@ std::string Design(const std::string& body, const std::string& print) {
          "endmodule\n";
 }
 
-// §18.4.1: an unconstrained 8-bit rand variable takes any value from 0 to
-// 255 with equal probability, so 2048 draws reach at least 240 of the 256
-// values, none more than three times its share of 8, and successive calls
-// repeat a value about 1 in 256 times, within 24 repeats where 8 are
-// expected.
 TEST(RandModifierRun, AnIntegralVariableIsUniformOverItsRange) {
   SimFixture f;
   std::string out = RunCapture(
@@ -53,9 +44,6 @@ TEST(RandModifierRun, AnIntegralVariableIsUniformOverItsRange) {
   EXPECT_EQ(out, "1 1 1\n");
 }
 
-// §18.4.1: a rand real is uniformly distributed over its range, so of 2048
-// draws of v the halves 0.0 to 1.0 and 1.0 to 2.0 receive counts within a
-// sixth of each other, and every draw stays in the range.
 TEST(RandModifierRun, ARealVariableIsUniformOverItsRange) {
   SimFixture f;
   std::string out = RunCapture(

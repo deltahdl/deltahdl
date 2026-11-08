@@ -187,9 +187,6 @@ TEST(AlwaysCombSensitivitySim, FunctionCallBodyReadRetriggers) {
   EXPECT_EQ(var->value.ToUint64(), 25u);
 }
 
-// §11.5.3 dependency end-to-end: an indexed part-select `a[i +: 4]` reads both
-// the array base and the offset `i`. Changing only `i` must retrigger the block
-// (the offset is in the runtime sensitivity), so the selected slice updates.
 TEST(AlwaysCombSensitivitySim, IndexedPartSelectOffsetRetriggers) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -207,13 +204,9 @@ TEST(AlwaysCombSensitivitySim, IndexedPartSelectOffsetRetriggers) {
       "endmodule\n",
       f, "y");
   ASSERT_NE(y, nullptr);
-  // a[5:2] of 1011_0100 is 1101 == 13.
   EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
-// §8.23 dependency end-to-end: a static method called through the class scope
-// resolution operator picks up its argument as a sensitivity contributor, so a
-// change to that argument retriggers the block and the result propagates.
 TEST(AlwaysCombSensitivitySim, ClassStaticMethodCallArgRetriggers) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -236,9 +229,6 @@ TEST(AlwaysCombSensitivitySim, ClassStaticMethodCallArgRetriggers) {
   EXPECT_EQ(y->value.ToUint64(), 10u);
 }
 
-// §11.5.3 dependency end-to-end: a packed-struct member read `p.lo` puts the
-// struct variable in the runtime sensitivity, so changing the struct retriggers
-// the block and the member value propagates.
 TEST(AlwaysCombSensitivitySim, StructMemberChangeRetriggers) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -280,18 +270,6 @@ TEST(AlwaysCombSensitivitySim, TaskCallInAlwaysCombExecutes) {
   EXPECT_EQ(var->value.ToUint64(), 6u);
 }
 
-// §9.2.2.2.1 (printed page 223) settles what an immediate assertion inside an
-// always_comb contributes: an expression in an immediate assertion (§16.3) in
-// the procedure, or in a function the procedure calls, joins the always_comb's
-// implicit sensitivity list as though it were an if statement's condition,
-// while an expression in an assertion action block adds nothing to that list.
-// Its worked example writes `disable_error` in the else action and has the
-// block trigger on any change of b, c or e, naming the action block's
-// identifier in neither list.
-//
-// So `en`, the assertion expression, is in the list, and `a`, read only in the
-// pass statement, is not. `a` moves from 10 to 20 at time 1 while `en` is held,
-// and `y` keeps the 13 that the time-zero evaluation left it.
 TEST(AlwaysCombSensitivitySim, AssertPassStatementReadStaysOutOfSensitivity) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -312,11 +290,6 @@ TEST(AlwaysCombSensitivitySim, AssertPassStatementReadStaysOutOfSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
-// §9.2.2.2.1 (printed page 223): the fail statement is the other half of the
-// action block the clause excludes, and the clause's own example puts its
-// excluded identifier there. `en` is the assertion expression and drives the
-// block; `b` is read only in the fail statement, so changing `b` at time 1
-// leaves `y` at the 13 the time-zero evaluation wrote.
 TEST(AlwaysCombSensitivitySim, AssertFailStatementReadStaysOutOfSensitivity) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -337,14 +310,6 @@ TEST(AlwaysCombSensitivitySim, AssertFailStatementReadStaysOutOfSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
-// §9.2.2.2.1: the implicit sensitivity list holds every net or variable
-// identifier or select expression the block reads, and its three exceptions
-// name a declaration, a write and a timing control expression. None of them
-// names a statement position, and the action-block exclusion on printed page
-// 223 is about assertion action blocks alone, so a read inside a randcase item
-// counts. `a` is read only in the item, moves from 10 to 20 at time 1, and the
-// re-evaluated block leaves 23 behind. The single item carries weight 3, so
-// §18.16 selects it on every draw whatever the random number is.
 TEST(AlwaysCombSensitivitySim, RandcaseItemReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -366,10 +331,6 @@ TEST(AlwaysCombSensitivitySim, RandcaseItemReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 23u);
 }
 
-// §9.2.2.2.1: a randsequence production's code block is a statement within the
-// block, and no exception of the clause and no sentence of printed page 223
-// excludes it, so the read of `a` inside it belongs to the implicit sensitivity
-// list. `a` moves from 10 to 20 at time 1 and the re-evaluated block leaves 23.
 TEST(AlwaysCombSensitivitySim, RandsequenceCodeBlockReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -391,16 +352,6 @@ TEST(AlwaysCombSensitivitySim, RandsequenceCodeBlockReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 23u);
 }
 
-// §9.2.2.2.1 exception (b) leaves out of the implicit sensitivity list any
-// expression the block also writes, and names no statement position, so a write
-// standing in an assertion action block is a write within the block. `tmp` is
-// read by `y = tmp;` and written by the pass statement, so exception (b)
-// removes it and the procedure does not re-trigger on its own assignment. The
-// count of evaluations is what distinguishes that from a procedure sensitive to
-// `tmp`: such a procedure evaluates once at time zero, drives `tmp` from x to
-// 13, wakes on that change and evaluates a second time. Both evaluations
-// compute the same 13, so the printed line is the only place the extra pass
-// shows.
 TEST(AlwaysCombSensitivitySim, ActionBlockWriteKeepsNameOutOfSensitivity) {
   SimFixture f;
   std::string out = RunCapture(
@@ -418,15 +369,6 @@ TEST(AlwaysCombSensitivitySim, ActionBlockWriteKeepsNameOutOfSensitivity) {
   EXPECT_EQ(out, "eval 13\n");
 }
 
-// §9.2.2.2.1 (printed page 223) excludes the expressions used in an assertion
-// action block from the implicit sensitivity list, and a call to `plus_a` is
-// such an expression. What the function reads therefore reaches the list by no
-// route: `a` is read only in `plus_a`, `plus_a` is called only from the pass
-// statement, and moving `a` from 10 to 20 at time 1 leaves `y` at 13.
-//
-// The contrast is with AlwaysCombSensitivitySim.FunctionCallBodyReadRetriggers
-// above, where the same function is called from an ordinary statement and the
-// same change to `a` does re-evaluate the block.
 TEST(AlwaysCombSensitivitySim, ActionBlockFunctionCallStaysOutOfSensitivity) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -449,17 +391,6 @@ TEST(AlwaysCombSensitivitySim, ActionBlockFunctionCallStaysOutOfSensitivity) {
   EXPECT_EQ(y->value.ToUint64(), 13u);
 }
 
-// §9.2.2.2.1 puts in the implicit sensitivity list every net or variable
-// identifier the block reads, and A.2.4 gives a variable_decl_assignment an
-// initializer, which is where `a` and `b` are read here and nowhere else. None
-// of the clause's three exceptions removes them: neither is declared within the
-// block, neither is written within it, and an initializer is not a timing
-// control expression. So the change to `a` at time 1 re-evaluates the block:
-// `y` is 13 after the time-zero evaluation and 23 after the second one, and a
-// block that never woke leaves 13 behind. `tmp` is declared automatic, so §6.21
-// runs its initializer on every evaluation; a static one would be initialized
-// once, and §6.21 requires the `static` to be written where it has an
-// initializer in a procedural block.
 TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -481,22 +412,6 @@ TEST(AlwaysCombSensitivitySim, BlockLocalInitializerReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 23u);
 }
 
-// §9.2.2.2.1 counts every net or variable read within the block, and §18.16
-// makes a randcase weight an expression the statement evaluates, any expression
-// and not only a constant. `w` is read in the two weights and nowhere else, and
-// no exception of §9.2.2.2.1 removes it.
-//
-// The weights are written so that `w` alone decides which branch runs, which is
-// what makes a failure attributable. They sum to 8 whatever `w` holds, so
-// §18.16's case of every weight being zero never arises and a branch is
-// selected on every execution; and §18.16 never selects a zero-weight branch,
-// so at `w == 8'd8` the second weight is zero and the first branch runs, while
-// at `w == 8'd0` the first weight is zero and the second runs. The random draw
-// therefore changes nothing. `y` is 21 after the time-zero evaluation, and 35
-// only if the change to `w` at time 1 re-evaluated the block. `w` is the only
-// name the block reads -- `y` is written within the block, which exception (b)
-// removes -- so no other name can wake the process and a run that never reads
-// the weight leaves 21.
 TEST(AlwaysCombSensitivitySim, RandcaseWeightReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -519,21 +434,6 @@ TEST(AlwaysCombSensitivitySim, RandcaseWeightReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 35u);
 }
 
-// §9.2.2.2.1 counts a read inside any function the block calls and puts no
-// condition on where in the block the call stands. `a` is read only in
-// `plus_a`, and `plus_a` is called only from the initializer of a block-local
-// declaration, so `a` reaches the implicit sensitivity list only through the
-// walk that collects the names of called functions. That is a separate walk
-// from the one
-// AlwaysCombSensitivitySim.BlockLocalInitializerReadRetriggersProcess above
-// pins, and it fails separately: the call is passed the literal 8'd5, so the
-// initializer's own reads contribute nothing.
-//
-// `y` is 17 after the time-zero evaluation and 41 after the change to `a` at
-// time 1. The contrast is with
-// AlwaysCombSensitivitySim.FunctionCallBodyReadRetriggers above, where the same
-// shape of function is called from an assignment's right-hand side. `tmp` is
-// automatic for the reason BlockLocalInitializerReadRetriggersProcess gives.
 TEST(AlwaysCombSensitivitySim, InitializerFunctionCallReadRetriggersProcess) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -557,11 +457,6 @@ TEST(AlwaysCombSensitivitySim, InitializerFunctionCallReadRetriggersProcess) {
   EXPECT_EQ(y->value.ToUint64(), 41u);
 }
 
-// Runs a design declaring one scalar and one four-bit vector, which between
-// them give a name that designates an object, a name that designates a position
-// within one, and the absence of a name -- the three cases a watch list can
-// carry. Returns false when the source did not elaborate, which a case reads as
-// having covered nothing.
 bool RunTwoSignalDesign(SimFixture& f) {
   auto* design = ElaborateSrc(
       "module t;\n"
@@ -578,16 +473,6 @@ bool RunTwoSignalDesign(SimFixture& f) {
   return true;
 }
 
-// §9.2.2.2.1 puts on the implicit sensitivity list the expansion of the longest
-// static prefix of every net or variable identifier or select expression it
-// reads, and an expansion is an object of the design. `b[3]` names a position
-// within `b` and no object, SimContext::FindVariable resolving a declared name
-// against one Variable per declaration, so it belongs to no expansion and is
-// not on the list.
-//
-// Watching it is what the list was doing. The awaiters skip a name they cannot
-// resolve when they arm, so the name contributed nothing but its presence, and
-// its presence is what the emptiness test at each watching loop reads.
 TEST(ImplicitSensitivityWatchList, DropsANameThatDesignatesNoObject) {
   SimFixture f;
   ASSERT_TRUE(RunTwoSignalDesign(f));
@@ -596,9 +481,6 @@ TEST(ImplicitSensitivityWatchList, DropsANameThatDesignatesNoObject) {
   EXPECT_EQ(names, std::vector<std::string_view>{"a"});
 }
 
-// The control on the case above. A name that does designate an object stays,
-// whatever else the list carried, so the drop cannot be satisfied by a list
-// that empties itself.
 TEST(ImplicitSensitivityWatchList, KeepsEveryNameThatDesignatesAnObject) {
   SimFixture f;
   ASSERT_TRUE(RunTwoSignalDesign(f));
@@ -607,13 +489,6 @@ TEST(ImplicitSensitivityWatchList, KeepsEveryNameThatDesignatesAnObject) {
   EXPECT_EQ(names, (std::vector<std::string_view>{"a", "b"}));
 }
 
-// The case the emptiness test at each watching loop exists to answer. A list
-// whose every name designates no object arms no watcher at all, so the process
-// suspending on it can never be resumed: it is never scheduled again and
-// whatever it drives holds its last value for the rest of the run, reported
-// nowhere. The list has to reach that test empty for the loop to evaluate once
-// and finish, which is what §9.2.2.2.1 leaves for a procedure with nothing on
-// its sensitivity list -- it runs once, automatically, at time zero.
 TEST(ImplicitSensitivityWatchList, EmptiesAListWhoseNamesAllDesignateNoObject) {
   SimFixture f;
   ASSERT_TRUE(RunTwoSignalDesign(f));
@@ -622,13 +497,6 @@ TEST(ImplicitSensitivityWatchList, EmptiesAListWhoseNamesAllDesignateNoObject) {
   EXPECT_TRUE(names.empty());
 }
 
-// §9.2.2.2.1: an always_comb's implicit sensitivity list holds the expansion of
-// the longest static prefix of every net or variable identifier or select
-// expression the block reads. An unpacked array's element is a Variable of its
-// own, and every element writer notifies that Variable rather than the one the
-// array's name denotes, so watching the base name alone left this block reading
-// Table 6-7's 'x for the rest of the run. 8'hEF against that x is the
-// discriminating pair: ToUint64 reads an all-x value as 0.
 TEST(AlwaysCombSensitivitySim, ReactsToAWriteOfTheArrayElementItReads) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -646,10 +514,6 @@ TEST(AlwaysCombSensitivitySim, ReactsToAWriteOfTheArrayElementItReads) {
   EXPECT_EQ(var->value.ToUint64(), 0xEFu);
 }
 
-// The packed half of the same rule, which is what keeps the fix from being a
-// blanket switch to watching prefixes: `a[1]` names no simulation object -- a
-// `logic [7:0] a` is one Variable -- so the base name is what a bit-select read
-// is watched through, and a write to any bit of it still re-runs the block.
 TEST(AlwaysCombSensitivitySim, StillReactsToAWriteOfThePackedBitItReads) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -668,13 +532,6 @@ TEST(AlwaysCombSensitivitySim, StillReactsToAWriteOfThePackedBitItReads) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §9.2.2.2.1 excludes a called function's formals and block-locals from the
-// reads made within that function, and no further: the block's own read of a
-// module variable stays in the list though the function it calls names a
-// formal after that variable. The formal `k` of `twice` shadows nothing
-// outside `twice`, so the write of the module's `k` at time 1 re-runs the
-// block, and `y` reads 2 * 7 + 7. Before the fix the formal silenced the
-// block's read of `k`, and `y` stayed at 2 * 3 + 3.
 TEST(AlwaysCombSensitivitySim,
      FormalNamedAsAModuleVariableDoesNotSilenceTheBlocksRead) {
   SimFixture f;
@@ -696,9 +553,6 @@ TEST(AlwaysCombSensitivitySim,
   EXPECT_EQ(var->value.ToUint64(), 13u);
 }
 
-// §9.2.2.2.1: references to class objects add nothing to an always_comb's
-// sensitivity, so a write to `h.a` leaves the block as it last ran, while the
-// module variable it reads still retriggers it.
 TEST(AlwaysCombSensitivitySim, WriteThroughAClassHandleDoesNotRetrigger) {
   SimFixture f;
   EXPECT_EQ(RunCapture("class C; int a = 7; endclass\n"
@@ -719,10 +573,6 @@ TEST(AlwaysCombSensitivitySim, WriteThroughAClassHandleDoesNotRetrigger) {
             "y@20=23\n");
 }
 
-// §9.2.2.2.1 with §11.5.3: `a[j]` with `j` a variable has the whole array `a`
-// as its longest static prefix, whose expansion is every element of `a`, so a
-// write to any element re-runs the block. Each element is a Variable of its own
-// and a write notifies the element alone, so watching `a` alone missed it.
 TEST(AlwaysCombSensitivitySim, VariableIndexReadWakesOnAnElementWrite) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -737,8 +587,6 @@ TEST(AlwaysCombSensitivitySim, VariableIndexReadWakesOnAnElementWrite) {
             "n=6\n");
 }
 
-// The same where the index is a for loop's variable and the write is an
-// assignment pattern, which writes every element.
 TEST(AlwaysCombSensitivitySim, LoopOverAnArrayWakesOnAPatternWrite) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -755,8 +603,6 @@ TEST(AlwaysCombSensitivitySim, LoopOverAnArrayWakesOnAPatternWrite) {
             "0 1 0\n");
 }
 
-// The expansion of a two-dimensional unpacked array is every element of each
-// of its rows.
 TEST(AlwaysCombSensitivitySim, TwoDimensionalVariableIndexReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -771,8 +617,6 @@ TEST(AlwaysCombSensitivitySim, TwoDimensionalVariableIndexReadWakes) {
             "n=6\n");
 }
 
-// §9.2.2.2.1 with §26.3, end to end: a write of the package's variable a
-// function called through the package scope reads re-runs the block.
 TEST(AlwaysCombSensitivitySim, PackageScopedFunctionReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -791,8 +635,6 @@ TEST(AlwaysCombSensitivitySim, PackageScopedFunctionReadWakes) {
             "y=5\n");
 }
 
-// §9.2.2.2.1 with §26.3, end to end: the same for an imported package
-// function called by its bare name, the import naming no `g` in the module.
 TEST(AlwaysCombSensitivitySim, ImportedPackageFunctionReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -812,8 +654,6 @@ TEST(AlwaysCombSensitivitySim, ImportedPackageFunctionReadWakes) {
             "y=5\n");
 }
 
-// §9.2.2.2.1 with §26.3, end to end: a write of a package's variable the
-// block reads through the package scope re-runs the block.
 TEST(AlwaysCombSensitivitySim, PackageScopedReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"
@@ -831,8 +671,6 @@ TEST(AlwaysCombSensitivitySim, PackageScopedReadWakes) {
             "y=6\n");
 }
 
-// §9.2.2.2.1 with §8.23, end to end: a write of the static property a class's
-// static method reads re-runs the block calling the method.
 TEST(AlwaysCombSensitivitySim, ClassStaticMethodReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -853,9 +691,6 @@ TEST(AlwaysCombSensitivitySim, ClassStaticMethodReadWakes) {
             "y=5\n");
 }
 
-// §9.2.2.2.1 with §23.6, end to end: a write of the child instance's variable
-// a function of the instance reads re-runs the block calling it by its
-// hierarchical name.
 TEST(AlwaysCombSensitivitySim, InstanceFunctionReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module sub;\n"
@@ -875,9 +710,6 @@ TEST(AlwaysCombSensitivitySim, InstanceFunctionReadWakes) {
             "y=5\n");
 }
 
-// §9.2.2.2.1 with §26.3, end to end: what a package's function reads through
-// another function of its package, called by its bare name, re-runs the
-// block.
 TEST(AlwaysCombSensitivitySim, PackageFunctionsBareCallReadWakes) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package p;\n"

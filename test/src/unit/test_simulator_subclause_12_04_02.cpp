@@ -204,12 +204,6 @@ TEST(QualifiedIfSimulation, UniqueIfOverlapWithElseStillEmitsViolation) {
   EXPECT_GE(f.diag.WarningCount(), 1u);
 }
 
-// §12.4.2: a unique-if shall continue evaluating and comparing the remaining
-// conditions after an earlier one is found true (unlike a plain if-else-if,
-// which short-circuits — see §12.4.1). Here the first condition is true, yet
-// the later condition's i++ side effect still runs, leaving i==1. The later
-// condition is false, so there is no overlap and no violation, isolating the
-// continue-after-match behavior from the overlap path.
 TEST(QualifiedIfSimulation,
      UniqueIfContinuesEvaluatingLaterConditionAfterMatch) {
   SimFixture f;
@@ -224,7 +218,7 @@ TEST(QualifiedIfSimulation,
                                  "endmodule\n",
                                  "x", "i");
   EXPECT_EQ(x, 10u);
-  EXPECT_EQ(i, 1u);  // later condition still evaluated after the first match
+  EXPECT_EQ(i, 1u);
   EXPECT_EQ(f.diag.WarningCount(), 0u);
 }
 

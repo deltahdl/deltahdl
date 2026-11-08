@@ -10,10 +10,6 @@
 
 namespace {
 
-// §6.5 (printed page 91) has data declared before it is used, implicit nets
-// apart. Each case below writes a use above the declaration it reaches, which
-// is reported at the use, and beside it the same text with the declaration
-// written first, which elaborates with no report.
 ::testing::AssertionResult UsedBeforeDeclared(ElabFixture& f,
                                               std::string_view name,
                                               uint32_t line) {
@@ -22,8 +18,6 @@ namespace {
                        line, "6.5");
 }
 
-// A read on an assignment's right side, in an if's condition and in an event
-// control each use the variable.
 TEST(DeclaredBeforeUse, VariableReadAboveItsDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -48,8 +42,6 @@ TEST(DeclaredBeforeUse, VariableReadAboveItsDeclaration) {
              "endmodule\n"));
 }
 
-// A procedural assignment uses the variable it writes, whether it writes the
-// whole of it, a select of it or a part of a concatenation.
 TEST(DeclaredBeforeUse, VariableWrittenAboveItsDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,9 +74,6 @@ TEST(DeclaredBeforeUse, VariableWrittenAboveItsDeclaration) {
              "endmodule\n"));
 }
 
-// A continuous assignment reading a net uses it. The net it drives is §6.10's
-// implicit net when nothing above declares one, so the explicit declaration
-// below redeclares it rather than standing after a use.
 TEST(DeclaredBeforeUse, NetUsedAboveItsDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -114,8 +103,6 @@ TEST(DeclaredBeforeUse, NetUsedAboveItsDeclaration) {
              "endmodule\n"));
 }
 
-// A procedural continuous assignment and its deassign, and a force and its
-// release, each use the variable or net they name.
 TEST(DeclaredBeforeUse, ProceduralContinuousTargetAboveItsDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -147,8 +134,6 @@ TEST(DeclaredBeforeUse, ProceduralContinuousTargetAboveItsDeclaration) {
              "endmodule\n"));
 }
 
-// A parameter named in a packed range, a further packed dimension, an unpacked
-// dimension or a variable's initializer is used there.
 TEST(DeclaredBeforeUse, ParameterUsedAboveItsDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -263,9 +248,6 @@ TEST(DeclaredBeforeUse, CompilationUnitUsesAboveTheirDeclarations) {
              "endmodule\n"));
 }
 
-// Above its own declaration of x, a module or a class reads the unit's x when
-// the unit declares one above the read; a unit declaration below the module is
-// no declaration the read reaches.
 TEST(DeclaredBeforeUse, UnitDeclarationAboveTheUseIsTheOneUsed) {
   ElabFixture f;
   ElaborateSrc(
@@ -296,12 +278,6 @@ TEST(DeclaredBeforeUse, UnitDeclarationAboveTheUseIsTheOneUsed) {
              "endmodule\n"));
 }
 
-// A name an import makes visible, by a wildcard or by name, is visible from
-// the import on, so a use below the import reaches it rather than the scope's
-// own declaration further down; §26.3 rules on that later declaration. So is
-// a name a wildcard import of a package the unit does not hold may supply. A
-// wildcard import of a package declaring no such name supplies nothing, and
-// the use stands above the declaration.
 TEST(DeclaredBeforeUse, ImportedNameIsNoUseAboveTheLocalDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -342,8 +318,6 @@ TEST(DeclaredBeforeUse, ImportedNameIsNoUseAboveTheLocalDeclaration) {
   EXPECT_TRUE(UsedBeforeDeclared(f, "w", 26));
 }
 
-// A non-ANSI port's direction declaration declares the port, so a use below it
-// and above the data declaration completing it uses a declared name.
 TEST(DeclaredBeforeUse, PortDeclarationAboveTheUseDeclaresIt) {
   EXPECT_TRUE(
       ElabOk("module t(a);\n"
@@ -353,9 +327,6 @@ TEST(DeclaredBeforeUse, PortDeclarationAboveTheUseDeclaresIt) {
              "endmodule\n"));
 }
 
-// A generate block is a scope nested in the module: a use in it reaches the
-// block's own declarations, then the module's, in each branch of a
-// generate-if and each item of a generate-case.
 TEST(DeclaredBeforeUse, GenerateBlockUsesAboveTheirDeclarations) {
   ElabFixture f;
   ElaborateSrc(
@@ -395,8 +366,6 @@ TEST(DeclaredBeforeUse, GenerateBlockUsesAboveTheirDeclarations) {
              "endmodule\n"));
 }
 
-// A generate-if's condition and a generate-case item's expression are
-// constant expressions, and a parameter named in either is used there.
 TEST(DeclaredBeforeUse, GenerateConditionAboveItsParameter) {
   ElabFixture f;
   ElaborateSrc(
@@ -426,8 +395,6 @@ TEST(DeclaredBeforeUse, GenerateConditionAboveItsParameter) {
              "endmodule\n"));
 }
 
-// A named block reaches the module's declarations as well as its own, and one
-// it declares itself stands above the use.
 TEST(DeclaredBeforeUse, NamedBlockUseAboveItsDeclaration) {
   ElabFixture f;
   ElaborateSrc(
@@ -449,8 +416,6 @@ TEST(DeclaredBeforeUse, NamedBlockUseAboveItsDeclaration) {
              "endmodule\n"));
 }
 
-// A task's or function's body reaches the module's declarations, and its own
-// formals stand above every use in it.
 TEST(DeclaredBeforeUse, SubroutineUsesAboveTheirDeclarations) {
   ElabFixture f;
   ElaborateSrc(
@@ -488,9 +453,6 @@ TEST(DeclaredBeforeUse, SubroutineUsesAboveTheirDeclarations) {
              "endmodule\n"));
 }
 
-// A class's properties are data of its body: a method and another property's
-// initializer use them, in a class of the unit, one nested in it and one
-// declared in a module.
 TEST(DeclaredBeforeUse, ClassUsesAboveTheirDeclarations) {
   ElabFixture f;
   ElaborateSrc(
@@ -544,9 +506,6 @@ TEST(DeclaredBeforeUse, ClassUsesAboveTheirDeclarations) {
              "endmodule\n"));
 }
 
-// A derived class's method may read a property its base declares, so a name
-// a base declares, or a base found nowhere may declare, is no use above the
-// derived class's own declaration of it. A name no base declares is.
 TEST(DeclaredBeforeUse, DerivedClassUsesWhatItsBaseMayDeclare) {
   ElabFixture f;
   ElaborateSrc(
@@ -580,10 +539,6 @@ TEST(DeclaredBeforeUse, DerivedClassUsesWhatItsBaseMayDeclare) {
   EXPECT_FALSE(UsedBeforeDeclared(unknown, "z", 3));
 }
 
-// §27.2 makes a generate block a collection of module items, so a task inside
-// one assigning a variable a continuous assignment drives makes the mixture
-// §6.5 forbids, of the module's variable and of the block's own; a variable
-// no continuous assignment drives stays allowed.
 TEST(DeclaredBeforeUse, SubroutineAssignmentInsideGenerateBlocksJoinsMixture) {
   EXPECT_TRUE(RejectedInsideGenerateBlocks(
       {"", "logic v; assign v = 1;", "task t; v = 0; endtask"},

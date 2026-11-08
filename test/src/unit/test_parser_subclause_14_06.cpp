@@ -56,8 +56,6 @@ TEST(SignalMultiBlockParse, SharedClockSignal) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// §14.6 names inouts among the signal directions that may recur across
-// clocking blocks. The parser accepts the same inout signal in two blocks.
 TEST(SignalMultiBlockParse, InoutSignalInTwoBlocks) {
   auto r = Parse(
       "module m;\n"
@@ -78,9 +76,6 @@ TEST(SignalMultiBlockParse, InoutSignalInTwoBlocks) {
   EXPECT_EQ(clocking_count, 2);
 }
 
-// §14.6 also lists outputs among the signal directions that may recur across
-// clocking blocks. The parser accepts the same output signal declared in two
-// blocks without flagging the reuse.
 TEST(SignalMultiBlockParse, SameOutputSignalInTwoBlocks) {
   auto r = Parse(
       "module m;\n"

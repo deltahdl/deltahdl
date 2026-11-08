@@ -9,15 +9,10 @@ using namespace delta;
 
 namespace {
 
-// Navigate `module t; initial x = <expr>; endmodule` down to the RHS of the
-// blocking assignment, so a test can inspect how <expr> parsed.
 const Expr* RhsOf(const ParseResult& r) {
   return r.cu->modules[0]->items[0]->body->rhs;
 }
 
-// §11.11 / Syntax 11-7 mintypmax_expression: a colon-separated triplet in
-// parentheses parses to a single min:typ:max node holding all three
-// expressions in min, typ, max order.
 TEST(MinTypMaxParse, TripletBuildsThreeOrderedExprs) {
   auto r = Parse("module t; initial x = (10:20:30); endmodule");
   ASSERT_FALSE(r.has_errors);
@@ -26,15 +21,11 @@ TEST(MinTypMaxParse, TripletBuildsThreeOrderedExprs) {
   ASSERT_NE(e->lhs, nullptr);
   ASSERT_NE(e->condition, nullptr);
   ASSERT_NE(e->rhs, nullptr);
-  EXPECT_EQ(e->lhs->int_val, 10u);        // min
-  EXPECT_EQ(e->condition->int_val, 20u);  // typ
-  EXPECT_EQ(e->rhs->int_val, 30u);        // max
+  EXPECT_EQ(e->lhs->int_val, 10u);
+  EXPECT_EQ(e->condition->int_val, 20u);
+  EXPECT_EQ(e->rhs->int_val, 30u);
 }
 
-// §11.11 lets the form stand wherever an expression may (Example 1): two
-// parenthesized triplets combined by a binary operator. Each operand must parse
-// as its own mintypmax node — the general parenthesized-primary path recognizes
-// the form, not just the delay positions.
 TEST(MinTypMaxParse, TripletsAsBinaryOperands) {
   auto r = Parse("module t; initial x = (1:2:3) + (4:5:6); endmodule");
   ASSERT_FALSE(r.has_errors);
@@ -51,8 +42,6 @@ TEST(MinTypMaxParse, TripletsAsBinaryOperands) {
   EXPECT_EQ(e->rhs->rhs->int_val, 6u);
 }
 
-// §11.11 Example 2 shape: a triplet mixed with a plain (non-triplet) operand.
-// Only the triplet operand becomes a mintypmax node.
 TEST(MinTypMaxParse, TripletMixedWithPlainOperand) {
   auto r = Parse("module t; initial x = 200 - (50:75:100); endmodule");
   ASSERT_FALSE(r.has_errors);
@@ -67,8 +56,6 @@ TEST(MinTypMaxParse, TripletMixedWithPlainOperand) {
   EXPECT_EQ(e->rhs->rhs->int_val, 100u);
 }
 
-// mintypmax_expression's first alternative is a bare expression: a single
-// parenthesized value is NOT a mintypmax node, just a parenthesized primary.
 TEST(MinTypMaxParse, SingleValueIsNotTriplet) {
   auto r = Parse("module t; initial x = (7); endmodule");
   ASSERT_FALSE(r.has_errors);
@@ -78,14 +65,11 @@ TEST(MinTypMaxParse, SingleValueIsNotTriplet) {
   EXPECT_EQ(e->int_val, 7u);
 }
 
-// Negative form: the triplet requires exactly two colons. A single colon
-// (min:typ with no max) is rejected.
 TEST(MinTypMaxParse, RejectsMissingMaxExpression) {
   auto r = Parse("module t; initial x = (1:2); endmodule");
   EXPECT_TRUE(ReportedError(r.diags, "expected ':', got ')'", 1, "11.11"));
 }
 
-// Negative form: a fourth colon-separated value is not part of the grammar.
 TEST(MinTypMaxParse, RejectsFourthValue) {
   auto r = Parse("module t; initial x = (1:2:3:4); endmodule");
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ':'", 1, "11.11"));

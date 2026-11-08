@@ -22,12 +22,6 @@ TEST(InheritanceElaboration, ClassExtendsOk) {
              "endmodule\n"));
 }
 
-// Elaborator::ValidateFinalClassExtension in
-// src/elaborator/elaborator_validate_class_members.cpp has two sites carrying
-// this message: one for a class extending the built-in `process`, one for a
-// class whose named base carries `:final`. A user-written `:final` base reaches
-// the second, and the report stands at the extending class's own declaration,
-// which the site passes as `cls->range.start`.
 TEST(InheritanceElaboration, ExtendFinalClassError) {
   ElabFixture f;
   ElabOk(
@@ -114,11 +108,6 @@ TEST(InheritanceElaboration, FinalDerivedClassOk) {
              "endmodule\n"));
 }
 
-// Elaborator::BreakClassInheritanceCycles in
-// src/elaborator/elaborator_validate_class_overrides.cpp: a class extending
-// itself has no original base class for its superclasses to begin with, and
-// it is reported at its own declaration rather than sending every later walk
-// up its chain of base classes around the cycle without end.
 TEST(InheritanceElaboration, ClassExtendingItselfError) {
   ElabFixture f;
   ElabOk(
@@ -131,9 +120,6 @@ TEST(InheritanceElaboration, ClassExtendingItselfError) {
                             "class 'A' inherits from itself", 1, "8.13"));
 }
 
-// Two classes extending each other close one cycle, reported once at the class
-// the walk set out from; the extends clause it drops leaves the other class a
-// chain that ends.
 TEST(InheritanceElaboration, MutualExtensionCycleReportedOnce) {
   ElabFixture f;
   ElabOk(
@@ -150,9 +136,6 @@ TEST(InheritanceElaboration, MutualExtensionCycleReportedOnce) {
                              "class 'B' inherits from itself", 3, "8.13"));
 }
 
-// A class extending into a cycle it is not on is not reported: its walk stops
-// where it meets the cycle, and the cycle's own class is reported, here one
-// declared inside a module.
 TEST(InheritanceElaboration, CycleReachedFromOutsideReportsItsOwnClass) {
   ElabFixture f;
   ElabOk(
@@ -171,8 +154,6 @@ TEST(InheritanceElaboration, CycleReachedFromOutsideReportsItsOwnClass) {
                              "class 'C' inherits from itself", 1, "8.13"));
 }
 
-// A class nested in another (§8.23) is found by no scope's list of classes,
-// and a cycle through its extends clause is reported all the same.
 TEST(InheritanceElaboration, NestedClassExtendingItselfError) {
   ElabFixture f;
   ElabOk(
@@ -187,9 +168,6 @@ TEST(InheritanceElaboration, NestedClassExtendingItselfError) {
                             "class 'In' inherits from itself", 2, "8.13"));
 }
 
-// §8.1 lets a class be declared in a package, a module or another class as
-// well as at compilation-unit scope, and §8.13's rule on a :final base holds
-// over a deriving class wherever it is declared.
 TEST(InheritanceElaboration, ExtendFinalClassFromAnyScopeIsAnError) {
   ElabFixture f;
   ElabOk(
@@ -213,11 +191,6 @@ TEST(InheritanceElaboration, ExtendFinalClassFromAnyScopeIsAnError) {
   }
 }
 
-// §8.13 has a class extend the class its extends name resolves to from the
-// scope the class is written in (§3.13, §23.9): that scope's own class before
-// the compilation unit's, and each module's own where several declare one
-// name. E extends c's final K and is reported; D extends b's K and DJ b's J,
-// neither of them final, though a's K and the compilation unit's J are.
 TEST(InheritanceElaboration, ABaseIsTheClassItsOwnScopeResolves) {
   ElabFixture f;
   ElabOk(

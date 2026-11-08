@@ -13,15 +13,11 @@ using namespace delta;
 
 namespace {
 
-// Evaluates a unary reduction `op` applied to variable "v" and returns the
-// 64-bit unsigned result. Shared by the AllReductions* value tests.
 uint64_t EvalReduceToU64(SimFixture& f, TokenKind op) {
   auto* expr = MakeUnary(f.arena, op, MakeId(f.arena, "v"));
   return EvalExpr(expr, f.ctx, f.arena).ToUint64();
 }
 
-// Evaluates a unary reduction `op` applied to variable "v" and returns the
-// low-word bval (x/z presence). Shared by the AllReductions* X/Z tests.
 uint64_t EvalReduceBval(SimFixture& f, TokenKind op) {
   auto* expr = MakeUnary(f.arena, op, MakeId(f.arena, "v"));
   return EvalExpr(expr, f.ctx, f.arena).words[0].bval;
@@ -412,15 +408,6 @@ TEST(EvalOp, ReductionFirstStepWidthTwo) {
   EXPECT_EQ(EvalReduceToU64(f, TokenKind::kTildeCaret), 0u);
 }
 
-// The following tests drive an operand that genuinely carries an x bit through
-// real source syntax (a 4-state based literal assigned into a logic vector),
-// then observe the reduction result end-to-end after lowering and running.
-// This exercises the Table 11-16/11-17/11-18 truth-table rules on unknown
-// operands through the production evaluation path, rather than hand-seeding a
-// 4-state variable state.
-
-// Reduction AND over 1..1x has no known 0 to force the result, so the unknown
-// bit propagates and the single-bit result is x (Table 11-16).
 TEST(OperatorSim, ReductionAndXOperandFullPipeline) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -437,8 +424,6 @@ TEST(OperatorSim, ReductionAndXOperandFullPipeline) {
   EXPECT_FALSE(r->value.IsKnown());
 }
 
-// Reduction OR over 1..1x is pinned to 1 by the known 1 bit: the unknown is
-// absorbed and the result is a definite 1 (Table 11-17).
 TEST(OperatorSim, ReductionOrKnownOneAbsorbsXFullPipeline) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -456,8 +441,6 @@ TEST(OperatorSim, ReductionOrKnownOneAbsorbsXFullPipeline) {
   EXPECT_EQ(r->value.ToUint64(), 1u);
 }
 
-// Reduction XOR sees any unknown bit and yields x regardless of the other bits
-// (Table 11-18).
 TEST(OperatorSim, ReductionXorXOperandFullPipeline) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -474,8 +457,6 @@ TEST(OperatorSim, ReductionXorXOperandFullPipeline) {
   EXPECT_FALSE(r->value.IsKnown());
 }
 
-// Inverting an unknown reduction-AND result leaves it unknown: reduction NAND
-// of 1..1x stays x, confirming the invert step preserves x.
 TEST(OperatorSim, ReductionNandXOperandStaysXFullPipeline) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -492,8 +473,6 @@ TEST(OperatorSim, ReductionNandXOperandStaysXFullPipeline) {
   EXPECT_FALSE(r->value.IsKnown());
 }
 
-// Reduction OR over an all-z operand yields x: z is treated as x by the logic
-// table, so with no known 1 the single-bit result is unknown.
 TEST(OperatorSim, ReductionOrZOperandFullPipeline) {
   SimFixture f;
   auto* r = RunAndFindVar(
@@ -510,9 +489,6 @@ TEST(OperatorSim, ReductionOrZOperandFullPipeline) {
   EXPECT_FALSE(r->value.IsKnown());
 }
 
-// Input form: an operand wider than one machine word (100 bits) forces the fold
-// to keep applying the operator across word boundaries. All 100 bits are 1, so
-// reduction AND is 1 and reduction XOR is 0 (an even number of set bits).
 TEST(OperatorSim, ReductionOverWideMultiWordOperand) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -537,9 +513,6 @@ TEST(OperatorSim, ReductionOverWideMultiWordOperand) {
   EXPECT_EQ(r_xor->value.ToUint64(), 0u);
 }
 
-// Input form: a 2-state operand type (bit) can never carry x/z, so the result
-// is always a definite 0/1. AND of 4'b1011 is 0 (a bit is clear); XOR is 1
-// (an odd number of set bits).
 TEST(OperatorSim, ReductionOverTwoStateOperand) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -566,9 +539,6 @@ TEST(OperatorSim, ReductionOverTwoStateOperand) {
   EXPECT_EQ(r_xor->value.ToUint64(), 1u);
 }
 
-// Input form: a single-bit operand. With only one bit there are no fold steps,
-// so every reduction just yields that bit's value (single operand -> single-bit
-// result). All three of AND/OR/XOR over 1'b1 are 1.
 TEST(OperatorSim, ReductionOverSingleBitOperand) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -592,8 +562,6 @@ TEST(OperatorSim, ReductionOverSingleBitOperand) {
   EXPECT_EQ(f.ctx.FindVariable("r_xor")->value.ToUint64(), 1u);
 }
 
-// Syntactic position: the reduction drives a continuous assignment rather than
-// a procedural one. AND of an all-ones vector resolves the net to 1.
 TEST(OperatorSim, ReductionInContinuousAssign) {
   SimFixture f;
   auto* y = RunAndFindVar(
@@ -608,9 +576,6 @@ TEST(OperatorSim, ReductionInContinuousAssign) {
   EXPECT_EQ(y->value.ToUint64(), 1u);
 }
 
-// Dependency (value parameter, §6.20.2): the reduced operand is produced by a
-// real parameter declaration, driven end-to-end. XOR of 4'b1110 is 1 (an odd
-// number of set bits).
 TEST(OperatorSim, ReductionOverParameterOperand) {
   SimFixture f;
   auto* r = RunAndFindVar(

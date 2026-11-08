@@ -54,10 +54,6 @@ TEST(TimingCheckCommandParsing, PeriodWithNotifier) {
   EXPECT_EQ(tc->notifier, "ntfr");
 }
 
-// Reference-edge input form built from the §31.5 edge-control specifier: an
-// edge[...] descriptor is a valid edge specification, so it satisfies $period's
-// edge-required reference rule just as posedge/negedge do. The reference
-// records the edge kind as kEdge and parses without the missing-edge error.
 TEST(TimingCheckCommandParsing, PeriodEdgeControlSpecifierReference) {
   auto r = Parse(
       "module m;\n"

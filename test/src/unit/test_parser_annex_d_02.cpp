@@ -18,10 +18,6 @@ TEST(OptionalSystemTaskParserParsing, Countdrivers) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-// Annex D.2: the call template carries an optional trailing argument list (the
-// net followed by up to five output arguments), so the argument count may vary.
-// The full six-argument form parses as one system call retaining every
-// argument.
 TEST(OptionalSystemTaskParserParsing, CountdriversOptionalArguments) {
   auto r = Parse(
       "module m;\n"

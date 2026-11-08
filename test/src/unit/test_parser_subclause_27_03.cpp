@@ -56,15 +56,10 @@ TEST(GenerateRegion, MissingEndgenerateRejected) {
       "  generate\n"
       "    wire w;\n"
       "endmodule\n");
-  // The region stops at the `endmodule` that closes the module holding it, so
-  // the report for the missing `endgenerate` stands on that keyword, line 4.
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate', got 'endmodule'",
                             4, "27.3"));
 }
 
-// The `endmodule` the region stops at is left for Parser::ParseModuleDecl, so
-// the module finds the keyword it needs and reports nothing of its own. One
-// missing `endgenerate` draws one report.
 TEST(GenerateRegion,
      MissingEndgenerateLeavesTheEnclosingEndmoduleToItsOwnProduction) {
   auto r = Parse(
@@ -77,9 +72,6 @@ TEST(GenerateRegion,
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
-// A.4.2 gives `generate_region ::= generate { generate_item } endgenerate`, so
-// a generate_block inside one is followed by the `endgenerate` closing the
-// region when its own `end` is missing. The §27.3 report names that keyword.
 TEST(GenerateRegion, MissingEndInAGenerateBlockNamesTheEndgenerate) {
   auto r = Parse(
       "module m;\n"
@@ -93,10 +85,6 @@ TEST(GenerateRegion, MissingEndInAGenerateBlockNamesTheEndgenerate) {
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
-// A.4.2 gives `case_generate_construct ::= case ( constant_expression )
-// case_generate_item { case_generate_item } endcase` and puts a generate_block
-// in each case_generate_item, so a block left open in a case item is followed
-// by the `endcase` closing the construct.
 TEST(GenerateCaseConstruct, MissingEndInACaseItemNamesTheEndcase) {
   auto r = Parse(
       "module m;\n"
@@ -146,11 +134,6 @@ TEST(GenerateRegion, EmptyRegionProducesNoItems) {
   EXPECT_TRUE(r.cu->modules[0]->items.empty());
 }
 
-// Syntax 27-1: case_generate_construct ::=
-//   case ( constant_expression ) case_generate_item { case_generate_item }
-//   endcase
-// with case_generate_item carrying value labels or a default branch, each
-// followed by a generate_block.
 TEST(GenerateCaseConstruct, ValueAndDefaultItemsParse) {
   auto r = Parse(
       "module m;\n"
@@ -172,17 +155,12 @@ TEST(GenerateCaseConstruct, ValueAndDefaultItemsParse) {
     if (it->kind == ModuleItemKind::kGenerateCase) gen_case = it;
   }
   ASSERT_NE(gen_case, nullptr);
-  // Two case_generate_items: the value item (labels 0, 1) and the default.
   ASSERT_EQ(gen_case->gen_case_items.size(), 2u);
   EXPECT_EQ(gen_case->gen_case_items[0].patterns.size(), 2u);
   EXPECT_FALSE(gen_case->gen_case_items[0].is_default);
   EXPECT_TRUE(gen_case->gen_case_items[1].is_default);
 }
 
-// Syntax 27-1: if_generate_construct ::=
-//   if ( constant_expression ) generate_block [ else generate_block ]
-// The optional else arm is recorded so both alternative blocks survive
-// parsing.
 TEST(GenerateIfConstruct, IfElseBlocksParse) {
   auto r = Parse(
       "module m;\n"
@@ -202,10 +180,6 @@ TEST(GenerateIfConstruct, IfElseBlocksParse) {
   EXPECT_FALSE(mod->items[0]->gen_else->gen_body.empty());
 }
 
-// A.4.2 gives `if_generate_construct ::= if ( constant_expression )
-// generate_block [ else generate_block ]`, so the `else` is what follows the
-// first block when its own `end` is missing, and no generate_item begins with
-// that keyword. The §27.3 report names it.
 TEST(GenerateIfConstruct, MissingEndBeforeElseNamesTheElseKeyword) {
   auto r = Parse(
       "module m;\n"
@@ -219,9 +193,6 @@ TEST(GenerateIfConstruct, MissingEndBeforeElseNamesTheElseKeyword) {
   EXPECT_EQ(r.diags.size(), 1u);
 }
 
-// The `else` the first block stops at is left for Parser::ParseGenerateIf, so
-// the else branch is read as its own generate_block instead of being absorbed
-// into the branch before it.
 TEST(GenerateIfConstruct, MissingEndBeforeElseStillReadsTheElseBranch) {
   auto r = Parse(
       "module m;\n"
@@ -240,11 +211,6 @@ TEST(GenerateIfConstruct, MissingEndBeforeElseStillReadsTheElseBranch) {
   EXPECT_EQ(mod->items[0]->gen_else->gen_body.size(), 1u);
 }
 
-// Syntax 27-1: loop_generate_construct ::=
-//   for ( genvar_initialization ; genvar_expression ; genvar_iteration )
-//   generate_block
-// genvar_initialization carries an optional inline genvar keyword; the three
-// loop-control clauses are each captured.
 TEST(GenerateLoopConstruct, ForWithInlineGenvarParsesAllClauses) {
   auto r = Parse(
       "module m;\n"
@@ -265,10 +231,6 @@ TEST(GenerateLoopConstruct, ForWithInlineGenvarParsesAllClauses) {
   EXPECT_NE(loop->gen_step, nullptr);
 }
 
-// §27.3 closes a generate region with `endgenerate`. A region left open runs to
-// the end of the source, and the report that says so names `endgenerate` under
-// §27.3. It comes first because the generate region is the innermost construct
-// the source ran out of; the enclosing module's own report follows it.
 TEST(GenerateRegion, MalformedGenerateRegionNames27_3) {
   auto r = Parse(
       "module m;\n"
@@ -276,11 +238,6 @@ TEST(GenerateRegion, MalformedGenerateRegionNames27_3) {
   EXPECT_TRUE(ReportedError(r.diags, "expected 'endgenerate'", 3, "27.3"));
 }
 
-// Syntax 27-1 writes what a generate block holds as generate_items, and none
-// of module_or_generate_item, interface_or_generate_item and
-// checker_or_generate_item reaches a module, interface or program declaration.
-// A checker declaration is reached, through
-// package_or_generate_item_declaration, so the checker on line 6 is left alone.
 TEST(GenerateItemContent, DesignElementDeclaredInAGenerateBlockIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -306,8 +263,6 @@ TEST(GenerateItemContent, DesignElementDeclaredInAGenerateBlockIsReported) {
   EXPECT_FALSE(ReportedError(r.diags, "declares a design element", 6, "27.3"));
 }
 
-// A.4.2 gives a generate region the same generate_items, so a declaration
-// written straight into one is reported as one in a block is.
 TEST(GenerateItemContent, DesignElementDeclaredInAGenerateRegionIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -321,8 +276,6 @@ TEST(GenerateItemContent, DesignElementDeclaredInAGenerateRegionIsReported) {
                             3, "27.3"));
 }
 
-// The single generate_item form of generate_block, with no begin-end, is read
-// apart from the begin-end form, and is held to the same rule.
 TEST(GenerateItemContent, DesignElementAsASingleItemGenerateBodyIsReported) {
   auto r = Parse(
       "module m;\n"
@@ -335,10 +288,6 @@ TEST(GenerateItemContent, DesignElementAsASingleItemGenerateBodyIsReported) {
                             3, "27.3"));
 }
 
-// A module body reaches a module declaration through non_port_module_item, and
-// a generate block reaches an interface class declaration through
-// package_or_generate_item_declaration, so neither is reported: the rule turns
-// on the item being a design element in a generate block, not on the keyword.
 TEST(GenerateItemContent, NestedModuleAndGenerateInterfaceClassAreAccepted) {
   auto r = Parse(
       "module m;\n"

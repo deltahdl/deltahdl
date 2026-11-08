@@ -1,4 +1,3 @@
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -648,9 +647,6 @@ TEST(ClockingSkewParse, DefaultOutputSkew) {
   EXPECT_EQ(item->clocking_signals[0].name, "ack");
 }
 
-// clocking_declaration second alternative: `global clocking [id] event ;
-// endclocking`. The global form carries no clocking_item body, so no signals
-// are recorded and the global flag is set.
 TEST(ClockingBlockParse, GlobalClockingDeclaration) {
   auto r = Parse(
       "module m;\n"
@@ -667,9 +663,6 @@ TEST(ClockingBlockParse, GlobalClockingDeclaration) {
   EXPECT_EQ(item->clocking_signals.size(), 0u);
 }
 
-// clocking_declaration first alternative with the optional `default` prefix and
-// a clocking_event: `default clocking [id] event ; { clocking_item }
-// endclocking`. Distinct from the bodyless `default clocking id ;` form.
 TEST(ClockingBlockParse, DefaultClockingWithEvent) {
   auto r = Parse(
       "module m;\n"
@@ -686,9 +679,6 @@ TEST(ClockingBlockParse, DefaultClockingWithEvent) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-// Negative: clocking_declaration requires a clocking_event after the (optional)
-// identifier for a non-default block. A bare `clocking id ;` has no event and
-// must be rejected.
 TEST(ClockingBlockParse, MissingClockingEventRejected) {
   auto r = Parse(
       "module m;\n"
@@ -696,13 +686,9 @@ TEST(ClockingBlockParse, MissingClockingEventRejected) {
       "    input data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // §14.3 owns the clocking_event, which opens with '@'.
   EXPECT_TRUE(ReportedError(r.diags, "expected '@', got ';'", 2, "14.3"));
 }
 
-// clocking_drive ::= clockvar_expression <= [ cycle_delay ] expression.
-// Without a cycle_delay the drive is a nonblocking assignment whose lvalue is a
-// clockvar_expression (`cb.data`, a member access), with no cycle delay set.
 TEST(ClockingDriveParse, DriveWithoutCycleDelay) {
   auto r = Parse(
       "module m;\n"
@@ -718,8 +704,6 @@ TEST(ClockingDriveParse, DriveWithoutCycleDelay) {
   EXPECT_EQ(s->cycle_delay, nullptr);
 }
 
-// cycle_delay ::= ## integral_number. The `##2` before the expression records
-// an integer-literal cycle delay on the drive.
 TEST(ClockingDriveParse, DriveWithCycleDelayInteger) {
   auto r = Parse(
       "module m;\n"
@@ -734,8 +718,6 @@ TEST(ClockingDriveParse, DriveWithCycleDelayInteger) {
   EXPECT_EQ(s->cycle_delay->kind, ExprKind::kIntegerLiteral);
 }
 
-// cycle_delay ::= ## identifier. The delay may name a constant instead of a
-// literal, e.g. `##n`.
 TEST(ClockingDriveParse, DriveWithCycleDelayIdentifier) {
   auto r = Parse(
       "module m;\n"
@@ -749,8 +731,6 @@ TEST(ClockingDriveParse, DriveWithCycleDelayIdentifier) {
   EXPECT_EQ(s->cycle_delay->kind, ExprKind::kIdentifier);
 }
 
-// cycle_delay ::= ## ( expression ). A parenthesized expression delay, e.g.
-// `##(a + 1)`, parses to the enclosed expression tree.
 TEST(ClockingDriveParse, DriveWithCycleDelayParenExpr) {
   auto r = Parse(
       "module m;\n"
@@ -764,8 +744,6 @@ TEST(ClockingDriveParse, DriveWithCycleDelayParenExpr) {
   EXPECT_EQ(s->cycle_delay->kind, ExprKind::kBinary);
 }
 
-// clockvar_expression ::= clockvar select. A bit-select applied to the clockvar
-// (`cb.data[3]`) makes the drive lvalue a select over the member access.
 TEST(ClockingDriveParse, ClockvarExpressionWithSelect) {
   auto r = Parse(
       "module m;\n"
@@ -780,9 +758,6 @@ TEST(ClockingDriveParse, ClockvarExpressionWithSelect) {
   EXPECT_EQ(s->lhs->kind, ExprKind::kSelect);
 }
 
-// clocking_declaration: the clocking_identifier is optional. An anonymous
-// clocking block (no name before the event) is accepted and records an empty
-// name.
 TEST(ClockingBlockParse, AnonymousClockingBlock) {
   auto r = Parse(
       "module m;\n"
@@ -800,8 +775,6 @@ TEST(ClockingBlockParse, AnonymousClockingBlock) {
   EXPECT_EQ(item->clocking_signals[0].name, "data");
 }
 
-// clocking_declaration second alternative: the clocking_identifier is likewise
-// optional for `global clocking`.
 TEST(ClockingBlockParse, AnonymousGlobalClocking) {
   auto r = Parse(
       "module m;\n"
@@ -816,8 +789,6 @@ TEST(ClockingBlockParse, AnonymousGlobalClocking) {
   EXPECT_TRUE(item->name.empty());
 }
 
-// clocking_item third alternative admits an assertion_item_declaration; a
-// sequence declaration is one such input form.
 TEST(ClockingBlockParse, SequenceDeclInsideBlock) {
   auto r = Parse(
       "module m;\n"
@@ -835,8 +806,6 @@ TEST(ClockingBlockParse, SequenceDeclInsideBlock) {
   ASSERT_EQ(item->clocking_signals.size(), 2u);
 }
 
-// clocking_item third alternative: a let declaration is also a valid
-// assertion_item_declaration inside a clocking block.
 TEST(ClockingBlockParse, LetDeclInsideBlock) {
   auto r = Parse(
       "module m;\n"
@@ -852,8 +821,6 @@ TEST(ClockingBlockParse, LetDeclInsideBlock) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
 
-// clocking_item third alternative: the assertion_item_declaration may be
-// preceded by attribute_instance(s).
 TEST(ClockingBlockParse, AttributedAssertionItemInBlock) {
   auto r = Parse(
       "module m;\n"
@@ -871,9 +838,6 @@ TEST(ClockingBlockParse, AttributedAssertionItemInBlock) {
   ASSERT_EQ(item->clocking_signals.size(), 1u);
 }
 
-// Negative: {attribute_instance} is grammatical only before the
-// assertion_item_declaration alternative of clocking_item, not before a
-// clocking_direction, so an attributed signal direction is rejected.
 TEST(ClockingBlockParse, AttributeBeforeDirectionRejected) {
   auto r = Parse(
       "module m;\n"
@@ -887,8 +851,6 @@ TEST(ClockingBlockParse, AttributeBeforeDirectionRejected) {
                             3, "14.3"));
 }
 
-// Negative: the inout alternative of clocking_direction admits no
-// clocking_skew, so a skew before an inout signal is rejected.
 TEST(ClockingBlockParse, InoutWithSkewRejected) {
   auto r = Parse(
       "module m;\n"
@@ -896,8 +858,6 @@ TEST(ClockingBlockParse, InoutWithSkewRejected) {
       "    inout #1 data;\n"
       "  endclocking\n"
       "endmodule\n");
-  // The inout alternative parses no skew, so the '#' stands where §14.3
-  // requires the signal identifier.
   EXPECT_TRUE(
       ReportedError(r.diags, "expected identifier, got '#'", 3, "14.3"));
 }

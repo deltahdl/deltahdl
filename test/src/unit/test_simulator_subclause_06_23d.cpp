@@ -8,12 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.23's registry example, with the `var` §6.23 requires before a type
-// reference in a variable declaration: get() returns registry #(int), the one
-// object both spellings of the default specialization reach, and other()
-// returns its my_int_registry object, stored without a cast. m and n are
-// made first with vals of their own, so a handle the call cut short reaches
-// one of them, or none, rather than the registry's object.
 TEST(TypeOfThisClassSim, RegistryExampleReturnsHandlesOfTheEnclosingClass) {
   const std::string kSrc =
       "class registry #(type T = int);\n"
@@ -55,9 +49,6 @@ TEST(TypeOfThisClassSim, RegistryExampleReturnsHandlesOfTheEnclosingClass) {
   EXPECT_EQ(RunAndGet(kSrc, "back"), 1u);
 }
 
-// §6.23 with §8.13: type(this) is the class whose body writes it, so in a
-// derived class's method it is the derived class and not its base, and in a
-// method the derived class inherits it is still the base.
 TEST(TypeOfThisClassSim, DerivedClassIsNotItsBase) {
   const std::string kSrc =
       "class B;\n"
@@ -87,10 +78,6 @@ TEST(TypeOfThisClassSim, DerivedClassIsNotItsBase) {
   EXPECT_EQ(RunAndGet(kSrc, "s"), 1u);
 }
 
-// §6.23 with §8.25: in a specialization of a parameterized class, type(this)
-// is that specialization, matching it and no other. registry #(int) binds
-// the default and so is the default specialization, which `#()` and, other
-// than before `::`, the unadorned name also denote.
 TEST(TypeOfThisClassSim, SpecializationMatchesItselfOnly) {
   const std::string kSrc =
       "class registry #(type T = int);\n"
@@ -118,10 +105,6 @@ TEST(TypeOfThisClassSim, SpecializationMatchesItselfOnly) {
   EXPECT_EQ(RunAndGet(kSrc, "i"), 0b1110u);
 }
 
-// §6.23 with §8.5 and §13.3: a property and a formal declared type(this) each
-// hold a handle of the enclosing class, so link() chains three nodes that a
-// read walks back through and calls a method of the node it is handed, and the
-// `new` grow() assigns to the property makes a node.
 TEST(TypeOfThisClassSim, PropertyAndFormalHoldHandlesOfTheClass) {
   const std::string kSrc =
       "class node;\n"
@@ -166,10 +149,6 @@ TEST(TypeOfThisClassSim, PropertyAndFormalHoldHandlesOfTheClass) {
   EXPECT_EQ(RunAndGet(kSrc, "e"), 4u);
 }
 
-// §6.23 with §8.25: in a specialization, a property declared type(this) is a
-// handle of that specialization, so the `new` grow() assigns to it makes a
-// ring #(12), whose twelve-bit v keeps 12'h7FF where the default
-// specialization's four bits kept 4'hF.
 TEST(TypeOfThisClassSim, SpecializationPropertyHoldsItsOwnSpecialization) {
   const std::string kSrc =
       "class ring #(int W = 4);\n"
@@ -195,11 +174,6 @@ TEST(TypeOfThisClassSim, SpecializationPropertyHoldsItsOwnSpecialization) {
   EXPECT_EQ(RunAndGet(kSrc, "a"), 0x7FFu);
 }
 
-// §6.23 with §8.5, §8.11 and §8.13: in a method, a declaration written with a
-// type reference to a property, read through this or by its bare name, takes
-// the property's type and unpacked dimensions, a property the class inherits
-// included. probe() reads its own byte x and unpacked y; inherited() reads x
-// from its base and its own int z.
 TEST(TypeOfThisClassSim, DeclarationThroughThisTakesThePropertysType) {
   const std::string kSrc =
       "class B;\n"

@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include "elaborator/rtlir.h"
@@ -45,8 +43,6 @@ TEST(InterfaceModport, ModuleWithGenericInterfacePortAndModportElaborates) {
              "endmodule\n"));
 }
 
-// §25.5: a modport may not implicitly declare a new port, so naming something
-// the interface never declares is an elaboration error.
 TEST(InterfaceModportNames, ModportNameNotDeclaredByInterfaceErrors) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,8 +60,6 @@ TEST(InterfaceModportNames, ModportNameNotDeclaredByInterfaceErrors) {
                             3, "25.5"));
 }
 
-// §25.5: a name the interface contributes through its own port list (e.g. clk)
-// counts as declared by that interface and may appear in a modport.
 TEST(InterfaceModportNames, ModportNameMayBeAnInterfacePort) {
   EXPECT_TRUE(
       ElabOk("interface bus(input logic clk);\n"
@@ -76,8 +70,6 @@ TEST(InterfaceModportNames, ModportNameMayBeAnInterfacePort) {
              "endmodule\n"));
 }
 
-// §25.5: every declarator of a comma-separated signal declaration is a distinct
-// name the interface declares, so each may be referenced by a modport.
 TEST(InterfaceModportNames, ModportNamesFromCommaDeclarationResolve) {
   EXPECT_TRUE(
       ElabOk("interface bus;\n"
@@ -88,8 +80,6 @@ TEST(InterfaceModportNames, ModportNamesFromCommaDeclarationResolve) {
              "endmodule\n"));
 }
 
-// §25.5: when the module header and the instance connection both select a
-// modport, choosing the same one is legal.
 TEST(InterfaceModportAgreement,
      HeaderAndConnectionSelectSameModportElaborates) {
   EXPECT_TRUE(
@@ -106,8 +96,6 @@ TEST(InterfaceModportAgreement,
              "endmodule\n"));
 }
 
-// §25.5: when both sites select a modport, they shall name the same one;
-// selecting different modports is an elaboration error.
 TEST(InterfaceModportAgreement,
      HeaderAndConnectionSelectDifferentModportsErrors) {
   ElabFixture f;
@@ -132,8 +120,6 @@ TEST(InterfaceModportAgreement,
       10, "25.5"));
 }
 
-// §25.5: selecting a modport in the header alone leaves nothing to disagree
-// with, so a bare instance connection is accepted.
 TEST(InterfaceModportAgreement, ModportSelectedOnlyInHeaderElaborates) {
   EXPECT_TRUE(
       ElabOk("interface bus_if;\n"
@@ -148,9 +134,6 @@ TEST(InterfaceModportAgreement, ModportSelectedOnlyInHeaderElaborates) {
              "endmodule\n"));
 }
 
-// §25.5: a modport restricts which interface signals a module may reach. A
-// module reaching a member the selected modport lists is accepted — the
-// restriction admits the listed signal.
 TEST(InterfaceModportAccess, ListedMemberIsAccessibleThroughModport) {
   ElabFixture f;
   ElaborateSrc(
@@ -166,9 +149,6 @@ TEST(InterfaceModportAccess, ListedMemberIsAccessibleThroughModport) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.5: the same restriction rejects a member the selected modport omits —
-// reaching a signal outside the modport list through the modport port is an
-// elaboration error, which is the whole point of restricting access.
 TEST(InterfaceModportAccess, UnlistedMemberIsInaccessibleThroughModport) {
   ElabFixture f;
   ElaborateSrc(
@@ -187,9 +167,6 @@ TEST(InterfaceModportAccess, UnlistedMemberIsInaccessibleThroughModport) {
       7, "25.5"));
 }
 
-// §25.5 input form: the access restriction applies to NET members too (the
-// LRM's own modport example lists `wire` signals). A net the modport lists is
-// reachable through the modport port.
 TEST(InterfaceModportAccess, ListedNetMemberIsAccessibleThroughModport) {
   ElabFixture f;
   ElaborateSrc(
@@ -205,8 +182,6 @@ TEST(InterfaceModportAccess, ListedNetMemberIsAccessibleThroughModport) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.5 negative, net input form: a net member the modport omits is just as
-// inaccessible through the modport port as an omitted variable member.
 TEST(InterfaceModportAccess, UnlistedNetMemberIsInaccessibleThroughModport) {
   ElabFixture f;
   ElaborateSrc(
@@ -225,9 +200,6 @@ TEST(InterfaceModportAccess, UnlistedNetMemberIsInaccessibleThroughModport) {
       7, "25.5"));
 }
 
-// §25.5: a modport list name may be selected in the port connection alone, with
-// the module header declaring a plain interface port — the elaborator accepts
-// the connection-side modport selection.
 TEST(InterfaceModportAgreement,
      ConnectionSelectsModportWithPlainHeaderElaborates) {
   EXPECT_TRUE(
@@ -243,9 +215,6 @@ TEST(InterfaceModportAgreement,
              "endmodule\n"));
 }
 
-// §25.5 input form: the default-access rule covers NET members as well. With no
-// modport selected, a net member of an interface port is accessible (inout),
-// so reading it raises no error.
 TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsNetMemberAccess) {
   ElabFixture f;
   ElaborateSrc(
@@ -260,9 +229,6 @@ TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsNetMemberAccess) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.5: with no modport selected in the header or the connection, an interface
-// port's nets and variables stay accessible — here a member is both read and
-// driven through a modport-less port and the elaborator raises no error.
 TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsMemberAccess) {
   ElabFixture f;
   ElaborateSrc(
@@ -277,9 +243,6 @@ TEST(InterfaceDefaultAccess, ModportlessInterfacePortPermitsMemberAccess) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §25.5: the report that refuses an interface member the modport does not list
-// names the subclause stating the rule, so a caller learns which rule was
-// enforced without matching the wording of the message.
 TEST(InterfaceModportAccess, UnlistedMemberNames25_5) {
   ElabFixture f;
   ElaborateSrc(
@@ -297,9 +260,6 @@ TEST(InterfaceModportAccess, UnlistedMemberNames25_5) {
       "'secret' is not accessible through modport 'master'", 7, "25.5"));
 }
 
-// §25.5: the report that refuses a modport item the interface never declares
-// names the subclause stating the rule. It is a different site from the
-// unlisted-member report above, and both enforce §25.5.
 TEST(InterfaceModportNames, UndeclaredModportNameNames25_5) {
   ElabFixture f;
   ElaborateSrc(
@@ -314,22 +274,6 @@ TEST(InterfaceModportNames, UndeclaredModportNameNames25_5) {
   EXPECT_TRUE(
       ReportedError(f.diag.Diagnostics(), "which interface 'bus'", 3, "25.5"));
 }
-
-// §25.5 restricts access through an interface port to the members its selected
-// modport lists, and names no statement the restriction is lifted in, so every
-// child-statement link Stmt declares is a position the restriction reaches.
-// WalkStmtsForInterfaceObjectAccess in
-// src/elaborator/elaborator_validate_interface.cpp had kept its own list of six
-// of the thirteen links ForEachChildStmt in
-// src/elaborator/elaborator_validate_internal.h states, so the same access
-// UnlistedMemberIsInaccessibleThroughModport above rejects was accepted in any
-// of the other seven. The walk now takes its list from ForEachChildStmt, and
-// the seven cases below are one per newly reached position: A.6.3's par_block
-// (Stmt::fork_stmts), A.6.8's for_initialization and for_step
-// (Stmt::for_inits, Stmt::for_steps), A.6.10's action_block
-// (Stmt::assert_pass_stmt, Stmt::assert_fail_stmt), A.6.9's randcase_item
-// (Stmt::randcase_items) and A.6.12's rs_code_block (Stmt::rs_productions).
-// Each holds a statement, so each can hold the read of the unlisted member.
 
 TEST(InterfaceModportAccess, UnlistedMemberInForkArmIsInaccessible) {
   ElabFixture f;
@@ -468,9 +412,6 @@ TEST(InterfaceModportAccess,
       9, "25.5"));
 }
 
-// §25.5 holds a nested interface declaration's modport to that interface's own
-// declarations: x and y belong to the enclosing interface i, which §23.4 makes
-// visible inside illegal_i without making them illegal_i's.
 TEST(InterfaceModport, NestedInterfaceModportNamingOuterSignalIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -492,10 +433,6 @@ TEST(InterfaceModport, NestedInterfaceModportNamingOuterSignalIsError) {
                             5, "25.5"));
 }
 
-// §25.5 with §37.7: the elaborated interface carries the modports its
-// declaration wrote, in source order with their ports, so the VPI model a run
-// builds from the elaborated design can give each interface instance its
-// modport objects.
 TEST(InterfaceModportNames, AnElaboratedInterfaceCarriesItsModports) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -518,7 +455,6 @@ TEST(InterfaceModportNames, AnElaboratedInterfaceCarriesItsModports) {
   EXPECT_EQ(ifc->modports[1]->name, "mq");
 }
 
-// A module declares no modports, and carries none.
 TEST(InterfaceModportNames, AnElaboratedModuleCarriesNoModports) {
   ElabFixture f;
   auto* design = Elaborate("module top;\nendmodule\n", f, "top");
@@ -526,11 +462,6 @@ TEST(InterfaceModportNames, AnElaboratedModuleCarriesNoModports) {
   EXPECT_TRUE(design->top_modules[0]->modports.empty());
 }
 
-// §25.5 declares a modport's items with its directions as if inside the module
-// the interface is a port of, and §23.3.3.2 lets no assignment target a
-// variable declared an input port, so assigning `i.a` through a modport listing
-// a as an input is refused, procedurally or continuously, of the whole
-// variable or a select of it, while the output c beside it may be assigned.
 TEST(ModportElaboration, AssigningAModportInputVariableIsRefused) {
   ElabFixture f;
   ElaborateSrc(
@@ -556,9 +487,6 @@ TEST(ModportElaboration, AssigningAModportInputVariableIsRefused) {
                              3, "25.5"));
 }
 
-// A net a modport lists as an input is no variable, and §23.3.3.1 coerces an
-// input net assigned from inside the module rather than forbidding it, so
-// `assign i.w = 1` through such a modport is not refused under §25.5.
 TEST(ModportElaboration, AssigningAModportInputNetIsNotRefused) {
   ElabFixture f;
   ElaborateSrc(

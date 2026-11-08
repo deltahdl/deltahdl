@@ -16,12 +16,10 @@ using namespace delta;
 
 namespace {
 
-// The IP author, the name the author's key is provided under, and the key.
 constexpr std::string_view kAuthor = "acme-ip";
 constexpr std::string_view kAuthorsKeyName = "acme-2026";
 constexpr std::string_view kAuthorsKey = "acme-private-key-material";
 
-// What the block holds: the two licences, then the design.
 constexpr std::string_view kInsideTheBlock =
     "`pragma protect decrypt_license=(library=\"lic.so\", "
     "entry=\"acquire\", feature=\"decrypt\")\n"
@@ -29,8 +27,6 @@ constexpr std::string_view kInsideTheBlock =
     "entry=\"acquire\", feature=\"simulate\")\n"
     "  initial result = 42;\n";
 
-// The tool's database, holding the author's key under the author's owner
-// and name.
 ProtectKeyList TheAuthorsKeyInTheDatabase() {
   ProtectKeyList keys;
   keys.Add({std::string(kAuthor), std::string(kAuthorsKeyName),
@@ -38,10 +34,6 @@ ProtectKeyList TheAuthorsKeyInTheDatabase() {
   return keys;
 }
 
-// The output the encrypting run generates for an input of §O.4.1 with a
-// cleartext section on either side of its one block, the block naming the
-// provider's key under the provider, asking for a digest, and holding the
-// licences and the design.
 std::string TheOutput() {
   std::string src = "module m;\n";
   src += "`pragma protect author=\"Acme Author\"\n";
@@ -58,7 +50,6 @@ std::string TheOutput() {
   return EncryptEnvelopes(src, "", TheAuthorsKeyInTheDatabase());
 }
 
-// How many times `written` carries `needle`.
 size_t Count(std::string_view written, std::string_view needle) {
   size_t count = 0;
   for (size_t pos = written.find(needle); pos != std::string_view::npos;
@@ -68,9 +59,6 @@ size_t Count(std::string_view written, std::string_view needle) {
   return count;
 }
 
-// The text a decrypting run of `envelope` produced with the author's key in
-// its database and the licence the block carries (§34.5.28.2), where the data
-// the block recorded come back as the source the compilation step reads.
 std::string Recovered(const std::string& envelope) {
   SourceManager mgr;
   DiagEngine diag{mgr};
@@ -81,10 +69,6 @@ std::string Recovered(const std::string& envelope) {
   return pp.Preprocess(mgr.AddFile("<envelope>", envelope));
 }
 
-// §O.4.2: the output is the one §O.3.2 has the tool generate -- the cleartext
-// copied, the same ten expressions for each block, the data composed of the
-// licences and the text between begin and end -- with the key name the
-// provider's and the method the public/private scheme's name.
 TEST(IpAuthorSecretKeyOutput,
      TheOutputIsTheToolVendorSystemsWithTheAuthorsKey) {
   EXPECT_TRUE(CleartextIsCopiedToTheIpAuthorSecretKeyOutput());
@@ -102,15 +86,6 @@ TEST(IpAuthorSecretKeyOutput,
   EXPECT_TRUE(IpAuthorSecretKeyOutputNamesThePublicPrivateSchemeAsItsMethod());
 }
 
-// §O.4.2 against the flow: the encrypting run holding the author's key in
-// its database copies the cleartext on either side of the block and
-// generates for the block a protected region carrying each listed
-// expression in the clear, the key's owner being the author and the key's
-// name the provider's, with the digest and the data blocks announced by
-// their keywords standing alone. The designations the input wrote ahead of
-// the block are cleartext the run copies as well, so an expression may stand
-// more than once; what the annex has is that the region generated carries
-// it.
 TEST(IpAuthorSecretKeyOutput, TheRunGeneratesTheListedExpressionsForTheBlock) {
   std::string written = TheOutput();
   EXPECT_EQ(Count(written, "module m;\n"), 1u);
@@ -132,12 +107,6 @@ TEST(IpAuthorSecretKeyOutput, TheRunGeneratesTheListedExpressionsForTheBlock) {
   }
 }
 
-// §O.4.2 against the flow: the data the block records under the author's
-// key are the two licences and the text between begin and end, none in the
-// clear, and a decrypting run holding the author's key gets the design back
-// where the block stood. The method the output names is the cipher this
-// tool sealed the block with rather than a public/private scheme, this tool
-// providing none.
 TEST(IpAuthorSecretKeyOutput,
      TheDataAreTheLicencesAndTheTextUnderTheAuthorsKey) {
   std::string written = TheOutput();

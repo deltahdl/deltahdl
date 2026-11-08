@@ -112,23 +112,9 @@ TEST(PliPostReNbaSim, PostReNBAEventsAcrossMultipleTimeSlots) {
 }
 
 TEST(PliPostReNbaSim, PostReNBAIsClassifiedAsPliRegion) {
-  // §4.4.3.8 establishes Post-Re-NBA as a PLI callback control point; the
-  // scheduler encodes that membership in IsPliRegion.
   EXPECT_TRUE(IsPliRegion(Region::kPostReNBA));
 }
 
-// End-to-end coverage of §4.4.3.8's read guarantee, building the consumed value
-// from real source syntax rather than a hand-scheduled event. §4.4.3.8 lets a
-// Post-Re-NBA PLI callback read values after the Re-NBA region is evaluated;
-// because Post-Re-NBA runs late in the time slot, a value settled by an earlier
-// region is still visible when it fires. Parsing/elaborating/lowering
-// `q <= 8'd42` schedules q's update into the real NBA region at time 0. A
-// Post-Re-NBA callback in that same slot (the only way PLI code reaches this
-// region - there is no HDL syntax for it) must observe the value that genuine
-// nonblocking assignment wrote, which holds only if the scheduler drives every
-// intervening region through Post-Re-NBA before the callback runs. Driving the
-// whole pipeline - not a hand-built NBA event - ties the read rule to a real
-// nonblocking assignment.
 TEST(PliPostReNbaSim, PostReNBAReadsValueFromRealNonblockingAssign) {
   SimFixture f;
   ExpectRegionCallbackReads(f,
@@ -139,17 +125,6 @@ TEST(PliPostReNbaSim, PostReNBAReadsValueFromRealNonblockingAssign) {
                             Region::kPostReNBA, "q", 42u);
 }
 
-// End-to-end coverage of §4.4.3.8's read guarantee built from the Re-NBA region
-// dependency's (§4.4.2.8) own real syntax. Re-NBA is the reactive-region-set
-// dual of NBA: a nonblocking assignment executed by a program's reactive
-// process schedules its update into Re-NBA, not into the active-set NBA region.
-// Lowering a program-block `q <= 8'd42` therefore produces a genuine Re-NBA
-// event at time 0. §4.4.3.8 says a Post-Re-NBA callback reads values after
-// Re-NBA is evaluated, so a callback in that same slot must observe the value
-// the reactive nonblocking assignment settled - which holds only if the
-// scheduler drains Re-NBA before Post-Re-NBA. Driving the whole pipeline - not
-// a hand-scheduled Re-NBA event - ties the read rule to a real reactive
-// nonblocking update.
 TEST(PliPostReNbaSim, PostReNBAReadsValueSettledByReactiveNonblockingAssign) {
   SimFixture f;
   ExpectRegionCallbackReads(f,

@@ -44,11 +44,6 @@
 
 namespace delta {
 
-// §7.4.1: the range one element of a packed array of `dt` is addressed by,
-// where its element is a type of its own: a named type's declared range, the
-// base type's dimension of an enumeration written with packed dimensions
-// after its body, and none for a structure or union, whose bits are counted
-// from zero.
 static std::optional<PackedRange> PackedElementRange(const DataType& dt,
                                                      SimContext& ctx,
                                                      Arena& arena) {
@@ -61,9 +56,6 @@ static std::optional<PackedRange> PackedElementRange(const DataType& dt,
       SelectBoundValue(EvalExpr(dt.packed_dim_right, ctx, arena))};
 }
 
-// §7.4.1: the packed dimensions of `dt`, outermost first: for an enumeration,
-// those written after its body, the one its base type writes being its
-// element's.
 static std::vector<std::pair<Expr*, Expr*>> PackedDimsOf(const DataType& dt) {
   std::vector<std::pair<Expr*, Expr*>> dims = dt.enum_array_dims;
   if (dims.empty() && dt.packed_dim_left != nullptr) {
@@ -74,23 +66,13 @@ static std::vector<std::pair<Expr*, Expr*>> PackedDimsOf(const DataType& dt) {
   return dims;
 }
 
-// Whether the packed dimensions of `dt` are those of an array of a type that
-// is not itself one of them: a named type, a structure or union, or an
-// enumeration written with dimensions after its body.
 static bool HasPackedElement(const DataType& dt) {
   return dt.kind == DataTypeKind::kNamed || dt.kind == DataTypeKind::kStruct ||
          dt.kind == DataTypeKind::kUnion || !dt.enum_array_dims.empty();
 }
 
-// §6.9.1: either bound of a packed dimension may be negative, so each is read
-// as the integer it stands for (SelectBoundValue) and not as the magnitude of
-// its bits: `logic [-1:4] b` read its `-1` as 4294967295, a span that did not
-// account for the six bits, and the vector stayed addressed as [5:0], where
-// b[4] was bit 4 and b[-1] out of range.
 void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
                        Arena& arena) {
-  // §7.4.4: a type written as a name alone has the dimensions its typedef
-  // writes, `T x` under `typedef logic [1:0][3:0] T` two elements of four bits.
   if (dt != nullptr) dt = ctx.PackedTypeBehind(*dt);
   if (dt == nullptr) return;
   const std::vector<std::pair<Expr*, Expr*>> kDims = PackedDimsOf(*dt);
@@ -101,10 +83,6 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
   auto span = [](int64_t l, int64_t r) {
     return static_cast<uint64_t>((l >= r ? l - r : r - l) + 1);
   };
-  // §7.4.4: every dimension inside the outermost is kept as declared, so a
-  // select chain steps through them one index at a time (Variable::
-  // PackedLevelWithin); their product alone left `z[1][0]` on a
-  // `logic [1:0][1:0][7:0]` a bit of the sixteen-bit `z[1]`.
   uint64_t stride = 1;
   std::vector<PackedRange> inner;
   for (size_t i = 1; i < kDims.size(); ++i) {
@@ -112,11 +90,6 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
     stride *= span(inner.back().left, inner.back().right);
   }
   PackedRange range{eval(kDims[0].first), eval(kDims[0].second)};
-  // §7.4.4: packed dimensions may also be built up in stages through a
-  // typedef, and those the name stands for vary most rapidly, inside the ones
-  // written where it is used: `bsix [1:10] v5` under `typedef bit [1:5] bsix`
-  // is ten elements of the five bits [1:5]. §7.4.1: a packed structure,
-  // union or enumeration with dimensions is an array of it in the same way.
   uint64_t outer = span(range.left, range.right) * stride;
   if (HasPackedElement(*dt) && outer > 0 && v->value.width > outer &&
       v->value.width % outer == 0) {
@@ -131,29 +104,13 @@ void RecordPackedRange(const DataType* dt, Variable* v, SimContext& ctx,
     v->packed_elem_width = static_cast<uint32_t>(stride);
     v->inner_packed_dims = std::move(inner);
   }
-  // The elaborator sized this storage from the same dimensions. Bounds that do
-  // not account for its width came from an expression this scope cannot fold,
-  // and a range read off them would misaddress every bit, so leave the storage
-  // addressed as [width-1:0].
   if (span(range.left, range.right) * stride != v->value.width) return;
   v->packed_range = range;
   v->has_packed_range = true;
-  // §7.4.1: the elements a select reaches through every dimension written
-  // here are of the named type, signed when it was declared so.
   if (dt->kind == DataTypeKind::kNamed && DeclaredTypeIsSigned(*dt, ctx))
     v->signed_elem_depth = kDims.size() - 1;
 }
 
-// §6.20.2 lets a value parameter's expression name literals, parameters,
-// genvars, enumeration names, constant functions and package references, and
-// this is which of those have storage the instance can read now, its own
-// parameters lowered ahead of it. A subroutine is registered after the
-// parameters, an enumeration constant and an imported name are bound after
-// them, and a genvar or a configuration's localparam has no storage at all, so
-// a name FindVariable does not answer and any subroutine call say no. The
-// two sides of a package scope resolution, `pk::X`, are a package's key and
-// its member rather than names of this scope, and the package's storage was
-// created ahead of every module, so those are passed over.
 static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
   std::vector<const Expr*> scoped;
   ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
@@ -172,9 +129,6 @@ static bool EveryNameHasStorage(const Expr* expr, SimContext& ctx) {
   return all;
 }
 
-// §5.7.1 (printed page 78): whether `expr` holds a literal with an x or a z
-// in it -- `'x`, `'z`, or a based literal with an x, z or ? digit after its
-// base -- which the elaborator's fold, holding no unknown bit, folded as 0.
 static bool HoldsXZLiteral(const Expr* expr) {
   bool found = false;
   ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
@@ -190,10 +144,6 @@ static bool HoldsXZLiteral(const Expr* expr) {
   return found;
 }
 
-// §6.20.2: whether `expr` names a parameter whose storage holds an x or a z,
-// `localparam logic [3:0] M = L` under `parameter logic [3:0] L = 4'b1x1x`.
-// The elaborator's fold holds no unknown bit, so the value it made of such a
-// name is not the one the name has.
 static bool NamesAnUnknownValue(const Expr* expr, SimContext& ctx) {
   bool found = false;
   ForEachEvaluatedSubExpr(expr, [&](const Expr* e) {
@@ -212,37 +162,18 @@ const DataType* ParamValueType(const RtlirParamDecl& param) {
 void ReevaluateParamValue(const RtlirParamDecl& param, Variable* var,
                           SimContext& ctx, Arena& arena) {
   uint32_t width = var->value.width;
-  // ApplyParamOverride in src/elaborator/elaborator_module.cpp records the
-  // override's expression, and Elaborator::ApplyDefparamSite a defparam's
-  // literal. An override that recorded no expression -- a defparam naming
-  // something, or §33.4.3's `#()` handing the declaration's own initializer
-  // back -- replaced the declaration's value with one no expression here
-  // spells, so that value stays as folded.
   if (param.from_override && param.override_expr == nullptr) return;
   const Expr* expr = param.override_expr != nullptr ? param.override_expr
                                                     : param.default_value;
   if (expr == nullptr) return;
-  // An expression constant evaluation left unfolded -- a select reaching
-  // outside its vector (§11.5.1), whose x the fold cannot hold -- is evaluated
-  // here too, where the operands' state sets are known.
-  // A name standing for a value with an x or a z is read the same way, in
-  // the scope the expression is written in.
   std::string own = ctx.ActiveInstancePrefix();
   if (param.override_expr != nullptr)
     ctx.SetLoweringInstancePrefix(ctx.InstantiatingPrefix(own));
   bool folded = width <= 64 && param.is_resolved && !HoldsXZLiteral(expr) &&
                 !NamesAnUnknownValue(expr, ctx);
   if (!folded && EveryNameHasStorage(expr, ctx)) {
-    // §11.6.1 with §6.20.2: the value is sized to the declaration as an
-    // assignment to it is. The words are copied because an expression that is
-    // a bare parameter name answers that parameter's own storage.
     Logic4Vec value = EvalExpr(expr, ctx, arena, width);
     var->value = OwnRhsWords(ResizeToWidth(value, width, arena), arena);
-    // §6.11.2: a parameter of a 2-state type stores an unknown bit its value
-    // has, `$size` of a dimension the operand lacks (§20.7), as 0. A typedef
-    // name is judged by the type it stands for (§6.18), so one naming a
-    // 4-state type, `typedef logic [3:0] n4_t`, keeps x and z, and a type
-    // parameter's name by the type it has in the instance (§6.20.3).
     const DataType* type = ParamValueType(param);
     if (type != nullptr && !DeclaredTypeIs4State(*type, ctx))
       CoerceTo2State(var->value);
@@ -275,9 +206,6 @@ Net* CreateNetStorage(std::string_view name, const RtlirNet& net,
   AttachNettypeResolution(*created, net.resolve_func, ctx);
   created->delay = NetDelayTicks(net, scale, ctx, arena);
   RecordPackedRange(net.dtype, created->resolved, ctx, arena);
-  // §6.7.1 with §7.2.1: a net of a packed structure, `wire instruction_t
-  // w`, is laid out from the aggregate its declaration carries so a member
-  // select names a run of the net's bits, as a net port's is.
   RegisterAggregateLayout(name, net.dtype, net.width, ctx, arena);
   return created;
 }
@@ -294,13 +222,6 @@ void RegisterModuleNets(const RtlirModule* mod, SimContext& ctx, Arena& arena) {
   }
 }
 
-// §23.3.3.2: an input port left unconnected starts at the default initial
-// value of its data type, and Table 6-7 gives that value per
-// type. Fresh storage is created holding x, which is already the 4-state
-// integral default, so only a type whose default is zero needs writing. String
-// and event are excluded for the same reason the body declaration excludes
-// them: their defaults are an empty string and a new event, neither of which
-// is a bit pattern this write would produce.
 bool PortDefaultsToZero(const RtlirPort& port) {
   if (port.type_kind == DataTypeKind::kString ||
       port.type_kind == DataTypeKind::kEvent) {
@@ -309,18 +230,6 @@ bool PortDefaultsToZero(const RtlirPort& port) {
   return !Is4stateType(port.type_kind);
 }
 
-// §23.3.3.5 (printed page 748): the port's elements pair with the
-// connection's, left index with left index, so an unpacked array port is
-// an array of elements each connected apart, not one value. A one-dimensional
-// port is laid out as a declared array of its kind is, each address held as
-// the net or variable "name[addr]" (CreateDeclaredNet above, and
-// CreateArrayElements in lowerer_var.cpp) under the array's registered shape,
-// each starting at the port's default (§23.3.3.2). Held as one value of an
-// element's width, `input var int i[3]` read bits of that value for i[0] to
-// i[2]. §7.4.2 lets a bound be negative, and each address is then held by its
-// 32 bits, as every select names it, so `[-1:0]` holds [4294967295] and [0];
-// such a port was held as one value, which no select of an element reached.
-// False, creating nothing, for a port that is no such array.
 static bool CreatePortArrayElements(std::string_view name,
                                     const RtlirPort& port, SimContext& ctx,
                                     Arena& arena) {
@@ -355,9 +264,6 @@ static bool CreatePortArrayElements(std::string_view name,
   return true;
 }
 
-// §6.12: a port of a real type holds a real, to which an assignment,
-// continuous or procedural, converts what it writes (§6.12.1), as it does for
-// a real variable declared in the body.
 static void MarkRealPort(std::string_view name, const RtlirPort& port,
                          Variable& v, SimContext& ctx) {
   if (port.type_kind != DataTypeKind::kReal &&
@@ -370,50 +276,21 @@ static void MarkRealPort(std::string_view name, const RtlirPort& port,
 
 void CreatePortVariable(std::string_view name, const RtlirPort& port,
                         SimContext& ctx, Arena& arena) {
-  // §21.7.4.3.1: an extended VCD port record takes its state characters from
-  // the list for the port's direction, and the direction is a property of the
-  // declaration rather than of the storage. Recorded before the question below
-  // of whether storage already exists, because a port whose name a module-body
-  // declaration already created is still a port and still faces one way.
   ctx.Vcd().SetVcdPortDirection(name, port.direction);
   if (ctx.FindVariable(name) || ctx.FindArrayInfo(name)) return;
   if (CreatePortArrayElements(name, port, ctx, arena)) return;
-  // §23.2.2.3 decides whether a port is a net or a variable, and a port it
-  // makes a net is one: its drivers resolve against each other (§28.12) and it
-  // carries a strength, which is what %v (§21.2.1.4) and an extended VCD port
-  // record (§21.7.4.3) report. Where the port is written -- in the header or,
-  // as a net declaration, in the body -- decides nothing, so the two spellings
-  // reach the same model.
   Variable* v = nullptr;
   bool is_net = port.net_type != NetType::kNone;
   if (is_net) {
-    // §23.3.3.3 (printed page 747): a port with a net type is a net, whose
-    // value its drivers decide, and an input of one left unconnected holds
-    // 'z -- the z CreateNet has just installed, §6.7.1's value
-    // of a net nothing drives. It holds z until its drivers first resolve, so
-    // an output port's connection, which copies the port into the parent's
-    // net, copies z there at time 0 rather than an x or a 0 the port never
-    // held, and an event control on the parent's net sees no change.
     v = ctx.CreateNet(name, port.net_type, port.width,
                       NetSpec{.is_signed = port.is_signed})
             ->resolved;
   } else {
-    // §6.16: a string holds as many characters as it is given, so its storage
-    // takes no fixed width, as a string variable declared in the body does.
     v = ctx.CreateVariable(
         name, port.type_kind == DataTypeKind::kString ? 0 : port.width);
   }
-  // §23.3.3.2, Table 6-7: an unconnected variable input reads as its type's
-  // default rather than as whatever the storage happens to hold. A 4-state
-  // type's default is the x CreateVariable leaves behind; only a 2-state one
-  // needs writing.
   if (!is_net && PortDefaultsToZero(port))
     v->value = MakeLogic4VecVal(arena, port.width, 0);
-  // §23.2.2.2, footnote 2: a variable output port may be initialized, and its
-  // `= constant_expression` is the value it holds before any procedure runs,
-  // as §6.8 gives a variable declaration's initializer. The value is sized to
-  // the port as an assignment to it would be (§10.7), and a 2-state port takes
-  // it through §6.11.2's conversion as any variable's initializer does.
   if (port.init_value != nullptr) {
     Logic4Vec init = OwnRhsWords(
         ResizeToWidth(EvalExpr(port.init_value, ctx, arena, port.width),
@@ -424,27 +301,9 @@ void CreatePortVariable(std::string_view name, const RtlirPort& port,
   }
   if (port.is_signed) v->is_signed = true;
   MarkRealPort(name, port, *v, ctx);
-  // §6.16: a port of type string holds a string, read and written as a
-  // string variable declared in the body is.
   if (port.type_kind == DataTypeKind::kString) ctx.RegisterStringVariable(name);
-  // §11.5.1: which bit an address reaches depends in part on the declaration
-  // -- port.width says how many bits the port has rather than which bit an
-  // index names, because `[8:1]` and `[1:8]` are both eight bits wide and index
-  // 3 reaches a different bit of each.
   RecordPackedRange(port.dtype, v, ctx, arena);
-  // §7.2.1 with §23.2.2.3: a port the clause makes a net may be a net of a
-  // packed structure (§6.7.1), and a member select of it names a run of the
-  // net's bits. The elaborator hands such a port its resolved aggregate on the
-  // same record field, since it declares no variable for a net; a variable
-  // port of a structure never reaches here, its declaration having created
-  // and laid out the storage above.
   RegisterAggregateLayout(name, port.dtype, port.width, ctx, arena);
-  // §21.7.5 (Table 21-11): a port declared with a SystemVerilog data type is
-  // dumped under that type's 1364-2005 masquerade, just as a module-body
-  // declaration of the same type is. A port reaching here has no body
-  // declaration that already recorded its kind, so record the declared keyword
-  // now. The port carries only that keyword, so an enum port keeps the default
-  // enum mapping rather than any specified base type.
   ctx.Vcd().SetVcdVarKind(name, port.type_kind);
 }
 
@@ -455,24 +314,11 @@ void RegisterModulePorts(const RtlirModule* mod, SimContext& ctx,
 
 void RegisterModuleSubroutines(const RtlirModule* mod, SimContext& ctx) {
   for (auto* func : mod->function_decls) {
-    // §8.24: an out-of-block method body among the module's items is a
-    // method of the class its `C::` prefix names, which LowerClassDecl
-    // attaches, and not a subroutine of the module under its bare name.
     if (!func->method_class.empty()) continue;
     ctx.RegisterFunction(func->name, func);
   }
 }
 
-// §13.3 with §23.6: a task or function of a module instance is enabled by
-// its hierarchical name from another instance, `u1.tk(3)`, and §13.3.2 gives
-// a static task in each instance its own storage, so every instance's
-// subroutines are registered under the instance's prefixed key as well as
-// the bare name RegisterModuleSubroutines records, "u1.tk" for the instance
-// "u1." and "u1.u2.tk" for one nested in it, the key FindSubroutineTarget in
-// eval_function_hier.cpp resolves a dotted callee by. The key is interned in
-// the arena because the registry holds it rather than a copy. §8.24 keeps an
-// out-of-block method body out of the instance's subroutines, as the bare
-// registration does.
 void RegisterInstanceSubroutines(const RtlirModule* mod,
                                  const std::string& inst_prefix,
                                  SimContext& ctx, Arena& arena) {
@@ -481,15 +327,10 @@ void RegisterInstanceSubroutines(const RtlirModule* mod,
     auto* key =
         arena.Create<std::string>(inst_prefix + std::string(func->name));
     ctx.RegisterFunction(*key, func);
-    // §25.7.4: an interface's extern forkjoin task is run through the
-    // definitions its connected modules export, which wait on the prototype.
     if (func->is_extern && func->is_forkjoin) ctx.DeclareForkjoinTask(*key);
   }
 }
 
-// §21.2.1.5 and §27.3: the generate block instances of a path spelled as
-// the levels of a hierarchical name, a loop block's instance with its index
-// in brackets, `g[0].h`; empty for an empty path.
 std::string GenBlockName(const HierPath& path) {
   std::string name;
   for (const HierStep& step : path) {
@@ -500,19 +341,6 @@ std::string GenBlockName(const HierPath& path) {
   return name;
 }
 
-// §27.4 with §13.4 and §23.6: a subroutine a named generate block instance
-// declares is called from outside the block by the instance's hierarchical
-// name, `blk[1].triple(10)` or `u1.blk[1].triple(10)`, so it is registered
-// under that key, `key_prefix` and then the block path as §23.6 spells it,
-// and the scope its body runs in is recorded under the same key for
-// FindSubroutineTarget in eval_function_hier.cpp: the module instance
-// `inst_prefix`, the block's name prefixes and its loop localparams, as the
-// block's own processes carry them. The two prefixes part for a top-level
-// module alone, whose instance is the empty prefix while §23.6 names it
-// from a parallel hierarchy through the top's name, "m.blk[1].triple"
-// (LowerModule in lowerer.cpp). §23.6 has a declaration of an unnamed block
-// reachable by hierarchical name from within the block alone, and such a
-// block's step has no name to spell, so it is registered under no key.
 void RegisterGenBlockSubroutines(const RtlirModule* mod,
                                  const std::string& key_prefix,
                                  const std::string& inst_prefix,
@@ -535,21 +363,8 @@ void RegisterGenBlockSubroutines(const RtlirModule* mod,
   }
 }
 
-// §26.3: a package's subroutine is referenced through the package scope
-// resolution operator, `pk::f(x)`, from any scope, imported or not, so each
-// one is registered under its "pk::f" key, the key a scoped call resolves by
-// (FindSubroutineTarget in eval_function_hier.cpp). An import binds the bare
-// name as well, in LowerPackageItem. §8.24 keeps an out-of-block method body
-// out of the package's own subroutines.
-// One item of package `pkg` recorded as the package's: its subroutine under
-// "pkg::name" and as the package's, its let, sequence and property under
-// "pkg::name", and its import as one of the package's.
 static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
                                       SimContext& ctx, Arena& arena) {
-  // §26.3 with §13.4: the package's subroutines read its variables, and
-  // through its imports another package's, by their bare names, so each
-  // subroutine is recorded as the package's and each import as one of the
-  // package's; SimContext::FindInPackageScope reads both back.
   if (item->kind == ModuleItemKind::kImportDecl) {
     const ImportItem& imp = item->import_item;
     ctx.RegisterPackageImport(pkg->name, imp.package_name,
@@ -558,16 +373,11 @@ static void RegisterPackageScopedItem(const PackageDecl* pkg, ModuleItem* item,
   }
   auto* key = arena.Create<std::string>(std::string(pkg->name) +
                                         "::" + std::string(item->name));
-  // §11.12 with §26.3: a package's let is a declaration of the package,
-  // named from any scope through the package, `pex::twice(7)`, and so, §19.3,
-  // is its covergroup, the type of `pk::pcg c`.
   if (item->kind == ModuleItemKind::kLetDecl ||
       item->kind == ModuleItemKind::kCovergroupDecl) {
     ctx.RegisterLetDecl(*key, item);
     return;
   }
-  // §16.8 and §16.12 with §26.3: so are its named sequences and properties,
-  // `pk::s2(a, b)`.
   if (item->kind == ModuleItemKind::kSequenceDecl) {
     ctx.RegisterSequenceDecl(*key, item);
     return;
@@ -592,16 +402,6 @@ void RegisterPackageScopedSubroutines(const RtlirDesign* design,
   }
 }
 
-// §35.5.4 declares an imported subroutine in the scope that writes the
-// declaration, and §35.6 has a call to one written exactly as a call to a
-// native subroutine. The registry is what a call reaches the declaration
-// through, so a design's declarations are put in it as the design is lowered;
-// a design that declares no import never asks for one. The registry holds one
-// entry per SystemVerilog name, and a module instantiated twice registers its
-// declarations once: the second instance's are the same declarations.
-// §3.12.1: a unit's declarations in a design of several units stand under
-// "scope::name" where `unit_scope` names the unit's scope
-// (DpiRuntime::FindImportIn).
 static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
                                    const ScopeMap& scope, SimContext& ctx,
                                    std::string_view unit_scope = {}) {
@@ -617,25 +417,12 @@ static void RegisterDpiImportDecls(const std::vector<ModuleItem*>& decls,
     if (dpi->HasImport(sv_name)) continue;
     DpiRtFunction func;
     func.sv_name = sv_name;
-    // §35.4: a declaration that gives no global name takes the SystemVerilog
-    // name of the subroutine as its global name, which is the rule
-    // DpiLinkageName states for the elaborator's own reading of the same
-    // declaration.
     func.c_name = item->dpi_c_name.empty() ? item->name : item->dpi_c_name;
     func.return_type = item->return_type.kind;
-    // §H.7.4: the parser has settled the result type's signedness, a byte,
-    // shortint, int or longint being signed unless qualified unsigned.
     func.return_is_unsigned = !item->return_type.is_signed;
-    // §35.5.1.3: the declaration says whether the subroutine is pure or
-    // context, and §35.5.2 and §35.5.3 are read off those two.
     func.is_pure = item->dpi_is_pure;
     func.is_context = item->dpi_is_context;
-    // §H.2: an import declares a task or a function, and only an imported task
-    // can in turn call exported tasks.
     func.is_task = item->dpi_is_task;
-    // §H.14.1: a declaration annotated "DPI" selects the SV3.1a argument
-    // passing semantics on the C side and one annotated "DPI-C" the IEEE Std
-    // 1800 semantics, per function.
     func.packed_arg_passing =
         DpiPassingSemanticsOfSpecString(item->dpi_spec_string);
     for (const auto& arg : item->func_args) {
@@ -649,12 +436,6 @@ void RegisterModuleDpiImports(const RtlirModule* mod, SimContext& ctx) {
   RegisterDpiImportDecls(mod->dpi_import_decls, DpiParameterScope(*mod), ctx);
 }
 
-// §6.18 with §15.4.9 (printed page 377): each typedef item among `items`,
-// the type it was declared with recorded under `prefix` plus its name
-// (SimContext::RegisterTypeDeclaration) -- the parameter list of a `typedef
-// mailbox #(int) mb_t` stands on this type and on no name the targets hold.
-// The items are the parser's and outlive the run, as a class declaration
-// does.
 static void RegisterTypedefItems(const std::vector<ModuleItem*>& items,
                                  std::string_view prefix, SimContext& ctx) {
   for (const ModuleItem* item : items) {
@@ -674,20 +455,12 @@ static void RegisterScopeTypedefs(const std::vector<ModuleDecl*>& decls,
     RegisterTypedefItems(decl->items, {}, ctx);
 }
 
-// The typedef items of every scope of the design: a package's under
-// "pkg::name" (§26.3), as the elaborator keys its typedef table, and a
-// module's, an interface's, a program's and the compilation unit's under the
-// bare name, as the type targets are keyed. A design built with no parsed
-// unit behind it records none.
 static void RegisterTypeDeclarations(const RtlirDesign* design,
                                      SimContext& ctx) {
   const CompilationUnit* unit = design->compilation_unit;
   if (unit == nullptr) return;
   RegisterTypedefItems(unit->cu_items, {}, ctx);
   RegisterUnitCovergroups(unit->cu_items, {}, ctx);
-  // §3.12.1: where each unit has a scope of its own, each unit's typedefs and
-  // covergroups stand under that scope's name too, which the run's lookups ask
-  // first for the running code's unit (DeclaredNameTables::UnitKeyIn).
   if (!design->compilation_units.empty()) {
     ForEachUnitScope(design, ctx.GetArena(),
                      [&](const CompilationUnit& own, std::string_view scope) {
@@ -702,59 +475,12 @@ static void RegisterTypeDeclarations(const RtlirDesign* design,
   RegisterScopeTypedefs(unit->programs, ctx);
 }
 
-// §6.18 (printed page 118 of IEEE 1800-2023): the name at the end of each
-// typedef name's chain, recorded for the run, class or not
-// (SimContext::RegisterTypeTarget), with the typedef items' own types beside
-// it (RegisterTypeDeclarations) for the parameter list a typedef of a
-// parameterized mailbox carries. §15.4.9 (printed 377) declares a mailbox
-// through `typedef mailbox #(string) s_mbox` and §15.3.1 (printed 373) a
-// semaphore alike, neither built-in class has a record to bind the name to,
-// and a class property declared through the typedef is told to be one by
-// SyncKindOfType (eval_class_sync.cpp) following the chain in this table;
-// with no table, `mb_t mb = new` built no mailbox. Recorded ahead of every
-// class (Lowerer::LowerDesignData), since §8.9 (printed 186) with §6.21
-// (printed 132-133) creates a static property's one copy at the class's
-// static initialization, which lowering the class runs
-// (InitStaticProperties in lowerer_class.cpp): recorded with the class
-// aliases, after the packages' and the unit's classes were lowered, a
-// package class's `static mb_t mb = new(K)` was known for no mailbox then
-// and was built on the first reference, reading K as the module had left it.
 void RegisterTypeTargets(const RtlirDesign* design, SimContext& ctx) {
   RegisterTypeDeclarations(design, ctx);
   for (const auto& [alias, target] : design->type_targets)
     ctx.RegisterTypeTarget(alias, target);
 }
 
-// §6.18 with §8.25.1: a typedef name whose chain ends in a class names that
-// class -- `typedef C T;` makes `T::p` the default specialization's `C#()::p`
-// -- so each such name is bound to the class it denotes, once every class of
-// the design is lowered, unless the design declares a class of that name.
-
-// §6.18 with §8.3 (printed page 180): a typedef is a class item too, and a
-// class's own `typedef C#(T,CB) this_type;` names the class C throughout the
-// class body and, §8.13, its subclasses' bodies, so each such typedef is
-// bound under `Class::alias`, the key a nested class is held by and
-// SimContext::FindClassType tries under the running method's class and its
-// bases. The class the typedef names is found by its bare or scoped name as
-// the design's typedefs' targets are, the parameter list a specialization
-// carries naming the one declaration every specialization shares; a name
-// the run holds no class for yet is left for the design-wide pass below.
-// Called as the class is registered, ahead of its static initializers,
-// which run its methods (Lowerer::RegisterClassDecl): bound nowhere,
-// uvm_callbacks#(T,CB)'s `local static this_type m_inst` was a variable of
-// no class, and `m_inst = new` stored the null handle.
-// The class a typedef's declared type names, by the scoped spelling where
-// it wrote one the run holds a class by, else by the bare name; null for a
-// type that is no class name.
-// §8.25 (printed page 204 of IEEE 1800-2023): what `typedef V#(4) t4;` writes
-// is a specialization -- the generic class together with one set of actual
-// parameter values -- and §8.25 makes each specialization a type of its own
-// carrying its own set of static member variables, the generic class being no
-// type at all. The name the typedef's own `#(...)` list spells is therefore
-// what the alias is bound to, rather than the declaration's type, which
-// §8.25.1 makes the default specialization alone: bound to that, `t4::W` and
-// `t8::W` both read the default's W. A typedef writing no list names that
-// default, which SpecializationOf answers for an empty list.
 static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
                                           const ClassTypeInfo* holder,
                                           SimContext& ctx, Arena& arena) {
@@ -766,13 +492,6 @@ static ClassTypeInfo* ClassNamedByTypedef(const DataType& target,
   }
   if (generic == nullptr) generic = ctx.FindClassType(target.type_name);
   if (generic == nullptr) return nullptr;
-  // §8.25 with §8.3: a value actual the list writes is an expression of the
-  // holder's scope, UVM's `Tname` in uvm_component_registry#(T,Tname)'s
-  // `typedef uvm_registry_common#(this_type, ..., T, Tname) common_type;`, so
-  // it is evaluated with the holder as the running class, whose own value
-  // parameters its static storage holds (EvalIdentifierClassScope). Evaluated
-  // under no class, the name read nothing and every specialization's
-  // common_type was one whose Tname was empty.
   ctx.PushMethodClass(holder);
   ClassTypeInfo* spec = SpecializationOf(
       generic, ActualsUnderSpecialization(holder, target.type_params, ctx), ctx,
@@ -789,12 +508,6 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
         member->typedef_item == nullptr) {
       continue;
     }
-    // §6.18: a typedef's unpacked dimensions are part of the type it
-    // declares, so UVM's `typedef uvm_resource_base rsrc_sv_q_t[$];` names a
-    // queue of handles and no class. Bound under the alias, it stood for
-    // uvm_resource_base itself, and HolderScopeClass spelled the actual of
-    // `typedef uvm_shared#(rsrc_sv_q_t) rsrc_shared_q_t;` as that class, so
-    // uvm_shared's `T value` was one handle and the resource pool kept nothing.
     if (!member->typedef_item->unpacked_dims.empty()) continue;
     auto* alias = arena.Create<std::string>(std::string(info->name) +
                                             "::" + std::string(member->name));
@@ -805,14 +518,6 @@ void RegisterClassScopeTypedefAliases(ClassTypeInfo* info, SimContext& ctx,
   }
 }
 
-// §8.25 (printed page 204): a typedef of the design that writes a list,
-// `typedef R#(A) ra;`, names the specialization the list spells, as a class's
-// own typedef does (ClassNamedByTypedef), rather than `target`, the class at
-// the end of the chain, which §8.25.1 makes the default specialization alone:
-// bound to that, `ra x = new;` built an R whose T read R's default. A typedef
-// naming another typedef, `typedef ra rb;`, names what that one names, so the
-// chain is followed to the first declaration writing a list; a chain writing
-// none names `target` itself.
 static ClassTypeInfo* ClassNamedByDesignTypedef(std::string_view alias,
                                                 ClassTypeInfo* target,
                                                 SimContext& ctx, Arena& arena) {
@@ -852,9 +557,6 @@ std::string UnitBuiltinClassKey(const DataType& type) {
   return std::string(type.type_name);
 }
 
-// "pkg::name", the key LowerPackageClass (lowerer_import.cpp) binds a
-// package's class under, where the design's package `pkg` declares a class
-// so named; empty otherwise.
 static std::string PackageClassKeyIn(const RtlirDesign* design,
                                      std::string_view pkg,
                                      std::string_view name) {
@@ -869,14 +571,6 @@ static std::string PackageClassKeyIn(const RtlirDesign* design,
   return {};
 }
 
-// §3.12.1 (printed page 56) with §26.3 (printed 810): the key the run holds
-// the class under that a bare type name written in the compilation-unit
-// scope denotes -- the unit's own class by its bare name, the name
-// LowerCompilationUnitClasses binds it under and a unit declaration takes
-// over an import (§26.5), else the class the first import of the unit that
-// provides the name brings in, a wildcard import or an explicit import of
-// that very name. Empty where neither declares a class of the name: a
-// typedef, an enumeration or a type nothing declares.
 static std::string UnitScopeClassKey(const RtlirDesign* design,
                                      std::string_view name) {
   for (const auto* cls : design->cu_class_decls) {
@@ -892,10 +586,6 @@ static std::string UnitScopeClassKey(const RtlirDesign* design,
   return {};
 }
 
-// The key the run holds the class under that `type`, the declared type of a
-// compilation-unit variable, names: the built-in class, the package class a
-// `p::C` wrote, or the class a bare name denotes in the unit's scope. Empty
-// where the type names no class.
 static std::string UnitClassKey(const RtlirDesign* design,
                                 const DataType& type) {
   std::string key = UnitBuiltinClassKey(type);
@@ -912,15 +602,7 @@ void RegisterUnitClassVariables(const RtlirDesign* design, SimContext& ctx,
     if (item->kind != ModuleItemKind::kVarDecl) continue;
     std::string key = UnitClassKey(design, item->data_type);
     if (key.empty()) continue;
-    // SimContext keys the record by string_view, and the item's name is the
-    // bare key a module's `h = new` asks the class of, the storage itself
-    // standing under "$unit.name" (CreateUnitDataVariables), to which
-    // CarryUnitClassRecord in lowerer_package_data.cpp carries the record,
-    // so the class key alone is given the design's lifetime.
     ctx.SetVariableClassType(item->name, *arena.Create<std::string>(key));
-    // §8.25 (printed page 203): the specialization the declaration wrote,
-    // `G #(5) b`, bound on the object its `new` constructs; nothing for a
-    // bare `G b`.
     RecordClassParamActuals(item->name, key, item->data_type.type_params, ctx);
   }
 }

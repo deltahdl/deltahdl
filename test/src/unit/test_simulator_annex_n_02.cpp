@@ -13,20 +13,10 @@
 
 using namespace delta;
 
-// Annex N.2 gives the reference C source that defines the exact numeric
-// behavior of the probabilistic distribution system functions ($dist_uniform,
-// $dist_normal, $dist_exponential, $dist_poisson, $dist_chi_square, $dist_t,
-// $dist_erlang). The block below is an INDEPENDENT transcription of that
-// source, used as a golden model: the simulator's evaluator
-// (src/simulator/eval_math.cpp) must reproduce these values exactly for the
-// same seed and arguments. Because the algorithm is fully deterministic in the
-// seed, an exact match is the strongest possible evidence that production
-// applies the §N.2 algorithm.
-
 namespace {
 
 double RefUniform(int32_t* seed, int32_t start, int32_t end) {
-  const double kD = 0.00000011920928955078125;  // 2^-23
+  const double kD = 0.00000011920928955078125;
   double a = 0.0;
   double b = 0.0;
   if (*seed == 0) *seed = 259341593;
@@ -106,20 +96,15 @@ double RefErlangian(int32_t* seed, int32_t k, int32_t mean) {
 }
 
 int32_t RoundDistResult(double r) {
-  // The §N.2 reference's own idiom, (long)(r + 0.5) of the magnitude with the
-  // sign put back: one half added in double, then truncated.
   if (r >= 0) return static_cast<int32_t>(r + 0.5);
   r = -r;
   return -static_cast<int32_t>(r + 0.5);
 }
 
-// §N.2 reference's truncation-toward-the-draw step: positive draws truncate
-// directly, negative draws subtract one before truncating.
 int32_t DistTruncate(double r) {
   return r >= 0 ? static_cast<int32_t>(r) : static_cast<int32_t>(r - 1);
 }
 
-// §N.2 rtl_dist_uniform, common (end != INT32_MAX) branch.
 int32_t GoldenRtlDistUniformIncEnd(int32_t* seed, int32_t start, int32_t end) {
   end++;
   int32_t i = DistTruncate(RefUniform(seed, start, end));
@@ -128,7 +113,6 @@ int32_t GoldenRtlDistUniformIncEnd(int32_t* seed, int32_t start, int32_t end) {
   return i;
 }
 
-// §N.2 rtl_dist_uniform, end-at-INT32_MAX branch (decrements start).
 int32_t GoldenRtlDistUniformDecStart(int32_t* seed, int32_t start,
                                      int32_t end) {
   start--;
@@ -138,7 +122,6 @@ int32_t GoldenRtlDistUniformDecStart(int32_t* seed, int32_t start,
   return i;
 }
 
-// §N.2 rtl_dist_uniform, full signed-range branch (rescales the draw).
 int32_t GoldenRtlDistUniformFullRange(int32_t* seed, int32_t start,
                                       int32_t end) {
   double r = (RefUniform(seed, start, end) + 2147483648.0) / 4294967295.0;
@@ -177,8 +160,6 @@ int32_t GoldenRtlDistErlang(int32_t* seed, int32_t k, int32_t mean) {
   return RoundDistResult(RefErlangian(seed, k, mean));
 }
 
-// Evaluate a $dist_* system call with a literal seed and return its 32-bit
-// result through the production evaluator.
 int32_t EvalDist(SimFixture& f, const char* name, std::vector<Expr*> args) {
   auto* call = MkSysCall(f.arena, name, std::move(args));
   return static_cast<int32_t>(EvalExpr(call, f.ctx, f.arena).ToUint64());
@@ -186,8 +167,6 @@ int32_t EvalDist(SimFixture& f, const char* name, std::vector<Expr*> args) {
 
 const int32_t kSeeds[] = {1, 7, 42, 12345, 65535, 99999, 259341593, 0};
 
-// §N.2 rtl_dist_uniform: production reproduces the reference value exactly,
-// including the seed advance, the rounding, and the [start, end] clamping.
 TEST(ProbabilisticDistributionAlgorithm, UniformMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -200,9 +179,6 @@ TEST(ProbabilisticDistributionAlgorithm, UniformMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_uniform: when end is the maximum representable value the
-// reference takes a distinct branch (it decrements start instead of
-// incrementing end). The production evaluator must match it exactly.
 TEST(ProbabilisticDistributionAlgorithm, UniformEndAtMaxMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -216,9 +192,6 @@ TEST(ProbabilisticDistributionAlgorithm, UniformEndAtMaxMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_uniform: spanning the whole signed range (start at the minimum,
-// end at the maximum) drives the reference's third branch, which rescales the
-// draw across the full 32-bit range. Production must reproduce it exactly.
 TEST(ProbabilisticDistributionAlgorithm, UniformFullRangeMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -232,7 +205,6 @@ TEST(ProbabilisticDistributionAlgorithm, UniformFullRangeMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_normal: the Marsaglia polar method is reproduced exactly.
 TEST(ProbabilisticDistributionAlgorithm, NormalMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -245,9 +217,6 @@ TEST(ProbabilisticDistributionAlgorithm, NormalMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_normal: with a zero mean and a wide deviation the draw
-// straddles zero, so production must also reproduce the reference's
-// sign-preserving rounding for negative results, not only positive ones.
 TEST(ProbabilisticDistributionAlgorithm, NormalSignedRoundingMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -260,7 +229,6 @@ TEST(ProbabilisticDistributionAlgorithm, NormalSignedRoundingMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_exponential: the inverse-transform draw is reproduced exactly.
 TEST(ProbabilisticDistributionAlgorithm, ExponentialMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -273,7 +241,6 @@ TEST(ProbabilisticDistributionAlgorithm, ExponentialMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_poisson: the product-counting draw is reproduced exactly.
 TEST(ProbabilisticDistributionAlgorithm, PoissonMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -286,9 +253,6 @@ TEST(ProbabilisticDistributionAlgorithm, PoissonMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_chi_square: the squared-normal plus exponential-pairs sum is
-// reproduced exactly. This is the strongest guard against the prior behavior,
-// which returned a raw 32-bit random instead of the §N.2 algorithm.
 TEST(ProbabilisticDistributionAlgorithm, ChiSquareMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -301,8 +265,6 @@ TEST(ProbabilisticDistributionAlgorithm, ChiSquareMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_t: a normal over the root of a normalized chi-square is
-// reproduced exactly.
 TEST(ProbabilisticDistributionAlgorithm, TMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -315,7 +277,6 @@ TEST(ProbabilisticDistributionAlgorithm, TMatchesReference) {
   }
 }
 
-// §N.2 rtl_dist_erlang: the k-fold uniform product is reproduced exactly.
 TEST(ProbabilisticDistributionAlgorithm, ErlangMatchesReference) {
   for (int32_t s : kSeeds) {
     int32_t rseed = s;
@@ -328,9 +289,6 @@ TEST(ProbabilisticDistributionAlgorithm, ErlangMatchesReference) {
   }
 }
 
-// §N.2 uniform(): the seed is advanced by the 69069 linear-congruential step.
-// After a draw the inout seed variable holds exactly the state the reference
-// algorithm leaves behind, which observes both the LCG and the write-back.
 TEST(ProbabilisticDistributionAlgorithm, SeedAdvancesByReferenceLcg) {
   SimFixture f;
   MakeVar(f, "seed", 32, 1u);
@@ -340,14 +298,12 @@ TEST(ProbabilisticDistributionAlgorithm, SeedAdvancesByReferenceLcg) {
   EvalExpr(call, f.ctx, f.arena);
 
   int32_t rseed = 1;
-  GoldenRtlDistUniform(&rseed, 0, 1000);  // advance the golden seed identically
+  GoldenRtlDistUniform(&rseed, 0, 1000);
   auto after =
       static_cast<uint32_t>(f.ctx.FindVariable("seed")->value.ToUint64());
   EXPECT_EQ(after, static_cast<uint32_t>(rseed));
 }
 
-// §N.2 rtl_dist_uniform: when start >= end the bounding interval is a single
-// point, so the reference returns start without drawing.
 TEST(ProbabilisticDistributionAlgorithm, UniformDegenerateReturnsStart) {
   SimFixture f;
   for (int i = 0; i < 8; ++i) {
@@ -358,8 +314,6 @@ TEST(ProbabilisticDistributionAlgorithm, UniformDegenerateReturnsStart) {
   }
 }
 
-// §N.2 rtl_dist_uniform: every draw lands within [start, end] thanks to the
-// reference's rounding-and-clamp step.
 TEST(ProbabilisticDistributionAlgorithm, UniformStaysInRange) {
   SimFixture f;
   MakeVar(f, "seed", 32, 3u);
@@ -373,9 +327,6 @@ TEST(ProbabilisticDistributionAlgorithm, UniformStaysInRange) {
   }
 }
 
-// §N.2: the rtl_dist_* wrappers for exponential, poisson, chi-square, t, and
-// erlang return 0 when the argument the reference requires to be positive is
-// not (the reference's "else i = 0" branch). $dist_normal has no such guard.
 TEST(ProbabilisticDistributionAlgorithm, NonPositiveArgumentReturnsZero) {
   SimFixture f;
   EXPECT_EQ(EvalDist(f, "$dist_exponential",
@@ -395,9 +346,6 @@ TEST(ProbabilisticDistributionAlgorithm, NonPositiveArgumentReturnsZero) {
       0);
 }
 
-// §N.2 uniform(): the algorithm is fully determined by the seed, so evaluating
-// any distribution twice with the same literal seed yields the same value. This
-// observes the production result directly, without a reference oracle.
 TEST(ProbabilisticDistributionAlgorithm, AllDistributionsAreDeterministic) {
   SimFixture f;
   auto twice_equal = [&](const char* name, std::vector<Expr*> a,
@@ -423,10 +371,6 @@ TEST(ProbabilisticDistributionAlgorithm, AllDistributionsAreDeterministic) {
               {seed(), MkInt(f.arena, 3u), MkInt(f.arena, 7u)});
 }
 
-// §N.2: exponential, poisson, and chi-square are built from non-negative
-// quantities (a scaled negative log, a count, and a sum of squares and
-// exponentials), so their integer results are never negative. Asserting this on
-// the production output observes the algorithm's structure without an oracle.
 TEST(ProbabilisticDistributionAlgorithm, DistributionsAreNonNegative) {
   for (int32_t s : kSeeds) {
     SimFixture f;
@@ -448,11 +392,6 @@ TEST(ProbabilisticDistributionAlgorithm, DistributionsAreNonNegative) {
   }
 }
 
-// §N.2 chi_square(): the result is a small statistic on the order of its
-// degrees of freedom, never the full-width 32-bit random the function returned
-// before the §N.2 algorithm was implemented. A loose magnitude bound observes
-// that the production code now runs the algorithm rather than echoing a raw
-// draw.
 TEST(ProbabilisticDistributionAlgorithm, ChiSquareIsAlgorithmicNotRawRandom) {
   for (int32_t s : kSeeds) {
     SimFixture f;
@@ -464,12 +403,6 @@ TEST(ProbabilisticDistributionAlgorithm, ChiSquareIsAlgorithmicNotRawRandom) {
   }
 }
 
-// §N.2 rounds every draw but the uniform one with (long)(r + 0.5), one half
-// added in double and the sum truncated, the sign of a negative draw put back
-// after rounding its magnitude. The one double just below one half is where
-// that idiom parts from an exact rounding: the sum ties to one, so the idiom
-// answers 1 where an exact rounding of the value answers 0, and the annex's
-// answer is the idiom's. A half rounds away from zero either way.
 TEST(ProbabilisticDistributionAlgorithm, RoundingIsTheAnnexsIdiom) {
   const double kJustBelowHalf = 0.49999999999999994;
   EXPECT_EQ(delta::RtlDistRound(kJustBelowHalf), 1);
@@ -482,9 +415,6 @@ TEST(ProbabilisticDistributionAlgorithm, RoundingIsTheAnnexsIdiom) {
   EXPECT_EQ(delta::RtlDistRound(0.0), 0);
 }
 
-// §N.2's seven rtl_dist_ functions are the ones Table N.1 names, callable as
-// the annex declares them, each reproducing the golden transcription's value
-// and its advance of the seed for the same seed and arguments.
 TEST(ProbabilisticDistributionAlgorithm, TheSevenCFunctionsMatchTheReference) {
   for (int32_t s : kSeeds) {
     int32_t g = s;

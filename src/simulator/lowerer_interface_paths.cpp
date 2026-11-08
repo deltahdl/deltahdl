@@ -1,7 +1,3 @@
-// §25.6 with §30.4: a module path whose destination is a signal of an
-// interface the module reaches through an interface port delays that signal
-// as a path to an output port delays the port.
-
 #include <algorithm>
 #include <string>
 #include <string_view>
@@ -21,8 +17,6 @@ namespace delta {
 
 namespace {
 
-// §30.4.2: the signals of the interface port `port` a module path of `mod`
-// ends at, `q` of `(posedge ch.c => (ch.q +: ch.d))` through `ch`.
 std::vector<std::string_view> PathDestinationsThrough(const RtlirModule& mod,
                                                       std::string_view port) {
   std::vector<std::string_view> names;
@@ -36,8 +30,6 @@ std::vector<std::string_view> PathDestinationsThrough(const RtlirModule& mod,
   return names;
 }
 
-// An identifier naming `text` as the scope the connection is lowered in reads
-// it.
 Expr* NameExpr(std::string text, Arena& arena) {
   auto* owned = arena.Create<std::string>(std::move(text));
   auto* id = arena.Create<Expr>();
@@ -48,12 +40,6 @@ Expr* NameExpr(std::string text, Arena& arena) {
 
 }  // namespace
 
-// A variable of the interface instance `instance` that a module path of
-// `inst` ends at, reached through its port `port_name`, is that path's output.
-// The instance writes a variable of its own under the port's name for it, in
-// place of the alias to the shared one, and a connection like an output
-// port's carries its value to the shared variable, delayed by the paths that
-// end at it.
 void Lowerer::DrivePathDelayedMembers(const RtlirModuleInst& inst,
                                       std::string_view port_name,
                                       const RtlirModule* ifc,

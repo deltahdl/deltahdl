@@ -33,11 +33,6 @@ namespace delta {
 
 namespace {
 
-// The rules on a declaration's type that hold wherever it is written
-// (CheckDeclaredTypeRules), `names_covergroup` answering for the covergroups
-// the module sees, and §25.9's on the interface a virtual interface type names
-// (ValidateVirtualInterfaceType), `find_module` resolving the name, on each
-// declaration inside `decl` ForEachInnerDeclaredType visits.
 void CheckInnerDeclaredTypes(
     const ModuleDecl* decl, const AggregateShapeCtx& ctx,
     const std::function<const ModuleDecl*(std::string_view)>& find_module,
@@ -53,53 +48,26 @@ void CheckInnerDeclaredTypes(
 
 void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
                                            RtlirModule* mod) {
-  // §11.2.1: constant-expression checks below (indexed part-select width, etc.)
-  // may reference module parameters, so evaluate them in the module's parameter
-  // scope rather than an empty one.
   ScopeMap scope = mod ? BuildParamScope(mod) : ScopeMap{};
-  // §11.4.12.1: expose the resolved module parameter scope to the replication-
-  // multiplier checks below so a parameter-valued multiplier is const-folded
-  // the same way a literal one is.
   replicate_multiplier_scope_ = scope;
-  // §11.4.14.2: expose the same resolved parameter scope to the streaming
-  // slice_size check so a parameter/localparam-valued slice size is
-  // const-folded (and its zero/negative rejection applied) the same way a
-  // literal one is.
   streaming_slice_size_scope_ = scope;
-  // §20.7.1: the array-query dimension index n is a constant expression, so
-  // expose the same resolved parameter scope to the variable-sized-dimension
-  // check for const-folding a parameter/localparam/genvar-valued n.
   array_query_dim_scope_ = scope;
-  // §7.7: the array-argument check folds a formal's dimension bounds, which may
-  // be parameter-valued, in the same scope.
   array_arg_dim_scope_ = scope;
-  // §20.16.3: the PLA ascending-order check folds declaration range bounds,
-  // which may be parameter- or localparam-valued, so give it the same resolved
-  // scope; and §8.25.1 the arguments of a specialization a procedure's
-  // declaration is written with. One statement for both keeps the function
-  // within its statement budget.
   pla_ascending_scope_ = procedural_typedef_scope_ = scope;
   for (const auto* item : decl->items) {
     ValidateItemConstraints(item, *mod, scope);
   }
-  // The bulk of module-level validation is an ordered series of independent
-  // single-element checks. Two of them inspect elaborator-wide state rather
-  // than the module declaration and must run in their original positions, so
-  // the dispatch is driven by an ordered table of pointer-to-member checks; a
-  // null decl-check entry is the cursor for the next no-argument check. This
-  // keeps the dispatch (and its exact execution order) in one place while
-  // staying well under the per-function statement budget.
   using DeclCheck = void (Elaborator::*)(const ModuleDecl*);
   using PlainCheck = void (Elaborator::*)();
   static constexpr DeclCheck kDeclChecks[] = {
       &Elaborator::ValidatePackageImportRules,
       &Elaborator::ValidateScopeRules,
-      nullptr,  // ValidateMixedAssignments
+      nullptr,
       &Elaborator::ValidateInputPortAssignments,
       &Elaborator::ValidatePatterns,
       &Elaborator::ValidateDisableTargets,
       &Elaborator::ValidateFinalTaskEnables,
-      nullptr,  // ValidateProceduralNetAssign
+      nullptr,
       &Elaborator::AdoptProceduralTypedefDims,
       &Elaborator::ValidateDynamicArrayNba,
       &Elaborator::ValidateArrayQueryOnDynamicType,
@@ -168,7 +136,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
       &Elaborator::ValidateClassMethodBodies,
       &Elaborator::ValidateThisUsage,
   };
-  // No-argument checks, consumed in order at each null table entry.
   static constexpr PlainCheck kPlainChecks[] = {
       &Elaborator::ValidateMixedAssignments,
       &Elaborator::ValidateProceduralNetAssign,
@@ -200,8 +167,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
   CheckNettypeUses(decl, *unit_, nettype_names_, diag_);
   CheckNewPlacement(decl, diag_);
   const TypeShapeTables kShapeTables{typedefs_, td_array_dims_, class_names_};
-  // §25.9 with §23.4: the interface a virtual interface type names is found
-  // from the module's scope, its nested declarations among it.
   CheckInnerDeclaredTypes(
       decl, {kShapeTables, &scope, diag_},
       [this](std::string_view name) { return FindModuleInScope(name); },
@@ -212,9 +177,6 @@ void Elaborator::ValidateModuleConstraints(const ModuleDecl* decl,
 
 namespace {
 
-// One half of what a time scope declares (§3.14.2.2): whether it states the
-// time unit, or the time precision, and the unit-with-magnitude it is written
-// as.
 struct DeclaredTime {
   bool declared;
   TimeUnit unit;
@@ -243,25 +205,17 @@ DeclaredTimescale DeclaredBy(const CompilationUnit* cu) {
       {cu->has_cu_timeprecision, cu->cu_time_prec, cu->cu_time_prec_magnitude}};
 }
 
-// A `timescale directive (§22.7) states both halves or, absent, neither.
 DeclaredTimescale DeclaredBy(bool has_timescale, const TimeScale& ts) {
   return {{has_timescale, ts.unit, ts.magnitude},
           {has_timescale, ts.precision, ts.prec_magnitude}};
 }
 
-// The running record of the §3.14.2.3 timescale-consistency scan: whether any
-// element was fully specified, whether any was not, and where the first that
-// was not stands.
 struct TimescaleScan {
   bool any_specified = false;
   bool any_unspecified = false;
   SourceLoc unspecified_loc;
 };
 
-// An element specifies its time unit, and likewise its precision, when it
-// declares it, when a `timescale precedes its header (§3.14.2.3 b), or when
-// the compilation unit declares one (c). Only the default (d) leaves it
-// unspecified.
 void ClassifyTimescaleElement(const DeclaredTimescale& own,
                               const DeclaredTimescale& directive,
                               const DeclaredTimescale& cu, SourceLoc loc,
@@ -278,11 +232,6 @@ void ClassifyTimescaleElement(const DeclaredTimescale& own,
   }
 }
 
-// §3.14 (printed page 59): a design element's time precision may be no coarser
-// than its time unit. The comparison is of the time scale the element runs at,
-// the one ModuleTimescale or PackageTimescale gives it by §3.14.2.3 (printed
-// page 60) and its delays are scaled by, wherever each half came from, so a
-// lone `timeunit 1ps;` is held to the 1 ns default precision.
 void CheckTimescaleOrder(const TimeScale& ts, SourceLoc loc, DiagEngine& diag) {
   if (EffectiveTimeOrder(ts.precision, ts.prec_magnitude) >
       EffectiveTimeOrder(ts.unit, ts.magnitude)) {
@@ -291,12 +240,6 @@ void CheckTimescaleOrder(const TimeScale& ts, SourceLoc loc, DiagEngine& diag) {
   }
 }
 
-// Checks a module, interface or program of `unit` and every module or interface
-// nested in it, `nested` saying whether `decl` stands inside another. A nested
-// element that declares neither half takes its pair whole from the one
-// enclosing it, so the pair is that element's and is reported there. An extern
-// declaration (§23.5) is not an element of its own and is left to its
-// definition.
 void CheckDesignElementTimescales(const ModuleDecl* decl, bool nested,
                                   const CompilationUnit& unit,
                                   DiagEngine& diag) {
@@ -315,15 +258,10 @@ void CheckDesignElementTimescales(const ModuleDecl* decl, bool nested,
 
 }  // namespace
 
-// The design elements `unit` declares, each classified into `scan` against
-// `unit`'s own compilation-unit declarations.
 static void ScanTimescaleElements(const CompilationUnit* unit,
                                   TimescaleScan& scan) {
   DeclaredTimescale cu = DeclaredBy(unit);
 
-  // An extern declaration (§23.5) declares the ports of the design element its
-  // definition gives, and is not an element of its own, so only the definition
-  // is classified.
   for (const auto* list :
        {&unit->modules, &unit->interfaces, &unit->programs}) {
     for (const auto* decl : *list) {
@@ -334,8 +272,6 @@ static void ScanTimescaleElements(const CompilationUnit* unit,
           cu, decl->range.start, scan);
     }
   }
-  // §3.2 (printed page 50) counts a package among the design elements, and
-  // §3.14.2.2 lets it declare its own time unit and precision.
   for (const auto* pkg : unit->packages) {
     ClassifyTimescaleElement(
         DeclaredBy(pkg),
@@ -346,9 +282,6 @@ static void ScanTimescaleElements(const CompilationUnit* unit,
 
 void Elaborator::ValidateTimescaleConsistency() {
   TimescaleScan scan;
-  // §3.14.2.3 (printed page 60) states the rule over the design elements of
-  // the design, whichever compilation unit each stands in, and §3.12.1 gives
-  // each its own unit's declarations to be specified by.
   UnitScopeTables::ForEachUnit(*this,
                                [&] { ScanTimescaleElements(unit_, scan); });
 
@@ -360,18 +293,11 @@ void Elaborator::ValidateTimescaleConsistency() {
   }
 }
 
-// §3.14: enforce the precision-no-coarser-than-unit rule on every design
-// element that can carry a time unit, from its declaration rather than from
-// module item elaboration: a package is never elaborated that way, and a
-// module, interface or program that is declared but never instantiated is
-// skipped by it, so scanning the declarations covers each exactly once. A
-// package is never nested, so it resolves from its own declarations, the
-// `timescale before its header and the compilation unit alone.
 void Elaborator::ValidateTimescaleOrder() {
   for (const auto* list :
        {&unit_->modules, &unit_->interfaces, &unit_->programs}) {
     for (const auto* decl : *list) {
-      CheckDesignElementTimescales(decl, /*nested=*/false, *unit_, diag_);
+      CheckDesignElementTimescales(decl, false, *unit_, diag_);
     }
   }
   const TimeScale kUnitScale = CompilationUnitTimescale(*unit_);

@@ -28,10 +28,6 @@ TEST(MultidimensionalArrayParsing, MultidimensionalPackedArray) {
 }
 
 TEST(MultidimensionalArrayParsing, MultiplePackedDimsBeforeNameAreAllPacked) {
-  // §7.4.4: dimensions written before the identifier are packed dimensions, and
-  // a multidimensional packed array may be declared with no unpacked dimensions
-  // at all. The same bracket syntax that becomes unpacked when it follows the
-  // name (see UnpackedDimMultiple) is recorded as packed when it precedes it.
   auto r = Parse("module m; bit [3:0] [7:0] x; endmodule\n");
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -43,10 +39,6 @@ TEST(MultidimensionalArrayParsing, MultiplePackedDimsBeforeNameAreAllPacked) {
 }
 
 TEST(MultidimensionalArrayParsing, CommaListSharesMultiplePackedDims) {
-  // §7.4.4: every name in a comma-separated declaration carries the same data
-  // type and the same packed dimensions; only the unpacked dimensions after
-  // each name are independent. Here v7 and v8 both inherit the two packed
-  // ranges [7:0][31:0], while their trailing unpacked dimensions differ.
   auto r = Parse(
       "module t;\n"
       "  bit [7:0] [31:0] v7 [1:5] [1:10], v8 [0:255];\n"
@@ -62,12 +54,10 @@ TEST(MultidimensionalArrayParsing, CommaListSharesMultiplePackedDims) {
   ASSERT_NE(v8->data_type.packed_dim_left, nullptr);
   EXPECT_EQ(v7->data_type.packed_dim_left->int_val,
             v8->data_type.packed_dim_left->int_val);
-  // The second packed dimension is shared too, not just the leading one.
   ASSERT_EQ(v7->data_type.extra_packed_dims.size(), 1u);
   ASSERT_EQ(v8->data_type.extra_packed_dims.size(), 1u);
   EXPECT_EQ(v7->data_type.extra_packed_dims[0].first->int_val,
             v8->data_type.extra_packed_dims[0].first->int_val);
-  // Unpacked dimensions remain per-name: v7 has two, v8 has one.
   EXPECT_EQ(v7->unpacked_dims.size(), 2u);
   EXPECT_EQ(v8->unpacked_dims.size(), 1u);
 }

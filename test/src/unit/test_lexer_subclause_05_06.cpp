@@ -40,12 +40,6 @@ TEST(LexicalConventionLexing, SimpleIdentMixed) {
   EXPECT_EQ(r.token.text, "abc_123$xyz");
 }
 
-// §5.6: a simple identifier may not begin with a digit or $. The lexer does not
-// report `42abc`, it splits it: Lexer::Next() sends a leading digit to
-// Lexer::LexNumber(), which stops at `a` and yields the integer literal `42`,
-// and the identifier scan then takes `abc`. This fails if the digit run is
-// folded into one identifier token, or if the text of either token moves the
-// boundary between them.
 TEST(LexicalConventionLexing, DigitStartIsNumber) {
   auto tokens = Lex("42abc ");
   ASSERT_GE(tokens.size(), 3u);
@@ -55,20 +49,12 @@ TEST(LexicalConventionLexing, DigitStartIsNumber) {
   EXPECT_EQ(tokens[1].text, "abc");
 }
 
-// §5.6 bars the leading $ from a simple identifier, and §5.6.3 reads a name
-// following $ as a system task or system function. This fails if `$abc` comes
-// back as anything but the system identifier, or if its text drops the `$` that
-// decides the interpretation.
 TEST(LexicalConventionLexing, DollarStartIsNotIdentifier) {
   auto r = LexOne("$abc ");
   EXPECT_EQ(r.token.kind, TokenKind::kSystemIdentifier);
   EXPECT_EQ(r.token.text, "$abc");
 }
 
-// §5.6: no keyword (§5.6.2) may serve as a user-defined identifier.
-// Lexer::LexIdentifier() scans the word and hands it to LookupKeyword(), so
-// `module` comes back under its own kind rather than as an identifier. This
-// fails if the keyword table stops covering `module` for the version in force.
 TEST(LexicalConventionLexing, KeywordIsNotIdentifier) {
   auto r = LexOne("module ");
   EXPECT_EQ(r.token.kind, TokenKind::kKwModule);
@@ -116,11 +102,6 @@ TEST(LexicalConventionLexing, EscapedMaxLength1024Ok) {
   EXPECT_EQ(tokens[0].text.size(), 1024u);
 }
 
-// The limit reads like an internal one and is not. §5.6 lets an implementation
-// cap identifier length, but at no fewer than 1024 characters, and requires an
-// error report for an identifier past the cap. The standard requires the
-// report, so the record names 5.6 rather than leaving the number to look like a
-// fact about this run.
 TEST(LexicalConventionLexing, OverLimitIdentifierNames5_6) {
   auto diags = LexDiagnostics(std::string(1025, 'a'));
   EXPECT_TRUE(ReportedError(

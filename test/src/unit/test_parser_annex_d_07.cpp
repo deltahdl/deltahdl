@@ -6,8 +6,6 @@ using namespace delta;
 
 namespace {
 
-// Annex D.7: $nolog is invoked with no argument, parsing as an ordinary system
-// task call.
 TEST(OptionalLogParserParsing, NologNoArgument) {
   auto r = Parse(
       "module m;\n"
@@ -16,7 +14,6 @@ TEST(OptionalLogParserParsing, NologNoArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.7: $log may be invoked with no argument, reenabling log output.
 TEST(OptionalLogParserParsing, LogNoArgument) {
   auto r = Parse(
       "module m;\n"
@@ -25,8 +22,6 @@ TEST(OptionalLogParserParsing, LogNoArgument) {
   ASSERT_NE(r.cu, nullptr);
 }
 
-// Annex D.7: the optional argument to $log is a string literal naming the new
-// log file.
 TEST(OptionalLogParserParsing, LogFilenameArgument) {
   auto r = Parse(
       "module m;\n"

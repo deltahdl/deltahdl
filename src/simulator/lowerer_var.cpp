@@ -29,7 +29,6 @@
 
 namespace delta {
 
-// The layout itself is built and registered in lowerer_var_layout.cpp.
 static void RegisterStructInfo(std::string_view name, const RtlirVariable& var,
                                Variable* v, SimContext& ctx, Arena& arena) {
   RegisterAggregateLayout(name, var.dtype, var.width, ctx, arena);
@@ -51,44 +50,12 @@ const Expr* StringLiteralSource(const Expr* expr) {
   return expr->kind == ExprKind::kStringLiteral ? expr : nullptr;
 }
 
-// §6.8, Table 6-7: the value an element left without one takes -- the default
-// initial value of its own type, 'x for a 4-state integral and '0 for a 2-state
-// one. An element is a variable of the array's element type, so the rule
-// reaches it exactly as it reaches a scalar declared alongside; only the
-// 2-state case is zero. Both of this function's callers write the same rule,
-// and the two makers of array leaves have already drifted once over a
-// per-element property of exactly this kind (the is_4state/is_signed flags), so
-// it is written once.
 static Logic4Vec ElementDefaultInitialValue(const RtlirVariable& var,
                                             Arena& arena) {
   return var.is_4state ? MakeAllX(arena, var.width)
                        : MakeLogic4VecVal(arena, var.width, 0);
 }
 
-// §10.5 makes a variable declaration assignment one particular kind of
-// procedural assignment, and §10.9.1 evaluates each pattern item in the
-// assignment context of its element, so an item stored on a leaf takes the two
-// steps a runtime write to that element takes: §10.7's resize to the element
-// width, and §6.11.2's conversion of every unknown or high-impedance bit to
-// zero on the way into a 2-state type. The resize is not the second of those:
-// ResizeToWidth answers its argument untouched when the widths already match,
-// and copies the bval plane word for word when they differ, so an x reached a
-// `bit` element either way -- where the same value written to the same element
-// by a statement (WriteVar), or to a scalar of the same type by a declaration
-// (CoerceVarInitValue), reads 0. The three helpers below each stored their item
-// without it.
-//
-// The copy is taken before the coercion because the coercion writes in place
-// and an item that is a bare name is answered with that variable's own
-// Logic4Vec (§6.8): coercing through it would clear the source's own unknown
-// bits, which is the defect #3563 removed elsewhere. It is worth taking on the
-// 4-state path too, a leaf sharing one buffer with the variable its initializer
-// read being the same family again.
-//
-// §10.7 converts the item to the element's type, signedness included: `logic
-// [3:0] lv[2] = '{9, 10}` holds two unsigned elements, and the signed integer
-// literals left their signedness on the values, so lv[0] read -7 where a
-// procedural write of the same 9 reads 9.
 static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
                                      Arena& arena) {
   val = ArrayItemForElement(var, val, arena);
@@ -97,9 +64,6 @@ static Logic4Vec CoerceArrayInitItem(const RtlirVariable& var, Logic4Vec val,
   return val;
 }
 
-// The element variable an initializer's item is stored in, with the
-// element's structure layout for an array of structures, whose pattern items
-// are packed by it (§10.9.2), and null for any other.
 struct ElementTarget {
   Variable* elem = nullptr;
   const StructTypeInfo* layout = nullptr;
@@ -127,8 +91,6 @@ static void InitArrayElement(const RtlirVariable& var, uint32_t elem_idx,
         var, EvalItemForLayout(elements[elem_idx], layout, ctx, arena), arena);
     return;
   }
-  // Past the end of the pattern's items no value was supplied for this element
-  // either, so Table 6-7 governs it the same way.
   elem->value = ElementDefaultInitialValue(var, arena);
 }
 
@@ -149,13 +111,6 @@ static void InitArrayFromReplicate(const RtlirVariable& var, uint32_t elem_idx,
       arena);
 }
 
-// §10.9.1: a key resolves a value evaluated in the assignment context of the
-// element -- an index key, then a type key, then, for an element that is a
-// structure no type key matches, the type keys and the default applied to its
-// members, and then the default, member by member for a structure element. An
-// element no key covers is a pattern the clause forbids, reported at
-// elaboration; for a caller that goes on, it answers Table 6-7 as the
-// positional and multidimensional makers do.
 static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
                                const ElementTarget& target, SimContext& ctx,
                                Arena& arena) {
@@ -181,16 +136,11 @@ static void InitArrayFromNamed(const RtlirVariable& var, uint32_t idx,
   target.elem->value = CoerceArrayInitItem(var, val, arena);
 }
 
-// §7.4.4: two dimensions or more, the bounds of every one folded.
 static bool IsMultiDimArray(const RtlirVariable& var) {
   return var.unpacked_dim_sizes.size() >= 2 &&
          var.unpacked_dims.size() == var.unpacked_dim_sizes.size();
 }
 
-// §7.4.2: register a fixed multidimensional unpacked array and create its
-// leaves. The single-dimension lo/size keep describing the outermost dimension
-// (so existing whole-array and outer-index paths still work), while dim_los /
-// dim_sizes carry every dimension. Returns false for a single-dimension array.
 static bool TryCreateMultiDimArray(std::string_view name,
                                    const RtlirVariable& var, SimContext& ctx,
                                    Arena& arena) {
@@ -203,11 +153,6 @@ static bool TryCreateMultiDimArray(std::string_view name,
   info.is_4state = var.is_4state;
   RecordElementType(info, var, ctx, arena);
   info.elem_type_is_unpacked_array = var.element.type_is_unpacked_array;
-  // ArrayInfo::dim_los is uint32_t, so a negative bound (§7.4.2) is held as
-  // its 32 bits, the bits CreateMultiDimLeaves names the leaves by. The
-  // direction beside it is the comparison of the two int64_t bounds, made here
-  // before either is narrowed, so `[-1:-3]` records as descending however its
-  // low bound lands.
   info.dim_los.reserve(var.unpacked_dims.size());
   info.dim_descending.reserve(var.unpacked_dims.size());
   for (const auto& dim : var.unpacked_dims) {
@@ -216,22 +161,16 @@ static bool TryCreateMultiDimArray(std::string_view name,
   }
   info.dim_sizes = var.unpacked_dim_sizes;
   ctx.RegisterArray(name, info);
-  FillMultiDimLeaves(name, var, ctx, arena, /*in_place=*/false);
+  FillMultiDimLeaves(name, var, ctx, arena, false);
   return true;
 }
 
-// §7.4.2: "name[idx]", the address of position `i` counted from the low bound.
 static std::string ArrayElementKey(std::string_view name,
                                    const RtlirVariable& var, uint32_t i) {
   uint32_t idx = static_cast<uint32_t>(var.unpacked_lo) + i;
   return std::string(name) + "[" + std::to_string(idx) + "]";
 }
 
-// §10.9.1: the value the declaration's initializer gives the element at
-// position `i` of a one-dimensional array, by the item form the pattern
-// wrote -- keyed, replicated or positional -- or §6.8 Table 6-7's default
-// where it names none; a keyed item is found by the element's address and a
-// positional one counted from the declaration's left bound (§11.5.2).
 static void FillArrayElement(const RtlirVariable& var, uint32_t i,
                              const ElementTarget& target, SimContext& ctx,
                              Arena& arena) {
@@ -267,23 +206,9 @@ void CreateArrayElements(std::string_view name, const RtlirVariable& var,
     auto* stored = arena.Create<std::string>(ArrayElementKey(name, var, i));
     auto* elem = ctx.CreateVariable(*stored, var.width);
     RecordPackedRange(var.dtype, elem, ctx, arena);
-    // §6.11.2: in a 2-state type every unknown or high-impedance bit is turned
-    // to zero, and the flag is what decides whether that
-    // conversion runs at all -- WriteVar coerces only when it is clear, so an
-    // element left at Variable's 4-state default keeps an x a runtime write
-    // put there. The two makers of array leaves disagreed about this:
-    // CreateMultiDimLeaves carried the declaration's state-ness and
-    // signedness onto every leaf and this one carried neither, so
-    // `bit [7:0] c [0:1]` and `bit [7:0] d [0:1][0:1]` answered `= 8'hxx`
-    // differently on one write path. The sibling was right; an element is a
-    // variable of the array's element type, so it is 2-state exactly when the
-    // declaration is. §6.11.3 likewise fixes signedness by the declaration
-    // rather than by whatever value flowed in.
     elem->is_4state = var.is_4state;
     elem->is_signed = var.is_signed;
     elem->is_string = var.is_string;
-    // §15.5 with §7.4: an element of an array of events is a named event,
-    // which `-> arr[1]` triggers and `@arr[1]` waits on (EventArrayElement).
     elem->is_event = var.is_event;
     FillArrayElement(var, i, {elem, ctx.GetVariableStructType(name)}, ctx,
                      arena);
@@ -294,7 +219,7 @@ void InitArrayElements(std::string_view name, const RtlirVariable& var,
                        SimContext& ctx, Arena& arena) {
   if (var.unpacked_size == 0) return;
   if (IsMultiDimArray(var)) {
-    FillMultiDimLeaves(name, var, ctx, arena, /*in_place=*/true);
+    FillMultiDimLeaves(name, var, ctx, arena, true);
     return;
   }
   for (uint32_t i = 0; i < var.unpacked_size; ++i) {
@@ -311,10 +236,6 @@ static std::string StripQuotes(std::string_view s) {
   return std::string(s);
 }
 
-// §7.5.1: a dynamic array declaration may use the new[] constructor as its
-// declaration-assignment right-hand side. Size the array, default-initialize
-// its elements, then copy from the optional initialization array. Returns true
-// when the init_expr was a new[] constructor (handled here).
 static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
                                  SimContext& ctx, Arena& arena) {
   if (init_expr->kind != ExprKind::kCall || init_expr->text != "new" ||
@@ -329,14 +250,6 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
                         Subclause("7.5.1"));
     return true;
   }
-  // §7.5.1: with no initialization expression each element starts at its
-  // type's default value -- elements, each one initialized, and §6.8 makes
-  // each a data object that keeps its value from one assignment to the next,
-  // so each owes its own words. vector::assign(n, value) copy-constructs every
-  // slot it makes from the single value it is handed, and a Logic4Vec copy
-  // carries the `words` pointer rather than the words, so filling that way gave
-  // `int d[] = new[4];` one buffer read four times. Building the elements one
-  // at a time gives each its own allocation.
   q->elements.clear();
   q->elements.reserve(static_cast<size_t>(sz));
   for (int64_t i = 0; i < sz; ++i)
@@ -345,14 +258,6 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
     auto* src_expr = init_expr->args[1];
     if (src_expr && src_expr->kind == ExprKind::kIdentifier) {
       if (auto* src = ctx.FindQueue(src_expr->text)) {
-        // §7.5.1: the optional initialization expression gives the dynamic
-        // array its initial contents. Each entry it initializes is a store
-        // of its own, so each takes a copy of the source entry's words rather
-        // than the pointer a plain Logic4Vec assignment would leave the two
-        // sharing. The clause says what the sharing breaks: reinitializing
-        // with new destroys the old contents and leaves every earlier reference
-        // to an element outdated, and an entry still naming the source's
-        // words is exactly such a reference left live.
         size_t copy_len = std::min(q->elements.size(), src->elements.size());
         for (size_t i = 0; i < copy_len; ++i)
           q->elements[i] = OwnRhsWords(src->elements[i], arena);
@@ -364,11 +269,6 @@ static bool LowerDynArrayNewInit(const Expr* init_expr, QueueObject* q,
   return true;
 }
 
-// `q` is the store this declaration's own name was just created under, passed
-// rather than looked up again: the name is already qualified by the instance,
-// and SimContext::FindQueue resolves a name within the instance being built,
-// so a second lookup would search for the qualified name inside the instance
-// that qualified it.
 void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
                            Arena& arena) {
   if (!q || !init) return;
@@ -378,7 +278,6 @@ void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
     return;
   }
   std::vector<Logic4Vec> items;
-  // §10.10: a concatenation's array items contribute each of their elements.
   if (init->kind == ExprKind::kConcatenation) {
     CollectQueueElements(init, ctx, arena, items);
   } else if (init->kind == ExprKind::kAssignmentPattern) {
@@ -390,10 +289,6 @@ void InitQueueFromDeclInit(QueueObject* q, const Expr* init, SimContext& ctx,
   for (const auto& item : items)
     q->elements.push_back(SizedForQueueElement(*q, item, arena));
   EnforceQueueBound(q, "declaration initializer", init->range.start, ctx);
-  // Every element carries an id, and the two lists are indexed together, so
-  // they have to be the same length however the elements arrived. Leaving the
-  // ids empty here made an initialized queue's first insert at a nonzero index
-  // offset past the end of the id list.
   q->AssignFreshIds();
 }
 
@@ -407,13 +302,6 @@ void InitAssocFromDeclInit(const Expr* init, AssocArrayObject* aa,
   for (size_t i = 0; i < init->pattern_keys.size(); ++i) {
     if (i >= init->elements.size()) break;
     const auto* key = init->pattern_keys[i];
-    // §7.9.11's literal gives the array a default and its named entries their
-    // values, and each of those is storage of its own under §6.8. A bare item
-    // name of the element width is answered with that variable's own
-    // Logic4Vec, so without the copy `int aa[int] = '{default: seed}` would
-    // leave the array's default sharing seed's words: a later in-place deposit
-    // into seed -- a bit-select write, say -- would rewrite the default, and
-    // through it every entry allocated from the default.
     auto val = OwnRhsWords(EvalExpr(init->elements[i], ctx, arena), arena);
     if (key->text == "default") {
       aa->has_default = true;
@@ -421,11 +309,6 @@ void InitAssocFromDeclInit(const Expr* init, AssocArrayObject* aa,
     } else if (aa->is_string_key) {
       aa->str_data[StripQuotes(key->text)] = val;
     } else {
-      // §7.9.11: an integer-keyed entry is written at the index its key
-      // evaluates to, which is the whole key expression's value. It is read as
-      // an index of this array's declared index type, the same way a key
-      // written on the left of an assignment to one element is, so that a key
-      // and an index that name one entry land on one entry.
       auto key_val = EvalExpr(key, ctx, arena);
       aa->int_data[AssocIntKey(key_val, aa->is_wildcard, aa->index_width,
                                aa->is_index_signed)] = val;
@@ -447,17 +330,8 @@ static void ApplyStructMemberDefaults(std::string_view name,
   ApplyLayoutDefaults(v->value, *sinfo, 0, ctx, arena);
 }
 
-// §21.7.5 (Table 21-11): the effective type keyword under which a variable is
-// dumped to a VCD file. Normally the declared element type keyword, with two
-// substitutions the table calls out: a typed enum is dumped as its specified
-// base type rather than the default integer/32, and a packed structure is
-// dumped as a single reg vector (masqueraded here as a bit vector so it carries
-// the reg keyword and its collapsed total width, exactly like a packed array).
 static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
   DataTypeKind kind = var.elem_type_kind;
-  // A variable declared through a typedef carries the named kind; the
-  // elaborator resolved the underlying type onto var.dtype, so recover its kind
-  // to see the real enum/struct/integral type the typedef names.
   if (kind == DataTypeKind::kNamed && var.dtype != nullptr)
     kind = var.dtype->kind;
   if (kind == DataTypeKind::kEnum && var.dtype != nullptr &&
@@ -469,16 +343,10 @@ static DataTypeKind VcdEffectiveDeclKind(const RtlirVariable& var) {
   return kind;
 }
 
-// §25.9: whether the declaration wrote a virtual interface type, whose
-// variable holds the handle of the interface instance it represents.
 static bool IsVirtualInterfaceDecl(const RtlirVariable& var) {
   return var.elem_type_kind == DataTypeKind::kVirtualInterface;
 }
 
-// The width of the variable's storage: a class handle (§8.3), a virtual
-// interface handle (§25.9) and a covergroup handle (§19.3) are 64 bits wide
-// whatever the declaration's own width says, and every other declaration is
-// as wide as it was elaborated.
 static uint32_t StorageWidth(const RtlirVariable& var) {
   if (!var.class_type_name.empty() || IsVirtualInterfaceDecl(var) ||
       var.covergroup != nullptr) {
@@ -487,11 +355,6 @@ static uint32_t StorageWidth(const RtlirVariable& var) {
   return var.width;
 }
 
-// §25.9: a virtual interface variable holds the handle of the interface
-// instance it represents, 64 bits wide as a class handle is, and holds the
-// null handle before it is initialized; marking it is what makes a member
-// reached through it a component of that instance. Does nothing for a
-// variable of any other type.
 static void MarkVirtualInterfaceVar(const RtlirVariable& var, Variable* v,
                                     uint32_t width, SimContext& ctx,
                                     Arena& arena) {
@@ -500,12 +363,6 @@ static void MarkVirtualInterfaceVar(const RtlirVariable& var, Variable* v,
   v->value = MakeLogic4VecVal(arena, width, 0);
 }
 
-// §8.25: a class variable declared with a specialization, `G #(5) b`, has
-// the parameter value assignment recorded under its name before anything
-// constructs an object for it -- the declaration's own `= new` in
-// TryLowerClassNewVarInit, or a later `b = new` in a procedural block -- so
-// that either construction binds the actuals on the object. Does nothing for
-// a variable of any other type.
 static void RecordClassSpecialization(std::string_view name,
                                       const RtlirVariable& var,
                                       SimContext& ctx) {
@@ -514,9 +371,6 @@ static void RecordClassSpecialization(std::string_view name,
                           var.class_data_type->type_params, ctx);
 }
 
-// §21.7.5 (Table 21-11) with §6.19: the declared type keyword a dumped
-// variable's $var masquerades by, and whether the storage is an enumeration's
-// named constant, which no dump declares.
 static void RecordVcdDeclaration(std::string_view name,
                                  const RtlirVariable& var, SimContext& ctx) {
   ctx.Vcd().SetVcdVarKind(name, VcdEffectiveDeclKind(var));
@@ -537,34 +391,19 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
   if (var.is_chandle) v->value = MakeLogic4VecVal(arena_, width, 0);
   v->is_4state = var.is_4state;
   v->declared_type = var.written_type != nullptr ? var.written_type : var.dtype;
-  // §20.6.1, step d: the fixed unpacked dimensions the variable was declared
-  // with, as $typename writes them.
   v->declared_unpacked = *arena_.Create<std::string>(UnpackedDimsText(var));
   if (var.is_event) v->is_event = true;
   if (var.is_signed) v->is_signed = true;
   if (var.is_string) ctx_.RegisterStringVariable(name);
-  // §6.12: the mark the store and read paths take from the variable itself,
-  // beside the name the readers that hold no Variable ask for.
   v->is_real = var.is_real;
   if (var.is_real) ctx_.RegisterRealVariable(name);
-  // §21.7.5 (Table 21-11): remember the declared type keyword so this
-  // variable's $var declaration masquerades as the matching 1364-2005 var_type
-  // when dumped.
   RecordVcdDeclaration(name, var, ctx_);
-  // §21.2.1.6: the %p renderer prints a null chandle as "null", so it needs to
-  // know which variables are chandles.
   if (var.is_chandle) ctx_.RegisterChandleVariable(name);
   RegisterStructInfo(name, var, v, ctx_, arena_);
-  // §6.19.5.7 with §6.21: the enumeration a variable is declared with is a
-  // fact of the declaration, and its initializer may call a method of it on
-  // the variable itself, `Colors c = c.first;` as the subclause's own example
-  // does, so the record stands before the initializer is evaluated.
   if (!var.enum_type_name.empty() && var.dtype) {
     RegisterEnumForCast(name, var);
     ctx_.SetStorageEnumType(v, var.enum_type_name);
   }
-  // §27.4: a declaration in a loop generate block reads the instance's loop
-  // index in its initializer, a semaphore's `new(i + 1)` among them.
   GenBlockConstFrame loop_consts(var.gen_block_consts, ctx_, arena_);
   if (var.init_expr) {
     ctx_.SetLoweringGenBlockPrefix(var.gen_block_prefix);
@@ -572,31 +411,12 @@ void Lowerer::LowerVar(std::string_view name, const RtlirVariable& var) {
     ctx_.SetLoweringGenBlockPrefix({});
   }
   if (!var.init_expr) ApplyStructMemberDefaults(name, var, v, ctx_, arena_);
-  // §8.25: the specialization recorded above stands; the generic class's bare
-  // name does not replace it.
   if (!var.class_type_name.empty() && ctx_.GetVariableClassType(name).empty())
     ctx_.SetVariableClassType(name, var.class_type_name);
   CreateSyncObjectForVar(name, var, v, ctx_, arena_);
   LowerVarAggregate(name, var);
 }
 
-// §8.7/§6.8: a class-handle declaration initialized with `new` constructs the
-// object as part of static initialization (before any initial/always block),
-// the same as a runtime `handle = new(args)` assignment. Generic EvalExpr
-// cannot do this because a bare `new` call carries no target class type; the
-// declared handle type supplies it. §8.25: the object is then bound to the
-// specialization the declaration wrote, `G #(5) b = new`, as the procedural
-// declaration path binds its own (TryExecClassVarDecl); built without it, a
-// method of `b` read every parameter as the class's default. §8.30.1
-// (printed page 217 of IEEE 1800-2023) with §6.21 (printed 132-133): the
-// built-in weak_reference class, of which the run holds no record, has its own
-// `new(obj)`, taken through EvalWeakReferenceNew as the procedural `w =
-// new(h)` (TryClassNewAssign) and a package's or the unit's declaration
-// (ConstructClassNewInit, lowerer_package_data.cpp) take it, so a module's
-// `weak_reference #(C) w = new(h);` refers to the object its earlier `C h =
-// new;` constructed; handed to EvalClassNew, which found no class, it
-// constructed nothing and `w.get()` answered null. Returns true when it
-// handled a class-new initializer.
 static bool TryLowerClassNewVarInit(std::string_view name,
                                     const RtlirVariable& var, Variable* v,
                                     SimContext& ctx, Arena& arena) {
@@ -607,9 +427,6 @@ static bool TryLowerClassNewVarInit(std::string_view name,
     v->value = EvalWeakReferenceNew(var.init_expr, ctx, arena);
     return true;
   }
-  // §8.25: the specialization RecordClassSpecialization recorded is the type
-  // constructed; the bare class name is the generic class, which the clause
-  // makes no type at all (class_specialization.h).
   std::string_view cls = ctx.GetVariableClassType(name);
   if (cls.empty()) cls = var.class_type_name;
   v->value =
@@ -618,9 +435,6 @@ static bool TryLowerClassNewVarInit(std::string_view name,
   return true;
 }
 
-// §6.17/§15: an event variable initialized to `null` is a null event; one
-// initialized to another event identifier aliases that event. Returns true when
-// it handled an event initializer.
 static bool TryLowerEventVarInit(std::string_view name,
                                  const RtlirVariable& var, Variable* v,
                                  SimContext& ctx) {
@@ -638,22 +452,6 @@ static bool TryLowerEventVarInit(std::string_view name,
   return false;
 }
 
-// §6.12.1: a declaration initializer is an assignment, so an initializer that
-// crosses the real/integer boundary undergoes the same implicit conversion as a
-// procedural assign (round-to-nearest ties-away one way; x/z->0 numeric
-// conversion the other), never a raw bit reinterpretation of the operand.
-// §5.7.1 final paragraph: a sized signed literal is sign-extended when
-// assigned to a wider logic object whether or not the object is signed, and
-// §11.6.1 with §11.8.2 extends any signed operand the same way into an int or
-// integer. The initializer is sized by ResizeToWidth, which sign-extends on
-// the value's is_signed exactly as WriteVar does for the procedural assignment
-// the initializer stands for (§6.8); widening through the value's unsigned
-// integer read `int c = 4'shf` as 15 and `int f = -8'sd6` as 250 where the
-// `initial c = 4'shf` beside it read -1 and -6.
-// §6.11.2: assigning a 4-state initializer to a 2-state variable is likewise an
-// automatic conversion, so unknown/high-impedance bits become zero; the resize
-// keeps them, as a 4-state object of another width holds the x or z the
-// literal wrote, and the coercion below clears them for a 2-state one.
 Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
                                       uint32_t width) {
   if (val.is_real != var.is_real && !var.is_string && !val.is_string &&
@@ -662,9 +460,6 @@ Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
   if (val.width != width && !var.is_real && !var.is_string)
     val = ResizeToWidth(val, width, arena_);
   if (var.is_string) val = StripStringZeros(val, arena_);
-  // §6.11: an integral variable is signed or unsigned as declared, so the
-  // value it starts with is too, not the initializer's: `logic a = 1` holds an
-  // unsigned 1 though the literal 1 is signed.
   if (!var.is_string && !var.is_real && !var.is_event && !var.is_chandle) {
     val.is_signed = var.is_signed;
     if (!var.is_4state) CoerceTo2State(val);
@@ -672,21 +467,10 @@ Logic4Vec Lowerer::CoerceVarInitValue(const RtlirVariable& var, Logic4Vec val,
   return val;
 }
 
-// §11.6: a declaration initializer is an assignment, so its target width is the
-// context the initializer expression is evaluated in, exactly as for a
-// procedural assign. For a plain integral scalar target this lets an arithmetic
-// initializer such as `logic [16:0] s = a + b;` keep the carry-out that a
-// self-determined evaluation at the operands' own width would drop. Aggregate,
-// real, string, event, and chandle initializers keep their dedicated sizing and
-// stay self-determined.
 void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
                            Variable* v, uint32_t width) {
   if (TryLowerEventVarInit(name, var, v, ctx_)) return;
   if (TryLowerClassNewVarInit(name, var, v, ctx_, arena_)) return;
-  // §8.8: `C c = D::new;` at module scope constructs the specified type during
-  // static initialization. The argument-less typed constructor is a bare
-  // scope-resolved member access, not a `new` call, so route it to the typed
-  // construction path before the generic initializer lowering below.
   {
     Logic4Vec typed;
     if (var.init_expr &&
@@ -702,27 +486,14 @@ void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
   if (init->kind == ExprKind::kCast && init->lhs &&
       init->lhs->kind == ExprKind::kAssignmentPattern)
     init = init->lhs;
-  // §10.9.2: a struct-typed declaration initializer that is an assignment
-  // pattern (keyed or positional) is evaluated against the member layout, so
-  // each member expression is coerced to its member's type.
   if (init->kind == ExprKind::kAssignmentPattern && sinfo) {
     v->value = EvalStructPatternValue(init, sinfo, ctx_, arena_);
     return;
   }
-  // §11.4.14 (printed page 291): a streaming concatenation is evaluated at
-  // its own width and then left-aligned in the fixed-size variable it
-  // initializes, widened with zero bits on the right, or reported where the
-  // variable is the narrower -- the rule InitializeDeclVariable applies to a
-  // block-local declaration. Evaluated under the declared width, `bit
-  // [127:0] m = {<< 32 {a, b, c}}` at module scope held the 96-bit stream
-  // right-aligned.
   bool is_stream = init->kind == ExprKind::kStreamingConcat && !var.is_string;
   bool self_determined = sinfo != nullptr || var.is_real || var.is_string ||
                          var.is_event || var.is_chandle || is_stream ||
                          init->kind == ExprKind::kAssignmentPattern;
-  // §11.9: a tagged initializer is evaluated by the union's layout as the
-  // assignment `u = tagged M v` is, each member value converted to its
-  // member's type (EvalTaggedForLayout).
   auto val = EvalTaggedOrPlain(var.init_expr, sinfo, ctx_, arena_,
                                self_determined ? 0 : width);
   if (is_stream && width > 0) {
@@ -731,13 +502,6 @@ void Lowerer::LowerVarInit(std::string_view name, const RtlirVariable& var,
   }
   v->value = CoerceVarInitValue(var, val, width);
 
-  // §11.9: initializing a tagged-union variable with a tagged expression
-  // establishes the variable's active tag, exactly as the procedural
-  // `u = tagged Member value` assignment does. Without this the tag would stay
-  // undefined and a later member access would not be checked against the tag
-  // set by the initializer. `name` is the key the storage was created under,
-  // instance-prefixed inside a child (§23.9), which is the key every writer
-  // and reader of the tag resolves a bare name to (TagKeyOfName).
   if (var.init_expr->kind == ExprKind::kTagged && var.init_expr->rhs)
     ctx_.SetVariableTag(name, var.init_expr->rhs->text);
 }

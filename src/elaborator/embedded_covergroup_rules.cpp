@@ -72,9 +72,6 @@ void CollectCrossReads(const CoverCrossDecl& cross, Reads& reads) {
   }
 }
 
-// The names the expressions of `cg` read: its options' values, its
-// coverpoints' expressions, guards and bins, and its crosses' guards, options
-// and bins.
 Reads CovergroupReads(const CovergroupDecl& cg) {
   Reads reads;
   for (const CoverageSpecOrOption& item : cg.items) {
@@ -93,8 +90,6 @@ Reads CovergroupReads(const CovergroupDecl& cg) {
   return reads;
 }
 
-// Whether `name` is a formal of `cg`, of its covergroup or of its sample
-// method (§19.8.1), which hides any property of that name.
 bool IsFormalOf(const CovergroupDecl& cg, std::string_view name) {
   if (FindCovergroupFormal(cg, name) != nullptr) return true;
   for (const FunctionArg& formal : cg.event.sample_formals) {
@@ -103,7 +98,6 @@ bool IsFormalOf(const CovergroupDecl& cg, std::string_view name) {
   return false;
 }
 
-// Whether `s` or a statement it holds satisfies `pred`.
 bool AnyStmt(const Stmt* s, const std::function<bool(const Stmt*)>& pred) {
   if (s == nullptr) return false;
   if (pred(s)) return true;
@@ -113,7 +107,6 @@ bool AnyStmt(const Stmt* s, const std::function<bool(const Stmt*)>& pred) {
   return found;
 }
 
-// Whether `s` builds the covergroup `cg` of `cls`, assigning it a `new`.
 bool BuildsCovergroupAt(const Stmt* s, const ClassDecl* cls,
                         std::string_view cg) {
   return OwnPropertyAssigned(s, cls) == cg && s->rhs->text == "new";
@@ -130,8 +123,6 @@ bool BuildsCovergroup(const Stmt* s, const ClassDecl* cls,
                  [&](const Stmt* t) { return BuildsCovergroupAt(t, cls, cg); });
 }
 
-// §19.3: each `new` the constructor statements `stmts` of `cls` build an
-// instance of the covergroup `cg` with.
 void CheckConstructorNews(const std::vector<Stmt*>& stmts, const ClassDecl* cls,
                           const CovergroupDecl& cg, DiagEngine& diag) {
   const CovergroupDeclared kNoNets = [](std::string_view) { return false; };
@@ -145,27 +136,18 @@ void CheckConstructorNews(const std::vector<Stmt*>& stmts, const ClassDecl* cls,
   }
 }
 
-// Where a constructor initializes an instance constant relative to the
-// statement building a covergroup that reads it.
 enum class InitOrder : uint8_t { kUnknown, kInitFirst, kNewFirst, kTogether };
 
-// The looping statements, and fork, which in a constructor is fork-join_none:
-// a function holds no other fork (§13.4).
 constexpr std::array<StmtKind, 7> kRepeatedOrForked = {
     StmtKind::kFor,    StmtKind::kForeach, StmtKind::kWhile, StmtKind::kForever,
     StmtKind::kRepeat, StmtKind::kDoWhile, StmtKind::kFork};
 
-// A class whose constructor is read, with the names of an instance constant
-// of it and of a covergroup it builds.
 struct CtorOrder {
   const ClassDecl* cls;
   std::string_view constant;
   std::string_view cg;
 };
 
-// The order in which the statements `stmts` initialize the constant and build
-// the covergroup `order` names: by the first statement doing either, a
-// sequential block doing both being read in turn.
 InitOrder OrderIn(const std::vector<Stmt*>& stmts, const CtorOrder& order) {
   for (const Stmt* s : stmts) {
     bool init = AssignsTo(s, order.cls, order.constant);
@@ -184,8 +166,6 @@ InitOrder OrderIn(const std::vector<Stmt*>& stmts, const CtorOrder& order) {
   return InitOrder::kUnknown;
 }
 
-// A covergroup `cg` the class `cls` embeds, the unit holding the classes
-// `cls` may extend, and where the reports go.
 struct ClassSite {
   const ClassDecl* cls;
   const CovergroupDecl& cg;
@@ -193,17 +173,12 @@ struct ClassSite {
   DiagEngine& diag;
 };
 
-// Whether `name` is an instance constant of `cls`: a const property declared
-// without an initializer, which the constructor assigns (§8.19).
 bool IsInstanceConstant(const ClassDecl* cls, std::string_view name,
                         const CompilationUnit* unit) {
   const ClassMember* m = FindMemberInClass(cls, name, unit);
   return m != nullptr && m->is_const && m->init_expr == nullptr;
 }
 
-// §19.5: each instance constant `read` of the class, read by the covergroup
-// `cg`, is initialized in the constructor `ctor` before the statement
-// building `cg`, and not in the same looping statement or fork-join_none.
 void CheckInstanceConstant(const Expr* read, const ClassSite& site,
                            const ModuleItem* ctor) {
   const CovergroupDecl& cg = site.cg;
@@ -232,7 +207,6 @@ void CheckInstanceConstant(const Expr* read, const ClassSite& site,
   }
 }
 
-// The constructor `cls` declares; null where it declares none.
 const ModuleItem* Constructor(const ClassDecl* cls) {
   for (const ClassMember* m : cls->members) {
     if (m->name == "new") return m->method;
@@ -240,8 +214,6 @@ const ModuleItem* Constructor(const ClassDecl* cls) {
   return nullptr;
 }
 
-// §19.4 with §8.18: a covergroup of a class covers no property local to a
-// class it extends, the name `name` read at `loc` among them.
 void CheckBaseLocal(const ClassSite& site, std::string_view name,
                     SourceLoc loc) {
   if (IsFormalOf(site.cg, name)) return;
@@ -258,9 +230,6 @@ void CheckBaseLocal(const ClassSite& site, std::string_view name,
       Subclause("19.4"));
 }
 
-// CheckBaseLocal over the names a covergroup of a class reads and its cross
-// items, and CheckInstanceConstant over the instance constants it reads where
-// `ctor` is the class's constructor.
 void CheckCovergroupOfClass(const ClassSite& site, const ModuleItem* ctor) {
   for (const Expr* read : CovergroupReads(site.cg)) {
     CheckBaseLocal(site, read->text, read->range.start);
@@ -286,8 +255,6 @@ void CheckEmbeddedCovergroupUses(const ClassDecl* cls,
   for (const ClassMember* m : cls->members) {
     if (m->kind != ClassMemberKind::kCovergroup) continue;
     CheckCovergroupOfClass({cls, *m->covergroup, unit, diag}, ctor);
-    // §19.4.1: a derived covergroup has its base's formals, which its own
-    // declaration does not list.
     if (ctor != nullptr && m->covergroup->extends_base.empty()) {
       CheckConstructorNews(ctor->func_body_stmts, cls, *m->covergroup, diag);
     }

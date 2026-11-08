@@ -12,27 +12,8 @@
 
 using namespace delta;
 
-// §40.4.7 — Pragmas in one-line comments.
-//
-// The FSM recognition pragmas described throughout §40.4 are not confined to
-// block comments. They work in both forms of comment: between the `/*` and `*/`
-// delimiters of a block comment, and following the `//` of a one-line comment.
-// The LRM's example places the enumeration-name pragma in a one-line comment
-// after a parameter bit width:
-//
-//     parameter [1:0] // tool enum enumeration_name
-//     S0 = 0, s1 = 1, s2 = 2, s3 = 3;
-//
-// Until now the lexer recognized these pragmas only inside block comments and
-// discarded the body of every one-line comment. These tests observe that the
-// same recognizer now runs over `//` comment bodies, so every §40.4 pragma form
-// — the enum-only form, the current-state signal form, and the part-select
-// form — is surfaced when written in a one-line comment, exactly as it is in a
-// block comment.
-
 namespace {
 
-// Plain-data copy of a recognized part-select (§40.4.2) FSM pragma.
 struct FsmPartSelectInfo {
   std::string signal;
   int msb = 0;
@@ -56,7 +37,6 @@ std::vector<FsmPartSelectInfo> CollectPartSelectPragmas(
   return out;
 }
 
-// Plain-data copy of a recognized concatenation (§40.4.3) FSM pragma.
 struct FsmConcatInfo {
   std::vector<std::string> signals;
   std::string fsm_name;
@@ -82,12 +62,6 @@ std::vector<FsmConcatInfo> CollectConcatPragmas(const std::string& src) {
   return out;
 }
 
-// The core §40.4.7 claim — these pragmas work in both block comments and
-// one-line comments. The same enum-only pragma is written once in each comment
-// style in one source. Both are surfaced identically, confirming the one-line
-// form is recognized rather than discarded. The one-line form is the LRM's own
-// example (after a parameter bit width), and its state-naming parameters still
-// reach the token stream for a downstream extractor to read.
 TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
   const std::string kSrc =
       "module fsm;\n"
@@ -106,8 +80,6 @@ TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
     EXPECT_TRUE(p.signal.empty());
   }
 
-  // The one-line comment ends at the newline: the parameters on the following
-  // line are ordinary tokens, not swallowed by the comment.
   auto idents = CollectIdentifiers(kSrc);
   std::vector<std::string> states;
   for (const auto& id : idents) {
@@ -120,9 +92,6 @@ TEST(FsmOneLineCommentPragmaLexing, RecognizedInBothBlockAndOneLineComments) {
   EXPECT_EQ(states[3], "s3");
 }
 
-// The current-state signal pragma (§40.4.1's `tool state_vector signal enum E`)
-// is among the pragmas §40.4.7 speaks of, so it too is recognized in a one-line
-// comment.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesStateVectorCurrentStatePragmaInOneLineComment) {
   const std::string kSrc =
@@ -139,9 +108,6 @@ TEST(FsmOneLineCommentPragmaLexing,
   EXPECT_EQ(pragmas[0].enum_name, "myFSM");
 }
 
-// The part-select pragma form (§40.4.2) is likewise recognized in a one-line
-// comment, confirming that every pragma §40.4.7 speaks of reaches the `//`
-// comment path and not just the enum-only form of the LRM example.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesPartSelectPragmaInOneLineComment) {
   const std::string kSrc =
@@ -159,10 +125,6 @@ TEST(FsmOneLineCommentPragmaLexing,
   EXPECT_EQ(part_selects[0].enum_name, "E");
 }
 
-// The concatenation pragma form (§40.4.3) completes the set of §40.4 pragma
-// families, and it too is recognized in a one-line comment. This confirms that
-// the `//` comment path feeds the shared recognizer for every pragma form, not
-// just the enum-only, current-state, and part-select forms above.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesConcatenationPragmaInOneLineComment) {
   const std::string kSrc =
@@ -180,11 +142,6 @@ TEST(FsmOneLineCommentPragmaLexing,
   EXPECT_EQ(concats[0].enum_name, "E");
 }
 
-// Edge case — a one-line comment is terminated by end of file rather than a
-// newline. The comment is the last thing in the source and has no trailing
-// newline, so the lexer's line-comment scan stops at end of file. The pragma
-// body still reaches the recognizer and the pragma is surfaced, exercising the
-// end-of-file termination of the line-comment scan rather than the newline one.
 TEST(FsmOneLineCommentPragmaLexing,
      RecognizesOneLineCommentPragmaTerminatedByEndOfFile) {
   const std::string kSrc = "logic [1:0] cs; // tool enum myFSM";
@@ -197,18 +154,6 @@ TEST(FsmOneLineCommentPragmaLexing,
   EXPECT_TRUE(pragmas[0].signal.empty());
 }
 
-// Working in a one-line comment is more than being recognized in one. Every
-// rule §40.4.4 through §40.4.6 states is read off where the pragma stands -
-// §40.4.6 puts it immediately after the parameter bit width, §40.4.5 takes the
-// signals following it - so a `//` comment that surfaced the pragma at some
-// other place would bind the FSM to a declaration nobody annotated, and a case
-// counting pragmas would not see it. The LRM's own §40.4.7 example is §40.4.6's
-// bit-width placement written after `//`, and it answers both questions the way
-// the block comment does: the closing bracket of the width stands before the
-// pragma, and the possible states are the names following it, as far as the
-// semicolon ending the declaration. A parameter declared ahead of the pragma is
-// none of them, so the states are read from where the pragma is rather than
-// from a list of names the case already held.
 TEST(FsmOneLineCommentPragmaLexing, TheOneLineFormStandsWhereTheBlockFormDoes) {
   const std::string kOneLine =
       "module fsm;\n"
@@ -227,20 +172,11 @@ TEST(FsmOneLineCommentPragmaLexing, TheOneLineFormStandsWhereTheBlockFormDoes) {
   EXPECT_EQ(KindBeforeEnumPragma(kOneLine), TokenKind::kRBracket);
   EXPECT_EQ(NamesFollowingEnumPragma(kOneLine), kPossibleStates);
 
-  // "Both" is the clause's own word, so the two comment forms are asked the
-  // same two questions and have to give the same two answers.
   EXPECT_EQ(KindBeforeEnumPragma(kBlock), KindBeforeEnumPragma(kOneLine));
   EXPECT_EQ(NamesFollowingEnumPragma(kBlock),
             NamesFollowingEnumPragma(kOneLine));
 }
 
-// What the recognizer says about a pragma is part of what works in both comment
-// forms. A §40.4.3 concatenation holding a part-select is an FSM its author
-// meant to specify, and the prohibition that stopped it being one is the tool's
-// one report about such a comment. Following `//` it is the same pragma, so the
-// same warning is reported against it, at the line the `//` stands on. A
-// one-line path that reached the recognizer with a body it had cut short would
-// leave this silent while the block-comment case went on passing.
 TEST(FsmOneLineCommentPragmaLexing,
      ProhibitedSelectIsReportedFromAOneLineComment) {
   const std::string kSrc =

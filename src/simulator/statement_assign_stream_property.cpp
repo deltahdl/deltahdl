@@ -1,6 +1,3 @@
-// §11.4.14.3 with §8.5: a streaming unpack whose targets include class
-// properties reached through a handle.
-
 #include <cstddef>
 #include <cstdint>
 #include <map>
@@ -26,9 +23,6 @@ namespace delta {
 
 namespace {
 
-// One property target of the unpack and the local standing in for it while
-// the unpack runs: a queue for a queue or dynamic array property, a variable
-// of the property's declared width for any other.
 struct PropertyStandIn {
   const Expr* target;
   QueueObject* property_queue = nullptr;
@@ -38,9 +32,6 @@ struct PropertyStandIn {
   Variable* local_var = nullptr;
 };
 
-// §7.5 with §8.5: a dynamic array property, `bit [7:0] d[]`, is held by the
-// class-array machinery rather than as a queue, so its stand-in is a queue of
-// its elements that the unpack may resize like any other.
 bool MakeDynamicArrayStandIn(const Expr* target, std::string_view name,
                              SimContext& ctx, Arena& arena,
                              PropertyStandIn& out) {
@@ -58,8 +49,6 @@ bool MakeDynamicArrayStandIn(const Expr* target, std::string_view name,
   return true;
 }
 
-// Resizes the dynamic array property `s` stood in for to what its stand-in
-// holds and stores each element.
 void WriteBackDynamicArray(const PropertyStandIn& s, SimContext& ctx,
                            Arena& arena) {
   ClassArrayRef ref;
@@ -73,15 +62,11 @@ void WriteBackDynamicArray(const PropertyStandIn& s, SimContext& ctx,
                            arena);
 }
 
-// The name the stand-in for target `i` goes by, kept in the arena because
-// the variable and queue tables hold the key rather than a copy of it.
 std::string_view StandInName(size_t i, Arena& arena) {
   std::string name = "$stream_property_" + std::to_string(i);
   return {arena.AllocString(name.data(), name.size()), name.size()};
 }
 
-// Makes the stand-in for the member access `target`, or answers false where
-// it names no property the unpack can take bits into.
 bool MakeStandIn(const Expr* target, std::string_view name, SimContext& ctx,
                  Arena& arena, PropertyStandIn& out) {
   out.target = target;
@@ -103,7 +88,6 @@ bool MakeStandIn(const Expr* target, std::string_view name, SimContext& ctx,
   return true;
 }
 
-// Hands what the unpack left in a stand-in to the property it stood in for.
 void WriteBack(const PropertyStandIn& s, SimContext& ctx, Arena& arena) {
   if (s.dynamic_array) {
     WriteBackDynamicArray(s, ctx, arena);
@@ -123,8 +107,6 @@ bool IsPropertyTarget(const Expr* e) {
   return e != nullptr && e->kind == ExprKind::kMemberAccess;
 }
 
-// `h.len` for the member access `e` of one handle and one member, the form a
-// `with` range names an earlier target by; empty for any other expression.
 std::string MemberPath(const Expr* e) {
   if (e == nullptr || e->kind != ExprKind::kMemberAccess || e->lhs == nullptr ||
       e->rhs == nullptr || e->lhs->kind != ExprKind::kIdentifier ||
@@ -133,10 +115,6 @@ std::string MemberPath(const Expr* e) {
   return std::string(e->lhs->text) + "." + std::string(e->rhs->text);
 }
 
-// §11.4.14.4: a `with` range may read a target unpacked before it, as the
-// Packet example's `q.payload with [0 +: q.len]` does. While the unpack runs,
-// that target's bits are in its stand-in, so the range is read with each
-// target it names replaced by its stand-in's name.
 Expr* SubstituteStandIns(const Expr* e,
                          const std::map<std::string, std::string_view>& names,
                          Arena& arena) {
@@ -159,8 +137,6 @@ Expr* SubstituteStandIns(const Expr* e,
   return copy;
 }
 
-// Gives each stand-in in `rewritten` the `with` range its target in `lhs`
-// wrote, read against the stand-ins (SubstituteStandIns).
 void SubstituteWithRanges(const Expr* lhs, Expr& rewritten, Arena& arena) {
   std::map<std::string, std::string_view> names;
   for (size_t i = 0; i < rewritten.elements.size(); ++i) {
@@ -175,7 +151,6 @@ void SubstituteWithRanges(const Expr* lhs, Expr& rewritten, Arena& arena) {
   }
 }
 
-// The object a non-null class handle variable `e` names, or null.
 ClassObject* HandleTargetObject(const Expr* e, SimContext& ctx) {
   if (e->kind != ExprKind::kIdentifier ||
       ctx.GetVariableClassType(e->text).empty())
@@ -184,10 +159,6 @@ ClassObject* HandleTargetObject(const Expr* e, SimContext& ctx) {
   return var == nullptr ? nullptr : ctx.GetClassObject(var->value.ToUint64());
 }
 
-// §11.4.14.3 unpacks a stream as the reverse of packing, and §11.4.14.1 packs
-// a non-null class handle as its object's data members in declaration order,
-// base members first, so such a target stands for those members, each a
-// property target: `{>> {h}}` for `{>> {h.a, h.b}}`.
 const Expr* ExpandHandleTargets(const Expr* lhs, SimContext& ctx,
                                 Arena& arena) {
   std::vector<Expr*> expanded;

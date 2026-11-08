@@ -30,10 +30,6 @@ TEST(AssertionSemanticsParsing, ConsecutiveRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.2 and §16.12.2: a repetition on its own is a sequence, and a
-// sequence is a sequential property, so a spec that is a repetition alone
-// is read as one, its body a sequence with the repetition on its operand
-// rather than a boolean the repetition's bracket would end.
 TEST(AssertionSemanticsParsing, ARepetitionAloneIsASequentialProperty) {
   auto r = Parse(
       "module m;\n"
@@ -76,13 +72,6 @@ TEST(AssertionSemanticsParsing, NonconsecutiveRepetition) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kAssertProperty));
 }
 
-// §16.9.2: a parenthesised sequence of more than one operand may be repeated
-// by a range, `$`, a count of 0 or a count written as a constant expression,
-// none of which copies of its operands spliced into the chain stand for. Each
-// such group is read as a sequence of its own standing as one operand before
-// c, as a group holding `or` is, the repetition on that operand and the
-// group's two operands under it; an exact count, `[*2]`, is still unrolled
-// into the chain, a and b twice before c.
 TEST(SequenceRepetitionParsing, AGroupRepeatedByARangeIsOneNestedOperand) {
   auto r = Parse(
       "module m;\n"
@@ -128,9 +117,6 @@ TEST(SequenceRepetitionParsing, AGroupRepeatedByARangeIsOneNestedOperand) {
   EXPECT_EQ(exact->seq_linear.operands.size(), 5u);
 }
 
-// §16.10: the match items of a group repeated by a range run at the end of
-// each of its iterations, so they stay with the group's sequence, on its
-// last operand, rather than on the operand after the group.
 TEST(SequenceRepetitionParsing, ARepeatedGroupsMatchItemsEndEachIteration) {
   auto r = Parse(
       "module m;\n"

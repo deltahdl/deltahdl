@@ -37,9 +37,6 @@ TEST(ContAssignStatementElaboration, VarWithInitializerAndContAssignErrors) {
       "10.3.2"));
 }
 
-// §10.3.2 (printed page 249): a variable driven by a continuous assignment has
-// no initializer, and an assignment to a member of a structure variable drives
-// the variable as one to a select of it does.
 TEST(ContAssignStatementElaboration,
      StructVarWithInitializerAndMemberContAssignErrors) {
   ElabFixture f;
@@ -92,8 +89,6 @@ TEST(ContAssignStatementElaboration, VarMultipleContAssignsErrors) {
       "  assign v = 1'b1;\n"
       "endmodule\n",
       f);
-  // §10.3.2 restates the one-continuous-assignment rule and refers to §6.5,
-  // which states it in full, so the report carries §6.5.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "multiple continuous assignments to 'v'", 4,
                             "6.5"));
@@ -115,10 +110,6 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithSelectErrors) {
       4, "10.3.2"));
 }
 
-// The rule forbids indexing into or selecting from the nettype value. A
-// bit-select is the indexing form; a part-select of a vector nettype is the
-// distinct select form and must be rejected the same way, since a continuous
-// assignment to a nettype net must drive the entire nettype value.
 TEST(ContAssignStatementElaboration, NettypeLhsWithPartSelectErrors) {
   ElabFixture f;
   Elaborate(
@@ -148,11 +139,6 @@ TEST(ContAssignStatementElaboration, NettypeLhsWithoutSelectSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// The target net of a continuous assignment need not be declared explicitly:
-// an undeclared left-hand identifier inherits an implicit net declaration
-// (§6.10). Building the input from that real form — a bare name never declared
-// — and elaborating it must succeed, with the implicit net standing in as the
-// continuous assignment's driven net.
 TEST(ContAssignStatementElaboration,
      ContAssignToImplicitlyDeclaredNetSucceeds) {
   ElabFixture f;
@@ -174,9 +160,6 @@ TEST(ContAssignStatementElaboration, VarContAndProceduralAssignErrors) {
       "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateMixedAssignments reports a whole-variable mix of a
-  // continuous and a procedural driver under §6.5, at the continuous
-  // assignment's location.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' has both continuous and procedural assignments", 3, "6.5"));
@@ -217,9 +200,6 @@ TEST(ContAssignStatementElaboration, VarContAssignAndNonblockingErrors) {
       "  always @(*) v <= 1'b1;\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateMixedAssignments reports a whole-variable mix of a
-  // continuous and a procedural driver under §6.5, at the continuous
-  // assignment's location.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' has both continuous and procedural assignments", 3, "6.5"));
@@ -237,8 +217,6 @@ TEST(ContAssignStatementElaboration, NetDeclAssignAndContAssignAllowed) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// Unlike a variable, a net may be driven by a mixture of drivers — here a
-// module output and a continuous assignment together — without error.
 TEST(ContAssignStatementElaboration, NetDrivenByOutputAndContAssignAllowed) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -281,9 +259,6 @@ TEST(ContAssignStatementElaboration, VarMultipleOutputPortsErrors) {
       "  child c2(.y(v));\n"
       "endmodule\n",
       f);
-  // Two output ports driving one variable is reported by
-  // Elaborator::RecordOutputPortDrivenVariables under §23.3.3.2, at the second
-  // instantiation.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "variable 'v' driven by multiple outputs", 6,
                             "23.3.3.2"));
@@ -299,15 +274,11 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithInitializerErrors) {
       "  child c(.y(v));\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateMixedAssignments reports the output-port driver
-  // conflicts under §6.5, at the instantiation that drives the variable.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' driven by output port has an initializer", 5, "6.5"));
 }
 
-// A variable may have at most one driver: a module output and a continuous
-// assignment targeting the same variable are two drivers, which is an error.
 TEST(ContAssignStatementElaboration, VarContAssignAndOutputPortErrors) {
   ElabFixture f;
   Elaborate(
@@ -319,16 +290,12 @@ TEST(ContAssignStatementElaboration, VarContAssignAndOutputPortErrors) {
       "  child c(.y(v));\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateMixedAssignments reports the output-port driver
-  // conflicts under §6.5, at the instantiation that drives the variable.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' driven by both output port and continuous assignment", 6,
       "6.5"));
 }
 
-// A variable driven by a module output may not also be the target of a
-// procedural assignment. The blocking form is exercised here.
 TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
   ElabFixture f;
   Elaborate(
@@ -340,17 +307,12 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithProceduralAssignErrors) {
       "  initial v = 1'b1;\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateMixedAssignments reports the output-port driver
-  // conflicts under §6.5, at the instantiation that drives the variable.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' driven by output port has procedural assignments", 5,
       "6.5"));
 }
 
-// The prohibition on a second driver covers every procedural-assignment form,
-// so an output-driven variable that is also the target of a nonblocking
-// assignment is the same error as the blocking case above.
 TEST(ContAssignStatementElaboration, VarOutputPortWithNonblockingErrors) {
   ElabFixture f;
   Elaborate(
@@ -362,17 +324,12 @@ TEST(ContAssignStatementElaboration, VarOutputPortWithNonblockingErrors) {
       "  always @(*) v <= 1'b1;\n"
       "endmodule\n",
       f);
-  // Elaborator::ValidateMixedAssignments reports the output-port driver
-  // conflicts under §6.5, at the instantiation that drives the variable.
   EXPECT_TRUE(ReportedError(
       f.diag.Diagnostics(),
       "variable 'v' driven by output port has procedural assignments", 5,
       "6.5"));
 }
 
-// §10.3.2: the report that rejects a variable carrying both an initializer and
-// a continuous assignment names the subclause stating the rule, so a caller
-// learns which rule was enforced without matching the wording of the message.
 TEST(ContAssignStatementElaboration, VarInitializerAndContAssignNames10_3_2) {
   ElabFixture f;
   Elaborate(
@@ -386,11 +343,6 @@ TEST(ContAssignStatementElaboration, VarInitializerAndContAssignNames10_3_2) {
       "variable 'v' has both an initializer and a continuous", 3, "10.3.2"));
 }
 
-// §10.3.2 with A.8.3 (printed page 1210): a continuous assignment's net lvalue
-// takes a constant_select, and a constant_part_select_range includes the
-// constant_indexed_range `constant_expression +: constant_expression` and its
-// `-:` form, so an indexed part-select whose base and width are constant --
-// literals, or a parameter -- is a target like `a[3:0]`.
 TEST(ContAssignStatementElaboration,
      ConstantIndexedPartSelectTargetsElaborate) {
   ElabFixture f;
@@ -406,9 +358,6 @@ TEST(ContAssignStatementElaboration,
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.3.2: an indexed part-select whose base is a variable is no
-// constant_indexed_range, so as a continuous assignment's target it is still
-// reported under the subclause.
 TEST(ContAssignStatementElaboration,
      VariableBaseIndexedPartSelectTargetErrors) {
   ElabFixture f;
@@ -425,9 +374,6 @@ TEST(ContAssignStatementElaboration,
                             4, "10.3.2"));
 }
 
-// Table 10-1: every select on a continuous assignment's left-hand side is
-// constant, the selects beneath the outermost one and those under a member
-// access included.
 TEST(ContAssignStatementElaboration, NestedNonConstantSelectErrors) {
   ElabFixture f;
   Elaborate(
@@ -446,9 +392,6 @@ TEST(ContAssignStatementElaboration, NestedNonConstantSelectErrors) {
   }
 }
 
-// Syntax 10-1 gives the continuous assignment to variables no drive strength
-// and a delay_control rather than a delay3, whether the target names the
-// variable whole, through a select or as a concatenation element.
 TEST(ContAssignStatementElaboration, StrengthAndDelay3OnVariableSelectErrors) {
   ElabFixture f;
   Elaborate(
@@ -471,9 +414,6 @@ TEST(ContAssignStatementElaboration, StrengthAndDelay3OnVariableSelectErrors) {
   }
 }
 
-// §10.3.2: a variable a continuous assignment writes, through a select or as a
-// concatenation element, takes no initializer, and one written whole as an
-// element takes no procedural assignment and no second continuous one.
 TEST(ContAssignStatementElaboration, SelectAndConcatenationTargetsAreDrivers) {
   ElabFixture f;
   Elaborate(
@@ -499,10 +439,6 @@ TEST(ContAssignStatementElaboration, SelectAndConcatenationTargetsAreDrivers) {
                             5, "6.5"));
 }
 
-// §10.3.2: a variable may be driven by one primitive output as by one
-// continuous assignment, so one a gate drives takes no initializer, no
-// procedural assignment and no second driver; an n-output gate drives every
-// terminal but its last.
 TEST(ContAssignStatementElaboration, PrimitiveOutputIsVariableDriver) {
   ElabFixture f;
   Elaborate(
@@ -534,8 +470,6 @@ TEST(ContAssignStatementElaboration, PrimitiveOutputIsVariableDriver) {
                             9, "10.3.2"));
 }
 
-// §10.3.2: an element of an array of nets of a user-defined nettype is itself
-// a whole net, which a continuous assignment may drive.
 TEST(ContAssignStatementElaboration, NettypeArrayElementTargetSucceeds) {
   ElabFixture f;
   auto* design = Elaborate(
@@ -549,8 +483,6 @@ TEST(ContAssignStatementElaboration, NettypeArrayElementTargetSucceeds) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §10.3.2: a select beyond the array's unpacked dimensions selects into the
-// nettype's data type, however deeply the selects nest.
 TEST(ContAssignStatementElaboration, NettypeArrayElementSelectErrors) {
   ElabFixture f;
   Elaborate(
@@ -567,9 +499,6 @@ TEST(ContAssignStatementElaboration, NettypeArrayElementSelectErrors) {
       4, "10.3.2"));
 }
 
-// §10.3.2 with §23.9: a continuous assignment or a primitive output in a
-// generate block naming a variable the block does not declare drives the
-// module's variable of that name, which then takes no initializer.
 TEST(ContAssignStatementElaboration, BlockDriverOfAnInitializedModuleVariable) {
   ElabFixture f;
   Elaborate(
@@ -592,10 +521,6 @@ TEST(ContAssignStatementElaboration, BlockDriverOfAnInitializedModuleVariable) {
                             6, "10.3.2"));
 }
 
-// §10.3.2 rules on one variable, and §27.4 makes each generate block a scope
-// of its own, so block a's initialized `w` and `g` and the `w` and `g` block
-// b drives are four variables, and so are the module's initialized `m` and
-// the `m` block b declares and drives. None has both.
 TEST(ContAssignStatementElaboration, InitializerAndDriverInTwoScopesAreApart) {
   ElabFixture f;
   auto* design = Elaborate(

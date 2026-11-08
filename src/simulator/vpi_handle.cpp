@@ -7,15 +7,11 @@
 #include <vector>
 
 #include "common/envelope_viewport.h"
-#include "simulator/vpi_class_typespecs.h"
-#include "simulator/vpi_user.h"
-
-// §37.10 detail 3: the package/interface/program instance kinds are defined in
-// the SystemVerilog VPI header alongside the §37.10 vpiInstance relation.
 #include "simulator/sim_context.h"
 #include "simulator/sv_vpi_user.h"
 #include "simulator/vpi_assertion_cb.h"
 #include "simulator/vpi_class_objects.h"
+#include "simulator/vpi_class_typespecs.h"
 #include "simulator/vpi_collection_elements.h"
 #include "simulator/vpi_constants.h"
 #include "simulator/vpi_constraint_relations.h"
@@ -32,26 +28,18 @@
 #include "simulator/vpi_model_helpers3.h"
 #include "simulator/vpi_object.h"
 #include "simulator/vpi_pool_keeper.h"
+#include "simulator/vpi_user.h"
 
 namespace delta {
 
 namespace {
 
-// Records a VPI error (state, level, and message) on the supplied error slot,
-// matching the §38.2 convention used throughout the handle-resolution routines.
 void SetVpiHandleError(s_vpi_error_info& err, const char* message) {
   err.state = kVpiPLI;
   err.level = kVpiError;
   err.message = VpiText(message);
 }
 
-// §38.21: one position in a hierarchical-name walk. A hierarchical name is
-// resolved one path component at a time, so each step is described by the
-// already-resolved enclosing scope (current, null before the first component),
-// the caller-supplied search scope (scope, used to root the outermost
-// component), the component name being resolved (part), and whether it is the
-// rightmost/terminal component (is_last, which governs the protected-scope
-// rule). These travel together as one entity through the resolution routines.
 struct NamePathStep {
   VpiHandle current;
   VpiHandle scope;
@@ -59,29 +47,14 @@ struct NamePathStep {
   bool is_last;
 };
 
-// §38.21: resolve a single path component of a hierarchical name to its handle.
-// With no enclosing scope yet, the outermost component is searched from the top
-// level of the design hierarchy (the object map); otherwise the search is
-// confined to the immediate contents of the current/supplied scope. Returns the
-// resolved handle, or null when the component names nothing.
 VpiHandle ResolveNamePathComponent(
     const NamePathStep& step,
     const std::unordered_map<std::string_view, VpiObject*>& object_map) {
   if (step.current == nullptr && step.scope == nullptr) {
-    // §38.21: with no scope the outermost component is searched for from the
-    // top level of the design hierarchy.
     auto it = object_map.find(step.part);
     return (it == object_map.end()) ? nullptr : it->second;
   }
-  // §38.21: within a scope - the supplied scope for the first component, or
-  // the previously resolved scope for a deeper one - the search is confined
-  // to that scope's immediate contents and nothing outside it.
   VpiHandle within = (step.current == nullptr) ? step.scope : step.current;
-  // §37.33 detail 9: vpi_handle_by_name() accepts a full name down to a
-  // non-static data member even though such a member has no vpiFullName
-  // property. The member lives on the class object the class variable
-  // references, not on the variable itself, so descend into the referenced
-  // object's members when stepping through a class variable.
   VpiHandle search = within;
   if (within->type == vpiClassVar && within->referenced_object) {
     search = within->referenced_object;
@@ -89,11 +62,6 @@ VpiHandle ResolveNamePathComponent(
   return ChildNamed(search, step.part);
 }
 
-// §38.21: a name passing through a protected scope is an error - a protected
-// component is not descended into - unless what it reaches is an object a
-// viewport opened (§34.5.32.2), reached through the scopes sealing it.
-// `path` holds at least the component the walk stopped at, null where it named
-// nothing.
 bool PassesThroughSealedScope(const std::vector<VpiHandle>& path) {
   const VpiHandle kReached = path.back();
   if (kReached != nullptr &&
@@ -111,17 +79,12 @@ bool PassesThroughSealedScope(const std::vector<VpiHandle>& path) {
 VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   if (!name) return nullptr;
 
-  // §38.21: a protected object cannot serve as the search scope. Unless
-  // otherwise specified, asking for a handle relative to a protected scope is
-  // an error; record it and return no handle.
   if (scope != nullptr && VpiReadSealed(*scope)) {
     SetVpiHandleError(
         last_error_, "vpi_handle_by_name() with a protected scope is an error");
     return nullptr;
   }
 
-  // §38.21: the name may be simple or hierarchical, so resolve it one path
-  // component at a time from the leftmost (outermost) scope to the rightmost.
   std::vector<std::string_view> parts = VpiHandleNameComponents(name);
 
   std::vector<VpiHandle> path;
@@ -145,8 +108,6 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
   }
 
   if (current == nullptr) return nullptr;
-  // §37.10 detail 6: imported items and compilation-unit objects must not be
-  // reachable by name even when an object happens to be registered under it.
   if (!VpiHandleByNameAccessible(*current)) return nullptr;
   return VpiLabelledAssertionOr(current);
 }
@@ -154,8 +115,6 @@ VpiHandle VpiContext::HandleByName(const char* name, VpiHandle scope) {
 VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
   if (!parent) return nullptr;
 
-  // §38.19: unless otherwise specified, calling vpi_handle_by_index() for a
-  // protected reference object is an error; record it (§38.2) and answer null.
   if (VpiReadSealed(*parent)) {
     SetVpiHandleError(
         last_error_, "vpi_handle_by_index() on a protected object is an error");
@@ -164,16 +123,8 @@ VpiHandle VpiContext::HandleByIndex(int index, VpiHandle parent) {
 
   if (VpiIndexesItsVarBits(*parent)) return VpiVarBitAt(*parent, index);
 
-  // §38.19: the reference object must have the access-by-index property. An
-  // object whose type offers no index-selected relationship cannot anchor an
-  // index select, so there is no handle to return.
   if (!VpiHasAccessByIndex(parent->type)) return nullptr;
 
-  // §38.19: return the sub-object selected by the index number. When no
-  // sub-object carries the index, the selection is not a legal SystemVerilog
-  // index select expression, so the result is a null handle. An element of a
-  // queue, dynamic or associative array lives in the run's store of the array
-  // and is made when first selected (§37.17).
   if ((parent->queue != nullptr || parent->assoc != nullptr) && sim_ctx_) {
     return VpiCollectionElement(
         *parent, index,
@@ -190,9 +141,6 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
                                          VpiHandle parent) {
   if (!parent) return nullptr;
 
-  // §38.20: as with vpi_handle_by_index(), calling vpi_handle_by_multi_index()
-  // for a protected reference object is an error unless otherwise specified.
-  // Record it (§38.2) and hand back a null handle.
   if (VpiReadSealed(*parent)) {
     SetVpiHandleError(
         last_error_,
@@ -200,12 +148,8 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
     return nullptr;
   }
 
-  // §38.20: the reference object must carry the access-by-index property - the
-  // same property vpi_handle_by_index() requires of its reference object.
   if (!VpiHasAccessByIndex(parent->type)) return nullptr;
 
-  // §38.20: num_index counts index_array's indices; with none there is no
-  // index select expression to construct, so no subobject is named.
   if (num_index <= 0 || index_array == nullptr) return nullptr;
 
   return VpiSubobjectByIndices(
@@ -215,17 +159,6 @@ VpiHandle VpiContext::HandleByMultiIndex(int num_index, const int* index_array,
 
 namespace {
 
-// The branches below resolve a single vpi_handle() relation that is held as a
-// designated pointer on the reference object (rather than reachable by the
-// generic child/parent walk). Each helper preserves the exact original branch
-// order and semantics: when a branch matches it writes the resolved handle to
-// `out` and returns true; otherwise it returns false so the caller continues
-// with the next group, finally falling through to the generic traversal. `ref`
-// is guaranteed non-null and non-protected by the caller.
-
-// §37.11/§37.13/§37.29/§37.84/§37.3.4 and §37.14/§37.15: connection and
-// designated-expression relations of iterators, instance arrays, io decls,
-// virtual interface vars, source-delay carriers, and ports.
 bool TryResolveConnectionRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiUse && ref->type == vpiIterator) {
     out = ref->iter_ref;
@@ -258,9 +191,6 @@ bool TryResolveConnectionRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.33/§37.41/§37.15/§37.29/§37.48: the class object a class var references,
-// a function's return variable, and the vpiActual of ref objs, virtual
-// interface vars, and clocking blocks.
 bool TryResolveClassAndActualRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiClassObj && ref->type == vpiClassVar) {
     out = ref->referenced_object;
@@ -285,18 +215,12 @@ bool TryResolveClassAndActualRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.48 detail 1: the delay of a clocking block's default input or output
-// skew, or of a clocking io decl's own.
 static bool TryResolveClockingSkew(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiInputSkew && type != vpiOutputSkew) return false;
   out = type == vpiInputSkew ? ref->input_skew : ref->output_skew;
   return true;
 }
 
-// §37.48/§37.56/§37.24: a clocking block's prefix and clocking event, a
-// clocking io decl's expression, the clocking event of a clocked seq within a
-// multiclock sequence expression - the same relation a property spec and a
-// clocked property use - and a reference object's typespec.
 static bool TryResolveClockingRelation(int type, VpiHandle ref,
                                        VpiHandle& out) {
   if (type == vpiPrefix && ref->type == vpiClockingBlock) {
@@ -311,11 +235,6 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
     out = VpiRefObjTypespec(ref);
     return true;
   }
-  // §37.5/§37.6/§37.9 (figure): a module, interface or program reaches the one
-  // clocking block it named default and the one it named global, and the
-  // expression its default disable iff was written with. All three are relation
-  // tags, so the traversal looking for a child of the type asked for reached
-  // none of them from any scope.
   if (type == vpiDefaultClocking || type == vpiGlobalClocking) {
     out = VpiScopeNamedClockingBlock(ref, type == vpiGlobalClocking);
     return true;
@@ -329,15 +248,6 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
     out = VpiClockingBlockClockingEvent(ref);
     return true;
   }
-  // §37.52 (figure): the vpiClockingEvent edge is drawn from the property spec
-  // and from the clocked property as well as from §37.56's clocked seq, and the
-  // three carry the event the same way - as the object's event control child.
-  // §39.3.2 is what reaches for them: the clocking block or clocking
-  // expression of an assertion, which it counts among an assertion's static
-  // information is the clocking block of §37.49 or, where the assertion was
-  // written with an event expression of its own instead, this edge. Only the
-  // clocked seq was routed here, so an assertion clocked by an expression had
-  // no traversal that reached it.
   if (ref->type == vpiClockedSeq || ref->type == vpiPropertySpec ||
       ref->type == vpiClockedProp) {
     out = VpiClockingEvent(ref);
@@ -346,8 +256,6 @@ static bool TryResolveClockingRelation(int type, VpiHandle ref,
   return false;
 }
 
-// §37.24/§37.10: the enclosing object of a reference object, a port bit, an
-// interface typespec, or an attribute.
 static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiParent) return false;
   if (ref->type == vpiRefObj) {
@@ -366,27 +274,17 @@ static bool TryResolveParentRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->parent;
     return true;
   }
-  // §37.16 detail 2, §37.17 detail 26, §37.18, §37.19 and §37.26: an array
-  // member, a packed array subelement, a var select and a struct or union
-  // member reach what holds them through vpiParent, a tag no object's type is.
   if (VpiVariableIsPackedArrayMember(ref) || VpiVariableIsArrayMember(ref) ||
       VpiVariableIsStructUnionMember(ref) || VpiNetStructUnionMember(ref) ||
       ref->type == vpiVarSelect) {
     out = ref->parent;
     return true;
   }
-  // §37.16 detail 31: a net in an array net reaches the largest array net
-  // holding it, past the subarrays a multidimensional one is held in.
   if (VpiNetIsArrayMember(ref)) {
     out = ref->parent;
     while (VpiNetIsArrayMember(out)) out = out->parent;
     return true;
   }
-  // §37.16 detail 31, §37.17 detail 26: a select of a packed vector that
-  // leaves dimensions unindexed, or whose index varies, reaches the vector it
-  // selects from, the largest packed array containing it. A bit select, a net
-  // bit and a var bit carry an offset too, but TryResolveSelectRelation
-  // answers their vpiParent first (§37.58, §37.16, §37.17).
   const bool kPackedSelect =
       ref->select_dim.has_value() || ref->bit_offset >= 0;
   if (kPackedSelect && ref->parent != nullptr) {
@@ -404,11 +302,6 @@ bool TryResolveClockingAndParentRelation(int type, VpiHandle ref,
          VpiTryResolveConstraintRelation(type, ref, out);
 }
 
-// §37.28/§37.65/§37.68: type/value parameter typespecs, defaults, ranges, the
-// lhs of a param assign, the guarded statement of event/delay controls, and the
-// delay expression a delay control reaches through vpiDelay.
-// §37.65/§37.68: the guarded statement of an event or delay control, and the
-// delay expression a delay control reaches through vpiDelay.
 static bool TryResolveTimingControlRelation(int type, VpiHandle ref,
                                             VpiHandle& out) {
   if (type == vpiDelay && ref->type == vpiDelayControl) {
@@ -427,8 +320,6 @@ static bool TryResolveTimingControlRelation(int type, VpiHandle ref,
   return false;
 }
 
-// §37.28: a type/value parameter's typespec, default, and declared range, and
-// the lhs of a param assign.
 static bool TryResolveParameterDeclRelation(int type, VpiHandle ref,
                                             VpiHandle& out) {
   if (type == vpiTypespec && ref->type == vpiTypeParameter) {
@@ -461,9 +352,6 @@ bool TryResolveParameterRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveTimingControlRelation(type, ref, out);
 }
 
-// §37.65/§37.66/§37.67/§37.71/§37.74/§37.75/§37.78/§37.52: the controlling
-// condition expression of event control, loop, wait, if, for, do-while, and
-// return statements, and the expression a case property selects on.
 bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiCondition) return false;
   if (ref->type == vpiEventControl) {
@@ -498,20 +386,10 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiCasePropertyConditionExpr(ref);
     return true;
   }
-  // §37.72 (figure): a case statement reaches the expression it selects on
-  // through vpiCondition, the same tagged edge every conditional statement
-  // above carries. The case was the one statement of the family this resolver
-  // did not name, so the relation fell through to a traversal that cannot serve
-  // it and the expression was unreachable.
   if (ref->type == vpiCase) {
     out = VpiCaseConditionExpr(ref);
     return true;
   }
-  // §37.38 (figure): the same tagged edge is drawn from an implication, a
-  // constraint if and a constraint if-else to the expression each is guarded
-  // by. None of the three was named here, so the relation fell through to a
-  // walk looking for a child whose own type is the vpiCondition tag - which no
-  // object has - and the condition of a constraint was unreachable.
   if (VpiHandle condition = VpiConstraintConditionExpr(ref)) {
     out = condition;
     return true;
@@ -519,17 +397,6 @@ bool TryResolveConditionRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.72 (figure): the pattern a tagged pattern tags and the one a struct
-// pattern holds, both drawn to the `pattern` class. §37.4.1 makes the class a
-// grouping, so vpiPattern is the group's name and the object it reaches is of
-// one of the kinds the group holds - which the generic traversal, matching a
-// child's own type against vpiPattern, reached for no pattern at all.
-// §37.35 (figure): a prim term and the primitive it belongs to are drawn to
-// each other, the primitive end being the `primitive` class. §37.4.1 makes that
-// enclosure a grouping, so the object the edge reaches is a gate, a switch or a
-// UDP - never one whose own type is vpiPrimitive, which the generic traversal
-// was left looking for. A udp reaches the udp defn it instantiates, which no
-// scope holds.
 bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiUdpDefn && ref->type == vpiUdp) {
     out = ref->udp_defn;
@@ -550,29 +417,7 @@ bool TryResolvePrimitiveRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
-// §37.63 (figure): a process and the statement it executes are drawn to each
-// other. The statement end is the `stmt` class, which §37.60 fills with the
-// scope and atomic statement kinds, and the process end is the `process` class
-// of the initial, final and always procedures. §37.4.1 makes each enclosure a
-// grouping, so what either edge reaches is an object of one of the kinds its
-// class holds - a begin, a fork, an if, an assignment on one side and an
-// initial, a final or an always on the other - never one whose own type is the
-// class name, which is what the generic traversal was left looking for.
-//
-// Either arm leaves the traversal alone when it finds nothing, so an object
-// carrying a class name as its type is still reached the way it always was.
-// §37.27 (figure): a named event reaches its event typespec and a named event
-// array its array typespec, both edges drawn to the `typespec` class §37.25
-// fills with the concrete typespec kinds. §37.4.1 makes that enclosure a
-// grouping, so the object either edge reaches is an event typespec, an array
-// typespec, a struct typespec and so on - never one whose own type is
-// vpiTypespec, which is the group's name and which the generic traversal was
-// left looking for.
-//
-// The traversal is left alone where no child is a typespec, so an object
-// carrying the class name as its own type is still reached the way it was.
 bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.32 detail 9: a class typespec reaches the one it extends.
   if (type == vpiExtends && ref->type == vpiClassTypespec) {
     out = VpiClassTypespecBase(*ref);
     return true;
@@ -586,10 +431,6 @@ bool TryResolveTypespecClassRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.80 (figure): the callback a prim term, an expr, a time queue or a stmt
-// reaches through the diagram's single arrow. The object holds it as a
-// designated pointer, set when the callback was registered, because a callback
-// object lives in the run's registry rather than among the object's children.
 bool TryResolveCallbackRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type != vpiCallback || !VpiIsCallbackHostType(ref->type)) return false;
   out = ref->callback;
@@ -602,17 +443,8 @@ bool TryResolvePatternRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
-// §37.64/§37.79/§37.76: the lhs/rhs of an assignment, of the procedural
-// continuous assignment family (assign/force/deassign/release) and of alias
-// statements.
 bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   const int kRef = ref->type;
-  // §37.64/§37.79/§37.76/§37.47/§37.28: the assignment kinds that name a
-  // left-hand side - a procedural assignment, the procedural continuous
-  // assignment family, an alias statement, a continuous assignment in either of
-  // the forms §37.47's enclosure groups, and a def param. vpiLhs is a relation
-  // tag, and the traversal a kind left out falls through to looks for a child
-  // whose own type is one, which reaches nothing.
   const bool kNamesLhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
                          kRef == vpiForce || kRef == vpiDeassign ||
                          kRef == vpiRelease || kRef == vpiAliasStmt ||
@@ -621,9 +453,6 @@ bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = ref->lhs;
     return true;
   }
-  // The right-hand side is drawn on the kinds that carry an expression to
-  // assign, §37.28's param assign among them; §37.79's deassign and release
-  // name a target and no source.
   const bool kNamesRhs = kRef == vpiAssignment || kRef == vpiAssignStmt ||
                          kRef == vpiForce || kRef == vpiAliasStmt ||
                          kRef == vpiDefParam || kRef == vpiParamAssign ||
@@ -635,11 +464,7 @@ bool TryResolveAssignLhsRhsRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.71/§37.69/§37.77: an if-else's else branch, the expressions of repeat
-// controls and disables, and a task/func body statement.
 bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.55 (figure): the three edges an immediate assertion draws, which the
-  // helpers named here set out.
   if (VpiIsImmediateAssertionType(ref->type)) {
     switch (type) {
       case vpiExpr:
@@ -655,8 +480,6 @@ bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
         break;
     }
   }
-  // §37.67: the else action of an ordered wait, told from its body by position
-  // because vpiElseStmt is a relation tag and no statement's type is one.
   if (type == vpiElseStmt && ref->type == vpiOrderedWait) {
     out = VpiOrderedWaitElseStmt(ref);
     return true;
@@ -665,8 +488,6 @@ bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
     out = VpiIfElseStmt(ref);
     return true;
   }
-  // §37.73: the else action of an expect statement, told from its pass action
-  // by position for the reason an ordered wait's is.
   if (type == vpiElseStmt && ref->type == vpiExpectStmt) {
     out = VpiExpectElseStmt(ref);
     return true;
@@ -686,10 +507,6 @@ bool TryResolveElseExprStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.79/§37.76/§37.71/§37.69/§37.77/§37.12: the lhs/rhs of the procedural
-// continuous assignment family and alias statements, an if-else's else branch,
-// repeat-control and disable expressions, a task/func body, and a loop control
-// variable's or a statement's enclosing scope.
 bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveAssignLhsRhsRelation(type, ref, out) ||
          TryResolveElseExprStmtRelation(type, ref, out) ||
@@ -697,18 +514,12 @@ bool TryResolveAssignAndStmtRelation(int type, VpiHandle ref, VpiHandle& out) {
          TryResolveStmtScopeRelation(type, ref, out);
 }
 
-// §37.35/§37.9/§37.6/§37.5/§37.85: the reference object types whose vpiIndex
-// relation reaches the index expression locating them within an array - a
-// primitive, program, interface, module, or gen scope.
 bool VpiObjectHasArrayIndexRelation(int ref_type) {
   return VpiObjectIsPrimitive(ref_type) || ref_type == vpiProgram ||
          ref_type == vpiInterface || ref_type == kVpiModule ||
          ref_type == vpiGenScope;
 }
 
-// §37.35/§37.9/§37.6/§37.5/§37.85: vpiIndex from a primitive, program,
-// interface, module, or gen scope reaches the index expression that locates it
-// within its array (NULL when it is not an array member).
 bool TryResolveIndexRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiIndex && VpiObjectHasArrayIndexRelation(ref->type)) {
     out = ref->array_member ? ref->index_expr : nullptr;
@@ -717,8 +528,6 @@ bool TryResolveIndexRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.42 (figure): the function or task a tf call calls, NULL for a built-in
-// method's. §37.8: the one an interface tf decl's definition is, if of `type`.
 bool TryResolveCalledTfRelation(int type, VpiHandle ref, VpiHandle& out) {
   const bool kDecl = ref->type == vpiInterfaceTfDecl;
   const bool kTask =
@@ -733,8 +542,6 @@ bool TryResolveCalledTfRelation(int type, VpiHandle ref, VpiHandle& out) {
   return true;
 }
 
-// §37.42/§37.61: a method call's prefix and with-clause, a dynamically
-// prefixed object's prefix, and the function or task a tf call calls.
 bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiPrefix && VpiIsMethodCallType(ref->type)) {
     out = ref->tf_prefix;
@@ -751,9 +558,6 @@ bool TryResolvePrefixWithRelation(int type, VpiHandle ref, VpiHandle& out) {
   return TryResolveCalledTfRelation(type, ref, out);
 }
 
-// §37.40/§37.45/§37.39: a timing check's terms and notifier, a path's
-// condition and its or a check's terms' expressions, a delay device's in/out
-// terms, and a foreach constraint/statement's array variable.
 bool TryResolveTimingTermRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (TryResolveSpecifyRelation(type, ref, out)) return true;
   if (type == vpiInTerm && ref->type == vpiDelayDevice) {
@@ -775,8 +579,6 @@ bool TryResolveTimingTermRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.38: a mod path's owning module - the nearest enclosing module scope, or
-// NULL when an interface scope intervenes first.
 VpiHandle ResolveModPathOwningModule(VpiHandle ref) {
   for (VpiObject* scope = ref->parent; scope; scope = scope->parent) {
     if (scope->type == vpiInterface) {
@@ -789,8 +591,6 @@ VpiHandle ResolveModPathOwningModule(VpiHandle ref) {
   return nullptr;
 }
 
-// §37.23: a nettype declaration's alias and resolution (with) function, and
-// §37.25 detail 1: the typedef a typespec's typedef aliases.
 bool TryResolveNettypeRelation(int type, VpiHandle ref, VpiHandle& out) {
   if (type == vpiNetTypedefAlias && ref->type == vpiNettypeDecl) {
     out = ref->aliased;
@@ -807,10 +607,6 @@ bool TryResolveNettypeRelation(int type, VpiHandle ref, VpiHandle& out) {
   return false;
 }
 
-// §37.40/§37.45/§37.38/§37.75/§37.39/§37.23: a timing check's ref/data terms, a
-// delay device's in/out terms, a foreach constraint/statement's array variable,
-// a mod path's owning module, and a nettype declaration's alias and resolution
-// function.
 bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
                                         VpiHandle& out) {
   if (TryResolveTimingTermRelation(type, ref, out)) return true;
@@ -821,11 +617,6 @@ bool TryResolveTimingAndNettypeRelation(int type, VpiHandle ref,
   return TryResolveNettypeRelation(type, ref, out);
 }
 
-// Runs the designated-pointer relation groups in their original order, stopping
-// at the first group that resolves the relation. Returns true (with the result
-// in `out`) when one fired; false when none did, leaving the caller to fall
-// back on the generic child/parent traversal. `object_of` reads the object a
-// class var references in the run.
 template <typename ObjectOf>
 bool TryResolveDesignatedRelation(int type, VpiHandle ref,
                                   const ObjectOf& object_of, VpiHandle& out) {
@@ -853,37 +644,21 @@ bool TryResolveDesignatedRelation(int type, VpiHandle ref,
 }  // namespace
 
 VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
-  // §37.43 detail 4: there is at most one active frame at a time in a given
-  // thread, and an application reaches it with vpi_handle(vpiFrame, NULL).
   if (!ref && type == vpiFrame) return ActiveFrame();
 
-  // §37.42 detail 3: the system task or function that invoked the application
-  // is reached with vpi_handle(vpiSysTfCall, NULL).
   if (!ref && type == vpiSysTfCall) return current_systf_call_;
 
-  // §37.82: vpi_handle(vpiActiveTimeFormat, NULL) reaches the system task call
-  // that established the active time format - the $timeformat() call. Detail 1
-  // requires NULL when $timeformat() has not been called; the recorded call is
-  // null until then, so this branch returns NULL in that case.
   if (!ref && type == vpiActiveTimeFormat) return active_time_format_call_;
 
   if (!ref) return nullptr;
-  // §37.13 detail 4: an io decl's ranges and typespec are what it declares.
   ref = VpiIoDeclStandIn(ref, type);
 
-  // §38.18: unless otherwise specified, asking vpi_handle() for an object
-  // related to a protected reference object is an error. Record it and hand
-  // back a null handle.
   if (VpiReadSealed(*ref)) {
     SetVpiHandleError(last_error_,
                       "vpi_handle() on a protected object is an error");
     return nullptr;
   }
 
-  // §37.3.5: it is an error to ask for a relation of an expression when the
-  // implementation cannot reach the related handle without also evaluating an
-  // expression that has side effects. The traversal is refused with an error
-  // and a null handle rather than triggering the side effect.
   if (ref->property_needs_side_effect_eval) {
     SetVpiHandleError(
         last_error_,
@@ -892,14 +667,6 @@ VpiHandle VpiContext::Handle(int type, VpiHandle ref) {
     return nullptr;
   }
 
-  // §37.3.4 through §37.85: every relation that is held on the reference object
-  // as a designated pointer (rather than reachable by the generic child/parent
-  // walk below) is resolved here, in the original spec-order. Each grouped
-  // helper documents the §37.x details for the relations it serves. When one
-  // matches, its (possibly null) result is the answer; otherwise the lookup
-  // falls through to the generic traversal.
-  // §37.48 detail 3: what a block a virtual interface var prefixes is now.
-  // §37.29: what a virtual interface var refers to now.
   const auto kByName = [this](const std::string& scope) {
     return HandleByName(scope.c_str(), nullptr);
   };

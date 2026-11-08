@@ -1,8 +1,3 @@
-// The index keys of an array assignment pattern, `'{ array_pattern_key :
-// expression { , array_pattern_key : expression } }` (A.6.7.1), wherever
-// ArrayPatternCheck reaches one: each is a constant expression, and each names
-// its element once.
-
 #include <format>
 #include <optional>
 #include <string>

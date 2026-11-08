@@ -8,10 +8,6 @@ using namespace delta;
 
 namespace {
 
-// The clause's B, a 1-bit s implying a 32-bit d is zero, under the ordering
-// constraints `order`, randomized 512 times by an initial that counts the
-// draws with s set and the draws with s set and d nonzero, as the design
-// test/src/e2e/variable_ordering.sv does.
 std::string CountingSet(const std::string& order) {
   return "class B;\n"
          "  rand bit s;\n"
@@ -33,10 +29,6 @@ std::string CountingSet(const std::string& order) {
          "endmodule\n";
 }
 
-// 18.5.9: with no ordering the solver gives a uniform distribution over the
-// legal value combinations, of which s is set in one of 1 + 2^32, so over
-// 512 draws of the clause's B with a 32-bit d, s is set as good as never,
-// which the 2-bit d of the earlier cases leaves at a fifth of the draws.
 TEST(VariableOrderingRun, TheUnorderedControlIsAsGoodAsNeverSet) {
   SimFixture f;
   std::string out = RunCapture(
@@ -60,10 +52,6 @@ TEST(VariableOrderingRun, TheUnorderedControlIsAsGoodAsNeverSet) {
   EXPECT_EQ(out, "0\n");
 }
 
-// 18.5.9: solve s before d has s chosen first, 0 or 1 with equal
-// probability, and d then subject to it, so over 512 draws s is set near
-// half the time, which a d of 32 bits drawn under s and tried against the
-// implication would never allow, and d is zero on every draw with s set.
 TEST(VariableOrderingRun, TheOrderedControlIsSetHalfTheTime) {
   SimFixture f;
   std::string out =
@@ -71,10 +59,6 @@ TEST(VariableOrderingRun, TheOrderedControlIsSetHalfTheTime) {
   EXPECT_EQ(out, "1 0\n");
 }
 
-// 18.5.9: the solver is free to depart from the stated order when doing so
-// cannot change the outcome: the clause's x held to 0 and below y under solve y
-// before x has one assignment for x, so every one of 64 solves succeeds with x
-// at 0 and y above it, the ordering never making the solver fail.
 TEST(VariableOrderingRun, AnOrderingNeverFailsTheSolve) {
   SimFixture f;
   std::string out = RunCapture(

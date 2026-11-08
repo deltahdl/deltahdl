@@ -11,10 +11,6 @@
 
 namespace delta {
 
-// Whether `obj` is a scope. §37.12 detail 1 makes an unnamed begin or fork one
-// only where it directly declares a block item, and detail 2 a for statement
-// only where it declares its loop variables; every other kind the scope class
-// groups is one always.
 bool VpiIsScopeObject(VpiHandle obj) {
   switch (obj->type) {
     case vpiBegin:
@@ -28,31 +24,19 @@ bool VpiIsScopeObject(VpiHandle obj) {
 
 namespace {
 
-// Whether `obj` is a statement, or a case item (§37.72), which holds one.
 bool VpiIsStmtOrCaseItem(VpiHandle obj) {
   return VpiIsScopeBodyStmtObject(obj) || obj->type == vpiCaseItem;
 }
 
-// Whether `obj` is a statement that is no scope: an unnamed begin or fork
-// declaring nothing (§37.12 detail 1), or any other statement but a foreach
-// loop or a for loop declaring its variables (detail 2). It stands between the
-// scope around it and the scopes written inside it without being one they are
-// nested in.
 bool VpiIsStmtThatIsNoScope(VpiHandle obj) {
   return VpiIsStmtOrCaseItem(obj) && !VpiIsScopeObject(obj);
 }
 
-// §37.32: a class typespec's own class defn, its first child, and the class
-// typespec it extends are objects it relates to, not scopes it holds.
 bool IsClassTypespecRelation(const VpiObject& scope, const VpiObject& child) {
   return scope.type == vpiClassTypespec &&
          (&child == scope.children.front() || child.type == vpiClassTypespec);
 }
 
-// §37.12 (figure): the scopes `scope` holds, reached through vpiInternalScope:
-// each child that is a scope, and the scopes nested in a child statement that
-// is none, which stands in the scope without nesting them in a scope of its
-// own.
 void CollectInternalScopes(VpiHandle scope, VpiHandle iter) {
   for (VpiObject* child : scope->children) {
     if (VpiIsScopeObject(child) && !IsClassTypespecRelation(*scope, *child)) {
@@ -63,8 +47,6 @@ void CollectInternalScopes(VpiHandle scope, VpiHandle iter) {
   }
 }
 
-// §37.12 (figure): begin, named begin, fork and named fork each reach the
-// statements they hold, through the one-to-many arrow to the `stmt` class.
 bool VpiIsBlockType(int type) {
   return type == vpiBegin || type == vpiNamedBegin || type == vpiFork ||
          type == vpiNamedFork;
@@ -73,11 +55,6 @@ bool VpiIsBlockType(int type) {
 }  // namespace
 
 bool VpiIsInternalScopeType(int type) {
-  // §37.12 (figure): `scope` is drawn as a class enclosure, which §37.4.1 makes
-  // a grouping rather than an object kind, so the vpiInternalScope relation
-  // drawn to it reaches the kinds it groups: the instances, tasks and
-  // functions, the four block kinds, class defns, typespecs and objects,
-  // clocking blocks, gen scopes, and for and foreach statements.
   if (VpiIsTaskFuncType(type)) return true;
   switch (type) {
     case kVpiModule:
@@ -101,7 +78,6 @@ bool VpiIsInternalScopeType(int type) {
   }
 }
 
-// The nearest object around `obj` that is a scope (§37.12), null where none is.
 static VpiHandle NearestScopeAround(VpiHandle obj) {
   for (VpiObject* scope = obj->parent; scope != nullptr;
        scope = scope->parent) {
@@ -111,13 +87,6 @@ static VpiHandle NearestScopeAround(VpiHandle obj) {
 }
 
 bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // §37.12 and §37.63 (figures): a statement reaches the scope it stands in
-  // through the untagged arrow to `scope`, the nearest object around it that
-  // is one; a block that is no scope is passed over. §37.42 draws the arrow on
-  // every tf call, so a call within an expression reaches the scope its
-  // expression stands in the same way. §37.12 draws the same arrow back from
-  // each internal scope, every kind the scope class groups, to the scope that
-  // holds it, none for a top.
   if (type != vpiScope ||
       !(VpiIsScopeBodyStmtObject(ref) || VpiIsTfCallType(ref->type) ||
         VpiIsInternalScopeType(ref->type))) {
@@ -128,20 +97,11 @@ bool TryResolveStmtScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
 }
 
 bool TryResolveVariableScopeRelation(int type, VpiHandle ref, VpiHandle& out) {
-  // The §37.17 figure draws an arrow from variables to the scope they are
-  // declared in, the nearest object around a variable that is one. For a loop
-  // control variable that is its foreach statement, or its for statement where
-  // the for declares its loop variables (§37.12 details 2 and 3); a for that
-  // does not is no scope and is passed over.
   if (type != vpiScope || !VpiIsLoopControlVarType(ref->type)) return false;
   out = NearestScopeAround(ref);
   return true;
 }
 
-// §37.54: the assignments and tf calls written as an expr's match items;
-// §37.52 details 4 and 5: the expressions a case property item groups, none
-// for the default item, its property reached apart from them. Answers whether
-// `type` and `ref` name either relation.
 static bool CollectAssertionParts(int type, VpiHandle ref, VpiHandle iter) {
   std::vector<VpiHandle> parts;
   if (type == vpiMatchItem) {
@@ -166,9 +126,6 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
   }
   if (CollectAssertionParts(type, ref, iter)) return true;
   if (VpiCollectFrameAutomatics(type, ref, iter)) return true;
-  // The `stmt` class §37.60 fills is a grouping (§37.4.1), so the iteration
-  // reaches the statements the block holds, each of the kind it is, in the
-  // order written, and none of the block's variables.
   if (type != vpiStmt || !VpiIsBlockType(ref->type)) return false;
   for (VpiObject* child : ref->children) {
     if (VpiIsScopeBodyStmtObject(child)) iter->children.push_back(child);
@@ -178,8 +135,6 @@ bool VpiCollectNestedObjects(int type, VpiHandle ref, VpiHandle iter) {
 
 VpiHandle VpiNestedScopeNamed(VpiHandle parent, std::string_view name) {
   for (VpiObject* child : parent->children) {
-    // A loop that is a scope but has no name, such as a for loop declaring
-    // its variables, adds no level to a name either.
     const bool kNamesNoLevel =
         VpiIsStmtThatIsNoScope(child) ||
         (VpiIsStmtOrCaseItem(child) && child->name.empty());

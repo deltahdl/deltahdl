@@ -7,15 +7,6 @@ using namespace delta;
 
 namespace {
 
-// Section 25.8 defines no grammar of its own; the parameter-port-list and
-// parameter-value-assignment grammar belong to 25.3 / 6.20 / 23.10.2. These
-// two tests are minimal observers of the surface the 25.8 worked example
-// exercises: an interface *declaration* carries a parameter port list (the AST
-// places it under cu->interfaces, distinct from a module), and an interface
-// *instance* carries a named override (matching simple_bus #(.DWIDTH(16))).
-// Override mechanics, type parameters, multiplicity and the duplicate/mixed
-// error cases live with 6.20 / 23.10.2 / 23.10.2.2.
-
 TEST(ParameterizedInterface, WithParameters) {
   auto r = Parse(
       "interface ifc #(parameter int WIDTH = 8);\n"

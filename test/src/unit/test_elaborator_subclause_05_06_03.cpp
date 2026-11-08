@@ -68,11 +68,6 @@ TEST(SystemNameElaboration, SystemTaskInAlwaysBlockElaborates) {
              "endmodule\n"));
 }
 
-// Syntax 5-1's footnote 55 has that a system_tf_identifier is not escaped, and
-// §5.6.1 makes an escaped name user-defined, so `\$display` is neither the
-// system task nor anything declared; the design is rejected at the escape
-// rather than the statement accepted as a call of nothing. The report is the
-// lexer's, so the source counts as not parsed.
 TEST(SystemNameElaboration, EscapedSystemTaskNameIsRejected) {
   ElabFixture f;
   ElaborateSrcAllowingParseErrors(

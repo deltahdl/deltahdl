@@ -1,5 +1,3 @@
-
-
 #include <gtest/gtest.h>
 
 #include <cstdint>
@@ -17,24 +15,6 @@ using namespace delta;
 
 namespace {
 
-// This file covers the rule of §28.14: the rnmos, rpmos, rcmos, rtran, rtranif1
-// and rtranif0 devices weaken the signals passing through them as Table 28-8
-// sets out.
-//
-// The ModelAndSimulator... cases claim more than the cases around them: at
-// every row of Table 28-8, ModelReduceResistive in
-// lib/cpp/test_models/model_strength.h and ReduceResistive in
-// src/common/types.h each produce the reduced strength the table gives. Both
-// functions are asserted against the table, so a row where the two agree with
-// each other and not with Table 28-8 fails here.
-//
-// Issue #3417 is the defect those cases answer. The model's function was named
-// ReduceResistive as well, so every call written in this file passed a Strength
-// and reached the simulator's function in src/common/types.h. The shared name
-// is what made the model read as covered while nothing ever called it.
-
-// Row-by-row coverage of Table 28-8 against the exact reduction function the
-// simulator lowerer applies for resistive devices.
 TEST(StrengthReductionResistive, SupplyReducesToPull) {
   EXPECT_EQ(ReduceResistive(Strength::kSupply), Strength::kPull);
 }
@@ -67,19 +47,10 @@ TEST(StrengthReductionResistive, HighzStaysHighz) {
   EXPECT_EQ(ReduceResistive(Strength::kHighz), Strength::kHighz);
 }
 
-// ModelReduceResistive states Table 28-8 independently of the simulator. Its
-// StrengthLevel and the simulator's Strength in src/common/types.h carry the
-// same eight levels of §28.11's Table 28-7 at the same underlying values, so a
-// level converts by its number.
 Strength ToStrength(StrengthLevel level) {
   return static_cast<Strength>(static_cast<uint8_t>(level));
 }
 
-// One case per row of Table 28-8, which reads: supply drive to pull drive,
-// strong drive to pull drive, pull drive to weak drive, large capacitor to
-// medium capacitor, weak drive to medium capacitor, medium capacitor to small
-// capacitor, small capacitor to small capacitor, high impedance to high
-// impedance.
 TEST(StrengthReductionResistive, ModelAndSimulatorReduceSupplyDriveToPull) {
   const StrengthLevel kInput = StrengthLevel::kSupply;
   const StrengthLevel kTableRow = StrengthLevel::kPull;
@@ -138,14 +109,6 @@ TEST(StrengthReductionResistive, ModelAndSimulatorKeepHighImpedanceHighz) {
   EXPECT_EQ(ReduceResistive(ToStrength(kInput)), ToStrength(kTableRow));
 }
 
-// End-to-end observation that §28.14's reduction rule is what the simulator
-// applies when a resistive device passes a signal: a known drive strength is
-// assigned to the data net, the conducting resistive switch forwards it, and
-// the output net settles with the Table 28-8 reduced strength. These exercise
-// the production lowerer path (which selects ReduceResistive for resistive
-// switches), not the helper in isolation.
-
-// Supply drive -> Pull drive through an rnmos.
 TEST(StrengthReductionResistive, RnmosReducesSupplyDriveToPull) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -163,7 +126,6 @@ TEST(StrengthReductionResistive, RnmosReducesSupplyDriveToPull) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
 }
 
-// Pull drive -> Weak drive through an rnmos.
 TEST(StrengthReductionResistive, RnmosReducesPullDriveToWeak) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -181,7 +143,6 @@ TEST(StrengthReductionResistive, RnmosReducesPullDriveToWeak) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kWeak);
 }
 
-// Weak drive -> Medium capacitor through an rnmos.
 TEST(StrengthReductionResistive, RnmosReducesWeakDriveToMedium) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -199,8 +160,6 @@ TEST(StrengthReductionResistive, RnmosReducesWeakDriveToMedium) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kMedium);
 }
 
-// The rule applies to rpmos as well: Strong drive -> Pull drive. rpmos
-// conducts when its control is low.
 TEST(StrengthReductionResistive, RpmosReducesStrongDriveToPull) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -218,8 +177,6 @@ TEST(StrengthReductionResistive, RpmosReducesStrongDriveToPull) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
 }
 
-// And to rcmos: Strong drive -> Pull drive. The rcmos n-half conducts the
-// high data value when its ncontrol is high.
 TEST(StrengthReductionResistive, RcmosReducesStrongDriveToPull) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -238,10 +195,6 @@ TEST(StrengthReductionResistive, RcmosReducesStrongDriveToPull) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kPull);
 }
 
-// Counterpoint confirming the reduction is specific to resistive routing: the
-// same strong drive forwarded by a non-resistive nmos is NOT reduced to pull,
-// so the pull result above is produced by §28.14's rule rather than by the
-// assign or the switch's value semantics.
 TEST(StrengthReductionResistive, NonresistiveNmosDoesNotReduceStrongDrive) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -259,16 +212,6 @@ TEST(StrengthReductionResistive, NonresistiveNmosDoesNotReduceStrongDrive) {
   EXPECT_EQ(y->resolved_strength.s1_hi, Strength::kStrong);
 }
 
-// §28.14 lists the bidirectional resistive switches rtran, rtranif1, and
-// rtranif0 alongside the unidirectional ones: a signal crossing a resistive
-// bidirectional switch is reduced by Table 28-8 too. These devices are resolved
-// by the standalone bidirectional switch-network resolver (they are not lowered
-// into the continuous-assignment path), whose behavior depends only on the
-// switch flavor and the source terminal's strength, not on how that strength
-// was produced -- so they are exercised directly against the production
-// resolver. Terminal a is driven to 1 with a chosen strength, terminal b is
-// undriven, and the conducting switch propagates a's value and reduced strength
-// onto b; b's resolved strength is what §28.14's rule produces on the far net.
 namespace {
 struct ResistiveBidirResult {
   NetPair nets;
@@ -289,7 +232,6 @@ ResistiveBidirResult ReduceAcrossResistiveBidir(BidirSwitchKind kind,
 }
 }  // namespace
 
-// Strong drive -> Pull drive across a conducting rtranif1 (control high).
 TEST(StrengthReductionResistive, Rtranif1ReducesStrongDriveToPull) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtranif1, {1, 0},
                                       Strength::kStrong);
@@ -297,7 +239,6 @@ TEST(StrengthReductionResistive, Rtranif1ReducesStrongDriveToPull) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
-// Pull drive -> Weak drive across an rtran, which conducts unconditionally.
 TEST(StrengthReductionResistive, RtranReducesPullDriveToWeak) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtran, {0, 0},
                                       Strength::kPull);
@@ -305,7 +246,6 @@ TEST(StrengthReductionResistive, RtranReducesPullDriveToWeak) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kWeak);
 }
 
-// Supply drive -> Pull drive across a conducting rtranif0 (control low).
 TEST(StrengthReductionResistive, Rtranif0ReducesSupplyDriveToPull) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtranif0, {0, 0},
                                       Strength::kSupply);
@@ -313,9 +253,6 @@ TEST(StrengthReductionResistive, Rtranif0ReducesSupplyDriveToPull) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kPull);
 }
 
-// Negative form: an rtranif1 held off passes nothing across, so the far net is
-// left at its default high-impedance strength -- the resistive reduction never
-// runs on a nonconducting switch.
 TEST(StrengthReductionResistive, NonconductingRtranif1LeavesFarNetStrength) {
   auto r = ReduceAcrossResistiveBidir(BidirSwitchKind::kRtranif1, {0, 0},
                                       Strength::kSupply);
@@ -323,11 +260,6 @@ TEST(StrengthReductionResistive, NonconductingRtranif1LeavesFarNetStrength) {
   EXPECT_EQ(r.b_strength.s1_hi, Strength::kHighz);
 }
 
-// Table 28-8's rows for the charge storage strengths apply to a trireg's stored
-// charge crossing a resistive switch: once the nmos turns off, the trireg holds
-// a large 1, which an rtran carries on as a medium 1 and a tran (§28.13) as a
-// large 1. The charge was offered to no net joined to the trireg, so both read
-// high impedance.
 TEST(StrengthReductionResistive,
      ATriregsChargeIsReducedCrossingAResistiveSwitch) {
   SimFixture f;
@@ -356,12 +288,6 @@ TEST(StrengthReductionResistive,
   EXPECT_EQ(w2->resolved_strength.s1_hi, Strength::kLarge);
 }
 
-// A resistive switch reduces the strength of whatever its data input is: a
-// variable or a constant drives at strong, which Table 28-8 reduces to pull,
-// and a bit-select of a supply net carries that bit's supply strength, also
-// reduced to pull, as does one named by its hierarchical name. Read only from a
-// data input naming a whole net by its simple name, these passed strong
-// unreduced.
 TEST(StrengthReductionResistive, ADataInputThatIsNoWholeNetIsReduced) {
   SimFixture f;
   auto* design = ElaborateSrc(
@@ -386,10 +312,6 @@ TEST(StrengthReductionResistive, ADataInputThatIsNoWholeNetIsReduced) {
   }
 }
 
-// A switch passes an ambiguous strength as the range it is (§28.12.2): u holds
-// a 1 from pull to strong (651), which an nmos passes unchanged and an rnmos
-// reduces at each end, strong to pull and pull to weak (531). Reduced at its
-// top alone, the range came out as one level.
 TEST(StrengthReductionResistive, ASwitchPassesAnAmbiguousStrengthAsARange) {
   SimFixture f;
   auto* design = ElaborateSrc(

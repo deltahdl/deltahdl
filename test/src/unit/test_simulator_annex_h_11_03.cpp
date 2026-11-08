@@ -13,7 +13,6 @@ using namespace delta;
 
 namespace {
 
-// A formal of Example 5's import, an input declared under the named type.
 DpiArg Formal(const char* name, DataTypeKind kind, const char* type_name) {
   DpiArg formal;
   formal.name = name;
@@ -23,9 +22,6 @@ DpiArg Formal(const char* name, DataTypeKind kind, const char* type_name) {
   return formal;
 }
 
-// §H.11.3: a packed struct or union argument corresponds to a
-// one-dimensional packed array argument -- the three-bit S and U are the
-// same const svBitVecVal* formal the three-bit array A is.
 TEST(DpiPackedAggregateArguments, APackedStructOrUnionIsAPackedArrayFormal) {
   const DpiArg kA = DpiPackedAggregateAsPackedArrayFormal(
       Formal("fa", DataTypeKind::kBit, "A"), false, 3);
@@ -44,8 +40,6 @@ TEST(DpiPackedAggregateArguments, APackedStructOrUnionIsAPackedArrayFormal) {
             "svBitVecVal* fu)");
 }
 
-// §H.11.3: a packed struct or union of 4-state members corresponds to a
-// packed logic array, the const svLogicVecVal* formal.
 TEST(DpiPackedAggregateArguments, AFourStatePackedAggregateIsALogicArray) {
   const DpiArg kFourState = DpiPackedAggregateAsPackedArrayFormal(
       Formal("fs", DataTypeKind::kStruct, "S4"), true, 3);
@@ -53,18 +47,10 @@ TEST(DpiPackedAggregateArguments, AFourStatePackedAggregateIsALogicArray) {
   EXPECT_EQ(DpiCTypeOfFormal(kFourState, false), "const svLogicVecVal*");
 }
 
-// The value the example's initial block builds: the packed struct S with a
-// set and b and c clear is 3'b100, its first member being its most
-// significant bit (§7.2.1), which is the 4 the array a and the union's array
-// member u.a are assigned.
 uint32_t PackedS(bool a, bool b, bool c) {
   return (a ? 4u : 0u) | (b ? 2u : 0u) | (c ? 1u : 0u);
 }
 
-// §H.11.3 under the runtime: f8 registered with the three packed array
-// formals and called with a, s and u as the initial block does -- each
-// arriving as one canonical chunk whose value is 4, so that the example's
-// printf reads "fa is 4, fs is 4, fu is 4".
 TEST(DpiPackedAggregateArguments, F8ReceivesFourFromTheArrayStructAndUnion) {
   DpiRuntime rt;
   DpiRtFunction f8;

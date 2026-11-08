@@ -95,9 +95,6 @@ TEST(ClassConstructorElaboration, PropertyWithExplicitDefaultElaborates) {
              "endmodule\n"));
 }
 
-// §8.7: a constructor may be declared as a local method. The qualifier is
-// accepted (unlike static/virtual, which are rejected) and the class still
-// elaborates. Access control on the local `new` is §8.18 machinery.
 TEST(ClassConstructorElaboration, LocalConstructorElaborates) {
   EXPECT_TRUE(
       ElabOk("class C;\n"
@@ -111,9 +108,6 @@ TEST(ClassConstructorElaboration, LocalConstructorElaborates) {
              "endmodule\n"));
 }
 
-// §8.7: a constructor may be declared as a protected method. A protected
-// constructor is reachable from a subclass, so the derived class's super.new()
-// call elaborates cleanly against it.
 TEST(ClassConstructorElaboration, ProtectedConstructorAccessibleToSubclass) {
   EXPECT_TRUE(
       ElabOk("class Base;\n"
@@ -135,9 +129,6 @@ TEST(ClassConstructorElaboration, ProtectedConstructorAccessibleToSubclass) {
              "endmodule\n"));
 }
 
-// §8.7 defines new as a function with no return type that, like every function,
-// must not block, which defers the nonblocking requirement to the rule §13.4
-// states for every function. The report therefore names §13.4.
 TEST(ClassConstructorElaboration, ConstructorWithTimingControlError) {
   ElabFixture f;
   ElabOk(
@@ -157,10 +148,6 @@ TEST(ClassConstructorElaboration, ConstructorWithTimingControlError) {
       "13.4"));
 }
 
-// §8.7's nonblocking requirement bars every kind of time control in the
-// constructor, not just delays. An event control is rejected under the same
-// §13.4 rule, since §8.7 states the requirement only by reference to what holds
-// for any other function.
 TEST(ClassConstructorElaboration, ConstructorWithEventControlError) {
   ElabFixture f;
   ElabOk(

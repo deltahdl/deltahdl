@@ -13,14 +13,6 @@
 
 using namespace delta;
 
-// §F.3.4.3.3 unfolds the nonoverlapping implication into the §F.3.2
-// overlapping one over an antecedent lengthened by one letter: (R |=> P) is
-// ((R ##1 1) |-> P) over an unclocked sequence, and (S |=> Q) is
-// ((S ##1 @(1) 1) |-> Q) over a clocked one. The cases check that each
-// factory builds the tree its identity names and that, under §F.5.3.1, the
-// consequent is judged from the letter after the antecedent's match where the
-// overlapping form judges it from the letter the match ends at.
-
 namespace {
 
 Letter A(std::set<std::string> atoms) { return LetterAtoms(std::move(atoms)); }
@@ -29,8 +21,6 @@ std::shared_ptr<const SequenceExpr> Atom(const std::string& name) {
   return SeqBoolean(BoolAtom(name));
 }
 
-// The unclocked form is the implication whose antecedent is (R ##1 1) and
-// whose consequent is P itself.
 TEST(DerivedNonoverlappingImplication, UnclockedFormLengthensTheAntecedent) {
   auto p = PropStrong(Atom("b"));
   auto form = PropNonoverlappingImplication(Atom("a"), p);
@@ -41,8 +31,6 @@ TEST(DerivedNonoverlappingImplication, UnclockedFormLengthensTheAntecedent) {
   EXPECT_EQ(form->lhs, p);
 }
 
-// The clocked form's antecedent ends in the clocked constant @(1) 1 rather
-// than the bare constant, which is what parts it from the unclocked form.
 TEST(DerivedNonoverlappingImplication, ClockedFormClocksTheAddedLetter) {
   auto q = ClkStrong(Atom("b"));
   auto s = SeqClock(BoolAtom("clk"), Atom("a"));
@@ -55,11 +43,6 @@ TEST(DerivedNonoverlappingImplication, ClockedFormClocksTheAddedLetter) {
       *ClkImplication(SeqConcat(s, SeqBoolean(BoolTrue())), q)));
 }
 
-// Under §F.5.3.1, a |=> strong(b) needs b on the letter after a: it holds on
-// a then b, fails on a then a letter without b, and holds vacuously on a lone
-// a, whose one letter is too short for the antecedent. The overlapping
-// a |-> strong(b) needs b on the letter with a, so it fails on a then b and
-// holds on a and b together followed by anything.
 TEST(DerivedNonoverlappingImplication, TheConsequentStartsOneLetterLater) {
   auto nonoverlapping =
       PropNonoverlappingImplication(Atom("a"), PropStrong(Atom("b")));
@@ -74,11 +57,6 @@ TEST(DerivedNonoverlappingImplication, TheConsequentStartsOneLetterLater) {
   EXPECT_TRUE(NeutrallySatisfies(Word{A({"x"}), A({"x"})}, *nonoverlapping));
 }
 
-// In the clocked model under @(clk), the added letter is one letter of the
-// word and the consequent then waits for the next clk tick: a at one tick
-// followed by an unclocked letter and then b at the next tick satisfies
-// a |=> strong(b) where the overlapping form, judged from the letter with a,
-// does not; b absent at the next tick fails both.
 TEST(DerivedNonoverlappingImplication, UnderAClockTheConsequentWaitsATick) {
   auto clk = BoolAtom("clk");
   auto nonoverlapping = ClkClock(

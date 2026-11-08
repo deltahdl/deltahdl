@@ -12,12 +12,6 @@
 
 using namespace delta;
 
-// Elaborate, lower, and run `src` in a freshly constructed seeded simulation
-// context, then read back each named scalar variable as an unsigned value. The
-// random-stability tests replay the same fork program from a fixed
-// initialization seed and compare the per-variable draws, so they share this
-// elaborate/lower/run/read sequence and differ only in the source text and the
-// set of variables they inspect.
 inline std::vector<uint64_t> RunSeededAndRead(
     const std::string& src, std::initializer_list<const char*> names) {
   SimFixtureSeeded f;

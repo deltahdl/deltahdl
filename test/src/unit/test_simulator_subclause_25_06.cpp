@@ -6,12 +6,6 @@ using namespace delta;
 
 namespace {
 
-// §25.6: a signal of an interface reached through a modport is a terminal the
-// module's specify block may use, so a module path ending at ch.q delays it as
-// the path ending at the output port qo delays qo. The flop's edge at 10
-// reaches qo after its rise delay of 2 and ch.q after its rise delay of 5, so
-// at 13 qo is 1 and q still x, and at 16 q is 1. Before, the path to ch.q was
-// ignored and q was 1 at 13.
 TEST(InterfaceSpecifySim, PathDelayToModportSignalIsApplied) {
   SimFixture f;
   EXPECT_EQ(RunCapture("interface itf;\n"

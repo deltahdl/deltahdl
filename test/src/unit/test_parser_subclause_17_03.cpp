@@ -33,12 +33,6 @@ TEST_F(VerifyParseTest, CheckerNestedWithClocking) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationConnectionStyles) {
-  // §17.3: checker formal arguments may be connected to actuals in the same
-  // ways as module ports — positionally, with fully explicit named
-  // connections, with implicit named connections, and with a wildcard port
-  // name. The existing test above covers the positional/ordered form; here a
-  // single checker is instantiated once in each of the remaining three named
-  // styles, all of which must parse without error.
   auto* unit = Parse(R"(
     checker chk(bit clk, bit [31:0] sig);
       a1: assert property (@(posedge clk) sig);
@@ -57,9 +51,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationConnectionStyles) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationRejectsRepeatedWildcard) {
-  // §17.3 (Syntax 17-2, footnote 34): the `.*` token pair shall appear at most
-  // once in a list of port connections. A checker instantiation that lists two
-  // wildcard connections is the closest rejected form of the wildcard style.
   auto* unit = Parse(R"(
     checker chk(bit clk, bit [31:0] sig);
       a1: assert property (@(posedge clk) sig);
@@ -71,17 +62,12 @@ TEST_F(VerifyParseTest, CheckerInstantiationRejectsRepeatedWildcard) {
     endmodule
   )");
   ASSERT_EQ(unit->checkers.size(), 1u);
-  // §23.3.2 owns the at-most-one-`.*` rule the parser reports here; §17.3
-  // repeats it for checker instantiations but has no report of its own.
   EXPECT_TRUE(ReportedError(
       diag_.Diagnostics(),
       ".* already appears earlier in this port connection list", 8, "23.3.2"));
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationEmptyConnectionList) {
-  // §17.3 (Syntax 17-2): the list_of_checker_port_connections is optional, so a
-  // checker instantiation may present an empty parenthesized list, leaving
-  // every formal unconnected. This must parse without error.
   auto* unit = Parse(R"(
     checker chk(bit clk, bit sig);
       a1: assert property (@(posedge clk) sig);
@@ -97,9 +83,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationEmptyConnectionList) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationOmittedOrderedConnection) {
-  // §17.3 (Syntax 17-2): in ordered_checker_port_connection the
-  // property_actual_arg is optional, so a positional connection list may omit
-  // an actual for a formal by leaving its slot blank between commas.
   auto* unit = Parse(R"(
     checker chk3(bit clk, bit a, bit b);
       a1: assert property (@(posedge clk) a || b);
@@ -115,9 +98,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationOmittedOrderedConnection) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationEmptyNamedActual) {
-  // §17.3 (Syntax 17-2): in named_checker_port_connection the actual argument
-  // inside the parentheses is optional, so `.formal()` explicitly names a
-  // formal while leaving it unconnected. This must parse without error.
   auto* unit = Parse(R"(
     checker chk3(bit clk, bit a, bit b);
       a1: assert property (@(posedge clk) a || b);
@@ -133,10 +113,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationEmptyNamedActual) {
 }
 
 TEST_F(VerifyParseTest, CheckerInstantiationPackageScopedIdentifier) {
-  // §17.3 (Syntax 17-2): ps_checker_identifier ::= [ package_scope ]
-  // checker_identifier, so a checker instantiation may name the checker through
-  // a package scope. The parser accepts the scoped instance form; resolving the
-  // package is left to elaboration.
   Parse(R"(
     module m;
       bit clk;
@@ -147,8 +123,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationPackageScopedIdentifier) {
   EXPECT_FALSE(diag_.HasErrors());
 }
 
-// The statement the always or initial procedure of the last module holds
-// first, the first of its block's statements where its body is a block.
 const Stmt* FirstProcedureStmt(const CompilationUnit* unit,
                                ModuleItemKind kind) {
   if (unit == nullptr || unit->modules.empty()) return nullptr;
@@ -161,10 +135,6 @@ const Stmt* FirstProcedureStmt(const CompilationUnit* unit,
   return nullptr;
 }
 
-// §17.3: a checker may be instantiated wherever a concurrent assertion may
-// appear, in an always procedure among those places, so the branch of an if
-// may be one: the statement carries the instantiation, the checker's name,
-// the instance's and its two ordered actuals.
 TEST_F(VerifyParseTest, CheckerInstantiationAsTheBranchOfAnIf) {
   auto* unit = Parse(R"(
     checker chk(logic a, logic clk);
@@ -191,8 +161,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationAsTheBranchOfAnIf) {
   EXPECT_EQ(inst->decl_item->inst_ports.size(), 2u);
 }
 
-// §17.3: the same in an initial procedure, an item of its block after an
-// event control, the checker named through a package scope.
 TEST_F(VerifyParseTest, PackageScopedCheckerInstantiationInAnInitialBlock) {
   auto* unit = Parse(R"(
     module m;
@@ -213,9 +181,6 @@ TEST_F(VerifyParseTest, PackageScopedCheckerInstantiationInAnInitialBlock) {
   EXPECT_EQ(inst->decl_item->inst_name, "c");
 }
 
-// §17.3 with §16.14: of procedural code, a concurrent assertion may appear
-// only in an always or an initial procedure, so a checker instantiated in a
-// task is reported.
 TEST_F(VerifyParseTest, CheckerInstantiationInATaskIsRejected) {
   Parse(R"(
     module m;
@@ -231,7 +196,6 @@ TEST_F(VerifyParseTest, CheckerInstantiationInATaskIsRejected) {
                             5, "17.3"));
 }
 
-// §17.3 with §16.14: a final procedure is not among those places either.
 TEST_F(VerifyParseTest, CheckerInstantiationInAFinalProcedureIsRejected) {
   Parse(R"(
     module m;

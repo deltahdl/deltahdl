@@ -9,8 +9,6 @@
 
 namespace delta {
 
-// True when a step of a path a source wrote names the same generate block
-// instance a step recorded on a declaration does.
 static bool SameHierStep(const HierStep& written, const HierStep& recorded) {
   if (written.name != recorded.name) return false;
   if (written.has_index != recorded.has_index) return false;
@@ -25,11 +23,6 @@ bool PathStartsWith(const HierPath& path, const HierPath& prefix) {
   return true;
 }
 
-// Whether the instance `child` answers the step `step`: by its name, and for
-// a step carrying an instance select by the element of an instance array
-// (§23.6) the select names, which RtlirModuleInst::array records. A step holds
-// one select, which names an element of a one-dimensional array alone: in an
-// array of more dimensions it names no instance.
 static bool ChildAnswersStep(const RtlirModuleInst& child,
                              const HierStep& step) {
   if (child.simple_inst_name != step.name) return false;
@@ -37,8 +30,6 @@ static bool ChildAnswersStep(const RtlirModuleInst& child,
   return child.array.dims.size() == 1 && child.array.index == step.index;
 }
 
-// The instance `mod` holds as `step` inside exactly the generate block
-// instances `blocks` names, or nullptr when it holds no such thing.
 static RtlirModuleInst* ChildUnderBlocks(RtlirModule* mod, const HierStep& step,
                                          const HierPath& blocks) {
   for (auto& child : mod->children) {

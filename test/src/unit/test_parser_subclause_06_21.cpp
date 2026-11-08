@@ -491,14 +491,7 @@ TEST(ScopeAndLifetimeParsing, LifetimeStaticOnModuleItem) {
 }
 
 TEST(ScopeAndLifetimeParsing, LifetimeAutomaticOnModuleItem) {
-  // §6.21: variables declared in a module outside a task, process, or function
-  // have a static lifetime; the `automatic` lifetime is permitted only inside a
-  // task, function, or block (a procedural context). A module-level `automatic`
-  // data declaration is therefore illegal and is rejected.
   auto r = Parse("module m; automatic int y = 0; endmodule");
-  // §6.8 states the data_declaration the lifetime is written on, and that is
-  // where Parser::ParseDataDeclItem files the report; §6.21 has none of its
-  // own.
   EXPECT_TRUE(ReportedError(r.diags,
                             "'automatic' is not allowed in a data_declaration "
                             "outside a procedural context",

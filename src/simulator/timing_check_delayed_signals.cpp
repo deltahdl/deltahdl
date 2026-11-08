@@ -1,21 +1,3 @@
-// §31.9.1 (printed pages 920-922) and §31.9.4 (printed page 923): the timing
-// checks produce delayed copies of their data and reference signals, and a
-// check may declare those copies by name so that the model's functional code
-// can read them. The elaborator declares each named one as a net of the module
-// (elaborator_delayed_signals.cpp); what drives it is here.
-//
-// Without the option enabling negative timing checks the delayed signals are
-// plain copies of the originals, so a copy follows at once. With it they lag
-// by the delays SpecifyManager::ResolveNegativeTimingCheckDelays
-// (simulator/timing_check_negative_delays.cpp) settles across every check. A
-// signal given a delayed copy in some checks and not in others uses that
-// delayed copy in all of them, so the delay belongs to the original signal,
-// whichever check names the copy.
-//
-// Each transition of the original reaches the copy the same delay later,
-// however close the next one follows: a delayed copy carries the signal, not a
-// computed value an inertial delay could filter.
-
 #include "simulator/timing_check_delayed_signals.h"
 
 #include <cstddef>
@@ -40,8 +22,6 @@
 namespace delta {
 namespace {
 
-// One named delayed signal: the original it copies, with the select its
-// terminal was written with, and where the copy lands.
 struct DelayedCopy {
   std::string source;
   TerminalSelect select;
@@ -50,8 +30,6 @@ struct DelayedCopy {
   int64_t index = 0;
 };
 
-// The copies the registered checks name, keyed by the copy so that a copy two
-// checks name is driven once.
 struct DelayedCopyPlan {
   std::vector<DelayedCopy> copies;
   std::map<std::string, bool> planned;
@@ -68,9 +46,6 @@ struct DelayedCopyPlan {
   }
 };
 
-// The copies $setuphold and $recrem declare. How far each lags its original is
-// SpecifyManager::TimingCheckSignalDelay's answer, which §31.9.1 makes a
-// property of the original signal whichever check names the copy.
 DelayedCopyPlan PlanCopies(const SpecifyManager& mgr) {
   DelayedCopyPlan plan;
   for (const TimingCheckEntry& e : mgr.GetTimingChecks()) {
@@ -84,7 +59,6 @@ DelayedCopyPlan PlanCopies(const SpecifyManager& mgr) {
   return plan;
 }
 
-// The bits of the original the copy carries, least significant first.
 Logic4Vec CopiedValue(const Variable& src, const std::vector<uint32_t>& bits,
                       Arena& arena) {
   const uint32_t kWidth =
@@ -113,8 +87,6 @@ void SetBit(Logic4Vec& v, uint32_t bit, const Logic4Vec& from, uint32_t src) {
   if (((f.bval >> (src % 64U)) & 1U) != 0U) w.bval |= kMask;
 }
 
-// Where a copy lands: a driver slot of its net, or the variable the module
-// declared it as.
 struct CopyTarget {
   Net* net = nullptr;
   Variable* var = nullptr;
@@ -124,11 +96,6 @@ struct CopyTarget {
   bool has_slot = false;
 };
 
-// A copy written `name[index]` sets that bit alone; a net's slot stands at z
-// in every other bit, so copies of other bits can drive the same net.
-// The value the target is given: the copy in the bits it covers and, where it
-// was written `name[index]`, the variable's other bits as they stand, or z in
-// a net's slot.
 Logic4Vec TargetValue(const CopyTarget& t, const Variable& shape,
                       const Logic4Vec& value, Arena& arena) {
   Logic4Vec out = MakeLogic4Vec(arena, shape.value.width);

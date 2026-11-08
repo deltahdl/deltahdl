@@ -152,9 +152,6 @@ namespace {
 bool Satisfies(const Word& word, const LvProperty& property,
                const LocalContext& context);
 
-// §F.5.6.1: w, L_0 |= strong(R) iff there exist 0 <= j < |w| and L_1 with
-// w^{0,j}, L_0, L_1 |== R. §F.5.5's relation yields the set of such L_1, so the
-// existential reduces to that set being nonempty for some prefix.
 bool StrongHolds(const Word& word, const SequenceExpr& seq,
                  const LocalContext& context) {
   for (std::size_t j = 0; j < word.size(); ++j) {
@@ -166,8 +163,6 @@ bool StrongHolds(const Word& word, const SequenceExpr& seq,
   return false;
 }
 
-// §F.5.6.1: w, L_0 |= weak(R) iff for every 0 <= j < |w|, the T^omega-completed
-// prefix w^{0,j} T^omega, L_0 |= strong(R).
 bool WeakHolds(const Word& word, const SequenceExpr& seq,
                const LocalContext& context) {
   const std::size_t kReach = SequenceReach(seq);
@@ -181,9 +176,6 @@ bool WeakHolds(const Word& word, const SequenceExpr& seq,
   return true;
 }
 
-// §F.5.6.1: w, L_0 |= ( R |-> P ) iff for every 0 <= j < |w| and every output
-// context L_1 with w-bar^{0,j}, L_0, L_1 |== R, w^{j.}, L_1 |= P. Each L_1 the
-// antecedent yields is threaded into the consequent.
 bool ImplicationHolds(const Word& word, const LvProperty& property,
                       const LocalContext& context) {
   if (!property.sequence || !property.lhs) {
@@ -201,7 +193,6 @@ bool ImplicationHolds(const Word& word, const LvProperty& property,
   return true;
 }
 
-// §F.5.6.1 helper: w^{i.}, L_0 |= P1 holds for every 0 <= i < limit.
 bool UntilLhsHoldsThroughLimit(const Word& word, const LvProperty& lhs,
                                const LocalContext& context, std::size_t limit) {
   for (std::size_t i = 0; i < limit; ++i) {
@@ -212,8 +203,6 @@ bool UntilLhsHoldsThroughLimit(const Word& word, const LvProperty& lhs,
   return true;
 }
 
-// §F.5.6.1 helper: some 0 <= j < |w| has w^{j.}, L_0 |= P2 while
-// w^{i.}, L_0 |= P1 for all 0 <= i < j.
 bool UntilHasReleasingIndex(const Word& word, const LvProperty& property,
                             const LocalContext& context) {
   for (std::size_t j = 0; j < word.size(); ++j) {
@@ -225,9 +214,6 @@ bool UntilHasReleasingIndex(const Word& word, const LvProperty& property,
   return false;
 }
 
-// §F.5.6.1: w, L_0 |= ( P1 until P2 ) iff some 0 <= j < |w| has
-// w^{j.}, L_0 |= P2 with w^{i.}, L_0 |= P1 for all 0 <= i < j, or
-// w^{i.}, L_0 |= P1 for all i.
 bool UntilHolds(const Word& word, const LvProperty& property,
                 const LocalContext& context) {
   if (!property.lhs || !property.rhs) {
@@ -239,8 +225,6 @@ bool UntilHolds(const Word& word, const LvProperty& property,
   return UntilLhsHoldsThroughLimit(word, *property.lhs, context, word.size());
 }
 
-// §F.5.6.1: w, L_0 |= ( accept_on (b) P ) iff w, L_0 |= P, or for some
-// 0 <= i < |w| with w^i |= b, w^{0,i-1} T^omega, L_0 |= P.
 bool AcceptOnHolds(const Word& word, const LvProperty& property,
                    const LocalContext& context) {
   if (!property.boolean || !property.lhs) {
@@ -266,40 +250,29 @@ bool Satisfies(const Word& word, const LvProperty& property,
                const LocalContext& context) {
   switch (property.kind) {
     case LvProperty::Kind::kLocalVarDecl:
-      // §F.5.6.1: w, L_0 |= ( t v ; P ) iff w, L_0\v |= P. The declared name is
-      // stripped from the context the body sees.
       return property.lhs &&
              Satisfies(word, *property.lhs,
                        RemoveName(context, property.local_var_name));
     case LvProperty::Kind::kParen:
-      // §F.5.6.1: w, L_0 |= ( P ) iff w, L_0 |= P.
       return property.lhs && Satisfies(word, *property.lhs, context);
     case LvProperty::Kind::kNot:
-      // §F.5.6.1: w, L_0 |= not P iff w-bar, L_0 does not satisfy P, the word
-      // complemented and the verdict negated as in the §F.5.3.1 rule without
-      // local variables.
       return property.lhs &&
              !Satisfies(ComplementWord(word), *property.lhs, context);
     case LvProperty::Kind::kStrong:
-      // §F.5.6.1: strong(R) over the four-way tight-satisfaction relation.
       return property.sequence &&
              StrongHolds(word, *property.sequence, context);
     case LvProperty::Kind::kWeak:
-      // §F.5.6.1: weak(R) over the four-way tight-satisfaction relation.
       return property.sequence && WeakHolds(word, *property.sequence, context);
     case LvProperty::Kind::kImplication:
       return ImplicationHolds(word, property, context);
     case LvProperty::Kind::kOr:
-      // §F.5.6.1: w, L_0 |= ( P1 or P2 ) iff w, L_0 |= P1 or w, L_0 |= P2.
       return (property.lhs && Satisfies(word, *property.lhs, context)) ||
              (property.rhs && Satisfies(word, *property.rhs, context));
     case LvProperty::Kind::kAnd:
-      // §F.5.6.1: w, L_0 |= ( P1 and P2 ) iff w, L_0 |= P1 and w, L_0 |= P2.
       return property.lhs && property.rhs &&
              Satisfies(word, *property.lhs, context) &&
              Satisfies(word, *property.rhs, context);
     case LvProperty::Kind::kNexttime:
-      // §F.5.6.1: w, L_0 |= ( nexttime P ) iff |w| = 0 or w^{1.}, L_0 |= P.
       return word.empty() ||
              (property.lhs &&
               Satisfies(Suffix(word, 1), *property.lhs, context));
@@ -320,7 +293,6 @@ bool NeutrallySatisfiesWithLocals(const Word& word, const LvProperty& property,
 
 bool NeutrallySatisfiesWithLocals(const Word& word,
                                   const LvProperty& property) {
-  // §F.5.6.1: "w |= Q iff w, {} |= Q" -- start from the empty context.
   return Satisfies(word, property, LocalContext{});
 }
 
@@ -329,12 +301,8 @@ bool NeutrallySatisfiesTopLevelWithLocals(const Word& word,
                                           const LocalContext& context) {
   switch (top.kind) {
     case LvTopLevelProperty::Kind::kProperty:
-      // §F.5.6.1: for T = P, w, L_0 |= T iff w, L_0 |= P.
       return top.property && Satisfies(word, *top.property, context);
     case LvTopLevelProperty::Kind::kDisableIff: {
-      // §F.5.6.1: for T = disable iff (b) P, w, L_0 |= T iff either w, L_0 |= P
-      // and no letter of w satisfies b, or some letter satisfies b and
-      // w^{0,i-1} _|_^omega, L_0 |= P for i the least index with w^i |= b.
       if (!top.disable_condition || !top.property) {
         return false;
       }
@@ -348,11 +316,9 @@ bool NeutrallySatisfiesTopLevelWithLocals(const Word& word,
       return Satisfies(kCompleted, *top.property, context);
     }
     case LvTopLevelProperty::Kind::kParen:
-      // §F.5.6.1: w, L_0 |= ( T ) iff w, L_0 |= T.
       return top.inner &&
              NeutrallySatisfiesTopLevelWithLocals(word, *top.inner, context);
     case LvTopLevelProperty::Kind::kLocalVarDecl:
-      // §F.5.6.1: w, L_0 |= ( t v ; T ) iff w, L_0\v |= T.
       return top.inner &&
              NeutrallySatisfiesTopLevelWithLocals(
                  word, *top.inner, RemoveName(context, top.local_var_name));
@@ -364,21 +330,15 @@ bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                                 const LocalContext& context) {
   switch (top.kind) {
     case LvTopLevelProperty::Kind::kProperty:
-      // §F.5.6.1: for T = P, w, L_0 |=^d T never holds.
       return false;
     case LvTopLevelProperty::Kind::kDisableIff:
-      // §F.5.6.1: for T = disable iff (b) P, w, L_0 |=^d T iff some letter of w
-      // satisfies b and both w^{0,i-1} T^omega, L_0 |= P and
-      // w^{0,i-1} _|_^omega, L_0 |/= P for i the least index with w^i |= b.
       return DisableIffShape(word, top,
                              [&context](const Word& w, const auto& p) {
                                return Satisfies(w, p, context);
                              });
     case LvTopLevelProperty::Kind::kParen:
-      // §F.5.6.1: w, L_0 |=^d ( T ) iff w, L_0 |=^d T.
       return top.inner && DisablesTopLevelWithLocals(word, *top.inner, context);
     case LvTopLevelProperty::Kind::kLocalVarDecl:
-      // §F.5.6.1: w, L_0 |=^d ( t v ; T ) iff w, L_0\v |=^d T.
       return top.inner &&
              DisablesTopLevelWithLocals(
                  word, *top.inner, RemoveName(context, top.local_var_name));
@@ -388,22 +348,17 @@ bool DisablesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
 
 bool PassesTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                               const LocalContext& context) {
-  // §F.5.6.1: T passes on w, L_0 when w, L_0 |= T.
   return NeutrallySatisfiesTopLevelWithLocals(word, top, context);
 }
 
 bool IsDisabledTopLevelWithLocals(const Word& word,
                                   const LvTopLevelProperty& top,
                                   const LocalContext& context) {
-  // §F.5.6.1: T is disabled on w, L_0 when w, L_0 |=^d T.
   return DisablesTopLevelWithLocals(word, top, context);
 }
 
 bool FailsTopLevelWithLocals(const Word& word, const LvTopLevelProperty& top,
                              const LocalContext& context) {
-  // §F.5.6.1: T fails on w, L_0 when it neither passes nor is disabled there.
-  // Pass and disabled are mutually exclusive, so failure is their joint
-  // negation.
   return !PassesTopLevelWithLocals(word, top, context) &&
          !IsDisabledTopLevelWithLocals(word, top, context);
 }

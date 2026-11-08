@@ -1,16 +1,3 @@
-// §6.16 (printed page 112) declares the string methods of §6.16.1 through
-// §6.16.15 on the string type, so each is called on any expression of that
-// type: a class property named through a handle (§8.3), by its bare name or
-// through `this` (§8.11) inside a method, a static property named `C::name`
-// (§8.9, §8.10) or bare inside a static method, a subroutine formal (§13.3,
-// §13.4), a package variable (§26.3), the result of a subroutine (§13.4) or of
-// another string method, and a property read after a task's timing control
-// (§13.3). Each case here prints what the standard predicts and reads the
-// simulator's output whole, so a method that answered "" or 0 for a receiver
-// it did not recognise as a string fails on the value rather than on a
-// diagnostic. A module-scope `string s` is the one receiver that always
-// worked, so every case names its receiver some other way.
-
 #include <gtest/gtest.h>
 
 #include <string>
@@ -21,8 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §6.16.1 and §6.16.4 on a property named through a handle, `h.s.len()`, and
-// on the property's bare name inside a method of the class, `s.len()` in `l`.
 TEST(StringMethodReceivers, PropertyThroughAHandleAndBareInsideAMethod) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -41,8 +26,6 @@ TEST(StringMethodReceivers, PropertyThroughAHandleAndBareInsideAMethod) {
             "len=5 up=HELLO in=5\n");
 }
 
-// §8.11: `this.s` inside a method names the object's own property, and the
-// method called on it answers for that property.
 TEST(StringMethodReceivers, PropertyThroughThisInsideAMethod) {
   SimFixture f;
   EXPECT_EQ(
@@ -63,8 +46,6 @@ TEST(StringMethodReceivers, PropertyThroughThisInsideAMethod) {
       "up=HELLO n=5\n");
 }
 
-// The value-answering methods of §6.16.1 through §6.16.8 on one property:
-// len, toupper, tolower chained on toupper's result, substr and getc.
 TEST(StringMethodReceivers, EveryValueMethodOnAProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -83,8 +64,6 @@ TEST(StringMethodReceivers, EveryValueMethodOnAProperty) {
       "len=5 up=HELLO lo=hello sub=ell g=101\n");
 }
 
-// §6.16.9 and §6.16.10: the conversions read the property's text, so the
-// number each answers is the one the text spells and not 0.
 TEST(StringMethodReceivers, ConversionsOnAProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -104,8 +83,6 @@ TEST(StringMethodReceivers, ConversionsOnAProperty) {
       "atoi=123 hex=255 oct=8 bin=5 real=2.500000\n");
 }
 
-// §6.16.6: compare's argument is a property read through another handle, and
-// its receiver a property through a handle; "abd" against "abc" is positive.
 TEST(StringMethodReceivers, CompareOfAPropertyWithAProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -125,9 +102,6 @@ TEST(StringMethodReceivers, CompareOfAPropertyWithAProperty) {
       "cmp=1 icmp=0\n");
 }
 
-// §8.9 and §8.10: a static property named through the class scope resolution
-// operator, `C::name.substr(0,0)`, and bare inside static methods of the
-// class, `name.len()` and `name.toupper()`.
 TEST(StringMethodReceivers, StaticPropertyScopedAndBareInAStaticMethod) {
   SimFixture f;
   EXPECT_EQ(
@@ -148,8 +122,6 @@ TEST(StringMethodReceivers, StaticPropertyScopedAndBareInAStaticMethod) {
       "n=4 up=NAME first=n\n");
 }
 
-// §13.4 and §13.5.1: an input formal declared string holds the actual's text,
-// and the methods called on it inside the body read that text.
 TEST(StringMethodReceivers, InputStringFormal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -168,8 +140,6 @@ TEST(StringMethodReceivers, InputStringFormal) {
             "in=5 UP=WORLD\nn=5\n");
 }
 
-// §13.3 and §13.5.1: an output formal declared string is a string the body
-// writes and then reads through a method before it is copied out.
 TEST(StringMethodReceivers, OutputStringFormal) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -187,8 +157,6 @@ TEST(StringMethodReceivers, OutputStringFormal) {
             "out=4 ABC-\no=abc-\n");
 }
 
-// §26.3: a package's string variable, read by its bare name under a wildcard
-// import and through `P::ps`.
 TEST(StringMethodReceivers, PackageStringImportedAndScoped) {
   SimFixture f;
   EXPECT_EQ(RunCapture("package P;\n"
@@ -206,11 +174,6 @@ TEST(StringMethodReceivers, PackageStringImportedAndScoped) {
             "len=4 up=NAME q=NAME sub=am\n");
 }
 
-// §13.4 with §6.16: a method called on what a subroutine returned, and on what
-// another string method returned, answers for that result. The module's own
-// `s` is a different string from the property `get` returns and `l` reads
-// (§23.9: the class scope is searched before the module's), so a reading of
-// the bare name against the module's tables prints the wrong text or length.
 TEST(StringMethodReceivers, MethodOnACallResultAndOnAMethodResult) {
   SimFixture f;
   EXPECT_EQ(
@@ -239,9 +202,6 @@ TEST(StringMethodReceivers, MethodOnACallResultAndOnAMethodResult) {
       "a=3 b=ELL c=hel d=72 e=WOR\nf=5 g=3 l=5\n");
 }
 
-// §6.16 with §8.5: a string property selected from a call's result is a
-// string whose methods read its text, while a property of another type is
-// read as itself (#7736).
 TEST(StringMethodReceivers, AStringPropertyOfACallsResultTakesStringMethods) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -257,9 +217,6 @@ TEST(StringMethodReceivers, AStringPropertyOfACallsResultTakesStringMethods) {
             "2 XYZ 7\n");
 }
 
-// §6.18 with §6.16: a property declared through a typedef of the string type
-// is a string, whose methods read its text through a call's result and
-// through a handle alike (#7746).
 TEST(StringMethodReceivers, AStringTypedefPropertyTakesStringMethods) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -274,11 +231,6 @@ TEST(StringMethodReceivers, AStringTypedefPropertyTakesStringMethods) {
             "XYZ XYZ\n");
 }
 
-// §8.6: a class's own methods are its own whatever they are named, so `len`
-// and `substr` declared by the class run as the class's methods on a handle,
-// on a property holding a handle and through the class scope; a dispatcher
-// that took every call of a string method's name for one would answer the
-// length of no string here.
 TEST(StringMethodReceivers, ClassMethodsNamedLikeStringMethodsAreTheClasss) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -300,8 +252,6 @@ TEST(StringMethodReceivers, ClassMethodsNamedLikeStringMethodsAreTheClasss) {
             "7 7 3\n");
 }
 
-// §13.4: a module function declared to return a string answers a string, so
-// a method on its call reads the text it returned.
 TEST(StringMethodReceivers, MethodOnAModuleFunctionResult) {
   SimFixture f;
   EXPECT_EQ(
@@ -316,10 +266,6 @@ TEST(StringMethodReceivers, MethodOnAModuleFunctionResult) {
       "n=3 up=AB2\n");
 }
 
-// §13.3 with §9.4: a task of the class suspends at `#5` and resumes on the
-// same object, so a method on the property after the delay reads the text
-// the statement before it wrote, and the assignment of a method's result
-// back to the property stores that result.
 TEST(StringMethodReceivers, PropertyAfterADelayInATaskOfTheClass) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -339,8 +285,6 @@ TEST(StringMethodReceivers, PropertyAfterADelayInATaskOfTheClass) {
             "t=5 len=5\nt=10 s=ABCXY\n");
 }
 
-// §8.3: a property of a class-typed property, `d.c.s`, is reached by a chain
-// of handles, and the method answers for the string at its end.
 TEST(StringMethodReceivers, PropertyThroughAChainOfHandles) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -357,10 +301,6 @@ TEST(StringMethodReceivers, PropertyThroughAChainOfHandles) {
             "len=3 up=ABC\n");
 }
 
-// §6.16.2 (putc) and the indexed character assignment of §6.16 (printed page
-// 113) on a property through a handle: each replaces one character of the
-// property's text and the property holds the result, where a dispatcher
-// finding no variable under `h.p` left the text as it was.
 TEST(StringMethodReceivers, PutcAndIndexedWriteOnAPropertyThroughAHandle) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -375,9 +315,6 @@ TEST(StringMethodReceivers, PutcAndIndexedWriteOnAPropertyThroughAHandle) {
             "prop=xyz\n");
 }
 
-// §6.16.11 through §6.16.15 on a property named bare inside a method of the
-// class: each conversion stores its text in the property, so the five prints
-// are the five conversions and not the text the property last held.
 TEST(StringMethodReceivers, ConversionsIntoAPropertyInsideAMethod) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -400,8 +337,6 @@ TEST(StringMethodReceivers, ConversionsIntoAPropertyInsideAMethod) {
             "itoa=42 hextoa=ff octtoa=17 bintoa=101 realtoa=1.5\n");
 }
 
-// §8.11 with §6.16.2: `this.s.putc` inside a method and a bare `s[i] = c`
-// there write the object's own property, read back through the handle.
 TEST(StringMethodReceivers, PutcThroughThisAndIndexedWriteBareInsideAMethod) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -420,9 +355,6 @@ TEST(StringMethodReceivers, PutcThroughThisAndIndexedWriteBareInsideAMethod) {
             "put=hall!\n");
 }
 
-// §8.9 and §8.10 with §6.16.2 and §6.16.11: a static property written by
-// putc through `C::name` and by itoa on its bare name inside a static method
-// is the class's one copy, read back through `C::name`.
 TEST(StringMethodReceivers, PutcScopedAndItoaBareOnAStaticProperty) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -442,8 +374,6 @@ TEST(StringMethodReceivers, PutcScopedAndItoaBareOnAStaticProperty) {
             "Name\n7\n");
 }
 
-// §13.5.1 with §6.16.11: an output formal declared string takes itoa's text
-// and the concatenations around it, and the actual holds the result.
 TEST(StringMethodReceivers, ItoaIntoAnOutputStringFormal) {
   SimFixture f;
   EXPECT_EQ(
@@ -463,10 +393,6 @@ TEST(StringMethodReceivers, ItoaIntoAnOutputStringFormal) {
       "out=abc-3\no=abc-3\n");
 }
 
-// §6.16 with §7.4, §7.5 and §7.10: an element of a declared array of strings
-// is a string, so a method called on it reads the element's text -- in a
-// queue, a fixed array and a dynamic array -- and a two-character element is
-// told from a longer one.
 TEST(StringMethodReceivers, ElementOfAStringArray) {
   SimFixture f;
   EXPECT_EQ(RunCapture("module t;\n"
@@ -485,8 +411,6 @@ TEST(StringMethodReceivers, ElementOfAStringArray) {
             "5 2 3 4 HELLO ABC\n");
 }
 
-// §6.16 with §7.10 and §8.5: an element of a queue property of strings is a
-// string too, named bare in a method or through a handle.
 TEST(StringMethodReceivers, ElementOfAStringQueueProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -508,11 +432,6 @@ TEST(StringMethodReceivers, ElementOfAStringQueueProperty) {
       "5 5 WORLD\n");
 }
 
-// §6.16 with §7.4 and §8.5: an element of a class property that is an array
-// of strings is a string, so a character write into it replaces that
-// character -- named bare in a method, through a handle, through the class
-// scope, and in a dynamic array. Reached by no writer, each write changed
-// nothing.
 TEST(StringMethodReceivers, CharacterWriteIntoAnElementOfAStringArrayProperty) {
   SimFixture f;
   EXPECT_EQ(
@@ -538,10 +457,6 @@ TEST(StringMethodReceivers, CharacterWriteIntoAnElementOfAStringArrayProperty) {
       "Yd aX sT Dy\n");
 }
 
-// §6.16 with §6.18 and §8.5: a property declared through a typedef of a queue
-// of strings, `sq_t tq` under `typedef string sq_t[$]`, holds strings, so the
-// string methods read its elements. Taken for no string, `h.tq[0].len()`
-// read 0.
 TEST(StringMethodReceivers, ElementOfATypedefStringQueueProperty) {
   SimFixture f;
   EXPECT_EQ(

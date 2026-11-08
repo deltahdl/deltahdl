@@ -9,9 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §19.6: a cross_item that names a variable implicitly creates a coverpoint
-// over it, and may do so only for an integral variable; a real variable takes
-// part in a cross only through a coverpoint of a real expression.
 TEST(CrossItems, RealVariableCrossItemIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -33,10 +30,6 @@ TEST(CrossItems, RealVariableCrossItemIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.6: a cross_item is a coverpoint of the covergroup being defined, by its
-// label or by the variable an unlabelled coverpoint names, or a variable. A
-// coverpoint of another covergroup is neither. A variable of the module, one a
-// wildcard import makes visible and a covergroup formal are all variables.
 TEST(CrossItems, CrossItemNamingNoCoverpointOrVariableIsError) {
   ElabFixture f;
   ElaborateSrc(
@@ -64,10 +57,6 @@ TEST(CrossItems, CrossItemNamingNoCoverpointOrVariableIsError) {
   EXPECT_EQ(f.diag.ErrorCount(), 1u);
 }
 
-// §19.6 restricts the names and calls of a cross's bins as §19.5 restricts a
-// coverpoint's: a non-constant variable in an `intersect` range list or a
-// `matches` count, and a function keeping state, are errors, while a formal
-// that is not ref and the cross's own items in its `with` expression are not.
 TEST(CrossBinExpressions, NonConstantReadOrRestrictedCallIsError) {
   ElabFixture f;
   ElaborateSrc(

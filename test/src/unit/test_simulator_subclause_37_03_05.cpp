@@ -15,23 +15,6 @@
 namespace delta {
 namespace {
 
-// §37.3.5 (Expressions with side effects) governs how VPI behaves when an
-// expression it reaches has side effects when evaluated - one built from an
-// assignment or increment/decrement operator, a state-changing function or
-// system-function call, or any expression containing such a subexpression as an
-// operand, argument, or index. Three normative rules follow from that:
-//   - Claim A: applying vpi_get_value() to such an expression shall fully
-//     evaluate it together with its side effects.
-//   - Claim B: it shall be an error to ask for a property or relation of an
-//     expression when the value or handle cannot be determined without
-//     evaluating an expression with side effects (Example 1: the vpiSize of a
-//     function call that cannot be sized without calling it).
-//   - Claim C: it shall be an error to apply vpi_put_value() to an object when
-//     any of its index expressions has side effects (Example 2: my_array[i++]).
-// The fixture installs a private context as the global one so the public
-// vpi_get/vpi_get_value/vpi_put_value/vpi_handle entry points run their real
-// dispatch and so vpi_chk_error() observes the recorded error, exactly as a PLI
-// program would.
 class ExpressionsWithSideEffects : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&ctx_); }
@@ -40,13 +23,9 @@ class ExpressionsWithSideEffects : public ::testing::Test {
   VpiContext ctx_;
 };
 
-// Claim A: applying vpi_get_value() to an expression with side effects fully
-// evaluates the expression together with its side effects. The evaluation, and
-// therefore the side effect, is observed through the per-expression count the
-// read bumps; a second read evaluates the side effect again.
 TEST_F(ExpressionsWithSideEffects, GetValueEvaluatesTheSideEffect) {
   VpiObject call;
-  call.type = vpiFuncCall;  // e.g. ename(e), whose call mutates state
+  call.type = vpiFuncCall;
   call.has_side_effects = true;
 
   s_vpi_value value = {};
@@ -59,13 +38,10 @@ TEST_F(ExpressionsWithSideEffects, GetValueEvaluatesTheSideEffect) {
   EXPECT_EQ(call.side_effect_count, 2);
 }
 
-// Claim A (boundary): the full evaluation is the side effect's, not every
-// read's. An expression with no side effects is read without any such
-// evaluation, so its count stays at zero.
 TEST_F(ExpressionsWithSideEffects,
        GetValueOnPlainExpressionEvaluatesNoSideEffect) {
   VpiObject expr;
-  expr.type = vpiOperation;  // a plain operation, no side effects
+  expr.type = vpiOperation;
 
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -75,10 +51,6 @@ TEST_F(ExpressionsWithSideEffects,
   EXPECT_FALSE(VpiExpressionHasSideEffects(&expr));
 }
 
-// Claim B (Example 1): asking for a property of an expression whose value
-// cannot be determined without evaluating a side-effecting expression - such as
-// the vpiSize of the function call ename(e) - is an error. vpi_get() refuses
-// the query, records the error, and returns vpiUndefined.
 TEST_F(ExpressionsWithSideEffects, GetPropertyNeedingSideEffectEvalIsAnError) {
   VpiObject call;
   call.type = vpiFuncCall;
@@ -88,13 +60,9 @@ TEST_F(ExpressionsWithSideEffects, GetPropertyNeedingSideEffectEvalIsAnError) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  // The side effect was not triggered: the query was refused, not evaluated.
   EXPECT_EQ(call.side_effect_count, 0);
 }
 
-// Claim B (carve-out): the object's kind never requires evaluation, so vpiType
-// remains answerable structurally on the very same expression - it returns the
-// type and records no error.
 TEST_F(ExpressionsWithSideEffects, GetTypeIsAllowedOnSuchAnExpression) {
   VpiObject call;
   call.type = vpiFuncCall;
@@ -106,10 +74,6 @@ TEST_F(ExpressionsWithSideEffects, GetTypeIsAllowedOnSuchAnExpression) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Claim B (relation): the rule covers handles as well as values. Traversing a
-// relation from an expression whose related handle cannot be determined without
-// evaluating a side-effecting expression is an error: vpi_handle() refuses it,
-// records the error, and returns a null handle.
 TEST_F(ExpressionsWithSideEffects,
        HandleRelationNeedingSideEffectEvalIsAnError) {
   VpiObject call;
@@ -122,15 +86,12 @@ TEST_F(ExpressionsWithSideEffects,
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
 }
 
-// Claim C (Example 2): applying vpi_put_value() to an object one of whose index
-// expressions has side effects - my_array[i++] - is an error. The write is
-// rejected before any value is stored: it returns NULL and records the error.
 TEST_F(ExpressionsWithSideEffects, PutValueWithSideEffectingIndexIsAnError) {
-  VpiObject post_inc;  // the index expression i++
+  VpiObject post_inc;
   post_inc.type = vpiOperation;
   post_inc.has_side_effects = true;
 
-  VpiObject select;  // the target my_array[i++]
+  VpiObject select;
   select.type = vpiReg;
   select.index_expressions.push_back(&post_inc);
 
@@ -143,25 +104,19 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithSideEffectingIndexIsAnError) {
 
   s_vpi_error_info info = {};
   EXPECT_EQ(vpi_chk_error(&info), vpiError);
-  // The refused write never evaluated the side-effecting index expression.
   EXPECT_EQ(post_inc.side_effect_count, 0);
 }
 
-// Claim C (edge - every one of the select's index expressions): the guard
-// checks every index expression, not just the first. A multi-dimensional select
-// whose leading index is side-effect-free but whose trailing index has side
-// effects - my_array[2][--i] - is still rejected, exercising the loop past the
-// clean index before it fires on the side-effecting one.
 TEST_F(ExpressionsWithSideEffects,
        PutValueWithLaterSideEffectingIndexIsAnError) {
-  VpiObject leading;  // the side-effect-free index 2
+  VpiObject leading;
   leading.type = vpiConstant;
 
-  VpiObject pre_dec;  // the trailing index expression --i
+  VpiObject pre_dec;
   pre_dec.type = vpiOperation;
   pre_dec.has_side_effects = true;
 
-  VpiObject select;  // the target my_array[2][--i]
+  VpiObject select;
   select.type = vpiReg;
   select.index_expressions.push_back(&leading);
   select.index_expressions.push_back(&pre_dec);
@@ -178,15 +133,11 @@ TEST_F(ExpressionsWithSideEffects,
   EXPECT_EQ(pre_dec.side_effect_count, 0);
 }
 
-// Claim C (boundary): the restriction is on side-effecting index expressions
-// only. An index expression without side effects - my_array[2] - does not trip
-// the §37.3.5 guard, so vpi_put_value() records no error from it (the target
-// here carries no storage, so the write simply stops with no error).
 TEST_F(ExpressionsWithSideEffects, PutValueWithPlainIndexIsNotRefused) {
-  VpiObject constant;  // the index expression 2
+  VpiObject constant;
   constant.type = vpiConstant;
 
-  VpiObject select;  // the target my_array[2]
+  VpiObject select;
   select.type = vpiReg;
   select.index_expressions.push_back(&constant);
 
@@ -200,11 +151,6 @@ TEST_F(ExpressionsWithSideEffects, PutValueWithPlainIndexIsNotRefused) {
   EXPECT_EQ(vpi_chk_error(&info), 0);
 }
 
-// Claim D: the classification the subclause opens with, applied to a source
-// expression. An increment or decrement operator (§11.4.2) and an assignment
-// operator (§11.4.1) have side effects; an expression carrying one as an
-// operand, argument or index has them too; an expression built from neither
-// does not.
 TEST(SideEffectClassification, TheFormsTheSubclauseLists) {
   SimFixture f;
 
@@ -213,7 +159,6 @@ TEST(SideEffectClassification, TheFormsTheSubclauseLists) {
   EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("(j = 3)", f)));
   EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("(j += 3)", f)));
 
-  // As an operand, and as an index expression - §37.3.5's own my_array[i++].
   EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("a + (i++)", f)));
   EXPECT_TRUE(VpiSourceExprHasSideEffects(ParseExprFrom("my_array[i++]", f)));
 
@@ -222,8 +167,6 @@ TEST(SideEffectClassification, TheFormsTheSubclauseLists) {
   EXPECT_FALSE(VpiSourceExprHasSideEffects(nullptr));
 }
 
-// What the application found. A calltf is a plain C function with no return
-// path to the case that provoked it.
 bool g_arg_has_side_effects = false;
 int g_arg_side_effect_count = -1;
 
@@ -243,12 +186,6 @@ PLI_INT32 ProbeArgumentCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// Claim A, against a design: an argument a system task was called with is one
-// of the two ways §37.3.5 says VPI gives an application access to a source
-// expression, so an argument written `i++` is an expression with side effects
-// and vpi_get_value() on it performs the evaluation the clause mandates.
-// Nothing marked an argument object at all, so the subclause's rules stood over
-// an empty set and this argument answered that it had no side effects.
 TEST(SideEffectClassification, ASystemTaskArgumentCarriesItsSideEffects) {
   VpiContext vpi_ctx;
   SetGlobalVpiContext(&vpi_ctx);
@@ -280,9 +217,6 @@ TEST(SideEffectClassification, ASystemTaskArgumentCarriesItsSideEffects) {
   SetGlobalVpiContext(nullptr);
 }
 
-// Whether the last VPI routine called recorded the §37.3.5 refusal of a put
-// through an index expression with side effects, rather than no error or one
-// of another kind.
 bool RefusedForASideEffectingIndex() {
   s_vpi_error_info info = {};
   if (vpi_chk_error(&info) == 0 || info.message == nullptr) return false;
@@ -292,7 +226,6 @@ bool RefusedForASideEffectingIndex() {
                  "effects") != std::string_view::npos;
 }
 
-// Puts 3 to `obj` with no delay.
 void PutThree(vpiHandle obj) {
   s_vpi_value value = {};
   value.format = vpiIntVal;
@@ -307,7 +240,6 @@ PLI_INT32 PutEachArgumentCalltf(PLI_BYTE8*) {
   vpiHandle itr = call == nullptr ? nullptr : vpi_iterate(vpiArgument, call);
   if (itr == nullptr) return 0;
   while (vpiHandle arg = vpi_scan(itr)) {
-    // An omitted argument (§37.42 detail 8) holds nothing to write.
     if (vpi_get(vpiOpType, arg) == vpiNullOp) {
       g_args_refused.push_back(false);
       continue;
@@ -318,11 +250,6 @@ PLI_INT32 PutEachArgumentCalltf(PLI_BYTE8*) {
   return 0;
 }
 
-// Claim B, against a design (#6969): an argument written as a select whose
-// index has side effects, `a[i++]`, and one over such a select, `b[i--][1]`,
-// are refused by vpi_put_value() for it; `a[i]` and an omitted argument are
-// not. The argument was marked as a whole and never listed its index
-// expressions, so the put went through.
 TEST(SideEffectingIndexDesign,
      APutThroughAnArgumentsSideEffectingIndexIsRefused) {
   VpiContext vpi_ctx;
@@ -357,8 +284,6 @@ TEST(SideEffectingIndexDesign,
 
 class SideEffectingIndexOfARun : public VpiDesignRun {
  protected:
-  // The right side of the assignment that is the body of `scope`'s procedure
-  // number `n`, counting from 0.
   static vpiHandle RhsOfProcess(vpiHandle scope, int n) {
     vpiHandle it = vpi_iterate(vpiProcess, scope);
     vpiHandle proc = it == nullptr ? nullptr : vpi_scan(it);
@@ -368,9 +293,6 @@ class SideEffectingIndexOfARun : public VpiDesignRun {
   }
 };
 
-// Claim B, walking the design (#6969): the select a statement writes,
-// `a[i++]`, is refused by vpi_put_value() as the argument is; `a[i]` is not.
-// Its index expression object was never marked, so nothing was refused.
 TEST_F(SideEffectingIndexOfARun,
        APutThroughAStatementsSideEffectingIndexIsRefused) {
   Run("module top;\n"

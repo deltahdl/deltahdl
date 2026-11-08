@@ -13,22 +13,6 @@
 
 using namespace delta;
 
-// Annex H.8.2 (Calling SystemVerilog tasks and functions from C): there is
-// no difference in argument passing between a call from SystemVerilog to C
-// and one from C to SystemVerilog; a task or function exported from
-// SystemVerilog cannot have an open array as an argument, and apart from
-// that the same types of formal can be declared for an export as for an
-// import; a subroutine exported from SystemVerilog shall have the same
-// function header in C as an imported function with the same result type
-// and the same formal list would; for an argument passed by reference the
-// actual to a SystemVerilog subroutine called from C shall be allocated
-// with the layout SystemVerilog uses for the type, the caller being
-// responsible for the allocation; and calling a SystemVerilog task from C
-// is the same as calling a function except that the return type of an
-// exported task is an int with the meaning §35.9 gives it. The cases check
-// the header an export and an import share, the int an exported task
-// returns, the open array an export may not take, and who allocates.
-
 namespace {
 
 DpiArg Formal(const char* name, DataTypeKind type, Direction direction,
@@ -41,9 +25,6 @@ DpiArg Formal(const char* name, DataTypeKind type, Direction direction,
   return formal;
 }
 
-// §H.8.2: an export has the header in C that an import with the same
-// result type and formal list has -- int f(const int a, svBitVecVal* b,
-// const svLogicVecVal* c) for both -- and a void result is void.
 TEST(DpiCallsFromC, AnExportHasTheHeaderAnImportWithTheSameListHas) {
   const std::vector<DpiArg> kFormals = {
       Formal("a", DataTypeKind::kInt, Direction::kInput),
@@ -59,8 +40,6 @@ TEST(DpiCallsFromC, AnExportHasTheHeaderAnImportWithTheSameListHas) {
   EXPECT_EQ(DpiCFunctionHeader("g", DataTypeKind::kVoid, {}), "void g()");
 }
 
-// §H.8.2: calling an exported task is calling a function whose return
-// type is int, whatever result a task has none of.
 TEST(DpiCallsFromC, AnExportedTaskReturnsAnInt) {
   const std::vector<DpiArg> kFormals = {
       Formal("a", DataTypeKind::kInt, Direction::kInput)};
@@ -70,8 +49,6 @@ TEST(DpiCallsFromC, AnExportedTaskReturnsAnInt) {
   EXPECT_EQ(DpiCTypeOfExportedTaskResult(), "int");
 }
 
-// §H.8.2: an export cannot have an open array formal; apart from that the
-// types an import's formals take are the types an export's may.
 TEST(DpiCallsFromC, AnExportCannotHaveAnOpenArrayFormal) {
   EXPECT_FALSE(DpiExportFormalMayBeAnOpenArray());
   EXPECT_TRUE(DpiExportFormalMayHaveType(DataTypeKind::kInt));
@@ -80,9 +57,6 @@ TEST(DpiCallsFromC, AnExportCannotHaveAnOpenArrayFormal) {
   EXPECT_FALSE(DpiExportFormalMayHaveType(DataTypeKind::kEvent));
 }
 
-// §H.8.2: an actual passed by reference to a SystemVerilog subroutine
-// called from C is the caller's to allocate, in SystemVerilog's layout for
-// the type, which for a packed array is the canonical one.
 TEST(DpiCallsFromC, TheCallerAllocatesAnActualPassedByReference) {
   EXPECT_EQ(DpiSideAllocatingActualOfExportCall(), DpiMemorySide::kC);
   EXPECT_EQ(DpiRepresentationOfFormal(
@@ -90,16 +64,11 @@ TEST(DpiCallsFromC, TheCallerAllocatesAnActualPassedByReference) {
             DpiRepresentation::kCanonical);
 }
 
-// The C struct the exports below take, laid out as the C compiler lays out
-// the SystemVerilog pair.
 struct Pair {
   int x;
   int y;
 };
 
-// The C functions the design below imports, each calling an export by its
-// linkage name, found among the process's global symbols where the
-// forwarders of a design's exports stand.
 template <typename Function>
 Function ExportNamed(const char* name) {
   return reinterpret_cast<Function>(dlsym(RTLD_DEFAULT, name));
@@ -125,9 +94,6 @@ uint64_t VariableValue(SimFixture& f, std::string_view name) {
   return var == nullptr ? ~uint64_t{0} : var->value.ToUint64();
 }
 
-// §H.8.2 with §H.7.8: an export takes the unpacked struct an import may, by
-// reference to the C compiler's layout of it, an input read from C's object
-// and an output written back into it.
 TEST(DpiCallsFromC, AnExportTakesAnUnpackedStructFormal) {
   SimFixture f;
   RunWithImportsBound(

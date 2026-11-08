@@ -27,7 +27,6 @@ Expr* MakeIdentifier(std::string_view text, SourceLoc loc, Arena& arena) {
   return id;
 }
 
-// The covergroup named `name` among `items`, or null where none is.
 const CovergroupDecl* CovergroupNamed(const std::vector<ModuleItem*>& items,
                                       std::string_view name) {
   for (const ModuleItem* item : items) {
@@ -38,7 +37,6 @@ const CovergroupDecl* CovergroupNamed(const std::vector<ModuleItem*>& items,
   return nullptr;
 }
 
-// The covergroup named `name` that package `pkg_name` declares, or null.
 const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
                                         std::string_view pkg_name,
                                         std::string_view name) {
@@ -48,9 +46,6 @@ const CovergroupDecl* PackageCovergroup(const CompilationUnit* unit,
   return nullptr;
 }
 
-// The declaration of the covergroup a variable of type `dt` holds an instance
-// of, or null where `dt` names none. §26.3: a name written behind a package
-// scope is that package's; a bare name is one VisibleCovergroup finds.
 const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
                                          const RtlirModule* mod,
                                          const CompilationUnit* unit) {
@@ -61,8 +56,6 @@ const CovergroupDecl* DeclaredCovergroup(const DataType& dt,
   return VisibleCovergroup(dt.type_name, mod, unit);
 }
 
-// Adds to `mod` an always process that waits on the covergroup's clocking
-// event and calls sample() on the instance the variable `var_name` holds.
 void AddCovergroupEventProcess(std::string_view var_name,
                                const CovergroupDecl& cg, SourceLoc loc,
                                RtlirModule* mod, Arena& arena) {
@@ -107,8 +100,6 @@ const CovergroupDecl* VisibleCovergroup(std::string_view name,
       return imported;
     }
   }
-  // §3.12.1: else one the compilation unit declares, outside every design
-  // element, which every scope below it sees.
   return CovergroupNamed(unit->cu_items, name);
 }
 

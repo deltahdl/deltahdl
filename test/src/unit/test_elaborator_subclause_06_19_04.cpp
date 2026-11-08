@@ -1,16 +1,3 @@
-// Tests for §6.19.4 "Enumerated types in numerical expressions": an enumerated
-// variable may appear in a numerical expression, where it contributes the
-// numerical value of its enumerated value, an enum variable or identifier in an
-// expression being cast automatically to the enum declaration's base type,
-// explicit or the default int.
-//
-// The restriction §6.19.4 closes with -- an expression assigned to an enum
-// variable needs a cast unless its type is equivalent to the variable's
-// enumeration type -- restates §6.19.3's demand for an explicit cast when an
-// arbitrary expression is assigned to an enumerated variable. One elaborator
-// path enforces both, and it names §6.19.3, so that is the subclause the
-// rejections below read back.
-
 #include <gtest/gtest.h>
 
 #include "fixture_elaborator.h"
@@ -20,11 +7,6 @@ using namespace delta;
 
 namespace {
 
-// A compound assignment adds to the enum variable and assigns the sum back,
-// so the variable is an operand of a numerical expression: §6.19.4 auto-casts
-// it to the base type there and requires a cast to assign the result to the
-// variable, whose type the sum's is not. §6.19.3 states the cast for a value
-// outside the enumeration, so it is the §6.19.4 rule the report cites.
 TEST(EnumNumericalExpr, EnumArithNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -82,9 +64,6 @@ TEST(EnumNumericalExpr, EnumIntComparison_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// C + 1 is a numerical expression §6.19.4 permits, and assigning it back to an
-// enum variable is what the same clause requires a cast for, since the sum's
-// type is the base type and not the enumeration's.
 TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(
@@ -102,9 +81,6 @@ TEST(EnumNumericalExpr, EnumExprAssignNoCast_Error) {
                             "6.19.4"));
 }
 
-// The expression need not name the variable it is assigned to: a member of the
-// enumeration is an enum identifier used as part of an expression, which
-// §6.19.4 auto-casts to the base type, so `Red + 1` is that clause's case too.
 TEST(EnumNumericalExpr,
      EnumMemberExprAssignNoCastIsANumericalExpressionReport) {
   ElabFixture f;
@@ -122,10 +98,6 @@ TEST(EnumNumericalExpr,
                             "6.19.4"));
 }
 
-// The enumeration methods first, last, next and prev return a value of the
-// enumeration type (§6.19.5), so `C.next + 1` is arithmetic on an enum value
-// and the assignment back is §6.19.4's case. A walk that stopped at every
-// member access as it does at `c.num()` would call this §6.19.3.
 TEST(EnumNumericalExpr,
      EnumMethodResultExprAssignNoCastIsANumericalExpressionReport) {
   ElabFixture f;
@@ -144,10 +116,6 @@ TEST(EnumNumericalExpr,
                             "6.19.4"));
 }
 
-// A declaration's initializer is an assignment of the value to the variable,
-// so an initializer that is arithmetic on an enum member is §6.19.4's case
-// wherever the declaration stands: as a module item and as a procedural
-// declaration, which two different walks judge.
 TEST(EnumNumericalExpr, EnumExprInitializersAreNumericalExpressionReports) {
   ElabFixture f;
   ElaborateSrc(
@@ -167,9 +135,6 @@ TEST(EnumNumericalExpr, EnumExprInitializersAreNumericalExpressionReports) {
                             "6.19.4"));
 }
 
-// An expression with no enum operand is an arbitrary expression of another
-// type, whose cast §6.19.3 states; §6.19.4 speaks only of expressions an enum
-// takes part in. A fix that cited §6.19.4 for every non-bare value fails here.
 TEST(EnumNumericalExpr, IntegerExprAssignNoCastStaysATypeCheckingReport) {
   ElabFixture f;
   ElaborateSrc(
@@ -223,10 +188,6 @@ TEST(EnumNumericalExpr, EnumAddTwoEnumsToInt_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// 6.19.4: casting to an enum type only reshapes the value into the base type
-// and never asks whether the result is one of the members, so a value naming
-// no member is accepted. Here Su (a Week member, value 6) is cast into the
-// three-member Colors enum; the cast is legal even though 6 names no Colors.
 TEST(EnumNumericalExpr, EnumCastOutOfRange_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -243,10 +204,6 @@ TEST(EnumNumericalExpr, EnumCastOutOfRange_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// 6.19.4: the auto-cast-to-base-type rule covers an enum whose base type is
-// declared explicitly, not only the int default. An explicit-base enum member
-// used in arithmetic and assigned to an integer elaborates without a cast,
-// because the member auto-casts to its (explicit) base type.
 TEST(EnumNumericalExpr, EnumExplicitBaseAutocast_Ok) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -260,8 +217,6 @@ TEST(EnumNumericalExpr, EnumExplicitBaseAutocast_Ok) {
   EXPECT_FALSE(f.diag.HasErrors());
 }
 
-// An increment is the same assignment written a third way, §11.4.2 having
-// `C++` stand for `C = C + 1`, so it is reported under the same §6.19.4 rule.
 TEST(EnumNumericalExpr, EnumIncrementNoCast_Error) {
   ElabFixture f;
   ElaborateSrc(

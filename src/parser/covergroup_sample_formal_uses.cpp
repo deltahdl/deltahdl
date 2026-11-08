@@ -33,12 +33,10 @@ const Expr* FindNamedIdentifier(const Expr* e,
 
 namespace {
 
-// The sample formals of one covergroup and where their misuses are reported.
 struct SampleFormalUses {
   std::vector<std::string_view> formals;
   DiagEngine& diag;
 
-  // Reports each distinct formal `e` names, `context` saying what `e` is.
   void Report(const Expr* e, std::string_view context) const {
     std::vector<std::string_view> rest = formals;
     while (const Expr* formal = FindNamedIdentifier(e, rest)) {

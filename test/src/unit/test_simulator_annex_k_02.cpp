@@ -1,16 +1,5 @@
-// §K.2 defines PLI_DLLISPEC only where nothing defined it before the include,
-// and takes back at the end of the file only the one it defined itself; this
-// definition, made ahead of the first include, is what the portability tests
-// below look for afterwards.
 #define PLI_DLLISPEC
 
-// §K.2's portability help is what defines the sized types the file's own
-// typedefs read, so the annex's file comes first here, ahead of any header
-// that would bring <cstdint> along and hide a platform the help misses, and
-// the width the help promises is read while it is still the only header. On
-// macOS the help reaches <sys/types.h>, which declares no uint64_t, and it is
-// the top-level CMakeLists.txt that gives every translation unit <stdint.h>
-// ahead of its first line there; the annex's file itself is not edited.
 #include "simulator/vpi_user.h"
 static_assert(sizeof(PLI_UINT64) == 8,
               "K.2's portability help must define PLI_UINT64 before any "
@@ -25,9 +14,6 @@ static_assert(sizeof(PLI_UINT64) == 8,
 
 namespace {
 
-// §K.2 numbers the value formats from vpiBinStrVal at 1 through
-// vpiRawFourStateVal at 18, vpiDecStrVal standing third so that every format
-// after it is one higher than a header that left the decimal string out.
 TEST(VpiConstantAndStructSim, ValueFormatConstants) {
   EXPECT_EQ(vpiBinStrVal, 1);
   EXPECT_EQ(vpiOctStrVal, 2);
@@ -57,19 +43,12 @@ TEST(VpiConstantAndStructSim, ObjectTypeConstants) {
   EXPECT_EQ(vpiCallback, 107);
 }
 
-// §K.2 has vpiScaledRealTime first among the time types, the same numbering
-// the svdpi.h of Annex I carries, so a time structure filled by a DPI call
-// reads the same to a VPI routine.
 TEST(VpiConstantAndStructSim, TimeTypeConstants) {
   EXPECT_EQ(vpiScaledRealTime, 1);
   EXPECT_EQ(vpiSimTime, 2);
   EXPECT_EQ(vpiSuppressTime, 3);
 }
 
-// §K.2 numbers the callback reasons in four groups: the simulation-related
-// reasons 1 through 4, the time-related 5 through 9, the action-related 10
-// through 24, and those added with 1364-2001 and 1364-2005 from 25 through
-// 31.
 TEST(VpiConstantAndStructSim, CallbackReasonConstants) {
   EXPECT_EQ(cbValueChange, 1);
   EXPECT_EQ(cbStmt, 2);
@@ -104,10 +83,6 @@ TEST(VpiConstantAndStructSim, CallbackReasonConstants) {
   EXPECT_EQ(cbAtEndOfSimTime, 31);
 }
 
-// §K.2 numbers the generic and module properties, the vpi_control()
-// operations and the scalar values; each of these once carried another
-// property's or operation's number, so a PLI application written to the annex
-// asked the tool for one thing and was answered about another.
 TEST(VpiConstantAndStructSim, PropertyControlAndScalarConstants) {
   EXPECT_EQ(vpiDefName, 9);
   EXPECT_EQ(vpiDirection, 20);
@@ -629,9 +604,6 @@ TEST(VpiUserHeader, VpiArrayValueDefaultInit) {
 }
 
 TEST(VpiUserHeader, VpiArrayValueUnionArmsAreAddressable) {
-  // §K.2: the array value's union carries one arm per element encoding. Each
-  // arm is observed by aiming it at storage of the matching element type and
-  // reading the value back through the same arm of the production struct.
   PLI_INT32 ints[2] = {7, 9};
   PLI_INT16 shorts[2] = {1, 2};
   PLI_INT64 longs[2] = {1, 2};
@@ -666,9 +638,6 @@ TEST(VpiUserHeader, VpiArrayValueUnionArmsAreAddressable) {
 }
 
 TEST(VpiUserHeader, VpiDelayHoldsDelayArrayAndFlags) {
-  // §K.2: the delay structure points at an application-allocated array of time
-  // values and carries the mtm/append/pulse-reject flags. Populate it and read
-  // back through the production struct, including the suppress-time code.
   s_vpi_time slots[2] = {};
   slots[0].low = 5u;
   slots[1].low = 11u;
@@ -690,8 +659,6 @@ TEST(VpiUserHeader, VpiDelayHoldsDelayArrayAndFlags) {
 }
 
 TEST(VpiUserHeader, VpiStrengthValHoldsStrengthCoding) {
-  // §K.2: the scalar strength value pairs a logic code with two components
-  // drawn from the strength masks.
   s_vpi_strengthval s = {};
   s.logic = vpi1;
   s.s0 = vpiSupplyDrive;
@@ -702,11 +669,9 @@ TEST(VpiUserHeader, VpiStrengthValHoldsStrengthCoding) {
 }
 
 TEST(VpiUserHeader, PortabilityTypedefValueRanges) {
-  // §K.2 sizes the PLI integer types so the wide variants carry values past the
-  // 32-bit range and the signed variants represent negatives.
-  PLI_INT64 wide = 5000000000;  // beyond 2^32
+  PLI_INT64 wide = 5000000000;
   EXPECT_GT(wide, static_cast<PLI_INT64>(0xFFFFFFFF));
-  PLI_UINT64 uwide = 0xFFFFFFFFFFULL;  // 40-bit value
+  PLI_UINT64 uwide = 0xFFFFFFFFFFULL;
   EXPECT_EQ(uwide >> 32, 0xFFULL);
   PLI_INT16 neg = -12345;
   EXPECT_LT(neg, 0);
@@ -715,8 +680,6 @@ TEST(VpiUserHeader, PortabilityTypedefValueRanges) {
 }
 
 TEST(VpiUserHeader, AliasConstantsMatchCanonical) {
-  // §K.2 defines several constants as aliases of an earlier name; each alias
-  // resolves to the same value as its canonical macro.
   EXPECT_EQ(vpiBitXnorOp, vpiBitXNorOp);
   EXPECT_EQ(vpiSysFuncType, vpiFuncType);
   EXPECT_EQ(vpiSysFuncInt, vpiIntFunc);
@@ -726,9 +689,6 @@ TEST(VpiUserHeader, AliasConstantsMatchCanonical) {
 }
 
 TEST(VpiUserHeader, EdgeBitsComposeIntoPosNegAnyEdge) {
-  // §K.2 builds the posedge/negedge/anyedge masks from the single-bit edge
-  // transitions; vpiNoEdge is the empty mask and the six transitions are
-  // mutually exclusive single bits.
   EXPECT_EQ(vpiNoEdge, 0);
   EXPECT_EQ(vpiPosedge, vpiEdgex1 | vpiEdge01 | vpiEdge0x);
   EXPECT_EQ(vpiNegedge, vpiEdgex0 | vpiEdge10 | vpiEdge1x);
@@ -739,8 +699,6 @@ TEST(VpiUserHeader, EdgeBitsComposeIntoPosNegAnyEdge) {
 }
 
 TEST(VpiUserHeader, ValueRoutineFlagBitsDoNotOverlap) {
-  // §K.2 reserves a distinct bit for each put/get value flag so they may be
-  // combined without collision.
   EXPECT_EQ(vpiReturnEvent & vpiUserAllocFlag, 0);
   EXPECT_EQ(vpiReturnEvent & vpiOneValue, 0);
   EXPECT_EQ(vpiUserAllocFlag & vpiPropagateOff, 0);
@@ -751,18 +709,12 @@ TEST(VpiUserHeader, ValueRoutineFlagBitsDoNotOverlap) {
 }
 
 TEST(VpiUserHeader, StrengthMasksOccupyDistinctBits) {
-  // §K.2 gives each drive and charge strength its own bit; ORing all eight
-  // yields a full byte, confirming none overlap.
   int all = vpiSupplyDrive | vpiStrongDrive | vpiPullDrive | vpiLargeCharge |
             vpiWeakDrive | vpiMediumCharge | vpiSmallCharge | vpiHiZ;
   EXPECT_EQ(all, 0xFF);
   EXPECT_EQ(vpiSupplyDrive & vpiStrongDrive, 0);
 }
 
-// §K.2 guards the 64-bit sized types with SVPI_TYPES and the rest with
-// PLI_TYPES, so that a file which brought its own definitions of them under
-// those names is not handed a second set; the file defines both where it
-// defines the types.
 TEST(VpiUserHeaderPortability, TheSizedTypeGuardsAreDefined) {
 #if defined(SVPI_TYPES) && defined(PLI_TYPES)
   SUCCEED();
@@ -771,10 +723,6 @@ TEST(VpiUserHeaderPortability, TheSizedTypeGuardsAreDefined) {
 #endif
 }
 
-// §K.2 guards the time structure with VPI_TIME and the vector value with
-// VPI_VECVAL, the guards svdpi.h of Annex I tests before laying down its own
-// copies of the two; read after vpi_user.h, svdpi.h finds both and its
-// svTimeVal and svLogicVecVal are this file's s_vpi_time and s_vpi_vecval.
 TEST(VpiUserHeaderPortability, TheStructureGuardsMakeSvdpiHShareTheTypes) {
 #if defined(VPI_TIME) && defined(VPI_VECVAL)
   SUCCEED();
@@ -787,9 +735,6 @@ TEST(VpiUserHeaderPortability, TheStructureGuardsMakeSvdpiHShareTheTypes) {
   EXPECT_EQ(sv_sim_time, vpiSimTime);
 }
 
-// §K.2 ends the file by undefining PLI_EXTERN and PLI_VEXTERN, and, with
-// PLI_PROTOTYPES, the PROTO_PARAMS, XXTERN and EETERN it wrote its declarations
-// with, so that none of them is left for the code after the include.
 TEST(VpiUserHeaderPortability, TheFileTakesBackItsPrototypeMacros) {
 #if defined(PLI_EXTERN) || defined(PLI_VEXTERN) || defined(PLI_PROTOTYPES) || \
     defined(PROTO_PARAMS) || defined(XXTERN) || defined(EETERN)
@@ -799,10 +744,6 @@ TEST(VpiUserHeaderPortability, TheFileTakesBackItsPrototypeMacros) {
 #endif
 }
 
-// §K.2 defines a DLL specification only where the includer defined none, and
-// records with VPI_USER_DEFINED_DLLISPEC that it did so, undefining both at
-// the end; the PLI_DLLISPEC this file defined before the include is therefore
-// still defined after it, and the record is not.
 TEST(VpiUserHeaderPortability, ADllSpecificationDefinedBeforeTheIncludeStands) {
 #if defined(PLI_DLLISPEC) && !defined(VPI_USER_DEFINED_DLLISPEC)
   SUCCEED();
@@ -811,10 +752,6 @@ TEST(VpiUserHeaderPortability, ADllSpecificationDefinedBeforeTheIncludeStands) {
 #endif
 }
 
-// §K.2 ends each structure definition with a pointer spelling beside the
-// structure's, and declares the routines that take a pointer with it:
-// vpi_register_cb takes a p_cb_data, vpi_chk_error a p_vpi_error_info and
-// vpi_get_vlog_info a p_vpi_vlog_info.
 TEST(VpiUserHeaderPortability, EachStructureHasItsPointerSpelling) {
   static_assert(std::is_same_v<p_vpi_time, s_vpi_time*>);
   static_assert(std::is_same_v<p_vpi_value, s_vpi_value*>);
@@ -835,9 +772,6 @@ TEST(VpiUserHeaderPortability, EachStructureHasItsPointerSpelling) {
   SUCCEED();
 }
 
-// §K.2 gives the value union eight arms, a time arm for a vpiTimeVal and a
-// misc arm for any other value among them; each is a pointer the application
-// can set and read back through the same union.
 TEST(VpiUserHeaderPortability, TheValueUnionHasTheTimeAndMiscArms) {
   s_vpi_time t = {};
   t.type = vpiSimTime;

@@ -15,14 +15,11 @@ using namespace delta;
 
 namespace {
 
-// The ten identifiers this version_specifier drops from what "1364-2001"
-// reserves.
 constexpr const char* kExcluded[] = {
     "cell",    "config",   "design",  "endconfig", "incdir",
     "include", "instance", "liblist", "library",   "use",
 };
 
-// The rest of Table 22-2, which this version keeps reserved.
 constexpr const char* kKept[] = {
     "automatic",
     "endgenerate",
@@ -40,22 +37,11 @@ constexpr const char* kKept[] = {
 bool ParsesNoconfig(const std::string& body) {
   return ParseWithPreprocessorOk(InNoconfig(body));
 }
-// The exception itself, swept over all ten and paired with the version it is
-// taken from. Being excluded from the reserved list means being an ordinary
-// identifier, so each word has to occupy the identifier slot of a declaration
-// here while the very same declaration is rejected under "1364-2001". One leg
-// alone would prove nothing: the accepting leg could be any parse that
-// happens to succeed, and the rejecting leg could be any unrelated failure.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordsCanNameAVariable) {
   EXPECT_EQ(std::size(kExcluded), 10u);
   for (const char* word : kExcluded) {
     EXPECT_TRUE(ParseWithPreprocessorOk(InNoconfig(VarDecl(word))))
         << word << " is dropped from the reserved list by this version";
-    // §6.8 owns the report: VarDecl heads its declaration with `reg`, so the
-    // word stands where Parser::ParseVarDeclList reads a variable's name and
-    // the report names it. Naming it is what makes each entry separately
-    // covered: an expectation shared by all ten is answered by whichever of
-    // them the run happened to reject.
     auto r = ParseWithPreprocessor(In2001(VarDecl(word)));
     EXPECT_TRUE(ReportedError(
         r.diags, std::string("expected identifier, got '") + word + "'",
@@ -64,10 +50,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordsCanNameAVariable) {
   }
 }
 
-// The complement of the exception: the eleven entries of Table 22-2 it does
-// not name stay reserved, so none of them can name a variable. The 1364-1995
-// leg is what keeps this from being an unrelated parse failure -- under the
-// list "1364-2001" extends, the same declaration is accepted.
 TEST(CompilerDirectiveParsing, NoconfigKeepsOtherVerilog2001AdditionsReserved) {
   EXPECT_EQ(std::size(kKept), 11u);
   for (const char* word : kKept) {
@@ -81,10 +63,6 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsOtherVerilog2001AdditionsReserved) {
   }
 }
 
-// The inherited list is outside the exception's reach, so all 102 of Table
-// 22-1's entries stay reserved under this version. Sweeping the whole table is
-// what makes the inheritance, rather than a handful of its entries, the thing
-// being checked.
 TEST(CompilerDirectiveParsing, NoconfigKeepsAllVerilog1995KeywordsReserved) {
   EXPECT_EQ(std::size(kVerilog1995Keywords), 102u);
   for (const char* word : kVerilog1995Keywords) {
@@ -96,11 +74,6 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsAllVerilog1995KeywordsReserved) {
   }
 }
 
-// A declaration is only the most obvious identifier position. This puts all
-// ten dropped words through the rest of them at once -- the module name, both
-// port names, a parameter, a net, two variables, a task, a named block, and an
-// instance name -- and reads each back off the parsed tree, so the words are
-// observed naming things rather than merely getting past the lexer.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordsNameEveryDeclaredEntity) {
   auto r = ParseWithPreprocessor(
       InNoconfig("module cell (input wire design, output wire library);\n"
@@ -141,9 +114,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordsNameEveryDeclaredEntity) {
   EXPECT_EQ(u->inst_name, "config");
 }
 
-// The same words in positions that carry a value rather than introduce a
-// name -- an expression operand and the target of a procedural assignment --
-// which reach the parser by a different path than a declaration does.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordIsOperandAndAssignTarget) {
   auto r =
       ParseWithPreprocessor(InNoconfig("module m;\n"
@@ -171,9 +141,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordIsOperandAndAssignTarget) {
   EXPECT_EQ(second->rhs->lhs->text, "library");
 }
 
-// The declaration kinds the entity sweep above does not reach: an event, a
-// function, and a gate instance name, each a distinct production a dropped
-// word has to survive in its own right.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesOtherDeclarationKinds) {
   auto r = ParseWithPreprocessor(
       InNoconfig("module m (input wire a, output wire y);\n"
@@ -202,13 +169,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesOtherDeclarationKinds) {
   EXPECT_EQ(gate->gate_inst_name, "instance");
 }
 
-// A subroutine's formal argument is its own declaration production, reached by
-// a different path than any module-level declaration, so a dropped word has to
-// survive it in its own right. Here dropped words name a function's argument
-// and a task's argument, and each body reads the argument back, so the name has
-// to resolve inside the subroutine and not merely be accepted in its header.
-// The paired leg rejects the same headers under the version this one is defined
-// from, which localizes the acceptance to the exclusion.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesASubroutineArgument) {
   auto r = ParseWithPreprocessor(
       InNoconfig("module m;\n"
@@ -231,9 +191,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesASubroutineArgument) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kFunctionDecl, "twice"));
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "bump"));
 
-  // §13.3 owns both reports: a reserved word in a tf_port_item's name slot
-  // leaves the item with no port_identifier, which is what
-  // Parser::ParseFunctionArgTrailer says.
   auto as_func_arg = ParseWithPreprocessor(
       In2001("module m;\n"
              "  function [7:0] twice(input reg [7:0] library);\n"
@@ -256,13 +213,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesASubroutineArgument) {
                             LineInRegion(3), "13.3"));
 }
 
-// The dropped words in their *keyword* role rather than in an identifier slot,
-// which is where the exclusion has its sharpest consequence. Seven of the ten
-// exist to build one construct -- a configuration -- so under "1364-2001" this
-// source produces a config declaration, and under this version it cannot be
-// written at all: every word opening it has become an ordinary identifier. The
-// module alongside it parses under both, which localizes the failure to the
-// construct rather than to the source as a whole.
 TEST(CompilerDirectiveParsing, NoconfigCannotWriteAConfigDeclaration) {
   const std::string kSrc =
       "module top;\n"
@@ -274,8 +224,6 @@ TEST(CompilerDirectiveParsing, NoconfigCannotWriteAConfigDeclaration) {
       "  cell m1 use lib.m2;\n"
       "endconfig\n";
 
-  // Under the version this one is defined from, the seven words keep their
-  // keyword roles and the declaration is built.
   auto under_2001 = ParseWithPreprocessor(In2001(kSrc));
   ASSERT_NE(under_2001.cu, nullptr);
   EXPECT_FALSE(under_2001.has_errors);
@@ -285,30 +233,18 @@ TEST(CompilerDirectiveParsing, NoconfigCannotWriteAConfigDeclaration) {
   EXPECT_EQ(cfg->design_cells.size(), 1u);
   EXPECT_EQ(cfg->rules.size(), 3u);
 
-  // Dropping the words from the reserved list takes the construct with them.
-  // §3.12.1 owns the report: with `config` an ordinary identifier, line 3 of
-  // the source heads nothing the compilation unit admits and
-  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto dropped = ParseWithPreprocessor(InNoconfig(kSrc));
   EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
                             LineInRegion(3), "3.12.1"));
 
-  // The module on its own parses under this version, so the rejection above is
-  // the configuration's doing and not a wholesale failure of the region.
   EXPECT_TRUE(ParsesNoconfig("module top;\nendmodule\n"));
 }
 
-// The same claim one word at a time: a configuration cannot even be opened
-// under this version, and the word that would open it is free to name a
-// module instead -- the two halves of the exclusion in one place.
 TEST(CompilerDirectiveParsing, NoconfigFreesTheWordThatOpensAConfiguration) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk(In2001("config c;\n"
                                      "  design lib.top;\n"
                                      "endconfig\n")));
-  // §3.12.1 owns the report: with `config` an ordinary identifier the first
-  // line heads nothing the compilation unit admits, and
-  // Parser::ReportUnexpectedTopLevelToken says so in src/parser/parser.cpp.
   auto dropped =
       ParseWithPreprocessor(InNoconfig("config c;\n"
                                        "  design lib.top;\n"
@@ -316,7 +252,6 @@ TEST(CompilerDirectiveParsing, NoconfigFreesTheWordThatOpensAConfiguration) {
   EXPECT_TRUE(ReportedError(dropped.diags, "expected top-level declaration",
                             LineInRegion(1), "3.12.1"));
 
-  // The very same word, now naming a design element under this version.
   auto r = ParseWithPreprocessor(InNoconfig("module config;\nendmodule\n"));
   ASSERT_NE(r.cu, nullptr);
   EXPECT_FALSE(r.has_errors);
@@ -325,12 +260,6 @@ TEST(CompilerDirectiveParsing, NoconfigFreesTheWordThatOpensAConfiguration) {
   EXPECT_TRUE(r.cu->configs.empty());
 }
 
-// That this version acts much like 1364-2001 is a claim about what it still
-// does, not only about what it drops. The eleven kept additions go on opening
-// the constructs they open under that version: `localparam` declares a
-// constant, `genvar`/`generate`/`endgenerate` build a loop generate construct,
-// `automatic` qualifies a subroutine, and `signed`/`unsigned` qualify a
-// declaration.
 TEST(CompilerDirectiveParsing, NoconfigKeptAdditionsStillOpenTheirConstructs) {
   auto r = ParseWithPreprocessor(
       InNoconfig("module m;\n"
@@ -368,9 +297,6 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionsStillOpenTheirConstructs) {
   EXPECT_TRUE(HasItemKindNamed(items, ModuleItemKind::kTaskDecl, "bump"));
 }
 
-// The kept pulse-control additions occupy a position none of the other tests
-// reaches: they are specify block items, so their keyword role only exists
-// inside a specify block that Table 22-1's own words open.
 TEST(CompilerDirectiveParsing, NoconfigKeepsPulseControlKeywords) {
   auto r = ParseWithPreprocessor(
       InNoconfig("module m (input wire a, output wire y);\n"
@@ -388,13 +314,8 @@ TEST(CompilerDirectiveParsing, NoconfigKeepsPulseControlKeywords) {
   EXPECT_NE(FindSpecifyBlock(r.cu->modules[0]->items), nullptr);
 }
 
-// A dropped word naming a module and an instance -- the two positions the
-// variable sweep does not cover -- again paired against the version this one
-// is defined from.
 TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
   EXPECT_TRUE(ParsesNoconfig("module config;\nendmodule\n"));
-  // §23.2.1 owns the report on the module name: the word stands where
-  // Parser::ParseModuleDecl reads it.
   auto as_module = ParseWithPreprocessor(In2001("module config;\nendmodule\n"));
   EXPECT_TRUE(ReportedError(as_module.diags,
                             "expected identifier, got 'config'",
@@ -403,10 +324,6 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
   EXPECT_TRUE(
       ParsesNoconfig("module sub;\nendmodule\n"
                      "module top;\n  sub library ();\nendmodule\n"));
-  // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
-  // is recognized by the identifier following the module name, so
-  // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
-  // instead and that demands a semicolon in src/parser/parser_items.cpp.
   auto as_instance =
       ParseWithPreprocessor(In2001("module sub;\nendmodule\n"
                                    "module top;\n  sub library ();\n"
@@ -415,11 +332,7 @@ TEST(CompilerDirectiveParsing, NoconfigExcludedWordNamesAModule) {
                             LineInRegion(4), "6.8"));
 }
 
-// A kept word still cannot name a module, which is the same complement claim
-// in a position the variable sweep does not reach.
 TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
-  // §23.2.1 owns the report on the module name: the word stands where
-  // Parser::ParseModuleDecl reads it.
   auto as_module =
       ParseWithPreprocessor(InNoconfig("module generate;\n"
                                        "endmodule\n"));
@@ -428,10 +341,6 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
                             LineInRegion(1), "23.2.1"));
   EXPECT_TRUE(ParseWithPreprocessorOk(In1995("module generate;\nendmodule\n")));
 
-  // §6.8 owns the report on the instance name, not §23.3.2: an instantiation
-  // is recognized by the identifier that follows the module name, so
-  // Parser::ParseImplicitTypeOrInst hands `sub` to Parser::ParsePlainVarDecl
-  // instead and that demands a semicolon in src/parser/parser_items.cpp.
   auto as_instance =
       ParseWithPreprocessor(InNoconfig("module sub;\nendmodule\n"
                                        "module top;\n  sub localparam ();\n"
@@ -440,17 +349,7 @@ TEST(CompilerDirectiveParsing, NoconfigKeptAdditionCannotNameAModule) {
                             LineInRegion(4), "6.8"));
 }
 
-// The bound from above: this version reserves no more than "1364-2001" does,
-// so a word a later list introduces carries no keyword meaning here either.
-// `uwire` is the sharpest case, being the sole addition of the very next
-// version. Each case is paired with the same source outside the region, which
-// is what places the difference in the reserved word list this version puts in
-// force rather than in some unrelated limitation of the parser.
 TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
-  // The word being an ordinary identifier here, the declaration it opens is one
-  // of a variable whose type_identifier is spelled uwire, and no such type is
-  // declared anywhere, which is what §6.18 refuses at elaboration. What the
-  // parse leaves behind names the word as the type it was read as.
   auto as_net =
       ParseWithPreprocessor(InNoconfig("module m;\n  uwire w;\n"
                                        "endmodule\n"));
@@ -461,9 +360,6 @@ TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   EXPECT_TRUE(as_net_item->type_name_undeclared_at_parse);
   EXPECT_TRUE(ParseWithPreprocessorOk("module m;\n  uwire w;\nendmodule\n"));
 
-  // §6.8 owns this one instead: a packed dimension is where the declaration
-  // was meant to end, so Parser::ParsePlainVarDecl in
-  // src/parser/parser_items.cpp demands the semicolon.
   auto as_type =
       ParseWithPreprocessor(InNoconfig("module m;\n"
                                        "  logic [7:0] v;\n"
@@ -473,16 +369,6 @@ TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   EXPECT_TRUE(
       ParseWithPreprocessorOk("module m;\n  logic [7:0] v;\nendmodule\n"));
 
-  // The word being an ordinary identifier here as well, what it heads is a
-  // data_declaration and not a process: A.2.4 writes variable_decl_assignment
-  // as `variable_identifier { variable_dimension } [ = expression ]`, so `r =
-  // 1'b0` is a declarator with an initializer. No `(` follows it, and A.4.1.1
-  // requires the parenthesized list_of_port_connections of every
-  // hierarchical_instance, so Parser::LooksLikeUndeclaredTypeDecl in
-  // src/parser/parser_items.cpp reads a variable whose type_identifier is
-  // spelled always_comb -- a type declared nowhere, which is what §6.18 refuses
-  // at elaboration. The parse is what this case reads, so it names the type the
-  // word was read as and the initializer kept with it.
   auto as_decl =
       ParseWithPreprocessor(InNoconfig("module m;\n"
                                        "  reg r;\n"
@@ -501,10 +387,6 @@ TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   EXPECT_EQ(decl_items[1]->init_expr->kind, ExprKind::kIntegerLiteral);
   EXPECT_EQ(decl_items[1]->init_expr->text, "1'b0");
 
-  // The same source outside the region, where the word keeps its keyword role
-  // and the very same characters are an always_comb procedure. Reading both
-  // back is what places the difference in the reserved word list this version
-  // puts in force rather than in anything else about the source.
   auto outside = ParseWithPreprocessor(
       "module m;\n"
       "  reg r;\n"
@@ -518,9 +400,6 @@ TEST(CompilerDirectiveParsing, WordOutsideNoconfigListIsNotAKeyword) {
   EXPECT_EQ(outside_items[1]->kind, ModuleItemKind::kAlwaysCombBlock);
 }
 
-// Words neither table lists are ordinary identifiers under this version too,
-// exactly as they are under the version it is defined from -- the exception
-// adds ten names to that group without disturbing it.
 TEST(CompilerDirectiveParsing, NoconfigLeavesUnlistedWordsFree) {
   auto r = ParseWithPreprocessor(
       InNoconfig("module bit (input wire logic, output wire byte);\n"

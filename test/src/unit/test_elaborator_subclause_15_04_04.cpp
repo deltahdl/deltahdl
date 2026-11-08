@@ -51,9 +51,6 @@ TEST(MailboxTryPutElaborator, TryPutWithVariableArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.4: the try_put() message may be any singular expression, explicitly
-// including object handles. A class handle passed as the argument elaborates
-// without error, just like the integral cases above.
 TEST(MailboxTryPutElaborator, TryPutWithObjectHandleArg) {
   ElabFixture f;
   auto* design = ElaborateSrc(
@@ -72,9 +69,6 @@ TEST(MailboxTryPutElaborator, TryPutWithObjectHandleArg) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §15.4.4: a message is a singular expression, which a variable of an
-// unpacked structure type, named through a typedef and declared in the
-// procedure, is not (§6.4).
 TEST(MailboxTryPutElaborator, TryPutOfAnUnpackedStructIsReported) {
   ElabFixture f;
   ElaborateSrc(

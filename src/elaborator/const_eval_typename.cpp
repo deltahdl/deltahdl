@@ -1,11 +1,3 @@
-// §20.6.1 (printed page 628 of IEEE 1800-2023): $typename may stand in a
-// constant expression, its answer fixed during elaboration. The fold writes
-// the type by the clause's steps (elaborator/typename_writer.h) from the
-// declarations of the module being elaborated -- the module a live
-// ParamRangeRegistryGuard installed, its parameters, and the typedef table a
-// TypedefRegistryGuard installed -- and declines, leaving the call to the
-// run, wherever those do not settle the answer.
-
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -25,8 +17,6 @@ namespace delta {
 
 namespace {
 
-// The variable the registered module declares as `name`; null where no
-// module is registered or it declares none.
 const RtlirVariable* RegisteredVariable(std::string_view name) {
   const RtlirModule* mod = RegisteredModule();
   if (mod == nullptr) return nullptr;
@@ -36,11 +26,6 @@ const RtlirVariable* RegisteredVariable(std::string_view name) {
   return nullptr;
 }
 
-// §7.4.1: the width of one element of the outermost packed dimension the
-// variable `var` was declared with, its width over that dimension's span; 1
-// where its type has no packed dimension or its bounds do not fold. §7.4.4: a
-// type written as a typedef's name alone has the dimensions the typedef
-// writes, followed through a chain of them.
 uint32_t PackedElementWidth(const RtlirVariable& var) {
   const DataType* type = var.written_type;
   while (type != nullptr && type->kind == DataTypeKind::kNamed &&
@@ -56,11 +41,6 @@ uint32_t PackedElementWidth(const RtlirVariable& var) {
   return std::max<uint32_t>(var.width / span, 1);
 }
 
-// What the §20.6.1 steps ask of the place a type is written in, answered from
-// the module being elaborated. `declined` is set where a step asks what its
-// declarations do not settle: a bound that does not fold, a name no typedef of
-// the module resolves -- a class, a package's type -- and the scope an
-// anonymous aggregate is named after where no module is registered.
 TypenameEnvironment ElabTypenameEnvironment(bool& declined) {
   TypenameEnvironment env;
   env.value_of = [&declined](const Expr* expr) {
@@ -69,11 +49,10 @@ TypenameEnvironment ElabTypenameEnvironment(bool& declined) {
     return value.value_or(0);
   };
   env.resolve_name = [](std::string_view scope_name, std::string_view type_name,
-                        std::string& /*prefix*/) {
+                        std::string&) {
     return scope_name.empty() ? RegisteredTypedef(type_name) : nullptr;
   };
-  env.qualified_class_name = [&declined](std::string_view /*scope_name*/,
-                                         std::string_view /*type_name*/) {
+  env.qualified_class_name = [&declined](std::string_view, std::string_view) {
     declined = true;
     return std::string();
   };
@@ -104,11 +83,6 @@ TypenameEnvironment ElabTypenameEnvironment(bool& declined) {
   return env;
 }
 
-// A name the registered module declares, as $typename writes it: a variable
-// by the type its declaration wrote, its unpacked dimensions after a "$"
-// (step d), and a typedef name by the type it stands for (step a); empty
-// where it names neither, or a variable that records no declared type, as the
-// storage of an enumeration constant does.
 std::string TypenameOfDeclaredName(std::string_view name,
                                    TypenameWriter& writer) {
   if (const RtlirVariable* var = RegisteredVariable(name)) {
@@ -122,12 +96,6 @@ std::string TypenameOfDeclaredName(std::string_view name,
   return writer.OfType(reference, "", name);
 }
 
-// A select of one element of a fixed unpacked array the registered module
-// declares, `AB[0]` of `AB_t AB[10]`, as $typename writes it: the element
-// type, which is the declared type without the dimension the select takes
-// away; empty where `arg` is no such select. An array with a dimension whose
-// bounds do not fold, a dynamic or an associative one, has no dimensions to
-// write and is no such array.
 std::string TypenameOfElement(const Expr* arg, TypenameWriter& writer) {
   if (arg->kind != ExprKind::kSelect || arg->index_end != nullptr ||
       arg->base->kind != ExprKind::kIdentifier) {
@@ -142,10 +110,6 @@ std::string TypenameOfElement(const Expr* arg, TypenameWriter& writer) {
          ElementDimsText(unpacked);
 }
 
-// The argument of a $typename call as the fold writes it, by the form it
-// takes: a type node, a built-in type keyword alone or with a packed range, a
-// name, an element of an unpacked array, or an expression's self-determined
-// type; empty where none of them is settled.
 std::string TypenameOfArgument(const Expr* arg, TypenameWriter& writer,
                                const TypenameEnvironment& env) {
   if (arg->kind == ExprKind::kTypeRef) {

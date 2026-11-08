@@ -108,14 +108,10 @@ TEST(CaseMatchesSyntaxParsing, CaseInsideAndMatchesMutualExclusion) {
       "    endcase\n"
       "  end\n"
       "endmodule\n");
-  // The emission site files this under §12.5, which carries the case statement
-  // both keywords qualify, rather than under §12.6.
   EXPECT_TRUE(ReportedError(
       r.diags, "'matches' and 'inside' cannot be used together", 3, "12.5"));
 }
 
-// §12.6 BNF: the `[ pattern ]` after `tagged member_identifier` is optional,
-// and §12.6 prose notes that the nested pattern is omitted for void members.
 TEST(CaseMatchesSyntaxParsing, TaggedVoidMemberOmitsNestedPattern) {
   auto r = Parse(
       "module m;\n"
@@ -127,8 +123,6 @@ TEST(CaseMatchesSyntaxParsing, TaggedVoidMemberOmitsNestedPattern) {
   EXPECT_FALSE(r.has_errors);
 }
 
-// Syntax 12-3 writes every case form with at least one item, so a case
-// statement that reaches endcase with none is reported there.
 TEST(CaseMatchesSyntaxParsing, CaseMatchesWithNoItemsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -141,12 +135,6 @@ TEST(CaseMatchesSyntaxParsing, CaseMatchesWithNoItemsRejected) {
       r.diags, "case statement shall have at least one case item", 4, "12.5"));
 }
 
-// Covers the `matches` branch of Parser::TryParseSpecialInfix in
-// src/parser/expr_parser.cpp. It assigned no range.start before this commit, so
-// a report standing at a cond_pattern printed "<unknown location>" instead of a
-// file, line and column. §12.6 writes a cond_pattern as `expression matches
-// pattern`, so the node begins where its left operand begins: `x`, at column 15
-// of line 2.
 TEST(CaseMatchesSyntaxParsing, MatchesCondPatternStartsAtItsLeftOperand) {
   auto r = Parse(
       "module m;\n"
@@ -162,10 +150,6 @@ TEST(CaseMatchesSyntaxParsing, MatchesCondPatternStartsAtItsLeftOperand) {
   EXPECT_EQ(stmt->condition->range.start.column, 15u);
 }
 
-// Syntax 12-4 ends a tagged pattern's member pattern where the pattern ends,
-// so the `&&&` filter after `tagged Valid .*` joins the whole `matches` clause
-// (§12.6.2), and the `?` after the void member `tagged Invalid` begins the
-// conditional (§12.6.3) rather than a member pattern.
 TEST(PatternSyntaxParsing, TaggedMemberPatternStopsAtFilterAndQuestion) {
   auto r = Parse(
       "module m;\n"

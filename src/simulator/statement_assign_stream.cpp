@@ -27,41 +27,27 @@ struct StreamElemInfo {
   std::string target_name;
 };
 
-// Streaming unpack evaluation environment (IEEE 1800 §11.4.14): the simulation
-// context used to resolve/evaluate targets together with the arena used to
-// allocate result vectors. These two always travel together.
 struct StreamEnv {
   SimContext& ctx;
   Arena& arena;
 };
 
-// A source stream presented as a fixed-size bit buffer: the packed RHS value
-// produced for the unpack plus its total bit width (the addressable bound).
 struct StreamView {
   const Logic4Vec& stream;
   uint32_t total_width;
 };
 
-// Greedy-sizing budget for the single bare dynamic queue in an unpack target
-// list (§11.4.14): the available RHS bit width and the bits already claimed by
-// all fixed (non-greedy) targets. The greedy queue takes what remains.
 struct GreedyFill {
   uint32_t rhs_width;
   uint32_t fixed_sum;
 };
 
-// The in-progress element collection for the greedy unpack pass: the growing
-// list of collected stream targets, the running greedy-pass state (whether the
-// one greedy dynamic queue has been consumed), and the per-call bits-added
-// out-parameter.
 struct GreedyUnpackSink {
   std::vector<StreamElemInfo>& elems;
   bool& first_dynamic_consumed;
   uint32_t& added;
 };
 
-// Single-index with-range (no index_end): one element at `idx`, or
-// out-of-range.
 static bool ResolveSingleIndexRange(int64_t idx, uint32_t array_size,
                                     uint32_t array_lo, uint32_t& out_start,
                                     uint32_t& out_count) {
@@ -76,7 +62,6 @@ static bool ResolveSingleIndexRange(int64_t idx, uint32_t array_size,
   return true;
 }
 
-// [idx +: idx2] indexed part-select.
 static void ResolvePlusPartSelectRange(int64_t idx, int64_t idx2,
                                        uint32_t array_lo, uint32_t& out_start,
                                        uint32_t& out_count) {
@@ -85,7 +70,6 @@ static void ResolvePlusPartSelectRange(int64_t idx, int64_t idx2,
   out_count = (idx2 < 0) ? 0 : static_cast<uint32_t>(idx2);
 }
 
-// [idx -: idx2] indexed part-select.
 static void ResolveMinusPartSelectRange(int64_t idx, int64_t idx2,
                                         uint32_t array_lo, uint32_t& out_start,
                                         uint32_t& out_count) {
@@ -96,7 +80,6 @@ static void ResolveMinusPartSelectRange(int64_t idx, int64_t idx2,
   out_count = width;
 }
 
-// [idx : idx2] explicit range (either direction).
 static void ResolveExplicitRange(int64_t idx, int64_t idx2, uint32_t array_lo,
                                  uint32_t& out_start, uint32_t& out_count) {
   int64_t lo = idx, hi = idx2;
@@ -133,11 +116,6 @@ bool ResolveWithRange(const Expr* with_expr, SimContext& ctx, Arena& arena,
   return true;
 }
 
-// §11.4.14.3: a null class handle is skipped by the unpack operation — it
-// consumes no stream bits, is left unmodified, and the unpack never allocates
-// an object to fill (the hierarchy must be built before the streaming operator
-// is applied). Detects a target element naming a class-handle variable that
-// currently holds the null handle.
 static bool IsNullClassHandleTarget(const Expr* elem, SimContext& ctx) {
   if (!elem || elem->kind != ExprKind::kIdentifier) return false;
   if (ctx.GetVariableClassType(elem->text).empty()) return false;
@@ -145,8 +123,6 @@ static bool IsNullClassHandleTarget(const Expr* elem, SimContext& ctx) {
   return var && var->value.ToUint64() == kNullClassHandle;
 }
 
-// Whether any bare (non-with) identifier element is a dynamic queue, which
-// makes the unpack greedily size that queue from the leftover stream bits.
 static bool LhsHasGreedyDynamicElement(const Expr* lhs, SimContext& ctx) {
   for (auto* elem : lhs->elements) {
     if (elem->stream_range) continue;
@@ -157,8 +133,6 @@ static bool LhsHasGreedyDynamicElement(const Expr* lhs, SimContext& ctx) {
   return false;
 }
 
-// Bit width contributed by a with-range identifier element (fixed array or
-// queue) when computing the fixed-target sum.
 static uint32_t FixedWithRangeElementWidth(const Expr* elem, SimContext& ctx,
                                            Arena& arena) {
   if (auto* ainfo = ctx.FindArrayInfo(elem->text)) {
@@ -178,44 +152,10 @@ static uint32_t FixedWithRangeElementWidth(const Expr* elem, SimContext& ctx,
   return 0;
 }
 
-// §11.4.14.1: each stream_expression of the stream_concatenation is turned
-// into a bit-stream and appended, and Syntax 11-4 makes every item of
-// a stream_concatenation an expression, so what a target element contributes is
-// the expression's and not the object some sub-expression of it names. A select
-// is such an element; a select with no base is not, its index standing on
-// nothing to select from and the whole reducing to an ordinary lvalue. This is
-// the test the plain-concatenation walk applies, for the same reason.
 static bool IsStreamSelectElement(const Expr* elem) {
   return elem->kind == ExprKind::kSelect && elem->base != nullptr;
 }
 
-// How many bits of the stream a target element claims: what its expression
-// names, by the clause above -- SelectExprWidth's answer for a select, and the
-// whole of the resolved variable for every other element shape.
-//
-// How wide the element is and which bits of its object it may write are two
-// questions, and this answers the first. It gave SelectStorageBits' window to
-// both before, and §11.5.1 leaves that window empty for a select addressing no
-// bit of its object, giving the invalid reference a value rather than an
-// absence -- x for a 4-state type and 0 for a 2-state one -- while saying
-// separately that the write leaves the stored data untouched. Such an
-// element is still one element of the stream, and it claimed none of it: on
-// `logic [7:0] a, b, c`, `{>> {c, a[9], b}} = 17'h1AAC3` sized the target list
-// at sixteen bits where it names seventeen. §11.4.14.3 consumes a surplus from
-// its most significant, left-hand end, so what moves is the elements to the
-// *right* of the mis-sized one -- `b` read 8'h61 where it owns the source's low
-// eight bits and must read 8'hC3. On an exact fit that invented a truncation
-// the clause does not authorize; on a short source it hid the "too few bits in
-// stream" report §11.4.14.3 requires.
-//
-// SelectStorageBits still answers the window, reached by the writers through
-// WriteBitSelect, which declines a select addressing nothing on its own. The
-// two part wherever a select runs off the end of its object: §11.5.1 has a
-// write through such a part-select change only its in-range bits, so
-// `a[9:6]` on a `logic [7:0] a` claims four bits of the stream and writes two.
-//
-// Three sites ask this -- the collecting pass, the fixed-width sum the single
-// greedy queue is budgeted from, and the forward pass.
 static uint32_t StreamElementClaimedBits(const Expr* elem, const Variable& var,
                                          SimContext& ctx, Arena& arena) {
   if (IsStreamSelectElement(elem))
@@ -223,8 +163,6 @@ static uint32_t StreamElementClaimedBits(const Expr* elem, const Variable& var,
   return var.value.width;
 }
 
-// Sum of bit widths of all non-greedy (fixed) targets, used to compute how
-// many bits remain for the single greedy dynamic queue.
 static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
                                       Arena& arena) {
   uint32_t fixed_sum = 0;
@@ -236,16 +174,11 @@ static uint32_t SumFixedElementWidths(const Expr* lhs, SimContext& ctx,
     if (elem->kind == ExprKind::kIdentifier && ctx.FindQueue(elem->text))
       continue;
     auto* var = ResolveLhsVariable(elem, ctx);
-    // §11.4.14.4 sizes the single greedy queue from what the fixed elements
-    // leave, so a select beside a queue contributes the bits it names: its
-    // write window understated the budget, and `{>> {a[9], q}} = 24'hC3A55A`
-    // on a `byte q[$]` gave `q` three elements where twenty-three bits fit two.
     if (var) fixed_sum += StreamElementClaimedBits(elem, *var, ctx, arena);
   }
   return fixed_sum;
 }
 
-// Collect targets for a fixed-array with-range element. Returns bits added.
 static uint32_t CollectArrayWithRangeElements(
     const Expr* elem, ArrayInfo* ainfo, SimContext& ctx, Arena& arena,
     std::vector<StreamElemInfo>& elems) {
@@ -264,7 +197,6 @@ static uint32_t CollectArrayWithRangeElements(
   }
   uint32_t added = 0;
   for (uint32_t i = 0; i < count; ++i) {
-    // §11.4.14.4: in the array's own order, from its left bound.
     uint32_t abs_idx =
         ainfo->lo + (ainfo->is_descending ? start + count - 1 - i : start + i);
     std::string name =
@@ -275,8 +207,6 @@ static uint32_t CollectArrayWithRangeElements(
   return added;
 }
 
-// Collect targets for a queue with-range element, growing the queue as needed.
-// Returns bits added.
 static uint32_t CollectQueueWithRangeElements(
     const Expr* elem, QueueObject* queue, SimContext& ctx, Arena& arena,
     std::vector<StreamElemInfo>& elems) {
@@ -289,10 +219,6 @@ static uint32_t CollectQueueWithRangeElements(
   while (queue->elements.size() < needed) {
     queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
   }
-  // §7.10.3: the range names the elements this writes, so the elements outside
-  // it are neither removed nor replaced and keep the identities any reference
-  // to them was taken on. The elements grown onto the end are new and get
-  // identities of their own.
   queue->AllocateIdsForAppended();
   uint32_t added = 0;
   for (uint32_t i = 0; i < count; ++i) {
@@ -304,8 +230,6 @@ static uint32_t CollectQueueWithRangeElements(
   return added;
 }
 
-// Collect targets for the (single) greedy dynamic queue, sized from the bits
-// left after all fixed targets. Returns bits added.
 static uint32_t CollectGreedyQueueElements(const Expr* elem, QueueObject* queue,
                                            const GreedyFill& fill, Arena& arena,
                                            std::vector<StreamElemInfo>& elems) {
@@ -316,8 +240,6 @@ static uint32_t CollectGreedyQueueElements(const Expr* elem, QueueObject* queue,
   for (uint32_t i = 0; i < count; ++i) {
     queue->elements.push_back(MakeLogic4Vec(arena, queue->elem_width));
   }
-  // §7.10.3: the queue is the whole target of the assignment, so every element
-  // it held is gone and every reference to one of them is outdated.
   queue->AssignFreshIds();
   uint32_t added = 0;
   for (uint32_t i = 0; i < count; ++i) {
@@ -328,8 +250,6 @@ static uint32_t CollectGreedyQueueElements(const Expr* elem, QueueObject* queue,
   return added;
 }
 
-// Try to collect a with-range element (fixed array or queue). Returns true and
-// sets `added` if the element was a with-range identifier handled here.
 static bool TryCollectWithRangeElement(const Expr* elem, SimContext& ctx,
                                        Arena& arena,
                                        std::vector<StreamElemInfo>& elems,
@@ -346,9 +266,6 @@ static bool TryCollectWithRangeElement(const Expr* elem, SimContext& ctx,
   return false;
 }
 
-// Try to collect a bare dynamic-queue element under greedy sizing. Returns true
-// if the element was such a queue (the first one is sized greedily; subsequent
-// ones are cleared). Sets `added` for the greedy queue.
 static bool TryCollectGreedyDynamicElement(const Expr* elem, StreamEnv env,
                                            const GreedyFill& fill,
                                            const GreedyUnpackSink& sink) {
@@ -360,19 +277,12 @@ static bool TryCollectGreedyDynamicElement(const Expr* elem, StreamEnv env,
     sink.added =
         CollectGreedyQueueElements(elem, queue, fill, env.arena, sink.elems);
   } else {
-    // §7.10.3: a second queue on the left of one streaming assignment takes no
-    // bits and is emptied, which removes every element it held and so outdates
-    // every reference to one.
     queue->elements.clear();
     queue->element_ids.clear();
   }
   return true;
 }
 
-// §11.4.14.3 unpacks into an unpacked array element by element, in the order
-// §11.4.14.1 packs it, foreach's: a one-dimensional array from its left
-// bound, a multidimensional one leaf by leaf. A dynamic array is unpacked as a
-// queue is.
 static bool TryCollectFixedArrayElements(const Expr* elem, SimContext& ctx,
                                          std::vector<StreamElemInfo>& elems,
                                          uint32_t& added) {
@@ -417,8 +327,6 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
       total_width += added;
       continue;
     }
-    // §11.4.14.3: a null class handle target is skipped (no bits consumed, not
-    // modified, no object created).
     if (IsNullClassHandleTarget(elem, ctx)) continue;
     auto* var = ResolveLhsVariable(elem, ctx);
     if (!var) continue;
@@ -429,8 +337,6 @@ static uint32_t CollectStreamElements(const Expr* lhs, SimContext& ctx,
   return total_width;
 }
 
-// Copy a single bit position `sbit` of `src` into bit position `dbit` of `dst`.
-// Out-of-range source words contribute nothing.
 static void CopyOneStreamBit(const Logic4Vec& src, Logic4Vec& dst,
                              uint32_t sbit, uint32_t dbit) {
   uint32_t sw = sbit / 64, sb = sbit % 64;
@@ -440,8 +346,6 @@ static void CopyOneStreamBit(const Logic4Vec& src, Logic4Vec& dst,
   if ((src.words[sw].bval >> sb) & 1) dst.words[dw].bval |= uint64_t{1} << db;
 }
 
-// Copy `bits_to_copy` bits from `stream`[src_start..] into `dst`[dst_start..],
-// stopping at total_width.
 static void CopyStreamSliceBits(const StreamView& src, Logic4Vec& dst,
                                 uint32_t src_start, uint32_t dst_start,
                                 uint32_t bits_to_copy) {
@@ -482,7 +386,6 @@ static Logic4Vec ExtractStreamBits(const Logic4Vec& stream, uint32_t bit_offset,
   return result;
 }
 
-// Whether `e` (or any operand it is built from) names one of `names`.
 static bool ExprRefsIdentifierIn(const Expr* e,
                                  const std::vector<std::string_view>& names) {
   if (!e) return false;
@@ -497,24 +400,12 @@ static bool ExprRefsIdentifierIn(const Expr* e,
          ExprRefsIdentifierIn(e->base, names);
 }
 
-// §11.4.14.4: a with-range expression is evaluated immediately before its array
-// is unpacked, so when it refers to a field that this same operator unpacks to
-// its left, the just-unpacked value must drive the range. The default unpack
-// pass resolves every with-range up front (before any write-back), which only
-// satisfies the complementary case — a reference to a field unpacked to the
-// right uses that field's previous value. This predicate detects the
-// left-reference case (a with-range naming an earlier scalar target) so it can
-// be routed to a forward, write-as-you-go unpack instead. It is limited to
-// forms with no greedy dynamic operand, where stream bits map MSB-first onto
-// elements in order once the forward pass has re-ordered a `<<` stream.
 static bool ShouldForwardResolveUnpack(const Expr* lhs, SimContext& ctx) {
   std::vector<std::string_view> earlier;
   bool dependency = false;
   for (auto* elem : lhs->elements) {
     if (elem->kind == ExprKind::kIdentifier && !elem->stream_range &&
         ctx.FindQueue(elem->text)) {
-      // A bare dynamic queue triggers greedy sizing; leave that to the
-      // established pass.
       return false;
     }
     if (elem->stream_range && elem->kind == ExprKind::kIdentifier &&
@@ -529,12 +420,8 @@ static bool ShouldForwardResolveUnpack(const Expr* lhs, SimContext& ctx) {
   return dependency;
 }
 
-// Consumes the next `w` bits from the most-significant end of `rhs_val`, given
-// that `cursor` bits have already been consumed. Out-of-range yields zeros.
 using StreamTaker = std::function<Logic4Vec(uint32_t w)>;
 
-// Forward-unpack arm for a fixed-array with-range element: write each selected
-// element variable from successive stream bits, advancing `cursor`.
 static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
                                         StreamEnv env, const StreamTaker& take,
                                         uint32_t& cursor) {
@@ -567,11 +454,6 @@ static void ForwardUnpackArrayWithRange(const Expr* elem, ArrayInfo* ainfo,
   }
 }
 
-// Forward-unpack arm for a queue with-range element: write each selected queue
-// slot from successive stream bits, advancing `cursor`.
-// §11.4.14 casts a stream to its target's type, and §11.4.14.3 a 4-state one
-// unpacked into a 2-state target to that type: an element written into a
-// queue of a 2-state element type holds no x or z.
 static Logic4Vec AsQueueElement(const QueueObject& queue, Logic4Vec value) {
   if (!queue.is_4state) CoerceTo2State(value);
   return value;
@@ -588,9 +470,6 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
   uint32_t needed = start + count;
   while (queue->elements.size() < needed)
     queue->elements.push_back(MakeLogic4Vec(env.arena, queue->elem_width));
-  // §7.10.3: as in CollectQueueWithRangeElements, growing the queue removes
-  // nothing, so the elements already there keep their identities and only the
-  // new ones are given any.
   queue->AllocateIdsForAppended();
   for (uint32_t i = 0; i < count; ++i) {
     Logic4Vec v = take(queue->elem_width);
@@ -600,26 +479,14 @@ static void ForwardUnpackQueueWithRange(const Expr* elem, QueueObject* queue,
   }
 }
 
-// Defined below, beside the default pass that is its other caller: deposit a
-// whole element's bits in its variable, subject to §6.11.2's coercion and
-// §10.6.2's override. Declared here because the forward-unpack pass writes its
-// scalar elements through the same function rather than restating it.
 static void StoreStreamValueToVar(Variable* var, Logic4Vec value);
 
-// Forward-unpack arm for a plain scalar/lvalue element: write the target from
-// the next `width` stream bits, advancing `cursor`.
 static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
                                 const StreamTaker& take, uint32_t& cursor) {
   auto* var = ResolveLhsVariable(elem, env.ctx);
   if (!var) return;
   uint32_t w = StreamElementClaimedBits(elem, *var, env.ctx, env.arena);
   Logic4Vec bits = take(w);
-  // §11.4.14.3 unpacks the stream into one variable or several, and a select
-  // element names a window of a variable rather than the variable, so the bits
-  // outside it stand. WriteBitSelect resolves that window, which §11.5.1 makes
-  // narrower than the width taken above whenever the select runs off the end of
-  // its object and empty when it addresses no bit -- a case WriteBitSelect
-  // declines itself. The cursor advances by the element's width either way.
   if (IsStreamSelectElement(elem)) {
     WriteBitSelect(var, elem, bits, env.ctx, env.arena);
   } else {
@@ -628,16 +495,11 @@ static void ForwardUnpackScalar(const Expr* elem, StreamEnv env,
   cursor += w;
 }
 
-// Forward-unpack dispatch for one element (with-range array, with-range queue,
-// or plain scalar/lvalue).
 static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
                                     Arena& arena, const StreamTaker& take,
                                     uint32_t& cursor) {
-  // §11.4.14.3: a null class handle target is skipped, consuming no bits.
   if (IsNullClassHandleTarget(elem, ctx)) return;
   if (elem->stream_range && elem->kind == ExprKind::kIdentifier) {
-    // §7.5: a dynamic array keeps its elements in a queue and is resized by
-    // the range like one; only a fixed-size array is bounded by it.
     if (auto* ainfo = ctx.FindArrayInfo(elem->text);
         ainfo != nullptr && !ainfo->is_dynamic) {
       ForwardUnpackArrayWithRange(elem, ainfo, StreamEnv{ctx, arena}, take,
@@ -653,27 +515,16 @@ static void ForwardUnpackOneElement(const Expr* elem, SimContext& ctx,
   ForwardUnpackScalar(elem, StreamEnv{ctx, arena}, take, cursor);
 }
 
-// Forward unpack for the right-shift form: walk elements in stream order and
-// write each target before resolving the next element's with-range, consuming
-// bits from the most-significant end of the stream as we go. This makes an
-// earlier-unpacked field visible to a later array's with-range (§11.4.14.4).
 static void UnpackStreamingConcatLhsForward(const Expr* lhs,
                                             const Logic4Vec& rhs_val,
                                             SimContext& ctx, Arena& arena) {
   uint32_t total = rhs_val.width;
-  // §11.4.14.2 with §11.4.14.3: `<<` re-orders the stream by its slices before
-  // the targets take their bits, as the collecting path below does over the
-  // bits it needs; a `with` range read from an earlier target decides how many
-  // bits that is only as the targets are reached, so the whole source is
-  // re-ordered, which is what the collecting path does where every bit is
-  // taken. Taken unordered, §11.4.14.4's Packet example unpacked its header's
-  // bytes backwards.
   Logic4Vec stream = rhs_val;
   if (lhs->op == TokenKind::kLtLt) {
     uint32_t ss = StreamSliceSize(lhs->lhs, ctx, arena);
     stream = ReverseStreamSlices(rhs_val, total, ss, arena);
   }
-  uint32_t cursor = 0;  // bits already consumed from the MSB end
+  uint32_t cursor = 0;
   StreamTaker take = [&](uint32_t w) -> Logic4Vec {
     if (cursor + w <= total)
       return ExtractStreamBits(stream, total - cursor - w, w, total, arena);
@@ -688,8 +539,6 @@ static void UnpackStreamingConcatLhsForward(const Expr* lhs,
                         Subclause("11.4.14.3"));
 }
 
-// Produce a `total_width`-bit stream from `rhs_val`, dropping any surplus bits
-// from the least-significant end (left-aligning the relevant bits).
 static Logic4Vec BuildLeftAlignedStream(const Logic4Vec& rhs_val,
                                         uint32_t total_width, Arena& arena) {
   if (rhs_val.width <= total_width) return rhs_val;
@@ -701,24 +550,13 @@ static Logic4Vec BuildLeftAlignedStream(const Logic4Vec& rhs_val,
   return stream;
 }
 
-// Write `value` into `var`, coercing to 2-state if needed and notifying.
 static void StoreStreamValueToVar(Variable* var, Logic4Vec value) {
-  // §10.6.2: a force overrides procedural assignments to the variable until a
-  // release is executed on it. The check is inside the write rather than at the
-  // unpack's entry because §11.4.14.3 unpacks the stream into one variable or
-  // several: a force on one of them declines that one while the rest take their
-  // slices, and declining at the entry would drop the whole statement. It has
-  // to be inside for the deferred route as well, where the unpack runs from an
-  // update-region callback and the flag that governs the write is the one
-  // standing then.
   if (var->is_forced) return;
   var->value = value;
   if (!var->is_4state) CoerceTo2State(var->value);
   var->NotifyWatchers();
 }
 
-// Write a collected element targeting a synthetic queue slot
-// ("<name>__q__<idx>") at `qpos`, the position of "__q__" in the name.
 static void WriteStreamQueueElement(const StreamElemInfo& ei, size_t qpos,
                                     const StreamView& src, uint32_t bit_offset,
                                     StreamEnv env) {
@@ -733,7 +571,6 @@ static void WriteStreamQueueElement(const StreamElemInfo& ei, size_t qpos,
   }
 }
 
-// Write a collected element targeting a named variable, creating it on demand.
 static void WriteStreamNamedVar(const StreamElemInfo& ei, const StreamView& src,
                                 uint32_t bit_offset, StreamEnv env) {
   auto* var = env.ctx.FindVariable(ei.target_name);
@@ -745,8 +582,6 @@ static void WriteStreamNamedVar(const StreamElemInfo& ei, const StreamView& src,
                                                src.total_width, env.arena));
 }
 
-// Write one collected stream element's bits to its target (queue slot, named
-// variable, or resolved lvalue), coercing/notifying as needed.
 static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
                                uint32_t bit_offset, StreamEnv env) {
   if (!ei.target_name.empty()) {
@@ -762,15 +597,6 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
   if (!var) return;
   Logic4Vec bits = ExtractStreamBits(src.stream, bit_offset, ei.width,
                                      src.total_width, env.arena);
-  // §11.4.14.3 deposits an element's bits in what the element names, and a
-  // select names a window of its variable, so the rest of that variable stands;
-  // storing the value whole gave `{>> {a[3:0], b}}` the whole of `a` and lost
-  // the bits `a[7:4]` had. WriteBitSelect resolves the window §11.5.1 gives the
-  // indices, which is not the width StreamElementClaimedBits carved the stream
-  // by: a select running off the end of its object writes only the bits that
-  // lie in range, and one addressing no bit writes nothing, WriteBitSelect
-  // declining it rather than falling through to the whole variable. Both
-  // writers decline a variable §10.6.2 has forced.
   if (IsStreamSelectElement(ei.expr)) {
     WriteBitSelect(var, ei.expr, bits, env.ctx, env.arena);
     return;
@@ -778,10 +604,6 @@ static void WriteStreamElement(const StreamElemInfo& ei, const StreamView& src,
   StoreStreamValueToVar(var, bits);
 }
 
-// §7.10.5: an unpack grows a queue target to the slots its with-range names or
-// to the elements the leftover bits fill, and the bound applies to what the
-// whole unpack leaves behind rather than to each element as it arrives. Every
-// queue the target list names is therefore trimmed once the unpack has run.
 static void EnforceQueueTargetBounds(const Expr* lhs, SimContext& ctx) {
   for (const auto* elem : lhs->elements) {
     if (!elem || elem->kind != ExprKind::kIdentifier) continue;
@@ -826,9 +648,6 @@ void UnpackStreamingConcatLhs(const Expr* lhs, const Logic4Vec& rhs_val,
   EnforceQueueTargetBounds(lhs, ctx);
 }
 
-// §11.4.14: extract a slice of `total_w` bits from `src` starting at bit
-// `start`, returning a `width`-bit Logic4Vec. Helper shared by the
-// pack-to-queue path below.
 static Logic4Vec ExtractWidenedSlice(const Logic4Vec& src, uint32_t start,
                                      uint32_t width, Arena& arena) {
   auto out = MakeLogic4Vec(arena, width);
@@ -846,9 +665,6 @@ static Logic4Vec ExtractWidenedSlice(const Logic4Vec& src, uint32_t start,
   return out;
 }
 
-// §11.4.14: geometry of a widened bit-stream that is unpacked MSB-first into a
-// queue: the padded stream bits plus the element count, total width, and
-// element width describing how to carve it into successive elements.
 struct WidenedStreamLayout {
   const Logic4Vec& widened;
   uint32_t n_elems;
@@ -856,8 +672,6 @@ struct WidenedStreamLayout {
   uint32_t elem_w;
 };
 
-// Repopulate `queue` from the widened stream described by `layout`, carving out
-// `n_elems` element-width slices (MSB-first into successive elements).
 static void PopulateQueueFromWidenedStream(QueueObject* queue,
                                            const WidenedStreamLayout& layout,
                                            Arena& arena) {

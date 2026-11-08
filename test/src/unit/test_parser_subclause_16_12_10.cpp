@@ -9,10 +9,6 @@ using namespace delta;
 
 namespace {
 
-// §16.12.10: the indexed nexttime forms carry a tick count that shall be a
-// non-negative integer constant expression. A non-negative integer literal
-// index — including zero, the alignment-operator case — is accepted, and the
-// property declaration parses cleanly.
 TEST(NexttimeIndexParsing, LiteralNonNegativeIndexParses) {
   auto r = Parse(
       "module m;\n"
@@ -29,9 +25,6 @@ TEST(NexttimeIndexParsing, LiteralNonNegativeIndexParses) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.10: a negative integer literal tick count violates the non-negative
-// requirement, so the weak indexed form `nexttime[-1]` is rejected during
-// parsing.
 TEST(NexttimeIndexParsing, NegativeLiteralIndexIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -44,9 +37,6 @@ TEST(NexttimeIndexParsing, NegativeLiteralIndexIsRejected) {
       "16.12.10"));
 }
 
-// §16.12.10: the same non-negative requirement applies to the strong indexed
-// form, so `s_nexttime[-1]` is likewise rejected. This exercises the separate
-// operator-group code path that consumes the `s_nexttime` keyword.
 TEST(NexttimeIndexParsing, StrongNegativeLiteralIndexIsRejected) {
   auto r = Parse(
       "module m;\n"
@@ -59,11 +49,6 @@ TEST(NexttimeIndexParsing, StrongNegativeLiteralIndexIsRejected) {
       "16.12.10"));
 }
 
-// §16.12.10: a symbolic index — here a module parameter — takes a different
-// code path than an integer literal. The literal-only parse check leaves
-// symbolic tick counts for the later constant-folding stages, so a parameter
-// index parses without a parse-stage error rather than being misreported as
-// negative.
 TEST(NexttimeIndexParsing, SymbolicParameterIndexIsDeferred) {
   auto r = Parse(
       "module m;\n"
@@ -78,9 +63,6 @@ TEST(NexttimeIndexParsing, SymbolicParameterIndexIsDeferred) {
   ASSERT_NE(item, nullptr);
 }
 
-// §16.12.10: the strong form's index is the operator's own, so a source
-// ending inside it ends the property's body there, and the body is reported
-// where the grammar's reading of it stops.
 TEST(NexttimeIndexParsing, ASourceEndingInTheStrongFormsIndexEndsTheBody) {
   auto r = Parse(
       "module m;\n"

@@ -44,8 +44,6 @@ TEST(SubroutineCallExprParsing, ListOfArgsPositionalOnly) {
 }
 
 TEST(SubroutineCallExprParsing, ListOfArgsEmptyPlaceholders) {
-  // list_of_arguments permits omitted (empty) positional elements; the parser
-  // must record a null entry for each so later argument positions stay aligned.
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(1, , 3); end\n"
@@ -63,7 +61,6 @@ TEST(SubroutineCallExprParsing, ListOfArgsEmptyPlaceholders) {
 }
 
 TEST(SubroutineCallExprParsing, ListOfArgsLeadingEmptyPlaceholder) {
-  // A leading empty element is also a valid positional placeholder.
   auto r = Parse(
       "module m;\n"
       "  initial begin foo(, 5); end\n"
@@ -122,10 +119,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorMissingCloseParen) {
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 2, "13.5"));
 }
 
-// Syntax 13-3 gives subroutine_call_statement a second alternative,
-// void ' ( function_subroutine_call ) ;. The A.8.2 view of the same input,
-// which alternative of subroutine_call sits inside the cast, is
-// VoidCastFunctionCall in test_parser_annex_a_08_02.cpp.
 TEST(SubroutineCallSyntaxParsing, VoidCastSubroutineCallStatement) {
   VerifyVoidCastFunctionCall();
 }
@@ -147,9 +140,6 @@ TEST(SubroutineCallSyntaxParsing, VoidFunctionCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kCall);
 }
 
-// 13.5 binds arguments by position unless they are named; a method call
-// carries such a positional list_of_arguments. The A.8.2 method_call_body
-// view is MethodCallWithArgs in test_parser_annex_a_08_02.cpp.
 TEST(SubroutineCallSyntaxParsing, MethodCallWithPositionalArgs) {
   auto r = Parse(
       "module m;\n"
@@ -179,24 +169,15 @@ TEST(SubroutineCallSyntaxParsing, SystemTaskCallAsStatement) {
   EXPECT_EQ(stmt->expr->kind, ExprKind::kSystemCall);
 }
 
-// The void ' ( function_subroutine_call ) ; alternative of
-// subroutine_call_statement needs both parentheses. The annex counterpart is
-// ErrorVoidCastMissingCloseParen in test_parser_annex_a_08_02.cpp.
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingCloseParen) {
   auto r = Parse(
       "module m;\n"
       "  function int foo(); return 1; endfunction\n"
       "  initial void'(foo();\n"
       "endmodule\n");
-  // A.6.9 writes the void cast statement's parentheses and
-  // Parser::ParseVoidCastCallStmt reads them, so the report for the unclosed
-  // `void'(` is filed there rather than under §13.5.
   EXPECT_TRUE(ReportedError(r.diags, "expected ')', got ';'", 3, "A.6.9"));
 }
 
-// A void-cast subroutine_call_statement still terminates with a semicolon.
-// The annex counterpart is ErrorVoidCastMissingSemicolon in
-// test_parser_annex_a_08_02.cpp.
 TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingSemicolon) {
   auto r = Parse(
       "module m;\n"
@@ -205,8 +186,6 @@ TEST(SubroutineCallSyntaxParsing, ErrorVoidCastStatementMissingSemicolon) {
       "    void'(foo())\n"
       "  end\n"
       "endmodule\n");
-  // §12.3 owns the semicolon that ends a statement, and the `end` on line 5 is
-  // the token standing where it belongs.
   EXPECT_TRUE(ReportedError(r.diags, "expected ';', got 'end'", 5, "12.3"));
 }
 

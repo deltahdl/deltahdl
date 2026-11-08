@@ -14,9 +14,6 @@
 
 using namespace delta;
 
-// The dump a test's writer produces goes to `tmp_path_`, and a dump file the
-// test's source names relatively (§21.7.1.1) to the scratch directory the test
-// stands in for its length, removed when it ends.
 class VcdTestBase : public ::testing::Test {
  protected:
   void SetUp() override {

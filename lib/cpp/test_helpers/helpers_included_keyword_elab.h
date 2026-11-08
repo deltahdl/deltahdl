@@ -16,30 +16,6 @@
 
 using namespace delta;
 
-// §22.14: each version_specifier's reserved word list includes the lists of
-// the versions before it, so every word an earlier table introduced keeps its
-// keyword role under a later specifier. The checks here state that as
-// structure rather than as tokens -- a source written entirely in one included
-// table's words is elaborated under the specifier `spec` names, and each
-// declaration is looked for in the design as the kind that word makes it. A
-// word that had quietly decayed into a plain identifier would still lex, so
-// only the elaborated design settles it.
-//
-// One check per table, taking the specifier as its parameter: the table fixes
-// what is written, the specifier fixes what is in force, and inclusion is the
-// claim that the two go together for every specifier at or after the table's
-// own version.
-//
-// Each table's check hands an already-elaborated design to one helper per
-// claim it makes. Every helper takes the design the caller has already found
-// non-null, because an ASSERT_ in a helper returns from that helper alone: an
-// ASSERT_NE moved out of a table's own check would leave the check running on
-// a null design. What each helper does assert on is a pointer it looked up
-// itself, whose reads all stand below the assertion in the same body.
-
-// Table 22-1's nine net type words, each read back as the net type that word
-// makes it. A word that had decayed into a plain identifier would leave no net
-// of its name in the design at all.
 inline void ExpectVerilog1995NetTypesElaborate(RtlirDesign* design) {
   struct NetCase {
     const char* name;
@@ -59,11 +35,6 @@ inline void ExpectVerilog1995NetTypesElaborate(RtlirDesign* design) {
   }
 }
 
-// Table 22-1's variable type words, each read back as the width or the flag
-// that word carries: `reg [7:0]` eight bits, `integer` thirty-two, `time`
-// sixty-four, `real` the real flag and `event` the event flag. The width is
-// what separates the three integral words from one another, so a word that had
-// been taken for another would be caught here rather than by the name alone.
 inline void ExpectVerilog1995VariableTypesElaborate(RtlirDesign* design) {
   const auto* v = FindVar(design, "m", "r");
   ASSERT_NE(v, nullptr);
@@ -82,9 +53,6 @@ inline void ExpectVerilog1995VariableTypesElaborate(RtlirDesign* design) {
   EXPECT_TRUE(v->is_event);
 }
 
-// Table 22-1, the Verilog-1995 list: the net types, the variable types with
-// their widths and their four-state and real and event flags, a parameter, and
-// a gate instantiation.
 inline void ExpectVerilog1995DeclarationsElaborate(const char* spec) {
   ElabFixture f;
   auto* design =
@@ -119,10 +87,6 @@ inline void ExpectVerilog1995DeclarationsElaborate(const char* spec) {
   EXPECT_EQ(p->resolved_value, 8);
 }
 
-// Table 22-2's `signed` and `unsigned` words, read back off two variables and
-// a net that differ in nothing but the qualifier. The declared width is read
-// back alongside the signedness: what the keyword selects is the signedness and
-// not the storage.
 inline void ExpectVerilog2001SignQualifiersElaborate(RtlirDesign* design) {
   const auto* s = FindVar(design, "t", "s");
   ASSERT_NE(s, nullptr);
@@ -137,13 +101,6 @@ inline void ExpectVerilog2001SignQualifiersElaborate(RtlirDesign* design) {
   EXPECT_TRUE(sn->is_signed);
 }
 
-// Table 22-2, the Verilog-2001 list, as structure rather than as tokens.
-// `localparam` resolves to a constant, `genvar`/`generate`/`endgenerate`
-// produce one copy of the loop body per iteration, and `signed`/`unsigned`
-// select what they select. The three are tied together on purpose: the
-// localparam is the loop bound, so the count of declarations reaching the
-// design depends on it resolving, and the nested condition picks out a single
-// iteration, so the genvar has to hold a different constant on each pass.
 inline void ExpectVerilog2001DeclarationsElaborate(const char* spec) {
   ElabFixture f;
   auto* design =
@@ -179,8 +136,6 @@ inline void ExpectVerilog2001DeclarationsElaborate(const char* spec) {
   ExpectVerilog2001SignQualifiersElaborate(design);
 }
 
-// Table 22-3, the Verilog-2005 list, whose lone entry is a net type of its
-// own: `uwire` shall still resolve to itself, scalar and vectored alike.
 inline void ExpectVerilog2005DeclarationsElaborate(const char* spec) {
   ElabFixture f;
   auto* design = ElaborateWithPreprocessor(In(spec,
@@ -204,10 +159,6 @@ inline void ExpectVerilog2005DeclarationsElaborate(const char* spec) {
   }
 }
 
-// Table 22-4's data type words, each read back as the width and the four-state
-// flag that word carries, together with the two words whose type is neither:
-// `string` and `chandle`. The two typedef'd names are read here as well, since
-// a variable of a user-defined type carries the width the type resolved to.
 inline void ExpectSystemVerilog2005DataTypesElaborate(RtlirDesign* design) {
   struct TypedVar {
     const char* name;
@@ -236,9 +187,6 @@ inline void ExpectSystemVerilog2005DataTypesElaborate(RtlirDesign* design) {
   EXPECT_TRUE(h->is_chandle);
 }
 
-// Table 22-4's `enum` word, read back as the members the user-defined type
-// resolved to: three of them, in the order written, with the values §6.19
-// gives an enumeration whose first member is unassigned.
 inline void ExpectSystemVerilog2005EnumMembersElaborate(RtlirDesign* design) {
   const auto* m = FindModule(design, "m");
   ASSERT_NE(m, nullptr);
@@ -251,9 +199,6 @@ inline void ExpectSystemVerilog2005EnumMembersElaborate(RtlirDesign* design) {
   EXPECT_EQ(members->second[2].value, 2);
 }
 
-// Table 22-4's four procedural words, each read back as the process kind it
-// infers. A process carries no name, so the kind is the whole of what
-// distinguishes `always_comb` from `always_ff`, `always_latch` and `final`.
 inline void ExpectSystemVerilog2005ProcessesElaborate(RtlirDesign* design) {
   EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysComb));
   EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kAlwaysFF));
@@ -261,11 +206,6 @@ inline void ExpectSystemVerilog2005ProcessesElaborate(RtlirDesign* design) {
   EXPECT_TRUE(HasProcess(design, "m", RtlirProcessKind::kFinal));
 }
 
-// Table 22-4's design elements beyond the module, read back as the elements
-// they make rather than as the words that wrote them: `package`/`endpackage`
-// leaves one package in the design, `import` leaves a wildcard import on the
-// module, and `interface`/`endinterface` leaves a design element the
-// elaborator marks as an interface.
 inline void ExpectSystemVerilog2005DesignElementsElaborate(
     RtlirDesign* design) {
   EXPECT_EQ(design->packages.size(), 1u);
@@ -284,12 +224,6 @@ inline void ExpectSystemVerilog2005DesignElementsElaborate(
   EXPECT_TRUE(ifc->is_interface);
 }
 
-// The closing leg: the same source under "1364-2005", the last specifier
-// before Table 22-4, where none of it elaborates. Every SystemVerilog word the
-// source is built from is an ordinary identifier there, so `package` at its
-// head reaches no top-level production and Parser::ParseTopLevel in
-// src/parser/parser.cpp reports "expected top-level declaration". That report
-// is this leg's subject, so the source is not required to parse.
 inline void ExpectSystemVerilog2005SourceRejectedUnderVerilog2005(
     const std::string& src) {
   ElabFixture included;
@@ -299,12 +233,6 @@ inline void ExpectSystemVerilog2005SourceRejectedUnderVerilog2005(
                             "3.12.1"));
 }
 
-// Table 22-4, the SystemVerilog-2005 list, read back as elaborated structure:
-// the design elements beyond the module, the data types with their widths and
-// four-state flags, the user-defined types with their resolved members, and
-// the inferred processes each as its own kind. The closing leg is the same
-// source under "1364-2005", the last specifier before this table, where none
-// of it elaborates.
 inline void ExpectSystemVerilog2005DeclarationsElaborate(const char* spec) {
   const std::string kSrc =
       "package pkg;\n"
@@ -350,10 +278,6 @@ inline void ExpectSystemVerilog2005DeclarationsElaborate(const char* spec) {
   ExpectSystemVerilog2005SourceRejectedUnderVerilog2005(kSrc);
 }
 
-// The two let declarations a source states the `let` and `untyped` words
-// with: one at compilation-unit scope named `gain`, and one inside module `m`
-// named `sum` whose first formal is left without a data type while its typed
-// neighbour keeps one, so the two words are observed together.
 inline void ExpectLetDeclarationsElaborated(RtlirDesign* design) {
   bool cu_let_seen = false;
   for (auto* item : design->cu_let_decls) {

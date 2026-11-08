@@ -1,20 +1,3 @@
-// Tests for IEEE 1800-2023 clause 7.12.5 -- the array map() method. map()
-// returns an unpacked array with the same range (or, for an associative array,
-// the same set of index values) as the source, with each element replaced by
-// the value of the required with expression. Three rules are enumerated here:
-//   (1) each element is replaced by the with value, and that with clause is
-//       required (a bare map() is illegal);
-//   (2) each returned element takes the self-determined type of the with
-//       expression (dependency 11.6.1 supplies that type);
-//   (3) the returned range / set of index values and index type match the
-//       source.
-// map()'s result depends on how the source array is produced -- its element
-// type, its array kind (fixed 7.4, dynamic 7.5, queue 7.10, or associative
-// 7.8), and its index type -- so every test builds the source from a real
-// declaration + initializer and drives `dst = src.map() with (...)` through
-// parse -> elaborate -> lower -> run, observing the array/queue the method
-// produces rather than hand-building the iterator scope.
-
 #include <gtest/gtest.h>
 
 #include <cstddef>
@@ -30,10 +13,6 @@ using namespace delta;
 
 namespace {
 
-// Runs a full-pipeline design and reports whether the simulation raised a
-// diagnostic. Used for the with-clause-required rule, whose violation is
-// detected while the map method executes (not at elaboration), so the design
-// must actually run before the error appears.
 bool RunProducesError(const std::string& src) {
   SimFixture f;
   auto* design = ElaborateSrc(src, f);
@@ -45,9 +24,6 @@ bool RunProducesError(const std::string& src) {
   return f.diag.HasErrors();
 }
 
-// Runs a full-pipeline design and returns the width of element `idx` of queue
-// `qname` after the run, so the self-determined element type of a map result
-// can be observed directly rather than inferred from a value.
 uint32_t RunQueueElemWidth(const std::string& src, const char* qname,
                            size_t idx) {
   SimFixture f;
@@ -64,9 +40,6 @@ uint32_t RunQueueElemWidth(const std::string& src, const char* qname,
   return q->elements[idx].width;
 }
 
-// §7.12.5 rule (1) -- each element is replaced by the value of the with
-// expression. A dynamic-array source (7.5) mapped in place with an int literal
-// in the with clause: {1,2,3} + 1 => {2,3,4}, so the last element is 4.
 TEST(ArrayMap, ReplacesEachDynamicArrayElement) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -81,8 +54,6 @@ TEST(ArrayMap, ReplacesEachDynamicArrayElement) {
   EXPECT_EQ(v, 4u);
 }
 
-// §7.12.5 rule (3) -- the result keeps the source's range: one element per
-// source element, so a three-element source maps to a three-element result.
 TEST(ArrayMap, PreservesElementCount) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -98,9 +69,6 @@ TEST(ArrayMap, PreservesElementCount) {
   EXPECT_EQ(sz, 3u);
 }
 
-// §7.12.5 rules (1)+(3) -- a map result assigned to a queue target, using the
-// iterator index to read a matching element of a second array. With A already
-// {2,3,4} and B {2,3,5}: {2+2, 3+3, 4+5} => {4,6,9}, so the last element is 9.
 TEST(ArrayMap, ResultAssignedToQueueUsingIndex) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -117,9 +85,6 @@ TEST(ArrayMap, ResultAssignedToQueueUsingIndex) {
   EXPECT_EQ(v, 9u);
 }
 
-// §7.12.5 rule (1) -- map applies to any unpacked array, including a fixed-size
-// one (7.4). Each element is replaced by the with value: {3,6,9} * 2 keeps
-// three elements, so the middle result is 12.
 TEST(ArrayMap, OverFixedSizeArray) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -135,9 +100,6 @@ TEST(ArrayMap, OverFixedSizeArray) {
   EXPECT_EQ(v, 12u);
 }
 
-// §7.12.5 rule (1) -- a queue source (7.10) is a distinct unpacked-array kind
-// with its own element-collection path; map replaces each element the same
-// way. {5,15,25} + 1 => {6,16,26}, so the first element is 6.
 TEST(ArrayMap, OverQueueSource) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -153,12 +115,6 @@ TEST(ArrayMap, OverQueueSource) {
   EXPECT_EQ(v, 6u);
 }
 
-// §7.12.5 rule (2) -- each returned element takes the self-determined type of
-// the with expression (11.6.1), not the source element type. `item << 4` over a
-// byte source is self-determined 8 bits wide and, byte being signed (6.11),
-// signed (11.8.1), so 8'h7F << 4 truncates to 8'hF0, which is -16 and
-// sign-extends into the int element. A 32-bit result would give 2032, and an
-// unsigned 8-bit one 240.
 TEST(ArrayMap, ElementTakesWithExpressionSelfDeterminedType) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -174,12 +130,6 @@ TEST(ArrayMap, ElementTakesWithExpressionSelfDeterminedType) {
   EXPECT_EQ(v, 0xFFFFFFF0u);
 }
 
-// §7.12.5 rule (2) -- the self-determined type of the with expression can be
-// wider than the source element type, and the returned element keeps that wider
-// type rather than being clamped to the source width. `item * 256` over a byte
-// source is self-determined 32 bits wide (the 256 literal is an int) and signed
-// (11.8.1), so 8'hFF * 256 == -256 survives in full; clamping to 8 bits would
-// give 0, and an unsigned product 65280.
 TEST(ArrayMap, ElementTypeWiderThanSourceElement) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -195,9 +145,6 @@ TEST(ArrayMap, ElementTypeWiderThanSourceElement) {
   EXPECT_EQ(v, 0xFFFFFF00u);
 }
 
-// §7.12.5 rule (2) -- a comparison with expression is self-determined 1 bit
-// wide, so every mapped element is 1 bit even though the source elements are
-// 32-bit ints. Observed directly on the result queue's element width.
 TEST(ArrayMap, ElementWidthIsWithExpressionWidth) {
   uint32_t w = RunQueueElemWidth(
       "module m;\n"
@@ -209,9 +156,6 @@ TEST(ArrayMap, ElementWidthIsWithExpressionWidth) {
   EXPECT_EQ(w, 1u);
 }
 
-// §7.12.5 rule (2) -- the boolean comparison values themselves are also
-// correct. With A {2,3,9} and B {2,3,5}: {2==2, 3==3, 9==5} => {1,1,0}, encoded
-// as 1*4 + 1*2 + 0 == 6.
 TEST(ArrayMap, BooleanComparisonElements) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -228,8 +172,6 @@ TEST(ArrayMap, BooleanComparisonElements) {
   EXPECT_EQ(v, 6u);
 }
 
-// §7.12.5 rule (3), edge case -- mapping an empty source yields an empty result
-// (and is not an error, since the with clause is present).
 TEST(ArrayMap, EmptyDynamicSourceYieldsEmptyResult) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -245,10 +187,6 @@ TEST(ArrayMap, EmptyDynamicSourceYieldsEmptyResult) {
   EXPECT_EQ(sz, 0u);
 }
 
-// §7.12.5 rules (1)+(3) for an associative source (7.8) -- map returns an array
-// with the same set of index values, each stored value replaced by the with
-// expression. The keys carry over unchanged; the value at key 20 (15) becomes
-// 15+1 == 16.
 TEST(ArrayMap, AssociativeSourcePreservesKeysReplacesValues) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -267,9 +205,6 @@ TEST(ArrayMap, AssociativeSourcePreservesKeysReplacesValues) {
   EXPECT_EQ(v, 16u);
 }
 
-// §7.12.5 rule (3) -- the returned associative array's index type matches the
-// source. A non-default shortint index carries through: the entry keyed 200
-// still exists after the map and its value 8 becomes 8*10 == 80.
 TEST(ArrayMap, AssociativeSourcePreservesNonIntIndexType) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -287,13 +222,6 @@ TEST(ArrayMap, AssociativeSourcePreservesNonIntIndexType) {
   EXPECT_EQ(v, 80u);
 }
 
-// §7.12.5 rule (2) for an associative source -- each mapped value also takes
-// the self-determined type of the with expression (11.6.1), produced by the
-// associative map path (distinct code from the indexed path). With a
-// byte-valued source, `x << 4` is self-determined 8 bits wide and signed
-// (11.8.1), so 8'h7F << 4 truncates to 8'hF0, which is -16 and sign-extends
-// into the int value. A 32-bit result would give 2032, and an unsigned 8-bit
-// one 240.
 TEST(ArrayMap, AssociativeElementTakesWithExpressionSelfDeterminedType) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -310,10 +238,6 @@ TEST(ArrayMap, AssociativeElementTakesWithExpressionSelfDeterminedType) {
   EXPECT_EQ(v, 0xFFFFFFF0u);
 }
 
-// §7.12.5 rules (1)+(3) for a string-keyed associative source -- the index type
-// of an associative array (7.8) may be a string, not just an integer type. map
-// preserves that string key set and replaces each stored value; the entry keyed
-// "hi" (9) becomes 9+1 == 10 and both keys survive.
 TEST(ArrayMap, StringKeyedAssociativeSourcePreservesKeys) {
   uint64_t v = RunAndGet(
       "module m;\n"
@@ -331,8 +255,6 @@ TEST(ArrayMap, StringKeyedAssociativeSourcePreservesKeys) {
   EXPECT_EQ(v, 12u);
 }
 
-// §7.12.5 rule (3), edge case for an associative source -- mapping an empty
-// associative array yields an empty result with no error.
 TEST(ArrayMap, EmptyAssociativeSourceYieldsEmptyResult) {
   uint64_t sz = RunAndGet(
       "module m;\n"
@@ -348,9 +270,6 @@ TEST(ArrayMap, EmptyAssociativeSourceYieldsEmptyResult) {
   EXPECT_EQ(sz, 0u);
 }
 
-// §7.12.5 rule (1) -- the with clause is required for map(): every element is
-// replaced by its value, so a bare map() over an indexed source is an error
-// rather than a silent no-op.
 TEST(ArrayMap, IndexedSourceRequiresWithClause) {
   EXPECT_TRUE(
       RunProducesError("module m;\n"
@@ -360,8 +279,6 @@ TEST(ArrayMap, IndexedSourceRequiresWithClause) {
                        "endmodule\n"));
 }
 
-// §7.12.5 rule (1) -- the with clause is likewise required for map() over an
-// associative source; a bare call is an error.
 TEST(ArrayMap, AssociativeSourceRequiresWithClause) {
   EXPECT_TRUE(
       RunProducesError("module m;\n"
@@ -374,10 +291,6 @@ TEST(ArrayMap, AssociativeSourceRequiresWithClause) {
                        "endmodule\n"));
 }
 
-// Elaborates, lowers and runs `src` into `f`, so the caller can read the
-// subclause off the report the map() call raised. The with-clause-required
-// rule is checked while the method executes rather than at elaboration, so the
-// design has to run before the report exists.
 void RunForDiags(const std::string& src, SimFixture& f) {
   auto* design = ElaborateSrc(src, f);
   ASSERT_NE(design, nullptr);
@@ -387,9 +300,6 @@ void RunForDiags(const std::string& src, SimFixture& f) {
   f.ctx.RunFinalBlocks();
 }
 
-// §7.12.5: map() replaces each element with the value of its required with
-// clause, so a bare map() over an indexed source is an error that names
-// §7.12.5.
 TEST(ArrayMap, IndexedSourceMissingWithNames7_12_5) {
   SimFixture f;
   RunForDiags(
@@ -404,8 +314,6 @@ TEST(ArrayMap, IndexedSourceMissingWithNames7_12_5) {
                             "7.12.5"));
 }
 
-// §7.12.5: an associative source reaches the same rule on its own path, and
-// the report it raises names the same subclause.
 TEST(ArrayMap, AssociativeSourceMissingWithNames7_12_5) {
   SimFixture f;
   RunForDiags(
@@ -423,9 +331,6 @@ TEST(ArrayMap, AssociativeSourceMissingWithNames7_12_5) {
                             "7.12.5"));
 }
 
-// §7.12.5 with §7.4.4: map() over a two-dimensional array visits each row,
-// the iterator bound to the row, so the with clause can reduce it and select
-// from it: 3 + 0 for row 0 and 12 + 3 for row 1.
 TEST(ArrayMap, MapOverTheRowsOfA2DArray) {
   SimFixture f;
   auto out = RunCapture(

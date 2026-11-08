@@ -14,7 +14,6 @@ bool HasItemKind(ParseResult& r, ModuleItemKind kind) {
   return false;
 }
 
-// §16.12.6: the two-branch form `if (expr) p1 else p2`.
 TEST(AssertionSemanticsParsing, PropertyIfElse) {
   auto r = Parse(
       "module m;\n"
@@ -27,8 +26,6 @@ TEST(AssertionSemanticsParsing, PropertyIfElse) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-// §16.12.6: the single-branch form `if (expr) p` with no else is equally a
-// valid if-else property and must be accepted on its own.
 TEST(AssertionSemanticsParsing, PropertyIfWithoutElse) {
   auto r = Parse(
       "module m;\n"
@@ -41,9 +38,6 @@ TEST(AssertionSemanticsParsing, PropertyIfWithoutElse) {
   EXPECT_TRUE(HasItemKind(r, ModuleItemKind::kPropertyDecl));
 }
 
-// §16.12.6 edge case: the else-branch property_expr of the two-branch form may
-// itself be another if-else, so an if/else-if/else chain is still one valid
-// if-else property declaration.
 TEST(AssertionSemanticsParsing, PropertyIfElseIfChain) {
   auto r = Parse(
       "module m;\n"

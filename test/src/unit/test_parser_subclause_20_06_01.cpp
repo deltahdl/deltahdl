@@ -37,9 +37,6 @@ TEST(SubroutineCallExprParsing, TypenameDataTypeForm) {
   EXPECT_EQ(stmt->rhs->callee, "$typename");
 }
 
-// Syntax 20-6 second form, data_type input built with a packed dimension: the
-// argument is a sized vector type rather than a bare keyword, and the whole
-// construct still parses as the $typename system call.
 TEST(SubroutineCallExprParsing, TypenameDataTypeFormPackedVector) {
   auto r = Parse(
       "module m;\n"

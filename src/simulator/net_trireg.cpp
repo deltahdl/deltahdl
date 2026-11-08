@@ -1,8 +1,3 @@
-// §28.15.2 and §28.16.2: the charge storage state of a trireg net, bit by bit,
-// and the charge decay of each bit that enters it, moved out of
-// src/simulator/net.cpp, which resolves a net from its sources, at its size
-// limit.
-
 #include "simulator/net_trireg.h"
 
 #include <algorithm>
@@ -21,13 +16,9 @@ namespace delta {
 
 namespace {
 
-// The states Net::charge_since gives a bit besides the tick it entered the
-// charge storage state at: a source drives it, or it holds the x the net starts
-// with, which no driver left there and which so stands against no source.
 constexpr uint64_t kBitDriven = UINT64_MAX;
 constexpr uint64_t kBitInitial = UINT64_MAX - 1;
 
-// The value of bit `bit` of `v`: 0, 1, 2 for x and 3 for z.
 uint8_t BitOf(const Logic4Vec& v, uint32_t bit) {
   uint64_t mask = uint64_t{1} << (bit % 64);
   const Logic4Word& word = v.words[bit / 64];
@@ -44,9 +35,6 @@ void CopyBit(Logic4Vec& dst, const Logic4Vec& src, uint32_t bit) {
   to.bval = (to.bval & ~mask) | (from.bval & mask);
 }
 
-// The strongest level any of `values` drives bit `bit` at, or `strongest`
-// where each leaves the bit z. `strengths` holds one entry for each of
-// `values`.
 Strength StrongestAt(const std::vector<Logic4Vec>& values,
                      const std::vector<DriverStrength>& strengths, uint32_t bit,
                      Strength strongest) {
@@ -62,8 +50,6 @@ Strength StrongestAt(const std::vector<Logic4Vec>& values,
   return strongest;
 }
 
-// The strongest level a source of the net drives bit `bit` at: one of its own
-// drivers, or a signal a switch carries to it (§28.8).
 Strength StrongestSourceAt(const Net& net,
                            const std::vector<DriverStrength>& own,
                            uint32_t bit) {
@@ -71,12 +57,6 @@ Strength StrongestSourceAt(const Net& net,
                      StrongestAt(net.drivers, own, bit, Strength::kHighz));
 }
 
-// §28.16.2.1: the charge decay time of the bits that entered the charge
-// storage state at tick `since` runs out: each of them still holding the
-// charge it took then moves from 1 or 0 to x, and the net resolves again with
-// that x as its charge, at its charge strength. A bit a source has driven
-// since, or one that entered the state again later, is another charge and is
-// left alone.
 void ScheduleChargeDecay(Net& net, uint64_t since, Arena& arena,
                          Scheduler* sched) {
   auto* event = sched->GetEventPool().Acquire();
@@ -90,9 +70,6 @@ void ScheduleChargeDecay(Net& net, uint64_t since, Arena& arena,
       value.words[b / 64].bval |= mask;
     }
     net.Resolve(arena, sched);
-    // The decay changed the value the net shows in place, which a net that
-    // resolves after a net delay (Net::delay) finds already standing and so
-    // announces to no one.
     net.resolved->NotifyWatchers();
   };
   auto time = sched->CurrentTime();
@@ -102,15 +79,6 @@ void ScheduleChargeDecay(Net& net, uint64_t since, Arena& arena,
 
 }  // namespace
 
-// §28.16.2: a bit enters the charge storage state when every source of it goes
-// to high impedance, keeping the value it was driven to, and §28.12 resolves
-// each bit of a net on its own, so a bit enters it while others are still
-// driven. §28.15.2 has the charge drive at the trireg's charge strength, so it
-// stands against a source weaker than that, and the bit leaves the state only
-// for a source at least as strong (§28.16.2.1: a driver turning on ends the
-// decay when its value gets into the net). The decay of a bit is scheduled
-// once, as it enters the state, so neither a source that stays at z nor one the
-// charge outranks starts it again or ends it.
 std::optional<Logic4Vec> SettleTriregCharge(Net& net, Arena& arena,
                                             Scheduler* sched) {
   uint32_t width = net.resolved->value.width;

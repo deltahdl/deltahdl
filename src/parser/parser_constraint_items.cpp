@@ -17,8 +17,6 @@ namespace delta {
 
 namespace {
 
-// A.1.10: a constraint_primary short of its optional `()`: a name, reached
-// through '.' or '::' from another, with its selects.
 bool IsPrimaryName(const Expr* e) {
   if (e == nullptr) return false;
   switch (e->kind) {
@@ -33,11 +31,6 @@ bool IsPrimaryName(const Expr* e) {
 
 }  // namespace
 
-// A.10 footnote 48 confines the `local::` qualifier to an inline constraint
-// block, and a class's own constraint block is none: reports each `local` in
-// the block whose items the lexer stands at, through its closing '}', and
-// leaves the lexer where it found it. The block's expressions are read with
-// their reports suppressed, so the qualifier is found among the tokens.
 void ParserConstraintItemHelpers::ReportLocalQualifiers(Parser& p) {
   auto saved = p.lexer_.SavePos();
   for (int depth = 1; depth > 0 && !p.AtEnd(); p.Consume()) {
@@ -50,9 +43,6 @@ void ParserConstraintItemHelpers::ReportLocalQualifiers(Parser& p) {
   p.lexer_.RestorePos(saved);
 }
 
-// A block whose items do not parse, or parse only through a suppressed
-// report, is no constraint_block A.1.10 writes, and is reported where the
-// parse broke off.
 void ParserConstraintItemHelpers::Capture(Parser& p, ClassMember* member) {
   if (member == nullptr) return;
   auto saved = p.lexer_.SavePos();
@@ -74,8 +64,6 @@ void ParserConstraintItemHelpers::Capture(Parser& p, ClassMember* member) {
   member->constraint_items_parsed = true;
 }
 
-// The items of a block, or with `in_set` of a braced constraint_set, through
-// its '}'.
 bool ParserConstraintItemHelpers::ParseItemsToBrace(
     Parser& p, std::vector<ConstraintItem*>& out, bool in_set) {
   while (!p.Match(TokenKind::kRBrace)) {
@@ -87,8 +75,6 @@ bool ParserConstraintItemHelpers::ParseItemsToBrace(
   return true;
 }
 
-// A.1.10: one constraint_block_item, told apart by the keyword it opens with;
-// null where it does not parse.
 ConstraintItem* ParserConstraintItemHelpers::ParseExpressionItem(Parser& p) {
   auto* item = p.arena_.Create<ConstraintItem>();
   bool parsed = false;
@@ -101,7 +87,6 @@ ConstraintItem* ParserConstraintItemHelpers::ParseExpressionItem(Parser& p) {
   } else if (p.Match(TokenKind::kKwSolve)) {
     parsed = ParseSolveBefore(p, *item);
   } else if (p.Match(TokenKind::kKwDisable)) {
-    // §18.5.13.2: disable soft constraint_primary ;
     item->kind = ConstraintItemKind::kDisableSoft;
     item->expr = p.Match(TokenKind::kKwSoft) ? ParsePrimary(p) : nullptr;
     parsed = item->expr != nullptr && p.Match(TokenKind::kSemicolon);
@@ -112,15 +97,11 @@ ConstraintItem* ParserConstraintItemHelpers::ParseExpressionItem(Parser& p) {
   return parsed ? item : nullptr;
 }
 
-// A.1.10: one constraint_expression of a constraint_set, which, unlike an
-// item of the block, is never a solve-before; null where it does not parse.
 ConstraintItem* ParserConstraintItemHelpers::ParseSetItem(Parser& p) {
   if (p.Check(TokenKind::kKwSolve)) return nullptr;
   return ParseExpressionItem(p);
 }
 
-// A.1.10: a constraint_set, a braced list of constraint expressions or one
-// constraint expression alone.
 bool ParserConstraintItemHelpers::ParseSet(Parser& p,
                                            std::vector<ConstraintItem*>& out) {
   if (p.Match(TokenKind::kLBrace)) return ParseItemsToBrace(p, out, true);
@@ -130,8 +111,6 @@ bool ParserConstraintItemHelpers::ParseSet(Parser& p,
   return true;
 }
 
-// §18.5.6: if ( expression ) constraint_set [ else constraint_set ], an else
-// binding to the closest if before it.
 bool ParserConstraintItemHelpers::ParseIfElse(Parser& p, ConstraintItem& item) {
   item.kind = ConstraintItemKind::kIfElse;
   if (!p.Match(TokenKind::kLParen)) return false;
@@ -142,9 +121,6 @@ bool ParserConstraintItemHelpers::ParseIfElse(Parser& p, ConstraintItem& item) {
   return !item.has_else || ParseSet(p, item.else_body);
 }
 
-// §18.5.7.1: foreach ( array [ loop_variables ] ) constraint_set, a loop
-// variable left out keeping its place as an empty name, and the array opening
-// with a name or with this or super, A.6.8's implicit_class_handle.
 bool ParserConstraintItemHelpers::ParseForeach(Parser& p,
                                                ConstraintItem& item) {
   item.kind = ConstraintItemKind::kForeach;
@@ -165,7 +141,6 @@ bool ParserConstraintItemHelpers::ParseForeach(Parser& p,
   return ParseSet(p, item.body);
 }
 
-// §18.5.4: unique { range_list } ;
 bool ParserConstraintItemHelpers::ParseUnique(Parser& p, ConstraintItem& item) {
   item.kind = ConstraintItemKind::kUnique;
   if (!p.Match(TokenKind::kLBrace)) return false;
@@ -177,7 +152,6 @@ bool ParserConstraintItemHelpers::ParseUnique(Parser& p, ConstraintItem& item) {
   return p.Match(TokenKind::kRBrace) && p.Match(TokenKind::kSemicolon);
 }
 
-// §18.5.9: solve solve_before_list before solve_before_list ;
 bool ParserConstraintItemHelpers::ParseSolveBefore(Parser& p,
                                                    ConstraintItem& item) {
   item.kind = ConstraintItemKind::kSolveBefore;
@@ -185,10 +159,6 @@ bool ParserConstraintItemHelpers::ParseSolveBefore(Parser& p,
          ParsePrimaryList(p, item.after) && p.Match(TokenKind::kSemicolon);
 }
 
-// §18.5.5 and §18.5.3: an expression followed by `->` and the constraint_set
-// it implies, or an expression_or_dist through its ';'. The antecedent is read
-// at a binding power just above the implication's own, so it stops at the
-// `->`; written `soft`, the item is an expression_or_dist alone.
 bool ParserConstraintItemHelpers::ParseExpressionOrDist(Parser& p,
                                                         ConstraintItem& item) {
   if (!item.soft) {
@@ -208,7 +178,6 @@ bool ParserConstraintItemHelpers::ParseExpressionOrDist(Parser& p,
   return p.Match(TokenKind::kSemicolon);
 }
 
-// §18.5.3: the braced dist_list after `dist`.
 bool ParserConstraintItemHelpers::ParseDistList(Parser& p,
                                                 ConstraintItem& item) {
   item.has_dist = true;
@@ -221,9 +190,6 @@ bool ParserConstraintItemHelpers::ParseDistList(Parser& p,
   return p.Match(TokenKind::kRBrace);
 }
 
-// A.1.10: a constraint_primary, read as an expression and kept only in its
-// shape, a name ending in at most an empty `()`; null otherwise, with the
-// lexer back where the primary began.
 Expr* ParserConstraintItemHelpers::ParsePrimary(Parser& p) {
   auto saved = p.lexer_.SavePos();
   Expr* e = p.ParseExpr();
@@ -237,7 +203,6 @@ Expr* ParserConstraintItemHelpers::ParsePrimary(Parser& p) {
   return nullptr;
 }
 
-// A.1.10: a solve_before_list, constraint_primary { , constraint_primary }.
 bool ParserConstraintItemHelpers::ParsePrimaryList(Parser& p,
                                                    std::vector<Expr*>& out) {
   do {

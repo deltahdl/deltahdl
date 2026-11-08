@@ -606,8 +606,6 @@ TEST(ConditionalCompilation, IfdefUndefinedExcludesBlock) {
   EXPECT_EQ(FindGateByKind(r.cu->modules[0]->items, GateKind::kAnd), nullptr);
 }
 
-// A directive inside a multi-line block comment within a skipped block_of_text
-// is hidden and must not terminate the surrounding conditional construct.
 TEST(Preprocessor, BlockCommentInSkippedBlockHidesEndif) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -624,8 +622,6 @@ TEST(Preprocessor, BlockCommentInSkippedBlockHidesEndif) {
   EXPECT_NE(result.find("tail_text"), std::string::npos);
 }
 
-// The same hiding rule applies to a comment inside an active block_of_text: the
-// commented `endif must not close the construct early.
 TEST(Preprocessor, BlockCommentInActiveBlockHidesEndif) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -646,8 +642,6 @@ TEST(Preprocessor, BlockCommentInActiveBlockHidesEndif) {
   EXPECT_NE(result.find("after_text"), std::string::npos);
 }
 
-// Compiler directive names are not considered defined by `elsif (companion to
-// the `ifdef case), so a `elsif naming a directive never selects its branch.
 TEST(Preprocessor, ElsifDirectiveNameNotDefined) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -661,9 +655,6 @@ TEST(Preprocessor, ElsifDirectiveNameNotDefined) {
   EXPECT_EQ(result.find("should_not_appear"), std::string::npos);
 }
 
-// A directive token appearing inside a text macro definition body is hidden and
-// must not terminate the surrounding conditional construct. Here the `endif in
-// the macro body must not close the `ifdef, so the `else branch stays skipped.
 TEST(Preprocessor, DirectiveInMacroBodyHidesEndif) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -681,9 +672,6 @@ TEST(Preprocessor, DirectiveInMacroBodyHidesEndif) {
   EXPECT_EQ(result.find("in_else"), std::string::npos);
 }
 
-// A directive token appearing inside a string literal is hidden and must not be
-// acted upon: the `else inside the string does not flip the active branch, so
-// the text that follows in the taken branch is still emitted.
 TEST(Preprocessor, DirectiveInStringLiteralHidesElse) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -699,9 +687,6 @@ TEST(Preprocessor, DirectiveInStringLiteralHidesElse) {
   EXPECT_NE(result.find("`else"), std::string::npos);
 }
 
-// White space is not significant around the directives beyond separating
-// tokens: leading indentation and extra spaces between a directive and its
-// identifier are accepted and do not affect block selection or termination.
 TEST(Preprocessor, IndentedAndSpacedDirectives) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -718,9 +703,6 @@ TEST(Preprocessor, IndentedAndSpacedDirectives) {
   EXPECT_EQ(result.find("indented_else"), std::string::npos);
 }
 
-// The hiding rule covers single-line comments too: a directive token after //
-// is part of the comment, so a commented `else does not split the block and the
-// text that follows stays in the (taken) then-branch.
 TEST(Preprocessor, DirectiveInLineCommentHidesElse) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -737,9 +719,6 @@ TEST(Preprocessor, DirectiveInLineCommentHidesElse) {
   EXPECT_NE(result.find("still_then"), std::string::npos);
 }
 
-// In a skipped block a `endif hidden behind // must not terminate the
-// construct, so the surrounding conditional runs to its real `endif and the
-// text in between remains excluded while text after the real `endif is emitted.
 TEST(Preprocessor, LineCommentEndifInSkippedBlockDoesNotTerminate) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -756,8 +735,6 @@ TEST(Preprocessor, LineCommentEndifInSkippedBlockDoesNotTerminate) {
   EXPECT_NE(result.find("tail_text"), std::string::npos);
 }
 
-// An inline `ifdef ... `endif sequence that appears inside a string literal is
-// hidden: it must be emitted verbatim, not evaluated as a conditional.
 TEST(Preprocessor, InlineConditionalInsideStringIsHidden) {
   PreprocFixture f;
   PreprocConfig cfg;
@@ -771,13 +748,6 @@ TEST(Preprocessor, InlineConditionalInsideStringIsHidden) {
   EXPECT_NE(result.find("`ifdef NOPE 1 `endif kept"), std::string::npos);
 }
 
-// §22.6: when an ifdef_macro_expression is evaluated, every identifier is
-// replaced by 1 if it names a currently defined text macro and 0 otherwise --
-// the macro's TEXT VALUE is irrelevant. A macro defined (from real `define
-// source, per 22.5) to the literal 0 is still "defined", so under `!` the
-// operand resolves to 1 and the negation is 0, skipping the block. This
-// exercises the definedness rule through the expression evaluator, not the
-// bare-identifier path. (LRM Example 4: `ifdef (!example_def0).)
 TEST(Preprocessor, ExprNegationOfMacroDefinedToZeroSkipsBlock) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -790,11 +760,6 @@ TEST(Preprocessor, ExprNegationOfMacroDefinedToZeroSkipsBlock) {
   EXPECT_EQ(result.find("negated_zero_macro"), std::string::npos);
 }
 
-// Companion to the above through the `&&` path: two macros defined from real
-// source -- one to the literal 0, one to an empty body -- are both "defined",
-// so `(example_def0 && example_def1)` resolves to 1 and the block is taken.
-// The 0-valued and empty bodies must not make either operand false.
-// (LRM Example 4: `ifdef (example_def0 && example_def1).)
 TEST(Preprocessor, ExprAndOfDefinedZeroAndDefinedEmptyIsTaken) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -808,13 +773,6 @@ TEST(Preprocessor, ExprAndOfDefinedZeroAndDefinedEmptyIsTaken) {
   EXPECT_NE(result.find("both_terms_defined"), std::string::npos);
 }
 
-// The full ifdef/elsif/else chain from LRM Example 4, driven from real `define
-// source: the `ifdef expression is false because example_def2 is never defined;
-// the `elsif expression `(!example_def0 || !example_def1)` is false because
-// BOTH operands are defined (their 0/empty values are irrelevant), so neither
-// negation holds; therefore the `else block is selected. This observes claim
-// 8's elsif/else fall-through together with claim 6's definedness rule under
-// `||`.
 TEST(Preprocessor, ExprElsifElseChainSelectsElseWhenAllFalse) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -834,10 +792,6 @@ TEST(Preprocessor, ExprElsifElseChainSelectsElseWhenAllFalse) {
   EXPECT_NE(result.find("else_branch"), std::string::npos);
 }
 
-// Negative (condition-false) form of the `||` binary_logical_operator: with
-// neither operand defined, `(A || B)` resolves to 0 and the block is excluded.
-// The other three operators already have their false cases (And/Impl/Equiv);
-// this completes the operator truth-table coverage for `||`.
 TEST(Preprocessor, IfdefExprOrFalse) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -849,10 +803,6 @@ TEST(Preprocessor, IfdefExprOrFalse) {
   EXPECT_EQ(result.find("either_defined"), std::string::npos);
 }
 
-// §22.6 resolves an identifier by whether it is a CURRENTLY defined text macro.
-// Building the input from real 22.5 source -- a `define followed by a `undef of
-// the same name -- leaves the macro not currently defined, so `ifdef takes the
-// `else branch. This exercises §22.6 consuming a `undef (dependency 22.5).
 TEST(Preprocessor, DefineThenUndefMakesIfdefSelectElse) {
   PreprocFixture f;
   auto result = Preprocess(
@@ -869,10 +819,6 @@ TEST(Preprocessor, DefineThenUndefMakesIfdefSelectElse) {
   EXPECT_NE(result.find("now_undefined"), std::string::npos);
 }
 
-// A function-like text macro (a distinct 22.5 definition form) is still a
-// defined text macro for the purposes of §22.6: naming it in an `ifdef with no
-// argument list succeeds on definedness alone. Input is built from real
-// `define M(args) source and driven through the preprocessor.
 TEST(Preprocessor, IfdefSeesFunctionLikeMacroAsDefined) {
   PreprocFixture f;
   auto result = Preprocess(

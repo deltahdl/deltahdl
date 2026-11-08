@@ -90,10 +90,6 @@ TEST(FineGrainProcessControlParsing, ProcessPassedToTask) {
               "endmodule\n"));
 }
 
-// §9.7: besides being passed through tasks, a process handle can be
-// incorporated into other objects -- i.e. declared as a property of a class.
-// Such a class, including a method that stores a process handle into the
-// member, parses cleanly.
 TEST(FineGrainProcessControlParsing, ProcessHandleAsClassMember) {
   EXPECT_TRUE(
       ParseOk("class Wrapper;\n"

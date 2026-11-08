@@ -156,9 +156,6 @@ TEST(IpcSync, WaitOrderEmptyEventsCompletes) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §15.5.4: preceding events are not limited to occur only once. Once an event
-// has occurred in the prescribed order, it can be triggered again without
-// causing the construct to fail.
 TEST(IpcSync, WaitOrderPrecedingEventMayRetrigger) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -171,7 +168,7 @@ TEST(IpcSync, WaitOrderPrecedingEventMayRetrigger) {
       "  end\n"
       "  initial begin\n"
       "    #1 -> a;\n"
-      "    #1 -> a;\n"  // a re-triggers after already passing in order
+      "    #1 -> a;\n"
       "    #1 -> b;\n"
       "    #1 -> c;\n"
       "    #1 $finish;\n"
@@ -182,10 +179,6 @@ TEST(IpcSync, WaitOrderPrecedingEventMayRetrigger) {
   EXPECT_EQ(var->value.ToUint64(), 1u);
 }
 
-// §15.5.4: only the first event in the list can wait for the persistent
-// triggered state. A non-first event that is already triggered in the current
-// time step must still be triggered afresh, so this sequence never completes
-// and neither the action nor the fail statement runs.
 TEST(IpcSync, WaitOrderOnlyFirstEventUsesPersistentTrigger) {
   LowerFixture f;
   auto* var = RunAndFindVar(
@@ -194,8 +187,8 @@ TEST(IpcSync, WaitOrderOnlyFirstEventUsesPersistentTrigger) {
       "  logic [7:0] result;\n"
       "  initial begin\n"
       "    result = 8'd5;\n"
-      "    -> a;\n"  // first event: persistent triggered state satisfies it
-      "    -> b;\n"  // second event: persistent state must NOT satisfy it
+      "    -> a;\n"
+      "    -> b;\n"
       "    wait_order(a, b) result = 8'd1;\n"
       "    else result = 8'd2;\n"
       "  end\n"
@@ -208,8 +201,6 @@ TEST(IpcSync, WaitOrderOnlyFirstEventUsesPersistentTrigger) {
   EXPECT_EQ(var->value.ToUint64(), 5u);
 }
 
-// §15.5.4: when the else (fail) clause is omitted, a failed sequence generates
-// a default run-time error by calling $error (see §20.10).
 TEST(IpcSync, WaitOrderDefaultFailureCallsError) {
   LowerFixture f;
   auto* design = ElaborateSrc(
@@ -255,11 +246,6 @@ TEST(IpcSync, WaitOrderElseOnlyBranch) {
   EXPECT_EQ(var->value.ToUint64(), 77u);
 }
 
-// §15.5.4 with §6.17: wait_order takes a class's event properties, `s.a` and
-// `s.b` through a handle, as it takes declared events: triggered in order at
-// 1 and 2 it succeeds at 2, and triggered out of order it takes the else
-// branch, read as 1, 2 and 0 in 120. Found by name alone, the properties were
-// watched by nothing and neither wait_order ever completed.
 TEST(WaitOrderSim, ClassEventPropertiesAreWaitedOnInOrder) {
   SimFixture f;
   auto* var = RunAndFindVar(
@@ -286,12 +272,6 @@ TEST(WaitOrderSim, ClassEventPropertiesAreWaitedOnInOrder) {
   EXPECT_EQ(var->value.ToUint64(), 120u);
 }
 
-// §15.5.4 with §4.5: the statements after a wait_order run as the process that
-// waited, so the unique-if violation they raise is queued on the waiter, and
-// its resumption from @(b) discards it (§12.4.2.1). The trigger of a wakes the
-// waiter in the active region, before the triggering process's #0 lets it
-// trigger b; resumed without its own process current, the waiter queued the
-// report elsewhere, where its @(b) never discarded it.
 TEST(WaitOrderSim, StatementsAfterTheWaitRunAsTheWaiter) {
   SimFixture f;
   auto* var = RunAndFindVar(

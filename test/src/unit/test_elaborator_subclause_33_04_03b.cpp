@@ -9,9 +9,6 @@
 
 namespace {
 
-// §33.4.3 bars a generate scope from a hierarchical reference in a config
-// override, and §27.6 makes an unnamed generate block one, named genblk<n>, so
-// a reference through `genblk1` is reported as one through a named block is.
 TEST(ConfigParamOverride, HierRefThroughUnnamedGenerateBlockRejected) {
   ElabFixture f;
   ElaborateSrc(
@@ -34,7 +31,6 @@ TEST(ConfigParamOverride, HierRefThroughUnnamedGenerateBlockRejected) {
                             10, "33.4.3"));
 }
 
-// The parameter named `name` of `m`, or null.
 const RtlirParamDecl* ParamNamed(const RtlirModule* m, std::string_view name) {
   for (const auto& p : m->params) {
     if (p.name == name) return &p;
@@ -42,8 +38,6 @@ const RtlirParamDecl* ParamNamed(const RtlirModule* m, std::string_view name) {
   return nullptr;
 }
 
-// §33.4.3: a config may give a real parameter a real value, which reaches the
-// instance as an instantiation's real assignment would.
 TEST(ConfigParamApply, RealOverrideReachesTheInstance) {
   ElabFixture f;
   auto* u =
@@ -61,8 +55,6 @@ TEST(ConfigParamApply, RealOverrideReachesTheInstance) {
   EXPECT_DOUBLE_EQ(r->resolved_real, 2.5);
 }
 
-// §33.4.3: an override naming nothing that holds a constant cannot be applied,
-// and is reported rather than leaving the parameter at its default unsaid.
 TEST(ConfigParamApply, OverrideNamingNoConstantReported) {
   ElabFixture f;
   ConfigElab(f,
@@ -78,9 +70,6 @@ TEST(ConfigParamApply, OverrideNamingNoConstantReported) {
                             5, "33.4.3"));
 }
 
-// §33.4.3: names in an override resolve upward from the instance's parent as a
-// bind statement's do, so top.WIDTH reaches past the parent a1 to top: b's W
-// is 7.
 TEST(ConfigParamApply, OverrideReadsAParameterAboveTheParent) {
   ElabFixture f;
   auto* design =
@@ -100,9 +89,6 @@ TEST(ConfigParamApply, OverrideReadsAParameterAboveTheParent) {
   EXPECT_EQ(ResolvedParam(b, "W"), 7);
 }
 
-// §33.4.3 with §3.12.1: the top-level module's enclosing scope is its
-// compilation unit, so an override of the top reads a parameter declared
-// there.
 TEST(ConfigParamApply, TopOverrideReadsACompilationUnitParameter) {
   ElabFixture f;
   auto* design = ConfigElab(f,
@@ -117,9 +103,6 @@ TEST(ConfigParamApply, TopOverrideReadsACompilationUnitParameter) {
   EXPECT_EQ(ResolvedParam(design->top_modules[0], "WIDTH"), 5);
 }
 
-// §33.4.3: a bare name a config localparam declares is that localparam, so a
-// defparam changing a parameter of the instance's parent, which refolds the
-// child's overrides, leaves W at the localparam's 24.
 TEST(ConfigParamApply, DefparamRefoldKeepsTheConfigLocalparam) {
   ElabFixture f;
   auto* design =

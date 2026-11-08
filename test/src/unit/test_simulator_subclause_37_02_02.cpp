@@ -14,14 +14,6 @@
 namespace delta {
 namespace {
 
-// §37.2.2 Handle release. vpi_release_handle() causes a tool to release a
-// handle; the underlying object is left in place, so a handle another VPI
-// program has not released keeps referring to that object. Certain simulation
-// events also release handles automatically: a restart releases all handles
-// except the restart-callback handles; freeing a frame/thread's objects
-// releases handles to those objects and their subelements; reclaiming a class
-// object's memory releases handles to the object and its automatic data
-// members. These tests observe the simulator applying those rules.
 class VpiHandleReleaseSim : public ::testing::Test {
  protected:
   void SetUp() override { SetGlobalVpiContext(&vpi_ctx_); }
@@ -35,8 +27,6 @@ class VpiHandleReleaseSim : public ::testing::Test {
   VpiContext vpi_ctx_;
 };
 
-// §37.2.2: vpi_release_handle() releases a handle - afterward the handle is no
-// longer a live handle to its object.
 TEST_F(VpiHandleReleaseSim, ReleasingHandleMarksItReleased) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
 
@@ -45,27 +35,18 @@ TEST_F(VpiHandleReleaseSim, ReleasingHandleMarksItReleased) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
 }
 
-// §37.2.2: if a tool shares resources, one VPI program releasing a handle shall
-// leave other programs able to refer to objects through handles they have not
-// released. Releasing one handle to an object therefore leaves a distinct
-// handle to the same object live and still referring to that object.
 TEST_F(VpiHandleReleaseSim, ReleasingOneHandleLeavesDistinctHandleUsable) {
   auto* mod = vpi_ctx_.CreateModule("top", "top");
-  auto* other = vpi_ctx_.CreateHandleFor(mod);  // a second, distinct handle
+  auto* other = vpi_ctx_.CreateHandleFor(mod);
   ASSERT_NE(other, mod);
 
   vpi_ctx_.ReleaseHandle(mod);
 
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(other));
-  // The distinct handle still refers to the same object.
   EXPECT_EQ(vpi_compare_objects(VpiHandleOf(other), VpiHandleOf(mod)), 1);
 }
 
-// §37.2.2 with §37.2.1: a tool that hands two requests for one object the same
-// handle shares it, and that sharing shall not alter what either program sees:
-// releasing the handle one request got leaves the other's live, and a handle
-// asked for again after every earlier one was released is live too.
 TEST_F(VpiHandleReleaseSim, ReleasingOneHandedOutHandleLeavesTheOtherLive) {
   vpi_ctx_.CreateModule("top", "top");
   PLI_BYTE8 name[] = "top";
@@ -83,10 +64,8 @@ TEST_F(VpiHandleReleaseSim, ReleasingOneHandedOutHandleLeavesTheOtherLive) {
   EXPECT_EQ(vpi_release_handle(again), 1);
 }
 
-// §37.2.2: a null handle names nothing to release, and releasing a handle more
-// than once is harmless (it stays released).
 TEST_F(VpiHandleReleaseSim, ReleasingNullIsHarmlessAndReleaseIsIdempotent) {
-  vpi_ctx_.ReleaseHandle(nullptr);  // must not crash
+  vpi_ctx_.ReleaseHandle(nullptr);
   EXPECT_FALSE(vpi_ctx_.HandleReleased(nullptr));
 
   auto* mod = vpi_ctx_.CreateModule("top", "top");
@@ -95,11 +74,6 @@ TEST_F(VpiHandleReleaseSim, ReleasingNullIsHarmlessAndReleaseIsIdempotent) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
 }
 
-// §37.2.2 (restart, list item 1): a simulation restart shall release all
-// handles except the handles to cbStartOfRestart and cbEndOfRestart callbacks.
-// Driving the real restart path (DispatchRestart) shows the two
-// restart-callback handles surviving while an ordinary callback handle and an
-// ordinary object handle are released.
 TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
   s_cb_data start{};
   start.reason = cbStartOfRestart;
@@ -112,7 +86,7 @@ TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
   VpiObject watched;
   watched.type = vpiReg;
   s_cb_data ordinary{};
-  ordinary.reason = cbValueChange;  // not a restart reason
+  ordinary.reason = cbValueChange;
   ordinary.obj = VpiHandleOf(&watched);
   auto* ordinary_cb = vpi_ctx_.RegisterCb(&ordinary);
 
@@ -120,17 +94,12 @@ TEST_F(VpiHandleReleaseSim, RestartReleasesAllButRestartCallbackHandles) {
 
   vpi_ctx_.DispatchRestart();
 
-  // The restart-callback handles survive.
   EXPECT_FALSE(vpi_ctx_.HandleReleased(start_cb));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(end_cb));
-  // Every other handle is released.
   EXPECT_TRUE(vpi_ctx_.HandleReleased(ordinary_cb));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(mod));
 }
 
-// §37.2.2 (frame/thread free, list item 2): when the simulator frees objects
-// belonging to a frame or thread, it shall release all handles to those objects
-// and to any subelement of them, and the handles to callbacks placed on them.
 TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
   auto* frame_obj = vpi_ctx_.CreateModule("f", "f");
   auto* subelement = vpi_ctx_.CreateModule("f.s", "f.s");
@@ -138,7 +107,7 @@ TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
 
   s_cb_data cb_data{};
   cb_data.reason = cbValueChange;
-  cb_data.obj = VpiHandleOf(subelement);  // a callback placed on the subelement
+  cb_data.obj = VpiHandleOf(subelement);
   auto* cb = vpi_ctx_.RegisterCb(&cb_data);
 
   vpi_ctx_.ReleaseFrameOrThreadObject(frame_obj);
@@ -148,9 +117,6 @@ TEST_F(VpiHandleReleaseSim, FreeingFrameObjectReleasesSubelementsAndCallbacks) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(cb));
 }
 
-// §37.2.2 (frame/thread free) with §37.44: a thread a fork spawned is a thread
-// of its own, so the end of the thread that spawned it leaves its handle live
-// while it runs on.
 TEST_F(VpiHandleReleaseSim, EndingAThreadLeavesTheThreadsItSpawnedLive) {
   auto* parent = vpi_ctx_.CreateModule("p", "p");
   auto* child = vpi_ctx_.CreateModule("c", "c");
@@ -164,12 +130,6 @@ TEST_F(VpiHandleReleaseSim, EndingAThreadLeavesTheThreadsItSpawnedLive) {
   EXPECT_FALSE(vpi_ctx_.HandleReleased(child));
 }
 
-// §37.2.2 (class reclaim, list item 3): reclaiming a class object's memory
-// shall release the handle to the class object, to any automatic data member,
-// and to any subelement of those automatic members, plus callbacks placed on
-// them. Static data members persist (NOTE 3) and their handles are not
-// released, and nor is a method the object reaches, which is its class defn's
-// (§37.33 detail 6) and no data member.
 TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   auto* class_obj = vpi_ctx_.CreateModule("obj", "obj");
 
@@ -190,7 +150,7 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   class_obj->children.push_back(method);
 
   s_cb_data cb_data{};
-  cb_data.reason = cbStmt;  // a callback placed on the automatic member
+  cb_data.reason = cbStmt;
   cb_data.obj = VpiHandleOf(automatic_member);
   auto* cb = vpi_ctx_.RegisterCb(&cb_data);
 
@@ -200,14 +160,10 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectReleasesAutomaticNotStatic) {
   EXPECT_TRUE(vpi_ctx_.HandleReleased(automatic_member));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(automatic_subelement));
   EXPECT_TRUE(vpi_ctx_.HandleReleased(cb));
-  // A static data member is not reclaimed with the class object.
   EXPECT_FALSE(vpi_ctx_.HandleReleased(static_member));
   EXPECT_FALSE(vpi_ctx_.HandleReleased(method));
 }
 
-// ...and an automatic class var's class typespec is a subelement released with
-// it, but the class defn the typespec reaches is the class's (§37.33 detail 5,
-// §37.31) and stays live.
 TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectKeepsAClassVarsClassDefn) {
   auto* class_obj = vpi_ctx_.CreateModule("obj", "obj");
   auto* class_var = vpi_ctx_.CreateModule("obj.b", "obj.b");
@@ -228,11 +184,6 @@ TEST_F(VpiHandleReleaseSim, ReclaimingClassObjectKeepsAClassVarsClassDefn) {
   EXPECT_FALSE(vpi_ctx_.HandleReleased(defn));
 }
 
-// §37.2.2 (list item a): some VPI calls release a handle as part of what they
-// do, and vpi_remove_callback() is one, releasing the handle of the callback it
-// removes. Removing a callback stopped it from being delivered and left its
-// handle live, so a program that had removed a callback still held a handle
-// every routine accepted.
 TEST_F(VpiHandleReleaseSim, RemovingACallbackReleasesItsHandle) {
   s_cb_data data = {};
   data.reason = cbEndOfSimulation;
@@ -244,15 +195,9 @@ TEST_F(VpiHandleReleaseSim, RemovingACallbackReleasesItsHandle) {
   EXPECT_EQ(vpi_remove_cb(cb), 1);
   EXPECT_TRUE(VpiObjectOf(cb)->released);
 
-  // §38.39: the handle is no longer valid, so a second removal through it
-  // fails rather than reporting success again.
   EXPECT_EQ(vpi_remove_cb(cb), 0);
 }
 
-// §37.2.2 (list item a): the release is of the handle the call was given. A
-// callback the program did not remove keeps its own handle, which is what the
-// clause asks of a release: any other VPI program can still reach objects
-// through the handles it has not released itself.
 TEST_F(VpiHandleReleaseSim, RemovingOneCallbackLeavesAnotherHandleLive) {
   s_cb_data first = {};
   first.reason = cbEndOfSimulation;

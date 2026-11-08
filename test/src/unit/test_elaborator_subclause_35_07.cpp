@@ -8,9 +8,6 @@ using namespace delta;
 
 namespace {
 
-// §35.7: an export declaration's c_identifier is optional; when omitted it
-// defaults to the SystemVerilog function_identifier. The elaborator therefore
-// accepts an export declaration with no explicit c_identifier.
 TEST(DpiExportElab, OmittedCIdentifierDefaultsToFunctionIdentifier) {
   ElabFixture f;
   Elaborate(R"(
@@ -23,10 +20,6 @@ TEST(DpiExportElab, OmittedCIdentifierDefaultsToFunctionIdentifier) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.7: an export declaration whose explicit c_identifier matches the
-// implicit (function-name) c_identifier of another export in the same scope
-// collides. The rule covers explicit and implicit forms uniformly, so the
-// elaborator rejects this mixed-form clash just like the two-explicit case.
 TEST(DpiExportElab, ExplicitCIdentifierClashesWithImplicitInSameScopeIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -38,17 +31,12 @@ TEST(DpiExportElab, ExplicitCIdentifierClashesWithImplicitInSameScopeIsError) {
     endmodule
   )",
             f, "m");
-  // The explicit/implicit c_identifier clash is reported under §35.4, whose
-  // per-scope linkage-name rule the elaborator enforces for both forms.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "DPI export linkage name 'link' already declared "
                             "in this scope",
                             6, "35.4"));
 }
 
-// §35.7: two functions of one SystemVerilog scope may not be exported under one
-// c_identifier, whether written or defaulted. Two export declarations in one
-// module that share an explicit c_identifier collide.
 TEST(DpiExportElab, DuplicateExplicitCIdentifierInSameScopeIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -60,17 +48,12 @@ TEST(DpiExportElab, DuplicateExplicitCIdentifierInSameScopeIsError) {
     endmodule
   )",
             f, "m");
-  // A repeated c_identifier is reported under §35.4, which states the
-  // per-scope linkage-name rule §35.7 relies on.
   EXPECT_TRUE(ReportedError(f.diag.Diagnostics(),
                             "DPI export linkage name 'link' already declared "
                             "in this scope",
                             6, "35.4"));
 }
 
-// §35.7: the export declaration and the function's definition may come in
-// either order. Placing the export declaration before the function definition
-// is well-formed.
 TEST(DpiExportElab, ExportBeforeFunctionDefinitionInSameScopeIsOk) {
   ElabFixture f;
   Elaborate(R"(
@@ -83,10 +66,6 @@ TEST(DpiExportElab, ExportBeforeFunctionDefinitionInSameScopeIsOk) {
   EXPECT_FALSE(f.has_errors);
 }
 
-// §35.7: a SystemVerilog function may be exported by one declaration only. Two
-// exports of the same SV function with distinct c_identifiers would slip
-// through a c_identifier-only collision check, so the elaborator also dedupes
-// on the underlying SystemVerilog routine.
 TEST(DpiExportElab, TwoExportsOfSameSvFunctionWithDifferentCIdsIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -103,10 +82,6 @@ TEST(DpiExportElab, TwoExportsOfSameSvFunctionWithDifferentCIdsIsError) {
                             5, "35.7"));
 }
 
-// §35.7: an exported SystemVerilog function must obey the same restrictions
-// on argument types as an imported function. The §35.5.4 prohibition on the
-// ref qualifier in DPI declarations carries through, so a function with a
-// ref argument cannot be exported.
 TEST(DpiExportElab, ExportedFunctionWithRefArgumentIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -122,11 +97,6 @@ TEST(DpiExportElab, ExportedFunctionWithRefArgumentIsError) {
                             4, "35.7"));
 }
 
-// §35.8: everything §35.7 says of exported functions holds for exported tasks
-// too, so the ref-argument prohibition of §35.7 refuses an exported task with a
-// ref formal exactly as it refuses a function. §35.8 terms such a subroutine an
-// exported task, so the report names the word the declaration used rather than
-// calling it a function.
 TEST(DpiExportElab, ExportedTaskWithRefArgumentSaysTask) {
   ElabFixture f;
   Elaborate(R"(
@@ -142,9 +112,6 @@ TEST(DpiExportElab, ExportedTaskWithRefArgumentSaysTask) {
                             4, "35.7"));
 }
 
-// §35.7: an export declaration may stand only in the scope that defines the
-// function it exports. An export that names an identifier with no matching
-// SystemVerilog function in the enclosing module is rejected.
 TEST(DpiExportElab, ExportOfUndefinedFunctionInScopeIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -160,9 +127,6 @@ TEST(DpiExportElab, ExportOfUndefinedFunctionInScopeIsError) {
                             3, "35.7"));
 }
 
-// §35.7: the function being exported must be defined in the same scope as
-// the export declaration. Defining the function in a different module does
-// not satisfy the scope requirement for an export sitting in another module.
 TEST(DpiExportElab, ExportOfFunctionDefinedInDifferentModuleIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -182,10 +146,6 @@ TEST(DpiExportElab, ExportOfFunctionDefinedInDifferentModuleIsError) {
                             7, "35.7"));
 }
 
-// §35.7: an export declaration may stand only in the scope that defines the
-// function it exports. A package body is a scope of its own, so an export
-// written there names a function that package must define, and a function of
-// that name defined in a module does not answer for it.
 TEST(DpiExportElab, ExportInAPackageOfAFunctionThePackageDoesNotDefineIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -205,11 +165,6 @@ TEST(DpiExportElab, ExportInAPackageOfAFunctionThePackageDoesNotDefineIsError) {
                             3, "35.7"));
 }
 
-// §35.7: exporting a SystemVerilog function leaves its meaning and behavior on
-// the SystemVerilog side as they were. The elaborator keeps the export
-// declaration out of the module's let declarations, whose entries a run
-// resolves a call to before it reaches a function, so the exported function
-// stays the thing its own name calls.
 TEST(DpiExportElab, AnExportDeclarationIsNotAmongTheLetDeclarations) {
   ElabFixture f;
   auto* design = Elaborate(R"(
@@ -227,9 +182,6 @@ TEST(DpiExportElab, AnExportDeclarationIsNotAmongTheLetDeclarations) {
   }
 }
 
-// The other half of that rule: the export declaration is still elaborated, and
-// is reachable where §35.7's exports are held. Without this the case above
-// would hold of an elaborator that dropped the declaration entirely.
 TEST(DpiExportElab, AnExportDeclarationIsAmongTheExportDeclarations) {
   ElabFixture f;
   auto* design = Elaborate(R"(
@@ -251,10 +203,6 @@ TEST(DpiExportElab, AnExportDeclarationIsAmongTheExportDeclarations) {
   EXPECT_TRUE(carries_export);
 }
 
-// §35.7: any SystemVerilog function may be exported except a class member
-// function. §8.24 writes an out-of-block method body in the scope its class is
-// declared in, under the bare method name, so such a definition sits among the
-// scope's callables and an export naming it reaches a class member function.
 TEST(DpiExportElab, ExportOfAnOutOfBlockClassMethodIsError) {
   ElabFixture f;
   Elaborate(R"(
@@ -275,10 +223,6 @@ TEST(DpiExportElab, ExportOfAnOutOfBlockClassMethodIsError) {
                             9, "35.7"));
 }
 
-// §35.7: an export declaration may stand only in the scope that defines the
-// function it exports. An interface is such a scope — A.1.4's
-// module_common_item carries dpi_import_export into an interface body — so an
-// export written in one names a function that interface must define.
 TEST(DpiExportElab, ExportInAnInterfaceOfAFunctionItDoesNotDefineIsError) {
   ElabFixture f;
   Elaborate(R"(

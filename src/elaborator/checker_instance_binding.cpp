@@ -26,7 +26,6 @@ namespace delta {
 
 namespace {
 
-// §17.2: the checker `name` the package `pkg` declares, or nullptr.
 ModuleDecl* PackageChecker(const CompilationUnit* unit, std::string_view pkg,
                            std::string_view name) {
   for (const PackageDecl* package : unit->packages) {
@@ -119,8 +118,6 @@ ConstantCheckerFormals CheckerConstantFormals(const ModuleDecl* decl,
 
 namespace {
 
-// Each variable the assignment target `lhs` writes, through a select, a
-// member or a concatenation.
 void CollectTargets(const Expr* lhs,
                     std::unordered_set<std::string_view>& names) {
   if (lhs == nullptr) return;
@@ -135,7 +132,6 @@ void CollectTargets(const Expr* lhs,
   }
 }
 
-// §17.7.1: the variables the checker variable assignments of `decl` write.
 std::unordered_set<std::string_view> AssignedCheckerVariables(
     const ModuleDecl* decl) {
   std::unordered_set<std::string_view> assigned;
@@ -169,27 +165,6 @@ void SetCheckerFreeVariables(const ModuleDecl* decl, RtlirModule* mod) {
   }
 }
 
-// A.4.1 writes four instantiation forms, and three of them are one form under
-// three identifier classes: `module_instantiation`, `interface_instantiation`
-// and `program_instantiation` each read
-// `<identifier> [ parameter_value_assignment ] hierarchical_instance
-// { , hierarchical_instance } ;`. The fourth is deliberately narrower --
-//
-//     checker_instantiation ::=
-//         ps_checker_identifier name_of_instance
-//         ( [ list_of_checker_port_connections ] ) ;
-//
-// -- and what it leaves out is the parameter value assignment and the
-// `{ , hierarchical_instance }` after the first instance. A checker takes its
-// arguments through the ports that connection list fills (§17.3), so an
-// override written before the instance name names nothing the declaration has;
-// and one instantiation names one instance of it. Parsed by the one path all
-// four forms share, an override was read as the parameter value assignment of
-// the other three and carried to a declaration that has no parameters for it
-// to override, and `chk c1(a), c2(b);` was read as the other three's list and
-// elaborated as two instances, both silently. An empty `#( )` is the same
-// parameter value assignment holding no entry, so what is asked is whether one
-// was written.
 void CheckCheckerInstForm(const ModuleItem* item, const ModuleDecl* child,
                           DiagEngine& diag) {
   if (child->decl_kind != ModuleDeclKind::kChecker) return;

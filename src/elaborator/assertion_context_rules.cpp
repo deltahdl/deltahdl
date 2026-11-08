@@ -25,7 +25,6 @@ namespace {
 
 using Clock = std::vector<EventExpr>;
 
-// The named sequence `e` applies triggered to, null where it applies none.
 const ModuleItem* TriggeredSequence(const Expr* e,
                                     const NamedDecls& sequences) {
   return SequenceMethodOf(e) == "triggered"
@@ -33,8 +32,6 @@ const ModuleItem* TriggeredSequence(const Expr* e,
              : nullptr;
 }
 
-// Whether `body`, or a sequence it instantiates, holds a sequence match item;
-// `seen` holds the sequences already followed.
 bool BodyHasMatchItems(const SeqLinearBody& body, const NamedDecls& sequences,
                        std::unordered_set<const ModuleItem*>& seen);
 
@@ -67,9 +64,6 @@ bool IsFutureGclk(const Expr* e) {
          IsGlobalClockingFutureFunction(fn);
 }
 
-// §16.9.4: a global clocking future sampled value function stands in no
-// assertion holding a sequence match item, its own or one reached through
-// an instance of a named sequence.
 void CheckFutureGclkWithMatchItems(const Stmt* s, const NamedDecls& sequences,
                                    DiagEngine& diag) {
   bool future = false;
@@ -97,15 +91,11 @@ void CheckFutureGclkWithMatchItems(const Stmt* s, const NamedDecls& sequences,
              Subclause("16.9.4"));
 }
 
-// §16.13.3: the clock a named sequence ends on: the one flowing out of its
-// body where the body changes clock, else its leading clock.
 const Clock& EndingClock(const ModuleItem* seq) {
   return seq->seq_linear.clock_out.empty() ? seq->seq_clock
                                            : seq->seq_linear.clock_out;
 }
 
-// §16.9.11 and §16.13.5: the ending clock of a sequence triggered is applied
-// to is the clock of the context the method stands in, `clock`.
 void CheckEndingClocks(const Expr* e, const Clock& clock,
                        const NamedDecls& sequences, DiagEngine& diag) {
   ForEachSubExpr(e, [&](const Expr* sub) {
@@ -124,8 +114,6 @@ void CheckEndingClocks(const Expr* e, const Clock& clock,
   });
 }
 
-// The clock in force at each operand of `body`, the one flowing in being
-// `clock`, checked against each triggered there.
 void CheckBodyEndingClocks(const SeqLinearBody& body, const Clock& clock,
                            const NamedDecls& sequences, DiagEngine& diag) {
   const Clock* in_force = &clock;
@@ -150,8 +138,6 @@ void CheckTreeEndingClocks(const PropertyExprNode* node, const Clock& clock,
   }
 }
 
-// The sequences each sequence depends on: through triggered alone, and
-// through triggered and its instances.
 struct TriggeredGraph {
   std::unordered_map<const ModuleItem*, std::vector<const ModuleItem*>>
       triggered;
@@ -190,8 +176,6 @@ bool Reaches(const TriggeredGraph& graph, const ModuleItem* from,
   return false;
 }
 
-// §16.13.6: no sequence lies on a cycle of dependencies one of whose edges
-// is the use of triggered.
 void CheckTriggeredCycles(const ModuleDecl* decl, const NamedDecls& sequences,
                           const PropertyRegistry& registry, DiagEngine& diag) {
   TriggeredGraph graph = BuildTriggeredGraph(sequences, registry);
@@ -211,9 +195,6 @@ void CheckTriggeredCycles(const ModuleDecl* decl, const NamedDecls& sequences,
   }
 }
 
-// §16.9.11 with §16.14.6: in a procedure whose clock is inferred, each
-// triggered its expressions read, a wait's condition among them, is applied
-// to a sequence ending on that clock.
 void CheckProcedureEndingClocks(const ModuleItem* item, const RtlirModule* mod,
                                 const NamedDecls& sequences, DiagEngine& diag) {
   if (!IsProceduralItemKind(item->kind)) return;
